@@ -21,6 +21,7 @@ import GHC		( Session, verbosity, dopt, DynFlag(..), Target(..),
 			  TyThing(..), Name, LoadHowMuch(..), Phase,
 			  GhcException(..), showGhcException,
 			  CheckedModule(..), SrcLoc )
+import DynFlags         ( allFlags )
 import Packages		( PackageState(..) )
 import PackageConfig	( InstalledPackageInfo(..) )
 import UniqFM		( eltsUFM )
@@ -95,34 +96,34 @@ ghciWelcomeMsg =
  "/ /_\\\\/ __  / /___| |      http://www.haskell.org/ghc/\n"++
  "\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
 
-type Command = (String, String -> GHCi Bool, String -> IO [String])
-cmdName (n,_,_) = n
+type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
+cmdName (n,_,_,_) = n
 
 GLOBAL_VAR(commands, builtin_commands, [Command])
 
 builtin_commands :: [Command]
 builtin_commands = [
-  ("add",	keepGoingPaths addModule,	completeFilename),
-  ("browse",    keepGoing browseCmd,		completeModule),
-  ("cd",    	keepGoing changeDirectory, 	completeFilename),
-  ("def",	keepGoing defineMacro,		completeIdentifier),
-  ("help",	keepGoing help,			completeNone),
-  ("?",		keepGoing help,			completeNone),
-  ("info",      keepGoing info,			completeIdentifier),
-  ("load",	keepGoingPaths loadModule_,	completeHomeModuleOrFile),
-  ("module",	keepGoing setContext,		completeModule),
-  ("main",	keepGoing runMain,		completeIdentifier),
-  ("reload",	keepGoing reloadModule,		completeNone),
-  ("check",	keepGoing checkModule,		completeHomeModule),
-  ("set",	keepGoing setCmd,		completeNone), -- ToDo
-  ("show",	keepGoing showCmd,		completeNone),
-  ("etags",	keepGoing createETagsFileCmd,	completeFilename),
-  ("ctags",	keepGoing createCTagsFileCmd, 	completeFilename),
-  ("type",	keepGoing typeOfExpr,		completeIdentifier),
-  ("kind",	keepGoing kindOfType,		completeIdentifier),
-  ("unset",	keepGoing unsetOptions,		completeNone), -- ToDo
-  ("undef",     keepGoing undefineMacro,	completeNone), -- ToDo
-  ("quit",	quit,				completeNone)
+  ("add",	keepGoingPaths addModule,	False, completeFilename),
+  ("browse",    keepGoing browseCmd,		False, completeModule),
+  ("cd",    	keepGoing changeDirectory, 	False, completeFilename),
+  ("def",	keepGoing defineMacro,		False, completeIdentifier),
+  ("help",	keepGoing help,			False, completeNone),
+  ("?",		keepGoing help,			False, completeNone),
+  ("info",      keepGoing info,			False, completeIdentifier),
+  ("load",	keepGoingPaths loadModule_,	False, completeHomeModuleOrFile),
+  ("module",	keepGoing setContext,		False, completeModule),
+  ("main",	keepGoing runMain,		False, completeIdentifier),
+  ("reload",	keepGoing reloadModule,		False, completeNone),
+  ("check",	keepGoing checkModule,		False, completeHomeModule),
+  ("set",	keepGoing setCmd,		True,  completeSetOptions),
+  ("show",	keepGoing showCmd,		False, completeNone),
+  ("etags",	keepGoing createETagsFileCmd,	False, completeFilename),
+  ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
+  ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
+  ("kind",	keepGoing kindOfType,		False, completeIdentifier),
+  ("unset",	keepGoing unsetOptions,		True,  completeSetOptions),
+  ("undef",     keepGoing undefineMacro,	False, completeMacro),
+  ("quit",	quit,				False, completeNone)
   ]
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
@@ -511,7 +512,7 @@ specialCommand str = do
   case maybe_cmd of
     Nothing -> io (hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n" 
 		                    ++ shortHelpText) >> return False)
-    Just (_,f,_) -> f (dropWhile isSpace rest)
+    Just (_,f,_,_) -> f (dropWhile isSpace rest)
 
 lookupCommand :: String -> IO (Maybe Command)
 lookupCommand str = do
@@ -519,7 +520,7 @@ lookupCommand str = do
   -- look for exact match first, then the first prefix match
   case [ c | c <- cmds, str == cmdName c ] of
      c:_ -> return (Just c)
-     [] -> case [ c | c@(s,_,_) <- cmds, prefixMatch str s ] of
+     [] -> case [ c | c@(s,_,_,_) <- cmds, prefixMatch str s ] of
      		[] -> return Nothing
      		c:_ -> return (Just c)
 
@@ -657,7 +658,7 @@ defineMacro s = do
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef commands --
-		    (cmds ++ [(macro_name, keepGoing (runMacro hv), completeNone)]))
+		    (cmds ++ [(macro_name, keepGoing (runMacro hv), False, completeNone)]))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi ()
 runMacro fun s = do
@@ -1194,12 +1195,20 @@ completeWord w start end = do
      _other
 	| Just c <- is_cmd line -> do
 	   maybe_cmd <- lookupCommand c
+           let (n,w') = selectWord 0 (words line)
 	   case maybe_cmd of
 	     Nothing -> return Nothing
-	     Just (_,_,complete) -> wrapCompleter complete w
+	     Just (_,_,False,complete) -> wrapCompleter complete w
+	     Just (_,_,True,complete) -> let complete' w = do rets <- complete w
+                                                              return (map (drop n) rets)
+                                         in wrapCompleter complete' w'
 	| otherwise     -> do
 		--printf "complete %s, start = %d, end = %d\n" w start end
 		wrapCompleter completeIdentifier w
+    where selectWord _ [] = (0,w)
+          selectWord n (x:xs)
+              | n+length x >= start = (start-n-1,take (end-n+1) x)
+              | otherwise = selectWord (n+length x) xs
 
 is_cmd line 
  | ((':':w) : _) <- words (dropWhile isSpace line) = Just w
@@ -1210,6 +1219,11 @@ completeNone w = return []
 completeCmd w = do
   cmds <- readIORef commands
   return (filter (w `isPrefixOf`) (map (':':) (map cmdName cmds)))
+
+completeMacro w = do
+  cmds <- readIORef commands
+  let cmds' = [ cmd | cmd <- map cmdName cmds, cmd `elem` map cmdName builtin_commands ]
+  return (filter (w `isPrefixOf`) cmds')
 
 completeIdentifier w = do
   s <- restoreSession
@@ -1227,6 +1241,10 @@ completeHomeModule w = do
   g <- GHC.getModuleGraph s
   let home_mods = map GHC.ms_mod g
   return (filter (w `isPrefixOf`) (map (showSDoc.ppr) home_mods))
+
+completeSetOptions w = do
+  return (filter (w `isPrefixOf`) options)
+    where options = "args":"prog":allFlags
 
 completeFilename = Readline.filenameCompletionFunction
 

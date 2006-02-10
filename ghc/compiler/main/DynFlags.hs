@@ -41,6 +41,7 @@ module DynFlags (
 	
 	-- parsing DynFlags
 	parseDynamicFlags,
+        allFlags,
 
 	-- misc stuff
 	machdepCCOpts, picCCOpts,
@@ -763,6 +764,15 @@ getStgToDo dflags
 
 -- -----------------------------------------------------------------------------
 -- DynFlags parser
+
+allFlags :: [String]
+allFlags = map ('-':) $
+           [ name | (name, optkind) <- dynamic_flags, ok optkind ] ++
+           map ("fno-"++) flags ++
+           map ("f"++) flags
+    where ok (PrefixPred _ _) = False
+          ok _ = True
+          flags = map fst fFlags
 
 dynamic_flags :: [(String, OptKind DynP)]
 dynamic_flags = [
