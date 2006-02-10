@@ -206,7 +206,7 @@ atomicModifyMutVarzh_fast
 
    HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, atomicModifyMutVarzh_fast);
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     foreign "C" ACQUIRE_LOCK(sm_mutex "ptr") [R1,R2];
 #endif
 
@@ -237,7 +237,7 @@ atomicModifyMutVarzh_fast
    LDV_RECORD_CREATE(r);
    StgThunk_payload(r,0) = z;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     foreign "C" RELEASE_LOCK(sm_mutex "ptr") [];
 #endif
 
@@ -512,7 +512,7 @@ word64ToIntegerzh_fast
 
 /* ToDo: this is shockingly inefficient */
 
-#ifndef SMP
+#ifndef THREADED_RTS
 section "bss" {
   mp_tmp1:
     bits8 [SIZEOF_MP_INT];
@@ -534,7 +534,7 @@ section "bss" {
 }
 #endif
 
-#ifdef SMP
+#ifdef THREADED_RTS
 #define FETCH_MP_TEMP(X) \
 W_ X; \
 X = BaseReg + (OFFSET_StgRegTable_r ## X);
@@ -655,7 +655,7 @@ GMP_TAKE1_RET1(complementIntegerzh_fast, mpz_com)
 GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr)
 GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr)
 
-#ifndef SMP
+#ifndef THREADED_RTS
 section "bss" {
   mp_tmp_w:  W_; // NB. mp_tmp_w is really an here mp_limb_t
 }
@@ -1469,7 +1469,7 @@ takeMVarzh_fast
     /* args: R1 = MVar closure */
     mvar = R1;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     "ptr" info = foreign "C" lockClosure(mvar "ptr");
 #else
     info = GET_INFO(mvar);
@@ -1520,7 +1520,7 @@ takeMVarzh_fast
 	  StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
       }
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
       foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #endif
       RET_P(val);
@@ -1530,7 +1530,7 @@ takeMVarzh_fast
       /* No further putMVars, MVar is now empty */
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
  
-#if defined(SMP)
+#if defined(THREADED_RTS)
       foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #else
       SET_INFO(mvar,stg_EMPTY_MVAR_info);
@@ -1549,14 +1549,14 @@ tryTakeMVarzh_fast
 
     mvar = R1;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     "ptr" info = foreign "C" lockClosure(mvar "ptr");
 #else
     info = GET_INFO(mvar);
 #endif
 
     if (info == stg_EMPTY_MVAR_info) {
-#if defined(SMP)
+#if defined(THREADED_RTS)
         foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #endif
 	/* HACK: we need a pointer to pass back, 
@@ -1592,7 +1592,7 @@ tryTakeMVarzh_fast
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
-#if defined(SMP)
+#if defined(THREADED_RTS)
         foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #endif
     }
@@ -1600,7 +1600,7 @@ tryTakeMVarzh_fast
     {
 	/* No further putMVars, MVar is now empty */
 	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-#if defined(SMP)
+#if defined(THREADED_RTS)
     	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #else
 	SET_INFO(mvar,stg_EMPTY_MVAR_info);
@@ -1618,7 +1618,7 @@ putMVarzh_fast
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     "ptr" info = foreign "C" lockClosure(mvar "ptr");
 #else
     info = GET_INFO(mvar);
@@ -1661,7 +1661,7 @@ putMVarzh_fast
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
@@ -1671,7 +1671,7 @@ putMVarzh_fast
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = R2;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #else
 	SET_INFO(mvar,stg_FULL_MVAR_info);
@@ -1690,14 +1690,14 @@ tryPutMVarzh_fast
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     "ptr" info = foreign "C" lockClosure(mvar "ptr");
 #else
     info = GET_INFO(mvar);
 #endif
 
     if (info == stg_FULL_MVAR_info) {
-#if defined(SMP)
+#if defined(THREADED_RTS)
     	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #endif
 	RET_N(0);
@@ -1726,7 +1726,7 @@ tryPutMVarzh_fast
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
 #endif
     }
@@ -1735,7 +1735,7 @@ tryPutMVarzh_fast
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = R2;
 
-#if defined(SMP)
+#if defined(THREADED_RTS)
     	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
 #else
 	SET_INFO(mvar,stg_FULL_MVAR_info);

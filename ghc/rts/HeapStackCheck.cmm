@@ -840,7 +840,7 @@ INFO_TABLE_RET( stg_block_takemvar, 1/*framesize*/, 0/*bitmap*/, RET_SMALL )
 // code fragment executed just before we return to the scheduler
 stg_block_takemvar_finally
 {
-#ifdef SMP
+#ifdef THREADED_RTS
     foreign "C" unlockClosure(R3 "ptr", stg_EMPTY_MVAR_info);
 #endif
     jump StgReturn;
@@ -866,7 +866,7 @@ INFO_TABLE_RET( stg_block_putmvar, 2/*framesize*/, 0/*bitmap*/, RET_SMALL )
 // code fragment executed just before we return to the scheduler
 stg_block_putmvar_finally
 {
-#ifdef SMP
+#ifdef THREADED_RTS
     foreign "C" unlockClosure(R3 "ptr", stg_FULL_MVAR_info);
 #endif
     jump StgReturn;
@@ -885,7 +885,7 @@ stg_block_putmvar
 // code fragment executed just before we return to the scheduler
 stg_block_blackhole_finally
 {
-#if defined(SMP)
+#if defined(THREADED_RTS)
     // The last thing we do is release sched_lock, which is
     // preventing other threads from accessing blackhole_queue and
     // picking up this thread before we are finished with it.
