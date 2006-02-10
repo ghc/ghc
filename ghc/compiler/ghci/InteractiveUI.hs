@@ -1195,7 +1195,7 @@ completeWord w start end = do
      _other
 	| Just c <- is_cmd line -> do
 	   maybe_cmd <- lookupCommand c
-           let (n,w') = selectWord 0 (words line)
+           let (n,w') = selectWord (words' 0 line)
 	   case maybe_cmd of
 	     Nothing -> return Nothing
 	     Just (_,_,False,complete) -> wrapCompleter complete w
@@ -1205,10 +1205,17 @@ completeWord w start end = do
 	| otherwise     -> do
 		--printf "complete %s, start = %d, end = %d\n" w start end
 		wrapCompleter completeIdentifier w
-    where selectWord _ [] = (0,w)
-          selectWord n (x:xs)
-              | n+length x >= start = (start-n-1,take (end-n+1) x)
-              | otherwise = selectWord (n+length x) xs
+    where words' _ [] = []
+          words' n str = let (w,r) = break isSpace str
+                             (s,r') = span isSpace r
+                         in (n,w):words' (n+length w+length s) r'
+          -- In a Haskell expression we want to parse 'a-b' as three words
+          -- where a compiler flag (ie. -fno-monomorphism-restriction) should
+          -- only be a single word.
+          selectWord [] = (0,w)
+          selectWord ((offset,x):xs)
+              | offset+length x >= start = (start-offset,take (end-offset) x)
+              | otherwise = selectWord xs
 
 is_cmd line 
  | ((':':w) : _) <- words (dropWhile isSpace line) = Just w
