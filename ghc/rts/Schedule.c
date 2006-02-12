@@ -445,6 +445,9 @@ schedule (Capability *initialCapability, Task *task)
     scheduleCheckBlockedThreads(cap);
 
     scheduleDetectDeadlock(cap,task);
+#if defined(THREADED_RTS)
+    cap = task->cap;    // reload cap, it might have changed
+#endif
 
     // Normally, the only way we can get here with no threads to
     // run is if a keyboard interrupt received during 
@@ -678,7 +681,12 @@ run_thread:
     }
 
     if (scheduleDoHeapProfile(ready_to_gc)) { ready_to_gc = rtsFalse; }
-    if (ready_to_gc) { scheduleDoGC(cap,task,rtsFalse,GetRoots); }
+    if (ready_to_gc) {
+      scheduleDoGC(cap,task,rtsFalse,GetRoots);
+#if defined(THREADED_RTS)
+      cap = task->cap;    // reload cap, it might have changed  
+#endif
+    }
   } /* end of while() */
 
   IF_PAR_DEBUG(verbose,
@@ -915,6 +923,10 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	// exception.  Any threads thus released will be immediately
 	// runnable.
 	scheduleDoGC( cap, task, rtsTrue/*force  major GC*/, GetRoots );
+#if defined(THREADED_RTS)
+	cap = task->cap;    // reload cap, it might have changed
+#endif
+
 	recent_activity = ACTIVITY_DONE_GC;
 	
 	if ( !emptyRunQueue(cap) ) return;
@@ -1899,7 +1911,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
 	    IF_DEBUG(scheduler, sched_belch("someone else is trying to GC..."));
 	    if (cap) yieldCapability(&cap,task);
 	} while (waiting_for_gc);
-	return;
+	return;  // NOTE: task->cap might have changed here
     }
 
     for (i=0; i < n_capabilities; i++) {
