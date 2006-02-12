@@ -33,12 +33,24 @@ INLINE_HEADER StgWord
 xchg(StgPtr p, StgWord w)
 {
     StgWord result;
+#if i386_HOST_ARCH || x86_64_HOST_ARCH
     result = w;
     __asm__ __volatile__ (
  	  "xchg %1,%0"
           :"+r" (result), "+m" (*p)
           : /* no input-only operands */
 	);
+#elif powerpc_HOST_ARCH
+    __asm__ __volatile__ (
+        "1:     lwarx     %0, 0, %2\n"
+        "       stwcx.    %1, 0, %2\n"
+        "       bne-      1b"
+        :"=r" (result)
+        :"r" (w), "r" (p)
+    );
+#else
+#error xchg() unimplemented on this architecture
+#endif
     return result;
 }
 
@@ -49,11 +61,28 @@ xchg(StgPtr p, StgWord w)
 INLINE_HEADER StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
+#if i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ (
  	  "lock cmpxchg %3,%1"
           :"=a"(o), "=m" (*(volatile unsigned int *)p) 
           :"0" (o), "r" (n));
     return o;
+#elif powerpc_HOST_ARCH
+    StgWord result;
+    __asm__ __volatile__ (
+        "1:     lwarx     %0, 0, %3\n"
+        "       cmpw      %0, %1\n"
+        "       bne       2f\n"
+        "       stwcx.    %2, 0, %3\n"
+        "       bne-      1b\n"
+        "2:"
+        :"=r" (result)
+        :"r" (o), "r" (n), "r" (p)
+    );
+    return result;
+#else
+#error cas() unimplemented on this architecture
+#endif
 }
 
 /*
@@ -70,6 +99,8 @@ INLINE_HEADER void
 wb(void) {
 #if i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
+#elif powerpc_HOST_ARCH
+    __asm__ __volatile__ ("lwsync" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
 #endif
@@ -85,7 +116,7 @@ wb(void) {
 INLINE_HEADER StgInfoTable *
 lockClosure(StgClosure *p)
 {
-#if i386_HOST_ARCH || x86_64_HOST_ARCH
+#if i386_HOST_ARCH || x86_64_HOST_ARCH || powerpc_HOST_ARCH
     StgWord info;
     do {
 	nat i = 0;
@@ -103,7 +134,7 @@ lockClosure(StgClosure *p)
 INLINE_HEADER void
 unlockClosure(StgClosure *p, StgInfoTable *info)
 {
-#if i386_HOST_ARCH || x86_64_HOST_ARCH
+#if i386_HOST_ARCH || x86_64_HOST_ARCH || powerpc_HOST_ARCH
     // This is a strictly ordered write, so we need a wb():
     wb();
     p->header.info = info;
