@@ -1186,6 +1186,9 @@ cleanType ty = do
 -- -----------------------------------------------------------------------------
 -- Completion
 
+completeNone :: String -> IO [String]
+completeNone w = return []
+
 #ifdef USE_READLINE
 completeWord :: String -> Int -> Int -> IO (Maybe (String, [String]))
 completeWord w start end = do
@@ -1220,8 +1223,6 @@ completeWord w start end = do
 is_cmd line 
  | ((':':w) : _) <- words (dropWhile isSpace line) = Just w
  | otherwise = Nothing
-
-completeNone w = return []
 
 completeCmd w = do
   cmds <- readIORef commands
@@ -1287,6 +1288,15 @@ allExposedModules dflags
  = map GHC.mkModule (concat (map exposedModules (filter exposed (eltsUFM pkg_db))))
  where
   pkg_db = pkgIdMap (pkgState dflags)
+#else
+completeCmd        = completeNone
+completeMacro      = completeNone
+completeIdentifier = completeNone
+completeModule     = completeNone
+completeHomeModule = completeNone
+completeSetOptions = completeNone
+completeFilename   = completeNone
+completeHomeModuleOrFile=completeNone
 #endif
 
 -----------------------------------------------------------------------------
