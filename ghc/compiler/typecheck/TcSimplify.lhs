@@ -21,6 +21,7 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyType )
+import TypeRep		( Type(..) )
 import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, emptyLHsBinds )
 import TcHsSyn		( mkHsApp, mkHsTyApp, mkHsDictApp )
 
@@ -41,7 +42,8 @@ import Inst		( lookupInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders,
 			  lclEnvElts, tcMetaTy )
 import InstEnv		( lookupInstEnv, classInstances, pprInstances )
-import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
+import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars,
+			  checkAmbiguity, checkInstTermination )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, 
                           mkClassPred, isOverloadedTy, mkTyConApp, isSkolemTyVar,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
@@ -49,6 +51,7 @@ import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType,
 import TcIface		( checkWiredInTyCon )
 import Id		( idType, mkUserLocal )
 import Var		( TyVar )
+import TyCon		( TyCon )
 import Name		( Name, getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig, classKey )
@@ -2225,11 +2228,12 @@ a,b,c are type variables.  This is required for the context of
 instance declarations.
 
 \begin{code}
-tcSimplifyDeriv :: [TyVar]	
+tcSimplifyDeriv :: TyCon
+		-> [TyVar]	
 		-> ThetaType		-- Wanted
 	        -> TcM ThetaType	-- Needed
 
-tcSimplifyDeriv tyvars theta
+tcSimplifyDeriv tc tyvars theta
   = tcInstTyVars tyvars			`thenM` \ (tvs, _, tenv) ->
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
@@ -2238,6 +2242,7 @@ tcSimplifyDeriv tyvars theta
     simpleReduceLoop doc reduceMe wanteds		`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 
+    doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
     doptM Opt_AllowUndecidableInstances		`thenM` \ undecidable_ok ->
     let
  	tv_set      = mkVarSet tvs
@@ -2247,15 +2252,7 @@ tcSimplifyDeriv tyvars theta
 	   = let pred = dictPred dict	-- reduceMe squashes all non-dicts
 	     in isEmptyVarSet (tyVarsOfPred pred)
 		  -- Things like (Eq T) are bad
-	     || (not undecidable_ok && not (isTyVarClassPred pred))
-		  -- The returned dictionaries should be of form (C a b)
-		  -- 	(where a, b are type variables).  
-		  -- We allow non-tyvar dicts if we had -fallow-undecidable-instances,
-		  -- but note that risks non-termination in the 'deriving' context-inference
-		  -- fixpoint loop.   It is useful for situations like
-		  --	data Min h a = E | M a (h a)
-		  -- which gives the instance decl
-		  --	instance (Eq a, Eq (h a)) => Eq (Min h a)
+	     || (not gla_exts && not (isTyVarClassPred pred))
   
 	simpl_theta = map dictPred ok_insts
 	weird_preds = [pred | pred <- simpl_theta
@@ -2269,11 +2266,19 @@ tcSimplifyDeriv tyvars theta
 	rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
 		-- This reverse-mapping is a Royal Pain, 
 		-- but the result should mention TyVars not TcTyVars
+
+	head_ty = TyConApp tc (map TyVarTy tvs)
     in
    
     addNoInstanceErrs Nothing [] bad_insts		`thenM_`
     mapM_ (addErrTc . badDerivedPred) weird_preds	`thenM_`
     checkAmbiguity tvs simpl_theta tv_set		`thenM_`
+      -- Check instance termination as for user-declared instances.
+      -- unless we had -fallow-undecidable-instances (which risks
+      -- non-termination in the 'deriving' context-inference fixpoint
+      -- loop).
+    ifM (gla_exts && not undecidable_ok)
+	(checkInstTermination simpl_theta [head_ty])	`thenM_`
     returnM (substTheta rev_env simpl_theta)
   where
     doc    = ptext SLIT("deriving classes for a data type")

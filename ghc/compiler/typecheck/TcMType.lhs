@@ -34,6 +34,7 @@ module TcMType (
   Rank, UserTypeCtxt(..), checkValidType, 
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, checkValidInstance, checkAmbiguity,
+  checkInstTermination,
   arityErr, 
 
   --------------------------------
@@ -97,6 +98,7 @@ import Util		( nOfThem, isSingleton, notNull )
 import ListSetOps	( removeDups )
 import Outputable
 
+import Control.Monad	( when )
 import Data.List	( (\\) )
 \end{code}
 
@@ -1107,18 +1109,19 @@ instTypeErr pp_ty msg
 \begin{code}
 checkValidInstance :: [TyVar] -> ThetaType -> Class -> [TcType] -> TcM ()
 checkValidInstance tyvars theta clas inst_tys
-  = do	{ dflags <- getDOpts
+  = do	{ gla_exts <- doptM Opt_GlasgowExts
+	; undecidable_ok <- doptM Opt_AllowUndecidableInstances
 
 	; checkValidTheta InstThetaCtxt theta
 	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
 
-	-- Check that instance inference will termainate
+	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98, checkValidTheta has already done that
-	; checkInstTermination dflags theta inst_tys
+	; when (gla_exts && not undecidable_ok) $
+	    checkInstTermination theta inst_tys
 	
 	-- The Coverage Condition
-	; checkTc (dopt Opt_AllowUndecidableInstances dflags ||
-		   checkInstCoverage clas inst_tys)
+	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
 	}
   where
@@ -1133,11 +1136,9 @@ This is only needed with -fglasgow-exts, as Haskell 98 restrictions
 (which have already been checked) guarantee termination.
 
 \begin{code}
-checkInstTermination :: DynFlags -> ThetaType -> [TcType] -> TcM ()
-checkInstTermination dflags theta tys
-  | not (dopt Opt_GlasgowExts dflags)         = returnM ()
-  | dopt Opt_AllowUndecidableInstances dflags = returnM ()
-  | otherwise = do
+checkInstTermination :: ThetaType -> [TcType] -> TcM ()
+checkInstTermination theta tys
+  = do
     mappM_ (check_nomore (fvTypes tys)) theta
     mappM_ (check_smaller (sizeTypes tys)) theta
 

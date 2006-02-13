@@ -727,7 +727,7 @@ solveDerivEqns overlap_flag orig_eqns
     gen_soln (_, clas, tc,tyvars,deriv_rhs)
       = setSrcSpan (srcLocSpan (getSrcLoc tc))		$
 	addErrCtxt (derivCtxt (Just clas) tc)	$
-	tcSimplifyDeriv tyvars deriv_rhs	`thenM` \ theta ->
+	tcSimplifyDeriv tc tyvars deriv_rhs	`thenM` \ theta ->
 	returnM (sortLe (<=) theta)	-- Canonicalise before returning the soluction
 
     ------------------------------------------------------------------
