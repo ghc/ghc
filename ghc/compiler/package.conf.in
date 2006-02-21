@@ -87,6 +87,7 @@ exposed-modules:
 	ErrUtils
 	ExternalCore
 	FastMutInt
+        Encoding
 	FastString
 	FastTypes
 	FieldLabel
