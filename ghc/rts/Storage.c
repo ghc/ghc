@@ -51,13 +51,18 @@ ullong total_allocated = 0;	/* total memory allocated during run */
 nat n_nurseries         = 0;    /* == RtsFlags.ParFlags.nNodes, convenience */
 step *nurseries         = NULL; /* array of nurseries, >1 only if THREADED_RTS */
 
+#ifdef THREADED_RTS
 /*
  * Storage manager mutex:  protects all the above state from
  * simultaneous access by two STG threads.
  */
-#ifdef THREADED_RTS
 Mutex sm_mutex;
+/*
+ * This mutex is used by atomicModifyMutVar# only
+ */
+Mutex atomic_modify_mutvar_mutex;
 #endif
+
 
 /*
  * Forward references

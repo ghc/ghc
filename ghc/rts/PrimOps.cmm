@@ -207,7 +207,7 @@ atomicModifyMutVarzh_fast
    HP_CHK_GEN_TICKY(SIZE, R1_PTR & R2_PTR, atomicModifyMutVarzh_fast);
 
 #if defined(THREADED_RTS)
-    foreign "C" ACQUIRE_LOCK(sm_mutex "ptr") [R1,R2];
+    foreign "C" ACQUIRE_LOCK(atomic_modify_mutvar_mutex "ptr") [R1,R2];
 #endif
 
    x = StgMutVar_var(R1);
@@ -238,7 +238,7 @@ atomicModifyMutVarzh_fast
    StgThunk_payload(r,0) = z;
 
 #if defined(THREADED_RTS)
-    foreign "C" RELEASE_LOCK(sm_mutex "ptr") [];
+    foreign "C" RELEASE_LOCK(atomic_modify_mutvar_mutex "ptr") [];
 #endif
 
    RET_P(r);

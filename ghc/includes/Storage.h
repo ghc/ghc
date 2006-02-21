@@ -200,6 +200,7 @@ extern void GarbageCollect(void (*get_roots)(evac_fn),rtsBool force_major_gc);
  */
 #if defined(THREADED_RTS)
 extern Mutex sm_mutex;
+extern Mutex atomic_modify_mutvar_mutex;
 #endif
 
 #if defined(THREADED_RTS)
