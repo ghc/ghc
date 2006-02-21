@@ -772,7 +772,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
     bdescr *bd;
     if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
 	p->header.info = &stg_MUT_VAR_DIRTY_info;
-	bd = Bdescr(p);
+	bd = Bdescr((StgPtr)p);
 	if (bd->gen_no > 0) recordMutableCap(p,cap,bd->gen_no);
     }
 }
