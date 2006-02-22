@@ -3083,27 +3083,32 @@ outOfLineFloatOp mop res args vols
           code2 <- stmtToInstrs (CmmAssign res (demote (CmmReg tmp)))
           return (code1 `appOL` code2)
   where
+#if i386_TARGET_ARCH
         promote (x,hint) = (CmmMachOp (MO_S_Conv F32 F64) [x], hint)
         demote  x = CmmMachOp (MO_S_Conv F64 F32) [x]
+#else
+        promote (x,hint) = (x,hint)
+        demote  x = x
+#endif
 
 	lbl = mkForeignLabel fn Nothing True
 
 	fn = case mop of
-	      MO_F32_Sqrt  -> FSLIT("sqrt")
-	      MO_F32_Sin   -> FSLIT("sin")
-	      MO_F32_Cos   -> FSLIT("cos")
-	      MO_F32_Tan   -> FSLIT("tan")
-	      MO_F32_Exp   -> FSLIT("exp")
-	      MO_F32_Log   -> FSLIT("log")
+	      MO_F32_Sqrt  -> FSLIT("sqrtf")
+	      MO_F32_Sin   -> FSLIT("sinf")
+	      MO_F32_Cos   -> FSLIT("cosf")
+	      MO_F32_Tan   -> FSLIT("tanf")
+	      MO_F32_Exp   -> FSLIT("expf")
+	      MO_F32_Log   -> FSLIT("logf")
 
-	      MO_F32_Asin  -> FSLIT("asin")
-	      MO_F32_Acos  -> FSLIT("acos")
-	      MO_F32_Atan  -> FSLIT("atan")
+	      MO_F32_Asin  -> FSLIT("asinf")
+	      MO_F32_Acos  -> FSLIT("acosf")
+	      MO_F32_Atan  -> FSLIT("atanf")
 
-	      MO_F32_Sinh  -> FSLIT("sinh")
-	      MO_F32_Cosh  -> FSLIT("cosh")
-	      MO_F32_Tanh  -> FSLIT("tanh")
-	      MO_F32_Pwr   -> FSLIT("pow")
+	      MO_F32_Sinh  -> FSLIT("sinhf")
+	      MO_F32_Cosh  -> FSLIT("coshf")
+	      MO_F32_Tanh  -> FSLIT("tanhf")
+	      MO_F32_Pwr   -> FSLIT("powf")
 
 	      MO_F64_Sqrt  -> FSLIT("sqrt")
 	      MO_F64_Sin   -> FSLIT("sin")
