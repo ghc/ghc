@@ -80,7 +80,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 
 		-- Deal with top-level fixity decls 
 		-- (returns the total new fixity env)
-	fix_env <- rnSrcFixityDecls fix_decls ;
+	fix_env <- rnSrcFixityDeclsEnv fix_decls ;
+        rn_fix_decls <- rnSrcFixityDecls fix_decls ;
 	updGblEnv (\gbl -> gbl { tcg_fix_env = fix_env })
 		  $ do {
 
@@ -111,7 +112,7 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
 			    	hs_tyclds = rn_tycl_decls,
 			    	hs_instds = rn_inst_decls,
-			    	hs_fixds  = [],
+			    	hs_fixds  = rn_fix_decls,
 			    	hs_depds  = [],
 			    	hs_fords  = rn_foreign_decls,
 			    	hs_defds  = rn_default_decls,
@@ -149,16 +150,27 @@ addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 %*********************************************************
 
 \begin{code}
-rnSrcFixityDecls :: [LFixitySig RdrName] -> RnM FixityEnv
+rnSrcFixityDecls :: [LFixitySig RdrName] -> RnM [LFixitySig Name]
 rnSrcFixityDecls fix_decls
+    = do fix_decls <- mapM rnFixityDecl fix_decls
+         return (concat fix_decls)
+
+rnFixityDecl :: LFixitySig RdrName -> RnM [LFixitySig Name]
+rnFixityDecl (L loc (FixitySig (L nameLoc rdr_name) fixity))
+    = do names <- lookupLocalDataTcNames rdr_name
+         return [ L loc (FixitySig (L nameLoc name) fixity)
+                      | name <- names ]
+
+rnSrcFixityDeclsEnv :: [LFixitySig RdrName] -> RnM FixityEnv
+rnSrcFixityDeclsEnv fix_decls
   = getGblEnv					`thenM` \ gbl_env ->
-    foldlM rnFixityDecl (tcg_fix_env gbl_env) 
+    foldlM rnFixityDeclEnv (tcg_fix_env gbl_env) 
 	    fix_decls				 	`thenM` \ fix_env ->
     traceRn (text "fixity env" <+> pprFixEnv fix_env)	`thenM_`
     returnM fix_env
 
-rnFixityDecl :: FixityEnv -> LFixitySig RdrName -> RnM FixityEnv
-rnFixityDecl fix_env (L loc (FixitySig rdr_name fixity))
+rnFixityDeclEnv :: FixityEnv -> LFixitySig RdrName -> RnM FixityEnv
+rnFixityDeclEnv fix_env (L loc (FixitySig rdr_name fixity))
   = setSrcSpan loc $
         -- GHC extension: look up both the tycon and data con 
 	-- for con-like things
