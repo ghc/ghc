@@ -1869,8 +1869,19 @@ scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
     if (performHeapProfile ||
 	(RtsFlags.ProfFlags.profileInterval==0 &&
 	 RtsFlags.ProfFlags.doHeapProfile && ready_to_gc)) {
+
+	// checking black holes is necessary before GC, otherwise
+	// there may be threads that are unreachable except by the
+	// blackhole queue, which the GC will consider to be
+	// deadlocked.
+	scheduleCheckBlackHoles(&MainCapability);
+
+	IF_DEBUG(scheduler, sched_belch("garbage collecting before heap census"));
 	GarbageCollect(GetRoots, rtsTrue);
+
+	IF_DEBUG(scheduler, sched_belch("performing heap census"));
 	heapCensus();
+
 	performHeapProfile = rtsFalse;
 	return rtsTrue;  // true <=> we already GC'd
     }
