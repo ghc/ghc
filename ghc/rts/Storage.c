@@ -132,6 +132,7 @@ initStorage( void )
   
 #if defined(THREADED_RTS)
   initMutex(&sm_mutex);
+  initMutex(&atomic_modify_mutvar_mutex);
 #endif
 
   ACQUIRE_SM_LOCK;
