@@ -355,7 +355,7 @@ GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #error BaseReg must be in a register for THREADED_RTS
 #endif
 #define BaseReg (&((struct PartCapability_ *)MainCapability)->r)
-#define ASSIGN_BaseReg(e) /*nothing*/
+#define ASSIGN_BaseReg(e) (e)
 #endif
 
 #if defined(REG_Sp) && !defined(NO_GLOBAL_REG_DECLS)
