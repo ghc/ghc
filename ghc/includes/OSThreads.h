@@ -90,12 +90,27 @@ typedef DWORD ThreadLocalKey;
 #if USE_CRITICAL_SECTIONS
 
 typedef CRITICAL_SECTION Mutex;
+
+#ifdef LOCK_DEBUG
+
+#define ACQUIRE_LOCK(mutex) \
+  debugBelch("ACQUIRE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); \
+  EnterCriticalSection(mutex)
+#define RELEASE_LOCK(mutex) \
+  debugBelch("RELEASE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); \
+  LeaveCriticalSection(mutex)
+#define ASSERT_LOCK_HELD(mutex) /* nothing */
+
+#else
+
 #define ACQUIRE_LOCK(mutex)  EnterCriticalSection(mutex)
 #define RELEASE_LOCK(mutex)  LeaveCriticalSection(mutex)
 
 // I don't know how to do this.  TryEnterCriticalSection() doesn't do
 // the right thing.
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
+
+#endif
 
 #else
 
