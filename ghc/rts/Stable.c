@@ -139,12 +139,20 @@ initFreeList(snEntry *table, nat n, snEntry *free)
 void
 initStablePtrTable(void)
 {
-    // Nothing to do:
-    // the table will be allocated the first time makeStablePtr is
-    // called, and we want the table to persist through multiple inits.
-    //
-    // Also, getStablePtr is now called from __attribute__((constructor))
-    // functions, so initialising things here wouldn't work anyway.
+	if (SPT_size > 0)
+		return;
+
+    SPT_size = INIT_SPT_SIZE;
+    stable_ptr_table = stgMallocBytes(SPT_size * sizeof(snEntry),
+				      "initStablePtrTable");
+
+    /* we don't use index 0 in the stable name table, because that
+     * would conflict with the hash table lookup operations which
+     * return NULL if an entry isn't found in the hash table.
+     */
+    initFreeList(stable_ptr_table+1,INIT_SPT_SIZE-1,NULL);
+    addrToStableHash = allocHashTable();
+
 #ifdef THREADED_RTS
     initMutex(&stable_mutex);
 #endif
@@ -212,6 +220,8 @@ StgWord
 lookupStableName(StgPtr p)
 {
     StgWord res;
+
+    initStablePtrTable();
     ACQUIRE_LOCK(&stable_mutex);
     res = lookupStableName_(p);
     RELEASE_LOCK(&stable_mutex);
@@ -234,6 +244,7 @@ getStablePtr(StgPtr p)
 {
   StgWord sn;
 
+  initStablePtrTable();
   ACQUIRE_LOCK(&stable_mutex);
   sn = lookupStableName_(p);
   stable_ptr_table[sn].ref++;
@@ -246,6 +257,7 @@ freeStablePtr(StgStablePtr sp)
 {
     snEntry *sn;
 
+	initStablePtrTable();
     ACQUIRE_LOCK(&stable_mutex);
 
     sn = &stable_ptr_table[(StgWord)sp];
@@ -268,30 +280,15 @@ void
 enlargeStablePtrTable(void)
 {
   nat old_SPT_size = SPT_size;
-  
-  if (SPT_size == 0) {
-    // 1st time
-    SPT_size = INIT_SPT_SIZE;
-    stable_ptr_table = stgMallocBytes(SPT_size * sizeof(snEntry), 
-				      "enlargeStablePtrTable");
-    
-    /* we don't use index 0 in the stable name table, because that
-     * would conflict with the hash table lookup operations which
-     * return NULL if an entry isn't found in the hash table.
-     */
-    initFreeList(stable_ptr_table+1,INIT_SPT_SIZE-1,NULL);
-    addrToStableHash = allocHashTable();
-  }
-  else {
+
     // 2nd and subsequent times
-    SPT_size *= 2;
-    stable_ptr_table = 
-      stgReallocBytes(stable_ptr_table, 
+  SPT_size *= 2;
+  stable_ptr_table =
+    stgReallocBytes(stable_ptr_table,
 		      SPT_size * sizeof(snEntry),
 		      "enlargeStablePtrTable");
 
-    initFreeList(stable_ptr_table + old_SPT_size, old_SPT_size, NULL);
-  }
+  initFreeList(stable_ptr_table + old_SPT_size, old_SPT_size, NULL);
 }
 
 /* -----------------------------------------------------------------------------
