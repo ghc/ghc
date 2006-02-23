@@ -1,20 +1,20 @@
 
-tc125.hs:14:0:
+tc125.hs:15:0:
     Warning: No explicit method nor default method for `add'
 	     In the instance declaration for `Add Z a a'
 
-tc125.hs:15:0:
+tc125.hs:16:0:
     Warning: No explicit method nor default method for `add'
 	     In the instance declaration for `Add (S a) b (S c)'
 
-tc125.hs:19:0:
+tc125.hs:20:0:
     Warning: No explicit method nor default method for `mul'
 	     In the instance declaration for `Mul Z a Z'
 
-tc125.hs:20:0:
+tc125.hs:21:0:
     Warning: No explicit method nor default method for `mul'
 	     In the instance declaration for `Mul (S a) b d'
 
-tc125.hs:27:0:
+tc125.hs:28:0:
     Warning: No explicit method nor default method for `add'
 	     In the instance declaration for `Add (Q a b) (Q c d) (Q ad_bc bd)'

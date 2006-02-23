@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances #-}
+-- -fallow-undecidable-instanced now needed because the Coverage Condition fails
 
 -- This one blew up Hugs (Apr 02)
 

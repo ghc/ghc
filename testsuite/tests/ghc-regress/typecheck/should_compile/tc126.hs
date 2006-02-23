@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS_GHC -fglasgow-exts -fallow-undecidable-instances #-}
+-- -fallow-undecidable-instanced now needed because the Coverage Condition fails
 
 -- !!! Functional dependency test. Hugs [Apr 2001] fails to typecheck this
 -- Rather bizarre example submitted by Jonathon Bell
