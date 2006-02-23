@@ -1137,14 +1137,19 @@ Termination test: each assertion in the context satisfies
  (2) the assertion has fewer constructors and variables (taken together
      and counting repetitions) than the head.
 This is only needed with -fglasgow-exts, as Haskell 98 restrictions
-(which have already been checked) guarantee termination.
+(which have already been checked) guarantee termination. 
+
+The underlying idea is that 
+
+    for any ground substitution, each assertion in the
+    context has fewer type constructors than the head.
+
 
 \begin{code}
 checkInstTermination :: ThetaType -> [TcType] -> TcM ()
 checkInstTermination theta tys
-  = do
-    mappM_ (check_nomore (fvTypes tys)) theta
-    mappM_ (check_smaller (sizeTypes tys)) theta
+  = do	{ mappM_ (check_nomore (fvTypes tys))    theta
+	; mappM_ (check_smaller (sizeTypes tys)) theta }
 
 check_nomore :: [TyVar] -> PredType -> TcM ()
 check_nomore fvs pred
