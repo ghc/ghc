@@ -7,7 +7,7 @@ It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
 module FunDeps (
- 	Equation, pprEquation, pprEquationDoc,
+ 	Equation, pprEquation,
 	oclose, grow, improve, 
 	checkInstCoverage, checkFunDeps,
 	pprFundeps
@@ -172,18 +172,19 @@ type Equation = (TyVarSet, [(Type, Type)])
 -- We usually act on an equation by instantiating the quantified type varaibles
 -- to fresh type variables, and then calling the standard unifier.
 
-pprEquationDoc (eqn, doc) = vcat [pprEquation eqn, nest 2 doc]
-
 pprEquation (qtvs, pairs) 
   = vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
 	  nest 2 (vcat [ ppr t1 <+> ptext SLIT(":=:") <+> ppr t2 | (t1,t2) <- pairs])]
 
 ----------
-improve :: (Class -> [Instance])	-- Gives instances for given class
-	-> [(PredType,SDoc)]	-- Current constraints; doc says where they come from
-	-> [(Equation,SDoc)]	-- Derived equalities that must also hold
-				-- (NB the above INVARIANT for type Equation)
-				-- The SDoc explains why the equation holds (for error messages)
+type Pred_Loc = (PredType, SDoc)	-- SDoc says where the Pred comes from
+
+improve :: (Class -> [Instance])		-- Gives instances for given class
+	-> [Pred_Loc]				-- Current constraints; 
+	-> [(Equation,Pred_Loc,Pred_Loc)]	-- Derived equalities that must also hold
+						-- (NB the above INVARIANT for type Equation)
+						-- The Pred_Locs explain which two predicates were
+						-- combined (for error messages)
 \end{code}
 
 Given a bunch of predicates that must hold, such as
@@ -222,13 +223,13 @@ improve inst_env preds
 
 ----------
 checkGroup :: (Class -> [Instance])
-	   -> [(PredType,SDoc)]
-	   -> [(Equation, SDoc)]
+	   -> [Pred_Loc]
+	   -> [(Equation, Pred_Loc, Pred_Loc)]
   -- The preds are all for the same class or implicit param
 
 checkGroup inst_env (p1@(IParam _ ty, _) : ips)
   = 	-- For implicit parameters, all the types must match
-    [ ((emptyVarSet, [(ty,ty')]), mkEqnMsg p1 p2) 
+    [ ((emptyVarSet, [(ty,ty')]), p1, p2) 
     | p2@(IParam _ ty', _) <- ips, not (ty `tcEqType` ty')]
 
 checkGroup inst_env clss@((ClassP cls _, _) : _)
@@ -261,18 +262,18 @@ checkGroup inst_env clss@((ClassP cls _, _) : _)
 
 	-- NOTE that we iterate over the fds first; they are typically
 	-- empty, which aborts the rest of the loop.
-    pairwise_eqns :: [(Equation,SDoc)]
+    pairwise_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
     pairwise_eqns	-- This group comes from pairwise comparison
-      = [ (eqn, mkEqnMsg p1 p2)
+      = [ (eqn, p1, p2)
 	| fd <- cls_fds,
 	  p1@(ClassP _ tys1, _) : rest <- tails clss,
 	  p2@(ClassP _ tys2, _)	<- rest,
 	  eqn <- checkClsFD emptyVarSet fd cls_tvs tys1 tys2
 	]
 
-    instance_eqns :: [(Equation,SDoc)]
+    instance_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
     instance_eqns	-- This group comes from comparing with instance decls
-      = [ (eqn, mkEqnMsg p1 p2)
+      = [ (eqn, p1, p2)
 	| fd <- cls_fds,	-- Iterate through the fundeps first, 
 				-- because there often are none!
 	  p2@(ClassP _ tys2, _) <- clss,
@@ -285,12 +286,6 @@ checkGroup inst_env clss@((ClassP cls _, _) : _)
 		    ptext SLIT("arising from the instance declaration at") <+> 
 			ppr (getSrcLoc ispec))
 	]
-
-mkEqnMsg (pred1,from1) (pred2,from2)
-  = vcat [ptext SLIT("When using functional dependencies to combine"),
-	  nest 2 (sep [ppr pred1 <> comma, nest 2 from1]), 
-	  nest 2 (sep [ppr pred2 <> comma, nest 2 from2])]
- 
 ----------
 checkClsFD :: TyVarSet 			-- Quantified type variables; see note below
 	   -> FunDep TyVar -> [TyVar] 	-- One functional dependency from the class

@@ -42,9 +42,9 @@ import Inst		( lookupInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders,
 			  lclEnvElts, tcMetaTy )
 import InstEnv		( lookupInstEnv, classInstances, pprInstances )
-import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars,
+import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, zonkTcPredType,
 			  checkAmbiguity, checkInstTermination )
-import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, 
+import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, tidyPred,
                           mkClassPred, isOverloadedTy, mkTyConApp, isSkolemTyVar,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
 			  tyVarsOfPred, tcEqType, pprPred, mkPredTy, tcIsTyVarTy )
@@ -55,7 +55,7 @@ import TyCon		( TyCon )
 import Name		( Name, getOccName, getSrcLoc )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig, classKey )
-import FunDeps		( oclose, grow, improve, pprEquationDoc )
+import FunDeps		( oclose, grow, improve, pprEquation )
 import PrelInfo		( isNumericClass, isStandardClass ) 
 import PrelNames	( splitName, fstName, sndName, integerTyConName,
 			  showClassKey, eqClassKey, ordClassKey )
@@ -1660,11 +1660,21 @@ tcImprove avails
         mappM_ unify eqns	`thenM_`
 	returnM False
   where
-    unify ((qtvs, pairs), doc)
-	 = addErrCtxt doc			$
+    unify ((qtvs, pairs), what1, what2)
+	 = addErrCtxtM (mkEqnMsg what1 what2)	$
 	   tcInstTyVars (varSetElems qtvs)	`thenM` \ (_, _, tenv) ->
 	   mapM_ (unif_pr tenv) pairs
     unif_pr tenv (ty1,ty2) =  unifyType (substTy tenv ty1) (substTy tenv ty2)
+
+pprEquationDoc (eqn, (p1,w1), (p2,w2)) = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
+
+mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
+  = do	{ pred1' <- zonkTcPredType pred1; pred2' <- zonkTcPredType pred2
+	; let { pred1'' = tidyPred tidy_env pred1'; pred2'' = tidyPred tidy_env pred2' }
+	; let msg = vcat [ptext SLIT("When using functional dependencies to combine"),
+			  nest 2 (sep [ppr pred1'' <> comma, nest 2 from1]), 
+			  nest 2 (sep [ppr pred2'' <> comma, nest 2 from2])]
+	; return (tidy_env, msg) }
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.
