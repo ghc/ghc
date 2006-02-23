@@ -3000,7 +3000,7 @@ static const struct _charblock_ spacechars[]={
 
 static const struct _convrule_ nullrule={0,NUMCAT_CN,0,0,0,0};
 
-int blkcmp(const void *vk,const void *vb)
+static int blkcmp(const void *vk,const void *vb)
 {
 	const struct _charblock_ *key,*cur;
 	key=vk;
