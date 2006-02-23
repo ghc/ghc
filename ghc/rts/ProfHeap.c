@@ -255,6 +255,7 @@ LDV_recordDead( StgClosure *c, nat size )
 		if (RtsFlags.ProfFlags.bioSelector == NULL) {
 		    censuses[t].void_total   += (int)size;
 		    censuses[era].void_total -= (int)size;
+		    ASSERT(censuses[t].void_total < censuses[t].not_used);
 		} else {
 		    id = closureIdentity(c);
 		    ctr = lookupHashTable(censuses[t].hash, (StgWord)id);
@@ -653,6 +654,15 @@ aggregateCensusInfo( void )
 	int void_total, drag_total;
 
 	// Now we compute void_total and drag_total for each census
+	// After the program has finished, the void_total field of
+	// each census contains the count of words that were *created*
+	// in this era and were eventually void.  Conversely, if a
+	// void closure was destroyed in this era, it will be
+	// represented by a negative count of words in void_total.
+	//
+	// To get the count of live words that are void at each
+	// census, just propagate the void_total count forwards:
+
 	void_total = 0;
 	drag_total = 0;
 	for (t = 1; t < era; t++) { // note: start at 1, not 0
@@ -660,8 +670,15 @@ aggregateCensusInfo( void )
 	    drag_total += censuses[t].drag_total;
 	    censuses[t].void_total = void_total;
 	    censuses[t].drag_total = drag_total;
+
 	    ASSERT( censuses[t].void_total <= censuses[t].not_used );
+	    // should be true because: void_total is the count of
+	    // live words that are void at this census, which *must*
+	    // be less than the number of live words that have not
+	    // been used yet.
+
 	    ASSERT( censuses[t].drag_total <= censuses[t].used );
+	    // similar reasoning as above.
 	}
 	
 	return;
