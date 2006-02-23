@@ -4,5 +4,4 @@ rnfail043.hs:10:0:
     Declared at: rnfail043.hs:6:0
 		 rnfail043.hs:10:0
 Loading package base-1.0 ... linking ... done.
-Loading package haskell98-1.0 ... linking ... done.
 Loading package template-haskell-1.0 ... linking ... done.
