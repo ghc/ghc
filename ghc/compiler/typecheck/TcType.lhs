@@ -759,8 +759,8 @@ tcValidInstHeadTy ty
 	   where
 	     tvs = mapCatMaybes get_tv tys
 
-    get_tv (NoteTy _ ty) = get_tv ty 	-- through synonyms
-    get_tv (TyVarTy tv)  = Just tv	-- Again, do not look
+    get_tv (NoteTy _ ty) = get_tv ty 	-- Again, do not look
+    get_tv (TyVarTy tv)  = Just tv	-- through synonyms
     get_tv other  	 = Nothing
 \end{code}
 
