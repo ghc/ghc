@@ -1,5 +1,6 @@
 
-TH_reifyDecl1.hs:33:9: data TH_reifyDecl1.T = TH_reifyDecl1.A | TH_reifyDecl1.B
+TH_reifyDecl1.hs:33:9:
+    data TH_reifyDecl1.T = TH_reifyDecl1.A | TH_reifyDecl1.B
 
 TH_reifyDecl1.hs:33:9:
     data TH_reifyDecl1.R a_0 = TH_reifyDecl1.C a_0 | TH_reifyDecl1.D
@@ -12,7 +13,8 @@ TH_reifyDecl1.hs:33:9:
     data TH_reifyDecl1.Tree a_0 = TH_reifyDecl1.Leaf
                             | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 
-TH_reifyDecl1.hs:33:9: type TH_reifyDecl1.IntList = GHC.Base.[] GHC.Base.Int
+TH_reifyDecl1.hs:33:9:
+    type TH_reifyDecl1.IntList = GHC.Base.[] GHC.Base.Int
 
 TH_reifyDecl1.hs:33:9:
     newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Base.Int
@@ -25,5 +27,4 @@ TH_reifyDecl1.hs:33:9:
                                                                                       GHC.Base.Int
                                infixl 3 TH_reifyDecl1.m
 Loading package base-1.0 ... linking ... done.
-Loading package haskell98-1.0 ... linking ... done.
 Loading package template-haskell-1.0 ... linking ... done.
