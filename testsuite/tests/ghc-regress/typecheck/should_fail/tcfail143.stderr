@@ -4,5 +4,5 @@ tcfail143.hs:1:0:
     When using functional dependencies to combine
       MinMax a Z Z a,
 	arising from the instance declaration at tcfail143.hs:10:0
-      MinMax (S Z) Z _c Z,
+      MinMax (S Z) Z Z Z,
 	arising from use of `extend' at tcfail143.hs:27:5-18

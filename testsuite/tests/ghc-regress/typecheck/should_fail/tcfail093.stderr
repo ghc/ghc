@@ -1,7 +1,7 @@
 
-tcfail093.hs:14:9:
+tcfail093.hs:15:9:
     No instance for (Call (IO Int) h)
-      arising from use of `call' at tcfail093.hs:14:9-20
+      arising from use of `call' at tcfail093.hs:15:9-20
     Possible fix: add an instance declaration for (Call (IO Int) h)
     In the call (call primDup)
     In the expression: call primDup
