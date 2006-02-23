@@ -7,5 +7,5 @@
 
 module ShouldCompile where
 
-main | x <- 1*2+3*4 = undefined
+main | x <- 1*2+3*4 = x
  

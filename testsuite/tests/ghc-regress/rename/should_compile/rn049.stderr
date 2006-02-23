@@ -1,0 +1,4 @@
+
+rn049.hs:10:5:
+    Warning: accepting non-standard pattern guards (-fglasgow-exts to suppress this message)
+		 x <- (1 * 2) + (3 * 4)
