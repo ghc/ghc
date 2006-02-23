@@ -93,7 +93,7 @@ import TcRnMonad          -- TcType, amongst others
 import FunDeps		( grow, checkInstCoverage )
 import Name		( Name, setNameUnique, mkSysTvName )
 import VarSet
-import DynFlags		( dopt, DynFlag(..), DynFlags )
+import DynFlags		( dopt, DynFlag(..) )
 import Util		( nOfThem, isSingleton, notNull )
 import ListSetOps	( removeDups )
 import Outputable
@@ -1075,24 +1075,27 @@ checkValidInstHead ty	-- Should be a source type
 check_inst_head dflags clas tys
 	-- If GlasgowExts then check at least one isn't a type variable
   | dopt Opt_GlasgowExts dflags
-  = returnM ()
+  = mapM_ check_one tys
 
 	-- WITH HASKELL 98, MUST HAVE C (T a b c)
-  | isSingleton tys,
-    tcValidInstHeadTy first_ty
-  = returnM ()
-
   | otherwise
-  = failWithTc (instTypeErr (pprClassPred clas tys) head_shape_msg)
+  = checkTc (isSingleton tys && tcValidInstHeadTy first_ty)
+	    (instTypeErr (pprClassPred clas tys) head_shape_msg)
 
   where
     (first_ty : _) = tys
 
     head_shape_msg = parens (text "The instance type must be of form (T a b c)" $$
 			     text "where T is not a synonym, and a,b,c are distinct type variables")
-\end{code}
 
-\begin{code}
+	-- For now, I only allow tau-types (not polytypes) in 
+	-- the head of an instance decl.  
+	-- 	E.g.  instance C (forall a. a->a) is rejected
+	-- One could imagine generalising that, but I'm not sure
+	-- what all the consequences might be
+    check_one ty = do { check_tau_type (Rank 0) UT_NotOk ty
+		      ; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
+
 instTypeErr pp_ty msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes pp_ty, 
 	 nest 4 msg]
