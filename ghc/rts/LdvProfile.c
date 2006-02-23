@@ -36,7 +36,6 @@
 void 
 LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
 {
-    StgInfoTable *info;
     nat size, i;
 
 #if defined(__GNUC__) && __GNUC__ < 3 && defined(DEBUG)
