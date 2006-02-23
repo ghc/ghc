@@ -1,8 +1,7 @@
 
 tcfail108.hs:7:0:
-    Non-type variables, or repeated type variables,
-      in the constraint: Eq (f (Rec f))
-    (Use -fallow-undecidable-instances to permit this)
+    Non-type variable argument in the constraint: Eq (f (Rec f))
+    (Use -fglasgow-exts to permit this)
     In the context: (Eq (f (Rec f)))
     While checking the context of an instance declaration
     In the instance declaration for `Eq (Rec f)'

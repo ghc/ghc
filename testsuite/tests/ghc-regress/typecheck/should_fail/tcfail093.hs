@@ -1,4 +1,5 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
+-- -fallow-undecidable-instances now needed because the Coverage Condition fails
 
 module ShouldFail where
 
