@@ -927,12 +927,13 @@ check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
 check_class_pred_tys dflags ctxt tys 
   = case ctxt of
 	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
-	InstThetaCtxt -> gla_exts || all tcIsTyVarTy tys
+	InstThetaCtxt -> gla_exts || undecidable_ok || all tcIsTyVarTy tys
 				-- Further checks on head and theta in
 				-- checkInstTermination
 	other	      -> gla_exts || all tyvar_head tys
   where
-    gla_exts 	   = dopt Opt_GlasgowExts dflags
+    gla_exts       = dopt Opt_GlasgowExts dflags
+    undecidable_ok = dopt Opt_AllowUndecidableInstances dflags
 
 -------------------------
 tyvar_head ty			-- Haskell 98 allows predicates of form 
@@ -1025,7 +1026,7 @@ checkThetaCtxt ctxt theta
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
 
 badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
-predTyVarErr pred  = sep [ptext SLIT("Non-type variable argument"),
+predTyVarErr pred  = sep [ptext SLIT("Non type-variable argument"),
 			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
 
@@ -1121,14 +1122,14 @@ checkValidInstance tyvars theta clas inst_tys
 	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98, checkValidTheta has already done that
 	; when (gla_exts && not undecidable_ok) $
-	    checkInstTermination theta inst_tys
+	       checkInstTermination theta inst_tys
 	
 	-- The Coverage Condition
 	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
 	}
   where
-    msg  = parens (ptext SLIT("the instance types do not agree with the functional dependencies of the class"))
+    msg  = parens (ptext SLIT("the Coverage Condition fails for one of the functional dependencies"))
 \end{code}
 
 Termination test: each assertion in the context satisfies
