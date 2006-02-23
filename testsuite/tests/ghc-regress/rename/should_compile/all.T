@@ -46,6 +46,9 @@ test('rn047', normal, compile, ['-W'])
 test('rn048', normal, compile, ['-W'])
 test('rn049', normal, compile, ['-W'])
 
+test('rn050', normal, multimod_compile, ['rn050', '-v0'])
+clean(['Rn050_A.hi', 'Rn050_A.o'])
+
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
 test('timing003', normal, compile, [''])
