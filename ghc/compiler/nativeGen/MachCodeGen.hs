@@ -3078,19 +3078,10 @@ outOfLineFloatOp mop res args vols
           let 
             tmp = CmmLocal (LocalReg uq F64)
           -- in
-          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)]
-                                         (map promote args) vols)
-          code2 <- stmtToInstrs (CmmAssign res (demote (CmmReg tmp)))
+          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args vols)
+          code2 <- stmtToInstrs (CmmAssign res (CmmReg tmp))
           return (code1 `appOL` code2)
   where
-#if i386_TARGET_ARCH
-        promote (x,hint) = (CmmMachOp (MO_S_Conv F32 F64) [x], hint)
-        demote  x = CmmMachOp (MO_S_Conv F64 F32) [x]
-#else
-        promote (x,hint) = (x,hint)
-        demote  x = x
-#endif
-
 	lbl = mkForeignLabel fn Nothing True
 
 	fn = case mop of
