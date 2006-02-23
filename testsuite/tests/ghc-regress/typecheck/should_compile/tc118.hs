@@ -1,8 +1,9 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts -fallow-undecidable-instances #-}
 
 -- !!! An instance decl with a context containing a free type variable
 -- The interest here is that there's a "b" in the instance decl
 -- context that isn't mentioned in the instance head.  
+-- Hence -fallow-undecidable-instances
 
 module ShouldCompile where
 
