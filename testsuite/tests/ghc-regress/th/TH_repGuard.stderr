@@ -6,5 +6,4 @@ bar x_0 | Data.Maybe.Just y_1 <- x_0
             = y_1
 bar _ = 9
 Loading package base-1.0 ... linking ... done.
-Loading package haskell98-1.0 ... linking ... done.
 Loading package template-haskell-1.0 ... linking ... done.
