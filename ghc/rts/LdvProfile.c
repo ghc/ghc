@@ -320,7 +320,7 @@ LdvCensusForDead( nat N )
 		    processNurseryForDead();
 		    processChainForDead(generations[g].steps[s].large_objects);
 		} else{
-		    processHeapForDead(generations[g].steps[s].blocks);
+		    processHeapForDead(generations[g].steps[s].old_blocks);
 		    processChainForDead(generations[g].steps[s].large_objects);
 		}
 	    }
