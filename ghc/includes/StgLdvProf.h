@@ -25,7 +25,7 @@
  */
 #ifndef CMINUSMINUS
 #define LDV_RECORD_CREATE(c)   \
-  LDVW((c)) = (RTS_DEREF(era) << LDV_SHIFT) | LDV_STATE_CREATE
+  LDVW((c)) = ((StgWord)RTS_DEREF(era) << LDV_SHIFT) | LDV_STATE_CREATE
 #endif
 
 #ifdef CMINUSMINUS
