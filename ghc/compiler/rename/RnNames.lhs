@@ -8,8 +8,7 @@ module RnNames (
 	rnImports, mkRdrEnvAndImports, importsFromLocalDecls,
 	rnExports, mkExportNameSet,
 	getLocalDeclBinders, extendRdrEnvRn,
-	reportUnusedNames, reportDeprecations,
-	mkModDeps
+	reportUnusedNames, reportDeprecations
     ) where
 
 #include "HsVersions.h"
@@ -215,12 +214,8 @@ importsFromImportDeclDirect this_mod
          warnIf (want_boot && not (mi_boot iface))
                     (warnRedundantSourceImport imp_mod_name)
 
-         let deprecs	= mi_deprecs iface
-             is_orph	= mi_orphan iface 
-             deps 	= mi_deps iface
-             filtered_exports = filter not_this_mod (mi_exports iface)
+         let filtered_exports = filter not_this_mod (mi_exports iface)
              not_this_mod (mod,_) = mod /= this_mod
-             imp_mod	= mi_module iface
 
 	-- If the module exports anything defined in this module, just ignore it.
 	-- Reason: otherwise it looks as if there are two local definition sites
