@@ -847,6 +847,9 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 
 	let excessPrecision = dopt Opt_ExcessPrecision dflags
 
+	let cc_opt | optLevel dflags >= 2 = "-O2"
+		   | otherwise            = "-O"
+
 	-- Decide next phase
 	
         let mangle = dopt Opt_DoAsmMangling dflags
@@ -891,7 +894,7 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		       ++ (if hcc 
 			     then more_hcc_opts
 			     else [])
-		       ++ [ verb, "-S", "-Wimplicit", "-O" ]
+		       ++ [ verb, "-S", "-Wimplicit", cc_opt ]
 		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 		       ++ cc_opts
 		       ++ split_opt
