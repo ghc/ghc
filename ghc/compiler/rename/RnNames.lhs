@@ -205,15 +205,6 @@ importsFromImportDeclDirect this_mod
                             (L loc importDecl@(ImportDecl loc_imp_mod_name want_boot qual_only as_mod imp_details))
     = setSrcSpan loc $
       do iface <- loadSrcInterface doc imp_mod_name want_boot
-         -- Compiler sanity check: if the import didn't say
-         -- {-# SOURCE #-} we should not get a hi-boot file
-         WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) $ do
-         -- Issue a user warning for a redundant {- SOURCE -} import
-         -- NB that we arrange to read all the ordinary imports before 
-         -- any of the {- SOURCE -} imports
-         warnIf (want_boot && not (mi_boot iface))
-                    (warnRedundantSourceImport imp_mod_name)
-
          let filtered_exports = filter not_this_mod (mi_exports iface)
              not_this_mod (mod,_) = mod /= this_mod
 
@@ -241,7 +232,7 @@ importsFromImportDeclDirect this_mod
                                        is_dloc = loc, is_as = qual_mod_name }
 
 	 -- Get the total imports, and filter them according to the import list
-         total_avails <- ifaceExportNames filtered_exports
+         total_avails <- ifaceExportNames (mi_exports iface)
          importDecl' <- rnImportDecl iface imp_spec importDecl total_avails
          return (L loc importDecl')
     where imp_mod_name = unLoc loc_imp_mod_name
