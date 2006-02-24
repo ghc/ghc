@@ -730,7 +730,7 @@ data CheckedModule =
 	--  fields within CheckedModule.
 
 type ParsedSource      = Located (HsModule RdrName)
-type RenamedSource     = HsGroup Name
+type RenamedSource     = (HsGroup Name, [LImportDecl Name], Maybe [LIE Name])
 type TypecheckedSource = LHsBinds Id
 
 -- NOTE:

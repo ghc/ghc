@@ -43,7 +43,8 @@ module TcRnTypes(
 #include "HsVersions.h"
 
 import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
-			  ArithSeqInfo, DictBinds, LHsBinds, HsGroup )
+			  ArithSeqInfo, DictBinds, LHsBinds, LImportDecl, HsGroup,
+                          IE )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
@@ -62,7 +63,7 @@ import OccName		( OccEnv )
 import Var		( Id, TyVar )
 import VarEnv		( TidyEnv )
 import Module
-import SrcLoc		( SrcSpan, SrcLoc, srcSpanStart )
+import SrcLoc		( SrcSpan, SrcLoc, Located, srcSpanStart )
 import VarSet		( IdSet )
 import ErrUtils		( Messages, Message )
 import UniqSupply	( UniqSupply )
@@ -217,6 +218,8 @@ data TcGblEnv
 		-- collected initially in un-zonked form and are
 		-- finally zonked in tcRnSrcDecls
 
+        tcg_rn_imports :: Maybe [LImportDecl Name],
+        tcg_rn_exports :: Maybe [Located (IE Name)],
 	tcg_rn_decls :: Maybe (HsGroup Name),	-- renamed decls, maybe
 		-- Nothing <=> Don't retain renamed decls
 
@@ -726,6 +729,7 @@ cmpInst (LitInst _ lit1 ty1 _)	(LitInst _ lit2 ty2 _)  = (lit1 `compare` lit2) `
 %************************************************************************
 
 \begin{code}
+-- FIXME: Rename this. It clashes with (Located (IE ...))
 type LIE = Bag Inst
 
 isEmptyLIE	  = isEmptyBag

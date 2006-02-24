@@ -5,10 +5,10 @@
 
 \begin{code}
 module RnNames (
-	rnImports, importsFromLocalDecls, 
-	rnExports,
+	rnImports, mkRdrEnvAndImports, importsFromLocalDecls,
+	rnExports, mkExportNameSet,
 	getLocalDeclBinders, extendRdrEnvRn,
-	reportUnusedNames, reportDeprecations, 
+	reportUnusedNames, reportDeprecations,
 	mkModDeps
     ) where
 
@@ -17,12 +17,12 @@ module RnNames (
 import DynFlags		( DynFlag(..), GhcMode(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
-			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames 
-			)
+			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
+			  LIE )
 import RnEnv
 import IfaceEnv		( ifaceExportNames )
 import LoadIface	( loadSrcInterface )
-import TcRnMonad
+import TcRnMonad hiding (LIE)
 
 import FiniteMap
 import PrelNames	( pRELUDE, isUnboundName, main_RDR_Unqual )
@@ -70,52 +70,36 @@ import IO		( openFile, IOMode(..) )
 %************************************************************************
 
 \begin{code}
-rnImports :: [LImportDecl RdrName]
-	  -> RnM (GlobalRdrEnv, ImportAvails)
-
+rnImports :: [LImportDecl RdrName] -> RnM [LImportDecl Name]
 rnImports imports
-  = do	{	-- PROCESS IMPORT DECLS
-		-- Do the non {- SOURCE -} ones first, so that we get a helpful
-		-- warning for {- SOURCE -} ones that are unnecessary
-	  this_mod <- getModule
-	; implicit_prelude <- doptM Opt_ImplicitPrelude
-	; let
-	    all_imports	       = mk_prel_imports this_mod implicit_prelude ++ imports
-	    (source, ordinary) = partition is_source_import all_imports
-	    is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
+         -- PROCESS IMPORT DECLS
+         -- Do the non {- SOURCE -} ones first, so that we get a helpful
+         -- warning for {- SOURCE -} ones that are unnecessary
+    = do this_mod <- getModule
+         implicit_prelude <- doptM Opt_ImplicitPrelude
+         let all_imports	       = mk_prel_imports this_mod implicit_prelude ++ imports
+             (source, ordinary) = partition is_source_import all_imports
+             is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
+             get_imports = importsFromImportDeclDirect this_mod
 
-	    get_imports = importsFromImportDecl this_mod
+         stuff1 <- mapM get_imports ordinary
+         stuff2 <- mapM get_imports source
+         return (stuff1 ++ stuff2)
+    where
+-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
+-- because the former doesn't even look at Prelude.hi for instance 
+-- declarations, whereas the latter does.
+   mk_prel_imports this_mod implicit_prelude
+       |  this_mod == pRELUDE
+          || explicit_prelude_import
+          || not implicit_prelude
+           = []
+       | otherwise = [preludeImportDecl]
+   explicit_prelude_import
+       = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- imports, 
+	           unLoc mod == pRELUDE ]
 
-	; stuff1 <- mappM get_imports ordinary
-	; stuff2 <- mappM get_imports source
-
-		-- COMBINE RESULTS
-	; let
-	    (imp_gbl_envs, imp_avails) = unzip (stuff1 ++ stuff2)
-	    gbl_env :: GlobalRdrEnv
-	    gbl_env = foldr plusGlobalRdrEnv emptyGlobalRdrEnv imp_gbl_envs
-
-	    all_avails :: ImportAvails
-	    all_avails = foldr plusImportAvails emptyImportAvails imp_avails
-
-		-- ALL DONE
-	; return (gbl_env, all_avails) }
-  where
-	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
-	-- because the former doesn't even look at Prelude.hi for instance 
-	-- declarations, whereas the latter does.
-    mk_prel_imports this_mod implicit_prelude
-	|  this_mod == pRELUDE
-	|| explicit_prelude_import
-	|| not implicit_prelude
-	= []
-
-	| otherwise = [preludeImportDecl]
-
-    explicit_prelude_import
-      = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- imports, 
-		       unLoc mod == pRELUDE ]
-
+preludeImportDecl :: LImportDecl RdrName
 preludeImportDecl
   = L loc $
 	ImportDecl (L loc pRELUDE)
@@ -124,12 +108,152 @@ preludeImportDecl
 	       Nothing	{- No "as" -}
 	       Nothing	{- No import list -}
   where
-    loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")
+    loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")         
+
+mkRdrEnvAndImports :: [LImportDecl Name] -> RnM (GlobalRdrEnv, ImportAvails)
+mkRdrEnvAndImports imports
+  = do this_mod <- getModule
+       let get_imports = importsFromImportDecl this_mod
+       stuff <- mapM get_imports imports
+       let (imp_gbl_envs, imp_avails) = unzip stuff
+           gbl_env :: GlobalRdrEnv
+           gbl_env = foldr plusGlobalRdrEnv emptyGlobalRdrEnv imp_gbl_envs
+
+           all_avails :: ImportAvails
+           all_avails = foldr plusImportAvails emptyImportAvails imp_avails
+       -- ALL DONE
+       return (gbl_env, all_avails)
+
 \end{code}
 	
 \begin{code}
+rnImportDecl :: ModIface -> ImpDeclSpec -> ImportDecl RdrName -> NameSet -> RnM (ImportDecl Name)
+rnImportDecl iface decl_spec (ImportDecl loc_imp_mod_name want_boot qual_only as_mod Nothing) all_names
+    = return $ ImportDecl loc_imp_mod_name want_boot qual_only as_mod Nothing
+rnImportDecl iface decl_spec (ImportDecl loc_imp_mod_name want_boot qual_only as_mod (Just (want_hiding,import_items))) all_names
+    = do import_items_mbs <- mapM (srcSpanWrapper) import_items
+         let rn_import_items = concat . catMaybes $ import_items_mbs
+         return $ ImportDecl loc_imp_mod_name want_boot qual_only as_mod (Just (want_hiding,rn_import_items))
+    where
+    srcSpanWrapper (L span ieRdr)
+        = setSrcSpan span $
+          case get_item ieRdr of
+            Nothing
+                -> do addErr (badImportItemErr iface decl_spec ieRdr)
+                      return Nothing
+            Just ieNames
+                -> return (Just [L span ie | ie <- ieNames])
+    occ_env :: OccEnv Name	-- Maps OccName to corresponding Name
+    occ_env = mkOccEnv [(nameOccName n, n) | n <- nameSetToList all_names]
+	-- This env will have entries for data constructors too,
+	-- they won't make any difference because naked entities like T
+	-- in an import list map to TcOccs, not VarOccs.
+
+    sub_env :: NameEnv [Name]
+    sub_env = mkSubNameEnv all_names
+
+    get_item :: IE RdrName -> Maybe [IE Name]
+        -- Empty result for a bad item.
+	-- Singleton result is typical case.
+        -- Can have two when we are hiding, and mention C which might be
+	--	both a class and a data constructor.  
+    get_item item@(IEModuleContents _) 
+      = Nothing
+
+    get_item (IEThingAll tc)
+      = do name <- check_name tc
+           return [IEThingAll name]
+{-
+   -> -- This occurs when you import T(..), but
+			-- only export T abstractly.  The single [n]
+			-- in the AvailTC is the type or class itself
+			ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn tc)) `thenM_`
+		     	return [ IEThingAll n ]
+
+	  names -> return [ IEThingAll n | n <- names ]
+-}
+
+    get_item (IEThingAbs tc)
+        | want_hiding   -- hiding ( C )
+                        -- Here the 'C' can be a data constructor 
+                        --  *or* a type/class, or even both
+            = case catMaybes [check_name tc, check_name (setRdrNameSpace tc srcDataName)] of
+                []    -> Nothing
+                names -> return [ IEThingAbs n | n <- names ]
+        | otherwise
+            = do name <- check_name tc
+                 return [IEThingAbs name]
+    get_item (IEThingWith n ns) -- import (C (A,B))
+        = do name <- check_name n
+             let env = mkOccEnv [(nameOccName s, s) | s <- subNames sub_env name]
+                 mb_names = map (lookupOccEnv env . rdrNameOcc) ns
+             names <- sequence mb_names
+             return [IEThingWith name names]
+
+    get_item (IEVar n)
+      = do name <- check_name n
+           return [IEVar name]
+
+    check_name :: RdrName -> Maybe Name
+    check_name rdrName
+	= lookupOccEnv occ_env (rdrNameOcc rdrName)
+
+
+importsFromImportDeclDirect :: Module
+                            -> LImportDecl RdrName
+                            -> RnM (LImportDecl Name)
+importsFromImportDeclDirect this_mod
+                            (L loc importDecl@(ImportDecl loc_imp_mod_name want_boot qual_only as_mod imp_details))
+    = setSrcSpan loc $
+      do iface <- loadSrcInterface doc imp_mod_name want_boot
+         -- Compiler sanity check: if the import didn't say
+         -- {-# SOURCE #-} we should not get a hi-boot file
+         WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) $ do
+         -- Issue a user warning for a redundant {- SOURCE -} import
+         -- NB that we arrange to read all the ordinary imports before 
+         -- any of the {- SOURCE -} imports
+         warnIf (want_boot && not (mi_boot iface))
+                    (warnRedundantSourceImport imp_mod_name)
+
+         let deprecs	= mi_deprecs iface
+             is_orph	= mi_orphan iface 
+             deps 	= mi_deps iface
+             filtered_exports = filter not_this_mod (mi_exports iface)
+             not_this_mod (mod,_) = mod /= this_mod
+             imp_mod	= mi_module iface
+
+	-- If the module exports anything defined in this module, just ignore it.
+	-- Reason: otherwise it looks as if there are two local definition sites
+	-- for the thing, and an error gets reported.  Easiest thing is just to
+	-- filter them out up front. This situation only arises if a module
+	-- imports itself, or another module that imported it.  (Necessarily,
+	-- this invoves a loop.)  
+	--
+	-- Tiresome consequence: if you say
+	--	module A where
+	--	   import B( AType )
+	--	   type AType = ...
+	--
+	--	module B( AType ) where
+	--	   import {-# SOURCE #-} A( AType )
+	--
+	-- then you'll get a 'B does not export AType' message.  Oh well.
+
+             qual_mod_name = case as_mod of
+                               Nothing  	    -> imp_mod_name
+                               Just another_name -> another_name
+             imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,  
+                                       is_dloc = loc, is_as = qual_mod_name }
+
+	 -- Get the total imports, and filter them according to the import list
+         total_avails <- ifaceExportNames filtered_exports
+         importDecl' <- rnImportDecl iface imp_spec importDecl total_avails
+         return (L loc importDecl')
+    where imp_mod_name = unLoc loc_imp_mod_name
+          doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
+
 importsFromImportDecl :: Module
-		      -> LImportDecl RdrName
+		      -> LImportDecl Name
 		      -> RnM (GlobalRdrEnv, ImportAvails)
 
 importsFromImportDecl this_mod
@@ -378,7 +502,7 @@ available, and filters it through the import spec (if any).
 \begin{code}
 filterImports :: ModIface
 	      -> ImpDeclSpec			-- The span for the entire import decl
-	      -> Maybe (Bool, [Located (IE RdrName)])	-- Import spec; True => hiding
+	      -> Maybe (Bool, [LIE Name])	-- Import spec; True => hiding
 	      -> NameSet			-- What's available
 	      -> RnM (NameSet,			-- What's imported (qualified or unqualified)
 		      GlobalRdrEnv)		-- Same again, but in GRE form
@@ -393,35 +517,20 @@ mkGenericRdrEnv decl_spec names
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
 filterImports iface decl_spec Nothing all_names
-  = returnM (all_names, mkGenericRdrEnv decl_spec all_names)
+  = return (all_names, mkGenericRdrEnv decl_spec all_names)
 
 filterImports iface decl_spec (Just (want_hiding, import_items)) all_names
-  = mappM (addLocM get_item) import_items 	`thenM` \ gres_s ->
-    let
-	gres = concat gres_s
-	specified_names = mkNameSet (map gre_name gres)
-    in
-    if not want_hiding then
-      return (specified_names, mkGlobalRdrEnv gres)
-    else
-    let
-	keep n = not (n `elemNameSet` specified_names)
-	pruned_avails = filterNameSet keep all_names
-    in
-    return (pruned_avails, mkGenericRdrEnv decl_spec pruned_avails)
-
+  = mapM (addLocM get_item) import_items >>= \gres_s ->
+    let gres = concat gres_s
+        specified_names = mkNameSet (map gre_name gres)
+    in if not want_hiding then
+       return (specified_names, mkGlobalRdrEnv gres)
+    else let keep n = not (n `elemNameSet` specified_names)
+             pruned_avails = filterNameSet keep all_names
+         in return (pruned_avails, mkGenericRdrEnv decl_spec pruned_avails)
   where
-    occ_env :: OccEnv Name	-- Maps OccName to corresponding Name
-    occ_env = mkOccEnv [(nameOccName n, n) | n <- nameSetToList all_names]
-	-- This env will have entries for data constructors too,
-	-- they won't make any difference because naked entities like T
-	-- in an import list map to TcOccs, not VarOccs.
-
-    sub_env :: NameEnv [Name]
+    sub_env :: NameEnv [Name]	-- Classify each name by its parent
     sub_env = mkSubNameEnv all_names
-
-    bale_out item = addErr (badImportItemErr iface decl_spec item)  `thenM_`
-		    returnM []
 
     succeed_with :: Bool -> [Name] -> RnM [GlobalRdrElt]
     succeed_with all_explicit names
@@ -435,46 +544,29 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_names
 	    item_spec = ImpSome { is_explicit = explicit, is_iloc = loc }
 	    explicit  = all_explicit || isNothing (nameParent_maybe name)
 
-    get_item :: IE RdrName -> RnM [GlobalRdrElt]
+    get_item :: IE Name -> RnM [GlobalRdrElt]
 	-- Empty result for a bad item.
 	-- Singleton result is typical case.
 	-- Can have two when we are hiding, and mention C which might be
 	--	both a class and a data constructor.  
     get_item item@(IEModuleContents _) 
-      = bale_out item
+        -- This case should be filtered out by 'rnImports'.
+        = panic "filterImports: IEModuleContents?" 
 
-    get_item item@(IEThingAll tc)
-      = case check_item item of
-	  []    -> bale_out item
+    get_item (IEThingAll name)
+        = case subNames sub_env name of
+            [] -> do ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn name))
+                     succeed_with False [name]
+            names -> succeed_with False (name:names)
 
-	  [n]   -> -- This occurs when you import T(..), but
-			-- only export T abstractly.  The single [n]
-			-- in the AvailTC is the type or class itself
-			ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn tc)) `thenM_`
-		     	succeed_with False [n]
+    get_item (IEThingAbs name)
+        = succeed_with True [name]
 
-	  names -> succeed_with False names
+    get_item (IEThingWith name names)
+        = succeed_with True (name:names)
+    get_item (IEVar name)
+        = succeed_with True [name]
 
-    get_item item@(IEThingAbs n)
-      | want_hiding	-- hiding( C ) 
-			-- Here the 'C' can be a data constructor 
-			--  *or* a type/class, or even both
-      = case concat [check_item item, check_item (IEVar data_n)] of
-	  []    -> bale_out item
-	  names -> succeed_with True names
-      where
-	data_n = setRdrNameSpace n srcDataName
-
-    get_item item
-      = case check_item item of
-	  []    -> bale_out item
-	  names -> succeed_with True names
-
-    check_item :: IE RdrName -> [Name]
-    check_item item 
-	= case lookupOccEnv occ_env (rdrNameOcc (ieName item)) of
-	    Nothing   -> []
-	    Just name -> filterAvail item name sub_env
 \end{code}
 
 
@@ -504,23 +596,54 @@ type ExportAccum	-- The type of the accumulating parameter of
 	NameSet)		-- The accumulated exported stuff
 emptyExportAccum = ([], emptyOccEnv, emptyNameSet) 
 
-type ExportOccMap = OccEnv (Name, IE RdrName)
+type ExportOccMap = OccEnv (Name, IE Name)
 	-- Tracks what a particular exported OccName
 	--   in an export list refers to, and which item
 	--   it came from.  It's illegal to export two distinct things
 	--   that have the same occurrence name
 
+rnExports :: Maybe [LIE RdrName]
+          -> RnM (Maybe [LIE Name])
+rnExports Nothing = return Nothing
+rnExports (Just exports)
+    = do TcGblEnv { tcg_imports = ImportAvails { imp_env = imp_env } } <- getGblEnv
+         let sub_env :: NameEnv [Name]	-- Classify each name by its parent
+             sub_env = mkSubNameEnv (foldModuleEnv unionNameSets emptyNameSet imp_env)
+             inLoc fn (L span x)
+                 = do x' <- fn x
+                      return (L span x')
+             rnExport (IEVar rdrName)
+                 = do name <- lookupGlobalOccRn rdrName
+                      return (IEVar name)
+             rnExport (IEThingAbs rdrName)
+                 = do name <- lookupGlobalOccRn rdrName
+                      return (IEThingAbs name)
+             rnExport (IEThingAll rdrName)
+                 = do name <- lookupGlobalOccRn rdrName
+                      return (IEThingAll name)
+             rnExport (IEThingWith rdrName rdrNames)
+                 = do name <- lookupGlobalOccRn rdrName
+                      let env = mkOccEnv [(nameOccName s, s) | s <- subNames sub_env name]
+                          mb_names = map (lookupOccEnv env . rdrNameOcc) rdrNames
+                      if any isNothing mb_names
+                         then -- The export error will be reporting in 'mkExportNameSet'
+                              return (IEThingWith name [])
+                         else return (IEThingWith name (catMaybes mb_names))
+             rnExport (IEModuleContents mod)
+                 = return (IEModuleContents mod)
+         rn_exports <- mapM (inLoc rnExport) exports
+         return (Just rn_exports)
 
-rnExports :: Bool  -- False => no 'module M(..) where' header at all
-	  -> Maybe [Located (IE RdrName)] -- Nothing => no explicit export list
-	  -> RnM NameSet
+mkExportNameSet :: Bool  -- False => no 'module M(..) where' header at all
+                -> Maybe [LIE Name] -- Nothing => no explicit export list
+                -> RnM NameSet
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
 
-rnExports explicit_mod exports
- = do { TcGblEnv { tcg_rdr_env = rdr_env, 
-		   tcg_imports = imports } <- getGblEnv ;
+mkExportNameSet explicit_mod exports
+ = do TcGblEnv { tcg_rdr_env = rdr_env, 
+                 tcg_imports = imports } <- getGblEnv
 
 	-- If the module header is omitted altogether, then behave
 	-- as if the user had written "module Main(main) where..."
@@ -528,13 +651,17 @@ rnExports explicit_mod exports
 	-- written "module Main where ..."
 	-- Reason: don't want to complain about 'main' not in scope
 	--	   in interactive mode
-	ghci_mode <- getGhciMode ;
-	let { real_exports 
-		| explicit_mod   	   = exports
-		| ghci_mode == Interactive = Nothing
-		| otherwise 		   = Just [noLoc (IEVar main_RDR_Unqual)] } ;
+      ghci_mode <- getGhciMode
+      real_exports <- case () of
+                        () | explicit_mod
+                               -> return exports
+                           | ghci_mode == Interactive
+                               -> return Nothing
+                           | otherwise
+                               -> do mainName <- lookupGlobalOccRn main_RDR_Unqual
+                                     return (Just [noLoc (IEVar mainName)])
 		-- ToDo: the 'noLoc' here is unhelpful if 'main' turns out to be out of scope
-	exports_from_avail real_exports rdr_env imports }
+      exports_from_avail real_exports rdr_env imports
 
 
 exports_from_avail Nothing rdr_env imports
@@ -546,16 +673,16 @@ exports_from_avail Nothing rdr_env imports
 		       isLocalGRE gre ])
 
 exports_from_avail (Just items) rdr_env (ImportAvails { imp_env = imp_env }) 
-  = foldlM do_litem emptyExportAccum items    `thenM` \ (_, _, exports) ->
-    returnM exports
+  = do (_, _, exports) <- foldlM do_litem emptyExportAccum items
+       return exports
   where
     sub_env :: NameEnv [Name]	-- Classify each name by its parent
     sub_env = mkSubNameEnv (foldModuleEnv unionNameSets emptyNameSet imp_env)
 
-    do_litem :: ExportAccum -> Located (IE RdrName) -> RnM ExportAccum
+    do_litem :: ExportAccum -> LIE Name -> RnM ExportAccum
     do_litem acc = addLocM (exports_from_item acc)
 
-    exports_from_item :: ExportAccum -> IE RdrName -> RnM ExportAccum
+    exports_from_item :: ExportAccum -> IE Name -> RnM ExportAccum
     exports_from_item acc@(mods, occs, exports) ie@(IEModuleContents mod)
 	| mod `elem` mods 	-- Duplicate export of M
 	= do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
@@ -564,48 +691,36 @@ exports_from_avail (Just items) rdr_env (ImportAvails { imp_env = imp_env })
 
 	| otherwise
 	= case lookupModuleEnv imp_env mod of
-	    Nothing -> addErr (modExportErr mod)	`thenM_`
-		       returnM acc
-	    Just names
-		-> let
-		     new_exports = filterNameSet (inScopeUnqual rdr_env) names
-		   in
-
-		-- This check_occs not only finds conflicts between this item
-		-- and others, but also internally within this item.  That is,
-		-- if 'M.x' is in scope in several ways, we'll have several
-		-- members of mod_avails with the same OccName.
-		   check_occs ie occs (nameSetToList new_exports)	`thenM` \ occs' ->
-		   returnM (mod:mods, occs', exports `unionNameSets` new_exports)
+            Nothing -> do addErr (modExportErr mod)
+                          return acc
+            Just names
+                -> do let new_exports = filterNameSet (inScopeUnqual rdr_env) names
+                      -- This check_occs not only finds conflicts between this item
+                      -- and others, but also internally within this item.  That is,
+                      -- if 'M.x' is in scope in several ways, we'll have several
+                      -- members of mod_avails with the same OccName.
+                      occs' <- check_occs ie occs (nameSetToList new_exports)
+                      return (mod:mods, occs', exports `unionNameSets` new_exports)
 
     exports_from_item acc@(mods, occs, exports) ie
-	= lookupGlobalOccRn (ieName ie)	 		`thenM` \ name -> 
-	  if isUnboundName name then
-		returnM acc 	-- Avoid error cascade
-	  else let
-	    new_exports = filterAvail ie name sub_env
-	  in
-	  checkErr (not (null new_exports)) (exportItemErr ie)	`thenM_`
-	  checkForDodgyExport ie new_exports			`thenM_`
-          check_occs ie occs new_exports			`thenM` \ occs' ->
-	  returnM (mods, occs', addListToNameSet exports new_exports)
+        = if isUnboundName (ieName ie)
+          then return acc 	-- Avoid error cascade
+          else let new_exports = filterAvail ie sub_env in
+          do checkErr (not (null new_exports)) (exportItemErr ie)
+             checkForDodgyExport ie new_exports
+             occs' <- check_occs ie occs new_exports
+             return (mods, occs', addListToNameSet exports new_exports)
 	  
 -------------------------------
-filterAvail :: IE RdrName	-- Wanted
-	    -> Name		-- The Name of the ieName of the item
+filterAvail :: IE Name  	-- Wanted
 	    -> NameEnv [Name]	-- Maps type/class names to their sub-names
-	    -> [Name]		-- Empty if even one thing reqd is missing
+	    -> [Name]
 
-filterAvail (IEVar _)      	 n subs = [n]
-filterAvail (IEThingAbs _) 	 n subs = [n]
-filterAvail (IEThingAll _) 	 n subs = n : subNames subs n
-filterAvail (IEThingWith _ rdrs) n subs
-  | any isNothing mb_names = []
-  | otherwise		   = n : catMaybes mb_names
-  where
-    env = mkOccEnv [(nameOccName s, s) | s <- subNames subs n]
-    mb_names = map (lookupOccEnv env . rdrNameOcc) rdrs
-filterAvail (IEModuleContents _) _ _ = panic "filterAvail"
+filterAvail (IEVar n)          subs = [n]
+filterAvail (IEThingAbs n)     subs = [n]
+filterAvail (IEThingAll n)     subs = n : subNames subs n
+filterAvail (IEThingWith n ns) subs = n : ns
+filterAvail (IEModuleContents _) _  = panic "filterAvail"
 
 subNames :: NameEnv [Name] -> Name -> [Name]
 subNames env n = lookupNameEnv env n `orElse` []
@@ -628,7 +743,7 @@ inScopeUnqual :: GlobalRdrEnv -> Name -> Bool
 inScopeUnqual env n = any unQualOK (lookupGRE_Name env n)
 
 -------------------------------
-checkForDodgyExport :: IE RdrName -> [Name] -> RnM ()
+checkForDodgyExport :: IE Name -> [Name] -> RnM ()
 checkForDodgyExport ie@(IEThingAll tc) [n] 
   | isTcOcc (nameOccName n) = addWarn (dodgyExportWarn tc)
 	-- This occurs when you export T(..), but
@@ -639,7 +754,7 @@ checkForDodgyExport ie@(IEThingAll tc) [n]
 checkForDodgyExport _ _ = return ()
 
 -------------------------------
-check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
+check_occs :: IE Name -> ExportOccMap -> [Name] -> RnM ExportOccMap
 check_occs ie occs names
   = foldlM check occs names
   where
@@ -730,7 +845,7 @@ gre_is_used used_names gre = gre_name gre `elemNameSet` used_names
 %*********************************************************
 
 \begin{code}
-reportUnusedNames :: Maybe [Located (IE RdrName)] 	-- Export list
+reportUnusedNames :: Maybe [LIE RdrName] 	-- Export list
 		  -> TcGblEnv -> RnM ()
 reportUnusedNames export_decls gbl_env 
   = do	{ traceRn ((text "RUN") <+> (ppr (tcg_dus gbl_env)))
@@ -970,8 +1085,8 @@ printMinimalImports imps
 	= ptext SLIT("import") <+> ppr mod_name <> 
 		    parens (fsep (punctuate comma (map ppr ies)))
 
-    to_ies (mod, avail_env) = mappM to_ie (availEnvElts avail_env)	`thenM` \ ies ->
-			      returnM (mod, ies)
+    to_ies (mod, avail_env) = do ies <- mapM to_ie (availEnvElts avail_env)
+                                 returnM (mod, ies)
 
     to_ie :: AvailInfo -> RnM (IE Name)
 	-- The main trick here is that if we're importing all the constructors

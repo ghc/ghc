@@ -53,6 +53,7 @@ import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
 import RnNames		( importsFromLocalDecls, rnImports, rnExports,
+                          mkRdrEnvAndImports, mkExportNameSet,
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
@@ -149,7 +150,7 @@ tcRnModule :: HscEnv
 	   -> Located (HsModule RdrName)
 	   -> IO (Messages, Maybe TcGblEnv)
 
-tcRnModule hsc_env hsc_src save_rn_decls
+tcRnModule hsc_env hsc_src save_rn_syntax
 	 (L loc (HsModule maybe_mod export_ies 
 			  import_decls local_decls mod_deprec))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
@@ -161,8 +162,9 @@ tcRnModule hsc_env hsc_src save_rn_decls
    initTc hsc_env hsc_src this_mod $ 
    setSrcSpan loc $
    do {
-		-- Deal with imports; sets tcg_rdr_env, tcg_imports
-	(rdr_env, imports) <- rnImports import_decls ;
+		-- Deal with imports;
+	rn_imports <- rnImports import_decls ;
+        (rdr_env, imports) <- mkRdrEnvAndImports rn_imports ;
 
 	let { dep_mods :: ModuleEnv (Module, IsBootInterface)
 	    ; dep_mods = imp_dep_mods imports
@@ -189,7 +191,11 @@ tcRnModule hsc_env hsc_src save_rn_decls
 		gbl { tcg_rdr_env  = rdr_env,
 		      tcg_inst_env = extendInstEnvList (tcg_inst_env gbl) home_insts,
 		      tcg_imports  = tcg_imports gbl `plusImportAvails` imports,
-		      tcg_rn_decls = if save_rn_decls then
+                      tcg_rn_imports = if save_rn_syntax then
+                                         Just rn_imports
+                                       else
+                                         Nothing,
+		      tcg_rn_decls = if save_rn_syntax then
 					Just emptyRnGroup
 				     else
 					Nothing })
@@ -223,7 +229,8 @@ tcRnModule hsc_env hsc_src save_rn_decls
 	reportDeprecations tcg_env ;
 
 		-- Process the export list
-	exports <- rnExports (isJust maybe_mod) export_ies ;
+	rn_exports <- rnExports export_ies ;
+        exports <- mkExportNameSet (isJust maybe_mod) rn_exports ;
 
 		-- Check whether the entire module is deprecated
 		-- This happens only once per module
@@ -231,6 +238,9 @@ tcRnModule hsc_env hsc_src save_rn_decls
 
 		-- Add exports and deprecations to envt
 	let { final_env  = tcg_env { tcg_exports = exports,
+                                     tcg_rn_exports = if save_rn_syntax then
+                                                         rn_exports
+                                                      else Nothing,
 				     tcg_dus = tcg_dus tcg_env `plusDU` usesOnly exports,
 				     tcg_deprecs = tcg_deprecs tcg_env `plusDeprecs` 
 						   mod_deprecs }

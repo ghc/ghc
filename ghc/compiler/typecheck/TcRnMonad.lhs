@@ -98,6 +98,8 @@ initTc hsc_env hsc_src mod do_this
 		tcg_imports  = init_imports,
 		tcg_home_mods = home_mods,
 		tcg_dus      = emptyDUs,
+                tcg_rn_imports = Nothing,
+                tcg_rn_exports = Nothing,
 		tcg_rn_decls = Nothing,
 		tcg_binds    = emptyLHsBinds,
 		tcg_deprecs  = NoDeprecs,

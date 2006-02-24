@@ -40,7 +40,7 @@ import VarEnv		( emptyTidyEnv )
 import Var		( Id )
 import Module		( emptyModuleEnv, ModLocation(..) )
 import RdrName		( GlobalRdrEnv, RdrName )
-import HsSyn		( HsModule, LHsBinds, HsGroup )
+import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl )
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
 import Parser
@@ -133,9 +133,12 @@ data HscResult
 
    -- In IDE mode: we just do the static/dynamic checks
    | HscChecked 
-	(Located (HsModule RdrName))			-- parsed
-	(Maybe (HsGroup Name))				-- renamed
-	(Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails)) -- typechecked
+        -- parsed
+	(Located (HsModule RdrName))
+        -- renamed
+	(Maybe (HsGroup Name,[LImportDecl Name],Maybe [LIE Name]))
+        -- typechecked
+	(Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
 
    -- Concluded that it wasn't necessary
    | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
@@ -339,8 +342,12 @@ hscFileCheck hsc_env mod_summary = do {
 				md_rules   = [panic "no rules"] }
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker
+                    rnInfo = do decl <- tcg_rn_decls tc_result
+                                imports <- tcg_rn_imports tc_result
+                                let exports = tcg_rn_exports tc_result
+                                return (decl,imports,exports)
 		return (HscChecked rdr_module 
-				   (tcg_rn_decls tc_result)
+                                   rnInfo
 				   (Just (tcg_binds tc_result,
 					  tcg_rdr_env tc_result,
 					  md)))
