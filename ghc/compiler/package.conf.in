@@ -121,12 +121,9 @@ exposed-modules:
 	IfaceEnv
 	IfaceSyn
 	IfaceType
-	IlxGen
 	Inst
 	InstEnv
 	InteractiveUI
-	Java
-	JavaGen
 	Kind
 	Lexer
 	LexCore
@@ -176,10 +173,7 @@ exposed-modules:
 	PrelNames
 	PrelRules
 	Pretty
-	PrettyTest
 	PrimOp
-	PrimPacked
-	PrintJava
 	RdrHsSyn
 	RdrName
 	RegAllocInfo
@@ -248,7 +242,6 @@ exposed-modules:
 	TypeRep
 	TysPrim
 	TysWiredIn
-	UnicodeUtil
 	Unify
 	UniqFM
 	UniqSet
