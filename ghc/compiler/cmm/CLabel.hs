@@ -614,6 +614,9 @@ tell whether a code fragment is a return point or a closure/function
 entry.
 -}
 
+instance Outputable CLabel where
+  ppr = pprCLabel
+
 pprCLabel :: CLabel -> SDoc
 
 #if ! OMIT_NATIVE_CODEGEN
