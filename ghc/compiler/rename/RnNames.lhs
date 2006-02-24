@@ -79,7 +79,7 @@ rnImports imports
          let all_imports	       = mk_prel_imports this_mod implicit_prelude ++ imports
              (source, ordinary) = partition is_source_import all_imports
              is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
-             get_imports = importsFromImportDeclDirect this_mod
+             get_imports = rnImportDecl this_mod
 
          stuff1 <- mapM get_imports ordinary
          stuff2 <- mapM get_imports source
@@ -126,13 +126,30 @@ mkRdrEnvAndImports imports
 \end{code}
 	
 \begin{code}
-rnImportDecl :: ModIface -> ImpDeclSpec -> ImportDecl RdrName -> NameSet -> RnM (ImportDecl Name)
-rnImportDecl iface decl_spec (ImportDecl loc_imp_mod_name want_boot qual_only as_mod Nothing) all_names
-    = return $ ImportDecl loc_imp_mod_name want_boot qual_only as_mod Nothing
-rnImportDecl iface decl_spec (ImportDecl loc_imp_mod_name want_boot qual_only as_mod (Just (want_hiding,import_items))) all_names
+rnImportDecl :: Module
+             -> LImportDecl RdrName
+             -> RnM (LImportDecl Name)
+rnImportDecl this_mod (L loc importDecl@(ImportDecl loc_imp_mod_name want_boot qual_only as_mod imp_details))
+    = setSrcSpan loc $
+      do iface <- loadSrcInterface doc imp_mod_name want_boot
+         let qual_mod_name = case as_mod of
+                               Nothing           -> imp_mod_name
+                               Just another_name -> another_name
+             imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,  
+                                       is_dloc = loc, is_as = qual_mod_name }
+         total_avails <- ifaceExportNames (mi_exports iface)
+         importDecl' <- rnImportDecl' iface imp_spec importDecl total_avails
+         return (L loc importDecl')
+    where imp_mod_name = unLoc loc_imp_mod_name
+          doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
+
+rnImportDecl' :: ModIface -> ImpDeclSpec -> ImportDecl RdrName -> NameSet -> RnM (ImportDecl Name)
+rnImportDecl' iface decl_spec (ImportDecl mod_name want_boot qual_only as_mod Nothing) all_names
+    = return $ ImportDecl mod_name want_boot qual_only as_mod Nothing
+rnImportDecl' iface decl_spec (ImportDecl mod_name want_boot qual_only as_mod (Just (want_hiding,import_items))) all_names
     = do import_items_mbs <- mapM (srcSpanWrapper) import_items
          let rn_import_items = concat . catMaybes $ import_items_mbs
-         return $ ImportDecl loc_imp_mod_name want_boot qual_only as_mod (Just (want_hiding,rn_import_items))
+         return $ ImportDecl mod_name want_boot qual_only as_mod (Just (want_hiding,rn_import_items))
     where
     srcSpanWrapper (L span ieRdr)
         = setSrcSpan span $
@@ -157,21 +174,10 @@ rnImportDecl iface decl_spec (ImportDecl loc_imp_mod_name want_boot qual_only as
         -- Can have two when we are hiding, and mention C which might be
 	--	both a class and a data constructor.  
     get_item item@(IEModuleContents _) 
-      = Nothing
-
+        = Nothing
     get_item (IEThingAll tc)
-      = do name <- check_name tc
-           return [IEThingAll name]
-{-
-   -> -- This occurs when you import T(..), but
-			-- only export T abstractly.  The single [n]
-			-- in the AvailTC is the type or class itself
-			ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn tc)) `thenM_`
-		     	return [ IEThingAll n ]
-
-	  names -> return [ IEThingAll n | n <- names ]
--}
-
+        = do name <- check_name tc
+             return [IEThingAll name]
     get_item (IEThingAbs tc)
         | want_hiding   -- hiding ( C )
                         -- Here the 'C' can be a data constructor 
@@ -188,55 +194,14 @@ rnImportDecl iface decl_spec (ImportDecl loc_imp_mod_name want_boot qual_only as
                  mb_names = map (lookupOccEnv env . rdrNameOcc) ns
              names <- sequence mb_names
              return [IEThingWith name names]
-
     get_item (IEVar n)
-      = do name <- check_name n
-           return [IEVar name]
+        = do name <- check_name n
+             return [IEVar name]
 
     check_name :: RdrName -> Maybe Name
     check_name rdrName
 	= lookupOccEnv occ_env (rdrNameOcc rdrName)
 
-
-importsFromImportDeclDirect :: Module
-                            -> LImportDecl RdrName
-                            -> RnM (LImportDecl Name)
-importsFromImportDeclDirect this_mod
-                            (L loc importDecl@(ImportDecl loc_imp_mod_name want_boot qual_only as_mod imp_details))
-    = setSrcSpan loc $
-      do iface <- loadSrcInterface doc imp_mod_name want_boot
-         let filtered_exports = filter not_this_mod (mi_exports iface)
-             not_this_mod (mod,_) = mod /= this_mod
-
-	-- If the module exports anything defined in this module, just ignore it.
-	-- Reason: otherwise it looks as if there are two local definition sites
-	-- for the thing, and an error gets reported.  Easiest thing is just to
-	-- filter them out up front. This situation only arises if a module
-	-- imports itself, or another module that imported it.  (Necessarily,
-	-- this invoves a loop.)  
-	--
-	-- Tiresome consequence: if you say
-	--	module A where
-	--	   import B( AType )
-	--	   type AType = ...
-	--
-	--	module B( AType ) where
-	--	   import {-# SOURCE #-} A( AType )
-	--
-	-- then you'll get a 'B does not export AType' message.  Oh well.
-
-             qual_mod_name = case as_mod of
-                               Nothing  	    -> imp_mod_name
-                               Just another_name -> another_name
-             imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,  
-                                       is_dloc = loc, is_as = qual_mod_name }
-
-	 -- Get the total imports, and filter them according to the import list
-         total_avails <- ifaceExportNames (mi_exports iface)
-         importDecl' <- rnImportDecl iface imp_spec importDecl total_avails
-         return (L loc importDecl')
-    where imp_mod_name = unLoc loc_imp_mod_name
-          doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
 
 importsFromImportDecl :: Module
 		      -> LImportDecl Name
@@ -541,7 +506,9 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_names
 
     get_item (IEThingAll name)
         = case subNames sub_env name of
-            [] -> do ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn name))
+            [] ->       -- This occurs when you import T(..), but
+                        -- only export T abstractly.
+                  do ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn name))
                      succeed_with False [name]
             names -> succeed_with False (name:names)
 
