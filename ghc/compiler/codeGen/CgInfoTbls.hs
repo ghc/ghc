@@ -249,7 +249,7 @@ emitReturnTarget name stmts vector srt
 	; emitInfoTableAndCode info_lbl std_info extra_bits args blks
 	; return info_lbl }
   where
-    args = trace "emitReturnTarget: missing args" []
+    args      = {- trace "emitReturnTarget: missing args" -} []
     uniq      = getUnique name
     info_lbl  = mkReturnInfoLabel uniq
 
