@@ -121,8 +121,11 @@ exposed-modules:
 	IfaceEnv
 	IfaceSyn
 	IfaceType
+	IlxGen
 	Inst
 	InstEnv
+	Java
+	JavaGen
 	InteractiveUI
 	Kind
 	Lexer
@@ -171,6 +174,7 @@ exposed-modules:
 	PprTyThing
 	PrelInfo
 	PrelNames
+	PrintJava
 	PrelRules
 	Pretty
 	PrimOp
