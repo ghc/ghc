@@ -22,6 +22,7 @@ import MachInstrs
 import MachRegs
 import NCGMonad
 import PositionIndependentCode ( cmmMakeDynamicReference, initializePicBase )
+import RegAllocInfo ( mkBranchInstr )
 
 -- Our intermediate code:
 import PprCmm		( pprExpr )
@@ -2555,22 +2556,7 @@ genJump tree
 
 genBranch :: BlockId -> NatM InstrBlock
 
-#if alpha_TARGET_ARCH
-genBranch id = return (unitOL (BR id))
-#endif
-
-#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-genBranch id = return (unitOL (JXX ALWAYS id))
-#endif
-
-#if sparc_TARGET_ARCH
-genBranch (BlockId id) = return (toOL [BI ALWAYS False (ImmCLbl (mkAsmTempLabel id)), NOP])
-#endif
-
-#if powerpc_TARGET_ARCH
-genBranch id = return (unitOL (BCC ALWAYS id))
-#endif
-
+genBranch = return . toOL . mkBranchInstr
 
 -- -----------------------------------------------------------------------------
 --  Conditional jumps

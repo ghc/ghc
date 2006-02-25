@@ -193,7 +193,7 @@ cmmNativeGen dflags cmm
      {-# SCC "genMachCode"      #-}
 	genMachCode cmm              `thenUs` \ (pre_regalloc, lastMinuteImports) ->
      {-# SCC "regAlloc"         #-}
-	map regAlloc pre_regalloc    `bind`   \ with_regs ->
+	mapUs regAlloc pre_regalloc `thenUs`   \ with_regs ->
      {-# SCC "sequenceBlocks"   #-}
 	map sequenceTop with_regs    `bind`   \ sequenced ->
      {-# SCC "x86fp_kludge"     #-}

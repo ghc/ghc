@@ -14,19 +14,20 @@ module RegAllocInfo (
 	regUsage,
 	patchRegs,
 	jumpDests,
+	patchJump,
 	isRegRegMove,
 
 	maxSpillSlots,
 	mkSpillInstr,
 	mkLoadInstr,
+	mkRegRegMoveInstr,
+	mkBranchInstr
     ) where
 
 #include "HsVersions.h"
 
 import Cmm		( BlockId )
-#if powerpc_TARGET_ARCH || i386_TARGET_ARCH || x86_64_TARGET_ARCH || sparc_TARGET_ARCH
-import MachOp           ( MachRep(..) )
-#endif
+import MachOp           ( MachRep(..), wordRep )
 import MachInstrs
 import MachRegs
 import Outputable
@@ -404,6 +405,18 @@ jumpDests insn acc
 #endif
 	_other		-> acc
 
+patchJump :: Instr -> BlockId -> BlockId -> Instr
+
+patchJump insn old new
+  = case insn of
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+	JXX cc id | id == old -> JXX cc new
+	JMP_TBL op ids -> error "Cannot patch JMP_TBL"
+#elif powerpc_TARGET_ARCH
+        BCC cc id | id == old -> BCC cc new
+        BCTR targets -> error "Cannot patch BCTR"
+#endif
+	_other		-> insn
 
 -- -----------------------------------------------------------------------------
 -- 'patchRegs' function
@@ -780,6 +793,38 @@ mkLoadInstr reg delta slot
                 RcInteger -> I32
                 RcDouble -> F64
     in LD sz reg (AddrRegImm sp (ImmInt (off-delta)))
+#endif
+
+mkRegRegMoveInstr
+    :: Reg
+    -> Reg
+    -> Instr
+mkRegRegMoveInstr src dst
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+    = case regClass src of
+        RcInteger -> MOV wordRep (OpReg src) (OpReg dst)
+        RcDouble  -> GMOV src dst
+#elif powerpc_TARGET_ARCH
+    = MR dst src
+#endif
+
+mkBranchInstr
+    :: BlockId
+    -> [Instr]
+#if alpha_TARGET_ARCH
+mkBranchInstr id = [BR id]
+#endif
+
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+mkBranchInstr id = [JXX ALWAYS id]
+#endif
+
+#if sparc_TARGET_ARCH
+mkBranchInstr (BlockId id) = [BI ALWAYS False (ImmCLbl (mkAsmTempLabel id)), NOP]
+#endif
+
+#if powerpc_TARGET_ARCH
+mkBranchInstr id = [BCC ALWAYS id]
 #endif
 
 
