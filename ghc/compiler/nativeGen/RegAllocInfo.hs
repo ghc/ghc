@@ -803,7 +803,11 @@ mkRegRegMoveInstr src dst
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
     = case regClass src of
         RcInteger -> MOV wordRep (OpReg src) (OpReg dst)
+#if i386_TARGET_ARCH
         RcDouble  -> GMOV src dst
+#else
+        RcDouble  -> MOV F64 (OpReg src) (OpReg dst)
+#endif
 #elif powerpc_TARGET_ARCH
     = MR dst src
 #endif
