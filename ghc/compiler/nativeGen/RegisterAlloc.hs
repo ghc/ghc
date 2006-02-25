@@ -341,7 +341,7 @@ computeLiveness sccs
 
 
               linearLiveness :: BlockMap RegSet -> [NatBasicBlock]
-                             -> (BlockMap RegSet, AnnBasicBlock])
+                             -> (BlockMap RegSet, [AnnBasicBlock])
               linearLiveness = mapAccumL processBlock
 
 	      processBlock blockmap input@(BasicBlock block_id instrs)
