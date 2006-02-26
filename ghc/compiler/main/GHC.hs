@@ -734,9 +734,6 @@ type RenamedSource     = (HsGroup Name, [LImportDecl Name], Maybe [LIE Name])
 type TypecheckedSource = LHsBinds Id
 
 -- NOTE:
---   - things that aren't in the output of the renamer:
---     - the export list
---     - the imports
 --   - things that aren't in the output of the typechecker right now:
 --     - the export list
 --     - the imports
