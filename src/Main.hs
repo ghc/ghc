@@ -11,6 +11,7 @@ import Binary
 import Digraph
 --import HaddockDB   -- not compiling
 import HaddockHtml
+import HaddockHoogle
 import HaddockLex
 import HaddockParse
 import HaddockRename
@@ -72,6 +73,7 @@ data Flag
   | Flag_Heading String
   | Flag_Package String
   | Flag_Html
+  | Flag_Hoogle
   | Flag_HtmlHelp String
   | Flag_Lib String
   | Flag_NoImplicitPrelude
@@ -111,6 +113,8 @@ options backwardsCompat =
 --	"output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
+    Option []  ["hoogle"]     (NoArg Flag_Hoogle)
+    "output for Hoogle",
     Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")
 	"produce index and table of contents in\nmshelp, mshelp2 or devhelp format (with -h)",
     Option []  ["source-base"]   (ReqArg Flag_SourceBaseURL "URL") 
@@ -319,6 +323,9 @@ run flags files = do
 		maybe_source_urls maybe_wiki_urls
 		maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
+
+  when (Flag_Hoogle `elem` flags) $ do
+    ppHoogle package these_ifaces odir
 
   -- dump an interface if requested
   case dump_iface of
