@@ -181,10 +181,14 @@ my_mmap (void *addr, lnat size)
     if(!addr || err)	// try to allocate anywhere
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
 	
-    if(err) // don't know what the error codes mean exactly
-	barf("memory allocation failed (requested %lu bytes)", size);
-    else
+    if(err) {
+	// don't know what the error codes mean exactly, assume it's
+	// not our problem though.
+	errorBelch("memory allocation failed (requested %lu bytes)", size);
+	stg_exit(EXIT_FAILURE);
+    } else {
 	vm_protect(mach_task_self(),ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
+    }
 #else
     ret = mmap(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC, 
 	       MAP_ANON | MAP_PRIVATE, -1, 0);
