@@ -22,10 +22,6 @@
 
 .DELETE_ON_ERROR:
 
-# This line prevents GNU make from deleting any intermediate targets:
-
-.SECONDARY:
-
 #-----------------------------------------------------------------------------
 # Haskell Suffix Rules
 
