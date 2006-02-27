@@ -219,7 +219,7 @@ sub init_TARGET_STUFF {
     $T_POST_LBL     = ':';
 
     $T_MOVE_DIRVS   = '^(\s*\.(globl|text|data|section|align|size|type|ident|local)\s+.*\n)';
-    $T_COPY_DIRVS   = '\.(globl|local)';
+    $T_COPY_DIRVS   = '\.(globl|type|size|local)';
 
     $T_DOT_WORD     = '\.(quad|long|value|byte|zero)';
     $T_DOT_GLOBAL   = '\.global';
