@@ -379,7 +379,6 @@ RTS_ENTRY(stg_ap_7_upd_entry);
 /* standard application routines (see also rts/gen_apply.py, 
  * and compiler/codeGen/CgStackery.lhs).
  */
-RTS_RET_INFO(stg_ap_0_info);
 RTS_RET_INFO(stg_ap_v_info);
 RTS_RET_INFO(stg_ap_f_info);
 RTS_RET_INFO(stg_ap_d_info);
@@ -395,7 +394,6 @@ RTS_RET_INFO(stg_ap_pppp_info);
 RTS_RET_INFO(stg_ap_ppppp_info);
 RTS_RET_INFO(stg_ap_pppppp_info);
 
-RTS_ENTRY(stg_ap_0_ret);
 RTS_ENTRY(stg_ap_v_ret);
 RTS_ENTRY(stg_ap_f_ret);
 RTS_ENTRY(stg_ap_d_ret);
@@ -410,6 +408,22 @@ RTS_ENTRY(stg_ap_pppv_ret);
 RTS_ENTRY(stg_ap_pppp_ret);
 RTS_ENTRY(stg_ap_ppppp_ret);
 RTS_ENTRY(stg_ap_pppppp_ret);
+
+RTS_FUN(stg_ap_0_fast);
+RTS_FUN(stg_ap_v_fast);
+RTS_FUN(stg_ap_f_fast);
+RTS_FUN(stg_ap_d_fast);
+RTS_FUN(stg_ap_l_fast);
+RTS_FUN(stg_ap_n_fast);
+RTS_FUN(stg_ap_p_fast);
+RTS_FUN(stg_ap_pv_fast);
+RTS_FUN(stg_ap_pp_fast);
+RTS_FUN(stg_ap_ppv_fast);
+RTS_FUN(stg_ap_ppp_fast);
+RTS_FUN(stg_ap_pppv_fast);
+RTS_FUN(stg_ap_pppp_fast);
+RTS_FUN(stg_ap_ppppp_fast);
+RTS_FUN(stg_ap_pppppp_fast);
 
 /* standard GC & stack check entry points, all defined in HeapStackCheck.hc */
 

@@ -402,7 +402,6 @@ typedef struct _RtsSymbolVal {
 #define RTS_RET_SYMBOLS 			\
       SymX(stg_enter_ret)			\
       SymX(stg_gc_fun_ret)			\
-      SymX(stg_ap_0_ret)			\
       SymX(stg_ap_v_ret)			\
       SymX(stg_ap_f_ret)			\
       SymX(stg_ap_d_ret)			\
@@ -617,7 +616,6 @@ typedef struct _RtsSymbolVal {
       SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
       SymX(stg_MUT_ARR_PTRS_FROZEN0_info)	\
       SymX(stg_WEAK_info)                       \
-      SymX(stg_ap_0_info)			\
       SymX(stg_ap_v_info)			\
       SymX(stg_ap_f_info)			\
       SymX(stg_ap_d_info)			\
@@ -632,6 +630,21 @@ typedef struct _RtsSymbolVal {
       SymX(stg_ap_pppp_info)			\
       SymX(stg_ap_ppppp_info)			\
       SymX(stg_ap_pppppp_info)			\
+      SymX(stg_ap_0_fast)			\
+      SymX(stg_ap_v_fast)			\
+      SymX(stg_ap_f_fast)			\
+      SymX(stg_ap_d_fast)			\
+      SymX(stg_ap_l_fast)			\
+      SymX(stg_ap_n_fast)			\
+      SymX(stg_ap_p_fast)			\
+      SymX(stg_ap_pv_fast)			\
+      SymX(stg_ap_pp_fast)			\
+      SymX(stg_ap_ppv_fast)			\
+      SymX(stg_ap_ppp_fast)			\
+      SymX(stg_ap_pppv_fast)			\
+      SymX(stg_ap_pppp_fast)			\
+      SymX(stg_ap_ppppp_fast)			\
+      SymX(stg_ap_pppppp_fast)			\
       SymX(stg_ap_1_upd_info)			\
       SymX(stg_ap_2_upd_info)			\
       SymX(stg_ap_3_upd_info)			\

@@ -15,28 +15,13 @@
 /* ----------------------------------------------------------------------------
  * Evaluate a closure and return it.
  *
- *      stg_ap_0_info   <--- Sp
- *
- * NOTE: this needs to be a polymorphic return point, because we can't
- * be sure that the thing being evaluated is not a function.
+ * There isn't an info table / return address version of stg_ap_0, because
+ * everything being returned is guaranteed evaluated, so it would be a no-op.
  */
-
-#if MAX_VECTORED_RTN > 8
-#error MAX_VECTORED_RTN has changed: please modify stg_ap_0 too.
-#endif
 
 STRING(stg_ap_0_ret_str,"stg_ap_0_ret... ")
 
-INFO_TABLE_RET( stg_ap_0,
-	        0/*framsize*/, 0/*bitmap*/, RET_SMALL,
-		RET_LBL(stg_ap_0),	
-		RET_LBL(stg_ap_0),	
-		RET_LBL(stg_ap_0),	
-		RET_LBL(stg_ap_0),	
-		RET_LBL(stg_ap_0),	
-		RET_LBL(stg_ap_0),	
-		RET_LBL(stg_ap_0),	
-		RET_LBL(stg_ap_0) )
+stg_ap_0_fast
 { 
     // fn is in R1, no args on the stack
 
@@ -45,11 +30,10 @@ INFO_TABLE_RET( stg_ap_0,
 	foreign "C" printClosure(R1 "ptr") [R1]);
 
     IF_DEBUG(sanity,
-	foreign "C" checkStackChunk(Sp+WDS(1) "ptr",
+	foreign "C" checkStackChunk(Sp "ptr",
 				    CurrentTSO + TSO_OFFSET_StgTSO_stack +
 				    WDS(StgTSO_stack_size(CurrentTSO)) "ptr") [R1]);
 
-    Sp_adj(1);
     ENTER();
 }
 

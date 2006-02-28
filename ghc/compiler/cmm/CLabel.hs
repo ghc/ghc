@@ -80,6 +80,8 @@ module CLabel (
 	mkRtsCodeLabelFS,
 	mkRtsDataLabelFS,
 
+	mkRtsApFastLabel,
+
 	mkForeignLabel,
 
 	mkCCLabel, mkCCSLabel,
@@ -259,6 +261,8 @@ data RtsLabelInfo
   | RtsDataFS     FastString	-- misc rts data bits, eg CHARLIKE_closure
   | RtsCodeFS     FastString	-- misc rts code
 
+  | RtsApFast	LitString	-- _fast versions of generic apply
+
   | RtsSlowTickyCtr String
 
   deriving (Eq, Ord)
@@ -393,6 +397,8 @@ mkRtsRetLabelFS     str = RtsLabel (RtsRetFS     str)
 mkRtsCodeLabelFS    str = RtsLabel (RtsCodeFS    str)
 mkRtsDataLabelFS    str = RtsLabel (RtsDataFS    str)
 
+mkRtsApFastLabel str = RtsLabel (RtsApFast str)
+
 mkRtsSlowTickyCtrLabel :: String -> CLabel
 mkRtsSlowTickyCtrLabel pat = RtsLabel (RtsSlowTickyCtr pat)
 
@@ -520,6 +526,7 @@ labelType (RtsLabel (RtsInfoFS _))            = DataLabel
 labelType (RtsLabel (RtsEntryFS _))           = CodeLabel
 labelType (RtsLabel (RtsRetInfoFS _))         = DataLabel
 labelType (RtsLabel (RtsRetFS _))             = CodeLabel
+labelType (RtsLabel (RtsApFast _))            = CodeLabel
 labelType (CaseLabel _ CaseReturnInfo)        = DataLabel
 labelType (CaseLabel _ _)	              = CodeLabel
 labelType (ModuleInitLabel _ _ _)             = CodeLabel
@@ -675,6 +682,8 @@ pprCLbl (RtsLabel (RtsCode str))   = ptext str
 pprCLbl (RtsLabel (RtsData str))   = ptext str
 pprCLbl (RtsLabel (RtsCodeFS str)) = ftext str
 pprCLbl (RtsLabel (RtsDataFS str)) = ftext str
+
+pprCLbl (RtsLabel (RtsApFast str)) = ptext str <> ptext SLIT("_fast")
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
   = hcat [ptext SLIT("stg_sel_"), text (show offset),

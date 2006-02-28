@@ -996,8 +996,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
        R1 = StgCatchRetryFrame_first_code(frame);
        StgCatchRetryFrame_first_code_trec(frame) = new_trec;
      }
-     Sp_adj(-1);
-     jump RET_LBL(stg_ap_v);
+     jump stg_ap_v_fast;
    }
 }
 
@@ -1061,8 +1060,7 @@ INFO_TABLE_RET(stg_atomically_frame,
     "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
     StgTSO_trec(CurrentTSO) = trec;
     R1 = StgAtomicallyFrame_code(frame);
-    Sp_adj(-1);
-    jump RET_LBL(stg_ap_v);
+    jump stg_ap_v_fast;
   }
 }
 
@@ -1097,8 +1095,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
     StgTSO_trec(CurrentTSO) = trec;
     StgHeader_info(frame) = stg_atomically_frame_info;
     R1 = StgAtomicallyFrame_code(frame);
-    Sp_adj(-1);
-    jump RET_LBL(stg_ap_v);
+    jump stg_ap_v_fast;
   }
 }
 
@@ -1193,8 +1190,7 @@ atomicallyzh_fast
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Apply R1 to the realworld token */
-  Sp_adj(-1);
-  jump RET_LBL(stg_ap_v);
+  jump stg_ap_v_fast;
 }
 
 
@@ -1214,8 +1210,7 @@ catchSTMzh_fast
   StgCatchSTMFrame_handler(frame) = R2;
 
   /* Apply R1 to the realworld token */
-  Sp_adj(-1);
-  jump RET_LBL(stg_ap_v);
+  jump stg_ap_v_fast;
 }
 
 
@@ -1248,8 +1243,7 @@ catchRetryzh_fast
   StgCatchRetryFrame_first_code_trec(frame) = new_trec;
 
   /* Apply R1 to the realworld token */
-  Sp_adj(-1);
-  jump RET_LBL(stg_ap_v);  
+  jump stg_ap_v_fast;
 }
 
 
@@ -1281,8 +1275,7 @@ retry_pop_stack:
       StgTSO_trec(CurrentTSO) = trec;
       StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
       R1 = StgCatchRetryFrame_alt_code(frame);
-      Sp_adj(-1);
-      jump RET_LBL(stg_ap_v);
+      jump stg_ap_v_fast;
     } else {
       // Retry in the alternative code: propagate
       W_ other_trec;
@@ -1306,8 +1299,7 @@ retry_pop_stack:
         StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
         StgTSO_trec(CurrentTSO) = trec;
         R1 = StgCatchRetryFrame_first_code(frame);
-        Sp_adj(-1);
-        jump RET_LBL(stg_ap_v);
+        jump stg_ap_v_fast;
       }
     }
   }
@@ -1332,8 +1324,7 @@ retry_pop_stack:
     StgTSO_trec(CurrentTSO) = trec;
     R1 = StgAtomicallyFrame_code(frame);
     Sp = frame;
-    Sp_adj(-1);
-    jump RET_LBL(stg_ap_v);
+    jump stg_ap_v_fast;
   }
 }
 

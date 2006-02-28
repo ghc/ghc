@@ -83,9 +83,14 @@ longRegs    n = [ "L" ++ show m | m <- [1..n] ]
 
 loadRegArgs :: RegStatus -> Int -> [ArgRep] -> (Doc,Int)
 loadRegArgs regstatus sp args 
- = (vcat (map (uncurry assign_stk_to_reg) reg_locs), sp')
- where
-  (reg_locs, _leftovers, sp') = assignRegs regstatus sp args
+ = (loadRegOffs reg_locs, sp')
+ where (reg_locs, _, sp') = assignRegs regstatus sp args
+
+loadRegOffs :: [(Reg,Int)] -> Doc
+loadRegOffs = vcat . map (uncurry assign_stk_to_reg)
+
+saveRegOffs :: [(Reg,Int)] -> Doc
+saveRegOffs = vcat . map (uncurry assign_reg_to_stk)
 
 -- a bit like assignRegs in CgRetConv.lhs
 assignRegs
@@ -163,10 +168,15 @@ mkApplyName args
 mkApplyRetName args
   = mkApplyName args <> text "_ret"
 
+mkApplyFastName args
+  = mkApplyName args <> text "_fast"
+
 mkApplyInfoName args
   = mkApplyName args <> text "_info"
 
-genMkPAP regstatus macro jump ticker disamb stack_apply 
+genMkPAP regstatus macro jump ticker disamb
+	no_load_regs  	-- don't load argumnet regs before jumping
+	args_in_regs  	-- arguments are already in regs
 	is_pap args all_args_size fun_info_label
   =  smaller_arity_cases
   $$ exact_arity_case
@@ -175,45 +185,104 @@ genMkPAP regstatus macro jump ticker disamb stack_apply
   where
     n_args = length args
 
-    -- offset of args on the stack, see large comment above.
-    arg_sp_offset = 1
+	-- offset of arguments on the stack at slow apply calls.
+    stk_args_slow_offset = 1
+
+    stk_args_offset
+	| args_in_regs = 0
+	| otherwise    = stk_args_slow_offset
 
 -- The SMALLER ARITY cases:
 --	if (arity == 1) {
 --	    Sp[0] = Sp[1];
 --	    Sp[1] = (W_)&stg_ap_1_info;
 --	    JMP_(GET_ENTRY(R1.cl));
-
     smaller_arity_cases = vcat [ smaller_arity i | i <- [1..n_args-1] ]
 
     smaller_arity arity
         =  text "if (arity == " <> int arity <> text ") {" $$
-	   let
-	     (reg_doc, sp')
-		| stack_apply = (empty, arg_sp_offset)
-		| otherwise   = loadRegArgs regstatus arg_sp_offset these_args
-	   in
            nest 4 (vcat [
 	     text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_MANY();",
-	     reg_doc,
-	     vcat [ shuffle_down j | j <- [sp'..these_args_size] ],
-	     loadSpWordOff "W_" these_args_size <> text " = " <>
-                mkApplyInfoName rest_args <> semi,
-	     text "Sp_adj(" <> int (sp' -  1) <> text ");",
+
+		-- load up regs for the call, if necessary
+	     load_regs,
+
+		-- If we have more args in registers than are required
+		-- for the call, then we must save some on the stack,
+		-- and set up the stack for the follow-up call.
+		-- If the extra arguments are on the stack, then we must
+		-- instead shuffle them down to make room for the info
+		-- table for the follow-on call.
+	     if overflow_regs
+		then save_extra_regs
+		else shuffle_extra_args,
+
 		-- for a PAP, we have to arrange that the stack contains a
 		-- return address in the even that stg_PAP_entry fails its
 		-- heap check.  See stg_PAP_entry in Apply.hc for details.
 	     if is_pap 
-		then text "R2 = " <> mkApplyInfoName these_args <> semi
+		then text "R2 = " <> mkApplyInfoName this_call_args <> semi
+
 		else empty,
 	     text "jump " <> text jump <> semi
 	    ]) $$
  	   text "}"
+
 	where
-		(these_args, rest_args) = splitAt arity args
-	        these_args_size = sum (map argSize these_args)
+		-- offsets in case we need to save regs:
+	     (reg_locs, _, _)
+		= assignRegs regstatus stk_args_offset args
+
+		-- register assignment for *this function call*
+	     (reg_locs', reg_call_leftovers, reg_call_sp_stk_args) 
+		= assignRegs regstatus stk_args_offset (take arity args)
+
+	     load_regs
+		| no_load_regs || args_in_regs = empty
+		| otherwise		       = loadRegOffs reg_locs'
+
+	     (this_call_args, rest_args) = splitAt arity args
+
+		-- the offset of the stack args from initial Sp
+	     sp_stk_args
+		| args_in_regs = stk_args_offset
+		| no_load_regs = stk_args_offset
+		| otherwise    = reg_call_sp_stk_args
+
+		-- the stack args themselves
+	     this_call_stack_args
+		| args_in_regs = reg_call_leftovers -- sp offsets are wrong
+		| no_load_regs = this_call_args
+		| otherwise    = reg_call_leftovers
+
+	     stack_args_size = sum (map argSize this_call_stack_args)
 		
-		shuffle_down i = 
+	     overflow_regs = args_in_regs && length reg_locs > length reg_locs'
+
+	     save_extra_regs
+		= -- we have extra arguments in registers to save
+		  let
+	           extra_reg_locs = drop (length reg_locs') (reverse reg_locs)
+		   adj_reg_locs = [ (reg, off - adj + 1) | 
+				    (reg,off) <- extra_reg_locs ]
+		   adj = case extra_reg_locs of
+			   (reg, fst_off):_ -> fst_off
+		   size = snd (last adj_reg_locs)
+		   in
+	           text "Sp_adj(" <> int (-size - 1) <> text ");" $$
+		   saveRegOffs adj_reg_locs $$
+	     	   loadSpWordOff "W_" 0 <> text " = " <>
+		                mkApplyInfoName rest_args <> semi
+
+	     shuffle_extra_args
+		= vcat (map shuffle_down
+		         [sp_stk_args .. sp_stk_args+stack_args_size-1]) $$
+	     	  loadSpWordOff "W_" (sp_stk_args+stack_args_size-1)
+			<> text " = "
+	                <> mkApplyInfoName rest_args <> semi $$
+	          text "Sp_adj(" <> int (sp_stk_args -  1) <> text ");"
+
+	     shuffle_down i = 
 		  loadSpWordOff "W_" (i-1) <> text " = " <>
 		  loadSpWordOff "W_" i <> semi
 
@@ -227,8 +296,8 @@ genMkPAP regstatus macro jump ticker disamb stack_apply
 	= text "if (arity == " <> int n_args <> text ") {" $$
 	  let
 	     (reg_doc, sp')
-		| stack_apply = (empty, arg_sp_offset)
-		| otherwise   = loadRegArgs regstatus arg_sp_offset args
+		| no_load_regs || args_in_regs = (empty, stk_args_offset)
+		| otherwise    = loadRegArgs regstatus stk_args_offset args
 	  in
 	  nest 4 (vcat [
 	    text "TICK_SLOW_CALL_" <> text ticker <> text "_CORRECT();",
@@ -248,8 +317,17 @@ genMkPAP regstatus macro jump ticker disamb stack_apply
 
     larger_arity_case = 
 	   text "} else {" $$
+	   let
+	     save_regs
+	 	| args_in_regs = 
+		        text "Sp_adj(" <> int (-sp_offset) <> text ");" $$
+			saveRegOffs  reg_locs
+		| otherwise =
+			empty
+	   in
 	   nest 4 (vcat [
 	  	text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_FEW();",
+		save_regs,
 		text macro <> char '(' <> int n_args <> comma <> 
 					int all_args_size <>  
 					text "," <> fun_info_label <>
@@ -257,6 +335,11 @@ genMkPAP regstatus macro jump ticker disamb stack_apply
 					text ");"
 	   ]) $$
 	   char '}'
+	where
+	  -- offsets in case we need to save regs:
+	  (reg_locs, leftovers, sp_offset) 
+		= assignRegs regstatus stk_args_slow_offset args
+		-- BUILD_PAP assumes args start at offset 1
 
 -- -----------------------------------------------------------------------------
 -- generate an apply function
@@ -342,7 +425,7 @@ genApply regstatus args =
 	  text "arity = TO_W_(StgBCO_arity(R1));",
 	  text "ASSERT(arity > 0);",
 	  genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" "FUN" "BCO"
-		True{-stack apply-} False{-not a PAP-}
+		True{-stack apply-} False{-args on stack-} False{-not a PAP-}
 		args all_args_size fun_info_label
 	 ]),
 	text "}",
@@ -361,7 +444,7 @@ genApply regstatus args =
 	  text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
 	  text "ASSERT(arity > 0);",
           genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(R1)" "FUN" "FUN"
-		False{-reg apply-} False{-not a PAP-}
+		False{-reg apply-} False{-args on stack-} False{-not a PAP-}
 		args all_args_size fun_info_label
 	 ]),
 	text "}",
@@ -375,7 +458,7 @@ genApply regstatus args =
  	  text "arity = TO_W_(StgPAP_arity(R1));",
 	  text "ASSERT(arity > 0);",
 	  genMkPAP regstatus "NEW_PAP" "ENTRY_LBL(stg_PAP)" "PAP" "PAP"
-		True{-stack apply-} True{-is a PAP-}
+		True{-stack apply-} False{-args on stack-} True{-is a PAP-}
 		args all_args_size fun_info_label
 	 ]),
 	text "}",
@@ -437,6 +520,59 @@ genApply regstatus args =
     ]
 
 -- -----------------------------------------------------------------------------
+-- Making a fast unknown application, args are in regs
+
+genApplyFast regstatus args =
+   let
+    fun_fast_label = mkApplyFastName args
+    fun_ret_label  = text "RET_LBL" <> parens (mkApplyName args)
+    fun_info_label = mkApplyInfoName args
+    all_args_size  = sum (map argSize args)
+   in
+    vcat [
+     fun_fast_label,
+     char '{',
+     nest 4 (vcat [     
+        text "W_ info;",
+        text "W_ arity;",
+        text  "info = %GET_STD_INFO(R1);",
+        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (%INFO_TYPE(info)) {",
+	nest 4 (vcat [
+          text "case FUN,",
+          text "     FUN_1_0,",
+          text "     FUN_0_1,",
+          text "     FUN_2_0,",
+          text "     FUN_1_1,",
+          text "     FUN_0_2,",
+          text "     FUN_STATIC: {",
+	  nest 4 (vcat [
+	    text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
+	    text "ASSERT(arity > 0);",
+            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(R1)" "FUN" "FUN"
+	  	False{-reg apply-} True{-args in regs-} False{-not a PAP-}
+	  	args all_args_size fun_info_label
+	   ]),
+	  char '}',
+	  
+	  text "default: {",
+	  let
+	     (reg_locs, leftovers, sp_offset) = assignRegs regstatus 1 args
+		-- leave a one-word space on the top of the stack when
+		-- calling the slow version
+	  in
+	  nest 4 (vcat [
+	     text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
+	     saveRegOffs reg_locs,
+	     text "jump" <+> fun_ret_label <> semi
+	  ]),
+	  char '}'
+	]),
+	char '}'
+      ]),
+     char '}'
+   ]
+
+-- -----------------------------------------------------------------------------
 -- Making a stack apply
 
 -- These little functions are like slow entry points.  They provide
@@ -488,7 +624,7 @@ genStackSave regstatus args =
    ]
  where
    body = vcat [text "Sp_adj" <> parens (int (-sp_offset)) <> semi,
-		vcat (map (uncurry assign_reg_to_stk) reg_locs),
+		saveRegOffs reg_locs,
 		text "Sp(2) = R1;",
 		text "Sp(1) =" <+> int stk_args <> semi,
 		text "Sp(0) = stg_gc_fun_info;",
@@ -524,6 +660,9 @@ main = do
 		   map (genApply regstatus) applyTypes),
 		vcat (intersperse (text "") $ 
 		   map (genStackFns regstatus) stackApplyTypes),
+
+		vcat (intersperse (text "") $ 
+		   map (genApplyFast regstatus) applyTypes),
 
 		genStackApplyArray stackApplyTypes,
 		genStackSaveArray stackApplyTypes,

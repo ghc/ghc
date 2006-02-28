@@ -102,10 +102,9 @@ blockAsyncExceptionszh_fast
 	Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
       }
     }
-    Sp_adj(-1);
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
-    jump RET_LBL(stg_ap_v);
+    jump stg_ap_v_fast;
 }
 
 unblockAsyncExceptionszh_fast
@@ -130,10 +129,9 @@ unblockAsyncExceptionszh_fast
 	Sp(0) = stg_blockAsyncExceptionszh_ret_info;
       }
     }
-    Sp_adj(-1);
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
-    jump RET_LBL(stg_ap_v);
+    jump stg_ap_v_fast;
 }
 
 
@@ -307,10 +305,9 @@ catchzh_fast
     TICK_CATCHF_PUSHED();
 
     /* Apply R1 to the realworld token */
-    Sp_adj(-1);
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
-    jump RET_LBL(stg_ap_v);
+    jump stg_ap_v_fast;
 }      
 
 /* -----------------------------------------------------------------------------
@@ -372,8 +369,7 @@ retry_pop_stack:
         "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
         StgTSO_trec(CurrentTSO) = trec;
         R1 = StgAtomicallyFrame_code(Sp);
-        Sp_adj(-1);
-        jump RET_LBL(stg_ap_v);
+        jump stg_ap_v_fast;
       }          
     }
 

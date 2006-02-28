@@ -206,17 +206,20 @@ mkRegLiveness regs ptrs nptrs
 
 -- For a slow call, we must take a bunch of arguments and intersperse
 -- some stg_ap_<pattern>_ret_info return addresses.
-constructSlowCall :: [(CgRep,CmmExpr)] -> (CLabel, [(CgRep,CmmExpr)])
+constructSlowCall
+	:: [(CgRep,CmmExpr)]
+	-> (CLabel,		-- RTS entry point for call
+	   [(CgRep,CmmExpr)],	-- args to pass to the entry point
+	   [(CgRep,CmmExpr)])	-- stuff to save on the stack
+
    -- don't forget the zero case
 constructSlowCall [] 
-  = (stg_ap_0, [])
-  where
-    stg_ap_0 = enterRtsRetLabel SLIT("stg_ap_0")
+  = (mkRtsApFastLabel SLIT("stg_ap_0"), [], [])
 
 constructSlowCall amodes
-  = (stg_ap_pat, these ++ slowArgs rest)
+  = (stg_ap_pat, these, rest)
   where 
-    stg_ap_pat = enterRtsRetLabel arg_pat
+    stg_ap_pat = mkRtsApFastLabel arg_pat
     (arg_pat, these, rest) = matchSlowPattern amodes
 
 enterRtsRetLabel arg_pat

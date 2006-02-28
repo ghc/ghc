@@ -149,62 +149,59 @@ performTailCall fun_info arg_amodes pending_assts
 	    -- A slow function call via the RTS apply routines
 	    -- Node must definitely point to the thing
 	    SlowCall -> do 
-		{ let (apply_lbl, new_amodes) = constructSlowCall arg_amodes
-
-	 	    -- Fill in all the arguments on the stack
-		; (final_sp,stk_assts) <- mkStkAmodes sp new_amodes
-    
-		; emitSimultaneously (node_asst `plusStmts` stk_assts 
-						`plusStmts` pending_assts)
-
-		; when (not (null arg_amodes)) $ do
+		{  when (not (null arg_amodes)) $ do
 		   { if (isKnownFun lf_info) 
 			then tickyKnownCallTooFewArgs
 			else tickyUnknownCall
-		   ; tickySlowCallPat (map fst arg_amodes)
-		  } 
+		   ; tickySlowCallPat (map fst arg_amodes) 
+		   }
 
-		; doFinalJump (final_sp + 1)
-			-- Add one, because the stg_ap functions
-			-- expect there to be a free slot on the stk
-		      False (jumpToLbl apply_lbl)
+		; let (apply_lbl, args, extra_args) 
+			= constructSlowCall arg_amodes
+
+		; directCall sp apply_lbl args extra_args 
+			(node_asst `plusStmts` pending_assts)
 		}
     
 	    -- A direct function call (possibly with some left-over arguments)
 	    DirectEntry lbl arity -> do
- 		{ let
-		     -- The args beyond the arity go straight on the stack
-		     (arity_args, extra_stk_args) = splitAt arity arg_amodes
-     
-		     -- First chunk of args go in registers
-		     (reg_arg_amodes, stk_args) = assignCallRegs arity_args
-     
-		     -- Any "extra" arguments are placed in frames on the
-		     -- stack after the other arguments.
-		     slow_stk_args = slowArgs extra_stk_args
-     
-		     reg_assts = assignToRegs reg_arg_amodes
-
-		; if null slow_stk_args
+		{ if arity == length arg_amodes
 			then tickyKnownCallExact
 			else do tickyKnownCallExtraArgs
-				tickySlowCallPat (map fst extra_stk_args)
+				tickySlowCallPat (map fst (drop arity arg_amodes))
 
-	   	; (final_sp, stk_assts) <- mkStkAmodes sp 
-						(stk_args ++ slow_stk_args)
-
-		; emitSimultaneously (opt_node_asst `plusStmts` 
-				      reg_assts     `plusStmts`
-				      stk_assts     `plusStmts`
-				      pending_assts)
-
-		; doFinalJump final_sp False (jumpToLbl lbl) }
+ 		; let
+		     -- The args beyond the arity go straight on the stack
+		     (arity_args, extra_args) = splitAt arity arg_amodes
+     
+		; directCall sp lbl arity_args extra_args
+			(opt_node_asst `plusStmts` pending_assts)
+	        }
 	}
   where
     fun_name  = idName (cgIdInfoId fun_info)
     lf_info   = cgIdInfoLF fun_info
 
 
+
+directCall sp lbl args extra_args assts = do
+  let
+	-- First chunk of args go in registers
+	(reg_arg_amodes, stk_args) = assignCallRegs args
+     
+	-- Any "extra" arguments are placed in frames on the
+	-- stack after the other arguments.
+	slow_stk_args = slowArgs extra_args
+
+	reg_assts = assignToRegs reg_arg_amodes
+  --
+  (final_sp, stk_assts) <- mkStkAmodes sp (stk_args ++ slow_stk_args)
+
+  emitSimultaneously (reg_assts     `plusStmts`
+		      stk_assts     `plusStmts`
+		      assts)
+
+  doFinalJump final_sp False (jumpToLbl lbl)
 
 -- -----------------------------------------------------------------------------
 -- The final clean-up before we do a jump at the end of a basic block.
