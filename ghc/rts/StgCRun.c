@@ -224,7 +224,7 @@ void StgRunIsImplementedInAssembler(void)
 	/*
 	 * Set BaseReg
 	 */
-	"movq %%rsi,%%rbx\n\t"
+	"movq %%rsi,%%r13\n\t"
 	/*
 	 * grab the function argument from the stack, and jump to it.
 	 */
@@ -234,7 +234,7 @@ void StgRunIsImplementedInAssembler(void)
 	".global " STG_RETURN "\n"
        	STG_RETURN ":\n\t"
 
-	"movq %%r13, %%rax\n\t"   /* Return value in R1  */
+	"movq %%rbx, %%rax\n\t"   /* Return value in R1  */
 
 	/*
 	 * restore callee-saves registers.  (Don't stomp on %%rax!)

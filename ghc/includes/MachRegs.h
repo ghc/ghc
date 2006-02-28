@@ -62,17 +62,6 @@
    Caller-saves regs have to be saved around C-calls made from STG
    land, so this file defines CALLER_SAVES_<reg> for each <reg> that
    is designated caller-saves in that machine's C calling convention.
-
-   Additionally, the following macros should be defined when
-
-     CALLER_SAVES_USER		one or more of R<n>, F, D
- 			        are caller-saves.
-
-     CALLER_SAVES_SYSTEM        one or more of Sp, SpLim, Hp, HpLim
-     				are caller-saves.
-
-   This is so that the callWrapper mechanism knows which kind of
-   wrapper to generate for certain types of C call.
    -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------
@@ -261,8 +250,7 @@
 /* -----------------------------------------------------------------------------
   The x86-64 register mapping
 
-  		callee-saves
-  %rax
+  %rax		caller-saves, don't steal this one
   %rbx		YES
   %rcx          arg reg, caller-saves
   %rdx		arg reg, caller-saves
@@ -282,19 +270,6 @@
   %xmm0-7       arg regs, caller-saves
   %xmm8-15      caller-saves
 
-  A better reg mapping might be:
-
-      %rbp  Sp
-      %rbx  R1
-      %r8   R2
-      %r9   R3
-      %r10  R4
-      %r12  Hp
-      %r14  SpLim
-      %r15  HpLim
-      %xmm8-11   F1-F4
-      %xmm12-13  D1-D2
-
   Use the caller-saves regs for Rn, because we don't always have to
   save those (as opposed to Sp/Hp/SpLim etc. which always have to be
   saved).
@@ -305,17 +280,41 @@
 
 #define REG(x) __asm__("%" #x)
 
-#define REG_Base  rbx
+#define REG_Base  r13
 #define REG_Sp    rbp
 #define REG_Hp    r12
-#define REG_R1    r13
+#define REG_R1    rbx
+#define REG_R2    rsi
+#define REG_R3    rdi
+#define REG_R4    r8
+#define REG_R5    r9
 #define REG_SpLim r14
 #define REG_HpLim r15
-/* ToDo: try R2/R3 instead of SpLim/HpLim? */
 
-#define MAX_REAL_VANILLA_REG 1
-#define MAX_REAL_FLOAT_REG   0
-#define MAX_REAL_DOUBLE_REG  0
+#define REG_F1    xmm1
+#define REG_F2    xmm2
+#define REG_F3    xmm3
+#define REG_F4    xmm4
+
+#define REG_D1    xmm5
+#define REG_D2    xmm6
+
+#define CALLER_SAVES_R2
+#define CALLER_SAVES_R3
+#define CALLER_SAVES_R4
+#define CALLER_SAVES_R5
+
+#define CALLER_SAVES_F1
+#define CALLER_SAVES_F2
+#define CALLER_SAVES_F3
+#define CALLER_SAVES_F4
+
+#define CALLER_SAVES_D1
+#define CALLER_SAVES_D2
+
+#define MAX_REAL_VANILLA_REG 5
+#define MAX_REAL_FLOAT_REG   4
+#define MAX_REAL_DOUBLE_REG  2
 #define MAX_REAL_LONG_REG    0
 
 #endif /* x86_64 */
