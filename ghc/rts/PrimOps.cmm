@@ -97,7 +97,7 @@ newArrayzh_fast
     MAYBE_GC(R2_PTR,newArrayzh_fast);
 
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
-    "ptr" arr = foreign "C" allocateLocal(MyCapability() "ptr",words) [];
+    "ptr" arr = foreign "C" allocateLocal(MyCapability() "ptr",words) [R2];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
@@ -882,8 +882,8 @@ forkzh_fast
   // create it right now, return ThreadID in R1
   "ptr" R1 = foreign "C" createIOThread( MyCapability() "ptr", 
 				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
-				R1 "ptr");
-  foreign "C" scheduleThread(MyCapability() "ptr", R1 "ptr");
+				R1 "ptr") [R1];
+  foreign "C" scheduleThread(MyCapability() "ptr", R1 "ptr") [R1];
 
   // switch at the earliest opportunity
   CInt[context_switch] = 1 :: CInt;
@@ -908,7 +908,7 @@ labelThreadzh_fast
 	R1 = ThreadId#
 	R2 = Addr# */
 #ifdef DEBUG
-  foreign "C" labelThread(R1 "ptr", R2 "ptr");
+  foreign "C" labelThread(R1 "ptr", R2 "ptr") [];
 #endif
   jump %ENTRY_CODE(Sp(0));
 }
@@ -1049,7 +1049,7 @@ INFO_TABLE_RET(stg_atomically_frame,
   trec = StgTSO_trec(CurrentTSO);
 
   /* The TSO is not currently waiting: try to commit the transaction */
-  valid = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr");
+  valid = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr") [];
   if (valid) {
     /* Transaction was valid: commit succeeded */
     StgTSO_trec(CurrentTSO) = NO_TREC;
@@ -1058,7 +1058,7 @@ INFO_TABLE_RET(stg_atomically_frame,
     jump %ENTRY_CODE(Sp(SP_OFF));
   } else {
     /* Transaction was not valid: try again */
-    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
+    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
     StgTSO_trec(CurrentTSO) = trec;
     R1 = StgAtomicallyFrame_code(frame);
     Sp_adj(-1);
@@ -1084,7 +1084,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
   frame = Sp;
 
   /* The TSO is currently waiting: should we stop waiting? */
-  valid = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr");
+  valid = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr") [];
   if (valid) {
     /* Previous attempt is still valid: no point trying again yet */
 	  IF_NOT_REG_R1(Sp_adj(-2);
@@ -1093,7 +1093,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
     jump stg_block_noregs;
   } else {
     /* Previous attempt is no longer valid: try again */
-    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
+    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
     StgTSO_trec(CurrentTSO) = trec;
     StgHeader_info(frame) = stg_atomically_frame_info;
     R1 = StgAtomicallyFrame_code(frame);
@@ -1189,7 +1189,7 @@ atomicallyzh_fast
   StgAtomicallyFrame_code(frame) = R1;
 
   /* Start the memory transcation */
-  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", old_trec "ptr");
+  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", old_trec "ptr") [R1];
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Apply R1 to the realworld token */
@@ -1234,7 +1234,7 @@ catchRetryzh_fast
 
   /* Start a nested transaction within which to run the first code */
   trec = StgTSO_trec(CurrentTSO);
-  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr");
+  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr") [R1,R2];
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Set up the catch-retry frame */
@@ -1266,9 +1266,9 @@ retryzh_fast
   // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
 retry_pop_stack:
   trec = StgTSO_trec(CurrentTSO);
-  "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr");
+  "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
   StgTSO_sp(CurrentTSO) = Sp;
-  frame_type = foreign "C" findRetryFrameHelper(CurrentTSO "ptr");
+  frame_type = foreign "C" findRetryFrameHelper(CurrentTSO "ptr") [];
   Sp = StgTSO_sp(CurrentTSO);
   frame = Sp;
 
@@ -1277,7 +1277,7 @@ retry_pop_stack:
     ASSERT(outer != NO_TREC);
     if (!StgCatchRetryFrame_running_alt_code(frame)) {
       // Retry in the first code: try the alternative
-      "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr");
+      "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
       StgTSO_trec(CurrentTSO) = trec;
       StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
       R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1287,11 +1287,11 @@ retry_pop_stack:
       // Retry in the alternative code: propagate
       W_ other_trec;
       other_trec = StgCatchRetryFrame_first_code_trec(frame);
-      r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", other_trec "ptr");
+      r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", other_trec "ptr") [];
       if (r) {
-        r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr");
+        r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
       } else {
-        foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr");
+        foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
       }
       if (r) {
         // Merge between siblings succeeded: commit it back to enclosing transaction
@@ -1301,7 +1301,7 @@ retry_pop_stack:
         goto retry_pop_stack;
       } else {
         // Merge failed: we musn't propagate the retry.  Try both paths again.
-        "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr");
+        "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
         StgCatchRetryFrame_first_code_trec(frame) = trec;
         StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
         StgTSO_trec(CurrentTSO) = trec;
@@ -1315,7 +1315,7 @@ retry_pop_stack:
   // We've reached the ATOMICALLY_FRAME: attempt to wait 
   ASSERT(frame_type == ATOMICALLY_FRAME);
   ASSERT(outer == NO_TREC);
-  r = foreign "C" stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr");
+  r = foreign "C" stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr") [];
   if (r) {
     // Transaction was valid: stmWait put us on the TVars' queues, we now block
     StgHeader_info(frame) = stg_atomically_waiting_frame_info;
@@ -1328,7 +1328,7 @@ retry_pop_stack:
     jump stg_block_stmwait;
   } else {
     // Transaction was not valid: retry immediately
-    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr");
+    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
     StgTSO_trec(CurrentTSO) = trec;
     R1 = StgAtomicallyFrame_code(frame);
     Sp = frame;
@@ -1347,7 +1347,7 @@ newTVarzh_fast
 
   MAYBE_GC (R1_PTR, newTVarzh_fast); 
   new_value = R1;
-  "ptr" tv = foreign "C" stmNewTVar(MyCapability() "ptr", new_value "ptr");
+  "ptr" tv = foreign "C" stmNewTVar(MyCapability() "ptr", new_value "ptr") [];
   RET_P(tv);
 }
 
@@ -1470,7 +1470,7 @@ takeMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+    "ptr" info = foreign "C" lockClosure(mvar "ptr") [];
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1521,7 +1521,7 @@ takeMVarzh_fast
       }
 
 #if defined(THREADED_RTS)
-      foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
+      foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
 #endif
       RET_P(val);
   } 
@@ -1531,7 +1531,7 @@ takeMVarzh_fast
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
  
 #if defined(THREADED_RTS)
-      foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
+      foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
 #else
       SET_INFO(mvar,stg_EMPTY_MVAR_info);
 #endif
@@ -1550,14 +1550,14 @@ tryTakeMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+    "ptr" info = foreign "C" lockClosure(mvar "ptr") [];
 #else
     info = GET_INFO(mvar);
 #endif
 
     if (info == stg_EMPTY_MVAR_info) {
 #if defined(THREADED_RTS)
-        foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
+        foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
 #endif
 	/* HACK: we need a pointer to pass back, 
 	 * so we abuse NO_FINALIZER_closure
@@ -1593,7 +1593,7 @@ tryTakeMVarzh_fast
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 #if defined(THREADED_RTS)
-        foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
+        foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
 #endif
     }
     else 
@@ -1601,7 +1601,7 @@ tryTakeMVarzh_fast
 	/* No further putMVars, MVar is now empty */
 	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
 #else
 	SET_INFO(mvar,stg_EMPTY_MVAR_info);
 #endif
@@ -1619,7 +1619,7 @@ putMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+    "ptr" info = foreign "C" lockClosure(mvar "ptr") [R2];
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1662,7 +1662,7 @@ putMVarzh_fast
 	}
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1672,7 +1672,7 @@ putMVarzh_fast
 	StgMVar_value(mvar) = R2;
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
 #else
 	SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif
@@ -1691,14 +1691,14 @@ tryPutMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr");
+    "ptr" info = foreign "C" lockClosure(mvar "ptr") [R2];
 #else
     info = GET_INFO(mvar);
 #endif
 
     if (info == stg_FULL_MVAR_info) {
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
 #endif
 	RET_N(0);
     }
@@ -1727,7 +1727,7 @@ tryPutMVarzh_fast
 	}
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
 #endif
     }
     else
@@ -1736,7 +1736,7 @@ tryPutMVarzh_fast
 	StgMVar_value(mvar) = R2;
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info);
+    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
 #else
 	SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif
@@ -1997,8 +1997,9 @@ asyncReadzh_fast
 
     /* could probably allocate this on the heap instead */
     "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
-					    stg_asyncReadzh_malloc_str);
-    reqID = foreign "C" addIORequest(R1, 0/*FALSE*/,R2,R3,R4 "ptr");
+					    stg_asyncReadzh_malloc_str)
+			[R1,R2,R3,R4];
+    reqID = foreign "C" addIORequest(R1, 0/*FALSE*/,R2,R3,R4 "ptr") [];
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
@@ -2023,8 +2024,9 @@ asyncWritezh_fast
     StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
 
     "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
-					    stg_asyncWritezh_malloc_str);
-    reqID = foreign "C" addIORequest(R1, 1/*TRUE*/,R2,R3,R4 "ptr");
+					    stg_asyncWritezh_malloc_str)
+			[R1,R2,R3,R4];
+    reqID = foreign "C" addIORequest(R1, 1/*TRUE*/,R2,R3,R4 "ptr") [];
 
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
@@ -2051,8 +2053,9 @@ asyncDoProczh_fast
 
     /* could probably allocate this on the heap instead */
     "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
-					    stg_asyncDoProczh_malloc_str);
-    reqID = foreign "C" addDoProcRequest(R1 "ptr",R2 "ptr");
+					    stg_asyncDoProczh_malloc_str) 
+				[R1,R2];
+    reqID = foreign "C" addDoProcRequest(R1 "ptr",R2 "ptr") [];
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
