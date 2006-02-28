@@ -54,16 +54,17 @@ import Util		( Suffix, global, notNull, consIORef, joinFileName,
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, Option(..),
 			  setTmpDir, defaultDynFlags )
 
-import EXCEPTION	( throwDyn )
+import EXCEPTION	( throwDyn, finally )
 import DATA_IOREF	( IORef, readIORef, writeIORef )
 import DATA_INT
     
 import Monad		( when, unless )
 import System		( ExitCode(..), getEnv, system )
-import IO		( try, catch,
+import IO		( try, catch, hGetContents,
 			  openFile, hPutStr, hClose, hFlush, IOMode(..), 
 			  stderr, ioError, isDoesNotExistError )
 import Directory	( doesFileExist, removeFile )
+import Maybe		( isJust )
 import List             ( partition )
 
 -- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
@@ -462,7 +463,21 @@ runPp dflags args =   do
 runCc :: DynFlags -> [Option] -> IO ()
 runCc dflags args =   do 
   let (p,args0) = pgm_c dflags
-  runSomething dflags "C Compiler" p (args0++args)
+  runSomethingFiltered dflags cc_filter "C Compiler" p (args0++args)
+ where
+  -- discard some harmless warnings from gcc that we can't turn off
+  cc_filter str = unlines (do_filter (lines str))
+
+  do_filter [] = []
+  do_filter ls@(l:ls')
+      | (w:rest) <- dropWhile (isJust .matchRegex r_from) ls, 
+        isJust (matchRegex r_warn w)
+      = do_filter rest
+      | otherwise
+      = l : do_filter ls'
+
+  r_from = mkRegex "from.*:[0-9]+"
+  r_warn = mkRegex "warning: call-clobbered register used"
 
 runMangle :: DynFlags -> [Option] -> IO ()
 runMangle dflags args = do 
@@ -599,12 +614,18 @@ runSomething :: DynFlags
 				--	runSomething will dos-ify them
 	     -> IO ()
 
-runSomething dflags phase_name pgm args = do
+runSomething dflags phase_name pgm args = 
+  runSomethingFiltered dflags id phase_name pgm args
+
+runSomethingFiltered
+  :: DynFlags -> (String->String) -> String -> String -> [Option] -> IO ()
+
+runSomethingFiltered dflags filter_fn phase_name pgm args = do
   let real_args = filter notNull (map showOpt args)
   traceCmd dflags phase_name (unwords (pgm:real_args)) $ do
   (exit_code, doesn'tExist) <- 
      IO.catch (do
-         rc <- builderMainLoop dflags pgm real_args
+         rc <- builderMainLoop dflags filter_fn pgm real_args
 	 case rc of
 	   ExitSuccess{} -> return (rc, False)
 	   ExitFailure n 
@@ -636,18 +657,18 @@ runSomething dflags phase_name pgm args = do
 
 
 #if __GLASGOW_HASKELL__ < 603
-builderMainLoop dflags pgm real_args = do
+builderMainLoop dflags filter_fn pgm real_args = do
   rawSystem pgm real_args
 #else
-builderMainLoop dflags pgm real_args = do
+builderMainLoop dflags filter_fn pgm real_args = do
   chan <- newChan
   (hStdIn, hStdOut, hStdErr, hProcess) <- runInteractiveProcess pgm real_args Nothing Nothing
 
   -- and run a loop piping the output from the compiler to the log_action in DynFlags
   hSetBuffering hStdOut LineBuffering
   hSetBuffering hStdErr LineBuffering
-  forkIO (readerProc chan hStdOut)
-  forkIO (readerProc chan hStdErr)
+  forkIO (readerProc chan hStdOut filter_fn)
+  forkIO (readerProc chan hStdErr filter_fn)
   rc <- loop chan hProcess 2 1 ExitSuccess
   hClose hStdIn
   hClose hStdOut
@@ -680,30 +701,33 @@ builderMainLoop dflags pgm real_args = do
                   loop chan hProcess (t-1) p exitcode
           | otherwise -> loop chan hProcess t p exitcode
 
-readerProc chan hdl = loop Nothing `catch` \e -> writeChan chan EOF
+readerProc chan hdl filter_fn =
+    (do str <- hGetContents hdl
+        loop (lines (filter_fn str)) Nothing) 
+    `finally`
+       writeChan chan EOF
 	-- ToDo: check errors more carefully
+	-- ToDo: in the future, the filter should be implemented as
+	-- a stream transformer.
     where
-         loop in_err = do
-	        l <- hGetLine hdl `catch` \e -> do
-			case in_err of
-			  Just err -> writeChan chan err
-			  Nothing  -> return ()
-			ioError e
+	loop []     Nothing    = return ()	
+	loop []     (Just err) = writeChan chan err
+	loop (l:ls) in_err     =
 		case in_err of
 		  Just err@(BuildError srcLoc msg)
 		    | leading_whitespace l -> do
-			loop (Just (BuildError srcLoc (msg $$ text l)))
+			loop ls (Just (BuildError srcLoc (msg $$ text l)))
 		    | otherwise -> do
 			writeChan chan err
-			checkError l
+			checkError l ls
 		  Nothing -> do
-			checkError l
+			checkError l ls
 
-	 checkError l
+	checkError l ls
 	   = case matchRegex errRegex l of
 		Nothing -> do
 		    writeChan chan (BuildMsg (text l))
-		    loop Nothing
+		    loop ls Nothing
 		Just (file':lineno':colno':msg:_) -> do
 		    let file   = mkFastString file'
 		        lineno = read lineno'::Int
@@ -711,10 +735,10 @@ readerProc chan hdl = loop Nothing `catch` \e -> writeChan chan EOF
 		                   "" -> 0
 		                   _  -> read (init colno') :: Int
 		        srcLoc = mkSrcLoc file lineno colno
-		    loop (Just (BuildError srcLoc (text msg)))
+		    loop ls (Just (BuildError srcLoc (text msg)))
 
-	 leading_whitespace []    = False
-	 leading_whitespace (x:_) = isSpace x
+	leading_whitespace []    = False
+	leading_whitespace (x:_) = isSpace x
 
 errRegex = mkRegex "^([^:]*):([0-9]+):([0-9]+:)?(.*)"
 
