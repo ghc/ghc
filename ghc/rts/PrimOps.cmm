@@ -1496,6 +1496,7 @@ takeMVarzh_fast
       /* actually perform the putMVar for the thread that we just woke up */
       tso = StgMVar_head(mvar);
       PerformPut(tso,StgMVar_value(mvar));
+      foreign "C" dirtyTSO(tso "ptr") [];
 
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
@@ -1569,6 +1570,7 @@ tryTakeMVarzh_fast
 	/* actually perform the putMVar for the thread that we just woke up */
 	tso = StgMVar_head(mvar);
 	PerformPut(tso,StgMVar_value(mvar));
+        foreign "C" dirtyTSO(tso "ptr") [];
 
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
@@ -1638,6 +1640,7 @@ putMVarzh_fast
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
+        foreign "C" dirtyTSO(tso "ptr") [];
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
@@ -1703,6 +1706,7 @@ tryPutMVarzh_fast
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
+        foreign "C" dirtyTSO(tso "ptr") [];
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */

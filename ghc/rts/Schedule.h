@@ -287,18 +287,18 @@ emptyThreadQueues(Capability *cap)
     ;
 }
 
-STATIC_INLINE void
-dirtyTSO (StgTSO *tso)
-{
-    tso->flags |= TSO_DIRTY;
-}
-
 #ifdef DEBUG
 void sched_belch(char *s, ...)
    GNU_ATTRIBUTE(format (printf, 1, 2));
 #endif
 
 #endif /* !IN_STG_CODE */
+
+STATIC_INLINE void
+dirtyTSO (StgTSO *tso)
+{
+    tso->flags |= TSO_DIRTY;
+}
 
 #endif /* SCHEDULE_H */
 
