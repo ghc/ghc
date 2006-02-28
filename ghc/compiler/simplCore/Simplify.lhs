@@ -233,7 +233,7 @@ simplTopBinds env binds
 	-- so that if a transformation rule has unexpectedly brought
 	-- anything into scope, then we don't get a complaint about that.
 	-- It's rather as if the top-level binders were imported.
-    simplLetBndrs env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
+    simplRecBndrs env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
     simpl_binds env binds bndrs'		`thenSmpl` \ (floats, _) ->
     freeTick SimplifierDone			`thenSmpl_`
     returnSmpl (floatBinds floats)
@@ -308,16 +308,10 @@ simplNonRecBind' env bndr rhs rhs_se cont_ty thing_inside
   | isStrictDmd (idNewDemandInfo bndr) || isStrictType bndr_ty	-- A strict let
   =  	-- Don't use simplBinder because that doesn't keep 
 	-- fragile occurrence info in the substitution
-    simplLetBndr env bndr					`thenSmpl` \ (env, bndr1) ->
-    simplStrictArg AnRhs env rhs rhs_se (idType bndr1) cont_ty	$ \ env1 rhs1 ->
+    simplNonRecBndr env bndr					`thenSmpl` \ (env, bndr2) ->
+    simplStrictArg AnRhs env rhs rhs_se (idType bndr2) cont_ty	$ \ env2 rhs1 ->
 
 	-- Now complete the binding and simplify the body
-    let
-	-- simplLetBndr doesn't deal with the IdInfo, so we must
-	-- do so here (c.f. simplLazyBind)
-	bndr2  = bndr1 `setIdInfo` simplIdInfo env (idInfo bndr)
-	env2   = modifyInScope env1 bndr2 bndr2
-    in
     if needsCaseBinding bndr_ty rhs1
     then
       thing_inside env2					`thenSmpl` \ (floats, body) ->
@@ -329,7 +323,7 @@ simplNonRecBind' env bndr rhs rhs_se cont_ty thing_inside
   | otherwise							-- Normal, lazy case
   =  	-- Don't use simplBinder because that doesn't keep 
 	-- fragile occurrence info in the substitution
-    simplLetBndr env bndr				`thenSmpl` \ (env, bndr') ->
+    simplNonRecBndr env bndr				`thenSmpl` \ (env, bndr') ->
     simplLazyBind env NotTopLevel NonRecursive
 		  bndr bndr' rhs rhs_se 		`thenSmpl` \ (floats, env) ->
     addFloats env floats thing_inside
@@ -465,43 +459,12 @@ simplLazyBind :: SimplEnv
 	      -> InExpr -> SimplEnv 	-- The RHS and its environment
 	      -> SimplM (FloatsWith SimplEnv)
 
-simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
-  = let	-- Transfer the IdInfo of the original binder to the new binder
-	-- This is crucial: we must preserve
-	--	strictness
-	--	rules
-	--	worker info
-	-- etc.  To do this we must apply the current substitution, 
-	-- which incorporates earlier substitutions in this very letrec group.
-	--
-	-- NB 1.  We do this *before* processing the RHS of the binder, so that
-	-- its substituted rules are visible in its own RHS.
-	-- This is important.  Manuel found cases where he really, really
-	-- wanted a RULE for a recursive function to apply in that function's
- 	-- own right-hand side.
-	--
-	-- NB 2: We do not transfer the arity (see Subst.substIdInfo)
-	-- The arity of an Id should not be visible
-	-- in its own RHS, else we eta-reduce
-	--	f = \x -> f x
-	-- to
-	--	f = f
-	-- which isn't sound.  And it makes the arity in f's IdInfo greater than
-	-- the manifest arity, which isn't good.
-	-- The arity will get added later.
-	--
-	-- NB 3: It's important that we *do* transer the loop-breaker OccInfo,
-	-- because that's what stops the Id getting inlined infinitely, in the body
-	-- of the letrec.
-
-	-- NB 4: does no harm for non-recursive bindings
-
-	bndr2  	  	  = bndr1 `setIdInfo` simplIdInfo env (idInfo bndr)
-	env1	     	  = modifyInScope env bndr2 bndr2
-	rhs_env      	  = setInScope rhs_se env1
+simplLazyBind env top_lvl is_rec bndr bndr2 rhs rhs_se
+  = let	
+	rhs_env      	  = setInScope rhs_se env
  	is_top_level	  = isTopLevel top_lvl
 	ok_float_unlifted = not is_top_level && isNonRec is_rec
-	rhs_cont	  = mkRhsStop (idType bndr1)
+	rhs_cont	  = mkRhsStop (idType bndr2)
     in
   	-- Simplify the RHS; note the mkRhsStop, which tells 
 	-- the simplifier that this is the RHS of a let.
@@ -510,7 +473,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 	-- If any of the floats can't be floated, give up now
 	-- (The allLifted predicate says True for empty floats.)
     if (not ok_float_unlifted && not (allLifted floats)) then
-	completeLazyBind env1 top_lvl bndr bndr2
+	completeLazyBind env top_lvl bndr bndr2
 			 (wrapFloats floats rhs1)
     else	
 
@@ -521,7 +484,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 	-- If the result is a PAP, float the floats out, else wrap them
 	-- By this time it's already been ANF-ised (if necessary)
     if isEmptyFloats floats && isNilOL aux_binds then	-- Shortcut a common case
-	completeLazyBind env1 top_lvl bndr bndr2 rhs2
+	completeLazyBind env top_lvl bndr bndr2 rhs2
 
     else if is_top_level || exprIsTrivial rhs2 || exprIsHNF rhs2 then
 	-- 	WARNING: long dodgy argument coming up
@@ -562,12 +525,12 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 	         ppr (filter demanded_float (floatBinds floats)) )
 
 	tick LetFloatFromLet			`thenSmpl_` (
-	addFloats env1 floats			$ \ env2 ->
+	addFloats env floats			$ \ env2 ->
 	addAtomicBinds env2 (fromOL aux_binds)	$ \ env3 ->
 	completeLazyBind env3 top_lvl bndr bndr2 rhs2)
 
     else
-	completeLazyBind env1 top_lvl bndr bndr2 (wrapFloats floats rhs1)
+	completeLazyBind env top_lvl bndr bndr2 (wrapFloats floats rhs1)
 
 #ifdef DEBUG
 demanded_float (NonRec b r) = isStrictDmd (idNewDemandInfo b) && not (isUnLiftedType (idType b))
@@ -756,7 +719,7 @@ simplExprF env (Case scrut bndr case_ty alts) cont
     case_ty'  = substTy env case_ty	-- c.f. defn of simplExpr
 
 simplExprF env (Let (Rec pairs) body) cont
-  = simplLetBndrs env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
+  = simplRecBndrs env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
 	-- NB: bndrs' don't have unfoldings or rules
 	-- We add them as we go down
 

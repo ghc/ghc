@@ -254,7 +254,7 @@ substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
     new_id = maybeModifyIdInfo (substIdInfo rec_subst) id2
 
 	-- Extend the substitution if the unique has changed
-	-- See the notes with substTyVarBndr for the delSubstEnv
+	-- See the notes with substTyVarBndr for the delVarEnv
     new_env | new_id /= old_id  = extendVarEnv env old_id (Var new_id)
 	    | otherwise         = delVarEnv env old_id
 \end{code}

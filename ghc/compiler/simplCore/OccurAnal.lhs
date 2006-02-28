@@ -22,11 +22,10 @@ import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial, isDefaultAlt )
 import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo, isLocalId,
-			  isExportedId, idArity, idSpecialisation, 
+			  isExportedId, idArity, 
 			  idType, idUnique, Id
 			)
 import BasicTypes	( OccInfo(..), isOneOcc, InterestingCxt )
-import IdInfo		( isEmptySpecInfo )
 
 import VarSet
 import VarEnv
@@ -320,9 +319,14 @@ reOrderRec env (CyclicSCC (bind : binds))
 
 	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
 
-	| not (isEmptySpecInfo (idSpecialisation bndr)) = 1
-		-- Avoid things with specialisations; we'd like
-		-- to take advantage of them in the subsequent bindings
+-- NOT NEEDED ANY MORE [Feb06]
+-- We make all rules available in all bindings, by substituting
+-- the IdInfo before looking at any RHSs.  I'm just leaving this
+-- snippet in as a commment so we can find it again if necessary.
+--
+--	| not (isEmptySpecInfo (idSpecialisation bndr)) = 1
+--		-- Avoid things with specialisations; we'd like
+--		-- to take advantage of them in the subsequent bindings
 
 	| otherwise = 0
 
