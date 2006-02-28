@@ -303,6 +303,19 @@ typedef struct _RtsSymbolVal {
       SymX(exp)                                 \
       SymX(log)                                 \
       SymX(sqrt)                                \
+      SymX(powf)                                 \
+      SymX(tanhf)                                \
+      SymX(coshf)                                \
+      SymX(sinhf)                                \
+      SymX(atanf)                                \
+      SymX(acosf)                                \
+      SymX(asinf)                                \
+      SymX(tanf)                                 \
+      SymX(cosf)                                 \
+      SymX(sinf)                                 \
+      SymX(expf)                                 \
+      SymX(logf)                                 \
+      SymX(sqrtf)                                \
       SymX(memcpy)                              \
       SymX(rts_InstallConsoleEvent)             \
       SymX(rts_ConsoleHandlerDone)              \
