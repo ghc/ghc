@@ -10,7 +10,7 @@ module CmmUtils(
 	CmmStmts, noStmts, oneStmt, mkStmts, plusStmts, stmtList,
 	isNopStmt,
 
-	isTrivialCmmExpr,
+	isTrivialCmmExpr, hasNoGlobalRegs,
 
 	cmmRegOff, cmmLabelOff, cmmOffset, cmmOffsetLit, cmmIndex,
 	cmmOffsetExpr, cmmIndexExpr, cmmLoadIndex,
@@ -89,6 +89,14 @@ isTrivialCmmExpr (CmmMachOp _ _) = False
 isTrivialCmmExpr (CmmLit _)      = True
 isTrivialCmmExpr (CmmReg _)      = True
 isTrivialCmmExpr (CmmRegOff _ _) = True
+
+hasNoGlobalRegs :: CmmExpr -> Bool
+hasNoGlobalRegs (CmmLoad e _)   	   = hasNoGlobalRegs e
+hasNoGlobalRegs (CmmMachOp _ es) 	   = all hasNoGlobalRegs es
+hasNoGlobalRegs (CmmLit _)      	   = True
+hasNoGlobalRegs (CmmReg (CmmLocal _))      = True
+hasNoGlobalRegs (CmmRegOff (CmmLocal _) _) = True
+hasNoGlobalRegs _ = False
 
 ---------------------------------------------------
 --

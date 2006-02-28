@@ -14,6 +14,7 @@ module CgPrimOp (
 
 import ForeignCall	( CCallConv(CCallConv) )
 import StgSyn		( StgLiveVars, StgArg )
+import CgForeignCall	( emitForeignCall' )
 import CgBindery	( getVolatileRegs, getArgAmodes )
 import CgMonad
 import CgInfoTbls	( getConstrTag )
@@ -117,10 +118,11 @@ emitPrimOp [res] ParOp [arg] live
 	-- for now, just implement this in a C function
 	-- later, we might want to inline it.
     vols <- getVolatileRegs live
-    stmtC (CmmCall (CmmForeignCall newspark CCallConv) [(res,NoHint)]
-		[(CmmReg (CmmGlobal BaseReg), PtrHint), 
-		 (arg,PtrHint)] 
-		(Just vols))
+    emitForeignCall' PlayRisky
+	[(res,NoHint)]
+    	(CmmForeignCall newspark CCallConv) 
+	[(CmmReg (CmmGlobal BaseReg), PtrHint), (arg,PtrHint)] 
+	(Just vols)
   where
 	newspark = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("newSpark")))
 
@@ -131,12 +133,12 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
    = do
 	stmtC (CmmStore (cmmOffsetW mutv fixedHdrSize) var)
 	vols <- getVolatileRegs live
-	stmtC (CmmCall (CmmForeignCall (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-				CCallConv) 
-			[{-no results-}]
-			[(CmmReg (CmmGlobal BaseReg), PtrHint),
-			 (mutv,PtrHint)]
-			(Just vols))
+	emitForeignCall' PlayRisky
+		[{-no results-}]
+		(CmmForeignCall (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
+			 CCallConv)
+		[(CmmReg (CmmGlobal BaseReg), PtrHint), (mutv,PtrHint)]
+		(Just vols)
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
@@ -336,8 +338,11 @@ emitPrimOp [res] op [arg] live
 emitPrimOp [res] op args live
    | Just prim <- callishOp op
    = do vols <- getVolatileRegs live
-	stmtC (CmmCall (CmmPrim prim) [(res,NoHint)] 
-		[(a,NoHint) | a<-args] (Just vols)) -- ToDo: hints?
+	emitForeignCall' PlayRisky
+	   [(res,NoHint)] 
+	   (CmmPrim prim) 
+	   [(a,NoHint) | a<-args]  -- ToDo: hints?
+	   (Just vols)
 
    | Just mop <- translateOp op
    = let stmt = CmmAssign res (CmmMachOp mop args) in

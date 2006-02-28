@@ -32,7 +32,7 @@ import MachOp
 import SMRep		( fixedHdrSize, CgRep(..) )
 import Lexer
 
-import ForeignCall	( CCallConv(..) )
+import ForeignCall	( CCallConv(..), Safety(..) )
 import Literal		( mkMachInt )
 import Unique
 import UniqFM
@@ -732,7 +732,8 @@ foreignCall "C" results_code expr_code args_code vols
 	results <- sequence results_code
 	expr <- expr_code
 	args <- sequence args_code
-	stmtEC (CmmCall (CmmForeignCall expr CCallConv) results args vols)
+        code (emitForeignCall' PlayRisky results 
+                 (CmmForeignCall expr CCallConv) args vols)
 foreignCall conv _ _ _ _
   = fail ("unknown calling convention: " ++ conv)
 

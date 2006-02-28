@@ -15,6 +15,7 @@ module CmmOpt (
 #include "HsVersions.h"
 
 import Cmm
+import CmmUtils	( hasNoGlobalRegs )
 import CLabel	( entryLblToInfoLbl )
 import MachOp
 import SMRep	( tablesNextToCode )
@@ -85,8 +86,17 @@ lookForInline u expr (CmmNop : rest)
 
 lookForInline u expr (stmt:stmts)
   = case lookupUFM (getStmtUses stmt) u of
-	Just 1 -> Just (inlineStmt u expr stmt : stmts)
+	Just 1 | ok_to_inline -> Just (inlineStmt u expr stmt : stmts)
 	_other -> Nothing
+  where
+	-- we don't inline into CmmCall if the expression refers to global
+	-- registers.  This is a HACK to avoid global registers clashing with
+	-- C argument-passing registers, really the back-end ought to be able
+	-- to handle it properly, but currently neither PprC nor the NCG can
+	-- do it.  See also CgForeignCall:load_args_into_temps.
+    ok_to_inline = case stmt of
+		     CmmCall{} -> hasNoGlobalRegs expr
+		     _ -> True
 
 -- -----------------------------------------------------------------------------
 -- Boring Cmm traversals for collecting usage info and substitutions.

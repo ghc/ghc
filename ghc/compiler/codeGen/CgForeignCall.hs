@@ -7,8 +7,9 @@
 -----------------------------------------------------------------------------
 
 module CgForeignCall (
-  emitForeignCall,
   cgForeignCall,
+  emitForeignCall,
+  emitForeignCall',
   shimForeignCallArg,
   emitSaveThreadState, -- will be needed by the Cmm parser
   emitLoadThreadState, -- ditto
@@ -22,7 +23,8 @@ import StgSyn		( StgLiveVars, StgArg, stgArgType )
 import CgProf		( curCCS, curCCSAddr )
 import CgBindery	( getVolatileRegs, getArgAmodes )
 import CgMonad
-import CgUtils		( cmmOffsetW, cmmOffsetB, cmmLoadIndexW, newTemp )
+import CgUtils		( cmmOffsetW, cmmOffsetB, cmmLoadIndexW, newTemp,
+			  assignTemp )
 import Type		( tyConAppTyCon, repType )
 import TysPrim
 import CLabel		( mkForeignLabel, mkRtsCodeLabel )
@@ -68,41 +70,15 @@ emitForeignCall
 	-> Code
 
 emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
-  | not (playSafe safety) 
-  = do 
-    vols <- getVolatileRegs live
-    stmtC (the_call vols)
-  
-  | otherwise -- it's a safe foreign call
-  = do
-    vols <- getVolatileRegs live
-    id <- newTemp wordRep
-    emitSaveThreadState
-    stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
-			[(id,PtrHint)]
-			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
-			(Just vols)
-			)
-    stmtC (the_call vols)
-    stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
-			[ (CmmGlobal BaseReg, PtrHint) ]
-				-- Assign the result to BaseReg: we
-				-- might now have a different
-				-- Capability!
-			[ (CmmReg id, PtrHint) ]
-			(Just vols)
-			)
-    emitLoadThreadState
-
+  = do vols <- getVolatileRegs live
+       emitForeignCall' safety results
+		(CmmForeignCall cmm_target cconv) call_args (Just vols)
   where
       (call_args, cmm_target)
 	= case target of
 	   StaticTarget lbl -> (args, CmmLit (CmmLabel 
 					(mkForeignLabel lbl call_size False)))
 	   DynamicTarget    ->  case args of (fn,_):rest -> (rest, fn)
-
-      the_call vols = CmmCall (CmmForeignCall cmm_target cconv) 
-			  results call_args (Just vols)
 
 	-- in the stdcall calling convention, the symbol needs @size appended
 	-- to it, where size is the total number of bytes of arguments.  We
@@ -115,12 +91,65 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 	-- ToDo: this might not be correct for 64-bit API
       arg_size rep = max (machRepByteWidth rep) wORD_SIZE
 
-
 emitForeignCall results (DNCall _) args live
   = panic "emitForeignCall: DNCall"
 
+
+-- alternative entry point, used by CmmParse
+emitForeignCall'
+	:: Safety
+	-> [(CmmReg,MachHint)]	-- where to put the results
+	-> CmmCallTarget	-- the op
+	-> [(CmmExpr,MachHint)] -- arguments
+	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
+	-> Code
+emitForeignCall' safety results target args vols 
+  | not (playSafe safety) = do
+    temp_args <- load_args_into_temps args
+    stmtC (CmmCall target results temp_args vols)
+
+  | otherwise = do
+    id <- newTemp wordRep
+    temp_args <- load_args_into_temps args
+    emitSaveThreadState
+    stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
+			[(id,PtrHint)]
+			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
+			vols
+			)
+    stmtC (CmmCall target results temp_args vols)
+    stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
+			[ (CmmGlobal BaseReg, PtrHint) ]
+				-- Assign the result to BaseReg: we
+				-- might now have a different
+				-- Capability!
+			[ (CmmReg id, PtrHint) ]
+			vols
+			)
+    emitLoadThreadState
+
+
 suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("suspendThread")))
 resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("resumeThread")))
+
+
+-- we might need to load arguments into temporaries before
+-- making the call, because certain global registers might
+-- overlap with registers that the C calling convention uses
+-- for passing arguments.
+--
+-- This is a HACK; really it should be done in the back end, but
+-- it's easier to generate the temporaries here.
+load_args_into_temps args = mapM maybe_assignTemp args
+	
+maybe_assignTemp (e, hint)
+  | hasNoGlobalRegs e = return (e, hint)
+  | otherwise          = do 
+	-- don't use assignTemp, it uses its own notion of "trivial"
+	-- expressions, which are wrong here
+	reg <- newTemp (cmmExprRep e)
+	stmtC (CmmAssign reg e)
+	return (CmmReg reg, hint)
 
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
