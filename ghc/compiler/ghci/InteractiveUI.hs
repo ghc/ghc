@@ -153,6 +153,7 @@ helpText =
  "   :set <option> ...           set options\n" ++
  "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
  "   :set prog <progname>        set the value returned by System.getProgName\n" ++
+ "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
  "\n" ++
  "   :show modules               show the currently loaded modules\n" ++
  "   :show bindings              show the current bindings made at the prompt\n" ++
@@ -220,6 +221,7 @@ interactiveUI session srcs maybe_expr = do
    startGHCi (runGHCi srcs maybe_expr)
 	GHCiState{ progname = "<interactive>",
 		   args = [],
+                   prompt = "%s> ",
 		   session = session,
 		   options = [] }
 
@@ -357,10 +359,11 @@ checkPerms name =
 #endif
 
 fileLoop :: Handle -> Bool -> GHCi ()
-fileLoop hdl prompt = do
+fileLoop hdl show_prompt = do
    session <- getSession
    (mod,imports) <- io (GHC.getContext session)
-   when prompt (io (putStr (mkPrompt mod imports)))
+   st <- getGHCiState
+   when show_prompt (io (putStr (mkPrompt mod imports (prompt st))))
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e		   -> return ()
@@ -373,9 +376,9 @@ fileLoop hdl prompt = do
 		-- EOF.
 	Right l -> 
 	  case removeSpaces l of
-	    "" -> fileLoop hdl prompt
+            "" -> fileLoop hdl show_prompt
 	    l  -> do quit <- runCommand l
-          	     if quit then return () else fileLoop hdl prompt
+                     if quit then return () else fileLoop hdl show_prompt
 
 stringLoop :: [String] -> GHCi ()
 stringLoop [] = return ()
@@ -385,10 +388,17 @@ stringLoop (s:ss) = do
 	l  -> do quit <- runCommand l
                  if quit then return () else stringLoop ss
 
-mkPrompt toplevs exports
-  = showSDoc (hsep (map (\m -> char '*' <> pprModule m) toplevs)
-	     <+> hsep (map pprModule exports)
-	     <> text "> ")
+mkPrompt toplevs exports prompt
+  = showSDoc $ f prompt
+    where
+        f ('%':'s':xs) = perc_s <> f xs
+        f ('%':'%':xs) = char '%' <> f xs
+        f (x:xs) = char x <> f xs
+        f [] = empty
+    
+        perc_s = hsep (map (\m -> char '*' <> pprModule m) toplevs) <+>
+                 hsep (map pprModule exports)
+             
 
 #ifdef USE_READLINE
 readlineLoop :: GHCi ()
@@ -397,7 +407,8 @@ readlineLoop = do
    (mod,imports) <- io (GHC.getContext session)
    io yield
    saveSession -- for use by completion
-   l <- io (readline (mkPrompt mod imports)
+   st <- getGHCiState
+   l <- io (readline (mkPrompt mod imports (prompt st))
 	  	`finally` setNonBlockingFD 0)
 		-- readline sometimes puts stdin into blocking mode,
 		-- so we need to put it back for the IO library
@@ -1055,6 +1066,7 @@ setCmd str
   = case words str of
 	("args":args) -> setArgs args
 	("prog":prog) -> setProg prog
+        ("prompt":prompt) -> setPrompt (dropWhile isSpace $ drop 6 $ dropWhile isSpace str)
 	wds -> setOptions wds
 
 setArgs args = do
@@ -1066,6 +1078,15 @@ setProg [prog] = do
   setGHCiState st{ progname = prog }
 setProg _ = do
   io (hPutStrLn stderr "syntax: :set prog <progname>")
+
+setPrompt value = do
+  st <- getGHCiState
+  if null value
+      then io $ hPutStrLn stderr $ "syntax: :set prompt <prompt>, currently \"" ++ prompt st ++ "\""
+      else setGHCiState st{ prompt = remQuotes value }
+  where
+     remQuotes ('\"':xs) | not (null xs) && last xs == '\"' = init xs
+     remQuotes x = x
 
 setOptions wds =
    do -- first, deal with the GHCi opts (+s, +t, etc.)
@@ -1306,6 +1327,7 @@ data GHCiState = GHCiState
      { 
 	progname       :: String,
 	args	       :: [String],
+        prompt         :: String,
 	session        :: GHC.Session,
 	options        :: [GHCiOption]
      }

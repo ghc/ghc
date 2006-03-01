@@ -59,7 +59,8 @@ Prelude>
    :set &lt;option&gt; ...          set options
    :set args &lt;arg&gt; ...        set the arguments returned by System.getArgs
    :set prog &lt;progname&gt;       set the value returned by System.getProgName
-
+   :set prompt &lt;prompt&gt;       set the prompt used in GHCi
+ 
    :show modules              show the currently loaded modules
    :show bindings             show the current bindings made at the prompt
 
@@ -1096,7 +1097,7 @@ Prelude> :. cmds.ghci
       <varlistentry>
 	<term>
           <literal>:set</literal> <literal>args</literal> <replaceable>arg</replaceable> ...
-          <indexterm><primary><literal>:set</literal></primary></indexterm>
+          <indexterm><primary><literal>:set args</literal></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Sets the list of arguments which are returned when the
@@ -1108,13 +1109,26 @@ Prelude> :. cmds.ghci
       <varlistentry>
 	<term>
            <literal>:set</literal> <literal>prog</literal> <replaceable>prog</replaceable>
-           <indexterm><primary><literal>:set</literal></primary></indexterm>
+           <indexterm><primary><literal>:set prog</literal></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Sets the string to be returned when the program calls
 	  <literal>System.getProgName</literal><indexterm><primary>getProgName</primary>
 	    </indexterm>.</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+           <literal>:set</literal> <literal>prompt</literal> <replaceable>prompt</replaceable>
+        </term>
+	<listitem>
+	  <para>Sets the string to be used as the prompt in GHCi.
+	  Inside <replaceable>prompt</replaceable>, the sequence
+	  <literal>%s</literal> is replaced by the names of the
+	  modules currently in scope, and <literal>%%</literal> is
+	  replaced by <literal>%</literal>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
