@@ -308,10 +308,13 @@ simplNonRecBind' env bndr rhs rhs_se cont_ty thing_inside
   | isStrictDmd (idNewDemandInfo bndr) || isStrictType bndr_ty	-- A strict let
   =  	-- Don't use simplBinder because that doesn't keep 
 	-- fragile occurrence info in the substitution
-    simplNonRecBndr env bndr					`thenSmpl` \ (env, bndr2) ->
-    simplStrictArg AnRhs env rhs rhs_se (idType bndr2) cont_ty	$ \ env2 rhs1 ->
+    simplNonRecBndr env bndr					`thenSmpl` \ (env, bndr1) ->
+    simplStrictArg AnRhs env rhs rhs_se (idType bndr1) cont_ty	$ \ env1 rhs1 ->
 
 	-- Now complete the binding and simplify the body
+    let
+	(env2,bndr2) = addLetIdInfo env1 bndr bndr1
+    in
     if needsCaseBinding bndr_ty rhs1
     then
       thing_inside env2					`thenSmpl` \ (floats, body) ->
@@ -459,9 +462,10 @@ simplLazyBind :: SimplEnv
 	      -> InExpr -> SimplEnv 	-- The RHS and its environment
 	      -> SimplM (FloatsWith SimplEnv)
 
-simplLazyBind env top_lvl is_rec bndr bndr2 rhs rhs_se
+simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
   = let	
-	rhs_env      	  = setInScope rhs_se env
+	(env1,bndr2)      = addLetIdInfo env bndr bndr1
+	rhs_env      	  = setInScope rhs_se env1
  	is_top_level	  = isTopLevel top_lvl
 	ok_float_unlifted = not is_top_level && isNonRec is_rec
 	rhs_cont	  = mkRhsStop (idType bndr2)
@@ -473,7 +477,7 @@ simplLazyBind env top_lvl is_rec bndr bndr2 rhs rhs_se
 	-- If any of the floats can't be floated, give up now
 	-- (The allLifted predicate says True for empty floats.)
     if (not ok_float_unlifted && not (allLifted floats)) then
-	completeLazyBind env top_lvl bndr bndr2
+	completeLazyBind env1 top_lvl bndr bndr2
 			 (wrapFloats floats rhs1)
     else	
 
@@ -484,7 +488,7 @@ simplLazyBind env top_lvl is_rec bndr bndr2 rhs rhs_se
 	-- If the result is a PAP, float the floats out, else wrap them
 	-- By this time it's already been ANF-ised (if necessary)
     if isEmptyFloats floats && isNilOL aux_binds then	-- Shortcut a common case
-	completeLazyBind env top_lvl bndr bndr2 rhs2
+	completeLazyBind env1 top_lvl bndr bndr2 rhs2
 
     else if is_top_level || exprIsTrivial rhs2 || exprIsHNF rhs2 then
 	-- 	WARNING: long dodgy argument coming up
@@ -525,12 +529,12 @@ simplLazyBind env top_lvl is_rec bndr bndr2 rhs rhs_se
 	         ppr (filter demanded_float (floatBinds floats)) )
 
 	tick LetFloatFromLet			`thenSmpl_` (
-	addFloats env floats			$ \ env2 ->
+	addFloats env1 floats			$ \ env2 ->
 	addAtomicBinds env2 (fromOL aux_binds)	$ \ env3 ->
 	completeLazyBind env3 top_lvl bndr bndr2 rhs2)
 
     else
-	completeLazyBind env top_lvl bndr bndr2 (wrapFloats floats rhs1)
+	completeLazyBind env1 top_lvl bndr bndr2 (wrapFloats floats rhs1)
 
 #ifdef DEBUG
 demanded_float (NonRec b r) = isStrictDmd (idNewDemandInfo b) && not (isUnLiftedType (idType b))

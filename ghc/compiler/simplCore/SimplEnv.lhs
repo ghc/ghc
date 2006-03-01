@@ -26,7 +26,7 @@ module SimplEnv (
 	SimplSR(..), mkContEx, substId, 
 
 	simplNonRecBndr, simplRecBndrs, simplLamBndr, simplLamBndrs, 
- 	simplBinder, simplBinders, 
+ 	simplBinder, simplBinders, addLetIdInfo,
 	substExpr, substTy,
 
 	-- Floats
@@ -476,10 +476,51 @@ seqIds (id:ids) = seqId id `seq` seqIds ids
 
 Simplifying let binders
 ~~~~~~~~~~~~~~~~~~~~~~~
-Rename the binders if necessary, and substitute their IdInfo,
-and re-attach it.  The resulting binders therefore have all
-their RULES, which is important in a mutually recursive group
+Rename the binders if necessary, 
 
+\begin{code}
+simplNonRecBndr :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
+simplNonRecBndr env id
+  = do	{ let (env1, id1) = substLetIdBndr env id
+	; seqId id1 `seq` return (env1, id1) }
+
+---------------
+simplRecBndrs :: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
+simplRecBndrs env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) ids
+  = do	{ let (env1, ids1) = mapAccumL substLetIdBndr env ids
+	; seqIds ids1 `seq` return (env1, ids1) }
+
+---------------
+substLetIdBndr :: SimplEnv -> InBinder 	-- Env and binder to transform
+	       -> (SimplEnv, OutBinder)
+-- C.f. CoreSubst.substIdBndr
+-- Clone Id if necessary, substitute its type
+-- Return an Id with completely zapped IdInfo
+-- 	[addLetIdInfo, below, will restore its IdInfo]
+-- Augment the subtitution 
+--	if the unique changed, *or* 
+--	if there's interesting occurrence info
+
+substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old_id
+  = (env { seInScope = in_scope `extendInScopeSet` new_id, 
+	   seIdSubst = new_subst }, new_id)
+  where
+    id1	   = uniqAway in_scope old_id
+    id2    = substIdType env id1
+    new_id = setIdInfo id2 vanillaIdInfo
+
+	-- Extend the substitution if the unique has changed,
+	-- or there's some useful occurrence information
+	-- See the notes with substTyVarBndr for the delSubstEnv
+    occ_info = occInfo (idInfo old_id)
+    new_subst | new_id /= old_id || isFragileOcc occ_info
+	      = extendVarEnv id_subst old_id (DoneId new_id occ_info)
+	      | otherwise 
+	      = delVarEnv id_subst old_id
+\end{code}
+
+Add IdInfo back onto a let-bound Id
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must transfer the IdInfo of the original binder to the new binder.
 This is crucial, to preserve
 	strictness
@@ -510,54 +551,25 @@ of the letrec.
 
 NB 4: does no harm for non-recursive bindings
 
+NB 5: we can't do the addLetIdInfo part before *all* the RHSs because
+	rec { f = g
+	      h = ...
+		RULE h Int = f
+	}
+Here, we'll do postInlineUnconditionally on f, and we must "see" that 
+when substituting in h's RULE.  
+
 \begin{code}
-simplNonRecBndr :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
-simplNonRecBndr env id
-  = do	{ let subst = mkCoreSubst env
-	      (env1, id1) = substLetIdBndr subst env id
-	; seqId id1 `seq` return (env1, id1) }
-
----------------
-simplRecBndrs :: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
-simplRecBndrs env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) ids
-  = do	{ let 	-- Notice the knot here; we need the result to make 
-		-- a substitution for the IdInfo.  c.f. CoreSubst.substIdBndr
-	       (env1, ids1) = mapAccumL (substLetIdBndr subst) env ids
-	       subst = mkCoreSubst env1
-	; seqIds ids1 `seq` return (env1, ids1) }
-
----------------
-substLetIdBndr :: CoreSubst.Subst	-- Substitution to use for the IdInfo (knot-tied)
-	       -> SimplEnv -> InBinder 	-- Env and binder to transform
-	       -> (SimplEnv, OutBinder)
--- C.f. CoreSubst.substIdBndr
--- Clone Id if necessary, substitute its type
--- Return an Id with completely zapped IdInfo
--- 	[A subsequent substIdInfo will restore its IdInfo]
--- Augment the subtitution 
---	if the unique changed, *or* 
---	if there's interesting occurrence info
---
--- The difference between SimplEnv.substIdBndr above is
---	a) the rec_subst
---	b) the hackish "interesting occ info" part (due to vanish)
-
-substLetIdBndr rec_subst env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old_id
-  = (env { seInScope = in_scope `extendInScopeSet` new_id, 
-	   seIdSubst = new_subst }, new_id)
+addLetIdInfo :: SimplEnv -> InBinder -> OutBinder -> (SimplEnv, OutBinder)
+addLetIdInfo env in_id out_id
+  = (modifyInScope env out_id out_id, final_id)
   where
-    id1	   = uniqAway in_scope old_id
-    id2    = substIdType env id1
-    new_id = maybeModifyIdInfo (substIdInfo rec_subst) id2
-
-	-- Extend the substitution if the unique has changed,
-	-- or there's some useful occurrence information
-	-- See the notes with substTyVarBndr for the delSubstEnv
-    occ_info = occInfo (idInfo old_id)
-    new_subst | new_id /= old_id || isFragileOcc occ_info
-	      = extendVarEnv id_subst old_id (DoneId new_id occ_info)
-	      | otherwise 
-	      = delVarEnv id_subst old_id
+    final_id = out_id `setIdInfo` new_info
+    subst = mkCoreSubst env
+    old_info = idInfo in_id
+    new_info = case substIdInfo subst old_info of
+	 	  Nothing       -> old_info
+		  Just new_info -> new_info
 
 substIdInfo :: CoreSubst.Subst -> IdInfo -> Maybe IdInfo
 -- Substitute the 
