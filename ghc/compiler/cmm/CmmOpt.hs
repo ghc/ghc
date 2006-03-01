@@ -80,11 +80,6 @@ To inline _smi:
      its occurrences.
 -}
 
-
-It catches many useful cases, but could be generalised in
--- several ways.
-
-
 cmmMiniInline :: [CmmBasicBlock] -> [CmmBasicBlock]
 cmmMiniInline blocks = map do_inline blocks 
   where 
