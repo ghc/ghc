@@ -319,14 +319,9 @@ reOrderRec env (CyclicSCC (bind : binds))
 
 	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
 
--- NOT NEEDED ANY MORE [Feb06]
--- We make all rules available in all bindings, by substituting
--- the IdInfo before looking at any RHSs.  I'm just leaving this
--- snippet in as a commment so we can find it again if necessary.
---
---	| not (isEmptySpecInfo (idSpecialisation bndr)) = 1
---		-- Avoid things with specialisations; we'd like
---		-- to take advantage of them in the subsequent bindings
+	| not (isEmptySpecInfo (idSpecialisation bndr)) = 1
+		-- Avoid things with specialisations; we'd like
+		-- to take advantage of them in the subsequent bindings
 
 	| otherwise = 0
 
