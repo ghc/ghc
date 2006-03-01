@@ -35,13 +35,55 @@ import GLAEXTS
 -- -----------------------------------------------------------------------------
 -- The mini-inliner
 
--- This pass inlines assignments to temporaries that are used just
--- once in the very next statement only.  Generalising this would be
--- quite difficult (have to take into account aliasing of memory
--- writes, and so on), but at the moment it catches a number of useful
--- cases and lets the code generator generate much better code.
+{-
+This pass inlines assignments to temporaries that are used just
+once.  It works as follows:
 
--- NB. This assumes that temporaries are single-assignment.
+  - count uses of each temporary
+  - for each temporary that occurs just once:
+	- attempt to push it forward to the statement that uses it
+        - only push forward past assignments to other temporaries
+	  (assumes that temporaries are single-assignment)
+	- if we reach the statement that uses it, inline the rhs
+	  and delete the original assignment.
+
+Possible generalisations: here is an example from factorial
+
+Fac_zdwfac_entry:
+    cmG:
+        _smi = R2;
+        if (_smi != 0) goto cmK;
+        R1 = R3;
+        jump I64[Sp];
+    cmK:
+        _smn = _smi * R3;
+        R2 = _smi + (-1);
+        R3 = _smn;
+        jump Fac_zdwfac_info;
+
+We want to inline _smi and _smn.  To inline _smn:
+
+   - we must be able to push forward past assignments to global regs.
+     We can do this if the rhs of the assignment we are pushing
+     forward doesn't refer to the global reg being assigned to; easy
+     to test.
+
+To inline _smi:
+
+   - It is a trivial replacement, reg for reg, but it occurs more than
+     once.
+   - We can inline trivial assignments even if the temporary occurs
+     more than once, as long as we don't eliminate the original assignment
+     (this doesn't help much on its own).
+   - We need to be able to propagate the assignment forward through jumps;
+     if we did this, we would find that it can be inlined safely in all
+     its occurrences.
+-}
+
+
+It catches many useful cases, but could be generalised in
+-- several ways.
+
 
 cmmMiniInline :: [CmmBasicBlock] -> [CmmBasicBlock]
 cmmMiniInline blocks = map do_inline blocks 
