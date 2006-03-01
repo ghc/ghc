@@ -40,6 +40,7 @@ data HsLocalBinds id	-- Bindings in a 'let' expression
 			-- or a 'where' clause
   = HsValBinds (HsValBinds id)
   | HsIPBinds  (HsIPBinds id)
+
   | EmptyLocalBinds
 
 data HsValBinds id	-- Value bindings (not implicit parameters)

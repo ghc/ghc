@@ -28,7 +28,7 @@ tcRules :: [LRuleDecl Name] -> TcM [LRuleDecl TcId]
 tcRules decls = mappM (wrapLocM tcRule) decls
 
 tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
-tcRule (HsRule name act vars lhs rhs)
+tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
   = addErrCtxt (ruleCtxt name)			$
     traceTc (ptext SLIT("---- Rule ------")
 		 <+> ppr name)			`thenM_` 
@@ -84,8 +84,8 @@ tcRule (HsRule name act vars lhs rhs)
 
     returnM (HsRule name act
 		    (map (RuleBndr . noLoc) (forall_tvs2 ++ tpl_ids))	-- yuk
-		    (mkHsDictLet lhs_binds lhs')
-		    (mkHsDictLet rhs_binds rhs'))
+		    (mkHsDictLet lhs_binds lhs') fv_lhs
+		    (mkHsDictLet rhs_binds rhs') fv_rhs)
   where
 
 tcRuleBndrs [] thing_inside = thing_inside []

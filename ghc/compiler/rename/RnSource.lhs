@@ -330,25 +330,25 @@ extendTyVarEnvForMethodBinds tyvars thing_inside
 %*********************************************************
 
 \begin{code}
-rnHsRuleDecl (HsRule rule_name act vars lhs rhs)
+rnHsRuleDecl (HsRule rule_name act vars lhs fv_lhs rhs fv_rhs)
   = bindPatSigTyVarsFV (collectRuleBndrSigTys vars)	$
 
     bindLocatedLocalsFV doc (map get_var vars)		$ \ ids ->
     mapFvRn rn_var (vars `zip` ids)		`thenM` \ (vars', fv_vars) ->
 
-    rnLExpr lhs					`thenM` \ (lhs', fv_lhs) ->
-    rnLExpr rhs					`thenM` \ (rhs', fv_rhs) ->
+    rnLExpr lhs					`thenM` \ (lhs', fv_lhs') ->
+    rnLExpr rhs					`thenM` \ (rhs', fv_rhs') ->
     let
 	mb_bad = validRuleLhs ids lhs'
     in
     checkErr (isNothing mb_bad)
 	     (badRuleLhsErr rule_name lhs' mb_bad)	`thenM_`
     let
-	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs)]
+	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs')]
     in
     mappM (addErr . badRuleVar rule_name) bad_vars	`thenM_`
-    returnM (HsRule rule_name act vars' lhs' rhs',
-	     fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
+    returnM (HsRule rule_name act vars' lhs' fv_lhs' rhs' fv_rhs',
+	     fv_vars `plusFV` fv_lhs' `plusFV` fv_rhs')
   where
     doc = text "In the transformation rule" <+> ftext rule_name
   

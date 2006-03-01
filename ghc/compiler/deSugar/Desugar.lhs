@@ -263,7 +263,7 @@ ppr_ds_rules rules
 
 \begin{code}
 dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM (Maybe CoreRule)
-dsRule mod in_scope (L loc (HsRule name act vars lhs rhs))
+dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
   = putSrcSpanDs loc $ 
     do	{ let bndrs     = [var | RuleBndr (L _ var) <- vars]
 	; lhs'  <- dsLExpr lhs

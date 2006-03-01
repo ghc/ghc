@@ -532,7 +532,7 @@ rule  	:: { LHsDecl RdrName }
 	: STRING activation rule_forall infixexp '=' exp
 	     { LL $ RuleD (HsRule (getSTRING $1) 
 				  ($2 `orElse` AlwaysActive) 
-				  $3 $4 $6) }
+				  $3 $4 placeHolderNames $6 placeHolderNames) }
 
 activation :: { Maybe Activation } 
         : {- empty -}                           { Nothing }

@@ -36,6 +36,7 @@ import HsBinds		( HsValBinds(..), HsBind, LHsBinds, plusHsValBinds,
 import HsPat		( HsConDetails(..), hsConArgs )
 import HsImpExp		( pprHsVar )
 import HsTypes
+import NameSet          ( NameSet )
 import HscTypes		( DeprecTxt )
 import CoreSyn		( RuleName )
 import Kind		( Kind, pprKind )
@@ -750,7 +751,9 @@ data RuleDecl name
 	Activation
 	[RuleBndr name]		-- Forall'd vars; after typechecking this includes tyvars
 	(Located (HsExpr name))	-- LHS
+        NameSet                 -- Free-vars from the LHS
 	(Located (HsExpr name))	-- RHS
+        NameSet                 -- Free-vars from the RHS
 
 data RuleBndr name
   = RuleBndr (Located name)
@@ -760,7 +763,7 @@ collectRuleBndrSigTys :: [RuleBndr name] -> [LHsType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 instance OutputableBndr name => Outputable (RuleDecl name) where
-  ppr (HsRule name act ns lhs rhs)
+  ppr (HsRule name act ns lhs fv_lhs rhs fv_rhs)
 	= sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
 	       nest 4 (pp_forall <+> pprExpr (unLoc lhs)), 
 	       nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
