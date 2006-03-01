@@ -47,6 +47,12 @@ import DATA_BITS
 import Data.Char
 import Ratio
 --import TRACE
+
+#if __GLASGOW_HASKELL__ >= 605
+import Data.Char 	( GeneralCategory(..), generalCategory )
+#else
+import Compat.Unicode	( GeneralCategory(..), generalCategory )
+#endif
 }
 
 $unispace    = \x05
@@ -1182,9 +1188,6 @@ alexGetChar (AI loc ofs s)
 	other_graphic	= '\x6'
 
 	adj_c 
-#if __GLASGOW_HASKELL__ < 605
-	  = c  -- no Unicode support
-#else
 	  | c <= '\x06' = non_graphic
 	  | c <= '\xff' = c
 	  | otherwise = 
@@ -1213,7 +1216,6 @@ alexGetChar (AI loc ofs s)
 		  OtherSymbol           -> symbol
 		  Space                 -> space
 		  _other		-> non_graphic
-#endif
 
 -- This version does not squash unicode characters, it is used when
 -- lexing strings.

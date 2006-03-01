@@ -68,6 +68,9 @@ Distribution/ParseUtils.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/
 Distribution/Compiler.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compiler.hs
 Distribution/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Version.hs
 Language/Haskell/Extension.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Language/Haskell/Extension.hs
+cbits/unicode.o : $(FPTOOLS_TOP)/libraries/base/cbits/WCsubst.c $(FPTOOLS_TOP)/libraries/base/include/WCsubst.h
+
+SRC_CC_OPTS += -I$(FPTOOLS_TOP)/libraries/base/cbits -I$(FPTOOLS_TOP)/libraries/base/include
 
 # Make the #includes in the stubs independent of the current location
 SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
