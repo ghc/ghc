@@ -86,6 +86,8 @@ import Foreign
 import CString		( CString, peekCString )
 #endif
 
+import Text.Regex
+
 #if __GLASGOW_HASKELL__ < 603
 -- rawSystem comes from libghccompat.a in stage1
 import Compat.RawSystem	( rawSystem )
@@ -95,7 +97,6 @@ import System.IO.Error  ( ioeGetErrorType )
 import System.Process	( runInteractiveProcess, getProcessExitCode )
 import System.IO        ( hSetBuffering, hGetLine, BufferMode(..) )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
-import Text.Regex
 import Data.Char        ( isSpace )
 import FastString       ( mkFastString )
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
