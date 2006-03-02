@@ -84,6 +84,7 @@ import Type		( TyThing(..) )
 import Class		( Class, classSelIds, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
+import PrelNames	( gHC_PRIM )
 import Packages		( PackageIdH, PackageId, PackageConfig, HomeModules )
 import DynFlags		( DynFlags(..), isOneShot )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
@@ -275,9 +276,17 @@ hptRules hsc_env deps
     |	-- Find each non-hi-boot module below me
       (mod, False) <- deps
 
+	-- unsavoury: when compiling the base package with --make, we
+	-- sometimes try to look up RULES for GHC.Prim.  GHC.Prim won't
+	-- be in the HPT, because we never compile it; it's in the EPT
+	-- instead.  ToDo: clean up, and remove this slightly bogus
+	-- filter:
+    , mod /= gHC_PRIM
+
 	-- Look it up in the HPT
-    , let mod_info = ASSERT( mod `elemModuleEnv` hpt )
-		     expectJust "hptRules" (lookupModuleEnv hpt mod)
+    , let mod_info = case lookupModuleEnv hpt mod of
+		  	Nothing -> pprPanic "hptRules" (ppr mod <+> ppr deps)
+		  	Just x  -> x
 
 	-- And get its dfuns
     , rule <- md_rules (hm_details mod_info) ]
