@@ -22,9 +22,10 @@ import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial, isDefaultAlt )
 import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo, isLocalId,
-			  isExportedId, idArity, 
+			  isExportedId, idArity, idSpecialisation,
 			  idType, idUnique, Id
 			)
+import IdInfo		( isEmptySpecInfo )
 import BasicTypes	( OccInfo(..), isOneOcc, InterestingCxt )
 
 import VarSet
