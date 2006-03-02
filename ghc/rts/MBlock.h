@@ -13,6 +13,7 @@ extern lnat RTS_VAR(mblocks_allocated);
 
 extern void * getMBlock(void);
 extern void * getMBlocks(nat n);
+extern void freeAllMBlocks(void);
 
 #if osf3_HOST_OS
 /* ToDo: Perhaps by adjusting this value we can make linking without

@@ -299,6 +299,12 @@ getMBlocks(nat n)
   return ret;
 }
 
+void
+freeAllMBlocks(void)
+{
+  /* XXX Do something here */
+}
+
 #else /* defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS) */
 
 /*
@@ -316,8 +322,10 @@ getMBlocks(nat n)
  our case).
 */
 
-char* base_non_committed = (char*)0;
-char* end_non_committed = (char*)0;
+static char* base_non_committed = (char*)0;
+static char* end_non_committed = (char*)0;
+
+static void *membase;
 
 /* Default is to reserve 256M of VM to minimise the slop cost. */
 #define SIZE_RESERVED_POOL  ( 256 * 1024 * 1024 )
@@ -356,9 +364,10 @@ getMBlocks(nat n)
 				      , MEM_RESERVE
 				      , PAGE_READWRITE
 				      );
+    membase = base_non_committed;
     if ( base_non_committed == 0 ) {
-         errorBelch("getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
-         ret=(void*)-1;
+         errorBelch("getMBlocks: VirtualAlloc MEM_RESERVE %lu failed with: %ld\n", size_reserved_pool, GetLastError());
+       ret=(void*)-1;
     } else {
       end_non_committed = (char*)base_non_committed + (unsigned long)size_reserved_pool;
       /* The returned pointer is not aligned on a mega-block boundary. Make it. */
@@ -380,7 +389,7 @@ getMBlocks(nat n)
   if ( ret != (void*)-1 ) {
      ret = VirtualAlloc(next_request, size, MEM_COMMIT, PAGE_READWRITE);
      if (ret == NULL) {
-        debugBelch("getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
+        debugBelch("getMBlocks: VirtualAlloc MEM_COMMIT %lu failed with: %ld\n", size, GetLastError());
         ret=(void*)-1;
      }
   }
@@ -404,6 +413,18 @@ getMBlocks(nat n)
   }
 
   return ret;
+}
+
+void
+freeAllMBlocks(void)
+{
+  BOOL rc;
+
+  rc = VirtualFree(membase, 0, MEM_RELEASE);
+  
+  if (rc == FALSE) {
+     debugBelch("freeAllMBlocks: VirtualFree failed with: %ld\n", GetLastError());
+  }
 }
 
 /* Hand back the physical memory that is allocated to a mega-block. 
