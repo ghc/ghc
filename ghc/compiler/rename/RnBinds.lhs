@@ -44,7 +44,7 @@ import BasicTypes	( RecFlag(..) )
 import Digraph		( SCC(..), stronglyConnComp )
 import Bag
 import Outputable
-import Maybes		( orElse, fromJust, isJust )
+import Maybes		( orElse, isJust )
 import Util		( filterOut )
 import Monad		( foldM )
 \end{code}
@@ -315,9 +315,8 @@ depAnalBinds binds_w_dus
 
     keyd_nodes = bagToList binds_w_dus `zip` [0::Int ..]
 
-    edges = [ (node, key, [fromJust mb_key | n <- nameSetToList uses,
-			   let mb_key = lookupNameEnv key_map n,
-			   isJust mb_key ])
+    edges = [ (node, key, [key | n <- nameSetToList uses,
+			         Just key <- [lookupNameEnv key_map n] ])
 	    | (node@(_,_,uses), key) <- keyd_nodes ]
 
     key_map :: NameEnv Int	-- Which binding it comes from
