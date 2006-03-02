@@ -84,21 +84,40 @@ union fv1 fv2 fv_cand in_scope = fv1 fv_cand in_scope `unionVarSet` fv2 fv_cand 
 noVars :: FV
 noVars fv_cand in_scope = emptyVarSet
 
--- At a variable occurrence, add in any free variables of its rule rhss
--- Curiously, we gather the Id's free *type* variables from its binding
--- site, but its free *rule-rhs* variables from its usage sites.  This
--- is a little weird.  The reason is that the former is more efficient,
--- but the latter is more fine grained, and a makes a difference when
--- a variable mentions itself one of its own rule RHSs
+--	Comment about obselete code
+-- We used to gather the free variables the RULES at a variable occurrence
+-- with the following cryptic comment:
+--     "At a variable occurrence, add in any free variables of its rule rhss
+--     Curiously, we gather the Id's free *type* variables from its binding
+--     site, but its free *rule-rhs* variables from its usage sites.  This
+--     is a little weird.  The reason is that the former is more efficient,
+--     but the latter is more fine grained, and a makes a difference when
+--     a variable mentions itself one of its own rule RHSs"
+-- Not only is this "weird", but it's also pretty bad because it can make
+-- a function seem more recursive than it is.  Suppose
+--	f  = ...g...
+--	g  = ...
+--         RULE g x = ...f...
+-- Then f is not mentioned in its own RHS, and needn't be a loop breaker
+-- (though g may be).  But if we collect the rule fvs from g's occurrence,
+-- it looks as if f mentions itself.  (This bites in the eftInt/eftIntFB
+-- code in GHC.Enum.)
+-- 
+-- Anyway, it seems plain wrong.  The RULE is like an extra RHS for the
+-- function, so its free variables belong at the definition site.
+--
+-- Deleted code looked like
+--     foldVarSet add_rule_var var_itself_set (idRuleVars var)
+--     add_rule_var var set | keep_it fv_cand in_scope var = extendVarSet set var
+--			    | otherwise			   = set
+-- 	SLPJ Feb06
+
 oneVar :: Id -> FV
 oneVar var fv_cand in_scope
   = ASSERT( isId var ) 
-    foldVarSet add_rule_var var_itself_set (idRuleVars var)
-  where
-    var_itself_set | keep_it fv_cand in_scope var = unitVarSet var
-	           | otherwise		      = emptyVarSet
-    add_rule_var var set | keep_it fv_cand in_scope var = extendVarSet set var
-			 | otherwise			= set
+    if keep_it fv_cand in_scope var 
+    then unitVarSet var
+    else emptyVarSet
 
 someVars :: VarSet -> FV
 someVars vars fv_cand in_scope
@@ -139,12 +158,15 @@ expr_fvs (Case scrut bndr ty alts)
     alt_fvs (con, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
 
 expr_fvs (Let (NonRec bndr rhs) body)
-  = expr_fvs rhs `union` addBndr bndr (expr_fvs body)
+  = rhs_fvs (bndr, rhs) `union` addBndr bndr (expr_fvs body)
 
 expr_fvs (Let (Rec pairs) body)
-  = addBndrs bndrs (foldr (union . expr_fvs) (expr_fvs body) rhss)
-  where
-    (bndrs,rhss) = unzip pairs
+  = addBndrs (map fst pairs) 
+	     (foldr (union . rhs_fvs) (expr_fvs body) pairs)
+
+---------
+rhs_fvs (bndr, rhs) = expr_fvs rhs `union` someVars (idRuleVars bndr)
+	-- Treat any RULES as extra RHSs of the binding
 
 ---------
 exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
