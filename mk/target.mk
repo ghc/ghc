@@ -322,34 +322,6 @@ endif
 
 # Extra stuff for compiling Haskell files with $(SplitObjs):
 
-HC_SPLIT_PRE = \
-    $(RM) $@; if [ ! -d $(basename $@)_split ]; then mkdir $(basename $@)_split; else \
-    $(FIND) $(basename $@)_split -name '*.$(way_)o' -print | xargs $(RM) __rm_food; fi
-ifeq "$(GhcWithInterpreter)" "YES"
-ifeq "$(LdIsGNULd)" "YES"
-# If ld is GNU ld, we can use a linker script to pass the names of the
-# input files.  This avoids problems with limits on the length of the
-# ld command line, which we run into for large Haskell modules.
-HC_SPLIT_POST = \
-  ( cd $(basename $@)_split; \
-    $(RM) ld.script; \
-    touch ld.script; \
-    echo "INPUT(" *.$(way_)o ")" >>ld.script; \
-    $(LD) -r $(LD_X) -o ../$(notdir $@) ld.script; \
-  )
-else
-HC_SPLIT_POST = \
-  ( cd $(basename $@)_split; \
-    $(LD) -r $(LD_X) -o ../$(notdir $@) *.$(way_)o; \
-  )
-endif # LdIsGNULd == YES
-else
-HC_SPLIT_POST = touch $@
-endif # GhcWithInterpreter == YES
-
-SRC_HC_PRE_OPTS  += $(HC_SPLIT_PRE);
-SRC_HC_POST_OPTS += $(HC_SPLIT_POST);
-
 #
 # If (Haskell) object files are split, cleaning up 
 # consist of descending into the directories where

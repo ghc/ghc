@@ -216,6 +216,8 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cRAWCPP_FLAGS         = \"$(RAWCPP_FLAGS)\"" >> $(CONFIG_HS)
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
 	@echo "cMKDLL                = \"$(BLD_DLL)\"" >> $(CONFIG_HS)
+	@echo "cLdIsGNULd            = \"$(LdIsGNULd)\"" >> $(CONFIG_HS)
+	@echo "cLD_X		     = \"$(LD_X)\"" >> $(CONFIG_HS)
 	@echo "cPROJECT_DIR          = \"$(PROJECT_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_DRIVER_DIR_REL   = \"$(GHC_DRIVER_DIR_REL)\"" >> $(CONFIG_HS)
 	@echo "cGHC_TOUCHY_PGM       = \"$(GHC_TOUCHY_PGM)\"" >> $(CONFIG_HS)

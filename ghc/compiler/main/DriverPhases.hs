@@ -150,6 +150,7 @@ startPhase "C"        = Cc
 startPhase "cc"       = Cc
 startPhase "cxx"      = Cc
 startPhase "raw_s"    = Mangle
+startPhase "split_s"  = SplitMangle
 startPhase "s"        = As
 startPhase "S"        = As
 startPhase "o"        = StopLn

@@ -65,6 +65,7 @@ import Directory
 import System
 import IO
 import Monad
+import Data.List	( isSuffixOf )
 import Maybe
 
 
@@ -297,7 +298,7 @@ link BatchCompile dflags batch_attempt_linking hpt
 	    pkg_deps  = concatMap (dep_pkgs . mi_deps . hm_iface) home_mod_infos
 
 	    -- the linkables to link
-	    linkables = map (fromJust.hm_linkable) home_mod_infos
+	    linkables = map (expectJust "link".hm_linkable) home_mod_infos
 
         debugTraceMsg dflags 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
 
@@ -985,33 +986,63 @@ runPhase As stop dflags _basename _suff input_fn get_output_fn maybe_loc
 
 
 runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
-  = do  let as_opts = getOpts dflags opt_a
+  = do  
+	output_fn <- get_output_fn StopLn maybe_loc
+
+	let (base_o, _) = splitFilename output_fn
+	    split_odir  = base_o ++ "_split"
+	    osuf = objectSuf dflags
+
+	createDirectoryHierarchy split_odir
+
+	-- remove M_split/ *.o, because we're going to archive M_split/ *.o
+	-- later and we don't want to pick up any old objects.
+	fs <- getDirectoryContents split_odir 
+	mapM_ removeFile $ map (split_odir `joinFileName`)
+			 $ filter (osuf `isSuffixOf`) fs
+
+	let as_opts = getOpts dflags opt_a
 
 	(split_s_prefix, n) <- readIORef v_Split_info
 
-	let real_odir
-		| Just d <- objectDir dflags = d
-		| otherwise                  = basename ++ "_split"
+	let split_s   n = split_s_prefix ++ "__" ++ show n `joinFileExt` "s"
+	    split_obj n = split_odir `joinFileName`
+				filenameOf base_o ++ "__" ++ show n
+					`joinFileExt` osuf
 
 	let assemble_file n
-	      = do  let input_s  = split_s_prefix ++ "__" ++ show n ++ ".s"
-		    let output_o = replaceFilenameDirectory
-					(basename ++ "__" ++ show n ++ ".o")
-					 real_odir
-		    let osuf = objectSuf dflags
-		    let real_o = replaceFilenameSuffix output_o osuf
-		    SysTools.runAs dflags
-				 (map SysTools.Option as_opts ++
-		    		    [ SysTools.Option "-c"
-				    , SysTools.Option "-o"
-				    , SysTools.FileOption "" real_o
-				    , SysTools.FileOption "" input_s
-				    ])
+	      = SysTools.runAs dflags
+			 (map SysTools.Option as_opts ++
+		   	 [ SysTools.Option "-c"
+			 , SysTools.Option "-o"
+			 , SysTools.FileOption "" (split_obj n)
+			 , SysTools.FileOption "" (split_s n)
+			 ])
 	
 	mapM_ assemble_file [1..n]
 
-	output_fn <- get_output_fn StopLn maybe_loc
+	-- and join the split objects into a single object file:
+	let ld_r args = SysTools.runLink dflags ([ 
+				SysTools.Option "-nostdlib",
+				SysTools.Option "-nodefaultlibs",
+				SysTools.Option "-Wl,-r", 
+				SysTools.Option ld_x_flag, 
+				SysTools.Option "-o", 
+				SysTools.FileOption "" output_fn ] ++ args)
+            ld_x_flag | null cLD_X = ""
+		      | otherwise  = "-Wl,-x"	  
+
+	if cLdIsGNULd == "YES"
+	    then do 
+		  let script = split_odir `joinFileName` "ld.script"
+		  writeFile script $
+		      "INPUT(" ++ unwords (map split_obj [1..n]) ++ ")"
+		  ld_r [SysTools.FileOption "" script]
+	    else do
+		  ld_r (map (SysTools.FileOption "" . split_obj) [1..n])
+
 	return (StopLn, dflags, maybe_loc, output_fn)
+
 
 -----------------------------------------------------------------------------
 -- MoveBinary sort-of-phase
