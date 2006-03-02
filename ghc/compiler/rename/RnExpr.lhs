@@ -42,7 +42,7 @@ import UniqSet		( emptyUniqSet )
 import List		( nub )
 import Util		( isSingleton )
 import ListSetOps	( removeDups )
-import Maybes		( fromJust )
+import Maybes		( expectJust )
 import Outputable
 import SrcLoc		( Located(..), unLoc, getLoc, cmpLocated )
 import FastString
@@ -678,7 +678,7 @@ rnStmt ctxt (ParStmt segs) thing_inside
 		     { 	-- Find the Names that are bound by stmts
 		       lcl_env <- getLocalRdrEnv
 		     ; let { rdr_bndrs = collectLStmtsBinders stmts
-		     	   ; bndrs = map ( fromJust
+		     	   ; bndrs = map ( expectJust "rnStmt"
 		     		         . lookupLocalRdrEnv lcl_env
 		     		         . unLoc) rdr_bndrs
 		           ; new_bndrs = nub bndrs ++ bndrs_so_far 

@@ -62,7 +62,7 @@ import SrcLoc		( Located(..), unLoc, getLoc )
 import Bag
 import ErrUtils		( Message )
 import Digraph		( SCC(..), stronglyConnComp )
-import Maybes		( fromJust, isJust, isNothing, orElse )
+import Maybes		( expectJust, isJust, isNothing, orElse )
 import Util		( singleton )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 			  RecFlag(..), isNonRec, InlineSpec, defaultInlineSpec )
@@ -251,10 +251,8 @@ mkEdges :: TcSigFun -> LHsBinds Name
 type BKey  = Int -- Just number off the bindings
 
 mkEdges sig_fn binds
-  = [ (bind, key, [fromJust mb_key | n <- nameSetToList (bind_fvs (unLoc bind)),
-				     let mb_key = lookupNameEnv key_map n,
-				     isJust mb_key,
-				     no_sig n ])
+  = [ (bind, key, [key | n <- nameSetToList (bind_fvs (unLoc bind)),
+			 Just key <- [lookupNameEnv key_map n], no_sig n ])
     | (bind, key) <- keyd_binds
     ]
   where
@@ -419,7 +417,8 @@ type TcPragFun = Name -> [LSig Name]
 mkPragFun :: [LSig Name] -> TcPragFun
 mkPragFun sigs = \n -> lookupNameEnv env n `orElse` []
 	where
-	  prs = [(fromJust (sigName sig), sig) | sig <- sigs, isPragLSig sig]
+	  prs = [(expectJust "mkPragFun" (sigName sig), sig) 
+		| sig <- sigs, isPragLSig sig]
 	  env = foldl add emptyNameEnv prs
 	  add env (n,p) = extendNameEnv_Acc (:) singleton env n p
 
@@ -958,7 +957,7 @@ mkSigFun :: [LSig Name] -> TcSigFun
 -- Precondition: no duplicates
 mkSigFun sigs = lookupNameEnv env
   where
-    env = mkNameEnv [(fromJust (sigName sig), sig) | sig <- sigs]
+    env = mkNameEnv [(expectJust "mkSigFun" (sigName sig), sig) | sig <- sigs]
 
 ---------------
 data TcSigInfo

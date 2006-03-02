@@ -52,7 +52,8 @@ import Var		( TyVar, idType, idName )
 import VarSet		( elemVarSet, mkVarSet )
 import Name		( Name, getSrcLoc )
 import Outputable
-import Maybe		( isJust, fromJust )
+import Maybe		( isJust )
+import Maybes		( expectJust )
 import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
 import List		( partition )
@@ -663,7 +664,7 @@ checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
 	; checkTc (isJust mb_subst2) (fieldTypeMisMatch fld con1 con2) }
   where
     mb_subst1 = tcMatchTys tvs1 res1 res2
-    mb_subst2 = tcMatchTyX tvs1 (fromJust mb_subst1) fty1 fty2
+    mb_subst2 = tcMatchTyX tvs1 (expectJust "checkFieldCompat" mb_subst1) fty1 fty2
 
 -------------------------------
 checkValidDataCon :: TyCon -> DataCon -> TcM ()

@@ -94,7 +94,7 @@ import IfaceSyn		( IfaceInst, IfaceRule, IfaceDecl(ifName) )
 
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
-import Maybes		( orElse, fromJust, expectJust )
+import Maybes		( orElse, expectJust, expectJust )
 import Outputable
 import SrcLoc		( SrcSpan, Located )
 import UniqSupply	( UniqSupply )
@@ -277,7 +277,7 @@ hptRules hsc_env deps
 
 	-- Look it up in the HPT
     , let mod_info = ASSERT( mod `elemModuleEnv` hpt )
-		     fromJust (lookupModuleEnv hpt mod)
+		     expectJust "hptRules" (lookupModuleEnv hpt mod)
 
 	-- And get its dfuns
     , rule <- md_rules (hm_details mod_info) ]

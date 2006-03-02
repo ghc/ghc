@@ -234,7 +234,7 @@ import Maybes		( expectJust, mapCatMaybes )
 
 import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist )
-import Data.Maybe	( isJust, isNothing, fromJust )
+import Data.Maybe	( isJust, isNothing )
 import Data.List	( partition, nub )
 import qualified Data.List as List
 import Control.Monad	( unless, when )
@@ -768,7 +768,7 @@ checkModule session@(Session ref) mod = do
 	   -- ml_hspp_file field, say
 	   let dflags0 = hsc_dflags hsc_env
 	       hspp_buf = expectJust "GHC.checkModule" (ms_hspp_buf ms)
-	       filename = fromJust (ml_hs_file (ms_location ms))
+	       filename = expectJust "checkModule" (ml_hs_file (ms_location ms))
 	       opts = getOptionsFromStringBuffer hspp_buf filename
 	   (dflags1,leftovers) <- parseDynamicFlags dflags0 (map snd opts)
 	   if (not (null leftovers))
@@ -1446,7 +1446,7 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 findSummaryBySourceFile :: [ModSummary] -> FilePath -> Maybe ModSummary
 findSummaryBySourceFile summaries file
   = case [ ms | ms <- summaries, HsSrcFile <- [ms_hsc_src ms],
-			         fromJust (ml_hs_file (ms_location ms)) == file ] of
+			         expectJust "findSummaryBySourceFile" (ml_hs_file (ms_location ms)) == file ] of
 	[] -> Nothing
 	(x:xs) -> Just x
 
@@ -2065,6 +2065,6 @@ showModule s mod_summary = withSession s $ \hsc_env -> do
 	Nothing	      -> panic "missing linkable"
 	Just mod_info -> return (showModMsg obj_linkable mod_summary)
 		      where
-			 obj_linkable = isObjectLinkable (fromJust (hm_linkable mod_info))
+			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
 
 #endif /* GHCI */

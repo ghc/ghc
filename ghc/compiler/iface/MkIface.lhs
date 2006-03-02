@@ -234,7 +234,7 @@ import DATA_IOREF	( writeIORef )
 import Monad		( when )
 import List		( insert )
 import Maybes		( orElse, mapCatMaybes, isNothing, isJust, 
-			  fromJust, expectJust, MaybeErr(..) )
+			  expectJust, MaybeErr(..) )
 \end{code}
 
 
@@ -321,7 +321,7 @@ mkIface hsc_env maybe_old_iface
 
 		-- Debug printing
 	; when (isJust pp_orphs && dopt Opt_WarnOrphans dflags) 
-	       (printDump (fromJust pp_orphs))
+	       (printDump (expectJust "mkIface" pp_orphs))
 	; when (dopt Opt_D_dump_hi_diffs dflags) (printDump pp_diffs)
 	; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
 			(pprModIface new_iface)
@@ -896,7 +896,7 @@ checkModUsage (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 	-- CHECK EXPORT LIST
     if checkExportList maybe_old_export_vers new_export_vers then
 	out_of_date_vers (ptext SLIT("  Export list changed"))
-		         (fromJust maybe_old_export_vers) 
+		         (expectJust "checkModUsage" maybe_old_export_vers) 
 		         new_export_vers
     else
 

@@ -67,7 +67,7 @@ import VarSet		( emptyVarSet, mkVarSet, unitVarSet, unionVarSet, elemVarSet, var
 import VarEnv
 import Name		( Name, isSystemName )
 import ErrUtils		( Message )
-import Maybes		( fromJust, isNothing )
+import Maybes		( expectJust, isNothing )
 import BasicTypes	( Arity )
 import UniqSupply	( uniqsFromSupply )
 import Util		( notNull, equalLength )
@@ -1197,7 +1197,8 @@ checkTauTvUpdate orig_tv orig_ty
 	     ; case mb_tys' of
 		Just tys' -> return (TyConApp tc tys')
 				-- Retain the synonym (the common case)
-		Nothing   -> go (fromJust (tcView (TyConApp tc tys)))
+		Nothing   -> go (expectJust "checkTauTvUpdate" 
+					(tcView (TyConApp tc tys)))
 				-- Try again, expanding the synonym
 	     }
 \end{code}
