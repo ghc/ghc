@@ -63,7 +63,7 @@ badHead = errorEmptyList "head"
 -- This rule is useful in cases like 
 --	head [y | (x,y) <- ps, x==t]
 {-# RULES
-"head/build"	forall (g::forall b.(Bool->b->b)->b->b) . 
+"head/build"	forall (g::forall b.(a->b->b)->b->b) .
 		head (build g) = g (\x _ -> x) badHead
 "head/augment"	forall xs (g::forall b. (a->b->b) -> b -> b) . 
 		head (augment g xs) = g (\x _ -> x) (head xs)
