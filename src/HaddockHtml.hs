@@ -120,12 +120,13 @@ copyFile fromFPath toFPath =
 copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
 copyHtmlBits odir libdir maybe_css = do
   let 
+	libhtmldir = pathJoin [libdir, "html"]
 	css_file = case maybe_css of
-			Nothing -> pathJoin [libdir, cssFile]
+			Nothing -> pathJoin [libhtmldir, cssFile]
 			Just f  -> f
 	css_destination = pathJoin [odir, cssFile]
 	copyLibFile f = do
-	   copyFile (pathJoin [libdir, f]) (pathJoin [odir, f])
+	   copyFile (pathJoin [libhtmldir, f]) (pathJoin [odir, f])
  
   copyFile css_file css_destination
   mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile ]
