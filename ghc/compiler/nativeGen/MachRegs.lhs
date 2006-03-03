@@ -359,7 +359,12 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
 
     regs_to_save = system_regs ++ vol_list
 
-    vol_list = case vols of Nothing -> []; Just regs -> regs
+    vol_list = case vols of Nothing -> all_of_em; Just regs -> regs
+
+    all_of_em = [ VanillaReg n | n <- [0..mAX_Vanilla_REG] ]
+	     ++ [ FloatReg   n | n <- [0..mAX_Float_REG] ]
+	     ++ [ DoubleReg  n | n <- [0..mAX_Double_REG] ]
+	     ++ [ LongReg    n | n <- [0..mAX_Long_REG] ]
 
     callerSaveGlobalReg reg next
 	| callerSaves reg = 
