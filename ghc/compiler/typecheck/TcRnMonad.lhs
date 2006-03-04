@@ -257,8 +257,8 @@ ifOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()	-- Do it flag is tru
 ifOptM flag thing_inside = do { b <- doptM flag; 
 				if b then thing_inside else return () }
 
-getGhciMode :: TcRnIf gbl lcl GhcMode
-getGhciMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
+getGhcMode :: TcRnIf gbl lcl GhcMode
+getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 \end{code}
 
 \begin{code}

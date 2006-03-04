@@ -604,11 +604,11 @@ mkExportNameSet explicit_mod exports
 	-- written "module Main where ..."
 	-- Reason: don't want to complain about 'main' not in scope
 	--	   in interactive mode
-      ghci_mode <- getGhciMode
+      ghc_mode <- getGhcMode
       real_exports <- case () of
                         () | explicit_mod
                                -> return exports
-                           | ghci_mode == Interactive
+                           | ghc_mode == Interactive
                                -> return Nothing
                            | otherwise
                                -> do mainName <- lookupGlobalOccRn main_RDR_Unqual

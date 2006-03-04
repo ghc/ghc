@@ -782,8 +782,8 @@ check_old_iface mod_summary source_unchanged maybe_iface
 
      -- If the source has changed and we're in interactive mode, avoid reading
      -- an interface; just return the one we might have been supplied with.
-    getGhciMode					`thenM` \ ghci_mode ->
-    if (ghci_mode == Interactive || ghci_mode == JustTypecheck) 
+    getGhcMode					`thenM` \ ghc_mode ->
+    if (ghc_mode == Interactive || ghc_mode == JustTypecheck) 
 	&& not source_unchanged then
          returnM (outOfDate, maybe_iface)
     else
