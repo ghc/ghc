@@ -171,10 +171,10 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
            = do stub_o <- compileStub dflags' this_mod location
                 return [ DotO stub_o ]
 
-       handleMake (NewHscNoRecomp, iface, details)
+       handleMake (HscNoRecomp, iface, details)
            = ASSERT (isJust maybe_old_linkable)
              return (CompOK details iface maybe_old_linkable)
-       handleMake (NewHscRecomp hasStub, iface, details)
+       handleMake (HscRecomp hasStub, iface, details)
            | isHsBoot src_flavour
                = return (CompOK details iface Nothing)
            | otherwise
@@ -757,13 +757,13 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 
 	case mbResult of
           Nothing -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
-          Just NewHscNoRecomp
+          Just HscNoRecomp
               -> do SysTools.touch dflags' "Touching object file" o_file
                     -- The .o file must have a later modification date
                     -- than the source file (else we wouldn't be in HscNoRecomp)
                     -- but we touch it anyway, to keep 'make' happy (we think).
                     return (StopLn, dflags', Just location4, o_file)
-          Just (NewHscRecomp hasStub)
+          Just (HscRecomp hasStub)
               -> do when hasStub $
                          do stub_o <- compileStub dflags' mod_name location4
                             consIORef v_Ld_inputs stub_o
