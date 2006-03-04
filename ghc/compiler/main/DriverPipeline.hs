@@ -166,70 +166,65 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
        hsc_env' = hsc_env { hsc_dflags = dflags' }
        object_filename = ml_obj_file location
 
+   let getStubLinkable False = return []
+       getStubLinkable True
+           = do stub_o <- compileStub dflags' this_mod location
+                return [ DotO stub_o ]
+
+       handleMake (NewHscNoRecomp, iface, details)
+           = ASSERT (isJust maybe_old_linkable)
+             return (CompOK details iface maybe_old_linkable)
+       handleMake (NewHscRecomp hasStub, iface, details)
+           | isHsBoot src_flavour
+               = return (CompOK details iface Nothing)
+           | otherwise
+               = do stub_unlinked <- getStubLinkable hasStub
+                    (hs_unlinked, unlinked_time) <-
+                        case hsc_lang of
+                          HscNothing
+                            -> return ([], ms_hs_date mod_summary)
+                          -- We're in --make mode: finish the compilation pipeline.
+                          _other
+                            -> do runPipeline StopLn dflags (output_fn,Nothing) Persistent
+                                              (Just location)
+                                  -- The object filename comes from the ModLocation
+                                  o_time <- getModificationTime object_filename
+                                  return ([DotO object_filename], o_time)
+                    let linkable = LM unlinked_time this_mod
+			           (hs_unlinked ++ stub_unlinked)
+                    return (CompOK details iface (Just linkable))
+
+       handleInterpreted (InteractiveNoRecomp, iface, details)
+           = ASSERT (isJust maybe_old_linkable)
+             return (CompOK details iface maybe_old_linkable)
+       handleInterpreted (InteractiveRecomp hasStub comp_bc, iface, details)
+           = do stub_unlinked <- getStubLinkable hasStub
+                let hs_unlinked = [BCOs comp_bc]
+                    unlinked_time = ms_hs_date mod_summary
+                  -- Why do we use the timestamp of the source file here,
+                  -- rather than the current time?  This works better in
+                  -- the case where the local clock is out of sync
+                  -- with the filesystem's clock.  It's just as accurate:
+                  -- if the source is modified, then the linkable will
+                  -- be out of date.
+                let linkable = LM unlinked_time this_mod
+                               (hs_unlinked ++ stub_unlinked)
+                return (CompOK details iface (Just linkable))
+
+   let runCompiler compiler handle
+           = do mbResult <- compiler hsc_env' mod_summary
+                                     source_unchanged have_object old_iface
+                                     (Just (mod_index, nmods))
+                case mbResult of
+                  Nothing     -> return CompErrs
+                  Just result -> handle result
    -- run the compiler
-   hsc_result <- hscMain hsc_env' mod_summary
-			 source_unchanged have_object old_iface
-                         (Just (mod_index, nmods))
-
-   case hsc_result of
-      HscFail -> return CompErrs
-
-      HscNoRecomp details iface -> 
-	  ASSERT(isJust maybe_old_linkable)
-	  return (CompOK details iface maybe_old_linkable)
-
-      HscRecomp details iface stub_h_exists stub_c_exists maybe_interpreted_code 
-
-	| isHsBoot src_flavour	-- No further compilation to do
-	-> do	case hsc_lang of
-		   HscInterpreted -> return ()
-		   _other -> SysTools.touch dflags' "Touching object file" 
-					    object_filename
-		return (CompOK details iface Nothing)
-
-	| otherwise	-- Normal source file
-	-> do
-	   stub_unlinked <-
-	     if stub_c_exists then do
-		stub_o <- compileStub dflags' this_mod location
-		return [ DotO stub_o ]
-	     else
-		return []
-
-	   (hs_unlinked, unlinked_time) <-
-	     case hsc_lang of
-
-		-- in interpreted mode, just return the compiled code
-		-- as our "unlinked" object.
-		HscInterpreted
-		  -> case maybe_interpreted_code of
-#ifdef GHCI
-		       Just comp_bc -> return ([BCOs comp_bc], ms_hs_date mod_summary)
-			-- Why do we use the timestamp of the source file here,
-			-- rather than the current time?  This works better in
-			-- the case where the local clock is out of sync
-			-- with the filesystem's clock.  It's just as accurate:
-			-- if the source is modified, then the linkable will
-			-- be out of date.
-#endif
-		       Nothing -> panic "compile: no interpreted code"
-
-		HscNothing
-		  -> return ([], ms_hs_date mod_summary)
-
-		-- We're in --make mode: finish the compilation pipeline.
-		_other
-		  -> do	runPipeline StopLn dflags (output_fn,Nothing) Persistent
-				    (Just location)
-				-- The object filename comes from the ModLocation
-
-			o_time <- getModificationTime object_filename
-			return ([DotO object_filename], o_time)
-
-	   let linkable = LM unlinked_time this_mod
-			     (hs_unlinked ++ stub_unlinked)
-
-	   return (CompOK details iface (Just linkable))
+   case hsc_lang of
+     HscInterpreted | not (isHsBoot src_flavour) -- We can't compile boot files to
+                                                 -- bytecode so don't even try.
+         -> runCompiler hscCompileInteractive handleInterpreted
+     _other
+         -> runCompiler hscCompileMake handleMake
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
@@ -754,38 +749,29 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 	addHomeModuleToFinder hsc_env mod_name location4
 
   -- run the compiler!
-	result <- hscMain hsc_env
+	mbResult <- hscCompileOneShot hsc_env
 			  mod_summary source_unchanged 
 			  False		-- No object file
 			  Nothing	-- No iface
                           Nothing       -- No "module i of n" progress info
 
-	case result of
-
-	    HscFail -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
-
-            HscNoRecomp details iface -> do
-		SysTools.touch dflags' "Touching object file" o_file
-			-- The .o file must have a later modification date
-			-- than the source file (else we wouldn't be in HscNoRecomp)
-			-- but we touch it anyway, to keep 'make' happy (we think).
-		return (StopLn, dflags', Just location4, o_file)
-
-	    HscRecomp _details _iface 
-		      stub_h_exists stub_c_exists
-		      _maybe_interpreted_code -> do
-
-		when stub_c_exists $ do
-			stub_o <- compileStub dflags' mod_name location4
-			consIORef v_Ld_inputs stub_o
-
-		-- In the case of hs-boot files, generate a dummy .o-boot 
-		-- stamp file for the benefit of Make
-		case src_flavour of
-		  HsBootFile -> SysTools.touch dflags' "Touching object file" o_file
-		  other	     -> return ()
-
-		return (next_phase, dflags', Just location4, output_fn)
+	case mbResult of
+          Nothing -> throwDyn (PhaseFailed "hsc" (ExitFailure 1))
+          Just NewHscNoRecomp
+              -> do SysTools.touch dflags' "Touching object file" o_file
+                    -- The .o file must have a later modification date
+                    -- than the source file (else we wouldn't be in HscNoRecomp)
+                    -- but we touch it anyway, to keep 'make' happy (we think).
+                    return (StopLn, dflags', Just location4, o_file)
+          Just (NewHscRecomp hasStub)
+              -> do when hasStub $
+                         do stub_o <- compileStub dflags' mod_name location4
+                            consIORef v_Ld_inputs stub_o
+                    -- In the case of hs-boot files, generate a dummy .o-boot 
+                    -- stamp file for the benefit of Make
+                    when (isHsBoot src_flavour) $
+                      SysTools.touch dflags' "Touching object file" o_file
+                    return (next_phase, dflags', Just location4, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cmm phase
