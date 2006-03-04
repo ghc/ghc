@@ -5,21 +5,21 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-module HscMain ( 
-	HscResult(..),
-	hscMain, newHscEnv, hscCmmFile, 
-	hscFileCheck,
-	hscParseIdentifier,
+module HscMain
+    ( newHscEnv, hscCmmFile
+    , hscFileCheck
+    , hscParseIdentifier
 #ifdef GHCI
-	hscStmt, hscTcExpr, hscKcType,
-	compileExpr,
+    , hscStmt, hscTcExpr, hscKcType
+    , compileExpr
 #endif
-          hscCompileOneShot     -- :: Compiler HscStatus
-        , hscCompileMake        -- :: Compiler (HscStatus, ModIface, ModDetails)
-        , hscCompileInteractive -- :: Compiler (InteractiveStatus, ModIface, ModDetails)
-        , HscStatus (..)
-        , InteractiveStatus (..)
-	) where
+    , hscCompileOneShot     -- :: Compiler HscStatus
+    , hscCompileMake        -- :: Compiler (HscStatus, ModIface, ModDetails)
+    , hscCompileInteractive -- :: Compiler (InteractiveStatus, ModIface, ModDetails)
+    , HscStatus (..)
+    , InteractiveStatus (..)
+    , HscChecked (..)
+    ) where
 
 #include "HsVersions.h"
 
@@ -157,38 +157,16 @@ Trying to compile a hs-boot file to byte-code will result in a run-time
 error. This is the only thing that isn't caught by the type-system.
 
 \begin{code}
-data HscResult
-   -- Compilation failed
-   = HscFail
 
-   -- In IDE mode: we just do the static/dynamic checks
-   | HscChecked 
+data HscChecked
+    = HscChecked
         -- parsed
-	(Located (HsModule RdrName))
+        (Located (HsModule RdrName))
         -- renamed
-	(Maybe (HsGroup Name,[LImportDecl Name],Maybe [LIE Name]))
+        (Maybe (HsGroup Name,[LImportDecl Name],Maybe [LIE Name]))
         -- typechecked
-	(Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
+        (Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
 
-   -- Concluded that it wasn't necessary
-   | HscNoRecomp ModDetails  	         -- new details (HomeSymbolTable additions)
-	         ModIface	         -- new iface (if any compilation was done)
-
-   -- Did recompilation
-   | HscRecomp   ModDetails  		-- new details (HomeSymbolTable additions)
-                 ModIface		-- new iface (if any compilation was done)
-	         Bool	 	 	-- stub_h exists
-	         Bool  		 	-- stub_c exists
-	         (Maybe CompiledByteCode)
-
-
--- What to do when we have compiler error or warning messages
-type MessageAction = Messages -> IO ()
-
-
---------------------------------------------------------------
--- Exterimental code start.
---------------------------------------------------------------
 
 data HscStatus
     = NewHscNoRecomp
@@ -500,93 +478,7 @@ hscCodeGenInteractive hsc_env mod_summary (iface, details, cgguts)
 #endif
 
 
-
---------------------------------------------------------------
--- Exterimental code end.
---------------------------------------------------------------
-
-	-- no errors or warnings; the individual passes
-	-- (parse/rename/typecheck) print messages themselves
-
-hscMain
-  :: HscEnv
-  -> ModSummary
-  -> Bool		-- True <=> source unchanged
-  -> Bool		-- True <=> have an object file (for msgs only)
-  -> Maybe ModIface	-- Old interface, if available
-  -> Maybe (Int, Int)   -- Just (i,n) <=> module i of n (for msgs)
-  -> IO HscResult
-
-hscMain hsc_env mod_summary
-	source_unchanged have_object maybe_old_iface
-        mb_mod_index
- = do {
-      (recomp_reqd, maybe_checked_iface) <- 
-		{-# SCC "checkOldIface" #-}
-		checkOldIface hsc_env mod_summary 
-			      source_unchanged maybe_old_iface;
-
-      let no_old_iface = not (isJust maybe_checked_iface)
-          what_next | recomp_reqd || no_old_iface = hscRecomp 
-                    | otherwise                   = hscNoRecomp
-
-      ; what_next hsc_env mod_summary have_object 
-		  maybe_checked_iface
-                  mb_mod_index
-      }
-
-
-------------------------------
-hscNoRecomp hsc_env mod_summary 
-	    have_object (Just old_iface)
-            mb_mod_index
- | isOneShot (ghcMode (hsc_dflags hsc_env))
- = do {
-      compilationProgressMsg (hsc_dflags hsc_env) $
-	"compilation IS NOT required";
-      dumpIfaceStats hsc_env ;
-
-      let { bomb = panic "hscNoRecomp:OneShot" };
-      return (HscNoRecomp bomb bomb)
-      }
- | otherwise
- = do	{ compilationProgressMsg (hsc_dflags hsc_env) $
-		(showModuleIndex mb_mod_index ++ 
-                 "Skipping  " ++ showModMsg have_object mod_summary)
-
-	; new_details <- {-# SCC "tcRnIface" #-}
-		         initIfaceCheck hsc_env $
-			 typecheckIface old_iface ;
-	; dumpIfaceStats hsc_env
-
-	; return (HscNoRecomp new_details old_iface)
-    }
-
-hscNoRecomp hsc_env mod_summary 
-	    have_object Nothing
-	    mb_mod_index
-  = panic "hscNoRecomp"	-- hscNoRecomp definitely expects to 
-			-- have the old interface available
-
-------------------------------
-hscRecomp hsc_env mod_summary
-	  have_object maybe_old_iface
-          mb_mod_index
- = case ms_hsc_src mod_summary of
-     HsSrcFile -> do
-	front_res <- hscFileFrontEnd hsc_env mod_summary mb_mod_index
-	case ghcMode (hsc_dflags hsc_env) of
-	  JustTypecheck -> hscBootBackEnd hsc_env mod_summary maybe_old_iface front_res
-	  _             -> hscBackEnd     hsc_env mod_summary maybe_old_iface front_res
-
-     HsBootFile -> do
-	front_res <- hscFileFrontEnd hsc_env mod_summary mb_mod_index
-	hscBootBackEnd hsc_env mod_summary maybe_old_iface front_res
-
-     ExtCoreFile -> do
-	front_res <- hscCoreFrontEnd hsc_env mod_summary mb_mod_index
-	hscBackEnd hsc_env mod_summary maybe_old_iface front_res
-
+hscCoreFrontEnd :: FrontEnd ModGuts
 hscCoreFrontEnd hsc_env mod_summary mb_mod_index = do {
  	    -------------------
  	    -- PARSE
@@ -607,7 +499,7 @@ hscCoreFrontEnd hsc_env mod_summary mb_mod_index = do {
       	     Just mod_guts -> return (Just mod_guts)	-- No desugaring to do!
 	}}
 	 
-
+hscFileFrontEnd :: FrontEnd ModGuts
 hscFileFrontEnd hsc_env mod_summary mb_mod_index = do {
  	    -------------------
  	    -- DISPLAY PROGRESS MESSAGE
@@ -656,7 +548,7 @@ hscFileFrontEnd hsc_env mod_summary mb_mod_index = do {
 
 ------------------------------
 
-hscFileCheck :: HscEnv -> ModSummary -> IO HscResult
+hscFileCheck :: HscEnv -> ModSummary -> IO (Maybe HscChecked)
 hscFileCheck hsc_env mod_summary = do {
  	    -------------------
  	    -- PARSE
@@ -669,7 +561,7 @@ hscFileCheck hsc_env mod_summary = do {
 
 	; case maybe_parsed of {
       	     Left err -> do { printBagOfErrors dflags (unitBag err)
-			    ; return HscFail } ;
+			    ; return Nothing } ;
       	     Right rdr_module -> do {
 
  	    -------------------
@@ -683,7 +575,7 @@ hscFileCheck hsc_env mod_summary = do {
 
 	; printErrorsAndWarnings dflags tc_msgs
 	; case maybe_tc_result of {
-      	     Nothing -> return (HscChecked rdr_module Nothing Nothing);
+      	     Nothing -> return (Just (HscChecked rdr_module Nothing Nothing));
       	     Just tc_result -> do
 		let md = ModDetails { 
 				md_types   = tcg_type_env tc_result,
@@ -696,193 +588,12 @@ hscFileCheck hsc_env mod_summary = do {
                                 imports <- tcg_rn_imports tc_result
                                 let exports = tcg_rn_exports tc_result
                                 return (decl,imports,exports)
-		return (HscChecked rdr_module 
+		return (Just (HscChecked rdr_module 
                                    rnInfo
 				   (Just (tcg_binds tc_result,
 					  tcg_rdr_env tc_result,
-					  md)))
+					  md))))
 	}}}}
-
-------------------------------
-hscBootBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
--- For hs-boot files, there's no code generation to do
-
-hscBootBackEnd hsc_env mod_summary maybe_old_iface Nothing 
-  = return HscFail
-hscBootBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result)
-  = do	{ details <- mkBootModDetails hsc_env ds_result
-
-	; (new_iface, no_change) 
-		<- {-# SCC "MkFinalIface" #-}
-		   mkIface hsc_env maybe_old_iface ds_result details
-
-	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
-
-      	  -- And the answer is ...
-	; dumpIfaceStats hsc_env
-
-	; return (HscRecomp details new_iface
-                            False False Nothing)
- 	}
-
-------------------------------
-hscBackEnd :: HscEnv -> ModSummary -> Maybe ModIface -> Maybe ModGuts -> IO HscResult
-
-hscBackEnd hsc_env mod_summary maybe_old_iface Nothing 
-  = return HscFail
-
-hscBackEnd hsc_env mod_summary maybe_old_iface (Just ds_result) 
-  = do 	{ 	-- OMITTED: 
-		-- ; seqList imported_modules (return ())
-
-	  let one_shot  = isOneShot (ghcMode dflags)
-	      dflags    = hsc_dflags hsc_env
-
- 	    -------------------
- 	    -- FLATTENING
- 	    -------------------
-	; flat_result <- {-# SCC "Flattening" #-}
- 			 flatten hsc_env ds_result
-
-
-{-	TEMP: need to review space-leak fixing here
-	NB: even the code generator can force one of the
-	    thunks for constructor arguments, for newtypes in particular
-
-	; let 	-- Rule-base accumulated from imported packages
-	     pkg_rule_base = eps_rule_base (hsc_EPS hsc_env)
-
-		-- In one-shot mode, ZAP the external package state at
-		-- this point, because we aren't going to need it from
-		-- now on.  We keep the name cache, however, because
-		-- tidyCore needs it.
-	     pcs_middle 
-		 | one_shot  = pcs_tc{ pcs_EPS = error "pcs_EPS missing" }
-		 | otherwise = pcs_tc
-
-	; pkg_rule_base `seq` pcs_middle `seq` return ()
--}
-
-	-- alive at this point:  
-	--	pcs_middle
-	--	flat_result
-	--      pkg_rule_base
-
- 	    -------------------
- 	    -- SIMPLIFY
- 	    -------------------
-	; simpl_result <- {-# SCC "Core2Core" #-}
-			  core2core hsc_env flat_result
-
- 	    -------------------
- 	    -- TIDY
- 	    -------------------
-	; (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-			         tidyProgram hsc_env simpl_result
-
-	-- Alive at this point:  
-	--	tidy_result, pcs_final
-	--      hsc_env
-
- 	    -------------------
-	    -- BUILD THE NEW ModIface and ModDetails
-	    --	and emit external core if necessary
-	    -- This has to happen *after* code gen so that the back-end
-	    -- info has been set.  Not yet clear if it matters waiting
-	    -- until after code output
-	; (new_iface, no_change)
-		<- {-# SCC "MkFinalIface" #-}
-		   mkIface hsc_env maybe_old_iface simpl_result details
-
-	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
-
-	    -- Space leak reduction: throw away the new interface if
-	    -- we're in one-shot mode; we won't be needing it any
-	    -- more.
-	; final_iface <- if one_shot then return (error "no final iface")
-			 else return new_iface
-
-	    -- Build the final ModDetails (except in one-shot mode, where
-	    -- we won't need this information after compilation).
-	; final_details <- if one_shot then return (error "no final details")
-		 	   else return $! details
-
-	-- Emit external core
-	; emitExternalCore dflags cg_guts
-
- 	    -------------------
- 	    -- CONVERT TO STG and COMPLETE CODE GENERATION
-	; (stub_h_exists, stub_c_exists, maybe_bcos)
-		<- hscCodeGen dflags (ms_location mod_summary) cg_guts
-
-      	  -- And the answer is ...
-	; dumpIfaceStats hsc_env
-
-	; return (HscRecomp final_details
-			    final_iface
-                            stub_h_exists stub_c_exists
-      			    maybe_bcos)
-      	 }
-
-
-
-hscCodeGen dflags location
-    CgGuts{  -- This is the last use of the ModGuts in a compilation.
-	      -- From now on, we just use the bits we need.
-        cg_module   = this_mod,
-	cg_binds    = core_binds,
-	cg_tycons   = tycons,
-	cg_dir_imps = dir_imps,
-	cg_foreign  = foreign_stubs,
-	cg_home_mods = home_mods,
-	cg_dep_pkgs = dependencies     }  = do {
-
-  let { data_tycons = filter isDataTyCon tycons } ;
-	-- cg_tycons includes newtypes, for the benefit of External Core,
-	-- but we don't generate any code for newtypes
-
- 	    -------------------
- 	    -- PREPARE FOR CODE GENERATION
-	    -- Do saturation and convert to A-normal form
-  prepd_binds <- {-# SCC "CorePrep" #-}
-		 corePrepPgm dflags core_binds data_tycons ;
-
-  case hscTarget dflags of
-      HscNothing -> return (False, False, Nothing)
-
-      HscInterpreted ->
-#ifdef GHCI
-	do  -----------------  Generate byte code ------------------
-	    comp_bc <- byteCodeGen dflags prepd_binds data_tycons
-	
-	    ------------------ Create f-x-dynamic C-side stuff ---
-	    (istub_h_exists, istub_c_exists) 
-	       <- outputForeignStubs dflags this_mod location foreign_stubs
-	    
-	    return ( istub_h_exists, istub_c_exists, Just comp_bc )
-#else
-	panic "GHC not compiled with interpreter"
-#endif
-
-      other ->
-	do
-	    -----------------  Convert to STG ------------------
-	    (stg_binds, cost_centre_info) <- {-# SCC "CoreToStg" #-}
-	    		 myCoreToStg dflags home_mods this_mod prepd_binds	
-
-            ------------------  Code generation ------------------
-	    abstractC <- {-# SCC "CodeGen" #-}
-		         codeGen dflags home_mods this_mod data_tycons
-				 foreign_stubs dir_imps cost_centre_info
-				 stg_binds
-
-	    ------------------  Code output -----------------------
-	    (stub_h_exists, stub_c_exists)
-		     <- codeOutput dflags this_mod location foreign_stubs 
-				dependencies abstractC
-
-	    return (stub_h_exists, stub_c_exists, Nothing)
-   }
 
 
 hscCmmFile :: DynFlags -> FilePath -> IO Bool

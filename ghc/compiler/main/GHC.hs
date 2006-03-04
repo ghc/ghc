@@ -211,7 +211,7 @@ import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import GetImports	( getImports )
 import Packages		( isHomePackage )
 import Finder
-import HscMain		( newHscEnv, hscFileCheck, HscResult(..) )
+import HscMain		( newHscEnv, hscFileCheck, HscChecked(..) )
 import HscTypes
 import DynFlags
 import StaticFlags
@@ -776,18 +776,17 @@ checkModule session@(Session ref) mod = do
 		        return Nothing
 		else do
 
-	   r <- hscFileCheck hsc_env{hsc_dflags=dflags1} ms
-	   case r of
-		HscFail -> 
-		   return Nothing
-		HscChecked parsed renamed Nothing ->
+	   mbChecked <- hscFileCheck hsc_env{hsc_dflags=dflags1} ms
+	   case mbChecked of
+             Nothing -> return Nothing
+             Just (HscChecked parsed renamed Nothing) ->
 		   return (Just (CheckedModule {
 					parsedSource = parsed,
 					renamedSource = renamed,
 					typecheckedSource = Nothing,
 					checkedModuleInfo = Nothing }))
-		HscChecked parsed renamed
-			   (Just (tc_binds, rdr_env, details)) -> do
+             Just (HscChecked parsed renamed
+			   (Just (tc_binds, rdr_env, details))) -> do
 		   let minf = ModuleInfo {
 				minf_type_env  = md_types details,
 				minf_exports   = md_exports details,
@@ -799,7 +798,7 @@ checkModule session@(Session ref) mod = do
 					renamedSource = renamed,
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf }))
-		_other ->
+             _other ->
 			panic "checkModule"
 
 -- ---------------------------------------------------------------------------
