@@ -14,6 +14,11 @@ module HscMain (
 	hscStmt, hscTcExpr, hscKcType,
 	compileExpr,
 #endif
+          hscCompileOneShot     -- :: Compiler HscStatus
+        , hscCompileMake        -- :: Compiler (HscStatus, ModIface, ModDetails)
+        , hscCompileInteractive -- :: Compiler (InteractiveStatus, ModIface, ModDetails)
+        , HscStatus (..)
+        , InteractiveStatus (..)
 	) where
 
 #include "HsVersions.h"
