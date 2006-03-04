@@ -213,7 +213,7 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 
    let runCompiler compiler handle
            = do mbResult <- compiler hsc_env' mod_summary
-                                     source_unchanged have_object old_iface
+                                     source_unchanged old_iface
                                      (Just (mod_index, nmods))
                 case mbResult of
                   Nothing     -> return CompErrs
@@ -751,7 +751,6 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
   -- run the compiler!
 	mbResult <- hscCompileOneShot hsc_env
 			  mod_summary source_unchanged 
-			  False		-- No object file
 			  Nothing	-- No iface
                           Nothing       -- No "module i of n" progress info
 

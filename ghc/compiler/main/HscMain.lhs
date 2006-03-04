@@ -181,7 +181,7 @@ data InteractiveStatus
     | InteractiveRecomp Bool     -- Same as HscStatus
                         CompiledByteCode
 
-type NoRecomp result = HscEnv -> ModSummary -> Bool -> ModIface -> Maybe (Int,Int) -> IO result
+type NoRecomp result = HscEnv -> ModSummary -> ModIface -> Maybe (Int,Int) -> IO result
 type FrontEnd core = HscEnv -> ModSummary -> Maybe (Int,Int) -> IO (Maybe core)
 type BackEnd core prepCore = HscEnv -> ModSummary -> Maybe ModIface -> core -> IO prepCore
 type CodeGen prepCore result = HscEnv -> ModSummary -> prepCore -> IO result
@@ -191,7 +191,6 @@ type CodeGen prepCore result = HscEnv -> ModSummary -> prepCore -> IO result
 type Compiler result =  HscEnv
                      -> ModSummary
                      -> Bool                -- True <=> source unchanged
-                     -> Bool                -- True <=> have an object file (for msgs only)
                      -> Maybe ModIface      -- Old interface, if available
                      -> Maybe (Int,Int)     -- Just (i,n) <=> module i of n (for msgs)
                      -> IO (Maybe result)
@@ -207,14 +206,14 @@ hscMkCompiler :: NoRecomp result         -- What to do when recompilation isn't 
               -> Compiler result
 hscMkCompiler norecomp frontend backend codegen
               hsc_env mod_summary source_unchanged
-              have_object mbOldIface mbModIndex
+              mbOldIface mbModIndex
     = do (recomp_reqd, mbCheckedIface)
              <- {-# SCC "checkOldIface" #-}
                 checkOldIface hsc_env mod_summary
                               source_unchanged mbOldIface
          case mbCheckedIface of 
            Just iface | not recomp_reqd
-               -> do result <- norecomp hsc_env mod_summary have_object iface mbModIndex
+               -> do result <- norecomp hsc_env mod_summary iface mbModIndex
                      return (Just result)
            _otherwise
                -> do mbCore <- frontend hsc_env mod_summary mbModIndex
@@ -283,7 +282,7 @@ hscCompileInteractive hsc_env mod_summary =
 
 norecompOneShot :: a -> NoRecomp a
 norecompOneShot a hsc_env mod_summary 
-                have_object old_iface
+                old_iface
                 mb_mod_index
     = do compilationProgressMsg (hsc_dflags hsc_env) $
            "compilation IS NOT required"
@@ -291,17 +290,17 @@ norecompOneShot a hsc_env mod_summary
          return a
 
 norecompMake :: NoRecomp (HscStatus, ModIface, ModDetails)
-norecompMake = norecompWorker HscNoRecomp
+norecompMake = norecompWorker HscNoRecomp False
 
 norecompInteractive :: NoRecomp (InteractiveStatus, ModIface, ModDetails)
-norecompInteractive = norecompWorker InteractiveNoRecomp
+norecompInteractive = norecompWorker InteractiveNoRecomp True
 
-norecompWorker :: a -> NoRecomp (a, ModIface, ModDetails)
-norecompWorker a hsc_env mod_summary have_object
+norecompWorker :: a -> Bool -> NoRecomp (a, ModIface, ModDetails)
+norecompWorker a isInterp hsc_env mod_summary
              old_iface mb_mod_index
     = do compilationProgressMsg (hsc_dflags hsc_env) $
            (showModuleIndex mb_mod_index ++ 
-            "Skipping  " ++ showModMsg have_object mod_summary)
+            "Skipping  " ++ showModMsg isInterp mod_summary)
          new_details <- {-# SCC "tcRnIface" #-}
                         initIfaceCheck hsc_env $
                         typecheckIface old_iface
@@ -333,6 +332,7 @@ hscCoreFrontEnd hsc_env mod_summary mb_mod_index = do {
       	     Nothing       -> return Nothing
       	     Just mod_guts -> return (Just mod_guts)	-- No desugaring to do!
 	}}
+
 	 
 hscFileFrontEnd :: FrontEnd ModGuts
 hscFileFrontEnd hsc_env mod_summary mb_mod_index = do {
