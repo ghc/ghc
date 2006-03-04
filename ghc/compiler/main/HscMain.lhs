@@ -58,9 +58,9 @@ import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
 import MkIface		( checkOldIface, mkIface, writeIfaceFile )
-import Desugar
+import Desugar          ( deSugar )
 import Flattening       ( flatten )
-import SimplCore
+import SimplCore        ( core2core )
 import TidyPgm		( tidyProgram, mkBootModDetails )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
@@ -74,7 +74,6 @@ import CodeOutput	( codeOutput )
 
 import DynFlags
 import ErrUtils
-import Util
 import UniqSupply	( mkSplitUniqSupply )
 
 import Outputable
@@ -87,7 +86,6 @@ import FastString
 import Maybes		( expectJust )
 import Bag		( unitBag )
 import Monad		( when )
-import Maybe		( isJust )
 import IO
 import DATA_IOREF	( newIORef, readIORef )
 \end{code}
@@ -503,7 +501,6 @@ hscCodeGenCompile hsc_env mod_summary cgguts
                      cg_dep_pkgs = dependencies } = cgguts
              dflags = hsc_dflags hsc_env
              location = ms_location mod_summary
-             modName = ms_mod mod_summary
              data_tycons = filter isDataTyCon tycons
              -- cg_tycons includes newtypes, for the benefit of External Core,
              -- but we don't generate any code for newtypes
@@ -548,7 +545,6 @@ hscCodeGenInteractive hsc_env mod_summary (iface, details, cgguts)
                      cg_dep_pkgs = dependencies } = cgguts
              dflags = hsc_dflags hsc_env
              location = ms_location mod_summary
-             modName = ms_mod mod_summary
              data_tycons = filter isDataTyCon tycons
              -- cg_tycons includes newtypes, for the benefit of External Core,
              -- but we don't generate any code for newtypes
