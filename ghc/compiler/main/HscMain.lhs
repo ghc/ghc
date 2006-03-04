@@ -127,6 +127,30 @@ knownKeyNames = map getName wiredInThings
 %*									*
 %************************************************************************
 
+                   --------------------------------
+                        The compilation proper
+                   --------------------------------
+
+
+It's the task of the compilation proper to compile Haskell, hs-boot and
+core files to either byte-code, hard-code (C, asm, Java, ect) or to
+nothing at all (the module is still parsed and type-checked. This
+feature is mostly used by IDE's and the likes).
+Compilation can happen in either 'one-shot', 'make', or 'interactive'
+mode. 'One-shot' mode targets hard-code, 'make' mode targets hard-code
+and nothing, and 'interactive' mode targets byte-code. The modes are
+kept separate because of their different types.
+In 'one-shot' mode, we're only compiling a single file and can therefore
+discard the new ModIface and ModDetails. This is also the reason it only
+targets hard-code; compiling to byte-code or nothing doesn't make sense
+when we discard the result. 'Make' mode is like 'one-shot' except that we
+keep the resulting ModIface and ModDetails. 'Make' mode doesn't target
+byte-code since that require us to return the newly compiled byte-code.
+'Interactive' mode is similar to 'make' mode except that we return
+the compiled byte-code together with the ModIface and ModDetails.
+Trying to compile a hs-boot file to byte-code will result in a run-time
+error. This is the only thing that isn't caught by the type-system.
+
 \begin{code}
 data HscResult
    -- Compilation failed
