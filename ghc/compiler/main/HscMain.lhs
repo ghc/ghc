@@ -253,7 +253,7 @@ hscCompileMake hsc_env mod_summary
     = compiler hsc_env mod_summary
     where mkComp = hscMkCompiler norecompMake
           backend = case hscTarget (hsc_dflags hsc_env) of
-                      HscNothing -> hscCodeGenSimple (\(i, d, g) -> (HscRecomp False, i, d))
+                      HscNothing -> hscCodeGenNothing
                       _other     -> hscCodeGenMake
           compiler
               = case ms_hsc_src mod_summary of
@@ -530,9 +530,6 @@ hscCodeGenCompile hsc_env mod_summary cgguts
 
 hscCodeGenIdentity :: CodeGen a a
 hscCodeGenIdentity hsc_env mod_summary a = return a
-
-hscCodeGenSimple :: (a -> b) -> CodeGen a b
-hscCodeGenSimple fn hsc_env mod_summary a = return (fn a)
 
 hscCodeGenConst :: b -> CodeGen a b
 hscCodeGenConst b hsc_env mod_summary a = return b
