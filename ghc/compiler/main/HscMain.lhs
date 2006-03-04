@@ -69,6 +69,7 @@ import CodeOutput	( codeOutput )
 
 import DynFlags
 import ErrUtils
+import Util
 import UniqSupply	( mkSplitUniqSupply )
 
 import Outputable
@@ -155,6 +156,340 @@ data HscResult
 -- What to do when we have compiler error or warning messages
 type MessageAction = Messages -> IO ()
 
+
+--------------------------------------------------------------
+-- Exterimental code start.
+--------------------------------------------------------------
+
+data HscStatus
+    = NewHscNoRecomp
+    | NewHscRecomp  Bool         -- Has stub files.
+                                 -- This is a hack. We can't compile C files here
+                                 -- since it's done in DriverPipeline. For now we
+                                 -- just return True if we want the caller to compile
+                                 -- it for us.
+
+data InteractiveStatus
+    = InteractiveNoRecomp
+    | InteractiveRecomp Bool     -- Same as HscStatus
+                        CompiledByteCode
+
+type NoRecomp result = HscEnv -> ModSummary -> Bool -> ModIface -> Maybe (Int,Int) -> IO result
+type FrontEnd core = HscEnv -> ModSummary -> Maybe (Int,Int) -> IO (Maybe core)
+type BackEnd core prepCore = HscEnv -> ModSummary -> Maybe ModIface -> core -> IO prepCore
+type CodeGen prepCore result = HscEnv -> ModSummary -> prepCore -> IO result
+
+type Compiler result =  HscEnv
+                     -> ModSummary
+                     -> Bool                -- True <=> source unchanged
+                     -> Bool                -- True <=> have an object file (for msgs only)
+                     -> Maybe ModIface      -- Old interface, if available
+                     -> Maybe (Int,Int)     -- Just (i,n) <=> module i of n (for msgs)
+                     -> IO (Maybe result)
+
+
+hscMkCompiler :: NoRecomp result         -- What to do when recompilation isn't required.
+              -> FrontEnd core
+              -> BackEnd core prepCore
+              -> CodeGen prepCore result
+              -> Compiler result
+hscMkCompiler norecomp frontend backend codegen
+              hsc_env mod_summary source_unchanged
+              have_object mbOldIface mbModIndex
+    = do (recomp_reqd, mbCheckedIface)
+             <- {-# SCC "checkOldIface" #-}
+                checkOldIface hsc_env mod_summary
+                              source_unchanged mbOldIface
+         case mbCheckedIface of 
+           Just iface | not recomp_reqd
+               -> do result <- norecomp hsc_env mod_summary have_object iface mbModIndex
+                     return (Just result)
+           _otherwise
+               -> do mbCore <- frontend hsc_env mod_summary mbModIndex
+                     case mbCore of
+                       Nothing
+                           -> return Nothing
+                       Just core
+                           -> do prepCore <- backend hsc_env mod_summary
+                                                     mbCheckedIface core
+                                 result <- codegen hsc_env mod_summary prepCore
+                                 return (Just result)
+
+-- Compile Haskell, boot and extCore in OneShot mode.
+hscCompileOneShot :: Compiler HscStatus
+hscCompileOneShot hsc_env mod_summary =
+    compiler hsc_env mod_summary
+    where mkComp = hscMkCompiler (norecompOneShot NewHscNoRecomp)
+          compiler
+              = case ms_hsc_src mod_summary of
+                ExtCoreFile
+                    -> mkComp hscCoreFrontEnd hscNewBackEnd hscCodeGenOneShot
+--        1         2         3         4         5         6         7         8          9
+                HsSrcFile
+                    -> mkComp hscFileFrontEnd hscNewBackEnd hscCodeGenOneShot
+                HsBootFile
+                    -> mkComp hscFileFrontEnd hscNewBootBackEnd
+                              (hscCodeGenConst (NewHscRecomp False))
+
+-- Compile Haskell, boot and extCore in --make mode.
+hscCompileMake :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileMake hsc_env mod_summary
+    = compiler hsc_env mod_summary
+    where mkComp = hscMkCompiler norecompMake
+          compiler
+              = case ms_hsc_src mod_summary of
+                ExtCoreFile
+                    -> mkComp hscCoreFrontEnd hscNewBackEnd hscCodeGenMake
+                HsSrcFile
+                    -> mkComp hscFileFrontEnd hscNewBackEnd hscCodeGenMake
+                HsBootFile
+                    -> mkComp hscFileFrontEnd hscNewBootBackEnd hscCodeGenIdentity
+
+-- Same as 'hscCompileMake' but don't generate any actual code.
+hscCompileMakeNothing :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileMakeNothing hsc_env mod_summary
+    = compiler hsc_env mod_summary
+    where mkComp = hscMkCompiler norecompMake
+          codeGen = hscCodeGenSimple (\(i, d, g) -> (NewHscRecomp False, i, d))
+          compiler
+              = case ms_hsc_src mod_summary of
+                ExtCoreFile
+                    -> mkComp hscCoreFrontEnd hscNewBackEnd
+                              codeGen
+                HsSrcFile
+                    -> mkComp hscFileFrontEnd hscNewBackEnd
+                              codeGen
+                HsBootFile
+                    -> mkComp hscFileFrontEnd hscNewBootBackEnd
+                              hscCodeGenIdentity
+
+-- Compile Haskell, extCore to bytecode.
+hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
+hscCompileInteractive hsc_env mod_summary =
+    hscMkCompiler norecompInteractive frontend hscNewBackEnd hscCodeGenInteractive
+                  hsc_env mod_summary
+    where frontend = case ms_hsc_src mod_summary of
+                       ExtCoreFile -> hscCoreFrontEnd
+                       HsSrcFile   -> hscFileFrontEnd
+                       HsBootFile  -> panic bootErrorMsg
+          bootErrorMsg = "Compiling a HsBootFile to bytecode doesn't make sense. " ++
+                         "Use 'hscCompileMake' instead."
+
+norecompOneShot :: a -> NoRecomp a
+norecompOneShot a hsc_env mod_summary 
+                have_object old_iface
+                mb_mod_index
+    = do compilationProgressMsg (hsc_dflags hsc_env) $
+           "compilation IS NOT required"
+         dumpIfaceStats hsc_env
+         return a
+
+norecompMake :: NoRecomp (HscStatus, ModIface, ModDetails)
+norecompMake = norecompWorker NewHscNoRecomp
+
+norecompInteractive :: NoRecomp (InteractiveStatus, ModIface, ModDetails)
+norecompInteractive = norecompWorker InteractiveNoRecomp
+
+norecompWorker :: a -> NoRecomp (a, ModIface, ModDetails)
+norecompWorker a hsc_env mod_summary have_object
+             old_iface mb_mod_index
+    = do compilationProgressMsg (hsc_dflags hsc_env) $
+           (showModuleIndex mb_mod_index ++ 
+            "Skipping  " ++ showModMsg have_object mod_summary)
+         new_details <- {-# SCC "tcRnIface" #-}
+                        initIfaceCheck hsc_env $
+                        typecheckIface old_iface
+         dumpIfaceStats hsc_env
+         return (a, old_iface, new_details)
+
+hscNewBootBackEnd :: BackEnd ModGuts (HscStatus, ModIface, ModDetails)
+hscNewBootBackEnd hsc_env mod_summary maybe_old_iface ds_result
+  = do details <- mkBootModDetails hsc_env ds_result
+       (new_iface, no_change) 
+           <- {-# SCC "MkFinalIface" #-}
+              mkIface hsc_env maybe_old_iface ds_result details
+       writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
+       -- And the answer is ...
+       dumpIfaceStats hsc_env
+       return (NewHscRecomp False, new_iface, details)
+
+hscNewBackEnd :: BackEnd ModGuts (ModIface, ModDetails, CgGuts)
+hscNewBackEnd hsc_env mod_summary maybe_old_iface ds_result
+  = do 	{ 	-- OMITTED: 
+		-- ; seqList imported_modules (return ())
+
+	  let dflags    = hsc_dflags hsc_env
+
+ 	    -------------------
+ 	    -- FLATTENING
+ 	    -------------------
+	; flat_result <- {-# SCC "Flattening" #-}
+ 			 flatten hsc_env ds_result
+
+
+{-	TEMP: need to review space-leak fixing here
+	NB: even the code generator can force one of the
+	    thunks for constructor arguments, for newtypes in particular
+
+	; let 	-- Rule-base accumulated from imported packages
+	     pkg_rule_base = eps_rule_base (hsc_EPS hsc_env)
+
+		-- In one-shot mode, ZAP the external package state at
+		-- this point, because we aren't going to need it from
+		-- now on.  We keep the name cache, however, because
+		-- tidyCore needs it.
+	     pcs_middle 
+		 | one_shot  = pcs_tc{ pcs_EPS = error "pcs_EPS missing" }
+		 | otherwise = pcs_tc
+
+	; pkg_rule_base `seq` pcs_middle `seq` return ()
+-}
+
+	-- alive at this point:  
+	--	pcs_middle
+	--	flat_result
+	--      pkg_rule_base
+
+ 	    -------------------
+ 	    -- SIMPLIFY
+ 	    -------------------
+	; simpl_result <- {-# SCC "Core2Core" #-}
+			  core2core hsc_env flat_result
+
+ 	    -------------------
+ 	    -- TIDY
+ 	    -------------------
+	; (cg_guts, details) <- {-# SCC "CoreTidy" #-}
+			         tidyProgram hsc_env simpl_result
+
+	-- Alive at this point:  
+	--	tidy_result, pcs_final
+	--      hsc_env
+
+ 	    -------------------
+	    -- BUILD THE NEW ModIface and ModDetails
+	    --	and emit external core if necessary
+	    -- This has to happen *after* code gen so that the back-end
+	    -- info has been set.  Not yet clear if it matters waiting
+	    -- until after code output
+	; (new_iface, no_change)
+		<- {-# SCC "MkFinalIface" #-}
+		   mkIface hsc_env maybe_old_iface simpl_result details
+
+	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
+
+	-- Emit external core
+	; emitExternalCore dflags cg_guts
+
+ 	    -------------------
+ 	    -- Return the prepared code.
+	; return (new_iface, details, cg_guts)
+      	 }
+
+-- Don't output any code.
+hscCodeGenNothing :: CodeGen (ModIface, ModDetails, CgGuts) (HscStatus, ModIface, ModDetails)
+hscCodeGenNothing hsc_env mod_summary (iface, details, cgguts)
+    = return (NewHscRecomp False, iface, details)
+
+-- Generate code and return both the new ModIface and the ModDetails.
+hscCodeGenMake :: CodeGen (ModIface, ModDetails, CgGuts) (HscStatus, ModIface, ModDetails)
+hscCodeGenMake hsc_env mod_summary (iface, details, cgguts)
+    = do hasStub <- hscCodeGenCompile hsc_env mod_summary cgguts
+         return (NewHscRecomp hasStub, iface, details)
+
+-- Here we don't need the ModIface and ModDetails anymore.
+hscCodeGenOneShot :: CodeGen (ModIface, ModDetails, CgGuts) HscStatus
+hscCodeGenOneShot hsc_env mod_summary (_, _, cgguts)
+    = do hasStub <- hscCodeGenCompile hsc_env mod_summary cgguts
+         return (NewHscRecomp hasStub)
+
+hscCodeGenCompile :: CodeGen CgGuts Bool
+hscCodeGenCompile hsc_env mod_summary cgguts
+    = do let CgGuts{ -- This is the last use of the ModGuts in a compilation.
+                     -- From now on, we just use the bits we need.
+                     cg_module   = this_mod,
+                     cg_binds    = core_binds,
+                     cg_tycons   = tycons,
+                     cg_dir_imps = dir_imps,
+                     cg_foreign  = foreign_stubs,
+                     cg_home_mods = home_mods,
+                     cg_dep_pkgs = dependencies } = cgguts
+             dflags = hsc_dflags hsc_env
+             location = ms_location mod_summary
+             modName = ms_mod mod_summary
+             data_tycons = filter isDataTyCon tycons
+             -- cg_tycons includes newtypes, for the benefit of External Core,
+             -- but we don't generate any code for newtypes
+
+         -------------------
+         -- PREPARE FOR CODE GENERATION
+         -- Do saturation and convert to A-normal form
+         prepd_binds <- {-# SCC "CorePrep" #-}
+                        corePrepPgm dflags core_binds data_tycons ;
+         -----------------  Convert to STG ------------------
+         (stg_binds, cost_centre_info)
+             <- {-# SCC "CoreToStg" #-}
+                myCoreToStg dflags home_mods this_mod prepd_binds	
+         ------------------  Code generation ------------------
+         abstractC <- {-# SCC "CodeGen" #-}
+                      codeGen dflags home_mods this_mod data_tycons
+                              foreign_stubs dir_imps cost_centre_info
+                              stg_binds
+         ------------------  Code output -----------------------
+         (stub_h_exists,stub_c_exists)
+             <- codeOutput dflags this_mod location foreign_stubs 
+                dependencies abstractC
+         return stub_c_exists
+
+hscCodeGenIdentity :: CodeGen a a
+hscCodeGenIdentity hsc_env mod_summary a = return a
+
+hscCodeGenSimple :: (a -> b) -> CodeGen a b
+hscCodeGenSimple fn hsc_env mod_summary a = return (fn a)
+
+hscCodeGenConst :: b -> CodeGen a b
+hscCodeGenConst b hsc_env mod_summary a = return b
+
+hscCodeGenInteractive :: CodeGen (ModIface, ModDetails, CgGuts)
+                                 (InteractiveStatus, ModIface, ModDetails)
+hscCodeGenInteractive hsc_env mod_summary (iface, details, cgguts)
+#ifdef GHCI
+    = do let CgGuts{ -- This is the last use of the ModGuts in a compilation.
+                     -- From now on, we just use the bits we need.
+                     cg_module   = this_mod,
+                     cg_binds    = core_binds,
+                     cg_tycons   = tycons,
+                     cg_foreign  = foreign_stubs,
+                     cg_home_mods = home_mods,
+                     cg_dep_pkgs = dependencies } = cgguts
+             dflags = hsc_dflags hsc_env
+             location = ms_location mod_summary
+             modName = ms_mod mod_summary
+             data_tycons = filter isDataTyCon tycons
+             -- cg_tycons includes newtypes, for the benefit of External Core,
+             -- but we don't generate any code for newtypes
+
+         -------------------
+         -- PREPARE FOR CODE GENERATION
+         -- Do saturation and convert to A-normal form
+         prepd_binds <- {-# SCC "CorePrep" #-}
+                        corePrepPgm dflags core_binds data_tycons ;
+         -----------------  Generate byte code ------------------
+         comp_bc <- byteCodeGen dflags prepd_binds data_tycons
+         ------------------ Create f-x-dynamic C-side stuff ---
+         (istub_h_exists, istub_c_exists) 
+             <- outputForeignStubs dflags this_mod location foreign_stubs
+         return (InteractiveRecomp istub_c_exists comp_bc, iface, details)
+#else
+    = panic "GHC not compiled with interpreter"
+#endif
+
+
+
+--------------------------------------------------------------
+-- Exterimental code end.
+--------------------------------------------------------------
+
 	-- no errors or warnings; the individual passes
 	-- (parse/rename/typecheck) print messages themselves
 
@@ -234,10 +569,10 @@ hscRecomp hsc_env mod_summary
 	hscBootBackEnd hsc_env mod_summary maybe_old_iface front_res
 
      ExtCoreFile -> do
-	front_res <- hscCoreFrontEnd hsc_env mod_summary
+	front_res <- hscCoreFrontEnd hsc_env mod_summary mb_mod_index
 	hscBackEnd hsc_env mod_summary maybe_old_iface front_res
 
-hscCoreFrontEnd hsc_env mod_summary = do {
+hscCoreFrontEnd hsc_env mod_summary mb_mod_index = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
