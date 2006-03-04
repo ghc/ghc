@@ -260,32 +260,18 @@ hscCompileMake :: Compiler (HscStatus, ModIface, ModDetails)
 hscCompileMake hsc_env mod_summary
     = compiler hsc_env mod_summary
     where mkComp = hscMkCompiler norecompMake
+          backend = case hscTarget (hsc_dflags hsc_env) of
+                      HscNothing -> hscCodeGenSimple (\(i, d, g) -> (NewHscRecomp False, i, d))
+                      _other     -> hscCodeGenMake
           compiler
               = case ms_hsc_src mod_summary of
                 ExtCoreFile
-                    -> mkComp hscCoreFrontEnd hscNewBackEnd hscCodeGenMake
+                    -> mkComp hscCoreFrontEnd hscNewBackEnd backend
                 HsSrcFile
-                    -> mkComp hscFileFrontEnd hscNewBackEnd hscCodeGenMake
+                    -> mkComp hscFileFrontEnd hscNewBackEnd backend
                 HsBootFile
                     -> mkComp hscFileFrontEnd hscNewBootBackEnd hscCodeGenIdentity
 
--- Same as 'hscCompileMake' but don't generate any actual code.
-hscCompileMakeNothing :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileMakeNothing hsc_env mod_summary
-    = compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecompMake
-          codeGen = hscCodeGenSimple (\(i, d, g) -> (NewHscRecomp False, i, d))
-          compiler
-              = case ms_hsc_src mod_summary of
-                ExtCoreFile
-                    -> mkComp hscCoreFrontEnd hscNewBackEnd
-                              codeGen
-                HsSrcFile
-                    -> mkComp hscFileFrontEnd hscNewBackEnd
-                              codeGen
-                HsBootFile
-                    -> mkComp hscFileFrontEnd hscNewBootBackEnd
-                              hscCodeGenIdentity
 
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
