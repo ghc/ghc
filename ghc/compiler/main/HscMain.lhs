@@ -186,6 +186,8 @@ type FrontEnd core = HscEnv -> ModSummary -> Maybe (Int,Int) -> IO (Maybe core)
 type BackEnd core prepCore = HscEnv -> ModSummary -> Maybe ModIface -> core -> IO prepCore
 type CodeGen prepCore result = HscEnv -> ModSummary -> prepCore -> IO result
 
+-- FIXME: The old interface and module index are only using in 'make' and
+--        'interactive' mode. They should be removed from 'oneshot' mode.
 type Compiler result =  HscEnv
                      -> ModSummary
                      -> Bool                -- True <=> source unchanged
@@ -334,6 +336,7 @@ hscCoreFrontEnd hsc_env mod_summary mb_mod_index = do {
 	 
 hscFileFrontEnd :: FrontEnd ModGuts
 hscFileFrontEnd hsc_env mod_summary mb_mod_index = do {
+-- FIXME: Move 'DISPLAY PROGRESS MESSAGE' out of the frontend.
  	    -------------------
  	    -- DISPLAY PROGRESS MESSAGE
  	    -------------------
@@ -382,6 +385,8 @@ hscFileFrontEnd hsc_env mod_summary mb_mod_index = do {
 --------------------------------------------------------------
 -- BackEnds
 --------------------------------------------------------------
+
+-- FIXME: Rename backend to simplifier, and codegen to backend.
 
 hscNewBootBackEnd :: BackEnd ModGuts (HscStatus, ModIface, ModDetails)
 hscNewBootBackEnd hsc_env mod_summary maybe_old_iface ds_result
