@@ -275,7 +275,7 @@ TH_TY_QUOTE	{ L _ ITtyQuote       }      -- ''T
 %name parseIdentifier  identifier
 %name parseType ctype
 %partial parseHeader header
-%tokentype { Located Token }
+%tokentype { (Located Token) }
 %%
 
 -----------------------------------------------------------------------------
