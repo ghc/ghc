@@ -30,7 +30,7 @@ sub split_asm_file {
 
     &collectExports_hppa() if $TargetPlatform =~ /^hppa/;
     &collectExports_mips() if $TargetPlatform =~ /^mips/;
-    &collectDyldStuff_powerpc_darwin() if $TargetPlatform =~ /^powerpc-apple-darwin/;
+    &collectDyldStuff_darwin() if $TargetPlatform =~ /-apple-darwin/;
 
     $octr = 0;	# output file counter
     $* = 1; 	# multi-line matches are OK
@@ -119,7 +119,7 @@ sub collectExports_mips { # Note: MIPS only
     seek(TMPI, 0, 0);
 }
 
-sub collectDyldStuff_powerpc_darwin {
+sub collectDyldStuff_darwin {
     local($chunk_label,$label,$cur_section,$section,$chunk,$alignment,$cur_alignment);
     
     %DyldChunks = (); # NB: global table
@@ -151,7 +151,7 @@ sub collectDyldStuff_powerpc_darwin {
 	    $section = $cur_section;
 	    $alignment = $cur_alignment;
 	    print STDERR "label: $label\n" if $Dump_asm_splitting_info;
-	} elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data)/ ) {
+	} elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data|section __IMPORT,.*)/ ) {
 	    $cur_section = $_;
 	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
 	    $cur_alignment = ''
@@ -218,6 +218,8 @@ that are used-but-not-defined here.
 sub process_asm_block {
     local($str) = @_;
 
+    return(&process_asm_block_darwin($str))
+                            if $TargetPlatform =~ /-apple-darwin/;
     return(&process_asm_block_m68k($str))  if $TargetPlatform =~ /^m68k-/;
     return(&process_asm_block_sparc($str)) if $TargetPlatform =~ /^sparc-/;
     return(&process_asm_block_iX86($str))  if $TargetPlatform =~ /^i[34]86-/;
@@ -225,8 +227,6 @@ sub process_asm_block {
     return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/;
     return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/;
     return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/;
-    return(&process_asm_block_powerpc_darwin($str))
-                            if $TargetPlatform =~ /^powerpc-apple-darwin/;
     return(&process_asm_block_powerpc_linux($str))
                             if $TargetPlatform =~ /^powerpc-[^-]+-linux/;
 
@@ -531,7 +531,9 @@ sub process_asm_block_mips {
 \end{code}
 
 \begin{code}
-sub process_asm_block_powerpc_darwin {
+# The logic for both Darwin/PowerPC and Darwin/x86 ends up being the same.
+
+sub process_asm_block_darwin {
     local($str) = @_;
     local($dyld_stuff) = '';
 
@@ -570,7 +572,7 @@ sub process_asm_block_powerpc_darwin {
 
     $str .= "\n" . $dyld_stuff;
 
-    print STDERR "### STRIPPED BLOCK (powerpc darwin):\n$str" if $Dump_asm_splitting_info;
+    print STDERR "### STRIPPED BLOCK (darwin):\n$str" if $Dump_asm_splitting_info;
 
     $str;
 }
