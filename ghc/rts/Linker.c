@@ -4191,7 +4191,7 @@ static int ocResolve_MachO(ObjectCode* oc)
     struct load_command *lc = (struct load_command*) (image + sizeof(struct mach_header));
     unsigned i;
     struct segment_command *segLC = NULL;
-    struct section *sections, *la_ptrs = NULL, *nl_ptrs = NULL, *jump_table = NULL;
+    struct section *sections;
     struct symtab_command *symLC = NULL;
     struct dysymtab_command *dsymLC = NULL;
     struct nlist *nlist;
@@ -4211,36 +4211,32 @@ static int ocResolve_MachO(ObjectCode* oc)
     nlist = symLC ? (struct nlist*) (image + symLC->symoff)
                   : NULL;
 
-    for(i=0;i<segLC->nsects;i++)
-    {
-	if(!strcmp(sections[i].sectname,"__la_symbol_ptr"))
-	    la_ptrs = &sections[i];
-	else if(!strcmp(sections[i].sectname,"__nl_symbol_ptr"))
-	    nl_ptrs = &sections[i];
-        else if(!strcmp(sections[i].sectname,"__la_sym_ptr2"))
-	    la_ptrs = &sections[i];
-        else if(!strcmp(sections[i].sectname,"__la_sym_ptr3"))
-	    la_ptrs = &sections[i];
-        else if(!strcmp(sections[i].sectname,"__pointers"))
-	    nl_ptrs = &sections[i];
-        else if(!strcmp(sections[i].sectname,"__jump_table"))
-	    jump_table = &sections[i];
-    }
-
     if(dsymLC)
     {
         unsigned long *indirectSyms
             = (unsigned long*) (image + dsymLC->indirectsymoff);
 
-        if(la_ptrs)
-            if(!resolveImports(oc,image,symLC,la_ptrs,indirectSyms,nlist))
-                return 0;
-        if(nl_ptrs)
-            if(!resolveImports(oc,image,symLC,nl_ptrs,indirectSyms,nlist))
-                return 0;
-        if(jump_table)
-            if(!resolveImports(oc,image,symLC,jump_table,indirectSyms,nlist))
-                return 0;
+        for(i=0;i<segLC->nsects;i++)
+        {
+            if(    !strcmp(sections[i].sectname,"__la_symbol_ptr")
+                || !strcmp(sections[i].sectname,"__la_sym_ptr2")
+                || !strcmp(sections[i].sectname,"__la_sym_ptr3"))
+            {
+                if(!resolveImports(oc,image,symLC,&sections[i],indirectSyms,nlist))
+                    return 0;
+            }
+            else if(!strcmp(sections[i].sectname,"__nl_symbol_ptr")
+                ||  !strcmp(sections[i].sectname,"__pointers"))
+            {
+                if(!resolveImports(oc,image,symLC,&sections[i],indirectSyms,nlist))
+                    return 0;
+            }
+            else if(!strcmp(sections[i].sectname,"__jump_table"))
+            {
+                if(!resolveImports(oc,image,symLC,&sections[i],indirectSyms,nlist))
+                    return 0;
+            }
+        }
     }
     
     for(i=0;i<segLC->nsects;i++)
