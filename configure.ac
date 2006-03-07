@@ -188,15 +188,6 @@ i[[3456]]86-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
-i[[3456]]86-*-gnu*)
-        HostPlatform=i386-unknown-gnu
-        TargetPlatform=i386-unknown-gnu
-        BuildPlatform=i386-unknown-gnu
-        HostPlatform_CPP=i386_unknown_gnu
-        HostArch_CPP=i386
-        HostVendor_CPP=unknown
-        HostOS_CPP=gnu
-        ;;
 i[[3456]]86-*-kfreebsd*-gnu)
         HostPlatform=i386-unknown-kfreebsdgnu # hack again
         TargetPlatform=i386-unknown-kfreebsdgnu
@@ -280,6 +271,15 @@ i[[3456]]86-apple-darwin*)
 	HostVendor_CPP='apple'
 	HostOS_CPP='darwin'
 	;;
+i[[3456]]86-*-gnu*)
+        HostPlatform=i386-unknown-gnu
+        TargetPlatform=i386-unknown-gnu
+        BuildPlatform=i386-unknown-gnu
+        HostPlatform_CPP=i386_unknown_gnu
+        HostArch_CPP=i386
+        HostVendor_CPP=unknown
+        HostOS_CPP=gnu
+        ;;
 ia64-*-linux*)
         HostPlatform=ia64-unknown-linux # hack again
         TargetPlatform=ia64-unknown-linux
