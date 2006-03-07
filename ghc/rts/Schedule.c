@@ -616,7 +616,7 @@ run_thread:
     // be running again, see code below.
     t->saved_errno = errno;
 
-#ifdef SMP
+#if defined(THREADED_RTS)
     // If ret is ThreadBlocked, and this Task is bound to the TSO that
     // blocked, we are in limbo - the TSO is now owned by whatever it
     // is blocked on, and may in fact already have been woken up,
