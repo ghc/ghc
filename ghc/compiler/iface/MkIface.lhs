@@ -336,18 +336,11 @@ mkIface hsc_env maybe_old_iface
 
 					      
 -----------------------------
-writeIfaceFile :: HscEnv -> ModLocation -> ModIface -> Bool -> IO ()
--- Write the interface file, if necessary
-writeIfaceFile hsc_env location new_iface no_change_at_all
-  | no_change_at_all 	      = return ()
-  | ghc_mode == Interactive   = return ()
-  | ghc_mode == JustTypecheck = return ()
-  | otherwise
-  = do	{ createDirectoryHierarchy (directoryOf hi_file_path)
-	; writeBinIface hi_file_path new_iface }
-  where
-     ghc_mode = ghcMode (hsc_dflags hsc_env)
-     hi_file_path = ml_hi_file location
+writeIfaceFile :: ModLocation -> ModIface -> IO ()
+writeIfaceFile location new_iface
+    = do createDirectoryHierarchy (directoryOf hi_file_path)
+         writeBinIface hi_file_path new_iface
+    where hi_file_path = ml_hi_file location
 
 
 -----------------------------

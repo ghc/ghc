@@ -171,10 +171,10 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
            = do stub_o <- compileStub dflags' this_mod location
                 return [ DotO stub_o ]
 
-       handleMake (HscNoRecomp, iface, details)
+       handleBatch (HscNoRecomp, iface, details)
            = ASSERT (isJust maybe_old_linkable)
              return (CompOK details iface maybe_old_linkable)
-       handleMake (HscRecomp hasStub, iface, details)
+       handleBatch (HscRecomp hasStub, iface, details)
            | isHsBoot src_flavour
                = return (CompOK details iface Nothing)
            | otherwise
@@ -223,8 +223,10 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
      HscInterpreted | not (isHsBoot src_flavour) -- We can't compile boot files to
                                                  -- bytecode so don't even try.
          -> runCompiler hscCompileInteractive handleInterpreted
+     HscNothing
+         -> runCompiler hscCompileNothing handleBatch
      _other
-         -> runCompiler hscCompileMake handleMake
+         -> runCompiler hscCompileBatch handleBatch
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)

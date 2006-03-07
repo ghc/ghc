@@ -14,7 +14,8 @@ module HscMain
     , compileExpr
 #endif
     , hscCompileOneShot     -- :: Compiler HscStatus
-    , hscCompileMake        -- :: Compiler (HscStatus, ModIface, ModDetails)
+    , hscCompileBatch       -- :: Compiler (HscStatus, ModIface, ModDetails)
+    , hscCompileNothing     -- :: Compiler (HscStatus, ModIface, ModDetails)
     , hscCompileInteractive -- :: Compiler (InteractiveStatus, ModIface, ModDetails)
     , HscStatus (..)
     , InteractiveStatus (..)
@@ -62,7 +63,7 @@ import PrelInfo		( wiredInThings, basicKnownKeyNames )
 import MkIface		( checkOldIface, mkIface, writeIfaceFile )
 import Desugar          ( deSugar )
 import Flattening       ( flatten )
-import SimplCore        ( core2core, simplifyExpr )
+import SimplCore        ( core2core )
 import TidyPgm		( tidyProgram, mkBootModDetails )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
@@ -87,7 +88,7 @@ import ParserCoreUtils
 import FastString
 import Maybes		( expectJust )
 import Bag		( unitBag )
-import Monad		( when )
+import Monad		( unless )
 import IO
 import DATA_IOREF	( newIORef, readIORef )
 \end{code}
@@ -141,18 +142,25 @@ It's the task of the compilation proper to compile Haskell, hs-boot and
 core files to either byte-code, hard-code (C, asm, Java, ect) or to
 nothing at all (the module is still parsed and type-checked. This
 feature is mostly used by IDE's and the likes).
-Compilation can happen in either 'one-shot', 'make', or 'interactive'
-mode. 'One-shot' mode targets hard-code, 'make' mode targets hard-code
-and nothing, and 'interactive' mode targets byte-code. The modes are
-kept separate because of their different types.
+Compilation can happen in either 'one-shot', 'batch', 'nothing',
+or 'interactive' mode. 'One-shot' mode targets hard-code, 'batch' mode
+targets hard-code, 'nothing' mode targets nothing and 'interactive' mode
+targets byte-code.
+The modes are kept separate because of their different types and meanings.
 In 'one-shot' mode, we're only compiling a single file and can therefore
 discard the new ModIface and ModDetails. This is also the reason it only
 targets hard-code; compiling to byte-code or nothing doesn't make sense
-when we discard the result. 'Make' mode is like 'one-shot' except that we
-keep the resulting ModIface and ModDetails. 'Make' mode doesn't target
-byte-code since that require us to return the newly compiled byte-code.
-'Interactive' mode is similar to 'make' mode except that we return
-the compiled byte-code together with the ModIface and ModDetails.
+when we discard the result.
+'Batch' mode is like 'one-shot' except that we keep the resulting ModIface
+and ModDetails. 'Batch' mode doesn't target byte-code since that require
+us to return the newly compiled byte-code.
+'Nothing' mode has exactly the same type as 'batch' mode but they're still
+kept separate. This is because compiling to nothing is fairly special: We
+don't output any interface files, we don't run the simplifier and we don't
+generate any code.
+'Interactive' mode is similar to 'batch' mode except that we return the
+compiled byte-code together with the ModIface and ModDetails.
+
 Trying to compile a hs-boot file to byte-code will result in a run-time
 error. This is the only thing that isn't caught by the type-system.
 
@@ -183,12 +191,41 @@ data InteractiveStatus
     | InteractiveRecomp Bool     -- Same as HscStatus
                         CompiledByteCode
 
-type NoRecomp result = HscEnv -> ModSummary -> ModIface -> Maybe (Int,Int) -> IO result
-type FrontEnd core = HscEnv -> ModSummary -> Maybe (Int,Int) -> IO (Maybe core)
-type BackEnd core prepCore = HscEnv -> ModSummary -> Maybe ModIface -> core -> IO prepCore
-type CodeGen prepCore result = HscEnv -> ModSummary -> prepCore -> IO result
 
--- FIXME: The old interface and module index are only using in 'make' and
+-- I want Control.Monad.State! --Lemmih 03/07/2006
+newtype Comp a = Comp {runComp :: CompState -> IO (a, CompState)}
+
+instance Monad Comp where
+    g >>= fn = Comp $ \s -> runComp g s >>= \(a,s') -> runComp (fn a) s'
+    return a = Comp $ \s -> return (a,s)
+    fail = error
+
+evalComp :: Comp a -> CompState -> IO a
+evalComp comp st = do (val,_st') <- runComp comp st
+                      return val
+
+data CompState
+    = CompState
+    { compHscEnv     :: HscEnv
+    , compModSummary :: ModSummary
+    , compOldIface   :: Maybe ModIface
+    }
+
+get :: Comp CompState
+get = Comp $ \s -> return (s,s)
+
+gets :: (CompState -> a) -> Comp a
+gets getter = do st <- get
+                 return (getter st)
+
+liftIO :: IO a -> Comp a
+liftIO ioA = Comp $ \s -> do a <- ioA
+                             return (a,s)
+
+type NoRecomp result = ModIface -> Comp result
+type FrontEnd core = Comp (Maybe core)
+
+-- FIXME: The old interface and module index are only using in 'batch' and
 --        'interactive' mode. They should be removed from 'oneshot' mode.
 type Compiler result =  HscEnv
                      -> ModSummary
@@ -199,110 +236,128 @@ type Compiler result =  HscEnv
 
 
 -- This functions checks if recompilation is necessary and
--- then combines the FrontEnd, BackEnd and CodeGen to a
--- working compiler.
+-- then combines the FrontEnd and BackEnd to a working compiler.
 hscMkCompiler :: NoRecomp result         -- What to do when recompilation isn't required.
+              -> (Maybe (Int,Int) -> Bool -> Comp ())
               -> FrontEnd core
-              -> BackEnd core prepCore
-              -> CodeGen prepCore result
+              -> (core -> Comp result)   -- Backend.
               -> Compiler result
-hscMkCompiler norecomp frontend backend codegen
+hscMkCompiler norecomp messenger frontend backend
               hsc_env mod_summary source_unchanged
               mbOldIface mbModIndex
-    = do (recomp_reqd, mbCheckedIface)
+    = flip evalComp (CompState hsc_env mod_summary mbOldIface) $
+      do (recomp_reqd, mbCheckedIface)
              <- {-# SCC "checkOldIface" #-}
-                checkOldIface hsc_env mod_summary
+                liftIO $ checkOldIface hsc_env mod_summary
                               source_unchanged mbOldIface
          case mbCheckedIface of 
            Just iface | not recomp_reqd
-               -> do result <- norecomp hsc_env mod_summary iface mbModIndex
+               -> do messenger mbModIndex False
+                     result <- norecomp iface
                      return (Just result)
            _otherwise
-               -> do mbCore <- frontend hsc_env mod_summary mbModIndex
+               -> do messenger mbModIndex True
+                     mbCore <- frontend
                      case mbCore of
                        Nothing
                            -> return Nothing
                        Just core
-                           -> do prepCore <- backend hsc_env mod_summary
-                                                     mbCheckedIface core
-                                 result <- codegen hsc_env mod_summary prepCore
+                           -> do result <- backend core
                                  return (Just result)
 
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
 
+--        1         2         3         4         5         6         7         8          9
 -- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: Compiler HscStatus
 hscCompileOneShot hsc_env mod_summary =
     compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler (norecompOneShot HscNoRecomp)
+    where mkComp = hscMkCompiler (norecompOneShot HscNoRecomp) oneShotMsg
+          -- How to compile nonBoot files.
+          nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
+                            hscWriteIface >>= hscOneShot
+          -- How to compile boot files.
+          bootComp inp = hscBootIface inp >>= hscWriteIface >>= hscConst (HscRecomp False)
           compiler
               = case ms_hsc_src mod_summary of
                 ExtCoreFile
-                    -> mkComp hscCoreFrontEnd hscNewBackEnd hscCodeGenOneShot
---        1         2         3         4         5         6         7         8          9
+                    -> mkComp hscCoreFrontEnd nonBootComp
                 HsSrcFile
-                    -> mkComp hscFileFrontEnd hscNewBackEnd hscCodeGenOneShot
+                    -> mkComp hscFileFrontEnd nonBootComp
                 HsBootFile
-                    -> mkComp hscFileFrontEnd hscNewBootBackEnd
-                              (hscCodeGenConst (HscRecomp False))
+                    -> mkComp hscFileFrontEnd bootComp
 
--- Compile Haskell, boot and extCore in --make mode.
-hscCompileMake :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileMake hsc_env mod_summary
+-- Compile Haskell, boot and extCore in batch mode.
+hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileBatch hsc_env mod_summary
     = compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecompMake
-          backend = case hscTarget (hsc_dflags hsc_env) of
-                      HscNothing -> hscCodeGenNothing
-                      _other     -> hscCodeGenMake
+    where mkComp = hscMkCompiler norecompBatch (batchMsg False)
+          nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
+                            hscWriteIface >>= hscBatch
+          bootComp inp = hscBootIface inp >>= hscWriteIface >>= hscNothing
           compiler
               = case ms_hsc_src mod_summary of
                 ExtCoreFile
-                    -> mkComp hscCoreFrontEnd hscNewBackEnd backend
+                    -> mkComp hscCoreFrontEnd nonBootComp
                 HsSrcFile
-                    -> mkComp hscFileFrontEnd hscNewBackEnd backend
+                    -> mkComp hscFileFrontEnd nonBootComp
                 HsBootFile
-                    -> mkComp hscFileFrontEnd hscNewBootBackEnd hscCodeGenIdentity
+                    -> mkComp hscFileFrontEnd bootComp
 
+-- Type-check Haskell, boot and extCore.
+hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileNothing hsc_env mod_summary
+    = compiler hsc_env mod_summary
+    where mkComp = hscMkCompiler norecompBatch (batchMsg False)
+          nonBootComp inp = hscNormalIface inp >>= hscIgnoreIface >>= hscNothing
+          bootComp inp = hscBootIface inp >>= hscIgnoreIface >>= hscNothing
+          compiler
+              = case ms_hsc_src mod_summary of
+                ExtCoreFile
+                    -> mkComp hscCoreFrontEnd nonBootComp
+                HsSrcFile
+                    -> mkComp hscFileFrontEnd nonBootComp
+                HsBootFile
+                    -> mkComp hscFileFrontEnd bootComp
 
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
 hscCompileInteractive hsc_env mod_summary =
-    hscMkCompiler norecompInteractive frontend hscNewBackEnd hscCodeGenInteractive
+    hscMkCompiler norecompInteractive (batchMsg True)
+                  frontend backend
                   hsc_env mod_summary
-    where frontend = case ms_hsc_src mod_summary of
+    where backend inp = hscSimplify inp >>= hscNormalIface >>= hscIgnoreIface >>= hscInteractive
+          frontend = case ms_hsc_src mod_summary of
                        ExtCoreFile -> hscCoreFrontEnd
                        HsSrcFile   -> hscFileFrontEnd
                        HsBootFile  -> panic bootErrorMsg
           bootErrorMsg = "Compiling a HsBootFile to bytecode doesn't make sense. " ++
-                         "Use 'hscCompileMake' instead."
+                         "Use 'hscCompileBatch' instead."
 
 --------------------------------------------------------------
 -- NoRecomp handlers
 --------------------------------------------------------------
 
 norecompOneShot :: a -> NoRecomp a
-norecompOneShot a hsc_env mod_summary 
-                old_iface
-                mb_mod_index
-    = do compilationProgressMsg (hsc_dflags hsc_env) $
-           "compilation IS NOT required"
+norecompOneShot a old_iface
+    = do hsc_env <- gets compHscEnv
+         liftIO $ do
          dumpIfaceStats hsc_env
          return a
 
-norecompMake :: NoRecomp (HscStatus, ModIface, ModDetails)
-norecompMake = norecompWorker HscNoRecomp False
+norecompBatch :: NoRecomp (HscStatus, ModIface, ModDetails)
+norecompBatch = norecompWorker HscNoRecomp False
 
 norecompInteractive :: NoRecomp (InteractiveStatus, ModIface, ModDetails)
 norecompInteractive = norecompWorker InteractiveNoRecomp True
 
 norecompWorker :: a -> Bool -> NoRecomp (a, ModIface, ModDetails)
-norecompWorker a isInterp hsc_env mod_summary
-             old_iface mb_mod_index
-    = do compilationProgressMsg (hsc_dflags hsc_env) $
-           (showModuleIndex mb_mod_index ++ 
-            "Skipping  " ++ showModMsg isInterp mod_summary)
+norecompWorker a isInterp old_iface
+    = do hsc_env <- gets compHscEnv
+         mod_summary <- gets compModSummary
+         liftIO $ do
          new_details <- {-# SCC "tcRnIface" #-}
                         initIfaceCheck hsc_env $
                         typecheckIface old_iface
@@ -310,149 +365,146 @@ norecompWorker a isInterp hsc_env mod_summary
          return (a, old_iface, new_details)
 
 --------------------------------------------------------------
+-- Progress displayers.
+--------------------------------------------------------------
+
+oneShotMsg :: Maybe (Int,Int) -> Bool -> Comp ()
+oneShotMsg _mb_mod_index recomp
+    = do hsc_env <- gets compHscEnv
+         liftIO $ do
+         if recomp
+            then return ()
+            else compilationProgressMsg (hsc_dflags hsc_env) $
+                     "compilation IS NOT required"
+
+batchMsg :: Bool -> Maybe (Int,Int) -> Bool -> Comp ()
+batchMsg toInterp mb_mod_index recomp
+    = do hsc_env <- gets compHscEnv
+         mod_summary <- gets compModSummary
+         let showMsg msg = compilationProgressMsg (hsc_dflags hsc_env) $
+                           (showModuleIndex mb_mod_index ++
+                            msg ++ showModMsg (not toInterp) mod_summary)
+         liftIO $ do
+         if recomp
+            then showMsg "Compiling "
+            else showMsg "Skipping  "
+
+
+
+--------------------------------------------------------------
 -- FrontEnds
 --------------------------------------------------------------
 
 hscCoreFrontEnd :: FrontEnd ModGuts
-hscCoreFrontEnd hsc_env mod_summary mb_mod_index = do {
- 	    -------------------
- 	    -- PARSE
- 	    -------------------
-	; inp <- readFile (expectJust "hscCoreFrontEnd" (ms_hspp_file mod_summary))
-	; case parseCore inp 1 of
-	    FailP s        -> do errorMsg (hsc_dflags hsc_env) (text s{-ToDo: wrong-})
-                                 return Nothing
-	    OkP rdr_module -> do {
-    
- 	    -------------------
- 	    -- RENAME and TYPECHECK
- 	    -------------------
-	; (tc_msgs, maybe_tc_result) <- {-# SCC "TypeCheck" #-}
-			      tcRnExtCore hsc_env rdr_module
-	; printErrorsAndWarnings (hsc_dflags hsc_env) tc_msgs
-	; case maybe_tc_result of
-      	     Nothing       -> return Nothing
-      	     Just mod_guts -> return (Just mod_guts)	-- No desugaring to do!
-	}}
+hscCoreFrontEnd =
+    do hsc_env <- gets compHscEnv
+       mod_summary <- gets compModSummary
+       liftIO $ do
+            -------------------
+            -- PARSE
+            -------------------
+       inp <- readFile (expectJust "hscCoreFrontEnd" (ms_hspp_file mod_summary))
+       case parseCore inp 1 of
+         FailP s
+             -> do errorMsg (hsc_dflags hsc_env) (text s{-ToDo: wrong-})
+                   return Nothing
+         OkP rdr_module
+             -------------------
+             -- RENAME and TYPECHECK
+             -------------------
+             -> do (tc_msgs, maybe_tc_result) <- {-# SCC "TypeCheck" #-}
+                                                 tcRnExtCore hsc_env rdr_module
+                   printErrorsAndWarnings (hsc_dflags hsc_env) tc_msgs
+                   case maybe_tc_result of
+                     Nothing       -> return Nothing
+                     Just mod_guts -> return (Just mod_guts)         -- No desugaring to do!
 
 	 
 hscFileFrontEnd :: FrontEnd ModGuts
-hscFileFrontEnd hsc_env mod_summary mb_mod_index = do {
--- FIXME: Move 'DISPLAY PROGRESS MESSAGE' out of the frontend.
- 	    -------------------
- 	    -- DISPLAY PROGRESS MESSAGE
- 	    -------------------
-	; let dflags    = hsc_dflags hsc_env
-	      one_shot  = isOneShot (ghcMode dflags)
-	      toInterp  = hscTarget dflags == HscInterpreted
-      	; when (not one_shot) $
-		 compilationProgressMsg dflags $
-		 (showModuleIndex mb_mod_index ++
-                  "Compiling " ++ showModMsg (not toInterp) mod_summary)
-			
- 	    -------------------
- 	    -- PARSE
- 	    -------------------
-	; let hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
-	      hspp_buf  = ms_hspp_buf  mod_summary
-
-	; maybe_parsed <- myParseModule dflags hspp_file hspp_buf
-
-	; case maybe_parsed of {
-      	     Left err -> do { printBagOfErrors dflags (unitBag err)
-			    ; return Nothing } ;
-      	     Right rdr_module -> do {
-
- 	    -------------------
- 	    -- RENAME and TYPECHECK
- 	    -------------------
-	  (tc_msgs, maybe_tc_result) 
-		<- {-# SCC "Typecheck-Rename" #-}
-		   tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
-
-	; printErrorsAndWarnings dflags tc_msgs
-	; case maybe_tc_result of {
-      	     Nothing -> return Nothing ;
-      	     Just tc_result -> do {
-
- 	    -------------------
- 	    -- DESUGAR
- 	    -------------------
-	; (warns, maybe_ds_result) <- {-# SCC "DeSugar" #-}
-		 	     deSugar hsc_env tc_result
-	; printBagOfWarnings dflags warns
-	; return maybe_ds_result
-	}}}}}
+hscFileFrontEnd =
+    do hsc_env <- gets compHscEnv
+       mod_summary <- gets compModSummary
+       liftIO $ do
+             -------------------
+             -- PARSE
+             -------------------
+       let dflags = hsc_dflags hsc_env
+           hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
+           hspp_buf  = ms_hspp_buf  mod_summary
+       maybe_parsed <- myParseModule dflags hspp_file hspp_buf
+       case maybe_parsed of
+         Left err
+             -> do printBagOfErrors dflags (unitBag err)
+                   return Nothing
+         Right rdr_module
+             -------------------
+             -- RENAME and TYPECHECK
+             -------------------
+             -> do (tc_msgs, maybe_tc_result) 
+                       <- {-# SCC "Typecheck-Rename" #-}
+                          tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+                   printErrorsAndWarnings dflags tc_msgs
+                   case maybe_tc_result of
+                     Nothing
+                         -> return Nothing
+                     Just tc_result
+                         -------------------
+                         -- DESUGAR
+                         -------------------
+                         -> do (warns, maybe_ds_result) <- {-# SCC "DeSugar" #-}
+                                                           deSugar hsc_env tc_result
+                               printBagOfWarnings dflags warns
+                               return maybe_ds_result
 
 --------------------------------------------------------------
--- BackEnds
+-- Simplifiers
 --------------------------------------------------------------
 
--- FIXME: Rename backend to simplifier, and codegen to backend.
+hscSimplify :: ModGuts -> Comp ModGuts
+hscSimplify ds_result
+  = do hsc_env <- gets compHscEnv
+       liftIO $ do
+       flat_result <- {-# SCC "Flattening" #-}
+                      flatten hsc_env ds_result
+           -------------------
+           -- SIMPLIFY
+           -------------------
+       simpl_result <- {-# SCC "Core2Core" #-}
+                       core2core hsc_env flat_result
+       return simpl_result
 
-hscNewBootBackEnd :: BackEnd ModGuts (HscStatus, ModIface, ModDetails)
-hscNewBootBackEnd hsc_env mod_summary maybe_old_iface ds_result
-  = do details <- mkBootModDetails hsc_env ds_result
+--------------------------------------------------------------
+-- Interface generators
+--------------------------------------------------------------
+
+-- HACK: we return ModGuts even though we know it's not gonna be used.
+--       We do this because the type signature needs to be identical
+--       in structure to the type of 'hscNormalIface'.
+hscBootIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, ModGuts)
+hscBootIface ds_result
+  = do hsc_env <- gets compHscEnv
+       mod_summary <- gets compModSummary
+       maybe_old_iface <- gets compOldIface
+       liftIO $ do
+       details <- mkBootModDetails hsc_env ds_result
        (new_iface, no_change) 
            <- {-# SCC "MkFinalIface" #-}
               mkIface hsc_env maybe_old_iface ds_result details
-       writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
        -- And the answer is ...
        dumpIfaceStats hsc_env
-       return (HscRecomp False, new_iface, details)
+       return (new_iface, no_change, details, ds_result)
 
-hscNewBackEnd :: BackEnd ModGuts (ModIface, ModDetails, CgGuts)
-hscNewBackEnd hsc_env mod_summary maybe_old_iface ds_result
-  = do 	{ 	-- OMITTED: 
-		-- ; seqList imported_modules (return ())
-
-	  let dflags    = hsc_dflags hsc_env
-
- 	    -------------------
- 	    -- FLATTENING
- 	    -------------------
-	; flat_result <- {-# SCC "Flattening" #-}
- 			 flatten hsc_env ds_result
-
-
-{-	TEMP: need to review space-leak fixing here
-	NB: even the code generator can force one of the
-	    thunks for constructor arguments, for newtypes in particular
-
-	; let 	-- Rule-base accumulated from imported packages
-	     pkg_rule_base = eps_rule_base (hsc_EPS hsc_env)
-
-		-- In one-shot mode, ZAP the external package state at
-		-- this point, because we aren't going to need it from
-		-- now on.  We keep the name cache, however, because
-		-- tidyCore needs it.
-	     pcs_middle 
-		 | one_shot  = pcs_tc{ pcs_EPS = error "pcs_EPS missing" }
-		 | otherwise = pcs_tc
-
-	; pkg_rule_base `seq` pcs_middle `seq` return ()
--}
-
-	-- alive at this point:  
-	--	pcs_middle
-	--	flat_result
-	--      pkg_rule_base
-
- 	    -------------------
- 	    -- SIMPLIFY
- 	    -------------------
-	; simpl_result <- {-# SCC "Core2Core" #-}
-			  core2core hsc_env flat_result
-
+hscNormalIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, CgGuts)
+hscNormalIface simpl_result
+  = do hsc_env <- gets compHscEnv
+       mod_summary <- gets compModSummary
+       maybe_old_iface <- gets compOldIface
+       liftIO $ do
  	    -------------------
  	    -- TIDY
  	    -------------------
-	; (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-			         tidyProgram hsc_env simpl_result
-
-	-- Alive at this point:  
-	--	tidy_result, pcs_final
-	--      hsc_env
+       (cg_guts, details) <- {-# SCC "CoreTidy" #-}
+                             tidyProgram hsc_env simpl_result
 
  	    -------------------
 	    -- BUILD THE NEW ModIface and ModDetails
@@ -460,44 +512,56 @@ hscNewBackEnd hsc_env mod_summary maybe_old_iface ds_result
 	    -- This has to happen *after* code gen so that the back-end
 	    -- info has been set.  Not yet clear if it matters waiting
 	    -- until after code output
-	; (new_iface, no_change)
+       (new_iface, no_change)
 		<- {-# SCC "MkFinalIface" #-}
 		   mkIface hsc_env maybe_old_iface simpl_result details
-
-	; writeIfaceFile hsc_env (ms_location mod_summary) new_iface no_change
-
 	-- Emit external core
-	; emitExternalCore dflags cg_guts
+       emitExternalCore (hsc_dflags hsc_env) cg_guts -- Move this? --Lemmih 03/07/2006
 
  	    -------------------
  	    -- Return the prepared code.
-	; return (new_iface, details, cg_guts)
-      	 }
+       return (new_iface, no_change, details, cg_guts)
 
 --------------------------------------------------------------
--- Code generators
+-- BackEnd combinators
 --------------------------------------------------------------
+
+hscWriteIface :: (ModIface, Bool, ModDetails, a) -> Comp (ModIface, ModDetails, a)
+hscWriteIface (iface, no_change, details, a)
+    = do mod_summary <- gets compModSummary
+         liftIO $ do
+         unless no_change
+           $ writeIfaceFile (ms_location mod_summary) iface
+         return (iface, details, a)
+
+hscIgnoreIface :: (ModIface, Bool, ModDetails, a) -> Comp (ModIface, ModDetails, a)
+hscIgnoreIface (iface, no_change, details, a)
+    = return (iface, details, a)
 
 -- Don't output any code.
-hscCodeGenNothing :: CodeGen (ModIface, ModDetails, CgGuts) (HscStatus, ModIface, ModDetails)
-hscCodeGenNothing hsc_env mod_summary (iface, details, cgguts)
+hscNothing :: (ModIface, ModDetails, a) -> Comp (HscStatus, ModIface, ModDetails)
+hscNothing (iface, details, a)
     = return (HscRecomp False, iface, details)
 
 -- Generate code and return both the new ModIface and the ModDetails.
-hscCodeGenMake :: CodeGen (ModIface, ModDetails, CgGuts) (HscStatus, ModIface, ModDetails)
-hscCodeGenMake hsc_env mod_summary (iface, details, cgguts)
-    = do hasStub <- hscCodeGenCompile hsc_env mod_summary cgguts
+hscBatch :: (ModIface, ModDetails, CgGuts) -> Comp (HscStatus, ModIface, ModDetails)
+hscBatch (iface, details, cgguts)
+    = do hasStub <- hscCompile cgguts
          return (HscRecomp hasStub, iface, details)
 
 -- Here we don't need the ModIface and ModDetails anymore.
-hscCodeGenOneShot :: CodeGen (ModIface, ModDetails, CgGuts) HscStatus
-hscCodeGenOneShot hsc_env mod_summary (_, _, cgguts)
-    = do hasStub <- hscCodeGenCompile hsc_env mod_summary cgguts
+hscOneShot :: (ModIface, ModDetails, CgGuts) -> Comp HscStatus
+hscOneShot (_, _, cgguts)
+    = do hasStub <- hscCompile cgguts
          return (HscRecomp hasStub)
 
-hscCodeGenCompile :: CodeGen CgGuts Bool
-hscCodeGenCompile hsc_env mod_summary cgguts
-    = do let CgGuts{ -- This is the last use of the ModGuts in a compilation.
+-- Compile to hard-code.
+hscCompile :: CgGuts -> Comp Bool
+hscCompile cgguts
+    = do hsc_env <- gets compHscEnv
+         mod_summary <- gets compModSummary
+         liftIO $ do
+         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                      -- From now on, we just use the bits we need.
                      cg_module   = this_mod,
                      cg_binds    = core_binds,
@@ -532,24 +596,22 @@ hscCodeGenCompile hsc_env mod_summary cgguts
                 dependencies abstractC
          return stub_c_exists
 
-hscCodeGenIdentity :: CodeGen a a
-hscCodeGenIdentity hsc_env mod_summary a = return a
+hscConst :: b -> a -> Comp b
+hscConst b a = return b
 
-hscCodeGenConst :: b -> CodeGen a b
-hscCodeGenConst b hsc_env mod_summary a = return b
-
-hscCodeGenInteractive :: CodeGen (ModIface, ModDetails, CgGuts)
-                                 (InteractiveStatus, ModIface, ModDetails)
-hscCodeGenInteractive hsc_env mod_summary (iface, details, cgguts)
+hscInteractive :: (ModIface, ModDetails, CgGuts)
+               -> Comp (InteractiveStatus, ModIface, ModDetails)
+hscInteractive (iface, details, cgguts)
 #ifdef GHCI
-    = do let CgGuts{ -- This is the last use of the ModGuts in a compilation.
+    = do hsc_env <- gets compHscEnv
+         mod_summary <- gets compModSummary
+         liftIO $ do
+         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                      -- From now on, we just use the bits we need.
                      cg_module   = this_mod,
                      cg_binds    = core_binds,
                      cg_tycons   = tycons,
-                     cg_foreign  = foreign_stubs,
-                     cg_home_mods = home_mods,
-                     cg_dep_pkgs = dependencies } = cgguts
+                     cg_foreign  = foreign_stubs } = cgguts
              dflags = hsc_dflags hsc_env
              location = ms_location mod_summary
              data_tycons = filter isDataTyCon tycons
@@ -570,7 +632,6 @@ hscCodeGenInteractive hsc_env mod_summary (iface, details, cgguts)
 #else
     = panic "GHC not compiled with interpreter"
 #endif
-
 
 ------------------------------
 
