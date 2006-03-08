@@ -516,6 +516,7 @@ hscNormalIface simpl_result
 		   mkIface hsc_env maybe_old_iface simpl_result details
 	-- Emit external core
        emitExternalCore (hsc_dflags hsc_env) cg_guts -- Move this? --Lemmih 03/07/2006
+       dumpIfaceStats hsc_env
 
  	    -------------------
  	    -- Return the prepared code.
