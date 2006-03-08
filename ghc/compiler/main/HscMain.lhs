@@ -279,7 +279,7 @@ hscCompileOneShot hsc_env mod_summary =
           nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
                             hscWriteIface >>= hscOneShot
           -- How to compile boot files.
-          bootComp inp = hscBootIface inp >>= hscWriteIface >>= hscConst (HscRecomp False)
+          bootComp inp = hscSimpleIface inp >>= hscWriteIface >>= hscConst (HscRecomp False)
           compiler
               = case ms_hsc_src mod_summary of
                 ExtCoreFile
@@ -296,7 +296,7 @@ hscCompileBatch hsc_env mod_summary
     where mkComp = hscMkCompiler norecompBatch (batchMsg False)
           nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
                             hscWriteIface >>= hscBatch
-          bootComp inp = hscBootIface inp >>= hscWriteIface >>= hscNothing
+          bootComp inp = hscSimpleIface inp >>= hscWriteIface >>= hscNothing
           compiler
               = case ms_hsc_src mod_summary of
                 ExtCoreFile
@@ -311,16 +311,15 @@ hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
 hscCompileNothing hsc_env mod_summary
     = compiler hsc_env mod_summary
     where mkComp = hscMkCompiler norecompBatch (batchMsg False)
-          nonBootComp inp = hscNormalIface inp >>= hscIgnoreIface >>= hscNothing
-          bootComp inp = hscBootIface inp >>= hscIgnoreIface >>= hscNothing
+          pipeline inp = hscSimpleIface inp >>= hscIgnoreIface >>= hscNothing
           compiler
               = case ms_hsc_src mod_summary of
                 ExtCoreFile
-                    -> mkComp hscCoreFrontEnd nonBootComp
+                    -> mkComp hscCoreFrontEnd pipeline
                 HsSrcFile
-                    -> mkComp hscFileFrontEnd nonBootComp
+                    -> mkComp hscFileFrontEnd pipeline
                 HsBootFile
-                    -> mkComp hscFileFrontEnd bootComp
+                    -> mkComp hscFileFrontEnd pipeline
 
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
@@ -480,8 +479,8 @@ hscSimplify ds_result
 -- HACK: we return ModGuts even though we know it's not gonna be used.
 --       We do this because the type signature needs to be identical
 --       in structure to the type of 'hscNormalIface'.
-hscBootIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, ModGuts)
-hscBootIface ds_result
+hscSimpleIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, ModGuts)
+hscSimpleIface ds_result
   = do hsc_env <- gets compHscEnv
        mod_summary <- gets compModSummary
        maybe_old_iface <- gets compOldIface
