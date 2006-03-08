@@ -494,7 +494,7 @@ AC_REQUIRE([AC_PROG_CC])
 AC_CACHE_CHECK([whether ranlib is needed], [fp_cv_prog_ar_needs_ranlib],
 [if test $fp_prog_ar_is_gnu = yes; then
   fp_cv_prog_ar_needs_ranlib=no
-elif test $TargetPlatform = powerpc-apple-darwin; then
+elif echo $TargetPlatform | grep "^.*-apple-darwin$"  > /dev/null 2> /dev/null; then
   # It's quite tedious to check for Apple's crazy timestamps in .a files,
   # so we hardcode it.
   fp_cv_prog_ar_needs_ranlib=yes
