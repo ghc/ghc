@@ -44,6 +44,7 @@ module Data.Map  (
             , null
             , size
             , member
+            , notMember
             , lookup
             , findWithDefault
             
@@ -271,6 +272,10 @@ member k m
   = case lookup k m of
       Nothing -> False
       Just x  -> True
+
+-- | /O(log n)/. Is the key not a member of the map?
+notMember :: Ord k => k -> Map k a -> Bool
+notMember k m = not $ Data.Map.member k m
 
 -- | /O(log n)/. Find the value at a key.
 -- Calls 'error' when the element can not be found.

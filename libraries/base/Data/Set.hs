@@ -43,6 +43,7 @@ module Data.Set  (
             , null
             , size
             , member
+            , notMember
             , isSubsetOf
             , isProperSubsetOf
             
@@ -202,6 +203,11 @@ member x t
                LT -> member x l
                GT -> member x r
                EQ -> True       
+
+-- | /O(log n)/. Is the element not in the set?
+notMember :: Ord a => a -> Set a -> Bool
+notMember x t = not $ Data.Set.member x t
+
 
 {--------------------------------------------------------------------
   Construction
