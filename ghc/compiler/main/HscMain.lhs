@@ -274,7 +274,7 @@ hscMkCompiler norecomp messenger frontend backend
 hscCompileOneShot :: Compiler HscStatus
 hscCompileOneShot hsc_env mod_summary =
     compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler (norecompOneShot HscNoRecomp) oneShotMsg
+    where mkComp = hscMkCompiler norecompOneShot oneShotMsg
           -- How to compile nonBoot files.
           nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
                             hscWriteIface >>= hscOneShot
@@ -307,6 +307,7 @@ hscCompileBatch hsc_env mod_summary
                     -> mkComp hscFileFrontEnd bootComp
 
 -- Type-check Haskell, boot and extCore.
+-- Does it make sense to compile extCore to nothing?
 hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
 hscCompileNothing hsc_env mod_summary
     = compiler hsc_env mod_summary
@@ -339,12 +340,12 @@ hscCompileInteractive hsc_env mod_summary =
 -- NoRecomp handlers
 --------------------------------------------------------------
 
-norecompOneShot :: a -> NoRecomp a
-norecompOneShot a old_iface
+norecompOneShot :: NoRecomp HscStatus
+norecompOneShot old_iface
     = do hsc_env <- gets compHscEnv
          liftIO $ do
          dumpIfaceStats hsc_env
-         return a
+         return HscNoRecomp
 
 norecompBatch :: NoRecomp (HscStatus, ModIface, ModDetails)
 norecompBatch = norecompWorker HscNoRecomp False
