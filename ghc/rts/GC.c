@@ -4690,8 +4690,8 @@ end:
     // Should we squeeze or not?  Arbitrary heuristic: we squeeze if
     // the number of words we have to shift down is less than the
     // number of stack words we squeeze away by doing so.
-    if (1 /*RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
-	    weight < words_to_squeeze*/) {
+    if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
+	weight < words_to_squeeze) {
 	stackSqueeze(tso, (StgPtr)frame);
     }
 }
