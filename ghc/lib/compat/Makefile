@@ -43,6 +43,11 @@ UseGhcForCc = YES
 # compiling with (e.g. 6.2.1). Hence the filter-out.
 SRC_HC_OPTS += $(filter-out -D%, $(GhcHcOpts)) 
 
+# GHC 6.4 didn't have WCsubst.c, but 6.4.1 did, and we need to know
+# this in cbits/unicode.c The patchlevel isn't normally exposed as a
+# CPP symbol, so we have to do it by hand:
+SRC_CC_OPTS += -D__GHC_PATCHLEVEL__=$(GhcPatchLevel)
+
 ifeq "$(ghc_ge_603)" "YES"
 # These modules are provided in GHC 6.3+
 EXCLUDED_SRCS += \
