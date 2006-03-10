@@ -270,8 +270,8 @@ addToClockTime (TimeDiff year mon day hour min sec psec)
                      60 * toInteger min +
                      3600 * toInteger hour +
                      24 * 3600 * toInteger day
-	  cal      = toUTCTime (TOD (c_sec + sec_diff) (c_psec + psec))
-                                                       -- FIXME! ^^^^
+          (d_sec, d_psec) = (c_psec + psec) `quotRem` 1000000000000
+          cal      = toUTCTime (TOD (c_sec + sec_diff + d_sec) d_psec)
           new_mon  = fromEnum (ctMonth cal) + r_mon 
 	  month' = fst tmp
 	  yr_diff = snd tmp
