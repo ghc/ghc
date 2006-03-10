@@ -20,7 +20,7 @@ data-files:
 executable: haddock
 hs-source-dirs: src
 main-is: Main.hs
-extensions: CPP
+extensions: CPP, PatternGuards
 other-modules:
 	Binary
 	BlockTable
