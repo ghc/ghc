@@ -2289,6 +2289,8 @@ resumeThread (void *task_)
     /* We might have GC'd, mark the TSO dirty again */
     dirtyTSO(tso);
 
+    IF_DEBUG(sanity, checkTSO(tso));
+
     return &cap->r;
 }
 
