@@ -435,9 +435,13 @@ INFO_TABLE(stg_SE_CAF_BLACKHOLE,0,1,SE_CAF_BLACKHOLE,"SE_CAF_BLACKHOLE","SE_CAF_
 #endif
 
 /* ----------------------------------------------------------------------------
+   Whiteholes are used for the "locked" state of a closure (see lockClosure())
+
+   The closure type is BLAKCHOLE, just because we need a valid closure type
+   for sanity checking.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_WHITEHOLE, 0,0, INVALID_OBJECT, "WHITEHOLE", "WHITEHOLE")
+INFO_TABLE(stg_WHITEHOLE, 0,0, BLACKHOLE, "WHITEHOLE", "WHITEHOLE")
 { foreign "C" barf("WHITEHOLE object entered!"); }
 
 /* ----------------------------------------------------------------------------
