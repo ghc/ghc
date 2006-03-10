@@ -22,7 +22,7 @@
 
 {
 module Lexer (
-   Token(..), lexer, mkPState, PState(..),
+   Token(..), lexer, pragState, mkPState, PState(..),
    P(..), ParseResult(..), getSrcLoc, 
    failLocMsgP, failSpanMsgP, srcParseFail,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
@@ -158,7 +158,7 @@ $white_no_nl+ 				;
 -- generate a matching '}' token.
 <layout_left>  ()			{ do_layout_left }
 
-<0,glaexts> \n				{ begin bol }
+<0,option_prags,glaexts> \n				{ begin bol }
 
 "{-#" $whitechar* (line|LINE) 		{ begin line_prag2 }
 
@@ -184,7 +184,7 @@ $white_no_nl+ 				;
 <glaexts>
   "{-#" $whitechar* (RULES|rules)	{ token ITrules_prag }
 
-<0,glaexts> {
+<0,option_prags,glaexts> {
   "{-#" $whitechar* (INLINE|inline)	{ token (ITinline_prag True) }
   "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline)
   					{ token (ITinline_prag False) }
@@ -201,13 +201,20 @@ $white_no_nl+ 				;
   "{-#" $whitechar* (SCC|scc)		{ token ITscc_prag }
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
   "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
-  
+
   "{-#" 				{ nested_comment }
 
   -- ToDo: should only be valid inside a pragma:
   "#-}" 				{ token ITclose_prag}
 }
 
+<option_prags> {
+  "{-#" $whitechar* (OPTIONS|options)   { lex_string_prag IToptions_prag }
+  "{-#" $whitechar* (OPTIONS_GHC|options_ghc)
+                                        { lex_string_prag IToptions_prag }
+  "{-#" $whitechar* (LANGUAGE|language) { token ITlanguage_prag }
+  "{-#" $whitechar* (INCLUDE|include)   { lex_string_prag ITinclude_prag }
+}
 
 -- '0' state: ordinary lexemes
 -- 'glaexts' state: glasgow extensions (postfix '#', etc.)
@@ -248,7 +255,7 @@ $white_no_nl+ 				;
   "|}"					{ token ITccurlybar }
 }
 
-<0,glaexts> {
+<0,option_prags,glaexts> {
   \(					{ special IToparen }
   \)					{ special ITcparen }
   \[					{ special ITobrack }
@@ -261,7 +268,7 @@ $white_no_nl+ 				;
   \}					{ close_brace }
 }
 
-<0,glaexts> {
+<0,option_prags,glaexts> {
   @qual @varid			{ check_qvarid }
   @qual @conid			{ idtoken qconid }
   @varid			{ varid }
@@ -377,6 +384,9 @@ data Token
   | ITcore_prag                 -- hdaume: core annotations
   | ITunpack_prag
   | ITclose_prag
+  | IToptions_prag String
+  | ITinclude_prag String
+  | ITlanguage_prag
 
   | ITdotdot  			-- reserved symbols
   | ITcolon
@@ -851,6 +861,32 @@ setFile code span buf len = do
   pushLexState code
   lexToken
 
+
+-- -----------------------------------------------------------------------------
+-- Options, includes and language pragmas.
+
+lex_string_prag :: (String -> Token) -> Action
+lex_string_prag mkTok span buf len
+    = do input <- getInput
+         start <- getSrcLoc
+         tok <- go [] input
+         end <- getSrcLoc
+         return (L (mkSrcSpan start end) tok)
+    where go acc input
+              = if isString input "#-}"
+                   then do setInput input
+                           return (mkTok (reverse acc))
+                   else case alexGetChar input of
+                          Just (c,i) -> go (c:acc) i
+                          Nothing -> err input
+          isString i [] = True
+          isString i (x:xs)
+              = case alexGetChar i of
+                  Just (c,i') | c == x    -> isString i' xs
+                  _other -> False
+          err (AI end _ _) = failLocMsgP (srcSpanStart span) end "unterminated options pragma"
+
+
 -- -----------------------------------------------------------------------------
 -- Strings & Chars
 
@@ -1272,6 +1308,22 @@ thEnabled      flags = testBit flags thBit
 ipEnabled      flags = testBit flags ipBit
 tvEnabled      flags = testBit flags tvBit
 bangPatEnabled flags = testBit flags bangPatBit
+
+-- PState for parsing options pragmas
+--
+pragState :: StringBuffer -> SrcLoc -> PState
+pragState buf loc  = 
+  PState {
+      buffer	 = buf,
+      last_loc   = mkSrcSpan loc loc,
+      last_offs  = 0,
+      last_len   = 0,
+      loc        = loc,
+      extsBitmap = 0,
+      context    = [],
+      lex_state  = [bol, option_prags, 0]
+    }
+
 
 -- create a parse state
 --

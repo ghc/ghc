@@ -102,7 +102,7 @@ exposed-modules:
 	FunDeps
 	GHC
 	Generics
-	GetImports
+        HeaderInfo
 	HsBinds
 	HsDecls
 	HsExpr

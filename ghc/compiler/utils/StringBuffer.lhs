@@ -13,6 +13,8 @@ module StringBuffer
 
 	 -- * Creation\/destruction
         hGetStringBuffer,
+        hGetStringBufferBlock,
+        appendStringBuffers,
 	stringToStringBuffer,
 
 	-- * Inspection
@@ -40,7 +42,8 @@ import Encoding
 import FastString		( FastString,mkFastString,mkFastStringBytes )
 
 import Foreign
-import System.IO		( hGetBuf, hFileSize,IOMode(ReadMode), hClose )
+import System.IO		( hGetBuf, hFileSize,IOMode(ReadMode), hClose
+                                , Handle, hTell )
 
 import GHC.Ptr			( Ptr(..) )
 import GHC.Exts
@@ -101,6 +104,32 @@ hGetStringBuffer fname = do
 	  pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
 		 -- sentinels for UTF-8 decoding
 	  return (StringBuffer buf size 0)
+
+hGetStringBufferBlock :: Handle -> Int -> IO StringBuffer
+hGetStringBufferBlock handle wanted
+    = do size_i <- hFileSize handle
+         offset_i <- hTell handle
+         let size = min wanted (fromIntegral $ size_i-offset_i)
+         buf <- mallocForeignPtrArray (size+3)
+         withForeignPtr buf $ \ptr ->
+             do r <- if size == 0 then return 0 else hGetBuf handle ptr size
+                if r /= size
+                   then ioError (userError $ "short read of file: "++show(r,size,fromIntegral size_i,handle))
+                   else do pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
+                           return (StringBuffer buf size 0)
+
+appendStringBuffers :: StringBuffer -> StringBuffer -> IO StringBuffer
+appendStringBuffers sb1 sb2
+    = do newBuf <- mallocForeignPtrArray (size+3)
+         withForeignPtr newBuf $ \ptr ->
+          withForeignPtr (buf sb1) $ \sb1Ptr ->
+           withForeignPtr (buf sb2) $ \sb2Ptr ->
+             do copyArray (sb1Ptr `advancePtr` cur sb1) ptr (calcLen sb1)
+                copyArray (sb2Ptr `advancePtr` cur sb2) (ptr `advancePtr` cur sb1) (calcLen sb2)
+                pokeArray (ptr `advancePtr` size) [0,0,0]
+                return (StringBuffer newBuf size 0)
+    where calcLen sb = len sb - cur sb
+          size = calcLen sb1 + calcLen sb2
 
 stringToStringBuffer :: String -> IO StringBuffer
 stringToStringBuffer str = do

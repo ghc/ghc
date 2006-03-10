@@ -962,9 +962,10 @@ data ModSummary
 	ms_obj_date  :: Maybe ClockTime,	-- Timestamp of object, maybe
         ms_srcimps   :: [Located Module],	-- Source imports
         ms_imps      :: [Located Module],	-- Non-source imports
-        ms_hspp_file :: Maybe FilePath,		-- Filename of preprocessed source,
-						-- once we have preprocessed it.
-	ms_hspp_buf  :: Maybe StringBuffer	-- The actual preprocessed source, maybe.
+        ms_hspp_file :: FilePath,		-- Filename of preprocessed source.
+        ms_hspp_opts :: DynFlags,               -- Cached flags from OPTIONS, INCLUDE
+                                                -- and LANGUAGE pragmas.
+	ms_hspp_buf  :: Maybe StringBuffer    	-- The actual preprocessed source, maybe.
      }
 
 -- The ModLocation contains both the original source filename and the

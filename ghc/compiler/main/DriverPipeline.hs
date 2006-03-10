@@ -22,14 +22,12 @@ module DriverPipeline (
         -- DLL building
    doMkDLL,
 
-   getOptionsFromStringBuffer,	-- used in module GHC
-   optionsErrorMsgs,	  	-- ditto
   ) where
 
 #include "HsVersions.h"
 
 import Packages
-import GetImports
+import HeaderInfo
 import DriverPhases
 import SysTools		( newTempName, addFilesToClean, getSysMan, copy )
 import qualified SysTools	
@@ -50,9 +48,8 @@ import Maybes		( expectJust )
 import Ctype		( is_ident )
 import StringBuffer	( StringBuffer(..), lexemeToString )
 import ParserCoreUtils	( getCoreModuleName )
-import SrcLoc		( srcLocSpan, mkSrcLoc )
+import SrcLoc		( srcLocSpan, mkSrcLoc, unLoc )
 import FastString	( mkFastString )
-import Bag		( listToBag, emptyBag )
 import SrcLoc		( Located(..) )
 
 import Distribution.Compiler ( extensionsToGHCFlag )
@@ -112,7 +109,7 @@ data CompResult
 
 compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do 
 
-   let dflags0     = hsc_dflags hsc_env
+   let dflags0     = ms_hspp_opts mod_summary
        this_mod    = ms_mod mod_summary
        src_flavour = ms_hsc_src mod_summary
 
@@ -124,20 +121,9 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 
    let location	  = ms_location mod_summary
    let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
-   let input_fnpp = expectJust "compile:hspp" (ms_hspp_file mod_summary)
+   let input_fnpp = ms_hspp_file mod_summary
 
    debugTraceMsg dflags0 2 (text "compile: input file" <+> text input_fnpp)
-
-   -- Add in the OPTIONS from the source file
-   -- This is nasty: we've done this once already, in the compilation manager
-   -- It might be better to cache the flags in the ml_hspp_file field,say
-   let hspp_buf = expectJust "compile:hspp_buf" (ms_hspp_buf mod_summary)
-       opts = getOptionsFromStringBuffer hspp_buf input_fn
-   (dflags1,unhandled_flags) <- parseDynamicFlags dflags0 (map snd opts)
-   if (not (null unhandled_flags))
-	then do printErrorsAndWarnings dflags1 (optionsErrorMsgs unhandled_flags opts input_fn)
-		return CompErrs
-	else do
 
    let (basename, _) = splitFilename input_fn
 
@@ -145,8 +131,8 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
   -- This is needed when we try to compile the .hc file later, if it
   -- imports a _stub.h file that we created here.
    let current_dir = directoryOf basename
-       old_paths   = includePaths dflags1
-       dflags      = dflags1 { includePaths = current_dir : old_paths }
+       old_paths   = includePaths dflags0
+       dflags      = dflags0 { includePaths = current_dir : old_paths }
 
    -- Figure out what lang we're generating
    let hsc_lang = hscMaybeAdjustTarget dflags StopLn src_flavour (hscTarget dflags)
@@ -603,8 +589,8 @@ runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_lo
 --	       (b) runs cpp if necessary
 
 runPhase (Cpp sf) _stop dflags0 basename suff input_fn get_output_fn maybe_loc
-  = do src_opts <- getOptionsFromSource input_fn
-       (dflags,unhandled_flags) <- parseDynamicFlags dflags0 src_opts
+  = do src_opts <- getOptionsFromFile input_fn
+       (dflags,unhandled_flags) <- parseDynamicFlags dflags0 (map unLoc src_opts)
        checkProcessArgsResult unhandled_flags (basename `joinFileExt` suff)
 
        if not (dopt Opt_Cpp dflags) then
@@ -702,7 +688,8 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 		-- Some fields are not looked at by hscMain
 	    mod_summary = ModSummary {	ms_mod 	     = mod_name, 
 					ms_hsc_src   = src_flavour,
-				 	ms_hspp_file = Just input_fn,
+				 	ms_hspp_file = input_fn,
+                                        ms_hspp_opts = dflags,
 					ms_hspp_buf  = hspp_buf,
 					ms_location  = location4,
 					ms_hs_date   = src_timestamp,
@@ -1385,113 +1372,6 @@ hsSourceCppOpts =
 	, "-D__CONCURRENT_HASKELL__"
 	]
 
------------------------------------------------------------------------------
--- Reading OPTIONS pragmas
-
--- This is really very ugly and should be rewritten.
---   - some error messages are thrown as exceptions (should return)
---   - we ignore LINE pragmas
---   - parsing is horrible, combination of prefixMatch and 'read'.
-
-getOptionsFromSource 
-	:: String		-- input file
-	-> IO [String]		-- options, if any
-getOptionsFromSource file
-  = do h <- openFile file ReadMode
-       look h 1 `finally` hClose h
-  where
-	look h i = do
-	    r <- tryJust ioErrors (hGetLine h)
-	    case r of
-	      Left e | isEOFError e -> return []
-	             | otherwise    -> ioError e
-	      Right l' -> do
-	    	let l = removeSpaces l'
-	    	case () of
-		    () | null l -> look h (i+1)
-		       | prefixMatch "#" l -> look h (i+1)
-		       | prefixMatch "{-# LINE" l -> look h (i+1)  -- -} wrong!
-		       | Just opts <- matchOptions i file l
-		       	-> do rest <- look h (i+1)
-                              return (opts ++ rest)
-		       | otherwise -> return []
-
-getOptionsFromStringBuffer :: StringBuffer -> FilePath -> [(Int,String)]
-getOptionsFromStringBuffer buffer@(StringBuffer _ len _) fn = 
-  let 
-	ls = lines (lexemeToString buffer len)  -- lazy, so it's ok
-  in
-  look 1 ls
-  where
-	look i [] = []
-	look i (l':ls) = do
-	    let l = removeSpaces l'
-	    case () of
-		() | null l -> look (i+1) ls
-		   | prefixMatch "#" l -> look (i+1) ls
-		   | prefixMatch "{-# LINE" l -> look (i+1) ls   -- -} wrong!
-		   | Just opts <- matchOptions i fn l
-			-> zip (repeat i) opts ++ look (i+1) ls
-		   | otherwise -> []
-
--- detect {-# OPTIONS_GHC ... #-}.  For the time being, we accept OPTIONS
--- instead of OPTIONS_GHC, but that is deprecated.
-matchOptions i fn s
-  | Just s1 <- maybePrefixMatch "{-#" s -- -} 
-  = matchOptions1 i fn (removeSpaces s1)
-  | otherwise
-  = Nothing
- where
-  matchOptions1 i fn s
-    | Just s2 <- maybePrefixMatch "OPTIONS" s
-    = case () of
-	_ | Just s3 <- maybePrefixMatch "_GHC" s2, not (is_ident (head s3))
-	  -> matchOptions2 i fn s3
-	  | not (is_ident (head s2))
-	  -> matchOptions2 i fn s2
-	  | otherwise
-	  -> Just []  -- OPTIONS_anything is ignored, not treated as start of source
-    | Just s2 <- maybePrefixMatch "INCLUDE" s, not (is_ident (head s2)),
-      Just s3 <- maybePrefixMatch "}-#" (reverse s2)
-    = Just ["-#include", removeSpaces (reverse s3)]
-
-    | Just s2 <- maybePrefixMatch "LANGUAGE" s, not (is_ident (head s2)),
-      Just s3 <- maybePrefixMatch "}-#" (reverse s2)
-    = case [ exts | (exts,"") <- reads ('[' : reverse (']':s3))] of
-	[] -> languagePragParseError i fn
-	exts:_ -> case extensionsToGHCFlag exts of
-			([], opts) -> Just opts
-			(unsup,_) -> unsupportedExtnError i fn unsup
-    | otherwise = Nothing
-  matchOptions2 i fn s
-    | Just s3 <- maybePrefixMatch "}-#" (reverse s) = Just (words (reverse s3))
-    | otherwise = Nothing
-
-
-languagePragParseError i fn = 
-  pgmError (showSDoc (mkLocMessage loc (
-		text "cannot parse LANGUAGE pragma")))
-  where loc = srcLocSpan (mkSrcLoc (mkFastString fn) i 0)
-
-unsupportedExtnError i fn unsup = 
-  pgmError (showSDoc (mkLocMessage loc (
-		text "unsupported extensions: " <>
-		hcat (punctuate comma (map (text.show) unsup)))))
-  where loc = srcLocSpan (mkSrcLoc (mkFastString fn) i 0)
-
-
-optionsErrorMsgs :: [String] -> [(Int,String)] -> FilePath -> Messages
-optionsErrorMsgs unhandled_flags flags_lines filename
-  = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
-  where
-	unhandled_flags_lines = [ (l,f) | f <- unhandled_flags, 
-					  (l,f') <- flags_lines, f == f' ]
-	mkMsg (line,flag) = 
-	    ErrUtils.mkPlainErrMsg (srcLocSpan loc) $
-		text "unknown flag in  {-# OPTIONS #-} pragma:" <+> text flag
-	  where
-		loc = mkSrcLoc (mkFastString filename) line 0
-		-- ToDo: we need a better SrcSpan here
 
 -- -----------------------------------------------------------------------------
 -- Misc.

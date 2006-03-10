@@ -208,7 +208,7 @@ import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
 import SrcLoc
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
-import GetImports	( getImports )
+import HeaderInfo	( getImports, getOptions, optionsErrorMsgs )
 import Packages		( isHomePackage )
 import Finder
 import HscMain		( newHscEnv, hscFileCheck, HscChecked(..) )
@@ -712,7 +712,7 @@ discardProg hsc_env
 -- used to fish out the preprocess output files for the purposes of
 -- cleaning up.  The preprocessed file *might* be the same as the
 -- source file, but that doesn't do any harm.
-ppFilesFromSummaries summaries = [ fn | Just fn <- map ms_hspp_file summaries ]
+ppFilesFromSummaries summaries = map ms_hspp_file summaries
 
 -- -----------------------------------------------------------------------------
 -- Check module
@@ -762,21 +762,7 @@ checkModule session@(Session ref) mod = do
    case [ ms | ms <- mg, ms_mod ms == mod ] of
 	[] -> return Nothing
 	(ms:_) -> do 
-	   -- Add in the OPTIONS from the source file This is nasty:
-	   -- we've done this once already, in the compilation manager
-	   -- It might be better to cache the flags in the
-	   -- ml_hspp_file field, say
-	   let dflags0 = hsc_dflags hsc_env
-	       hspp_buf = expectJust "GHC.checkModule" (ms_hspp_buf ms)
-	       filename = expectJust "checkModule" (ml_hs_file (ms_location ms))
-	       opts = getOptionsFromStringBuffer hspp_buf filename
-	   (dflags1,leftovers) <- parseDynamicFlags dflags0 (map snd opts)
-	   if (not (null leftovers))
-		then do printErrorsAndWarnings dflags1 (optionsErrorMsgs leftovers opts filename)
-		        return Nothing
-		else do
-
-	   mbChecked <- hscFileCheck hsc_env{hsc_dflags=dflags1} ms
+	   mbChecked <- hscFileCheck hsc_env{hsc_dflags=ms_hspp_opts ms} ms
 	   case mbChecked of
              Nothing -> return Nothing
              Just (HscChecked parsed renamed Nothing) ->
@@ -1436,7 +1422,8 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 
         return (ModSummary { ms_mod = mod, ms_hsc_src = HsSrcFile,
 			     ms_location = location,
-                             ms_hspp_file = Just hspp_fn,
+                             ms_hspp_file = hspp_fn,
+                             ms_hspp_opts = dflags',
 			     ms_hspp_buf  = Just buf,
                              ms_srcimps = srcimps, ms_imps = the_imps,
 			     ms_hs_date = src_timestamp,
@@ -1546,7 +1533,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 	return (Just ( ModSummary { ms_mod       = wanted_mod, 
 				    ms_hsc_src   = hsc_src,
 				    ms_location  = location,
-				    ms_hspp_file = Just hspp_fn,
+				    ms_hspp_file = hspp_fn,
+                                    ms_hspp_opts = dflags',
 				    ms_hspp_buf  = Just buf,
 				    ms_srcimps   = srcimps,
 				    ms_imps      = the_imps,
@@ -1571,9 +1559,9 @@ preprocessFile dflags src_fn mb_phase (Just (buf, time))
   = do
 	-- case we bypass the preprocessing stage?
 	let 
-	    local_opts = getOptionsFromStringBuffer buf src_fn
+	    local_opts = getOptions buf src_fn
 	--
-	(dflags', errs) <- parseDynamicFlags dflags (map snd local_opts)
+	(dflags', errs) <- parseDynamicFlags dflags (map unLoc local_opts)
 
 	let
 	    needs_preprocessing

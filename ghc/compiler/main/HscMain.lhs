@@ -402,7 +402,7 @@ hscCoreFrontEnd =
             -------------------
             -- PARSE
             -------------------
-       inp <- readFile (expectJust "hscCoreFrontEnd" (ms_hspp_file mod_summary))
+       inp <- readFile (ms_hspp_file mod_summary)
        case parseCore inp 1 of
          FailP s
              -> do errorMsg (hsc_dflags hsc_env) (text s{-ToDo: wrong-})
@@ -428,7 +428,7 @@ hscFileFrontEnd =
              -- PARSE
              -------------------
        let dflags = hsc_dflags hsc_env
-           hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
+           hspp_file = ms_hspp_file mod_summary
            hspp_buf  = ms_hspp_buf  mod_summary
        maybe_parsed <- myParseModule dflags hspp_file hspp_buf
        case maybe_parsed of
@@ -641,7 +641,7 @@ hscFileCheck hsc_env mod_summary = do {
  	    -- PARSE
  	    -------------------
 	; let dflags    = hsc_dflags hsc_env
-	      hspp_file = expectJust "hscFileFrontEnd" (ms_hspp_file mod_summary)
+	      hspp_file = ms_hspp_file mod_summary
 	      hspp_buf  = ms_hspp_buf  mod_summary
 
 	; maybe_parsed <- myParseModule dflags hspp_file hspp_buf
