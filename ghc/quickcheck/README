@@ -1,0 +1,9 @@
+QuickCheck for the GHC library.
+
+Requirements:
+  stage2 of ghc.
+
+Usage:
+  ./run.sh
+  ./run.sh debug       # runs quickCheck in debug mode.
+  ./run.sh ghci [file] # loads [file] with the stage2 compiler.
