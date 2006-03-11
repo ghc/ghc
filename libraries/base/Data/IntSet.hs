@@ -212,7 +212,7 @@ member x t
     
 -- | /O(log n)/. Is the element not in the set?
 notMember :: Int -> IntSet -> Bool
-notMember k = not $ member k
+notMember k = not . member k
 
 -- 'lookup' is used by 'intersection' for left-biasing
 lookup :: Int -> IntSet -> Maybe Int
