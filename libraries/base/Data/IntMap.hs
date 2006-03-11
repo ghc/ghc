@@ -45,6 +45,7 @@ module Data.IntMap  (
             , null
             , size
             , member
+            , notMember
 	    , lookup
             , findWithDefault
             
@@ -263,6 +264,10 @@ member k m
       Nothing -> False
       Just x  -> True
     
+-- | /O(log n)/. Is the key not a member of the map?
+notMember :: Key -> IntMap a -> Bool
+notMember k m = not $ member k m
+
 -- | /O(min(n,W))/. Lookup the value at a key in the map.
 lookup :: Key -> IntMap a -> Maybe a
 lookup k t

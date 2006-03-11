@@ -275,7 +275,7 @@ member k m
 
 -- | /O(log n)/. Is the key not a member of the map?
 notMember :: Ord k => k -> Map k a -> Bool
-notMember k m = not $ Data.Map.member k m
+notMember k m = not $ member k m
 
 -- | /O(log n)/. Find the value at a key.
 -- Calls 'error' when the element can not be found.

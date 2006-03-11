@@ -206,8 +206,7 @@ member x t
 
 -- | /O(log n)/. Is the element not in the set?
 notMember :: Ord a => a -> Set a -> Bool
-notMember x t = not $ Data.Set.member x t
-
+notMember x t = not $ member x t
 
 {--------------------------------------------------------------------
   Construction
