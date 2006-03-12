@@ -208,13 +208,12 @@ import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
 import SrcLoc
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
-import HeaderInfo	( getImports, getOptions, optionsErrorMsgs )
+import HeaderInfo	( getImports, getOptions )
 import Packages		( isHomePackage )
 import Finder
 import HscMain		( newHscEnv, hscFileCheck, HscChecked(..) )
 import HscTypes
 import DynFlags
-import StaticFlags
 import SysTools		( initSysTools, cleanTempFiles )
 import Module
 import FiniteMap
@@ -244,7 +243,6 @@ import Control.Exception as Exception hiding (handle)
 import Data.IORef
 import System.IO
 import System.IO.Error	( isDoesNotExistError )
-import System.IO.Unsafe	( unsafePerformIO )
 import Prelude hiding (init)
 
 #if __GLASGOW_HASKELL__ < 600
@@ -784,8 +782,6 @@ checkModule session@(Session ref) mod = do
 					renamedSource = renamed,
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf }))
-             _other ->
-			panic "checkModule"
 
 -- ---------------------------------------------------------------------------
 -- Unloading

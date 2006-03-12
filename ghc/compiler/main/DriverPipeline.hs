@@ -45,14 +45,9 @@ import Util
 import StringBuffer	( hGetStringBuffer )
 import BasicTypes	( SuccessFlag(..) )
 import Maybes		( expectJust )
-import Ctype		( is_ident )
-import StringBuffer	( StringBuffer(..), lexemeToString )
 import ParserCoreUtils	( getCoreModuleName )
-import SrcLoc		( srcLocSpan, mkSrcLoc, unLoc )
-import FastString	( mkFastString )
+import SrcLoc		( unLoc )
 import SrcLoc		( Located(..) )
-
-import Distribution.Compiler ( extensionsToGHCFlag )
 
 import EXCEPTION
 import DATA_IOREF	( readIORef, writeIORef, IORef )
