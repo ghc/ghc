@@ -563,6 +563,8 @@ run_thread:
     // ----------------------------------------------------------------------
     // Run the current thread 
 
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
+
     prev_what_next = t->what_next;
 
     errno = t->saved_errno;
