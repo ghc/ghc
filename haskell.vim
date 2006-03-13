@@ -2,36 +2,39 @@
 " It should be placed in ~/.vim/after/syntax/haskell.vim
 " Brad Bowman <haddock.vim@bereft.net>
 
-syn match   hsHdocStart "\([$^|]\|\*\+\)" contained
-
-syn region  hsHdocAnchor start="#" skip="\\#" end="#" contained oneline
 syn match   hsHdocChunk "$\i\+" contained
 syn match   hsHdocMod /"\(\i\|[.]\)\+"/ contained
 syn match   hsHdocLink "'\(\i\|[.#]\)\+'" contained
-syn region  hsHdocEm start="/" skip="\\/" end="/" contained oneline
-syn region  hsHdocURL start="<" end=">" contained oneline
-syn region  hsHdocCode start="@" skip="\\@" end="@" contained oneline
-syn region  hsHdocCodeBlock start="^@" end="^@" contained
+syn region  hsHdocAnchor start="\\\@<!#" skip="\\#" end="\\\@<!#" contained oneline
+" I think emphasis can span multiple lines
+syn region  hsHdocEm start="\\\@<!/" skip="\\/" end="\\\@!/" contained oneline
+syn region  hsHdocURL start="\\\@<!<" end="\\\@<!>" contained oneline
+syn region  hsHdocCode start="\\\@<!@" skip="\\@" end="\\\@<!@" contained oneline
+syn region  hsHdocBCodeBlock start="^@\(\s\|$\)" end="^@\s*$" contained
+syn region  hsHdocLCodeBlock start="\(^\s*--\s*\)\@<=@\s*$" end="\(^\s*--\s*\)\@<=@\s*$" contained
 syn match   hsHdocBHeading "^\s*\*\+" contained
 syn match   hsHdocLHeading "\(^\s*--\s*\)\@<=\*\+" contained
 syn match   hsHdocBTracks "^\s*>" contained
 " match only the > using a look-behind
 syn match   hsHdocLTracks "\(^\s*--\s*\)\@<=>" contained
 
+" todo: numbered lists, mark haddock start separately
+"syn match   hsHdocStart "\([$^|]\|\*\+\)" contained
+
 syn cluster hsHdocSpecial 
   \ contains=hsHdocMod,hsHdocLink,hsHdocEm,hsHdocCode,hsHdocURL,
-  \ hsHdocCodeBlock,hsHdocAnchor,hsHdocChunk
+  \ hsHdocAnchor,hsHdocChunk
 
 syn region  hsHdocDef start="^\s*\(--\)\?\s*\[" end="\]" contained contains=hsHdocSpecial
 
 syn region  hsHdocLines start="--\s*\([$\^|]\|\*\+\)" 
                       \ skip="^\s*\(--.*\)$" 
                       \ end="^\s*\(\$\|--\)\@!" 
-                      \ contains=@hsHdocSpecial,hsHdocLTracks,hsHdocLHeading
+                      \ contains=@hsHdocSpecial,hsHdocLTracks,hsHdocLHeading,hsHdocLCodeBlock,hsHdocDef
 syn region  hsHdocBlock start="{-\s*\([$\^|]\|\*\+\)" end="-}" 
-                      \ contains=@hsHdocSpecial,hsHdocBTracks,hsHdocBHeading
+                      \ contains=@hsHdocSpecial,hsHdocBTracks,hsHdocBHeading,hsHdocBCodeBlock,hsHdocDef
 
-syn sync minlines=10
+syn sync minlines=20
 
 if version >= 508 || !exists("did_haddock_syntax_inits")
   if version < 508
@@ -55,7 +58,8 @@ if version >= 508 || !exists("did_haddock_syntax_inits")
   HiLink hsHdocBHeading         Special
   HiLink hsHdocLTracks          Special
   HiLink hsHdocBTracks          Special
-  HiLink hsHdocCodeBlock        Special
+  HiLink hsHdocBCodeBlock       Special
+  HiLink hsHdocLCodeBlock       Special
   HiLink hsHdocSpecial          Special
 
   delcommand HiLink                       
