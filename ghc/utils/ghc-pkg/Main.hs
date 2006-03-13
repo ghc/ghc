@@ -290,6 +290,16 @@ getPkgDatabases modify flags = do
 			Just dir -> return (dir `joinFileName` "package.conf")
         fs -> return (last fs)
 
+  let global_conf_dir = global_conf ++ ".d"
+  global_conf_dir_exists <- doesDirectoryExist global_conf_dir
+  global_confs <-
+    if global_conf_dir_exists
+      then do files <- getDirectoryContents global_conf_dir
+              return [ global_conf_dir ++ '/' : file
+                     | file <- files
+                     , isSuffixOf ".conf" file]
+      else return []
+
   -- get the location of the user package database, and create it if necessary
   appdir <- getAppUserDataDirectory "ghc"
 
@@ -302,8 +312,8 @@ getPkgDatabases modify flags = do
   -- If the user database doesn't exist, and this command isn't a
   -- "modify" command, then we won't attempt to create or use it.
   let sys_databases
-	| modify || user_exists = [user_conf,global_conf]
-	| otherwise             = [global_conf]
+	| modify || user_exists = user_conf : global_confs ++ [global_conf]
+	| otherwise             = global_confs ++ [global_conf]
 
   e_pkg_path <- try (getEnv "GHC_PACKAGE_PATH")
   let env_stack =

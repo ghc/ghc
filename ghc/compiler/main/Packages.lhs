@@ -65,7 +65,8 @@ import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
-import System.Directory	( doesFileExist )
+import System.Directory	( doesFileExist, doesDirectoryExist,
+			  getDirectoryContents )
 import Control.Monad	( foldM )
 import Data.List	( nub, partition, sortBy, isSuffixOf )
 import FastString
@@ -225,6 +226,21 @@ getSystemPackageConfigs dflags = do
 	-- System one always comes first
    system_pkgconf <- getPackageConfigPath
 
+	-- allow package.conf.d to contain a bunch of .conf files
+	-- containing package specifications.  This is an easier way
+	-- to maintain the package database on systems with a package
+	-- management system, or systems that don't want to run ghc-pkg
+	-- to register or unregister packages.  Undocumented feature for now.
+   let system_pkgconf_dir = system_pkgconf ++ ".d"
+   system_pkgconf_dir_exists <- doesDirectoryExist system_pkgconf_dir
+   system_pkgconfs <-
+     if system_pkgconf_dir_exists
+       then do files <- getDirectoryContents system_pkgconf_dir
+               return [ system_pkgconf_dir ++ '/' : file
+                      | file <- files
+                      , isSuffixOf ".conf" file]
+       else return []
+
 	-- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
 	-- unless the -no-user-package-conf flag was given.
 	-- We only do this when getAppUserDataDirectory is available 
@@ -240,7 +256,7 @@ getSystemPackageConfigs dflags = do
 	then return [pkgconf]
 	else return []
 
-   return (user_pkgconf ++ [system_pkgconf])
+   return (user_pkgconf ++ system_pkgconfs ++ [system_pkgconf])
 
 
 readPackageConfig
