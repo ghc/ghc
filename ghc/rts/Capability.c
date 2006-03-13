@@ -59,16 +59,17 @@ anyWorkForMe( Capability *cap, Task *task )
 	// can't be sure that we have the right capability: the thread
 	// might be woken up on some other capability, and task->cap
 	// could change under our feet.
-	return (!emptyRunQueue(cap) && cap->run_queue_hd->bound == task);
+	return !emptyRunQueue(cap) && cap->run_queue_hd->bound == task;
     } else {
-	// A vanilla worker task runs if either (a) there is a
-	// lightweight thread at the head of the run queue, or (b)
-	// there are sparks to execute, or (c) there is some other
-	// global condition to check, such as threads blocked on
-	// blackholes.
-	return ((!emptyRunQueue(cap) && cap->run_queue_hd->bound == NULL)
-		|| !emptySparkPoolCap(cap)
-		|| globalWorkToDo());
+	// A vanilla worker task runs if either there is a lightweight
+	// thread at the head of the run queue, or the run queue is
+	// empty and (there are sparks to execute, or there is some
+	// other global condition to check, such as threads blocked on
+	// blackholes).
+	if (emptyRunQueue(cap)) {
+	    return !emptySparkPoolCap(cap) || globalWorkToDo();
+	} else
+	    return cap->run_queue_hd->bound == NULL;
     }
 }
 #endif
