@@ -53,19 +53,23 @@ globalWorkToDo (void)
 STATIC_INLINE rtsBool
 anyWorkForMe( Capability *cap, Task *task )
 {
-    // If the run queue is not empty, then we only wake up the guy who
-    // can run the thread at the head, even if there is some other
-    // reason for this task to run (eg. interrupted=rtsTrue).
-    if (!emptyRunQueue(cap)) {
-	if (cap->run_queue_hd->bound == NULL) {
-	    return (task->tso == NULL);
-	} else {
-	    return (cap->run_queue_hd->bound == task);
-	}
-    } else if (task->tso == NULL && !emptySparkPoolCap(cap)) {
-	return rtsTrue;
+    if (task->tso != NULL) {
+	// A bound task only runs if its thread is on the run queue of
+	// the capability on which it was woken up.  Otherwise, we
+	// can't be sure that we have the right capability: the thread
+	// might be woken up on some other capability, and task->cap
+	// could change under our feet.
+	return (!emptyRunQueue(cap) && cap->run_queue_hd->bound == task);
+    } else {
+	// A vanilla worker task runs if either (a) there is a
+	// lightweight thread at the head of the run queue, or (b)
+	// there are sparks to execute, or (c) there is some other
+	// global condition to check, such as threads blocked on
+	// blackholes.
+	return ((!emptyRunQueue(cap) && cap->run_queue_hd->bound == NULL)
+		|| !emptySparkPoolCap(cap)
+		|| globalWorkToDo());
     }
-    return globalWorkToDo();
 }
 #endif
 
