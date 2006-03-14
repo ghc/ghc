@@ -8,3 +8,4 @@ main = do
 ok name = "getDirContents" `isPrefixOf` name 
 	  && not ("bak" `isSuffixOf` name)
 	  && not ("prof" `isSuffixOf` name)
+	  && not ("hp" `isSuffixOf` name)
