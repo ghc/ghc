@@ -232,9 +232,11 @@
 
 #define ENTER()						\
  again:							\
+  W_ info;						\
+  info = %INFO_PTR(R1);					\
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]		\
-         (TO_W_( %INFO_TYPE(%GET_STD_INFO(R1)) )) {	\
-  case 							\
+         (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {	\
+  case							\
     IND,						\
     IND_OLDGEN,						\
     IND_PERM,						\
@@ -244,7 +246,7 @@
       R1 = StgInd_indirectee(R1);			\
       goto again;					\
    }							\
-  case 							\
+  case							\
     BCO,						\
     FUN,						\
     FUN_1_0,						\
@@ -259,7 +261,7 @@
    }							\
   default:						\
    {							\
-      jump %GET_ENTRY(R1);				\
+      jump %ENTRY_CODE(info);				\
    }							\
   }
 
