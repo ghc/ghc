@@ -58,6 +58,9 @@ stg_ap_0_fast
    -------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_PAP,/*special layout*/0,0,PAP,"PAP","PAP")
+{  foreign "C" barf("PAP object entered!"); }
+    
+stg_PAP_apply
 {
   W_ Words;
   W_ pap;

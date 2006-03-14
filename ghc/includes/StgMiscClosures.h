@@ -424,6 +424,7 @@ RTS_FUN(stg_ap_pppv_fast);
 RTS_FUN(stg_ap_pppp_fast);
 RTS_FUN(stg_ap_ppppp_fast);
 RTS_FUN(stg_ap_pppppp_fast);
+RTS_FUN(stg_PAP_apply);
 
 /* standard GC & stack check entry points, all defined in HeapStackCheck.hc */
 

@@ -457,7 +457,7 @@ genApply regstatus args =
 	nest 4 (vcat [
  	  text "arity = TO_W_(StgPAP_arity(R1));",
 	  text "ASSERT(arity > 0);",
-	  genMkPAP regstatus "NEW_PAP" "ENTRY_LBL(stg_PAP)" "PAP" "PAP"
+	  genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" "PAP" "PAP"
 		True{-stack apply-} False{-args on stack-} True{-is a PAP-}
 		args all_args_size fun_info_label
 	 ]),
