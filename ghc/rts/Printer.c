@@ -540,9 +540,12 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	    
 	case UPDATE_FRAME:
 	case CATCH_FRAME:
-	case STOP_FRAME:
 	    printObj((StgClosure*)sp);
 	    continue;
+
+	case STOP_FRAME:
+	    printObj((StgClosure*)sp);
+	    return;
 
 	case RET_DYN:
 	{ 
@@ -577,7 +580,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 	case RET_SMALL:
 	case RET_VEC_SMALL:
-	    debugBelch("RET_SMALL (%p)\n", sp);
+	    debugBelch("RET_SMALL (%p)\n", info);
 	    bitmap = info->layout.bitmap;
 	    printSmallBitmap(spBottom, sp+1, 
 			     BITMAP_BITS(bitmap), BITMAP_SIZE(bitmap));
@@ -607,10 +610,10 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	    ret_fun = (StgRetFun *)sp;
 	    fun_info = get_fun_itbl(ret_fun->fun);
 	    size = ret_fun->size;
-	    debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun, fun_info->f.fun_type);
+	    debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, fun_info->f.fun_type);
 	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
-		printSmallBitmap(spBottom, sp+1,
+		printSmallBitmap(spBottom, sp+2,
 				 BITMAP_BITS(fun_info->f.b.bitmap),
 				 BITMAP_SIZE(fun_info->f.b.bitmap));
 		break;
@@ -620,7 +623,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 				 GET_FUN_LARGE_BITMAP(fun_info)->size);
 		break;
 	    default:
-		printSmallBitmap(spBottom, sp+1,
+		printSmallBitmap(spBottom, sp+2,
 				 BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
 				 BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
 		break;
