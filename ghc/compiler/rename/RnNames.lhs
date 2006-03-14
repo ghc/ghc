@@ -549,7 +549,7 @@ type ExportAccum	-- The type of the accumulating parameter of
 	NameSet)		-- The accumulated exported stuff
 emptyExportAccum = ([], emptyOccEnv, emptyNameSet) 
 
-type ExportOccMap = OccEnv (Name, IE Name)
+type ExportOccMap = OccEnv (Name, IE RdrName)
 	-- Tracks what a particular exported OccName
 	--   in an export list refers to, and which item
 	--   it came from.  It's illegal to export two distinct things
@@ -562,9 +562,6 @@ rnExports (Just exports)
     = do TcGblEnv { tcg_imports = ImportAvails { imp_env = imp_env } } <- getGblEnv
          let sub_env :: NameEnv [Name]	-- Classify each name by its parent
              sub_env = mkSubNameEnv (foldModuleEnv unionNameSets emptyNameSet imp_env)
-             inLoc fn (L span x)
-                 = do x' <- fn x
-                      return (L span x')
              rnExport (IEVar rdrName)
                  = do name <- lookupGlobalOccRn rdrName
                       return (IEVar name)
@@ -574,21 +571,24 @@ rnExports (Just exports)
              rnExport (IEThingAll rdrName)
                  = do name <- lookupGlobalOccRn rdrName
                       return (IEThingAll name)
-             rnExport (IEThingWith rdrName rdrNames)
+             rnExport ie@(IEThingWith rdrName rdrNames)
                  = do name <- lookupGlobalOccRn rdrName
+                      if isUnboundName name
+                         then return (IEThingWith name [])
+                         else do
                       let env = mkOccEnv [(nameOccName s, s) | s <- subNames sub_env name]
                           mb_names = map (lookupOccEnv env . rdrNameOcc) rdrNames
                       if any isNothing mb_names
-                         then -- The export error will be reporting in 'mkExportNameSet'
-                              return (IEThingWith name [])
+                         then do addErr (exportItemErr ie)
+                                 return (IEThingWith name [])
                          else return (IEThingWith name (catMaybes mb_names))
              rnExport (IEModuleContents mod)
                  = return (IEModuleContents mod)
-         rn_exports <- mapM (inLoc rnExport) exports
+         rn_exports <- mapM (wrapLocM rnExport) exports
          return (Just rn_exports)
 
 mkExportNameSet :: Bool  -- False => no 'module M(..) where' header at all
-                -> Maybe [LIE Name] -- Nothing => no explicit export list
+                -> Maybe ([LIE Name], [LIE RdrName]) -- Nothing => no explicit export list
                 -> RnM NameSet
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
@@ -612,7 +612,8 @@ mkExportNameSet explicit_mod exports
                                -> return Nothing
                            | otherwise
                                -> do mainName <- lookupGlobalOccRn main_RDR_Unqual
-                                     return (Just [noLoc (IEVar mainName)])
+                                     return (Just ([noLoc (IEVar mainName)]
+                                                  ,[noLoc (IEVar main_RDR_Unqual)]))
 		-- ToDo: the 'noLoc' here is unhelpful if 'main' turns out to be out of scope
       exports_from_avail real_exports rdr_env imports
 
@@ -625,18 +626,19 @@ exports_from_avail Nothing rdr_env imports
 		     | gre <- globalRdrEnvElts rdr_env,
 		       isLocalGRE gre ])
 
-exports_from_avail (Just items) rdr_env (ImportAvails { imp_env = imp_env }) 
-  = do (_, _, exports) <- foldlM do_litem emptyExportAccum items
+exports_from_avail (Just (items,origItems)) rdr_env (ImportAvails { imp_env = imp_env }) 
+  = do (_, _, exports) <- foldlM do_litem emptyExportAccum (zip items origItems)
        return exports
   where
     sub_env :: NameEnv [Name]	-- Classify each name by its parent
     sub_env = mkSubNameEnv (foldModuleEnv unionNameSets emptyNameSet imp_env)
 
-    do_litem :: ExportAccum -> LIE Name -> RnM ExportAccum
-    do_litem acc = addLocM (exports_from_item acc)
+    do_litem :: ExportAccum -> (LIE Name, LIE RdrName) -> RnM ExportAccum
+    do_litem acc (ieName, ieRdr)
+        = addLocM (exports_from_item acc (unLoc ieRdr)) ieName
 
-    exports_from_item :: ExportAccum -> IE Name -> RnM ExportAccum
-    exports_from_item acc@(mods, occs, exports) ie@(IEModuleContents mod)
+    exports_from_item :: ExportAccum -> IE RdrName -> IE Name -> RnM ExportAccum
+    exports_from_item acc@(mods, occs, exports) ieRdr@(IEModuleContents mod) ie
 	| mod `elem` mods 	-- Duplicate export of M
 	= do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
 	       warnIf warn_dup_exports (dupModuleExport mod) ;
@@ -652,16 +654,16 @@ exports_from_avail (Just items) rdr_env (ImportAvails { imp_env = imp_env })
                       -- and others, but also internally within this item.  That is,
                       -- if 'M.x' is in scope in several ways, we'll have several
                       -- members of mod_avails with the same OccName.
-                      occs' <- check_occs ie occs (nameSetToList new_exports)
+                      occs' <- check_occs ieRdr occs (nameSetToList new_exports)
                       return (mod:mods, occs', exports `unionNameSets` new_exports)
 
-    exports_from_item acc@(mods, occs, exports) ie
+    exports_from_item acc@(mods, occs, exports) ieRdr ie
         = if isUnboundName (ieName ie)
           then return acc 	-- Avoid error cascade
           else let new_exports = filterAvail ie sub_env in
-          do checkErr (not (null new_exports)) (exportItemErr ie)
+          do -- checkErr (not (null (drop 1 new_exports))) (exportItemErr ie)
              checkForDodgyExport ie new_exports
-             occs' <- check_occs ie occs new_exports
+             occs' <- check_occs ieRdr occs new_exports
              return (mods, occs', addListToNameSet exports new_exports)
 	  
 -------------------------------
@@ -707,7 +709,7 @@ checkForDodgyExport ie@(IEThingAll tc) [n]
 checkForDodgyExport _ _ = return ()
 
 -------------------------------
-check_occs :: IE Name -> ExportOccMap -> [Name] -> RnM ExportOccMap
+check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
 check_occs ie occs names
   = foldlM check occs names
   where

@@ -230,7 +230,8 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
 		-- Process the export list
 	rn_exports <- rnExports export_ies ;
-        exports <- mkExportNameSet (isJust maybe_mod) rn_exports ;
+        let { liftM2' fn a b = do a' <- a; b' <- b; return (fn a' b') } ;
+        exports <- mkExportNameSet (isJust maybe_mod) (liftM2' (,) rn_exports export_ies) ;
 
 		-- Check whether the entire module is deprecated
 		-- This happens only once per module
