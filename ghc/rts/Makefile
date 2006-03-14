@@ -124,6 +124,8 @@ SRC_HC_OPTS += -static
 endif
 # SRC_HC_OPTS += -fPIC
 
+RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
+
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
 endif

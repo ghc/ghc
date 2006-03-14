@@ -120,11 +120,10 @@ showGhcException (InstallationError str)
 showGhcException (Interrupted)
    = showString "interrupted"
 showGhcException (Panic s)
-   = showString ("panic! (the `impossible' happened, GHC version "
-		 ++ cProjectVersion ++ "):\n\t"
+   = showString ("panic! (the 'impossible' happened)\n"
+		 ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
 	         ++ s ++ "\n\n"
-	         ++ "Please report this as a compiler bug.  See:\n"
-		 ++ "  http://www.haskell.org/ghc/reportabug\n")
+	         ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n")
 
 #if __GLASGOW_HASKELL__ < 603
 myMkTyConApp = mkAppTy

@@ -261,9 +261,9 @@ stage1/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "#ifndef __PLATFORM_H__"  >$@
 	@echo "#define __PLATFORM_H__" >>$@
 	@echo >> $@
-	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_CPP)" >> $@
-	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)" >> $@
-	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
+	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\"" >> $@
+	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM)\"" >> $@
+	@echo "#define TargetPlatform_NAME \"$(TARGETPLATFORM)\"" >> $@
 	@echo >> $@
 	@echo "#define $(BuildPlatform_CPP)_BUILD  	1" >> $@
 	@echo "#define $(HostPlatform_CPP)_HOST		1" >> $@
@@ -307,9 +307,9 @@ stage2/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "#ifndef __PLATFORM_H__"  >$@
 	@echo "#define __PLATFORM_H__" >>$@
 	@echo >> $@
-	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
-	@echo "#define HostPlatform_TYPE   $(TargetPlatform_CPP)" >> $@
-	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
+	@echo "#define BuildPlatform_NAME  \"$(HOSTPLATFORM)\"" >> $@
+	@echo "#define HostPlatform_NAME   \"$(TARGETPLATFORM)\"" >> $@
+	@echo "#define TargetPlatform_NAME \"$(TARGETPLATFORM)\"" >> $@
 	@echo >> $@
 	@echo "#define $(HostPlatform_CPP)_BUILD  	1" >> $@
 	@echo "#define $(TargetPlatform_CPP)_HOST		1" >> $@

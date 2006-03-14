@@ -107,6 +107,9 @@ isGUIApp()
 }
 #endif
 
+#define xstr(s) str(s)
+#define str(s) #s
+
 void
 rtsFatalInternalErrorFn(char *s, va_list ap)
 {
@@ -135,7 +138,8 @@ rtsFatalInternalErrorFn(char *s, va_list ap)
      }
      vfprintf(stderr, s, ap);
      fprintf(stderr, "\n");
-     fprintf(stderr, "    Please report this as a compiler bug.  See:\n    http://www.haskell.org/ghc/reportabug\n");
+     fprintf(stderr, "    (GHC version %s for %s)\n", ProjectVersion, xstr(HostPlatform_TYPE));
+     fprintf(stderr, "    Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n");
      fflush(stderr);
   }
 
