@@ -464,8 +464,10 @@ exprOp name args_code =
 exprMacros :: UniqFM ([CmmExpr] -> CmmExpr)
 exprMacros = listToUFM [
   ( FSLIT("ENTRY_CODE"),   \ [x] -> entryCode x ),
-  ( FSLIT("GET_ENTRY"),    \ [x] -> entryCode (closureInfoPtr x) ),
+  ( FSLIT("INFO_PTR"),     \ [x] -> closureInfoPtr x ),
   ( FSLIT("STD_INFO"),     \ [x] -> infoTable x ),
+  ( FSLIT("FUN_INFO"),     \ [x] -> funInfoTable x ),
+  ( FSLIT("GET_ENTRY"),    \ [x] -> entryCode (closureInfoPtr x) ),
   ( FSLIT("GET_STD_INFO"), \ [x] -> infoTable (closureInfoPtr x) ),
   ( FSLIT("GET_FUN_INFO"), \ [x] -> funInfoTable (closureInfoPtr x) ),
   ( FSLIT("INFO_TYPE"),    \ [x] -> infoTableClosureType x ),

@@ -409,12 +409,12 @@ genApply regstatus args =
        vcat (do_assert args 1),
 
        text  "again:",
-       text  "info = %GET_STD_INFO(R1);",
+       text  "info = %INFO_PTR(R1);",
 
 --    if fast == 1:
 --        print "    goto *lbls[info->type];";
 --    else:
-        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (%INFO_TYPE(info)) {",
+        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (%INFO_TYPE(%STD_INFO(info))) {",
 	nest 4 (vcat [
 
 --    if fast == 1:
@@ -441,7 +441,7 @@ genApply regstatus args =
         text "     FUN_0_2,",
         text "     FUN_STATIC: {",
 	nest 4 (vcat [
-	  text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
+	  text "arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));",
 	  text "ASSERT(arity > 0);",
           genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(R1)" "FUN" "FUN"
 		False{-reg apply-} False{-args on stack-} False{-not a PAP-}
@@ -485,7 +485,11 @@ genApply regstatus args =
 	nest 4 (vcat [
           text "TICK_SLOW_CALL_UNEVALD(" <> int (length args) <> text ");",
 	  text "Sp(0) = " <> fun_info_label <> text ";",
-	  text "jump %GET_ENTRY(R1);",
+	  -- CAREFUL! in SMP mode, the info table may already have been
+	  -- overwritten by an indirection, so we must enter the original
+	  -- info pointer we read, don't read it again, because it might
+	  -- not be enterable any more.
+	  text "jump %ENTRY_CODE(info);",
 	  text ""
 	 ]),
 	text "}",
