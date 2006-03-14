@@ -5,7 +5,7 @@ include $(TOP)/mk/test.mk
 GHC_PKG=$(FPTOOLS_TOP)/ghc/utils/ghc-pkg/ghc-pkg-inplace
 
 clean:
-	rm -f setup a.out dist/build/testA
+	rm -rf setup a.out dist/build/testA
 	rm -rf ,tmp dist ,tmp2
 	find . -name "*.o" |xargs rm -f
 	find . -name "*.hi" |xargs rm -f
