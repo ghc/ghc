@@ -48,41 +48,41 @@ handle_tick(int unused STG_UNUSED)
       if (ticks_to_ctxt_switch <= 0) {
 	  ticks_to_ctxt_switch = RtsFlags.ConcFlags.ctxtSwitchTicks;
 	  context_switch = 1;	/* schedule a context switch */
-
-#if defined(THREADED_RTS)
-	  /* 
-	   * If we've been inactive for idleGCDelayTicks (set by +RTS
-	   * -I), tell the scheduler to wake up and do a GC, to check
-	   * for threads that are deadlocked.
-	   */
-	  switch (recent_activity) {
-	  case ACTIVITY_YES:
-	      recent_activity = ACTIVITY_MAYBE_NO;
-	      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
-	      break;
-	  case ACTIVITY_MAYBE_NO:
-	      if (ticks_to_gc == 0) break; /* 0 ==> no idle GC */
-	      ticks_to_gc--;
-	      if (ticks_to_gc == 0) {
-		  ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
-		  recent_activity = ACTIVITY_INACTIVE;
-		  blackholes_need_checking = rtsTrue;
-		  /* hack: re-use the blackholes_need_checking flag */
-
-		  /* ToDo: this doesn't work.  Can't invoke
-		   * pthread_cond_signal from a signal handler.
-		   * Furthermore, we can't prod a capability that we
-		   * might be holding.  What can we do?
-		   */
-		  prodOneCapability();
-	      }
-	      break;
-	  default:
-	      break;
-	  }
-#endif
       }
   }
+
+#if defined(THREADED_RTS)
+  /* 
+   * If we've been inactive for idleGCDelayTicks (set by +RTS
+   * -I), tell the scheduler to wake up and do a GC, to check
+   * for threads that are deadlocked.
+   */
+  switch (recent_activity) {
+  case ACTIVITY_YES:
+      recent_activity = ACTIVITY_MAYBE_NO;
+      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
+      break;
+  case ACTIVITY_MAYBE_NO:
+      if (ticks_to_gc == 0) break; /* 0 ==> no idle GC */
+      ticks_to_gc--;
+      if (ticks_to_gc == 0) {
+	  ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
+	  recent_activity = ACTIVITY_INACTIVE;
+	  blackholes_need_checking = rtsTrue;
+	  /* hack: re-use the blackholes_need_checking flag */
+	  
+	  /* ToDo: this doesn't work.  Can't invoke
+	   * pthread_cond_signal from a signal handler.
+	   * Furthermore, we can't prod a capability that we
+	   * might be holding.  What can we do?
+	   */
+	  prodOneCapability();
+      }
+      break;
+  default:
+      break;
+  }
+#endif
 }
 
 int

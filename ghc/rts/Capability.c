@@ -44,7 +44,7 @@ STATIC_INLINE rtsBool
 globalWorkToDo (void)
 {
     return blackholes_need_checking
-	|| interrupted
+	|| sched_state >= SCHED_INTERRUPTING
 	;
 }
 #endif
@@ -286,7 +286,7 @@ releaseCapability_ (Capability* cap)
 	// is interrupted, we only create a worker task if there
 	// are threads that need to be completed.  If the system is
 	// shutting down, we never create a new worker.
-	if (!shutting_down_scheduler) {
+	if (sched_state < SCHED_SHUTTING_DOWN || !emptyRunQueue(cap)) {
 	    IF_DEBUG(scheduler,
 		     sched_belch("starting new worker on capability %d", cap->no));
 	    startWorkerTask(cap, workerStart);
@@ -575,7 +575,7 @@ shutdownCapability (Capability *cap, Task *task)
 {
     nat i;
 
-    ASSERT(interrupted && shutting_down_scheduler);
+    ASSERT(sched_state == SCHED_SHUTTING_DOWN);
 
     task->cap = cap;
 

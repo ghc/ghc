@@ -215,7 +215,7 @@ awaitEvent(rtsBool wait)
 
 	  /* we were interrupted, return to the scheduler immediately.
 	   */
-	  if (interrupted) {
+	  if (sched_state >= SCHED_INTERRUPTING) {
 	      return; /* still hold the lock */
 	  }
 	  
@@ -272,7 +272,8 @@ awaitEvent(rtsBool wait)
 	  }
       }
       
-    } while (wait && !interrupted && emptyRunQueue(&MainCapability));
+    } while (wait && sched_state == SCHED_RUNNING
+	     && emptyRunQueue(&MainCapability));
 }
 
 #endif /* THREADED_RTS */

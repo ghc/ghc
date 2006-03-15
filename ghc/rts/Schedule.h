@@ -106,15 +106,16 @@ void    initThread(StgTSO *tso, nat stack_size);
  */
 extern int RTS_VAR(context_switch);
 
-/* Interrupted flag.
- * Locks required  : none (makes one transition from false->true)
+/* The state of the scheduler.  This is used to control the sequence
+ * of events during shutdown, and when the runtime is interrupted
+ * using ^C.
  */
-extern rtsBool RTS_VAR(interrupted);
+#define SCHED_RUNNING       0  /* running as normal */
+#define SCHED_INTERRUPTING  1  /* ^C detected, before threads are deleted */
+#define SCHED_INTERRUPTED   2  /* ^C detected, after threads deleted */
+#define SCHED_SHUTTING_DOWN 3  /* final shutdown */
 
-/* Shutdown flag.
- * Locks required  : none (makes one transition from false->true)
- */
-extern rtsBool shutting_down_scheduler;
+extern rtsBool RTS_VAR(sched_state);
 
 /* 
  * flag that tracks whether we have done any execution in this time slice.

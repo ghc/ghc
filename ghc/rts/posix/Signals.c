@@ -253,7 +253,7 @@ anyUserHandlers(void)
 void
 awaitUserSignals(void)
 {
-    while (!signals_pending() && !interrupted) {
+    while (!signals_pending() && sched_state == SCHED_RUNNING) {
 	pause();
     }
 }
@@ -432,7 +432,7 @@ shutdown_handler(int sig STG_UNUSED)
     // If we're already trying to interrupt the RTS, terminate with
     // extreme prejudice.  So the first ^C tries to exit the program
     // cleanly, and the second one just kills it.
-    if (interrupted) {
+    if (sched_state >= SCHED_INTERRUPTING) {
 	stg_exit(EXIT_INTERRUPTED);
     } else {
 	interruptStgRts();
