@@ -27,7 +27,8 @@ module Control.Monad.ST
 
 	-- * Unsafe operations
 	unsafeInterleaveST,  	-- :: ST s a -> ST s a
-	unsafeIOToST		-- :: IO a -> ST s a
+	unsafeIOToST,		-- :: IO a -> ST s a
+	unsafeSTToIO		-- :: ST s a -> IO a
       ) where
 
 import Prelude
@@ -55,7 +56,7 @@ unsafeInterleaveST =
 #ifdef __GLASGOW_HASKELL__
 import GHC.ST		( ST, runST, fixST, unsafeInterleaveST )
 import GHC.Base		( RealWorld )
-import GHC.IOBase 	( stToIO, unsafeIOToST )
+import GHC.IOBase 	( stToIO, unsafeIOToST, unsafeSTToIO )
 #endif
 
 instance MonadFix (ST s) where

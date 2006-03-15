@@ -20,7 +20,7 @@ module GHC.IOBase(
     unsafePerformIO, unsafeInterleaveIO,
   
 	-- To and from from ST
-    stToIO, ioToST, unsafeIOToST,
+    stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
 
 	-- References
     IORef(..), newIORef, readIORef, writeIORef, 
@@ -154,6 +154,9 @@ ioToST (IO m) = (ST m)
 --
 unsafeIOToST        :: IO a -> ST s a
 unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
+
+unsafeSTToIO :: ST s a -> IO a
+unsafeSTToIO (ST m) = IO (unsafeCoerce# m)
 
 -- ---------------------------------------------------------------------------
 -- Unsafe IO operations
