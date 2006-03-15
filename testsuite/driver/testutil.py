@@ -16,3 +16,14 @@ def chop(s):
     else:
         return s
     
+def all(p,xs):
+    for x in xs:
+        if not p(x):
+            return False
+    return True
+
+def elem(xs):
+    return lambda x: x in xs
+
+def notElem(xs):
+    return lambda x: x not in xs

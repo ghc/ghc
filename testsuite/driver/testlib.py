@@ -89,17 +89,17 @@ class TestRun:
        self.total_tests = 0
        self.total_test_cases = 0
        self.n_framework_failures = 0
-       self.framework_failures = []
+       self.framework_failures = {}
        self.n_tests_skipped = 0
-       self.tests_skipped = []
+       self.tests_skipped = {}
        self.n_expected_passes = 0
-       self.expected_passes = []
+       self.expected_passes = {}
        self.n_expected_failures = 0
-       self.expected_failures = []
+       self.expected_failures = {}
        self.n_unexpected_passes = 0
-       self.unexpected_passes = []
+       self.unexpected_passes = {}
        self.n_unexpected_failures = 0
-       self.unexpected_failures = []
+       self.unexpected_failures = {}
 
 global t
 t = TestRun()
@@ -337,28 +337,41 @@ def test( name, setup, func, args ):
     # Set our test-local options
     setup(testopts)
     
+    # All the ways we might run this test
     if func == compile or func == multimod_compile:
-        ways = config.compile_ways
+        all_ways = config.compile_ways
     elif func == compile_and_run or func == multimod_compile_and_run:
-        ways = config.run_ways
+        all_ways = config.run_ways
     elif func == ghci_script:
         if 'ghci' in config.run_ways:
-            ways = ['ghci']
+            all_ways = ['ghci']
         else:
-            ways = []
+            all_ways = []
     else:
-        ways = ['normal']
+        all_ways = ['normal']
 
-    for way in ways:
-        if testopts.skip \
-               or (config.only != [] and name not in config.only) \
-               or (testopts.only_ways != [] and way not in testopts.only_ways) \
-               or way in testopts.omit_ways:
-            skiptest(name)
-        else:
-            do_test( name, way, func, args )
-            if config.fast:
-                break # just do the first way in fast mode
+    t.total_test_cases = t.total_test_cases + len(all_ways)
+
+    ok_way = lambda way: \
+        not testopts.skip \
+        and (config.only == [] or name in config.only) \
+        and (testopts.only_ways == [] or way in testopts.only_ways) \
+        and way not in testopts.omit_ways
+
+    # Which ways we are asked to skip
+    do_ways = filter (ok_way,all_ways)
+
+    # In fast mode, we skip all but one way
+    if config.fast and len(do_ways) > 0:
+        do_ways = [do_ways[0]]
+
+    # Run the required tests...
+    for way in do_ways:
+        do_test (name, way, func, args)
+
+    for way in all_ways:
+        if way not in do_ways:
+            skiptest (name,way)
 
     clean(map (lambda suff: name + suff,
               ['', '.genscript', '.run.stderr', '.run.stdout',
@@ -366,6 +379,10 @@ def test( name, setup, func, args ):
                '.interp.stderr', '.interp.stdout',
                '.hi', '.o', '.prof', '.hc', '_stub.h', '_stub.c',
                 '_stub.o']))
+
+
+def fullname(name,way):
+    return name + '(' + way + ')'
 
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
@@ -381,7 +398,6 @@ def clean_full_paths(names):
 
 def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
-    t.total_test_cases = t.total_test_cases + 1
 
     try:
         print '=====>', full_name
@@ -396,30 +412,44 @@ def do_test(name, way, func, args):
             if testopts.expect == 'pass' \
                and way not in testopts.expect_fail_for:
                 t.n_expected_passes = t.n_expected_passes + 1
-                t.expected_passes.append(full_name)
+                if name in t.expected_passes:
+                    t.expected_passes[name].append(way)
+                else:
+                    t.expected_passes[name] = [way]
             else:
                 print '*** unexpected pass for', full_name
                 t.n_unexpected_passes = t.n_unexpected_passes + 1
-                t.unexpected_passes.append(full_name)
+                if name in t.unexpected_passes:
+                    t.unexpected_passes[name].append(way)
+                else:
+                    t.unexpected_passes[name] = [way]
         else:
             if testopts.expect == 'pass' \
                and way not in testopts.expect_fail_for:
                 print '*** unexpected failure for', full_name
                 t.n_unexpected_failures = t.n_unexpected_failures + 1
-                t.unexpected_failures.append(full_name)
+                if name in t.unexpected_failures:
+                    t.unexpected_failures[name].append(way)
+                else:
+                    t.unexpected_failures[name] = [way]
             else:
                 t.n_expected_failures = t.n_expected_failures + 1
-                t.expected_failures.append(full_name)
-
+                if name in t.expected_failures:
+                    t.expected_failures[name].append(way)
+                else:
+                    t.expected_failures[name] = [way]
     except:
         print '*** framework failure for', full_name, ':'
         traceback.print_exc()
         framework_fail(full_name)
 
-def skiptest( name ):
+def skiptest (name, way):
     # print 'Skipping test \"', name, '\"'
     t.n_tests_skipped = t.n_tests_skipped + 1
-    t.tests_skipped.append(name)
+    if name in t.tests_skipped:
+        t.tests_skipped[name].append(way)
+    else:
+        t.tests_skipped[name] = [way]
 
 def framework_fail( name ):
     t.n_framework_failures = t.n_framework_failures + 1
@@ -1061,13 +1091,13 @@ def summary(t, file):
     if t.n_unexpected_passes > 0:
         file.write('Unexpected passes:\n')
         for test in t.unexpected_passes:
-            file.write('   ' + test + '\n')
+            file.write('   ' + test + '(' + \
+                       join(t.unexpected_passes[test],',') + ')\n')
         file.write('\n')
             
     if t.n_unexpected_failures > 0:
         file.write('Unexpected failures:\n')
         for test in t.unexpected_failures:
-            file.write('   ' + test + '\n')
+            file.write('   ' + test + '(' + \
+                       join(t.unexpected_failures[test],',') + ')\n')
         file.write('\n')
-           
- 
