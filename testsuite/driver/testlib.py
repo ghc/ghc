@@ -380,10 +380,6 @@ def test( name, setup, func, args ):
                '.hi', '.o', '.prof', '.hc', '_stub.h', '_stub.c',
                 '_stub.o']))
 
-
-def fullname(name,way):
-    return name + '(' + way + ')'
-
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
 
