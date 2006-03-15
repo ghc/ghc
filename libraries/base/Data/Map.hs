@@ -63,6 +63,7 @@ module Data.Map  (
             , update
             , updateWithKey
             , updateLookupWithKey
+            , alter
 
             -- * Combine
 
@@ -426,6 +427,23 @@ updateLookupWithKey f k t
                EQ -> case f kx x of
                        Just x' -> (Just x',Bin sx kx x' l r)
                        Nothing -> (Just x,glue l r)
+
+-- | /O(log n)/. The expression (@'alter' f k map@) alters the value @x@ at @k@, or absence thereof.
+-- 'alter' can be used to insert, delete, or update a value in a 'Map'.
+-- In short : @'lookup' k ('alter' f k m) = f ('lookup' k m)@
+alter :: Ord k => (Maybe a -> Maybe a) -> k -> Map k a -> Map k a
+alter f k t
+  = case t of
+      Tip -> case f Nothing of
+               Nothing -> Tip
+               Just x -> singleton k x
+      Bin sx kx x l r 
+          -> case compare k kx of
+               LT -> balance kx x (alter f k l) r
+               GT -> balance kx x l (alter f k r)
+               EQ -> case f (Just x) of
+                       Just x' -> Bin sx kx x' l r
+                       Nothing -> glue l r
 
 {--------------------------------------------------------------------
   Indexing

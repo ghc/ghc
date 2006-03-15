@@ -64,6 +64,7 @@ module Data.IntMap  (
             , update
             , updateWithKey
             , updateLookupWithKey
+            , alter
   
             -- * Combine
 
@@ -449,6 +450,30 @@ updateLookupWithKey f k t
                              Nothing -> (Just y,Nil)
         | otherwise     -> (Nothing,t)
       Nil -> (Nothing,Nil)
+
+
+
+-- | /O(log n)/. The expression (@'alter' f k map@) alters the value @x@ at @k@, or absence thereof.
+-- 'alter' can be used to insert, delete, or update a value in a 'Map'.
+-- In short : @'lookup' k ('alter' f k m) = f ('lookup' k m)@
+alter f k t
+  = case t of
+      Bin p m l r 
+        | nomatch k p m -> case f Nothing of 
+                             Nothing -> t
+                             Just x -> join k (Tip k x) p t
+        | zero k m      -> bin p m (alter f k l) r
+        | otherwise     -> bin p m l (alter f k r)
+      Tip ky y          
+        | k==ky         -> case f (Just y) of
+                             Just x -> Tip ky x
+                             Nothing -> Nil
+        | otherwise     -> case f Nothing of
+                             Just x -> join k (Tip k x) ky t
+                             Nothing -> Tip ky y
+      Nil               -> case f Nothing of
+                             Just x -> Tip k x
+                             Nothing -> Nil
 
 
 {--------------------------------------------------------------------
