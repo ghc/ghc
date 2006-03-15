@@ -10,11 +10,15 @@
 --
 -- fmapM generalises fmap, just as mapM generalises map.
 --
+-- NOTE: This module is DEPRECATED.
+-- The classes in "Data.Foldable" and "Data.Traversable" provide a
+-- more general interface.
+--
 -----------------------------------------------------------------------------
 
-module Data.FunctorM (
-	FunctorM(..)
-  ) where
+module Data.FunctorM
+{-# DEPRECATED "Use the more general Data.Foldable and Data.Traversable instead" #-}
+  (FunctorM(..)) where
 
 import Prelude
 import Data.Array
