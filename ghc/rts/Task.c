@@ -176,7 +176,13 @@ discardTask (Task *task)
 {
     ASSERT_LOCK_HELD(&sched_mutex);
     if (!task->stopped) {
-	IF_DEBUG(scheduler,sched_belch("discarding task %p",(void *)task->id));
+	IF_DEBUG(scheduler,sched_belch("discarding task %p",
+#ifdef THREADED_RTS
+				       (void *)task->id
+#else
+				       (void *)task
+#endif
+		     ));
 	task->cap = NULL;
 	task->tso = NULL;
 	task->stopped = rtsTrue;
