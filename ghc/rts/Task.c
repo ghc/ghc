@@ -175,10 +175,15 @@ void
 discardTask (Task *task)
 {
     ASSERT_LOCK_HELD(&sched_mutex);
-    task->stopped = rtsTrue;
-    task->cap = NULL;
-    task->next = task_free_list;
-    task_free_list = task;
+    if (!task->stopped) {
+	IF_DEBUG(scheduler,sched_belch("discarding task %p",(void *)task->id));
+	task->cap = NULL;
+	task->tso = NULL;
+	task->stopped = rtsTrue;
+	tasksRunning--;
+	task->next = task_free_list;
+	task_free_list = task;
+    }
 }
 
 void
