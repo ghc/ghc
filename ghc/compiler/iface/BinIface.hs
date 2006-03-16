@@ -23,6 +23,7 @@ import Kind		( Kind(..) )
 import Panic
 import Binary
 import Util
+import Config		( cGhcUnregisterised )
 
 import DATA_IOREF
 import EXCEPTION	( throwDyn )
@@ -109,8 +110,8 @@ instance Binary ModIface where
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers }) = do
 	put_ bh (show opt_HiVersion)
-	build_tag <- readIORef v_Build_tag
-	put  bh build_tag
+	way_descr <- getWayDescr
+	put  bh way_descr
 	put_ bh mod
 	put_ bh is_boot
 	put_ bh mod_vers
@@ -138,13 +139,13 @@ instance Binary ModIface where
 
 	check_way <- get bh
         ignore_way <- readIORef v_IgnoreHiWay
-	build_tag <- readIORef v_Build_tag
-        when (not ignore_way && check_way /= build_tag) $
+	way_descr <- getWayDescr
+        when (not ignore_way && check_way /= way_descr) $
 	   -- use userError because this will be caught by readIface
 	   -- which will emit an error msg containing the iface module name.
 	   throwDyn (ProgramError (
 		"mismatched interface file ways: expected "
-		++ build_tag ++ ", found " ++ check_way))
+		++ way_descr ++ ", found " ++ check_way))
 
 	mod_name  <- get bh
 	is_boot   <- get bh
@@ -183,6 +184,13 @@ instance Binary ModIface where
 		 mi_ver_fn = mkIfaceVerCache decls })
 
 GLOBAL_VAR(v_IgnoreHiWay, False, Bool)
+
+getWayDescr :: IO String
+getWayDescr = do
+  tag <- readIORef v_Build_tag
+  if cGhcUnregisterised == "YES" then return ('u':tag) else return tag
+	-- if this is an unregisterised build, make sure our interfaces
+	-- can't be used by a registerised build.
 
 -------------------------------------------------------------------------
 --		Types from: HscTypes
