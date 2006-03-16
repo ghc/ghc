@@ -4498,7 +4498,7 @@ sched_belch(char *s, ...)
     va_list ap;
     va_start(ap,s);
 #ifdef THREADED_RTS
-    debugBelch("sched (task %p, pid %d): ", (void *)(unsigned long)(unsigned int)osThreadId(), getpid());
+    debugBelch("sched (task %p): ", (void *)(unsigned long)(unsigned int)osThreadId());
 #elif defined(PARALLEL_HASKELL)
     debugBelch("== ");
 #else
