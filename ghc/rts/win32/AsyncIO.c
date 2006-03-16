@@ -219,7 +219,7 @@ start:
     if (completed_hw == 0) {
 	/* empty table, drop lock and wait */
 	LeaveCriticalSection(&queue_lock);
-	if ( wait && !interrupted ) {
+	if ( wait && sched_state == SCHED_RUNNING ) {
 	    DWORD dwRes = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
 	    switch (dwRes) {
 	    case WAIT_OBJECT_0:

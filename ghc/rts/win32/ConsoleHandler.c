@@ -70,7 +70,7 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 	// If we're already trying to interrupt the RTS, terminate with
 	// extreme prejudice.  So the first ^C tries to exit the program
 	// cleanly, and the second one just kills it.
-	if (interrupted) {
+	if (sched_state >= SCHED_INTERRUPTING) {
 	    stg_exit(EXIT_INTERRUPTED);
 	} else {
 	    interruptStgRts();
