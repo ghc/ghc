@@ -1,3 +1,4 @@
+{-# OPTIONS -cpp #-}
 module Main where
 
 import Control.Concurrent
@@ -6,7 +7,13 @@ import Prelude hiding (catch)
 import Foreign
 import System.IO
 
-foreign import "sleep" unsafe sleepBlock :: Int -> IO ()
+#ifdef mingw32_HOST_OS
+sleep n = sleepBlock (n*1000)
+foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
+#else
+sleep n = sleepBlock n
+foreign import unsafe "sleep" sleepBlock :: Int -> IO ()
+#endif
 
 main :: IO ()
 main = do
@@ -14,7 +21,7 @@ main = do
   th <- newEmptyMVar
   forkIO $ do
      putStrLn "newThread started"
-     sleepBlock 1
+     sleep 1
      putMVar th "child"
   threadDelay 500000 >> putMVar th "main" `catch` \_ -> return ()
 	-- tests that the other thread doing an unsafe call to 
