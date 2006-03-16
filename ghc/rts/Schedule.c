@@ -2105,7 +2105,7 @@ isThreadBound(StgTSO* tso USED_IF_THREADS)
 
 #ifdef FORKPROCESS_PRIMOP_SUPPORTED
 static void 
-deleteThreadImmediately(Capability *cap, StgTSO *tso);
+deleteThread_(Capability *cap, StgTSO *tso);
 #endif
 StgInt
 forkProcess(HsStablePtr *entry
@@ -2142,28 +2142,47 @@ forkProcess(HsStablePtr *entry
 	
     } else { // child
 	
-	// delete all threads
-	cap->run_queue_hd = END_TSO_QUEUE;
-	cap->run_queue_tl = END_TSO_QUEUE;
-	
+	// Now, all OS threads except the thread that forked are
+	// stopped.  We need to stop all Haskell threads, including
+	// those involved in foreign calls.  Also we need to delete
+	// all Tasks, because they correspond to OS threads that are
+	// now gone.
+
 	for (t = all_threads; t != END_TSO_QUEUE; t = next) {
-	    next = t->link;
-	    
-	    // don't allow threads to catch the ThreadKilled exception
-	    deleteThreadImmediately(cap,t);
+	    next = t->global_link;
+	    // don't allow threads to catch the ThreadKilled
+	    // exception, but we do want to raiseAsync() because these
+	    // threads may be evaluating thunks that we need later.
+	    deleteThread_(cap,t);
 	}
 	
-	// wipe the task list
+	// Empty the run queue.  It seems tempting to let all the
+	// killed threads stay on the run queue as zombies to be
+	// cleaned up later, but some of them correspond to bound
+	// threads for which the corresponding Task does not exist.
+	cap->run_queue_hd = END_TSO_QUEUE;
+	cap->run_queue_tl = END_TSO_QUEUE;
+
+	// Any suspended C-calling Tasks are no more, their OS threads
+	// don't exist now:
+	cap->suspended_ccalling_tasks = NULL;
+
+	// Empty the all_threads list.  Otherwise, the garbage
+	// collector may attempt to resurrect some of these threads.
+	all_threads = END_TSO_QUEUE;
+
+	// Wipe the task list, except the current Task.
 	ACQUIRE_LOCK(&sched_mutex);
 	for (task = all_tasks; task != NULL; task=task->all_link) {
-	    if (task != cap->running_task) discardTask(task);
+	    if (task != cap->running_task) {
+		discardTask(task);
+	    }
 	}
 	RELEASE_LOCK(&sched_mutex);
 
-	cap->suspended_ccalling_tasks = NULL;
-
 #if defined(THREADED_RTS)
-	// wipe our spare workers list.
+	// Wipe our spare workers list, they no longer exist.  New
+	// workers will be created if necessary.
 	cap->spare_workers = NULL;
 	cap->returning_tasks_hd = NULL;
 	cap->returning_tasks_tl = NULL;
@@ -2887,6 +2906,7 @@ GetRoots( evac_fn evac )
 	
 	for (task = cap->suspended_ccalling_tasks; task != NULL; 
 	     task=task->next) {
+	    IF_DEBUG(scheduler,sched_belch("evac'ing suspended TSO %d", task->suspended_tso->id));
 	    evac((StgClosure **)&task->suspended_tso);
 	}
     }
@@ -3979,20 +3999,17 @@ deleteThread (Capability *cap, StgTSO *tso)
 
 #ifdef FORKPROCESS_PRIMOP_SUPPORTED
 static void 
-deleteThreadImmediately(Capability *cap, StgTSO *tso)
+deleteThread_(Capability *cap, StgTSO *tso)
 { // for forkProcess only:
-  // delete thread without giving it a chance to catch the KillThread exception
+  // like deleteThread(), but we delete threads in foreign calls, too.
 
-  if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
-      return;
-  }
-
-  if (tso->why_blocked != BlockedOnCCall &&
-      tso->why_blocked != BlockedOnCCall_NoUnblockExc) {
-      unblockThread(cap,tso);
-  }
-
-  tso->what_next = ThreadKilled;
+    if (tso->why_blocked == BlockedOnCCall ||
+	tso->why_blocked == BlockedOnCCall_NoUnblockExc) {
+	unblockOne(cap,tso);
+	tso->what_next = ThreadKilled;
+    } else {
+	deleteThread(cap,tso);
+    }
 }
 #endif
 
@@ -4481,7 +4498,7 @@ sched_belch(char *s, ...)
     va_list ap;
     va_start(ap,s);
 #ifdef THREADED_RTS
-    debugBelch("sched (task %p): ", (void *)(unsigned long)(unsigned int)osThreadId());
+    debugBelch("sched (task %p, pid %d): ", (void *)(unsigned long)(unsigned int)osThreadId(), getpid());
 #elif defined(PARALLEL_HASKELL)
     debugBelch("== ");
 #else
