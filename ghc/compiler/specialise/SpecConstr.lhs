@@ -14,11 +14,13 @@ import CoreSyn
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, tcEqExpr, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
+import CoreSubst	( Subst, mkSubst, substExpr )
 import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
-import DataCon		( dataConRepArity )
-import Type		( tyConAppArgs )
+import DataCon		( dataConRepArity, isVanillaDataCon )
+import Type		( tyConAppArgs, tyVarsOfTypes )
+import Unify		( coreRefineTys )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
 			  mkUserLocal, mkSysLocal )
 import Var		( Var )
@@ -204,9 +206,16 @@ data ScEnv = SCE { scope :: VarEnv HowBound,
 		   cons  :: ConstrEnv
 	     }
 
-type ConstrEnv = IdEnv (AltCon, [CoreArg])
+type ConstrEnv = IdEnv ConValue
+data ConValue  = CV AltCon [CoreArg]
 	-- Variables known to be bound to a constructor
 	-- in a particular case alternative
+
+refineConstrEnv :: Subst -> ConstrEnv -> ConstrEnv
+-- The substitution is a type substitution only
+refineConstrEnv subst env = mapVarEnv refine_con_value env
+  where
+    refine_con_value (CV con args) = CV con (map (substExpr subst) args)
 
 emptyScEnv = SCE { scope = emptyVarEnv, cons = emptyVarEnv }
 
@@ -239,23 +248,46 @@ extendCaseBndrs :: ScEnv -> Id -> CoreExpr -> AltCon -> [Var] -> ScEnv
 extendCaseBndrs env case_bndr scrut DEFAULT alt_bndrs
   = extendBndrs env (case_bndr : alt_bndrs)
 
-extendCaseBndrs env case_bndr scrut con alt_bndrs
-  = case scrut of
+extendCaseBndrs env case_bndr scrut con@(LitAlt lit) alt_bndrs
+  = ASSERT( null alt_bndrs ) extendAlt env case_bndr scrut (CV con []) []
+
+extendCaseBndrs env case_bndr scrut con@(DataAlt data_con) alt_bndrs
+  | isVanillaDataCon data_con
+  = extendAlt env case_bndr scrut (CV con vanilla_args) alt_bndrs
+    
+  | otherwise	-- GADT
+  = extendAlt env1 case_bndr scrut (CV con gadt_args) alt_bndrs
+  where
+    vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
+		   map varToCoreExpr alt_bndrs
+
+    gadt_args = map (substExpr subst . varToCoreExpr) alt_bndrs
+
+    (alt_tvs, _) = span isTyVar alt_bndrs
+    Just (tv_subst, is_local) = coreRefineTys data_con alt_tvs (idType case_bndr)
+    subst = mkSubst in_scope tv_subst emptyVarEnv	-- No Id substitition
+    in_scope = mkInScopeSet (tyVarsOfTypes (varEnvElts tv_subst))
+
+    env1 | is_local  = env
+	 | otherwise = env { cons = refineConstrEnv subst (cons env) }
+
+
+
+extendAlt :: ScEnv -> Id -> CoreExpr -> ConValue -> [Var] -> ScEnv
+extendAlt env case_bndr scrut val alt_bndrs
+  = let 
+       env1 = SCE { scope = extendVarEnvList (scope env) [(b,Other) | b <- case_bndr : alt_bndrs],
+		    cons  = extendVarEnv     (cons  env) case_bndr val }
+    in
+    case scrut of
 	Var v ->   -- Bind the scrutinee in the ConstrEnv if it's a variable
 		   -- Also forget if the scrutinee is a RecArg, because we're
 		   -- now in the branch of a case, and we don't want to
 		   -- record a non-scrutinee use of v if we have
 		   --	case v of { (a,b) -> ...(f v)... }
 		 SCE { scope = extendVarEnv (scope env1) v Other,
-		       cons  = extendVarEnv (cons env1)  v (con,args) }
+		       cons  = extendVarEnv (cons env1)  v val }
 	other -> env1
-
-  where
-    env1 = SCE { scope = extendVarEnvList (scope env) [(b,Other) | b <- case_bndr : alt_bndrs],
-		 cons  = extendVarEnv     (cons  env) case_bndr (con,args) }
-
-    args = map Type (tyConAppArgs (idType case_bndr)) ++
-	   map varToCoreExpr alt_bndrs
 
     -- When we encounter a recursive function binding
     --	f = \x y -> ...
@@ -543,12 +575,12 @@ they are constructor applications.
     -- placeholder variables.  For example:
     --    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
 
-argToPat   :: ConstrEnv -> UniqSupply -> CoreArg   -> (UniqSupply, CoreExpr)
+argToPat   :: ConstrEnv -> UniqSupply -> CoreArg -> (UniqSupply, CoreExpr)
 argToPat env us (Type ty) 
   = (us, Type ty)
 
 argToPat env us arg
-  | Just (dc,args) <- is_con_app_maybe env arg
+  | Just (CV dc args) <- is_con_app_maybe env arg
   = let
 	(us',args') = argsToPats env us args
     in
@@ -568,7 +600,7 @@ argsToPats env us args = mapAccumL (argToPat env) us args
 
 
 \begin{code}
-is_con_app_maybe :: ConstrEnv -> CoreExpr -> Maybe (AltCon, [CoreExpr])
+is_con_app_maybe :: ConstrEnv -> CoreExpr -> Maybe ConValue
 is_con_app_maybe env (Var v)
   = lookupVarEnv env v
 	-- You might think we could look in the idUnfolding here
@@ -576,14 +608,14 @@ is_con_app_maybe env (Var v)
 	-- case we are in, which is the whole point
 
 is_con_app_maybe env (Lit lit)
-  = Just (LitAlt lit, [])
+  = Just (CV (LitAlt lit) [])
 
 is_con_app_maybe env expr
   = case collectArgs expr of
 	(Var fun, args) | Just con <- isDataConWorkId_maybe fun,
 			  args `lengthAtLeast` dataConRepArity con
 		-- Might be > because the arity excludes type args
-		        -> Just (DataAlt con,args)
+		        -> Just (CV (DataAlt con) args)
 
 	other -> Nothing
 
