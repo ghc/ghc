@@ -2149,11 +2149,15 @@ forkProcess(HsStablePtr *entry
 	// now gone.
 
 	for (t = all_threads; t != END_TSO_QUEUE; t = next) {
-	    next = t->global_link;
-	    // don't allow threads to catch the ThreadKilled
-	    // exception, but we do want to raiseAsync() because these
-	    // threads may be evaluating thunks that we need later.
-	    deleteThread_(cap,t);
+	    if (t->what_next == ThreadRelocated) {
+		next = t->link;
+	    } else {
+		next = t->global_link;
+		// don't allow threads to catch the ThreadKilled
+		// exception, but we do want to raiseAsync() because these
+		// threads may be evaluating thunks that we need later.
+		deleteThread_(cap,t);
+	    }
 	}
 	
 	// Empty the run queue.  It seems tempting to let all the
