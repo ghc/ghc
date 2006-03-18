@@ -1223,7 +1223,7 @@
 	    <row>
 	      <entry><option>-fno-code</option></entry>
 	      <entry>Omit code generation</entry>
-	      <entry>dynamic</entry>
+	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -1869,12 +1869,6 @@
 	      <entry>Turn off assembly mangling (use <option>-unreg</option> instead)</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-fwrite-iface</option></entry>
-	      <entry>Write interface to disk even when not generating any code (see <option>-fno-code</option>)</entry>
-	      <entry>dynamic</entry>
-	      <entry>-fno-write-iface</entry>
 	    </row>
 	  </tbody>
 	</tgroup>
