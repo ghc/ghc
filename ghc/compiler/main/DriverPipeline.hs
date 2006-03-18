@@ -130,7 +130,7 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
        dflags      = dflags0 { includePaths = current_dir : old_paths }
 
    -- Figure out what lang we're generating
-   let hsc_lang = hscMaybeAdjustTarget dflags StopLn src_flavour (hscTarget dflags)
+   let hsc_lang = hscTarget dflags
    -- ... and what the next phase should be
    let next_phase = hscNextPhase dflags src_flavour hsc_lang
    -- ... and what file to generate the output into
@@ -204,8 +204,6 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
      HscInterpreted | not (isHsBoot src_flavour) -- We can't compile boot files to
                                                  -- bytecode so don't even try.
          -> runCompiler hscCompileInteractive handleInterpreted
-     HscNothing
-         -> runCompiler hscCompileNothing handleBatch
      _other
          -> runCompiler hscCompileBatch handleBatch
 
@@ -719,7 +717,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 				  else return False
 
   -- get the DynFlags
-	let hsc_lang = hscMaybeAdjustTarget dflags stop src_flavour (hscTarget dflags)
+	let hsc_lang = hscTarget dflags
 	let next_phase = hscNextPhase dflags src_flavour hsc_lang
 	output_fn  <- get_output_fn next_phase (Just location4)
 
@@ -767,7 +765,7 @@ runPhase CmmCpp stop dflags basename suff input_fn get_output_fn maybe_loc
 
 runPhase Cmm stop dflags basename suff input_fn get_output_fn maybe_loc
   = do
-	let hsc_lang = hscMaybeAdjustTarget dflags stop HsSrcFile (hscTarget dflags)
+	let hsc_lang = hscTarget dflags
 	let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
 	output_fn <- get_output_fn next_phase maybe_loc
 
@@ -1378,27 +1376,8 @@ hscNextPhase dflags other hsc_lang =
 	HscC -> HCc
 	HscAsm | dopt Opt_SplitObjs dflags -> SplitMangle
 	       | otherwise -> As
-	HscNothing     -> StopLn
-	HscInterpreted -> StopLn
+        HscNothing     -> HCc
 	_other         -> StopLn
-
-
-hscMaybeAdjustTarget :: DynFlags -> Phase -> HscSource -> HscTarget -> HscTarget
-hscMaybeAdjustTarget dflags stop HsBootFile current_hsc_lang 
-  = HscNothing		-- No output (other than Foo.hi-boot) for hs-boot files
-hscMaybeAdjustTarget dflags stop other current_hsc_lang 
-  = hsc_lang 
-  where
-	keep_hc = dopt Opt_KeepHcFiles dflags
-	hsc_lang
-		-- don't change the lang if we're interpreting
-		 | current_hsc_lang == HscInterpreted = current_hsc_lang
-
-		-- force -fvia-C if we are being asked for a .hc file
-		 | HCc <- stop = HscC
-		 | keep_hc     = HscC
-		-- otherwise, stick to the plan
-		 | otherwise = current_hsc_lang
 
 GLOBAL_VAR(v_Split_info, ("",0), (String,Int))
 	-- The split prefix and number of files

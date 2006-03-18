@@ -174,6 +174,7 @@ data DynFlag
    | Opt_RecompChecking
    | Opt_DryRun
    | Opt_DoAsmMangling
+   | Opt_WriteIface
    | Opt_ExcessPrecision
    | Opt_ReadUserPackageConf
    | Opt_NoHsMain
@@ -405,6 +406,7 @@ defaultDynFlags =
     			-- a good thing anyway, but it seems fragile.
     
     	    Opt_DoAsmMangling,
+            Opt_WriteIface,
     
     	    -- and the default no-optimisation options:
     	    Opt_IgnoreInterfacePragmas,
@@ -834,8 +836,10 @@ dynamic_flags = [
   ,  ( "stubdir"	, HasArg (upd . setStubDir . Just))
 
 	------- Keeping temporary files -------------------------------------
-  ,  ( "keep-hc-file"   , AnySuffix (\_ -> setDynFlag Opt_KeepHcFiles))
-  ,  ( "keep-s-file"    , AnySuffix (\_ -> setDynFlag Opt_KeepSFiles))
+  ,  ( "keep-hc-file"   , AnySuffix (\_ -> do setDynFlag Opt_KeepHcFiles
+                                              setTarget HscC))
+  ,  ( "keep-s-file"    , AnySuffix (\_ -> do setDynFlag Opt_KeepSFiles
+                                              setTarget HscAsm))
   ,  ( "keep-raw-s-file", AnySuffix (\_ -> setDynFlag Opt_KeepRawSFiles))
   ,  ( "keep-tmp-files" , AnySuffix (\_ -> setDynFlag Opt_KeepTmpFiles))
 
@@ -941,7 +945,8 @@ dynamic_flags = [
 
         ------ Compiler flags -----------------------------------------------
 
-  ,  ( "fno-code",	NoArg (setTarget HscNothing))
+  ,  ( "fno-code",	NoArg (do setTarget HscNothing
+                                  unSetDynFlag Opt_WriteIface))
   ,  ( "fasm",		AnySuffix (\_ -> setTarget HscAsm) )
   ,  ( "fvia-c",	NoArg (setTarget HscC) )
   ,  ( "fvia-C",	NoArg (setTarget HscC) )
@@ -999,7 +1004,8 @@ fFlags = [
   ( "case-merge",			Opt_CaseMerge ),
   ( "unbox-strict-fields",		Opt_UnboxStrictFields ),
   ( "excess-precision",			Opt_ExcessPrecision ),
-  ( "asm-mangling",			Opt_DoAsmMangling )
+  ( "asm-mangling",			Opt_DoAsmMangling ),
+  ( "write-iface",                      Opt_WriteIface )
   ]
 
 glasgowExtsFlags = [ 

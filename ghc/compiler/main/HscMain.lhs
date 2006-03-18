@@ -529,9 +529,11 @@ hscNormalIface simpl_result
 
 hscWriteIface :: (ModIface, Bool, ModDetails, a) -> Comp (ModIface, ModDetails, a)
 hscWriteIface (iface, no_change, details, a)
-    = do mod_summary <- gets compModSummary
+    = do hsc_env <- gets compHscEnv
+         mod_summary <- gets compModSummary
+         let writeIface = dopt Opt_WriteIface (hsc_dflags hsc_env)
          liftIO $ do
-         unless no_change
+         unless (no_change || not writeIface)
            $ writeIfaceFile (ms_location mod_summary) iface
          return (iface, details, a)
 
