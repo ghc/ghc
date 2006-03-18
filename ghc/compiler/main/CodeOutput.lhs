@@ -61,7 +61,11 @@ codeOutput :: DynFlags
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
 
 codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
-  = 
+    | HscNothing <- hscTarget dflags
+      -- We aren't interested in any code when HscNothing is our target.
+    = return (False, False)
+    | otherwise
+    =
     -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
