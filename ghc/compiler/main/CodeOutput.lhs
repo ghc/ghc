@@ -100,7 +100,6 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
 #else
                                panic "ILX support not compiled into this ghc";
 #endif
-             HscNothing     -> return ();
 	  }
 	; return stubs_exist
 	}

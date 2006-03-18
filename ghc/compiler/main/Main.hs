@@ -147,13 +147,7 @@ main =
         ShowInterface f -> showIface f
 	DoMake 	        -> doMake session srcs
 	DoMkDependHS    -> doMkDependHS session (map fst srcs)
-	StopBefore p
-            -- Stop after compiling Haskell if we aren't
-            -- interested in any further results.
-            | HscNothing <- hscTarget dflags
-                        -> oneShot dflags HCc srcs
-            | otherwise
-                        -> oneShot dflags p srcs
+	StopBefore p    -> oneShot dflags p srcs
 	DoInteractive   -> interactiveUI session srcs Nothing
 	DoEval expr     -> interactiveUI session srcs (Just expr)
 
@@ -354,6 +348,11 @@ mode_flags =
   ,  ( "-make"		, PassFlag (setMode DoMake))
   ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
   ,  ( "e"              , HasArg   (\s -> setMode (DoEval s) "-e"))
+
+	-- -fno-code says to stop after Hsc but don't generate any code.
+  ,  ( "fno-code"	, PassFlag (\f -> do setMode (StopBefore HCc) f
+					     addFlag "-fno-code"
+					     addFlag "-no-recomp"))
   ]
 
 setMode :: CmdLineMode -> String -> ModeM ()
