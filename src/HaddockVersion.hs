@@ -8,7 +8,7 @@ module HaddockVersion (
 	projectName, projectVersion, projectUrl
    ) where
 
-import Paths_Haddock ( version )
+import Paths_haddock ( version )
 import Data.Version ( showVersion )
 
 projectName, projectUrl :: String

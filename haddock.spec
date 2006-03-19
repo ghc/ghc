@@ -17,7 +17,7 @@
 # version label of your release tarball.
 
 %define name    haddock
-%define version 0.7
+%define version 0.8
 %define release 1
 
 Name:           %{name}
@@ -26,11 +26,11 @@ Release:        %{release}
 License:        BSD-like
 Group:          Development/Languages/Haskell
 URL:            http://haskell.org/haddock/
-Source:         http://haskell.org/haddock/haddock-%{version}-src.tar.gz
+Source:         http://haskell.org/haddock/haddock-%{version}.tar.gz
 Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Prefix:         %{_prefix}
-BuildRequires:  alex, happy, ghc, docbook-dtd, docbook-xsl-stylesheets, libxslt, libxml2, fop, xmltex, dvips
+BuildRequires:  ghc, docbook-dtd, docbook-xsl-stylesheets, libxslt, libxml2, fop, xmltex, dvips
 Summary:        A documentation tool for annotated Haskell source code
 
 %description
@@ -52,25 +52,30 @@ browser to view it properly (Mozilla, Konqueror, Opera, and IE 6
 should all be ok).
 
 %prep
-%setup -n haddock-%{version}
+%setup
 
 %build
+runhaskell Setup.lhs configure --prefix=%{prefix}
+runhaskell Setup.lhs build
+cd doc
 test -f configure || autoreconf
-./configure --prefix=%{prefix}
-make
+./configure
 make html
 
 %install
-make prefix=${RPM_BUILD_ROOT}%{prefix} install
+runhaskell Setup.lhs copy --destdir=${RPM_BUILD_ROOT}
 
 %clean
 rm -rf ${RPM_BUILD_ROOT}
 
 %files
 %defattr(-,root,root)
-%doc haddock/README
-%doc haddock/doc/haddock
+%doc CHANGES
+%doc LICENSE
+%doc README
+%doc TODO
+%doc doc/haddock
+%doc examples
+%doc haskell.vim
 %{prefix}/bin/haddock
-%{prefix}/bin/haddock-%{version}
-%{prefix}/lib/haddock-%{version}
 %{prefix}/share/haddock-%{version}

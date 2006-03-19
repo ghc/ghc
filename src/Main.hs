@@ -24,7 +24,7 @@ import HsSyn
 import Map ( Map )
 import qualified Map hiding ( Map )
 import Set
-import Paths_Haddock	( getDataDir )
+import Paths_haddock	( getDataDir )
 
 import Control.Exception ( bracket )
 import Control.Monad ( when )
