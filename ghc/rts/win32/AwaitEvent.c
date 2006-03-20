@@ -44,7 +44,7 @@ awaitEvent(rtsBool wait)
     //  - new threads have arrived
 
   } while (wait
-	   && !interrupted
+	   && sched_state == SCHED_RUNNING
 	   && emptyRunQueue(&MainCapability)
       );
 }
