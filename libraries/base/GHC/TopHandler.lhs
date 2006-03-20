@@ -16,7 +16,7 @@
 
 -- #hide
 module GHC.TopHandler (
-   runMainIO, runIO, runNonIO, reportStackOverflow, reportError
+   runMainIO, runIO, runIOFastExit, runNonIO, reportStackOverflow, reportError
   ) where
 
 import Prelude
@@ -24,6 +24,7 @@ import Prelude
 import System.IO
 import Control.Exception
 
+import Foreign.C	( CInt )
 import GHC.IOBase
 import GHC.Exception
 import GHC.Prim (unsafeCoerce#)
@@ -42,6 +43,22 @@ runMainIO main = (do a <- main; cleanUp; return a) `catchException` topHandler
 --
 runIO :: IO a -> IO a
 runIO main = catchException main topHandler
+
+-- | Like 'runIO', but in the event of an exception that causes an exit,
+-- we don't shut down the system cleanly, we just exit.  This is
+-- useful in some cases, because the safe exit version will give other
+-- threads a chance to clean up first, which might shut down the
+-- system in a different way.  For example, try 
+--
+--   main = forkIO (runIO (exitWith (ExitFailure 1))) >> threadDelay 10000
+--
+-- This will sometimes exit with "interrupted" and code 0, because the
+-- main thread is given a chance to shut down when the child thread calls
+-- safeExit.  There is a race to shut down between the main and child threads.
+--
+runIOFastExit :: IO a -> IO a
+runIOFastExit main = catchException main topHandlerFastExit
+	-- NB. this is used by the testsuite driver
 
 -- | The same as 'runIO', but for non-IO computations.  Used for
 -- wrapping @foreign export@ and @foreign import \"wrapper\"@ when these
