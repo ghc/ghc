@@ -8,6 +8,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <process.h>
+#include "OSThreads.h"
 
 /*
  * Provide a timer service for the RTS, periodically
@@ -20,6 +21,7 @@
  * signals.)
  */
 static HANDLE hStopEvent = INVALID_HANDLE_VALUE;
+static HANDLE tickThread = INVALID_HANDLE_VALUE;
 
 static TickProc tickProc = NULL;
 
@@ -38,11 +40,13 @@ unsigned
 WINAPI
 TimerProc(PVOID param)
 {
+    return 0;
+
   int ms = (int)param;
   DWORD waitRes;
   
-  /* interpret a < 0 timeout period as 'instantaneous' */
-  if (ms < 0) ms = 0;
+  /* interpret a < 0 timeout period as 'instantaneous' */ 
+ if (ms < 0) ms = 0;
 
   while (1) {
     waitRes = WaitForSingleObject(hStopEvent, ms);
@@ -86,19 +90,37 @@ startTicker(nat ms, TickProc handle_tick)
     return 0;
   }
   tickProc = handle_tick;
-  return ( 0 != _beginthreadex(NULL,
+  tickThread = (HANDLE)(long)_beginthreadex( NULL,
 			       0,
 			       TimerProc,
 			       (LPVOID)ms,
 			       0,
-			       &threadId) );
+			       &threadId);
+  return (tickThread != 0);
 }
 
 int
 stopTicker(void)
 {
-  if (hStopEvent != INVALID_HANDLE_VALUE) {
-    SetEvent(hStopEvent);
-  }
-  return 0;
+    // We must wait for the ticker thread to terminate, since if we
+    // are in a DLL that is about to be unloaded, the ticker thread
+    // cannot be allowed to return to a missing DLL.
+
+    if (hStopEvent != INVALID_HANDLE_VALUE && 
+	tickThread != INVALID_HANDLE_VALUE) {
+	DWORD exitCode;
+	SetEvent(hStopEvent);
+	while (1) {
+	    WaitForSingleObject(tickThread, 20);
+	    if (!GetExitCodeThread(tickThread, &exitCode)) {
+		return 1;
+	    }
+	    if (exitCode != STILL_ACTIVE) {
+		tickThread = INVALID_HANDLE_VALUE;
+		return 0;
+	    }
+	    TerminateThread(tickThread, 0);
+	}
+    }
+    return 0;
 }
