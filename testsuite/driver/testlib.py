@@ -1092,14 +1092,18 @@ def summary(t, file):
 
     if t.n_unexpected_passes > 0:
         file.write('Unexpected passes:\n')
-        for test in t.unexpected_passes:
+        keys = t.unexpected_passes.keys()
+        keys.sort()
+        for test in keys:
             file.write('   ' + test + '(' + \
                        join(t.unexpected_passes[test],',') + ')\n')
         file.write('\n')
             
     if t.n_unexpected_failures > 0:
         file.write('Unexpected failures:\n')
-        for test in t.unexpected_failures:
+        keys = t.unexpected_failures.keys()
+        keys.sort()
+        for test in keys:
             file.write('   ' + test + '(' + \
                        join(t.unexpected_failures[test],',') + ')\n')
         file.write('\n')
