@@ -727,7 +727,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         script.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
-        script.write('GHC.TopHandler.runIO Main.main Prelude.>> Prelude.return ()\n')
+        script.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
     script.close()
 
     # figure out what to use for stdin
