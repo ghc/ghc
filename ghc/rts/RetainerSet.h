@@ -127,7 +127,7 @@ extern RetainerSet rs_MANY;
  */
 
 #define BINARY_SEARCH_THRESHOLD   8
-static inline rtsBool
+INLINE_HEADER rtsBool
 isMember(retainer r, RetainerSet *rs)
 {
   int i, left, right;       // must be int, not nat (because -1 can appear)
