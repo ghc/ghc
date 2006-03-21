@@ -1734,7 +1734,7 @@ retainRoot( StgClosure **tl )
     ASSERT(isEmptyRetainerStack());
     currentStackBoundary = stackTop;
 
-    if (isRetainer(*tl)) {
+    if (*tl != &stg_END_TSO_QUEUE_closure && isRetainer(*tl)) {
 	retainClosure(*tl, *tl, getRetainerFrom(*tl));
     } else {
 	retainClosure(*tl, *tl, CCS_SYSTEM);
@@ -1778,7 +1778,8 @@ computeRetainerSet( void )
     // object (computing sumOfNewCostExtra and updating costArray[] when
     // debugging retainer profiler).
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        ASSERT(g != 0 || (generations[g].mut_list == NULL));
+	// NOT TRUE: even G0 has a block on its mutable list
+        // ASSERT(g != 0 || (generations[g].mut_list == NULL));
 
 	// Traversing through mut_list is necessary
 	// because we can find MUT_VAR objects which have not been
