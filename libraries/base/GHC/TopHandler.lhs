@@ -68,27 +68,31 @@ runNonIO :: a -> IO a
 runNonIO a = catchException (a `seq` return a) topHandler
 
 topHandler :: Exception -> IO a
-topHandler err = catchException (real_handler err) topHandler
+topHandler err = catchException (real_handler safeExit err) topHandler
+
+topHandlerFastExit :: Exception -> IO a
+topHandlerFastExit err = 
+  catchException (real_handler fastExit err) topHandlerFastExit
 
 -- Make sure we handle errors while reporting the error!
 -- (e.g. evaluating the string passed to 'error' might generate
 --  another error, etc.)
 --
-real_handler :: Exception -> IO a
-real_handler ex =
+real_handler :: (Int -> IO a) -> Exception -> IO a
+real_handler exit exn =
   cleanUp >>
-  case ex of
+  case exn of
 	AsyncException StackOverflow -> do
 	   reportStackOverflow
-	   safeExit 2
+	   exit 2
 
 	-- only the main thread gets ExitException exceptions
-	ExitException ExitSuccess     -> safeExit 0
-	ExitException (ExitFailure n) -> safeExit n
+	ExitException ExitSuccess     -> exit 0
+	ExitException (ExitFailure n) -> exit n
 
 	other -> do
 	   reportError other
-	   safeExit 1
+	   exit 1
 	   
 
 reportStackOverflow :: IO a
@@ -125,4 +129,10 @@ safeExit r = unsafeCoerce# (shutdownHaskellAndExit r)
 -- re-enter Haskell land through finalizers.
 foreign import ccall "shutdownHaskellAndExit" 
   shutdownHaskellAndExit :: Int -> IO ()
+
+fastExit :: Int -> IO a
+fastExit r = unsafeCoerce# (stg_exit (fromIntegral r))
+
+foreign import ccall "stg_exit" 
+  stg_exit :: CInt -> IO ()
 \end{code}
