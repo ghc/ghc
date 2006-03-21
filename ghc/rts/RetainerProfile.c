@@ -590,6 +590,21 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	if (*first_child == NULL)
 	    return;     // no child
 	break;
+	
+    case TVAR_WAIT_QUEUE:
+	*first_child = (StgClosure *)((StgTVarWaitQueue *)c)->waiting_tso;
+	se.info.next.step = 2;            // 2 = second
+	break;
+    case TVAR:
+	*first_child = (StgClosure *)((StgTVar *)c)->current_value;
+	break;
+    case TREC_HEADER:
+	*first_child = (StgClosure *)((StgTRecHeader *)c)->enclosing_trec;
+	break;
+    case TREC_CHUNK:
+	*first_child = (StgClosure *)((StgTRecChunk *)c)->prev_chunk;
+	se.info.next.step = 0;  // entry no.
+	break;
 
 	// cannot appear
     case PAP:
@@ -817,6 +832,60 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    *r = se->c_child_r;
 	    return;
 
+	case TVAR_WAIT_QUEUE:
+	    if (se->info.next.step == 2) {
+		*c = (StgClosure *)((StgTVarWaitQueue *)se->c)->next_queue_entry;
+		se->info.next.step++;             // move to the next step
+		// no popOff
+	    } else {
+		*c = (StgClosure *)((StgTVarWaitQueue *)se->c)->prev_queue_entry;
+		popOff();
+	    }
+	    *cp = se->c;
+	    *r = se->c_child_r;
+	    return;
+
+	case TVAR:
+	    *c = (StgClosure *)((StgTVar *)se->c)->first_wait_queue_entry;
+	    *cp = se->c;
+	    *r = se->c_child_r;
+	    popOff();
+	    return;
+
+	case TREC_HEADER:
+	    *c = (StgClosure *)((StgTRecHeader *)se->c)->current_chunk;
+	    *cp = se->c;
+	    *r = se->c_child_r;
+	    popOff();
+	    return;
+
+	case TREC_CHUNK: {
+	    // These are pretty complicated: we have N entries, each
+	    // of which contains 3 fields that we want to follow.  So
+	    // we divide the step counter: the 2 low bits indicate
+	    // which field, and the rest of the bits indicate the
+	    // entry number (starting from zero).
+	    nat entry_no = se->info.next.step >> 2;
+	    nat field_no = se->info.next.step & 3;
+	    if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
+		*c = NULL;
+		popOff();
+		return;
+	    }
+	    TRecEntry *entry = &((StgTRecChunk *)se->c)->entries[entry_no];
+	    if (field_no == 0) {
+		*c = (StgClosure *)entry->tvar;
+	    } else if (field_no == 1) {
+		*c = entry->expected_value;
+	    } else {
+		*c = entry->new_value;
+	    }
+	    *cp = se->c;
+	    *r = se->c_child_r;
+	    se->info.next.step++;
+	    return;
+	}
+
 	case CONSTR:
 	case STABLE_NAME:
 	case BCO:
@@ -1017,6 +1086,10 @@ isRetainer( StgClosure *c )
 	// WEAK objects are roots; there is separate code in which traversing
 	// begins from WEAK objects.
     case WEAK:
+
+	// Since the other mutvar-type things are retainers, seems
+	// like the right thing to do:
+    case TVAR:
 	return rtsTrue;
 
 	//
@@ -1055,6 +1128,10 @@ isRetainer( StgClosure *c )
     case STABLE_NAME:
     case BCO:
     case ARR_WORDS:
+	// STM
+    case TVAR_WAIT_QUEUE:
+    case TREC_HEADER:
+    case TREC_CHUNK:
 	return rtsFalse;
 
 	//
@@ -1308,6 +1385,9 @@ retainStack( StgClosure *c, retainer c_child_r,
 
 	case STOP_FRAME:
 	case CATCH_FRAME:
+	case CATCH_STM_FRAME:
+	case CATCH_RETRY_FRAME:
+	case ATOMICALLY_FRAME:
 	case RET_SMALL:
 	case RET_VEC_SMALL:
 	    bitmap = BITMAP_BITS(info->i.layout.bitmap);
