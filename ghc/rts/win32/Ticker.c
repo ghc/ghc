@@ -40,8 +40,6 @@ unsigned
 WINAPI
 TimerProc(PVOID param)
 {
-    return 0;
-
   int ms = (int)param;
   DWORD waitRes;
   
