@@ -203,8 +203,8 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
-void StgRunIsImplementedInAssembler(void);
-void StgRunIsImplementedInAssembler(void)
+static void GNUC3_ATTRIBUTE(used)
+StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
 	/*
@@ -591,7 +591,8 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
 #ifdef darwin_HOST_OS
-void StgRunIsImplementedInAssembler(void)
+static void GNUC3_ATTRIBUTE(used)
+StgRunIsImplementedInAssembler(void)
 {
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
             // if the toolchain supports deadstripping, we have to
@@ -629,7 +630,8 @@ void StgRunIsImplementedInAssembler(void)
 // *) The Link Register is saved to a different offset in the caller's stack frame
 //    (Linux: 4(r1), Darwin 8(r1))
 
-static void StgRunIsImplementedInAssembler(void)
+static void GNUC3_ATTRIBUTE(used)
+StgRunIsImplementedInAssembler(void)
 {
 	__asm__ volatile (
 		"\t.globl StgRun\n"
@@ -708,7 +710,8 @@ static void StgRunIsImplementedInAssembler(void)
 #ifdef linux_HOST_OS
 extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
-static void StgRunIsImplementedInAssembler(void)
+static void GNUC3_ATTRIBUTE(used)
+StgRunIsImplementedInAssembler(void)
 {
         // r0 volatile
 	// r1 stack pointer
@@ -858,7 +861,8 @@ static void StgRunIsImplementedInAssembler(void)
 #define LOCALS 31
 #endif
 
-static void StgRunIsImplementedInAssembler(void)
+static void GNUC3_ATTRIBUTE(used)
+StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile(
 		".global StgRun\n"
