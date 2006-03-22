@@ -591,8 +591,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
 #ifdef darwin_HOST_OS
-static void GNUC3_ATTRIBUTE(used)
-StgRunIsImplementedInAssembler(void)
+void StgRunIsImplementedInAssembler(void)
 {
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
             // if the toolchain supports deadstripping, we have to
