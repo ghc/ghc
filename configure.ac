@@ -125,6 +125,15 @@ amd64-*-openbsd*|x86_64-*-openbsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
+amd64-*-freebsd*)
+	HostPlatform=x86_64-unknown-freebsd
+	TargetPlatform=x86_64-unknown-freebsd
+	BuildPlatform=x86_64-unknown-freebsd
+	HostPlatform_CPP='x86_64_unknown_freebsd'
+	HostArch_CPP='x86_64'
+	HostVendor_CPP='unknown'
+	HostOS_CPP='freebsd'
+	;;
 arm*-linux*)
         HostPlatform=arm-unknown-linux # hack again
         TargetPlatform=arm-unknown-linux
