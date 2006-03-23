@@ -12,7 +12,7 @@ import System.Process
 import Control.Monad (when)
 #if !defined(mingw32_HOST_OS)
 import System.Process.Internals (mkProcessHandle)
-import System.Posix.Process (forkProcess, createSession)
+import System.Posix.Process (forkProcess, createSession, executeFile)
 import System.Posix.Signals (installHandler, Handler(Catch),
                              signalProcessGroup, sigINT, sigTERM, sigKILL )
 #endif
@@ -30,10 +30,7 @@ main = do
         forkIO (do threadDelay (read secs * 1000000)
                    putMVar m Nothing
                )
-        forkIO (do try (do pid <- forkProcess $ do
-                               createSession
-                               r <- system cmd
-                               exitWith r
+        forkIO (do try (do pid <- systemSession cmd
 			   ph <- mkProcessHandle pid
                            putMVar mp (pid,ph)
                            r <- waitForProcess ph
@@ -50,6 +47,16 @@ main = do
                 exitWith r
     _other -> do hPutStrLn stderr "timeout: bad arguments"
                  exitWith (ExitFailure 1)
+
+systemSession cmd =  
+ forkProcess $ do
+   createSession
+   executeFile "/bin/sh" False ["-c", cmd] Nothing
+   -- need to use exec() directly here, rather than something like
+   -- System.Process.system, because we are in a forked child and some
+   -- pthread libraries get all upset if you start doing certain
+   -- things in a forked child of a pthread process, such as forking
+   -- more threads.
 
 killProcess pid ph = do
   try (signalProcessGroup sigTERM pid)
