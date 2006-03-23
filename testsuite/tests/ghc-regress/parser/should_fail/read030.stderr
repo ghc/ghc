@@ -1,2 +1,1 @@
-read030.hs:1:0:
-    unsupported extensions: ExtensibleRecords,RestrictedTypeSynonyms,HereDocuments,NamedFieldPuns
+read030.hs:1:13: unsupported extension: ExtensibleRecords
