@@ -40,7 +40,7 @@
 #include <pthread.h>
 #endif
 
-#if defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
+#if defined(openbsd_HOST_OS) || defined(linux_HOST_OS) || defined(darwin_HOST_OS)
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -352,7 +352,7 @@ stgMallocBytesRWX(int len)
     barf("mallocBytesRWX: failed to protect 0x%p; error=%lu; old protection: %lu\n",
          addr, (unsigned long)GetLastError(), (unsigned long)dwOldProtect);
   }
-#elif defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
+#elif defined(openbsd_HOST_OS) || defined(linux_HOST_OS) || defined(darwin_HOST_OS)
   /* malloced memory isn't executable by default on OpenBSD */
   my_uintptr_t pageSize         = sysconf(_SC_PAGESIZE);
   my_uintptr_t mask             = ~(pageSize - 1);
