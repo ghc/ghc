@@ -48,6 +48,10 @@ SRC_HSC2HS_OPTS += -Iinclude -I$(FPTOOLS_TOP)/ghc/includes
 # ESSENTIAL, for getting reasonable performance from the I/O library:
 SRC_HC_OPTS += -funbox-strict-fields
 
+# Grrr, gcc-4.1.0 has a bug in -O2 and higher that causes miscompilation of
+# GHC.Show.itos.  See gcc bug #26824.  We must drop back to -O1.
+GHC/Show_HC_OPTS += -optc-O1
+
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
 
