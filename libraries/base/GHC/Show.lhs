@@ -397,12 +397,13 @@ showSignedInt (I# p) (I# n) r
 
 itos :: Int# -> String -> String
 itos n# cs
-    | n# <# 0# = let
-        n'# = negateInt# n#
-        in if n'# <# 0# -- minInt?
-            then '-' : itos' (negateInt# (n'# `quotInt#` 10#))
-                             (itos' (negateInt# (n'# `remInt#` 10#)) cs)
-            else '-' : itos' n'# cs
+    | n# <# 0# =
+	let I# minInt# = minInt in
+	if n# ==# minInt#
+		-- negateInt# minInt overflows, so we can't do that:
+	   then '-' : itos' (negateInt# (n# `quotInt#` 10#))
+                             (itos' (negateInt# (n# `remInt#` 10#)) cs)
+	   else '-' : itos' (negateInt# n#) cs
     | otherwise = itos' n# cs
     where
     itos' :: Int# -> String -> String
