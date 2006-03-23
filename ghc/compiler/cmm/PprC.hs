@@ -702,6 +702,15 @@ pprCall ppr_fn cconv results args vols
   | otherwise
   = save vols $$
     ptext SLIT("CALLER_SAVE_SYSTEM") $$
+#if x86_64_TARGET_ARCH
+	-- HACK around gcc optimisations.
+	-- x86_64 needs a __DISCARD__() here, to create a barrier between
+	-- putting the arguments into temporaries and passing the arguments
+	-- to the callee, because the argument expressions may refer to
+	-- machine registers that are also used for passing arguments in the
+	-- C calling convention.
+    ptext SLIT("__DISCARD__();") $$
+#endif
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi $$
     ptext SLIT("CALLER_RESTORE_SYSTEM") $$
     restore vols
