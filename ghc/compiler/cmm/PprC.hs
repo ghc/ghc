@@ -38,6 +38,7 @@ import UniqFM		( eltsUFM )
 import FastString
 import Outputable
 import Constants
+import StaticFlags 	( opt_Unregisterised )
 
 -- The rest
 import Data.List        ( intersperse, groupBy )
@@ -709,7 +710,9 @@ pprCall ppr_fn cconv results args vols
 	-- to the callee, because the argument expressions may refer to
 	-- machine registers that are also used for passing arguments in the
 	-- C calling convention.
-    ptext SLIT("__DISCARD__();") $$
+    (if (not opt_Unregisterised) 
+	then ptext SLIT("__DISCARD__();") 
+	else empty) $$
 #endif
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi $$
     ptext SLIT("CALLER_RESTORE_SYSTEM") $$
