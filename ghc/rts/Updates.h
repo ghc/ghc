@@ -278,7 +278,7 @@ FILL_SLOP(StgClosure *p)
     if (bdescr_gen_no(bd) != 0 :: CInt) {			\
       foreign "C" recordMutableCap(p1 "ptr",			\
 				   MyCapability() "ptr",	\
-		                   bdescr_gen_no(bd));		\
+		                   bdescr_gen_no(bd)) [R1];	\
       SET_INFO(p1, stg_IND_OLDGEN_info);			\
       LDV_RECORD_CREATE(p1);					\
       TICK_UPD_OLD_IND();					\
