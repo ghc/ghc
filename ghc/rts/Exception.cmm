@@ -380,7 +380,7 @@ retry_pop_stack:
 	 * entry code in StgStartup.cmm.
 	 */
 	Sp = CurrentTSO + TSO_OFFSET_StgTSO_stack 
-		+ WDS(StgTSO_stack_size(CurrentTSO)) - WDS(2);
+		+ WDS(TO_W_(StgTSO_stack_size(CurrentTSO))) - WDS(2);
 	Sp(1) = R1;		/* save the exception */
 	Sp(0) = stg_enter_info; /* so that GC can traverse this stack */
 	StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;

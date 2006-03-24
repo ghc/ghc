@@ -70,7 +70,7 @@ struct Capability_ {
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
 
-    // This lock protects running_task and returning_tasks_{hd,tl}.
+    // This lock protects running_task, returning_tasks_{hd,tl}, wakeup_queue.
     Mutex lock;
 
     // Tasks waiting to return from a foreign call, or waiting to make
@@ -80,6 +80,12 @@ struct Capability_ {
     // check whether it is NULL without taking the lock, however.
     Task *returning_tasks_hd; // Singly-linked, with head/tail
     Task *returning_tasks_tl;
+
+    // A list of threads to append to this Capability's run queue at
+    // the earliest opportunity.  These are threads that have been
+    // woken up by another Capability.
+    StgTSO *wakeup_queue_hd;
+    StgTSO *wakeup_queue_tl;
 #endif
 
     // Per-capability STM-related data
@@ -188,6 +194,11 @@ void yieldCapability (Capability** pCap, Task *task);
 // On return: pCap points to the capability.
 //
 void waitForCapability (Task *task, Mutex *mutex, Capability **pCap);
+
+// Wakes up a thread on a Capability (probably a different Capability
+// from the one held by the current Task).
+//
+void wakeupThreadOnCapability (Capability *cap, StgTSO *tso);
 
 // Wakes up a worker thread on just one Capability, used when we
 // need to service some global event.

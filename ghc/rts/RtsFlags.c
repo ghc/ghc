@@ -219,6 +219,8 @@ void initRtsFlagsDefaults(void)
 
 #ifdef THREADED_RTS
     RtsFlags.ParFlags.nNodes	        = 1;
+    RtsFlags.ParFlags.migrate           = rtsTrue;
+    RtsFlags.ParFlags.wakeupMigrate     = rtsFalse;
 #endif
 
 #ifdef PAR
@@ -437,6 +439,8 @@ usage_text[] = {
 #endif /* DEBUG */
 #if defined(THREADED_RTS)
 "  -N<n>     Use <n> OS threads (default: 1)",
+"  -qm       Don't automatically migrate threads between CPUs",
+"  -qw       Migrate a thread to the current CPU when it is woken up",
 #endif
 #if defined(THREADED_RTS) || defined(PAR)
 "  -e<size>  Size of spark pools (default 100)",
@@ -1049,6 +1053,25 @@ error = rtsTrue;
 		    }
 		}
 		) break;
+
+	    case 'q':
+		    switch (rts_argv[arg][2]) {
+		    case '\0':
+			errorBelch("incomplete RTS option: %s",rts_argv[arg]);
+			error = rtsTrue;
+			break;
+		    case 'm':
+			RtsFlags.ParFlags.migrate = rtsFalse;
+			break;
+		    case 'w':
+			RtsFlags.ParFlags.wakeupMigrate = rtsTrue;
+			break;
+		    default:
+			errorBelch("unknown RTS option: %s",rts_argv[arg]);
+			error = rtsTrue;
+			break;
+		    }
+		    break;
 #endif
 	      /* =========== PARALLEL =========================== */
 	      case 'e':
@@ -1063,10 +1086,12 @@ error = rtsTrue;
 		}
 		) break;
 
+#ifdef PAR
     	      case 'q':
 		PAR_BUILD_ONLY(
 		  process_par_option(arg, rts_argc, rts_argv, &error);
 		) break;
+#endif
 
 	      /* =========== GRAN =============================== */
 

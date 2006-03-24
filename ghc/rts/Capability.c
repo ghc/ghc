@@ -67,7 +67,9 @@ anyWorkForMe( Capability *cap, Task *task )
 	// other global condition to check, such as threads blocked on
 	// blackholes).
 	if (emptyRunQueue(cap)) {
-	    return !emptySparkPoolCap(cap) || globalWorkToDo();
+	    return !emptySparkPoolCap(cap)
+		|| !emptyWakeupQueue(cap)
+		|| globalWorkToDo();
 	} else
 	    return cap->run_queue_hd->bound == NULL;
     }
@@ -135,6 +137,8 @@ initCapability( Capability *cap, nat i )
     cap->suspended_ccalling_tasks = NULL;
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
+    cap->wakeup_queue_hd    = END_TSO_QUEUE;
+    cap->wakeup_queue_tl    = END_TSO_QUEUE;
 #endif
 
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
@@ -296,7 +300,8 @@ releaseCapability_ (Capability* cap)
 
     // If we have an unbound thread on the run queue, or if there's
     // anything else to do, give the Capability to a worker thread.
-    if (!emptyRunQueue(cap) || !emptySparkPoolCap(cap) || globalWorkToDo()) {
+    if (!emptyRunQueue(cap) || !emptyWakeupQueue(cap)
+	      || !emptySparkPoolCap(cap) || globalWorkToDo()) {
 	if (cap->spare_workers) {
 	    giveCapabilityToTask(cap,cap->spare_workers);
 	    // The worker Task pops itself from the queue;
@@ -499,6 +504,37 @@ yieldCapability (Capability** pCap, Task *task)
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     return;
+}
+
+/* ----------------------------------------------------------------------------
+ * Wake up a thread on a Capability.
+ *
+ * This is used when the current Task is running on a Capability and
+ * wishes to wake up a thread on a different Capability.
+ * ------------------------------------------------------------------------- */
+
+void
+wakeupThreadOnCapability (Capability *cap, StgTSO *tso)
+{
+    ASSERT(tso->cap == cap);
+    ASSERT(tso->bound ? tso->bound->cap == cap : 1);
+
+    ACQUIRE_LOCK(&cap->lock);
+    if (cap->running_task == NULL) {
+	// nobody is running this Capability, we can add our thread
+	// directly onto the run queue and start up a Task to run it.
+	appendToRunQueue(cap,tso);
+
+	// start it up
+	cap->running_task = myTask(); // precond for releaseCapability_()
+	releaseCapability_(cap);
+    } else {
+	appendToWakeupQueue(cap,tso);
+	// someone is running on this Capability, so it cannot be
+	// freed without first checking the wakeup queue (see
+	// releaseCapability_).
+    }
+    RELEASE_LOCK(&cap->lock);
 }
 
 /* ----------------------------------------------------------------------------

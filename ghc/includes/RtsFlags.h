@@ -164,6 +164,8 @@ struct PAR_FLAGS {
 #ifdef THREADED_RTS
 struct PAR_FLAGS {
   nat            nNodes;         /* number of threads to run simultaneously */
+  rtsBool        migrate;        /* migrate threads between capabilities */
+  rtsBool        wakeupMigrate;  /* migrate a thread on wakeup */
   unsigned int	 maxLocalSparks;
 };
 #endif /* THREADED_RTS */

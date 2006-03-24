@@ -32,7 +32,7 @@ stg_ap_0_fast
     IF_DEBUG(sanity,
 	foreign "C" checkStackChunk(Sp "ptr",
 				    CurrentTSO + TSO_OFFSET_StgTSO_stack +
-				    WDS(StgTSO_stack_size(CurrentTSO)) "ptr") [R1]);
+				    WDS(TO_W_(StgTSO_stack_size(CurrentTSO))) "ptr") [R1]);
 
     ENTER();
 }

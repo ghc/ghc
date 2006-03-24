@@ -259,6 +259,20 @@ appendToBlockedQueue(StgTSO *tso)
 }
 #endif
 
+#if defined(THREADED_RTS)
+STATIC_INLINE void
+appendToWakeupQueue (Capability *cap, StgTSO *tso)
+{
+    ASSERT(tso->link == END_TSO_QUEUE);
+    if (cap->wakeup_queue_hd == END_TSO_QUEUE) {
+	cap->wakeup_queue_hd = tso;
+    } else {
+	cap->wakeup_queue_tl->link = tso;
+    }
+    cap->wakeup_queue_tl = tso;
+}
+#endif
+
 /* Check whether various thread queues are empty
  */
 STATIC_INLINE rtsBool
@@ -272,6 +286,14 @@ emptyRunQueue(Capability *cap)
 {
     return emptyQueue(cap->run_queue_hd);
 }
+
+#if defined(THREADED_RTS)
+STATIC_INLINE rtsBool
+emptyWakeupQueue(Capability *cap)
+{
+    return emptyQueue(cap->wakeup_queue_hd);
+}
+#endif
 
 #if !defined(THREADED_RTS)
 #define EMPTY_BLOCKED_QUEUE()  (emptyQueue(blocked_queue_hd))

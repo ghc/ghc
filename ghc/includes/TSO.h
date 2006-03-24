@@ -93,6 +93,8 @@ typedef StgWord32 StgThreadID;
  */
 #define TSO_DIRTY   1
 
+#define tsoDirty(tso) ((tso)->flags & TSO_DIRTY)
+
 /*
  * Type returned after running a thread.  Values of this type
  * include HeapOverflow, StackOverflow etc.  See Constants.h for the
@@ -134,43 +136,44 @@ typedef union {
  */
 
 typedef struct StgTSO_ {
-  StgHeader          header;
+    StgHeader               header;
 
-  struct StgTSO_*    link;	     /* Links threads onto blocking queues */
-  struct StgTSO_*    global_link;    /* Links all threads together */
-  
-  StgWord16          what_next;      /* Values defined in Constants.h */
-  StgWord16          why_blocked;    /* Values defined in Constants.h */
-  StgWord32          flags;
-  StgTSOBlockInfo    block_info;
-  struct StgTSO_*    blocked_exceptions;
-  StgThreadID        id;
-  int                saved_errno;
-  struct Task_*      bound;          // non-NULL for a bound thread
-  struct StgTRecHeader_ *trec;       /* STM transaction record */
-  
+    struct StgTSO_*         link;       /* Links threads onto blocking queues */
+    struct StgTSO_*         global_link;    /* Links all threads together */
+    
+    StgWord16               what_next;      /* Values defined in Constants.h */
+    StgWord16               why_blocked;    /* Values defined in Constants.h */
+    StgWord32               flags;
+    StgTSOBlockInfo         block_info;
+    struct StgTSO_*         blocked_exceptions;
+    StgThreadID             id;
+    int                     saved_errno;
+    struct Task_*           bound;
+    struct Capability_*     cap;
+    struct StgTRecHeader_ * trec;       /* STM transaction record */
+
 #ifdef TICKY_TICKY
-  /* TICKY-specific stuff would go here. */
+    /* TICKY-specific stuff would go here. */
 #endif
 #ifdef PROFILING
-   StgTSOProfInfo prof;
+    StgTSOProfInfo prof;
 #endif
 #ifdef PAR
-   StgTSOParInfo par;
+    StgTSOParInfo par;
 #endif
 #ifdef GRAN
-   StgTSOGranInfo gran;
+    StgTSOGranInfo gran;
 #endif
 #ifdef DIST
-   StgTSODistInfo dist;
+    StgTSODistInfo dist;
 #endif
 
-  /* The thread stack... */
-  StgWord    	     stack_size;     /* stack size in *words* */
-  StgWord            max_stack_size; /* maximum stack size in *words* */
-  StgPtr             sp;
-  
-  StgWord            stack[FLEXIBLE_ARRAY];
+    /* The thread stack... */
+    StgWord32	       stack_size;     /* stack size in *words* */
+    StgWord32          max_stack_size; /* maximum stack size in *words* */
+    StgPtr             sp;
+    
+    StgWord            stack[FLEXIBLE_ARRAY];
 } StgTSO;
 
 /* -----------------------------------------------------------------------------
