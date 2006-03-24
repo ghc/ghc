@@ -818,7 +818,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	}
 	copied +=  mut_list_size;
 
-	IF_DEBUG(gc, debugBelch("mut_list_size: %d (%d vars, %d arrays, %d others)\n", mut_list_size * sizeof(W_), mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS));
+	IF_DEBUG(gc, debugBelch("mut_list_size: %ld (%d vars, %d arrays, %d others)\n", mut_list_size * sizeof(W_), mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS));
     }
 
     for (s = 0; s < generations[g].n_steps; s++) {
