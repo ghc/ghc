@@ -113,7 +113,7 @@ DerivedConstants.h :
 
 else
 
-mkDerivedConstants.c : $(H_CONFIG)
+mkDerivedConstants.c : $(H_CONFIG) $(H_PLATFORM)
 
 mkDerivedConstantsHdr : mkDerivedConstants.o
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkDerivedConstants.o
