@@ -145,12 +145,12 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	 */
         "movl %2,%%eax\n\t"
         
-#if darwin_TARGET_OS
 	/*
-	 * Darwin: keep the stack aligned
+	 * Darwin note:
+	 * The stack pointer has to be aligned to a multiple of 16 bytes at
+	 * this point. This works out correctly with gcc 4.0.1, but it might
+	 * break at any time in the future. TODO: Make this future-proof.
 	 */
-        "subl $12,%%esp\n\t"
-#endif
 
 	/*
 	 * jump to it
@@ -159,13 +159,6 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 	STG_GLOBAL STG_RETURN "\n"
        	STG_RETURN ":\n\t"
-
-#if darwin_TARGET_OS
-	/*
-	 * Darwin: keep the stack aligned
-	 */
-        "addl $12,%%esp\n\t"
-#endif
 
 	"movl %%esi, %%eax\n\t"   /* Return value in R1  */
 
