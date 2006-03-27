@@ -121,7 +121,7 @@ lockClosure(StgClosure *p)
     do {
 	nat i = 0;
 	do {
-	    info = xchg((P_)&p->header.info, (W_)&stg_WHITEHOLE_info);
+	    info = xchg((P_)(void *)&p->header.info, (W_)&stg_WHITEHOLE_info);
 	    if (info != (W_)&stg_WHITEHOLE_info) return (StgInfoTable *)info;
 	} while (++i < SPIN_COUNT);
 	yieldThread();
