@@ -25,6 +25,7 @@ module GHC.Conc
 
 	-- Forking and suchlike
 	, forkIO	-- :: IO a -> IO ThreadId
+	, forkOnIO	-- :: Int -> IO a -> IO ThreadId
 	, childHandler  -- :: Exception -> IO ()
 	, myThreadId 	-- :: IO ThreadId
 	, killThread	-- :: ThreadId -> IO ()
@@ -143,6 +144,12 @@ library that uses thread-local storage, use 'forkOS' instead.
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s -> 
    case (fork# action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
+ where
+  action_plus = catchException action childHandler
+
+forkOnIO :: Int -> IO () -> IO ThreadId
+forkOnIO (I# cpu) action = IO $ \ s -> 
+   case (forkOn# cpu action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
  where
   action_plus = catchException action childHandler
 
