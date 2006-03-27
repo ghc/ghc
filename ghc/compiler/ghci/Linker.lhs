@@ -16,7 +16,8 @@ necessary.
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
 module Linker ( HValue, showLinkerState,
-		linkExpr, unload, extendLinkEnv, 
+		linkExpr, unload, extendLinkEnv,
+                extendLoadedPkgs,
 		linkPackages,
 	) where
 
@@ -47,7 +48,7 @@ import ErrUtils         ( debugTraceMsg )
 -- Standard libraries
 import Control.Monad	( when, filterM, foldM )
 
-import Data.IORef	( IORef, readIORef, writeIORef )
+import Data.IORef	( IORef, readIORef, writeIORef, modifyIORef )
 import Data.List	( partition, nub )
 
 import System.IO	( putStr, putStrLn, hPutStrLn, stderr, fixIO )
@@ -124,6 +125,10 @@ emptyPLS dflags = PersistentLinkerState {
 \end{code}
 
 \begin{code}
+extendLoadedPkgs :: [PackageId] -> IO ()
+extendLoadedPkgs pkgs
+    = modifyIORef v_PersistentLinkerState (\s -> s{pkgs_loaded = pkgs ++ pkgs_loaded s})
+
 extendLinkEnv :: [(Name,HValue)] -> IO ()
 -- Automatically discards shadowed bindings
 extendLinkEnv new_bindings
