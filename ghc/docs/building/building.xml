@@ -142,9 +142,6 @@
 <indexterm><primary>GHC</primary><secondary>ports</secondary></indexterm>
 <indexterm><primary>platforms</primary><secondary>supported</secondary></indexterm>
 
-    <para>The main question is whether or not the Haskell compiler
-    (GHC) runs on your platform.</para>
-
     <para>A &ldquo;platform&rdquo; is a
     architecture/manufacturer/operating-system combination, such as
     <literal>sparc-sun-solaris2</literal>.  Other common ones are
@@ -164,13 +161,10 @@
     platforms; for example, a sockets library is of no use unless the
     operating system supports the underlying BSDisms.</para>
 
-    <sect2>
-      <title>What platforms the Haskell compiler (GHC) runs on</title>
-
-      <indexterm><primary>fully-supported platforms</primary></indexterm>
-      <indexterm><primary>native-code generator</primary></indexterm>
-      <indexterm><primary>registerised ports</primary></indexterm>
-      <indexterm><primary>unregisterised ports</primary></indexterm>
+    <indexterm><primary>fully-supported platforms</primary></indexterm>
+    <indexterm><primary>native-code generator</primary></indexterm>
+    <indexterm><primary>registerised ports</primary></indexterm>
+    <indexterm><primary>unregisterised ports</primary></indexterm>
 
       <para>The GHC hierarchy of Porting Goodness: (a)&nbsp;Best is a
       native-code generator; (b)&nbsp;next best is a
@@ -178,10 +172,6 @@
       &ldquo;unregisterised&rdquo; port.
       (&ldquo;Unregisterised&rdquo; is so terrible that we won't say
       more about it).</para>
-
-      <para>We use Sparcs running Solaris 2.7 and x86 boxes running
-      FreeBSD and Linux, so those are the best supported platforms,
-      unsurprisingly.</para>
 
       <para>Here's everything that's known about GHC ports.  We
       identify platforms by their &ldquo;canonical&rdquo;
@@ -389,7 +379,6 @@
       distant past, including various Motorola 68k boxes.  The 68k
       support still remains, but porting to one of these systems will
       certainly be a non-trivial task.</para>
-    </sect2>
   </sect1>
 
   <sect1 id="sec-pre-supposed">
