@@ -223,7 +223,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
 #else
 
 StgInt
-newSpark (StgRegTable *reg, StgClosure *p)
+newSpark (StgRegTable *reg STG_UNUSED, StgClosure *p STG_UNUSED)
 {
     /* nothing */
     return 1;
