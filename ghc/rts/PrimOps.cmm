@@ -876,19 +876,45 @@ decodeDoublezh_fast
 forkzh_fast
 {
   /* args: R1 = closure to spark */
-  
+
   MAYBE_GC(R1_PTR, forkzh_fast);
 
-  // create it right now, return ThreadID in R1
-  "ptr" R1 = foreign "C" createIOThread( MyCapability() "ptr", 
+  W_ closure;
+  W_ threadid;
+  closure = R1;
+
+  "ptr" threadid = foreign "C" createIOThread( MyCapability() "ptr", 
 				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
-				R1 "ptr") [R1];
-  foreign "C" scheduleThread(MyCapability() "ptr", R1 "ptr") [R1];
+				closure "ptr") [];
+  foreign "C" scheduleThread(MyCapability() "ptr", threadid "ptr") [];
 
   // switch at the earliest opportunity
   CInt[context_switch] = 1 :: CInt;
   
-  RET_P(R1);
+  RET_P(threadid);
+}
+
+forkOnzh_fast
+{
+  /* args: R1 = cpu, R2 = closure to spark */
+
+  MAYBE_GC(R2_PTR, forkOnzh_fast);
+
+  W_ cpu;
+  W_ closure;
+  W_ threadid;
+  cpu = R1;
+  closure = R2;
+
+  "ptr" threadid = foreign "C" createIOThread( MyCapability() "ptr", 
+				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
+				closure "ptr") [];
+  foreign "C" scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr") [];
+
+  // switch at the earliest opportunity
+  CInt[context_switch] = 1 :: CInt;
+  
+  RET_P(threadid);
 }
 
 yieldzh_fast

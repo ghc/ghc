@@ -1441,6 +1441,13 @@ primop  ForkOp "fork#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primop  ForkOnOp "forkOn#" GenPrimOp
+   Int# -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
+   with
+   usage            = { mangle ForkOnOp [mkO, mkP] mkR }
+   has_side_effects = True
+   out_of_line      = True
+
 primop  KillThreadOp "killThread#"  GenPrimOp
    ThreadId# -> a -> State# RealWorld -> State# RealWorld
    with

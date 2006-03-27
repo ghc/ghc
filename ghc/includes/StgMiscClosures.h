@@ -579,6 +579,7 @@ RTS_FUN(makeStablePtrzh_fast);
 RTS_FUN(deRefStablePtrzh_fast);
 
 RTS_FUN(forkzh_fast);
+RTS_FUN(forkOnzh_fast);
 RTS_FUN(yieldzh_fast);
 RTS_FUN(killThreadzh_fast);
 RTS_FUN(blockAsyncExceptionszh_fast);

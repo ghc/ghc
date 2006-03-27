@@ -20,8 +20,13 @@
 void initScheduler (void);
 void exitScheduler (void);
 
-// Place a new thread on the run queue of the specified Capability
+// Place a new thread on the run queue of the current Capability
 void scheduleThread (Capability *cap, StgTSO *tso);
+
+// Place a new thread on the run queue of a specified Capability
+// (cap is the currently owned Capability, cpu is the number of
+// the desired Capability).
+void scheduleThreadOn(Capability *cap, StgWord cpu, StgTSO *tso);
 
 /* awakenBlockedQueue()
  *

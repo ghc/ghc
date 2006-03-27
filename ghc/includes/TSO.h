@@ -93,7 +93,13 @@ typedef StgWord32 StgThreadID;
  */
 #define TSO_DIRTY   1
 
-#define tsoDirty(tso) ((tso)->flags & TSO_DIRTY)
+/*
+ * TSO_LOCKED is set when a TSO is locked to a particular Capability.
+ */
+#define TSO_LOCKED  2
+
+#define tsoDirty(tso)  ((tso)->flags & TSO_DIRTY)
+#define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 
 /*
  * Type returned after running a thread.  Values of this type
