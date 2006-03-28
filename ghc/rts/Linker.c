@@ -491,6 +491,7 @@ typedef struct _RtsSymbolVal {
       SymX(divExactIntegerzh_fast)		\
       SymX(divModIntegerzh_fast)		\
       SymX(forkzh_fast)				\
+      SymX(forkOnzh_fast)			\
       SymX(forkProcess)				\
       SymX(forkOS_createThread)			\
       SymX(freeHaskellFunctionPtr)		\
