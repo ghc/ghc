@@ -98,6 +98,15 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                 -- reversed because args are pushed L -> R onto C stack
                 | (a_offW, a_rep) <- reverse arg_offs_n_reps
               ]
+         
+         arguments_size = bytes_per_word * length offsets_to_pushW
+#if darwin_TARGET_OS
+             -- Darwin: align stack frame size to a multiple of 16 bytes
+         stack_frame_size = (arguments_size + 15) .&. complement 15
+         stack_frame_pad = stack_frame_size - arguments_size
+#else
+         stack_frame_size = arguments_size
+#endif
 
          -- some helpers to assemble x86 insns.
          movl_offespmem_esi offB	-- movl   offB(%esp), %esi
@@ -189,6 +198,13 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      -}
      ++ movl_offespmem_esi 32
 
+#if darwin_TARGET_OS
+     {- On Darwin, add some padding so that the stack stays aligned. -}
+     ++ (if stack_frame_pad /= 0
+            then add_lit_esp (-stack_frame_pad)
+            else [])
+#endif
+
      {- For each arg in args_offs_n_reps, examine the associated
         CgRep to determine how many words there are.  This gives a
         bunch of offsets on the H stack to copy to the C stack:
@@ -216,7 +232,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            movl        28+4(%esp), %esi
      -}
      ++ (if   cconv /= StdCallConv
-         then add_lit_esp (bytes_per_word * length offsets_to_pushW)
+         then add_lit_esp stack_frame_size
          else [])
      ++ movl_offespmem_esi 32
 
