@@ -5,7 +5,7 @@ module Compat.Unicode (
 
 #if __GLASGOW_HASKELL__ > 604
 
-import Data.Char (GeneralCategory(..), generalCategory)
+import Data.Char (GeneralCategory(..), generalCategory,isPrint,isUpper)
 
 #else
 
