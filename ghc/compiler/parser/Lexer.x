@@ -44,14 +44,14 @@ import Ctype
 import Util		( maybePrefixMatch, readRational )
 
 import DATA_BITS
-import Data.Char
+import Data.Char 	( chr )
 import Ratio
 --import TRACE
 
 #if __GLASGOW_HASKELL__ >= 605
-import Data.Char 	( GeneralCategory(..), generalCategory )
+import Data.Char 	( GeneralCategory(..), generalCategory, isPrint, isUpper )
 #else
-import Compat.Unicode	( GeneralCategory(..), generalCategory )
+import Compat.Unicode	( GeneralCategory(..), generalCategory, isPrint, isUpper )
 #endif
 }
 

@@ -1,6 +1,6 @@
 {-# OPTIONS -cpp #-}
 module Compat.Unicode (
-    GeneralCategory(..), generalCategory,
+    GeneralCategory(..), generalCategory, isPrint, isUpper
   ) where
 
 #if __GLASGOW_HASKELL__ > 604
@@ -54,4 +54,13 @@ generalCategory c = toEnum (wgencat (fromIntegral (ord c)))
 
 foreign import ccall unsafe "u_gencat"
   wgencat :: CInt -> Int
+
+isPrint c = iswprint (fromIntegral (ord c)) /= 0
+isUpper c = iswupper (fromIntegral (ord c)) /= 0
+
+foreign import ccall unsafe "u_iswprint"
+  iswprint :: CInt -> CInt
+
+foreign import ccall unsafe "u_iswupper"
+  iswupper :: CInt -> CInt
 #endif
