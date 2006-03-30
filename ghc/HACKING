@@ -117,14 +117,14 @@ If you will be hacking mostly on libraries, then you probably want to
 build stage1 with optimisation, because you're only building it once
 but using it many times.
 
-  GhcState1HcOpts = -O
+  GhcStage1HcOpts = -O
 
 If you are working on GHCi or Template Haskell, then you will be
 building and modifying the stage 2 compiler.  Hence, you want to build
 stage 1 with, and stage 2 without, optimisation.
 
-  GhcState1HcOpts = -O
-  GhcState2HcOpts = -O0 -DDEBUG
+  GhcStage1HcOpts = -O
+  GhcStage2HcOpts = -O0 -DDEBUG
 
 Take a look through mk/config.mk for more settings you might want to
 override in build.mk.  Remember: don't modify config.mk directly (it
