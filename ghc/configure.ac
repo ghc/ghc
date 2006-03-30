@@ -1,5 +1,5 @@
 # Initialise and check sanity.
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.5], [glasgow-haskell-bugs@haskell.org], [ghc])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.5.20060329], [glasgow-haskell-bugs@haskell.org], [ghc])
 AC_CONFIG_SRCDIR([ghc.spec.in])
 
 # duplicate from ../configure.ac

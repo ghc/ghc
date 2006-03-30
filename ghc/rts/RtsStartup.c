@@ -373,9 +373,8 @@ hs_exit(void)
     /* stop timing the shutdown, we're about to print stats */
     stat_endExit();
     
-    /* clean up things from the storage manager's point of view.
-     * also outputs the stats (+RTS -s) info.
-     */
+    // clean up things from the storage manager's point of view.
+    // also outputs the stats (+RTS -s) info.
     exitStorage();
     
 #ifdef RTS_GTK_FRONTPANEL
@@ -398,7 +397,7 @@ hs_exit(void)
     // during endProfiling().
     fclose(prof_file);
 #endif
-    
+
 #if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
@@ -406,6 +405,9 @@ hs_exit(void)
 #if defined(mingw32_HOST_OS)
     shutdownAsyncIO();
 #endif
+
+    // Finally, free all our storage.
+    freeStorage();
 }
 
 // Compatibility interfaces

@@ -266,6 +266,11 @@ void
 exitStorage (void)
 {
     stat_exit(calcAllocated());
+}
+
+void
+freeStorage (void)
+{
     freeAllMBlocks();
 }
 
