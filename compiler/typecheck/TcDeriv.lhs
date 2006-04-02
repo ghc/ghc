@@ -44,8 +44,8 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
-			  isUnLiftedType, mkClassPred, tyVarsOfTypes, isArgTypeKind,
-			  tcEqTypes, tcSplitAppTys, mkAppTys )
+			  isUnLiftedType, mkClassPred, tyVarsOfType,
+			  isArgTypeKind, tcEqTypes, tcSplitAppTys, mkAppTys )
 import Var		( TyVar, tyVarKind, varName )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
@@ -419,7 +419,8 @@ makeDerivEqns overlap_flag tycl_decls
 	args_to_drop   = drop n_args_to_keep rep_ty_args
  	args_to_keep   = take n_args_to_keep rep_ty_args
 
-	rep_tys  = tys ++ [mkAppTys rep_fn args_to_keep]
+	rep_fn'  = mkAppTys rep_fn args_to_keep
+	rep_tys  = tys ++ [rep_fn']
 	rep_pred = mkClassPred clas rep_tys
 		-- rep_pred is the representation dictionary, from where
 		-- we are gong to get all the methods for the newtype dictionary
@@ -494,7 +495,7 @@ makeDerivEqns overlap_flag tycl_decls
 	--	(b) the remaining type args mention 
 	--	    only the remaining type variables
 	eta_ok = (args_to_drop `tcEqTypes` mkTyVarTys tyvars_to_drop)
-	      && (tyVarsOfTypes args_to_keep `subVarSet` mkVarSet tyvars_to_keep) 
+	      && (tyVarsOfType rep_fn' `subVarSet` mkVarSet tyvars_to_keep) 
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
 				(vcat [ptext SLIT("even with cunning newtype deriving:"),

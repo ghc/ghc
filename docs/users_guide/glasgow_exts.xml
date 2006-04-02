@@ -3742,20 +3742,17 @@ Derived instance declarations are constructed as follows. Consider the
 declaration (after expansion of any type synonyms)
 
 <programlisting> 
-  newtype T v1...vn = T' (S t1...tk vk+1...vn) deriving (c1...cm) 
+  newtype T v1...vn = T' (t vk+1...vn) deriving (c1...cm) 
 </programlisting> 
 
 where 
  <itemizedlist>
 <listitem><para>
-  <literal>S</literal> is a type constructor, 
+  The type <literal>t</literal> is an arbitrary type
 </para></listitem>
 <listitem><para>
-  The <literal>t1...tk</literal> are types,
-</para></listitem>
-<listitem><para>
-  The <literal>vk+1...vn</literal> are type variables which do not occur in any of
-  the <literal>ti</literal>, and
+  The <literal>vk+1...vn</literal> are type variables which do not occur in 
+  <literal>t</literal>, and
 </para></listitem>
 <listitem><para>
   The <literal>ci</literal> are partial applications of
@@ -3773,7 +3770,7 @@ where
 Then, for each <literal>ci</literal>, the derived instance
 declaration is:
 <programlisting> 
-  instance ci (S t1...tk vk+1...v) => ci (T v1...vp)
+  instance ci (t vk+1...v) => ci (T v1...vp)
 </programlisting>
 where <literal>p</literal> is chosen so that <literal>T v1...vp</literal> is of the 
 right <emphasis>kind</emphasis> for the last parameter of class <literal>Ci</literal>.
