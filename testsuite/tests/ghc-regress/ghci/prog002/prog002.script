@@ -1,13 +1,17 @@
 :unset +s
 :unset +t
+
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+
 -- first, clean up:
-:! rm -f *.hi *.o *~
-:! cp A1.hs A.hs
+:shell rm -f *.hi *.o *~
+:shell cp A1.hs A.hs
 
 :load D
 
 -- compile A & reload
-:! $HC $HC_OPTS -no-recomp -c A.hs
+:shell $HC $HC_OPTS -no-recomp -c A.hs
 :reload
 
 B.g 42
@@ -15,9 +19,9 @@ B.g 42
 B.g 42
 
 -- swap A2 for A, compile & reload
-:! sleep 1
-:! cp A2.hs A.hs
-:! $HC $HC_OPTS -no-recomp -c A.hs
+:shell sleep 1
+:shell cp A2.hs A.hs
+:shell $HC $HC_OPTS -no-recomp -c A.hs
 :reload
 -- the system should ignore the compiled version and compile its own.
 
@@ -33,7 +37,7 @@ B.g 42
 B.g 42
 
 -- remove A.o: system should recompile A
-:! rm A.o
+:shell rm A.o
 :reload
 
 B.g 42

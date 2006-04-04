@@ -1,7 +1,11 @@
 :unset +s
+
+:l ../shell.hs
+:def shell (\s -> do shell s; return "")
+
 -- first, tidy up:
-:! rm -f *.hi *.o *~
-:! cp D1.hs D.hs
+:shell rm -f *.hi *.o *~
+:shell cp D1.hs D.hs
 
 -- load the program (all interpreted)
 :load A
@@ -13,21 +17,21 @@
 main
 
 -- touch a module + recompile
-:! sleep 1
-:! touch C.hs
+:shell sleep 1
+:shell touch C.hs
 :reload
 
 -- make sure `main' still works
 main
 
 -- compile D & reload
-:! $HC $HC_OPTS -no-recomp -c D.hs
+:shell $HC $HC_OPTS -no-recomp -c D.hs
 :reload
 main
 
 -- change D, recompile & reload
-:! cp D2.hs D.hs
-:! $HC $HC_OPTS -no-recomp -c D.hs
+:shell cp D2.hs D.hs
+:shell $HC $HC_OPTS -no-recomp -c D.hs
 :reload
 :load A
 
