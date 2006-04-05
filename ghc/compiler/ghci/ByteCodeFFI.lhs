@@ -24,7 +24,7 @@ import DATA_WORD	( Word8, Word32 )
 import Foreign		( Ptr )
 import System.IO.Unsafe ( unsafePerformIO )
 import IO		( hPutStrLn, stderr )
--- import Debug.Trace	( trace )
+import Debug.Trace	( trace )
 \end{code}
 
 %************************************************************************
@@ -74,7 +74,7 @@ mkMarshalCode :: CCallConv
 mkMarshalCode cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    = let bytes = mkMarshalCode_wrk cconv (r_offW, r_rep) 
                                    addr_offW arg_offs_n_reps
-     in  Foreign.newArray bytes
+     in  trace (show bytes) $ Foreign.newArray bytes
 
 
 
@@ -133,11 +133,6 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             = [0xDD, 0x9E] ++ lit32 offB
          fstps_offesimem offB		-- fstps   offB(%esi)
             = [0xD9, 0x9E] ++ lit32 offB
-         lit32 :: Int -> [Word8]
-         lit32 i = let w32 = (fromIntegral i) :: Word32
-                   in  map (fromIntegral . ( .&. 0xFF))
-                           [w32, w32 `shiftR` 8, 
-                            w32 `shiftR` 16,  w32 `shiftR` 24]
          {-
              2 0000 8BB42478    movl    0x12345678(%esp), %esi
              2      563412
@@ -277,6 +272,173 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      ++ restore_regs
      ++ ret
      )
+
+#elif x86_64_TARGET_ARCH
+
+   =
+     -- the address of the H stack is in %rdi.  We need to move it out, so
+     -- we can use %rdi as an arg reg for the following call:
+    pushq_rbp ++
+    movq_rdi_rbp ++
+	
+     -- ####### load / push the args
+
+     let
+	(stack_args, fregs_unused, reg_loads) = 
+	   load_arg_regs arg_offs_n_reps int_loads float_loads []
+
+	tot_arg_size = bytes_per_word * length stack_args
+
+	-- On entry to the called function, %rsp should be aligned
+	-- on a 16-byte boundary +8 (i.e. the first stack arg after
+	-- the return address is 16-byte aligned).  In STG land
+	-- %rsp is kept 16-byte aligned (see StgCRun.c), so we just
+	-- need to make sure we push a multiple of 16-bytes of args,
+	-- plus the return address, to get the correct alignment.
+	(real_size, adjust_rsp)
+	  | tot_arg_size `rem` 16 == 0 	  = (tot_arg_size, [])
+	  | otherwise           	  = (tot_arg_size + 8, subq_lit_rsp 8)
+
+	(stack_pushes, stack_words) =
+		push_args stack_args [] 0
+
+	-- we need to know the number of SSE regs used in the call, see later
+	n_sse_regs_used = length float_loads - length fregs_unused
+     in
+        concat reg_loads
+     ++ adjust_rsp
+     ++ concat stack_pushes -- push in reverse order
+
+     -- ####### make the call
+
+	-- use %r10 to make the call, because we don't have to save it.
+        --      movq 8*addr_offW(%rbp), %r10
+     ++ movq_rbpoff_r10 (bytes_per_word * addr_offW)
+
+	-- The x86_64 ABI requires us to set %al to the number of SSE
+	-- registers that contain arguments, if the called routine
+	-- is a varargs function.  We don't know whether it's a
+	-- varargs function or not, so we have to assume it is.
+	--
+	-- It's not safe to omit this assignment, even if the number
+	-- of SSE regs in use is zero.  If %al is larger than 8
+	-- on entry to a varargs function, seg faults ensue.
+     ++ movq_lit_rax n_sse_regs_used
+     ++ call_star_r10
+
+	-- pop the args from the stack, only in ccall mode 
+	-- (in stdcall the callee does it).
+     ++ (if   cconv /= StdCallConv
+         then addq_lit_rsp real_size
+         else [])
+
+     -- ####### place the result in the right place and return
+
+     ++ assign_result
+     ++ popq_rbp
+     ++ ret
+
+  where
+     bytes_per_word = 8
+
+     -- int arg regs: rdi,rsi,rdx,rcx,r8,r9
+     -- flt arg regs: xmm0..xmm7
+     int_loads   = [ movq_rbpoff_rdi, movq_rbpoff_rsi, movq_rbpoff_rdx,
+ 		     movq_rbpoff_rcx, movq_rbpoff_r8,  movq_rbpoff_r9 ]
+     float_loads = [ (mov_f32_rbpoff_xmm n, mov_f64_rbpoff_xmm n) | n <- [0..7] ]
+
+     load_arg_regs args [] [] code     =  (args, [], code)
+     load_arg_regs [] iregs fregs code =  ([], fregs, code)
+     load_arg_regs ((off,rep):args) iregs fregs code
+	| FloatArg  <- rep, ((mov_f32,_):frest) <- fregs =
+		load_arg_regs args iregs frest (mov_f32 (bytes_per_word * off) : code)
+	| DoubleArg <- rep, ((_,mov_f64):frest) <- fregs =
+		load_arg_regs args iregs frest (mov_f64 (bytes_per_word * off) : code)
+	| (mov_reg:irest) <- iregs =
+		load_arg_regs args irest fregs (mov_reg (bytes_per_word * off) : code)
+	| otherwise =
+		 push_this_arg
+	where
+	   push_this_arg = ((off,rep):args',fregs', code')
+		where (args',fregs',code') = load_arg_regs args iregs fregs code
+
+     push_args [] code pushed_words = (code, pushed_words)
+     push_args ((off,rep):args) code pushed_words
+	| FloatArg  <- rep =
+		push_args args (push_f32_rbpoff (bytes_per_word * off) : code) 
+			(pushed_words+1)
+	| DoubleArg <- rep =
+		push_args args (push_f64_rbpoff (bytes_per_word * off) : code)
+			(pushed_words+1)
+	| otherwise =
+		push_args args (pushq_rbpoff (bytes_per_word * off) : code)
+			(pushed_words+1)
+
+
+     assign_result = 
+	case r_rep of
+	  DoubleArg -> f64
+	  FloatArg  -> f32
+          VoidArg   -> []
+	  _other    -> i64
+	where
+	  i64 = movq_rax_rbpoff 0
+	  f32 = mov_f32_xmm0_rbpoff 0
+	  f64 = mov_f64_xmm0_rbpoff 0
+
+-- ######### x86_64 machine code:
+
+--   0:   48 89 fd                mov    %rdi,%rbp
+--   3:   48 8b bd 78 56 34 12    mov    0x12345678(%rbp),%rdi
+--   a:   48 8b b5 78 56 34 12    mov    0x12345678(%rbp),%rsi
+--  11:   48 8b 95 78 56 34 12    mov    0x12345678(%rbp),%rdx
+--  18:   48 8b 8d 78 56 34 12    mov    0x12345678(%rbp),%rcx
+--  1f:   4c 8b 85 78 56 34 12    mov    0x12345678(%rbp),%r8
+--  26:   4c 8b 8d 78 56 34 12    mov    0x12345678(%rbp),%r9
+--  2d:   4c 8b 95 78 56 34 12    mov    0x12345678(%rbp),%r10
+--  34:   48 c7 c0 78 56 34 12    mov    $0x12345678,%rax
+--  3b:   48 89 85 78 56 34 12    mov    %rax,0x12345678(%rbp)
+--  42:   f3 0f 10 85 78 56 34 12 movss  0x12345678(%rbp),%xmm0
+--  4a:   f2 0f 10 85 78 56 34 12 movsd  0x12345678(%rbp),%xmm0
+--  52:   f3 0f 11 85 78 56 34 12 movss  %xmm0,0x12345678(%rbp)
+--  5a:   f2 0f 11 85 78 56 34 12 movsd  %xmm0,0x12345678(%rbp)
+--  62:   ff b5 78 56 34 12       pushq  0x12345678(%rbp)
+--  68:   f3 44 0f 11 04 24       movss  %xmm8,(%rsp)
+--  6e:   f2 44 0f 11 04 24       movsd  %xmm8,(%rsp)
+--  74:   48 81 ec 78 56 34 12    sub    $0x12345678,%rsp
+--  7b:   48 81 c4 78 56 34 12    add    $0x12345678,%rsp
+--  82:   41 ff d2                callq  *%r10
+--  85:   c3                      retq   
+
+     movq_rdi_rbp         = [0x48,0x89,0xfd]
+     movq_rbpoff_rdi  off = [0x48, 0x8b, 0xbd] ++ lit32 off
+     movq_rbpoff_rsi  off = [0x48, 0x8b, 0xb5] ++ lit32 off
+     movq_rbpoff_rdx  off = [0x48, 0x8b, 0x95] ++ lit32 off
+     movq_rbpoff_rcx  off = [0x48, 0x8b, 0x8d] ++ lit32 off 
+     movq_rbpoff_r8   off = [0x4c, 0x8b, 0x85] ++ lit32 off
+     movq_rbpoff_r9   off = [0x4c, 0x8b, 0x8d] ++ lit32 off
+     movq_rbpoff_r10  off = [0x4c, 0x8b, 0x95] ++ lit32 off
+     movq_lit_rax     lit = [0x48, 0xc7, 0xc0] ++ lit32 lit
+     movq_rax_rbpoff  off = [0x48, 0x89, 0x85] ++ lit32 off
+     mov_f32_rbpoff_xmm n off = [0xf3, 0x0f, 0x10, 0x85 + n`shiftL`3] ++ lit32 off
+     mov_f64_rbpoff_xmm n off = [0xf2, 0x0f, 0x10, 0x85 + n`shiftL`3] ++ lit32 off
+     mov_f32_xmm0_rbpoff  off = [0xf3, 0x0f, 0x11, 0x85] ++ lit32 off
+     mov_f64_xmm0_rbpoff  off = [0xf2, 0x0f, 0x11, 0x85] ++ lit32 off
+     pushq_rbpoff     off = [0xff, 0xb5] ++ lit32 off
+     push_f32_rbpoff  off = 
+	mov_f32_rbpoff_xmm 8 off ++		 -- movss off(%rbp), %xmm8
+	[0xf3, 0x44, 0x0f, 0x11, 0x04, 0x24] ++	 -- movss %xmm8, (%rsp)
+	subq_lit_rsp 8				 -- subq $8, %rsp
+     push_f64_rbpoff  off =
+	mov_f64_rbpoff_xmm 8 off ++		 -- movsd off(%rbp), %xmm8
+	[0xf2, 0x44, 0x0f, 0x11, 0x04, 0x24] ++  -- movsd %xmm8, (%rsp)
+	subq_lit_rsp 8				 -- subq $8, %rsp
+     subq_lit_rsp     lit = [0x48, 0x81, 0xec] ++ lit32 lit
+     addq_lit_rsp     lit = [0x48, 0x81, 0xc4] ++ lit32 lit
+     call_star_r10 = [0x41,0xff,0xd2]
+     ret = [0xc3]
+     pushq_rbp = [0x55]
+     popq_rbp = [0x5d]
 
 #elif sparc_TARGET_ARCH
 
@@ -659,5 +821,12 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 
 #endif
 
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+lit32 :: Int -> [Word8]
+lit32 i = let w32 = (fromIntegral i) :: Word32
+          in  map (fromIntegral . ( .&. 0xFF))
+                  [w32, w32 `shiftR` 8, 
+                   w32 `shiftR` 16,  w32 `shiftR` 24]
+#endif
 \end{code}
 
