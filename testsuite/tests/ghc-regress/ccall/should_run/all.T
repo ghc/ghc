@@ -9,6 +9,7 @@ def f( opts ):
 
 setTestOpts(f)
 
+
 # Doesn't work with External Core due to __labels
 test('fed001', compose(only_compiler_types(['ghc']),
 			expect_fail_for(['extcore','optextcore'])),
@@ -35,8 +36,22 @@ test('ffi005', compose(skip, exit_code(3)), compile_and_run, [''])
 # ffi[006-009] don't work with External Core due to non-static-C foreign calls
 
 test('ffi006', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
-test('ffi007', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
-test('ffi008', compose(expect_fail_for(['extcore','optextcore']), exit_code(1)), compile_and_run, [''])
+
+# Skip ffi00{7,8} for GHCi.  These tests both try to exit or raise an
+# error from a foreign export, which shuts down the runtime.  When
+# GHCi is running, this results in GHCi's main thread also trying to
+# shut down, and a race ensues to see who gets to call exit() first.
+# Sometimes we end up with the wrong exit code, or get an extra
+# 'interrupted' message from the GHCi thread shutting down.
+
+test('ffi007', compose( omit_ways(['ghci']),
+		        expect_fail_for(['extcore','optextcore']) ), 
+	       compile_and_run, [''])
+
+test('ffi008', compose(expect_fail_for(['extcore','optextcore']), 
+		       compose(exit_code(1),
+			       omit_ways(['ghci']))), 
+	       compile_and_run, [''])
 
 # On i386, expect fail for way optasm, because the native code generator
 # doesn't do -ffloat-store and gets different answers when
