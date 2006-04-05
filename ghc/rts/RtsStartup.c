@@ -313,7 +313,8 @@ void
 hs_exit(void)
 {
     if (hs_init_count <= 0) {
-	barf("too many hs_exit()s");
+	errorBelch("warning: too many hs_exit()s");
+	return;
     }
     hs_init_count--;
     if (hs_init_count > 0) {
