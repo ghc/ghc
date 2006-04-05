@@ -109,6 +109,7 @@ extern generation * RTS_VAR(oldest_gen);
 
 extern void initStorage(void);
 extern void exitStorage(void);
+extern void freeStorage(void);
 
 /* -----------------------------------------------------------------------------
    Generic allocation
