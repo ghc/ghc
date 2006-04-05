@@ -20,14 +20,14 @@ module Foreign.ForeignPtr
 	-- * Finalised data pointers
 	  ForeignPtr
 	, FinalizerPtr
-#ifdef __HUGS__
+#if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
 	, FinalizerEnvPtr
 #endif
 	-- ** Basic operations
         , newForeignPtr
         , newForeignPtr_
         , addForeignPtrFinalizer
-#ifdef __HUGS__
+#if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
 	, newForeignPtrEnv
 	, addForeignPtrFinalizerEnv
 #endif
@@ -138,7 +138,7 @@ withForeignPtr fo io
        return r
 #endif /* ! __NHC__ */
 
-#ifdef __HUGS__
+#if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
 -- | This variant of 'newForeignPtr' adds a finalizer that expects an
 -- environment in addition to the finalized pointer.  The environment
 -- that will be passed to the finalizer is fixed by the second argument to
@@ -150,6 +150,24 @@ newForeignPtrEnv finalizer env p
        addForeignPtrFinalizerEnv finalizer env fObj
        return fObj
 #endif /* __HUGS__ */
+
+#ifdef __GLASGOW_HASKELL__
+type FinalizerEnvPtr env a = FunPtr (Ptr env -> Ptr a -> IO ())
+
+-- | like 'addForeignPtrFinalizerEnv' but allows the finalizer to be
+-- passed an additional environment parameter to be passed to the
+-- finalizer.  The environment passed to the finalizer is fixed by the
+-- second argument to 'addForeignPtrFinalizerEnv'
+addForeignPtrFinalizerEnv ::
+  FinalizerEnvPtr env a -> Ptr env -> ForeignPtr a -> IO ()
+addForeignPtrFinalizerEnv finalizer env fptr = 
+  addForeignPtrConcFinalizer fptr 
+	(mkFinalizerEnv finalizer env (unsafeForeignPtrToPtr fptr))
+
+foreign import ccall "dynamic" 
+  mkFinalizerEnv :: FinalizerEnvPtr env a -> Ptr env -> Ptr a -> IO ()
+#endif
+
 
 #ifndef __GLASGOW_HASKELL__
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
