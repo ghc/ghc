@@ -55,7 +55,7 @@ import GHC.List
 import GHC.Read
 
 #ifndef __HADDOCK__
-import {-# SOURCE #-} Data.Dynamic
+import {-# SOURCE #-} GHC.Dynamic
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -743,7 +743,7 @@ instance Show Exception where
   showsPrec _ (RecConError err)	         = showString err
   showsPrec _ (RecUpdError err)	         = showString err
   showsPrec _ (AssertionFailed err)      = showString err
-  showsPrec _ (DynException _err)        = showString "unknown exception"
+  showsPrec _ (DynException err)         = showString "exception :: " . showsTypeRep (dynTypeRep err)
   showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (BlockedIndefinitely)	 = showString "thread blocked indefinitely"
