@@ -84,7 +84,18 @@ install_vtalrm_handler(TickProc handle_tick)
     action.sa_handler = handle_tick;
 
     sigemptyset(&action.sa_mask);
+
+#ifdef SA_RESTART
+    // specify SA_RESTART.  One consequence if we don't do this is
+    // that readline gets confused by the -threaded RTS.  It seems
+    // that if a SIGALRM handler is installed without SA_RESTART,
+    // readline installs its own SIGALRM signal handler (see
+    // readline's signals.c), and this somehow causes readline to go
+    // wrong when the input exceeds a single line (try it).
+    action.sa_flags = SA_RESTART;
+#else
     action.sa_flags = 0;
+#endif
 
     return sigaction(ITIMER_SIGNAL, &action, NULL);
 }
