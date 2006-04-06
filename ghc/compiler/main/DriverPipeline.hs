@@ -112,7 +112,8 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
 	       | otherwise = False
 
-   showPass dflags0 ("Compiling " ++ showModMsg have_object mod_summary)
+   -- FIXME: We need to know whether or not we're recompiling the file. Move this to HscMain?
+   --showPass dflags0 ("Compiling " ++ showModMsg have_object mod_summary)
 
    let location	  = ms_location mod_summary
    let input_fn   = expectJust "compile:hs" (ml_hs_file location) 

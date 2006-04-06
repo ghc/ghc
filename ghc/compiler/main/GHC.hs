@@ -2046,7 +2046,7 @@ showModule :: Session -> ModSummary -> IO String
 showModule s mod_summary = withSession s $ \hsc_env -> do
   case lookupModuleEnv (hsc_HPT hsc_env) (ms_mod mod_summary) of
 	Nothing	      -> panic "missing linkable"
-	Just mod_info -> return (showModMsg obj_linkable mod_summary)
+	Just mod_info -> return (showModMsg (hscTarget (hsc_dflags hsc_env)) (not obj_linkable) mod_summary)
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
 

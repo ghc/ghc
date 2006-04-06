@@ -293,7 +293,7 @@ hscCompileOneShot hsc_env mod_summary =
 hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
 hscCompileBatch hsc_env mod_summary
     = compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecompBatch (batchMsg False)
+    where mkComp = hscMkCompiler norecompBatch batchMsg
           nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
                             hscWriteIface >>= hscBatch
           bootComp inp = hscSimpleIface inp >>= hscWriteIface >>= hscNothing
@@ -311,7 +311,7 @@ hscCompileBatch hsc_env mod_summary
 hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
 hscCompileNothing hsc_env mod_summary
     = compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecompBatch (batchMsg False)
+    where mkComp = hscMkCompiler norecompBatch batchMsg
           pipeline inp = hscSimpleIface inp >>= hscIgnoreIface >>= hscNothing
           compiler
               = case ms_hsc_src mod_summary of
@@ -325,7 +325,7 @@ hscCompileNothing hsc_env mod_summary
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
 hscCompileInteractive hsc_env mod_summary =
-    hscMkCompiler norecompInteractive (batchMsg True)
+    hscMkCompiler norecompInteractive batchMsg
                   frontend backend
                   hsc_env mod_summary
     where backend inp = hscSimplify inp >>= hscNormalIface >>= hscIgnoreIface >>= hscInteractive
@@ -377,13 +377,13 @@ oneShotMsg _mb_mod_index recomp
             else compilationProgressMsg (hsc_dflags hsc_env) $
                      "compilation IS NOT required"
 
-batchMsg :: Bool -> Maybe (Int,Int) -> Bool -> Comp ()
-batchMsg toInterp mb_mod_index recomp
+batchMsg :: Maybe (Int,Int) -> Bool -> Comp ()
+batchMsg mb_mod_index recomp
     = do hsc_env <- gets compHscEnv
          mod_summary <- gets compModSummary
          let showMsg msg = compilationProgressMsg (hsc_dflags hsc_env) $
                            (showModuleIndex mb_mod_index ++
-                            msg ++ showModMsg (not toInterp) mod_summary)
+                            msg ++ showModMsg (hscTarget (hsc_dflags hsc_env)) recomp mod_summary)
          liftIO $ do
          if recomp
             then showMsg "Compiling "

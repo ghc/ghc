@@ -86,7 +86,7 @@ import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
 import Packages		( PackageIdH, PackageId, PackageConfig, HomeModules )
-import DynFlags		( DynFlags(..), isOneShot )
+import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
@@ -997,12 +997,15 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: Bool -> ModSummary -> String
-showModMsg use_object mod_summary
+showModMsg :: HscTarget -> Bool -> ModSummary -> String
+showModMsg target recomp mod_summary
   = showSDoc (hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
 	            char '(', text (msHsFilePath mod_summary) <> comma,
-		    if use_object then text (msObjFilePath mod_summary)
-			      else text "interpreted",
+		    case target of
+                      HscInterpreted | recomp
+                                 -> text "interpreted"
+                      HscNothing -> text "nothing"
+                      _other     -> text (msObjFilePath mod_summary),
 		    char ')'])
  where 
     mod     = ms_mod mod_summary 
