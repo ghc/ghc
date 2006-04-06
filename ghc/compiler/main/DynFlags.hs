@@ -164,6 +164,7 @@ data DynFlag
    | Opt_OmitInterfacePragmas
    | Opt_DoLambdaEtaExpansion
    | Opt_IgnoreAsserts
+   | Opt_IgnoreBreakpoints
    | Opt_DoEtaReduction
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
@@ -995,6 +996,7 @@ fFlags = [
   ( "omit-interface-pragmas",		Opt_OmitInterfacePragmas ),
   ( "do-lambda-eta-expansion",		Opt_DoLambdaEtaExpansion ),
   ( "ignore-asserts",			Opt_IgnoreAsserts ),
+  ( "ignore-breakpoints",               Opt_IgnoreBreakpoints),
   ( "do-eta-reduction",			Opt_DoEtaReduction ),
   ( "case-merge",			Opt_CaseMerge ),
   ( "unbox-strict-fields",		Opt_UnboxStrictFields ),

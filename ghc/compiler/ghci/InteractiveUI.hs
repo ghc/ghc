@@ -13,6 +13,22 @@ module InteractiveUI (
 
 #include "HsVersions.h"
 
+#if defined(GHCI) && defined(BREAKPOINT)
+import GHC.Exts         ( Int(..), Ptr(..), int2Addr# )
+import Foreign.StablePtr ( deRefStablePtr, castPtrToStablePtr )
+import System.IO.Unsafe ( unsafePerformIO )
+import Var              ( Id, globaliseId, idName, idType )
+import HscTypes         ( Session(..), InteractiveContext(..), HscEnv(..)
+                        , extendTypeEnvWithIds )
+import RdrName          ( extendLocalRdrEnv, mkRdrUnqual, lookupLocalRdrEnv )
+import NameEnv          ( delListFromNameEnv )
+import TcType           ( tidyTopType )
+import qualified Id     ( setIdType )
+import IdInfo           ( GlobalIdDetails(..) )
+import Linker           ( HValue, extendLinkEnv, withExtendedLinkEnv,initDynLinker  )
+import PrelNames        ( breakpointJumpName )
+#endif
+
 -- The GHC interface
 import qualified GHC
 import GHC		( Session, verbosity, dopt, DynFlag(..), Target(..),
@@ -176,9 +192,67 @@ helpText =
  "                         (eg. -v2, -fglasgow-exts, etc.)\n"
 
 
+#if defined(GHCI) && defined(BREAKPOINT)
+globaliseAndTidy :: Id -> Id
+globaliseAndTidy id
+-- Give the Id a Global Name, and tidy its type
+  = Id.setIdType (globaliseId VanillaGlobal id) tidy_type
+  where
+    tidy_type = tidyTopType (idType id)
+
+
+printScopeMsg :: Session -> String -> [Id] -> IO ()
+printScopeMsg session location ids
+    = GHC.getPrintUnqual session >>= \unqual ->
+      printForUser stdout unqual $
+        text "Local bindings in scope:" $$
+        nest 2 (pprWithCommas showId ids)
+    where showId id = ppr (idName id) <+> dcolon <+> ppr (idType id)
+
+jumpFunction :: Session -> Int -> [HValue] -> String -> b -> b
+jumpFunction session@(Session ref) (I# idsPtr) hValues location b
+    = unsafePerformIO $
+      do ids <- deRefStablePtr (castPtrToStablePtr (Ptr (int2Addr# idsPtr)))
+         let names = map idName ids
+         ASSERT (length names == length hValues) return ()
+         printScopeMsg session location ids
+         hsc_env <- readIORef ref
+
+         let ictxt = hsc_IC hsc_env
+             global_ids = map globaliseAndTidy ids
+             rn_env   = ic_rn_local_env ictxt
+             type_env = ic_type_env ictxt
+             bound_names = map idName global_ids
+             new_rn_env  = extendLocalRdrEnv rn_env bound_names
+		-- Remove any shadowed bindings from the type_env;
+		-- they are inaccessible but might, I suppose, cause 
+		-- a space leak if we leave them there
+             shadowed = [ n | name <- bound_names,
+                          let rdr_name = mkRdrUnqual (nameOccName name),
+                          Just n <- [lookupLocalRdrEnv rn_env rdr_name] ]
+             filtered_type_env = delListFromNameEnv type_env shadowed
+             new_type_env = extendTypeEnvWithIds filtered_type_env global_ids
+             new_ic = ictxt { ic_rn_local_env = new_rn_env, 
+		  	      ic_type_env     = new_type_env }
+         writeIORef ref (hsc_env { hsc_IC = new_ic })
+         withExtendedLinkEnv (zip names hValues) $
+           startGHCi (runGHCi [] Nothing)
+                     GHCiState{ progname = "<interactive>",
+                                args = [],
+                                prompt = location++"> ",
+                                session = session,
+                                options = [] }
+         writeIORef ref hsc_env
+         putStrLn $ "Returning to normal execution..."
+         return b
+#endif
+
 interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe String -> IO ()
 interactiveUI session srcs maybe_expr = do
-
+#if defined(GHCI) && defined(BREAKPOINT)
+   initDynLinker =<< GHC.getSessionDynFlags session
+   extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))]
+#endif
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -756,6 +830,9 @@ afterLoad ok session = do
   graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod) graph
   setContextAfterLoad session graph'
   modulesLoadedMsg ok (map GHC.ms_mod graph')
+#if defined(GHCI) && defined(BREAKPOINT)
+  io (extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))])
+#endif
 
 setContextAfterLoad session [] = do
   io (GHC.setContext session [] [prelude_mod])

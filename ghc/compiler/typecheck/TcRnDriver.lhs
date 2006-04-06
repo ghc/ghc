@@ -66,7 +66,7 @@ import Var		( Var )
 import Module           ( Module, ModuleEnv, moduleEnvElts, elemModuleEnv )
 import OccName		( mkVarOccFS )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
-			  mkExternalName )
+			  mkExternalName, isInternalName )
 import NameSet
 import TyCon		( tyConHasGenerics, isSynTyCon, synTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
@@ -1253,6 +1253,7 @@ loadUnqualIfaces ictxt
     unqual_mods = [ nameModule name
 		  | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt),
 		    let name = gre_name gre,
+                    not (isInternalName name),
 		    isTcOcc (nameOccName name),  -- Types and classes only
 		    unQualOK gre ]		 -- In scope unqualified
     doc = ptext SLIT("Need interface for module whose export(s) are in scope unqualified")

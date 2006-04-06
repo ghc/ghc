@@ -10,6 +10,17 @@ module TcRnMonad(
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
+#if defined(GHCI) && defined(BREAKPOINT)
+import TypeRep          ( Type(..), liftedTypeKind, TyThing(..) )
+import Var              ( mkTyVar, mkGlobalId )
+import IdInfo           ( GlobalIdDetails(..), vanillaIdInfo )
+import OccName          ( mkOccName, tvName )
+import SrcLoc           ( noSrcLoc  )
+import TysWiredIn       ( intTy, stringTy, mkListTy, unitTy )
+import PrelNames        ( breakpointJumpName )
+import NameEnv          ( mkNameEnv )
+#endif
+
 import HsSyn		( emptyLHsBinds )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  TyThing, TypeEnv, emptyTypeEnv, HscSource(..),
@@ -81,7 +92,6 @@ initTc hsc_env hsc_src mod do_this
 	keep_var     <- newIORef emptyNameSet ;
 	th_var	     <- newIORef False ;
 	dfun_n_var   <- newIORef 1 ;
-
       	let {
 	     gbl_env = TcGblEnv {
 		tcg_mod      = mod,
@@ -124,10 +134,30 @@ initTc hsc_env hsc_src mod do_this
    
 	-- OK, here's the business end!
 	maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
-			     do { r <- tryM do_this 
-				; case r of
-				    Right res -> return (Just res)
-				    Left _    -> return Nothing } ;
+		     do {
+#if defined(GHCI) && defined(BREAKPOINT)
+                          unique <- newUnique ;
+                          let { var = mkInternalName unique (mkOccName tvName "a") noSrcLoc;
+                                tyvar = mkTyVar var liftedTypeKind;
+                                breakpointJumpType = mkGlobalId
+                                                     (VanillaGlobal)
+                                                     (breakpointJumpName)
+                                                     (FunTy intTy
+                                                      (FunTy (mkListTy unitTy)
+                                                       (FunTy stringTy
+                                                        (ForAllTy tyvar
+                                                         (FunTy (TyVarTy tyvar)
+                                                          (TyVarTy tyvar))))))
+                                                     (vanillaIdInfo);
+                                new_env = mkNameEnv [(breakpointJumpName,AGlobal (AnId breakpointJumpType))];
+                              };
+                          r <- tryM (updLclEnv (\gbl -> gbl{tcl_env=new_env}) do_this)
+#else
+                          r <- tryM do_this
+#endif
+			; case r of
+			  Right res -> return (Just res)
+			  Left _    -> return Nothing } ;
 
 	-- Collect any error messages
 	msgs <- readIORef errs_var ;

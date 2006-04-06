@@ -16,9 +16,9 @@ necessary.
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
 module Linker ( HValue, showLinkerState,
-		linkExpr, unload, extendLinkEnv,
+		linkExpr, unload, extendLinkEnv, withExtendedLinkEnv,
                 extendLoadedPkgs,
-		linkPackages,
+		linkPackages,initDynLinker
 	) where
 
 #include "HsVersions.h"
@@ -54,7 +54,7 @@ import Data.List	( partition, nub )
 import System.IO	( putStr, putStrLn, hPutStrLn, stderr, fixIO )
 import System.Directory	( doesFileExist )
 
-import Control.Exception ( block, throwDyn )
+import Control.Exception ( block, throwDyn, bracket )
 import Maybe		( isJust, fromJust )
 
 #if __GLASGOW_HASKELL__ >= 503
@@ -136,6 +136,18 @@ extendLinkEnv new_bindings
 	let new_closure_env = extendClosureEnv (closure_env pls) new_bindings
 	    new_pls = pls { closure_env = new_closure_env }
 	writeIORef v_PersistentLinkerState new_pls
+
+withExtendedLinkEnv :: [(Name,HValue)] -> IO a -> IO a
+withExtendedLinkEnv new_env action
+    = bracket set_new_env
+              reset_old_env
+              (const action)
+    where set_new_env = do pls <- readIORef v_PersistentLinkerState
+                           let new_closure_env = extendClosureEnv (closure_env pls) new_env
+                               new_pls = pls { closure_env = new_closure_env }
+                           writeIORef v_PersistentLinkerState new_pls
+                           return pls
+          reset_old_env pls = writeIORef v_PersistentLinkerState pls
 
 -- filterNameMap removes from the environment all entries except 
 -- 	those for a given set of modules;

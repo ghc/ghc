@@ -7,6 +7,14 @@
 module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
+#if defined(GHCI) && defined(BREAKPOINT)
+import Foreign.StablePtr ( newStablePtr, castStablePtrToPtr )
+import GHC.Exts         ( Ptr(..), Int(..), addr2Int# )
+import IOEnv            ( ioToIOEnv )
+import PrelNames        ( breakpointJumpName )
+import TysWiredIn       ( unitTy )
+import TypeRep          ( Type(..) )
+#endif
 
 import Match		( matchWrapper, matchSinglePat, matchEquations )
 import MatchLit		( dsLit, dsOverLit )
@@ -203,6 +211,36 @@ dsExpr (NegApp expr neg_expr)
 dsExpr expr@(HsLam a_Match)
   = matchWrapper LambdaExpr a_Match	`thenDs` \ (binders, matching_code) ->
     returnDs (mkLams binders matching_code)
+
+#if defined(GHCI) && defined(BREAKPOINT)
+dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
+    | HsVar funId <- fun
+    , idName funId == breakpointJumpName
+    , ids <- filter (not.hasTyVar.idType) (extractIds arg)
+    = do dsWarn (text "Extracted ids:" <+> ppr ids <+> ppr (map idType ids))
+         stablePtr <- ioToIOEnv $ newStablePtr ids
+         -- Yes, I know... I'm gonna burn in hell.
+         let Ptr addr# = castStablePtrToPtr stablePtr
+         funCore <- dsLExpr realFun
+         argCore <- dsLExpr (L loc (HsLit (HsInt (fromIntegral (I# (addr2Int# addr#))))))
+         hvalCore <- dsLExpr (L loc (extractHVals ids))
+         return ((funCore `App` argCore) `App` hvalCore)
+    where extractIds :: HsExpr Id -> [Id]
+          extractIds (HsApp fn arg)
+              | HsVar argId <- unLoc arg
+              = argId:extractIds (unLoc fn)
+              | TyApp arg' ts <- unLoc arg
+              , HsVar argId <- unLoc arg'
+              = error (showSDoc (ppr ts)) -- argId:extractIds (unLoc fn)
+          extractIds x = []
+          extractHVals ids = ExplicitList unitTy (map (L loc . HsVar) ids)
+          hasTyVar (TyVarTy _) = True
+          hasTyVar (FunTy a b) = hasTyVar a || hasTyVar b
+          hasTyVar (NoteTy _ t) = hasTyVar t
+          hasTyVar (AppTy a b) = hasTyVar a || hasTyVar b
+          hasTyVar (TyConApp _ ts) = any hasTyVar ts
+          hasTyVar _ = False
+#endif
 
 dsExpr expr@(HsApp fun arg)      
   = dsLExpr fun		`thenDs` \ core_fun ->

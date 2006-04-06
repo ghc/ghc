@@ -30,7 +30,9 @@ module MkId (
 	mkRuntimeErrorApp,
 	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
 	nON_EXHAUSTIVE_GUARDS_ERROR_ID,	nO_METHOD_BINDING_ERROR_ID,
-	pAT_ERROR_ID, eRROR_ID
+	pAT_ERROR_ID, eRROR_ID,
+
+        unsafeCoerceName
     ) where
 
 #include "HsVersions.h"

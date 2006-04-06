@@ -33,6 +33,13 @@ import BasicTypes	( FixityDirection(..) )
 import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName )
+#if defined(GHCI) && defined(BREAKPOINT)
+import PrelNames        ( breakpointJumpName, undefined_RDR, breakpointIdKey )
+import UniqFM           ( eltsUFM )
+import DynFlags         ( GhcMode(..) )
+import SrcLoc           ( srcSpanFile, srcSpanStartLine )
+import Name             ( isTyVarName )
+#endif
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
 import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
@@ -87,18 +94,31 @@ rnLExpr = wrapLocFstM rnExpr
 rnExpr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 
 rnExpr (HsVar v)
-  = lookupOccRn v	`thenM` \ name ->
-    doptM Opt_IgnoreAsserts `thenM` \ ignore_asserts ->
-    if name `hasKey` assertIdKey && not ignore_asserts then
-	-- We expand it to (GHC.Err.assertError location_string)
-        mkAssertErrorExpr	`thenM` \ (e, fvs) ->
-	returnM (e, fvs `addOneFV` name)
-		-- Keep 'assert' as a free var, to ensure it's not reported as unused!
-    else
-        -- The normal case.  Even if the Id was 'assert', if we are 
-	-- ignoring assertions we leave it as GHC.Base.assert; 
-	-- this function just ignores its first arg.
-       returnM (HsVar name, unitFV name)
+  = do name           <- lookupOccRn v
+       localRdrEnv    <- getLocalRdrEnv
+       lclEnv         <- getLclEnv
+       ignore_asserts <- doptM Opt_IgnoreAsserts
+       ignore_breakpoints <- doptM Opt_IgnoreBreakpoints
+       let conds = [ (name `hasKey` assertIdKey
+                      && not ignore_asserts,
+                      do (e, fvs) <- mkAssertErrorExpr
+                         return (e, fvs `addOneFV` name))
+#if defined(GHCI) && defined(BREAKPOINT)
+                   , (name `hasKey` breakpointIdKey
+                      && not ignore_breakpoints,
+                      do ghcMode <- getGhcMode
+                         case ghcMode of
+                           Interactive
+                               -> do let isWantedName = not.isTyVarName
+                                     (e, fvs) <- mkBreakPointExpr (filter isWantedName (eltsUFM localRdrEnv))
+                                     return (e, fvs `addOneFV` name)
+                           _ -> return (HsVar name, unitFV name)
+                     )
+#endif
+                   ]
+       case lookup True conds of
+         Just action -> action
+         Nothing     -> return (HsVar name, unitFV name)
 
 rnExpr (HsIPVar v)
   = newIPNameRn v		`thenM` \ name ->
@@ -911,6 +931,32 @@ segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
 	       non_rec    = isSingleton ss && isEmptyNameSet fwds
 	       used_later = defs `intersectNameSet` later_uses
 				-- The ones needed after the RecStmt
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{breakpoint utils}
+%*									*
+%************************************************************************
+
+\begin{code}
+#if defined(GHCI) && defined(BREAKPOINT)
+mkBreakPointExpr :: [Name] -> RnM (HsExpr Name, FreeVars)
+mkBreakPointExpr scope
+    = do sloc <- getSrcSpanM
+         undef <- lookupOccRn undefined_RDR
+         let inLoc = L sloc
+             lHsApp x y = inLoc (HsApp x y)
+             mkExpr fnName args = mkExpr' fnName (reverse args)
+             mkExpr' fnName [] = inLoc (HsVar fnName)
+             mkExpr' fnName (arg:args)
+                 = lHsApp (mkExpr' fnName args) (inLoc arg)
+             expr = unLoc $ mkExpr breakpointJumpName [mkScopeArg scope, HsVar undef, HsLit msg]
+             mkScopeArg args
+                 = unLoc $ mkExpr undef (map HsVar args)
+             msg = HsString (mkFastString (unpackFS (srcSpanFile sloc) ++ ":" ++ show (srcSpanStartLine sloc)))
+         return (expr, emptyFVs)
+#endif
 \end{code}
 
 %************************************************************************

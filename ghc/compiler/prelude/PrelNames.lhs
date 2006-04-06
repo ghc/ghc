@@ -186,7 +186,8 @@ basicKnownKeyNames
 	-- Others
 	otherwiseIdName, 
 	plusIntegerName, timesIntegerName,
-	eqStringName, assertName, assertErrorName, runSTRepName,
+	eqStringName, assertName, breakpointName, assertErrorName,
+        runSTRepName,
 	printName, fstName, sndName,
 
 	-- MonadFix
@@ -470,14 +471,20 @@ returnMName	   = methName monadClassName FSLIT("return") returnMClassOpKey
 failMName	   = methName monadClassName FSLIT("fail")   failMClassOpKey
 
 -- Random PrelBase functions
-otherwiseIdName   = varQual pREL_BASE FSLIT("otherwise") otherwiseIdKey
-foldrName	  = varQual pREL_BASE FSLIT("foldr")     foldrIdKey
-buildName	  = varQual pREL_BASE FSLIT("build")     buildIdKey
-augmentName	  = varQual pREL_BASE FSLIT("augment")   augmentIdKey
-appendName	  = varQual pREL_BASE FSLIT("++")        appendIdKey
-andName		  = varQual pREL_BASE FSLIT("&&")	 andIdKey
-orName		  = varQual pREL_BASE FSLIT("||")	 orIdKey
-assertName        = varQual pREL_BASE FSLIT("assert")    assertIdKey
+otherwiseIdName   = varQual pREL_BASE FSLIT("otherwise")  otherwiseIdKey
+foldrName	  = varQual pREL_BASE FSLIT("foldr")      foldrIdKey
+buildName	  = varQual pREL_BASE FSLIT("build")      buildIdKey
+augmentName	  = varQual pREL_BASE FSLIT("augment")    augmentIdKey
+appendName	  = varQual pREL_BASE FSLIT("++")         appendIdKey
+andName		  = varQual pREL_BASE FSLIT("&&")	  andIdKey
+orName		  = varQual pREL_BASE FSLIT("||")	  orIdKey
+assertName        = varQual pREL_BASE FSLIT("assert")     assertIdKey
+breakpointName    = varQual pREL_BASE FSLIT("breakpoint") breakpointIdKey
+breakpointJumpName
+    = mkInternalName
+        breakpointJumpIdKey
+        (mkOccNameFS varName FSLIT("breakpointJump"))
+        noSrcLoc
 
 -- PrelTup
 fstName		  = varQual pREL_TUP FSLIT("fst") fstIdKey
@@ -901,6 +908,9 @@ orIdKey			      = mkPreludeMiscIdUnique 58
 thenIOIdKey		      = mkPreludeMiscIdUnique 59
 lazyIdKey		      = mkPreludeMiscIdUnique 60
 assertErrorIdKey	      = mkPreludeMiscIdUnique 61
+
+breakpointIdKey               = mkPreludeMiscIdUnique 62
+breakpointJumpIdKey           = mkPreludeMiscIdUnique 63
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 80
