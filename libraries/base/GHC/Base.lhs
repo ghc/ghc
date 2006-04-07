@@ -711,7 +711,10 @@ lazy x = x
 --	defined here in Base.lhs
 assert :: Bool -> a -> a
 assert pred r = r
- 
+
+breakpoint :: a -> a
+breakpoint r = r
+
 -- | Constant function.
 const			:: a -> b -> a
 const x _		=  x
