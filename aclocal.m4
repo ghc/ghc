@@ -1114,6 +1114,6 @@ test -z "$ProjectPatchLevel" && ProjectPatchLevel=0
 ProjectPatchLevel=`echo $ProjectPatchLevel | sed 's/\.//'`
 
 AC_SUBST([ProjectPatchLevel])
-])# FP_SETUP_PROJECT_INFO
+])# FP_SETUP_PROJECT_VERSION
 
 # LocalWords:  fi
