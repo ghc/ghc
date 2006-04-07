@@ -68,12 +68,12 @@ test('conc032', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 # Also hangs with the threaded RTS
-test('conc033', omit_ways(['ghci', 'threaded']), compile_and_run, [''])
+test('conc033', omit_ways(['ghci', 'threaded1','threaded2']), compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 # Also hangs with the threaded RTS
 test('conc034', compose(only_compiler_types(['ghc']),
-			compose(omit_ways(['ghci','threaded', 'smp']), 
+			compose(omit_ways(['ghci','threaded1', 'threaded2']), 
 			extra_run_opts('+RTS -C0 -RTS'))),
 		compile_and_run, [''])
 
@@ -82,22 +82,19 @@ test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 # Omit for GHCi: the main thread never gets the deadlock exception, because
 # it is waiting for a ^C interrupt.
 # Omit for threaded: deadlock detection isn't working properly.
-test('conc036', compose(omit_ways(['ghci','threaded']),
-		compose(skip_if_fast,
-		  only_compiler_types(['ghc']))), compile_and_run, [''])
+test('conc036', compose(skip_if_fast,
+		  only_compiler_types(['ghc'])), compile_and_run, [''])
 
-test('conc037', only_ways(['threaded','smp']), compile_and_run, [''])
-test('conc038', only_ways(['threaded','smp']), compile_and_run, [''])
-
-# Omit for GHCi, uses foreign export
-# Omit for threaded way, relies on non-threaded execution
-test('conc039', omit_ways(['ghci', 'threaded']), compile_and_run, [''])
+test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
+test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
-# Omit threaded RTS: Hangs forever
+test('conc039', omit_ways(['ghci']), compile_and_run, [''])
+
+# Omit for GHCi, uses foreign export
 test('conc040', compose(only_compiler_types(['ghc']),
 			compose(exit_code(1),
-			omit_ways(['ghci','threaded', 'smp']))),
+			omit_ways(['ghci']))),
 		compile_and_run, [''])
 
 # STM-related tests.  As with conc033, omit threaded in 047 and 048 because
@@ -111,9 +108,9 @@ test('conc046', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # Omit GHCi for these two, since they appear to deadlock (23/11/2004 --SDM)
 test('conc047', compose(only_compiler_types(['ghc']), 
-                        omit_ways(['threaded','ghci'])), compile_and_run, [''])
+                        omit_ways(['threaded1','threaded2','ghci'])), compile_and_run, [''])
 test('conc048', compose(only_compiler_types(['ghc']), 
-                        omit_ways(['threaded','ghci'])), compile_and_run, [''])
+                        omit_ways(['threaded1','threaded2','ghci'])), compile_and_run, [''])
 
 # skip this test right now - for some reason it goes on for ever in the 
 # 'opt' ways. (ToDo)
@@ -123,8 +120,8 @@ test('conc050', skip, compile_and_run, ['-package stm'])
 test('conc051', normal, compile_and_run, [''])
 
 test('conc052', normal, compile_and_run, ['-package stm'])
-test('conc053', only_ways(['threaded','smp']), compile_and_run, ['-package stm'])
+test('conc053', only_ways(['threaded1','threaded2']), compile_and_run, ['-package stm'])
 test('conc054', normal, compile_and_run, ['-package stm'])
 test('conc055', exit_code(1), compile_and_run, ['-package stm'])
-test('conc056', only_ways(['threaded']), compile_and_run, ['-package stm -package network'])
+test('conc056', only_ways(['threaded1','threaded2']), compile_and_run, ['-package stm -package network'])
 
