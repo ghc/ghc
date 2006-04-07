@@ -172,6 +172,7 @@ static void         zero_static_object_list ( StgClosure* first_static );
 
 static rtsBool      traverse_weak_ptr_list  ( void );
 static void         mark_weak_ptr_list      ( StgWeak **list );
+static rtsBool      traverse_blackhole_queue ( void );
 
 static StgClosure * eval_thunk_selector     ( nat field, StgSelector * p );
 
@@ -722,6 +723,11 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	}
       }
     }
+
+    // if any blackholes are alive, make the threads that wait on
+    // them alive too.
+    if (traverse_blackhole_queue())
+	flag = rtsTrue;
 
     if (flag) { goto loop; }
 
@@ -1366,16 +1372,6 @@ traverse_weak_ptr_list(void)
 		  ;
 	      }
 	      
-	      // Threads blocked on black holes: if the black hole
-	      // is alive, then the thread is alive too.
-	      if (tmp == NULL && t->why_blocked == BlockedOnBlackHole) {
-		  if (isAlive(t->block_info.closure)) {
-		      t = (StgTSO *)evacuate((StgClosure *)t);
-		      tmp = t;
-		      flag = rtsTrue;
-		  }
-	      }
-
 	      if (tmp == NULL) {
 		  // not alive (yet): leave this thread on the
 		  // old_all_threads list.
@@ -1431,6 +1427,34 @@ traverse_weak_ptr_list(void)
       return rtsTrue;
   }
 
+}
+
+/* -----------------------------------------------------------------------------
+   The blackhole queue
+   
+   Threads on this list behave like weak pointers during the normal
+   phase of garbage collection: if the blackhole is reachable, then
+   the thread is reachable too.
+   -------------------------------------------------------------------------- */
+static rtsBool
+traverse_blackhole_queue (void)
+{
+    StgTSO *prev, *t, *tmp;
+    rtsBool flag;
+
+    flag = rtsFalse;
+    prev = NULL;
+
+    for (t = blackhole_queue; t != END_TSO_QUEUE; prev=t, t = t->link) {
+	if (! (tmp = (StgTSO *)isAlive((StgClosure*)t))) {
+	    if (isAlive(t->block_info.closure)) {
+		t = (StgTSO *)evacuate((StgClosure *)t);
+		if (prev) prev->link = t;
+		flag = rtsTrue;
+	    }
+	}
+    }
+    return flag;
 }
 
 /* -----------------------------------------------------------------------------
