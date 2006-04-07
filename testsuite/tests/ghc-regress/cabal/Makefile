@@ -3,7 +3,6 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 PKGCONF=local.package.conf
-GHC_PKG_INPLACE = $(FPTOOLS_TOP)/ghc/utils/ghc-pkg/ghc-pkg-inplace
 GHC_PKG= $(GHC_PKG_INPLACE) -f $(PKGCONF)
 
 # a bunch of tests for ghc-pkg
@@ -79,7 +78,7 @@ COPY_PACKAGE_CONF = package.conf.copy
 GHC_PKG_COPY = $(GHC_PKG_INPLACE) --global-conf=$(COPY_PACKAGE_CONF)
 
 copy :
-	cp $(FPTOOLS_TOP)/ghc/driver/package.conf.inplace $(COPY_PACKAGE_CONF)
+	cp $(GHC_DRIVER_DIR)/package.conf.inplace $(COPY_PACKAGE_CONF)
 
 ghcpkg02 : copy
 	for i in `$(GHC_PKG_COPY) list --global --simple-output`; do \

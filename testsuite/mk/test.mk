@@ -26,9 +26,9 @@ endif
 export MAKE
 
 # ghastly hack, because the driver requires that $tool be an absolute path name.
-GHC_STAGE1_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/stage1/ghc-inplace
-GHC_STAGE2_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/stage2/ghc-inplace
-GHC_STAGE3_ABS	= $(FPTOOLS_TOP_ABS)/ghc/compiler/stage3/ghc-inplace
+GHC_STAGE1_ABS	= $(GHC_COMPILER_DIR_ABS)/stage1/ghc-inplace
+GHC_STAGE2_ABS	= $(GHC_COMPILER_DIR_ABS)/stage2/ghc-inplace
+GHC_STAGE3_ABS	= $(GHC_COMPILER_DIR_ABS)/stage3/ghc-inplace
 
 EXTRA_HC_OPTS += -D$(HostPlatform_CPP)
   # ideally TargetPlatform_CPP, but that doesn't exist; they're always the same anyway
