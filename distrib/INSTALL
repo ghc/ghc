@@ -1,14 +1,10 @@
-This is the INSTALL instructions for a binary distribution of one of
-the fptools projects (eg. GHC). For more details on what on earth this
-package is up to, please consult the README and ANNOUNCE.
+This is the INSTALL instructions for a binary distribution of GHC. For
+more details on what on earth this package is up to, please consult
+the README and ANNOUNCE.
 
-To start using the bundle, you can either:
-
-* use it in-place, i.e., don't go ahead with a
-  full install, but just set it up to use the unpacked
-  distribution in-situ.
-
-* get it over with, and do the full install (details of how are ahead).
+This distribution can either be installed in a location of your
+choosing, or it can be used directly in-place (but it needs to be set
+up first, read on).
 
 To set the ball rolling, run the configure script (as usual, run the
 script with --help to see what options it supports).  eg. to set up
@@ -16,14 +12,14 @@ the package for installing in directory <my-dir>, use
 
 	./configure --prefix=<my-dir>
 
-The default installation directory is /usr/local.  For using the
-package in-place, the --prefix option can be omitted.
+The default installation directory is /usr/local.  To use GHC
+in-place, the --prefix option can be omitted.
 
-This will figure out what platform you're running on, and a couple of
-other interesting pieces of trivia, which it will then fill in the
-Makefile.in template to give you a real Makefile.  If you're of a
-paranoid persuasion, you might want to take a look at this Makefile to
-see if the information is correct.
+The configure script will figure out what platform you're running on,
+and a couple of other interesting pieces of trivia, which it will then
+fill in the Makefile.in template to give you a real Makefile.  If
+you're of a paranoid persuasion, you might want to take a look at this
+Makefile to see if the information is correct.
 
 To use the software in-place, now run:
 
@@ -36,12 +32,17 @@ or if you're installing,  run
 (`make show-install-setup' prints the details of where the different
 pieces of the bundle are heading when -- possibly helpful).
 
-If you're installing GHC, then its installation instructions have more
-information, check out http://www.haskell.org/ghc/documentation.html.
+For more information, full GHC documentation is available from the
+main GHC site:
 
-Bug reports/suggestions for improvement to the installation procedure/setup
-(as well as other GHC related troubles you're experiencing, of course),
-gratefully received at glasgow-haskell-bugs@haskell.org.
+  http://www.haskell.org/ghc
+
+Bug reports/suggestions for improvement to the installation
+procedure/setup (as well as other GHC related troubles you're
+experiencing, of course), gratefully received.  Bug reporting
+instructions are here:
+
+  http://www.haskell.org/ghc/reportabug
 
 Enjoy,
 -- The GHC Team.

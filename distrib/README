@@ -1,0 +1,17 @@
+The Glasgow Haskell Compiler
+============================
+
+This is a binary distribution of GHC, a compiler and interactive
+environment for the Haskell functional programming language.
+
+For more information, visit GHC's web site:
+
+  http://www.haskell.org/ghc/
+
+Information for developers of GHC can be found here:
+
+  http://hackage.haskell.org/trac/ghc/
+
+
+For installation instructions, see the accompanying INSTALL file.
+
