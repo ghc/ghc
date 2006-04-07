@@ -63,7 +63,7 @@ function darcsget()
   done
 }
 
-if test ! -d _darcs -o ! -d ghc; then
+if test ! -d _darcs; then
   echo "error: darcs-all must be run from the top level of the ghc tree."
   exit 1;
 fi
