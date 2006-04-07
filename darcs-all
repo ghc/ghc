@@ -33,7 +33,7 @@ function darcsall()
 	message "== running darcs $* in libraries/$pkg"
 	darcs $* --repodir libraries/$pkg
     else
-	echo "warning: $dir doesn't seem to exist, use 'darcs-all get' to get it"
+	echo "warning: $pkg doesn't seem to exist, use 'darcs-all get' to get it"
     fi
   done
 }
