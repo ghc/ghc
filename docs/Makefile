@@ -1,6 +1,6 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = docbook-cheat-sheet
+SUBDIRS = building docbook-cheat-sheet ext-core storage-mgt users_guide
 
 include $(TOP)/mk/target.mk

@@ -13,7 +13,12 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([fptools build system], [1.0], [cvs-fptools@haskell.org], [fptools])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.5], [glasgow-haskell-bugs@haskell.org], [ghc])
+
+FP_SETUP_PROJECT_VERSION
+
+# Hmmm, we fix the RPM release number to 1 here... Is this convenient?
+AC_SUBST([release], [1])
 
 # First off, a distrib sanity check..
 AC_CONFIG_SRCDIR([mk/config.mk.in])
@@ -28,7 +33,7 @@ dnl
 dnl After the toplevel configuration is complete, the script will recurse into
 dnl these subdirectories if they exist. The use of a cache file makes repeated
 dnl checks cheap.
-AC_CONFIG_SUBDIRS([ghc libraries])
+AC_CONFIG_SUBDIRS([libraries])
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
@@ -649,6 +654,9 @@ if test "$WithGhc" != ""; then
   AC_SUBST(GhcPatchLevel)dnl
 fi
 
+# Check whether this GHC has readline installed
+FP_GHC_HAS_READLINE
+
 AC_PATH_PROGS(NHC,nhc nhc98)
 AC_PATH_PROG(HBC,hbc)
 
@@ -716,21 +724,6 @@ dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
 if test "$BootingFromHc" = "NO" -a "$WithGhc" = "" -a -d "$srcdir/ghc"; then
 AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
 fi;
-
-dnl ** --enable-threaded-rts (not used any more)
-dnl --------------------------------------------------------------
-AC_ARG_ENABLE(threaded-rts,
-[AC_HELP_STRING([--enable-threaded-rts],
-[DEPRECATED (backwards compatibility only). [default=no]])],
-[ if test x"$enableval" = x"yes"; then
-	ThreadedRts=YES
-  else
-	ThreadedRts=NO
-  fi
-],
-[ThreadedRts=NO]
-)
-AC_SUBST(ThreadedRts)
 
 dnl ** Enable the construction of Win32 DLLs?
 dnl --------------------------------------------------------------
@@ -850,6 +843,7 @@ dnl     If gcc, make sure it's at least 2.1
 dnl
 FP_HAVE_GCC
 FP_MINGW_GCC
+FP_GCC_NEEDS_NO_OMIT_LFPTR
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
@@ -1236,7 +1230,18 @@ AC_TRY_LINK_FUNC(printf$LSBLStub,
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
 
+# test for GTK+
+AC_PATH_PROGS([GTK_CONFIG], [pkg-config])
+if test -n "$GTK_CONFIG"; then
+  if $GTK_CONFIG gtk+-2.0 --atleast-version=2.0; then
+    GTK_CONFIG="$GTK_CONFIG gtk+-2.0"
+  else
+    AC_MSG_WARN([GTK+ not usable, need at least version 2.0])
+    GTK_CONFIG=
+  fi
+fi
+AC_SUBST([GTK_CONFIG])
 
-AC_CONFIG_FILES([mk/config.mk])
+AC_CONFIG_FILES([mk/config.mk ghc.spec docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT

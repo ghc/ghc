@@ -1,93 +1,100 @@
 ############################################################################
 #
-#			fptools/Makefile
+#		This is the top-level Makefile for GHC
 #
-#		This is the main Makefile for fptools.
+# Targets: 
+#
+# 	bootsrap (DEFAULT)
+#		Builds GHC, then builds the libraries,
+#		then uses this GHC ("stage 1") to build itself
+#		("stage 2").
+#
+#	bootstrap2
+#		Same as bootstrap
+#
+#	bootstrap3
+#		bootstrap2 + we build GHC one more time ("stage 3")
+#
+#	stage1
+#		Just build up to stage 1
+#
+#	stage2
+#		Just build stage 2 (stage 1 must be built)
+#
+#	stage3
+#		Just build stage 3 (stage 2 must be built)
+#
+#	all
+#		Same as bootstrap
+#
+#       install
+#		Install everything, including stage 2 compiler by default
+#		(override with stage=3, for example).
+#
+#	dist
+#		Make a source dist (WARNING: runs 'make distclean' first)
+#
+#	binary-dist
+#		Builds a binary distribution
+#
+#	hc-file-bundle
+#		Builds an HC-file bundle, for bootstrapping
+#
+#	clean, distclean, maintainer-clean
+#		Increasing levels of cleanliness
 #
 ############################################################################
 
 TOP=.
 include $(TOP)/mk/boilerplate.mk
 
-# find the projects that actually exist...
-ProjectsThatExist = $(filter $(patsubst %/, %, $(wildcard */)), $(AllProjects))
-
-# and filter only those that the user requested, if necessary
-ifeq "$(ProjectsToBuild)" ""
-SUBDIRS = $(ProjectsThatExist)
-else
-SUBDIRS = $(filter $(ProjectsToBuild), $(ProjectsThatExist))
-endif
-
-ifneq "$(Project)" ""
-   ifeq "$(Project)" "GreenCard"
-       ProjectDirectory=greencard
-   else
-	ifeq "$(Project)" "HaskellDirect"
-		ProjectDirectory=hdirect
-	else
-		ProjectDirectory=$(Project)
-	endif
-   endif
-   -include $(shell echo $(ProjectDirectory) | tr A-Z a-z)/mk/config.mk
-   -include $(shell echo $(ProjectDirectory) | tr A-Z a-z)/mk/version.mk
-endif
-
-# -----------------------------------------------------------------------------
-# Certain targets require that Project is set from the command line.
-
-CURRENT_TARGET = $(MAKECMDGOALS)
-project-check :
-	@if [ "$(Project)" = "" ]; then \
-		echo "	You need to set \"Project\" in order to make $(CURRENT_TARGET)"; \
-		echo "	eg. make $(CURRENT_TARGET) Project=Ghc"; \
-		exit 1; \
-	fi
-
-# -----------------------------------------------------------------------------
-# Targets: all, stage1, stage2, stage3
-
-DIST_CLEAN_FILES += config.cache config.status mk/config.h mk/stamp-h
-
-extraclean::
-	$(RM) -rf autom4te.cache
-
 #
-# If you've ended up using an in-place version of Happy,
-# make sure it gets built early on.
+# Order is important! It's e.g. necessary to descend into include/
+# before the rest to have a config.h, etc.
 #
-ifeq "$(HAPPY)" "$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace"
-build :: $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
-
-$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace : glafp-utils
-	$(MAKE) -C happy boot all
-endif
-
-# Build all projects that we know about
-build ::
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS); do \
-	   if [ -d $$i ]; then \
-	      $(MAKE) -C $$i boot; \
-	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
-	      $(MAKE) -C $$i all; \
-	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
-	      fi; \
-	done
-
-ifeq "$(findstring ghc, $(SUBDIRS))" "ghc"
-
+# If we're booting from .hc files, swap the order
+# we descend into subdirs - to boot utils must be before driver.
+#
 .PHONY: stage1 stage2 stage3 bootstrap bootstrap2 bootstrap3
 
-stage1 : build
+# We can't 'make boot' in libraries until stage1 is built
+ifeq "$(BootingFromHc)" "YES"
+SUBDIRS_NOLIB = includes rts docs compiler compat utils driver
+else
+SUBDIRS_NOLIB = includes compat utils driver docs compiler rts
+endif
+
+SUBDIRS = $(SUBDIRS_NOLIB) libraries
+
+stage1 :
+	$(MAKE) -C utils/mkdependC boot
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(SUBDIRS_NOLIB); do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "== $(MAKE) boot $(MFLAGS);"; \
+	  echo " in $(shell pwd)/$$i"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) boot; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	done; \
+	for i in $(SUBDIRS_NOLIB); do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "== $(MAKE) all $(MFLAGS);"; \
+	  echo " in $(shell pwd)/$$i"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) all; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	done
+	@$(MAKE) -C libraries boot
+	@$(MAKE) -C libraries all
 
 stage2 :
-	$(MAKE) -C ghc/compiler boot stage=2
-	$(MAKE) -C ghc/compiler stage=2
+	$(MAKE) -C compiler boot stage=2
+	$(MAKE) -C compiler stage=2
 
 stage3 :
-	$(MAKE) -C ghc/compiler boot stage=3
-	$(MAKE) -C ghc/compiler stage=3
+	$(MAKE) -C compiler boot stage=3
+	$(MAKE) -C compiler stage=3
 
 bootstrap  : bootstrap2
 
@@ -99,6 +106,9 @@ bootstrap3 : bootstrap2
 
 all :: bootstrap
 
+# -----------------------------------------------------------------------------
+# Installing
+
 # We want to install the stage 2 bootstrapped compiler by default, but we let
 # the user override this by saying 'make install stage=1', for example.
 ifeq "$(stage)" ""
@@ -107,26 +117,24 @@ else
 INSTALL_STAGE =
 endif
 
-else # Not building GHC
-
-all :: build
-
-INSTALL_STAGE =
-
-endif
-
-boot ::
-	@echo "Please use \`make all' only from the top-level, or \`make boot' followed"
-	@echo "by \`make all' in an individual project subdirectory (ghc, hslibs etc.)."
-
+# Same as default rule, but we pass $(INSTALL_STAGE) to $(MAKE) too
 install ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
-	   if [ -d $$i ]; then \
-	      $(MAKE) -C $$i $(INSTALL_STAGE) install; \
-	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
-	      fi; \
+	for i in $(SUBDIRS); do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "== $(MAKE) $@ $(MFLAGS);"; \
+	  echo " in $(shell pwd)/$$i"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) --no-print-directory -C $$i $(INSTALL_STAGE) $(MFLAGS) $@; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+# These files need to be in the InstallShield
+# INSTALL_DATAS rather than INSTALL_DOCS is used so these files go
+# in the top-level directory of the distribution
+INSTALL_DATAS += ANNOUNCE LICENSE README VERSION
+endif
 
 # If installing on Windows with MinGW32, copy the gcc compiler, headers and libs
 # and the perl interpreter and dll into the GHC prefix directory.
@@ -152,11 +160,13 @@ endif
 
 install-docs ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
-	   if [ -d $$i ]; then \
-	      $(MAKE) -C $$i $(INSTALL_STAGE) install-docs; \
-	      if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
-	      fi; \
+	for i in $(SUBDIRS); do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "== $(MAKE) $@ $(MFLAGS);"; \
+	  echo " in $(shell pwd)/$$i"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) --no-print-directory -C $$i $(INSTALL_STAGE) $(MFLAGS) $@; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
 
 # -----------------------------------------------------------------------------
@@ -185,7 +195,18 @@ install-docs ::
 #	binary-dist is an FPtools addition for binary distributions
 # 
 
-binary-dist :: project-check
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+GhcBinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion) hsc2hs
+else
+GhcBinDistShScripts =
+endif
+
+GhcBinDistPrlScripts = ghcprof
+GhcBinDistLibPrlScripts = ghc-asm ghc-split
+GhcBinDistBins = hp2ps runghc
+GhcBinDistOptBins = runhaskell
+GhcBinDistLinks = ghc ghci ghc-pkg
+GhcBinDistLibSplicedFiles = package.conf
 
 BIN_DIST_TMPDIR=$(FPTOOLS_TOP_ABS)
 BIN_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
@@ -391,7 +412,7 @@ binary-dist::
 # Do it like this: 
 #
 #	$ make
-#	$ make dist Project=Ghc
+#	$ make dist
 #
 # WARNING: `make dist' calls `make distclean' before tarring up the tree.
 #
@@ -453,29 +474,41 @@ dist-package-zip ::
 hc-file-bundle : project-check
 	$(RM) -r $(ProjectNameShort)-$(ProjectVersion)
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
-	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
-	     $(ProjectNameShort)-$(ProjectVersion)/ghc/utils \
-	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
+	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/compiler \
+	     $(ProjectNameShort)-$(ProjectVersion)/utils \
+	     $(ProjectNameShort)-$(ProjectVersion)/compat \
 	     $(ProjectNameShort)-$(ProjectVersion)/libraries -follow \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
-	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/utils $(ProjectNameShort)-$(ProjectVersion)/libraries -name "*.hsc" -follow -print` ""; do \
+	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/compiler $(ProjectNameShort)-$(ProjectVersion)/utils $(ProjectNameShort)-$(ProjectVersion)/libraries -name "*.hsc" -follow -print` ""; do \
 	     if test "x$$f" != "x" && test -e `echo "$$f" | sed 's/hsc$$/hs/g'`; then \
 	        echo `echo "$$f" | sed 's/hsc$$/hs/g' ` >> hc-files-to-go ; \
 	     fi; \
 	done;
-	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/rts -name "*.cmm" -follow -print` ""; do \
+	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/compiler $(ProjectNameShort)-$(ProjectVersion)/rts -name "*.cmm" -follow -print` ""; do \
 	     if test "x$$f" != "x"; then \
 	        echo `echo "$$f" | sed 's/cmm$$/hc/g' ` >> hc-files-to-go ; \
 	     fi; \
 	done;
 	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/base/GHC/PrimopWrappers.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/Parser.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/ParserCore.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/main/ParsePkgConf.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/compiler/parser/Parser.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/compiler/parser/ParserCore.hs >> hc-files-to-go
+	echo $(ProjectNameShort)-$(ProjectVersion)/compiler/main/ParsePkgConf.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/haskell-src/Language/Haskell/Parser.hs >> hc-files-to-go
 	tar czf $(ProjectNameShort)-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
 
+# -----------------------------------------------------------------------------
+# Cleaning
+
 CLEAN_FILES += hc-files-to-go *-hc.tar.gz
+
+DIST_CLEAN_FILES += config.cache config.status mk/config.h mk/stamp-h \
+	ghc.spec docs/users_guide/ug-book.xml
+
+# don't clean config.mk: it's needed when cleaning stuff later on
+LATE_DIST_CLEAN_FILES += mk/config.mk 
+
+extraclean::
+	$(RM) -rf autom4te.cache
 
 # -----------------------------------------------------------------------------
 

@@ -1,60 +1,67 @@
-GHC build system
-================
+The Glasgow Haskell Compiler
+============================
 
-This is the top-level directory of the fptools build system.  Several
-packages are part of this build system; if you got this as part of a
-source distribution (eg. for GHC), then you will have one or more of
-the following directories:
+This is the source tree for GHC, a compiler and interactive
+environment for the Haskell functional programming language.
 
-    ghc		  The Glasgow Haskell Compiler
-    hslibs	  A Collection of Haskell libraries
-    haddock	  A Haskell documentation tool
-    haggis	  The Haggis GUI toolkit
-    happy	  The Happy Haskell parser generator
-    hdirect       Haskell interop tool
-    greencard	  A foreign function interface pre-processor for Haskell.
-    libraries	  Haskell libraries (reqd. by ghc)
-    nofib	  The NoFib Haskell benchmarking suite
+For more information, visit GHC's web site:
 
-Additional documentation for each project can be found in its
-respective directory.
+  http://www.haskell.org/ghc/
 
-In addition, the following directories contain project-independent bits:
+Information for developers of GHC can be found here:
 
-    mk	          GNU make setup used by all of fptools
-    glafp-utils   Shared utility programs
-    docs          Documentation on the installing and using
-                  the fptools build system.
-    distrib	  Tools and additional bits for building distributions
+  http://hackage.haskell.org/trac/ghc/
 
-Quick start:  the following is *supposed* to work
 
+Building & Installing
+=====================
+
+NB. you need GHC installed in order to build GHC, because the compiler
+is itself written in Haskell.  It is possible to build GHC using just
+a C compiler, but we don't recommend this as the normal route.  If you
+*really* want to do it this way, then see the Building Guide (link
+below).
+
+You also need a few other tools installed: Happy [4], Alex [5], and
+Haddock [6] (for building library documentation), and a good DocBook
+XML toolchain if you want to build the compiler documentation. 
+
+Quick start:  the following gives you a default build:
+
+	$ autoreconf
 	$ ./configure
 	$ make
 	$ make install
 
-where 'make' is whatever GNU make is called on your system (GNU make
-is *required*).  If there are any other tools required for the build,
-then the configure script will detect them and tell you if any are
-missing.  For example, a working GHC installation is required for
-building most of the tools (including GHC itself).
+The autoreconf step is only necessary if this is a tree checked out
+from darcs.  For source distributions downloaded from GHC's web site,
+this step has already been performed.
 
-The configuration script is a standard GNU autoconf script which
-accepts all the normal arguments, eg. --prefix=<blah> to install the
-package somewhere other than /usr/local.  Try ./configure --help to
-get a full list of the options.
+These steps give you the default build, which includes everything
+optimised and built in various ways (eg. profiling libs are built).
+It can take a long time.  To customise the build, see the file
+HACKING.
 
-There is usually an ANNOUNCE* file with any distribution.  Please
-consult that, or the <piece>/README file, to find out how to proceed.
+For full information on building GHC, see the GHC Building Guide [3],
+which is also available in source form (DocBook XML) in docs/building.
 
-Full documentation for the fptools build system can be found in the 
-Building Guide:
 
-	http://www.haskell.org/ghc/docs/latest/html/building/building-guide.html
+References
+==========
 
-More information about GHC can be found here:
+ [1] http://www.haskell.org/ghc/		GHC Home Page
+ [2] http://hackage.haskell.org/trac/ghc	GHC Developer's Wiki
+ [3] http://www.haskell.org/ghc/docs/latest/html/building/index.html
+						Building Guide
 
-	http://www.haskell.org/ghc/
+ [4] http://www.haskell.org/happy/		Happy
+ [5] http://www.haskell.org/alex/		Alex
+ [6] http://www.haskell.org/haddock/		Haddock
 
---
-The GHC Team,  glasgow-haskell-users@haskell.org
+
+Contributors
+============
+
+Please see
+  
+   http://www.haskell.org/ghc/contributors.html

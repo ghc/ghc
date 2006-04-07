@@ -26,7 +26,7 @@
 # Haskell Suffix Rules
 
 # The $(odir) support is for building GHC, where we need to build three
-# different versions from the same sources.  See ghc/compiler/Makefile.
+# different versions from the same sources.  See compiler/Makefile.
 ifneq "$(odir)" ""
 odir_ = $(odir)/
 else
@@ -165,7 +165,7 @@ endif # BootingFromHc
 #
 ifneq "$(BootingFromHc)" "YES"
 %_hsc.c %_hsc.h %.hs : %.hsc
-	$(HSC2HS) $(HSC2HS_OPTS) $<
+	$(HSC2HS_INPLACE) $(HSC2HS_OPTS) $<
 	@touch $(patsubst %.hsc,%_hsc.c,$<)
 endif
 

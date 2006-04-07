@@ -32,10 +32,6 @@ SUBDIRS = includes lib utils driver docs compiler
 endif
 endif
 
-ifeq ($(IncludeTestDirsInBuild),YES)
-SUBDIRS += tests
-endif
-
 SRC_DIST_FILES += configure
 
 # Clean everything created by configure:

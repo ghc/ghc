@@ -46,7 +46,7 @@ esac
 echo "*** Building compiler..."
 ./configure --enable-hc-boot $configopts
 
-$MAKE -C glafp-utils boot all
+$MAKE -C utils boot all
 $MAKE -C ghc boot
 $MAKE -C libraries boot all GhcBootLibs=YES
 $MAKE -C ghc all
@@ -60,7 +60,7 @@ configopts=`echo $configopts | sed s/--enable-hc-boot-unregisterised//`
 
 # Reconfigure, using the newly-build ghc binary as our $(GHC), and
 # with hc bootstrapping disabled.
-HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/ghc/compiler/ghc-inplace" $configopts
+HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/compiler/ghc-inplace" $configopts
 
 PRIMOP_BITS="primop-data-decl.hs-incl \
 	      primop-tag.hs-incl  \
@@ -80,27 +80,24 @@ PRIMOP_BITS="primop-data-decl.hs-incl \
 find libraries hslibs | grep '\.[oa]$' | xargs rm -f
 
 # Do includes and RTS now
-$MAKE -C ghc/includes boot && $MAKE -C ghc/includes all
-$MAKE -C ghc/rts      boot && $MAKE -C ghc/rts      all
+$MAKE -C includes boot && $MAKE -C includes all
+$MAKE -C rts      boot && $MAKE -C rts      all
 
 # Now build a new set of libraries (GhcBootLibs only for now)
 $MAKE -C libraries boot all GhcBootLibs=YES
 
-# Build all of ghc/lib
-$MAKE -C ghc/lib clean && $MAKE -C ghc/lib boot all
+# Build all of compat
+$MAKE -C compat clean && $MAKE -C compat boot all
 
-# Build all of ghc/utils
-$MAKE -C ghc/utils clean && $MAKE -C ghc/utils boot all
+# Build all of utils
+$MAKE -C utils clean && $MAKE -C utils boot all
 
 # Build the rest of the libraries
 $MAKE -C libraries boot all
 
-# Now we can build hslibs (hsc2hs is required, so must be after ghc/utils)
-$MAKE -C hslibs  boot all
-
 # The reconfigure step updates a few files, which can lead to
 # unnecessary recompilations.  Touch a bunch of things here to avoid
 # having to recompile stuff that we've already built.
-(cd ghc/compiler; touch $PRIMOP_BITS parser/hschooks.o prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
+(cd compiler; touch $PRIMOP_BITS parser/hschooks.o prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
 
 # At this point, the tree should be safe to do 'make install' in.

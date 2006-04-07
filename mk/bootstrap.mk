@@ -67,7 +67,7 @@ PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS) $(CC_OPTS)
 
-SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/libraries/unix/include -I$(FPTOOLS_TOP_ABS)/libraries/parsec/include
+SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/$(GHC_INCLUDE_DIR_REL) -I$(FPTOOLS_TOP_ABS)/libraries/base/include -I$(FPTOOLS_TOP_ABS)/libraries/unix/include -I$(FPTOOLS_TOP_ABS)/libraries/parsec/include
 
 # C code compiled with UseGhcForCc=YES assumes the existence of certain CPP
 # symbols defined by GHC (eg. __GLASGOW_HASKELL__), so we better make sure
@@ -89,11 +89,11 @@ UNDERSCORE=
 endif
 
 ifeq "$(HaveLibGmp)" "NO"
-DASH_L_GHC_RTS_GMP_DIR=-L$(FPTOOLS_TOP_ABS)/ghc/rts/gmp
+DASH_L_GHC_RTS_GMP_DIR=-L$(FPTOOLS_TOP_ABS)/$(GHC_RTS_DIR_REL)/gmp
 endif
 
 HC_BOOT_LD_OPTS =				\
-   -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
+   -L$(FPTOOLS_TOP_ABS)/$(GHC_RTS_DIR_REL)	\
    $(DASH_L_GHC_RTS_GMP_DIR)                    \
    -L$(FPTOOLS_TOP_ABS)/libraries/base		\
    -L$(FPTOOLS_TOP_ABS)/libraries/base/cbits	\

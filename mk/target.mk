@@ -2,14 +2,14 @@
 #
 #			target.mk
 #
-#		Standard targets for fptools
+#		Standard targets for GHC
 #
 #################################################################################
 
 #
 # This file contain three groups of target rules:
 #
-# 1.  FPtools targets
+# 1.  GHC targets
 #	depend*
 #	runtests*
 #
@@ -19,7 +19,7 @@
 #       install-docs*
 #	clean* distclean* mostlyclean* maintainer-clean*
 #	tags*
-#	dvi ps (no info) FPTOOLS adds: pdf rtf html chm HxS
+#	dvi ps (no info) GHC adds: pdf rtf html chm HxS
 #	check
 #
 # 3. Some of the above targets have a version that
@@ -50,7 +50,7 @@ include $(TOP)/mk/package.mk
 include $(TOP)/mk/suffix.mk
 
 ##################################################################
-# 		FPtools standard targets
+# 		GHC standard targets
 #
 # depend:
 #
@@ -202,7 +202,7 @@ endif
 #      directories where files are installed, and their parent
 #      directories. There is a script called `mkinstalldirs' which is
 #      convenient for this; find it in the Texinfo package.
-#      (FPTOOLS: we use a close relative of the suggested script, situated
+#      (GHC: we use a close relative of the suggested script, situated
 #       in glafp-utils/mkdirhier -- SOF)
 
 
@@ -373,7 +373,7 @@ SRC_BLD_DLL_OPTS += --export-all --output-def=HS$(PACKAGE)$(_cbits)$(_way).def D
 ifneq "$(PACKAGE) $(IS_CBITS_LIB)" "std YES"
 ifneq "$(PACKAGE)" "rts"
 SRC_BLD_DLL_OPTS += -lHSstd_cbits_imp -L$(GHC_LIB_DIR)/std/cbits
-SRC_BLD_DLL_OPTS += -lHSrts_$(way_)imp -L$(GHC_RUNTIME_DIR)
+SRC_BLD_DLL_OPTS += -lHSrts_$(way_)imp -L$(GHC_RTS_DIR)
 ifneq "$(PACKAGE)" "std"
   ifeq "$(IS_CBITS_LIB)" ""
   SRC_BLD_DLL_OPTS += -lHSstd_$(way_)imp -L$(GHC_LIB_DIR)/std 
@@ -382,7 +382,7 @@ endif
 endif
 endif
 
-SRC_BLD_DLL_OPTS += -lgmp -L. -L$(GHC_RUNTIME_DIR)/gmp
+SRC_BLD_DLL_OPTS += -lgmp -L. -L$(GHC_RTS_DIR)/gmp
 ifeq "$(IS_CBITS_LIB)" ""
 SRC_BLD_DLL_OPTS += $(patsubst %,-lHS%_$(way_)imp, $(PACKAGE_DEPS))
 SRC_BLD_DLL_OPTS += $(patsubst %,-L../%, $(PACKAGE_DEPS))
@@ -1077,21 +1077,21 @@ ifeq "$(way)" ""
 # since these are way-independent
 all docs TAGS clean distclean mostlyclean maintainer-clean install ::
 	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Recursively making \`$@' for ways: $(WAYS) ..."
+	@echo "== Recursively making \`$@' for ways: $(WAYS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 # Don't rely on -e working, instead we check exit return codes from sub-makes.
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(WAYS) ; do \
 	  echo "------------------------------------------------------------------------"; \
-	  echo "==fptools== $(MAKE) way=$$i $@;"; \
+	  echo "== $(MAKE) way=$$i $@;"; \
 	  echo "PWD = $(shell pwd)"; \
 	  echo "------------------------------------------------------------------------"; \
 	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
 	  if [ $$? -eq 0 ] ; then true; else exit $$x_on_err; fi; \
 	done
 	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Finished recursively making \`$@' for ways: $(WAYS) ..."
+	@echo "== Finished recursively making \`$@' for ways: $(WAYS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 
@@ -1171,21 +1171,21 @@ endif
 
 $(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html chm HxS ps dvi txt::
 	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
+	@echo "== Recursively making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 # Don't rely on -e working, instead we check exit return codes from sub-makes.
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
-	  echo "==fptools== $(MAKE) $@ $(MFLAGS);"; \
+	  echo "== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
 	  echo "------------------------------------------------------------------------"; \
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
 	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
+	@echo "== Finished making \`$@' in $(SUBDIRS) ..."
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 

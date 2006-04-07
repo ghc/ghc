@@ -1,0 +1,152 @@
+/* The RTS is just another package! */
+
+#include "ghcconfig.h"
+#include "RtsConfig.h"
+
+name:		PACKAGE
+version:	1.0
+license:	BSD3
+maintainer:	glasgow-haskell-users@haskell.org
+exposed:	True
+
+exposed-modules:
+hidden-modules:
+
+import-dirs:
+
+#ifdef INSTALLING
+library-dirs:		LIB_DIR
+# ifdef mingw32_HOST_OS
+			, LIB_DIR"/gcc-lib"
+			/* force the dist-provided gcc-lib/ into scope. */
+# endif
+#else /* !INSTALLING */
+library-dirs:		FPTOOLS_TOP_ABS"/rts"
+# if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
+			, FPTOOLS_TOP_ABS"/rts/gmp"
+# endif
+#endif
+
+hs-libraries:   "HSrts"
+
+extra-libraries:		"m"		/* for ldexp() */
+#ifndef HAVE_FRAMEWORK_GMP
+			      , "gmp"
+#ifdef HAVE_LIBDL
+			      , "dl"
+#endif
+#endif
+#ifdef HAVE_LIBRT
+			      , "rt"
+#endif
+#ifdef mingw32_HOST_OS
+			      ,"wsock32"	/* for the linker */
+#endif
+#ifdef WANT_DOTNET_SUPPORT
+			      , "oleaut32", "ole32", "uuid"
+#endif
+#if defined(DEBUG) && defined(HAVE_LIBBFD)
+			      ,"bfd", "iberty"	/* for debugging */
+#endif
+#ifdef HAVE_LIBMINGWEX
+# ifndef INSTALLING                             /* Bundled Mingw is behind */
+                              ,"mingwex"
+# endif
+#endif
+
+#ifdef INSTALLING
+include-dirs:		INCLUDE_DIR
+# ifdef mingw32_HOST_OS
+			, INCLUDE_DIR"/mingw"
+# endif
+#else /* !INSTALLING */
+include-dirs:		FPTOOLS_TOP_ABS"/includes"
+#endif
+
+includes:		Stg.h
+depends:	 	
+hugs-options:
+cc-options:
+
+ld-options:
+#ifdef LEADING_UNDERSCORE
+           "-u", "_GHCziBase_Izh_static_info"
+         , "-u", "_GHCziBase_Czh_static_info"
+         , "-u", "_GHCziFloat_Fzh_static_info"
+         , "-u", "_GHCziFloat_Dzh_static_info"
+         , "-u", "_GHCziPtr_Ptr_static_info"
+         , "-u", "_GHCziWord_Wzh_static_info"
+         , "-u", "_GHCziInt_I8zh_static_info"
+         , "-u", "_GHCziInt_I16zh_static_info"
+         , "-u", "_GHCziInt_I32zh_static_info"
+         , "-u", "_GHCziInt_I64zh_static_info"
+         , "-u", "_GHCziWord_W8zh_static_info"
+         , "-u", "_GHCziWord_W16zh_static_info"
+         , "-u", "_GHCziWord_W32zh_static_info"
+         , "-u", "_GHCziWord_W64zh_static_info"
+         , "-u", "_GHCziStable_StablePtr_static_info"
+         , "-u", "_GHCziBase_Izh_con_info"
+         , "-u", "_GHCziBase_Czh_con_info"
+         , "-u", "_GHCziFloat_Fzh_con_info"
+         , "-u", "_GHCziFloat_Dzh_con_info"
+         , "-u", "_GHCziPtr_Ptr_con_info"
+         , "-u", "_GHCziPtr_FunPtr_con_info"
+         , "-u", "_GHCziStable_StablePtr_con_info"
+         , "-u", "_GHCziBase_False_closure"
+         , "-u", "_GHCziBase_True_closure"
+         , "-u", "_GHCziPack_unpackCString_closure"
+         , "-u", "_GHCziIOBase_stackOverflow_closure"
+         , "-u", "_GHCziIOBase_heapOverflow_closure"
+         , "-u", "_GHCziIOBase_NonTermination_closure"
+         , "-u", "_GHCziIOBase_BlockedOnDeadMVar_closure"
+         , "-u", "_GHCziIOBase_BlockedIndefinitely_closure"
+         , "-u", "_GHCziIOBase_Deadlock_closure"
+         , "-u", "_GHCziIOBase_NestedAtomically_closure"
+         , "-u", "_GHCziWeak_runFinalizzerBatch_closure"
+#else
+           "-u", "GHCziBase_Izh_static_info"
+         , "-u", "GHCziBase_Czh_static_info"
+         , "-u", "GHCziFloat_Fzh_static_info"
+         , "-u", "GHCziFloat_Dzh_static_info"
+         , "-u", "GHCziPtr_Ptr_static_info"
+         , "-u", "GHCziWord_Wzh_static_info"
+         , "-u", "GHCziInt_I8zh_static_info"
+         , "-u", "GHCziInt_I16zh_static_info"
+         , "-u", "GHCziInt_I32zh_static_info"
+         , "-u", "GHCziInt_I64zh_static_info"
+         , "-u", "GHCziWord_W8zh_static_info"
+         , "-u", "GHCziWord_W16zh_static_info"
+         , "-u", "GHCziWord_W32zh_static_info"
+         , "-u", "GHCziWord_W64zh_static_info"
+         , "-u", "GHCziStable_StablePtr_static_info"
+         , "-u", "GHCziBase_Izh_con_info"
+         , "-u", "GHCziBase_Czh_con_info"
+         , "-u", "GHCziFloat_Fzh_con_info"
+         , "-u", "GHCziFloat_Dzh_con_info"
+         , "-u", "GHCziPtr_Ptr_con_info"
+         , "-u", "GHCziPtr_FunPtr_con_info"
+         , "-u", "GHCziStable_StablePtr_con_info"
+         , "-u", "GHCziBase_False_closure"
+         , "-u", "GHCziBase_True_closure"
+         , "-u", "GHCziPack_unpackCString_closure"
+         , "-u", "GHCziIOBase_stackOverflow_closure"
+         , "-u", "GHCziIOBase_heapOverflow_closure"
+         , "-u", "GHCziIOBase_NonTermination_closure"
+         , "-u", "GHCziIOBase_BlockedOnDeadMVar_closure"
+         , "-u", "GHCziIOBase_BlockedIndefinitely_closure"
+         , "-u", "GHCziIOBase_Deadlock_closure"
+         , "-u", "GHCziIOBase_NestedAtomically_closure"
+         , "-u", "GHCziWeak_runFinalizzerBatch_closure"
+#endif
+
+framework-dirs:
+
+#ifdef HAVE_FRAMEWORK_GMP
+frameworks:	"GMP"
+#else
+frameworks:
+#endif
+
+haddock-interfaces:
+haddock-html:
+

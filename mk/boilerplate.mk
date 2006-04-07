@@ -2,10 +2,10 @@
 #
 #			    mk/boilerplate.mk
 #
-#		The Glorious fptools Boilerplate Makefile
+#		The Glorious GHC Boilerplate Makefile
 #
 # This one file should be included (directly or indirectly) by all Makefiles 
-# in the fptools hierarchy.
+# in the GHC hierarchy.
 #
 #################################################################################
 

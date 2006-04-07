@@ -230,7 +230,7 @@ TAGS_C_SRCS=$(C_SRCS)
 #
 # NOTE: $(SCRIPT_OBJS) is not in MOSTLY_CLEAN_FILES, because in some
 # places in the tree it appears that we have source files in $(SCRIPT_OBJS).
-# Specifically glafp-utils/mkdependC/mkdependC.prl and others in ghc/driver and
+# Specifically glafp-utils/mkdependC/mkdependC.prl and others in driver/ and
 # possibly others elsewhere in the tree.  ToDo: fix this properly.
 MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS) $(GC_C_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \

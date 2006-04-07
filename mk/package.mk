@@ -3,13 +3,8 @@
 
 ifneq "$(PACKAGE)" ""
 
-ifeq "$(STANDALONE_PACKAGE)" ""
-ifeq "$(ProjectNameShort)" "ghc"
+# FIXME: does anyone do this any more?
 STANDALONE_PACKAGE = NO
-else
-STANDALONE_PACKAGE = YES
-endif
-endif
 
 # -----------------------------------------------------------------------------
 # Directory layouts, installation etc.
@@ -104,7 +99,7 @@ package.conf.installed : package.conf.in
 	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
 
 # we could be more accurate here and add a dependency on
-# ghc/driver/package.conf, but that doesn't work too well because of
+# driver/package.conf, but that doesn't work too well because of
 # make's limited accuracy with modification times: when doing 'make
 # boot' in multiple packages, make won't detect that the package
 # configuration needs updating if it was updated already in the last
