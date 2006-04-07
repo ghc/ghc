@@ -397,6 +397,7 @@ binary-dist::
 #
 # Directory in which we're going to build the src dist
 #
+SRC_DIST_NAME=ghc-$(ProjectVersion)
 SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 
 #
@@ -405,13 +406,11 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 SRC_DIST_DIRS += docs distrib $(filter-out docs distrib,$(SUBDIRS))
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
-	aclocal.m4 README Makefile install-sh \
+	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
 	mk/bootstrap.mk \
 	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \
 	mk/paths.mk mk/package.mk mk/suffix.mk mk/target.mk \
 	mk/fptools.css mk/fix_install_names.sh
-
-dist dist-manifest dist-package :: project-check
 
 # clean the tree first, leaving certain extra files in place (eg. configure)
 dist :: distclean
@@ -446,7 +445,7 @@ dist-package-zip ::
 # -----------------------------------------------------------------------------
 # HC file bundles
 
-hc-file-bundle : project-check
+hc-file-bundle :
 	$(RM) -r $(ProjectNameShort)-$(ProjectVersion)
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
 	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/compiler \

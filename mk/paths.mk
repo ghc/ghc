@@ -262,45 +262,6 @@ MOSTLY_CLEAN_FILES += \
  *.toc *.lot *.lof *.blg *.cb *_stub.c *_stub.h *.raw_s *.a.list
 
 #------------------------------------------------------------------
-#
-# Distribution setup
-#
-# Following variables are used for creating source and binary distributions:
-#
-#  SRC_DIST_NAME && BIN_DIST_NAME  -- the package names
-#
-#  SRC_DIST_FILES = list of extra files to include from a build tree into a source
-#                   distribution
-#
-#  SRC_DIST_DIR  = what the current directory in the source/build tree
-#                  maps to in the source distrib. tree being created.
-#
-SRC_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
-
-#
-# Binary distributions proceeds as follows:
-#
-# Fromthe top of a build tree, you do `make binary-dist'. The
-# canned rule for this  (in target.mk) will then do a binary
-# install to a temporary directory before packaging it all up.
-# The following variables guide the binary-dist:
-#
-#  BIN_DIST_TMPDIR= the absolute path to where the temporary directory
-#		    structure of a binary distribution should be created.
-#		    [Default: toplevel from which you issue `make binary-dist']
-#  BIN_DIST_NAME=   what to call the thing.
-#
-#  BIN_DIST_DIRS=   at the toplevel, list of directories to descend into when
-#		    building the distribution tree.
-#
-#  An extra directory variable that is set during bin-dists is $(bindist_top), giving
-#  the abs. path to the root of the binary installation tree. (useful when punting
-#  stuff like README and ANNOUNCE into a distrib, for instance)
-#
-#  The layout of a binary distribution is described in the
-#  installation documentation.
-#
-
 
 # Directory in which DLLs are dumped so as not to get picked up by running
 # programs (e.g. ghc or hsc) that run in the build tree
