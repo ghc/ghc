@@ -133,7 +133,7 @@ ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 # These files need to be in the InstallShield
 # INSTALL_DATAS rather than INSTALL_DOCS is used so these files go
 # in the top-level directory of the distribution
-INSTALL_DATAS += ANNOUNCE LICENSE README VERSION
+INSTALL_DATAS += ANNOUNCE LICENSE README
 endif
 
 # If installing on Windows with MinGW32, copy the gcc compiler, headers and libs
@@ -172,9 +172,6 @@ install-docs ::
 # -----------------------------------------------------------------------------
 # Making a binary distribution
 #
-# To make a particular binary distribution: 
-# set $(Project) to the name of the project, capitalised (eg. Ghc or Happy).
-
 # `dist' `binary-dist'
 #      Create a distribution tar file for this program. The tar file
 #      should be set up so that the file names in the tar file start with
@@ -192,41 +189,33 @@ install-docs ::
 #      that are in the distribution, to make sure they are up to date in
 #      the distribution. See Making Releases.
 #
-#	binary-dist is an FPtools addition for binary distributions
+#	binary-dist is a GHC addition for binary distributions
 # 
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-GhcBinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion) hsc2hs
+BinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion) hsc2hs
 else
-GhcBinDistShScripts =
+BinDistShScripts =
 endif
 
-GhcBinDistPrlScripts = ghcprof
-GhcBinDistLibPrlScripts = ghc-asm ghc-split
-GhcBinDistBins = hp2ps runghc
-GhcBinDistOptBins = runhaskell
-GhcBinDistLinks = ghc ghci ghc-pkg
-GhcBinDistLibSplicedFiles = package.conf
+BinDistPrlScripts = ghcprof
+BinDistLibPrlScripts = ghc-asm ghc-split
+BinDistBins = hp2ps runghc
+BinDistOptBins = runhaskell
+BinDistLinks = ghc ghci ghc-pkg
+BinDistLibSplicedFiles = package.conf
+BinDistDirs = includes compiler docs driver libraries rts utils
 
+BIN_DIST_NAME=ghc-$(ProjectVersion)
 BIN_DIST_TMPDIR=$(FPTOOLS_TOP_ABS)
-BIN_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
-
-#
-# list of toplevel directories to include in binary distrib.
-#
-BIN_DIST_MAIN_DIR=$($(Project)MainDir)
-BIN_DIST_DIRS=$($(Project)BinDistDirs)
-
-binary-dist:: binary-dist-pre
 
 BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      distrib/configure-bin.ac \
 	      distrib/INSTALL \
-	      $(BIN_DIST_MAIN_DIR)/ANNOUNCE \
-	      $(BIN_DIST_MAIN_DIR)/VERSION \
-	      $(BIN_DIST_MAIN_DIR)/LICENSE \
-	      $(BIN_DIST_MAIN_DIR)/README \
-	      glafp-utils/mkdirhier/mkdirhier \
+	      distrib/README \
+	      ANNOUNCE \
+	      LICENSE \
+	      utils/mkdirhier/mkdirhier \
 	      install-sh \
 	      config.guess \
 	      config.sub   \
@@ -236,24 +225,18 @@ ifeq "$(darwin_TARGET_OS)" "1"
 BIN_DIST_TOP+=mk/fix_install_names.sh
 endif
 
-#
-# binary-dist creates a binary bundle, set BIN_DIST_NAME
-# to package name and do `make binary-dist Project=<project-name>'
-# (normally this just a thing you would do from the toplevel of fptools)
-#
 .PHONY: binary-dist-pre binary-dist binary-pack
 
-BIN_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
-BIN_DIST_TMPDIR=$(FPTOOLS_TOP_ABS)
+binary-dist:: binary-dist-pre
 
 binary-dist-pre::
 ifeq "$(BIN_DIST)" ""
-	@echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in your build.mk" && exit 1
+	@echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in mk/build.mk" && exit 1
 endif
 	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
 	-$(RM) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
 	-echo "BIN_DIST_DIRS = $(BIN_DIST_DIRS)"
-	@for i in $(BIN_DIST_DIRS); do 		 	 \
+	@for i in $(BinDistDirs); do 		 	 \
 	  if test -d "$$i"; then 			 \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
 	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
@@ -289,25 +272,17 @@ binary-dist::
 	touch $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	echo "package = $(ProjectNameShort)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	echo "version = $(ProjectVersion)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_SH_SCRIPTS = $($(Project)BinDistShScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_PRL_SCRIPTS = $($(Project)BinDistPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_LIB_PRL_SCRIPTS = $($(Project)BinDistLibPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_LIB_SPLICED_FILES = $($(Project)BinDistLibSplicedFiles)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_BINS = $($(Project)BinDistBins)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_OPT_BINS = $($(Project)BinDistOptBins)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_LINKS = $($(Project)BinDistLinks)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_SH_SCRIPTS = $(BinDistShScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_PRL_SCRIPTS = $(BinDistPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_LIB_PRL_SCRIPTS = $(BinDistLibPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_LIB_SPLICED_FILES = $(BinDistLibSplicedFiles)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_BINS = $(BinDistBins)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_OPT_BINS = $(BinDistOptBins)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "PACKAGE_LINKS = $(BinDistLinks)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	cat $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile-bin.in >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.ac $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.ac
 	( cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
-	if test -x $(BIN_DIST_MAIN_DIR)/mk/post-install-script ; then \
-		cp $(BIN_DIST_MAIN_DIR)/mk/post-install-script \
-			$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) ; \
-	fi
-	if test -x $(BIN_DIST_MAIN_DIR)/mk/post-inplace-script ; then \
-		cp $(BIN_DIST_MAIN_DIR)/mk/post-inplace-script \
-			$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) ; \
-	fi
 #
 # binary dist'ing the documentation.  
 # The default documentation to build/install is given below; overrideable
@@ -359,25 +334,25 @@ endif
 # Rename scripts to $i.prl and $i.sh where necessary.
 # ToDo: do this in a cleaner way...
 
-ifneq "$($(Project)BinDistPrlScripts)" ""
+ifneq "$(BinDistPrlScripts)" ""
 binary-dist::
-	@for i in $($(Project)BinDistPrlScripts); do \
+	@for i in $(BinDistPrlScripts); do \
 	     echo "Renaming $$i to $$i.prl"; \
 	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i.prl; \
 	done
 endif
 
-ifneq "$($(Project)BinDistLibPrlScripts)" ""
+ifneq "$(BinDistLibPrlScripts)" ""
 binary-dist::
-	@for i in $($(Project)BinDistLibPrlScripts); do \
+	@for i in $(BinDistLibPrlScripts); do \
 	     echo "Renaming $$i to $$i.prl"; \
 	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i.prl; \
 	done
 endif
 
-ifneq "$($(Project)BinDistShScripts)" ""
+ifneq "$(BinDistShScripts)" ""
 binary-dist::
-	@for i in $($(Project)BinDistShScripts); do \
+	@for i in $(BinDistShScripts); do \
 	    if test -x $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i ; then \
 	    	echo "Renaming $$i to $$i.sh"; \
 	    	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i.sh; \
