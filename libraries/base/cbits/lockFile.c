@@ -10,7 +10,7 @@
 
 #include "HsBase.h"
 #include "Rts.h"
-#include "../../ghc/rts/RtsUtils.h" // for barf()
+#include "RtsUtils.h"
 
 typedef struct {
     dev_t device;

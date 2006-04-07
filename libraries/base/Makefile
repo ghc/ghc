@@ -40,7 +40,7 @@ PACKAGE = base
 VERSION = 1.0
 
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude -"\#include" HsBase.h
-SRC_HSC2HS_OPTS += -Iinclude -I$(FPTOOLS_TOP)/ghc/includes
+SRC_HSC2HS_OPTS += -Iinclude -I$(GHC_INCLUDE_DIR)
 
 # -----------------------------------------------------------------------------
 # Per-module flags
@@ -51,7 +51,7 @@ SRC_HC_OPTS += -funbox-strict-fields
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
 
-# These two lines are required for pre-processing ghc/compiler/prelude/primops.txt
+# These two lines are required for pre-processing compiler/prelude/primops.txt
 SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
 SRC_CPP_OPTS += ${GhcCppOpts}
 
@@ -61,12 +61,12 @@ GHC/PrimopWrappers.hs: GHC/Prim.hs
 else
 GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt GHC/Prim.hs
 	@$(RM) $@
-	$(GHC_GENPRIMOP) --make-haskell-wrappers < $< > $@
+	$(GENPRIMOP) --make-haskell-wrappers < $< > $@
 endif
 
 GHC/Prim.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt
 	@$(RM) $@
-	$(GHC_GENPRIMOP) --make-haskell-source < $< > $@
+	$(GENPRIMOP) --make-haskell-source < $< > $@
 
 EXCLUDED_SRCS = GHC/Prim.hs
 EXTRA_HADDOCK_SRCS = GHC/Prim.hs
@@ -80,7 +80,7 @@ CLEAN_FILES += GHC/PrimopWrappers.hs
 ifneq "$(BootingFromHc)" "YES"
 STUBOBJS += \
    Control/Concurrent_stub.$(way_)o
-   
+
 CLEAN_FILES += $(STUBOBJS) \
    Control/Concurrent_stub.[ch]
 endif
