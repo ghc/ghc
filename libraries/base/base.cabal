@@ -20,6 +20,7 @@ exposed-modules:
 	Control.Exception,
 	Control.Monad,
 	Control.Monad.Fix,
+	Control.Monad.Instances,
 	Control.Monad.ST,
 	Control.Monad.ST.Lazy,
 	Control.Monad.ST.Strict,

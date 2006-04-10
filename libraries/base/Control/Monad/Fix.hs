@@ -24,6 +24,7 @@ module Control.Monad.Fix (
 
 import Prelude
 import System.IO
+import Control.Monad.Instances ()
 
 -- | @'fix' f@ is the least fixed point of the function @f@,
 -- i.e. the least defined @x@ such that @f x = x@.
@@ -71,3 +72,6 @@ instance MonadFix [] where
 -- IO:
 instance MonadFix IO where
     mfix = fixIO 
+
+instance MonadFix ((->) r) where
+    mfix f = \ r -> let a = f a r in a
