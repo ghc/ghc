@@ -1383,6 +1383,16 @@ f "2"    = 2
 	    <para>Turns off the full laziness optimisation (also known as
 	      let-floating).  Full laziness increases sharing, which can lead
 	      to increased memory residency.</para>
+
+            <para>NOTE: GHC doesn't implement complete full-laziness.
+            When optimisation in on, and
+            <option>-fno-full-laziness</option> is not given, some
+            transformations that increase sharing are performed, such
+            as extracting repeated computations from a loop.  These
+            are the same transformations that a fully lazy
+            implementation would do, the difference is that GHC
+            doesn't consistently apply full-laziness, so don't rely on
+            it.</para>
 	  </listitem>
 	</varlistentry>
 
