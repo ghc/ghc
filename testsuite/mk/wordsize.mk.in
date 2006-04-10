@@ -1,5 +1,5 @@
 
-#include "../../ghc/includes/MachDeps.h"
+#include "../../includes/MachDeps.h"
 
 WORDSIZE = WORD_SIZE_IN_BITS
 
