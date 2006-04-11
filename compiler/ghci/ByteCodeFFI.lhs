@@ -24,7 +24,7 @@ import DATA_WORD	( Word8, Word32 )
 import Foreign		( Ptr )
 import System.IO.Unsafe ( unsafePerformIO )
 import IO		( hPutStrLn, stderr )
-import Debug.Trace	( trace )
+-- import Debug.Trace	( trace )
 \end{code}
 
 %************************************************************************
@@ -74,7 +74,7 @@ mkMarshalCode :: CCallConv
 mkMarshalCode cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    = let bytes = mkMarshalCode_wrk cconv (r_offW, r_rep) 
                                    addr_offW arg_offs_n_reps
-     in  trace (show bytes) $ Foreign.newArray bytes
+     in  Foreign.newArray bytes
 
 
 
