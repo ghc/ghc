@@ -8,7 +8,7 @@ else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode ghc-pkg unlit
 else
-SUBDIRS = mkdependC mkdirhier runstdtest ghc-pkg hasktags hp2ps hsc2hs lndir \
+SUBDIRS = mkdependC mkdirhier runstdtest ghc-pkg hasktags hp2ps hsc2hs \
 	  parallel prof unlit genprimopcode genapply runghc
 endif
 endif
@@ -16,6 +16,12 @@ endif
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SUBDIRS += touchy
 endif
+
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+# lndir doesn't build on Windows
+SUBDIRS += lndir
+endif
+
 
 # Utils that we don't build by default:
 #	nofib-analyse
