@@ -26,9 +26,9 @@ module Encoding (
 #define COMPILING_FAST_STRING
 #include "HsVersions.h"
 import Foreign
-import Data.Char	( ord, chr, isDigit, digitToInt, isHexDigit )
-import Numeric		( showHex )
-
+import Data.Char	( ord, chr, isDigit, digitToInt, intToDigit,
+			  isHexDigit )
+import Numeric		( showIntAtBase )
 import Data.Bits
 import GHC.Ptr		( Ptr(..) )
 import GHC.Base
@@ -280,6 +280,9 @@ encode_ch c    = 'z' : if isDigit (head hex_str) then hex_str
   -- ToDo: we could improve the encoding here in various ways.
   -- eg. strings of unicode characters come out as 'z1234Uz5678U', we
   -- could remove the 'U' in the middle (the 'z' works as a separator).
+
+	showHex = showIntAtBase 16 intToDigit
+	-- needed because prior to GHC 6.2, Numeric.showHex added a "0x" prefix
 
 zDecodeString :: EncodedString -> UserString
 zDecodeString [] = []
