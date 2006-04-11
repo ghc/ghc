@@ -35,7 +35,7 @@ import SMRep		( argMachRep, primRepToCgRep, primRepHint )
 import OccName		( mkForeignExportOcc )
 import Name		( Name, NamedThing(..), mkExternalName )
 import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
-			  tcSplitForAllTys, 
+			  tcSplitForAllTys, tcSplitIOType_maybe,
 			  isFFIArgumentTy, isFFIImportResultTy, 
 			  isFFIExportResultTy, isFFILabelTy,
 			  isFFIExternalTy, isFFIDynArgumentTy,
@@ -277,13 +277,14 @@ nonIOok  = True
 mustBeIO = False
 
 checkForeignRes non_io_result_ok pred_res_ty ty
- = case tcSplitTyConApp_maybe ty of
-      Just (io, [res_ty]) 
-        | io `hasKey` ioTyConKey && pred_res_ty res_ty 
-	-> returnM ()
-      _   
-        -> check (non_io_result_ok && pred_res_ty ty) 
-		 (illegalForeignTyErr result ty)
+	-- (IO t) is ok, and so is any newtype wrapping thereof
+  | Just (io, res_ty) <- tcSplitIOType_maybe ty,
+    pred_res_ty res_ty
+  = returnM ()
+ 
+  | otherwise
+  = check (non_io_result_ok && pred_res_ty ty) 
+	  (illegalForeignTyErr result ty)
 \end{code}
 
 \begin{code}

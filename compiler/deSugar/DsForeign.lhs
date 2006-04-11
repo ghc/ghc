@@ -32,21 +32,21 @@ import Module		( moduleFS )
 import Name		( getOccString, NamedThing(..) )
 import Type		( repType, coreEqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
-			  mkFunTy, tcSplitTyConApp_maybe, 
+			  mkFunTy, tcSplitTyConApp_maybe, tcSplitIOType_maybe,
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
 			)
 
 import BasicTypes       ( Boxity(..) )
 import HscTypes		( ForeignStubs(..) )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
-			  Safety(..), playSafe,
+			  Safety(..), 
 			  CExportSpec(..), CLabelString,
 			  CCallConv(..), ccallConvToInt,
 			  ccallConvAttribute
 			)
 import TysWiredIn	( unitTy, tupleTyCon )
 import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy )
-import PrelNames	( hasKey, ioTyConKey, stablePtrTyConName, newStablePtrName, bindIOName,
+import PrelNames	( stablePtrTyConName, newStablePtrName, bindIOName,
 			  checkDotnetResName )
 import BasicTypes	( Activation( NeverActive ) )
 import SrcLoc		( Located(..), unLoc )
@@ -253,9 +253,6 @@ dsFCall fn_id fcall no_hdrs
         wrap_rhs     = mkInlineMe (mkLams (tvs ++ args) wrapper_body)
     in
     returnDs ([(work_id, work_rhs), (fn_id, wrap_rhs)], empty, empty)
-
-unsafe_call (CCall (CCallSpec _ _ safety)) = playSafe safety
-unsafe_call (DNCall _)			   = False
 \end{code}
 
 
@@ -304,19 +301,12 @@ dsFExport fn_id ty ext_name cconv isDyn
 	-- Look at the result type of the exported function, orig_res_ty
 	-- If it's IO t, return		(t, True)
 	-- If it's plain t, return	(t, False)
-     (case tcSplitTyConApp_maybe orig_res_ty of
-	-- We must use tcSplit here so that we see the (IO t) in
-	-- the type.  [IO t is transparent to plain splitTyConApp.]
-
-	Just (ioTyCon, [res_ty])
-	      -> ASSERT( ioTyCon `hasKey` ioTyConKey )
-		 -- The function already returns IO t
-		 returnDs (res_ty, True)
-
-	other -> -- The function returns t
-	         returnDs (orig_res_ty, False)
-     )
-					`thenDs` \ (res_ty,		-- t
+     (case tcSplitIOType_maybe orig_res_ty of
+	Just (ioTyCon, res_ty) -> returnDs (res_ty, True)
+		-- The function already returns IO t
+	Nothing 	       -> returnDs (orig_res_ty, False)	
+		-- The function returns t
+     )					`thenDs` \ (res_ty,		-- t
 						    is_IO_res_ty) ->	-- Bool
      returnDs $
        mkFExportCBits ext_name 

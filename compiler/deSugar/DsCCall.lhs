@@ -27,12 +27,12 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety,
 			  CCallConv(..), CLabelString )
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
 
-import TcType		( tcSplitTyConApp_maybe )
+import TcType		( tcSplitIOType_maybe )
 import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
 			  isPrimitiveType, splitTyConApp_maybe, 
 			  splitRecNewType_maybe, splitForAllTy_maybe,
-			  isUnboxedTupleType
+			  isUnboxedTupleType, coreView
 			)
 
 import PrimOp		( PrimOp(..) )
@@ -214,7 +214,7 @@ unboxArg arg
     	      \ body ->
 	        let
 		 io_ty = exprType body
-		 (Just (_,[io_arg])) = tcSplitTyConApp_maybe io_ty
+		 Just (_,io_arg) = tcSplitIOType_maybe io_ty
 		in
 	      	mkApps (Var unpack_id)
 		       [ Type io_arg
@@ -230,7 +230,7 @@ unboxArg arg
     	      \ body ->
 	        let
 		 io_ty = exprType body
-		 (Just (_,[io_arg])) = tcSplitTyConApp_maybe io_ty
+		 Just (_,io_arg) = tcSplitIOType_maybe io_ty
 		in
 	      	mkApps (Var unpack_id)
 		       [ Type io_arg
@@ -271,65 +271,70 @@ boxResult :: ((Maybe Type, CoreExpr -> CoreExpr) -> (Maybe Type, CoreExpr -> Cor
 -- where t' is the unwrapped form of t.  If t is simply (), then
 -- the result type will be 
 --	State# RealWorld -> (# State# RealWorld #)
+--
+-- The gruesome 'augment' and 'mbTopCon' are to do with .NET foreign calls
+-- It looks a mess: I wonder if it could be refactored.
 
 boxResult augment mbTopCon result_ty
-  = case tcSplitTyConApp_maybe result_ty of
-	-- This split absolutely has to be a tcSplit, because we must
-	-- see the IO type; and it's a newtype which is transparent to splitTyConApp.
+  | Just (io_tycon, io_res_ty) <- tcSplitIOType_maybe result_ty
+	-- isIOType_maybe handles the case where the type is a 
+	-- simple wrapping of IO.  E.g.
+	-- 	newtype Wrap a = W (IO a)
+	-- No coercion necessay because its a non-recursive newtype
+	-- (If we wanted to handle a *recursive* newtype too, we'd need
+	-- another case, and a coercion.)
+  = 	-- The result is IO t, so wrap the result in an IO constructor
+	
+    resultWrapper io_res_ty             `thenDs` \ res ->
+    let aug_res          = augment res
+        extra_result_tys = case aug_res of
+			     (Just ty,_) 
+			       | isUnboxedTupleType ty 
+			       -> let (Just (_, ls)) = splitTyConApp_maybe ty in tail ls
+			     _ -> []
 
-	-- The result is IO t, so wrap the result in an IO constructor
-	Just (io_tycon, [io_res_ty]) | io_tycon `hasKey` ioTyConKey
-		-> resultWrapper io_res_ty             `thenDs` \ res ->
-		   let aug_res          = augment res
-		       extra_result_tys =
-		         case aug_res of
-			   (Just ty,_) 
-			     | isUnboxedTupleType ty ->
-			        let (Just (_, ls)) = splitTyConApp_maybe ty in tail ls
-			   _ -> []
-	           in
-		   mk_alt (return_result extra_result_tys) aug_res 
-		   					`thenDs` \ (ccall_res_ty, the_alt) ->
-		   newSysLocalDs  realWorldStatePrimTy  `thenDs` \ state_id ->
-		   let
-			io_data_con = head (tyConDataCons io_tycon)
-			toIOCon = 
-			  case mbTopCon of
-			    Nothing -> dataConWrapId io_data_con
-			    Just x  -> x
-			wrap = \ the_call -> 
-				 mkApps (Var toIOCon)
-					   [ Type io_res_ty, 
-					     Lam state_id $
-					      Case (App the_call (Var state_id))
-						   (mkWildId ccall_res_ty)
-                                                   (coreAltType the_alt) 
-						   [the_alt]
-					   ]
-		   in
-		   returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
-		where
-		   return_result ts state anss 
-		     = mkConApp (tupleCon Unboxed (2 + length ts))
-			        (Type realWorldStatePrimTy : Type io_res_ty : map Type ts ++
-			         state : anss) 
-	-- It isn't, so do unsafePerformIO
+        return_result state anss
+	  = mkConApp (tupleCon Unboxed (2 + length extra_result_tys))
+	             (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
+		      ++ (state : anss)) 
+    in
+    mk_alt return_result aug_res 	`thenDs` \ (ccall_res_ty, the_alt) ->
+    newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
+    let
+	io_data_con = head (tyConDataCons io_tycon)
+	toIOCon = case mbTopCon of
+			Nothing -> dataConWrapId io_data_con
+			Just x  -> x
+	wrap = \ the_call -> mkApps (Var toIOCon)
+				    [ Type io_res_ty, 
+				      Lam state_id $
+				       Case (App the_call (Var state_id))
+				    	   (mkWildId ccall_res_ty)
+                                            (coreAltType the_alt) 
+				    	   [the_alt]
+				    ]
+    in
+    returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
+
+boxResult augment mbTopCon result_ty
+  = 	-- It isn't IO, so do unsafePerformIO
 	-- It's not conveniently available, so we inline it
-	other -> resultWrapper result_ty            `thenDs` \ res ->
-	         mk_alt return_result (augment res) `thenDs` \ (ccall_res_ty, the_alt) ->
-		 let
-		    wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
+    resultWrapper result_ty            `thenDs` \ res ->
+    mk_alt return_result (augment res) `thenDs` \ (ccall_res_ty, the_alt) ->
+    let
+	wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
 					      (mkWildId ccall_res_ty)
                                               (coreAltType the_alt)
 					      [the_alt]
-		 in
-		 returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
-	      where
-		 return_result state [ans] = ans
-		 return_result _ _ = panic "return_result: expected single result"
+    in
+    returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
   where
-    mk_alt return_result (Nothing, wrap_result)
-	= 	-- The ccall returns ()
+    return_result state [ans] = ans
+    return_result _ _ = panic "return_result: expected single result"
+
+
+mk_alt return_result (Nothing, wrap_result)
+  = 	-- The ccall returns ()
 	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
 	  let
 		the_rhs = return_result (Var state_id) 
@@ -340,37 +345,37 @@ boxResult augment mbTopCon result_ty
 	  in
 	  returnDs (ccall_res_ty, the_alt)
 
-    mk_alt return_result (Just prim_res_ty, wrap_result)
+mk_alt return_result (Just prim_res_ty, wrap_result)
     		-- The ccall returns a non-() value
-        | isUnboxedTupleType prim_res_ty
-        = let
-		Just (_, ls) = splitTyConApp_maybe prim_res_ty
-		arity = 1 + length ls
-	  in
-	  mappM newSysLocalDs ls 		`thenDs` \ args_ids@(result_id:as) ->
-	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
-	  let
-		the_rhs = return_result (Var state_id) 
-					(wrap_result (Var result_id) : map Var as)
-		ccall_res_ty = mkTyConApp (tupleTyCon Unboxed arity)
-					  (realWorldStatePrimTy : ls)
-		the_alt	     = ( DataAlt (tupleCon Unboxed arity)
-			       , (state_id : args_ids)
-			       , the_rhs
-			       )
-	  in
-	  returnDs (ccall_res_ty, the_alt)
-	| otherwise
-	= newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
-	  newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
-	  let
-		the_rhs = return_result (Var state_id) 
-					[wrap_result (Var result_id)]
+  | isUnboxedTupleType prim_res_ty
+  = let
+	Just (_, ls) = splitTyConApp_maybe prim_res_ty
+	arity = 1 + length ls
+    in
+    mappM newSysLocalDs ls 		`thenDs` \ args_ids@(result_id:as) ->
+    newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
+    let
+	the_rhs = return_result (Var state_id) 
+				(wrap_result (Var result_id) : map Var as)
+	ccall_res_ty = mkTyConApp (tupleTyCon Unboxed arity)
+				  (realWorldStatePrimTy : ls)
+	the_alt	     = ( DataAlt (tupleCon Unboxed arity)
+		       , (state_id : args_ids)
+		       , the_rhs
+		       )
+    in
+    returnDs (ccall_res_ty, the_alt)
 
-		ccall_res_ty = mkTyConApp unboxedPairTyCon [realWorldStatePrimTy, prim_res_ty]
-		the_alt	     = (DataAlt unboxedPairDataCon, [state_id, result_id], the_rhs)
-	  in
-	  returnDs (ccall_res_ty, the_alt)
+  | otherwise
+  = newSysLocalDs prim_res_ty 		`thenDs` \ result_id ->
+    newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
+    let
+	the_rhs = return_result (Var state_id) 
+				[wrap_result (Var result_id)]
+	ccall_res_ty = mkTyConApp unboxedPairTyCon [realWorldStatePrimTy, prim_res_ty]
+	the_alt	     = (DataAlt unboxedPairDataCon, [state_id, result_id], the_rhs)
+    in
+    returnDs (ccall_res_ty, the_alt)
 
 
 resultWrapper :: Type

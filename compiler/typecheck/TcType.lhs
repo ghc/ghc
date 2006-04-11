@@ -82,7 +82,7 @@ module TcType (
   isFFIDotnetTy,       -- :: DynFlags -> Type -> Bool
   isFFIDotnetObjTy,    -- :: Type -> Bool
   isFFITy,	       -- :: Type -> Bool
-  
+  tcSplitIOType_maybe, -- :: Type -> Maybe Type  
   toDNType,            -- :: Type -> DNType
 
   --------------------------------
@@ -160,7 +160,7 @@ import Type		(	-- Re-exports
 		  	  substTy, substTys, substTyWith, substTheta, 
 			  substTyVar, substTyVarBndr, substPred, lookupTyVar,
 
-			  typeKind, repType,
+			  typeKind, repType, coreView,
 			  pprKind, pprParendKind,
 			  pprType, pprParendType, pprTyThingCategory,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
@@ -1029,6 +1029,23 @@ restricted set of types as arguments and results (the restricting factor
 being the )
 
 \begin{code}
+tcSplitIOType_maybe :: Type -> Maybe (TyCon, Type)
+-- (isIOType t) returns (Just (IO,t')) if t is of the form (IO t'), or
+--				       some newtype wrapping thereof
+--		returns Nothing otherwise
+tcSplitIOType_maybe ty 
+  | Just (io_tycon, [io_res_ty]) <- tcSplitTyConApp_maybe ty,
+	-- This split absolutely has to be a tcSplit, because we must
+	-- see the IO type; and it's a newtype which is transparent to splitTyConApp.
+    io_tycon `hasKey` ioTyConKey
+  = Just (io_tycon, io_res_ty)
+
+  | Just ty' <- coreView ty	-- Look through non-recursive newtypes
+  = tcSplitIOType_maybe ty'
+
+  | otherwise
+  = Nothing
+
 isFFITy :: Type -> Bool
 -- True for any TyCon that can possibly be an arg or result of an FFI call
 isFFITy ty = checkRepTyCon legalFFITyCon ty
