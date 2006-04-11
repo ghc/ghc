@@ -28,7 +28,7 @@ module Data.Tree(
 import Prelude
 #endif
 
-import Control.Applicative (Applicative(..))
+import Control.Applicative (Applicative(..), (<$>))
 import Control.Monad
 import Data.Monoid (Monoid(..))
 import Data.Sequence (Seq, empty, singleton, (<|), (|>), fromList,

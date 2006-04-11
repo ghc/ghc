@@ -11,6 +11,8 @@
 -- This module describes a structure intermediate between a functor and
 -- a monad: it provides pure expressions and sequencing, but no binding.
 -- (Technically, a strong lax monoidal functor.)  For more details, see
+-- /Applicative Programming with Effects/,
+-- by Conor McBride and Ross Paterson, online at
 -- <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
 --
 -- This interface was introduced for parsers by Niklas R&#xF6;jemo, because
@@ -26,7 +28,7 @@ module Control.Applicative (
 	-- * Instances
 	WrappedMonad(..), Const(..), ZipList(..),
 	-- * Utility functions
-	(<$), (*>), (<*), (<**>),
+	(<$>), (<$), (*>), (<*), (<**>),
 	liftA, liftA2, liftA3
 	) where
 
@@ -35,6 +37,7 @@ import Prelude
 #endif
 
 import Control.Monad (liftM, ap)
+import Control.Monad.Instances ()
 import Data.Monoid (Monoid(..))
 
 infixl 4 <$>, <$
@@ -56,24 +59,14 @@ infixl 4 <*>, <*, *>, <**>
 -- [/interchange/]
 --	@u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
 --
--- [/pure application/]
---	@f '<$>' v = 'pure' f '<*>' v@
---
--- Minimal complete definition: 'pure' and '<*>'.
---
--- If @f@ is also a 'Functor', define @('<$>') = 'fmap'@.
--- If it is also a 'Monad', define @'pure' = 'return'@ and @('<*>') = 'ap'@.
+-- If @f@ is also a 'Monad', define @'pure' = 'return'@ and @('<*>') = 'ap'@.
 
-class Applicative f where
+class Functor f => Applicative f where
 	-- | Lift a value.
 	pure :: a -> f a
 
         -- | Sequential application.
 	(<*>) :: f (a -> b) -> f a -> f b
-
-	-- | Map a function over an action.
-	(<$>) :: (a -> b) -> f a -> f b
-	f <$> v = pure f <*> v
 
 -- instances for Prelude types
 
@@ -93,21 +86,29 @@ instance Applicative ((->) a) where
 	pure = const
 	(<*>) f g x = f x (g x)
 
+instance Monoid a => Applicative ((,) a) where
+	pure x = (mempty, x)
+	(u, f) <*> (v, x) = (u `mappend` v, f x)
+
 -- new instances
 
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
 
+instance Monad m => Functor (WrappedMonad m) where
+	fmap f (WrapMonad v) = WrapMonad (liftM f v)
+
 instance Monad m => Applicative (WrappedMonad m) where
 	pure = WrapMonad . return
 	WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
-	f <$> WrapMonad v = WrapMonad (liftM f v)
 
 newtype Const a b = Const { getConst :: a }
+
+instance Functor (Const m) where
+	fmap _ (Const v) = Const v
 
 instance Monoid m => Applicative (Const m) where
 	pure _ = Const mempty
 	Const f <*> Const v = Const (f `mappend` v)
-	_ <$> Const v = Const v
 
 -- | Lists, but with an 'Applicative' functor based on zipping, so that
 --
@@ -115,15 +116,21 @@ instance Monoid m => Applicative (Const m) where
 --
 newtype ZipList a = ZipList { getZipList :: [a] }
 
+instance Functor ZipList where
+	fmap f (ZipList xs) = ZipList (map f xs)
+
 instance Applicative ZipList where
 	pure x = ZipList (repeat x)
 	ZipList fs <*> ZipList xs = ZipList (zipWith id fs xs)
-	f <$> ZipList xs = ZipList (map f xs)
 
 -- extra functions
 
+-- | A synonym for 'fmap'.
+(<$>) :: Functor f => (a -> b) -> f a -> f b
+f <$> a = fmap f a
+
 -- | Replace the value.
-(<$) :: Applicative f => a -> f b -> f a
+(<$) :: Functor f => a -> f b -> f a
 (<$) = (<$>) . const
  
 -- | Sequence actions, discarding the value of the first argument.
@@ -138,9 +145,10 @@ instance Applicative ZipList where
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 
--- | A synonym for '<$>'.
+-- | Lift a function to actions.
+-- This function may be used as a value for `fmap` in a `Functor` instance.
 liftA :: Applicative f => (a -> b) -> f a -> f b
-liftA f a = f <$> a
+liftA f a = pure f <*> a
 
 -- | Lift a binary function to actions.
 liftA2 :: Applicative f => (a -> b -> c) -> f a -> f b -> f c

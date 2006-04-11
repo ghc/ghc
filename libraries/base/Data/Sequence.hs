@@ -67,7 +67,7 @@ import Prelude hiding (
 	null, length, take, drop, splitAt, foldl, foldl1, foldr, foldr1,
 	reverse)
 import qualified Data.List (foldl')
-import Control.Applicative (Applicative(..))
+import Control.Applicative (Applicative(..), (<$>))
 import Control.Monad (MonadPlus(..))
 import Data.Monoid (Monoid(..))
 import Data.Foldable
@@ -100,7 +100,7 @@ class Sized a where
 newtype Seq a = Seq (FingerTree (Elem a))
 
 instance Functor Seq where
-	fmap = fmapDefault
+	fmap f (Seq xs) = Seq (fmap (fmap f) xs)
 
 instance Foldable Seq where
 	foldr f z (Seq xs) = foldr (flip (foldr f)) z xs
@@ -223,6 +223,12 @@ instance Foldable FingerTree where
 	foldl1 f (Deep _ pr m sf) =
 		foldl f (foldl (foldl f) (foldl1 f pr) m) sf
 
+instance Functor FingerTree where
+	fmap _ Empty = Empty
+	fmap f (Single x) = Single (f x)
+	fmap f (Deep v pr m sf) =
+		Deep v (fmap f pr) (fmap (fmap f) m) (fmap f sf)
+
 instance Traversable FingerTree where
 	traverse _ Empty = pure Empty
 	traverse f (Single x) = Single <$> f x
@@ -268,6 +274,9 @@ instance Foldable Digit where
 	foldl1 f (Three a b c) = (a `f` b) `f` c
 	foldl1 f (Four a b c d) = ((a `f` b) `f` c) `f` d
 
+instance Functor Digit where
+	fmap = fmapDefault
+
 instance Traversable Digit where
 	traverse f (One a) = One <$> f a
 	traverse f (Two a b) = Two <$> f a <*> f b
@@ -302,6 +311,9 @@ instance Foldable Node where
 
 	foldl f z (Node2 _ a b) = (z `f` a) `f` b
 	foldl f z (Node3 _ a b c) = ((z `f` a) `f` b) `f` c
+
+instance Functor Node where
+	fmap = fmapDefault
 
 instance Traversable Node where
 	traverse f (Node2 v a b) = Node2 v <$> f a <*> f b

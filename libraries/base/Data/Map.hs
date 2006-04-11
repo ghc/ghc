@@ -160,7 +160,7 @@ import qualified Data.Set as Set
 import qualified Data.List as List
 import Data.Monoid (Monoid(..))
 import Data.Typeable
-import Control.Applicative (Applicative(..))
+import Control.Applicative (Applicative(..), (<$>))
 import Data.Traversable (Traversable(traverse))
 import Data.Foldable (Foldable(foldMap))
 

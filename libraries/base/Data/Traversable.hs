@@ -10,12 +10,12 @@
 --
 -- Class of data structures that can be traversed from left to right.
 --
--- See also <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
+-- See also /Applicative Programming with Effects/,
+-- by Conor McBride and Ross Paterson, online at
+-- <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
 
 module Data.Traversable (
 	Traversable(..),
-	sequenceA,
-	sequence,
 	fmapDefault,
 	foldMapDefault,
 	) where
@@ -23,13 +23,14 @@ module Data.Traversable (
 import Prelude hiding (mapM, sequence)
 import qualified Prelude (mapM)
 import Control.Applicative
+import Data.Foldable (Foldable)
 import Data.Monoid (Monoid)
 import Data.Array
 
 -- | Functors representing data structures that can be traversed from
 -- left to right.
 --
--- Minimal complete definition: 'traverse'.
+-- Minimal complete definition: 'traverse' or 'sequenceA'.
 --
 -- Instances are similar to 'Functor', e.g. given a data type
 --
@@ -45,15 +46,26 @@ import Data.Array
 -- This is suitable even for abstract types, as the laws for '<*>'
 -- imply a form of associativity.
 --
-class Traversable t where
+class (Functor t, Foldable t) => Traversable t where
 	-- | Map each element of a structure to an action, evaluate
 	-- these actions from left to right, and collect the results.
 	traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
+	traverse f = sequenceA . fmap f
+
+	-- | Evaluate each action in the structure from left to right,
+	-- and collect the results.
+	sequenceA :: Applicative f => t (f a) -> f (t a)
+	sequenceA = traverse id
 
 	-- | Map each element of a structure to an monadic action, evaluate
 	-- these actions from left to right, and collect the results.
 	mapM :: Monad m => (a -> m b) -> t a -> m (t b)
 	mapM f = unwrapMonad . traverse (WrapMonad . f)
+
+	-- | Evaluate each monadic action in the structure from left to right,
+	-- and collect the results.
+	sequence :: Monad m => t (m a) -> m (t a)
+	sequence = mapM id
 
 -- instances for Prelude types
 
@@ -72,30 +84,21 @@ instance Ix i => Traversable (Array i) where
 
 -- general functions
 
--- | Evaluate each action in the structure from left to right,
--- and collect the results.
-sequenceA :: (Traversable t, Applicative f) => t (f a) -> f (t a)
-sequenceA = traverse id
-
--- | Evaluate each monadic action in the structure from left to right,
--- and collect the results.
-sequence :: (Traversable t, Monad m) => t (m a) -> m (t a)
-sequence = mapM id
-
--- | Any 'Traversable' can also be made an instance of 'Functor' by
--- defining 'fmap' as 'fmapDefault'.
+-- | This function may be used as a value for `fmap` in a `Functor` instance.
 fmapDefault :: Traversable t => (a -> b) -> t a -> t b
 fmapDefault f = getId . traverse (Id . f)
 
--- | Any 'Traversable' can also be made an instance of
--- 'Data.Foldable.Foldable' by defining 'Data.Foldable.foldMap'
--- as 'foldMapDefault'.
+-- | This function may be used as a value for `Data.Foldable.foldMap`
+-- in a `Foldable` instance.
 foldMapDefault :: (Traversable t, Monoid m) => (a -> m) -> t a -> m
 foldMapDefault f = getConst . traverse (Const . f)
 
 -- local instances
 
 newtype Id a = Id { getId :: a }
+
+instance Functor Id where
+	fmap f (Id x) = Id (f x)
 
 instance Applicative Id where
 	pure = Id
