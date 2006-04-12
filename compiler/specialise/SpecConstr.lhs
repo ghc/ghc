@@ -262,6 +262,9 @@ extendCaseBndrs env case_bndr scrut con@(DataAlt data_con) alt_bndrs
 		   map varToCoreExpr alt_bndrs
 
     gadt_args = map (substExpr subst . varToCoreExpr) alt_bndrs
+	-- This call generates some bogus warnings from substExpr,
+	-- because it's inconvenient to put all the Ids in scope
+	-- Will be fixed when we move to FC
 
     (alt_tvs, _) = span isTyVar alt_bndrs
     Just (tv_subst, is_local) = coreRefineTys data_con alt_tvs (idType case_bndr)
@@ -463,7 +466,7 @@ specialise env fn bndrs body (SCU {calls=calls, occs=occs})
 	good_calls = [ pats
 		     | (con_env, call_args) <- all_calls,
 		       call_args `lengthAtLeast` n_bndrs,	    -- App is saturated
-		       let call = (bndrs `zip` call_args),
+		       let call = bndrs `zip` call_args,
 		       any (good_arg con_env occs) call,    -- At least one arg is a constr app
 		       let (_, pats) = argsToPats con_env us call_args
 		     ]
