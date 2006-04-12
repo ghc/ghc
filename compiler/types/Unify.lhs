@@ -7,7 +7,7 @@ module Unify (
 
 	gadtRefineTys, BindFlag(..),
 
-	coreRefineTys, TypeRefinement,
+	coreRefineTys, dataConCanMatch, TypeRefinement,
 
 	-- Re-export
 	MaybeErr(..)
@@ -23,7 +23,7 @@ import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, mkTyVarTys,
 			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX,
 			  mkOpenTvSubst, tcView )
 import TypeRep          ( Type(..), PredType(..), funTyCon )
-import DataCon 		( DataCon, dataConInstResTy )
+import DataCon 		( DataCon, isVanillaDataCon, dataConResTys, dataConInstResTy )
 import Util		( snocView )
 import ErrUtils		( Message )
 import Outputable
@@ -220,6 +220,17 @@ tcUnifyTys bind_fn tys1 tys2
   where
     tvs1 = tyVarsOfTypes tys1
     tvs2 = tyVarsOfTypes tys2
+
+----------------------------
+dataConCanMatch :: DataCon -> [Type] -> Bool
+-- Returns True iff the data con can match a scrutinee of type (T tys)
+--		    where T is the type constructor for the data con
+dataConCanMatch con tys
+  | isVanillaDataCon con
+  = True
+  | otherwise
+  = isSuccess $ initUM (\tv -> BindMe) $
+    unify_tys emptyTvSubstEnv (dataConResTys con) tys
 
 ----------------------------
 coreRefineTys :: DataCon -> [TyVar]	-- Case pattern (con tv1 .. tvn ...)

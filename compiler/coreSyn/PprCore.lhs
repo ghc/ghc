@@ -279,8 +279,13 @@ pprCoreBinder LetBind binder
 -- Lambda bound type variables are preceded by "@"
 pprCoreBinder LambdaBind bndr = parens (pprTypedBinder bndr)
 
--- Case bound things don't get a signature or a herald
-pprCoreBinder CaseBind bndr = pprUntypedBinder bndr
+-- Case bound things don't get a signature or a herald, unless we have debug on
+pprCoreBinder CaseBind bndr 
+  = getPprStyle $ \ sty ->
+    if debugStyle sty then
+	parens (pprTypedBinder bndr)
+    else
+	pprUntypedBinder bndr
 
 pprUntypedBinder binder
   | isTyVar binder = ptext SLIT("@") <+> ppr binder	-- NB: don't print kind

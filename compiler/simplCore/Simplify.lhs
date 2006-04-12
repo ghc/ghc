@@ -13,7 +13,7 @@ import DynFlags	( dopt, DynFlag(Opt_D_dump_inlinings),
 			)
 import SimplMonad
 import SimplEnv	
-import SimplUtils	( mkCase, mkLam, prepareAlts,
+import SimplUtils	( mkCase, mkLam,
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 			  mkRhsStop, mkBoringStop,  pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
@@ -22,7 +22,7 @@ import SimplUtils	( mkCase, mkLam, prepareAlts,
 			  inlineMode, activeInline, activeRule
 			)
 import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
-			  setIdUnfolding, isDeadBinder,
+			  idUnfolding, setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo, 
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda
 			)
@@ -34,15 +34,16 @@ import IdInfo		( OccInfo(..), isLoopBreaker,
 			  occInfo
 			)
 import NewDemand	( isStrictDmd )
-import Unify		( coreRefineTys )
-import DataCon		( dataConTyCon, dataConRepStrictness, isVanillaDataCon )
-import TyCon		( tyConArity )
+import Unify		( coreRefineTys, dataConCanMatch )
+import DataCon		( DataCon, dataConTyCon, dataConRepStrictness, isVanillaDataCon,
+			  dataConInstArgTys, dataConTyVars )
+import TyCon		( tyConArity, isAlgTyCon, isNewTyCon, tyConDataCons_maybe )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreUnfold	( mkUnfolding, callSiteInline )
 import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
-			  exprType, exprIsHNF, 
+			  exprType, exprIsHNF, findDefault, mergeAlts,
 			  exprOkForSpeculation, exprArity, 
 			  mkCoerce, mkCoerce2, mkSCC, mkInlineMe, applyTypeToArg
 			)
@@ -50,19 +51,23 @@ import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, coreEqType 
+			  splitFunTy_maybe, splitFunTy, coreEqType, splitTyConApp_maybe,
+			  isTyVarTy, mkTyVarTys
 			)
+import Var		( tyVarKind, mkTyVar )
 import VarEnv		( elemVarEnv, emptyVarEnv )
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
 			  RecFlag(..), isNonRec
 			)
+import Name		( mkSysTvName )
 import StaticFlags	( opt_PprStyle_Debug )
 import OrdList
+import List		( nub )
 import Maybes		( orElse )
 import Outputable
-import Util             ( notNull )
+import Util             ( notNull, filterOut )
 \end{code}
 
 
@@ -1292,13 +1297,10 @@ rebuildCase env scrut case_bndr alts cont
   = knownCon env (LitAlt lit) [] case_bndr alts cont
 
   | otherwise
-  = 	-- Prepare the alternatives.
-    prepareAlts scrut case_bndr alts		`thenSmpl` \ (better_alts, handled_cons) -> 
-	
-	-- Prepare the continuation;
+  = 	-- Prepare the continuation;
 	-- The new subst_env is in place
-    prepareCaseCont env better_alts cont	`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
-    addFloats env floats			$ \ env ->	
+    prepareCaseCont env alts cont	`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
+    addFloats env floats		$ \ env ->	
 
     let
 	-- The case expression is annotated with the result type of the continuation
@@ -1316,8 +1318,7 @@ rebuildCase env scrut case_bndr alts cont
     simplCaseBinder env scrut case_bndr 	`thenSmpl` \ (alt_env, case_bndr') ->
 
 	-- Deal with the case alternatives
-    simplAlts alt_env handled_cons
-	      case_bndr' better_alts dup_cont 	`thenSmpl` \ alts' ->
+    simplAlts alt_env scrut case_bndr' alts dup_cont 	`thenSmpl` \ alts' ->
 
 	-- Put the case back together
     mkCase scrut case_bndr' res_ty' alts'	`thenSmpl` \ case_expr ->
@@ -1429,29 +1430,174 @@ simplCaseBinder env other_scrut case_bndr
 \end{code}
 
 
+simplAlts does two things:
+
+1.  Eliminate alternatives that cannot match, including the
+    DEFAULT alternative.
+
+2.  If the DEFAULT alternative can match only one possible constructor,
+    then make that constructor explicit.
+    e.g.
+	case e of x { DEFAULT -> rhs }
+     ===>
+	case e of x { (a,b) -> rhs }
+    where the type is a single constructor type.  This gives better code
+    when rhs also scrutinises x or e.
+
+Here "cannot match" includes knowledge from GADTs
+
+It's a good idea do do this stuff before simplifying the alternatives, to
+avoid simplifying alternatives we know can't happen, and to come up with
+the list of constructors that are handled, to put into the IdInfo of the
+case binder, for use when simplifying the alternatives.
+
+Eliminating the default alternative in (1) isn't so obvious, but it can
+happen:
+
+data Colour = Red | Green | Blue
+
+f x = case x of
+	Red -> ..
+	Green -> ..
+	DEFAULT -> h x
+
+h y = case y of
+	Blue -> ..
+	DEFAULT -> [ case y of ... ]
+
+If we inline h into f, the default case of the inlined h can't happen.
+If we don't notice this, we may end up filtering out *all* the cases
+of the inner case y, which give us nowhere to go!
+
 
 \begin{code}
 simplAlts :: SimplEnv 
-	  -> [AltCon]			-- Alternatives the scrutinee can't be
-					-- in the default case
+	  -> OutExpr
 	  -> OutId			-- Case binder
 	  -> [InAlt] -> SimplCont
 	  -> SimplM [OutAlt]		-- Includes the continuation
 
-simplAlts env handled_cons case_bndr' alts cont'
-  = do	{ mb_alts <- mapSmpl simpl_alt alts
-	; return [alt' | Just (_, alt') <- mb_alts] }
-	-- Filter out the alternatives that are inaccessible
+simplAlts env scrut case_bndr' alts cont'
+  = do	{ mb_alts      <- mapSmpl (simplAlt env imposs_cons case_bndr' cont') alts_wo_default
+	; default_alts <- simplDefault env case_bndr' imposs_deflt_cons cont' maybe_deflt
+	; return (mergeAlts default_alts [alt' | Just (_, alt') <- mb_alts]) }
+	-- We need the mergeAlts in case the new default_alt 
+	-- has turned into a constructor alternative.
   where
-    simpl_alt alt = simplAlt env handled_cons case_bndr' alt cont'
+    (alts_wo_default, maybe_deflt) = findDefault alts
+    imposs_cons = case scrut of
+		    Var v -> otherCons (idUnfolding v)
+		    other -> []
 
-simplAlt :: SimplEnv -> [AltCon] -> OutId -> InAlt -> SimplCont
+	-- "imposs_deflt_cons" are handled either by the context, 
+	-- OR by a branch in this case expression. (Don't include DEFAULT!!)
+    imposs_deflt_cons = nub (imposs_cons ++ [con | (con,_,_) <- alts_wo_default])
+
+simplDefault :: SimplEnv
+	     -> OutId		-- Case binder; need just for its type. Note that as an
+				--   OutId, it has maximum information; this is important.
+				--   Test simpl013 is an example
+	     -> [AltCon]	-- These cons can't happen when matching the default
+	     -> SimplCont
+	     -> Maybe InExpr
+	     -> SimplM [OutAlt]	-- One branch or none; we use a list because it's what 
+				--   mergeAlts expects
+
+
+simplDefault env case_bndr' imposs_cons cont Nothing
+  = return []	-- No default branch
+simplDefault env case_bndr' imposs_cons cont (Just rhs)
+  | 	-- This branch handles the case where we are 
+	-- scrutinisng an algebraic data type
+    Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr'),
+    isAlgTyCon tycon,		-- It's a data type, tuple, or unboxed tuples.  
+    not (isNewTyCon tycon),	-- We can have a newtype, if we are just doing an eval:
+				-- 	case x of { DEFAULT -> e }
+				-- and we don't want to fill in a default for them!
+    Just all_cons <- tyConDataCons_maybe tycon,
+    not (null all_cons),	-- This is a tricky corner case.  If the data type has no constructors,
+				-- which GHC allows, then the case expression will have at most a default
+				-- alternative.  We don't want to eliminate that alternative, because the
+				-- invariant is that there's always one alternative.  It's more convenient
+				-- to leave	
+				--	case x of { DEFAULT -> e }     
+				-- as it is, rather than transform it to
+				--	error "case cant match"
+				-- which would be quite legitmate.  But it's a really obscure corner, and
+				-- not worth wasting code on.
+
+    let imposs_data_cons = [con | DataAlt con <- imposs_cons]	-- We now know it's a data type 
+	poss_data_cons   = filterOut (`elem` imposs_data_cons) all_cons
+	gadt_imposs      | all isTyVarTy inst_tys = []
+			 | otherwise = filter (cant_match inst_tys) poss_data_cons
+	final_poss       = filterOut (`elem` gadt_imposs) poss_data_cons
+	
+  = case final_poss of
+	[]    -> returnSmpl []	-- Eliminate the default alternative
+				-- altogether if it can't match
+
+	[con] -> 	-- It matches exactly one constructor, so fill it in
+		 do { con_alt <- mkDataConAlt case_bndr' con inst_tys rhs
+		    ; Just (_, alt') <- simplAlt env [] case_bndr' cont con_alt
+			-- The simplAlt must succeed with Just because we have
+			-- already filtered out construtors that can't match
+		    ; return [alt'] }
+
+	two_or_more -> simplify_default (map DataAlt gadt_imposs ++ imposs_cons)
+
+  | otherwise
+  = simplify_default imposs_cons
+  where
+    cant_match tys data_con = not (dataConCanMatch data_con tys)
+
+    simplify_default imposs_cons
+	= do { let env' = mk_rhs_env env case_bndr' (mkOtherCon imposs_cons)
+		-- Record the constructors that the case-binder *can't* be.
+	     ; rhs' <- simplExprC env' rhs cont
+	     ; return [(DEFAULT, [], rhs')] }
+
+mkDataConAlt :: Id -> DataCon -> [OutType] -> InExpr -> SimplM InAlt
+-- Make a data-constructor alternative to replace the DEFAULT case
+-- NB: there's something a bit bogus here, because we put OutTypes into an InAlt
+mkDataConAlt case_bndr con tys rhs
+  = do 	{ tick (FillInCaseDefault case_bndr)
+	; args <- mk_args con tys
+	; return (DataAlt con, args, rhs) }
+  where
+    mk_args con inst_tys
+      = do { (tv_bndrs, inst_tys') <- mk_tv_bndrs con inst_tys
+	   ; let arg_tys = dataConInstArgTys con inst_tys'
+	   ; arg_ids <- mapM (newId FSLIT("a")) arg_tys
+	   ; returnSmpl (tv_bndrs ++ arg_ids) }
+
+    mk_tv_bndrs con inst_tys
+      | isVanillaDataCon con
+      = return ([], inst_tys)
+      | otherwise
+      = do { tv_uniqs <- getUniquesSmpl
+	   ; let new_tvs    = zipWith mk tv_uniqs (dataConTyVars con)
+ 	 	 mk uniq tv = mkTyVar (mkSysTvName uniq FSLIT("t")) (tyVarKind tv)
+	   ; return (new_tvs, mkTyVarTys new_tvs) }
+
+simplAlt :: SimplEnv
+	 -> [AltCon]	-- These constructors can't be present when
+			-- matching this alternative
+	 -> OutId	-- The case binder
+	 -> SimplCont
+	 -> InAlt
 	 -> SimplM (Maybe (TvSubstEnv, OutAlt))
+
 -- Simplify an alternative, returning the type refinement for the 
 -- alternative, if the alternative does any refinement at all
 -- Nothing => the alternative is inaccessible
 
-simplAlt env handled_cons case_bndr' (DEFAULT, bndrs, rhs) cont'
+simplAlt env imposs_cons case_bndr' cont' (con, bndrs, rhs)
+  | con `elem` imposs_cons	-- This case can't match
+  = return Nothing
+
+simplAlt env handled_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
+	-- TURGID DUPLICATION, needed only for the simplAlt call
+	-- in mkDupableAlt.  Clean this up when moving to FC
   = ASSERT( null bndrs )
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
     returnSmpl (Just (emptyVarEnv, (DEFAULT, [], rhs')))
@@ -1459,14 +1605,14 @@ simplAlt env handled_cons case_bndr' (DEFAULT, bndrs, rhs) cont'
     env' = mk_rhs_env env case_bndr' (mkOtherCon handled_cons)
 	-- Record the constructors that the case-binder *can't* be.
 
-simplAlt env handled_cons case_bndr' (LitAlt lit, bndrs, rhs) cont'
+simplAlt env handled_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
   = ASSERT( null bndrs )
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
     returnSmpl (Just (emptyVarEnv, (LitAlt lit, [], rhs')))
   where
     env' = mk_rhs_env env case_bndr' (mkUnfolding False (Lit lit))
 
-simplAlt env handled_cons case_bndr' (DataAlt con, vs, rhs) cont'
+simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
   | isVanillaDataCon con
   = 	-- Deal with the pattern-bound variables
 	-- Mark the ones that are in ! positions in the data constructor
@@ -1765,7 +1911,7 @@ mkDupableAlts env case_bndr' alts dupable_cont
 			  )}}
 					
 mkDupableAlt env case_bndr' cont alt
-  = simplAlt env [] case_bndr' alt cont		`thenSmpl` \ mb_stuff ->
+  = simplAlt env [] case_bndr' cont alt		`thenSmpl` \ mb_stuff ->
     case mb_stuff of {
 	Nothing -> returnSmpl (emptyFloats env, Nothing) ;
 

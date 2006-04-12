@@ -5,7 +5,7 @@
 
 \begin{code}
 module SimplUtils (
-	mkLam, prepareAlts, mkCase,
+	mkLam, mkCase,
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, activeInline, activeRule,
@@ -31,24 +31,22 @@ import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, exprIsCheap,
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
-			  findDefault, exprOkForSpeculation, exprIsHNF
+			  findDefault, exprOkForSpeculation, exprIsHNF, mergeAlts
 			)
 import Literal		( mkStringLit )
 import CoreUnfold	( smallEnoughToInline )
 import MkId		( eRROR_ID )
 import Id		( idType, isDataConWorkId, idOccInfo, isDictId, 
-			  mkSysLocal, isDeadBinder, idNewDemandInfo, isExportedId,
+			  isDeadBinder, idNewDemandInfo, isExportedId,
 			  idUnfolding, idNewStrictness, idInlinePragma,
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
 import Type		( Type, splitFunTys, dropForAlls, isStrictType,
-			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys
+			  splitTyConApp_maybe, tyConAppArgs 
 			)
-import Name		( mkSysTvName )
-import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
-import DataCon		( dataConRepArity, dataConTyVars, dataConInstArgTys, isVanillaDataCon )
-import Var		( tyVarKind, mkTyVar )
+import TyCon		( tyConDataCons_maybe )
+import DataCon		( dataConRepArity )
 import VarSet
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
 			  Activation, isAlwaysActive, isActive )
@@ -1073,144 +1071,6 @@ tryRhsTyLam env tyvars body 		-- Only does something if there's a let
 
 %************************************************************************
 %*									*
-\subsection{Case alternative filtering
-%*									*
-%************************************************************************
-
-prepareAlts does two things:
-
-1.  Eliminate alternatives that cannot match, including the
-    DEFAULT alternative.
-
-2.  If the DEFAULT alternative can match only one possible constructor,
-    then make that constructor explicit.
-    e.g.
-	case e of x { DEFAULT -> rhs }
-     ===>
-	case e of x { (a,b) -> rhs }
-    where the type is a single constructor type.  This gives better code
-    when rhs also scrutinises x or e.
-
-It's a good idea do do this stuff before simplifying the alternatives, to
-avoid simplifying alternatives we know can't happen, and to come up with
-the list of constructors that are handled, to put into the IdInfo of the
-case binder, for use when simplifying the alternatives.
-
-Eliminating the default alternative in (1) isn't so obvious, but it can
-happen:
-
-data Colour = Red | Green | Blue
-
-f x = case x of
-	Red -> ..
-	Green -> ..
-	DEFAULT -> h x
-
-h y = case y of
-	Blue -> ..
-	DEFAULT -> [ case y of ... ]
-
-If we inline h into f, the default case of the inlined h can't happen.
-If we don't notice this, we may end up filtering out *all* the cases
-of the inner case y, which give us nowhere to go!
-
-
-\begin{code}
-prepareAlts :: OutExpr 		-- Scrutinee
-	    -> InId		-- Case binder (passed only to use in statistics)
-	    -> [InAlt]		-- Increasing order
-	    -> SimplM ([InAlt], 	-- Better alternatives, still incresaing order
-			[AltCon])	-- These cases are handled
-
-prepareAlts scrut case_bndr alts
-  = let
-	(alts_wo_default, maybe_deflt) = findDefault alts
-
-        impossible_cons = case scrut of
-			    Var v -> otherCons (idUnfolding v)
-			    other -> []
-
-	-- Filter out alternatives that can't possibly match
-	better_alts | null impossible_cons = alts_wo_default
-		    | otherwise		   = [alt | alt@(con,_,_) <- alts_wo_default, 
-						    not (con `elem` impossible_cons)]
-
-	-- "handled_cons" are handled either by the context, 
-	-- or by a branch in this case expression
-	-- (Don't add DEFAULT to the handled_cons!!)
-	handled_cons = impossible_cons ++ [con | (con,_,_) <- better_alts]
-    in
-	-- Filter out the default, if it can't happen,
-	-- or replace it with "proper" alternative if there
-	-- is only one constructor left
-    prepareDefault scrut case_bndr handled_cons maybe_deflt	`thenSmpl` \ deflt_alt ->
-
-    returnSmpl (mergeAlts better_alts deflt_alt, handled_cons)
-	-- We need the mergeAlts in case the new default_alt 
-	-- has turned into a constructor alternative.
-
-prepareDefault scrut case_bndr handled_cons (Just rhs)
-  | Just (tycon, inst_tys) <- splitTyConApp_maybe (exprType scrut),
-	-- Use exprType scrut here, rather than idType case_bndr, because
-	-- case_bndr is an InId, so exprType scrut may have more information
-	-- Test simpl013 is an example
-    isAlgTyCon tycon,		-- It's a data type, tuple, or unboxed tuples.  
-    not (isNewTyCon tycon),	-- We can have a newtype, if we are just doing an eval:
-				-- 	case x of { DEFAULT -> e }
-				-- and we don't want to fill in a default for them!
-    Just all_cons <- tyConDataCons_maybe tycon,
-    not (null all_cons),	-- This is a tricky corner case.  If the data type has no constructors,
-				-- which GHC allows, then the case expression will have at most a default
-				-- alternative.  We don't want to eliminate that alternative, because the
-				-- invariant is that there's always one alternative.  It's more convenient
-				-- to leave	
-				--	case x of { DEFAULT -> e }     
-				-- as it is, rather than transform it to
-				--	error "case cant match"
-				-- which would be quite legitmate.  But it's a really obscure corner, and
-				-- not worth wasting code on.
-    let handled_data_cons = [data_con | DataAlt data_con <- handled_cons],
-    let missing_cons      = [con | con <- all_cons, 
-			           not (con `elem` handled_data_cons)]
-  = case missing_cons of
-	[] 	    -> returnSmpl []	-- Eliminate the default alternative
-					-- if it can't match
-
-	[con]	    -> 	-- It matches exactly one constructor, so fill it in
-		       tick (FillInCaseDefault case_bndr)	`thenSmpl_`
-    		       mk_args con inst_tys 			`thenSmpl` \ args ->
-		       returnSmpl [(DataAlt con, args, rhs)]
-
-	two_or_more -> returnSmpl [(DEFAULT, [], rhs)]
-
-  | otherwise
-  = returnSmpl [(DEFAULT, [], rhs)]
-
-prepareDefault scrut case_bndr handled_cons Nothing
-  = returnSmpl []
-
-mk_args missing_con inst_tys
-  = mk_tv_bndrs missing_con inst_tys	`thenSmpl` \ (tv_bndrs, inst_tys') ->
-    getUniquesSmpl			`thenSmpl` \ id_uniqs ->
-    let arg_tys = dataConInstArgTys missing_con inst_tys'
-	arg_ids = zipWith (mkSysLocal FSLIT("a")) id_uniqs arg_tys
-    in
-    returnSmpl (tv_bndrs ++ arg_ids)
-
-mk_tv_bndrs missing_con inst_tys
-  | isVanillaDataCon missing_con
-  = returnSmpl ([], inst_tys)
-  | otherwise
-  = getUniquesSmpl		`thenSmpl` \ tv_uniqs ->
-    let new_tvs    = zipWith mk tv_uniqs (dataConTyVars missing_con)
-	mk uniq tv = mkTyVar (mkSysTvName uniq FSLIT("t")) (tyVarKind tv)
-    in
-    returnSmpl (new_tvs, mkTyVarTys new_tvs)
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Case absorption and identity-case elimination}
 %*									*
 %************************************************************************
@@ -1339,19 +1199,6 @@ mkAlts dflags scrut outer_bndr outer_alts
 ------------------------------------------------
 
 mkAlts dflags scrut case_bndr other_alts = returnSmpl other_alts
-
-
----------------------------------
-mergeAlts :: [OutAlt] -> [OutAlt] -> [OutAlt]
--- Merge preserving order; alternatives in the first arg
--- shadow ones in the second
-mergeAlts [] as2 = as2
-mergeAlts as1 [] = as1
-mergeAlts (a1:as1) (a2:as2)
-  = case a1 `cmpAlt` a2 of
-	LT -> a1 : mergeAlts as1      (a2:as2)
-	EQ -> a1 : mergeAlts as1      as2	-- Discard a2
-	GT -> a2 : mergeAlts (a1:as1) as2
 \end{code}
 
 

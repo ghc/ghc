@@ -11,7 +11,7 @@ module CoreUtils (
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
 	-- Taking expressions apart
-	findDefault, findAlt, isDefaultAlt,
+	findDefault, findAlt, isDefaultAlt, mergeAlts,
 
 	-- Properties of expressions
 	exprType, coreAltType,
@@ -306,6 +306,18 @@ findAlt con alts
 isDefaultAlt :: CoreAlt -> Bool
 isDefaultAlt (DEFAULT, _, _) = True
 isDefaultAlt other	     = False
+
+---------------------------------
+mergeAlts :: [CoreAlt] -> [CoreAlt] -> [CoreAlt]
+-- Merge preserving order; alternatives in the first arg
+-- shadow ones in the second
+mergeAlts [] as2 = as2
+mergeAlts as1 [] = as1
+mergeAlts (a1:as1) (a2:as2)
+  = case a1 `cmpAlt` a2 of
+	LT -> a1 : mergeAlts as1      (a2:as2)
+	EQ -> a1 : mergeAlts as1      as2	-- Discard a2
+	GT -> a2 : mergeAlts (a1:as1) as2
 \end{code}
 
 

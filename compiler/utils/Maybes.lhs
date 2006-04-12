@@ -8,7 +8,7 @@ module Maybes (
 	module Maybe,		-- Re-export all of Maybe
 
 	MaybeErr(..),	-- Instance of Monad
-	failME,
+	failME, isSuccess,
 
 	orElse, 
 	mapCatMaybes,
@@ -117,6 +117,10 @@ instance Monad (MaybeErr err) where
   return v = Succeeded v
   Succeeded v >>= k = k v
   Failed e    >>= k = Failed e
+
+isSuccess :: MaybeErr err val -> Bool
+isSuccess (Succeeded {}) = True
+isSuccess (Failed {})    = False
 
 failME :: err -> MaybeErr err val
 failME e = Failed e
