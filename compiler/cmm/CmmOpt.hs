@@ -385,14 +385,37 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt 1 rep))]
 cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
   = case mop of
     	MO_Mul rep
-           -> case exactLog2 n of
-                 Nothing -> unchanged
-                 Just p  -> CmmMachOp (MO_Shl rep) [x, CmmLit (CmmInt p rep)]
+	   | Just p <- exactLog2 n ->
+                 CmmMachOp (MO_Shl rep) [x, CmmLit (CmmInt p rep)]
     	MO_S_Quot rep
-           -> case exactLog2 n of
-                 Nothing -> unchanged
-                 Just p  -> CmmMachOp (MO_S_Shr rep) [x, CmmLit (CmmInt p rep)]
-    	other 
+	   | Just p <- exactLog2 n, 
+	     CmmReg _ <- x ->	-- We duplicate x below, hence require
+				-- it is a reg.  FIXME: remove this restriction.
+		-- shift right is not the same as quot, because it rounds
+		-- to minus infinity, whereasq uot rounds toward zero.
+		-- To fix this up, we add one less than the divisor to the
+		-- dividend if it is a negative number.
+		--
+		-- to avoid a test/jump, we use the following sequence:
+		-- 	x1 = x >> word_size-1  (all 1s if -ve, all 0s if +ve)
+		--      x2 = y & (divisor-1)
+		--      result = (x+x2) >>= log2(divisor)
+		-- this could be done a bit more simply using conditional moves,
+		-- but we're processor independent here.
+		--
+		-- we optimise the divide by 2 case slightly, generating
+		--      x1 = x >> word_size-1  (unsigned)
+		--      return = (x + x1) >>= log2(divisor)
+		let 
+		    bits = fromIntegral (machRepBitWidth rep) - 1
+		    shr = if p == 1 then MO_U_Shr rep else MO_S_Shr rep
+		    x1 = CmmMachOp shr [x, CmmLit (CmmInt bits rep)]
+		    x2 = if p == 1 then x1 else
+			 CmmMachOp (MO_And rep) [x1, CmmLit (CmmInt (n-1) rep)]
+		    x3 = CmmMachOp (MO_Add rep) [x, x2]
+		in
+                CmmMachOp (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)]
+    	other
            -> unchanged
     where
        unchanged = CmmMachOp mop args
