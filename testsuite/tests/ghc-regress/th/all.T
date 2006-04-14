@@ -54,3 +54,5 @@ test('TH_fail', normal, compile_fail, [''])
 
 test('TH_dupdecl', normal, compile_fail, [''])
 test('TH_exn', normal, compile_fail, [''])
+
+test('TH_recover', normal, compile_and_run, [''])
