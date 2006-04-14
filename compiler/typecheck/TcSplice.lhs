@@ -421,7 +421,16 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 
   qCurrentModule = do { m <- getModule; return (moduleString m) }
   qReify v = reify v
-  qRecover = recoverM
+
+	-- For qRecover, discard error messages if 
+	-- the recovery action is chosen.  Otherwise
+	-- we'll only fail higher up.  c.f. tryTcLIE_
+  qRecover recover main = do { (msgs, mb_res) <- tryTcErrs main
+			     ; case mb_res of
+		  	         Just val -> do { addMessages msgs	-- There might be warnings
+				   	        ; return val }
+		  	         Nothing  -> recover			-- Discard all msgs
+			  }
 
   qRunIO io = ioToTcRn io
 \end{code}
