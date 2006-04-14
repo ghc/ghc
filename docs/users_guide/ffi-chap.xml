@@ -54,6 +54,31 @@ the <option>-fglasgow-exts</option><indexterm><primary><option>-fglasgow-exts</o
       and <literal>ByteArray#</literal>.</para>
     </sect2>
 
+    <sect2>
+      <title>Newtype wrapping of the IO monad</title>
+      <para>The FFI spec requires the IO monad to appear in various  places,
+      but it can sometimes be convenient to wrap the IO monad in a
+      <literal>newtype</literal>, thus:
+<programlisting>
+  newtype MyIO a = MIO (IO a)
+</programlisting>
+     (A reason for doing so might be to prevent the programmer from
+	calling arbitrary IO procedures in some part of the program.)
+</para>
+<para>The Haskell FFI already specifies that arguments and results of
+foreign imports and exports will be automatically unwrapped if they are 
+newtypes (Section 3.2 of the FFI addendum).  GHC extends the FFI by automatically unnwrapping any newtypes that
+wrap the IO monad itself.
+More precisely, wherever the FFI specification requires an IO type, GHC will
+accept any newtype-wrapping of an IO type.  For example, these declarations are
+OK:
+<programlisting>
+   foreign import foo :: Int -> MyIO Int
+   foreign import "dynamic" baz :: (Int -> MyIO Int) -> CInt -> MyIO Int
+</programlisting>
+</para>
+      </sect2>
+
   </sect1>
 
   <sect1 id="sec-ffi-ghc">
