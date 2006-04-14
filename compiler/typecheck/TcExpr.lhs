@@ -32,9 +32,7 @@ import BasicTypes	( Arity, isMarkedStrict )
 import Inst		( newMethodFromName, newIPDict, instToId,
 			  newDicts, newMethodWithGivenTy, tcInstStupidTheta )
 import TcBinds		( tcLocalBinds )
-import TcEnv		( tcLookup, tcLookupId,
-			  tcLookupDataCon, tcLookupGlobalId
-			)
+import TcEnv		( tcLookup, tcLookupId, tcLookupDataCon, tcLookupField )
 import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, TcMatchCtxt(..) )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
@@ -394,7 +392,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
     let 
 	field_names = map fst rbinds
     in
-    mappM (tcLookupGlobalId.unLoc) field_names	`thenM` \ sel_ids ->
+    mappM (tcLookupField . unLoc) field_names	`thenM` \ sel_ids ->
 	-- The renamer has already checked that they
 	-- are all in scope
     let

@@ -11,7 +11,7 @@ module TcEnv(
 	tcExtendGlobalEnv, 
 	tcExtendGlobalValEnv,
 	tcLookupLocatedGlobal,	tcLookupGlobal, 
-	tcLookupGlobalId, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
+	tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
 	tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
 	tcLookupLocatedClass, 
 	
@@ -121,16 +121,19 @@ tcLookupGlobal name
 		tcImportDecl name	-- Go find it in an interface
 	}}}}}
 
-tcLookupGlobalId :: Name -> TcM Id
--- Never used for Haskell-source DataCons, hence no ADataCon case
-tcLookupGlobalId name
+tcLookupField :: Name -> TcM Id		-- Returns the selector Id
+tcLookupField name
   = tcLookupGlobal name		`thenM` \ thing ->
-    return (tyThingId thing)
+    case thing of
+	AnId id -> return id
+	other	-> wrongThingErr "field name" (AGlobal thing) name
 
 tcLookupDataCon :: Name -> TcM DataCon
-tcLookupDataCon con_name
-  = tcLookupGlobal con_name	`thenM` \ thing ->
-    return (tyThingDataCon thing)
+tcLookupDataCon name
+  = tcLookupGlobal name	`thenM` \ thing ->
+    case thing of
+	ADataCon con -> return con
+	other	     -> wrongThingErr "data constructor" (AGlobal thing) name
 
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name

@@ -201,11 +201,9 @@ isExact_maybe other	= Nothing
 \begin{code}
 instance Outputable RdrName where
     ppr (Exact name)   = ppr name
-    ppr (Unqual occ)   = ppr occ <+> ppr_name_space occ
-    ppr (Qual mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
-    ppr (Orig mod occ) = ppr mod <> dot <> ppr occ <+> ppr_name_space occ
-
-ppr_name_space occ = ifPprDebug (parens (pprNonVarNameSpace (occNameSpace occ)))
+    ppr (Unqual occ)   = ppr occ
+    ppr (Qual mod occ) = ppr mod <> dot <> ppr occ
+    ppr (Orig mod occ) = ppr mod <> dot <> ppr occ
 
 instance OutputableBndr RdrName where
     pprBndr _ n 
