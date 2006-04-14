@@ -439,8 +439,13 @@ topdecl :: { OrdList (LHsDecl RdrName) }
 	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
 	| '{-# DEPRECATED' deprecations '#-}'	{ $2 }
 	| '{-# RULES' rules '#-}'		{ $2 }
-	| '$(' exp ')'				{ unitOL (LL $ SpliceD (SpliceDecl $2)) }
       	| decl					{ unLoc $1 }
+
+	-- Template Haskell Extension
+	| '$(' exp ')'				{ unitOL (LL $ SpliceD (SpliceDecl $2)) }
+	| TH_ID_SPLICE				{ unitOL (LL $ SpliceD (SpliceDecl $
+							L1 $ HsVar (mkUnqual varName (getTH_ID_SPLICE $1))
+						  )) }
 
 tycl_decl :: { LTyClDecl RdrName }
  	: 'type' type '=' ctype	
@@ -1099,7 +1104,7 @@ aexp2	:: { LHsExpr RdrName }
 	| '(' qopm infixexp ')'		{ LL $ SectionR $2 $3 }
 	| '_'				{ L1 EWildPat }
 	
-	-- MetaHaskell Extension
+	-- Template Haskell Extension
 	| TH_ID_SPLICE          { L1 $ HsSpliceE (mkHsSplice 
 					(L1 $ HsVar (mkUnqual varName 
 							(getTH_ID_SPLICE $1)))) } -- $x
