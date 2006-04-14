@@ -390,7 +390,7 @@ runMeta convert expr
 		-- We also do the TH -> HS syntax conversion inside the same
 		-- exception-cacthing thing so that if there are any lurking 
 		-- exceptions in the data structure returned by hval, we'll
-		-- encounter them inside the tryALlM
+		-- encounter them inside the try
 	  either_tval <- tryAllM $ do
 		{ th_syn <- TH.runQ (unsafeCoerce# hval)
 		; case convert (getLoc expr) th_syn of

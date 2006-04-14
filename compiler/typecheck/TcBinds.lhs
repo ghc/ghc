@@ -173,6 +173,11 @@ tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
 	      ; sig_fn  = mkSigFun ty_sigs }
 
 	; poly_ids <- mapM tcTySig ty_sigs
+		-- No recovery from bad signatures, because the type sigs
+		-- may bind type variables, so proceeding without them
+		-- can lead to a cascade of errors
+		-- ToDo: this means we fall over immediately if any type sig
+		-- is wrong, which is over-conservative, see Trac bug #745
 
 		-- Extend the envt right away with all 
 		-- the Ids declared with type signatures
