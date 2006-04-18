@@ -666,6 +666,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
    */
   markStablePtrTable(mark_root);
 
+  /* Mark the root pointer table.
+   */
+  markRootPtrTable(mark_root);
+
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
    * more scavenging to be done.

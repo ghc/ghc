@@ -16,6 +16,8 @@ module ObjLink (
    loadDLL,		 -- :: String -> IO (Maybe String)
    loadObj,     	 -- :: String -> IO ()
    unloadObj,   	 -- :: String -> IO ()
+   insertSymbol,         -- :: String -> String -> Ptr a -> IO ()
+   insertStableSymbol,   -- :: String -> String -> a -> IO ()
    lookupSymbol,	 -- :: String -> IO (Maybe (Ptr a))
    resolveObjs  	 -- :: IO SuccessFlag
   )  where
@@ -23,15 +25,31 @@ module ObjLink (
 import Monad            ( when )
 
 import Foreign.C
-import Foreign		( Ptr, nullPtr )
+import Foreign		( nullPtr )
 import Panic		( panic )
 import BasicTypes	( SuccessFlag, successIf )
 import Config		( cLeadingUnderscore )
 import Outputable
 
+import GHC.Exts         ( Ptr(..), unsafeCoerce# )
+
 -- ---------------------------------------------------------------------------
 -- RTS Linker Interface
 -- ---------------------------------------------------------------------------
+
+insertSymbol :: String -> String -> Ptr a -> IO ()
+insertSymbol obj_name key symbol
+    = let str = prefixUnderscore key
+      in withCString obj_name $ \c_obj_name ->
+         withCString str $ \c_str ->
+          c_insertSymbol c_obj_name c_str symbol
+
+insertStableSymbol :: String -> String -> a -> IO ()
+insertStableSymbol obj_name key symbol
+    = let str = prefixUnderscore key
+      in withCString obj_name $ \c_obj_name ->
+         withCString str $ \c_str ->
+          c_insertStableSymbol c_obj_name c_str (Ptr (unsafeCoerce# symbol))
 
 lookupSymbol :: String -> IO (Maybe (Ptr a))
 lookupSymbol str_in = do
@@ -81,6 +99,9 @@ resolveObjs = do
 #if __GLASGOW_HASKELL__ >= 504
 foreign import ccall unsafe "addDLL"	   c_addDLL :: CString -> IO CString
 foreign import ccall unsafe "initLinker"   initObjLinker :: IO ()
+foreign import ccall unsafe "insertSymbol" c_insertSymbol :: CString -> CString -> Ptr a -> IO ()
+foreign import ccall unsafe "insertStableSymbol" c_insertStableSymbol
+    :: CString -> CString -> Ptr a -> IO ()
 foreign import ccall unsafe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr a)
 foreign import ccall unsafe "loadObj"      c_loadObj :: CString -> IO Int
 foreign import ccall unsafe "unloadObj"    c_unloadObj :: CString -> IO Int
@@ -88,6 +109,9 @@ foreign import ccall unsafe "resolveObjs"  c_resolveObjs :: IO Int
 #else
 foreign import "addDLL"       unsafe	c_addDLL :: CString -> IO CString
 foreign import "initLinker"   unsafe	initLinker :: IO ()
+foreign import "insertSymbol" unsafe	c_insertSymbol :: CString -> CString -> Ptr a -> IO ()
+foreign import "insertStableSymbol" unsafe c_insertStableSymbol
+    :: CString -> CString -> Ptr a -> IO ()
 foreign import "lookupSymbol" unsafe	c_lookupSymbol :: CString -> IO (Ptr a)
 foreign import "loadObj"      unsafe	c_loadObj :: CString -> IO Int
 foreign import "unloadObj"    unsafe	c_unloadObj :: CString -> IO Int

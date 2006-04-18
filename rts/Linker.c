@@ -92,6 +92,17 @@
 /* Hash table mapping symbol names to Symbol */
 static /*Str*/HashTable *symhash;
 
+typedef struct {
+  void *addr;
+} rootEntry;
+
+/* Hash table mapping symbol names to StgStablePtr */
+static /*Str*/HashTable *stablehash;
+rootEntry *root_ptr_table = NULL;
+static rootEntry *root_ptr_free = NULL;
+
+static unsigned int RPT_size = 0;
+
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;	/* initially empty */
 
@@ -526,6 +537,8 @@ typedef struct _RtsSymbolVal {
       SymX(isFloatNegativeZero)			\
       SymX(killThreadzh_fast)			\
       SymX(loadObj)          			\
+      SymX(insertStableSymbol) 			\
+      SymX(insertSymbol)     			\
       SymX(lookupSymbol)     			\
       SymX(makeStablePtrzh_fast)		\
       SymX(minusIntegerzh_fast)			\
@@ -790,6 +803,95 @@ static RtsSymbolVal rtsSyms[] = {
       { 0, 0 } /* sentinel */
 };
 
+
+/* -----------------------------------------------------------------------------
+ * Utilities for handling root pointers.
+ * -------------------------------------------------------------------------- */
+
+
+#define INIT_RPT_SIZE 64
+
+STATIC_INLINE void
+initFreeList(rootEntry *table, nat n, rootEntry *free)
+{
+  rootEntry *p;
+
+  for (p = table + n - 1; p >= table; p--) {
+    p->addr   = (P_)free;
+    free = p;
+  }
+  root_ptr_free = table;
+}
+
+void
+initRootPtrTable(void)
+{
+  if (RPT_size > 0)
+    return;
+
+  RPT_size = INIT_RPT_SIZE;
+  root_ptr_table = stgMallocBytes(RPT_size * sizeof(rootEntry),
+                                    "initRootPtrTable");
+
+  initFreeList(root_ptr_table,INIT_RPT_SIZE,NULL);
+}
+
+
+void
+enlargeRootPtrTable(void)
+{
+  nat old_RPT_size = RPT_size;
+
+  // 2nd and subsequent times
+  RPT_size *= 2;
+  root_ptr_table =
+    stgReallocBytes(root_ptr_table,
+                    RPT_size * sizeof(rootEntry),
+                    "enlargeRootPtrTable");
+
+  initFreeList(root_ptr_table + old_RPT_size, old_RPT_size, NULL);
+}
+
+static void
+addRootObject(void *addr)
+{
+  StgWord rt;
+
+  if (root_ptr_free == NULL) {
+    enlargeRootPtrTable();
+  }
+
+  rt = root_ptr_free - root_ptr_table;
+  root_ptr_free  = (rootEntry*)(root_ptr_free->addr);
+  root_ptr_table[rt].addr = addr;
+}
+
+/* -----------------------------------------------------------------------------
+ * Treat root pointers as roots for the garbage collector.
+ * -------------------------------------------------------------------------- */
+
+void
+markRootPtrTable(evac_fn evac)
+{
+  rootEntry *p, *end_root_ptr_table;
+  StgPtr q;
+
+  end_root_ptr_table = &root_ptr_table[RPT_size];
+
+  for (p = root_ptr_table; p < end_root_ptr_table; p++) {
+    q = p->addr;
+
+    if (q && (q < (P_)root_ptr_table || q >= (P_)end_root_ptr_table)) {
+        evac((StgClosure **)p->addr);
+    }
+  }
+}
+
+/* -----------------------------------------------------------------------------
+ * End of utilities for handling root pointers.
+ * -------------------------------------------------------------------------- */
+
+
 /* -----------------------------------------------------------------------------
  * Insert symbols into hash tables, checking for duplicates.
  */
@@ -852,6 +954,8 @@ initLinker( void )
       linker_init_done = 1;
     }
 
+    initRootPtrTable();
+    stablehash = allocStrHashTable();
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
@@ -986,6 +1090,26 @@ addDLL( char *dll_name )
 #  else
    barf("addDLL: not implemented on this platform");
 #  endif
+}
+
+/* -----------------------------------------------------------------------------
+ * insert a stable symbol in the hash table
+ */
+
+void
+insertStableSymbol(char* obj_name, char* key, StgPtr p)
+{
+  ghciInsertStrHashTable(obj_name, stablehash, key, getStablePtr(p));
+}
+
+
+/* -----------------------------------------------------------------------------
+ * insert a symbol in the hash table
+ */
+void
+insertSymbol(char* obj_name, char* key, void* data)
+{
+  ghciInsertStrHashTable(obj_name, symhash, key, data);
 }
 
 /* -----------------------------------------------------------------------------
@@ -3134,6 +3258,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       Elf_Addr  S;
       void*     S_tmp;
       Elf_Addr  value;
+      StgStablePtr stablePtr;
+      StgPtr stableVal;
 
       IF_DEBUG(linker,debugBelch( "Rel entry %3d is raw(%6p %6p)",
                              j, (void*)offset, (void*)info ));
@@ -3152,10 +3278,18 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                        + stab[ELF_R_SYM(info)].st_value);
 
 	 } else {
-            /* No, so look up the name in our global table. */
             symbol = strtab + sym.st_name;
-            S_tmp = lookupSymbol( symbol );
-            S = (Elf_Addr)S_tmp;
+            stablePtr = (StgStablePtr)lookupHashTable(stablehash, (StgWord)symbol);
+            if (NULL == stablePtr) {
+              /* No, so look up the name in our global table. */
+              S_tmp = lookupSymbol( symbol );
+              S = (Elf_Addr)S_tmp;
+            } else {
+              stableVal = deRefStablePtr( stablePtr );
+              addRootObject((void*)P);
+              S_tmp = stableVal;
+              S = (Elf_Addr)S_tmp;
+            }
 	 }
          if (!S) {
             errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);

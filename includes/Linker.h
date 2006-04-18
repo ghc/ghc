@@ -12,6 +12,12 @@
 /* initialize the object linker */
 void initLinker( void );
 
+/* insert a stable symbol in the hash table */
+void insertStableSymbol(char* obj_name, char* key, StgPtr data);
+
+/* insert a symbol in the hash table */
+void insertSymbol(char* obj_name, char* key, void* data);
+
 /* lookup a symbol in the hash table */
 void *lookupSymbol( char *lbl );
 
@@ -26,5 +32,8 @@ HsInt resolveObjs( void );
 
 /* load a dynamic library */
 char *addDLL( char* dll_name );
+
+extern void markRootPtrTable(evac_fn evac);
+
 
 #endif /* LINKER_H */
