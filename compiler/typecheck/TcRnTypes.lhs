@@ -352,6 +352,8 @@ type ThLevel = Int
 	-- 	(always >= 0)
 	-- Incremented when going inside a bracket,
 	-- decremented when going inside a splice
+	-- NB: ThLevel is one greater than the 'n' in Fig 2 of the
+	--     original "Template meta-programmign for Haskell" paper
 
 impLevel, topLevel :: ThLevel
 topLevel = 1	-- Things defined at top level of this module
