@@ -314,26 +314,34 @@ dsFExport fn_id ty ext_name cconv isDyn
                       fe_arg_tys res_ty is_IO_res_ty cconv
 \end{code}
 
-@foreign export dynamic@ lets you dress up Haskell IO actions
-of some fixed type behind an externally callable interface (i.e.,
-as a C function pointer). Useful for callbacks and stuff.
+@foreign import "wrapper"@ (previously "foreign export dynamic") lets
+you dress up Haskell IO actions of some fixed type behind an
+externally callable interface (i.e., as a C function pointer). Useful
+for callbacks and stuff.
 
 \begin{verbatim}
-foreign export dynamic f :: (Addr -> Int -> IO Int) -> IO Addr
+type Fun = Bool -> Int -> IO Int
+foreign import "wrapper" f :: Fun -> IO (FunPtr Fun)
 
 -- Haskell-visible constructor, which is generated from the above:
 -- SUP: No check for NULL from createAdjustor anymore???
 
-f :: (Addr -> Int -> IO Int) -> IO Addr
+f :: Fun -> IO (FunPtr Fun)
 f cback =
    bindIO (newStablePtr cback)
           (\StablePtr sp# -> IO (\s1# ->
               case _ccall_ createAdjustor cconv sp# ``f_helper'' s1# of
                  (# s2#, a# #) -> (# s2#, A# a# #)))
 
-foreign export "f_helper" f_helper :: StablePtr (Addr -> Int -> IO Int) -> Addr -> Int -> IO Int
--- `special' foreign export that invokes the closure pointed to by the
--- first argument.
+foreign import "&f_helper" f_helper :: FunPtr (StablePtr Fun -> Fun)
+
+-- and the helper in C:
+
+f_helper(StablePtr s, HsBool b, HsInt i)
+{
+	rts_evalIO(rts_apply(rts_apply(deRefStablePtr(s), 
+				       rts_mkBool(b)), rts_mkInt(i)));
+}
 \end{verbatim}
 
 \begin{code}
