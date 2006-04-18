@@ -34,6 +34,7 @@ import Type		( repType, coreEqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, tcSplitTyConApp_maybe, tcSplitIOType_maybe,
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
+			  isBoolTy
 			)
 
 import BasicTypes       ( Boxity(..) )
@@ -45,7 +46,7 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..),
 			  ccallConvAttribute
 			)
 import TysWiredIn	( unitTy, tupleTyCon )
-import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy )
+import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy, intPrimTy )
 import PrelNames	( stablePtrTyConName, newStablePtrName, bindIOName,
 			  checkDotnetResName )
 import BasicTypes	( Activation( NeverActive ) )
@@ -629,16 +630,19 @@ ret_addr_arg = (text "original_return_addr", text "void*", undefined,
 		typeMachRep addrPrimTy)
 
 -- This function returns the primitive type associated with the boxed
--- type argument to a foreign export (eg. Int ==> Int#).  It assumes
--- that all the types we are interested in have a single constructor
--- with a single primitive-typed argument, which is true for all of the legal
--- foreign export argument types (see TcType.legalFEArgTyCon).
+-- type argument to a foreign export (eg. Int ==> Int#).
 getPrimTyOf :: Type -> Type
-getPrimTyOf ty =
-  case splitProductType_maybe (repType ty) of
+getPrimTyOf ty
+  | isBoolTy rep_ty = intPrimTy
+  -- Except for Bool, the types we are interested in have a single constructor
+  -- with a single primitive-typed argument (see TcType.legalFEArgTyCon).
+  | otherwise =
+  case splitProductType_maybe rep_ty of
      Just (_, _, data_con, [prim_ty]) ->
 	ASSERT(dataConSourceArity data_con == 1)
 	ASSERT2(isUnLiftedType prim_ty, ppr prim_ty)
 	prim_ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
+  where
+	rep_ty = repType ty
 \end{code}
