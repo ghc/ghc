@@ -50,8 +50,8 @@ test6D = do
 
 --------------------------------------------------------------------------------
 
-type FunType11M = Int -> Double -> Float -> Char -> Int -> Int -> Float -> Int
-               -> Char -> Double -> Int -> Double
+type FunType11M = Int -> Double -> Float -> Char -> Bool -> Int -> Float -> Int
+               -> Char -> Double -> Bool -> Double
 
 foreign import ccall "dynamic" callFun11M :: FunPtr FunType11M -> FunType11M
 foreign import ccall "wrapper" mkFun11M   :: FunType11M -> IO (FunPtr FunType11M)
@@ -60,10 +60,10 @@ manyArgs11M :: FunType11M
 manyArgs11M a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 =
    (((((((((fromIntegral           a1   * 31 +                         a2)  * 31 +
             realToFrac             a3)  * 31 + fromIntegral (fromEnum  a4)) * 31 +
-            fromIntegral           a5)  * 31 + fromIntegral            a6)  * 31 +
+            fromIntegral (fromEnum a5)) * 31 + fromIntegral            a6)  * 31 +
             realToFrac             a7)  * 31 + fromIntegral            a8)  * 31 +
-            fromIntegral (fromEnum a9)) * 31 +                        a10)  * 31 +
-            fromIntegral a11
+            fromIntegral (fromEnum a9)) * 31 +                         a10) * 31 +
+            fromIntegral (fromEnum a11)
 
 test11M :: IO ()
 test11M = do
