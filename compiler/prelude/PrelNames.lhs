@@ -110,8 +110,6 @@ basicKnownKeyNames
 	rationalTyConName,
 	ratioDataConName,
 	ratioTyConName,
-	byteArrayTyConName,
-	mutableByteArrayTyConName,
 	integerTyConName, smallIntegerDataConName, largeIntegerDataConName,
 
 	--  Classes.  *Must* include:
@@ -240,7 +238,6 @@ pREL_CONC	= mkModule "GHC.Conc"
 pREL_IO_BASE	= mkModule "GHC.IOBase"
 pREL_ST		= mkModule "GHC.ST"
 pREL_ARR	= mkModule "GHC.Arr"
-pREL_BYTEARR	= mkModule "PrelByteArr"
 pREL_STABLE	= mkModule "GHC.Stable"
 pREL_ADDR	= mkModule "GHC.Addr"
 pREL_PTR	= mkModule "GHC.Ptr"
@@ -605,10 +602,6 @@ addrTyConName	  = tcQual   aDDR FSLIT("Addr") addrTyConKey
 ptrTyConName	  = tcQual   pREL_PTR FSLIT("Ptr") ptrTyConKey
 funPtrTyConName	  = tcQual   pREL_PTR FSLIT("FunPtr") funPtrTyConKey
 
--- Byte array types
-byteArrayTyConName	  = tcQual pREL_BYTEARR  FSLIT("ByteArray") byteArrayTyConKey
-mutableByteArrayTyConName = tcQual pREL_BYTEARR  FSLIT("MutableByteArray") mutableByteArrayTyConKey
-
 -- Foreign objects and weak pointers
 stablePtrTyConName    = tcQual   pREL_STABLE FSLIT("StablePtr") stablePtrTyConKey
 newStablePtrName      = varQual  pREL_STABLE FSLIT("newStablePtr") newStablePtrIdKey
@@ -762,10 +755,8 @@ stablePtrTyConKey			= mkPreludeTyConUnique 36
 statePrimTyConKey			= mkPreludeTyConUnique 50
 stableNamePrimTyConKey			= mkPreludeTyConUnique 51
 stableNameTyConKey		        = mkPreludeTyConUnique 52
-mutableByteArrayTyConKey		= mkPreludeTyConUnique 53
 mutVarPrimTyConKey			= mkPreludeTyConUnique 55
 ioTyConKey				= mkPreludeTyConUnique 56
-byteArrayTyConKey			= mkPreludeTyConUnique 57
 wordPrimTyConKey			= mkPreludeTyConUnique 58
 wordTyConKey				= mkPreludeTyConUnique 59
 word8TyConKey				= mkPreludeTyConUnique 60
@@ -998,8 +989,6 @@ numericTyKeys =
 cCallishTyKeys = 
 	[ addrTyConKey
 	, wordTyConKey
-	, byteArrayTyConKey
-	, mutableByteArrayTyConKey
 	, stablePtrTyConKey
 	, int8TyConKey
 	, int16TyConKey

@@ -1083,8 +1083,7 @@ isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey, addrTyConKey]
 
 isFFIDotnetTy :: DynFlags -> Type -> Bool
 isFFIDotnetTy dflags ty
-  = checkRepTyCon (\ tc -> not (isByteArrayLikeTyCon tc) &&
-  			   (legalFIResultTyCon dflags tc || 
+  = checkRepTyCon (\ tc -> (legalFIResultTyCon dflags tc || 
 			   isFFIDotnetObjTy ty || isStringTy ty)) ty
 
 -- Support String as an argument or result from a .NET FFI call.
@@ -1160,35 +1159,24 @@ These chaps do the work; they are not exported
 
 \begin{code}
 legalFEArgTyCon :: TyCon -> Bool
--- It's illegal to return foreign objects and (mutable)
--- bytearrays from a _ccall_ / foreign declaration
--- (or be passed them as arguments in foreign exported functions).
 legalFEArgTyCon tc
-  | isByteArrayLikeTyCon tc
-  = False
-  -- It's also illegal to make foreign exports that take unboxed
+  -- It's illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
-  | otherwise
   = boxedMarshalableTyCon tc
 
 legalFIResultTyCon :: DynFlags -> TyCon -> Bool
 legalFIResultTyCon dflags tc
-  | isByteArrayLikeTyCon tc = False
   | tc == unitTyCon         = True
   | otherwise	            = marshalableTyCon dflags tc
 
 legalFEResultTyCon :: TyCon -> Bool
 legalFEResultTyCon tc
-  | isByteArrayLikeTyCon tc = False
   | tc == unitTyCon         = True
   | otherwise               = boxedMarshalableTyCon tc
 
 legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
 -- Checks validity of types going from Haskell -> external world
 legalOutgoingTyCon dflags safety tc
-  | playSafe safety && isByteArrayLikeTyCon tc
-  = False
-  | otherwise
   = marshalableTyCon dflags tc
 
 legalFFITyCon :: TyCon -> Bool
@@ -1209,11 +1197,6 @@ boxedMarshalableTyCon tc
 			 , addrTyConKey, ptrTyConKey, funPtrTyConKey
 			 , charTyConKey
 			 , stablePtrTyConKey
-			 , byteArrayTyConKey, mutableByteArrayTyConKey
 			 , boolTyConKey
 			 ]
-
-isByteArrayLikeTyCon :: TyCon -> Bool
-isByteArrayLikeTyCon tc = 
-  getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
 \end{code}
