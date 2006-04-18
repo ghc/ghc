@@ -731,14 +731,16 @@ check_poly_type (Rank 0) ubx_tup ty
   = check_tau_type (Rank 0) ubx_tup ty
 
 check_poly_type rank ubx_tup ty 
-  = let
-	(tvs, theta, tau) = tcSplitSigmaTy ty
-    in
-    check_valid_theta SigmaCtxt theta		`thenM_`
-    check_tau_type (decRank rank) ubx_tup tau 	`thenM_`
-    checkFreeness tvs theta			`thenM_`
-    checkAmbiguity tvs theta (tyVarsOfType tau)
-
+  | null tvs && null theta
+  = check_tau_type rank ubx_tup ty
+  | otherwise
+  = do	{ check_valid_theta SigmaCtxt theta
+	; check_poly_type rank ubx_tup tau	-- Allow foralls to right of arrow
+	; checkFreeness tvs theta
+	; checkAmbiguity tvs theta (tyVarsOfType tau) }
+  where
+    (tvs, theta, tau) = tcSplitSigmaTy ty
+   
 ----------------------------------------
 check_arg_type :: Type -> TcM ()
 -- The sort of type that can instantiate a type variable,
@@ -781,8 +783,8 @@ check_tau_type rank ubx_tup (PredTy sty) = getDOpts		`thenM` \ dflags ->
 
 check_tau_type rank ubx_tup (TyVarTy _)       = returnM ()
 check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
-  = check_poly_type rank UT_NotOk arg_ty	`thenM_`
-    check_poly_type rank UT_Ok    res_ty
+  = check_poly_type (decRank rank) UT_NotOk arg_ty	`thenM_`
+    check_poly_type rank 	   UT_Ok    res_ty
 
 check_tau_type rank ubx_tup (AppTy ty1 ty2)
   = check_arg_type ty1 `thenM_` check_arg_type ty2
