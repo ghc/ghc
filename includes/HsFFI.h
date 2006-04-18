@@ -81,7 +81,7 @@ typedef StgWord32		HsWord32;
 typedef StgWord64		HsWord64;
 typedef StgFloat		HsFloat;
 typedef StgDouble		HsDouble;
-typedef StgBool			HsBool;
+typedef StgInt			HsBool;
 typedef void*			HsPtr;          /* this should better match StgAddr */
 typedef void			(*HsFunPtr)(void); /* this should better match StgAddr */
 typedef void*			HsForeignPtr;   /* ... and this StgForeignPtr       */
