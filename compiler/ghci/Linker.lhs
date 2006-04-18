@@ -146,8 +146,8 @@ withExtendedLinkEnv new_env action
                            let new_closure_env = extendClosureEnv (closure_env pls) new_env
                                new_pls = pls { closure_env = new_closure_env }
                            writeIORef v_PersistentLinkerState new_pls
-                           return pls
-          reset_old_env pls = writeIORef v_PersistentLinkerState pls
+                           return (closure_env pls)
+          reset_old_env env = modifyIORef v_PersistentLinkerState (\pls -> pls{ closure_env = env })
 
 -- filterNameMap removes from the environment all entries except 
 -- 	those for a given set of modules;
