@@ -64,7 +64,7 @@ import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( Module, ModuleEnv, moduleEnvElts, elemModuleEnv )
-import OccName		( mkVarOccFS )
+import OccName		( mkVarOccFS, plusOccEnv )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
 			  mkExternalName, isInternalName )
 import NameSet
@@ -188,7 +188,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
 		-- Update the gbl env
 	updGblEnv ( \ gbl -> 
-		gbl { tcg_rdr_env  = rdr_env,
+		gbl { tcg_rdr_env  = plusOccEnv (tcg_rdr_env gbl) rdr_env,
 		      tcg_inst_env = extendInstEnvList (tcg_inst_env gbl) home_insts,
 		      tcg_imports  = tcg_imports gbl `plusImportAvails` imports,
                       tcg_rn_imports = if save_rn_syntax then

@@ -29,6 +29,12 @@ module GHC (
 	removeTarget,
 	guessTarget,
 	
+        -- * Extending the program scope 
+        extendGlobalRdrScope,  -- :: Session -> [GlobalRdrElt] -> IO ()
+        setGlobalRdrScope,     -- :: Session -> [GlobalRdrElt] -> IO ()
+        extendGlobalTypeScope, -- :: Session -> [Id] -> IO ()
+        setGlobalTypeScope,    -- :: Session -> [Id] -> IO ()
+
 	-- * Loading\/compiling the program
 	depanal,
 	load, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
@@ -169,7 +175,7 @@ import TcRnDriver	( tcRnLookupRdrName, tcRnGetInfo,
 			  tcRnLookupName, getModuleExports )
 import RdrName		( plusGlobalRdrEnv, Provenance(..), 
 			  ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
-			  emptyGlobalRdrEnv, mkGlobalRdrEnv )
+			  mkGlobalRdrEnv )
 import HscMain		( hscParseIdentifier, hscStmt, hscTcExpr, hscKcType )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
@@ -179,7 +185,8 @@ import GHC.Exts		( unsafeCoerce# )
 import Packages		( initPackages )
 import NameSet		( NameSet, nameSetToList, elemNameSet )
 import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName(..), 
-			  globalRdrEnvElts )
+			  globalRdrEnvElts, extendGlobalRdrEnv,
+                          emptyGlobalRdrEnv )
 import HsSyn
 import Type		( Kind, Type, dropForAlls, PredType, ThetaType,
 			  pprThetaArrow, pprParendType, splitForAllTys,
@@ -445,6 +452,31 @@ guessTarget file Nothing
      where 
 	 hs_file  = file `joinFileExt` "hs"
 	 lhs_file = file `joinFileExt` "lhs"
+
+-- -----------------------------------------------------------------------------
+-- Extending the program scope
+
+extendGlobalRdrScope :: Session -> [GlobalRdrElt] -> IO ()
+extendGlobalRdrScope session rdrElts
+    = modifySession session $ \hscEnv ->
+      let global_rdr = hsc_global_rdr_env hscEnv
+      in hscEnv{ hsc_global_rdr_env = foldl extendGlobalRdrEnv global_rdr rdrElts }
+
+setGlobalRdrScope :: Session -> [GlobalRdrElt] -> IO ()
+setGlobalRdrScope session rdrElts
+    = modifySession session $ \hscEnv ->
+      hscEnv{ hsc_global_rdr_env = foldl extendGlobalRdrEnv emptyGlobalRdrEnv rdrElts }
+
+extendGlobalTypeScope :: Session -> [Id] -> IO ()
+extendGlobalTypeScope session ids
+    = modifySession session $ \hscEnv ->
+      let global_type = hsc_global_type_env hscEnv
+      in hscEnv{ hsc_global_type_env = extendTypeEnvWithIds global_type ids }
+
+setGlobalTypeScope :: Session -> [Id] -> IO ()
+setGlobalTypeScope session ids
+    = modifySession session $ \hscEnv ->
+      hscEnv{ hsc_global_type_env = extendTypeEnvWithIds emptyTypeEnv ids }
 
 -- -----------------------------------------------------------------------------
 -- Loading the program

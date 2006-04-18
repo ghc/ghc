@@ -172,9 +172,11 @@ data HscEnv
 		-- sucking in interface files.  They cache the state of
 		-- external interface files, in effect.
 
-	hsc_FC  :: {-# UNPACK #-} !(IORef FinderCache)
+	hsc_FC  :: {-# UNPACK #-} !(IORef FinderCache),
 		-- The finder's cache.  This caches the location of modules,
 		-- so we don't have to search the filesystem multiple times.
+        hsc_global_rdr_env :: GlobalRdrEnv,
+        hsc_global_type_env :: TypeEnv
  }
 
 hscEPS :: HscEnv -> IO ExternalPackageState

@@ -47,7 +47,7 @@ import VarEnv		( emptyTidyEnv )
 
 import Var		( Id )
 import Module		( emptyModuleEnv, ModLocation(..) )
-import RdrName		( GlobalRdrEnv, RdrName )
+import RdrName		( GlobalRdrEnv, RdrName, emptyGlobalRdrEnv )
 import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl )
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
@@ -74,6 +74,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CmmParse		( parseCmmFile )
 import CodeOutput	( codeOutput )
+import NameEnv          ( emptyNameEnv )
 
 import DynFlags
 import ErrUtils
@@ -114,7 +115,9 @@ newHscEnv dflags
 			   hsc_HPT    = emptyHomePackageTable,
 			   hsc_EPS    = eps_var,
 			   hsc_NC     = nc_var,
-			   hsc_FC     = fc_var } ) }
+			   hsc_FC     = fc_var,
+                           hsc_global_rdr_env = emptyGlobalRdrEnv,
+                           hsc_global_type_env = emptyNameEnv } ) }
 			
 
 knownKeyNames :: [Name]	-- Put here to avoid loops involving DsMeta,
