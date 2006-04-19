@@ -509,18 +509,6 @@ f (Wibble x y)  # ugly, and proud of it
           <option>-A&lt;size&gt;</option><indexterm><primary>-A&lt;size&gt;
           RTS option</primary></indexterm> RTS options (see <xref
           linkend="rts-options-gc"/>).</para>
-
-	  <para>This is especially important if your program uses a
-	  lot of mutable arrays of pointers or mutable variables
-	  (i.e. <literal>STArray</literal>,
-	  <literal>IOArray</literal>, <literal>STRef</literal> and
-	  <literal>IORef</literal>, but not <literal>UArray</literal>,
-	  <literal>STUArray</literal> or <literal>IOUArray</literal>).
-	  GHC's garbage collector currently scans these objects on
-	  every collection, so your program won't benefit from
-	  generational GC in the normal way if you use lots of
-	  these.  Increasing the heap size to reduce the number of
-	  collections will probably help.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
