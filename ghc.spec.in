@@ -125,7 +125,6 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc docs/storage-mgt/rp.ps
 %doc docs/storage-mgt/sm.ps
 %doc docs/users_guide/users_guide
-%doc hslibs/doc/hslibs
 %doc html/*
 %doc libraries/Cabal/doc/Cabal
 %{prefix}/bin/ghc
