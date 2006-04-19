@@ -85,8 +85,8 @@ test -f configure || autoreconf
 ./configure --prefix=%{prefix}
 make
 make html
-make -C ghc/docs/ext-core ps
-make -C ghc/docs/storage-mgt ps
+make -C docs/ext-core ps
+make -C docs/storage-mgt ps
  
 %install
 make prefix=${RPM_BUILD_ROOT}%{prefix} install
@@ -116,15 +116,15 @@ rm -rf ${RPM_BUILD_ROOT}
 %files -f rpm-noprof-lib-files
 %defattr(-,root,root)
 %doc docs/docbook-cheat-sheet/docbook-cheat-sheet
-%doc ghc/ANNOUNCE
-%doc ghc/LICENSE
-%doc ghc/README
-%doc ghc/docs/building/building
-%doc ghc/docs/ext-core/core.ps
-%doc ghc/docs/storage-mgt/ldv.ps
-%doc ghc/docs/storage-mgt/rp.ps
-%doc ghc/docs/storage-mgt/sm.ps
-%doc ghc/docs/users_guide/users_guide
+%doc ANNOUNCE
+%doc LICENSE
+%doc README
+%doc docs/building/building
+%doc docs/ext-core/core.ps
+%doc docs/storage-mgt/ldv.ps
+%doc docs/storage-mgt/rp.ps
+%doc docs/storage-mgt/sm.ps
+%doc docs/users_guide/users_guide
 %doc hslibs/doc/hslibs
 %doc html/*
 %doc libraries/Cabal/doc/Cabal
@@ -140,7 +140,6 @@ rm -rf ${RPM_BUILD_ROOT}
 %{prefix}/bin/hsc2hs
 %{prefix}/bin/runghc
 %{prefix}/bin/runhaskell
-%{prefix}/bin/stat2resid
 
 %files prof -f rpm-prof-lib-files
 %defattr(-,root,root)
