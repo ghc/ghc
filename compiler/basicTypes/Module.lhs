@@ -5,23 +5,23 @@
 Module
 ~~~~~~~~~~
 Simply the name of a module, represented as a FastString.
-These are Uniquable, hence we can build FiniteMaps with ModuleNames as
+These are Uniquable, hence we can build FiniteMaps with Modules as
 the keys.
 
 \begin{code}
 module Module 
     (
       Module 		   	-- Abstract, instance of Eq, Ord, Outputable
-    , pprModule			-- :: ModuleName -> SDoc
+    , pprModule			-- :: Module -> SDoc
 
     , ModLocation(..)
     , addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn
 
-    , moduleString		-- :: ModuleName -> String
-    , moduleFS			-- :: ModuleName -> FastString
+    , moduleString		-- :: Module -> String
+    , moduleFS			-- :: Module -> FastString
 
-    , mkModule			-- :: String -> ModuleName
-    , mkModuleFS		-- :: FastString -> ModuleName
+    , mkModule			-- :: String -> Module
+    , mkModuleFS		-- :: FastString -> Module
  
     , ModuleEnv
     , elemModuleEnv, extendModuleEnv, extendModuleEnvList, plusModuleEnv_C
