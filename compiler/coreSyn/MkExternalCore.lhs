@@ -64,7 +64,8 @@ collect_tdefs tcon tdefs
   where
     tdef | isNewTyCon tcon = 
                 C.Newtype (make_con_qid (tyConName tcon)) (map make_tbind tyvars) repclause 
-         | null (tyConDataCons tcon) = error "MkExternalCore died: can't handle datatype declarations with no data constructors"
+-- 20060420 GHC handles empty data types just fine. ExtCore should too! jds
+--         | null (tyConDataCons tcon) = error "MkExternalCore died: can't handle datatype declarations with no data constructors"
          | otherwise = 
                 C.Data (make_con_qid (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
          where repclause | isRecursiveTyCon tcon = Nothing

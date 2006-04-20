@@ -82,7 +82,7 @@ tdefs	:: { [TyClDecl RdrName] }
 	| tdef ';' tdefs	{$1:$3}
 
 tdef	:: { TyClDecl RdrName }
-	: '%data' q_tc_name tv_bndrs '=' '{' cons1 '}'
+	: '%data' q_tc_name tv_bndrs '=' '{' cons '}'
                 { mkTyData DataType (noLoc [], noLoc (ifaceExtRdrName $2), map toHsTvBndr $3) Nothing $6 Nothing }
 	| '%newtype' q_tc_name tv_bndrs trep 
 		{ let tc_rdr = ifaceExtRdrName $2 in
@@ -97,9 +97,9 @@ trep    :: { OccName -> [LConDecl RdrName] }
 			                in [noLoc $ ConDecl (noLoc dc_name) Explicit []
 					   (noLoc []) con_info ResTyH98]) }
 
-cons1	:: { [LConDecl RdrName] }
-	: con		{ [$1] }
-	| con ';' cons1	{ $1:$3 }
+cons	:: { [LConDecl RdrName] }
+	: {- empty -}	{ [] } -- 20060420 Empty data types allowed. jds
+	| con ';' cons	{ $1:$3 }
 
 con	:: { LConDecl RdrName }
 	: d_pat_occ attv_bndrs hs_atys 
