@@ -554,11 +554,10 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
 	contents = td << vanillaTable << ppModuleContents exports
 
 	description
-         | Just doc <- iface_doc iface
-         = (tda [theclass "section1"] << toHtml "Description") </>
-	   docBox (docToHtml doc)
-	 | otherwise
-	 = Html.emptyTable
+          = case iface_doc iface of
+              Nothing -> Html.emptyTable
+              Just doc -> (tda [theclass "section1"] << toHtml "Description") </>
+                          docBox (docToHtml doc)
 
 	-- omit the synopsis if there are no documentation annotations at all
 	synopsis
@@ -910,9 +909,9 @@ ppHsClassDecl summary links instances orig_c
 
 	hdr = ppClassHdr summary ctxt nm tvs fds
 
-	classdoc
-	   | Just d <- doc = ndocBox (docToHtml d)
-	   | otherwise     = Html.emptyTable
+	classdoc = case doc of
+                     Nothing -> Html.emptyTable
+                     Just d -> ndocBox (docToHtml d)
 
 	methods_bit
 	   | null decls = Html.emptyTable
@@ -1057,9 +1056,9 @@ ppHsQName n@(Qual mdl str)
   | otherwise		= linkId mdl (Just str) << ppHsName str
 
 isSpecial :: HsName -> Bool
-isSpecial (HsTyClsName id0) | HsSpecial _ <- id0 = True
-isSpecial (HsVarName id0)   | HsSpecial _ <- id0 = True
-isSpecial _                                      = False
+isSpecial (HsTyClsName (HsSpecial _)) = True
+isSpecial (HsVarName   (HsSpecial _)) = True
+isSpecial _                           = False
 
 ppHsName :: HsName -> Html
 ppHsName nm = toHtml (hsNameStr nm)
