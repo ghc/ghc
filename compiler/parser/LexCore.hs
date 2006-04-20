@@ -5,7 +5,8 @@ import Ratio
 import Char
 import qualified Numeric( readFloat, readDec )
 
-isNameChar c = isAlpha c || isDigit c || (c == '_') || (c == '\'') 
+isNameChar c = isAlpha c || isDigit c || (c == '_') || (c == '\'')
+	       || (c == ':') || (c == '$')
 isKeywordChar c = isAlpha c || (c == '_') 
 
 lexer :: (Token -> P a) -> P a 
@@ -35,6 +36,10 @@ lexer cont ('\\':cs)    = cont TKlambda cs
 lexer cont ('@':cs) 	= cont TKat cs
 lexer cont ('?':cs) 	= cont TKquestion cs
 lexer cont (';':cs) 	= cont TKsemicolon cs
+-- 20060420 GHC spits out constructors with colon in them nowadays. jds
+lexer cont (':':cs)     = lexName cont TKcname (':':cs)
+-- 20060420 Likewise does it create identifiers starting with dollar. jds
+lexer cont ('$':cs)     = lexName cont TKname ('$':cs)
 lexer cont (c:cs) 	= failP "invalid character" [c]
 
 
