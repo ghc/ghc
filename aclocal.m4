@@ -1091,6 +1091,7 @@ fi])# FP_GCC_NEEDS_NO_OMIT_LFPTR
 # ---------------------
 AC_DEFUN([FP_SETUP_PROJECT_VERSION],
 [# Some renamings
+AC_SUBST([ProjectName], [$PACKAGE_NAME])
 AC_SUBST([ProjectVersion], [$PACKAGE_VERSION])
 
 # Split PACKAGE_VERSION into (possibly empty) parts

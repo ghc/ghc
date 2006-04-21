@@ -55,6 +55,7 @@ endif
 # change between versions.  Rationale: calling conventions or other 
 # random .o-file stuff might change even if the .hi syntax doesn't
 
+ProjectName       = @ProjectName@
 ProjectVersion    = @ProjectVersion@
 ProjectVersionInt = @ProjectVersionInt@
 ProjectPatchLevel = @ProjectPatchLevel@
