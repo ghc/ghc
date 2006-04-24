@@ -235,7 +235,6 @@ ifeq "$(BIN_DIST)" ""
 endif
 	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
 	-$(RM) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
-	-echo "BIN_DIST_DIRS = $(BIN_DIST_DIRS)"
 	@for i in $(BinDistDirs); do 		 	 \
 	  if test -d "$$i"; then 			 \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
@@ -310,7 +309,7 @@ endif # BINDIST_DOC_WAYS
 
 binary-dist ::
 ifneq "$(DIR_DOCBOOK_XSL)" ""
-	@for i in $(BIN_DIST_DIRS); do 		 	 	\
+	@for i in $(BinDistDirs); do 		 	 	\
 	  if test -d "$$i"; then 			 	\
 	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
 	    echo $(MAKE) -C $$i $(MFLAGS) install-docs XMLDocWays="$(BINDIST_DOC_WAYS)" \
