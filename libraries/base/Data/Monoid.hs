@@ -111,6 +111,7 @@ instance Monoid (Endo a) where
 
 -- | Boolean monoid under conjunction.
 newtype All = All { getAll :: Bool }
+	deriving (Eq, Ord, Read, Show, Bounded)
 
 instance Monoid All where
 	mempty = All True
@@ -118,6 +119,7 @@ instance Monoid All where
 
 -- | Boolean monoid under disjunction.
 newtype Any = Any { getAny :: Bool }
+	deriving (Eq, Ord, Read, Show, Bounded)
 
 instance Monoid Any where
 	mempty = Any False
@@ -125,6 +127,7 @@ instance Monoid Any where
 
 -- | Monoid under addition.
 newtype Sum a = Sum { getSum :: a }
+	deriving (Eq, Ord, Read, Show, Bounded)
 
 instance Num a => Monoid (Sum a) where
 	mempty = Sum 0
@@ -132,6 +135,7 @@ instance Num a => Monoid (Sum a) where
 
 -- | Monoid under multiplication.
 newtype Product a = Product { getProduct :: a }
+	deriving (Eq, Ord, Read, Show, Bounded)
 
 instance Num a => Monoid (Product a) where
 	mempty = Product 1
