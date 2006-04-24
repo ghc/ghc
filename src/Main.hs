@@ -659,19 +659,21 @@ derivedInstances mdl decl = case decl of
  where
   derived srcloc ctxt n tvs cons drv =
      [HsInstDecl srcloc
-		 (ctxt ++ [(cls,[v]) | v <- simple_tvars] ++ extra_constraint)
+		 (ctxt ++ [(cls,[t]) | t <- simple_args] ++ extra_constraint)
 		 (cls,[lhs]) [] |
 	cls <- drv]
    where
      targs = map stripDocs (targsConstrs cons)
-     -- a type variable is simple if it occurs as a data constructor argument
-     simple_tvars = map HsTyVar $ Set.elems $ Set.fromList $ [tv | HsTyVar tv <- targs]
+     -- an argument of a data constructor is simple if it has a variable head
+     simple_args = nub $ filter varHead targs
      -- a type variable is complex if it occurs inside a data constructor
      -- argument, except where the argument is identical to the lhs.
      complex_tvars = map HsTyVar $ Set.elems $ Set.unions $ map tvarsType $
-			filter (/= lhs) $ filter (not . isVar) targs
-     isVar (HsTyVar _) = True
-     isVar _ = False
+			filter (/= lhs) $ filter (not . varHead) targs
+     varHead (HsTyVar _) = True
+     varHead (HsTyApp t _) = varHead t
+     varHead (HsTyDoc t _) = varHead t
+     varHead _ = False
      extra_constraint
  	| null complex_tvars = []
  	| otherwise = [(unknownConstraint,complex_tvars)]
