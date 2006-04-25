@@ -42,6 +42,7 @@ exposed-modules:
 	Data.Either,
 	Data.Eq,
 	Data.FiniteMap,
+	Data.Fixed,
 	Data.Foldable,
 	Data.FunctorM,
 	Data.Generics,
