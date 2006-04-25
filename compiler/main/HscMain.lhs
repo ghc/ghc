@@ -217,6 +217,9 @@ data CompState
 get :: Comp CompState
 get = Comp $ \s -> return (s,s)
 
+modify :: (CompState -> CompState) -> Comp ()
+modify f = Comp $ \s -> return ((), f s)
+
 gets :: (CompState -> a) -> Comp a
 gets getter = do st <- get
                  return (getter st)
@@ -253,6 +256,10 @@ hscMkCompiler norecomp messenger frontend backend
              <- {-# SCC "checkOldIface" #-}
                 liftIO $ checkOldIface hsc_env mod_summary
                               source_unchanged mbOldIface
+	 -- save the interface that comes back from checkOldIface.
+	 -- In one-shot mode we don't have the old iface until this
+	 -- point, when checkOldIface reads it from the disk.
+	 modify (\s -> s{ compOldIface = mbCheckedIface })
          case mbCheckedIface of 
            Just iface | not recomp_reqd
                -> do messenger mbModIndex False
