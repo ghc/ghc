@@ -494,6 +494,8 @@ way_details =
 #if defined(freebsd_TARGET_OS)
 	  "-optc-pthread"
         , "-optl-pthread"
+#elif defined(solaris2_TARGET_OS)
+          "-optl-lrt"
 #endif
 	] ),
 
