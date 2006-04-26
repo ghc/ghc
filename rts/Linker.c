@@ -856,7 +856,7 @@ static void
 addRootObject(void *addr)
 {
   StgWord rt;
-
+  initRootPtrTable();
   if (root_ptr_free == NULL) {
     enlargeRootPtrTable();
   }
@@ -954,7 +954,6 @@ initLinker( void )
       linker_init_done = 1;
     }
 
-    initRootPtrTable();
     stablehash = allocStrHashTable();
     symhash = allocStrHashTable();
 
