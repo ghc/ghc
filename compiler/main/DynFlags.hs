@@ -1007,7 +1007,6 @@ fFlags = [
 glasgowExtsFlags = [ 
   Opt_GlasgowExts, 
   Opt_FFI, 
-  Opt_TH, 
   Opt_ImplicitParams, 
   Opt_ScopedTypeVariables,
   Opt_BangPatterns ]

@@ -628,7 +628,7 @@
 	    <row>
 	      <entry><option>-fth</option></entry>
 	      <entry>Enable Template Haskell. 
-		Implied by <option>-fglasgow-exts</option>.</entry>
+		No longer implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-th</option></entry>
 	    </row>

@@ -244,7 +244,8 @@ documentation</ulink> describes all the libraries that come with GHC.
 	<term><option>-fth</option></term>
 	<listitem>
 	  <para>Enables Template Haskell (see <xref
-	  linkend="template-haskell"/>).  Currently also implied by
+	  linkend="template-haskell"/>).  This flag must
+	  be given explicitly; it is no longer implied by
 	  <option>-fglasgow-exts</option>.</para>
 
 	  <para>Syntax stolen: <literal>[|</literal>,
@@ -4086,9 +4087,8 @@ Tim Sheard is going to expand it.)
       constructions.  You need to use the flag
       <option>-fth</option><indexterm><primary><option>-fth</option></primary>
       </indexterm>to switch these syntactic extensions on
-      (<option>-fth</option> is currently implied by
-      <option>-fglasgow-exts</option>, but you are encouraged to
-      specify it explicitly).</para>
+      (<option>-fth</option> is no longer implied by
+      <option>-fglasgow-exts</option>).</para>
 
 	<itemizedlist>
 	      <listitem><para>
