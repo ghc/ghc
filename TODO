@@ -54,6 +54,10 @@
 -----------------------------------------------------------------------------
 -- features
 
+* Haddock could compare interfaces from multiple versions of a module
+  and indicate changes between versions (eg. a small "new!" or
+  "changed!" icon, or "stable since 1.0").
+
 * Something equivalent to JavaDoc's @since
 
 * Source code: various people want to get at the source code from the docs.
