@@ -23,4 +23,5 @@ parsec
 readline
 stm
 template-haskell
+time
 unix
