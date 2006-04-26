@@ -10,14 +10,14 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
---  This module defines a "Fixed" type for fixed-precision arithmetic.
---  The parameter to Fixed is any type that's an instance of HasResolution.
---  HasResolution has a single method that gives the resolution of the Fixed type.
---  Parameter types E6 and E12 (for 10^6 and 10^12) are defined, as well as
---  type synonyms for Fixed E6 and Fixed E12.
+-- This module defines a "Fixed" type for fixed-precision arithmetic.
+-- The parameter to Fixed is any type that's an instance of HasResolution.
+-- HasResolution has a single method that gives the resolution of the Fixed type.
+-- Parameter types E6 and E12 (for 10^6 and 10^12) are defined, as well as
+-- type synonyms for Fixed E6 and Fixed E12.
 --
---  This module also contains generalisations of div, mod, and divmod to work
---  with any Real instance.
+-- This module also contains generalisations of div, mod, and divmod to work
+-- with any Real instance.
 --
 -----------------------------------------------------------------------------
 
