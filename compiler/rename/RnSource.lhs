@@ -80,8 +80,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 
 		-- Deal with top-level fixity decls 
 		-- (returns the total new fixity env)
-	fix_env <- rnSrcFixityDeclsEnv fix_decls ;
         rn_fix_decls <- rnSrcFixityDecls fix_decls ;
+	fix_env <- rnSrcFixityDeclsEnv rn_fix_decls ;
 	updGblEnv (\gbl -> gbl { tcg_fix_env = fix_env })
 		  $ do {
 
@@ -157,11 +157,16 @@ rnSrcFixityDecls fix_decls
 
 rnFixityDecl :: LFixitySig RdrName -> RnM [LFixitySig Name]
 rnFixityDecl (L loc (FixitySig (L nameLoc rdr_name) fixity))
-    = do names <- lookupLocalDataTcNames rdr_name
+    = setSrcSpan nameLoc $
+        -- GHC extension: look up both the tycon and data con 
+	-- for con-like things
+	-- If neither are in scope, report an error; otherwise
+	-- add both to the fixity env
+      do names <- lookupLocalDataTcNames rdr_name
          return [ L loc (FixitySig (L nameLoc name) fixity)
                       | name <- names ]
 
-rnSrcFixityDeclsEnv :: [LFixitySig RdrName] -> RnM FixityEnv
+rnSrcFixityDeclsEnv :: [LFixitySig Name] -> RnM FixityEnv
 rnSrcFixityDeclsEnv fix_decls
   = getGblEnv					`thenM` \ gbl_env ->
     foldlM rnFixityDeclEnv (tcg_fix_env gbl_env) 
@@ -169,24 +174,15 @@ rnSrcFixityDeclsEnv fix_decls
     traceRn (text "fixity env" <+> pprFixEnv fix_env)	`thenM_`
     returnM fix_env
 
-rnFixityDeclEnv :: FixityEnv -> LFixitySig RdrName -> RnM FixityEnv
-rnFixityDeclEnv fix_env (L loc (FixitySig rdr_name fixity))
-  = setSrcSpan loc $
-        -- GHC extension: look up both the tycon and data con 
-	-- for con-like things
-	-- If neither are in scope, report an error; otherwise
-	-- add both to the fixity env
-     addLocM lookupLocalDataTcNames rdr_name	`thenM` \ names ->
-     foldlM add fix_env names
-  where
-    add fix_env name
-      = case lookupNameEnv fix_env name of
-          Just (FixItem _ _ loc') 
-		  -> addLocErr rdr_name (dupFixityDecl loc')	`thenM_`
-    		     returnM fix_env
-    	  Nothing -> returnM (extendNameEnv fix_env name fix_item)
-      where
-	fix_item = FixItem (nameOccName name) fixity (getLoc rdr_name)
+rnFixityDeclEnv :: FixityEnv -> LFixitySig Name -> RnM FixityEnv
+rnFixityDeclEnv fix_env (L loc (FixitySig (L nameLoc name) fixity))
+  = case lookupNameEnv fix_env name of
+      Just (FixItem _ _ loc') 
+	  -> do addLocErr (L nameLoc name) (dupFixityDecl loc')
+    	        return fix_env
+      Nothing
+          -> return (extendNameEnv fix_env name fix_item)
+    where fix_item = FixItem (nameOccName name) fixity nameLoc
 
 pprFixEnv :: FixityEnv -> SDoc
 pprFixEnv env 
