@@ -79,6 +79,11 @@ import NHC.FFI
 import Hugs.Directory
 #endif /* __HUGS__ */
 
+#if defined(__GLASGOW_HASKELL__) || defined(mingw32_HOST_OS)
+import Foreign
+import Foreign.C
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 import Prelude
 
@@ -87,8 +92,6 @@ import System.Posix.Types
 import System.Posix.Internals
 import System.Time             ( ClockTime(..) )
 import System.IO
-import Foreign
-import Foreign.C
 
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
 
