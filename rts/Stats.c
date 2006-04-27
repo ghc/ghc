@@ -578,7 +578,7 @@ statDescribeGens(void)
       if (s != 0) {
 	debugBelch("%36s","");
       }
-      debugBelch("%6d %8d %8d %8d\n", s, step->n_blocks,
+      debugBelch("%6d %8d %8ld %8d\n", s, step->n_blocks,
 	      live, lge);
     }
   }
