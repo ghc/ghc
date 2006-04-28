@@ -328,6 +328,11 @@ else
 PrimOps_HC_OPTS += -\#include posix/Itimer.h
 endif
 
+# Otherwise the stack-smash handler gets triggered.
+ifeq "$(TargetOS_CPP)" "openbsd"
+SRC_HC_OPTS += -optc-fno-stack-protector
+endif
+
 # -O3 helps unroll some loops (especially in copy() with a constant argument).
 # -fno-strict-aliasing is a hack because we often mix StgPtr and StgClosure pointers
 # to the same object, and gcc will assume these don't alias.  eg. it happens in
