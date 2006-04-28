@@ -81,7 +81,7 @@ package.conf.inplace   : package.conf.in
 		-DDATA_DIR='"$(DATA_DIR_INPLACE)"' \
 		-DHTML_DIR='"$(HTML_DIR_INPLACE)"' \
 		-DHADDOCK_IFACE='"$(HADDOCK_IFACE_INPLACE)"' \
-		-DFPTOOLS_TOP_ABS=\"${FPTOOLS_TOP_ABS}\" \
+		-DFPTOOLS_TOP_ABS='"${FPTOOLS_TOP_ABS}"' \
 		-x c $(PACKAGE_CPP_OPTS) $< | \
 	grep -v '^#pragma GCC' | \
 	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
