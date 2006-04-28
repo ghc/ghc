@@ -1,0 +1,3 @@
+test('bytestring001', normal, compile_and_run, ['-package QuickCheck'])
+test('bytestring002', normal, compile_and_run, [''])
+test('bytestring003', normal, compile_and_run, [''])
