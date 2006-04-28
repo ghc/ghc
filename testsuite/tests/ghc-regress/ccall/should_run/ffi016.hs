@@ -5,6 +5,7 @@ import Foreign.ForeignPtr
 import Foreign
 import GHC.TopHandler
 import Control.Concurrent
+import Data.List
 
 foreign export ccall fin :: Ptr Int -> Ptr Int -> IO ()
 foreign import ccall "&fin" finptr :: FinalizerEnvPtr Int Int
@@ -20,4 +21,4 @@ main = do
   a   <- new (55 :: Int)
   env <- new (66 :: Int)
   fp  <- newForeignPtrEnv finptr env a
-  sum [1..1000000] `seq` return ()
+  foldl' (+) 0 [1..500000] `seq` return ()
