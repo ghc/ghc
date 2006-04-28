@@ -38,6 +38,8 @@ exposed-modules:
 	Data.Array.Unboxed,
 	Data.Bits,
 	Data.Bool,
+	Data.ByteString,
+	Data.ByteString.Char8,
 	Data.Char,
 	Data.Complex,
 	Data.Dynamic,

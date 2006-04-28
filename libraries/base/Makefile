@@ -12,6 +12,7 @@ ALL_DIRS = \
 	Control/Monad \
 	Control/Monad/ST \
 	Data \
+	Data/ByteString \
 	Data/Generics \
 	Data/Array \
 	Data/Array/IO \
