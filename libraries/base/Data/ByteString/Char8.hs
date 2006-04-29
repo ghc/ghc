@@ -79,7 +79,6 @@ module Data.ByteString.Char8 (
         maximum,                -- :: ByteString -> Char
         minimum,                -- :: ByteString -> Char
         mapIndexed,             -- :: (Int -> Char -> Char) -> ByteString -> ByteString
-        hash,                   -- :: ByteString -> Int32
 
         -- * Generating and unfolding ByteStrings
         replicate,              -- :: Int -> Char -> ByteString
@@ -193,6 +192,7 @@ module Data.ByteString.Char8 (
 
         -- ** Files
         readFile,               -- :: FilePath -> IO ByteString
+--      mmapFile,               -- :: FilePath -> IO ByteString
         writeFile,              -- :: FilePath -> ByteString -> IO ()
 
         -- ** I\/O with Handles
@@ -230,12 +230,12 @@ import qualified Data.ByteString as B
 import Data.ByteString (ByteString(..)
                        ,empty,null,length,tail,init,append
                        ,inits,tails,elems,reverse,transpose
-                       ,concat,hash,take,drop,splitAt,join
+                       ,concat,take,drop,splitAt,join
                        ,sort,isPrefixOf,isSuffixOf,isSubstringOf,findSubstring
                        ,findSubstrings,unsafeTail,copy
 
                        ,getContents, putStr, putStrLn
-                       ,readFile, writeFile
+                       ,readFile, {-mmapFile,-} writeFile
                        ,hGetContents, hGet, hPut
 #if defined(__GLASGOW_HASKELL__)
                        ,getLine, getArgs, hGetLine, hGetNonBlocking
