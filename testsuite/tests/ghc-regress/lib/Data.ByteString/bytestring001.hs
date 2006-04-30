@@ -192,10 +192,26 @@ prop_foldl1_1 xs =
     P.foldl1 (\x c -> if c > x then c else x)      xs ==
     P.foldl  (\x c -> if c > x then c else x) '\0' xs
 
+prop_foldl1_2 xs =
+    (not . P.null) xs ==>
+    P.foldl1 const xs == P.head xs
+
+prop_foldl1_3 xs =
+    (not . P.null) xs ==>
+    P.foldl1 (flip const) xs == P.last xs
+
 prop_foldr1_1 xs =
     (not . P.null) xs ==>
     P.foldr1 (\c x -> if c > x then c else x)      xs ==
     P.foldr  (\c x -> if c > x then c else x) '\0' xs
+
+prop_foldr1_2 xs =
+    (not . P.null) xs ==>
+    P.foldr1 (flip const) xs == P.last xs
+
+prop_foldr1_3 xs =
+    (not . P.null) xs ==>
+    P.foldr1 const xs == P.head xs
 
 prop_takeWhile xs = (takeWhile (/= 'X') xs) == (unpack . (P.takeWhile (/= 'X')) . pack) xs
 
@@ -401,6 +417,15 @@ main = do
             ,    ("foldl2",       mytest prop_foldl2)
             ,    ("foldr1",       mytest prop_foldr1)
             ,    ("foldr2",       mytest prop_foldr2)
+
+            ,    ("foldl1_1",     mytest prop_foldl1_1)
+            ,    ("foldl1_2",     mytest prop_foldl1_2)
+            ,    ("foldl1_3",     mytest prop_foldl1_3)
+
+            ,    ("foldr1_1",     mytest prop_foldr1_1)
+            ,    ("foldr1_2",     mytest prop_foldr1_2)
+            ,    ("foldr1_3",     mytest prop_foldr1_3)
+
             ,    ("all",       mytest prop_all)
             ,    ("take",       mytest prop_take)
             ,    ("drop",       mytest prop_drop)
