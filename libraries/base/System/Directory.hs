@@ -599,7 +599,7 @@ foreign import stdcall unsafe "SearchPathA"
                          -> CString
                          -> Ptr CString
                          -> IO CInt
-# if defined(__GLASGOW_HASKELL__)
+# if !defined(__GLASGOW_HASKELL__)
 long_path_size :: Int
 long_path_size = 4096
 # endif
