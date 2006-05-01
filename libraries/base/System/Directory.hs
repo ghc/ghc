@@ -591,7 +591,7 @@ findExecutable binary =
               return (Just fpath)
       else return Nothing
 
-foreign import stdcall unsafe "SearchPath"
+foreign import stdcall unsafe "SearchPathA"
             c_SearchPath :: CString
                          -> CString
                          -> CString
@@ -599,6 +599,10 @@ foreign import stdcall unsafe "SearchPath"
                          -> CString
                          -> Ptr CString
                          -> IO CInt
+# if defined(__GLASGOW_HASKELL__)
+long_path_size :: Int
+long_path_size = 4096
+# endif
 #else
  do
   path <- getEnv "PATH"
