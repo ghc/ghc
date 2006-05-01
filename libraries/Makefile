@@ -22,6 +22,7 @@ SUBDIRS += $(wildcard parsec)
 # needed to bootstrap GHC.
 ifneq "$(GhcBootLibs)" "YES"
 SUBDIRS += $(wildcard haskell-src)
+SUBDIRS += $(wildcard time)
 SUBDIRS += $(wildcard network)
 SUBDIRS += $(wildcard QuickCheck)
 SUBDIRS += $(wildcard HUnit)
