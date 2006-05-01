@@ -103,6 +103,8 @@ prop_spanS f xs = P.span f (P.pack xs) ==
 prop_breakS f xs = P.break f (P.pack xs) ==
     let (a,b) = break f xs in (P.pack a, P.pack b)
 
+prop_breakspan_1 xs c = P.break (== c) xs == P.span (/= c) xs
+
 prop_linesS xs = P.lines (P.pack xs) == map P.pack (lines xs)
 
 prop_unlinesS xss = P.unlines (map P.pack xss) == P.pack (unlines xss)
@@ -254,6 +256,11 @@ prop_wordstokens xs = P.words xs == P.tokens isSpace xs
 
 prop_unwords xs = (pack.unwords.words) xs == (P.unwords . P.words .pack) xs
 
+prop_group xs   = group xs == (map unpack . P.group . pack) xs
+
+prop_groupBy xs = groupBy (==) xs == (map unpack . P.groupBy (==) . pack) xs
+prop_groupBy1 xs = groupBy (/=) xs == (map unpack . P.groupBy (/=) . pack) xs
+
 prop_join xs = (concat . (intersperse "XYX") . lines) xs ==
                (unpack $ P.join (pack "XYX") (P.lines (pack xs)))
 
@@ -314,6 +321,13 @@ prop_spanEnd xs =
 prop_breakChar c xs =
         (break (==c) xs) ==
         (let (x,y) = P.breakChar c (pack xs) in (unpack x, unpack y))
+
+prop_spanChar c xs =
+        (break (/=c) xs) ==
+        (let (x,y) = P.spanChar c (pack xs) in (unpack x, unpack y))
+
+prop_spanChar_1 c xs =
+        (P.span (==c) xs) == P.spanChar c xs
 
 prop_breakFirst c xs = (let (x,y) = break (==c) xs
                         in if null y then Nothing
@@ -444,6 +458,9 @@ main = do
             ,    ("unlines",       mytest prop_unlines)
             ,    ("words",       mytest prop_words)
             ,    ("unwords",       mytest prop_unwords)
+            ,    ("group",      mytest prop_group)
+            ,    ("groupBy",    mytest prop_groupBy)
+            ,    ("groupBy1",    mytest prop_groupBy1)
             ,    ("join",       mytest prop_join)
             ,    ("elemIndex1",       mytest prop_elemIndex1)
             ,    ("elemIndex2",       mytest prop_elemIndex2)
@@ -460,6 +477,8 @@ main = do
             ,    ("maximum",       mytest prop_maximum)
             ,    ("minimum",       mytest prop_minimum)
             ,    ("breakChar",       mytest prop_breakChar)
+            ,    ("spanChar",       mytest prop_spanChar)
+            ,    ("spanChar1",   mytest prop_spanChar_1)
             ,    ("breakSpace",       mytest prop_breakSpace)
             ,    ("dropSpace",       mytest prop_dropSpace)
             ,    ("spanEnd",       mytest prop_spanEnd)
@@ -512,6 +531,7 @@ main = do
             ,    ("dropWhileS",       mytest prop_dropWhileS)
             ,    ("spanS",       mytest prop_spanS)
             ,    ("breakS",       mytest prop_breakS)
+            ,    ("breakspan",    mytest prop_breakspan_1)
             ,    ("linesS",       mytest prop_linesS)
             ,    ("unlinesS",       mytest prop_unlinesS)
             ,    ("wordsS",       mytest prop_wordsS)
