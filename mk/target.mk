@@ -1069,7 +1069,7 @@ endif
 # -------------------------------------------------------------------------
 # Rules to invoke the current target recursively for each way
 
-ifneq "$(WAYS)" ""
+ifneq "$(strip $(WAYS))" ""
 ifeq "$(way)" ""
 
 # NB: the targets exclude 
@@ -1081,7 +1081,7 @@ all docs TAGS clean distclean mostlyclean maintainer-clean install ::
 	@echo "PWD = $(shell pwd)"
 	@echo "------------------------------------------------------------------------"
 # Don't rely on -e working, instead we check exit return codes from sub-makes.
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(WAYS) ; do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) way=$$i $@;"; \
