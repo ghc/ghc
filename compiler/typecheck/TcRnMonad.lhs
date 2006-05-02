@@ -16,8 +16,8 @@ import Var              ( mkTyVar, mkGlobalId )
 import IdInfo           ( GlobalIdDetails(..), vanillaIdInfo )
 import OccName          ( mkOccName, tvName )
 import SrcLoc           ( noSrcLoc  )
-import TysWiredIn       ( intTy, stringTy, mkListTy, unitTy )
-import PrelNames        ( breakpointJumpName )
+import TysWiredIn       ( intTy, stringTy, mkListTy, unitTy, boolTy )
+import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 import NameEnv          ( mkNameEnv )
 #endif
 
@@ -29,8 +29,7 @@ import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  Deprecs(..), FixityEnv, FixItem, 
 			  lookupType, unQualInScope )
 import Module		( Module, unitModuleEnv )
-import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
-			  LocalRdrEnv, emptyLocalRdrEnv )
+import RdrName		( GlobalRdrEnv, LocalRdrEnv, emptyLocalRdrEnv )
 import Name		( Name, isInternalName, mkInternalName, tidyNameOcc, nameOccName, getSrcLoc )
 import Type		( Type )
 import TcType		( tcIsTyVarTy, tcGetTyVar )
@@ -139,17 +138,23 @@ initTc hsc_env hsc_src mod do_this
                           unique <- newUnique ;
                           let { var = mkInternalName unique (mkOccName tvName "a") noSrcLoc;
                                 tyvar = mkTyVar var liftedTypeKind;
-                                breakpointJumpType = mkGlobalId
-                                                     (VanillaGlobal)
-                                                     (breakpointJumpName)
-                                                     (FunTy intTy
-                                                      (FunTy (mkListTy unitTy)
-                                                       (FunTy stringTy
-                                                        (ForAllTy tyvar
-                                                         (FunTy (TyVarTy tyvar)
-                                                          (TyVarTy tyvar))))))
-                                                     (vanillaIdInfo);
-                                new_env = mkNameEnv [(breakpointJumpName,AGlobal (AnId breakpointJumpType))];
+                                basicType extra = (FunTy intTy
+                                                   (FunTy (mkListTy unitTy)
+                                                    (FunTy stringTy
+                                                     (ForAllTy tyvar
+                                                      (extra
+                                                       (FunTy (TyVarTy tyvar)
+                                                        (TyVarTy tyvar)))))));
+                                breakpointJumpType
+                                    = mkGlobalId VanillaGlobal breakpointJumpName
+                                                 (basicType id) vanillaIdInfo;
+                                breakpointCondJumpType
+                                    = mkGlobalId VanillaGlobal breakpointCondJumpName
+                                                 (basicType (FunTy boolTy)) vanillaIdInfo;
+                                new_env = mkNameEnv [(breakpointJumpName
+                                                     , AGlobal (AnId breakpointJumpType))
+                                                    ,(breakpointCondJumpName
+                                                     , AGlobal (AnId breakpointCondJumpType))];
                               };
                           r <- tryM (updLclEnv (\gbl -> gbl{tcl_env=new_env}) do_this)
 #else

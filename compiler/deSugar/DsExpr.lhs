@@ -11,7 +11,7 @@ module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 import Foreign.StablePtr ( newStablePtr, castStablePtrToPtr )
 import GHC.Exts         ( Ptr(..), Int(..), addr2Int# )
 import IOEnv            ( ioToIOEnv )
-import PrelNames        ( breakpointJumpName )
+import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 import TysWiredIn       ( unitTy )
 import TypeRep          ( Type(..) )
 #endif
@@ -215,7 +215,7 @@ dsExpr expr@(HsLam a_Match)
 #if defined(GHCI) && defined(BREAKPOINT)
 dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
     | HsVar funId <- fun
-    , idName funId == breakpointJumpName
+    , idName funId `elem` [breakpointJumpName, breakpointCondJumpName]
     , ids <- filter (not.hasTyVar.idType) (extractIds arg)
     = do dsWarn (text "Extracted ids:" <+> ppr ids <+> ppr (map idType ids))
          stablePtr <- ioToIOEnv $ newStablePtr ids

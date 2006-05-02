@@ -26,7 +26,7 @@ import TcType           ( tidyTopType )
 import qualified Id     ( setIdType )
 import IdInfo           ( GlobalIdDetails(..) )
 import Linker           ( HValue, extendLinkEnv, withExtendedLinkEnv,initDynLinker  )
-import PrelNames        ( breakpointJumpName )
+import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 #endif
 
 -- The GHC interface
@@ -209,6 +209,11 @@ printScopeMsg session location ids
         nest 2 (pprWithCommas showId ids)
     where showId id = ppr (idName id) <+> dcolon <+> ppr (idType id)
 
+jumpCondFunction :: Session -> Int -> [HValue] -> String -> Bool -> b -> b
+jumpCondFunction session ptr hValues location True b = b
+jumpCondFunction session ptr hValues location False b
+    = jumpFunction session ptr hValues location b
+
 jumpFunction :: Session -> Int -> [HValue] -> String -> b -> b
 jumpFunction session@(Session ref) (I# idsPtr) hValues location b
     = unsafePerformIO $
@@ -251,7 +256,8 @@ interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe String -> IO ()
 interactiveUI session srcs maybe_expr = do
 #if defined(GHCI) && defined(BREAKPOINT)
    initDynLinker =<< GHC.getSessionDynFlags session
-   extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))]
+   extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))
+                 ,(breakpointCondJumpName,unsafeCoerce# (jumpCondFunction session))]
 #endif
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
@@ -831,7 +837,8 @@ afterLoad ok session = do
   setContextAfterLoad session graph'
   modulesLoadedMsg ok (map GHC.ms_mod graph')
 #if defined(GHCI) && defined(BREAKPOINT)
-  io (extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))])
+  io (extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))
+                    ,(breakpointCondJumpName,unsafeCoerce# (jumpCondFunction session))])
 #endif
 
 setContextAfterLoad session [] = do

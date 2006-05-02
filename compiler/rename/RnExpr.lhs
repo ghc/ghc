@@ -34,7 +34,8 @@ import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName )
 #if defined(GHCI) && defined(BREAKPOINT)
-import PrelNames        ( breakpointJumpName, undefined_RDR, breakpointIdKey )
+import PrelNames        ( breakpointJumpName, breakpointCondJumpName
+                        , undefined_RDR, breakpointIdKey, breakpointCondIdKey )
 import UniqFM           ( eltsUFM )
 import DynFlags         ( GhcMode(..) )
 import SrcLoc           ( srcSpanFile, srcSpanStartLine )
@@ -99,20 +100,25 @@ rnExpr (HsVar v)
        lclEnv         <- getLclEnv
        ignore_asserts <- doptM Opt_IgnoreAsserts
        ignore_breakpoints <- doptM Opt_IgnoreBreakpoints
+       ghcMode        <- getGhcMode
        let conds = [ (name `hasKey` assertIdKey
                       && not ignore_asserts,
                       do (e, fvs) <- mkAssertErrorExpr
                          return (e, fvs `addOneFV` name))
 #if defined(GHCI) && defined(BREAKPOINT)
                    , (name `hasKey` breakpointIdKey
-                      && not ignore_breakpoints,
-                      do ghcMode <- getGhcMode
-                         case ghcMode of
-                           Interactive
-                               -> do let isWantedName = not.isTyVarName
-                                     (e, fvs) <- mkBreakPointExpr (filter isWantedName (eltsUFM localRdrEnv))
-                                     return (e, fvs `addOneFV` name)
-                           _ -> return (HsVar name, unitFV name)
+                      && not ignore_breakpoints
+                      && ghcMode == Interactive,
+                         do let isWantedName = not.isTyVarName
+                            (e, fvs) <- mkBreakpointExpr (filter isWantedName (eltsUFM localRdrEnv))
+                            return (e, fvs `addOneFV` name)
+                     )
+                   , (name `hasKey` breakpointCondIdKey
+                      && not ignore_breakpoints
+                      && ghcMode == Interactive,
+                         do let isWantedName = not.isTyVarName
+                            (e, fvs) <- mkBreakpointCondExpr (filter isWantedName (eltsUFM localRdrEnv))
+                            return (e, fvs `addOneFV` name)
                      )
 #endif
                    ]
@@ -941,8 +947,14 @@ segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
 
 \begin{code}
 #if defined(GHCI) && defined(BREAKPOINT)
-mkBreakPointExpr :: [Name] -> RnM (HsExpr Name, FreeVars)
-mkBreakPointExpr scope
+mkBreakpointExpr :: [Name] -> RnM (HsExpr Name, FreeVars)
+mkBreakpointExpr = mkBreakpointExpr' breakpointJumpName
+
+mkBreakpointCondExpr :: [Name] -> RnM (HsExpr Name, FreeVars)
+mkBreakpointCondExpr = mkBreakpointExpr' breakpointCondJumpName
+
+mkBreakpointExpr' :: Name -> [Name] -> RnM (HsExpr Name, FreeVars)
+mkBreakpointExpr' breakpointFunc scope
     = do sloc <- getSrcSpanM
          undef <- lookupOccRn undefined_RDR
          let inLoc = L sloc
@@ -951,7 +963,7 @@ mkBreakPointExpr scope
              mkExpr' fnName [] = inLoc (HsVar fnName)
              mkExpr' fnName (arg:args)
                  = lHsApp (mkExpr' fnName args) (inLoc arg)
-             expr = unLoc $ mkExpr breakpointJumpName [mkScopeArg scope, HsVar undef, HsLit msg]
+             expr = unLoc $ mkExpr breakpointFunc [mkScopeArg scope, HsVar undef, HsLit msg]
              mkScopeArg args
                  = unLoc $ mkExpr undef (map HsVar args)
              msg = HsString (mkFastString (unpackFS (srcSpanFile sloc) ++ ":" ++ show (srcSpanStartLine sloc)))

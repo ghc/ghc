@@ -184,8 +184,8 @@ basicKnownKeyNames
 	-- Others
 	otherwiseIdName, 
 	plusIntegerName, timesIntegerName,
-	eqStringName, assertName, breakpointName, assertErrorName,
-        runSTRepName,
+	eqStringName, assertName, breakpointName, breakpointCondName,
+        assertErrorName, runSTRepName,
 	printName, fstName, sndName,
 
 	-- MonadFix
@@ -477,10 +477,16 @@ andName		  = varQual pREL_BASE FSLIT("&&")	  andIdKey
 orName		  = varQual pREL_BASE FSLIT("||")	  orIdKey
 assertName        = varQual pREL_BASE FSLIT("assert")     assertIdKey
 breakpointName    = varQual pREL_BASE FSLIT("breakpoint") breakpointIdKey
+breakpointCondName= varQual pREL_BASE FSLIT("breakpointCond") breakpointCondIdKey
 breakpointJumpName
     = mkInternalName
         breakpointJumpIdKey
         (mkOccNameFS varName FSLIT("breakpointJump"))
+        noSrcLoc
+breakpointCondJumpName
+    = mkInternalName
+        breakpointCondJumpIdKey
+        (mkOccNameFS varName FSLIT("breakpointCondJump"))
         noSrcLoc
 
 -- PrelTup
@@ -901,7 +907,9 @@ lazyIdKey		      = mkPreludeMiscIdUnique 60
 assertErrorIdKey	      = mkPreludeMiscIdUnique 61
 
 breakpointIdKey               = mkPreludeMiscIdUnique 62
-breakpointJumpIdKey           = mkPreludeMiscIdUnique 63
+breakpointCondIdKey           = mkPreludeMiscIdUnique 63
+breakpointJumpIdKey           = mkPreludeMiscIdUnique 64
+breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 65
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 80
