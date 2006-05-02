@@ -8,17 +8,6 @@
 # compile the .hc files, so we have to duplicate that functionality here.
 # The result is unfortunately ugly, but we don't have another choice.
 
-TOP_SAVED := $(TOP)
-TOP:=$(TOP)/ghc
-
-include $(TOP)/mk/version.mk
-include $(TOP)/mk/paths.mk
-
-# Reset TOP
-TOP:=$(TOP_SAVED)
-
-include $(TOP)/mk/suffix.mk
-
 # -----------------------------------------------------------------------------
 # Set the platform-specific options to send to the C compiler.  These should
 # match the list in machdepCCOpts in ghc/compiler/DriverFlags.hs.
