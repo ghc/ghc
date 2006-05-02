@@ -59,7 +59,7 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_NOLIB = includes rts docs compiler compat utils driver
+SUBDIRS_NOLIB = includes rts compat compiler docs utils driver
 else
 SUBDIRS_NOLIB = includes compat utils driver docs compiler rts
 endif
