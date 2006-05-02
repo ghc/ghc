@@ -52,6 +52,7 @@
 ^libraries/readline/
 ^libraries/stm/
 ^libraries/template-haskell/
+^libraries/time/
 ^libraries/unix/
 # Boring file regexps:
 \.hi$
