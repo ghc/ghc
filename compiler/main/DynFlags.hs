@@ -1267,11 +1267,13 @@ machdepCCOpts dflags
 			-- and get in the way of -split-objs.  Another option
 			-- would be to throw them away in the mangler, but this
 			-- is easier.
+#ifdef HAVE_GCC_HAS_NO_UNIT_AT_A_TIME
 		 "-fno-unit-at-a-time",
 			-- unit-at-a-time doesn't do us any good, and screws
 			-- up -split-objs by moving the split markers around.
 			-- It's only turned on with -O2, but put it here just
 			-- in case someone uses -optc-O2.
+#endif
 		 "-fno-builtin"
 			-- calling builtins like strlen() using the FFI can
 			-- cause gcc to run out of regs, so use the external
