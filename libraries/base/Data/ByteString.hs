@@ -238,6 +238,7 @@ import Data.Maybe               (listToMaybe)
 import Data.Array               (listArray)
 import qualified Data.Array as Array ((!))
 
+-- Control.Exception.bracket not available in yhc or nhc
 import Control.Exception        (bracket)
 
 import Foreign.C.String         (CString, CStringLen)
@@ -247,6 +248,7 @@ import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable         (Storable(..))
 
+-- hGetBuf and hPutBuf not available in yhc or nhc
 import System.IO                (stdin,stdout,hClose,hFileSize
                                 ,hGetBuf,hPutBuf,openBinaryFile
                                 ,Handle,IOMode(..))
@@ -1663,7 +1665,7 @@ hGetLine h = wantReadableHandle "Data.ByteString.hGetLine" h $ \ handle_ -> do
 mkPS :: RawBuffer -> Int -> Int -> IO ByteString
 mkPS buf start end = do
     let len = end - start
-    fp <- mallocByteString (len `quot` 8)
+    fp <- mallocByteString len
     withForeignPtr fp $ \p -> do
         memcpy_ptr_baoff p buf start (fromIntegral len)
         return (PS fp 0 len)
