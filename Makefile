@@ -269,7 +269,7 @@ binary-dist::
 	done;
 	@echo "Configuring the Makefile for this project..."
 	touch $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "package = $(ProjectNameShort)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	echo "package = ghc" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	echo "version = $(ProjectVersion)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	echo "PACKAGE_SH_SCRIPTS = $(BinDistShScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	echo "PACKAGE_PRL_SCRIPTS = $(BinDistPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
@@ -445,29 +445,29 @@ dist-package-zip ::
 # HC file bundles
 
 hc-file-bundle :
-	$(RM) -r $(ProjectNameShort)-$(ProjectVersion)
-	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
-	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/compiler \
-	     $(ProjectNameShort)-$(ProjectVersion)/utils \
-	     $(ProjectNameShort)-$(ProjectVersion)/compat \
-	     $(ProjectNameShort)-$(ProjectVersion)/libraries -follow \
+	$(RM) -r ghc-$(ProjectVersion)
+	$(LN_S) . ghc-$(ProjectVersion)
+	$(FIND) ghc-$(ProjectVersion)/compiler \
+	     ghc-$(ProjectVersion)/utils \
+	     ghc-$(ProjectVersion)/compat \
+	     ghc-$(ProjectVersion)/libraries -follow \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
-	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/compiler $(ProjectNameShort)-$(ProjectVersion)/utils $(ProjectNameShort)-$(ProjectVersion)/libraries -name "*.hsc" -follow -print` ""; do \
+	for f in `$(FIND) ghc-$(ProjectVersion)/compiler ghc-$(ProjectVersion)/utils ghc-$(ProjectVersion)/libraries -name "*.hsc" -follow -print` ""; do \
 	     if test "x$$f" != "x" && test -e `echo "$$f" | sed 's/hsc$$/hs/g'`; then \
 	        echo `echo "$$f" | sed 's/hsc$$/hs/g' ` >> hc-files-to-go ; \
 	     fi; \
 	done;
-	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/compiler $(ProjectNameShort)-$(ProjectVersion)/rts -name "*.cmm" -follow -print` ""; do \
+	for f in `$(FIND) ghc-$(ProjectVersion)/compiler ghc-$(ProjectVersion)/rts -name "*.cmm" -follow -print` ""; do \
 	     if test "x$$f" != "x"; then \
 	        echo `echo "$$f" | sed 's/cmm$$/hc/g' ` >> hc-files-to-go ; \
 	     fi; \
 	done;
-	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/base/GHC/PrimopWrappers.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/compiler/parser/Parser.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/compiler/parser/ParserCore.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/compiler/main/ParsePkgConf.hs >> hc-files-to-go
-	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/haskell-src/Language/Haskell/Parser.hs >> hc-files-to-go
-	tar czf $(ProjectNameShort)-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
+	echo ghc-$(ProjectVersion)/libraries/base/GHC/PrimopWrappers.hs >> hc-files-to-go
+	echo ghc-$(ProjectVersion)/compiler/parser/Parser.hs >> hc-files-to-go
+	echo ghc-$(ProjectVersion)/compiler/parser/ParserCore.hs >> hc-files-to-go
+	echo ghc-$(ProjectVersion)/compiler/main/ParsePkgConf.hs >> hc-files-to-go
+	echo ghc-$(ProjectVersion)/libraries/haskell-src/Language/Haskell/Parser.hs >> hc-files-to-go
+	tar czf ghc-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
 
 # -----------------------------------------------------------------------------
 # Cleaning
