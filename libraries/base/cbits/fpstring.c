@@ -41,16 +41,6 @@ void reverse(unsigned char *dest, unsigned char *from, int len) {
         *q++ = *p--;
 }
 
-/* compare bytes ascii-wise */
-static int cmp(const void *p, const void *q) {
-    return (*(unsigned char *)p - *(unsigned char *)q);
-}
-
-/* quicksort wrapper */
-void my_qsort(unsigned char *base, size_t size) {
-    qsort(base, size, sizeof(char), cmp);
-}
-
 /* duplicate a string, interspersing the character through the elements
    of the duplicated string */
 void intersperse(unsigned char *dest, unsigned char *from, int len, char c) {

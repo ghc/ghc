@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -cpp -fffi #-}
+{-# OPTIONS_GHC -cpp -fffi -fglasgow-exts #-}
 --
 -- Module      : ByteString
 -- Copyright   : (c) The University of Glasgow 2001,
@@ -99,6 +99,7 @@ module Data.ByteString (
 
         -- ** Breaking and dropping on specific bytes
         breakByte,              -- :: Word8 -> ByteString -> (ByteString, ByteString)
+        spanByte,               -- :: Word8 -> ByteString -> (ByteString, ByteString)
         breakFirst,             -- :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
         breakLast,              -- :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
 
@@ -106,6 +107,8 @@ module Data.ByteString (
         split,                  -- :: Word8 -> ByteString -> [ByteString]
         splitWith,              -- :: (Word8 -> Bool) -> ByteString -> [ByteString]
         tokens,                 -- :: (Word8 -> Bool) -> ByteString -> [ByteString]
+        group,                  -- :: ByteString -> [ByteString]
+        groupBy,                -- :: (Word8 -> Word8 -> Bool) -> ByteString -> [ByteString]
 
         -- ** Joining strings
         join,                   -- :: ByteString -> [ByteString] -> ByteString
@@ -240,6 +243,7 @@ import qualified Data.Array as Array ((!))
 
 -- Control.Exception.bracket not available in yhc or nhc
 import Control.Exception        (bracket)
+import Control.Monad            (when)
 
 import Foreign.C.String         (CString, CStringLen)
 import Foreign.C.Types          (CSize, CInt)
@@ -647,7 +651,7 @@ foldl1 f ps
 foldr1 :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
 foldr1 f ps
     | null ps        = errorEmptyList "foldr1"
-    | otherwise      = f (unsafeHead ps) (foldr1 f (unsafeTail ps))
+    | otherwise      = foldr f (last ps) (init ps)
 
 -- ---------------------------------------------------------------------
 -- Special folds
@@ -873,6 +877,24 @@ breakByte c p = case elemIndex c p of
     Just n  -> (take n p, drop n p)
 {-# INLINE breakByte #-}
 
+-- | 'spanByte' breaks its ByteString argument at the first
+-- occurence of a byte other than its argument. It is more efficient
+-- than 'span (==)'
+--
+-- > span  (=='c') "abcd" == spanByte 'c' "abcd"
+--
+spanByte :: Word8 -> ByteString -> (ByteString, ByteString)
+spanByte c ps@(PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
+    go (p `plusPtr` s) 0
+  where
+    STRICT2(go)
+    go p i | i >= l    = return (ps, empty)
+           | otherwise = do c' <- peekByteOff p i
+                            if c /= c'
+                                then return (take i ps, drop i ps)
+                                else go p (i+1)
+{-# INLINE spanByte #-}
+
 -- | /O(n)/ 'breakFirst' breaks the given ByteString on the first
 -- occurence of @w@. It behaves like 'break', except the delimiter is
 -- not returned, and @Nothing@ is returned if the delimiter is not in
@@ -910,7 +932,7 @@ breakLast c p = case elemIndexLast c p of
 -- | 'span' @p xs@ breaks the ByteString into two segments. It is
 -- equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
 span :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
-span  p ps = break (not . p) ps
+span p ps = break (not . p) ps
 {-# INLINE span #-}
 
 -- | 'spanEnd' behaves like 'span' but from the end of the 'ByteString'.
@@ -1036,6 +1058,31 @@ split (W8# w#) (PS fp off len) = splitWith' off len fp
 --
 tokens :: (Word8 -> Bool) -> ByteString -> [ByteString]
 tokens f = P.filter (not.null) . splitWith f
+
+-- | The 'group' function takes a ByteString and returns a list of
+-- ByteStrings such that the concatenation of the result is equal to the
+-- argument.  Moreover, each sublist in the result contains only equal
+-- elements.  For example,
+--
+-- > group "Mississippi" = ["M","i","ss","i","ss","i","pp","i"]
+--
+-- It is a special case of 'groupBy', which allows the programmer to
+-- supply their own equality test. It is about 40% faster than 
+-- /groupBy (==)/
+group :: ByteString -> [ByteString]
+group xs
+    | null xs   = []
+    | otherwise = ys : group zs
+    where
+        (ys, zs) = spanByte (unsafeHead xs) xs
+
+-- | The 'groupBy' function is the non-overloaded version of 'group'.
+groupBy :: (Word8 -> Word8 -> Bool) -> ByteString -> [ByteString]
+groupBy k xs
+    | null xs   = []
+    | otherwise = take n xs : groupBy k (drop n xs)
+    where
+        n = 1 + findIndexOrEnd (not . k (unsafeHead xs)) (unsafeTail xs)
 
 -- | /O(n)/ The 'join' function takes a 'ByteString' and a list of
 -- 'ByteString's and concatenates the list after interspersing the first
@@ -1390,15 +1437,51 @@ elems (PS x s l) = (PS x s 1:elems (PS x (s+1) (l-1)))
 -- ---------------------------------------------------------------------
 -- ** Ordered 'ByteString's
 
--- | /O(n log(n))/ Sort a ByteString efficiently, using qsort(3).
+-- | /O(n)/ Sort a ByteString efficiently, using counting sort.
+sort :: ByteString -> ByteString
+sort (PS input s l) = create l $ \p -> allocaArray 256 $ \arr -> do
+
+    memset (castPtr arr) 0 (256 * fromIntegral (sizeOf (undefined :: CSize)))
+    withForeignPtr input (\x -> countEach arr (x `plusPtr` s) l)
+
+    let STRICT2(go)
+        go 256 _   = return ()
+        go i   ptr = do n <- peekElemOff arr i
+                        when (n /= 0) $ memset ptr (fromIntegral i) n >> return ()
+                        go (i + 1) (ptr `plusPtr` (fromIntegral n))
+    go 0 p
+
+-- "countEach counts str l" counts the number of occurences of each Word8 in
+-- str, and stores the result in counts.
+countEach :: Ptr CSize -> Ptr Word8 -> Int -> IO ()
+STRICT3(countEach)
+countEach counts str l = go 0
+ where
+    STRICT1(go)
+    go i | i == l    = return ()
+         | otherwise = do k <- fromIntegral `fmap` peekElemOff str i
+                          x <- peekElemOff counts k
+                          pokeElemOff counts k (x + 1)
+                          go (i + 1)
+
+{-
 sort :: ByteString -> ByteString
 sort (PS x s l) = create l $ \p -> withForeignPtr x $ \f -> do
         memcpy p (f `plusPtr` s) l
         c_qsort p l -- inplace
+-}
 
 {-
 sort = pack . List.sort . unpack
 -}
+
+-- | The 'sortBy' function is the non-overloaded version of 'sort'.
+--
+-- Try some linear sorts: radix, counting
+-- Or mergesort.
+--
+-- sortBy :: (Word8 -> Word8 -> Ordering) -> ByteString -> ByteString
+-- sortBy f ps = undefined
 
 -- ---------------------------------------------------------------------
 --
@@ -1863,8 +1946,9 @@ mallocByteString l = do
 
 -- | A way of creating ForeignPtrs outside the IO monad. The @Int@
 -- argument gives the final size of the ByteString. Unlike 'generate'
--- the ByteString is no reallocated if the final size is less than the
--- estimated size.
+-- the ByteString is not reallocated if the final size is less than the
+-- estimated size. Also, unlike 'generate' ByteString's created this way
+-- are managed on the Haskell heap.
 create :: Int -> (Ptr Word8 -> IO ()) -> ByteString
 create l write_ptr = inlinePerformIO $ do
     fp <- mallocByteString (l+1)
@@ -1970,9 +2054,6 @@ foreign import ccall unsafe "static fpstring.h minimum" c_minimum
 
 foreign import ccall unsafe "static fpstring.h count" c_count
     :: Ptr Word8 -> Int -> Word8 -> Int
-
-foreign import ccall unsafe "static fpstring.h my_qsort" c_qsort
-    :: Ptr Word8 -> Int -> IO ()
 
 -- ---------------------------------------------------------------------
 -- MMap
