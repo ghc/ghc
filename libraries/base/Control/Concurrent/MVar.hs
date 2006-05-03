@@ -73,6 +73,9 @@ swapMVar mvar new =
   original contents of the 'MVar' if an exception is raised (see
   "Control.Exception").
 -}
+{-# INLINE withMVar #-}
+-- inlining has been reported to have dramatic effects; see
+-- http://www.haskell.org//pipermail/haskell/2006-May/017907.html
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io = 
   block $ do
@@ -87,6 +90,7 @@ withMVar m io =
   'modifyMVar' will replace the original contents of the 'MVar' if an
   exception is raised during the operation.
 -}
+{-# INLINE modifyMVar_ #-}
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
 modifyMVar_ m io = 
   block $ do
@@ -99,6 +103,7 @@ modifyMVar_ m io =
   A slight variation on 'modifyMVar_' that allows a value to be
   returned (@b@) in addition to the modified value of the 'MVar'.
 -}
+{-# INLINE modifyMVar #-}
 modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
 modifyMVar m io = 
   block $ do
