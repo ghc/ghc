@@ -390,6 +390,8 @@ find_thing ignore_it tidy_env (ATyVar tv ty)
 	bound_at = parens $ ptext SLIT("bound at:") <+> ppr (getSrcLoc tv)
     in
     returnM (tidy_env1, Just msg)
+
+find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 \end{code}
 
 \begin{code}
