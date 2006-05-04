@@ -308,10 +308,8 @@ writeFile f txt = bracket (openFile f WriteMode) hClose
 -- > main = appendFile "squares" (show [(x,x*x) | x <- [0,0.1..2]])
 
 appendFile      :: FilePath -> String -> IO ()
-appendFile name str = do
-    hdl <- openFile name AppendMode
-    hPutStr hdl str
-    hClose hdl
+appendFile f txt = bracket (openFile f AppendMode) hClose
+			   (\hdl -> hPutStr hdl txt)
 
 -- | The 'readLn' function combines 'getLine' and 'readIO'.
 
