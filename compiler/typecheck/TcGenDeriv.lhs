@@ -692,7 +692,7 @@ Example
   infix 4 %%
   data T = Int %% Int
  	 | T1 { f1 :: Int }
-	 | T2 Int
+	 | T2 T
 
 
 instance Read T where
@@ -704,7 +704,9 @@ instance Read T where
            y           <- ReadP.step Read.readPrec
            return (x %% y))
       +++
-      prec appPrec (
+      prec (appPrec+1) (
+	-- Note the "+1" part; "T2 T1 {f1=3}" should parse ok
+	-- Record construction binds even more tightly than application
 	do Ident "T1" <- Lex.lex
 	   Punc '{' <- Lex.lex
 	   Ident "f1" <- Lex.lex
@@ -762,9 +764,9 @@ gen_Read_binds get_fixity tycon
     read_non_nullary_con data_con
       = nlHsApps prec_RDR [nlHsIntLit prec, nlHsDo DoExpr stmts body]
       where
-       	stmts | is_infix 	  = infix_stmts
-     	      | length labels > 0 = lbl_stmts
-     	      | otherwise	  = prefix_stmts
+       	stmts | is_infix  = infix_stmts
+     	      | is_record = lbl_stmts
+     	      | otherwise = prefix_stmts
      
 	body = result_expr data_con as_needed
 	con_str = data_con_str data_con
@@ -792,10 +794,14 @@ gen_Read_binds get_fixity tycon
        	labels       = dataConFieldLabels data_con
        	dc_nm	     = getName data_con
        	is_infix     = dataConIsInfix data_con
+	is_record    = length labels > 0
        	as_needed    = take con_arity as_RDRs
 	read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (dataConOrigArgTys data_con)
        	(read_a1:read_a2:_) = read_args
-       	prec 	     = getPrec is_infix get_fixity dc_nm
+       	prec | is_infix  = getPrecedence get_fixity dc_nm
+	     | is_record = appPrecedence + 1	-- Record construction binds even more tightly
+						-- than application; e.g. T2 T1 {x=2} means T2 (T1 {x=2})
+	     | otherwise = appPrecedence
 
     ------------------------------------------------------------------------
     --		Helpers
