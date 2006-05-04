@@ -2777,7 +2777,8 @@ GhcBootLibs = YES</programlisting>
 		<listitem>
 		  <para>change <literal>TARGETPLATFORM</literal>
                   appropriately, and set the variables involving
-                  <literal>TARGET</literal> to the correct values for
+                  <literal>TARGET</literal> or
+                  <literal>Target</literal> to the correct values for
                   the target platform.  This step is necessary because
                   currently <literal>configure</literal> doesn't cope
                   with specifying different values for the
