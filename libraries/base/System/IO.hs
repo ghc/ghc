@@ -294,12 +294,9 @@ readFile name	=  openFile name ReadMode >>= hGetContents
 
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.
-
-writeFile       :: FilePath -> String -> IO ()
-writeFile name str = do
-    hdl <- openFile name WriteMode
-    hPutStr hdl str
-    hClose hdl
+writeFile :: FilePath -> String -> IO ()
+writeFile f txt = bracket (openFile f WriteMode) hClose
+			  (\hdl -> hPutStr hdl txt) 
 
 -- | The computation 'appendFile' @file str@ function appends the string @str@,
 -- to the file @file@.
@@ -408,3 +405,22 @@ hSetBinaryMode _ _ = return ()
 -- It follows that an attempt to write to a file (using 'writeFile', for
 -- example) that was earlier opened by 'readFile' will usually result in
 -- failure with 'System.IO.Error.isAlreadyInUseError'.
+
+-- -----------------------------------------------------------------------------
+-- Utils
+
+-- Copied here to avoid recursive dependency with Control.Exception
+bracket 
+	:: IO a		-- ^ computation to run first (\"acquire resource\")
+	-> (a -> IO b)  -- ^ computation to run last (\"release resource\")
+	-> (a -> IO c)	-- ^ computation to run in-between
+	-> IO c		-- returns the value from the in-between computation
+bracket before after thing =
+  block (do
+    a <- before 
+    r <- catchException
+	   (unblock (thing a))
+	   (\e -> do { after a; throw e })
+    after a
+    return r
+ )
