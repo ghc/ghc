@@ -115,8 +115,13 @@ ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- definitely can't match 'tpl' by instantiating 'tpl'.  
 -- It's only a one-way match; unlike instance matching we 
 -- don't consider unification
+-- 
+-- Notice that there is no case
+--	ruleCantMatch (Just n1 : ts) (Nothing : as) = True
+-- Reason: a local variable 'v' in the actuals might 
+-- 	   have an unfolding which is a global.
+--	   This quite often happens with case scrutinees.
 ruleCantMatch (Just n1 : ts) (Just n2 : as) = n1 /= n2 || ruleCantMatch ts as
-ruleCantMatch (Just n1 : ts) (Nothing : as) = True
 ruleCantMatch (t       : ts) (a       : as) = ruleCantMatch ts as
 ruleCantMatch ts	     as		    = False
 \end{code}
@@ -403,10 +408,10 @@ match menv subst@(tv_subst, id_subst) (Var v1) e2
 
 	other -> Nothing
 
-  | otherwise	-- v1 is not a template variable
-  = case e2 of
-	Var v2 | v1' == rnOccR rn_env v2 -> Just subst
-	other				 -> Nothing
+  | 	-- v1 is not a template variable; check for an exact match with e2
+    Var v2 <- e2, v1' == rnOccR rn_env v2
+  = Just subst
+
   where
     rn_env = me_env menv
     v1'    = rnOccL rn_env v1
