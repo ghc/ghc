@@ -562,7 +562,7 @@ when substituting in h's RULE.
 \begin{code}
 addLetIdInfo :: SimplEnv -> InBinder -> OutBinder -> (SimplEnv, OutBinder)
 addLetIdInfo env in_id out_id
-  = (modifyInScope env out_id out_id, final_id)
+  = (modifyInScope env out_id final_id, final_id)
   where
     final_id = out_id `setIdInfo` new_info
     subst = mkCoreSubst env
