@@ -211,6 +211,10 @@ data ConValue  = CV AltCon [CoreArg]
 	-- Variables known to be bound to a constructor
 	-- in a particular case alternative
 
+
+instance Outputable ConValue where
+   ppr (CV con args) = ppr con <+> interpp'SP args
+
 refineConstrEnv :: Subst -> ConstrEnv -> ConstrEnv
 -- The substitution is a type substitution only
 refineConstrEnv subst env = mapVarEnv refine_con_value env
@@ -391,29 +395,30 @@ scExpr env e@(App _ _)
   = let 
 	(fn, args) = collectArgs e
     in
-    mapAndUnzipUs (scExpr env) args	`thenUs` \ (usgs, args') ->
+    mapAndUnzipUs (scExpr env) (fn:args)	`thenUs` \ (usgs, (fn':args')) ->
+	-- Process the function too.   It's almost always a variable,
+	-- but not always.  In particular, if this pass follows float-in,
+	-- which it may, we can get 
+	--	(let f = ...f... in f) arg1 arg2
     let
-	arg_usg = combineUsages usgs
-	fn_usg  | Var f <- fn,
-		  Just RecFun <- lookupScopeEnv env f
-		= SCU { calls = unitVarEnv f [(cons env, args)], 
-			occs  = emptyVarEnv }
-		| otherwise
-		= nullUsage
+	call_usg = case fn of
+		 	Var f | Just RecFun <- lookupScopeEnv env f
+			      -> SCU { calls = unitVarEnv f [(cons env, args)], 
+				       occs  = emptyVarEnv }
+			other -> nullUsage
     in
-    returnUs (arg_usg `combineUsage` fn_usg, mkApps fn args')
-	-- Don't bother to look inside fn;
-	-- it's almost always a variable
+    returnUs (combineUsages usgs `combineUsage` call_usg, mkApps fn' args')
+
 
 ----------------------
 scBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, ScUsage, CoreBind)
 scBind env (Rec [(fn,rhs)])
   | notNull val_bndrs
   = scExpr env_fn_body body		`thenUs` \ (usg, body') ->
+    specialise env fn bndrs body usg	`thenUs` \ (rules, spec_prs) ->
     let
 	SCU { calls = calls, occs = occs } = usg
     in
-    specialise env fn bndrs body usg	`thenUs` \ (rules, spec_prs) ->
     returnUs (extendBndr env fn,	-- For the body of the letrec, just
 					-- extend the env with Other to record 
 					-- that it's in scope; no funny RecFun business
