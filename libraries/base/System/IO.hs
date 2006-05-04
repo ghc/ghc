@@ -407,6 +407,7 @@ hSetBinaryMode _ _ = return ()
 -- -----------------------------------------------------------------------------
 -- Utils
 
+#ifdef __GLASGOW_HASKELL__
 -- Copied here to avoid recursive dependency with Control.Exception
 bracket 
 	:: IO a		-- ^ computation to run first (\"acquire resource\")
@@ -422,3 +423,4 @@ bracket before after thing =
     after a
     return r
  )
+#endif
