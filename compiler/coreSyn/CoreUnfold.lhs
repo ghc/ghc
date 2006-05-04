@@ -36,7 +36,7 @@ import StaticFlags	( opt_UF_CreationThreshold, opt_UF_UseThreshold,
 			)
 import DynFlags		( DynFlags, DynFlag(..), dopt )
 import CoreSyn
-import PprCore		( pprCoreExpr )
+import PprCore		()	-- Instances
 import OccurAnal	( occurAnalyseExpr )
 import CoreUtils	( exprIsHNF, exprIsCheap, exprIsTrivial )
 import Id		( Id, idType, isId,
@@ -86,6 +86,14 @@ mkUnfolding top_lvl expr
 	--
 	-- This can occasionally mean that the guidance is very pessimistic;
 	-- it gets fixed up next round
+
+instance Outputable Unfolding where
+  ppr NoUnfolding = ptext SLIT("No unfolding")
+  ppr (OtherCon cs) = ptext SLIT("OtherCon") <+> ppr cs
+  ppr (CompulsoryUnfolding e) = ptext SLIT("Compulsory") <+> ppr e
+  ppr (CoreUnfolding e top hnf cheap g) 
+	= ptext SLIT("Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr g, 
+				     ppr e]
 
 mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
   = CompulsoryUnfolding (occurAnalyseExpr expr)
