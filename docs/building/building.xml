@@ -2839,11 +2839,10 @@ $ make boot stage=2 &amp;&amp; make stage=2</screen>
 	    </listitem>
 
 	    <listitem>
-<screen>$ cd <replaceable>H</replaceable>/ghc/lib/compat
+<screen>$ cd <replaceable>H</replaceable>/compat
 $ make clean
 $ rm .depend
-$ make boot UseStage1=YES
-$ make -k UseStage1=YES EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'
+$ make boot UseStage1=YES EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'
 $ cd <replaceable>H</replaceable>/ghc/utils
 $ make clean
 $ make -k UseStage1=YES EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'</screen>
