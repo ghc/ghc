@@ -46,10 +46,13 @@ esac
 echo "*** Building compiler..."
 ./configure --enable-hc-boot $configopts
 
-$MAKE -C utils boot all
-$MAKE -C ghc boot
+$MAKE -C utils/mkdependC boot all
+$MAKE -C includes boot all
+$MAKE -C rts boot all
 $MAKE -C libraries boot all GhcBootLibs=YES
-$MAKE -C ghc all
+$MAKE -C compat boot all
+$MAKE -C utils boot all
+$MAKE -C compiler boot all
 
 MAKEFLAGS=
 
