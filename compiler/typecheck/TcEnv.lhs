@@ -64,14 +64,11 @@ import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
-import Name		( Name, NamedThing(..), getSrcLoc, nameModule, isExternalName )
+import Name		( Name, NamedThing(..), getSrcLoc, nameModule )
 import PrelNames	( thFAKE )
 import NameEnv
 import OccName		( mkDFunOcc, occNameString )
-import HscTypes		( extendTypeEnvList, lookupType,
-			  TyThing(..), tyThingId, tyThingDataCon,
-			  ExternalPackageState(..) )
-
+import HscTypes		( extendTypeEnvList, lookupType, TyThing(..), ExternalPackageState(..) )
 import SrcLoc		( SrcLoc, Located(..) )
 import Outputable
 \end{code}
