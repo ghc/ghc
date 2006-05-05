@@ -215,6 +215,14 @@ module Data.ByteString.Char8 (
         unsafePackAddress,      -- :: Int -> Addr# -> ByteString
 #endif
 
+        -- * Utilities (needed for array fusion)
+#if defined(__GLASGOW_HASKELL__)
+        unpackList,
+#endif
+        noAL, NoAL, loopArr, loopAcc, loopSndAcc,
+        loopU, mapEFL, filterEFL,
+        filterF, mapF
+
     ) where
 
 import qualified Prelude as P
@@ -243,7 +251,10 @@ import Data.ByteString (ByteString(..)
 #if defined(__GLASGOW_HASKELL__)
                        ,getLine, getArgs, hGetLine, hGetNonBlocking
                        ,packAddress, unsafePackAddress
+                       ,unpackList
 #endif
+                       ,noAL, NoAL, loopArr, loopAcc, loopSndAcc
+                       ,loopU, mapEFL, filterEFL, filterF, mapF
                        ,useAsCString, unsafeUseAsCString
                        )
 
