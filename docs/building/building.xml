@@ -875,9 +875,9 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
 
       <para>The first thing you need to know is that <emphasis>you
       must use GNU <command>make</command></emphasis>.  On some
-      systems this is called <command>gmake</command>, whereas on
-      others it is the standard <command>make</command> command.  In
-      this document we will always refer to it as
+      systems (eg. FreeBSD) this is called <command>gmake</command>,
+      whereas on others it is the standard <command>make</command>
+      command.  In this document we will always refer to it as
       <command>make</command>; please substitute with
       <command>gmake</command> if your system requires it.  If you use
       a the wrong <command>make</command> you will get all sorts of
@@ -960,6 +960,23 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
 	    <replaceable>n</replaceable> is the stage to install.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>binary-dist</literal></term>
+	  <listitem>
+	    <para>make a binary distribution.  This is the target we
+            use to build the binary distributions of GHC.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>dist</literal></term>
+	  <listitem>
+	    <para>make a source distribution.  Note that this target
+            does &ldquo;make distclean&rdquo; as part of its work;
+            don't use it if you want to keep what you've built.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
 
       <para>The top-level <filename>Makefile</filename> also arranges
@@ -997,12 +1014,11 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
 
 	    <para>Invoking the <literal>boot</literal> target
             explicitly is not normally necessary.  From the top-level
-            <literal>fptools</literal> directory, invoking
-            <literal>make</literal> causes <literal>make boot
-            all</literal> to be invoked in each of the project
-            subdirectories, in the order specified by
-            <literal>&dollar;(AllTargets)</literal> in
-            <literal>config.mk</literal>.</para>
+            directory, invoking <literal>make</literal> causes
+            <literal>make boot</literal> to be invoked in various
+            subdirectories first, in the right order.  Unless you
+            really know what you are doing, it is best to always say
+            <literal>make</literal> from the top level first.</para>
 
 	    <para>If you're working in a subdirectory somewhere and
             need to update the dependencies, <literal>make
@@ -1049,7 +1065,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
 	  <term><literal>uninstall</literal></term>
 	  <listitem>
 	    <para>reverses the effect of
-            <literal>install</literal>.</para>
+            <literal>install</literal> (WARNING: probably doesn't work).</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1105,13 +1121,10 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
             anything that needs to exist in order to run
             <filename>configure</filename> and then begin to build the
             program.</para>
-	  </listitem>
-	</varlistentry>
 
-	<varlistentry>
-	  <term><literal>check</literal></term>
-	  <listitem>
-	    <para>run the test suite.</para>
+	    <para>After a <literal>maintainer-clean</literal>, a
+	    <literal>configure</literal> will be necessary before
+	    building again.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -1120,16 +1133,6 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
       sub-directories.  Certain other standard targets do not:</para>
 
       <variablelist>
-	<varlistentry>
-	  <term><literal>configure</literal></term>
-	  <listitem>
-	    <para>is only available in the root directory
-            <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>; it has
-            been discussed in <xref
-            linkend="sec-build-config"/>.</para>
-	  </listitem>
-	</varlistentry>
-
 	<varlistentry>
 	  <term><literal>depend</literal></term>
 	  <listitem>
@@ -1151,49 +1154,29 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
             file is automatically included by every Makefile.</para>
 	  </listitem>
 	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>binary-dist</literal></term>
-	  <listitem>
-	    <para>make a binary distribution.  This is the target we
-            use to build the binary distributions of GHC and
-            Happy.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><literal>dist</literal></term>
-	  <listitem>
-	    <para>make a source distribution.  Note that this target
-            does &ldquo;make distclean&rdquo; as part of its work;
-            don't use it if you want to keep what you've built.</para>
-	  </listitem>
-	</varlistentry>
       </variablelist>
 
-      <para>Most <filename>Makefile</filename>s have targets other
+      <para>Some <filename>Makefile</filename>s have targets other
       than these.  You can discover them by looking in the
       <filename>Makefile</filename> itself.</para>
     </sect2>
 
     <sect2>
-      <title>Using a project from the build tree</title> 
+      <title>Using GHC from the build tree</title>
 
-      <para>If you want to build GHC (say) and just use it direct from
-      the build tree without doing <literal>make install</literal>
-      first, you can run the in-place driver script:
-      <filename>compiler/ghc-inplace</filename>.</para>
+      <para>If you want to build GHC and just use it direct from the
+      build tree without doing <literal>make install</literal> first,
+      you can run the in-place driver script.  To run the stage 1
+      compiler, use <filename>compiler/stage1/ghc-inplace</filename>,
+      stage 2 is <filename>compiler/stage2/ghc-inplace</filename>, and
+      so on.</para>
 
       <para> Do <emphasis>NOT</emphasis> use
-      <filename>compiler/ghc</filename>, or
-      <filename>compiler/ghc-6.xx</filename>, as these are the
+      <filename>compiler/stage1/ghc</filename>, or
+      <filename>compiler/stage1/ghc-6.xx</filename>, as these are the
       scripts intended for installation, and contain hard-wired paths
       to the installed libraries, rather than the libraries in the
       build tree.</para>
-
-      <para>Happy can similarly be run from the build tree, using
-      <filename>happy/src/happy-inplace</filename>, and similarly for
-      Alex and Haddock.</para>
     </sect2>
 
     <sect2>
@@ -1263,27 +1246,23 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
     </sect2>
 
     <sect2>
-      <title>A small project</title>
+      <title>A small example</title>
 
       <para>To get started, let us look at the
-      <filename>Makefile</filename> for an imaginary small
-      <literal>fptools</literal> project, <literal>small</literal>.
-      Each project in <literal>fptools</literal> has its own directory
-      in <constant>FPTOOLS&lowbar;TOP</constant>, so the
-      <literal>small</literal> project will have its own directory
-      <constant>FPOOLS&lowbar;TOP/small/</constant>.  Inside the
-      <filename>small/</filename> directory there will be a
+      <filename>Makefile</filename> for an imaginary small program,
+      <literal>small</literal>.  Each program or library in the GHC
+      source tree typically has its own directory, in this case we'll
+      use <filename>&dollar;(FPTOOLS&lowbar;TOP)/small</filename>.
+      Inside the <filename>small/</filename> directory there will be a
       <filename>Makefile</filename>, looking something like
       this:</para>
 
 <indexterm><primary>Makefile, minimal</primary></indexterm>
 
-<programlisting># Makefile for fptools project "small"
-
+<programlisting># Makefile for program "small"
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SRCS = $(wildcard *.lhs) $(wildcard *.c)
 HS_PROG = small
 
 include $(TOP)/target.mk</programlisting>
@@ -1303,9 +1282,8 @@ directive.
 </para>
 </footnote>
 
-          a file of &ldquo;boilerplate&rdquo; code from the level
-          above (which in this case will be
-          <filename>FPTOOLS&lowbar;TOP/mk/boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm>).
+          a file of &ldquo;boilerplate&rdquo; code from the top level
+          <indexterm><primary>boilerplate.mk</primary></indexterm>).
           As its name suggests, <filename>boilerplate.mk</filename>
           consists of a large quantity of standard
           <filename>Makefile</filename> code.  We discuss this
@@ -1317,12 +1295,12 @@ directive.
           <para>Before the <literal>include</literal> statement, you
           must define the <command>make</command> variable
           <constant>TOP</constant><indexterm><primary>TOP</primary></indexterm>
-          to be the directory containing the <filename>mk</filename>
+          to be the top-level directory of the source tree, containing
+          the <filename>mk</filename>
           directory in which the <filename>boilerplate.mk</filename>
           file is.  It is <emphasis>not</emphasis> OK to simply say</para>
 
 <programlisting>include ../mk/boilerplate.mk  # NO NO NO</programlisting>
-
 
           <para>Why?  Because the <filename>boilerplate.mk</filename>
           file needs to know where it is, so that it can, in turn,
@@ -1338,40 +1316,16 @@ directive.
           refers to itself.</emphasis> It is up to the
           <filename>Makefile</filename> doing the
           <literal>include</literal> to ensure this is the case.</para>
-
-          <para>Files intended for inclusion in other
-          <filename>Makefile</filename>s are written to have the
-          following property: <emphasis>after
-          <filename>foo.mk</filename> is <literal>include</literal>d,
-          it leaves <constant>TOP</constant> containing the same value
-          as it had just before the <literal>include</literal>
-          statement</emphasis>.  In our example, this invariant
-          guarantees that the <literal>include</literal> for
-          <filename>target.mk</filename> will look in the same
-          directory as that for <filename>boilerplate.mk</filename>.</para>
 	</listitem>
 
 	<listitem>
-	  <para> The second section defines the following standard
-          <command>make</command> variables:
-          <constant>SRCS</constant><indexterm><primary>SRCS</primary></indexterm>
-          (the source files from which is to be built), and
+	  <para> The second section defines the standard
+          <command>make</command> variable
           <constant>HS&lowbar;PROG</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>
           (the executable binary to be built).  We will discuss in
           more detail what the &ldquo;standard variables&rdquo; are,
           and how they affect what happens, in <xref
           linkend="sec-targets"/>.</para>
-
-	  <para>The definition for <constant>SRCS</constant> uses the
-          useful GNU <command>make</command> construct
-          <literal>&dollar;(wildcard&nbsp;$pat$)</literal><indexterm><primary>wildcard</primary></indexterm>,
-          which expands to a list of all the files matching the
-          pattern <literal>pat</literal> in the current directory.  In
-          this example, <constant>SRCS</constant> is set to the list
-          of all the <filename>.lhs</filename> and
-          <filename>.c</filename> files in the directory.  (Let's
-          suppose there is one of each, <filename>Foo.lhs</filename>
-          and <filename>Baz.c</filename>.)</para>
 	</listitem>
 
 	<listitem>
@@ -1405,14 +1359,22 @@ directive.
 
       <itemizedlist>
 	<listitem>
-	  <para><command>make</command> figures out that the object
-          files are <filename>Foo.o</filename> and
-          <filename>Baz.o</filename>.</para>
+	  <para><command>make</command> looks in the current directory
+	  to see what source files it can find
+	  (eg. <filename>Foo.hs</filename>,
+	  <filename>Baz.c</filename>), and from that it figures out
+	  what object files need to be built
+	  (eg. <filename>Foo.o</filename>,
+	  <filename>Baz.o</filename>).  Because source files are found
+	  and used automatically, omitting them from a program or
+	  library has to be done manually (see
+	  <literal>EXCLUDED_SRCS</literal> in <xref
+	  linkend="sec-boiler" />).</para>
 	</listitem>
 
 	<listitem>
 	  <para>It uses a boilerplate pattern rule to compile
-          <filename>Foo.lhs</filename> to <filename>Foo.o</filename>
+          <filename>Foo.hs</filename> to <filename>Foo.o</filename>
           using a Haskell compiler.  (Which one?  That is set in the
           build configuration.)</para>
 	</listitem>
@@ -1438,90 +1400,6 @@ directive.
 
       <para>All <filename>Makefile</filename>s should follow the above
       three-section format.</para>
-    </sect2>
-
-    <sect2>
-      <title>A larger project</title>
-
-      <para>Larger projects are usually structured into a number of
-      sub-directories, each of which has its own
-      <filename>Makefile</filename>.  (In very large projects, this
-      sub-structure might be iterated recursively, though that is
-      rare.)  To give you the idea, here's part of the directory
-      structure for the (rather large) GHC project:</para>
-
-<programlisting>$(FPTOOLS_TOP)/ghc/
-  Makefile
-  mk/
-    boilerplate.mk
-    rules.mk
-   docs/
-    Makefile
-    ...source files for documentation...
-   driver/
-    Makefile
-    ...source files for driver...
-   compiler/
-    Makefile
-    parser/...source files for parser...
-    renamer/...source files for renamer...
-    ...etc...</programlisting>
-
-      <para>The sub-directories <filename>docs</filename>,
-      <filename>driver</filename>, <filename>compiler</filename>, and
-      so on, each contains a sub-component of GHC, and each has its
-      own <filename>Makefile</filename>.  There must also be a
-      <filename>Makefile</filename> in
-      <filename>&dollar;(FPTOOLS&lowbar;TOP)/ghc</filename>.
-      It does most of its work by recursively invoking
-      <command>make</command> on the <filename>Makefile</filename>s
-      in the sub-directories.  We say that
-      <filename>ghc/Makefile</filename> is a <emphasis>non-leaf
-      <filename>Makefile</filename></emphasis>, because it does little
-      except organise its children, while the
-      <filename>Makefile</filename>s in the sub-directories are all
-      <emphasis>leaf <filename>Makefile</filename>s</emphasis>.  (In
-      principle the sub-directories might themselves contain a
-      non-leaf <filename>Makefile</filename> and several
-      sub-sub-directories, but that does not happen in GHC.)</para>
-
-      <para>The <filename>Makefile</filename> in
-      <filename>ghc/compiler</filename> is considered a leaf
-      <filename>Makefile</filename> even though the
-      <filename>ghc/compiler</filename> has sub-directories, because
-      these sub-directories do not themselves have
-      <filename>Makefile</filename>s in them.  They are just used to
-      structure the collection of modules that make up GHC, but all
-      are managed by the single <filename>Makefile</filename> in
-      <filename>ghc/compiler</filename>.</para>
-
-      <para>You will notice that <filename>ghc/</filename> also
-      contains a directory <filename>ghc/mk/</filename>.  It contains
-      GHC-specific <filename>Makefile</filename> boilerplate code.
-      More precisely:</para>
-
-      <itemizedlist>
-	<listitem>
-	  <para><filename>ghc/mk/boilerplate.mk</filename> is included
-          at the top of <filename>ghc/Makefile</filename>, and of all
-          the leaf <filename>Makefile</filename>s in the
-          sub-directories.  It in turn <literal>include</literal>s the
-          main boilerplate file
-          <filename>mk/boilerplate.mk</filename>.</para>
-	</listitem>
-
-	<listitem>
-	  <para><filename>ghc/mk/target.mk</filename> is
-          <literal>include</literal>d at the bottom of
-          <filename>ghc/Makefile</filename>, and of all the leaf
-          <filename>Makefile</filename>s in the sub-directories.  It
-          in turn <literal>include</literal>s the file
-          <filename>mk/target.mk</filename>.</para>
-	</listitem>
-      </itemizedlist>
-
-      <para>So these two files are the place to look for GHC-wide
-      customisation of the standard boilerplate.</para>
     </sect2>
 
     <sect2 id="sec-boiler-arch">
@@ -1642,7 +1520,7 @@ directive.
     </sect2>
 
     <sect2 id="sec-boiler">
-      <title>The main <filename>mk/boilerplate.mk</filename> file</title>
+      <title>The <filename>mk/boilerplate.mk</filename> file</title>
       <indexterm><primary>boilerplate.mk</primary></indexterm>
 
       <para>If you look at
@@ -2036,7 +1914,7 @@ directive.
 	    <para>extra options to pass to all C compilations.  This
             is intended for command line use, thus:</para>
 
-<screen>$ make libHS.a EXTRA_CC_OPTS="-v"</screen>
+<screen>$ make libHS.a EXTRA_HC_OPTS="-v"</screen>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -2112,34 +1990,9 @@ directive.
             <constant>&dollar;(libdir)</constant>.</para>
 	  </listitem>
 	</varlistentry>
-
-	<varlistentry>
-	  <term><constant>LIB&lowbar;DATA</constant><indexterm><primary>LIB&lowbar;DATA</primary></indexterm></term>
-	  <listitem>
-	    <para>&hellip;</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><constant>LIB&lowbar;EXEC</constant><indexterm><primary>LIB&lowbar;EXEC</primary></indexterm></term>
-	  <listitem>
-	    <para>&hellip;</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term><constant>HS&lowbar;SRCS</constant><indexterm><primary>HS&lowbar;SRCS</primary></indexterm>, <constant>C&lowbar;SRCS</constant><indexterm><primary>C&lowbar;SRCS</primary></indexterm>.</term>
-	  <listitem>
-	    <para>If <constant>HS&lowbar;SRCS</constant> is defined
-            and non-empty, a rule for the target
-            <literal>depend</literal> is included, which generates
-            dependency information for Haskell programs.  Similarly
-            for <constant>C&lowbar;SRCS</constant>.</para>
-	  </listitem>
-	</varlistentry>
       </variablelist>
 
-      <para>All of these rules are &ldquo;double-colon&rdquo; rules,
+      <para>Some rules are &ldquo;double-colon&rdquo; rules,
       thus</para>
 
 <programlisting>install :: $(HS_PROG)
