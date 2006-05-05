@@ -152,9 +152,9 @@ initTc hsc_env hsc_src mod do_this
                                     = mkGlobalId VanillaGlobal breakpointCondJumpName
                                                  (basicType (FunTy boolTy)) vanillaIdInfo;
                                 new_env = mkNameEnv [(breakpointJumpName
-                                                     , AGlobal (AnId breakpointJumpType))
-                                                    ,(breakpointCondJumpName
-                                                     , AGlobal (AnId breakpointCondJumpType))];
+                                                     , ATcId breakpointJumpType topLevel False)
+                                                     ,(breakpointCondJumpName
+                                                     , ATcId breakpointCondJumpType topLevel False)];
                               };
                           r <- tryM (updLclEnv (\gbl -> gbl{tcl_env=new_env}) do_this)
 #else
