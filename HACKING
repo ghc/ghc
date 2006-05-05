@@ -98,8 +98,8 @@ Building individual parts of the tree
 The first thing to understand is that the source tree is built in two
 passes.  First 'make boot' builds dependencies and any other tools
 required as part of the build itself.  For example,
-ghc/utils/genprimopcode is built as part of 'make boot', because it is
-required to preprocess ghc/compiler/prelude/primops.txt.pp.
+utils/genprimopcode is built as part of 'make boot', because it is
+required to preprocess compiler/prelude/primops.txt.pp.
 
 After 'make boot', 'make' will build everything.
 
@@ -150,27 +150,17 @@ Roadmap
 
 A rough roadmap to the source tree:
 
+ compat         compatibility library used by GHC and utils
+ compiler       the compiler itself
  distrib        materials for building distributions
-
- docs           build system documentation
-
- ghc            The GHC Compiler
-   rts          the runtime system and storage manager
-   lib          libraries used in GHC and its tools
-   utils	tools that come with GHC, and tools used in the build
-   compiler     the compiler itself
-   driver       various scripts, and package databases
-   docs         compiler documentation
-   includes     header files shipped with GHC
-
- glafp-utils    tools for the build system
-
+ driver         various scripts, and package databases
+ docs           all documentation
+ includes       header files shipped with GHC
  libraries	The hierarchical libraries
-
- nofib          A benchmark suite
-
- testsuite      The regression test suite
-
+ nofib          A benchmark suite (optional)
+ rts            the runtime system and storage manager
+ testsuite      The regression test suite (optional)
+ utils          tools that come with GHC, and tools used in the build
 
 Resources
 ---------
