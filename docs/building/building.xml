@@ -504,12 +504,12 @@ $ make install</screen>
       <para>Like the source tree, the top level of your build tree
       must be (a linked copy of) the root directory of the GHC source
       tree..  Inside Makefiles, the root of your build tree is called
-      <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant><indexterm><primary>FPTOOLS&lowbar;TOP</primary></indexterm>.
+      <constant>&dollar;(GHC&lowbar;TOP)</constant><indexterm><primary>GHC&lowbar;TOP</primary></indexterm>.
       In the rest of this document path names are relative to
-      <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> unless
+      <constant>&dollar;(GHC&lowbar;TOP)</constant> unless
       otherwise stated.  For example, the file
       <filename>mk/target.mk</filename> is actually
-      <filename>&dollar;(FPTOOLS&lowbar;TOP)/mk/target.mk</filename>.</para>
+      <filename>&dollar;(GHC&lowbar;TOP)/mk/target.mk</filename>.</para>
     </sect2>
 
     <sect2 id="sec-build-config">
@@ -545,15 +545,15 @@ $ make install</screen>
 	    rather than darcs sources, you can skip this step.</para>
 
 	    <para>Change directory to
-            <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
+            <constant>&dollar;(GHC&lowbar;TOP)</constant> and
             issue the command</para>
 <screen>$ autoreconf</screen>
             <indexterm><primary>autoreconf</primary></indexterm>
             <para>(with no arguments). This GNU program (recursively) converts
-            <filename>&dollar;(FPTOOLS&lowbar;TOP)/configure.ac</filename> and
-            <filename>&dollar;(FPTOOLS&lowbar;TOP)/aclocal.m4</filename>
+            <filename>&dollar;(GHC&lowbar;TOP)/configure.ac</filename> and
+            <filename>&dollar;(GHC&lowbar;TOP)/aclocal.m4</filename>
             to a shell script called
-            <filename>&dollar;(FPTOOLS&lowbar;TOP)/configure</filename>.
+            <filename>&dollar;(GHC&lowbar;TOP)/configure</filename>.
 	      If <command>autoreconf</command> bleats that it can't write the file <filename>configure</filename>,
 	      then delete the latter and try again.  Note that you must use <command>autoreconf</command>,
 	      and not the old <command>autoconf</command>!  If you erroneously use the latter, you'll get 
@@ -564,7 +564,7 @@ $ make install</screen>
             libraries, have their own configure script.
             <command>autoreconf</command> takes care of that, too, so all you have
              to do is calling <command>autoreconf</command> in the top-level directory
-            <filename>&dollar;(FPTOOLS&lowbar;TOP)</filename>.</para>
+            <filename>&dollar;(GHC&lowbar;TOP)</filename>.</para>
 
 	    <para>These steps are completely platform-independent; they just mean
             that the human-written files (<filename>configure.ac</filename> and
@@ -784,7 +784,7 @@ $ make install</screen>
       <para>You can also use <filename>build.mk</filename> to override
       anything that <command>configure</command> got wrong.  One place
       where this happens often is with the definition of
-      <constant>FPTOOLS&lowbar;TOP&lowbar;ABS</constant>: this
+      <constant>GHC&lowbar;TOP&lowbar;ABS</constant>: this
       variable is supposed to be the canonical path to the top of your
       source tree, but if your system uses an automounter then the
       correct directory is hard to find automatically.  If you find
@@ -1252,7 +1252,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
       <filename>Makefile</filename> for an imaginary small program,
       <literal>small</literal>.  Each program or library in the GHC
       source tree typically has its own directory, in this case we'll
-      use <filename>&dollar;(FPTOOLS&lowbar;TOP)/small</filename>.
+      use <filename>&dollar;(GHC&lowbar;TOP)/small</filename>.
       Inside the <filename>small/</filename> directory there will be a
       <filename>Makefile</filename>, looking something like
       this:</para>
@@ -1524,7 +1524,7 @@ directive.
       <indexterm><primary>boilerplate.mk</primary></indexterm>
 
       <para>If you look at
-      <filename>&dollar;(FPTOOLS&lowbar;TOP)/mk/boilerplate.mk</filename>
+      <filename>&dollar;(GHC&lowbar;TOP)/mk/boilerplate.mk</filename>
       you will find that it consists of the following sections, each
       held in a separate file:</para>
 
@@ -2179,8 +2179,7 @@ directive.
       <title>Tools for building the Documentation</title>
 
       <para>The following additional tools are required if you want to
-      format the documentation that comes with the
-      <literal>fptools</literal> projects:</para>
+      format the documentation that comes with GHC:</para>
       
       <variablelist>
 	<varlistentry>
@@ -2213,11 +2212,9 @@ directive.
 	  <listitem>
 	    <para>Haddock is a Haskell documentation tool that we use
 	    for automatically generating documentation from the
-	    library source code.  It is an <literal>fptools</literal>
-	    project in itself.  To build documentation for the
-	    libraries (<literal>fptools/libraries</literal>) you
-	    should check out and build Haddock in
-	    <literal>fptools/haddock</literal>.  Haddock requires GHC
+	    library source code.  To build documentation for the
+	    libraries (<literal>$(GHC&lowbar;TOP)/libraries</literal>) you
+	    should build and install Haddock.  Haddock requires GHC
 	    to build.</para>
 	  </listitem>
 	</varlistentry>
@@ -2854,7 +2851,7 @@ Hello World!</screen>
 	<title>GHCi</title>
 
 	<para>To support GHCi, you need to port the dynamic linker
-	(<filename>fptools/ghc/rts/Linker.c</filename>).  The linker
+	(<filename>$(GHC&lowbar;TOP)/rts/Linker.c</filename>).  The linker
 	currently supports the ELF and PEi386 object file formats - if
 	your platform uses one of these then things will be
 	significantly easier.  The majority of Unix platforms use the
@@ -2902,9 +2899,8 @@ The best way around it is to say
 
 <programlisting>export TMPDIR=&#60;dir&#62;</programlisting>
 
-in your <filename>build.mk</filename> file.
-Then GHC and the other <literal>fptools</literal> programs will use the appropriate directory
-in all cases.
+in your <filename>build.mk</filename> file.  Then GHC and the other
+tools will use the appropriate directory in all cases.
 
 
 </para>
@@ -3570,7 +3566,7 @@ you do that, <command>ssh</command> uses the $HOME environment variable instead.
 <para>You have to install the following other things to build GHC, listed below.</para>
 
 <para>On Windows you often install executables in directories with spaces, such as 
-"<filename>Program Files</filename>". However, the <literal>make</literal> system for fptools doesn't 
+"<filename>Program Files</filename>". However, the <literal>make</literal> system doesn't 
 deal with this situation (it'd have to do more quoting of binaries), so you are strongly advised
 to put binaries for all tools in places with no spaces in their path.
 On both MSYS and Cygwin, it's perfectly OK to install such programs in the standard Unixy places,
@@ -3635,10 +3631,10 @@ but you must have them; hence needing the  Cygwin binutils package.
 
 <listitem>
 <para>We use <command>emacs</command> a lot, so we install that too.
-When you are in <filename>fptools/ghc/compiler</filename>, you can use
+When you are in <filename>$(GHC&lowbar;TOP)/compiler</filename>, you can use
 "<literal>make tags</literal>" to make a TAGS file for emacs.  That uses the utility
-<filename>fptools/ghc/utils/hasktags/hasktags</filename>, so you need to make that first.
-The most convenient way to do this is by going <literal>make boot</literal> in <filename>fptools/ghc</filename>.
+<filename>$(GHC&lowbar;TOP)/ghc/utils/hasktags/hasktags</filename>, so you need to make that first.
+The most convenient way to do this is by going <literal>make boot</literal> in <filename>$(GHC&lowbar;TOP)/ghc</filename>.
 The <literal>make tags</literal> command also uses <command>etags</command>, which comes with <command>emacs</command>,
 so you will need to add <filename>emacs/bin</filename> to your <literal>PATH</literal>.
 </para>
@@ -3690,7 +3686,7 @@ Solution: delete <filename>configure</filename> first.
 <listitem>
   <para> 
     After <command>autoreconf</command> run <command>./configure</command> in
-    <filename>fptools/</filename> thus:
+    <filename>$(GHC&lowbar;TOP)/</filename> thus:
 
 <screen>$ ./configure --host=i386-unknown-mingw32 --with-gcc=c:/mingw/bin/gcc</screen>
 This is the point at which you specify that you are building GHC-mingw
@@ -3708,7 +3704,7 @@ say <literal>--with-gcc=/mingw/bin/gcc</literal>, it'll be interpreted as
 time it tries to invoke it.   Worse, the failure comes with
 no error message whatsoever.  GHC simply fails silently when first invoked, 
 typically leaving you with this:
-<screen>make[4]: Leaving directory `/cygdrive/e/fptools-stage1/ghc/rts/gmp'
+<screen>make[4]: Leaving directory `/cygdrive/e/ghc-stage1/ghc/rts/gmp'
 ../../ghc/compiler/ghc-inplace -optc-mno-cygwin -optc-O 
   -optc-Wall -optc-W -optc-Wstrict-prototypes -optc-Wmissing-prototypes 
   -optc-Wmissing-declarations -optc-Winline -optc-Waggregate-return 
@@ -3718,7 +3714,7 @@ typically leaving you with this:
   -package-name rts -O -dcore-lint -c Adjustor.c -o Adjustor.o
 make[2]: *** [Adjustor.o] Error 1
 make[1]: *** [all] Error 1
-make[1]: Leaving directory `/cygdrive/e/fptools-stage1/ghc'
+make[1]: Leaving directory `/cygdrive/e/ghc-stage1/ghc'
 make: *** [all] Error 1</screen>
 Be warned!
 </para>
@@ -3797,7 +3793,7 @@ choices, but it gives a single path that works.</para>
     ; also, subscribe to cvs-all@haskell.org, or follow the mailing list
     ; archive, in case you checkout a version with problems
     ; http://www.haskell.org//pipermail/cvs-all/
-  - mkdir c:/fptools; cd c:/fptools 
+  - mkdir c:/ghc-build; cd c:/ghc-build
     ; (or whereever you want your darcs tree to be)
   - darcs get http://darcs.haskell.org/ghc
   - cd ghc
@@ -3809,7 +3805,7 @@ choices, but it gives a single path that works.</para>
     ; for haddock, alex, happy (*)
   - export PATH=/cygdrive/c/mingw/bin:$PATH
     ; without, we pick up some cygwin tools at best!
-  - cd c:/fptools/fptools
+  - cd c:/ghc-build
     ; (if you aren't there already)
   - autoreconf
   - ./configure --host=i386-unknown-mingw32 --with-gcc=C:/Mingw/bin/gcc.exe
