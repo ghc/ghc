@@ -158,10 +158,12 @@
           <indexterm><primary>GHC, pre-supposed</primary></indexterm>
         </term>
 	<listitem>
-	  <para>GHC is required to build many of the tools, including
-	  GHC itself.  If you need to port GHC to your platform
-	  because there isn't a binary distribution of GHC available,
-	  then see <xref linkend="sec-porting-ghc"/>.</para>
+	  <para>GHC is required to build GHC, because GHC itself is
+	  written in Haskell, and uses GHC extensions.  It is possible
+	  to build GHC using just a C compiler, and indeed some
+	  distributions of GHC do just that, but it isn't the best
+	  supported method, and you may encounter difficulties.  Full
+	  instructions are in <xref linkend="sec-porting-ghc"/>.</para>
 
 	  <para>Which version of GHC you need will depend on the
 	  packages you intend to build.  GHC itself will normally
@@ -222,10 +224,9 @@
           <indexterm><primary>make</primary><secondary>GNU</secondary></indexterm>
         </term>
 	<listitem>
-	  <para>The fptools build system makes heavy use of features
+	  <para>The GHC build system makes heavy use of features
 	  specific to GNU <command>make</command>, so you must have
-	  this installed in order to build any of the fptools
-	  suite.</para>
+	  this installed in order to build GHC.</para>
 
 	  <para>NB. it has been reported that version 3.79 no longer
 	  works to build GHC, and 3.80 is required.</para>
@@ -246,16 +247,10 @@
 	    modify the compiler and/or you're using a darcs checkout, then you
 	    need Happy.</para>
 
-	  <para>Happy version 1.15 is currently required to build GHC.</para>
-
-	  <para>Happy is written in
-          Haskell, and is a project in the CVS repository
-          (<literal>fptools/happy</literal>).  It can be built from
-          source, but bear in mind that you'll need GHC installed in
-          order to build it.  To avoid the chicken/egg problem,
-          install a binary distribution of either Happy or GHC to get
-          started.  Happy distributions are available from <ulink url="http://www.haskell.org/happy/">Happy's Web
-          Page</ulink>.</para>
+	  <para>Happy version 1.15 is currently required to build GHC.
+	  Grab a copy from <ulink
+	  url="http://www.haskell.org/happy/">Happy's Web
+	  Page</ulink>.</para>
 	</listitem>
       </varlistentry>
 
@@ -317,13 +312,6 @@
       </varlistentry>
     </variablelist>
 
-    <para>One <literal>fptools</literal> project is worth a quick note
-    at this point, because it is useful for all the others:
-    <literal>glafp-utils</literal> contains several utilities which
-    aren't particularly Glasgow-ish, but Occasionally Indispensable.
-    Like <command>lndir</command> for creating symbolic link
-    trees.</para>
-
     <sect2 id="pre-supposed-gph-tools">
       <title>Tools for building parallel GHC (GPH)</title>
 
@@ -365,29 +353,9 @@
 	  </listitem>
 	</varlistentry>
       </variablelist>
-    </sect2>
 
-    <sect2 id="pre-supposed-other-tools">
-      <title>Other useful tools</title>
-
-      <variablelist>
-	<varlistentry>
-	  <term>Flex
-            <indexterm><primary>pre-supposed: flex</primary></indexterm> 
-            <indexterm><primary>flex, pre-supposed</primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>This is a quite-a-bit-better-than-Lex lexer.  Used
-            to build a couple of utilities in
-            <literal>glafp-utils</literal>.  Depending on your
-            operating system, the supplied <command>lex</command> may
-            or may not work; you should get the GNU version.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para>More tools are required if you want to format the documentation
-      that comes with GHC and other fptools projects.  See <xref
+      <para>More tools are required if you want to format the
+      documentation that comes with GHC.  See <xref
       linkend="building-docs"/>.</para>
     </sect2>
   </sect1>
@@ -428,7 +396,7 @@ $ make install</screen>
       <title>Quick start for GHC developers</title>
       
       <para>This section is a copy of the file
-	<literal>ghc/HACKING</literal> from the GHC source tree.  It describes
+	<literal>HACKING</literal> from the GHC source tree.  It describes
 	how to get started with setting up your build tree for developing GHC
 	or its libraries, and how to start building.</para>
 
@@ -447,53 +415,28 @@ $ make install</screen>
     software, and lay hands on them gently when they don't
     work.</para>
 
-    <sect2 id="sec-source-tree">
-      <title>Your source tree</title>
+    <sect2>
+      <title>History</title>
 
-      <para>The source code is held in your <emphasis>source
-      tree</emphasis>.  The root directory of your source tree
-      <emphasis>must</emphasis> contain the following directories and
-      files:</para>
+      <para>First, a historical note.  The GHC build system used to be
+      called "fptools": a generic build system used to build multiple
+      projects (GHC, Happy, GreenCard, H/Direct, etc.).  It had a
+      concept of the generic project-independent parts, and
+      project-specific parts that resided in a project
+      subdirectory.</para>
 
-      <itemizedlist>
-	<listitem>
-	  <para><filename>Makefile</filename>: the root
-	  Makefile.</para>
-	</listitem>
+      <para>Nowadays, most of these other projects are using <ulink
+      url="http://www.haskell.org/cabal/">Cabal</ulink>, or have faded
+      away, and GHC is the only regular user of the fptools build
+      system.  We decided therefore to simplify the situation for
+      developers, and specialise the build system for GHC.  This
+      resulted in a simpler organisation of the source tree and the
+      build system, which hopefully makes the whole thing easier to
+      understand.</para>
 
-	<listitem>
-	  <para><filename>mk/</filename>: the directory that contains
-          the main Makefile code, shared by all the
-          <literal>fptools</literal> software.</para>
-	</listitem>
-
-	<listitem>
-	  <para><filename>configure.ac</filename>,
-          <filename>config.sub</filename>,
-          <filename>config.guess</filename>: these files support the
-          configuration process.</para>
-	</listitem>
-
-	<listitem>
-	  <para><filename>install-sh</filename>.</para>
-	</listitem>
-      </itemizedlist>
-
-      <para>All the other directories are individual
-      <emphasis>projects</emphasis> of the <literal>fptools</literal>
-      system&mdash;for example, the Glasgow Haskell Compiler
-      (<literal>ghc</literal>), the Happy parser generator
-      (<literal>happy</literal>), the <literal>nofib</literal>
-      benchmark suite, and so on.  You can have zero or more of these.
-      Needless to say, some of them are needed to build others.</para>
-
-      <para>The important thing to remember is that even if you want
-      only one project (<literal>happy</literal>, say), you must have
-      a source tree whose root directory contains
-      <filename>Makefile</filename>, <filename>mk/</filename>,
-      <filename>configure.ac</filename>, and the project(s) you want
-      (<filename>happy/</filename> in this case).  You cannot get by
-      with just the <filename>happy/</filename> directory.</para>
+      <para>You might find old comments that refer to "projects" or
+      "fptools" in the documentation and/or source; please let us know
+      if you do.</para>
     </sect2>
 
     <sect2>
@@ -522,7 +465,7 @@ $ make install</screen>
       are two (If you don't have either, the source distribution
       includes sources for the X11
       <command>lndir</command>&mdash;check out
-      <filename>fptools/glafp-utils/lndir</filename>). See <xref
+      <filename>utils/lndir</filename>). See <xref
       linkend="sec-storysofar"/> for a typical invocation.</para>
 
       <para>The build tree does not need to be anywhere near the
@@ -559,24 +502,23 @@ $ make install</screen>
       source file.)</para>
 
       <para>Like the source tree, the top level of your build tree
-      must be (a linked copy of) the root directory of the
-      <literal>fptools</literal> suite.  Inside Makefiles, the root of
-      your build tree is called
+      must be (a linked copy of) the root directory of the GHC source
+      tree..  Inside Makefiles, the root of your build tree is called
       <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant><indexterm><primary>FPTOOLS&lowbar;TOP</primary></indexterm>.
       In the rest of this document path names are relative to
       <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> unless
       otherwise stated.  For example, the file
-      <filename>ghc/mk/target.mk</filename> is actually
-      <filename>&dollar;(FPTOOLS&lowbar;TOP)/ghc/mk/target.mk</filename>.</para>
+      <filename>mk/target.mk</filename> is actually
+      <filename>&dollar;(FPTOOLS&lowbar;TOP)/mk/target.mk</filename>.</para>
     </sect2>
 
     <sect2 id="sec-build-config">
       <title>Getting the build you want</title>
 
-      <para>When you build <literal>fptools</literal> you will be
-      compiling code on a particular <emphasis>host
-      platform</emphasis>, to run on a particular <emphasis>target
-      platform</emphasis> (usually the same as the host
+      <para>When you build GHC you will be compiling code on a
+      particular <emphasis>host platform</emphasis>, to run on a
+      particular <emphasis>target platform</emphasis> (usually the
+      same as the host
       platform)<indexterm><primary>platform</primary></indexterm>.
       The difficulty is that there are minor differences between
       different platforms; minor, but enough that the code needs to be
@@ -585,12 +527,11 @@ $ make install</screen>
       different native-code generator.</para>
 
       <para>There are also knobs you can turn to control how the
-      <literal>fptools</literal> software is built.  For example, you
-      might want to build GHC optimised (so that it runs fast) or
-      unoptimised (so that you can compile it fast after you've
-      modified it.  Or, you might want to compile it with debugging on
-      (so that extra consistency-checking code gets included) or off.
-      And so on.</para>
+      software is built.  For example, you might want to build GHC
+      optimised (so that it runs fast) or unoptimised (so that you can
+      compile it fast after you've modified it.  Or, you might want to
+      compile it with debugging on (so that extra consistency-checking
+      code gets included) or off.  And so on.</para>
 
       <para>All of this stuff is called the
       <emphasis>configuration</emphasis> of your build.  You set the
@@ -619,7 +560,8 @@ $ make install</screen>
 	      a message like "No rule to make target 'mk/config.h.in'".
             </para>
 
-	    <para>Some projects, including GHC, have their own configure script.
+	    <para>Some parts of the source tree, particularly
+            libraries, have their own configure script.
             <command>autoreconf</command> takes care of that, too, so all you have
              to do is calling <command>autoreconf</command> in the top-level directory
             <filename>&dollar;(FPTOOLS&lowbar;TOP)</filename>.</para>
@@ -712,7 +654,10 @@ $ make install</screen>
 		  <para>Specifies the path to any installed Haskell
 		  compiler.  This compiler will be used for compiling
 		  generic Haskell code.  The default is to use
-		  <literal>ghc</literal>.</para>
+		  <literal>ghc</literal>. (NOTE: I'm not sure it
+		  actually works to specify a compiler other than GHC
+		  here; unless you really know what you're doing I
+		  suggest not using this option at all.)</para>
 		</listitem>
 	      </varlistentry>
 	      
@@ -737,7 +682,7 @@ $ make install</screen>
 	  <term>Step 3: build configuration.</term>
 	  <listitem>
 	    <para>Next, you say how this build of
-            <literal>fptools</literal> is to differ from the standard
+            GHC is to differ from the standard
             defaults by creating a new file
             <filename>mk/build.mk</filename><indexterm><primary>build.mk</primary></indexterm>
             <emphasis>in the build tree</emphasis>.  This file is the
@@ -774,13 +719,14 @@ $ make install</screen>
       includes <filename>build.mk</filename> after
       <filename>config.mk</filename>.)</para>
 
-     <para>For your convenience, there's a file called <filename>build.mk.sample</filename>
-     that can serve as a starting point for your <filename>build.mk</filename>.</para>
+     <para>For your convenience, there's a file called
+     <filename>build.mk.sample</filename> that can serve as a starting
+     point for your <filename>build.mk</filename>.</para>
 
       <para>For example, <filename>config.mk.in</filename> contains
       the definition:</para>
 
-<programlisting>GhcHcOpts=-O -Rghc-timing</programlisting>
+<programlisting>GhcHcOpts=-Rghc-timing</programlisting>
 
       <para>The accompanying comment explains that this is the list of
       flags passed to GHC when building GHC itself.  For doing
@@ -788,20 +734,30 @@ $ make install</screen>
       enable debugging code.  So you would add the following to
       <filename>build.mk</filename>:</para>
       
-      <para>or, if you prefer,</para>
-
 <programlisting>GhcHcOpts += -DDEBUG</programlisting>
 
       <para>GNU <command>make</command> allows existing definitions to
       have new text appended using the &ldquo;<literal>+=</literal>&rdquo;
-      operator, which is quite a convenient feature.)</para>
+      operator, which is quite a convenient feature.</para>
 
-      <para>If you want to remove the <literal>-O</literal> as well (a
-      good idea when developing, because the turn-around cycle gets a
-      lot quicker), you can just override
-      <literal>GhcLibHcOpts</literal> altogether:</para>
+      <para>Haskell compilations by default have <literal>-O</literal>
+      turned on, by virtue of this setting from
+      <filename>config.mk</filename>:</para>
 
-<programlisting>GhcHcOpts=-DDEBUG -Rghc-timing</programlisting>
+<programlisting>SRC_HC_OPTS += -H16m -O</programlisting>
+
+      <para><literal>SRC_HC_OPTS</literal> means "options for HC from
+      the source tree", where HC stands for Haskell Compiler.
+      <literal>SRC_HC_OPTS</literal> are added to every Haskell
+      compilation.  To turn off optimisation, you could add this to
+      <filename>build.mk</filename>:</para>
+
+<programlisting>SRC_HC_OPTS = -H16m -O0</programlisting>
+
+      <para>Or you could just add <literal>-O0</literal> to
+      <literal>GhcHcOpts</literal> to turn off optimisation for the
+      compiler.  See <xref linkend="quick-start" /> for some more
+      suggestions.</para>
 
       <para>When reading <filename>config.mk.in</filename>, remember
       that anything between &ldquo;@...@&rdquo; signs is going to be substituted
@@ -834,7 +790,6 @@ $ make install</screen>
       correct directory is hard to find automatically.  If you find
       that <command>configure</command> has got it wrong, just put the
       correct definition in <filename>build.mk</filename>.</para>
-
     </sect2>
 
     <sect2 id="sec-storysofar">
@@ -847,19 +802,16 @@ $ make install</screen>
 	<listitem>
 	  <para> Get your source tree from somewhere (darcs repository
           or source distribution).  Say you call the root directory
-          <filename>myfptools</filename> (it does not have to be
-          called <filename>fptools</filename>).  Make sure that you
-          have the essential files (see <xref
-          linkend="sec-source-tree"/>).</para>
+          <filename>myghc</filename> (it does not have to be
+          called <filename>ghc</filename>).</para>
 	</listitem>
 
 	<listitem>
-
 	  <para>(Optional) Use <command>lndir</command> or
 	  <command>mkshadowdir</command> to create a build tree.</para>
 
-<screen>$ cd myfptools
-$ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
+<screen>$ cd myghc
+$ mkshadowdir . /scratch/joe-bloggs/myghc-x86</screen>
 
 	  <para>(N.B. <command>mkshadowdir</command>'s first argument
           is taken relative to its second.) You probably want to give
@@ -872,7 +824,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
 	  <para>Change directory to the build tree.  Everything is
           going to happen there now.</para>
 
-<screen>$ cd /scratch/joe-bloggs/myfptools-sun4</screen>
+<screen>$ cd /scratch/joe-bloggs/myghc-x86</screen>
 
 	</listitem>
 
@@ -902,8 +854,6 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
 	  <para>Create the file <filename>mk/build.mk</filename>,
           adding definitions for your desired configuration
           options.</para>
-
-<screen>$ emacs mk/build.mk</screen>
 	</listitem>
       </orderedlist>
 
@@ -911,10 +861,9 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
       <filename>mk/build.mk</filename> as often as you like.  You do
       not have to run any further configuration programs to make these
       changes take effect. In theory you should, however, say
-      <command>gmake clean</command>, <command>gmake all</command>,
-      because configuration option changes could affect
-      anything&mdash;but in practice you are likely to know what's
-      affected.</para>
+      <command>make clean; make</command>, because configuration
+      option changes could affect anything&mdash;but in practice you
+      are likely to know what's affected.</para>
     </sect2>
 
     <sect2>
@@ -925,18 +874,23 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
       things.</para>
 
       <para>The first thing you need to know is that <emphasis>you
-      must use GNU <command>make</command>, usually called
-      <command>gmake</command>, not standard Unix
-      <command>make</command></emphasis>.  If you use standard Unix
-      <command>make</command> you will get all sorts of error messages
-      (but no damage) because the <literal>fptools</literal>
+      must use GNU <command>make</command></emphasis>.  On some
+      systems this is called <command>gmake</command>, whereas on
+      others it is the standard <command>make</command> command.  In
+      this document we will always refer to it as
+      <command>make</command>; please substitute with
+      <command>gmake</command> if your system requires it.  If you use
+      a the wrong <command>make</command> you will get all sorts of
+      error messages (but no damage) because the GHC
       <command>Makefiles</command> use GNU <command>make</command>'s
       facilities extensively.</para>
 
       <para>To just build the whole thing, <command>cd</command> to
-      the top of your <literal>fptools</literal> tree and type
-      <command>gmake</command>.  This will prepare the tree and build
-      the various projects in the correct order.</para>
+      the top of your build tree and type <command>make</command>.
+      This will prepare the tree and build the various parts in the
+      correct order, resulting in a complete build of GHC that can
+      even be used directly from the tree, without being installed
+      first.</para>
     </sect2>
 
     <sect2 id="sec-bootstrapping">
@@ -953,13 +907,12 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
       <para>Note that when doing a bootstrap, the stage 1 compiler
       must be built, followed by the runtime system and libraries, and
       then the stage 2 compiler.  The correct ordering is implemented
-      by the top-level fptools <filename>Makefile</filename>, so if
-      you want everything to work automatically it's best to start
-      <command>make</command> from the top of the tree.  When building
-      GHC, the top-level fptools <filename>Makefile</filename> is set
-      up to do a 2-stage bootstrap by default (when you say
-      <command>make</command>).  Some other targets it supports
-      are:</para>
+      by the top-level <filename>Makefile</filename>, so if you want
+      everything to work automatically it's best to start
+      <command>make</command> from the top of the tree.  The top-level
+      <filename>Makefile</filename> is set up to do a 2-stage
+      bootstrap by default (when you say <command>make</command>).
+      Some other targets it supports are:</para>
 
       <variablelist>
 	<varlistentry>
@@ -1015,14 +968,14 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
 
       <para>The <literal>stage1</literal>, <literal>stage2</literal>
       and <literal>stage3</literal> targets also work in the
-      <literal>ghc/compiler</literal> directory, but don't forget that
+      <literal>compiler</literal> directory, but don't forget that
       each stage requires its own <literal>make boot</literal> step:
       for example, you must do</para>
 
       <screen>$ make boot stage=2</screen>
 
       <para>before <literal>make stage2</literal> in
-      <literal>ghc/compiler</literal>.</para>
+      <literal>compiler</literal>.</para>
     </sect2>
 
     <sect2 id="sec-standard-targets">
@@ -1037,7 +990,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
 	  <term><literal>boot</literal></term>
 	  <listitem>
 	    <para>does the one-off preparation required to get ready
-            for the real work.  Notably, it does <command>gmake
+            for the real work.  Notably, it does <command>make
             depend</command> in all directories that contain programs.
             It also builds the necessary tools for compilation to
             proceed.</para>
@@ -1045,14 +998,14 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
 	    <para>Invoking the <literal>boot</literal> target
             explicitly is not normally necessary.  From the top-level
             <literal>fptools</literal> directory, invoking
-            <literal>gmake</literal> causes <literal>gmake boot
+            <literal>make</literal> causes <literal>make boot
             all</literal> to be invoked in each of the project
             subdirectories, in the order specified by
             <literal>&dollar;(AllTargets)</literal> in
             <literal>config.mk</literal>.</para>
 
 	    <para>If you're working in a subdirectory somewhere and
-            need to update the dependencies, <literal>gmake
+            need to update the dependencies, <literal>make
             boot</literal> is a good way to do it.</para>
 	  </listitem>
 	</varlistentry>
@@ -1064,8 +1017,8 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
             Depending on which directory you are in a &ldquo;final
             target&rdquo; may be an executable program, a library
             archive, a shell script, or a Postscript file.  Typing
-            <command>gmake</command> alone is generally the same as
-            typing <command>gmake all</command>.</para>
+            <command>make</command> alone is generally the same as
+            typing <command>make all</command>.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1106,7 +1059,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
 	    <para>Delete all files from the current directory that are
             normally created by building the program.  Don't delete
             the files that record the configuration, or files
-            generated by <command>gmake boot</command>.  Also preserve
+            generated by <command>make boot</command>.  Also preserve
             files that could be made by building, but normally aren't
             because the distribution comes with them.</para>
 	  </listitem>
@@ -1229,11 +1182,11 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
       <para>If you want to build GHC (say) and just use it direct from
       the build tree without doing <literal>make install</literal>
       first, you can run the in-place driver script:
-      <filename>ghc/compiler/ghc-inplace</filename>.</para>
+      <filename>compiler/ghc-inplace</filename>.</para>
 
       <para> Do <emphasis>NOT</emphasis> use
-      <filename>ghc/compiler/ghc</filename>, or
-      <filename>ghc/compiler/ghc-6.xx</filename>, as these are the
+      <filename>compiler/ghc</filename>, or
+      <filename>compiler/ghc-6.xx</filename>, as these are the
       scripts intended for installation, and contain hard-wired paths
       to the installed libraries, rather than the libraries in the
       build tree.</para>
@@ -1256,7 +1209,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
       <command>make</command> is going to rebuild everything anyway,
       the following hack may be useful:</para>
 
-<screen>$ gmake FAST=YES</screen>
+<screen>$ make FAST=YES</screen>
 
       <para>This tells the make system to ignore dependencies and just
       build what you tell it to.  In other words, it's equivalent to
@@ -1278,7 +1231,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</screen>
     <indexterm><primary>makefile architecture</primary></indexterm>
 
     <para><command>make</command> is great if everything
-    works&mdash;you type <command>gmake install</command> and lo! the
+    works&mdash;you type <command>make install</command> and lo! the
     right things get compiled and installed in the right places.  Our
     goal is to make this happen often, but somehow it often doesn't;
     instead some weird error message eventually emerges from the
@@ -1376,7 +1329,7 @@ directive.
           <literal>include</literal> other files.  (Unfortunately,
           when an <literal>include</literal>d file does an
           <literal>include</literal>, the filename is treated relative
-          to the directory in which <command>gmake</command> is being
+          to the directory in which <command>make</command> is being
           run, not the directory in which the
           <literal>include</literal>d sits.)  In general,
           <emphasis>every file <filename>foo.mk</filename> assumes
@@ -1425,7 +1378,7 @@ directive.
 	  <para>The last section includes a second file of standard
           code, called
           <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm>.
-          It contains the rules that tell <command>gmake</command> how
+          It contains the rules that tell <command>make</command> how
           to make the standard targets (<xref
           linkend="sec-standard-targets"/>).  Why, you ask, can't this
           standard code be part of
@@ -1447,12 +1400,12 @@ directive.
 
       <para>In our example <filename>Makefile</filename>, most of the
       work is done by the two <literal>include</literal>d files.  When
-      you say <command>gmake all</command>, the following things
+      you say <command>make all</command>, the following things
       happen:</para>
 
       <itemizedlist>
 	<listitem>
-	  <para><command>gmake</command> figures out that the object
+	  <para><command>make</command> figures out that the object
           files are <filename>Foo.o</filename> and
           <filename>Baz.o</filename>.</para>
 	</listitem>
@@ -1476,7 +1429,7 @@ directive.
           compiler to do the link step.  (Why not use
           <command>ld</command>?  Because the Haskell compiler knows
           what standard libraries to link in.  How did
-          <command>gmake</command> know to use the Haskell compiler to
+          <command>make</command> know to use the Haskell compiler to
           do the link, rather than the C compiler?  Because we set the
           variable <constant>HS&lowbar;PROG</constant> rather than
           <constant>C&lowbar;PROG</constant>.)</para>
@@ -1521,7 +1474,7 @@ directive.
       <filename>Makefile</filename> in
       <filename>&dollar;(FPTOOLS&lowbar;TOP)/ghc</filename>.
       It does most of its work by recursively invoking
-      <command>gmake</command> on the <filename>Makefile</filename>s
+      <command>make</command> on the <filename>Makefile</filename>s
       in the sub-directories.  We say that
       <filename>ghc/Makefile</filename> is a <emphasis>non-leaf
       <filename>Makefile</filename></emphasis>, because it does little
@@ -1603,7 +1556,7 @@ directive.
 
 	    <listitem>
 	      <para><emphasis>Standard pattern rules</emphasis> that
-              tell <command>gmake</command> how to construct one file
+              tell <command>make</command> how to construct one file
               from another.</para>
 	    </listitem>
 	  </itemizedlist>
@@ -1613,7 +1566,7 @@ directive.
           of each <filename>Makefile</filename>, so that the user can
           replace the boilerplate definitions or pattern rules by
           simply giving a new definition or pattern rule in the
-          <filename>Makefile</filename>.  <command>gmake</command>
+          <filename>Makefile</filename>.  <command>make</command>
           simply takes the last definition as the definitive one.</para>
 
 	  <para>Instead of <emphasis>replacing</emphasis> boilerplate
@@ -1646,7 +1599,7 @@ directive.
 	  <itemizedlist>
 	    <listitem>
 
-	      <para><command>gmake</command> commits target and
+	      <para><command>make</command> commits target and
               dependency lists earlier than it should.  For example,
               <filename>target.mk</filename> has a rule that looks
               like this:</para>
@@ -1660,8 +1613,8 @@ directive.
               and
               <constant>&dollar;(OBJS)</constant><indexterm><primary>OBJS</primary></indexterm>
               would not have their final values at the moment
-              <command>gmake</command> encountered the rule.  Alas,
-              <command>gmake</command> takes a snapshot of their
+              <command>make</command> encountered the rule.  Alas,
+              <command>make</command> takes a snapshot of their
               current values, and wires that snapshot into the rule.
               (In contrast, the commands executed when the rule
               &ldquo;fires&rdquo; are only substituted at the moment
@@ -2083,7 +2036,7 @@ directive.
 	    <para>extra options to pass to all C compilations.  This
             is intended for command line use, thus:</para>
 
-<screen>$ gmake libHS.a EXTRA_CC_OPTS="-v"</screen>
+<screen>$ make libHS.a EXTRA_CC_OPTS="-v"</screen>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -2198,7 +2151,7 @@ directive.
       dependencies say to do so.  This means that you can, for
       example, define both <constant>HS&lowbar;PROG</constant> and
       <constant>LIBRARY</constant>, which will generate two rules for
-      <literal>install</literal>.  When you type <command>gmake
+      <literal>install</literal>.  When you type <command>make
       install</command> both rules will be fired, and both the program
       and the library will be installed, just as you wanted.</para>
     </sect2>
@@ -2228,7 +2181,7 @@ directive.
       <para><emphasis>These recursive invocations are guaranteed to
       occur in the order in which the list of directories is specified
       in <constant>SUBDIRS</constant>. </emphasis>This guarantee can
-      be important.  For example, when you say <command>gmake
+      be important.  For example, when you say <command>make
       boot</command> it can be important that the recursive invocation
       of <command>make boot</command> is done in one sub-directory
       (the include files, say) before another (the source files).
@@ -2274,11 +2227,11 @@ directive.
       <para>A <command>make</command> variable called
       <constant>way</constant> holds the current way tag.
       <emphasis><constant>way</constant> is only ever set on the
-      command line of <command>gmake</command></emphasis> (usually in
-      a recursive invocation of <command>gmake</command> by the
+      command line of <command>make</command></emphasis> (usually in
+      a recursive invocation of <command>make</command> by the
       system).  It is never set inside a
       <filename>Makefile</filename>.  So it is a global constant for
-      any one invocation of <command>gmake</command>.  Two other
+      any one invocation of <command>make</command>.  Two other
       <command>make</command> variables,
       <constant>way&lowbar;</constant> and
       <constant>&lowbar;way</constant> are immediately derived from
@@ -2323,9 +2276,9 @@ directive.
           <filename>Foo.mp&lowbar;o</filename>) there is a rule which
           recursively invokes <command>make</command> to make the
           specified target, setting the <constant>way</constant>
-          variable.  So if you say <command>gmake
+          variable.  So if you say <command>make
           Foo.mp&lowbar;o</command> you should see a recursive
-          invocation <command>gmake Foo.mp&lowbar;o way=mp</command>,
+          invocation <command>make Foo.mp&lowbar;o way=mp</command>,
           and <emphasis>in this recursive invocation the pattern rule
           for compiling a Haskell file into a <filename>.o</filename>
           file will match</emphasis>.  The key pattern rules (in
@@ -3168,7 +3121,7 @@ above.
 </itemizedlist>
 
 
-and try again: <command>gmake</command>.  (see <xref linkend="sec-suffix"/> for information about
+and try again: <command>make</command>.  (see <xref linkend="sec-suffix"/> for information about
 <constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</constant>.)
 
 Alternatively, just cut to the chase:
