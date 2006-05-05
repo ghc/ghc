@@ -32,14 +32,14 @@ import TcMType		( lookupTcTyVar, LookupTyVarResult(..),
                           tcInstSkolType, newKindVar, newMetaTyVar,
 			  tcInstBoxy, newBoxyTyVar, newBoxyTyVarTys, readFilledBox, 
 			  readMetaTyVar, writeMetaTyVar, newFlexiTyVarTy,
-			  tcInstSkolTyVars, 
+			  tcInstSkolTyVars, tcInstTyVar,
 			  zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
 			  readKindVar, writeKindVar )
 import TcSimplify	( tcSimplifyCheck )
 import TcEnv		( tcGetGlobalTyVars, findGlobals )
 import TcIface		( checkWiredInTyCon )
 import TcRnMonad         -- TcType, amongst others
-import TcType		( TcKind, TcType, TcTyVar, TcTauType,
+import TcType		( TcKind, TcType, TcTyVar, BoxyTyVar, TcTauType,
 			  BoxySigmaType, BoxyRhoType, BoxyType, 
 			  TcTyVarSet, TcThetaType, TcTyVarDetails(..), BoxInfo(..), 
 			  SkolemInfo( GenSkol, UnkSkol ), MetaDetails(..), isImmutableTyVar,
@@ -1079,13 +1079,18 @@ uUnfilledVars outer swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2)
     update_tv1 = updateMeta tv1 ref1 (mkTyVarTy tv2)
     update_tv2 = updateMeta tv2 ref2 (mkTyVarTy tv1)
 
-    box_meets_box | k1_sub_k2 = fill_with k1
-		  | k2_sub_k1 = fill_with k2
+    box_meets_box | k1_sub_k2 = if k2_sub_k1 && nicer_to_update_tv1
+				then fill_from tv2
+				else fill_from tv1
+		  | k2_sub_k1 = fill_from tv2
 		  | otherwise = kind_err
 
-    fill_with kind = do { tau_ty <- newFlexiTyVarTy kind
-		        ; updateMeta tv1 ref1 tau_ty
-		        ; updateMeta tv2 ref2 tau_ty }
+	-- Update *both* tyvars with a TauTv whose name and kind
+	-- are gotten from tv (avoid losing nice names is poss)
+    fill_from tv = do { tv' <- tcInstTyVar tv
+		      ; let tau_ty = mkTyVarTy tv'
+		      ; updateMeta tv1 ref1 tau_ty
+		      ; updateMeta tv2 ref2 tau_ty }
 
     kind_err = addErrCtxtM (unifyKindCtxt swapped tv1 (mkTyVarTy tv2))	$
 	       unifyKindMisMatch k1 k2
@@ -1181,9 +1186,7 @@ checkTauTvUpdate orig_tv orig_ty
 	     ; case cts of
 		  Indirect ty -> go ty 
 		  Flexi -> case box of
-				BoxTv -> do { tau <- newFlexiTyVarTy (tyVarKind tv)
-				   	    ; writeMutVar ref (Indirect tau)
-					    ; return tau }
+				BoxTv -> fillBoxWithTau tv ref
 				other -> return (TyVarTy tv)
 	     }
 
@@ -1201,6 +1204,19 @@ checkTauTvUpdate orig_tv orig_ty
 					(tcView (TyConApp tc tys)))
 				-- Try again, expanding the synonym
 	     }
+
+fillBoxWithTau :: BoxyTyVar -> IORef MetaDetails -> TcM TcType
+-- (fillBoxWithTau tv ref) fills ref with a freshly allocated 
+--  tau-type meta-variable, whose print-name is the same as tv
+-- Choosing the same name is good: when we instantiate a function
+-- we allocate boxy tyvars with the same print-name as the quantified
+-- tyvar; and then we often fill the box with a tau-tyvar, and again
+-- we want to choose the same name.
+fillBoxWithTau tv ref 
+  = do	{ tv' <- tcInstTyVar tv		-- Do not gratuitously forget
+	; let tau = mkTyVarTy tv'	-- name of the type variable
+	; writeMutVar ref (Indirect tau)
+	; return tau }
 \end{code}
 
 Note [Type synonyms and the occur check]
@@ -1271,13 +1287,11 @@ unBox (TyVarTy tv)
   , MetaTv BoxTv ref <- tcTyVarDetails tv	-- NB: non-TcTyVars are possible
   = do	{ cts <- readMutVar ref			--     under nested quantifiers
 	; case cts of
+	    Flexi	-> fillBoxWithTau tv ref
 	    Indirect ty -> do { non_boxy_ty <- unBox ty
 			      ; if isTauTy non_boxy_ty 
 				then return non_boxy_ty
 				else notMonoType non_boxy_ty }
-	    Flexi -> do { tau <- newFlexiTyVarTy (tyVarKind tv)
-			; writeMutVar ref (Indirect tau)
-			; return tau }
 	}
   | otherwise 	-- Skolems, and meta-tau-variables
   = return (TyVarTy tv)
