@@ -261,36 +261,36 @@ exposed-modules:
 #ifdef INSTALLING
 import-dirs:	PKG_LIBDIR"/hslibs-imports/ghc"
 #else
-import-dirs:   FPTOOLS_TOP_ABS"/ghc/compiler/stage2/utils",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/basicTypes",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/types",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/hsSyn",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/prelude",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/rename",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/typecheck",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/deSugar",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/ghci",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/coreSyn",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/specialise",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/simplCore",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/stranal",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/stgSyn",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/simplStg",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/codeGen",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/main",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/profiling",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/parser",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/cprAnalysis",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/ndpFlatten",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/iface",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/cmm",
-	       FPTOOLS_TOP_ABS"/ghc/compiler/stage2/nativeGen"
+import-dirs:   FPTOOLS_TOP_ABS"/compiler/stage2/utils",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/basicTypes",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/types",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/hsSyn",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/prelude",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/rename",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/typecheck",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/deSugar",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/ghci",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/coreSyn",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/specialise",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/simplCore",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/stranal",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/stgSyn",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/simplStg",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/codeGen",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/main",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/profiling",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/parser",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/cprAnalysis",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/ndpFlatten",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/iface",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/cmm",
+	       FPTOOLS_TOP_ABS"/compiler/stage2/nativeGen"
 #endif
 
 #ifdef INSTALLING
 library-dirs:		LIB_DIR
 #else
-library-dirs:		FPTOOLS_TOP_ABS"/ghc/compiler"
+library-dirs:		FPTOOLS_TOP_ABS"/compiler"
 #endif
 
 hs-libraries: 		"HSghc"
