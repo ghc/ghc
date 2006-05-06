@@ -827,6 +827,13 @@ lines ps
     where search = elemIndex '\n'
 {-# INLINE lines #-}
 
+{-# RULES
+
+"length.lines/count" 
+    P.length . lines = count '\n'
+
+  #-}
+
 {-
 -- Just as fast, but more complex. Should be much faster, I thought.
 lines :: ByteString -> [ByteString]
@@ -1025,6 +1032,7 @@ inlinePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
 inlinePerformIO = unsafePerformIO
 #endif
 
+-- Selects white-space characters in the Latin-1 range
 -- ordered by frequency
 -- Idea from Ketil
 isSpaceWord8 :: Word8 -> Bool
@@ -1035,6 +1043,7 @@ isSpaceWord8 w = case w of
     0x0C -> True -- FF, \f
     0x0D -> True -- CR, \r
     0x0B -> True -- VT, \v
+    0xA0 -> True -- spotted by QC..
     _    -> False
 {-# INLINE isSpaceWord8 #-}
 

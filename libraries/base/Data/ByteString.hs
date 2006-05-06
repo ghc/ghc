@@ -395,10 +395,28 @@ empty = inlinePerformIO $ mallocByteString 1 >>= \fp -> return $ PS fp 0 0
 
 -- | /O(1)/ Convert a 'Word8' into a 'ByteString'
 packByte :: Word8 -> ByteString
-packByte c = inlinePerformIO $ mallocByteString 2 >>= \fp -> do
+packByte c = unsafePerformIO $ mallocByteString 2 >>= \fp -> do
     withForeignPtr fp $ \p -> poke p c
     return $ PS fp 0 1
-{-# NOINLINE packByte #-}
+{-# INLINE packByte #-}
+
+--
+-- XXX must use unsafePerformIO, not inlinePerformIO here, otherwise ghc
+-- 6.5 compiles:
+--
+--  packByte 255 `compare` packByte 127
+--
+-- into
+--
+--  case mallocByteString 2 of 
+--      ForeignPtr f internals -> 
+--           case writeWord8OffAddr# f 0 255 of _ -> 
+--           case writeWord8OffAddr# f 0 127 of _ ->
+--           case eqAddr# f f of 
+--                  False -> case compare (GHC.Prim.plusAddr# f 0) 
+--                                        (GHC.Prim.plusAddr# f 0)
+--
+--
 
 -- | /O(n)/ Convert a '[Word8]' into a 'ByteString'. 
 --
@@ -561,22 +579,6 @@ append xs ys | null xs   = ys
              | otherwise = concat [xs,ys]
 {-# INLINE append #-}
 
-{-
---
--- About 30% faster, but allocating in a big chunk isn't good for memory use
---
-append :: ByteString -> ByteString -> ByteString
-append xs@(PS ffp s l) ys@(PS fgp t m)
-    | null xs   = ys
-    | null ys   = xs
-    | otherwise = create len $ \ptr ->
-        withForeignPtr ffp $ \fp ->
-        withForeignPtr fgp $ \gp -> do
-            memcpy ptr               (fp `plusPtr` s) l
-            memcpy (ptr `plusPtr` l) (gp `plusPtr` t) m
-        where len = length xs + length ys
--}
-
 -- ---------------------------------------------------------------------
 -- Transformations
 
@@ -694,26 +696,13 @@ foldr1 f ps
 concat :: [ByteString] -> ByteString
 concat []     = empty
 concat [ps]   = ps
-concat xs     = inlinePerformIO $ do
-    let start_size = 1024
-    p <- mallocArray start_size
-    f p 0 1024 xs
-
-    where f ptr len _ [] = do
-                ptr' <- reallocArray ptr (len+1)
-                poke (ptr' `plusPtr` len) (0::Word8)    -- XXX so CStrings work
-                fp   <- newForeignFreePtr ptr'
-                return $ PS fp 0 len
-
-          f ptr len to_go pss@(PS p s l:pss')
-           | l <= to_go = do withForeignPtr p $ \pf ->
-                                 memcpy (ptr `plusPtr` len)
-                                          (pf `plusPtr` s) l
-                             f ptr (len + l) (to_go - l) pss'
-
-           | otherwise = do let new_total = ((len + to_go) * 2) `max` (len + l)
-                            ptr' <- reallocArray ptr new_total
-                            f ptr' len (new_total - len) pss
+concat xs     = create len $ \ptr -> go xs ptr
+  where len = P.sum . P.map length $ xs
+        STRICT2(go)
+        go []            _   = return ()
+        go (PS p s l:ps) ptr = do
+                withForeignPtr p $ \fp -> memcpy ptr (fp `plusPtr` s) l
+                go ps (ptr `plusPtr` l)
 
 -- | Map a function over a 'ByteString' and concatenate the results
 concatMap :: (Word8 -> ByteString) -> ByteString -> ByteString
@@ -2178,13 +2167,19 @@ loopU :: (acc -> Word8 -> (acc, Maybe Word8))  -- ^ mapping & folding, once per 
       -> ByteString                            -- ^ input ByteString
       -> (ByteString, acc)
 
-loopU f start (PS fp s i) = inlinePerformIO $ withForeignPtr fp $ \a -> do
-    p <- mallocArray (i+1)
-    (acc, i') <- go (a `plusPtr` s) p start
-    p' <- if i == i' then return p else reallocArray p (i'+1) -- avoid realloc for maps
-    poke (p' `plusPtr` i') (0::Word8)
-    fp' <- newForeignFreePtr p'
-    return (PS fp' 0 i', acc)
+loopU f start (PS z s i) = inlinePerformIO $ withForeignPtr z $ \a -> do
+    fp          <- mallocByteString i
+    (ptr,n,acc) <- withForeignPtr fp $ \p -> do
+        (acc, i') <- go (a `plusPtr` s) p start
+        if i' == i
+            then return (fp,i,acc)                      -- no realloc for map
+            else do fp_ <- mallocByteString (i'+1)      -- realloc
+                    withForeignPtr fp_ $ \p' -> do
+                        memcpy p' p i'
+                        poke (p' `plusPtr` i') (0::Word8)
+                    return (fp_,i',acc)
+
+    return (PS ptr 0 n, acc)
   where
     go p ma = trans 0 0
         where
@@ -2217,9 +2212,8 @@ loopU f start (PS fp s i) = inlinePerformIO $ withForeignPtr fp $ \a -> do
 "loopArr/loopSndAcc" forall x.
   loopArr (loopSndAcc x) = loopArr x
 
--- orphan?
--- "seq/NoAL" forall (u::NoAL) e.
---   u `seq` e = e
+"seq/NoAL" forall (u::NoAL) e.
+  u `seq` e = e
 
  #-}
 
