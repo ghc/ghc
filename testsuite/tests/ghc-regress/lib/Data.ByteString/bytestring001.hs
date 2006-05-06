@@ -20,9 +20,11 @@ import Data.ByteString.Char8 (ByteString, pack , unpack)
 import qualified Data.ByteString.Char8 as P
 
 instance Arbitrary Char where
-  arbitrary = oneof $ map return
-                (['a'..'z']++['A'..'Z']++['1'..'9']++['\n','\t','0','~','.',',','-','/'])
+  arbitrary = choose ('\0', '\255') -- since we have to test words, unlines too
   coarbitrary c = variant (ord c `rem` 16)
+
+--  arbitrary = oneof $ map return
+--                (['a'..'z']++['A'..'Z']++['1'..'9']++['\n','\t','0','~','.',',','-','/'])
 
 instance Arbitrary Word8 where
   arbitrary = choose (minBound, maxBound)
@@ -71,7 +73,11 @@ prop_unsafeIndex xs =
 
 prop_mapS f xs = P.map f (P.pack xs) == P.pack (map f xs)
 
+prop_mapfusion f g xs = P.map f (P.map g xs) == P.map (f . g) xs
+
 prop_filter f xs = P.filter f (P.pack xs) == P.pack (filter f xs)
+
+prop_filterfusion f g xs = P.filter f (P.filter g xs) == P.filter (\c -> f c && g c) xs
 
 prop_reverseS xs = P.reverse (P.pack xs) == P.pack (reverse xs)
 
@@ -109,7 +115,8 @@ prop_linesS xs = P.lines (P.pack xs) == map P.pack (lines xs)
 
 prop_unlinesS xss = P.unlines (map P.pack xss) == P.pack (unlines xss)
 
-prop_wordsS xs = P.words (P.pack xs) == map P.pack (words xs)
+prop_wordsS xs =
+    P.words (P.pack xs) == map P.pack (words xs)
 
 prop_unwordsS xss = P.unwords (map P.pack xss) == P.pack (unwords xss)
 
@@ -133,17 +140,24 @@ prop_splitsplitWith c xs = P.split c xs == P.splitWith (== c) xs
 prop_bijection  c = (P.w2c . P.c2w) c == id c
 prop_bijection' w = (P.c2w . P.w2c) w == id w
 
+prop_packunpack  s = (P.unpack . P.pack) s == id s
+prop_packunpack' s = (P.pack . P.unpack) s == id s
+
 ------------------------------------------------------------------------
 -- at first we just check the correspondence to List functions
 
 prop_eq1 xs      = xs            == (unpack . pack $ xs)
 
 prop_compare1 xs  = (pack xs         `compare` pack xs) == EQ
-prop_compare2 xs  = (pack (xs++"X")  `compare` pack xs) == GT
-prop_compare3 xs  = (pack xs  `compare` pack (xs++"X")) == LT
+prop_compare2 xs c = (pack (xs++[c]) `compare` pack xs) == GT
+prop_compare3 xs c = (pack xs `compare` pack (xs++[c])) == LT
+
 prop_compare4 xs  = (not (null xs)) ==> (pack xs  `compare` P.empty) == GT
 prop_compare5 xs  = (not (null xs)) ==> (P.empty `compare` pack xs) == LT
 prop_compare6 xs ys= (not (null ys)) ==> (pack (xs++ys)  `compare` pack xs) == GT
+
+prop_compare7 x  y = x `compare` y == (P.packChar x `compare` P.packChar y)
+prop_compare8 xs ys = xs `compare` ys == (P.pack xs `compare` P.pack ys)
 
 -- prop_nil1 xs = (null xs) ==> pack xs == P.empty
 -- prop_nil2 xs = (null xs) ==> xs == unpack P.empty
@@ -166,7 +180,11 @@ prop_init xs     =
 
 -- prop_null xs = (null xs) ==> null xs == (nullPS (pack xs))
 
-prop_length xs = length xs == P.length (pack xs)
+prop_length xs = P.length xs == length1 xs
+    where
+        length1 ys
+            | P.null ys = 0
+            | otherwise = 1 + length1 (P.tail ys)
 
 prop_append1 xs = (xs ++ xs) == (unpack $ pack xs `P.append` pack xs)
 prop_append2 xs ys = (xs ++ ys) == (unpack $ pack xs `P.append` pack ys)
@@ -178,13 +196,13 @@ prop_filter2 xs c = (filter (==c) xs) == (unpack $ P.filter (==c) (pack xs))
 
 prop_find xs c = find (==c) xs == P.find (==c) (pack xs)
 
-prop_foldl1 xs = ((foldl (\x c -> if c == 'a' then x else c:x) [] xs)) ==
-                (unpack $ P.foldl (\x c -> if c == 'a' then x else c `P.cons` x) P.empty (pack xs))
+prop_foldl1 xs a = ((foldl (\x c -> if c == a then x else c:x) [] xs)) ==
+                   (unpack $ P.foldl (\x c -> if c == a then x else c `P.cons` x) P.empty (pack xs))
 
 prop_foldl2 xs = P.foldl (\xs c -> c `P.cons` xs) P.empty (pack xs) == P.reverse (pack xs)
 
-prop_foldr1 xs = ((foldr (\c x -> if c == 'a' then x else c:x) [] xs)) ==
-                (unpack $ P.foldr (\c x -> if c == 'a' then x else c `P.cons` x)
+prop_foldr1 xs a = ((foldr (\c x -> if c == a then x else c:x) [] xs)) ==
+                (unpack $ P.foldr (\c x -> if c == a then x else c `P.cons` x)
                     P.empty (pack xs))
 
 prop_foldr2 xs = P.foldr (\c xs -> c `P.cons` xs) P.empty (pack xs) == (pack xs)
@@ -215,9 +233,9 @@ prop_foldr1_3 xs =
     (not . P.null) xs ==>
     P.foldr1 const xs == P.head xs
 
-prop_takeWhile xs = (takeWhile (/= 'X') xs) == (unpack . (P.takeWhile (/= 'X')) . pack) xs
+prop_takeWhile xs a = (takeWhile (/= a) xs) == (unpack . (P.takeWhile (/= a)) . pack) xs
 
-prop_dropWhile xs = (dropWhile (/= 'X') xs) == (unpack . (P.dropWhile (/= 'X')) . pack) xs
+prop_dropWhile xs a = (dropWhile (/= a) xs) == (unpack . (P.dropWhile (/= a)) . pack) xs
 
 prop_take xs = (take 10 xs) == (unpack . (P.take 10) . pack) xs
 
@@ -227,15 +245,15 @@ prop_splitAt i xs = collect (i >= 0 && i < length xs) $
     splitAt i xs ==
     let (x,y) = P.splitAt i (pack xs) in (unpack x, unpack y)
 
-prop_span xs = (span (/='X') xs) == (let (x,y) = P.span (/='X') (pack xs)
+prop_span xs a = (span (/=a) xs) == (let (x,y) = P.span (/=a) (pack xs)
                                      in (unpack x, unpack y))
 
-prop_break xs = (break (/='X') xs) == (let (x,y) = P.break (/='X') (pack xs)
+prop_break xs a = (break (/=a) xs) == (let (x,y) = P.break (/=a) (pack xs)
                                        in (unpack x, unpack y))
 
 prop_reverse xs = (reverse xs) == (unpack . P.reverse . pack) xs
 
-prop_elem xs = ('X' `elem` xs) == ('X' `P.elem` (pack xs))
+prop_elem xs a = (a `elem` xs) == (a `P.elem` (pack xs))
 
 prop_notElem c xs = P.notElem c (P.pack xs) == notElem c xs
 
@@ -244,25 +262,27 @@ prop_concat1 xs = (concat [xs,xs]) == (unpack $ P.concat [pack xs, pack xs])
 
 prop_concat2 xs = (concat [xs,[]]) == (unpack $ P.concat [pack xs, pack []])
 
-prop_any xs = (any (== 'X') xs) == (P.any (== 'X') (pack xs))
-prop_all xs = (all (== 'X') xs) == (P.all (== 'X') (pack xs))
+prop_any xs a = (any (== a) xs) == (P.any (== a) (pack xs))
+prop_all xs a = (all (== a) xs) == (P.all (== a) (pack xs))
 
 prop_lines xs = (lines xs) == ((map unpack) . P.lines . pack) xs
 
 prop_unlines xs = (unlines.lines) xs == (unpack. P.unlines . P.lines .pack) xs
 
-prop_words xs = (words xs) == ((map unpack) . P.words . pack) xs
+prop_words xs =
+    (words xs) == ((map unpack) . P.words . pack) xs
 prop_wordstokens xs = P.words xs == P.tokens isSpace xs
 
-prop_unwords xs = (pack.unwords.words) xs == (P.unwords . P.words .pack) xs
+prop_unwords xs =
+    (pack.unwords.words) xs == (P.unwords . P.words .pack) xs
 
 prop_group xs   = group xs == (map unpack . P.group . pack) xs
 
 prop_groupBy xs = groupBy (==) xs == (map unpack . P.groupBy (==) . pack) xs
 prop_groupBy1 xs = groupBy (/=) xs == (map unpack . P.groupBy (/=) . pack) xs
 
-prop_join xs = (concat . (intersperse "XYX") . lines) xs ==
-               (unpack $ P.join (pack "XYX") (P.lines (pack xs)))
+prop_join xs ys = (concat . (intersperse ys) . lines) xs ==
+               (unpack $ P.join (pack ys) (P.lines (pack xs)))
 
 prop_elemIndex1 xs   = (elemIndex 'X' xs) == (P.elemIndex 'X' (pack xs))
 prop_elemIndex2 xs c = (elemIndex c xs) == (P.elemIndex c (pack xs))
@@ -281,7 +301,7 @@ prop_elemIndexLast2 c xs = (P.elemIndexLast c (pack xs)) ==
 
 prop_elemIndices xs c = elemIndices c xs == P.elemIndices c (pack xs)
 
-prop_findIndex xs = (findIndex (=='X') xs) == (P.findIndex (=='X') (pack xs))
+prop_findIndex xs a = (findIndex (==a) xs) == (P.findIndex (==a) (pack xs))
 
 prop_findIndicies xs c = (findIndices (==c) xs) == (P.findIndices (==c) (pack xs))
 
@@ -311,8 +331,9 @@ prop_dropSpace xs    = dropWhile isSpace xs == unpack (P.dropSpace (pack xs))
 prop_dropSpaceEnd xs = (P.reverse . (P.dropWhile isSpace) . P.reverse) (pack xs) ==
                        (P.dropSpaceEnd (pack xs))
 
-prop_breakSpace xs = (let (x,y) = P.breakSpace (pack xs)
-                      in (unpack x, unpack y)) == (break isSpace xs)
+prop_breakSpace xs =
+    (let (x,y) = P.breakSpace (pack xs)
+     in (unpack x, unpack y)) == (break isSpace xs)
 
 prop_spanEnd xs =
         (P.spanEnd (not . isSpace) (pack xs)) ==
@@ -339,8 +360,10 @@ prop_breakLast c xs = (let (x,y) = break (==c) (reverse xs)
                                     else Just (pack (reverse $ drop 1 y), pack (reverse x))) ==
                        (P.breakLast c (pack xs))
 
-prop_words' xs = (unpack . P.unwords  . P.words' . pack) xs ==
-                 (map (\c -> if isSpace c then ' ' else c) xs)
+prop_words' xs =
+    (unpack . P.unwords  . P.words' . pack) xs ==
+    (map (\c -> if isSpace c then ' ' else c) xs)
+
 prop_lines' xs = (unpack . P.unlines' . P.lines' . pack) xs == (xs)
 
 prop_unfoldr c =
@@ -388,7 +411,7 @@ prop_filterChar3 c xs = P.filterChar c xs == P.replicate (P.count c xs) c
 prop_filterNotChar1 c xs = (filter (/=c) xs) == ((P.unpack . P.filterNotChar c . P.pack) xs)
 prop_filterNotChar2 c xs = (P.filter (/=c) (P.pack xs)) == (P.filterNotChar c (P.pack xs))
 
-prop_joinjoinpath xs ys = P.joinWithChar ' ' xs ys == P.join (P.packChar ' ') [xs,ys]
+prop_joinjoinpath xs ys c = P.joinWithChar c xs ys == P.join (P.packChar c) [xs,ys]
 
 prop_zip  xs ys = zip xs ys == P.zip (pack xs) (pack ys)
 prop_zip1 xs ys = P.zip xs ys == zip (P.unpack xs) (P.unpack ys)
@@ -406,6 +429,8 @@ main = do
   where
     tests = [    ("bijection",       mytest prop_bijection)
             ,    ("bijection'",       mytest prop_bijection')
+            ,    ("pack/unpack",        mytest prop_packunpack)
+            ,    ("unpack/pack",        mytest prop_packunpack')
             ,    ("eq1",       mytest prop_eq1)
             ,    ("compare1",       mytest prop_compare1)
             ,    ("compare2",       mytest prop_compare2)
@@ -413,6 +438,8 @@ main = do
             ,    ("compare4",       mytest prop_compare4)
             ,    ("compare5",       mytest prop_compare5)
             ,    ("compare6",       mytest prop_compare6)
+            ,    ("compare7",       mytest prop_compare7)
+            ,    ("compare8",       mytest prop_compare8)
             ,    ("cons1",       mytest prop_cons1)
             ,    ("cons2",       mytest prop_cons2)
             ,    ("snoc1",       mytest prop_snoc1)
@@ -427,6 +454,8 @@ main = do
             ,    ("map",       mytest prop_map)
             ,    ("filter1",       mytest prop_filter1)
             ,    ("filter2",       mytest prop_filter2)
+            ,    ("map fusion",       mytest prop_mapfusion)
+            ,    ("filter fusion",       mytest prop_filterfusion)
             ,    ("foldl1",       mytest prop_foldl1)
             ,    ("foldl2",       mytest prop_foldl2)
             ,    ("foldr1",       mytest prop_foldr1)
@@ -490,6 +519,7 @@ main = do
             ,    ("lines'",       mytest prop_lines')
             ,    ("dropSpaceEnd",       mytest prop_dropSpaceEnd)
             ,    ("unfoldr",       mytest prop_unfoldr)
+
             ,    ("prefix",       mytest prop_prefix)
             ,    ("suffix",       mytest prop_suffix)
             ,    ("copy",       mytest prop_copy)
@@ -510,6 +540,7 @@ main = do
             ,    ("nil1",       mytest prop_nil1)
             ,    ("nil2",       mytest prop_nil2)
             ,    ("cons",       mytest prop_cons)
+            ,    ("length",     mytest prop_length)
             ,    ("headS",       mytest prop_headS)
             ,    ("lengthS",       mytest prop_lengthS)
             ,    ("tailS",       mytest prop_tailS)
