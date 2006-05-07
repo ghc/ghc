@@ -254,7 +254,7 @@ import Data.ByteString (ByteString(..)
                        ,unpackList
 #endif
                        ,noAL, NoAL, loopArr, loopAcc, loopSndAcc
-                       ,loopU, mapEFL, filterEFL,
+                       ,loopU, mapEFL, filterEFL
                        ,useAsCString, unsafeUseAsCString
                        )
 
