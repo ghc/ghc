@@ -9,7 +9,7 @@
 --
 -- Array fusion code:
 --               (c) 2001,2002 Manuel M T Chakravarty & Gabriele Keller
---		         (c) 2006      Manuel M T Chakravarty & Roman Leshchinskiy
+--               (c) 2006      Manuel M T Chakravarty & Roman Leshchinskiy
 --
 -- License     : BSD-style
 --
@@ -401,12 +401,13 @@ packByte c = unsafePerformIO $ mallocByteString 2 >>= \fp -> do
 {-# INLINE packByte #-}
 
 --
--- XXX must use unsafePerformIO, not inlinePerformIO here, otherwise ghc
--- 6.5 compiles:
+-- XXX The unsafePerformIO is critical!
+--
+-- Otherwise:
 --
 --  packByte 255 `compare` packByte 127
 --
--- into
+-- is compiled to:
 --
 --  case mallocByteString 2 of 
 --      ForeignPtr f internals -> 
@@ -1238,7 +1239,17 @@ count w (PS x s m) = inlinePerformIO $ withForeignPtr x $ \p ->
 -- returns the index of the first element in the ByteString
 -- satisfying the predicate.
 findIndex :: (Word8 -> Bool) -> ByteString -> Maybe Int
-findIndex = (listToMaybe .) . findIndices
+findIndex k ps@(PS x s l)
+    | null ps   = Nothing
+    | otherwise = inlinePerformIO $ withForeignPtr x $ \f -> go (f `plusPtr` s) 0
+  where
+    STRICT2(go)
+    go ptr n | n >= l    = return Nothing
+             | otherwise = do w <- peek ptr
+                              if k w
+                                then return (Just n)
+                                else go (ptr `plusPtr` 1) (n+1)
+{-# INLINE findIndex #-}
 
 -- | The 'findIndices' function extends 'findIndex', by returning the
 -- indices of all elements satisfying the predicate, in ascending order.
@@ -1246,8 +1257,8 @@ findIndices :: (Word8 -> Bool) -> ByteString -> [Int]
 findIndices p ps = loop 0 ps
    where
      STRICT2(loop)
-     loop _ qs | null qs           = []
-     loop n qs | p (unsafeHead qs) = n : loop (n+1) (unsafeTail qs)
+     loop n qs | null qs           = []
+               | p (unsafeHead qs) = n : loop (n+1) (unsafeTail qs)
                | otherwise         =     loop (n+1) (unsafeTail qs)
 
 -- ---------------------------------------------------------------------
@@ -1262,6 +1273,30 @@ elem c ps = case elemIndex c ps of Nothing -> False ; _ -> True
 notElem :: Word8 -> ByteString -> Bool
 notElem c ps = not (elem c ps)
 {-# INLINE notElem #-}
+
+-- | /O(n)/ 'filter', applied to a predicate and a ByteString,
+-- returns a ByteString containing those characters that satisfy the
+-- predicate. This function is subject to array fusion.
+filter :: (Word8 -> Bool) -> ByteString -> ByteString
+filter p  = loopArr . loopU (filterEFL p) noAL
+{-# INLINE filter #-}
+
+-- | /O(n)/ 'filterF' is a non-fuseable version of filter, that may be
+-- faster for some one-shot applications.
+filterF :: (Word8 -> Bool) -> ByteString -> ByteString
+filterF k ps@(PS x s l)
+    | null ps   = ps
+    | otherwise = inlinePerformIO $ generate l $ \p -> withForeignPtr x $ \f -> do
+        t <- go (f `plusPtr` s) p l
+        return (t `minusPtr` p) -- actual length
+    where
+        STRICT3(go)
+        go _ t 0 = return t
+        go f t e = do w <- peek f
+                      if k w
+                        then poke t w >> go (f `plusPtr` 1) (t `plusPtr` 1) (e - 1)
+                        else             go (f `plusPtr` 1) t               (e - 1)
+{-# INLINE filterF #-}
 
 --
 -- | /O(n)/ A first order equivalent of /filter . (==)/, for the common
@@ -1298,37 +1333,29 @@ filterNotByte ch ps@(PS x s l)
                         then poke t w >> go (f `plusPtr` 1) (t `plusPtr` 1) (e-1)
                         else             go (f `plusPtr` 1) t               (e-1)
 
--- | /O(n)/ 'filter', applied to a predicate and a ByteString,
--- returns a ByteString containing those characters that satisfy the
--- predicate. This function is subject to array fusion.
-filter :: (Word8 -> Bool) -> ByteString -> ByteString
-filter p  = loopArr . loopU (filterEFL p) noAL
-{-# INLINE filter #-}
-
-filterF :: (Word8 -> Bool) -> ByteString -> ByteString
-filterF k ps@(PS x s l)
-    | null ps   = ps
-    | otherwise = inlinePerformIO $ generate l $ \p -> withForeignPtr x $ \f -> do
-        t <- go (f `plusPtr` s) p l
-        return (t `minusPtr` p) -- actual length
-    where
-        STRICT3(go)
-        go _ t 0 = return t
-        go f t e = do w <- peek f
-                      if k w
-                        then poke t w >> go (f `plusPtr` 1) (t `plusPtr` 1) (e - 1)
-                        else             go (f `plusPtr` 1) t               (e - 1)
-{-# INLINE filterF #-}
-
 -- Almost as good: pack $ foldl (\xs c -> if f c then c : xs else xs) [] ps
 
 -- | /O(n)/ The 'find' function takes a predicate and a ByteString,
 -- and returns the first element in matching the predicate, or 'Nothing'
 -- if there is no such element.
+--
+-- > find f p = case findIndex f p of Just n -> Just (p ! n) ; _ -> Nothing
+--
 find :: (Word8 -> Bool) -> ByteString -> Maybe Word8
-find p ps = case filter p ps of
-    q | null q -> Nothing
-      | otherwise -> Just (unsafeHead q)
+find f p = case findIndex f p of
+                    Just n -> Just (p `unsafeIndex` n)
+                    _      -> Nothing
+{-# INLINE find #-}
+
+{-
+--
+-- fuseable, but we don't want to walk the whole array.
+-- 
+find k = foldl findEFL Nothing
+    where findEFL a@(Just _) _ = a
+          findEFL _          c | k c       = Just c
+                               | otherwise = Nothing
+-}
 
 -- ---------------------------------------------------------------------
 -- Searching for substrings
