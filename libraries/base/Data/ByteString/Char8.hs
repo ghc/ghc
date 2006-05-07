@@ -254,7 +254,7 @@ import Data.ByteString (ByteString(..)
                        ,unpackList
 #endif
                        ,noAL, NoAL, loopArr, loopAcc, loopSndAcc
-                       ,loopU, mapEFL, filterEFL, filterF, mapF
+                       ,loopU, mapEFL, filterEFL,
                        ,useAsCString, unsafeUseAsCString
                        )
 
@@ -1047,3 +1047,12 @@ isSpaceWord8 w = case w of
     _    -> False
 {-# INLINE isSpaceWord8 #-}
 
+-- | /O(n)/ Like 'map', but not fuseable. The benefit is that it is
+-- slightly faster for one-shot cases.
+mapF :: (Char -> Char) -> ByteString -> ByteString
+mapF f = B.mapF (c2w . f . w2c)
+
+-- | /O(n)/ 'filterF' is a non-fuseable version of filter, that may be
+-- around 2x faster for some one-shot applications.
+filterF :: (Char -> Bool) -> ByteString -> ByteString
+filterF f = B.filterF (f . w2c)

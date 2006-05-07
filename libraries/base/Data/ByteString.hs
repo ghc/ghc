@@ -1282,20 +1282,21 @@ filter p  = loopArr . loopU (filterEFL p) noAL
 {-# INLINE filter #-}
 
 -- | /O(n)/ 'filterF' is a non-fuseable version of filter, that may be
--- faster for some one-shot applications.
+-- around 2x faster for some one-shot applications.
 filterF :: (Word8 -> Bool) -> ByteString -> ByteString
 filterF k ps@(PS x s l)
     | null ps   = ps
     | otherwise = inlinePerformIO $ generate l $ \p -> withForeignPtr x $ \f -> do
-        t <- go (f `plusPtr` s) p l
+        t <- go (f `plusPtr` s) p (f `plusPtr` (s + l))
         return (t `minusPtr` p) -- actual length
     where
         STRICT3(go)
-        go _ t 0 = return t
-        go f t e = do w <- peek f
-                      if k w
-                        then poke t w >> go (f `plusPtr` 1) (t `plusPtr` 1) (e - 1)
-                        else             go (f `plusPtr` 1) t               (e - 1)
+        go f t end | f == end  = return t
+                   | otherwise = do
+                        w <- peek f
+                        if k w
+                            then poke t w >> go (f `plusPtr` 1) (t `plusPtr` 1) end
+                            else             go (f `plusPtr` 1) t               end
 {-# INLINE filterF #-}
 
 --
@@ -1309,6 +1310,7 @@ filterF k ps@(PS x s l)
 -- filter equivalent
 filterByte :: Word8 -> ByteString -> ByteString
 filterByte w ps = replicate (count w ps) w
+{-# INLINE filterByte #-}
 
 --
 -- | /O(n)/ A first order equivalent of /filter . (\/=)/, for the common
@@ -1317,23 +1319,10 @@ filterByte w ps = replicate (count w ps) w
 --
 -- > filterNotByte == filter . (/=)
 --
--- filterNotByte is around 3x faster, and uses much less space, than its
--- filter equivalent
+-- filterNotByte is around 2x faster than its filter equivalent.
 filterNotByte :: Word8 -> ByteString -> ByteString
-filterNotByte ch ps@(PS x s l)
-    | null ps   = ps
-    | otherwise = inlinePerformIO $ generate l $ \p -> withForeignPtr x $ \f -> do
-        t <- go (f `plusPtr` s) p l
-        return (t `minusPtr` p) -- actual length
-    where
-        STRICT3(go)
-        go _ t 0 = return t
-        go f t e = do w <- peek f
-                      if w /= ch
-                        then poke t w >> go (f `plusPtr` 1) (t `plusPtr` 1) (e-1)
-                        else             go (f `plusPtr` 1) t               (e-1)
-
--- Almost as good: pack $ foldl (\xs c -> if f c then c : xs else xs) [] ps
+filterNotByte w = filterF (/= w)
+{-# INLINE filterNotByte #-}
 
 -- | /O(n)/ The 'find' function takes a predicate and a ByteString,
 -- and returns the first element in matching the predicate, or 'Nothing'
