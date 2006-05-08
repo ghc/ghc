@@ -66,7 +66,7 @@ import Var		( Var )
 import Module           ( Module, ModuleEnv, moduleEnvElts, elemModuleEnv )
 import OccName		( mkVarOccFS, plusOccEnv )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
-			  mkExternalName, isInternalName )
+			  mkExternalName )
 import NameSet
 import TyCon		( tyConHasGenerics, isSynTyCon, synTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
@@ -114,7 +114,7 @@ import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
 import Kind		( Kind )
 import Var		( globaliseId )
-import Name		( nameOccName, nameModule, isBuiltInSyntax )
+import Name		( nameOccName, nameModule, isBuiltInSyntax, isInternalName )
 import OccName		( isTcOcc )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
