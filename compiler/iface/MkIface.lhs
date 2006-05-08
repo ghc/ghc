@@ -279,8 +279,10 @@ mkIface hsc_env maybe_old_iface
 
 		; decls  = [ tyThingToIfaceDecl ext_nm_rhs thing 
 			   | thing <- typeEnvElts type_env, 
-			     not (isImplicitName (getName thing)) ]
+			     let name = getName thing,
+			     not (isImplicitName name || isWiredInName name) ]
 		    	-- Don't put implicit Ids and class tycons in the interface file
+			-- Nor wired-in things; the compiler knows about them anyhow
 
 		; fixities    = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
 		; deprecs     = mkIfaceDeprec src_deprecs
