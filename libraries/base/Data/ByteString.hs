@@ -353,7 +353,7 @@ compareBytes (PS x1 s1 l1) (PS x2 s2 l2)
     | otherwise                         = inlinePerformIO $
         withForeignPtr x1 $ \p1 ->
         withForeignPtr x2 $ \p2 -> do
-            i <- memcmp (p1 `plusPtr` s1) (p2 `plusPtr` s2) (min l1 l2)
+            i <- memcmp (p1 `plusPtr` s1) (p2 `plusPtr` s2) (fromIntegral $ min l1 l2)
             return $ case i `compare` 0 of
                         EQ  -> l1 `compare` l2
                         x   -> x
@@ -530,7 +530,7 @@ length (PS _ _ l) = l
 -- complexity, as it requires a memcpy.
 cons :: Word8 -> ByteString -> ByteString
 cons c (PS x s l) = create (l+1) $ \p -> withForeignPtr x $ \f -> do
-        memcpy (p `plusPtr` 1) (f `plusPtr` s) l
+        memcpy (p `plusPtr` 1) (f `plusPtr` s) (fromIntegral l)
         poke p c
 {-# INLINE cons #-}
 
@@ -539,7 +539,7 @@ cons c (PS x s l) = create (l+1) $ \p -> withForeignPtr x $ \f -> do
 -- | /O(n)/ Append a byte to the end of a 'ByteString'
 snoc :: ByteString -> Word8 -> ByteString
 snoc (PS x s l) c = create (l+1) $ \p -> withForeignPtr x $ \f -> do
-        memcpy p (f `plusPtr` s) l
+        memcpy p (f `plusPtr` s) (fromIntegral l)
         poke (p `plusPtr` l) c
 {-# INLINE snoc #-}
 
@@ -612,7 +612,7 @@ mapF f (PS fp s len) = inlinePerformIO $ withForeignPtr fp $ \a -> do
 -- | /O(n)/ 'reverse' @xs@ efficiently returns the elements of @xs@ in reverse order.
 reverse :: ByteString -> ByteString
 reverse (PS x s l) = create l $ \p -> withForeignPtr x $ \f ->
-        c_reverse p (f `plusPtr` s) l
+        c_reverse p (f `plusPtr` s) (fromIntegral l)
 
 {-
 reverse = pack . P.reverse . unpack
@@ -626,7 +626,7 @@ intersperse :: Word8 -> ByteString -> ByteString
 intersperse c ps@(PS x s l)
     | length ps < 2  = ps
     | otherwise      = create (2*l-1) $ \p -> withForeignPtr x $ \f ->
-        c_intersperse p (f `plusPtr` s) l c
+        c_intersperse p (f `plusPtr` s) (fromIntegral l) c
 
 {-
 intersperse c = pack . List.intersperse c . unpack
@@ -702,7 +702,7 @@ concat xs     = create len $ \ptr -> go xs ptr
         STRICT2(go)
         go []            _   = return ()
         go (PS p s l:ps) ptr = do
-                withForeignPtr p $ \fp -> memcpy ptr (fp `plusPtr` s) l
+                withForeignPtr p $ \fp -> memcpy ptr (fp `plusPtr` s) (fromIntegral l)
                 go ps (ptr `plusPtr` l)
 
 -- | Map a function over a 'ByteString' and concatenate the results
@@ -744,7 +744,7 @@ maximum :: ByteString -> Word8
 maximum xs@(PS x s l)
     | null xs   = errorEmptyList "maximum"
     | otherwise = inlinePerformIO $ withForeignPtr x $ \p ->
-                    return $ c_maximum (p `plusPtr` s) l
+                    return $ c_maximum (p `plusPtr` s) (fromIntegral l)
 {-# INLINE maximum #-}
 
 -- | /O(n)/ 'minimum' returns the minimum value from a 'ByteString'
@@ -752,7 +752,7 @@ minimum :: ByteString -> Word8
 minimum xs@(PS x s l)
     | null xs   = errorEmptyList "minimum"
     | otherwise = inlinePerformIO $ withForeignPtr x $ \p ->
-                    return $ c_minimum (p `plusPtr` s) l
+                    return $ c_minimum (p `plusPtr` s) (fromIntegral l)
 {-# INLINE minimum #-}
 
 -- fusion is too slow here (10x)
@@ -1131,9 +1131,9 @@ joinWithByte :: Word8 -> ByteString -> ByteString -> ByteString
 joinWithByte c f@(PS ffp s l) g@(PS fgp t m) = create len $ \ptr ->
     withForeignPtr ffp $ \fp ->
     withForeignPtr fgp $ \gp -> do
-        memcpy ptr (fp `plusPtr` s) l
+        memcpy ptr (fp `plusPtr` s) (fromIntegral l)
         poke (ptr `plusPtr` l) c
-        memcpy (ptr `plusPtr` (l + 1)) (gp `plusPtr` t) m
+        memcpy (ptr `plusPtr` (l + 1)) (gp `plusPtr` t) (fromIntegral m)
     where
       len = length f + length g + 1
 {-# INLINE joinWithByte #-}
@@ -1357,7 +1357,7 @@ isPrefixOf (PS x1 s1 l1) (PS x2 s2 l2)
     | l2 < l1   = False
     | otherwise = inlinePerformIO $ withForeignPtr x1 $ \p1 ->
         withForeignPtr x2 $ \p2 -> do
-            i <- memcmp (p1 `plusPtr` s1) (p2 `plusPtr` s2) l1
+            i <- memcmp (p1 `plusPtr` s1) (p2 `plusPtr` s2) (fromIntegral l1)
             return (i == 0)
 
 -- | /O(n)/ The 'isSuffixOf' function takes two ByteStrings and returns 'True'
@@ -1375,7 +1375,7 @@ isSuffixOf (PS x1 s1 l1) (PS x2 s2 l2)
     | l2 < l1   = False
     | otherwise = inlinePerformIO $ withForeignPtr x1 $ \p1 ->
         withForeignPtr x2 $ \p2 -> do
-            i <- memcmp (p1 `plusPtr` s1) (p2 `plusPtr` s2 `plusPtr` (l2 - l1)) l1
+            i <- memcmp (p1 `plusPtr` s1) (p2 `plusPtr` s2 `plusPtr` (l2 - l1)) (fromIntegral l1)
             return (i == 0)
 
 -- | Check whether one string is a substring of another. @isSubstringOf
@@ -1670,7 +1670,8 @@ unsafeUseAsCString (PS ps s _) ac = withForeignPtr ps $ \p -> ac (castPtr p `plu
 --   if a large string has been read in, and only a small part of it 
 --   is needed in the rest of the program.
 copy :: ByteString -> ByteString
-copy (PS x s l) = create l $ \p -> withForeignPtr x $ \f -> memcpy p (f `plusPtr` s) l
+copy (PS x s l) = create l $ \p -> withForeignPtr x $ \f ->
+    memcpy p (f `plusPtr` s) (fromIntegral l)
 
 -- | /O(n)/ Duplicate a CString as a ByteString. Useful if you know the
 -- CString is going to be deallocated from C land.
@@ -1682,7 +1683,7 @@ copyCStringLen :: CStringLen -> ByteString
 copyCStringLen (cstr, len) = inlinePerformIO $ do
     fp <- mallocForeignPtrArray (len+1)
     withForeignPtr fp $ \p -> do
-        memcpy p (castPtr cstr) len
+        memcpy p (castPtr cstr) (fromIntegral len)
         poke (p `plusPtr` len) (0 :: Word8)
     return $! PS fp 0 len
 
@@ -1782,7 +1783,7 @@ mkPS buf start end = do
     let len = end - start
     fp <- mallocByteString len
     withForeignPtr fp $ \p -> do
-        memcpy_ptr_baoff p buf start (fromIntegral len)
+        memcpy_ptr_baoff p buf (fromIntegral start) (fromIntegral len)
         return (PS fp 0 len)
 
 mkBigPS :: Int -> [ByteString] -> IO ByteString
@@ -2062,10 +2063,10 @@ foreign import ccall unsafe "string.h memchr" memchr
     :: Ptr Word8 -> Word8 -> CSize -> Ptr Word8
 
 foreign import ccall unsafe "string.h memcmp" memcmp
-    :: Ptr Word8 -> Ptr Word8 -> Int -> IO Int
+    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO Int
 
 foreign import ccall unsafe "string.h memcpy" memcpy
-    :: Ptr Word8 -> Ptr Word8 -> Int -> IO ()
+    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO ()
 
 -- ---------------------------------------------------------------------
 --
@@ -2073,19 +2074,19 @@ foreign import ccall unsafe "string.h memcpy" memcpy
 --
 
 foreign import ccall unsafe "static fpstring.h reverse" c_reverse
-    :: Ptr Word8 -> Ptr Word8 -> Int -> IO ()
+    :: Ptr Word8 -> Ptr Word8 -> CInt -> IO ()
 
 foreign import ccall unsafe "static fpstring.h intersperse" c_intersperse
-    :: Ptr Word8 -> Ptr Word8 -> Int -> Word8 -> IO ()
+    :: Ptr Word8 -> Ptr Word8 -> CInt -> Word8 -> IO ()
 
 foreign import ccall unsafe "static fpstring.h maximum" c_maximum
-    :: Ptr Word8 -> Int -> Word8
+    :: Ptr Word8 -> CInt -> Word8
 
 foreign import ccall unsafe "static fpstring.h minimum" c_minimum
-    :: Ptr Word8 -> Int -> Word8
+    :: Ptr Word8 -> CInt -> Word8
 
 foreign import ccall unsafe "static fpstring.h count" c_count
-    :: Ptr Word8 -> Int -> Word8 -> Int
+    :: Ptr Word8 -> CInt -> Word8 -> Int
 
 -- ---------------------------------------------------------------------
 -- MMap
@@ -2111,7 +2112,7 @@ foreign import ccall unsafe "RtsAPI.h getProgArgv"
     getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
 
 foreign import ccall unsafe "__hscore_memcpy_src_off"
-   memcpy_ptr_baoff :: Ptr a -> RawBuffer -> Int -> CSize -> IO (Ptr ())
+   memcpy_ptr_baoff :: Ptr a -> RawBuffer -> CInt -> CSize -> IO (Ptr ())
 #endif
 
 -- ---------------------------------------------------------------------
@@ -2191,7 +2192,7 @@ loopU f start (PS z s i) = inlinePerformIO $ withForeignPtr z $ \a -> do
             then return (fp,i,acc)                      -- no realloc for map
             else do fp_ <- mallocByteString (i'+1)      -- realloc
                     withForeignPtr fp_ $ \p' -> do
-                        memcpy p' p i'
+                        memcpy p' p (fromIntegral i')
                         poke (p' `plusPtr` i') (0::Word8)
                     return (fp_,i',acc)
 
