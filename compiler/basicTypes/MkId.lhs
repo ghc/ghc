@@ -902,22 +902,26 @@ seqId
     ty  = mkForAllTys [alphaTyVar,openBetaTyVar]
 		      (mkFunTy alphaTy (mkFunTy openBetaTy openBetaTy))
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
--- gaw 2004
     rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
 
 -- lazy :: forall a?. a? -> a?	 (i.e. works for unboxed types too)
 -- Used to lazify pseq:		pseq a b = a `seq` lazy b
--- No unfolding: it gets "inlined" by the worker/wrapper pass
--- Also, no strictness: by being a built-in Id, it overrides all
--- the info in PrelBase.hi.  This is important, because the strictness
+-- 
+-- Also, no strictness: by being a built-in Id, all the info about lazyId comes from here,
+-- not from GHC.Base.hi.   This is important, because the strictness
 -- analyser will spot it as strict!
+--
+-- Also no unfolding in lazyId: it gets "inlined" by a HACK in the worker/wrapper pass
+--	(see WorkWrap.wwExpr)	
+-- We could use inline phases to do this, but that would be vulnerable to changes in 
+-- phase numbering....we must inline precisely after strictness analysis.
 lazyId
   = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo
     ty  = mkForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
 
-lazyIdUnfolding :: CoreExpr	-- Used to expand LazyOp after strictness anal
+lazyIdUnfolding :: CoreExpr	-- Used to expand 'lazyId' after strictness anal
 lazyIdUnfolding = mkLams [openAlphaTyVar,x] (Var x)
 		where
 		  [x] = mkTemplateLocals [openAlphaTy]

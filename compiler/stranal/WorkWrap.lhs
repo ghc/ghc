@@ -137,7 +137,7 @@ wwExpr e@(Note InlineMe expr) = returnUs e
 wwExpr e@(Var v)
   | v `hasKey` lazyIdKey = returnUs lazyIdUnfolding
   | otherwise            = returnUs e
-	-- Inline 'lazy' after strictness analysis
+	-- HACK alert: Inline 'lazy' after strictness analysis
 	-- (but not inside InlineMe's)
 
 wwExpr (Lam binder expr)

@@ -530,34 +530,6 @@ by dmdAnalTopBind.
 
 \begin{code}
 mk_sig_ty never_inline thunk_cpr_ok rhs (DmdType fv dmds res) 
-  | never_inline && not (isBotRes res)
-	-- 			HACK ALERT
-	-- Don't strictness-analyse NOINLINE things.  Why not?  Because
-	-- the NOINLINE says "don't expose any of the inner workings at the call 
-	-- site" and the strictness is certainly an inner working.
-	--
-	-- More concretely, the demand analyser discovers the following strictness
-	-- for unsafePerformIO:  C(U(AV))
-	-- But then consider
-	--	unsafePerformIO (\s -> let r = f x in 
-	--			       case writeIORef v r s of (# s1, _ #) ->
-	--			       (# s1, r #)
-	-- The strictness analyser will find that the binding for r is strict,
-	-- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
-	-- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
-	-- get a deadlock!  
-	--
-	-- Solution: don't expose the strictness of unsafePerformIO.
-	--
-	-- But we do want to expose the strictness of error functions, 
-	-- which are also often marked NOINLINE
-	--	{-# NOINLINE foo #-}
-	--	foo x = error ("wubble buggle" ++ x)
-	-- So (hack, hack) we only drop the strictness for non-bottom things
-	-- This is all very unsatisfactory.
-  = (deferEnv fv, topSig)
-
-  | otherwise
   = (lazy_fv, mkStrictSig dmd_ty)
   where
     dmd_ty = DmdType strict_fv final_dmds res'
