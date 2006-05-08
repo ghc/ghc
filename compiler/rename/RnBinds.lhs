@@ -28,7 +28,7 @@ import RnTypes		( rnHsSigType, rnLHsType, rnHsTypeFVs,
 			  rnLPat, rnPatsAndThen, patSigErr, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupLocatedBndrRn, 
 			  lookupLocatedInstDeclBndr, newIPNameRn,
-			  lookupLocatedSigOccRn, bindPatSigTyVars, bindPatSigTyVarsFV,
+			  lookupLocatedSigOccRn, bindPatSigTyVarsFV,
 			  bindLocalFixities, bindSigTyVarsFV, 
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
@@ -44,7 +44,7 @@ import BasicTypes	( RecFlag(..) )
 import Digraph		( SCC(..), stronglyConnComp )
 import Bag
 import Outputable
-import Maybes		( orElse, isJust )
+import Maybes		( orElse )
 import Util		( filterOut )
 import Monad		( foldM )
 \end{code}
