@@ -1,1 +1,1 @@
-($$$) :: [b1 -> b] -> [b1] -> [b] 	-- Defined at <interactive>:1:7
+($$$) :: [a -> b] -> [a] -> [b] 	-- Defined at <interactive>:1:7
