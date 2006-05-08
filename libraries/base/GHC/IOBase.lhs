@@ -215,13 +215,29 @@ help of 'unsafePerformIO'.  So be careful!
 -}
 {-# NOINLINE unsafePerformIO #-}
 unsafePerformIO	:: IO a -> a
-unsafePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
+unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
 
 -- Why do we NOINLINE unsafePerformIO?  See the comment with
 -- GHC.ST.runST.  Essentially the issue is that the IO computation
 -- inside unsafePerformIO must be atomic: it must either all run, or
 -- not at all.  If we let the compiler see the application of the IO
 -- to realWorld#, it might float out part of the IO.
+
+-- Why is there a call to 'lazy' in unsafePerformIO?
+-- If we don't have it, the demand analyser discovers the following strictness
+-- for unsafePerformIO:  C(U(AV))
+-- But then consider
+--	unsafePerformIO (\s -> let r = f x in 
+--			       case writeIORef v r s of (# s1, _ #) ->
+--			       (# s1, r #)
+-- The strictness analyser will find that the binding for r is strict,
+-- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
+-- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
+-- get a deadlock!  
+--
+-- Solution: don't expose the strictness of unsafePerformIO,
+--	     by hiding it with 'lazy'
+
 
 {-|
 'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
