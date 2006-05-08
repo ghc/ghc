@@ -38,7 +38,7 @@ module GHC.List (
  ) where
 
 import {-# SOURCE #-} GHC.Err ( error )
-import Data.Tuple
+import Data.Tuple()	-- Instances
 import Data.Maybe
 import GHC.Base
 
