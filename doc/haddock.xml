@@ -1306,6 +1306,38 @@ import B
 	point locally to <literal>C.T</literal>.</para>
     </section>
 
+    <section id="deriving">
+      <title>Derived instances</title>
+
+      <para>The <literal>deriving</literal> keyword in Haskell
+      presents a small problem for Haddock.  Lacking a full type
+      system, Haddock has to figure out what the shape of the derived
+      instance is.  There is currently a partial implementation of
+      this, but for some data types Haddock can't determine the shape
+      of the derived instance, and you see something like
+      &ldquo;???&rdquo; in the documentation.</para>
+
+      <para>One workaround for this is to use CPP (<xref linkend="cpp"
+      />) to give Haddock explicit instance headers.  Here is an
+      example from the OpenGL library:</para> 
+
+<programlisting>
+data VertexArrayDescriptor a =
+   VertexArrayDescriptor !NumComponents !DataType !Stride !(Ptr a)
+#ifdef __HADDOCK__
+-- Help Haddock a bit, because it doesn't do any instance inference.
+instance Eq (VertexArrayDescriptor a)
+instance Ord (VertexArrayDescriptor a)
+instance Show (VertexArrayDescriptor a)
+#else
+   deriving ( Eq, Ord, Show )
+#endif
+</programlisting>
+
+      <para>As a rule of thumb, try <literal>deriving</literal> first,
+      and if that doesn't work then use the above workaround.</para>
+    </section>
+
     <section id="module-attributes">
       <title>Module Attributes</title>
 
