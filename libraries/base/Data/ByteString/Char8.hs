@@ -220,7 +220,7 @@ module Data.ByteString.Char8 (
         unpackList,
 #endif
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
-        loopU, mapEFL, filterEFL,
+        loopU, mapEFL, filterEFL, foldEFL, fuseEFL,
         filterF, mapF
 
     ) where
@@ -254,7 +254,7 @@ import Data.ByteString (ByteString(..)
                        ,unpackList
 #endif
                        ,noAL, NoAL, loopArr, loopAcc, loopSndAcc
-                       ,loopU, mapEFL, filterEFL
+                       ,loopU, mapEFL, filterEFL, foldEFL, fuseEFL
                        ,useAsCString, unsafeUseAsCString
                        )
 
