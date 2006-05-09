@@ -1016,11 +1016,11 @@ splitWith pred_ (PS fp off len) = splitWith0 pred# off len fp
 
 #else
 splitWith _ (PS _ _ 0) = []
-splitWith p ps = splitWith' p ps
+splitWith p ps = loop p ps
     where
-        STRICT2(splitWith')
-        splitWith' q qs = if null rest then [chunk]
-                                       else chunk : splitWith' q (unsafeTail rest)
+        STRICT2(loop)
+        loop q qs = if null rest then [chunk]
+                                 else chunk : loop q (unsafeTail rest)
             where (chunk,rest) = break q qs
 #endif
 
@@ -1087,6 +1087,7 @@ split (W8# w#) (PS fp off len) = splitWith' off len fp
 --
 tokens :: (Word8 -> Bool) -> ByteString -> [ByteString]
 tokens f = P.filter (not.null) . splitWith f
+{-# INLINE tokens #-}
 
 -- | The 'group' function takes a ByteString and returns a list of
 -- ByteStrings such that the concatenation of the result is equal to the
@@ -1122,6 +1123,7 @@ join filler pss = concat (splice pss)
         splice []  = []
         splice [x] = [x]
         splice (x:y:xs) = x:filler:splice (y:xs)
+{-# INLINE join #-}
 
 --
 -- | /O(n)/ joinWithByte. An efficient way to join to two ByteStrings
@@ -1195,6 +1197,7 @@ elemIndices w (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p -> do
                         else let i = q `minusPtr` ptr
                              in i : loop (i+1)
     return (loop 0)
+{-# INLINE elemIndices #-}
 
 {-
 -- much slower
@@ -2143,36 +2146,50 @@ data NoAL = NoAL
 -- | Element function expressing a mapping only
 mapEFL :: (Word8 -> Word8) -> (NoAL -> Word8 -> (NoAL, Maybe Word8))
 mapEFL f = \_ e -> (noAL, (Just $ f e))
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] mapEFL #-}
+#endif
 
 -- | Element function implementing a filter function only
 filterEFL :: (Word8 -> Bool) -> (NoAL -> Word8 -> (NoAL, Maybe Word8))
 filterEFL p = \_ e -> if p e then (noAL, Just e) else (noAL, Nothing)
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] filterEFL #-}
+#endif
 
 -- |Element function expressing a reduction only
 foldEFL :: (acc -> Word8 -> acc) -> (acc -> Word8 -> (acc, Maybe Word8))
 foldEFL f = \a e -> (f a e, Nothing)
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] foldEFL #-}
+#endif
 
 -- | No accumulator
 noAL :: NoAL
 noAL = NoAL
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] noAL #-}
+#endif
 
 -- | Projection functions that are fusion friendly (as in, we determine when
 -- they are inlined)
 loopArr :: (ByteString, acc) -> ByteString
 loopArr (arr, _) = arr
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] loopArr #-}
+#endif
 
 loopAcc :: (ByteString, acc) -> acc
 loopAcc (_, acc) = acc
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] loopAcc #-}
+#endif
 
 loopSndAcc :: (ByteString, (acc1, acc2)) -> (ByteString, acc2)
 loopSndAcc (arr, (_, acc)) = (arr, acc)
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] loopSndAcc #-}
+#endif
 
 ------------------------------------------------------------------------
 
@@ -2210,7 +2227,9 @@ loopU f start (PS z s i) = inlinePerformIO $ withForeignPtr z $ \a -> do
                                        return $ ma_off + 1
                     trans (a_off+1) ma_off' acc'
 
+#if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] loopU #-}
+#endif
 
 infixr 9 `fuseEFL`
 

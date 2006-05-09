@@ -866,10 +866,12 @@ unlines ss = (concat $ List.intersperse nl ss) `append` nl -- half as much space
 --
 words :: ByteString -> [ByteString]
 words = B.tokens isSpaceWord8
+{-# INLINE words #-}
 
 -- | The 'unwords' function is analogous to the 'unlines' function, on words.
 unwords :: [ByteString] -> ByteString
 unwords = join (packChar ' ')
+{-# INLINE unwords #-}
 
 -- | /O(n)/ Indicies of newlines. Shorthand for 
 --
@@ -877,6 +879,7 @@ unwords = join (packChar ' ')
 --
 lineIndices :: ByteString -> [Int]
 lineIndices = elemIndices '\n'
+{-# INLINE lineIndices #-}
 
 -- | 'lines\'' behaves like 'lines', in that it breaks a ByteString on
 -- newline Chars. However, unlike the Prelude functions, 'lines\'' and
