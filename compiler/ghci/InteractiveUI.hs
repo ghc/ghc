@@ -240,8 +240,9 @@ jumpFunction session@(Session ref) (I# idsPtr) hValues location b
              new_ic = ictxt { ic_rn_local_env = new_rn_env, 
 		  	      ic_type_env     = new_type_env }
          writeIORef ref (hsc_env { hsc_IC = new_ic })
+         is_tty <- hIsTerminalDevice stdin
          withExtendedLinkEnv (zip names hValues) $
-           startGHCi (runGHCi [] Nothing)
+           startGHCi (interactiveLoop is_tty True)
                      GHCiState{ progname = "<interactive>",
                                 args = [],
                                 prompt = location++"> ",
