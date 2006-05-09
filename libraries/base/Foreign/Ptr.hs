@@ -37,6 +37,13 @@ module Foreign.Ptr (
     freeHaskellFunPtr, -- :: FunPtr a -> IO ()
     -- Free the function pointer created by foreign export dynamic.
 
+    -- * Integral types with lossless conversion to/from pointers
+    IntPtr,
+    ptrToIntPtr,
+    intPtrToPtr,
+    WordPtr,
+    ptrToWordPtr,
+    wordPtrToPtr
  ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -45,8 +52,19 @@ import GHC.IOBase
 import GHC.Base
 import GHC.Num
 import GHC.List
+import GHC.Read
+import GHC.Real
 import GHC.Show
+import GHC.Enum
+import GHC.Word		( Word(..) )
+import Data.Bits
+import Data.Typeable 	( Typeable(..), mkTyCon, mkTyConApp )
 import Numeric
+import Foreign.C.Types
+
+import Foreign.Storable
+import Data.Int
+import Data.Word
 #endif
 
 #ifdef __NHC__
@@ -71,27 +89,39 @@ import Hugs.Ptr
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-#include "MachDeps.h"
-
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
-instance Show (Ptr a) where
-   showsPrec p (Ptr a) rs = pad_out (showHex (word2Integer(int2Word#(addr2Int# a))) "") rs
-     where
-        -- want 0s prefixed to pad it out to a fixed length.
-       pad_out ls rs = 
-	  '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
-       -- word2Integer :: Word# -> Integer (stolen from Word.lhs)
-       word2Integer w = case word2Integer# w of
-			(# s, d #) -> J# s d
-
-instance Show (FunPtr a) where
-   showsPrec p = showsPrec p . castFunPtrToPtr
-#endif
-
 -- | Release the storage associated with the given 'FunPtr', which
 -- must have been obtained from a wrapper stub.  This should be called
 -- whenever the return value from a foreign import wrapper function is
 -- no longer required; otherwise, the storage it uses will leak.
 foreign import ccall unsafe "freeHaskellFunctionPtr"
     freeHaskellFunPtr :: FunPtr a -> IO ()
+
+#include "HsBaseConfig.h"
+#include "CTypes.h"
+
+-- | An unsigend integral type that can be losslessly converted to and from
+-- @Ptr@.
+INTEGRAL_TYPE(WordPtr,tyConWordPtr,"WordPtr",Word)
+	-- Word and Int are guaranteed pointer-sized in GHC
+
+-- | A sigend integral type that can be losslessly converted to and from
+-- @Ptr@.
+INTEGRAL_TYPE(IntPtr,tyConIntPtr,"IntPtr",Int)
+	-- Word and Int are guaranteed pointer-sized in GHC
+
+-- | casts a @Ptr@ to a @WordPtr@
+ptrToWordPtr :: Ptr a -> WordPtr
+ptrToWordPtr (Ptr a#) = WordPtr (W# (int2Word# (addr2Int# a#)))
+
+-- | casts a @WordPtr@ to a @Ptr@
+wordPtrToPtr :: WordPtr -> Ptr a
+wordPtrToPtr (WordPtr (W# w#)) = Ptr (int2Addr# (word2Int# w#))
+
+-- | casts a @Ptr@ to an @IntPtr@
+ptrToIntPtr :: Ptr a -> IntPtr
+ptrToIntPtr (Ptr a#) = IntPtr (I# (addr2Int# a#))
+
+-- | casts an @IntPtr@ to a @Ptr@
+intPtrToPtr :: IntPtr -> Ptr a
+intPtrToPtr (IntPtr (I# i#)) = Ptr (int2Addr# i#)
 #endif
