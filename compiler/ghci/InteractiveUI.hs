@@ -460,13 +460,13 @@ fileLoop hdl show_prompt = do
 	    l  -> do quit <- runCommand l
                      if quit then return () else fileLoop hdl show_prompt
 
-stringLoop :: [String] -> GHCi ()
-stringLoop [] = return ()
+stringLoop :: [String] -> GHCi Bool{-True: we quit-}
+stringLoop [] = return False
 stringLoop (s:ss) = do
    case removeSpaces s of
 	"" -> stringLoop ss
 	l  -> do quit <- runCommand l
-                 if quit then return () else stringLoop ss
+                 if quit then return True else stringLoop ss
 
 mkPrompt toplevs exports prompt
   = showSDoc $ f prompt
@@ -749,9 +749,9 @@ defineMacro s = do
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef commands --
-		    (cmds ++ [(macro_name, keepGoing (runMacro hv), False, completeNone)]))
+		    (cmds ++ [(macro_name, runMacro hv, False, completeNone)]))
 
-runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi ()
+runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
   str <- io ((unsafeCoerce# fun :: String -> IO String) s)
   stringLoop (lines str)
