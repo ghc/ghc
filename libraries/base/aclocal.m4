@@ -105,6 +105,14 @@ AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <stdio.h>
 # include <ctype.h>
 #endif
 
+#if HAVE_INTTYPES_H
+# include <inttypes.h>
+#else
+# if HAVE_STDINT_H
+#  include <stdint.h>
+# endif
+#endif
+
 #if defined(HAVE_GL_GL_H)
 # include <GL/gl.h>
 #elif defined(HAVE_OPENGL_GL_H)

@@ -30,6 +30,8 @@ module Foreign.C.Types
 	, CLong,  CULong
 	, CPtrdiff, CSize, CWchar, CSigAtomic
         , CLLong, CULLong
+	, CIntPtr, CUIntPtr
+	, CIntMax, CUIntMax
 
 	  -- ** Numeric types
 	  -- | These types are are represented as @newtype@s of basic
@@ -191,8 +193,20 @@ data CFpos = CFpos
 -- | Haskell type representing the C @jmp_buf@ type.
 data CJmpBuf = CJmpBuf
 
+INTEGRAL_TYPE(CIntPtr,tyConCIntPtr,"CIntPtr",HTYPE_INTPTR_T)
+INTEGRAL_TYPE(CUIntPtr,tyConCUIntPtr,"CUIntPtr",HTYPE_UINTPTR_T)
+INTEGRAL_TYPE(CIntMax,tyConCIntMax,"CIntMax",HTYPE_INTMAX_T)
+INTEGRAL_TYPE(CUIntMax,tyConCUIntMax,"CUIntMax",HTYPE_UINTMAX_T)
+
+{-# RULES
+"fromIntegral/a->CIntPtr"  fromIntegral = \x -> CIntPtr  (fromIntegral x)
+"fromIntegral/a->CUIntPtr" fromIntegral = \x -> CUIntPtr (fromIntegral x)
+"fromIntegral/a->CIntMax"  fromIntegral = \x -> CIntMax  (fromIntegral x)
+"fromIntegral/a->CUIntMax" fromIntegral = \x -> CUIntMax (fromIntegral x)
+ #-}
+
 -- C99 types which are still missing include:
--- intptr_t, uintptr_t, intmax_t, uintmax_t, wint_t, wctrans_t, wctype_t
+-- wint_t, wctrans_t, wctype_t
 
 {- $ctypes
 
