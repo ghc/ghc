@@ -2351,24 +2351,25 @@ $ make install</screen>
     <title>Porting GHC</title>
 
     <para>This section describes how to port GHC to a currenly
-    unsupported platform.  There are two distinct
-    possibilities:</para>
+    unsupported platform.  To avoid confusion, when we say
+    &ldquo;architecture&rdquo; we are referring to the processor, and
+    we use the term &ldquo;platform&rdquo; to refer to the combination
+    of architecture and operating system.</para>
+
+    <para>There are two distinct porting scenarios:</para>
 
     <itemizedlist>
       <listitem>
-	<para>The hardware architecture for your system is already
-	supported by GHC, but you're running an OS that isn't
-	supported (or perhaps has been supported in the past, but
-	currently isn't).  This is the easiest type of porting job,
-	but it still requires some careful bootstrapping.  Proceed to
-	<xref linkend="sec-booting-from-hc"/>.</para>
+	<para>Your platform is already supported, but you want to
+	compile up GHC using just a C compiler.  This is a
+	straightforward bootstrap from HC files, and is described in
+	<xref linkend="sec-booting-from-hc" />.</para>
       </listitem>
       
       <listitem>
-	<para>Your system's hardware architecture isn't supported by
-	GHC.  This will be a more difficult port (though by comparison
-	perhaps not as difficult as porting gcc).  Proceed to <xref
-	linkend="unregisterised-porting"/>.</para>
+	<para>Your platform isn't supported by GHC.  You will need to
+	do an <emphasis>unregisterised bootstrap</emphasis>, proceed
+	to <xref linkend="unregisterised-porting"/>.</para>
       </listitem>
     </itemizedlist>
     
@@ -2389,25 +2390,40 @@ $ make install</screen>
       later.</emphasis></para>
 
       <para>HC files are platform-dependent, so you have to get a set
-	that were generated on <emphasis>the same platform</emphasis>.  There
-	may be some supplied on the GHC download page, otherwise you'll have to
-	compile some up yourself, or start from
-	<emphasis>unregisterised</emphasis> HC files - see <xref
-	  linkend="unregisterised-porting"/>.</para>
+	that were generated on <emphasis>the same platform</emphasis>.
+	There may be some supplied on the GHC download page, otherwise
+	you'll have to compile some up yourself.</para>
 
       <para>The following steps should result in a working GHC build
       with full libraries:</para>
 
       <itemizedlist>
 	<listitem>
-	  <para>Unpack the HC files on top of a fresh source tree
-          (make sure the source tree version matches the version of
-          the HC files <emphasis>exactly</emphasis>!).  This will
-          place matching <filename>.hc</filename> files next to the
-          corresponding Haskell source (<filename>.hs</filename> or
-          <filename>.lhs</filename>) in the compiler subdirectory
-          <filename>ghc/compiler</filename> and in the libraries
-          (subdirectories of 
+	  <para>Make a set of HC files.  On an identical system with
+	  GHC already installed, get a GHC source tree and put the
+	  following in <literal>mk/build.mk</literal>:</para>
+
+<programlisting>
+SRC_HC_OPTS     = -H32m -O -fasm -Rghc-timing -keep-hc-files
+GhcLibHcOpts    = -O
+GhcLibWays      =
+SplitObjs       = NO
+</programlisting>
+
+	  <para>Build GHC as normal, and then <literal>make
+	  hc-file-bundle Project=ghc</literal> to creates the tar file
+	  containing the hc files.</para>
+	</listitem>
+
+	<listitem>
+	  <para>On the target system, unpack the HC files on top of a
+          fresh source tree (make sure the source tree version matches
+          the version of the HC files <emphasis>exactly</emphasis>!).
+          This will place matching <filename>.hc</filename> files next
+          to the corresponding Haskell source
+          (<filename>.hs</filename> or <filename>.lhs</filename>) in
+          the compiler subdirectory <filename>ghc/compiler</filename>
+          and in the libraries (subdirectories of
           <literal>libraries</literal>).</para>
 	</listitem>
 
@@ -2439,10 +2455,10 @@ $ make install</screen>
     </sect2>
 
     <sect2 id="unregisterised-porting">
-      <title>Porting GHC to a new architecture</title>
+      <title>Porting GHC to a new platform</title>
       
-      <para>The first step in porting to a new architecture is to get
-      an <firstterm>unregisterised</firstterm> build working.  An
+      <para>The first step in porting to a new platform is to get an
+      <firstterm>unregisterised</firstterm> build working.  An
       unregisterised build is one that compiles via vanilla C only.
       By contrast, a registerised build uses the following
       architecture-specific hacks for speed:</para>
@@ -2472,6 +2488,13 @@ $ make install</screen>
       optimisations costs about a factor of two in performance, but
       since unregisterised compilation is usually just a step on the
       way to a full registerised port, we don't mind too much.</para>
+
+      <para>You should go through this process even if your
+      architecture is already has registerised support in GHC, but
+      your OS currently isn't supported.  In this case you probably
+      won't need to port any of the architecture-specific parts of the
+      code, and you can proceed straight from the unregisterised build
+      to build a registerised compiler.</para>
 
       <para>Notes on GHC portability in general: we've tried to stick
       to writing portable code in most parts of the system, so it
@@ -2529,7 +2552,7 @@ $ ./configure --enable-hc-boot --enable-hc-boot-unregisterised</screen>
 
 	      <para>You might need to update
               <filename>configure.in</filename> to recognise the new
-              architecture, and re-generate
+              platform, and re-generate
               <filename>configure</filename> with
               <literal>autoreconf</literal>.</para>
 	    </listitem>
@@ -2851,15 +2874,15 @@ Hello World!</screen>
 	<title>GHCi</title>
 
 	<para>To support GHCi, you need to port the dynamic linker
-	(<filename>$(GHC&lowbar;TOP)/rts/Linker.c</filename>).  The linker
-	currently supports the ELF and PEi386 object file formats - if
-	your platform uses one of these then things will be
-	significantly easier.  The majority of Unix platforms use the
-	ELF format these days.  Even so, there are some
+	(<filename>$(GHC&lowbar;TOP)/rts/Linker.c</filename>).  The
+	linker currently supports the ELF and PEi386 object file
+	formats - if your platform uses one of these then things will
+	be significantly easier.  The majority of Unix platforms use
+	the ELF format these days.  Even so, there are some
 	machine-specific parts of the ELF linker: for example, the
 	code for resolving particular relocation types is
 	machine-specific, so some porting of this code to your
-	architecture will probaly be necessary.</para>
+	architecture and/or OS will probaly be necessary.</para>
 	
 	<para>If your system uses a different object file format, then
 	you have to write a linker &mdash; good luck!</para>
