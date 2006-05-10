@@ -14,6 +14,7 @@ import IOEnv            ( ioToIOEnv )
 import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 import TysWiredIn       ( unitTy )
 import TypeRep          ( Type(..) )
+import TyCon            ( isUnLiftedTyCon )
 #endif
 
 import Match		( matchWrapper, matchSinglePat, matchEquations )
@@ -216,7 +217,7 @@ dsExpr expr@(HsLam a_Match)
 dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
     | HsVar funId <- fun
     , idName funId `elem` [breakpointJumpName, breakpointCondJumpName]
-    , ids <- filter (not.hasTyVar.idType) (extractIds arg)
+    , ids <- filter (isValidType . idType) (extractIds arg)
     = do dsWarn (text "Extracted ids:" <+> ppr ids <+> ppr (map idType ids))
          stablePtr <- ioToIOEnv $ newStablePtr ids
          -- Yes, I know... I'm gonna burn in hell.
@@ -234,12 +235,13 @@ dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
               = error (showSDoc (ppr ts)) -- argId:extractIds (unLoc fn)
           extractIds x = []
           extractHVals ids = ExplicitList unitTy (map (L loc . HsVar) ids)
-          hasTyVar (TyVarTy _) = True
-          hasTyVar (FunTy a b) = hasTyVar a || hasTyVar b
-          hasTyVar (NoteTy _ t) = hasTyVar t
-          hasTyVar (AppTy a b) = hasTyVar a || hasTyVar b
-          hasTyVar (TyConApp _ ts) = any hasTyVar ts
-          hasTyVar _ = False
+          -- checks for tyvars and unlifted kinds.
+          isValidType (TyVarTy _) = False
+          isValidType (FunTy a b) = isValidType a && isValidType b
+          isValidType (NoteTy _ t) = isValidType t
+          isValidType (AppTy a b) = isValidType a && isValidType b
+          isValidType (TyConApp con ts) = not (isUnLiftedTyCon con) && all isValidType ts
+          isValidType _ = True
 #endif
 
 dsExpr expr@(HsApp fun arg)      
