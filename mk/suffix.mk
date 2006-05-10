@@ -134,10 +134,10 @@ else
 $(odir_)%.raw_s : %.hc
 	$(CC) -x c $< -o $@ -S -O $(HC_BOOT_CC_OPTS) -I.  `echo $(patsubst -monly-%-regs, -DSTOLEN_X86_REGS=%, $(filter -monly-%-regs, $($*_HC_OPTS))) | sed 's/^$$/-DSTOLEN_X86_REGS=4/'`
 
-$(odir_)%.s : %.raw_s
+$(odir_)%.s : $(odir_)%.raw_s
 	$(MANGLER) $< $@ $(patsubst -monly-%-regs, %, $(filter -monly-%-regs, $($*_HC_OPTS)))
 
-$(odir_)%.o : %.s
+$(odir_)%.o : $(odir_)%.s
 	$(CC) -c -o $@ $<
 
 endif # not BootingFromUnregisterisedHc
