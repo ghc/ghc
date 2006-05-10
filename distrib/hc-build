@@ -46,7 +46,11 @@ esac
 echo "*** Building compiler..."
 ./configure --enable-hc-boot $configopts
 
+# ToDo: figure out the minimal correct sequence here
 $MAKE -C utils/mkdependC boot all
+$MAKE -C utils/unlit boot all
+$MAKE -C utils/mkdirhier boot all
+$MAKE -C driver/mangler boot all
 $MAKE -C includes boot all
 $MAKE -C rts boot all
 $MAKE -C libraries boot all GhcBootLibs=YES
