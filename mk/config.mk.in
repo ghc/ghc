@@ -759,35 +759,12 @@ RUNTEST			= $(GHC_RUNTEST_DIR)/$(GHC_RUNTEST_PGM)
 
 GHC		= @WithGhc@
 GhcDir          = $(dir $(GHC))
-GhcVersion	= @GhcVersion@
-GhcMajVersion	= @GhcMajVersion@
-GhcMinVersion	= @GhcMinVersion@
-GhcPatchLevel	= @GhcPatchLevel@
 
 # Set to YES if $(GHC) has the readline package installed
 GhcHasReadline	= @GhcHasReadline@
 
-# Canonicalised ghc version number, used for easy (integer) version
-# comparisons.  We must expand $(GhcMinVersion) to two digits by
-# adding a leading zero if necessary:
-ifneq "$(findstring $(GhcMinVersion), 0 1 2 3 4 5 6 7 8 9)" ""
-GhcCanonVersion = $(GhcMajVersion)0$(GhcMinVersion)
-else
-GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
-endif
-
 HBC		= @HBC@
 NHC		= @NHC@
-
-# Setting UseStage1=YES forces use of the stage1 compiler to compile
-# Haskell code, rather than the installed compiler.
-ifeq "$(UseStage1)" "YES"
-HC		=$(GHC_STAGE1)
-MKDEPENDHS	=$(GHC_STAGE1)
-else
-HC	        = @WithHc@
-MKDEPENDHS	= $(GHC)
-endif
 
 # Sometimes we want to invoke ghc from the build tree in different
 # places (eg. it's handy to have a nofib & a ghc build in the same
@@ -798,25 +775,46 @@ GHC_STAGE1 	= $(GHC_COMPILER_DIR)/stage1/ghc-inplace
 GHC_STAGE2 	= $(GHC_COMPILER_DIR)/stage2/ghc-inplace
 GHC_STAGE3 	= $(GHC_COMPILER_DIR)/stage3/ghc-inplace
 
-# Some useful GHC version predicates:
+ifneq "$(findstring YES, $(UseStage1) $(BootingFromHc))" ""
 
-ifeq "$(UseStage1)" "YES"
+# We are using the stage1 compiler to compile Haskell code, set up
+# some variables appropriately:
+HC		=$(GHC_STAGE1)
+MKDEPENDHS	=$(GHC_STAGE1)
+GhcVersion	= @ProjectVersion@
+GhcPatchLevel	= @ProjectPatchLevel@
+# oops, these are wrong:
+GhcMajVersion	= @GhcMajVersion@
+GhcMinVersion	= @GhcMinVersion@
+
 ghc_ge_504 = YES
 ghc_ge_601 = YES
 ghc_ge_602 = YES
 ghc_ge_603 = YES
-else
-ifeq "$(BootingFromHc)" "YES"
-ghc_ge_504 = YES
-ghc_ge_601 = YES
-ghc_ge_602 = YES
-ghc_ge_603 = YES
-else
+
+else # not UseStage1 or BootingFromHc
+
+HC	        = @WithHc@
+MKDEPENDHS	= $(GHC)
+GhcVersion	= @GhcVersion@
+GhcPatchLevel	= @GhcPatchLevel@
+GhcMajVersion	= @GhcMajVersion@
+GhcMinVersion	= @GhcMinVersion@
+
+# Some useful GHC version predicates:
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 ghc_ge_601 = $(shell if (test $(GhcCanonVersion) -ge 601); then echo YES; else echo NO; fi)
 ghc_ge_602 = $(shell if (test $(GhcCanonVersion) -ge 602); then echo YES; else echo NO; fi)
 ghc_ge_603 = $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
 endif
+
+# Canonicalised ghc version number, used for easy (integer) version
+# comparisons.  We must expand $(GhcMinVersion) to two digits by
+# adding a leading zero if necessary:
+ifneq "$(findstring $(GhcMinVersion), 0 1 2 3 4 5 6 7 8 9)" ""
+GhcCanonVersion = $(GhcMajVersion)0$(GhcMinVersion)
+else
+GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
 endif
 
 #-----------------------------------------------------------------------------
