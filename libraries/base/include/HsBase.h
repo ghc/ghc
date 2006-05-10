@@ -95,6 +95,11 @@
 #if HAVE_WCTYPE_H
 #include <wctype.h>
 #endif
+#if HAVE_INTTYPES_H
+# include <inttypes.h>
+#elif HAVE_STDINT_H
+# include <stdint.h>
+#endif
 
 #if !defined(mingw32_HOST_OS) && !defined(irix_HOST_OS)
 # if HAVE_SYS_RESOURCE_H
@@ -764,6 +769,12 @@ INLINE unsigned int __hscore_get_osver(void) { return _osver; }
  *    be in scope at link-time. */
 extern char** environ;
 INLINE char **__hscore_environ() { return environ; }
+
+/* lossless conversions between pointers and integral types */
+INLINE void *    __hscore_from_uintptr(uintptr_t n) { return (void *)n; }
+INLINE void *    __hscore_from_intptr (intptr_t n)  { return (void *)n; }
+INLINE uintptr_t __hscore_to_uintptr  (void *p)     { return (uintptr_t)p; }
+INLINE intptr_t  __hscore_to_intptr   (void *p)     { return (intptr_t)p; }
 
 #endif /* __HSBASE_H__ */
 

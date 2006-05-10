@@ -81,8 +81,11 @@ import GHC.Show
 import GHC.Read
 import GHC.Num
 #else
-import Control.Monad
-import Foreign.Ptr
+import Control.Monad	( liftM )
+#endif
+
+#ifdef __HUGS__
+import Hugs.Ptr		( castPtr )
 #endif
 
 #include "HsBaseConfig.h"

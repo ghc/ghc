@@ -37,6 +37,7 @@ module Foreign.Ptr (
     freeHaskellFunPtr, -- :: FunPtr a -> IO ()
     -- Free the function pointer created by foreign export dynamic.
 
+#ifndef __NHC__
     -- * Integral types with lossless conversion to/from pointers
     IntPtr,
     ptrToIntPtr,
@@ -44,6 +45,7 @@ module Foreign.Ptr (
     WordPtr,
     ptrToWordPtr,
     wordPtrToPtr
+#endif
  ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -51,21 +53,22 @@ import GHC.Ptr
 import GHC.IOBase
 import GHC.Base
 import GHC.Num
-import GHC.List
 import GHC.Read
 import GHC.Real
 import GHC.Show
 import GHC.Enum
 import GHC.Word		( Word(..) )
-import Data.Bits
-import Data.Typeable 	( Typeable(..), mkTyCon, mkTyConApp )
-import Numeric
-import Foreign.C.Types
 
-import Foreign.Storable
 import Data.Int
 import Data.Word
+#else
+import Foreign.C.Types
 #endif
+
+import Control.Monad	( liftM )
+import Data.Bits
+import Data.Typeable 	( Typeable(..), mkTyCon, mkTyConApp )
+import Foreign.Storable ( Storable(..) )
 
 #ifdef __NHC__
 import NHC.FFI
@@ -95,16 +98,19 @@ import Hugs.Ptr
 -- no longer required; otherwise, the storage it uses will leak.
 foreign import ccall unsafe "freeHaskellFunctionPtr"
     freeHaskellFunPtr :: FunPtr a -> IO ()
+#endif
 
-#include "HsBaseConfig.h"
-#include "CTypes.h"
+#ifndef __NHC__
+# include "HsBaseConfig.h"
+# include "CTypes.h"
 
--- | An unsigend integral type that can be losslessly converted to and from
+# ifdef __GLASGOW_HASKELL__
+-- | An unsigned integral type that can be losslessly converted to and from
 -- @Ptr@.
 INTEGRAL_TYPE(WordPtr,tyConWordPtr,"WordPtr",Word)
 	-- Word and Int are guaranteed pointer-sized in GHC
 
--- | A sigend integral type that can be losslessly converted to and from
+-- | A signed integral type that can be losslessly converted to and from
 -- @Ptr@.
 INTEGRAL_TYPE(IntPtr,tyConIntPtr,"IntPtr",Int)
 	-- Word and Int are guaranteed pointer-sized in GHC
@@ -124,4 +130,25 @@ ptrToIntPtr (Ptr a#) = IntPtr (I# (addr2Int# a#))
 -- | casts an @IntPtr@ to a @Ptr@
 intPtrToPtr :: IntPtr -> Ptr a
 intPtrToPtr (IntPtr (I# i#)) = Ptr (int2Addr# i#)
-#endif
+
+# else /* !__GLASGOW_HASKELL__ */
+
+INTEGRAL_TYPE(WordPtr,tyConWordPtr,"WordPtr",CUIntPtr)
+INTEGRAL_TYPE(IntPtr,tyConIntPtr,"IntPtr",CIntPtr)
+
+{-# CFILES cbits/PrelIOUtils.c #-}
+
+foreign import ccall unsafe "__hscore_to_uintptr"
+    ptrToWordPtr :: Ptr a -> WordPtr
+
+foreign import ccall unsafe "__hscore_from_uintptr"
+    wordPtrToPtr :: WordPtr -> Ptr a
+
+foreign import ccall unsafe "__hscore_to_intptr"
+    ptrToIntPtr :: Ptr a -> IntPtr
+
+foreign import ccall unsafe "__hscore_from_intptr"
+    intPtrToPtr :: IntPtr -> Ptr a
+
+# endif /* !__GLASGOW_HASKELL__ */
+#endif /* !__NHC_ */

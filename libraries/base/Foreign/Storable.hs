@@ -54,12 +54,12 @@ import GHC.Base
 #else
 import Data.Int
 import Data.Word
-import Foreign.Ptr
 import Foreign.StablePtr
 #endif
 
 #ifdef __HUGS__
 import Hugs.Prelude
+import Hugs.Ptr
 import Hugs.Storable
 #endif
 
