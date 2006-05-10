@@ -76,6 +76,7 @@ module Data.ByteString (
         foldr,                  -- :: (Word8 -> a -> a) -> a -> ByteString -> a
         foldl1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
         foldr1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
+        foldl',                 -- :: (a -> Word8 -> a) -> a -> ByteString -> a
 
         -- ** Special folds
         concat,                 -- :: [ByteString] -> ByteString
@@ -88,7 +89,7 @@ module Data.ByteString (
 
         -- * Generating and unfolding ByteStrings
         replicate,              -- :: Int -> Word8 -> ByteString
-        unfoldrN,               -- :: (Word8 -> Maybe (Word8, Word8)) -> Word8 -> ByteString
+        unfoldrN,               -- :: (a -> Maybe (Word8, a)) -> a -> ByteString
 
         -- * Substrings
 
@@ -227,7 +228,7 @@ module Data.ByteString (
 #endif
 
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
-        loopU, mapEFL, filterEFL, foldEFL, fuseEFL,
+        loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL,
         filterF, mapF
 
   ) where
@@ -524,14 +525,27 @@ null (PS _ _ l) = l == 0
 -- | /O(1)/ 'length' returns the length of a ByteString as an 'Int'.
 length :: ByteString -> Int
 length (PS _ _ l) = l
-{-# INLINE length #-}
+
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] length #-}
+#endif
+
+{-# 
+
+-- Translate length into a loop. 
+-- Performace ok, but allocates too much, so disable for now.
+
+  "length/loop" forall f acc s .
+  length (loopArr (loopU f acc s)) = foldl' (const . (+1)) (0::Int) (loopArr (loopU f acc s))
+
+  #-}
 
 -- | /O(n)/ 'cons' is analogous to (:) for lists, but of different
 -- complexity, as it requires a memcpy.
 cons :: Word8 -> ByteString -> ByteString
 cons c (PS x s l) = create (l+1) $ \p -> withForeignPtr x $ \f -> do
-        memcpy (p `plusPtr` 1) (f `plusPtr` s) (fromIntegral l)
         poke p c
+        memcpy (p `plusPtr` 1) (f `plusPtr` s) (fromIntegral l)
 {-# INLINE cons #-}
 
 -- todo fuse
@@ -661,6 +675,11 @@ foldl f v (PS x s l) = inlinePerformIO $ withForeignPtr x $ \ptr ->
                   | otherwise = do c <- peek p
                                    lgo (f z c) (p `plusPtr` 1) q
 -}
+
+-- | 'foldl\'' is like foldl, but strict in the accumulator.
+foldl' :: (a -> Word8 -> a) -> a -> ByteString -> a
+foldl' f z = loopAcc . loopU (foldEFL' f) z
+{-# INLINE foldl' #-}
 
 -- | 'foldr', applied to a binary operator, a starting value
 -- (typically the right-identity of the operator), and a ByteString,
@@ -840,7 +859,7 @@ replicate w c = inlinePerformIO $ generate w $ \ptr -> go ptr w
 -- The following equation connects the depth-limited unfoldr to the List unfoldr:
 --
 -- > unfoldrN n == take n $ List.unfoldr
-unfoldrN :: Int -> (Word8 -> Maybe (Word8, Word8)) -> Word8 -> ByteString
+unfoldrN :: Int -> (a -> Maybe (Word8, a)) -> a -> ByteString
 unfoldrN i f w = inlinePerformIO $ generate i $ \p -> go p w 0
     where
         STRICT3(go)
@@ -1999,7 +2018,7 @@ withPtr fp io = inlinePerformIO (withForeignPtr fp io)
 -- constant strings created when compiled:
 errorEmptyList :: String -> a
 errorEmptyList fun = error ("Data.ByteString." ++ fun ++ ": empty ByteString")
-{-# INLINE errorEmptyList #-}
+{-# NOINLINE errorEmptyList #-}
 
 -- 'findIndexOrEnd' is a variant of findIndex, that returns the length
 -- of the string if no element is found, rather than Nothing.
@@ -2164,6 +2183,13 @@ foldEFL f = \a e -> (f a e, Nothing)
 {-# INLINE [1] foldEFL #-}
 #endif
 
+-- | A strict foldEFL.
+foldEFL' :: (acc -> Word8 -> acc) -> (acc -> Word8 -> (acc, Maybe Word8))
+foldEFL' f = \a e -> let a' = f a e in a' `seq` (a', Nothing)
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] foldEFL' #-}
+#endif
+
 -- | No accumulator
 noAL :: NoAL
 noAL = NoAL
@@ -2193,6 +2219,10 @@ loopSndAcc (arr, (_, acc)) = (arr, acc)
 
 ------------------------------------------------------------------------
 
+--
+-- size, and then percentage.
+--
+
 -- | Iteration over over ByteStrings
 loopU :: (acc -> Word8 -> (acc, Maybe Word8))  -- ^ mapping & folding, once per elem
       -> acc                                   -- ^ initial acc value
@@ -2204,7 +2234,7 @@ loopU f start (PS z s i) = inlinePerformIO $ withForeignPtr z $ \a -> do
     (ptr,n,acc) <- withForeignPtr fp $ \p -> do
         (acc, i') <- go (a `plusPtr` s) p start
         if i' == i
-            then return (fp,i,acc)                      -- no realloc for map
+            then return (fp,i',acc)                     -- no realloc for map
             else do fp_ <- mallocByteString (i'+1)      -- realloc
                     withForeignPtr fp_ $ \p' -> do
                         memcpy p' p (fromIntegral i')   -- can't avoid this,  right?
@@ -2248,7 +2278,7 @@ fuseEFL f g (acc1, acc2) e1 =
 
 {-# RULES
 
-"Array fusion!" forall em1 em2 start1 start2 arr.
+"loop/loop fusion!" forall em1 em2 start1 start2 arr.
   loopU em2 start2 (loopArr (loopU em1 start1 arr)) =
     loopSndAcc (loopU (em1 `fuseEFL` em2) (start1, start2) arr)
 

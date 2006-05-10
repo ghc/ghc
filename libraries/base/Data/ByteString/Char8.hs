@@ -70,6 +70,7 @@ module Data.ByteString.Char8 (
         foldr,                  -- :: (Char -> a -> a) -> a -> ByteString -> a
         foldl1,                 -- :: (Char -> Char -> Char) -> ByteString -> Char
         foldr1,                 -- :: (Char -> Char -> Char) -> ByteString -> Char
+        foldl',                 -- :: (a -> Char -> a) -> a -> ByteString -> a
 
         -- ** Special folds
         concat,                 -- :: [ByteString] -> ByteString
@@ -82,7 +83,7 @@ module Data.ByteString.Char8 (
 
         -- * Generating and unfolding ByteStrings
         replicate,              -- :: Int -> Char -> ByteString
-        unfoldrN,               -- :: (Char -> Maybe (Char, Char)) -> Char -> ByteString
+        unfoldrN,               -- :: (a -> Maybe (Char, a)) -> a -> ByteString
 
         -- * Substrings
 
@@ -220,7 +221,7 @@ module Data.ByteString.Char8 (
         unpackList,
 #endif
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
-        loopU, mapEFL, filterEFL, foldEFL, fuseEFL,
+        loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL,
         filterF, mapF
 
     ) where
@@ -254,7 +255,7 @@ import Data.ByteString (ByteString(..)
                        ,unpackList
 #endif
                        ,noAL, NoAL, loopArr, loopAcc, loopSndAcc
-                       ,loopU, mapEFL, filterEFL, foldEFL, fuseEFL
+                       ,loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL
                        ,useAsCString, unsafeUseAsCString
                        )
 
@@ -363,6 +364,11 @@ foldl :: (a -> Char -> a) -> a -> ByteString -> a
 foldl f = B.foldl (\a c -> f a (w2c c))
 {-# INLINE foldl #-}
 
+-- | 'foldl\'' is like foldl, but strict in the accumulator.
+foldl' :: (a -> Char -> a) -> a -> ByteString -> a
+foldl' f = B.foldl' (\a c -> f a (w2c c))
+{-# INLINE foldl' #-}
+
 -- | 'foldr', applied to a binary operator, a starting value
 -- (typically the right-identity of the operator), and a packed string,
 -- reduces the packed string using the binary operator, from right to left.
@@ -447,9 +453,9 @@ replicate w = B.replicate w . c2w
 --
 -- > unfoldrN n == take n $ List.unfoldr
 --
-unfoldrN :: Int -> (Char -> Maybe (Char, Char)) -> Char -> ByteString
-unfoldrN n f w = B.unfoldrN n ((k `fmap`) . f . w2c) (c2w w)
-    where k (i,j) = (c2w i, c2w j) -- (c2w *** c2w)
+unfoldrN :: Int -> (a -> Maybe (Char, a)) -> a -> ByteString
+unfoldrN n f w = B.unfoldrN n ((k `fmap`) . f) w
+    where k (i,j) = (c2w i, j)
 {-# INLINE unfoldrN #-}
 
 -- | 'takeWhile', applied to a predicate @p@ and a ByteString @xs@,
