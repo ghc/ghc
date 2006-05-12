@@ -1165,9 +1165,9 @@ joinWithByte c f@(PS ffp s l) g@(PS fgp t m) = create len $ \ptr ->
 -- | /O(1)/ 'ByteString' index (subscript) operator, starting from 0.
 index :: ByteString -> Int -> Word8
 index ps n
-    | n < 0          = error $ "ByteString.indexWord8: negative index: " ++ show n
-    | n >= length ps = error $ "ByteString.indexWord8: index too large: " ++ show n
-                                ++ ", length = " ++ show (length ps)
+    | n < 0          = moduleError "index" ("negative index: " ++ show n)
+    | n >= length ps = moduleError "index" ("index too large: " ++ show n
+                                         ++ ", length = " ++ show (length ps))
     | otherwise      = ps `unsafeIndex` n
 {-# INLINE index #-}
 
@@ -1235,7 +1235,7 @@ elemIndices c ps = loop 0 ps
 -- But more efficiently than using length on the intermediate list.
 count :: Word8 -> ByteString -> Int
 count w (PS x s m) = inlinePerformIO $ withForeignPtr x $ \p ->
-    return $ c_count (p `plusPtr` s) (fromIntegral m) w
+    return $ fromIntegral $ c_count (p `plusPtr` s) (fromIntegral m) w
 {-# INLINE count #-}
 
 {-
@@ -1882,7 +1882,7 @@ hGetContents h = do
 getContents :: IO ByteString
 getContents = hGetContents stdin
 
--- | Read an entire file directly into a 'ByteString'.  This is far more
+-- | Read an entire file strictly into a 'ByteString'.  This is far more
 -- efficient than reading the characters into a 'String' and then using
 -- 'pack'.  It also may be more efficient than opening the file and
 -- reading it using hGet.
@@ -1896,10 +1896,8 @@ readFile f = do
 
 -- | Write a 'ByteString' to a file.
 writeFile :: FilePath -> ByteString -> IO ()
-writeFile f ps = do
-    h <- openBinaryFile f WriteMode
-    hPut h ps
-    hClose h
+writeFile f ps = bracket (openBinaryFile f WriteMode) hClose
+    (\h -> hPut h ps)
 
 {-
 --
@@ -2017,8 +2015,12 @@ withPtr fp io = inlinePerformIO (withForeignPtr fp io)
 -- Common up near identical calls to `error' to reduce the number
 -- constant strings created when compiled:
 errorEmptyList :: String -> a
-errorEmptyList fun = error ("Data.ByteString." ++ fun ++ ": empty ByteString")
+errorEmptyList fun = moduleError fun "empty ByteString"
 {-# NOINLINE errorEmptyList #-}
+
+moduleError :: String -> String -> a
+moduleError fun msg = error ("Data.ByteString." ++ fun ++ ':':' ':msg)
+{-# NOINLINE moduleError #-}
 
 -- 'findIndexOrEnd' is a variant of findIndex, that returns the length
 -- of the string if no element is found, rather than Nothing.
@@ -2083,7 +2085,7 @@ foreign import ccall unsafe "string.h memchr" memchr
     :: Ptr Word8 -> Word8 -> CSize -> Ptr Word8
 
 foreign import ccall unsafe "string.h memcmp" memcmp
-    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO Int
+    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO CInt
 
 foreign import ccall unsafe "string.h memcpy" memcpy
     :: Ptr Word8 -> Ptr Word8 -> CSize -> IO ()
@@ -2106,7 +2108,7 @@ foreign import ccall unsafe "static fpstring.h minimum" c_minimum
     :: Ptr Word8 -> CInt -> Word8
 
 foreign import ccall unsafe "static fpstring.h count" c_count
-    :: Ptr Word8 -> CInt -> Word8 -> Int
+    :: Ptr Word8 -> CInt -> Word8 -> CInt
 
 -- ---------------------------------------------------------------------
 -- MMap
