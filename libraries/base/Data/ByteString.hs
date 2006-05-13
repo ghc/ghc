@@ -51,7 +51,7 @@ module Data.ByteString (
 
         -- * Basic interface
         cons,                   -- :: Word8 -> ByteString -> ByteString
-        snoc,                   -- :: Word8 -> ByteString -> ByteString
+        snoc,                   -- :: ByteString -> Word8 -> ByteString
         null,                   -- :: ByteString -> Bool
         length,                 -- :: ByteString -> Int
         head,                   -- :: ByteString -> Word8
@@ -1726,12 +1726,28 @@ unsafeUseAsCStringLen (PS ps s l) ac = withForeignPtr ps $ \p -> ac (castPtr p `
 --
 generate :: Int -> (Ptr Word8 -> IO Int) -> IO ByteString
 generate i f = do
+    fp      <- mallocByteString i
+    (ptr,n) <- withForeignPtr fp $ \p -> do
+        i' <- f p
+        if i' == i
+            then return (fp,i')
+            else do fp_ <- mallocByteString i'      -- realloc
+                    withForeignPtr fp_ $ \p' -> memcpy p' p (fromIntegral i')
+                    return (fp_,i')
+    return (PS ptr 0 n)
+
+{-
+--
+-- On the C malloc heap. Less fun.
+--
+generate i f = do
     p <- mallocArray (i+1)
     i' <- f p
     p' <- reallocArray p (i'+1)
     poke (p' `plusPtr` i') (0::Word8)    -- XXX so CStrings work
     fp <- newForeignFreePtr p'
     return $ PS fp 0 i'
+-}
 
 -- ---------------------------------------------------------------------
 -- line IO
@@ -2236,11 +2252,9 @@ loopU f start (PS z s i) = inlinePerformIO $ withForeignPtr z $ \a -> do
     (ptr,n,acc) <- withForeignPtr fp $ \p -> do
         (acc, i') <- go (a `plusPtr` s) p start
         if i' == i
-            then return (fp,i',acc)                     -- no realloc for map
-            else do fp_ <- mallocByteString (i'+1)      -- realloc
-                    withForeignPtr fp_ $ \p' -> do
-                        memcpy p' p (fromIntegral i')   -- can't avoid this,  right?
-                        poke (p' `plusPtr` i') (0::Word8)
+            then return (fp,i',acc)                 -- no realloc for map
+            else do fp_ <- mallocByteString i'      -- realloc
+                    withForeignPtr fp_ $ \p' -> memcpy p' p (fromIntegral i')
                     return (fp_,i',acc)
 
     return (PS ptr 0 n, acc)
