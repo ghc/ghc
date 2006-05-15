@@ -18,11 +18,15 @@ PLATFORM_HC_BOOT_CC_OPTS =
 
 ifeq "$(i386_TARGET_ARCH)" "1"
 PLATFORM_CC_OPTS += -DDONT_WANT_WIN32_DLL_SUPPORT
-PLATFORM_HC_BOOT_CC_OPTS += -fno-defer-pop -fomit-frame-pointer 
+PLATFORM_HC_BOOT_CC_OPTS += -fno-defer-pop -fomit-frame-pointer -fno-builtin
+endif
+
+ifeq "$(x86_64_TARGET_ARCH)" "1"
+PLATFORM_HC_BOOT_CC_OPTS += -fomit-frame-pointer -fno-asynchronous-unwind-tables -fno-unit-at-a-time -fno-builtin
 endif
 
 ifeq "$(hppa_TARGET_ARCH)" "1"
-PLATFORM_CC_OPTS += -static -D_HPUX_SOURCE
+PLATFORM_CC_OPTS += -D_HPUX_SOURCE
 endif
 
 ifeq "$(powerpc_TARGET_ARCH)" "1"
