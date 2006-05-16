@@ -2908,6 +2908,9 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    IF_DEBUG(linker,debugBelch( "Architecture is " ));
    switch (ehdr->e_machine) {
       case EM_386:   IF_DEBUG(linker,debugBelch( "x86" )); break;
+#ifdef EM_SPARC32PLUS
+      case EM_SPARC32PLUS:
+#endif
       case EM_SPARC: IF_DEBUG(linker,debugBelch( "sparc" )); break;
 #ifdef EM_IA_64
       case EM_IA_64: IF_DEBUG(linker,debugBelch( "ia64" )); break;
