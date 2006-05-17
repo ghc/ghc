@@ -151,7 +151,7 @@ data TyCon
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
 
-	tyConTyVars     :: [TyVar],	-- Bound tyvars
+	tyConTyVars :: [TyVar],	-- Bound tyvars
 	synTcRhs    :: Type,	-- Right-hand side, mentioning these type vars.
 					-- Acts as a template for the expansion when
 					-- the tycon is applied to some types.
