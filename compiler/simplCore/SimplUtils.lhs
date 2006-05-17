@@ -449,7 +449,7 @@ because doing so inhibits floating
     ==> ...(case x of I# x# -> case fw x# of ...)...
 and now the redex (f x) isn't floatable any more.
 
-The no-inling thing is also important for Template Haskell.  You might be 
+The no-inlining thing is also important for Template Haskell.  You might be 
 compiling in one-shot mode with -O2; but when TH compiles a splice before
 running it, we don't want to use -O2.  Indeed, we don't want to inline
 anything, because the byte-code interpreter might get confused about 
