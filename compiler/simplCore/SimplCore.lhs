@@ -23,6 +23,7 @@ import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
 import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
 			  setWorkerInfo, workerInfo,
+			  setInlinePragInfo, inlinePragInfo,
 			  setSpecInfo, specInfo, specInfoRules )
 import CoreUtils	( coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
@@ -468,6 +469,9 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 		-- because indirection-shorting uses the export flag on *occurrences*
 		-- and that isn't guaranteed to be ok until after the first run propagates
 		-- stuff from the binding site to its occurrences
+		--
+		-- ToDo: alas, this means that indirection-shorting does not happen at all
+		--	 if the simplifier does nothing (not common, I know, but unsavoury)
 	   let { binds'' = _scc_ "ZapInd" shortOutIndirections binds' } ;
 
 		-- Dump the result of this iteration
@@ -600,8 +604,8 @@ type IndEnv = IdEnv Id		-- Maps local_id -> exported_id
 shortOutIndirections :: [CoreBind] -> [CoreBind]
 shortOutIndirections binds
   | isEmptyVarEnv ind_env = binds
-  | no_need_to_flatten	  = binds'
-  | otherwise 		  = [Rec (flattenBinds binds')]	-- See Note [Rules and indirect-zapping]
+  | no_need_to_flatten	  = binds'			-- See Note [Rules and indirect-zapping]
+  | otherwise 		  = [Rec (flattenBinds binds')]	-- for this no_need_to_flatten stuff
   where
     ind_env 	       = makeIndEnv binds
     exp_ids 	       = varSetElems ind_env	-- These exported Ids are the subjects
@@ -663,12 +667,19 @@ shortMeOut ind_env exported_id local_id
 
 -----------------
 transferIdInfo :: Id -> Id -> Id
+-- If we have
+--	lcl_id = e; exp_id = lcl_id
+-- and lcl_id has useful IdInfo, we don't want to discard it by going
+--	gbl_id = e; lcl_id = gbl_id
+-- Instead, transfer IdInfo from lcl_id to exp_id
+-- Overwriting, rather than merging, seems to work ok.
 transferIdInfo exported_id local_id
   = modifyIdInfo transfer exported_id
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setNewStrictnessInfo` newStrictnessInfo local_info
 				 `setWorkerInfo`        workerInfo local_info
+				 `setInlinePragInfo`	inlinePragInfo local_info
 				 `setSpecInfo`	        addSpecInfo (specInfo exp_info)
 							            (specInfo local_info)
 \end{code}
