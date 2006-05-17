@@ -252,7 +252,7 @@ mkDataConIds wrap_name wkr_name data_con
 			   isSingleton orig_arg_tys )
 	  	   -- No existentials on a newtype, but it can have a context
 	  	   -- e.g. 	newtype Eq a => T a = MkT (...)
-	  	   mkTopUnfolding $ Note InlineMe $
+	  	   mkCompulsoryUnfolding $ 
 	  	   mkLams tyvars $ Lam id_arg1 $ 
 	  	   mkNewTypeBody tycon result_ty (Var id_arg1)
 

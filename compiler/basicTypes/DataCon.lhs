@@ -452,9 +452,11 @@ dataConWorkId dc = case dcIds dc of
 			NewDC _ -> pprPanic "dataConWorkId" (ppr dc)
 
 dataConWrapId_maybe :: DataCon -> Maybe Id
+-- Returns Nothing if there is no wrapper for an algebraic data con
+--		   and also for a newtype (whose constructor is inlined compulsorily)
 dataConWrapId_maybe dc = case dcIds dc of
 				AlgDC mb_wrap _ -> mb_wrap
-				NewDC wrap	-> Just wrap
+				NewDC wrap	-> Nothing
 
 dataConWrapId :: DataCon -> Id
 -- Returns an Id which looks like the Haskell-source constructor
