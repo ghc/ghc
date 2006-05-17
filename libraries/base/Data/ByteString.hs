@@ -70,6 +70,7 @@ module Data.ByteString (
         reverse,                -- :: ByteString -> ByteString
         intersperse,            -- :: Word8 -> ByteString -> ByteString
         transpose,              -- :: [ByteString] -> [ByteString]
+        map',                   -- :: (Word8 -> Word8) -> ByteString -> ByteString
 
         -- * Reducing 'ByteString's
         foldl,                  -- :: (a -> Word8 -> a) -> a -> ByteString -> a
@@ -145,6 +146,7 @@ module Data.ByteString (
         -- ** Searching with a predicate
         filter,                 -- :: (Word8 -> Bool) -> ByteString -> ByteString
         find,                   -- :: (Word8 -> Bool) -> ByteString -> Maybe Word8
+        filter',                -- :: (Word8 -> Bool) -> ByteString -> ByteString
 
         -- ** Prefixes and suffixes
         -- | These functions use memcmp(3) to efficiently compare substrings
@@ -229,7 +231,6 @@ module Data.ByteString (
 
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
         loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL,
-        filterF, mapF
 
   ) where
 
@@ -605,14 +606,14 @@ map f = loopArr . loopU (mapEFL f) noAL
 
 -- | /O(n)/ Like 'map', but not fuseable. The benefit is that it is
 -- slightly faster for one-shot cases.
-mapF :: (Word8 -> Word8) -> ByteString -> ByteString
-STRICT2(mapF)
-mapF f (PS fp s len) = inlinePerformIO $ withForeignPtr fp $ \a -> do
+map' :: (Word8 -> Word8) -> ByteString -> ByteString
+map' f (PS fp s len) = inlinePerformIO $ withForeignPtr fp $ \a -> do
     np <- mallocByteString (len+1)
     withForeignPtr np $ \p -> do
         map_ 0 (a `plusPtr` s) p
         return (PS np 0 len)
   where
+
     map_ :: Int -> Ptr Word8 -> Ptr Word8 -> IO ()
     STRICT3(map_)
     map_ n p1 p2
@@ -621,7 +622,7 @@ mapF f (PS fp s len) = inlinePerformIO $ withForeignPtr fp $ \a -> do
             x <- peekByteOff p1 n
             pokeByteOff p2 n (f x)
             map_ (n+1) p1 p2
-{-# INLINE mapF #-}
+{-# INLINE map' #-}
 
 -- | /O(n)/ 'reverse' @xs@ efficiently returns the elements of @xs@ in reverse order.
 reverse :: ByteString -> ByteString
@@ -826,7 +827,8 @@ mapIndexed k (PS ps s l) = create l $ \p -> withForeignPtr ps $ \f ->
 --
 -- This implemenation uses @memset(3)@
 replicate :: Int -> Word8 -> ByteString
-replicate w c = create w $ \ptr -> memset ptr c (fromIntegral w) >> return ()
+replicate w c | w <= 0    = empty
+              | otherwise = create w $ \ptr -> memset ptr c (fromIntegral w) >> return ()
 
 {-
 -- About 5x slower
@@ -860,7 +862,9 @@ replicate w c = inlinePerformIO $ generate w $ \ptr -> go ptr w
 --
 -- > unfoldrN n == take n $ List.unfoldr
 unfoldrN :: Int -> (a -> Maybe (Word8, a)) -> a -> ByteString
-unfoldrN i f w = inlinePerformIO $ generate i $ \p -> go p w 0
+unfoldrN i f w
+    | i <= 0    = empty
+    | otherwise = inlinePerformIO $ generate i $ \p -> go p w 0
     where
         STRICT3(go)
         go q c n | n == i    = return n      -- stop if we reach `i'
@@ -893,7 +897,7 @@ drop n ps@(PS x s l)
 
 -- | /O(1)/ 'splitAt' @n xs@ is equivalent to @('take' n xs, 'drop' n xs)@.
 splitAt :: Int -> ByteString -> (ByteString, ByteString)
-splitAt  n ps  = (take n ps, drop n ps)
+splitAt n ps  = (take n ps, drop n ps)
 {-# INLINE splitAt #-}
 
 -- | 'takeWhile', applied to a predicate @p@ and a ByteString @xs@,
@@ -1301,10 +1305,10 @@ filter :: (Word8 -> Bool) -> ByteString -> ByteString
 filter p  = loopArr . loopU (filterEFL p) noAL
 {-# INLINE filter #-}
 
--- | /O(n)/ 'filterF' is a non-fuseable version of filter, that may be
+-- | /O(n)/ 'filter\'' is a non-fuseable version of filter, that may be
 -- around 2x faster for some one-shot applications.
-filterF :: (Word8 -> Bool) -> ByteString -> ByteString
-filterF k ps@(PS x s l)
+filter' :: (Word8 -> Bool) -> ByteString -> ByteString
+filter' k ps@(PS x s l)
     | null ps   = ps
     | otherwise = inlinePerformIO $ generate l $ \p -> withForeignPtr x $ \f -> do
         t <- go (f `plusPtr` s) p (f `plusPtr` (s + l))
@@ -1317,7 +1321,7 @@ filterF k ps@(PS x s l)
                         if k w
                             then poke t w >> go (f `plusPtr` 1) (t `plusPtr` 1) end
                             else             go (f `plusPtr` 1) t               end
-{-# INLINE filterF #-}
+{-# INLINE filter' #-}
 
 --
 -- | /O(n)/ A first order equivalent of /filter . (==)/, for the common
@@ -1341,7 +1345,7 @@ filterByte w ps = replicate (count w ps) w
 --
 -- filterNotByte is around 2x faster than its filter equivalent.
 filterNotByte :: Word8 -> ByteString -> ByteString
-filterNotByte w = filterF (/= w)
+filterNotByte w = filter' (/= w)
 {-# INLINE filterNotByte #-}
 
 -- | /O(n)/ The 'find' function takes a predicate and a ByteString,

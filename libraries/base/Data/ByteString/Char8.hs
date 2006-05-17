@@ -222,7 +222,7 @@ module Data.ByteString.Char8 (
 #endif
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
         loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL,
-        filterF, mapF
+        filter', map'
 
     ) where
 
@@ -1058,10 +1058,10 @@ isSpaceWord8 w = case w of
 
 -- | /O(n)/ Like 'map', but not fuseable. The benefit is that it is
 -- slightly faster for one-shot cases.
-mapF :: (Char -> Char) -> ByteString -> ByteString
-mapF f = B.mapF (c2w . f . w2c)
+map' :: (Char -> Char) -> ByteString -> ByteString
+map' f = B.map' (c2w . f . w2c)
 
--- | /O(n)/ 'filterF' is a non-fuseable version of filter, that may be
+-- | /O(n)/ 'filter\'' is a non-fuseable version of filter, that may be
 -- around 2x faster for some one-shot applications.
-filterF :: (Char -> Bool) -> ByteString -> ByteString
-filterF f = B.filterF (f . w2c)
+filter' :: (Char -> Bool) -> ByteString -> ByteString
+filter' f = B.filter' (f . w2c)
