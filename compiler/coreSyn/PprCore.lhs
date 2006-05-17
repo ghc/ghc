@@ -324,7 +324,7 @@ pprIdBndrInfo info
 
     doc | no_info = empty
  	| otherwise
-        = brackets $ hcat [ppr prag_info, ppr occ_info, 
+        = brackets $ hsep [ppr prag_info, ppr occ_info, 
 			   ppr dmd_info, ppr lbv_info
 #ifdef OLD_STRICTNESS
 			   , ppr (demandInfo id)
