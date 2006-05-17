@@ -271,17 +271,18 @@ tidyProgram hsc_env
 		-- and indeed it does, but if omit_prags is on, ext_rules is empty
 
 	      ; implicit_binds = getImplicitBinds type_env
+	      ; all_tidy_binds = implicit_binds ++ tidy_binds
 	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
 	      }
 
-   	; endPass dflags "Tidy Core" Opt_D_dump_simpl tidy_binds
+   	; endPass dflags "Tidy Core" Opt_D_dump_simpl all_tidy_binds
 	; dumpIfSet_core dflags Opt_D_dump_simpl
 		"Tidy Core Rules"
 		(pprRules tidy_rules)
 
 	; return (CgGuts { cg_module   = mod, 
 			   cg_tycons   = alg_tycons,
-			   cg_binds    = implicit_binds ++ tidy_binds,
+			   cg_binds    = all_tidy_binds,
 			   cg_dir_imps = dir_imps,
 			   cg_foreign  = foreign_stubs,
 			   cg_home_mods = home_mods,
