@@ -599,8 +599,9 @@ toIfaceIdInfo ext id_info
     unfold_info = unfoldingInfo id_info
     inline_prag = inlinePragInfo id_info
     rhs		= unfoldingTemplate unfold_info
-    unfold_hsinfo |  neverUnfold unfold_info 
-		  || has_worker = Nothing
+    unfold_hsinfo |  neverUnfold unfold_info 	-- The CoreTidy phase retains unfolding info iff
+		  || has_worker = Nothing	-- we want to expose the unfolding, taking into account
+						-- unconditional NOINLINE, etc.  See TidyPgm.addExternal
 		  | otherwise	= Just (HsUnfold inline_prag (toIfaceExpr ext rhs))
 
 --------------------------
