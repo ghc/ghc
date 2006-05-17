@@ -396,11 +396,9 @@ prop_findSubstrings s x l
     naive_findSubstrings p s = [x | x <- [0..length s], p `isPrefixOf` drop x s]
 
 prop_replicate1 n c =
-    (n >= 0) ==>
     unpack (P.replicate n c) == replicate n c
 
 prop_replicate2 n c =
-    (n >= 0) ==>
     P.replicate n c == P.unfoldrN n (\u -> Just (u,u)) c
 
 prop_replicate3 c = unpack (P.replicate 0 c) == replicate 0 c
