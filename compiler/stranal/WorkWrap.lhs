@@ -256,14 +256,19 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
 	work_rhs = work_fn rhs
 	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
 			`setInlinePragma` inline_prag
+				-- Any inline pragma (which sets when inlining is active) 
+				-- on the original function is duplicated on the worker and wrapper
+				-- It *matters* that the pragma stays on the wrapper
+				-- It seems sensible to have it on the worker too, although we
+				-- can't think of a compelling reason. (In ptic, INLINE things are 
+				-- not w/wd)
 			`setIdNewStrictness` StrictSig (mkTopDmdType work_demands work_res_info)
 				-- Even though we may not be at top level, 
 				-- it's ok to give it an empty DmdEnv
 
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdWorkerInfo` HasWorker work_id arity
-			 `setInlinePragma` AlwaysActive	-- Zap any inline pragma;
-							-- Put it on the worker instead
+
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
