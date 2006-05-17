@@ -31,6 +31,8 @@ module Data.Fixed
 	E12,Pico
 ) where
 
+import Prelude -- necessary to get dependencies right
+
 -- | generalisation of 'div' to any instance of Real
 div' :: (Real a,Integral b) => a -> a -> b
 div' n d = floor ((toRational n) / (toRational d))
