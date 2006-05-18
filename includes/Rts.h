@@ -34,6 +34,10 @@ extern "C" {
 #define __MSVCRT__ 1
 #endif
 
+/* Needed to get the macro version of errno on some OSs, and also to
+   get prototypes for the _r versions of C library functions. */
+#define _REENTRANT 1
+
 /*
  * We often want to know the size of something in units of an
  * StgWord... (rounded up, of course!)
