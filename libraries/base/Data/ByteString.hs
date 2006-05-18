@@ -1699,12 +1699,12 @@ copy (PS x s l) = create l $ \p -> withForeignPtr x $ \f ->
 
 -- | /O(n)/ Duplicate a CString as a ByteString. Useful if you know the
 -- CString is going to be deallocated from C land.
-copyCString :: CString -> ByteString
+copyCString :: CString -> IO ByteString
 copyCString cstr = copyCStringLen (cstr, (fromIntegral $ c_strlen cstr))
 
 -- | /O(n)/ Same as copyCString, but saves a strlen call when the length is known.
-copyCStringLen :: CStringLen -> ByteString
-copyCStringLen (cstr, len) = inlinePerformIO $ do
+copyCStringLen :: CStringLen -> IO ByteString
+copyCStringLen (cstr, len) = do
     fp <- mallocForeignPtrArray (len+1)
     withForeignPtr fp $ \p -> do
         memcpy p (castPtr cstr) (fromIntegral len)
