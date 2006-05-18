@@ -676,19 +676,26 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 	  if (res == -1)
 	     then do
 		err <- getErrno
-		if err == eINTR
-			then do_select delays'
-			else return (res,delays')
+		case err of
+		  _ | err == eINTR ->  do_select delays'
+			-- EINTR: just redo the select()
+		  _ | err == eBADF ->  return (True, delays)
+			-- EBADF: one of the file descriptors is closed or bad,
+			-- we don't know which one, so wake everyone up.
+		  _ | otherwise    ->  throwErrno "select"
+			-- otherwise (ENOMEM or EINVAL) something has gone
+			-- wrong; report the error.
 	     else
-		return (res,delays')
+		return (False,delays')
 
-  (res,delays') <- do_select delays
-  -- ToDo: check result
+  (wakeup_all,delays') <- do_select delays
 
-  b <- fdIsSet wakeup readfds
-  if b == 0 
-    then return ()
-    else alloca $ \p -> do 
+  if wakeup_all then return ()
+    else do
+      b <- fdIsSet wakeup readfds
+      if b == 0 
+        then return ()
+        else alloca $ \p -> do 
 	    c_read (fromIntegral wakeup) p 1; return ()
 	    s <- peek p		
 	    if (s == 0xff) 
@@ -701,7 +708,9 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
   takeMVar prodding
   putMVar prodding False
 
-  reqs' <- completeRequests reqs readfds writefds []
+  reqs' <- if wakeup_all then do wakeupAll reqs; return []
+			 else completeRequests reqs readfds writefds []
+
   service_loop wakeup readfds writefds ptimeval reqs' delays'
 
 stick :: IORef Fd
@@ -752,6 +761,10 @@ completeRequests (Write fd m : reqs) readfds writefds reqs' = do
   if b /= 0
     then do putMVar m (); completeRequests reqs readfds writefds reqs'
     else completeRequests reqs readfds writefds (Write fd m : reqs')
+
+wakeupAll [] = return ()
+wakeupAll (Read  fd m : reqs) = do putMVar m (); wakeupAll reqs
+wakeupAll (Write fd m : reqs) = do putMVar m (); wakeupAll reqs
 
 waitForReadEvent :: Fd -> IO ()
 waitForReadEvent fd = do
