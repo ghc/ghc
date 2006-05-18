@@ -641,9 +641,8 @@ getCoreToDo dflags
 			-- Similarly, don't apply any rules until after full 
 			-- laziness.  Notably, list fusion can prevent floating.
 
-            NoCaseOfCase,
-			-- Don't do case-of-case transformations.
-			-- This makes full laziness work better
+            NoCaseOfCase,	-- Don't do case-of-case transformations.
+				-- This makes full laziness work better
 	    MaxSimplifierIterations max_iter
 	],
 
