@@ -1,0 +1,23 @@
+Compiler:
+- SMP support
+- GHC API
+- better GC for IORef/IOArray and lots of threads
+- loosen rules on instance decls
+- impredicative types
+- completion in GHCi
+- UTF-8 source files
+- bang patterns
+- :main
+- breakpoints
+
+Libraries:
+- Data.ByteString
+- hslibs removed
+
+Internals/Source tree:
+- NCG handles loops
+- unknown calls take args in registers, if available
+- x86_64: more argument regs
+- refactored HscMain
+- darcs
+- source tree flattened
