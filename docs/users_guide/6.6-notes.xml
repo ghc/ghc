@@ -9,6 +9,8 @@ Compiler:
 - bang patterns
 - :main
 - breakpoints
+- -split-objs now works with --make and Cabal
+- relaxed dependency analysis (with -fglasgow-exts)
 
 Libraries:
 - Data.ByteString
