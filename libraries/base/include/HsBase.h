@@ -20,6 +20,11 @@
 #undef PACKAGE_TARNAME
 #undef PACKAGE_VERSION
 
+/* Needed to get the macro version of errno on some OSs (eg. Solaris).
+   We must do this, because these libs are only compiled once, but
+   must work in both single-threaded and multi-threaded programs. */
+#define _REENTRANT 1
+
 #include "HsFFI.h"
 
 #include <stdio.h>
