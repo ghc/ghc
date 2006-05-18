@@ -16,11 +16,11 @@ SUBDIRS += unix
 endif
 
 SUBDIRS += Cabal
-SUBDIRS += $(wildcard parsec)
 
 # Set GhcBootLibs=YES from the command line to work with just the libraries
 # needed to bootstrap GHC.
 ifneq "$(GhcBootLibs)" "YES"
+SUBDIRS += $(wildcard parsec)
 SUBDIRS += $(wildcard haskell-src)
 SUBDIRS += $(wildcard time)
 SUBDIRS += $(wildcard network)
