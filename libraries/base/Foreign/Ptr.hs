@@ -38,7 +38,7 @@ module Foreign.Ptr (
     -- Free the function pointer created by foreign export dynamic.
 
 #ifndef __NHC__
-    -- * Integral types with lossless conversion to/from pointers
+    -- * Integral types with lossless conversion to and from pointers
     IntPtr,
     ptrToIntPtr,
     intPtrToPtr,
