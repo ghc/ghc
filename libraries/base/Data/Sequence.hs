@@ -786,7 +786,7 @@ viewRTree (Deep s pr m (Four w x y z)) =
 -- | /O(log(min(i,n-i)))/. The element at the specified position
 index		:: Seq a -> Int -> a
 index (Seq xs) i
-  | 0 <= i && i < size xs = case lookupTree (-i) xs of
+  | 0 <= i && i < size xs = case lookupTree i xs of
 				Place _ (Elem x) -> x
   | otherwise	= error "index out of bounds"
 
@@ -801,49 +801,49 @@ lookupTree :: Sized a => Int -> FingerTree a -> Place a
 lookupTree _ Empty = error "lookupTree of empty tree"
 lookupTree i (Single x) = Place i x
 lookupTree i (Deep _ pr m sf)
-  | vpr > 0	=  lookupDigit i pr
-  | vm > 0	=  case lookupTree vpr m of
+  | i < spr	=  lookupDigit i pr
+  | i < spm	=  case lookupTree (i - spr) m of
 			Place i' xs -> lookupNode i' xs
-  | otherwise	=  lookupDigit vm sf
-  where	vpr	=  i + size pr
-	vm	=  vpr + size m
+  | otherwise	=  lookupDigit (i - spm) sf
+  where	spr	= size pr
+	spm	= spr + size m
 
 {-# SPECIALIZE lookupNode :: Int -> Node (Elem a) -> Place (Elem a) #-}
 {-# SPECIALIZE lookupNode :: Int -> Node (Node a) -> Place (Node a) #-}
 lookupNode :: Sized a => Int -> Node a -> Place a
 lookupNode i (Node2 _ a b)
-  | va > 0	= Place i a
-  | otherwise	= Place va b
-  where	va	= i + size a
+  | i < sa	= Place i a
+  | otherwise	= Place (i - sa) b
+  where	sa	= size a
 lookupNode i (Node3 _ a b c)
-  | va > 0	= Place i a
-  | vab > 0	= Place va b
-  | otherwise	= Place vab c
-  where	va	= i + size a
-	vab	= va + size b
+  | i < sa	= Place i a
+  | i < sab	= Place (i - sa) b
+  | otherwise	= Place (i - sab) c
+  where	sa	= size a
+	sab	= sa + size b
 
 {-# SPECIALIZE lookupDigit :: Int -> Digit (Elem a) -> Place (Elem a) #-}
 {-# SPECIALIZE lookupDigit :: Int -> Digit (Node a) -> Place (Node a) #-}
 lookupDigit :: Sized a => Int -> Digit a -> Place a
 lookupDigit i (One a) = Place i a
 lookupDigit i (Two a b)
-  | va > 0	= Place i a
-  | otherwise	= Place va b
-  where	va	= i + size a
+  | i < sa	= Place i a
+  | otherwise	= Place (i - sa) b
+  where	sa	= size a
 lookupDigit i (Three a b c)
-  | va > 0	= Place i a
-  | vab > 0	= Place va b
-  | otherwise	= Place vab c
-  where	va	= i + size a
-	vab	= va + size b
+  | i < sa	= Place i a
+  | i < sab	= Place (i - sa) b
+  | otherwise	= Place (i - sab) c
+  where	sa	= size a
+	sab	= sa + size b
 lookupDigit i (Four a b c d)
-  | va > 0	= Place i a
-  | vab > 0	= Place va b
-  | vabc > 0	= Place vab c
-  | otherwise	= Place vabc d
-  where	va	= i + size a
-	vab	= va + size b
-	vabc	= vab + size c
+  | i < sa	= Place i a
+  | i < sab	= Place (i - sa) b
+  | i < sabc	= Place (i - sab) c
+  | otherwise	= Place (i - sabc) d
+  where	sa	= size a
+	sab	= sa + size b
+	sabc	= sab + size c
 
 -- | /O(log(min(i,n-i)))/. Replace the element at the specified position
 update		:: Int -> a -> Seq a -> Seq a
@@ -852,7 +852,7 @@ update i x	= adjust (const x) i
 -- | /O(log(min(i,n-i)))/. Update the element at the specified position
 adjust		:: (a -> a) -> Int -> Seq a -> Seq a
 adjust f i (Seq xs)
-  | 0 <= i && i < size xs = Seq (adjustTree (const (fmap f)) (-i) xs)
+  | 0 <= i && i < size xs = Seq (adjustTree (const (fmap f)) i xs)
   | otherwise	= Seq xs
 
 {-# SPECIALIZE adjustTree :: (Int -> Elem a -> Elem a) -> Int -> FingerTree (Elem a) -> FingerTree (Elem a) #-}
@@ -862,48 +862,48 @@ adjustTree	:: Sized a => (Int -> a -> a) ->
 adjustTree _ _ Empty = error "adjustTree of empty tree"
 adjustTree f i (Single x) = Single (f i x)
 adjustTree f i (Deep s pr m sf)
-  | vpr > 0	= Deep s (adjustDigit f i pr) m sf
-  | vm > 0	= Deep s pr (adjustTree (adjustNode f) vpr m) sf
-  | otherwise	= Deep s pr m (adjustDigit f vm sf)
-  where	vpr	= i + size pr
-	vm	= vpr + size m
+  | i < spr	= Deep s (adjustDigit f i pr) m sf
+  | i < spm	= Deep s pr (adjustTree (adjustNode f) (i - spr) m) sf
+  | otherwise	= Deep s pr m (adjustDigit f (i - spm) sf)
+  where	spr	= size pr
+	spm	= spr + size m
 
 {-# SPECIALIZE adjustNode :: (Int -> Elem a -> Elem a) -> Int -> Node (Elem a) -> Node (Elem a) #-}
 {-# SPECIALIZE adjustNode :: (Int -> Node a -> Node a) -> Int -> Node (Node a) -> Node (Node a) #-}
 adjustNode	:: Sized a => (Int -> a -> a) -> Int -> Node a -> Node a
 adjustNode f i (Node2 s a b)
-  | va > 0	= Node2 s (f i a) b
-  | otherwise	= Node2 s a (f va b)
-  where	va	= i + size a
+  | i < sa	= Node2 s (f i a) b
+  | otherwise	= Node2 s a (f (i - sa) b)
+  where	sa	= size a
 adjustNode f i (Node3 s a b c)
-  | va > 0	= Node3 s (f i a) b c
-  | vab > 0	= Node3 s a (f va b) c
-  | otherwise	= Node3 s a b (f vab c)
-  where	va	= i + size a
-	vab	= va + size b
+  | i < sa	= Node3 s (f i a) b c
+  | i < sab	= Node3 s a (f (i - sa) b) c
+  | otherwise	= Node3 s a b (f (i - sab) c)
+  where	sa	= size a
+	sab	= sa + size b
 
 {-# SPECIALIZE adjustDigit :: (Int -> Elem a -> Elem a) -> Int -> Digit (Elem a) -> Digit (Elem a) #-}
 {-# SPECIALIZE adjustDigit :: (Int -> Node a -> Node a) -> Int -> Digit (Node a) -> Digit (Node a) #-}
 adjustDigit	:: Sized a => (Int -> a -> a) -> Int -> Digit a -> Digit a
 adjustDigit f i (One a) = One (f i a)
 adjustDigit f i (Two a b)
-  | va > 0	= Two (f i a) b
-  | otherwise	= Two a (f va b)
-  where	va	= i + size a
+  | i < sa	= Two (f i a) b
+  | otherwise	= Two a (f (i - sa) b)
+  where	sa	= size a
 adjustDigit f i (Three a b c)
-  | va > 0	= Three (f i a) b c
-  | vab > 0	= Three a (f va b) c
-  | otherwise	= Three a b (f vab c)
-  where	va	= i + size a
-	vab	= va + size b
+  | i < sa	= Three (f i a) b c
+  | i < sab	= Three a (f (i - sa) b) c
+  | otherwise	= Three a b (f (i - sab) c)
+  where	sa	= size a
+	sab	= sa + size b
 adjustDigit f i (Four a b c d)
-  | va > 0	= Four (f i a) b c d
-  | vab > 0	= Four a (f va b) c d
-  | vabc > 0	= Four a b (f vab c) d
-  | otherwise	= Four a b c (f vabc d)
-  where	va	= i + size a
-	vab	= va + size b
-	vabc	= vab + size c
+  | i < sa	= Four (f i a) b c d
+  | i < sab	= Four a (f (i - sa) b) c d
+  | i < sabc	= Four a b (f (i - sab) c) d
+  | otherwise	= Four a b c (f (i- sabc) d)
+  where	sa	= size a
+	sab	= sa + size b
+	sabc	= sab + size c
 
 -- Splitting
 
@@ -926,7 +926,7 @@ split i Empty	= i `seq` (Empty, Empty)
 split i xs
   | size xs > i	= (l, consTree x r)
   | otherwise	= (xs, Empty)
-  where Split l x r = splitTree (-i) xs
+  where Split l x r = splitTree i xs
 
 data Split t a = Split t a t
 #if TESTING
@@ -939,15 +939,16 @@ splitTree :: Sized a => Int -> FingerTree a -> Split (FingerTree a) a
 splitTree _ Empty = error "splitTree of empty tree"
 splitTree i (Single x) = i `seq` Split Empty x Empty
 splitTree i (Deep _ pr m sf)
-  | vpr > 0	= case splitDigit i pr of
+  | i < spr	= case splitDigit i pr of
 			Split l x r -> Split (maybe Empty digitToTree l) x (deepL r m sf)
-  | vm > 0	= case splitTree vpr m of
-			Split ml xs mr -> case splitNode (vpr + size ml) xs of
+  | i < spm	= case splitTree im m of
+			Split ml xs mr -> case splitNode (im - size ml) xs of
 			    Split l x r -> Split (deepR pr  ml l) x (deepL r mr sf)
-  | otherwise	= case splitDigit vm sf of
+  | otherwise	= case splitDigit (i - spm) sf of
 			Split l x r -> Split (deepR pr  m  l) x (maybe Empty digitToTree r)
-  where	vpr	= i + size pr
-	vm	= vpr + size m
+  where	spr	= size pr
+	spm	= spr + size m
+	im	= i - spr
 
 {-# SPECIALIZE deepL :: Maybe (Digit (Elem a)) -> FingerTree (Node (Elem a)) -> Digit (Elem a) -> FingerTree (Elem a) #-}
 {-# SPECIALIZE deepL :: Maybe (Digit (Node a)) -> FingerTree (Node (Node a)) -> Digit (Node a) -> FingerTree (Node a) #-}
@@ -969,38 +970,38 @@ deepR pr m (Just sf)	= deep pr m sf
 {-# SPECIALIZE splitNode :: Int -> Node (Node a) -> Split (Maybe (Digit (Node a))) (Node a) #-}
 splitNode :: Sized a => Int -> Node a -> Split (Maybe (Digit a)) a
 splitNode i (Node2 _ a b)
-  | va > 0	= Split Nothing a (Just (One b))
+  | i < sa	= Split Nothing a (Just (One b))
   | otherwise	= Split (Just (One a)) b Nothing
-  where	va	= i + size a
+  where	sa	= size a
 splitNode i (Node3 _ a b c)
-  | va > 0	= Split Nothing a (Just (Two b c))
-  | vab > 0	= Split (Just (One a)) b (Just (One c))
+  | i < sa	= Split Nothing a (Just (Two b c))
+  | i < sab	= Split (Just (One a)) b (Just (One c))
   | otherwise	= Split (Just (Two a b)) c Nothing
-  where	va	= i + size a
-	vab	= va + size b
+  where	sa	= size a
+	sab	= sa + size b
 
 {-# SPECIALIZE splitDigit :: Int -> Digit (Elem a) -> Split (Maybe (Digit (Elem a))) (Elem a) #-}
 {-# SPECIALIZE splitDigit :: Int -> Digit (Node a) -> Split (Maybe (Digit (Node a))) (Node a) #-}
 splitDigit :: Sized a => Int -> Digit a -> Split (Maybe (Digit a)) a
 splitDigit i (One a) = i `seq` Split Nothing a Nothing
 splitDigit i (Two a b)
-  | va > 0	= Split Nothing a (Just (One b))
+  | i < sa	= Split Nothing a (Just (One b))
   | otherwise	= Split (Just (One a)) b Nothing
-  where	va	= i + size a
+  where	sa	= size a
 splitDigit i (Three a b c)
-  | va > 0	= Split Nothing a (Just (Two b c))
-  | vab > 0	= Split (Just (One a)) b (Just (One c))
+  | i < sa	= Split Nothing a (Just (Two b c))
+  | i < sab	= Split (Just (One a)) b (Just (One c))
   | otherwise	= Split (Just (Two a b)) c Nothing
-  where	va	= i + size a
-	vab	= va + size b
+  where	sa	= size a
+	sab	= sa + size b
 splitDigit i (Four a b c d)
-  | va > 0	= Split Nothing a (Just (Three b c d))
-  | vab > 0	= Split (Just (One a)) b (Just (Two c d))
-  | vabc > 0	= Split (Just (Two a b)) c (Just (One d))
+  | i < sa	= Split Nothing a (Just (Three b c d))
+  | i < sab	= Split (Just (One a)) b (Just (Two c d))
+  | i < sabc	= Split (Just (Two a b)) c (Just (One d))
   | otherwise	= Split (Just (Three a b c)) d Nothing
-  where	va	= i + size a
-	vab	= va + size b
-	vabc	= vab + size c
+  where	sa	= size a
+	sab	= sa + size b
+	sabc	= sab + size c
 
 ------------------------------------------------------------------------
 -- Lists
