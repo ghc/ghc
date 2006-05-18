@@ -5010,63 +5010,58 @@ key_function :: Int -> String -> (Bool, Double)
         If you use <option>-dverbose-core2core</option> you'll see the
         sequence of phase numbers for successive runs of the
         simplifier.  In an INLINE pragma you can optionally specify a
-        phase number, thus:</para>
-
+        phase number, thus:
 	<itemizedlist>
 	  <listitem>
-	    <para>You can say "inline <literal>f</literal> in Phase 2
-            and all subsequent phases":
-<programlisting>
-  {-# INLINE [2] f #-}
-</programlisting>
-            </para>
-	  </listitem>
-
+	    <para>"<literal>INLINE[k] f</literal>" means: do not inline
+	    <literal>f</literal>
+	      until phase <literal>k</literal>, but from phase
+	      <literal>k</literal> onwards be very keen to inline it.
+            </para></listitem>
 	  <listitem>
-	    <para>You can say "inline <literal>g</literal> in all
-            phases up to, but not including, Phase 3":
-<programlisting>
-  {-# INLINE [~3] g #-}
-</programlisting>
-            </para>
-	  </listitem>
-
+	    <para>"<literal>INLINE[~k] f</literal>" means: be very keen to inline
+	    <literal>f</literal>
+	      until phase <literal>k</literal>, but from phase
+	      <literal>k</literal> onwards do not inline it.
+            </para></listitem>
 	  <listitem>
-	    <para>If you omit the phase indicator, you mean "inline in
-            all phases".</para>
-	  </listitem>
+	    <para>"<literal>NOINLINE[k] f</literal>" means: do not inline
+	    <literal>f</literal>
+	      until phase <literal>k</literal>, but from phase
+	      <literal>k</literal> onwards be willing to inline it (as if
+	      there was no pragma).
+            </para></listitem>
+	    <listitem>
+	    <para>"<literal>INLINE[~k] f</literal>" means: be willing to inline
+	    <literal>f</literal>
+	      until phase <literal>k</literal>, but from phase
+	      <literal>k</literal> onwards do not inline it.
+            </para></listitem>
 	</itemizedlist>
-
-	<para>You can use a phase number on a NOINLINE pragma too:</para>
-
-	<itemizedlist>
-	  <listitem>
-	    <para>You can say "do not inline <literal>f</literal>
-            until Phase 2; in Phase 2 and subsequently behave as if
-            there was no pragma at all":
+The same information is summarised here:
 <programlisting>
-  {-# NOINLINE [2] f #-}
+                           -- Before phase 2     Phase 2 and later
+  {-# INLINE   [2]  f #-}  --      No                 Yes
+  {-# INLINE   [~2] f #-}  --      Yes                No
+  {-# NOINLINE [2]  f #-}  --      No                 Maybe
+  {-# NOINLINE [~2] f #-}  --      Maybe              No
+
+  {-# INLINE   f #-}       --      Yes                Yes
+  {-# NOINLINE f #-}       --      No                 No
 </programlisting>
-            </para>
-	  </listitem>
-
-	  <listitem>
-	    <para>You can say "do not inline <literal>g</literal> in
-            Phase 3 or any subsequent phase; before that, behave as if
-            there was no pragma":
-<programlisting>
-  {-# NOINLINE [~3] g #-}
-</programlisting>
-            </para>
-	  </listitem>
-
-	  <listitem>
-	    <para>If you omit the phase indicator, you mean "never
-            inline this function".</para>
-	  </listitem>
-	</itemizedlist>
-
-	<para>The same phase-numbering control is available for RULES
+By "Maybe" we mean that the usual heuristic inlining rules apply (if the
+function body is small, or it is applied to interesting-looking arguments etc).
+Another way to understand the semantics is this:
+<itemizedlist>
+<listitem><para>For both INLINE and NOINLINE, the phase number says
+when inlining is allowed at all.</para></listitem>
+<listitem><para>The INLINE pragma has the additional effect of making the
+function body look small, so that when inlining is allowed it is very likely to
+happen.
+</para></listitem>
+</itemizedlist>
+</para>
+<para>The same phase-numbering control is available for RULES
 	(<xref linkend="rewrite-rules"/>).</para>
       </sect3>
     </sect2>
