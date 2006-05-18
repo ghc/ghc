@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-/* gettimeofday isn't POSIX */
-/* #include "PosixSource.h" */
+#include "PosixSource.h"
 
 #include "Rts.h"
 #include "RtsAPI.h"
@@ -16,14 +15,7 @@
 #include "Ticky.h"
 
 #ifdef HAVE_TIME_H
-#ifdef solaris2_HOST_OS
-// Solaris requires this to get access to the POSIX ctime_r()
-#define _POSIX_PTHREAD_SEMANTICS
-#endif
 #include <time.h>
-#ifdef solaris2_HOST_OS
-#undef _POSIX_PTHREAD_SEMANTICS
-#endif
 #endif
 
 #ifdef HAVE_FCNTL_H
