@@ -169,44 +169,6 @@ implement thread-friendly I\/O, so calling standard Haskell I\/O
 functions blocks only the thread making the call.
 -}
 
--- Thread Ids, specifically the instances of Eq and Ord for these things.
--- The ThreadId type itself is defined in std/PrelConc.lhs.
-
--- Rather than define a new primitve, we use a little helper function
--- cmp_thread in the RTS.
-
-#ifdef __GLASGOW_HASKELL__
-id2TSO :: ThreadId -> ThreadId#
-id2TSO (ThreadId t) = t
-
-foreign import ccall unsafe "cmp_thread" cmp_thread :: ThreadId# -> ThreadId# -> CInt
--- Returns -1, 0, 1
-
-cmpThread :: ThreadId -> ThreadId -> Ordering
-cmpThread t1 t2 = 
-   case cmp_thread (id2TSO t1) (id2TSO t2) of
-      -1 -> LT
-      0  -> EQ
-      _  -> GT -- must be 1
-
-instance Eq ThreadId where
-   t1 == t2 = 
-      case t1 `cmpThread` t2 of
-         EQ -> True
-         _  -> False
-
-instance Ord ThreadId where
-   compare = cmpThread
-
-foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> Int
-
-instance Show ThreadId where
-   showsPrec d t = 
-   	showString "ThreadId " . 
-        showsPrec d (getThreadId (id2TSO t))
-
-#endif /* __GLASGOW_HASKELL__ */
-
 #ifndef __HUGS__
 max_buff_size :: Int
 max_buff_size = 1

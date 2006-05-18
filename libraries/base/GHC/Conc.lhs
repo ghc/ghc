@@ -99,6 +99,7 @@ import GHC.Exception    ( catchException, Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
+import GHC.Show		( Show(..), showString )
 import Data.Typeable
 
 infixr 0 `par`, `pseq`
@@ -132,6 +133,35 @@ This misfeature will hopefully be corrected at a later date.
 /Note/: Hugs does not provide any operations on other threads;
 it defines 'ThreadId' as a synonym for ().
 -}
+
+instance Show ThreadId where
+   showsPrec d t = 
+   	showString "ThreadId " . 
+        showsPrec d (getThreadId (id2TSO t))
+
+foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> Int
+
+id2TSO :: ThreadId -> ThreadId#
+id2TSO (ThreadId t) = t
+
+foreign import ccall unsafe "cmp_thread" cmp_thread :: ThreadId# -> ThreadId# -> CInt
+-- Returns -1, 0, 1
+
+cmpThread :: ThreadId -> ThreadId -> Ordering
+cmpThread t1 t2 = 
+   case cmp_thread (id2TSO t1) (id2TSO t2) of
+      -1 -> LT
+      0  -> EQ
+      _  -> GT -- must be 1
+
+instance Eq ThreadId where
+   t1 == t2 = 
+      case t1 `cmpThread` t2 of
+         EQ -> True
+         _  -> False
+
+instance Ord ThreadId where
+   compare = cmpThread
 
 {- |
 This sparks off a new thread to run the 'IO' computation passed as the
