@@ -1786,7 +1786,8 @@ prepareCaseCont :: SimplEnv
 		-> [InAlt] -> SimplCont
 	        -> SimplM (FloatsWith (SimplCont,SimplCont)) 	
 			-- Return a duplicatable continuation, a non-duplicable part 
-			-- plus some extra bindings
+			-- plus some extra bindings (that scope over the entire
+			-- continunation)
 
 	-- No need to make it duplicatable if there's only one alternative
 prepareCaseCont env [alt] cont = returnSmpl (emptyFloats env, (cont, mkBoringStop (contResultType cont)))
@@ -1842,56 +1843,56 @@ mkDupableCont env (ApplyTo _ arg se cont)
 	--	==>
 	--		let a = ...arg... 
 	--		in [...hole...] a
-    simplExpr (setInScope se env) arg			`thenSmpl` \ arg' ->
-
-    mkDupableCont env cont				`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
-    addFloats env floats				$ \ env ->
-
-    if exprIsDupable arg' then
-	returnSmpl (emptyFloats env, (ApplyTo OkToDup arg' (zapSubstEnv se) dup_cont, nondup_cont))
-    else
-    newId FSLIT("a") (exprType arg')			`thenSmpl` \ arg_id ->
-
-    tick (CaseOfCase arg_id)				`thenSmpl_`
-	-- Want to tick here so that we go round again,
-	-- and maybe copy or inline the code.
-	-- Not strictly CaseOfCase, but never mind
-
-    returnSmpl (unitFloat env arg_id arg', 
-		(ApplyTo OkToDup (Var arg_id) (zapSubstEnv se) dup_cont,
-		 nondup_cont))
-	-- But what if the arg should be case-bound? 
-	-- This has been this way for a long time, so I'll leave it,
-	-- but I can't convince myself that it's right.
+    do	{ (floats, (dup_cont, nondup_cont)) <- mkDupableCont env cont
+	; addFloats env floats $ \ env -> do
+	{ arg1 <- simplExpr (setInScope se env) arg
+	; (floats2, arg2) <- mkDupableArg env arg1
+	; return (floats2, (ApplyTo OkToDup arg2 (zapSubstEnv se) dup_cont, nondup_cont)) }}
 
 mkDupableCont env (Select _ case_bndr alts se cont)
   = 	-- e.g.		(case [...hole...] of { pi -> ei })
 	--	===>
 	--		let ji = \xij -> ei 
 	--		in case [...hole...] of { pi -> ji xij }
-    tick (CaseOfCase case_bndr)					`thenSmpl_`
-    let
-	alt_env = setInScope se env
-    in
-    prepareCaseCont alt_env alts cont				`thenSmpl` \ (floats1, (dup_cont, nondup_cont)) ->
-    addFloats alt_env floats1 					$ \ alt_env ->
+    do	{ tick (CaseOfCase case_bndr)
+	; let alt_env = setInScope se env
+	; (floats1, (dup_cont, nondup_cont)) <- mkDupableCont alt_env cont
+		-- NB: call mkDupableCont here, *not* prepareCaseCont
+		-- We must make a duplicable continuation, whereas prepareCaseCont
+		-- doesn't when there is a single case branch
+	; addFloats alt_env floats1 	$ \ alt_env -> do
 
-    simplBinder alt_env case_bndr				`thenSmpl` \ (alt_env, case_bndr') ->
-	-- NB: simplBinder does not zap deadness occ-info, so
-	-- a dead case_bndr' will still advertise its deadness
-	-- This is really important because in
-	--	case e of b { (# a,b #) -> ... }
-	-- b is always dead, and indeed we are not allowed to bind b to (# a,b #),
-	-- which might happen if e was an explicit unboxed pair and b wasn't marked dead.
-	-- In the new alts we build, we have the new case binder, so it must retain
-	-- its deadness.
+	{ (alt_env, case_bndr') <- simplBinder alt_env case_bndr
+		-- NB: simplBinder does not zap deadness occ-info, so
+		-- a dead case_bndr' will still advertise its deadness
+		-- This is really important because in
+		--	case e of b { (# a,b #) -> ... }
+		-- b is always dead, and indeed we are not allowed to bind b to (# a,b #),
+		-- which might happen if e was an explicit unboxed pair and b wasn't marked dead.
+		-- In the new alts we build, we have the new case binder, so it must retain
+		-- its deadness.
 
-    mkDupableAlts alt_env case_bndr' alts dup_cont	`thenSmpl` \ (floats2, alts') ->
-    addFloats alt_env floats2 				$ \ alt_env ->
-    returnSmpl (emptyFloats alt_env, 
-		(Select OkToDup case_bndr' alts' (zapSubstEnv se) 
-			(mkBoringStop (contResultType dup_cont)),
-		 nondup_cont))
+	; (floats2, alts') <- mkDupableAlts alt_env case_bndr' alts dup_cont
+	; return (floats2, (Select OkToDup case_bndr' alts' (zapSubstEnv se) 
+			   	   (mkBoringStop (contResultType dup_cont)),
+		  	    nondup_cont))
+	}}
+
+mkDupableArg :: SimplEnv -> OutExpr -> SimplM (FloatsWith OutExpr)
+-- Let-bind the thing if necessary
+mkDupableArg env arg
+  | exprIsDupable arg 
+  = return (emptyFloats env, arg)
+  | otherwise 	   
+  = do	{ arg_id <- newId FSLIT("a") (exprType arg)
+	; tick (CaseOfCase arg_id)
+		-- Want to tick here so that we go round again,
+		-- and maybe copy or inline the code.
+		-- Not strictly CaseOfCase, but never mind
+	; return (unitFloat env arg_id arg, Var arg_id) }
+	-- What if the arg should be case-bound? 
+	-- This has been this way for a long time, so I'll leave it,
+	-- but I can't convince myself that it's right.
 
 mkDupableAlts :: SimplEnv -> OutId -> [InAlt] -> SimplCont
 	      -> SimplM (FloatsWith [InAlt])
