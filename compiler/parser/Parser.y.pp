@@ -425,7 +425,7 @@ ops   	:: { Located [Located RdrName] }
 -----------------------------------------------------------------------------
 -- Top-Level Declarations
 
-topdecls :: { OrdList (LHsDecl RdrName) }	-- Reversed
+topdecls :: { OrdList (LHsDecl RdrName) }
 	: topdecls ';' topdecl		{ $1 `appOL` $3 }
 	| topdecls ';'			{ $1 }
 	| topdecl			{ $1 }
@@ -498,18 +498,18 @@ tycl_hdr :: { Located (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrNam
 -----------------------------------------------------------------------------
 -- Nested declarations
 
-decls 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+decls 	:: { Located (OrdList (LHsDecl RdrName)) }	
 	: decls ';' decl		{ LL (unLoc $1 `appOL` unLoc $3) }
 	| decls ';'			{ LL (unLoc $1) }
 	| decl				{ $1 }
 	| {- empty -}			{ noLoc nilOL }
 
 
-decllist :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+decllist :: { Located (OrdList (LHsDecl RdrName)) }
 	: '{'            decls '}'	{ LL (unLoc $2) }
 	|     vocurly    decls close	{ $2 }
 
-where 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+where 	:: { Located (OrdList (LHsDecl RdrName)) }
 				-- No implicit parameters
 	: 'where' decllist		{ LL (unLoc $2) }
 	| {- empty -}			{ noLoc nilOL }
@@ -527,7 +527,7 @@ wherebinds :: { Located (HsLocalBinds RdrName) }	-- May have implicit parameters
 -----------------------------------------------------------------------------
 -- Transformation Rules
 
-rules	:: { OrdList (LHsDecl RdrName) }	-- Reversed
+rules	:: { OrdList (LHsDecl RdrName) }
 	:  rules ';' rule			{ $1 `snocOL` $3 }
         |  rules ';'				{ $1 }
         |  rule					{ unitOL $1 }
@@ -562,7 +562,7 @@ rule_var :: { RuleBndr RdrName }
 -----------------------------------------------------------------------------
 -- Deprecations (c.f. rules)
 
-deprecations :: { OrdList (LHsDecl RdrName) }	-- Reversed
+deprecations :: { OrdList (LHsDecl RdrName) }
 	: deprecations ';' deprecation		{ $1 `appOL` $3 }
 	| deprecations ';' 			{ $1 }
 	| deprecation				{ $1 }

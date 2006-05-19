@@ -222,7 +222,7 @@ cvBindsAndSigs  fb = go (fromOL fb)
 getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
   -> (LHsBind RdrName, [LHsDecl RdrName])
 -- Suppose 	(b',ds') = getMonoBind b ds
--- 	ds is a *reversed* list of parsed bindings
+-- 	ds is a list of parsed bindings
 --	b is a MonoBinds that has just been read off the front
 
 -- Then b' is the result of grouping more equations from ds that
