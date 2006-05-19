@@ -416,7 +416,14 @@ checkPrecMatch True op (MatchGroup ms _)
       = checkPrec op (unLoc p1) False	`thenM_`
         checkPrec op (unLoc p2) True
 
-    check _ = panic "checkPrecMatch"
+    check _ = return ()	
+	-- This can happen.  Consider
+	--	a `op` True = ...
+	--	op          = ...
+	-- The infix flag comes from the first binding of the group
+	-- but the second eqn has no args (an error, but not discovered
+	-- until the type checker).  So we don't want to crash on the
+	-- second eqn.
 
 checkPrec op (ConPatIn op1 (InfixCon _ _)) right
   = lookupFixityRn op		`thenM` \  op_fix@(Fixity op_prec  op_dir) ->

@@ -231,15 +231,18 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 --
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
-getMonoBind (L loc bind@(FunBind { fun_id = L _ f, fun_matches = MatchGroup mtchs _ })) binds
-  | has_args mtchs
-  = go mtchs loc binds
+getMonoBind (L loc1 bind@(FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1, 
+				   fun_matches = MatchGroup mtchs1 _ })) binds
+  | has_args mtchs1
+  = go is_infix1 mtchs1 loc1 binds
   where
-    go mtchs1 loc1 (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_matches = MatchGroup mtchs2 _ })) : binds)
-	| f == f2 = go (mtchs2++mtchs1) loc binds
-	where loc = combineSrcSpans loc1 loc2
-    go mtchs1 loc binds
-	= (L loc (bind { fun_matches = mkMatchGroup (reverse mtchs1) }), binds)
+    go is_infix mtchs loc 
+       (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_infix = is_infix2,
+			        fun_matches = MatchGroup mtchs2 _ })) : binds)
+	| f1 == f2 = go (is_infix || is_infix2) (mtchs2 ++ mtchs) 
+		        (combineSrcSpans loc loc2) binds
+    go is_infix mtchs loc binds
+	= (L loc (makeFunBind fun_id1 is_infix (reverse mtchs)), binds)
 	-- Reverse the final matches, to get it back in the right order
 
 getMonoBind bind binds = (bind, binds)
@@ -603,11 +606,15 @@ checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
   | otherwise
   = do	ps <- checkPatterns pats
 	let match_span = combineSrcSpans lhs_loc rhs_span
-	    matches    = mkMatchGroup [L match_span (Match ps opt_sig grhss)]
-	return (FunBind { fun_id = fun, fun_infix = is_infix, fun_matches = matches,
-			  fun_co_fn = idCoercion, bind_fvs = placeHolderNames })
+	return (makeFunBind fun is_infix [L match_span (Match ps opt_sig grhss)])
 	-- The span of the match covers the entire equation.  
 	-- That isn't quite right, but it'll do for now.
+
+makeFunBind :: Located id -> Bool -> [LMatch id] -> HsBind id
+-- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
+makeFunBind fn is_infix ms 
+  = FunBind { fun_id = fn, fun_infix = is_infix, fun_matches = mkMatchGroup ms,
+	      fun_co_fn = idCoercion, bind_fvs = placeHolderNames }
 
 checkPatBind lhs (L _ grhss)
   = do	{ lhs <- checkPattern lhs
@@ -672,15 +679,29 @@ isFunLhs e = go e []
 	| not (isRdrDataCon f)	 = return (Just (L loc f, False, es))
    go (L _ (HsApp f e)) es 	 = go f (e:es)
    go (L _ (HsPar e))   es@(_:_) = go e es
+
+	-- For infix function defns, there should be only one infix *function*
+	-- (though there may be infix *datacons* involved too).  So we don't
+	-- need fixity info to figure out which function is being defined.
+	--	a `K1` b `op` c `K2` d
+	-- must parse as
+	--	(a `K1` b) `op` (c `K2` d)
+	-- The renamer checks later that the precedences would yield such a parse.
+	-- 
+	-- There is a complication to deal with bang patterns.
+	--
+	-- ToDo: what about this?
+	--		x + 1 `op` y = ...
+
    go e@(L loc (OpApp l (L loc' (HsVar op)) fix r)) es
 	| Just (e',es') <- splitBang e
 	= do { bang_on <- extension bangPatEnabled
 	     ; if bang_on then go e' (es' ++ es)
 	       else return (Just (L loc' op, True, (l:r:es))) }
 		-- No bangs; behave just like the next case
-	| not (isRdrDataCon op) 
+	| not (isRdrDataCon op) 	-- We have found the function!
 	= return (Just (L loc' op, True, (l:r:es)))
-	| otherwise
+	| otherwise			-- Infix data con; keep going
 	= do { mb_l <- go l es
 	     ; case mb_l of
 		 Just (op', True, j : k : es')
