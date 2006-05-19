@@ -10,7 +10,7 @@ module TcRules ( tcRules ) where
 
 import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), mkHsDictLet )
 import TcRnMonad
-import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
+import TcSimplify	( tcSimplifyRuleLhs, tcSimplifyInferCheck )
 import TcMType		( newFlexiTyVarTy, zonkQuantifiedTyVar, tcSkolSigTyVars )
 import TcType		( tyVarsOfTypes, openTypeKind, SkolemInfo(..), substTyWith, mkTyVarTys )
 import TcHsType		( UserTypeCtxt(..), tcHsPatSigType )
@@ -43,7 +43,7 @@ tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
     )				`thenM` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
 
 		-- Check that LHS has no overloading at all
-    getLIE (tcSimplifyToDicts lhs_lie)	`thenM` \ (lhs_binds, lhs_dicts) ->
+    tcSimplifyRuleLhs lhs_lie	`thenM` \ (lhs_dicts, lhs_binds) ->
 
 	-- Gather the template variables and tyvars
     let
@@ -86,7 +86,7 @@ tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
 		    (map (RuleBndr . noLoc) (forall_tvs2 ++ tpl_ids))	-- yuk
 		    (mkHsDictLet lhs_binds lhs') fv_lhs
 		    (mkHsDictLet rhs_binds rhs') fv_rhs)
-  where
+
 
 tcRuleBndrs [] thing_inside = thing_inside []
 tcRuleBndrs (RuleBndr var : vars) thing_inside

@@ -9,7 +9,7 @@
 module TcSimplify (
 	tcSimplifyInfer, tcSimplifyInferCheck,
 	tcSimplifyCheck, tcSimplifyRestricted,
-	tcSimplifyToDicts, tcSimplifyIPs, 
+	tcSimplifyRuleLhs, tcSimplifyIPs, 
 	tcSimplifySuperClasses,
 	tcSimplifyTop, tcSimplifyInteractive,
 	tcSimplifyBracket,
@@ -1114,7 +1114,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 
 %************************************************************************
 %*									*
-\subsection{tcSimplifyToDicts}
+		tcSimplifyRuleLhs
 %*									*
 %************************************************************************
 
@@ -1122,60 +1122,76 @@ On the LHS of transformation rules we only simplify methods and constants,
 getting dictionaries.  We want to keep all of them unsimplified, to serve
 as the available stuff for the RHS of the rule.
 
-The same thing is used for specialise pragmas. Consider
+Example.  Consider the following left-hand side of a rule
+	
+	f (x == y) (y > z) = ...
 
-	f :: Num a => a -> a
-	{-# SPECIALISE f :: Int -> Int #-}
-	f = ...
+If we typecheck this expression we get constraints
 
-The type checker generates a binding like:
+	d1 :: Ord a, d2 :: Eq a
 
-	f_spec = (f :: Int -> Int)
+We do NOT want to "simplify" to the LHS
 
-and we want to end up with
+	forall x::a, y::a, z::a, d1::Ord a.
+	  f ((==) (eqFromOrd d1) x y) ((>) d1 y z) = ...
 
-	f_spec = _inline_me_ (f Int dNumInt)
+Instead we want	
 
-But that means that we must simplify the Method for f to (f Int dNumInt)!
-So tcSimplifyToDicts squeezes out all Methods.
+	forall x::a, y::a, z::a, d1::Ord a, d2::Eq a.
+	  f ((==) d2 x y) ((>) d1 y z) = ...
 
-IMPORTANT NOTE:  we *don't* want to do superclass commoning up.  Consider
+Here is another example:
 
 	fromIntegral :: (Integral a, Num b) => a -> b
 	{-# RULES "foo"  fromIntegral = id :: Int -> Int #-}
 
-Here, a=b=Int, and Num Int is a superclass of Integral Int. But we *dont*
-want to get
+In the rule, a=b=Int, and Num Int is a superclass of Integral Int. But
+we *dont* want to get
 
 	forall dIntegralInt.
-	fromIntegral Int Int dIntegralInt (scsel dIntegralInt) = id Int
+	   fromIntegral Int Int dIntegralInt (scsel dIntegralInt) = id Int
 
 because the scsel will mess up RULE matching.  Instead we want
 
 	forall dIntegralInt, dNumInt.
-	fromIntegral Int Int dIntegralInt dNumInt = id Int
+	  fromIntegral Int Int dIntegralInt dNumInt = id Int
 
-Hence "WithoutSCs"
+Even if we have 
+
+	g (x == y) (y == z) = ..
+
+where the two dictionaries are *identical*, we do NOT WANT
+
+	forall x::a, y::a, z::a, d1::Eq a
+	  f ((==) d1 x y) ((>) d1 y z) = ...
+
+because that will only match if the dict args are (visibly) equal.
+Instead we want to quantify over the dictionaries separately.
+
+In short, tcSimplifyRuleLhs must *only* squash LitInst and MethInts, leaving
+all dicts unchanged, with absolutely no sharing.  It's simpler to do this
+from scratch, rather than further parameterise simpleReduceLoop etc
 
 \begin{code}
-tcSimplifyToDicts :: [Inst] -> TcM (TcDictBinds)
-tcSimplifyToDicts wanteds
-  = simpleReduceLoop doc try_me wanteds		`thenM` \ (frees, binds, irreds) ->
-	-- Since try_me doesn't look at types, we don't need to
-	-- do any zonking, so it's safe to call reduceContext directly
-    ASSERT( null frees )
-    extendLIEs irreds		`thenM_`
-    returnM binds
-
+tcSimplifyRuleLhs :: [Inst] -> TcM ([Inst], TcDictBinds)
+tcSimplifyRuleLhs wanteds
+  = go [] emptyBag wanteds
   where
-    doc = text "tcSimplifyToDicts"
-
-	-- Reduce methods and lits only; stop as soon as we get a dictionary
-    try_me inst	| isDict inst = KeepDictWithoutSCs	-- See notes above re "WithoutSCs"
-		| otherwise   = ReduceMe NoSCs
+    go dicts binds []
+	= return (dicts, binds)
+    go dicts binds (w:ws)
+	| isDict w
+	= go (w:dicts) binds ws
+	| otherwise
+	= do { w' <- zonkInst w  -- So that (3::Int) does not generate a call
+				 -- to fromInteger; this looks fragile to me
+	     ; lookup_result <- lookupInst w'
+	     ; case lookup_result of
+		 GenInst ws' rhs -> go dicts (addBind binds w rhs) (ws' ++ ws)
+		 SimpleInst rhs  -> go dicts (addBind binds w rhs) ws
+		 NoInstance	 -> pprPanic "tcSimplifyRuleLhs" (ppr w)
+	  }
 \end{code}
-
-
 
 tcSimplifyBracket is used when simplifying the constraints arising from
 a Template Haskell bracket [| ... |].  We want to check that there aren't
@@ -1321,9 +1337,6 @@ data WhatToDo
 			-- but don't produce an error message of any kind.
 			-- It might be quite legitimate such as (Eq a)!
 
- | KeepDictWithoutSCs	-- Return as irreducible; don't add its superclasses
-			-- Rather specialised: see notes with tcSimplifyToDicts
-
  | DontReduceUnlessConstant	-- Return as irreducible unless it can
 				-- be reduced to a constant in one step
 
@@ -1457,10 +1470,6 @@ extractResults avails wanteds
 	-- When simplifying with i,f free, we might still notice that
 	--   t1=t3; but alas, the binding for t2 (which mentions t1)
 	--   will continue to float out!
-	-- (split n i a) returns: n rhss
-	--			  auxiliary bindings
-	--			  1 or 0 insts to add to irreds
-
 
 split :: Int -> TcId -> TcId -> Inst 
       -> TcM (TcDictBinds, [LHsExpr TcId])
@@ -1736,8 +1745,6 @@ reduce stack try_me wanted avails
 
   | otherwise
   = case try_me wanted of {
-
-      KeepDictWithoutSCs -> addIrred NoSCs avails wanted
 
     ; DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
   				     -- First, see if the inst can be reduced to a constant in one step
