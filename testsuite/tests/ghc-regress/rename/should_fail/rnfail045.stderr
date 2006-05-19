@@ -1,0 +1,10 @@
+
+rnfail045.hs:5:0:
+    Equations for `op1' have different numbers of arguments
+      rnfail045.hs:5:0-15
+      rnfail045.hs:6:0-12
+
+rnfail045.hs:8:0:
+    Equations for `op2' have different numbers of arguments
+      rnfail045.hs:8:0-12
+      rnfail045.hs:9:0-15
