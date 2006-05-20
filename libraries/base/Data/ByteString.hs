@@ -76,6 +76,7 @@ module Data.ByteString (
         foldl,                  -- :: (a -> Word8 -> a) -> a -> ByteString -> a
         foldr,                  -- :: (Word8 -> a -> a) -> a -> ByteString -> a
         foldl1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
+        foldl1',                -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
         foldr1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
         foldl',                 -- :: (a -> Word8 -> a) -> a -> ByteString -> a
 
@@ -88,6 +89,10 @@ module Data.ByteString (
         minimum,                -- :: ByteString -> Word8
         mapIndexed,             -- :: (Int -> Word8 -> Word8) -> ByteString -> ByteString
 
+        -- * Building ByteStrings
+        scanl,                  -- :: (Word8 -> Word8 -> Word8) -> Word8 -> ByteString -> ByteString
+        scanl1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> ByteString
+
         -- * Generating and unfolding ByteStrings
         replicate,              -- :: Int -> Word8 -> ByteString
         unfoldrN,               -- :: (a -> Maybe (Word8, a)) -> a -> ByteString
@@ -96,7 +101,9 @@ module Data.ByteString (
 
         -- ** Breaking strings
         take,                   -- :: Int -> ByteString -> ByteString
+        unsafeTake,             -- :: Int -> ByteString -> ByteString
         drop,                   -- :: Int -> ByteString -> ByteString
+        unsafeDrop,             -- :: Int -> ByteString -> ByteString
         splitAt,                -- :: Int -> ByteString -> (ByteString, ByteString)
         takeWhile,              -- :: (Word8 -> Bool) -> ByteString -> ByteString
         dropWhile,              -- :: (Word8 -> Bool) -> ByteString -> ByteString
@@ -129,6 +136,7 @@ module Data.ByteString (
         findIndex,              -- :: (Word8 -> Bool) -> ByteString -> Maybe Int
         findIndices,            -- :: (Word8 -> Bool) -> ByteString -> [Int]
         count,                  -- :: Word8 -> ByteString -> Int
+        findIndexOrEnd,         -- :: (Word8 -> Bool) -> ByteString -> Int
 
         -- * Ordered ByteStrings
         sort,                   -- :: ByteString -> ByteString
@@ -218,6 +226,7 @@ module Data.ByteString (
 #if defined(__GLASGOW_HASKELL__)
         getArgs,                -- :: IO [ByteString]
         hGetLine,               -- :: Handle -> IO ByteString
+        hGetLines,              -- :: Handle -> IO [ByteString]
         hGetNonBlocking,        -- :: Handle -> Int -> IO ByteString
 #endif
         hGetContents,           -- :: Handle -> IO ByteString
@@ -230,7 +239,7 @@ module Data.ByteString (
 #endif
 
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
-        loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL,
+        loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL, scanEFL,
 
   ) where
 
@@ -240,7 +249,7 @@ import Prelude hiding           (reverse,head,tail,last,init,null
                                 ,concat,any,take,drop,splitAt,takeWhile
                                 ,dropWhile,span,break,elem,filter,maximum
                                 ,minimum,all,concatMap,foldl1,foldr1
-                                ,readFile,writeFile,replicate
+                                ,scanl,scanl1,readFile,writeFile,replicate
                                 ,getContents,getLine,putStr,putStrLn
                                 ,zip,zipWith,unzip,notElem)
 
@@ -253,11 +262,11 @@ import Data.Array               (listArray)
 import qualified Data.Array as Array ((!))
 
 -- Control.Exception.bracket not available in yhc or nhc
-import Control.Exception        (bracket)
+import Control.Exception        (bracket, assert)
 import Control.Monad            (when)
 
 import Foreign.C.String         (CString, CStringLen)
-import Foreign.C.Types          (CSize, CInt)
+import Foreign.C.Types          (CSize,CInt)
 import Foreign.ForeignPtr
 import Foreign.Marshal.Array
 import Foreign.Ptr
@@ -488,6 +497,8 @@ unpackFoldr (PS fp off len) f ch = withPtr fp $ \p -> do
     loop (p `plusPtr` off) (len-1) ch
 {-# INLINE [0] unpackFoldr #-}
 
+-- TODO just use normal foldr here.
+
 #endif
 
 ------------------------------------------------------------------------
@@ -703,6 +714,12 @@ foldl1 f ps
     | null ps   = errorEmptyList "foldl1"
     | otherwise = foldl f (unsafeHead ps) (unsafeTail ps)
 
+-- | A strict version of 'foldl1'
+foldl1' :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
+foldl1' f ps
+    | null ps   = errorEmptyList "foldl1'"
+    | otherwise = foldl' f (unsafeHead ps) (unsafeTail ps)
+
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty 'ByteString's
 foldr1 :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
@@ -728,6 +745,7 @@ concat xs     = create len $ \ptr -> go xs ptr
 -- | Map a function over a 'ByteString' and concatenate the results
 concatMap :: (Word8 -> ByteString) -> ByteString -> ByteString
 concatMap f = foldr (append . f) empty
+-- A silly function for ByteStrings anyway.
 
 -- | /O(n)/ Applied to a predicate and a ByteString, 'any' determines if
 -- any element of the 'ByteString' satisfies the predicate.
@@ -818,6 +836,31 @@ mapIndexed k (PS ps s l) = create l $ \p -> withForeignPtr ps $ \f ->
                                 go (n+1) (f `plusPtr` 1) (t `plusPtr` 1) p
 
 -- ---------------------------------------------------------------------
+-- Building ByteStrings
+
+-- | 'scanl' is similar to 'foldl', but returns a list of successive
+-- reduced values from the left. This function will fuse.
+--
+-- > scanl f z [x1, x2, ...] == [z, z `f` x1, (z `f` x1) `f` x2, ...]
+--
+-- Note that
+--
+-- > last (scanl f z xs) == foldl f z xs.
+scanl :: (Word8 -> Word8 -> Word8) -> Word8 -> ByteString -> ByteString
+scanl f z ps = loopArr . loopU (scanEFL f) z $ (ps `snoc` 0) -- extra space
+{-# INLINE scanl #-}
+
+-- | 'scanl1' is a variant of 'scanl' that has no starting value argument.
+-- This function will fuse.
+--
+-- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
+scanl1 :: (Word8 -> Word8 -> Word8) -> ByteString -> ByteString
+scanl1 f ps
+    | null ps   = empty
+    | otherwise = scanl f (unsafeHead ps) (unsafeTail ps)
+{-# INLINE scanl1 #-}
+
+-- ---------------------------------------------------------------------
 -- Unfolds and replicates
 
 -- | /O(n)/ 'replicate' @n x@ is a ByteString of length @n@ with @x@
@@ -881,7 +924,7 @@ unfoldrN i f w
 -- of @xs@ of length @n@, or @xs@ itself if @n > 'length' xs@.
 take :: Int -> ByteString -> ByteString
 take n ps@(PS x s l)
-    | n < 0     = empty
+    | n <= 0    = empty
     | n >= l    = ps
     | otherwise = PS x s n
 {-# INLINE take #-}
@@ -891,30 +934,33 @@ take n ps@(PS x s l)
 drop  :: Int -> ByteString -> ByteString
 drop n ps@(PS x s l)
     | n <= 0    = ps
-    | n >  l    = empty
+    | n >= l    = empty
     | otherwise = PS x (s+n) (l-n)
 {-# INLINE drop #-}
 
 -- | /O(1)/ 'splitAt' @n xs@ is equivalent to @('take' n xs, 'drop' n xs)@.
 splitAt :: Int -> ByteString -> (ByteString, ByteString)
-splitAt n ps  = (take n ps, drop n ps)
+splitAt n ps@(PS x s l)
+    | n <= 0    = (empty, ps)
+    | n >= l    = (ps, empty)
+    | otherwise = (PS x s n, PS x (s+n) (l-n))
 {-# INLINE splitAt #-}
 
 -- | 'takeWhile', applied to a predicate @p@ and a ByteString @xs@,
 -- returns the longest prefix (possibly empty) of @xs@ of elements that
 -- satisfy @p@.
 takeWhile :: (Word8 -> Bool) -> ByteString -> ByteString
-takeWhile f ps = take (findIndexOrEnd (not . f) ps) ps
+takeWhile f ps = unsafeTake (findIndexOrEnd (not . f) ps) ps
 {-# INLINE takeWhile #-}
 
 -- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@.
 dropWhile :: (Word8 -> Bool) -> ByteString -> ByteString
-dropWhile f ps = drop (findIndexOrEnd (not . f) ps) ps
+dropWhile f ps = unsafeDrop (findIndexOrEnd (not . f) ps) ps
 {-# INLINE dropWhile #-}
 
 -- | 'break' @p@ is equivalent to @'span' ('not' . p)@.
 break :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
-break p ps = case findIndexOrEnd p ps of n -> (take n ps, drop n ps)
+break p ps = case findIndexOrEnd p ps of n -> (unsafeTake n ps, unsafeDrop n ps)
 {-# INLINE break #-}
 
 -- | 'breakByte' breaks its ByteString argument at the first occurence
@@ -926,7 +972,7 @@ break p ps = case findIndexOrEnd p ps of n -> (take n ps, drop n ps)
 breakByte :: Word8 -> ByteString -> (ByteString, ByteString)
 breakByte c p = case elemIndex c p of
     Nothing -> (p,empty)
-    Just n  -> (take n p, drop n p)
+    Just n  -> (unsafeTake n p, unsafeDrop n p)
 {-# INLINE breakByte #-}
 
 -- | 'spanByte' breaks its ByteString argument at the first
@@ -943,7 +989,7 @@ spanByte c ps@(PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
     go p i | i >= l    = return (ps, empty)
            | otherwise = do c' <- peekByteOff p i
                             if c /= c'
-                                then return (take i ps, drop i ps)
+                                then return (unsafeTake i ps, unsafeDrop i ps)
                                 else go p (i+1)
 {-# INLINE spanByte #-}
 
@@ -961,7 +1007,7 @@ spanByte c ps@(PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
 breakFirst :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
 breakFirst c p = case elemIndex c p of
    Nothing -> Nothing
-   Just n -> Just (take n p, drop (n+1) p)
+   Just n -> Just (unsafeTake n p, unsafeDrop (n+1) p)
 {-# INLINE breakFirst #-}
 
 -- | /O(n)/ 'breakLast' behaves like breakFirst, but from the end of the
@@ -978,7 +1024,7 @@ breakFirst c p = case elemIndex c p of
 breakLast :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
 breakLast c p = case elemIndexLast c p of
     Nothing -> Nothing
-    Just n -> Just (take n p, drop (n+1) p)
+    Just n -> Just (unsafeTake n p, unsafeDrop (n+1) p)
 {-# INLINE breakLast #-}
 
 -- | 'span' @p xs@ breaks the ByteString into two segments. It is
@@ -1133,7 +1179,7 @@ group xs
 groupBy :: (Word8 -> Word8 -> Bool) -> ByteString -> [ByteString]
 groupBy k xs
     | null xs   = []
-    | otherwise = take n xs : groupBy k (drop n xs)
+    | otherwise = unsafeTake n xs : groupBy k (unsafeDrop n xs)
     where
         n = 1 + findIndexOrEnd (not . k (unsafeHead xs)) (unsafeTail xs)
 
@@ -1263,9 +1309,7 @@ count w (PS x s m) = inlinePerformIO $ withForeignPtr x $ \p ->
 -- returns the index of the first element in the ByteString
 -- satisfying the predicate.
 findIndex :: (Word8 -> Bool) -> ByteString -> Maybe Int
-findIndex k ps@(PS x s l)
-    | null ps   = Nothing
-    | otherwise = inlinePerformIO $ withForeignPtr x $ \f -> go (f `plusPtr` s) 0
+findIndex k (PS x s l) = inlinePerformIO $ withForeignPtr x $ \f -> go (f `plusPtr` s) 0
   where
     STRICT2(go)
     go ptr n | n >= l    = return Nothing
@@ -1284,6 +1328,19 @@ findIndices p ps = loop 0 ps
      loop n qs | null qs           = []
                | p (unsafeHead qs) = n : loop (n+1) (unsafeTail qs)
                | otherwise         =     loop (n+1) (unsafeTail qs)
+
+-- | 'findIndexOrEnd' is a variant of findIndex, that returns the length
+-- of the string if no element is found, rather than Nothing.
+findIndexOrEnd :: (Word8 -> Bool) -> ByteString -> Int
+findIndexOrEnd k (PS x s l) = inlinePerformIO $ withForeignPtr x $ \f -> go (f `plusPtr` s) 0
+  where
+    STRICT2(go)
+    go ptr n | n >= l    = return l
+             | otherwise = do w <- peek ptr
+                              if k w
+                                then return n
+                                else go (ptr `plusPtr` 1) (n+1)
+{-# INLINE findIndexOrEnd #-}
 
 -- ---------------------------------------------------------------------
 -- Searching ByteStrings
@@ -1566,6 +1623,20 @@ unsafeIndex :: ByteString -> Int -> Word8
 unsafeIndex (PS x s _) i = inlinePerformIO $ withForeignPtr x $ \p -> peekByteOff p (s+i)
 {-# INLINE unsafeIndex #-}
 
+-- | A variety of 'take' which omits the checks on @n@ so there is an
+-- obligation on the programmer to provide a proof that @0 <= n <= 'length' xs@.
+unsafeTake :: Int -> ByteString -> ByteString
+unsafeTake n (PS x s l) =
+  assert (0 <= n && n <= l) $ PS x s n
+{-# INLINE unsafeTake #-}
+
+-- | A variety of 'drop' which omits the checks on @n@ so there is an
+-- obligation on the programmer to provide a proof that @0 <= n <= 'length' xs@.
+unsafeDrop  :: Int -> ByteString -> ByteString
+unsafeDrop n (PS x s l) =
+  assert (0 <= n && n <= l) $ PS x (s+n) (l-n)
+{-# INLINE unsafeDrop #-}
+
 -- ---------------------------------------------------------------------
 -- Low level constructors
 
@@ -1762,6 +1833,19 @@ generate i f = do
 getLine :: IO ByteString
 getLine = hGetLine stdin
 
+-- | Lazily construct a list of lines of ByteStrings. This will be much
+-- better on memory consumption than using lines =<< getContents.
+hGetLines :: Handle -> IO [ByteString]
+hGetLines h = go
+    where
+        go = unsafeInterleaveIO $ do
+                ms <- catch (hGetLine h >>= return . Just)
+                            (\_ -> return Nothing)
+                case ms of
+                    Nothing -> return []
+                    Just s  -> do ss <- go
+                                  return (s:ss)
+
 -- | hGetLine. read a ByteString from a handle
 hGetLine :: Handle -> IO ByteString
 hGetLine h = wantReadableHandle "Data.ByteString.hGetLine" h $ \ handle_ -> do
@@ -1872,6 +1956,10 @@ hGetNonBlocking h i = do
 #endif
 
 -- | Read entire handle contents into a 'ByteString'.
+-- This function reads chunks at a time, doubling the chunksize on each
+-- read. The final buffer is then realloced to the appropriate size. For
+-- files > half of available memory, this may lead to memory exhaustion.
+-- Consider using 'readFile' in this case.
 --
 -- As with 'hGet', the string representation in the file is assumed to
 -- be ISO-8859-1.
@@ -2042,16 +2130,6 @@ moduleError :: String -> String -> a
 moduleError fun msg = error ("Data.ByteString." ++ fun ++ ':':' ':msg)
 {-# NOINLINE moduleError #-}
 
--- 'findIndexOrEnd' is a variant of findIndex, that returns the length
--- of the string if no element is found, rather than Nothing.
-findIndexOrEnd :: (Word8 -> Bool) -> ByteString -> Int
-STRICT2(findIndexOrEnd)
-findIndexOrEnd f ps
-    | null ps           = 0
-    | f (unsafeHead ps) = 0
-    | otherwise         = 1 + findIndexOrEnd f (unsafeTail ps)
-{-# INLINE findIndexOrEnd #-}
-
 -- Find from the end of the string using predicate
 findFromEndUntil :: (Word8 -> Bool) -> ByteString -> Int
 STRICT2(findFromEndUntil)
@@ -2210,6 +2288,14 @@ foldEFL' :: (acc -> Word8 -> acc) -> (acc -> Word8 -> (acc, Maybe Word8))
 foldEFL' f = \a e -> let a' = f a e in a' `seq` (a', Nothing)
 #if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] foldEFL' #-}
+#endif
+
+-- | Element function expressing a prefix reduction only
+--
+scanEFL :: (Word8 -> Word8 -> Word8) -> Word8 -> Word8 -> (Word8, Maybe Word8)
+scanEFL f = \a e -> (f a e, Just a)
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] scanEFL #-}
 #endif
 
 -- | No accumulator

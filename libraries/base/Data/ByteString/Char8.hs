@@ -69,6 +69,7 @@ module Data.ByteString.Char8 (
         foldl,                  -- :: (a -> Char -> a) -> a -> ByteString -> a
         foldr,                  -- :: (Char -> a -> a) -> a -> ByteString -> a
         foldl1,                 -- :: (Char -> Char -> Char) -> ByteString -> Char
+        foldl1',                -- :: (Char -> Char -> Char) -> ByteString -> Char
         foldr1,                 -- :: (Char -> Char -> Char) -> ByteString -> Char
         foldl',                 -- :: (a -> Char -> a) -> a -> ByteString -> a
 
@@ -80,6 +81,10 @@ module Data.ByteString.Char8 (
         maximum,                -- :: ByteString -> Char
         minimum,                -- :: ByteString -> Char
         mapIndexed,             -- :: (Int -> Char -> Char) -> ByteString -> ByteString
+
+        -- * Building ByteStrings
+        scanl,
+        scanl1,
 
         -- * Generating and unfolding ByteStrings
         replicate,              -- :: Int -> Char -> ByteString
@@ -221,7 +226,7 @@ module Data.ByteString.Char8 (
         unpackList,
 #endif
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
-        loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL,
+        loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL, scanEFL,
         filter', map'
 
     ) where
@@ -231,7 +236,7 @@ import Prelude hiding           (reverse,head,tail,last,init,null
                                 ,length,map,lines,foldl,foldr,unlines
                                 ,concat,any,take,drop,splitAt,takeWhile
                                 ,dropWhile,span,break,elem,filter,unwords
-                                ,words,maximum,minimum,all,concatMap
+                                ,words,maximum,minimum,all,concatMap,scanl,scanl1
                                 ,foldl1,foldr1,readFile,writeFile,replicate
                                 ,getContents,getLine,putStr,putStrLn
                                 ,zip,zipWith,unzip,notElem)
@@ -255,7 +260,7 @@ import Data.ByteString (ByteString(..)
                        ,unpackList
 #endif
                        ,noAL, NoAL, loopArr, loopAcc, loopSndAcc
-                       ,loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL
+                       ,loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL, scanEFL
                        ,useAsCString, unsafeUseAsCString
                        )
 
@@ -382,6 +387,11 @@ foldl1 :: (Char -> Char -> Char) -> ByteString -> Char
 foldl1 f ps = w2c (B.foldl1 (\x y -> c2w (f (w2c x) (w2c y))) ps)
 {-# INLINE foldl1 #-}
 
+-- | A strict version of 'foldl1'
+foldl1' :: (Char -> Char -> Char) -> ByteString -> Char
+foldl1' f ps = w2c (B.foldl1' (\x y -> c2w (f (w2c x) (w2c y))) ps)
+{-# INLINE foldl1' #-}
+
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty 'ByteString's
 foldr1 :: (Char -> Char -> Char) -> ByteString -> Char
@@ -419,6 +429,23 @@ minimum = w2c . B.minimum
 mapIndexed :: (Int -> Char -> Char) -> ByteString -> ByteString
 mapIndexed f = B.mapIndexed (\i c -> c2w (f i (w2c c)))
 {-# INLINE mapIndexed #-}
+
+-- | 'scanl' is similar to 'foldl', but returns a list of successive
+-- reduced values from the left:
+--
+-- > scanl f z [x1, x2, ...] == [z, z `f` x1, (z `f` x1) `f` x2, ...]
+--
+-- Note that
+--
+-- > last (scanl f z xs) == foldl f z xs.
+scanl :: (Char -> Char -> Char) -> Char -> ByteString -> ByteString
+scanl f z = B.scanl (\a b -> c2w (f (w2c a) (w2c b))) (c2w z)
+
+-- | 'scanl1' is a variant of 'scanl' that has no starting value argument:
+--
+-- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
+scanl1 :: (Char -> Char -> Char) -> ByteString -> ByteString
+scanl1 f = B.scanl1 (\a b -> c2w (f (w2c a) (w2c b)))
 
 -- | /O(n)/ 'replicate' @n x@ is a ByteString of length @n@ with @x@
 -- the value of every element. The following holds:
