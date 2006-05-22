@@ -8,6 +8,7 @@ module CoreSubst (
 	-- Substitution stuff
 	Subst, TvSubstEnv, IdSubstEnv, InScopeSet,
 
+	deShadowBinds,
 	substTy, substExpr, substSpec, substWorker,
 	lookupIdSubst, lookupTvSubst, 
 
@@ -23,7 +24,7 @@ module CoreSubst (
 
 #include "HsVersions.h"
 
-import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
+import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBind,
 			  CoreRule(..), hasUnfolding, noUnfolding
 			)
 import CoreFVs		( exprFreeVars )
@@ -185,15 +186,9 @@ substExpr subst expr
 		       where
 			 (subst', bndr') = substBndr subst bndr
 
-    go (Let (NonRec bndr rhs) body) = Let (NonRec bndr' (go rhs)) (substExpr subst' body)
-				    where
-				      (subst', bndr') = substBndr subst bndr
-
-    go (Let (Rec pairs) body) = Let (Rec pairs') (substExpr subst' body)
-			      where
-				(subst', bndrs') = substRecBndrs subst (map fst pairs)
-				pairs'	= bndrs' `zip` rhss'
-				rhss'	= map (substExpr subst' . snd) pairs
+    go (Let bind body) = Let bind' (substExpr subst' body)
+		       where
+			 (subst', bind') = substBind subst bind
 
     go (Case scrut bndr ty alts) = Case (go scrut) bndr' (substTy subst ty) (map (go_alt subst') alts)
 			         where
@@ -205,6 +200,29 @@ substExpr subst expr
 
     go_note (Coerce ty1 ty2) = Coerce (substTy subst ty1) (substTy subst ty2)
     go_note note	     = note
+
+substBind :: Subst -> CoreBind -> (Subst, CoreBind)
+substBind subst (NonRec bndr rhs) = (subst', NonRec bndr' (substExpr subst rhs))
+				  where
+				    (subst', bndr') = substBndr subst bndr
+
+substBind subst (Rec pairs) = (subst', Rec pairs')
+			    where
+				(subst', bndrs') = substRecBndrs subst (map fst pairs)
+				pairs'	= bndrs' `zip` rhss'
+				rhss'	= map (substExpr subst' . snd) pairs
+\end{code}
+
+De-shadowing the program is sometimes a useful pre-pass.  It can be done simply
+by running over the bindings with an empty substitution, becuase substitution
+returns a result that has no-shadowing guaranteed.
+
+(Actually, within a single *type* there might still be shadowing, because 
+substType is a no-op for the empty substitution, but that's OK.)
+
+\begin{code}
+deShadowBinds :: [CoreBind] -> [CoreBind]
+deShadowBinds binds = snd (mapAccumL substBind emptySubst binds)
 \end{code}
 
 
