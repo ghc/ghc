@@ -26,7 +26,7 @@ import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..),
 			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Unique		( hasKey )
-import BasicTypes	( RecFlag(..), isNonRec, Activation(..) )
+import BasicTypes	( RecFlag(..), isNonRec )
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import DynFlags
