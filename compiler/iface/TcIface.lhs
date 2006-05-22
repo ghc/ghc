@@ -751,7 +751,8 @@ tcIdInfo name ty (HasInfo info) = foldlM tcPrag init_info info
 
 	-- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsWorker nm arity) = tcWorkerInfo ty info nm arity
-    tcPrag info (HsUnfold inline_prag expr)
+    tcPrag info (HsInline inline_prag) = returnM (info `setInlinePragInfo` inline_prag)
+    tcPrag info (HsUnfold expr)
 	= tcPragExpr name expr 	`thenM` \ maybe_expr' ->
 	  let
 		-- maybe_expr' doesn't get looked at if the unfolding
@@ -760,8 +761,7 @@ tcIdInfo name ty (HasInfo info) = foldlM tcPrag init_info info
 				Nothing    -> noUnfolding
 				Just expr' -> mkTopUnfolding expr' 
 	  in
- 	  returnM (info `setUnfoldingInfoLazily` unfold_info
-			`setInlinePragInfo`      inline_prag)
+ 	  returnM (info `setUnfoldingInfoLazily` unfold_info)
 \end{code}
 
 \begin{code}

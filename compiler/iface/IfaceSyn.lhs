@@ -66,7 +66,7 @@ import ForeignCall	( ForeignCall )
 import TysPrim		( alphaTyVars )
 import BasicTypes	( Arity, Activation(..), StrictnessMark, 
 			  RecFlag(..), boolToRecFlag, Boxity(..), 
-			  tupleParens )
+			  isAlwaysActive, tupleParens )
 import Outputable
 import FastString
 import Maybes		( catMaybes )
@@ -189,7 +189,8 @@ data IfaceIdInfo
 data IfaceInfoItem
   = HsArity	 Arity
   | HsStrictness StrictSig
-  | HsUnfold	 Activation IfaceExpr
+  | HsInline     Activation
+  | HsUnfold	 IfaceExpr
   | HsNoCafRefs
   | HsWorker	 IfaceExtName Arity	-- Worker, if any see IdInfo.WorkerInfo
 					-- for why we want arity here.
@@ -426,8 +427,9 @@ instance Outputable IfaceIdInfo where
    ppr NoInfo       = empty
    ppr (HasInfo is) = ptext SLIT("{-") <+> fsep (map ppr_hs_info is) <+> ptext SLIT("-}")
 
-ppr_hs_info (HsUnfold prag unf) = sep [ptext SLIT("Unfolding: ") <> ppr prag,
-				       parens (pprIfaceExpr noParens unf)]
+ppr_hs_info (HsUnfold unf) 	= ptext SLIT("Unfolding:") <+>
+				  	parens (pprIfaceExpr noParens unf)
+ppr_hs_info (HsInline act)      = ptext SLIT("Inline:") <+> ppr act
 ppr_hs_info (HsArity arity)     = ptext SLIT("Arity:") <+> int arity
 ppr_hs_info (HsStrictness str)  = ptext SLIT("Strictness:") <+> pprIfaceStrictSig str
 ppr_hs_info HsNoCafRefs		= ptext SLIT("HasNoCafRefs")
@@ -567,7 +569,7 @@ instanceToIfaceInst ext_lhs ispec@(Instance { is_dfun = dfun_id, is_flag = oflag
 toIfaceIdInfo :: (Name -> IfaceExtName) -> IdInfo -> [IfaceInfoItem]
 toIfaceIdInfo ext id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
-	       wrkr_hsinfo,  unfold_hsinfo] 
+	       inline_hsinfo, wrkr_hsinfo,  unfold_hsinfo] 
   where
     ------------  Arity  --------------
     arity_info = arityInfo id_info
@@ -596,13 +598,23 @@ toIfaceIdInfo ext id_info
 
     ------------  Unfolding  --------------
     -- The unfolding is redundant if there is a worker
-    unfold_info = unfoldingInfo id_info
+    unfold_info  = unfoldingInfo id_info
+    rhs		 = unfoldingTemplate unfold_info
+    no_unfolding = neverUnfold unfold_info
+		  	-- The CoreTidy phase retains unfolding info iff
+			-- we want to expose the unfolding, taking into account
+			-- unconditional NOINLINE, etc.  See TidyPgm.addExternal
+    unfold_hsinfo | no_unfolding = Nothing			
+		  | has_worker   = Nothing	-- Unfolding is implicit
+		  | otherwise	 = Just (HsUnfold (toIfaceExpr ext rhs))
+					
+    ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info
-    rhs		= unfoldingTemplate unfold_info
-    unfold_hsinfo |  neverUnfold unfold_info 	-- The CoreTidy phase retains unfolding info iff
-		  || has_worker = Nothing	-- we want to expose the unfolding, taking into account
-						-- unconditional NOINLINE, etc.  See TidyPgm.addExternal
-		  | otherwise	= Just (HsUnfold inline_prag (toIfaceExpr ext rhs))
+    inline_hsinfo | isAlwaysActive inline_prag     = Nothing
+		  | no_unfolding && not has_worker = Nothing
+			-- If the iface file give no unfolding info, we 
+			-- don't need to say when inlining is OK!
+		  | otherwise			   = Just (HsInline inline_prag)
 
 --------------------------
 coreRuleToIfaceRule :: (Name -> IfaceExtName) 	-- For the LHS names
@@ -840,11 +852,12 @@ eq_cls_sig env (IfaceClassOp n1 dm1 ty1) (IfaceClassOp n2 dm2 ty2)
 -----------------
 eqIfIdInfo NoInfo	 NoInfo	       = Equal
 eqIfIdInfo (HasInfo is1) (HasInfo is2) = eqListBy eq_item is1 is2
-eqIfIdInfo i1 i2 = NotEqual
+eqIfIdInfo i1 		 i2 = NotEqual
 
+eq_item (HsInline a1)	   (HsInline a2)      = bool (a1 == a2)
 eq_item (HsArity a1)	   (HsArity a2)	      = bool (a1 == a2)
 eq_item (HsStrictness s1)  (HsStrictness s2)  = bool (s1 == s2)
-eq_item (HsUnfold a1 u1)   (HsUnfold a2 u2)   = bool (a1 == a2) &&& eq_ifaceExpr emptyEqEnv u1 u2
+eq_item (HsUnfold u1)   (HsUnfold u2)         = eq_ifaceExpr emptyEqEnv u1 u2
 eq_item HsNoCafRefs        HsNoCafRefs	      = Equal
 eq_item (HsWorker wkr1 a1) (HsWorker wkr2 a2) = bool (a1==a2) &&& (wkr1 `eqIfExt` wkr2)
 eq_item _ _ = NotEqual

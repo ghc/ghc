@@ -829,14 +829,16 @@ instance Binary IfaceInfoItem where
     put_ bh (HsStrictness ab) = do
 	    putByte bh 1
 	    put_ bh ab
-    put_ bh (HsUnfold ac ad) = do
+    put_ bh (HsUnfold ad) = do
 	    putByte bh 2
-	    put_ bh ac
+	    put_ bh ad
+    put_ bh (HsInline ad) = do
+	    putByte bh 3
 	    put_ bh ad
     put_ bh HsNoCafRefs = do
-	    putByte bh 3
-    put_ bh (HsWorker ae af) = do
 	    putByte bh 4
+    put_ bh (HsWorker ae af) = do
+	    putByte bh 5
 	    put_ bh ae
 	    put_ bh af
     get bh = do
@@ -846,10 +848,11 @@ instance Binary IfaceInfoItem where
 		      return (HsArity aa)
 	      1 -> do ab <- get bh
 		      return (HsStrictness ab)
-	      2 -> do ac <- get bh
-		      ad <- get bh
-		      return (HsUnfold ac ad)
-	      3 -> do return HsNoCafRefs
+	      2 -> do ad <- get bh
+		      return (HsUnfold ad)
+	      3 -> do ad <- get bh
+		      return (HsInline ad)
+	      4 -> do return HsNoCafRefs
 	      _ -> do ae <- get bh
 		      af <- get bh
 		      return (HsWorker ae af)
