@@ -22,10 +22,9 @@ import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial, isDefaultAlt )
 import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo, isLocalId,
-			  isExportedId, idArity, idSpecialisation,
+			  isExportedId, idArity, idHasRules,
 			  idType, idUnique, Id
 			)
-import IdInfo		( isEmptySpecInfo )
 import BasicTypes	( OccInfo(..), isOneOcc, InterestingCxt )
 
 import VarSet
@@ -320,7 +319,7 @@ reOrderRec env (CyclicSCC (bind : binds))
 
 	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
 
-	| not (isEmptySpecInfo (idSpecialisation bndr)) = 1
+	| idHasRules bndr = 1
 		-- Avoid things with specialisations; we'd like
 		-- to take advantage of them in the subsequent bindings
 

@@ -66,7 +66,7 @@ module Id (
 	idNewStrictness, idNewStrictness_maybe, 
 	idWorkerInfo,
 	idUnfolding,
-	idSpecialisation, idCoreRules,
+	idSpecialisation, idCoreRules, idHasRules,
 	idCafInfo,
 	idLBVarInfo,
 	idOccInfo,
@@ -408,6 +408,9 @@ idSpecialisation id = specInfo (idInfo id)
 
 idCoreRules :: Id -> [CoreRule]
 idCoreRules id = specInfoRules (idSpecialisation id)
+
+idHasRules :: Id -> Bool
+idHasRules id = not (isEmptySpecInfo (idSpecialisation id))
 
 setIdSpecialisation :: Id -> SpecInfo -> Id
 setIdSpecialisation id spec_info = modifyIdInfo (`setSpecInfo` spec_info) id
