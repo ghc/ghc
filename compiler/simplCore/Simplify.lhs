@@ -15,11 +15,11 @@ import SimplMonad
 import SimplEnv	
 import SimplUtils	( mkCase, mkLam,
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
-			  mkRhsStop, mkBoringStop,  pushContArgs,
+			  mkRhsStop, mkBoringStop,  mkLazyArgStop, pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType,
 			  preInlineUnconditionally, postInlineUnconditionally, 
-			  inlineMode, activeInline, activeRule
+			  interestingArgContext, inlineMode, activeInline, activeRule
 			)
 import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
 			  idUnfolding, setIdUnfolding, isDeadBinder,
@@ -923,7 +923,8 @@ completeCall env var occ_info cont
 	(args, call_cont, inline_call) = getContArgs chkr var cont
 	fn_ty			       = idType var
     in
-    simplifyArgs env fn_ty args (contResultType call_cont)	$ \ env args ->
+    simplifyArgs env fn_ty (interestingArgContext var call_cont) args 
+		 (contResultType call_cont)	$ \ env args ->
 
 	-- Next, look for rules or specialisations that match
 	--
@@ -976,11 +977,9 @@ completeCall env var occ_info cont
 	-- Next, look for an inlining
     let
 	arg_infos = [ interestingArg arg | arg <- args, isValArg arg]
-
 	interesting_cont = interestingCallContext (notNull args)
 						  (notNull arg_infos)
 						  call_cont
-
     	active_inline = activeInline env var occ_info
 	maybe_inline  = callSiteInline dflags active_inline inline_call occ_info
 				       var arg_infos interesting_cont
@@ -1053,6 +1052,7 @@ makeThatCall env var fun args cont
 
 simplifyArgs :: SimplEnv 
 	     -> OutType				-- Type of the function
+	     -> Bool				-- True if the fn has RULES
 	     -> [(InExpr, SimplEnv, Bool)]	-- Details of the arguments
 	     -> OutType				-- Type of the continuation
 	     -> (SimplEnv -> [OutExpr] -> SimplM FloatsWithExpr)
@@ -1083,19 +1083,19 @@ simplifyArgs :: SimplEnv
 -- discard the entire application and replace it with (error "foo").  Getting
 -- all this at once is TOO HARD!
 
-simplifyArgs env fn_ty args cont_ty thing_inside
+simplifyArgs env fn_ty has_rules args cont_ty thing_inside
   = go env fn_ty args thing_inside
   where
     go env fn_ty []	    thing_inside = thing_inside env []
-    go env fn_ty (arg:args) thing_inside = simplifyArg env fn_ty arg cont_ty 		$ \ env arg' ->
+    go env fn_ty (arg:args) thing_inside = simplifyArg env fn_ty has_rules arg cont_ty	$ \ env arg' ->
 					   go env (applyTypeToArg fn_ty arg') args 	$ \ env args' ->
 					   thing_inside env (arg':args')
 
-simplifyArg env fn_ty (Type ty_arg, se, _) cont_ty thing_inside
+simplifyArg env fn_ty has_rules (Type ty_arg, se, _) cont_ty thing_inside
   = simplType (setInScope se env) ty_arg 	`thenSmpl` \ new_ty_arg ->
     thing_inside env (Type new_ty_arg)
 
-simplifyArg env fn_ty (val_arg, arg_se, is_strict) cont_ty thing_inside 
+simplifyArg env fn_ty has_rules (val_arg, arg_se, is_strict) cont_ty thing_inside 
   | is_strict 
   = simplStrictArg AnArg env val_arg arg_se arg_ty cont_ty thing_inside
 
@@ -1105,8 +1105,8 @@ simplifyArg env fn_ty (val_arg, arg_se, is_strict) cont_ty thing_inside
 		-- have to be very careful about bogus strictness through 
 		-- floating a demanded let.
   = simplExprC (setInScope arg_se env) val_arg
-	       (mkBoringStop arg_ty)		`thenSmpl` \ arg1 ->
-   thing_inside env arg1
+	       (mkLazyArgStop arg_ty has_rules)		`thenSmpl` \ arg1 ->
+    thing_inside env arg1
   where
     arg_ty = funArgTy fn_ty
 

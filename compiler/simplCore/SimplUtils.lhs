@@ -15,8 +15,9 @@ module SimplUtils (
 	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 	contIsDupable, contResultType,
 	countValArgs, countArgs, pushContArgs,
-	mkBoringStop, mkRhsStop, contIsRhs, contIsRhsOrArg,
-	getContArgs, interestingCallContext, interestingArg, isStrictType
+	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhs, contIsRhsOrArg,
+	getContArgs, interestingCallContext, interestingArgContext,
+	interestingArg, isStrictType
 
     ) where
 
@@ -29,16 +30,16 @@ import StaticFlags	( opt_UF_UpdateInPlace, opt_SimplNoPreInlining,
 			  opt_RulesOff )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, exprIsCheap,
+import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, 
 			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
 			  findDefault, exprOkForSpeculation, exprIsHNF, mergeAlts
 			)
 import Literal		( mkStringLit )
 import CoreUnfold	( smallEnoughToInline )
 import MkId		( eRROR_ID )
-import Id		( idType, isDataConWorkId, idOccInfo, isDictId, 
+import Id		( Id, idType, isDataConWorkId, idOccInfo, isDictId, 
 			  isDeadBinder, idNewDemandInfo, isExportedId,
-			  idUnfolding, idNewStrictness, idInlinePragma,
+			  idUnfolding, idNewStrictness, idInlinePragma, idHasRules
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
@@ -63,11 +64,16 @@ import Outputable
 
 \begin{code}
 data SimplCont		-- Strict contexts
-  = Stop     OutType		-- Type of the result
+  = Stop     OutType	-- Type of the result
 	     LetRhsFlag
-	     Bool		-- True <=> This is the RHS of a thunk whose type suggests
-				--	    that update-in-place would be possible
-				--	    (This makes the inliner a little keener.)
+	     Bool	-- True <=> There is something interesting about
+			--          the context, and hence the inliner
+			--	    should be a bit keener (see interestingCallContext)
+			-- Two cases:
+			-- (a) This is the RHS of a thunk whose type suggests
+			--     that update-in-place would be possible
+			-- (b) This is an argument of a function that has RULES
+			--     Inlining the call might allow the rule to fire
 
   | CoerceIt OutType			-- The To-type, simplified
 	     SimplCont
@@ -86,7 +92,7 @@ data SimplCont		-- Strict contexts
   | ArgOf    LetRhsFlag		-- An arbitrary strict context: the argument 
   	     			-- 	of a strict function, or a primitive-arg fn
 				-- 	or a PrimOp
-				-- No DupFlag because we never duplicate it
+				-- No DupFlag, because we never duplicate it
 	     OutType		-- arg_ty: type of the argument itself
 	     OutType		-- cont_ty: the type of the expression being sought by the context
 				--	f (error "foo") ==> coerce t (error "foo")
@@ -120,9 +126,14 @@ instance Outputable DupFlag where
 
 
 -------------------
-mkBoringStop, mkRhsStop :: OutType -> SimplCont
-mkBoringStop ty = Stop ty AnArg (canUpdateInPlace ty)
-mkRhsStop    ty = Stop ty AnRhs (canUpdateInPlace ty)
+mkBoringStop :: OutType -> SimplCont
+mkBoringStop ty = Stop ty AnArg False
+
+mkLazyArgStop :: OutType -> Bool -> SimplCont
+mkLazyArgStop ty has_rules = Stop ty AnArg (canUpdateInPlace ty || has_rules)
+
+mkRhsStop :: OutType -> SimplCont
+mkRhsStop ty = Stop ty AnRhs (canUpdateInPlace ty)
 
 contIsRhs :: SimplCont -> Bool
 contIsRhs (Stop _ AnRhs _)    = True
@@ -382,7 +393,7 @@ interestingCallContext some_args some_val_args cont
 						-- seen (coerce f) x, where f has an INLINE prag,
 						-- So we have to give some motivaiton for inlining it
     interesting (ArgOf _ _ _ _)	         = some_val_args
-    interesting (Stop ty _ upd_in_place) = some_val_args && upd_in_place
+    interesting (Stop ty _ interesting)  = some_val_args && interesting
     interesting (CoerceIt _ cont)        = interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
@@ -399,6 +410,33 @@ interestingCallContext some_args some_val_args cont
 	-- a build it's *great* to inline it here.  So we must ensure that
 	-- the context for (f x) is not totally uninteresting.
 
+
+-------------------
+interestingArgContext :: Id -> SimplCont -> Bool
+-- If the argument has form (f x y), where x,y are boring,
+-- and f is marked INLINE, then we don't want to inline f.
+-- But if the context of the argument is
+--	g (f x y) 
+-- where g has rules, then we *do* want to inline f, in case it
+-- exposes a rule that might fire.  Similarly, if the context is
+--	h (g (f x x))
+-- where h has rules, then we do want to inline f.
+-- The interesting_arg_ctxt flag makes this happen; if it's
+-- set, the inliner gets just enough keener to inline f 
+-- regardless of how boring f's arguments are, if it's marked INLINE
+--
+-- The alternative would be to *always* inline an INLINE function,
+-- regardless of how boring its context is; but that seems overkill
+-- For example, it'd mean that wrapper functions were always inlined
+interestingArgContext fn cont
+  = idHasRules fn || go cont
+  where
+    go (InlinePlease c)       = go c
+    go (Select {})	      = False
+    go (ApplyTo {})	      = False
+    go (ArgOf {})	      = True
+    go (CoerceIt _ c)	      = go c
+    go (Stop _ _ interesting) = interesting
 
 -------------------
 canUpdateInPlace :: Type -> Bool
