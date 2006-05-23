@@ -727,7 +727,7 @@ getCoreToDo dflags
 
 	++ 
 
-     if opt_level >= 2 then
+     (if opt_level >= 2 then
 	   [  CoreLiberateCase,
 	      CoreDoSimplify (SimplPhase 0) [
 		  MaxSimplifierIterations max_iter
@@ -736,8 +736,8 @@ getCoreToDo dflags
 			-- Reason: see Note [Shadowing] in SpecConstr.lhs
 	     CoreDoSpecConstr
 	   ]
-     else
-	   []
+      else
+	   [])
 
 	++
 
