@@ -722,19 +722,27 @@ getCoreToDo dflags
 -- Case-liberation for -O2.  This should be after
 -- strictness analysis and the simplification which follows it.
 
-	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing }
+     ]
 
-	if opt_level >= 2 then
-	   CoreLiberateCase
-	else
-	   CoreDoNothing,
-	if opt_level >= 2 then
-	   CoreDoSpecConstr
-	else
-	   CoreDoNothing,
+	++ 
+
+     if opt_level >= 2 then
+	   [  CoreLiberateCase,
+	      CoreDoSimplify (SimplPhase 0) [
+		  MaxSimplifierIterations max_iter
+	      ],	-- Run the simplifier after LiberateCase to vastly 
+			-- reduce the possiblility of shadowing
+			-- Reason: see Note [Shadowing] in SpecConstr.lhs
+	     CoreDoSpecConstr
+	   ]
+     else
+	   []
+
+	++
 
 	-- Final clean-up simplification:
-	CoreDoSimplify (SimplPhase 0) [
+     [	CoreDoSimplify (SimplPhase 0) [
 	  MaxSimplifierIterations max_iter
 	]
      ]

@@ -122,6 +122,8 @@ So we look for
       Those are the only uses of the parameter
 
 
+What to abstract over
+~~~~~~~~~~~~~~~~~~~~~
 There's a bit of a complication with type arguments.  If the call
 site looks like
 
@@ -157,12 +159,36 @@ So the grand plan is:
 	* Find the free variables of the abstracted pattern
 
 	* Pass these variables, less any that are in scope at
-	  the fn defn.
+	  the fn defn.  But see Note [Shadowing] below.
 
 
 NOTICE that we only abstract over variables that are not in scope,
 so we're in no danger of shadowing variables used in "higher up"
 in f_spec's RHS.
+
+
+Note [Shadowing]
+~~~~~~~~~~~~~~~~
+In this pass we gather up usage information that may mention variables
+that are bound between the usage site and the definition site; or (more
+seriously) may be bound to something different at the definition site.
+For example:
+
+	f x = letrec g y v = let x = ... 
+			     in ...(g (a,b) x)...
+
+Since 'x' is in scope at the call site, we may make a rewrite rule that 
+looks like
+	RULE forall a,b. g (a,b) x = ...
+But this rule will never match, because it's really a different 'x' at 
+the call site -- and that difference will be manifest by the time the
+simplifier gets to it.  [A worry: the simplifier doesn't *guarantee*
+no-shadowing, so perhaps it may not be distinct?]
+
+Anyway, the rule isn't actually wrong, it's just not useful.  One possibility
+is to run deShadowBinds before running SpecConstr, but instead we run the
+simplifier.  That gives the simplest possible program for SpecConstr to
+chew on; and it virtually guarantees no shadowing.
 
 
 %************************************************************************
@@ -535,6 +561,8 @@ spec_one env fn rhs (pats, rule_number)
 	spec_occ     = mkSpecOcc (nameOccName fn_name)
 	pat_fvs	     = varSetElems (exprsFreeVars pats)
 	vars_to_bind = filter not_avail pat_fvs
+		-- See Note [Shadowing] at the top
+
 	not_avail v  = not (v `elemVarEnv` scope env)
 		-- Put the type variables first; the type of a term
 		-- variable may mention a type variable
