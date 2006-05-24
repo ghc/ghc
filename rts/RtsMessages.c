@@ -88,7 +88,7 @@ vdebugBelch(char *s, va_list ap)
 
 #define BUFSIZE 512
 
-#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
 static int
 isGUIApp()
 {
@@ -113,7 +113,7 @@ isGUIApp()
 void
 rtsFatalInternalErrorFn(char *s, va_list ap)
 {
-#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
   if (isGUIApp())
   {
      char title[BUFSIZE], message[BUFSIZE];
@@ -150,7 +150,7 @@ rtsFatalInternalErrorFn(char *s, va_list ap)
 void
 rtsErrorMsgFn(char *s, va_list ap)
 {
-#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
   if (isGUIApp())
   {
      char buf[BUFSIZE];
@@ -180,7 +180,7 @@ rtsErrorMsgFn(char *s, va_list ap)
 void
 rtsDebugMsgFn(char *s, va_list ap)
 {
-#if defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
   if (isGUIApp())
   {
      char buf[BUFSIZE];
