@@ -1028,7 +1028,7 @@ freeHaskellFunctionPtr(void* ptr)
  } else {
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }
-#elif defined(x86_TARGET_ARCH) && defined(darwin_HOST_OS)
+#elif defined(x86_HOST_ARCH) && defined(darwin_HOST_OS)
 if ( *(unsigned char*)ptr != 0xe8 ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
