@@ -4,6 +4,10 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* HsParser bug: starting the module with '-- | doc' followed by a declaration
+  doesn't parse, because the '-- | doc' is interpreted as the module
+  documentation (the grammar has an S/R conflict because of this).
+
 * We don't point module references ("..." in doc strings) to the correct
   package, they are always assumed to be modules in the current package.
 
