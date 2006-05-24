@@ -720,20 +720,24 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   (wakeup_all,delays') <- do_select delays
 
-  if wakeup_all then return ()
-    else do
-      b <- fdIsSet wakeup readfds
-      if b == 0 
-        then return ()
-        else alloca $ \p -> do 
-	    c_read (fromIntegral wakeup) p 1; return ()
-	    s <- peek p		
-	    if (s == 0xff) 
-	      then return ()
-	      else do handler_tbl <- peek handlers
-		      sp <- peekElemOff handler_tbl (fromIntegral s)
-		      forkIO (do io <- deRefStablePtr sp; io)
-		      return ()
+  exit <-
+    if wakeup_all then return False
+      else do
+        b <- fdIsSet wakeup readfds
+        if b == 0 
+          then return False
+          else alloca $ \p -> do 
+	         c_read (fromIntegral wakeup) p 1; return ()
+		 s <- peek p		
+		 case s of
+		  _ | s == io_MANAGER_WAKEUP -> return False
+		  _ | s == io_MANAGER_DIE    -> return True
+		  _ -> do handler_tbl <- peek handlers
+		          sp <- peekElemOff handler_tbl (fromIntegral s)
+		          forkIO (do io <- deRefStablePtr sp; io)
+		          return False
+
+  if exit then return () else do
 
   takeMVar prodding
   putMVar prodding False
@@ -747,6 +751,9 @@ stick :: IORef Fd
 {-# NOINLINE stick #-}
 stick = unsafePerformIO (newIORef 0)
 
+io_MANAGER_WAKEUP = 0xff :: CChar
+io_MANAGER_DIE    = 0xfe :: CChar
+
 prodding :: MVar Bool
 {-# NOINLINE prodding #-}
 prodding = unsafePerformIO (newMVar False)
@@ -756,7 +763,8 @@ prodServiceThread = do
   b <- takeMVar prodding
   if (not b) 
     then do fd <- readIORef stick
-	    with 0xff $ \pbuf -> do c_write (fromIntegral fd) pbuf 1; return ()
+	    with io_MANAGER_WAKEUP $ \pbuf -> do 
+		c_write (fromIntegral fd) pbuf 1; return ()
     else return ()
   putMVar prodding True
 
