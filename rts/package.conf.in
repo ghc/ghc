@@ -139,6 +139,14 @@ ld-options:
          , "-u", "GHCziWeak_runFinalizzerBatch_closure"
 #endif
 
+#ifndef mingw32_HOST_OS
+#ifdef LEADING_UNDERSCORE
+	 , "-u", "_GHCziConc_ensureIOManagerIsRunning_closure"
+#else
+	 , "-u", "GHCziConc_ensureIOManagerIsRunning_closure"
+#endif
+#endif
+
 framework-dirs:
 
 #ifdef HAVE_FRAMEWORK_GMP

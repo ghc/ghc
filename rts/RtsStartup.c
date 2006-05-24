@@ -228,6 +228,10 @@ hs_init(int *argc, char **argv[])
     x86_init_fpu();
 #endif
 
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+    ioManagerStart();
+#endif
+
     /* Record initialization times */
     stat_endInit();
 }
@@ -325,6 +329,10 @@ hs_exit(void)
     /* start timing the shutdown */
     stat_startExit();
     
+#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+    ioManagerDie();
+#endif
+
     /* stop all running tasks */
     exitScheduler();
     

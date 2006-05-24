@@ -12,12 +12,16 @@
 extern rtsBool anyUserHandlers(void);
 
 #if !defined(THREADED_RTS)
-
 extern StgPtr pending_handler_buf[];
 extern StgPtr *next_pending_handler;
 #define signals_pending() (next_pending_handler != pending_handler_buf)
 void startSignalHandlers(Capability *cap);
+#endif
 
+#if defined(THREADED_RTS)
+void ioManagerWakeup (void);
+void ioManagerDie (void);
+void ioManagerStart (void);
 #endif
 
 extern StgInt *signal_handlers;

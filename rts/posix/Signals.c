@@ -16,6 +16,7 @@
 #include "posix/Signals.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+#include "Prelude.h"
 
 #ifdef alpha_HOST_ARCH
 # if defined(linux_HOST_OS)
@@ -107,6 +108,9 @@ more_handlers(I_ sig)
 // Here's the pipe into which we will send our signals
 static int io_manager_pipe = -1;
 
+#define IO_MANAGER_WAKEUP 0xff
+#define IO_MANAGER_DIE    0xfe
+
 void
 setIOManagerPipe (int fd)
 {
@@ -114,6 +118,40 @@ setIOManagerPipe (int fd)
     // compiled here because GHC.Conc depends on it.
     io_manager_pipe = fd;
 }
+
+#if defined(THREADED_RTS)
+void
+ioManagerWakeup (void)
+{
+    // Wake up the IO Manager thread by sending a byte down its pipe
+    if (io_manager_pipe >= 0) {
+	StgWord8 byte = (StgWord8)IO_MANAGER_WAKEUP;
+	write(io_manager_pipe, &byte, 1);
+    }
+}
+
+void
+ioManagerDie (void)
+{
+    // Ask the IO Manager thread to exit
+    if (io_manager_pipe >= 0) {
+	StgWord8 byte = (StgWord8)IO_MANAGER_DIE;
+	write(io_manager_pipe, &byte, 1);
+    }
+}
+
+void
+ioManagerStart (void)
+{
+    // Make sure the IO manager thread is running
+    Capability *cap;
+    if (io_manager_pipe < 0) {
+	cap = rts_lock();
+	rts_evalIO(cap,&GHCziConc_ensureIOManagerIsRunning_closure,NULL);
+	rts_unlock(cap);
+    }
+}
+#endif
 
 #if !defined(THREADED_RTS)
 
