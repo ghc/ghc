@@ -513,11 +513,13 @@ lexChar cont s0 loc0 y x f = case s0 of
                     '\\':s1 -> (escapeChar s1 `thenP` \(e,s,i) _ _ _ _ _ ->
                                charEnd e s loc0 y (x+i) f) s1 loc0 y x f
                     c:s     -> charEnd c s loc0 y (x+1) f
-                    []      -> error "Internal error: lexChar"
+                    []      -> char_err [] loc0 y x f
 
   where charEnd c ('\'':'#':s) = \loc y0 x0 f0 -> cont (PrimChar c) s loc y0 (x0+2) f0
 	charEnd c ('\'':s) = \loc y0 x0 f0 -> cont (Character c) s loc y0 (x0+1) f0
-        charEnd _ s = parseError "Improperly terminated character constant" s
+	charEnd c s = char_err s
+
+	char_err s = parseError "Improperly terminated character constant" s
 
 lexString :: (Token -> P a) -> P a
 lexString cont s0 loc y0 x0 f0 = loop "" s0 x0 y0 f0
