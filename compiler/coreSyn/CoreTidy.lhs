@@ -81,7 +81,7 @@ tidyAlt case_bndr env (DataAlt con, vs, rhs)
   | not (isVanillaDataCon con)	-- GADT case
   = tidyBndrs env tvs	 	=: \ (env1, tvs') ->
     let 
-	env2 = refineTidyEnv env con tvs' scrut_ty
+	env2 = refineTidyEnv env1 con tvs' scrut_ty
     in
     tidyBndrs env2 ids 	=: \ (env3, ids') ->
     (DataAlt con, tvs' ++ ids', tidyExpr env3 rhs)
