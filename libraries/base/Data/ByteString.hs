@@ -23,11 +23,11 @@
 -- | A time and space-efficient implementation of byte vectors using
 -- packed Word8 arrays, suitable for high performance use, both in terms
 -- of large data quantities, or high speed requirements. Byte vectors
--- are encoded as strict Word8 arrays of bytes, held in a ForeignPtr,
+-- are encoded as strict 'Word8' arrays of bytes, held in a 'ForeignPtr',
 -- and can be passed between C and Haskell with little effort.
 --
 -- This module is intended to be imported @qualified@, to avoid name
--- clashes with Prelude functions.  eg.
+-- clashes with "Prelude" functions.  eg.
 --
 -- > import qualified Data.ByteString as B
 --
@@ -43,7 +43,7 @@ module Data.ByteString (
 
         -- * Introducing and eliminating 'ByteString's
         empty,                  -- :: ByteString
-        packByte,               -- :: Word8   -> ByteString
+        singleton,               -- :: Word8   -> ByteString
         pack,                   -- :: [Word8] -> ByteString
         unpack,                 -- :: ByteString -> [Word8]
         packWith,               -- :: (a -> Word8) -> [a] -> ByteString
@@ -52,33 +52,28 @@ module Data.ByteString (
         -- * Basic interface
         cons,                   -- :: Word8 -> ByteString -> ByteString
         snoc,                   -- :: ByteString -> Word8 -> ByteString
+        append,                 -- :: ByteString -> ByteString -> ByteString
+        head,                   -- :: ByteString -> Word8
+        last,                   -- :: ByteString -> Word8
+        tail,                   -- :: ByteString -> ByteString
+        init,                   -- :: ByteString -> ByteString
         null,                   -- :: ByteString -> Bool
         length,                 -- :: ByteString -> Int
-        head,                   -- :: ByteString -> Word8
-        tail,                   -- :: ByteString -> ByteString
-        last,                   -- :: ByteString -> Word8
-        init,                   -- :: ByteString -> ByteString
-        append,                 -- :: ByteString -> ByteString -> ByteString
-
-        -- * Special ByteStrings
-        inits,                  -- :: ByteString -> [ByteString]
-        tails,                  -- :: ByteString -> [ByteString]
-        elems,                  -- :: ByteString -> [ByteString]
 
         -- * Transformating ByteStrings
         map,                    -- :: (Word8 -> Word8) -> ByteString -> ByteString
+        map',                   -- :: (Word8 -> Word8) -> ByteString -> ByteString
         reverse,                -- :: ByteString -> ByteString
         intersperse,            -- :: Word8 -> ByteString -> ByteString
         transpose,              -- :: [ByteString] -> [ByteString]
-        map',                   -- :: (Word8 -> Word8) -> ByteString -> ByteString
 
-        -- * Reducing 'ByteString's
+        -- * Reducing 'ByteString's (folds)
         foldl,                  -- :: (a -> Word8 -> a) -> a -> ByteString -> a
-        foldr,                  -- :: (Word8 -> a -> a) -> a -> ByteString -> a
+        foldl',                 -- :: (a -> Word8 -> a) -> a -> ByteString -> a
         foldl1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
         foldl1',                -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
+        foldr,                  -- :: (Word8 -> a -> a) -> a -> ByteString -> a
         foldr1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
-        foldl',                 -- :: (a -> Word8 -> a) -> a -> ByteString -> a
 
         -- ** Special folds
         concat,                 -- :: [ByteString] -> ByteString
@@ -87,77 +82,52 @@ module Data.ByteString (
         all,                    -- :: (Word8 -> Bool) -> ByteString -> Bool
         maximum,                -- :: ByteString -> Word8
         minimum,                -- :: ByteString -> Word8
-        mapIndexed,             -- :: (Int -> Word8 -> Word8) -> ByteString -> ByteString
 
         -- * Building ByteStrings
+        -- ** Scans
         scanl,                  -- :: (Word8 -> Word8 -> Word8) -> Word8 -> ByteString -> ByteString
         scanl1,                 -- :: (Word8 -> Word8 -> Word8) -> ByteString -> ByteString
 
-        -- * Generating and unfolding ByteStrings
+        -- ** Accumulating maps
+        mapAccumL,              -- :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
+--      mapAccumR,              -- :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
+        mapIndexed,             -- :: (Int -> Word8 -> Word8) -> ByteString -> ByteString
+
+        -- ** Unfolding ByteStrings
         replicate,              -- :: Int -> Word8 -> ByteString
-        unfoldrN,               -- :: (a -> Maybe (Word8, a)) -> a -> ByteString
+        unfoldr,                -- :: (a -> Maybe (Word8, a)) -> a -> ByteString
+        unfoldrN,               -- :: Int -> (a -> Maybe (Word8, a)) -> a -> ByteString
 
         -- * Substrings
 
         -- ** Breaking strings
         take,                   -- :: Int -> ByteString -> ByteString
-        unsafeTake,             -- :: Int -> ByteString -> ByteString
         drop,                   -- :: Int -> ByteString -> ByteString
-        unsafeDrop,             -- :: Int -> ByteString -> ByteString
         splitAt,                -- :: Int -> ByteString -> (ByteString, ByteString)
         takeWhile,              -- :: (Word8 -> Bool) -> ByteString -> ByteString
         dropWhile,              -- :: (Word8 -> Bool) -> ByteString -> ByteString
-        break,                  -- :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
         span,                   -- :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
         spanEnd,                -- :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
+        break,                  -- :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
+        group,                  -- :: ByteString -> [ByteString]
+        groupBy,                -- :: (Word8 -> Word8 -> Bool) -> ByteString -> [ByteString]
+        inits,                  -- :: ByteString -> [ByteString]
+        tails,                  -- :: ByteString -> [ByteString]
 
         -- ** Breaking and dropping on specific bytes
         breakByte,              -- :: Word8 -> ByteString -> (ByteString, ByteString)
         spanByte,               -- :: Word8 -> ByteString -> (ByteString, ByteString)
-        breakFirst,             -- :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
-        breakLast,              -- :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
 
         -- ** Breaking into many substrings
         split,                  -- :: Word8 -> ByteString -> [ByteString]
         splitWith,              -- :: (Word8 -> Bool) -> ByteString -> [ByteString]
         tokens,                 -- :: (Word8 -> Bool) -> ByteString -> [ByteString]
-        group,                  -- :: ByteString -> [ByteString]
-        groupBy,                -- :: (Word8 -> Word8 -> Bool) -> ByteString -> [ByteString]
 
         -- ** Joining strings
         join,                   -- :: ByteString -> [ByteString] -> ByteString
         joinWithByte,           -- :: Word8 -> ByteString -> ByteString -> ByteString
 
-        -- * Indexing ByteStrings
-        index,                  -- :: ByteString -> Int -> Word8
-        elemIndex,              -- :: Word8 -> ByteString -> Maybe Int
-        elemIndices,            -- :: Word8 -> ByteString -> [Int]
-        elemIndexLast,          -- :: Word8 -> ByteString -> Maybe Int
-        findIndex,              -- :: (Word8 -> Bool) -> ByteString -> Maybe Int
-        findIndices,            -- :: (Word8 -> Bool) -> ByteString -> [Int]
-        count,                  -- :: Word8 -> ByteString -> Int
-        findIndexOrEnd,         -- :: (Word8 -> Bool) -> ByteString -> Int
-
-        -- * Ordered ByteStrings
-        sort,                   -- :: ByteString -> ByteString
-
-        -- * Searching ByteStrings
-
-        -- ** Searching by equality
-        -- | These functions use memchr(3) to efficiently search the ByteString
-
-        elem,                   -- :: Word8 -> ByteString -> Bool
-        notElem,                -- :: Word8 -> ByteString -> Bool
-        filterByte,             -- :: Word8 -> ByteString -> ByteString
-        filterNotByte,          -- :: Word8 -> ByteString -> ByteString
-
-        -- ** Searching with a predicate
-        filter,                 -- :: (Word8 -> Bool) -> ByteString -> ByteString
-        find,                   -- :: (Word8 -> Bool) -> ByteString -> Maybe Word8
-        filter',                -- :: (Word8 -> Bool) -> ByteString -> ByteString
-
-        -- ** Prefixes and suffixes
-        -- | These functions use memcmp(3) to efficiently compare substrings
+        -- * Predicates
         isPrefixOf,             -- :: ByteString -> ByteString -> Bool
         isSuffixOf,             -- :: ByteString -> ByteString -> Bool
 
@@ -166,15 +136,45 @@ module Data.ByteString (
         findSubstring,          -- :: ByteString -> ByteString -> Maybe Int
         findSubstrings,         -- :: ByteString -> ByteString -> [Int]
 
+        -- * Searching ByteStrings
+
+        -- ** Searching by equality
+        -- | These functions use memchr(3) to efficiently search the ByteString
+        elem,                   -- :: Word8 -> ByteString -> Bool
+        notElem,                -- :: Word8 -> ByteString -> Bool
+        filterByte,             -- :: Word8 -> ByteString -> ByteString
+        filterNotByte,          -- :: Word8 -> ByteString -> ByteString
+
+        -- ** Searching with a predicate
+        find,                   -- :: (Word8 -> Bool) -> ByteString -> Maybe Word8
+        filter,                 -- :: (Word8 -> Bool) -> ByteString -> ByteString
+        filter',                -- :: (Word8 -> Bool) -> ByteString -> ByteString
+--      partition               -- :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
+
+        -- * Indexing ByteStrings
+        index,                  -- :: ByteString -> Int -> Word8
+        elemIndex,              -- :: Word8 -> ByteString -> Maybe Int
+        elemIndices,            -- :: Word8 -> ByteString -> [Int]
+        elemIndexEnd,           -- :: Word8 -> ByteString -> Maybe Int
+        findIndex,              -- :: (Word8 -> Bool) -> ByteString -> Maybe Int
+        findIndices,            -- :: (Word8 -> Bool) -> ByteString -> [Int]
+        count,                  -- :: Word8 -> ByteString -> Int
+        findIndexOrEnd,         -- :: (Word8 -> Bool) -> ByteString -> Int
+
         -- * Zipping and unzipping ByteStrings
         zip,                    -- :: ByteString -> ByteString -> [(Word8,Word8)]
         zipWith,                -- :: (Word8 -> Word8 -> c) -> ByteString -> ByteString -> [c]
         unzip,                  -- :: [(Word8,Word8)] -> (ByteString,ByteString)
 
+        -- * Ordered ByteStrings
+        sort,                   -- :: ByteString -> ByteString
+
         -- * Unchecked access
         unsafeHead,             -- :: ByteString -> Word8
         unsafeTail,             -- :: ByteString -> ByteString
         unsafeIndex,            -- :: ByteString -> Int -> Word8
+        unsafeTake,             -- :: Int -> ByteString -> ByteString
+        unsafeDrop,             -- :: Int -> ByteString -> ByteString
 
         -- * Low level introduction and elimination
         generate,               -- :: Int -> (Ptr Word8 -> IO Int) -> IO ByteString
@@ -206,7 +206,7 @@ module Data.ByteString (
         copyCString,            -- :: CString -> ByteString
         copyCStringLen,         -- :: CStringLen -> ByteString
 
-        -- * I\/O with @ByteString@s
+        -- * I\/O with 'ByteString's
 
         -- ** Standard input and output
 
@@ -240,6 +240,7 @@ module Data.ByteString (
 
         noAL, NoAL, loopArr, loopAcc, loopSndAcc,
         loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL, scanEFL,
+        mapAccumEFL, mapIndexEFL,
 
   ) where
 
@@ -276,6 +277,8 @@ import Foreign.Storable         (Storable(..))
 import System.IO                (stdin,stdout,hClose,hFileSize
                                 ,hGetBuf,hPutBuf,openBinaryFile
                                 ,Handle,IOMode(..))
+
+import Data.Monoid              (Monoid, mempty, mappend, mconcat)
 
 #if !defined(__GLASGOW_HASKELL__)
 import System.IO.Unsafe
@@ -342,6 +345,11 @@ instance Show ByteString where
 instance Read ByteString where
     readsPrec p str = [ (packWith c2w x, y) | (x, y) <- readsPrec p str ]
 
+instance Monoid ByteString where
+    mempty  = empty
+    mappend = append
+    mconcat = concat
+
 {-
 instance Arbitrary PackedString where
     arbitrary = P.pack `fmap` arbitrary
@@ -405,18 +413,18 @@ empty = inlinePerformIO $ mallocByteString 1 >>= \fp -> return $ PS fp 0 0
 {-# NOINLINE empty #-}
 
 -- | /O(1)/ Convert a 'Word8' into a 'ByteString'
-packByte :: Word8 -> ByteString
-packByte c = unsafePerformIO $ mallocByteString 2 >>= \fp -> do
+singleton :: Word8 -> ByteString
+singleton c = unsafePerformIO $ mallocByteString 2 >>= \fp -> do
     withForeignPtr fp $ \p -> poke p c
     return $ PS fp 0 1
-{-# INLINE packByte #-}
+{-# INLINE singleton #-}
 
 --
 -- XXX The unsafePerformIO is critical!
 --
 -- Otherwise:
 --
---  packByte 255 `compare` packByte 127
+--  singleton 255 `compare` singleton 127
 --
 -- is compiled to:
 --
@@ -688,7 +696,7 @@ foldl f v (PS x s l) = inlinePerformIO $ withForeignPtr x $ \ptr ->
                                    lgo (f z c) (p `plusPtr` 1) q
 -}
 
--- | 'foldl\'' is like foldl, but strict in the accumulator.
+-- | 'foldl\'' is like 'foldl', but strict in the accumulator.
 foldl' :: (a -> Word8 -> a) -> a -> ByteString -> a
 foldl' f z = loopAcc . loopU (foldEFL' f) z
 {-# INLINE foldl' #-}
@@ -714,7 +722,7 @@ foldl1 f ps
     | null ps   = errorEmptyList "foldl1"
     | otherwise = foldl f (unsafeHead ps) (unsafeTail ps)
 
--- | A strict version of 'foldl1'
+-- | 'foldl1\'' is like 'foldl1', but strict in the accumulator.
 foldl1' :: (Word8 -> Word8 -> Word8) -> ByteString -> Word8
 foldl1' f ps
     | null ps   = errorEmptyList "foldl1'"
@@ -823,17 +831,14 @@ minimum_ ptr n m c
                      minimum_ ptr (n+1) m (if w < c then w else c)
 -}
 
+mapAccumL :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
+mapAccumL f z = loopU (mapAccumEFL f) z
+
+--mapAccumR :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
+
 -- | /O(n)/ map Word8 functions, provided with the index at each position
 mapIndexed :: (Int -> Word8 -> Word8) -> ByteString -> ByteString
-mapIndexed k (PS ps s l) = create l $ \p -> withForeignPtr ps $ \f ->
-    go 0 (f `plusPtr` s) p (f `plusPtr` s `plusPtr` l)
-  where
-    go :: Int -> Ptr Word8 -> Ptr Word8 -> Ptr Word8 -> IO ()
-    STRICT4(go)
-    go n f t p | f == p    = return ()
-               | otherwise = do w <- peek f
-                                ((poke t) . k n) w
-                                go (n+1) (f `plusPtr` 1) (t `plusPtr` 1) p
+mapIndexed f = loopArr . loopU (mapIndexEFL f) 0
 
 -- ---------------------------------------------------------------------
 -- Building ByteStrings
@@ -882,40 +887,49 @@ replicate w c = inlinePerformIO $ generate w $ \ptr -> go ptr w
         go ptr n = poke ptr c >> go (ptr `plusPtr` 1) (n-1)
 -}
 
--- | /O(n)/ The 'unfoldrN' function is analogous to the List \'unfoldr\'.
--- 'unfoldrN' builds a ByteString from a seed value.  The function takes
--- the element and returns 'Nothing' if it is done producing the
--- ByteString or returns 'Just' @(a,b)@, in which case, @a@ is a
--- prepending to the ByteString and @b@ is used as the next element in a
--- recursive call.
---
--- To preven unfoldrN having /O(n^2)/ complexity (as prepending a
--- character to a ByteString is /O(n)/, this unfoldr requires a maximum
--- final size of the ByteString as an argument. 'cons' can then be
--- implemented in /O(1)/ (i.e.  a 'poke'), and the unfoldr itself has
--- linear complexity. The depth of the recursion is limited to this
--- size, but may be less. For lazy, infinite unfoldr, use
--- 'Data.List.unfoldr' (from 'Data.List').
+-- | /O(n)/, where /n/ is the length of the result.  The 'unfoldr' 
+-- function is analogous to the List \'unfoldr\'.  'unfoldr' builds a 
+-- ByteString from a seed value.  The function takes the element and 
+-- returns 'Nothing' if it is done producing the ByteString or returns 
+-- 'Just' @(a,b)@, in which case, @a@ is the next byte in the string, 
+-- and @b@ is the seed value for further production.
 --
 -- Examples:
 --
--- > unfoldrN 10 (\x -> Just (x, chr (ord x + 1))) '0' == "0123456789"
+-- >    unfoldr (\x -> if x <= 5 then Just (x, x + 1) else Nothing) 0
+-- > == pack [0, 1, 2, 3, 4, 5]
 --
--- The following equation connects the depth-limited unfoldr to the List unfoldr:
+unfoldr :: (a -> Maybe (Word8, a)) -> a -> ByteString
+unfoldr f = concat . unfoldChunk 32 64
+  where unfoldChunk n n' x =
+          case unfoldrN n f x of
+            (s, Nothing) -> s : []
+            (s, Just x') -> s : unfoldChunk n' (n+n') x'
+
+-- | /O(n)/ Like 'unfoldr', 'unfoldrN' builds a ByteString from a seed
+-- value.  However, the length of the result is limited by the first
+-- argument to 'unfoldrN'.  This function is more efficient than 'unfoldr'
+-- when the maximum length of the result is known.
 --
--- > unfoldrN n == take n $ List.unfoldr
-unfoldrN :: Int -> (a -> Maybe (Word8, a)) -> a -> ByteString
-unfoldrN i f w
-    | i <= 0    = empty
-    | otherwise = inlinePerformIO $ generate i $ \p -> go p w 0
-    where
-        STRICT3(go)
-        go q c n | n == i    = return n      -- stop if we reach `i'
-                 | otherwise = case f c of
-                                   Nothing        -> return n
-                                   Just (a,new_c) -> do
-                                        poke q a
-                                        go (q `plusPtr` 1) new_c (n+1)
+-- The following equation relates 'unfoldrN' and 'unfoldr':
+--
+-- > unfoldrN n f s == take n (unfoldr f s)
+--
+unfoldrN :: Int -> (a -> Maybe (Word8, a)) -> a -> (ByteString, Maybe a)
+unfoldrN i f x0
+    | i < 0     = (empty, Just x0)
+    | otherwise = inlinePerformIO $ do
+                    fp <- mallocByteString i
+                    withForeignPtr fp (\p -> go fp p x0 0)
+  where STRICT4(go)
+        go fp p x n =
+          case f x of
+            Nothing      -> let s = copy (PS fp 0 n)
+                             in s `seq` return (s, Nothing)
+            Just (w,x')
+             | n == i    -> return (PS fp 0 i, Just x)
+             | otherwise -> do poke p w
+                               go fp (p `plusPtr` 1) x' (n+1)
 
 -- ---------------------------------------------------------------------
 -- Substrings
@@ -992,40 +1006,6 @@ spanByte c ps@(PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
                                 then return (unsafeTake i ps, unsafeDrop i ps)
                                 else go p (i+1)
 {-# INLINE spanByte #-}
-
--- | /O(n)/ 'breakFirst' breaks the given ByteString on the first
--- occurence of @w@. It behaves like 'break', except the delimiter is
--- not returned, and @Nothing@ is returned if the delimiter is not in
--- the ByteString. I.e.
---
--- > breakFirst 'b' "aabbcc" == Just ("aa","bcc")
---
--- > breakFirst c xs ==
--- > let (x,y) = break (== c) xs 
--- > in if null y then Nothing else Just (x, drop 1 y))
---
-breakFirst :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
-breakFirst c p = case elemIndex c p of
-   Nothing -> Nothing
-   Just n -> Just (unsafeTake n p, unsafeDrop (n+1) p)
-{-# INLINE breakFirst #-}
-
--- | /O(n)/ 'breakLast' behaves like breakFirst, but from the end of the
--- ByteString.
---
--- > breakLast ('b') (pack "aabbcc") == Just ("aab","cc")
---
--- and the following are equivalent:
---
--- > breakLast 'c' "abcdef"
--- > let (x,y) = break (=='c') (reverse "abcdef") 
--- > in if null x then Nothing else Just (reverse (drop 1 y), reverse x)
---
-breakLast :: Word8 -> ByteString -> Maybe (ByteString,ByteString)
-breakLast c p = case elemIndexLast c p of
-    Nothing -> Nothing
-    Just n -> Just (unsafeTake n p, unsafeDrop (n+1) p)
-{-# INLINE breakLast #-}
 
 -- | 'span' @p xs@ breaks the ByteString into two segments. It is
 -- equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
@@ -1187,11 +1167,7 @@ groupBy k xs
 -- 'ByteString's and concatenates the list after interspersing the first
 -- argument between each element of the list.
 join :: ByteString -> [ByteString] -> ByteString
-join filler pss = concat (splice pss)
-    where
-        splice []  = []
-        splice [x] = [x]
-        splice (x:y:xs) = x:filler:splice (y:xs)
+join s = concat . (List.intersperse s)
 {-# INLINE join #-}
 
 --
@@ -1232,16 +1208,16 @@ elemIndex c (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p -> do
     return $ if q == nullPtr then Nothing else Just $! q `minusPtr` p'
 {-# INLINE elemIndex #-}
 
--- | /O(n)/ The 'elemIndexLast' function returns the last index of the
+-- | /O(n)/ The 'elemIndexEnd' function returns the last index of the
 -- element in the given 'ByteString' which is equal to the query
 -- element, or 'Nothing' if there is no such element. The following
 -- holds:
 --
--- > elemIndexLast c xs == 
+-- > elemIndexEnd c xs == 
 -- > (-) (length xs - 1) `fmap` elemIndex c (reverse xs)
 --
-elemIndexLast :: Word8 -> ByteString -> Maybe Int
-elemIndexLast ch (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
+elemIndexEnd :: Word8 -> ByteString -> Maybe Int
+elemIndexEnd ch (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
     go (p `plusPtr` s) (l-1)
   where
     STRICT2(go)
@@ -1250,7 +1226,7 @@ elemIndexLast ch (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
                             if ch == ch'
                                 then return $ Just i
                                 else go p (i-1)
-{-# INLINE elemIndexLast #-}
+{-# INLINE elemIndexEnd #-}
 
 -- | /O(n)/ The 'elemIndices' function extends 'elemIndex', by returning
 -- the indices of all elements equal to the query element, in ascending order.
@@ -1540,12 +1516,6 @@ tails p | null p    = [empty]
         | otherwise = p : tails (unsafeTail p)
 
 -- less efficent spacewise: tails (PS x s l) = [PS x (s+n) (l-n) | n <- [0..l]]
-
--- | /O(n)/ breaks a ByteString to a list of ByteStrings, one byte each.
-elems :: ByteString -> [ByteString]
-elems (PS _ _ 0) = []
-elems (PS x s l) = (PS x s 1:elems (PS x (s+1) (l-1)))
-{-# INLINE elems #-}
 
 -- ---------------------------------------------------------------------
 -- ** Ordered 'ByteString's
@@ -1932,7 +1902,7 @@ putStr = hPut stdout
 -- | Write a ByteString to stdout, appending a newline byte
 putStrLn :: ByteString -> IO ()
 putStrLn ps = hPut stdout ps >> hPut stdout nl
-    where nl = packByte 0x0a
+    where nl = singleton 0x0a
 
 -- | Read a 'ByteString' directly from the specified 'Handle'.  This
 -- is far more efficient than reading the characters into a 'String'
@@ -2298,6 +2268,22 @@ scanEFL f = \a e -> (f a e, Just a)
 {-# INLINE [1] scanEFL #-}
 #endif
 
+-- | Element function implementing a map and fold
+--
+mapAccumEFL :: (acc -> Word8 -> (acc, Word8)) -> acc -> Word8 -> (acc, Maybe Word8)
+mapAccumEFL f = \a e -> case f a e of (a', e') -> (a', Just e')
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] mapAccumEFL #-}
+#endif
+
+-- | Element function implementing a map with index
+--
+mapIndexEFL :: (Int -> Word8 -> Word8) -> Int -> Word8 -> (Int, Maybe Word8)
+mapIndexEFL f = \i e -> let i' = i+1 in i' `seq` (i', Just $ f i e)
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] mapIndexEFL #-}
+#endif
+
 -- | No accumulator
 noAL :: NoAL
 noAL = NoAL
@@ -2307,20 +2293,20 @@ noAL = NoAL
 
 -- | Projection functions that are fusion friendly (as in, we determine when
 -- they are inlined)
-loopArr :: (ByteString, acc) -> ByteString
-loopArr (arr, _) = arr
+loopArr :: (acc, byteString) -> byteString
+loopArr (_, arr) = arr
 #if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] loopArr #-}
 #endif
 
-loopAcc :: (ByteString, acc) -> acc
-loopAcc (_, acc) = acc
+loopAcc :: (acc, byteString) -> acc
+loopAcc (acc, _) = acc
 #if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] loopAcc #-}
 #endif
 
-loopSndAcc :: (ByteString, (acc1, acc2)) -> (ByteString, acc2)
-loopSndAcc (arr, (_, acc)) = (arr, acc)
+loopSndAcc :: ((acc1, acc2), byteString) -> (acc2, byteString)
+loopSndAcc ((_, acc), arr) = (acc, arr)
 #if defined(__GLASGOW_HASKELL__)
 {-# INLINE [1] loopSndAcc #-}
 #endif
@@ -2335,7 +2321,7 @@ loopSndAcc (arr, (_, acc)) = (arr, acc)
 loopU :: (acc -> Word8 -> (acc, Maybe Word8))  -- ^ mapping & folding, once per elem
       -> acc                                   -- ^ initial acc value
       -> ByteString                            -- ^ input ByteString
-      -> (ByteString, acc)
+      -> (acc, ByteString)
 
 loopU f start (PS z s i) = inlinePerformIO $ withForeignPtr z $ \a -> do
     fp          <- mallocByteString i
@@ -2347,7 +2333,7 @@ loopU f start (PS z s i) = inlinePerformIO $ withForeignPtr z $ \a -> do
                     withForeignPtr fp_ $ \p' -> memcpy p' p (fromIntegral i')
                     return (fp_,i',acc)
 
-    return (PS ptr 0 n, acc)
+    return (acc, PS ptr 0 n)
   where
     go p ma = trans 0 0
         where
