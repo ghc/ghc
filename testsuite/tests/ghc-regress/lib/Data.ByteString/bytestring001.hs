@@ -158,7 +158,7 @@ prop_compare4 xs  = (not (null xs)) ==> (pack xs  `compare` P.empty) == GT
 prop_compare5 xs  = (not (null xs)) ==> (P.empty `compare` pack xs) == LT
 prop_compare6 xs ys= (not (null ys)) ==> (pack (xs++ys)  `compare` pack xs) == GT
 
-prop_compare7 x  y = x `compare` y == (P.packChar x `compare` P.packChar y)
+prop_compare7 x  y = x `compare` y == (P.singleton x `compare` P.singleton y)
 prop_compare8 xs ys = xs `compare` ys == (P.pack xs `compare` P.pack ys)
 
 -- prop_nil1 xs = (null xs) ==> pack xs == P.empty
@@ -298,12 +298,12 @@ prop_lineIndices1 xs = P.elemIndices '\n' xs == P.lineIndices xs
 
 prop_count c xs = length (P.elemIndices c xs) == P.count c xs
 
-prop_elemIndexLast1 c xs = (P.elemIndexLast c (pack xs)) ==
+prop_elemIndexEnd1 c xs = (P.elemIndexEnd c (pack xs)) ==
                            (case P.elemIndex c (pack (reverse xs)) of
                                 Nothing -> Nothing
                                 Just i  -> Just (length xs -1 -i))
 
-prop_elemIndexLast2 c xs = (P.elemIndexLast c (pack xs)) ==
+prop_elemIndexEnd2 c xs = (P.elemIndexEnd c (pack xs)) ==
                            ((-) (length xs - 1) `fmap` P.elemIndex c (pack $ reverse xs))
 
 prop_elemIndices xs c = elemIndices c xs == P.elemIndices c (pack xs)
@@ -357,16 +357,6 @@ prop_spanChar c xs =
 prop_spanChar_1 c xs =
         (P.span (==c) xs) == P.spanChar c xs
 
-prop_breakFirst c xs = (let (x,y) = break (==c) xs
-                        in if null y then Nothing
-                                     else Just (pack x, pack $ drop 1 y)) ==
-                       (P.breakFirst c (pack xs))
-
-prop_breakLast c xs = (let (x,y) = break (==c) (reverse xs)
-                       in if null y then Nothing
-                                    else Just (pack (reverse $ drop 1 y), pack (reverse x))) ==
-                       (P.breakLast c (pack xs))
-
 prop_words' xs =
     (unpack . P.unwords  . P.words' . pack) xs ==
     (map (\c -> if isSpace c then ' ' else c) xs)
@@ -374,7 +364,7 @@ prop_words' xs =
 prop_lines' xs = (unpack . P.unlines' . P.lines' . pack) xs == (xs)
 
 prop_unfoldr c =
-    (P.unfoldrN 100 (\x -> Just (x, chr (ord x + 1))) c) ==
+    (fst $ P.unfoldrN 100 (\x -> Just (x, chr (ord x + 1))) c) ==
     (pack $ take 100 $ unfoldr (\x -> Just (x, chr (ord x + 1))) c)
 
 prop_prefix xs ys = isPrefixOf xs ys == (P.pack xs `P.isPrefixOf` P.pack ys)
@@ -399,7 +389,7 @@ prop_replicate1 n c =
     unpack (P.replicate n c) == replicate n c
 
 prop_replicate2 n c =
-    P.replicate n c == P.unfoldrN n (\u -> Just (u,u)) c
+    P.replicate n c == fst (P.unfoldrN n (\u -> Just (u,u)) c)
 
 prop_replicate3 c = unpack (P.replicate 0 c) == replicate 0 c
 
@@ -416,7 +406,7 @@ prop_filterChar3 c xs = P.filterChar c xs == P.replicate (P.count c xs) c
 prop_filterNotChar1 c xs = (filter (/=c) xs) == ((P.unpack . P.filterNotChar c . P.pack) xs)
 prop_filterNotChar2 c xs = (P.filter (/=c) (P.pack xs)) == (P.filterNotChar c (P.pack xs))
 
-prop_joinjoinpath xs ys c = P.joinWithChar c xs ys == P.join (P.packChar c) [xs,ys]
+prop_joinjoinpath xs ys c = P.joinWithChar c xs ys == P.join (P.singleton c) [xs,ys]
 
 prop_zip  xs ys = zip xs ys == P.zip (pack xs) (pack ys)
 prop_zip1 xs ys = P.zip xs ys == zip (P.unpack xs) (P.unpack ys)
@@ -519,10 +509,8 @@ main = do
             ,    ("breakSpace",       mytest prop_breakSpace)
             ,    ("dropSpace",       mytest prop_dropSpace)
             ,    ("spanEnd",       mytest prop_spanEnd)
-            ,    ("breakFirst",       mytest prop_breakFirst)
-            ,    ("breakLast",       mytest prop_breakLast)
-            ,    ("elemIndexLast1",       mytest prop_elemIndexLast1)
-            ,    ("elemIndexLast2",       mytest prop_elemIndexLast2)
+            ,    ("elemIndexEnd1",       mytest prop_elemIndexEnd1)
+            ,    ("elemIndexEnd2",       mytest prop_elemIndexEnd2)
             ,    ("words'",       mytest prop_words')
             ,    ("lines'",       mytest prop_lines')
             ,    ("dropSpaceEnd",       mytest prop_dropSpaceEnd)
