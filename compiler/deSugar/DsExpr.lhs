@@ -43,13 +43,13 @@ import TcHsSyn		( hsPatType, mkVanillaTuplePat )
 
 import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppTyCon, 
 			  tcTyConAppArgs, isUnLiftedType, Type, mkAppTy )
-import Type		( funArgTy, splitFunTys, isUnboxedTupleType, mkFunTy )
+import Type		( splitFunTys, isUnboxedTupleType, mkFunTy )
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import CostCentre	( mkUserCC )
 import Id		( Id, idType, idName, idDataCon )
-import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
+import PrelInfo		( rEC_CON_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isVanillaDataCon )
 import TyCon		( FieldLabel, tyConDataCons )
