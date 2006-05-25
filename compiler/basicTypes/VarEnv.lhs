@@ -26,7 +26,8 @@ module VarEnv (
 
 	-- RnEnv2 and its operations
 	RnEnv2, mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
-		rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR,
+		rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, extendRnInScopeList,
+		rnInScope,
 
 	-- TidyEnvs
 	TidyEnv, emptyTidyEnv
@@ -40,7 +41,7 @@ import VarSet
 import UniqFM  
 import Unique	  ( Unique, deriveUnique, getUnique )
 import Util	  ( zipEqual, foldl2 )
-import Maybes	  ( orElse, isJust )
+import Maybes	  ( orElse )
 import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastTypes
@@ -183,6 +184,13 @@ mkRnEnv2 vars = RV2	{ envL 	   = emptyVarEnv
 			, envR 	   = emptyVarEnv
 			, in_scope = vars }
 
+extendRnInScopeList :: RnEnv2 -> [Var] -> RnEnv2
+extendRnInScopeList env vs
+  = env { in_scope = extendInScopeSetList (in_scope env) vs }
+
+rnInScope :: Var -> RnEnv2 -> Bool
+rnInScope x env = x `elemInScopeSet` in_scope env
+
 rnBndrs2 :: RnEnv2 -> [Var] -> [Var] -> RnEnv2
 -- Arg lists must be of equal length
 rnBndrs2 env bsL bsR = foldl2 rnBndr2 env bsL bsR 
@@ -236,8 +244,8 @@ rnOccR (RV2 { envR = env }) v = lookupVarEnv env v `orElse` v
 
 inRnEnvL, inRnEnvR :: RnEnv2 -> Var -> Bool
 -- Tells whether a variable is locally bound
-inRnEnvL (RV2 { envL = env }) v = isJust (lookupVarEnv env v)
-inRnEnvR (RV2 { envR = env }) v = isJust (lookupVarEnv env v)
+inRnEnvL (RV2 { envL = env }) v = v `elemVarEnv` env
+inRnEnvR (RV2 { envR = env }) v = v `elemVarEnv` env
 
 nukeRnEnvL, nukeRnEnvR :: RnEnv2 -> RnEnv2
 nukeRnEnvL env = env { envL = emptyVarEnv }

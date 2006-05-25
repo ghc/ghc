@@ -5,8 +5,9 @@ Taken quite directly from the Peyton Jones/Lester paper.
 
 \begin{code}
 module CoreFVs (
-	exprFreeVars,	-- CoreExpr -> VarSet	-- Find all locally-defined free Ids or tyvars
+	exprFreeVars,	-- CoreExpr   -> VarSet	-- Find all locally-defined free Ids or tyvars
 	exprsFreeVars,	-- [CoreExpr] -> VarSet
+	bindFreeVars, 	-- CoreBind   -> VarSet
 
 	exprSomeFreeVars, exprsSomeFreeVars,
 	exprFreeNames, exprsFreeNames,
@@ -58,6 +59,12 @@ exprFreeVars = exprSomeFreeVars isLocalVar
 
 exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = foldr (unionVarSet . exprFreeVars) emptyVarSet
+
+bindFreeVars :: CoreBind -> VarSet
+bindFreeVars (NonRec b r) = exprFreeVars r
+bindFreeVars (Rec prs)    = addBndrs (map fst prs) 
+				     (foldr (union . rhs_fvs) noVars prs)
+				     isLocalVar emptyVarSet
 
 exprSomeFreeVars :: InterestingVarFun 	-- Says which Vars are interesting
 		 -> CoreExpr
