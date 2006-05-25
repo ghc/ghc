@@ -11,6 +11,18 @@
 -- This module provides support for raising and catching both built-in
 -- and user-defined exceptions.
 --
+-- In addition to exceptions thrown by 'IO' operations, exceptions may
+-- be thrown by pure code (imprecise exceptions) or by external events
+-- (asynchronous exceptions), but may only be caught in the 'IO' monad.
+-- For more details, see:
+--
+--  * /A semantics for imprecise exceptions/, by Simon Peyton Jones,
+--    Alastair Reid, Tony Hoare, Simon Marlow, Fergus Henderson,
+--    in /PLDI'99/.
+--
+--  * /Asynchronous exceptions in Haskell/, by Simon Marlow, Simon Peyton
+--    Jones, Andy Moran and John Reppy, in /PLDI'01/.
+--
 -----------------------------------------------------------------------------
 
 module Control.Exception (
