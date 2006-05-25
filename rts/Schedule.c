@@ -3016,17 +3016,15 @@ static void (*extra_roots)(evac_fn);
 static void
 performGC_(rtsBool force_major, void (*get_roots)(evac_fn))
 {
-    Task *task = myTask();
-
-    if (task == NULL) {
-	ACQUIRE_LOCK(&sched_mutex);
-	task = newBoundTask();
-	RELEASE_LOCK(&sched_mutex);
-	scheduleDoGC(NULL,task,force_major, get_roots);
-	boundTaskExiting(task);
-    } else {
-	scheduleDoGC(NULL,task,force_major, get_roots);
-    }
+    Task *task;
+    // We must grab a new Task here, because the existing Task may be
+    // associated with a particular Capability, and chained onto the 
+    // suspended_ccalling_tasks queue.
+    ACQUIRE_LOCK(&sched_mutex);
+    task = newBoundTask();
+    RELEASE_LOCK(&sched_mutex);
+    scheduleDoGC(NULL,task,force_major, get_roots);
+    boundTaskExiting(task);
 }
 
 void
