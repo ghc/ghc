@@ -654,7 +654,6 @@ toIfaceExpr ext (Lit l)       = IfaceLit l
 toIfaceExpr ext (Type ty)     = IfaceType (toIfaceType ext ty)
 toIfaceExpr ext (Lam x b)     = IfaceLam (toIfaceBndr ext x) (toIfaceExpr ext b)
 toIfaceExpr ext (App f a)     = toIfaceApp ext f [a]
--- gaw 2004
 toIfaceExpr ext (Case s x ty as) = IfaceCase (toIfaceExpr ext s) (getOccName x) (toIfaceType ext ty) (map (toIfaceAlt ext) as)
 toIfaceExpr ext (Let b e)     = IfaceLet (toIfaceBind ext b) (toIfaceExpr ext e)
 toIfaceExpr ext (Note n e)    = IfaceNote (toIfaceNote ext n) (toIfaceExpr ext e)

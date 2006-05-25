@@ -288,9 +288,10 @@ initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
 tcIfaceLclId :: OccName -> IfL Id
 tcIfaceLclId occ
   = do	{ lcl <- getLclEnv
-	; return (lookupOccEnv (if_id_env lcl) occ
-		  `orElse` 
-		  pprPanic "tcIfaceLclId" (ppr occ)) }
+	; case (lookupOccEnv (if_id_env lcl) occ) of
+            Just ty_var -> return ty_var
+            Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ)
+        }
 
 refineIfaceIdEnv :: TypeRefinement -> IfL a -> IfL a
 refineIfaceIdEnv (tv_subst, _) thing_inside
@@ -311,9 +312,10 @@ extendIfaceIdEnv ids thing_inside
 tcIfaceTyVar :: OccName -> IfL TyVar
 tcIfaceTyVar occ
   = do	{ lcl <- getLclEnv
-	; return (lookupOccEnv (if_tv_env lcl) occ
-		  `orElse`
-		  pprPanic "tcIfaceTyVar" (ppr occ)) }
+	; case (lookupOccEnv (if_tv_env lcl) occ) of
+            Just ty_var -> return ty_var
+            Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
+        }
 
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
 extendIfaceTyVarEnv tyvars thing_inside
