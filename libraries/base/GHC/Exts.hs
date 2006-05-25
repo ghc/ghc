@@ -28,6 +28,8 @@ module GHC.Exts
 	-- * Linear implicit parameter support
 	Splittable(..),
 
+	-- * Debugging
+	breakpoint,
        ) where
 
 import Prelude
