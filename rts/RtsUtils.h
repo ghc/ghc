@@ -16,9 +16,6 @@
 extern void *stgMallocBytes(int n, char *msg)
     GNUC3_ATTRIBUTE(__malloc__);
 
-extern void* stgMallocBytesRWX(int len)
-    GNUC3_ATTRIBUTE(__malloc__);
-
 extern void *stgReallocBytes(void *p, int n, char *msg);
 
 extern void *stgCallocBytes(int n, int m, char *msg)

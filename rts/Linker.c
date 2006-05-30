@@ -707,7 +707,8 @@ typedef struct _RtsSymbolVal {
       SymX(stg_interp_constr6_entry)            \
       SymX(stg_interp_constr7_entry)            \
       SymX(stg_interp_constr8_entry)            \
-      SymX(stgMallocBytesRWX)                   \
+      SymX(allocateExec)	                \
+      SymX(freeExec)		                \
       SymX(getAllocations)                      \
       SymX(revertCAFs)                          \
       SymX(RtsFlags)                            \

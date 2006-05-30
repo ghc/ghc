@@ -166,6 +166,10 @@ doYouWantToGC( void )
   return (alloc_blocks >= alloc_blocks_lim);
 }
 
+/* memory allocator for executable memory */
+extern void *allocateExec (nat bytes);
+extern void freeExec (void *p);
+
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection
 

@@ -85,8 +85,10 @@ typedef struct bdescr_ {
 #define BF_PINNED    4
 /* Block is part of a compacted generation */
 #define BF_COMPACTED 8
-/* Block is free, and on the free list */
+/* Block is free, and on the free list  (TODO: is this used?) */
 #define BF_FREE      16
+/* Block is executable */
+#define BF_EXEC	     32
 
 /* Finding the block descriptor for a given block -------------------------- */
 

@@ -40,6 +40,7 @@ Haskell side.
 #include "Rts.h"
 #include "RtsExternal.h"
 #include "RtsUtils.h"
+#include "Storage.h"
 #include <stdlib.h>
 
 #if defined(_WIN32)
@@ -266,7 +267,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      <c>: 	ff e0             jmp    %eax        	   # and jump to it.
 		# the callee cleans up the stack
     */
-    adjustor = stgMallocBytesRWX(14);
+    adjustor = allocateExec(14);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 	adj_code[0x00] = (unsigned char)0x58;  /* popl %eax  */
@@ -311,7 +312,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
     That's (thankfully) the case here with the restricted set of 
     return types that we support.
   */
-    adjustor = stgMallocBytesRWX(17);
+    adjustor = allocateExec(17);
     {
 	unsigned char *const adj_code = (unsigned char *)adjustor;
 
@@ -340,7 +341,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
           
           We offload most of the work to AdjustorAsm.S.
         */
-        AdjustorStub *adjustorStub = stgMallocBytesRWX(sizeof(AdjustorStub));
+        AdjustorStub *adjustorStub = allocateExec(sizeof(AdjustorStub));
         adjustor = adjustorStub;
 
         extern void adjustorCode(void);
@@ -443,7 +444,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	}
 
 	if (i < 6) {
-	    adjustor = stgMallocBytesRWX(0x30);
+	    adjustor = allocateExec(0x30);
 
 	    *(StgInt32 *)adjustor        = 0x49c1894d;
 	    *(StgInt32 *)(adjustor+0x4)  = 0x8948c889;
@@ -457,7 +458,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	}
 	else
 	{
-	    adjustor = stgMallocBytesRWX(0x40);
+	    adjustor = allocateExec(0x40);
 
 	    *(StgInt32 *)adjustor        = 0x35ff5141;
 	    *(StgInt32 *)(adjustor+0x4)  = 0x00000020;
@@ -504,7 +505,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      similarly, and local variables should be accessed via %fp, not %sp. In a
      nutshell: This should work! (Famous last words! :-)
   */
-    adjustor = stgMallocBytesRWX(4*(11+1));
+    adjustor = allocateExec(4*(11+1));
     {
         unsigned long *const adj_code = (unsigned long *)adjustor;
 
@@ -581,7 +582,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
       4 bytes (getting rid of the nop), hence saving memory. [ccshan]
   */
     ASSERT(((StgWord64)wptr & 3) == 0);
-    adjustor = stgMallocBytesRWX(48);
+    adjustor = allocateExec(48);
     {
 	StgWord64 *const code = (StgWord64 *)adjustor;
 
@@ -686,7 +687,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
             */
                     // allocate space for at most 4 insns per parameter
                     // plus 14 more instructions.
-        adjustor = stgMallocBytesRWX(4 * (4*n + 14));
+        adjustor = allocateExec(4 * (4*n + 14));
         code = (unsigned*)adjustor;
         
         *code++ = 0x48000008; // b *+8
@@ -845,7 +846,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 #ifdef FUNDESCS
         adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
 #else
-        adjustorStub = stgMallocBytesRWX(sizeof(AdjustorStub));
+        adjustorStub = allocateExec(sizeof(AdjustorStub));
 #endif
         adjustor = adjustorStub;
             
@@ -1088,7 +1089,7 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
 #endif
  *((unsigned char*)ptr) = '\0';
 
- stgFree(ptr);
+ freeExec(ptr);
 }
 
 
@@ -1101,7 +1102,7 @@ void
 initAdjustor(void)
 {
 #if defined(i386_HOST_ARCH) && defined(openbsd_HOST_OS)
-    obscure_ccall_ret_code_dyn = stgMallocBytesRWX(4);
+    obscure_ccall_ret_code_dyn = allocateExec(4);
     obscure_ccall_ret_code_dyn[0] = ((unsigned char *)obscure_ccall_ret_code)[0];
     obscure_ccall_ret_code_dyn[1] = ((unsigned char *)obscure_ccall_ret_code)[1];
     obscure_ccall_ret_code_dyn[2] = ((unsigned char *)obscure_ccall_ret_code)[2];

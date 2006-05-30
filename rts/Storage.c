@@ -22,6 +22,7 @@
 #include "Storage.h"
 #include "Schedule.h"
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
+#include "OSMem.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -968,6 +969,99 @@ calcNeeded(void)
     return needed;
 }
 
+/* ----------------------------------------------------------------------------
+   Executable memory
+
+   Executable memory must be managed separately from non-executable
+   memory.  Most OSs these days require you to jump through hoops to
+   dynamically allocate executable memory, due to various security
+   measures.
+
+   Here we provide a small memory allocator for executable memory.
+   Memory is managed with a page granularity; we allocate linearly
+   in the page, and when the page is emptied (all objects on the page
+   are free) we free the page again, not forgetting to make it
+   non-executable.
+   ------------------------------------------------------------------------- */
+
+static bdescr *exec_block;
+
+void *allocateExec (nat bytes)
+{
+    void *ret;
+    nat n;
+
+    ACQUIRE_SM_LOCK;
+
+    // round up to words.
+    n  = (bytes + sizeof(W_) + 1) / sizeof(W_);
+
+    if (n+1 > BLOCK_SIZE_W) {
+	barf("allocateExec: can't handle large objects");
+    }
+
+    if (exec_block == NULL || 
+	exec_block->free + n + 1 > exec_block->start + BLOCK_SIZE_W) {
+	bdescr *bd;
+	lnat pagesize = getPageSize();
+	bd = allocGroup(stg_max(1, pagesize / BLOCK_SIZE));
+	IF_DEBUG(gc, debugBelch("allocate exec block %p\n", bd->start));
+	bd->gen_no = 0;
+	bd->flags = BF_EXEC;
+	bd->link = exec_block;
+	if (exec_block != NULL) {
+	    exec_block->u.back = bd;
+	}
+	bd->u.back = NULL;
+	setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsTrue);
+	exec_block = bd;
+    }
+    *(exec_block->free) = n;  // store the size of this chunk
+    exec_block->gen_no += n;  // gen_no stores the number of words allocated
+    ret = exec_block->free + 1;
+    exec_block->free += n + 1;
+
+    RELEASE_SM_LOCK
+    return ret;
+}
+
+void freeExec (void *addr)
+{
+    StgPtr p = (StgPtr)addr - 1;
+    bdescr *bd = Bdescr((StgPtr)p);
+
+    if ((bd->flags & BF_EXEC) == 0) {
+	barf("freeExec: not executable");
+    }
+
+    if (*(StgPtr)p == 0) {
+	barf("freeExec: already free?");
+    }
+
+    ACQUIRE_SM_LOCK;
+
+    bd->gen_no -= *(StgPtr)p;
+    *(StgPtr)p = 0;
+
+    // Free the block if it is empty, but not if it is the block at
+    // the head of the queue.
+    if (bd->gen_no == 0 && bd != exec_block) {
+	IF_DEBUG(gc, debugBelch("free exec block %p\n", bd->start));
+	if (bd->u.back) {
+	    bd->u.back->link = bd->link;
+	} else {
+	    exec_block = bd->link;
+	}
+	if (bd->link) {
+	    bd->link->u.back = bd->u.back;
+	}
+	setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsFalse);
+	freeGroup(bd);
+    }
+
+    RELEASE_SM_LOCK
+}    
+
 /* -----------------------------------------------------------------------------
    Debugging
 
@@ -1047,6 +1141,11 @@ memInventory(void)
 
   // count the blocks allocated by the arena allocator
   total_blocks += arenaBlocks();
+
+  // count the blocks containing executable memory
+  for (bd = exec_block; bd; bd = bd->link) {
+    total_blocks += bd->blocks;
+  }
 
   /* count the blocks on the free list */
   free_blocks = countFreeList();
