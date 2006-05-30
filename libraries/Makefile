@@ -22,7 +22,6 @@ SUBDIRS += Cabal
 ifneq "$(GhcBootLibs)" "YES"
 SUBDIRS += $(wildcard parsec)
 SUBDIRS += $(wildcard haskell-src)
-SUBDIRS += $(wildcard time)
 SUBDIRS += $(wildcard network)
 SUBDIRS += $(wildcard QuickCheck)
 SUBDIRS += $(wildcard HUnit)
@@ -32,6 +31,7 @@ SUBDIRS += $(wildcard X11)
 ifeq "$(Windows)" "YES"
 SUBDIRS += $(wildcard Win32)
 endif
+SUBDIRS += $(wildcard time)
 SUBDIRS += $(wildcard HGL)
 SUBDIRS += $(wildcard OpenGL)
 SUBDIRS += $(wildcard GLUT)
