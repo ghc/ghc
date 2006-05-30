@@ -89,4 +89,5 @@ test('ffi014', only_ways(['threaded']), compile_and_run, ['ffi014_cbits.c'])
 # GHCi can't handle the separate C file (ToDo: fix this somehow)
 test('ffi015', omit_ways(['ghci']), compile_and_run, ['ffi015_cbits.c'])
 
-test('ffi016', normal, compile_and_run, [''])
+# GHCi can't handle foreign import "&"
+test('ffi016', omit_ways(['ghci]), compile_and_run, [''])
