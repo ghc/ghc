@@ -7,6 +7,8 @@
  * ---------------------------------------------------------------------------*/
 
 #include <windows.h>
+#include "Rts.h"
+#include "OSMem.h"
 
 lnat getPageSize (void)
 {
@@ -24,11 +26,11 @@ lnat getPageSize (void)
 void setExecutable (void *p, lnat len, rtsBool exec)
 {
     DWORD dwOldProtect = 0;
-    if (VirtualProtect (addr, len, 
+    if (VirtualProtect (p, len, 
 			exec ? PAGE_EXECUTE_READWRITE : PAGE_READWRITE, 
 			&dwOldProtect) == 0)
     {
 	barf("makeExecutable: failed to protect 0x%p; error=%lu; old protection: %lu\n",
-	     addr, (unsigned long)GetLastError(), (unsigned long)dwOldProtect);
+	     p, (unsigned long)GetLastError(), (unsigned long)dwOldProtect);
     }
 }
