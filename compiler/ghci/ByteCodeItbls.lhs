@@ -357,10 +357,10 @@ load :: Storable a => PtrIO a
 load = do addr <- advance
           lift (peek addr)
 
-foreign import ccall unsafe "stgMallocBytesRWX"
-  _stgMallocBytesRWX :: CInt -> IO (Ptr a)
+foreign import ccall unsafe "allocateExec"
+  _allocateExec :: CUInt -> IO (Ptr a)
 
 malloc_exec :: Int -> IO (Ptr a)
-malloc_exec bytes = _stgMallocBytesRWX (fromIntegral bytes)
+malloc_exec bytes = _allocateExec (fromIntegral bytes)
 
 \end{code}
