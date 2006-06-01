@@ -65,7 +65,7 @@ $decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
-$ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~]
+$ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~ \xa1-\xbf \xd7 \xf7]
 $unisymbol = \x04
 $symbol    = [$ascsymbol $unisymbol] # [$special \_\:\"\']
 
