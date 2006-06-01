@@ -138,6 +138,7 @@ countUTF8Chars ptr bytes = go ptr 0
 
 unPtr (Ptr a) = a
 
+utf8EncodeChar :: Char -> Ptr Word8 -> IO (Ptr Word8)
 utf8EncodeChar c ptr =
   let x = ord c in
   case () of
