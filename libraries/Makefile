@@ -14,6 +14,9 @@ SUBDIRS = base haskell98 template-haskell
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
 endif
+ifeq "$(Windows)" "YES"
+SUBDIRS += $(wildcard Win32)
+endif
 
 SUBDIRS += Cabal
 
@@ -28,9 +31,6 @@ SUBDIRS += $(wildcard HUnit)
 SUBDIRS += $(wildcard mtl)
 SUBDIRS += $(wildcard fgl)
 SUBDIRS += $(wildcard X11)
-ifeq "$(Windows)" "YES"
-SUBDIRS += $(wildcard Win32)
-endif
 SUBDIRS += $(wildcard time)
 SUBDIRS += $(wildcard HGL)
 SUBDIRS += $(wildcard OpenGL)

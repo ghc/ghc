@@ -67,6 +67,7 @@ import System.Posix
 #endif
 #else
 import GHC.ConsoleHandler ( flushConsole )
+import System.Win32	  ( setConsoleCP, setConsoleOutputCP )
 #endif
 
 #ifdef USE_READLINE
@@ -374,6 +375,9 @@ runGHCi paths maybe_expr = do
    		      | otherwise -> io (ioError err)
    	     Right () -> return ()
 #endif
+	    -- initialise the console if necessary
+	    io setUpConsole
+
 	    -- enter the interactive loop
 	    interactiveLoop is_tty show_prompt
 	Just expr -> do
@@ -1529,7 +1533,7 @@ revertCAFs = do
 foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()  
 	-- Make it "safe", just in case
 
--- -----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
 -- Utils
 
 expandPath :: String -> GHCi String
@@ -1540,3 +1544,27 @@ expandPath path =
 	return (tilde ++ '/':d)
    other -> 
 	return other
+
+-- ----------------------------------------------------------------------------
+-- Windows console setup
+
+setUpConsole :: IO ()
+setUpConsole = do
+#ifdef mingw32_HOST_OS
+	-- On Windows we need to set a known code page, otherwise the characters
+  	-- we read from the console will be be in some strange encoding, and
+	-- similarly for characters we write to the console.
+	--
+	-- At the moment, GHCi pretends all input is Latin-1.  In the
+	-- future we should support UTF-8, but for now we set the code pages
+	-- to Latin-1.
+	--
+	-- It seems you have to set the font in the console window to
+	-- a Unicode font in order for output to work properly,
+	-- otherwise non-ASCII characters are mapped wrongly.  sigh.
+	-- (see MSDN for SetConsoleOutputCP()).
+	--
+	setConsoleCP 28591       -- ISO Latin-1
+	setConsoleOutputCP 28591 -- ISO Latin-1
+#endif
+	return ()
