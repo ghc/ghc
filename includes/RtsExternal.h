@@ -77,7 +77,7 @@ extern StgInt *signal_handlers;
 #endif
 extern void setIOManagerPipe (int fd);
 
-extern void* allocateExec(int len);
+extern void* allocateExec(unsigned int len);
 
 /* -----------------------------------------------------------------------------
    Storage manager stuff exported
