@@ -1210,6 +1210,7 @@ alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
 alexGetChar (AI loc ofs s) 
   | atEnd s   = Nothing
   | otherwise = adj_c `seq` loc' `seq` ofs' `seq` s' `seq` 
+		--trace (show (ord c)) $
 		Just (adj_c, (AI loc' ofs' s'))
   where (c,s') = nextChar s
         loc'   = advanceSrcLoc loc c
@@ -1259,6 +1260,7 @@ alexGetChar' :: AlexInput -> Maybe (Char,AlexInput)
 alexGetChar' (AI loc ofs s) 
   | atEnd s   = Nothing
   | otherwise = c `seq` loc' `seq` ofs' `seq` s' `seq` 
+		--trace (show (ord c)) $
 		Just (c, (AI loc' ofs' s'))
   where (c,s') = nextChar s
         loc'   = advanceSrcLoc loc c
