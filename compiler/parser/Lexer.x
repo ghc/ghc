@@ -1445,15 +1445,13 @@ lexToken = do
 	span `seq` setLastToken span bytes
 	t span buf bytes
 
--- ToDo: Alex reports the buffer at the start of the erroneous lexeme,
--- but it would be more informative to report the location where the
--- error was actually discovered, especially if this is a decoding
--- error.
-reportLexError loc1 loc2 buf str = 
+reportLexError loc1 loc2 buf str
+  | atEnd buf = failLocMsgP loc1 loc2 (str ++ " at end of input")
+  | otherwise =
   let 
 	c = fst (nextChar buf)
   in
   if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
-    then failLocMsgP loc2 loc2 "UTF-8 decoding error"
+    then failLocMsgP loc2 loc2 (str ++ " (UTF-8 decoding error)")
     else failLocMsgP loc1 loc2 (str ++ " at character " ++ show c)
 }
