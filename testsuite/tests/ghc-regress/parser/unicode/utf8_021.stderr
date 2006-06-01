@@ -1,2 +1,3 @@
 
-utf8_021.hs:2:7: UTF-8 decoding error
+utf8_021.hs:2:7:
+    lexical error in string/character literal (UTF-8 decoding error)
