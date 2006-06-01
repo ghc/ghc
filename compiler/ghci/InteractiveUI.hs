@@ -363,8 +363,8 @@ runGHCi paths maybe_expr = do
 
   case maybe_expr of
 	Nothing -> 
-#if defined(mingw32_HOST_OS)
           do
+#if defined(mingw32_HOST_OS)
             -- The win32 Console API mutates the first character of 
             -- type-ahead when reading from it in a non-buffered manner. Work
             -- around this by flushing the input buffer of type-ahead characters,
