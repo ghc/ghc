@@ -232,7 +232,6 @@ exp	:: { IfaceExpr }
 	| '%note' STRING exp 	   
 	    { case $2 of
 	       --"SCC"      -> IfaceNote (IfaceSCC "scc") $3
-	       "InlineCall" -> IfaceNote IfaceInlineCall $3
 	       "InlineMe"   -> IfaceNote IfaceInlineMe $3
             }
         | '%external' STRING aty   { IfaceFCall (ForeignCall.CCall 
