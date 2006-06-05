@@ -215,7 +215,6 @@ data IfaceExpr
 
 data IfaceNote = IfaceSCC CostCentre
 	       | IfaceCoerce IfaceType
-	       | IfaceInlineCall
 	       | IfaceInlineMe
                | IfaceCoreNote String
 
@@ -411,7 +410,6 @@ pprIfaceApp fun	 	       args = sep (pprIfaceExpr parens fun : args)
 instance Outputable IfaceNote where
     ppr (IfaceSCC cc)     = pprCostCentreCore cc
     ppr (IfaceCoerce ty)  = ptext SLIT("__coerce") <+> pprParendIfaceType ty
-    ppr IfaceInlineCall   = ptext SLIT("__inline_call")
     ppr IfaceInlineMe     = ptext SLIT("__inline_me")
     ppr (IfaceCoreNote s) = ptext SLIT("__core_note") <+> pprHsString (mkFastString s)
 
@@ -661,7 +659,6 @@ toIfaceExpr ext (Note n e)    = IfaceNote (toIfaceNote ext n) (toIfaceExpr ext e
 ---------------------
 toIfaceNote ext (SCC cc)      = IfaceSCC cc
 toIfaceNote ext (Coerce t1 _) = IfaceCoerce (toIfaceType ext t1)
-toIfaceNote ext InlineCall    = IfaceInlineCall
 toIfaceNote ext InlineMe      = IfaceInlineMe
 toIfaceNote ext (CoreNote s)  = IfaceCoreNote s
 
@@ -906,7 +903,6 @@ eq_ifaceConAlt _ _ = False
 eq_ifaceNote :: EqEnv -> IfaceNote -> IfaceNote -> IfaceEq
 eq_ifaceNote env (IfaceSCC c1)    (IfaceSCC c2)        = bool (c1==c2)
 eq_ifaceNote env (IfaceCoerce t1) (IfaceCoerce t2)     = eq_ifType env t1 t2
-eq_ifaceNote env IfaceInlineCall  IfaceInlineCall      = Equal
 eq_ifaceNote env IfaceInlineMe    IfaceInlineMe        = Equal
 eq_ifaceNote env (IfaceCoreNote s1) (IfaceCoreNote s2) = bool (s1==s2)
 eq_ifaceNote env _ _ = NotEqual

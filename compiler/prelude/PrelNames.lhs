@@ -453,6 +453,9 @@ unpackCStringFoldrName  = varQual pREL_BASE FSLIT("unpackFoldrCString#") unpackC
 unpackCStringUtf8Name   = varQual pREL_BASE FSLIT("unpackCStringUtf8#") unpackCStringUtf8IdKey
 eqStringName	 	= varQual pREL_BASE FSLIT("eqString")  eqStringIdKey
 
+-- The 'inline' function
+inlineIdName	 	= varQual pREL_BASE FSLIT("inline") inlineIdKey
+
 -- Base classes (Eq, Ord, Functor)
 eqClassName	  = clsQual pREL_BASE FSLIT("Eq")      eqClassKey
 eqName		  = methName eqClassName FSLIT("==")   eqClassOpKey
@@ -910,6 +913,8 @@ breakpointIdKey               = mkPreludeMiscIdUnique 62
 breakpointCondIdKey           = mkPreludeMiscIdUnique 63
 breakpointJumpIdKey           = mkPreludeMiscIdUnique 64
 breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 65
+
+inlineIdKey		      = mkPreludeMiscIdUnique 66
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 80

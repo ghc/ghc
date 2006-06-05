@@ -639,7 +639,6 @@ tcIfaceExpr (IfaceNote note expr)
 	IfaceCoerce to_ty -> tcIfaceType to_ty	`thenM` \ to_ty' ->
 			     returnM (Note (Coerce to_ty'
                                                    (exprType expr')) expr')
-	IfaceInlineCall   -> returnM (Note InlineCall expr')
 	IfaceInlineMe     -> returnM (Note InlineMe   expr')
 	IfaceSCC cc       -> returnM (Note (SCC cc)   expr')
 	IfaceCoreNote n   -> returnM (Note (CoreNote n) expr')

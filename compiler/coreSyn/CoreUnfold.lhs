@@ -500,7 +500,6 @@ StrictAnal.addStrictnessInfoToTopId
 \begin{code}
 callSiteInline :: DynFlags
 	       -> Bool			-- True <=> the Id can be inlined
-	       -> Bool			-- 'inline' note at call site
 	       -> OccInfo
 	       -> Id			-- The Id
 	       -> [Bool]		-- One for each value arg; True if it is interesting
@@ -508,7 +507,7 @@ callSiteInline :: DynFlags
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-callSiteInline dflags active_inline inline_call occ id arg_infos interesting_cont
+callSiteInline dflags active_inline occ id arg_infos interesting_cont
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon cs -> Nothing ;
@@ -547,9 +546,6 @@ callSiteInline dflags active_inline inline_call occ id arg_infos interesting_con
 		-- consider_safe decides whether it's a good idea to
 		-- inline something, given that there's no
 		-- work-duplication issue (the caller checks that).
-	  | inline_call  = True
-
-	  | otherwise
 	  = case guidance of
 	      UnfoldNever  -> False
 	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount

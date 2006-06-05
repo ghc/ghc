@@ -368,7 +368,7 @@ matchN in_scope tmpl_vars tmpl_es target_es
 --   from nested matches; see the Let case of match, below
 --
 type SubstEnv   = (TvSubstEnv, IdSubstEnv, OrdList CoreBind)
-type IdSubstEnv = IdEnv    CoreExpr		
+type IdSubstEnv = IdEnv CoreExpr		
 
 emptySubstEnv :: SubstEnv
 emptySubstEnv = (emptyVarEnv, emptyVarEnv, nilOL)

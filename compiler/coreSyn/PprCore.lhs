@@ -232,9 +232,6 @@ ppr_expr add_par (Note (Coerce to_ty from_ty) expr)
 	 pprParendExpr expr]
 #endif
 
-ppr_expr add_par (Note InlineCall expr)
-  = add_par (ptext SLIT("__inline_call") <+> pprParendExpr expr)
-
 ppr_expr add_par (Note InlineMe expr)
   = add_par $ ptext SLIT("__inline_me") <+> pprParendExpr expr
 

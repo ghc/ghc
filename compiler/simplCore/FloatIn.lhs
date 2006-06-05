@@ -208,11 +208,6 @@ fiExpr to_drop (_, AnnNote note@(SCC cc) expr)
   = 	-- Wimp out for now
     mkCoLets' to_drop (Note note (fiExpr [] expr))
 
-fiExpr to_drop (_, AnnNote InlineCall expr)
-  = 	-- Wimp out for InlineCall; keep it close
-	-- the the call it annotates
-    mkCoLets' to_drop (Note InlineCall (fiExpr [] expr))
-
 fiExpr to_drop (_, AnnNote InlineMe expr)
   = 	-- Ditto... don't float anything into an INLINE expression
     mkCoLets' to_drop (Note InlineMe (fiExpr [] expr))

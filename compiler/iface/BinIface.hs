@@ -864,8 +864,6 @@ instance Binary IfaceNote where
     put_ bh (IfaceCoerce ab) = do
 	    putByte bh 1
 	    put_ bh ab
-    put_ bh IfaceInlineCall = do
-	    putByte bh 2
     put_ bh IfaceInlineMe = do
 	    putByte bh 3
     put_ bh (IfaceCoreNote s) = do
@@ -878,7 +876,6 @@ instance Binary IfaceNote where
 		      return (IfaceSCC aa)
 	      1 -> do ab <- get bh
 		      return (IfaceCoerce ab)
-	      2 -> do return IfaceInlineCall
 	      3 -> do return IfaceInlineMe
               _ -> do ac <- get bh
                       return (IfaceCoreNote ac)

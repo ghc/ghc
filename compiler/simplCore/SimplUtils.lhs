@@ -78,9 +78,6 @@ data SimplCont		-- Strict contexts
   | CoerceIt OutType			-- The To-type, simplified
 	     SimplCont
 
-  | InlinePlease			-- This continuation makes a function very
-	     SimplCont			-- keen to inline itelf
-
   | ApplyTo  DupFlag 
 	     InExpr SimplEnv		-- The argument, as yet unsimplified, 
 	     SimplCont			-- and its environment
@@ -116,7 +113,6 @@ instance Outputable SimplCont where
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont
   ppr (CoerceIt ty cont)	     = (ptext SLIT("CoerceIt") <+> ppr ty) $$ ppr cont
-  ppr (InlinePlease cont)	     = ptext SLIT("InlinePlease") $$ ppr cont
 
 data DupFlag = OkToDup | NoDup
 
@@ -150,14 +146,12 @@ contIsDupable (Stop _ _ _)     		 = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
 contIsDupable (Select   OkToDup _ _ _ _) = True
 contIsDupable (CoerceIt _ cont)          = contIsDupable cont
-contIsDupable (InlinePlease cont)        = contIsDupable cont
 contIsDupable other	  	         = False
 
 -------------------
 discardableCont :: SimplCont -> Bool
 discardableCont (Stop _ _ _)	    = False
 discardableCont (CoerceIt _ cont)   = discardableCont cont
-discardableCont (InlinePlease cont) = discardableCont cont
 discardableCont other		    = True
 
 discardCont :: SimplCont	-- A continuation, expecting
@@ -174,7 +168,6 @@ contResultType (Stop to_ty _ _)	     = to_ty
 contResultType (ArgOf _ _ to_ty _)   = to_ty
 contResultType (ApplyTo _ _ _ cont)  = contResultType cont
 contResultType (CoerceIt _ cont)     = contResultType cont
-contResultType (InlinePlease cont)   = contResultType cont
 contResultType (Select _ _ _ _ cont) = contResultType cont
 
 -------------------
@@ -199,8 +192,7 @@ pushContArgs env (arg : args) cont = ApplyTo NoDup arg env (pushContArgs env arg
 getContArgs :: SwitchChecker
 	    -> OutId -> SimplCont 
 	    -> ([(InExpr, SimplEnv, Bool)],	-- Arguments; the Bool is true for strict args
-		SimplCont,			-- Remaining continuation
-		Bool)				-- Whether we came across an InlineCall
+		SimplCont)			-- Remaining continuation
 -- getContArgs id k = (args, k', inl)
 -- 	args are the leading ApplyTo items in k
 --	(i.e. outermost comes first)
@@ -213,22 +205,18 @@ getContArgs chkr fun orig_cont
 	stricts | switchIsOn chkr NoCaseOfCase = vanilla_stricts
 		| otherwise		       = computed_stricts
     in
-    go [] stricts False orig_cont
+    go [] stricts orig_cont
   where
     ----------------------------
 
 	-- Type argument
-    go acc ss inl (ApplyTo _ arg@(Type _) se cont)
-	= go ((arg,se,False) : acc) ss inl cont
+    go acc ss (ApplyTo _ arg@(Type _) se cont)
+	= go ((arg,se,False) : acc) ss cont
 		-- NB: don't bother to instantiate the function type
 
 	-- Value argument
-    go acc (s:ss) inl (ApplyTo _ arg se cont)
-	= go ((arg,se,s) : acc) ss inl cont
-
-	-- An Inline continuation
-    go acc ss inl (InlinePlease cont)
-	= go acc ss True cont
+    go acc (s:ss) (ApplyTo _ arg se cont)
+	= go ((arg,se,s) : acc) ss cont
 
 	-- We're run out of arguments, or else we've run out of demands
 	-- The latter only happens if the result is guaranteed bottom
@@ -240,9 +228,9 @@ getContArgs chkr fun orig_cont
 	-- Then, especially in the first of these cases, we'd like to discard
 	-- the continuation, leaving just the bottoming expression.  But the
 	-- type might not be right, so we may have to add a coerce.
-    go acc ss inl cont 
-	| null ss && discardableCont cont = (reverse acc, discardCont cont, inl)
-	| otherwise			  = (reverse acc, cont, 	    inl)
+    go acc ss cont 
+	| null ss && discardableCont cont = (reverse acc, discardCont cont)
+	| otherwise			  = (reverse acc, cont)
 
     ----------------------------
     vanilla_stricts, computed_stricts :: [Bool]
@@ -386,7 +374,6 @@ interestingCallContext :: Bool 		-- False <=> no args at all
 interestingCallContext some_args some_val_args cont
   = interesting cont
   where
-    interesting (InlinePlease _)         = True
     interesting (Select _ _ _ _ _)       = some_args
     interesting (ApplyTo _ _ _ _)        = True	-- Can happen if we have (coerce t (f x)) y
 						-- Perhaps True is a bit over-keen, but I've
@@ -431,7 +418,6 @@ interestingArgContext :: Id -> SimplCont -> Bool
 interestingArgContext fn cont
   = idHasRules fn || go cont
   where
-    go (InlinePlease c)       = go c
     go (Select {})	      = False
     go (ApplyTo {})	      = False
     go (ArgOf {})	      = True

@@ -869,9 +869,6 @@ simplNote env (SCC cc) e cont
   = simplExpr (setEnclosingCC env currentCCS) e 	`thenSmpl` \ e' ->
     rebuild env (mkSCC cc e') cont
 
-simplNote env InlineCall e cont
-  = simplExprF env e (InlinePlease cont)
-
 -- See notes with SimplMonad.inlineMode
 simplNote env InlineMe e cont
   | contIsRhsOrArg cont		-- Totally boring continuation; see notes above
@@ -919,9 +916,9 @@ completeCall env var occ_info cont
   =     -- Simplify the arguments
     getDOptsSmpl					`thenSmpl` \ dflags ->
     let
-	chkr			       = getSwitchChecker env
-	(args, call_cont, inline_call) = getContArgs chkr var cont
-	fn_ty			       = idType var
+	chkr		  = getSwitchChecker env
+	(args, call_cont) = getContArgs chkr var cont
+	fn_ty		  = idType var
     in
     simplifyArgs env fn_ty (interestingArgContext var call_cont) args 
 		 (contResultType call_cont)	$ \ env args ->
@@ -981,7 +978,7 @@ completeCall env var occ_info cont
 						  (notNull arg_infos)
 						  call_cont
     	active_inline = activeInline env var occ_info
-	maybe_inline  = callSiteInline dflags active_inline inline_call occ_info
+	maybe_inline  = callSiteInline dflags active_inline occ_info
 				       var arg_infos interesting_cont
     in
     case maybe_inline of {
@@ -1255,7 +1252,6 @@ rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM FloatsWithExpr
 rebuild env expr (Stop _ _ _)		      = rebuildDone env expr
 rebuild env expr (ArgOf _ _ _ cont_fn)	      = cont_fn env expr
 rebuild env expr (CoerceIt to_ty cont)	      = rebuild env (mkCoerce to_ty expr) cont
-rebuild env expr (InlinePlease cont) 	      = rebuild env (Note InlineCall expr) cont
 rebuild env expr (Select _ bndr alts se cont) = rebuildCase (setInScope se env) expr bndr alts cont
 rebuild env expr (ApplyTo _ arg se cont)      = rebuildApp  (setInScope se env) expr arg cont
 
@@ -1805,10 +1801,6 @@ mkDupableCont env cont
 mkDupableCont env (CoerceIt ty cont)
   = mkDupableCont env cont		`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
     returnSmpl (floats, (CoerceIt ty dup_cont, nondup_cont))
-
-mkDupableCont env (InlinePlease cont)
-  = mkDupableCont env cont		`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
-    returnSmpl (floats, (InlinePlease dup_cont, nondup_cont))
 
 mkDupableCont env cont@(ArgOf _ arg_ty _ _)
   =  returnSmpl (emptyFloats env, (mkBoringStop arg_ty, cont))

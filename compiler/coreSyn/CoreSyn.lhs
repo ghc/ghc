@@ -123,9 +123,6 @@ data Note
 	Type		-- The to-type:   type of whole coerce expression
 	Type		-- The from-type: type of enclosed expression
 
-  | InlineCall		-- Instructs simplifier to inline
-			-- the enclosed call
-
   | InlineMe		-- Instructs simplifer to treat the enclosed expression
 			-- as very small, and inline it at its call sites
 

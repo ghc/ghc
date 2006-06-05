@@ -5989,6 +5989,74 @@ r) ->
 
 </sect1>
 
+<sect1 id="special-ids">
+<title>Special built-in functions</title>
+<para>GHC has a few built-in funcions with special behaviour, 
+described in this section.  All are exported by
+<literal>GHC.Exts</literal>.</para>
+
+<sect2> <title>The <literal>inline</literal> function </title>
+<para>
+The <literal>inline</literal> function is somewhat experimental.
+<programlisting>
+  inline :: a -> a
+</programlisting>
+The call <literal>(inline f)</literal> arranges that <literal>f</literal> 
+is inlined, regardless of its size.  More precisely, the call
+<literal>(inline f)</literal> rewrites to the right-hand side of <literal>f</literal>'s 
+definition.  
+This allows the programmer to control inlining from 
+a particular <emphasis>call site</emphasis>
+rather than the <emphasis>definition site</emphasis> of the function 
+(c.f. <literal>INLINE</literal> pragmas <xref linkend="inline-noinline-pragma"/>).
+</para>
+<para>
+This inlining occurs regardless of the argument to the call
+or the size of <literal>f</literal>'s definition; it is unconditional.
+The main caveat is that <literal>f</literal>'s definition must be
+visible to the compiler.  That is, <literal>f</literal> must be
+let-bound in the current scope.
+If no inlining takes place, the <literal>inline</literal> function
+expands to the identity function in Phase zero; so its use imposes
+no overhead.</para>
+
+<para> If the function is defined in another
+module, GHC only exposes its inlining in the interface file if the
+function is sufficiently small that it <emphasis>might</emphasis> be
+inlined by the automatic mechanism.  There is currently no way to tell
+GHC to expose arbitrarily-large functions in the interface file.  (This
+shortcoming is something that could be fixed, with some kind of pragma.)
+</para>
+</sect2>
+
+<sect2> <title>The <literal>inline</literal> function </title>
+<para>
+The <literal>lazy</literal> function restrains strictness analysis a little:
+<programlisting>
+  lazy :: a -> a
+</programlisting>
+The call <literal>(lazy e)</literal> means the same as <literal>e</literal>, 
+but <literal>lazy</literal> has a magical property so far as strictness
+analysis is concerned: it is lazy in its first argument,
+even though its semantics is strict.  After strictness analysis has run,
+calls to <literal>lazy</literal> are inlined to be the identity function.
+</para>
+<para>
+This behaviour is occasionally useful when controlling evaluation order.
+Notably, <literal>lazy</literal> is used in the library definition of
+<literal>Control.Parallel.par</literal>:
+<programlisting>
+  par :: a -> b -> b
+  par x y = case (par# x) of { _ -> lazy y }
+</programlisting>
+If <literal>lazy</literal> were not lazy, <literal>par</literal> would
+look strict in <literal>y</literal> which would defeat the whole 
+purpose of <literal>par</literal>.
+</para>
+</sect2>
+</sect1>
+
+
 <sect1 id="generic-classes">
 <title>Generic classes</title>
 

@@ -20,7 +20,7 @@ module PrelRules ( primOpRules, builtinRules ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( mkWildId, isPrimOpId_maybe )
+import Id		( mkWildId, isPrimOpId_maybe, idUnfolding )
 import Literal		( Literal(..), mkMachInt, mkMachWord
 			, literalType
 			, word2IntLit, int2WordLit
@@ -38,7 +38,7 @@ import CoreUtils	( cheapEqExpr, exprIsConApp_maybe )
 import Type		( tyConAppTyCon, coreEqType )
 import OccName		( occNameFS )
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
-			  eqStringName, unpackCStringIdKey )
+			  eqStringName, unpackCStringIdKey, inlineIdName )
 import Maybes		( orElse )
 import Name		( Name )
 import Outputable
@@ -409,10 +409,12 @@ builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
   = [ BuiltinRule FSLIT("AppendLitString") unpackCStringFoldrName match_append_lit,
-      BuiltinRule FSLIT("EqString") eqStringName match_eq_string
+      BuiltinRule FSLIT("EqString") eqStringName match_eq_string,
+      BuiltinRule FSLIT("Inline") inlineIdName match_inline
     ]
 
 
+---------------------------------------------------
 -- The rule is this:
 -- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
 
@@ -434,6 +436,7 @@ match_append_lit [Type ty1,
 
 match_append_lit other = Nothing
 
+---------------------------------------------------
 -- The rule is this:
 -- 	eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 
@@ -444,4 +447,16 @@ match_eq_string [Var unpk1 `App` Lit (MachStr s1),
   = Just (if s1 == s2 then trueVal else falseVal)
 
 match_eq_string other = Nothing
+
+
+---------------------------------------------------
+-- The rule is this:
+--	inline (f a b c) = <f's unfolding> a b c
+-- (if f has an unfolding)
+match_inline (e:args2)
+  | (Var f, args1) <- collectArgs e,
+    Just unf <- maybeUnfoldingTemplate (idUnfolding f)
+  = Just (mkApps (mkApps unf args1) args2)
+
+match_inline other = Nothing
 \end{code}		

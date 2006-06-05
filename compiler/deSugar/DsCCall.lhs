@@ -32,7 +32,7 @@ import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  tyVarsOfType, mkForAllTys, mkTyConApp, 
 			  isPrimitiveType, splitTyConApp_maybe, 
 			  splitRecNewType_maybe, splitForAllTy_maybe,
-			  isUnboxedTupleType, coreView
+			  isUnboxedTupleType
 			)
 
 import PrimOp		( PrimOp(..) )
@@ -51,7 +51,7 @@ import TysWiredIn	( unitDataConId,
 			)
 import BasicTypes       ( Boxity(..) )
 import Literal		( mkMachInt )
-import PrelNames	( Unique, hasKey, ioTyConKey, boolTyConKey, unitTyConKey,
+import PrelNames	( Unique, hasKey, boolTyConKey, unitTyConKey,
 			  int8TyConKey, int16TyConKey, int32TyConKey,
 			  word8TyConKey, word16TyConKey, word32TyConKey
 			  -- dotnet interop

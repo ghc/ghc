@@ -165,12 +165,6 @@ mkNote (SCC cc)	expr		   = mkSCC cc expr
 mkNote InlineMe expr		   = mkInlineMe expr
 mkNote note     expr		   = Note note expr
 #endif
-
--- Slide InlineCall in around the function
---	No longer necessary I think (SLPJ Apr 99)
--- mkNote InlineCall (App f a) = App (mkNote InlineCall f) a
--- mkNote InlineCall (Var v)   = Note InlineCall (Var v)
--- mkNote InlineCall expr      = expr
 \end{code}
 
 Drop trivial InlineMe's.  This is somewhat important, because if we have an unfolding
@@ -1106,7 +1100,6 @@ eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && tcEqExprX (rnBndrs2 env vs1  vs2)
 
 eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
 eq_note env (Coerce t1 f1) (Coerce t2 f2) = tcEqTypeX env t1 t2 && tcEqTypeX env f1 f2
-eq_note env InlineCall     InlineCall     = True
 eq_note env (CoreNote s1)  (CoreNote s2)  = s1 == s2
 eq_note env other1	       other2	  = False
 \end{code}
@@ -1136,7 +1129,6 @@ exprSize (Type t)        = seqType t `seq` 1
 
 noteSize (SCC cc)       = cc `seq` 1
 noteSize (Coerce t1 t2) = seqType t1 `seq` seqType t2 `seq` 1
-noteSize InlineCall     = 1
 noteSize InlineMe       = 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
 
