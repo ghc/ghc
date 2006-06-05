@@ -1010,8 +1010,8 @@ in a type synonym, thus:
   f :: Discard a
   f x y = (x, show y)
 
-  g :: Discard Int -> (Int,Bool)    -- A rank-2 type
-  g f = f Int True
+  g :: Discard Int -> (Int,String)    -- A rank-2 type
+  g f = f 3 True
 </programlisting>
 </para>
 </listitem>
