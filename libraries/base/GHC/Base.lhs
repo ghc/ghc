@@ -618,6 +618,8 @@ eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
 eqString cs1      cs2	   = False
 
 {-# RULES "eqString" (==) = eqString #-}
+-- eqString also has a BuiltInRule in PrelRules.lhs:
+--	eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 \end{code}
 
 
@@ -683,13 +685,26 @@ compareInt# x# y#
 id			:: a -> a
 id x			=  x
 
--- lazy function; this is just the same as id, but its unfolding
--- and strictness are over-ridden by the definition in MkId.lhs
--- That way, it does not get inlined, and the strictness analyser
--- sees it as lazy.  Then the worker/wrapper phase inlines it.
--- Result: happiness
+-- | The call '(lazy e)' means the same as 'e', but 'lazy' has a 
+-- magical strictness property: it is lazy in its first argument, 
+-- even though its semantics is strict.
 lazy :: a -> a
 lazy x = x
+-- Implementation note: its strictness and unfolding are over-ridden
+-- by the definition in MkId.lhs; in both cases to nothing at all.
+-- That way, 'lazy' does not get inlined, and the strictness analyser
+-- sees it as lazy.  Then the worker/wrapper phase inlines it.
+-- Result: happiness
+
+
+-- | The call '(inline f)' reduces to 'f', but 'inline' has a BuiltInRule
+-- that tries to inline 'f' (if it has an unfolding) unconditionally
+-- The 'NOINLINE' pragma arranges that inline only gets inlined (and
+-- hence eliminated) late in compilation, after the rule has had
+-- a god chance to fire.
+inline :: a -> a
+{-# NOINLINE[0] inline #-}
+inline x = x
 
 -- Assertion function.  This simply ignores its boolean argument.
 -- The compiler may rewrite it to @('assertError' line)@.
@@ -997,6 +1012,9 @@ unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a
 {-# NOINLINE [0] unpackFoldrCString# #-}
 -- Don't inline till right at the end;
 -- usually the unpack-list rule turns it into unpackCStringList
+-- It also has a BuiltInRule in PrelRules.lhs:
+-- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
+--	  =  unpackFoldrCString# "foobaz" c n
 unpackFoldrCString# addr f z 
   = unpack 0#
   where

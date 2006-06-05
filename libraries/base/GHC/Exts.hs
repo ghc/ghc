@@ -30,6 +30,10 @@ module GHC.Exts
 
 	-- * Debugging
 	breakpoint,
+
+	-- * Ids with special behaviour
+	lazy, inline,
+
        ) where
 
 import Prelude
