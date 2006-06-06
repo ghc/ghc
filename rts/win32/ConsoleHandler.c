@@ -180,10 +180,8 @@ void startSignalHandlers(Capability *cap)
  */
 void markSignalHandlers (evac_fn evac)
 {
-    if (console_handler >= 0) {
-	StgPtr p = deRefStablePtr((StgStablePtr)console_handler);
-	evac((StgClosure**)(void *)&p);
-    }
+    // nothing to mark; the console handler is a StablePtr which is
+    // already treated as a root by the GC.
 }
 
 
