@@ -898,21 +898,19 @@ getRegister (CmmMachOp mop [x]) -- unary MachOps
       MO_Not rep   -> trivialUCode rep (NOT  rep) x
 
       -- Nop conversions
-      -- TODO: these are only nops if the arg is not a fixed register that
-      -- can't be byte-addressed.
-      MO_U_Conv I32 I8  -> conversionNop I32 x
-      MO_S_Conv I32 I8  -> conversionNop I32 x
-      MO_U_Conv I16 I8  -> conversionNop I16 x
-      MO_S_Conv I16 I8  -> conversionNop I16 x
-      MO_U_Conv I32 I16 -> conversionNop I32 x
-      MO_S_Conv I32 I16 -> conversionNop I32 x
+      MO_U_Conv I32 I8  -> toI8Reg  I32 x
+      MO_S_Conv I32 I8  -> toI8Reg  I32 x
+      MO_U_Conv I16 I8  -> toI8Reg  I16 x
+      MO_S_Conv I16 I8  -> toI8Reg  I16 x
+      MO_U_Conv I32 I16 -> toI16Reg I32 x
+      MO_S_Conv I32 I16 -> toI16Reg I32 x
 #if x86_64_TARGET_ARCH
       MO_U_Conv I64 I32 -> conversionNop I64 x
       MO_S_Conv I64 I32 -> conversionNop I64 x
-      MO_U_Conv I64 I16 -> conversionNop I64 x
-      MO_S_Conv I64 I16 -> conversionNop I64 x
-      MO_U_Conv I64 I8  -> conversionNop I64 x
-      MO_S_Conv I64 I8  -> conversionNop I64 x
+      MO_U_Conv I64 I16 -> toI16Reg I64 x
+      MO_S_Conv I64 I16 -> toI16Reg I64 x
+      MO_U_Conv I64 I8  -> toI8Reg  I64 x
+      MO_S_Conv I64 I8  -> toI8Reg  I64 x
 #endif
 
       MO_U_Conv rep1 rep2 | rep1 == rep2 -> conversionNop rep1 x
@@ -963,6 +961,18 @@ getRegister (CmmMachOp mop [x]) -- unary MachOps
 		  e_code `snocOL`
 		  instr from (OpReg reg) (OpReg dst)
 	    return (Any to code)
+
+	toI8Reg new_rep expr
+            = do codefn <- getAnyReg expr
+		 return (Any new_rep codefn)
+		-- HACK: use getAnyReg to get a byte-addressable register.
+		-- If the source was a Fixed register, this will add the
+		-- mov instruction to put it into the desired destination.
+		-- We're assuming that the destination won't be a fixed
+		-- non-byte-addressable register; it won't be, because all
+		-- fixed registers are word-sized.
+
+	toI16Reg = toI8Reg -- for now
 
         conversionNop new_rep expr
             = do e_code <- getRegister expr
