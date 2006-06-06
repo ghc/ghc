@@ -31,9 +31,7 @@ SUBDIRS += $(wildcard HUnit)
 SUBDIRS += $(wildcard mtl)
 SUBDIRS += $(wildcard fgl)
 SUBDIRS += $(wildcard X11)
-ifneq "$(Windows)" "YES"
 SUBDIRS += $(wildcard time)
-endif
 SUBDIRS += $(wildcard HGL)
 SUBDIRS += $(wildcard OpenGL)
 SUBDIRS += $(wildcard GLUT)
