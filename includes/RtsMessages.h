@@ -26,13 +26,13 @@
  * barf() invokes (*fatalInternalErrorFn)().  This function is not
  * expected to return.
  */
-extern void barf(char *s, ...)
+extern void barf(const char *s, ...)
    GNUC3_ATTRIBUTE(__noreturn__);
 
-extern void vbarf(char *s, va_list ap)
+extern void vbarf(const char *s, va_list ap)
    GNUC3_ATTRIBUTE(__noreturn__);
 
-extern void _assertFail(char *filename, unsigned int linenum)
+extern void _assertFail(const char *filename, unsigned int linenum)
    GNUC3_ATTRIBUTE(__noreturn__);
 
 /*
@@ -41,10 +41,10 @@ extern void _assertFail(char *filename, unsigned int linenum)
  *
  * errorBelch() invokes (*errorMsgFn)().
  */
-extern void errorBelch(char *s, ...)
+extern void errorBelch(const char *s, ...)
    GNUC3_ATTRIBUTE(format (printf, 1, 2));
 
-extern void verrorBelch(char *s, va_list ap);
+extern void verrorBelch(const char *s, va_list ap);
 
 /*
  * A debugging message.  Debugging messages are generated either as a
@@ -53,15 +53,15 @@ extern void verrorBelch(char *s, va_list ap);
  *
  * debugBelch() invokes (*debugMsgFn)().
  */
-extern void debugBelch(char *s, ...)
+extern void debugBelch(const char *s, ...)
    GNUC3_ATTRIBUTE(format (printf, 1, 2));
 
-extern void vdebugBelch(char *s, va_list ap);
+extern void vdebugBelch(const char *s, va_list ap);
 
 
 /* Hooks for redirecting message generation: */
 
-typedef void RtsMsgFunction(char *, va_list);
+typedef void RtsMsgFunction(const char *, va_list);
 
 extern RtsMsgFunction *fatalInternalErrorFn;
 extern RtsMsgFunction *debugMsgFn;

@@ -30,7 +30,7 @@ RtsMsgFunction *debugMsgFn           = rtsDebugMsgFn;
 RtsMsgFunction *errorMsgFn           = rtsErrorMsgFn;
 
 void
-barf(char *s, ...)
+barf(const char*s, ...)
 {
   va_list ap;
   va_start(ap,s);
@@ -40,20 +40,20 @@ barf(char *s, ...)
 }
 
 void
-vbarf(char *s, va_list ap)
+vbarf(const char*s, va_list ap)
 {
   (*fatalInternalErrorFn)(s,ap);
   stg_exit(EXIT_INTERNAL_ERROR); // just in case fatalInternalErrorFn() returns
 }
 
 void 
-_assertFail(char *filename, unsigned int linenum)
+_assertFail(const char*filename, unsigned int linenum)
 {
     barf("ASSERTION FAILED: file %s, line %u\n", filename, linenum);
 }
 
 void
-errorBelch(char *s, ...)
+errorBelch(const char*s, ...)
 {
   va_list ap;
   va_start(ap,s);
@@ -62,13 +62,13 @@ errorBelch(char *s, ...)
 }
 
 void
-verrorBelch(char *s, va_list ap)
+verrorBelch(const char*s, va_list ap)
 {
   (*errorMsgFn)(s,ap);
 }
 
 void
-debugBelch(char *s, ...)
+debugBelch(const char*s, ...)
 {
   va_list ap;
   va_start(ap,s);
@@ -77,7 +77,7 @@ debugBelch(char *s, ...)
 }
 
 void
-vdebugBelch(char *s, va_list ap)
+vdebugBelch(const char*s, va_list ap)
 {
   (*debugMsgFn)(s,ap);
 }
@@ -111,7 +111,7 @@ isGUIApp()
 #define str(s) #s
 
 void
-rtsFatalInternalErrorFn(char *s, va_list ap)
+rtsFatalInternalErrorFn(const char *s, va_list ap)
 {
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
   if (isGUIApp())
@@ -148,7 +148,7 @@ rtsFatalInternalErrorFn(char *s, va_list ap)
 }
 
 void
-rtsErrorMsgFn(char *s, va_list ap)
+rtsErrorMsgFn(const char *s, va_list ap)
 {
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
   if (isGUIApp())
@@ -178,7 +178,7 @@ rtsErrorMsgFn(char *s, va_list ap)
 }
 
 void
-rtsDebugMsgFn(char *s, va_list ap)
+rtsDebugMsgFn(const char *s, va_list ap)
 {
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
   if (isGUIApp())

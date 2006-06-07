@@ -57,7 +57,7 @@ extern "C" {
 #define ASSERT(predicate) /* nothing */
 #else
 
-extern void _assertFail (char *, unsigned int);
+extern void _assertFail (const char *, unsigned int);
 
 #define ASSERT(predicate)			\
 	if (predicate)				\
