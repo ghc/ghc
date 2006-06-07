@@ -49,7 +49,6 @@ struct DEBUG_FLAGS {
     /* flags to control debugging output & extra checking in various subsystems */
     rtsBool scheduler;      /* 's' */
     rtsBool interpreter;    /* 'i' */
-    rtsBool codegen;        /* 'c' */
     rtsBool weak;           /* 'w' */
     rtsBool gccafs;         /* 'G' */
     rtsBool gc;             /* 'g' */

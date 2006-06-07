@@ -156,7 +156,6 @@ void initRtsFlagsDefaults(void)
 #ifdef DEBUG
     RtsFlags.DebugFlags.scheduler	= rtsFalse;
     RtsFlags.DebugFlags.interpreter	= rtsFalse;
-    RtsFlags.DebugFlags.codegen		= rtsFalse;
     RtsFlags.DebugFlags.weak		= rtsFalse;
     RtsFlags.DebugFlags.gccafs		= rtsFalse;
     RtsFlags.DebugFlags.gc		= rtsFalse;
@@ -400,7 +399,6 @@ usage_text[] = {
 #if defined(DEBUG)
 "  -Ds  DEBUG: scheduler",
 "  -Di  DEBUG: interpreter",
-"  -Dc  DEBUG: codegen",
 "  -Dw  DEBUG: weak",
 "  -DG  DEBUG: gccafs",
 "  -Dg  DEBUG: gc",
@@ -670,9 +668,6 @@ error = rtsTrue;
 			  break;
 		      case 'i':
 			  RtsFlags.DebugFlags.interpreter = rtsTrue;
-			  break;
-		      case 'c':
-			  RtsFlags.DebugFlags.codegen = rtsTrue;
 			  break;
 		      case 'w':
 			  RtsFlags.DebugFlags.weak = rtsTrue;
