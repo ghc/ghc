@@ -416,8 +416,6 @@ schedule (Capability *initialCapability, Task *task)
     //     needs to acquire all the capabilities).  We can't kill
     //     threads involved in foreign calls.
     // 
-    //   * sched_state := SCHED_INTERRUPTED
-    //
     //   * somebody calls shutdownHaskell(), which calls exitScheduler()
     //
     //   * sched_state := SCHED_SHUTTING_DOWN
@@ -442,9 +440,6 @@ schedule (Capability *initialCapability, Task *task)
 #endif
 	/* scheduleDoGC() deletes all the threads */
 	cap = scheduleDoGC(cap,task,rtsFalse,GetRoots);
-	break;
-    case SCHED_INTERRUPTED:
-	IF_DEBUG(scheduler, sched_belch("SCHED_INTERRUPTED"));
 	break;
     case SCHED_SHUTTING_DOWN:
 	IF_DEBUG(scheduler, sched_belch("SCHED_SHUTTING_DOWN"));
@@ -2060,7 +2055,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
      */
     if (sched_state >= SCHED_INTERRUPTING) {
 	deleteAllThreads(&capabilities[0]);
-	sched_state = SCHED_INTERRUPTED;
+	sched_state = SCHED_SHUTTING_DOWN;
     }
 
     /* everybody back, start the GC.
@@ -2901,7 +2896,7 @@ exitScheduler( void )
 #endif
 
     // If we haven't killed all the threads yet, do it now.
-    if (sched_state < SCHED_INTERRUPTED) {
+    if (sched_state < SCHED_SHUTTING_DOWN) {
 	sched_state = SCHED_INTERRUPTING;
 	scheduleDoGC(NULL,task,rtsFalse,GetRoots);    
     }

@@ -117,8 +117,7 @@ extern int RTS_VAR(context_switch);
  */
 #define SCHED_RUNNING       0  /* running as normal */
 #define SCHED_INTERRUPTING  1  /* ^C detected, before threads are deleted */
-#define SCHED_INTERRUPTED   2  /* ^C detected, after threads deleted */
-#define SCHED_SHUTTING_DOWN 3  /* final shutdown */
+#define SCHED_SHUTTING_DOWN 2  /* final shutdown */
 
 extern rtsBool RTS_VAR(sched_state);
 
