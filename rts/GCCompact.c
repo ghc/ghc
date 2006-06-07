@@ -47,9 +47,9 @@
    -------------------------------------------------------------------------- */
 
 STATIC_INLINE void
-thread( StgPtr p )
+thread (StgClosure **p)
 {
-    StgPtr q = (StgPtr)*p;
+    StgPtr q = *(StgPtr *)p;
     bdescr *bd;
 
     // It doesn't look like a closure at the moment, because the info
@@ -63,11 +63,16 @@ thread( StgPtr p )
 	// is zero (it's non-zero for all the other areas of live
 	// memory).
 	if ((bd->flags & BF_EVACUATED) == 0) {
-	    *p = (StgWord)*q;
+
+	    *(StgPtr)p = (StgWord)*q;
 	    *q = (StgWord)p + 1;	// set the low bit
 	}
     }
 }
+
+// This version of thread() takes a (void *), used to circumvent
+// warnings from gcc about pointer punning and strict aliasing.
+STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
 
 STATIC_INLINE void
 unthread( StgPtr p, StgPtr free )
@@ -119,7 +124,7 @@ thread_static( StgClosure* p )
     switch (info->type) {
       
     case IND_STATIC:
-	thread((StgPtr)&((StgInd *)p)->indirectee);
+	thread(&((StgInd *)p)->indirectee);
 	p = *IND_STATIC_LINK(p);
 	continue;
       
@@ -150,7 +155,7 @@ thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
 	if ((bitmap & 1) == 0) {
-	    thread(p);
+	    thread((StgClosure **)p);
 	}
 	i++;
 	p++;
@@ -187,7 +192,7 @@ thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     small_bitmap:
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
-		thread(p);
+		thread((StgClosure **)p);
 	    }
 	    p++;
 	    bitmap = bitmap >> 1;
@@ -229,7 +234,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    size   = RET_DYN_BITMAP_SIZE;
 	    while (size > 0) {
 		if ((bitmap & 1) == 0) {
-		    thread(p);
+		    thread((StgClosure **)p);
 		}
 		p++;
 		bitmap = bitmap >> 1;
@@ -241,7 +246,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    
 	    // follow the ptr words
 	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-		thread(p);
+		thread((StgClosure **)p);
 		p++;
 	    }
 	    continue;
@@ -263,7 +268,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    // don't have an StgHeader in the same sense as a heap closure.
 	    while (size > 0) {
 		if ((bitmap & 1) == 0) {
-		    thread(p);
+		    thread((StgClosure **)p);
 		}
 		p++;
 		bitmap = bitmap >> 1;
@@ -277,7 +282,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    
 	    p++;
 	    bco = (StgBCO *)*p;
-	    thread(p);
+	    thread((StgClosure **)p);
 	    p++;
 	    size = BCO_BITMAP_SIZE(bco);
 	    thread_large_bitmap(p, BCO_BITMAP(bco), size);
@@ -302,7 +307,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    fun_info = itbl_to_fun_itbl(
 		get_threaded_info((StgPtr)ret_fun->fun));
 	         // *before* threading it!
-	    thread((StgPtr)&ret_fun->fun);
+	    thread(&ret_fun->fun);
 	    p = thread_arg_block(fun_info, ret_fun->payload);
 	    continue;
 	}
@@ -343,7 +348,7 @@ thread_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     small_bitmap:
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
-		thread(p);
+		thread((StgClosure **)p);
 	    }
 	    p++;
 	    bitmap = bitmap >> 1;
@@ -360,7 +365,7 @@ thread_PAP (StgPAP *pap)
 {
     StgPtr p;
     p = thread_PAP_payload(pap->fun, pap->payload, pap->n_args);
-    thread((StgPtr)&pap->fun);
+    thread(&pap->fun);
     return p;
 }
     
@@ -369,14 +374,14 @@ thread_AP (StgAP *ap)
 {
     StgPtr p;
     p = thread_PAP_payload(ap->fun, ap->payload, ap->n_args);
-    thread((StgPtr)&ap->fun);
+    thread(&ap->fun);
     return p;
 }    
 
 STATIC_INLINE StgPtr
 thread_AP_STACK (StgAP_STACK *ap)
 {
-    thread((StgPtr)&ap->fun);
+    thread(&ap->fun);
     thread_stack((P_)ap->payload, (P_)ap->payload + ap->size);
     return (P_)ap + sizeofW(StgAP_STACK) + ap->size;
 }
@@ -384,8 +389,8 @@ thread_AP_STACK (StgAP_STACK *ap)
 static StgPtr
 thread_TSO (StgTSO *tso)
 {
-    thread((StgPtr)&tso->link);
-    thread((StgPtr)&tso->global_link);
+    thread_(&tso->link);
+    thread_(&tso->global_link);
 
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
@@ -395,13 +400,13 @@ thread_TSO (StgTSO *tso)
 	|| tso->why_blocked == BlockedOnGA_NoSend
 #endif
 	) {
-	thread((StgPtr)&tso->block_info.closure);
+	thread_(&tso->block_info.closure);
     }
     if ( tso->blocked_exceptions != NULL ) {
-	thread((StgPtr)&tso->blocked_exceptions);
+	thread_(&tso->blocked_exceptions);
     }
     
-    thread((StgPtr)&tso->trec);
+    thread_(&tso->trec);
 
     thread_stack(tso->sp, &(tso->stack[tso->stack_size]));
     return (StgPtr)tso + tso_sizeW(tso);
@@ -435,7 +440,7 @@ update_fwd_large( bdescr *bd )
 
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    thread(p);
+	    thread((StgClosure **)p);
 	}
 	continue;
       }
@@ -457,11 +462,11 @@ update_fwd_large( bdescr *bd )
         StgWord i;
         StgTRecChunk *tc = (StgTRecChunk *)p;
 	TRecEntry *e = &(tc -> entries[0]);
-	thread((StgPtr)&tc->prev_chunk);
+	thread_(&tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  thread((StgPtr)&e->tvar);
-	  thread((StgPtr)&e->expected_value);
-	  thread((StgPtr)&e->new_value);
+	  thread_(&e->tvar);
+	  thread(&e->expected_value);
+	  thread(&e->new_value);
 	}
 	continue;
     }
@@ -485,11 +490,11 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	
     case FUN_1_0:
     case CONSTR_1_0:
-	thread((StgPtr)&((StgClosure *)p)->payload[0]);
+	thread(&((StgClosure *)p)->payload[0]);
 	return p + sizeofW(StgHeader) + 1;
 	
     case THUNK_1_0:
-	thread((StgPtr)&((StgThunk *)p)->payload[0]);
+	thread(&((StgThunk *)p)->payload[0]);
 	return p + sizeofW(StgThunk) + 1;
 	
     case THUNK_0_2:
@@ -500,31 +505,31 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	return p + sizeofW(StgHeader) + 2;
 	
     case THUNK_1_1:
-	thread((StgPtr)&((StgThunk *)p)->payload[0]);
+	thread(&((StgThunk *)p)->payload[0]);
 	return p + sizeofW(StgThunk) + 2;
 
     case FUN_1_1:
     case CONSTR_1_1:
-	thread((StgPtr)&((StgClosure *)p)->payload[0]);
+	thread(&((StgClosure *)p)->payload[0]);
 	return p + sizeofW(StgHeader) + 2;
 	
     case THUNK_2_0:
-	thread((StgPtr)&((StgThunk *)p)->payload[0]);
-	thread((StgPtr)&((StgThunk *)p)->payload[1]);
+	thread(&((StgThunk *)p)->payload[0]);
+	thread(&((StgThunk *)p)->payload[1]);
 	return p + sizeofW(StgThunk) + 2;
 
     case FUN_2_0:
     case CONSTR_2_0:
-	thread((StgPtr)&((StgClosure *)p)->payload[0]);
-	thread((StgPtr)&((StgClosure *)p)->payload[1]);
+	thread(&((StgClosure *)p)->payload[0]);
+	thread(&((StgClosure *)p)->payload[1]);
 	return p + sizeofW(StgHeader) + 2;
 	
     case BCO: {
 	StgBCO *bco = (StgBCO *)p;
-	thread((StgPtr)&bco->instrs);
-	thread((StgPtr)&bco->literals);
-	thread((StgPtr)&bco->ptrs);
-	thread((StgPtr)&bco->itbls);
+	thread_(&bco->instrs);
+	thread_(&bco->literals);
+	thread_(&bco->ptrs);
+	thread_(&bco->itbls);
 	return p + bco_sizeW(bco);
     }
 
@@ -535,7 +540,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	end = (P_)((StgThunk *)p)->payload + 
 	    info->layout.payload.ptrs;
 	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
-	    thread(p);
+	    thread((StgClosure **)p);
 	}
 	return p + info->layout.payload.nptrs;
     }
@@ -556,7 +561,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	end = (P_)((StgClosure *)p)->payload + 
 	    info->layout.payload.ptrs;
 	for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
-	    thread(p);
+	    thread((StgClosure **)p);
 	}
 	return p + info->layout.payload.nptrs;
     }
@@ -564,11 +569,11 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case WEAK:
     {
 	StgWeak *w = (StgWeak *)p;
-	thread((StgPtr)&w->key);
-	thread((StgPtr)&w->value);
-	thread((StgPtr)&w->finalizer);
+	thread(&w->key);
+	thread(&w->value);
+	thread(&w->finalizer);
 	if (w->link != NULL) {
-	    thread((StgPtr)&w->link);
+	    thread_(&w->link);
 	}
 	return p + sizeofW(StgWeak);
     }
@@ -576,21 +581,21 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case MVAR:
     { 
 	StgMVar *mvar = (StgMVar *)p;
-	thread((StgPtr)&mvar->head);
-	thread((StgPtr)&mvar->tail);
-	thread((StgPtr)&mvar->value);
+	thread_(&mvar->head);
+	thread_(&mvar->tail);
+	thread(&mvar->value);
 	return p + sizeofW(StgMVar);
     }
     
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
-	thread((StgPtr)&((StgInd *)p)->indirectee);
+	thread(&((StgInd *)p)->indirectee);
 	return p + sizeofW(StgInd);
 
     case THUNK_SELECTOR:
     { 
 	StgSelector *s = (StgSelector *)p;
-	thread((StgPtr)&s->selectee);
+	thread(&s->selectee);
 	return p + THUNK_SELECTOR_sizeW();
     }
     
@@ -616,7 +621,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    thread(p);
+	    thread((StgClosure **)p);
 	}
 	return p;
     }
@@ -627,25 +632,25 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case TVAR_WAIT_QUEUE:
     {
         StgTVarWaitQueue *wq = (StgTVarWaitQueue *)p;
-	thread((StgPtr)&wq->waiting_tso);
-	thread((StgPtr)&wq->next_queue_entry);
-	thread((StgPtr)&wq->prev_queue_entry);
+	thread_(&wq->waiting_tso);
+	thread_(&wq->next_queue_entry);
+	thread_(&wq->prev_queue_entry);
 	return p + sizeofW(StgTVarWaitQueue);
     }
     
     case TVAR:
     {
         StgTVar *tvar = (StgTVar *)p;
-	thread((StgPtr)&tvar->current_value);
-	thread((StgPtr)&tvar->first_wait_queue_entry);
+	thread((void *)&tvar->current_value);
+	thread((void *)&tvar->first_wait_queue_entry);
 	return p + sizeofW(StgTVar);
     }
     
     case TREC_HEADER:
     {
         StgTRecHeader *trec = (StgTRecHeader *)p;
-	thread((StgPtr)&trec->enclosing_trec);
-	thread((StgPtr)&trec->current_chunk);
+	thread_(&trec->enclosing_trec);
+	thread_(&trec->current_chunk);
 	return p + sizeofW(StgTRecHeader);
     }
 
@@ -654,11 +659,11 @@ thread_obj (StgInfoTable *info, StgPtr p)
         StgWord i;
         StgTRecChunk *tc = (StgTRecChunk *)p;
 	TRecEntry *e = &(tc -> entries[0]);
-	thread((StgPtr)&tc->prev_chunk);
+	thread_(&tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  thread((StgPtr)&e->tvar);
-	  thread((StgPtr)&e->expected_value);
-	  thread((StgPtr)&e->new_value);
+	  thread_(&e->tvar);
+	  thread(&e->expected_value);
+	  thread(&e->new_value);
 	}
 	return p + sizeofW(StgTRecChunk);
     }
@@ -879,10 +884,10 @@ compact( void (*get_roots)(evac_fn) )
 
     // the weak pointer lists...
     if (weak_ptr_list != NULL) {
-	thread((StgPtr)(void *)&weak_ptr_list);
+	thread((void *)&weak_ptr_list);
     }
     if (old_weak_ptr_list != NULL) {
-	thread((StgPtr)(void *)&old_weak_ptr_list); // tmp
+	thread((void *)&old_weak_ptr_list); // tmp
     }
 
     // mutable lists
@@ -891,23 +896,23 @@ compact( void (*get_roots)(evac_fn) )
 	StgPtr p;
 	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
 	    for (p = bd->start; p < bd->free; p++) {
-		thread(p);
+		thread((StgClosure **)p);
 	    }
 	}
     }
 
     // the global thread list
-    thread((StgPtr)(void *)&all_threads);
+    thread((void *)&all_threads);
 
     // any threads resurrected during this GC
-    thread((StgPtr)(void *)&resurrected_threads);
+    thread((void *)&resurrected_threads);
 
     // the task list
     {
 	Task *task;
 	for (task = all_tasks; task != NULL; task = task->all_link) {
 	    if (task->tso) {
-		thread((StgPtr)&task->tso);
+		thread_(&task->tso);
 	    }
 	}
     }
