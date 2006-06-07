@@ -99,10 +99,10 @@ newTask (void)
 #if defined(THREADED_RTS)
     currentUserTime = getThreadCPUTime();
     currentElapsedTime = getProcessElapsedTime();
-    task->mut_time = 0.0;
-    task->mut_etime = 0.0;
-    task->gc_time = 0.0;
-    task->gc_etime = 0.0;
+    task->mut_time = 0;
+    task->mut_etime = 0;
+    task->gc_time = 0;
+    task->gc_etime = 0;
     task->muttimestart = currentUserTime;
     task->elapsedtimestart = currentElapsedTime;
 #endif
@@ -193,15 +193,10 @@ discardTask (Task *task)
 }
 
 void
-taskStop (Task *task)
+taskTimeStamp (Task *task USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    OSThreadId id;
     Ticks currentElapsedTime, currentUserTime, elapsedGCTime;
-
-    id = osThreadId();
-    ASSERT(task->id == id);
-    ASSERT(myTask() == task);
 
     currentUserTime = getThreadCPUTime();
     currentElapsedTime = getProcessElapsedTime();
@@ -215,10 +210,22 @@ taskStop (Task *task)
     task->mut_etime = 
 	currentElapsedTime - task->elapsedtimestart - elapsedGCTime;
 
-    if (task->mut_time < 0.0)  { task->mut_time = 0.0;  }
-    if (task->mut_etime < 0.0) { task->mut_etime = 0.0; }
+    if (task->mut_time  < 0) { task->mut_time  = 0; }
+    if (task->mut_etime < 0) { task->mut_etime = 0; }
+#endif
+}
+
+void
+workerTaskStop (Task *task)
+{
+#if defined(THREADED_RTS)
+    OSThreadId id;
+    id = osThreadId();
+    ASSERT(task->id == id);
+    ASSERT(myTask() == task);
 #endif
 
+    taskTimeStamp(task);
     task->stopped = rtsTrue;
     tasksRunning--;
 }

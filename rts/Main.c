@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
 	void *cap = rts_lock();
 	cap = rts_evalLazyIO(cap,(HaskellObj)(void *)mainIO_closure, NULL);
 	status = rts_getSchedStatus(cap);
+	taskTimeStamp(myTask());
 	rts_unlock(cap);
     }
 

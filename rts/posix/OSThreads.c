@@ -16,6 +16,7 @@
 #if defined(THREADED_RTS)
 #include "OSThreads.h"
 #include "RtsUtils.h"
+#include "Task.h"
 
 #if HAVE_STRING_H
 #include <string.h>
@@ -140,6 +141,7 @@ forkOS_createThreadWrapper ( void * entry )
     Capability *cap;
     cap = rts_lock();
     cap = rts_evalStableIO(cap, (HsStablePtr) entry, NULL);
+    taskTimeStamp(myTask());
     rts_unlock(cap);
     return NULL;
 }

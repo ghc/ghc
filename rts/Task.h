@@ -190,7 +190,13 @@ INLINE_HEADER void taskEnter (Task *task);
 // mainly for stats-gathering purposes.
 // Requires: sched_mutex.
 //
-void taskStop (Task *task);
+void workerTaskStop (Task *task);
+
+// Record the time spent in this Task.
+// This is called by workerTaskStop() but not by boundTaskExiting(),
+// because it would impose an extra overhead on call-in.
+//
+void taskTimeStamp (Task *task);
 
 // Put the task back on the free list, mark it stopped.  Used by
 // forkProcess().

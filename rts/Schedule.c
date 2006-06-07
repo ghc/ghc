@@ -2800,7 +2800,7 @@ workerStart(Task *task)
 
     // On exit from schedule(), we have a Capability.
     releaseCapability(cap);
-    taskStop(task);
+    workerTaskStop(task);
 }
 #endif
 
