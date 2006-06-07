@@ -8,19 +8,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-//@menu
-//* Includes::			
-//* Constants::			
-//* Static function decls::	
-//* Command-line option parsing routines::  
-//* GranSim specific options::	
-//* Aux fcts::			
-//@end menu
-//*/
-
-//@node Includes, Constants
-//@subsection Includes
-
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsFlags.h"
@@ -47,9 +34,6 @@ char  **prog_argv = NULL;
 char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
 char   *rts_argv[MAX_RTS_ARGS];
-
-//@node Constants, Static function decls, Includes
-//@subsection Constants
 
 /*
  * constants, used later 
@@ -108,9 +92,6 @@ static char par_debug_opts_flags[] = {
 
 #endif /* PAR */
 
-//@node Static function decls, Command-line option parsing routines, Constants
-//@subsection Static function decls
-
 /* -----------------------------------------------------------------------------
    Static function decls
    -------------------------------------------------------------------------- */
@@ -136,9 +117,6 @@ static void process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool
 static void set_par_debug_options(nat n);
 static void help_par_debug_options(nat n);
 #endif
-
-//@node Command-line option parsing routines, GranSim specific options, Static function decls
-//@subsection Command-line option parsing routines
 
 /* -----------------------------------------------------------------------------
  * Command-line option parsing routines.
@@ -1166,9 +1144,6 @@ error = rtsTrue;
 
 #if defined(GRAN)
 
-//@node GranSim specific options, Aux fcts, Command-line option parsing routines
-//@subsection GranSim specific options
-
 static void
 enable_GranSimLight(void) {
 
@@ -2139,9 +2114,6 @@ help_par_debug_options(nat n) {
 }
 
 #endif /* PAR */
-
-//@node Aux fcts,  , GranSim specific options
-//@subsection Aux fcts
 
 static void
 stats_fprintf(FILE *f, char *s, ...)
