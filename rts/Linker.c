@@ -825,7 +825,7 @@ initFreeList(rootEntry *table, nat n, rootEntry *free)
   root_ptr_free = table;
 }
 
-void
+static void
 initRootPtrTable(void)
 {
   if (RPT_size > 0)
@@ -839,7 +839,7 @@ initRootPtrTable(void)
 }
 
 
-void
+static void
 enlargeRootPtrTable(void)
 {
   nat old_RPT_size = RPT_size;
