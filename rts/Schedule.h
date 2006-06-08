@@ -43,6 +43,12 @@ void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
 void awakenBlockedQueue (Capability *cap, StgTSO *tso);
 #endif
 
+/* wakeUpRts()
+ * 
+ * Causes an OS thread to wake up and run the scheduler, if necessary.
+ */
+void wakeUpRts(void);
+
 /* unblockOne()
  *
  * Put the specified thread on the run queue of the given Capability.

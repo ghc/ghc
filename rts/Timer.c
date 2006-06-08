@@ -72,20 +72,8 @@ handle_tick(int unused STG_UNUSED)
 	  blackholes_need_checking = rtsTrue;
 	  /* hack: re-use the blackholes_need_checking flag */
 	  
-#if !defined(mingw32_HOST_OS)
-	  // This forces the IO Manager thread to wakeup, which will
-	  // in turn ensure that some OS thread wakes up and runs the
-	  // scheduler loop, which will cause a GC and deadlock check.
-	  ioManagerWakeup();
-#else
-	  /* ToDo: this doesn't work.  Can't invoke
-	   * pthread_cond_signal from a signal handler.
-	   * Furthermore, we can't prod a capability that we
-	   * might be holding.  What can we do?
-	   */
-	  prodOneCapability();
-#endif
       }
+      wakeUpRts();
       break;
   default:
       break;

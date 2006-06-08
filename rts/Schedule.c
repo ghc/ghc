@@ -3446,8 +3446,37 @@ interruptStgRts(void)
 {
     sched_state = SCHED_INTERRUPTING;
     context_switch = 1;
+    wakeUpRts();
+}
+
+/* -----------------------------------------------------------------------------
+   Wake up the RTS
+   
+   This function causes at least one OS thread to wake up and run the
+   scheduler loop.  It is invoked when the RTS might be deadlocked, or
+   an external event has arrived that may need servicing (eg. a
+   keyboard interrupt).
+
+   In the single-threaded RTS we don't do anything here; we only have
+   one thread anyway, and the event that caused us to want to wake up
+   will have interrupted any blocking system call in progress anyway.
+   -------------------------------------------------------------------------- */
+
+void
+wakeUpRts(void)
+{
 #if defined(THREADED_RTS)
-    prodAllCapabilities();
+#if !defined(mingw32_HOST_OS)
+    // This forces the IO Manager thread to wakeup, which will
+    // in turn ensure that some OS thread wakes up and runs the
+    // scheduler loop, which will cause a GC and deadlock check.
+    ioManagerWakeup();
+#else
+    // On Windows this might be safe enough, because we aren't
+    // in a signal handler.  Later we should use the IO Manager,
+    // though.
+    prodOneCapability();
+#endif
 #endif
 }
 
