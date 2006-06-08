@@ -795,9 +795,9 @@ void stmPreGCHook() {
 
 static volatile StgInt64 max_commits = 0;
 
+#if defined(THREADED_RTS)
 static volatile StgBool token_locked = FALSE;
 
-#if defined(THREADED_RTS)
 static void getTokenBatch(Capability *cap) {
   while (cas((void *)&token_locked, FALSE, TRUE) == TRUE) { /* nothing */ }
   max_commits += TOKEN_BATCH_SIZE;
