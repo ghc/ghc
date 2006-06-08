@@ -48,11 +48,14 @@ typedef unsigned char            StgWord8;
 typedef signed   short           StgInt16;
 typedef unsigned short           StgWord16;
 
-#if SIZEOF_UNSIGNED_INT == 4
+#if SIZEOF_LONG == 4
+typedef signed   long            StgInt32;
+typedef unsigned long            StgWord32;
+#elif SIZEOF_INT == 4
 typedef signed   int             StgInt32;
 typedef unsigned int             StgWord32;
 #else
-#error GHC untested on this architecture: sizeof(unsigned int) != 4
+#error GHC untested on this architecture: sizeof(int) != 4
 #endif
 
 #ifdef SUPPORT_LONG_LONGS
@@ -77,6 +80,12 @@ typedef unsigned __int64       StgWord64;
 /*
  * Define the standard word size we'll use on this machine: make it
  * big enough to hold a pointer.
+ *
+ * It's useful if StgInt/StgWord are always the same as long, so that
+ * we can use a consistent printf format specifier without warnings on
+ * any platform.  Fortunately this works at the moement; if it breaks
+ * in the future we'll have to start using macros for format
+ * specifiers (c.f. FMT_StgWord64 in Rts.h).
  */
 
 #if SIZEOF_VOID_P == 8
