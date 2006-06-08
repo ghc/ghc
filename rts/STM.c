@@ -307,7 +307,7 @@ static void unlock_tvar(StgTRecHeader *trec STG_UNUSED,
                         StgClosure *c,
                         StgBool force_update STG_UNUSED) {
   TRACE("%p : unlock_tvar(%p, %p)\n", trec, s, c);
-  ASSERT(s -> current_value == trec);
+  ASSERT(s -> current_value == (StgClosure *)trec);
   s -> current_value = c;
 }
 
@@ -501,7 +501,7 @@ static void build_wait_queue_entries_for_trec(Capability *cap,
     StgTVarWaitQueue *fq;
     s = e -> tvar;
     TRACE("%p : adding tso=%p to wait queue for tvar=%p\n", trec, tso, s);
-    ACQ_ASSERT(s -> current_value == trec);
+    ACQ_ASSERT(s -> current_value == (StgClosure *)trec);
     NACQ_ASSERT(s -> current_value == e -> expected_value);
     fq = s -> first_wait_queue_entry;
     q = alloc_stg_tvar_wait_queue(cap, tso);
@@ -533,7 +533,7 @@ static void remove_wait_queue_entries_for_trec(Capability *cap,
     StgClosure *saw = lock_tvar(trec, s);
     q = (StgTVarWaitQueue *) (e -> new_value);
     TRACE("%p : removing tso=%p from wait queue for tvar=%p\n", trec, q -> waiting_tso, s);
-    ACQ_ASSERT(s -> current_value == trec);
+    ACQ_ASSERT(s -> current_value == (StgClosure *)trec);
     nq = q -> next_queue_entry;
     pq = q -> prev_queue_entry;
     if (nq != END_STM_WAIT_QUEUE) {
@@ -716,7 +716,7 @@ static StgBool validate_and_acquire_ownership (StgTRecHeader *trec,
             result = FALSE;
             BREAK_FOR_EACH;
           } else {
-            TRACE("%p : need to check version %d\n", trec, e -> num_updates);
+            TRACE("%p : need to check version %ld\n", trec, e -> num_updates);
           }
         });
       }
@@ -750,7 +750,7 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
       StgTVar *s;
       s = e -> tvar;
       if (entry_is_read_only(e)) {
-        TRACE("%p : check_read_only for TVar %p, saw %d\n", trec, s, e -> num_updates);
+        TRACE("%p : check_read_only for TVar %p, saw %ld", trec, s, e -> num_updates);
         if (s -> num_updates != e -> num_updates) {
           // ||s -> current_value != e -> expected_value) {
           TRACE("%p : mismatch\n", trec);
@@ -1027,7 +1027,7 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
             unlock_tvar(trec, s, e -> expected_value, FALSE);
           }
           merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
-          ACQ_ASSERT(s -> current_value != trec);
+          ACQ_ASSERT(s -> current_value != (StgClosure *)trec);
         });
       } else {
         revert_ownership(trec, FALSE);
