@@ -52,5 +52,6 @@ void      statDescribeGens( void );
 HsInt64   getAllocations( void );
 
 Ticks stat_getElapsedGCTime(void);
+Ticks stat_getElapsedTime(void);
 
 #endif /* STATS_H */

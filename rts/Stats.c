@@ -75,6 +75,11 @@ Ticks stat_getElapsedGCTime(void)
     return GCe_tot_time;
 }
 
+Ticks stat_getElapsedTime(void)
+{
+    return getProcessElapsedTime() - ElapsedTimeStart;
+}
+
 /* mut_user_time_during_GC() and mut_user_time()
  *
  * The former function can be used to get the current mutator time

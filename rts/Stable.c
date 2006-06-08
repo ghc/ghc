@@ -18,6 +18,7 @@
 #include "RtsAPI.h"
 #include "RtsFlags.h"
 #include "OSThreads.h"
+#include "Trace.h"
 
 /* Comment from ADR's implementation in old RTS:
 
@@ -199,7 +200,7 @@ lookupStableName_(StgPtr p)
   
   if (sn != 0) {
     ASSERT(stable_ptr_table[sn].addr == p);
-    IF_DEBUG(stable,debugBelch("cached stable name %ld at %p\n",sn,p));
+    debugTrace(DEBUG_stable, "cached stable name %ld at %p",sn,p);
     return sn;
   } else {
     sn = stable_ptr_free - stable_ptr_table;
@@ -207,7 +208,7 @@ lookupStableName_(StgPtr p)
     stable_ptr_table[sn].ref = 0;
     stable_ptr_table[sn].addr = p;
     stable_ptr_table[sn].sn_obj = NULL;
-    /* IF_DEBUG(stable,debugBelch("new stable name %d at %p\n",sn,p)); */
+    /* debugTrace(DEBUG_stable, "new stable name %d at %p\n",sn,p); */
     
     /* add the new stable name to the hash table */
     insertHashTable(addrToStableHash, (W_)p, (void *)sn);
@@ -399,13 +400,15 @@ gcStablePtrTable( void )
 		if (p->sn_obj == NULL) {
 		    // StableName object is dead
 		    freeStableName(p);
-		    IF_DEBUG(stable, debugBelch("GC'd Stable name %ld\n", 
-						p - stable_ptr_table));
+		    debugTrace(DEBUG_stable, "GC'd Stable name %ld", 
+			       p - stable_ptr_table);
 		    continue;
 		    
 		} else {
 		  p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
-		    IF_DEBUG(stable, debugBelch("Stable name %ld still alive at %p, ref %ld\n", p - stable_ptr_table, p->addr, p->ref));
+		  debugTrace(DEBUG_stable, 
+			     "stable name %ld still alive at %p, ref %ld\n",
+			     p - stable_ptr_table, p->addr, p->ref);
 		}
 	    }
 	}

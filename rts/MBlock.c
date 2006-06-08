@@ -16,6 +16,7 @@
 #include "RtsFlags.h"
 #include "MBlock.h"
 #include "BlockAlloc.h"
+#include "Trace.h"
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -287,7 +288,7 @@ getMBlocks(nat n)
   // ToDo: check that we haven't already grabbed the memory at next_request
   next_request = ret + size;
 
-  IF_DEBUG(gc,debugBelch("Allocated %d megablock(s) at %p\n",n,ret));
+  debugTrace(DEBUG_gc, "allocated %d megablock(s) at %p",n,ret);
 
   // fill in the table
   for (i = 0; i < n; i++) {
@@ -402,7 +403,7 @@ getMBlocks(nat n)
      barf("getMBlocks: unknown memory allocation failure on Win32.");
   }
 
-  IF_DEBUG(gc,debugBelch("Allocated %d megablock(s) at 0x%x\n",n,(nat)ret));
+  debugTrace(DEBUG_gc, "allocated %d megablock(s) at 0x%x",n,(nat)ret);
   next_request = (char*)next_request + size;
 
   mblocks_allocated += n;

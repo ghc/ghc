@@ -314,11 +314,6 @@ emptyThreadQueues(Capability *cap)
     ;
 }
 
-#ifdef DEBUG
-void sched_belch(char *s, ...)
-   GNU_ATTRIBUTE(format (printf, 1, 2));
-#endif
-
 #endif /* !IN_STG_CODE */
 
 STATIC_INLINE void

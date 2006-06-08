@@ -25,6 +25,7 @@
 #include "Capability.h"
 #include "Schedule.h"
 #include "Sparks.h"
+#include "Trace.h"
 
 // one global capability, this is the Capability for non-threaded
 // builds, and for +RTS -N1
@@ -196,8 +197,7 @@ initCapabilities( void )
 	initCapability(&capabilities[i], i);
     }
 
-    IF_DEBUG(scheduler, sched_belch("allocated %d capabilities", 
-				    n_capabilities));
+    debugTrace(DEBUG_sched, "allocated %d capabilities", n_capabilities);
 
 #else /* !THREADED_RTS */
 
@@ -233,10 +233,10 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->cap == cap);
-    IF_DEBUG(scheduler,
-	     sched_belch("passing capability %d to %s %p",
-			 cap->no, task->tso ? "bound task" : "worker",
-			 (void *)task->id));
+    trace(TRACE_sched | DEBUG_sched,
+	  "passing capability %d to %s %p",
+	  cap->no, task->tso ? "bound task" : "worker",
+	  (void *)task->id);
     ACQUIRE_LOCK(&task->lock);
     task->wakeup = rtsTrue;
     // the wakeup flag is needed because signalCondition() doesn't
@@ -291,8 +291,8 @@ releaseCapability_ (Capability* cap)
 	// are threads that need to be completed.  If the system is
 	// shutting down, we never create a new worker.
 	if (sched_state < SCHED_SHUTTING_DOWN || !emptyRunQueue(cap)) {
-	    IF_DEBUG(scheduler,
-		     sched_belch("starting new worker on capability %d", cap->no));
+	    debugTrace(DEBUG_sched,
+		       "starting new worker on capability %d", cap->no);
 	    startWorkerTask(cap, workerStart);
 	    return;
 	}
@@ -310,7 +310,7 @@ releaseCapability_ (Capability* cap)
     }
 
     last_free_capability = cap;
-    IF_DEBUG(scheduler, sched_belch("freeing capability %d", cap->no));
+    trace(TRACE_sched | DEBUG_sched, "freeing capability %d", cap->no);
 }
 
 void
@@ -396,8 +396,7 @@ waitForReturnCapability (Capability **pCap, Task *task)
 
     ACQUIRE_LOCK(&cap->lock);
 
-    IF_DEBUG(scheduler,
-	     sched_belch("returning; I want capability %d", cap->no));
+    debugTrace(DEBUG_sched, "returning; I want capability %d", cap->no);
 
     if (!cap->running_task) {
 	// It's free; just grab it
@@ -435,8 +434,7 @@ waitForReturnCapability (Capability **pCap, Task *task)
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    IF_DEBUG(scheduler,
-	     sched_belch("returning; got capability %d", cap->no));
+    trace(TRACE_sched | DEBUG_sched, "resuming capability %d", cap->no);
 
     *pCap = cap;
 #endif
@@ -455,7 +453,7 @@ yieldCapability (Capability** pCap, Task *task)
     // The fast path has no locking, if we don't enter this while loop
 
     while ( cap->returning_tasks_hd != NULL || !anyWorkForMe(cap,task) ) {
-	IF_DEBUG(scheduler, sched_belch("giving up capability %d", cap->no));
+	debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
 
 	// We must now release the capability and wait to be woken up
 	// again.
@@ -470,10 +468,12 @@ yieldCapability (Capability** pCap, Task *task)
 	    task->wakeup = rtsFalse;
 	    RELEASE_LOCK(&task->lock);
 
-	    IF_DEBUG(scheduler, sched_belch("woken up on capability %d", cap->no));
+	    debugTrace(DEBUG_sched, "woken up on capability %d", cap->no);
+
 	    ACQUIRE_LOCK(&cap->lock);
 	    if (cap->running_task != NULL) {
-		IF_DEBUG(scheduler, sched_belch("capability %d is owned by another task", cap->no));
+		debugTrace(DEBUG_sched, 
+			   "capability %d is owned by another task", cap->no);
 		RELEASE_LOCK(&cap->lock);
 		continue;
 	    }
@@ -495,7 +495,7 @@ yieldCapability (Capability** pCap, Task *task)
 	    break;
 	}
 
-	IF_DEBUG(scheduler, sched_belch("got capability %d", cap->no));
+	trace(TRACE_sched | DEBUG_sched, "resuming capability %d", cap->no);
 	ASSERT(cap->running_task == task);
     }
 
@@ -527,6 +527,7 @@ wakeupThreadOnCapability (Capability *cap, StgTSO *tso)
 
 	// start it up
 	cap->running_task = myTask(); // precond for releaseCapability_()
+	trace(TRACE_sched, "resuming capability %d", cap->no);
 	releaseCapability_(cap);
     } else {
 	appendToWakeupQueue(cap,tso);
@@ -557,6 +558,7 @@ prodCapabilities(rtsBool all)
 	ACQUIRE_LOCK(&cap->lock);
 	if (!cap->running_task) {
 	    if (cap->spare_workers) {
+		trace(TRACE_sched, "resuming capability %d", cap->no);
 		task = cap->spare_workers;
 		ASSERT(!task->stopped);
 		giveCapabilityToTask(cap,task);
@@ -616,23 +618,25 @@ shutdownCapability (Capability *cap, Task *task)
     task->cap = cap;
 
     for (i = 0; i < 50; i++) {
-	IF_DEBUG(scheduler, sched_belch("shutting down capability %d, attempt %d", cap->no, i));
+	debugTrace(DEBUG_sched, 
+		   "shutting down capability %d, attempt %d", cap->no, i);
 	ACQUIRE_LOCK(&cap->lock);
 	if (cap->running_task) {
 	    RELEASE_LOCK(&cap->lock);
-	    IF_DEBUG(scheduler, sched_belch("not owner, yielding"));
+	    debugTrace(DEBUG_sched, "not owner, yielding");
 	    yieldThread();
 	    continue;
 	}
 	cap->running_task = task;
 	if (!emptyRunQueue(cap) || cap->spare_workers) {
-	    IF_DEBUG(scheduler, sched_belch("runnable threads or workers still alive, yielding"));
+	    debugTrace(DEBUG_sched, 
+		       "runnable threads or workers still alive, yielding");
 	    releaseCapability_(cap); // this will wake up a worker
 	    RELEASE_LOCK(&cap->lock);
 	    yieldThread();
 	    continue;
 	}
-	IF_DEBUG(scheduler, sched_belch("capability %d is stopped.", cap->no));
+	debugTrace(DEBUG_sched, "capability %d is stopped.", cap->no);
 	RELEASE_LOCK(&cap->lock);
 	break;
     }

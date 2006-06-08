@@ -42,7 +42,7 @@
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
 #endif
-
+#include "Trace.h"
 #include "RetainerProfile.h"
 
 #include <string.h>
@@ -355,10 +355,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   CostCentreStack *prev_CCS;
 #endif
 
-#if defined(DEBUG) && defined(GRAN)
-  IF_DEBUG(gc, debugBelch("@@ Starting garbage collection at %ld (%lx)\n", 
-		     Now, Now));
-#endif
+  debugTrace(DEBUG_gc, "starting GC");
 
 #if defined(RTS_USER_SIGNALS)
   // block signals
@@ -516,8 +513,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	      stp->bitmap = bitmap_bdescr;
 	      bitmap = bitmap_bdescr->start;
 	      
-	      IF_DEBUG(gc, debugBelch("bitmap_size: %d, bitmap: %p",
-				   bitmap_size, bitmap););
+	      debugTrace(DEBUG_gc, "bitmap_size: %d, bitmap: %p",
+			 bitmap_size, bitmap);
 	      
 	      // don't forget to fill it with zeros!
 	      memset(bitmap, 0, bitmap_size);
@@ -828,7 +825,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	}
 	copied +=  mut_list_size;
 
-	IF_DEBUG(gc, debugBelch("mut_list_size: %ld (%d vars, %d arrays, %d others)\n", mut_list_size * sizeof(W_), mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS));
+	debugTrace(DEBUG_gc,
+		   "mut_list_size: %ld (%d vars, %d arrays, %d others)",
+		   mut_list_size * sizeof(W_), 
+		   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS);
     }
 
     for (s = 0; s < generations[g].n_steps; s++) {
@@ -1077,7 +1077,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       int pc_free; 
       
       adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
-      IF_DEBUG(gc, debugBelch("@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
+
+      debugTrace(DEBUG_gc, "near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld", 
+		 RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks);
+
       pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
       if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
 	heapOverflow();
@@ -1309,8 +1312,10 @@ traverse_weak_ptr_list(void)
 		  w->link = weak_ptr_list;
 		  weak_ptr_list = w;
 		  flag = rtsTrue;
-		  IF_DEBUG(weak, debugBelch("Weak pointer still alive at %p -> %p", 
-				       w, w->key));
+
+		  debugTrace(DEBUG_weak, 
+			     "weak pointer still alive at %p -> %p",
+			     w, w->key);
 		  continue;
 	      }
 	      else {
@@ -2196,18 +2201,16 @@ loop:
       to = copy(q,BLACKHOLE_sizeW(),stp); 
       //ToDo: derive size etc from reverted IP
       //to = copy(q,size,stp);
-      IF_DEBUG(gc,
-	       debugBelch("@@ evacuate: RBH %p (%s) to %p (%s)",
-		     q, info_type(q), to, info_type(to)));
+      debugTrace(DEBUG_gc, "evacuate: RBH %p (%s) to %p (%s)",
+		 q, info_type(q), to, info_type(to));
       return to;
     }
-
+  
   case BLOCKED_FETCH:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOD_SIZE);
     to = copy(q,sizeofW(StgBlockedFetch),stp);
-    IF_DEBUG(gc,
-	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
-		   q, info_type(q), to, info_type(to)));
+    debugTrace(DEBUG_gc, "evacuate: %p (%s) to %p (%s)",
+	       q, info_type(q), to, info_type(to));
     return to;
 
 # ifdef DIST    
@@ -2216,17 +2219,15 @@ loop:
   case FETCH_ME:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOAD_SIZE);
     to = copy(q,sizeofW(StgFetchMe),stp);
-    IF_DEBUG(gc,
-	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
-		   q, info_type(q), to, info_type(to)));
+    debugTrace(DEBUG_gc, "evacuate: %p (%s) to %p (%s)",
+	       q, info_type(q), to, info_type(to)));
     return to;
 
   case FETCH_ME_BQ:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOAD_SIZE);
     to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
-    IF_DEBUG(gc,
-	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
-		   q, info_type(q), to, info_type(to)));
+    debugTrace(DEBUG_gc, "evacuate: %p (%s) to %p (%s)",
+	       q, info_type(q), to, info_type(to)));
     return to;
 #endif
 
@@ -3072,9 +3073,8 @@ scavenge(step *stp)
 	(StgClosure *)rbh->blocking_queue = 
 	    evacuate((StgClosure *)rbh->blocking_queue);
 	failed_to_evac = rtsTrue;  // mutable anyhow.
-	IF_DEBUG(gc,
-		 debugBelch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
-		       p, info_type(p), (StgClosure *)rbh->blocking_queue));
+	debugTrace(DEBUG_gc, "scavenge: RBH %p (%s) (new blocking_queue link=%p)",
+		   p, info_type(p), (StgClosure *)rbh->blocking_queue);
 	// ToDo: use size of reverted closure here!
 	p += BLACKHOLE_sizeW(); 
 	break;
@@ -3089,10 +3089,9 @@ scavenge(step *stp)
 	// follow the link to the rest of the blocking queue 
 	(StgClosure *)bf->link = 
 	    evacuate((StgClosure *)bf->link);
-	IF_DEBUG(gc,
-		 debugBelch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
-		       bf, info_type((StgClosure *)bf), 
-		       bf->node, info_type(bf->node)));
+	debugTrace(DEBUG_gc, "scavenge: %p (%s); node is now %p; exciting, isn't it",
+		   bf, info_type((StgClosure *)bf), 
+		   bf->node, info_type(bf->node)));
 	p += sizeofW(StgBlockedFetch);
 	break;
     }
@@ -3109,9 +3108,8 @@ scavenge(step *stp)
 	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
 	(StgClosure *)fmbq->blocking_queue = 
 	    evacuate((StgClosure *)fmbq->blocking_queue);
-	IF_DEBUG(gc,
-		 debugBelch("@@ scavenge: %p (%s) exciting, isn't it",
-		       p, info_type((StgClosure *)p)));
+	debugTrace(DEBUG_gc, "scavenge: %p (%s) exciting, isn't it",
+		   p, info_type((StgClosure *)p)));
 	p += sizeofW(StgFetchMeBlockingQueue);
 	break;
     }
@@ -3464,9 +3462,8 @@ linear_scan:
 	    bh->blocking_queue = 
 		(StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
 	    failed_to_evac = rtsTrue;  // mutable anyhow.
-	    IF_DEBUG(gc,
-		     debugBelch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
-			   p, info_type(p), (StgClosure *)rbh->blocking_queue));
+	    debugTrace(DEBUG_gc, "scavenge: RBH %p (%s) (new blocking_queue link=%p)",
+		       p, info_type(p), (StgClosure *)rbh->blocking_queue));
 	    break;
 	}
 	
@@ -3479,10 +3476,9 @@ linear_scan:
 	    // follow the link to the rest of the blocking queue 
 	    (StgClosure *)bf->link = 
 		evacuate((StgClosure *)bf->link);
-	    IF_DEBUG(gc,
-		     debugBelch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
-			   bf, info_type((StgClosure *)bf), 
-			   bf->node, info_type(bf->node)));
+	    debugTrace(DEBUG_gc, "scavenge: %p (%s); node is now %p; exciting, isn't it",
+		       bf, info_type((StgClosure *)bf), 
+		       bf->node, info_type(bf->node)));
 	    break;
 	}
 
@@ -3497,9 +3493,8 @@ linear_scan:
 	    StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
 	    (StgClosure *)fmbq->blocking_queue = 
 		evacuate((StgClosure *)fmbq->blocking_queue);
-	    IF_DEBUG(gc,
-		     debugBelch("@@ scavenge: %p (%s) exciting, isn't it",
-			   p, info_type((StgClosure *)p)));
+	    debugTrace(DEBUG_gc, "scavenge: %p (%s) exciting, isn't it",
+		       p, info_type((StgClosure *)p)));
 	    break;
 	}
 #endif /* PAR */
@@ -3574,7 +3569,7 @@ linear_scan:
 
     // start a new linear scan if the mark stack overflowed at some point
     if (mark_stack_overflowed && oldgen_scan_bd == NULL) {
-	IF_DEBUG(gc, debugBelch("scavenge_mark_stack: starting linear scan"));
+	debugTrace(DEBUG_gc, "scavenge_mark_stack: starting linear scan");
 	mark_stack_overflowed = rtsFalse;
 	oldgen_scan_bd = oldest_gen->steps[0].old_blocks;
 	oldgen_scan = oldgen_scan_bd->start;
@@ -3816,9 +3811,8 @@ scavenge_one(StgPtr p)
 	(StgClosure *)rbh->blocking_queue = 
 	    evacuate((StgClosure *)rbh->blocking_queue);
 	failed_to_evac = rtsTrue;  // mutable anyhow.
-	IF_DEBUG(gc,
-		 debugBelch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
-		       p, info_type(p), (StgClosure *)rbh->blocking_queue));
+	debugTrace(DEBUG_gc, "scavenge: RBH %p (%s) (new blocking_queue link=%p)",
+		   p, info_type(p), (StgClosure *)rbh->blocking_queue));
 	// ToDo: use size of reverted closure here!
 	break;
     }
@@ -3832,10 +3826,10 @@ scavenge_one(StgPtr p)
 	// follow the link to the rest of the blocking queue 
 	(StgClosure *)bf->link = 
 	    evacuate((StgClosure *)bf->link);
-	IF_DEBUG(gc,
-		 debugBelch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
-		       bf, info_type((StgClosure *)bf), 
-		       bf->node, info_type(bf->node)));
+	debugTrace(DEBUG_gc,
+		   "scavenge: %p (%s); node is now %p; exciting, isn't it",
+		   bf, info_type((StgClosure *)bf), 
+		   bf->node, info_type(bf->node)));
 	break;
     }
 
@@ -3850,9 +3844,8 @@ scavenge_one(StgPtr p)
 	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
 	(StgClosure *)fmbq->blocking_queue = 
 	    evacuate((StgClosure *)fmbq->blocking_queue);
-	IF_DEBUG(gc,
-		 debugBelch("@@ scavenge: %p (%s) exciting, isn't it",
-		       p, info_type((StgClosure *)p)));
+	debugTrace(DEBUG_gc, "scavenge: %p (%s) exciting, isn't it",
+		   p, info_type((StgClosure *)p)));
 	break;
     }
 #endif
@@ -4180,8 +4173,6 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
   StgWord bitmap;
   nat size;
 
-  //IF_DEBUG(sanity, debugBelch("  scavenging stack between %p and %p", p, stack_end));
-
   /* 
    * Each time around this loop, we are looking at a chunk of stack
    * that starts with an activation record. 
@@ -4441,11 +4432,11 @@ gcCAFs(void)
     ASSERT(info->type == IND_STATIC);
 
     if (STATIC_LINK(info,p) == NULL) {
-      IF_DEBUG(gccafs, debugBelch("CAF gc'd at 0x%04lx", (long)p));
-      // black hole it 
-      SET_INFO(p,&stg_BLACKHOLE_info);
-      p = STATIC_LINK2(info,p);
-      *pp = p;
+	debugTrace(DEBUG_gccafs, "CAF gc'd at 0x%04lx", (long)p);
+	// black hole it 
+	SET_INFO(p,&stg_BLACKHOLE_info);
+	p = STATIC_LINK2(info,p);
+	*pp = p;
     }
     else {
       pp = &STATIC_LINK2(info,p);
@@ -4455,7 +4446,7 @@ gcCAFs(void)
 
   }
 
-  //  debugBelch("%d CAFs live", i); 
+  debugTrace(DEBUG_gccafs, "%d CAFs live", i); 
 }
 #endif
 
@@ -4650,7 +4641,9 @@ threadPaused(Capability *cap, StgTSO *tso)
 	    bh = ((StgUpdateFrame *)frame)->updatee;
 
 	    if (closure_IND(bh) || bh->header.info == &stg_BLACKHOLE_info) {
-		IF_DEBUG(squeeze, debugBelch("suspending duplicate work: %ld words of stack\n", (StgPtr)frame - tso->sp));
+		debugTrace(DEBUG_squeeze,
+			   "suspending duplicate work: %ld words of stack",
+			   (StgPtr)frame - tso->sp);
 
 		// If this closure is already an indirection, then
 		// suspend the computation up to this point:
@@ -4710,10 +4703,10 @@ threadPaused(Capability *cap, StgTSO *tso)
     }
 
 end:
-    IF_DEBUG(squeeze, 
-	     debugBelch("words_to_squeeze: %d, weight: %d, squeeze: %s\n", 
-			words_to_squeeze, weight, 
-			weight < words_to_squeeze ? "YES" : "NO"));
+    debugTrace(DEBUG_squeeze, 
+	       "words_to_squeeze: %d, weight: %d, squeeze: %s", 
+	       words_to_squeeze, weight, 
+	       weight < words_to_squeeze ? "YES" : "NO");
 
     // Should we squeeze or not?  Arbitrary heuristic: we squeeze if
     // the number of words we have to shift down is less than the
@@ -4735,7 +4728,7 @@ printMutableList(generation *gen)
     bdescr *bd;
     StgPtr p;
 
-    debugBelch("@@ Mutable list %p: ", gen->mut_list);
+    debugBelch("mutable list %p: ", gen->mut_list);
 
     for (bd = gen->mut_list; bd != NULL; bd = bd->link) {
 	for (p = bd->start; p < bd->free; p++) {

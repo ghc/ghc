@@ -27,6 +27,7 @@
 #include "Linker.h"
 #include "ThreadLabels.h"
 #include "BlockAlloc.h"
+#include "Trace.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -160,6 +161,9 @@ hs_init(int *argc, char **argv[])
 	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
 	setProgArgv(*argc,*argv);
     }
+
+    /* initTracing must be after setupRtsFlags() */
+    initTracing();
 
 #if defined(PAR)
     /* NB: this really must be done after processing the RTS flags */

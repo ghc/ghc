@@ -17,6 +17,7 @@
 #include "RtsFlags.h"
 #include "Schedule.h"
 #include "Hash.h"
+#include "Trace.h"
 
 #if HAVE_SIGNAL_H
 #include <signal.h>
@@ -69,7 +70,9 @@ initTaskManager (void)
 void
 stopTaskManager (void)
 {
-    IF_DEBUG(scheduler, sched_belch("stopping task manager, %d tasks still running", tasksRunning));
+    debugTrace(DEBUG_sched, 
+	       "stopping task manager, %d tasks still running",
+	       tasksRunning);
 }
 
 
@@ -144,7 +147,7 @@ newBoundTask (void)
 
     taskEnter(task);
 
-    IF_DEBUG(scheduler,sched_belch("new task (taskCount: %d)", taskCount););
+    debugTrace(DEBUG_sched, "new task (taskCount: %d)", taskCount);
     return task;
 }
 
@@ -168,7 +171,7 @@ boundTaskExiting (Task *task)
     task_free_list = task;
     RELEASE_LOCK(&sched_mutex);
 
-    IF_DEBUG(scheduler,sched_belch("task exiting"));
+    debugTrace(DEBUG_sched, "task exiting");
 }
 
 #ifdef THREADED_RTS
@@ -182,7 +185,7 @@ discardTask (Task *task)
 {
     ASSERT_LOCK_HELD(&sched_mutex);
     if (!task->stopped) {
-	IF_DEBUG(scheduler,sched_belch("discarding task %p", TASK_ID(task)));
+	debugTrace(DEBUG_sched, "discarding task %p", TASK_ID(task));
 	task->cap = NULL;
 	task->tso = NULL;
 	task->stopped = rtsTrue;
@@ -275,7 +278,7 @@ startWorkerTask (Capability *cap,
     barf("startTask: Can't create new task");
   }
 
-  IF_DEBUG(scheduler,sched_belch("new worker task (taskCount: %d)", taskCount););
+  debugTrace(DEBUG_sched, "new worker task (taskCount: %d)", taskCount);
 
   task->id = tid;
 

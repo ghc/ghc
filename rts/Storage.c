@@ -23,6 +23,7 @@
 #include "Schedule.h"
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
 #include "OSMem.h"
+#include "Trace.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -495,15 +496,15 @@ resizeNursery ( step *stp, nat blocks )
   if (nursery_blocks == blocks) return;
 
   if (nursery_blocks < blocks) {
-    IF_DEBUG(gc, debugBelch("Increasing size of nursery to %d blocks\n", 
-			 blocks));
+      debugTrace(DEBUG_gc, "increasing size of nursery to %d blocks", 
+		 blocks);
     stp->blocks = allocNursery(stp, stp->blocks, blocks-nursery_blocks);
   } 
   else {
     bdescr *next_bd;
     
-    IF_DEBUG(gc, debugBelch("Decreasing size of nursery to %d blocks\n", 
-			 blocks));
+    debugTrace(DEBUG_gc, "decreasing size of nursery to %d blocks", 
+	       blocks);
 
     bd = stp->blocks;
     while (nursery_blocks > blocks) {
@@ -1005,7 +1006,7 @@ void *allocateExec (nat bytes)
 	bdescr *bd;
 	lnat pagesize = getPageSize();
 	bd = allocGroup(stg_max(1, pagesize / BLOCK_SIZE));
-	IF_DEBUG(gc, debugBelch("allocate exec block %p\n", bd->start));
+	debugTrace(DEBUG_gc, "allocate exec block %p", bd->start);
 	bd->gen_no = 0;
 	bd->flags = BF_EXEC;
 	bd->link = exec_block;
@@ -1046,7 +1047,7 @@ void freeExec (void *addr)
     // Free the block if it is empty, but not if it is the block at
     // the head of the queue.
     if (bd->gen_no == 0 && bd != exec_block) {
-	IF_DEBUG(gc, debugBelch("free exec block %p\n", bd->start));
+	debugTrace(DEBUG_gc, "free exec block %p", bd->start);
 	if (bd->u.back) {
 	    bd->u.back->link = bd->link;
 	} else {

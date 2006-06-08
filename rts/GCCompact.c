@@ -17,6 +17,7 @@
 #include "GCCompact.h"
 #include "Schedule.h"
 #include "Apply.h"
+#include "Trace.h"
 
 // Turn off inlining when debugging - it obfuscates things
 #ifdef DEBUG
@@ -931,12 +932,14 @@ compact( void (*get_roots)(evac_fn) )
 	for (s = 0; s < generations[g].n_steps; s++) {
 	    if (g==0 && s ==0) continue;
 	    stp = &generations[g].steps[s];
-	    IF_DEBUG(gc, debugBelch("update_fwd:  %d.%d\n", stp->gen->no, stp->no););
+	    debugTrace(DEBUG_gc, "update_fwd:  %d.%d", 
+		       stp->gen->no, stp->no);
 
 	    update_fwd(stp->blocks);
 	    update_fwd_large(stp->scavenged_large_objects);
 	    if (g == RtsFlags.GcFlags.generations-1 && stp->old_blocks != NULL) {
-		IF_DEBUG(gc, debugBelch("update_fwd:  %d.%d (compact)\n", stp->gen->no, stp->no););
+		debugTrace(DEBUG_gc, "update_fwd:  %d.%d (compact)",
+			   stp->gen->no, stp->no);
 		update_fwd_compact(stp->old_blocks);
 	    }
 	}
@@ -946,9 +949,10 @@ compact( void (*get_roots)(evac_fn) )
     stp = &oldest_gen->steps[0];
     if (stp->old_blocks != NULL) {
 	blocks = update_bkwd_compact(stp);
-	IF_DEBUG(gc, debugBelch("update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)\n", 
-			     stp->gen->no, stp->no,
-			     stp->n_old_blocks, blocks););
+	debugTrace(DEBUG_gc, 
+		   "update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)",
+		   stp->gen->no, stp->no,
+		   stp->n_old_blocks, blocks);
 	stp->n_old_blocks = blocks;
     }
 }

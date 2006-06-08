@@ -21,6 +21,7 @@
 # include "GranSimRts.h"
 # endif
 #include "Sparks.h"
+#include "Trace.h"
 
 #if defined(THREADED_RTS) || defined(PARALLEL_HASKELL)
 
@@ -149,19 +150,18 @@ markSparkQueue (evac_fn evac)
 	PAR_TICKY_MARK_SPARK_QUEUE_END(n);
 	
 #if defined(PARALLEL_HASKELL)
-	IF_DEBUG(scheduler,
-		 debugBelch("markSparkQueue: marked %d sparks and pruned %d sparks on [%x]",
-			    n, pruned_sparks, mytid));
+	debugTrace(DEBUG_sched, 
+		   "marked %d sparks and pruned %d sparks on [%x]",
+		   n, pruned_sparks, mytid);
 #else
-	IF_DEBUG(scheduler,
-	       debugBelch("markSparkQueue: marked %d sparks and pruned %d sparks\n",
-			  n, pruned_sparks));
+	debugTrace(DEBUG_sched, 
+		   "marked %d sparks and pruned %d sparks",
+		   n, pruned_sparks);
 #endif
 	
-	IF_DEBUG(scheduler,
-		 debugBelch("markSparkQueue:   new spark queue len=%d; (hd=%p; tl=%p)\n",
-			    sparkPoolSize(pool), pool->hd, pool->tl));
-	
+	debugTrace(DEBUG_sched,
+		   "new spark queue len=%d; (hd=%p; tl=%p)\n",
+		   sparkPoolSize(pool), pool->hd, pool->tl);
     }
 }
 
@@ -825,8 +825,9 @@ markSparkQueue(void)
       // ToDo?: statistics gathering here (also for GUM!)
       sp->node = (StgClosure *)MarkRoot(sp->node);
     }
+
   IF_DEBUG(gc,
-	   debugBelch("@@ markSparkQueue: spark statistics at start of GC:");
+	   debugBelch("markSparkQueue: spark statistics at start of GC:");
 	   print_sparkq_stats());
 }
 

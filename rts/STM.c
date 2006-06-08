@@ -90,6 +90,7 @@
 #include "SMP.h"
 #include "STM.h"
 #include "Storage.h"
+#include "Trace.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -113,16 +114,7 @@
 // If SHAKE is defined then validation will sometime spuriously fail.  They helps test
 // unusualy code paths if genuine contention is rare
 
-#if defined(DEBUG)
-#define SHAKE
-#if defined(THREADED_RTS)
-#define TRACE(_x...) IF_DEBUG(stm, debugBelch("STM  (task %p): ", (void *)(unsigned long)(unsigned int)osThreadId()); debugBelch ( _x ))
-#else
-#define TRACE(_x...) IF_DEBUG(stm, debugBelch ( _x ))
-#endif
-#else
-#define TRACE(_x...) /*Nothing*/
-#endif
+#define TRACE(_x...) debugTrace(DEBUG_stm, "STM: " _x)
 
 #ifdef SHAKE
 static const int do_shake = TRUE;

@@ -17,6 +17,7 @@
 #include "Schedule.h"
 #include "Prelude.h"
 #include "RtsAPI.h"
+#include "Trace.h"
 
 StgWeak *weak_ptr_list;
 
@@ -70,7 +71,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     // No finalizers to run?
     if (n == 0) return;
 
-    IF_DEBUG(weak,debugBelch("weak: batching %d finalizers\n", n));
+    debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
 
     arr = (StgMutArrPtrs *)allocateLocal(cap, sizeofW(StgMutArrPtrs) + n);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);

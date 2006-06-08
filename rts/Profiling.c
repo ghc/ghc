@@ -353,11 +353,12 @@ CostCentreStack *
 PushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
 #define PushCostCentre _PushCostCentre
 {
-  IF_DEBUG(prof, 
-	   debugBelch("Pushing %s on ", cc->label);
-	   debugCCS(ccs);
-	   debugBelch("\n"));
-  return PushCostCentre(ccs,cc);
+    IF_DEBUG(prof,
+	     traceBegin("pushing %s on ", cc->label);
+	     debugCCS(ccs);
+	     traceEnd(););
+	     
+    return PushCostCentre(ccs,cc);
 }
 #endif
 
