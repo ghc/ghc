@@ -289,6 +289,10 @@ struct TICKY_FLAGS {
     FILE   *tickyFile;
 };
 
+struct TRACE_FLAGS {
+    rtsBool sched;		/* trace scheduler events for profiling */
+    rtsBool timestamp;          /* add timestamps to traces */
+};
 
 /* Put them together: */
 
@@ -300,6 +304,7 @@ typedef struct _RTS_FLAGS {
     struct COST_CENTRE_FLAGS CcFlags;
     struct PROFILING_FLAGS   ProfFlags;
     struct TICKY_FLAGS	     TickyFlags;
+    struct TRACE_FLAGS       TraceFlags;
 
 #if defined(THREADED_RTS) || defined(PAR)
     struct PAR_FLAGS	ParFlags;

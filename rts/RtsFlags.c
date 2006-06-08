@@ -1,8 +1,7 @@
-
 /* -----------------------------------------------------------------------------
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2006
  *
  * Functions for parsing the argument list.
  *
@@ -299,6 +298,9 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TickyFlags.showTickyStats	 = rtsFalse;
     RtsFlags.TickyFlags.tickyFile	 = NULL;
 #endif
+
+    RtsFlags.TraceFlags.timestamp	= rtsFalse;
+    RtsFlags.TraceFlags.sched 		= rtsFalse;
 }
 
 static const char *
@@ -395,6 +397,9 @@ usage_text[] = {
 "  -C<secs>  Context-switch interval in seconds",
 "                (0 or no argument means switch as often as possible)",
 "                the default is .02 sec; resolution is .02 sec",
+"",
+"  -vs       Trace scheduler events (see also -Ds with -debug)",
+"  -vt       Time-stamp trace messages",
 "",
 #if defined(DEBUG)
 "  -Ds  DEBUG: scheduler",
@@ -1027,7 +1032,7 @@ error = rtsTrue;
 		}
 		) break;
 
-	    case 'q':
+	      case 'q':
 		    switch (rts_argv[arg][2]) {
 		    case '\0':
 			errorBelch("incomplete RTS option: %s",rts_argv[arg]);
@@ -1088,6 +1093,27 @@ error = rtsTrue;
 		    if (r == -1) { error = rtsTrue; }
 		}
 	        ) break;
+
+	      /* =========== TRACING ---------=================== */
+
+	      case 'v':
+                switch(rts_argv[arg][2]) {
+		case '\0':
+		    errorBelch("incomplete RTS option: %s",rts_argv[arg]);
+		    error = rtsTrue;
+		    break;
+		case 't':
+		    RtsFlags.TraceFlags.timestamp = rtsTrue;
+		    break;
+		case 's':
+		    RtsFlags.TraceFlags.sched = rtsTrue;
+		    break;
+		default:
+		    errorBelch("unknown RTS option: %s",rts_argv[arg]);
+		    error = rtsTrue;
+		    break;
+		}
+                break;
 
 	      /* =========== EXTENDED OPTIONS =================== */
 
