@@ -20,7 +20,9 @@ module GHC.ForeignPtr
 	FinalizerPtr,
 	newForeignPtr_,
 	mallocForeignPtr,
+	mallocPlainForeignPtr,
 	mallocForeignPtrBytes,
+	mallocPlainForeignPtrBytes,
 	addForeignPtrFinalizer,	
 	touchForeignPtr,
 	unsafeForeignPtrToPtr,
@@ -70,9 +72,10 @@ data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
 	-- object, because that ensures that whatever the finalizer is
 	-- attached to is kept alive.
 
-data ForeignPtrContents 
+data ForeignPtrContents
   = PlainForeignPtr !(IORef [IO ()])
-  | MallocPtr (MutableByteArray# RealWorld) !(IORef [IO ()])
+  | MallocPtr      (MutableByteArray# RealWorld) !(IORef [IO ()])
+  | PlainPtr       (MutableByteArray# RealWorld)
 
 instance Eq (ForeignPtr a) where
     p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
@@ -169,6 +172,39 @@ mallocForeignPtrBytes (I# size) = do
 		        (MallocPtr mbarr# r) #)
      }
 
+-- | Allocate some memory and return a 'ForeignPtr' to it.  The memory
+-- will be released automatically when the 'ForeignPtr' is discarded.
+--
+-- GHC notes: 'mallocPlainForeignPtr' has a heavily optimised
+-- implementation in GHC.  It uses pinned memory in the garbage
+-- collected heap, as for mallocForeignPtr. Unlike mallocForeignPtr, a
+-- ForeignPtr created with mallocPlainForeignPtr carries no finalizers.
+-- It is not possible to add a finalizer to a ForeignPtr created with
+-- mallocPlainForeignPtr. This is useful for ForeignPtrs that will live
+-- only inside Haskell (such as those created for packed strings).
+-- Attempts to add a finalizer to a ForeignPtr created this way, or to
+-- finalize such a pointer, will have no effect.
+-- 
+mallocPlainForeignPtr :: Storable a => IO (ForeignPtr a)
+mallocPlainForeignPtr = doMalloc undefined
+  where doMalloc :: Storable b => b -> IO (ForeignPtr b)
+        doMalloc a = IO $ \s ->
+            case newPinnedByteArray# size s of { (# s, mbarr# #) ->
+             (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                              (PlainPtr mbarr#) #)
+            }
+            where (I# size) = sizeOf a
+
+-- | This function is similar to 'mallocForeignPtrBytes', except that
+-- the internally an optimised ForeignPtr representation with no
+-- finalizer is used.
+mallocPlainForeignPtrBytes :: Int -> IO (ForeignPtr a)
+mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
+    case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
+       (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                        (PlainPtr mbarr#) #)
+     }
+
 addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 -- ^This function adds a finalizer to the given foreign object.  The
 -- finalizer will run /before/ all other finalizers for the same
@@ -212,6 +248,9 @@ addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
 	       case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
 		  (# s1, w #) -> (# s1, () #)
      else return ()
+
+addForeignPtrConcFinalizer_ _ _ =
+  error "GHC.ForeignPtr: attempt to add a finalizer to plain pointer"
 
 foreign import ccall "dynamic" 
   mkFinalizer :: FinalizerPtr a -> Ptr a -> IO ()
@@ -280,6 +319,7 @@ castForeignPtr f = unsafeCoerce# f
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
+finalizeForeignPtr (ForeignPtr _ (PlainPtr _)) = return () -- no effect
 finalizeForeignPtr (ForeignPtr _ foreignPtr) = do
 	finalizers <- readIORef refFinalizers
 	sequence_ finalizers
@@ -287,4 +327,5 @@ finalizeForeignPtr (ForeignPtr _ foreignPtr) = do
 	where
 		refFinalizers = case foreignPtr of
 			(PlainForeignPtr ref) -> ref
-			(MallocPtr  _ ref) -> ref
+			(MallocPtr     _ ref) -> ref
+
