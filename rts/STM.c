@@ -297,7 +297,8 @@ static StgClosure *lock_tvar(StgTRecHeader *trec,
     do {
       result = s -> current_value;
     } while (GET_INFO(result) == &stg_TREC_HEADER_info);
-  } while (cas(&(s -> current_value), result, trec) != result);
+  } while (cas((void *)&(s -> current_value),
+	       (StgWord)result, (StgWord)trec) != (StgWord)result);
   return result;
 }
 
@@ -314,8 +315,10 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec,
                               StgTVar *s,
                               StgClosure *expected) {
   StgClosure *result;
+  StgWord w;
   TRACE("%p : cond_lock_tvar(%p, %p)\n", trec, s, expected);
-  result = cas(&(s -> current_value), expected, trec);
+  w = cas((void *)&(s -> current_value), (StgWord)expected, (StgWord)trec);
+  result = (StgClosure *)w;
   TRACE("%p : %s\n", trec, result ? "success" : "failure");
   return (result == expected);
 }
@@ -796,7 +799,7 @@ static volatile StgBool token_locked = FALSE;
 
 #if defined(THREADED_RTS)
 static void getTokenBatch(Capability *cap) {
-  while (cas(&token_locked, FALSE, TRUE) == TRUE) { /* nothing */ }
+  while (cas((void *)&token_locked, FALSE, TRUE) == TRUE) { /* nothing */ }
   max_commits += TOKEN_BATCH_SIZE;
   cap -> transaction_tokens = TOKEN_BATCH_SIZE;
   token_locked = FALSE;
