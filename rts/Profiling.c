@@ -283,7 +283,7 @@ initProfilingLogFile(void)
 	{
 	    CostCentre *cc;
 	    for (cc = CC_LIST; cc != NULL; cc = cc->link) {
-		fprintf(prof_file, "%d %d \"%s\" \"%s\"\n",
+		fprintf(prof_file, "%d %ld \"%s\" \"%s\"\n",
 			CC_UQ, cc->ccID, cc->label, cc->module);
 	    }
 	}
@@ -533,10 +533,10 @@ DecCCS(CostCentreStack *ccs)
 {
   if (prof_file && RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
     if (ccs->prevStack == EMPTY_STACK)
-      fprintf(prof_file, "%d %d 1 %d\n", CCS_UQ, 
+      fprintf(prof_file, "%d %ld 1 %ld\n", CCS_UQ, 
 	      ccs->ccsID, ccs->cc->ccID);
     else
-      fprintf(prof_file, "%d %d 2 %d %d\n", CCS_UQ, 
+      fprintf(prof_file, "%d %ld 2 %ld %ld\n", CCS_UQ, 
 	      ccs->ccsID, ccs->cc->ccID, ccs->prevStack->ccsID);
   }
 }
@@ -546,10 +546,10 @@ DecBackEdge( CostCentreStack *ccs, CostCentreStack *oldccs )
 {
   if (prof_file && RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
     if (ccs->prevStack == EMPTY_STACK)
-      fprintf(prof_file, "%d %d 1 %d\n", CCS_UQ, 
+      fprintf(prof_file, "%d %ld 1 %ld\n", CCS_UQ, 
 	      ccs->ccsID, ccs->cc->ccID);
     else
-      fprintf(prof_file, "%d %d 2 %d %d\n", CCS_UQ, 
+      fprintf(prof_file, "%d %ld 2 %ld %ld\n", CCS_UQ, 
 	      ccs->ccsID, ccs->cc->ccID, oldccs->ccsID);
   }
 }
@@ -663,7 +663,8 @@ report_per_cc_costs( void )
 	  );
       
       if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-	fprintf(prof_file, "  %5llu %9llu", (StgWord64)(cc->time_ticks), cc->mem_alloc);
+	fprintf(prof_file, "  %5" FMT_Word64 " %9" FMT_Word64,
+		(StgWord64)(cc->time_ticks), cc->mem_alloc);
       }
       fprintf(prof_file, "\n");
   }
@@ -768,7 +769,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
     fprintf(prof_file, "%-*s%-*s %-50s", 
 	    indent, "", 24-indent, cc->label, cc->module);
 
-    fprintf(prof_file, "%6d %11.0f %5.1f  %5.1f   %5.1f  %5.1f",
+    fprintf(prof_file, "%6ld %11.0f %5.1f  %5.1f   %5.1f  %5.1f",
 	    ccs->ccsID, (double) ccs->scc_count, 
 	    total_prof_ticks == 0 ? 0.0 : ((double)ccs->time_ticks / (double)total_prof_ticks * 100.0),
 	    total_alloc == 0 ? 0.0 : ((double)ccs->mem_alloc / (double)total_alloc * 100.0),
@@ -777,7 +778,8 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	    );
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-      fprintf(prof_file, "  %5llu %9llu", (StgWord64)(ccs->time_ticks), ccs->mem_alloc*sizeof(W_));
+      fprintf(prof_file, "  %5" FMT_Word64 " %9" FMT_Word64, 
+	      (StgWord64)(ccs->time_ticks), ccs->mem_alloc*sizeof(W_));
 #if defined(PROFILING_DETAIL_COUNTS)
       fprintf(prof_file, "  %8ld %8ld %8ld %8ld %8ld %8ld %8ld",
 	      ccs->mem_allocs, ccs->thunk_count,
@@ -893,7 +895,7 @@ reportCCS_XML(CostCentreStack *ccs)
 
   cc = ccs->cc;
   
-  fprintf(prof_file, " 1 %d %llu %llu %llu", 
+  fprintf(prof_file, " 1 %ld %" FMT_Word64 " %" FMT_Word64 " %" FMT_Word64, 
 	  ccs->ccsID, ccs->scc_count, (StgWord64)(ccs->time_ticks), ccs->mem_alloc);
 
   for (i = ccs->indexTable; i != 0; i = i->next) {

@@ -90,6 +90,17 @@ extern void _assertFail (const char *, unsigned int);
 #define USED_IF_NOT_THREADS
 #endif
 
+/*
+ * Getting printf formats right for platform-dependent typedefs
+ */
+#if SIZEOF_LONG == 8
+#define FMT_Word64 "lu"
+#define FMT_Int64  "ld"
+#else
+#define FMT_Word64 "llu"
+#define FMT_Int64  "lld"
+#endif
+
 /* -----------------------------------------------------------------------------
    Include everything STG-ish
    -------------------------------------------------------------------------- */
