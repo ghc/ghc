@@ -49,7 +49,7 @@ disInstr ( StgBCO *bco, int pc )
                          instrs[pc], (signed int)instrs[pc+1]);
          pc += 2; break;
       case bci_CCALL:
-         debugBelch("CCALL    marshaller at 0x%x\n", 
+         debugBelch("CCALL    marshaller at 0x%lx\n", 
                          literals[instrs[pc]] );
          pc += 1; break;
       case bci_STKCHECK: 
@@ -102,7 +102,7 @@ disInstr ( StgBCO *bco, int pc )
       case bci_PUSH_UBX:
          debugBelch("PUSH_UBX ");
          for (i = 0; i < instrs[pc+1]; i++) 
-            debugBelch("0x%x ", literals[i + instrs[pc]] );
+            debugBelch("0x%lx ", literals[i + instrs[pc]] );
          debugBelch("\n");
          pc += 2; break;
       case bci_PUSH_APPLY_N:
@@ -162,29 +162,29 @@ disInstr ( StgBCO *bco, int pc )
          pc += 2; break;
 
       case bci_TESTLT_I:
-         debugBelch("TESTLT_I  %d, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTLT_I  %ld, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_I:
-         debugBelch("TESTEQ_I  %d, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTEQ_I  %ld, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
       case bci_TESTLT_F:
-         debugBelch("TESTLT_F  %d, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTLT_F  %ld, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_F:
-         debugBelch("TESTEQ_F  %d, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTEQ_F  %ld, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
       case bci_TESTLT_D:
-         debugBelch("TESTLT_D  %d, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTLT_D  %ld, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_D:
-         debugBelch("TESTEQ_D  %d, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTEQ_D  %ld, fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
