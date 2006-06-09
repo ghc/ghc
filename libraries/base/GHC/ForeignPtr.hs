@@ -183,7 +183,7 @@ mallocForeignPtrBytes (I# size) = do
 -- mallocPlainForeignPtr. This is useful for ForeignPtrs that will live
 -- only inside Haskell (such as those created for packed strings).
 -- Attempts to add a finalizer to a ForeignPtr created this way, or to
--- finalize such a pointer, will have no effect.
+-- finalize such a pointer, will throw an exception.
 -- 
 mallocPlainForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocPlainForeignPtr = doMalloc undefined
@@ -197,7 +197,8 @@ mallocPlainForeignPtr = doMalloc undefined
 
 -- | This function is similar to 'mallocForeignPtrBytes', except that
 -- the internally an optimised ForeignPtr representation with no
--- finalizer is used.
+-- finalizer is used. Attempts to add a finalizer will cause an
+-- exception to be thrown.
 mallocPlainForeignPtrBytes :: Int -> IO (ForeignPtr a)
 mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
     case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
