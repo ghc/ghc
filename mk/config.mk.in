@@ -377,18 +377,6 @@ ifeq "$(TargetArch_CPP)" "ia64"
 SplitObjs=NO
 endif
 
-# Build the Haskell Readline bindings?
-#
-GhcLibsWithReadline=@GhcLibsWithReadline@
-
-# Libraries needed for linking with readline
-LibsReadline=@LibsReadline@
-
-# Include path to readline.h
-# (no path == in standard include path)
-#
-ReadlineIncludePath=
-
 # Math library
 LIBM=@LIBM@
 

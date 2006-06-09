@@ -9,7 +9,7 @@ include $(TOP)/mk/boilerplate.mk
 # want the Makefile.
 MFLAGS += -f Makefile
 
-SUBDIRS = base haskell98 template-haskell
+SUBDIRS = base haskell98 template-haskell readline
 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -41,10 +41,6 @@ SUBDIRS += $(wildcard stm)
 ifeq "$(GhcLibsWithObjectIO)" "YES"
 SUBDIRS += $(wildcard ObjectIO)
 endif
-endif
-
-ifeq "$(GhcLibsWithReadline)" "YES"
-SUBDIRS += $(wildcard readline)
 endif
 
 # -----------------------------------------------------------------------------

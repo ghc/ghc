@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.5], [glasgow-haskell-bugs@haskell.org], [ghc])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.5.20060608], [glasgow-haskell-bugs@haskell.org], [ghc])
 
 FP_SETUP_PROJECT_VERSION
 
@@ -1118,40 +1118,6 @@ dnl ** check whether this machine has BFD and liberty installed (used for debugg
 dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
-
-dnl ** check for readline, for Hugs and hslibs' Readline
-dnl ncurses supersedes termcap and curses, but for compatibility,
-dnl we have to check for all...
-AC_CHECK_LIB(ncurses, tputs, HaveLibTermcap=YES; LibTermcap=ncurses,
-  AC_CHECK_LIB(termcap, tputs, HaveLibTermcap=YES; LibTermcap=termcap,
-    AC_CHECK_LIB(curses, tputs, HaveLibTermcap=YES; LibTermcap=curses,
-      HaveLibTermcap=NO; LibTermcap=not-installed)))
-
-if test $HaveLibTermcap = YES ; then
-  LIBS="-l$LibTermcap $LIBS"
-  AC_CHECK_LIB(readline, readline, HaveLibReadline=YES, HaveLibReadline=NO)
-fi
-
-if test $HaveLibTermcap = YES && test x"$HaveLibReadline" = xYES ; then
-  AC_DEFINE([HAVE_READLINE_LIBS], [1], [Define to 1 if readline plus any additional libs needed for it exist.])
-  LibsReadline="readline $LibTermcap"
-else
-  AC_DEFINE([HAVE_READLINE_LIBS], [0], [Define to 1 if readline plus any additional libs needed for it exist.])
-  LibsReadline=
-fi
-AC_SUBST(LibsReadline)
-
-if test "$HaveLibReadline"; then
-  AC_CHECK_LIB(readline, rl_erase_empty_line,
-    [AC_DEFINE([HAVE_READLINE_4], [1], [Define to 1 if readline has version >= 4.0.])],
-    [AC_DEFINE([HAVE_READLINE_4], [0], [Define to 1 if readline has version >= 4.0.])])
-  AC_CHECK_LIB(readline, rl_free_undo_list,
-    [AC_DEFINE([HAVE_READLINE_4_2], [1], [Define to 1 if readline has version >= 4.2.])],
-    [AC_DEFINE([HAVE_READLINE_4_2], [0], [Define to 1 if readline has version >= 4.2.])])
-else
-  AC_DEFINE([HAVE_READLINE_4], [0], [Define to 1 if readline has version >= 4.0.])
-  AC_DEFINE([HAVE_READLINE_4_2], [0], [Define to 1 if readline has version >= 4.2.])
-fi
 
 dnl ** check for math library
 AC_CHECK_FUNC(atan,[fp_libm_not_needed=yes;LIBM=],[fp_libm_not_needed=dunno])

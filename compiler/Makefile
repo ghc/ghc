@@ -438,7 +438,8 @@ SRC_HC_OPTS += -package readline -DUSE_READLINE
 PKG_DEPENDS += readline
 endif
 else
-ifeq "$(GhcLibsWithReadline)" "YES"
+-include $(FPTOOLS_TOP)/libraries/readline/config.mk
+ifeq "$(READLINE_BUILD_PACKAGE)" "yes"
 SRC_HC_OPTS += -package readline -DUSE_READLINE
 PKG_DEPENDS += readline
 endif
