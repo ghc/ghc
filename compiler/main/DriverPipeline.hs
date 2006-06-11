@@ -302,7 +302,7 @@ link BatchCompile dflags batch_attempt_linking hpt
 			any (t <) (map linkableTime linkables)
 
 	if dopt Opt_RecompChecking dflags && not linking_needed
-	   then do debugTraceMsg dflags 1 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
+	   then do debugTraceMsg dflags 2 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
 		   return Succeeded
 	   else do
 
