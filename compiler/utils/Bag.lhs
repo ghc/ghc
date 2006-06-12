@@ -170,8 +170,5 @@ bagToList b = foldrBag (:) [] b
 
 \begin{code}
 instance (Outputable a) => Outputable (Bag a) where
-    ppr EmptyBag	= ptext SLIT("emptyBag")
-    ppr (UnitBag a)     = ppr a
-    ppr (TwoBags b1 b2) = hsep [ppr b1 <> comma, ppr b2]
-    ppr (ListBag as)    = interpp'SP as
+    ppr bag = char '<' <> pprWithCommas ppr (bagToList bag) <> char '>'
 \end{code}
