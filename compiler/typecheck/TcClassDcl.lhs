@@ -24,7 +24,8 @@ import TcEnv		( tcLookupLocatedClass,
 			  simpleInstInfoTyCon, simpleInstInfoTy,
 			  InstBindings(..), newDFunName
 			)
-import TcBinds		( TcPragFun, tcMonoBinds, tcPrags, mkPragFun, TcSigInfo(..) )
+import TcBinds		( TcPragFun, tcMonoBinds, tcPrags, mkPragFun, TcSigInfo(..), 
+			  TcSigFun, mkTcSigFun )
 import TcHsType		( tcHsKindedType, tcHsSigType )
 import TcSimplify	( tcSimplifyCheck )
 import TcUnify		( checkSigTyVars, sigCtxt )
@@ -246,7 +247,8 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
     let
 	(tyvars, _, _, op_items) = classBigSig clas
 	prag_fn			 = mkPragFun sigs
-	tc_dm			 = tcDefMeth clas tyvars default_binds prag_fn
+	sig_fn			 = mkTcSigFun sigs
+	tc_dm			 = tcDefMeth clas tyvars default_binds sig_fn prag_fn
 
 	dm_sel_ids		 = [sel_id | (sel_id, DefMeth) <- op_items]
 	-- Generate code for polymorphic default methods only
@@ -259,7 +261,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
     mapAndUnzipM tc_dm dm_sel_ids	`thenM` \ (defm_binds, dm_ids_s) ->
     returnM (listToBag defm_binds, concat dm_ids_s)
     
-tcDefMeth clas tyvars binds_in prag_fn sel_id
+tcDefMeth clas tyvars binds_in sig_fn prag_fn sel_id
   = do	{ dm_name <- lookupTopBndrRn (mkDefMethRdrName sel_id)
 	; let	rigid_info  = ClsSkol clas
 		clas_tyvars = tcSkolSigTyVars rigid_info tyvars
@@ -271,8 +273,8 @@ tcDefMeth clas tyvars binds_in prag_fn sel_id
 
 	; (_, meth_info) <- mkMethodBind origin clas inst_tys binds_in (sel_id, DefMeth)
 	; [this_dict] <- newDicts origin theta
-	; (defm_bind, insts_needed) <- getLIE (tcMethodBind clas_tyvars theta 
-							    [this_dict] prag_fn meth_info)
+	; (defm_bind, insts_needed) <- getLIE (tcMethodBind clas_tyvars theta [this_dict]
+							    sig_fn prag_fn meth_info)
     
 	; addErrCtxt (defltMethCtxt clas) $ do
     
@@ -332,11 +334,12 @@ tcMethodBind
 	-> TcThetaType		-- Available theta; it's just used for the error message
 	-> [Inst]		-- Available from context, used to simplify constraints 
 				-- 	from the method body
-	-> TcPragFun		-- Pragmas (e.g. inline pragmas)
+	-> TcSigFun		-- For scoped tyvars, indexed by sel_name
+	-> TcPragFun		-- Pragmas (e.g. inline pragmas), indexed by sel_name
 	-> MethodSpec		-- Details of this method
 	-> TcM (LHsBinds Id)
 
-tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
+tcMethodBind inst_tyvars inst_theta avail_insts sig_fn prag_fn
 	     (sel_id, meth_id, meth_bind)
   = recoverM (returnM emptyLHsBinds) $
 	-- If anything fails, recover returning no bindings.
@@ -346,19 +349,16 @@ tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
 
     	-- Check the bindings; first adding inst_tyvars to the envt
 	-- so that we don't quantify over them in nested places
-
 	
-    let meth_sig = noLoc (TypeSig (noLoc (idName meth_id)) (noLoc bogus_ty))
-	bogus_ty = HsTupleTy Boxed []	-- *Only* used to extract scoped type
-					-- variables... and there aren't any
-        lookup_sig name = ASSERT( name == idName meth_id ) 
-			  Just meth_sig
+    let sel_name = idName sel_id
+	meth_sig_fn meth_name = ASSERT( meth_name == idName meth_id ) sig_fn sel_name
+	-- The meth_bind metions the meth_name, but sig_fn is indexed by sel_name
     in
     tcExtendTyVarEnv inst_tyvars (
 	tcExtendIdEnv [meth_id] 	$	-- In scope for tcInstSig
 	addErrCtxt (methodCtxt sel_id)	$
 	getLIE 				$
-	tcMonoBinds [meth_bind] lookup_sig Recursive
+	tcMonoBinds [meth_bind] meth_sig_fn Recursive
     )					`thenM` \ ((meth_bind, mono_bind_infos), meth_lie) ->
 
 	-- Now do context reduction.   We simplify wrt both the local tyvars
@@ -379,7 +379,6 @@ tcMethodBind inst_tyvars inst_theta avail_insts prag_fn
 	meth_tvs   = sig_tvs sig
 	all_tyvars = meth_tvs ++ inst_tyvars
 	all_insts  = avail_insts ++ meth_dicts
-	sel_name   = idName sel_id
     in
     tcSimplifyCheck
 	 (ptext SLIT("class or instance method") <+> quotes (ppr sel_id))

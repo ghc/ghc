@@ -12,7 +12,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 module RnBinds (
 	rnTopBinds, 
 	rnLocalBindsAndThen, rnValBindsAndThen, rnValBinds, trimWith,
-	rnMethodBinds, renameSigs, 
+	rnMethodBinds, renameSigs, mkSigTvFn,
 	rnMatchGroup, rnGRHSs
    ) where
 
@@ -420,23 +420,25 @@ a binder.
 
 \begin{code}
 rnMethodBinds :: Name			-- Class name
+	      -> (Name -> [Name])	-- Signature tyvar function
 	      -> [Name]			-- Names for generic type variables
 	      -> LHsBinds RdrName
 	      -> RnM (LHsBinds Name, FreeVars)
 
-rnMethodBinds cls gen_tyvars binds
+rnMethodBinds cls sig_fn gen_tyvars binds
   = foldM do_one (emptyBag,emptyFVs) (bagToList binds)
   where do_one (binds,fvs) bind = do
-	   (bind', fvs_bind) <- rnMethodBind cls gen_tyvars bind
+	   (bind', fvs_bind) <- rnMethodBind cls sig_fn gen_tyvars bind
 	   return (bind' `unionBags` binds, fvs_bind `plusFV` fvs)
 
-rnMethodBind cls gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf, 
-					      fun_matches = MatchGroup matches _ }))
-  =  setSrcSpan loc $ 
-     lookupLocatedInstDeclBndr cls name			`thenM` \ sel_name -> 
-     let plain_name = unLoc sel_name in
+rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf, 
+					             fun_matches = MatchGroup matches _ }))
+  = setSrcSpan loc $ 
+    lookupLocatedInstDeclBndr cls name			`thenM` \ sel_name -> 
+    let plain_name = unLoc sel_name in
 	-- We use the selector name as the binder
 
+    bindSigTyVarsFV (sig_fn plain_name)			$
     mapFvRn (rn_match plain_name) matches		`thenM` \ (new_matches, fvs) ->
     let 
 	new_group = MatchGroup new_matches placeHolderType
@@ -460,7 +462,7 @@ rnMethodBind cls gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf,
 
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind cls gen_tyvars mbind@(L loc (PatBind other_pat _ _ _))
+rnMethodBind cls sig_fn gen_tyvars mbind@(L loc (PatBind other_pat _ _ _))
   = addLocErr mbind methodBindErr	`thenM_`
     returnM (emptyBag, emptyFVs) 
 \end{code}

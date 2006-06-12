@@ -20,7 +20,7 @@ import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, globalRdrEnvElts,
 import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
-import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
+import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, mkSigTvFn )
 import RnEnv		( lookupLocalDataTcNames,
 			  lookupLocatedTopBndrRn, lookupLocatedOccRn,
 			  lookupOccRn, newLocalsRn, 
@@ -38,7 +38,7 @@ import NameSet
 import NameEnv
 import OccName		( occEnvElts )
 import Outputable
-import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
+import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
 import Maybe            ( isNothing )
@@ -286,7 +286,8 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags)
     extendTyVarEnvForMethodBinds inst_tyvars (		
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too
-	rnMethodBinds cls [] mbinds
+	rnMethodBinds cls (\n->[]) 	-- No scoped tyvars
+		      [] mbinds
     )						`thenM` \ (mbinds', meth_fvs) ->
 	-- Rename the prags and signatures.
 	-- Note that the type variables are not in scope here,
@@ -538,7 +539,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
    	 in
    	 checkDupNames meth_doc meth_rdr_names_w_locs	`thenM_`
    	 newLocalsRn gen_rdr_tyvars_w_locs	`thenM` \ gen_tyvars ->
-   	 rnMethodBinds (unLoc cname') gen_tyvars mbinds
+   	 rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds
     ) `thenM` \ (mbinds', meth_fvs) ->
 
     returnM (ClassDecl { tcdCtxt = context', tcdLName = cname', tcdTyVars = tyvars',

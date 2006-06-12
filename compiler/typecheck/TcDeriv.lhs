@@ -828,7 +828,7 @@ genInst spec
 	-- *non-renamed* auxiliary bindings
 	; (rn_meth_binds, _fvs) <- discardWarnings $ 
 				   bindLocalNames (map varName tyvars)	$
-			 	   rnMethodBinds clas_nm [] meth_binds
+			 	   rnMethodBinds clas_nm (\n -> []) [] meth_binds
 
 	-- Build the InstInfo
 	; return (InstInfo { iSpec = spec, 

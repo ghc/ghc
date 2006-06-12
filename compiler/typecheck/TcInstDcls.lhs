@@ -451,7 +451,10 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
     let
 	prag_fn	       = mkPragFun uprags
 	all_insts      = avail_insts ++ catMaybes meth_insts
-	tc_method_bind = tcMethodBind inst_tyvars' dfun_theta' all_insts prag_fn
+	sig_fn n       = Just []	-- No scoped type variables, but every method has
+					-- a type signature, in effect, so that we check
+					-- the method has the right type
+	tc_method_bind = tcMethodBind inst_tyvars' dfun_theta' all_insts sig_fn prag_fn
 	meth_ids       = [meth_id | (_,meth_id,_) <- meth_infos]
     in
 
