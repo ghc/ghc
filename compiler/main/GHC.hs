@@ -494,7 +494,7 @@ depanal (Session ref) excluded_mods allow_dup_roots = do
 	
   showPass dflags "Chasing dependencies"
   when (gmode == BatchCompile) $
-	debugTraceMsg dflags 1 (hcat [
+	debugTraceMsg dflags 2 (hcat [
 		     text "Chasing modules from: ",
 	     		hcat (punctuate comma (map pprTarget targets))])
 
