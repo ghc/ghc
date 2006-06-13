@@ -704,7 +704,7 @@ builderMainLoop dflags filter_fn pgm real_args = do
 
 readerProc chan hdl filter_fn =
     (do str <- hGetContents hdl
-        loop (lines (filter_fn str)) Nothing) 
+        loop (linesPlatform (filter_fn str)) Nothing) 
     `finally`
        writeChan chan EOF
 	-- ToDo: check errors more carefully
@@ -812,6 +812,24 @@ getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
 #else
 getProcessID :: IO Int
 getProcessID = Posix.getProcessID
+#endif
+
+-- Divvy up text stream into lines, taking platform dependent
+-- line termination into account.
+linesPlatform :: String -> [String]
+#if !defined(mingw32_HOST_OS)
+linesPlatform ls = lines ls
+#else
+linesPlatform "" = []
+linesPlatform xs = 
+  case lineBreak xs of
+    (as,xs1) -> as : linesPlatform xs1
+  where
+   lineBreak "" = ("","")
+   lineBreak ('\r':'\n':xs) = ([],xs)
+   lineBreak ('\n':xs) = ([],xs)
+   lineBreak (x:xs) = let (as,bs) = lineBreak xs in (x:as,bs)
+
 #endif
 
 \end{code}
