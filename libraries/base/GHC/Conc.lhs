@@ -23,7 +23,7 @@
 module GHC.Conc
 	( ThreadId(..)
 
-	-- Forking and suchlike
+	-- * Forking and suchlike
 	, forkIO	-- :: IO a -> IO ThreadId
 	, forkOnIO	-- :: Int -> IO a -> IO ThreadId
 	, childHandler  -- :: Exception -> IO ()
@@ -35,13 +35,13 @@ module GHC.Conc
 	, yield         -- :: IO ()
 	, labelThread	-- :: ThreadId -> String -> IO ()
 
-	-- Waiting
+	-- * Waiting
 	, threadDelay	  	-- :: Int -> IO ()
 	, registerDelay		-- :: Int -> IO (TVar Bool)
 	, threadWaitRead	-- :: Int -> IO ()
 	, threadWaitWrite	-- :: Int -> IO ()
 
-	-- MVars
+	-- * MVars
 	, MVar		-- abstract
 	, newMVar 	-- :: a -> IO (MVar a)
 	, newEmptyMVar  -- :: IO (MVar a)
@@ -52,7 +52,7 @@ module GHC.Conc
 	, isEmptyMVar	-- :: MVar a -> IO Bool
 	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 
-   	-- TVars
+   	-- * TVars
 	, STM           -- abstract
 	, atomically    -- :: STM a -> IO a
 	, retry         -- :: STM a
@@ -65,6 +65,7 @@ module GHC.Conc
 	, writeTVar	-- :: a -> TVar a -> STM ()
 	, unsafeIOToSTM	-- :: IO a -> STM a
 
+   	-- * Miscellaneous
 #ifdef mingw32_HOST_OS
 	, asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 	, asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
@@ -290,6 +291,7 @@ TVars are shared memory locations which support atomic memory
 transactions.
 
 \begin{code}
+-- |A monad supporting atomic memory transactions.
 newtype STM a = STM (State# RealWorld -> (# State# RealWorld, a #)) deriving( Typeable )
 
 unSTM :: STM a -> (State# RealWorld -> (# State# RealWorld, a #))
@@ -333,14 +335,15 @@ atomically (STM m) = IO (\s -> (atomically# m) s )
 -- values in TVars which mean that it should not continue (e.g. the TVars
 -- represent a shared buffer that is now empty).  The implementation may
 -- block the thread until one of the TVars that it has read from has been
--- udpated.
+-- udpated. (GHC only)
 retry :: STM a
 retry = STM $ \s# -> retry# s#
 
--- |Compose two alternative STM actions.  If the first action completes without
--- retrying then it forms the result of the orElse.  Otherwise, if the first
--- action retries, then the second action is tried in its place.  If both actions
--- retry then the orElse as a whole retries.
+-- |Compose two alternative STM actions (GHC only).  If the first action
+-- completes without retrying then it forms the result of the orElse.
+-- Otherwise, if the first action retries, then the second action is
+-- tried in its place.  If both actions retry then the orElse as a
+-- whole retries.
 orElse :: STM a -> STM a -> STM a
 orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 
@@ -348,6 +351,7 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 catchSTM :: STM a -> (Exception -> STM a) -> STM a
 catchSTM (STM m) k = STM $ \s -> catchSTM# m (\ex -> unSTM (k ex)) s
 
+-- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a) deriving( Typeable )
 
 instance Eq (TVar a) where
