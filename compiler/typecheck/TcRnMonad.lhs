@@ -1016,8 +1016,10 @@ forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
 forkM_maybe doc thing_inside
  = do {	unsafeInterleaveM $
 	do { traceIf (text "Starting fork {" <+> doc)
-	   ; mb_res <- tryM thing_inside ;
-	     case mb_res of
+	   ; mb_res <- tryM $
+		       updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $ 
+		       thing_inside
+	   ; case mb_res of
 		Right r  -> do	{ traceIf (text "} ending fork" <+> doc)
 				; return (Just r) }
 		Left exn -> do {
