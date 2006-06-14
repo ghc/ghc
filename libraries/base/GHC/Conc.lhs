@@ -583,6 +583,7 @@ threadDelay time
 	case delay# time# s of { s -> (# s, () #)
 	}}
 
+registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs 
 #ifndef mingw32_HOST_OS
   | threaded = waitForDelayEventSTM usecs
