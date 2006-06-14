@@ -71,9 +71,8 @@ handle_tick(int unused STG_UNUSED)
 	  recent_activity = ACTIVITY_INACTIVE;
 	  blackholes_need_checking = rtsTrue;
 	  /* hack: re-use the blackholes_need_checking flag */
-	  
+	  wakeUpRts();
       }
-      wakeUpRts();
       break;
   default:
       break;
