@@ -23,4 +23,6 @@ main = do
 
 raise = do
   id <- readIORef m
+  me <- myThreadId
+  forkIO $ do threadDelay 10000; throwTo me (ErrorCall "timeout")
   throwTo id (ErrorCall "kapow!")
