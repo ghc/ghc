@@ -67,13 +67,11 @@ test('conc031', skip, compile_and_run, [''])
 test('conc032', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
-# Also hangs with the threaded RTS
-test('conc033', omit_ways(['ghci', 'threaded1','threaded2']), compile_and_run, [''])
+test('conc033', omit_ways(['ghci']), compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
-# Also hangs with the threaded RTS
 test('conc034', compose(only_compiler_types(['ghc']),
-			compose(omit_ways(['ghci','threaded1', 'threaded2']), 
+			compose(omit_ways(['ghci']), 
 			extra_run_opts('+RTS -C0 -RTS'))),
 		compile_and_run, [''])
 
@@ -81,7 +79,6 @@ test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # Omit for GHCi: the main thread never gets the deadlock exception, because
 # it is waiting for a ^C interrupt.
-# Omit for threaded: deadlock detection isn't working properly.
 test('conc036', compose(skip_if_fast,
 		  only_compiler_types(['ghc'])), compile_and_run, [''])
 
@@ -97,8 +94,7 @@ test('conc040', compose(only_compiler_types(['ghc']),
 			omit_ways(['ghci']))),
 		compile_and_run, [''])
 
-# STM-related tests.  As with conc033, omit threaded in 047 and 048 because
-# they rely on deadlock detection
+# STM-related tests.
 test('conc041', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc042', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc043', only_compiler_types(['ghc']), compile_and_run, [''])
@@ -108,9 +104,9 @@ test('conc046', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # Omit GHCi for these two, since they appear to deadlock (23/11/2004 --SDM)
 test('conc047', compose(only_compiler_types(['ghc']), 
-                        omit_ways(['threaded1','threaded2','ghci'])), compile_and_run, [''])
+                        omit_ways(['ghci'])), compile_and_run, [''])
 test('conc048', compose(only_compiler_types(['ghc']), 
-                        omit_ways(['threaded1','threaded2','ghci'])), compile_and_run, [''])
+                        omit_ways(['ghci'])), compile_and_run, [''])
 
 # skip this test right now - for some reason it goes on for ever in the 
 # 'opt' ways. (ToDo)
