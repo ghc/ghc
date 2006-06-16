@@ -111,7 +111,7 @@ typedef struct StgRegTable_ {
   // rmp_tmp1..rmp_result2 are only used in THREADED_RTS builds to
   // avoid per-thread temps in bss, but currently always incldue here
   // so we just run mkDerivedConstants once
-  StgInt          rmp_tmp_w;
+  StgWord         rmp_tmp_w;
   MP_INT          rmp_tmp1;      
   MP_INT          rmp_tmp2;      
   MP_INT          rmp_result1;
