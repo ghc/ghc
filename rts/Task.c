@@ -189,7 +189,7 @@ discardTask (Task *task)
 {
     ASSERT_LOCK_HELD(&sched_mutex);
     if (!task->stopped) {
-	debugTrace(DEBUG_sched, "discarding task %p", TASK_ID(task));
+	debugTrace(DEBUG_sched, "discarding task %ld", TASK_ID(task));
 	task->cap = NULL;
 	task->tso = NULL;
 	task->stopped = rtsTrue;
@@ -240,7 +240,7 @@ workerTaskStop (Task *task)
 void
 resetTaskManagerAfterFork (void)
 {
-#warning TODO!
+    // TODO!
     taskCount = 0;
 }
 
