@@ -3,10 +3,7 @@ module Main where
 
 import Arithmetic
 import Trit
-import Stream
 import Converter
-import Control.Concurrent
-import Control.Concurrent.MVar
 import System.IO.Unsafe
 import Data.Ratio
 import Utilities
