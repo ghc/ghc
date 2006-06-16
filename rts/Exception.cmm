@@ -148,7 +148,7 @@ killThreadzh_fast
     target = R1;
     exception = R2;
     
-    STK_CHK_GEN( WDS(3), R1_PTR | R2_PTR, killThreadzh_fast);
+    STK_CHK_GEN( WDS(3), R1_PTR & R2_PTR, killThreadzh_fast);
 
     /* 
      * We might have killed ourselves.  In which case, better be *very*
