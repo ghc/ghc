@@ -485,7 +485,7 @@ unblockOne_ (Capability *cap, StgTSO *tso,
 {
   StgTSO *next;
 
-  ASSERT(get_itbl(tso)->type == TSO);
+  // NO, might be a WHITEHOLE: ASSERT(get_itbl(tso)->type == TSO);
   ASSERT(tso->why_blocked != NotBlocked);
 
   tso->why_blocked = NotBlocked;
