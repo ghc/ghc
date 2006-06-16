@@ -148,6 +148,8 @@ module Data.Map  (
             , updateMax
             , updateMinWithKey
             , updateMaxWithKey
+            , minView
+            , maxView
             
             -- * Debugging
             , showTree
@@ -511,13 +513,13 @@ deleteAt i map
 findMin :: Map k a -> (k,a)
 findMin (Bin _ kx x Tip r)  = (kx,x)
 findMin (Bin _ kx x l r)    = findMin l
-findMin Tip                 = error "Map.findMin: empty tree has no minimal element"
+findMin Tip                 = error "Map.findMin: empty map has no minimal element"
 
 -- | /O(log n)/. The maximal key of the map.
 findMax :: Map k a -> (k,a)
 findMax (Bin _ kx x l Tip)  = (kx,x)
 findMax (Bin _ kx x l r)    = findMax r
-findMax Tip                 = error "Map.findMax: empty tree has no maximal element"
+findMax Tip                 = error "Map.findMax: empty map has no maximal element"
 
 -- | /O(log n)/. Delete the minimal key.
 deleteMin :: Map k a -> Map k a
@@ -562,6 +564,19 @@ updateMaxWithKey f t
       Bin sx kx x l r    -> balance kx x l (updateMaxWithKey f r)
       Tip                -> Tip
 
+-- | /O(log n)/. Retrieves the minimal key of the map, and the map stripped from that element
+-- @fail@s (in the monad) when passed an empty map.
+minView :: Monad m => Map k a -> m (Map k a, (k,a))
+minView Tip = fail "Map.minView: empty map"
+minView x = return (swap $ deleteFindMin x)
+
+-- | /O(log n)/. Retrieves the maximal key of the map, and the map stripped from that element
+-- @fail@s (in the monad) when passed an empty map.
+maxView :: Monad m => Map k a -> m (Map k a, (k,a))
+maxView Tip = fail "Map.maxView: empty map"
+maxView x = return (swap $ deleteFindMax x)
+
+swap (a,b) = (b,a)
 
 {--------------------------------------------------------------------
   Union. 
