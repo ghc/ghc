@@ -85,7 +85,7 @@ import DATA_IOREF
 import UNSAFE_IO	( unsafePerformIO )
 import Monad		( when )
 import Char		( isDigit )
-import List		( sort, intersperse )
+import Data.List	( sort, intersperse, nub )
 
 -----------------------------------------------------------------------------
 -- Static flags
@@ -458,7 +458,7 @@ allowed_combination way = and [ x `allowedWith` y
 findBuildTag :: IO [String]  -- new options
 findBuildTag = do
   way_names <- readIORef v_Ways
-  let ws = sort way_names
+  let ws = sort (nub way_names)
   if not (allowed_combination ws)
       then throwDyn (CmdLineError $
       		    "combination not supported: "  ++
