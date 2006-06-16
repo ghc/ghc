@@ -328,15 +328,21 @@ static void park_tso(StgTSO *tso) {
 }
 
 static void unpark_tso(Capability *cap, StgTSO *tso) {
-  // We will continue unparking threads while they remain on one of the wait
-  // queues: it's up to the thread itself to remove it from the wait queues
-  // if it decides to do so when it is scheduled.
-  if (tso -> why_blocked == BlockedOnSTM) {
-    TRACE("unpark_tso on tso=%p\n", tso);
-    unblockOne(cap,tso);
-  } else {
-    TRACE("spurious unpark_tso on tso=%p\n", tso);
-  }
+    // We will continue unparking threads while they remain on one of the wait
+    // queues: it's up to the thread itself to remove it from the wait queues
+    // if it decides to do so when it is scheduled.
+
+    // Unblocking a TSO from BlockedOnSTM is done under the TSO lock,
+    // to avoid multiple CPUs unblocking the same TSO, and also to
+    // synchronise with throwTo().
+    lockTSO(tso);
+    if (tso -> why_blocked == BlockedOnSTM) {
+	TRACE("unpark_tso on tso=%p\n", tso);
+	unblockOne(cap,tso);
+    } else {
+	TRACE("spurious unpark_tso on tso=%p\n", tso);
+    }
+    unlockTSO(tso);
 }
 
 static void unpark_waiters_on(Capability *cap, StgTVar *s) {
