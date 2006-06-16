@@ -902,6 +902,31 @@ stg_block_blackhole
     BLOCK_BUT_FIRST(stg_block_blackhole_finally);
 }
 
+INFO_TABLE_RET( stg_block_throwto, 2/*framesize*/, 0/*bitmap*/, RET_SMALL )
+{
+    R2 = Sp(2);
+    R1 = Sp(1);
+    Sp_adj(3);
+    jump killThreadzh_fast;
+}
+
+stg_block_throwto_finally
+{
+#ifdef THREADED_RTS
+    foreign "C" throwToReleaseTarget (R3 "ptr");
+#endif
+    jump StgReturn;
+}
+
+stg_block_throwto
+{
+    Sp_adj(-3);
+    Sp(2) = R2;
+    Sp(1) = R1;
+    Sp(0) = stg_block_throwto_info;
+    BLOCK_BUT_FIRST(stg_block_throwto_finally);
+}
+
 #ifdef mingw32_HOST_OS
 INFO_TABLE_RET( stg_block_async, 0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {

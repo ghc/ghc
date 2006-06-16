@@ -55,24 +55,7 @@ void wakeUpRts(void);
  * Called from STG :  yes
  * Locks assumed   :  we own the Capability.
  */
-StgTSO * unblockOne(Capability *cap, StgTSO *tso);
-
-/* raiseAsync()
- *
- * Raises an exception asynchronously in the specified thread.
- *
- * Called from STG :  yes
- * Locks assumed   :  none
- */
-void raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception);
-
-/* suspendComputation()
- *
- * A variant of raiseAsync(), this strips the stack of the specified
- * thread down to the stop_here point, leaving a current closure on
- * top of the stack at [stop_here - 1].
- */
-void suspendComputation(Capability *cap, StgTSO *tso, StgPtr stop_here);
+StgTSO * unblockOne (Capability *cap, StgTSO *tso);
 
 /* raiseExceptionHelper */
 StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception);
@@ -176,8 +159,6 @@ extern rtsBool blackholes_need_checking;
 extern Mutex RTS_VAR(sched_mutex);
 #endif
 
-StgBool isThreadBound(StgTSO *tso);
-
 SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
 
 /* Called by shutdown_handler(). */
@@ -197,8 +178,6 @@ void print_bq (StgClosure *node);
 #if defined(PAR)
 void print_bqe (StgBlockingQueueElement *bqe);
 #endif
-
-void labelThread(StgPtr tso, char *label);
 
 /* -----------------------------------------------------------------------------
  * Some convenient macros/inline functions...

@@ -11,6 +11,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Cmm.h"
+#include "RaiseAsync.h"
 
 /* -----------------------------------------------------------------------------
    Exception Primitives
@@ -54,13 +55,13 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
 {
     // Not true: see comments above
     // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
-#if defined(GRAN) || defined(PAR)
-    foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
-				   NULL "ptr"); 
-#else
-    foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr");
-#endif
-    StgTSO_blocked_exceptions(CurrentTSO) = NULL;
+
+    foreign "C" awakenBlockedExceptionQueue(MyCapability() "ptr", 
+					    CurrentTSO "ptr") [R1];
+
+    StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
+	~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
+
 #ifdef REG_R1
     Sp_adj(1);
     jump %ENTRY_CODE(Sp(0));
@@ -76,7 +77,10 @@ INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret,
 {
     // Not true: see comments above
     // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) == NULL);
-    StgTSO_blocked_exceptions(CurrentTSO) = END_TSO_QUEUE;
+
+    StgTSO_flags(CurrentTSO) = 
+	StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
+
 #ifdef REG_R1
     Sp_adj(1);
     jump %ENTRY_CODE(Sp(0));
@@ -92,15 +96,18 @@ blockAsyncExceptionszh_fast
     /* Args: R1 :: IO a */
     STK_CHK_GEN( WDS(2)/* worst case */, R1_PTR, blockAsyncExceptionszh_fast);
 
-    if (StgTSO_blocked_exceptions(CurrentTSO) == NULL) {
-      StgTSO_blocked_exceptions(CurrentTSO) = END_TSO_QUEUE;
-      /* avoid growing the stack unnecessarily */
-      if (Sp(0) == stg_blockAsyncExceptionszh_ret_info) {
-	Sp_adj(1);
-      } else {
-	Sp_adj(-1);
-	Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
-      }
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
+	
+	StgTSO_flags(CurrentTSO) = 
+	   StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
+
+	/* avoid growing the stack unnecessarily */
+	if (Sp(0) == stg_blockAsyncExceptionszh_ret_info) {
+	    Sp_adj(1);
+	} else {
+	    Sp_adj(-1);
+	    Sp(0) = stg_unblockAsyncExceptionszh_ret_info;
+	}
     }
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
@@ -112,22 +119,17 @@ unblockAsyncExceptionszh_fast
     /* Args: R1 :: IO a */
     STK_CHK_GEN( WDS(2), R1_PTR, unblockAsyncExceptionszh_fast);
 
-    if (StgTSO_blocked_exceptions(CurrentTSO) != NULL) {
-#if defined(GRAN) || defined(PAR)
-      foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr", 
-	          		     StgTSO_block_info(CurrentTSO) "ptr");
-#else
-      foreign "C" awakenBlockedQueue(MyCapability() "ptr", StgTSO_blocked_exceptions(CurrentTSO) "ptr");
-#endif
-      StgTSO_blocked_exceptions(CurrentTSO) = NULL;
+    if (TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) {
+	foreign "C" awakenBlockedExceptionQueue(MyCapability() "ptr", 
+						CurrentTSO "ptr") [R1];
 
-      /* avoid growing the stack unnecessarily */
-      if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
-	Sp_adj(1);
-      } else {
-	Sp_adj(-1);
-	Sp(0) = stg_blockAsyncExceptionszh_ret_info;
-      }
+	/* avoid growing the stack unnecessarily */
+	if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
+	    Sp_adj(1);
+	} else {
+	    Sp_adj(-1);
+	    Sp(0) = stg_blockAsyncExceptionszh_ret_info;
+	}
     }
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
@@ -135,74 +137,62 @@ unblockAsyncExceptionszh_fast
 }
 
 
-#define interruptible(what_next) 		\
-        (   what_next == BlockedOnMVar		\
-         || what_next == BlockedOnException	\
-         || what_next == BlockedOnRead		\
-         || what_next == BlockedOnWrite		\
-         || what_next == BlockedOnDelay		\
-         || what_next == BlockedOnDoProc)
-
 killThreadzh_fast
 {
-  /* args: R1 = TSO to kill, R2 = Exception */
+    /* args: R1 = TSO to kill, R2 = Exception */
 
-  W_ why_blocked;
+    W_ why_blocked;
+    W_ target;
+    W_ exception;
+    
+    target = R1;
+    exception = R2;
+    
+    STK_CHK_GEN( WDS(3), R1_PTR | R2_PTR, killThreadzh_fast);
 
-  /* This thread may have been relocated.
-   * (see Schedule.c:threadStackOverflow)
-   */
- while:
-  if (StgTSO_what_next(R1) == ThreadRelocated::I16) {
-    R1 = StgTSO_link(R1);
-    goto while;
-  }
-
-  /* Determine whether this thread is interruptible or not */
-
-  /* If the target thread is currently blocking async exceptions,
-   * we'll have to block until it's ready to accept them.  The
-   * exception is interruptible threads - ie. those that are blocked
-   * on some resource.
-   */
-  why_blocked = TO_W_(StgTSO_why_blocked(R1));
-  if (StgTSO_blocked_exceptions(R1) != NULL && !interruptible(why_blocked))
-  {
-      StgTSO_link(CurrentTSO) = StgTSO_blocked_exceptions(R1);
-      StgTSO_blocked_exceptions(R1) = CurrentTSO;
-      
-      StgTSO_why_blocked(CurrentTSO) = BlockedOnException::I16;
-      StgTSO_block_info(CurrentTSO) = R1;
-      
-      BLOCK( R1_PTR & R2_PTR, killThreadzh_fast );
-  }
-
-  /* Killed threads turn into zombies, which might be garbage
-   * collected at a later date.  That's why we don't have to
-   * explicitly remove them from any queues they might be on.
-   */
-
-  /* We might have killed ourselves.  In which case, better be *very*
-   * careful.  If the exception killed us, then return to the scheduler.
-   * If the exception went to a catch frame, we'll just continue from
-   * the handler.
-   */
-  if (R1 == CurrentTSO) {
+    /* 
+     * We might have killed ourselves.  In which case, better be *very*
+     * careful.  If the exception killed us, then return to the scheduler.
+     * If the exception went to a catch frame, we'll just continue from
+     * the handler.
+     */
+    if (target == CurrentTSO) {
 	SAVE_THREAD_STATE();
-	foreign "C" raiseAsync(MyCapability() "ptr", R1 "ptr", R2 "ptr");
+	/* ToDo: what if the current thread is blocking exceptions? */
+	foreign "C" throwToSingleThreaded(MyCapability() "ptr", 
+					  target "ptr", exception "ptr")[R1,R2];
 	if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
-		R1 = ThreadFinished;
-		jump StgReturn;
+	    R1 = ThreadFinished;
+	    jump StgReturn;
 	} else {
-		LOAD_THREAD_STATE();
-		ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
-		jump %ENTRY_CODE(Sp(0));
+	    LOAD_THREAD_STATE();
+	    ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+	    jump %ENTRY_CODE(Sp(0));
 	}
-  } else {
-	foreign "C" raiseAsync(MyCapability() "ptr", R1 "ptr", R2 "ptr");
-  }
+    } else {
+	W_ out;
+	W_ retcode;
+	out = BaseReg + OFFSET_StgRegTable_rmp_tmp_w;
+	
+	retcode = foreign "C" throwTo(MyCapability() "ptr",
+				      CurrentTSO "ptr",
+				      target "ptr",
+				      exception "ptr",
+				      out "ptr") [R1,R2];
+	
+	switch [THROWTO_SUCCESS .. THROWTO_BLOCKED] (retcode) {
 
-  jump %ENTRY_CODE(Sp(0));
+	case THROWTO_SUCCESS: {
+	    jump %ENTRY_CODE(Sp(0));
+	}
+
+	case THROWTO_BLOCKED: {
+	    R3 = W_[out];
+	    // we must block, and call throwToReleaseTarget() before returning
+	    jump stg_block_throwto;
+	}
+	}
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -300,15 +290,14 @@ catchzh_fast
     SET_HDR(Sp,stg_catch_frame_info,W_[CCCS]);
     
     StgCatchFrame_handler(Sp) = R2;
-    StgCatchFrame_exceptions_blocked(Sp) = 
-	(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
+    StgCatchFrame_exceptions_blocked(Sp) = TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX;
     TICK_CATCHF_PUSHED();
 
     /* Apply R1 to the realworld token */
     TICK_UNKNOWN_CALL();
     TICK_SLOW_CALL_v();
     jump stg_ap_v_fast;
-}      
+}
 
 /* -----------------------------------------------------------------------------
  * The raise infotable
@@ -423,9 +412,8 @@ retry_pop_stack:
 
     /* Ensure that async excpetions are blocked when running the handler.
     */
-    if (StgTSO_blocked_exceptions(CurrentTSO) == NULL) {
-      StgTSO_blocked_exceptions(CurrentTSO) = END_TSO_QUEUE;
-    }
+    StgTSO_flags(CurrentTSO) = 
+	StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
 
     /* Call the handler, passing the exception value and a realworld
      * token as arguments.

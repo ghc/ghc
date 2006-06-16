@@ -518,8 +518,10 @@ wakeupThreadOnCapability (Capability *cap, StgTSO *tso)
 {
     ASSERT(tso->cap == cap);
     ASSERT(tso->bound ? tso->bound->cap == cap : 1);
+    ASSERT_LOCK_HELD(&cap->lock);
 
-    ACQUIRE_LOCK(&cap->lock);
+    tso->cap = cap;
+
     if (cap->running_task == NULL) {
 	// nobody is running this Capability, we can add our thread
 	// directly onto the run queue and start up a Task to run it.
@@ -535,6 +537,33 @@ wakeupThreadOnCapability (Capability *cap, StgTSO *tso)
 	// freed without first checking the wakeup queue (see
 	// releaseCapability_).
     }
+}
+
+void
+wakeupThreadOnCapability_lock (Capability *cap, StgTSO *tso)
+{
+    ACQUIRE_LOCK(&cap->lock);
+    migrateThreadToCapability (cap, tso);
+    RELEASE_LOCK(&cap->lock);
+}
+
+void
+migrateThreadToCapability (Capability *cap, StgTSO *tso)
+{
+    // ASSUMES: cap->lock is held (asserted in wakeupThreadOnCapability)
+    if (tso->bound) {
+	ASSERT(tso->bound->cap == tso->cap);
+    	tso->bound->cap = cap;
+    }
+    tso->cap = cap;
+    wakeupThreadOnCapability(cap,tso);
+}
+
+void
+migrateThreadToCapability_lock (Capability *cap, StgTSO *tso)
+{
+    ACQUIRE_LOCK(&cap->lock);
+    migrateThreadToCapability (cap, tso);
     RELEASE_LOCK(&cap->lock);
 }
 

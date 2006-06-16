@@ -77,27 +77,6 @@ typedef StgTSOStatBuf StgTSOGranInfo;
  */
 typedef StgWord32 StgThreadID;
 
-/* 
- * Flags for the tso->flags field.
- *
- * The TSO_DIRTY flag indicates that this TSO's stack should be
- * scanned during garbage collection.  The link field of a TSO is
- * always scanned, so we don't have to dirty a TSO just for linking
- * it on a different list.
- *
- * TSO_DIRTY is set by 
- *    - schedule(), just before running a thread,
- *    - raiseAsync(), because it modifies a thread's stack
- *    - resumeThread(), just before running the thread again
- * and unset by the garbage collector (only).
- */
-#define TSO_DIRTY   1
-
-/*
- * TSO_LOCKED is set when a TSO is locked to a particular Capability.
- */
-#define TSO_LOCKED  2
-
 #define tsoDirty(tso)  ((tso)->flags & TSO_DIRTY)
 #define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 
@@ -127,6 +106,7 @@ typedef union {
   StgWord target;
 } StgTSOBlockInfo;
 
+
 /*
  * TSOs live on the heap, and therefore look just like heap objects.
  * Large TSOs will live in their own "block group" allocated by the
@@ -151,12 +131,18 @@ typedef struct StgTSO_ {
     StgWord16               why_blocked;    /* Values defined in Constants.h */
     StgWord32               flags;
     StgTSOBlockInfo         block_info;
-    struct StgTSO_*         blocked_exceptions;
     StgThreadID             id;
     int                     saved_errno;
     struct Task_*           bound;
     struct Capability_*     cap;
     struct StgTRecHeader_ * trec;       /* STM transaction record */
+
+    /* 
+       A list of threads blocked on this TSO waiting to throw
+       exceptions.  In order to access this field, the TSO must be
+       locked using lockClosure/unlockClosure (see SMP.h).
+    */
+    struct StgTSO_ *        blocked_exceptions;
 
 #ifdef TICKY_TICKY
     /* TICKY-specific stuff would go here. */

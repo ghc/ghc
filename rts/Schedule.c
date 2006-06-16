@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2005
+ * (c) The GHC Team, 1998-2006
  *
  * The scheduler and thread-related functionality
  *
@@ -19,7 +19,6 @@
 #include "Schedule.h"
 #include "StgMiscClosures.h"
 #include "Interpreter.h"
-#include "Exception.h"
 #include "Printer.h"
 #include "RtsSignals.h"
 #include "Sanity.h"
@@ -51,6 +50,8 @@
 #include "win32/IOManager.h"
 #endif
 #include "Trace.h"
+#include "RaiseAsync.h"
+#include "Threads.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -140,23 +141,6 @@ nat recent_activity = ACTIVITY_YES;
  */
 rtsBool sched_state = SCHED_RUNNING;
 
-/* Next thread ID to allocate.
- * LOCK: sched_mutex
- */
-static StgThreadID next_thread_id = 1;
-
-/* The smallest stack size that makes any sense is:
- *    RESERVED_STACK_WORDS    (so we can get back from the stack overflow)
- *  + sizeofW(StgStopFrame)   (the stg_stop_thread_info frame)
- *  + 1                       (the closure to enter)
- *  + 1			      (stg_ap_v_ret)
- *  + 1			      (spare slot req'd by stg_ap_v_ret)
- *
- * A thread with this stack will bomb immediately with a stack
- * overflow, which will increase its stack size.  
- */
-#define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 3)
-
 #if defined(GRAN)
 StgTSO *CurrentTSO;
 #endif
@@ -186,6 +170,10 @@ Mutex sched_mutex;
 StgTSO *LastTSO;
 rtsTime TimeOfLastYield;
 rtsBool emitSchedule = rtsTrue;
+#endif
+
+#if !defined(mingw32_HOST_OS)
+#define FORKPROCESS_PRIMOP_SUPPORTED
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -233,22 +221,16 @@ static Capability *scheduleDoGC(Capability *cap, Task *task,
 				rtsBool force_major, 
 				void (*get_roots)(evac_fn));
 
-static void unblockThread(Capability *cap, StgTSO *tso);
 static rtsBool checkBlackHoles(Capability *cap);
 static void AllRoots(evac_fn evac);
 
 static StgTSO *threadStackOverflow(Capability *cap, StgTSO *tso);
 
-static void raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception, 
-			rtsBool stop_at_atomically, StgPtr stop_here);
-
 static void deleteThread (Capability *cap, StgTSO *tso);
 static void deleteAllThreads (Capability *cap);
 
-#ifdef DEBUG
-static void printThreadBlockage(StgTSO *tso);
-static void printThreadStatus(StgTSO *tso);
-void printThreadQueue(StgTSO *tso);
+#ifdef FORKPROCESS_PRIMOP_SUPPORTED
+static void deleteThread_(Capability *cap, StgTSO *tso);
 #endif
 
 #if defined(PARALLEL_HASKELL)
@@ -595,6 +577,9 @@ run_thread:
 #if defined(PROFILING)
     startHeapProfTimer();
 #endif
+
+    // Check for exceptions blocked on this thread
+    maybePerformBlockedException (cap, t);
 
     // ----------------------------------------------------------------------
     // Run the current thread 
@@ -1019,7 +1004,8 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	    case BlockedOnBlackHole:
 	    case BlockedOnException:
 	    case BlockedOnMVar:
-		raiseAsync(cap, task->tso, (StgClosure *)NonTermination_closure);
+		throwToSingleThreaded(cap, task->tso, 
+				      (StgClosure *)NonTermination_closure);
 		return;
 	    default:
 		barf("deadlock: main thread blocked in a strange way");
@@ -1644,7 +1630,7 @@ static void
 scheduleHandleStackOverflow (Capability *cap, Task *task, StgTSO *t)
 {
     debugTrace (DEBUG_sched,
-		"--<< thread %ld (%s) stopped, StackOverflow\n", 
+		"--<< thread %ld (%s) stopped, StackOverflow", 
 		(long)t->id, whatNext_strs[t->what_next]);
 
     /* just adjust the stack for this thread, then pop it back
@@ -1687,11 +1673,11 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
 #ifdef DEBUG
     if (t->what_next != prev_what_next) {
 	debugTrace(DEBUG_sched,
-		   "--<< thread %ld (%s) stopped to switch evaluators\n", 
+		   "--<< thread %ld (%s) stopped to switch evaluators", 
 		   (long)t->id, whatNext_strs[t->what_next]);
     } else {
 	debugTrace(DEBUG_sched,
-		   "--<< thread %ld (%s) stopped, yielding\n",
+		   "--<< thread %ld (%s) stopped, yielding",
 		   (long)t->id, whatNext_strs[t->what_next]);
     }
 #endif
@@ -2024,6 +2010,18 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
 		next = t->link;
 	    } else {
 		next = t->global_link;
+		
+		// This is a good place to check for blocked
+		// exceptions.  It might be the case that a thread is
+		// blocked on delivering an exception to a thread that
+		// is also blocked - we try to ensure that this
+		// doesn't happen in throwTo(), but it's too hard (or
+		// impossible) to close all the race holes, so we
+		// accept that some might get through and deal with
+		// them here.  A GC will always happen at some point,
+		// even if the system is otherwise deadlocked.
+		maybePerformBlockedException (&capabilities[0], t);
+
 		if (t -> trec != NO_TREC && t -> why_blocked == NotBlocked) {
 		    if (!stmValidateNestOfTransactions (t -> trec)) {
 			debugTrace(DEBUG_sched | DEBUG_stm,
@@ -2033,7 +2031,8 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
 			// ATOMICALLY_FRAME, aborting the (nested)
 			// transaction, and saving the stack of any
 			// partially-evaluated thunks on the heap.
-			raiseAsync_(&capabilities[0], t, NULL, rtsTrue, NULL);
+			throwToSingleThreaded_(&capabilities[0], t, 
+					       NULL, rtsTrue, NULL);
 			
 #ifdef REG_R1
 			ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
@@ -2099,45 +2098,9 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
 }
 
 /* ---------------------------------------------------------------------------
- * rtsSupportsBoundThreads(): is the RTS built to support bound threads?
- * used by Control.Concurrent for error checking.
- * ------------------------------------------------------------------------- */
- 
-StgBool
-rtsSupportsBoundThreads(void)
-{
-#if defined(THREADED_RTS)
-  return rtsTrue;
-#else
-  return rtsFalse;
-#endif
-}
-
-/* ---------------------------------------------------------------------------
- * isThreadBound(tso): check whether tso is bound to an OS thread.
- * ------------------------------------------------------------------------- */
- 
-StgBool
-isThreadBound(StgTSO* tso USED_IF_THREADS)
-{
-#if defined(THREADED_RTS)
-  return (tso->bound != NULL);
-#endif
-  return rtsFalse;
-}
-
-/* ---------------------------------------------------------------------------
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
-#if !defined(mingw32_HOST_OS)
-#define FORKPROCESS_PRIMOP_SUPPORTED
-#endif
-
-#ifdef FORKPROCESS_PRIMOP_SUPPORTED
-static void 
-deleteThread_(Capability *cap, StgTSO *tso);
-#endif
 StgInt
 forkProcess(HsStablePtr *entry
 #ifndef FORKPROCESS_PRIMOP_SUPPORTED
@@ -2243,26 +2206,28 @@ forkProcess(HsStablePtr *entry
 static void
 deleteAllThreads ( Capability *cap )
 {
-  StgTSO* t, *next;
-  debugTrace(DEBUG_sched,"deleting all threads");
-  for (t = all_threads; t != END_TSO_QUEUE; t = next) {
-      if (t->what_next == ThreadRelocated) {
-	  next = t->link;
-      } else {
-	  next = t->global_link;
-	  deleteThread(cap,t);
-      }
-  }      
+    // NOTE: only safe to call if we own all capabilities.
 
-  // The run queue now contains a bunch of ThreadKilled threads.  We
-  // must not throw these away: the main thread(s) will be in there
-  // somewhere, and the main scheduler loop has to deal with it.
-  // Also, the run queue is the only thing keeping these threads from
-  // being GC'd, and we don't want the "main thread has been GC'd" panic.
+    StgTSO* t, *next;
+    debugTrace(DEBUG_sched,"deleting all threads");
+    for (t = all_threads; t != END_TSO_QUEUE; t = next) {
+	if (t->what_next == ThreadRelocated) {
+	    next = t->link;
+	} else {
+	    next = t->global_link;
+	    deleteThread(cap,t);
+	}
+    }      
+
+    // The run queue now contains a bunch of ThreadKilled threads.  We
+    // must not throw these away: the main thread(s) will be in there
+    // somewhere, and the main scheduler loop has to deal with it.
+    // Also, the run queue is the only thing keeping these threads from
+    // being GC'd, and we don't want the "main thread has been GC'd" panic.
 
 #if !defined(THREADED_RTS)
-  ASSERT(blocked_queue_hd == END_TSO_QUEUE);
-  ASSERT(sleeping_queue == END_TSO_QUEUE);
+    ASSERT(blocked_queue_hd == END_TSO_QUEUE);
+    ASSERT(sleeping_queue == END_TSO_QUEUE);
 #endif
 }
 
@@ -2337,9 +2302,10 @@ suspendThread (StgRegTable *reg)
 
   threadPaused(cap,tso);
 
-  if(tso->blocked_exceptions == NULL)  {
+  if ((tso->flags & TSO_BLOCKEX) == 0)  {
       tso->why_blocked = BlockedOnCCall;
-      tso->blocked_exceptions = END_TSO_QUEUE;
+      tso->flags |= TSO_BLOCKEX;
+      tso->flags &= ~TSO_INTERRUPTIBLE;
   } else {
       tso->why_blocked = BlockedOnCCall_NoUnblockExc;
   }
@@ -2390,8 +2356,8 @@ resumeThread (void *task_)
     debugTrace(DEBUG_sched, "thread %d: re-entering RTS", tso->id);
     
     if (tso->why_blocked == BlockedOnCCall) {
-	awakenBlockedQueue(cap,tso->blocked_exceptions);
-	tso->blocked_exceptions = NULL;
+	awakenBlockedExceptionQueue(cap,tso);
+	tso->flags &= ~(TSO_BLOCKEX | TSO_INTERRUPTIBLE);
     }
     
     /* Reset blocking status */
@@ -2408,300 +2374,6 @@ resumeThread (void *task_)
 
     return &cap->r;
 }
-
-/* ---------------------------------------------------------------------------
- * Comparing Thread ids.
- *
- * This is used from STG land in the implementation of the
- * instances of Eq/Ord for ThreadIds.
- * ------------------------------------------------------------------------ */
-
-int
-cmp_thread(StgPtr tso1, StgPtr tso2) 
-{ 
-  StgThreadID id1 = ((StgTSO *)tso1)->id; 
-  StgThreadID id2 = ((StgTSO *)tso2)->id;
- 
-  if (id1 < id2) return (-1);
-  if (id1 > id2) return 1;
-  return 0;
-}
-
-/* ---------------------------------------------------------------------------
- * Fetching the ThreadID from an StgTSO.
- *
- * This is used in the implementation of Show for ThreadIds.
- * ------------------------------------------------------------------------ */
-int
-rts_getThreadId(StgPtr tso) 
-{
-  return ((StgTSO *)tso)->id;
-}
-
-#ifdef DEBUG
-void
-labelThread(StgPtr tso, char *label)
-{
-  int len;
-  void *buf;
-
-  /* Caveat: Once set, you can only set the thread name to "" */
-  len = strlen(label)+1;
-  buf = stgMallocBytes(len * sizeof(char), "Schedule.c:labelThread()");
-  strncpy(buf,label,len);
-  /* Update will free the old memory for us */
-  updateThreadLabel(((StgTSO *)tso)->id,buf);
-}
-#endif /* DEBUG */
-
-/* ---------------------------------------------------------------------------
-   Create a new thread.
-
-   The new thread starts with the given stack size.  Before the
-   scheduler can run, however, this thread needs to have a closure
-   (and possibly some arguments) pushed on its stack.  See
-   pushClosure() in Schedule.h.
-
-   createGenThread() and createIOThread() (in SchedAPI.h) are
-   convenient packaged versions of this function.
-
-   currently pri (priority) is only used in a GRAN setup -- HWL
-   ------------------------------------------------------------------------ */
-#if defined(GRAN)
-/*   currently pri (priority) is only used in a GRAN setup -- HWL */
-StgTSO *
-createThread(nat size, StgInt pri)
-#else
-StgTSO *
-createThread(Capability *cap, nat size)
-#endif
-{
-    StgTSO *tso;
-    nat stack_size;
-
-    /* sched_mutex is *not* required */
-
-    /* First check whether we should create a thread at all */
-#if defined(PARALLEL_HASKELL)
-    /* check that no more than RtsFlags.ParFlags.maxThreads threads are created */
-    if (advisory_thread_count >= RtsFlags.ParFlags.maxThreads) {
-	threadsIgnored++;
-	debugBelch("{createThread}Daq ghuH: refusing to create another thread; no more than %d threads allowed (currently %d)\n",
-		   RtsFlags.ParFlags.maxThreads, advisory_thread_count);
-	return END_TSO_QUEUE;
-    }
-    threadsCreated++;
-#endif
-
-#if defined(GRAN)
-    ASSERT(!RtsFlags.GranFlags.Light || CurrentProc==0);
-#endif
-
-    // ToDo: check whether size = stack_size - TSO_STRUCT_SIZEW
-
-    /* catch ridiculously small stack sizes */
-    if (size < MIN_STACK_WORDS + TSO_STRUCT_SIZEW) {
-	size = MIN_STACK_WORDS + TSO_STRUCT_SIZEW;
-    }
-
-    stack_size = size - TSO_STRUCT_SIZEW;
-    
-    tso = (StgTSO *)allocateLocal(cap, size);
-    TICK_ALLOC_TSO(stack_size, 0);
-
-    SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
-#if defined(GRAN)
-    SET_GRAN_HDR(tso, ThisPE);
-#endif
-
-    // Always start with the compiled code evaluator
-    tso->what_next = ThreadRunGHC;
-
-    tso->why_blocked  = NotBlocked;
-    tso->blocked_exceptions = NULL;
-    tso->flags = TSO_DIRTY;
-    
-    tso->saved_errno = 0;
-    tso->bound = NULL;
-    tso->cap = cap;
-    
-    tso->stack_size     = stack_size;
-    tso->max_stack_size = round_to_mblocks(RtsFlags.GcFlags.maxStkSize) 
-	                  - TSO_STRUCT_SIZEW;
-    tso->sp             = (P_)&(tso->stack) + stack_size;
-
-    tso->trec = NO_TREC;
-    
-#ifdef PROFILING
-    tso->prof.CCCS = CCS_MAIN;
-#endif
-    
-  /* put a stop frame on the stack */
-    tso->sp -= sizeofW(StgStopFrame);
-    SET_HDR((StgClosure*)tso->sp,(StgInfoTable *)&stg_stop_thread_info,CCS_SYSTEM);
-    tso->link = END_TSO_QUEUE;
-    
-  // ToDo: check this
-#if defined(GRAN)
-    /* uses more flexible routine in GranSim */
-    insertThread(tso, CurrentProc);
-#else
-    /* In a non-GranSim setup the pushing of a TSO onto the runq is separated
-     * from its creation
-     */
-#endif
-    
-#if defined(GRAN) 
-    if (RtsFlags.GranFlags.GranSimStats.Full) 
-	DumpGranEvent(GR_START,tso);
-#elif defined(PARALLEL_HASKELL)
-    if (RtsFlags.ParFlags.ParStats.Full) 
-	DumpGranEvent(GR_STARTQ,tso);
-    /* HACk to avoid SCHEDULE 
-       LastTSO = tso; */
-#endif
-    
-    /* Link the new thread on the global thread list.
-     */
-    ACQUIRE_LOCK(&sched_mutex);
-    tso->id = next_thread_id++;  // while we have the mutex
-    tso->global_link = all_threads;
-    all_threads = tso;
-    RELEASE_LOCK(&sched_mutex);
-    
-#if defined(DIST)
-    tso->dist.priority = MandatoryPriority; //by default that is...
-#endif
-    
-#if defined(GRAN)
-    tso->gran.pri = pri;
-# if defined(DEBUG)
-    tso->gran.magic = TSO_MAGIC; // debugging only
-# endif
-    tso->gran.sparkname   = 0;
-    tso->gran.startedat   = CURRENT_TIME; 
-    tso->gran.exported    = 0;
-    tso->gran.basicblocks = 0;
-    tso->gran.allocs      = 0;
-    tso->gran.exectime    = 0;
-    tso->gran.fetchtime   = 0;
-    tso->gran.fetchcount  = 0;
-    tso->gran.blocktime   = 0;
-    tso->gran.blockcount  = 0;
-    tso->gran.blockedat   = 0;
-    tso->gran.globalsparks = 0;
-    tso->gran.localsparks  = 0;
-    if (RtsFlags.GranFlags.Light)
-	tso->gran.clock  = Now; /* local clock */
-    else
-	tso->gran.clock  = 0;
-    
-    IF_DEBUG(gran,printTSO(tso));
-#elif defined(PARALLEL_HASKELL)
-# if defined(DEBUG)
-    tso->par.magic = TSO_MAGIC; // debugging only
-# endif
-    tso->par.sparkname   = 0;
-    tso->par.startedat   = CURRENT_TIME; 
-    tso->par.exported    = 0;
-    tso->par.basicblocks = 0;
-    tso->par.allocs      = 0;
-    tso->par.exectime    = 0;
-    tso->par.fetchtime   = 0;
-    tso->par.fetchcount  = 0;
-    tso->par.blocktime   = 0;
-    tso->par.blockcount  = 0;
-    tso->par.blockedat   = 0;
-    tso->par.globalsparks = 0;
-    tso->par.localsparks  = 0;
-#endif
-    
-#if defined(GRAN)
-    globalGranStats.tot_threads_created++;
-    globalGranStats.threads_created_on_PE[CurrentProc]++;
-    globalGranStats.tot_sq_len += spark_queue_len(CurrentProc);
-    globalGranStats.tot_sq_probes++;
-#elif defined(PARALLEL_HASKELL)
-    // collect parallel global statistics (currently done together with GC stats)
-    if (RtsFlags.ParFlags.ParStats.Global &&
-	RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
-	//debugBelch("Creating thread %d @ %11.2f\n", tso->id, usertime()); 
-	globalParStats.tot_threads_created++;
-    }
-#endif 
-    
-#if defined(GRAN)
-    debugTrace(GRAN_DEBUG_pri,
-	       "==__ schedule: Created TSO %d (%p);",
-	       CurrentProc, tso, tso->id);
-#elif defined(PARALLEL_HASKELL)
-    debugTrace(PAR_DEBUG_verbose,
-	       "==__ schedule: Created TSO %d (%p); %d threads active",
-	       (long)tso->id, tso, advisory_thread_count);
-#else
-    debugTrace(DEBUG_sched,
-	       "created thread %ld, stack size = %lx words", 
-	       (long)tso->id, (long)tso->stack_size);
-#endif    
-    return tso;
-}
-
-#if defined(PAR)
-/* RFP:
-   all parallel thread creation calls should fall through the following routine.
-*/
-StgTSO *
-createThreadFromSpark(rtsSpark spark) 
-{ StgTSO *tso;
-  ASSERT(spark != (rtsSpark)NULL);
-// JB: TAKE CARE OF THIS COUNTER! BUGGY
-  if (advisory_thread_count >= RtsFlags.ParFlags.maxThreads) 
-  { threadsIgnored++;
-    barf("{createSparkThread}Daq ghuH: refusing to create another thread; no more than %d threads allowed (currently %d)",
-	  RtsFlags.ParFlags.maxThreads, advisory_thread_count);    
-    return END_TSO_QUEUE;
-  }
-  else
-  { threadsCreated++;
-    tso = createThread(RtsFlags.GcFlags.initialStkSize);
-    if (tso==END_TSO_QUEUE)	
-      barf("createSparkThread: Cannot create TSO");
-#if defined(DIST)
-    tso->priority = AdvisoryPriority;
-#endif
-    pushClosure(tso,spark);
-    addToRunQueue(tso);
-    advisory_thread_count++;  // JB: TAKE CARE OF THIS COUNTER! BUGGY
-  }
-  return tso;
-}
-#endif
-
-/*
-  Turn a spark into a thread.
-  ToDo: fix for SMP (needs to acquire SCHED_MUTEX!)
-*/
-#if 0
-StgTSO *
-activateSpark (rtsSpark spark) 
-{
-  StgTSO *tso;
-
-  tso = createSparkThread(spark);
-  if (RtsFlags.ParFlags.ParStats.Full) {   
-    //ASSERT(run_queue_hd == END_TSO_QUEUE); // I think ...
-      IF_PAR_DEBUG(verbose,
-		   debugBelch("==^^ activateSpark: turning spark of closure %p (%s) into a thread\n",
-			      (StgClosure *)spark, info_type((StgClosure *)spark)));
-  }
-  // ToDo: fwd info on local/global spark to thread -- HWL
-  // tso->gran.exported =  spark->exported;
-  // tso->gran.locked =   !spark->global;
-  // tso->gran.sparkname = spark->name;
-
-  return tso;
-}
-#endif
 
 /* ---------------------------------------------------------------------------
  * scheduleThread()
@@ -2731,12 +2403,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
     } else {
-	Capability *target_cap = &capabilities[cpu];
-	if (tso->bound) {
-	    tso->bound->cap = target_cap;
-	}
-	tso->cap = target_cap;
-	wakeupThreadOnCapability(target_cap,tso);
+	migrateThreadToCapability_lock(&capabilities[cpu],tso);
     }
 #else
     appendToRunQueue(cap,tso);
@@ -3072,19 +2739,25 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
   StgTSO *dest;
 
   IF_DEBUG(sanity,checkTSO(tso));
+
+  // don't allow throwTo() to modify the blocked_exceptions queue
+  // while we are moving the TSO:
+  lockClosure((StgClosure *)tso);
+
   if (tso->stack_size >= tso->max_stack_size) {
 
       debugTrace(DEBUG_gc,
-		 "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)\n",
+		 "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)",
 		 (long)tso->id, tso, (long)tso->stack_size, (long)tso->max_stack_size);
       IF_DEBUG(gc,
 	       /* If we're debugging, just print out the top of the stack */
 	       printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
 						tso->sp+64)));
 
-    /* Send this thread the StackOverflow exception */
-    raiseAsync(cap, tso, (StgClosure *)stackOverflow_closure);
-    return tso;
+      // Send this thread the StackOverflow exception
+      unlockTSO(tso);
+      throwToSingleThreaded(cap, tso, (StgClosure *)stackOverflow_closure);
+      return tso;
   }
 
   /* Try to double the current stack size.  If that takes us over the
@@ -3098,7 +2771,7 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
   new_stack_size = new_tso_size - TSO_STRUCT_SIZEW;
 
   debugTrace(DEBUG_sched, 
-	     "increasing stack size from %ld words to %d.\n",
+	     "increasing stack size from %ld words to %d.",
 	     (long)tso->stack_size, new_stack_size);
 
   dest = (StgTSO *)allocate(new_tso_size);
@@ -3133,308 +2806,16 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
 	       printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
 						tso->sp+64)));
   
-  IF_DEBUG(sanity,checkTSO(tso));
+  unlockTSO(dest);
+  unlockTSO(tso);
+
+  IF_DEBUG(sanity,checkTSO(dest));
 #if 0
   IF_DEBUG(scheduler,printTSO(dest));
 #endif
 
   return dest;
 }
-
-/* ---------------------------------------------------------------------------
-   Wake up a queue that was blocked on some resource.
-   ------------------------------------------------------------------------ */
-
-#if defined(GRAN)
-STATIC_INLINE void
-unblockCount ( StgBlockingQueueElement *bqe, StgClosure *node )
-{
-}
-#elif defined(PARALLEL_HASKELL)
-STATIC_INLINE void
-unblockCount ( StgBlockingQueueElement *bqe, StgClosure *node )
-{
-  /* write RESUME events to log file and
-     update blocked and fetch time (depending on type of the orig closure) */
-  if (RtsFlags.ParFlags.ParStats.Full) {
-    DumpRawGranEvent(CURRENT_PROC, CURRENT_PROC, 
-		     GR_RESUMEQ, ((StgTSO *)bqe), ((StgTSO *)bqe)->block_info.closure,
-		     0, 0 /* spark_queue_len(ADVISORY_POOL) */);
-    if (emptyRunQueue())
-      emitSchedule = rtsTrue;
-
-    switch (get_itbl(node)->type) {
-	case FETCH_ME_BQ:
-	  ((StgTSO *)bqe)->par.fetchtime += CURRENT_TIME-((StgTSO *)bqe)->par.blockedat;
-	  break;
-	case RBH:
-	case FETCH_ME:
-	case BLACKHOLE_BQ:
-	  ((StgTSO *)bqe)->par.blocktime += CURRENT_TIME-((StgTSO *)bqe)->par.blockedat;
-	  break;
-#ifdef DIST
-        case MVAR:
-          break;
-#endif	  
-	default:
-	  barf("{unblockOne}Daq Qagh: unexpected closure in blocking queue");
-	}
-      }
-}
-#endif
-
-#if defined(GRAN)
-StgBlockingQueueElement *
-unblockOne(StgBlockingQueueElement *bqe, StgClosure *node)
-{
-    StgTSO *tso;
-    PEs node_loc, tso_loc;
-
-    node_loc = where_is(node); // should be lifted out of loop
-    tso = (StgTSO *)bqe;  // wastes an assignment to get the type right
-    tso_loc = where_is((StgClosure *)tso);
-    if (IS_LOCAL_TO(PROCS(node),tso_loc)) { // TSO is local
-      /* !fake_fetch => TSO is on CurrentProc is same as IS_LOCAL_TO */
-      ASSERT(CurrentProc!=node_loc || tso_loc==CurrentProc);
-      CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.lunblocktime;
-      // insertThread(tso, node_loc);
-      new_event(tso_loc, tso_loc, CurrentTime[CurrentProc],
-		ResumeThread,
-		tso, node, (rtsSpark*)NULL);
-      tso->link = END_TSO_QUEUE; // overwrite link just to be sure 
-      // len_local++;
-      // len++;
-    } else { // TSO is remote (actually should be FMBQ)
-      CurrentTime[CurrentProc] += RtsFlags.GranFlags.Costs.mpacktime +
-                                  RtsFlags.GranFlags.Costs.gunblocktime +
-	                          RtsFlags.GranFlags.Costs.latency;
-      new_event(tso_loc, CurrentProc, CurrentTime[CurrentProc],
-		UnblockThread,
-		tso, node, (rtsSpark*)NULL);
-      tso->link = END_TSO_QUEUE; // overwrite link just to be sure 
-      // len++;
-    }
-    /* the thread-queue-overhead is accounted for in either Resume or UnblockThread */
-    IF_GRAN_DEBUG(bq,
-		  debugBelch(" %s TSO %d (%p) [PE %d] (block_info.closure=%p) (next=%p) ,",
-			  (node_loc==tso_loc ? "Local" : "Global"), 
-			  tso->id, tso, CurrentProc, tso->block_info.closure, tso->link));
-    tso->block_info.closure = NULL;
-    debugTrace(DEBUG_sched, "-- waking up thread %ld (%p)\n", 
-	       tso->id, tso));
-}
-#elif defined(PARALLEL_HASKELL)
-StgBlockingQueueElement *
-unblockOne(StgBlockingQueueElement *bqe, StgClosure *node)
-{
-    StgBlockingQueueElement *next;
-
-    switch (get_itbl(bqe)->type) {
-    case TSO:
-      ASSERT(((StgTSO *)bqe)->why_blocked != NotBlocked);
-      /* if it's a TSO just push it onto the run_queue */
-      next = bqe->link;
-      ((StgTSO *)bqe)->link = END_TSO_QUEUE; // debugging?
-      APPEND_TO_RUN_QUEUE((StgTSO *)bqe); 
-      threadRunnable();
-      unblockCount(bqe, node);
-      /* reset blocking status after dumping event */
-      ((StgTSO *)bqe)->why_blocked = NotBlocked;
-      break;
-
-    case BLOCKED_FETCH:
-      /* if it's a BLOCKED_FETCH put it on the PendingFetches list */
-      next = bqe->link;
-      bqe->link = (StgBlockingQueueElement *)PendingFetches;
-      PendingFetches = (StgBlockedFetch *)bqe;
-      break;
-
-# if defined(DEBUG)
-      /* can ignore this case in a non-debugging setup; 
-	 see comments on RBHSave closures above */
-    case CONSTR:
-      /* check that the closure is an RBHSave closure */
-      ASSERT(get_itbl((StgClosure *)bqe) == &stg_RBH_Save_0_info ||
-	     get_itbl((StgClosure *)bqe) == &stg_RBH_Save_1_info ||
-	     get_itbl((StgClosure *)bqe) == &stg_RBH_Save_2_info);
-      break;
-
-    default:
-      barf("{unblockOne}Daq Qagh: Unexpected IP (%#lx; %s) in blocking queue at %#lx\n",
-	   get_itbl((StgClosure *)bqe), info_type((StgClosure *)bqe), 
-	   (StgClosure *)bqe);
-# endif
-    }
-  IF_PAR_DEBUG(bq, debugBelch(", %p (%s)\n", bqe, info_type((StgClosure*)bqe)));
-  return next;
-}
-#endif
-
-StgTSO *
-unblockOne(Capability *cap, StgTSO *tso)
-{
-  StgTSO *next;
-
-  ASSERT(get_itbl(tso)->type == TSO);
-  ASSERT(tso->why_blocked != NotBlocked);
-
-  tso->why_blocked = NotBlocked;
-  next = tso->link;
-  tso->link = END_TSO_QUEUE;
-
-#if defined(THREADED_RTS)
-  if (tso->cap == cap || (!tsoLocked(tso) && RtsFlags.ParFlags.wakeupMigrate)) {
-      // We are waking up this thread on the current Capability, which
-      // might involve migrating it from the Capability it was last on.
-      if (tso->bound) {
-	  ASSERT(tso->bound->cap == tso->cap);
-	  tso->bound->cap = cap;
-      }
-      tso->cap = cap;
-      appendToRunQueue(cap,tso);
-      // we're holding a newly woken thread, make sure we context switch
-      // quickly so we can migrate it if necessary.
-      context_switch = 1;
-  } else {
-      // we'll try to wake it up on the Capability it was last on.
-      wakeupThreadOnCapability(tso->cap, tso);
-  }
-#else
-  appendToRunQueue(cap,tso);
-  context_switch = 1;
-#endif
-
-  debugTrace(DEBUG_sched,
-	     "waking up thread %ld on cap %d",
-	     (long)tso->id, tso->cap->no);
-
-  return next;
-}
-
-
-#if defined(GRAN)
-void 
-awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node)
-{
-  StgBlockingQueueElement *bqe;
-  PEs node_loc;
-  nat len = 0; 
-
-  IF_GRAN_DEBUG(bq, 
-		debugBelch("##-_ AwBQ for node %p on PE %d @ %ld by TSO %d (%p): \n", \
-		      node, CurrentProc, CurrentTime[CurrentProc], 
-		      CurrentTSO->id, CurrentTSO));
-
-  node_loc = where_is(node);
-
-  ASSERT(q == END_BQ_QUEUE ||
-	 get_itbl(q)->type == TSO ||   // q is either a TSO or an RBHSave
-	 get_itbl(q)->type == CONSTR); // closure (type constructor)
-  ASSERT(is_unique(node));
-
-  /* FAKE FETCH: magically copy the node to the tso's proc;
-     no Fetch necessary because in reality the node should not have been 
-     moved to the other PE in the first place
-  */
-  if (CurrentProc!=node_loc) {
-    IF_GRAN_DEBUG(bq, 
-		  debugBelch("## node %p is on PE %d but CurrentProc is %d (TSO %d); assuming fake fetch and adjusting bitmask (old: %#x)\n",
-			node, node_loc, CurrentProc, CurrentTSO->id, 
-			// CurrentTSO, where_is(CurrentTSO),
-			node->header.gran.procs));
-    node->header.gran.procs = (node->header.gran.procs) | PE_NUMBER(CurrentProc);
-    IF_GRAN_DEBUG(bq, 
-		  debugBelch("## new bitmask of node %p is %#x\n",
-			node, node->header.gran.procs));
-    if (RtsFlags.GranFlags.GranSimStats.Global) {
-      globalGranStats.tot_fake_fetches++;
-    }
-  }
-
-  bqe = q;
-  // ToDo: check: ASSERT(CurrentProc==node_loc);
-  while (get_itbl(bqe)->type==TSO) { // q != END_TSO_QUEUE) {
-    //next = bqe->link;
-    /* 
-       bqe points to the current element in the queue
-       next points to the next element in the queue
-    */
-    //tso = (StgTSO *)bqe;  // wastes an assignment to get the type right
-    //tso_loc = where_is(tso);
-    len++;
-    bqe = unblockOne(bqe, node);
-  }
-
-  /* if this is the BQ of an RBH, we have to put back the info ripped out of
-     the closure to make room for the anchor of the BQ */
-  if (bqe!=END_BQ_QUEUE) {
-    ASSERT(get_itbl(node)->type == RBH && get_itbl(bqe)->type == CONSTR);
-    /*
-    ASSERT((info_ptr==&RBH_Save_0_info) ||
-	   (info_ptr==&RBH_Save_1_info) ||
-	   (info_ptr==&RBH_Save_2_info));
-    */
-    /* cf. convertToRBH in RBH.c for writing the RBHSave closure */
-    ((StgRBH *)node)->blocking_queue = (StgBlockingQueueElement *)((StgRBHSave *)bqe)->payload[0];
-    ((StgRBH *)node)->mut_link       = (StgMutClosure *)((StgRBHSave *)bqe)->payload[1];
-
-    IF_GRAN_DEBUG(bq,
-		  debugBelch("## Filled in RBH_Save for %p (%s) at end of AwBQ\n",
-			node, info_type(node)));
-  }
-
-  /* statistics gathering */
-  if (RtsFlags.GranFlags.GranSimStats.Global) {
-    // globalGranStats.tot_bq_processing_time += bq_processing_time;
-    globalGranStats.tot_bq_len += len;      // total length of all bqs awakened
-    // globalGranStats.tot_bq_len_local += len_local;  // same for local TSOs only
-    globalGranStats.tot_awbq++;             // total no. of bqs awakened
-  }
-  IF_GRAN_DEBUG(bq,
-		debugBelch("## BQ Stats of %p: [%d entries] %s\n",
-			node, len, (bqe!=END_BQ_QUEUE) ? "RBH" : ""));
-}
-#elif defined(PARALLEL_HASKELL)
-void 
-awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node)
-{
-  StgBlockingQueueElement *bqe;
-
-  IF_PAR_DEBUG(verbose, 
-	       debugBelch("##-_ AwBQ for node %p on [%x]: \n",
-		     node, mytid));
-#ifdef DIST  
-  //RFP
-  if(get_itbl(q)->type == CONSTR || q==END_BQ_QUEUE) {
-    IF_PAR_DEBUG(verbose, debugBelch("## ... nothing to unblock so lets just return. RFP (BUG?)\n"));
-    return;
-  }
-#endif
-  
-  ASSERT(q == END_BQ_QUEUE ||
-	 get_itbl(q)->type == TSO ||           
-  	 get_itbl(q)->type == BLOCKED_FETCH || 
-  	 get_itbl(q)->type == CONSTR); 
-
-  bqe = q;
-  while (get_itbl(bqe)->type==TSO || 
-	 get_itbl(bqe)->type==BLOCKED_FETCH) {
-    bqe = unblockOne(bqe, node);
-  }
-}
-
-#else   /* !GRAN && !PARALLEL_HASKELL */
-
-void
-awakenBlockedQueue(Capability *cap, StgTSO *tso)
-{
-    if (tso == NULL) return; // hack; see bug #1235728, and comments in
-	 		     // Exception.cmm
-    while (tso != END_TSO_QUEUE) {
-	tso = unblockOne(cap,tso);
-    }
-}
-#endif
 
 /* ---------------------------------------------------------------------------
    Interrupt execution
@@ -3479,316 +2860,6 @@ wakeUpRts(void)
 #endif
 #endif
 }
-
-/* -----------------------------------------------------------------------------
-   Unblock a thread
-
-   This is for use when we raise an exception in another thread, which
-   may be blocked.
-   This has nothing to do with the UnblockThread event in GranSim. -- HWL
-   -------------------------------------------------------------------------- */
-
-#if defined(GRAN) || defined(PARALLEL_HASKELL)
-/*
-  NB: only the type of the blocking queue is different in GranSim and GUM
-      the operations on the queue-elements are the same
-      long live polymorphism!
-
-  Locks: sched_mutex is held upon entry and exit.
-
-*/
-static void
-unblockThread(Capability *cap, StgTSO *tso)
-{
-  StgBlockingQueueElement *t, **last;
-
-  switch (tso->why_blocked) {
-
-  case NotBlocked:
-    return;  /* not blocked */
-
-  case BlockedOnSTM:
-    // Be careful: nothing to do here!  We tell the scheduler that the thread
-    // is runnable and we leave it to the stack-walking code to abort the 
-    // transaction while unwinding the stack.  We should perhaps have a debugging
-    // test to make sure that this really happens and that the 'zombie' transaction
-    // does not get committed.
-    goto done;
-
-  case BlockedOnMVar:
-    ASSERT(get_itbl(tso->block_info.closure)->type == MVAR);
-    {
-      StgBlockingQueueElement *last_tso = END_BQ_QUEUE;
-      StgMVar *mvar = (StgMVar *)(tso->block_info.closure);
-
-      last = (StgBlockingQueueElement **)&mvar->head;
-      for (t = (StgBlockingQueueElement *)mvar->head; 
-	   t != END_BQ_QUEUE; 
-	   last = &t->link, last_tso = t, t = t->link) {
-	if (t == (StgBlockingQueueElement *)tso) {
-	  *last = (StgBlockingQueueElement *)tso->link;
-	  if (mvar->tail == tso) {
-	    mvar->tail = (StgTSO *)last_tso;
-	  }
-	  goto done;
-	}
-      }
-      barf("unblockThread (MVAR): TSO not found");
-    }
-
-  case BlockedOnBlackHole:
-    ASSERT(get_itbl(tso->block_info.closure)->type == BLACKHOLE_BQ);
-    {
-      StgBlockingQueue *bq = (StgBlockingQueue *)(tso->block_info.closure);
-
-      last = &bq->blocking_queue;
-      for (t = bq->blocking_queue; 
-	   t != END_BQ_QUEUE; 
-	   last = &t->link, t = t->link) {
-	if (t == (StgBlockingQueueElement *)tso) {
-	  *last = (StgBlockingQueueElement *)tso->link;
-	  goto done;
-	}
-      }
-      barf("unblockThread (BLACKHOLE): TSO not found");
-    }
-
-  case BlockedOnException:
-    {
-      StgTSO *target  = tso->block_info.tso;
-
-      ASSERT(get_itbl(target)->type == TSO);
-
-      if (target->what_next == ThreadRelocated) {
-	  target = target->link;
-	  ASSERT(get_itbl(target)->type == TSO);
-      }
-
-      ASSERT(target->blocked_exceptions != NULL);
-
-      last = (StgBlockingQueueElement **)&target->blocked_exceptions;
-      for (t = (StgBlockingQueueElement *)target->blocked_exceptions; 
-	   t != END_BQ_QUEUE; 
-	   last = &t->link, t = t->link) {
-	ASSERT(get_itbl(t)->type == TSO);
-	if (t == (StgBlockingQueueElement *)tso) {
-	  *last = (StgBlockingQueueElement *)tso->link;
-	  goto done;
-	}
-      }
-      barf("unblockThread (Exception): TSO not found");
-    }
-
-  case BlockedOnRead:
-  case BlockedOnWrite:
-#if defined(mingw32_HOST_OS)
-  case BlockedOnDoProc:
-#endif
-    {
-      /* take TSO off blocked_queue */
-      StgBlockingQueueElement *prev = NULL;
-      for (t = (StgBlockingQueueElement *)blocked_queue_hd; t != END_BQ_QUEUE; 
-	   prev = t, t = t->link) {
-	if (t == (StgBlockingQueueElement *)tso) {
-	  if (prev == NULL) {
-	    blocked_queue_hd = (StgTSO *)t->link;
-	    if ((StgBlockingQueueElement *)blocked_queue_tl == t) {
-	      blocked_queue_tl = END_TSO_QUEUE;
-	    }
-	  } else {
-	    prev->link = t->link;
-	    if ((StgBlockingQueueElement *)blocked_queue_tl == t) {
-	      blocked_queue_tl = (StgTSO *)prev;
-	    }
-	  }
-#if defined(mingw32_HOST_OS)
-	  /* (Cooperatively) signal that the worker thread should abort
-	   * the request.
-	   */
-	  abandonWorkRequest(tso->block_info.async_result->reqID);
-#endif
-	  goto done;
-	}
-      }
-      barf("unblockThread (I/O): TSO not found");
-    }
-
-  case BlockedOnDelay:
-    {
-      /* take TSO off sleeping_queue */
-      StgBlockingQueueElement *prev = NULL;
-      for (t = (StgBlockingQueueElement *)sleeping_queue; t != END_BQ_QUEUE; 
-	   prev = t, t = t->link) {
-	if (t == (StgBlockingQueueElement *)tso) {
-	  if (prev == NULL) {
-	    sleeping_queue = (StgTSO *)t->link;
-	  } else {
-	    prev->link = t->link;
-	  }
-	  goto done;
-	}
-      }
-      barf("unblockThread (delay): TSO not found");
-    }
-
-  default:
-    barf("unblockThread");
-  }
-
- done:
-  tso->link = END_TSO_QUEUE;
-  tso->why_blocked = NotBlocked;
-  tso->block_info.closure = NULL;
-  pushOnRunQueue(cap,tso);
-}
-#else
-static void
-unblockThread(Capability *cap, StgTSO *tso)
-{
-  StgTSO *t, **last;
-  
-  /* To avoid locking unnecessarily. */
-  if (tso->why_blocked == NotBlocked) {
-    return;
-  }
-
-  switch (tso->why_blocked) {
-
-  case BlockedOnSTM:
-    // Be careful: nothing to do here!  We tell the scheduler that the thread
-    // is runnable and we leave it to the stack-walking code to abort the 
-    // transaction while unwinding the stack.  We should perhaps have a debugging
-    // test to make sure that this really happens and that the 'zombie' transaction
-    // does not get committed.
-    goto done;
-
-  case BlockedOnMVar:
-    ASSERT(get_itbl(tso->block_info.closure)->type == MVAR);
-    {
-      StgTSO *last_tso = END_TSO_QUEUE;
-      StgMVar *mvar = (StgMVar *)(tso->block_info.closure);
-
-      last = &mvar->head;
-      for (t = mvar->head; t != END_TSO_QUEUE; 
-	   last = &t->link, last_tso = t, t = t->link) {
-	if (t == tso) {
-	  *last = tso->link;
-	  if (mvar->tail == tso) {
-	    mvar->tail = last_tso;
-	  }
-	  goto done;
-	}
-      }
-      barf("unblockThread (MVAR): TSO not found");
-    }
-
-  case BlockedOnBlackHole:
-    {
-      last = &blackhole_queue;
-      for (t = blackhole_queue; t != END_TSO_QUEUE; 
-	   last = &t->link, t = t->link) {
-	if (t == tso) {
-	  *last = tso->link;
-	  goto done;
-	}
-      }
-      barf("unblockThread (BLACKHOLE): TSO not found");
-    }
-
-  case BlockedOnException:
-    {
-      StgTSO *target  = tso->block_info.tso;
-
-      ASSERT(get_itbl(target)->type == TSO);
-
-      while (target->what_next == ThreadRelocated) {
-	  target = target->link;
-	  ASSERT(get_itbl(target)->type == TSO);
-      }
-      
-      ASSERT(target->blocked_exceptions != NULL);
-
-      last = &target->blocked_exceptions;
-      for (t = target->blocked_exceptions; t != END_TSO_QUEUE; 
-	   last = &t->link, t = t->link) {
-	ASSERT(get_itbl(t)->type == TSO);
-	if (t == tso) {
-	  *last = tso->link;
-	  goto done;
-	}
-      }
-      barf("unblockThread (Exception): TSO not found");
-    }
-
-#if !defined(THREADED_RTS)
-  case BlockedOnRead:
-  case BlockedOnWrite:
-#if defined(mingw32_HOST_OS)
-  case BlockedOnDoProc:
-#endif
-    {
-      StgTSO *prev = NULL;
-      for (t = blocked_queue_hd; t != END_TSO_QUEUE; 
-	   prev = t, t = t->link) {
-	if (t == tso) {
-	  if (prev == NULL) {
-	    blocked_queue_hd = t->link;
-	    if (blocked_queue_tl == t) {
-	      blocked_queue_tl = END_TSO_QUEUE;
-	    }
-	  } else {
-	    prev->link = t->link;
-	    if (blocked_queue_tl == t) {
-	      blocked_queue_tl = prev;
-	    }
-	  }
-#if defined(mingw32_HOST_OS)
-	  /* (Cooperatively) signal that the worker thread should abort
-	   * the request.
-	   */
-	  abandonWorkRequest(tso->block_info.async_result->reqID);
-#endif
-	  goto done;
-	}
-      }
-      barf("unblockThread (I/O): TSO not found");
-    }
-
-  case BlockedOnDelay:
-    {
-      StgTSO *prev = NULL;
-      for (t = sleeping_queue; t != END_TSO_QUEUE; 
-	   prev = t, t = t->link) {
-	if (t == tso) {
-	  if (prev == NULL) {
-	    sleeping_queue = t->link;
-	  } else {
-	    prev->link = t->link;
-	  }
-	  goto done;
-	}
-      }
-      barf("unblockThread (delay): TSO not found");
-    }
-#endif
-
-  default:
-    barf("unblockThread");
-  }
-
- done:
-  tso->link = END_TSO_QUEUE;
-  tso->why_blocked = NotBlocked;
-  tso->block_info.closure = NULL;
-  appendToRunQueue(cap,tso);
-
-  // We might have just migrated this TSO to our Capability:
-  if (tso->bound) {
-      tso->bound->cap = cap;
-  }
-  tso->cap = cap;
-}
-#endif
 
 /* -----------------------------------------------------------------------------
  * checkBlackHoles()
@@ -3840,264 +2911,6 @@ checkBlackHoles (Capability *cap)
 }
 
 /* -----------------------------------------------------------------------------
- * raiseAsync()
- *
- * The following function implements the magic for raising an
- * asynchronous exception in an existing thread.
- *
- * We first remove the thread from any queue on which it might be
- * blocked.  The possible blockages are MVARs and BLACKHOLE_BQs.
- *
- * We strip the stack down to the innermost CATCH_FRAME, building
- * thunks in the heap for all the active computations, so they can 
- * be restarted if necessary.  When we reach a CATCH_FRAME, we build
- * an application of the handler to the exception, and push it on
- * the top of the stack.
- * 
- * How exactly do we save all the active computations?  We create an
- * AP_STACK for every UpdateFrame on the stack.  Entering one of these
- * AP_STACKs pushes everything from the corresponding update frame
- * upwards onto the stack.  (Actually, it pushes everything up to the
- * next update frame plus a pointer to the next AP_STACK object.
- * Entering the next AP_STACK object pushes more onto the stack until we
- * reach the last AP_STACK object - at which point the stack should look
- * exactly as it did when we killed the TSO and we can continue
- * execution by entering the closure on top of the stack.
- *
- * We can also kill a thread entirely - this happens if either (a) the 
- * exception passed to raiseAsync is NULL, or (b) there's no
- * CATCH_FRAME on the stack.  In either case, we strip the entire
- * stack and replace the thread with a zombie.
- *
- * ToDo: in THREADED_RTS mode, this function is only safe if either
- * (a) we hold all the Capabilities (eg. in GC, or if there is only
- * one Capability), or (b) we own the Capability that the TSO is
- * currently blocked on or on the run queue of.
- *
- * -------------------------------------------------------------------------- */
- 
-void
-raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception)
-{
-    raiseAsync_(cap, tso, exception, rtsFalse, NULL);
-}
-
-void
-suspendComputation(Capability *cap, StgTSO *tso, StgPtr stop_here)
-{
-    raiseAsync_(cap, tso, NULL, rtsFalse, stop_here);
-}
-
-static void
-raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception, 
-	    rtsBool stop_at_atomically, StgPtr stop_here)
-{
-    StgRetInfoTable *info;
-    StgPtr sp, frame;
-    nat i;
-  
-    // Thread already dead?
-    if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
-	return;
-    }
-
-    debugTrace(DEBUG_sched,
-	       "raising exception in thread %ld.", (long)tso->id);
-    
-    // Remove it from any blocking queues
-    unblockThread(cap,tso);
-
-    // mark it dirty; we're about to change its stack.
-    dirtyTSO(tso);
-
-    sp = tso->sp;
-    
-    // The stack freezing code assumes there's a closure pointer on
-    // the top of the stack, so we have to arrange that this is the case...
-    //
-    if (sp[0] == (W_)&stg_enter_info) {
-	sp++;
-    } else {
-	sp--;
-	sp[0] = (W_)&stg_dummy_ret_closure;
-    }
-
-    frame = sp + 1;
-    while (stop_here == NULL || frame < stop_here) {
-
-	// 1. Let the top of the stack be the "current closure"
-	//
-	// 2. Walk up the stack until we find either an UPDATE_FRAME or a
-	// CATCH_FRAME.
-	//
-	// 3. If it's an UPDATE_FRAME, then make an AP_STACK containing the
-	// current closure applied to the chunk of stack up to (but not
-	// including) the update frame.  This closure becomes the "current
-	// closure".  Go back to step 2.
-	//
-	// 4. If it's a CATCH_FRAME, then leave the exception handler on
-	// top of the stack applied to the exception.
-	// 
-	// 5. If it's a STOP_FRAME, then kill the thread.
-        // 
-        // NB: if we pass an ATOMICALLY_FRAME then abort the associated 
-        // transaction
-       
-	info = get_ret_itbl((StgClosure *)frame);
-
-	switch (info->i.type) {
-
-	case UPDATE_FRAME:
-	{
-	    StgAP_STACK * ap;
-	    nat words;
-	    
-	    // First build an AP_STACK consisting of the stack chunk above the
-	    // current update frame, with the top word on the stack as the
-	    // fun field.
-	    //
-	    words = frame - sp - 1;
-	    ap = (StgAP_STACK *)allocateLocal(cap,AP_STACK_sizeW(words));
-	    
-	    ap->size = words;
-	    ap->fun  = (StgClosure *)sp[0];
-	    sp++;
-	    for(i=0; i < (nat)words; ++i) {
-		ap->payload[i] = (StgClosure *)*sp++;
-	    }
-	    
-	    SET_HDR(ap,&stg_AP_STACK_info,
-		    ((StgClosure *)frame)->header.prof.ccs /* ToDo */); 
-	    TICK_ALLOC_UP_THK(words+1,0);
-	    
-	    //IF_DEBUG(scheduler,
-	    //	     debugBelch("sched: Updating ");
-	    //	     printPtr((P_)((StgUpdateFrame *)frame)->updatee); 
-	    //	     debugBelch(" with ");
-	    //	     printObj((StgClosure *)ap);
-	    //	);
-
-	    // Replace the updatee with an indirection
-	    //
-	    // Warning: if we're in a loop, more than one update frame on
-	    // the stack may point to the same object.  Be careful not to
-	    // overwrite an IND_OLDGEN in this case, because we'll screw
-	    // up the mutable lists.  To be on the safe side, don't
-	    // overwrite any kind of indirection at all.  See also
-	    // threadSqueezeStack in GC.c, where we have to make a similar
-	    // check.
-	    //
-	    if (!closure_IND(((StgUpdateFrame *)frame)->updatee)) {
-		// revert the black hole
-		UPD_IND_NOLOCK(((StgUpdateFrame *)frame)->updatee,
-			       (StgClosure *)ap);
-	    }
-	    sp += sizeofW(StgUpdateFrame) - 1;
-	    sp[0] = (W_)ap; // push onto stack
-	    frame = sp + 1;
-	    continue; //no need to bump frame
-	}
-
-	case STOP_FRAME:
-	    // We've stripped the entire stack, the thread is now dead.
-	    tso->what_next = ThreadKilled;
-	    tso->sp = frame + sizeofW(StgStopFrame);
-	    return;
-
-	case CATCH_FRAME:
-	    // If we find a CATCH_FRAME, and we've got an exception to raise,
-	    // then build the THUNK raise(exception), and leave it on
-	    // top of the CATCH_FRAME ready to enter.
-	    //
-	{
-#ifdef PROFILING
-	    StgCatchFrame *cf = (StgCatchFrame *)frame;
-#endif
-	    StgThunk *raise;
-	    
-	    if (exception == NULL) break;
-
-	    // we've got an exception to raise, so let's pass it to the
-	    // handler in this frame.
-	    //
-	    raise = (StgThunk *)allocateLocal(cap,sizeofW(StgThunk)+1);
-	    TICK_ALLOC_SE_THK(1,0);
-	    SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
-	    raise->payload[0] = exception;
-	    
-	    // throw away the stack from Sp up to the CATCH_FRAME.
-	    //
-	    sp = frame - 1;
-	    
-	    /* Ensure that async excpetions are blocked now, so we don't get
-	     * a surprise exception before we get around to executing the
-	     * handler.
-	     */
-	    if (tso->blocked_exceptions == NULL) {
-		tso->blocked_exceptions = END_TSO_QUEUE;
-	    }
-
-	    /* Put the newly-built THUNK on top of the stack, ready to execute
-	     * when the thread restarts.
-	     */
-	    sp[0] = (W_)raise;
-	    sp[-1] = (W_)&stg_enter_info;
-	    tso->sp = sp-1;
-	    tso->what_next = ThreadRunGHC;
-	    IF_DEBUG(sanity, checkTSO(tso));
-	    return;
-	}
-	    
-	case ATOMICALLY_FRAME:
-	    if (stop_at_atomically) {
-		ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
-		stmCondemnTransaction(cap, tso -> trec);
-#ifdef REG_R1
-		tso->sp = frame;
-#else
-		// R1 is not a register: the return convention for IO in
-		// this case puts the return value on the stack, so we
-		// need to set up the stack to return to the atomically
-		// frame properly...
-		tso->sp = frame - 2;
-		tso->sp[1] = (StgWord) &stg_NO_FINALIZER_closure; // why not?
-		tso->sp[0] = (StgWord) &stg_ut_1_0_unreg_info;
-#endif
-		tso->what_next = ThreadRunGHC;
-		return;
-	    }
-	    // Not stop_at_atomically... fall through and abort the
-	    // transaction.
-	    
-	case CATCH_RETRY_FRAME:
-	    // IF we find an ATOMICALLY_FRAME then we abort the
-	    // current transaction and propagate the exception.  In
-	    // this case (unlike ordinary exceptions) we do not care
-	    // whether the transaction is valid or not because its
-	    // possible validity cannot have caused the exception
-	    // and will not be visible after the abort.
-	    debugTrace(DEBUG_stm, 
-		       "found atomically block delivering async exception");
-
-            StgTRecHeader *trec = tso -> trec;
-            StgTRecHeader *outer = stmGetEnclosingTRec(trec);
-            stmAbortTransaction(cap, trec);
-            tso -> trec = outer;
-	    break;
-	    
-	default:
-	    break;
-	}
-
-	// move on to the next stack frame
-	frame += stack_frame_sizeW((StgClosure *)frame);
-    }
-
-    // if we got here, then we stopped at stop_here
-    ASSERT(stop_here != NULL);
-}
-
-/* -----------------------------------------------------------------------------
    Deleting threads
 
    This is used for interruption (^C) and forking, and corresponds to
@@ -4108,10 +2921,15 @@ raiseAsync_(Capability *cap, StgTSO *tso, StgClosure *exception,
 static void 
 deleteThread (Capability *cap, StgTSO *tso)
 {
-  if (tso->why_blocked != BlockedOnCCall &&
-      tso->why_blocked != BlockedOnCCall_NoUnblockExc) {
-      raiseAsync(cap,tso,NULL);
-  }
+    // NOTE: must only be called on a TSO that we have exclusive
+    // access to, because we will call throwToSingleThreaded() below.
+    // The TSO must be on the run queue of the Capability we own, or 
+    // we must own all Capabilities.
+
+    if (tso->why_blocked != BlockedOnCCall &&
+	tso->why_blocked != BlockedOnCCall_NoUnblockExc) {
+	throwToSingleThreaded(cap,tso,NULL);
+    }
 }
 
 #ifdef FORKPROCESS_PRIMOP_SUPPORTED
@@ -4293,13 +3111,16 @@ resurrectThreads (StgTSO *threads)
 	case BlockedOnMVar:
 	case BlockedOnException:
 	    /* Called by GC - sched_mutex lock is currently held. */
-	    raiseAsync(cap, tso,(StgClosure *)BlockedOnDeadMVar_closure);
+	    throwToSingleThreaded(cap, tso,
+				  (StgClosure *)BlockedOnDeadMVar_closure);
 	    break;
 	case BlockedOnBlackHole:
-	    raiseAsync(cap, tso,(StgClosure *)NonTermination_closure);
+	    throwToSingleThreaded(cap, tso,
+				  (StgClosure *)NonTermination_closure);
 	    break;
 	case BlockedOnSTM:
-	    raiseAsync(cap, tso,(StgClosure *)BlockedIndefinitely_closure);
+	    throwToSingleThreaded(cap, tso,
+				  (StgClosure *)BlockedIndefinitely_closure);
 	    break;
 	case NotBlocked:
 	    /* This might happen if the thread was blocked on a black hole
@@ -4312,298 +3133,3 @@ resurrectThreads (StgTSO *threads)
 	}
     }
 }
-
-/* ----------------------------------------------------------------------------
- * Debugging: why is a thread blocked
- * [Also provides useful information when debugging threaded programs
- *  at the Haskell source code level, so enable outside of DEBUG. --sof 7/02]
-   ------------------------------------------------------------------------- */
-
-#if DEBUG
-static void
-printThreadBlockage(StgTSO *tso)
-{
-  switch (tso->why_blocked) {
-  case BlockedOnRead:
-    debugBelch("is blocked on read from fd %d", (int)(tso->block_info.fd));
-    break;
-  case BlockedOnWrite:
-    debugBelch("is blocked on write to fd %d", (int)(tso->block_info.fd));
-    break;
-#if defined(mingw32_HOST_OS)
-    case BlockedOnDoProc:
-    debugBelch("is blocked on proc (request: %ld)", tso->block_info.async_result->reqID);
-    break;
-#endif
-  case BlockedOnDelay:
-    debugBelch("is blocked until %ld", (long)(tso->block_info.target));
-    break;
-  case BlockedOnMVar:
-    debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
-    break;
-  case BlockedOnException:
-    debugBelch("is blocked on delivering an exception to thread %d",
-	    tso->block_info.tso->id);
-    break;
-  case BlockedOnBlackHole:
-    debugBelch("is blocked on a black hole");
-    break;
-  case NotBlocked:
-    debugBelch("is not blocked");
-    break;
-#if defined(PARALLEL_HASKELL)
-  case BlockedOnGA:
-    debugBelch("is blocked on global address; local FM_BQ is %p (%s)",
-	    tso->block_info.closure, info_type(tso->block_info.closure));
-    break;
-  case BlockedOnGA_NoSend:
-    debugBelch("is blocked on global address (no send); local FM_BQ is %p (%s)",
-	    tso->block_info.closure, info_type(tso->block_info.closure));
-    break;
-#endif
-  case BlockedOnCCall:
-    debugBelch("is blocked on an external call");
-    break;
-  case BlockedOnCCall_NoUnblockExc:
-    debugBelch("is blocked on an external call (exceptions were already blocked)");
-    break;
-  case BlockedOnSTM:
-    debugBelch("is blocked on an STM operation");
-    break;
-  default:
-    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %d (%d)",
-	 tso->why_blocked, tso->id, tso);
-  }
-}
-
-void
-printThreadStatus(StgTSO *t)
-{
-    debugBelch("\tthread %4d @ %p ", t->id, (void *)t);
-    {
-      void *label = lookupThreadLabel(t->id);
-      if (label) debugBelch("[\"%s\"] ",(char *)label);
-    }
-    if (t->what_next == ThreadRelocated) {
-	debugBelch("has been relocated...\n");
-    } else {
-	switch (t->what_next) {
-	case ThreadKilled:
-	    debugBelch("has been killed");
-	    break;
-	case ThreadComplete:
-	    debugBelch("has completed");
-	    break;
-	default:
-	    printThreadBlockage(t);
-	}
-	debugBelch("\n");
-    }
-}
-
-void
-printAllThreads(void)
-{
-  StgTSO *t, *next;
-  nat i;
-  Capability *cap;
-
-# if defined(GRAN)
-  char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
-  ullong_format_string(TIME_ON_PROC(CurrentProc), 
-		       time_string, rtsFalse/*no commas!*/);
-
-  debugBelch("all threads at [%s]:\n", time_string);
-# elif defined(PARALLEL_HASKELL)
-  char time_string[TIME_STR_LEN], node_str[NODE_STR_LEN];
-  ullong_format_string(CURRENT_TIME,
-		       time_string, rtsFalse/*no commas!*/);
-
-  debugBelch("all threads at [%s]:\n", time_string);
-# else
-  debugBelch("all threads:\n");
-# endif
-
-  for (i = 0; i < n_capabilities; i++) {
-      cap = &capabilities[i];
-      debugBelch("threads on capability %d:\n", cap->no);
-      for (t = cap->run_queue_hd; t != END_TSO_QUEUE; t = t->link) {
-	  printThreadStatus(t);
-      }
-  }
-
-  debugBelch("other threads:\n");
-  for (t = all_threads; t != END_TSO_QUEUE; t = next) {
-      if (t->why_blocked != NotBlocked) {
-	  printThreadStatus(t);
-      }
-      if (t->what_next == ThreadRelocated) {
-	  next = t->link;
-      } else {
-	  next = t->global_link;
-      }
-  }
-}
-
-// useful from gdb
-void 
-printThreadQueue(StgTSO *t)
-{
-    nat i = 0;
-    for (; t != END_TSO_QUEUE; t = t->link) {
-	printThreadStatus(t);
-	i++;
-    }
-    debugBelch("%d threads on queue\n", i);
-}
-
-/* 
-   Print a whole blocking queue attached to node (debugging only).
-*/
-# if defined(PARALLEL_HASKELL)
-void 
-print_bq (StgClosure *node)
-{
-  StgBlockingQueueElement *bqe;
-  StgTSO *tso;
-  rtsBool end;
-
-  debugBelch("## BQ of closure %p (%s): ",
-	  node, info_type(node));
-
-  /* should cover all closures that may have a blocking queue */
-  ASSERT(get_itbl(node)->type == BLACKHOLE_BQ ||
-	 get_itbl(node)->type == FETCH_ME_BQ ||
-	 get_itbl(node)->type == RBH ||
-	 get_itbl(node)->type == MVAR);
-    
-  ASSERT(node!=(StgClosure*)NULL);         // sanity check
-
-  print_bqe(((StgBlockingQueue*)node)->blocking_queue);
-}
-
-/* 
-   Print a whole blocking queue starting with the element bqe.
-*/
-void 
-print_bqe (StgBlockingQueueElement *bqe)
-{
-  rtsBool end;
-
-  /* 
-     NB: In a parallel setup a BQ of an RBH must end with an RBH_Save closure;
-  */
-  for (end = (bqe==END_BQ_QUEUE);
-       !end; // iterate until bqe points to a CONSTR
-       end = (get_itbl(bqe)->type == CONSTR) || (bqe->link==END_BQ_QUEUE), 
-       bqe = end ? END_BQ_QUEUE : bqe->link) {
-    ASSERT(bqe != END_BQ_QUEUE);                               // sanity check
-    ASSERT(bqe != (StgBlockingQueueElement *)NULL);            // sanity check
-    /* types of closures that may appear in a blocking queue */
-    ASSERT(get_itbl(bqe)->type == TSO ||           
-	   get_itbl(bqe)->type == BLOCKED_FETCH || 
-	   get_itbl(bqe)->type == CONSTR); 
-    /* only BQs of an RBH end with an RBH_Save closure */
-    //ASSERT(get_itbl(bqe)->type != CONSTR || get_itbl(node)->type == RBH);
-
-    switch (get_itbl(bqe)->type) {
-    case TSO:
-      debugBelch(" TSO %u (%x),",
-	      ((StgTSO *)bqe)->id, ((StgTSO *)bqe));
-      break;
-    case BLOCKED_FETCH:
-      debugBelch(" BF (node=%p, ga=((%x, %d, %x)),",
-	      ((StgBlockedFetch *)bqe)->node, 
-	      ((StgBlockedFetch *)bqe)->ga.payload.gc.gtid,
-	      ((StgBlockedFetch *)bqe)->ga.payload.gc.slot,
-	      ((StgBlockedFetch *)bqe)->ga.weight);
-      break;
-    case CONSTR:
-      debugBelch(" %s (IP %p),",
-	      (get_itbl(bqe) == &stg_RBH_Save_0_info ? "RBH_Save_0" :
-	       get_itbl(bqe) == &stg_RBH_Save_1_info ? "RBH_Save_1" :
-	       get_itbl(bqe) == &stg_RBH_Save_2_info ? "RBH_Save_2" :
-	       "RBH_Save_?"), get_itbl(bqe));
-      break;
-    default:
-      barf("Unexpected closure type %s in blocking queue", // of %p (%s)",
-	   info_type((StgClosure *)bqe)); // , node, info_type(node));
-      break;
-    }
-  } /* for */
-  debugBelch("\n");
-}
-# elif defined(GRAN)
-void 
-print_bq (StgClosure *node)
-{
-  StgBlockingQueueElement *bqe;
-  PEs node_loc, tso_loc;
-  rtsBool end;
-
-  /* should cover all closures that may have a blocking queue */
-  ASSERT(get_itbl(node)->type == BLACKHOLE_BQ ||
-	 get_itbl(node)->type == FETCH_ME_BQ ||
-	 get_itbl(node)->type == RBH);
-    
-  ASSERT(node!=(StgClosure*)NULL);         // sanity check
-  node_loc = where_is(node);
-
-  debugBelch("## BQ of closure %p (%s) on [PE %d]: ",
-	  node, info_type(node), node_loc);
-
-  /* 
-     NB: In a parallel setup a BQ of an RBH must end with an RBH_Save closure;
-  */
-  for (bqe = ((StgBlockingQueue*)node)->blocking_queue, end = (bqe==END_BQ_QUEUE);
-       !end; // iterate until bqe points to a CONSTR
-       end = (get_itbl(bqe)->type == CONSTR) || (bqe->link==END_BQ_QUEUE), bqe = end ? END_BQ_QUEUE : bqe->link) {
-    ASSERT(bqe != END_BQ_QUEUE);             // sanity check
-    ASSERT(bqe != (StgBlockingQueueElement *)NULL);  // sanity check
-    /* types of closures that may appear in a blocking queue */
-    ASSERT(get_itbl(bqe)->type == TSO ||           
-	   get_itbl(bqe)->type == CONSTR); 
-    /* only BQs of an RBH end with an RBH_Save closure */
-    ASSERT(get_itbl(bqe)->type != CONSTR || get_itbl(node)->type == RBH);
-
-    tso_loc = where_is((StgClosure *)bqe);
-    switch (get_itbl(bqe)->type) {
-    case TSO:
-      debugBelch(" TSO %d (%p) on [PE %d],",
-	      ((StgTSO *)bqe)->id, (StgTSO *)bqe, tso_loc);
-      break;
-    case CONSTR:
-      debugBelch(" %s (IP %p),",
-	      (get_itbl(bqe) == &stg_RBH_Save_0_info ? "RBH_Save_0" :
-	       get_itbl(bqe) == &stg_RBH_Save_1_info ? "RBH_Save_1" :
-	       get_itbl(bqe) == &stg_RBH_Save_2_info ? "RBH_Save_2" :
-	       "RBH_Save_?"), get_itbl(bqe));
-      break;
-    default:
-      barf("Unexpected closure type %s in blocking queue of %p (%s)",
-	   info_type((StgClosure *)bqe), node, info_type(node));
-      break;
-    }
-  } /* for */
-  debugBelch("\n");
-}
-# endif
-
-#if defined(PARALLEL_HASKELL)
-static nat
-run_queue_len(void)
-{
-    nat i;
-    StgTSO *tso;
-    
-    for (i=0, tso=run_queue_hd; 
-	 tso != END_TSO_QUEUE;
-	 i++, tso=tso->link) {
-	/* nothing */
-    }
-	
-    return i;
-}
-#endif
-
-#endif /* DEBUG */

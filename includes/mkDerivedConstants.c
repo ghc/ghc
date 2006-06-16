@@ -18,6 +18,7 @@
  * doesn't affect the offsets of anything else.
  */
 #define PROFILING
+#define THREADED_RTS
 
 #include "Rts.h"
 #include "RtsFlags.h"
@@ -227,6 +228,7 @@ main(int argc, char *argv[])
     def_offset("stgGCFun", FUN_OFFSET(stgGCFun));
 
     field_offset(Capability, r);
+    field_offset(Capability, lock);
 
     struct_field(bdescr, start);
     struct_field(bdescr, free);
@@ -276,8 +278,10 @@ main(int argc, char *argv[])
     closure_field(StgTSO, block_info);
     closure_field(StgTSO, blocked_exceptions);
     closure_field(StgTSO, id);
+    closure_field(StgTSO, cap);
     closure_field(StgTSO, saved_errno);
     closure_field(StgTSO, trec);
+    closure_field(StgTSO, flags);
     closure_field_("StgTSO_CCCS", StgTSO, prof.CCCS);
     tso_field(StgTSO, sp);
     tso_field_offset(StgTSO, stack);

@@ -45,11 +45,11 @@ void traceEnd (void);
 #ifdef DEBUG
 #define debugTrace(class, str, ...) trace(class,str, ## __VA_ARGS__)
 // variable arg macros are C99, and supported by gcc.
-#define debugTraceBegin(class, str, ...) traceBegin(class,str, ## __VA_ARGS__)
+#define debugTraceBegin(str, ...) traceBegin(str, ## __VA_ARGS__)
 #define debugTraceEnd() traceEnd()
 #else
 #define debugTrace(class, str, ...) /* nothing */
-#define debugTraceBegin(class, str, ...) /* nothing */
+#define debugTraceBegin(str, ...) /* nothing */
 #define debugTraceEnd() /* nothing */
 #endif
 

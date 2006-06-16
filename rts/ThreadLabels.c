@@ -8,8 +8,10 @@
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
+#include "Rts.h"
 #include "ThreadLabels.h"
 #include "RtsUtils.h"
+#include "Hash.h"
 
 #include <stdlib.h>
 
@@ -47,4 +49,19 @@ removeThreadLabel(StgWord key)
     stgFree(old);
   }  
 }
+
+void
+labelThread(StgPtr tso, char *label)
+{
+  int len;
+  void *buf;
+
+  /* Caveat: Once set, you can only set the thread name to "" */
+  len = strlen(label)+1;
+  buf = stgMallocBytes(len * sizeof(char), "Schedule.c:labelThread()");
+  strncpy(buf,label,len);
+  /* Update will free the old memory for us */
+  updateThreadLabel(((StgTSO *)tso)->id,buf);
+}
+
 #endif /* DEBUG */

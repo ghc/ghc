@@ -199,6 +199,10 @@ void waitForCapability (Task *task, Mutex *mutex, Capability **pCap);
 // from the one held by the current Task).
 //
 void wakeupThreadOnCapability (Capability *cap, StgTSO *tso);
+void wakeupThreadOnCapability_lock (Capability *cap, StgTSO *tso);
+
+void migrateThreadToCapability (Capability *cap, StgTSO *tso);
+void migrateThreadToCapability_lock (Capability *cap, StgTSO *tso);
 
 // Wakes up a worker thread on just one Capability, used when we
 // need to service some global event.

@@ -155,6 +155,21 @@ xchg(StgPtr p, StgWord w)
     return old;
 }
 
+INLINE_HEADER StgInfoTable *
+lockClosure(StgClosure *p)
+{ return (StgInfoTable *)p->header.info; }
+
+INLINE_HEADER void
+unlockClosure(StgClosure *p STG_UNUSED, StgInfoTable *info STG_UNUSED)
+{ /* nothing */ }
+
 #endif /* !THREADED_RTS */
+
+// Handy specialised versions of lockClosure()/unlockClosure()
+INLINE_HEADER void lockTSO(StgTSO *tso)
+{ lockClosure((StgClosure *)tso); }
+
+INLINE_HEADER void unlockTSO(StgTSO *tso)
+{ unlockClosure((StgClosure*)tso, (StgInfoTable*)&stg_TSO_info); }
 
 #endif /* SMP_H */

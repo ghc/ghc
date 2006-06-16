@@ -403,9 +403,7 @@ thread_TSO (StgTSO *tso)
 	) {
 	thread_(&tso->block_info.closure);
     }
-    if ( tso->blocked_exceptions != NULL ) {
-	thread_(&tso->blocked_exceptions);
-    }
+    thread_(&tso->blocked_exceptions);
     
     thread_(&tso->trec);
 

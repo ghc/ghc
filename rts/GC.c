@@ -44,6 +44,7 @@
 #endif
 #include "Trace.h"
 #include "RetainerProfile.h"
+#include "RaiseAsync.h"
 
 #include <string.h>
 
@@ -2631,10 +2632,8 @@ scavengeTSO (StgTSO *tso)
 	) {
 	tso->block_info.closure = evacuate(tso->block_info.closure);
     }
-    if ( tso->blocked_exceptions != NULL ) {
-	tso->blocked_exceptions = 
-	    (StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
-    }
+    tso->blocked_exceptions = 
+	(StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
     
     // We don't always chase the link field: TSOs on the blackhole
     // queue are not automatically alive, so the link field is a
@@ -4620,6 +4619,14 @@ threadPaused(Capability *cap, StgTSO *tso)
     nat weight_pending   = 0;
     rtsBool prev_was_update_frame;
     
+    // Check to see whether we have threads waiting to raise
+    // exceptions, and we're not blocking exceptions, or are blocked
+    // interruptibly.  This is important; if a thread is running with
+    // TSO_BLOCKEX and becomes blocked interruptibly, this is the only
+    // place we ensure that the blocked_exceptions get a chance.
+    maybePerformBlockedException (cap, tso);
+    if (tso->what_next == ThreadKilled) { return; }
+
     stack_end = &tso->stack[tso->stack_size];
     
     frame = (StgClosure *)tso->sp;

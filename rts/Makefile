@@ -301,26 +301,7 @@ endif
 # Compiling the cmm files
 
 # ToDo: should we really include Rts.h here?  Required for GNU_ATTRIBUTE().
-SRC_HC_OPTS += \
-  -I. \
-  -\#include Prelude.h \
-  -\#include Rts.h \
-  -\#include RtsFlags.h \
-  -\#include RtsUtils.h \
-  -\#include StgRun.h \
-  -\#include Schedule.h \
-  -\#include Printer.h \
-  -\#include Sanity.h \
-  -\#include STM.h \
-  -\#include Storage.h \
-  -\#include SchedAPI.h \
-  -\#include Timer.h \
-  -\#include ProfHeap.h \
-  -\#include LdvProfile.h \
-  -\#include Profiling.h \
-  -\#include OSThreads.h \
-  -\#include Apply.h \
-  -\#include SMP.h
+SRC_HC_OPTS += -I. -\#include HCIncludes.h
 
 ifeq "$(Windows)" "YES"
 PrimOps_HC_OPTS += -\#include '<windows.h>' -\#include win32/AsyncIO.h
