@@ -58,7 +58,11 @@ initTaskManager (void)
 	taskCount = 0;
 	workerCount = 0;
 	tasksRunning = 0;
+#if defined(THREADED_RTS)
+	maxWorkers = DEFAULT_MAX_WORKERS * RtsFlags.ParFlags.nNodes;
+#else
 	maxWorkers = DEFAULT_MAX_WORKERS;
+#endif
 	initialized = 1;
 #if defined(THREADED_RTS)
 	newThreadLocalKey(&currentTaskKey);
