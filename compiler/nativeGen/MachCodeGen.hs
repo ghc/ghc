@@ -2047,7 +2047,7 @@ getCondCode (CmmMachOp mop [x, y])
       MO_U_Lt rep -> condIntCode LU   x y
       MO_U_Le rep -> condIntCode LEU  x y
 
-      other -> pprPanic "getCondCode(x86,sparc)" (pprMachOp mop)
+      other -> pprPanic "getCondCode(x86,x86_64,sparc)" (ppr (CmmMachOp mop [x,y]))
 
 getCondCode other =  pprPanic "getCondCode(2)(x86,sparc)" (ppr other)
 
