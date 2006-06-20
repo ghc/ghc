@@ -220,7 +220,7 @@ flattenCgStmts id stmts =
   -- Eliminating these has to be done with a dead-code analysis.  For now,
   -- we just make it into a well-formed block by adding a recursive jump.
   flatten [CgLabel id]
-    = ( [], [BasicBlock id [CmmBranch id]] )
+    = ( [CmmBranch id], [BasicBlock id [CmmBranch id]] )
 
   -- A jump/branch: throw away all the code up to the next label, because
   -- it is unreachable.  Be careful to keep forks that we find on the way.
