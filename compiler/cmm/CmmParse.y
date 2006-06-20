@@ -253,7 +253,8 @@ names 	:: { [FastString] }
 stmt	:: { ExtCode }
 	: ';'					{ nopEC }
 
-	| block_id ':'				{ code (labelC $1) }
+	| NAME ':'
+		{ do l <- newLabel $1; code (labelC l) }
 
 	| lreg '=' expr ';'			
 		{ do reg <- $1; e <- $3; stmtEC (CmmAssign reg e) }
@@ -274,8 +275,8 @@ stmt	:: { ExtCode }
 		{% stmtMacro $1 $3  }
 	| 'switch' maybe_range expr '{' arms default '}'
 		{ doSwitch $2 $3 $5 $6 }
-	| 'goto' block_id ';'
-		{ stmtEC (CmmBranch $2) }
+	| 'goto' NAME ';'
+		{ do l <- lookupLabel $2; stmtEC (CmmBranch l) }
 	| 'jump' expr {-maybe_actuals-} ';'
 		{ do e <- $2; stmtEC (CmmJump e []) }
 	| 'if' bool_expr '{' body '}' else 	
@@ -402,13 +403,6 @@ lreg	:: { ExtFCode CmmReg }
 					CmmReg r -> r
 					other -> pprPanic "CmmParse:" (ftext $1 <> text " not a register") }
 	| GLOBALREG		{ return (CmmGlobal $1) }
-
-block_id :: { BlockId }
-	: NAME			{ BlockId (newTagUnique (getUnique $1) 'L') }
-			-- TODO: ugh.  The unique of a FastString has a null
-			-- tag, so we have to put our own tag on.  We should
-			-- really make a new unique for every label, and keep
-			-- them in an environment.
 
 type	:: { MachRep }
 	: 'bits8'		{ I8 }
@@ -623,8 +617,9 @@ stmtMacros = listToUFM [
 -- to collect declarations as we parse the proc, and feed the environment
 -- back in circularly (to avoid a two-pass algorithm).
 
-type Decls = [(FastString,CmmExpr)]
-type Env   = UniqFM CmmExpr
+data Named = Var CmmExpr | Label BlockId
+type Decls = [(FastString,Named)]
+type Env   = UniqFM Named
 
 newtype ExtFCode a = EC { unEC :: Env -> Decls -> FCode (Decls, a) }
 
@@ -649,12 +644,29 @@ getEnv :: ExtFCode Env
 getEnv = EC $ \e s -> return (s, e)
 
 addVarDecl :: FastString -> CmmExpr -> ExtCode
-addVarDecl var expr = EC $ \e s -> return ((var,expr):s, ())
+addVarDecl var expr = EC $ \e s -> return ((var, Var expr):s, ())
+
+addLabel :: FastString -> BlockId -> ExtCode
+addLabel name block_id = EC $ \e s -> return ((name, Label block_id):s, ())
 
 newLocal :: MachRep -> FastString -> ExtCode
 newLocal ty name  = do
    u <- code newUnique
    addVarDecl name (CmmReg (CmmLocal (LocalReg u ty)))
+
+newLabel :: FastString -> ExtFCode BlockId
+newLabel name = do
+   u <- code newUnique
+   addLabel name (BlockId u)
+   return (BlockId u)
+
+lookupLabel :: FastString -> ExtFCode BlockId
+lookupLabel name = do
+  env <- getEnv
+  return $ 
+     case lookupUFM env name of
+	Just (Label l) -> l
+	_other -> BlockId (newTagUnique (getUnique name) 'L')
 
 -- Unknown names are treated as if they had been 'import'ed.
 -- This saves us a lot of bother in the RTS sources, at the expense of
@@ -664,8 +676,8 @@ lookupName name = do
   env <- getEnv
   return $ 
      case lookupUFM env name of
-	Nothing -> CmmLit (CmmLabel (mkRtsCodeLabelFS name))
-	Just e  -> e
+	Just (Var e) -> e
+	_other -> CmmLit (CmmLabel (mkRtsCodeLabelFS name))
 
 -- Lifting FCode computations into the ExtFCode monad:
 code :: FCode a -> ExtFCode a
@@ -865,9 +877,9 @@ doSwitch mb_range scrut arms deflt
 initEnv :: Env
 initEnv = listToUFM [
   ( FSLIT("SIZEOF_StgHeader"), 
-	CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordRep) ),
+    Var (CmmLit (CmmInt (fromIntegral (fixedHdrSize * wORD_SIZE)) wordRep) )),
   ( FSLIT("SIZEOF_StgInfoTable"),
-        CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordRep) )
+    Var (CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordRep) ))
   ]
 
 parseCmmFile :: DynFlags -> HomeModules -> FilePath -> IO (Maybe Cmm)
