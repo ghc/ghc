@@ -118,10 +118,14 @@ lintCmmStmt (CmmStore l r) = do
   lintCmmExpr r
   return ()
 lintCmmStmt (CmmCall _target _res args _vols) = mapM_ (lintCmmExpr.fst) args
-lintCmmStmt (CmmCondBranch e _id)   = lintCmmExpr e >> return ()
+lintCmmStmt (CmmCondBranch e _id)   = lintCmmExpr e >> checkCond e >> return ()
 lintCmmStmt (CmmSwitch e _branches) = lintCmmExpr e >> return ()
 lintCmmStmt (CmmJump e _args)       = lintCmmExpr e >> return ()
 lintCmmStmt _other 		    = return ()
+
+checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
+checkCond expr = cmmLintErr (hang (text "expression is not a conditional:") 2
+				    (ppr expr))
 
 -- -----------------------------------------------------------------------------
 -- CmmLint monad
