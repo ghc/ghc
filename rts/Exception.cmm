@@ -329,7 +329,7 @@ raisezh_fast
     /* ToDo: currently this is a hack.  Would be much better if
      * the info was only displayed for an *uncaught* exception.
      */
-    if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags)) {
+    if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags) != 0) {
       foreign "C" fprintCCS_stderr(W_[CCCS] "ptr");
     }
 #endif
@@ -348,7 +348,7 @@ retry_pop_stack:
       r = foreign "C" stmValidateNestOfTransactions(trec "ptr");
       foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr");
       StgTSO_trec(CurrentTSO) = NO_TREC;
-      if (r) {
+      if (r != 0) {
         // Transaction was valid: continue searching for a catch frame
         Sp = Sp + SIZEOF_StgAtomicallyFrame;
         goto retry_pop_stack;

@@ -1005,7 +1005,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
    trec = StgTSO_trec(CurrentTSO);
    "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
    r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
-   if (r) {
+   if (r != 0) {
      /* Succeeded (either first branch or second branch) */
      StgTSO_trec(CurrentTSO) = outer;
      Sp = Sp + SIZEOF_StgCatchRetryFrame;
@@ -1016,7 +1016,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
      W_ new_trec;
      "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
      StgTSO_trec(CurrentTSO) = new_trec;
-     if (StgCatchRetryFrame_running_alt_code(frame)) {
+     if (StgCatchRetryFrame_running_alt_code(frame) != 0::I32) {
        R1 = StgCatchRetryFrame_alt_code(frame);
      } else {
        R1 = StgCatchRetryFrame_first_code(frame);
@@ -1075,7 +1075,7 @@ INFO_TABLE_RET(stg_atomically_frame,
 
   /* The TSO is not currently waiting: try to commit the transaction */
   valid = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr") [];
-  if (valid) {
+  if (valid != 0) {
     /* Transaction was valid: commit succeeded */
     StgTSO_trec(CurrentTSO) = NO_TREC;
     Sp = Sp + SIZEOF_StgAtomicallyFrame;
@@ -1109,7 +1109,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
 
   /* The TSO is currently waiting: should we stop waiting? */
   valid = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr") [];
-  if (valid) {
+  if (valid != 0) {
     /* Previous attempt is still valid: no point trying again yet */
 	  IF_NOT_REG_R1(Sp_adj(-2);
 			Sp(1) = stg_NO_FINALIZER_closure;
@@ -1295,7 +1295,7 @@ retry_pop_stack:
   if (frame_type == CATCH_RETRY_FRAME) {
     // The retry reaches a CATCH_RETRY_FRAME before the atomic frame
     ASSERT(outer != NO_TREC);
-    if (!StgCatchRetryFrame_running_alt_code(frame)) {
+    if (!StgCatchRetryFrame_running_alt_code(frame) != 0::I32) {
       // Retry in the first code: try the alternative
       "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
       StgTSO_trec(CurrentTSO) = trec;
@@ -1307,12 +1307,12 @@ retry_pop_stack:
       W_ other_trec;
       other_trec = StgCatchRetryFrame_first_code_trec(frame);
       r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", other_trec "ptr") [];
-      if (r) {
+      if (r != 0) {
         r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
       } else {
         foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
       }
-      if (r) {
+      if (r != 0) {
         // Merge between siblings succeeded: commit it back to enclosing transaction
         // and then propagate the retry
         StgTSO_trec(CurrentTSO) = outer;
@@ -1334,7 +1334,7 @@ retry_pop_stack:
   ASSERT(frame_type == ATOMICALLY_FRAME);
   ASSERT(outer == NO_TREC);
   r = foreign "C" stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr") [];
-  if (r) {
+  if (r != 0) {
     // Transaction was valid: stmWait put us on the TVars' queues, we now block
     StgHeader_info(frame) = stg_atomically_waiting_frame_info;
     Sp = frame;
