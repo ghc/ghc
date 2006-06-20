@@ -119,7 +119,7 @@ unblockAsyncExceptionszh_fast
     /* Args: R1 :: IO a */
     STK_CHK_GEN( WDS(2), R1_PTR, unblockAsyncExceptionszh_fast);
 
-    if (TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) {
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
 	foreign "C" awakenBlockedExceptionQueue(MyCapability() "ptr", 
 						CurrentTSO "ptr") [R1];
 
