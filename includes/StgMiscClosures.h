@@ -491,6 +491,7 @@ RTS_ENTRY(stg_block_async_void_ret);
 #endif
 RTS_FUN(stg_block_stmwait);
 RTS_FUN(stg_block_throwto);
+RTS_ENTRY(stg_block_throwto_ret);
 RTS_RET_INFO(stg_block_throwto_info);
 
 /* Entry/exit points from StgStartup.cmm */
