@@ -214,7 +214,7 @@
  * Note the syntax is slightly different to the C version of this macro.
  */
 #ifdef DEBUG
-#define IF_DEBUG(c,s)  if (RtsFlags_DebugFlags_##c(RtsFlags)) { s; }
+#define IF_DEBUG(c,s)  if (RtsFlags_DebugFlags_##c(RtsFlags) != 0::I32) { s; }
 #else
 #define IF_DEBUG(c,s)  /* nothing */
 #endif
