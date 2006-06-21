@@ -535,19 +535,34 @@ This is important.  Manuel found cases where he really, really
 wanted a RULE for a recursive function to apply in that function's
 own right-hand side.
 
-NB 2: We do not transfer the arity (see Subst.substIdInfo)
-The arity of an Id should not be visible
-in its own RHS, else we eta-reduce
+NB 2: ARITY.  We *do* transfer the arity.  This is important, so that
+the arity of an Id is visible in its own RHS.  For example:
+	f = \x. ....g (\y. f y)....
+We can eta-reduce the arg to g, becuase f is a value.  But that 
+needs to be visible.  
+
+This interacts with the 'state hack' too:
+	f :: Bool -> IO Int
+	f = \x. case x of 
+		  True  -> f y
+		  False -> \s -> ...
+Can we eta-expand f?  Only if we see that f has arity 1, and then we 
+take advantage of the 'state hack' on the result of
+(f y) :: State# -> (State#, Int) to expand the arity one more.
+
+There is a disadvantage though.  Making the arity visible in the RHA
+allows us to eta-reduce
 	f = \x -> f x
 to
 	f = f
-which isn't sound.  And it makes the arity in f's IdInfo greater than
-the manifest arity, which isn't good.
-The arity will get added later.
+which technically is not sound.   This is very much a corner case, so
+I'm not worried about it.  Another idea is to ensure that f's arity 
+never decreases; its arity started as 1, and we should never eta-reduce
+below that.
 
-NB 3: It's important that we *do* transer the loop-breaker OccInfo,
-because that's what stops the Id getting inlined infinitely, in the body
-of the letrec.
+NB 3: OccInfo.  It's important that we *do* transer the loop-breaker
+OccInfo, because that's what stops the Id getting inlined infinitely,
+in the body of the letrec.
 
 NB 4: does no harm for non-recursive bindings
 
@@ -577,7 +592,7 @@ substIdInfo :: CoreSubst.Subst -> IdInfo -> Maybe IdInfo
 --	worker info
 -- Zap the unfolding 
 -- Keep only 'robust' OccInfo
--- Zap Arity
+--	     arity
 -- 
 -- Seq'ing on the returned IdInfo is enough to cause all the 
 -- substitutions to happen completely
@@ -585,20 +600,18 @@ substIdInfo :: CoreSubst.Subst -> IdInfo -> Maybe IdInfo
 substIdInfo subst info
   | nothing_to_do = Nothing
   | otherwise     = Just (info `setOccInfo`    	  (if keep_occ then old_occ else NoOccInfo)
-			       `setArityInfo`     (if keep_arity then old_arity else unknownArity)
 			       `setSpecInfo`   	  CoreSubst.substSpec   subst old_rules
 			       `setWorkerInfo` 	  CoreSubst.substWorker subst old_wrkr
 			       `setUnfoldingInfo` noUnfolding)
 			-- setSpecInfo does a seq
 			-- setWorkerInfo does a seq
   where
-    nothing_to_do = keep_occ && keep_arity &&
+    nothing_to_do = keep_occ && 
 		    isEmptySpecInfo old_rules &&
 		    not (workerExists old_wrkr) &&
 		    not (hasUnfolding (unfoldingInfo info))
     
     keep_occ   = not (isFragileOcc old_occ)
-    keep_arity = old_arity == unknownArity
     old_arity = arityInfo info
     old_occ   = occInfo info
     old_rules = specInfo info

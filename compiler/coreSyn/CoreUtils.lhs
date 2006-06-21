@@ -822,8 +822,9 @@ arityType (Var v)
 	--		False -> \(s:RealWorld) -> e
 	-- where foo has arity 1.  Then we want the state hack to
 	-- apply to foo too, so we can eta expand the case.
-    mk 0 tys | isBottomingId v  = ABot
-             | otherwise	= ATop
+    mk 0 tys | isBottomingId v			   = ABot
+             | (ty:tys) <- tys, isStateHackType ty = AFun True ATop
+	     | otherwise			   = ATop
     mk n (ty:tys) = AFun (isStateHackType ty) (mk (n-1) tys)
     mk n []       = AFun False		      (mk (n-1) [])
 
@@ -851,14 +852,14 @@ arityType (App f a)  	   = case arityType f of
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
 arityType (Case scrut _ _ alts) = case foldr1 andArityType [arityType rhs | (_,_,rhs) <- alts] of
-				  xs@(AFun one_shot _) | one_shot -> xs
-				  xs | exprIsCheap scrut	  -> xs
-				     | otherwise	 	  -> ATop
+				    xs | exprIsCheap scrut	    -> xs
+				    xs@(AFun one_shot _) | one_shot -> AFun True ATop
+				    other	 	  	    -> ATop
 
 arityType (Let b e) = case arityType e of
-		        xs@(AFun one_shot _) | one_shot			      -> xs
 		        xs		     | all exprIsCheap (rhssOfBind b) -> xs
-					     | otherwise		      -> ATop
+		        xs@(AFun one_shot _) | one_shot			      -> AFun True ATop
+			other						      -> ATop
 
 arityType other = ATop
 

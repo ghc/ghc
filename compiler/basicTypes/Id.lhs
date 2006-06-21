@@ -475,7 +475,7 @@ idLBVarInfo id = lbvarInfo (idInfo id)
 isOneShotBndr :: Id -> Bool
 -- This one is the "business end", called externally.
 -- Its main purpose is to encapsulate the Horrible State Hack
-isOneShotBndr id = isOneShotLambda id || (isStateHackType (idType id))
+isOneShotBndr id = isOneShotLambda id || isStateHackType (idType id)
 
 isStateHackType :: Type -> Bool
 isStateHackType ty
