@@ -4236,7 +4236,46 @@ Hello
 </programlisting>
 
 </sect2>
+
+<sect2>
+<title>Using Template Haskell with Profiling</title>
+<indexterm><primary>profiling</primary><secondary>with Template Haskell</secondary></indexterm>
  
+<para>Template Haskell relies on GHC's built-in bytecode compiler and
+interpreter to run the splice expressions.  The bytecode interpreter
+runs the compiled expression on top of the same runtime on which GHC
+itself is running; this means that the compiled code referred to by
+the interpreted expression must be compatible with this runtime, and
+in particular this means that object code that is compiled for
+profiling <emphasis>cannot</emphasis> be loaded and used by a splice
+expression, because profiled object code is only compatible with the
+profiling version of the runtime.</para>
+
+<para>This causes difficulties if you have a multi-module program
+containing Template Haskell code and you need to compile it for
+profiling, because GHC cannot load the profiled object code and use it
+when executing the splices.  Fortunately GHC provides a workaround.
+The basic idea is to compile the program twice:</para>
+
+<orderedlist>
+<listitem>
+  <para>Compile the program or library first the normal way, without
+  <option>-prof</option><indexterm><primary><option>-prof</option></primary></indexterm>.</para>
+</listitem>
+<listitem>
+  <para>Then compile it again with <option>-prof</option>, and
+  additionally use <option>-osuf
+  p_o</option><indexterm><primary><option>-osuf</option></primary></indexterm>
+  to name the object files differentliy (you can choose any suffix
+  that isn't the normal object suffix here).  GHC will automatically
+  load the object files built in the first step when executing splice
+  expressions.  If you omit the <option>-osuf</option> flag when
+  building with <option>-prof</option> and Template Haskell is used,
+  GHC will emit an error message. </para>
+</listitem>
+</orderedlist>
+</sect2>
+
 </sect1>
 
 <!-- ===================== Arrow notation ===================  -->
