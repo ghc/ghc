@@ -9,7 +9,8 @@ module Specialise ( specProgram ) where
 #include "HsVersions.h"
 
 import DynFlags	( DynFlags, DynFlag(..) )
-import Id		( Id, idName, idType, mkUserLocal ) 
+import Id		( Id, idName, idType, mkUserLocal, 
+			  idInlinePragma, setInlinePragma ) 
 import TcType		( Type, mkTyVarTy, tcSplitSigmaTy, 
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  tcCmpType, isUnLiftedType
@@ -785,13 +786,10 @@ specDefn subst calls (fn, rhs)
   && rhs_bndrs  `lengthAtLeast` n_dicts	-- and enough dict args
   && notNull calls_for_me		-- And there are some calls to specialise
 
--- At one time I tried not specialising small functions
--- but sometimes there are big functions marked INLINE
--- that we'd like to specialise.  In particular, dictionary
--- functions, which Marcin is keen to inline
---  && not (certainlyWillInline fn)	-- And it's not small
-					-- If it's small, it's better just to inline
-					-- it than to construct lots of specialisations
+--   && not (certainlyWillInline (idUnfolding fn))	-- And it's not small
+--	See Note [Inline specialisation] for why we do not 
+--	switch off specialisation for inline functions
+
   =   -- Specialise the body of the function
     specExpr subst rhs					`thenSM` \ (rhs', rhs_uds) ->
 
@@ -815,11 +813,12 @@ specDefn subst calls (fn, rhs)
     (tyvars, theta, _) = tcSplitSigmaTy fn_type
     n_tyvars	       = length tyvars
     n_dicts	       = length theta
+    inline_prag        = idInlinePragma fn
 
-    (rhs_tyvars, rhs_ids, rhs_body) 
-	= collectTyAndValBinders (dropInline rhs)
 	-- It's important that we "see past" any INLINE pragma
 	-- else we'll fail to specialise an INLINE thing
+    (inline_rhs, rhs_inside) = dropInline rhs
+    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs_inside
 
     rhs_dicts = take n_dicts rhs_ids
     rhs_bndrs = rhs_tyvars ++ rhs_dicts
@@ -891,25 +890,47 @@ specDefn subst calls (fn, rhs)
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   final_uds = foldr addDictBind rhs_uds (my_zipEqual "spec_call" rhs_dicts' call_ds)
 
-	-- NOTE: we don't add back in any INLINE pragma on the RHS, so even if
-	-- the original function said INLINE, the specialised copies won't.
-	-- The idea is that the point of inlining was precisely to specialise
-	-- the function at its call site, and that's not so important for the
-	-- specialised copies.   But it still smells like an ad hoc decision.
-
+	   spec_pr | inline_rhs = (spec_f `setInlinePragma` inline_prag, Note InlineMe spec_rhs)
+		   | otherwise  = (spec_f, 				 spec_rhs)
 	in
-        returnSM ((spec_f, spec_rhs),	
-	          final_uds,
-		  spec_env_rule)
+        returnSM (spec_pr, final_uds, spec_env_rule)
 
       where
 	my_zipEqual doc xs ys 
 	 | not (equalLength xs ys) = pprPanic "my_zipEqual" (ppr xs $$ ppr ys $$ (ppr fn <+> ppr call_ts) $$ ppr rhs)
 	 | otherwise		   = zipEqual doc xs ys
+\end{code}
 
-dropInline :: CoreExpr -> CoreExpr
-dropInline (Note InlineMe rhs) = rhs
-dropInline rhs		       = rhs
+Note [Inline specialisations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We transfer to the specialised function any INLINE stuff from the
+original.  This means (a) the Activation in the IdInfo, and (b) any
+InlineMe on the RHS.  
+
+This is a change (Jun06).  Previously the idea is that the point of
+inlining was precisely to specialise the function at its call site,
+and that's not so important for the specialised copies.  But
+*pragma-directed* specialisation now takes place in the
+typechecker/desugarer, with manually specified INLINEs.  The
+specialiation here is automatic.  It'd be very odd if a function
+marked INLINE was specialised (because of some local use), and then
+forever after (including importing modules) the specialised version
+wasn't INLINEd.  After all, the programmer said INLINE!
+
+You might wonder why we don't just not specialise INLINE functions.
+It's because even INLINE functions are sometimes not inlined, when 
+they aren't applied to interesting arguments.  But perhaps the type
+arguments alone are enough to specialise (even though the args are too
+boring to trigger inlining), and it's certainly better to call the 
+specialised version.
+
+A case in point is dictionary functions, which are current marked
+INLINE, but which are worth specialising.
+
+\begin{code}
+dropInline :: CoreExpr -> (Bool, CoreExpr)
+dropInline (Note InlineMe rhs) = (True,  rhs)
+dropInline rhs		       = (False, rhs)
 \end{code}
 
 %************************************************************************
