@@ -41,7 +41,7 @@ import PrelNames	( iNTERACTIVE )
 import Kind		( Kind )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
-import SrcLoc		( noSrcLoc )
+import SrcLoc		( noSrcLoc, getLoc )
 import VarEnv		( emptyTidyEnv )
 #endif
 
@@ -901,7 +901,8 @@ compileExpr :: HscEnv
 
 compileExpr hsc_env this_mod rdr_env type_env tc_expr
   = do	{ let { dflags  = hsc_dflags hsc_env ;
-		lint_on = dopt Opt_DoCoreLinting dflags }
+		lint_on = dopt Opt_DoCoreLinting dflags ;
+		!srcspan = getLoc tc_expr }
 	      
 	 	-- Desugar it
 	; ds_expr <- deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
@@ -931,7 +932,7 @@ compileExpr hsc_env this_mod rdr_env type_env tc_expr
 	; bcos <- coreExprToBCOs dflags prepd_expr
 
 		-- link it
-	; hval <- linkExpr hsc_env bcos
+	; hval <- linkExpr hsc_env srcspan bcos
 
 	; return hval
      }

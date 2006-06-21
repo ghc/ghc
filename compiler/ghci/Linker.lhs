@@ -41,9 +41,12 @@ import DynFlags		( DynFlags(..), getOpts )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import Panic            ( GhcException(..) )
-import Util             ( zipLazy, global, joinFileExt, joinFileName, suffixOf )
-import StaticFlags	( v_Ld_inputs )
-import ErrUtils         ( debugTraceMsg )
+import Util             ( zipLazy, global, joinFileExt, joinFileName, suffixOf,
+			  replaceFilenameSuffix )
+import StaticFlags	( v_Ld_inputs, v_Build_tag )
+import ErrUtils         ( debugTraceMsg, mkLocMessage )
+import DriverPhases	( phaseInputExt, Phase(..) )
+import SrcLoc		( SrcSpan )
 
 -- Standard libraries
 import Control.Monad	( when, filterM, foldM )
@@ -317,7 +320,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
 %************************************************************************
 
 \begin{code}
-linkExpr :: HscEnv -> UnlinkedBCO -> IO HValue
+linkExpr :: HscEnv -> SrcSpan -> UnlinkedBCO -> IO HValue
 
 -- Link a single expression, *including* first linking packages and 
 -- modules that this expression depends on.
@@ -325,21 +328,28 @@ linkExpr :: HscEnv -> UnlinkedBCO -> IO HValue
 -- Raises an IO exception if it can't find a compiled version of the
 -- dependents to link.
 
-linkExpr hsc_env root_ul_bco
+linkExpr hsc_env span root_ul_bco
   = do {  
 	-- Initialise the linker (if it's not been done already)
      let dflags = hsc_dflags hsc_env
    ; initDynLinker dflags
 
+	-- The interpreter and dynamic linker can only handle object code built
+	-- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
+	-- So here we check the build tag: if we're building a non-standard way
+	-- then we need to find & link object files built the "normal" way.
+   ; maybe_normal_osuf <- checkNonStdWay dflags span
+
 	-- Find what packages and linkables are required
    ; eps <- readIORef (hsc_EPS hsc_env)
-   ; (lnks, pkgs) <- getLinkDeps hsc_env hpt (eps_PIT eps) needed_mods
+   ; (lnks, pkgs) <- getLinkDeps hsc_env hpt (eps_PIT eps) 
+				maybe_normal_osuf span needed_mods
 
 	-- Link the packages and modules required
    ; linkPackages dflags pkgs
    ; ok <- linkModules dflags lnks
    ; if failed ok then
-	dieWith empty
+	throwDyn (ProgramError "")
      else do {
 
 	-- Link the expression itself
@@ -366,14 +376,32 @@ linkExpr hsc_env root_ul_bco
 	-- All wired-in names are in the base package, which we link
 	-- by default, so we can safely ignore them here.
  
-dieWith msg = throwDyn (ProgramError (showSDoc msg))
+dieWith span msg = throwDyn (ProgramError (showSDoc (mkLocMessage span msg)))
+
+
+checkNonStdWay :: DynFlags -> SrcSpan -> IO (Maybe String)
+checkNonStdWay dflags srcspan = do
+  tag <- readIORef v_Build_tag
+  if null tag then return Nothing else do
+  let default_osuf = phaseInputExt StopLn
+  if objectSuf dflags == default_osuf
+	then failNonStd srcspan
+	else return (Just default_osuf)
+
+failNonStd srcspan = dieWith srcspan $
+  ptext SLIT("Dynamic linking required, but this is a non-standard build (eg. prof).") $$
+  ptext SLIT("You need to build the program twice: once the normal way, and then") $$
+  ptext SLIT("in the desired way using -osuf to set the object file suffix.")
+  
 
 getLinkDeps :: HscEnv -> HomePackageTable -> PackageIfaceTable
+	    -> Maybe String			-- the "normal" object suffix
+	    -> SrcSpan				-- for error messages
 	    -> [Module]				-- If you need these
 	    -> IO ([Linkable], [PackageId])	-- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt pit mods
+getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {	pls <- readIORef v_PersistentLinkerState ;
 	let {
@@ -391,7 +419,7 @@ getLinkDeps hsc_env hpt pit mods
 	-- 3.  For each dependent module, find its linkable
 	--     This will either be in the HPT or (in the case of one-shot
 	--     compilation) we may need to use maybe_getFileLinkable
-	lnks_needed <- mapM get_linkable mods_needed ;
+	lnks_needed <- mapM (get_linkable maybe_normal_osuf) mods_needed ;
 
 	return (lnks_needed, pkgs_needed) }
   where
@@ -413,13 +441,19 @@ getLinkDeps hsc_env hpt pit mods
     no_iface mod = ptext SLIT("No iface for") <+> ppr mod
 	-- This one is a GHC bug
 
-    no_obj mod = dieWith (ptext SLIT("No compiled code for") <+> ppr mod)
+    no_obj mod = dieWith span $
+		     ptext SLIT("cannot find object file for module ") <> 
+			quotes (ppr mod) $$
+		     while_linking_expr
+		
+    while_linking_expr = ptext SLIT("while linking an interpreted expression")
+
 	-- This one is a build-system bug
 
-    get_linkable mod_name	-- A home-package module
+    get_linkable maybe_normal_osuf mod_name	-- A home-package module
 	| Just mod_info <- lookupModuleEnv hpt mod_name 
 	= ASSERT(isJust (hm_linkable mod_info))
-	  return (fromJust (hm_linkable mod_info))
+	  adjust_linkable (fromJust (hm_linkable mod_info))
 	| otherwise	
 	=	-- It's not in the HPT because we are in one shot mode, 
 		-- so use the Finder to get a ModLocation...
@@ -428,14 +462,30 @@ getLinkDeps hsc_env hpt pit mods
 		  Found loc _ -> found loc mod_name ;
 		  _ -> no_obj mod_name
 	     }}
-
-    found loc mod_name = do {
+	where
+	    found loc mod_name = do {
 		-- ...and then find the linkable for it
 	       mb_lnk <- findObjectLinkableMaybe mod_name loc ;
 	       case mb_lnk of {
 		  Nothing -> no_obj mod_name ;
-		  Just lnk -> return lnk
+		  Just lnk -> adjust_linkable lnk
 	      }}
+
+	    adjust_linkable lnk
+		| Just osuf <- maybe_normal_osuf = do
+			new_uls <- mapM (adjust_ul osuf) (linkableUnlinked lnk)
+        		return lnk{ linkableUnlinked=new_uls }
+		| otherwise =
+			return lnk
+
+	    adjust_ul osuf (DotO file) = do
+		let new_file = replaceFilenameSuffix file osuf
+		ok <- doesFileExist new_file
+		if (not ok)
+		   then dieWith span $
+			  ptext SLIT("cannot find normal object file ")
+				<> quotes (text new_file) $$ while_linking_expr
+		   else return (DotO new_file)
 \end{code}
 
 
