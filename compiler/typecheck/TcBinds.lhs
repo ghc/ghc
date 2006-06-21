@@ -449,6 +449,8 @@ tcSpecPrag poly_id hs_ty inl
 	; extendLIEs lie
 	; let const_dicts = map instToId lie
 	; return (SpecPrag (mkHsCoerce co_fn (HsVar poly_id)) spec_ty const_dicts inl) }
+	-- Most of the work of specialisation is done by 
+	-- the desugarer, guided by the SpecPrag
   
 --------------
 -- If typechecking the binds fails, then return with each
