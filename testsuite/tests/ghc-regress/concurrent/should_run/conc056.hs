@@ -22,3 +22,5 @@ main = do
   forkOS (sequence_ $ repeat $ atomically (inc tv))
   forkOS (bad m)
   takeMVar m
+  threadDelay 100000 -- allow time for the exception to be printed
+
