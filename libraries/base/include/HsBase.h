@@ -458,14 +458,6 @@ __hscore_PrelHandle_recv( HsInt fd, HsAddr ptr, HsInt off, int sz )
 
 #endif /* __GLASGOW_HASKELL__ */
 
-#if defined(mingw32_HOST_OS) || defined(_MSC_VER)
-INLINE long *
-__hscore_Time_ghcTimezone( void ) { return &_timezone; }
-
-INLINE char **
-__hscore_Time_ghcTzname( void ) { return _tzname; }
-#endif
-
 INLINE HsInt
 __hscore_mkdir( HsAddr pathName, HsInt mode )
 {
