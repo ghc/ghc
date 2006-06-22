@@ -337,7 +337,15 @@ mkName str
   = split [] (reverse str)
   where
     split occ []        = Name (mkOccName occ) NameS
-    split occ ('.':rev)	= Name (mkOccName occ) (NameQ (mkModName (reverse rev)))
+    split occ ('.':rev)	| not (null occ), 
+			  not (null rev), head rev /= '.'
+			= Name (mkOccName occ) (NameQ (mkModName (reverse rev)))
+	-- The 'not (null occ)' guard ensures that
+	-- 	mkName "&." = Name "&." NameS
+	-- The 'rev' guards ensure that
+	--	mkName ".&" = Name ".&" NameS
+	--	mkName "Data.Bits..&" = Name ".&" (NameQ "Data.Bits")
+	-- This rather bizarre case actually happened; (.&.) is in Data.Bits
     split occ (c:rev)   = split (c:occ) rev
 
 mkNameU :: String -> Uniq -> Name	-- Only used internally
