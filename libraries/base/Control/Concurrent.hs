@@ -77,6 +77,10 @@ module Control.Concurrent (
 	-- |This section describes features specific to GHC's
 	-- implementation of Concurrent Haskell.
 	
+	-- ** Haskell threads and Operating System threads
+
+	-- $osthreads
+
 	-- ** Terminating the program
 
 	-- $termination
@@ -298,6 +302,11 @@ used for any other foreign calls.
 
 This means that you can use all kinds of foreign libraries from this thread 
 (even those that rely on thread-local state), without the limitations of 'forkIO'.
+
+Just to clarify, 'forkOS' is /only/ necessary if you need to associate
+a Haskell thread with a particular OS thread.  It is not necessary if
+you only need to make non-blocking foreign calls (see "Control.Concurrent#osthreads").
+
 -}
 forkOS :: IO () -> IO ThreadId
 
@@ -394,6 +403,47 @@ runInUnboundThread action = do
 
 -- ---------------------------------------------------------------------------
 -- More docs
+
+{- $osthreads
+
+      #osthreads# In GHC, threads created by 'forkIO' are lightweight threads, and
+      are managed entirely by the GHC runtime.  Typically Haskell
+      threads are an order of magnitude or two more efficient (in
+      terms of both time and space) than operating system threads.
+
+      The downside of having lightweight threads is that only one can
+      run at a time, so if one thread blocks in a foreign call, for
+      example, the other threads cannot continue.  The GHC runtime
+      works around this by making use of full OS threads where
+      necessary.  When the program is built with the @-threaded@
+      option (to link against the multithreaded version of the
+      runtime), a thread making a @safe@ foreign call will not block
+      the other threads in the system; another OS thread will take
+      over running Haskell threads until the original call returns.
+      The runtime maintains a pool of these /worker/ threads so that
+      multiple Haskell threads can be involved in external calls
+      simultaneously.
+
+      The "System.IO" library manages multiplexing in its own way.  On
+      Windows systems it uses @safe@ foreign calls to ensure that
+      threads doing I\/O operations don't block the whole runtime,
+      whereas on Unix systems all the currently blocked I\/O reqwests
+      are managed by a single thread (the /IO manager thread/) using
+      @select@.
+
+      The runtime will run a Haskell thread using any of the available
+      worker OS threads.  If you need control over which particular OS
+      thread is used to run a given Haskell thread, perhaps because
+      you need to call a foreign library that uses OS-thread-local
+      state, then you need "bound threads" (see above).
+
+      If you don't use the @-threaded@ option, then the runtime does
+      not make use of multiple OS threads.  Foreign calls will block
+      all other running Haskell threads until the call returns.  The
+      "System.IO" library still does multiplexing, so there can be multiple
+      threads doing I\/O, and this is handled internally by the runtime using
+      @select@.
+-}
 
 {- $termination
 
