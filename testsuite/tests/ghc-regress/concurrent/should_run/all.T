@@ -77,10 +77,12 @@ test('conc034', compose(only_compiler_types(['ghc']),
 
 test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 
-# Omit for GHCi: the main thread never gets the deadlock exception, because
-# it is waiting for a ^C interrupt.
+# Omit for GHCi: firstly GHCi doesn't have unsafe FFI calls, and secondly
+# the main thread cannot receive the deadlock exception because it can be
+# woken up by ^C.
 test('conc036', compose(skip_if_fast,
-		  only_compiler_types(['ghc'])), compile_and_run, [''])
+		  compose(omit_ways(['ghci']),
+		    only_compiler_types(['ghc']))), compile_and_run, [''])
 
 test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
