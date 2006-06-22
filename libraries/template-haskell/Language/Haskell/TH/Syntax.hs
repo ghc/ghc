@@ -472,9 +472,10 @@ data Info
   | TyVarI 	-- Scoped type variable
 	Name
 	Type	-- What it is bound to
+  deriving( Show )
 
-data Fixity 	     = Fixity Int FixityDirection deriving( Eq )
-data FixityDirection = InfixL | InfixR | InfixN   deriving( Eq )
+data Fixity 	     = Fixity Int FixityDirection deriving( Eq, Show )
+data FixityDirection = InfixL | InfixR | InfixN   deriving( Eq, Show )
 
 maxPrecedence :: Int
 maxPrecedence = (9::Int)
