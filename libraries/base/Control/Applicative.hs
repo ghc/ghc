@@ -59,6 +59,12 @@ infixl 4 <*>, <*, *>, <**>
 -- [/interchange/]
 --	@u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
 --
+-- The 'Functor' instance should satisfy
+--
+-- @
+--	'fmap' f x = 'pure' f '<*>' x
+-- @
+--
 -- If @f@ is also a 'Monad', define @'pure' = 'return'@ and @('<*>') = 'ap'@.
 
 class Functor f => Applicative f where

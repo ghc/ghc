@@ -10,9 +10,16 @@
 --
 -- Class of data structures that can be traversed from left to right.
 --
--- See also /Applicative Programming with Effects/,
--- by Conor McBride and Ross Paterson, online at
--- <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
+-- See also
+--
+--  * /Applicative Programming with Effects/,
+--    by Conor McBride and Ross Paterson, online at
+--    <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
+--
+--  * /The Essence of the Iterator Pattern/,
+--    by Jeremy Gibbons and Bruno Oliveira,
+--    in /Mathematically-Structured Functional Programming/, 2006, and online at
+--    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
 
 module Data.Traversable (
 	Traversable(..),
@@ -45,6 +52,15 @@ import Data.Array
 --
 -- This is suitable even for abstract types, as the laws for '<*>'
 -- imply a form of associativity.
+--
+-- The superclass instances should satisfy the following:
+--
+--  * In the 'Functor' instance, 'fmap' should be equivalent to traversal
+--    with the identity applicative functor ('fmapDefault').
+--
+--  * In the 'Foldable' instance, 'Data.Foldable.foldMap' should be
+--    equivalent to traversal with a constant applicative functor
+--    ('foldMapDefault').
 --
 class (Functor t, Foldable t) => Traversable t where
 	-- | Map each element of a structure to an action, evaluate
