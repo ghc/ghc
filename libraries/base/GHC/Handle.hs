@@ -973,6 +973,17 @@ mkStdHandle fd filepath ha_type buf bmode = do
 mkFileHandle :: FD -> Bool -> FilePath -> HandleType -> Bool -> IO Handle
 mkFileHandle fd is_stream filepath ha_type binary = do
   (buf, bmode) <- getBuffer fd (initBufferState ha_type)
+
+#ifdef mingw32_HOST_OS
+  -- On Windows, if this is a read/write handle and we are in text mode,
+  -- turn off buffering.  We don't correctly handle the case of switching
+  -- from read mode to write mode on a buffered text-mode handle, see bug
+  -- #679.
+  bmode <- case ha_type of
+      		ReadWriteHandle | not binary -> return NoBuffering
+		_other			     -> return bmode
+#endif
+
   spares <- newIORef BufferListNil
   newFileHandle filepath (handleFinalizer filepath)
 	    (Handle__ { haFD = fd,
