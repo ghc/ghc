@@ -36,11 +36,28 @@ fi
 
 # The gcc-lib directory of the mingw tree you want to
 # include with the binary dist.
-if [ "x${gcc_version}" == "x" ]; then
-  # The default (with mingw3)
-  export gcc_lib=$mingw_top/lib/gcc-lib/mingw32/3.2.3
-else
-  export gcc_lib=$mingw_top/lib/gcc-lib/mingw32/${gcc_version}
+if [ "x${gcc_lib}" == "x" ]; then
+ if [ "x${gcc_version}" == "x" ]; then
+   # The default (with mingw3)
+   export gcc_lib=$mingw_top/lib/gcc-lib/mingw32/3.2.3
+ else
+   export gcc_lib=$mingw_top/lib/gcc-lib/mingw32/${gcc_version}
+ fi
+fi
+if [ "x${gcc_libexec}" == "x" ]; then
+ if [ "x${gcc_version}" == "x" ]; then
+   # The default (with mingw3)
+   export gcc_libexec=$mingw_top/lib/gcc-lib/mingw32/3.2.3
+ else
+   if [ -d $mingw_top/lib/gcc-lib/mingw32/${gcc_version} ]; then
+     export gcc_libexec=$mingw_top/lib/gcc-lib/mingw32/${gcc_version}
+   elif [ -d $mingw_top/libexec/gcc/mingw32/${gcc_version} ]; then
+     export gcc_libexec=$mingw_top/libexec/gcc/mingw32/${gcc_version}
+   else
+     echo "WARNING: Unable to determine location of your gcc 'libexec' directory"
+     export gcc_libexec=$mingw_top/lib/gcc-lib/mingw32/${gcc_version}
+   fi
+ fi
 fi
 
 #Directory where a (cygwin-free) perl binary resides.
@@ -102,6 +119,7 @@ echo "create gcc-lib/"
 mkdir gcc-lib
 mkdir gcc-lib/include
 cp $gcc_lib/* gcc-lib/
+cp $gcc_libexec/* gcc-lib/
 cp $gcc_lib/include/* gcc-lib/include/
 cp $mingw_lib/* gcc-lib/
 cp $mingw_bin/as.exe gcc-lib/
@@ -110,7 +128,11 @@ cp $mingw_bin/ar.exe bin/
 # Note: later versions of dlltool.exe depend on a bfd helper DLL.
 cp $mingw_bin/dllwrap.exe gcc-lib/
 cp $mingw_bin/dlltool.exe gcc-lib/
+# Remove unused cruft
 rm gcc-lib/f771.exe || echo "good - f771.exe not found"
+rm gcc-lib/gnat1.exe || echo "good - gnat1.exe not found"
+rm gcc-lib/jc1.exe || echo "good - jc1.exe not found"
+rm gcc-lib/jvgenmain.exe || echo "good - jvgenmain.exe not found"
 
 echo "extra header files inside of include/"
 #
