@@ -88,7 +88,9 @@ test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
-test('conc039', omit_ways(['ghci']), compile_and_run, [''])
+# Omit for SMP (threaded2), because in this case the main thread is allowed to 
+# complete, which causes the child thread to be interrupted.
+test('conc039', omit_ways(['ghci','threaded2']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
 test('conc040', compose(only_compiler_types(['ghc']),
