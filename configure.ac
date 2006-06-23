@@ -721,7 +721,7 @@ fi;
 fi;
 
 dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO" -a "$WithGhc" = "" -a -d "$srcdir/ghc"; then
+if test "$BootingFromHc" = "NO" -a "$WithGhc" = "" -a -d "$srcdir/compiler"; then
 AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
 fi;
 
@@ -909,51 +909,15 @@ FPTOOLS_GREENCARD(3.00)
 ]
 )
 
-AC_ARG_ENABLE(src-tree-happy,
-[AC_HELP_STRING([--enable-src-tree-happy],
-	[Build and use source tree (fptools/happy) version of Happy. 
-	 [default=autodetect]])],
-[ if test x"$enableval" = x"yes"; then
-	UseSrcTreeHappy=YES
-  else
-	UseSrcTreeHappy=NO
-  fi
-],
-[UseSrcTreeHappy=NO]
-)
 dnl ** check for installed happy binary + version
 dnl    (don't do it if we're booting from .hc files though.)
 if test "$BootingFromHc" = "NO"; then
 FPTOOLS_HAPPY
 fi;
 
-AC_ARG_ENABLE(src-tree-haddock,
-[AC_HELP_STRING([--enable-src-tree-haddock],
-        [Build and use source tree (fptools/haddock) version of Haddock.
-	 [default=autodetect]])],
-[ if test x"$enableval" = x"yes"; then
-	UseSrcTreeHaddock=YES
-  else
-	UseSrcTreeHaddock=NO
-  fi
-],
-[UseSrcTreeHaddock=NO]
-)
 dnl ** check for installed haddock
 FPTOOLS_HADDOCK
 
-AC_ARG_ENABLE(src-tree-alex,
-[AC_HELP_STRING([--enable-src-tree-alex],
-        [Build and use source tree (fptools/alex) version of Alex.
-	 [default=autodetect]])],
-[ if test x"$enableval" = x"yes"; then
-	UseSrcTreeAlex=YES
-  else
-	UseSrcTreeAlex=NO
-  fi
-],
-[UseSrcTreeAlex=NO]
-)
 dnl ** check for installed alex binary + version
 dnl    (don't do it if we're booting from .hc files though.)
 if test "$BootingFromHc" = "NO"; then

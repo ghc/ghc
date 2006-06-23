@@ -245,26 +245,10 @@ dnl at least Happy version 1.14.  If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
-[
-if test -d $srcdir/happy; then
-   SrcTreeHappyCmd=$hardtop/happy/src/happy-inplace
-else
-   SrcTreeHappyCmd=""
-fi
-if test x"$UseSrcTreeHappy" = xYES; then
-  if test x"$SrcTreeHappyCmd" != x; then
-     HappyCmd=$SrcTreeHappyCmd
-  else
-     AC_MSG_ERROR([--enable-src-tree-happy given, but happy not found in source tree])
-  fi
-else
-  AC_PATH_PROG(HappyCmd,happy,$SrcTreeHappyCmd)
-fi
+[AC_PATH_PROG(HappyCmd,happy,)
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
-[if test x"$HappyCmd" = x"$SrcTreeHappyCmd" -a -e $srcdir/happy/mk/version.mk; then
-   fptools_cv_happy_version=`grep '^ProjectVersion[ 	]*=' $srcdir/happy/mk/version.mk | sed 's/[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/g'`;
-elif test x"$HappyCmd" != x; then
+[if test x"$HappyCmd" != x; then
    fptools_cv_happy_version="`$HappyCmd -v |
 			  grep 'Happy Version' | sed -e 's/Happy Version \([^ ]*\).*/\1/g'`" ;
 else
@@ -272,10 +256,8 @@ else
 fi;
 changequote([, ])dnl
 ])
-if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Parser.hs; then
-  FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.15],
+FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.15],
   [AC_MSG_ERROR([Happy version 1.15 or later is required to compile GHC.])])[]dnl
-fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
 ])
@@ -285,21 +267,7 @@ dnl Check for Haddock and version.  If there's no installed Haddock, we look
 dnl for a haddock source tree and point the build system at that instead.
 dnl
 AC_DEFUN([FPTOOLS_HADDOCK],
-[
-if test -d $srcdir/haddock; then
-   SrcTreeHaddockCmd=$hardtop/haddock/src/haddock-inplace
-else
-   SrcTreeHaddockCmd=""
-fi
-if test x"$UseSrcTreeHaddock" = xYES; then
-  if test x"$SrcTreeHaddockCmd" != x; then
-     HaddockCmd=$SrcTreeHaddockCmd
-  else
-     AC_MSG_ERROR([--enable-src-tree-haddock given, but haddock not found in source tree])
-  fi
-else
-  AC_PATH_PROG(HaddockCmd,haddock,$SrcTreeHaddockCmd)
-fi
+[AC_PATH_PROG(HaddockCmd,haddock,)
 dnl Darn, I forgot to make Haddock print out its version number when
 dnl invoked with -v.  We could try generating some HTML and grepping
 dnl through that to find the version number, but I think we'll make
@@ -313,25 +281,10 @@ dnl for a alex source tree and point the build system at that instead.
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [
-if test -d $srcdir/alex; then
-   SrcTreeAlexCmd=$hardtop/alex/src/alex-inplace
-else
-   SrcTreeAlexCmd=""
-fi
-if test x"$UseSrcTreeAlex" = xYES; then
-  if test x"$SrcTreeAlexCmd" != x; then
-     AlexCmd=$SrcTreeAlexCmd
-  else
-     AC_MSG_ERROR([--enable-src-tree-alex given, but alex not found in source tree])
-  fi
-else
-  AC_PATH_PROG(AlexCmd,alex,$SrcTreeAlexCmd)
-fi
+AC_PATH_PROG(AlexCmd,alex,)
 AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
-[if test x"$AlexCmd" = x"$SrcTreeAlexCmd"; then
-   fptools_cv_alex_version=`grep '^ProjectVersion[ 	]*=' $srcdir/alex/mk/version.mk | sed 's/[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/g'`;
-elif test x"$AlexCmd" != x; then
+[if test x"$AlexCmd" != x; then
    fptools_cv_alex_version="`$AlexCmd -v |
 			  grep 'Alex [Vv]ersion' | sed -e 's/Alex [Vv]ersion \([0-9\.]*\).*/\1/g'`" ;
 else
@@ -339,10 +292,8 @@ else
 fi;
 changequote([, ])dnl
 ])
-if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Lexer.hs; then
-  FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0],
+FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0],
   [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])[]dnl
-fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 ])
