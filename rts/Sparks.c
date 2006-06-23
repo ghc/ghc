@@ -129,13 +129,15 @@ markSparkQueue (evac_fn evac)
 	sparkp = pool->hd;
 	to_sparkp = pool->hd;
 	while (sparkp != pool->tl) {
-	    ASSERT(to_sparkp<=sparkp);
 	    ASSERT(*sparkp!=NULL);
 	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
 	    // ToDo?: statistics gathering here (also for GUM!)
 	    if (closure_SHOULD_SPARK(*sparkp)) {
 		evac(sparkp);
 		*to_sparkp++ = *sparkp;
+		if (to_sparkp == pool->lim) {
+		    to_sparkp = pool->base;
+		}
 		n++;
 	    } else {
 		pruned_sparks++;
