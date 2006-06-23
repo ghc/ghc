@@ -174,6 +174,7 @@ make_ty (NoteTy _ t) 	= make_ty t
 make_kind :: Kind -> C.Kind
 make_kind (FunKind k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
 make_kind LiftedTypeKind   = C.Klifted
+make_kind UnboxedTypeKind  = C.Kunboxed
 make_kind UnliftedTypeKind = C.Kunlifted
 make_kind OpenTypeKind     = C.Kopen
 make_kind _ = error "MkExternalCore died: make_kind"

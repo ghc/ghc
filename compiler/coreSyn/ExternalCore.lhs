@@ -57,6 +57,7 @@ data Ty
 data Kind 
   = Klifted
   | Kunlifted
+  | Kunboxed
   | Kopen
   | Karrow Kind Kind
 

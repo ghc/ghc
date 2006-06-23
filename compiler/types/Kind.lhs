@@ -5,10 +5,10 @@
 \begin{code}
 module Kind (
 	Kind(..), SimpleKind, 
-	openTypeKind, liftedTypeKind, unliftedTypeKind, 
+	openTypeKind, liftedTypeKind, unliftedTypeKind, unboxedTypeKind,
 	argTypeKind, ubxTupleKind,
 
-	isLiftedTypeKind, isUnliftedTypeKind, 
+	isLiftedTypeKind, isUnliftedTypeKind, isUnliftedBoxedTypeKind,
 	isArgTypeKind, isOpenTypeKind,
 	mkArrowKind, mkArrowKinds,
 
@@ -37,11 +37,11 @@ There's a little subtyping at the kind level:
 		/ \
 	       /   \
 	      ??   (#)
-	     /  \
-            *   #
+	    / | \
+	   *  !  #
 
 where	*    [LiftedTypeKind]   means boxed type
-	#    [UnliftedTypeKind] means unboxed type
+	#    [UnboxedTypeKind]  means unboxed type
 	(#)  [UbxTupleKind]     means unboxed tuple
 	??   [ArgTypeKind]      is the lub of *,#
 	?    [OpenTypeKind]	means any type at all
@@ -55,11 +55,12 @@ In particular:
 \begin{code}
 data Kind 
   = LiftedTypeKind 	--  *
-  | OpenTypeKind	-- ?
-  | UnliftedTypeKind	--  #
-  | UbxTupleKind	-- (##)
-  | ArgTypeKind		-- ??
-  | FunKind Kind Kind	-- k1 -> k2
+  | OpenTypeKind	--  ?
+  | UnboxedTypeKind	--  #
+  | UnliftedTypeKind    --  !
+  | UbxTupleKind	--  (##)
+  | ArgTypeKind		--  ??
+  | FunKind Kind Kind	--  k1 -> k2
   | KindVar KindVar
   deriving( Eq )
 
@@ -120,6 +121,7 @@ less-informative one to the more informative one.  Neat, eh?
 
 \begin{code}
 liftedTypeKind   = LiftedTypeKind
+unboxedTypeKind  = UnboxedTypeKind
 unliftedTypeKind = UnliftedTypeKind
 openTypeKind     = OpenTypeKind
 argTypeKind      = ArgTypeKind
@@ -152,13 +154,18 @@ isLiftedTypeKind, isUnliftedTypeKind :: Kind -> Bool
 isLiftedTypeKind LiftedTypeKind = True
 isLiftedTypeKind other		= False
 
+isUnliftedBoxedTypeKind UnliftedTypeKind = True
+isUnliftedBoxedTypeKind other	    = False
+
 isUnliftedTypeKind UnliftedTypeKind = True
+isUnliftedTypeKind UnboxedTypeKind  = True
 isUnliftedTypeKind other	    = False
 
 isArgTypeKind :: Kind -> Bool
 -- True of any sub-kind of ArgTypeKind 
 isArgTypeKind LiftedTypeKind   = True
 isArgTypeKind UnliftedTypeKind = True
+isArgTypeKind UnboxedTypeKind  = True
 isArgTypeKind ArgTypeKind      = True
 isArgTypeKind other	       = False
 
@@ -174,6 +181,7 @@ isSubKind :: Kind -> Kind -> Bool
 -- (k1 `isSubKind` k2) checks that k1 <: k2
 isSubKind LiftedTypeKind   LiftedTypeKind   = True
 isSubKind UnliftedTypeKind UnliftedTypeKind = True
+isSubKind UnboxedTypeKind  UnboxedTypeKind  = True
 isSubKind UbxTupleKind     UbxTupleKind     = True
 isSubKind k1 		   OpenTypeKind     = isOpenTypeKind k1
 isSubKind k1 		   ArgTypeKind      = isArgTypeKind k1
@@ -219,7 +227,8 @@ pprParendKind k		      = pprKind k
 
 pprKind (KindVar v)      = ppr v
 pprKind LiftedTypeKind   = ptext SLIT("*")
-pprKind UnliftedTypeKind = ptext SLIT("#")
+pprKind UnliftedTypeKind = ptext SLIT("!")
+pprKind UnboxedTypeKind  = ptext SLIT("#")
 pprKind OpenTypeKind     = ptext SLIT("?")
 pprKind ArgTypeKind      = ptext SLIT("??")
 pprKind UbxTupleKind     = ptext SLIT("(#)")

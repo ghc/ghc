@@ -562,11 +562,12 @@ instance Binary IfaceBndr where
 instance Binary Kind where
     put_ bh LiftedTypeKind   = putByte bh 0
     put_ bh UnliftedTypeKind = putByte bh 1
-    put_ bh OpenTypeKind     = putByte bh 2
-    put_ bh ArgTypeKind      = putByte bh 3
-    put_ bh UbxTupleKind     = putByte bh 4
+    put_ bh UnboxedTypeKind  = putByte bh 2
+    put_ bh OpenTypeKind     = putByte bh 3
+    put_ bh ArgTypeKind      = putByte bh 4
+    put_ bh UbxTupleKind     = putByte bh 5
     put_ bh (FunKind k1 k2)  = do 
-	    putByte bh 5
+	    putByte bh 6
 	    put_ bh k1
 	    put_ bh k2
     put_ bh (KindVar kv) = pprPanic "BinIface.put_: kind var" (ppr kv)
@@ -576,9 +577,10 @@ instance Binary Kind where
 	    case h of
 	      0 -> return LiftedTypeKind 
 	      1 -> return UnliftedTypeKind
-	      2 -> return OpenTypeKind
-	      3 -> return ArgTypeKind
-	      4 -> return UbxTupleKind
+	      2 -> return UnboxedTypeKind
+	      3 -> return OpenTypeKind
+	      4 -> return ArgTypeKind
+	      5 -> return UbxTupleKind
 	      _ -> do k1 <- get bh
 		      k2 <- get bh
 		      return (FunKind k1 k2)

@@ -32,7 +32,7 @@ import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
 			  mkSrcLoc, mkSrcSpan )
 import Module
 import StaticFlags	( opt_SccProfilingOn )
-import Type		( Kind, mkArrowKind, liftedTypeKind )
+import Type		( Kind, mkArrowKind, liftedTypeKind, unliftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..), defaultInlineSpec )
 import OrdList
@@ -850,6 +850,7 @@ kind	:: { Kind }
 
 akind	:: { Kind }
 	: '*'			{ liftedTypeKind }
+	| '!'			{ unliftedTypeKind }
 	| '(' kind ')'		{ $2 }
 
 

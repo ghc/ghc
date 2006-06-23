@@ -50,7 +50,8 @@ import OccName		( mkOccNameFS, tcName, mkTyVarOcc )
 import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
-			  unliftedTypeKind, liftedTypeKind, openTypeKind, 
+			  unliftedTypeKind, unboxedTypeKind, 
+			  liftedTypeKind, openTypeKind, 
 			  Kind, mkArrowKinds,
 			  TyThing(..)
 			)
@@ -196,13 +197,17 @@ pcPrimTyCon name arg_vrcs rep
   where
     arity       = length arg_vrcs
     kind        = mkArrowKinds (replicate arity liftedTypeKind) result_kind
-    result_kind = unliftedTypeKind -- all primitive types are unlifted
+    result_kind = case rep of 
+		    PtrRep -> unliftedTypeKind
+		    _other -> unboxedTypeKind
 
 pcPrimTyCon0 :: Name -> PrimRep -> TyCon
 pcPrimTyCon0 name rep
   = mkPrimTyCon name result_kind 0 [] rep
   where
-    result_kind = unliftedTypeKind -- all primitive types are unlifted
+    result_kind = case rep of 
+		    PtrRep -> unliftedTypeKind
+		    _other -> unboxedTypeKind
 
 charPrimTy	= mkTyConTy charPrimTyCon
 charPrimTyCon	= pcPrimTyCon0 charPrimTyConName WordRep

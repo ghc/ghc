@@ -53,7 +53,8 @@ import TcType		( TcKind, TcType, TcTyVar, BoxyTyVar, TcTauType,
 			  TvSubst, mkTvSubst, zipTyEnv, substTy, emptyTvSubst, 
 			  lookupTyVar, extendTvSubst )
 import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
-			  openTypeKind, liftedTypeKind, mkArrowKind, defaultKind,
+			  openTypeKind, liftedTypeKind, unliftedTypeKind, 
+			  mkArrowKind, defaultKind,
 			  isOpenTypeKind, argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
 			  isSubKind, pprKind, splitKindFunTys )
 import TysPrim		( alphaTy, betaTy )
@@ -1504,6 +1505,7 @@ kindSimpleKind orig_swapped orig_kind
     go True OpenTypeKind = return liftedTypeKind
     go True ArgTypeKind  = return liftedTypeKind
     go sw LiftedTypeKind  = return liftedTypeKind
+    go sw UnliftedTypeKind = return unliftedTypeKind
     go sw k@(KindVar _)	  = return k	-- KindVars are always simple
     go swapped kind = failWithTc (ptext SLIT("Unexpected kind unification failure:")
 				  <+> ppr orig_swapped <+> ppr orig_kind)
