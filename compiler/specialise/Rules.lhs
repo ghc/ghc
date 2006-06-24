@@ -34,7 +34,7 @@ import VarEnv		( IdEnv, InScopeSet, emptyTidyEnv,
 			  emptyVarEnv, lookupVarEnv, extendVarEnv, 
 			  nukeRnEnvL, mkRnEnv2, rnOccR, rnOccL, inRnEnvR,
 			  rnBndrR, rnBndr2, rnBndrL, rnBndrs2,
-			  rnInScope, extendRnInScopeList )
+			  rnInScope, extendRnInScopeList, lookupRnInScope )
 import VarSet
 import Name		( Name, NamedThing(..), nameOccName )
 import NameEnv
@@ -414,10 +414,18 @@ match menv subst (Var v1) e2
 -- (Its occurrence information is not necessarily up to date,
 --  so we don't use it.)
 match menv subst e1 (Var v2)
-  | isCheapUnfolding unfolding
+  | not (inRnEnvR rn_env v2),
+	-- If v2 is in the RnEnvR, then it's locally bound and can't
+	-- have an unfolding. We must make this check because if it
+	-- is locally bound we must not look it up in the in-scope set
+	-- E.g. 	(\x->x) where x is already in scope
+    isCheapUnfolding unfolding
   = match menv subst e1 (unfoldingTemplate unfolding)
   where
-    unfolding = idUnfolding v2
+    rn_env    = me_env menv
+    unfolding = idUnfolding (lookupRnInScope rn_env v2)
+	-- Notice that we look up v2 in the in-scope set
+	-- See Note [Lookup in-scope]
 
 match menv subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
@@ -534,7 +542,7 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 		-> Nothing	-- Occurs check failure
 		-- e.g. match forall a. (\x-> a x) against (\y. y y)
 
-		| otherwise
+		| otherwise	-- No renaming to do on e2
 		-> Just (tv_subst, extendVarEnv id_subst v1 e2, binds)
 
 	Just e2' | tcEqExprX (nukeRnEnvL rn_env) e2' e2 
@@ -589,6 +597,42 @@ match_ty menv (tv_subst, id_subst, binds) ty1 ty2
   = do	{ tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
 	; return (tv_subst', id_subst, binds) }
 \end{code}
+
+
+Note [Lookup in-scope]
+~~~~~~~~~~~~~~~~~~~~~~
+Consider this example
+	foo :: Int -> Maybe Int -> Int
+	foo 0 (Just n) = n
+	foo m (Just n) = foo (m-n) (Just n)
+
+SpecConstr sees this fragment:
+
+	case w_smT of wild_Xf [Just A] {
+	  Data.Maybe.Nothing -> lvl_smf;
+	  Data.Maybe.Just n_acT [Just S(L)] ->
+	    case n_acT of wild1_ams [Just A] { GHC.Base.I# y_amr [Just L] ->
+	    $wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
+	    }};
+
+and correctly generates the rule
+
+	RULES: "SC:$wfoo1" [0] __forall {y_amr [Just L] :: GHC.Prim.Int#
+					  sc_snn :: GHC.Prim.Int#}
+	  $wfoo_smW sc_snn (Data.Maybe.Just @ GHC.Base.Int (GHC.Base.I# y_amr))
+	  = $s$wfoo_sno y_amr sc_snn ;]
+
+BUT we must ensure that this rule matches in the original function!
+Note that the call to $wfoo is
+	    $wfoo_smW (GHC.Prim.-# ds_Xmb y_amr) wild_Xf
+
+During matching we expand wild_Xf to (Just n_acT).  But then we must also
+expand n_acT to (I# y_amr).  And we can only do that if we look up n_acT
+in the in-scope set, because in wild_Xf's unfolding it won't have an unfolding
+at all. 
+
+That is why the 'lookupRnInScope' call in the (Var v2) case of 'match'
+is so important.
 
 
 %************************************************************************

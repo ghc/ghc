@@ -27,7 +27,7 @@ module VarEnv (
 	-- RnEnv2 and its operations
 	RnEnv2, mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
 		rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, extendRnInScopeList,
-		rnInScope,
+		rnInScope, lookupRnInScope,
 
 	-- TidyEnvs
 	TidyEnv, emptyTidyEnv
@@ -246,6 +246,9 @@ inRnEnvL, inRnEnvR :: RnEnv2 -> Var -> Bool
 -- Tells whether a variable is locally bound
 inRnEnvL (RV2 { envL = env }) v = v `elemVarEnv` env
 inRnEnvR (RV2 { envR = env }) v = v `elemVarEnv` env
+
+lookupRnInScope :: RnEnv2 -> Var -> Var
+lookupRnInScope env v = lookupInScope (in_scope env) v `orElse` v
 
 nukeRnEnvL, nukeRnEnvR :: RnEnv2 -> RnEnv2
 nukeRnEnvL env = env { envL = emptyVarEnv }
