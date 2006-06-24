@@ -352,19 +352,12 @@ getPkgDatabases modify flags = do
 	     in
 		go flags
 
-  -- we create the user database iff (a) we're modifying, and (b) the
-  -- user asked to use it by giving the --user flag.
-  when (not user_exists && user_conf `elem` final_stack) $ do
-	putStrLn ("Creating user package database in " ++ user_conf)
-	createDirectoryIfMissing True archdir
-	writeFile user_conf emptyPackageConfig
-
   db_stack <- mapM readParseDatabase final_stack
   return db_stack
 
 readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
 readParseDatabase filename = do
-  str <- readFile filename
+  str <- readFile filename `Exception.catch` \_ -> return emptyPackageConfig
   let packages = read str
   Exception.evaluate packages
     `Exception.catch` \_ -> 
