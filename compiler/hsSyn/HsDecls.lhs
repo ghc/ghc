@@ -462,7 +462,7 @@ instance OutputableBndr name
 
       | otherwise	-- Laid out
       = sep [hsep [top_matter, ptext SLIT("where {")],
-	     nest 4 (sep [sep (map ppr_sig sigs), ppr methods, char '}'])]
+	     nest 4 (sep [sep (map ppr_sig sigs), pprLHsBinds methods, char '}'])]
       where
         top_matter  = ptext SLIT("class") <+> pp_decl_head (unLoc context) lclas tyvars <+> pprFundeps (map unLoc fds)
 	ppr_sig sig = ppr sig <> semi
