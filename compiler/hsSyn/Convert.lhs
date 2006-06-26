@@ -47,7 +47,11 @@ convertToHsDecls :: SrcSpan -> [TH.Dec] -> Either Message [LHsDecl RdrName]
 convertToHsDecls loc ds = initCvt loc (mapM cvtTop ds)
 
 convertToHsExpr :: SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName)
-convertToHsExpr loc e = initCvt loc (cvtl e)
+convertToHsExpr loc e 
+  = case initCvt loc (cvtl e) of
+	Left msg  -> Left (msg $$ (ptext SLIT("When converting TH expression")
+				    <+> text (show e)))
+	Right res -> Right res
 
 convertToHsType :: SrcSpan -> TH.Type -> Either Message (LHsType RdrName)
 convertToHsType loc t = initCvt loc (cvtType t)
