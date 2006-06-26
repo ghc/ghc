@@ -1,6 +1,7 @@
 
 drvfail003.hs:13:5:
-    No instance for (Show (v (v a)))
-      arising from the 'deriving' clause of a data type declaration at drvfail003.hs:13:5
-    Possible fix: add an instance declaration for (Show (v (v a)))
-    When deriving the `Show' instance for type `Square_'
+    Variable occurs more often in a constraint than in the instance head
+      in the constraint: Show (v (v a))
+    (Use -fallow-undecidable-instances to permit this)
+    In the derived instance
+      instance (Show (v (v a))) => Show (Square_ v w a)
