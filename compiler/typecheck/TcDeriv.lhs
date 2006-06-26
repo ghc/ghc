@@ -15,6 +15,7 @@ import DynFlags	( DynFlag(..) )
 
 import Generics		( mkTyConGenericBinds )
 import TcRnMonad
+import TcMType		( checkValidInstance )
 import TcEnv		( newDFunName, pprInstInfoDetails, 
 			  InstInfo(..), InstBindings(..), simpleInstInfoClsTy,
 			  tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv
@@ -30,7 +31,7 @@ import RnEnv		( bindLocalNames )
 import HscTypes		( FixityEnv )
 
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
-import Type		( zipOpenTvSubst, substTheta )
+import Type		( zipOpenTvSubst, substTheta, pprThetaArrow, pprClassPred )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
 import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConOrigArgTys )
@@ -341,7 +342,7 @@ makeDerivEqns overlap_flag tycl_decls
     mk_eqn (new_or_data, tycon_name, hs_deriv_ty)
       = tcLookupTyCon tycon_name		`thenM` \ tycon ->
 	setSrcSpan (srcLocSpan (getSrcLoc tycon))		$
-        addErrCtxt (derivCtxt Nothing tycon)	$
+        addErrCtxt (derivCtxt tycon)		$
 	tcExtendTyVarEnv (tyConTyVars tycon)	$	-- Deriving preds may (now) mention
 							-- the type variables for the type constructor
 	tcHsDeriv hs_deriv_ty			`thenM` \ (deriv_tvs, clas, tys) ->
@@ -726,10 +727,15 @@ solveDerivEqns overlap_flag orig_eqns
 
     ------------------------------------------------------------------
     gen_soln (_, clas, tc,tyvars,deriv_rhs)
-      = setSrcSpan (srcLocSpan (getSrcLoc tc))		$
-	addErrCtxt (derivCtxt (Just clas) tc)	$
-	tcSimplifyDeriv tc tyvars deriv_rhs	`thenM` \ theta ->
-	returnM (sortLe (<=) theta)	-- Canonicalise before returning the soluction
+      = setSrcSpan (srcLocSpan (getSrcLoc tc))	$
+	do { let inst_tys = [mkTyConApp tc (mkTyVarTys tyvars)]
+	   ; theta <- addErrCtxt (derivInstCtxt [] clas inst_tys) $
+		      tcSimplifyDeriv tc tyvars deriv_rhs
+	   ; addErrCtxt (derivInstCtxt theta clas inst_tys) $
+	     checkValidInstance tyvars theta clas inst_tys
+	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the soluction
+      where
+	
 
     ------------------------------------------------------------------
     mk_inst_spec (dfun_name, clas, tycon, tyvars, _) theta
@@ -950,12 +956,12 @@ derivingThingErr clas tys tycon tyvars why
   where
     pred = mkClassPred clas (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars)])
 
-derivCtxt :: Maybe Class -> TyCon -> SDoc
-derivCtxt maybe_cls tycon
-  = ptext SLIT("When deriving") <+> cls <+> ptext SLIT("for type") <+> quotes (ppr tycon)
-  where
-    cls = case maybe_cls of
-	    Nothing -> ptext SLIT("instances")
-	    Just c  -> ptext SLIT("the") <+> quotes (ppr c) <+> ptext SLIT("instance")
+derivCtxt :: TyCon -> SDoc
+derivCtxt tycon
+  = ptext SLIT("When deriving instances for") <+> quotes (ppr tycon)
+
+derivInstCtxt theta clas inst_tys
+  = hang (ptext SLIT("In the derived instance"))
+       2 (ptext SLIT("instance") <+> sep [pprThetaArrow theta, pprClassPred clas inst_tys])
 \end{code}
 

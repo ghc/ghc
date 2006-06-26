@@ -42,8 +42,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders,
 			  lclEnvElts, tcMetaTy )
 import InstEnv		( lookupInstEnv, classInstances, pprInstances )
-import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, zonkTcPredType,
-			  checkAmbiguity, checkInstTermination )
+import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, zonkTcPredType  )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, tidyPred,
                           mkClassPred, isOverloadedTy, mkTyConApp, isSkolemTyVar,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
@@ -2283,19 +2282,10 @@ tcSimplifyDeriv tc tyvars theta
 	rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
 		-- This reverse-mapping is a Royal Pain, 
 		-- but the result should mention TyVars not TcTyVars
-
-	head_ty = TyConApp tc (map TyVarTy tvs)
     in
    
     addNoInstanceErrs Nothing [] bad_insts		`thenM_`
     mapM_ (addErrTc . badDerivedPred) weird_preds	`thenM_`
-    checkAmbiguity tvs simpl_theta tv_set		`thenM_`
-      -- Check instance termination as for user-declared instances.
-      -- unless we had -fallow-undecidable-instances (which risks
-      -- non-termination in the 'deriving' context-inference fixpoint
-      -- loop).
-    ifM (gla_exts && not undecidable_ok)
-	(checkInstTermination simpl_theta [head_ty])	`thenM_`
     returnM (substTheta rev_env simpl_theta)
   where
     doc    = ptext SLIT("deriving classes for a data type")
