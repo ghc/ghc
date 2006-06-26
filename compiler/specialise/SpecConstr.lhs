@@ -22,7 +22,7 @@ import DataCon		( dataConRepArity, isVanillaDataCon )
 import Type		( tyConAppArgs, tyVarsOfTypes )
 import Unify		( coreRefineTys )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
-			  mkUserLocal, mkSysLocal )
+			  mkUserLocal, mkSysLocal, idUnfolding )
 import Var		( Var )
 import VarEnv
 import VarSet
@@ -638,10 +638,20 @@ argsToPats env us args = mapAccumL (argToPat env) us args
 \begin{code}
 is_con_app_maybe :: ConstrEnv -> CoreExpr -> Maybe ConValue
 is_con_app_maybe env (Var v)
-  = lookupVarEnv env v
-	-- You might think we could look in the idUnfolding here
-	-- but that doesn't take account of which branch of a 
-	-- case we are in, which is the whole point
+  = case lookupVarEnv env v of
+	Just stuff -> Just stuff
+		-- You might think we could look in the idUnfolding here
+		-- but that doesn't take account of which branch of a 
+		-- case we are in, which is the whole point
+
+	Nothing | isCheapUnfolding unf
+		-> is_con_app_maybe env (unfoldingTemplate unf)
+		where
+		  unf = idUnfolding v
+		-- However we do want to consult the unfolding as well,
+		-- for let-bound constructors!
+
+	other  -> Nothing
 
 is_con_app_maybe env (Lit lit)
   = Just (CV (LitAlt lit) [])
