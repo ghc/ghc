@@ -98,6 +98,8 @@ of n is needed (else we'd avoid the eval but pay more for re-boxing n).
 So in this case we want that the *only* uses of n are in case statements.
 
 
+Note [Good arguments]
+~~~~~~~~~~~~~~~~~~~~~
 So we look for
 
 * A self-recursive function.  Ignore mutual recursion for now, 
@@ -441,7 +443,10 @@ scBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, ScUsage, CoreBind)
 scBind env (Rec [(fn,rhs)])
   | notNull val_bndrs
   = scExpr env_fn_body body		`thenUs` \ (usg, body') ->
-    specialise env fn bndrs body usg	`thenUs` \ (rules, spec_prs) ->
+    specialise env fn bndrs body' usg	`thenUs` \ (rules, spec_prs) ->
+	-- Note body': the specialised copies should be based on the 
+	-- 	       optimised version of the body, in case there were
+	--	       nested functions inside.
     let
 	SCU { calls = calls, occs = occs } = usg
     in
@@ -510,6 +515,7 @@ specialise env fn bndrs body (SCU {calls=calls, occs=occs})
 
 ---------------------
 good_arg :: ConstrEnv -> IdEnv ArgOcc -> (CoreBndr, CoreArg) -> Bool
+-- See Note [Good arguments] above
 good_arg con_env arg_occs (bndr, arg)
   = case is_con_app_maybe con_env arg of	
 	Just _ ->  bndr_usg_ok arg_occs bndr arg
