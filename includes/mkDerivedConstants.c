@@ -318,6 +318,8 @@ main(int argc, char *argv[])
     closure_field(StgAP_STACK, fun);
     closure_payload(StgAP_STACK, payload);
 
+    thunk_size(StgSelector);
+
     closure_field(StgInd, indirectee);
 
     closure_size(StgMutVar);

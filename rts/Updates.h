@@ -198,17 +198,20 @@ extern void awakenBlockedQueue(StgBlockingQueueElement *q, StgClosure *node);
   W_ sz;								\
   W_ i;									\
   inf = %GET_STD_INFO(p);						\
-  if (%INFO_TYPE(inf) != HALF_W_(THUNK_SELECTOR)			\
-	&& %INFO_TYPE(inf) != HALF_W_(BLACKHOLE)			\
+  if (%INFO_TYPE(inf) != HALF_W_(BLACKHOLE)				\
 	&& %INFO_TYPE(inf) != HALF_W_(CAF_BLACKHOLE)) {			\
-      if (%INFO_TYPE(inf) == HALF_W_(AP_STACK)) {			\
-          sz = StgAP_STACK_size(p) + BYTES_TO_WDS(SIZEOF_StgAP_STACK_NoThunkHdr); \
-      } else {								\
-          if (%INFO_TYPE(inf) == HALF_W_(AP)) {				\
-	      sz = TO_W_(StgAP_n_args(p)) +  BYTES_TO_WDS(SIZEOF_StgAP_NoThunkHdr);	\
+      if (%INFO_TYPE(inf) == HALF_W_(THUNK_SELECTOR)) {			\
+	  sz = BYTES_TO_WDS(SIZEOF_StgSelector_NoThunkHdr);		\
+     } else {								\
+          if (%INFO_TYPE(inf) == HALF_W_(AP_STACK)) {			\
+              sz = StgAP_STACK_size(p) + BYTES_TO_WDS(SIZEOF_StgAP_STACK_NoThunkHdr); \
           } else {							\
-              sz = TO_W_(%INFO_PTRS(inf)) + TO_W_(%INFO_NPTRS(inf));	\
-	  }								\
+              if (%INFO_TYPE(inf) == HALF_W_(AP)) {			\
+	          sz = TO_W_(StgAP_n_args(p)) +  BYTES_TO_WDS(SIZEOF_StgAP_NoThunkHdr);	\
+              } else {							\
+                  sz = TO_W_(%INFO_PTRS(inf)) + TO_W_(%INFO_NPTRS(inf)); \
+	      }								\
+          }								\
       }									\
       i = 0;								\
       for:								\
@@ -231,7 +234,8 @@ FILL_SLOP(StgClosure *p)
     case BLACKHOLE:
     case CAF_BLACKHOLE:
     case THUNK_SELECTOR:
-	return;
+	sz = sizeofW(StgSelector) - sizeofW(StgThunkHeader);
+	break;
     case AP:
 	sz = ((StgAP *)p)->n_args + sizeofW(StgAP) - sizeofW(StgThunkHeader);
 	break;
