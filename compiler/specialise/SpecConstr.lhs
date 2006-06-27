@@ -192,6 +192,142 @@ is to run deShadowBinds before running SpecConstr, but instead we run the
 simplifier.  That gives the simplest possible program for SpecConstr to
 chew on; and it virtually guarantees no shadowing.
 
+-----------------------------------------------------
+		Stuff not yet handled
+-----------------------------------------------------
+
+Here are notes arising from Roman's work that I don't want to lose.
+
+Example 1
+~~~~~~~~~
+    data T a = T !a
+
+    foo :: Int -> T Int -> Int
+    foo 0 t = 0
+    foo x t | even x    = case t of { T n -> foo (x-n) t }
+            | otherwise = foo (x-1) t
+
+SpecConstr does no specialisation, because the second recursive call
+looks like a boxed use of the argument.  A pity.
+
+    $wfoo_sFw :: GHC.Prim.Int# -> T.T GHC.Base.Int -> GHC.Prim.Int#
+    $wfoo_sFw =
+      \ (ww_sFo [Just L] :: GHC.Prim.Int#) (w_sFq [Just L] :: T.T GHC.Base.Int) ->
+    	 case ww_sFo of ds_Xw6 [Just L] {
+    	   __DEFAULT ->
+    		case GHC.Prim.remInt# ds_Xw6 2 of wild1_aEF [Dead Just A] {
+    		  __DEFAULT -> $wfoo_sFw (GHC.Prim.-# ds_Xw6 1) w_sFq;
+    		  0 ->
+    		    case w_sFq of wild_Xy [Just L] { T.T n_ad5 [Just U(L)] ->
+    		    case n_ad5 of wild1_aET [Just A] { GHC.Base.I# y_aES [Just L] ->
+    		    $wfoo_sFw (GHC.Prim.-# ds_Xw6 y_aES) wild_Xy
+    		    } } };
+    	   0 -> 0
+
+Example 2
+~~~~~~~~~
+    data a :*: b = !a :*: !b
+    data T a = T !a
+
+    foo :: (Int :*: T Int) -> Int
+    foo (0 :*: t) = 0
+    foo (x :*: t) | even x    = case t of { T n -> foo ((x-n) :*: t) }
+                  | otherwise = foo ((x-1) :*: t)
+
+Very similar to the previous one, except that the parameters are now in
+a strict tuple. Before SpecConstr, we have
+
+    $wfoo_sG3 :: GHC.Prim.Int# -> T.T GHC.Base.Int -> GHC.Prim.Int#
+    $wfoo_sG3 =
+      \ (ww_sFU [Just L] :: GHC.Prim.Int#) (ww_sFW [Just L] :: T.T
+    GHC.Base.Int) ->
+        case ww_sFU of ds_Xws [Just L] {
+          __DEFAULT ->
+    	case GHC.Prim.remInt# ds_Xws 2 of wild1_aEZ [Dead Just A] {
+    	  __DEFAULT ->
+    	    case ww_sFW of tpl_B2 [Just L] { T.T a_sFo [Just A] ->
+    	    $wfoo_sG3 (GHC.Prim.-# ds_Xws 1) tpl_B2		-- $wfoo1
+    	    };
+    	  0 ->
+    	    case ww_sFW of wild_XB [Just A] { T.T n_ad7 [Just S(L)] ->
+    	    case n_ad7 of wild1_aFd [Just L] { GHC.Base.I# y_aFc [Just L] ->
+    	    $wfoo_sG3 (GHC.Prim.-# ds_Xws y_aFc) wild_XB	-- $wfoo2
+    	    } } };
+          0 -> 0 }
+
+We get two specialisations:
+"SC:$wfoo1" [0] __forall {a_sFB :: GHC.Base.Int sc_sGC :: GHC.Prim.Int#}
+		  Foo.$wfoo sc_sGC (Foo.T @ GHC.Base.Int a_sFB)
+		  = Foo.$s$wfoo1 a_sFB sc_sGC ;
+"SC:$wfoo2" [0] __forall {y_aFp :: GHC.Prim.Int# sc_sGC :: GHC.Prim.Int#}
+		  Foo.$wfoo sc_sGC (Foo.T @ GHC.Base.Int (GHC.Base.I# y_aFp))
+		  = Foo.$s$wfoo y_aFp sc_sGC ;
+
+But perhaps the first one isn't good.  After all, we know that tpl_B2 is
+a T (I# x) really!
+
+
+Example 3
+~~~~~~~~~
+This one is about specialising on a *lambda* argument
+
+    foo :: Int -> (Int -> Int) -> Int
+    foo 0 f = 0
+    foo m f = foo (f m) (+1)
+
+It produces
+
+    lvl_rmV :: GHC.Base.Int -> GHC.Base.Int
+    lvl_rmV =
+      \ (ds_dlk :: GHC.Base.Int) ->
+        case ds_dlk of wild_alH { GHC.Base.I# x_alG ->
+        GHC.Base.I# (GHC.Prim.+# x_alG 1)
+
+    T.$wfoo :: GHC.Prim.Int# -> (GHC.Base.Int -> GHC.Base.Int) ->
+    GHC.Prim.Int#
+    T.$wfoo =
+      \ (ww_sme :: GHC.Prim.Int#) (w_smg :: GHC.Base.Int -> GHC.Base.Int) ->
+        case ww_sme of ds_Xlw {
+          __DEFAULT ->
+    	case w_smg (GHC.Base.I# ds_Xlw) of w1_Xmo { GHC.Base.I# ww1_Xmz ->
+    	T.$wfoo ww1_Xmz lvl_rmV
+    	};
+          0 -> 0
+        }
+
+Of course, it would be much nicer if the optimiser specialised $wfoo for
+when lvl_rmV is passed as the second argument and then inlined it.
+
+Example 4
+~~~~~~~~~
+    foo :: Int -> (Int -> Int) -> Int
+    foo 0 f = 0
+    foo m f = foo (f m) (\n -> n-m)
+
+This is subtly different from the previous one in that we get an
+explicit lambda as the argument:
+
+    T.$wfoo :: GHC.Prim.Int# -> (GHC.Base.Int -> GHC.Base.Int) ->
+    GHC.Prim.Int#
+    T.$wfoo =
+      \ (ww_sm8 :: GHC.Prim.Int#) (w_sma :: GHC.Base.Int -> GHC.Base.Int) ->
+        case ww_sm8 of ds_Xlr {
+          __DEFAULT ->
+    	case w_sma (GHC.Base.I# ds_Xlr) of w1_Xmf { GHC.Base.I# ww1_Xmq ->
+    	T.$wfoo
+    	  ww1_Xmq
+    	  (\ (n_ad3 :: GHC.Base.Int) ->
+    	     case n_ad3 of wild_alB { GHC.Base.I# x_alA ->
+    	     GHC.Base.I# (GHC.Prim.-# x_alA ds_Xlr)
+    	     })
+    	};
+          0 -> 0
+        }
+
+I wonder if SpecConstr couldn't be extended to handle this? After all,
+lambda is a sort of constructor for functions and perhaps it already
+has most of the necessary machinery?
+
 
 %************************************************************************
 %*									*
