@@ -248,11 +248,7 @@ extern StgTSO dummy_tso;
 
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
-#if IN_STG_CODE
-#define END_TSO_QUEUE  (stg_END_TSO_QUEUE_closure)
-#else
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
-#endif
 
 #if defined(PAR) || defined(GRAN)
 /* this is the NIL ptr for a blocking queue */

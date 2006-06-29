@@ -229,6 +229,7 @@ main(int argc, char *argv[])
 
     field_offset(Capability, r);
     field_offset(Capability, lock);
+    struct_field(Capability, mut_lists);
 
     struct_field(bdescr, start);
     struct_field(bdescr, free);

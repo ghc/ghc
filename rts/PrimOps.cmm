@@ -138,7 +138,7 @@ unsafeThawArrayzh_fast
   //
   if (StgHeader_info(R1) != stg_MUT_ARR_PTRS_FROZEN0_info) {
 	SET_INFO(R1,stg_MUT_ARR_PTRS_DIRTY_info);
-	foreign "C" recordMutableLock(R1 "ptr") [R1];
+	recordMutable(R1, R1);
 	// must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
 	RET_P(R1);
   } else {
@@ -1522,7 +1522,7 @@ takeMVarzh_fast
       /* actually perform the putMVar for the thread that we just woke up */
       tso = StgMVar_head(mvar);
       PerformPut(tso,StgMVar_value(mvar));
-      foreign "C" dirtyTSO(tso "ptr") [];
+      dirtyTSO(tso);
 
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
@@ -1596,7 +1596,7 @@ tryTakeMVarzh_fast
 	/* actually perform the putMVar for the thread that we just woke up */
 	tso = StgMVar_head(mvar);
 	PerformPut(tso,StgMVar_value(mvar));
-        foreign "C" dirtyTSO(tso "ptr") [];
+        dirtyTSO(tso);
 
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
@@ -1666,7 +1666,7 @@ putMVarzh_fast
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
-        foreign "C" dirtyTSO(tso "ptr") [];
+        dirtyTSO(tso);
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
@@ -1732,7 +1732,7 @@ tryPutMVarzh_fast
 	/* actually perform the takeMVar */
 	tso = StgMVar_head(mvar);
 	PerformTake(tso, R2);
-        foreign "C" dirtyTSO(tso "ptr") [];
+        dirtyTSO(tso);
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */

@@ -514,4 +514,32 @@
 
 #define TICK_MILLISECS   (1000/TICK_FREQUENCY)   /* ms per tick */
 
+#define NO_TREC        stg_NO_TREC_closure
+#define END_TSO_QUEUE  stg_END_TSO_QUEUE_closure
+
+#define dirtyTSO(tso) \
+    StgTSO_flags(tso) = StgTSO_flags(tso) | TSO_DIRTY::I32;
+
+#define recordMutableCap(p, gen, regs)					\
+  W_ __bd;								\
+  W_ mut_list;								\
+  mut_list = Capability_mut_lists(MyCapability()) + WDS(gen);		\
+ __bd = W_[mut_list];							\
+  if (bdescr_free(__bd) >= bdescr_start(__bd) + BLOCK_SIZE) {		\
+      W_ __new_bd;							\
+      "ptr" __new_bd = foreign "C" allocBlock_lock() [regs];		\
+      bdescr_link(__new_bd) = __bd;					\
+      __bd = __new_bd;							\
+      W_[mut_list] = __bd;						\
+  }									\
+  W_ free;								\
+  free = bdescr_free(__bd);						\
+  W_[free] = p;								\
+  bdescr_free(__bd) = free + WDS(1);
+
+#define recordMutable(p, regs)						\
+      W_ __p;								\
+      __p = p;								\
+      recordMutableCap(__p, TO_W_(bdescr_gen_no(Bdescr(__p))), regs)
+
 #endif /* CMM_H */

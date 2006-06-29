@@ -221,11 +221,7 @@ extern void stmWriteTVar(Capability *cap,
 #define END_STM_WAIT_QUEUE ((StgTVarWaitQueue *)(void *)&stg_END_STM_WAIT_QUEUE_closure)
 #define END_STM_CHUNK_LIST ((StgTRecChunk *)(void *)&stg_END_STM_CHUNK_LIST_closure)
 
-#if IN_STG_CODE
-#define NO_TREC (stg_NO_TREC_closure)
-#else
 #define NO_TREC ((StgTRecHeader *)(void *)&stg_NO_TREC_closure)
-#endif
 
 /*----------------------------------------------------------------------*/
 
