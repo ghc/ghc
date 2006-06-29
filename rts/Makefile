@@ -325,9 +325,6 @@ GC_HC_OPTS += -optc-O3
 # upd_evacee() assigments get moved before the object copy.
 SRC_CC_OPTS += -fno-strict-aliasing
 
-# Cmm must be compiled via-C for now, because the NCG can't handle loops
-SRC_HC_OPTS += -fvia-C
-
 # We *want* type-checking of hand-written cmm.
 SRC_HC_OPTS += -dcmm-lint 
 
