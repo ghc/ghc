@@ -567,7 +567,7 @@ name                                                                    \
   MP_INT__mp_size(mp_tmp2)  = (s2);                                     \
   MP_INT__mp_d(mp_tmp2)	    = BYTE_ARR_CTS(d2);                         \
                                                                         \
-  foreign "C" mpz_init(mp_result1 "ptr") [];                            \
+  foreign "C" __gmpz_init(mp_result1 "ptr") [];                            \
                                                                         \
   /* Perform the operation */                                           \
   foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1  "ptr",mp_tmp2  "ptr") []; \
@@ -594,7 +594,7 @@ name                                                                    \
   MP_INT__mp_size(mp_tmp1)	= (s1);                                 \
   MP_INT__mp_d(mp_tmp1)		= BYTE_ARR_CTS(d1);                     \
                                                                         \
-  foreign "C" mpz_init(mp_result1 "ptr") [];                            \
+  foreign "C" __gmpz_init(mp_result1 "ptr") [];                            \
                                                                         \
   /* Perform the operation */                                           \
   foreign "C" mp_fun(mp_result1 "ptr",mp_tmp1 "ptr") [];                \
@@ -628,8 +628,8 @@ name                                                                            
   MP_INT__mp_size(mp_tmp2)	= (s2);                                                 \
   MP_INT__mp_d(mp_tmp2)		= BYTE_ARR_CTS(d2);                                     \
                                                                                         \
-  foreign "C" mpz_init(mp_result1 "ptr") [];                                               \
-  foreign "C" mpz_init(mp_result2 "ptr") [];                                               \
+  foreign "C" __gmpz_init(mp_result1 "ptr") [];                                               \
+  foreign "C" __gmpz_init(mp_result2 "ptr") [];                                               \
                                                                                         \
   /* Perform the operation */                                                           \
   foreign "C" mp_fun(mp_result1 "ptr",mp_result2 "ptr",mp_tmp1 "ptr",mp_tmp2 "ptr") [];    \
@@ -640,20 +640,20 @@ name                                                                            
            MP_INT__mp_d(mp_result2) - SIZEOF_StgArrWords);                              \
 }
 
-GMP_TAKE2_RET1(plusIntegerzh_fast,     mpz_add)
-GMP_TAKE2_RET1(minusIntegerzh_fast,    mpz_sub)
-GMP_TAKE2_RET1(timesIntegerzh_fast,    mpz_mul)
-GMP_TAKE2_RET1(gcdIntegerzh_fast,      mpz_gcd)
-GMP_TAKE2_RET1(quotIntegerzh_fast,     mpz_tdiv_q)
-GMP_TAKE2_RET1(remIntegerzh_fast,      mpz_tdiv_r)
-GMP_TAKE2_RET1(divExactIntegerzh_fast, mpz_divexact)
-GMP_TAKE2_RET1(andIntegerzh_fast,      mpz_and)
-GMP_TAKE2_RET1(orIntegerzh_fast,       mpz_ior)
-GMP_TAKE2_RET1(xorIntegerzh_fast,      mpz_xor)
-GMP_TAKE1_RET1(complementIntegerzh_fast, mpz_com)
+GMP_TAKE2_RET1(plusIntegerzh_fast,     __gmpz_add)
+GMP_TAKE2_RET1(minusIntegerzh_fast,    __gmpz_sub)
+GMP_TAKE2_RET1(timesIntegerzh_fast,    __gmpz_mul)
+GMP_TAKE2_RET1(gcdIntegerzh_fast,      __gmpz_gcd)
+GMP_TAKE2_RET1(quotIntegerzh_fast,     __gmpz_tdiv_q)
+GMP_TAKE2_RET1(remIntegerzh_fast,      __gmpz_tdiv_r)
+GMP_TAKE2_RET1(divExactIntegerzh_fast, __gmpz_divexact)
+GMP_TAKE2_RET1(andIntegerzh_fast,      __gmpz_and)
+GMP_TAKE2_RET1(orIntegerzh_fast,       __gmpz_ior)
+GMP_TAKE2_RET1(xorIntegerzh_fast,      __gmpz_xor)
+GMP_TAKE1_RET1(complementIntegerzh_fast, __gmpz_com)
 
-GMP_TAKE2_RET2(quotRemIntegerzh_fast, mpz_tdiv_qr)
-GMP_TAKE2_RET2(divModIntegerzh_fast,  mpz_fdiv_qr)
+GMP_TAKE2_RET2(quotRemIntegerzh_fast, __gmpz_tdiv_qr)
+GMP_TAKE2_RET2(divModIntegerzh_fast,  __gmpz_fdiv_qr)
 
 #ifndef THREADED_RTS
 section "bss" {
@@ -668,7 +668,7 @@ gcdIntzh_fast
     FETCH_MP_TEMP(mp_tmp_w);
 
     W_[mp_tmp_w] = R1;
-    r = foreign "C" mpn_gcd_1(mp_tmp_w "ptr", 1, R2) [];
+    r = foreign "C" __gmpn_gcd_1(mp_tmp_w "ptr", 1, R2) [];
 
     R1 = r;
     /* Result parked in R1, return via info-pointer at TOS */
@@ -679,7 +679,7 @@ gcdIntzh_fast
 gcdIntegerIntzh_fast
 {
     /* R1 = s1; R2 = d1; R3 = the int */
-    R1 = foreign "C" mpn_gcd_1( BYTE_ARR_CTS(R2) "ptr", R1, R3) [];
+    R1 = foreign "C" __gmpn_gcd_1( BYTE_ARR_CTS(R2) "ptr", R1, R3) [];
     
     /* Result parked in R1, return via info-pointer at TOS */
     jump %ENTRY_CODE(Sp(0));
@@ -695,7 +695,7 @@ cmpIntegerIntzh_fast
     vsize = 0;
     v_digit = R3;
 
-    // paraphrased from mpz_cmp_si() in the GMP sources
+    // paraphrased from __gmpz_cmp_si() in the GMP sources
     if (%gt(v_digit,0)) {
 	vsize = 1;
     } else { 
@@ -737,7 +737,7 @@ cmpIntegerzh_fast
     W_ usize, vsize, size, up, vp;
     CInt cmp;
 
-    // paraphrased from mpz_cmp() in the GMP sources
+    // paraphrased from __gmpz_cmp() in the GMP sources
     usize = R1;
     vsize = R3;
 
@@ -760,7 +760,7 @@ cmpIntegerzh_fast
     up = BYTE_ARR_CTS(R2);
     vp = BYTE_ARR_CTS(R4);
 
-    cmp = foreign "C" mpn_cmp(up "ptr", vp "ptr", size) [];
+    cmp = foreign "C" __gmpn_cmp(up "ptr", vp "ptr", size) [];
 
     if (cmp == 0 :: CInt) {
 	R1 = 0; 
