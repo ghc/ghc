@@ -861,42 +861,56 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	       -- make sure that every temporary always gets its own
 	       -- stack slot.
 	       
-	       let graph = [ (loc0, loc0,
-	                       [lookupWithDefaultUFM_Directly
-                                    dest_assig
-                                    (panic "RegisterAlloc.joinToTargets")
-                                    vreg]
-                                    )
-	                   | (vreg, loc0) <- ufmToList adjusted_assig ]
+	       let graph = [ node | (vreg, src) <- ufmToList adjusted_assig,
+			     	    node <- mkNodes src vreg ]
+
 	           sccs = stronglyConnCompR graph
 	           
-	           handleComponent (CyclicSCC [one]) = []
-	           handleComponent (AcyclicSCC (src,_,[dst]))
-	               = makeMove src dst
+		   mkNodes src vreg = 
+			expandNode src (lookupWithDefaultUFM_Directly
+                                    	  dest_assig
+                                    	  (panic "RegisterAlloc.joinToTargets")
+                                    	  vreg)
+
+		-- The InBoth handling is a little tricky here.  If
+		-- the destination is InBoth, then we must ensure that
+		-- the value ends up in both locations.  An InBoth
+		-- destination must conflict with an InReg or InMem
+		-- source, so we expand an InBoth destination as
+		-- necessary.  An InBoth source is slightly different:
+		-- we only care about the register that the source value
+		-- is in, so that we can move it to the destinations.
+
+		   expandNode loc@(InReg src) (InBoth dst mem)
+			| src == dst = [(loc, loc, [InMem dst])]
+			| otherwise  = [(loc, loc, [InReg dst, InMem mem])]
+		   expandNode loc@(InMem src) (InBoth dst mem)
+			| src == mem = [(loc, loc, [InReg dst])]
+			| otherwise  = [(loc, loc, [InReg dst, InMem mem])]
+		   expandNode loc@(InBoth _ src) (InMem dst)
+			| src == dst = [] -- guaranteed to be true
+		   expandNode loc@(InBoth src _) (InReg dst)
+			| src == dst = []
+		   expandNode loc@(InBoth src _) dst
+			= expandNode (InReg src) dst
+		   expandNode src dst
+			| src == dst = []
+			| otherwise  = [(src, src, [dst])]
+
+		-- we have eliminated any possibility of single-node cylces
+		-- in expandNode above.
+	           handleComponent (AcyclicSCC (src,_,dsts))
+	               = map (makeMove src) dsts
 	           handleComponent (CyclicSCC things)
 	               = panic $ "Register Allocator: handleComponent: cyclic"
 	                         ++ " (workaround: use -fviaC)"
 	           
 	           makeMove (InReg src) (InReg dst)
-	               = [mkRegRegMoveInstr (RealReg src) (RealReg dst)]
+	               = mkRegRegMoveInstr (RealReg src) (RealReg dst)
 	     	   makeMove (InMem src) (InReg dst)
-	     	       = [mkLoadInstr (RealReg dst) delta src]
+	     	       = mkLoadInstr (RealReg dst) delta src
 	     	   makeMove (InReg src) (InMem dst)
-	     	       = [mkSpillInstr (RealReg src) delta dst]
-	     	   
-	     	   makeMove (InBoth src _) (InReg dst)
-	     	       | src == dst = []
-	     	   makeMove (InBoth _ src) (InMem dst)
-	     	       | src == dst = []
-	     	   makeMove (InBoth src _) dst
-	     	       = makeMove (InReg src) dst
-                   makeMove (InReg src) (InBoth dstR dstM)
-                       | src == dstR
-                       = makeMove (InReg src) (InMem dstM)
-                       | otherwise
-                       = makeMove (InReg src) (InReg dstR)
-                       ++ makeMove (InReg src) (InMem dstM)
-	     	   
+	     	       = mkSpillInstr (RealReg src) delta dst
 	     	   makeMove src dst
 	     	       = panic $ "makeMove (" ++ show src ++ ") ("
 	     	                 ++ show dst ++ ")"
