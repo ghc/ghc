@@ -117,9 +117,7 @@ typedef struct StgRegTable_ {
   MP_INT          rmp_result1;
   MP_INT          rmp_result2;
   StgWord         rRet;  // holds the return code of the thread
-#if defined(THREADED_RTS) || defined(PAR)
   StgSparkPool    rSparks;	/* per-task spark pool */
-#endif
 } StgRegTable;
 
 #if IN_STG_CODE
