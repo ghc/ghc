@@ -547,6 +547,7 @@ pprCallishMachOp_for_C mop
         MO_F32_Log  -> ptext SLIT("logf")
         MO_F32_Exp  -> ptext SLIT("expf")
         MO_F32_Sqrt -> ptext SLIT("sqrtf")
+	MO_WriteBarrier -> ptext SLIT("write_barrier")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines

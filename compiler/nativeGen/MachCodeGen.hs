@@ -2909,6 +2909,10 @@ genCCall fn cconv result_regs args
 
 #if i386_TARGET_ARCH
 
+genCCall (CmmPrim MO_WriteBarrier) _ _ _ = return nilOL
+	-- write barrier compiles to no code on x86/x86-64; 
+	-- we keep it this long in order to prevent earlier optimisations.
+
 -- we only cope with a single result for foreign calls
 genCCall (CmmPrim op) [(r,_)] args vols = do
   case op of
@@ -3118,6 +3122,10 @@ outOfLineFloatOp mop res args vols
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if x86_64_TARGET_ARCH
+
+genCCall (CmmPrim MO_WriteBarrier) _ _ _ = return nilOL
+	-- write barrier compiles to no code on x86/x86-64; 
+	-- we keep it this long in order to prevent earlier optimisations.
 
 genCCall (CmmPrim op) [(r,_)] args vols = 
   outOfLineFloatOp op r args vols

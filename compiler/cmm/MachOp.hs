@@ -385,6 +385,7 @@ data CallishMachOp
   | MO_F32_Log
   | MO_F32_Exp
   | MO_F32_Sqrt
+  | MO_WriteBarrier
   deriving (Eq, Show)
 
 pprCallishMachOp :: CallishMachOp -> SDoc
