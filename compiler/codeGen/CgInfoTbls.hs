@@ -51,7 +51,7 @@ import CgMonad
 import CmmUtils		( mkIntCLit, zeroCLit )
 import Cmm		( CmmStmt(..), CmmExpr(..), CmmLit(..), LocalReg,
 			  CmmBasicBlock, nodeReg )
-import MachOp		( MachOp(..), wordRep, halfWordRep )
+import MachOp
 import CLabel
 import StgSyn		( SRT(..) )
 import Name		( Name )
@@ -217,7 +217,14 @@ retVec :: CmmExpr -> CmmExpr -> CmmExpr
 -- Get a return vector from the info pointer
 retVec info_amode zero_indexed_tag
   = let slot = vectorSlot info_amode zero_indexed_tag
+#ifdef x86_64_TARGET_ARCH
+        tableEntry = CmmMachOp (MO_S_Conv I32 I64) [CmmLoad slot I32]
+	-- offsets are 32-bits on x86-64, due to the inability of
+	-- the tools to handle 64-bit PC-relative relocations.  See also
+	-- PprMach.pprDataItem, and InfoTables.h:OFFSET_FIELD().
+#else
         tableEntry = CmmLoad slot wordRep
+#endif
     in if tablesNextToCode
            then CmmMachOp (MO_Add wordRep) [tableEntry, info_amode]
            else tableEntry
