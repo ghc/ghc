@@ -315,10 +315,15 @@ SRC_HC_OPTS += -optc-fno-stack-protector
 endif
 
 # -O3 helps unroll some loops (especially in copy() with a constant argument).
-# -fno-strict-aliasing is a hack because we often mix StgPtr and StgClosure pointers
-# to the same object, and gcc will assume these don't alias.  eg. it happens in
-# copy() with gcc 3.4.3, the upd_evacee() assigments get moved before the object copy.
-GC_HC_OPTS += -optc-O3 -optc-fno-strict-aliasing
+GC_HC_OPTS += -optc-O3
+
+# -fno-strict-aliasing is required for the runtime, because we often
+# use a variety of types to represent closure pointers (StgPtr,
+# StgClosure, StgMVar, etc.), and without -fno-strict-aliasing gcc is
+# allowed to assume that these pointers do not alias.  eg. without
+# this flag we get problems in GC.c:copy() with gcc 3.4.3, the
+# upd_evacee() assigments get moved before the object copy.
+SRC_CC_OPTS += -fno-strict-aliasing
 
 # Cmm must be compiled via-C for now, because the NCG can't handle loops
 SRC_HC_OPTS += -fvia-C
