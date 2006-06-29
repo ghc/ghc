@@ -137,6 +137,7 @@ data CmmToken
   | CmmT_if
   | CmmT_jump
   | CmmT_foreign
+  | CmmT_prim
   | CmmT_import
   | CmmT_switch
   | CmmT_case
@@ -211,6 +212,7 @@ reservedWordsFM = listToUFM $
 	( "if",			CmmT_if ),
 	( "jump",		CmmT_jump ),
 	( "foreign",		CmmT_foreign ),
+	( "prim",		CmmT_prim ),
 	( "import",		CmmT_import ),
 	( "switch",		CmmT_switch ),
 	( "case",		CmmT_case ),

@@ -103,6 +103,7 @@ import Data.Char	( ord )
 	'if'		{ L _ (CmmT_if) }
 	'jump'		{ L _ (CmmT_jump) }
 	'foreign'	{ L _ (CmmT_foreign) }
+	'prim'		{ L _ (CmmT_prim) }
 	'import'	{ L _ (CmmT_import) }
 	'switch'	{ L _ (CmmT_switch) }
 	'case'		{ L _ (CmmT_case) }
@@ -265,6 +266,11 @@ stmt	:: { ExtCode }
 	| lreg '=' 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
 		{% let result = do r <- $1; return (r,NoHint) in
 		   foreignCall $4 [result] $5 $7 $9 }
+	| 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
+		{% primCall [] $3 $5 $7 }
+	| lreg '=' 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
+		{% let result = do r <- $1; return (r,NoHint) in
+		   primCall [result] $5 $7 $9 }
 	| STRING lreg '=' 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
 		{% do h <- parseHint $1;
 		      let result = do r <- $2; return (r,h) in
@@ -530,6 +536,12 @@ machOps = listToUFM $
 	( "i2f64",    flip MO_S_Conv F64 )
 	]
 
+callishMachOps = listToUFM $
+	map (\(x, y) -> (mkFastString x, y)) [
+        ( "write_barrier", MO_WriteBarrier )
+        -- ToDo: the rest, maybe
+    ]
+
 parseHint :: String -> P MachHint
 parseHint "ptr"    = return PtrHint
 parseHint "signed" = return SignedHint
@@ -750,6 +762,19 @@ foreignCall "C" results_code expr_code args_code vols
                  (CmmForeignCall expr CCallConv) args vols)
 foreignCall conv _ _ _ _
   = fail ("unknown calling convention: " ++ conv)
+
+primCall
+	:: [ExtFCode (CmmReg,MachHint)]
+	-> FastString
+	-> [ExtFCode (CmmExpr,MachHint)]
+	-> Maybe [GlobalReg] -> P ExtCode
+primCall results_code name args_code vols
+  = case lookupUFM callishMachOps name of
+	Nothing -> fail ("unknown primitive " ++ unpackFS name)
+	Just p  -> return $ do
+		results <- sequence results_code
+		args <- sequence args_code
+        	code (emitForeignCall' PlayRisky results (CmmPrim p) args vols)
 
 doStore :: MachRep -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
 doStore rep addr_code val_code
