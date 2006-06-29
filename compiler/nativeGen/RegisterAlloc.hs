@@ -510,13 +510,26 @@ raInsn block_live new_instrs (instr, r_dying, w_dying) = do
     -- register does not already have an assignment, then we can
     -- eliminate the instruction.
     case isRegRegMove instr of
-	Just (src,dst)
-		| src `elem` r_dying, 
-		  isVirtualReg dst,
-		  Just loc <- lookupUFM assig src,
-	 	  not (dst `elemUFM` assig) -> do
-			setAssigR (addToUFM (delFromUFM assig src) dst loc)
-			return (new_instrs, [])
+	Just (src,dst)	| src `elem` r_dying, 
+		  	  isVirtualReg dst,
+		 	  not (dst `elemUFM` assig) -> do
+	   case src of
+	      RealReg i -> setAssigR (addToUFM assig dst (InReg i))
+		-- if src is a fixed reg, then we just map dest to this
+		-- reg in the assignment.  src must be an allocatable reg,
+		-- otherwise it wouldn't be in r_dying.
+	      _virt -> case lookupUFM assig src of
+		         Nothing -> panic "raInsn"
+			 Just loc ->
+			   setAssigR (addToUFM (delFromUFM assig src) dst loc)
+
+	   -- we have elimianted this instruction
+	   {-
+	   freeregs <- getFreeRegsR
+    	   assig <- getAssigR
+	   pprTrace "raInsn" (text "ELIMINATED: " <> docToSDoc (pprInstr instr) $$ ppr r_dying <+> ppr w_dying $$ text (show freeregs) $$ ppr assig) $ do
+	   -}
+	   return (new_instrs, [])
 
 	other -> genRaInsn block_live new_instrs instr r_dying w_dying
 
