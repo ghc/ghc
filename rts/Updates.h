@@ -277,7 +277,7 @@ FILL_SLOP(StgClosure *p)
     DEBUG_FILL_SLOP(p1);					\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
     StgInd_indirectee(p1) = p2;					\
-    foreign "C" wb() [];					\
+    prim %write_barrier() [];					\
     bd = Bdescr(p1);						\
     if (bdescr_gen_no(bd) != 0 :: CInt) {			\
       foreign "C" recordMutableCap(p1 "ptr",			\
@@ -294,28 +294,28 @@ FILL_SLOP(StgClosure *p)
       and_then;							\
   }
 #else
-#define updateWithIndirection(ind_info, p1, p2, and_then)		\
-  {									\
-    bdescr *bd;								\
-									\
-    /* cas(p1, 0, &stg_WHITEHOLE_info); */				\
-    ASSERT( (P_)p1 != (P_)p2 && !closure_IND(p1) );			\
-    DEBUG_FILL_SLOP(p1);						\
-    LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);				\
-    ((StgInd *)p1)->indirectee = p2;					\
-    wb();								\
-    bd = Bdescr((P_)p1);						\
-    if (bd->gen_no != 0) {						\
-      recordMutableGenLock(p1, &generations[bd->gen_no]);		\
-      SET_INFO(p1, &stg_IND_OLDGEN_info);				\
-      TICK_UPD_OLD_IND();						\
-      and_then;								\
-    } else {								\
-      SET_INFO(p1, ind_info);						\
-      LDV_RECORD_CREATE(p1);						\
-      TICK_UPD_NEW_IND();						\
-      and_then;								\
-    }									\
+#define updateWithIndirection(ind_info, p1, p2, and_then)	\
+  {								\
+    bdescr *bd;							\
+								\
+    /* cas(p1, 0, &stg_WHITEHOLE_info); */			\
+    ASSERT( (P_)p1 != (P_)p2 && !closure_IND(p1) );		\
+    DEBUG_FILL_SLOP(p1);					\
+    LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
+    ((StgInd *)p1)->indirectee = p2;				\
+    write_barrier();						\
+    bd = Bdescr((P_)p1);					\
+    if (bd->gen_no != 0) {					\
+      recordMutableGenLock(p1, &generations[bd->gen_no]);	\
+      SET_INFO(p1, &stg_IND_OLDGEN_info);			\
+      TICK_UPD_OLD_IND();					\
+      and_then;							\
+    } else {							\
+      SET_INFO(p1, ind_info);					\
+      LDV_RECORD_CREATE(p1);					\
+      TICK_UPD_NEW_IND();					\
+      and_then;							\
+    }								\
   }
 #endif
 

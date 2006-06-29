@@ -240,7 +240,7 @@ check_target:
     {
 	Capability *target_cap;
 
-	wb();
+	write_barrier();
 	target_cap = target->cap;
 	if (target_cap == cap && (target->flags & TSO_BLOCKEX) == 0) {
 	    // It's on our run queue and not blocking exceptions
@@ -464,7 +464,7 @@ blockedThrowTo (StgTSO *source, StgTSO *target)
     dirtyTSO(target); // we modified the blocked_exceptions queue
     
     source->block_info.tso = target;
-    wb(); // throwTo_exception *must* be visible if BlockedOnException is.
+    write_barrier(); // throwTo_exception *must* be visible if BlockedOnException is.
     source->why_blocked = BlockedOnException;
 }
 

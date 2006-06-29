@@ -96,7 +96,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
  * that require it (not x86 or x86_64).
  */
 INLINE_HEADER void
-wb(void) {
+write_barrier(void) {
 #if i386_HOST_ARCH || x86_64_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
 #elif powerpc_HOST_ARCH
@@ -136,7 +136,7 @@ unlockClosure(StgClosure *p, StgInfoTable *info)
 {
 #if i386_HOST_ARCH || x86_64_HOST_ARCH || powerpc_HOST_ARCH
     // This is a strictly ordered write, so we need a wb():
-    wb();
+    write_barrier();
     p->header.info = info;
 #else
     RELEASE_SM_LOCK;
@@ -145,7 +145,7 @@ unlockClosure(StgClosure *p, StgInfoTable *info)
 
 #else /* !THREADED_RTS */
 
-#define wb() /* nothing */
+#define write_barrier() /* nothing */
 
 INLINE_HEADER StgWord
 xchg(StgPtr p, StgWord w)
