@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -cpp -fffi -fglasgow-exts #-}
+{-# OPTIONS_GHC -cpp -fglasgow-exts #-}
 --
 -- Module      : Data.ByteString.Char8
 -- Copyright   : (c) Don Stewart 2006
@@ -35,11 +35,11 @@
 module Data.ByteString.Char8 (
 
         -- * The @ByteString@ type
-        ByteString(..),         -- instances: Eq, Ord, Show, Read, Data, Typeable
+        ByteString,             -- abstract, instances: Eq, Ord, Show, Read, Data, Typeable, Monoid
 
         -- * Introducing and eliminating 'ByteString's
         empty,                  -- :: ByteString
-        singleton,               -- :: Char   -> ByteString
+        singleton,              -- :: Char   -> ByteString
         pack,                   -- :: String -> ByteString
         unpack,                 -- :: ByteString -> String
 
@@ -104,6 +104,7 @@ module Data.ByteString.Char8 (
         span,                   -- :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
         spanEnd,                -- :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
         break,                  -- :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
+        breakEnd,               -- :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
         group,                  -- :: ByteString -> [ByteString]
         groupBy,                -- :: (Char -> Char -> Bool) -> ByteString -> [ByteString]
         inits,                  -- :: ByteString -> [ByteString]
@@ -179,19 +180,28 @@ module Data.ByteString.Char8 (
         -- * Ordered ByteStrings
         sort,                   -- :: ByteString -> ByteString
 
-        -- * Unchecked access
-        unsafeHead,             -- :: ByteString -> Char
-        unsafeTail,             -- :: ByteString -> ByteString
-        unsafeIndex,            -- :: ByteString -> Int -> Char
+        -- * Conversion
         w2c,                    -- :: Word8 -> Char
         c2w,                    -- :: Char  -> Word8
 
         -- * Reading from ByteStrings
         readInt,                -- :: ByteString -> Maybe Int
-        unsafeReadInt,          -- :: ByteString -> Maybe Int
+
+        -- * Low level CString conversions
+
+        -- ** Packing CStrings and pointers
+        packCString,            -- :: CString -> ByteString
+        packCStringLen,         -- :: CString -> ByteString
+        packMallocCString,      -- :: CString -> ByteString
+
+        -- ** Using ByteStrings as CStrings
+        useAsCString,           -- :: ByteString -> (CString -> IO a) -> IO a
+        useAsCStringLen,        -- :: ByteString -> (CStringLen -> IO a) -> IO a
 
         -- * Copying ByteStrings
         copy,                   -- :: ByteString -> ByteString
+        copyCString,            -- :: CString -> IO ByteString
+        copyCStringLen,         -- :: CStringLen -> IO ByteString
 
         -- * I\/O with @ByteString@s
 
@@ -207,17 +217,21 @@ module Data.ByteString.Char8 (
         -- ** Files
         readFile,               -- :: FilePath -> IO ByteString
         writeFile,              -- :: FilePath -> ByteString -> IO ()
+        appendFile,             -- :: FilePath -> ByteString -> IO ()
 --      mmapFile,               -- :: FilePath -> IO ByteString
 
         -- ** I\/O with Handles
 #if defined(__GLASGOW_HASKELL__)
         getArgs,                -- :: IO [ByteString]
         hGetLine,               -- :: Handle -> IO ByteString
+        hGetLines,              -- :: Handle -> IO ByteString
         hGetNonBlocking,        -- :: Handle -> Int -> IO ByteString
 #endif
         hGetContents,           -- :: Handle -> IO ByteString
         hGet,                   -- :: Handle -> Int -> IO ByteString
         hPut,                   -- :: Handle -> ByteString -> IO ()
+        hPutStr,                -- :: Handle -> ByteString -> IO ()
+        hPutStrLn,              -- :: Handle -> ByteString -> IO ()
 
 #if defined(__GLASGOW_HASKELL__)
         -- * Low level construction
@@ -230,8 +244,6 @@ module Data.ByteString.Char8 (
 #if defined(__GLASGOW_HASKELL__)
         unpackList,
 #endif
-        noAL, NoAL, loopArr, loopAcc, loopSndAcc,
-        loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL, scanEFL,
         filter', map'
 
     ) where
@@ -242,45 +254,47 @@ import Prelude hiding           (reverse,head,tail,last,init,null
                                 ,concat,any,take,drop,splitAt,takeWhile
                                 ,dropWhile,span,break,elem,filter,unwords
                                 ,words,maximum,minimum,all,concatMap,scanl,scanl1
-                                ,foldl1,foldr1,readFile,writeFile,replicate
+                                ,foldl1,foldr1,readFile,writeFile,appendFile,replicate
                                 ,getContents,getLine,putStr,putStrLn
                                 ,zip,zipWith,unzip,notElem)
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base as B
 
 -- Listy functions transparently exported
-import Data.ByteString (ByteString(..)
-                       ,empty,null,length,tail,init,append
+import Data.ByteString (empty,null,length,tail,init,append
                        ,inits,tails,reverse,transpose
                        ,concat,take,drop,splitAt,join
                        ,sort,isPrefixOf,isSuffixOf,isSubstringOf,findSubstring
-                       ,findSubstrings,unsafeTail,copy,group
+                       ,findSubstrings,copy,group
 
                        ,getContents, putStr, putStrLn
-                       ,readFile, {-mmapFile,-} writeFile
-                       ,hGetContents, hGet, hPut
+                       ,readFile, {-mmapFile,-} writeFile, appendFile
+                       ,hGetContents, hGet, hPut, hPutStr, hPutStrLn
+                       ,packCString,packCStringLen, packMallocCString
+                       ,useAsCString,useAsCStringLen, copyCString,copyCStringLen
 #if defined(__GLASGOW_HASKELL__)
-                       ,getLine, getArgs, hGetLine, hGetNonBlocking
-                       ,packAddress, unsafePackAddress
+                       ,getLine, getArgs, hGetLine, hGetLines, hGetNonBlocking
                        ,unpackList
 #endif
-                       ,noAL, NoAL, loopArr, loopAcc, loopSndAcc
-                       ,loopU, mapEFL, filterEFL, foldEFL, foldEFL', fuseEFL, scanEFL
-                       ,useAsCString, unsafeUseAsCString
                        )
 
-import Data.Char
+import Data.ByteString.Base (
+                        ByteString(..)
+#if defined(__GLASGOW_HASKELL__)
+                       ,packAddress, unsafePackAddress
+#endif
+                       ,c2w, w2c, unsafeTail, inlinePerformIO, isSpaceWord8
+                       )
 
 import qualified Data.List as List (intersperse)
 
 import Foreign
-import Foreign.C.Types          (CLong)
-import Foreign.Marshal.Utils    (with)
 
 #if defined(__GLASGOW_HASKELL__)
-import GHC.Base                 (Char(..),unsafeChr,unpackCString#,unsafeCoerce#)
+import GHC.Base                 (Char(..),unpackCString#,unsafeCoerce#)
 import GHC.IOBase               (IO(..),stToIO)
-import GHC.Prim                 (Addr#,writeWord8OffAddr#,realWorld#,plusAddr#)
+import GHC.Prim                 (Addr#,writeWord8OffAddr#,plusAddr#)
 import GHC.Ptr                  (Ptr(..))
 import GHC.ST                   (ST(..))
 #endif
@@ -288,6 +302,7 @@ import GHC.ST                   (ST(..))
 #define STRICT1(f) f a | a `seq` False = undefined
 #define STRICT2(f) f a b | a `seq` b `seq` False = undefined
 #define STRICT3(f) f a b c | a `seq` b `seq` c `seq` False = undefined
+#define STRICT4(f) f a b c d | a `seq` b `seq` c `seq` d `seq` False = undefined
 
 ------------------------------------------------------------------------
 
@@ -303,13 +318,13 @@ singleton = B.singleton . c2w
 pack :: String -> ByteString
 #if !defined(__GLASGOW_HASKELL__)
 
-pack str = B.create (P.length str) $ \p -> go p str
+pack str = B.unsafeCreate (P.length str) $ \p -> go p str
     where go _ []     = return ()
           go p (x:xs) = poke p (c2w x) >> go (p `plusPtr` 1) xs
 
 #else /* hack away */
 
-pack str = B.create (P.length str) $ \(Ptr p) -> stToIO (go p str)
+pack str = B.unsafeCreate (P.length str) $ \(Ptr p) -> stToIO (go p str)
   where
     go :: Addr# -> [Char] -> ST a ()
     go _ []        = return ()
@@ -527,6 +542,13 @@ spanEnd :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
 spanEnd f = B.spanEnd (f . w2c)
 {-# INLINE spanEnd #-}
 
+-- | 'breakEnd' behaves like 'break' but from the end of the 'ByteString'
+-- 
+-- breakEnd p == spanEnd (not.p)
+breakEnd :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
+breakEnd f = B.breakEnd (f . w2c)
+{-# INLINE breakEnd #-}
+
 -- | 'breakChar' breaks its ByteString argument at the first occurence
 -- of the specified Char. It is more efficient than 'break' as it is
 -- implemented with @memchr(3)@. I.e.
@@ -742,22 +764,6 @@ unsafeIndex :: ByteString -> Int -> Char
 unsafeIndex = (w2c .) . B.unsafeIndex
 {-# INLINE unsafeIndex #-}
 
--- | Conversion between 'Word8' and 'Char'. Should compile to a no-op.
-w2c :: Word8 -> Char
-#if !defined(__GLASGOW_HASKELL__)
-w2c = chr . fromIntegral
-#else
-w2c = unsafeChr . fromIntegral
-#endif
-{-# INLINE w2c #-}
-
--- | Unsafe conversion between 'Char' and 'Word8'. This is a no-op and
--- silently truncates to 8 bits Chars > '\255'. It is provided as
--- convenience for ByteString construction.
-c2w :: Char -> Word8
-c2w = fromIntegral . ord
-{-# INLINE c2w #-}
-
 -- ---------------------------------------------------------------------
 -- Things that depend on the encoding
 
@@ -769,7 +775,7 @@ c2w = fromIntegral . ord
 breakSpace :: ByteString -> (ByteString,ByteString)
 breakSpace (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p -> do
     i <- firstspace (p `plusPtr` s) 0 l
-    return $ case () of {_
+    return $! case () of {_
         | i == 0    -> (empty, PS x s l)
         | i == l    -> (PS x s l, empty)
         | otherwise -> (PS x s i, PS x (s+i) (l-i))
@@ -792,7 +798,7 @@ firstspace ptr n m
 dropSpace :: ByteString -> ByteString
 dropSpace (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p -> do
     i <- firstnonspace (p `plusPtr` s) 0 l
-    return $ if i == l then empty else PS x (s+i) (l-i)
+    return $! if i == l then empty else PS x (s+i) (l-i)
 {-# INLINE dropSpace #-}
 
 firstnonspace :: Ptr Word8 -> Int -> Int -> IO Int
@@ -812,7 +818,7 @@ firstnonspace ptr n m
 dropSpaceEnd :: ByteString -> ByteString
 dropSpaceEnd (PS x s l) = inlinePerformIO $ withForeignPtr x $ \p -> do
     i <- lastnonspace (p `plusPtr` s) (l-1)
-    return $ if i == (-1) then empty else PS x s (i+1)
+    return $! if i == (-1) then empty else PS x s (i+1)
 {-# INLINE dropSpaceEnd #-}
 
 lastnonspace :: Ptr Word8 -> Int -> IO Int
@@ -972,90 +978,33 @@ betweenLines start end ps =
 -- ---------------------------------------------------------------------
 -- Reading from ByteStrings
 
--- | readInt skips any whitespace at the beginning of its argument, and
--- reads an Int from the beginning of the ByteString.  If there is no
+-- | readInt reads an Int from the beginning of the ByteString.  If there is no
 -- integer at the beginning of the string, it returns Nothing, otherwise
 -- it just returns the int read, and the rest of the string.
 readInt :: ByteString -> Maybe (Int, ByteString)
-readInt p@(PS x s l) = inlinePerformIO $ useAsCString p $ \cstr ->
-    with (castPtr cstr) $ \endpp -> do
-        val     <- c_strtol (castPtr cstr) endpp 0
-        skipped <- (`minusPtr` cstr) `fmap` peek endpp
-        return $ if skipped == 0
-                 then Nothing
-                 else Just (fromIntegral val, PS x (s+skipped) (l-skipped))
+readInt as
+    | null as   = Nothing
+    | otherwise =
+        case unsafeHead as of
+            '-' -> loop True  0 0 (unsafeTail as)
+            '+' -> loop False 0 0 (unsafeTail as)
+            _   -> loop False 0 0 as
 
--- | unsafeReadInt is like readInt, but requires a null terminated
--- ByteString. It avoids a copy if this is the case. It returns the Int
--- read, if any, and the rest of the string.
-unsafeReadInt :: ByteString -> Maybe (Int, ByteString)
-unsafeReadInt p@(PS x s l) = inlinePerformIO $ unsafeUseAsCString p $ \cstr ->
-    with (castPtr cstr) $ \endpp -> do
-        val     <- c_strtol (castPtr cstr) endpp 0
-        skipped <- (`minusPtr` cstr) `fmap` peek endpp
-        return $ if skipped == 0
-                 then Nothing
-                 else Just (fromIntegral val, PS x (s+skipped) (l-skipped))
+    where loop :: Bool -> Int -> Int -> ByteString -> Maybe (Int, ByteString)
+          STRICT4(loop)
+          loop neg i n ps
+              | null ps   = end neg i n ps
+              | otherwise =
+                  case B.unsafeHead ps of
+                    w | w >= 0x30
+                     && w <= 0x39 -> loop neg (i+1)
+                                          (n * 10 + (fromIntegral w - 0x30))
+                                          (unsafeTail ps)
+                      | otherwise -> end neg i n ps
 
-foreign import ccall unsafe "stdlib.h strtol" c_strtol
-    :: Ptr Word8 -> Ptr (Ptr Word8) -> Int -> IO CLong
-
-{-
---
--- not quite there yet
---
-readInt :: ByteString -> Maybe (Int, ByteString)
-readInt = go 0
-    where
-        STRICT2(go)
-        go i ps
-            | B.null ps = Nothing
-            | x == '-'  = neg 0 xs
-            | otherwise = pos (parse x) xs
-            where (x, xs) = (ps `unsafeIndex` 0, unsafeTail ps)
-
-        STRICT2(neg)
-        neg n qs | isSpace x   = return $ Just ((i-n),xs)
-                 | otherwise   = neg (parse x + (10 * n)) xs
-                 where (x, xs) = (qs `unsafeIndex` 0, unsafeTail qs)
-
-        STRICT2(pos)
-        pos n qs | isSpace x = go (i+n) xs
-                 | otherwise = pos (parse x + (10 * n)) xs
-                 where (x, xs) = (qs `unsafeIndexWord8` 0, unsafeTail qs)
-
-        parse w = fromIntegral (w - 48) :: Int
-        {-# INLINE parse #-}
--}
-
--- ---------------------------------------------------------------------
--- Internals
-
--- Just like inlinePerformIO, but we inline it. Big performance gains as
--- it exposes lots of things to further inlining
---
-{-# INLINE inlinePerformIO #-}
-inlinePerformIO :: IO a -> a
-#if defined(__GLASGOW_HASKELL__)
-inlinePerformIO (IO m) = case m realWorld# of (# _, r #) -> r
-#else
-inlinePerformIO = unsafePerformIO
-#endif
-
--- Selects white-space characters in the Latin-1 range
--- ordered by frequency
--- Idea from Ketil
-isSpaceWord8 :: Word8 -> Bool
-isSpaceWord8 w = case w of
-    0x20 -> True -- SPACE
-    0x0A -> True -- LF, \n
-    0x09 -> True -- HT, \t
-    0x0C -> True -- FF, \f
-    0x0D -> True -- CR, \r
-    0x0B -> True -- VT, \v
-    0xA0 -> True -- spotted by QC..
-    _    -> False
-{-# INLINE isSpaceWord8 #-}
+          end _    0 _ _  = Nothing
+          end True _ n ps = Just (negate n, ps)
+          end _    _ n ps = Just (n, ps)
 
 -- | /O(n)/ Like 'map', but not fuseable. The benefit is that it is
 -- slightly faster for one-shot cases.
