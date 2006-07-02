@@ -526,7 +526,7 @@ hscNormalIface simpl_result
 		<- {-# SCC "MkFinalIface" #-}
 		   mkIface hsc_env maybe_old_iface simpl_result details
 	-- Emit external core
-       emitExternalCore (hsc_dflags hsc_env) cg_guts -- Move this? --Lemmih 03/07/2006
+       emitExternalCore (hsc_dflags hsc_env) (mg_exports simpl_result) cg_guts -- Move this? --Lemmih 03/07/2006
        dumpIfaceStats hsc_env
 
  	    -------------------

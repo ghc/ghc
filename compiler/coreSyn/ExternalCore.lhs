@@ -21,7 +21,7 @@ data Vdefg
   = Rec [Vdef]
   | Nonrec Vdef
 
-type Vdef = (Var,Ty,Exp) 	-- Top level bindings are unqualified now
+type Vdef = (Bool,Var,Ty,Exp) 	-- Top level bindings are unqualified now
 
 data Exp 
   = Var (Qual Var)

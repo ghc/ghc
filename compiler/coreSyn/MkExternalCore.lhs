@@ -26,6 +26,8 @@ import IdInfo
 import Kind
 import Literal
 import Name
+import NameSet ( NameSet, emptyNameSet )
+import UniqSet ( elementOfUniqSet )
 import Outputable
 import ForeignCall
 import DynFlags	( DynFlags(..) )
@@ -33,27 +35,27 @@ import StaticFlags	( opt_EmitExternalCore )
 import IO
 import FastString
 
-emitExternalCore :: DynFlags -> CgGuts -> IO ()
-emitExternalCore dflags cg_guts
+emitExternalCore :: DynFlags -> NameSet -> CgGuts -> IO ()
+emitExternalCore dflags exports cg_guts
  | opt_EmitExternalCore 
  = (do handle <- openFile corename WriteMode
-       hPutStrLn handle (show (mkExternalCore cg_guts))      
+       hPutStrLn handle (show (mkExternalCore exports cg_guts))      
        hClose handle)
    `catch` (\err -> pprPanic "Failed to open or write external core output file" 
 	                     (text corename))
    where corename = extCoreName dflags
-emitExternalCore _ _
+emitExternalCore _ _ _
  | otherwise
  = return ()
 
 
-mkExternalCore :: CgGuts -> C.Module
+mkExternalCore :: NameSet -> CgGuts -> C.Module
 -- The ModGuts has been tidied, but the implicit bindings have
 -- not been injected, so we have to add them manually here
 -- We don't include the strange data-con *workers* because they are
 -- implicit in the data type declaration itself
-mkExternalCore (CgGuts {cg_module=this_mod, cg_tycons = tycons, cg_binds = binds})
-  = C.Module mname tdefs (map make_vdef binds)
+mkExternalCore exports (CgGuts {cg_module=this_mod, cg_tycons = tycons, cg_binds = binds})
+  = C.Module mname tdefs (map (make_vdef exports) binds)
   where
     mname  = make_mid this_mod
     tdefs  = foldr collect_tdefs [] tycons
@@ -90,12 +92,14 @@ make_tbind tv = (make_var_id (tyVarName tv), make_kind (tyVarKind tv))
 make_vbind :: Var -> C.Vbind
 make_vbind v = (make_var_id  (Var.varName v), make_ty (idType v))
 
-make_vdef :: CoreBind -> C.Vdefg
-make_vdef b = 
+make_vdef :: NameSet -> CoreBind -> C.Vdefg
+make_vdef exports b = 
   case b of
     NonRec v e -> C.Nonrec (f (v,e))
     Rec ves -> C.Rec (map f ves)
-  where f (v,e) = (make_var_id (Var.varName v), make_ty (idType v),make_exp e)
+  where
+  f (v,e) = (local, make_var_id (Var.varName v), make_ty (idType v),make_exp e)
+  	where local = not $ elementOfUniqSet (Var.varName v) exports
 	-- Top level bindings are unqualified now
 
 make_exp :: CoreExpr -> C.Exp
@@ -112,7 +116,7 @@ make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
 make_exp (Lam v e) | isTyVar v = C.Lam (C.Tb (make_tbind v)) (make_exp e)
 make_exp (Lam v e) | otherwise = C.Lam (C.Vb (make_vbind v)) (make_exp e)
-make_exp (Let b e) = C.Let (make_vdef b) (make_exp e)
+make_exp (Let b e) = C.Let (make_vdef emptyNameSet b) (make_exp e)
 -- gaw 2004
 make_exp (Case e v ty alts) = C.Case (make_exp e) (make_vbind v) (make_ty ty) (map make_alt alts)
 make_exp (Note (SCC cc) e) = C.Note "SCC"  (make_exp e) -- temporary

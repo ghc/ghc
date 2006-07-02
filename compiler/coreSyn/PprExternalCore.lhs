@@ -95,11 +95,14 @@ pappty t ts = sep (map paty (t:ts))
 pforall tbs (Tforall tb t) = pforall (tbs ++ [tb]) t
 pforall tbs t = hsep (map ptbind tbs) <+> char '.' <+> pty t
 
-pvdefg (Rec vtes) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (map pvte vtes))))
-pvdefg (Nonrec vte) = pvte vte
+pvdefg (Rec vdefs) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (map pvdef vdefs))))
+pvdefg (Nonrec vdef) = pvdef vdef
 
-pvte (v,t,e) = sep [pname v <+> text "::" <+> pty t <+> char '=',
+pvdef (l,v,t,e) = sep [plocal l <+> pname v <+> text "::" <+> pty t <+> char '=',
 		    indent (pexp e)]
+
+plocal True  = text "%local"
+plocal False = empty
 
 paexp (Var x) = pqname x
 paexp (Dcon x) = pqname x
