@@ -8,6 +8,7 @@ module PprExternalCore () where
 import Pretty
 import ExternalCore
 import Char
+import Encoding ( zEncodeString )
 
 instance Show Module where
   showsPrec d m = shows (pmodule m)
@@ -40,7 +41,7 @@ instance Show Lit where
 indent = nest 2
 
 pmodule (Module mname tdefs vdefgs) =
-  (text "%module" <+> text mname)
+  (text "%module" <+> text (zEncodeString mname))
     $$ indent ((vcat (map ((<> char ';') . ptdef) tdefs))
 	       $$ (vcat (map ((<> char ';') . pvdefg) vdefgs)))
 
@@ -59,7 +60,7 @@ pcdef (Constr dcon tbinds tys)  =
 pcdef (GadtConstr dcon ty)  =
   (pname dcon) <+> text "::" <+> pty ty
 
-pname id = text id
+pname id = text (zEncodeString id)
 
 pqname ("",id) = pname id
 pqname (m,id)  = pname m <> char '.' <> pname id
