@@ -1,0 +1,253 @@
+bijection                : OK, 100 tests.
+bijection'               : OK, 100 tests.
+pack/unpack              : OK, 100 tests.
+unpack/pack              : OK, 100 tests.
+eq 1                     : OK, 100 tests.
+eq 2                     : OK, 100 tests.
+eq 3                     : OK, 100 tests.
+compare 1                : OK, 100 tests.
+compare 2                : OK, 100 tests.
+compare 3                : OK, 100 tests.
+compare 4                : OK, 100 tests.
+compare 5                : OK, 100 tests.
+compare 6                : OK, 100 tests.
+compare 7                : OK, 100 tests.
+compare 8                : OK, 100 tests.
+empty 1                  : OK, 100 tests.
+empty 2                  : OK, 100 tests.
+null                     : OK, 100 tests.
+length 1                 : OK, 100 tests.
+length 2                 : OK, 100 tests.
+cons 1                   : OK, 100 tests.
+cons 2                   : OK, 100 tests.
+cons 3                   : OK, 100 tests.
+cons 4                   : OK, 100 tests.
+cons 5                   : OK, 100 tests.
+snoc                     : OK, 100 tests.
+head 1                   : OK, 100 tests.
+head 2                   : OK, 100 tests.
+head 3                   : OK, 100 tests.
+tail                     : OK, 100 tests.
+tail 1                   : OK, 100 tests.
+last                     : OK, 100 tests.
+init                     : OK, 100 tests.
+append 1                 : OK, 100 tests.
+append 2                 : OK, 100 tests.
+append 3                 : OK, 100 tests.
+map 1                    : OK, 100 tests.
+map 2                    : OK, 100 tests.
+map 3                    : OK, 100 tests.
+filter1                  : OK, 100 tests.
+filter2                  : OK, 100 tests.
+map fusion               : OK, 100 tests.
+filter fusion            : OK, 100 tests.
+reverse 1                : OK, 100 tests.
+reverse 2                : OK, 100 tests.
+reverse 3                : OK, 100 tests.
+foldl 1                  : OK, 100 tests.
+foldl 2                  : OK, 100 tests.
+foldr 1                  : OK, 100 tests.
+foldr 2                  : OK, 100 tests.
+foldl1 1                 : OK, 100 tests.
+foldl1 2                 : OK, 100 tests.
+foldl1 3                 : OK, 100 tests.
+foldr1 1                 : OK, 100 tests.
+foldr1 2                 : OK, 100 tests.
+foldr1 3                 : OK, 100 tests.
+scanl/foldl              : OK, 100 tests.
+all                      : OK, 100 tests.
+any                      : OK, 100 tests.
+take                     : OK, 100 tests.
+drop                     : OK, 100 tests.
+takeWhile                : OK, 100 tests.
+dropWhile                : OK, 100 tests.
+splitAt                  : OK, 100 tests.
+span                     : OK, 100 tests.
+break                    : OK, 100 tests.
+elem                     : OK, 100 tests.
+notElem                  : OK, 100 tests.
+concat 1                 : OK, 100 tests.
+concat 2                 : OK, 100 tests.
+concat 3                 : OK, 100 tests.
+lines                    : OK, 100 tests.
+unlines                  : OK, 100 tests.
+words                    : OK, 100 tests.
+unwords                  : OK, 100 tests.
+group                    : OK, 100 tests.
+groupBy                  : OK, 100 tests.
+groupBy 1                : OK, 100 tests.
+join                     : OK, 100 tests.
+elemIndex 1              : OK, 100 tests.
+elemIndex 2              : OK, 100 tests.
+findIndex                : OK, 100 tests.
+findIndicies             : OK, 100 tests.
+elemIndices              : OK, 100 tests.
+find                     : OK, 100 tests.
+find/findIndex           : OK, 100 tests.
+sort 1                   : OK, 100 tests.
+sort 2                   : OK, 100 tests.
+sort 3                   : OK, 100 tests.
+sort 4                   : OK, 100 tests.
+sort 5                   : OK, 100 tests.
+intersperse              : OK, 100 tests.
+maximum                  : OK, 100 tests.
+minimum                  : OK, 100 tests.
+breakChar                : OK, 100 tests.
+spanChar 1               : OK, 100 tests.
+spanChar 2               : OK, 100 tests.
+breakSpace               : OK, 100 tests.
+dropSpace                : OK, 100 tests.
+spanEnd                  : OK, 100 tests.
+breakEnd                 : OK, 100 tests.
+elemIndexEnd 1           : OK, 100 tests.
+elemIndexEnd 2           : OK, 100 tests.
+words'                   : OK, 100 tests.
+lines'                   : OK, 100 tests.
+dropSpaceEnd             : OK, 100 tests.
+unfoldr                  : OK, 100 tests.
+prefix                   : OK, 100 tests.
+suffix                   : OK, 100 tests.
+copy                     : OK, 100 tests.
+inits                    : OK, 100 tests.
+tails                    : OK, 100 tests.
+findSubstrings           : OK, 100 tests.
+replicate1               : OK, 100 tests.
+replicate2               : OK, 100 tests.
+replicate3               : OK, 100 tests.
+readInt                  : OK, 100 tests.
+readInt 2                : OK, 100 tests.
+Lazy.readInt             : OK, 100 tests.
+filterChar1              : OK, 100 tests.
+filterChar2              : OK, 100 tests.
+filterChar3              : OK, 100 tests.
+filterNotChar1           : OK, 100 tests.
+filterNotChar2           : OK, 100 tests.
+tail                     : OK, 100 tests.
+index                    : OK, 100 tests.
+unsafeIndex              : OK, 100 tests.
+map'                     : OK, 100 tests.
+filter                   : OK, 100 tests.
+elem                     : OK, 100 tests.
+take                     : OK, 100 tests.
+drop                     : OK, 100 tests.
+splitAt                  : OK, 100 tests.
+foldl                    : OK, 100 tests.
+foldr                    : OK, 100 tests.
+takeWhile                : OK, 100 tests.
+dropWhile                : OK, 100 tests.
+span                     : OK, 100 tests.
+break                    : OK, 100 tests.
+breakspan                : OK, 100 tests.
+lines                    : OK, 100 tests.
+unlines                  : OK, 100 tests.
+words                    : OK, 100 tests.
+unwords                  : OK, 100 tests.
+wordstokens              : OK, 100 tests.
+splitWith                : OK, 100 tests.
+joinsplit                : OK, 100 tests.
+lineIndices              : OK, 100 tests.
+count                    : OK, 100 tests.
+linessplit               : OK, 100 tests.
+splitsplitWith           : OK, 100 tests.
+joinjoinpath             : OK, 100 tests.
+zip                      : OK, 100 tests.
+zip1                     : OK, 100 tests.
+zipWith                  : OK, 100 tests.
+zipWith'                 : OK, 100 tests.
+unzip                    : OK, 100 tests.
+concatMap                : OK, 100 tests.
+eq 1                     : OK, 100 tests.
+eq 2                     : OK, 100 tests.
+eq 3                     : OK, 100 tests.
+eq refl                  : OK, 100 tests.
+eq symm                  : OK, 100 tests.
+compare 1                : OK, 100 tests.
+compare 2                : OK, 100 tests.
+compare 3                : OK, 100 tests.
+compare 4                : OK, 100 tests.
+compare 5                : OK, 100 tests.
+compare 6                : OK, 100 tests.
+compare 7                : OK, 100 tests.
+compare 8                : OK, 100 tests.
+empty 1                  : OK, 100 tests.
+empty 2                  : OK, 100 tests.
+pack/unpack              : OK, 100 tests.
+unpack/pack              : OK, 100 tests.
+null                     : OK, 100 tests.
+length 1                 : OK, 100 tests.
+length 2                 : OK, 100 tests.
+cons 1                   : OK, 100 tests.
+cons 2                   : OK, 100 tests.
+cons 3                   : OK, 100 tests.
+cons 4                   : OK, 100 tests.
+snoc                     : OK, 100 tests.
+head/pack                : OK, 100 tests.
+head/unpack              : OK, 100 tests.
+tail/pack                : OK, 100 tests.
+tail/unpack              : OK, 100 tests.
+last                     : OK, 100 tests.
+init                     : OK, 100 tests.
+append 1                 : OK, 100 tests.
+append 2                 : OK, 100 tests.
+append 3                 : OK, 100 tests.
+map 1                    : OK, 100 tests.
+map 2                    : OK, 100 tests.
+map 3                    : OK, 100 tests.
+filter 1                 : OK, 100 tests.
+filter 2                 : OK, 100 tests.
+reverse                  : OK, 100 tests.
+reverse1                 : OK, 100 tests.
+reverse2                 : OK, 100 tests.
+transpose                : OK, 100 tests.
+foldl                    : OK, 100 tests.
+foldl/reverse            : OK, 100 tests.
+foldr                    : OK, 100 tests.
+foldr/id                 : OK, 100 tests.
+foldl1/foldl             : OK, 100 tests.
+foldl1/head              : OK, 100 tests.
+foldl1/tail              : OK, 100 tests.
+foldr1/foldr             : OK, 100 tests.
+foldr1/last              : OK, 100 tests.
+foldr1/head              : OK, 100 tests.
+concat 1                 : OK, 100 tests.
+concat 2                 : OK, 100 tests.
+concat/pack              : OK, 100 tests.
+any                      : OK, 100 tests.
+all                      : OK, 100 tests.
+maximum                  : OK, 100 tests.
+minimum                  : OK, 100 tests.
+replicate 1              : OK, 100 tests.
+replicate 2              : OK, 100 tests.
+take                     : OK, 100 tests.
+drop                     : OK, 100 tests.
+splitAt                  : OK, 100 tests.
+takeWhile                : OK, 100 tests.
+dropWhile                : OK, 100 tests.
+break                    : OK, 100 tests.
+span                     : OK, 100 tests.
+break/span               : OK, 100 tests.
+break/breakByte          : OK, 100 tests.
+span/spanByte            : OK, 100 tests.
+split                    : OK, 100 tests.
+splitWith                : OK, 100 tests.
+join.split/id            : OK, 100 tests.
+join/joinByte            : OK, 100 tests.
+group                    : OK, 100 tests.
+groupBy                  : OK, 100 tests.
+index                    : OK, 100 tests.
+elemIndex                : OK, 100 tests.
+elemIndices              : OK, 100 tests.
+count/elemIndices        : OK, 100 tests.
+findIndex                : OK, 100 tests.
+findIndices              : OK, 100 tests.
+find                     : OK, 100 tests.
+find/findIndex           : OK, 100 tests.
+elem                     : OK, 100 tests.
+notElem                  : OK, 100 tests.
+elem/notElem             : OK, 100 tests.
+filterByte 1             : OK, 100 tests.
+filterByte 2             : OK, 100 tests.
+filterNotByte 1          : OK, 100 tests.
+filterNotByte 2          : OK, 100 tests.
+isPrefixOf               : OK, 100 tests.
+concatMap                : OK, 100 tests.
