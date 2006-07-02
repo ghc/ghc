@@ -280,7 +280,7 @@ import qualified Foreign.Concurrent as FC (newForeignPtr)
 
 import GHC.Handle
 import GHC.Prim                 (Word#, (+#), writeWord8OffAddr#)
-import GHC.Base                 (build)
+-- import GHC.Base                 (build)
 import GHC.Word hiding (Word8)
 import GHC.Ptr                  (Ptr(..))
 import GHC.ST                   (ST(..))
@@ -432,7 +432,7 @@ pack str = unsafeCreate (P.length str) $ \(Ptr p) -> stToIO (go p 0# str)
 -- | /O(n)/ Converts a 'ByteString' to a '[Word8]'.
 unpack :: ByteString -> [Word8]
 
-#if !defined(__GLASGOW_HASKELL__)
+-- #if !defined(__GLASGOW_HASKELL__)
 
 unpack (PS _  _ 0) = []
 unpack (PS ps s l) = inlinePerformIO $ withForeignPtr ps $ \p ->
@@ -443,10 +443,14 @@ unpack (PS ps s l) = inlinePerformIO $ withForeignPtr ps $ \p ->
         go p n acc = peekByteOff p n >>= \e -> go p (n-1) (e : acc)
 {-# INLINE unpack #-}
 
-#else
+-- #else
 
-unpack ps = build (unpackFoldr ps)
-{-# INLINE unpack #-}
+--
+-- Interacting with head/build fusion rule in ghc 6.5. Disable for now
+--
+
+-- unpack ps = build (unpackFoldr ps)
+-- {-# INLINE unpack #-}
 
 unpackList :: ByteString -> [Word8]
 unpackList (PS fp off len) = withPtr fp $ \p -> do
@@ -471,15 +475,7 @@ unpackFoldr (PS fp off len) f ch = withPtr fp $ \p -> do
     loop (p `plusPtr` off) (len-1) ch
 {-# INLINE [0] unpackFoldr #-}
 
--- TODO just use normal foldr here.
---
--- or
--- unpack xs | null xs = []
---           | otherwise = unsafeHead xs : unpack (unsafeTail xs)
---
--- ?
-
-#endif
+-- #endif
 
 ------------------------------------------------------------------------
 
