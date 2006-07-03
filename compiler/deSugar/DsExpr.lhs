@@ -85,7 +85,9 @@ dsValBinds (ValBindsOut binds _) body = foldrDs ds_val_bind body binds
 -------------------------
 dsIPBinds (IPBinds ip_binds dict_binds) body
   = do	{ prs <- dsLHsBinds dict_binds
-	; let inner = foldr (\(x,r) e -> Let (NonRec x r) e) body prs 
+	; let inner = Let (Rec prs) body
+		-- The dict bindings may not be in 
+		-- dependency order; hence Rec
 	; foldrDs ds_ip_bind inner ip_binds }
   where
     ds_ip_bind (L _ (IPBind n e)) body
