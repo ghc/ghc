@@ -9,14 +9,14 @@ default_lib_repo_root=$default_repo_root/packages
 
 quiet=NO
 
-function message()
+message()
 {
   if [ "$quiet" = "NO" ]; then
      echo $*
   fi
 }
 
-function darcsall()
+darcsall()
 {
   message "== running darcs $* at the top level"
   darcs $*
@@ -38,7 +38,7 @@ function darcsall()
   done
 }
 
-function darcsget()
+darcsget()
 {
   case $* in
     *--partial*) ;;
