@@ -95,7 +95,7 @@ import IfaceSyn		( IfaceInst, IfaceRule, IfaceDecl(ifName) )
 
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
-import Maybes		( orElse, expectJust, expectJust )
+import Maybes		( orElse, expectJust )
 import Outputable
 import SrcLoc		( SrcSpan, Located )
 import UniqSupply	( UniqSupply )
