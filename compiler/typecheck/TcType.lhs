@@ -52,7 +52,7 @@ module TcType (
   tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred, tcEqTypeX,
   isSigmaTy, isOverloadedTy, isRigidTy, isBoxyTy,
   isDoubleTy, isFloatTy, isIntTy, isStringTy,
-  isIntegerTy, isAddrTy, isBoolTy, isUnitTy,
+  isIntegerTy, isBoolTy, isUnitTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
 
   ---------------------------------
@@ -899,7 +899,6 @@ isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isIntegerTy    = is_tc integerTyConKey
 isIntTy        = is_tc intTyConKey
-isAddrTy       = is_tc addrTyConKey
 isBoolTy       = is_tc boolTyConKey
 isUnitTy       = is_tc unitTyConKey
 
@@ -1070,17 +1069,17 @@ isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 isFFIDynArgumentTy :: Type -> Bool
 -- The argument type of a foreign import dynamic must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFIDynArgumentTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey, addrTyConKey]
+isFFIDynArgumentTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
 isFFIDynResultTy :: Type -> Bool
 -- The result type of a foreign export dynamic must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFIDynResultTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey, addrTyConKey]
+isFFIDynResultTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
 isFFILabelTy :: Type -> Bool
 -- The type of a foreign label must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey, addrTyConKey]
+isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
 isFFIDotnetTy :: DynFlags -> Type -> Bool
 isFFIDotnetTy dflags ty
@@ -1131,7 +1130,6 @@ toDNType ty
 		 , (word64TyConKey, DNWord64)
 		 , (floatTyConKey,  DNFloat)
 		 , (doubleTyConKey, DNDouble)
-		 , (addrTyConKey,   DNPtr)
 		 , (ptrTyConKey,    DNPtr)
 		 , (funPtrTyConKey, DNPtr)
 		 , (charTyConKey,   DNChar)
@@ -1195,7 +1193,7 @@ boxedMarshalableTyCon tc
 			 , wordTyConKey, word8TyConKey, word16TyConKey
 			 , word32TyConKey, word64TyConKey
 			 , floatTyConKey, doubleTyConKey
-			 , addrTyConKey, ptrTyConKey, funPtrTyConKey
+			 , ptrTyConKey, funPtrTyConKey
 			 , charTyConKey
 			 , stablePtrTyConKey
 			 , boolTyConKey

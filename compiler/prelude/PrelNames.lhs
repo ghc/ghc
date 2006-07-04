@@ -177,7 +177,7 @@ basicKnownKeyNames
 	toPName, bpermutePName, bpermuteDftPName, indexOfPName,
 
 	-- FFI primitive types that are not wired-in.
-	stablePtrTyConName, ptrTyConName, funPtrTyConName, addrTyConName,
+	stablePtrTyConName, ptrTyConName, funPtrTyConName,
 	int8TyConName, int16TyConName, int32TyConName, int64TyConName,
 	wordTyConName, word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
@@ -260,7 +260,6 @@ pREL_WORD	= mkModule "GHC.Word"
 mONAD		= mkModule "Control.Monad"
 mONAD_FIX	= mkModule "Control.Monad.Fix"
 aRROW		= mkModule "Control.Arrow"
-aDDR		= mkModule "Addr"
 rANDOM		= mkModule "System.Random"
 
 gLA_EXTS	= mkModule "GHC.Exts"
@@ -349,7 +348,6 @@ unpackCStringFoldr_RDR 	= nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR  	= nameRdrName unpackCStringUtf8Name
 
 newStablePtr_RDR 	= nameRdrName newStablePtrName
-addrDataCon_RDR		= dataQual_RDR aDDR FSLIT("A#")
 wordDataCon_RDR		= dataQual_RDR pREL_WORD FSLIT("W#")
 
 bindIO_RDR	  	= nameRdrName bindIOName
@@ -604,9 +602,6 @@ word64TyConName   = tcQual  pREL_WORD FSLIT("Word64") word64TyConKey
 wordTyConName     = tcQual  pREL_WORD FSLIT("Word")   wordTyConKey
 wordDataConName   = conName wordTyConName FSLIT("W#") wordDataConKey
 
--- Addr module
-addrTyConName	  = tcQual   aDDR FSLIT("Addr") addrTyConKey
-
 -- PrelPtr module
 ptrTyConName	  = tcQual   pREL_PTR FSLIT("Ptr") ptrTyConKey
 funPtrTyConName	  = tcQual   pREL_PTR FSLIT("FunPtr") funPtrTyConKey
@@ -729,7 +724,6 @@ randomGenClassKey	= mkPreludeClassUnique 32
 
 \begin{code}
 addrPrimTyConKey			= mkPreludeTyConUnique	1
-addrTyConKey				= mkPreludeTyConUnique	2
 arrayPrimTyConKey			= mkPreludeTyConUnique	3
 boolTyConKey				= mkPreludeTyConUnique	4
 byteArrayPrimTyConKey			= mkPreludeTyConUnique	5
@@ -989,28 +983,11 @@ loopAIdKey	= mkPreludeMiscIdUnique 124
 
 \begin{code}
 numericTyKeys = 
-	[ addrTyConKey
-	, wordTyConKey
+	[ wordTyConKey
 	, intTyConKey
 	, integerTyConKey
 	, doubleTyConKey
 	, floatTyConKey
-	]
-
-	-- Renamer always imports these data decls replete with constructors
-	-- so that desugarer can always see their constructors.  Ugh!
-cCallishTyKeys = 
-	[ addrTyConKey
-	, wordTyConKey
-	, stablePtrTyConKey
-	, int8TyConKey
-	, int16TyConKey
-	, int32TyConKey
-	, int64TyConKey
-	, word8TyConKey
-	, word16TyConKey
-	, word32TyConKey
-	, word64TyConKey
 	]
 \end{code}
 
