@@ -44,7 +44,6 @@ import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply, uniqsFromSupply
 import FiniteMap	( emptyFM, lookupFM, addToFM )
 import BasicTypes	( IPName(..), mapIPName )
 import SrcLoc		( SrcLoc, noSrcLoc )
-import Maybes		( orElse )
 
 import Outputable
 \end{code}
