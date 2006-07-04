@@ -1077,8 +1077,10 @@ isInterpretable = not . isObject
 nameOfObject (DotO fn)   = fn
 nameOfObject (DotA fn)   = fn
 nameOfObject (DotDLL fn) = fn
+nameOfObject other       = pprPanic "nameOfObject" (ppr other)
 
 byteCodeOfObject (BCOs bc) = bc
+byteCodeOfObject other     = pprPanic "byteCodeOfObject" (ppr other)
 \end{code}
 
 
