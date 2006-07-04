@@ -1256,6 +1256,13 @@ machdepCCOpts dflags
 			-- -fomit-frame-pointer, so we disable it first here.
 			"-mno-omit-leaf-frame-pointer",
 #endif
+#ifdef HAVE_GCC_HAS_NO_UNIT_AT_A_TIME
+		 	"-fno-unit-at-a-time",
+			-- unit-at-a-time doesn't do us any good, and screws
+			-- up -split-objs by moving the split markers around.
+			-- It's only turned on with -O2, but put it here just
+			-- in case someone uses -optc-O2.
+#endif
 			"-fomit-frame-pointer",
 			-- we want -fno-builtin, because when gcc inlines
 			-- built-in functions like memcpy() it tends to
