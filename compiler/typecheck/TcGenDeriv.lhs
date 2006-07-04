@@ -1322,7 +1322,6 @@ box_con_tbl =
     [(charPrimTy,	getRdrName charDataCon)
     ,(intPrimTy,	getRdrName intDataCon)
     ,(wordPrimTy,	wordDataCon_RDR)
-    ,(addrPrimTy,	addrDataCon_RDR)
     ,(floatPrimTy,	getRdrName floatDataCon)
     ,(doublePrimTy,	getRdrName doubleDataCon)
     ]
