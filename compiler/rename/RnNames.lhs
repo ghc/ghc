@@ -325,7 +325,7 @@ importsFromImportDecl this_mod
     returnM (gbl_env, imports)
 
 warnRedundantSourceImport mod_name
-  = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
+  = ptext SLIT("Unnecessary {-# SOURCE #-} in the import of module")
           <+> quotes (ppr mod_name)
 \end{code}
 
