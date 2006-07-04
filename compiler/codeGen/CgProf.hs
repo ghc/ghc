@@ -43,12 +43,12 @@ import MachOp
 import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
 import CLabel		( mkCCLabel, mkCCSLabel, mkRtsDataLabel )
 
-import Module		( moduleString )
+import Module		( pprModule )
 import Id		( Id )
 import CostCentre
 import StgSyn		( GenStgExpr(..), StgExpr )
 import StaticFlags	( opt_SccProfilingOn )
-import FastString	( FastString, mkFastString, LitString )	
+import FastString	( FastString )
 import Constants	-- Lots of field offsets
 import Outputable
 
