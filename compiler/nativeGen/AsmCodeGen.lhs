@@ -131,6 +131,15 @@ nativeCodeGen dflags cmms us
                 -- There's a hack to make this work in PprMach.pprNatCmmTop.
             Pretty.$$ Pretty.text ".subsections_via_symbols"
 #endif
+#if HAVE_GNU_NONEXEC_STACK
+                -- On recent GNU ELF systems one can mark an object file
+                -- as not requiring an executable stack. If all objects
+                -- linked into a program have this note then the program
+                -- will not use an executable stack, which is good for
+                -- security. GHC generated code does not need an executable
+                -- stack so add the note in:
+            Pretty.$$ Pretty.text ".section .note.GNU-stack,\"\",@progbits"
+#endif
             )
    }
 

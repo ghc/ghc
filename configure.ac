@@ -1148,6 +1148,18 @@ AC_TRY_COMPILE(,[__asm__ (".subsections_via_symbols");],
             [Define to 1 if Apple-style dead-stripping is supported.])
     ])
 
+dnl *** check for GNU non-executable stack note support (ELF only)
+dnl     (.section .note.GNU-stack,"",@progbits)
+
+AC_MSG_CHECKING(for GNU non-executable stack support)
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM([__asm__ (".section .note.GNU-stack,\"\",@progbits");], [0])],
+    [AC_MSG_RESULT(yes)
+     AC_DEFINE([HAVE_GNU_NONEXEC_STACK],[1],
+               [Define to 1 if GNU non-executable stack notes are supported.])
+    ],
+    [AC_MSG_RESULT(no)])
+
 dnl ** check for librt
 AC_CHECK_LIB(rt, clock_gettime)
 AC_CHECK_FUNCS(clock_gettime)
