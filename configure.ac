@@ -1136,17 +1136,13 @@ dnl    (.subsections-via-symbols assembler directive)
 
 
 AC_MSG_CHECKING(for .subsections_via_symbols)
-AC_TRY_COMPILE(,[__asm__ (".subsections_via_symbols");],
-    [
-        AC_MSG_RESULT(yes)
-        AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
-            [Define to 1 if Apple-style dead-stripping is supported.])
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
+    [AC_MSG_RESULT(yes)
+     AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
+               [Define to 1 if Apple-style dead-stripping is supported.])
     ],
-    [
-        AC_MSG_RESULT(no)
-        AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[0],
-            [Define to 1 if Apple-style dead-stripping is supported.])
-    ])
+    [AC_MSG_RESULT(no)])
 
 dnl *** check for GNU non-executable stack note support (ELF only)
 dnl     (.section .note.GNU-stack,"",@progbits)
