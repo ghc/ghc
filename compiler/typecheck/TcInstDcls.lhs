@@ -51,7 +51,6 @@ pass, when the class-instance envs and GVE contain all the info from
 all the instance and value decls.  Indeed that's the reason we need
 two passes over the instance decls.
 
-
 Here is the overall algorithm.
 Assume that we have an instance declaration
 
