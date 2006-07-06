@@ -34,7 +34,6 @@ import Id		( Id, idName )
 import Var		( idUnique )
 import SMRep		( retAddrSizeW )
 import BasicTypes	( RecFlag(..) )
-import Outputable
 \end{code}
 
 %************************************************************************
