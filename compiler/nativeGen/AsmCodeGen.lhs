@@ -39,6 +39,7 @@ import CLabel           ( pprCLabel )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags		( DynFlags, DynFlag(..), dopt )
 import StaticFlags	( opt_Static, opt_PIC )
+import Config           ( cProjectVersion )
 
 import Digraph
 import qualified Pretty
@@ -140,6 +141,12 @@ nativeCodeGen dflags cmms us
                 -- stack so add the note in:
             Pretty.$$ Pretty.text ".section .note.GNU-stack,\"\",@progbits"
 #endif
+                -- And just because every other compiler does, lets stick in
+		-- an identifier directive: .ident "GHC x.y.z"
+	    Pretty.$$ let compilerIdent = Pretty.text "GHC" Pretty.<+>
+	                                  Pretty.text cProjectVersion
+                       in Pretty.text ".ident" Pretty.<+>
+                          Pretty.doubleQuotes compilerIdent
             )
    }
 
