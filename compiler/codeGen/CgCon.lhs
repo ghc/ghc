@@ -28,7 +28,6 @@ import CgStackery	( mkVirtStkOffsets, freeStackSlots,
 			  getRealSp, getVirtSp, setRealAndVirtualSp )
 import CgUtils		( addIdReps, cmmLabelOffW, emitRODataLits, emitDataLits )
 import CgCallConv	( assignReturnRegs )
-import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE )
 import CgHeapery	( allocDynClosure, layOutDynConstr, 
 			  layOutStaticConstr, mkStaticClosureFields )
 import CgTailCall	( performReturn, emitKnownConReturnCode, returnUnboxedTuple )
