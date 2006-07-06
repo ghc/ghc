@@ -41,7 +41,7 @@ instance Show Lit where
 indent = nest 2
 
 pmodule (Module mname tdefs vdefgs) =
-  (text "%module" <+> text (zEncodeString mname))
+  (text "%module" <+> text mname)
     $$ indent ((vcat (map ((<> char ';') . ptdef) tdefs))
 	       $$ (vcat (map ((<> char ';') . pvdefg) vdefgs)))
 
@@ -63,7 +63,7 @@ pcdef (GadtConstr dcon ty)  =
 pname id = text (zEncodeString id)
 
 pqname ("",id) = pname id
-pqname (m,id)  = pname m <> char '.' <> pname id
+pqname (m,id)  = text m <> char '.' <> pname id
 
 ptbind (t,Klifted) = pname t
 ptbind (t,k) = parens (pname t <> text "::" <> pkind k)
