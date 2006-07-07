@@ -162,6 +162,7 @@ data StdGen
 instance RandomGen StdGen where
   next  = stdNext
   split = stdSplit
+  genRange _ = stdRange
 
 instance Show StdGen where
   showsPrec p (StdGen s1 s2) = 
@@ -342,7 +343,11 @@ intRange  = toInteger (maxBound::Int) - toInteger (minBound::Int)
 iLogBase :: Integer -> Integer -> Integer
 iLogBase b i = if i < b then 1 else 1 + iLogBase b (i `div` b)
 
+stdRange :: (Int,Int)
+stdRange = (0, 2147483562)
+
 stdNext :: StdGen -> (Int, StdGen)
+-- Returns values in the range stdRange
 stdNext (StdGen s1 s2) = (z', StdGen s1'' s2'')
 	where	z'   = if z < 1 then z + 2147483562 else z
 		z    = s1'' - s2''
