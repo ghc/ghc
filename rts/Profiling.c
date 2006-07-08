@@ -882,8 +882,6 @@ gen_XML_logfile( void )
   reportCCS_XML(pruneCCSTree(CCS_MAIN));
 
   fprintf(prof_file, " 0\n");
-
-  fclose(prof_file);
 }
 
 static void 
