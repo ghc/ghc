@@ -136,8 +136,8 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
    -- ... and what the next phase should be
    let next_phase = hscNextPhase dflags src_flavour hsc_lang
    -- ... and what file to generate the output into
-   output_fn <- getOutputFilename dflags next_phase 
-			Temporary basename next_phase (Just location)
+   output_fn <- getOutputFilename next_phase 
+			Temporary basename dflags next_phase (Just location)
 
    let dflags' = dflags { hscTarget = hsc_lang,
 				hscOutName = output_fn,
@@ -433,7 +433,7 @@ runPipeline stop_phase dflags (input_fn, mb_phase) output maybe_loc
 
   -- this is a function which will be used to calculate output file names
   -- as we go along (we partially apply it to some of its inputs here)
-  let get_output_fn = getOutputFilename dflags stop_phase output basename
+  let get_output_fn = getOutputFilename stop_phase output basename
 
   -- Execute the pipeline...
   (dflags', output_fn, maybe_loc) <- 
@@ -448,7 +448,7 @@ runPipeline stop_phase dflags (input_fn, mb_phase) output maybe_loc
     Temporary -> 
 	return (dflags', output_fn)
     _other ->
-	do final_fn <- get_output_fn stop_phase maybe_loc
+	do final_fn <- get_output_fn dflags' stop_phase maybe_loc
 	   when (final_fn /= output_fn) $
 		  copy dflags ("Copying `" ++ output_fn ++ "' to `" ++ final_fn
 			++ "'") output_fn final_fn
@@ -458,7 +458,7 @@ runPipeline stop_phase dflags (input_fn, mb_phase) output maybe_loc
 
 pipeLoop :: DynFlags -> Phase -> Phase 
 	 -> FilePath  -> String -> Suffix
-	 -> (Phase -> Maybe ModLocation -> IO FilePath)
+	 -> (DynFlags -> Phase -> Maybe ModLocation -> IO FilePath)
 	 -> Maybe ModLocation
 	 -> IO (DynFlags, FilePath, Maybe ModLocation)
 
@@ -485,28 +485,28 @@ pipeLoop dflags phase stop_phase
 		   orig_basename orig_suff orig_get_output_fn maybe_loc }
 
 getOutputFilename
-  :: DynFlags -> Phase -> PipelineOutput -> String
-  -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
-getOutputFilename dflags stop_phase output basename
+  :: Phase -> PipelineOutput -> String
+  -> DynFlags -> Phase{-next phase-} -> Maybe ModLocation -> IO FilePath
+getOutputFilename stop_phase output basename
  = func
  where
-	hcsuf      = hcSuf dflags
-	odir       = objectDir dflags
-	osuf       = objectSuf dflags
-	keep_hc    = dopt Opt_KeepHcFiles dflags
-	keep_raw_s = dopt Opt_KeepRawSFiles dflags
-	keep_s     = dopt Opt_KeepSFiles dflags
-
-        myPhaseInputExt HCc    = hcsuf
-        myPhaseInputExt StopLn = osuf
-        myPhaseInputExt other  = phaseInputExt other
-
-	func next_phase maybe_location
+	func dflags next_phase maybe_location
 	   | is_last_phase, Persistent <- output     = persistent_fn
 	   | is_last_phase, SpecificFile f <- output = return f
 	   | keep_this_output	   		     = persistent_fn
      	   | otherwise        	   		     = newTempName dflags suffix
 	   where
+		hcsuf      = hcSuf dflags
+		odir       = objectDir dflags
+		osuf       = objectSuf dflags
+		keep_hc    = dopt Opt_KeepHcFiles dflags
+		keep_raw_s = dopt Opt_KeepRawSFiles dflags
+		keep_s     = dopt Opt_KeepSFiles dflags
+
+		myPhaseInputExt HCc    = hcsuf
+		myPhaseInputExt StopLn = osuf
+		myPhaseInputExt other  = phaseInputExt other
+
 		is_last_phase = next_phase `eqPhase` stop_phase
 
 		-- sometimes, we keep output from intermediate stages
@@ -549,7 +549,7 @@ runPhase :: Phase	-- Do this phase first
 	 -> String	-- basename of original input source
 	 -> String	-- its extension
 	 -> FilePath	-- name of file which contains the input to this phase.
-	 -> (Phase -> Maybe ModLocation -> IO FilePath)
+	 -> (DynFlags -> Phase -> Maybe ModLocation -> IO FilePath)
 			-- how to calculate the output filename
 	 -> Maybe ModLocation		-- the ModLocation, if we have one
 	 -> IO (Phase,	  		-- next phase
@@ -567,7 +567,7 @@ runPhase :: Phase	-- Do this phase first
 runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do let unlit_flags = getOpts dflags opt_L
        -- The -h option passes the file name for unlit to put in a #line directive
-       output_fn <- get_output_fn (Cpp sf) maybe_loc
+       output_fn <- get_output_fn dflags (Cpp sf) maybe_loc
 
        SysTools.runUnlit dflags 
 		(map SysTools.Option unlit_flags ++
@@ -593,7 +593,7 @@ runPhase (Cpp sf) _stop dflags0 basename suff input_fn get_output_fn maybe_loc
 	   -- to the next phase of the pipeline.
           return (HsPp sf, dflags, maybe_loc, input_fn)
 	else do
-	    output_fn <- get_output_fn (HsPp sf) maybe_loc
+	    output_fn <- get_output_fn dflags (HsPp sf) maybe_loc
 	    doCpp dflags True{-raw-} False{-no CC opts-} input_fn output_fn
 	    return (HsPp sf, dflags, maybe_loc, output_fn)
 
@@ -608,7 +608,7 @@ runPhase (HsPp sf) _stop dflags basename suff input_fn get_output_fn maybe_loc
 	else do
 	    let hspp_opts = getOpts dflags opt_F
 	    let orig_fn = basename `joinFileExt` suff
-	    output_fn <- get_output_fn (Hsc sf) maybe_loc
+	    output_fn <- get_output_fn dflags (Hsc sf) maybe_loc
 	    SysTools.runPp dflags
 			   ( [ SysTools.Option     orig_fn
 			     , SysTools.Option     input_fn
@@ -707,7 +707,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
   -- get the DynFlags
 	let hsc_lang = hscMaybeAdjustTarget dflags stop src_flavour (hscTarget dflags)
 	let next_phase = hscNextPhase dflags src_flavour hsc_lang
-	output_fn  <- get_output_fn next_phase (Just location4)
+	output_fn  <- get_output_fn dflags next_phase (Just location4)
 
         let dflags' = dflags { hscTarget = hsc_lang,
 			       hscOutName = output_fn,
@@ -762,7 +762,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 
 runPhase CmmCpp stop dflags basename suff input_fn get_output_fn maybe_loc
   = do
-       output_fn <- get_output_fn Cmm maybe_loc
+       output_fn <- get_output_fn dflags Cmm maybe_loc
        doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn	
        return (Cmm, dflags, maybe_loc, output_fn)
 
@@ -770,7 +770,7 @@ runPhase Cmm stop dflags basename suff input_fn get_output_fn maybe_loc
   = do
 	let hsc_lang = hscMaybeAdjustTarget dflags stop HsSrcFile (hscTarget dflags)
 	let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
-	output_fn <- get_output_fn next_phase maybe_loc
+	output_fn <- get_output_fn dflags next_phase maybe_loc
 
         let dflags' = dflags { hscTarget = hsc_lang,
 			       hscOutName = output_fn,
@@ -827,7 +827,7 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
             next_phase
 		| hcc && mangle     = Mangle
 		| otherwise         = As
-	output_fn <- get_output_fn next_phase maybe_loc
+	output_fn <- get_output_fn dflags next_phase maybe_loc
 
 	let
 	  more_hcc_opts =
@@ -893,7 +893,7 @@ runPhase Mangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
             next_phase
 		| split = SplitMangle
 		| otherwise = As
-	output_fn <- get_output_fn next_phase maybe_loc
+	output_fn <- get_output_fn dflags next_phase maybe_loc
 
 	SysTools.runMangle dflags (map SysTools.Option mangler_opts
 		          ++ [ SysTools.FileOption "" input_fn
@@ -937,7 +937,7 @@ runPhase As stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do	let as_opts =  getOpts dflags opt_a
         let cmdline_include_paths = includePaths dflags
 
-	output_fn <- get_output_fn StopLn maybe_loc
+	output_fn <- get_output_fn dflags StopLn maybe_loc
 
 	-- we create directories for the object file, because it
 	-- might be a hierarchical module.
@@ -957,7 +957,7 @@ runPhase As stop dflags _basename _suff input_fn get_output_fn maybe_loc
 
 runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
   = do  
-	output_fn <- get_output_fn StopLn maybe_loc
+	output_fn <- get_output_fn dflags StopLn maybe_loc
 
 	let (base_o, _) = splitFilename output_fn
 	    split_odir  = base_o ++ "_split"
