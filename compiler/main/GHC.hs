@@ -226,7 +226,7 @@ import Finder
 import HscMain		( newHscEnv, hscFileCheck, HscChecked(..) )
 import HscTypes
 import DynFlags
-import SysTools		( initSysTools, cleanTempFiles )
+import SysTools		( initSysTools, cleanTempFiles, cleanTempFilesExcept )
 import Module
 import UniqFM
 import PackageConfig    ( PackageId )
@@ -240,7 +240,6 @@ import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
-import SysTools		( cleanTempFilesExcept )
 import BasicTypes
 import TcType           ( tcSplitSigmaTy, isDictTy )
 import Maybes		( expectJust, mapCatMaybes )
