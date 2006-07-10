@@ -615,19 +615,14 @@ removeTmpDirs :: DynFlags -> [FilePath] -> IO ()
 removeTmpDirs dflags ds
   = traceCmd dflags "Deleting temp dirs"
 	     ("Deleting: " ++ unwords ds)
-	     (mapM_ rmdir ds)
-  where
-    rmdir d = removeDirectory d `IO.catch`
-		(\_ignored ->
-		    debugTraceMsg dflags 2 (ptext SLIT("Warning: deleting") <+> text d <+> ptext SLIT("raised exception"))
-		)
+	     (mapM_ (removeWith dflags removeDirectory) ds)
 
 removeTmpFiles :: DynFlags -> [FilePath] -> IO ()
 removeTmpFiles dflags fs
   = warnNon $
     traceCmd dflags "Deleting temp files" 
 	     ("Deleting: " ++ unwords deletees)
-	     (mapM_ rm deletees)
+	     (mapM_ (removeWith dflags removeFile) deletees)
   where
      -- Flat out refuse to delete files that are likely to be source input
      -- files (is there a worse bug than having a compiler delete your source
@@ -643,11 +638,16 @@ removeTmpFiles dflags fs
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
-    rm f = removeFile f `IO.catch` 
-		(\_ignored -> 
-		    debugTraceMsg dflags 2 (ptext SLIT("Warning: deleting non-existent") <+> text f)
-		)
-
+removeWith :: DynFlags -> (FilePath -> IO ()) -> FilePath -> IO ()
+removeWith dflags remover f = remover f `IO.catch`
+  (\e ->
+   let msg = if isDoesNotExistError e
+             then ptext SLIT("Warning: deleting non-existent") <+> text f
+             else ptext SLIT("Warning: exception raised when deleting")
+                                            <+> text f <> colon
+               $$ text (show e)
+   in debugTraceMsg dflags 2 msg
+  )
 
 -----------------------------------------------------------------------------
 -- Running an external program
