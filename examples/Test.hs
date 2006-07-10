@@ -84,7 +84,7 @@ module Test (
 	Ex(..),
 
 	-- * Type signatures with argument docs
-	k, l, m, n, o,
+	k, l, m, o,
 
 	-- * A section
 	-- and without an intervening comma:
@@ -96,7 +96,6 @@ module Test (
  $ a non /literal/ line $
 -}
 
-	p,
 	f',
    ) where
 
@@ -135,7 +134,7 @@ data T6
     C4
 
 -- | A newtype
-newtype N1 a b = N1 (a b)
+newtype N1 a = N1 a
 
 -- | A newtype with a fieldname
 newtype N2 a b = N2 {n :: a b}
@@ -163,10 +162,10 @@ newtype N7 a b = N7 {n7 :: a b
 
 class (D a) => C a  where
    -- |this is a description of the 'a' method
-   a :: Int
-   b :: Float
+   a :: IO a
+   b :: [a]
    -- ^ this is a description of the 'b' method
-   c :: Double -- c is hidden in the export list
+   c :: a -- c is hidden in the export list
 
 -- ^ This comment applies to the /previous/ declaration (the 'C' class)
 
@@ -175,18 +174,22 @@ class D a where
    e :: (a,a)
 -- ^ This is a class declaration with no separate docs for the methods
 
-instance D Int
+instance D Int where
+  d = undefined
+  e = undefined
 
 -- instance with a qualified class name
-instance Test.D Float
+instance Test.D Float where
+  d = undefined
+  e = undefined
 
 class E a where
-  ee :: Int
+  ee :: a
 -- ^ This is a class declaration with no methods (or no methods exported)
 
 -- This is a class declaration with no documentation at all
 class F a where
-  ff :: Float
+  ff :: a
 
 -- | This is the documentation for the 'R' record, which has four fields,
 -- 'p', 'q', 'r', and 's'.
@@ -197,7 +200,7 @@ data R =
      , -- | This comment applies to both 'r' and 's'
        r,s :: Int
      }
-  | C2 { t :: T1 -> T2 -> T3 -> T4 -> T5,
+  | C2 { t :: T1 -> (T2 Int Int)-> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
        u,v :: Int
      }
   -- ^ This is the 'C2' record constructor, also with some fields:
@@ -210,7 +213,8 @@ data R1
 	  s1 :: Int
 	-- | The 's2' record selector
 	, s2 :: Int
-	, s3 :: Int,
+	, s3 :: Int  -- NOTE: In the original examples/Test.hs in Haddock, there is an extra "," here.
+                     -- Since GHC doesn't allow that, I have removed it in this file. 
 	-- ^ The 's3' record selector
      }
 
@@ -246,8 +250,7 @@ using double quotes: "Foo".  We can add emphasis /like this/.
 We can also include URLs in documentation: <http://www.haskell.org/>.
 -}
 
-f :: C a => Int -> Int
-
+f :: C a => a -> Int
 
 -- | we can export foreign declarations too
 foreign import ccall g :: Int -> IO CInt
@@ -346,17 +349,17 @@ test2
 data Ex a 
   = forall b . C b => Ex1 b
   | forall b . Ex2 b
-  | C a => Ex3 b
+  | forall b . C a => Ex3 b -- NOTE: I have added "forall b" here make GHC accept this file 
   | Ex4 (forall a . a -> a)
 
 -- | This is a function with documentation for each argument
-k :: T 		-- ^ This argument has type 'T'
-  -> T2 	-- ^ This argument has type 'T2'
-  -> (T3 -> T4) -- ^ This argument has type @T3 -> T4@
-  -> T5		-- ^ This argument has a very long description that should
-		-- hopefully cause some wrapping to happen when it is finally
-		-- rendered by Haddock in the generated HTML page.
-  -> IO ()	-- ^ This is the result type
+k :: T () () 	  -- ^ This argument has type 'T'
+  -> (T2 Int Int) -- ^ This argument has type 'T2 Int Int'
+  -> (T3 Bool Bool -> T4 Float Float) -- ^ This argument has type @T3 Bool Bool -> T4 Float Float@
+  -> T5 () ()	  -- ^ This argument has a very long description that should
+		  -- hopefully cause some wrapping to happen when it is finally
+		  -- rendered by Haddock in the generated HTML page.
+  -> IO ()	  -- ^ This is the result type
 
 -- This function has arg docs but no docs for the function itself
 l :: (Int, Int, Float) -- ^ takes a triple
@@ -364,13 +367,17 @@ l :: (Int, Int, Float) -- ^ takes a triple
 
 -- | This function has some arg docs 
 m :: R
-  -> N1		-- ^ one of the arguments
+  -> N1 ()	-- ^ one of the arguments
   -> IO Int	-- ^ and the return value
 
 -- | This function has some arg docs but not a return value doc
-n :: R		-- ^ one of the arguments, an 'R'
-  -> N1		-- ^ one of the arguments
-  -> IO Int
+
+-- can't use the original name ('n') with GHC
+newn :: R		-- ^ one of the arguments, an 'R'
+     -> N1 ()		-- ^ one of the arguments
+     -> IO Int
+newn = undefined 
+
 
 -- | A foreign import with argument docs
 foreign import ccall unsafe 
@@ -378,8 +385,23 @@ foreign import ccall unsafe
    -> IO Float  -- ^ The output float
 
 -- | We should be able to escape this: \#\#\#
-p :: Int
+
+-- p :: Int 
+-- can't use the above original definition with GHC
+newp :: Int  
+newp = undefined
 
 -- | a function with a prime can be referred to as 'f'' 
 -- but f' doesn't get link'd 'f\''
 f' :: Int
+
+
+-- Add some definitions here so that this file can be compiled with GHC
+
+data T1
+f = undefined
+f' = undefined
+type CInt = Int  
+k = undefined
+l = undefined
+m = undefined

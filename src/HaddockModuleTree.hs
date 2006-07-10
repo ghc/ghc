@@ -1,6 +1,6 @@
 module HaddockModuleTree(ModuleTree(..), mkModuleTree) where
 
-import HsSyn
+import HsSyn2
 
 data ModuleTree = Node String Bool (Maybe String) (Maybe Doc) [ModuleTree]
 

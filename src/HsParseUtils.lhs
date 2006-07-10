@@ -33,7 +33,7 @@ module HsParseUtils (
 	, toTyClsHsName		-- HsName -> HsName
  ) where
 
-import HsSyn
+import HsSyn2
 import HsParseMonad
 
 import Char(isDigit,isOctDigit,isHexDigit,digitToInt)

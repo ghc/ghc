@@ -25,11 +25,11 @@ module HaddockUtil (
   html_xrefs_ref,
  ) where
 
-import Binary
-import HaddockLex
-import HaddockParse
+import Binary2
+import HaddockLex2
+import HaddockParse2
 import HaddockTypes
-import HsSyn
+import HsSyn2
 import Map ( Map )
 import qualified Map hiding ( Map )
 
@@ -142,6 +142,42 @@ addConDocs (x:xs) doc = addConDoc x doc : xs
 -- ---------------------------------------------------------------------------
 -- Making abstract declarations
 
+restrictTo :: [GHC.Name] -> (GHC.HsDecl GHC.Name) -> (GHC.HsDecl GHC.Name)
+restrictTo names decl = case decl of
+  TyClD d | isDataDecl d && tcdND d == DataType -> 
+    TyClD (d { tcdCons = restrictCons names (tcdCons d) }
+  TyClD d | isDataDecl d && tcdND d == NewType -> 
+   case restrictCons names (tcdCons d) of
+      []    -> TyClD (d { tcdND = DataType, tcdCons = [] })
+      [con] -> TyClD (d { tcdCons = con })
+  TyClD d | isClassDecl d -> 
+    TyClD (d { tcdSigs = restrictDecls names (tcdSigs d) })   
+  _ -> decl
+   
+restrictCons :: [GHC.Name] -> [GHC.LConDecl GHC.Name] -> [GHC.LConDecl GHC.Name]
+restrictCons names decls = [ d | Just d <- map keep decls ]  
+  where keep d | con_name (unLoc d) `elem` names = 
+          case con_details d of
+            PrefixCon _ -> Just d
+            RecCon fields 
+              | all field_avail fields -> Just d
+              | otherwise = Just (d { con_details = PrefixCon field_types })
+       		-- if we have *all* the field names available, then
+		-- keep the record declaration.  Otherwise degrade to
+		-- a constructor declaration.  This isn't quite right, but
+		-- it's the best we can do.
+	   where
+            field_avail (HsRecField n _ _) = (unLoc n) `elem` names
+            field_types = [ ty | HsRecField n ty _ <- fields] 
+        keep d | otherwise = Nothing
+
+restrictDecls :: [GHC.Name] -> [GHC.LSig GHC.Name] -> [GHC.LSig GHC.Name]
+restrictDecls names decls = filter keep decls
+  where keep d = sigName d `elem` names
+        
+	-- ToDo: not really correct
+
+{-
 restrictTo :: [HsName] -> HsDecl -> HsDecl
 restrictTo names decl = case decl of
      HsDataDecl loc ctxt n xs cons drv doc -> 
@@ -177,7 +213,7 @@ restrictDecls :: [HsName] -> [HsDecl] -> [HsDecl]
 restrictDecls names decls = filter keep decls
   where keep d = not (null (declBinders d `intersect` names))
 	-- ToDo: not really correct
-
+-}
 -- -----------------------------------------------------------------------------
 -- Extract documentation from a declaration
 

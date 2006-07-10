@@ -13,7 +13,7 @@ module HaddockHoogle (
 
 import HaddockTypes
 import HaddockUtil
-import HsSyn
+import HsSyn2
 
 import Data.List ( intersperse )
 

@@ -3,7 +3,7 @@ module HaddockDevHelp(ppDevHelpFile) where
 import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
-import HsSyn hiding(Doc)
+import HsSyn2 hiding(Doc)
 import qualified Map
 
 import Data.Maybe ( fromMaybe )

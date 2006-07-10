@@ -17,12 +17,12 @@ ToDo: Differentiate between record updates and labeled construction.
 > module HsParser (parse) where
 > 
 > import Monad
-> import HsSyn
+> import HsSyn2
 > import HsParseMonad
 > import HsLexer
 > import HsParseUtils
-> import HaddockLex 	hiding (Token)
-> import HaddockParse
+> import HaddockLex2 	hiding (Token)
+> import HaddockParse2
 > import HaddockUtil 	hiding (splitTyConApp)
 > import Char 		( isSpace )
 > }

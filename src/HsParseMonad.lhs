@@ -10,7 +10,7 @@
 \begin{code}
 module HsParseMonad where
 
-import HsSyn
+import HsSyn2
 \end{code}
 
 \begin{code}

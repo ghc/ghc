@@ -12,8 +12,11 @@ module HaddockTypes (
   DocOption(..), InstHead,
  ) where
 
-import HsSyn
-import Map
+import HsSyn2
+
+import qualified GHC as GHC
+
+import Data.Map
 
 -- ---------------------------------------------------------------------------
 -- Describing a module interface
@@ -84,8 +87,8 @@ data DocOption
 
 data ExportItem 
   = ExportDecl
-	HsQName		-- the original name
-	HsDecl		-- a declaration (with doc annotations)
+	GHC.Name	-- the original name
+	GHC.HsDecl	-- a declaration (with doc annotations)
 	[InstHead]	-- instances relevant to this declaration
 
   | ExportNoDecl	-- an exported entity for which we have no documentation
@@ -105,6 +108,13 @@ data ExportItem
   | ExportModule	-- a cross-reference to another module
 	Module
 
-type ModuleMap = Map Module Interface
-
 type InstHead = (HsContext,HsAsst)
+
+type ModuleMap = Map Module Interface
+type ModuleMap2 = Map GHC.Module HaddockModule
+
+data HaddockModule = HM {
+  hmod_options      :: [DocOption],
+  hmod_decls        :: Map Name GHC.HsDecl,
+  hmod_orig_exports :: [ExportItem]
+}

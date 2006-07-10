@@ -17,7 +17,7 @@ module HsLexer (Token(..), lexer, parseError,isSymbol) where
 
 import HsParseMonad
 import HsParseUtils
-import HsSyn
+import HsSyn2
 
 import Numeric	( readHex, readOct )
 import Char

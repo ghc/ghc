@@ -9,7 +9,7 @@ maintainer: Simon Marlow <simonmar@microsoft.com>
 stability: stable
 homepage: http://www.haskell.org/haddock/
 synopsis: Haddock is a documentation-generation tool for Haskell libraries
-build-depends: base>=1.0, haskell98>=1.0, mtl>=1.0, network>=1.0
+build-depends: base>=1.0, haskell98>=1.0, mtl>=1.0, network>=1.0, ghc
 data-files:
 	html/haddock-DEBUG.css
 	html/haddock.css
@@ -58,19 +58,19 @@ hs-source-dirs: src
 main-is: Main.hs
 extensions: CPP
 other-modules:
-	Binary
+	Binary2
 	BlockTable
-	Digraph
-	FastMutInt
+	Digraph2
+	FastMutInt2
 	HaddockDB
 	HaddockDevHelp
 	HaddockHH
 	HaddockHH2
 	HaddockHoogle
 	HaddockHtml
-	HaddockLex
+	HaddockLex2
 	HaddockModuleTree
-	HaddockParse
+	HaddockParse2
 	HaddockRename
 	HaddockTypes
 	HaddockUtil
@@ -79,7 +79,7 @@ other-modules:
 	HsParseMonad
 	HsParseUtils
 	HsParser
-	HsSyn
+	HsSyn2
 	Html
 	Main
 	Map

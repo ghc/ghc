@@ -15,7 +15,7 @@ module HaddockRename (
 
 import HaddockTypes
 import HaddockUtil	( unQual )
-import HsSyn
+import HsSyn2
 import Map ( Map )
 import qualified Map hiding ( Map )
 

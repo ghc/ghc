@@ -12,7 +12,7 @@ module HaddockHtml (
 
 import Prelude hiding (div)
 
-import Binary ( openBinaryFile )
+import Binary2 ( openBinaryFile )
 import HaddockDevHelp
 import HaddockHH
 import HaddockHH2
@@ -20,7 +20,7 @@ import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
 import HaddockVersion
-import HsSyn
+import HsSyn2
 import Html
 import qualified Html
 import Map ( Map )
