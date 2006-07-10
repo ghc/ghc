@@ -29,7 +29,7 @@ module SysTools (
 	-- Temporary-file management
 	setTmpDir,
 	newTempName,
-	cleanTempFiles, cleanTempFilesExcept,
+	cleanTempDirs, cleanTempFiles, cleanTempFilesExcept,
 	addFilesToClean,
 
 	-- System interface
@@ -62,10 +62,13 @@ import Monad		( when, unless )
 import System		( ExitCode(..), getEnv, system )
 import IO		( try, catch, hGetContents,
 			  openFile, hPutStr, hClose, hFlush, IOMode(..), 
-			  stderr, ioError, isDoesNotExistError )
-import Directory	( doesFileExist, removeFile )
+			  stderr, ioError, isDoesNotExistError,
+			  isAlreadyExistsError )
+import Directory	( doesFileExist, removeFile,
+			  createDirectory, removeDirectory )
 import Maybe		( isJust )
 import List             ( partition )
+import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, eltsFM )
 
 -- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
 -- lines on mingw32, so we disallow it now.
@@ -543,9 +546,16 @@ getUsageMsgPaths = readIORef v_Path_usages
 
 \begin{code}
 GLOBAL_VAR(v_FilesToClean, [],               [String] )
+GLOBAL_VAR(v_DirsToClean, emptyFM, FiniteMap FilePath FilePath )
 \end{code}
 
 \begin{code}
+cleanTempDirs :: DynFlags -> IO ()
+cleanTempDirs dflags
+   = do ds <- readIORef v_DirsToClean
+        removeTmpDirs dflags (eltsFM ds)
+        writeIORef v_DirsToClean emptyFM
+
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
    = do fs <- readIORef v_FilesToClean
@@ -562,9 +572,10 @@ cleanTempFilesExcept dflags dont_delete
 
 -- find a temporary name that doesn't already exist.
 newTempName :: DynFlags -> Suffix -> IO FilePath
-newTempName DynFlags{tmpDir=tmp_dir} extn
-  = do x <- getProcessID
-       findTempName (tmp_dir ++ "/ghc" ++ show x ++ "_") 0
+newTempName dflags extn
+  = do d <- getTempDir dflags
+       x <- getProcessID
+       findTempName (d ++ "/ghc" ++ show x ++ "_") 0
   where 
     findTempName prefix x
       = do let filename = (prefix ++ show x) `joinFileExt` extn
@@ -573,9 +584,43 @@ newTempName DynFlags{tmpDir=tmp_dir} extn
 		else do consIORef v_FilesToClean filename -- clean it up later
 		        return filename
 
+-- return our temporary directory within tmp_dir, creating one if we
+-- don't have one yet
+getTempDir :: DynFlags -> IO FilePath
+getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
+  = do mapping <- readIORef v_DirsToClean
+       case lookupFM mapping tmp_dir of
+           Nothing ->
+               do x <- getProcessID
+                  let prefix = tmp_dir ++ "/ghc" ++ show x ++ "_"
+                      mkTempDir x
+                       = let dirname = prefix ++ show x
+                         in do createDirectory dirname
+                               let mapping' = addToFM mapping tmp_dir dirname
+                               writeIORef v_DirsToClean mapping'
+                               debugTraceMsg dflags 2 (ptext SLIT("Created temporary directory:") <+> text dirname)
+                               return dirname
+                            `IO.catch` \e ->
+                                    if isAlreadyExistsError e
+                                    then mkTempDir (x+1)
+                                    else ioError e
+                  mkTempDir 0
+           Just d -> return d
+
 addFilesToClean :: [FilePath] -> IO ()
 -- May include wildcards [used by DriverPipeline.run_phase SplitMangle]
 addFilesToClean files = mapM_ (consIORef v_FilesToClean) files
+
+removeTmpDirs :: DynFlags -> [FilePath] -> IO ()
+removeTmpDirs dflags ds
+  = traceCmd dflags "Deleting temp dirs"
+	     ("Deleting: " ++ unwords ds)
+	     (mapM_ rmdir ds)
+  where
+    rmdir d = removeDirectory d `IO.catch`
+		(\_ignored ->
+		    debugTraceMsg dflags 2 (ptext SLIT("Warning: deleting") <+> text d <+> ptext SLIT("raised exception"))
+		)
 
 removeTmpFiles :: DynFlags -> [FilePath] -> IO ()
 removeTmpFiles dflags fs

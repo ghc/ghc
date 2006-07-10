@@ -226,7 +226,8 @@ import Finder
 import HscMain		( newHscEnv, hscFileCheck, HscChecked(..) )
 import HscTypes
 import DynFlags
-import SysTools		( initSysTools, cleanTempFiles, cleanTempFilesExcept )
+import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
+                      cleanTempDirs )
 import Module
 import UniqFM
 import PackageConfig    ( PackageId )
@@ -309,13 +310,15 @@ defaultErrorHandler dflags inner =
 -- handling, but still get the ordinary cleanup behaviour.
 defaultCleanupHandler :: DynFlags -> IO a -> IO a
 defaultCleanupHandler dflags inner = 
-   -- make sure we clean up after ourselves
-   later (unless (dopt Opt_KeepTmpFiles dflags) $ 
-	    cleanTempFiles dflags) 
-	-- exceptions will be blocked while we clean the temporary files,
-	-- so there shouldn't be any difficulty if we receive further
-	-- signals.
-   inner
+    -- make sure we clean up after ourselves
+    later (unless (dopt Opt_KeepTmpFiles dflags) $
+               do cleanTempFiles dflags
+                  cleanTempDirs dflags
+          )
+          -- exceptions will be blocked while we clean the temporary files,
+          -- so there shouldn't be any difficulty if we receive further
+          -- signals.
+    inner
 
 
 -- | Initialises GHC.  This must be done /once/ only.  Takes the
