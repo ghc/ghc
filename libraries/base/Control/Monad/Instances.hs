@@ -1,3 +1,4 @@
+{-# OPTIONS_NHC98 -prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Instances
@@ -11,7 +12,7 @@
 -- 'Functor' and 'Monad' instances for @(->) r@ and
 -- 'Functor' instances for @(,) a@ and @'Either' a@.
 
-module Control.Monad.Instances () where
+module Control.Monad.Instances (Functor(..),Monad(..)) where
 
 import Prelude
 
