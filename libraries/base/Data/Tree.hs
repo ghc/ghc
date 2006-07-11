@@ -93,7 +93,7 @@ draw (Node x ts0) = x : drawSubTrees ts0
 -- | The elements of a tree in pre-order.
 flatten :: Tree a -> [a]
 flatten t = squish t []
-  where squish (Node x ts) xs = x:foldr squish xs ts
+  where squish (Node x ts) xs = x:Prelude.foldr squish xs ts
 
 -- | Lists of nodes at each level of the tree.
 levels :: Tree a -> [[a]]
@@ -120,7 +120,7 @@ unfoldTreeM f b = do
 #ifndef __NHC__
 unfoldForestM :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
 #endif
-unfoldForestM f = mapM (unfoldTreeM f)
+unfoldForestM f = Prelude.mapM (unfoldTreeM f)
 
 -- | Monadic tree builder, in breadth-first order,
 -- using an algorithm adapted from
@@ -146,7 +146,7 @@ unfoldForestQ f aQ = case viewl aQ of
 	EmptyL -> return empty
 	a :< aQ -> do
 		(b, as) <- f a
-		tQ <- unfoldForestQ f (foldl (|>) aQ as)
+		tQ <- unfoldForestQ f (Prelude.foldl (|>) aQ as)
 		let (tQ', ts) = splitOnto [] as tQ
 		return (Node b ts <| tQ')
   where splitOnto :: [a'] -> [b'] -> Seq a' -> (Seq a', [a'])

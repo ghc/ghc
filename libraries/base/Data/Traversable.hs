@@ -27,10 +27,10 @@ module Data.Traversable (
 	foldMapDefault,
 	) where
 
-import Prelude hiding (mapM, sequence)
-import qualified Prelude (mapM)
+import Prelude hiding (mapM, sequence, foldr)
+import qualified Prelude (mapM, foldr)
 import Control.Applicative
-import Data.Foldable (Foldable)
+import Data.Foldable (Foldable())
 import Data.Monoid (Monoid)
 import Data.Array
 
@@ -90,7 +90,7 @@ instance Traversable Maybe where
 	traverse f (Just x) = Just <$> f x
 
 instance Traversable [] where
-	traverse f = foldr cons_f (pure [])
+	traverse f = Prelude.foldr cons_f (pure [])
 	  where cons_f x ys = (:) <$> f x <*> ys
 
 	mapM = Prelude.mapM
