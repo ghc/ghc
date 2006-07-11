@@ -301,7 +301,7 @@ run flags files = do
       then die "Failed to load all modules" 
       else return (zip modules checked_modules)
     
-  let module_map = Map.empty
+ {- let module_map = Map.empty
 
   let loop ((mod, checkedMod):modules) module_map = do
         exported_names <- get_exported_names
@@ -320,7 +320,7 @@ run flags files = do
             return (GHC.modInfoExports module_info)     
           
            
-
+-}
   --let Just (group, imports, exports) = GHC.renamedSource (head sorted_checked_modules)
   --printSDoc (ppr group) defaultUserStyle
    
@@ -412,7 +412,7 @@ run flags files = do
     pprList [] = []
     pprList [x] = show x
     pprList (x:xs) = show x ++ ", " ++ pprList xs
-
+{-
 mk_exported_decls_map :: [GHC.Name] -> GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDecl GHC.Name) 
 mk_exported_decls_map exported_names group = Map.fromList 
   [ (name, decl) | name <- exported_names, 
@@ -443,7 +443,7 @@ getDeclFromGroup group name = case catMaybes [getDeclFromVals  (GHC.hs_valds  gr
       _      -> Nothing
       where
         matching = [ for | L _ for@(GHC.ForeignExport n _ _ _) <- lfors, (unLoc n) == name ]
- 
+ -}
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
   case break (==',') s of
