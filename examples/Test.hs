@@ -102,6 +102,8 @@ module Test (
 import Hidden
 import Visible
 
+--hej = visible
+
 -- | This comment applies to the /following/ declaration
 -- and it continues until the next non-comment line
 data T a b

@@ -6,8 +6,8 @@
 
 module HaddockTypes (
   -- * Module interfaces
-  NameEnv, Interface(..), ExportItem(..), ModuleMap,
-
+  NameEnv, Interface(..), ExportItem(..), ExportItem2(..), ModuleMap, ModuleMap2,
+  HaddockModule(..),
   -- * Misc types
   DocOption(..), InstHead,
  ) where
@@ -87,9 +87,9 @@ data DocOption
 
 data ExportItem 
   = ExportDecl
-	GHC.Name	-- the original name
-	GHC.HsDecl	-- a declaration (with doc annotations)
-	[InstHead]	-- instances relevant to this declaration
+	HsQName	      -- the original name
+	HsDecl        -- a declaration (with doc annotations)
+	[InstHead]    -- instances relevant to this declaration
 
   | ExportNoDecl	-- an exported entity for which we have no documentation
 			-- (perhaps becuase it resides in another package)
@@ -108,6 +108,29 @@ data ExportItem
   | ExportModule	-- a cross-reference to another module
 	Module
 
+data ExportItem2 
+  = ExportDecl2
+	GHC.Name	      -- the original name
+	(GHC.HsDecl GHC.Name) -- a declaration (with doc annotations)
+	[InstHead]	      -- instances relevant to this declaration
+
+  | ExportNoDecl2	-- an exported entity for which we have no documentation
+			-- (perhaps becuase it resides in another package)
+	GHC.Name		-- the original name
+	GHC.Name		-- where to link to
+	[GHC.Name]	-- subordinate names
+
+  | ExportGroup2		-- a section heading
+	Int		-- section level (1, 2, 3, ... )
+	String		-- section "id" (for hyperlinks)
+	(GHC.HsDoc GHC.Name)		-- section heading text
+
+  | ExportDoc2		-- some documentation
+	(GHC.HsDoc GHC.Name)
+
+  | ExportModule2	-- a cross-reference to another module
+	GHC.Module
+
 type InstHead = (HsContext,HsAsst)
 
 type ModuleMap = Map Module Interface
@@ -115,6 +138,7 @@ type ModuleMap2 = Map GHC.Module HaddockModule
 
 data HaddockModule = HM {
   hmod_options      :: [DocOption],
-  hmod_decls        :: Map Name GHC.HsDecl,
-  hmod_orig_exports :: [ExportItem]
+  hmod_decls        :: Map GHC.Name (GHC.HsDecl GHC.Name),
+  hmod_orig_exports :: [ExportItem2],
+  hmod_subs         :: Map GHC.Name [GHC.Name]
 }

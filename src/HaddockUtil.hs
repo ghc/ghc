@@ -33,11 +33,14 @@ import HsSyn2
 import Map ( Map )
 import qualified Map hiding ( Map )
 
+import qualified GHC as GHC
+import SrcLoc
+
 import Control.Monad ( liftM, MonadPlus(..) )
 import Data.Char ( isAlpha, isSpace, toUpper, ord )
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( intersect, isSuffixOf, intersperse )
-import Data.Maybe ( maybeToList, fromMaybe )
+import Data.Maybe ( maybeToList, fromMaybe, isJust, fromJust )
 import Network.URI
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
@@ -144,38 +147,37 @@ addConDocs (x:xs) doc = addConDoc x doc : xs
 
 restrictTo :: [GHC.Name] -> (GHC.HsDecl GHC.Name) -> (GHC.HsDecl GHC.Name)
 restrictTo names decl = case decl of
-  TyClD d | isDataDecl d && tcdND d == DataType -> 
-    TyClD (d { tcdCons = restrictCons names (tcdCons d) }
-  TyClD d | isDataDecl d && tcdND d == NewType -> 
-   case restrictCons names (tcdCons d) of
-      []    -> TyClD (d { tcdND = DataType, tcdCons = [] })
-      [con] -> TyClD (d { tcdCons = con })
-  TyClD d | isClassDecl d -> 
-    TyClD (d { tcdSigs = restrictDecls names (tcdSigs d) })   
+  GHC.TyClD d | GHC.isDataDecl d && GHC.tcdND d == GHC.DataType -> 
+    GHC.TyClD (d { GHC.tcdCons = restrictCons names (GHC.tcdCons d) })
+  GHC.TyClD d | GHC.isDataDecl d && GHC.tcdND d == GHC.NewType -> 
+    case restrictCons names (GHC.tcdCons d) of
+      []    -> GHC.TyClD (d { GHC.tcdND = GHC.DataType, GHC.tcdCons = [] })
+      [con] -> GHC.TyClD (d { GHC.tcdCons = [con] })
+  GHC.TyClD d | GHC.isClassDecl d -> 
+    GHC.TyClD (d { GHC.tcdSigs = restrictDecls names (GHC.tcdSigs d) })   
   _ -> decl
    
 restrictCons :: [GHC.Name] -> [GHC.LConDecl GHC.Name] -> [GHC.LConDecl GHC.Name]
-restrictCons names decls = [ d | Just d <- map keep decls ]  
-  where keep d | con_name (unLoc d) `elem` names = 
-          case con_details d of
-            PrefixCon _ -> Just d
-            RecCon fields 
+restrictCons names decls = [ L p (fromJust (keep d)) | L p d <- decls, isJust (keep d) ]  
+  where keep d | unLoc (GHC.con_name d) `elem` names = 
+          case GHC.con_details d of
+            GHC.PrefixCon _ -> Just d
+            GHC.RecCon fields  
               | all field_avail fields -> Just d
-              | otherwise = Just (d { con_details = PrefixCon field_types })
+              | otherwise -> Just (d { GHC.con_details = GHC.PrefixCon (field_types fields) })
        		-- if we have *all* the field names available, then
 		-- keep the record declaration.  Otherwise degrade to
 		-- a constructor declaration.  This isn't quite right, but
 		-- it's the best we can do.
 	   where
-            field_avail (HsRecField n _ _) = (unLoc n) `elem` names
-            field_types = [ ty | HsRecField n ty _ <- fields] 
+            field_avail (GHC.HsRecField n _ _) = (unLoc n) `elem` names
+            field_types flds = [ ty | GHC.HsRecField n ty _ <- flds] 
         keep d | otherwise = Nothing
 
 restrictDecls :: [GHC.Name] -> [GHC.LSig GHC.Name] -> [GHC.LSig GHC.Name]
 restrictDecls names decls = filter keep decls
-  where keep d = sigName d `elem` names
-        
-	-- ToDo: not really correct
+  where keep d = fromJust (GHC.sigName d) `elem` names
+        -- has to have a name, since it's a class method type signature
 
 {-
 restrictTo :: [HsName] -> HsDecl -> HsDecl
