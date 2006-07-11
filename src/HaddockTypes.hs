@@ -7,7 +7,7 @@
 module HaddockTypes (
   -- * Module interfaces
   NameEnv, Interface(..), ExportItem(..), ExportItem2(..), ModuleMap, ModuleMap2,
-  HaddockModule(..),
+  HaddockModule(..), 
   -- * Misc types
   DocOption(..), InstHead,
  ) where

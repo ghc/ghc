@@ -292,21 +292,23 @@ run flags files = do
     maybe_module_graph <- GHC.depanal session [] True
     module_graph <- case maybe_module_graph of 
       Just module_graph -> return module_graph 
-      Nothing -> die "Failed to load modules"
+      Nothing -> die "Failed to load modules\n"
     let sorted_modules = concatMap Digraph.flattenSCC (GHC.topSortModuleGraph False module_graph Nothing) 
     let modules = [ GHC.ms_mod modsum | modsum <- sorted_modules, GHC.ms_hspp_file modsum `elem` files ]
     mb_checked_modules <- mapM (GHC.checkModule session) modules
     let checked_modules = catMaybes mb_checked_modules
     if length checked_modules /= length mb_checked_modules
-      then die "Failed to load all modules" 
+      then die "Failed to load all modules\n" 
       else return (zip modules checked_modules)
     
- {- let module_map = Map.empty
+  let module_map = Map.empty
 
-  let loop ((mod, checkedMod):modules) module_map = do
+{-  let loop ((mod, checkedMod):modules) module_map = do
         exported_names <- get_exported_names
         binding_group  <- get_binding_group 
         let exported_decls_map = mk_exported_decls_map exported_names binding_group
+        let exported_decls = Map.elems exported_decls_map
+
         mkExportItems module_map mod exported_names exported_decls_map
         where 
           get_binding_group = case GHC.renamedSource checkedMod of
@@ -318,14 +320,41 @@ run flags files = do
           get_exported_names = do
             module_info <- get_module_info  
             return (GHC.modInfoExports module_info)     
-          
-           
--}
+-}          
+
+  let Just (group,_,_) = GHC.renamedSource (snd (head sorted_checked_modules))
+  let Just mi = GHC.checkedModuleInfo (snd (head sorted_checked_modules))
+  let exported_names = GHC.modInfoExports mi
+ 
+  let exported_decls_map = mk_exported_decls_map exported_names group
+  let exported_decls = Map.elems exported_decls_map
+ 
+  putStrLn "Printing all exported names:"
+  putStrLn "----------------------------" 
+
+  printSDoc (ppr exported_names) defaultUserStyle
+ 
+  if length exported_decls /= length exported_names
+    then putStrLn "-----------\nWARNING: Not all names found\n-----------\n"
+    else return ()
+     
+  putStrLn "Printing all corresponding decls:"
+  putStrLn "---------------------------------" 
+  printSDoc (ppr exported_decls) defaultUserStyle        
+
+  let not_found = exported_names \\ (Map.keys exported_decls_map) 
+
+  putStrLn "Printing all names not found:"
+  putStrLn "---------------------------------" 
+  printSDoc (ppr not_found) defaultUserStyle        
+
+
+
   --let Just (group, imports, exports) = GHC.renamedSource (head sorted_checked_modules)
   --printSDoc (ppr group) defaultUserStyle
    
-  let exports = GHC.modInfoExports $ fromJust $ GHC.checkedModuleInfo $ snd $ (head sorted_checked_modules)
-  printSDoc (ppr exports) defaultUserStyle
+--  let exports = GHC.modInfoExports $ fromJust $ GHC.checkedModuleInfo $ snd $ (head sorted_checked_modules)
+---  printSDoc (ppr exports) defaultUserStyle
 
 
                             
@@ -412,38 +441,40 @@ run flags files = do
     pprList [] = []
     pprList [x] = show x
     pprList (x:xs) = show x ++ ", " ++ pprList xs
-{-
+
 mk_exported_decls_map :: [GHC.Name] -> GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDecl GHC.Name) 
-mk_exported_decls_map exported_names group = Map.fromList 
-  [ (name, decl) | name <- exported_names, 
-    let Just decl = getDeclFromGroup name group ]  
+mk_exported_decls_map exported_names group = Map.fromList $ 
+ [ (n,d)  | (n,Just d) <- [ (name, getDeclFromGroup group name) | name <- exported_names ] ]
 
 getDeclFromGroup :: GHC.HsGroup GHC.Name -> GHC.Name -> Maybe (GHC.HsDecl GHC.Name)
 getDeclFromGroup group name = case catMaybes [getDeclFromVals  (GHC.hs_valds  group), 
                                               getDeclFromTyCls (GHC.hs_tyclds group),
                                               getDeclFromFors  (GHC.hs_fords  group)] of
-  [Just decl] -> Just decl
+  [decl] -> Just decl
   _ -> Nothing
   where 
     getDeclFromVals (GHC.ValBindsOut _ lsigs) = case matching of 
       [lsig] -> Just (GHC.SigD (unLoc lsig))
       _      -> Nothing
      where 
-        matching = [ lsig | lsig <- lsigs, GHC.sigName lsig == name ]
+        matching = [ lsig | lsig <- lsigs, let Just n = GHC.sigName lsig, n == name ]
     getDeclFromVals _ = error "getDeclFromVals: illegal input"
      
     getDeclFromTyCls ltycls = case matching of 
       [ltycl] -> Just (GHC.TyClD (unLoc ltycl))
       _       -> Nothing
       where
-        matching = [ ltycl | ltycl <- ltycls, unLoc (GHC.tcdLName (unLoc ltycl)) == name ]
-    
+        matching = [ ltycl | ltycl <- ltycls, 
+                     name `elem` map unLoc (GHC.tyClDeclNames (unLoc ltycl))]
+ 
     getDeclFromFors lfors = case matching of 
       [for] -> Just (GHC.ForD for)
       _      -> Nothing
       where
-        matching = [ for | L _ for@(GHC.ForeignExport n _ _ _) <- lfors, (unLoc n) == name ]
- -}
+        matching = [ for | L _ for <- lfors, forName for == name ]
+        forName (GHC.ForeignExport n _ _ _) = unLoc n
+        forName (GHC.ForeignImport n _ _ _) = unLoc n
+ 
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
   case break (==',') s of
