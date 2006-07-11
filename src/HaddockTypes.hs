@@ -137,8 +137,8 @@ type ModuleMap = Map Module Interface
 type ModuleMap2 = Map GHC.Module HaddockModule
 
 data HaddockModule = HM {
-  hmod_options      :: [DocOption],
-  hmod_decls        :: Map GHC.Name (GHC.HsDecl GHC.Name),
-  hmod_orig_exports :: [ExportItem2],
-  hmod_subs         :: Map GHC.Name [GHC.Name]
+  hmod_options           :: [DocOption],
+  hmod_exported_decl_map :: Map GHC.Name (GHC.HsDecl GHC.Name),
+  hmod_orig_exports      :: [ExportItem2],
+  hmod_sub_map           :: Map GHC.Name [GHC.Name]
 }

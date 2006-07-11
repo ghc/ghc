@@ -55,6 +55,7 @@ import Outputable
 import SrcLoc
 import qualified Digraph as Digraph
 import Name
+import Module (moduleString)-- TODO: add an export to GHC API? 
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
@@ -300,34 +301,15 @@ run flags files = do
     if length checked_modules /= length mb_checked_modules
       then die "Failed to load all modules\n" 
       else return (zip modules checked_modules)
-    
-  let module_map = Map.empty
+  
+  sorted_checked_modules' <- remove_maybes sorted_checked_modules
 
-{-  let loop ((mod, checkedMod):modules) module_map = do
-        exported_names <- get_exported_names
-        binding_group  <- get_binding_group 
-        let exported_decls_map = mk_exported_decls_map exported_names binding_group
-        let exported_decls = Map.elems exported_decls_map
-
-        mkExportItems module_map mod exported_names exported_decls_map
-        where 
-          get_binding_group = case GHC.renamedSource checkedMod of
-            Just (group, _, _) -> group
-            Nothing            -> die "Failed to get renamed source"
-          get_module_info = case GHC.checkedModuleInfo checkedMod of 
-            Just mi -> return mi
-            Nothing -> die "Failed to get checkedModuleInfo"
-          get_exported_names = do
-            module_info <- get_module_info  
-            return (GHC.modInfoExports module_info)     
--}          
-
-  let Just (group,_,_) = GHC.renamedSource (snd (head sorted_checked_modules))
+{-  let Just (group,_,_) = GHC.renamedSource (snd (head sorted_checked_modules))
   let Just mi = GHC.checkedModuleInfo (snd (head sorted_checked_modules))
   let exported_names = GHC.modInfoExports mi
  
-  let exported_decls_map = mk_exported_decls_map exported_names group
-  let exported_decls = Map.elems exported_decls_map
+  let exported_decl_map = mk_exported_decl_map exported_names group
+  let exported_decls = Map.elems exported_decl_map
  
   putStrLn "Printing all exported names:"
   putStrLn "----------------------------" 
@@ -342,13 +324,24 @@ run flags files = do
   putStrLn "---------------------------------" 
   printSDoc (ppr exported_decls) defaultUserStyle        
 
-  let not_found = exported_names \\ (Map.keys exported_decls_map) 
+  let not_found = exported_names \\ (Map.keys exported_decl_map) 
 
   putStrLn "Printing all names not found:"
   putStrLn "---------------------------------" 
   printSDoc (ppr not_found) defaultUserStyle        
 
+  let sub_names = mk_sub_map_from_group group
+  putStrLn "Printing the submap:"
+  putStrLn "---------------------------------" 
+  printSDoc (ppr (Map.toList sub_names)) defaultUserStyle        
+-}
+  
+  let (export_item_map, messages) = runWriter (pass1 sorted_checked_modules' flags) 
 
+  putStrLn "pass 1 messages:"
+  print messages
+  putStrLn "pass 1 export items:"
+  printSDoc (ppr (map (hmod_orig_exports . snd) (Map.toList export_item_map))) defaultUserStyle 
 
   --let Just (group, imports, exports) = GHC.renamedSource (head sorted_checked_modules)
   --printSDoc (ppr group) defaultUserStyle
@@ -441,9 +434,115 @@ run flags files = do
     pprList [] = []
     pprList [x] = show x
     pprList (x:xs) = show x ++ ", " ++ pprList xs
+ 
+    remove_maybes modules | length modules' == length modules = return modules'
+                          | otherwise = die "Missing checked module phase information\n" 
+      where modules' = [ (mod, (a,b,c,d)) | (mod, GHC.CheckedModule a (Just b) (Just c) (Just d)) <- modules ] 
 
-mk_exported_decls_map :: [GHC.Name] -> GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDecl GHC.Name) 
-mk_exported_decls_map exported_names group = Map.fromList $ 
+instance Outputable ExportItem2 where
+  ppr (ExportDecl2 n decl instns) = text "ExportDecl" <+> ppr n <+> ppr decl <+> text (show instns)
+  ppr (ExportNoDecl2 n1 n2 ns) = text "ExportNoDecl (org name, link name, sub names)" <+> ppr n1 <+> ppr n2 <+> ppr ns
+  ppr (ExportGroup2 lev id doc) = text "ExportGroup (lev, id, doc)" <+> ppr lev <+> ppr doc
+  ppr (ExportDoc2 doc) = text "ExportDoc" <+> ppr doc
+  ppr (ExportModule2 mod) = text "ExportModule" <+> ppr mod 	
+
+{-  let loop ((mod, checkedMod):modules) module_map = do
+        exported_names <- get_exported_names
+        binding_group  <- get_binding_group 
+        let exported_decls_map = mk_exported_decls_map exported_names binding_group
+        let exported_decls = Map.elems exported_decls_map
+
+        mkExportItems module_map mod exported_names exported_decls_map
+        where 
+          get_binding_group = case GHC.renamedSource checkedMod of
+            Just (group, _, _) -> group
+            Nothing            -> die "Failed to get renamed source"
+          get_module_info = case GHC.checkedModuleInfo checkedMod of 
+            Just mi -> return mi
+            Nothing -> die "Failed to get checkedModuleInfo"
+          get_exported_names = do
+            module_info <- get_module_info  
+            return (GHC.modInfoExports module_info)     
+-}          
+
+type FullyCheckedModule = (GHC.ParsedSource, 
+                           GHC.RenamedSource, 
+                           GHC.TypecheckedSource, 
+                           GHC.ModuleInfo)
+
+pass1 :: [(GHC.Module, FullyCheckedModule)] -> [Flag] -> ErrMsgM ModuleMap2
+pass1 modules flags = worker modules (Map.empty) flags
+  where
+    worker :: [(GHC.Module, FullyCheckedModule)] -> ModuleMap2 -> [Flag] -> ErrMsgM ModuleMap2
+    worker [] module_map _ = return module_map
+    worker ((mod, checked_mod):rest_modules) module_map flags = do
+ 
+      let (parsed_source, renamed_source, _, module_info) = checked_mod
+          (mb_doc_opts, haddock_mod_info, mb_mod_doc) = get_module_stuff parsed_source
+
+      opts <- mk_doc_opts mb_doc_opts
+
+      let exported_names = GHC.modInfoExports module_info
+          (group, _, mb_exports) = renamed_source  
+          exported_decl_map = mk_exported_decl_map exported_names group
+          sub_map = mk_sub_map_from_group group
+          decls = recover_decls_from_group group
+          exports = fmap (map unLoc) mb_exports
+          ignore_all_exports = Flag_IgnoreAllExports `elem` flags
+
+      export_items <- mkExportItems module_map mod exported_names
+                                        exported_decl_map sub_map decls opts  
+                                        exports ignore_all_exports 
+
+      let haddock_module = HM {
+            hmod_options           = opts,
+            hmod_exported_decl_map = exported_decl_map,
+            hmod_orig_exports      = export_items,
+            hmod_sub_map           = sub_map
+          }
+
+      let module_map' = Map.insert mod haddock_module module_map
+      worker rest_modules module_map' flags 
+      
+      where 
+        get_module_stuff source = 
+          let GHC.HsModule _ _ _ _ _ mb_opts info mb_doc = unLoc source
+          in (mb_opts, info, mb_doc)
+
+        mk_doc_opts mb_opts = do
+          opts <- case mb_opts of 
+            Just opts -> processOptions opts
+            Nothing -> return []
+          let opts' = if Flag_HideModule (moduleString mod) `elem` flags 
+                then OptHide : opts
+                else opts      
+          return opts'
+                       
+get_all_subnames_from_group :: GHC.HsGroup GHC.Name -> [GHC.Name]
+get_all_subnames_from_group group = 
+  concat [ tail (map unLoc (GHC.tyClDeclNames tycld)) | L _ tycld <- GHC.hs_tyclds group ]
+
+mk_sub_map_from_group :: GHC.HsGroup GHC.Name -> Map GHC.Name [GHC.Name]
+mk_sub_map_from_group group =  
+  Map.fromList [ (name, subs) | L _ tycld <- GHC.hs_tyclds group,
+                 let name:subs = map unLoc (GHC.tyClDeclNames tycld) ]
+
+
+recover_decls_from_group :: GHC.HsGroup GHC.Name -> [GHC.HsDecl GHC.Name]
+recover_decls_from_group group = 
+  map (GHC.SigD    . unLoc) (sigs_from_valds (GHC.hs_valds group)) ++
+  map (GHC.TyClD   . unLoc) (GHC.hs_tyclds group) ++
+  map (GHC.InstD   . unLoc) (GHC.hs_instds group) ++
+  map (GHC.DefD    . unLoc) (GHC.hs_defds  group) ++ 
+  map (GHC.ForD    . unLoc) (GHC.hs_fords  group) ++
+  map (GHC.DeprecD . unLoc) (GHC.hs_depds  group) ++
+  map (GHC.RuleD   . unLoc) (GHC.hs_ruleds group) 
+  where 
+    sigs_from_valds (GHC.ValBindsOut _ lsigs) = lsigs  
+    sigs_from_valds _ = error "recover_decls_from_group: illegal input"
+
+mk_exported_decl_map :: [GHC.Name] -> GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDecl GHC.Name) 
+mk_exported_decl_map exported_names group = Map.fromList $ 
  [ (n,d)  | (n,Just d) <- [ (name, getDeclFromGroup group name) | name <- exported_names ] ]
 
 getDeclFromGroup :: GHC.HsGroup GHC.Name -> GHC.Name -> Maybe (GHC.HsDecl GHC.Name)
@@ -952,7 +1051,7 @@ mkExportItems mod_map this_mod exported_names decl_map sub_map decls
 	| m == this_mod = Map.lookup n decl_map
 	| otherwise = 
 	   case Map.lookup m mod_map of
-		Just hmod -> Map.lookup n (hmod_decls hmod)
+		Just hmod -> Map.lookup n (hmod_exported_decl_map hmod)
 		Nothing -> Nothing
       where
         m = nameModule n
@@ -1306,7 +1405,7 @@ all_subs_of_qname :: ModuleMap2 -> GHC.Name -> [GHC.Name]
 all_subs_of_qname mod_map name 
   | isExternalName name =
     case Map.lookup (nameModule name) mod_map of
-      Just hmod -> Map.findWithDefault [] name (hmod_subs hmod)
+      Just hmod -> Map.findWithDefault [] name (hmod_sub_map hmod)
       Nothing   -> []
   | otherwise =  error $ "Main.all_subs_of_qname: unexpected unqual'd name"
 
@@ -1506,6 +1605,9 @@ findNamedDoc name decls = search decls
 
 -- -----------------------------------------------------------------------------
 -- Haddock options embedded in the source file
+
+processOptions_ str = let (opts, msg) = runWriter (processOptions str) 
+                      in print msg >> return opts 
 
 processOptions :: String -> ErrMsgM [DocOption]
 processOptions str = do
