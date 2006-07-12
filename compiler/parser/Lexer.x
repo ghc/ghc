@@ -216,6 +216,11 @@ $white_no_nl+ 				;
   "{-#" $whitechar* (INCLUDE|include)   { lex_string_prag ITinclude_prag }
 }
 
+<0,option_prags,glaexts> {
+	-- This is to catch things like {-# OPTIONS OPTIONS_HUGS ... 
+  "{-#" $whitechar* $idchar+            { nested_comment }
+}
+
 -- '0' state: ordinary lexemes
 -- 'glaexts' state: glasgow extensions (postfix '#', etc.)
 
