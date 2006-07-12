@@ -58,7 +58,7 @@ import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
 			  isOneShotBndr, isStateHackType, isDataConWorkId_maybe, mkSysLocal,
-			  isDataConWorkId, isBottomingId
+			  isDataConWorkId, isBottomingId, isDictId
 			)
 import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo )
 import NewDemand	( appIsBottom )
@@ -74,6 +74,7 @@ import CostCentre	( CostCentre )
 import BasicTypes	( Arity )
 import Unique		( Unique )
 import Outputable
+import DynFlags		( DynFlags, DynFlag(Opt_DictsCheap), dopt )
 import TysPrim		( alphaTy )	-- Debugging only
 import Util             ( equalLength, lengthAtLeast, foldl2 )
 \end{code}
@@ -432,8 +433,8 @@ exprIsCheap (Case e _ _ alts)       = exprIsCheap e &&
 exprIsCheap (Let (NonRec x _) e)  
       | isUnLiftedType (idType x) = exprIsCheap e
       | otherwise		  = False
-	-- strict lets always have cheap right hand sides, and
-	-- do no allocation.
+	-- strict lets always have cheap right hand sides,
+	-- and do no allocation.
 
 exprIsCheap other_expr 
   = go other_expr 0 True
@@ -448,7 +449,7 @@ exprIsCheap other_expr
 			-- because it certainly doesn't need to be shared!
 	
     go (App f a) n_args args_cheap 
-	| not (isRuntimeArg a) = go f n_args 	  args_cheap
+	| not (isRuntimeArg a) = go f n_args 	   args_cheap
 	| otherwise            = go f (n_args + 1) (exprIsCheap a && args_cheap)
 
     go other   n_args args_cheap = False
@@ -487,7 +488,6 @@ It returns True iff
 	soon, 
 	without raising an exception,
 	without causing a side effect (e.g. writing a mutable variable)
-
 E.G.
 	let x = case y# +# 1# of { r# -> I# r# }
 	in E
@@ -706,7 +706,7 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
 %************************************************************************
 
 \begin{code}
-exprEtaExpandArity :: CoreExpr -> Arity
+exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
 {- The Arity returned is the number of value args the 
    thing can be applied to without doing much work
 
@@ -786,7 +786,7 @@ decopose Int to a function type.   Hence the final case in eta_expand.
 -}
 
 
-exprEtaExpandArity e = arityDepth (arityType e)
+exprEtaExpandArity dflags e = arityDepth (arityType dflags e)
 
 -- A limited sort of function type
 data ArityType = AFun Bool ArityType	-- True <=> one-shot
@@ -802,17 +802,17 @@ andArityType ATop	    at2		  = ATop
 andArityType (AFun t1 at1)  (AFun t2 at2) = AFun (t1 && t2) (andArityType at1 at2)
 andArityType at1	    at2		  = andArityType at2 at1
 
-arityType :: CoreExpr -> ArityType
+arityType :: DynFlags -> CoreExpr -> ArityType
 	-- (go1 e) = [b1,..,bn]
 	-- means expression can be rewritten \x_b1 -> ... \x_bn -> body
 	-- where bi is True <=> the lambda is one-shot
 
-arityType (Note n e) = arityType e
+arityType dflags (Note n e) = arityType dflags e
 --	Not needed any more: etaExpand is cleverer
---  | ok_note n = arityType e
+--  | ok_note n = arityType dflags e
 --  | otherwise = ATop
 
-arityType (Var v) 
+arityType dflags (Var v) 
   = mk (idArity v) (arg_tys (idType v))
   where
     mk :: Arity -> [Type] -> ArityType
@@ -835,14 +835,15 @@ arityType (Var v)
 	| otherwise				   = []
 
 	-- Lambdas; increase arity
-arityType (Lam x e) | isId x    = AFun (isOneShotBndr x) (arityType e)
-		    | otherwise	= arityType e
+arityType dflags (Lam x e)
+  | isId x    = AFun (isOneShotBndr x) (arityType dflags e)
+  | otherwise = arityType dflags e
 
 	-- Applications; decrease arity
-arityType (App f (Type _)) = arityType f
-arityType (App f a)  	   = case arityType f of
-				AFun one_shot xs | exprIsCheap a -> xs
-				other				 -> ATop
+arityType dflags (App f (Type _)) = arityType dflags f
+arityType dflags (App f a)  	  = case arityType dflags f of
+					AFun one_shot xs | exprIsCheap a -> xs
+					other				 -> ATop
 							   
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
@@ -851,17 +852,40 @@ arityType (App f a)  	   = case arityType f of
 	--  ===>
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
-arityType (Case scrut _ _ alts) = case foldr1 andArityType [arityType rhs | (_,_,rhs) <- alts] of
-				    xs | exprIsCheap scrut	    -> xs
-				    xs@(AFun one_shot _) | one_shot -> AFun True ATop
-				    other	 	  	    -> ATop
+arityType dflags (Case scrut _ _ alts)
+  = case foldr1 andArityType [arityType dflags rhs | (_,_,rhs) <- alts] of
+	xs | exprIsCheap scrut	        -> xs
+	xs@(AFun one_shot _) | one_shot -> AFun True ATop
+	other	 	  	        -> ATop
 
-arityType (Let b e) = case arityType e of
-		        xs		     | all exprIsCheap (rhssOfBind b) -> xs
-		        xs@(AFun one_shot _) | one_shot			      -> AFun True ATop
-			other						      -> ATop
+arityType dflags (Let b e) 
+  = case arityType dflags e of
+	xs		     | cheap_bind b -> xs
+	xs@(AFun one_shot _) | one_shot	    -> AFun True ATop
+	other				    -> ATop
+  where
+    cheap_bind (NonRec b e) = is_cheap (b,e)
+    cheap_bind (Rec prs)    = all is_cheap prs
+    is_cheap (b,e) = (dopt Opt_DictsCheap dflags && isDictId b)
+		   || exprIsCheap e
+	-- If the experimental -fdicts-cheap flag is on, we eta-expand through
+	-- dictionary bindings.  This improves arities. Thereby, it also
+	-- means that full laziness is less prone to floating out the
+	-- application of a function to its dictionary arguments, which
+	-- can thereby lose opportunities for fusion.  Example:
+	-- 	foo :: Ord a => a -> ...
+	--	foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
+	--		-- So foo has arity 1
+	--
+	--	f = \x. foo dInt $ bar x
+	--
+	-- The (foo DInt) is floated out, and makes ineffective a RULE 
+	--	foo (bar x) = ...
+	--
+	-- One could go further and make exprIsCheap reply True to any
+	-- dictionary-typed expression, but that's more work.
 
-arityType other = ATop
+arityType dflags other = ATop
 
 {- NOT NEEDED ANY MORE: etaExpand is cleverer
 ok_note InlineMe = False

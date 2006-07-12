@@ -168,6 +168,7 @@ data DynFlag
    | Opt_DoEtaReduction
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
+   | Opt_DictsCheap
 
    -- misc opts
    | Opt_Cpp
@@ -1007,6 +1008,7 @@ fFlags = [
   ( "do-eta-reduction",			Opt_DoEtaReduction ),
   ( "case-merge",			Opt_CaseMerge ),
   ( "unbox-strict-fields",		Opt_UnboxStrictFields ),
+  ( "dicts-cheap",			Opt_DictsCheap ),
   ( "excess-precision",			Opt_ExcessPrecision ),
   ( "asm-mangling",			Opt_DoAsmMangling )
   ]

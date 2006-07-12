@@ -25,7 +25,7 @@ module SimplUtils (
 
 import SimplEnv
 import DynFlags		( SimplifierSwitch(..), SimplifierMode(..),
-			  DynFlag(..), dopt )
+			  DynFlags, DynFlag(..), dopt )
 import StaticFlags	( opt_UF_UpdateInPlace, opt_SimplNoPreInlining,
 			  opt_RulesOff )
 import CoreSyn
@@ -818,7 +818,7 @@ mkLam env bndrs body cont
 
    | dopt Opt_DoLambdaEtaExpansion dflags,
      any isRuntimeVar bndrs
-   = tryEtaExpansion body		`thenSmpl` \ body' ->
+   = tryEtaExpansion dflags body	`thenSmpl` \ body' ->
      returnSmpl (emptyFloats env, mkLams bndrs body')
 
 {-	Sept 01: I'm experimenting with getting the
@@ -901,13 +901,13 @@ when computing arity; and etaExpand adds the coerces as necessary when
 actually computing the expansion.
 
 \begin{code}
-tryEtaExpansion :: OutExpr -> SimplM OutExpr
+tryEtaExpansion :: DynFlags -> OutExpr -> SimplM OutExpr
 -- There is at least one runtime binder in the binders
-tryEtaExpansion body
+tryEtaExpansion dflags body
   = getUniquesSmpl 			`thenSmpl` \ us ->
     returnSmpl (etaExpand fun_arity us body (exprType body))
   where
-    fun_arity = exprEtaExpandArity body
+    fun_arity = exprEtaExpandArity dflags body
 \end{code}
 
 
