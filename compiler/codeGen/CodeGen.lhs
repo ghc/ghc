@@ -35,21 +35,21 @@ import CLabel
 import Cmm
 import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
 import PprCmm		( pprCmms )
-import MachOp		( wordRep, MachHint(..) )
+import MachOp		( wordRep )
 
 import StgSyn
-import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN, pREL_TOP_HANDLER )
+import PrelNames	( gHC_PRIM, rOOT_MAIN, pREL_TOP_HANDLER )
 import Packages		( HomeModules )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_SccProfilingOn )
 
-import HscTypes		( ForeignStubs(..), TypeEnv, typeEnvTyCons )
+import HscTypes		( ForeignStubs(..) )
 import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
 import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
 import OccName		( mkLocalOcc )
 import TyCon            ( TyCon )
-import Module		( Module, mkModule )
+import Module		( Module )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
 

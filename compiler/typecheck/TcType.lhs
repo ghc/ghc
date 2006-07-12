@@ -814,8 +814,8 @@ mkDictTy clas tys = mkPredTy (ClassP clas tys)
 
 isDictTy :: Type -> Bool
 isDictTy ty | Just ty' <- tcView ty = isDictTy ty'
-isDictTy (PredTy p)   = isClassPred p
-isDictTy other		= False
+isDictTy (PredTy p) = isClassPred p
+isDictTy other	    = False
 \end{code}
 
 --------------------- Implicit parameters ---------------------------------
