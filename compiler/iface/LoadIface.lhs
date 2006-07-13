@@ -338,7 +338,8 @@ ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
 ifaceDeclSubBndrs IfaceClass { ifCtxt = sc_ctxt, 
                                ifName = cls_occ, 
                                ifSigs = sigs }
-  = [tc_occ, dc_occ, dcww_occ] ++
+  = co_occs ++
+    [tc_occ, dc_occ, dcww_occ] ++
     [op | IfaceClassOp op _ _ <- sigs] ++
     [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] 
   where
@@ -346,6 +347,8 @@ ifaceDeclSubBndrs IfaceClass { ifCtxt = sc_ctxt,
     n_sigs = length sigs
     tc_occ  = mkClassTyConOcc cls_occ
     dc_occ  = mkClassDataConOcc cls_occ	
+    co_occs | is_newtype = [mkNewTyCoOcc tc_occ]
+	    | otherwise  = []
     dcww_occ | is_newtype = mkDataConWrapperOcc dc_occ	-- Newtypes have wrapper but no worker
 	     | otherwise  = mkDataConWorkerOcc dc_occ	-- Otherwise worker but no wrapper
     is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
