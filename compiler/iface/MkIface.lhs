@@ -482,7 +482,9 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 
     -------------------
     -- Adding version info
-    new_version     = bumpVersion old_mod_vers
+    new_version = bumpVersion old_mod_vers	-- Start from the old module version, not from zero
+						-- so that if you remove f, and then add it again,
+						-- you don't thereby reduce f's version number
     add_vers decl | occ `elemOccSet` changed_occs = new_version
 		  | otherwise = expectJust "add_vers" (old_decl_vers occ)
 				-- If it's unchanged, there jolly well 

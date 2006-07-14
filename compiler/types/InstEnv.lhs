@@ -108,7 +108,7 @@ data Instance
 --		This is used for versioning; the instance decl is
 --		considered part of the defn of n when computing versions
 --
---    Nothing 	The head mentions nothing defined in this modle
+--    Nothing 	The head mentions nothing defined in this module
 --
 -- If a module contains any orphans, then its interface file is read 
 -- regardless, so that its instances are not missed. 
@@ -240,6 +240,7 @@ data OverlapFlag
 		-- Without the Incoherent flag, we'd complain that
 		-- instantiating 'b' would change which instance 
 		-- was chosen
+  deriving( Eq )
 
 instance Outputable OverlapFlag where
    ppr NoOverlap  = empty

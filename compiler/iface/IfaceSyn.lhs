@@ -800,7 +800,7 @@ eqWith :: [IfaceTvBndr] -> [IfaceTvBndr] -> (EqEnv -> IfaceEq) -> IfaceEq
 eqWith = eq_ifTvBndrs emptyEqEnv
 
 -----------------------
-eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2)
+eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2 && ifOFlag d1 == ifOFlag d2)
 -- All other changes are handled via the version info on the dfun
 
 eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1 o1)
