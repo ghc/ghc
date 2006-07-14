@@ -540,6 +540,7 @@ isIndirect other        = False
 %************************************************************************
 
 \begin{code}
+mkSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkPhiTy theta tau)
 
 mkPhiTy :: [PredType] -> Type -> Type
@@ -620,15 +621,15 @@ tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
 tcIsForAllTy (ForAllTy tv ty) = True
 tcIsForAllTy t		      = False
 
-tcSplitPhiTy :: Type -> ([PredType], Type)
+tcSplitPhiTy :: Type -> (ThetaType, Type)
 tcSplitPhiTy ty = split ty ty []
  where
   split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
-  split orig_ty (FunTy arg res) ts = case tcSplitPredTy_maybe arg of
-					Just p  -> split res res (p:ts)
-					Nothing -> (reverse ts, orig_ty)
+  split orig_ty (FunTy arg res) ts 
+	| Just p <- tcSplitPredTy_maybe arg = split res res (p:ts)
   split orig_ty ty		ts = (reverse ts, orig_ty)
 
+tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
 			(tvs, rho) -> case tcSplitPhiTy rho of
 					(theta, tau) -> (tvs, theta, tau)
