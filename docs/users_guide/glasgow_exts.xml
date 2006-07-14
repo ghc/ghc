@@ -2107,7 +2107,9 @@ can be modified by two flags: <option>-fallow-overlapping-instances</option>
 </primary></indexterm> 
 and <option>-fallow-incoherent-instances</option>
 <indexterm><primary>-fallow-incoherent-instances
-</primary></indexterm>, as this section discusses.</para>
+</primary></indexterm>, as this section discusses.  Both these
+flags are dynamic flags, and can be set on a per-module basis, using 
+an <literal>OPTIONS_GHC</literal> pragma if desired (<xref linkend="source-file-options"/>).</para>
 <para>
 When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
 it tries to match every instance declaration against the
