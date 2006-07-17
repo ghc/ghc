@@ -523,7 +523,7 @@ runCommand c = ghciHandle handler (doCommand c)
 runCommandEval c = ghciHandle handleEval (doCommand c)
   where 
     handleEval (ExitException code) = io (exitWith code)
-    handleEval e                    = do showException e
+    handleEval e                    = do handler e
 				         io (exitWith (ExitFailure 1))
 
     doCommand (':' : command) = specialCommand command
