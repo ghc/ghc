@@ -395,12 +395,12 @@ getMBlocks(nat n)
      }
   }
 
-  if (((W_)ret & MBLOCK_MASK) != 0) {
-    barf("getMBlocks: misaligned block returned");
-  }
-
   if (ret == (void*)-1) {
      barf("getMBlocks: unknown memory allocation failure on Win32.");
+  }
+
+  if (((W_)ret & MBLOCK_MASK) != 0) {
+    barf("getMBlocks: misaligned block returned");
   }
 
   debugTrace(DEBUG_gc, "allocated %d megablock(s) at 0x%x",n,(nat)ret);
