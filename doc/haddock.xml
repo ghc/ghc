@@ -42,7 +42,7 @@
 	code.</para>
       </listitem>
       <listitem>
-	<para>There is s tremendous amount of useful API documentation
+	<para>There is a tremendous amount of useful API documentation
 	that can be extracted from just the bare source code,
 	including types of exported functions, definitions of data
 	types and classes, and so on.  Haddock can therefore generate
@@ -106,17 +106,13 @@
       from its <ulink url="http://www.haskell.org/haddock/">web
       site</ulink>.</para>
 
-      <para>Up-to-date sources can also be obtained from CVS.  The
-      Haddock sources are under <literal>fptools/haddock</literal> in
-      the <literal>fptools</literal> CVS repository, which also
-      contains GHC, Happy, and several other projects.  See <ulink
-      url="http://www.haskell.org/ghc/docs/latest/html/building/sec-cvs.html">Using
-      The CVS Repository</ulink> for information on how to access the
-      CVS repository.  Note that you need to check out the
-      <literal>fpconfig</literal> module first to get the generic
-      build system (the <literal>fptools</literal> directory), and
-      then check out <literal>fptools/haddock</literal> to get the
-      Haddock sources.</para>
+      <para>Up-to-date sources can also be obtained from our public
+      darcs repository.  The Haddock sources are at
+      <literal>http://darcs.haskell.org/haddock</literal>.  The same
+      server also has separate repositories for GHC, Happy, and many
+      other projects.  See
+      <ulink url="http://www.darcs.net/">darcs.net</ulink> for more
+      information on the darcs version control utility.</para>
     </section>
 
     <section id="license">
