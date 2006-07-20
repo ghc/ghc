@@ -536,6 +536,11 @@
 	  replace it with a character <replaceable>c</replaceable> use
 	  <literal>%{MODULE/./<replaceable>c</replaceable>}</literal>.</para>
 
+          <para>One example of a tool that can generate syntax-highlighted
+          HTML from your source code, complete with anchors suitable for use
+          from haddock, is
+          <ulink url="http://www.cs.york.ac.uk/fp/darcs/hscolour">hscolour</ulink>.</para>
+
 	</listitem>
       </varlistentry>
 
