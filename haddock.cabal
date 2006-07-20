@@ -68,17 +68,13 @@ other-modules:
 	HaddockHH2
 	HaddockHoogle
 	HaddockHtml
-	HaddockLex2
 	HaddockModuleTree
-	HaddockParse2
 	HaddockRename
 	HaddockTypes
 	HaddockUtil
 	HaddockVersion
 	HsLexer
 	HsParseMonad
-	HsParseUtils
-	HsParser
 	HsSyn2
 	Html
 	Main

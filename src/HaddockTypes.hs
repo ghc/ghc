@@ -83,7 +83,7 @@ data DocOption
   | OptIgnoreExports	-- pretend everything is exported
   | OptNotHome		-- not the best place to get docs for things
 		 	-- exported by this module.
-  deriving (Eq)
+  deriving (Eq, Show)
 
 data ExportItem 
   = ExportDecl

@@ -18,7 +18,6 @@ import Set
 import Paths_haddock	( getDataDir )
 import Binary2
 import Digraph2
-import HsParser
 import HsParseMonad
 
 import Control.Exception ( bracket )
@@ -56,6 +55,7 @@ import SrcLoc
 import qualified Digraph as Digraph
 import Name
 import Module (moduleString)-- TODO: add an export to GHC API? 
+import qualified DynFlags as DynFlags
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
@@ -275,7 +275,7 @@ run flags files = do
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
     ppHtmlHelpFiles title package visible_read_ifaces odir maybe_html_help_format pkg_paths
 
-  GHC.init (Just "/home/davve/dev/lib/ghc-6.5.20060608")
+  GHC.init (Just "/home/davve/dev/local/lib/ghc-6.5")
   let ghcMode = GHC.JustTypecheck
   session <- GHC.newSession ghcMode
   ghcFlags <- GHC.getSessionDynFlags session
@@ -284,9 +284,10 @@ run flags files = do
   let haddockGhcFlags = [ f | Flag_GHCFlag f <- flags ] 
   (ghcFlags'', rest) <- GHC.parseDynamicFlags ghcFlags' haddockGhcFlags 
   when (not (null rest)) (die $ "The following flags are not GHC flags: " ++ pprList rest ++ "\n")
+  let ghcFlags''' = DynFlags.dopt_set ghcFlags'' DynFlags.Opt_Haddock 
 
-  sorted_checked_modules <- GHC.defaultErrorHandler ghcFlags'' $ do 
-    GHC.setSessionDynFlags session ghcFlags''
+  sorted_checked_modules <- GHC.defaultErrorHandler ghcFlags''' $ do 
+    GHC.setSessionDynFlags session ghcFlags'''
     targets <- mapM (\s -> GHC.guessTarget s Nothing) files
     GHC.setTargets session targets
   
@@ -295,7 +296,7 @@ run flags files = do
       Just module_graph -> return module_graph 
       Nothing -> die "Failed to load modules\n"
     let sorted_modules = concatMap Digraph.flattenSCC (GHC.topSortModuleGraph False module_graph Nothing) 
-    let modules = [ GHC.ms_mod modsum | modsum <- sorted_modules, GHC.ms_hspp_file modsum `elem` files ]
+    let modules = [ GHC.ms_mod modsum | modsum <- sorted_modules ]
     mb_checked_modules <- mapM (GHC.checkModule session) modules
     let checked_modules = catMaybes mb_checked_modules
     if length checked_modules /= length mb_checked_modules
@@ -439,6 +440,8 @@ run flags files = do
                           | otherwise = die "Missing checked module phase information\n" 
       where modules' = [ (mod, (a,b,c,d)) | (mod, GHC.CheckedModule a (Just b) (Just c) (Just d)) <- modules ] 
 
+print_ x = printSDoc (ppr x) defaultUserStyle        
+
 instance Outputable ExportItem2 where
   ppr (ExportDecl2 n decl instns) = text "ExportDecl" <+> ppr n <+> ppr decl <+> text (show instns)
   ppr (ExportNoDecl2 n1 n2 ns) = text "ExportNoDecl (org name, link name, sub names)" <+> ppr n1 <+> ppr n2 <+> ppr ns
@@ -481,6 +484,7 @@ pass1 modules flags = worker modules (Map.empty) flags
           (mb_doc_opts, haddock_mod_info, mb_mod_doc) = get_module_stuff parsed_source
 
       opts <- mk_doc_opts mb_doc_opts
+      tell [show mb_doc_opts]
 
       let exported_names = GHC.modInfoExports module_info
           (group, _, mb_exports) = renamed_source  
@@ -589,7 +593,7 @@ updateHTMLXRefs paths ifaces_s =
 	    | (fpath, ifaces) <- zip paths ifaces_s,
 	      iface <- ifaces
 	    ]
-
+{-
 parse_file :: FilePath -> IO HsModule
 parse_file file = do
   bracket 
@@ -600,7 +604,7 @@ parse_file file = do
 	        Ok _ e -> return e
 	        Failed err -> die (file ++ ':':err ++ "\n")
     )
-
+-}
 {-
 getPrologue :: [Flag] -> IO (Maybe Doc)
 getPrologue flags

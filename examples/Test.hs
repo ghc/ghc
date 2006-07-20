@@ -101,6 +101,9 @@ module Test (
 
 import Hidden
 import Visible
+import Data.Maybe
+
+bla = Nothing
 
 --hej = visible
 
