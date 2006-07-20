@@ -7,6 +7,20 @@ that will help get you started right away, and point you in the
 direction of more comprehensive documentation for later.
 
 
+Getting the sources
+-------------------
+
+First get the GHC darcs repository:
+
+   $ darcs get http://darcs.haskell.org/ghc/
+
+Then run the darcs-all shell script in that repository 
+to get the other repositories:
+
+   $ cd ghc
+   $ sh darcs-all
+
+
 Setting up your build
 ---------------------
 

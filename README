@@ -13,6 +13,20 @@ Information for developers of GHC can be found here:
   http://hackage.haskell.org/trac/ghc/
 
 
+Getting the Source
+==================
+
+First get the GHC darcs repository:
+
+   $ darcs get http://darcs.haskell.org/ghc/
+
+Then run the darcs-all shell script in that repository 
+to get the other repositories:
+
+   $ cd ghc
+   $ sh darcs-all
+
+
 Building & Installing
 =====================
 
