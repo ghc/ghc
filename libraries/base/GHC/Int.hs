@@ -105,7 +105,7 @@ instance Bounded Int8 where
 
 instance Ix Int8 where
     range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
     inRange (m,n) i          = m <= i && i <= n
 
 instance Read Int8 where
@@ -210,7 +210,7 @@ instance Bounded Int16 where
 
 instance Ix Int16 where
     range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
     inRange (m,n) i          = m <= i && i <= n
 
 instance Read Int16 where
@@ -507,7 +507,7 @@ instance Bounded Int32 where
 
 instance Ix Int32 where
     range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
     inRange (m,n) i          = m <= i && i <= n
 
 ------------------------------------------------------------------------
@@ -777,5 +777,5 @@ instance Bounded Int64 where
 
 instance Ix Int64 where
     range (m,n)              = [m..n]
-    unsafeIndex b@(m,_) i    = fromIntegral (i - m)
+    unsafeIndex b@(m,_) i    = fromIntegral i - fromIntegral m
     inRange (m,n) i          = m <= i && i <= n
