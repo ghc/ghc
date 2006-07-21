@@ -617,7 +617,7 @@ clunky env var1 var1 = case lookup env var1 of
     Nothing -&gt; fail
     Just val2 -&gt; val1 + val2
 where
-  fail = val1 + val2
+  fail = var1 + var2
 </programlisting>
 
 <para>
