@@ -41,7 +41,7 @@ import Outputable
 import SrcLoc		( Located(..) )
 import Maybes		( isJust, catMaybes, orElse )
 import Bag		( bagToList )
-import BasicTypes	( Activation(..), InlineSpec(..), isAlwaysActive, defaultInlineSpec )
+import BasicTypes	( Activation(..), InlineSpec(..), isAlwaysActive )
 import Monad		( foldM )
 import FastString	( mkFastString )
 import List		( (\\) )
@@ -99,17 +99,40 @@ dsHsBind auto_scc rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = t
     mappM (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)
 
-	-- Common special case: no type or dictionary abstraction
-	-- For the (rare) case when there are some mixed-up
-	-- dictionary bindings (for which a Rec is convenient)
-	-- we reply on the enclosing dsBind to wrap a Rec around.
+-- Note [Rules and inlining]
+-- Common special case: no type or dictionary abstraction
+-- This is a bit less trivial than you might suppose
+-- The naive way woudl be to desguar to something like
+--	f_lcl = ...f_lcl...	-- The "binds" from AbsBinds
+--	M.f = f_lcl		-- Generated from "exports"
+-- But we don't want that, because if M.f isn't exported,
+-- it'll be inlined unconditionally at every call site (its rhs is 
+-- trivial).  That woudl be ok unless it has RULES, which would 
+-- thereby be completely lost.  Bad, bad, bad.
+--
+-- Instead we want to generate
+--	M.f = ...f_lcl...
+--	f_lcl = M.f
+-- Now all is cool. The RULES are attached to M.f (by SimplCore), 
+-- and f_lcl is rapidly inlined away.
+--
+-- This does not happen in the same way to polymorphic binds,
+-- because they desugar to
+--	M.f = /\a. let f_lcl = ...f_lcl... in f_lcl
+-- Although I'm a bit worried about whether full laziness might
+-- float the f_lcl binding out and then inline M.f at its call site
+
 dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
-  = ds_lhs_binds (addSccs auto_scc exports) binds 	`thenDs` \ core_prs ->
-    let
-	core_prs' = addLocalInlines exports core_prs
-	exports'  = [(global, Var local) | (_, global, local, _) <- exports]
-    in
-    returnDs (core_prs' ++ exports' ++ rest)
+  = do	{ core_prs <- ds_lhs_binds (addSccs auto_scc exports) binds
+	; let env = mkVarEnv [ (lcl_id, (gbl_id, prags)) 
+			     | (_, gbl_id, lcl_id, prags) <- exports]
+	      do_one (lcl_id, rhs) | Just (gbl_id, prags) <- lookupVarEnv env lcl_id
+				   = addInlinePrags prags gbl_id rhs
+				   | otherwise = (lcl_id, rhs)
+	      locals'  = [(lcl_id, Var gbl_id) | (_, gbl_id, lcl_id, _) <- exports]
+	; return (map do_one core_prs ++ locals' ++ rest) }
+		-- No Rec needed here (contrast the other AbsBinds cases)
+		-- because we can rely on the enclosing dsBind to wrap in Rec
 
 	-- Another common case: one exported variable
 	-- Non-recursive bindings come through this way
@@ -128,17 +151,19 @@ dsHsBind auto_scc rest
 	(spec_binds, rules) = unzip (catMaybes mb_specs)
 	global' = addIdSpecialisations global rules
 	rhs'    = mkLams tyvars $ mkLams dicts $ Let core_bind (Var local)
-	inl 	= case [inl | InlinePrag inl <- prags] of
-	    	 	[]      -> defaultInlineSpec 
-	    	 	(inl:_) -> inl
     in
-    returnDs (addInlineInfo inl global' rhs' : spec_binds ++ rest)
+    returnDs (addInlinePrags prags global' rhs' : spec_binds ++ rest)
 
 dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
   = ds_lhs_binds (addSccs auto_scc exports) binds 	`thenDs` \ core_prs ->
      let 
+	add_inline (bndr,rhs) | Just prags <- lookupVarEnv inline_env bndr
+			      = addInlinePrags prags bndr rhs
+			      | otherwise = (bndr,rhs)
+	inline_env = mkVarEnv [(lcl_id, prags) | (_, _, lcl_id, prags) <- exports]
+					   
 	-- Rec because of mixed-up dictionary bindings
-	core_bind = Rec (addLocalInlines exports core_prs)
+	core_bind = Rec (map add_inline core_prs)
 
 	tup_expr      = mkTupleExpr locals
 	tup_ty	      = exprType tup_expr
@@ -308,17 +333,12 @@ simpleSubst subst expr
     go (Case scrut bndr ty alts)    = Case (go scrut) bndr ty 
 					   [(c,bs,go r) | (c,bs,r) <- alts]
 
-addLocalInlines exports core_prs
-  = map add_inline core_prs
-  where
-    add_inline (bndr,rhs) | Just inl <- lookupVarEnv inline_env bndr
-			  = addInlineInfo inl bndr rhs
-			  | otherwise 
-			  = (bndr,rhs)
-    inline_env = mkVarEnv [(mono_id, prag) 
-			  | (_, _, mono_id, prags) <- exports,
-			    InlinePrag prag <- prags]
-					   
+addInlinePrags :: [Prag] -> Id -> CoreExpr -> (Id,CoreExpr)
+addInlinePrags prags bndr rhs
+  = case [inl | InlinePrag inl <- prags] of
+	[]      -> (bndr, rhs)
+	(inl:_) -> addInlineInfo inl bndr rhs
+
 addInlineInfo :: InlineSpec -> Id -> CoreExpr -> (Id,CoreExpr)
 addInlineInfo (Inline phase is_inline) bndr rhs
   = (attach_phase bndr phase, wrap_inline is_inline rhs)
