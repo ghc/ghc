@@ -145,6 +145,7 @@ data DynFlag
    | Opt_AllowUndecidableInstances
    | Opt_AllowIncoherentInstances
    | Opt_MonomorphismRestriction
+   | Opt_MonoPatBinds
    | Opt_GlasgowExts
    | Opt_FFI
    | Opt_PArr			       -- syntactic support for parallel arrays
@@ -392,6 +393,10 @@ defaultDynFlags =
     	    Opt_RecompChecking,
     	    Opt_ReadUserPackageConf,
     
+	    Opt_MonoPatBinds, 	-- Experimentally, I'm making this non-standard
+				-- behaviour the default, to see if anyone notices
+				-- SLPJ July 06
+
     	    Opt_ImplicitPrelude,
     	    Opt_MonomorphismRestriction,
     	    Opt_Strictness,
@@ -992,6 +997,7 @@ fFlags = [
   ( "scoped-type-variables",  		Opt_ScopedTypeVariables ),
   ( "bang-patterns",	  		Opt_BangPatterns ),
   ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
+  ( "mono-pat-binds",			Opt_MonoPatBinds ),
   ( "implicit-params",			Opt_ImplicitParams ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),

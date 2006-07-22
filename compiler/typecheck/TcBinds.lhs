@@ -15,7 +15,8 @@ module TcBinds ( tcLocalBinds, tcTopBinds,
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 
-import DynFlags		( DynFlag(Opt_MonomorphismRestriction, Opt_GlasgowExts) )
+import DynFlags		( dopt, DynFlags,
+			  DynFlag(Opt_MonomorphismRestriction, Opt_MonoPatBinds, Opt_GlasgowExts) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
 			  HsLocalBinds(..), HsValBinds(..), HsIPBinds(..),
 			  LSig, Match(..), IPBind(..), Prag(..),
@@ -363,10 +364,10 @@ tc_poly_binds top_lvl rec_group rec_tc sig_fn prag_fn binds
 		   [poly_id | (_, poly_id, _, _) <- exports]) }	-- Guaranteed zonked
 
     else do	-- The normal lifted case: GENERALISE
-  { is_unres <- isUnRestrictedGroup bind_list sig_fn
+  { dflags <- getDOpts 
   ; (tyvars_to_gen, dict_binds, dict_ids)
 	<- addErrCtxt (genCtxt (bndrNames mono_bind_infos)) $
-	   generalise top_lvl is_unres mono_bind_infos lie_req
+	   generalise dflags top_lvl bind_list sig_fn mono_bind_infos lie_req
 
 	-- FINALISE THE QUANTIFIED TYPE VARIABLES
 	-- The quantified type variables often include meta type variables
@@ -699,11 +700,15 @@ getMonoBindInfo tc_binds
 %************************************************************************
 
 \begin{code}
-generalise :: TopLevelFlag -> Bool 
+generalise :: DynFlags -> TopLevelFlag 
+	   -> [LHsBind Name] -> TcSigFun 
 	   -> [MonoBindInfo] -> [Inst]
 	   -> TcM ([TcTyVar], TcDictBinds, [TcId])
-generalise top_lvl is_unrestricted mono_infos lie_req
-  | not is_unrestricted	-- RESTRICTED CASE
+generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
+  | isMonoGroup dflags bind_list
+  = do { extendLIEs lie_req; return ([], emptyBag, []) }
+
+  | isRestrictedGroup dflags bind_list sig_fn 	-- RESTRICTED CASE
   = 	-- Check signature contexts are empty 
     do	{ checkTc (all is_mono_sig sigs)
 	  	  (restrictedBindCtxtErr bndrs)
@@ -1070,11 +1075,20 @@ tcInstSig use_skols name scoped_names
 		       | otherwise = []
 
 -------------------
-isUnRestrictedGroup :: [LHsBind Name] -> TcSigFun -> TcM Bool
-isUnRestrictedGroup binds sig_fn
-  = do	{ mono_restriction <- doptM Opt_MonomorphismRestriction
-	; return (not mono_restriction || all_unrestricted) }
+isMonoGroup :: DynFlags -> [LHsBind Name] -> Bool
+-- No generalisation at all
+isMonoGroup dflags binds
+  = dopt Opt_MonoPatBinds dflags && any is_pat_bind binds
+  where
+    is_pat_bind (L _ (PatBind {})) = True
+    is_pat_bind other	           = False
+
+-------------------
+isRestrictedGroup :: DynFlags -> [LHsBind Name] -> TcSigFun -> Bool
+isRestrictedGroup dflags binds sig_fn
+  = mono_restriction && not all_unrestricted
   where 
+    mono_restriction = dopt Opt_MonomorphismRestriction dflags
     all_unrestricted = all (unrestricted . unLoc) binds
     has_sig n = isJust (sig_fn n)
 
