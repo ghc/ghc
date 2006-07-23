@@ -145,14 +145,14 @@ addConDocs (x:xs) doc = addConDoc x doc : xs
 
 restrictTo :: [GHC.Name] -> (GHC.HsDecl GHC.Name) -> (GHC.HsDecl GHC.Name)
 restrictTo names decl = case decl of
-  GHC.TyClD d | GHC.isDataDecl d && GHC.tcdND d == GHC.DataType -> 
-    GHC.TyClD (d { GHC.tcdCons = restrictCons names (GHC.tcdCons d) })
-  GHC.TyClD d | GHC.isDataDecl d && GHC.tcdND d == GHC.NewType -> 
+  GHC.TyClD d doc | GHC.isDataDecl d && GHC.tcdND d == GHC.DataType -> 
+    GHC.TyClD (d { GHC.tcdCons = restrictCons names (GHC.tcdCons d) }) doc
+  GHC.TyClD d doc | GHC.isDataDecl d && GHC.tcdND d == GHC.NewType -> 
     case restrictCons names (GHC.tcdCons d) of
-      []    -> GHC.TyClD (d { GHC.tcdND = GHC.DataType, GHC.tcdCons = [] })
-      [con] -> GHC.TyClD (d { GHC.tcdCons = [con] })
-  GHC.TyClD d | GHC.isClassDecl d -> 
-    GHC.TyClD (d { GHC.tcdSigs = restrictDecls names (GHC.tcdSigs d) })   
+      []    -> GHC.TyClD (d { GHC.tcdND = GHC.DataType, GHC.tcdCons = [] }) doc
+      [con] -> GHC.TyClD (d { GHC.tcdCons = [con] }) doc
+  GHC.TyClD d doc | GHC.isClassDecl d -> 
+    GHC.TyClD (d { GHC.tcdSigs = restrictDecls names (GHC.tcdSigs d) }) doc
   _ -> decl
    
 restrictCons :: [GHC.Name] -> [GHC.LConDecl GHC.Name] -> [GHC.LConDecl GHC.Name]

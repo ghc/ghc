@@ -38,7 +38,7 @@ import Foreign.C
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Maybe
-
+import Data.List ( nubBy )
 
 #if __GLASGOW_HASKELL__ >= 603
 import System.Process
@@ -305,7 +305,7 @@ run flags files = do
   
   sorted_checked_modules' <- remove_maybes sorted_checked_modules
 
-{-  let Just (group,_,_) = GHC.renamedSource (snd (head sorted_checked_modules))
+{-  let Just (group,_,_,_) = GHC.renamedSource (snd (head sorted_checked_modules))
   let Just mi = GHC.checkedModuleInfo (snd (head sorted_checked_modules))
   let exported_names = GHC.modInfoExports mi
  
@@ -334,8 +334,8 @@ run flags files = do
   let sub_names = mk_sub_map_from_group group
   putStrLn "Printing the submap:"
   putStrLn "---------------------------------" 
-  printSDoc (ppr (Map.toList sub_names)) defaultUserStyle        
--}
+  printSDoc (ppr (Map.toList sub_names)) defaultUserStyle -}
+
   
   let (export_item_map, messages) = runWriter (pass1 sorted_checked_modules' flags) 
 
@@ -443,11 +443,17 @@ run flags files = do
 print_ x = printSDoc (ppr x) defaultUserStyle        
 
 instance Outputable ExportItem2 where
-  ppr (ExportDecl2 n decl instns) = text "ExportDecl" <+> ppr n <+> ppr decl <+> text (show instns)
+  ppr (ExportDecl2 n decl doc instns) = text "ExportDecl" <+> ppr n <+> ppr decl <+> ppr doc <+> text (show instns)
   ppr (ExportNoDecl2 n1 n2 ns) = text "ExportNoDecl (org name, link name, sub names)" <+> ppr n1 <+> ppr n2 <+> ppr ns
   ppr (ExportGroup2 lev id doc) = text "ExportGroup (lev, id, doc)" <+> ppr lev <+> ppr doc
   ppr (ExportDoc2 doc) = text "ExportDoc" <+> ppr doc
   ppr (ExportModule2 mod) = text "ExportModule" <+> ppr mod 	
+
+
+instance Outputable (GHC.DocEntity GHC.Name) where
+  ppr (GHC.DocEntity d) = ppr d
+  ppr (GHC.DeclEntity name) = ppr name
+
 
 {-  let loop ((mod, checkedMod):modules) module_map = do
         exported_names <- get_exported_names
@@ -480,27 +486,29 @@ pass1 modules flags = worker modules (Map.empty) flags
     worker [] module_map _ = return module_map
     worker ((mod, checked_mod):rest_modules) module_map flags = do
  
-      let (parsed_source, renamed_source, _, module_info) = checked_mod
+      let (parsed_source, renamed_source, _, moduleInfo) = checked_mod
           (mb_doc_opts, haddock_mod_info, mb_mod_doc) = get_module_stuff parsed_source
 
       opts <- mk_doc_opts mb_doc_opts
-      tell [show mb_doc_opts]
 
-      let exported_names = GHC.modInfoExports module_info
-          (group, _, mb_exports) = renamed_source  
-          exported_decl_map = mk_exported_decl_map exported_names group
+      let exportedNames = GHC.modInfoExports moduleInfo 
+          (group, _, mb_exports, doc) = renamed_source
+          entities = nubBy sameName (GHC.hs_docs group)
+          entityNames = getEntityNames entities 
+          exportedDeclMap = mkDeclMap exportedNames group
+          localDeclMap = mkDeclMap entityNames group
           sub_map = mk_sub_map_from_group group
-          decls = recover_decls_from_group group
-          exports = fmap (map unLoc) mb_exports
+          exports = fmap (map unLoc) mb_exports 
           ignore_all_exports = Flag_IgnoreAllExports `elem` flags
-
-      export_items <- mkExportItems module_map mod exported_names
-                                        exported_decl_map sub_map decls opts  
-                                        exports ignore_all_exports 
+          docMap = mkDocMap group
+       
+      export_items <- mkExportItems module_map mod exportedNames
+                                    exportedDeclMap localDeclMap sub_map entities opts  
+                                    exports ignore_all_exports docMap
 
       let haddock_module = HM {
             hmod_options           = opts,
-            hmod_exported_decl_map = exported_decl_map,
+            hmod_exported_decl_map = exportedDeclMap,
             hmod_orig_exports      = export_items,
             hmod_sub_map           = sub_map
           }
@@ -521,7 +529,47 @@ pass1 modules flags = worker modules (Map.empty) flags
                 then OptHide : opts
                 else opts      
           return opts'
-                       
+ 
+sameName (GHC.DocEntity _) _ = False
+sameName (GHC.DeclEntity _) (GHC.DocEntity _) = False
+sameName (GHC.DeclEntity a) (GHC.DeclEntity b) = a == b
+
+mkDocMap :: GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDoc GHC.Name)
+mkDocMap group = Map.fromList $
+  collectDocs (GHC.hs_docs group) ++ collectDocsFromClassMeths (getClasses group)
+  where
+    getClasses group = filter GHC.isClassDecl (map unLoc (GHC.hs_tyclds group))
+    collectDocsFromClassMeths classes = concatMap (collectDocs . GHC.tcdDocs) classes
+          
+collectDocs :: [GHC.DocEntity GHC.Name] -> [(GHC.Name, GHC.HsDoc GHC.Name)]
+collectDocs entities = collect Nothing GHC.DocEmpty entities
+
+collect :: Maybe (GHC.DocEntity GHC.Name) -> GHC.HsDoc GHC.Name -> [GHC.DocEntity GHC.Name] -> [(GHC.Name, GHC.HsDoc GHC.Name)]
+collect d doc_so_far [] =
+   case d of
+        Nothing -> []
+        Just d0  -> finishedDoc d0 doc_so_far []
+
+collect d doc_so_far (e:es) =
+   case e of
+      GHC.DocEntity (GHC.DocCommentNext str) ->
+        case d of
+           Nothing -> collect d (GHC.docAppend doc_so_far str) es
+           Just d0 -> finishedDoc d0 doc_so_far (collect Nothing str es)
+
+      GHC.DocEntity (GHC.DocCommentPrev str) -> collect d (GHC.docAppend doc_so_far str) es
+
+      _other ->
+        case d of
+            Nothing -> collect (Just e) doc_so_far es
+            Just d0 -> finishedDoc d0 doc_so_far
+                           (collect (Just e) GHC.DocEmpty es)
+
+finishedDoc :: GHC.DocEntity GHC.Name -> GHC.HsDoc GHC.Name -> [(GHC.Name, GHC.HsDoc GHC.Name)] -> [(GHC.Name, GHC.HsDoc GHC.Name)]
+finishedDoc d GHC.DocEmpty rest = rest
+finishedDoc (GHC.DeclEntity name) doc rest = (name, doc) : rest
+finishedDoc _ _ rest = rest
+        
 get_all_subnames_from_group :: GHC.HsGroup GHC.Name -> [GHC.Name]
 get_all_subnames_from_group group = 
   concat [ tail (map unLoc (GHC.tyClDeclNames tycld)) | L _ tycld <- GHC.hs_tyclds group ]
@@ -531,23 +579,31 @@ mk_sub_map_from_group group =
   Map.fromList [ (name, subs) | L _ tycld <- GHC.hs_tyclds group,
                  let name:subs = map unLoc (GHC.tyClDeclNames tycld) ]
 
-
 recover_decls_from_group :: GHC.HsGroup GHC.Name -> [GHC.HsDecl GHC.Name]
 recover_decls_from_group group = 
-  map (GHC.SigD    . unLoc) (sigs_from_valds (GHC.hs_valds group)) ++
-  map (GHC.TyClD   . unLoc) (GHC.hs_tyclds group) ++
-  map (GHC.InstD   . unLoc) (GHC.hs_instds group) ++
-  map (GHC.DefD    . unLoc) (GHC.hs_defds  group) ++ 
-  map (GHC.ForD    . unLoc) (GHC.hs_fords  group) ++
-  map (GHC.DeprecD . unLoc) (GHC.hs_depds  group) ++
-  map (GHC.RuleD   . unLoc) (GHC.hs_ruleds group) 
+  map (withDoc    GHC.SigD    . unLoc) (sigs_from_valds (GHC.hs_valds group)) ++
+  map (withDoc    GHC.TyClD   . unLoc) (GHC.hs_tyclds group) ++
+  map (withoutDoc GHC.InstD   . unLoc) (GHC.hs_instds group) ++
+  map (withoutDoc GHC.DefD    . unLoc) (GHC.hs_defds  group) ++ 
+  map (withDoc    GHC.ForD    . unLoc) (GHC.hs_fords  group) ++
+  map (withoutDoc GHC.DeprecD . unLoc) (GHC.hs_depds  group) ++
+  map (withoutDoc GHC.RuleD   . unLoc) (GHC.hs_ruleds group) 
   where 
     sigs_from_valds (GHC.ValBindsOut _ lsigs) = lsigs  
     sigs_from_valds _ = error "recover_decls_from_group: illegal input"
+    withDoc c d = c d Nothing
+--    withDoc c d = case GHC.getMainDeclBinder (c d Nothing) of
+--                    Just name -> c d (find_doc name group)
+--                    Nothing -> c d Nothing
+    withoutDoc c d = c d
 
-mk_exported_decl_map :: [GHC.Name] -> GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDecl GHC.Name) 
-mk_exported_decl_map exported_names group = Map.fromList $ 
- [ (n,d)  | (n,Just d) <- [ (name, getDeclFromGroup group name) | name <- exported_names ] ]
+mkDeclMap :: [GHC.Name] -> GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDecl GHC.Name) 
+mkDeclMap names group = Map.fromList [ (n,d)  | (n,Just d) <- maybeDecls ]
+  where 
+  maybeDecls = [ (name, getDeclFromGroup group name) | name <- names ]
+
+getEntityNames :: [GHC.DocEntity GHC.Name] -> [GHC.Name]
+getEntityNames entities = [ name | GHC.DeclEntity name <- entities ] 
 
 getDeclFromGroup :: GHC.HsGroup GHC.Name -> GHC.Name -> Maybe (GHC.HsDecl GHC.Name)
 getDeclFromGroup group name = case catMaybes [getDeclFromVals  (GHC.hs_valds  group), 
@@ -557,21 +613,21 @@ getDeclFromGroup group name = case catMaybes [getDeclFromVals  (GHC.hs_valds  gr
   _ -> Nothing
   where 
     getDeclFromVals (GHC.ValBindsOut _ lsigs) = case matching of 
-      [lsig] -> Just (GHC.SigD (unLoc lsig))
+      [lsig] -> Just (GHC.SigD (unLoc lsig) Nothing)
       _      -> Nothing
      where 
         matching = [ lsig | lsig <- lsigs, let Just n = GHC.sigName lsig, n == name ]
     getDeclFromVals _ = error "getDeclFromVals: illegal input"
      
     getDeclFromTyCls ltycls = case matching of 
-      [ltycl] -> Just (GHC.TyClD (unLoc ltycl))
+      [ltycl] -> Just (GHC.TyClD (unLoc ltycl) Nothing)
       _       -> Nothing
       where
         matching = [ ltycl | ltycl <- ltycls, 
                      name `elem` map unLoc (GHC.tyClDeclNames (unLoc ltycl))]
  
     getDeclFromFors lfors = case matching of 
-      [for] -> Just (GHC.ForD for)
+      [for] -> Just (GHC.ForD for Nothing)
       _      -> Nothing
       where
         matching = [ for | L _ for <- lfors, forName for == name ]
@@ -584,7 +640,6 @@ parseIfaceOption s =
 	(fpath,',':file) -> (fpath,file)
 	(file, _)        -> ("", file)
 		
-
 updateHTMLXRefs :: [FilePath] -> [[Interface]] -> IO ()
 updateHTMLXRefs paths ifaces_s =
   writeIORef html_xrefs_ref (Map.fromList mapping)
@@ -989,16 +1044,18 @@ mkExportItems
         :: ModuleMap2
 	-> GHC.Module			-- this module
 	-> [GHC.Name]			-- exported names (orig)
-	-> Map GHC.Name (GHC.HsDecl GHC.Name)	-- maps local names to declarations
+        -> Map GHC.Name (GHC.HsDecl GHC.Name) -- maps exported names to declarations
+	-> Map GHC.Name (GHC.HsDecl GHC.Name) -- maps local names to declarations
 	-> Map GHC.Name [GHC.Name]	-- sub-map for this module
-	-> [GHC.HsDecl GHC.Name]			-- decls in the current module
+	-> [GHC.DocEntity GHC.Name]	-- entities in the current module
 	-> [DocOption]
 	-> Maybe [GHC.IE GHC.Name]
 	-> Bool				-- --ignore-all-exports flag
+        -> Map GHC.Name (GHC.HsDoc GHC.Name)
 	-> ErrMsgM [ExportItem2]
 
-mkExportItems mod_map this_mod exported_names decl_map sub_map decls
-              opts maybe_exps ignore_all_exports
+mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_map entities
+              opts maybe_exps ignore_all_exports docMap
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
   | Just specs <- maybe_exps = do 
@@ -1006,7 +1063,7 @@ mkExportItems mod_map this_mod exported_names decl_map sub_map decls
       return (concat exps)
   where
     everything_local_exported =  -- everything exported
-	return (fullContentsOfThisModule this_mod decls)
+      return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
 
     lookupExport (GHC.IEVar x)             = declWith x
     lookupExport (GHC.IEThingAbs t)        = declWith t
@@ -1014,19 +1071,20 @@ mkExportItems mod_map this_mod exported_names decl_map sub_map decls
     lookupExport (GHC.IEThingWith t cs)    = declWith t
     lookupExport (GHC.IEModuleContents m)  = fullContentsOf m
     lookupExport (GHC.IEGroup lev doc)     = return [ ExportGroup2 lev "" doc ]
-    lookupExport (GHC.IEDoc doc)           = return [ ExportDoc2 doc ]
+    lookupExport (GHC.IEDoc doc)           = return [ ExportDoc2 doc ] 
     lookupExport (GHC.IEDocNamed str)
-	= do r <- findNamedDoc str decls
+	= do r <- findNamedDoc str entities
 	     case r of
 		Nothing -> return []
 		Just found -> return [ ExportDoc2 found ]
-
+ 
     -- NOTE: I'm unsure about this. Currently only "External" names are considered.	
     declWith :: GHC.Name -> ErrMsgM [ ExportItem2 ]
     declWith t | not (isExternalName t) = return []
     declWith t
 	| Just decl <- findDecl t
-	= return [ ExportDecl2 t (restrictTo subs (extractDecl t mdl decl)) [] ]
+	= let maybeDoc = Map.lookup t docMap in
+          return [ ExportDecl2 t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
 	| otherwise
 	= return [ ExportNoDecl2 t t subs ]
 	-- can't find the decl (it might be from another package), but let's
@@ -1039,8 +1097,8 @@ mkExportItems mod_map this_mod exported_names decl_map sub_map decls
               all_subs | mdl == this_mod = Map.findWithDefault [] t sub_map
 		       | otherwise       = all_subs_of_qname mod_map t
 
-    fullContentsOf m
-	| m == this_mod = return (fullContentsOfThisModule this_mod decls)
+    fullContentsOf m  
+	| m == this_mod = return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
 	| otherwise = 
 	   case Map.lookup m mod_map of
 	     Just hmod
@@ -1052,7 +1110,7 @@ mkExportItems mod_map this_mod exported_names decl_map sub_map decls
     findDecl :: GHC.Name -> Maybe (GHC.HsDecl GHC.Name)
     findDecl n | not (isExternalName n) = Nothing
     findDecl n 
-	| m == this_mod = Map.lookup n decl_map
+	| m == this_mod = Map.lookup n exportedDeclMap
 	| otherwise = 
 	   case Map.lookup m mod_map of
 		Just hmod -> Map.lookup n (hmod_exported_decl_map hmod)
@@ -1060,19 +1118,14 @@ mkExportItems mod_map this_mod exported_names decl_map sub_map decls
       where
         m = nameModule n
 
-fullContentsOfThisModule :: GHC.Module -> [GHC.HsDecl GHC.Name] -> [ExportItem2]
-fullContentsOfThisModule mdl decls = 
-  map mkExportItem (filter keepDecl decls)
-  where mkExportItem (GHC.DocD (GHC.DocGroup lev doc)) = ExportGroup2 lev "" doc
-	mkExportItem decl = ExportDecl2 x decl [] -- NOTE: will this work? is x qualified correctly?
-	     where Just x = GHC.getMainDeclBinder decl
-
-keepDecl :: GHC.HsDecl GHC.Name -> Bool
-keepDecl (GHC.SigD _)                       = True
-keepDecl (GHC.TyClD _)                      = True
-keepDecl (GHC.DocD _)                       = True
-keepDecl (GHC.ForD (GHC.ForeignImport _ _ _ _)) = True
-keepDecl _                              = False
+fullContentsOfThisModule :: GHC.Module -> [GHC.DocEntity GHC.Name] -> Map GHC.Name (GHC.HsDecl GHC.Name) ->
+                            Map GHC.Name (GHC.HsDoc GHC.Name) -> [ExportItem2]
+fullContentsOfThisModule module_ entities declMap docMap = map mkExportItem entities
+  where 
+    mkExportItem (GHC.DocEntity (GHC.DocGroup lev doc)) = ExportGroup2 lev "" doc
+    mkExportItem (GHC.DeclEntity name) = case Map.lookup name declMap of 
+      Just decl -> let maybe_doc = Map.lookup name docMap in ExportDecl2 name decl maybe_doc []
+      Nothing -> error "fullContentsOfThisModule: This shouldn't happen"
 
 {-
 --< -----------------------------------------------------------------------------
@@ -1184,22 +1237,23 @@ keepDecl _ = False
 -- cases we have to extract the required declaration (and somehow cobble 
 -- together a type signature for it...)
 -- We put noSrcSpan everywhere in the cobbled together type signatures since
--- they aren't actually located in the soure code.
+-- they're not actually located in the source code.
  
 extractDecl :: GHC.Name -> GHC.Module -> GHC.HsDecl GHC.Name -> GHC.HsDecl GHC.Name
 extractDecl name mdl decl
   | Just n <- GHC.getMainDeclBinder decl, n == name = decl
   | otherwise  =  
     case decl of
-      GHC.TyClD d | GHC.isClassDecl d -> 
-        let matching_sigs = [ sig | sig <- GHC.tcdSigs d, GHC.sigName sig == Just name ] 
-        in case matching_sigs of 
+      GHC.TyClD d _ | GHC.isClassDecl d -> 
+        let matches = [ sig | sig <- GHC.tcdSigs d, GHC.sigName sig == Just name ] 
+        in case matches of 
           [s0] -> let (n, tyvar_names) = name_and_tyvars d
-                  in GHC.SigD (extractClassDecl n mdl tyvar_names s0)
+                  in GHC.SigD (extractClassDecl n mdl tyvar_names s0) Nothing
           _ -> error "internal: extractDecl" 
-      GHC.TyClD d | GHC.isDataDecl d -> 
+      GHC.TyClD d _ | GHC.isDataDecl d -> 
         let (n, tyvar_names) = name_and_tyvars d
-        in GHC.SigD (extractRecSel name mdl n tyvar_names (GHC.tcdCons d))
+            sig = extractRecSel name mdl n tyvar_names (GHC.tcdCons d)
+        in GHC.SigD sig Nothing 
       _ -> error "internal: extractDecl"
   where
     name_and_tyvars d = (unLoc (GHC.tcdLName d), GHC.hsLTyVarLocNames (GHC.tcdTyVars d))
@@ -1543,7 +1597,7 @@ expandDecl d = [ d ]
 
 -----------------------------------------------------------------------------
 -- Collecting documentation and attach it to the right declarations
-
+{-
 collectDoc :: [HsDecl] -> [HsDecl]
 collectDoc decls = collect Nothing DocEmpty decls
 
@@ -1593,16 +1647,18 @@ collectInDecl (HsClassDecl loc ctxt n tvs fds meths doc)
   = HsClassDecl loc ctxt n tvs fds (collect Nothing DocEmpty meths) doc
 collectInDecl decl
   = decl
-
+-}
 -- -----------------------------------------------------------------------------
 -- Named documentation
 
-findNamedDoc :: String -> [GHC.HsDecl GHC.Name] -> ErrMsgM (Maybe (GHC.HsDoc GHC.Name))
-findNamedDoc name decls = search decls
+-- TODO: work out this stuff 
+
+findNamedDoc :: String -> [GHC.DocEntity GHC.Name] -> ErrMsgM (Maybe (GHC.HsDoc GHC.Name))
+findNamedDoc name entities = search entities 
 	where search [] = do
 		tell ["Cannot find documentation for: $" ++ name]
 		return Nothing
-	      search ((GHC.DocD (GHC.DocCommentNamed name' doc)):rest) 
+	      search ((GHC.DocEntity (GHC.DocCommentNamed name' doc)):rest) 
 			| name == name' = return (Just doc)
 		   	| otherwise = search rest
 	      search (_other_decl : rest) = search rest

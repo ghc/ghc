@@ -111,7 +111,8 @@ data ExportItem
 data ExportItem2 
   = ExportDecl2
 	GHC.Name	      -- the original name
-	(GHC.HsDecl GHC.Name) -- a declaration (with doc annotations)
+	(GHC.HsDecl GHC.Name) -- a declaration
+        (Maybe (GHC.HsDoc GHC.Name))       -- maybe a doc comment
 	[InstHead]	      -- instances relevant to this declaration
 
   | ExportNoDecl2	-- an exported entity for which we have no documentation
