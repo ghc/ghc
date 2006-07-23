@@ -454,30 +454,16 @@ instance Outputable (GHC.DocEntity GHC.Name) where
   ppr (GHC.DocEntity d) = ppr d
   ppr (GHC.DeclEntity name) = ppr name
 
-
-{-  let loop ((mod, checkedMod):modules) module_map = do
-        exported_names <- get_exported_names
-        binding_group  <- get_binding_group 
-        let exported_decls_map = mk_exported_decls_map exported_names binding_group
-        let exported_decls = Map.elems exported_decls_map
-
-        mkExportItems module_map mod exported_names exported_decls_map
-        where 
-          get_binding_group = case GHC.renamedSource checkedMod of
-            Just (group, _, _) -> group
-            Nothing            -> die "Failed to get renamed source"
-          get_module_info = case GHC.checkedModuleInfo checkedMod of 
-            Just mi -> return mi
-            Nothing -> die "Failed to get checkedModuleInfo"
-          get_exported_names = do
-            module_info <- get_module_info  
-            return (GHC.modInfoExports module_info)     
--}          
-
 type FullyCheckedModule = (GHC.ParsedSource, 
                            GHC.RenamedSource, 
                            GHC.TypecheckedSource, 
                            GHC.ModuleInfo)
+
+getDocumentedExports :: [ExportItem2] -> [GHC.Name]
+getDocumentedExports exports = concatMap getName exports
+  where
+  getName (ExportDecl2 name _ _ _) = [name]
+  getName _ = [] 
 
 pass1 :: [(GHC.Module, FullyCheckedModule)] -> [Flag] -> ErrMsgM ModuleMap2
 pass1 modules flags = worker modules (Map.empty) flags
@@ -507,10 +493,12 @@ pass1 modules flags = worker modules (Map.empty) flags
                                     exports ignore_all_exports docMap
 
       let haddock_module = HM {
-            hmod_options           = opts,
-            hmod_exported_decl_map = exportedDeclMap,
-            hmod_orig_exports      = export_items,
-            hmod_sub_map           = sub_map
+            hmod_options            = opts,
+            hmod_exported_decl_map  = exportedDeclMap,
+            hmod_doc_map            = docMap,
+            hmod_orig_exports       = export_items,
+            hmod_sub_map            = sub_map,
+            hmod_documented_exports = getDocumentedExports export_items
           }
 
       let module_map' = Map.insert mod haddock_module module_map
@@ -578,24 +566,6 @@ mk_sub_map_from_group :: GHC.HsGroup GHC.Name -> Map GHC.Name [GHC.Name]
 mk_sub_map_from_group group =  
   Map.fromList [ (name, subs) | L _ tycld <- GHC.hs_tyclds group,
                  let name:subs = map unLoc (GHC.tyClDeclNames tycld) ]
-
-recover_decls_from_group :: GHC.HsGroup GHC.Name -> [GHC.HsDecl GHC.Name]
-recover_decls_from_group group = 
-  map (withDoc    GHC.SigD    . unLoc) (sigs_from_valds (GHC.hs_valds group)) ++
-  map (withDoc    GHC.TyClD   . unLoc) (GHC.hs_tyclds group) ++
-  map (withoutDoc GHC.InstD   . unLoc) (GHC.hs_instds group) ++
-  map (withoutDoc GHC.DefD    . unLoc) (GHC.hs_defds  group) ++ 
-  map (withDoc    GHC.ForD    . unLoc) (GHC.hs_fords  group) ++
-  map (withoutDoc GHC.DeprecD . unLoc) (GHC.hs_depds  group) ++
-  map (withoutDoc GHC.RuleD   . unLoc) (GHC.hs_ruleds group) 
-  where 
-    sigs_from_valds (GHC.ValBindsOut _ lsigs) = lsigs  
-    sigs_from_valds _ = error "recover_decls_from_group: illegal input"
-    withDoc c d = c d Nothing
---    withDoc c d = case GHC.getMainDeclBinder (c d Nothing) of
---                    Just name -> c d (find_doc name group)
---                    Nothing -> c d Nothing
-    withoutDoc c d = c d
 
 mkDeclMap :: [GHC.Name] -> GHC.HsGroup GHC.Name -> Map GHC.Name (GHC.HsDecl GHC.Name) 
 mkDeclMap names group = Map.fromList [ (n,d)  | (n,Just d) <- maybeDecls ]
@@ -1082,9 +1052,8 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
     declWith :: GHC.Name -> ErrMsgM [ ExportItem2 ]
     declWith t | not (isExternalName t) = return []
     declWith t
-	| Just decl <- findDecl t
-	= let maybeDoc = Map.lookup t docMap in
-          return [ ExportDecl2 t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
+	| (Just decl, maybeDoc) <- findDecl t
+        = return [ ExportDecl2 t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
 	| otherwise
 	= return [ ExportNoDecl2 t t subs ]
 	-- can't find the decl (it might be from another package), but let's
@@ -1107,14 +1076,15 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
 		| otherwise -> return [ ExportModule2 m ]
 	     Nothing -> return [] -- already emitted a warning in exportedNames
 
-    findDecl :: GHC.Name -> Maybe (GHC.HsDecl GHC.Name)
-    findDecl n | not (isExternalName n) = Nothing
+    findDecl :: GHC.Name -> (Maybe (GHC.HsDecl GHC.Name), Maybe (GHC.HsDoc GHC.Name))
+    findDecl n | not (isExternalName n) = error "This shouldn't happen"
     findDecl n 
-	| m == this_mod = Map.lookup n exportedDeclMap
+	| m == this_mod = (Map.lookup n exportedDeclMap, Map.lookup n docMap)
 	| otherwise = 
 	   case Map.lookup m mod_map of
-		Just hmod -> Map.lookup n (hmod_exported_decl_map hmod)
-		Nothing -> Nothing
+		Just hmod -> (Map.lookup n (hmod_exported_decl_map hmod), 
+                              Map.lookup n (hmod_doc_map hmod))
+		Nothing -> (Nothing, Nothing)
       where
         m = nameModule n
 
