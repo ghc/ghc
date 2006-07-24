@@ -107,7 +107,6 @@ void	regfree (regex_t *);
 
 #ifdef __cplusplus
 }
-extern "C" {
 #endif
 
 #endif /* !_REGEX_H_ */
