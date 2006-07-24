@@ -56,9 +56,9 @@ import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCo
 import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, isVanillaDataCon )
 import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
-import OccName		( OccName, OccEnv, emptyOccEnv, 
-			  lookupOccEnv, extendOccEnv, parenSymOcc,
+import OccName		( OccName, parenSymOcc, occNameFS,
 			  OccSet, unionOccSets, unitOccSet )
+import UniqFM           ( UniqFM, emptyUFM, addToUFM, lookupUFM )
 import Name		( Name, NamedThing(..), nameOccName, isExternalName )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
@@ -109,7 +109,7 @@ data IfaceDecl
   | IfaceClass { ifCtxt    :: IfaceContext, 	-- Context...
 		 ifName    :: OccName,		-- Name of the class
 		 ifTyVars  :: [IfaceTvBndr],	-- Type variables
-		 ifFDs     :: [FunDep OccName],	-- Functional dependencies
+		 ifFDs     :: [FunDep FastString], -- Functional dependencies
 		 ifSigs    :: [IfaceClassOp],	-- Method signatures
 	         ifRec	   :: RecFlag,		-- Is newtype/datatype associated with the class recursive?
 		 ifVrcs    :: ArgVrcs		-- ... and what are its argument variances ...
@@ -201,13 +201,13 @@ data IfaceInfoItem
 
 --------------------------------
 data IfaceExpr
-  = IfaceLcl 	OccName
+  = IfaceLcl 	FastString
   | IfaceExt    IfaceExtName
   | IfaceType   IfaceType
   | IfaceTuple 	Boxity [IfaceExpr]		-- Saturated; type arguments omitted
   | IfaceLam 	IfaceBndr IfaceExpr
   | IfaceApp 	IfaceExpr IfaceExpr
-  | IfaceCase	IfaceExpr OccName IfaceType [IfaceAlt]
+  | IfaceCase	IfaceExpr FastString IfaceType [IfaceAlt]
   | IfaceLet	IfaceBinding  IfaceExpr
   | IfaceNote	IfaceNote IfaceExpr
   | IfaceLit	Literal
@@ -218,7 +218,7 @@ data IfaceNote = IfaceSCC CostCentre
 	       | IfaceInlineMe
                | IfaceCoreNote String
 
-type IfaceAlt = (IfaceConAlt, [OccName], IfaceExpr)
+type IfaceAlt = (IfaceConAlt, [FastString], IfaceExpr)
 	-- Note: OccName, not IfaceBndr (and same with the case binder)
 	-- We reconstruct the kind/type of the thing from the context
 	-- thus saving bulk in interface files
@@ -481,7 +481,7 @@ tyThingToIfaceDecl ext (AClass clas)
 	  (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
 	  op_ty		       = funResultTy rho_ty
 
-    toIfaceFD (tvs1, tvs2) = (map getOccName tvs1, map getOccName tvs2)
+    toIfaceFD (tvs1, tvs2) = (map (occNameFS.getOccName) tvs1, map (occNameFS.getOccName) tvs2)
 
 tyThingToIfaceDecl ext (ATyCon tycon)
   | isSynTyCon tycon
@@ -652,7 +652,7 @@ toIfaceExpr ext (Lit l)       = IfaceLit l
 toIfaceExpr ext (Type ty)     = IfaceType (toIfaceType ext ty)
 toIfaceExpr ext (Lam x b)     = IfaceLam (toIfaceBndr ext x) (toIfaceExpr ext b)
 toIfaceExpr ext (App f a)     = toIfaceApp ext f [a]
-toIfaceExpr ext (Case s x ty as) = IfaceCase (toIfaceExpr ext s) (getOccName x) (toIfaceType ext ty) (map (toIfaceAlt ext) as)
+toIfaceExpr ext (Case s x ty as) = IfaceCase (toIfaceExpr ext s) (occNameFS (getOccName x)) (toIfaceType ext ty) (map (toIfaceAlt ext) as)
 toIfaceExpr ext (Let b e)     = IfaceLet (toIfaceBind ext b) (toIfaceExpr ext e)
 toIfaceExpr ext (Note n e)    = IfaceNote (toIfaceNote ext n) (toIfaceExpr ext e)
 
@@ -667,7 +667,7 @@ toIfaceBind ext (NonRec b r) = IfaceNonRec (toIfaceIdBndr ext b) (toIfaceExpr ex
 toIfaceBind ext (Rec prs)    = IfaceRec [(toIfaceIdBndr ext b, toIfaceExpr ext r) | (b,r) <- prs]
 
 ---------------------
-toIfaceAlt ext (c,bs,r) = (toIfaceCon c, map getOccName bs, toIfaceExpr ext r)
+toIfaceAlt ext (c,bs,r) = (toIfaceCon c, map (occNameFS.getOccName) bs, toIfaceExpr ext r)
 
 ---------------------
 toIfaceCon (DataAlt dc) | isTupleTyCon tc = IfaceTupleAlt (tupleTyConBoxity tc)
@@ -703,7 +703,7 @@ toIfaceVar ext v
   | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType ext (idType v))
 	  -- Foreign calls have special syntax
   | isExternalName name		    = IfaceExt (ext name)
-  | otherwise			    = IfaceLcl (nameOccName name)
+  | otherwise			    = IfaceLcl (occNameFS (nameOccName name))
   where
     name = idName v
 \end{code}
@@ -949,24 +949,24 @@ eqIfTc _ _ = NotEqual
 
 \begin{code}
 ------------------------------------
-type EqEnv = OccEnv OccName	-- Tracks the mapping from L-variables to R-variables
+type EqEnv = UniqFM FastString	-- Tracks the mapping from L-variables to R-variables
 
-eqIfOcc :: EqEnv -> OccName -> OccName -> IfaceEq
-eqIfOcc env n1 n2 = case lookupOccEnv env n1 of
+eqIfOcc :: EqEnv -> FastString -> FastString -> IfaceEq
+eqIfOcc env n1 n2 = case lookupUFM env n1 of
 			Just n1 -> bool (n1 == n2)
 			Nothing -> bool (n1 == n2)
 
-extendEqEnv :: EqEnv -> OccName -> OccName -> EqEnv
+extendEqEnv :: EqEnv -> FastString -> FastString -> EqEnv
 extendEqEnv env n1 n2 | n1 == n2  = env
-		      | otherwise = extendOccEnv env n1 n2
+		      | otherwise = addToUFM env n1 n2
 
 emptyEqEnv :: EqEnv
-emptyEqEnv = emptyOccEnv
+emptyEqEnv = emptyUFM
 
 ------------------------------------
 type ExtEnv bndr = EqEnv -> bndr -> bndr -> (EqEnv -> IfaceEq) -> IfaceEq
 
-eq_ifNakedBndr :: ExtEnv OccName
+eq_ifNakedBndr :: ExtEnv FastString
 eq_ifBndr      :: ExtEnv IfaceBndr
 eq_ifTvBndr    :: ExtEnv IfaceTvBndr
 eq_ifIdBndr    :: ExtEnv IfaceIdBndr
@@ -983,7 +983,7 @@ eq_ifIdBndr env (v1, t1) (v2, t2) k = eq_ifType env t1 t2 &&& k (extendEqEnv env
 eq_ifBndrs   	:: ExtEnv [IfaceBndr]
 eq_ifIdBndrs 	:: ExtEnv [IfaceIdBndr]
 eq_ifTvBndrs 	:: ExtEnv [IfaceTvBndr]
-eq_ifNakedBndrs :: ExtEnv [OccName]
+eq_ifNakedBndrs :: ExtEnv [FastString]
 eq_ifBndrs   	= eq_bndrs_with eq_ifBndr
 eq_ifIdBndrs 	= eq_bndrs_with eq_ifIdBndr
 eq_ifTvBndrs 	= eq_bndrs_with eq_ifTvBndr

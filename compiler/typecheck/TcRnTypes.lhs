@@ -59,13 +59,13 @@ import RdrName		( GlobalRdrEnv, LocalRdrEnv )
 import Name		( Name )
 import NameEnv
 import NameSet		( NameSet, unionNameSets, DefUses )
-import OccName		( OccEnv )
 import Var		( Id, TyVar )
 import VarEnv		( TidyEnv )
 import Module
 import SrcLoc		( SrcSpan, SrcLoc, Located, srcSpanStart )
 import VarSet		( IdSet )
 import ErrUtils		( Messages, Message )
+import UniqFM           ( UniqFM )
 import UniqSupply	( UniqSupply )
 import BasicTypes	( IPName )
 import Util		( thenCmp )
@@ -266,8 +266,8 @@ data IfLclEnv
 		--	.hi file, or GHCi state, or ext core
 		-- plus which bit is currently being examined
 
-	if_tv_env  :: OccEnv TyVar,	-- Nested tyvar bindings
-	if_id_env  :: OccEnv Id		-- Nested id binding
+	if_tv_env  :: UniqFM TyVar,	-- Nested tyvar bindings
+	if_id_env  :: UniqFM Id		-- Nested id binding
     }
 \end{code}
 

@@ -31,7 +31,7 @@ import TypeRep		( TyThing(..), Type(..), PredType(..), ThetaType )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
-import OccName		( OccName, parenSymOcc )
+import OccName		( OccName, parenSymOcc, occNameFS )
 import Name		( Name, getName, getOccName, nameModule, nameOccName,
 			  wiredInNameTyThing_maybe )
 import Module		( Module )
@@ -98,17 +98,17 @@ interactiveExtNameFun print_unqual name
 
 \begin{code}
 data IfaceBndr 		-- Local (non-top-level) binders
-  = IfaceIdBndr IfaceIdBndr
-  | IfaceTvBndr IfaceTvBndr
+  = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
+  | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
 
-type IfaceIdBndr  = (OccName, IfaceType)	-- OccName, because always local
-type IfaceTvBndr  = (OccName, IfaceKind)
+type IfaceIdBndr  = (FastString, IfaceType)
+type IfaceTvBndr  = (FastString, IfaceKind)
 
 -------------------------------
 type IfaceKind = Kind			-- Re-use the Kind type, but no KindVars in it
 
 data IfaceType
-  = IfaceTyVar    OccName			-- Type variable only, not tycon
+  = IfaceTyVar    FastString			-- Type variable only, not tycon
   | IfaceAppTy    IfaceType IfaceType
   | IfaceForAllTy IfaceTvBndr IfaceType
   | IfacePredTy   IfacePredType
@@ -327,8 +327,8 @@ pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 
 \begin{code}
 ----------------
-toIfaceTvBndr tyvar   = (getOccName tyvar, tyVarKind tyvar)
-toIfaceIdBndr ext id  = (getOccName id,    toIfaceType ext (idType id))
+toIfaceTvBndr tyvar   = (occNameFS (getOccName tyvar), tyVarKind tyvar)
+toIfaceIdBndr ext id  = (occNameFS (getOccName id),    toIfaceType ext (idType id))
 toIfaceTvBndrs tyvars = map toIfaceTvBndr tyvars
 
 toIfaceBndr ext var
@@ -338,7 +338,7 @@ toIfaceBndr ext var
 ---------------------
 toIfaceType :: (Name -> IfaceExtName) -> Type -> IfaceType
 -- Synonyms are retained in the interface type
-toIfaceType ext (TyVarTy tv)     	     = IfaceTyVar (getOccName tv)
+toIfaceType ext (TyVarTy tv)     	     = IfaceTyVar (occNameFS (getOccName tv))
 toIfaceType ext (AppTy t1 t2)    	     = IfaceAppTy (toIfaceType ext t1) (toIfaceType ext t2)
 toIfaceType ext (FunTy t1 t2)    	     = IfaceFunTy (toIfaceType ext t1) (toIfaceType ext t2)
 toIfaceType ext (TyConApp tc tys) 	     = IfaceTyConApp (toIfaceTyCon ext tc) (toIfaceTypes ext tys)

@@ -168,7 +168,7 @@ vdef	:: { (IfaceIdBndr, IfaceExpr) }
   -- same as the module being compiled, and Iface syntax only
   -- has OccNames in binding positions
 
-qd_occ :: { OccName }
+qd_occ :: { FastString }
         : var_occ { $1 }
         | d_occ   { $1 }
 
@@ -212,7 +212,7 @@ kind 	:: { IfaceKind }
 
 aexp    :: { IfaceExpr }
 	: var_occ	         { IfaceLcl $1 }
-	| modid '.' qd_occ	 { IfaceExt (ExtPkg $1 $3) }
+        | modid '.' qd_occ	 { IfaceExt (ExtPkg $1 (mkVarOccFS $3)) }
 	| lit		{ IfaceLit $1 }
 	| '(' exp ')' 	{ $2 }
 
@@ -260,11 +260,11 @@ lit	:: { Literal }
 	| '(' CHAR '::' aty ')'		{ MachChar $2 }
 	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
 
-tv_occ	:: { OccName }
-	: NAME	{ mkOccName tvName $1 }
+tv_occ	:: { FastString }
+	: NAME	{ mkFastString $1 }
 
-var_occ	:: { OccName }
-	: NAME	{ mkVarOcc $1 }
+var_occ	:: { FastString }
+	: NAME	{ mkFastString $1 }
 
 
 -- Type constructor
@@ -278,8 +278,8 @@ d_pat_occ :: { OccName }
 
 -- Data constructor occurrence in an expression;
 -- use the varName because that's the worker Id
-d_occ :: { OccName }
-       : CNAME { mkVarOcc $1 }
+d_occ :: { FastString }
+       : CNAME { mkFastString $1 }
 
 {
 
@@ -314,14 +314,14 @@ eqTc (IfaceTc (ExtPkg mod occ)) tycon
 -- are very limited (see the productions for 'ty', so the translation
 -- isn't hard
 toHsType :: IfaceType -> LHsType RdrName
-toHsType (IfaceTyVar v)        		 = noLoc $ HsTyVar (mkRdrUnqual v)
+toHsType (IfaceTyVar v)        		 = noLoc $ HsTyVar (mkRdrUnqual (mkTyVarOcc v))
 toHsType (IfaceAppTy t1 t2)    		 = noLoc $ HsAppTy (toHsType t1) (toHsType t2)
 toHsType (IfaceFunTy t1 t2)    		 = noLoc $ HsFunTy (toHsType t1) (toHsType t2)
 toHsType (IfaceTyConApp (IfaceTc tc) ts) = foldl mkHsAppTy (noLoc $ HsTyVar (ifaceExtRdrName tc)) (map toHsType ts) 
 toHsType (IfaceForAllTy tv t)            = add_forall (toHsTvBndr tv) (toHsType t)
 
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
-toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual tv) k
+toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOcc tv)) k
 
 ifaceExtRdrName :: IfaceExtName -> RdrName
 ifaceExtRdrName (ExtPkg mod occ) = mkOrig mod occ

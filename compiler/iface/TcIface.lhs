@@ -51,14 +51,15 @@ import Var		( TyVar, mkTyVar, tyVarKind )
 import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
 			  wiredInNameTyThing_maybe, nameParent )
 import NameEnv
-import OccName		( OccName )
+import OccName		( OccName, mkVarOccFS, mkTyVarOcc )
+import FastString       ( FastString )
 import Module		( Module, lookupModuleEnv )
 import UniqSupply	( initUs_ )
 import Outputable	
 import ErrUtils		( Message )
 import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
-import Util		( zipWithEqual, dropList, equalLength )
+import Util		( zipWithEqual, equalLength, splitAtList )
 import DynFlags		( DynFlag(..), isOneShot )
 \end{code}
 
@@ -603,7 +604,7 @@ tcIfaceExpr (IfaceApp fun arg)
 
 tcIfaceExpr (IfaceCase scrut case_bndr ty alts) 
   = tcIfaceExpr scrut		`thenM` \ scrut' ->
-    newIfaceName case_bndr	`thenM` \ case_bndr_name ->
+    newIfaceName (mkVarOccFS case_bndr)	`thenM` \ case_bndr_name ->
     let
 	scrut_ty   = exprType scrut'
 	case_bndr' = mkLocalId case_bndr_name scrut_ty
@@ -657,23 +658,24 @@ tcIfaceAlt _ (IfaceLitAlt lit, names, rhs)
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_occs, rhs)
+tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
   = do	{ let tycon_mod = nameModule (tyConName tycon)
 	; con <- tcIfaceDataCon (ExtPkg tycon_mod data_occ)
 	; ASSERT2( con `elem` tyConDataCons tycon,
 		   ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon) )
 		  
 	  if isVanillaDataCon con then
-		tcVanillaAlt con inst_tys arg_occs rhs
+		tcVanillaAlt con inst_tys arg_strs rhs
 	  else
     do 	{ 	-- General case
-	  arg_names <- newIfaceNames arg_occs
+          let (tyvar_strs, id_strs) = splitAtList (dataConTyVars con) arg_strs
+        ; tyvar_names <- mapM (newIfaceName . mkTyVarOcc) tyvar_strs
+        ; id_names    <- mapM (newIfaceName . mkVarOccFS) id_strs
 	; let	tyvars   = [ mkTyVar name (tyVarKind tv) 
-			   | (name,tv) <- arg_names `zip` dataConTyVars con] 
+			   | (name,tv) <- tyvar_names `zip` dataConTyVars con ]
 		arg_tys	 = dataConInstArgTys con (mkTyVarTys tyvars)
-		id_names = dropList tyvars arg_names
 		arg_ids  = ASSERT2( equalLength id_names arg_tys,
-				    ppr (con, arg_names, rhs) $$ ppr tyvars $$ ppr arg_tys )
+				    ppr (con, tyvar_names++id_names, rhs) $$ ppr tyvars $$ ppr arg_tys )
 			   zipWith mkLocalId id_names arg_tys
 
 		Just refine = coreRefineTys con tyvars (mkTyConApp tycon inst_tys)
@@ -694,11 +696,11 @@ tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
     do	{ let [data_con] = tyConDataCons tycon
 	; tcVanillaAlt data_con inst_tys arg_occs rhs }
 
-tcVanillaAlt data_con inst_tys arg_occs rhs
-  = do	{ arg_names <- newIfaceNames arg_occs
+tcVanillaAlt data_con inst_tys arg_strs rhs
+  = do	{ arg_names <- newIfaceNames (map mkVarOccFS arg_strs)
 	; let arg_tys = dataConInstArgTys data_con inst_tys
 	; let arg_ids = ASSERT2( equalLength arg_names arg_tys,
-				 ppr data_con <+> ppr inst_tys <+> ppr arg_occs $$ ppr rhs )
+				 ppr data_con <+> ppr inst_tys <+> ppr arg_strs $$ ppr rhs )
 			zipWith mkLocalId arg_names arg_tys
 	; rhs' <- extendIfaceIdEnv arg_ids (tcIfaceExpr rhs)
 	; returnM (DataAlt data_con, arg_ids, rhs') }
@@ -931,16 +933,16 @@ bindIfaceBndrs (b:bs) thing_inside
     thing_inside (b':bs')
 
 -----------------------
-bindIfaceId :: (OccName, IfaceType) -> (Id -> IfL a) -> IfL a
+bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
 bindIfaceId (occ, ty) thing_inside
-  = do	{ name <- newIfaceName occ
+  = do	{ name <- newIfaceName (mkVarOccFS occ)
 	; ty' <- tcIfaceType ty
 	; let {	id = mkLocalId name ty' }
 	; extendIfaceIdEnv [id] (thing_inside id) }
     
-bindIfaceIds :: [(OccName, IfaceType)] -> ([Id] -> IfL a) -> IfL a
+bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a
 bindIfaceIds bndrs thing_inside
-  = do 	{ names <- newIfaceNames occs
+  = do 	{ names <- newIfaceNames (map mkVarOccFS occs)
 	; tys' <- mappM tcIfaceType tys
 	; let {	ids = zipWithEqual "tcCoreValBndr" mkLocalId names tys' }
 	; extendIfaceIdEnv ids (thing_inside ids) }
@@ -949,23 +951,23 @@ bindIfaceIds bndrs thing_inside
 
 
 -----------------------
-newExtCoreBndr :: (OccName, IfaceType) -> IfL Id
-newExtCoreBndr (occ, ty)
+newExtCoreBndr :: IfaceIdBndr -> IfL Id
+newExtCoreBndr (var, ty)
   = do	{ mod <- getIfModule
-	; name <- newGlobalBinder mod occ Nothing noSrcLoc
+	; name <- newGlobalBinder mod (mkVarOccFS var) Nothing noSrcLoc
 	; ty' <- tcIfaceType ty
 	; return (mkLocalId name ty') }
 
 -----------------------
 bindIfaceTyVar :: IfaceTvBndr -> (TyVar -> IfL a) -> IfL a
 bindIfaceTyVar (occ,kind) thing_inside
-  = do	{ name <- newIfaceName occ
+  = do	{ name <- newIfaceName (mkTyVarOcc occ)
    	; let tyvar = mk_iface_tyvar name kind
 	; extendIfaceTyVarEnv [tyvar] (thing_inside tyvar) }
 
 bindIfaceTyVars :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
 bindIfaceTyVars bndrs thing_inside
-  = do	{ names <- newIfaceNames occs
+  = do	{ names <- newIfaceNames (map mkTyVarOcc occs)
   	; let tyvars = zipWith mk_iface_tyvar names kinds
 	; extendIfaceTyVarEnv tyvars (thing_inside tyvars) }
   where

@@ -33,11 +33,13 @@ import Name		( Name, nameUnique, nameModule,
 		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
 import NameSet		( NameSet, emptyNameSet, addListToNameSet )
-import OccName		( OccName, isTupleOcc_maybe, tcName, dataName, mapOccEnv,
+import OccName		( OccName, isTupleOcc_maybe, tcName, dataName, mapOccEnv, occNameFS,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
 import PrelNames	( gHC_PRIM, pREL_TUP )
 import Module		( Module, emptyModuleEnv, 
 			  lookupModuleEnv, extendModuleEnv_C )
+import UniqFM           ( lookupUFM, addListToUFM )
+import FastString       ( FastString )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply, uniqsFromSupply )
 import FiniteMap	( emptyFM, lookupFM, addToFM )
 import BasicTypes	( IPName(..), mapIPName )
@@ -285,10 +287,10 @@ initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
 %************************************************************************
 
 \begin{code}
-tcIfaceLclId :: OccName -> IfL Id
+tcIfaceLclId :: FastString -> IfL Id
 tcIfaceLclId occ
   = do	{ lcl <- getLclEnv
-	; case (lookupOccEnv (if_id_env lcl) occ) of
+	; case (lookupUFM (if_id_env lcl) occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ)
         }
@@ -304,15 +306,15 @@ refineIfaceIdEnv (tv_subst, _) thing_inside
 extendIfaceIdEnv :: [Id] -> IfL a -> IfL a
 extendIfaceIdEnv ids thing_inside
   = do	{ env <- getLclEnv
-	; let { id_env' = extendOccEnvList (if_id_env env) pairs
-	      ;	pairs   = [(getOccName id, id) | id <- ids] }
+	; let { id_env' = addListToUFM (if_id_env env) pairs
+	      ;	pairs   = [(occNameFS (getOccName id), id) | id <- ids] }
 	; setLclEnv (env { if_id_env = id_env' }) thing_inside }
 
 
-tcIfaceTyVar :: OccName -> IfL TyVar
+tcIfaceTyVar :: FastString -> IfL TyVar
 tcIfaceTyVar occ
   = do	{ lcl <- getLclEnv
-	; case (lookupOccEnv (if_tv_env lcl) occ) of
+	; case (lookupUFM (if_tv_env lcl) occ) of
             Just ty_var -> return ty_var
             Nothing     -> failIfM (text "Iface type variable out of scope: " <+> ppr occ)
         }
@@ -320,8 +322,8 @@ tcIfaceTyVar occ
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
 extendIfaceTyVarEnv tyvars thing_inside
   = do	{ env <- getLclEnv
-	; let { tv_env' = extendOccEnvList (if_tv_env env) pairs
-	      ;	pairs   = [(getOccName tv, tv) | tv <- tyvars] }
+	; let { tv_env' = addListToUFM (if_tv_env env) pairs
+	      ;	pairs   = [(occNameFS (getOccName tv), tv) | tv <- tyvars] }
 	; setLclEnv (env { if_tv_env = tv_env' }) thing_inside }
 \end{code}
 
