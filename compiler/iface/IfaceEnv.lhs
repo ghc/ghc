@@ -358,7 +358,7 @@ lookupHomePackage mod_name occ
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ
   = do	{ uniq <- newUnique
-	; return (mkInternalName uniq occ noSrcLoc) }
+	; return $! mkInternalName uniq occ noSrcLoc }
 
 newIfaceNames :: [OccName] -> IfL [Name]
 newIfaceNames occs
