@@ -40,10 +40,13 @@ import {-# SOURCE #-} TypeRep( TyThing )
 import OccName		-- All of it
 import Module		( Module )
 import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
-import Unique		( Unique, Uniquable(..), getKey, pprUnique )
+import Unique		( Unique, Uniquable(..), getKey, pprUnique,
+                          mkUniqueGrimily, getKey# )
 import Maybes		( orElse, isJust )
 import FastString	( FastString, zEncodeFS )
 import Outputable
+
+import GLAEXTS          ( Int#, Int(..) )
 \end{code}
 
 %************************************************************************
@@ -56,7 +59,7 @@ import Outputable
 data Name = Name {
 		n_sort :: NameSort,	-- What sort of name it is
 		n_occ  :: !OccName,	-- Its occurrence name
-		n_uniq :: {-# UNPACK #-} !Unique,
+		n_uniq :: Int#,         -- UNPACK doesn't work, recursive type
 		n_loc  :: !SrcLoc	-- Definition site
 	    }
 
@@ -122,7 +125,7 @@ nameOccName		:: Name -> OccName
 nameModule		:: Name -> Module
 nameSrcLoc		:: Name -> SrcLoc
 
-nameUnique  name = n_uniq name
+nameUnique  name = mkUniqueGrimily (I# (n_uniq name))
 nameOccName name = n_occ  name
 nameSrcLoc  name = n_loc  name
 \end{code}
@@ -190,7 +193,7 @@ isSystemName other		      = False
 
 \begin{code}
 mkInternalName :: Unique -> OccName -> SrcLoc -> Name
-mkInternalName uniq occ loc = Name { n_uniq = uniq, n_sort = Internal, n_occ = occ, n_loc = loc }
+mkInternalName uniq occ loc = Name { n_uniq = getKey# uniq, n_sort = Internal, n_occ = occ, n_loc = loc }
 	-- NB: You might worry that after lots of huffing and
 	-- puffing we might end up with two local names with distinct
 	-- uniques, but the same OccName.  Indeed we can, but that's ok
@@ -202,18 +205,18 @@ mkInternalName uniq occ loc = Name { n_uniq = uniq, n_sort = Internal, n_occ = o
 
 mkExternalName :: Unique -> Module -> OccName -> Maybe Name -> SrcLoc -> Name
 mkExternalName uniq mod occ mb_parent loc 
-  = Name { n_uniq = uniq, n_sort = External mod mb_parent,
+  = Name { n_uniq = getKey# uniq, n_sort = External mod mb_parent,
            n_occ = occ, n_loc = loc }
 
 mkWiredInName :: Module -> OccName -> Unique 
 	      -> Maybe Name -> TyThing -> BuiltInSyntax -> Name
 mkWiredInName mod occ uniq mb_parent thing built_in
-  = Name { n_uniq = uniq,
+  = Name { n_uniq = getKey# uniq,
 	   n_sort = WiredIn mod mb_parent thing built_in,
 	   n_occ = occ, n_loc = wiredInSrcLoc }
 
 mkSystemName :: Unique -> OccName -> Name
-mkSystemName uniq occ = Name { n_uniq = uniq, n_sort = System, 
+mkSystemName uniq occ = Name { n_uniq = getKey# uniq, n_sort = System, 
 			       n_occ = occ, n_loc = noSrcLoc }
 
 mkSystemVarName :: Unique -> FastString -> Name
@@ -224,12 +227,12 @@ mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs)
 
 mkFCallName :: Unique -> String -> Name
 	-- The encoded string completely describes the ccall
-mkFCallName uniq str =  Name { n_uniq = uniq, n_sort = Internal, 
+mkFCallName uniq str =  Name { n_uniq = getKey# uniq, n_sort = Internal, 
 			       n_occ = mkVarOcc str, n_loc = noSrcLoc }
 
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
-  = Name { n_uniq = uniq,
+  = Name { n_uniq = getKey# uniq,
 	   n_sort = Internal,
 	   n_occ  = occ,
 	   n_loc = noSrcLoc }
@@ -239,7 +242,8 @@ mkIPName uniq occ
 -- When we renumber/rename things, we need to be
 -- able to change a Name's Unique to match the cached
 -- one in the thing it's the name of.  If you know what I mean.
-setNameUnique name uniq = name {n_uniq = uniq}
+setNameUnique :: Name -> Unique -> Name
+setNameUnique name uniq = name {n_uniq = getKey# uniq}
 
 tidyNameOcc :: Name -> OccName -> Name
 -- We set the OccName of a Name when tidying
@@ -272,7 +276,7 @@ hashName name = getKey (nameUnique name)
 %************************************************************************
 
 \begin{code}
-cmpName n1 n2 = n_uniq n1 `compare` n_uniq n2
+cmpName n1 n2 = I# (n_uniq n1) `compare` I# (n_uniq n2)
 \end{code}
 
 \begin{code}
@@ -308,13 +312,14 @@ instance Outputable Name where
 instance OutputableBndr Name where
     pprBndr _ name = pprName name
 
-pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
+pprName name@(Name {n_sort = sort, n_uniq = u#, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
       WiredIn mod _ _ builtin -> pprExternal sty uniq mod occ True  builtin
       External mod _  	      -> pprExternal sty uniq mod occ False UserSyntax
       System   		      -> pprSystem sty uniq occ
       Internal    	      -> pprInternal sty uniq occ
+  where uniq = mkUniqueGrimily (I# u#)
 
 pprExternal sty uniq mod occ is_wired is_builtin
   | codeStyle sty        = ppr mod <> char '_' <> ppr_z_occ_name occ
