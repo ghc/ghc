@@ -39,7 +39,8 @@ module Language.Haskell.TH.Syntax(
 	mkNameG_v, mkNameG_d, mkNameG_tc, Uniq, mkNameL, mkNameU,
  	tupleTypeName, tupleDataName,
 	OccName, mkOccName, occString,
-	ModName, mkModName, modString
+	ModName, mkModName, modString,
+	PkgName, mkPkgName, pkgString
     ) where
 
 import Data.PackedString
@@ -241,8 +242,8 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
 
 
 trueName, falseName :: Name
-trueName  = mkNameG DataName "GHC.Base" "True"
-falseName = mkNameG DataName "GHC.Base" "False"
+trueName  = mkNameG DataName "base" "GHC.Base" "True"
+falseName = mkNameG DataName "base" "GHC.Base" "False"
 
 
 -----------------------------------------------------
@@ -256,6 +257,15 @@ mkModName s = packString s
 
 modString :: ModName -> String
 modString m = unpackPS m
+
+
+type PkgName = PackedString	-- package name
+
+mkPkgName :: String -> PkgName
+mkPkgName s = packString s
+
+pkgString :: PkgName -> String
+pkgString m = unpackPS m
 
 
 -----------------------------------------------------
@@ -303,7 +313,7 @@ data NameFlavour
 	-- These Names should never appear in a binding position in a TH syntax tree
 
   | NameL Int#			-- 
-  | NameG NameSpace ModName	-- An original name (occurrences only, not binders)
+  | NameG NameSpace PkgName ModName	-- An original name (occurrences only, not binders)
 				-- Need the namespace too to be sure which 
 				-- thing we are naming
 
@@ -320,7 +330,7 @@ nameBase (Name occ _) = occString occ
 
 nameModule :: Name -> Maybe String
 nameModule (Name _ (NameQ m))   = Just (modString m)
-nameModule (Name _ (NameG _ m)) = Just (modString m)
+nameModule (Name _ (NameG _ _ m)) = Just (modString m)
 nameModule other_name		= Nothing
 
 mkName :: String -> Name
@@ -354,11 +364,11 @@ mkNameU s (I# u) = Name (mkOccName s) (NameU u)
 mkNameL :: String -> Uniq -> Name	-- Only used internally
 mkNameL s (I# u) = Name (mkOccName s) (NameL u)
 
-mkNameG :: NameSpace -> String -> String -> Name	-- Used for 'x etc, but not available
-mkNameG ns mod occ 					-- to the programmer
-  = Name (mkOccName occ) (NameG ns (mkModName mod))
+mkNameG :: NameSpace -> String -> String -> String -> Name	-- Used for 'x etc, but not available
+mkNameG ns pkg mod occ 					-- to the programmer
+  = Name (mkOccName occ) (NameG ns (mkPkgName pkg) (mkModName mod))
 
-mkNameG_v, mkNameG_tc, mkNameG_d :: String -> String -> Name
+mkNameG_v, mkNameG_tc, mkNameG_d :: String -> String -> String -> Name
 mkNameG_v  = mkNameG VarName
 mkNameG_tc = mkNameG TcClsName
 mkNameG_d  = mkNameG DataName
@@ -397,19 +407,21 @@ instance Ord NameFlavour where
 				  | otherwise = GT
   (NameL _)  `compare` other      = LT
 
-  (NameG ns1 m1) `compare` (NameG ns2 m2) = (ns1 `compare` ns2) `thenCmp`
-					    (m1 `compare` m2)
-  (NameG _ _)    `compare` other	  = GT
+  (NameG ns1 p1 m1) `compare` (NameG ns2 p2 m2) = (ns1 `compare` ns2) `thenCmp`
+                                            (p1 `compare` p2) `thenCmp`
+					    (m1 `compare` m2) 
+  (NameG _ _ _)    `compare` other	  = GT
 
 instance Show Name where
 	-- For now, we make the NameQ and NameG print the same, 
 	-- and ditto NameU and NameL.  We may well want to
 	-- distinguish them in the end.
-  show (Name occ NameS)        = occString occ
-  show (Name occ (NameU u))    = occString occ ++ "_" ++ show (I# u)
-  show (Name occ (NameQ m))    = modString m ++ "." ++ occString occ
-  show (Name occ (NameL u))    = occString occ ++ "_" ++ show (I# u)
-  show (Name occ (NameG ns m)) = modString m   ++ "." ++ occString occ
+  show (Name occ NameS)          = occString occ
+  show (Name occ (NameU u))      = occString occ ++ "_" ++ show (I# u)
+  show (Name occ (NameQ m))      = modString m ++ "." ++ occString occ
+  show (Name occ (NameL u))      = occString occ ++ "_" ++ show (I# u)
+  show (Name occ (NameG ns p m)) = pkgString p ++ ":" ++ modString m
+                                          ++ "." ++ occString occ
 
 
 -- 	Tuple data and type constructors
@@ -425,7 +437,7 @@ tupleTypeName 1 = error "tupleTypeName 1"
 tupleTypeName n = mk_tup_name (n-1) TcClsName 
 
 mk_tup_name n_commas space
-  = Name occ (NameG space tup_mod)
+  = Name occ (NameG space (mkPkgName "base") tup_mod)
   where
     occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
     tup_mod = mkModName "Data.Tuple"
