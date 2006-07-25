@@ -153,20 +153,20 @@ SRC_HSC2HS_OPTS += -I.
 
 ifeq "$(STANDALONE_PACKAGE)" "NO"
 HC = $(GHC_INPLACE)
-IGNORE_PACKAGE_FLAG = -ignore-package
+IGNORE_PACKAGE_FLAG = -package-name  $(PACKAGE)-$(VERSION)
 else
 # Only use -ignore-package if supported by HC; i.e., ghc-6.3 and later.
 # (Don't like the use of slow $(shell ..) in Makefiles, but can't see a way around it here.)
 ifeq "$(strip $(GHC))" ""
-IGNORE_PACKAGE_FLAG = -ignore-package
+IGNORE_PACKAGE_FLAG = -ignore-package $(PACKAGE)
 else
 # Making the assumption here that standalone packages will be using mk/config.mk:GHC
-IGNORE_PACKAGE_FLAG = $(shell if (test $(GhcCanonVersion) -ge 603); then echo "-ignore-package"; else echo "-package-name"; fi)
+IGNORE_PACKAGE_FLAG = $(shell if (test $(GhcCanonVersion) -ge 603); then echo "-ignore-package"; else echo "-package-name"; fi) $(PACKAGE)
 endif 
 endif # STANDALONE_PACKAGE
 
 ifeq "$(NON_HS_PACKAGE)" ""
-SRC_HC_OPTS	+= $(IGNORE_PACKAGE_FLAG) $(PACKAGE)
+SRC_HC_OPTS	+= $(IGNORE_PACKAGE_FLAG)
 SRC_HC_OPTS 	+= $(GhcLibHcOpts)
 SRC_HC_OPTS     += $(patsubst %, -package %, $(PACKAGE_DEPS))
 endif
