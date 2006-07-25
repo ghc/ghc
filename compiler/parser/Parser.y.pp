@@ -394,7 +394,7 @@ optqualified :: { Bool }
       	: 'qualified'                           { True  }
       	| {- empty -}				{ False }
 
-maybeas :: { Located (Maybe Module) }
+maybeas :: { Located (Maybe ModuleName) }
       	: 'as' modid                            { LL (Just (unLoc $2)) }
       	| {- empty -}				{ noLoc Nothing }
 
@@ -1545,10 +1545,10 @@ close :: { () }
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
 
-modid 	:: { Located Module }
-	: CONID			{ L1 $ mkModuleFS (getCONID $1) }
+modid 	:: { Located ModuleName }
+	: CONID			{ L1 $ mkModuleNameFS (getCONID $1) }
         | QCONID		{ L1 $ let (mod,c) = getQCONID $1 in
-				  mkModuleFS
+				  mkModuleNameFS
 				   (mkFastString
 				     (unpackFS mod ++ '.':unpackFS c))
 				}

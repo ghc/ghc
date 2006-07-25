@@ -32,8 +32,8 @@ import Maybes		( maybeToBool )
 import Name		( getOccName, isExternalName, nameOccName )
 import OccName		( occNameString, occNameFS )
 import BasicTypes       ( Arity )
-import Packages		( HomeModules )
 import StaticFlags	( opt_RuntimeTypes )
+import PackageConfig	( PackageId )
 import Outputable
 
 infixr 9 `thenLne`
@@ -140,10 +140,10 @@ for x, solely to put in the SRTs lower down.
 %************************************************************************
 
 \begin{code}
-coreToStg :: HomeModules -> [CoreBind] -> IO [StgBinding]
-coreToStg hmods pgm
+coreToStg :: PackageId -> [CoreBind] -> IO [StgBinding]
+coreToStg this_pkg pgm
   = return pgm'
-  where (_, _, pgm') = coreTopBindsToStg hmods emptyVarEnv pgm
+  where (_, _, pgm') = coreTopBindsToStg this_pkg emptyVarEnv pgm
 
 coreExprToStg :: CoreExpr -> StgExpr
 coreExprToStg expr 
@@ -151,35 +151,35 @@ coreExprToStg expr
 
 
 coreTopBindsToStg
-    :: HomeModules
+    :: PackageId
     -> IdEnv HowBound		-- environment for the bindings
     -> [CoreBind]
     -> (IdEnv HowBound, FreeVarsInfo, [StgBinding])
 
-coreTopBindsToStg hmods env [] = (env, emptyFVInfo, [])
-coreTopBindsToStg hmods env (b:bs)
+coreTopBindsToStg this_pkg env [] = (env, emptyFVInfo, [])
+coreTopBindsToStg this_pkg env (b:bs)
   = (env2, fvs2, b':bs')
   where
 	-- env accumulates down the list of binds, fvs accumulates upwards
-	(env1, fvs2, b' ) = coreTopBindToStg hmods env fvs1 b
-  	(env2, fvs1, bs') = coreTopBindsToStg hmods env1 bs
+	(env1, fvs2, b' ) = coreTopBindToStg this_pkg env fvs1 b
+  	(env2, fvs1, bs') = coreTopBindsToStg this_pkg env1 bs
 
 
 coreTopBindToStg
-	:: HomeModules
+	:: PackageId
 	-> IdEnv HowBound
 	-> FreeVarsInfo		-- Info about the body
 	-> CoreBind
 	-> (IdEnv HowBound, FreeVarsInfo, StgBinding)
 
-coreTopBindToStg hmods env body_fvs (NonRec id rhs)
+coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
   = let 
 	env' 	  = extendVarEnv env id how_bound
 	how_bound = LetBound TopLet $! manifestArity rhs
 
         (stg_rhs, fvs') = 
 	    initLne env (
-              coreToTopStgRhs hmods body_fvs (id,rhs)	`thenLne` \ (stg_rhs, fvs') ->
+              coreToTopStgRhs this_pkg body_fvs (id,rhs)	`thenLne` \ (stg_rhs, fvs') ->
 	      returnLne (stg_rhs, fvs')
            )
 	
@@ -190,7 +190,7 @@ coreTopBindToStg hmods env body_fvs (NonRec id rhs)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
-coreTopBindToStg hmods env body_fvs (Rec pairs)
+coreTopBindToStg this_pkg env body_fvs (Rec pairs)
   = let 
 	(binders, rhss) = unzip pairs
 
@@ -200,7 +200,7 @@ coreTopBindToStg hmods env body_fvs (Rec pairs)
 
         (stg_rhss, fvs')
 	  = initLne env' (
-	       mapAndUnzipLne (coreToTopStgRhs hmods body_fvs) pairs
+	       mapAndUnzipLne (coreToTopStgRhs this_pkg body_fvs) pairs
 						`thenLne` \ (stg_rhss, fvss') ->
 	       let fvs' = unionFVInfos fvss' in
 	       returnLne (stg_rhss, fvs')
@@ -232,18 +232,18 @@ consistentCafInfo id bind
 
 \begin{code}
 coreToTopStgRhs
-	:: HomeModules
+	:: PackageId
 	-> FreeVarsInfo		-- Free var info for the scope of the binding
 	-> (Id,CoreExpr)
 	-> LneM (StgRhs, FreeVarsInfo)
 
-coreToTopStgRhs hmods scope_fv_info (bndr, rhs)
+coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs)
   = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, _) ->
     freeVarsToLiveVars rhs_fvs	`thenLne` \ lv_info ->
     returnLne (mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
-    is_static = rhsIsStatic hmods rhs
+    is_static = rhsIsStatic this_pkg rhs
 
 mkTopStgRhs :: Bool -> FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr
 	-> StgRhs

@@ -8,8 +8,7 @@ module TidyPgm( mkBootModDetails, tidyProgram ) where
 
 #include "HsVersions.h"
 
-import DynFlags		( DynFlag(..), dopt )
-import Packages		( HomeModules )
+import DynFlags		( DynFlag(..), DynFlags(..), dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding )
 import CoreFVs		( ruleLhsFreeIds, exprSomeFreeVars )
@@ -50,6 +49,7 @@ import HscTypes		( HscEnv(..), NameCache( nsUniqs ), CgGuts(..),
 			)
 import Maybes		( orElse, mapCatMaybes )
 import ErrUtils		( showPass, dumpIfSet_core )
+import PackageConfig	( PackageId )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
 import Maybe		( isJust )
@@ -238,7 +238,6 @@ tidyProgram hsc_env
 				mg_binds = binds, 
 				mg_rules = imp_rules,
 				mg_dir_imps = dir_imps, mg_deps = deps, 
-				mg_home_mods = home_mods,
 				mg_foreign = foreign_stubs })
 
   = do	{ let dflags = hsc_dflags hsc_env
@@ -257,7 +256,7 @@ tidyProgram hsc_env
 		-- (It's a sort of mutual recursion.)
   	}
 
-	; (tidy_env, tidy_binds) <- tidyTopBinds hsc_env home_mods mod type_env ext_ids binds
+	; (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod type_env ext_ids binds
 
 	; let { tidy_type_env = tidyTypeEnv omit_prags exports type_env tidy_binds
 	      ; tidy_ispecs   = tidyInstances (lookup_dfun tidy_type_env) insts_tc
@@ -285,7 +284,6 @@ tidyProgram hsc_env
 			   cg_binds    = all_tidy_binds,
 			   cg_dir_imps = dir_imps,
 			   cg_foreign  = foreign_stubs,
-			   cg_home_mods = home_mods,
 			   cg_dep_pkgs = dep_pkgs deps }, 
 
 		   ModDetails { md_types = tidy_type_env,
@@ -535,7 +533,6 @@ findExternalRules binds non_local_rules ext_ids
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
 tidyTopBinds :: HscEnv
-	     -> HomeModules
 	     -> Module
 	     -> TypeEnv
 	     -> IdEnv Bool	-- Domain = Ids that should be external
@@ -543,7 +540,7 @@ tidyTopBinds :: HscEnv
 	     -> [CoreBind]
 	     -> IO (TidyEnv, [CoreBind])
 
-tidyTopBinds hsc_env hmods mod type_env ext_ids binds
+tidyTopBinds hsc_env mod type_env ext_ids binds
   = tidy init_env binds
   where
     nc_var = hsc_NC hsc_env 
@@ -567,13 +564,15 @@ tidyTopBinds hsc_env hmods mod type_env ext_ids binds
 		-- since their names are "taken".
 		-- The type environment is a convenient source of such things.
 
+    this_pkg = thisPackage (hsc_dflags hsc_env)
+
     tidy env []     = return (env, [])
-    tidy env (b:bs) = do { (env1, b')  <- tidyTopBind hmods mod nc_var ext_ids env b
+    tidy env (b:bs) = do { (env1, b')  <- tidyTopBind this_pkg mod nc_var ext_ids env b
 			 ; (env2, bs') <- tidy env1 bs
 			 ; return (env2, b':bs') }
 
 ------------------------
-tidyTopBind  :: HomeModules
+tidyTopBind  :: PackageId
 	     -> Module
 	     -> IORef NameCache	-- For allocating new unique names
 	     -> IdEnv Bool	-- Domain = Ids that should be external
@@ -581,16 +580,16 @@ tidyTopBind  :: HomeModules
 	     -> TidyEnv -> CoreBind
 	     -> IO (TidyEnv, CoreBind)
 
-tidyTopBind hmods mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (NonRec bndr rhs)
+tidyTopBind this_pkg mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (NonRec bndr rhs)
   = do	{ (occ_env2, name') <- tidyTopName mod nc_var ext_ids occ_env1 bndr
 	; let	{ (bndr', rhs') = tidyTopPair ext_ids tidy_env2 caf_info name' (bndr, rhs)
 		; subst2        = extendVarEnv subst1 bndr bndr'
 		; tidy_env2     = (occ_env2, subst2) }
 	; return (tidy_env2, NonRec bndr' rhs') }
   where
-    caf_info = hasCafRefs hmods subst1 (idArity bndr) rhs
+    caf_info = hasCafRefs this_pkg subst1 (idArity bndr) rhs
 
-tidyTopBind hmods mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
+tidyTopBind this_pkg mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
   = do	{ (occ_env2, names') <- tidyTopNames mod nc_var ext_ids occ_env1 bndrs
 	; let	{ prs'      = zipWith (tidyTopPair ext_ids tidy_env2 caf_info)
 				      names' prs
@@ -603,7 +602,7 @@ tidyTopBind hmods mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
 	-- the CafInfo for a recursive group says whether *any* rhs in
 	-- the group may refer indirectly to a CAF (because then, they all do).
     caf_info 
-	| or [ mayHaveCafRefs (hasCafRefs hmods subst1 (idArity bndr) rhs)
+	| or [ mayHaveCafRefs (hasCafRefs this_pkg subst1 (idArity bndr) rhs)
 	     | (bndr,rhs) <- prs ] = MayHaveCafRefs
 	| otherwise 		   = NoCafRefs
 
@@ -779,13 +778,13 @@ it as a CAF.  In these cases however, we would need to use an additional
 CAF list to keep track of non-collectable CAFs.  
 
 \begin{code}
-hasCafRefs  :: HomeModules -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
-hasCafRefs hmods p arity expr 
+hasCafRefs  :: PackageId -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
+hasCafRefs this_pkg p arity expr 
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise 		    = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefs p expr)
-  is_caf = not (arity > 0 || rhsIsStatic hmods expr)
+  is_caf = not (arity > 0 || rhsIsStatic this_pkg expr)
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
   -- knows how much eta expansion is going to be done by 

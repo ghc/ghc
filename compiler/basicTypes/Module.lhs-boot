@@ -1,6 +1,10 @@
 \begin{code}
 module Module where
 
-data Module
-\end{code}
+import PackageConfig (PackageId)
 
+data Module
+data ModuleName
+moduleName :: Module -> ModuleName
+modulePackageId :: Module -> PackageId
+\end{code}

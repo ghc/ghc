@@ -27,6 +27,7 @@ import Finder		( mkStubPaths )
 import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
+import PackageConfig	( rtsPackageId )
 import Util
 import FastString	( unpackFS )
 import Cmm		( Cmm )
@@ -35,7 +36,7 @@ import DynFlags
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )
-import Module		( Module, ModLocation(..) )
+import Module		( Module, ModLocation(..), moduleName )
 import List		( nub )
 import Maybes		( firstJust )
 
@@ -156,7 +157,7 @@ outputC dflags filenm mod location flat_absC
 	     hPutStrLn h ("#include \"" ++ (filenameOf stub_h) ++ "\"")
 	  writeCs dflags h flat_absC
   where
-    (_, stub_h) = mkStubPaths dflags mod location
+    (_, stub_h) = mkStubPaths dflags (moduleName mod) location
 \end{code}
 
 
@@ -259,12 +260,9 @@ outputForeignStubs dflags mod location stubs
                       "Foreign export header file" stub_h_output_d
 
 	-- we need the #includes from the rts package for the stub files
-	let rtsid = rtsPackageId (pkgState dflags)
- 	    rts_includes 
-		| ExtPackage pid <- rtsid = 
-			let rts_pkg = getPackageDetails (pkgState dflags) pid in
-			concatMap mk_include (includes rts_pkg)
-		| otherwise = []
+	let rts_includes = 
+	       let rts_pkg = getPackageDetails (pkgState dflags) rtsPackageId in
+	       concatMap mk_include (includes rts_pkg)
 	    mk_include i = "#include \"" ++ i ++ "\"\n"
 
 	stub_h_file_exists
@@ -287,7 +285,7 @@ outputForeignStubs dflags mod location stubs
 
         return (stub_h_file_exists, stub_c_file_exists)
   where
-   (stub_c, stub_h) = mkStubPaths dflags mod location
+   (stub_c, stub_h) = mkStubPaths dflags (moduleName mod) location
 
 cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
 cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"

@@ -31,9 +31,9 @@ import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 
 -- The GHC interface
 import qualified GHC
-import GHC		( Session, verbosity, dopt, DynFlag(..), Target(..),
+import GHC		( Session, dopt, DynFlag(..), Target(..),
 			  TargetId(..), DynFlags(..),
-			  pprModule, Type, Module, SuccessFlag(..),
+			  pprModule, Type, Module, ModuleName, SuccessFlag(..),
 			  TyThing(..), Name, LoadHowMuch(..), Phase,
 			  GhcException(..), showGhcException,
 			  CheckedModule(..), SrcLoc )
@@ -45,7 +45,6 @@ import PprTyThing
 import Outputable
 
 -- for createtags (should these come via GHC?)
-import Module		( moduleString )
 import Name		( nameSrcLoc, nameModule, nameOccName )
 import OccName		( pprOccName )
 import SrcLoc		( isGoodSrcLoc, srcLocFile, srcLocLine, srcLocCol )
@@ -95,7 +94,6 @@ import System.IO.Error as IO
 import Data.Char
 import Control.Monad as Monad
 import Foreign.StablePtr	( newStablePtr )
-import Text.Printf
 
 import GHC.Exts		( unsafeCoerce# )
 import GHC.IOBase	( IOErrorType(InvalidArgument) )
@@ -242,13 +240,15 @@ jumpFunction session@(Session ref) (I# idsPtr) hValues location b
 		  	      ic_type_env     = new_type_env }
          writeIORef ref (hsc_env { hsc_IC = new_ic })
          is_tty <- hIsTerminalDevice stdin
+         prel_mod <- GHC.findModule session prel_name Nothing
          withExtendedLinkEnv (zip names hValues) $
            startGHCi (interactiveLoop is_tty True)
                      GHCiState{ progname = "<interactive>",
                                 args = [],
                                 prompt = location++"> ",
                                 session = session,
-                                options = [] }
+                                options = [],
+                                prelude =  prel_mod }
          writeIORef ref hsc_env
          putStrLn $ "Returning to normal execution..."
          return b
@@ -284,7 +284,8 @@ interactiveUI session srcs maybe_expr = do
    hSetBuffering stdin NoBuffering
 
 	-- initial context is just the Prelude
-   GHC.setContext session [] [prelude_mod]
+   prel_mod <- GHC.findModule session prel_name Nothing
+   GHC.setContext session [] [prel_mod]
 
 #ifdef USE_READLINE
    Readline.initialize
@@ -305,13 +306,16 @@ interactiveUI session srcs maybe_expr = do
 		   args = [],
                    prompt = "%s> ",
 		   session = session,
-		   options = [] }
+		   options = [],
+                   prelude = prel_mod }
 
 #ifdef USE_READLINE
    Readline.resetTerminal Nothing
 #endif
 
    return ()
+
+prel_name = GHC.mkModuleName "Prelude"
 
 runGHCi :: [(FilePath, Maybe Phase)] -> Maybe String -> GHCi ()
 runGHCi paths maybe_expr = do
@@ -807,7 +811,7 @@ loadModule' files = do
 
 checkModule :: String -> GHCi ()
 checkModule m = do
-  let modl = GHC.mkModule m
+  let modl = GHC.mkModuleName m
   session <- getSession
   result <- io (GHC.checkModule session modl)
   case result of
@@ -816,7 +820,7 @@ checkModule m = do
 	case checkedModuleInfo r of
 	   Just cm | Just scope <- GHC.modInfoTopLevelScope cm -> 
 		let
-		    (local,global) = partition ((== modl) . GHC.nameModule) scope
+		    (local,global) = partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
 		in
 			(text "global names: " <+> ppr global) $$
 		        (text "local  names: " <+> ppr local)
@@ -832,22 +836,23 @@ reloadModule "" = do
 reloadModule m = do
   io (revertCAFs)		-- always revert CAFs on reload.
   session <- getSession
-  ok <- io (GHC.load session (LoadUpTo (GHC.mkModule m)))
+  ok <- io (GHC.load session (LoadUpTo (GHC.mkModuleName m)))
   afterLoad ok session
 
 afterLoad ok session = do
   io (revertCAFs)  -- always revert CAFs on load.
   graph <- io (GHC.getModuleGraph session)
-  graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod) graph
+  graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
   setContextAfterLoad session graph'
-  modulesLoadedMsg ok (map GHC.ms_mod graph')
+  modulesLoadedMsg ok (map GHC.ms_mod_name graph')
 #if defined(GHCI) && defined(BREAKPOINT)
   io (extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))
                     ,(breakpointCondJumpName,unsafeCoerce# (jumpCondFunction session))])
 #endif
 
 setContextAfterLoad session [] = do
-  io (GHC.setContext session [] [prelude_mod])
+  prel_mod <- getPrelude
+  io (GHC.setContext session [] [prel_mod])
 setContextAfterLoad session ms = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- io (GHC.getTargets session)
@@ -864,7 +869,7 @@ setContextAfterLoad session ms = do
 	(m:_) -> Just m
 
    summary `matches` Target (TargetModule m) _
-	= GHC.ms_mod summary == m
+	= GHC.ms_mod_name summary == m
    summary `matches` Target (TargetFile f _) _ 
 	| Just f' <- GHC.ml_hs_file (GHC.ms_location summary)	= f == f'
    summary `matches` target
@@ -873,17 +878,19 @@ setContextAfterLoad session ms = do
    load_this summary | m <- GHC.ms_mod summary = do
 	b <- io (GHC.moduleIsInterpreted session m)
 	if b then io (GHC.setContext session [m] []) 
-       	     else io (GHC.setContext session []  [prelude_mod,m])
+       	     else do
+                   prel_mod <- getPrelude
+                   io (GHC.setContext session []  [prel_mod,m])
 
 
-modulesLoadedMsg :: SuccessFlag -> [Module] -> GHCi ()
+modulesLoadedMsg :: SuccessFlag -> [ModuleName] -> GHCi ()
 modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
   when (verbosity dflags > 0) $ do
    let mod_commas 
 	| null mods = text "none."
 	| otherwise = hsep (
-	    punctuate comma (map pprModule mods)) <> text "."
+	    punctuate comma (map ppr mods)) <> text "."
    case ok of
     Failed ->
        io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
@@ -950,8 +957,9 @@ createTagsFile session tagskind tagFile = do
         is_interpreted <- GHC.moduleIsInterpreted session m
         -- should we just skip these?
         when (not is_interpreted) $
-          throwDyn (CmdLineError ("module '" ++ moduleString m ++ "' is not interpreted"))
-
+          throwDyn (CmdLineError ("module '" 
+                                ++ GHC.moduleNameString (GHC.moduleName m)
+                                ++ "' is not interpreted"))
         mbModInfo <- GHC.getModuleInfo session m
         let unqual 
 	      | Just modinfo <- mbModInfo,
@@ -1039,8 +1047,7 @@ browseCmd m =
 
 browseModule m exports_only = do
   s <- getSession
-
-  let modl = GHC.mkModule m
+  modl <- io $ GHC.findModule s (GHC.mkModuleName m) Nothing
   is_interpreted <- io (GHC.moduleIsInterpreted s modl)
   when (not is_interpreted && not exports_only) $
 	throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
@@ -1048,7 +1055,8 @@ browseModule m exports_only = do
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
   (as,bs) <- io (GHC.getContext s)
-  io (if exports_only then GHC.setContext s [] [prelude_mod,modl]
+  prel_mod <- getPrelude
+  io (if exports_only then GHC.setContext s [] [prel_mod,modl]
 		      else GHC.setContext s [modl] [])
   unqual <- io (GHC.getPrintUnqual s)
   io (GHC.setContext s as bs)
@@ -1089,47 +1097,53 @@ setContext str
     sensible ('*':m) = looksLikeModuleName m
     sensible m       = looksLikeModuleName m
 
-newContext mods = do
-  session <- getSession
-  (as,bs) <- separate session mods [] []
-  let bs' = if null as && prelude_mod `notElem` bs then prelude_mod:bs else bs
-  io (GHC.setContext session as bs')
-
-separate :: Session -> [String] -> [Module] -> [Module]
-  -> GHCi ([Module],[Module])
+separate :: Session -> [String] -> [Module] -> [Module] 
+        -> GHCi ([Module],[Module])
 separate session []           as bs = return (as,bs)
-separate session (('*':m):ms) as bs = do
-   let modl = GHC.mkModule m
-   b <- io (GHC.moduleIsInterpreted session modl)
-   if b then separate session ms (modl:as) bs
-   	else throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
-separate session (m:ms)       as bs = separate session ms as (GHC.mkModule m:bs)
+separate session (('*':str):ms) as bs = do
+   m <- io $ GHC.findModule session (GHC.mkModuleName str) Nothing
+   b <- io $ GHC.moduleIsInterpreted session m
+   if b then separate session ms (m:as) bs
+   	else throwDyn (CmdLineError ("module '"
+                        ++ GHC.moduleNameString (GHC.moduleName m)
+                        ++ "' is not interpreted"))
+separate session (str:ms) as bs = do
+  m <- io $ GHC.findModule session (GHC.mkModuleName str) Nothing
+  separate session ms as (m:bs)
 
-prelude_mod = GHC.mkModule "Prelude"
-
-
-addToContext mods = do
-  cms <- getSession
-  (as,bs) <- io (GHC.getContext cms)
-
-  (as',bs') <- separate cms mods [] []
-
-  let as_to_add = as' \\ (as ++ bs)
-      bs_to_add = bs' \\ (as ++ bs)
-
-  io (GHC.setContext cms (as ++ as_to_add) (bs ++ bs_to_add))
+newContext :: [String] -> GHCi ()
+newContext strs = do
+  s <- getSession
+  (as,bs) <- separate s strs [] []
+  prel_mod <- getPrelude
+  let bs' = if null as && prel_mod `notElem` bs then prel_mod:bs else bs
+  io $ GHC.setContext s as bs'
 
 
-removeFromContext mods = do
-  cms <- getSession
-  (as,bs) <- io (GHC.getContext cms)
+addToContext :: [String] -> GHCi ()
+addToContext strs = do
+  s <- getSession
+  (as,bs) <- io $ GHC.getContext s
 
-  (as_to_remove,bs_to_remove) <- separate cms mods [] []
+  (new_as,new_bs) <- separate s strs [] []
+
+  let as_to_add = new_as \\ (as ++ bs)
+      bs_to_add = new_bs \\ (as ++ bs)
+
+  io $ GHC.setContext s (as ++ as_to_add) (bs ++ bs_to_add)
+
+
+removeFromContext :: [String] -> GHCi ()
+removeFromContext strs = do
+  s <- getSession
+  (as,bs) <- io $ GHC.getContext s
+
+  (as_to_remove,bs_to_remove) <- separate s strs [] []
 
   let as' = as \\ (as_to_remove ++ bs_to_remove)
       bs' = bs \\ (as_to_remove ++ bs_to_remove)
 
-  io (GHC.setContext cms as' bs')
+  io $ GHC.setContext s as' bs'
 
 ----------------------------------------------------------------------------
 -- Code for `:set'
@@ -1357,7 +1371,7 @@ completeModule w = do
 completeHomeModule w = do
   s <- restoreSession
   g <- GHC.getModuleGraph s
-  let home_mods = map GHC.ms_mod g
+  let home_mods = map GHC.ms_mod_name g
   return (filter (w `isPrefixOf`) (map (showSDoc.ppr) home_mods))
 
 completeSetOptions w = do
@@ -1393,9 +1407,9 @@ getCommonPrefix (s:ss) = foldl common s ss
 	   | c == d = c : common cs ds
 	   | otherwise = ""
 
-allExposedModules :: DynFlags -> [Module]
+allExposedModules :: DynFlags -> [ModuleName]
 allExposedModules dflags 
- = map GHC.mkModule (concat (map exposedModules (filter exposed (eltsUFM pkg_db))))
+ = map GHC.mkModuleName (concat (map exposedModules (filter exposed (eltsUFM pkg_db))))
  where
   pkg_db = pkgIdMap (pkgState dflags)
 #else
@@ -1418,7 +1432,8 @@ data GHCiState = GHCiState
 	args	       :: [String],
         prompt         :: String,
 	session        :: GHC.Session,
-	options        :: [GHCiOption]
+	options        :: [GHCiOption],
+        prelude        :: Module
      }
 
 data GHCiOption 
@@ -1445,6 +1460,7 @@ setGHCiState s = GHCi $ \r -> writeIORef r s
 
 -- for convenience...
 getSession = getGHCiState >>= return . session
+getPrelude = getGHCiState >>= return . prelude
 
 GLOBAL_VAR(saved_sess, no_saved_sess, Session)
 no_saved_sess = error "no saved_ses"

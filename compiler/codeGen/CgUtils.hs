@@ -48,13 +48,12 @@ import MachOp		( MachRep(..), wordRep, MachOp(..),  MachHint(..),
 			  mo_wordULt, mo_wordUGt, mo_wordUGe, machRepByteWidth )
 import ForeignCall	( CCallConv(..) )
 import Literal		( Literal(..) )
-import CLabel		( CLabel, mkStringLitLabel )
 import Digraph		( SCC(..), stronglyConnComp )
 import ListSetOps	( assocDefault )
 import Util		( filterOut, sortLe )
 import DynFlags		( DynFlags(..), HscTarget(..) )
-import Packages		( HomeModules )
-import FastString	( LitString, FastString, bytesFS )
+import FastString	( LitString, bytesFS )
+import PackageConfig	( PackageId )
 import Outputable
 
 import Char		( ord )
@@ -213,11 +212,11 @@ addToMemE rep ptr n
 --
 -------------------------------------------------------------------------
 
-tagToClosure :: HomeModules -> TyCon -> CmmExpr -> CmmExpr
-tagToClosure hmods tycon tag
+tagToClosure :: PackageId -> TyCon -> CmmExpr -> CmmExpr
+tagToClosure this_pkg tycon tag
   = CmmLoad (cmmOffsetExprW closure_tbl tag) wordRep
   where closure_tbl = CmmLit (CmmLabel lbl)
-	lbl = mkClosureTableLabel hmods (tyConName tycon)
+	lbl = mkClosureTableLabel this_pkg (tyConName tycon)
 
 -------------------------------------------------------------------------
 --
@@ -488,7 +487,6 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 		 -- a 2-branch switch always turns into an if.
     small      	 = n_tags <= 4
     dense      	 = n_branches > (n_tags `div` 2)
-    exhaustive   = n_tags == n_branches
     n_branches   = length branches
     
     -- ignore default slots at each end of the range if there's 

@@ -183,12 +183,16 @@ endif
 #
 ifneq "$(way)" "dll"
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-HS_PROG=$(odir)/ghc$(_way)-$(ProjectVersion)
+GHC_PROG=$(odir)/ghc$(_way)-$(ProjectVersion)
 else
-HS_PROG=$(odir)/ghc$(_way)
+GHC_PROG=$(odir)/ghc$(_way)
 endif
 else
-HS_PROG=$(odir)/ghc-$(ProjectVersion)
+GHC_PROG=$(odir)/ghc-$(ProjectVersion)
+endif
+
+ifneq "$(stage)" "2"
+HS_PROG = $(GHC_PROG)
 endif
 
 # -----------------------------------------------------------------------------
@@ -679,10 +683,10 @@ SRC_LD_OPTS += -no-link-chk
 
 all :: $(odir)/ghc-inplace ghc-inplace
 
-$(odir)/ghc-inplace : $(HS_PROG)
+$(odir)/ghc-inplace : $(GHC_PROG)
 	@$(RM) $@
 	echo '#!/bin/sh' >>$@
-	echo exec $(GHC_COMPILER_DIR_ABS)/$(HS_PROG) '-B$(subst \,\\,$(FPTOOLS_TOP_ABS_PLATFORM))' '"$$@"' >>$@
+	echo exec $(GHC_COMPILER_DIR_ABS)/$(GHC_PROG) '-B$(subst \,\\,$(FPTOOLS_TOP_ABS_PLATFORM))' '"$$@"' >>$@
 	chmod 755 $@
 
 ghc-inplace : stage1/ghc-inplace
@@ -704,9 +708,9 @@ CLEAN_FILES += $(odir)/ghc-inplace
 DESTDIR = $(INSTALL_LIBRARY_DIR_GHC)
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-INSTALL_LIBEXECS += $(HS_PROG)
+INSTALL_LIBEXECS += $(GHC_PROG)
 else
-INSTALL_PROGS += $(HS_PROG)
+INSTALL_PROGS += $(GHC_PROG)
 endif
 
 # ----------------------------------------------------------------------------
@@ -787,6 +791,19 @@ HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 
 # Haddock can't handle recursive modules currently, so we disable it for now.
 NO_HADDOCK_DOCS = YES
+
+# Don't build the GHC binary as normal, because we need to link it
+# against the GHC package.  The GHC binary itself is built by
+# compiling Main.o separately and linking it with -package ghc.  This is
+# done using a separate Makefile:
+
+all :: $(GHC_PROG)
+
+$(GHC_PROG) : libHS$(PACKAGE)$(_way).a main/Main.hs
+	$(MAKE) -f Makefile.ghcbin $(MFLAGS) HS_PROG=$(GHC_PROG) $@
+
+docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html chm HxS ps dvi txt::
+	$(MAKE) -f Makefile.ghcbin $(MFLAGS) $@
 endif
 
 #-----------------------------------------------------------------------------

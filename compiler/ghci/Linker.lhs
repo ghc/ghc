@@ -30,16 +30,19 @@ import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
 import DriverPhases	( isObjectFilename, isDynLibFilename )
-import Finder		( findModule, findObjectLinkableMaybe, FindResult(..) )
+import Finder		( findHomeModule, findObjectLinkableMaybe,
+                          FindResult(..) )
 import HscTypes
 import Name		( Name, nameModule, isExternalName, isWiredInName )
 import NameEnv
 import NameSet		( nameSetToList )
+import UniqFM           ( lookupUFM )
 import Module
 import ListSetOps	( minusList )
 import DynFlags		( DynFlags(..), getOpts )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
+import PackageConfig    ( rtsPackageId )
 import Panic            ( GhcException(..) )
 import Util             ( zipLazy, global, joinFileExt, joinFileName, suffixOf,
 			  replaceFilenameSuffix )
@@ -58,7 +61,10 @@ import System.IO	( putStr, putStrLn, hPutStrLn, stderr, fixIO )
 import System.Directory	( doesFileExist )
 
 import Control.Exception ( block, throwDyn, bracket )
-import Maybe		( isJust, fromJust )
+import Maybe		( fromJust )
+#ifdef DEBUG
+import Maybe            ( isJust )
+#endif
 
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.IOBase	( IO(..) )
@@ -122,9 +128,7 @@ emptyPLS dflags = PersistentLinkerState {
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs
-	  | ExtPackage rts_id <- rtsPackageId (pkgState dflags) = [rts_id]
-	  | otherwise = []
+  where init_pkgs = [rtsPackageId]
 \end{code}
 
 \begin{code}
@@ -363,7 +367,6 @@ linkExpr hsc_env span root_ul_bco
    }}
    where
      hpt    = hsc_HPT hsc_env
-     dflags = hsc_dflags hsc_env
      free_names = nameSetToList (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]
@@ -413,7 +416,8 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 	    mods_needed = nub (concat mods_s) `minusList` linked_mods     ;
 	    pkgs_needed = nub (concat pkgs_s) `minusList` pkgs_loaded pls ;
 
-	    linked_mods = map linkableModule (objs_loaded pls ++ bcos_loaded pls)
+	    linked_mods = map (moduleName.linkableModule) 
+                                (objs_loaded pls ++ bcos_loaded pls)
 	} ;
 	
 	-- 3.  For each dependent module, find its linkable
@@ -423,19 +427,22 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 
 	return (lnks_needed, pkgs_needed) }
   where
-    get_deps :: Module -> ([Module],[PackageId])
+    dflags = hsc_dflags hsc_env
+    this_pkg = thisPackage dflags
+
+    get_deps :: Module -> ([ModuleName],[PackageId])
 	-- Get the things needed for the specified module
 	-- This is rather similar to the code in RnNames.importsFromImportDecl
     get_deps mod
-	| ExtPackage p <- mi_package iface
-	= ([], p : dep_pkgs deps)
+        | pkg /= this_pkg
+        = ([], pkg : dep_pkgs deps)
 	| otherwise
-	= (mod : [m | (m,_) <- dep_mods deps], dep_pkgs deps)
+	= (moduleName mod : [m | (m,_) <- dep_mods deps], dep_pkgs deps)
 	where
-	  iface = get_iface mod
-	  deps  = mi_deps iface
+          pkg   = modulePackageId mod
+	  deps  = mi_deps (get_iface mod)
 
-    get_iface mod = case lookupIface hpt pit mod of
+    get_iface mod = case lookupIfaceByModule dflags hpt pit mod of
 			    Just iface -> iface
 			    Nothing    -> pprPanic "getLinkDeps" (no_iface mod)
     no_iface mod = ptext SLIT("No iface for") <+> ppr mod
@@ -451,23 +458,22 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 	-- This one is a build-system bug
 
     get_linkable maybe_normal_osuf mod_name	-- A home-package module
-	| Just mod_info <- lookupModuleEnv hpt mod_name 
+	| Just mod_info <- lookupUFM hpt mod_name 
 	= ASSERT(isJust (hm_linkable mod_info))
 	  adjust_linkable (fromJust (hm_linkable mod_info))
 	| otherwise	
-	=	-- It's not in the HPT because we are in one shot mode, 
+	= do	-- It's not in the HPT because we are in one shot mode, 
 		-- so use the Finder to get a ModLocation...
-	  do { mb_stuff <- findModule hsc_env mod_name False ;
-	       case mb_stuff of {
-		  Found loc _ -> found loc mod_name ;
+	     mb_stuff <- findHomeModule hsc_env mod_name
+	     case mb_stuff of
+		  Found loc mod -> found loc mod
 		  _ -> no_obj mod_name
-	     }}
-	where
-	    found loc mod_name = do {
+
+    found loc mod = do {
 		-- ...and then find the linkable for it
-	       mb_lnk <- findObjectLinkableMaybe mod_name loc ;
+	       mb_lnk <- findObjectLinkableMaybe mod loc ;
 	       case mb_lnk of {
-		  Nothing -> no_obj mod_name ;
+		  Nothing -> no_obj mod ;
 		  Just lnk -> adjust_linkable lnk
 	      }}
 

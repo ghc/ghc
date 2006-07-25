@@ -10,6 +10,7 @@ import OccName
 import Kind( Kind(..) )
 import Name( nameOccName, nameModule )
 import Module
+import PackageConfig	( mainPackageId )
 import ParserCoreUtils
 import LexCore
 import Literal
@@ -72,7 +73,8 @@ module	:: { HsExtCore RdrName }
          : '%module' modid tdefs vdefgs { HsExtCore $2 $3 $4 }
 
 modid	:: { Module }
-	: CNAME	                 { mkModuleFS (mkFastString $1) }
+        : CNAME	                 { mkModule mainPackageId  -- ToDo: wrong
+		  			(mkModuleNameFS (mkFastString $1)) }
 
 -------------------------------------------------------------
 --     Type and newtype declarations are in HsSyn syntax

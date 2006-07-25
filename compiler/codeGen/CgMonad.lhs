@@ -47,7 +47,7 @@ module CgMonad (
 	Sequel(..), -- ToDo: unabstract?
 
 	-- ideally we wouldn't export these, but some other modules access internal state
-	getState, setState, getInfoDown, getDynFlags, getHomeModules,
+	getState, setState, getInfoDown, getDynFlags, getThisPackage,
 
 	-- more localised access to monad state	
 	getStkUsage, setStkUsage,
@@ -61,8 +61,8 @@ module CgMonad (
 
 import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 
-import DynFlags		( DynFlags )
-import Packages		( HomeModules )
+import DynFlags		( DynFlags(..) )
+import PackageConfig	( PackageId )
 import Cmm
 import CmmUtils		( CmmStmts, isNopStmt )
 import CLabel
@@ -97,7 +97,6 @@ along.
 data CgInfoDownwards	-- information only passed *downwards* by the monad
   = MkCgInfoDown {
 	cgd_dflags  :: DynFlags,
-	cgd_hmods   :: HomeModules,	-- Packages we depend on
 	cgd_mod     :: Module,		-- Module being compiled
 	cgd_statics :: CgBindings,	-- [Id -> info] : static environment
 	cgd_srt     :: CLabel,		-- label of the current SRT
@@ -105,10 +104,9 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 	cgd_eob     :: EndOfBlockInfo	-- Info for stuff to do at end of basic block:
   }
 
-initCgInfoDown :: DynFlags -> HomeModules -> Module -> CgInfoDownwards
-initCgInfoDown dflags hmods mod
+initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
+initCgInfoDown dflags mod
   = MkCgInfoDown {	cgd_dflags  = dflags,
-			cgd_hmods   = hmods,
 			cgd_mod     = mod,
 			cgd_statics = emptyVarEnv,
 			cgd_srt     = error "initC: srt",
@@ -378,11 +376,11 @@ instance Monad FCode where
 The Abstract~C is not in the environment so as to improve strictness.
 
 \begin{code}
-initC :: DynFlags -> HomeModules -> Module -> FCode a -> IO a
+initC :: DynFlags -> Module -> FCode a -> IO a
 
-initC dflags hmods mod (FCode code)
+initC dflags mod (FCode code)
   = do	{ uniqs <- mkSplitUniqSupply 'c'
-	; case code (initCgInfoDown dflags hmods mod) (initCgState uniqs) of
+	; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
 	      (res, _) -> return res
 	}
 
@@ -510,8 +508,8 @@ getInfoDown = FCode $ \info_down state -> (info_down,state)
 getDynFlags :: FCode DynFlags
 getDynFlags = liftM cgd_dflags getInfoDown
 
-getHomeModules :: FCode HomeModules
-getHomeModules = liftM cgd_hmods getInfoDown
+getThisPackage :: FCode PackageId
+getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
 withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state 

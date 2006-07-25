@@ -8,7 +8,7 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
-import Module		( Module )
+import Module		( ModuleName )
 import Outputable
 import FastString
 import SrcLoc		( Located(..) )
@@ -26,10 +26,10 @@ One per \tr{import} declaration in a module.
 type LImportDecl name = Located (ImportDecl name)
 
 data ImportDecl name
-  = ImportDecl	  (Located Module)		-- module name
+  = ImportDecl	  (Located ModuleName)		-- module name
 		  Bool				-- True <=> {-# SOURCE #-} import
 		  Bool				-- True => qualified
-		  (Maybe Module)		-- as Module
+		  (Maybe ModuleName)		-- as Module
 		  (Maybe (Bool, [LIE name]))	-- (True => hiding, names)
 \end{code}
 
@@ -72,7 +72,7 @@ data IE name
   | IEThingAbs          name		-- Class/Type (can't tell)
   | IEThingAll          name		-- Class/Type plus all methods/constructors
   | IEThingWith		name [name]	-- Class/Type plus some methods/constructors
-  | IEModuleContents    Module		-- (Export Only)
+  | IEModuleContents    ModuleName	-- (Export Only)
 \end{code}
 
 \begin{code}

@@ -49,10 +49,14 @@ module DynFlags (
 
 #include "HsVersions.h"
 
-import Module		( Module, mkModule )
+import Module		( Module, mkModuleName, mkModule )
+import PackageConfig
 import PrelNames	( mAIN )
-import StaticFlags	( opt_Static, opt_PIC, 
-			  WayName(..), v_Ways, v_Build_tag, v_RTS_Build_tag )
+#ifdef i386_TARGET_ARCH
+import StaticFlags	( opt_Static )
+#endif
+import StaticFlags	( opt_PIC, WayName(..), v_Ways, v_Build_tag,
+			  v_RTS_Build_tag )
 import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases	( Phase(..), phaseInputExt )
 import Config
@@ -210,6 +214,7 @@ data DynFlags = DynFlags {
   importPaths		:: [FilePath],
   mainModIs		:: Module,
   mainFunIs		:: Maybe String,
+  thisPackage		:: PackageId,
 
   -- ways
   wayNames		:: [WayName],	-- way flags from the cmd line
@@ -344,6 +349,7 @@ defaultDynFlags =
 	importPaths		= ["."],
 	mainModIs		= mAIN,
 	mainFunIs		= Nothing,
+	thisPackage		= mainPackageId,
 	
 	wayNames		= panic "ways",
 	buildTag		= panic "buildTag",
@@ -864,7 +870,7 @@ dynamic_flags = [
         ------- Packages ----------------------------------------------------
   ,  ( "package-conf"   , HasArg extraPkgConf_ )
   ,  ( "no-user-package-conf", NoArg (unSetDynFlag Opt_ReadUserPackageConf) )
-  ,  ( "package-name"   , HasArg ignorePackage ) -- for compatibility
+  ,  ( "package-name"   , HasArg setPackageName )
   ,  ( "package"        , HasArg exposePackage )
   ,  ( "hide-package"   , HasArg hidePackage )
   ,  ( "hide-all-packages", NoArg (setDynFlag Opt_HideAllPackages) )
@@ -1073,6 +1079,13 @@ hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p = 
   upd (\s -> s{ packageFlags = IgnorePackage p : packageFlags s })
+setPackageName p
+  | Nothing <- unpackPackageId pid
+  = throwDyn (CmdLineError ("cannot parse \'" ++ p ++ "\' as a package identifier"))
+  | otherwise
+  = upd (\s -> s{ thisPackage = pid })
+  where
+        pid = stringToPackageId p
 
 -- we can only switch between HscC, HscAsmm, and HscILX with dynamic flags 
 -- (-fvia-C, -fasm, -filx respectively).
@@ -1096,10 +1109,10 @@ setMainIs :: String -> DynP ()
 setMainIs arg
   | not (null main_fn)		-- The arg looked like "Foo.baz"
   = upd $ \d -> d{ mainFunIs = Just main_fn,
-	  	   mainModIs = mkModule main_mod }
+	  	   mainModIs = mkModule mainPackageId (mkModuleName main_mod) }
 
   | isUpper (head main_mod)	-- The arg looked like "Foo"
-  = upd $ \d -> d{ mainModIs = mkModule main_mod }
+  = upd $ \d -> d{ mainModIs = mkModule mainPackageId (mkModuleName main_mod) }
   
   | otherwise			-- The arg looked like "baz"
   = upd $ \d -> d{ mainFunIs = Just main_mod }

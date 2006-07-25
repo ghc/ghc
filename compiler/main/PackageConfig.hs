@@ -6,14 +6,21 @@ module PackageConfig (
 	-- * PackageId
 	PackageId, 
 	mkPackageId, stringToPackageId, packageIdString, packageConfigId,
-	packageIdFS, fsToPackageId, 
+	packageIdFS, fsToPackageId,  unpackPackageId,
 	
 	-- * The PackageConfig type: information about a package
 	PackageConfig,
 	InstalledPackageInfo(..), showPackageId,
 	Version(..),
 	PackageIdentifier(..),
-	defaultPackageConfig
+	defaultPackageConfig,
+
+	-- * Wired-in PackageIds
+	basePackageId,
+	rtsPackageId,
+	haskell98PackageId,
+	thPackageId,
+	mainPackageId
   ) where
 
 #include "HsVersions.h"
@@ -22,6 +29,7 @@ import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
 import FastString
+import Text.ParserCombinators.ReadP ( readP_to_S )
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is just InstalledPackageInfo from Cabal.  Later we
@@ -66,4 +74,40 @@ mkPackageId = stringToPackageId . showPackageId
 packageConfigId :: PackageConfig -> PackageId
 packageConfigId = mkPackageId . package
 
+unpackPackageId :: PackageId -> Maybe PackageIdentifier
+unpackPackageId p
+  = case [ pid | (pid,"") <- readP_to_S parsePackageId str ] of
+        []      -> Nothing
+        (pid:_) -> Just pid
+  where str = packageIdString p
+
+-- -----------------------------------------------------------------------------
+-- Package Ids that are wired in
+
+-- Certain packages are "known" to the compiler, in that we know about certain
+-- entities that reside in these packages, and the compiler needs to 
+-- declare static Modules and Names that refer to these packages.  Hence
+-- the wired-in packages can't include version numbers, since we don't want
+-- to bake the version numbers of these packages into GHC.
+--
+-- So here's the plan.  Wired-in packages are still versioned as
+-- normal in the packages database, and you can still have multiple
+-- versions of them installed.  However, for each invocation of GHC,
+-- only a single instance of each wired-in package will be recognised
+-- (the desired one is selected via -package/-hide-package), and GHC
+-- will use the unversioned PackageId below when referring to it,
+-- including in .hi files and object file symbols.  Unselected
+-- versions of wired-in packages will be ignored, as will any other
+-- package that depends directly or indirectly on it (much as if you
+-- had used -ignore-package).
+
+basePackageId      = fsToPackageId FSLIT("base")
+rtsPackageId	   = fsToPackageId FSLIT("rts")
+haskell98PackageId = fsToPackageId FSLIT("haskell98")
+thPackageId        = fsToPackageId FSLIT("template-haskell")
+
+-- This is the package Id for the program.  It is the default package
+-- Id if you don't specify a package name.  We don't add this prefix
+-- to symbol name, since there can be only one main package per program.
+mainPackageId	   = fsToPackageId FSLIT("main")
 

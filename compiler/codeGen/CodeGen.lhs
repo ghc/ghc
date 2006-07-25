@@ -38,11 +38,11 @@ import PprCmm		( pprCmms )
 import MachOp		( wordRep )
 
 import StgSyn
-import PrelNames	( gHC_PRIM, rOOT_MAIN, pREL_TOP_HANDLER )
-import Packages		( HomeModules )
+import PrelNames	( gHC_PRIM, rOOT_MAIN, gHC_TOP_HANDLER )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_SccProfilingOn )
 
+import PackageConfig	( PackageId )
 import HscTypes		( ForeignStubs(..) )
 import CostCentre       ( CollectedCCs )
 import Id               ( Id, idName, setIdName )
@@ -51,16 +51,14 @@ import OccName		( mkLocalOcc )
 import TyCon            ( TyCon )
 import Module		( Module )
 import ErrUtils		( dumpIfSet_dyn, showPass )
-import Panic		( assertPanic )
 
 #ifdef DEBUG
-import Outputable
+import Panic		( assertPanic )
 #endif
 \end{code}
 
 \begin{code}
 codeGen :: DynFlags
-	-> HomeModules
 	-> Module
 	-> [TyCon]
 	-> ForeignStubs
@@ -69,7 +67,7 @@ codeGen :: DynFlags
 	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	-> IO [Cmm]		-- Output
 
-codeGen dflags hmods this_mod data_tycons foreign_stubs imported_mods 
+codeGen dflags this_mod data_tycons foreign_stubs imported_mods 
 	cost_centre_info stg_binds
   = do	
   { showPass dflags "CodeGen"
@@ -79,10 +77,10 @@ codeGen dflags hmods this_mod data_tycons foreign_stubs imported_mods
 -- Why?
 --   ; mapM_ (\x -> seq x (return ())) data_tycons
 
-  ; code_stuff <- initC dflags hmods this_mod $ do 
-		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags hmods) stg_binds
+  ; code_stuff <- initC dflags this_mod $ do 
+		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
 		; cmm_tycons <- mapM cgTyCon data_tycons
-		; cmm_init   <- getCmm (mkModuleInit dflags hmods way cost_centre_info 
+		; cmm_init   <- getCmm (mkModuleInit dflags way cost_centre_info 
 					     this_mod main_mod
 				  	     foreign_stubs imported_mods)
 		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
@@ -143,7 +141,6 @@ We initialise the module tree by keeping a work-stack,
 \begin{code}
 mkModuleInit 
 	:: DynFlags
-	-> HomeModules
 	-> String		-- the "way"
 	-> CollectedCCs         -- cost centre info
 	-> Module
@@ -151,7 +148,7 @@ mkModuleInit
 	-> ForeignStubs
 	-> [Module]
 	-> Code
-mkModuleInit dflags hmods way cost_centre_info this_mod main_mod foreign_stubs imported_mods
+mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs imported_mods
   = do	{ 	
         if opt_SccProfilingOn
             then do { -- Allocate the static boolean that records if this
@@ -184,9 +181,11 @@ mkModuleInit dflags hmods way cost_centre_info this_mod main_mod foreign_stubs i
 		(emitSimpleProc plain_main_init_lbl jump_to_init)
     }
   where
-    plain_init_lbl = mkPlainModuleInitLabel hmods this_mod
-    real_init_lbl  = mkModuleInitLabel hmods this_mod way
-    plain_main_init_lbl = mkPlainModuleInitLabel hmods rOOT_MAIN
+    this_pkg = thisPackage dflags
+
+    plain_init_lbl = mkPlainModuleInitLabel this_pkg this_mod
+    real_init_lbl  = mkModuleInitLabel this_pkg this_mod way
+    plain_main_init_lbl = mkPlainModuleInitLabel this_pkg rOOT_MAIN
 
     jump_to_init = stmtC (CmmJump (mkLblExpr real_init_lbl) [])
 
@@ -195,7 +194,7 @@ mkModuleInit dflags hmods way cost_centre_info this_mod main_mod foreign_stubs i
     -- Main refers to GHC.TopHandler.runIO, so make sure we call the
     -- init function for GHC.TopHandler.
     extra_imported_mods
-	| this_mod == main_mod = [pREL_TOP_HANDLER]
+	| this_mod == main_mod = [gHC_TOP_HANDLER]
 	| otherwise	       = []
 
     mod_init_code = do
@@ -204,7 +203,7 @@ mkModuleInit dflags hmods way cost_centre_info this_mod main_mod foreign_stubs i
 
 		-- Now do local stuff
 	; initCostCentres cost_centre_info
-	; mapCs (registerModuleImport hmods way) 
+	; mapCs (registerModuleImport this_pkg way) 
 		(imported_mods++extra_imported_mods)
 	} 
 
@@ -214,13 +213,13 @@ mkModuleInit dflags hmods way cost_centre_info this_mod main_mod foreign_stubs i
                       , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
 
 -----------------------
-registerModuleImport :: HomeModules -> String -> Module -> Code
-registerModuleImport hmods way mod 
+registerModuleImport :: PackageId -> String -> Module -> Code
+registerModuleImport this_pkg way mod 
   | mod == gHC_PRIM
   = nopC 
   | otherwise 	-- Push the init procedure onto the work stack
   = stmtsC [ CmmAssign spReg (cmmRegOffW spReg (-1))
-	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel hmods mod way)) ]
+	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel this_pkg mod way)) ]
 \end{code}
 
 
@@ -261,32 +260,32 @@ style, with the increasing static environment being plumbed as a state
 variable.
 
 \begin{code}
-cgTopBinding :: DynFlags -> HomeModules -> (StgBinding,[(Id,[Id])]) -> Code
-cgTopBinding dflags hmods (StgNonRec id rhs, srts)
+cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> Code
+cgTopBinding dflags (StgNonRec id rhs, srts)
   = do	{ id' <- maybeExternaliseId dflags id
-	; mapM_ (mkSRT hmods [id']) srts
+	; mapM_ (mkSRT (thisPackage dflags) [id']) srts
 	; (id,info) <- cgTopRhs id' rhs
 	; addBindC id info 	-- Add the *un-externalised* Id to the envt,
 				-- so we find it when we look up occurrences
 	}
 
-cgTopBinding dflags hmods (StgRec pairs, srts)
+cgTopBinding dflags (StgRec pairs, srts)
   = do	{ let (bndrs, rhss) = unzip pairs
 	; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
 	; let pairs' = zip bndrs' rhss
-	; mapM_ (mkSRT hmods bndrs')  srts
+	; mapM_ (mkSRT (thisPackage dflags) bndrs')  srts
 	; _new_binds <- fixC (\ new_binds -> do 
 		{ addBindsC new_binds
 		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
 	; nopC }
 
-mkSRT :: HomeModules -> [Id] -> (Id,[Id]) -> Code
-mkSRT hmods these (id,[])  = nopC
-mkSRT hmods these (id,ids)
+mkSRT :: PackageId -> [Id] -> (Id,[Id]) -> Code
+mkSRT this_pkg these (id,[])  = nopC
+mkSRT this_pkg these (id,ids)
   = do	{ ids <- mapFCs remap ids
 	; id  <- remap id
 	; emitRODataLits (mkSRTLabel (idName id)) 
-		       (map (CmmLabel . mkClosureLabel hmods . idName) ids)
+		       (map (CmmLabel . mkClosureLabel this_pkg . idName) ids)
 	}
   where
 	-- Sigh, better map all the ids against the environment in 

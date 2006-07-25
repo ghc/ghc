@@ -19,19 +19,21 @@ import ByteCodeItbls	( ItblEnv, ItblPtr )
 import ByteCodeAsm	( UnlinkedBCO(..), BCOPtr(..), sizeSS, ssElts )
 import ObjLink		( lookupSymbol )
 
-import Name		( Name,  nameModule, nameOccName, isExternalName )
+import Name		( Name,  nameModule, nameOccName )
+#ifdef DEBUG
+import Name             ( isExternalName )
+#endif
 import NameEnv
 import OccName		( occNameFS )
 import PrimOp		( PrimOp, primOpOcc )
-import Module		( moduleFS )
+import Module
+import PackageConfig    ( mainPackageId, packageIdFS )
 import FastString	( FastString(..), unpackFS, zEncodeFS )
-import Outputable
 import Panic            ( GhcException(..) )
 
 -- Standard libraries
 import GHC.Word		( Word(..) )
 
-import Data.Array.IArray ( listArray )
 import Data.Array.Base
 import GHC.Arr		( STArray(..) )
 
@@ -256,8 +258,17 @@ linkFail who what
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String
 nameToCLabel n suffix
-   = unpackFS (zEncodeFS (moduleFS (nameModule n)))
-     ++ '_': unpackFS (zEncodeFS (occNameFS (nameOccName n))) ++ '_':suffix
+   = if pkgid /= mainPackageId
+        then package_part ++ '_': qual_name
+        else qual_name
+  where
+        pkgid = modulePackageId mod
+        mod = nameModule n
+        package_part = unpackFS (zEncodeFS (packageIdFS (modulePackageId mod)))
+        module_part  = unpackFS (zEncodeFS (moduleNameFS (moduleName mod)))
+        occ_part     = unpackFS (zEncodeFS (occNameFS (nameOccName n)))
+        qual_name = module_part ++ '_':occ_part ++ '_':suffix
+
 
 primopToCLabel :: PrimOp -> String{-suffix-} -> String
 primopToCLabel primop suffix

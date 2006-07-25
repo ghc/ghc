@@ -28,7 +28,7 @@ import SMRep		( argMachRep, typeCgRep )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..), mkStringLit )
-import Module		( moduleFS )
+import Module		( moduleNameFS, moduleName )
 import Name		( getOccString, NamedThing(..) )
 import Type		( repType, coreEqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
@@ -351,10 +351,10 @@ dsFExportDynamic :: Id
 		 -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id cconv
   =  newSysLocalDs ty				 `thenDs` \ fe_id ->
-     getModuleDs				`thenDs` \ mod_name -> 
+     getModuleDs				`thenDs` \ mod -> 
      let 
         -- hack: need to get at the name of the C stub we're about to generate.
-       fe_nm	   = mkFastString (unpackFS (zEncodeFS (moduleFS mod_name)) ++ "_" ++ toCName fe_id)
+       fe_nm	   = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName fe_id)
      in
      newSysLocalDs arg_ty			`thenDs` \ cback ->
      dsLookupGlobalId newStablePtrName		`thenDs` \ newStablePtrId ->

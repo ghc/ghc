@@ -336,10 +336,10 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
 	 	-- Bind the default binder if necessary
 		-- (avoiding it avoids the assignment)
 		-- The deadness info is set by StgVarInfo
-	; hmods <- getHomeModules
+	; this_pkg <- getThisPackage
 	; whenC (not (isDeadBinder bndr))
 		(do { tmp_reg <- bindNewToTemp bndr
-		    ; stmtC (CmmAssign tmp_reg (tagToClosure hmods tycon tag_amode)) })
+		    ; stmtC (CmmAssign tmp_reg (tagToClosure this_pkg tycon tag_amode)) })
 
 		-- Compile the alts
 	; (branches, mb_deflt) <- cgAlgAlts NoGC Nothing{-cc_slot-}

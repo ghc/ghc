@@ -49,7 +49,7 @@ import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
 			  availName, IsBootInterface, Deprecations )
-import Packages		( PackageId, HomeModules )
+import Packages		( PackageId )
 import Type		( Type, pprTyThingCategory )
 import TcType		( TcTyVarSet, TcType, TcThetaType, SkolemInfo, TvSubst,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes, pprSkolInfo )
@@ -62,6 +62,7 @@ import NameSet		( NameSet, unionNameSets, DefUses )
 import Var		( Id, TyVar )
 import VarEnv		( TidyEnv )
 import Module
+import UniqFM
 import SrcLoc		( SrcSpan, SrcLoc, Located, srcSpanStart )
 import VarSet		( IdSet )
 import ErrUtils		( Messages, Message )
@@ -91,10 +92,9 @@ type TcId    	 = Id 			-- Type may be a TcType
 type TcIdSet 	 = IdSet
 type TcDictBinds = DictBinds TcId	-- Bag of dictionary bindings
 
-
-
 type TcRnIf a b c = IOEnv (Env a b) c
 type IfM lcl a  = TcRnIf IfGblEnv lcl a		-- Iface stuff
+
 type IfG a  = IfM () a				-- Top level
 type IfL a  = IfM IfLclEnv a			-- Nested
 type TcRn a = TcRnIf TcGblEnv TcLclEnv a
@@ -115,7 +115,8 @@ data Env gbl lcl	-- Changes as we move into an expression
 	env_top	 :: HscEnv,	-- Top-level stuff that never changes
 				-- Includes all info about imported things
 
-	env_us   :: TcRef UniqSupply,	-- Unique supply for local varibles
+	env_us   :: {-# UNPACK #-} !(IORef UniqSupply),	
+				-- Unique supply for local varibles
 
 	env_gbl  :: gbl,	-- Info about things defined at the top level
 				-- of the module being compiled
@@ -163,10 +164,6 @@ data TcGblEnv
 	tcg_imports :: ImportAvails,	-- Information about what was imported 
 					--    from where, including things bound
 					--    in this module
-
-	tcg_home_mods :: HomeModules,
-				-- Calculated from ImportAvails, allows us to
-				-- call Packages.isHomeModule
 
 	tcg_dus :: DefUses,  	-- What is defined in this module and what is used.
 				-- The latter is used to generate 
@@ -472,7 +469,7 @@ It is used 	* when processing the export list
 \begin{code}
 data ImportAvails 
    = ImportAvails {
-	imp_env :: ModuleEnv NameSet,
+	imp_env :: ModuleNameEnv NameSet,
 		-- All the things imported, classified by 
 		-- the *module qualifier* for its import
 		--   e.g.	 import List as Foo
@@ -501,7 +498,7 @@ data ImportAvails
 		--       need to recompile if the export version changes
 		--   (b) to specify what child modules to initialise
 
-	imp_dep_mods :: ModuleEnv (Module, IsBootInterface),
+	imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
 		-- Home-package modules needed by the module being compiled
 		--
 		-- It doesn't matter whether any of these dependencies
@@ -520,16 +517,16 @@ data ImportAvails
 		-- Orphan modules below us in the import tree
       }
 
-mkModDeps :: [(Module, IsBootInterface)]
-	  -> ModuleEnv (Module, IsBootInterface)
-mkModDeps deps = foldl add emptyModuleEnv deps
+mkModDeps :: [(ModuleName, IsBootInterface)]
+	  -> ModuleNameEnv (ModuleName, IsBootInterface)
+mkModDeps deps = foldl add emptyUFM deps
 	       where
-		 add env elt@(m,_) = extendModuleEnv env m elt
+		 add env elt@(m,_) = addToUFM env m elt
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_env 	= emptyModuleEnv, 
+emptyImportAvails = ImportAvails { imp_env 	= emptyUFM, 
 				   imp_mods   	= emptyModuleEnv,
-				   imp_dep_mods = emptyModuleEnv,
+				   imp_dep_mods = emptyUFM,
 				   imp_dep_pkgs = [],
 				   imp_orphs    = [] }
 
@@ -539,9 +536,9 @@ plusImportAvails
 		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, imp_orphs = orphs1 })
   (ImportAvails { imp_env = env2, imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2, imp_orphs = orphs2 })
-  = ImportAvails { imp_env      = plusModuleEnv_C unionNameSets env1 env2, 
+  = ImportAvails { imp_env      = plusUFM_C unionNameSets env1 env2, 
 		   imp_mods     = mods1  `plusModuleEnv` mods2,	
-		   imp_dep_mods = plusModuleEnv_C plus_mod_dep dmods1 dmods2,	
+		   imp_dep_mods = plusUFM_C plus_mod_dep dmods1 dmods2,	
 		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
 		   imp_orphs    = orphs1 `unionLists` orphs2 }
   where

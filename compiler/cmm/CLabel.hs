@@ -103,11 +103,11 @@ module CLabel (
 
 #include "HsVersions.h"
 
-import Packages		( HomeModules )
 import StaticFlags	( opt_Static, opt_DoTickyProfiling )
-import Packages		( isHomeModule, isDllName )
+import Packages		( isDllName )
 import DataCon		( ConTag )
-import Module		( Module )
+import PackageConfig	( PackageId )
+import Module		( Module, modulePackageId )
 import Name		( Name, isExternalName )
 import Unique		( pprUnique, Unique )
 import PrimOp		( PrimOp )
@@ -293,20 +293,20 @@ mkLocalInfoTableLabel  	name 	= IdLabel name  InfoTable
 mkLocalEntryLabel	name 	= IdLabel name  Entry
 mkLocalClosureTableLabel name	= IdLabel name ClosureTable
 
-mkClosureLabel hmods name
-  | isDllName hmods name = DynIdLabel    name Closure
+mkClosureLabel this_pkg name
+  | isDllName this_pkg name = DynIdLabel    name Closure
   | otherwise             = IdLabel name Closure
 
-mkInfoTableLabel hmods name
-  | isDllName hmods name = DynIdLabel    name InfoTable
+mkInfoTableLabel this_pkg name
+  | isDllName this_pkg name = DynIdLabel    name InfoTable
   | otherwise		 = IdLabel name InfoTable
 
-mkEntryLabel hmods name
-  | isDllName hmods name = DynIdLabel    name Entry
+mkEntryLabel this_pkg name
+  | isDllName this_pkg name = DynIdLabel    name Entry
   | otherwise             = IdLabel name Entry
 
-mkClosureTableLabel hmods name
-  | isDllName hmods name = DynIdLabel    name ClosureTable
+mkClosureTableLabel this_pkg name
+  | isDllName this_pkg name = DynIdLabel    name ClosureTable
   | otherwise             = IdLabel name ClosureTable
 
 mkLocalConInfoTableLabel     con = IdLabel con ConInfoTable
@@ -320,12 +320,12 @@ mkConInfoTableLabel name True  = DynIdLabel name ConInfoTable
 mkStaticInfoTableLabel name False = IdLabel    name StaticInfoTable
 mkStaticInfoTableLabel name True  = DynIdLabel name StaticInfoTable
 
-mkConEntryLabel hmods name
-  | isDllName hmods name = DynIdLabel    name ConEntry
+mkConEntryLabel this_pkg name
+  | isDllName this_pkg name = DynIdLabel    name ConEntry
   | otherwise             = IdLabel name ConEntry
 
-mkStaticConEntryLabel hmods name
-  | isDllName hmods name = DynIdLabel    name StaticConEntry
+mkStaticConEntryLabel this_pkg name
+  | isDllName this_pkg name = DynIdLabel    name StaticConEntry
   | otherwise             = IdLabel name StaticConEntry
 
 
@@ -337,13 +337,13 @@ mkDefaultLabel  uniq 		= CaseLabel uniq CaseDefault
 mkStringLitLabel		= StringLitLabel
 mkAsmTempLabel 			= AsmTempLabel
 
-mkModuleInitLabel :: HomeModules -> Module -> String -> CLabel
-mkModuleInitLabel hmods mod way
-  = ModuleInitLabel mod way $! (not (isHomeModule hmods mod))
+mkModuleInitLabel :: PackageId -> Module -> String -> CLabel
+mkModuleInitLabel this_pkg mod way
+  = ModuleInitLabel mod way $! modulePackageId mod /= this_pkg
 
-mkPlainModuleInitLabel :: HomeModules -> Module -> CLabel
-mkPlainModuleInitLabel hmods mod
-  = PlainModuleInitLabel mod $! (not (isHomeModule hmods mod))
+mkPlainModuleInitLabel :: PackageId -> Module -> CLabel
+mkPlainModuleInitLabel this_pkg mod
+  = PlainModuleInitLabel mod $! modulePackageId mod /= this_pkg
 
 	-- Some fixed runtime system labels
 

@@ -17,9 +17,10 @@ import HsSyn as Hs
 import qualified Class (FunDep)
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, getRdrName, nameRdrName )
 import qualified Name	( Name, mkInternalName, getName )
-import Module   ( Module, mkModule )
+import Module   ( ModuleName, mkModuleName, mkModule )
 import RdrHsSyn	( mkClassDecl, mkTyData )
 import qualified OccName
+import PackageConfig    ( PackageId, stringToPackageId )
 import OccName	( startsVarId, startsVarSym, startsConId, startsConSym,
 		  pprNameSpace )
 import SrcLoc	( Located(..), SrcSpan )
@@ -569,7 +570,7 @@ thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- 	 which will give confusing error messages later
 -- 
 -- The strict applications ensure that any buried exceptions get forced
-thRdrName ctxt_ns occ (TH.NameG th_ns mod) = (mkOrig     $! (mk_mod mod)) $! (mk_occ (mk_ghc_ns th_ns) occ)
+thRdrName ctxt_ns occ (TH.NameG th_ns pkg mod) = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! (mk_occ (mk_ghc_ns th_ns) occ)
 thRdrName ctxt_ns occ (TH.NameL uniq)      = nameRdrName $! (((Name.mkInternalName $! (mk_uniq uniq)) $! (mk_occ ctxt_ns occ)) noSrcLoc)
 thRdrName ctxt_ns occ (TH.NameQ mod)       = (mkRdrQual  $! (mk_mod mod)) $! (mk_occ ctxt_ns occ)
 thRdrName ctxt_ns occ (TH.NameU uniq)      = mkRdrUnqual $! (mk_uniq_occ ctxt_ns occ uniq)
@@ -617,8 +618,11 @@ mk_ghc_ns TH.DataName  = OccName.dataName
 mk_ghc_ns TH.TcClsName = OccName.tcClsName
 mk_ghc_ns TH.VarName   = OccName.varName
 
-mk_mod :: TH.ModName -> Module
-mk_mod mod = mkModule (TH.modString mod)
+mk_mod :: TH.ModName -> ModuleName
+mk_mod mod = mkModuleName (TH.modString mod)
+
+mk_pkg :: TH.ModName -> PackageId
+mk_pkg pkg = stringToPackageId (TH.pkgString pkg)
 
 mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)

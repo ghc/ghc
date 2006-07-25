@@ -19,8 +19,8 @@ import Lexer		( P(..), ParseResult(..), mkPState, pragState
                         , lexer, Token(..), PState(..) )
 import FastString
 import HsSyn		( ImportDecl(..), HsModule(..) )
-import Module		( Module, mkModule )
-import PrelNames        ( gHC_PRIM )
+import Module		( ModuleName, moduleName )
+import PrelNames        ( gHC_PRIM, mAIN_NAME )
 import StringBuffer	( StringBuffer(..), hGetStringBuffer, hGetStringBufferBlock
                         , appendStringBuffers )
 import SrcLoc		( Located(..), mkSrcLoc, unLoc, noSrcSpan )
@@ -31,11 +31,9 @@ import Util
 import Outputable
 import Pretty           ()
 import Panic
-import Bag		( unitBag, emptyBag, listToBag )
+import Bag		( emptyBag, listToBag )
 
 import Distribution.Compiler
-
-import TRACE
 
 import EXCEPTION	( throwDyn )
 import IO
@@ -55,13 +53,13 @@ openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
 -- we can end up with a large number of open handles before the garbage
 -- collector gets around to closing them.
 getImportsFromFile :: DynFlags -> FilePath
-   -> IO ([Located Module], [Located Module], Located Module)
+   -> IO ([Located ModuleName], [Located ModuleName], Located ModuleName)
 getImportsFromFile dflags filename = do
   buf <- hGetStringBuffer filename
   getImports dflags buf filename
 
 getImports :: DynFlags -> StringBuffer -> FilePath
-    -> IO ([Located Module], [Located Module], Located Module)
+    -> IO ([Located ModuleName], [Located ModuleName], Located ModuleName)
 getImports dflags buf filename = do
   let loc  = mkSrcLoc (mkFastString filename) 1 0
   case unP parseHeader (mkPState buf loc dflags) of
@@ -71,10 +69,10 @@ getImports dflags buf filename = do
 	    L _ (HsModule mod _ imps _ _) ->
 	      let
 		mod_name | Just located_mod <- mod = located_mod
-			 | otherwise               = L noSrcSpan (mkModule "Main")
+			 | otherwise               = L noSrcSpan mAIN_NAME
 	        (src_idecls, ord_idecls) = partition isSourceIdecl (map unLoc imps)
 		source_imps   = map getImpMod src_idecls	
-		ordinary_imps = filter ((/= gHC_PRIM) . unLoc) 
+		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc) 
 					(map getImpMod ord_idecls)
 		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
 	      in

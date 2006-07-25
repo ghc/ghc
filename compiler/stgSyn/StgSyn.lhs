@@ -52,6 +52,7 @@ import Var		( isId )
 import Id		( Id, idName, idType, idCafInfo )
 import IdInfo		( mayHaveCafRefs )
 import Packages		( isDllName )
+import PackageConfig	( PackageId )
 import Literal		( Literal, literalType )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
@@ -65,8 +66,6 @@ import TyCon            ( TyCon )
 import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
 import Bitmap
-import DynFlags		( DynFlags )
-import Packages		( HomeModules )
 import StaticFlags	( opt_SccProfilingOn )
 \end{code}
 
@@ -106,18 +105,18 @@ data GenStgArg occ
 isStgTypeArg (StgTypeArg _) = True
 isStgTypeArg other	    = False
 
-isDllArg :: HomeModules -> StgArg -> Bool
+isDllArg :: PackageId -> StgArg -> Bool
 	-- Does this argument refer to something in a different DLL?
-isDllArg hmods (StgTypeArg v)  = False
-isDllArg hmods (StgVarArg v)   = isDllName hmods (idName v)
-isDllArg hmods (StgLitArg lit) = False
+isDllArg this_pkg (StgTypeArg v)  = False
+isDllArg this_pkg (StgVarArg v)   = isDllName this_pkg (idName v)
+isDllArg this_pkg (StgLitArg lit) = False
 
-isDllConApp :: HomeModules -> DataCon -> [StgArg] -> Bool
+isDllConApp :: PackageId -> DataCon -> [StgArg] -> Bool
 	-- Does this constructor application refer to 
 	-- anything in a different DLL?
 	-- If so, we can't allocate it statically
-isDllConApp hmods con args
-   = isDllName hmods (dataConName con) || any (isDllArg hmods) args
+isDllConApp this_pkg con args
+   = isDllName this_pkg (dataConName con) || any (isDllArg this_pkg) args
 
 stgArgType :: StgArg -> Type
 	-- Very half baked becase we have lost the type arguments

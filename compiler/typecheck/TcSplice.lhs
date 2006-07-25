@@ -41,7 +41,7 @@ import NameEnv		( lookupNameEnv )
 import HscTypes		( lookupType, ExternalPackageState(..), emptyModDetails )
 import OccName
 import Var		( Id, TyVar, idType )
-import Module		( moduleString )
+import Module		( moduleName, moduleNameString, modulePackageId )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classExtraBigSig )
@@ -59,7 +59,7 @@ import ErrUtils		( Message )
 import SrcLoc		( SrcSpan, noLoc, unLoc, getLoc )
 import Outputable
 import Unique		( Unique, Uniquable(..), getKey, mkUniqueGrimily )
-
+import PackageConfig    ( packageIdString )
 import BasicTypes	( StrictnessMark(..), Fixity(..), FixityDirection(..) )
 import Panic		( showException )
 import FastString	( LitString )
@@ -419,7 +419,10 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
   qReport True msg  = addErr (text msg)
   qReport False msg = addReport (text msg)
 
-  qCurrentModule = do { m <- getModule; return (moduleString m) }
+  qCurrentModule = do { m <- getModule;
+                        return (moduleNameString (moduleName m)) }
+                -- ToDo: is throwing away the package name ok here?
+
   qReify v = reify v
 
 	-- For qRecover, discard error messages if 
@@ -479,9 +482,9 @@ reify th_name
 	; reifyThing thing
     }
   where
-    ppr_ns (TH.Name _ (TH.NameG TH.DataName mod)) = text "data"
-    ppr_ns (TH.Name _ (TH.NameG TH.TcClsName mod)) = text "tc"
-    ppr_ns (TH.Name _ (TH.NameG TH.VarName mod)) = text "var"
+    ppr_ns (TH.Name _ (TH.NameG TH.DataName _pkg _mod)) = text "data"
+    ppr_ns (TH.Name _ (TH.NameG TH.TcClsName _pkg _mod)) = text "tc"
+    ppr_ns (TH.Name _ (TH.NameG TH.VarName _pkg _mod)) = text "var"
 
 lookupThName :: TH.Name -> TcM Name
 lookupThName th_name@(TH.Name occ flavour)
@@ -524,7 +527,8 @@ tcLookupTh name
 	 
 	  else do 		-- It's imported
 	{ (eps,hpt) <- getEpsAndHpt
-	; case lookupType hpt (eps_PTE eps) name of 
+        ; dflags <- getDOpts
+	; case lookupType dflags hpt (eps_PTE eps) name of 
 	    Just thing -> return (AGlobal thing)
 	    Nothing    -> do { thing <- tcImportDecl name
 			     ; return (AGlobal thing) }
@@ -663,7 +667,7 @@ reifyPred p@(IParam _ _)   = noTH SLIT("implicit parameters") (ppr p)
 ------------------------------
 reifyName :: NamedThing n => n -> TH.Name
 reifyName thing
-  | isExternalName name = mk_varg mod occ_str
+  | isExternalName name = mk_varg pkg_str mod_str occ_str
   | otherwise	        = TH.mkNameU occ_str (getKey (getUnique name))
 	-- Many of the things we reify have local bindings, and 
 	-- NameL's aren't supposed to appear in binding positions, so
@@ -671,7 +675,9 @@ reifyName thing
 	-- have free variables, we may need to generate NameL's for them.
   where
     name    = getName thing
-    mod     = moduleString (nameModule name)
+    mod     = nameModule name
+    pkg_str = packageIdString (modulePackageId mod)
+    mod_str = moduleNameString (moduleName mod)
     occ_str = occNameString occ
     occ     = nameOccName name
     mk_varg | OccName.isDataOcc occ = TH.mkNameG_d

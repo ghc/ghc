@@ -292,7 +292,7 @@ emitCostCentreDecl
    -> Code
 emitCostCentreDecl cc = do 
   { label <- mkStringCLit (costCentreUserName cc)
-  ; modl  <- mkStringCLit (moduleString (cc_mod cc))
+  ; modl  <- mkStringCLit (showSDoc (pprModule (cc_mod cc)))
   ; let
      lits = [ zero,   	-- StgInt ccID,
 	      label,	-- char *label,

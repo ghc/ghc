@@ -43,7 +43,7 @@ module GHC (
 	TypecheckedSource, ParsedSource, RenamedSource,
 
 	-- * Inspecting the module structure of the program
-	ModuleGraph, ModSummary(..), ModLocation(..),
+	ModuleGraph, ModSummary(..), ms_mod_name, ModLocation(..),
 	getModuleGraph,
 	isLoaded,
 	topSortModuleGraph,
@@ -65,6 +65,7 @@ module GHC (
 
 	-- * Interactive evaluation
 	getBindings, getPrintUnqual,
+        findModule,
 #ifdef GHCI
 	setContext, getContext,	
 	getNamesInScope,
@@ -83,8 +84,12 @@ module GHC (
 
 	-- * Abstract syntax elements
 
+        -- ** Packages
+        PackageId,
+
 	-- ** Modules
-	Module, mkModule, pprModule,
+	Module, mkModule, pprModule, moduleName, modulePackageId,
+        ModuleName, mkModuleName, moduleNameString,
 
 	-- ** Names
 	Name, 
@@ -177,6 +182,7 @@ import RdrName		( plusGlobalRdrEnv, Provenance(..),
 			  ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
 			  mkGlobalRdrEnv )
 import HscMain		( hscParseIdentifier, hscStmt, hscTcExpr, hscKcType )
+import Name		( nameOccName )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
 import GHC.Exts		( unsafeCoerce# )
@@ -208,7 +214,7 @@ import DataCon		( DataCon, dataConWrapId, dataConSig, dataConTyCon,
 			  dataConFieldLabels, dataConStrictMarks, 
 			  dataConIsInfix, isVanillaDataCon )
 import Name		( Name, nameModule, NamedThing(..), nameParent_maybe,
-			  nameSrcLoc, nameOccName )
+			  nameSrcLoc )
 import OccName		( parenSymOcc )
 import NameEnv		( nameEnvElts )
 import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
@@ -216,19 +222,20 @@ import SrcLoc
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo	( getImports, getOptions )
-import Packages		( isHomePackage )
 import Finder
 import HscMain		( newHscEnv, hscFileCheck, HscChecked(..) )
 import HscTypes
 import DynFlags
 import SysTools		( initSysTools, cleanTempFiles )
 import Module
+import UniqFM
+import PackageConfig    ( PackageId )
 import FiniteMap
 import Panic
 import Digraph
 import Bag		( unitBag )
 import ErrUtils		( Severity(..), showPass, fatalErrorMsg, debugTraceMsg,
-			  mkPlainErrMsg, printBagOfErrors, printErrorsAndWarnings )
+			  mkPlainErrMsg, printBagOfErrors )
 import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
@@ -448,7 +455,7 @@ guessTarget file Nothing
 	if exists
 	   then return (Target (TargetFile lhs_file Nothing) Nothing)
 	   else do
-	return (Target (TargetModule (mkModule file)) Nothing)
+	return (Target (TargetModule (mkModuleName file)) Nothing)
      where 
 	 hs_file  = file `joinFileExt` "hs"
 	 lhs_file = file `joinFileExt` "lhs"
@@ -483,7 +490,7 @@ setGlobalTypeScope session ids
 
 -- Perform a dependency analysis starting from the current targets
 -- and update the session with the new module graph.
-depanal :: Session -> [Module] -> Bool -> IO (Maybe ModuleGraph)
+depanal :: Session -> [ModuleName] -> Bool -> IO (Maybe ModuleGraph)
 depanal (Session ref) excluded_mods allow_dup_roots = do
   hsc_env <- readIORef ref
   let
@@ -522,8 +529,8 @@ data ErrMsg = ErrMsg {
 
 data LoadHowMuch
    = LoadAllTargets
-   | LoadUpTo Module
-   | LoadDependenciesOf Module
+   | LoadUpTo ModuleName
+   | LoadDependenciesOf ModuleName
 
 -- | Try to load the program.  If a Module is supplied, then just
 -- attempt to load up to this target.  If no Module is supplied,
@@ -552,10 +559,11 @@ load2 s@(Session ref) how_much mod_graph = do
 	-- B.hs-boot in the module graph, but no B.hs
 	-- The downsweep should have ensured this does not happen
 	-- (see msDeps)
-        let all_home_mods = [ms_mod s | s <- mod_graph, not (isBootSummary s)]
+        let all_home_mods = [ms_mod_name s 
+			    | s <- mod_graph, not (isBootSummary s)]
 #ifdef DEBUG
 	    bad_boot_mods = [s 	      | s <- mod_graph, isBootSummary s,
-					not (ms_mod s `elem` all_home_mods)]
+					not (ms_mod_name s `elem` all_home_mods)]
 #endif
 	ASSERT( null bad_boot_mods ) return ()
 
@@ -586,7 +594,7 @@ load2 s@(Session ref) how_much mod_graph = do
 	-- Unload any modules which are going to be re-linked this time around.
 	let stable_linkables = [ linkable
 			       | m <- stable_obj++stable_bco,
-				 Just hmi <- [lookupModuleEnv pruned_hpt m],
+				 Just hmi <- [lookupUFM pruned_hpt m],
 				 Just linkable <- [hm_linkable hmi] ]
 	unload hsc_env stable_linkables
 
@@ -623,7 +631,7 @@ load2 s@(Session ref) how_much mod_graph = do
 	    partial_mg
 		| LoadDependenciesOf mod <- how_much
 		= ASSERT( case last partial_mg0 of 
-			    AcyclicSCC ms -> ms_mod ms == mod; _ -> False )
+			    AcyclicSCC ms -> ms_mod_name ms == mod; _ -> False )
 		  List.init partial_mg0
 		| otherwise
 		= partial_mg0
@@ -631,9 +639,9 @@ load2 s@(Session ref) how_much mod_graph = do
 	    stable_mg = 
 		[ AcyclicSCC ms
 	        | AcyclicSCC ms <- full_mg,
-		  ms_mod ms `elem` stable_obj++stable_bco,
-		  ms_mod ms `notElem` [ ms_mod ms' | 
-					AcyclicSCC ms' <- partial_mg ] ]
+		  ms_mod_name ms `elem` stable_obj++stable_bco,
+		  ms_mod_name ms `notElem` [ ms_mod_name ms' | 
+						AcyclicSCC ms' <- partial_mg ] ]
 
 	    mg = stable_mg ++ partial_mg
 
@@ -679,7 +687,7 @@ load2 s@(Session ref) how_much mod_graph = do
 	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking) $
 	        debugTraceMsg dflags 1 (text ("Warning: output was redirected with -o, " ++
 				              "but no output will be generated\n" ++
-				              "because there is no " ++ moduleString main_mod ++ " module."))
+				              "because there is no " ++ moduleNameString (moduleName main_mod) ++ " module."))
 
 	      -- link everything together
               linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env1)
@@ -701,7 +709,7 @@ load2 s@(Session ref) how_much mod_graph = do
                      = filter ((`notElem` mods_to_zap_names).ms_mod) 
 			  modsDone
 
-              let hpt4 = retainInTopLevelEnvs (map ms_mod mods_to_keep) 
+              let hpt4 = retainInTopLevelEnvs (map ms_mod_name mods_to_keep) 
 					      (hsc_HPT hsc_env1)
 
 	      -- Clean up after ourselves
@@ -709,7 +717,7 @@ load2 s@(Session ref) how_much mod_graph = do
 
 	      -- there should be no Nothings where linkables should be, now
 	      ASSERT(all (isJust.hm_linkable) 
-			(moduleEnvElts (hsc_HPT hsc_env))) do
+			(eltsUFM (hsc_HPT hsc_env))) do
 	
 	      -- Link everything together
               linkresult <- link ghci_mode dflags False hpt4
@@ -780,7 +788,7 @@ type TypecheckedSource = LHsBinds Id
 -- for a module.  'checkModule' loads all the dependencies of the specified
 -- module in the Session, and then attempts to typecheck the module.  If
 -- successful, it returns the abstract syntax for the module.
-checkModule :: Session -> Module -> IO (Maybe CheckedModule)
+checkModule :: Session -> ModuleName -> IO (Maybe CheckedModule)
 checkModule session@(Session ref) mod = do
 	-- load up the dependencies first
    r <- load session (LoadDependenciesOf mod)
@@ -789,7 +797,7 @@ checkModule session@(Session ref) mod = do
 	-- now parse & typecheck the module
    hsc_env <- readIORef ref   
    let mg  = hsc_mod_graph hsc_env
-   case [ ms | ms <- mg, ms_mod ms == mod ] of
+   case [ ms | ms <- mg, ms_mod_name ms == mod ] of
 	[] -> return Nothing
 	(ms:_) -> do 
 	   mbChecked <- hscFileCheck hsc_env{hsc_dflags=ms_hspp_opts ms} ms
@@ -885,9 +893,9 @@ unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkables'
 checkStability
 	:: HomePackageTable		-- HPT from last compilation
 	-> [SCC ModSummary]		-- current module graph (cyclic)
-	-> [Module]			-- all home modules
-	-> ([Module],			-- stableObject
-	    [Module])			-- stableBCO
+	-> [ModuleName]			-- all home modules
+	-> ([ModuleName],		-- stableObject
+	    [ModuleName])		-- stableBCO
 
 checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
   where
@@ -897,7 +905,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
      | otherwise     = (stable_obj, stable_bco)
      where
 	scc = flattenSCC scc0
-	scc_mods = map ms_mod scc
+	scc_mods = map ms_mod_name scc
 	home_module m   = m `elem` all_home_mods && m `notElem` scc_mods
 
         scc_allimps = nub (filter home_module (concatMap ms_allimps scc))
@@ -919,7 +927,7 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 					 && same_as_prev t
 	  | otherwise = False
 	  where
-	     same_as_prev t = case lookupModuleEnv hpt (ms_mod ms) of
+	     same_as_prev t = case lookupUFM hpt (ms_mod_name ms) of
 				Just hmi  | Just l <- hm_linkable hmi
 				 -> isObjectLinkable l && t == linkableTime l
 				_other  -> True
@@ -931,13 +939,13 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
 		-- make's behaviour.
 
 	bco_ok ms
-	  = case lookupModuleEnv hpt (ms_mod ms) of
+	  = case lookupUFM hpt (ms_mod_name ms) of
 		Just hmi  | Just l <- hm_linkable hmi ->
 			not (isObjectLinkable l) && 
 			linkableTime l >= ms_hs_date ms
 		_other  -> False
 
-ms_allimps :: ModSummary -> [Module]
+ms_allimps :: ModSummary -> [ModuleName]
 ms_allimps ms = map unLoc (ms_srcimps ms ++ ms_imps ms)
 
 -- -----------------------------------------------------------------------------
@@ -958,23 +966,23 @@ ms_allimps ms = map unLoc (ms_srcimps ms ++ ms_imps ms)
 pruneHomePackageTable
    :: HomePackageTable
    -> [ModSummary]
-   -> ([Module],[Module])
+   -> ([ModuleName],[ModuleName])
    -> HomePackageTable
 
 pruneHomePackageTable hpt summ (stable_obj, stable_bco)
-  = mapModuleEnv prune hpt
+  = mapUFM prune hpt
   where prune hmi
 	  | is_stable modl = hmi'
 	  | otherwise      = hmi'{ hm_details = emptyModDetails }
 	  where
-	   modl = mi_module (hm_iface hmi)
+	   modl = moduleName (mi_module (hm_iface hmi))
 	   hmi' | Just l <- hm_linkable hmi, linkableTime l < ms_hs_date ms
 		= hmi{ hm_linkable = Nothing }
 		| otherwise
 		= hmi
-		where ms = expectJust "prune" (lookupModuleEnv ms_map modl)
+		where ms = expectJust "prune" (lookupUFM ms_map modl)
 
-        ms_map = mkModuleEnv [(ms_mod ms, ms) | ms <- summ]
+        ms_map = listToUFM [(ms_mod_name ms, ms) | ms <- summ]
 
 	is_stable m = m `elem` stable_obj || m `elem` stable_bco
 
@@ -1011,7 +1019,7 @@ findPartiallyCompletedCycles modsDone theGraph
 upsweep
     :: HscEnv			-- Includes initially-empty HPT
     -> HomePackageTable		-- HPT from last time round (pruned)
-    -> ([Module],[Module])	-- stable modules (see checkStability)
+    -> ([ModuleName],[ModuleName]) -- stable modules (see checkStability)
     -> IO ()			-- How to clean up unwanted tmp files
     -> [SCC ModSummary]		-- Mods to do (the worklist)
     -> IO (SuccessFlag,
@@ -1044,11 +1052,10 @@ upsweep' hsc_env old_hpt stable_mods cleanup
         case mb_mod_info of
 	    Nothing -> return (Failed, hsc_env, [])
 	    Just mod_info -> do 
-		{ let this_mod = ms_mod mod
+		{ let this_mod = ms_mod_name mod
 
 			-- Add new info to hsc_env
-		      hpt1     = extendModuleEnv (hsc_HPT hsc_env) 
-					this_mod mod_info
+		      hpt1     = addToUFM (hsc_HPT hsc_env) this_mod mod_info
 		      hsc_env1 = hsc_env { hsc_HPT = hpt1 }
 
 			-- Space-saving: delete the old HPT entry
@@ -1058,7 +1065,7 @@ upsweep' hsc_env old_hpt stable_mods cleanup
 			-- main Haskell source file.  Deleting it
 			-- would force .. (what?? --SDM)
 		      old_hpt1 | isBootSummary mod = old_hpt
-			       | otherwise = delModuleEnv old_hpt this_mod
+			       | otherwise = delFromUFM old_hpt this_mod
 
 		; (restOK, hsc_env2, modOKs) 
 			<- upsweep' hsc_env1 old_hpt1 stable_mods cleanup 
@@ -1071,7 +1078,7 @@ upsweep' hsc_env old_hpt stable_mods cleanup
 -- successful.  If no compilation happened, return the old Linkable.
 upsweep_mod :: HscEnv
             -> HomePackageTable
-	    -> ([Module],[Module])
+	    -> ([ModuleName],[ModuleName])
             -> ModSummary
             -> Int  -- index of module
             -> Int  -- total number of modules
@@ -1080,13 +1087,14 @@ upsweep_mod :: HscEnv
 upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
    = do 
         let 
+	    this_mod_name = ms_mod_name summary
 	    this_mod    = ms_mod summary
 	    mb_obj_date = ms_obj_date summary
 	    obj_fn	= ml_obj_file (ms_location summary)
 	    hs_date     = ms_hs_date summary
 
 	    compile_it :: Maybe Linkable -> IO (Maybe HomeModInfo)
-	    compile_it  = upsweep_compile hsc_env old_hpt this_mod 
+	    compile_it  = upsweep_compile hsc_env old_hpt this_mod_name 
 				summary mod_index nmods
 
 	case ghcMode (hsc_dflags hsc_env) of
@@ -1134,10 +1142,10 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 			  compile_it Nothing
 			-- no existing code at all: we must recompile.
 		   where
-		    is_stable_obj = this_mod `elem` stable_obj
-		    is_stable_bco = this_mod `elem` stable_bco
+		    is_stable_obj = this_mod_name `elem` stable_obj
+		    is_stable_bco = this_mod_name `elem` stable_bco
 
-		    old_hmi = lookupModuleEnv old_hpt this_mod
+		    old_hmi = lookupUFM old_hpt this_mod_name
 
 -- Run hsc to compile a module
 upsweep_compile hsc_env old_hpt this_mod summary
@@ -1154,7 +1162,7 @@ upsweep_compile hsc_env old_hpt this_mod summary
 	-- will always be recompiled
 
         mb_old_iface 
-		= case lookupModuleEnv old_hpt this_mod of
+		= case lookupUFM old_hpt this_mod of
 		     Nothing	 			  -> Nothing
 		     Just hm_info | isBootSummary summary -> Just iface
 				  | not (mi_boot iface)   -> Just iface
@@ -1180,11 +1188,11 @@ upsweep_compile hsc_env old_hpt this_mod summary
 
 
 -- Filter modules in the HPT
-retainInTopLevelEnvs :: [Module] -> HomePackageTable -> HomePackageTable
+retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
 retainInTopLevelEnvs keep_these hpt
-   = mkModuleEnv [ (mod, expectJust "retain" mb_mod_info)
+   = listToUFM   [ (mod, expectJust "retain" mb_mod_info)
 		 | mod <- keep_these
-		 , let mb_mod_info = lookupModuleEnv hpt mod
+		 , let mb_mod_info = lookupUFM hpt mod
 		 , isJust mb_mod_info ]
 
 -- ---------------------------------------------------------------------------
@@ -1193,7 +1201,7 @@ retainInTopLevelEnvs keep_these hpt
 topSortModuleGraph
 	  :: Bool 		-- Drop hi-boot nodes? (see below)
 	  -> [ModSummary]
-	  -> Maybe Module
+	  -> Maybe ModuleName
 	  -> [SCC ModSummary]
 -- Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
 -- The resulting list of strongly-connected-components is in topologically
@@ -1226,7 +1234,7 @@ topSortModuleGraph drop_hs_boot_nodes summaries (Just mod)
 	  | otherwise  = throwDyn (ProgramError "module does not exist")
 
 moduleGraphNodes :: Bool -> [ModSummary]
-  -> ([(ModSummary, Int, [Int])], HscSource -> Module -> Maybe Int)
+  -> ([(ModSummary, Int, [Int])], HscSource -> ModuleName -> Maybe Int)
 moduleGraphNodes drop_hs_boot_nodes summaries = (nodes, lookup_key)
    where
 	-- Drop hs-boot nodes by using HsSrcFile as the key
@@ -1235,7 +1243,7 @@ moduleGraphNodes drop_hs_boot_nodes summaries = (nodes, lookup_key)
 
 	-- We use integers as the keys for the SCC algorithm
 	nodes :: [(ModSummary, Int, [Int])]	
-	nodes = [(s, expectJust "topSort" (lookup_key (ms_hsc_src s) (ms_mod s)), 
+	nodes = [(s, expectJust "topSort" (lookup_key (ms_hsc_src s) (ms_mod_name s)), 
 		     out_edge_keys hs_boot_key (map unLoc (ms_srcimps s)) ++
 		     out_edge_keys HsSrcFile   (map unLoc (ms_imps s))    )
 		| s <- summaries
@@ -1243,29 +1251,33 @@ moduleGraphNodes drop_hs_boot_nodes summaries = (nodes, lookup_key)
 		-- Drop the hi-boot ones if told to do so
 
 	key_map :: NodeMap Int
-	key_map = listToFM ([(ms_mod s, ms_hsc_src s) | s <- summaries]
+	key_map = listToFM ([(moduleName (ms_mod s), ms_hsc_src s)
+			    | s <- summaries]
 			   `zip` [1..])
 
-	lookup_key :: HscSource -> Module -> Maybe Int
+	lookup_key :: HscSource -> ModuleName -> Maybe Int
 	lookup_key hs_src mod = lookupFM key_map (mod, hs_src)
 
-	out_edge_keys :: HscSource -> [Module] -> [Int]
+	out_edge_keys :: HscSource -> [ModuleName] -> [Int]
         out_edge_keys hi_boot ms = mapCatMaybes (lookup_key hi_boot) ms
 		-- If we want keep_hi_boot_nodes, then we do lookup_key with
 		-- the IsBootInterface parameter True; else False
 
 
-type NodeKey   = (Module, HscSource)	  -- The nodes of the graph are 
+type NodeKey   = (ModuleName, HscSource)  -- The nodes of the graph are 
 type NodeMap a = FiniteMap NodeKey a	  -- keyed by (mod, src_file_type) pairs
 
 msKey :: ModSummary -> NodeKey
-msKey (ModSummary { ms_mod = mod, ms_hsc_src = boot }) = (mod,boot)
+msKey (ModSummary { ms_mod = mod, ms_hsc_src = boot }) = (moduleName mod,boot)
 
 mkNodeMap :: [ModSummary] -> NodeMap ModSummary
 mkNodeMap summaries = listToFM [ (msKey s, s) | s <- summaries]
 	
 nodeMapElts :: NodeMap a -> [a]
 nodeMapElts = eltsFM
+
+ms_mod_name :: ModSummary -> ModuleName
+ms_mod_name = moduleName . ms_mod
 
 -----------------------------------------------------------------------------
 -- Downsweep (dependency analysis)
@@ -1284,7 +1296,7 @@ nodeMapElts = eltsFM
 
 downsweep :: HscEnv
 	  -> [ModSummary]	-- Old summaries
-	  -> [Module]		-- Ignore dependencies on these; treat
+	  -> [ModuleName]	-- Ignore dependencies on these; treat
 				-- them as if they were package modules
 	  -> Bool		-- True <=> allow multiple targets to have 
 				-- 	    the same module name; this is 
@@ -1336,7 +1348,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 	     dup_roots :: [[ModSummary]]	-- Each at least of length 2
 	     dup_roots = filterOut isSingleton (nodeMapElts root_map)
 
-	loop :: [(Located Module,IsBootInterface)]
+	loop :: [(Located ModuleName,IsBootInterface)]
 			-- Work list: process these modules
 	     -> NodeMap [ModSummary]
 		 	-- Visited set; the range is a list because
@@ -1365,7 +1377,7 @@ mkRootMap :: [ModSummary] -> NodeMap [ModSummary]
 mkRootMap summaries = addListToFM_C (++) emptyFM 
 			[ (msKey s, [s]) | s <- summaries ]
 
-msDeps :: ModSummary -> [(Located Module, IsBootInterface)]
+msDeps :: ModSummary -> [(Located ModuleName, IsBootInterface)]
 -- (msDeps s) returns the dependencies of the ModSummary s.
 -- A wrinkle is that for a {-# SOURCE #-} import we return
 --	*both* the hs-boot file
@@ -1432,14 +1444,14 @@ summariseFile hsc_env old_summaries file mb_phase maybe_buf
 	(dflags', hspp_fn, buf)
 	    <- preprocessFile dflags file mb_phase maybe_buf
 
-        (srcimps,the_imps, L _ mod) <- getImports dflags' buf hspp_fn
+        (srcimps,the_imps, L _ mod_name) <- getImports dflags' buf hspp_fn
 
 	-- Make a ModLocation for this file
-	location <- mkHomeModLocation dflags mod file
+	location <- mkHomeModLocation dflags mod_name file
 
 	-- Tell the Finder cache where it is, so that subsequent calls
 	-- to findModule will find it, even if it's not on any search path
-	addHomeModuleToFinder hsc_env mod location
+	mod <- addHomeModuleToFinder hsc_env mod_name location
 
         src_timestamp <- case maybe_buf of
 			   Just (_,t) -> return t
@@ -1469,9 +1481,9 @@ summariseModule
 	  :: HscEnv
 	  -> NodeMap ModSummary	-- Map of old summaries
 	  -> IsBootInterface	-- True <=> a {-# SOURCE #-} import
-	  -> Located Module	-- Imported module to be summarised
+	  -> Located ModuleName	-- Imported module to be summarised
 	  -> Maybe (StringBuffer, ClockTime)
-	  -> [Module]		-- Modules to exclude
+	  -> [ModuleName]		-- Modules to exclude
 	  -> IO (Maybe ModSummary)	-- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf excl_mods
@@ -1508,9 +1520,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 	   	obj_timestamp <- getObjTimestamp location is_boot
 		return (Just old_summary{ ms_obj_date = obj_timestamp })
 	| otherwise = 
-		-- source changed: find and re-summarise.  We call the finder
-		-- again, because the user may have moved the source file.
-		new_summary location src_fn src_timestamp
+		-- source changed: re-summarise.
+		new_summary location (ms_mod old_summary) src_fn src_timestamp
 
     find_it = do
 	-- Don't use the Finder's cache this time.  If the module was
@@ -1518,17 +1529,22 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 	-- search path, so we want to consider it to be a home module.  If
 	-- the module was previously a home module, it may have moved.
 	uncacheModule hsc_env wanted_mod
-	found <- findModule hsc_env wanted_mod True {-explicit-}
+	found <- findImportedModule hsc_env wanted_mod Nothing
 	case found of
-	     Found location pkg 
-		| not (isHomePackage pkg) -> return Nothing
-			-- Drop external-pkg
-		| isJust (ml_hs_file location) -> just_found location
+	     Found location mod 
+		| isJust (ml_hs_file location) ->
 			-- Home package
+			 just_found location mod
+		| otherwise -> 
+			-- Drop external-pkg
+			ASSERT(modulePackageId mod /= thisPackage dflags)
+			return Nothing
+		where
+			
 	     err -> noModError dflags loc wanted_mod err
 			-- Not found
 
-    just_found location = do
+    just_found location mod = do
 	  	-- Adjust location to point to the hs-boot source file, 
 		-- hi file, object file, when is_boot says so
 	let location' | is_boot   = addBootSuffixLocn location
@@ -1540,10 +1556,10 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 	maybe_t <- modificationTimeIfExists src_fn
 	case maybe_t of
 	  Nothing -> noHsFileErr loc src_fn
-	  Just t  -> new_summary location' src_fn t
+	  Just t  -> new_summary location' mod src_fn t
 
 
-    new_summary location src_fn src_timestamp
+    new_summary location mod src_fn src_timestamp
       = do
 	-- Preprocess the source file and get its imports
 	-- The dflags' contains the OPTIONS pragmas
@@ -1558,7 +1574,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 		-- Find the object timestamp, and return the summary
 	obj_timestamp <- getObjTimestamp location is_boot
 
-	return (Just ( ModSummary { ms_mod       = wanted_mod, 
+	return (Just ( ModSummary { ms_mod       = mod, 
 				    ms_hsc_src   = hsc_src,
 				    ms_location  = location,
 				    ms_hspp_file = hspp_fn,
@@ -1610,7 +1626,7 @@ preprocessFile dflags src_fn mb_phase (Just (buf, time))
 -- 			Error messages
 -----------------------------------------------------------------------------
 
-noModError :: DynFlags -> SrcSpan -> Module -> FindResult -> IO ab
+noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> IO ab
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc wanted_mod err
   = throwDyn $ mkPlainErrMsg loc $ cantFindError dflags wanted_mod err
@@ -1650,8 +1666,7 @@ cyclicModuleErr ms
 -- Note: if you change the working directory, you should also unload
 -- the current program (set targets to empty, followed by load).
 workingDirectoryChanged :: Session -> IO ()
-workingDirectoryChanged s = withSession s $ \hsc_env ->
-  flushFinderCache (hsc_FC hsc_env)
+workingDirectoryChanged s = withSession s $ flushFinderCaches
 
 -- -----------------------------------------------------------------------------
 -- inspecting the session
@@ -1660,9 +1675,9 @@ workingDirectoryChanged s = withSession s $ \hsc_env ->
 getModuleGraph :: Session -> IO ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph s = withSession s (return . hsc_mod_graph)
 
-isLoaded :: Session -> Module -> IO Bool
+isLoaded :: Session -> ModuleName -> IO Bool
 isLoaded s m = withSession s $ \hsc_env ->
-  return $! isJust (lookupModuleEnv (hsc_HPT hsc_env) m)
+  return $! isJust (lookupUFM (hsc_HPT hsc_env) m)
 
 getBindings :: Session -> IO [TyThing]
 getBindings s = withSession s (return . nameEnvElts . ic_type_env . hsc_IC)
@@ -1686,7 +1701,7 @@ getModuleInfo :: Session -> Module -> IO (Maybe ModuleInfo)
 getModuleInfo s mdl = withSession s $ \hsc_env -> do
   let mg = hsc_mod_graph hsc_env
   if mdl `elem` map ms_mod mg
-	then getHomeModuleInfo hsc_env mdl
+	then getHomeModuleInfo hsc_env (moduleName mdl)
 	else do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
 	then return Nothing
@@ -1713,7 +1728,7 @@ getPackageModuleInfo hsc_env mdl = do
 	return (Just (ModuleInfo {
 			minf_type_env  = mkTypeEnv tys,
 			minf_exports   = names,
-			minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names mdl,
+			minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names (moduleName mdl),
 			minf_instances = error "getModuleInfo: instances for package module unimplemented"
 		}))
 #else
@@ -1722,7 +1737,7 @@ getPackageModuleInfo hsc_env mdl = do
 #endif
 
 getHomeModuleInfo hsc_env mdl = 
-  case lookupModuleEnv (hsc_HPT hsc_env) mdl of
+  case lookupUFM (hsc_HPT hsc_env) mdl of
     Nothing  -> return Nothing
     Just hmi -> do
       let details = hm_details hmi
@@ -1753,7 +1768,7 @@ modInfoIsExportedName :: ModuleInfo -> Name -> Bool
 modInfoIsExportedName minf name = elemNameSet name (minf_exports minf)
 
 modInfoPrintUnqualified :: ModuleInfo -> Maybe PrintUnqualified
-modInfoPrintUnqualified minf = fmap unQualInScope (minf_rdr_env minf)
+modInfoPrintUnqualified minf = fmap mkPrintUnqualified (minf_rdr_env minf)
 
 modInfoLookupName :: Session -> ModuleInfo -> Name -> IO (Maybe TyThing)
 modInfoLookupName s minf name = withSession s $ \hsc_env -> do
@@ -1761,7 +1776,8 @@ modInfoLookupName s minf name = withSession s $ \hsc_env -> do
      Just tyThing -> return (Just tyThing)
      Nothing      -> do
        eps <- readIORef (hsc_EPS hsc_env)
-       return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
+       return $! lookupType (hsc_dflags hsc_env) 
+			    (hsc_HPT hsc_env) (eps_PTE eps) name
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id
@@ -1774,7 +1790,8 @@ isDictonaryId id
 lookupGlobalName :: Session -> Name -> IO (Maybe TyThing)
 lookupGlobalName s name = withSession s $ \hsc_env -> do
    eps <- readIORef (hsc_EPS hsc_env)
-   return $! lookupType (hsc_HPT hsc_env) (eps_PTE eps) name
+   return $! lookupType (hsc_dflags hsc_env) 
+			(hsc_HPT hsc_env) (eps_PTE eps) name
 
 -- -----------------------------------------------------------------------------
 -- Misc exported utils
@@ -1811,6 +1828,29 @@ getTokenStream :: Session -> Module -> IO [Located Token]
 -- -----------------------------------------------------------------------------
 -- Interactive evaluation
 
+-- | Takes a 'ModuleName' and possibly a 'PackageId', and consults the
+-- filesystem and package database to find the corresponding 'Module', 
+-- using the algorithm that is used for an @import@ declaration.
+findModule :: Session -> ModuleName -> Maybe PackageId -> IO Module
+findModule s mod_name maybe_pkg = withSession s $ \hsc_env ->
+  findModule' hsc_env mod_name maybe_pkg
+
+findModule' hsc_env mod_name maybe_pkg =
+  let
+        dflags = hsc_dflags hsc_env
+        hpt    = hsc_HPT hsc_env
+        this_pkg = thisPackage dflags
+  in
+  case lookupUFM hpt mod_name of
+    Just mod_info -> return (mi_module (hm_iface mod_info))
+    _not_a_home_module -> do
+	  res <- findImportedModule hsc_env mod_name Nothing
+	  case res of
+	    Found _ m | modulePackageId m /= this_pkg -> return m
+                        -- not allowed to be a home module
+	    err -> let msg = cantFindError dflags mod_name err in
+		   throwDyn (CmdLineError (showSDoc msg))
+
 #ifdef GHCI
 
 -- | Set the interactive evaluation context.
@@ -1822,17 +1862,16 @@ setContext :: Session
 	   -> [Module]	-- entire top level scope of these modules
 	   -> [Module]	-- exports only of these modules
 	   -> IO ()
-setContext (Session ref) toplevs exports = do 
+setContext (Session ref) toplev_mods export_mods = do 
   hsc_env <- readIORef ref
   let old_ic  = hsc_IC     hsc_env
       hpt     = hsc_HPT    hsc_env
-
-  mapM_ (checkModuleExists hsc_env hpt) exports
-  export_env  <- mkExportEnv hsc_env exports
-  toplev_envs <- mapM (mkTopLevEnv hpt) toplevs
+  --
+  export_env  <- mkExportEnv hsc_env export_mods
+  toplev_envs <- mapM (mkTopLevEnv hpt) toplev_mods
   let all_env = foldr plusGlobalRdrEnv export_env toplev_envs
-  writeIORef ref hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplevs,
-					    ic_exports      = exports,
+  writeIORef ref hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplev_mods,
+					    ic_exports      = export_mods,
 					    ic_rn_gbl_env   = all_env }}
 
 
@@ -1842,47 +1881,35 @@ mkExportEnv hsc_env mods = do
   stuff <- mapM (getModuleExports hsc_env) mods
   let 
 	(_msgs, mb_name_sets) = unzip stuff
-	gres = [ nameSetToGlobalRdrEnv name_set mod
+	gres = [ nameSetToGlobalRdrEnv name_set (moduleName mod)
   	       | (Just name_set, mod) <- zip mb_name_sets mods ]
   --
   return $! foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
 
-nameSetToGlobalRdrEnv :: NameSet -> Module -> GlobalRdrEnv
+nameSetToGlobalRdrEnv :: NameSet -> ModuleName -> GlobalRdrEnv
 nameSetToGlobalRdrEnv names mod =
   mkGlobalRdrEnv [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
 		 | name <- nameSetToList names ]
 
-vanillaProv :: Module -> Provenance
+vanillaProv :: ModuleName -> Provenance
 -- We're building a GlobalRdrEnv as if the user imported
 -- all the specified modules into the global interactive module
-vanillaProv mod = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
+vanillaProv mod_name = Imported [ImpSpec { is_decl = decl, is_item = ImpAll}]
   where
-    decl = ImpDeclSpec { is_mod = mod, is_as = mod, 
+    decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name, 
 			 is_qual = False, 
 			 is_dloc = srcLocSpan interactiveSrcLoc }
 
-checkModuleExists :: HscEnv -> HomePackageTable -> Module -> IO ()
-checkModuleExists hsc_env hpt mod = 
-  case lookupModuleEnv hpt mod of
-    Just mod_info -> return ()
-    _not_a_home_module -> do
-	  res <- findPackageModule hsc_env mod True
-	  case res of
-	    Found _ _ -> return  ()
-	    err -> let msg = cantFindError (hsc_dflags hsc_env) mod err in
-		   throwDyn (CmdLineError (showSDoc msg))
-
 mkTopLevEnv :: HomePackageTable -> Module -> IO GlobalRdrEnv
 mkTopLevEnv hpt modl
- = case lookupModuleEnv hpt modl of
-      Nothing -> 	
-	 throwDyn (ProgramError ("mkTopLevEnv: not a home module " 
-			++ showSDoc (pprModule modl)))
+  = case lookupUFM hpt (moduleName modl) of
+      Nothing -> throwDyn (ProgramError ("mkTopLevEnv: not a home module " ++ 
+                                                showSDoc (ppr modl)))
       Just details ->
 	 case mi_globals (hm_iface details) of
 		Nothing  -> 
 		   throwDyn (ProgramError ("mkTopLevEnv: not interpreted " 
-						++ showSDoc (pprModule modl)))
+						++ showSDoc (ppr modl)))
 		Just env -> return env
 
 -- | Get the interactive evaluation context, consisting of a pair of the
@@ -1896,9 +1923,11 @@ getContext s = withSession s (\HscEnv{ hsc_IC=ic } ->
 -- its full top-level scope available.
 moduleIsInterpreted :: Session -> Module -> IO Bool
 moduleIsInterpreted s modl = withSession s $ \h ->
- case lookupModuleEnv (hsc_HPT h) modl of
-      Just details       -> return (isJust (mi_globals (hm_iface details)))
-      _not_a_home_module -> return False
+ if modulePackageId modl /= thisPackage (hsc_dflags h)
+        then return False
+        else case lookupUFM (hsc_HPT h) (moduleName modl) of
+                Just details       -> return (isJust (mi_globals (hm_iface details)))
+                _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
 getInfo :: Session -> Name -> IO (Maybe (TyThing,Fixity,[Instance]))
@@ -2076,7 +2105,7 @@ foreign import "rts_evalStableIO"  {- safe -}
 
 showModule :: Session -> ModSummary -> IO String
 showModule s mod_summary = withSession s $ \hsc_env -> do
-  case lookupModuleEnv (hsc_HPT hsc_env) (ms_mod mod_summary) of
+  case lookupUFM (hsc_HPT hsc_env) (ms_mod_name mod_summary) of
 	Nothing	      -> panic "missing linkable"
 	Just mod_info -> return (showModMsg (hscTarget (hsc_dflags hsc_env)) (not obj_linkable) mod_summary)
 		      where

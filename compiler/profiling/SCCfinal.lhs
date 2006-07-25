@@ -29,12 +29,15 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 import StgSyn
 
-import Packages		( HomeModules )
+import PackageConfig	( PackageId )
 import StaticFlags	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Id		( Id )
 import Module		( Module )
-import UniqSupply	( uniqFromSupply, splitUniqSupply, UniqSupply )
+import UniqSupply	( splitUniqSupply, UniqSupply )
+#ifdef PROF_DO_BOXING
+import UniqSupply	( uniqFromSupply )
+#endif
 import Unique           ( Unique )
 import VarSet
 import ListSetOps	( removeDups )
@@ -45,13 +48,13 @@ infixr 9 `thenMM`, `thenMM_`
 
 \begin{code}
 stgMassageForProfiling
-	:: HomeModules
+	:: PackageId
 	-> Module			-- module name
 	-> UniqSupply		    	-- unique supply
 	-> [StgBinding]		    	-- input
 	-> (CollectedCCs, [StgBinding])
 
-stgMassageForProfiling pdeps mod_name us stg_binds
+stgMassageForProfiling this_pkg mod_name us stg_binds
   = let
 	((local_ccs, extern_ccs, cc_stacks),
 	 stg_binds2)
@@ -102,7 +105,7 @@ stgMassageForProfiling pdeps mod_name us stg_binds
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
     do_top_rhs binder (StgRhsClosure _ bi fv u srt [] (StgSCC cc (StgConApp con args)))
-      | not (isSccCountCostCentre cc) && not (isDllConApp pdeps con args)
+      | not (isSccCountCostCentre cc) && not (isDllConApp this_pkg con args)
 	-- Trivial _scc_ around nothing but static data
 	-- Eliminate _scc_ ... and turn into StgRhsCon
 
@@ -358,8 +361,10 @@ mapAccumMM f b (m:ms)
     mapAccumMM f b2 ms	`thenMM` \ (b3, rs) ->
     returnMM (b3, r:rs)
 
+#ifdef PROF_DO_BOXING
 getUniqueMM :: MassageM Unique
 getUniqueMM mod scope_cc us ids ccs = (ccs, uniqFromSupply us)
+#endif
 
 addTopLevelIshId :: Id -> MassageM a -> MassageM a
 addTopLevelIshId id scope mod scope_cc us ids ccs

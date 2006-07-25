@@ -15,8 +15,8 @@ module RdrName (
 	mkDerivedRdrName, 
 
 	-- Destruction
-	rdrNameModule, rdrNameOcc, setRdrNameSpace,
-	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isUnqual, 
+	rdrNameOcc, setRdrNameSpace,
+	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual, 
 	isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
 	-- Printing;	instance Outputable RdrName
@@ -41,7 +41,7 @@ module RdrName (
 #include "HsVersions.h"
 
 import OccName
-import Module   ( Module, mkModuleFS )
+import Module   ( ModuleName, mkModuleNameFS, Module, moduleName )
 import Name	( Name, NamedThing(getName), nameModule, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
 import Maybes	( mapCatMaybes )
@@ -62,7 +62,7 @@ data RdrName
   = Unqual OccName
 	-- Used for ordinary, unqualified occurrences 
 
-  | Qual Module OccName
+  | Qual ModuleName OccName
 	-- A qualified name written by the user in 
 	--  *source* code.  The module isn't necessarily 
 	-- the module where the thing is defined; 
@@ -92,12 +92,6 @@ data RdrName
 %************************************************************************
 
 \begin{code}
-rdrNameModule :: RdrName -> Module
-rdrNameModule (Qual m _) = m
-rdrNameModule (Orig m _) = m
-rdrNameModule (Exact n)  = nameModule n
-rdrNameModule (Unqual n) = pprPanic "rdrNameModule" (ppr n)
-
 rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (Qual _ occ) = occ
 rdrNameOcc (Unqual occ) = occ
@@ -125,7 +119,7 @@ setRdrNameSpace (Exact n)    ns = Orig (nameModule n)
 mkRdrUnqual :: OccName -> RdrName
 mkRdrUnqual occ = Unqual occ
 
-mkRdrQual :: Module -> OccName -> RdrName
+mkRdrQual :: ModuleName -> OccName -> RdrName
 mkRdrQual mod occ = Qual mod occ
 
 mkOrig :: Module -> OccName -> RdrName
@@ -146,7 +140,7 @@ mkVarUnqual :: FastString -> RdrName
 mkVarUnqual n = Unqual (mkVarOccFS n)
 
 mkQual :: NameSpace -> (FastString, FastString) -> RdrName
-mkQual sp (m, n) = Qual (mkModuleFS m) (mkOccNameFS sp n)
+mkQual sp (m, n) = Qual (mkModuleNameFS m) (mkOccNameFS sp n)
 
 getRdrName :: NamedThing thing => thing -> RdrName
 getRdrName name = nameRdrName (getName name)
@@ -177,6 +171,9 @@ isUnqual other	    = False
 
 isQual (Qual _ _) = True
 isQual _	  = False
+
+isQual_maybe (Qual m n) = Just (m,n)
+isQual_maybe _	        = Nothing
 
 isOrig (Orig _ _) = True
 isOrig _	  = False
@@ -372,24 +369,31 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 pickGREs rdr_name gres
   = mapCatMaybes pick gres
   where
-    is_unqual = isUnqual rdr_name
-    mod	      = rdrNameModule rdr_name
+    rdr_is_unqual = isUnqual rdr_name
+    rdr_is_qual   = isQual_maybe rdr_name
 
     pick :: GlobalRdrElt -> Maybe GlobalRdrElt
     pick gre@(GRE {gre_prov = LocalDef, gre_name = n}) 	-- Local def
-	| is_unqual || nameModule n == mod = Just gre
-	| otherwise			   = Nothing
+	| rdr_is_unqual		 		= Just gre
+	| Just (mod,_) <- rdr_is_qual, 
+	  mod == moduleName (nameModule n)	= Just gre
+	| otherwise 				= Nothing
     pick gre@(GRE {gre_prov = Imported [is]})	-- Single import (efficiency)
-	| is_unqual     = if not (is_qual (is_decl is)) then Just gre
-						        else Nothing
-	| otherwise     = if mod == is_as (is_decl is)  then Just gre
-						        else Nothing
+	| rdr_is_unqual,
+	  not (is_qual (is_decl is))		= Just gre
+	| Just (mod,_) <- rdr_is_qual, 
+	  mod == is_as (is_decl is)		= Just gre
+	| otherwise     			= Nothing
     pick gre@(GRE {gre_prov = Imported is})	-- Multiple import
 	| null filtered_is = Nothing
 	| otherwise	   = Just (gre {gre_prov = Imported filtered_is})
 	where
-	  filtered_is | is_unqual = filter (not . is_qual    . is_decl) is
-		      | otherwise = filter ((== mod) . is_as . is_decl) is
+	  filtered_is | rdr_is_unqual
+   		      = filter (not . is_qual    . is_decl) is
+		      | Just (mod,_) <- rdr_is_qual 
+	              = filter ((== mod) . is_as . is_decl) is
+		      | otherwise
+		      = []
 
 isLocalGRE :: GlobalRdrElt -> Bool
 isLocalGRE (GRE {gre_prov = LocalDef}) = True
@@ -449,10 +453,12 @@ data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
 data ImpDeclSpec	-- Describes a particular import declaration
 			-- Shared among all the Provenaces for that decl
   = ImpDeclSpec {
-	is_mod      :: Module,	-- 'import Muggle'
+	is_mod      :: ModuleName, -- 'import Muggle'
 				-- Note the Muggle may well not be 
 				-- the defining module for this thing!
-	is_as       :: Module,	-- 'as M' (or 'Muggle' if there is no 'as' clause)
+                                -- TODO: either should be Module, or there
+                                -- should be a Maybe PackageId here too.
+	is_as       :: ModuleName, -- 'as M' (or 'Muggle' if there is no 'as' clause)
 	is_qual     :: Bool,	-- True <=> qualified (only)
 	is_dloc     :: SrcSpan	-- Location of import declaration
     }
@@ -476,7 +482,7 @@ importSpecLoc :: ImportSpec -> SrcSpan
 importSpecLoc (ImpSpec decl ImpAll) = is_dloc decl
 importSpecLoc (ImpSpec _    item)   = is_iloc item
 
-importSpecModule :: ImportSpec -> Module
+importSpecModule :: ImportSpec -> ModuleName
 importSpecModule is = is_mod (is_decl is)
 
 -- Note [Comparing provenance]

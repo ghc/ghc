@@ -23,8 +23,7 @@ import StgSyn		( StgLiveVars, StgArg, stgArgType )
 import CgProf		( curCCS, curCCSAddr )
 import CgBindery	( getVolatileRegs, getArgAmodes )
 import CgMonad
-import CgUtils		( cmmOffsetW, cmmOffsetB, cmmLoadIndexW, newTemp,
-			  assignTemp )
+import CgUtils		( cmmOffsetW, cmmOffsetB, newTemp )
 import Type		( tyConAppTyCon, repType )
 import TysPrim
 import CLabel		( mkForeignLabel, mkRtsCodeLabel )

@@ -61,8 +61,8 @@ import SMRep		-- all of it
 
 import CLabel
 
-import Constants	( mIN_PAYLOAD_SIZE )
-import Packages		( isDllName, HomeModules )
+import Packages		( isDllName )
+import PackageConfig	( PackageId )
 import StaticFlags	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling )
 import Id		( Id, idType, idArity, idName )
@@ -330,15 +330,15 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info descr
     name   = idName id
     sm_rep = chooseSMRep is_static lf_info tot_wds ptr_wds
 
-mkConInfo :: HomeModules
+mkConInfo :: PackageId
 	  -> Bool	-- Is static
 	  -> DataCon	
 	  -> Int -> Int	-- Total and pointer words
 	  -> ClosureInfo
-mkConInfo hmods is_static data_con tot_wds ptr_wds
+mkConInfo this_pkg is_static data_con tot_wds ptr_wds
    = ConInfo {	closureSMRep = sm_rep,
 		closureCon = data_con,
-		closureDllCon = isDllName hmods (dataConName data_con) }
+		closureDllCon = isDllName this_pkg (dataConName data_con) }
   where
     sm_rep = chooseSMRep is_static (mkConLFInfo data_con) tot_wds ptr_wds
 \end{code}
@@ -560,30 +560,30 @@ data CallMethod
 	CLabel 				--   The code label
 	Int 				--   Its arity
 
-getCallMethod :: HomeModules
+getCallMethod :: PackageId
 	      -> Name		-- Function being applied
 	      -> LambdaFormInfo	-- Its info
 	      -> Int		-- Number of available arguments
 	      -> CallMethod
 
-getCallMethod hmods name lf_info n_args
+getCallMethod this_pkg name lf_info n_args
   | nodeMustPointToIt lf_info && opt_Parallel
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
     EnterIt
 
-getCallMethod hmods name (LFReEntrant _ arity _ _) n_args
+getCallMethod this_pkg name (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel hmods name) arity
+  | otherwise      = DirectEntry (enterIdLabel this_pkg name) arity
 
-getCallMethod hmods name (LFCon con) n_args
+getCallMethod this_pkg name (LFCon con) n_args
   = ASSERT( n_args == 0 )
     ReturnCon con
 
-getCallMethod hmods name (LFThunk _ _ updatable std_form_info is_fun) n_args
+getCallMethod this_pkg name (LFThunk _ _ updatable std_form_info is_fun) n_args
   | is_fun 	-- Must always "call" a function-typed 
   = SlowCall	-- thing, cannot just enter it [in eval/apply, the entry code
 		-- is the fast-entry code]
@@ -598,24 +598,24 @@ getCallMethod hmods name (LFThunk _ _ updatable std_form_info is_fun) n_args
 
   | otherwise	-- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    JumpToIt (thunkEntryLabel hmods name std_form_info updatable)
+    JumpToIt (thunkEntryLabel this_pkg name std_form_info updatable)
 
-getCallMethod hmods name (LFUnknown True) n_args
+getCallMethod this_pkg name (LFUnknown True) n_args
   = SlowCall -- might be a function
 
-getCallMethod hmods name (LFUnknown False) n_args
+getCallMethod this_pkg name (LFUnknown False) n_args
   = ASSERT2 ( n_args == 0, ppr name <+> ppr n_args ) 
     EnterIt -- Not a function
 
-getCallMethod hmods name (LFBlackHole _) n_args
+getCallMethod this_pkg name (LFBlackHole _) n_args
   = SlowCall	-- Presumably the black hole has by now
 		-- been updated, but we don't know with
 		-- what, so we slow call it
 
-getCallMethod hmods name (LFLetNoEscape 0) n_args
+getCallMethod this_pkg name (LFLetNoEscape 0) n_args
   = JumpToIt (enterReturnPtLabel (nameUnique name))
 
-getCallMethod hmods name (LFLetNoEscape arity) n_args
+getCallMethod this_pkg name (LFLetNoEscape arity) n_args
   | n_args == arity = DirectEntry (enterReturnPtLabel (nameUnique name)) arity
   | otherwise = pprPanic "let-no-escape: " (ppr name <+> ppr arity)
 
@@ -845,12 +845,12 @@ closureLabelFromCI _ = panic "closureLabelFromCI"
 -- thunkEntryLabel is a local help function, not exported.  It's used from both
 -- entryLabelFromCI and getCallMethod.
 
-thunkEntryLabel hmods thunk_id (ApThunk arity) is_updatable
+thunkEntryLabel this_pkg thunk_id (ApThunk arity) is_updatable
   = enterApLabel is_updatable arity
-thunkEntryLabel hmods thunk_id (SelectorThunk offset) upd_flag
+thunkEntryLabel this_pkg thunk_id (SelectorThunk offset) upd_flag
   = enterSelectorLabel upd_flag offset
-thunkEntryLabel hmods thunk_id _ is_updatable
-  = enterIdLabel hmods thunk_id
+thunkEntryLabel this_pkg thunk_id _ is_updatable
+  = enterIdLabel this_pkg thunk_id
 
 enterApLabel is_updatable arity
   | tablesNextToCode = mkApInfoTableLabel is_updatable arity
@@ -860,9 +860,9 @@ enterSelectorLabel upd_flag offset
   | tablesNextToCode = mkSelectorInfoLabel upd_flag offset
   | otherwise        = mkSelectorEntryLabel upd_flag offset
 
-enterIdLabel hmods id
-  | tablesNextToCode = mkInfoTableLabel hmods id
-  | otherwise        = mkEntryLabel hmods id
+enterIdLabel this_pkg id
+  | tablesNextToCode = mkInfoTableLabel this_pkg id
+  | otherwise        = mkEntryLabel this_pkg id
 
 enterLocalIdLabel id
   | tablesNextToCode = mkLocalInfoTableLabel id

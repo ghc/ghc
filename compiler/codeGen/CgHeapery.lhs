@@ -53,7 +53,7 @@ import TyCon		( tyConPrimRep )
 import CostCentre	( CostCentreStack )
 import Util		( mapAccumL, filterOut )
 import Constants	( wORD_SIZE )
-import Packages		( HomeModules )
+import PackageConfig	( PackageId )
 import Outputable
 
 \end{code}
@@ -123,7 +123,7 @@ getHpRelOffset virtual_offset
 
 \begin{code}
 layOutDynConstr, layOutStaticConstr
-	:: HomeModules
+	:: PackageId
 	-> DataCon 	
 	-> [(CgRep,a)]
 	-> (ClosureInfo,
@@ -132,8 +132,8 @@ layOutDynConstr, layOutStaticConstr
 layOutDynConstr    = layOutConstr False
 layOutStaticConstr = layOutConstr True
 
-layOutConstr  is_static hmods data_con args
-   = (mkConInfo hmods is_static data_con tot_wds ptr_wds,
+layOutConstr  is_static this_pkg data_con args
+   = (mkConInfo this_pkg is_static data_con tot_wds ptr_wds,
       things_w_offsets)
   where
     (tot_wds,		 --  #ptr_wds + #nonptr_wds

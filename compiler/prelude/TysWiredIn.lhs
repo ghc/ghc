@@ -128,25 +128,25 @@ mkWiredInDataConName built_in mod fs uniq datacon parent
 		  (ADataCon datacon)	-- Relevant DataCon
 		  built_in
 
-charTyConName	  = mkWiredInTyConName   UserSyntax pREL_BASE FSLIT("Char") charTyConKey charTyCon
-charDataConName   = mkWiredInDataConName UserSyntax pREL_BASE FSLIT("C#") charDataConKey charDataCon charTyConName
-intTyConName	  = mkWiredInTyConName   UserSyntax pREL_BASE FSLIT("Int") intTyConKey   intTyCon
-intDataConName	  = mkWiredInDataConName UserSyntax pREL_BASE FSLIT("I#") intDataConKey  intDataCon intTyConName
+charTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Char") charTyConKey charTyCon
+charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("C#") charDataConKey charDataCon charTyConName
+intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Int") intTyConKey   intTyCon
+intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("I#") intDataConKey  intDataCon intTyConName
 						  
-boolTyConName	  = mkWiredInTyConName   UserSyntax pREL_BASE FSLIT("Bool") boolTyConKey boolTyCon
-falseDataConName  = mkWiredInDataConName UserSyntax pREL_BASE FSLIT("False") falseDataConKey falseDataCon boolTyConName
-trueDataConName	  = mkWiredInDataConName UserSyntax pREL_BASE FSLIT("True")  trueDataConKey  trueDataCon  boolTyConName
-listTyConName	  = mkWiredInTyConName   BuiltInSyntax pREL_BASE FSLIT("[]") listTyConKey listTyCon
-nilDataConName 	  = mkWiredInDataConName BuiltInSyntax pREL_BASE FSLIT("[]") nilDataConKey nilDataCon  listTyConName
-consDataConName	  = mkWiredInDataConName BuiltInSyntax pREL_BASE FSLIT(":") consDataConKey consDataCon listTyConName
+boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Bool") boolTyConKey boolTyCon
+falseDataConName  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("False") falseDataConKey falseDataCon boolTyConName
+trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("True")  trueDataConKey  trueDataCon  boolTyConName
+listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_BASE FSLIT("[]") listTyConKey listTyCon
+nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT("[]") nilDataConKey nilDataCon  listTyConName
+consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT(":") consDataConKey consDataCon listTyConName
 
-floatTyConName	   = mkWiredInTyConName   UserSyntax pREL_FLOAT FSLIT("Float") floatTyConKey floatTyCon
-floatDataConName   = mkWiredInDataConName UserSyntax pREL_FLOAT FSLIT("F#") floatDataConKey floatDataCon floatTyConName
-doubleTyConName    = mkWiredInTyConName   UserSyntax pREL_FLOAT FSLIT("Double") doubleTyConKey doubleTyCon
-doubleDataConName  = mkWiredInDataConName UserSyntax pREL_FLOAT FSLIT("D#") doubleDataConKey doubleDataCon doubleTyConName
+floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_FLOAT FSLIT("Float") floatTyConKey floatTyCon
+floatDataConName   = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("F#") floatDataConKey floatDataCon floatTyConName
+doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_FLOAT FSLIT("Double") doubleTyConKey doubleTyCon
+doubleDataConName  = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("D#") doubleDataConKey doubleDataCon doubleTyConName
 
-parrTyConName	  = mkWiredInTyConName   BuiltInSyntax pREL_PARR FSLIT("[::]") parrTyConKey parrTyCon 
-parrDataConName   = mkWiredInDataConName UserSyntax    pREL_PARR FSLIT("PArr") parrDataConKey parrDataCon parrTyConName
+parrTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_PARR FSLIT("[::]") parrTyConKey parrTyCon 
+parrDataConName   = mkWiredInDataConName UserSyntax    gHC_PARR FSLIT("PArr") parrDataConKey parrDataCon parrTyConName
 
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR	= nameRdrName falseDataConName
@@ -537,7 +537,7 @@ mkPArrFakeCon arity  = data_con
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
-	name      = mkWiredInName pREL_PARR (mkOccNameFS dataName nameStr) uniq
+	name      = mkWiredInName gHC_PARR (mkOccNameFS dataName nameStr) uniq
 				  Nothing (ADataCon data_con) UserSyntax
 	uniq      = mkPArrDataConUnique arity
 

@@ -35,9 +35,9 @@ import Name		( Name, nameUnique, nameModule,
 import NameSet		( NameSet, emptyNameSet, addListToNameSet )
 import OccName		( OccName, isTupleOcc_maybe, tcName, dataName, mapOccEnv, occNameFS,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
-import PrelNames	( gHC_PRIM, pREL_TUP )
-import Module		( Module, emptyModuleEnv, 
-			  lookupModuleEnv, extendModuleEnv_C )
+import PrelNames	( gHC_PRIM, dATA_TUP )
+import Module		( Module, emptyModuleEnv, ModuleName, modulePackageId,
+			  lookupModuleEnv, extendModuleEnv_C, mkModule )
 import UniqFM           ( lookupUFM, addListToUFM )
 import FastString       ( FastString )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply, uniqsFromSupply )
@@ -230,7 +230,7 @@ newIPName occ_name_ip
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
-  | mod == pREL_TUP || mod == gHC_PRIM,		-- Boxed tuples from one, 
+  | mod == dATA_TUP || mod == gHC_PRIM,		-- Boxed tuples from one, 
     Just tup_info <- isTupleOcc_maybe occ	-- unboxed from the other
   = 	-- Special case for tuples; there are too many
 	-- of them to pre-populate the original-name cache
@@ -340,7 +340,7 @@ lookupIfaceTc other_tc	    = return (ifaceTyConName other_tc)
 
 lookupIfaceExt :: IfaceExtName -> IfL Name
 lookupIfaceExt (ExtPkg  mod occ)   = lookupOrig mod occ
-lookupIfaceExt (HomePkg mod occ _) = lookupOrig mod occ
+lookupIfaceExt (HomePkg mod occ _) = lookupHomePackage mod occ
 lookupIfaceExt (LocalTop occ)	   = lookupIfaceTop occ
 lookupIfaceExt (LocalTopSub occ _) = lookupIfaceTop occ
 
@@ -348,6 +348,12 @@ lookupIfaceTop :: OccName -> IfL Name
 -- Look up a top-level name from the current Iface module
 lookupIfaceTop occ
   = do	{ env <- getLclEnv; lookupOrig (if_mod env) occ }
+
+lookupHomePackage :: ModuleName -> OccName -> IfL Name
+lookupHomePackage mod_name occ
+  = do	{ env <- getLclEnv; 
+        ; let this_pkg = modulePackageId (if_mod env)
+        ; lookupOrig (mkModule this_pkg mod_name) occ }
 
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ

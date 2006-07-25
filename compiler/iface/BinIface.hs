@@ -15,7 +15,6 @@ import NewDemand
 import IfaceSyn
 import VarEnv
 import InstEnv		( OverlapFlag(..) )
-import Packages		( PackageIdH(..) )
 import Class		( DefMeth(..) )
 import CostCentre
 import StaticFlags	( opt_HiVersion, v_Build_tag )
@@ -97,7 +96,6 @@ instance Binary ModIface where
 		 mi_module    = mod,
 		 mi_boot      = is_boot,
 		 mi_mod_vers  = mod_vers,
-		 mi_package   = _, -- we ignore the package on output
 		 mi_orphan    = orphan,
 		 mi_deps      = deps,
 		 mi_usages    = usages,
@@ -162,7 +160,6 @@ instance Binary ModIface where
 	rules	  <- {-# SCC "bin_rules" #-} lazyGet bh
 	rule_vers <- get bh
 	return (ModIface {
-		 mi_package   = HomePackage, -- to be filled in properly later
 		 mi_module    = mod_name,
 		 mi_boot      = is_boot,
 		 mi_mod_vers  = mod_vers,

@@ -240,8 +240,8 @@ getCgIdInfo id
 	    name = idName id
 	in
 	if isExternalName name then do
-	    hmods <- getHomeModules 
-	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel hmods name))
+	    this_pkg <- getThisPackage
+	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel this_pkg name))
 	    return (stableIdInfo id ext_lbl (mkLFImported id))
 	else
 	if isVoidArg (idCgRep id) then

@@ -40,14 +40,14 @@ import HsUtils
 import IfaceSyn		( IfaceBinding )
 import Outputable
 import SrcLoc		( Located(..) )
-import Module		( Module )
+import Module		( Module, ModuleName )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.
 \begin{code}
 data HsModule name
   = HsModule
-	(Maybe (Located Module))-- Nothing => "module X where" is omitted
+	(Maybe (Located ModuleName))-- Nothing => "module X where" is omitted
 				--	(in which case the next field is Nothing too)
 	(Maybe [LIE name])	-- Export list; Nothing => export list omitted, so export everything
 				-- Just [] => export *nothing*

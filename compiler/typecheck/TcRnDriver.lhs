@@ -26,7 +26,6 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 
 import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
 import StaticFlags	( opt_PprStyle_Debug )
-import Packages		( checkForPackageConflicts, mkHomeModules )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
 			  SpliceDecl(..), HsBind(..), LHsBinds,
 			  emptyRdrGroup, emptyRnGroup, appendGroups, plusHsValBinds,
@@ -63,7 +62,8 @@ import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
-import Module           ( Module, ModuleEnv, moduleEnvElts, elemModuleEnv )
+import Module
+import UniqFM		( elemUFM, eltsUFM )
 import OccName		( mkVarOccFS, plusOccEnv )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
 			  mkExternalName )
@@ -103,9 +103,8 @@ import RnTypes		( rnLHsType )
 import Inst		( tcGetInstEnvs )
 import InstEnv		( classInstances, instEnvElts )
 import RnExpr		( rnStmts, rnLExpr )
-import LoadIface	( loadSrcInterface, loadSysInterface )
+import LoadIface	( loadSysInterface )
 import IfaceEnv		( ifaceExportNames )
-import Module		( moduleSetElts, mkModuleSet )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( setIdType )
 import MkId		( unsafeCoerceId )
@@ -127,11 +126,10 @@ import SrcLoc		( unLoc )
 #endif
 
 import FastString	( mkFastString )
-import Maybes		( MaybeErr(..) )
 import Util		( sortLe )
 import Bag		( unionBags, snocBag, emptyBag, unitBag, unionManyBags )
 
-import Maybe		( isJust )
+import Data.Maybe	( isJust, isNothing )
 \end{code}
 
 
@@ -155,9 +153,11 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 			  import_decls local_decls mod_deprec))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
-   let { this_mod = case maybe_mod of
-			Nothing  -> mAIN	  -- 'module M where' is omitted
-			Just (L _ mod) -> mod }	; -- The normal case
+   let { this_pkg = thisPackage (hsc_dflags hsc_env) ;
+	 this_mod = case maybe_mod of
+			Nothing  -> mAIN	-- 'module M where' is omitted
+			Just (L _ mod) -> mkModule this_pkg mod } ;
+						-- The normal case
 		
    initTc hsc_env hsc_src this_mod $ 
    setSrcSpan loc $
@@ -166,16 +166,16 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	rn_imports <- rnImports import_decls ;
         (rdr_env, imports) <- mkRdrEnvAndImports rn_imports ;
 
-	let { dep_mods :: ModuleEnv (Module, IsBootInterface)
+	let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
 	    ; dep_mods = imp_dep_mods imports
 
 		-- We want instance declarations from all home-package
 		-- modules below this one, including boot modules, except
 		-- ourselves.  The 'except ourselves' is so that we don't
 		-- get the instances from this module's hs-boot file
-	    ; want_instances :: Module -> Bool
-	    ; want_instances mod = mod `elemModuleEnv` dep_mods
-				   && mod /= this_mod
+	    ; want_instances :: ModuleName -> Bool
+	    ; want_instances mod = mod `elemUFM` dep_mods
+				   && mod /= moduleName this_mod
 	    ; home_insts = hptInstances hsc_env want_instances
 	    } ;
 
@@ -183,8 +183,6 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- visible to loadHiBootInterface in tcRnSrcDecls,
 		-- and any other incrementally-performed imports
 	updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
-
-	checkConflicts imports this_mod $ do {
 
 		-- Update the gbl env
 	updGblEnv ( \ gbl -> 
@@ -226,7 +224,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- that we don't bleat about re-exporting a deprecated
 		-- thing (especially via 'module Foo' export item)
 		-- Only uses in the body of the module are complained about
-	reportDeprecations tcg_env ;
+	reportDeprecations (hsc_dflags hsc_env) tcg_env ;
 
 		-- Process the export list
 	rn_exports <- rnExports export_ies ;
@@ -254,27 +252,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- Dump output and return
 	tcDump final_env ;
 	return final_env
-    }}}}}
-
-
--- The program is not allowed to contain two modules with the same
--- name, and we check for that here.  It could happen if the home package
--- contains a module that is also present in an external package, for example.
-checkConflicts imports this_mod and_then = do
-   dflags <- getDOpts
-   let 
-	dep_mods = this_mod : map fst (moduleEnvElts (imp_dep_mods imports))
-		-- don't forget to include the current module!
-
-	mb_dep_pkgs = checkForPackageConflicts 
-				dflags dep_mods (imp_dep_pkgs imports)
-   --
-   case mb_dep_pkgs of
-     Failed msg -> 
-	do addErr msg; failM
-     Succeeded _ -> 
-	updGblEnv (\gbl -> gbl{ tcg_home_mods = mkHomeModules dep_mods })
-	   and_then
+    }}}}
 \end{code}
 
 
@@ -333,7 +311,6 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_usages   = [],		-- ToDo: compute usage
 				mg_dir_imps = [],		-- ??
 				mg_deps     = noDependencies,	-- ??
-				mg_home_mods = mkHomeModules [], -- ?? wrong!!
 				mg_exports  = my_exports,
 				mg_types    = final_type_env,
 				mg_insts    = tcg_insts tcg_env,
@@ -1128,16 +1105,12 @@ getModuleExports hsc_env mod
 
 tcGetModuleExports :: Module -> TcM NameSet
 tcGetModuleExports mod = do
-  iface <- load_iface mod
+  let doc = ptext SLIT("context for compiling statements")
+  iface <- initIfaceTcRn $ loadSysInterface doc mod
   loadOrphanModules (dep_orphs (mi_deps iface))
   		-- Load any orphan-module interfaces,
   		-- so their instances are visible
   ifaceExportNames (mi_exports iface)
-
-load_iface mod = loadSrcInterface doc mod False {- Not boot iface -}
-	       where
-		 doc = ptext SLIT("context for compiling statements")
-
 
 tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Maybe [Name])
 tcRnLookupRdrName hsc_env rdr_name 
@@ -1239,7 +1212,9 @@ plausibleDFun print_unqual dfun	-- Dfun involving only names that print unqualif
   = all ok (nameSetToList (tyClsNamesOfType (idType dfun)))
   where
     ok name | isBuiltInSyntax name = True
-	    | isExternalName name  = print_unqual (nameModule name) (nameOccName name)
+	    | isExternalName name  = 
+                isNothing $ fst print_unqual (nameModule name) 
+                                             (nameOccName name)
 	    | otherwise		   = True
 
 loadUnqualIfaces :: InteractiveContext -> TcM ()
@@ -1308,7 +1283,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env = type_env,
 	 , ppr_insts dfun_ids
 	 , vcat (map ppr rules)
 	 , ppr_gen_tycons (typeEnvTyCons type_env)
-	 , ptext SLIT("Dependent modules:") <+> ppr (moduleEnvElts (imp_dep_mods imports))
+	 , ptext SLIT("Dependent modules:") <+> ppr (eltsUFM (imp_dep_mods imports))
 	 , ptext SLIT("Dependent packages:") <+> ppr (imp_dep_pkgs imports)]
 
 pprModGuts :: ModGuts -> SDoc

@@ -22,7 +22,7 @@ module DsMeta( dsBracket,
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
 import MatchLit	  ( dsLit )
-import DsUtils    ( mkListExpr, mkStringExpr, mkCoreTup, mkIntExpr )
+import DsUtils    ( mkListExpr, mkStringExpr, mkIntExpr )
 import DsMonad
 
 import qualified Language.Haskell.TH as TH
@@ -37,7 +37,8 @@ import OccName	  ( isDataOcc, isTvOcc, occNameString )
 -- ws previously used in this file.
 import qualified OccName
 
-import Module	  ( Module, mkModule, moduleString )
+import Module	  ( Module, mkModule, moduleNameString, moduleName,
+                    modulePackageId, mkModuleNameFS )
 import Id         ( Id, mkLocalId )
 import OccName	  ( mkOccNameFS )
 import Name       ( Name, mkExternalName, localiseName, nameOccName, nameModule, 
@@ -50,7 +51,7 @@ import TysWiredIn ( parrTyCon )
 import CoreSyn
 import CoreUtils  ( exprType )
 import SrcLoc	  ( noSrcLoc, unLoc, Located(..), SrcSpan, srcLocSpan )
-import Maybe	  ( catMaybes )
+import PackageConfig ( thPackageId, packageIdString )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique, getKey, Uniquable(..) )
 import BasicTypes ( isBoxed ) 
 import Outputable
@@ -58,6 +59,7 @@ import Bag	  ( bagToList, unionManyBags )
 import FastString ( unpackFS )
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..) )
 
+import Maybe	  ( catMaybes )
 import Monad ( zipWithM )
 import List ( sortBy )
  
@@ -905,14 +907,17 @@ globalVar :: Name -> DsM (Core TH.Name)
 globalVar name
   | isExternalName name
   = do	{ MkC mod <- coreStringLit name_mod
+        ; MkC pkg <- coreStringLit name_pkg
 	; MkC occ <- occNameLit name
-	; rep2 mk_varg [mod,occ] }
+	; rep2 mk_varg [pkg,mod,occ] }
   | otherwise
   = do 	{ MkC occ <- occNameLit name
 	; MkC uni <- coreIntLit (getKey (getUnique name))
 	; rep2 mkNameLName [occ,uni] }
   where
-      name_mod = moduleString (nameModule name)
+      mod = nameModule name
+      name_mod = moduleNameString (moduleName mod)
+      name_pkg = packageIdString (modulePackageId mod)
       name_occ = nameOccName name
       mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
 	      | OccName.isVarOcc  name_occ = mkNameG_vName
@@ -1293,9 +1298,6 @@ nonEmptyCoreList :: [Core a] -> Core [a]
 nonEmptyCoreList [] 	      = panic "coreList: empty argument"
 nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
 
-corePair :: (Core a, Core b) -> Core (a,b)
-corePair (MkC x, MkC y) = MkC (mkCoreTup [x,y])
-
 coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
@@ -1387,8 +1389,10 @@ templateHaskellNames = [
     fieldPatQTyConName, fieldExpQTyConName, funDepTyConName]
 
 thSyn :: Module
-thSyn = mkModule "Language.Haskell.TH.Syntax"
-thLib = mkModule "Language.Haskell.TH.Lib"
+thSyn = mkTHModule FSLIT("Language.Haskell.TH.Syntax")
+thLib = mkTHModule FSLIT("Language.Haskell.TH.Lib")
+
+mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
 
 mk_known_key_name mod space str uniq 
   = mkExternalName uniq mod (mkOccNameFS space str) 

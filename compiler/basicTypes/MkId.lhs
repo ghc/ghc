@@ -855,18 +855,18 @@ unsafeCoerceName = mkWiredInIdName gHC_PRIM FSLIT("unsafeCoerce#") unsafeCoerceI
 nullAddrName     = mkWiredInIdName gHC_PRIM FSLIT("nullAddr#")	   nullAddrIdKey      nullAddrId
 seqName		 = mkWiredInIdName gHC_PRIM FSLIT("seq")	   seqIdKey	      seqId
 realWorldName	 = mkWiredInIdName gHC_PRIM FSLIT("realWorld#")	   realWorldPrimIdKey realWorldPrimId
-lazyIdName	 = mkWiredInIdName pREL_BASE FSLIT("lazy")         lazyIdKey	      lazyId
+lazyIdName	 = mkWiredInIdName gHC_BASE FSLIT("lazy")         lazyIdKey	      lazyId
 
-errorName		 = mkWiredInIdName pREL_ERR FSLIT("error")	     errorIdKey eRROR_ID
-recSelErrorName		 = mkWiredInIdName pREL_ERR FSLIT("recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
-runtimeErrorName	 = mkWiredInIdName pREL_ERR FSLIT("runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
-irrefutPatErrorName	 = mkWiredInIdName pREL_ERR FSLIT("irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
-recConErrorName		 = mkWiredInIdName pREL_ERR FSLIT("recConError")     recConErrorIdKey rEC_CON_ERROR_ID
-patErrorName 		 = mkWiredInIdName pREL_ERR FSLIT("patError") 	     patErrorIdKey pAT_ERROR_ID
-noMethodBindingErrorName = mkWiredInIdName pREL_ERR FSLIT("noMethodBindingError")
+errorName		 = mkWiredInIdName gHC_ERR FSLIT("error")	     errorIdKey eRROR_ID
+recSelErrorName		 = mkWiredInIdName gHC_ERR FSLIT("recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
+runtimeErrorName	 = mkWiredInIdName gHC_ERR FSLIT("runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
+irrefutPatErrorName	 = mkWiredInIdName gHC_ERR FSLIT("irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
+recConErrorName		 = mkWiredInIdName gHC_ERR FSLIT("recConError")     recConErrorIdKey rEC_CON_ERROR_ID
+patErrorName 		 = mkWiredInIdName gHC_ERR FSLIT("patError") 	     patErrorIdKey pAT_ERROR_ID
+noMethodBindingErrorName = mkWiredInIdName gHC_ERR FSLIT("noMethodBindingError")
 					   noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
 nonExhaustiveGuardsErrorName 
-  = mkWiredInIdName pREL_ERR FSLIT("nonExhaustiveGuardsError") 
+  = mkWiredInIdName gHC_ERR FSLIT("nonExhaustiveGuardsError") 
 		    nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
 \end{code}
 

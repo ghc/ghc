@@ -38,7 +38,7 @@ import HsSyn		( HsExpr, HsMatchContext, Pat )
 import TcIface		( tcIfaceGlobal )
 import RdrName		( GlobalRdrEnv )
 import HscTypes		( TyThing(..), TypeEnv, HscEnv, 
-			  tyThingId, tyThingTyCon, tyThingDataCon, unQualInScope )
+			  tyThingId, tyThingTyCon, tyThingDataCon, mkPrintUnqualified )
 import Bag		( emptyBag, snocBag, Bag )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
@@ -176,7 +176,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
 	; return (res, mapBag mk_warn warns)
 	}
    where
-    print_unqual = unQualInScope rdr_env
+    print_unqual = mkPrintUnqualified rdr_env
 
     mk_warn :: (SrcSpan,SDoc) -> WarnMsg
     mk_warn (loc,sdoc) = mkWarnMsg loc print_unqual sdoc

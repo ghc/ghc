@@ -10,7 +10,7 @@ module IfaceType (
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr,
 
 	IfaceExtName(..), mkIfaceExtName, isLocalIfaceExtName,
-	ifaceTyConName, interactiveExtNameFun,
+	ifaceTyConName,
 
 	-- Conversion from Type -> IfaceType
 	toIfaceType, toIfacePred, toIfaceContext, 
@@ -34,7 +34,7 @@ import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, char
 import OccName		( OccName, parenSymOcc, occNameFS )
 import Name		( Name, getName, getOccName, nameModule, nameOccName,
 			  wiredInNameTyThing_maybe )
-import Module		( Module )
+import Module		( Module, ModuleName )
 import BasicTypes	( IPName(..), Arity, Version, mapIPName, tupleParens, Boxity )
 import Outputable
 import FastString
@@ -49,13 +49,15 @@ import FastString
 
 \begin{code}
 data IfaceExtName
-  = ExtPkg Module OccName		-- From an external package; no version #
-					-- Also used for wired-in things regardless
-					-- of whether they are home-pkg or not
+  = ExtPkg Module OccName
+	-- From an external package; no version # Also used for
+	-- wired-in things regardless of whether they are home-pkg or
+	-- not
 
-  | HomePkg Module OccName Version	-- From another module in home package;
-					-- has version #; in all other respects,
-					-- HomePkg and ExtPkg are the same
+  | HomePkg ModuleName OccName Version
+	-- From another module in home package; has version #; in all
+	-- other respects, HomePkg and ExtPkg are the same. Since this
+	-- is a home package name, we use ModuleName rather than Module
 
   | LocalTop OccName			-- Top-level from the same module as 
 					-- the enclosing IfaceDecl
@@ -79,14 +81,6 @@ ifaceExtOcc (ExtPkg _ occ)    	= occ
 ifaceExtOcc (HomePkg _ occ _) 	= occ
 ifaceExtOcc (LocalTop occ)    	= occ
 ifaceExtOcc (LocalTopSub occ _) = occ
-
-interactiveExtNameFun :: PrintUnqualified -> Name-> IfaceExtName
-interactiveExtNameFun print_unqual name
-  | print_unqual mod occ = LocalTop occ
-  | otherwise		 = ExtPkg mod occ
-  where
-    mod = nameModule name
-    occ = nameOccName name
 \end{code}
 
 
@@ -200,15 +194,12 @@ maybeParen ctxt_prec inner_prec pretty
 -- These instances are used only when printing for the user, either when
 -- debugging, or in GHCi when printing the results of a :info command
 instance Outputable IfaceExtName where
-    ppr (ExtPkg mod occ)       = pprExt mod occ
-    ppr (HomePkg mod occ vers) = pprExt mod occ <> braces (ppr vers)
+    ppr (ExtPkg mod occ)       = ppr mod <> dot <> ppr occ
+    ppr (HomePkg mod occ vers) = ppr mod <> dot <> ppr occ <> braces (ppr vers)
     ppr (LocalTop occ)	       = ppr occ	-- Do we want to distinguish these 
     ppr (LocalTopSub occ _)    = ppr occ	-- from an ordinary occurrence?
-
-pprExt :: Module -> OccName -> SDoc
 -- No need to worry about printing unqualified becuase that was handled
 -- in the transiation to IfaceSyn 
-pprExt mod occ = ppr mod <> dot <> ppr occ
 
 instance Outputable IfaceBndr where
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr

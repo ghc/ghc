@@ -53,7 +53,8 @@ import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
 import NameEnv
 import OccName		( OccName, mkVarOccFS, mkTyVarOcc )
 import FastString       ( FastString )
-import Module		( Module, lookupModuleEnv )
+import Module		( Module, moduleName )
+import UniqFM		( lookupUFM )
 import UniqSupply	( initUs_ )
 import Outputable	
 import ErrUtils		( Message )
@@ -246,7 +247,7 @@ tcHiBootIface mod
 		-- And that's fine, because if M's ModInfo is in the HPT, then 
 		-- it's been compiled once, and we don't need to check the boot iface
 	  then do { hpt <- getHpt
-		  ; case lookupModuleEnv hpt mod of
+		  ; case lookupUFM hpt (moduleName mod) of
 		      Just info | mi_boot (hm_iface info) 
 				-> return (hm_details info)
 		      other -> return emptyModDetails }
@@ -257,17 +258,16 @@ tcHiBootIface mod
 	-- so eps_is_boot will record if any of our imports mention us by 
 	-- way of hi-boot file
 	{ eps <- getEps
-	; case lookupModuleEnv (eps_is_boot eps) mod of {
+	; case lookupUFM (eps_is_boot eps) (moduleName mod) of {
 	    Nothing -> return emptyModDetails ;	-- The typical case
 
 	    Just (_, False) -> failWithTc moduleLoop ;
  		-- Someone below us imported us!
 		-- This is a loop with no hi-boot in the way
 		
-	    Just (mod, True) -> 	-- There's a hi-boot interface below us
+	    Just (_mod, True) -> 	-- There's a hi-boot interface below us
 		
     do	{ read_result <- findAndReadIface 
-				True	-- Explicit import? 
 				need mod
 				True	-- Hi-boot file
 
@@ -843,7 +843,8 @@ tcIfaceGlobal name
 	-- and its RULES are loaded too
   | otherwise
   = do	{ (eps,hpt) <- getEpsAndHpt
-	; case lookupType hpt (eps_PTE eps) name of {
+ 	; dflags <- getDOpts
+	; case lookupType dflags hpt (eps_PTE eps) name of {
 	    Just thing -> return thing ;
 	    Nothing    -> do
 

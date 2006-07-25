@@ -33,7 +33,7 @@ module CostCentre (
 
 import Var		( Id )
 import Name		( getOccName, occNameFS )
-import Module		( Module, moduleFS )
+import Module		( Module )
 import Outputable	
 import FastTypes
 import FastString
@@ -339,12 +339,12 @@ instance Outputable CostCentre where
 
 -- Printing in an interface file or in Core generally
 pprCostCentreCore (AllCafsCC {cc_mod = m})
-  = text "__sccC" <+> braces (ppr_mod m)
+  = text "__sccC" <+> braces (ppr m)
 pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m,
 			     cc_is_caf = caf, cc_is_dupd = dup})
   = text "__scc" <+> braces (hsep [
 	ftext (zEncodeFS n),
-	ppr_mod m,
+	ppr m,
 	pp_dup dup,
 	pp_caf caf
     ])
@@ -355,13 +355,11 @@ pp_dup other   = empty
 pp_caf CafCC = text "__C"
 pp_caf other   = empty
 
-ppr_mod m = ftext (zEncodeFS (moduleFS m))
-
 -- Printing as a C label
 ppCostCentreLbl (NoCostCentre)		  = text "NONE_cc"
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
-  = ppr_mod m <> ftext (zEncodeFS n) <> 
+  = ppr m <> ftext (zEncodeFS n) <> 
 	text (case is_caf of { CafCC -> "_CAF"; _ -> "" }) <> text "_cc"
 
 -- This is the name to go in the user-displayed string, 

@@ -44,7 +44,7 @@ import Name             ( isTyVarName )
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
 import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
-import LoadIface	( loadHomeInterface )
+import LoadIface	( loadInterfaceForName )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
 import List		( nub )
@@ -550,7 +550,7 @@ rnRbinds str rbinds
 rnBracket (VarBr n) = do { name <- lookupOccRn n
 			 ; this_mod <- getModule
 			 ; checkM (nameIsLocalOrFrom this_mod name) $	-- Reason: deprecation checking asumes the
-			   do { loadHomeInterface msg name		-- home interface is loaded, and this is the
+			   do { loadInterfaceForName msg name		-- home interface is loaded, and this is the
 			      ; return () }				-- only way that is going to happen
 			 ; returnM (VarBr name, unitFV name) }
 		    where

@@ -16,7 +16,7 @@ module Outputable (
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
 	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper, pprSetDepth,
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
-	ifPprDebug, unqualStyle, 
+	ifPprDebug, qualName, qualModule,
 	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
 
 	SDoc, 		-- Abstract
@@ -51,7 +51,8 @@ module Outputable (
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} 	Module( Module )
+import {-# SOURCE #-} 	Module( Module, modulePackageId, 
+                                ModuleName, moduleName )
 import {-# SOURCE #-} 	OccName( OccName )
 
 import StaticFlags	( opt_PprStyle_Debug, opt_PprUserLength )
@@ -99,33 +100,64 @@ data Depth = AllTheWay
            | PartWay Int	-- 0 => stop
 
 
-type PrintUnqualified = Module -> OccName -> Bool
-	-- This function tells when it's ok to print 
-	-- a (Global) name unqualified
+-- -----------------------------------------------------------------------------
+-- Printing original names
 
-alwaysQualify,neverQualify :: PrintUnqualified
-alwaysQualify m n = False
-neverQualify  m n = True
+-- When printing code that contains original names, we need to map the
+-- original names back to something the user understands.  This is the
+-- purpose of the pair of functions that gets passed around
+-- when rendering 'SDoc'.
+
+-- | given an /original/ name, this function tells you which module
+-- name it should be qualified with when printing for the user, if
+-- any.  For example, given @Control.Exception.catch@, which is in scope
+-- as @Exception.catch@, this fuction will return @Just "Exception"@.
+-- Note that the return value is a ModuleName, not a Module, because
+-- in source code, names are qualified by ModuleNames.
+type QualifyName = Module -> OccName -> Maybe ModuleName
+
+-- | For a given module, we need to know whether to print it with
+-- a package name to disambiguate it, and if so which package name should
+-- we use.
+type QualifyModule = Module -> Maybe PackageId
+
+type PrintUnqualified = (QualifyName, QualifyModule)
+
+alwaysQualifyNames :: QualifyName
+alwaysQualifyNames m n = Just (moduleName m)
+
+neverQualifyNames :: QualifyName
+neverQualifyNames m n = Nothing
+
+alwaysQualifyModules :: QualifyModule
+alwaysQualifyModules m = Just (modulePackageId m)
+
+neverQualifyModules :: QualifyModule
+neverQualifyModules m = Nothing
+
+alwaysQualify = (alwaysQualifyNames, alwaysQualifyModules)
+neverQualify  = (neverQualifyNames,  neverQualifyModules)
 
 defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
 
 defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
 		 |  otherwise          = PprDump
 
+-- | Style for printing error messages
 mkErrStyle :: PrintUnqualified -> PprStyle
--- Style for printing error messages
-mkErrStyle print_unqual = mkUserStyle print_unqual (PartWay opt_PprUserLength)
+mkErrStyle qual = mkUserStyle qual (PartWay opt_PprUserLength)
 
 defaultErrStyle :: PprStyle
 -- Default style for error messages
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
 defaultErrStyle 
-  | opt_PprStyle_Debug = mkUserStyle alwaysQualify AllTheWay
-  | otherwise	       = mkUserStyle alwaysQualify  (PartWay opt_PprUserLength)
+  | opt_PprStyle_Debug   = mkUserStyle alwaysQualify AllTheWay
+  | otherwise            = mkUserStyle alwaysQualify (PartWay opt_PprUserLength)
 
-mkUserStyle unqual depth |  opt_PprStyle_Debug = PprDebug
-	          	 |  otherwise          = PprUser unqual depth
+mkUserStyle unqual depth
+   | opt_PprStyle_Debug = PprDebug
+   | otherwise          = PprUser unqual depth
 \end{code}
 
 Orthogonal to the above printing styles are (possibly) some
@@ -152,22 +184,26 @@ withPprStyleDoc :: PprStyle -> SDoc -> Doc
 withPprStyleDoc sty d = d sty
 
 pprDeeper :: SDoc -> SDoc
-pprDeeper d (PprUser unqual (PartWay 0)) = Pretty.text "..."
-pprDeeper d (PprUser unqual (PartWay n)) = d (PprUser unqual (PartWay (n-1)))
-pprDeeper d other_sty        		 = d other_sty
+pprDeeper d (PprUser q (PartWay 0)) = Pretty.text "..."
+pprDeeper d (PprUser q (PartWay n)) = d (PprUser q (PartWay (n-1)))
+pprDeeper d other_sty        	    = d other_sty
 
 pprSetDepth :: Int -> SDoc -> SDoc
-pprSetDepth n d (PprUser unqual _) = d (PprUser unqual (PartWay n))
-pprSetDepth n d other_sty	   = d other_sty
+pprSetDepth n d (PprUser q _) = d (PprUser q (PartWay n))
+pprSetDepth n d other_sty     = d other_sty
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df sty = df sty sty
 \end{code}
 
 \begin{code}
-unqualStyle :: PprStyle -> PrintUnqualified
-unqualStyle (PprUser    unqual _) m n = unqual m n
-unqualStyle other		  m n = False
+qualName :: PprStyle -> QualifyName
+qualName (PprUser (qual_name,_) _) m n = qual_name m n
+qualName other		           m n = Just (moduleName m)
+
+qualModule :: PprStyle -> QualifyModule
+qualModule (PprUser (_,qual_mod) _) m = qual_mod m
+qualModule other                    m = Just (modulePackageId m)
 
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)	  = True

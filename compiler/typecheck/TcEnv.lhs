@@ -104,7 +104,8 @@ tcLookupGlobal name
 	 
 		-- Try global envt
 	{ (eps,hpt) <- getEpsAndHpt
-	; case lookupType hpt (eps_PTE eps) name of  {
+	; dflags <- getDOpts
+	; case lookupType dflags hpt (eps_PTE eps) name of  {
 	    Just thing -> return thing ;
 	    Nothing    -> do
 

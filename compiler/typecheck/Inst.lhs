@@ -68,9 +68,9 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcPredType,
 import Type	( TvSubst, substTy, substTyVar, substTyWith, substTheta, zipTopTvSubst,
 		  notElemTvSubst, extendTvSubstList )
 import Unify	( tcMatchTys )
+import Module	( modulePackageId )
 import Kind	( isSubKind )
-import Packages	( isHomeModule )
-import HscTypes	( ExternalPackageState(..) )
+import HscTypes	( ExternalPackageState(..), HscEnv(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName, dataConWrapId )
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
@@ -86,7 +86,7 @@ import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rational
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
-import DynFlags	( DynFlag(..), dopt )
+import DynFlags	( DynFlag(..), DynFlags(..), dopt )
 import Maybes	( isJust )
 import Outputable
 \end{code}
@@ -698,11 +698,11 @@ lookupPred pred@(ClassP clas tys)
 lookupPred ip_pred = return Nothing
 
 record_dfun_usage dfun_id 
-  = do	{ gbl <- getGblEnv
+  = do	{ hsc_env <- getTopEnv
 	; let  dfun_name = idName dfun_id
 	       dfun_mod  = nameModule dfun_name
 	; if isInternalName dfun_name ||    -- Internal name => defined in this module
-	     not (isHomeModule (tcg_home_mods gbl) dfun_mod)
+	     modulePackageId dfun_mod /= thisPackage (hsc_dflags hsc_env)
 	  then return () -- internal, or in another package
 	   else do { tcg_env <- getGblEnv
 	  	   ; updMutVar (tcg_inst_uses tcg_env)

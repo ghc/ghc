@@ -205,7 +205,7 @@ make_var_id :: Name -> C.Id
 make_var_id = make_id True
 
 make_mid :: Module -> C.Id
-make_mid = moduleString
+make_mid = showSDoc . pprModule
 
 make_qid :: Bool -> Name -> C.Qual C.Id
 make_qid is_var n = (mname,make_id is_var n)

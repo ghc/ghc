@@ -36,6 +36,7 @@ import Finder
 import HscTypes
 import Outputable
 import Module
+import UniqFM		( eltsUFM )
 import ErrUtils
 import DynFlags
 import StaticFlags	( v_Ld_inputs, opt_Static, WayName(..) )
@@ -235,7 +236,7 @@ compileStub dflags mod location = do
 	    stub_o = o_base ++ "_stub" `joinFileExt` o_ext
 
 	-- compile the _stub.c file w/ gcc
-	let (stub_c,_) = mkStubPaths dflags mod location
+	let (stub_c,_) = mkStubPaths dflags (moduleName mod) location
 	runPipeline StopLn dflags (stub_c,Nothing) 
 		(SpecificFile stub_o) Nothing{-no ModLocation-}
 
@@ -271,7 +272,7 @@ link BatchCompile dflags batch_attempt_linking hpt
    | batch_attempt_linking
    = do 
 	let 
-	    home_mod_infos = moduleEnvElts hpt
+	    home_mod_infos = eltsUFM hpt
 
 	    -- the packages we depend on
 	    pkg_deps  = concatMap (dep_pkgs . mi_deps . hm_iface) home_mod_infos
@@ -376,9 +377,7 @@ doLink dflags stop_phase o_files
   where
    -- Always link in the haskell98 package for static linking.  Other
    -- packages have to be specified via the -package flag.
-    link_pkgs
-	  | ExtPackage h98_id <- haskell98PackageId (pkgState dflags) = [h98_id]
-	  | otherwise = []
+    link_pkgs = [haskell98PackageId]
 
 
 -- ---------------------------------------------------------------------------
@@ -640,7 +639,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
             case src_flavour of
 		ExtCoreFile -> do {  -- no explicit imports in ExtCore input.
 			          ; m <- getCoreModuleName input_fn
-			          ; return (Nothing, mkModule m) }
+			          ; return (Nothing, mkModuleName m) }
 
 		other -> do { buf <- hGetStringBuffer input_fn
 			    ; (_,_,L _ mod_name) <- getImports dflags buf input_fn
@@ -677,22 +676,6 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 		      = location3 { ml_obj_file = ofile }
 		      | otherwise = location3
 
-  -- Make the ModSummary to hand to hscMain
-	src_timestamp <- getModificationTime (basename `joinFileExt` suff)
-	let
-	    unused_field = panic "runPhase:ModSummary field"
-		-- Some fields are not looked at by hscMain
-	    mod_summary = ModSummary {	ms_mod 	     = mod_name, 
-					ms_hsc_src   = src_flavour,
-				 	ms_hspp_file = input_fn,
-                                        ms_hspp_opts = dflags,
-					ms_hspp_buf  = hspp_buf,
-					ms_location  = location4,
-					ms_hs_date   = src_timestamp,
-					ms_obj_date  = Nothing,
-					ms_imps	     = unused_field,
-					ms_srcimps   = unused_field }
-
 	    o_file = ml_obj_file location4 	-- The real object file
 
 
@@ -703,6 +686,8 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
+	src_timestamp <- getModificationTime (basename `joinFileExt` suff)
+
 	let do_recomp = dopt Opt_RecompChecking dflags
 	source_unchanged <- 
           if not do_recomp || not (isStopLn stop)
@@ -731,7 +716,22 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 	hsc_env <- newHscEnv dflags'
 
   -- Tell the finder cache about this module
-	addHomeModuleToFinder hsc_env mod_name location4
+	mod <- addHomeModuleToFinder hsc_env mod_name location4
+
+  -- Make the ModSummary to hand to hscMain
+	let
+	    unused_field = panic "runPhase:ModSummary field"
+		-- Some fields are not looked at by hscMain
+	    mod_summary = ModSummary {	ms_mod 	     = mod, 
+					ms_hsc_src   = src_flavour,
+				 	ms_hspp_file = input_fn,
+                                        ms_hspp_opts = dflags,
+					ms_hspp_buf  = hspp_buf,
+					ms_location  = location4,
+					ms_hs_date   = src_timestamp,
+					ms_obj_date  = Nothing,
+					ms_imps	     = unused_field,
+					ms_srcimps   = unused_field }
 
   -- run the compiler!
 	mbResult <- hscCompileOneShot hsc_env
@@ -749,7 +749,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
                     return (StopLn, dflags', Just location4, o_file)
           Just (HscRecomp hasStub)
               -> do when hasStub $
-                         do stub_o <- compileStub dflags' mod_name location4
+                         do stub_o <- compileStub dflags' mod location4
                             consIORef v_Ld_inputs stub_o
                     -- In the case of hs-boot files, generate a dummy .o-boot 
                     -- stamp file for the benefit of Make
@@ -1272,12 +1272,8 @@ doMkDLL dflags o_files dep_packages = do
     let extra_ld_opts = getOpts dflags opt_dll 
 
     let pstate = pkgState dflags
-	rts_id | ExtPackage id <- rtsPackageId pstate = id
-	       | otherwise = panic "staticLink: rts package missing"
-	base_id | ExtPackage id <- basePackageId pstate = id
-	        | otherwise = panic "staticLink: base package missing"
-	rts_pkg  = getPackageDetails pstate rts_id
-        base_pkg = getPackageDetails pstate base_id
+	rts_pkg  = getPackageDetails pstate rtsPackageId
+        base_pkg = getPackageDetails pstate basePackageId
 
     let extra_os = if static || no_hs_main
                    then []

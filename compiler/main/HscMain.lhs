@@ -68,7 +68,6 @@ import TidyPgm		( tidyProgram, mkBootModDetails )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
 import TyCon		( isDataTyCon )
-import Packages		( mkHomeModules )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -87,7 +86,7 @@ import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
 import FastString
-import Maybes		( expectJust )
+import UniqFM		( emptyUFM )
 import Bag		( unitBag )
 import Monad		( unless )
 import IO
@@ -107,7 +106,8 @@ newHscEnv dflags
   = do 	{ eps_var <- newIORef initExternalPackageState
 	; us      <- mkSplitUniqSupply 'r'
 	; nc_var  <- newIORef (initNameCache us knownKeyNames)
-	; fc_var  <- newIORef emptyModuleEnv
+	; fc_var  <- newIORef emptyUFM
+	; mlc_var  <- newIORef emptyModuleEnv
 	; return (HscEnv { hsc_dflags = dflags,
 			   hsc_targets = [],
 			   hsc_mod_graph = [],
@@ -116,6 +116,7 @@ newHscEnv dflags
 			   hsc_EPS    = eps_var,
 			   hsc_NC     = nc_var,
 			   hsc_FC     = fc_var,
+			   hsc_MLC    = mlc_var,
                            hsc_global_rdr_env = emptyGlobalRdrEnv,
                            hsc_global_type_env = emptyNameEnv } ) }
 			
@@ -579,7 +580,6 @@ hscCompile cgguts
                      cg_tycons   = tycons,
                      cg_dir_imps = dir_imps,
                      cg_foreign  = foreign_stubs,
-                     cg_home_mods = home_mods,
                      cg_dep_pkgs = dependencies } = cgguts
              dflags = hsc_dflags hsc_env
              location = ms_location mod_summary
@@ -595,10 +595,10 @@ hscCompile cgguts
          -----------------  Convert to STG ------------------
          (stg_binds, cost_centre_info)
              <- {-# SCC "CoreToStg" #-}
-                myCoreToStg dflags home_mods this_mod prepd_binds	
+                myCoreToStg dflags this_mod prepd_binds	
          ------------------  Code generation ------------------
          abstractC <- {-# SCC "CodeGen" #-}
-                      codeGen dflags home_mods this_mod data_tycons
+                      codeGen dflags this_mod data_tycons
                               foreign_stubs dir_imps cost_centre_info
                               stg_binds
          ------------------  Code output -----------------------
@@ -696,7 +696,7 @@ hscFileCheck hsc_env mod_summary = do {
 
 hscCmmFile :: DynFlags -> FilePath -> IO Bool
 hscCmmFile dflags filename = do
-  maybe_cmm <- parseCmmFile dflags (mkHomeModules []) filename
+  maybe_cmm <- parseCmmFile dflags filename
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
@@ -739,13 +739,13 @@ myParseModule dflags src_filename maybe_src_buf
       }}
 
 
-myCoreToStg dflags home_mods this_mod prepd_binds
+myCoreToStg dflags this_mod prepd_binds
  = do 
       stg_binds <- {-# SCC "Core2Stg" #-}
-	     coreToStg home_mods prepd_binds
+	     coreToStg (thisPackage dflags) prepd_binds
 
       (stg_binds2, cost_centre_info) <- {-# SCC "Stg2Stg" #-}
-	     stg2stg dflags home_mods this_mod stg_binds
+	     stg2stg dflags this_mod stg_binds
 
       return (stg_binds2, cost_centre_info)
 \end{code}

@@ -38,7 +38,7 @@ module Name (
 import {-# SOURCE #-} TypeRep( TyThing )
 
 import OccName		-- All of it
-import Module		( Module, moduleFS )
+import Module		( Module )
 import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique )
 import Maybes		( orElse, isJust )
@@ -56,7 +56,7 @@ import Outputable
 data Name = Name {
 		n_sort :: NameSort,	-- What sort of name it is
 		n_occ  :: !OccName,	-- Its occurrence name
-		n_uniq :: Unique,
+		n_uniq :: {-# UNPACK #-} !Unique,
 		n_loc  :: !SrcLoc	-- Definition site
 	    }
 
@@ -308,7 +308,7 @@ instance Outputable Name where
 instance OutputableBndr Name where
     pprBndr _ name = pprName name
 
-pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
+pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
       WiredIn mod _ _ builtin -> pprExternal sty uniq mod occ True  builtin
@@ -317,18 +317,19 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       Internal    	      -> pprInternal sty uniq occ
 
 pprExternal sty uniq mod occ is_wired is_builtin
-  | codeStyle sty        = ppr_z_module mod <> char '_' <> ppr_z_occ_name occ
+  | codeStyle sty        = ppr mod <> char '_' <> ppr_z_occ_name occ
 	-- In code style, always qualify
 	-- ToDo: maybe we could print all wired-in things unqualified
 	-- 	 in code style, to reduce symbol table bloat?
-  | debugStyle sty       = ppr mod <> dot <> ppr_occ_name occ
-			   <> braces (hsep [if is_wired then ptext SLIT("(w)") else empty,
-					    pprNameSpaceBrief (occNameSpace occ), 
-		 			    pprUnique uniq])
+ | debugStyle sty       = ppr mod <> dot <> ppr_occ_name occ
+		<> braces (hsep [if is_wired then ptext SLIT("(w)") else empty,
+				 pprNameSpaceBrief (occNameSpace occ), 
+		 		 pprUnique uniq])
   | BuiltInSyntax <- is_builtin  = ppr_occ_name occ
 	-- never qualify builtin syntax
-  | unqualStyle sty mod occ = ppr_occ_name occ
-  | otherwise		    = ppr mod <> dot <> ppr_occ_name occ
+  | Just mod <- qualName sty mod occ = ppr mod <> dot <> ppr_occ_name occ
+        -- the PrintUnqualified tells us how to qualify this Name, if at all
+  | otherwise		          = ppr_occ_name occ
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
@@ -356,8 +357,6 @@ ppr_occ_name occ = ftext (occNameFS occ)
 -- In code style, we Z-encode the strings.  The results of Z-encoding each FastString are
 -- cached behind the scenes in the FastString implementation.
 ppr_z_occ_name occ = ftext (zEncodeFS (occNameFS occ))
-ppr_z_module   mod = ftext (zEncodeFS (moduleFS mod))
-
 \end{code}
 
 %************************************************************************

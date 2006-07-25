@@ -1,0 +1,30 @@
+# This Makefile builds the GHC binary for stage2.  In stage2, the GHC binary
+# is built as a single Main module that links to the GHC package.  It
+# is easier to do this with a separate Makefile, because we don't want most
+# of the options normally dumped into SRC_HC_OPTS by the main GHC Makefile.
+# In particular, we don't want the .hi files picked up along the home package
+# search path when compiling Main, we need the compiler to find them in
+# the GHC package.
+
+TOP = ..
+include $(TOP)/mk/boilerplate.mk
+
+stage=2
+
+HC=$(GHC_STAGE1)
+SRC_HC_OPTS += -package ghc
+SRC_HC_OPTS += -DGHCI -DBREAKPOINT
+SRC_HC_OPTS += -Istage$(stage)
+SRC_HC_OPTS += \
+  -cpp -fglasgow-exts -fno-generics -Rghc-timing \
+  -I. -IcodeGen -InativeGen -Iparser
+
+odir=stage$(stage)
+
+HS_SRCS = main/Main.hs
+HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS))))
+$(odir)/main/Main.o : libHSghc$(_way).a
+
+include $(TOP)/mk/target.mk
+
+-include .depend-$(stage)

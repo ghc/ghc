@@ -30,13 +30,14 @@ module RnEnv (
 
 #include "HsVersions.h"
 
-import LoadIface	( loadHomeInterface, loadSrcInterface )
+import LoadIface	( loadInterfaceForName, loadSrcInterface )
 import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
 import HsSyn		( FixitySig(..), HsExpr(..), SyntaxExpr, SyntaxTable,
 			  LHsTyVarBndr, LHsType, 
 			  Fixity, hsLTyVarLocNames, replaceTyVarName )
 import RdrHsSyn		( extractHsTyRdrTyVars )
-import RdrName		( RdrName, rdrNameModule, isQual, isUnqual, isOrig,
+import RdrName		( RdrName, isQual, isUnqual, isOrig_maybe,
+			  isQual_maybe,
 			  mkRdrUnqual, setRdrNameSpace, rdrNameOcc,
 			  pprGlobalRdrEnv, lookupGRE_RdrName, 
 			  isExact_maybe, isSrcRdrName,
@@ -52,7 +53,7 @@ import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 import NameSet
 import OccName		( tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
 			  reportIfUnused )
-import Module		( Module )
+import Module		( Module, ModuleName )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, consDataConKey, hasKey )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName )
@@ -91,7 +92,7 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	returnM name
 
 
-  | isOrig rdr_name
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
   = do	checkErr (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
 	         (badOrigBinding rdr_name)
 	-- When reading External Core we get Orig names as binders, 
@@ -111,13 +112,11 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	-- the RdrName, not from the environment.  In principle, it'd be fine to 
 	-- have an arbitrary mixture of external core definitions in a single module,
 	-- (apart from module-initialisation issues, perhaps).
-	newGlobalBinder rdr_mod (rdrNameOcc rdr_name) mb_parent 
+	newGlobalBinder rdr_mod rdr_occ mb_parent 
 	    	        (srcSpanStart loc) --TODO, should pass the whole span
 
   | otherwise
   = newGlobalBinder this_mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc)
-  where
-    rdr_mod  = rdrNameModule rdr_name
 \end{code}
 
 %*********************************************************
@@ -164,13 +163,12 @@ lookupTopBndrRn rdr_name
   | Just name <- isExact_maybe rdr_name
   = returnM name
 
-  | isOrig rdr_name	
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name	
 	-- This deals with the case of derived bindings, where
 	-- we don't bother to call newTopSrcBinder first
 	-- We assume there is no "parent" name
   = do	{ loc <- getSrcSpanM
-	; newGlobalBinder (rdrNameModule rdr_name)
-		          (rdrNameOcc rdr_name) Nothing (srcSpanStart loc) }
+	; newGlobalBinder rdr_mod rdr_occ Nothing (srcSpanStart loc) }
 
   | otherwise
   = do	{ mb_gre <- lookupGreLocalRn rdr_name
@@ -278,9 +276,12 @@ lookupImportedName rdr_name
 	-- This happens in derived code
   = returnM n
 
-  | otherwise	-- Always Orig, even when reading a .hi-boot file
-  = ASSERT( not (isUnqual rdr_name) )
-    lookupOrig (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+	-- Always Orig, even when reading a .hi-boot file
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
+  = lookupOrig rdr_mod rdr_occ
+
+  | otherwise
+  = pprPanic "RnEnv.lookupImportedName" (ppr rdr_name)
 
 unboundName :: RdrName -> RnM Name
 unboundName rdr_name 
@@ -337,13 +338,10 @@ lookupGreRn_help rdr_name lookup
 -- try to load the interface if we don't already have it.
 lookupQualifiedName :: RdrName -> RnM Name
 lookupQualifiedName rdr_name
- = let 
-       mod = rdrNameModule rdr_name
-       occ = rdrNameOcc rdr_name
-   in
+  | Just (mod,occ) <- isQual_maybe rdr_name
    -- Note: we want to behave as we would for a source file import here,
    -- and respect hiddenness of modules/packages, hence loadSrcInterface.
-   loadSrcInterface doc mod False	`thenM` \ iface ->
+   = loadSrcInterface doc mod False	`thenM` \ iface ->
 
    case  [ (mod,occ) | 
 	   (mod,avails) <- mi_exports iface,
@@ -353,6 +351,9 @@ lookupQualifiedName rdr_name
       ((mod,occ):ns) -> ASSERT (null ns) 
 			lookupOrig mod occ
       _ -> unboundName rdr_name
+
+  | otherwise
+  = pprPanic "RnEnv.lookupQualifiedName" (ppr rdr_name)
   where
     doc = ptext SLIT("Need to find") <+> ppr rdr_name
 \end{code}
@@ -421,7 +422,7 @@ lookupFixityRn name
 
     else	-- It's imported
       -- For imported names, we have to get their fixities by doing a
-      -- loadHomeInterface, and consulting the Ifaces that comes back
+      -- loadInterfaceForName, and consulting the Ifaces that comes back
       -- from that, because the interface file for the Name might not
       -- have been loaded yet.  Why not?  Suppose you import module A,
       -- which exports a function 'f', thus;
@@ -434,9 +435,9 @@ lookupFixityRn name
       -- 'f', we need to know its fixity, and it's then, and only
       -- then, that we load B.hi.  That is what's happening here.
       --
-      -- loadHomeInterface will find B.hi even if B is a hidden module,
+      -- loadInterfaceForName will find B.hi even if B is a hidden module,
       -- and that's what we want.
-        loadHomeInterface doc name	`thenM` \ iface ->
+        loadInterfaceForName doc name	`thenM` \ iface ->
 	returnM (mi_fix_fn iface (nameOccName name))
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
@@ -705,7 +706,7 @@ mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
 %************************************************************************
 
 \begin{code}
-warnUnusedModules :: [(Module,SrcSpan)] -> RnM ()
+warnUnusedModules :: [(ModuleName,SrcSpan)] -> RnM ()
 warnUnusedModules mods
   = ifOptM Opt_WarnUnusedImports (mappM_ bleat mods)
   where

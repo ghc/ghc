@@ -17,13 +17,12 @@ import GHC		( Session, ModSummary(..) )
 import DynFlags		( DynFlags( verbosity, opt_dep ), getOpts )
 import Util		( escapeSpaces, splitFilename, joinFileExt )
 import HscTypes		( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
-import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( Module, ModLocation(..), mkModule, 
+import Module		( ModuleName, ModLocation(..), mkModuleName,
 			  addBootSuffix_maybe )
 import Digraph		( SCC(..) )
-import Finder		( findModule, FindResult(..) )
+import Finder		( findImportedModule, FindResult(..) )
 import Util             ( global, consIORef )
 import Outputable
 import Panic
@@ -153,7 +152,7 @@ beginMkDependHS dflags = do
 -----------------------------------------------------------------
 
 processDeps :: Session
-	    -> [Module]
+	    -> [ModuleName]
 	    -> Handle		-- Write dependencies to here
 	    -> SCC ModSummary
 	    -> IO ()
@@ -217,23 +216,23 @@ processDeps session excl_mods hdl (AcyclicSCC node)
 
 findDependency	:: HscEnv
 		-> FilePath 		-- Importing module: used only for error msg
-		-> Module		-- Imported module
+		-> ModuleName		-- Imported module
 		-> IsBootInterface	-- Source import
 		-> Bool			-- Record dependency on package modules
 		-> IO (Maybe FilePath)	-- Interface file file
 findDependency hsc_env src imp is_boot include_pkg_deps
   = do	{ 	-- Find the module; this will be fast because
 		-- we've done it once during downsweep
-	  r <- findModule hsc_env imp True {-explicit-}
+	  r <- findImportedModule hsc_env imp Nothing
 	; case r of 
-	    Found loc pkg
-		-- Not in this package: we don't need a dependency
-		| ExtPackage _ <- pkg, not include_pkg_deps
-		-> return Nothing
-
+	    Found loc mod
 		-- Home package: just depend on the .hi or hi-boot file
-		| otherwise
+		| isJust (ml_hs_file loc)
 		-> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
+
+		-- Not in this package: we don't need a dependency
+		| otherwise
+		-> return Nothing
 
 	    _ -> panic "findDependency"
 	}
@@ -322,7 +321,7 @@ endMkDependHS dflags
 	-- Flags
 GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
 GLOBAL_VAR(v_Dep_include_pkg_deps, 	False, Bool);
-GLOBAL_VAR(v_Dep_exclude_mods,          [], [Module]);
+GLOBAL_VAR(v_Dep_exclude_mods,          [], [ModuleName]);
 GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
 GLOBAL_VAR(v_Dep_warnings,		True, Bool);
 
@@ -337,6 +336,6 @@ dep_opts =
    , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
    , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
    , (  "-include-pkg-deps",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
-   , (  "-exclude-module=",     Prefix (consIORef v_Dep_exclude_mods . mkModule) )
-   , (  "x",                    Prefix (consIORef v_Dep_exclude_mods . mkModule) )
+   , (  "-exclude-module=",     Prefix (consIORef v_Dep_exclude_mods . mkModuleName) )
+   , (  "x",                    Prefix (consIORef v_Dep_exclude_mods . mkModuleName) )
    ]

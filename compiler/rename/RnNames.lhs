@@ -13,7 +13,7 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import DynFlags		( DynFlag(..), GhcMode(..) )
+import DynFlags		( DynFlag(..), GhcMode(..), DynFlags(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
 			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
@@ -24,9 +24,8 @@ import LoadIface	( loadSrcInterface )
 import TcRnMonad hiding (LIE)
 
 import FiniteMap
-import PrelNames	( pRELUDE, isUnboundName, main_RDR_Unqual )
-import Module		( Module, moduleString, unitModuleEnv, 
-			  lookupModuleEnv, moduleEnvElts, foldModuleEnv )
+import PrelNames
+import Module
 import Name		( Name, nameSrcLoc, nameOccName, nameModule, isWiredInName,
 			  nameParent, nameParent_maybe, isExternalName,
 			  isBuiltInSyntax )
@@ -38,11 +37,10 @@ import OccName		( srcDataName, isTcOcc, pprNonVarNameSpace,
 			  extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo,
 			  HomePackageTable, PackageIfaceTable, 
-			  unQualInScope, 
+			  mkPrintUnqualified,
 			  Deprecs(..), ModIface(..), Dependencies(..), 
-			  lookupIface, ExternalPackageState(..)
+			  lookupIfaceByModule, ExternalPackageState(..)
 			)
-import Packages		( PackageIdH(..) )
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, 
 		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
 			  emptyGlobalRdrEnv, plusGlobalRdrEnv, globalRdrEnvElts,
@@ -50,6 +48,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 			  Provenance(..), ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..), 
 			  importSpecLoc, importSpecModule, isLocalGRE, pprNameProvenance )
 import Outputable
+import UniqFM
 import Maybes		( isNothing, catMaybes, mapCatMaybes, seqMaybe, orElse )
 import SrcLoc		( Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc, srcLocSpan, SrcSpan )
@@ -96,12 +95,12 @@ rnImports imports
        | otherwise = [preludeImportDecl]
    explicit_prelude_import
        = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- imports, 
-	           unLoc mod == pRELUDE ]
+	           unLoc mod == pRELUDE_NAME ]
 
 preludeImportDecl :: LImportDecl RdrName
 preludeImportDecl
   = L loc $
-	ImportDecl (L loc pRELUDE)
+	ImportDecl (L loc pRELUDE_NAME)
 	       False {- Not a boot interface -}
 	       False	{- Not qualified -}
 	       Nothing	{- No "as" -}
@@ -271,13 +270,14 @@ importsFromImportDecl this_mod
     let
 	-- Compute new transitive dependencies
 
- 	orphans | is_orph   = ASSERT( not (imp_mod_name `elem` dep_orphs deps) )
-			      imp_mod_name : dep_orphs deps
+ 	orphans | is_orph   = ASSERT( not (imp_mod `elem` dep_orphs deps) )
+			      imp_mod : dep_orphs deps
 		| otherwise = dep_orphs deps
 
+	pkg = modulePackageId (mi_module iface)
+
 	(dependent_mods, dependent_pkgs) 
-	   = case mi_package iface of
-		HomePackage ->
+	   | pkg == thisPackage dflags =
 	    	-- Imported module is from the home package
 		-- Take its dependent modules and add imp_mod itself
 		-- Take its dependent packages unchanged
@@ -291,7 +291,7 @@ importsFromImportDecl this_mod
 		-- check.  See LoadIface.loadHiBootInterface
 		  ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
 
-		ExtPackage pkg ->
+	   | otherwise =
  	   	-- Imported module is from another package
 		-- Dump the dependent modules
 		-- Add the package imp_mod comes from to the dependent packages
@@ -308,7 +308,7 @@ importsFromImportDecl this_mod
 	--	module M ( module P ) where ...
 	-- Then we must export whatever came from P unqualified.
 	imports   = ImportAvails { 
-			imp_env      = unitModuleEnv qual_mod_name avail_env,
+			imp_env      = unitUFM qual_mod_name avail_env,
 			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all, loc),
 			imp_orphs    = orphans,
 			imp_dep_mods = mkModDeps dependent_mods,
@@ -376,7 +376,7 @@ importsFromLocalDecls group
 
 	    ; this_mod = tcg_mod gbl_env
 	    ; imports = emptyImportAvails {
-			  imp_env = unitModuleEnv this_mod $
+			  imp_env = unitUFM (moduleName this_mod) $
 				    mkNameSet filtered_names
 		        }
 	    }
@@ -544,7 +544,7 @@ it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 \begin{code}
 type ExportAccum	-- The type of the accumulating parameter of
 			-- the main worker function in rnExports
-     = ([Module], 		-- 'module M's seen so far
+     = ([ModuleName], 		-- 'module M's seen so far
 	ExportOccMap,		-- Tracks exported occurrence names
 	NameSet)		-- The accumulated exported stuff
 emptyExportAccum = ([], emptyOccEnv, emptyNameSet) 
@@ -561,7 +561,7 @@ rnExports Nothing = return Nothing
 rnExports (Just exports)
     = do TcGblEnv { tcg_imports = ImportAvails { imp_env = imp_env } } <- getGblEnv
          let sub_env :: NameEnv [Name]	-- Classify each name by its parent
-             sub_env = mkSubNameEnv (foldModuleEnv unionNameSets emptyNameSet imp_env)
+             sub_env = mkSubNameEnv (foldUFM unionNameSets emptyNameSet imp_env)
              rnExport (IEVar rdrName)
                  = do name <- lookupGlobalOccRn rdrName
                       return (IEVar name)
@@ -631,7 +631,7 @@ exports_from_avail (Just (items,origItems)) rdr_env (ImportAvails { imp_env = im
        return exports
   where
     sub_env :: NameEnv [Name]	-- Classify each name by its parent
-    sub_env = mkSubNameEnv (foldModuleEnv unionNameSets emptyNameSet imp_env)
+    sub_env = mkSubNameEnv (foldUFM unionNameSets emptyNameSet imp_env)
 
     do_litem :: ExportAccum -> (LIE Name, LIE RdrName) -> RnM ExportAccum
     do_litem acc (ieName, ieRdr)
@@ -645,7 +645,7 @@ exports_from_avail (Just (items,origItems)) rdr_env (ImportAvails { imp_env = im
 	       returnM acc }
 
 	| otherwise
-	= case lookupModuleEnv imp_env mod of
+	= case lookupUFM imp_env mod of
             Nothing -> do addErr (modExportErr mod)
                           return acc
             Just names
@@ -738,8 +738,8 @@ check_occs ie occs names
 %*********************************************************
 
 \begin{code}
-reportDeprecations :: TcGblEnv -> RnM ()
-reportDeprecations tcg_env
+reportDeprecations :: DynFlags -> TcGblEnv -> RnM ()
+reportDeprecations dflags tcg_env
   = ifOptM Opt_WarnDeprecations	$
     do	{ (eps,hpt) <- getEpsAndHpt
 		-- By this time, typechecking is complete, 
@@ -752,7 +752,7 @@ reportDeprecations tcg_env
 
     check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_)})
       | name `elemNameSet` used_names
-      ,	Just deprec_txt <- lookupDeprec hpt pit name
+      ,	Just deprec_txt <- lookupDeprec dflags hpt pit name
       = setSrcSpan (importSpecLoc imp_spec) $
 	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
 			pprNonVarNameSpace (occNameSpace (nameOccName name)) <+> 
@@ -763,7 +763,7 @@ reportDeprecations tcg_env
 	  name_mod = nameModule name
 	  imp_mod  = importSpecModule imp_spec
 	  imp_msg  = ptext SLIT("imported from") <+> ppr imp_mod <> extra
-	  extra | imp_mod == name_mod = empty
+	  extra | imp_mod == moduleName name_mod = empty
 		| otherwise = ptext SLIT(", but defined in") <+> ppr name_mod
 
     check hpt pit ok_gre = returnM ()	-- Local, or not used, or not deprectated
@@ -774,10 +774,10 @@ reportDeprecations tcg_env
 	    -- the defn of a non-deprecated thing, when changing a module's 
 	    -- interface
 
-lookupDeprec :: HomePackageTable -> PackageIfaceTable 
+lookupDeprec :: DynFlags -> HomePackageTable -> PackageIfaceTable 
 	     -> Name -> Maybe DeprecTxt
-lookupDeprec hpt pit n 
-  = case lookupIface hpt pit (nameModule n) of
+lookupDeprec dflags hpt pit n 
+  = case lookupIfaceByModule dflags hpt pit (nameModule n) of
 	Just iface -> mi_dep_fn iface n `seqMaybe` 	-- Bleat if the thing, *or
 		      mi_dep_fn iface (nameParent n)	-- its parent*, is deprec'd
 	Nothing    
@@ -854,7 +854,7 @@ reportUnusedNames export_decls gbl_env
     -- into a bunch of avails, so they are properly grouped
     --
     -- BUG WARNING: this does not deal properly with qualified imports!
-    minimal_imports :: FiniteMap Module AvailEnv
+    minimal_imports :: FiniteMap ModuleName AvailEnv
     minimal_imports0 = foldr add_expall   emptyFM 	   expall_mods
     minimal_imports1 = foldr add_name     minimal_imports0 defined_and_used
     minimal_imports  = foldr add_inst_mod minimal_imports1 direct_import_mods
@@ -909,9 +909,10 @@ reportUnusedNames export_decls gbl_env
 		       | otherwise		 = Avail n
     
     add_inst_mod (mod,_,_) acc 
-      | mod `elemFM` acc = acc	-- We import something already
-      | otherwise        = addToFM acc mod emptyAvailEnv
+      | mod_name `elemFM` acc = acc	-- We import something already
+      | otherwise	      = addToFM acc mod_name emptyAvailEnv
       where
+	mod_name = moduleName mod
     	-- Add an empty collection of imports for a module
     	-- from which we have sucked only instance decls
    
@@ -928,15 +929,16 @@ reportUnusedNames export_decls gbl_env
     --
     -- BUG WARNING: does not deal correctly with multiple imports of the same module
     --	 	    becuase direct_import_mods has only one entry per module
-    unused_imp_mods = [(mod,loc) | (mod,no_imp,loc) <- direct_import_mods,
-    		       not (mod `elemFM` minimal_imports1),
+    unused_imp_mods = [(mod_name,loc) | (mod,no_imp,loc) <- direct_import_mods,
+		       let mod_name = moduleName mod,
+    		       not (mod_name `elemFM` minimal_imports1),
     		       mod /= pRELUDE,
 		       not no_imp]
 	-- The not no_imp part is not to complain about
 	-- import M (), which is an idiom for importing
 	-- instance declarations
     
-    module_unused :: Module -> Bool
+    module_unused :: ModuleName -> Bool
     module_unused mod = any (((==) mod) . fst) unused_imp_mods
 
 ---------------------
@@ -1017,7 +1019,7 @@ selectiveImpItem ImpAll       = False
 selectiveImpItem (ImpSome {}) = True
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
-printMinimalImports :: FiniteMap Module AvailEnv	-- Minimal imports
+printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
 		    -> RnM ()
 printMinimalImports imps
  = ifOptM Opt_D_dump_minimal_imports $ do {
@@ -1026,13 +1028,13 @@ printMinimalImports imps
    this_mod <- getModule ;
    rdr_env  <- getGlobalRdrEnv ;
    ioToTcRn (do { h <- openFile (mkFilename this_mod) WriteMode ;
-		  printForUser h (unQualInScope rdr_env) 
+		  printForUser h (mkPrintUnqualified rdr_env) 
 				 (vcat (map ppr_mod_ie mod_ies)) })
    }
   where
-    mkFilename this_mod = moduleString this_mod ++ ".imports"
+    mkFilename this_mod = moduleNameString (moduleName this_mod) ++ ".imports"
     ppr_mod_ie (mod_name, ies) 
-	| mod_name == pRELUDE 
+	| mod_name == moduleName pRELUDE
 	= empty
 	| null ies	-- Nothing except instances comes from here
 	= ptext SLIT("import") <+> ppr mod_name <> ptext SLIT("()    -- Instances only")
@@ -1053,7 +1055,7 @@ printMinimalImports imps
     to_ie (AvailTC n ns)  
 	= loadSrcInterface doc n_mod False			`thenM` \ iface ->
 	  case [xs | (m,as) <- mi_exports iface,
-		     m == n_mod,
+		     moduleName m == n_mod,
 		     AvailTC x xs <- as, 
 		     x == nameOccName n] of
 	      [xs] | all_used xs -> returnM (IEThingAll n)
@@ -1063,7 +1065,7 @@ printMinimalImports imps
 	where
 	  all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
 	  doc = text "Compute minimal imports from" <+> ppr n
-	  n_mod = nameModule n
+	  n_mod = moduleName (nameModule n)
 \end{code}
 
 

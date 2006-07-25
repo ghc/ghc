@@ -75,7 +75,7 @@ import VarEnv       (VarEnv, emptyVarEnv, zipVarEnv, plusVarEnv,
 		     elemVarEnv, lookupVarEnv, lookupVarEnv_NF, delVarEnvList)
 import Type	    (Type, tyConAppTyCon)
 import HscTypes	    (HomePackageTable,
-		     ExternalPackageState(eps_PTE), HscEnv(hsc_HPT),
+		     ExternalPackageState(eps_PTE), HscEnv(..),
 		     TyThing(..), lookupType)
 import PrelNames    ( fstName, andName, orName,
 		     lengthPName, replicatePName, mapPName, bpermutePName,
@@ -83,6 +83,7 @@ import PrelNames    ( fstName, andName, orName,
 import TysPrim      ( charPrimTyCon, intPrimTyCon, floatPrimTyCon, doublePrimTyCon )
 import PrimOp	    ( PrimOp(..) )
 import PrelInfo	    ( primOpId )
+import DynFlags	    (DynFlags)
 import CoreSyn      (Expr(..), Bind(..), CoreBndr, CoreExpr, CoreBind, mkApps)
 import CoreUtils    (exprType)
 import FastString   (FastString)
@@ -128,11 +129,12 @@ data FlattenState = FlattenState {
 
 -- initial value of the flattening state
 --
-initialFlattenState :: ExternalPackageState
+initialFlattenState :: DynFlags
+		    -> ExternalPackageState
 		    -> HomePackageTable 
 		    -> UniqSupply 
 		    -> FlattenState
-initialFlattenState eps hpt us = 
+initialFlattenState dflags eps hpt us = 
   FlattenState {
     us	     = us,
     env      = lookup,
@@ -142,7 +144,7 @@ initialFlattenState eps hpt us =
   }
   where
     lookup n = 
-      case lookupType hpt (eps_PTE eps) n of
+      case lookupType dflags hpt (eps_PTE eps) n of
         Just (AnId v) -> v 
 	_             -> pprPanic "FlattenMonad: unknown name:" (ppr n)
 
@@ -167,7 +169,8 @@ runFlatten :: HscEnv
 	   -> Flatten a 
 	   -> a    
 runFlatten hsc_env eps us m 
-  = fst $ unFlatten m (initialFlattenState eps (hsc_HPT hsc_env) us)
+  = fst $ unFlatten m (initialFlattenState (hsc_dflags hsc_env) 
+						eps (hsc_HPT hsc_env) us)
 
 
 -- variable generation

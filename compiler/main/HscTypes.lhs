@@ -7,7 +7,7 @@
 module HscTypes ( 
 	-- * Sessions and compilation state
 	Session(..), HscEnv(..), hscEPS,
-	FinderCache, FinderCacheEntry,
+	FinderCache, FindResult(..), ModLocationCache,
 	Target(..), TargetId(..), pprTarget, pprTargetId,
 	ModuleGraph, emptyMG,
 
@@ -24,10 +24,10 @@ module HscTypes (
 
 	ExternalPackageState(..), EpsStats(..), addEpsInStats,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
-	lookupIface, lookupIfaceByModule, emptyModIface,
+	lookupIfaceByModule, emptyModIface,
 
 	InteractiveContext(..), emptyInteractiveContext, 
-	icPrintUnqual, unQualInScope,
+	icPrintUnqual, mkPrintUnqualified,
 
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
 	emptyIfaceDepCache, 
@@ -67,8 +67,9 @@ import ByteCodeAsm	( CompiledByteCode )
 #endif
 
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv,
-			  LocalRdrEnv, emptyLocalRdrEnv,
-			  GlobalRdrElt(..), mkRdrUnqual, lookupGRE_RdrName )
+			  LocalRdrEnv, emptyLocalRdrEnv, GlobalRdrElt(..), 
+                          unQualOK, ImpDeclSpec(..), Provenance(..),
+                          ImportSpec(..), lookupGlobalRdrEnv )
 import Name		( Name, NamedThing, getName, nameOccName, nameModule )
 import NameEnv
 import NameSet	
@@ -85,7 +86,7 @@ import Class		( Class, classSelIds, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
-import Packages		( PackageIdH, PackageId, PackageConfig, HomeModules )
+import Packages		( PackageId )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
@@ -98,6 +99,7 @@ import CoreSyn		( CoreRule )
 import Maybes		( orElse, expectJust )
 import Outputable
 import SrcLoc		( SrcSpan, Located )
+import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 
@@ -172,9 +174,11 @@ data HscEnv
 		-- sucking in interface files.  They cache the state of
 		-- external interface files, in effect.
 
-	hsc_FC  :: {-# UNPACK #-} !(IORef FinderCache),
+	hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
+	hsc_MLC  :: {-# UNPACK #-} !(IORef ModLocationCache),
 		-- The finder's cache.  This caches the location of modules,
 		-- so we don't have to search the filesystem multiple times.
+
         hsc_global_rdr_env :: GlobalRdrEnv,
         hsc_global_type_env :: TypeEnv
  }
@@ -191,7 +195,7 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 data Target = Target TargetId (Maybe (StringBuffer,ClockTime))
 
 data TargetId
-  = TargetModule Module
+  = TargetModule ModuleName
 	-- ^ A module name: search for the file
   | TargetFile FilePath (Maybe Phase)
 	-- ^ A filename: preprocess & parse it to find the module name.
@@ -206,16 +210,13 @@ pprTarget (Target id _) = pprTargetId id
 pprTargetId (TargetModule m) = ppr m
 pprTargetId (TargetFile f _) = text f
 
-type FinderCache = ModuleEnv FinderCacheEntry
-type FinderCacheEntry = (ModLocation, Maybe (PackageConfig,Bool))
-	-- The finder's cache (see module Finder)
-
-type HomePackageTable  = ModuleEnv HomeModInfo
+type HomePackageTable  = ModuleNameEnv HomeModInfo
 	-- Domain = modules in the home package
+	-- "home" package name cached here for convenience
 type PackageIfaceTable = ModuleEnv ModIface
 	-- Domain = modules in the imported packages
 
-emptyHomePackageTable  = emptyModuleEnv
+emptyHomePackageTable  = emptyUFM
 emptyPackageIfaceTable = emptyModuleEnv
 
 data HomeModInfo 
@@ -232,40 +233,37 @@ data HomeModInfo
 		-- When re-linking a module (hscNoRecomp), we construct
 		-- the HomModInfo by building a new ModDetails from the
 		-- old ModIface (only).
-\end{code}
 
-Simple lookups in the symbol table.
-
-\begin{code}
-lookupIface :: HomePackageTable -> PackageIfaceTable -> Module -> Maybe ModIface
--- We often have two IfaceTables, and want to do a lookup
-lookupIface hpt pit mod
-  = case lookupModuleEnv hpt mod of
-	Just mod_info -> Just (hm_iface mod_info)
-	Nothing       -> lookupModuleEnv pit mod
-
-lookupIfaceByModule :: HomePackageTable -> PackageIfaceTable -> Module -> Maybe ModIface
--- We often have two IfaceTables, and want to do a lookup
-lookupIfaceByModule hpt pit mod
-  = case lookupModuleEnv hpt mod of
-	Just mod_info -> Just (hm_iface mod_info)
-	Nothing       -> lookupModuleEnv pit mod
+-- | Find the 'ModIface' for a 'Module'
+lookupIfaceByModule
+	:: DynFlags
+	-> HomePackageTable
+	-> PackageIfaceTable
+	-> Module
+	-> Maybe ModIface
+lookupIfaceByModule dflags hpt pit mod
+  -- in one-shot, we don't use the HPT
+  | not (isOneShot (ghcMode dflags)) && modulePackageId mod == this_pkg 
+  = fmap hm_iface (lookupUFM hpt (moduleName mod))
+  | otherwise
+  = lookupModuleEnv pit mod
+  where this_pkg = thisPackage dflags
 \end{code}
 
 
 \begin{code}
-hptInstances :: HscEnv -> (Module -> Bool) -> [Instance]
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> [Instance]
 -- Find all the instance declarations that are in modules imported 
 -- by this one, directly or indirectly, and are in the Home Package Table
 -- This ensures that we don't see instances from modules --make compiled 
 -- before this one, but which are not below this one
 hptInstances hsc_env want_this_module
   = [ ispec 
-    | mod_info <- moduleEnvElts (hsc_HPT hsc_env)
-    , want_this_module (mi_module (hm_iface mod_info))
+    | mod_info <- eltsUFM (hsc_HPT hsc_env)
+    , want_this_module (moduleName (mi_module (hm_iface mod_info)))
     , ispec <- md_insts (hm_details mod_info) ]
 
-hptRules :: HscEnv -> [(Module, IsBootInterface)] -> [CoreRule]
+hptRules :: HscEnv -> [(ModuleName, IsBootInterface)] -> [CoreRule]
 -- Get rules from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
 hptRules hsc_env deps
@@ -283,10 +281,10 @@ hptRules hsc_env deps
 	-- be in the HPT, because we never compile it; it's in the EPT
 	-- instead.  ToDo: clean up, and remove this slightly bogus
 	-- filter:
-    , mod /= gHC_PRIM
+    , mod /= moduleName gHC_PRIM
 
 	-- Look it up in the HPT
-    , let mod_info = case lookupModuleEnv hpt mod of
+    , let mod_info = case lookupUFM hpt mod of
 		  	Nothing -> pprPanic "hptRules" (ppr mod <+> ppr deps)
 		  	Just x  -> x
 
@@ -294,6 +292,47 @@ hptRules hsc_env deps
     , rule <- md_rules (hm_details mod_info) ]
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{The Finder cache}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | The 'FinderCache' maps home module names to the result of
+-- searching for that module.  It records the results of searching for
+-- modules along the search path.  On @:load@, we flush the entire
+-- contents of this cache.
+--
+-- Although the @FinderCache@ range is 'FindResult' for convenience ,
+-- in fact it will only ever contain 'Found' or 'NotFound' entries.
+--
+type FinderCache = ModuleNameEnv FindResult
+
+-- | The result of searching for an imported module.
+data FindResult
+  = Found ModLocation Module
+	-- the module was found
+  | NoPackage PackageId
+	-- the requested package was not found
+  | FoundMultiple [PackageId]
+	-- *error*: both in multiple packages
+  | PackageHidden PackageId
+	-- for an explicit source import: the package containing the module is
+	-- not exposed.
+  | ModuleHidden  PackageId
+	-- for an explicit source import: the package containing the module is
+	-- exposed, but the module itself is hidden.
+  | NotFound [FilePath]
+	-- the module was not found, the specified places were searched.
+  | NotFoundInPackage PackageId
+	-- the module was not found in this package
+
+-- | Cache that remembers where we found a particular module.  Contains both
+-- home modules and package modules.  On @:load@, only home modules are
+-- purged from this cache.
+type ModLocationCache = ModuleEnv ModLocation
+\end{code}
 
 %************************************************************************
 %*									*
@@ -313,7 +352,6 @@ the declarations into a single indexed map in the @PersistentRenamerState@.
 \begin{code}
 data ModIface 
    = ModIface {
-	mi_package  :: !PackageIdH,	    -- Which package the module comes from
         mi_module   :: !Module,
         mi_mod_vers :: !Version,	    -- Module version: changes when anything changes
 
@@ -408,7 +446,6 @@ data ModGuts
 	mg_boot     :: IsBootInterface, -- Whether it's an hs-boot module
 	mg_exports  :: !NameSet,	-- What it exports
 	mg_deps	    :: !Dependencies,	-- What is below it, directly or otherwise
-	mg_home_mods :: !HomeModules,	-- For calling isHomeModule etc.
 	mg_dir_imps :: ![Module],	-- Directly-imported modules; used to
 					--	generate initialisation code
 	mg_usages   :: ![Usage],	-- Version info for what it needed
@@ -458,7 +495,6 @@ data CgGuts
 		-- initialisation code
 
 	cg_foreign  :: !ForeignStubs,	
-	cg_home_mods :: !HomeModules,	-- for calling isHomeModule etc.
 	cg_dep_pkgs :: ![PackageId]	-- Used to generate #includes for C code gen
     }
 
@@ -489,10 +525,9 @@ data ForeignStubs = NoStubs
 \end{code}
 
 \begin{code}
-emptyModIface :: PackageIdH -> Module -> ModIface
-emptyModIface pkg mod
-  = ModIface { mi_package  = pkg,
-	       mi_module   = mod,
+emptyModIface :: Module -> ModIface
+emptyModIface mod
+  = ModIface { mi_module   = mod,
 	       mi_mod_vers = initialVersion,
 	       mi_orphan   = False,
 	       mi_boot	   = False,
@@ -546,25 +581,32 @@ emptyInteractiveContext
 			 ic_type_env = emptyTypeEnv }
 
 icPrintUnqual :: InteractiveContext -> PrintUnqualified
-icPrintUnqual ictxt = unQualInScope (ic_rn_gbl_env ictxt)
+icPrintUnqual ictxt = mkPrintUnqualified (ic_rn_gbl_env ictxt)
 \end{code}
 
-@unQualInScope@ returns a function that takes a @Name@ and tells whether
-its unqualified name is in scope.  This is put as a boolean flag in
-the @Name@'s provenance to guide whether or not to print the name qualified
-in error messages.
+%************************************************************************
+%*									*
+        Building a PrintUnqualified		
+%*									*
+%************************************************************************
 
 \begin{code}
-unQualInScope :: GlobalRdrEnv -> PrintUnqualified
--- True if 'f' is in scope, and has only one binding,
--- and the thing it is bound to is the name we are looking for
--- (i.e. false if A.f and B.f are both in scope as unqualified 'f')
---
--- [Out of date] Also checks for built-in syntax, which is always 'in scope'
-unQualInScope env mod occ
-  = case lookupGRE_RdrName (mkRdrUnqual occ) env of
-	[gre] -> nameModule (gre_name gre) == mod
-	other -> False
+mkPrintUnqualified :: GlobalRdrEnv -> PrintUnqualified
+mkPrintUnqualified env = (qual_name, qual_mod)
+  where
+  qual_name mod occ
+        | null gres = Just (moduleName mod)
+                -- it isn't in scope at all, this probably shouldn't happen,
+                -- but we'll qualify it by the original module anyway.
+        | any unQualOK gres = Nothing
+        | (Imported is : _) <- map gre_prov gres, (idecl : _) <- is
+          = Just (is_as (is_decl idecl))
+        | otherwise = panic "mkPrintUnqualified" 
+      where
+        gres  = [ gre | gre <- lookupGlobalRdrEnv env occ,
+	                nameModule (gre_name gre) == mod ]
+
+  qual_mod mod = Nothing       -- For now...
 \end{code}
 
 
@@ -637,11 +679,21 @@ extendTypeEnvList env things = foldl extendTypeEnv env things
 \end{code}
 
 \begin{code}
-lookupType :: HomePackageTable -> PackageTypeEnv -> Name -> Maybe TyThing
-lookupType hpt pte name
-  = case lookupModuleEnv hpt (nameModule name) of
-	Just details -> lookupNameEnv (md_types (hm_details details)) name
-	Nothing	     -> lookupNameEnv pte name
+lookupType :: DynFlags
+	   -> HomePackageTable
+	   -> PackageTypeEnv
+	   -> Name
+	   -> Maybe TyThing
+
+lookupType dflags hpt pte name
+  -- in one-shot, we don't use the HPT
+  | not (isOneShot (ghcMode dflags)) && modulePackageId mod == this_pkg 
+  = do hm <- lookupUFM hpt (moduleName mod) -- Maybe monad
+       lookupNameEnv (md_types (hm_details hm)) name
+  | otherwise
+  = lookupNameEnv pte name
+  where mod = nameModule name
+	this_pkg = thisPackage dflags
 \end{code}
 
 
@@ -809,7 +861,7 @@ type IsBootInterface = Bool
 -- Invariant: the dependencies of a module M never includes M
 -- Invariant: the lists are unordered, with no duplicates
 data Dependencies
-  = Deps { dep_mods  :: [(Module,IsBootInterface)],	-- Home-package module dependencies
+  = Deps { dep_mods  :: [(ModuleName,IsBootInterface)],	-- Home-package module dependencies
 	   dep_pkgs  :: [PackageId], 			-- External package dependencies
 	   dep_orphs :: [Module] }			-- Orphan modules (whether home or external pkg)
   deriving( Eq )
@@ -819,7 +871,7 @@ noDependencies :: Dependencies
 noDependencies = Deps [] [] []
  	  
 data Usage
-  = Usage { usg_name     :: Module,			-- Name of the module
+  = Usage { usg_name     :: ModuleName,			-- Name of the module
 	    usg_mod      :: Version,			-- Module version
 	    usg_entities :: [(OccName,Version)],	-- Sorted by occurrence name
 	    usg_exports  :: Maybe Version,		-- Export-list version, if we depend on it
@@ -859,14 +911,16 @@ type PackageInstEnv  = InstEnv
 
 data ExternalPackageState
   = EPS {
-	eps_is_boot :: !(ModuleEnv (Module, IsBootInterface)),
-		-- In OneShot mode (only), home-package modules accumulate in the
-		-- external package state, and are sucked in lazily.
-		-- For these home-pkg modules (only) we need to record which are
-		-- boot modules.  We set this field after loading all the 
-		-- explicitly-imported interfaces, but before doing anything else
+	eps_is_boot :: !(ModuleNameEnv (ModuleName, IsBootInterface)),
+		-- In OneShot mode (only), home-package modules
+		-- accumulate in the external package state, and are
+		-- sucked in lazily.  For these home-pkg modules
+		-- (only) we need to record which are boot modules.
+		-- We set this field after loading all the
+		-- explicitly-imported interfaces, but before doing
+		-- anything else
 		--
-		-- The Module part is not necessary, but it's useful for
+		-- The ModuleName part is not necessary, but it's useful for
 		-- debug prints, and it's convenient because this field comes
 		-- direct from TcRnTypes.ImportAvails.imp_dep_mods
 
@@ -957,13 +1011,13 @@ emptyMG = []
 
 data ModSummary
    = ModSummary {
-        ms_mod       :: Module,			-- Name of the module
+        ms_mod       :: Module,			-- Identity of the module
 	ms_hsc_src   :: HscSource,		-- Source is Haskell, hs-boot, external core
         ms_location  :: ModLocation,		-- Location
         ms_hs_date   :: ClockTime,		-- Timestamp of source file
 	ms_obj_date  :: Maybe ClockTime,	-- Timestamp of object, maybe
-        ms_srcimps   :: [Located Module],	-- Source imports
-        ms_imps      :: [Located Module],	-- Non-source imports
+        ms_srcimps   :: [Located ModuleName],	-- Source imports
+        ms_imps      :: [Located ModuleName],	-- Non-source imports
         ms_hspp_file :: FilePath,		-- Filename of preprocessed source.
         ms_hspp_opts :: DynFlags,               -- Cached flags from OPTIONS, INCLUDE
                                                 -- and LANGUAGE pragmas.
@@ -1011,7 +1065,7 @@ showModMsg target recomp mod_summary
 		    char ')'])
  where 
     mod     = ms_mod mod_summary 
-    mod_str = moduleString mod ++ hscSourceString (ms_hsc_src mod_summary)
+    mod_str = showSDoc (ppr mod) ++ hscSourceString (ms_hsc_src mod_summary)
 \end{code}
 
 

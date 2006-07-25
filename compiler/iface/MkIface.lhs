@@ -176,7 +176,6 @@ compiled with -O.  I think this is the case.]
 #include "HsVersions.h"
 
 import HsSyn
-import Packages		( isHomeModule, PackageIdH(..) )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 			  IfaceRule(..), IfaceInst(..), IfaceExtName(..), 
 			  eqIfDecl, eqIfRule, eqIfInst, IfaceEq(..), (&&&), bool, 
@@ -199,7 +198,6 @@ import HscTypes		( ModIface(..), ModDetails(..),
 			)
 
 
-import Packages		( HomeModules )
 import DynFlags		( GhcMode(..), DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_HiVersion )
 import Name		( Name, nameModule, nameOccName, nameParent,
@@ -213,11 +211,7 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
 			  extendOccSet, extendOccSetList,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
 			  occNameFS, isTcOcc )
-import Module		( Module, moduleFS,
-			  ModLocation(..), mkModuleFS, moduleString,
-			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
-			  extendModuleEnv_C
-			)
+import Module
 import Outputable
 import Util		( createDirectoryHierarchy, directoryOf )
 import Util		( sortLe, seqList )
@@ -227,6 +221,8 @@ import Unique		( Unique, Uniquable(..) )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Digraph		( stronglyConnComp, SCC(..) )
 import SrcLoc		( SrcSpan )
+import UniqFM
+import PackageConfig	( PackageId )
 import FiniteMap
 import FastString
 
@@ -259,7 +255,6 @@ mkIface hsc_env maybe_old_iface
 		      mg_boot    = is_boot,
 		      mg_usages  = usages,
 		      mg_deps    = deps,
-		      mg_home_mods = home_mods,
 		      mg_rdr_env = rdr_env,
 		      mg_fix_env = fix_env,
 		      mg_deprecs = src_deprecs })
@@ -274,7 +269,7 @@ mkIface hsc_env maybe_old_iface
 --	to expose in the interface
 
   = do	{ eps <- hscEPS hsc_env
-	; let	{ ext_nm_rhs = mkExtNameFn hsc_env home_mods eps this_mod
+	; let	{ ext_nm_rhs = mkExtNameFn hsc_env eps this_mod
 		; ext_nm_lhs = mkLhsNameFn this_mod
 
 		; decls  = [ tyThingToIfaceDecl ext_nm_rhs thing 
@@ -291,7 +286,6 @@ mkIface hsc_env maybe_old_iface
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
-			mi_package  = HomePackage,
 			mi_boot     = is_boot,
 			mi_deps     = deps,
 			mi_usages   = usages,
@@ -346,8 +340,8 @@ writeIfaceFile location new_iface
 
 
 -----------------------------
-mkExtNameFn :: HscEnv -> HomeModules -> ExternalPackageState -> Module -> Name -> IfaceExtName
-mkExtNameFn hsc_env hmods eps this_mod
+mkExtNameFn :: HscEnv -> ExternalPackageState -> Module -> Name -> IfaceExtName
+mkExtNameFn hsc_env eps this_mod
   = ext_nm
   where
     hpt = hsc_HPT hsc_env
@@ -358,10 +352,15 @@ mkExtNameFn hsc_env hmods eps this_mod
     				Nothing  -> LocalTop occ
     				Just par -> LocalTopSub occ (nameOccName par)
       | isWiredInName name       = ExtPkg  mod occ
-      | isHomeModule hmods mod   = HomePkg mod occ vers
+      | is_home mod		 = HomePkg mod_name occ vers
       | otherwise	         = ExtPkg  mod occ
       where
+	dflags = hsc_dflags hsc_env
+	this_pkg = thisPackage dflags
+	is_home mod = modulePackageId mod == this_pkg
+
     	mod      = nameModule name
+        mod_name = moduleName mod
     	occ	 = nameOccName name
     	par_occ  = nameOccName (nameParent name)
     		-- The version of the *parent* is the one want
@@ -374,7 +373,7 @@ mkExtNameFn hsc_env hmods eps this_mod
       = mi_ver_fn iface occ `orElse` 
         pprPanic "lookupVers1" (ppr mod <+> ppr occ)
       where
-        iface = lookupIfaceByModule hpt pit mod `orElse` 
+        iface = lookupIfaceByModule (hsc_dflags hsc_env) hpt pit mod `orElse` 
 	        pprPanic "lookupVers2" (ppr mod <+> ppr occ)
 
 
@@ -636,24 +635,24 @@ bump_unless False v = bumpVersion v
 
 \begin{code}
 mkUsageInfo :: HscEnv 
-	    -> HomeModules
 	    -> ModuleEnv (Module, Bool, SrcSpan)
-	    -> [(Module, IsBootInterface)]
+	    -> [(ModuleName, IsBootInterface)]
 	    -> NameSet -> IO [Usage]
-mkUsageInfo hsc_env hmods dir_imp_mods dep_mods used_names
+mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
   = do	{ eps <- hscEPS hsc_env
-	; let usages = mk_usage_info (eps_PIT eps) hsc_env hmods
+	; let usages = mk_usage_info (eps_PIT eps) hsc_env 
 				     dir_imp_mods dep_mods used_names
 	; usages `seqList`  return usages }
 	 -- seq the list of Usages returned: occasionally these
 	 -- don't get evaluated for a while and we can end up hanging on to
 	 -- the entire collection of Ifaces.
 
-mk_usage_info pit hsc_env hmods dir_imp_mods dep_mods proto_used_names
+mk_usage_info pit hsc_env dir_imp_mods dep_mods proto_used_names
   = mapCatMaybes mkUsage dep_mods
 	-- ToDo: do we need to sort into canonical order?
   where
     hpt = hsc_HPT hsc_env
+    dflags = hsc_dflags hsc_env
 
     used_names = mkNameSet $			-- Eliminate duplicates
 		 [ nameParent n			-- Just record usage on the 'main' names
@@ -682,28 +681,28 @@ mk_usage_info pit hsc_env hmods dir_imp_mods dep_mods proto_used_names
     --		(need to recompile if its export list changes: export_vers)
     --	c) is a home-package orphan module (need to recompile if its
     --	 	instance decls change: rules_vers)
-    mkUsage :: (Module, Bool) -> Maybe Usage
+    mkUsage :: (ModuleName, IsBootInterface) -> Maybe Usage
     mkUsage (mod_name, _)
-      |  isNothing maybe_iface	-- We can't depend on it if we didn't
-      || not (isHomeModule hmods mod)	-- even open the interface!
-      || (null used_occs
+      |  isNothing maybe_iface		-- We can't depend on it if we didn't
+      || (null used_occs		-- load its interface.
 	  && isNothing export_vers
 	  && not orphan_mod)
       = Nothing			-- Record no usage info
     
       | otherwise	
-      = Just (Usage { usg_name     = mod,
+      = Just (Usage { usg_name     = mod_name,
     	  	      usg_mod      = mod_vers,
     		      usg_exports  = export_vers,
     		      usg_entities = ent_vers,
     		      usg_rules    = rules_vers })
       where
-	maybe_iface  = lookupIfaceByModule hpt pit mod_name
+	maybe_iface  = lookupIfaceByModule dflags hpt pit mod
 		-- In one-shot mode, the interfaces for home-package 
 		-- modules accumulate in the PIT not HPT.  Sigh.
 
+        mod = mkModule (thisPackage dflags) mod_name
+
         Just iface   = maybe_iface
-        mod   	     = mi_module    iface
 	orphan_mod   = mi_orphan    iface
         version_env  = mi_ver_fn    iface
         mod_vers     = mi_mod_vers  iface
@@ -723,25 +722,25 @@ mkIfaceExports :: NameSet -> [(Module, [GenAvailInfo OccName])]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
 mkIfaceExports exports 
-  = [ (mkModuleFS fs, eltsFM avails)
-    | (fs, avails) <- fmToList groupFM
+  = [ (mod, eltsUFM avails)
+    | (mod, avails) <- fmToList groupFM
     ]
   where
-    groupFM :: FiniteMap FastString (FiniteMap FastString (GenAvailInfo OccName))
+    groupFM :: ModuleEnv (UniqFM (GenAvailInfo OccName))
 	-- Deliberately use the FastString so we
 	-- get a canonical ordering
-    groupFM = foldl add emptyFM (nameSetToList exports)
+    groupFM = foldl add emptyModuleEnv (nameSetToList exports)
 
-    add env name = addToFM_C add_avail env mod_fs 
-			     (unitFM avail_fs avail)
+    add env name = extendModuleEnv_C add_avail env mod
+			     		(unitUFM avail_fs avail)
       where
 	occ    = nameOccName name
-	mod_fs = moduleFS (nameModule name)
+	mod    = nameModule name
 	avail | Just p <- nameParent_maybe name	= AvailTC (nameOccName p) [occ]
 	      | isTcOcc occ 			= AvailTC occ [occ]
 	      | otherwise			= Avail occ
 	avail_fs = occNameFS (availName avail)	    
-	add_avail avail_fm _ = addToFM_C add_item avail_fm avail_fs avail
+	add_avail avail_fm _ = addToUFM_C add_item avail_fm avail_fs avail
 
 	add_item (AvailTC p occs) _ = AvailTC p (List.insert occ occs)
 	add_item (Avail n)	  _ = pprPanic "MkIface.addAvail" (ppr n <+> ppr name)
@@ -765,13 +764,14 @@ checkOldIface :: HscEnv
 
 checkOldIface hsc_env mod_summary source_unchanged maybe_iface
   = do	{ showPass (hsc_dflags hsc_env) 
-	           ("Checking old interface for " ++ moduleString (ms_mod mod_summary)) ;
+	           ("Checking old interface for " ++ 
+			showSDoc (ppr (ms_mod mod_summary))) ;
 
 	; initIfaceCheck hsc_env $
-	  check_old_iface mod_summary source_unchanged maybe_iface
+	  check_old_iface hsc_env mod_summary source_unchanged maybe_iface
      }
 
-check_old_iface mod_summary source_unchanged maybe_iface
+check_old_iface hsc_env mod_summary source_unchanged maybe_iface
  = 	-- CHECK WHETHER THE SOURCE HAS CHANGED
     ifM (not source_unchanged)
 	(traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
@@ -786,9 +786,9 @@ check_old_iface mod_summary source_unchanged maybe_iface
     else
 
     case maybe_iface of {
-       Just old_iface -> -- Use the one we already have
-                         checkVersions source_unchanged old_iface	`thenM` \ recomp ->
-			 returnM (recomp, Just old_iface)
+       Just old_iface -> do -- Use the one we already have
+	recomp <- checkVersions hsc_env source_unchanged old_iface
+	return (recomp, Just old_iface)
 
     ;  Nothing ->
 
@@ -807,7 +807,7 @@ check_old_iface mod_summary source_unchanged maybe_iface
     ;  Succeeded iface ->	
 
 	-- We have got the old iface; check its versions
-    checkVersions source_unchanged iface	`thenM` \ recomp ->
+    checkVersions hsc_env source_unchanged iface	`thenM` \ recomp ->
     returnM (recomp, Just iface)
     }}
 \end{code}
@@ -822,10 +822,11 @@ type RecompileRequired = Bool
 upToDate  = False	-- Recompile not required
 outOfDate = True	-- Recompile required
 
-checkVersions :: Bool		-- True <=> source unchanged
+checkVersions :: HscEnv
+	      -> Bool		-- True <=> source unchanged
 	      -> ModIface 	-- Old interface
 	      -> IfG RecompileRequired
-checkVersions source_unchanged iface
+checkVersions hsc_env source_unchanged iface
   | not source_unchanged
   = returnM outOfDate
   | otherwise
@@ -844,29 +845,33 @@ checkVersions source_unchanged iface
 	-- We do this regardless of compilation mode
 	; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
 
-	; checkList [checkModUsage u | u <- mi_usages iface]
+	; let this_pkg = thisPackage (hsc_dflags hsc_env)
+	; checkList [checkModUsage this_pkg u | u <- mi_usages iface]
     }
   where
 	-- This is a bit of a hack really
-    mod_deps :: ModuleEnv (Module, IsBootInterface)
+    mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
-checkModUsage :: Usage -> IfG RecompileRequired
+checkModUsage :: PackageId ->Usage -> IfG RecompileRequired
 -- Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
 
-checkModUsage (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
-		       usg_rules = old_rule_vers,
-		       usg_exports = maybe_old_export_vers, 
-		       usg_entities = old_decl_vers })
+checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
+		       		usg_rules = old_rule_vers,
+		       		usg_exports = maybe_old_export_vers, 
+		       		usg_entities = old_decl_vers })
   = 	-- Load the imported interface is possible
     let
     	doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
     in
     traceHiDiffs (text "Checking usages for module" <+> ppr mod_name) `thenM_`
 
-    loadInterface doc_str mod_name ImportBySystem	`thenM` \ mb_iface ->
+    let
+	mod = mkModule this_pkg mod_name
+    in
+    loadInterface doc_str mod ImportBySystem		`thenM` \ mb_iface ->
 	-- Load the interface, but don't complain on failure;
 	-- Instead, get an Either back which we can test
 
@@ -977,7 +982,6 @@ pprModIface :: ModIface -> SDoc
 -- Show a ModIface
 pprModIface iface
  = vcat [ ptext SLIT("interface")
-		<+> ppr_package (mi_package iface)
 		<+> ppr (mi_module iface) <+> pp_boot 
 		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
@@ -995,8 +999,6 @@ pprModIface iface
   where
     pp_boot | mi_boot iface = ptext SLIT("[boot]")
 	    | otherwise     = empty
-    ppr_package HomePackage = empty
-    ppr_package (ExtPackage id) = doubleQuotes (ppr id)
 
     exp_vers  = mi_exp_vers iface
     rule_vers = mi_rule_vers iface

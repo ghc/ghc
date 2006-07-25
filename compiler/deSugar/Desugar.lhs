@@ -26,7 +26,9 @@ import DsBinds		( dsTopLHsBinds, decomposeRuleLhs, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Module		( Module, moduleEnvElts, delModuleEnv, moduleFS )
+import Module
+import UniqFM		( eltsUFM, delFromUFM )
+import PackageConfig	( thPackageId )
 import RdrName	 	( GlobalRdrEnv )
 import NameSet
 import VarSet
@@ -34,7 +36,6 @@ import Bag		( Bag, isEmptyBag, emptyBag )
 import Rules		( roughTopNames )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars, exprsFreeNames )
-import Packages	  	( PackageState(thPackageId), PackageIdH(..) )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, printBagOfWarnings, 
 			  errorsFound, WarnMsg )
 import ListSetOps	( insertList )
@@ -62,7 +63,6 @@ deSugar hsc_env
 			    tcg_src	  = hsc_src,
 		    	    tcg_type_env  = type_env,
 		    	    tcg_imports   = imports,
-			    tcg_home_mods  = home_mods,
 		    	    tcg_exports   = exports,
 		    	    tcg_dus	  = dus, 
 		    	    tcg_inst_uses = dfun_uses_var,
@@ -116,13 +116,10 @@ deSugar hsc_env
 	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
 	; th_used   <- readIORef th_var			-- Whether TH is used
 	; let used_names = allUses dus `unionNameSets` dfun_uses
-	      thPackage = thPackageId (pkgState dflags)
-	      pkgs | ExtPackage th_id <- thPackage, th_used
-		   = insertList th_id  (imp_dep_pkgs imports)
-	      	   | otherwise
-		   = imp_dep_pkgs imports
+	      pkgs | th_used   = insertList thPackageId (imp_dep_pkgs imports)
+	      	   | otherwise = imp_dep_pkgs imports
 
-	      dep_mods = moduleEnvElts (delModuleEnv (imp_dep_mods imports) mod)
+	      dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
 		-- M.hi-boot can be in the imp_dep_mods, but we must remove
 		-- it before recording the modules on which this one depends!
 		-- (We want to retain M.hi-boot in imp_dep_mods so that 
@@ -132,15 +129,20 @@ deSugar hsc_env
 
 	      dir_imp_mods = imp_mods imports
 
-	; usages <- mkUsageInfo hsc_env home_mods dir_imp_mods dep_mods used_names
+	; showPass dflags "Desugar 3"
+
+	; usages <- mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
+
+	; showPass dflags "Desugar 4"
 
 	; let 
 		-- Modules don't compare lexicographically usually, 
 		-- but we want them to do so here.
 	     le_mod :: Module -> Module -> Bool	 
-	     le_mod m1 m2 = moduleFS m1 <= moduleFS m2
-	     le_dep_mod :: (Module, IsBootInterface) -> (Module, IsBootInterface) -> Bool	 
-	     le_dep_mod (m1,_) (m2,_) = m1 `le_mod` m2
+	     le_mod m1 m2 = moduleNameFS (moduleName m1) 
+				<= moduleNameFS (moduleName m2)
+	     le_dep_mod :: (ModuleName, IsBootInterface) -> (ModuleName, IsBootInterface) -> Bool	 
+	     le_dep_mod (m1,_) (m2,_) = moduleNameFS m1 <= moduleNameFS m2
 
 	     deps = Deps { dep_mods  = sortLe le_dep_mod dep_mods,
 			   dep_pkgs  = sortLe (<=)   pkgs,	
@@ -152,7 +154,6 @@ deSugar hsc_env
 		mg_boot	    = isHsBoot hsc_src,
 		mg_exports  = exports,
 		mg_deps	    = deps,
-		mg_home_mods = home_mods,
 		mg_usages   = usages,
 		mg_dir_imps = [m | (m,_,_) <- moduleEnvElts dir_imp_mods],
 	        mg_rdr_env  = rdr_env,
