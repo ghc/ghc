@@ -323,17 +323,28 @@ getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
 
 \begin{code}
 newUnique :: TcRnIf gbl lcl Unique
-newUnique = do { us <- newUniqueSupply ; 
-		 return (uniqFromSupply us) }
+newUnique
+ = do { env <- getEnv ;
+	let { u_var = env_us env } ;
+	us <- readMutVar u_var ;
+        case splitUniqSupply us of { (us1,_) -> do {
+	writeMutVar u_var us1 ;
+	return $! uniqFromSupply us }}}
+   -- NOTE 1: we strictly split the supply, to avoid the possibility of leaving
+   -- a chain of unevaluated supplies behind.
+   -- NOTE 2: we use the uniq in the supply from the MutVar directly, and
+   -- throw away one half of the new split supply.  This is safe because this
+   -- is the only place we use that unique.  Using the other half of the split
+   -- supply is safer, but slower.
 
 newUniqueSupply :: TcRnIf gbl lcl UniqSupply
 newUniqueSupply
  = do { env <- getEnv ;
 	let { u_var = env_us env } ;
 	us <- readMutVar u_var ;
-    	let { (us1, us2) = splitUniqSupply us } ;
+        case splitUniqSupply us of { (us1,us2) -> do {
 	writeMutVar u_var us1 ;
-	return us2 }
+	return us2 }}}
 
 newLocalName :: Name -> TcRnIf gbl lcl Name
 newLocalName name	-- Make a clone
