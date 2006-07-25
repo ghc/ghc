@@ -47,7 +47,7 @@ which will be distinct from the first and from all others.
 
 \begin{code}
 data UniqSupply
-  = MkSplitUniqSupply Int	-- make the Unique with this
+  = MkSplitUniqSupply Int#	-- make the Unique with this
 		   UniqSupply UniqSupply
 				-- when split => these two supplies
 \end{code}
@@ -73,14 +73,11 @@ mkSplitUniqSupply (C# c#)
 	-- This is one of the most hammered bits in the whole compiler
 	mk_supply#
 	  = unsafeInterleaveIO (
-		mk_unique   >>= \ uniq ->
+		genSymZh    >>= \ (W# u#) ->
 		mk_supply#  >>= \ s1 ->
 		mk_supply#  >>= \ s2 ->
-		return (MkSplitUniqSupply uniq s1 s2)
+		return (MkSplitUniqSupply (w2i (mask# `or#` u#)) s1 s2)
 	    )
-
-	mk_unique = genSymZh		>>= \ (W# u#) ->
-		    return (I# (w2i (mask# `or#` u#)))
     in
     mk_supply#
 
@@ -90,8 +87,8 @@ splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
 
 \begin{code}
-uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
-uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
+uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily (I# n)
+uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily (I# n) : uniqsFromSupply s2
 \end{code}
 
 %************************************************************************
