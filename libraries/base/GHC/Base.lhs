@@ -731,6 +731,8 @@ breakpoint r = r
 breakpointCond :: Bool -> a -> a
 breakpointCond _ r = r
 
+data Unknown 
+
 -- | Constant function.
 const			:: a -> b -> a
 const x _		=  x
