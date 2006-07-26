@@ -468,8 +468,8 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 	     case mb_stuff of
 		  Found loc mod -> found loc mod
 		  _ -> no_obj mod_name
-
-    found loc mod = do {
+        where
+            found loc mod = do {
 		-- ...and then find the linkable for it
 	       mb_lnk <- findObjectLinkableMaybe mod loc ;
 	       case mb_lnk of {
