@@ -593,18 +593,22 @@ rnConDecl (ConDecl name expl tvs cxt details res_ty)
 	; bindTyVarsRn doc tvs' $ \new_tyvars -> do
 	{ new_context <- rnContext doc cxt
         ; new_details <- rnConDetails doc details
-        ; new_res_ty  <- rnConResult doc res_ty
-        ; let rv = ConDecl new_name expl new_tyvars new_context new_details new_res_ty
-        ; traceRn (text "****** - autrijus" <> ppr rv)
-        ; return rv } }
+        ; (new_details', new_res_ty)  <- rnConResult doc new_details res_ty
+        ; return (ConDecl new_name expl new_tyvars new_context new_details' new_res_ty) }}
   where
     doc = text "In the definition of data constructor" <+> quotes (ppr name)
     get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy Boxed tys))
 
-rnConResult _ ResTyH98 = return ResTyH98
-rnConResult doc (ResTyGADT ty) = do
+rnConResult _ details ResTyH98 = return (details, ResTyH98)
+
+rnConResult doc details (ResTyGADT ty) = do
     ty' <- rnHsSigType doc ty
-    return $ ResTyGADT ty'
+    let (arg_tys, res_ty) = splitHsFunType ty'
+	-- We can split it up, now the renamer has dealt with fixities
+    case details of
+	PrefixCon _xs -> ASSERT( null _xs ) return (PrefixCon arg_tys, ResTyGADT res_ty)
+	RecCon fields -> return (details, ResTyGADT ty')
+	InfixCon {}   -> panic "rnConResult"
 
 rnConDetails doc (PrefixCon tys)
   = mappM (rnLHsType doc) tys	`thenM` \ new_tys  ->

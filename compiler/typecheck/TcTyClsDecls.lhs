@@ -301,7 +301,7 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
         details' <- kc_con_details details 
         res'     <- case res of
           ResTyH98 -> return ResTyH98
-          ResTyGADT ty -> return . ResTyGADT =<< kcHsSigType ty
+          ResTyGADT ty -> do { ty' <- kcHsSigType ty; return (ResTyGADT ty') }
         return (ConDecl name expl ex_tvs' ex_ctxt' details' res')
 
     kc_con_details (PrefixCon btys) 

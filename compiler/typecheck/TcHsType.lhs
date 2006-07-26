@@ -543,23 +543,26 @@ GADT constructor signatures
 
 \begin{code}
 tcLHsConResTy :: LHsType Name -> TcM (TyCon, [TcType])
-tcLHsConResTy ty@(L span _) 
-  = setSrcSpan span $ 
-    addErrCtxt (gadtResCtxt ty) $
-    tc_con_res ty []
-
-tc_con_res (L _ (HsAppTy fun res_ty)) res_tys
-  = do	{ res_ty' <- dsHsType res_ty
-	; tc_con_res fun (res_ty' : res_tys) }
-
-tc_con_res ty@(L _ (HsTyVar name)) res_tys
-  = do	{ thing <- tcLookup name
-	; case thing of
-	    AGlobal (ATyCon tc) -> return (tc, res_tys)
-	    other -> failWithTc (badGadtDecl ty)
-	}
-
-tc_con_res ty _ = failWithTc (badGadtDecl ty)
+tcLHsConResTy res_ty
+  = addErrCtxt (gadtResCtxt res_ty) $
+    case get_largs res_ty [] of
+	   (HsTyVar tc_name, args) 
+	      -> do { args' <- mapM dsHsType args
+		    ; thing <- tcLookup tc_name
+		    ; case thing of
+		        AGlobal (ATyCon tc) -> return (tc, args')
+		        other -> failWithTc (badGadtDecl res_ty) }
+	   other -> failWithTc (badGadtDecl res_ty)
+  where
+	-- We can't call dsHsType on res_ty, and then do tcSplitTyConApp_maybe
+	-- because that causes a black hole, and for good reason.  Building
+	-- the type means expanding type synonyms, and we can't do that
+	-- inside the "knot".  So we have to work by steam.
+    get_largs (L _ ty) args = get_args ty args
+    get_args (HsAppTy fun arg) 		  args = get_largs fun (arg:args)
+    get_args (HsParTy ty)      		  args = get_largs ty  args
+    get_args (HsOpTy ty1 (L span tc) ty2) args = get_args (HsTyVar tc) (ty1:ty2:args)
+    get_args ty  	     		  args = (ty, reverse args)
 
 gadtResCtxt ty
   = hang (ptext SLIT("In the result type of a data constructor:"))

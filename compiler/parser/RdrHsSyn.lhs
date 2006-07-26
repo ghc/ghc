@@ -630,30 +630,22 @@ checkValSig (L l (HsVar v)) ty
 checkValSig (L l other)     ty
   = parseError l "Invalid type signature"
 
-mkGadtDecl
-        :: Located RdrName
-        -> LHsType RdrName -- assuming HsType
-        -> ConDecl RdrName
-mkGadtDecl name (L _ (HsForAllTy _ qvars cxt ty)) = ConDecl
-  { con_name     = name
-  , con_explicit = Implicit
-  , con_qvars    = qvars
-  , con_cxt      = cxt
-  , con_details  = PrefixCon args
-  , con_res      = ResTyGADT res
-  }
-  where
-  (args, res) = splitHsFunType ty
-mkGadtDecl name ty = ConDecl
-  { con_name     = name
-  , con_explicit = Implicit
-  , con_qvars    = []
-  , con_cxt      = noLoc []
-  , con_details  = PrefixCon args
-  , con_res      = ResTyGADT res
-  }
-  where
-  (args, res) = splitHsFunType ty
+mkGadtDecl :: Located RdrName
+           -> LHsType RdrName -- assuming HsType
+           -> ConDecl RdrName
+mkGadtDecl name (L _ (HsForAllTy _ qvars cxt ty)) = mk_gadt_con name qvars cxt ty
+mkGadtDecl name ty				  = mk_gadt_con name [] (noLoc []) ty
+
+mk_gadt_con name qvars cxt ty
+  = ConDecl { con_name     = name
+	    , con_explicit = Implicit
+	    , con_qvars    = qvars
+	    , con_cxt      = cxt
+	    , con_details  = PrefixCon []
+	    , con_res      = ResTyGADT ty }
+  -- NB: we put the whole constr type into the ResTyGADT for now; 
+  -- the renamer will unravel it once it has sorted out
+  -- operator fixities
 
 -- A variable binding is parsed as a FunBind.
 
