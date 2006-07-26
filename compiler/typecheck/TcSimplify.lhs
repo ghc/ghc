@@ -1066,8 +1066,6 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- Zonk everything in sight
   = mappM zonkInst wanteds			`thenM` \ wanteds' ->
-    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
-    tcGetGlobalTyVars				`thenM` \ gbl_tvs' ->
 
    	-- 'reduceMe': Reduce as far as we can.  Don't stop at
 	-- dicts; the idea is to get rid of as many type
@@ -1076,25 +1074,30 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- immediately, with no constraint on s.
 	--
 	-- BUT do no improvement!  See Plan D above
+	-- HOWEVER, some unification may take place, if we instantiate
+	-- 	    a method Inst with an equality constraint
     reduceContextWithoutImprovement 
 	doc reduceMe wanteds' 		`thenM` \ (_frees, _binds, constrained_dicts) ->
 
 	-- Next, figure out the tyvars we will quantify over
+    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
+    tcGetGlobalTyVars				`thenM` \ gbl_tvs' ->
+    mappM zonkInst constrained_dicts		`thenM` \ constrained_dicts' ->
     let
-	constrained_tvs = tyVarsOfInsts constrained_dicts
-	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
-			 `minusVarSet` constrained_tvs
+	constrained_tvs' = tyVarsOfInsts constrained_dicts'
+	qtvs' = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
+			 `minusVarSet` constrained_tvs'
     in
     traceTc (text "tcSimplifyRestricted" <+> vcat [
-		pprInsts wanteds, pprInsts _frees, pprInsts constrained_dicts,
+		pprInsts wanteds, pprInsts _frees, pprInsts constrained_dicts',
 		ppr _binds,
-		ppr constrained_tvs, ppr tau_tvs', ppr qtvs ])	`thenM_`
+		ppr constrained_tvs', ppr tau_tvs', ppr qtvs' ])	`thenM_`
 
 	-- The first step may have squashed more methods than
 	-- necessary, so try again, this time more gently, knowing the exact
 	-- set of type variables to quantify over.
 	--
-	-- We quantify only over constraints that are captured by qtvs;
+	-- We quantify only over constraints that are captured by qtvs';
 	-- these will just be a subset of non-dicts.  This in contrast
 	-- to normal inference (using isFreeWhenInferring) in which we quantify over
 	-- all *non-inheritable* constraints too.  This implements choice
@@ -1108,7 +1111,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- expose implicit parameters to the test that follows
     let
 	is_nested_group = isNotTopLevel top_lvl
-        try_me inst | isFreeWrtTyVars qtvs inst,
+        try_me inst | isFreeWrtTyVars qtvs' inst,
 		      (is_nested_group || isDict inst) = Free
 	            | otherwise  		       = ReduceMe AddSCs
     in
@@ -1119,14 +1122,14 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- See "Notes on implicit parameters, Question 4: top level"
     if is_nested_group then
 	extendLIEs frees	`thenM_`
-        returnM (varSetElems qtvs, binds)
+        returnM (varSetElems qtvs', binds)
     else
 	let
     	    (non_ips, bad_ips) = partition isClassDict frees
 	in    
 	addTopIPErrs bndrs bad_ips	`thenM_`
 	extendLIEs non_ips		`thenM_`
-        returnM (varSetElems qtvs, binds)
+        returnM (varSetElems qtvs', binds)
 \end{code}
 
 
