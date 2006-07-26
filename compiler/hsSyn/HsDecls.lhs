@@ -569,13 +569,13 @@ pprConDecl (ConDecl con expl tvs cxt details ResTyH98)
     ppr_details con (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
     ppr_details con (RecCon fields)  = ppr con <+> ppr_fields fields
 
-pprConDecl (ConDecl con expl tvs cxt details (ResTyGADT res_ty))
-  = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr_details details]
+pprConDecl (ConDecl con expl tvs cxt (PrefixCon arg_tys) (ResTyGADT res_ty))
+  = ppr con <+> dcolon <+> 
+    sep [pprHsForAll expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
   where
-    ppr_details (PrefixCon arg_tys) = dcolon <+> ppr (foldr mk_fun_ty res_ty arg_tys)
-    ppr_details (RecCon fields)     = ppr fields <+> dcolon <+> ppr res_ty
-
     mk_fun_ty a b = noLoc (HsFunTy a b)
+pprConDecl (ConDecl con expl tvs cxt (RecCon fields) (ResTyGADT res_ty))
+  = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr fields <+> dcolon <+> ppr res_ty]
 
 ppr_fields fields = braces (sep (punctuate comma (map ppr_field fields)))
 ppr_field (n, ty) = ppr n <+> dcolon <+> ppr ty
