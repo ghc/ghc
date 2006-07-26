@@ -20,9 +20,6 @@ import ByteCodeAsm	( UnlinkedBCO(..), BCOPtr(..), sizeSS, ssElts )
 import ObjLink		( lookupSymbol )
 
 import Name		( Name,  nameModule, nameOccName )
-#ifdef DEBUG
-import Name             ( isExternalName )
-#endif
 import NameEnv
 import OccName		( occNameFS )
 import PrimOp		( PrimOp, primOpOcc )
@@ -30,6 +27,11 @@ import Module
 import PackageConfig    ( mainPackageId, packageIdFS )
 import FastString	( FastString(..), unpackFS, zEncodeFS )
 import Panic            ( GhcException(..) )
+
+#ifdef DEBUG
+import Name             ( isExternalName )
+import Outputable
+#endif
 
 -- Standard libraries
 import GHC.Word		( Word(..) )
