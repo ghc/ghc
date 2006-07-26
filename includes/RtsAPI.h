@@ -141,10 +141,10 @@ rts_getSchedStatus (Capability *cap);
    These are used by foreign export and foreign import "wrapper" stubs.
    ----------------------------------------------------------------------- */
 
-extern StgWord GHCziTopHandler_runIO_closure[];
-extern StgWord GHCziTopHandler_runNonIO_closure[];
-#define runIO_closure		  GHCziTopHandler_runIO_closure
-#define runNonIO_closure	  GHCziTopHandler_runNonIO_closure
+extern StgWord base_GHCziTopHandler_runIO_closure[];
+extern StgWord base_GHCziTopHandler_runNonIO_closure[];
+#define runIO_closure		  base_GHCziTopHandler_runIO_closure
+#define runNonIO_closure	  base_GHCziTopHandler_runNonIO_closure
 
 /* ------------------------------------------------------------------------ */
 

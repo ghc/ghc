@@ -641,8 +641,8 @@ static INFO_TBL_CONST StgInfoTable izh_static_info;
 #define Char_hash_static_info czh_static_info
 #define Int_hash_static_info izh_static_info
 #else
-#define Char_hash_static_info GHCziBase_Czh_static
-#define Int_hash_static_info GHCziBase_Izh_static
+#define Char_hash_static_info base_GHCziBase_Czh_static
+#define Int_hash_static_info base_GHCziBase_Izh_static
 #endif
 
 

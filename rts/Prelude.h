@@ -24,10 +24,10 @@
  * modules these names are defined in.
  */
 
-PRELUDE_CLOSURE(GHCziBase_True_closure);
-PRELUDE_CLOSURE(GHCziBase_False_closure);
-PRELUDE_CLOSURE(GHCziPack_unpackCString_closure);
-PRELUDE_CLOSURE(GHCziWeak_runFinalizzerBatch_closure);
+PRELUDE_CLOSURE(base_GHCziBase_True_closure);
+PRELUDE_CLOSURE(base_GHCziBase_False_closure);
+PRELUDE_CLOSURE(base_GHCziPack_unpackCString_closure);
+PRELUDE_CLOSURE(base_GHCziWeak_runFinalizzerBatch_closure);
 
 #ifdef IN_STG_CODE
 extern W_ ZCMain_main_closure[];
@@ -35,99 +35,99 @@ extern W_ ZCMain_main_closure[];
 extern StgClosure ZCMain_main_closure;
 #endif
 
-PRELUDE_CLOSURE(GHCziIOBase_stackOverflow_closure);
-PRELUDE_CLOSURE(GHCziIOBase_heapOverflow_closure);
-PRELUDE_CLOSURE(GHCziIOBase_BlockedOnDeadMVar_closure);
-PRELUDE_CLOSURE(GHCziIOBase_BlockedIndefinitely_closure);
-PRELUDE_CLOSURE(GHCziIOBase_NonTermination_closure);
-PRELUDE_CLOSURE(GHCziIOBase_NestedAtomically_closure);
+PRELUDE_CLOSURE(base_GHCziIOBase_stackOverflow_closure);
+PRELUDE_CLOSURE(base_GHCziIOBase_heapOverflow_closure);
+PRELUDE_CLOSURE(base_GHCziIOBase_BlockedOnDeadMVar_closure);
+PRELUDE_CLOSURE(base_GHCziIOBase_BlockedIndefinitely_closure);
+PRELUDE_CLOSURE(base_GHCziIOBase_NonTermination_closure);
+PRELUDE_CLOSURE(base_GHCziIOBase_NestedAtomically_closure);
 
 #if !defined(mingw32_HOST_OS)
-PRELUDE_CLOSURE(GHCziConc_ensureIOManagerIsRunning_closure);
+PRELUDE_CLOSURE(base_GHCziConc_ensureIOManagerIsRunning_closure);
 #endif
 
-PRELUDE_INFO(GHCziBase_Czh_static_info);
-PRELUDE_INFO(GHCziBase_Izh_static_info);
-PRELUDE_INFO(GHCziFloat_Fzh_static_info);
-PRELUDE_INFO(GHCziFloat_Dzh_static_info);
-PRELUDE_INFO(Addr_Azh_static_info);
-PRELUDE_INFO(GHCziPtr_Ptr_static_info);
-PRELUDE_INFO(GHCziPtr_FunPtr_static_info);
-PRELUDE_INFO(GHCziInt_I8zh_static_info);
-PRELUDE_INFO(GHCziInt_I16zh_static_info);
-PRELUDE_INFO(GHCziInt_I32zh_static_info);
-PRELUDE_INFO(GHCziInt_I64zh_static_info);
-PRELUDE_INFO(GHCziWord_Wzh_static_info);
-PRELUDE_INFO(GHCziWord_W8zh_static_info);
-PRELUDE_INFO(GHCziWord_W16zh_static_info);
-PRELUDE_INFO(GHCziWord_W32zh_static_info);
-PRELUDE_INFO(GHCziWord_W64zh_static_info);
-PRELUDE_INFO(GHCziBase_Czh_con_info);
-PRELUDE_INFO(GHCziBase_Izh_con_info);
-PRELUDE_INFO(GHCziFloat_Fzh_con_info);
-PRELUDE_INFO(GHCziFloat_Dzh_con_info);
-PRELUDE_INFO(GHCziPtr_Ptr_con_info);
-PRELUDE_INFO(GHCziPtr_FunPtr_con_info);
-PRELUDE_INFO(Addr_Azh_con_info);
-PRELUDE_INFO(GHCziWord_Wzh_con_info);
-PRELUDE_INFO(GHCziInt_I8zh_con_info);
-PRELUDE_INFO(GHCziInt_I16zh_con_info);
-PRELUDE_INFO(GHCziInt_I32zh_con_info);
-PRELUDE_INFO(GHCziInt_I64zh_con_info);
-PRELUDE_INFO(GHCziWord_W8zh_con_info);
-PRELUDE_INFO(GHCziWord_W16zh_con_info);
-PRELUDE_INFO(GHCziWord_W32zh_con_info);
-PRELUDE_INFO(GHCziWord_W64zh_con_info);
-PRELUDE_INFO(GHCziStable_StablePtr_static_info);
-PRELUDE_INFO(GHCziStable_StablePtr_con_info);
+PRELUDE_INFO(base_GHCziBase_Czh_static_info);
+PRELUDE_INFO(base_GHCziBase_Izh_static_info);
+PRELUDE_INFO(base_GHCziFloat_Fzh_static_info);
+PRELUDE_INFO(base_GHCziFloat_Dzh_static_info);
+PRELUDE_INFO(base_Addr_Azh_static_info);
+PRELUDE_INFO(base_GHCziPtr_Ptr_static_info);
+PRELUDE_INFO(base_GHCziPtr_FunPtr_static_info);
+PRELUDE_INFO(base_GHCziInt_I8zh_static_info);
+PRELUDE_INFO(base_GHCziInt_I16zh_static_info);
+PRELUDE_INFO(base_GHCziInt_I32zh_static_info);
+PRELUDE_INFO(base_GHCziInt_I64zh_static_info);
+PRELUDE_INFO(base_GHCziWord_Wzh_static_info);
+PRELUDE_INFO(base_GHCziWord_W8zh_static_info);
+PRELUDE_INFO(base_GHCziWord_W16zh_static_info);
+PRELUDE_INFO(base_GHCziWord_W32zh_static_info);
+PRELUDE_INFO(base_GHCziWord_W64zh_static_info);
+PRELUDE_INFO(base_GHCziBase_Czh_con_info);
+PRELUDE_INFO(base_GHCziBase_Izh_con_info);
+PRELUDE_INFO(base_GHCziFloat_Fzh_con_info);
+PRELUDE_INFO(base_GHCziFloat_Dzh_con_info);
+PRELUDE_INFO(base_GHCziPtr_Ptr_con_info);
+PRELUDE_INFO(base_GHCziPtr_FunPtr_con_info);
+PRELUDE_INFO(base_Addr_Azh_con_info);
+PRELUDE_INFO(base_GHCziWord_Wzh_con_info);
+PRELUDE_INFO(base_GHCziInt_I8zh_con_info);
+PRELUDE_INFO(base_GHCziInt_I16zh_con_info);
+PRELUDE_INFO(base_GHCziInt_I32zh_con_info);
+PRELUDE_INFO(base_GHCziInt_I64zh_con_info);
+PRELUDE_INFO(base_GHCziWord_W8zh_con_info);
+PRELUDE_INFO(base_GHCziWord_W16zh_con_info);
+PRELUDE_INFO(base_GHCziWord_W32zh_con_info);
+PRELUDE_INFO(base_GHCziWord_W64zh_con_info);
+PRELUDE_INFO(base_GHCziStable_StablePtr_static_info);
+PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 
-#define True_closure              (&GHCziBase_True_closure)
-#define False_closure             (&GHCziBase_False_closure)
-#define unpackCString_closure     (&GHCziPack_unpackCString_closure)
-#define runFinalizerBatch_closure (&GHCziWeak_runFinalizzerBatch_closure)
+#define True_closure              (&base_GHCziBase_True_closure)
+#define False_closure             (&base_GHCziBase_False_closure)
+#define unpackCString_closure     (&base_GHCziPack_unpackCString_closure)
+#define runFinalizerBatch_closure (&base_GHCziWeak_runFinalizzerBatch_closure)
 #define mainIO_closure            (&ZCMain_main_closure)
 
-#define stackOverflow_closure     (&GHCziIOBase_stackOverflow_closure)
-#define heapOverflow_closure      (&GHCziIOBase_heapOverflow_closure)
-#define BlockedOnDeadMVar_closure (&GHCziIOBase_BlockedOnDeadMVar_closure)
-#define BlockedIndefinitely_closure (&GHCziIOBase_BlockedIndefinitely_closure)
-#define NonTermination_closure    (&GHCziIOBase_NonTermination_closure)
-#define NestedAtomically_closure  (&GHCziIOBase_NestedAtomically_closure)
+#define stackOverflow_closure     (&base_GHCziIOBase_stackOverflow_closure)
+#define heapOverflow_closure      (&base_GHCziIOBase_heapOverflow_closure)
+#define BlockedOnDeadMVar_closure (&base_GHCziIOBase_BlockedOnDeadMVar_closure)
+#define BlockedIndefinitely_closure (&base_GHCziIOBase_BlockedIndefinitely_closure)
+#define NonTermination_closure    (&base_GHCziIOBase_NonTermination_closure)
+#define NestedAtomically_closure  (&base_GHCziIOBase_NestedAtomically_closure)
 
-#define Czh_static_info           (&GHCziBase_Czh_static_info)
-#define Fzh_static_info           (&GHCziFloat_Fzh_static_info)
-#define Dzh_static_info           (&GHCziFloat_Dzh_static_info)
-#define Azh_static_info           (&Addr_Azh_static_info)
-#define Izh_static_info           (&GHCziBase_Izh_static_info)
-#define I8zh_static_info          (&GHCziInt_I8zh_static_info)
-#define I16zh_static_info         (&GHCziInt_I16zh_static_info)
-#define I32zh_static_info         (&GHCziInt_I32zh_static_info)
-#define I64zh_static_info         (&GHCziInt_I64zh_static_info)
-#define Wzh_static_info           (&GHCziWord_Wzh_static_info)
-#define W8zh_static_info          (&GHCziWord_W8zh_static_info)
-#define W16zh_static_info         (&GHCziWord_W16zh_static_info)
-#define W32zh_static_info         (&GHCziWord_W32zh_static_info)
-#define W64zh_static_info         (&GHCziWord_W64zh_static_info)
-#define Ptr_static_info           (&GHCziPtr_Ptr_static_info)
-#define FunPtr_static_info        (&GHCziPtr_FunPtr_static_info)
-#define Czh_con_info              (&GHCziBase_Czh_con_info)
-#define Izh_con_info              (&GHCziBase_Izh_con_info)
-#define Fzh_con_info              (&GHCziFloat_Fzh_con_info)
-#define Dzh_con_info              (&GHCziFloat_Dzh_con_info)
-#define Azh_con_info              (&Addr_Azh_con_info)
-#define Wzh_con_info              (&GHCziWord_Wzh_con_info)
-#define W8zh_con_info             (&GHCziWord_W8zh_con_info)
-#define W16zh_con_info            (&GHCziWord_W16zh_con_info)
-#define W32zh_con_info            (&GHCziWord_W32zh_con_info)
-#define W64zh_con_info            (&GHCziWord_W64zh_con_info)
-#define I8zh_con_info             (&GHCziInt_I8zh_con_info)
-#define I16zh_con_info            (&GHCziInt_I16zh_con_info)
-#define I32zh_con_info            (&GHCziInt_I32zh_con_info)
-#define I64zh_con_info            (&GHCziInt_I64zh_con_info)
-#define I64zh_con_info            (&GHCziInt_I64zh_con_info)
-#define Ptr_con_info              (&GHCziPtr_Ptr_con_info)
-#define FunPtr_con_info           (&GHCziPtr_FunPtr_con_info)
-#define StablePtr_static_info     (&GHCziStable_StablePtr_static_info)
-#define StablePtr_con_info        (&GHCziStable_StablePtr_con_info)
+#define Czh_static_info           (&base_GHCziBase_Czh_static_info)
+#define Fzh_static_info           (&base_GHCziFloat_Fzh_static_info)
+#define Dzh_static_info           (&base_GHCziFloat_Dzh_static_info)
+#define Azh_static_info           (&base_Addr_Azh_static_info)
+#define Izh_static_info           (&base_GHCziBase_Izh_static_info)
+#define I8zh_static_info          (&base_GHCziInt_I8zh_static_info)
+#define I16zh_static_info         (&base_GHCziInt_I16zh_static_info)
+#define I32zh_static_info         (&base_GHCziInt_I32zh_static_info)
+#define I64zh_static_info         (&base_GHCziInt_I64zh_static_info)
+#define Wzh_static_info           (&base_GHCziWord_Wzh_static_info)
+#define W8zh_static_info          (&base_GHCziWord_W8zh_static_info)
+#define W16zh_static_info         (&base_GHCziWord_W16zh_static_info)
+#define W32zh_static_info         (&base_GHCziWord_W32zh_static_info)
+#define W64zh_static_info         (&base_GHCziWord_W64zh_static_info)
+#define Ptr_static_info           (&base_GHCziPtr_Ptr_static_info)
+#define FunPtr_static_info        (&base_GHCziPtr_FunPtr_static_info)
+#define Czh_con_info              (&base_GHCziBase_Czh_con_info)
+#define Izh_con_info              (&base_GHCziBase_Izh_con_info)
+#define Fzh_con_info              (&base_GHCziFloat_Fzh_con_info)
+#define Dzh_con_info              (&base_GHCziFloat_Dzh_con_info)
+#define Azh_con_info              (&base_Addr_Azh_con_info)
+#define Wzh_con_info              (&base_GHCziWord_Wzh_con_info)
+#define W8zh_con_info             (&base_GHCziWord_W8zh_con_info)
+#define W16zh_con_info            (&base_GHCziWord_W16zh_con_info)
+#define W32zh_con_info            (&base_GHCziWord_W32zh_con_info)
+#define W64zh_con_info            (&base_GHCziWord_W64zh_con_info)
+#define I8zh_con_info             (&base_GHCziInt_I8zh_con_info)
+#define I16zh_con_info            (&base_GHCziInt_I16zh_con_info)
+#define I32zh_con_info            (&base_GHCziInt_I32zh_con_info)
+#define I64zh_con_info            (&base_GHCziInt_I64zh_con_info)
+#define I64zh_con_info            (&base_GHCziInt_I64zh_con_info)
+#define Ptr_con_info              (&base_GHCziPtr_Ptr_con_info)
+#define FunPtr_con_info           (&base_GHCziPtr_FunPtr_con_info)
+#define StablePtr_static_info     (&base_GHCziStable_StablePtr_static_info)
+#define StablePtr_con_info        (&base_GHCziStable_StablePtr_con_info)
 
 #endif /* PRELUDE_H */

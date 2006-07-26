@@ -1200,7 +1200,7 @@ atomicallyzh_fast
 
   /* Nested transactions are not allowed; raise an exception */
   if (old_trec != NO_TREC) {
-     R1 = GHCziIOBase_NestedAtomically_closure;
+     R1 = base_GHCziIOBase_NestedAtomically_closure;
      jump raisezh_fast;
   }
 
