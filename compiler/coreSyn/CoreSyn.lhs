@@ -57,6 +57,9 @@ import DataCon		( DataCon, dataConWorkId, dataConTag )
 import BasicTypes	( Activation )
 import FastString
 import Outputable
+
+infixl 4 `mkApps`, `mkValApps`, `mkTyApps`, `mkVarApps`
+-- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
 \end{code}
 
 %************************************************************************
