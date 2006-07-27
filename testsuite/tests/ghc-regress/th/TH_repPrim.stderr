@@ -1,8 +1,8 @@
-AppE (ConE GHC.Base.I#) (LitE (IntPrimL 20))
-GHC.Base.I# 20#
-AppE (ConE GHC.Float.F#) (LitE (FloatPrimL (123%10)))
-GHC.Float.F# 12.3#
-AppE (ConE GHC.Float.D#) (LitE (DoublePrimL (123%5)))
-GHC.Float.D# 24.6##
-Loading package base-1.0 ... linking ... done.
-Loading package template-haskell-1.0 ... linking ... done.
+AppE (ConE base:GHC.Base.I#) (LitE (IntPrimL 20))
+base:GHC.Base.I# 20#
+AppE (ConE base:GHC.Float.F#) (LitE (FloatPrimL (123%10)))
+base:GHC.Float.F# 12.3#
+AppE (ConE base:GHC.Float.D#) (LitE (DoublePrimL (123%5)))
+base:GHC.Float.D# 24.6##
+Loading package base ... linking ... done.
+Loading package template-haskell ... linking ... done.

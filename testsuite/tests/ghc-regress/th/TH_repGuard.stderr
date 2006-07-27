@@ -1,9 +1,9 @@
-foo :: GHC.Base.Int -> GHC.Base.Int
-foo x_0 | x_0 GHC.Base.== 5 = 6
+foo :: base:GHC.Base.Int -> base:GHC.Base.Int
+foo x_0 | x_0 base:GHC.Base.== 5 = 6
 foo x_1 = 7
-bar :: Data.Maybe.Maybe GHC.Base.Int -> GHC.Base.Int
-bar x_0 | Data.Maybe.Just y_1 <- x_0
+bar :: base:Data.Maybe.Maybe base:GHC.Base.Int -> base:GHC.Base.Int
+bar x_0 | base:Data.Maybe.Just y_1 <- x_0
             = y_1
 bar _ = 9
-Loading package base-1.0 ... linking ... done.
-Loading package template-haskell-1.0 ... linking ... done.
+Loading package base ... linking ... done.
+Loading package template-haskell ... linking ... done.

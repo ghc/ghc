@@ -1,30 +1,32 @@
 
 TH_reifyDecl1.hs:33:9:
-    data TH_reifyDecl1.T = TH_reifyDecl1.A | TH_reifyDecl1.B
+    data main:TH_reifyDecl1.T = main:TH_reifyDecl1.A
+                          | main:TH_reifyDecl1.B
 
 TH_reifyDecl1.hs:33:9:
-    data TH_reifyDecl1.R a_0 = TH_reifyDecl1.C a_0 | TH_reifyDecl1.D
+    data main:TH_reifyDecl1.R a_0 = main:TH_reifyDecl1.C a_0
+                              | main:TH_reifyDecl1.D
 
 TH_reifyDecl1.hs:33:9:
-    data TH_reifyDecl1.List a_0 = TH_reifyDecl1.Nil
-                            | TH_reifyDecl1.Cons a_0 (TH_reifyDecl1.List a_0)
+    data main:TH_reifyDecl1.List a_0 = main:TH_reifyDecl1.Nil
+                                 | main:TH_reifyDecl1.Cons a_0 (main:TH_reifyDecl1.List a_0)
 
 TH_reifyDecl1.hs:33:9:
-    data TH_reifyDecl1.Tree a_0 = TH_reifyDecl1.Leaf
-                            | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
+    data main:TH_reifyDecl1.Tree a_0 = main:TH_reifyDecl1.Leaf
+                                 | (main:TH_reifyDecl1.Tree a_0) main:TH_reifyDecl1.:+: (main:TH_reifyDecl1.Tree a_0)
 
 TH_reifyDecl1.hs:33:9:
-    type TH_reifyDecl1.IntList = GHC.Base.[] GHC.Base.Int
+    type main:TH_reifyDecl1.IntList = base:GHC.Base.[] base:GHC.Base.Int
 
 TH_reifyDecl1.hs:33:9:
-    newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Base.Int
+    newtype main:TH_reifyDecl1.Length = main:TH_reifyDecl1.Length base:GHC.Base.Int
 
 TH_reifyDecl1.hs:33:9:
-    Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall a_0 . TH_reifyDecl1.Tree a_0
+    Constructor from main:TH_reifyDecl1.Tree: main:TH_reifyDecl1.Leaf :: forall a_0 . main:TH_reifyDecl1.Tree a_0
 
 TH_reifyDecl1.hs:33:9:
-    Class op from TH_reifyDecl1.C: TH_reifyDecl1.m :: forall a_0 . TH_reifyDecl1.C a_0 => a_0 ->
-                                                                                      GHC.Base.Int
-                               infixl 3 TH_reifyDecl1.m
-Loading package base-1.0 ... linking ... done.
-Loading package template-haskell-1.0 ... linking ... done.
+    Class op from main:TH_reifyDecl1.C: main:TH_reifyDecl1.m :: forall a_0 . main:TH_reifyDecl1.C a_0 => a_0 ->
+                                                                                                     base:GHC.Base.Int
+                                    infixl 3 main:TH_reifyDecl1.m
+Loading package base ... linking ... done.
+Loading package template-haskell ... linking ... done.

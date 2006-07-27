@@ -12,5 +12,5 @@ TH_exn.hs:1:0:
 		ds <- [d| |]
 		return [Language.Haskell.TH.Syntax.Dec] (tail
 							     Language.Haskell.TH.Syntax.Dec ds)
-Loading package base-1.0 ... linking ... done.
-Loading package template-haskell-1.0 ... linking ... done.
+Loading package base ... linking ... done.
+Loading package template-haskell ... linking ... done.
