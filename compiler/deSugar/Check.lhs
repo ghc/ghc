@@ -623,7 +623,8 @@ simplify_pat pat@(WildPat gt) = pat
 simplify_pat (VarPat id)      = WildPat (idType id) 
 simplify_pat (VarPatOut id _) = WildPat (idType id) 	-- Ignore the bindings
 simplify_pat (ParPat p)       = unLoc (simplify_lpat p)
-simplify_pat (LazyPat p)      = unLoc (simplify_lpat p)
+simplify_pat (LazyPat p)      = WildPat (hsPatType p)	-- For overlap and exhaustiveness checking
+							-- purposes, a ~pat is like a wildcard
 simplify_pat (BangPat p)      = unLoc (simplify_lpat p)
 simplify_pat (AsPat id p)     = unLoc (simplify_lpat p)
 simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
