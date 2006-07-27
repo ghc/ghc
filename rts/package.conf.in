@@ -141,9 +141,9 @@ ld-options:
 
 #ifndef mingw32_HOST_OS
 #ifdef LEADING_UNDERSCORE
-	 , "-u", "_GHCziConc_ensureIOManagerIsRunning_closure"
+	 , "-u", "_base_GHCziConc_ensureIOManagerIsRunning_closure"
 #else
-	 , "-u", "GHCziConc_ensureIOManagerIsRunning_closure"
+	 , "-u", "base_GHCziConc_ensureIOManagerIsRunning_closure"
 #endif
 #endif
 
