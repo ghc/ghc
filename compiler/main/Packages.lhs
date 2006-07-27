@@ -301,10 +301,11 @@ mkPackageState dflags orig_pkg_db = do
 	  = case partition (matches str) pkgs of
 		([],_) -> Nothing
 		(ps,rest) -> 
-		   case sortBy (flip (comparing (pkgVersion.package))) ps of
+		   case sortByVersion ps of
 			(p:ps) -> Just (p, ps ++ rest)
 			_ -> panic "Packages.pick"
 
+        sortByVersion = sortBy (flip (comparing (pkgVersion.package)))
         comparing f a b = f a `compare` f b
 
 	-- A package named on the command line can either include the
@@ -359,35 +360,44 @@ mkPackageState dflags orig_pkg_db = do
 	-- delete any other packages with the same name
 	-- update the package and any dependencies to point to the new
 	-- one.
+        --
+        -- When choosing which package to map to a wired-in package
+        -- name, we prefer exposed packages, and pick the latest
+        -- version.  To override the default choice, -hide-package
+        -- could be used to hide newer versions.
+        --
 	findWiredInPackage :: [PackageConfig] -> String
 			   -> IO (Maybe PackageIdentifier)
 	findWiredInPackage pkgs wired_pkg =
-	   case [ p | p <- pkgs, pkgName (package p) == wired_pkg,
-				 exposed p ] of
-		[] -> do 
-			debugTraceMsg dflags 2 $
+           let all_ps = [ p | p <- pkgs, pkgName (package p) == wired_pkg ] in
+	   case filter exposed all_ps of
+		[] -> case all_ps of
+                        []   -> notfound
+                        many -> pick (head (sortByVersion many))
+		many  -> pick (head (sortByVersion many))
+          where
+                notfound = do
+			  debugTraceMsg dflags 2 $
 			    ptext SLIT("wired-in package ")
 				 <> text wired_pkg
 				 <> ptext SLIT(" not found.")
-			return Nothing
-		[one] -> do 
-			debugTraceMsg dflags 2 $
+			  return Nothing
+                pick pkg = do
+                        debugTraceMsg dflags 2 $
 			    ptext SLIT("wired-in package ")
 				 <> text wired_pkg
 				 <> ptext SLIT(" mapped to ")
-				 <> text (showPackageId (package one))
-			return (Just (package one))
-		more -> do
-			throwDyn (CmdLineError (showSDoc $
-			    ptext SLIT("there are multiple exposed packages that match wired-in package ") <> text wired_pkg))
+				 <> text (showPackageId (package pkg))
+			return (Just (package pkg))
+
 
   mb_wired_in_ids <- mapM (findWiredInPackage pkgs2) wired_in_names
   let 
         wired_in_ids = catMaybes mb_wired_in_ids
 
-	deleteHiddenWiredInPackages pkgs = filter ok pkgs
+	deleteOtherWiredInPackages pkgs = filter ok pkgs
 	  where ok p = pkgName (package p) `notElem` wired_in_names
-                         || exposed p
+                     || package p `elem` wired_in_ids
 
 	updateWiredInDependencies pkgs = map upd_pkg pkgs
 	  where upd_pkg p = p{ package = upd_pid (package p),
@@ -397,7 +407,7 @@ mkPackageState dflags orig_pkg_db = do
 				[] -> pid
 				(x:_) -> x{ pkgVersion = Version [] [] }
 
-        pkgs3 = deleteHiddenWiredInPackages pkgs2
+        pkgs3 = deleteOtherWiredInPackages pkgs2
 
         pkgs4 = updateWiredInDependencies pkgs3
 
