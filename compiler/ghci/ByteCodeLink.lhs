@@ -274,7 +274,7 @@ nameToCLabel n suffix
 
 primopToCLabel :: PrimOp -> String{-suffix-} -> String
 primopToCLabel primop suffix
-   = let str = "GHCziPrimopWrappers_" ++ unpackFS (zEncodeFS (occNameFS (primOpOcc primop))) ++ '_':suffix
+   = let str = "base_GHCziPrimopWrappers_" ++ unpackFS (zEncodeFS (occNameFS (primOpOcc primop))) ++ '_':suffix
      in --trace ("primopToCLabel: " ++ str)
         str
 \end{code}
