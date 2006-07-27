@@ -140,7 +140,7 @@ documentation</ulink> describes all the libraries that come with GHC.
           <indexterm><primary><option>-fallow-incoherent-instances</option></primary></indexterm>
         </term>
 	<term>
-          <option>-fcontext-stack</option>
+          <option>-fcontext-stack=N</option>
           <indexterm><primary><option>-fcontext-stack</option></primary></indexterm>
         </term>
 	<listitem>
@@ -2090,7 +2090,7 @@ option</primary></indexterm>, you can use arbitrary
 types in both an instance context and instance head.  Termination is ensured by having a
 fixed-depth recursion stack.  If you exceed the stack depth you get a
 sort of backtrace, and the opportunity to increase the stack depth
-with <option>-fcontext-stack</option><emphasis>N</emphasis>.
+with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 </para>
 
 </sect3>

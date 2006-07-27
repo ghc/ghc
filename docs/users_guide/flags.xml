@@ -569,10 +569,10 @@
 	      <entry><option>-fno-arrows</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fcontext-stack</option><replaceable>n</replaceable></entry>
+	      <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
 	      <entry>set the limit for context reduction</entry>
-	      <entry>static</entry>
-	      <entry><option>-</option></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>20</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-ffi</option> or <option>-fffi</option></entry>

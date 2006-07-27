@@ -61,8 +61,10 @@ import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases	( Phase(..), phaseInputExt )
 import Config
 import CmdLineParser
+import Constants	( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic		( panic, GhcException(..) )
-import Util		( notNull, splitLongestPrefix, split, normalisePath )
+import Util		( notNull, splitLongestPrefix, normalisePath )
+import Maybes		( fromJust, orElse )
 import SrcLoc           ( SrcSpan )
 
 import DATA_IOREF	( readIORef )
@@ -71,7 +73,6 @@ import Monad		( when )
 #ifdef mingw32_TARGET_OS
 import Data.List	( isPrefixOf )
 #endif
-import Maybe		( fromJust )
 import Char		( isDigit, isUpper )
 import Outputable
 import System.IO        ( hPutStrLn, stderr )
@@ -214,6 +215,8 @@ data DynFlags = DynFlags {
   importPaths		:: [FilePath],
   mainModIs		:: Module,
   mainFunIs		:: Maybe String,
+  ctxtStkDepth	        :: Int,		-- Typechecker context stack depth
+
   thisPackage		:: PackageId,
 
   -- ways
@@ -349,6 +352,8 @@ defaultDynFlags =
 	importPaths		= ["."],
 	mainModIs		= mAIN,
 	mainFunIs		= Nothing,
+	ctxtStkDepth		= mAX_CONTEXT_REDUCTION_DEPTH,
+
 	thisPackage		= mainPackageId,
 	
 	wayNames		= panic "ways",
@@ -800,7 +805,7 @@ dynamic_flags = [
   ,  ( "cpp"		, NoArg  (setDynFlag Opt_Cpp))
   ,  ( "F"		, NoArg  (setDynFlag Opt_Pp))
   ,  ( "#include"	, HasArg (addCmdlineHCInclude) )
-  ,  ( "v"		, OptPrefix (setVerbosity) )
+  ,  ( "v"		, OptIntSuffix setVerbosity )
 
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg (upd . setPgmL) )  
@@ -929,7 +934,7 @@ dynamic_flags = [
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
   ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting))
   ,  ( "dshow-passes",           NoArg (do unSetDynFlag Opt_RecompChecking
-				           setVerbosity "2") )
+				           setVerbosity (Just 2)) )
   ,  ( "dfaststring-stats",	 NoArg (setDynFlag Opt_D_faststring_stats))
 
 	------ Machine dependant (-m<blah>) stuff ---------------------------
@@ -969,6 +974,9 @@ dynamic_flags = [
 
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
+
+  ,  ( "fcontext-stack"	, OptIntSuffix $ \mb_n -> upd $ \dfs -> 
+			  dfs{ ctxtStkDepth = mb_n `orElse` 3 })
 
 	-- the rest of the -f* and -fno-* flags
   ,  ( "fno-", 		PrefixPred (\f -> isFFlag f) (\f -> unSetDynFlag (getFFlag f)) )
@@ -1064,10 +1072,8 @@ setDumpFlag dump_flag
 	-- Whenver we -ddump, switch off the recompilation checker,
 	-- else you don't see the dump!
 
-setVerbosity "" = upd (\dfs -> dfs{ verbosity = 3 })
-setVerbosity n 
-  | all isDigit n = upd (\dfs -> dfs{ verbosity = read n })
-  | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
+setVerbosity :: Maybe Int -> DynP ()
+setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 
 addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 

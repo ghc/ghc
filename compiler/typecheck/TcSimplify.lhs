@@ -21,7 +21,6 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyType )
-import TypeRep		( Type(..) )
 import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, emptyLHsBinds )
 import TcHsSyn		( mkHsApp, mkHsTyApp, mkHsDictApp )
 
@@ -71,8 +70,8 @@ import ListSetOps	( equivClasses )
 import Util		( zipEqual, isSingleton )
 import List		( partition )
 import SrcLoc		( Located(..) )
-import DynFlags		( DynFlag(..) )
-import StaticFlags
+import DynFlags		( DynFlags(ctxtStkDepth), 
+			  DynFlag( Opt_GlasgowExts, Opt_AllowUndecidableInstances, Opt_WarnTypeDefaults ) )
 \end{code}
 
 
@@ -1715,22 +1714,21 @@ I had to produce Y, to produce Y I had to produce Z, and so on.
 
 \begin{code}
 reduceList (n,stack) try_me wanteds state
-  | n > opt_MaxContextReductionDepth
-  = failWithTc (reduceDepthErr n stack)
-
-  | otherwise
-  =
+  = do 	{ dopts <- getDOpts
 #ifdef DEBUG
-   (if n > 8 then
-	pprTrace "Interesting! Context reduction stack deeper than 8:" 
-		(int n $$ ifPprDebug (nest 2 (pprStack stack)))
-    else (\x->x))
+	; if n > 8 then
+		dumpTcRn (text "Interesting! Context reduction stack deeper than 8:" 
+			  <+> (int n $$ ifPprDebug (nest 2 (pprStack stack))))
+	  else return ()
 #endif
-    go wanteds state
+	; if n >= ctxtStkDepth dopts then
+	    failWithTc (reduceDepthErr n stack)
+	  else
+	    go wanteds state }
   where
-    go []     state = returnM state
-    go (w:ws) state = reduce (n+1, w:stack) try_me w state	`thenM` \ state' ->
-		      go ws state'
+    go []     state = return state
+    go (w:ws) state = do { state' <- reduce (n+1, w:stack) try_me w state
+			 ; go ws state' }
 
     -- Base case: we're done!
 reduce stack try_me wanted avails
@@ -2524,7 +2522,7 @@ badDerivedPred pred
 
 reduceDepthErr n stack
   = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,
-	  ptext SLIT("Use -fcontext-stack20 to increase stack size to (e.g.) 20"),
+	  ptext SLIT("Use -fcontext-stack=N to increase stack size to N"),
 	  nest 4 (pprStack stack)]
 
 pprStack stack = vcat (map pprInstInFull stack)

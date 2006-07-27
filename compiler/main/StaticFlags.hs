@@ -29,7 +29,6 @@ module StaticFlags (
 
 	-- language opts
 	opt_DictsStrict,
-        opt_MaxContextReductionDepth,
 	opt_IrrefutableTuples,
 	opt_Parallel,
 	opt_RuntimeTypes,
@@ -78,7 +77,6 @@ import FastString	( FastString, mkFastString )
 import Util
 import Maybes		( firstJust )
 import Panic		( GhcException(..), ghcError )
-import Constants	( mAX_CONTEXT_REDUCTION_DEPTH )
 
 import EXCEPTION	( throwDyn )
 import DATA_IOREF
@@ -253,7 +251,6 @@ opt_DoTickyProfiling		= lookUp  FSLIT("-fticky-ticky")
 -- language opts
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
 opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
-opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
 opt_Parallel			= lookUp  FSLIT("-fparallel")
 opt_Flatten			= lookUp  FSLIT("-fflatten")
 
@@ -337,7 +334,6 @@ isStaticFlag f =
 	"fPIC"
 	]
   || any (flip prefixMatch f) [
-	"fcontext-stack",
 	"fliberate-case-threshold",
 	"fmax-worker-args",
 	"fhistory-size",
