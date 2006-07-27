@@ -72,7 +72,10 @@ import EXCEPTION	( throwDyn )
 import Monad		( when )
 #ifdef mingw32_TARGET_OS
 import Data.List	( isPrefixOf )
+#else
+import Util		( split )
 #endif
+
 import Char		( isDigit, isUpper )
 import Outputable
 import System.IO        ( hPutStrLn, stderr )
