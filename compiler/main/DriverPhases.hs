@@ -71,6 +71,7 @@ data Phase
 	| Cpp   HscSource
 	| HsPp  HscSource
 	| Hsc   HscSource
+        | Ccpp
 	| Cc
 	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
 	| Mangle	-- assembly mangling, now done by a separate script.
@@ -99,6 +100,7 @@ eqPhase (Unlit _)   (Unlit _) 	= True
 eqPhase (Cpp   _)   (Cpp   _) 	= True
 eqPhase (HsPp  _)   (HsPp  _) 	= True
 eqPhase (Hsc   _)   (Hsc   _) 	= True
+eqPhase Ccpp	    Ccpp        = True
 eqPhase Cc	    Cc	        = True
 eqPhase HCc	    HCc		= True
 eqPhase Mangle	    Mangle    	= True
@@ -129,6 +131,7 @@ nextPhase Mangle	= SplitMangle
 nextPhase SplitMangle	= As
 nextPhase As		= SplitAs
 nextPhase SplitAs	= StopLn
+nextPhase Ccpp		= As
 nextPhase Cc		= As
 nextPhase CmmCpp	= Cmm
 nextPhase Cmm		= HCc
@@ -145,10 +148,10 @@ startPhase "hspp"     = Hsc   HsSrcFile
 startPhase "hcr"      = Hsc   ExtCoreFile
 startPhase "hc"       = HCc
 startPhase "c"        = Cc
-startPhase "cpp"      = Cc
+startPhase "cpp"      = Ccpp
 startPhase "C"        = Cc
-startPhase "cc"       = Cc
-startPhase "cxx"      = Cc
+startPhase "cc"       = Ccpp
+startPhase "cxx"      = Ccpp
 startPhase "raw_s"    = Mangle
 startPhase "split_s"  = SplitMangle
 startPhase "s"        = As
@@ -171,6 +174,7 @@ phaseInputExt (Hsc   _)  	  = "hspp"	-- intermediate only
 	--     because runPipeline uses the StopBefore phase to pick the
 	--     output filename.  That could be fixed, but watch out.
 phaseInputExt HCc         	  = "hc"  
+phaseInputExt Ccpp          	  = "cpp"
 phaseInputExt Cc          	  = "c"
 phaseInputExt Mangle      	  = "raw_s"
 phaseInputExt SplitMangle 	  = "split_s"	-- not really generated
