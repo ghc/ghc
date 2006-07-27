@@ -401,7 +401,8 @@ registerPackage input defines flags auto_ghci_libs update force = do
 
   let pkg = resolveDeps db_stack pkg0
   validatePackageConfig pkg db_stack auto_ghci_libs update force
-  let new_details = snd db_to_operate_on ++ [pkg]
+  let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
+      not_this p = package p /= package pkg
   savePackageConfig db_filename
   maybeRestoreOldConfig db_filename $
     writeNewConfig db_filename new_details
