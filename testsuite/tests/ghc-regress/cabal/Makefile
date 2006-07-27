@@ -50,9 +50,8 @@ ghcpkg03 :
 	$(GHC_PKG) register --force test2.pkg
 
 	@: # test4.pkg depends on testpkg-2.0, which conflicts with testpkg-1.2.3.4,
-	@: # so ghc-pkg will refuse to install it when registering, and hide
-	@: # testpkg-1.2.3.4 when updating.
-	if $(GHC_PKG) register test4.pkg; then false; else true; fi
+	@: # ghc-pkg will happily register it now (it didn't in GHC 6.4)
+	$(GHC_PKG) register test4.pkg
 	$(GHC_PKG) update test4.pkg
 
 	@: # and another update of test.pkg will now hide dep-2.0

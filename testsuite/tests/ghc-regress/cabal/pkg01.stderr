@@ -1,4 +1,0 @@
-
-pkg01.hs:1:0:
-    conflict: module `Char' belongs to the current program/library
-    and also to package haskell98-1.0
