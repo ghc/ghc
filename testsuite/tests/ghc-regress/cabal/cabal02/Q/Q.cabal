@@ -1,0 +1,4 @@
+Name: Q
+Version: 1.0
+Build-depends: base>=1.0, haskell98, P==1.0
+Exposed-modules: B

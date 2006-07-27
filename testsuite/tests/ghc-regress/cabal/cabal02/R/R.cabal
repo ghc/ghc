@@ -1,0 +1,6 @@
+Name: R
+Version: 1.0
+Build-depends: base>=1.0, haskell98, P==2.0, Q
+
+Executable: R
+Main-is: Main.hs
