@@ -1,5 +1,5 @@
 
 mod144.hs:2:10:
     Conflicting exports for `Bar':
-      `module Mod143_A' exports `Mod143_A.Bar' imported from Mod143_A at mod144.hs:4:0-14
-      `module M' exports `M.Bar' defined at mod144.hs:6:12
+      `module Mod143_A' exports `Bar' imported from Mod143_A at mod144.hs:4:0-14
+      `module M' exports `Bar' defined at mod144.hs:6:12

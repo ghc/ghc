@@ -1,5 +1,5 @@
 
 mod110.hs:11:9:
     Ambiguous occurrence `Eq'
-    It could refer to either `M.Eq', defined at mod110.hs:7:6
-		          or `GHC.Base.Eq', imported from Prelude at mod110.hs:4:0-13
+    It could refer to either `Eq', defined at mod110.hs:7:6
+		          or `Eq', imported from Prelude at mod110.hs:4:0-13

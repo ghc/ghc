@@ -1,6 +1,6 @@
 
 mod143.hs:2:10:
     Conflicting exports for `Foo':
-      `module M' exports `M.Foo' defined at mod143.hs:6:5
-      `module Mod143_A' exports `Mod143_A.Foo' imported from Mod143_A at mod143.hs:4:0-14
-						 (defined at ./Mod143_A.hs:3:5)
+      `module M' exports `Foo' defined at mod143.hs:6:5
+      `module Mod143_A' exports `Foo' imported from Mod143_A at mod143.hs:4:0-14
+					(defined at Mod143_A.hs:3:5)
