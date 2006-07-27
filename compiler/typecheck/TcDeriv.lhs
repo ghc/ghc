@@ -729,9 +729,9 @@ solveDerivEqns overlap_flag orig_eqns
     gen_soln (_, clas, tc,tyvars,deriv_rhs)
       = setSrcSpan (srcLocSpan (getSrcLoc tc))	$
 	do { let inst_tys = [mkTyConApp tc (mkTyVarTys tyvars)]
-	   ; theta <- addErrCtxt (derivInstCtxt [] clas inst_tys) $
+	   ; theta <- addErrCtxt (derivInstCtxt1 clas inst_tys) $
 		      tcSimplifyDeriv tc tyvars deriv_rhs
-	   ; addErrCtxt (derivInstCtxt theta clas inst_tys) $
+	   ; addErrCtxt (derivInstCtxt2 theta clas inst_tys) $
 	     checkValidInstance tyvars theta clas inst_tys
 	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the soluction
       where
@@ -960,8 +960,12 @@ derivCtxt :: TyCon -> SDoc
 derivCtxt tycon
   = ptext SLIT("When deriving instances for") <+> quotes (ppr tycon)
 
-derivInstCtxt theta clas inst_tys
-  = hang (ptext SLIT("In the derived instance"))
-       2 (ptext SLIT("instance") <+> sep [pprThetaArrow theta, pprClassPred clas inst_tys])
+derivInstCtxt1 clas inst_tys
+  = ptext SLIT("When deriving the instance for") <+> quotes (pprClassPred clas inst_tys)
+
+derivInstCtxt2 theta clas inst_tys
+  = vcat [ptext SLIT("In the derived instance declaration"),
+          nest 2 (ptext SLIT("instance") <+> sep [pprThetaArrow theta, 
+						  pprClassPred clas inst_tys])]
 \end{code}
 
