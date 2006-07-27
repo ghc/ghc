@@ -1,0 +1,4 @@
+
+ds058.hs:5:6:
+    Warning: Pattern match(es) are overlapped
+	     In a case alternative: Just _ -> ...
