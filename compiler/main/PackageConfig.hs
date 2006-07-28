@@ -29,7 +29,7 @@ import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
 import FastString
-import Text.ParserCombinators.ReadP ( readP_to_S )
+import Distribution.Compat.ReadP ( readP_to_S )
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is just InstalledPackageInfo from Cabal.  Later we
