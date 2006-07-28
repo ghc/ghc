@@ -1,6 +1,0 @@
-__interface CoreSyn 1 0 where
-__export CoreSyn CoreExpr ;
-
--- Needed by Var.lhs
-1 type CoreExpr = Expr Var.Var;
-1 data Expr b ;

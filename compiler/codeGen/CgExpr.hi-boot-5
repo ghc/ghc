@@ -1,3 +1,0 @@
-__interface CgExpr 1 0 where
-__export CgExpr cgExpr;
-1 cgExpr :: StgSyn.StgExpr -> CgMonad.Code ;

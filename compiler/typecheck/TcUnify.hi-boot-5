@@ -1,8 +1,0 @@
--- This boot file exists only to tie the knot between
---		TcUnify and TcSimplify
-
-__interface TcUnify 1 0 where
-__export TcUnify unifyTauTy ;
-1 unifyTauTy :: TcType.TcTauType -> TcType.TcTauType -> TcRnTypes.TcM PrelBase.Z0T ;
-
-

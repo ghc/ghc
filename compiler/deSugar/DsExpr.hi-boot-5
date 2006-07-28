@@ -1,5 +1,0 @@
-__interface DsExpr 1 0 where
-__export DsExpr dsExpr dsLet;
-1 dsExpr :: HsExpr.HsExpr Var.Id -> DsMonad.DsM CoreSyn.CoreExpr ;
-1 dsLExpr :: HsExpr.HsLExpr Var.Id -> DsMonad.DsM CoreSyn.CoreExpr ;
-1 dsLet  :: [HsBinds.HsBindGroup Var.Id] -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr ;

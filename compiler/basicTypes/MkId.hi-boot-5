@@ -1,3 +1,0 @@
-__interface MkId 1 0 where
-__export MkId mkDataConIds ;
-1 mkDataConIds :: Name.Name -> Name.Name -> DataCon.DataCon -> DataCon.DataConIds ;

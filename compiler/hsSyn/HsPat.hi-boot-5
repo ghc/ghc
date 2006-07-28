@@ -1,6 +1,0 @@
-__interface HsPat 1 0 where
-__export Pat LPat ;
-
-1 data Pat i ;
-1 type LPat i = SrcLoc.Located (Pat i) ;
-

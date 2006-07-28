@@ -1,6 +1,0 @@
-__interface Match 1 0 where
-__export Match match matchExport matchSimply matchSinglePat;
-1 match :: [Var.Id] -> [DsUtils.EquationInfo] -> DsMonad.DsM DsUtils.MatchResult ;
-1 matchExport :: [Var.Id] -> [DsUtils.EquationInfo] -> DsMonad.DsM DsUtils.MatchResult ;
-1 matchSimply :: CoreSyn.CoreExpr -> HsExpr.HsMatchContext Name.Name -> HsPat.LPat Var.Id -> CoreSyn.CoreExpr -> CoreSyn.CoreExpr -> DsMonad.DsM CoreSyn.CoreExpr ;
-1 matchSinglePat :: CoreSyn.CoreExpr -> DsMonad.DsMatchContext -> HsPat.LPat Var.Id -> DsUtils.MatchResult -> DsMonad.DsM DsUtils.MatchResult ;

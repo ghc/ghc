@@ -1,7 +1,0 @@
-__interface CgBindery 1 0 where
-__export CgBindery CgBindings CgIdInfo VolatileLoc StableLoc nukeVolatileBinds;
-1 type CgBindings = VarEnv.IdEnv CgIdInfo;
-1 data CgIdInfo;
-1 data VolatileLoc;
-1 data StableLoc;
-1 nukeVolatileBinds :: CgBindings -> CgBindings ;

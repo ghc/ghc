@@ -1,3 +1,0 @@
-__interface CgUsages 1 0 where
-__export CgUsages getSpRelOffset;
-1 getSpRelOffset :: AbsCSyn.VirtualSpOffset -> CgMonad.FCode AbsCSyn.RegRelative ;

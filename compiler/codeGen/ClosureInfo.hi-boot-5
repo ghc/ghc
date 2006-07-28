@@ -1,4 +1,0 @@
-__interface ClosureInfo 1 0 where
-__export ClosureInfo ClosureInfo LambdaFormInfo;
-1 data LambdaFormInfo;
-1 data ClosureInfo;

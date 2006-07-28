@@ -1,6 +1,0 @@
-__interface TyCon 1 0 where
-__export TyCon TyCon isTupleTyCon isUnboxedTupleTyCon isFunTyCon setTyConName ;
-1 data TyCon ;
-1 isTupleTyCon :: TyCon -> PrelBase.Bool ;
-1 isUnboxedTupleTyCon :: TyCon -> PrelBase.Bool ;
-1 isFunTyCon :: TyCon -> PrelBase.Bool ;

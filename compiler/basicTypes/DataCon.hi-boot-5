@@ -1,5 +1,0 @@
-__interface DataCon 1 0 where
-__export DataCon DataCon isExistentialDataCon dataConName ;
-1 data DataCon ;
-1 isExistentialDataCon :: DataCon -> PrelBase.Bool ;
-1 dataConName :: DataCon -> Name.Name ;

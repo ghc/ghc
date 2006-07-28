@@ -1,4 +1,0 @@
-__interface Module 1 0 where
-__export Module Module ;
-1 data Module ;
-
