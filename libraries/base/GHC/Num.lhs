@@ -184,8 +184,8 @@ divModInteger (J# s1 d1) (J# s2 d2)
 	    -> (J# s3 d3, J# s4 d4)
 
 remInteger :: Integer -> Integer -> Integer
-remInteger ia 0
-  = error "Prelude.Integral.rem{Integer}: divide by 0"
+remInteger ia ib
+ | ib == 0 = error "Prelude.Integral.rem{Integer}: divide by 0"
 remInteger a@(S# (-LEFTMOST_BIT#)) b = remInteger (toBig a) b
 remInteger (S# a) (S# b) = S# (remInt# a b)
 {- Special case doesn't work, because a 1-element J# has the range
@@ -205,8 +205,8 @@ remInteger (J# sa a) (J# sb b)
   = case remInteger# sa a sb b of (# sr, r #) -> J# sr r
 
 quotInteger :: Integer -> Integer -> Integer
-quotInteger ia 0
-  = error "Prelude.Integral.quot{Integer}: divide by 0"
+quotInteger ia ib
+ | ib == 0 = error "Prelude.Integral.quot{Integer}: divide by 0"
 quotInteger a@(S# (-LEFTMOST_BIT#)) b = quotInteger (toBig a) b
 quotInteger (S# a) (S# b) = S# (quotInt# a b)
 {- Special case disabled, see remInteger above

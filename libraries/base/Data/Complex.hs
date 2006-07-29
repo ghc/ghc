@@ -136,7 +136,7 @@ instance  (RealFloat a) => Num (Complex a)  where
     (x:+y) * (x':+y')	=  (x*x'-y*y') :+ (x*y'+y*x')
     negate (x:+y)	=  negate x :+ negate y
     abs z		=  magnitude z :+ 0
-    signum 0		=  0
+    signum (0:+0)	=  0
     signum z@(x:+y)	=  x/r :+ y/r  where r = magnitude z
     fromInteger n	=  fromInteger n :+ 0
 #ifdef __HUGS__
@@ -165,7 +165,7 @@ instance  (RealFloat a) => Floating (Complex a)	where
                       where expx = exp x
     log z          =  log (magnitude z) :+ phase z
 
-    sqrt 0         =  0
+    sqrt (0:+0)    =  0
     sqrt z@(x:+y)  =  u :+ (if y < 0 then -v else v)
                       where (u,v) = if x < 0 then (v',u') else (u',v')
                             v'    = abs y / (u'*2)
