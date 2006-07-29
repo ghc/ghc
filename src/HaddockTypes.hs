@@ -114,7 +114,7 @@ data ExportItem2 name
         GHC.Name	      -- the original name
 	(GHC.LHsDecl name) -- a declaration
         (Maybe (GHC.HsDoc name))       -- maybe a doc comment
-	[InstHead2]	      -- instances relevant to this declaration
+	[InstHead2 name]	      -- instances relevant to this declaration
 
   | ExportNoDecl2	-- an exported entity for which we have no documentation
 			-- (perhaps becuase it resides in another package)
@@ -135,7 +135,7 @@ data ExportItem2 name
 
 type InstHead = (HsContext,HsAsst)
 
-type InstHead2 = ([GHC.TyVar], [GHC.PredType], GHC.Class, [GHC.Type])
+type InstHead2 name = ([GHC.HsPred name], name, [GHC.HsType name])
 
 type ModuleMap = Map Module Interface
 type ModuleMap2 = Map GHC.Module HaddockModule

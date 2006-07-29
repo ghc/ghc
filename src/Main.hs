@@ -25,7 +25,7 @@ import Control.Monad ( when )
 import Control.Monad.Writer ( Writer, runWriter, tell )
 import Data.Char ( isSpace )
 import Data.IORef ( writeIORef )
-import Data.List ( nub, (\\), foldl', sortBy )
+import Data.List ( nub, (\\), foldl', sortBy, foldl1 )
 import Data.Maybe ( isJust, isNothing, maybeToList, listToMaybe )
 --import Debug.Trace
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
@@ -335,7 +335,7 @@ run flags files = do
 
   let haddockModules' = attachInstances haddockModules
 
-  let renamedModules = runWriter $ mapM (renameModule env) haddockModules'
+  let (renamedModules, messages') = runWriter $ mapM (renameModule env) haddockModules'
 
   putStrLn "pass 1 messages:"
   print messages
@@ -347,6 +347,7 @@ run flags files = do
 
   putStrLn "pass 2 export items:"
   printSDoc (ppr renamedModules) defaultUserStyle 
+  mapM_ putStrLn messages'
  
   --let Just (group, imports, exports) = GHC.renamedSource (head sorted_checked_modules)
   --printSDoc (ppr group) defaultUserStyle
@@ -830,15 +831,17 @@ renameModule renamingEnv mod =
       (finalModuleDoc, missingNames2)
         = runRnFM localEnv (renameMaybeDoc (hmod_doc mod))
 
-      missingNames = map (showSDoc . ppr) (nub (missingNames1 ++ missingNames2))
+      missingNames = nub $ filter isExternalName (missingNames1 ++ missingNames2)
+      strings = map (showSDoc . ppr) missingNames 
+     
   in do
 	-- report things that we couldn't link to.  Only do this
 	-- for non-hidden modules.
    when (OptHide `notElem` hmod_options mod &&
-	 not (null missingNames)) $
+	 not (null strings)) $
 	  tell ["Warning: " ++ show (ppr (hmod_mod mod) defaultUserStyle) ++ 
 		": could not find link destinations for:\n"++
-		"   " ++ concat (map (' ':) missingNames)
+		"   " ++ concat (map (' ':) strings)
 		]
 
    --  trace (show (Map.toAscList import_env)) $ do
@@ -1231,7 +1234,7 @@ data SimpleType = SimpleType GHC.Name [SimpleType] deriving (Eq,Ord)
 attachInstances :: [HaddockModule] -> [HaddockModule]
 attachInstances modules = map attach modules
   where
-    instMap = fmap (sortImage instHead) $ collectInstances modules
+    instMap = fmap (map toHsInstHead . sortImage instHead) $ collectInstances modules
     attach mod = mod { hmod_export_items = newItems }
       where
         newItems = map attachExport (hmod_export_items mod)
@@ -1244,7 +1247,7 @@ attachInstances modules = map attach modules
 
 collectInstances
    :: [HaddockModule]
-   -> Map GHC.Name [InstHead2]  -- maps class/type names to instances
+   -> Map GHC.Name [([GHC.TyVar], [GHC.PredType], Class, [Type])]  -- maps class/type names to instances
 
 collectInstances modules
   = Map.fromListWith (flip (++)) tyInstPairs `Map.union`
@@ -1256,7 +1259,7 @@ collectInstances modules
     tyInstPairs = [ (tycon, [instanceHead inst]) | inst <- allInstances, 
                     Just tycon <- nub (is_tcs inst) ]
 
-instHead :: InstHead2  -> ([Int], GHC.Name, [SimpleType])
+instHead :: ([GHC.TyVar], [GHC.PredType], Class, [Type]) -> ([Int], GHC.Name, [SimpleType])
 instHead (_, _, cls, args)
   = (map argCount args, className cls, map simplify args)
   where
@@ -1288,6 +1291,35 @@ funTyConName = mkWiredInName gHC_PRIM
                         Nothing                 -- No parent object
                         (ATyCon funTyCon)       -- Relevant TyCon
                         BuiltInSyntax
+
+toHsInstHead :: ([GHC.TyVar], [GHC.PredType], Class, [Type]) -> InstHead2 GHC.Name
+toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsType ts) 
+
+toHsPred :: PredType -> GHC.HsPred GHC.Name 
+toHsPred (ClassP cls ts) = GHC.HsClassP (className cls) (map toLHsType ts)
+toHsPred (IParam n t) = GHC.HsIParam n (toLHsType t)
+
+toLHsType = noLoc . toHsType
+ 
+toHsType :: Type -> GHC.HsType GHC.Name
+toHsType t = case t of 
+  TyVarTy v -> GHC.HsTyVar (tyVarName v) 
+  AppTy a b -> GHC.HsAppTy (toLHsType a) (toLHsType b)
+  TyConApp tc ts -> case ts of 
+    [] -> GHC.HsTyVar (tyConName tc)
+    _  -> GHC.HsAppTy (tycon tc) (args ts)
+  FunTy a b -> GHC.HsFunTy (toLHsType a) (toLHsType b) 
+  ForAllTy v t -> cvForAll [v] t 
+  PredTy p -> GHC.HsPredTy (toHsPred p) 
+  NoteTy _ t -> toHsType t
+  where
+
+    tycon tc = noLoc (GHC.HsTyVar (tyConName tc))
+    args ts = foldl1 (\a b -> noLoc $ GHC.HsAppTy a b) (map toLHsType ts)
+    
+    cvForAll vs (ForAllTy v t) = cvForAll (v:vs) t
+    cvForAll vs t = GHC.mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType t)
+    tyvarbinders vs = map (noLoc . GHC.UserTyVar . tyVarName) vs
 
 -- -----------------------------------------------------------------------------
 -- A monad which collects error messages
