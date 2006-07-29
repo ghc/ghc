@@ -64,6 +64,8 @@ import CString
 #endif
 #endif
 
+import IO ( isPermissionError, isDoesNotExistError )
+
 -- -----------------------------------------------------------------------------
 -- Entry point
 
@@ -383,7 +385,6 @@ registerPackage input defines flags auto_ghci_libs update force = do
 	db_to_operate_on = my_head "db" db_stack
 	db_filename	 = fst db_to_operate_on
   --
-  checkConfigAccess db_filename
 
   s <-
     case input of
@@ -403,8 +404,7 @@ registerPackage input defines flags auto_ghci_libs update force = do
   validatePackageConfig pkg db_stack auto_ghci_libs update force
   let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
       not_this p = package p /= package pkg
-  savePackageConfig db_filename
-  maybeRestoreOldConfig db_filename $
+  savingOldConfig db_filename $
     writeNewConfig db_filename new_details
 
 parsePackageInfo
@@ -437,15 +437,13 @@ modifyPackage
 modifyPackage fn pkgid flags  = do
   db_stack <- getPkgDatabases True{-modify-} flags
   let ((db_name, pkgs) : _) = db_stack
-  checkConfigAccess db_name
   ps <- findPackages [(db_name,pkgs)] pkgid
   let pids = map package ps
-  savePackageConfig db_name
   let new_config = concat (map modify pkgs)
       modify pkg
   	  | package pkg `elem` pids = fn pkg
   	  | otherwise               = [pkg]
-  maybeRestoreOldConfig db_name $
+  savingOldConfig db_name $
       writeNewConfig db_name new_config
 
 -- -----------------------------------------------------------------------------
@@ -566,49 +564,43 @@ strList = show
 -- -----------------------------------------------------------------------------
 -- Manipulating package.conf files
 
-checkConfigAccess :: FilePath -> IO ()
-checkConfigAccess filename = do
-  access <- getPermissions filename
-  when (not (writable access))
-      (die (filename ++ ": you don't have permission to modify this file"))
-
-maybeRestoreOldConfig :: FilePath -> IO () -> IO ()
-maybeRestoreOldConfig filename io
-  = io `catch` \e -> do
-	hPutStrLn stderr (show e)
-        hPutStr stdout ("\nWARNING: an error was encountered while the new \n"++
-        	          "configuration was being written.  Attempting to \n"++
-        	          "restore the old configuration... ")
-	renameFile (filename ++ ".old")  filename
-        hPutStrLn stdout "done."
-	ioError e
-
 writeNewConfig :: FilePath -> [InstalledPackageInfo] -> IO ()
 writeNewConfig filename packages = do
   hPutStr stdout "Writing new package config file... "
-  h <- openFile filename WriteMode
+  createDirectoryIfMissing True $ getFilenameDir filename
+  h <- openFile filename WriteMode `catch` \e ->
+      if isPermissionError e
+      then die (filename ++ ": you don't have permission to modify this file")
+      else ioError e
   hPutStrLn h (show packages)
   hClose h
   hPutStrLn stdout "done."
 
-savePackageConfig :: FilePath -> IO ()
-savePackageConfig filename = do
+savingOldConfig :: FilePath -> IO () -> IO ()
+savingOldConfig filename io = do
   hPutStr stdout "Saving old package config file... "
     -- mv rather than cp because we've already done an hGetContents
     -- on this file so we won't be able to open it for writing
     -- unless we move the old one out of the way...
   let oldFile = filename ++ ".old"
-  doesExist <- doesFileExist oldFile  `catch` (\ _ -> return False)
-  when doesExist (removeFile oldFile `catch` (const $ return ()))
-  catch (renameFile filename oldFile)
-  	(\ err -> do
-		hPutStrLn stderr (unwords [ "Unable to rename "
-					  , show filename
-					  , " to "
-					  , show oldFile
-					  ])
-		ioError err)
+  restore_on_error <- catch (renameFile filename oldFile >> return True) $
+      \err -> do
+          unless (isDoesNotExistError err) $ do
+              hPutStrLn stderr (unwords ["Unable to rename", show filename,
+                                         "to", show oldFile])
+              ioError err
+          return False
   hPutStrLn stdout "done."
+  io `catch` \e -> do
+      hPutStrLn stderr (show e)
+      hPutStr stdout ("\nWARNING: an error was encountered while writing"
+                   ++ "the new configuration.\n")
+      when restore_on_error $ do
+          hPutStr stdout "Attempting to restore the old configuration..."
+          do renameFile oldFile filename
+             hPutStrLn stdout "done."
+           `catch` \err -> hPutStrLn stdout ("Failed: " ++ show err)
+      ioError e
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
@@ -1011,6 +1003,11 @@ pathSeparator = '\\'
 #else
 pathSeparator = '/'
 #endif
+
+getFilenameDir :: FilePath -> FilePath
+getFilenameDir fn = case break isPathSeparator (reverse fn) of
+                        (xs, "") -> "."
+                        (_, sep:ys) -> reverse ys
 
 -- | The function splits the given string to substrings
 -- using the 'searchPathSeparator'.
