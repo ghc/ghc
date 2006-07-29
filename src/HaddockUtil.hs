@@ -143,8 +143,8 @@ addConDocs (x:xs) doc = addConDoc x doc : xs
 -- ---------------------------------------------------------------------------
 -- Making abstract declarations
 
-restrictTo :: [GHC.Name] -> (GHC.HsDecl GHC.Name) -> (GHC.HsDecl GHC.Name)
-restrictTo names decl = case decl of
+restrictTo :: [GHC.Name] -> (GHC.LHsDecl GHC.Name) -> (GHC.LHsDecl GHC.Name)
+restrictTo names (L loc decl) = L loc $ case decl of
   GHC.TyClD d doc | GHC.isDataDecl d && GHC.tcdND d == GHC.DataType -> 
     GHC.TyClD (d { GHC.tcdCons = restrictCons names (GHC.tcdCons d) }) doc
   GHC.TyClD d doc | GHC.isDataDecl d && GHC.tcdND d == GHC.NewType -> 

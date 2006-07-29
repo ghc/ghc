@@ -9,7 +9,8 @@ module HaddockTypes (
   NameEnv, Interface(..), ExportItem(..), ExportItem2(..), ModuleMap, ModuleMap2,
   HaddockModule(..), 
   -- * Misc types
-  DocOption(..), InstHead,
+  DocOption(..), InstHead, InstHead2,
+  DocName(..),
  ) where
 
 import HsSyn2
@@ -108,40 +109,71 @@ data ExportItem
   | ExportModule	-- a cross-reference to another module
 	Module
 
-data ExportItem2 
+data ExportItem2 name
   = ExportDecl2
-	GHC.Name	      -- the original name
-	(GHC.HsDecl GHC.Name) -- a declaration
-        (Maybe (GHC.HsDoc GHC.Name))       -- maybe a doc comment
-	[InstHead]	      -- instances relevant to this declaration
+        GHC.Name	      -- the original name
+	(GHC.LHsDecl name) -- a declaration
+        (Maybe (GHC.HsDoc name))       -- maybe a doc comment
+	[InstHead2]	      -- instances relevant to this declaration
 
   | ExportNoDecl2	-- an exported entity for which we have no documentation
 			-- (perhaps becuase it resides in another package)
-	GHC.Name		-- the original name
-	GHC.Name		-- where to link to
-	[GHC.Name]	-- subordinate names
+	GHC.Name	-- the original name
+	name		-- where to link to
+	[name]	-- subordinate names
 
   | ExportGroup2		-- a section heading
 	Int		-- section level (1, 2, 3, ... )
 	String		-- section "id" (for hyperlinks)
-	(GHC.HsDoc GHC.Name)		-- section heading text
+	(GHC.HsDoc name)		-- section heading text
 
   | ExportDoc2		-- some documentation
-	(GHC.HsDoc GHC.Name)
+	(GHC.HsDoc name)
 
   | ExportModule2	-- a cross-reference to another module
 	GHC.Module
 
 type InstHead = (HsContext,HsAsst)
 
+type InstHead2 = ([GHC.TyVar], [GHC.PredType], GHC.Class, [GHC.Type])
+
 type ModuleMap = Map Module Interface
 type ModuleMap2 = Map GHC.Module HaddockModule
 
+data DocName = Link GHC.Name | NoLink GHC.Name
+
 data HaddockModule = HM {
+
+-- | A value to identify the module
+  hmod_mod                :: GHC.Module,
+
+-- | The documentation header for this module
+  hmod_doc                :: Maybe (GHC.HsDoc GHC.Name),
+
+-- | The Haddock options for this module (prune, ignore-exports, etc)
   hmod_options            :: [DocOption],
-  hmod_exported_decl_map  :: Map GHC.Name (GHC.HsDecl GHC.Name),
+
+  hmod_exported_decl_map  :: Map GHC.Name (GHC.LHsDecl GHC.Name),
   hmod_doc_map            :: Map GHC.Name (GHC.HsDoc GHC.Name),  
-  hmod_orig_exports       :: [ExportItem2],
-  hmod_documented_exports :: [GHC.Name],
-  hmod_sub_map            :: Map GHC.Name [GHC.Name]
+  hmod_export_items       :: [ExportItem2 GHC.Name],
+
+-- | All the names that are defined in this module
+  hmod_locals             :: [GHC.Name],
+
+-- | All the names that are exported by this module
+  hmod_exports            :: [GHC.Name],
+
+-- | All the visible names exported by this module
+-- For a name to be visible, it has to:
+-- - be exported normally, and not via a full module re-exportation.
+-- - have a declaration in this module or any of it's imports, with the exception
+--   that it can't be from another package.
+-- Basically, a visible name is a name that will show up in the documentation.
+-- for this module.
+  hmod_visible_exports    :: [GHC.Name],
+
+  hmod_sub_map            :: Map GHC.Name [GHC.Name],
+
+-- | The instances exported by this module
+  hmod_instances          :: [GHC.Instance]
 }

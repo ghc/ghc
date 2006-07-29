@@ -5,21 +5,26 @@
 --
 
 module HaddockRename (
-	RnM, runRn, runRnFM, runRnUnqualFM, -- the monad (instance of Monad)
+	RnM, runRn, runRnFM, -- the monad (instance of Monad)
 
-	renameExportList, 
-	renameDecl,
-	renameExportItems, renameInstHead,
-	renameDoc, renameMaybeDoc,
+	--renameExportList, 
+	--renameDecl,
+	--renameExportItems, renameInstHead,
+	--renameDoc, renameMaybeDoc,
+  renameMaybeDoc, renameExportItems,
   ) where
 
 import HaddockTypes
 import HaddockUtil	( unQual )
-import HsSyn2
+--import HsSyn2
 import Map ( Map )
 import qualified Map hiding ( Map )
 
-import Monad
+import Prelude hiding ( mapM )
+import Control.Monad hiding ( mapM )
+import Data.Traversable
+
+import GHC
 
 -- -----------------------------------------------------------------------------
 -- Monad for renaming
@@ -29,11 +34,11 @@ import Monad
 -- the environment.
 
 newtype GenRnM n a = 
-  RnM { unRn :: (n -> (Bool,HsQName))	-- name lookup function
+  RnM { unRn :: (n -> (Bool, DocName))	-- name lookup function
              -> (a,[n])
       }
 
-type RnM a = GenRnM HsQName a
+type RnM a = GenRnM Name a
 
 instance Monad (GenRnM n) where
   (>>=) = thenRn
@@ -46,56 +51,76 @@ m `thenRn` k = RnM (\lkp -> case unRn m lkp of
 				(a,out1) -> case unRn (k a) lkp of
 						(b,out2) -> (b,out1++out2))
 
-getLookupRn :: RnM (HsQName -> (Bool,HsQName))
+getLookupRn :: RnM (Name -> (Bool, DocName))
 getLookupRn = RnM (\lkp -> (lkp,[]))
-outRn :: HsQName -> RnM ()
+outRn :: Name -> RnM ()
 outRn name = RnM (\_ -> ((),[name]))
 
-lookupRn :: (HsQName -> a) -> HsQName -> RnM a
+lookupRn :: (DocName -> a) -> Name -> RnM a
 lookupRn and_then name = do
   lkp <- getLookupRn
   case lkp name of
 	(False,maps_to) -> do outRn name; return (and_then maps_to)
 	(True, maps_to) -> return (and_then maps_to)
 
-runRnFM :: Map HsQName HsQName -> RnM a -> (a,[HsQName])
+runRnFM :: Map Name Name -> RnM a -> (a,[Name])
 runRnFM env rn = unRn rn lkp 
   where lkp n = case Map.lookup n env of
-		  Nothing -> (False, n) -- leave the qualified name
-		  Just q  -> (True,  q)
+		  Nothing -> (False, NoLink n) 
+		  Just q  -> (True,  Link q)
 
--- like runRnFM, but if it can't find a mapping for a name,
--- it leaves an unqualified name in place instead.
-runRnUnqualFM :: Map HsQName HsQName -> RnM a -> (a,[HsQName])
-runRnUnqualFM env rn = unRn rn lkp 
-  where lkp n = case Map.lookup n env of
-		  Nothing -> (False, unQual n) -- remove the qualifier
-		  Just q  -> (True, q)
-
-runRn :: (n -> (Bool,HsQName)) -> GenRnM n a -> (a,[n])
+runRn :: (n -> (Bool,DocName)) -> GenRnM n a -> (a,[n])
 runRn lkp rn = unRn rn lkp
+
+renameExportItems :: [ExportItem2 Name] -> RnM [ExportItem2 DocName]
+renameExportItems items = mapM renameExportItem items
+
+renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
+renameMaybeDoc mbDoc = mapM renameDoc mbDoc
+
+renameDoc :: HsDoc Name -> RnM (HsDoc DocName)
+renameDoc doc = case doc of
+
+  DocEmpty -> return DocEmpty
+
+  DocAppend a b -> do
+    a' <- renameDoc a
+    b' <- renameDoc b
+    return (DocAppend a' b')
+
+  DocString str -> return (DocString str)
+
+  DocParagraph doc -> do
+    doc' <- renameDoc doc
+    return (DocParagraph doc')
+
+  DocIdentifier ids -> do
+    lkp <- getLookupRn
+    case [ n | (True, n) <- map lkp ids ] of
+      ids'@(_:_) -> return (DocIdentifier ids')
+      [] -> return (DocIdentifier (map Link ids))
+
+  DocModule str -> return (DocModule str)
+
+  DocEmphasis doc -> do
+    doc' <- renameDoc doc
+    return (DocEmphasis doc')
+
+  DocMonospaced doc -> do
+    doc' <- renameDoc doc
+    return (DocMonospaced doc')
+
+  DocUnorderedList docs -> do
+    docs' <- mapM renameDoc docs
+    return (DocUnorderedList docs')
+
+  DocOrderedList docs -> do
+    docs' <- mapM renameDoc docs
+    return (DocOrderedList docs')
 
 -- -----------------------------------------------------------------------------
 -- Renaming source code & documentation
-
-renameExportList :: [HsExportSpec] -> RnM [HsExportSpec]
-renameExportList spec = mapM renameExport spec
-  where
-    renameExport (HsEVar x) = lookupRn HsEVar x
-    renameExport (HsEAbs x) = lookupRn HsEAbs x
-    renameExport (HsEThingAll x) = lookupRn HsEThingAll x
-    renameExport (HsEThingWith x cs) = do
-	cs' <- mapM (lookupRn id) cs
-	lookupRn (\x' -> HsEThingWith x' cs') x
-    renameExport (HsEModuleContents m) = return (HsEModuleContents m)
-    renameExport (HsEGroup lev doc0) = do
-	doc <- renameDoc doc0
-	return (HsEGroup lev doc)
-    renameExport (HsEDoc doc0) = do
-	doc <- renameDoc doc0
-	return (HsEDoc doc)
-    renameExport (HsEDocNamed str) = return (HsEDocNamed str)
-
+{-
 
 renameDecl :: HsDecl -> RnM HsDecl
 renameDecl decl
@@ -208,62 +233,6 @@ renameInstHead (ctx,asst) = do
   return (ctx,asst)
 
 -- -----------------------------------------------------------------------------
--- Renaming documentation
-
--- Renaming documentation is done by "marking it up" from ordinary Doc
--- into (Rn Doc), which can then be renamed with runRn.
-markupRename :: DocMarkup [HsQName] (RnM Doc)
-markupRename = Markup {
-  markupEmpty         = return DocEmpty,
-  markupString        = return . DocString,
-  markupParagraph     = liftM DocParagraph,
-  markupAppend        = liftM2 DocAppend,
-  markupIdentifier    = lookupForDoc,
-  markupModule        = return . DocModule,
-  markupEmphasis      = liftM DocEmphasis,
-  markupMonospaced    = liftM DocMonospaced,
-  markupUnorderedList = liftM DocUnorderedList . sequence,
-  markupOrderedList   = liftM DocOrderedList . sequence,
-  markupDefList       = liftM DocDefList . mapM markupDef,
-  markupCodeBlock     = liftM DocCodeBlock,
-  markupURL	      = return . DocURL,
-  markupAName	      = return . DocAName
-  }
-
-markupDef (ma,mb) = do a <- ma; b <- mb; return (a,b)
-
-renameDoc :: Doc -> RnM Doc
-renameDoc = markup markupRename
-
-renameMaybeDoc :: Maybe Doc -> RnM (Maybe Doc)
-renameMaybeDoc Nothing = return Nothing
-renameMaybeDoc (Just doc) = Just `liftM` renameDoc doc
-
--- ---------------------------------------------------------------------------
--- Looking up names in documentation
-
-lookupForDoc :: [HsQName] -> RnM Doc
-lookupForDoc qns = do
-  lkp <- getLookupRn
-  case [ n | (True,n) <- map lkp qns ] of
-	ns@(_:_) -> return (DocIdentifier ns)
-	[] -> -- if we were given a qualified name, but there's nothing
-	      -- matching that name in scope, then just assume its existence
-	      -- (this means you can use qualified names in doc strings wihout
-	      -- worrying about whether the entity is in scope).
-	      let quals = filter isQualified qns in
-	      if (not (null quals)) then
-		return (DocIdentifier quals)
-	      else do
-		outRn (head qns)
-		-- no qualified names: just replace this name with its
-		-- string representation.
-		return (DocString (show (head qns)))
- where
-   isQualified (Qual _ _) = True
-   isQualified _ = False
-   
--- -----------------------------------------------------------------------------
 
 renameExportItems :: [ExportItem] -> RnM [ExportItem]
 renameExportItems items = mapM rn items
@@ -284,3 +253,28 @@ renameExportItems items = mapM rn items
 	rn (ExportDoc doc0)
 	   = do doc <- renameDoc doc0
 		return (ExportDoc doc)
+-}
+
+renameInstHead = undefined
+
+
+renameDecl = undefined
+
+renameExportItem :: ExportItem2 Name -> RnM (ExportItem2 DocName)
+renameExportItem item = case item of 
+  ExportModule2 mod -> return (ExportModule2 mod)
+  ExportGroup2 lev id doc -> do
+    doc' <- renameDoc doc
+    return (ExportGroup2 lev id doc')
+  ExportDecl2 x decl doc instances -> do
+    decl' <- renameDecl decl
+    doc' <- mapM renameDoc doc
+    instances' <- mapM renameInstHead instances
+    return (ExportDecl2 x decl' doc' instances')
+  ExportNoDecl2 x y subs -> do
+    y' <- lookupRn id y
+    subs' <- mapM (lookupRn id) subs
+    return (ExportNoDecl2 x y' subs')
+  ExportDoc2 doc -> do
+    doc' <- renameDoc doc
+    return (ExportDoc2 doc')

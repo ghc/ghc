@@ -1,1 +1,3 @@
-module B(f, T) where import A
+module B(Test) where 
+
+data Test = Test

@@ -1,1 +1,6 @@
-module C(module B) where import B
+module C(C.bla) where 
+
+import D
+
+bla :: Test
+bla = undefined
