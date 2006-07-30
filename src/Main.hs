@@ -14,11 +14,8 @@ import HaddockRename
 import HaddockTypes
 import HaddockUtil
 import HaddockVersion
-import Set
 import Paths_haddock	( getDataDir )
 import Binary2
-import Digraph2
-import HsParseMonad
 
 import Control.Exception ( bracket )
 import Control.Monad ( when )
@@ -244,27 +241,10 @@ run flags files = do
 		
   prologue <- getPrologue flags
 
---  updateHTMLXRefs pkg_paths read_ifacess
-
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
 	&& Flag_Html `elem` flags) $
 	die ("-h cannot be used with --gen-index or --gen-contents")
 
-{-  when (Flag_GenContents `elem` flags) $ do
-	ppHtmlContents odir title package maybe_html_help_format
-            maybe_index_url maybe_source_urls maybe_wiki_urls
-            visible_read_ifaces prologue
-        copyHtmlBits odir libdir css_file
--}
-{-  when (Flag_GenIndex `elem` flags) $ do
-	ppHtmlIndex odir title package maybe_html_help_format
-            maybe_contents_url maybe_source_urls maybe_wiki_urls
-            visible_read_ifaces
-        copyHtmlBits odir libdir css_file
-        
-  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
-    ppHtmlHelpFiles title package visible_read_ifaces odir maybe_html_help_format pkg_paths
--}
   GHC.init (Just "/home/davve/dev/local/lib/ghc-6.5")
   let ghcMode = GHC.JustTypecheck
   session <- GHC.newSession ghcMode
@@ -279,57 +259,28 @@ run flags files = do
   sorted_checked_modules <- GHC.defaultErrorHandler ghcFlags''' $ do 
     GHC.setSessionDynFlags session ghcFlags'''
     targets <- mapM (\s -> GHC.guessTarget s Nothing) files
-    GHC.setTargets session targets
-  
+    GHC.setTargets session targets 
     maybe_module_graph <- GHC.depanal session [] True
     module_graph <- case maybe_module_graph of 
       Just module_graph -> return module_graph 
       Nothing -> die "Failed to load modules\n"
     let sorted_modules = concatMap Digraph.flattenSCC (GHC.topSortModuleGraph False module_graph Nothing) 
-    let modules = [ GHC.ms_mod modsum | modsum <- sorted_modules ]
+    let (modules, filenames) = unzip [ (GHC.ms_mod modsum, fromJust $ GHC.ml_hs_file (GHC.ms_location modsum)) | modsum <- sorted_modules,
+                                        fromJust (GHC.ml_hs_file (GHC.ms_location modsum)) `elem` files ]
+
     mb_checked_modules <- mapM (GHC.checkModule session) modules
     let checked_modules = catMaybes mb_checked_modules
     if length checked_modules /= length mb_checked_modules
       then die "Failed to load all modules\n" 
-      else return (zip modules checked_modules)
+      else return (zip3 modules checked_modules filenames)
   
   sorted_checked_modules' <- remove_maybes sorted_checked_modules
 
-{-  let Just (group,_,_,_) = GHC.renamedSource (snd (head sorted_checked_modules))
-  let Just mi = GHC.checkedModuleInfo (snd (head sorted_checked_modules))
-  let exported_names = GHC.modInfoExports mi
- 
-  let exported_decl_map = mk_exported_decl_map exported_names group
-  let exported_decls = Map.elems exported_decl_map
- 
-  putStrLn "Printing all exported names:"
-  putStrLn "----------------------------" 
+  let (modMap, messages) = runWriter (pass1 sorted_checked_modules' flags package) 
 
-  printSDoc (ppr exported_names) defaultUserStyle
- 
-  if length exported_decls /= length exported_names
-    then putStrLn "-----------\nWARNING: Not all names found\n-----------\n"
-    else return ()
-     
-  putStrLn "Printing all corresponding decls:"
-  putStrLn "---------------------------------" 
-  printSDoc (ppr exported_decls) defaultUserStyle        
-
-  let not_found = exported_names \\ (Map.keys exported_decl_map) 
-
-  putStrLn "Printing all names not found:"
-  putStrLn "---------------------------------" 
-  printSDoc (ppr not_found) defaultUserStyle        
-
-  let sub_names = mk_sub_map_from_group group
-  putStrLn "Printing the submap:"
-  putStrLn "---------------------------------" 
-  printSDoc (ppr (Map.toList sub_names)) defaultUserStyle -}
-
-  
-  let (modMap, messages) = runWriter (pass1 sorted_checked_modules' flags) 
-
-      haddockModules = catMaybes [ Map.lookup mod modMap | (mod, _) <- sorted_checked_modules' ]
+      haddockModules = catMaybes [ Map.lookup mod modMap | 
+                                   (mod, _, file) <- sorted_checked_modules',
+                                   file `elem` files ]
  
   let env = buildGlobalDocEnv haddockModules
 
@@ -348,6 +299,26 @@ run flags files = do
   putStrLn "pass 2 export items:"
   printSDoc (ppr renamedModules) defaultUserStyle 
   mapM_ putStrLn messages'
+
+  let visibleModules = [ m | m <- haddockModules', OptHide `notElem` (hmod_options m) ]
+ 
+  updateHTMLXRefs [] []
+
+  when (Flag_GenIndex `elem` flags) $ do
+	ppHtmlIndex odir title package maybe_html_help_format
+                maybe_contents_url maybe_source_urls maybe_wiki_urls
+                visibleModules
+	copyHtmlBits odir libdir css_file
+        
+  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
+    ppHtmlHelpFiles title package visibleModules odir maybe_html_help_format []
+
+  when (Flag_GenContents `elem` flags) $ do
+	ppHtmlContents odir title package maybe_html_help_format
+	               maybe_index_url maybe_source_urls maybe_wiki_urls
+	               visibleModules prologue
+	copyHtmlBits odir libdir css_file
+
  
   --let Just (group, imports, exports) = GHC.renamedSource (head sorted_checked_modules)
   --printSDoc (ppr group) defaultUserStyle
@@ -443,7 +414,7 @@ run flags files = do
  
     remove_maybes modules | length modules' == length modules = return modules'
                           | otherwise = die "Missing checked module phase information\n" 
-      where modules' = [ (mod, (a,b,c,d)) | (mod, GHC.CheckedModule a (Just b) (Just c) (Just d)) <- modules ] 
+      where modules' = [ (mod, (a,b,c,d), f) | (mod, GHC.CheckedModule a (Just b) (Just c) (Just d), f) <- modules ] 
 
 print_ x = printSDoc (ppr x) defaultUserStyle        
 
@@ -470,25 +441,19 @@ type FullyCheckedModule = (GHC.ParsedSource,
                            GHC.TypecheckedSource, 
                            GHC.ModuleInfo)
 
-getDocumentedExports :: [ExportItem2 GHC.Name] -> [GHC.Name]
-getDocumentedExports exports = concatMap getName exports
+pass1 :: [(GHC.Module, FullyCheckedModule, FilePath)] -> [Flag] -> Maybe String-> ErrMsgM ModuleMap2
+pass1 modules flags package = worker modules (Map.empty) flags
   where
-  getName (ExportDecl2 name _ _ _) = [name]
-  getName _ = [] 
-
-pass1 :: [(GHC.Module, FullyCheckedModule)] -> [Flag] -> ErrMsgM ModuleMap2
-pass1 modules flags = worker modules (Map.empty) flags
-  where
-    worker :: [(GHC.Module, FullyCheckedModule)] -> ModuleMap2 -> [Flag] -> ErrMsgM ModuleMap2
+    worker :: [(GHC.Module, FullyCheckedModule, FilePath)] -> ModuleMap2 -> [Flag] -> ErrMsgM ModuleMap2
     worker [] moduleMap _ = return moduleMap
-    worker ((mod, checked_mod):rest_modules) moduleMap flags = do
+    worker ((mod, checked_mod, filename):rest_modules) moduleMap flags = do
  
       let (parsed_source, renamed_source, _, moduleInfo) = checked_mod
-          (mb_doc_opts, haddock_mod_info, _) = get_module_stuff parsed_source
+          (mb_doc_opts, _, _) = get_module_stuff parsed_source
 
       opts <- mk_doc_opts mb_doc_opts
 
-      let (group, _, mb_exports, mbModDoc) = renamed_source
+      let (group, _, mb_exports, mbModDoc, haddockModInfo) = renamed_source
           entities = nubBy sameName (GHC.hs_docs group)
           exports = fmap (map unLoc) mb_exports 
  
@@ -508,29 +473,39 @@ pass1 modules flags = worker modules (Map.empty) flags
           localDeclMap = mkDeclMap theseEntityNames group
           docMap = mkDocMap group
 
-          ignore_all_exports = Flag_IgnoreAllExports `elem` flags
+          ignoreAllExports = Flag_IgnoreAllExports `elem` flags
       
       exportItems <- mkExportItems moduleMap mod exportedNames
                                    exportedDeclMap localDeclMap subMap entities opts  
-                                   exports ignore_all_exports docMap
+                                   exports ignoreAllExports docMap
 
-      let instances = GHC.modInfoInstances moduleInfo
+     -- prune the export list to just those declarations that have
+     -- documentation, if the 'prune' option is on.
+      let prunedExportItems
+	    | OptPrune `elem` opts = pruneExportItems exportItems
+	    | otherwise = exportItems
+ 
+          instances = GHC.modInfoInstances moduleInfo
 
-      let haddock_module = HM {
+          haddock_module = HM {
             hmod_mod                = mod,
+            hmod_orig_filename      = filename,
+            hmod_info               = haddockModInfo,
             hmod_doc                = mbModDoc,
             hmod_options            = opts,
             hmod_locals             = localNames,
             hmod_doc_map            = docMap,
             hmod_sub_map            = subMap,
-            hmod_export_items       = exportItems,
+            hmod_export_items       = prunedExportItems,
             hmod_exports            = exportedNames,
             hmod_visible_exports    = theseVisibleNames, 
             hmod_exported_decl_map  = exportedDeclMap,
-            hmod_instances          = instances
+            hmod_instances          = instances,
+            hmod_package            = package
           }
 
-      let moduleMap' = Map.insert mod haddock_module moduleMap
+          moduleMap' = Map.insert mod haddock_module moduleMap
+      
       worker rest_modules moduleMap' flags 
       
       where 
@@ -612,21 +587,21 @@ getDeclFromGroup group name = case catMaybes [getDeclFromVals  (GHC.hs_valds  gr
   _ -> Nothing
   where 
     getDeclFromVals (GHC.ValBindsOut _ lsigs) = case matching of 
-      [lsig] -> Just (L (getLoc lsig) (GHC.SigD (unLoc lsig) Nothing))
+      [lsig] -> Just (L (getLoc lsig) (GHC.SigD (unLoc lsig)))
       _      -> Nothing
      where 
         matching = [ lsig | lsig <- lsigs, let Just n = GHC.sigName lsig, n == name ]
     getDeclFromVals _ = error "getDeclFromVals: illegal input"
      
     getDeclFromTyCls ltycls = case matching of 
-      [ltycl] -> Just (L (getLoc ltycl) (GHC.TyClD (unLoc ltycl) Nothing))
+      [ltycl] -> Just (L (getLoc ltycl) (GHC.TyClD (unLoc ltycl)))
       _       -> Nothing
       where
         matching = [ ltycl | ltycl <- ltycls, 
                      name `elem` map unLoc (GHC.tyClDeclNames (unLoc ltycl))]
  
     getDeclFromFors lfors = case matching of 
-      [for] -> Just (L (getLoc for) (GHC.ForD (unLoc for) Nothing))
+      [for] -> Just (L (getLoc for) (GHC.ForD (unLoc for)))
       _      -> Nothing
       where
         matching = [ for | for <- lfors, forName (unLoc for) == name ]
@@ -659,158 +634,6 @@ getPrologue flags
 		Right doc -> return (Just doc)
 	_otherwise -> dieMsg "multiple -p/--prologue options"
 
------------------------------------------------------------------------------
--- Figuring out the definitions that are exported from a module
-
--- We're going to make interfaces in two passes:
---
---   1. Rename the code.  This basically involves resolving all
---      the names to "original names".
---
---   2. Convert all the entity references to "doc names".  These are
---      the names we want to link to in the documentation.
-{-
-mkInterfacePhase1
-   :: [Flag]
-   -> Bool				-- verbose
-   -> ModuleMap -> FilePath -> Maybe String -> HsModule
-   -> ErrMsgM Interface			-- the "interface" of the module
-
-mkInterfacePhase1 flags verbose mod_map filename package
-	(HsModule (SrcLoc _ _ orig_filename) mdl exps imps decls
-                  maybe_opts maybe_info maybe_doc) = do
-
-  let
-      no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
-      ignore_all_exports = Flag_IgnoreAllExports `elem` flags
-
-  -- Process the options, if available
-  opts0 <- case maybe_opts of
-		Just opt_str -> processOptions opt_str
-		Nothing      -> return []
-  let
-	-- check for a --hide option
-	Module mod_str = mdl
-	opts
-	  | Flag_HideModule mod_str `elem` flags = OptHide : opts0
-	  | otherwise			         = opts0
-
-  let
-     -- expand type signatures with multiple variables into multiple
-     -- type signatures
-     expanded_decls = concat (map expandDecl decls)
-
-     sub_map = mkSubNames expanded_decls
-
-     -- first, attach documentation to declarations
-     annotated_decls = collectDoc expanded_decls
-
-     -- now find the defined names
-     locally_defined_names = collectNames annotated_decls
-
-     qual_local_names   = map (Qual mdl) locally_defined_names
-     unqual_local_names = map UnQual     locally_defined_names
-
-     local_orig_env = Map.fromList (zip unqual_local_names qual_local_names ++
-			            zip qual_local_names   qual_local_names)
-	 -- both qualified and unqualifed names are in scope for local things
-
-     implicit_imps
-	| no_implicit_prelude || any is_prel_import imps = imps
-	| otherwise = HsImportDecl loc prelude_mod False Nothing Nothing : imps
-	where 
-		loc = SrcLoc 0 0 ""
-	 	is_prel_import (HsImportDecl _ mdl0 _ _ _ ) = mdl0 == prelude_mod
-  -- in
-
-     -- build the orig_env, which maps names to *original* names (so we can
-     -- find the original declarations & docs for things).
-  imported_orig_env <- buildOrigEnv mdl verbose mod_map implicit_imps
- 
-  let
-     orig_env = local_orig_env `Map.union` imported_orig_env
-
-     -- convert names in source code to original, fully qualified, names
-     (orig_exports, missing_names1) 
-	= runRnFM orig_env (mapMaybeM renameExportList exps)
-
-     (orig_decls, missing_names2)
-	= runRnFM orig_env (mapM renameDecl annotated_decls)
-
-     (orig_module_doc, missing_names3)
-        = runRnFM orig_env (renameMaybeDoc maybe_doc)
-
-     decl_map :: Map HsName HsDecl
-     decl_map = Map.fromList [ (n,d) | d <- orig_decls, n <- declBinders d ]
-
-     instances = [ d | d@HsInstDecl{} <- orig_decls ] ++
-		 [ d | decl <- orig_decls, d <- derivedInstances mdl decl]
-
-  -- trace (show (Map.toAscList orig_env)) $ do
-
-     -- gather up a list of entities that are exported (original names)
-  (exported_names, exported_visible_names)
-	 <- exportedNames mdl mod_map
-			locally_defined_names orig_env sub_map
-			orig_exports opts
-
-  let
-     -- maps exported HsNames to orig HsQNames
-     name_env = Map.fromList [ (nameOfQName n, n) | n <- exported_names ]
-
-     -- find the names exported by this module that other modules should *not*
-     -- link to.
-     reexports = [ nm | n@(Qual _ nm) <- exported_names, 
-			n `notElem` exported_visible_names ]
-
-  -- in
-
-  -- make the "export items", which will be converted into docs later
-  orig_export_items <- mkExportItems mod_map mdl exported_names decl_map sub_map
-			 		orig_decls opts orig_exports 
-					ignore_all_exports
-  let
-     -- prune the export list to just those declarations that have
-     -- documentation, if the 'prune' option is on.
-     pruned_export_list
-	| OptPrune `elem` opts = pruneExportItems orig_export_items
-	| otherwise = orig_export_items
-  -- in
-
-  -- report any names we couldn't find/resolve
-  let
-      missing_names = missing_names1 ++ missing_names2 ++ missing_names3
-			 --ignore missing_names3 & missing_names5 for now
-      filtered_missing_names = filter (`notElem` builtinNames) missing_names
-
-      name_strings = nub (map show filtered_missing_names)
-  -- in
-
-  when (OptHide `notElem` opts &&
-	not (null name_strings)) $
-	  tell ["Warning: " ++ show mdl ++ 
-		": the following names could not be resolved:\n"++
-		"   " ++ concat (map (' ':) name_strings)
-		]
-
-  return (Interface { 
-		   iface_filename     = filename,
-                   iface_orig_filename= orig_filename,
-		   iface_module	      = mdl,
-		   iface_package      = package,
-		   iface_env          = name_env,
-		   iface_reexported   = reexports,
-		   iface_sub	      = sub_map,
-		   iface_orig_exports = pruned_export_list,
-		   iface_decls        = decl_map,
-		   iface_info	      = maybe_info,
-		   iface_doc          = orig_module_doc,
-		   iface_options      = opts,
-		   iface_exports      = error "iface_exports",
-		   iface_insts	      = instances
-		}
-      	  )
--}
 -- -----------------------------------------------------------------------------
 -- Phase 2
 
@@ -818,7 +641,7 @@ renameModule :: Map GHC.Name GHC.Name -> HaddockModule -> ErrMsgM ([ExportItem2 
 renameModule renamingEnv mod =
 
   -- first create the local env, where every name exported by this module
-  -- is mapped to itself, and everything else comes from the global renameing
+  -- is mapped to itself, and everything else comes from the global renaming
   -- env
   let localEnv = foldl fn renamingEnv (hmod_visible_exports mod)
         where fn env name = Map.insert name (nameSetMod name (hmod_mod mod)) env
@@ -848,86 +671,6 @@ renameModule renamingEnv mod =
 
    return (renamedExportItems, finalModuleDoc)
  
--- -----------------------------------------------------------------------------
-{-
--- Try to generate instance declarations for derived instances.
--- We can't do this properly without instance inference, but if a type
--- variable occurs as a constructor argument, then we can just
--- propagate the derived class to the variable.  But we know nothing of
--- the constraints on any type variables that occur elsewhere.
--- Note that a type variable may be in both categories: then we know a
--- constraint, but there may be more, or a stronger constraint.
-derivedInstances :: Module -> HsDecl -> [HsDecl]
-derivedInstances mdl decl = case decl of
-   HsDataDecl srcloc ctxt n tvs cons drv@(_:_) _ ->
-      derived srcloc ctxt n tvs cons drv
-   HsNewTypeDecl srcloc ctxt n tvs con drv@(_:_) _ ->
-      derived srcloc ctxt n tvs [con] drv
-   _ -> []
- where
-  derived srcloc ctxt n tvs cons drv =
-     [HsInstDecl srcloc
-		 (ctxt ++ [(cls,[t]) | t <- simple_args] ++ extra_constraint)
-		 (cls,[lhs]) [] |
-	cls <- drv]
-   where
-     targs = map stripDocs (targsConstrs cons)
-     -- an argument of a data constructor is simple if it has a variable head
-     simple_args = nub $ filter varHead targs
-     -- a type variable is complex if it occurs inside a data constructor
-     -- argument, except where the argument is identical to the lhs.
-     complex_tvars = map HsTyVar $ Set.elems $ Set.unions $ map tvarsType $
-			filter (/= lhs) $ filter (not . varHead) targs
-     varHead (HsTyVar _) = True
-     varHead (HsTyApp t _) = varHead t
-     varHead (HsTyDoc t _) = varHead t
-     varHead _ = False
-     extra_constraint
- 	| null complex_tvars = []
- 	| otherwise = [(unknownConstraint,complex_tvars)]
-     lhs
-	| n == tuple_tycon_name (length tvs - 1) =
-	   HsTyTuple True (map HsTyVar tvs)
-        | otherwise = foldl HsTyApp (HsTyCon (Qual mdl n)) (map HsTyVar tvs)
-
-  -- collect type arguments of constructors
-  targsConstrs :: [HsConDecl] -> [HsType]
-  targsConstrs = foldr targsConstr []
-
-  targsConstr :: HsConDecl -> [HsType] -> [HsType]
-  targsConstr (HsConDecl _ _ _ _ bts _) ts = foldr targsBangType ts bts
-  targsConstr (HsRecDecl _ _ _ _ fs _) ts = foldr targsField ts fs
-
-  targsField (HsFieldDecl _ bt _) = targsBangType bt
-
-  targsBangType (HsBangedTy t) ts = t : ts
-  targsBangType (HsUnBangedTy t) ts = t : ts
-
-  -- remove documentation comments from a type
-  stripDocs :: HsType -> HsType
-  stripDocs (HsForAllType n ctxt t) = HsForAllType n ctxt (stripDocs t)
-  stripDocs (HsTyFun t1 t2) = HsTyFun (stripDocs t1) (stripDocs t2)
-  stripDocs (HsTyTuple boxed ts) = HsTyTuple boxed (map stripDocs ts)
-  stripDocs (HsTyApp t1 t2) = HsTyApp (stripDocs t1) (stripDocs t2)
-  stripDocs (HsTyDoc t _) = stripDocs t
-  stripDocs (HsTyIP n t) = HsTyIP n (stripDocs t)
-  stripDocs t = t
-
-  -- collect the type variables occurring free in a type
-  tvarsType (HsForAllType (Just tvs) _ t) = foldl (flip Set.delete) (tvarsType t) tvs
-  tvarsType (HsForAllType Nothing _ t) = tvarsType t
-  tvarsType (HsTyFun t1 t2) = tvarsType t1 `Set.union` tvarsType t2
-  tvarsType (HsTyTuple _ ts) = Set.unions (map tvarsType ts)
-  tvarsType (HsTyApp t1 t2) = tvarsType t1 `Set.union` tvarsType t2
-  tvarsType (HsTyVar tv) = Set.singleton tv
-  tvarsType (HsTyCon _) = Set.empty
-  tvarsType (HsTyDoc t _) = tvarsType t
-  tvarsType (HsTyIP _ t) = tvarsType t
-
-unknownConstraint :: HsQName
-unknownConstraint = UnQual (HsTyClsName (HsIdent "???"))
-
--}
 -- -----------------------------------------------------------------------------
 -- Build the list of items that will become the documentation, from the
 -- export list.  At this point, the list of ExportItems is in terms of
@@ -987,7 +730,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
               mdl = nameModule t
 	      subs = filter (`elem` exported_names) all_subs
               all_subs | mdl == this_mod = Map.findWithDefault [] t sub_map
-		       | otherwise       = all_subs_of_qname mod_map t
+		       | otherwise       = allSubsOfName mod_map t
 
     fullContentsOf m  
 	| m == this_mod = return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
@@ -1030,39 +773,36 @@ extractDecl name mdl decl
   | Just n <- GHC.getMainDeclBinder (unLoc decl), n == name = decl
   | otherwise  =  
     case unLoc decl of
-      GHC.TyClD d _ | GHC.isClassDecl d -> 
+      GHC.TyClD d | GHC.isClassDecl d -> 
         let matches = [ sig | sig <- GHC.tcdSigs d, GHC.sigName sig == Just name ] 
         in case matches of 
           [s0] -> let (n, tyvar_names) = name_and_tyvars d
                       L pos sig = extractClassDecl n mdl tyvar_names s0
-                  in L pos (GHC.SigD sig Nothing)
+                  in L pos (GHC.SigD sig)
           _ -> error "internal: extractDecl" 
-      GHC.TyClD d _ | GHC.isDataDecl d -> 
+      GHC.TyClD d | GHC.isDataDecl d -> 
         let (n, tyvar_names) = name_and_tyvars d
             L pos sig = extractRecSel name mdl n tyvar_names (GHC.tcdCons d)
-        in L pos (GHC.SigD sig Nothing)
+        in L pos (GHC.SigD sig)
       _ -> error "internal: extractDecl"
   where
     name_and_tyvars d = (unLoc (GHC.tcdLName d), GHC.hsLTyVarLocNames (GHC.tcdTyVars d))
 
 toTypeNoLoc :: Located GHC.Name -> GHC.LHsType GHC.Name
-toTypeNoLoc lname = mkNoLoc (GHC.HsTyVar (unLoc lname))
-
-mkNoLoc :: a -> Located a
-mkNoLoc a = L noSrcSpan a
+toTypeNoLoc lname = noLoc (GHC.HsTyVar (unLoc lname))
 
 rmLoc :: Located a -> Located a
-rmLoc a = mkNoLoc (unLoc a)
+rmLoc a = noLoc (unLoc a)
 
 -- originally expected unqualified 1:st name, now it doesn't
 extractClassDecl :: GHC.Name -> GHC.Module -> [Located GHC.Name] -> GHC.LSig GHC.Name -> GHC.LSig GHC.Name
 extractClassDecl c mdl tvs0 (L pos (GHC.TypeSig lname ltype)) = case ltype of
   L _ (GHC.HsForAllTy exp tvs (L _ preds) ty) -> 
-    L pos (GHC.TypeSig lname (mkNoLoc (GHC.HsForAllTy exp tvs (lctxt preds) ty)))
-  _ -> L pos (GHC.TypeSig lname (mkNoLoc (GHC.mkImplicitHsForAllTy (lctxt []) ltype)))
+    L pos (GHC.TypeSig lname (noLoc (GHC.HsForAllTy exp tvs (lctxt preds) ty)))
+  _ -> L pos (GHC.TypeSig lname (noLoc (GHC.mkImplicitHsForAllTy (lctxt []) ltype)))
   where
-    lctxt preds = mkNoLoc (ctxt preds)
-    ctxt preds = [mkNoLoc (GHC.HsClassP c (map toTypeNoLoc tvs0))] ++ preds  
+    lctxt preds = noLoc (ctxt preds)
+    ctxt preds = [noLoc (GHC.HsClassP c (map toTypeNoLoc tvs0))] ++ preds  
 
 extractClassDecl _ _ _ d = error $ "extractClassDecl: unexpected decl"
 
@@ -1074,19 +814,19 @@ extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case GHC.con_details con of
     GHC.RecCon fields | (GHC.HsRecField n ty _ : _) <- matching_fields fields -> 
-      L (getLoc n) (GHC.TypeSig (mkNoLoc nm) (mkNoLoc (GHC.HsFunTy data_ty (GHC.getBangType ty))))
+      L (getLoc n) (GHC.TypeSig (noLoc nm) (noLoc (GHC.HsFunTy data_ty (GHC.getBangType ty))))
     _ -> extractRecSel nm mdl t tvs rest
  where 
   matching_fields flds = [ f | f@(GHC.HsRecField n _ _) <- flds, (unLoc n) == nm ]   
-  data_ty = foldl (\x y -> mkNoLoc (GHC.HsAppTy x y)) (mkNoLoc (GHC.HsTyVar t)) (map toTypeNoLoc tvs)
+  data_ty = foldl (\x y -> noLoc (GHC.HsAppTy x y)) (noLoc (GHC.HsTyVar t)) (map toTypeNoLoc tvs)
 
 -- -----------------------------------------------------------------------------
 -- Pruning
 
-pruneExportItems :: [ExportItem] -> [ExportItem]
-pruneExportItems items = filter has_doc items
-  where has_doc (ExportDecl _ d _) = isJust (declDoc d)
-	has_doc _ = True
+pruneExportItems :: [ExportItem2 GHC.Name] -> [ExportItem2 GHC.Name]
+pruneExportItems items = filter hasDoc items
+  where hasDoc (ExportDecl2 _ _ d _) = isJust d
+	hasDoc _ = True
 
 
 -- -----------------------------------------------------------------------------
@@ -1119,7 +859,7 @@ visibleNames mdl modMap localNames scope subMap maybeExps opts
     GHC.IEThingAll t -> return (t : all_subs)
 	 where
 	      all_subs | nameModule t == mdl = Map.findWithDefault [] t subMap
-		       | otherwise = all_subs_of_qname modMap t
+		       | otherwise = allSubsOfName modMap t
 
     GHC.IEThingWith t cs -> return (t : cs)
 	
@@ -1136,20 +876,16 @@ visibleNames mdl modMap localNames scope subMap maybeExps opts
 
     _ -> return []
 
-exportModuleMissingErr this mdl 
-  = ["Warning: in export list of " ++ show this
-	 ++ ": module not found: " ++ show mdl]
-
 -- for a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
 -- class).
-all_subs_of_qname :: ModuleMap2 -> GHC.Name -> [GHC.Name]
-all_subs_of_qname mod_map name 
+allSubsOfName :: ModuleMap2 -> GHC.Name -> [GHC.Name]
+allSubsOfName mod_map name 
   | isExternalName name =
     case Map.lookup (nameModule name) mod_map of
       Just hmod -> Map.findWithDefault [] name (hmod_sub_map hmod)
       Nothing   -> []
-  | otherwise =  error $ "Main.all_subs_of_qname: unexpected unqual'd name"
+  | otherwise =  error $ "Main.allSubsOfName: unexpected unqual'd name"
 
 -- | Build a mapping which for each original name, points to the "best"
 -- place to link to in the documentation.  For the definition of
@@ -1181,14 +917,6 @@ buildGlobalDocEnv modules
 	keep_new env n = Map.insert n (nameSetMod n modName) env 
 
 nameSetMod n newMod = mkExternalName (nameUnique n) newMod (nameOccName n) Nothing (nameSrcLoc n)
-
-builtinDocEnv = Map.fromList (map (\a -> (a,a)) builtinNames)
-
--- These names cannot be explicitly exported, so we need to treat
--- them specially.
-builtinNames = 
-     [unit_tycon_qname, fun_tycon_qname, list_tycon_qname,
-      unit_con_name, nil_con_name]	
 
 -- -----------------------------------------------------------------------------
 -- Named documentation

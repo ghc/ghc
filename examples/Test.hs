@@ -97,6 +97,7 @@ module Test (
 -}
 
 	f',
+        hej
    ) where
 
 import Hidden
@@ -105,7 +106,7 @@ import Data.Maybe
 
 bla = Nothing
 
---hej = visible
+hej = visible
 
 -- | This comment applies to the /following/ declaration
 -- and it continues until the next non-comment line

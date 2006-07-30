@@ -23,16 +23,22 @@ module HaddockUtil (
 
   -- * HTML cross reference mapping
   html_xrefs_ref,
+
+  -- * HsDoc markup 
+  markup, 
+  idMarkup,
  ) where
 
 import Binary2
 import HaddockTypes
-import HsSyn2
+import HsSyn2 hiding ( DocMarkup(..), markup, idMarkup )
 import Map ( Map )
 import qualified Map hiding ( Map )
 
 import qualified GHC as GHC
 import SrcLoc
+import Name
+import OccName
 
 import Control.Monad ( liftM, MonadPlus(..) )
 import Data.Char ( isAlpha, isSpace, toUpper, ord )
@@ -116,8 +122,8 @@ freeTyCons ty = go ty []
 	go (HsTyDoc t _) r = go t r
 
 -- | extract a module's short description.
-toDescription :: Interface -> Maybe Doc
-toDescription = description. iface_info
+toDescription :: HaddockModule -> Maybe (GHC.HsDoc GHC.Name)
+toDescription = GHC.hmi_description . hmod_info
 
 -- -----------------------------------------------------------------------------
 -- Adding documentation to record fields (used in parsing).
@@ -145,14 +151,14 @@ addConDocs (x:xs) doc = addConDoc x doc : xs
 
 restrictTo :: [GHC.Name] -> (GHC.LHsDecl GHC.Name) -> (GHC.LHsDecl GHC.Name)
 restrictTo names (L loc decl) = L loc $ case decl of
-  GHC.TyClD d doc | GHC.isDataDecl d && GHC.tcdND d == GHC.DataType -> 
-    GHC.TyClD (d { GHC.tcdCons = restrictCons names (GHC.tcdCons d) }) doc
-  GHC.TyClD d doc | GHC.isDataDecl d && GHC.tcdND d == GHC.NewType -> 
+  GHC.TyClD d | GHC.isDataDecl d && GHC.tcdND d == GHC.DataType -> 
+    GHC.TyClD (d { GHC.tcdCons = restrictCons names (GHC.tcdCons d) }) 
+  GHC.TyClD d | GHC.isDataDecl d && GHC.tcdND d == GHC.NewType -> 
     case restrictCons names (GHC.tcdCons d) of
-      []    -> GHC.TyClD (d { GHC.tcdND = GHC.DataType, GHC.tcdCons = [] }) doc
-      [con] -> GHC.TyClD (d { GHC.tcdCons = [con] }) doc
-  GHC.TyClD d doc | GHC.isClassDecl d -> 
-    GHC.TyClD (d { GHC.tcdSigs = restrictDecls names (GHC.tcdSigs d) }) doc
+      []    -> GHC.TyClD (d { GHC.tcdND = GHC.DataType, GHC.tcdCons = [] }) 
+      [con] -> GHC.TyClD (d { GHC.tcdCons = [con] })
+  GHC.TyClD d | GHC.isClassDecl d -> 
+    GHC.TyClD (d { GHC.tcdSigs = restrictDecls names (GHC.tcdSigs d) })
   _ -> decl
    
 restrictCons :: [GHC.Name] -> [GHC.LConDecl GHC.Name] -> [GHC.LConDecl GHC.Name]
@@ -279,8 +285,13 @@ moduleHtmlFile mdl =
   where
    mdl' = map (\c -> if c == '.' then '-' else c) mdl
 
-nameHtmlRef :: String -> HsName -> String	
-nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (hsAnchorNameStr str)
+nameHtmlRef :: String -> GHC.Name -> String	
+nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (anchorNameStr str)
+
+anchorNameStr :: GHC.Name -> String
+anchorNameStr name | isValOcc occName = "v:" ++ getOccString name 
+                   | otherwise        = "t:" ++ getOccString name
+  where occName = nameOccName name
 
 contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
@@ -431,4 +442,46 @@ instance Binary id => Binary (GenDoc id) where
                   _ -> error ("Mysterious byte in document in interface" 
                      ++ show b)
 
+markup :: DocMarkup id a -> GHC.HsDoc id -> a
+markup m GHC.DocEmpty		   = markupEmpty m
+markup m (GHC.DocAppend d1 d2)	   = markupAppend m (markup m d1) (markup m d2)
+markup m (GHC.DocString s)         = markupString m s
+markup m (GHC.DocParagraph d)	   = markupParagraph m (markup m d)
+markup m (GHC.DocIdentifier ids)   = markupIdentifier m ids
+markup m (GHC.DocModule mod0)	   = markupModule m mod0
+markup m (GHC.DocEmphasis d)	   = markupEmphasis m (markup m d)
+markup m (GHC.DocMonospaced d)	   = markupMonospaced m (markup m d)
+markup m (GHC.DocUnorderedList ds) = markupUnorderedList m (map (markup m) ds)
+markup m (GHC.DocOrderedList ds)   = markupOrderedList m (map (markup m) ds)
+markup m (GHC.DocDefList ds)       = markupDefList m (map (markupPair m) ds)
+markup m (GHC.DocCodeBlock d)	   = markupCodeBlock m (markup m d)
+markup m (GHC.DocURL url)          = markupURL m url
+markup m (GHC.DocAName ref)	   = markupAName m ref
 
+markupPair :: DocMarkup id a -> (GHC.HsDoc id, GHC.HsDoc id) -> (a, a)
+markupPair m (a,b) = (markup m a, markup m b)
+
+-- | The identity markup
+idMarkup :: DocMarkup a (GHC.HsDoc a)
+idMarkup = Markup {
+  markupEmpty         = GHC.DocEmpty,
+  markupString        = GHC.DocString,
+  markupParagraph     = GHC.DocParagraph,
+  markupAppend        = GHC.DocAppend,
+  markupIdentifier    = GHC.DocIdentifier,
+  markupModule        = GHC.DocModule,
+  markupEmphasis      = GHC.DocEmphasis,
+  markupMonospaced    = GHC.DocMonospaced,
+  markupUnorderedList = GHC.DocUnorderedList,
+  markupOrderedList   = GHC.DocOrderedList,
+  markupDefList       = GHC.DocDefList,
+  markupCodeBlock     = GHC.DocCodeBlock,
+  markupURL	      = GHC.DocURL,
+  markupAName	      = GHC.DocAName
+  }
+
+-- | Since marking up is just a matter of mapping 'Doc' into some
+-- other type, we can \'rename\' documentation by marking up 'Doc' into
+-- the same thing, modifying only the identifiers embedded in it.
+mapIdent :: ([a] -> GHC.HsDoc b) -> DocMarkup a (GHC.HsDoc b)
+mapIdent f = idMarkup { markupIdentifier = f }

@@ -5,29 +5,21 @@
 --
 
 module HaddockRename (
-	RnM, runRn, runRnFM, -- the monad (instance of Monad)
-
-	--renameExportList, 
-	--renameDecl,
-	--renameExportItems, renameInstHead,
-	--renameDoc, renameMaybeDoc,
+  runRnFM, -- the monad (instance of Monad)
   renameMaybeDoc, renameExportItems,
-  ) where
+) where
 
 import HaddockTypes
-import HaddockUtil	( unQual )
---import HsSyn2
-import Map ( Map )
-import qualified Map hiding ( Map )
-
-import Prelude hiding ( mapM )
-import Control.Monad hiding ( mapM )
-import Data.Traversable
 
 import GHC
 import BasicTypes
 import SrcLoc 
-import Bag
+import Bag ( emptyBag )
+
+import Data.Map ( Map )
+import qualified Data.Map as Map hiding ( Map )
+import Prelude hiding ( mapM )
+import Data.Traversable ( mapM )
 
 -- -----------------------------------------------------------------------------
 -- Monad for renaming
@@ -214,18 +206,15 @@ renameInstHead (preds, className, types) = do
 renameLDecl (L loc d) = return . L loc =<< renameDecl d
 
 renameDecl d = case d of
-  TyClD d doc -> do
+  TyClD d -> do
     d' <- renameTyClD d
-    doc' <- renameMaybeDoc doc
-    return (TyClD d' doc')
-  SigD s doc -> do
+    return (TyClD d')
+  SigD s -> do
     s' <- renameSig s
-    doc' <- renameMaybeDoc doc
-    return (SigD s' doc')
-  ForD d doc -> do
+    return (SigD s')
+  ForD d -> do
     d' <- renameForD d
-    doc' <- renameMaybeDoc doc
-    return (ForD d' doc')
+    return (ForD d')
   _ -> error "renameDecl"
 
 renameTyClD d = case d of

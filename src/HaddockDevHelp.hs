@@ -3,20 +3,22 @@ module HaddockDevHelp(ppDevHelpFile) where
 import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
-import HsSyn2 hiding(Doc)
+import HsSyn2 hiding (Doc, Module)
 import qualified Map
+
+import Module ( moduleString, Module )
+import Name   ( Name, nameModule, getOccString )
+
 
 import Data.Maybe ( fromMaybe )
 import Text.PrettyPrint
 
 
-ppDevHelpFile :: FilePath -> String -> Maybe String -> [Interface] -> IO ()
-ppDevHelpFile odir doctitle maybe_package ifaces = do
+ppDevHelpFile :: FilePath -> String -> Maybe String -> [HaddockModule] -> IO ()
+ppDevHelpFile odir doctitle maybe_package modules = do
   let devHelpFile = package++".devhelp"
-      tree = mkModuleTree [ (iface_module iface, 
-			     iface_package iface, 
-			     toDescription iface)
-			  | iface <- ifaces ]
+      tree = mkModuleTree [ (hmod_mod mod, hmod_package mod, toDescription mod)
+			    | mod <- modules ]
       doc =
         text "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>" $$
         (text "<book xmlns=\"http://www.devhelp.net/book\" title=\""<>text doctitle<>
@@ -55,19 +57,21 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
           (s':ss') = reverse (s:ss)
 		-- reconstruct the module name
 
-    index :: [(HsName, [Module])]
-    index = Map.toAscList (foldr getIfaceIndex Map.empty ifaces)
+    index :: [(Name, [Module])]
+    index = Map.toAscList (foldr getModuleIndex Map.empty modules)
 
-    getIfaceIndex iface fm =
-		Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
-		where mdl = iface_module iface
+    getModuleIndex hmod fm =
+	Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mod]) | name <- hmod_exports hmod, nameModule name == mod]) fm
+	where mod = hmod_mod hmod
 
+    ppList :: [(Name, [Module])] -> Doc
     ppList [] = empty
     ppList ((name,refs):mdls)  =
       ppReference name refs $$
       ppList mdls
 
+    ppReference :: Name -> [Module] -> Doc
     ppReference name [] = empty
-    ppReference name (Module mdl:refs) =
-      text "<function name=\""<>text (escapeStr (show name))<>text"\" link=\""<>text (nameHtmlRef mdl name)<>text"\"/>" $$
+    ppReference name (mod:refs) = let modName = moduleString mod in 
+      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef modName name)<>text"\"/>" $$
       ppReference name refs

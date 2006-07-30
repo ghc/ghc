@@ -20,7 +20,7 @@ import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
 import HaddockVersion
-import HsSyn2
+import HsSyn2 hiding ( DocMarkup(..), markup, idMarkup, Module(..) ) 
 import Html
 import qualified Html
 import Map ( Map )
@@ -34,13 +34,22 @@ import Data.Maybe ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 
+import qualified GHC 
+import Name
+import Module
+import RdrName hiding ( Qual )
+
 -- the base, module and entity URLs for the source code and wiki links.
 type SourceURLs = (Maybe String, Maybe String, Maybe String)
 type WikiURLs = (Maybe String, Maybe String, Maybe String)
 
+ppHtml = undefined
+ppHtmlHelpFiles = undefined
+
+
 -- -----------------------------------------------------------------------------
 -- Generating HTML documentation
-
+{-
 ppHtml	:: String
 	-> Maybe String				-- package
 	-> [Interface]
@@ -100,7 +109,7 @@ ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format pkg_pa
 		ppHH2Collection odir doctitle maybe_package
     Just "devhelp" -> ppDevHelpFile odir doctitle maybe_package visible_ifaces
     Just format    -> fail ("The "++format++" format is not implemented")
-
+-}
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
 	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
@@ -139,32 +148,31 @@ footer =
 	  toHtml ("version " ++ projectVersion)
 	)
    
-
-srcButton :: SourceURLs -> Maybe Interface -> HtmlTable
+srcButton :: SourceURLs -> Maybe HaddockModule -> HtmlTable
 srcButton (Just src_base_url, _, _) Nothing =
   topButBox (anchor ! [href src_base_url] << toHtml "Source code")
 
-srcButton (_, Just src_module_url, _) (Just iface) =
-  let url = spliceURL (Just $ iface_orig_filename iface)
-                      (Just $ iface_module iface) Nothing src_module_url
+srcButton (_, Just src_module_url, _) (Just hmod) =
+  let url = spliceURL (Just $ hmod_orig_filename hmod)
+                      (Just $ hmod_mod hmod) Nothing src_module_url
    in topButBox (anchor ! [href url] << toHtml "Source code")
 
 srcButton _ _ =
   Html.emptyTable
  
-spliceURL :: Maybe FilePath -> Maybe Module -> Maybe HsName -> String -> String
+spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name -> String -> String
 spliceURL maybe_file maybe_mod maybe_name url = run url
  where
   file = fromMaybe "" maybe_file
   mod = case maybe_mod of
           Nothing           -> ""
-          Just (Module mod) -> mod  
+          Just mod -> moduleString mod  
   
   (name, kind) =
     case maybe_name of
-      Nothing                  -> ("","")
-      Just (n@(HsTyClsName _)) -> (escapeStr (hsNameStr n), "t")
-      Just (n@(HsVarName _))   -> (escapeStr (hsNameStr n), "v")
+      Nothing             -> ("","")
+      Just n | isValOcc (nameOccName n) -> (escapeStr (getOccString n), "v")
+             | otherwise -> (escapeStr (getOccString n), "t")
 
   run "" = ""
   run ('%':'M':rest) = mod ++ run rest
@@ -192,7 +200,6 @@ wikiButton (_, Just wiki_module_url, _) (Just mod) =
 
 wikiButton _ _ =
   Html.emptyTable
-
 
 contentsButton :: Maybe String -> HtmlTable
 contentsButton maybe_contents_url 
@@ -223,10 +230,10 @@ simpleHeader doctitle maybe_contents_url maybe_index_url
 	contentsButton maybe_contents_url <-> indexButton maybe_index_url
    ))
 
-pageHeader :: String -> Interface -> String
+pageHeader :: String -> HaddockModule -> String
     -> SourceURLs -> WikiURLs
     -> Maybe String -> Maybe String -> HtmlTable
-pageHeader mdl iface doctitle
+pageHeader mdl hmod doctitle
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url =
   (tda [theclass "topbar"] << 
@@ -235,8 +242,8 @@ pageHeader mdl iface doctitle
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " "]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	srcButton maybe_source_url (Just iface) <->
-	wikiButton maybe_wiki_url (Just $ iface_module iface) <->
+	srcButton maybe_source_url (Just hmod) <->
+	wikiButton maybe_wiki_url (Just $ hmod_mod hmod) <->
 	contentsButton maybe_contents_url <->
 	indexButton maybe_index_url
     )
@@ -244,16 +251,16 @@ pageHeader mdl iface doctitle
    tda [theclass "modulebar"] <<
 	(vanillaTable << (
 	  (td << font ! [size "6"] << toHtml mdl) <->
-	  moduleInfo iface
+	  moduleInfo hmod
 	)
     )
 
-moduleInfo :: Interface -> HtmlTable
-moduleInfo iface = 
+moduleInfo :: HaddockModule -> HtmlTable
+moduleInfo hmod = 
    let
-      info = iface_info iface
+      info = hmod_info hmod
 
-      doOneEntry :: (String,ModuleInfo -> Maybe String) -> Maybe HtmlTable
+      doOneEntry :: (String, (GHC.HaddockModInfo GHC.Name) -> Maybe String) -> Maybe HtmlTable
       doOneEntry (fieldName,field) = case field info of
          Nothing -> Nothing
          Just fieldValue -> 
@@ -262,9 +269,9 @@ moduleInfo iface =
      
       entries :: [HtmlTable]
       entries = mapMaybe doOneEntry [
-         ("Portability",portability),
-         ("Stability",stability),
-         ("Maintainer",maintainer)
+         ("Portability",GHC.hmi_portability),
+         ("Stability",GHC.hmi_stability),
+         ("Maintainer",GHC.hmi_maintainer)
          ]
    in
       case entries of
@@ -282,15 +289,13 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [Interface] -> Maybe Doc
+   -> [HaddockModule] -> Maybe (GHC.HsDoc GHC.RdrName)
    -> IO ()
 ppHtmlContents odir doctitle
   maybe_package maybe_html_help_format maybe_index_url
-  maybe_source_url maybe_wiki_url mdls prologue = do
+  maybe_source_url maybe_wiki_url modules prologue = do
   let tree = mkModuleTree 
-         [(iface_module iface,
-	   iface_package iface,
-	   toDescription iface) | iface <- mdls]
+         [(hmod_mod mod, hmod_package mod, toDescription mod) | mod <- modules]
       html = 
 	header 
 		(documentCharacterEncoding +++
@@ -315,11 +320,11 @@ ppHtmlContents odir doctitle
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
 
-ppPrologue :: String -> Maybe Doc -> HtmlTable
+ppPrologue :: String -> Maybe (GHC.HsDoc GHC.RdrName) -> HtmlTable
 ppPrologue title Nothing = Html.emptyTable
 ppPrologue title (Just doc) = 
   (tda [theclass "section1"] << toHtml title) </>
-  docBox (docToHtml doc)
+  docBox (rdrDocToHtml doc)
 
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
@@ -356,10 +361,10 @@ mkNode ss (Node s leaf pkg short ts) depth id = htmlNode
     shortDescr :: HtmlTable
     shortDescr = case short of
 	Nothing -> td empty
-	Just doc -> tda [theclass "rdoc"] (docToHtml doc)
+	Just doc -> tda [theclass "rdoc"] (origDocToHtml doc)
 
     htmlModule 
-      | leaf      = ppHsModule mdl
+      | leaf      = ppModule mdl
       | otherwise = toHtml s
 
     htmlPkg = case pkg of
@@ -382,6 +387,10 @@ mkNode ss (Node s leaf pkg short ts) depth id = htmlNode
       where
         (u,id') = mkNode (s:ss) x (depth+1) id
 
+-- The URL for source and wiki links, and the current module
+type LinksInfo = (SourceURLs, WikiURLs, HaddockModule)
+
+
 -- ---------------------------------------------------------------------------
 -- Generate the index
 
@@ -392,10 +401,10 @@ ppHtmlIndex :: FilePath
             -> Maybe String
             -> SourceURLs
             -> WikiURLs
-            -> [Interface] 
+            -> [HaddockModule] 
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
-  maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
+  maybe_contents_url maybe_source_url maybe_wiki_url modules = do
   let html = 
 	header (documentCharacterEncoding +++
 		thetitle (toHtml (doctitle ++ " (Index)")) +++
@@ -414,8 +423,8 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
-    Just "mshelp"  -> ppHHIndex  odir maybe_package ifaces
-    Just "mshelp2" -> ppHH2Index odir maybe_package ifaces
+    Just "mshelp"  -> ppHHIndex  odir maybe_package modules
+    Just "mshelp2" -> ppHH2Index odir maybe_package modules
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
  where
@@ -456,7 +465,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 
       index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
 
-  index :: [(String, Map HsQName [(Module,Bool)])]
+  index :: [(String, Map GHC.Name [(Module,Bool)])]
   index = sortBy cmp (Map.toAscList full_index)
     where cmp (n1,_) (n2,_) = n1 `compare` n2
 
@@ -464,56 +473,49 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   -- it can refer to, and for each of those we have a list of modules
   -- that export that entity.  Each of the modules exports the entity
   -- in a visible or invisible way (hence the Bool).
-  full_index :: Map String (Map HsQName [(Module,Bool)])
+  full_index :: Map String (Map GHC.Name [(Module,Bool)])
   full_index = Map.fromListWith (flip (Map.unionWith (++)))
-		(concat (map getIfaceIndex ifaces))
+		(concat (map getHModIndex modules))
 
-  getIfaceIndex iface = 
-    [ (hsNameStr nm, 
-	Map.fromList [(orig, [(mdl, not (nm `elem` iface_reexported iface))])])
-    | (nm, orig) <- Map.toAscList (iface_env iface) ]
-    where mdl = iface_module iface
+  getHModIndex hmod = 
+    [ (getOccString name, 
+	Map.fromList [(name, [(mdl, name `elem` hmod_visible_exports hmod)])])
+    | name <- hmod_exports hmod ]
+    where mdl = hmod_mod hmod
 
-  indexElt :: (String, Map HsQName [(Module,Bool)]) -> HtmlTable
+  indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
   indexElt (str, entities) = 
      case Map.toAscList entities of
 	[(nm,entries)] ->  
 	    tda [ theclass "indexentry" ] << toHtml str <-> 
-			indexLinks (unQual nm) entries
+			indexLinks nm entries
 	many_entities ->
 	    tda [ theclass "indexentry" ] << toHtml str </> 
 		aboves (map doAnnotatedEntity (zip [1..] many_entities))
 
-  unQual (Qual _ nm) = nm
-  unQual (UnQual nm) = nm
-
-  doAnnotatedEntity (j,(qnm,entries))
+  doAnnotatedEntity (j,(nm,entries))
 	= tda [ theclass "indexannot" ] << 
-		toHtml (show j) <+> parens (ppAnnot nm) <->
+		toHtml (show j) <+> parens (ppAnnot (nameOccName nm)) <->
 		 indexLinks nm entries
-	where nm = unQual qnm
 
-  ppAnnot (HsTyClsName n)
-       = toHtml "Type/Class"
-  ppAnnot (HsVarName n)
-       | isUpper c || c == ':'  = toHtml "Data Constructor"
-       | otherwise		= toHtml "Function"
-      where c = head (hsIdentifierStr n)
+  ppAnnot n | not (isValOcc n) = toHtml "Type/Class"
+            | isDataOcc n      = toHtml "Data Constructor"
+            | otherwise        = toHtml "Function"
 
   indexLinks nm entries = 
      tda [ theclass "indexlinks" ] << 
 	hsep (punctuate comma 
 	[ if visible then
-	     linkId (Module mdl) (Just nm) << toHtml mdl
+	     linkId mod (Just nm) << toHtml (moduleString mod)
 	  else
-	     toHtml mdl
-	| (Module mdl, visible) <- entries ])
+	     toHtml (moduleString mod)
+	| (mod, visible) <- entries ])
 
   initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
 
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
-
+{-
 ppHtmlModule
 	:: FilePath -> String
 	-> SourceURLs -> WikiURLs
@@ -615,9 +617,6 @@ numberSectionHeadings exports = go 1 exports
 	go n (other:es)
 	  = other : go n es
 
--- The URL for source and wiki links, and the current module
-type LinksInfo = (SourceURLs, WikiURLs, Interface)
-
 processExport :: Bool -> LinksInfo -> ExportItem -> HtmlTable
 processExport _ _ (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
@@ -630,7 +629,7 @@ processExport summmary _ (ExportNoDecl _ y subs)
 processExport _ _ (ExportDoc doc)
   = docBox (docToHtml doc)
 processExport _ _ (ExportModule (Module mdl))
-  = declBox (toHtml "module" <+> ppHsModule mdl)
+  = declBox (toHtml "module" <+> ppModule mdl)
 
 forSummary :: ExportItem -> Bool
 forSummary (ExportGroup _ _ _) = False
@@ -682,7 +681,7 @@ doDecl summary links x d instances = do_decl d
 	= if summary then Html.emptyTable 
 		     else ppDocGroup lev (docToHtml str)
 
-     do_decl _ = error ("do_decl: " ++ show d)
+     do_decl _ = nrror ("do_decl: " ++ show d)
 
 
 ppTypeSig :: Bool -> HsName -> HsType -> Html
@@ -1041,24 +1040,34 @@ ppHsAType (HsTyCon nm)
 ppHsAType (HsTyApp (HsTyCon (Qual _ (HsTyClsName (HsSpecial "[]")))) b )
   = brackets $ ppHsType b
 ppHsAType t = parens $ ppHsType t
-
+-}
 -- ----------------------------------------------------------------------------
 -- Names
 
+ppRdrName :: GHC.RdrName -> Html
+ppRdrName = toHtml . occNameString . rdrNameOcc
+
+ppDocName :: DocName -> Html
+ppDocName (Link name) = linkId (nameModule name) (Just name) << ppName name
+ppDocName (NoLink name) = toHtml (getOccString name)
+
 linkTarget :: HsName -> Html
 linkTarget nm = namedAnchor (hsAnchorNameStr nm) << toHtml ""
-
+{-
 ppHsQName :: HsQName -> Html
 ppHsQName (UnQual str) = ppHsName str
 ppHsQName n@(Qual mdl str)
   | n == unit_con_name	= ppHsName str
   | isSpecial str	= ppHsName str
   | otherwise		= linkId mdl (Just str) << ppHsName str
-
+-}
 isSpecial :: HsName -> Bool
 isSpecial (HsTyClsName (HsSpecial _)) = True
 isSpecial (HsVarName   (HsSpecial _)) = True
 isSpecial _                           = False
+
+ppName :: GHC.Name -> Html
+ppName name = toHtml (getOccString name)
 
 ppHsName :: HsName -> Html
 ppHsName nm = toHtml (hsNameStr nm)
@@ -1078,28 +1087,30 @@ ppHsBindIdent (HsIdent str)   =  toHtml str
 ppHsBindIdent (HsSymbol str)  =  parens (toHtml str)
 ppHsBindIdent (HsSpecial str) =  toHtml str
 
-linkId :: Module -> Maybe HsName -> Html -> Html
-linkId (Module mdl) mbName = anchor ! [href hr]
-  where hr = case mbName of
-                  Nothing   -> moduleHtmlFile mdl
-                  Just name -> nameHtmlRef mdl name
+linkId :: GHC.Module -> Maybe GHC.Name -> Html -> Html
+linkId mod mbName = anchor ! [href hr]
+  where 
+    hr = case mbName of
+      Nothing   -> moduleHtmlFile modName
+      Just name -> nameHtmlRef modName name
+    modName = moduleString mod   
 
-ppHsModule :: String -> Html
-ppHsModule mdl = anchor ! [href ((moduleHtmlFile modname) ++ ref)] << toHtml mdl
+ppModule :: String -> Html
+ppModule mdl = anchor ! [href ((moduleHtmlFile modname) ++ ref)] << toHtml mdl
   where 
         (modname,ref) = break (== '#') mdl
 
 -- -----------------------------------------------------------------------------
 -- * Doc Markup
 
-htmlMarkup :: DocMarkup [HsQName] Html
-htmlMarkup = Markup {
+parHtmlMarkup :: (a -> Html) -> DocMarkup a Html
+parHtmlMarkup ppId = Markup {
   markupParagraph     = paragraph,
   markupEmpty	      = toHtml "",
   markupString        = toHtml,
   markupAppend        = (+++),
-  markupIdentifier    = tt . ppHsQName . head,
-  markupModule        = ppHsModule,
+  markupIdentifier    = tt . ppId . head,
+  markupModule        = ppModule,
   markupEmphasis      = emphasize . toHtml,
   markupMonospaced    = tt . toHtml,
   markupUnorderedList = ulist . concatHtml . map (li <<),
@@ -1112,25 +1123,37 @@ htmlMarkup = Markup {
 
 markupDef (a,b) = dterm << a +++ ddef << b
 
+htmlMarkup = parHtmlMarkup ppDocName
+htmlOrigMarkup = parHtmlMarkup ppName
+htmlRdrMarkup = parHtmlMarkup ppRdrName
+
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).
-docToHtml :: Doc -> Html
+{-docToHtml :: Doc -> Html
 docToHtml doc = markup htmlMarkup (unParagraph (markup htmlCleanup doc))
+-}
+docToHtml :: GHC.HsDoc DocName -> Html
+docToHtml doc = markup htmlMarkup (unParagraph (markup htmlCleanup doc))
+
+origDocToHtml :: GHC.HsDoc GHC.Name -> Html
+origDocToHtml doc = markup htmlOrigMarkup (unParagraph (markup htmlCleanup doc))
+
+rdrDocToHtml doc = markup htmlRdrMarkup (unParagraph (markup htmlCleanup doc))
 
 -- If there is a single paragraph, then surrounding it with <P>..</P>
 -- can add too much whitespace in some browsers (eg. IE).  However if
 -- we have multiple paragraphs, then we want the extra whitespace to
 -- separate them.  So we catch the single paragraph case and transform it
 -- here.
-unParagraph (DocParagraph d) = d
+unParagraph (GHC.DocParagraph d) = d
 --NO: This eliminates line breaks in the code block:  (SDM, 6/5/2003)
 --unParagraph (DocCodeBlock d) = (DocMonospaced d)
 unParagraph doc              = doc
 
-htmlCleanup :: DocMarkup [HsQName] Doc
+htmlCleanup :: DocMarkup a (GHC.HsDoc a)
 htmlCleanup = idMarkup { 
-  markupUnorderedList = DocUnorderedList . map unParagraph,
-  markupOrderedList   = DocOrderedList   . map unParagraph
+  markupUnorderedList = GHC.DocUnorderedList . map unParagraph,
+  markupOrderedList   = GHC.DocOrderedList   . map unParagraph
   } 
 
 -- -----------------------------------------------------------------------------
@@ -1196,9 +1219,9 @@ declBox html = tda [theclass "decl"] << html
 
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
-topDeclBox :: LinksInfo -> SrcLoc -> HsName -> Html -> HtmlTable
+topDeclBox :: LinksInfo -> SrcLoc -> GHC.Name -> Html -> HtmlTable
 topDeclBox ((_,_,Nothing), (_,_,Nothing), _) _ _ html = declBox html
-topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
+topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), hmod)
            (SrcLoc _ _ fname) name html =
   tda [theclass "topdecl"] <<
   (        table ! [theclass "declbar"] <<
@@ -1221,7 +1244,7 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
                                                (Just name) url
                            in anchor ! [href url'] << toHtml "Comments"
   
-        mod = iface_module iface
+        mod = hmod_mod hmod
 
 -- a box for displaying an 'argument' (some code which has text to the
 -- right of it).  Wrapping is not allowed in these boxes, whereas it is
@@ -1242,7 +1265,7 @@ ndocBox html = tda [theclass "ndoc"] << html
 rdocBox :: Html -> HtmlTable
 rdocBox html = tda [theclass "rdoc"] << html
 
-maybeRDocBox :: Maybe Doc -> HtmlTable
+maybeRDocBox :: Maybe (GHC.HsDoc DocName) -> HtmlTable
 maybeRDocBox Nothing = rdocBox (noHtml)
 maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
 

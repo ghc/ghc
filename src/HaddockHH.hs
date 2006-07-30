@@ -1,5 +1,10 @@
 module HaddockHH(ppHHContents, ppHHIndex, ppHHProject) where
 
+ppHHContents = error "not yet"
+ppHHIndex = error "not yet"
+ppHHProject = error "not yet"
+
+{-
 import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
@@ -166,3 +171,4 @@ ppHHProject odir doctitle maybe_package ifaces pkg_paths = do
     getIfaceIndex iface fm =
         Map.union (Map.fromList [(toUpper (head (show name)),()) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
 	where mdl = iface_module iface
+-}

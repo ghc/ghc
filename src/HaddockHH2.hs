@@ -1,5 +1,11 @@
 module HaddockHH2(ppHH2Contents, ppHH2Index, ppHH2Files, ppHH2Collection) where
 
+ppHH2Contents = error "not yet"
+ppHH2Index = error "not yet"
+ppHH2Files = error "not yet"
+ppHH2Collection = error "not yet"
+
+{-
 import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
@@ -173,3 +179,4 @@ ppHH2Collection odir doctitle maybe_package = do
 		        text "<ItemMoniker Name=\"!SampleInfo\" ProgId=\"HxDs.HxSampleCollection\" InitData=\"\"/>") $$
 		text "</HelpCollection>"
   writeFile (pathJoin [odir, collectionHH2File]) (render doc)
+-}

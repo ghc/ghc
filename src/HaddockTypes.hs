@@ -11,9 +11,10 @@ module HaddockTypes (
   -- * Misc types
   DocOption(..), InstHead, InstHead2,
   DocName(..),
+  DocMarkup(..)
  ) where
 
-import HsSyn2
+import HsSyn2 hiding ( DocMarkup )
 
 import qualified GHC as GHC
 
@@ -147,6 +148,12 @@ data HaddockModule = HM {
 -- | A value to identify the module
   hmod_mod                :: GHC.Module,
 
+-- | The original filename for this module
+  hmod_orig_filename      :: FilePath,
+
+-- | Textual information about the module 
+  hmod_info               :: GHC.HaddockModInfo GHC.Name,
+
 -- | The documentation header for this module
   hmod_doc                :: Maybe (GHC.HsDoc GHC.Name),
 
@@ -175,5 +182,24 @@ data HaddockModule = HM {
   hmod_sub_map            :: Map GHC.Name [GHC.Name],
 
 -- | The instances exported by this module
-  hmod_instances          :: [GHC.Instance]
+  hmod_instances          :: [GHC.Instance],
+
+  hmod_package            :: Maybe String
+}
+
+data DocMarkup id a = Markup {
+  markupEmpty         :: a,
+  markupString        :: String -> a,
+  markupParagraph     :: a -> a,
+  markupAppend        :: a -> a -> a,
+  markupIdentifier    :: [id] -> a,
+  markupModule        :: String -> a,
+  markupEmphasis      :: a -> a,
+  markupMonospaced    :: a -> a,
+  markupUnorderedList :: [a] -> a,
+  markupOrderedList   :: [a] -> a,
+  markupDefList       :: [(a,a)] -> a,
+  markupCodeBlock     :: a -> a,
+  markupURL	      :: String -> a,
+  markupAName	      :: String -> a
 }
