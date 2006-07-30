@@ -77,73 +77,73 @@ exeext=''
 # separately.
 case $HostPlatform in
 alpha*-dec-osf[[12]]*)
-	HostPlatform=alpha-dec-osf1   # canonicalise for our purposes
-	TargetPlatform=alpha-dec-osf1 # this will work for now... (hack)
-	BuildPlatform=alpha-dec-osf1  # hack
+        HostPlatform=alpha-dec-osf1   # canonicalise for our purposes
+        TargetPlatform=alpha-dec-osf1 # this will work for now... (hack)
+        BuildPlatform=alpha-dec-osf1  # hack
         HostPlatform_CPP='alpha_dec_osf1'
         HostArch_CPP='alpha'
         HostVendor_CPP='dec'
         HostOS_CPP='osf1'
         ;;
 alpha*-dec-osf[[345]]*)
-	HostPlatform=alpha-dec-osf3   # canonicalise for our purposes
-	TargetPlatform=alpha-dec-osf3 # this will work for now... (hack)
-	BuildPlatform=alpha-dec-osf3  # hack
+        HostPlatform=alpha-dec-osf3   # canonicalise for our purposes
+        TargetPlatform=alpha-dec-osf3 # this will work for now... (hack)
+        BuildPlatform=alpha-dec-osf3  # hack
         HostPlatform_CPP='alpha_dec_osf3'
         HostArch_CPP='alpha'
         HostVendor_CPP='dec'
         HostOS_CPP='osf3'
         ;;
 alpha*-unknown-linux*)
-	HostPlatform=alpha-unknown-linux
-	TargetPlatform=alpha-unknown-linux
-	BuildPlatform=alpha-unknown-linux
+        HostPlatform=alpha-unknown-linux
+        TargetPlatform=alpha-unknown-linux
+        BuildPlatform=alpha-unknown-linux
         HostPlatform_CPP='alpha_unknown_linux'
         HostArch_CPP='alpha'
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
 alpha*-unknown-freebsd*)
-	HostPlatform=alpha-unknown-freebsd
-	TargetPlatform=alpha-unknown-freebsd
-	BuildPlatform=alpha-unknown-freebsd
+        HostPlatform=alpha-unknown-freebsd
+        TargetPlatform=alpha-unknown-freebsd
+        BuildPlatform=alpha-unknown-freebsd
         HostPlatform_CPP='alpha_unknown_freebsd'
         HostArch_CPP='alpha'
         HostVendor_CPP='unknown'
         HostOS_CPP='freebsd'
         ;;
 alpha*-unknown-openbsd*)
-	HostPlatform=alpha-unknown-openbsd
-	TargetPlatform=alpha-unknown-openbsd
-	BuildPlatform=alpha-unknown-openbsd
+        HostPlatform=alpha-unknown-openbsd
+        TargetPlatform=alpha-unknown-openbsd
+        BuildPlatform=alpha-unknown-openbsd
         HostPlatform_CPP='alpha_unknown_openbsd'
         HostArch_CPP='alpha'
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
 amd64-*-openbsd*|x86_64-*-openbsd*)
-	HostPlatform=x86_64-unknown-openbsd
-	TargetPlatform=x86_64-unknown-openbsd
-	BuildPlatform=x86_64-unknown-openbsd
+        HostPlatform=x86_64-unknown-openbsd
+        TargetPlatform=x86_64-unknown-openbsd
+        BuildPlatform=x86_64-unknown-openbsd
         HostPlatform_CPP='x86_64_unknown_openbsd'
         HostArch_CPP='x86_64'
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
 amd64-*-freebsd*)
-	HostPlatform=x86_64-unknown-freebsd
-	TargetPlatform=x86_64-unknown-freebsd
-	BuildPlatform=x86_64-unknown-freebsd
-	HostPlatform_CPP='x86_64_unknown_freebsd'
-	HostArch_CPP='x86_64'
-	HostVendor_CPP='unknown'
-	HostOS_CPP='freebsd'
-	;;
+        HostPlatform=x86_64-unknown-freebsd
+        TargetPlatform=x86_64-unknown-freebsd
+        BuildPlatform=x86_64-unknown-freebsd
+        HostPlatform_CPP='x86_64_unknown_freebsd'
+        HostArch_CPP='x86_64'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='freebsd'
+        ;;
 arm*-linux*)
         HostPlatform=arm-unknown-linux # hack again
         TargetPlatform=arm-unknown-linux
         BuildPlatform=arm-unknown-linux
-        HostPlatform_CPP='arm_unknown_linux'                 
+        HostPlatform_CPP='arm_unknown_linux'
         HostArch_CPP='arm'
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
@@ -152,7 +152,7 @@ arm*-openbsd*)
         HostPlatform=arm-unknown-openbsd
         TargetPlatform=arm-unknown-openbsd
         BuildPlatform=arm-unknown-openbsd
-        HostPlatform_CPP='arm_unknown_openbsd'                 
+        HostPlatform_CPP='arm_unknown_openbsd'
         HostArch_CPP='arm'
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
@@ -161,42 +161,42 @@ hppa*-*-linux*)
         HostPlatform=hppa-unknown-linux # hack again
         TargetPlatform=hppa-unknown-linux
         BuildPlatform=hppa-unknown-linux
-        HostPlatform_CPP='hppa_unknown_linux'                
+        HostPlatform_CPP='hppa_unknown_linux'
         HostArch_CPP='hppa'
-        HostVendor_CPP='unknown'                             
+        HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
 hppa*-*-openbsd*)
         HostPlatform=hppa-unknown-openbsd # hack again
         TargetPlatform=hppa-unknown-openbsd
         BuildPlatform=hppa-unknown-openbsd
-        HostPlatform_CPP='hppa_unknown_openbsd'                
+        HostPlatform_CPP='hppa_unknown_openbsd'
         HostArch_CPP='hppa'
-        HostVendor_CPP='unknown'                             
+        HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
 hppa1.1-hp-hpux*)
-	HostPlatform=hppa1.1-hp-hpux  # canonicalise for our purposes (hack)
-	TargetPlatform=hppa1.1-hp-hpux
-	BuildPlatform=hppa1.1-hp-hpux
+        HostPlatform=hppa1.1-hp-hpux  # canonicalise for our purposes (hack)
+        TargetPlatform=hppa1.1-hp-hpux
+        BuildPlatform=hppa1.1-hp-hpux
         HostPlatform_CPP='hppa1_1_hp_hpux'
         HostArch_CPP='hppa1_1'
         HostVendor_CPP='hp'
         HostOS_CPP='hpux'
         ;;
 i[[3456]]86-*-linuxaout*)
-	HostPlatform=i386-unknown-linuxaout   # hack again
-	TargetPlatform=i386-unknown-linuxaout
-	BuildPlatform=i386-unknown-linuxaout
+        HostPlatform=i386-unknown-linuxaout   # hack again
+        TargetPlatform=i386-unknown-linuxaout
+        BuildPlatform=i386-unknown-linuxaout
         HostPlatform_CPP='i386_unknown_linuxaout'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='linuxaout'
         ;;
 i[[3456]]86-*-linux*)
-	HostPlatform=i386-unknown-linux # hack again
-	TargetPlatform=i386-unknown-linux
-	BuildPlatform=i386-unknown-linux
+        HostPlatform=i386-unknown-linux # hack again
+        TargetPlatform=i386-unknown-linux
+        BuildPlatform=i386-unknown-linux
         HostPlatform_CPP='i386_unknown_linux'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
@@ -212,79 +212,79 @@ i[[3456]]86-*-kfreebsd*-gnu)
         HostOS_CPP='kfreebsdgnu'
         ;;
 i[[3456]]86-*-freebsd[[3-9]]*) # FreeBSD 3.0+ uses ELF
-	HostPlatform=i386-unknown-freebsd # hack again
-	TargetPlatform=i386-unknown-freebsd
-	BuildPlatform=i386-unknown-freebsd
+        HostPlatform=i386-unknown-freebsd # hack again
+        TargetPlatform=i386-unknown-freebsd
+        BuildPlatform=i386-unknown-freebsd
         HostPlatform_CPP='i386_unknown_freebsd'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='freebsd'
         ;;
 i[[3456]]86-*-freebsd2*) # Older FreeBSDs are a.out
-	HostPlatform=i386-unknown-freebsd2 # hack again
-	TargetPlatform=i386-unknown-freebsd2
-	BuildPlatform=i386-unknown-freebsd2
+        HostPlatform=i386-unknown-freebsd2 # hack again
+        TargetPlatform=i386-unknown-freebsd2
+        BuildPlatform=i386-unknown-freebsd2
         HostPlatform_CPP='i386_unknown_freebsd2'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='freebsd2'
         ;;
 i[[3456]]86-*-netbsd*)
-	HostPlatform=i386-unknown-netbsd # hack again
-	TargetPlatform=i386-unknown-netbsd
-	BuildPlatform=i386-unknown-netbsd
+        HostPlatform=i386-unknown-netbsd # hack again
+        TargetPlatform=i386-unknown-netbsd
+        BuildPlatform=i386-unknown-netbsd
         HostPlatform_CPP='i386_unknown_netbsd'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='netbsd'
         ;;
 i[[3456]]86-*-openbsd*)
-	HostPlatform=i386-unknown-openbsd # hack again
-	TargetPlatform=i386-unknown-openbsd
-	BuildPlatform=i386-unknown-openbsd
+        HostPlatform=i386-unknown-openbsd # hack again
+        TargetPlatform=i386-unknown-openbsd
+        BuildPlatform=i386-unknown-openbsd
         HostPlatform_CPP='i386_unknown_openbsd'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
 i[[3456]]86-*-solaris2*)
-	HostPlatform=i386-unknown-solaris2 # hack again
-	TargetPlatform=i386-unknown-solaris2
-	BuildPlatform=i386-unknown-solaris2
+        HostPlatform=i386-unknown-solaris2 # hack again
+        TargetPlatform=i386-unknown-solaris2
+        BuildPlatform=i386-unknown-solaris2
         HostPlatform_CPP='i386_unknown_solaris2'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='solaris2'
         ;;
 i[[3456]]86-*-cygwin*)
-	HostPlatform=i386-unknown-cygwin32 # hack again
-	TargetPlatform=i386-unknown-cygwin32
-	BuildPlatform=i386-unknown-cygwin32
+        HostPlatform=i386-unknown-cygwin32 # hack again
+        TargetPlatform=i386-unknown-cygwin32
+        BuildPlatform=i386-unknown-cygwin32
         HostPlatform_CPP='i386_unknown_cygwin32'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='cygwin32'
-	exeext='.exe'
+        exeext='.exe'
         ;;
 i[[3456]]86-*-mingw32*)
-	HostPlatform=i386-unknown-mingw32 # hack again
-	TargetPlatform=i386-unknown-mingw32
-	BuildPlatform=i386-unknown-mingw32
+        HostPlatform=i386-unknown-mingw32 # hack again
+        TargetPlatform=i386-unknown-mingw32
+        BuildPlatform=i386-unknown-mingw32
         HostPlatform_CPP='i386_unknown_mingw32'
         HostArch_CPP='i386'
         HostVendor_CPP='unknown'
         HostOS_CPP='mingw32'
-	exeext='.exe'
+        exeext='.exe'
         ;;
 i[[3456]]86-apple-darwin*)
-	HostPlatform=i386-apple-darwin
-	TargetPlatform=i386-apple-darwin #hack
-	BuildPlatform=i386-apple-darwin #hack
-	HostPlatform_CPP='i386_apple_darwin'
-	HostArch_CPP='i386'
-	HostVendor_CPP='apple'
-	HostOS_CPP='darwin'
-	;;
+        HostPlatform=i386-apple-darwin
+        TargetPlatform=i386-apple-darwin #hack
+        BuildPlatform=i386-apple-darwin #hack
+        HostPlatform_CPP='i386_apple_darwin'
+        HostArch_CPP='i386'
+        HostVendor_CPP='apple'
+        HostOS_CPP='darwin'
+        ;;
 i[[3456]]86-*-gnu*)
         HostPlatform=i386-unknown-gnu
         TargetPlatform=i386-unknown-gnu
@@ -311,10 +311,10 @@ x86_64-*-linux*)
         HostArch_CPP='x86_64'
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
-	;;
+        ;;
 m68k-*-linux*)
         HostPlatform=m68k-unknown-linux # hack again
-        TargetPlatform=m68k-unknown-linux                    
+        TargetPlatform=m68k-unknown-linux
         BuildPlatform=m68k-unknown-linux
         HostPlatform_CPP='m68k_unknown_linux'
         HostArch_CPP='m68k'
@@ -334,45 +334,45 @@ m68k-next-nextstep3)
         HostOS_CPP='nextstep3'
         ;;
 i[[3456]]86-next-nextstep3)
-	HostPlatform=i386-next-nextstep3 # hack again
-	TargetPlatform=i386-next-nextstep3
-	BuildPlatform=i386-next-nextstep3
+        HostPlatform=i386-next-nextstep3 # hack again
+        TargetPlatform=i386-next-nextstep3
+        BuildPlatform=i386-next-nextstep3
         HostPlatform_CPP='i386_next_nextstep3'
         HostArch_CPP='i386'
         HostVendor_CPP='next'
         HostOS_CPP='nextstep3'
         ;;
 m68k-*-openbsd*)
-	HostPlatform=m68k-unknown-openbsd
-	TargetPlatform=m68k-unknown-openbsd
-	BuildPlatform=m68k-unknown-openbsd
+        HostPlatform=m68k-unknown-openbsd
+        TargetPlatform=m68k-unknown-openbsd
+        BuildPlatform=m68k-unknown-openbsd
         HostPlatform_CPP='m68k_unknown_openbsd'
         HostArch_CPP='m68k'
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
 m68k-*-netbsd*)
-	HostPlatform=m68k-unknown-netbsd
-	TargetPlatform=m68k-unknown-netbsd
-	BuildPlatform=m68k-unknown-netbsd
+        HostPlatform=m68k-unknown-netbsd
+        TargetPlatform=m68k-unknown-netbsd
+        BuildPlatform=m68k-unknown-netbsd
         HostPlatform_CPP='m68k_unknown_netbsd'
         HostArch_CPP='m68k'
         HostVendor_CPP='unknown'
         HostOS_CPP='netbsd'
         ;;
 m68k-sun-sunos4*)
-	HostPlatform=m68k-sun-sunos4
-	TargetPlatform=m68k-sun-sunos4 #hack
-	BuildPlatform=m68k-sun-sunos4 #hack
+        HostPlatform=m68k-sun-sunos4
+        TargetPlatform=m68k-sun-sunos4 #hack
+        BuildPlatform=m68k-sun-sunos4 #hack
         HostPlatform_CPP='m68k_sun_sunos4'
         HostArch_CPP='m68k'
         HostVendor_CPP='sun'
         HostOS_CPP='sunos4'
         ;;
 m88k-*-openbsd*)
-	HostPlatform=m88k-unknown-openbsd
-	TargetPlatform=m88k-unknown-openbsd
-	BuildPlatform=m88k-unknown-openbsd
+        HostPlatform=m88k-unknown-openbsd
+        TargetPlatform=m88k-unknown-openbsd
+        BuildPlatform=m88k-unknown-openbsd
         HostPlatform_CPP='m88k_unknown_openbsd'
         HostArch_CPP='m88k'
         HostVendor_CPP='unknown'
@@ -394,41 +394,41 @@ mips-dec-ultrix*)
         HostOS_CPP='ultrix'
         ;;
 mips-sgi-irix*)
-	HostPlatform=mips-sgi-irix
-	TargetPlatform=mips-sgi-irix #hack
-	BuildPlatform=mips-sgi-irix #hack
+        HostPlatform=mips-sgi-irix
+        TargetPlatform=mips-sgi-irix #hack
+        BuildPlatform=mips-sgi-irix #hack
         HostPlatform_CPP='mips_sgi_irix'
         HostArch_CPP='mipseb'   # NB a little different
         HostVendor_CPP='sgi'
         HostOS_CPP='irix'
         ;;
 rs6000-ibm-aix*)
-	HostPlatform=rs6000-ibm-aix
-	TargetPlatform=rs6000-ibm-aix #hack
-	BuildPlatform=rs6000-ibm-aix #hack
+        HostPlatform=rs6000-ibm-aix
+        TargetPlatform=rs6000-ibm-aix #hack
+        BuildPlatform=rs6000-ibm-aix #hack
         HostPlatform_CPP='rs6000_ibm_aix'
         HostArch_CPP='rs6000'
         HostVendor_CPP='ibm'
         HostOS_CPP='aix'
         ;;
 powerpc-ibm-aix*)
-	HostPlatform=powerpc-ibm-aix
-	TargetPlatform=powerpc-ibm-aix #hack
-	BuildPlatform=powerpc-ibm-aix #hack
+        HostPlatform=powerpc-ibm-aix
+        TargetPlatform=powerpc-ibm-aix #hack
+        BuildPlatform=powerpc-ibm-aix #hack
         HostPlatform_CPP='powerpc_ibm_aix'
         HostArch_CPP='powerpc'
         HostVendor_CPP='ibm'
         HostOS_CPP='aix'
         ;;
 powerpc-apple-darwin*)
-	HostPlatform=powerpc-apple-darwin
-	TargetPlatform=powerpc-apple-darwin #hack
-	BuildPlatform=powerpc-apple-darwin #hack
-	HostPlatform_CPP='powerpc_apple_darwin'
-	HostArch_CPP='powerpc'
-	HostVendor_CPP='apple'
-	HostOS_CPP='darwin'
-	;;
+        HostPlatform=powerpc-apple-darwin
+        TargetPlatform=powerpc-apple-darwin #hack
+        BuildPlatform=powerpc-apple-darwin #hack
+        HostPlatform_CPP='powerpc_apple_darwin'
+        HostArch_CPP='powerpc'
+        HostVendor_CPP='apple'
+        HostOS_CPP='darwin'
+        ;;
 powerpc-unknown-linux*)
         HostPlatform=powerpc-unknown-linux
         TargetPlatform=powerpc-unknown-linux
@@ -448,15 +448,15 @@ powerpc-unknown-openbsd*)
         HostOS_CPP='openbsd'
         ;;
 powerpc64-unknown-linux*)
-	HostPlatform=powerpc64-unknown-linux
-	TargetPlatform=powerpc64-unknown-linux
-	BuildPlatform=powerpc64-unknown-linux
-	HostPlatform_CPP='powerpc64_unknown_linux'
-	HostArch_CPP='powerpc64'
+        HostPlatform=powerpc64-unknown-linux
+        TargetPlatform=powerpc64-unknown-linux
+        BuildPlatform=powerpc64-unknown-linux
+        HostPlatform_CPP='powerpc64_unknown_linux'
+        HostArch_CPP='powerpc64'
         HostVendor_CPP='unknown'
-	HostOS_CPP='linux'
-	;;
-								
+        HostOS_CPP='linux'
+        ;;
+
 s390-ibm-linux*)
        HostPlatform=s390-ibm-linux
        TargetPlatform=s390-ibm-linux #hack
@@ -467,18 +467,18 @@ s390-ibm-linux*)
         HostOS_CPP='linux'
         ;;
 sparc-sun-sunos4*)
-	HostPlatform=sparc-sun-sunos4
-	TargetPlatform=sparc-sun-sunos4 #hack
-	BuildPlatform=sparc-sun-sunos4 #hack
+        HostPlatform=sparc-sun-sunos4
+        TargetPlatform=sparc-sun-sunos4 #hack
+        BuildPlatform=sparc-sun-sunos4 #hack
         HostPlatform_CPP='sparc_sun_sunos4'
         HostArch_CPP='sparc'
         HostVendor_CPP='sun'
         HostOS_CPP='sunos4'
         ;;
 sparc-sun-solaris2*)
-	HostPlatform=sparc-sun-solaris2
-	TargetPlatform=sparc-sun-solaris2 #hack
-	BuildPlatform=sparc-sun-solaris2 #hack
+        HostPlatform=sparc-sun-solaris2
+        TargetPlatform=sparc-sun-solaris2 #hack
+        BuildPlatform=sparc-sun-solaris2 #hack
         HostPlatform_CPP='sparc_sun_solaris2'
         HostArch_CPP='sparc'
         HostVendor_CPP='sun'
@@ -573,23 +573,28 @@ dnl Remove common automounter nonsense
 dnl
 hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^//\(.\)/|\1:/|' `
 
-dnl Find 'hardtop_plat', the native format for 'hardtop' 
-dnl (i.e., right kind of \dnl slashes on a Win32 box, but with b-slashes being escaped).
+dnl Find 'hardtop_plat', the native format for 'hardtop'
+dnl (i.e., right kind of \dnl slashes on a Win32 box, but with b-slashes
+dnl being escaped).
 dnl
-dnl Note OSTYPE: On Cygwin we need to use 'cygpath' to convert /cygdrive/c/foo to c:/foo
-dnl		 but we must not do that if we aren't building using Cygwin (notably msys), 
-dnl		 because cygpath doesn't exist.  It seems that 'bash' sets OSTYPE to 'cygwin' 
-dnl		 or 'msys' respectively, but cygwin's 'sh' does not.  So we hackily assume
-dnl		 that if the shell hasn't set it to 'msys' then we must be in Cygwin.  Sigh.
+dnl Note OSTYPE: On Cygwin we need to use 'cygpath' to convert
+dnl              /cygdrive/c/foo to c:/foo but we must not do that if we
+dnl              aren't building using Cygwin (notably msys), because
+dnl              cygpath doesn't exist.  It seems that 'bash' sets
+dnl              OSTYPE to 'cygwin' or 'msys' respectively, but cygwin's
+dnl              'sh' does not.  So we hackily assume that if the shell
+dnl              hasn't set it to 'msys' then we must be in Cygwin.
+dnl              Sigh.
 dnl
-dnl		 The Right Thing is probably to test $BuildPlatform instead, but we are sloppy 
-dnl		 about setting that correctly at the moment, so we just work around for now.
+dnl              The Right Thing is probably to test $BuildPlatform
+dnl              instead, but we are sloppy about setting that correctly
+dnl              at the moment, so we just work around for now.
 dnl
-dnl		 The quotes round "$(OSTYPE)" are essential, for the Cygwin-sh case where OSTYPE
-dnl		 is not set.
+dnl              The quotes round "$(OSTYPE)" are essential, for the
+dnl              Cygwin-sh case where OSTYPE is not set.
 case $HostPlatform in
   i386-unknown-mingw32 | i386-unknown-cygwin32)
-        if test "${OSTYPE}" != "msys" 
+        if test "${OSTYPE}" != "msys"
           then
             # convert $hardtop to a path that mingw will understand too
             cyghardtop=${hardtop}
@@ -600,8 +605,8 @@ case $HostPlatform in
         fi
         ;;
   *)
-  	hardtop_plat=${hardtop}
-	;;
+        hardtop_plat=${hardtop}
+        ;;
 esac
 AC_SUBST(hardtop)
 AC_SUBST(hardtop_plat)
@@ -640,7 +645,7 @@ AC_SUBST([WithGhc])
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],
         [Use ARG as the path to the compiler for compiling ordinary
-	 Haskell code  (default= value of --with-ghc)])],
+         Haskell code  (default= value of --with-ghc)])],
 [WithHc="$withval"],
 [WithHc=$WithGhc]
 )
@@ -688,9 +693,9 @@ AC_ARG_ENABLE(hc-boot,
 [Boot the Glasgow Haskell Compiler from intermediate .hc files.
  (This option is mostly of interest to porters.) [default=no]])],
 [ if test x"$enableval" = x"yes"; then
-	BootingFromHc=YES
+        BootingFromHc=YES
   else
-	BootingFromHc=NO
+        BootingFromHc=NO
   fi
 ],
 [BootingFromHc=NO]
@@ -705,9 +710,9 @@ AC_ARG_ENABLE(hc-boot-unregisterised,
  unregisterised rather than registerised code.
  (This option is mostly of interest to porters.) [default=no]])],
 [ if test x"$enableval" = x"yes"; then
-	BootingFromUnregisterisedHc=YES
+        BootingFromUnregisterisedHc=YES
   else
-	BootingFromUnregisterisedHc=NO
+        BootingFromUnregisterisedHc=NO
   fi
 ],
 [BootingFromUnregisterisedHc=NO]
@@ -729,17 +734,17 @@ dnl ** Enable the construction of Win32 DLLs?
 dnl --------------------------------------------------------------
 dnl
 dnl [ The ability to build the RTS and libraries as separate DLLs used
-dnl   to be supported, but isn't currently (updates to the RTS, compiler 
+dnl   to be supported, but isn't currently (updates to the RTS, compiler
 dnl   and build system would be required to bring it back again.)
 dnl   Hence, exposing it as an option is false advertisement, so better
 dnl   disable it to avoid confusion (but leave it commented-out rather
-dnl   than removed in order to remind ourselves to bring back the 
+dnl   than removed in order to remind ourselves to bring back the
 dnl   feature at some stage.) ]
 dnl
 dnl AC_ARG_ENABLE(win32-dlls,
 dnl [  --enable-win32-dlls
 dnl         If on a Win32 platform running mingw32/cygwin, enable the
-dnl 	construction of DLLs containing ghc-compiled code.
+dnl         construction of DLLs containing ghc-compiled code.
 dnl ],
 dnl [
 dnl case $HostOS_CPP in
@@ -764,9 +769,9 @@ AC_ARG_ENABLE(objectio,
 [AC_HELP_STRING([--enable-objectio],
 [Build ObjectIO, a portable GUI library for Haskell. [default=no]])],
 [ if test x"$enableval" = x"yes"; then
-	GhcLibsWithObjectIO=YES
+        GhcLibsWithObjectIO=YES
   else
-	GhcLibsWithObjectIO=NO
+        GhcLibsWithObjectIO=NO
   fi
 ],
 [GhcLibsWithObjectIO=NO]
@@ -779,9 +784,9 @@ AC_ARG_ENABLE(dotnet,
 [AC_HELP_STRING([--enable-dotnet],
 [Build .NET interop layer. [default=no]])],
 [ if test x"$enableval" = x"yes"; then
-	DotnetSupport=YES; AC_DEFINE([WANT_DOTNET_SUPPORT], [1], [Define to 1 if you want to include .NET interop support.])
-  else 
-	DotnetSupport=NO
+        DotnetSupport=YES; AC_DEFINE([WANT_DOTNET_SUPPORT], [1], [Define to 1 if you want to include .NET interop support.])
+  else
+        DotnetSupport=NO
   fi],
 [DotnetSupport=NO]
 )
@@ -1096,10 +1101,10 @@ dnl ################################################################
 
 dnl ** check whether we need -ldl to get dlopen()
 
-AC_CHECK_LIB(dl, dlopen, 
+AC_CHECK_LIB(dl, dlopen,
     [HaveLibDL=YES
      AC_DEFINE([HAVE_LIBDL], [1], [Define to 1 if you need -ldl to get dlopen().])
-     LIBS="$LIBS -ldl"], 
+     LIBS="$LIBS -ldl"],
     [HaveLibDL=NO])
 AC_SUBST(HaveLibDL)
 
