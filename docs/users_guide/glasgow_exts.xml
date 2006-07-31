@@ -6072,7 +6072,7 @@ shortcoming is something that could be fixed, with some kind of pragma.)
 </para>
 </sect2>
 
-<sect2> <title>The <literal>inline</literal> function </title>
+<sect2> <title>The <literal>lazy</literal> function </title>
 <para>
 The <literal>lazy</literal> function restrains strictness analysis a little:
 <programlisting>
@@ -6095,6 +6095,21 @@ Notably, <literal>lazy</literal> is used in the library definition of
 If <literal>lazy</literal> were not lazy, <literal>par</literal> would
 look strict in <literal>y</literal> which would defeat the whole 
 purpose of <literal>par</literal>.
+</para>
+</sect2>
+
+<sect2> <title>The <literal>unsafeCoerce#</literal> function </title>
+<para>
+The function <literal>unsafeCoerce#</literal> allows you to side-step the
+typechecker entirely.  It has type
+<programlisting>
+  unsafeCoerce# :: a -> b
+</programlisting>
+That is, it allows you to coerce any type into any other type.  If you use this
+function, you had better get it right, otherwise segmentation faults await. 
+It is generally used when you want to write a program that you know is
+well-typed, but where Haskell's type system is not expressive enough to prove
+that it is well typed.
 </para>
 </sect2>
 </sect1>
