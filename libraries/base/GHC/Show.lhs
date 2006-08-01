@@ -412,3 +412,14 @@ itos n# cs
         | otherwise = case chr# (ord# '0'# +# (n# `remInt#` 10#)) of { c# ->
 		      itos' (n# `quotInt#` 10#) (C# c# : cs) }
 \end{code}
+
+%*********************************************************
+%*							*
+\subsection{Other instances}
+%*							*
+%*********************************************************
+
+\begin{code}
+instance Show Unknown where
+ show _ = "This is an untyped object. You can use seq to force its evaluation and then :print to recover its type"
+\end{code}
