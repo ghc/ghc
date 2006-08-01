@@ -636,6 +636,8 @@ scExpr env e@(Lit l)  = returnUs (nullUsage, e)
 scExpr env e@(Var v)  = returnUs (varUsage env v UnkOcc, e)
 scExpr env (Note n e) = scExpr env e	`thenUs` \ (usg,e') ->
 			returnUs (usg, Note n e')
+scExpr env (Cast e co)= scExpr env e	`thenUs` \ (usg,e') ->
+                        returnUs (usg, Cast e' co)
 scExpr env (Lam b e)  = scExpr (extendBndr env b) e	`thenUs` \ (usg,e') ->
 			returnUs (usg, Lam b e')
 
