@@ -577,7 +577,7 @@ writeNewConfig filename packages = do
   hPutStrLn stdout "done."
 
 savingOldConfig :: FilePath -> IO () -> IO ()
-savingOldConfig filename io = do
+savingOldConfig filename io = Exception.block $ do
   hPutStr stdout "Saving old package config file... "
     -- mv rather than cp because we've already done an hGetContents
     -- on this file so we won't be able to open it for writing
