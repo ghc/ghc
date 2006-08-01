@@ -478,8 +478,8 @@ boxyLub orig_ty1 orig_ty2
       = TyConApp tc1 (zipWith boxyLub ts1 ts2)
 
     go (TyVarTy tv1) ty2		-- This is the whole point; 
-      | isTcTyVar tv1, isMetaTyVar tv1 	-- choose ty2 if ty2 is a box
-      = ty2	
+      | isTcTyVar tv1, isBoxyTyVar tv1 	-- choose ty2 if ty2 is a box
+      = orig_ty2	
 
 	-- Look inside type synonyms, but only if the naive version fails
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
@@ -996,10 +996,14 @@ uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 ty2
   = 	-- Expand synonyms; ignore FTVs
     uUnfilledVar False swapped tv1 details1 nb2 ps_ty2 ty2'
 
-uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 ty2@(TyVarTy tv2)
-	-- Same type variable => no-op
-  | tv1 == tv2
-  = returnM ()
+uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 (TyVarTy tv2)
+  | tv1 == tv2	-- Same type variable => no-op (but watch out for the boxy case)
+  = case details1 of
+	MetaTv BoxTv ref1  -- A boxy type variable meets itself;
+			   -- this is box-meets-box, so fill in with a tau-type
+	      -> do { tau_tv <- tcInstTyVar tv1
+		    ; updateMeta tv1 ref1 (mkTyVarTy tau_tv) }
+	other -> returnM ()	-- No-op
 
 	-- Distinct type variables
   | otherwise
@@ -1025,10 +1029,26 @@ uMetaVar :: Bool
 -- tv1 is an un-filled-in meta type variable (maybe boxy, maybe tau)
 -- ty2 is not a type variable
 
+uMetaVar swapped tv1 BoxTv ref1 nb2 ps_ty2 non_var_ty2
+  = 	-- tv1 is a BoxTv.  So we must unbox ty2, to ensure
+	-- that any boxes in ty2 are filled with monotypes
+	-- 
+	-- It should not be the case that tv1 occurs in ty2
+	-- (i.e. no occurs check should be needed), but if perchance
+	-- it does, the unbox operation will fill it, and the DEBUG
+	-- checks for that.
+    do 	{ final_ty <- unBox ps_ty2
+#ifdef DEBUG
+	; meta_details <- readMutVar ref1
+	; case meta_details of
+	    Indirect ty -> WARN( True, ppr tv1 <+> ppr ty )
+			   return ()	-- This really should *not* happen
+	    Flexi       -> return ()
+#endif
+	; checkUpdateMeta swapped tv1 ref1 final_ty }
+
 uMetaVar swapped tv1 info1 ref1 nb2 ps_ty2 non_var_ty2
-  = do	{ final_ty <- case info1 of
-			BoxTv -> unBox ps_ty2			-- No occurs check
-			other -> checkTauTvUpdate tv1 ps_ty2	-- Occurs check + monotype check
+  = do	{ final_ty <- checkTauTvUpdate tv1 ps_ty2	-- Occurs check + monotype check
 	; checkUpdateMeta swapped tv1 ref1 final_ty }
 
 ----------------
