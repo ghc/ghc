@@ -1374,6 +1374,7 @@ special_id
 	| 'dynamic'		{ L1 FSLIT("dynamic") }
 	| 'stdcall'             { L1 FSLIT("stdcall") }
 	| 'ccall'               { L1 FSLIT("ccall") }
+	| 'iso'                 { L1 FSLIT("iso") }
 
 special_sym :: { Located FastString }
 special_sym : '!'	{ L1 FSLIT("!") }
