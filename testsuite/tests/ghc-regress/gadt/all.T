@@ -36,6 +36,7 @@ test('tdpe', normal, compile, [''])
 test('Nilsson', skip_if_fast, compile, [''])
 
 test('records', skip_if_fast, compile_and_run, [''])
+test('ubx-records', skip_if_fast, compile_and_run, [''])
 test('records-fail1', normal, compile_fail, [''])
 
 # New ones from Dimitrios
