@@ -109,7 +109,7 @@ cvtTop (TySynD tc tvs rhs)
   = do	{ tc' <- tconNameL tc
 	; tvs' <- cvtTvs tvs
 	; rhs' <- cvtType rhs
-	; returnL $ TyClD (TySynonym tc' tvs' rhs') }
+	; returnL $ TyClD (TySynonym tc' tvs' Nothing rhs') }
 
 cvtTop (DataD ctxt tc tvs constrs derivs)
   = do	{ stuff <- cvt_tycl_hdr ctxt tc tvs
