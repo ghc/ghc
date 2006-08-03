@@ -43,7 +43,8 @@ import MachOp
 import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
 import CLabel		( mkCCLabel, mkCCSLabel, mkRtsDataLabel )
 
-import Module		( pprModule )
+import Module		( moduleNameString )
+import qualified Module ( moduleName ) -- clashes with CgMonad.moduleName
 import Id		( Id )
 import CostCentre
 import StgSyn		( GenStgExpr(..), StgExpr )
@@ -292,7 +293,10 @@ emitCostCentreDecl
    -> Code
 emitCostCentreDecl cc = do 
   { label <- mkStringCLit (costCentreUserName cc)
-  ; modl  <- mkStringCLit (showSDoc (pprModule (cc_mod cc)))
+  ; modl  <- mkStringCLit (moduleNameString (Module.moduleName (cc_mod cc)))
+                -- All cost centres will be in the main package, since we
+                -- don't normally use -auto-all or add SCCs to other packages.
+                -- Hence don't emit the package name in the module here.
   ; let
      lits = [ zero,   	-- StgInt ccID,
 	      label,	-- char *label,
