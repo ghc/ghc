@@ -18,7 +18,7 @@ import GHC		( Session, DynFlags(..), GhcMode(..), HscTarget(..),
 import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
-import MkIface		( showIface )
+import LoadIface	( showIface )
 import DriverPipeline	( oneShot, compileFile )
 import DriverMkDepend	( doMkDependHS )
 #ifdef GHCI
