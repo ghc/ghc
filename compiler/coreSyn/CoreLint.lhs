@@ -15,12 +15,12 @@ module CoreLint (
 import CoreSyn
 import CoreFVs		( idFreeVars )
 import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize )
-import Unify      	( coreRefineTys )
 import Bag
 import Literal		( literalType )
-import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon, dataConWorkId )
+import DataCon		( dataConRepType, dataConTyCon, dataConWorkId )
 import TysWiredIn	( tupleCon )
-import Var		( Var, Id, TyVar, idType, tyVarKind, mustHaveLocalBinding )
+import Var		( Var, Id, TyVar, idType, tyVarKind, mustHaveLocalBinding, setTyVarKind, setIdType  )
+import VarEnv           ( lookupInScope )
 import VarSet
 import Name		( getSrcLoc )
 import PprCore
@@ -34,8 +34,9 @@ import Type		( Type, tyVarsOfType, coreEqType,
 			  isUnboxedTupleType, isSubKind,
 			  substTyWith, emptyTvSubst, extendTvInScope, 
 			  TvSubst, TvSubstEnv, mkTvSubst, setTvSubstEnv, substTy,
-			  extendTvSubst, composeTvSubst, isInScope,
-			  getTvSubstEnv, getTvInScope )
+			  extendTvSubst, composeTvSubst, substTyVarBndr, isInScope,
+			  getTvSubstEnv, getTvInScope, mkTyVarTy )
+import Coercion         ( Coercion, coercionKind )
 import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
 import StaticFlags	( opt_PprStyle_Debug )
@@ -108,6 +109,60 @@ Outstanding issues:
     --
     --  * Oversaturated type app after specialisation (eta reduction
     --   may well be happening...);
+
+
+Note [Type lets]
+~~~~~~~~~~~~~~~~
+In the desugarer, it's very very convenient to be able to say (in effect)
+	let a = Int in <body>
+That is, use a type let.  (See notes just below for why we want this.)
+
+We don't have type lets in Core, so the desugarer uses type lambda
+	(/\a. <body>) Int
+However, in the lambda form, we'd get lint errors from:
+	(/\a. let x::a = 4 in <body>) Int
+because (x::a) doesn't look compatible with (4::Int).
+
+So (HACK ALERT) the Lint phase does type-beta reduction "on the fly",
+as it were.  It carries a type substitution (in this example [a -> Int])
+and applies this substitution before comparing types.  The functin
+	lintTy :: Type -> LintM Type
+returns a substituted type; that's the only reason it returns anything.
+
+When we encounter a binder (like x::a) we must apply the substitution
+to the type of the binding variable.  lintBinders does this.
+
+For Ids, the type-substituted Id is added to the in_scope set (which 
+itself is part of the TvSubst we are carrying down), and when we
+find an occurence of an Id, we fetch it from the in-scope set.
+
+
+Why we need type let
+~~~~~~~~~~~~~~~~~~~~
+It's needed when dealing with desugarer output for GADTs. Consider
+  data T = forall a. T a (a->Int) Bool
+   f :: T -> ... -> 
+   f (T x f True)  = <e1>
+   f (T y g False) = <e2>
+After desugaring we get
+	f t b = case t of 
+		  T a (x::a) (f::a->Int) (b:Bool) ->
+		    case b of 
+			True -> <e1>
+			False -> (/\b. let y=x; g=f in <e2>) a
+And for a reason I now forget, the ...<e2>... can mention a; so 
+we want Lint to know that b=a.  Ugh.
+
+I tried quite hard to make the necessity for this go away, by changing the 
+desugarer, but the fundamental problem is this:
+	
+	T a (x::a) (y::Int) -> let fail::a = ...
+			       in (/\b. ...(case ... of       
+						True  -> x::b
+					 	False -> fail)
+				  ) a
+Now the inner case look as though it has incompatible branches.
+
 
 \begin{code}
 lintCoreBindings :: DynFlags -> String -> [CoreBind] -> IO ()
@@ -189,6 +244,8 @@ lintSingleBinding rec_flag (binder,rhs)
   where
     binder_ty = idType binder
     bndr_vars = varSetElems (idFreeVars binder)
+    lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
+	           | otherwise = return ()
 \end{code}
 
 %************************************************************************
@@ -207,18 +264,28 @@ lintCoreExpr :: CoreExpr -> LintM OutType
 --	lintCoreExpr e subst = exprType (subst e)
 
 lintCoreExpr (Var var)
-  = do	{ checkIdInScope var 
- 	; applySubst (idType var) }
+  = do	{ checkL (not (var == oneTupleDataConId))
+		 (ptext SLIT("Illegal one-tuple"))
+	; var' <- lookupIdInScope var
+        ; return (idType var')
+        }
 
 lintCoreExpr (Lit lit)
   = return (literalType lit)
 
-lintCoreExpr (Note (Coerce to_ty from_ty) expr)
-  = do	{ expr_ty <- lintCoreExpr expr
-	; to_ty <- lintTy to_ty
-	; from_ty <- lintTy from_ty	
-	; checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)
-	; return to_ty }
+--lintCoreExpr (Note (Coerce to_ty from_ty) expr)
+--  = do	{ expr_ty <- lintCoreExpr expr
+--	; to_ty <- lintTy to_ty
+--	; from_ty <- lintTy from_ty	
+--	; checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)
+--	; return to_ty }
+
+lintCoreExpr (Cast expr co)
+  = do { expr_ty <- lintCoreExpr expr
+       ; co' <- lintTy co
+       ; let (from_ty, to_ty) = coercionKind co'
+       ; checkTys from_ty expr_ty (mkCastErr from_ty expr_ty)
+       ; return to_ty }
 
 lintCoreExpr (Note other_note expr)
   = lintCoreExpr expr
@@ -226,40 +293,17 @@ lintCoreExpr (Note other_note expr)
 lintCoreExpr (Let (NonRec bndr rhs) body)
   = do	{ lintSingleBinding NonRecursive (bndr,rhs)
 	; addLoc (BodyOfLetRec [bndr])
-		 (addInScopeVars [bndr] (lintCoreExpr body)) }
+		 (lintAndScopeId bndr $ \_ -> (lintCoreExpr body)) }
 
 lintCoreExpr (Let (Rec pairs) body) 
-  = addInScopeVars bndrs	$
+  = lintAndScopeIds bndrs	$ \_ ->
     do	{ mapM (lintSingleBinding Recursive) pairs	
 	; addLoc (BodyOfLetRec bndrs) (lintCoreExpr body) }
   where
     bndrs = map fst pairs
 
 lintCoreExpr e@(App fun (Type ty))
--- This is like 'let' for types
--- It's needed when dealing with desugarer output for GADTs. Consider
---   data T = forall a. T a (a->Int) Bool
---    f :: T -> ... -> 
---    f (T x f True)  = <e1>
---    f (T y g False) = <e2>
--- After desugaring we get
---	f t b = case t of 
---		  T a (x::a) (f::a->Int) (b:Bool) ->
---		    case b of 
---			True -> <e1>
---			False -> (/\b. let y=x; g=f in <e2>) a
--- And for a reason I now forget, the ...<e2>... can mention a; so 
--- we want Lint to know that b=a.  Ugh.
---
--- I tried quite hard to make the necessity for this go away, by changing the 
--- desugarer, but the fundamental problem is this:
---	
---	T a (x::a) (y::Int) -> let fail::a = ...
---			       in (/\b. ...(case ... of       
---						True  -> x::b
---					 	False -> fail)
---				  ) a
--- Now the inner case look as though it has incompatible branches.
+-- See Note [Type let] above
   = addLoc (AnExpr e) $
     go fun [ty]
   where
@@ -267,12 +311,15 @@ lintCoreExpr e@(App fun (Type ty))
 	= do { go fun (ty:tys) }
     go (Lam tv body) (ty:tys)
 	= do  { checkL (isTyVar tv) (mkKindErrMsg tv ty)	-- Not quite accurate
-	      ; ty' <- lintTy ty; 
-	      ; checkKinds tv ty'
+	      ; ty' <- lintTy ty 
+              ; let kind = tyVarKind tv
+              ; kind' <- lintTy kind
+              ; let tv' = setTyVarKind tv kind'
+	      ; checkKinds tv' ty'              
 		-- Now extend the substitution so we 
 		-- take advantage of it in the body
-	      ; addInScopeVars [tv] $
-	        extendSubstL tv ty' $
+	      ; addInScopeVars [tv'] $
+	        extendSubstL tv' ty' $
 		go body tys }
     go fun tys
 	= do  { fun_ty <- lintCoreExpr fun
@@ -285,14 +332,13 @@ lintCoreExpr e@(App fun arg)
 
 lintCoreExpr (Lam var expr)
   = addLoc (LambdaBodyOf var) $
-    do	{ body_ty <- addInScopeVars [var] $
-                     lintCoreExpr expr
-	; if isId var then do
-		{ var_ty <- lintId var 	
-		; return (mkFunTy var_ty body_ty) }
-	  else
-		return (mkForAllTy var body_ty)
-	}
+    lintBinders [var] $ \[var'] -> 
+    do { body_ty <- lintCoreExpr expr
+       ; if isId var' then 
+             return (mkFunTy (idType var') body_ty) 
+	 else
+	     return (mkForAllTy var' body_ty)
+       }
 	-- The applySubst is needed to apply the subst to var
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
@@ -300,17 +346,22 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
   do { scrut_ty <- lintCoreExpr scrut
      ; alt_ty   <- lintTy alt_ty  
      ; var_ty   <- lintTy (idType var)	
-	-- Don't use lintId on var, because unboxed tuple is legitimate
+	-- Don't use lintIdBndr on var, because unboxed tuple is legitimate
 
-     ; checkTys var_ty scrut_ty (mkScrutMsg var scrut_ty)
+     ; subst <- getTvSubst 
+     ; checkTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
 
      -- If the binder is an unboxed tuple type, don't put it in scope
-     ; let vars = if (isUnboxedTupleType (idType var)) then [] else [var]
-     ; addInScopeVars vars $
+     ; let scope = if (isUnboxedTupleType (idType var)) then 
+                       pass_var 
+                   else lintAndScopeId var
+     ; scope $ \_ ->
        do { -- Check the alternatives
             checkCaseAlts e scrut_ty alts
           ; mapM (lintCoreAlt scrut_ty alt_ty) alts
           ; return alt_ty } }
+  where
+    pass_var f = f var
 
 lintCoreExpr e@(Type ty)
   = addErrL (mkStrangeTyMsg e)
@@ -444,50 +495,23 @@ lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) =
     lit_ty = literalType lit
 
 lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
-  | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty,
-    tycon == dataConTyCon con
-  = addLoc (CaseAlt alt) $
-    addInScopeVars args $	-- Put the args in scope before lintBinder,
-				-- because the Ids mention the type variables
-    if isVanillaDataCon con then
-    do	{ addLoc (CasePat alt) $ do
-	  { mapM lintBinder args 
-         	-- FIX! Add check that all args are Ids.
-		 -- Check the pattern
+  | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
+  = addLoc (CaseAlt alt) $  lintBinders args $ \ args -> 
+    
+      do	{ addLoc (CasePat alt) $ do
+	    {    -- Check the pattern
 		 -- Scrutinee type must be a tycon applicn; checked by caller
 		 -- This code is remarkably compact considering what it does!
 		 -- NB: args must be in scope here so that the lintCoreArgs line works.
 	         -- NB: relies on existential type args coming *after* ordinary type args
 
-	  ; con_type <- lintTyApps (dataConRepType con) tycon_arg_tys
-                 -- Can just map Var as we know that this is a vanilla datacon
-	  ; con_result_ty <- lintCoreArgs con_type (map Var args)
+	  ; con_result_ty <-  
+                               lintCoreArgs (dataConRepType con)
+					        (map Type tycon_arg_tys ++ varsToCoreExprs args)
 	  ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
  	  }
 	       -- Check the RHS
 	; checkAltExpr rhs alt_ty }
-
-    else 	-- GADT
-    do	{ let (tvs,ids) = span isTyVar args
-        ; subst <- getTvSubst 
-	; let in_scope  = getTvInScope subst
-	      subst_env = getTvSubstEnv subst
-        ; case coreRefineTys con tvs scrut_ty of {
-             Nothing          -> return () ;	-- Alternative is dead code
-             Just (refine, _) -> updateTvSubstEnv (composeTvSubst in_scope refine subst_env) $
-    do 	{ addLoc (CasePat alt) $ do
-	  { tvs'     <- mapM lintTy (mkTyVarTys tvs)
-	  ; con_type <- lintTyApps (dataConRepType con) tvs'
-	  ; mapM lintBinder ids	-- Lint Ids in the refined world
-	  ; lintCoreArgs con_type (map Var ids)
-	  }
-
-	; let refined_alt_ty = substTy (mkTvSubst in_scope refine) alt_ty
-		-- alt_ty is already an OutType, so don't re-apply 
-		-- the current substitution.  But we must apply the
-		-- refinement so that the check in checkAltExpr is ok
-	; checkAltExpr rhs refined_alt_ty
-    } } }
 
   | otherwise	-- Scrut-ty is wrong shape
   = addErrL (mkBadAltMsg scrut_ty alt)
@@ -500,24 +524,59 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 %************************************************************************
 
 \begin{code}
-lintBinder :: Var -> LintM ()
-lintBinder var | isId var  = lintId var >> return ()
-	       | otherwise = return ()
+-- When we lint binders, we (one at a time and in order):
+--  1. Lint var types or kinds (possibly substituting)
+--  2. Add the binder to the in scope set, and if its a coercion var,
+--     we may extend the substitution to reflect its (possibly) new kind
+lintBinders :: [Var] -> ([Var] -> LintM a) -> LintM a
+lintBinders [] linterF = linterF []
+lintBinders (var:vars) linterF = lintBinder var $ \var' ->
+				 lintBinders vars $ \ vars' ->
+				 linterF (var':vars')
 
-lintId :: Var -> LintM OutType
+lintBinder :: Var -> (Var -> LintM a) -> LintM a
+lintBinder var linterF
+  | isTyVar var = lint_ty_bndr
+  | otherwise   = lintIdBndr var linterF
+  where
+    lint_ty_bndr = do { lintTy (tyVarKind var)
+		      ; subst <- getTvSubst
+		      ; let (subst', tv') = substTyVarBndr subst var
+		      ; updateTvSubst subst' (linterF tv') }
+
+lintIdBndr :: Var -> (Var -> LintM a) -> LintM a
+-- Do substitution on the type of a binder and add the var with this 
+-- new type to the in-scope set of the second argument
 -- ToDo: lint its rules
-lintId id
+lintIdBndr id linterF 
   = do 	{ checkL (not (isUnboxedTupleType (idType id))) 
 		 (mkUnboxedTupleMsg id)
 		-- No variable can be bound to an unboxed tuple.
-	; lintTy (idType id) }
+        ; lintAndScopeId id $ \id' -> linterF id'
+        }
+
+lintAndScopeIds :: [Var] -> ([Var] -> LintM a) -> LintM a
+lintAndScopeIds ids linterF 
+  = go ids
+  where
+    go []       = linterF []
+    go (id:ids) = do { lintAndScopeId id $ \id ->
+                           lintAndScopeIds ids $ \ids ->
+                           linterF (id:ids) }
+
+lintAndScopeId :: Var -> (Var -> LintM a) -> LintM a
+lintAndScopeId id linterF 
+  = do { ty <- lintTy (idType id)
+       ; let id' = setIdType id ty
+       ; addInScopeVars [id'] $ (linterF id')
+       }
 
 lintTy :: InType -> LintM OutType
 -- Check the type, and apply the substitution to it
 -- ToDo: check the kind structure of the type
 lintTy ty 
   = do	{ ty' <- applySubst ty
-	; mapM_ checkIdInScope (varSetElems (tyVarsOfType ty'))
+	; mapM_ checkTyVarInScope (varSetElems (tyVarsOfType ty'))
 	; return ty' }
 \end{code}
 
@@ -595,9 +654,9 @@ addInScopeVars :: [Var] -> LintM a -> LintM a
 addInScopeVars vars m = 
   LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst vars) errs)
 
-updateTvSubstEnv :: TvSubstEnv -> LintM a -> LintM a
-updateTvSubstEnv substenv m = 
-  LintM (\ loc subst errs -> unLintM m loc (setTvSubstEnv subst substenv) errs)
+updateTvSubst :: TvSubst -> LintM a -> LintM a
+updateTvSubst subst' m = 
+  LintM (\ loc subst errs -> unLintM m loc subst' errs)
 
 getTvSubst :: LintM TvSubst
 getTvSubst = LintM (\ loc subst errs -> (Just subst, errs))
@@ -611,11 +670,19 @@ extendSubstL tv ty m
 \end{code}
 
 \begin{code}
-checkIdInScope :: Var -> LintM ()
-checkIdInScope id 
-  = do { checkL (not (id == oneTupleDataConId))
-		(ptext SLIT("Illegal one-tuple"))
-       ; checkInScope (ptext SLIT("is out of scope")) id }
+lookupIdInScope :: Id -> LintM Id
+lookupIdInScope id 
+  | not (mustHaveLocalBinding id)
+  = return id	-- An imported Id
+  | otherwise	
+  = do	{ subst <- getTvSubst
+	; case lookupInScope (getTvInScope subst) id of
+		Just v  -> return v
+		Nothing -> do { addErrL out_of_scope
+			      ; return id } }
+  where
+    out_of_scope = ppr id <+> ptext SLIT("is out of scope")
+
 
 oneTupleDataConId :: Id	-- Should not happen
 oneTupleDataConId = dataConWorkId (tupleCon Boxed 1)
@@ -626,6 +693,9 @@ checkBndrIdInScope binder id
     where
      msg = ptext SLIT("is out of scope inside info for") <+> 
 	   ppr binder
+
+checkTyVarInScope :: TyVar -> LintM ()
+checkTyVarInScope tv = checkInScope (ptext SLIT("is out of scope")) tv
 
 checkInScope :: SDoc -> Var -> LintM ()
 checkInScope loc_msg var =
@@ -698,11 +768,12 @@ mkCaseAltMsg e ty1 ty2
   = hang (text "Type of case alternatives not the same as the annotation on case:")
 	 4 (vcat [ppr ty1, ppr ty2, ppr e])
 
-mkScrutMsg :: Id -> Type -> Message
-mkScrutMsg var scrut_ty
+mkScrutMsg :: Id -> Type -> Type -> TvSubst -> Message
+mkScrutMsg var var_ty scrut_ty subst
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
-	  text "Result binder type:" <+> ppr (idType var),
-	  text "Scrutinee type:" <+> ppr scrut_ty]
+	  text "Result binder type:" <+> ppr var_ty,--(idType var),
+	  text "Scrutinee type:" <+> ppr scrut_ty,
+     hsep [ptext SLIT("Current TV subst"), ppr subst]]
 
 
 mkNonDefltMsg e
@@ -774,8 +845,8 @@ mkUnboxedTupleMsg binder
   = vcat [hsep [ptext SLIT("A variable has unboxed tuple type:"), ppr binder],
 	  hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]]
 
-mkCoerceErr from_ty expr_ty
-  = vcat [ptext SLIT("From-type of Coerce differs from type of enclosed expression"),
+mkCastErr from_ty expr_ty
+  = vcat [ptext SLIT("From-type of Cast differs from type of enclosed expression"),
 	  ptext SLIT("From-type:") <+> ppr from_ty,
 	  ptext SLIT("Type of enclosed expr:") <+> ppr expr_ty
     ]
