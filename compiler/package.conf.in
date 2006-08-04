@@ -127,7 +127,6 @@ exposed-modules:
 	Java
 	JavaGen
 	InteractiveUI
-	Kind
 	Lexer
 	LexCore
 	LiberateCase
