@@ -171,4 +171,5 @@ substIdEnv env (Case expr b ty alts) =
        (c, bnds, substIdEnv (delVarEnvList env bnds) expr)
 substIdEnv env (Note n expr) =
   Note n (substIdEnv env expr)
+substIdEnv env (Cast e co) = Cast (substIdEnv env e) co
 substIdEnv env e@(Type t) = e

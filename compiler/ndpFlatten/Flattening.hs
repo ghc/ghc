@@ -65,6 +65,7 @@ import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
 -- GHC
 import TcType	    ( tcIsForAllTy, tcView )
 import TypeRep	    ( Type(..) )
+import Coercion     ( coercionKind )
 import StaticFlags  (opt_Flatten)
 import Panic        (panic)
 import ErrUtils     (dumpIfSet_dyn)
@@ -448,11 +449,12 @@ lift cExpr@(Case expr b _ alts)  =
                 else extendContext [lb] (liftCaseDataCon b alts)
     letWrapper lExpr b lalts
 
-lift (Note (Coerce t1 t2) expr) =
-  do  
+lift (Cast expr co) =
+  do
     (lexpr, t) <- lift expr
-    let lt1 = liftTy t1
-    return ((Note (Coerce lt1 (liftTy t2)) lexpr), lt1)
+    let lco = liftTy co
+    let (t1, t2) = coercionKind lco
+    return ((Cast expr lco), t2)
 
 lift (Note note expr) =
   do 

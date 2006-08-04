@@ -87,6 +87,10 @@ arrUsage (Note n expr) =
 arrUsage (Type t) =
   typeArrayUsage  t
 
+-- not quite sure this is right
+arrUsage (Cast expr co) =
+  arrUsage expr 
+
 bindType (b, expr) =
   let
     bT    = varArrayUsage b
