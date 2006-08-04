@@ -16,6 +16,7 @@ import CoreUtils	( rhsIsStatic, manifestArity, exprType, findDefault )
 import StgSyn
 
 import Type
+import Coercion         ( mkUnsafeCoercion )
 import TyCon		( isAlgTyCon )
 import Id
 import Var		( Var, globalIdDetails, idType )
@@ -185,7 +186,7 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
 	
 	bind = StgNonRec id stg_rhs
     in
-    ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id)
+    ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id $$ (ptext SLIT("rhs:")) <+> ppr rhs $$ (ptext SLIT("stg_rhs:"))<+> ppr stg_rhs $$ (ptext SLIT("Manifest:")) <+> (ppr $ manifestArity rhs) $$ (ptext SLIT("STG:")) <+>(ppr $ stgRhsArity stg_rhs) )
     ASSERT2(consistentCafInfo id bind, ppr id)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
@@ -321,15 +322,19 @@ coreToStgExpr (Note (SCC cc) expr)
     returnLne (StgSCC cc expr2, fvs, escs) )
 
 #ifdef ILX
--- For ILX, convert (__coerce__ to_ty from_ty e) 
---	    into    (coerce to_ty from_ty e)
+-- For ILX, convert (__coerce__ to_ty from_ty e)
+--         into    (coerce to_ty from_ty e)
 -- where coerce is real function
-coreToStgExpr (Note (Coerce to_ty from_ty) expr)
-  = coreToStgExpr (mkApps (Var unsafeCoerceId) 
-			  [Type from_ty, Type to_ty, expr])
+coreToStgExpr (Cast expr co)
+  = let (from_ty, ty_ty) = coercionKind co in
+    coreToStgExpr (mkApps (Var unsafeCoerceId)
+                         [Type from_ty, Type to_ty, expr])
 #endif
 
 coreToStgExpr (Note other_note expr)
+  = coreToStgExpr expr
+
+coreToStgExpr (Cast expr co)
   = coreToStgExpr expr
 
 -- Cases require a little more real work.
@@ -1083,6 +1088,7 @@ myCollectBinders expr
   where
     go bs (Lam b e)          = go (b:bs) e
     go bs e@(Note (SCC _) _) = (reverse bs, e) 
+    go bs (Cast e co)        = go bs e
     go bs (Note _ e)         = go bs e
     go bs e	             = (reverse bs, e)
 
@@ -1095,6 +1101,7 @@ myCollectArgs expr
     go (Var v)          as = (v, as)
     go (App f a) as        = go f (a:as)
     go (Note (SCC _) e) as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+    go (Cast e co)      as = go e as
     go (Note n e)       as = go e as
     go _		as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 \end{code}
