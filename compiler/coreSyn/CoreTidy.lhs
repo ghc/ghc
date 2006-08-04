@@ -11,8 +11,7 @@ module CoreTidy (
 
 import CoreSyn
 import CoreUtils	( exprArity )
-import Unify		( coreRefineTys )
-import DataCon		( DataCon, isVanillaDataCon )
+import DataCon		( DataCon )
 import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique,
 			  idType, setIdType )
 import IdInfo		( setArityInfo, vanillaIdInfo,
@@ -57,11 +56,12 @@ tidyBind env (Rec prs)
 
 ------------  Expressions  --------------
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
-tidyExpr env (Var v)   	=  Var (tidyVarOcc env v)
-tidyExpr env (Type ty) 	=  Type (tidyType env ty)
-tidyExpr env (Lit lit) 	=  Lit lit
-tidyExpr env (App f a) 	=  App (tidyExpr env f) (tidyExpr env a)
-tidyExpr env (Note n e) =  Note (tidyNote env n) (tidyExpr env e)
+tidyExpr env (Var v)   	 =  Var (tidyVarOcc env v)
+tidyExpr env (Type ty) 	 =  Type (tidyType env ty)
+tidyExpr env (Lit lit) 	 =  Lit lit
+tidyExpr env (App f a) 	 =  App (tidyExpr env f) (tidyExpr env a)
+tidyExpr env (Note n e)  =  Note (tidyNote env n) (tidyExpr env e)
+tidyExpr env (Cast e co) =  Cast (tidyExpr env e) (tidyType env co)
 
 tidyExpr env (Let b e) 
   = tidyBind env b 	=: \ (env', b') ->
@@ -77,42 +77,11 @@ tidyExpr env (Lam b e)
     Lam b (tidyExpr env' e)
 
 ------------  Case alternatives  --------------
-tidyAlt case_bndr env (DataAlt con, vs, rhs)
-  | not (isVanillaDataCon con)	-- GADT case
-  = tidyBndrs env tvs	 	=: \ (env1, tvs') ->
-    let 
-	env2 = refineTidyEnv env1 con tvs' scrut_ty
-    in
-    tidyBndrs env2 ids 	=: \ (env3, ids') ->
-    (DataAlt con, tvs' ++ ids', tidyExpr env3 rhs)
-  where 
-    (tvs, ids) = span isTyVar vs
-    scrut_ty = idType case_bndr
-
 tidyAlt case_bndr env (con, vs, rhs)
   = tidyBndrs env vs 	=: \ (env', vs) ->
     (con, vs, tidyExpr env' rhs)
 
-refineTidyEnv :: TidyEnv -> DataCon -> [TyVar] -> Type -> TidyEnv
--- Refine the TidyEnv in the light of the type refinement from coreRefineTys
-refineTidyEnv tidy_env@(occ_env, var_env)  con tvs scrut_ty
-  = case coreRefineTys con tvs scrut_ty of
-	Nothing -> tidy_env
-	Just (tv_subst, all_bound_here)
-	    | all_bound_here 	-- Local type refinement only
-	    -> tidy_env
-	    | otherwise  	-- Apply the refining subst to the tidy env
-				-- This ensures that occurences have the most refined type
-				-- And that means that exprType will work right everywhere
-	    -> (occ_env, mapVarEnv (refine subst) var_env)
-	    where
-	      subst = mkOpenTvSubst tv_subst
-  where
-    refine subst var | isId var  = setIdType var (substTy subst (idType var)) 
-		     | otherwise = var
-
 ------------  Notes  --------------
-tidyNote env (Coerce t1 t2)  = Coerce (tidyType env t1) (tidyType env t2)
 tidyNote env note            = note
 
 ------------  Rules  --------------

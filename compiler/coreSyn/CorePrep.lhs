@@ -14,19 +14,19 @@ import CoreUtils( exprType, exprIsHNF, etaExpand, exprArity, exprOkForSpeculatio
 import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
-import Type	( Type, applyTy, splitFunTy_maybe, 
-		  isUnLiftedType, isUnboxedTupleType, seqType )
+import Type	( Type, applyTy, 
+                  splitFunTy_maybe, isUnLiftedType, isUnboxedTupleType, seqType )
+import Coercion ( coercionKind )
 import TyCon	( TyCon, tyConDataCons )
 import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import Var 	( Var, Id, setVarUnique )
 import VarSet
 import VarEnv
-import Id	( mkSysLocal, idType, idNewDemandInfo, idArity, setIdUnfolding, setIdType,
-		  isFCallId, isGlobalId, 
-		  isLocalId, hasNoBinding, idNewStrictness, 
+import Id	( mkSysLocal, idType, idNewDemandInfo, idArity, setIdUnfolding, 
+		  isFCallId, isGlobalId, isLocalId, hasNoBinding, idNewStrictness, 
 		  isPrimOpId_maybe
 		)
-import DataCon	  ( isVanillaDataCon, dataConWorkId )
+import DataCon	  ( dataConWorkId )
 import PrimOp	  ( PrimOp( DataToTagOp ) )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
@@ -48,7 +48,8 @@ The goal of this pass is to prepare for code generation.
 
 1.  Saturate constructor and primop applications.
 
-2.  Convert to A-normal form:
+2.  Convert to A-normal form; that is, function arguments
+    are always variables.
 
     * Use case for strict arguments:
 	f E ==> case E of x -> f x
@@ -338,6 +339,7 @@ exprIsTrivial (Lit lit)       	       = True
 exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
 exprIsTrivial (Note (SCC _) e) 	       = False
 exprIsTrivial (Note _ e)      	       = exprIsTrivial e
+exprIsTrivial (Cast e co)              = exprIsTrivial e
 exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
 exprIsTrivial other	      	       = False
 
@@ -387,6 +389,10 @@ corePrepExprFloat env (Note other_note expr)
   = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
     returnUs (floats, Note other_note expr')
 
+corePrepExprFloat env (Cast expr co)
+  = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
+    returnUs (floats, Cast expr' co)
+
 corePrepExprFloat env expr@(Lam _ _)
   = cloneBndrs env bndrs		`thenUs` \ (env', bndrs') ->
     corePrepAnExpr env' body		`thenUs` \ body' ->
@@ -406,10 +412,7 @@ corePrepExprFloat env (Case scrut bndr ty alts)
     returnUs (floats1 `appendFloats` floats2 , Case scrut2 bndr2 ty alts')
   where
     sat_alt env (con, bs, rhs)
-	  = let 
-		env1 = setGadt env con
-	    in
-	    cloneBndrs env1 bs		`thenUs` \ (env2, bs') ->
+	  = cloneBndrs env bs		`thenUs` \ (env2, bs') ->
 	    corePrepAnExpr env2 rhs  	`thenUs` \ rhs1 ->
 	    deLam rhs1			`thenUs` \ rhs2 ->
 	    returnUs (con, bs', rhs2)
@@ -475,11 +478,11 @@ corePrepExprFloat env expr@(App _ _)
 		-- Here, we can't evaluate the arg strictly, because this 
 		-- partial application might be seq'd
 
-
-    collect_args (Note (Coerce ty1 ty2) fun) depth
-        = collect_args fun depth  `thenUs` \ (fun', hd, fun_ty, floats, ss) ->
-	  returnUs (Note (Coerce ty1 ty2) fun', hd, ty1, floats, ss)
-
+    collect_args (Cast fun co) depth
+        = let (_ty1,ty2) = coercionKind co in
+          collect_args fun depth  `thenUs` \ (fun', hd, fun_ty, floats, ss) ->
+	  returnUs (Cast fun' co, hd, ty2, floats, ss)
+          
     collect_args (Note note fun) depth
 	| ignore_note note 	-- Drop these notes altogether
 				-- They aren't used by the code generator
@@ -675,6 +678,9 @@ etaExpandRhs bndr rhs
 -- ---------------------------------------------------------------------------
 
 deLam :: CoreExpr -> UniqSM CoreExpr
+-- Takes an expression that may be a lambda, 
+-- and returns one that definitely isn't:
+--	(\x.e) ==>  let f = \x.e in f
 deLam expr = 
   deLamFloat expr   `thenUs` \ (floats, expr) ->
   mkBinds floats expr
@@ -688,6 +694,10 @@ deLamFloat (Note n expr)
 	-- 	case e of { p -> coerce t (\s -> ...) }
     deLamFloat expr	`thenUs` \ (floats, expr') ->
     returnUs (floats, Note n expr')
+
+deLamFloat (Cast e co)
+  = deLamFloat e	`thenUs` \ (floats, e') ->
+    returnUs (floats, Cast e' co)
 
 deLamFloat expr 
   | null bndrs = returnUs (emptyFloats, expr)
@@ -703,7 +713,8 @@ deLamFloat expr
 -- Why try eta reduction?  Hasn't the simplifier already done eta?
 -- But the simplifier only eta reduces if that leaves something
 -- trivial (like f, or f Int).  But for deLam it would be enough to
--- get to a partial application, like (map f).
+-- get to a partial application:
+-- 	\xs. map f xs ==> map f
 
 tryEta bndrs expr@(App _ _)
   | ok_to_eta_reduce f &&
@@ -780,38 +791,18 @@ onceDem = RhsDemand False True   -- used at most once
 -- ---------------------------------------------------------------------------
 
 data CorePrepEnv = CPE (IdEnv Id)	-- Clone local Ids
-		       Bool		-- True <=> inside a GADT case; see Note [GADT]
-
--- Note [GADT]
---
--- Be careful with cloning inside GADTs.  For example, 
---	/\a. \f::a. \x::T a. case x of { T -> f True; ... }
--- The case on x may refine the type of f to be a function type.
--- Without this type refinement, exprType (f True) may simply fail,
--- which is bad.  
---
--- Solution: remember when we are inside a potentially-type-refining case,
--- 	     and in that situation use the type from the old occurrence
---	     when looking up occurrences
 
 emptyCorePrepEnv :: CorePrepEnv
-emptyCorePrepEnv = CPE emptyVarEnv False
+emptyCorePrepEnv = CPE emptyVarEnv
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
-extendCorePrepEnv (CPE env gadt) id id' = CPE (extendVarEnv env id id') gadt
+extendCorePrepEnv (CPE env) id id' = CPE (extendVarEnv env id id')
 
 lookupCorePrepEnv :: CorePrepEnv -> Id -> Id
--- See Note [GADT] above
-lookupCorePrepEnv (CPE env gadt) id
+lookupCorePrepEnv (CPE env) id
   = case lookupVarEnv env id of
-	Nothing		     -> id
-	Just id' | gadt      -> setIdType id' (idType id)
-		 | otherwise -> id'
-
-setGadt :: CorePrepEnv -> AltCon -> CorePrepEnv
-setGadt env@(CPE id_env _) (DataAlt data_con) | not (isVanillaDataCon data_con) = CPE id_env True
-setGadt env 		   other 						= env
-
+	Nothing	 -> id
+	Just id' -> id'
 
 ------------------------------------------------------------------------------
 -- Cloning binders
