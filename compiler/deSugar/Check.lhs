@@ -11,7 +11,7 @@ module Check ( check , ExhaustivePat ) where
 
 
 import HsSyn		
-import TcHsSyn		( hsPatType, mkVanillaTuplePat )
+import TcHsSyn		( hsLPatType, mkVanillaTuplePat )
 import TcType		( tcTyConAppTyCon )
 import DsUtils		( EquationInfo(..), MatchResult(..), 
 			  CanItFail(..), firstPat )
@@ -365,12 +365,12 @@ is transformed in:
 remove_first_column :: Pat Id                -- Constructor 
                     -> [(EqnNo, EquationInfo)] 
                     -> [(EqnNo, EquationInfo)]
-remove_first_column (ConPatOut (L _ con) _ _ _ (PrefixCon con_pats) _) qs
+remove_first_column (ConPatOut{ pat_con = L _ con, pat_args = PrefixCon con_pats }) qs
   = ASSERT2( okGroup qs, pprGroup qs ) 
     [(n, shift_var eqn) | q@(n, eqn) <- qs, is_var_con con (firstPatN q)]
   where
-     new_wilds = [WildPat (hsPatType arg_pat) | arg_pat <- con_pats]
-     shift_var eqn@(EqnInfo { eqn_pats = ConPatOut _ _ _ _ (PrefixCon ps') _ : ps}) 
+     new_wilds = [WildPat (hsLPatType arg_pat) | arg_pat <- con_pats]
+     shift_var eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_args = PrefixCon ps' } : ps}) 
  	= eqn { eqn_pats = map unLoc ps' ++ ps }
      shift_var eqn@(EqnInfo { eqn_pats = WildPat _ : ps })
   	= eqn { eqn_pats = new_wilds ++ ps }
@@ -391,7 +391,7 @@ make_row_vars_for_constructor (_, EqnInfo { eqn_pats = pats})
   = takeList (tail pats) (repeat nlWildPat)
 
 compare_cons :: Pat Id -> Pat Id -> Bool
-compare_cons (ConPatOut (L _ id1) _ _ _ _ _) (ConPatOut (L _ id2) _ _ _ _ _) = id1 == id2  
+compare_cons (ConPatOut{ pat_con = L _ id1 }) (ConPatOut { pat_con = L _ id2 }) = id1 == id2  
 
 remove_dups :: [Pat Id] -> [Pat Id]
 remove_dups []     = []
@@ -438,10 +438,10 @@ mb_neg (Just _) v = -v
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = unused_cons
      where
-       (ConPatOut _ _ _ _ _ ty) = head used_cons
+       (ConPatOut { pat_ty = ty }) = head used_cons
        ty_con 		      = tcTyConAppTyCon ty		-- Newtype observable
        all_cons        	      = tyConDataCons ty_con
-       used_cons_as_id 	      = map (\ (ConPatOut (L _ d) _ _ _ _ _) -> d) used_cons
+       used_cons_as_id 	      = map (\ (ConPatOut{ pat_con = L _ d}) -> d) used_cons
        unused_cons     	      = uniqSetToList
 		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
@@ -475,8 +475,8 @@ firstPatN :: (EqnNo, EquationInfo) -> Pat Id
 firstPatN (_, eqn) = firstPat eqn
 
 is_con :: Pat Id -> Bool
-is_con (ConPatOut _ _ _ _ _ _) = True
-is_con _                     = False
+is_con (ConPatOut {}) = True
+is_con _              = False
 
 is_lit :: Pat Id -> Bool
 is_lit (LitPat _)      = True
@@ -488,9 +488,9 @@ is_var (WildPat _) = True
 is_var _           = False
 
 is_var_con :: DataCon -> Pat Id -> Bool
-is_var_con con (WildPat _)                          = True
-is_var_con con (ConPatOut (L _ id) _ _ _ _ _) | id == con = True
-is_var_con con _                                    = False
+is_var_con con (WildPat _)                                 = True
+is_var_con con (ConPatOut{ pat_con = L _ id }) | id == con = True
+is_var_con con _                                           = False
 
 is_var_lit :: HsLit -> Pat Id -> Bool
 is_var_lit lit (WildPat _)   = True
@@ -552,12 +552,12 @@ make_list p (ListPat ps ty) = ListPat (p:ps) ty
 make_list _ _               = panic "Check.make_list: Invalid argument"
 
 make_con :: Pat Id -> ExhaustivePat -> ExhaustivePat           
-make_con (ConPatOut (L _ id) _ _ _ _ _) (lp:lq:ps, constraints) 
+make_con (ConPatOut{ pat_con = L _ id }) (lp:lq:ps, constraints) 
      | return_list id q = (noLoc (make_list lp q) : ps, constraints)
      | isInfixCon id    = (nlInfixConPat (getName id) lp lq : ps, constraints) 
    where q  = unLoc lq	
 
-make_con (ConPatOut (L _ id) _ _ _ (PrefixCon pats) ty) (ps, constraints) 
+make_con (ConPatOut{ pat_con = L _ id, pat_args = PrefixCon pats, pat_ty = ty }) (ps, constraints) 
       | isTupleTyCon tc  = (noLoc (TuplePat pats_con (tupleTyConBoxity tc) ty) : rest_pats, constraints) 
       | isPArrFakeCon id = (noLoc (PArrPat pats_con placeHolderType)           : rest_pats, constraints) 
       | otherwise        = (nlConPat name pats_con      : rest_pats, constraints)
@@ -603,16 +603,16 @@ has_nplusk_lpat :: LPat Id -> Bool
 has_nplusk_lpat (L _ p) = has_nplusk_pat p
 
 has_nplusk_pat :: Pat Id -> Bool
-has_nplusk_pat (NPlusKPat _ _ _ _) 	 = True
-has_nplusk_pat (ParPat p)  	   	 = has_nplusk_lpat p
-has_nplusk_pat (AsPat _ p) 	   	 = has_nplusk_lpat p
-has_nplusk_pat (SigPatOut p _ )    	 = has_nplusk_lpat p
-has_nplusk_pat (ConPatOut _ _ _ _ ps ty) = any has_nplusk_lpat (hsConArgs ps)
-has_nplusk_pat (ListPat ps _)  		 = any has_nplusk_lpat ps
-has_nplusk_pat (TuplePat ps _ _) 	 = any has_nplusk_lpat ps
-has_nplusk_pat (PArrPat ps _)  		 = any has_nplusk_lpat ps
-has_nplusk_pat (LazyPat p)     		 = False	-- Why?
-has_nplusk_pat (BangPat p)     		 = has_nplusk_lpat p	-- I think
+has_nplusk_pat (NPlusKPat _ _ _ _) 	     = True
+has_nplusk_pat (ParPat p)  	   	     = has_nplusk_lpat p
+has_nplusk_pat (AsPat _ p) 	   	     = has_nplusk_lpat p
+has_nplusk_pat (SigPatOut p _ )    	     = has_nplusk_lpat p
+has_nplusk_pat (ListPat ps _)  	   	     = any has_nplusk_lpat ps
+has_nplusk_pat (TuplePat ps _ _)   	     = any has_nplusk_lpat ps
+has_nplusk_pat (PArrPat ps _)  	   	     = any has_nplusk_lpat ps
+has_nplusk_pat (LazyPat p)     	   	     = False	-- Why?
+has_nplusk_pat (BangPat p)     	   	     = has_nplusk_lpat p	-- I think
+has_nplusk_pat (ConPatOut { pat_args = ps }) = any has_nplusk_lpat (hsConArgs ps)
 has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat, DictPat
 
 simplify_lpat :: LPat Id -> LPat Id  
@@ -629,8 +629,8 @@ simplify_pat (BangPat p)      = unLoc (simplify_lpat p)
 simplify_pat (AsPat id p)     = unLoc (simplify_lpat p)
 simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
 
-simplify_pat (ConPatOut (L loc id) tvs dicts binds ps ty) 
-  = ConPatOut (L loc id) tvs dicts binds (simplify_con id ps) ty
+simplify_pat pat@(ConPatOut { pat_con = L loc id, pat_args = ps })
+  = pat { pat_args = simplify_con id ps }
 
 simplify_pat (ListPat ps ty) = 
   unLoc $ foldr (\ x y -> mkPrefixConPat consDataCon [x,y] list_ty)
@@ -642,28 +642,26 @@ simplify_pat (ListPat ps ty) =
 -- arrays with the existing machinery for constructor pattern
 --
 simplify_pat (PArrPat ps ty)
-  = mk_simple_con_pat (parrFakeCon (length ps))
-		      (PrefixCon (map simplify_lpat ps)) 
-		      (mkPArrTy ty)
+  = unLoc $ mkPrefixConPat (parrFakeCon (length ps))
+			   (map simplify_lpat ps) 
+			   (mkPArrTy ty)
 
 simplify_pat (TuplePat ps boxity ty)
-  = mk_simple_con_pat (tupleCon boxity arity)
-		      (PrefixCon (map simplify_lpat ps))
-		      ty
+  = unLoc $ mkPrefixConPat (tupleCon boxity arity)
+		           (map simplify_lpat ps) ty
   where
     arity = length ps
 
 -- unpack string patterns fully, so we can see when they overlap with
 -- each other, or even explicit lists of Chars.
 simplify_pat pat@(LitPat (HsString s)) = 
-   foldr (\c pat -> mk_simple_con_pat consDataCon (PrefixCon [mk_char_lit c,noLoc pat]) stringTy)
-	 (mk_simple_con_pat nilDataCon (PrefixCon []) stringTy) (unpackFS s)
+   unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mk_char_lit c, pat] stringTy)
+		 (mkPrefixConPat nilDataCon [] stringTy) (unpackFS s)
   where
-    mk_char_lit c = noLoc (mk_simple_con_pat charDataCon (PrefixCon [nlLitPat (HsCharPrim c)]) charTy)
+    mk_char_lit c = mkPrefixConPat charDataCon [nlLitPat (HsCharPrim c)] charTy
 
-simplify_pat pat@(LitPat lit) = unLoc (tidyLitPat lit (noLoc pat))
-
-simplify_pat pat@(NPat lit mb_neg _ lit_ty) = unLoc (tidyNPat lit mb_neg lit_ty (noLoc pat))
+simplify_pat (LitPat lit)		 = tidyLitPat lit 
+simplify_pat (NPat lit mb_neg eq lit_ty) = tidyNPat lit mb_neg eq lit_ty
 
 simplify_pat (NPlusKPat id hslit hsexpr1 hsexpr2)
    = WildPat (idType (unLoc id))
@@ -676,8 +674,6 @@ simplify_pat (DictPat dicts methods)
     where
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)
-
-mk_simple_con_pat con args ty = ConPatOut (noLoc con) [] [] emptyLHsBinds args ty
 
 -----------------
 simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
