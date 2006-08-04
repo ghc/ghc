@@ -571,10 +571,10 @@ mkRecordSelId tycon field_label
 -- it manipulates CoreSyn.
 
 mkReboxingAlt
-  :: [Unique]			-- Uniques for the new Ids
+  :: [Unique]		-- Uniques for the new Ids
   -> DataCon
-  -> [Var]			-- Source-level args, including existential dicts
-  -> CoreExpr			-- RHS
+  -> [Var]		-- Source-level args, including existential dicts
+  -> CoreExpr		-- RHS
   -> CoreAlt
 
 mkReboxingAlt us con args rhs
