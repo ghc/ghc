@@ -806,6 +806,7 @@ cafRefs p (Lam x e) 	       = cafRefs p e
 cafRefs p (Let b e) 	       = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
 cafRefs p (Case e bndr _ alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
 cafRefs p (Note n e) 	       = cafRefs p e
+cafRefs p (Cast e co)          = cafRefs p e
 cafRefs p (Type t) 	       = fastBool False
 
 cafRefss p [] 	  = fastBool False
