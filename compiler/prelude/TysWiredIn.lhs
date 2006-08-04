@@ -74,7 +74,10 @@ import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed,
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys,
 			  TyThing(..) )
-import Kind		( mkArrowKinds, liftedTypeKind, ubxTupleKind )
+import Coercion         ( unsafeCoercionTyCon, symCoercionTyCon,
+                          transCoercionTyCon, leftCoercionTyCon, 
+                          rightCoercionTyCon, instCoercionTyCon )
+import TypeRep          ( mkArrowKinds, liftedTypeKind, ubxTupleKind )
 import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
 import Array
@@ -97,6 +100,12 @@ names in PrelNames, so they use wTcQual, wDataQual, etc
 
 \begin{code}
 wiredInTyCons :: [TyCon]	-- Excludes tuples
+-- This list is used only to define PrelInfo.wiredInThings
+
+-- It does not need to include kind constructors, because
+-- all that wiredInThings does is to initialise the Name table,
+-- and kind constructors don't appear in source code.
+
 wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
 				-- it's defined in GHC.Base, and there's only
 				-- one of it.  We put it in wiredInTyCons so
@@ -110,6 +119,12 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
     	      , intTyCon
     	      , listTyCon
 	      , parrTyCon
+              , unsafeCoercionTyCon
+              , symCoercionTyCon
+              , transCoercionTyCon
+              , leftCoercionTyCon
+              , rightCoercionTyCon
+              , instCoercionTyCon
     	      ]
 \end{code}
 
@@ -157,6 +172,16 @@ intDataCon_RDR	= nameRdrName intDataConName
 listTyCon_RDR	= nameRdrName listTyConName
 consDataCon_RDR = nameRdrName consDataConName
 parrTyCon_RDR	= nameRdrName parrTyConName
+{-
+tySuperKindTyCon_RDR     = nameRdrName tySuperKindTyConName
+coSuperKindTyCon_RDR = nameRdrName coSuperKindTyConName
+liftedTypeKindTyCon_RDR   = nameRdrName liftedTypeKindTyConName
+openTypeKindTyCon_RDR     = nameRdrName openTypeKindTyConName
+unliftedTypeKindTyCon_RDR = nameRdrName unliftedTypeKindTyConName
+ubxTupleKindTyCon_RDR     = nameRdrName ubxTupleKindTyConName
+argTypeKindTyCon_RDR      = nameRdrName argTypeKindTyConName
+funKindTyCon_RDR          = nameRdrName funKindTyConName
+-}
 \end{code}
 
 
@@ -182,6 +207,7 @@ pcTyCon is_enum is_rec name tyvars argvrcs cons
 		[] 		-- No record selectors
                 is_rec
 		True		-- All the wired-in tycons have generics
+		False		-- Not in GADT syntax
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataCon = pcDataConWithFixity False
@@ -197,10 +223,15 @@ pcDataConWithFixity :: Bool -> Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
   = data_con
   where
-    data_con = mkDataCon dc_name declared_infix True {- Vanilla -}
+    data_con = mkDataCon dc_name declared_infix
                 (map (const NotMarkedStrict) arg_tys)
-                [{- No labelled fields -}]
-                tyvars [] [] arg_tys tycon (mkTyVarTys tyvars)
+                [] 	-- No labelled fields
+                tyvars
+		[] 	-- No existential type variables
+		[]	-- No equality spec
+		[]	-- No theta
+		arg_tys tycon
+		[]	-- No stupid theta
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
 		
 
@@ -546,4 +577,5 @@ mkPArrFakeCon arity  = data_con
 isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 \end{code}
+
 

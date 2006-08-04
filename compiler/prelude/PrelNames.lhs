@@ -807,6 +807,28 @@ objectTyConKey				= mkPreludeTyConUnique 83
 
 eitherTyConKey				= mkPreludeTyConUnique 84
 
+-- Super Kinds constructors
+tySuperKindTyConKey                    = mkPreludeTyConUnique 85
+coSuperKindTyConKey                = mkPreludeTyConUnique 86
+
+-- Kind constructors
+liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
+openTypeKindTyConKey                    = mkPreludeTyConUnique 88
+unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
+ubxTupleKindTyConKey                    = mkPreludeTyConUnique 90
+argTypeKindTyConKey                     = mkPreludeTyConUnique 91
+
+eqCoercionKindTyConKey                    = mkPreludeTyConUnique 92
+
+-- Coercion constructors
+symCoercionTyConKey                     = mkPreludeTyConUnique 93
+transCoercionTyConKey                   = mkPreludeTyConUnique 94
+leftCoercionTyConKey                    = mkPreludeTyConUnique 95
+rightCoercionTyConKey                   = mkPreludeTyConUnique 96
+instCoercionTyConKey                    = mkPreludeTyConUnique 97
+unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
+
+
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-129
 -----------------------------------------------------
