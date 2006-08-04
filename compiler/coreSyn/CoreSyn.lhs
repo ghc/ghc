@@ -12,8 +12,8 @@ module CoreSyn (
 	mkLets, mkLams, 
 	mkApps, mkTyApps, mkValApps, mkVarApps,
 	mkLit, mkIntLitInt, mkIntLit, 
-	mkConApp, 
-	varToCoreExpr,
+	mkConApp, mkCast,
+	varToCoreExpr, varsToCoreExprs,
 
 	isTyVar, isId, cmpAltCon, cmpAlt, ltAlt,
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
@@ -50,6 +50,7 @@ import StaticFlags	( opt_RuntimeTypes )
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
+import Coercion         ( Coercion )
 import Name		( Name )
 import OccName		( OccName )
 import Literal	        ( Literal, mkMachInt )
@@ -90,6 +91,7 @@ data Expr b	-- "b" for the type of binders,
 	--		lit	(for LitAlts)
 	--	      This makes finding the relevant constructor easy,
 	--	      and makes comparison easier too
+  | Cast  (Expr b) Coercion
   | Note  Note (Expr b)
   | Type  Type			-- This should only show up at the top
 				-- level of an Arg
@@ -121,10 +123,6 @@ data Bind b = NonRec b (Expr b)
 
 data Note
   = SCC CostCentre
-
-  | Coerce	
-	Type		-- The to-type:   type of whole coerce expression
-	Type		-- The from-type: type of enclosed expression
 
   | InlineMe		-- Instructs simplifer to treat the enclosed expression
 			-- as very small, and inline it at its call sites
@@ -441,7 +439,7 @@ mkLets	      :: [Bind b] -> Expr b -> Expr b
 mkLams	      :: [b] -> Expr b -> Expr b
 
 mkLit lit	  = Lit lit
-mkConApp con args = mkApps (Var (dataConWorkId con)) args
+mkConApp con args = pprTrace "mkConApp" (ppr con) $ mkApps (Var (dataConWorkId con)) args
 
 mkLams binders body = foldr Lam body binders
 mkLets binds body   = foldr Let body binds
@@ -452,6 +450,12 @@ mkIntLitInt n = Lit (mkMachInt (toInteger n))
 varToCoreExpr :: CoreBndr -> Expr b
 varToCoreExpr v | isId v    = Var v
                 | otherwise = Type (mkTyVarTy v)
+
+varsToCoreExprs :: [CoreBndr] -> [Expr b]
+varsToCoreExprs vs = map varToCoreExpr vs
+
+mkCast   :: Expr b -> Coercion -> Expr b
+mkCast e co = Cast e co
 \end{code}
 
 
@@ -601,13 +605,13 @@ seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
 -- gaw 2004
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
+seqExpr (Cast e co)     = seqExpr e `seq` seqType co
 seqExpr (Note n e)      = seqNote n `seq` seqExpr e
 seqExpr (Type t)        = seqType t
 
 seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
 
-seqNote (Coerce t1 t2) = seqType t1 `seq` seqType t2
 seqNote (CoreNote s)   = s `seq` ()
 seqNote other	       = ()
 
@@ -650,6 +654,7 @@ data AnnExpr' bndr annot
 -- gaw 2004
   | AnnCase	(AnnExpr bndr annot) bndr Type [AnnAlt bndr annot]
   | AnnLet	(AnnBind bndr annot) (AnnExpr bndr annot)
+  | AnnCast     (AnnExpr bndr annot) Coercion
   | AnnNote	Note (AnnExpr bndr annot)
   | AnnType	Type
 
@@ -669,6 +674,7 @@ deAnnotate' (AnnVar  v)           = Var v
 deAnnotate' (AnnLit  lit)         = Lit lit
 deAnnotate' (AnnLam  binder body) = Lam binder (deAnnotate body)
 deAnnotate' (AnnApp  fun arg)     = App (deAnnotate fun) (deAnnotate arg)
+deAnnotate' (AnnCast e co)        = Cast (deAnnotate e) co
 deAnnotate' (AnnNote note body)   = Note note (deAnnotate body)
 
 deAnnotate' (AnnLet bind body)
