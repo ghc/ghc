@@ -91,7 +91,7 @@ lexKeyword cont cs =
       ("in",rest) -> cont TKin rest	
       ("case",rest) -> cont TKcase rest	
       ("of",rest) -> cont TKof rest	
-      ("coerce",rest) -> cont TKcoerce rest	
+      ("cast",rest) -> cont TKcast rest	
       ("note",rest) -> cont TKnote rest	
       ("external",rest) -> cont TKexternal rest
       ("_",rest) -> cont TKwild rest

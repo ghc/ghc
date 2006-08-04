@@ -44,7 +44,7 @@ data Token =
  | TKin
  | TKcase
  | TKof
- | TKcoerce
+ | TKcast
  | TKnote
  | TKexternal
  | TKwild

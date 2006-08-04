@@ -7,7 +7,10 @@ import RdrHsSyn
 import HsSyn
 import RdrName
 import OccName
-import Kind( Kind(..) )
+import Type ( Kind,
+              liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
+              argTypeKindTyCon, ubxTupleKindTyCon, mkArrowKind, mkTyConApp
+            )
 import Name( nameOccName, nameModule )
 import Module
 import PackageConfig	( mainPackageId )
@@ -39,7 +42,7 @@ import Char
  '%in'		{ TKin }
  '%case'	{ TKcase }
  '%of'		{ TKof }
- '%coerce'	{ TKcoerce }
+ '%cast'	{ TKcast }
  '%note'	{ TKnote }
  '%external'	{ TKexternal }
  '%_'		{ TKwild }
@@ -192,7 +195,7 @@ id_bndrs :: { [IfaceIdBndr] }
 	| id_bndr id_bndrs	{ $1:$2 }
 
 tv_bndr	:: { IfaceTvBndr }
-	:  tv_occ                    { ($1, LiftedTypeKind) }
+	:  tv_occ                    { ($1, ifaceLiftedTypeKind) }
 	|  '(' tv_occ '::' akind ')' { ($2, $4) }
 
 tv_bndrs 	:: { [IfaceTvBndr] }
@@ -200,14 +203,14 @@ tv_bndrs 	:: { [IfaceTvBndr] }
 	| tv_bndr tv_bndrs	{ $1:$2 }
 
 akind	:: { IfaceKind }
-	: '*' 		   { LiftedTypeKind   }	
-	| '#'		   { UnliftedTypeKind }
-	| '?'		   { OpenTypeKind     }
+	: '*' 		   { ifaceLiftedTypeKind }	
+	| '#'		   { ifaceUnliftedTypeKind }
+	| '?'		   { ifaceOpenTypeKind }
         | '(' kind ')'	   { $2 }
 
 kind 	:: { IfaceKind }
 	: akind 	   { $1 }
-	| akind '->' kind  { FunKind $1 $3 }
+	| akind '->' kind  { ifaceArrow $1 $3 }
 
 -----------------------------------------
 --             Expressions
@@ -230,7 +233,7 @@ exp	:: { IfaceExpr }
 -- gaw 2004
 	| '%case' '(' ty ')' aexp '%of' id_bndr
 	  '{' alts1 '}'		      { IfaceCase $5 (fst $7) $3 $9 }
-	| '%coerce' aty exp   	      { IfaceNote (IfaceCoerce $2) $3 }
+        | '%cast' exp aty { IfaceCast $2 $3 }
 	| '%note' STRING exp 	   
 	    { case $2 of
 	       --"SCC"      -> IfaceNote (IfaceSCC "scc") $3
@@ -285,6 +288,8 @@ d_occ :: { FastString }
 
 {
 
+ifaceKind kc = IfaceTyConApp kc []
+
 ifaceBndrName (IfaceIdBndr (n,_)) = n
 ifaceBndrName (IfaceTvBndr (n,_)) = n
 
@@ -322,8 +327,31 @@ toHsType (IfaceFunTy t1 t2)    		 = noLoc $ HsFunTy (toHsType t1) (toHsType t2)
 toHsType (IfaceTyConApp (IfaceTc tc) ts) = foldl mkHsAppTy (noLoc $ HsTyVar (ifaceExtRdrName tc)) (map toHsType ts) 
 toHsType (IfaceForAllTy tv t)            = add_forall (toHsTvBndr tv) (toHsType t)
 
+-- We also need to convert IfaceKinds to Kinds (now that they are different).
+-- Only a limited form of kind will be encountered... hopefully
+toKind :: IfaceKind -> Kind
+toKind (IfaceFunTy ifK1 ifK2)  = mkArrowKind (toKind ifK1) (toKind ifK2)
+toKind (IfaceTyConApp ifKc []) = mkTyConApp (toKindTc ifKc) []
+toKind other                   = pprPanic "toKind" (ppr other)
+
+toKindTc :: IfaceTyCon -> TyCon
+toKindTc IfaceLiftedTypeKindTc   = liftedTypeKindTyCon
+toKindTc IfaceOpenTypeKindTc     = openTypeKindTyCon
+toKindTc IfaceUnliftedTypeKindTc = unliftedTypeKindTyCon
+toKindTc IfaceUbxTupleKindTc     = ubxTupleKindTyCon
+toKindTc IfaceArgTypeKindTc      = argTypeKindTyCon
+toKindTc other                   = pprPanic "toKindTc" (ppr other)
+
+ifaceTcType ifTc = IfaceTyConApp ifTc []
+
+ifaceLiftedTypeKind   = ifaceTcType IfaceLiftedTypeKindTc
+ifaceOpenTypeKind     = ifaceTcType IfaceOpenTypeKindTc
+ifaceUnliftedTypeKind = ifaceTcType IfaceUnliftedTypeKindTc
+
+ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
+
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
-toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOcc tv)) k
+toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOcc tv)) (toKind k)
 
 ifaceExtRdrName :: IfaceExtName -> RdrName
 ifaceExtRdrName (ExtPkg mod occ) = mkOrig mod occ
