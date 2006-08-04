@@ -83,7 +83,7 @@ import Id		( Id )
 import Type		( TyThing(..) )
 
 import Class		( Class, classSelIds, classTyCon )
-import TyCon		( TyCon, tyConSelIds, tyConDataCons )
+import TyCon		( TyCon, tyConSelIds, tyConDataCons, isNewTyCon, newTyConCo )
 import DataCon		( dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
 import Packages		( PackageId )
@@ -618,13 +618,16 @@ mkPrintUnqualified env = (qual_name, qual_mod)
 
 \begin{code}
 implicitTyThings :: TyThing -> [TyThing]
+-- If you change this, make sure you change LoadIface.ifaceDeclSubBndrs in sync
+
 implicitTyThings (AnId id)   = []
 
 	-- For type constructors, add the data cons (and their extras),
 	-- and the selectors and generic-programming Ids too
 	--
 	-- Newtypes don't have a worker Id, so don't generate that?
-implicitTyThings (ATyCon tc) = map AnId (tyConSelIds tc) ++ 
+implicitTyThings (ATyCon tc) = implicitNewCoTyCon tc ++
+			       map AnId (tyConSelIds tc) ++ 
 			       concatMap (extras_plus . ADataCon) (tyConDataCons tc)
 		     
 	-- For classes, add the class TyCon too (and its extras)
@@ -635,6 +638,10 @@ implicitTyThings (AClass cl) = map AnId (classSelIds cl) ++
 
 	-- For data cons add the worker and wrapper (if any)
 implicitTyThings (ADataCon dc) = map AnId (dataConImplicitIds dc)
+
+	-- For newtypes, add the implicit coercion tycon
+implicitNewCoTyCon tc | isNewTyCon tc = [ATyCon (newTyConCo tc)]
+		      | otherwise     = []
 
 extras_plus thing = thing : implicitTyThings thing
 

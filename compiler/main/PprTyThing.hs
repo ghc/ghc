@@ -17,7 +17,9 @@ module PprTyThing (
 #include "HsVersions.h"
 
 import qualified GHC
+
 import GHC ( TyThing(..), SrcLoc )
+import DataCon ( dataConResTys )
 import Outputable
 
 -- -----------------------------------------------------------------------------
@@ -129,12 +131,15 @@ pprDataCon exts dataCon = pprAlgTyCon exts tyCon (== dataCon) (const True)
   where tyCon = GHC.dataConTyCon dataCon
 
 pprDataConDecl exts gadt_style show_label dataCon
+ = error "kevind stub"
+{-
   | not gadt_style = ppr_fields tys_w_strs
   | otherwise      = ppr_bndr dataCon <+> dcolon <+> 
 			sep [ ppr_tvs, GHC.pprThetaArrow theta, pp_tau ]
   where
-    (tyvars, theta, argTypes, tyCon, res_tys) = GHC.dataConSig dataCon
+    (tyvars, theta, argTypes, tyCon) = GHC.dataConSig dataCon
     labels = GHC.dataConFieldLabels dataCon
+    res_tys = dataConResTys dataCon
     qualVars = filter (flip notElem (GHC.tyConTyVars tyCon)) tyvars
     stricts = GHC.dataConStrictMarks dataCon
     tys_w_strs = zip stricts argTypes
@@ -171,7 +176,7 @@ pprDataConDecl exts gadt_style show_label dataCon
 	= ppr_bndr dataCon <+> 
 		braces (sep (punctuate comma (ppr_trim maybe_show_label 
 					(zip labels fields))))
-
+-}
 pprClass exts cls
   | null methods = 
 	pprClassHdr exts cls
