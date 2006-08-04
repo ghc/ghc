@@ -22,9 +22,6 @@ module IfaceSyn (
 	-- Misc
 	visibleIfConDecls,
 
-	-- Converting things to IfaceSyn
-	tyThingToIfaceDecl, instanceToIfaceInst, coreRuleToIfaceRule, 
-
 	-- Equality
 	IfaceEq(..), (&&&), bool, eqListBy, eqMaybeBy,
 	eqIfDecl, eqIfInst, eqIfRule, checkBootDecl,
@@ -38,24 +35,10 @@ module IfaceSyn (
 import CoreSyn
 import IfaceType
 
-import FunDeps		( pprFundeps )
 import NewDemand	( StrictSig, pprIfaceStrictSig )
 import TcType		( deNoteType )
-import Type		( TyThing(..), splitForAllTys, funResultTy )
-import InstEnv		( Instance(..), OverlapFlag )
-import Id		( Id, idName, idType, idInfo, idArity, isDataConWorkId_maybe, isFCallId_maybe )
-import NewDemand	( isTopSig )
-import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
-			  arityInfo, cafInfo, newStrictnessInfo, 
-			  workerInfo, unfoldingInfo, inlinePragInfo )
-import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCon,
-			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
-			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
-			  tyConHasGenerics, tyConArgVrcs, synTyConRhs,
-			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
-import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
-			  dataConTyCon, dataConIsInfix, isVanillaDataCon )
-import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
+import Class		( FunDep, DefMeth, pprFundeps )
+import TyCon		( ArgVrcs )
 import OccName		( OccName, parenSymOcc, occNameFS,
 			  OccSet, unionOccSets, unitOccSet )
 import UniqFM           ( UniqFM, emptyUFM, addToUFM, lookupUFM )
@@ -63,9 +46,8 @@ import Name		( Name, NamedThing(..), nameOccName, isExternalName )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
 import ForeignCall	( ForeignCall )
-import TysPrim		( alphaTyVars )
-import BasicTypes	( Arity, Activation(..), StrictnessMark, 
-			  RecFlag(..), boolToRecFlag, Boxity(..), 
+import BasicTypes	( Arity, Activation(..), StrictnessMark, OverlapFlag,
+			  RecFlag(..), Boxity(..), 
 			  isAlwaysActive, tupleParens )
 import Outputable
 import FastString
@@ -89,13 +71,14 @@ data IfaceDecl
 	      ifType   :: IfaceType, 
 	      ifIdInfo :: IfaceIdInfo }
 
-  | IfaceData { ifName     :: OccName,		-- Type constructor
-		ifTyVars   :: [IfaceTvBndr],	-- Type variables
-		ifCtxt	   :: IfaceContext,	-- The "stupid theta"
-		ifCons	   :: IfaceConDecls,	-- Includes new/data info
-	        ifRec	   :: RecFlag,		-- Recursive or not?
-		ifVrcs     :: ArgVrcs,
-		ifGeneric  :: Bool		-- True <=> generic converter functions available
+  | IfaceData { ifName       :: OccName,		-- Type constructor
+		ifTyVars     :: [IfaceTvBndr],	-- Type variables
+		ifCtxt	     :: IfaceContext,	-- The "stupid theta"
+		ifCons	     :: IfaceConDecls,	-- Includes new/data info
+	        ifRec	     :: RecFlag,	-- Recursive or not?
+		ifVrcs       :: ArgVrcs,
+		ifGadtSyntax :: Bool,		-- True <=> declared using GADT syntax
+		ifGeneric    :: Bool		-- True <=> generic converter functions available
     }						-- We need this for imported data decls, since the
 						-- imported modules may have been compiled with
 						-- different flags to the current compilation unit
@@ -134,18 +117,15 @@ visibleIfConDecls (IfDataTyCon cs) = cs
 visibleIfConDecls (IfNewTyCon c)   = [c]
 
 data IfaceConDecl 
-  = IfVanillaCon {
+  = IfCon {
 	ifConOcc     :: OccName,		-- Constructor name
 	ifConInfix   :: Bool,			-- True <=> declared infix
-	ifConArgTys  :: [IfaceType],		-- Arg types
-	ifConStricts :: [StrictnessMark],	-- Empty (meaning all lazy), or 1-1 corresp with arg types
-	ifConFields  :: [OccName] }		-- ...ditto... (field labels)
-  | IfGadtCon {
-	ifConOcc     :: OccName,		-- Constructor name
-	ifConTyVars  :: [IfaceTvBndr],		-- All tyvars
+	ifConUnivTvs :: [IfaceTvBndr],		-- Universal tyvars
+	ifConExTvs   :: [IfaceTvBndr],		-- Existential tyvars
+	ifConEqSpec  :: [(OccName,IfaceType)],	-- Equality contraints
 	ifConCtxt    :: IfaceContext,		-- Non-stupid context
 	ifConArgTys  :: [IfaceType],		-- Arg types
-	ifConResTys  :: [IfaceType],		-- Result type args
+	ifConFields  :: [OccName],		-- ...ditto... (field labels)
 	ifConStricts :: [StrictnessMark] }	-- Empty (meaning all lazy), or 1-1 corresp with arg types
 			
 data IfaceInst 
@@ -210,11 +190,11 @@ data IfaceExpr
   | IfaceCase	IfaceExpr FastString IfaceType [IfaceAlt]
   | IfaceLet	IfaceBinding  IfaceExpr
   | IfaceNote	IfaceNote IfaceExpr
+  | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit	Literal
   | IfaceFCall	ForeignCall IfaceType
 
 data IfaceNote = IfaceSCC CostCentre
-	       | IfaceCoerce IfaceType
 	       | IfaceInlineMe
                | IfaceCoreNote String
 
@@ -291,30 +271,27 @@ pprIfaceDeclHead context thing tyvars
 pp_condecls tc IfAbstractTyCon  = ptext SLIT("{- abstract -}")
 pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |"))
-						     (map (pprIfaceConDecl tc) cs))
+							     (map (pprIfaceConDecl tc) cs))
 
-pprIfaceConDecl tc (IfVanillaCon { 
-		      ifConOcc = name, ifConInfix = is_infix, 
-		      ifConArgTys = arg_tys, 
-		      ifConStricts = strs, ifConFields = fields })
-    = sep [ppr name <+> sep (map pprParendIfaceType arg_tys),
-	   if is_infix then ptext SLIT("Infix") else empty,
-	   if null strs then empty 
+pprIfaceConDecl tc
+	(IfCon { ifConOcc = name, ifConInfix = is_infix, 
+		 ifConUnivTvs = univ_tvs, ifConExTvs = ex_tvs, 
+		 ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys, 
+		 ifConStricts = strs, ifConFields = fields })
+  = sep [main_payload,
+	 if is_infix then ptext SLIT("Infix") else empty,
+	 if null strs then empty 
 	      else nest 4 (ptext SLIT("Stricts:") <+> hsep (map ppr strs)),
-	   if null fields then empty
+	 if null fields then empty
 	      else nest 4 (ptext SLIT("Fields:") <+> hsep (map ppr fields))]
+  where
+    main_payload = ppr name <+> dcolon <+> 
+		   pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) (ppr con_tau)
 
-pprIfaceConDecl tc (IfGadtCon { 
-		      ifConOcc = name, 
-		      ifConTyVars = tvs, ifConCtxt = ctxt,
-		      ifConArgTys = arg_tys, ifConResTys = res_tys, 
-		      ifConStricts = strs })
-    = sep [ppr name <+> dcolon <+> pprIfaceForAllPart tvs ctxt (ppr con_tau),
-	   if null strs then empty 
-	      else nest 4 (ptext SLIT("Stricts:") <+> hsep (map ppr strs))]
-    where
-      con_tau = foldr1 IfaceFunTy (arg_tys ++ [tc_app])
-      tc_app  = IfaceTyConApp (IfaceTc (LocalTop tc)) res_tys	
+    eq_ctxt = [(IfaceEqPred (IfaceTyVar tv) ty) | (tv,ty) <- eq_spec] 
+    con_tau = foldr1 IfaceFunTy (arg_tys ++ [tc_app])
+    tc_app  = IfaceTyConApp (IfaceTc (LocalTop tc)) 
+			    [IfaceTyVar tv | (tv,_) <- univ_tvs]
 	-- Gruesome, but jsut for debug print
 
 instance Outputable IfaceRule where
@@ -379,6 +356,8 @@ pprIfaceExpr add_par (IfaceCase scrut bndr ty alts)
 			<+> ppr bndr <+> char '{',
   		  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
+pprIfaceExpr add_par (IfaceCast expr co) = add_par (ptext SLIT("cast") <+> ppr expr <+> ppr co)
+
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
   = add_par (sep [ptext SLIT("let {"), 
 		  nest 2 (ppr_bind (b, rhs)),
@@ -409,7 +388,6 @@ pprIfaceApp fun	 	       args = sep (pprIfaceExpr parens fun : args)
 ------------------
 instance Outputable IfaceNote where
     ppr (IfaceSCC cc)     = pprCostCentreCore cc
-    ppr (IfaceCoerce ty)  = ptext SLIT("__coerce") <+> pprParendIfaceType ty
     ppr IfaceInlineMe     = ptext SLIT("__inline_me")
     ppr (IfaceCoreNote s) = ptext SLIT("__core_note") <+> pprHsString (mkFastString s)
 
@@ -432,280 +410,6 @@ ppr_hs_info (HsArity arity)     = ptext SLIT("Arity:") <+> int arity
 ppr_hs_info (HsStrictness str)  = ptext SLIT("Strictness:") <+> pprIfaceStrictSig str
 ppr_hs_info HsNoCafRefs		= ptext SLIT("HasNoCafRefs")
 ppr_hs_info (HsWorker w a)	= ptext SLIT("Worker:") <+> ppr w <+> int a
-\end{code}
-
-
-%************************************************************************
-%*									*
-	Converting things to their Iface equivalents
-%*									*
-%************************************************************************
-
-		 
-\begin{code}
-tyThingToIfaceDecl :: (Name -> IfaceExtName) -> TyThing -> IfaceDecl
--- Assumption: the thing is already tidied, so that locally-bound names
--- 	       (lambdas, for-alls) already have non-clashing OccNames
--- Reason: Iface stuff uses OccNames, and the conversion here does
---	   not do tidying on the way
-tyThingToIfaceDecl ext (AnId id)
-  = IfaceId { ifName   = getOccName id, 
-	      ifType   = toIfaceType ext (idType id),
-	      ifIdInfo = info }
-  where
-    info = case toIfaceIdInfo ext (idInfo id) of
-		[]    -> NoInfo
-		items -> HasInfo items
-
-tyThingToIfaceDecl ext (AClass clas)
-  = IfaceClass { ifCtxt	  = toIfaceContext ext sc_theta,
-		 ifName	  = getOccName clas,
-		 ifTyVars = toIfaceTvBndrs clas_tyvars,
-		 ifFDs    = map toIfaceFD clas_fds,
-		 ifSigs	  = map toIfaceClassOp op_stuff,
-	  	 ifRec    = boolToRecFlag (isRecursiveTyCon tycon),
-		 ifVrcs   = tyConArgVrcs tycon }
-  where
-    (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
-    tycon = classTyCon clas
-
-    toIfaceClassOp (sel_id, def_meth)
-	= ASSERT(sel_tyvars == clas_tyvars)
-	  IfaceClassOp (getOccName sel_id) def_meth (toIfaceType ext op_ty)
-	where
-		-- Be careful when splitting the type, because of things
-		-- like  	class Foo a where
-		--		  op :: (?x :: String) => a -> a
-		-- and  	class Baz a where
-		--		  op :: (Ord a) => a -> a
-	  (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
-	  op_ty		       = funResultTy rho_ty
-
-    toIfaceFD (tvs1, tvs2) = (map (occNameFS.getOccName) tvs1, map (occNameFS.getOccName) tvs2)
-
-tyThingToIfaceDecl ext (ATyCon tycon)
-  | isSynTyCon tycon
-  = IfaceSyn {	ifName   = getOccName tycon,
-		ifTyVars = toIfaceTvBndrs tyvars,
-		ifVrcs    = tyConArgVrcs tycon,
-		ifSynRhs = toIfaceType ext syn_ty }
-
-  | isAlgTyCon tycon
-  = IfaceData {	ifName    = getOccName tycon,
-		ifTyVars  = toIfaceTvBndrs tyvars,
-		ifCtxt    = toIfaceContext ext (tyConStupidTheta tycon),
-		ifCons    = ifaceConDecls (algTyConRhs tycon),
-	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
-		ifVrcs    = tyConArgVrcs tycon,
-		ifGeneric = tyConHasGenerics tycon }
-
-  | isForeignTyCon tycon
-  = IfaceForeign { ifName    = getOccName tycon,
-	    	   ifExtName = tyConExtName tycon }
-
-  | isPrimTyCon tycon || isFunTyCon tycon
-	-- Needed in GHCi for ':info Int#', for example
-  = IfaceData { ifName    = getOccName tycon,
-	  	ifTyVars  = toIfaceTvBndrs (take (tyConArity tycon) alphaTyVars),
-		ifCtxt	  = [],
-		ifCons    = IfAbstractTyCon,
-		ifGeneric = False,
-		ifRec     = NonRecursive,
-		ifVrcs    = tyConArgVrcs tycon }
-
-  | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
-  where
-    tyvars = tyConTyVars tycon
-    syn_ty = synTyConRhs tycon
-
-    ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
-    ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls AbstractTyCon			   = IfAbstractTyCon
-	-- The last case happens when a TyCon has been trimmed during tidying
-	-- Furthermore, tyThingToIfaceDecl is also used
-	-- in TcRnDriver for GHCi, when browsing a module, in which case the
-	-- AbstractTyCon case is perfectly sensible.
-
-    ifaceConDecl data_con 
-	| isVanillaDataCon data_con
-	= IfVanillaCon {ifConOcc = getOccName (dataConName data_con),
-			ifConInfix = dataConIsInfix data_con,
-			ifConArgTys = map (toIfaceType ext) arg_tys,
-			ifConStricts = strict_marks,
-			ifConFields = map getOccName field_labels }
-	| otherwise
-	= IfGadtCon   { ifConOcc = getOccName (dataConName data_con),
-			ifConTyVars = toIfaceTvBndrs tyvars,
-			ifConCtxt = toIfaceContext ext theta,
-			ifConArgTys = map (toIfaceType ext) arg_tys,
-			ifConResTys = map (toIfaceType ext) res_tys,
-			ifConStricts = strict_marks }
-	where
-	  (tyvars, theta, arg_tys, _, res_tys) = dataConSig data_con
-          field_labels = dataConFieldLabels data_con
-          strict_marks = dataConStrictMarks data_con
-
-tyThingToIfaceDecl ext (ADataCon dc)
- = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
-
-
---------------------------
-instanceToIfaceInst :: (Name -> IfaceExtName) -> Instance -> IfaceInst
-instanceToIfaceInst ext_lhs ispec@(Instance { is_dfun = dfun_id, is_flag = oflag,
-					      is_cls = cls, is_tcs = mb_tcs, 
-					      is_orph = orph })
-  = IfaceInst { ifDFun    = getOccName dfun_id, 
-		ifOFlag   = oflag,
-		ifInstCls = ext_lhs cls,
-		ifInstTys = map do_rough mb_tcs,
-		ifInstOrph = orph }
-  where
-    do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name ext_lhs n)
-
---------------------------
-toIfaceIdInfo :: (Name -> IfaceExtName) -> IdInfo -> [IfaceInfoItem]
-toIfaceIdInfo ext id_info
-  = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
-	       inline_hsinfo, wrkr_hsinfo,  unfold_hsinfo] 
-  where
-    ------------  Arity  --------------
-    arity_info = arityInfo id_info
-    arity_hsinfo | arity_info == 0 = Nothing
-		 | otherwise       = Just (HsArity arity_info)
-
-    ------------ Caf Info --------------
-    caf_info   = cafInfo id_info
-    caf_hsinfo = case caf_info of
-		   NoCafRefs -> Just HsNoCafRefs
-		   _other    -> Nothing
-
-    ------------  Strictness  --------------
-	-- No point in explicitly exporting TopSig
-    strict_hsinfo = case newStrictnessInfo id_info of
-			Just sig | not (isTopSig sig) -> Just (HsStrictness sig)
-			_other			      -> Nothing
-
-    ------------  Worker  --------------
-    work_info   = workerInfo id_info
-    has_worker  = case work_info of { HasWorker _ _ -> True; other -> False }
-    wrkr_hsinfo = case work_info of
-		    HasWorker work_id wrap_arity -> 
-			Just (HsWorker (ext (idName work_id)) wrap_arity)
-		    NoWorker -> Nothing
-
-    ------------  Unfolding  --------------
-    -- The unfolding is redundant if there is a worker
-    unfold_info  = unfoldingInfo id_info
-    rhs		 = unfoldingTemplate unfold_info
-    no_unfolding = neverUnfold unfold_info
-		  	-- The CoreTidy phase retains unfolding info iff
-			-- we want to expose the unfolding, taking into account
-			-- unconditional NOINLINE, etc.  See TidyPgm.addExternal
-    unfold_hsinfo | no_unfolding = Nothing			
-		  | has_worker   = Nothing	-- Unfolding is implicit
-		  | otherwise	 = Just (HsUnfold (toIfaceExpr ext rhs))
-					
-    ------------  Inline prag  --------------
-    inline_prag = inlinePragInfo id_info
-    inline_hsinfo | isAlwaysActive inline_prag     = Nothing
-		  | no_unfolding && not has_worker = Nothing
-			-- If the iface file give no unfolding info, we 
-			-- don't need to say when inlining is OK!
-		  | otherwise			   = Just (HsInline inline_prag)
-
---------------------------
-coreRuleToIfaceRule :: (Name -> IfaceExtName) 	-- For the LHS names
-		    -> (Name -> IfaceExtName) 	-- For the RHS names
-		    -> CoreRule -> IfaceRule
-coreRuleToIfaceRule ext_lhs ext_rhs (BuiltinRule { ru_fn = fn})
-  = pprTrace "toHsRule: builtin" (ppr fn) $
-    bogusIfaceRule (mkIfaceExtName fn)
-
-coreRuleToIfaceRule ext_lhs ext_rhs
-    (Rule { ru_name = name, ru_fn = fn, ru_act = act, ru_bndrs = bndrs,
-	    ru_args = args, ru_rhs = rhs, ru_orph = orph })
-  = IfaceRule { ifRuleName  = name, ifActivation = act, 
-		ifRuleBndrs = map (toIfaceBndr ext_lhs) bndrs,
-		ifRuleHead  = ext_lhs fn, 
-		ifRuleArgs  = map do_arg args,
-		ifRuleRhs   = toIfaceExpr ext_rhs rhs,
-		ifRuleOrph  = orph }
-  where
-	-- For type args we must remove synonyms from the outermost
-	-- level.  Reason: so that when we read it back in we'll
-	-- construct the same ru_rough field as we have right now;
-	-- see tcIfaceRule
-    do_arg (Type ty) = IfaceType (toIfaceType ext_lhs (deNoteType ty))
-    do_arg arg       = toIfaceExpr ext_lhs arg
-
-bogusIfaceRule :: IfaceExtName -> IfaceRule
-bogusIfaceRule id_name
-  = IfaceRule { ifRuleName = FSLIT("bogus"), ifActivation = NeverActive,  
-	ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [], 
-	ifRuleRhs = IfaceExt id_name, ifRuleOrph = Nothing }
-
----------------------
-toIfaceExpr :: (Name -> IfaceExtName) -> CoreExpr -> IfaceExpr
-toIfaceExpr ext (Var v)       = toIfaceVar ext v
-toIfaceExpr ext (Lit l)       = IfaceLit l
-toIfaceExpr ext (Type ty)     = IfaceType (toIfaceType ext ty)
-toIfaceExpr ext (Lam x b)     = IfaceLam (toIfaceBndr ext x) (toIfaceExpr ext b)
-toIfaceExpr ext (App f a)     = toIfaceApp ext f [a]
-toIfaceExpr ext (Case s x ty as) = IfaceCase (toIfaceExpr ext s) (occNameFS (getOccName x)) (toIfaceType ext ty) (map (toIfaceAlt ext) as)
-toIfaceExpr ext (Let b e)     = IfaceLet (toIfaceBind ext b) (toIfaceExpr ext e)
-toIfaceExpr ext (Note n e)    = IfaceNote (toIfaceNote ext n) (toIfaceExpr ext e)
-
----------------------
-toIfaceNote ext (SCC cc)      = IfaceSCC cc
-toIfaceNote ext (Coerce t1 _) = IfaceCoerce (toIfaceType ext t1)
-toIfaceNote ext InlineMe      = IfaceInlineMe
-toIfaceNote ext (CoreNote s)  = IfaceCoreNote s
-
----------------------
-toIfaceBind ext (NonRec b r) = IfaceNonRec (toIfaceIdBndr ext b) (toIfaceExpr ext r)
-toIfaceBind ext (Rec prs)    = IfaceRec [(toIfaceIdBndr ext b, toIfaceExpr ext r) | (b,r) <- prs]
-
----------------------
-toIfaceAlt ext (c,bs,r) = (toIfaceCon c, map (occNameFS.getOccName) bs, toIfaceExpr ext r)
-
----------------------
-toIfaceCon (DataAlt dc) | isTupleTyCon tc = IfaceTupleAlt (tupleTyConBoxity tc)
-	   		| otherwise       = IfaceDataAlt (getOccName dc)
-	   		where
-	   		  tc = dataConTyCon dc
-	   
-toIfaceCon (LitAlt l) = IfaceLitAlt l
-toIfaceCon DEFAULT    = IfaceDefault
-
----------------------
-toIfaceApp ext (App f a) as = toIfaceApp ext f (a:as)
-toIfaceApp ext (Var v) as
-  = case isDataConWorkId_maybe v of
-	-- We convert the *worker* for tuples into IfaceTuples
-	Just dc |  isTupleTyCon tc && saturated 
-		-> IfaceTuple (tupleTyConBoxity tc) tup_args
-	  where
-	    val_args  = dropWhile isTypeArg as
-	    saturated = val_args `lengthIs` idArity v
-	    tup_args  = map (toIfaceExpr ext) val_args
-	    tc	      = dataConTyCon dc
-
-        other -> mkIfaceApps ext (toIfaceVar ext v) as
-
-toIfaceApp ext e as = mkIfaceApps ext (toIfaceExpr ext e) as
-
-mkIfaceApps ext f as = foldl (\f a -> IfaceApp f (toIfaceExpr ext a)) f as
-
----------------------
-toIfaceVar :: (Name -> IfaceExtName) -> Id -> IfaceExpr
-toIfaceVar ext v 
-  | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType ext (idType v))
-	  -- Foreign calls have special syntax
-  | isExternalName name		    = IfaceExt (ext name)
-  | otherwise			    = IfaceLcl (occNameFS (nameOccName name))
-  where
-    name = idName v
 \end{code}
 
 
@@ -810,6 +514,7 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
   = bool (ifName d1    == ifName d2 && 
 	  ifRec d1     == ifRec   d2 && 
 	  ifVrcs d1    == ifVrcs   d2 && 
+	  ifGadtSyntax d1 == ifGadtSyntax   d2 && 
 	  ifGeneric d1 == ifGeneric d2) &&&
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
 	    eq_ifContext env (ifCtxt d1) (ifCtxt d2) &&& 
@@ -861,22 +566,15 @@ eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
 eq_hsCD env IfAbstractTyCon  IfAbstractTyCon  = Equal
 eq_hsCD env d1		     d2		      = NotEqual
 
-eq_ConDecl env c1@(IfVanillaCon {}) c2@(IfVanillaCon {})
+eq_ConDecl env c1 c2
   = bool (ifConOcc c1     == ifConOcc c2 && 
 	  ifConInfix c1   == ifConInfix c2 && 
 	  ifConStricts c1 == ifConStricts c2 && 
 	  ifConFields c1  == ifConFields c2) &&&
-   eq_ifTypes env (ifConArgTys c1) (ifConArgTys c2)
-
-eq_ConDecl env c1@(IfGadtCon {}) c2@(IfGadtCon {})
-  = bool (ifConOcc c1     == ifConOcc c2 && 
-	  ifConStricts c1 == ifConStricts c2) &&& 
-    eq_ifTvBndrs env (ifConTyVars c1) (ifConTyVars c2) (\ env ->
+    eq_ifTvBndrs env (ifConUnivTvs c1) (ifConUnivTvs c2) (\ env ->
+    eq_ifTvBndrs env (ifConExTvs c1) (ifConExTvs c2) (\ env ->
 	eq_ifContext env (ifConCtxt c1) (ifConCtxt c2) &&&
-	eq_ifTypes env (ifConResTys c1) (ifConResTys c2) &&&
-	eq_ifTypes env (ifConArgTys c1) (ifConArgTys c2))
-
-eq_ConDecl env c1 c2 = NotEqual
+	eq_ifTypes env (ifConArgTys c1) (ifConArgTys c2)))
 
 eq_hsFD env (ns1,ms1) (ns2,ms2)
   = eqListBy (eqIfOcc env) ns1 ns2 &&& eqListBy (eqIfOcc env) ms1 ms2
@@ -910,6 +608,7 @@ eq_ifaceExpr env (IfaceType ty1)      (IfaceType ty2)	   = eq_ifType env ty1 ty2
 eq_ifaceExpr env (IfaceTuple n1 as1)  (IfaceTuple n2 as2)  = bool (n1==n2) &&& eqListBy (eq_ifaceExpr env) as1 as2
 eq_ifaceExpr env (IfaceLam b1 body1)  (IfaceLam b2 body2)  = eq_ifBndr env b1 b2 (\env -> eq_ifaceExpr env body1 body2)
 eq_ifaceExpr env (IfaceApp f1 a1)     (IfaceApp f2 a2)	   = eq_ifaceExpr env f1 f2 &&& eq_ifaceExpr env a1 a2
+eq_ifaceExpr env (IfaceCast e1 co1)   (IfaceCast e2 co2)   = eq_ifaceExpr env e1 e2 &&& eq_ifType env co1 co2
 eq_ifaceExpr env (IfaceNote n1 r1)    (IfaceNote n2 r2)    = eq_ifaceNote env n1 n2 &&& eq_ifaceExpr env r1 r2
 
 eq_ifaceExpr env (IfaceCase s1 b1 ty1 as1) (IfaceCase s2 b2 ty2 as2)
@@ -944,7 +643,6 @@ eq_ifaceConAlt _ _ = False
 -----------------
 eq_ifaceNote :: EqEnv -> IfaceNote -> IfaceNote -> IfaceEq
 eq_ifaceNote env (IfaceSCC c1)    (IfaceSCC c2)        = bool (c1==c2)
-eq_ifaceNote env (IfaceCoerce t1) (IfaceCoerce t2)     = eq_ifType env t1 t2
 eq_ifaceNote env IfaceInlineMe    IfaceInlineMe        = Equal
 eq_ifaceNote env (IfaceCoreNote s1) (IfaceCoreNote s2) = bool (s1==s2)
 eq_ifaceNote env _ _ = NotEqual
@@ -1019,7 +717,7 @@ eq_ifBndr env (IfaceIdBndr b1) (IfaceIdBndr b2) k = eq_ifIdBndr env b1 b2 k
 eq_ifBndr env (IfaceTvBndr b1) (IfaceTvBndr b2) k = eq_ifTvBndr env b1 b2 k
 eq_ifBndr _ _ _ _ = NotEqual
 
-eq_ifTvBndr env (v1, k1) (v2, k2) k = bool (k1 == k2)     &&& k (extendEqEnv env v1 v2)
+eq_ifTvBndr env (v1, k1) (v2, k2) k = eq_ifType env k1 k2 &&& k (extendEqEnv env v1 v2)
 eq_ifIdBndr env (v1, t1) (v2, t2) k = eq_ifType env t1 t2 &&& k (extendEqEnv env v1 v2)
 
 eq_ifBndrs   	:: ExtEnv [IfaceBndr]
