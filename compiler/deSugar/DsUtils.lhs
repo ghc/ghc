@@ -17,7 +17,7 @@ module DsUtils (
 	extractMatchResult, combineMatchResults, 
 	adjustMatchResult,  adjustMatchResultDs,
 	mkCoLetMatchResult, mkGuardedMatchResult, 
-	matchCanFail,
+	matchCanFail, mkEvalMatchResult,
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
 	wrapBind, wrapBinds,
 
@@ -40,20 +40,22 @@ import {-# SOURCE #-}	Match ( matchSimply )
 import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn
-import TcHsSyn		( hsPatType )
+import TcHsSyn		( hsLPatType, hsPatType )
 import CoreSyn
 import Constants	( mAX_TUPLE_SIZE )
 import DsMonad
 
 import CoreUtils	( exprType, mkIfThenElse, mkCoerce, bindNonRec )
-import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, mkNewTypeBody )
+import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, unwrapNewTypeBody )
 import Id		( idType, Id, mkWildId, mkTemplateLocals, mkSysLocal )
 import Var		( Var )
 import Name		( Name )
 import Literal		( Literal(..), mkStringLit, inIntRange, tARGET_MAX_INT )
-import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon, dataConSourceArity, dataConTyCon, dataConTag )
-import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp, mkTyVarTy )
+import TyCon		( isNewTyCon, tyConDataCons, tyConArity )
+import DataCon		( DataCon, dataConSourceArity, dataConTyCon, dataConTag, dataConRepArgTys )
+import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp, mkTyVarTy,
+                          splitNewTyConApp )
+import Coercion         ( Coercion, mkUnsafeCoercion )
 import TcType		( tcEqType )
 import TysPrim		( intPrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
@@ -148,12 +150,14 @@ otherwise, make one up.
 
 \begin{code}
 selectSimpleMatchVarL :: LPat Id -> DsM Id
-selectSimpleMatchVarL pat = selectMatchVar (unLoc pat) (hsPatType pat)
+selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
 -- we try to use that, to save inventing lots of fresh variables.
--- But even if it is a variable, its type might not match.  Consider
+--
+-- OLD, but interesting note:
+--    But even if it is a variable, its type might not match.  Consider
 --	data T a where
 --	  T1 :: Int -> T Int
 --	  T2 :: a   -> T a
@@ -161,23 +165,19 @@ selectSimpleMatchVarL pat = selectMatchVar (unLoc pat) (hsPatType pat)
 --	f :: T a -> a -> Int
 --	f (T1 i) (x::Int) = x
 --	f (T2 i) (y::a)   = 0
--- Then we must not choose (x::Int) as the matching variable!
+--    Then we must not choose (x::Int) as the matching variable!
+-- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [Pat Id] -> [Type] -> DsM [Id]
-selectMatchVars []     [] 	= return []
-selectMatchVars (p:ps) (ty:tys) = do { v  <- selectMatchVar  p  ty
-				     ; vs <- selectMatchVars ps tys
-				     ; return (v:vs) }
+selectMatchVars :: [Pat Id] -> DsM [Id]
+selectMatchVars ps = mapM selectMatchVar ps
 
-selectMatchVar (BangPat pat)   pat_ty  = selectMatchVar (unLoc pat) pat_ty
-selectMatchVar (LazyPat pat)   pat_ty  = selectMatchVar (unLoc pat) pat_ty
-selectMatchVar (VarPat var)    pat_ty  = try_for var 	     pat_ty
-selectMatchVar (AsPat var pat) pat_ty  = try_for (unLoc var) pat_ty
-selectMatchVar other_pat       pat_ty  = newSysLocalDs pat_ty   -- OK, better make up one...
-
-try_for var pat_ty 
-  | idType var `tcEqType` pat_ty = returnDs var
-  | otherwise			 = newSysLocalDs pat_ty
+selectMatchVar (BangPat pat)   = selectMatchVar (unLoc pat)
+selectMatchVar (LazyPat pat)   = selectMatchVar (unLoc pat)
+selectMatchVar (ParPat pat)    = selectMatchVar (unLoc pat)
+selectMatchVar (VarPat var)    = return var
+selectMatchVar (AsPat var pat) = return (unLoc var)
+selectMatchVar other_pat       = newSysLocalDs (hsPatType other_pat)
+				  -- OK, better make up one...
 \end{code}
 
 
@@ -236,7 +236,7 @@ combineMatchResults (MatchResult CanFail      body_fn1)
 combineMatchResults match_result1@(MatchResult CantFail body_fn1) match_result2
   = match_result1
 
-adjustMatchResult :: (CoreExpr -> CoreExpr) -> MatchResult -> MatchResult
+adjustMatchResult :: DsWrapper -> MatchResult -> MatchResult
 adjustMatchResult encl_fn (MatchResult can_it_fail body_fn)
   = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
 				      returnDs (encl_fn body))
@@ -261,8 +261,11 @@ seqVar var body = Case (Var var) var (exprType body)
 			[(DEFAULT, [], body)]
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
-mkCoLetMatchResult bind match_result
-  = adjustMatchResult (mkDsLet bind) match_result
+mkCoLetMatchResult bind = adjustMatchResult (mkDsLet bind)
+
+mkEvalMatchResult :: Id -> Type -> MatchResult -> MatchResult
+mkEvalMatchResult var ty
+  = adjustMatchResult (\e -> Case (Var var) var ty [(DEFAULT, [], e)]) 
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult -> MatchResult
 mkGuardedMatchResult pred_expr (MatchResult can_it_fail body_fn)
@@ -307,7 +310,9 @@ mkCoAlgCaseMatchResult var ty match_alts
 	-- Stuff for newtype
     (con1, arg_ids1, match_result1) = head match_alts
     arg_id1 	= head arg_ids1
-    newtype_rhs = mkNewTypeBody tycon (idType arg_id1) (Var var)
+    var_ty      = idType var
+    (tc, ty_args) = splitNewTyConApp var_ty
+    newtype_rhs = unwrapNewTypeBody tycon ty_args (Var var)
 		
 	-- Stuff for data types
     data_cons      = tyConDataCons tycon
@@ -551,7 +556,7 @@ mkSelectorBinds pat val_expr
 	--
 	-- So to get the type of 'v', use the pattern not the rhs.  Often more
 	-- efficient too.
-    newSysLocalDs (hsPatType pat)	`thenDs` \ val_var ->
+    newSysLocalDs (hsLPatType pat)	`thenDs` \ val_var ->
 
 	-- For the error message we make one error-app, to avoid duplication.
 	-- But we need it at different types... so we use coerce for that
@@ -587,15 +592,16 @@ mkSelectorBinds pat val_expr
 		    (Var bndr_var) error_expr			`thenDs` \ rhs_expr ->
         returnDs (bndr_var, rhs_expr)
       where
-        error_expr = mkCoerce (idType bndr_var) (Var err_var)
+        error_expr = mkCoerce co (Var err_var)
+        co         = mkUnsafeCoercion (exprType (Var err_var)) (idType bndr_var)
 
     is_simple_lpat p = is_simple_pat (unLoc p)
 
-    is_simple_pat (TuplePat ps Boxed _)    = all is_triv_lpat ps
-    is_simple_pat (ConPatOut _ _ _ _ ps _) = all is_triv_lpat (hsConArgs ps)
-    is_simple_pat (VarPat _)	       	   = True
-    is_simple_pat (ParPat p)		   = is_simple_lpat p
-    is_simple_pat other		       	   = False
+    is_simple_pat (TuplePat ps Boxed _)        = all is_triv_lpat ps
+    is_simple_pat (ConPatOut{ pat_args = ps }) = all is_triv_lpat (hsConArgs ps)
+    is_simple_pat (VarPat _)	       	       = True
+    is_simple_pat (ParPat p)		       = is_simple_lpat p
+    is_simple_pat other		       	       = False
 
     is_triv_lpat p = is_triv_pat (unLoc p)
 
