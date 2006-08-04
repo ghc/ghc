@@ -53,7 +53,7 @@ import SrcLoc		( SrcSpan )
 
 -- Standard libraries
 import Control.Monad	( when, filterM, foldM )
-
+ 
 import Data.IORef	( IORef, readIORef, writeIORef, modifyIORef )
 import Data.List	( partition, nub )
 
