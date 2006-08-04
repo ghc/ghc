@@ -1,4 +1,4 @@
-%
+
 % (c) The University of Glasgow 2001
 %
 \begin{code}
@@ -18,12 +18,11 @@ import TyCon
 import TypeRep
 import Type
 import PprExternalCore	-- Instances
-import DataCon	( DataCon, dataConTyVars, dataConRepArgTys, 
+import DataCon	( DataCon, dataConExTyVars, dataConRepArgTys, 
 		  dataConName, dataConTyCon )
 import CoreSyn
 import Var
 import IdInfo
-import Kind
 import Literal
 import Name
 import NameSet ( NameSet, emptyNameSet )
@@ -83,7 +82,7 @@ make_cdef dcon =  C.Constr dcon_name existentials tys
   where 
     dcon_name    = make_var_id (dataConName dcon)
     existentials = map make_tbind ex_tyvars
-    ex_tyvars    = drop (tyConArity (dataConTyCon dcon)) (dataConTyVars dcon)
+    ex_tyvars    = dataConExTyVars dcon
     tys 	 = map make_ty (dataConRepArgTys dcon)
 
 make_tbind :: TyVar -> C.Tbind
@@ -116,11 +115,10 @@ make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
 make_exp (Lam v e) | isTyVar v = C.Lam (C.Tb (make_tbind v)) (make_exp e)
 make_exp (Lam v e) | otherwise = C.Lam (C.Vb (make_vbind v)) (make_exp e)
-make_exp (Let b e) = C.Let (make_vdef emptyNameSet b) (make_exp e)
+make_exp (Let b e) = C.Let (make_vdef b) (make_exp e)
 -- gaw 2004
 make_exp (Case e v ty alts) = C.Case (make_exp e) (make_vbind v) (make_ty ty) (map make_alt alts)
 make_exp (Note (SCC cc) e) = C.Note "SCC"  (make_exp e) -- temporary
-make_exp (Note (Coerce t_to t_from) e) = C.Coerce (make_ty t_to) (make_exp e)
 make_exp (Note (CoreNote s) e) = C.Note s (make_exp e)  -- hdaume: core annotations
 make_exp (Note InlineMe e) = C.Note "InlineMe" (make_exp e)
 make_exp _ = error "MkExternalCore died: make_exp"
@@ -176,11 +174,12 @@ make_ty (NoteTy _ t) 	= make_ty t
 
 
 make_kind :: Kind -> C.Kind
-make_kind (FunKind k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
-make_kind LiftedTypeKind   = C.Klifted
-make_kind UnboxedTypeKind  = C.Kunboxed
-make_kind UnliftedTypeKind = C.Kunlifted
-make_kind OpenTypeKind     = C.Kopen
+make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
+make_kind k
+  | isLiftedTypeKind k   = C.Klifted
+  | isUnliftedTypeKind k = C.Kunlifted
+--   | isUnboxedTypeKind k  = C.Kunboxed	Fix me
+  | isOpenTypeKind k     = C.Kopen
 make_kind _ = error "MkExternalCore died: make_kind"
 
 {- Id generation. -}

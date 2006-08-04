@@ -32,7 +32,7 @@ data Exp
   | Lam Bind Exp 	  
   | Let Vdefg Exp
   | Case Exp Vbind Ty [Alt] {- non-empty list -}
-  | Coerce Ty Exp 
+  | Cast Exp Ty
   | Note String Exp
   | External String Ty
 
