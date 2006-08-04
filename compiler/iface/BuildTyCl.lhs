@@ -14,26 +14,29 @@ module BuildTyCl (
 import IfaceEnv		( newImplicitBinder )
 import TcRnMonad
 
-import DataCon		( DataCon, isNullarySrcDataCon, dataConTyVars,
-			  mkDataCon, dataConFieldLabels, dataConOrigArgTys )
+import DataCon		( DataCon, isNullarySrcDataCon, dataConUnivTyVars,
+			  mkDataCon, dataConFieldLabels, dataConInstOrigArgTys,
+                          dataConTyCon )
 import Var		( tyVarKind, TyVar, Id )
 import VarSet		( isEmptyVarSet, intersectVarSet, elemVarSet )
 import TysWiredIn  	( unitTy )
 import BasicTypes	( RecFlag, StrictnessMark(..) )
 import Name		( Name )
 import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc, mkClassTyConOcc,
-			  mkClassDataConOcc, mkSuperDictSelOcc )
+			  mkClassDataConOcc, mkSuperDictSelOcc, mkNewTyCoOcc )
 import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
 import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
 			  tyConDataCons, isNewTyCon, mkClassTyCon, TyCon( tyConTyVars ),
-			  isRecursiveTyCon,
+			  isRecursiveTyCon, tyConArity,
 			  ArgVrcs, AlgTyConRhs(..), newTyConRhs )
 import Type		( mkArrowKinds, liftedTypeKind, typeKind, 
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 			  splitTyConApp_maybe, splitAppTy_maybe, getTyVar_maybe,
 			  mkPredTys, mkTyVarTys, ThetaType, Type, 
-			  substTyWith, zipTopTvSubst, substTheta )
+			  substTyWith, zipTopTvSubst, substTheta, mkForAllTys,
+                          mkTyConApp, mkTyVarTy )
+import Coercion         ( mkNewTypeCoercion )
 import Outputable
 import List		( nub )
 
@@ -54,11 +57,12 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> AlgTyConRhs
 	      -> ArgVrcs -> RecFlag
 	      -> Bool			-- True <=> want generics functions
+	      -> Bool			-- True <=> was declared in GADT syntax
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs stupid_theta rhs arg_vrcs is_rec want_generics
+buildAlgTyCon tc_name tvs stupid_theta rhs arg_vrcs is_rec want_generics gadt_syn
   = do	{ let { tycon = mkAlgTyCon tc_name kind tvs arg_vrcs stupid_theta
-				   rhs fields is_rec want_generics
+				   rhs fields is_rec want_generics gadt_syn
 	      ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 	      ; fields  = mkTyConSelIds tycon rhs
 	  }
@@ -72,16 +76,23 @@ mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons
   = DataTyCon { data_cons = cons, is_enum = all isNullarySrcDataCon cons }
 
-mkNewTyConRhs :: TyCon -> DataCon -> AlgTyConRhs
-mkNewTyConRhs tycon con 
-  = NewTyCon { data_con = con, 
-	       nt_rhs = rhs_ty,
-	       nt_etad_rhs = eta_reduce tvs rhs_ty,
-	       nt_rep = mkNewTyConRep tycon rhs_ty }
+mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
+-- Monadic because it makes a Name for the coercion TyCon
+-- We pass the Name of the parent TyCon, as well as the TyCon itself,
+-- because the latter is part of a knot, whereas the former is not.
+mkNewTyConRhs tycon_name tycon con 
+  = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
+	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon tvs rhs_ty 
+	; return (NewTyCon { data_con = con, 
+ 		       	     nt_co = co_tycon,
+		       	     nt_rhs = rhs_ty,
+		       	     nt_etad_rhs = eta_reduce tvs rhs_ty,
+		       	     nt_rep = mkNewTyConRep tycon rhs_ty }) }
   where
-    tvs    = dataConTyVars con
-    rhs_ty = head (dataConOrigArgTys con)
-	-- Newtypes are guaranteed vanilla, so OrigArgTys will do
+    tvs    = tyConTyVars tycon
+    rhs_ty = head (dataConInstOrigArgTys con (mkTyVarTys tvs))
+	-- Instantiate the data con with the 
+	-- type variables from the tycon
 
     eta_reduce [] ty = ([], ty)
     eta_reduce (a:as) ty | null as', 
@@ -132,19 +143,21 @@ mkNewTyConRep tc rhs_ty
 	    other -> rep_ty 
 
 ------------------------------------------------------
-buildDataCon :: Name -> Bool -> Bool
+buildDataCon :: Name -> Bool
 	    -> [StrictnessMark] 
 	    -> [Name]			-- Field labels
-	    -> [TyVar] 
+	    -> [TyVar] -> [TyVar]	-- Univ and ext 
+            -> [(TyVar,Type)]           -- Equality spec
 	    -> ThetaType		-- Does not include the "stupid theta"
-	    -> [Type] -> TyCon -> [Type]
+					-- or the GADT equalities
+	    -> [Type] -> TyCon
 	    -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
-buildDataCon src_name declared_infix vanilla arg_stricts field_lbls
-	     tyvars ctxt arg_tys tycon res_tys
+buildDataCon src_name declared_infix arg_stricts field_lbls
+	     univ_tvs ex_tvs eq_spec ctxt arg_tys tycon
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
 	-- This last one takes the name of the data constructor in the source
@@ -152,11 +165,11 @@ buildDataCon src_name declared_infix vanilla arg_stricts field_lbls
 	-- space, and puts it into the VarName name space
 
 	; let
-		stupid_ctxt = mkDataConStupidTheta tycon arg_tys res_tys
-		data_con = mkDataCon src_name declared_infix vanilla
+		stupid_ctxt = mkDataConStupidTheta tycon arg_tys univ_tvs
+		data_con = mkDataCon src_name declared_infix
 				     arg_stricts field_lbls
-				     tyvars stupid_ctxt ctxt
-				     arg_tys tycon res_tys dc_ids
+				     univ_tvs ex_tvs eq_spec ctxt
+				     arg_tys tycon stupid_ctxt dc_ids
 		dc_ids = mkDataConIds wrap_name work_name data_con
 
 	; returnM data_con }
@@ -164,18 +177,20 @@ buildDataCon src_name declared_infix vanilla arg_stricts field_lbls
 
 -- The stupid context for a data constructor should be limited to
 -- the type variables mentioned in the arg_tys
-mkDataConStupidTheta tycon arg_tys res_tys
+-- ToDo: Or functionally dependent on?  
+--	 This whole stupid theta thing is, well, stupid.
+mkDataConStupidTheta tycon arg_tys univ_tvs
   | null stupid_theta = []	-- The common case
   | otherwise 	      = filter in_arg_tys stupid_theta
   where
-    tc_subst	    = zipTopTvSubst (tyConTyVars tycon) res_tys
-    stupid_theta    = substTheta tc_subst (tyConStupidTheta tycon)
+    tc_subst	 = zipTopTvSubst (tyConTyVars tycon) (mkTyVarTys univ_tvs)
+    stupid_theta = substTheta tc_subst (tyConStupidTheta tycon)
 	-- Start by instantiating the master copy of the 
 	-- stupid theta, taken from the TyCon
 
     arg_tyvars      = tyVarsOfTypes arg_tys
     in_arg_tys pred = not $ isEmptyVarSet $ 
-			tyVarsOfPred pred `intersectVarSet` arg_tyvars
+		      tyVarsOfPred pred `intersectVarSet` arg_tyvars
 
 ------------------------------------------------------
 mkTyConSelIds :: TyCon -> AlgTyConRhs -> [Id]
@@ -211,30 +226,34 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
 	      -- (We used to call them D_C, but now we can have two different
 	      --  superclasses both called C!)
 
-	; fixM (\ clas -> do {	-- Only name generation inside loop
+	; fixM (\ rec_clas -> do {	-- Only name generation inside loop
 
-	  let { op_tys		   = [ty | (_,_,ty) <- sig_stuff]
+	  let { rec_tycon 	   = classTyCon rec_clas
+	      ; op_tys		   = [ty | (_,_,ty) <- sig_stuff]
 	      ; sc_tys		   = mkPredTys sc_theta
 	      ;	dict_component_tys = sc_tys ++ op_tys
-	      ; sc_sel_ids	   = [mkDictSelId sc_name clas | sc_name <- sc_sel_names]
-	      ; op_items = [ (mkDictSelId op_name clas, dm_info)
+	      ; sc_sel_ids	   = [mkDictSelId sc_name rec_clas | sc_name <- sc_sel_names]
+	      ; op_items = [ (mkDictSelId op_name rec_clas, dm_info)
 			   | (op_name, dm_info, _) <- sig_stuff ] }
 	  		-- Build the selector id and default method id
 
-	; dict_con <- buildDataCon datacon_name 
+	; dict_con <- buildDataCon datacon_name
 				   False 	-- Not declared infix
-				   True		-- Is vanilla; tyvars same as tycon
 				   (map (const NotMarkedStrict) dict_component_tys)
 				   [{- No labelled fields -}]
-				   tvs [{-No context-}] dict_component_tys
-				   (classTyCon clas) (mkTyVarTys tvs)
+				   tvs [{- no existentials -}]
+                                   [{- No equalities -}] [{-No context-}] 
+                                   dict_component_tys 
+				   rec_tycon
 
-	; let {	clas = mkClass class_name tvs fds
-		       sc_theta sc_sel_ids op_items
-		       tycon
+	; rhs <- case dict_component_tys of
+			    [rep_ty] -> mkNewTyConRhs tycon_name rec_tycon dict_con
+			    other    -> return (mkDataTyConRhs [dict_con])
 
-	      ;	tycon = mkClassTyCon tycon_name clas_kind tvs
-                             tc_vrcs rhs clas tc_isrec
+	; let {	clas_kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
+
+ 	      ; tycon = mkClassTyCon tycon_name clas_kind tvs
+                             tc_vrcs rhs rec_clas tc_isrec
 		-- A class can be recursive, and in the case of newtypes 
 		-- this matters.  For example
 		-- 	class C a where { op :: C b => a -> b -> Int }
@@ -242,14 +261,10 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
 		-- a newtype, and it should be a *recursive* newtype.
 		-- [If we don't make it a recursive newtype, we'll expand the
 		-- newtype like a synonym, but that will lead to an infinite type]
-
-	      ; clas_kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
-
- 	      ; rhs = case dict_component_tys of
-			    [rep_ty] -> mkNewTyConRhs tycon dict_con
-			    other    -> mkDataTyConRhs [dict_con]
 	      }
-	; return clas
+	; return (mkClass class_name tvs fds
+		       sc_theta sc_sel_ids op_items
+		       tycon)
 	})}
 \end{code}
 
