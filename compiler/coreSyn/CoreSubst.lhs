@@ -35,7 +35,7 @@ import Type		( Type, tyVarsOfType, TvSubstEnv, TvSubst(..), mkTyVarTy )
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
-import Id		( idType, setIdType, maybeModifyIdInfo, isLocalId )
+import Id		( idType, idInfo, setIdType, maybeModifyIdInfo, isLocalId )
 import IdInfo		( IdInfo, SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo,
 			  unfoldingInfo, setUnfoldingInfo, seqSpecInfo,
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo
@@ -43,7 +43,7 @@ import IdInfo		( IdInfo, SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo,
 import Unique		( Unique )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply )
 import Var		( Var, Id, TyVar, isTyVar )
-import Maybes		( orElse )
+import Maybes		( orElse, isNothing )
 import Outputable
 import PprCore		()		-- Instances
 import Util		( mapAccumL )
@@ -124,17 +124,28 @@ extendTvSubstList (Subst in_scope ids tvs) prs = Subst in_scope ids (extendVarEn
 lookupIdSubst :: Subst -> Id -> CoreExpr
 lookupIdSubst (Subst in_scope ids tvs) v 
   | not (isLocalId v) = Var v
-  | otherwise
-  = case lookupVarEnv ids v of {
-	Just e  -> e ;
-	Nothing -> 	
+  | otherwise	      = case lookupVarEnv ids v of
+			  Just e  -> e
+			  Nothing -> Var v 
+
+{-	We used to have to look up in the in-scope set, 
+	because GADTs were implicit in the intermediate language
+	But with FC, the type of an Id does not change in its scope
+	The worst that can happen if we don't look up in the in-scope set
+	is that we don't propagate IdInfo as vigorously as we might.
+	But that'll happen (when it's useful) in SimplEnv.substId
+
+	If you put this back in, you should worry about the
+		Just e -> e
+	case above too!
+
     case lookupInScope in_scope v of {
 	-- Watch out!  Must get the Id from the in-scope set,
 	-- because its type there may differ
 	Just v  -> Var v ;
 	Nothing -> WARN( True, ptext SLIT("CoreSubst.lookupIdSubst") <+> ppr v ) 
 		   Var v
-    }}
+-}
 
 lookupTvSubst :: Subst -> TyVar -> Type
 lookupTvSubst (Subst _ ids tvs) v = lookupVarEnv tvs v `orElse` mkTyVarTy v
@@ -182,6 +193,7 @@ substExpr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Note note e)   = Note (go_note note) (go e)
+    go (Cast e co)     = Cast (go e) (substTy subst co)
     go (Lam bndr body) = Lam bndr' (substExpr subst' body)
 		       where
 			 (subst', bndr') = substBndr subst bndr
@@ -198,7 +210,6 @@ substExpr subst expr
 				 where
 				   (subst', bndrs') = substBndrs subst bndrs
 
-    go_note (Coerce ty1 ty2) = Coerce (substTy subst ty1) (substTy subst ty2)
     go_note note	     = note
 
 substBind :: Subst -> CoreBind -> (Subst, CoreBind)
@@ -264,17 +275,24 @@ substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
   = (Subst (in_scope `extendInScopeSet` new_id) new_env tvs, new_id)
   where
     id1 = uniqAway in_scope old_id	-- id1 is cloned if necessary
-    id2 = substIdType subst id1		-- id2 has its type zapped
+    id2 | no_type_change = id1
+	| otherwise	 = setIdType id1 (substTy subst old_ty)
+
+    old_ty = idType old_id
+    no_type_change = isEmptyVarEnv tvs || isEmptyVarSet (tyVarsOfType old_ty)
 
 	-- new_id has the right IdInfo
 	-- The lazy-set is because we're in a loop here, with 
 	-- rec_subst, when dealing with a mutually-recursive group
-    new_id = maybeModifyIdInfo (substIdInfo rec_subst) id2
+    new_id = maybeModifyIdInfo mb_new_info id2
+    mb_new_info = substIdInfo rec_subst (idInfo id2)
 
 	-- Extend the substitution if the unique has changed
 	-- See the notes with substTyVarBndr for the delVarEnv
-    new_env | new_id /= old_id  = extendVarEnv env old_id (Var new_id)
-	    | otherwise         = delVarEnv env old_id
+    new_env | no_change = delVarEnv env old_id
+	    | otherwise = extendVarEnv env old_id (Var new_id)
+
+    no_change = False -- id1 == old_id && isNothing mb_new_info && no_type_change
 \end{code}
 
 Now a variant that unconditionally allocates a new unique.
@@ -307,7 +325,7 @@ clone_id rec_subst subst@(Subst in_scope env tvs) (old_id, uniq)
   where
     id1	    = setVarUnique old_id uniq
     id2     = substIdType subst id1
-    new_id  = maybeModifyIdInfo (substIdInfo rec_subst) id2
+    new_id  = maybeModifyIdInfo (substIdInfo rec_subst (idInfo old_id)) id2
     new_env = extendVarEnv env old_id (Var new_id)
 \end{code}
 

@@ -200,6 +200,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 	-- then we'll get a dfun which is a pair of two INLINE lambdas
 
     size_up (Note _        body) = size_up body	-- Other notes cost nothing
+    
+    size_up (Cast e _)           = size_up e
 
     size_up (App fun (Type t)) = size_up fun
     size_up (App fun arg)      = size_up_app fun [arg]
