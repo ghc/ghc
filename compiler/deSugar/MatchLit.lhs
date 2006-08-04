@@ -4,8 +4,8 @@
 \section[MatchLit]{Pattern-matching literal patterns}
 
 \begin{code}
-module MatchLit ( dsLit, dsOverLit,
-		  tidyLitPat, tidyNPat,
+module MatchLit ( dsLit, dsOverLit, hsLitKey, hsOverLitKey,
+		  tidyLitPat, tidyNPat, 
 		  matchLiterals, matchNPlusKPats, matchNPats ) where
 
 #include "HsVersions.h"
@@ -20,6 +20,7 @@ import HsSyn
 import Id		( Id, idType )
 import CoreSyn
 import TyCon		( tyConDataCons )
+import DataCon		( DataCon )
 import TcType		( tcSplitTyConApp, isIntegerTy, isIntTy, 
 			  isFloatTy, isDoubleTy, isStringTy )
 import Type		( Type )
@@ -29,10 +30,10 @@ import PrelNames	( eqStringName )
 import Unique		( hasKey )
 import Literal		( mkMachInt, Literal(..) )
 import SrcLoc		( noLoc )
-import ListSetOps	( equivClasses, runs )
 import Ratio 		( numerator, denominator )
-import SrcLoc		( Located(..) )
+import SrcLoc		( Located(..), unLoc )
 import Outputable
+import Util		( mapAndUnzip )
 import FastString	( lengthFS, unpackFS )
 \end{code}
 
@@ -59,15 +60,16 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 
 \begin{code}
 dsLit :: HsLit -> DsM CoreExpr
-dsLit (HsChar c)       = returnDs (mkCharExpr c)
-dsLit (HsCharPrim c)   = returnDs (mkLit (MachChar c))
-dsLit (HsString str)   = mkStringExprFS str
 dsLit (HsStringPrim s) = returnDs (mkLit (MachStr s))
-dsLit (HsInteger i _)  = mkIntegerExpr i
-dsLit (HsInt i)	       = returnDs (mkIntExpr i)
-dsLit (HsIntPrim i)    = returnDs (mkIntLit i)
+dsLit (HsCharPrim c)   = returnDs (mkLit (MachChar c))
+dsLit (HsIntPrim i)    = returnDs (mkLit (MachInt i))
 dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))
 dsLit (HsDoublePrim d) = returnDs (mkLit (MachDouble d))
+
+dsLit (HsChar c)       = returnDs (mkCharExpr c)
+dsLit (HsString str)   = mkStringExprFS str
+dsLit (HsInteger i _)  = mkIntegerExpr i
+dsLit (HsInt i)	       = returnDs (mkIntExpr i)
 
 dsLit (HsRat r ty)
   = mkIntegerExpr (numerator r)		`thenDs` \ num ->
@@ -86,6 +88,28 @@ dsOverLit (HsIntegral   _ lit) = dsExpr lit
 dsOverLit (HsFractional _ lit) = dsExpr lit
 \end{code}
 
+\begin{code}
+hsLitKey :: HsLit -> Literal
+-- Get a Core literal to use (only) a grouping key
+-- Hence its type doesn't need to match the type of the original literal
+--	(and doesn't for strings)
+-- It only works for primitive types and strings; 
+-- others have been removed by tidy
+hsLitKey (HsIntPrim     i) = mkMachInt  i
+hsLitKey (HsCharPrim    c) = MachChar   c
+hsLitKey (HsStringPrim  s) = MachStr    s
+hsLitKey (HsFloatPrim   f) = MachFloat  f
+hsLitKey (HsDoublePrim  d) = MachDouble d
+hsLitKey (HsString s)	   = MachStr    s
+
+hsOverLitKey :: HsOverLit a -> Bool -> Literal
+-- Ditto for HsOverLit; the boolean indicates to negate
+hsOverLitKey (HsIntegral i _) False   = MachInt i
+hsOverLitKey (HsIntegral i _) True    = MachInt (-i)
+hsOverLitKey (HsFractional r _) False = MachFloat r
+hsOverLitKey (HsFractional r _) True  = MachFloat (-r)
+\end{code}
+
 %************************************************************************
 %*									*
 	Tidying lit pats
@@ -93,30 +117,32 @@ dsOverLit (HsFractional _ lit) = dsExpr lit
 %************************************************************************
 
 \begin{code}
-tidyLitPat :: HsLit -> LPat Id -> LPat Id
+tidyLitPat :: HsLit -> Pat Id
 -- Result has only the following HsLits:
 --	HsIntPrim, HsCharPrim, HsFloatPrim
 --	HsDoublePrim, HsStringPrim, HsString
 --  * HsInteger, HsRat, HsInt can't show up in LitPats
 --  * We get rid of HsChar right here
-tidyLitPat (HsChar c) pat = mkCharLitPat c
-tidyLitPat (HsString s) pat
+tidyLitPat (HsChar c) = unLoc (mkCharLitPat c)
+tidyLitPat (HsString s)
   | lengthFS s <= 1	-- Short string literals only
-  = foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c,pat] stringTy)
-	  (mkNilPat stringTy) (unpackFS s)
+  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c, pat] stringTy)
+	          (mkNilPat stringTy) (unpackFS s)
 	-- The stringTy is the type of the whole pattern, not 
 	-- the type to instantiate (:) or [] with!
-tidyLitPat lit	      pat = pat
+tidyLitPat lit = LitPat lit
 
 ----------------
-tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> Type -> LPat Id -> LPat Id
-tidyNPat over_lit mb_neg lit_ty default_pat
+tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id
+	 -> Type -> Pat Id
+tidyNPat over_lit mb_neg eq lit_ty
   | isIntTy    lit_ty = mk_con_pat intDataCon    (HsIntPrim int_val)
   | isFloatTy  lit_ty = mk_con_pat floatDataCon  (HsFloatPrim  rat_val)
   | isDoubleTy lit_ty = mk_con_pat doubleDataCon (HsDoublePrim rat_val)
-  | otherwise	      = default_pat
+  | otherwise	      = NPat over_lit mb_neg eq lit_ty
   where
-    mk_con_pat con lit = mkPrefixConPat con [noLoc $ LitPat lit] lit_ty 
+    mk_con_pat :: DataCon -> HsLit -> Pat Id
+    mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] lit_ty)
     neg_lit = case (mb_neg, over_lit) of
 		(Nothing, 	       _)   -> over_lit
 		(Just _,  HsIntegral i s)   -> HsIntegral   (-i) s
@@ -142,43 +168,39 @@ tidyNPat over_lit mb_neg lit_ty default_pat
 
 \begin{code}
 matchLiterals :: [Id]
-	      -> Type	-- Type of the whole case expression
-	      -> [EquationInfo]
+	      -> Type			-- Type of the whole case expression
+	      -> [[EquationInfo]]	-- All PgLits
 	      -> DsM MatchResult
--- All the EquationInfos have LitPats at the front
 
-matchLiterals (var:vars) ty eqns
-  = do	{	-- Group by literal
-	  let groups :: [[(Literal, EquationInfo)]]
-	      groups = equivClasses cmpTaggedEqn (tagLitEqns eqns)
-
-		-- Deal with each group
-	; alts <- mapM match_group groups
+matchLiterals (var:vars) ty sub_groups
+  = do	{	-- Deal with each group
+	; alts <- mapM match_group sub_groups
 
 	 	-- Combine results.  For everything except String
 		-- we can use a case expression; for String we need
 		-- a chain of if-then-else
 	; if isStringTy (idType var) then
-	    do	{ mrs <- mapM wrap_str_guard alts
+	    do	{ eq_str <- dsLookupGlobalId eqStringName
+		; mrs <- mapM (wrap_str_guard eq_str) alts
 		; return (foldr1 combineMatchResults mrs) }
 	  else 
 	    return (mkCoPrimCaseMatchResult var ty alts)
 	}
   where
-    match_group :: [(Literal, EquationInfo)] -> DsM (Literal, MatchResult)
-    match_group group
-	= do { let (lits, eqns) = unzip group
+    match_group :: [EquationInfo] -> DsM (Literal, MatchResult)
+    match_group eqns
+	= do { let LitPat hs_lit = firstPat (head eqns)
 	     ; match_result <- match vars ty (shiftEqns eqns)
-	     ; return (head lits, match_result) }
+	     ; return (hsLitKey hs_lit, match_result) }
 
-    wrap_str_guard :: (Literal,MatchResult) -> DsM MatchResult
+    wrap_str_guard :: Id -> (Literal,MatchResult) -> DsM MatchResult
 	-- Equality check for string literals
-    wrap_str_guard (MachStr s, mr)
-	= do { eq_str <- dsLookupGlobalId eqStringName
-	     ; lit    <- mkStringExprFS s
+    wrap_str_guard eq_str (MachStr s, mr)
+	= do { lit    <- mkStringExprFS s
 	     ; let pred = mkApps (Var eq_str) [Var var, lit]
 	     ; return (mkGuardedMatchResult pred mr) }
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -187,35 +209,23 @@ matchLiterals (var:vars) ty eqns
 %************************************************************************
 
 \begin{code}
-matchNPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
--- All the EquationInfos have NPat at the front
+matchNPats :: [Id] -> Type -> [[EquationInfo]] -> DsM MatchResult
+	-- All NPats, but perhaps for different literals
+matchNPats vars ty groups
+  = do {  match_results <- mapM (matchOneNPat vars ty) groups
+	; return (foldr1 combineMatchResults match_results) }
 
-matchNPats (var:vars) ty eqns
-  = do {  let groups :: [[(Literal, EquationInfo)]]
-	      groups = equivClasses cmpTaggedEqn (tagLitEqns eqns)
-
-	; match_results <- mapM (match_group . map snd) groups
-
-	; ASSERT( not (null match_results) )
-	  return (foldr1 combineMatchResults match_results) }
-  where
-    match_group :: [EquationInfo] -> DsM MatchResult
-    match_group (eqn1:eqns)
-	= do { lit_expr <- dsOverLit lit
-	     ; neg_lit <- case mb_neg of
+matchOneNPat (var:vars) ty (eqn1:eqns)	-- All for the same literal
+  = do	{ let NPat lit mb_neg eq_chk _ = firstPat eqn1
+	; lit_expr <- dsOverLit lit
+	; neg_lit <- case mb_neg of
 			    Nothing -> return lit_expr
 			    Just neg -> do { neg_expr <- dsExpr neg
 					   ; return (App neg_expr lit_expr) }
-	     ; eq_expr <- dsExpr eq_chk
-	     ; let pred_expr = mkApps eq_expr [Var var, neg_lit]
-	     ; match_result <- match vars ty (eqn1' : shiftEqns eqns)
-	     ; return (adjustMatchResult (eqn_wrap eqn1) $
-			-- Bring the eqn1 wrapper stuff into scope because
-			-- it may be used in pred_expr
-		       mkGuardedMatchResult pred_expr match_result) }
-	where
-	  NPat lit mb_neg eq_chk _ : pats1 = eqn_pats eqn1
-	  eqn1' = eqn1 { eqn_wrap = idWrapper, eqn_pats = pats1 }
+	; eq_expr <- dsExpr eq_chk
+	; let pred_expr = mkApps eq_expr [Var var, neg_lit]
+	; match_result <- match vars ty (shiftEqns (eqn1:eqns))
+	; return (mkGuardedMatchResult pred_expr match_result) }
 \end{code}
 
 
@@ -235,95 +245,25 @@ We generate:
 	<try-next-pattern-or-whatever>
 \end{verbatim}
 
-WATCH OUT!  Consider
-
-	f (n+1) = ...
-	f (n+2) = ...
-	f (n+1) = ...
-
-We can't group the first and third together, because the second may match 
-the same thing as the first.  Contrast
-	f 1 = ...
-	f 2 = ...
-	f 1 = ...
-where we can group the first and third.  Hence 'runs' rather than 'equivClasses'
 
 \begin{code}
-matchNPlusKPats all_vars@(var:vars) ty eqns
-  = do {  let groups :: [[(Literal, EquationInfo)]]
-	      groups = runs eqTaggedEqn (tagLitEqns eqns)
-
-	; match_results <- mapM (match_group . map snd) groups
-
-	; ASSERT( not (null match_results) )
-	  return (foldr1 combineMatchResults match_results) }
+matchNPlusKPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+	-- All NPlusKPats, for the *same* literal k
+matchNPlusKPats all_vars@(var:vars) ty (eqn1:eqns)
+  = do	{ let NPlusKPat (L _ n1) lit ge minus = firstPat eqn1
+	; ge_expr     <- dsExpr ge
+	; minus_expr  <- dsExpr minus
+	; lit_expr    <- dsOverLit lit
+	; let pred_expr   = mkApps ge_expr [Var var, lit_expr]
+	      minusk_expr = mkApps minus_expr [Var var, lit_expr]
+	      (wraps, eqns') = mapAndUnzip (shift n1) eqns
+	; match_result <- match vars ty eqns'
+	; return  (mkGuardedMatchResult pred_expr 		$
+		   mkCoLetMatchResult (NonRec n1 minusk_expr)	$
+		   adjustMatchResult (foldr1 (.) wraps)		$
+		   match_result) }
   where
-    match_group :: [EquationInfo] -> DsM MatchResult
-    match_group (eqn1:eqns)
-	= do { ge_expr     <- dsExpr ge
-	     ; minus_expr  <- dsExpr minus
-	     ; lit_expr    <- dsOverLit lit
-	     ; let pred_expr   = mkApps ge_expr [Var var, lit_expr]
-		   minusk_expr = mkApps minus_expr [Var var, lit_expr]
-	     ; match_result <- match vars ty (eqn1' : map shift eqns)
-	     ; return  (adjustMatchResult (eqn_wrap eqn1) 	     $
-			-- Bring the eqn1 wrapper stuff into scope because
-			-- it may be used in ge_expr, minusk_expr
-		        mkGuardedMatchResult pred_expr 		    $
-			mkCoLetMatchResult (NonRec n1 minusk_expr)  $
-			match_result) }
-	where
-	  NPlusKPat (L _ n1) lit ge minus : pats1 = eqn_pats eqn1
-	  eqn1' = eqn1 { eqn_wrap = idWrapper, eqn_pats = pats1 }
-
-	  shift eqn@(EqnInfo { eqn_wrap = wrap,
-			       eqn_pats = NPlusKPat (L _ n) _ _ _ : pats })
-	    = eqn { eqn_wrap = wrap . wrapBind n n1, eqn_pats = pats }  
+    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat (L _ n) _ _ _ : pats })
+	= (wrapBind n n1, eqn { eqn_pats = pats })
+	-- The wrapBind is a no-op for the first equation
 \end{code}
-
-
-%************************************************************************
-%*									*
-		Grouping functions
-%*									*
-%************************************************************************
-
-Given a blob of @LitPat@s/@NPat@s, we want to split them into those
-that are ``same''/different as one we are looking at.  We need to know
-whether we're looking at a @LitPat@/@NPat@, and what literal we're after.
-
-\begin{code}
--- Tag equations by the leading literal
--- NB: we have ordering on Core Literals, but not on HsLits
-cmpTaggedEqn :: (Literal,EquationInfo) -> (Literal,EquationInfo) -> Ordering
-cmpTaggedEqn (lit1,_) (lit2,_) = lit1 `compare` lit2
-
-eqTaggedEqn :: (Literal,EquationInfo) -> (Literal,EquationInfo) -> Bool
-eqTaggedEqn (lit1,_) (lit2,_) = lit1 == lit2
-
-tagLitEqns :: [EquationInfo] -> [(Literal, EquationInfo)]
-tagLitEqns eqns = [(get_lit (firstPat eqn), eqn) | eqn <- eqns]
-
-get_lit :: Pat Id -> Literal
--- Get a Core literal to use (only) a grouping key
--- Hence its type doesn't need to match the type of the original literal
-get_lit (LitPat (HsIntPrim     i)) = mkMachInt  i
-get_lit (LitPat (HsCharPrim    c)) = MachChar   c
-get_lit (LitPat (HsStringPrim  s)) = MachStr    s
-get_lit (LitPat (HsFloatPrim   f)) = MachFloat  f
-get_lit (LitPat (HsDoublePrim  d)) = MachDouble d
-get_lit (LitPat (HsString s))	   = MachStr    s
-
-get_lit (NPat (HsIntegral i _) Nothing  _ _)   = MachInt i
-get_lit (NPat (HsIntegral i _) (Just _) _ _)   = MachInt (-i)
-get_lit (NPat (HsFractional r _) Nothing  _ _) = MachFloat r
-get_lit (NPat (HsFractional r _) (Just _) _ _) = MachFloat (-r)
-
-get_lit (NPlusKPat _ (HsIntegral i _) _ _) = MachInt i
-
--- These ones can't happen
--- get_lit (LitPat (HsChar c))
--- get_lit (LitPat (HsInt i))	
-get_lit other = pprPanic "get_lit:bad pattern" (ppr other)
-\end{code}
-

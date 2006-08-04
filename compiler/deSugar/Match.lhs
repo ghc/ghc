@@ -10,26 +10,29 @@ module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat 
 
 import DynFlags	( DynFlag(..), dopt )
 import HsSyn		
-import TcHsSyn		( mkVanillaTuplePat )
+import TcHsSyn		( mkVanillaTuplePat, hsPatType )
 import Check            ( check, ExhaustivePat )
 import CoreSyn
+import Literal		( Literal )
 import CoreUtils	( bindNonRec, exprType )
 import DsMonad
-import DsBinds		( dsLHsBinds )
+import DsBinds		( dsLHsBinds, dsCoercion )
 import DsGRHSs		( dsGRHSs )
 import DsUtils
 import Id		( idName, idType, Id )
-import DataCon		( dataConFieldLabels, dataConInstOrigArgTys, isVanillaDataCon )
+import DataCon		( DataCon )
 import MatchCon		( matchConFamily )
-import MatchLit		( matchLiterals, matchNPlusKPats, matchNPats, tidyLitPat, tidyNPat )
+import MatchLit		( matchLiterals, matchNPlusKPats, matchNPats, 
+			  tidyLitPat, tidyNPat, hsLitKey, hsOverLitKey )
 import PrelInfo		( pAT_ERROR_ID )
-import TcType		( Type, tcTyConAppArgs )
-import Type		( splitFunTysN, mkTyVarTys )
+import TcType		( Type )
+import Type		( splitFunTysN, coreEqType )
 import TysWiredIn	( consDataCon, mkListTy, unitTy,
 			  tupleCon, parrFakeCon, mkPArrTy )
 import BasicTypes	( Boxity(..) )
-import ListSetOps	( runs )
-import SrcLoc		( noLoc, unLoc, Located(..) )
+import ListSetOps	( equivClasses, runs )
+import SrcLoc		( unLoc, Located(..) )
+import Maybes		( isJust )
 import Util             ( lengthExceeds, notNull )
 import Name		( Name )
 import Outputable
@@ -141,6 +144,12 @@ ppr_eqn prefixF kind eqn = prefixF (ppr_shadow_pats kind (eqn_pats eqn))
 \end{code}
 
 
+%************************************************************************
+%*									*
+		The main matching function
+%*									*
+%************************************************************************
+
 The function @match@ is basically the same as in the Wadler chapter,
 except it is monadised, to carry around the name supply, info about
 annotations, etc.
@@ -191,13 +200,6 @@ Leaving out this third argument to @match@ (and slamming in lots of
 impossible to share the default expressions.  (Also, it stands no
 chance of working in our post-upheaval world of @Locals@.)
 \end{enumerate}
-So, the full type signature:
-\begin{code}
-match :: [Id]		  -- Variables rep'ing the exprs we're matching with
-      -> Type             -- Type of the case expression
-      -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
-      -> DsM MatchResult  -- Desugared result!
-\end{code}
 
 Note: @match@ is often called via @matchWrapper@ (end of this module),
 a function that does much of the house-keeping that goes with a call
@@ -230,34 +232,9 @@ appropriate thing for each kind of column-1 pattern, usually ending up
 in a recursive call to @match@.
 \end{enumerate}
 
-%************************************************************************
-%*									*
-%*  match: empty rule							*
-%*									*
-%************************************************************************
-\subsection[Match-empty-rule]{The ``empty rule''}
-
 We are a little more paranoid about the ``empty rule'' (SLPJ, p.~87)
 than the Wadler-chapter code for @match@ (p.~93, first @match@ clause).
 And gluing the ``success expressions'' together isn't quite so pretty.
-
-\begin{code}
-match [] ty eqns_info
-  = ASSERT( not (null eqns_info) )
-    returnDs (foldr1 combineMatchResults match_results)
-  where
-    match_results = [ ASSERT( null (eqn_pats eqn) ) 
-		      adjustMatchResult (eqn_wrap eqn) (eqn_rhs eqn)
-		    | eqn <- eqns_info ]
-\end{code}
-
-
-%************************************************************************
-%*									*
-%*  match: non-empty rule						*
-%*									*
-%************************************************************************
-\subsection[Match-nonempty]{@match@ when non-empty: unmixing}
 
 This (more interesting) clause of @match@ uses @tidy_and_unmix_eqns@
 (a)~to get `as'- and `twiddle'-patterns out of the way (tidying), and
@@ -271,40 +248,76 @@ Wadler-chapter @match@ (p.~93, last clause), and @match_unmixed_blk@
 corresponds roughly to @matchVarCon@.
 
 \begin{code}
-match vars@(v:_) ty eqns_info
-  = do	{ tidy_eqns <- mappM (tidyEqnInfo v) eqns_info
-	; let eqns_blks = runs same_family tidy_eqns
-	; match_results <- mappM match_block eqns_blks
-	; ASSERT( not (null match_results) )
-	  return (foldr1 combineMatchResults match_results) }
-  where
-    same_family eqn1 eqn2 
-      = samePatFamily (firstPat eqn1) (firstPat eqn2)
- 
-    match_block eqns
-      = case firstPat (head eqns) of
-	  WildPat {}   -> matchVariables  vars ty eqns
-	  ConPatOut {} -> matchConFamily  vars ty eqns
-	  NPlusKPat {} -> matchNPlusKPats vars ty eqns
-	  NPat {}      -> matchNPats	  vars ty eqns
-	  LitPat {}    -> matchLiterals   vars ty eqns
+match :: [Id]		  -- Variables rep'ing the exprs we're matching with
+      -> Type             -- Type of the case expression
+      -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
+      -> DsM MatchResult  -- Desugared result!
 
--- After tidying, there are only five kinds of patterns
-samePatFamily (WildPat {})   (WildPat {})   = True
-samePatFamily (ConPatOut {}) (ConPatOut {}) = True
-samePatFamily (NPlusKPat {}) (NPlusKPat {}) = True
-samePatFamily (NPat {})	     (NPat {}) 	    = True
-samePatFamily (LitPat {})    (LitPat {})    = True
-samePatFamily _		     _		    = False
+match [] ty eqns
+  = ASSERT( not (null eqns) )
+    returnDs (foldr1 combineMatchResults match_results)
+  where
+    match_results = [ ASSERT( null (eqn_pats eqn) ) 
+		      eqn_rhs eqn
+		    | eqn <- eqns ]
+
+match vars@(v:_) ty eqns
+  = ASSERT( not (null eqns ) )
+    do	{ 	-- Tidy the first pattern, generating
+		-- auxiliary bindings if necessary
+	  (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
+
+		-- Group the equations and match each group in turn
+	; match_results <- mapM match_group (groupEquations tidy_eqns)
+
+	; return (adjustMatchResult (foldr1 (.) aux_binds) $
+		  foldr1 combineMatchResults match_results) }
+  where
+    dropGroup :: [(PatGroup,EquationInfo)] -> [EquationInfo]
+    dropGroup = map snd
+
+    match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
+    match_group eqns@((group,_) : _)
+      = case group of
+	  PgAny     -> matchVariables  vars ty (dropGroup eqns)
+	  PgCon _   -> matchConFamily  vars ty (subGroups eqns)
+	  PgLit _   -> matchLiterals   vars ty (subGroups eqns)
+	  PgN lit   -> matchNPats      vars ty (subGroups eqns)
+	  PgNpK lit -> matchNPlusKPats vars ty (dropGroup eqns)
+	  PgBang    -> matchBangs      vars ty (dropGroup eqns)
+	  PgCo _    -> matchCoercion   vars ty (dropGroup eqns)
 
 matchVariables :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
 -- No binding to do: they'll all be wildcards by now (done in tidy)
 matchVariables (var:vars) ty eqns = match vars ty (shiftEqns eqns)
+
+matchBangs :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+matchBangs (var:vars) ty eqns
+  = do	{ match_result <- match (var:vars) ty (map shift eqns)
+	; return (mkEvalMatchResult var ty match_result) }
+  where
+    shift eqn@(EqnInfo { eqn_pats = BangPat pat : pats })
+	= eqn { eqn_pats = unLoc pat : pats }
+
+matchCoercion :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+-- Apply the coercion to the match variable and then match that
+matchCoercion (var:vars) ty (eqn1:eqns)
+  = do	{ let CoPat co pat _ = firstPat eqn1
+	; var' <- newUniqueId (idName var) (hsPatType pat)
+	; match_result <- match (var:vars) ty (map shift (eqn1:eqns))
+	; rhs <- dsCoercion co (return (Var var))
+	; return (mkCoLetMatchResult (NonRec var' rhs) match_result) }
+  where
+    shift eqn@(EqnInfo { eqn_pats = CoPat _ pat _ : pats })
+	= eqn { eqn_pats = pat : pats }
 \end{code}
 
-
-\end{code}
+%************************************************************************
+%*									*
+		Tidying patterns
+%*									*
+%************************************************************************
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
 which will be scrutinised.  This means:
@@ -342,7 +355,8 @@ Float, 	Double, at least) are converted to unboxed form; e.g.,
 \end{description}
 
 \begin{code}
-tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
+tidyEqnInfo :: Id -> EquationInfo
+	    -> DsM (DsWrapper, EquationInfo)
 	-- DsM'd because of internal call to dsLHsBinds
 	-- 	and mkSelectorBinds.
 	-- "tidy1" does the interesting stuff, looking at
@@ -356,29 +370,14 @@ tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
 	--	NPlusKPat
 	-- but no other
 
-tidyEqnInfo v eqn@(EqnInfo { eqn_wrap = wrap, eqn_pats = pat : pats })
-  = tidy1 v wrap pat 	`thenDs` \ (wrap', pat') ->
-    returnDs (eqn { eqn_wrap = wrap', eqn_pats = pat' : pats })
+tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats })
+  = tidy1 v pat 	`thenDs` \ (wrap, pat') ->
+    returnDs (wrap, eqn { eqn_pats = pat' : pats })
 
 tidy1 :: Id 			-- The Id being scrutinised
-      -> DsWrapper		-- Previous wrapping bindings
       -> Pat Id 		-- The pattern against which it is to be matched
-      -> DsM (DsWrapper,	-- Extra bindings around what to do afterwards
+      -> DsM (DsWrapper,	-- Extra bindings to do before the match
 	      Pat Id) 		-- Equivalent pattern
-
--- The extra bindings etc are all wrapped around the RHS of the match
--- so they are only available when matching is complete.  But that's ok
--- becuase, for example, in the pattern x@(...), the x can only be
--- used in the RHS, not in the nested pattern, nor subsquent patterns
---
--- However this does have an awkward consequence.  The bindings in 
--- a VarPatOut get wrapped around the result in right to left order,
--- rather than left to right.  This only matters if one set of 
--- bindings can mention things used in another, and that can happen
--- if we allow equality dictionary bindings of form d1=d2.  
--- bindIInstsOfLocalFuns is now careful not to do this, but it's a wart.
--- (Without this care in bindInstsOfLocalFuns, compiling 
--- Data.Generics.Schemes.hs fails in function everywhereBut.)
 
 -------------------------------------------------------
 --	(pat', mr') = tidy1 v pat mr
@@ -391,27 +390,25 @@ tidy1 :: Id 			-- The Id being scrutinised
 --	NPat
 --	NPlusKPat
 
-tidy1 v wrap (ParPat pat)      = tidy1 v wrap (unLoc pat) 
-tidy1 v wrap (SigPatOut pat _) = tidy1 v wrap (unLoc pat) 
-tidy1 v wrap (WildPat ty)      = returnDs (wrap, WildPat ty)
+tidy1 v (ParPat pat)      = tidy1 v (unLoc pat) 
+tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat) 
+tidy1 v (WildPat ty)      = returnDs (idWrapper, WildPat ty)
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
-tidy1 v wrap (VarPat var)
-  = returnDs (wrap . wrapBind var v, WildPat (idType var)) 
+tidy1 v (VarPat var)
+  = returnDs (wrapBind var v, WildPat (idType var)) 
 
-tidy1 v wrap (VarPatOut var binds)
+tidy1 v (VarPatOut var binds)
   = do	{ prs <- dsLHsBinds binds
-	; return (wrap . wrapBind var v . mkDsLet (Rec prs),
+	; return (wrapBind var v . mkDsLet (Rec prs),
 		  WildPat (idType var)) }
 
 	-- case v of { x@p -> mr[] }
 	-- = case v of { p -> let x=v in mr[] }
-tidy1 v wrap (AsPat (L _ var) pat)
-  = tidy1 v (wrap . wrapBind var v) (unLoc pat)
-
-tidy1 v wrap (BangPat pat)
-  = tidy1 v (wrap . seqVar v) (unLoc pat)
+tidy1 v (AsPat (L _ var) pat)
+  = do	{ (wrap, pat') <- tidy1 v (unLoc pat)
+	; return (wrapBind var v . wrap, pat') }
 
 {- now, here we handle lazy patterns:
     tidy1 v ~p bs = (v, v1 = case v of p -> v1 :
@@ -424,22 +421,13 @@ tidy1 v wrap (BangPat pat)
     The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
-tidy1 v wrap (LazyPat pat)
-  = do	{ v' <- newSysLocalDs (idType v)
-	; sel_prs <- mkSelectorBinds pat (Var v)
+tidy1 v (LazyPat pat)
+  = do	{ sel_prs <- mkSelectorBinds pat (Var v)
 	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
-	; returnDs (wrap . wrapBind v' v . mkDsLets sel_binds,
-		    WildPat (idType v)) }
+	; returnDs (mkDsLets sel_binds, WildPat (idType v)) }
 
--- re-express <con-something> as (ConPat ...) [directly]
-
-tidy1 v wrap (ConPatOut (L loc con) ex_tvs dicts binds ps pat_ty)
-  = returnDs (wrap, ConPatOut (L loc con) ex_tvs dicts binds tidy_ps pat_ty)
-  where
-    tidy_ps = PrefixCon (tidy_con con ex_tvs pat_ty ps)
-
-tidy1 v wrap (ListPat pats ty)
-  = returnDs (wrap, unLoc list_ConPat)
+tidy1 v (ListPat pats ty)
+  = returnDs (idWrapper, unLoc list_ConPat)
   where
     list_ty     = mkListTy ty
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] list_ty)
@@ -448,67 +436,39 @@ tidy1 v wrap (ListPat pats ty)
 
 -- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
-tidy1 v wrap (PArrPat pats ty)
-  = returnDs (wrap, unLoc parrConPat)
+tidy1 v (PArrPat pats ty)
+  = returnDs (idWrapper, unLoc parrConPat)
   where
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
-tidy1 v wrap (TuplePat pats boxity ty)
-  = returnDs (wrap, unLoc tuple_ConPat)
+tidy1 v (TuplePat pats boxity ty)
+  = returnDs (idWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats ty
 
-tidy1 v wrap (DictPat dicts methods)
+tidy1 v (DictPat dicts methods)
   = case num_of_d_and_ms of
-	0 -> tidy1 v wrap (TuplePat [] Boxed unitTy) 
-	1 -> tidy1 v wrap (unLoc (head dict_and_method_pats))
-	_ -> tidy1 v wrap (mkVanillaTuplePat dict_and_method_pats Boxed)
+	0 -> tidy1 v (TuplePat [] Boxed unitTy) 
+	1 -> tidy1 v (unLoc (head dict_and_method_pats))
+	_ -> tidy1 v (mkVanillaTuplePat dict_and_method_pats Boxed)
   where
     num_of_d_and_ms	 = length dicts + length methods
     dict_and_method_pats = map nlVarPat (dicts ++ methods)
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 v wrap pat@(LitPat lit)
-  = returnDs (wrap, unLoc (tidyLitPat lit (noLoc pat)))
+tidy1 v (LitPat lit)
+  = returnDs (idWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 v wrap pat@(NPat lit mb_neg _ lit_ty)
-  = returnDs (wrap, unLoc (tidyNPat lit mb_neg lit_ty (noLoc pat)))
+tidy1 v (NPat lit mb_neg eq lit_ty)
+  = returnDs (idWrapper, tidyNPat lit mb_neg eq lit_ty)
 
--- and everything else goes through unchanged...
+-- Everything else goes through unchanged...
 
-tidy1 v wrap non_interesting_pat
-  = returnDs (wrap, non_interesting_pat)
-
-
-tidy_con data_con ex_tvs pat_ty (PrefixCon ps)   = ps
-tidy_con data_con ex_tvs pat_ty (InfixCon p1 p2) = [p1,p2]
-tidy_con data_con ex_tvs pat_ty (RecCon rpats)
-  | null rpats
-  =	-- Special case for C {}, which can be used for 
-	-- a constructor that isn't declared to have
-	-- fields at all
-    map (noLoc . WildPat) con_arg_tys'
-
-  | otherwise
-  = map mk_pat tagged_arg_tys
-  where
-	-- Boring stuff to find the arg-tys of the constructor
-	
-    inst_tys | isVanillaDataCon data_con = tcTyConAppArgs pat_ty	-- Newtypes must be opaque
-	     | otherwise		 = mkTyVarTys ex_tvs
-
-    con_arg_tys'     = dataConInstOrigArgTys data_con inst_tys
-    tagged_arg_tys   = con_arg_tys' `zip` dataConFieldLabels data_con
-
-	-- mk_pat picks a WildPat of the appropriate type for absent fields,
-	-- and the specified pattern for present fields
-    mk_pat (arg_ty, lbl) = 
-	case [ pat | (sel_id,pat) <- rpats, idName (unLoc sel_id) == lbl] of
-	  (pat:pats) -> ASSERT( null pats ) pat
-	  []	     -> noLoc (WildPat arg_ty)
+tidy1 v non_interesting_pat
+  = returnDs (idWrapper, non_interesting_pat)
 \end{code}
 
 \noindent
@@ -651,20 +611,18 @@ JJQC 30-Nov-1997
 \begin{code}
 matchWrapper ctxt (MatchGroup matches match_ty)
   = do	{ eqns_info   <- mapM mk_eqn_info matches
-	; new_vars    <- selectMatchVars arg_pats pat_tys
+	; new_vars    <- selectMatchVars arg_pats
 	; result_expr <- matchEquations ctxt new_vars eqns_info rhs_ty
 	; return (new_vars, result_expr) }
   where
-    arg_pats          = map unLoc (hsLMatchPats (head matches))
-    n_pats	      = length arg_pats
-    (pat_tys, rhs_ty) = splitFunTysN n_pats match_ty
+    arg_pats    = map unLoc (hsLMatchPats (head matches))
+    n_pats	= length arg_pats
+    (_, rhs_ty) = splitFunTysN n_pats match_ty
 
     mk_eqn_info (L _ (Match pats _ grhss))
       = do { let upats = map unLoc pats
 	   ; match_result <- dsGRHSs ctxt upats grhss rhs_ty
-	   ; return (EqnInfo { eqn_wrap = idWrapper,
-			       eqn_pats = upats, 
-			       eqn_rhs  = match_result}) }
+	   ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
 
 
 matchEquations  :: HsMatchContext Name
@@ -728,9 +686,7 @@ matchSinglePat (Var var) hs_ctx (L _ pat) ty match_result
 	   where
 	     ds_ctx = DsMatchContext hs_ctx locn
     in
-    match_fn dflags [var] ty [EqnInfo { eqn_wrap = idWrapper,
-					eqn_pats = [pat],
-					eqn_rhs  = match_result }]
+    match_fn dflags [var] ty [EqnInfo { eqn_pats = [pat], eqn_rhs  = match_result }]
 
 matchSinglePat scrut hs_ctx pat ty match_result
   = selectSimpleMatchVarL pat 		 		`thenDs` \ var ->
@@ -738,3 +694,82 @@ matchSinglePat scrut hs_ctx pat ty match_result
     returnDs (adjustMatchResult (bindNonRec var scrut) match_result')
 \end{code}
 
+
+%************************************************************************
+%*									*
+		Pattern classification
+%*									*
+%************************************************************************
+
+\begin{code}
+data PatGroup
+  = PgAny		-- Immediate match: variables, wildcards, 
+			--		    lazy patterns
+  | PgCon DataCon	-- Constructor patterns (incl list, tuple)
+  | PgLit Literal	-- Literal patterns
+  | PgN   Literal	-- Overloaded literals
+  | PgNpK Literal	-- n+k patterns
+  | PgBang		-- Bang patterns
+  | PgCo Type		-- Coercion patterns; the type is the type
+			--	of the pattern *inside*
+
+
+groupEquations :: [EquationInfo] -> [[(PatGroup, EquationInfo)]]
+groupEquations eqns
+  = runs same_gp [(patGroup (firstPat eqn), eqn) | eqn <- eqns]
+  where
+    same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
+    (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2
+
+subGroups :: [(PatGroup, EquationInfo)] -> [[EquationInfo]]
+-- Input is a particular group.  The result sub-groups the 
+-- equations by with particular constructor, literal etc they match.
+-- The order may be swizzled, so the matching should be order-independent
+subGroups groups = map (map snd) (equivClasses cmp groups)
+  where
+    (pg1, _) `cmp` (pg2, _) = pg1 `cmp_pg` pg2
+    (PgCon c1) `cmp_pg` (PgCon c2) = c1 `compare` c2
+    (PgLit l1) `cmp_pg` (PgLit l2) = l1 `compare` l2
+    (PgN   l1) `cmp_pg` (PgN   l2) = l1 `compare` l2
+	-- These are the only cases that are every sub-grouped
+
+sameGroup :: PatGroup -> PatGroup -> Bool
+-- Same group means that a single case expression 
+-- or test will suffice to match both, *and* the order
+-- of testing within the group is insignificant.
+sameGroup PgAny      PgAny      = True
+sameGroup PgBang     PgBang     = True
+sameGroup (PgCon _)  (PgCon _)  = True		-- One case expression
+sameGroup (PgLit _)  (PgLit _)  = True		-- One case expression
+sameGroup (PgN l1)   (PgN l2)   = True		-- Needs conditionals
+sameGroup (PgNpK l1) (PgNpK l2) = l1==l2	-- Order is significant
+						-- See Note [Order of n+k]
+sameGroup (PgCo	t1)  (PgCo t2)  = t1 `coreEqType` t2
+sameGroup _          _          = False
+ 
+patGroup :: Pat Id -> PatGroup
+patGroup (WildPat {})       	      = PgAny
+patGroup (BangPat {})       	      = PgBang  
+patGroup (ConPatOut { pat_con = dc }) = PgCon (unLoc dc)
+patGroup (LitPat lit)		      = PgLit (hsLitKey lit)
+patGroup (NPat olit mb_neg _ _)	      = PgN   (hsOverLitKey olit (isJust mb_neg))
+patGroup (NPlusKPat _ olit _ _)	      = PgNpK (hsOverLitKey olit False)
+patGroup (CoPat _ p _)		      = PgCo  (hsPatType p)	-- Type of inner pattern
+patGroup pat = pprPanic "patGroup" (ppr pat)
+\end{code}
+
+Note [Order of n+k]
+~~~~~~~~~~~~~~~~~~~
+WATCH OUT!  Consider
+
+	f (n+1) = ...
+	f (n+2) = ...
+	f (n+1) = ...
+
+We can't group the first and third together, because the second may match 
+the same thing as the first.  Contrast
+	f 1 = ...
+	f 2 = ...
+	f 1 = ...
+where we can group the first and third.  Hence we don't regard (n+1) and
+(n+2) as part of the same group.
