@@ -17,8 +17,8 @@ module FunDeps (
 
 import Name		( Name, getSrcLoc )
 import Var		( TyVar )
-import Class		( Class, FunDep, classTvsFds )
-import Unify		( tcUnifyTys, BindFlag(..) )
+import Class		( Class, FunDep, pprFundeps, classTvsFds )
+import TcGadt		( tcUnifyTys, BindFlag(..) )
 import Type		( substTys, notElemTvSubst )
 import TcType		( Type, PredType(..), tcEqType, 
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
@@ -485,17 +485,4 @@ trimRoughMatchTcs clas_tvs (ltvs,_) mb_tcs
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsection{Miscellaneous}
-%*									*
-%************************************************************************
-
-\begin{code}
-pprFundeps :: Outputable a => [FunDep a] -> SDoc
-pprFundeps [] = empty
-pprFundeps fds = hsep (ptext SLIT("|") : punctuate comma (map ppr_fd fds))
-
-ppr_fd (us, vs) = hsep [interppSP us, ptext SLIT("->"), interppSP vs]
-\end{code}
 

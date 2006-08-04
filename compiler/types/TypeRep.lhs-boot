@@ -1,8 +1,19 @@
 \begin{code}
 module TypeRep where
 
+import {-# SOURCE #-} TyCon ( TyCon )
+
 data Type
 data PredType
 data TyThing
+
+type Coercion = Type
+
+type Kind = Type
+
+tySuperKind :: Kind
+coSuperKind :: Kind
+
+isCoSuperKind :: Kind -> Bool
 \end{code}
 

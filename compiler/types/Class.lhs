@@ -5,8 +5,10 @@
 
 \begin{code}
 module Class (
-	Class, ClassOpItem, FunDep,
+	Class, ClassOpItem, 
 	DefMeth (..),
+
+	FunDep,	pprFundeps,
 
 	mkClass, classTyVars, classArity,
 	classKey, className, classSelIds, classTyCon, classMethods,
@@ -159,6 +161,12 @@ instance Outputable DefMeth where
     ppr DefMeth     =  text "{- has default method -}"
     ppr GenDefMeth  =  text "{- has generic method -}"
     ppr NoDefMeth   =  empty   -- No default method
-\end{code}
 
+pprFundeps :: Outputable a => [FunDep a] -> SDoc
+pprFundeps []  = empty
+pprFundeps fds = hsep (ptext SLIT("|") : punctuate comma (map ppr_fd fds))
+	       where
+		 ppr_fd (us, vs) = hsep [interppSP us, ptext SLIT("->"), 
+					 interppSP vs]
+\end{code}
 

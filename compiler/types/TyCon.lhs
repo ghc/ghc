@@ -14,12 +14,13 @@ module TyCon(
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
-	isEnumerationTyCon, 
+	isEnumerationTyCon, isGadtSyntaxTyCon,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
-	isRecursiveTyCon, newTyConRep, newTyConRhs, 
-	isHiBootTyCon,
+	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConCo,
+	isHiBootTyCon, isSuperKindTyCon,
+        isCoercionTyCon_maybe, isCoercionTyCon,
 
-	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
+	tcExpandTyCon_maybe, coreExpandTyCon_maybe, stgExpandTyCon_maybe,
 
 	makeTyConAbstract, isAbstractTyCon,
 
@@ -29,9 +30,12 @@ module TyCon(
 	mkClassTyCon,
 	mkFunTyCon,
 	mkPrimTyCon,
+	mkVoidPrimTyCon,
 	mkLiftedPrimTyCon,
 	mkTupleTyCon,
 	mkSynTyCon,
+        mkSuperKindTyCon,
+        mkCoercionTyCon,
 
 	tyConName,
 	tyConKind,
@@ -54,16 +58,11 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TypeRep ( Type, PredType )
- -- Should just be Type(Type), but this fails due to bug present up to
- -- and including 4.02 involving slurping of hi-boot files.  Bug is now fixed.
-
+import {-# SOURCE #-} TypeRep ( Kind, Type, Coercion, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
-
 
 import Var   		( TyVar, Id )
 import Class		( Class )
-import Kind		( Kind )
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..) )
@@ -102,6 +101,10 @@ data TyCon
 
 	algTcSelIds :: [Id],  		-- Its record selectors (empty if none): 
 
+	algTcGadtSyntax  :: Bool,	-- True <=> the data type was declared using GADT syntax
+					-- That doesn't mean it's a true GADT; only that the "where"
+					-- 	form was used. This field is used only to guide
+					--	pretty-printinng
 	algTcStupidTheta :: [PredType],	-- The "stupid theta" for the data type
 					-- (always empty for GADTs)
 
@@ -115,23 +118,6 @@ data TyCon
 
 	algTcClass :: Maybe Class
 		-- Just cl if this tycon came from a class declaration
-    }
-
-  | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
-				-- Now includes foreign-imported types
-	tyConUnique   :: Unique,
-	tyConName     :: Name,
-	tyConKind     :: Kind,
-	tyConArity    :: Arity,
-	argVrcs       :: ArgVrcs,
-
-	primTyConRep  :: PrimRep,
-			-- Many primitive tycons are unboxed, but some are
-			-- boxed (represented by pointers). The CgRep tells.
-
-	isUnLifted   :: Bool,		-- Most primitive tycons are unlifted, 
-					-- but foreign-imported ones may not be
-	tyConExtName :: Maybe FastString	-- Just xx for foreign-imported types
     }
 
   | TupleTyCon {
@@ -151,12 +137,48 @@ data TyCon
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
 
-	tyConTyVars :: [TyVar],	-- Bound tyvars
-	synTcRhs    :: Type,	-- Right-hand side, mentioning these type vars.
+	tyConTyVars :: [TyVar],		-- Bound tyvars
+	synTcRhs    :: Type,		-- Right-hand side, mentioning these type vars.
 					-- Acts as a template for the expansion when
 					-- the tycon is applied to some types.
 	argVrcs :: ArgVrcs
     }
+
+  | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
+				-- Now includes foreign-imported types
+                                -- Also includes Kinds
+	tyConUnique   :: Unique,
+	tyConName     :: Name,
+	tyConKind     :: Kind,
+	tyConArity    :: Arity,
+	argVrcs       :: ArgVrcs,
+
+	primTyConRep  :: PrimRep,
+			-- Many primitive tycons are unboxed, but some are
+			-- boxed (represented by pointers). The CgRep tells.
+
+	isUnLifted   :: Bool,		-- Most primitive tycons are unlifted, 
+					-- but foreign-imported ones may not be
+	tyConExtName :: Maybe FastString	-- Just xx for foreign-imported types
+    }
+
+  | CoercionTyCon {	-- E.g. (:=:), sym, trans, left, right
+			-- INVARIANT: coercions are always fully applied
+	tyConUnique :: Unique,
+        tyConName   :: Name,
+	tyConArity  :: Arity,
+	coKindFun   :: [Type] -> Kind
+    }
+	
+  | SuperKindTyCon {    -- Super Kinds, TY (box) and CO (diamond).
+			-- They have no kind; and arity zero
+        tyConUnique :: Unique,
+        tyConName   :: Name
+    }
+
+type KindCon = TyCon
+
+type SuperKindCon = TyCon
 
 type FieldLabel = Name
 
@@ -183,6 +205,11 @@ data AlgTyConRhs
 
 	nt_rhs :: Type,		-- Cached: the argument type of the constructor
 				--  = the representation type of the tycon
+				-- The free tyvars of this type are the tyConTyVars
+      
+        nt_co :: TyCon,		-- The coercion used to create the newtype
+                                -- from the representation
+				-- See Note [Newtype coercions]
 
 	nt_etad_rhs :: ([TyVar], Type) ,
 			-- The same again, but this time eta-reduced
@@ -210,6 +237,20 @@ visibleDataCons AbstractTyCon      	      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 \end{code}
+
+Note [Newtype coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The NewTyCon field nt_co is a a TyCon (a coercion constructor in fact)
+which is used for coercing from the representation type of the
+newtype, to the newtype itself. For example,
+
+   newtype T a = MkT [a]
+
+the NewTyCon for T will contain nt_co = CoT where CoT t : [t] :=: T t.
+This TyCon is a CoercionTyCon, so it does not have a kind on its own;
+it basically has its own typing rule for the fully-applied version.
+If the newtype T has k type variables then CoT has arity k.
 
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
@@ -304,7 +345,7 @@ mkFunTyCon name kind
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars argvrcs stupid rhs sel_ids is_rec gen_info
+mkAlgTyCon name kind tyvars argvrcs stupid rhs sel_ids is_rec gen_info gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
@@ -317,6 +358,7 @@ mkAlgTyCon name kind tyvars argvrcs stupid rhs sel_ids is_rec gen_info
 	algTcSelIds	 = sel_ids,
 	algTcClass	 = Nothing,
 	algTcRec	 = is_rec,
+	algTcGadtSyntax  = gadt_syn,
 	hasGenerics = gen_info
     }
 
@@ -333,6 +375,7 @@ mkClassTyCon name kind tyvars argvrcs rhs clas is_rec
 	algTcSelIds	 = [],
 	algTcClass	 = Just clas,
 	algTcRec	 = is_rec,
+	algTcGadtSyntax  = False,	-- Doesn't really matter
 	hasGenerics = False
     }
 
@@ -370,6 +413,9 @@ mkForeignTyCon name ext_name kind arity arg_vrcs
 mkPrimTyCon name kind arity arg_vrcs rep
   = mkPrimTyCon' name kind arity arg_vrcs rep True  
 
+mkVoidPrimTyCon name kind arity arg_vrcs 
+  = mkPrimTyCon' name kind arity arg_vrcs VoidRep True  
+
 -- but RealWorld is lifted
 mkLiftedPrimTyCon name kind arity arg_vrcs rep
   = mkPrimTyCon' name kind arity arg_vrcs rep False
@@ -396,6 +442,21 @@ mkSynTyCon name kind tyvars rhs argvrcs
 	synTcRhs = rhs,
 	argVrcs      = argvrcs
     }
+
+mkCoercionTyCon name arity kindRule
+  = CoercionTyCon {
+        tyConName = name,
+        tyConUnique = nameUnique name,
+        tyConArity = arity,
+        coKindFun = kindRule
+    }
+
+-- Super kinds always have arity zero
+mkSuperKindTyCon name
+  = SuperKindTyCon {
+        tyConName = name,
+        tyConUnique = nameUnique name
+  }
 \end{code}
 
 \begin{code}
@@ -467,6 +528,10 @@ isSynTyCon :: TyCon -> Bool
 isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
 
+isGadtSyntaxTyCon :: TyCon -> Bool
+isGadtSyntaxTyCon (AlgTyCon { algTcGadtSyntax = res }) = res
+isGadtSyntaxTyCon other				       = False
+
 isEnumerationTyCon :: TyCon -> Bool
 isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon { is_enum = res }}) = res
 isEnumerationTyCon other				       	       = False
@@ -506,6 +571,18 @@ isForeignTyCon :: TyCon -> Bool
 -- isForeignTyCon identifies foreign-imported type constructors
 isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
 isForeignTyCon other				   = False
+
+isSuperKindTyCon :: TyCon -> Bool
+isSuperKindTyCon (SuperKindTyCon {}) = True
+isSuperKindTyCon other               = False
+
+isCoercionTyCon_maybe :: TyCon -> Maybe (Arity, [Type] -> Kind)
+isCoercionTyCon_maybe (CoercionTyCon {tyConArity = ar, coKindFun = rule}) 
+  = Just (ar, rule)
+isCoercionTyCon_maybe other = Nothing
+
+isCoercionTyCon (CoercionTyCon {}) = True
+isCoercionTyCon other              = False
 \end{code}
 
 
@@ -527,14 +604,25 @@ tcExpandTyCon_maybe (SynTyCon {tyConTyVars = tvs, synTcRhs = rhs }) tys
 tcExpandTyCon_maybe other_tycon tys = Nothing
 
 ---------------
--- For the *Core* view, we expand synonyms *and* non-recursive newtypes
+-- For the *Core* view, we expand synonyms only as well
+{-
 coreExpandTyCon_maybe (AlgTyCon {algTcRec = NonRecursive,	-- Not recursive
          algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs }}) tys
    = case etad_rhs of	-- Don't do this in the pattern match, lest we accidentally
 			-- match the etad_rhs of a *recursive* newtype
 	(tvs,rhs) -> expand tvs rhs tys
-	
+-}
 coreExpandTyCon_maybe tycon tys = tcExpandTyCon_maybe tycon tys
+
+---------------
+-- For the *STG* view, we expand synonyms *and* non-recursive newtypes
+stgExpandTyCon_maybe (AlgTyCon {algTcRec = NonRecursive,	-- Not recursive
+         algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs }}) tys
+   = case etad_rhs of	-- Don't do this in the pattern match, lest we accidentally
+			-- match the etad_rhs of a *recursive* newtype
+	(tvs,rhs) -> expand tvs rhs tys
+
+stgExpandTyCon_maybe tycon tys = coreExpandTyCon_maybe tycon tys
 
 ----------------
 expand	:: [TyVar] -> Type 			-- Template
@@ -592,6 +680,10 @@ newTyConRhs tycon = pprPanic "newTyConRhs" (ppr tycon)
 newTyConRep :: TyCon -> ([TyVar], Type)
 newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rep = rep }}) = (tvs, rep)
 newTyConRep tycon = pprPanic "newTyConRep" (ppr tycon)
+
+newTyConCo :: TyCon -> TyCon
+newTyConCo (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_co = co }}) = co
+newTyConCo tycon = pprPanic "newTyConCo" (ppr tycon)
 
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep

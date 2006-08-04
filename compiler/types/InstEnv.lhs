@@ -33,8 +33,10 @@ import TcType		( Type, PredType, tcEqType,
 			  tyClsNamesOfType, tcSplitTyConApp_maybe
 			)
 import TyCon		( tyConName )
-import Unify		( tcMatchTys, tcUnifyTys, BindFlag(..) )
+import TcGadt		( tcUnifyTys, BindFlag(..) )
+import Unify		( tcMatchTys )
 import Outputable
+import BasicTypes	( OverlapFlag(..) )
 import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C, eltsUFM )
 import Id		( idType, idName )
 import SrcLoc		( pprDefnLoc )
@@ -61,7 +63,8 @@ data Instance
 	     , is_tys  :: [Type]	-- Full arg types
 
 	     , is_dfun :: DFunId
-	     , is_flag :: OverlapFlag
+	     , is_flag :: OverlapFlag	-- See detailed comments with
+					-- the decl of BasicTypes.OverlapFlag
 
 	     , is_orph :: Maybe OccName }
 
@@ -213,39 +216,6 @@ instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- False is non-committal
 instanceCantMatch (Just t : ts) (Just a : as) = t/=a || instanceCantMatch ts as
 instanceCantMatch ts		as	      =  False	-- Safe
-
----------------------------------------------------
-data OverlapFlag
-  = NoOverlap	-- This instance must not overlap another
-
-  | OverlapOk	-- Silently ignore this instance if you find a 
-		-- more specific one that matches the constraint
-		-- you are trying to resolve
-		--
-		-- Example: constraint (Foo [Int])
-		-- 	    instances  (Foo [Int])
-		--		       (Foo [a])	OverlapOk
-		-- Since the second instance has the OverlapOk flag,
-		-- the first instance will be chosen (otherwise 
-		-- its ambiguous which to choose)
-
-  | Incoherent	-- Like OverlapOk, but also ignore this instance 
-		-- if it doesn't match the constraint you are
-		-- trying to resolve, but could match if the type variables
-		-- in the constraint were instantiated
-		--
-		-- Example: constraint (Foo [b])
-		--	    instances  (Foo [Int])	Incoherent
-		--		       (Foo [a])
-		-- Without the Incoherent flag, we'd complain that
-		-- instantiating 'b' would change which instance 
-		-- was chosen
-  deriving( Eq )
-
-instance Outputable OverlapFlag where
-   ppr NoOverlap  = empty
-   ppr OverlapOk  = ptext SLIT("[overlap ok]")
-   ppr Incoherent = ptext SLIT("[incoherent]")
 \end{code}
 
 

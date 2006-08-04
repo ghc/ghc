@@ -17,29 +17,51 @@ module TypeRep (
 	pprType, pprParendType, pprTyThingCategory,
 	pprPred, pprTheta, pprThetaArrow, pprClassPred,
 
-	-- Re-export fromKind
+	-- Kinds
 	liftedTypeKind, unliftedTypeKind, openTypeKind,
-	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, 
+        argTypeKind, ubxTupleKind,
+	isLiftedTypeKindCon, isLiftedTypeKind,
 	mkArrowKind, mkArrowKinds,
+
+        -- Kind constructors...
+        liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
+        argTypeKindTyCon, ubxTupleKindTyCon,
+
+        -- And their names
+        unliftedTypeKindTyConName, openTypeKindTyConName,
+        ubxTupleKindTyConName, argTypeKindTyConName,
+        liftedTypeKindTyConName,
+
+        -- Super Kinds
+	tySuperKind, coSuperKind,
+        isTySuperKind, isCoSuperKind,
+	tySuperKindTyCon, coSuperKindTyCon,
+        
+        isCoercionKindTyCon,
+
 	pprKind, pprParendKind
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} DataCon( DataCon, dataConName )
-
+import Monad 	  ( guard )
 -- friends:
-import Kind
+
 import Var	  ( Var, Id, TyVar, tyVarKind )
 import VarSet     ( TyVarSet )
 import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
 import OccName	  ( mkOccNameFS, tcName, parenSymOcc )
 import BasicTypes ( IPName, tupleParens )
-import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon, isNewTyCon )
+import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon, isNewTyCon, mkVoidPrimTyCon, mkSuperKindTyCon, isSuperKindTyCon, mkCoercionTyCon )
 import Class	  ( Class )
 
 -- others
-import PrelNames  ( gHC_PRIM, funTyConKey, listTyConKey, parrTyConKey, hasKey )
+import PrelNames  ( gHC_PRIM, funTyConKey, tySuperKindTyConKey, 
+                    coSuperKindTyConKey, liftedTypeKindTyConKey,
+                    openTypeKindTyConKey, unliftedTypeKindTyConKey,
+                    ubxTupleKindTyConKey, argTypeKindTyConKey, listTyConKey, 
+                    parrTyConKey, hasKey, eqCoercionKindTyConKey )
 import Outputable
 \end{code}
 
@@ -177,6 +199,19 @@ data Type
 	TyNote
 	Type		-- The expanded version
 
+type Kind = Type 	-- Invariant: a kind is always
+			--	FunTy k1 k2
+			-- or	TyConApp PrimTyCon [...]
+			-- or	TyVar kv (during inference only)
+			-- or   ForAll ... (for top-level coercions)
+
+type SuperKind = Type   -- Invariant: a super kind is always 
+                        --   TyConApp SuperKindTyCon ...
+
+type Coercion = Type
+
+type CoercionKind = Kind
+
 data TyNote = FTVNote TyVarSet	-- The free type variables of the noted expression
 \end{code}
 
@@ -204,6 +239,7 @@ Predicates are represented inside GHC by PredType:
 data PredType 
   = ClassP Class [Type]		-- Class predicate
   | IParam (IPName Name) Type	-- Implicit parameter
+  | EqPred Type Type		-- Equality predicate (ty1 :=: ty2)
 
 type ThetaType = [PredType]
 \end{code}
@@ -256,13 +292,16 @@ instance NamedThing TyThing where	-- Can't put this with the type
 
 %************************************************************************
 %*									*
-\subsection{Wired-in type constructors
+		Wired-in type constructors
 %*									*
 %************************************************************************
 
 We define a few wired-in type constructors here to avoid module knots
 
 \begin{code}
+--------------------------
+-- First the TyCons...
+
 funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind)
 	-- You might think that (->) should have type (?? -> ? -> *), and you'd be right
 	-- But if we do that we get kind errors when saying
@@ -272,13 +311,87 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] lif
 	-- the kind sub-typing does.  Sigh.  It really only matters if you use (->) in
 	-- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
 
-funTyConName = mkWiredInName gHC_PRIM
-			(mkOccNameFS tcName FSLIT("(->)"))
-			funTyConKey
-			Nothing 		-- No parent object
-			(ATyCon funTyCon)	-- Relevant TyCon
-			BuiltInSyntax
+
+tySuperKindTyCon     = mkSuperKindTyCon tySuperKindTyConName
+coSuperKindTyCon = mkSuperKindTyCon coSuperKindTyConName
+
+liftedTypeKindTyCon   = mkKindTyCon liftedTypeKindTyConName
+openTypeKindTyCon     = mkKindTyCon openTypeKindTyConName
+unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName
+ubxTupleKindTyCon     = mkKindTyCon ubxTupleKindTyConName
+argTypeKindTyCon      = mkKindTyCon argTypeKindTyConName
+eqCoercionKindTyCon = 
+  mkCoercionTyCon eqCoercionKindTyConName 2 (\ _ -> coSuperKind)
+
+mkKindTyCon :: Name -> TyCon
+mkKindTyCon name = mkVoidPrimTyCon name tySuperKind 0 [] 
+
+--------------------------
+-- ... and now their names
+
+tySuperKindTyConName     = mkPrimTyConName FSLIT("BOX") tySuperKindTyConKey tySuperKindTyCon
+coSuperKindTyConName = mkPrimTyConName FSLIT("COERCION") coSuperKindTyConKey coSuperKindTyCon
+liftedTypeKindTyConName   = mkPrimTyConName FSLIT("*") liftedTypeKindTyConKey liftedTypeKindTyCon
+openTypeKindTyConName     = mkPrimTyConName FSLIT("?") openTypeKindTyConKey openTypeKindTyCon
+unliftedTypeKindTyConName = mkPrimTyConName FSLIT("#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
+ubxTupleKindTyConName     = mkPrimTyConName FSLIT("(##)") ubxTupleKindTyConKey ubxTupleKindTyCon
+argTypeKindTyConName      = mkPrimTyConName FSLIT("??") argTypeKindTyConKey argTypeKindTyCon
+funTyConName              = mkPrimTyConName FSLIT("(->)") funTyConKey funTyCon
+
+eqCoercionKindTyConName   = mkWiredInName gHC_PRIM (mkOccNameFS tcName (FSLIT(":=:"))) 
+					eqCoercionKindTyConKey Nothing (ATyCon eqCoercionKindTyCon) 
+					BuiltInSyntax
+ 
+mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ) 
+					      key 
+					      Nothing 		-- No parent object
+					      (ATyCon tycon)
+					      BuiltInSyntax
+	-- All of the super kinds and kinds are defined in Prim and use BuiltInSyntax,
+	-- because they are never in scope in the source
+
+------------------
+-- We also need Kinds and SuperKinds, locally and in TyCon
+
+kindTyConType :: TyCon -> Type
+kindTyConType kind = TyConApp kind []
+
+liftedTypeKind   = kindTyConType liftedTypeKindTyCon
+unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
+openTypeKind     = kindTyConType openTypeKindTyCon
+argTypeKind      = kindTyConType argTypeKindTyCon
+ubxTupleKind	 = kindTyConType ubxTupleKindTyCon
+
+mkArrowKind :: Kind -> Kind -> Kind
+mkArrowKind k1 k2 = FunTy k1 k2
+
+mkArrowKinds :: [Kind] -> Kind -> Kind
+mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
+
+tySuperKind, coSuperKind :: SuperKind
+tySuperKind = kindTyConType tySuperKindTyCon 
+coSuperKind = kindTyConType coSuperKindTyCon 
+
+isTySuperKind (TyConApp kc []) = kc `hasKey` tySuperKindTyConKey
+isTySuperKind other            = False
+
+isCoSuperKind (TyConApp kc []) = kc `hasKey` coSuperKindTyConKey
+isCoSuperKind other            = False
+
+isCoercionKindTyCon kc = kc `hasKey` eqCoercionKindTyConKey
+
+
+-------------------
+-- lastly we need a few functions on Kinds
+
+isLiftedTypeKindCon tc    = tc `hasKey` liftedTypeKindTyConKey
+
+isLiftedTypeKind (TyConApp tc []) = isLiftedTypeKindCon tc
+isLiftedTypeKind other            = False
+
+
 \end{code}
+
 
 
 %************************************************************************
@@ -312,6 +425,7 @@ pprParendType ty = ppr_type TyConPrec ty
 pprPred :: PredType -> SDoc
 pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
+pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext SLIT(":=:")), ppr ty2]
 
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = parenSymOcc (getOccName clas) (ppr clas) 
@@ -337,6 +451,9 @@ instance Outputable name => OutputableBndr (IPName name) where
 
 ------------------
 	-- OK, here's the main printer
+
+pprKind = pprType
+pprParendKind = pprParendType
 
 ppr_type :: Prec -> Type -> SDoc
 ppr_type p (TyVarTy tv)       = ppr tv
@@ -382,6 +499,12 @@ ppr_tc_app p tc []
 ppr_tc_app p tc [ty] 
   | tc `hasKey` listTyConKey = brackets (pprType ty)
   | tc `hasKey` parrTyConKey = ptext SLIT("[:") <> pprType ty <> ptext SLIT(":]")
+  | tc `hasKey` liftedTypeKindTyConKey   = ptext SLIT("*")
+  | tc `hasKey` unliftedTypeKindTyConKey = ptext SLIT("#")
+  | tc `hasKey` openTypeKindTyConKey     = ptext SLIT("(?)")
+  | tc `hasKey` ubxTupleKindTyConKey     = ptext SLIT("(#)")
+  | tc `hasKey` argTypeKindTyConKey      = ptext SLIT("??")
+
 ppr_tc_app p tc tys
   | isTupleTyCon tc && tyConArity tc == length tys
   = tupleParens (tupleTyConBoxity tc) (sep (punctuate comma (map pprType tys)))

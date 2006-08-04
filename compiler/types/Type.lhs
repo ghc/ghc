@@ -3,21 +3,40 @@
 %
 \section[Type]{Type - public interface}
 
+
 \begin{code}
 module Type (
         -- re-exports from TypeRep
 	TyThing(..), Type, PredType(..), ThetaType, 
 	funTyCon,
 
-	-- Re-exports from Kind
-	module Kind,
+	-- Kinds
+        Kind, SimpleKind, KindVar,
+        kindFunResult, splitKindFunTys, 
+
+        liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
+        argTypeKindTyCon, ubxTupleKindTyCon,
+
+        liftedTypeKind, unliftedTypeKind, openTypeKind,
+        argTypeKind, ubxTupleKind,
+
+        tySuperKind, coSuperKind, 
+
+        isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
+        isUbxTupleKind, isArgTypeKind, isKind, isTySuperKind, 
+        isCoSuperKind, isSuperKind, isCoercionKind,
+	mkArrowKind, mkArrowKinds,
+
+        isSubArgTypeKind, isSubOpenTypeKind, isSubKind, defaultKind, eqKind,
+        isSubKindCon,
 
 	-- Re-exports from TyCon
 	PrimRep(..),
 
 	mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, isTyVarTy,
 
-	mkAppTy, mkAppTys, splitAppTy, splitAppTys, splitAppTy_maybe,
+	mkAppTy, mkAppTys, splitAppTy, splitAppTys, 
+	splitAppTy_maybe, repSplitAppTy_maybe,
 
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, 
 	splitFunTys, splitFunTysN,
@@ -25,9 +44,10 @@ module Type (
 
 	mkTyConApp, mkTyConTy, 
 	tyConAppTyCon, tyConAppArgs, 
-	splitTyConApp_maybe, splitTyConApp,
+	splitTyConApp_maybe, splitTyConApp, 
+        splitNewTyConApp_maybe, splitNewTyConApp,
 
-	repType, typePrimRep, coreView, tcView,
+	repType, typePrimRep, coreView, tcView, stgView, kindView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
@@ -74,7 +94,7 @@ module Type (
 
 	-- Pretty-printing
 	pprType, pprParendType, pprTyThingCategory,
-	pprPred, pprTheta, pprThetaArrow, pprClassPred
+	pprPred, pprTheta, pprThetaArrow, pprClassPred, pprKind, pprParendKind
     ) where
 
 #include "HsVersions.h"
@@ -85,20 +105,27 @@ module Type (
 import TypeRep
 
 -- friends:
-import Kind
-import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName, mkTyVar )
+import Var	( Var, TyVar, tyVarKind, tyVarName, 
+		  setTyVarName, setTyVarKind, mkTyVar, isTyVar )
+import Name	( Name(..) )
+import Unique	( Unique )
 import VarEnv
 import VarSet
 
 import OccName	( tidyOccName )
 import Name	( NamedThing(..), mkInternalName, tidyNameOcc )
 import Class	( Class, classTyCon )
+import PrelNames( openTypeKindTyConKey, unliftedTypeKindTyConKey, 
+                  ubxTupleKindTyConKey, argTypeKindTyConKey, 
+                  eqCoercionKindTyConKey )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
-		  isAlgTyCon, tyConArity, 
+		  isAlgTyCon, tyConArity, isSuperKindTyCon,
 		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
-	          tyConKind, PrimRep(..), tyConPrimRep,
+                  stgExpandTyCon_maybe,
+	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique,
+                  isCoercionTyCon_maybe, isCoercionTyCon
 		)
 
 -- others
@@ -122,7 +149,7 @@ In Core, we "look through" non-recursive newtypes and PredTypes.
 \begin{code}
 {-# INLINE coreView #-}
 coreView :: Type -> Maybe Type
--- Srips off the *top layer only* of a type to give 
+-- Strips off the *top layer only* of a type to give 
 -- its underlying representation type. 
 -- Returns Nothing if there is nothing to look through.
 --
@@ -150,6 +177,21 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc 
 				-- partially-applied type constructor; indeed, usually will!
 coreView ty		   = Nothing
 
+{-# INLINE stgView #-}
+stgView :: Type -> Maybe Type
+-- When generating STG from Core it is important that we look through newtypes
+-- but for the rest of Core we are just using coercions.  This does just what
+-- coreView USED to do.
+stgView (NoteTy _ ty) 	   = Just ty
+stgView (PredTy p)    	   = Just (predTypeRep p)
+stgView (TyConApp tc tys) | Just (tenv, rhs, tys') <- stgExpandTyCon_maybe tc tys 
+			   = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
+				-- Its important to use mkAppTys, rather than (foldl AppTy),
+				-- because the function part might well return a 
+				-- partially-applied type constructor; indeed, usually will!
+stgView ty		   = Nothing
+
+
 -----------------------------------------------
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
@@ -158,6 +200,14 @@ tcView (NoteTy _ ty) 	 = Just ty
 tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
 			 = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 tcView ty		 = Nothing
+
+-----------------------------------------------
+{-# INLINE kindView #-}
+kindView :: Kind -> Maybe Kind
+-- C.f. coreView, tcView
+-- For the moment, we don't even handle synonyms in kinds
+kindView (NoteTy _ k) = Just k
+kindView other	      = Nothing
 \end{code}
 
 
@@ -190,6 +240,7 @@ getTyVar_maybe :: Type -> Maybe TyVar
 getTyVar_maybe ty | Just ty' <- coreView ty = getTyVar_maybe ty'
 getTyVar_maybe (TyVarTy tv) 	 	    = Just tv  
 getTyVar_maybe other	         	    = Nothing
+
 \end{code}
 
 
@@ -231,20 +282,28 @@ mkAppTys orig_ty1 orig_tys2
 				-- mkTyConApp: see notes with mkAppTy
     mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
 
+-------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
-splitAppTy_maybe ty | Just ty' <- coreView ty = splitAppTy_maybe ty'
-splitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
-splitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
-splitAppTy_maybe (TyConApp tc tys) = case snocView tys of
-					Nothing         -> Nothing
-					Just (tys',ty') -> Just (TyConApp tc tys', ty')
-splitAppTy_maybe other	     	   = Nothing
+splitAppTy_maybe ty | Just ty' <- coreView ty
+		    = splitAppTy_maybe ty'
+splitAppTy_maybe ty = repSplitAppTy_maybe ty
 
+-------------
+repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
+-- Does the AppTy split, but assumes that any view stuff is already done
+repSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
+repSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
+repSplitAppTy_maybe (TyConApp tc tys) = case snocView tys of
+						Just (tys', ty') -> Just (TyConApp tc tys', ty')
+						Nothing		 -> Nothing
+repSplitAppTy_maybe other = Nothing
+-------------
 splitAppTy :: Type -> (Type, Type)
 splitAppTy ty = case splitAppTy_maybe ty of
 			Just pr -> pr
 			Nothing -> panic "splitAppTy"
 
+-------------
 splitAppTys :: Type -> (Type, [Type])
 splitAppTys ty = split ty ty []
   where
@@ -254,6 +313,7 @@ splitAppTys ty = split ty ty []
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty ty		        args = (orig_ty, args)
+
 \end{code}
 
 
@@ -354,6 +414,20 @@ splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitTyConApp_maybe other	      = Nothing
+
+-- Sometimes we do NOT want to look throught a newtype.  When case matching
+-- on a newtype we want a convenient way to access the arguments of a newty
+-- constructor so as to properly form a coercion.
+splitNewTyConApp :: Type -> (TyCon, [Type])
+splitNewTyConApp ty = case splitNewTyConApp_maybe ty of
+			Just stuff -> stuff
+			Nothing	   -> pprPanic "splitNewTyConApp" (ppr ty)
+splitNewTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
+splitNewTyConApp_maybe ty | Just ty' <- tcView ty = splitNewTyConApp_maybe ty'
+splitNewTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
+splitNewTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
+splitNewTyConApp_maybe other	      = Nothing
+
 \end{code}
 
 
@@ -396,8 +470,7 @@ repType (TyConApp tc tys)
 			   -- but we must expand them here.  Sure to
 			   -- be saturated because repType is only applied
 			   -- to types of kind *
-			   ASSERT( isRecursiveTyCon tc && 
-				   tys `lengthIs` tyConArity tc )
+			   ASSERT( {- isRecursiveTyCon tc && -} tys `lengthIs` tyConArity tc )
 			   repType (new_type_rep tc tys)
 repType ty = ty
 
@@ -560,6 +633,9 @@ splitRecNewType_maybe (TyConApp tc tys)
 			 Just (substTyWith tvs tys rep_ty)
 	
 splitRecNewType_maybe other = Nothing
+
+
+
 \end{code}
 
 
@@ -574,15 +650,30 @@ splitRecNewType_maybe other = Nothing
 		~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 typeKind :: Type -> Kind
+typeKind (TyConApp tycon tys) = ASSERT( not (isCoercionTyCon tycon) )
+				   -- We should be looking for the coercion kind,
+				   -- not the type kind
+				foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
+typeKind (NoteTy _ ty)	      = typeKind ty
+typeKind (PredTy pred)	      = predKind pred
+typeKind (AppTy fun arg)      = kindFunResult (typeKind fun)
+typeKind (ForAllTy tv ty)     = typeKind ty
+typeKind (TyVarTy tyvar)      = tyVarKind tyvar
+typeKind (FunTy arg res)
+    -- Hack alert.  The kind of (Int -> Int#) is liftedTypeKind (*), 
+    --              not unliftedTypKind (#)
+    -- The only things that can be after a function arrow are
+    --   (a) types (of kind openTypeKind or its sub-kinds)
+    --   (b) kinds (of super-kind TY) (e.g. * -> (* -> *))
+    | isTySuperKind k         = k
+    | otherwise               = ASSERT( isSubOpenTypeKind k) liftedTypeKind 
+    where
+      k = typeKind res
 
-typeKind (TyVarTy tyvar)	= tyVarKind tyvar
-typeKind (TyConApp tycon tys)	= foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
-typeKind (NoteTy _ ty)		= typeKind ty
-typeKind (PredTy _)		= liftedTypeKind -- Predicates are always 
-						 -- represented by lifted types
-typeKind (AppTy fun arg)	= kindFunResult (typeKind fun)
-typeKind (FunTy arg res)	= liftedTypeKind
-typeKind (ForAllTy tv ty)	= typeKind ty
+predKind :: PredType -> Kind
+predKind (EqPred {}) = coSuperKind	-- A coercion kind!
+predKind (ClassP {}) = liftedTypeKind	-- Class and implicitPredicates are
+predKind (IParam {}) = liftedTypeKind 	-- always represented by lifted types
 \end{code}
 
 
@@ -699,42 +790,11 @@ tidyTopType :: Type -> Type
 tidyTopType ty = tidyType emptyTidyEnv ty
 \end{code}
 
-
-%************************************************************************
-%*									*
-		Tidying Kinds
-%*									*
-%************************************************************************
-
-We use a grevious hack for tidying KindVars.  A TidyEnv contains
-a (VarEnv Var) substitution, to express the renaming; but
-KindVars are not Vars.  The Right Thing ultimately is to make them
-into Vars (and perhaps make Kinds into Types), but I just do a hack
-here: I make up a TyVar just to remember the new OccName for the
-renamed KindVar
-
 \begin{code}
+
 tidyKind :: TidyEnv -> Kind -> (TidyEnv, Kind)
-tidyKind env@(tidy_env, subst) (KindVar kvar)
-  | Just tv <- lookupVarEnv_Directly subst uniq
-  = (env, KindVar (setKindVarOcc kvar (getOccName tv)))
-  | otherwise
-  = ((tidy', subst'), KindVar kvar')
-  where
-    uniq = kindVarUniq kvar
-    (tidy', occ') = tidyOccName tidy_env (kindVarOcc kvar)
-    kvar'   = setKindVarOcc kvar occ'
-    fake_tv = mkTyVar tv_name (panic "tidyKind:fake tv kind")
-    tv_name = mkInternalName uniq occ' noSrcLoc
-    subst'  = extendVarEnv subst fake_tv fake_tv
+tidyKind env k = tidyOpenType env k
 
-tidyKind env (FunKind k1 k2) 
-  = (env2, FunKind k1' k2')
-  where
-    (env1, k1') = tidyKind env  k1
-    (env2, k2') = tidyKind env1 k2
-
-tidyKind env k = (env, k)	-- Atomic kinds
 \end{code}
 
 
@@ -867,8 +927,8 @@ coreEqType t1 t2
 	-- attempt to expand one side or the other.
 
 	-- Now deal with newtypes, synonyms, pred-tys
-    eq env t1 t2 | Just t1' <- coreView t1 = eq env t1' t2
-		 | Just t2' <- coreView t2 = eq env t1 t2'
+    eq env t1 t2 | Just t1' <- coreView t1 = eq env t1' t2 
+		 | Just t2' <- coreView t2 = eq env t1 t2' 
 
 	-- Fall through case; not equal!
     eq env t1 t2 = False
@@ -1167,6 +1227,7 @@ substTheta subst theta
 substPred :: TvSubst -> PredType -> PredType
 substPred subst (IParam n ty)     = IParam n (subst_ty subst ty)
 substPred subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
+substPred subst (EqPred ty1 ty2)  = EqPred (subst_ty subst ty1) (subst_ty subst ty2)
 
 deShadowTy :: TyVarSet -> Type -> Type	-- Remove any nested binders mentioning tvs
 deShadowTy tvs ty 
@@ -1174,6 +1235,9 @@ deShadowTy tvs ty
   where
     in_scope = mkInScopeSet tvs
 
+subst_ty :: TvSubst -> Type -> Type
+-- subst_ty is the main workhorse for type substitution
+--
 -- Note that the in_scope set is poked only if we hit a forall
 -- so it may often never be fully computed 
 subst_ty subst ty
@@ -1196,37 +1260,218 @@ subst_ty subst ty
 					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
 
 substTyVar :: TvSubst -> TyVar  -> Type
-substTyVar subst tv
-  = case lookupTyVar subst tv of
-	Nothing  -> TyVarTy tv
-       	Just ty' -> ty'	-- See Note [Apply Once]
+substTyVar subst@(TvSubst in_scope env) tv
+  = case lookupTyVar subst tv of {
+	Nothing  -> TyVarTy tv;
+       	Just ty -> ty	-- See Note [Apply Once]
+    } 
 
 lookupTyVar :: TvSubst -> TyVar  -> Maybe Type
 lookupTyVar (TvSubst in_scope env) tv = lookupVarEnv env tv
 
 substTyVarBndr :: TvSubst -> TyVar -> (TvSubst, TyVar)	
 substTyVarBndr subst@(TvSubst in_scope env) old_var
-  | old_var == new_var	-- No need to clone
-			-- But we *must* zap any current substitution for the variable.
-			--  For example:
-			--	(\x.e) with id_subst = [x |-> e']
-			-- Here we must simply zap the substitution for x
-			--
-			-- The new_id isn't cloned, but it may have a different type
-			-- etc, so we must return it, not the old id
-  = (TvSubst (in_scope `extendInScopeSet` new_var) 
-	     (delVarEnv env old_var),
-     new_var)
-
-  | otherwise	-- The new binder is in scope so
-		-- we'd better rename it away from the in-scope variables
-		-- Extending the substitution to do this renaming also
-		-- has the (correct) effect of discarding any existing
-		-- substitution for that variable
-  = (TvSubst (in_scope `extendInScopeSet` new_var) 
-	     (extendVarEnv env old_var (TyVarTy new_var)),
-     new_var)
+  = (TvSubst (in_scope `extendInScopeSet` new_var) new_env, new_var)
   where
-    new_var = uniqAway in_scope old_var
+
+    new_env | no_change = delVarEnv env old_var
+	    | otherwise = extendVarEnv env old_var (TyVarTy new_var)
+
+    no_change = new_var == old_var && not is_co_var
+	-- no_change means that the new_var is identical in
+	-- all respects to the old_var (same unique, same kind)
+	--
+	-- In that case we don't need to extend the substitution
+	-- to map old to new.  But instead we must zap any 
+	-- current substitution for the variable. For example:
+	--	(\x.e) with id_subst = [x |-> e']
+	-- Here we must simply zap the substitution for x
+
+    new_var = uniqAway in_scope subst_old_var
 	-- The uniqAway part makes sure the new variable is not already in scope
+
+    subst_old_var -- subst_old_var is old_var with the substitution applied to its kind
+		 -- It's only worth doing the substitution for coercions,
+		 -- becuase only they can have free type variables
+	| is_co_var = setTyVarKind old_var (substTy subst kind)
+	| otherwise = old_var
+    kind = tyVarKind old_var
+    is_co_var = isCoercionKind kind
+\end{code}
+
+----------------------------------------------------
+-- Kind Stuff
+
+Kinds
+~~~~~
+There's a little subtyping at the kind level:  
+
+		 ?
+		/ \
+	       /   \
+	      ??   (#)
+	     /  \
+            *   #
+
+where	*    [LiftedTypeKind]   means boxed type
+	#    [UnliftedTypeKind] means unboxed type
+	(#)  [UbxTupleKind]     means unboxed tuple
+	??   [ArgTypeKind]      is the lub of *,#
+	?    [OpenTypeKind]	means any type at all
+
+In particular:
+
+	error :: forall a:?. String -> a
+	(->)  :: ?? -> ? -> *
+	(\(x::t) -> ...)	Here t::?? (i.e. not unboxed tuple)
+
+\begin{code}
+type KindVar = TyVar  -- invariant: KindVar will always be a 
+                      -- TcTyVar with details MetaTv TauTv ...
+-- kind var constructors and functions are in TcType
+
+type SimpleKind = Kind
+\end{code}
+
+Kind inference
+~~~~~~~~~~~~~~
+During kind inference, a kind variable unifies only with 
+a "simple kind", sk
+	sk ::= * | sk1 -> sk2
+For example 
+	data T a = MkT a (T Int#)
+fails.  We give T the kind (k -> *), and the kind variable k won't unify
+with # (the kind of Int#).
+
+Type inference
+~~~~~~~~~~~~~~
+When creating a fresh internal type variable, we give it a kind to express 
+constraints on it.  E.g. in (\x->e) we make up a fresh type variable for x, 
+with kind ??.  
+
+During unification we only bind an internal type variable to a type
+whose kind is lower in the sub-kind hierarchy than the kind of the tyvar.
+
+When unifying two internal type variables, we collect their kind constraints by
+finding the GLB of the two.  Since the partial order is a tree, they only
+have a glb if one is a sub-kind of the other.  In that case, we bind the
+less-informative one to the more informative one.  Neat, eh?
+
+
+\begin{code}
+
+\end{code}
+
+%************************************************************************
+%*									*
+	Functions over Kinds		
+%*									*
+%************************************************************************
+
+\begin{code}
+kindFunResult :: Kind -> Kind
+kindFunResult k = funResultTy k
+
+splitKindFunTys :: Kind -> ([Kind],Kind)
+splitKindFunTys k = splitFunTys k
+
+isUbxTupleKind, isOpenTypeKind, isArgTypeKind, isUnliftedTypeKind :: Kind -> Bool
+
+isOpenTypeKindCon tc    = tyConUnique tc == openTypeKindTyConKey
+
+isOpenTypeKind (TyConApp tc _) = isOpenTypeKindCon tc
+isOpenTypeKind other           = False
+
+isUbxTupleKindCon tc = tyConUnique tc == ubxTupleKindTyConKey
+
+isUbxTupleKind (TyConApp tc _) = isUbxTupleKindCon tc
+isUbxTupleKind other 	       = False
+
+isArgTypeKindCon tc = tyConUnique tc == argTypeKindTyConKey
+
+isArgTypeKind (TyConApp tc _) = isArgTypeKindCon tc
+isArgTypeKind other = False
+
+isUnliftedTypeKindCon tc = tyConUnique tc == unliftedTypeKindTyConKey
+
+isUnliftedTypeKind (TyConApp tc _) = isUnliftedTypeKindCon tc
+isUnliftedTypeKind other           = False
+
+isSubOpenTypeKind :: Kind -> Bool
+-- True of any sub-kind of OpenTypeKind (i.e. anything except arrow)
+isSubOpenTypeKind (FunTy k1 k2)    = ASSERT2 ( isKind k1, text "isSubOpenTypeKind" <+> ppr k1 <+> text "::" <+> ppr (typeKind k1) ) 
+                                     ASSERT2 ( isKind k2, text "isSubOpenTypeKind" <+> ppr k2 <+> text "::" <+> ppr (typeKind k2) ) 
+                                     False
+isSubOpenTypeKind (TyConApp kc []) = ASSERT( isKind (TyConApp kc []) ) True
+isSubOpenTypeKind other            = ASSERT( isKind other ) False
+         -- This is a conservative answer
+         -- It matters in the call to isSubKind in
+	 -- checkExpectedKind.
+
+isSubArgTypeKindCon kc
+  | isUnliftedTypeKindCon kc = True
+  | isLiftedTypeKindCon kc   = True
+  | isArgTypeKindCon kc      = True
+  | otherwise                = False
+
+isSubArgTypeKind :: Kind -> Bool
+-- True of any sub-kind of ArgTypeKind 
+isSubArgTypeKind (TyConApp kc []) = isSubArgTypeKindCon kc
+isSubArgTypeKind other            = False
+
+isSuperKind :: Type -> Bool
+isSuperKind (TyConApp (skc) []) = isSuperKindTyCon skc
+isSuperKind other = False
+
+isKind :: Kind -> Bool
+isKind k = isSuperKind (typeKind k)
+
+
+
+isSubKind :: Kind -> Kind -> Bool
+-- (k1 `isSubKind` k2) checks that k1 <: k2
+isSubKind (TyConApp kc1 []) (TyConApp kc2 []) = kc1 `isSubKindCon` kc1
+isSubKind (FunTy a1 r1) (FunTy a2 r2)	      = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
+isSubKind k1 		k2 		      = False
+
+eqKind :: Kind -> Kind -> Bool
+eqKind = tcEqType
+
+isSubKindCon :: TyCon -> TyCon -> Bool
+-- (kc1 `isSubKindCon` kc2) checks that kc1 <: kc2
+isSubKindCon kc1 kc2
+  | isLiftedTypeKindCon kc1   && isLiftedTypeKindCon kc2   = True
+  | isUnliftedTypeKindCon kc1 && isUnliftedTypeKindCon kc2 = True
+  | isUbxTupleKindCon kc1     && isUbxTupleKindCon kc2     = True
+  | isOpenTypeKindCon kc2                                  = True 
+                           -- we already know kc1 is not a fun, its a TyCon
+  | isArgTypeKindCon kc2      && isSubArgTypeKindCon kc1   = True
+  | otherwise                                              = False
+
+defaultKind :: Kind -> Kind
+-- Used when generalising: default kind '?' and '??' to '*'
+-- 
+-- When we generalise, we make generic type variables whose kind is
+-- simple (* or *->* etc).  So generic type variables (other than
+-- built-in constants like 'error') always have simple kinds.  This is important;
+-- consider
+--	f x = True
+-- We want f to get type
+--	f :: forall (a::*). a -> Bool
+-- Not 
+--	f :: forall (a::??). a -> Bool
+-- because that would allow a call like (f 3#) as well as (f True),
+--and the calling conventions differ.  This defaulting is done in TcMType.zonkTcTyVarBndr.
+defaultKind k 
+  | isSubOpenTypeKind k = liftedTypeKind
+  | isSubArgTypeKind k  = liftedTypeKind
+  | otherwise        = k
+
+isCoercionKind :: Kind -> Bool
+-- All coercions are of form (ty1 :=: ty2)
+-- This function is here rather than in Coercion, 
+-- because it's used by substTy
+isCoercionKind k | Just k' <- kindView k = isCoercionKind k'
+isCoercionKind (PredTy (EqPred {})) 	 = True
+isCoercionKind other			 = False
 \end{code}
