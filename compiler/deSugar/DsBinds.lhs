@@ -323,6 +323,7 @@ simpleSubst subst expr
   = go expr
   where
     go (Var v)	       = lookupVarEnv subst v `orElse` Var v
+    go (Cast e co)     = Cast (go e) co
     go (Type ty)       = Type ty
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
@@ -421,16 +422,18 @@ addDictScc var rhs = returnDs rhs
 dsCoercion :: ExprCoFn -> DsM CoreExpr -> DsM CoreExpr
 dsCoercion CoHole 	     thing_inside = thing_inside
 dsCoercion (CoCompose c1 c2) thing_inside = dsCoercion c1 (dsCoercion c2 thing_inside)
-dsCoercion (CoLams ids c)    thing_inside = do { expr <- dsCoercion c thing_inside
+dsCoercion (ExprCoFn co)     thing_inside = do { expr <- thing_inside
+					       ; return (Cast expr co) }
+dsCoercion (CoLams ids)      thing_inside = do { expr <- thing_inside
 					       ; return (mkLams ids expr) }
-dsCoercion (CoTyLams tvs c)  thing_inside = do { expr <- dsCoercion c thing_inside
+dsCoercion (CoTyLams tvs)    thing_inside = do { expr <- thing_inside
 					       ; return (mkLams tvs expr) }
-dsCoercion (CoApps c ids)    thing_inside = do { expr <- dsCoercion c thing_inside
+dsCoercion (CoApps ids)      thing_inside = do { expr <- thing_inside
 					       ; return (mkVarApps expr ids) }
-dsCoercion (CoTyApps c tys)  thing_inside = do { expr <- dsCoercion c thing_inside
+dsCoercion (CoTyApps tys)    thing_inside = do { expr <- thing_inside
 					       ; return (mkTyApps expr tys) }
-dsCoercion (CoLet bs c)      thing_inside = do { prs <- dsLHsBinds bs
-					       ; expr <- dsCoercion c thing_inside
+dsCoercion (CoLet bs)        thing_inside = do { prs <- dsLHsBinds bs
+					       ; expr <- thing_inside
 					       ; return (Let (Rec prs) expr) }
 \end{code}
 

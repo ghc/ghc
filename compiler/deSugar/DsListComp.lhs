@@ -12,7 +12,7 @@ import {-# SOURCE #-} DsExpr ( dsLExpr, dsLocalBinds )
 
 import BasicTypes	( Boxity(..) )
 import HsSyn
-import TcHsSyn		( hsPatType, mkVanillaTuplePat )
+import TcHsSyn		( hsLPatType, mkVanillaTuplePat )
 import CoreSyn
 
 import DsMonad		-- the monadery used in the desugarer
@@ -197,7 +197,7 @@ deBindComp pat core_list1 quals body core_list2
 	u3_ty@u1_ty = exprType core_list1	-- two names, same thing
 
 	-- u1_ty is a [alpha] type, and u2_ty = alpha
-	u2_ty = hsPatType pat
+	u2_ty = hsLPatType pat
 
 	res_ty = exprType core_list2
 	h_ty   = u1_ty `mkFunTy` res_ty
@@ -313,7 +313,7 @@ dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) body
   = dsLExpr list1			`thenDs` \ core_list1 ->
 
     -- find the required type
-    let x_ty   = hsPatType pat
+    let x_ty   = hsLPatType pat
 	b_ty   = idType n_id
     in
 

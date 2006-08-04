@@ -19,7 +19,7 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType, coreAltType, mkCoerce2 )
+import CoreUtils	( exprType, coreAltType, mkCoerce )
 import Id		( Id, mkWildId )
 import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
@@ -34,7 +34,7 @@ import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  splitRecNewType_maybe, splitForAllTy_maybe,
 			  isUnboxedTupleType
 			)
-
+import Coercion         ( Coercion, splitRecNewTypeCo_maybe, mkSymCoercion )
 import PrimOp		( PrimOp(..) )
 import TysPrim		( realWorldStatePrimTy, intPrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
@@ -109,7 +109,7 @@ dsCCall :: CLabelString	-- C routine to invoke
 	-> [CoreExpr]	-- Arguments (desugared)
 	-> Safety	-- Safety of the call
 	-> Type		-- Type of the result: IO t
-	-> DsM CoreExpr
+	-> DsM CoreExpr	-- Result, of type ???
 
 dsCCall lbl args may_gc result_ty
   = mapAndUnzipDs unboxArg args	       `thenDs` \ (unboxed_args, arg_wrappers) ->
@@ -160,8 +160,8 @@ unboxArg arg
   = returnDs (arg, \body -> body)
 
   -- Recursive newtypes
-  | Just rep_ty <- splitRecNewType_maybe arg_ty
-  = unboxArg (mkCoerce2 rep_ty arg_ty arg)
+  | Just(rep_ty, co) <- splitRecNewTypeCo_maybe arg_ty
+  = unboxArg (mkCoerce (mkSymCoercion co) arg)
       
   -- Booleans
   | Just (tc,_) <- splitTyConApp_maybe arg_ty, 
@@ -399,9 +399,9 @@ resultWrapper result_ty
 				    (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 
   -- Recursive newtypes
-  | Just rep_ty <- splitRecNewType_maybe result_ty
+  | Just (rep_ty, co) <- splitRecNewTypeCo_maybe result_ty
   = resultWrapper rep_ty `thenDs` \ (maybe_ty, wrapper) ->
-    returnDs (maybe_ty, \e -> mkCoerce2 result_ty rep_ty (wrapper e))
+    returnDs (maybe_ty, \e -> mkCoerce co (wrapper e))
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).

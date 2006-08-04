@@ -31,6 +31,7 @@ import Literal		( Literal(..), mkStringLit )
 import Module		( moduleNameFS, moduleName )
 import Name		( getOccString, NamedThing(..) )
 import Type		( repType, coreEqType )
+import Coercion         ( mkUnsafeCoercion )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, tcSplitTyConApp_maybe, tcSplitIOType_maybe,
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
@@ -324,7 +325,7 @@ f :: Fun -> IO (FunPtr Fun)
 f cback =
    bindIO (newStablePtr cback)
           (\StablePtr sp# -> IO (\s1# ->
-              case _ccall_ createAdjustor cconv sp# ``f_helper'' s1# of
+              case _ccall_ createAdjustor cconv sp# ``f_helper'' <arg info> s1# of
                  (# s2#, a# #) -> (# s2#, A# a# #)))
 
 foreign import "&f_helper" f_helper :: FunPtr (StablePtr Fun -> Fun)
@@ -402,8 +403,9 @@ dsFExportDynamic id cconv
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
      let ccall_adj_ty = exprType ccall_adj
          ccall_io_adj = mkLams [stbl_value]		     $
-			Note (Coerce io_res_ty ccall_adj_ty)
-			     ccall_adj
+			(pprTrace "DsForeign: why is there an unsafeCoerce here?" (text "") $
+			(Cast ccall_adj (mkUnsafeCoercion ccall_adj_ty io_res_ty )))
+
          io_app = mkLams tvs	 $
 		  mkLams [cback] $
 		  stbl_app ccall_io_adj res_ty

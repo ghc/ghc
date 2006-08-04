@@ -34,7 +34,7 @@ import DsMeta		( dsBracket )
 #endif
 
 import HsSyn
-import TcHsSyn		( hsPatType, mkVanillaTuplePat )
+import TcHsSyn		( hsLPatType, mkVanillaTuplePat )
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
@@ -130,9 +130,9 @@ ds_val_bind (NonRecursive, hsbinds) body
 	   putSrcSpanDs loc			$
 	   do { rhs <- dsGuarded grhss ty
 	      ; let upat = unLoc pat
-		    eqn = EqnInfo { eqn_wrap = idWrapper, eqn_pats = [upat], 
+		    eqn = EqnInfo { eqn_pats = [upat], 
 				    eqn_rhs = cantFailMatchResult body_w_exports }
-	      ; var    <- selectMatchVar upat ty
+	      ; var    <- selectMatchVar upat
 	      ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
 	      ; return (scrungleMatch var rhs result) }
 
@@ -205,6 +205,7 @@ dsExpr (HsVar var)     	      = returnDs (Var var)
 dsExpr (HsIPVar ip)    	      = returnDs (Var (ipNameName ip))
 dsExpr (HsLit lit)     	      = dsLit lit
 dsExpr (HsOverLit lit) 	      = dsOverLit lit
+dsExpr (HsCoerce co_fn e)     = dsCoercion co_fn (dsExpr e)
 
 dsExpr (NegApp expr neg_expr) 
   = do	{ core_expr <- dsLExpr expr
@@ -232,9 +233,9 @@ dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
           extractIds (HsApp fn arg)
               | HsVar argId <- unLoc arg
               = argId:extractIds (unLoc fn)
-              | TyApp arg' ts <- unLoc arg
-              , HsVar argId <- unLoc arg'
-              = error (showSDoc (ppr ts)) -- argId:extractIds (unLoc fn)
+              | HsCoerce co_fn arg' <- unLoc arg
+              , HsVar argId <- arg'		-- SLPJ: not sure what is going on here
+              = error (showSDoc (ppr co_fn)) -- argId:extractIds (unLoc fn)
           extractIds x = []
           extractHVals ids = ExplicitList unitTy (map (L loc . HsVar) ids)
           -- checks for tyvars and unlifted kinds.
@@ -348,20 +349,6 @@ dsExpr (HsIf guard_expr then_expr else_expr)
     dsLExpr then_expr	`thenDs` \ core_then ->
     dsLExpr else_expr	`thenDs` \ core_else ->
     returnDs (mkIfThenElse core_guard core_then core_else)
-\end{code}
-
-
-\noindent
-\underline{\bf Type lambda and application}
-%              ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-\begin{code}
-dsExpr (TyLam tyvars expr)
-  = dsLExpr expr `thenDs` \ core_expr ->
-    returnDs (mkLams tyvars core_expr)
-
-dsExpr (TyApp expr tys)
-  = dsLExpr expr		`thenDs` \ core_expr ->
-    returnDs (mkTyApps core_expr tys)
 \end{code}
 
 
@@ -530,20 +517,18 @@ dsExpr expr@(RecordUpd record_expr rbinds record_in_ty record_out_ty)
 	      []	 -> nlHsVar old_arg_id
 
 	mk_alt con
-	  = newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys) `thenDs` \ arg_ids ->
+ 	  = ASSERT( isVanillaDataCon con )
+	    newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys) `thenDs` \ arg_ids ->
 		-- This call to dataConInstOrigArgTys won't work for existentials
 		-- but existentials don't have record types anyway
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
 					(dataConFieldLabels con) arg_ids
 		rhs = foldl (\a b -> nlHsApp a b)
-			(noLoc $ TyApp (nlHsVar (dataConWrapId con)) 
-				out_inst_tys)
-			  val_args
+			    (nlHsTyApp (dataConWrapId con) out_inst_tys)
+			    val_args
 	    in
-	    returnDs (mkSimpleMatch [noLoc $ ConPatOut (noLoc con) [] [] emptyLHsBinds 
-						       (PrefixCon (map nlVarPat arg_ids)) record_in_ty]
-				    rhs)
+ 	    returnDs (mkSimpleMatch [mkPrefixConPat con (map nlVarPat arg_ids) record_in_ty] rhs)
     in
 	-- Record stuff doesn't work for existentials
 	-- The type checker checks for this, but we need 
@@ -576,27 +561,6 @@ dsExpr expr@(RecordUpd record_expr rbinds record_in_ty record_out_ty)
       = all (`elem` con_fields) updated_fields
       where
 	con_fields = dataConFieldLabels con_id
-\end{code}
-
-
-\noindent
-\underline{\bf Dictionary lambda and application}
-%              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-@DictLam@ and @DictApp@ turn into the regular old things.
-(OLD:) @DictFunApp@ also becomes a curried application, albeit slightly more
-complicated; reminiscent of fully-applied constructors.
-\begin{code}
-dsExpr (DictLam dictvars expr)
-  = dsLExpr expr `thenDs` \ core_expr ->
-    returnDs (mkLams dictvars core_expr)
-
-------------------
-
-dsExpr (DictApp expr dicts)	-- becomes a curried application
-  = dsLExpr expr			`thenDs` \ core_expr ->
-    returnDs (foldl (\f d -> f `App` (Var d)) core_expr dicts)
-
-dsExpr (HsCoerce co_fn e) = dsCoercion co_fn (dsExpr e)
 \end{code}
 
 Here is where we desugar the Template Haskell brackets and escapes
@@ -720,7 +684,7 @@ dsMDo tbl stmts body result_ty
 	   ; match_code <- extractMatchResult match fail_expr
 
 	   ; rhs'       <- dsLExpr rhs
-	   ; returnDs (mkApps (Var bind_id) [Type (hsPatType pat), Type b_ty, 
+	   ; returnDs (mkApps (Var bind_id) [Type (hsLPatType pat), Type b_ty, 
 					     rhs', Lam var match_code]) }
     
     go (RecStmt rec_stmts later_ids rec_ids rec_rets binds : stmts)
@@ -738,7 +702,7 @@ dsMDo tbl stmts body result_ty
 	later_ids'   = filter (`notElem` mono_rec_ids) later_ids
 	mono_rec_ids = [ id | HsVar id <- rec_rets ]
     
-	mfix_app = nlHsApp (noLoc $ TyApp (nlHsVar mfix_id) [tup_ty]) mfix_arg
+	mfix_app = nlHsApp (nlHsTyApp mfix_id [tup_ty]) mfix_arg
 	mfix_arg = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
 					     (mkFunTy tup_ty body_ty))
 
@@ -755,7 +719,7 @@ dsMDo tbl stmts body result_ty
 	tup_ty  = mkCoreTupTy (map idType (later_ids' ++ rec_ids))
 		  -- mkCoreTupTy deals with singleton case
 
-	return_app  = nlHsApp (noLoc $ TyApp (nlHsVar return_id) [tup_ty]) 
+	return_app  = nlHsApp (nlHsTyApp return_id [tup_ty]) 
 			      (mk_ret_tup rets)
 
 	mk_wild_pat :: Id -> LPat Id 

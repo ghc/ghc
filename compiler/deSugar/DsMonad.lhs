@@ -73,8 +73,7 @@ data DsMatchContext
   deriving ()
 
 data EquationInfo
-  = EqnInfo { eqn_wrap :: DsWrapper,	-- Bindings
-	      eqn_pats :: [Pat Id],    	-- The patterns for an eqn
+  = EqnInfo { eqn_pats :: [Pat Id],    	-- The patterns for an eqn
 	      eqn_rhs  :: MatchResult }	-- What to do after match
 
 type DsWrapper = CoreExpr -> CoreExpr

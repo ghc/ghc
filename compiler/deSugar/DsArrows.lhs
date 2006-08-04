@@ -17,7 +17,7 @@ import DsUtils		( mkErrorAppDs,
 import DsMonad
 
 import HsSyn
-import TcHsSyn		( hsPatType )
+import TcHsSyn		( hsLPatType )
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
@@ -262,7 +262,7 @@ dsProcExpr pat (L _ (HsCmdTop cmd [] cmd_ty ids))
     matchSimply (Var var) ProcExpr pat (mkTupleExpr env_ids) fail_expr
 					`thenDs` \ match_code ->
     let
-	pat_ty = hsPatType pat
+	pat_ty = hsLPatType pat
 	proc_code = do_map_arrow meth_ids pat_ty env_ty cmd_ty
 		(Lam var match_code)
 		core_cmd
@@ -511,10 +511,10 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_
     dsLookupDataCon leftDataConName	`thenDs` \ left_con ->
     dsLookupDataCon rightDataConName	`thenDs` \ right_con ->
     let
-	left_id = nlHsVar (dataConWrapId left_con)
-	right_id = nlHsVar (dataConWrapId right_con)
-	left_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ TyApp left_id [ty1, ty2]) e
-	right_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ TyApp right_id [ty1, ty2]) e
+	left_id  = HsVar (dataConWrapId left_con)
+	right_id = HsVar (dataConWrapId right_con)
+	left_expr  ty1 ty2 e = noLoc $ HsApp (noLoc $ HsCoerce (CoTyApps [ty1, ty2]) left_id ) e
+	right_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ HsCoerce (CoTyApps [ty1, ty2]) right_id) e
 
 	-- Prefix each tuple with a distinct series of Left's and Right's,
 	-- in a balanced way, keeping track of the types.
@@ -742,10 +742,10 @@ dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd _ c_ty)
 -- but that's likely to be defined in terms of first.
 
 dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd _ _)
-  = dsfixCmd ids local_vars [] (hsPatType pat) cmd
+  = dsfixCmd ids local_vars [] (hsLPatType pat) cmd
 				`thenDs` \ (core_cmd, fv_cmd, env_ids1) ->
     let
-	pat_ty = hsPatType pat
+	pat_ty = hsLPatType pat
 	pat_vars = mkVarSet (collectPatBinders pat)
 	env_ids2 = varSetElems (mkVarSet out_ids `minusVarSet` pat_vars)
 	env_ty2 = mkTupleType env_ids2
