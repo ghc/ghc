@@ -461,10 +461,10 @@ NoFibRuns = 5
 
 DEFAULT_TMPDIR		= /tmp
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
-DEFAULT_TMPDIR		= C:/TEMP
+DEFAULT_TMPDIR		= /C/TEMP
 endif
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-DEFAULT_TMPDIR		= C:/TEMP
+DEFAULT_TMPDIR		= /C/TEMP
 endif
 
 # FPTOOLS_TOP: the top of the fptools hierarchy, absolute path. (POSIX / unix-style path).
@@ -489,7 +489,7 @@ mandir			= @mandir@
 ifeq "$(Windows)" "YES"
 
 ifeq "$(strip $(prefix))" ""
-prefix		= c:/ghc
+prefix		= /c/ghc
 endif
 
 # Hack: our directory layouts tend to be different on Windows, so
