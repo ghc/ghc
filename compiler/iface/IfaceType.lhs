@@ -7,7 +7,7 @@
 \begin{code}
 module IfaceType (
 	IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
-	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr,
+	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 
 	IfaceExtName(..), mkIfaceExtName, isLocalIfaceExtName,
 	ifaceTyConName,
@@ -26,8 +26,12 @@ module IfaceType (
 
 #include "HsVersions.h"
 
-import Kind		( Kind(..) )
-import TypeRep		( TyThing(..), Type(..), PredType(..), ThetaType )
+import Type		( Kind )
+import Coercion         ( Coercion )
+import TypeRep		( TyThing(..), Type(..), PredType(..), ThetaType,
+                          unliftedTypeKindTyConName, openTypeKindTyConName,
+                          ubxTupleKindTyConName, argTypeKindTyConName,
+                          liftedTypeKindTyConName, isLiftedTypeKind )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
@@ -99,7 +103,9 @@ type IfaceIdBndr  = (FastString, IfaceType)
 type IfaceTvBndr  = (FastString, IfaceKind)
 
 -------------------------------
-type IfaceKind = Kind			-- Re-use the Kind type, but no KindVars in it
+type IfaceKind = IfaceType			-- Re-use the Kind type, but no KindVars in it
+
+type IfaceCoercion = IfaceType
 
 data IfaceType
   = IfaceTyVar    FastString			-- Type variable only, not tycon
@@ -113,6 +119,7 @@ data IfaceType
 data IfacePredType 	-- NewTypes are handled as ordinary TyConApps
   = IfaceClassP IfaceExtName [IfaceType]
   | IfaceIParam (IPName OccName) IfaceType
+  | IfaceEqPred IfaceType IfaceType
 
 type IfaceContext = [IfacePredType]
 
@@ -121,6 +128,8 @@ data IfaceTyCon 	-- Abbreviations for common tycons with known names
   | IfaceIntTc | IfaceBoolTc | IfaceCharTc
   | IfaceListTc | IfacePArrTc
   | IfaceTupTc Boxity Arity 
+  | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
+  | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
 
 ifaceTyConName :: IfaceTyCon -> Name	-- Works for all except IfaceTc
 ifaceTyConName IfaceIntTc  	  = intTyConName
@@ -129,7 +138,14 @@ ifaceTyConName IfaceCharTc 	  = charTyConName
 ifaceTyConName IfaceListTc 	  = listTyConName
 ifaceTyConName IfacePArrTc 	  = parrTyConName
 ifaceTyConName (IfaceTupTc bx ar) = getName (tupleTyCon bx ar)
+ifaceTyConName IfaceLiftedTypeKindTc   = liftedTypeKindTyConName
+ifaceTyConName IfaceOpenTypeKindTc     = openTypeKindTyConName
+ifaceTyConName IfaceUnliftedTypeKindTc = unliftedTypeKindTyConName
+ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
+ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
 ifaceTyConName (IfaceTc ext)      = pprPanic "ifaceTyConName" (ppr ext)
+
+
 \end{code}
 
 
@@ -211,9 +227,9 @@ pprIfaceBndrs bs = sep (map ppr bs)
 pprIfaceIdBndr (name, ty) = hsep [ppr name, dcolon, ppr ty]
 
 pprIfaceTvBndr :: IfaceTvBndr -> SDoc
-pprIfaceTvBndr (tv, LiftedTypeKind) = ppr tv
-pprIfaceTvBndr (tv, kind) 	    = parens (ppr tv <> dcolon <> ppr kind)
-
+pprIfaceTvBndr (tv, IfaceTyConApp IfaceLiftedTypeKindTc []) 
+  = ppr tv
+pprIfaceTvBndr (tv, kind) = parens (ppr tv <> dcolon <> ppr kind)
 pprIfaceTvBndrs :: [IfaceTvBndr] -> SDoc
 pprIfaceTvBndrs tyvars = hsep (map pprIfaceTvBndr tyvars)
 \end{code}
@@ -289,6 +305,7 @@ ppr_tc tc		   = ppr tc
 -------------------
 instance Outputable IfacePredType where
 	-- Print without parens
+  ppr (IfaceEqPred ty1 ty2)= hsep [ppr ty1, ptext SLIT(":=:"), ppr ty2]
   ppr (IfaceIParam ip ty)  = hsep [ppr ip, dcolon, ppr ty]
   ppr (IfaceClassP cls ts) = parenSymOcc (ifaceExtOcc cls) (ppr cls)
 			     <+> sep (map pprParendIfaceType ts)
@@ -318,13 +335,16 @@ pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 
 \begin{code}
 ----------------
-toIfaceTvBndr tyvar   = (occNameFS (getOccName tyvar), tyVarKind tyvar)
+toIfaceTvBndr tyvar   = (occNameFS (getOccName tyvar), toIfaceKind (tyVarKind tyvar))
 toIfaceIdBndr ext id  = (occNameFS (getOccName id),    toIfaceType ext (idType id))
 toIfaceTvBndrs tyvars = map toIfaceTvBndr tyvars
 
 toIfaceBndr ext var
   | isId var  = IfaceIdBndr (toIfaceIdBndr ext var)
   | otherwise = IfaceTvBndr (toIfaceTvBndr var)
+
+-- we had better not have to use ext for kinds
+toIfaceKind = toIfaceType (\name -> pprPanic "toIfaceKind ext used on:" (ppr name))
 
 ---------------------
 toIfaceType :: (Name -> IfaceExtName) -> Type -> IfaceType
@@ -359,20 +379,26 @@ toIfaceTyCon_name ext nm
 
 toIfaceWiredInTyCon :: (Name -> IfaceExtName) -> TyCon -> Name -> IfaceTyCon
 toIfaceWiredInTyCon ext tc nm
-  | isTupleTyCon tc     = IfaceTupTc (tupleTyConBoxity tc) (tyConArity tc)
-  | nm == intTyConName  = IfaceIntTc
-  | nm == boolTyConName = IfaceBoolTc 
-  | nm == charTyConName = IfaceCharTc 
-  | nm == listTyConName = IfaceListTc 
-  | nm == parrTyConName = IfacePArrTc 
-  | otherwise		= IfaceTc (ext nm)
+  | isTupleTyCon tc                 =  IfaceTupTc (tupleTyConBoxity tc) (tyConArity tc)
+  | nm == intTyConName              = IfaceIntTc
+  | nm == boolTyConName             = IfaceBoolTc 
+  | nm == charTyConName             = IfaceCharTc 
+  | nm == listTyConName             = IfaceListTc 
+  | nm == parrTyConName             = IfacePArrTc 
+  | nm == liftedTypeKindTyConName   = IfaceLiftedTypeKindTc
+  | nm == unliftedTypeKindTyConName = IfaceUnliftedTypeKindTc
+  | nm == openTypeKindTyConName     = IfaceOpenTypeKindTc
+  | nm == argTypeKindTyConName      = IfaceArgTypeKindTc
+  | nm == ubxTupleKindTyConName     = IfaceUbxTupleKindTc
+  | otherwise		            = IfaceTc (ext nm)
 
 ----------------
 toIfaceTypes ext ts = map (toIfaceType ext) ts
 
 ----------------
-toIfacePred ext (ClassP cls ts) = IfaceClassP (ext (getName cls)) (toIfaceTypes ext ts)
-toIfacePred ext (IParam ip t)   = IfaceIParam (mapIPName getOccName ip) (toIfaceType ext t)
+toIfacePred ext (ClassP cls ts)  = IfaceClassP (ext (getName cls)) (toIfaceTypes ext ts)
+toIfacePred ext (IParam ip t)    = IfaceIParam (mapIPName getOccName ip) (toIfaceType ext t)
+toIfacePred ext (EqPred ty1 ty2) = IfaceEqPred (toIfaceType ext ty1) (toIfaceType ext ty2)
 
 ----------------
 toIfaceContext :: (Name -> IfaceExtName) -> ThetaType -> IfaceContext
