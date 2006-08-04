@@ -40,6 +40,7 @@ import IdInfo		( cprInfo, ppCprInfo, strictnessInfo, ppStrictnessInfo )
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
 import Type		( pprParendType, pprType, pprParendKind )
+import Coercion         ( coercionKindTyConApp )
 import BasicTypes	( tupleParens, isNoOcc, isAlwaysActive )
 import Util             ( lengthIs )
 import Outputable
@@ -121,6 +122,14 @@ ppr_expr add_par (Type ty)  = add_par (ptext SLIT("TYPE") <+> ppr ty)	-- Wierd
 	           
 ppr_expr add_par (Var name) = ppr name
 ppr_expr add_par (Lit lit)  = ppr lit
+
+ppr_expr add_par (Cast expr co) 
+  = add_par $
+    sep [pprParendExpr expr, 
+	 ptext SLIT("`cast`") <+> parens (pprCo co)]
+  where
+    pprCo co = sep [ppr co, dcolon <+> ppr (coercionKindTyConApp co)]
+	 
 
 ppr_expr add_par expr@(Lam _ _)
   = let
@@ -213,24 +222,6 @@ ppr_expr add_par (Let bind expr)
 
 ppr_expr add_par (Note (SCC cc) expr)
   = add_par (sep [pprCostCentreCore cc, pprCoreExpr expr])
-
-#ifdef DEBUG
-ppr_expr add_par (Note (Coerce to_ty from_ty) expr)
- = add_par $
-   getPprStyle $ \ sty ->
-   if debugStyle sty then
-      sep [ptext SLIT("__coerce") <+> 
-		sep [pprParendType to_ty, pprParendType from_ty],
-	   pprParendExpr expr]
-   else
-      sep [hsep [ptext SLIT("__coerce"), pprParendType to_ty],
-	          pprParendExpr expr]
-#else
-ppr_expr add_par (Note (Coerce to_ty from_ty) expr)
-  = add_par $
-    sep [sep [ptext SLIT("__coerce"), nest 2 (pprParendType to_ty)],
-	 pprParendExpr expr]
-#endif
 
 ppr_expr add_par (Note InlineMe expr)
   = add_par $ ptext SLIT("__inline_me") <+> pprParendExpr expr

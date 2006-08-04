@@ -132,7 +132,7 @@ pexp (Let vd e) = (text "%let" <+> pvdefg vd) $$ (text "%in" <+> pexp e)
 pexp (Case e vb ty alts) = sep [text "%case" <+> parens (paty ty) <+> paexp e,
 			     text "%of" <+> pvbind vb]
 			$$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
-pexp (Coerce t e) = (text "%coerce" <+> paty t) $$ pexp e
+pexp (Cast e co) = (text "%cast" <+> pexp e) $$ paty co
 pexp (Note s e) = (text "%note" <+> pstring s) $$ pexp e
 pexp (External n t) = (text "%external" <+> pstring n) $$ paty t
 pexp e = pfexp e
