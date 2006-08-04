@@ -40,7 +40,8 @@ import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
 import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
-import Type		( isUnLiftedType, coreEqType )
+import Type		( isUnLiftedType, coreEqType, splitTyConApp_maybe )
+import Coercion         ( coercionKind )
 import CoreLint		( showPass, endPass )
 import Util		( mapAndUnzip, mapAccumL, mapAccumR, lengthIs )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
@@ -164,16 +165,25 @@ dmdAnal sigs dmd (Lit lit)
 dmdAnal sigs dmd (Var var)
   = (dmdTransform sigs var dmd, Var var)
 
+dmdAnal sigs dmd (Cast e co)
+  = (dmd_ty, Cast e' co)
+  where
+    (dmd_ty, e') = dmdAnal sigs dmd' e
+    to_co        = snd (coercionKind co)
+    dmd'
+      | Just (tc, args) <- splitTyConApp_maybe to_co
+      , isRecursiveTyCon tc = evalDmd
+      | otherwise           = dmd
+	-- This coerce usually arises from a recursive
+        -- newtype, and we don't want to look inside them
+	-- for exactly the same reason that we don't look
+	-- inside recursive products -- we might not reach
+	-- a fixpoint.  So revert to a vanilla Eval demand
+
 dmdAnal sigs dmd (Note n e)
   = (dmd_ty, Note n e')
   where
-    (dmd_ty, e') = dmdAnal sigs dmd' e	
-    dmd' = case n of
-	     Coerce _ _ -> evalDmd  -- This coerce usually arises from a recursive
-	     other	-> dmd 	    -- newtype, and we don't want to look inside them
-				    -- for exactly the same reason that we don't look
-				    -- inside recursive products -- we might not reach
-				    -- a fixpoint.  So revert to a vanilla Eval demand
+    (dmd_ty, e') = dmdAnal sigs dmd e	
 
 dmdAnal sigs dmd (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))

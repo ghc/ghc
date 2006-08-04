@@ -153,6 +153,10 @@ wwExpr (Note note expr)
   = wwExpr expr			`thenUs` \ new_expr ->
     returnUs (Note note new_expr)
 
+wwExpr (Cast expr co)
+  = wwExpr expr			`thenUs` \ new_expr ->
+    returnUs (Cast new_expr co)
+
 wwExpr (Let bind expr)
   = wwBind bind			`thenUs` \ intermediate_bind ->
     wwExpr expr			`thenUs` \ new_expr ->
