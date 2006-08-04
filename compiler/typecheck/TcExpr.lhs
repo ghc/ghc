@@ -26,7 +26,7 @@ import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
 import TcHsSyn		( hsLitType )
 import TcRnMonad
 import TcUnify		( tcInfer, tcSubExp, tcFunResTy, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
-			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, boxySubMatchType, 
+			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, preSubType,, 
 			  unBox )
 import BasicTypes	( Arity, isMarkedStrict )
 import Inst		( newMethodFromName, newIPDict, instToId,
@@ -648,26 +648,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 	; extra_arg_boxes <- newBoxyTyVars (replicate n_missing_args argTypeKind)
 	; let extra_arg_tys' = mkTyVarTys extra_arg_boxes
 	      res_ty' 	     = mkFunTys extra_arg_tys' res_ty
-	      subst   	     = boxySubMatchType arg_qtvs fun_res_ty res_ty'
-				-- Only bind arg_qtvs, since only they will be
-				-- *definitely* be filled in by arg_checker
-				-- E.g.  error :: forall a. String -> a
-				--	 (error "foo") :: bx5
-				--  Don't make subst [a |-> bx5]
-				--  because then the result subsumption becomes
-				--	 	bx5 ~ bx5
-				--  and the unifer doesn't expect the 
-				--  same box on both sides
-	      inst_qtv tv | Just boxy_ty <- lookupTyVar subst tv = return boxy_ty
-			  | tv `elemVarSet` tau_qtvs = do { tv' <- tcInstBoxyTyVar tv
-					    	          ; return (mkTyVarTy tv') }
-			  | otherwise		     = do { tv' <- tcInstTyVar tv
-					    	          ; return (mkTyVarTy tv') }
-			-- The 'otherwise' case handles type variables that are
-			-- mentioned only in the constraints, not in argument or 
-			-- result types.  We'll make them tau-types
-
-	; qtys' <- mapM inst_qtv qtvs
+	; qtys' <- preSubType qtvs tau_qtvs fun_res_ty res_ty'
 	; let arg_subst    = zipOpenTvSubst qtvs qtys'
 	      fun_arg_tys' = substTys arg_subst fun_arg_tys
 
@@ -675,8 +656,12 @@ tcIdApp fun_name n_args arg_checker res_ty
 	-- Doing so will fill arg_qtvs and extra_arg_tys'
 	; args' <- arg_checker (fun_arg_tys' ++ extra_arg_tys')
 
+	-- Strip boxes from the qtvs that have been filled in by the arg checking
+	-- AND any variables that are mentioned in neither arg nor result
+	-- the latter are mentioned only in constraints; stripBoxyType will 
+	-- fill them with a monotype
 	; let strip qtv qty' | qtv `elemVarSet` arg_qtvs = stripBoxyType qty'
-			     | otherwise   		 = return qty'
+			     | otherwise		 = return qty'
 	; qtys'' <- zipWithM strip qtvs qtys'
 	; extra_arg_tys'' <- mapM readFilledBox extra_arg_boxes
 
@@ -722,17 +707,13 @@ tcId orig fun_name res_ty
 
 	-- Split up the function type
 	; let (tv_theta_prs, fun_tau) = tcMultiSplitSigmaTy (idType fun_id)
-	      qtvs     = concatMap fst tv_theta_prs	-- Quantified tyvars
-	      tau_qtvs = exactTyVarsOfType fun_tau	-- Mentiond in the tau part
-	      inst_qtv tv | tv `elemVarSet` tau_qtvs = do { tv' <- tcInstBoxyTyVar tv
-					      		  ; return (mkTyVarTy tv') }
-			  | otherwise	  	     = do { tv' <- tcInstTyVar tv
-					                  ; return (mkTyVarTy tv') }
+	      qtvs = concatMap fst tv_theta_prs	-- Quantified tyvars
+	      tau_qtvs = exactTyVarsOfType fun_tau	-- Mentioned in the tau part
+	; qtv_tys <- preSubType qtvs tau_qtvs fun_tau res_ty
 
 	-- Do the subsumption check wrt the result type
-	; qtv_tys <- mapM inst_qtv qtvs
-	; let res_subst   = zipTopTvSubst qtvs qtv_tys
-	      fun_tau' = substTy res_subst fun_tau
+	; let res_subst = zipTopTvSubst qtvs qtv_tys
+	      fun_tau'  = substTy res_subst fun_tau
 
 	; co_fn <- tcFunResTy fun_name fun_tau' res_ty
 

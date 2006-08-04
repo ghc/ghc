@@ -683,8 +683,7 @@ newLitInst orig lit res_ty	-- Make a LitInst
   = do 	{ loc <- getInstLoc orig
 	; res_tau <- zapToMonotype res_ty
 	; new_uniq <- newUnique
-	; let
- 		lit_nm   = mkSystemVarName new_uniq FSLIT("lit")
+	; let	lit_nm   = mkSystemVarName new_uniq FSLIT("lit")
 		lit_inst = LitInst lit_nm lit res_tau loc
 	; extendLIE lit_inst
 	; return (HsVar (instToId lit_inst)) }

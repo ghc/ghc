@@ -24,7 +24,7 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxy, tcInstBoxyTyVar,
+  tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxyTyVar,
   tcInstSigTyVars, zonkSigTyVar,
   tcInstSkolTyVar, tcInstSkolTyVars, tcInstSkolType, 
   tcSkolSigType, tcSkolSigTyVars,
@@ -58,8 +58,7 @@ import TypeRep		( Type(..), PredType(..),  -- Friend; can see representation
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
 			  MetaDetails(..), SkolemInfo(..), BoxInfo(..), 
-			  BoxyTyVar, BoxyType, BoxyThetaType, BoxySigmaType, 
-			  UserTypeCtxt(..),
+			  BoxyTyVar, BoxyType, UserTypeCtxt(..),
 			  isMetaTyVar, isSigTyVar, metaTvRef,
 			  tcCmpPred, isClassPred, tcGetTyVar,
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
@@ -327,12 +326,6 @@ readFilledBox box_tv = ASSERT( isBoxyTyVar box_tv )
 tcInstBoxyTyVar :: TyVar -> TcM BoxyTyVar
 -- Instantiate with a BOXY type variable
 tcInstBoxyTyVar tyvar = instMetaTyVar BoxTv tyvar
-
-tcInstBoxy :: TcType -> TcM ([BoxyTyVar], BoxyThetaType, BoxySigmaType)
--- tcInstType instantiates the outer-level for-alls of a TcType with
--- fresh BOXY type variables, splits off the dictionary part, 
--- and returns the pieces.
-tcInstBoxy ty = tcInstType (mapM tcInstBoxyTyVar) ty
 \end{code}
 
 

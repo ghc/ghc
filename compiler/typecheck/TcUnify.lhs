@@ -13,7 +13,7 @@ module TcUnify (
   unifyType, unifyTypeList, unifyTheta,
   unifyKind, unifyKinds, unifyFunKind, 
   checkExpectedKind, 
-  boxySubMatchType, boxyMatchTypes,
+  preSubType, boxyMatchTypes,
 
   --------------------------------
   -- Holes
@@ -29,8 +29,8 @@ import HsSyn		( ExprCoFn(..), idCoercion, isIdCoercion, (<.>) )
 import TypeRep		( Type(..), PredType(..) )
 
 import TcMType		( lookupTcTyVar, LookupTyVarResult(..),
-                          tcInstSkolType, newKindVar, newMetaTyVar,
-			  tcInstBoxy, newBoxyTyVar, newBoxyTyVarTys, readFilledBox, 
+                          tcInstSkolType, tcInstBoxyTyVar, newKindVar, newMetaTyVar,
+			  newBoxyTyVar, newBoxyTyVarTys, readFilledBox, 
 			  readMetaTyVar, writeMetaTyVar, newFlexiTyVarTy,
 			  tcInstSkolTyVars, tcInstTyVar,
 			  zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
@@ -46,11 +46,13 @@ import TcType		( TcKind, TcType, TcTyVar, BoxyTyVar, TcTauType,
 			  pprSkolTvBinding, isTauTy, isTauTyCon, isSigmaTy, 
 			  mkFunTy, mkFunTys, mkTyConApp, isMetaTyVar,
 			  tcSplitForAllTys, tcSplitAppTy_maybe, tcSplitFunTys, mkTyVarTys,
-			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy, 
+			  tcSplitSigmaTy, tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy, 
 			  typeKind, mkForAllTys, mkAppTy, isBoxyTyVar,
+			  exactTyVarsOfType, 
 			  tidyOpenType, tidyOpenTyVar, tidyOpenTyVars,
 			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar, tcView, 
-			  TvSubst, mkTvSubst, zipTyEnv, substTy, emptyTvSubst, 
+			  TvSubst, mkTvSubst, zipTyEnv, zipOpenTvSubst, emptyTvSubst, 
+			  substTy, substTheta, 
 			  lookupTyVar, extendTvSubst )
 import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
 			  openTypeKind, liftedTypeKind, unliftedTypeKind, 
@@ -334,15 +336,94 @@ withBox kind thing_inside
 %************************************************************************
 
 \begin{code}
+preSubType :: [TcTyVar]		-- Quantified type variables
+	   -> TcTyVarSet	-- Subset of quantified type variables
+				-- that can be instantiated with boxy types
+	    -> TcType		-- The rho-type part; quantified tyvars scopes over this
+	    -> BoxySigmaType	-- Matching type from the context
+	    -> TcM [TcType]	-- Types to instantiate the tyvars
+-- Perform pre-subsumption, and return suitable types
+-- to instantiate the quantified type varibles:
+--	info from the pre-subsumption, if there is any
+--	a boxy type variable otherwise
+--
+-- The 'btvs' are a subset of 'qtvs'.  They are the ones we can
+-- instantiate to a boxy type variable, because they'll definitely be
+-- filled in later.  This isn't always the case; sometimes we have type 
+-- variables mentioned in the context of the type, but not the body; 
+--		f :: forall a b. C a b => a -> a
+-- Then we may land up with an unconstrained 'b', so we want to 
+-- instantiate it to a monotype (non-boxy) type variable
+	
+preSubType qtvs btvs qty expected_ty
+  = mapM inst_tv qtvs
+  where
+    pre_subst = boxySubMatchType (mkVarSet qtvs) qty expected_ty
+    inst_tv tv	
+	| Just boxy_ty <- lookupTyVar pre_subst tv = return boxy_ty
+	| tv `elemVarSet` btvs = do { tv' <- tcInstBoxyTyVar tv
+				    ; return (mkTyVarTy tv') }
+	| otherwise	       = do { tv' <- tcInstTyVar tv
+				    ; return (mkTyVarTy tv') }
+
 boxySubMatchType 
 	:: TcTyVarSet -> TcType	-- The "template"; the tyvars are skolems
 	-> BoxyRhoType		-- Type to match (note a *Rho* type)
 	-> TvSubst 		-- Substitution of the [TcTyVar] to BoxySigmaTypes
 
+-- boxySubMatchType implements the Pre-subsumption judgement, in Fig 5 of the paper
+-- "Boxy types: inference for higher rank types and impredicativity"
+
+boxySubMatchType tmpl_tvs tmpl_ty boxy_ty
+  = go tmpl_ty emptyVarSet boxy_ty
+  where
+    go t_ty b_tvs b_ty
+	| Just t_ty' <- tcView t_ty = go t_ty' b_tvs b_ty
+	| Just b_ty' <- tcView b_ty = go t_ty b_tvs b_ty'
+
+    go (TyVarTy _) b_tvs b_ty = emptyTvSubst	-- Rule S-ANY; no bindings
+	-- Rule S-ANY covers (a) type variables and (b) boxy types
+	-- in the template.  Both look like a TyVarTy.
+	-- See Note [Sub-match] below
+
+    go (ForAllTy tv t_ty) b_tvs b_ty = go t_ty b_tvs b_ty	-- Rule S-SPEC
+    go t_ty b_tvs (ForAllTy tv b_ty) = go t_ty b_tvs' b_ty	-- Rule S-SKOL
+	where b_tvs' = extendVarSet b_tvs tv
+							
+    go (FunTy arg1 res1) b_tvs (FunTy arg2 res2)	-- Rule S-FUN
+	= boxy_match tmpl_tvs arg1 b_tvs arg2 (go res1 b_tvs res2)
+	-- Match the args, and sub-match the results
+
+    go t_ty b_tvs b_ty = boxy_match tmpl_tvs t_ty b_tvs b_ty emptyTvSubst
+	-- Otherwise defer to boxy matching
+	-- This covers TyConApp, AppTy, PredTy
+\end{code}
+
+Note [Sub-match]
+~~~~~~~~~~~~~~~~
+Consider this
+	head :: [a] -> a
+	|- head xs : <rhobox>
+We will do a boxySubMatchType between 	a ~ <rhobox>
+But we *don't* want to match [a |-> <rhobox>] because 
+    (a) The box should be filled in with a rho-type, but
+	   but the returned substitution maps TyVars to boxy
+	   *sigma* types
+    (b) In any case, the right final answer might be *either*
+	   instantiate 'a' with a rho-type or a sigma type
+	   head xs : Int   vs   head xs : forall b. b->b
+So the matcher MUST NOT make a choice here.   In general, we only
+bind a template type variable in boxyMatchType, not in boxySubMatchType.
+
+
+\begin{code}
 boxyMatchTypes 
 	:: TcTyVarSet -> [TcType] -- The "template"; the tyvars are skolems
 	-> [BoxySigmaType]	  -- Type to match
 	-> TvSubst 		  -- Substitution of the [TcTyVar] to BoxySigmaTypes
+
+-- boxyMatchTypes implements the Pre-matching judgement, in Fig 5 of the paper
+-- "Boxy types: inference for higher rank types and impredicativity"
 
 -- Find a *boxy* substitution that makes the template look as much 
 -- 	like the BoxySigmaType as possible.  
@@ -352,57 +433,12 @@ boxyMatchTypes
 -- NB1: This is a pure, non-monadic function.  
 --	It does no unification, and cannot fail
 --
--- Note [Matching kinds]
--- 	The target type might legitimately not be a sub-kind of template.  
---	For example, suppose the target is simply a box with an OpenTypeKind, 
---	and the template is a type variable with LiftedTypeKind.  
---	Then it's ok (because the target type will later be refined).
---	We simply don't bind the template type variable.
---
---	It might also be that the kind mis-match is an error. For example,
---	suppose we match the template (a -> Int) against (Int# -> Int),
---	where the template type variable 'a' has LiftedTypeKind.  This
---	matching function does not fail; it simply doesn't bind the template.
---	Later stuff will fail.
--- 
 -- Precondition: the arg lengths are equal
 -- Precondition: none of the template type variables appear in the [BoxySigmaType]
 -- Precondition: any nested quantifiers in either type differ from 
 -- 		 the template type variables passed as arguments
 --
--- Note [Sub-match]
--- ~~~~~~~~~~~~~~~~
--- Consider this
--- 	head :: [a] -> a
--- 	|- head xs : <rhobox>
--- We will do a boxySubMatchType between 	a ~ <rhobox>
--- But we *don't* want to match [a |-> <rhobox>] because 
---     (a)	The box should be filled in with a rho-type, but
--- 	but the returned substitution maps TyVars to boxy *sigma*
--- 	types
---     (b) In any case, the right final answer might be *either*
--- 	instantiate 'a' with a rho-type or a sigma type
--- 	   head xs : Int   vs   head xs : forall b. b->b
--- So the matcher MUST NOT make a choice here.   In general, we only
--- bind a template type variable in boxyMatchType, not in boxySubMatchType.
 	
-boxySubMatchType tmpl_tvs tmpl_ty boxy_ty
-  = go tmpl_ty boxy_ty
-  where
-    go t_ty b_ty 
-	| Just t_ty' <- tcView t_ty = go t_ty' b_ty
-	| Just b_ty' <- tcView b_ty = go t_ty b_ty'
-
-    go (FunTy arg1 res1) (FunTy arg2 res2)
-	= do_match arg1 arg2 (go res1 res2)
-		-- Match the args, and sub-match the results
-
-    go (TyVarTy _) b_ty = emptyTvSubst	-- Do not bind!  See Note [Sub-match]
-
-    go t_ty b_ty = do_match t_ty b_ty emptyTvSubst	-- Otherwise we are safe to bind
-
-    do_match t_ty b_ty subst = boxy_match tmpl_tvs t_ty emptyVarSet b_ty subst
-
 ------------
 boxyMatchTypes tmpl_tvs tmpl_tys boxy_tys
   = ASSERT( length tmpl_tys == length boxy_tys )
@@ -452,7 +488,7 @@ boxy_match tmpl_tvs orig_tmpl_ty boxy_tvs orig_boxy_ty subst
     go (TyVarTy tv) b_ty
  	| tv `elemVarSet` tmpl_tvs	-- Template type variable in the template
 	, not (intersectsVarSet boxy_tvs (tyVarsOfType orig_boxy_ty))
-	, typeKind b_ty `isSubKind` tyVarKind tv
+	, typeKind b_ty `isSubKind` tyVarKind tv  -- See Note [Matching kinds]
 	= extendTvSubst subst tv boxy_ty'
 	where
 	  boxy_ty' = case lookupTyVar subst tv of
@@ -489,6 +525,19 @@ boxyLub orig_ty1 orig_ty2
     go ty1 ty2 = orig_ty1	-- Default
 \end{code}
 
+Note [Matching kinds]
+~~~~~~~~~~~~~~~~~~~~~
+The target type might legitimately not be a sub-kind of template.  
+For example, suppose the target is simply a box with an OpenTypeKind, 
+and the template is a type variable with LiftedTypeKind.  
+Then it's ok (because the target type will later be refined).
+We simply don't bind the template type variable.
+
+It might also be that the kind mis-match is an error. For example,
+suppose we match the template (a -> Int) against (Int# -> Int),
+where the template type variable 'a' has LiftedTypeKind.  This
+matching function does not fail; it simply doesn't bind the template.
+Later stuff will fail.
 
 %************************************************************************
 %*									*
@@ -563,8 +612,8 @@ tc_sub outer act_sty act_ty exp_sty exp_ty
 	; return (gen_fn <.> co_fn) }
   where
     act_tvs = tyVarsOfType act_ty
-		-- It's really important to check for escape wrt the free vars of
-		-- both expected_ty *and* actual_ty
+		-- It's really important to check for escape wrt 
+		-- the free vars of both expected_ty *and* actual_ty
 
 -----------------------------------
 -- Specialisation case (rule ASPEC):
@@ -573,13 +622,31 @@ tc_sub outer act_sty act_ty exp_sty exp_ty
 --	co_fn e =    e Int dOrdInt
 
 tc_sub outer act_sty actual_ty exp_sty expected_ty
+-- Implements the new SPEC rule in the Appendix of the paper
+-- "Boxy types: inference for higher rank types and impredicativity"
+-- (This appendix isn't in the published version.)
+-- The idea is to *first* do pre-subsumption, and then full subsumption
+-- Example:	forall a. a->a  <=  Int -> (forall b. Int)
+--   Pre-subsumpion finds a|->Int, and that works fine, whereas
+--   just running full subsumption would fail.
   | isSigmaTy actual_ty
-  = do	{ (tyvars, theta, tau) <- tcInstBoxy actual_ty
-	; dicts <- newDicts InstSigOrigin theta
+  = do	{ 	-- Perform pre-subsumption, and instantiate
+	  	-- the type with info from the pre-subsumption; 
+		-- boxy tyvars if pre-subsumption gives no info
+	  let (tyvars, theta, tau) = tcSplitSigmaTy actual_ty
+	      tau_tvs = exactTyVarsOfType tau
+	; inst_tys <- preSubType tyvars tau_tvs tau expected_ty
+	; let subst' = zipOpenTvSubst tyvars inst_tys
+	      tau'   = substTy subst' tau
+
+		-- Perform a full subsumption check
+	; co_fn <- tc_sub False tau' tau' exp_sty expected_ty
+
+		-- Deal with the dictionaries
+	; dicts <- newDicts InstSigOrigin (substTheta subst' theta)
 	; extendLIEs dicts
-	; let inst_fn = CoApps (CoTyApps CoHole (mkTyVarTys tyvars)) 
+	; let inst_fn = CoApps (CoTyApps CoHole inst_tys) 
 			       (map instToId dicts)
-	; co_fn <- tc_sub False tau tau exp_sty expected_ty
 	; return (co_fn <.> inst_fn) }
 
 -----------------------------------
@@ -1288,7 +1355,7 @@ unBox :: BoxyType -> TcM TcType
 --	|- s' ~ box(s)
 -- with input s', and result s
 -- 
--- It remove all boxes from the input type, returning a non-boxy type.
+-- It removes all boxes from the input type, returning a non-boxy type.
 -- A filled box in the type can only contain a monotype; unBox fails if not
 -- The type can have empty boxes, which unBox fills with a monotype
 --

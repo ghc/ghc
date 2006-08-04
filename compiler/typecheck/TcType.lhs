@@ -170,7 +170,7 @@ import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, synTyConDefn, tyConUnique )
 import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
 import Class		( Class )
 import Var		( TyVar, Id, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
-import ForeignCall	( Safety, playSafe, DNType(..) )
+import ForeignCall	( Safety, DNType(..) )
 import Unify		( tcMatchTys )
 import VarSet
 
@@ -966,7 +966,7 @@ smart-app checking code --- see TcExpr.tcIdApp
 \begin{code}
 exactTyVarsOfType :: TcType -> TyVarSet
 -- Find the free type variables (of any kind)
--- but *expand* type synonyms.  See Note [Silly type synonym] belos.
+-- but *expand* type synonyms.  See Note [Silly type synonym] above.
 exactTyVarsOfType ty
   = go ty
   where

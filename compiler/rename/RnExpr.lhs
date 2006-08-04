@@ -459,7 +459,7 @@ methodNamesCmd other = emptyFVs
    -- The type checker will complain later
 
 ---------------------------------------------------
-methodNamesMatch (MatchGroup ms ty)
+methodNamesMatch (MatchGroup ms _)
   = plusFVs (map do_one ms)
  where 
     do_one (L _ (Match pats sig_ty grhss)) = methodNamesGRHSs grhss
