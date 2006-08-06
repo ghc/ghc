@@ -305,7 +305,7 @@ matchCoercion :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchCoercion (var:vars) ty (eqn1:eqns)
   = do	{ let CoPat co pat _ = firstPat eqn1
 	; var' <- newUniqueId (idName var) (hsPatType pat)
-	; match_result <- match (var:vars) ty (map shift (eqn1:eqns))
+	; match_result <- match (var':vars) ty (map shift (eqn1:eqns))
 	; rhs <- dsCoercion co (return (Var var))
 	; return (mkCoLetMatchResult (NonRec var' rhs) match_result) }
   where
