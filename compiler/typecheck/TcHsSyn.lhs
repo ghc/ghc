@@ -777,6 +777,14 @@ zonk_pat env (DictPat ds ms)
 	; ms' <- zonkIdBndrs env ms
 	; return (extendZonkEnv env (ds' ++ ms'), DictPat ds' ms') }
 
+zonk_pat env (CoPat co_fn pat ty) 
+  = do { (env', co_fn') <- zonkCoFn env co_fn
+       ; (env'', pat') <- zonkPat env' (noLoc pat)
+       ; ty' <- zonkTcTypeToType env'' ty
+       ; return (env'', CoPat co_fn' (unLoc pat') ty') }
+
+zonk_pat env pat = pprPanic "zonk_pat" (ppr pat)
+
 ---------------------------
 zonkConStuff env (PrefixCon pats)
   = do	{ (env', pats') <- zonkPats env pats

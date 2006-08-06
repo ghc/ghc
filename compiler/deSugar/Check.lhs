@@ -675,6 +675,8 @@ simplify_pat (DictPat dicts methods)
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)
 
+simplify_pat (CoPat co pat ty) = simplify_pat pat 
+
 -----------------
 simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
 simplify_con con (InfixCon p1 p2) = PrefixCon [simplify_lpat p1, simplify_lpat p2]
