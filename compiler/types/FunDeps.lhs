@@ -222,7 +222,11 @@ NOTA BENE:
 improve inst_env preds
   = [ eqn | group <- equivClassesByUniq (predTyUnique . fst) (filterEqPreds preds),
 	    eqn   <- checkGroup inst_env group ]
-  where filterEqPreds = filter (not . isEqPred . fst)
+  where 
+    filterEqPreds = filter (not . isEqPred . fst)
+	-- Equality predicates don't have uniques
+	-- In any case, improvement *generates*, rather than
+	-- *consumes*, equality constraints
 
 ----------
 checkGroup :: (Class -> [Instance])
