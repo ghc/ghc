@@ -115,7 +115,8 @@ make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
 make_exp (Lam v e) | isTyVar v = C.Lam (C.Tb (make_tbind v)) (make_exp e)
 make_exp (Lam v e) | otherwise = C.Lam (C.Vb (make_vbind v)) (make_exp e)
-make_exp (Let b e) = C.Let (make_vdef b) (make_exp e)
+make_exp (Cast e co) = C.Cast (make_exp e) (make_ty co)
+make_exp (Let b e) = C.Let (make_vdef emptyNameSet b) (make_exp e)
 -- gaw 2004
 make_exp (Case e v ty alts) = C.Case (make_exp e) (make_vbind v) (make_ty ty) (map make_alt alts)
 make_exp (Note (SCC cc) e) = C.Note "SCC"  (make_exp e) -- temporary
