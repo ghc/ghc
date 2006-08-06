@@ -19,7 +19,8 @@ import Bag
 import Literal		( literalType )
 import DataCon		( dataConRepType, dataConTyCon, dataConWorkId )
 import TysWiredIn	( tupleCon )
-import Var		( Var, Id, TyVar, idType, tyVarKind, mustHaveLocalBinding, setTyVarKind, setIdType  )
+import Var		( Var, Id, TyVar, isCoVar, idType, tyVarKind, 
+			  mustHaveLocalBinding, setTyVarKind, setIdType  )
 import VarEnv           ( lookupInScope )
 import VarSet
 import Name		( getSrcLoc )
@@ -36,7 +37,7 @@ import Type		( Type, tyVarsOfType, coreEqType,
 			  TvSubst, TvSubstEnv, mkTvSubst, setTvSubstEnv, substTy,
 			  extendTvSubst, composeTvSubst, substTyVarBndr, isInScope,
 			  getTvSubstEnv, getTvInScope, mkTyVarTy )
-import Coercion         ( Coercion, coercionKind )
+import Coercion         ( Coercion, coercionKind, coercionKindTyConApp )
 import TyCon		( isPrimTyCon )
 import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
 import StaticFlags	( opt_PprStyle_Debug )
@@ -425,11 +426,12 @@ checkKinds tyvar arg_ty
 	-- tyvar; notably this is used so that we can give
 	-- 	error :: forall a:*. String -> a
 	-- and then apply it to both boxed and unboxed types.
-  = checkL (argty_kind `isSubKind` tyvar_kind)
+  = checkL (arg_kind `isSubKind` tyvar_kind)
 	   (mkKindErrMsg tyvar arg_ty)
   where
     tyvar_kind = tyVarKind tyvar
-    argty_kind = typeKind arg_ty
+    arg_kind | isCoVar tyvar = coercionKindTyConApp arg_ty
+	     | otherwise     = typeKind arg_ty
 \end{code}
 
 
