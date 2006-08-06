@@ -1,4 +1,4 @@
-%
+
 % (c) The GRASP/AQUA Project, Glasgow University, 2000
 %
 \section[FunDeps]{FunDeps - functional dependencies}
@@ -20,6 +20,7 @@ import Var		( TyVar )
 import Class		( Class, FunDep, pprFundeps, classTvsFds )
 import TcGadt		( tcUnifyTys, BindFlag(..) )
 import Type		( substTys, notElemTvSubst )
+import Coercion         ( isEqPred )
 import TcType		( Type, PredType(..), tcEqType, 
 			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
 import InstEnv		( Instance(..), InstEnv, instanceHead, classInstances,
@@ -219,8 +220,9 @@ NOTA BENE:
 
 \begin{code}
 improve inst_env preds
-  = [ eqn | group <- equivClassesByUniq (predTyUnique . fst) preds,
+  = [ eqn | group <- equivClassesByUniq (predTyUnique . fst) (filterEqPreds preds),
 	    eqn   <- checkGroup inst_env group ]
+  where filterEqPreds = filter (not . isEqPred . fst)
 
 ----------
 checkGroup :: (Class -> [Instance])

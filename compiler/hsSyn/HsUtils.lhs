@@ -397,6 +397,7 @@ collectl (L l pat) bndrs
     go (TypePat ty)               = bndrs
     go (DictPat ids1 ids2)        = map noLoc ids1 ++ map noLoc ids2
 				    ++ bndrs
+    go (CoPat _ pat ty)           = collectl (noLoc pat) bndrs
 \end{code}
 
 \begin{code}
