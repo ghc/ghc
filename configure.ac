@@ -615,7 +615,12 @@ case $HostPlatform in
             hardtop=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@/@g'`
             hardtop_plat=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@\\\\\\\\@g'`
           else
-            hardtop_plat=${hardtop}
+dnl OK, so we're in the MSYS case.  hardtop looks like /c/....
+dnl We want to make hardtop_plat into c:/...
+dnl Stop using [] for quotes temporarily, so we can use [] in the sed regexp
+changequote(, )dnl
+               hardtop_plat=`echo ${hardtop} | sed -e 's@^/\\([a-zA-Z]\\)/@\\1:/@g'`
+changequote([, ])dnl
         fi
         ;;
   *)
