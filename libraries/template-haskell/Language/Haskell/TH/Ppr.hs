@@ -244,14 +244,14 @@ instance Ppr Foreign where
 
 ------------------------------
 instance Ppr Clause where
-    ppr (Clause ps rhs ds) = hsep (map ppr ps) <+> pprBody True rhs
-                          $$ where_clause ds
+    ppr (Clause ps rhs ds) = hsep (map (pprPat appPrec) ps) <+> pprBody True rhs
+                             $$ where_clause ds
 
 ------------------------------
 instance Ppr Con where
-    ppr (NormalC c sts) = ppr c <+> hsep (map pprStrictType sts)
+    ppr (NormalC c sts) = ppr c <+> sep (map pprStrictType sts)
     ppr (RecC c vsts)
-        = ppr c <+> braces (hsep (punctuate comma $ map pprVarStrictType vsts))
+        = ppr c <+> braces (sep (punctuate comma $ map pprVarStrictType vsts))
     ppr (InfixC st1 c st2) = pprStrictType st1 <+> ppr c <+> pprStrictType st2
     ppr (ForallC ns ctxt con) = text "forall" <+> hsep (map ppr ns)
                             <+> char '.' <+> pprCxt ctxt <+> ppr con
