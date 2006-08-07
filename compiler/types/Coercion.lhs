@@ -59,6 +59,8 @@ import Outputable
 ------------------------------
 decomposeCo :: Arity -> Coercion -> [Coercion]
 -- (decomposeCo 3 c) = [right (left (left c)), right (left c), right c]
+-- So this breaks a coercion with kind T A B C :=: T D E F into
+-- a list of coercions of kinds A :=: D, B :=: E and E :=: F
 decomposeCo n co
   = go n co []
   where
@@ -105,7 +107,6 @@ type CoercionKind = Kind	-- A CoercionKind is always of form (ty1 :=: ty2)
 coercionKind :: Coercion -> (Type, Type)
 -- 	c :: (t1 :=: t2)
 -- Then (coercionKind c) = (t1,t2)
-
 coercionKind (TyVarTy a) | isCoVar a = splitCoercionKind (tyVarKind a)
                          | otherwise = let t = (TyVarTy a) in (t, t)
 coercionKind (AppTy ty1 ty2) 
@@ -114,6 +115,7 @@ coercionKind (AppTy ty1 ty2)
     (mkAppTy t1 s1, mkAppTy t2 s2)
 coercionKind (TyConApp tc args)
   | Just (ar, rule) <- isCoercionTyCon_maybe tc 
+    -- CoercionTyCons carry their kinding rule, so we use it here
   = if length args >= ar 
     then splitCoercionKind (rule args)
     else pprPanic ("arity/arguments mismatch in coercionKind:") 
@@ -252,13 +254,21 @@ splitRightCoercion_maybe (TyConApp tc [co])
 splitRightCoercion_maybe other = Nothing
 
 -- Unsafe coercion is not safe, it is used when we know we are dealing with
--- bottom, which is the one case in which it is safe
+-- bottom, which is the one case in which it is safe.  It is also used to 
+-- implement the unsafeCoerce# primitive.
 mkUnsafeCoercion :: Type -> Type -> Coercion
 mkUnsafeCoercion ty1 ty2 
   = mkCoercion unsafeCoercionTyCon [ty1, ty2]
 
 
--- make the coercion associated with a newtype
+-- Make the coercion associated with a newtype.  If we have
+--
+--   newtype T a b = MkT (Int, a, b)
+--
+-- Then (mkNewTypeCoercion CoT T [a,b] (Int, a, b)) creates the coercion
+-- CoT, such kinding rule such that
+--
+--   CoT S U :: (Int, S, U) :=: T S U
 mkNewTypeCoercion :: Name -> TyCon -> [TyVar] -> Type -> TyCon
 mkNewTypeCoercion name tycon tvs rhs_ty 
   = ASSERT (length tvs == tyConArity tycon)
@@ -286,7 +296,7 @@ mkKindingFun f args =
 
 symCoercionTyCon, transCoercionTyCon, leftCoercionTyCon, rightCoercionTyCon, instCoercionTyCon :: TyCon
 -- Each coercion TyCon is built with the special CoercionTyCon record and
--- carries its won kinding rule.  Such CoercionTyCons must be fully applied
+-- carries its own kinding rule.  Such CoercionTyCons must be fully applied
 -- by any TyConApp in which they are applied, however they may also be over
 -- applied (see example above) and the kinding function must deal with this.
 symCoercionTyCon = 
@@ -361,7 +371,7 @@ unsafeCoercionTyConName = mkCoConName FSLIT("CoUnsafe") unsafeCoercionTyConKey u
 
 -- this is here to avoid module loops
 splitNewTypeRepCo_maybe :: Type -> Maybe (Type, Coercion)  
--- Sometimes we want to look through a recursive newtype, and that's what happens here
+-- Sometimes we want to look through a newtype and get its associated coercion
 -- It only strips *one layer* off, so the caller will usually call itself recursively
 -- Only applied to types of kind *, hence the newtype is always saturated
 splitNewTypeRepCo_maybe ty 
@@ -376,6 +386,5 @@ splitNewTypeRepCo_maybe (TyConApp tc tys)
 	      Just (substTyWith tvs tys rep_ty, mkTyConApp co_con tys)
   where
     co_con = maybe (pprPanic "splitNewTypeRepCo_maybe" (ppr tc)) id (newTyConCo tc)
-
 splitNewTypeRepCo_maybe other = Nothing
 \end{code}
