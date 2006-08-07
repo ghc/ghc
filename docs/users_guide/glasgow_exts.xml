@@ -128,6 +128,45 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
+          <option>-fno-mono-pat-binds</option>:
+          <indexterm><primary><option>-fno-mono-pat-binds</option></primary></indexterm>
+          <indexterm><primary><option>-fmono-pat-binds</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para> As an experimental change, we are exploring the possibility of
+	  making pattern bindings monomorphic; that is, not generalised at all.  
+	    A pattern binding is a binding whose LHS has no function arguments,
+	    and is not a simple variable.  For example:
+<programlisting>
+  f x = x                    -- Not a pattern binding
+  f = \x -> x                -- Not a pattern binding
+  f :: Int -> Int = \x -> x  -- Not a pattern binding
+
+  (g,h) = e                  -- A pattern binding
+  (f) = e                    -- A pattern binding
+  [x] = e                    -- A pattern binding
+</programlisting>
+Experimentally, GHC now makes pattern bindings monomorphic <emphasis>by
+default</emphasis>.  Use <option>-fno-mono-pat-binds</option> to recover the
+standard behaviour.
+          </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-fextended-default-rules</option>:
+          <indexterm><primary><option>-fextended-default-rules</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para> Use GHCi's extended default rules in a regular module (<xref linkend="extended-default-rules"/>).
+          Independent of the <option>-fglasgow-exts</option>
+          flag. </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-fallow-overlapping-instances</option>
           <indexterm><primary><option>-fallow-overlapping-instances</option></primary></indexterm>
         </term>

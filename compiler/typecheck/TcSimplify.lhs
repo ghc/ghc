@@ -71,7 +71,8 @@ import Util		( zipEqual, isSingleton )
 import List		( partition )
 import SrcLoc		( Located(..) )
 import DynFlags		( DynFlags(ctxtStkDepth), 
-			  DynFlag( Opt_GlasgowExts, Opt_AllowUndecidableInstances, Opt_WarnTypeDefaults ) )
+			  DynFlag( Opt_GlasgowExts, Opt_AllowUndecidableInstances, 
+			  Opt_WarnTypeDefaults, Opt_ExtendedDefaultRules ) )
 \end{code}
 
 
@@ -921,7 +922,8 @@ Two more nasty cases are in
 tcSimplifySuperClasses qtvs givens sc_wanteds
   = ASSERT( all isSkolemTyVar qtvs )
     do	{ (_, frees, binds1) <- tcSimplCheck doc get_qtvs NoSCs givens sc_wanteds
-	; binds2	     <- tc_simplify_top doc False NoSCs frees
+	; ext_default        <- doptM Opt_ExtendedDefaultRules
+	; binds2	     <- tc_simplify_top doc ext_default NoSCs frees
 	; return (binds1 `unionBags` binds2) }
   where
     get_qtvs = return (mkVarSet qtvs)
@@ -2009,7 +2011,8 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 \begin{code}
 tcSimplifyTop, tcSimplifyInteractive :: [Inst] -> TcM TcDictBinds
 tcSimplifyTop wanteds
-  = tc_simplify_top doc False {- Not interactive loop -} AddSCs wanteds
+  = do 	{ ext_default <- doptM Opt_ExtendedDefaultRules
+	; tc_simplify_top doc ext_default AddSCs wanteds }
   where 
     doc = text "tcSimplifyTop"
 
@@ -2020,7 +2023,7 @@ tcSimplifyInteractive wanteds
 
 -- The TcLclEnv should be valid here, solely to improve
 -- error message generation for the monomorphism restriction
-tc_simplify_top doc is_interactive want_scs wanteds
+tc_simplify_top doc use_extended_defaulting want_scs wanteds
   = do	{ lcl_env <- getLclEnv
 	; traceTc (text "tcSimplifyTop" <+> ppr (lclEnvElts lcl_env))
 
@@ -2046,13 +2049,13 @@ tc_simplify_top doc is_interactive want_scs wanteds
 		=  not (bad_tyvars `intersectsVarSet` tyVarsOfInst (head ds))
 		&& defaultable_classes (map get_clas ds)
 	    defaultable_classes clss 
-		| is_interactive = any isInteractiveClass clss
-		| otherwise	 = all isStandardClass clss && any isNumericClass clss
+		| use_extended_defaulting = any isInteractiveClass clss
+		| otherwise = all isStandardClass clss && any isNumericClass clss
 
 	    isInteractiveClass cls = isNumericClass cls
 				  || (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
-		 	-- In interactive mode, we default Show a to Show ()
-			-- to avoid graututious errors on "show []"
+		 	-- In interactive mode, or with -fextended-default-rules,
+			-- we default Show a to Show () to avoid graututious errors on "show []"
 
     
 		    -- Collect together all the bad guys

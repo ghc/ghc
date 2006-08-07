@@ -676,7 +676,7 @@ Wed Mar 14 12:23:13 GMT 2001
 
     </sect2>
 
-    <sect2>
+    <sect2 id="extended-default-rules">
       <title>Type defaulting in GHCi</title>
     <indexterm><primary>Type default</primary></indexterm>
     <indexterm><primary><literal>Show</literal> class</primary></indexterm>
@@ -715,6 +715,8 @@ Wed Mar 14 12:23:13 GMT 2001
 	    numeric, <emphasis>or is <literal>Show</literal>, 
 		<literal>Eq</literal>, or <literal>Ord</literal></emphasis>.</para></listitem>
       </itemizedlist>
+   The same type-default behaviour can be enabled in an ordinary Haskell
+   module, using the flag <literal>-fextended-default-rules</literal>.
    </para>
     </sect2>
   </sect1>

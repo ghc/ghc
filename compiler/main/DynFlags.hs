@@ -154,10 +154,11 @@ data DynFlag
    | Opt_AllowIncoherentInstances
    | Opt_MonomorphismRestriction
    | Opt_MonoPatBinds
+   | Opt_ExtendedDefaultRules		-- Use GHC's extended rules for defaulting
    | Opt_GlasgowExts
    | Opt_FFI
-   | Opt_PArr			       -- syntactic support for parallel arrays
-   | Opt_Arrows			       -- Arrow-notation syntax
+   | Opt_PArr				-- Syntactic support for parallel arrays
+   | Opt_Arrows				-- Arrow-notation syntax
    | Opt_TH
    | Opt_ImplicitParams
    | Opt_Generics
@@ -1015,6 +1016,7 @@ fFlags = [
   ( "bang-patterns",	  		Opt_BangPatterns ),
   ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
   ( "mono-pat-binds",			Opt_MonoPatBinds ),
+  ( "extended-default-rules",		Opt_ExtendedDefaultRules ),
   ( "implicit-params",			Opt_ImplicitParams ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),

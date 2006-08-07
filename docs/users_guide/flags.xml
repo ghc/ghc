@@ -619,6 +619,18 @@
 	      <entry><option>-fmonomorphism-restriction</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-fno-mono-pat-binds</option></entry>
+	      <entry>Make pattern bindings polymorphic</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fmono-pat-binds</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fextended-default-rules</option></entry>
+	      <entry>Use GHCi's extended default rules in a normal module</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-extended-default-rules</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-fscoped-type-variables</option></entry>
 	      <entry>Enable lexically-scoped type variables.
 	      Implied by <option>-fglasgow-exts</option>.</entry>
@@ -640,7 +652,7 @@
     <sect2>
       <title>Warnings</title>
       
-      <para>(<xref linkend="options-sanity"/></para>
+      <para><xref linkend="options-sanity"/></para>
 
     <informaltable>
       <tgroup cols="4" align="left" colsep="1" rowsep="1">
