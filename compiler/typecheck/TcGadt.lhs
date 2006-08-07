@@ -47,32 +47,31 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-data Refinement = Reft InScopeSet TvSubstEnv CoSubstEnv
-type CoSubstEnv = TvSubstEnv	-- Maps type variables to *coercions*
--- INVARIANT: in the refinement (tsub, csub)
---	      forall a. (csub(a) :: a:=:tsub(a))
+data Refinement = Reft InScopeSet InternalReft 
+-- INVARIANT:   a->(co,ty)   then   co :: (a:=:ty)
+-- Not necessarily idemopotent
 
 instance Outputable Refinement where
-  ppr (Reft in_scope tv_env co_env) 
-    = ptext SLIT("Refinment") <+>
-	braces (ppr tv_env $$ ppr co_env)
+  ppr (Reft in_scope env)
+    = ptext SLIT("Refinement") <+>
+        braces (ppr env)
 
 emptyRefinement :: Refinement
-emptyRefinement = Reft emptyInScopeSet emptyVarEnv emptyVarEnv
+emptyRefinement = (Reft emptyInScopeSet emptyVarEnv)
 
 refineType :: Refinement -> Type -> (ExprCoFn, Type)
 -- Apply the refinement to the type.
 -- If (refineType r ty) = (co, ty')
 -- Then co :: ty:=:ty'
-refineType (Reft in_scope tv_env co_env) ty
-  | not (isEmptyVarEnv tv_env),		-- Common case
-    any (`elemVarEnv` tv_env) (varSetElems (tyVarsOfType ty))
+refineType (Reft in_scope env) ty
+  | not (isEmptyVarEnv env),		-- Common case
+    any (`elemVarEnv` env) (varSetElems (tyVarsOfType ty))
   = (ExprCoFn (substTy co_subst ty), substTy tv_subst ty)
   | otherwise
   = (idCoercion, ty)	-- The type doesn't mention any refined type variables
   where
-    tv_subst = mkTvSubst in_scope tv_env
-    co_subst = mkTvSubst in_scope co_env
+    tv_subst = mkTvSubst in_scope (mapVarEnv snd env)
+    co_subst = mkTvSubst in_scope (mapVarEnv fst env)
  
 refineResType :: Refinement -> Type -> (ExprCoFn, Type)
 -- Like refineType, but returns the 'sym' coercion
@@ -135,9 +134,9 @@ Two refinements:
 -- The result is idempotent: the 
 
 \begin{code}
-gadtRefine (Reft in_scope tv_env1 co_env1) 
+gadtRefine (Reft in_scope env1) 
 	   ex_tvs co_vars
--- Precondition: fvs( co_vars ) # tv_env1
+-- Precondition: fvs( co_vars ) # env1
 -- That is, the kinds of the co_vars are a
 -- fixed point of the  incoming refinement
 
@@ -147,11 +146,9 @@ gadtRefine (Reft in_scope tv_env1 co_env1)
 
 		-- Find the fixed point of the resulting 
 		-- non-idempotent substitution
-	; let tv_env2 = tv_env1 `plusVarEnv` mapVarEnv snd env2
-	      co_env2 = co_env1 `plusVarEnv` mapVarEnv fst env2
-		
-	; return (Reft in_scope' (fixTvSubstEnv in_scope' tv_env2)
-				 (fixTvSubstEnv in_scope' co_env2)) }
+	; let tmp_env = env1 `plusVarEnv` env2
+              out_env = fixTvCoEnv in_scope' tmp_env
+	; return (Reft in_scope' out_env) }
   where
     tv_set = mkVarSet ex_tvs
     in_scope' = foldr extend in_scope co_vars
@@ -196,9 +193,26 @@ tcUnifyTys bind_fn tys1 tys2
 
 
 ----------------------------
-fixTvSubstEnv :: InScopeSet -> TvSubstEnv -> TvSubstEnv
-	-- Find the fixed point of a TvSubstEnv
+fixTvCoEnv :: InScopeSet -> InternalReft -> InternalReft
+	-- Find the fixed point of a Refinement
 	-- (assuming it has no loops!)
+fixTvCoEnv in_scope env
+  = fixpt
+  where
+    fixpt         = mapVarEnv step env
+
+    step (co, ty) = (co', ty')
+      -- Apply fixpt one step:
+      -- Use refineType to get a substituted type, ty', and a coercion, co_fn,
+      -- which justifies the substitution.  If the coercion is not the identity
+      -- then use transitivity with the original coercion
+      where
+        (co_fn, ty') = refineType (Reft in_scope fixpt) ty
+        co' | ExprCoFn co'' <- co_fn = mkTransCoercion co co''
+            | otherwise              = ASSERT( isIdCoercion co_fn ) co 
+
+-----------------------------
+fixTvSubstEnv :: InScopeSet -> TvSubstEnv -> TvSubstEnv
 fixTvSubstEnv in_scope env
   = fixpt 
   where
