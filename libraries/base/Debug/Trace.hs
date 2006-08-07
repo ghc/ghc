@@ -56,3 +56,11 @@ trace :: String -> a -> a
 trace string expr = unsafePerformIO $ do
     putTraceMsg string
     return expr
+
+{-|
+Like 'trace', but uses 'show' on the argument to convert it to a 'String'.
+
+> traceShow = trace . show
+-}
+traceShow :: (Show a) => a -> b -> b
+traceShow = trace . show
