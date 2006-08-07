@@ -288,7 +288,8 @@ pprIfaceConDecl tc
     main_payload = ppr name <+> dcolon <+> 
 		   pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) (ppr con_tau)
 
-    eq_ctxt = [(IfaceEqPred (IfaceTyVar tv) ty) | (tv,ty) <- eq_spec] 
+    eq_ctxt = [(IfaceEqPred (IfaceTyVar (occNameFS tv)) ty) 
+	      | (tv,ty) <- eq_spec] 
     con_tau = foldr1 IfaceFunTy (arg_tys ++ [tc_app])
     tc_app  = IfaceTyConApp (IfaceTc (LocalTop tc)) 
 			    [IfaceTyVar tv | (tv,_) <- univ_tvs]
