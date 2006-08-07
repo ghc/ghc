@@ -168,7 +168,7 @@ mkSymCoercion co
     -- should make this case better
   = mkAppCoercion (mkSymCoercion co1) (mkSymCoercion co2)
   | Just (co1, co2) <- splitTransCoercion_maybe co
-  = mkTransCoercion (mkSymCoercion co1) (mkSymCoercion co2)
+  = mkTransCoercion (mkSymCoercion co2) (mkSymCoercion co1)
   | Just (co, ty) <- splitInstCoercion_maybe co
   = mkInstCoercion (mkSymCoercion co) ty
   | Just co <- splitLeftCoercion_maybe co
