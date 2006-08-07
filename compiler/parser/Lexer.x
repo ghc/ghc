@@ -588,6 +588,9 @@ reservedSymsFM = listToUFM $
        ,("→",   ITrarrow,	bit glaExtsBit)
        ,("←",   ITlarrow,	bit glaExtsBit)
        ,("⋯", 	ITdotdot,	bit glaExtsBit)
+        -- ToDo: ideally, → and ∷ should be "specials", so that they cannot
+        -- form part of a large operator.  This would let us have a better
+        -- syntax for kinds: ɑ∷*→* would be a legal kind signature. (maybe).
 #endif
        ]
 
