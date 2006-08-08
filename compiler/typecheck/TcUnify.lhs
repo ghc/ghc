@@ -65,8 +65,7 @@ import TyCon		( TyCon, tyConArity, tyConTyVars, isSynTyCon )
 import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind, isTcTyVar, tcTyVarDetails )
-import VarSet		( emptyVarSet, mkVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems,
-			  extendVarSet, intersectsVarSet, extendVarSetList )
+import VarSet
 import VarEnv
 import Name		( Name, isSystemName )
 import ErrUtils		( Message )
@@ -377,22 +376,25 @@ boxySubMatchType
 -- "Boxy types: inference for higher rank types and impredicativity"
 
 boxySubMatchType tmpl_tvs tmpl_ty boxy_ty
-  = go tmpl_ty emptyVarSet boxy_ty
+  = go tmpl_tvs tmpl_ty emptyVarSet boxy_ty
   where
-    go t_ty b_tvs b_ty
-	| Just t_ty' <- tcView t_ty = go t_ty' b_tvs b_ty
-	| Just b_ty' <- tcView b_ty = go t_ty b_tvs b_ty'
+    go t_tvs t_ty b_tvs b_ty
+	| Just t_ty' <- tcView t_ty = go t_tvs t_ty' b_tvs b_ty
+	| Just b_ty' <- tcView b_ty = go t_tvs t_ty b_tvs b_ty'
 
-    go (TyVarTy _) b_tvs b_ty = emptyTvSubst	-- Rule S-ANY; no bindings
+    go t_tvs (TyVarTy _) b_tvs b_ty = emptyTvSubst	-- Rule S-ANY; no bindings
 	-- Rule S-ANY covers (a) type variables and (b) boxy types
 	-- in the template.  Both look like a TyVarTy.
 	-- See Note [Sub-match] below
 
-    go t_ty b_tvs b_ty
+    go t_tvs t_ty b_tvs b_ty
 	| isSigmaTy t_ty, (tvs, _, t_tau) <- tcSplitSigmaTy t_ty 
-	= go t_tau b_tvs b_ty				-- Rule S-SPEC
+	= go (t_tvs `delVarSetList` tvs) t_tau b_tvs b_ty	-- Rule S-SPEC
+		-- Under a forall on the left, if there is shadowing, 
+		-- do not bind! Hence the delVarSetList.
 	| isSigmaTy b_ty, (tvs, _, b_tau) <- tcSplitSigmaTy b_ty 
-	= go t_ty (extendVarSetList b_tvs tvs) b_ty	-- Rule S-SKOL
+	= go t_tvs t_ty (extendVarSetList b_tvs tvs) b_tau	-- Rule S-SKOL
+		-- Add to the variables we must not bind to
 	-- NB: it's *important* to discard the theta part. Otherwise
 	-- consider (forall a. Eq a => a -> b) ~<~ (Int -> Int -> Bool)
 	-- and end up with a completely bogus binding (b |-> Bool), by lining
@@ -400,11 +402,11 @@ boxySubMatchType tmpl_tvs tmpl_ty boxy_ty
 	-- This pre-subsumption stuff can return too few bindings, but it 
 	-- must *never* return bogus info.
 							
-    go (FunTy arg1 res1) b_tvs (FunTy arg2 res2)	-- Rule S-FUN
-	= boxy_match tmpl_tvs arg1 b_tvs arg2 (go res1 b_tvs res2)
+    go t_tvs (FunTy arg1 res1) b_tvs (FunTy arg2 res2)	-- Rule S-FUN
+	= boxy_match t_tvs arg1 b_tvs arg2 (go t_tvs res1 b_tvs res2)
 	-- Match the args, and sub-match the results
 
-    go t_ty b_tvs b_ty = boxy_match tmpl_tvs t_ty b_tvs b_ty emptyTvSubst
+    go t_tvs t_ty b_tvs b_ty = boxy_match t_tvs t_ty b_tvs b_ty emptyTvSubst
 	-- Otherwise defer to boxy matching
 	-- This covers TyConApp, AppTy, PredTy
 \end{code}
@@ -444,9 +446,7 @@ boxyMatchTypes
 --	It does no unification, and cannot fail
 --
 -- Precondition: the arg lengths are equal
--- Precondition: none of the template type variables appear in the [BoxySigmaType]
--- Precondition: any nested quantifiers in either type differ from 
--- 		 the template type variables passed as arguments
+-- Precondition: none of the template type variables appear anywhere in the [BoxySigmaType]
 --
 	
 ------------
@@ -458,8 +458,9 @@ boxyMatchTypes tmpl_tvs tmpl_tys boxy_tys
 boxy_match_s tmpl_tvs [] boxy_tvs [] subst
   = subst
 boxy_match_s tmpl_tvs (t_ty:t_tys) boxy_tvs (b_ty:b_tys) subst
-  = boxy_match_s tmpl_tvs t_tys boxy_tvs b_tys $
-    boxy_match tmpl_tvs t_ty boxy_tvs b_ty subst
+  = boxy_match tmpl_tvs t_ty boxy_tvs b_ty $
+    boxy_match_s tmpl_tvs t_tys boxy_tvs b_tys subst
+    
 
 ------------
 boxy_match :: TcTyVarSet -> TcType	-- Template
@@ -480,8 +481,13 @@ boxy_match tmpl_tvs orig_tmpl_ty boxy_tvs orig_boxy_ty subst
 	| Just t_ty' <- tcView t_ty = go t_ty' b_ty
 	| Just b_ty' <- tcView b_ty = go t_ty b_ty'
 
-    go (ForAllTy _ ty1) (ForAllTy tv2 ty2)
-	= boxy_match tmpl_tvs ty1 (boxy_tvs `extendVarSet` tv2) ty2 subst
+    go ty1 ty2		-- C.f. the isSigmaTy case for boxySubMatchType
+	| isSigmaTy ty1
+	, (tvs1, _, tau1) <- tcSplitSigmaTy ty1
+	, (tvs2, _, tau2) <- tcSplitSigmaTy ty2
+	, equalLength tvs1 tvs2
+	= boxy_match (tmpl_tvs `delVarSetList` tvs1)    tau1 
+		     (boxy_tvs `extendVarSetList` tvs2) tau2 subst
 
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
 	| tc1 == tc2 = go_s tys1 tys2
