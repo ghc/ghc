@@ -613,7 +613,7 @@ tcTyVarBndrs bndrs thing_inside
 
 -----------------------------------
 tcDataKindSig :: Maybe Kind -> TcM [TyVar]
--- GADT decls can have a (perhpas partial) kind signature
+-- GADT decls can have a (perhaps partial) kind signature
 --	e.g.  data T :: * -> * -> * where ...
 -- This function makes up suitable (kinded) type variables for 
 -- the argument kinds, and checks that the result kind is indeed *
