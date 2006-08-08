@@ -26,15 +26,16 @@ module SrcLoc (
 	pprDefnLoc,
 
 	SrcSpan,		-- Abstract
-	noSrcSpan,
+	noSrcSpan, 
 	mkGeneralSrcSpan, 
-	isGoodSrcSpan,
+	isGoodSrcSpan, isOneLineSpan,
 	mkSrcSpan, srcLocSpan,
 	combineSrcSpans,
-	srcSpanFile,
-	srcSpanStartLine, srcSpanEndLine,
-	srcSpanStartCol, srcSpanEndCol,
 	srcSpanStart, srcSpanEnd,
+
+	-- These are dubious exports, because they crash on some inputs,
+	-- used only in Lexer.x where we are sure what the Span looks like
+	srcSpanFile, srcSpanEndLine, srcSpanEndCol,
 
 	Located(..), getLoc, unLoc, noLoc, eqLocated, cmpLocated, combineLocs, addCLoc
     ) where
@@ -222,6 +223,19 @@ isGoodSrcSpan SrcSpanMultiLine{} = True
 isGoodSrcSpan SrcSpanPoint{} = True
 isGoodSrcSpan _ = False
 
+isOneLineSpan :: SrcSpan -> Bool
+-- True if the span is known to straddle more than one line
+-- By default, it returns False
+isOneLineSpan s
+  | isGoodSrcSpan s = srcSpanStartLine s == srcSpanEndLine s
+  | otherwise	    = False		
+
+--------------------------------------------------------
+-- Don't export these four;
+-- they panic on Imported, Unhelpful.
+-- They are for internal use only
+-- Urk!  Some are needed for Lexer.x; see comment in export list
+
 srcSpanStartLine SrcSpanOneLine{ srcSpanLine=l } = l
 srcSpanStartLine SrcSpanMultiLine{ srcSpanSLine=l } = l
 srcSpanStartLine SrcSpanPoint{ srcSpanLine=l } = l
@@ -241,13 +255,13 @@ srcSpanEndCol SrcSpanOneLine{ srcSpanECol=c } = c
 srcSpanEndCol SrcSpanMultiLine{ srcSpanECol=c } = c
 srcSpanEndCol SrcSpanPoint{ srcSpanCol=c } = c
 srcSpanEndCol _ = panic "SrcLoc.srcSpanEndCol"
+--------------------------------------------------------
 
 srcSpanStart (ImportedSpan str) = ImportedLoc str
 srcSpanStart (UnhelpfulSpan str) = UnhelpfulLoc str
-srcSpanStart s = 
-  mkSrcLoc (srcSpanFile s) 
-	   (srcSpanStartLine s)
- 	   (srcSpanStartCol s)
+srcSpanStart s = mkSrcLoc (srcSpanFile s) 
+			  (srcSpanStartLine s)
+		 	  (srcSpanStartCol s)
 
 srcSpanEnd (ImportedSpan str) = ImportedLoc str
 srcSpanEnd (UnhelpfulSpan str) = UnhelpfulLoc str

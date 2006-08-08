@@ -30,6 +30,7 @@ import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  dupFieldErr, checkTupSize )
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
+import SrcLoc           ( SrcSpan )
 import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName )
@@ -38,7 +39,6 @@ import PrelNames        ( breakpointJumpName, breakpointCondJumpName
                         , undefined_RDR, breakpointIdKey, breakpointCondIdKey )
 import UniqFM           ( eltsUFM )
 import DynFlags         ( GhcMode(..) )
-import SrcLoc           ( srcSpanFile, srcSpanStartLine )
 import Name             ( isTyVarName )
 #endif
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
@@ -963,12 +963,14 @@ mkBreakpointExpr' breakpointFunc scope
              mkExpr' fnName [] = inLoc (HsVar fnName)
              mkExpr' fnName (arg:args)
                  = lHsApp (mkExpr' fnName args) (inLoc arg)
-             expr = unLoc $ mkExpr breakpointFunc [mkScopeArg scope, HsVar undef, HsLit msg]
-             mkScopeArg args
-                 = unLoc $ mkExpr undef (map HsVar args)
-             msg = HsString (mkFastString (unpackFS (srcSpanFile sloc) ++ ":" ++ show (srcSpanStartLine sloc)))
+             expr = unLoc $ mkExpr breakpointFunc [mkScopeArg scope, HsVar undef, msg]
+             mkScopeArg args = unLoc $ mkExpr undef (map HsVar args)
+             msg = srcSpanLit sloc
          return (expr, emptyFVs)
 #endif
+
+srcSpanLit :: SrcSpan -> HsExpr Name
+srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
 \end{code}
 
 %************************************************************************
@@ -983,8 +985,8 @@ mkAssertErrorExpr :: RnM (HsExpr Name, FreeVars)
 mkAssertErrorExpr
   = getSrcSpanM    			`thenM` \ sloc ->
     let
-	expr = HsApp (L sloc (HsVar assertErrorName)) (L sloc (HsLit msg))
-	msg  = HsStringPrim (mkFastString (showSDoc (ppr sloc)))
+	expr = HsApp (L sloc (HsVar assertErrorName)) 
+		     (L sloc (srcSpanLit sloc))
     in
     returnM (expr, emptyFVs)
 \end{code}

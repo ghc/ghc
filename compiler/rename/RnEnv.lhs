@@ -58,7 +58,7 @@ import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, consDataConKey, hasKey
 import UniqSupply
 import BasicTypes	( IPName, mapIPName )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
-			  srcLocSpan, getLoc, combineSrcSpans, srcSpanStartLine, srcSpanEndLine )
+			  srcLocSpan, getLoc, combineSrcSpans, isOneLineSpan )
 import Outputable
 import Util		( sortLe )
 import ListSetOps	( removeDups )
@@ -801,7 +801,7 @@ dupNamesErr descriptor located_names
     L _ name1 = head located_names
     locs      = map getLoc located_names
     big_loc   = foldr1 combineSrcSpans locs
-    one_line  = srcSpanStartLine big_loc == srcSpanEndLine big_loc
+    one_line  = isOneLineSpan big_loc
     locations | one_line  = empty 
 	      | otherwise = ptext SLIT("Bound at:") <+> 
 			    vcat (map ppr (sortLe (<=) locs))
