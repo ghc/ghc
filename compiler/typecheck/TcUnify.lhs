@@ -168,7 +168,7 @@ subFunTys error_herald n_pats res_ty thing_inside
     loop n args_so_far res_ty@(AppTy _ _)
 	= do { [arg_ty',res_ty'] <- newBoxyTyVarTys [argTypeKind, openTypeKind]
 	     ; (_, mb_unit) <- tryTcErrs $ boxyUnify res_ty (FunTy arg_ty' res_ty')
-	     ; if isNothing mb_unit then bale_out args_so_far res_ty
+	     ; if isNothing mb_unit then bale_out args_so_far
 	       else loop n args_so_far (FunTy arg_ty' res_ty') }
 
     loop n args_so_far (TyVarTy tv)
@@ -185,9 +185,9 @@ subFunTys error_herald n_pats res_ty thing_inside
 		-- Note argTypeKind: the args can have an unboxed type,
 		-- but not an unboxed tuple.
 
-    loop n args_so_far res_ty = bale_out args_so_far res_ty
+    loop n args_so_far res_ty = bale_out args_so_far
 
-    bale_out args_so_far res_ty
+    bale_out args_so_far 
 	= do { env0 <- tcInitTidyEnv
 	     ; res_ty' <- zonkTcType res_ty
 	     ; let (env1, res_ty'') = tidyOpenType env0 res_ty'
