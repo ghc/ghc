@@ -66,7 +66,7 @@ import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
 import Var		( Var, varName, tyVarKind, isTcTyVar, tcTyVarDetails )
 import VarSet		( emptyVarSet, mkVarSet, unitVarSet, unionVarSet, elemVarSet, varSetElems,
-			  extendVarSet, intersectsVarSet )
+			  extendVarSet, intersectsVarSet, extendVarSetList )
 import VarEnv
 import Name		( Name, isSystemName )
 import ErrUtils		( Message )
@@ -356,7 +356,9 @@ preSubType :: [TcTyVar]		-- Quantified type variables
 -- instantiate it to a monotype (non-boxy) type variable
 	
 preSubType qtvs btvs qty expected_ty
-  = mapM inst_tv qtvs
+  = do { tys <- mapM inst_tv qtvs
+	; traceTc (text "preSubType" <+> (ppr qtvs $$ ppr btvs $$ ppr qty $$ ppr expected_ty $$ ppr pre_subst $$ ppr tys))
+	; return tys }
   where
     pre_subst = boxySubMatchType (mkVarSet qtvs) qty expected_ty
     inst_tv tv	
@@ -386,9 +388,17 @@ boxySubMatchType tmpl_tvs tmpl_ty boxy_ty
 	-- in the template.  Both look like a TyVarTy.
 	-- See Note [Sub-match] below
 
-    go (ForAllTy tv t_ty) b_tvs b_ty = go t_ty b_tvs b_ty	-- Rule S-SPEC
-    go t_ty b_tvs (ForAllTy tv b_ty) = go t_ty b_tvs' b_ty	-- Rule S-SKOL
-	where b_tvs' = extendVarSet b_tvs tv
+    go t_ty b_tvs b_ty
+	| isSigmaTy t_ty, (tvs, _, t_tau) <- tcSplitSigmaTy t_ty 
+	= go t_tau b_tvs b_ty				-- Rule S-SPEC
+	| isSigmaTy b_ty, (tvs, _, b_tau) <- tcSplitSigmaTy b_ty 
+	= go t_ty (extendVarSetList b_tvs tvs) b_ty	-- Rule S-SKOL
+	-- NB: it's *important* to discard the theta part. Otherwise
+	-- consider (forall a. Eq a => a -> b) ~<~ (Int -> Int -> Bool)
+	-- and end up with a completely bogus binding (b |-> Bool), by lining
+	-- up the (Eq a) with the Int, whereas it should be (b |-> (Int->Bool)).  
+	-- This pre-subsumption stuff can return too few bindings, but it 
+	-- must *never* return bogus info.
 							
     go (FunTy arg1 res1) b_tvs (FunTy arg2 res2)	-- Rule S-FUN
 	= boxy_match tmpl_tvs arg1 b_tvs arg2 (go res1 b_tvs res2)
@@ -490,12 +500,20 @@ boxy_match tmpl_tvs orig_tmpl_ty boxy_tvs orig_boxy_ty subst
 	, not (intersectsVarSet boxy_tvs (tyVarsOfType orig_boxy_ty))
 	, typeKind b_ty `isSubKind` tyVarKind tv  -- See Note [Matching kinds]
 	= extendTvSubst subst tv boxy_ty'
+	| otherwise
+	= subst				-- Ignore others
 	where
 	  boxy_ty' = case lookupTyVar subst tv of
 			Nothing -> orig_boxy_ty
 			Just ty -> ty `boxyLub` orig_boxy_ty
 
-    go _ _ = subst	-- Always safe
+    go _ _ = emptyTvSubst	-- It's important to *fail* by returning the empty substitution
+	-- Example:  Tree a ~ Maybe Int
+	-- We do not want to bind (a |-> Int) in pre-matching, because that can give very
+	-- misleading error messages.  An even more confusing case is
+	--	     a -> b ~ Maybe Int
+	-- Then we do not want to bind (b |-> Int)!  It's always safe to discard bindings
+	-- from this pre-matching phase.
 
     --------
     go_s tys1 tys2 = boxy_match_s tmpl_tvs tys1 boxy_tvs tys2 subst
