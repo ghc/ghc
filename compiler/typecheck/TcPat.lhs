@@ -278,7 +278,7 @@ tc_pat pstate (BangPat pat) pat_ty thing_inside
   = do	{ (pat', tvs, res) <- tc_lpat pstate pat pat_ty thing_inside
 	; return (BangPat pat', tvs, res) }
 
--- There's a wrinkle with irrefuatable patterns, namely that we
+-- There's a wrinkle with irrefutable patterns, namely that we
 -- must not propagate type refinement from them.  For example
 --	data T a where { T1 :: Int -> T Int; ... }
 --	f :: T a -> Int -> a
@@ -293,8 +293,14 @@ tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
 				  thing_inside pstate
 					-- Ignore refined pstate',
 					-- revert to pstate
+	-- Check no existentials
 	; if (null pat_tvs) then return ()
 	  else lazyPatErr lpat pat_tvs
+
+	-- Check that the pattern has a lifted type
+	; pat_tv <- newBoxyTyVar liftedTypeKind
+	; boxyUnify pat_ty (mkTyVarTy pat_tv)
+
 	; return (LazyPat pat', [], res) }
 
 tc_pat pstate (WildPat _) pat_ty thing_inside
