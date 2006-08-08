@@ -12,7 +12,10 @@ module Util (
 	mapFst, mapSnd,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, filterOut,
-	lengthExceeds, lengthIs, lengthAtLeast, listLengthCmp, atLength,
+
+	lengthExceeds, lengthIs, lengthAtLeast, 
+	listLengthCmp, atLength, equalLength, compareLength,
+
 	isSingleton, only, singleton,
 	notNull, snocView,
 
@@ -34,7 +37,7 @@ module Util (
 	takeList, dropList, splitAtList, split,
 
 	-- comparisons
-	isEqual, eqListBy, equalLength, compareLength,
+	isEqual, eqListBy, 
 	thenCmp, cmpList, prefixMatch, suffixMatch, maybePrefixMatch,
 	removeSpaces,
 
