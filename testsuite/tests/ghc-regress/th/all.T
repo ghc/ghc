@@ -21,6 +21,9 @@ test('TH_repPatSig', normal, compile, [''])
 test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5', '-v0'])
 clean(['TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o'])
 
+test('TH_spliceD1', normal, multimod_compile_fail, ['TH_spliceD1', '-v0'])
+clean(['TH_spliceD1_Lib.hi', 'TH_spliceD1_Lib.o'])
+
 # Testing profiling with TH is a bit tricky; we've already disabled
 # the prof way above, and also we want to add options specifically for
 # profiling (-osof p_o) because this is necessary when mixing
