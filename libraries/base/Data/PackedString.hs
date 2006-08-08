@@ -8,14 +8,20 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- An efficient implementation of strings.
+-- This API is deprecated.  You might be able to use "Data.ByteString"
+-- or "Data.ByteString.Char8", provided you don't need full Unicode support.
+-- The long term aim is to provide a Unicode layer on "Data.ByteString",
+-- and then to provide a replacement for this "Data.PackedString" API based on
+-- that.
 --
 -----------------------------------------------------------------------------
 
 -- Original GHC implementation by Bryan O\'Sullivan, 
 -- rewritten to use UArray by Simon Marlow.
 
-module Data.PackedString (
+module Data.PackedString 
+  {-# DEPRECATED "use Data.ByteString, Data.ByteString.Char8, or plain String." #-}
+  (
 	-- * The @PackedString@ type
         PackedString,      -- abstract, instances: Eq, Ord, Show, Typeable
 
