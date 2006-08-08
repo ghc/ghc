@@ -273,6 +273,11 @@ exitStorage (void)
 void
 freeStorage (void)
 {
+    nat g;
+
+    for(g = 0; g < RtsFlags.GcFlags.generations; g++)
+      stgFree(generations[g].steps);
+    stgFree(generations);
     freeAllMBlocks();
 }
 

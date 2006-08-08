@@ -159,6 +159,18 @@ initStablePtrTable(void)
 #endif
 }
 
+void
+exitStablePtrTable(void)
+{
+  if (addrToStableHash)
+    freeHashTable(addrToStableHash, NULL);
+  addrToStableHash = NULL;
+  if (stable_ptr_table)
+    stgFree(stable_ptr_table);
+  stable_ptr_table = NULL;
+  SPT_size = 0;
+}
+
 /*
  * get at the real stuff...remove indirections.
  *

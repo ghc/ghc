@@ -55,6 +55,7 @@ extern StgPtr deRefStablePtr(StgStablePtr sp);
 #endif
 
 extern void    initStablePtrTable    ( void );
+extern void    exitStablePtrTable    ( void );
 extern void    enlargeStablePtrTable ( void );
 extern StgWord lookupStableName      ( StgPtr p );
 
@@ -62,5 +63,7 @@ extern void    markStablePtrTable    ( evac_fn evac );
 extern void    threadStablePtrTable  ( evac_fn evac );
 extern void    gcStablePtrTable      ( void );
 extern void    updateStablePtrTable  ( rtsBool full );
+
+extern void    exitHashTable         ( void );
 
 #endif

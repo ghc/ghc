@@ -212,15 +212,25 @@ lookupHashTable(HashTable *table, StgWord key)
 
 static HashList *freeList = NULL;
 
+static struct chunkList {
+  void *chunk;
+  struct chunkList *next;
+} *chunks;
+
 static HashList *
 allocHashList(void)
 {
     HashList *hl, *p;
+    struct chunkList *cl;
 
     if ((hl = freeList) != NULL) {
 	freeList = hl->next;
     } else {
         hl = stgMallocBytes(HCHUNK * sizeof(HashList), "allocHashList");
+	cl = stgMallocBytes(sizeof (*cl), "allocHashList: chunkList");
+	cl->chunk = hl;
+	cl->next = chunks;
+	chunks = cl;
 
 	freeList = hl + 1;
 	for (p = freeList; p < hl + HCHUNK - 1; p++)
@@ -373,4 +383,16 @@ allocStrHashTable(void)
 {
     return allocHashTable_((HashFunction *)hashStr, 
 			   (CompareFunction *)compareStr);
+}
+
+void
+exitHashTable(void)
+{
+  struct chunkList *cl;
+
+  while ((cl = chunks) != NULL) {
+    chunks = cl->next;
+    stgFree(cl->chunk);
+    stgFree(cl);
+  }
 }

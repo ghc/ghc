@@ -537,6 +537,9 @@ stat_exit(int alloc)
 	statsFlush();
 	statsClose();
     }
+    if (GC_coll_times)
+      stgFree(GC_coll_times);
+    GC_coll_times = NULL;
 }
 
 /* -----------------------------------------------------------------------------

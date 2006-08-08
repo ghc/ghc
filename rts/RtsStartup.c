@@ -390,6 +390,12 @@ hs_exit(void)
     // also outputs the stats (+RTS -s) info.
     exitStorage();
     
+    /* initialise the stable pointer table */
+    exitStablePtrTable();
+
+    /* free hash table storage */
+    exitHashTable();
+
 #ifdef RTS_GTK_FRONTPANEL
     if (RtsFlags.GcFlags.frontpanel) {
 	stopFrontPanel();

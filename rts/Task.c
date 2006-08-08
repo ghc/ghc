@@ -74,9 +74,19 @@ initTaskManager (void)
 void
 stopTaskManager (void)
 {
+    Task *task, *next;
+
     debugTrace(DEBUG_sched, 
 	       "stopping task manager, %d tasks still running",
 	       tasksRunning);
+
+    ACQUIRE_LOCK(&sched_mutex);
+    for (task = task_free_list; task != NULL; next) {
+        next = task->next;
+        stgFree(task);
+    }
+    task_free_list = NULL;
+    RELEASE_LOCK(&sched_mutex);
 }
 
 
