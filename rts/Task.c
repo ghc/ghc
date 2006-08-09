@@ -28,8 +28,6 @@
 Task *all_tasks = NULL;
 static Task *task_free_list = NULL; // singly-linked
 static nat taskCount;
-#define DEFAULT_MAX_WORKERS 64
-static nat maxWorkers; // we won't create more workers than this
 static nat tasksRunning;
 static nat workerCount;
 
@@ -58,11 +56,6 @@ initTaskManager (void)
 	taskCount = 0;
 	workerCount = 0;
 	tasksRunning = 0;
-#if defined(THREADED_RTS)
-	maxWorkers = DEFAULT_MAX_WORKERS * RtsFlags.ParFlags.nNodes;
-#else
-	maxWorkers = DEFAULT_MAX_WORKERS;
-#endif
 	initialized = 1;
 #if defined(THREADED_RTS)
 	newThreadLocalKey(&currentTaskKey);
@@ -264,9 +257,6 @@ startWorkerTask (Capability *cap,
   OSThreadId tid;
   Task *task;
 
-  if (workerCount >= maxWorkers) {
-      barf("too many workers; runaway worker creation?");
-  }
   workerCount++;
 
   // A worker always gets a fresh Task structure.
