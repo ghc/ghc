@@ -29,6 +29,15 @@ AC_CHECK_FUNCS([ftime gmtime_r localtime_r lstat readdir_r])
 
 AC_CHECK_FUNCS([_chsize ftruncate])
 
+dnl ** check if it is safe to include both <time.h> and <sys/time.h>
+AC_HEADER_TIME
+
+dnl ** how do we get a timezone name, and UTC offset ?
+AC_STRUCT_TIMEZONE
+
+dnl ** do we have altzone?
+FP_DECL_ALTZONE
+
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
 FPTOOLS_CHECK_HTYPE(signed char)
