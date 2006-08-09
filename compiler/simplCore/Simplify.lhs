@@ -537,8 +537,8 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 		-- we only float if (a) arg' is a WHNF, or (b) it's going to top level
 		-- and so there can't be any 'will be demanded' bindings in the floats.
 		-- Hence the warning
-        ASSERT2( is_top_level || not (any demanded_float (floatBinds floats)), 
-	         ppr (filter demanded_float (floatBinds floats)) )
+        WARN( not (is_top_level || not (any demanded_float (floatBinds floats))), 
+	      ppr (filter demanded_float (floatBinds floats)) )
 
 	tick LetFloatFromLet			`thenSmpl_` (
 	addFloats env1 floats			$ \ env2 ->
