@@ -13,11 +13,16 @@ stage=2
 
 HC=$(GHC_STAGE1)
 SRC_HC_OPTS += -package ghc
-SRC_HC_OPTS += -DGHCI -DBREAKPOINT
 SRC_HC_OPTS += -Istage$(stage)
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts -fno-generics -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser
+
+ifeq "$(GhcWithInterpreter)" "YES"
+SRC_HC_OPTS += -DGHCI -DBREAKPOINT
+endif
+
+SRC_HC_OPTS += -threaded
 
 odir=stage$(stage)
 
