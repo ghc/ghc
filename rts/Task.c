@@ -74,7 +74,7 @@ stopTaskManager (void)
 	       tasksRunning);
 
     ACQUIRE_LOCK(&sched_mutex);
-    for (task = task_free_list; task != NULL; next) {
+    for (task = task_free_list; task != NULL; task = next) {
         next = task->next;
         stgFree(task);
     }
