@@ -41,7 +41,7 @@ UseGhcForCc = YES
 # In this particular case, it turned out that -DDEBUG made Cabal 
 # import HUnit, which might not be installed for the compiler we are
 # compiling with (e.g. 6.2.1). Hence the filter-out.
-SRC_HC_OPTS += $(filter-out -D%, $(GhcHcOpts)) 
+SRC_HC_OPTS += $(filter-out -D%, $(GhcHcOpts) $(GhcStage1HcOpts)) 
 
 # GHC 6.4 didn't have WCsubst.c, but 6.4.1 did, and we need to know
 # this in cbits/unicode.c The patchlevel isn't normally exposed as a
