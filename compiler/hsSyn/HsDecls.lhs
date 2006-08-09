@@ -645,10 +645,10 @@ instance (OutputableBndr name)
 type LForeignDecl name = Located (ForeignDecl name)
 
 data ForeignDecl name
-  = ForeignImport (Located name) (LHsType name) ForeignImport Bool  -- defines name
-  | ForeignExport (Located name) (LHsType name) ForeignExport Bool  -- uses name
+  = ForeignImport (Located name) (LHsType name) ForeignImport  -- defines name
+  | ForeignExport (Located name) (LHsType name) ForeignExport  -- uses name
 
--- specification of an imported external entity in dependence on the calling
+-- Specification Of an imported external entity in dependence on the calling
 -- convention 
 --
 data ForeignImport = -- import of a C entity
@@ -698,10 +698,10 @@ data FoType = DNType 		-- In due course we'll add subtype stuff
 --
 
 instance OutputableBndr name => Outputable (ForeignDecl name) where
-  ppr (ForeignImport n ty fimport _) =
+  ppr (ForeignImport n ty fimport) =
     ptext SLIT("foreign import") <+> ppr fimport <+> 
     ppr n <+> dcolon <+> ppr ty
-  ppr (ForeignExport n ty fexport _) =
+  ppr (ForeignExport n ty fexport) =
     ptext SLIT("foreign export") <+> ppr fexport <+> 
     ppr n <+> dcolon <+> ppr ty
 

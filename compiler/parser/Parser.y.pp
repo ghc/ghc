@@ -83,10 +83,6 @@ Conflicts: 36 shift/reduce (1.25)
   	might be the start of the declaration with the activation being
 	empty.  --SDM 1/4/2002
 
-6 for conflicts between `fdecl' and `fdeclDEPRECATED', 	[States 393,394]
-  	which are resolved correctly, and moreover, 
-  	should go away when `fdeclDEPRECATED' is removed.
-
 1 for ambiguity in '{-# RULES "name" forall = ... #-}' 	[State 474]
 	since 'forall' is a valid variable name, we don't know whether
 	to treat a forall on the input as the beginning of a quantifier
@@ -578,123 +574,14 @@ deprecation :: { OrdList (LHsDecl RdrName) }
 -----------------------------------------------------------------------------
 -- Foreign import and export declarations
 
--- for the time being, the following accepts foreign declarations conforming
--- to the FFI Addendum, Version 1.0 as well as pre-standard declarations
---
--- * a flag indicates whether pre-standard declarations have been used and
---   triggers a deprecation warning further down the road
---
--- NB: The first two rules could be combined into one by replacing `safety1'
---     with `safety'.  However, the combined rule conflicts with the
---     DEPRECATED rules.
---
 fdecl :: { LHsDecl RdrName }
-fdecl : 'import' callconv safety1 fspec
+fdecl : 'import' callconv safety fspec
 		{% mkImport $2 $3 (unLoc $4) >>= return.LL }
-      | 'import' callconv         fspec		
+      | 'import' callconv        fspec		
 		{% do { d <- mkImport $2 (PlaySafe False) (unLoc $3);
 			return (LL d) } }
       | 'export' callconv fspec
 		{% mkExport $2 (unLoc $3) >>= return.LL }
-        -- the following syntax is DEPRECATED
-      | fdecl1DEPRECATED			{ L1 (ForD (unLoc $1)) }
-      | fdecl2DEPRECATED			{ L1 (unLoc $1) }
-
-fdecl1DEPRECATED :: { LForeignDecl RdrName }
-fdecl1DEPRECATED 
-  ----------- DEPRECATED label decls ------------
-  : 'label' ext_name varid '::' sigtype
-    { LL $ ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) nilFS nilFS 
-				   (CLabel ($2 `orElse` mkExtName (unLoc $3)))) True }
-
-  ----------- DEPRECATED ccall/stdcall decls ------------
-  --
-  -- NB: This business with the case expression below may seem overly
-  --	 complicated, but it is necessary to avoid some conflicts.
-
-    -- DEPRECATED variant #1: lack of a calling convention specification
-    --			      (import) 
-  | 'import' {-no callconv-} ext_name safety varid_no_unsafe '::' sigtype
-    { let
-	target = StaticTarget ($2 `orElse` mkExtName (unLoc $4))
-      in
-      LL $ ForeignImport $4 $6 (CImport defaultCCallConv $3 nilFS nilFS 
-				   (CFunction target)) True }
-
-    -- DEPRECATED variant #2: external name consists of two separate strings
-    --			      (module name and function name) (import)
-  | 'import' callconv STRING STRING safety varid_no_unsafe '::' sigtype
-    {% case $2 of
-         DNCall      -> parseError (comb2 $1 $>) "Illegal format of .NET foreign import"
-	 CCall cconv -> return $
-           let
-	     imp = CFunction (StaticTarget (getSTRING $4))
-	   in
-	   LL $ ForeignImport $6 $8 (CImport cconv $5 nilFS nilFS imp) True }
-
-    -- DEPRECATED variant #3: `unsafe' after entity
-  | 'import' callconv STRING 'unsafe' varid_no_unsafe '::' sigtype
-    {% case $2 of
-         DNCall      -> parseError (comb2 $1 $>) "Illegal format of .NET foreign import"
-	 CCall cconv -> return $
-           let
-	     imp = CFunction (StaticTarget (getSTRING $3))
-	   in
-	   LL $ ForeignImport $5 $7 (CImport cconv PlayRisky nilFS nilFS imp) True }
-
-    -- DEPRECATED variant #4: use of the special identifier `dynamic' without
-    --			      an explicit calling convention (import)
-  | 'import' {-no callconv-} 'dynamic' safety varid_no_unsafe '::' sigtype
-    { LL $ ForeignImport $4 $6 (CImport defaultCCallConv $3 nilFS nilFS 
-				   (CFunction DynamicTarget)) True }
-
-    -- DEPRECATED variant #5: use of the special identifier `dynamic' (import)
-  | 'import' callconv 'dynamic' safety varid_no_unsafe '::' sigtype
-    {% case $2 of
-         DNCall      -> parseError (comb2 $1 $>) "Illegal format of .NET foreign import"
-	 CCall cconv -> return $
-	   LL $ ForeignImport $5 $7 (CImport cconv $4 nilFS nilFS 
-					(CFunction DynamicTarget)) True }
-
-    -- DEPRECATED variant #6: lack of a calling convention specification
-    --			      (export) 
-  | 'export' {-no callconv-} ext_name varid '::' sigtype
-    { LL $ ForeignExport $3 $5 (CExport (CExportStatic ($2 `orElse` mkExtName (unLoc $3))
-				   defaultCCallConv)) True }
-
-    -- DEPRECATED variant #7: external name consists of two separate strings
-    --			      (module name and function name) (export)
-  | 'export' callconv STRING STRING varid '::' sigtype
-    {% case $2 of
-         DNCall      -> parseError (comb2 $1 $>) "Illegal format of .NET foreign import"
-	 CCall cconv -> return $
-           LL $ ForeignExport $5 $7 
-			 (CExport (CExportStatic (getSTRING $4) cconv)) True }
-
-    -- DEPRECATED variant #8: use of the special identifier `dynamic' without
-    --			      an explicit calling convention (export)
-  | 'export' {-no callconv-} 'dynamic' varid '::' sigtype
-    { LL $ ForeignImport $3 $5 (CImport defaultCCallConv (PlaySafe False) nilFS nilFS 
-				   CWrapper) True }
-
-    -- DEPRECATED variant #9: use of the special identifier `dynamic' (export)
-  | 'export' callconv 'dynamic' varid '::' sigtype
-    {% case $2 of
-         DNCall      -> parseError (comb2 $1 $>) "Illegal format of .NET foreign import"
-	 CCall cconv -> return $
-	   LL $ ForeignImport $4 $6 
-		 (CImport cconv (PlaySafe False) nilFS nilFS CWrapper) True }
-
-  ----------- DEPRECATED .NET decls ------------
-  -- NB: removed the .NET call declaration, as it is entirely subsumed
-  --     by the new standard FFI declarations
-
-fdecl2DEPRECATED :: { LHsDecl RdrName }
-fdecl2DEPRECATED 
-  : 'import' 'dotnet' 'type' ext_name tycon { LL $ TyClD (ForeignType $5 $4 DNType) }
-    -- left this one unchanged for the moment as type imports are not
-    -- covered currently by the FFI standard -=chak
-
 
 callconv :: { CallConv }
 	  : 'stdcall'			{ CCall  StdCallConv }
@@ -703,15 +590,8 @@ callconv :: { CallConv }
 
 safety :: { Safety }
 	: 'unsafe'			{ PlayRisky }
-	| 'safe'			{ PlaySafe False }
-	| 'threadsafe'			{ PlaySafe True  }
-	| {- empty -}			{ PlaySafe False }
-
-safety1 :: { Safety }
-	: 'unsafe'			{ PlayRisky }
 	| 'safe'			{ PlaySafe  False }
 	| 'threadsafe'			{ PlaySafe  True }
-	  -- only needed to avoid conflicts with the DEPRECATED rules
 
 fspec :: { Located (Located FastString, Located RdrName, LHsType RdrName) }
        : STRING var '::' sigtype      { LL (L (getLoc $1) (getSTRING $1), $2, $4) }
@@ -719,13 +599,6 @@ fspec :: { Located (Located FastString, Located RdrName, LHsType RdrName) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
-
--- DEPRECATED syntax
-ext_name :: { Maybe CLabelString }
-	: STRING		{ Just (getSTRING $1) }
-	| STRING STRING		{ Just (getSTRING $2) }	-- Ignore "module name" for now
-	| {- empty -}           { Nothing }
-
 
 -----------------------------------------------------------------------------
 -- Type signatures

@@ -59,12 +59,12 @@ import MachOp		( machRepByteWidth, MachHint(FloatHint) )
 \begin{code}
 -- Defines a binding
 isForeignImport :: LForeignDecl name -> Bool
-isForeignImport (L _ (ForeignImport _ _ _ _)) = True
+isForeignImport (L _ (ForeignImport _ _ _)) = True
 isForeignImport _			      = False
 
 -- Exports a binding
 isForeignExport :: LForeignDecl name -> Bool
-isForeignExport (L _ (ForeignExport _ _ _ _)) = True
+isForeignExport (L _ (ForeignExport _ _ _)) = True
 isForeignExport _	  	              = False
 \end{code}
 
@@ -80,7 +80,7 @@ tcForeignImports decls
   = mapAndUnzipM (wrapLocSndM tcFImport) (filter isForeignImport decls)
 
 tcFImport :: ForeignDecl Name -> TcM (Id, ForeignDecl Id)
-tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl isDeprec)
+tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl)
  = addErrCtxt (foreignDeclCtxt fo)	$
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenM`	\ sig_ty ->
    let 
@@ -96,7 +96,7 @@ tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl isDeprec)
    tcCheckFIType sig_ty arg_tys res_ty imp_decl		`thenM` \ imp_decl' -> 
    -- can't use sig_ty here because it :: Type and we need HsType Id
    -- hence the undefined
-   returnM (id, ForeignImport (L loc id) undefined imp_decl' isDeprec)
+   returnM (id, ForeignImport (L loc id) undefined imp_decl')
 \end{code}
 
 
@@ -212,7 +212,7 @@ tcForeignExports decls
        returnM (b `consBag` binds, f:fs)
 
 tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id)
-tcFExport fo@(ForeignExport (L loc nm) hs_ty spec isDeprec) =
+tcFExport fo@(ForeignExport (L loc nm) hs_ty spec) =
    addErrCtxt (foreignDeclCtxt fo)	$
 
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenM` \ sig_ty ->
@@ -233,7 +233,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec isDeprec) =
 	id   = mkExportedLocalId gnm sig_ty
 	bind = L loc (VarBind id rhs)
    in
-   returnM (bind, ForeignExport (L loc id) undefined spec isDeprec)
+   returnM (bind, ForeignExport (L loc id) undefined spec)
 \end{code}
 
 ------------ Checking argument types for foreign export ----------------------

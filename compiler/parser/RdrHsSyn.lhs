@@ -747,10 +747,10 @@ mkImport :: CallConv
 	 -> P (HsDecl RdrName)
 mkImport (CCall  cconv) safety (entity, v, ty) = do
   importSpec <- parseCImport entity cconv safety v
-  return (ForD (ForeignImport v ty importSpec False))
+  return (ForD (ForeignImport v ty importSpec))
 mkImport (DNCall      ) _      (entity, v, ty) = do
   spec <- parseDImport entity
-  return $ ForD (ForeignImport v ty (DNImport spec) False)
+  return $ ForD (ForeignImport v ty (DNImport spec))
 
 -- parse the entity string of a foreign import declaration for the `ccall' or
 -- `stdcall' calling convention'
@@ -851,7 +851,7 @@ mkExport :: CallConv
          -> (Located FastString, Located RdrName, LHsType RdrName) 
 	 -> P (HsDecl RdrName)
 mkExport (CCall  cconv) (L loc entity, v, ty) = return $ 
-  ForD (ForeignExport v ty (CExport (CExportStatic entity' cconv)) False)
+  ForD (ForeignExport v ty (CExport (CExportStatic entity' cconv)))
   where
     entity' | nullFS entity = mkExtName (unLoc v)
 	    | otherwise     = entity

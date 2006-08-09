@@ -246,15 +246,15 @@ rnDefaultDecl (DefaultDecl tys)
 %*********************************************************
 
 \begin{code}
-rnHsForeignDecl (ForeignImport name ty spec isDeprec)
+rnHsForeignDecl (ForeignImport name ty spec)
   = lookupLocatedTopBndrRn name	        `thenM` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty	`thenM` \ (ty', fvs) ->
-    returnM (ForeignImport name' ty' spec isDeprec, fvs)
+    returnM (ForeignImport name' ty' spec, fvs)
 
-rnHsForeignDecl (ForeignExport name ty spec isDeprec)
+rnHsForeignDecl (ForeignExport name ty spec)
   = lookupLocatedOccRn name	        `thenM` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty  	`thenM` \ (ty', fvs) ->
-    returnM (ForeignExport name' ty' spec isDeprec, fvs )
+    returnM (ForeignExport name' ty' spec, fvs )
 	-- NB: a foreign export is an *occurrence site* for name, so 
 	--     we add it to the free-variable list.  It might, for example,
 	--     be imported from another module
