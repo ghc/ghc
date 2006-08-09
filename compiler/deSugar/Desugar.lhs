@@ -129,11 +129,7 @@ deSugar hsc_env
 
 	      dir_imp_mods = imp_mods imports
 
-	; showPass dflags "Desugar 3"
-
 	; usages <- mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
-
-	; showPass dflags "Desugar 4"
 
 	; let 
 		-- Modules don't compare lexicographically usually, 
