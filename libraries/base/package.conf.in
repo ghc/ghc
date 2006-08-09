@@ -47,7 +47,6 @@ exposed-modules:
 	Data.Dynamic,
 	Data.Either,
 	Data.Eq,
-	Data.FiniteMap,
 	Data.Fixed,
 	Data.Foldable,
 	Data.FunctorM,
