@@ -135,7 +135,7 @@ groupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
 -- Collect the binders of a Group
   = collectHsValBinders val_decls ++
     [n | d <- tycl_decls, n <- tyClDeclNames (unLoc d)] ++
-    [n | L _ (ForeignImport n _ _ _) <- foreign_decls]
+    [n | L _ (ForeignImport n _ _) <- foreign_decls]
 
 
 {- 	Note [Binders and occurrences]
@@ -251,7 +251,7 @@ repInstD' (L loc (InstDecl ty binds _))		-- Ignore user pragmas for now
    (tvs, cxt, cls, tys) = splitHsInstDeclTy (unLoc ty)
 
 repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
-repForD (L loc (ForeignImport name typ (CImport cc s ch cn cis) _))
+repForD (L loc (ForeignImport name typ (CImport cc s ch cn cis)))
  = do MkC name' <- lookupLOcc name
       MkC typ' <- repLTy typ
       MkC cc' <- repCCallConv cc
