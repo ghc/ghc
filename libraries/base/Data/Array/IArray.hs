@@ -16,7 +16,6 @@
 
 module Data.Array.IArray ( 
     -- * Array classes
-    HasBounds,  -- :: (* -> * -> *) -> class
     IArray,     -- :: (* -> * -> *) -> * -> class
 
     module Data.Ix,

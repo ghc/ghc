@@ -60,12 +60,6 @@ import Data.Typeable
 -----------------------------------------------------------------------------
 -- Class of immutable arrays
 
--- | Class of array types with immutable bounds
--- (even if the array elements are mutable).
-class HasBounds a where
-    -- | Extracts the bounds of an array
-    bounds :: Ix i => a i e -> (i,i)
-
 {- | Class of immutable array types.
 
 An array type has the form @(a i e)@ where @a@ is the array type
@@ -74,7 +68,9 @@ the class 'Ix'), and @e@ is the element type.  The @IArray@ class is
 parameterised over both @a@ and @e@, so that instances specialised to
 certain element types can be defined.
 -}
-class HasBounds a => IArray a e where
+class IArray a e where
+    -- | Extracts the bounds of an immutable array
+    bounds           :: Ix i => a i e -> (i,i)
     unsafeArray      :: Ix i => (i,i) -> [(Int, e)] -> a i e
     unsafeAt         :: Ix i => a i e -> Int -> e
     unsafeReplace    :: Ix i => a i e -> [(Int, e)] -> a i e
@@ -267,7 +263,7 @@ arr ! i = case bounds arr of (l,u) -> unsafeAt arr (index (l,u) i)
 
 {-# INLINE indices #-}
 -- | Returns a list of all the valid indices in an array.
-indices :: (HasBounds a, Ix i) => a i e -> [i]
+indices :: (IArray a e, Ix i) => a i e -> [i]
 indices arr = case bounds arr of (l,u) -> range (l,u)
 
 {-# INLINE elems #-}
@@ -358,11 +354,9 @@ ixmap (l,u) f arr =
 -----------------------------------------------------------------------------
 -- Normal polymorphic arrays
 
-instance HasBounds Arr.Array where
+instance IArray Arr.Array e where
     {-# INLINE bounds #-}
     bounds = Arr.bounds
-
-instance IArray Arr.Array e where
     {-# INLINE unsafeArray #-}
     unsafeArray      = Arr.unsafeArray
     {-# INLINE unsafeAt #-}
@@ -401,10 +395,6 @@ data UArray i e = UArray !i !i !ByteArray
 #endif
 
 INSTANCE_TYPEABLE2(UArray,uArrayTc,"UArray")
-
-instance HasBounds UArray where
-    {-# INLINE bounds #-}
-    bounds (UArray l u _) = (l,u)
 
 {-# INLINE unsafeArrayUArray #-}
 unsafeArrayUArray :: (MArray (STUArray s) e (ST s), Ix i)
@@ -510,6 +500,8 @@ unsafeAtBArray (UArray _ _ arr) = readByteArray arr
 #endif
 
 instance IArray UArray Bool where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies False)
 #ifdef __GLASGOW_HASKELL__
@@ -530,6 +522,8 @@ instance IArray UArray Bool where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Char where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies '\0')
     {-# INLINE unsafeAt #-}
@@ -547,6 +541,8 @@ instance IArray UArray Char where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Int where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -564,6 +560,8 @@ instance IArray UArray Int where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Word where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -581,6 +579,8 @@ instance IArray UArray Word where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray (Ptr a) where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies nullPtr)
     {-# INLINE unsafeAt #-}
@@ -598,6 +598,8 @@ instance IArray UArray (Ptr a) where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray (FunPtr a) where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies nullFunPtr)
 #ifdef __GLASGOW_HASKELL__
@@ -615,6 +617,8 @@ instance IArray UArray (FunPtr a) where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Float where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -632,6 +636,8 @@ instance IArray UArray Float where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Double where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -649,6 +655,8 @@ instance IArray UArray Double where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray (StablePtr a) where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies nullStablePtr)
 #ifdef __GLASGOW_HASKELL__
@@ -674,6 +682,8 @@ nullStablePtr = castPtrToStablePtr nullPtr
 #endif
 
 instance IArray UArray Int8 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -691,6 +701,8 @@ instance IArray UArray Int8 where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Int16 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -708,6 +720,8 @@ instance IArray UArray Int16 where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Int32 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -725,6 +739,8 @@ instance IArray UArray Int32 where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Int64 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -742,6 +758,8 @@ instance IArray UArray Int64 where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Word8 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -759,6 +777,8 @@ instance IArray UArray Word8 where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Word16 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -776,6 +796,8 @@ instance IArray UArray Word16 where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Word32 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -793,6 +815,8 @@ instance IArray UArray Word32 where
     unsafeAccumArray f init lu ies = runST (unsafeAccumArrayUArray f init lu ies)
 
 instance IArray UArray Word64 where
+    {-# INLINE bounds #-}
+    bounds (UArray l u _) = (l,u)
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies 0)
 #ifdef __GLASGOW_HASKELL__
@@ -836,7 +860,10 @@ instances specialised to certain element types can be defined, in the
 same way as for 'IArray'), and also over the type of the monad, @m@,
 in which the mutable array will be manipulated.
 -}
-class (HasBounds a, Monad m) => MArray a e m where
+class (Monad m) => MArray a e m where
+
+    -- | Returns the bounds of the array
+    getBounds   :: Ix i => a i e -> m (i,i)
 
     -- | Builds a new array, with every element initialised to the supplied 
     -- value.
@@ -891,41 +918,45 @@ newListArray (l,u) es = do
 {-# INLINE readArray #-}
 -- | Read an element from a mutable array
 readArray :: (MArray a e m, Ix i) => a i e -> i -> m e
-readArray marr i = case bounds marr of
-    (l,u) -> unsafeRead marr (index (l,u) i)
+readArray marr i = do
+  (l,u) <- getBounds marr
+  unsafeRead marr (index (l,u) i)
 
 {-# INLINE writeArray #-}
 -- | Write an element in a mutable array
 writeArray :: (MArray a e m, Ix i) => a i e -> i -> e -> m ()
-writeArray marr i e = case bounds marr of
-    (l,u) -> unsafeWrite marr (index (l,u) i) e
+writeArray marr i e = do
+  (l,u) <- getBounds marr
+  unsafeWrite marr (index (l,u) i) e
 
 {-# INLINE getElems #-}
 -- | Return a list of all the elements of a mutable array
 getElems :: (MArray a e m, Ix i) => a i e -> m [e]
-getElems marr = case bounds marr of
-    (l,u) -> sequence [unsafeRead marr i | i <- [0 .. rangeSize (l,u) - 1]]
+getElems marr = do 
+  (l,u) <- getBounds marr
+  sequence [unsafeRead marr i | i <- [0 .. rangeSize (l,u) - 1]]
 
 {-# INLINE getAssocs #-}
 -- | Return a list of all the associations of a mutable array, in
 -- index order.
 getAssocs :: (MArray a e m, Ix i) => a i e -> m [(i, e)]
-getAssocs marr = case bounds marr of
-    (l,u) -> sequence [do e <- unsafeRead marr (index (l,u) i); return (i,e)
-              | i <- range (l,u)]
+getAssocs marr = do 
+  (l,u) <- getBounds marr
+  sequence [ do e <- unsafeRead marr (index (l,u) i); return (i,e)
+           | i <- range (l,u)]
 
 {-# INLINE mapArray #-}
 -- | Constructs a new array derived from the original array by applying a
 -- function to each of the elements.
 mapArray :: (MArray a e' m, MArray a e m, Ix i) => (e' -> e) -> a i e' -> m (a i e)
-mapArray f marr = case bounds marr of
-  (l,u) -> do
-    marr' <- newArray_ (l,u)
-    sequence_ [do
+mapArray f marr = do 
+  (l,u) <- getBounds marr
+  marr' <- newArray_ (l,u)
+  sequence_ [do
         e <- unsafeRead marr i
         unsafeWrite marr' i (f e)
         | i <- [0 .. rangeSize (l,u) - 1]]
-    return marr'
+  return marr'
 
 {-# INLINE mapIndices #-}
 -- | Constructs a new array derived from the original array by applying a
@@ -942,11 +973,9 @@ mapIndices (l,u) f marr = do
 -----------------------------------------------------------------------------
 -- Polymorphic non-strict mutable arrays (ST monad)
 
-instance HasBounds (STArray s) where
-    {-# INLINE bounds #-}
-    bounds = ArrST.boundsSTArray
-
 instance MArray (STArray s) e (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds arr = return $! ArrST.boundsSTArray arr
     {-# INLINE newArray #-}
     newArray    = ArrST.newSTArray
     {-# INLINE unsafeRead #-}
@@ -955,6 +984,8 @@ instance MArray (STArray s) e (ST s) where
     unsafeWrite = ArrST.unsafeWriteSTArray
 
 instance MArray (STArray s) e (Lazy.ST s) where
+    {-# INLINE getBounds #-}
+    getBounds arr = strictToLazyST (return $! ArrST.boundsSTArray arr)
     {-# INLINE newArray #-}
     newArray (l,u) e    = strictToLazyST (ArrST.newSTArray (l,u) e)
     {-# INLINE unsafeRead #-}
@@ -993,12 +1024,10 @@ data STUArray s i a = STUArray !i !i !(MutableByteArray s)
 
 INSTANCE_TYPEABLE3(STUArray,stUArrayTc,"STUArray")
 
-instance HasBounds (STUArray s) where
-    {-# INLINE bounds #-}
-    bounds (STUArray l u _) = (l,u)
-
 #ifdef __GLASGOW_HASKELL__
 instance MArray (STUArray s) Bool (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray #-}
     newArray (l,u) init = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1031,6 +1060,8 @@ instance MArray (STUArray s) Bool (ST s) where
         (# s3#, () #) }}}}
 
 instance MArray (STUArray s) Char (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1046,6 +1077,8 @@ instance MArray (STUArray s) Char (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Int (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1061,6 +1094,8 @@ instance MArray (STUArray s) Int (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Word (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1076,6 +1111,8 @@ instance MArray (STUArray s) Word (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) (Ptr a) (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1091,6 +1128,8 @@ instance MArray (STUArray s) (Ptr a) (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) (FunPtr a) (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1106,6 +1145,8 @@ instance MArray (STUArray s) (FunPtr a) (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Float (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1121,6 +1162,8 @@ instance MArray (STUArray s) Float (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Double (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1136,6 +1179,8 @@ instance MArray (STUArray s) Double (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) (StablePtr a) (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1151,6 +1196,8 @@ instance MArray (STUArray s) (StablePtr a) (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Int8 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1166,6 +1213,8 @@ instance MArray (STUArray s) Int8 (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Int16 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1181,6 +1230,8 @@ instance MArray (STUArray s) Int16 (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Int32 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1196,6 +1247,8 @@ instance MArray (STUArray s) Int32 (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Int64 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1211,6 +1264,8 @@ instance MArray (STUArray s) Int64 (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Word8 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1226,6 +1281,8 @@ instance MArray (STUArray s) Word8 (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Word16 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1241,6 +1298,8 @@ instance MArray (STUArray s) Word16 (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Word32 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1256,6 +1315,8 @@ instance MArray (STUArray s) Word32 (ST s) where
         (# s2#, () #) }
 
 instance MArray (STUArray s) Word64 (ST s) where
+    {-# INLINE getBounds #-}
+    getBounds (STUArray l u _) = return (l,u)
     {-# INLINE newArray_ #-}
     newArray_ (l,u) = ST $ \s1# ->
         case rangeSize (l,u)            of { I# n# ->
@@ -1311,7 +1372,10 @@ unsafeReadMBArray (STUArray _ _ marr) = readMutableByteArray marr
 unsafeWriteMBArray :: Storable e => STUArray s i e -> Int -> e -> ST s ()
 unsafeWriteMBArray (STUArray _ _ marr) = writeMutableByteArray marr
 
+getBoundsMBArray (STUArray l u _) = return (l,u)
+
 instance MArray (STUArray s) Bool (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ (l,u) = do
         marr <- newMutableByteArray (bOOL_SCALE (rangeSize (l,u)))
         return (STUArray l u marr)
@@ -1328,81 +1392,97 @@ instance MArray (STUArray s) Bool (ST s) where
 	    (if e then setBit (w::BitSet) bit else clearBit w bit)
 
 instance MArray (STUArray s) Char (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Int (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Word (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) (Ptr a) (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) (FunPtr a) (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Float (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Double (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) (StablePtr a) (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Int8 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Int16 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Int32 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Int64 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Word8 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Word16 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Word32 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
 
 instance MArray (STUArray s) Word64 (ST s) where
+    getBounds = getBoundsMBArray
     newArray_ = newMBArray_
     unsafeRead = unsafeReadMBArray
     unsafeWrite = unsafeWriteMBArray
@@ -1428,11 +1508,11 @@ bOOL_SUBINDEX i = i `mod` bitSetSize
 -- immutable array (any instance of 'IArray') by taking a complete
 -- copy of it.
 freeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
-freeze marr = case bounds marr of
-  (l,u) -> do
-    ies <- sequence [do e <- unsafeRead marr i; return (i,e)
-                     | i <- [0 .. rangeSize (l,u) - 1]]
-    return (unsafeArray (l,u) ies)
+freeze marr = do
+  (l,u) <- getBounds marr
+  ies <- sequence [do e <- unsafeRead marr i; return (i,e)
+                   | i <- [0 .. rangeSize (l,u) - 1]]
+  return (unsafeArray (l,u) ies)
 
 #ifdef __GLASGOW_HASKELL__
 freezeSTUArray :: Ix i => STUArray s i e -> ST s (UArray i e)

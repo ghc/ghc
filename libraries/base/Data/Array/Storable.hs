@@ -49,10 +49,8 @@ import Foreign hiding (newArray)
 -- |The array type
 data StorableArray i e = StorableArray !i !i !(ForeignPtr e)
 
-instance HasBounds StorableArray where
-    bounds (StorableArray l u _) = (l,u)
-
 instance Storable e => MArray StorableArray e IO where
+    getBounds (StorableArray l u _) = return (l,u)
 
     newArray (l,u) init = do
         fp <- mallocForeignPtrArray size

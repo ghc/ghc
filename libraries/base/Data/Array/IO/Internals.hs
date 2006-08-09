@@ -48,18 +48,13 @@ INSTANCE_TYPEABLE2(IOArray,iOArrayTc,"IOArray")
 -----------------------------------------------------------------------------
 -- | Instance declarations for 'IOArray's
 
-#ifdef __GLASGOW_HASKELL__
-instance HasBounds IOArray where
-    {-# INLINE bounds #-}
-    bounds (IOArray marr) = bounds marr
-#endif
-
-#ifdef __HUGS__
-instance HasBounds IOArray where
-    bounds      = boundsIOArray
-#endif
-
 instance MArray IOArray e IO where
+#if defined(__HUGS__)
+    getBound    = return . boundsIOArray
+#elif defined(__GLASGOW_HASKELL__)
+    {-# INLINE getBounds #-}
+    getBounds (IOArray marr) = stToIO $ getBounds marr
+#endif
     newArray    = newIOArray
     unsafeRead  = unsafeReadIOArray
     unsafeWrite = unsafeWriteIOArray
@@ -79,11 +74,9 @@ newtype IOUArray i e = IOUArray (STUArray RealWorld i e)
 
 INSTANCE_TYPEABLE2(IOUArray,iOUArrayTc,"IOUArray")
 
-instance HasBounds IOUArray where
-    {-# INLINE bounds #-}
-    bounds (IOUArray marr) = bounds marr
-
 instance MArray IOUArray Bool IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -96,6 +89,8 @@ instance MArray IOUArray Bool IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Char IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -108,6 +103,8 @@ instance MArray IOUArray Char IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Int IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -120,6 +117,8 @@ instance MArray IOUArray Int IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Word IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -132,6 +131,8 @@ instance MArray IOUArray Word IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray (Ptr a) IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -144,6 +145,8 @@ instance MArray IOUArray (Ptr a) IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray (FunPtr a) IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -156,6 +159,8 @@ instance MArray IOUArray (FunPtr a) IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Float IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -168,6 +173,8 @@ instance MArray IOUArray Float IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Double IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -180,6 +187,8 @@ instance MArray IOUArray Double IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray (StablePtr a) IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -192,6 +201,8 @@ instance MArray IOUArray (StablePtr a) IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Int8 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -204,6 +215,8 @@ instance MArray IOUArray Int8 IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Int16 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -216,6 +229,8 @@ instance MArray IOUArray Int16 IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Int32 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -228,6 +243,8 @@ instance MArray IOUArray Int32 IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Int64 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -240,6 +257,8 @@ instance MArray IOUArray Int64 IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Word8 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -252,6 +271,8 @@ instance MArray IOUArray Word8 IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Word16 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -264,6 +285,8 @@ instance MArray IOUArray Word16 IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Word32 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
@@ -276,6 +299,8 @@ instance MArray IOUArray Word32 IO where
     unsafeWrite (IOUArray marr) i e = stToIO (unsafeWrite marr i e)
 
 instance MArray IOUArray Word64 IO where
+    {-# INLINE getBounds #-}
+    getBounds (IOUArray arr) = stToIO $ getBounds arr
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)

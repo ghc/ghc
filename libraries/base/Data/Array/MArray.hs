@@ -18,9 +18,6 @@ module Data.Array.MArray (
     -- * Class of mutable array types
     MArray,       -- :: (* -> * -> *) -> * -> (* -> *) -> class
 
-    -- * Class of array types with bounds
-    HasBounds,    -- :: (* -> * -> *) -> class
-
     -- * The @Ix@ class and operations
     module Data.Ix,
 
@@ -38,8 +35,7 @@ module Data.Array.MArray (
     mapIndices,   -- :: (MArray a e m, Ix i, Ix j) => (i,i) -> (i -> j) -> a j e -> m (a i e)
 
     -- * Deconstructing mutable arrays
-    bounds,       -- :: (HasBounds a, Ix i) => a i e -> (i,i)
-    indices,      -- :: (HasBounds a, Ix i) => a i e -> [i]
+    getBounds,    -- :: (MArray a e m, Ix i) => a i e -> m (i,i)
     getElems,     -- :: (MArray a e m, Ix i) => a i e -> m [e]
     getAssocs,    -- :: (MArray a e m, Ix i) => a i e -> m [(i, e)]
 
