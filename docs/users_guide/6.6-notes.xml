@@ -11,6 +11,7 @@ Compiler:
 - breakpoints
 - -split-objs now works with --make and Cabal
 - relaxed dependency analysis (with -fglasgow-exts)
+- old syntax for FFI declarations is no longer accepted
 
 Libraries:
 - Data.ByteString
