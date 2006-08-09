@@ -962,12 +962,6 @@ AC_SUBST(GhcLibsWithReadline)
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
 
-dnl ** how do we get a timezone name, and UTC offset ?
-AC_STRUCT_TIMEZONE
-
-dnl ** do we have altzone?
-FP_DECL_ALTZONE
-
 dnl ** do we have long longs?
 AC_CHECK_TYPES([long long])
 
