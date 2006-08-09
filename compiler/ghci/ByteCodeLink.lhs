@@ -157,10 +157,8 @@ mkPtrsArray ie ce n_ptrs ptrs = do
 
 newtype IOArray i e = IOArray (STArray RealWorld i e)
 
-instance HasBounds IOArray where
-    bounds (IOArray marr) = bounds marr
-
 instance MArray IOArray e IO where
+    getBounds (IOArray marr) = stToIO $ getBounds marr
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOArray marr)
     newArray_ lu = stToIO $ do
