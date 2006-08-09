@@ -44,7 +44,9 @@ import Array
 import List
 import Outputable
 
-#if __GLASGOW_HASKELL__ >= 504
+#if __GLASGOW_HASKELL__ > 604
+import Data.Array.ST
+#elif __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST  hiding ( indices, bounds )
 #else
 import ST
