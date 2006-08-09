@@ -127,7 +127,7 @@ initStorage( void )
       RtsFlags.GcFlags.minAllocAreaSize > 
       RtsFlags.GcFlags.maxHeapSize) {
       errorBelch("maximum heap size (-M) is smaller than minimum alloc area size (-A)");
-      exit(1);
+      RtsFlags.GcFlags.minAllocAreaSize = RtsFlags.GcFlags.maxHeapSize;
   }
 
   initBlockAllocator();

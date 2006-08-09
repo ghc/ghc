@@ -43,6 +43,8 @@ extern void shutdownHaskellAndExit ( int exitCode );
 extern void getProgArgv            ( int *argc, char **argv[] );
 extern void setProgArgv            ( int argc, char *argv[] );
 
+/* exit() override */
+extern void (*exitFn)(int);
 
 /* ----------------------------------------------------------------------------
    Locking.

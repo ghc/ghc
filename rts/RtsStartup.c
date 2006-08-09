@@ -459,6 +459,8 @@ shutdownHaskellAndExit(int n)
 static int exit_started=rtsFalse;
 #endif
 
+void (*exitFn)(int) = 0;
+
 void  
 stg_exit(int n)
 { 
@@ -471,5 +473,7 @@ stg_exit(int n)
   IF_PAR_DEBUG(verbose, debugBelch("==-- stg_exit %d on [%x]...", n, mytid));
   shutdownParallelSystem(n);
 #endif
+  if (exitFn)
+    (*exitFn)(n);
   exit(n);
 }
