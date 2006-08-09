@@ -11,6 +11,9 @@ module HaddockHoogle (
 	ppHoogle
   ) where
 
+ppHoogle = undefined
+
+{-
 import HaddockTypes
 import HaddockUtil
 import HsSyn2
@@ -178,3 +181,4 @@ ppExport (ExportDecl name decl insts) = ppDecl decl ++ map ppInst insts
 ppExport _ = []
 
 
+-}

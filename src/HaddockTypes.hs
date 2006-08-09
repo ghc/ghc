@@ -3,186 +3,123 @@
 --
 -- (c) Simon Marlow 2003
 --
+-- Ported to use the GHC API by David Waern 2006
+-- 
 
 module HaddockTypes (
-  -- * Module interfaces
-  NameEnv, Interface(..), ExportItem(..), ExportItem2(..), ModuleMap, ModuleMap2,
+  ExportItem2(..), 
+  ModuleMap2, 
+  DocMap,
   HaddockModule(..), 
-  -- * Misc types
-  DocOption(..), InstHead, InstHead2,
+  DocOption(..), 
+  InstHead2,
   DocName(..),
   DocMarkup(..)
  ) where
 
-import HsSyn2 hiding ( DocMarkup )
-
-import qualified GHC as GHC
+import GHC
+import Outputable
 
 import Data.Map
 
--- ---------------------------------------------------------------------------
--- Describing a module interface
-
-type NameEnv   = Map HsName HsQName
-
-data Interface 
-  = Interface {
-	iface_filename :: FilePath,
-		-- ^ the filename that contains the source code for this module
-
-	iface_orig_filename :: FilePath,
-		-- ^ the original filename for this module, which may be
-                -- different to the 'iface_filename' (for example the original
-                -- file may have had a .lhs or .hs.pp extension).
-
-	iface_module :: Module,
-
-	iface_package :: Maybe String,
-
-	iface_env :: NameEnv,
-		-- ^ environment mapping exported names to *original* names
-
-	iface_reexported :: [HsName],
-		-- ^ For names exported by this module, but not
-		-- actually documented in this module's documentation
-		-- (perhaps because they are reexported via 'module M'
-		-- in the export list), this mapping gives the
-		-- location of documentation for the name in another
-		-- module.
-
-	iface_sub :: Map HsName [HsName],
-		-- ^ maps names to "subordinate" names 
-		-- (eg. tycon to constrs & fields, class to methods)
-
-	iface_exports :: [ExportItem],
-		-- ^ the exports used to construct the documentation 
-
-	iface_orig_exports :: [ExportItem],
-		-- ^ the exports used to construct the documentation
-		-- (with orig names, not import names)
-
-	iface_decls :: Map HsName HsDecl,
-		-- ^ decls from this module (only)
-		-- restricted to only those bits exported.
-		-- the map key is the "main name" of the decl.
-
-	iface_insts :: [HsDecl],
-		-- ^ instances from this module
-
-	iface_info :: ModuleInfo,
-		-- ^ information from the module header
-
-	iface_doc :: Maybe Doc,
-		-- ^ documentation from the module header
-
-	iface_options :: [DocOption]
-		-- ^ module-wide doc options
-  }
-
 data DocOption
-  = OptHide		-- this module should not appear in the docs
+  = OptHide           -- ^ This module should not appear in the docs
   | OptPrune
-  | OptIgnoreExports	-- pretend everything is exported
-  | OptNotHome		-- not the best place to get docs for things
-		 	-- exported by this module.
+  | OptIgnoreExports  -- ^ Pretend everything is exported
+  | OptNotHome        -- ^ Not the best place to get docs for things
+                      -- exported by this module.
   deriving (Eq, Show)
-
-data ExportItem 
-  = ExportDecl
-	HsQName	      -- the original name
-	HsDecl        -- a declaration (with doc annotations)
-	[InstHead]    -- instances relevant to this declaration
-
-  | ExportNoDecl	-- an exported entity for which we have no documentation
-			-- (perhaps becuase it resides in another package)
-	HsQName		-- the original name
-	HsQName		-- where to link to
-	[HsQName]	-- subordinate names
-
-  | ExportGroup		-- a section heading
-	Int		-- section level (1, 2, 3, ... )
-	String		-- section "id" (for hyperlinks)
-	Doc		-- section heading text
-
-  | ExportDoc		-- some documentation
-	Doc
-
-  | ExportModule	-- a cross-reference to another module
-	Module
 
 data ExportItem2 name
   = ExportDecl2
-        GHC.Name	      -- the original name
-	(GHC.LHsDecl name) -- a declaration
-        (Maybe (GHC.HsDoc name))       -- maybe a doc comment
-	[InstHead2 name]	      -- instances relevant to this declaration
+      Name	               -- ^ The original name
+      (LHsDecl name)       -- ^ A declaration
+      (Maybe (HsDoc name)) -- ^ Maybe a doc comment
+      [InstHead2 name]	   -- ^ Instances relevant to this declaration
 
-  | ExportNoDecl2	-- an exported entity for which we have no documentation
-			-- (perhaps becuase it resides in another package)
-	GHC.Name	-- the original name
-	name		-- where to link to
-	[name]	-- subordinate names
+  | ExportNoDecl2	         -- ^ An exported entity for which we have no 
+                           -- documentation (perhaps because it resides in
+                           -- another package)
+      Name                 -- ^ The original name
+      name                 -- ^ Where to link to
+      [name]               -- ^ Subordinate names
 
-  | ExportGroup2		-- a section heading
-	Int		-- section level (1, 2, 3, ... )
-	String		-- section "id" (for hyperlinks)
-	(GHC.HsDoc name)		-- section heading text
+  | ExportGroup2           -- ^ A section heading
+      Int                  -- ^ section level (1, 2, 3, ... )
+      String               -- ^ Section "id" (for hyperlinks)
+      (HsDoc name)         -- ^ Section heading text
 
-  | ExportDoc2		-- some documentation
-	(GHC.HsDoc name)
+  | ExportDoc2             -- ^ Some documentation
+      (HsDoc name)
 
-  | ExportModule2	-- a cross-reference to another module
-	GHC.Module
+  | ExportModule2          -- ^ A cross-reference to another module
+      Module
 
-type InstHead = (HsContext,HsAsst)
+type InstHead2 name = ([HsPred name], name, [HsType name])
+type ModuleMap2 = Map Module HaddockModule
+type DocMap = Map Name (HsDoc DocName)
+data DocName = Link Name | NoLink Name
 
-type InstHead2 name = ([GHC.HsPred name], name, [GHC.HsType name])
-
-type ModuleMap = Map Module Interface
-type ModuleMap2 = Map GHC.Module HaddockModule
-
-data DocName = Link GHC.Name | NoLink GHC.Name
+instance Outputable DocName where
+  ppr (Link   n) = ppr n
+  ppr (NoLink n) = ppr n
 
 data HaddockModule = HM {
 
 -- | A value to identify the module
-  hmod_mod                :: GHC.Module,
+
+  hmod_mod                :: Module,
 
 -- | The original filename for this module
+
   hmod_orig_filename      :: FilePath,
 
 -- | Textual information about the module 
-  hmod_info               :: GHC.HaddockModInfo GHC.Name,
+
+  hmod_info               :: HaddockModInfo Name,
 
 -- | The documentation header for this module
-  hmod_doc                :: Maybe (GHC.HsDoc GHC.Name),
+
+  hmod_doc                :: Maybe (HsDoc Name),
+
+-- | The renamed documentation header for this module
+
+  hmod_rn_doc             :: Maybe (HsDoc DocName),
 
 -- | The Haddock options for this module (prune, ignore-exports, etc)
+
   hmod_options            :: [DocOption],
 
-  hmod_exported_decl_map  :: Map GHC.Name (GHC.LHsDecl GHC.Name),
-  hmod_doc_map            :: Map GHC.Name (GHC.HsDoc GHC.Name),  
-  hmod_export_items       :: [ExportItem2 GHC.Name],
+  hmod_exported_decl_map  :: Map Name (LHsDecl Name),
+  hmod_doc_map            :: Map Name (HsDoc Name),  
+  hmod_rn_doc_map         :: Map Name (HsDoc DocName),
+
+  hmod_export_items       :: [ExportItem2 Name],
+  hmod_rn_export_items    :: [ExportItem2 DocName],
 
 -- | All the names that are defined in this module
-  hmod_locals             :: [GHC.Name],
+
+  hmod_locals             :: [Name],
 
 -- | All the names that are exported by this module
-  hmod_exports            :: [GHC.Name],
+
+  hmod_exports            :: [Name],
 
 -- | All the visible names exported by this module
 -- For a name to be visible, it has to:
 -- - be exported normally, and not via a full module re-exportation.
 -- - have a declaration in this module or any of it's imports, with the exception
 --   that it can't be from another package.
--- Basically, a visible name is a name that will show up in the documentation.
+-- Basically, a visible name is a name that will show up in the documentation
 -- for this module.
-  hmod_visible_exports    :: [GHC.Name],
 
-  hmod_sub_map            :: Map GHC.Name [GHC.Name],
+  hmod_visible_exports    :: [Name],
+
+  hmod_sub_map            :: Map Name [Name],
 
 -- | The instances exported by this module
-  hmod_instances          :: [GHC.Instance],
+
+  hmod_instances          :: [Instance],
 
   hmod_package            :: Maybe String
 }
@@ -200,6 +137,6 @@ data DocMarkup id a = Markup {
   markupOrderedList   :: [a] -> a,
   markupDefList       :: [(a,a)] -> a,
   markupCodeBlock     :: a -> a,
-  markupURL	      :: String -> a,
-  markupAName	      :: String -> a
+  markupURL           :: String -> a,
+  markupAName         :: String -> a
 }

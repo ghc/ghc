@@ -16,6 +16,7 @@ module HaddockUtil (
   basename, dirname, splitFilename3, 
   moduleHtmlFile, nameHtmlRef,
   contentsHtmlFile, indexHtmlFile, subIndexHtmlFile, pathJoin,
+  anchorNameStr,
   cssFile, iconFile, jsFile, plusFile, minusFile,
 
   -- * Miscellaneous utilities
@@ -279,7 +280,7 @@ isPathSeparator ch =
 
 moduleHtmlFile :: String -> FilePath
 moduleHtmlFile mdl =
-  case Map.lookup (Module mdl) html_xrefs of
+  case Map.lookup (GHC.mkModule mdl) html_xrefs of
     Nothing  -> mdl' ++ ".html"
     Just fp0 -> pathJoin [fp0, mdl' ++ ".html"]
   where
@@ -287,11 +288,6 @@ moduleHtmlFile mdl =
 
 nameHtmlRef :: String -> GHC.Name -> String	
 nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (anchorNameStr str)
-
-anchorNameStr :: GHC.Name -> String
-anchorNameStr name | isValOcc occName = "v:" ++ getOccString name 
-                   | otherwise        = "t:" ++ getOccString name
-  where occName = nameOccName name
 
 contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
@@ -301,6 +297,11 @@ subIndexHtmlFile :: Char -> String
 subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
    where b | isAlpha a = [a]
            | otherwise = show (ord a)
+
+anchorNameStr :: Name -> String
+anchorNameStr name | isValOcc occName = "v:" ++ getOccString name 
+                   | otherwise        = "t:" ++ getOccString name
+  where occName = nameOccName name
 
 pathJoin :: [FilePath] -> FilePath
 pathJoin = foldr join []
@@ -368,11 +369,11 @@ escapeStr = escapeURIString isUnreserved
 -- being I'm going to use a write-once global variable.
 
 {-# NOINLINE html_xrefs_ref #-}
-html_xrefs_ref :: IORef (Map Module FilePath)
+html_xrefs_ref :: IORef (Map GHC.Module FilePath)
 html_xrefs_ref = unsafePerformIO (newIORef (error "module_map"))
 
 {-# NOINLINE html_xrefs #-}
-html_xrefs :: Map Module FilePath
+html_xrefs :: Map GHC.Module FilePath
 html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
 
 -----------------------------------------------------------------------------

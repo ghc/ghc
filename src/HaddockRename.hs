@@ -6,7 +6,7 @@
 
 module HaddockRename (
   runRnFM, -- the monad (instance of Monad)
-  renameMaybeDoc, renameExportItems,
+  renameDoc, renameMaybeDoc, renameExportItems,
 ) where
 
 import HaddockTypes
@@ -70,6 +70,12 @@ runRn lkp rn = unRn rn lkp
 -- -----------------------------------------------------------------------------
 -- Renaming 
 
+keep n = NoLink n
+keepL (L loc n) = L loc (NoLink n)
+
+rename = lookupRn id 
+renameL (L loc name) = return . L loc =<< rename name
+
 renameExportItems :: [ExportItem2 Name] -> RnM [ExportItem2 DocName]
 renameExportItems items = mapM renameExportItem items
 
@@ -118,9 +124,6 @@ renameDoc doc = case doc of
     return (DocCodeBlock doc')
   DocURL str -> return (DocURL str) 
   DocAName str -> return (DocAName str)
-
-rename = lookupRn id 
-renameL (L loc name) = return . L loc =<< rename name
 
 renameLPred (L loc p) = return . L loc =<< renamePred p
 
@@ -218,43 +221,40 @@ renameDecl d = case d of
   _ -> error "renameDecl"
 
 renameTyClD d = case d of
-  ForeignType name a b -> do
-    name' <- renameL name
-    return (ForeignType name' a b)
+  ForeignType _ _ _ -> error "renameTyClD" -- I'm guessing these can't be exported
+ -- ForeignType name a b -> do
+ --   name' <- renameL name
+ --   return (ForeignType name' a b)
 
   TyData x lcontext lname ltyvars k cons _ -> do
     lcontext' <- renameLContext lcontext
-    lname' <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     cons' <- mapM renameLCon cons
     -- we don't need the derivings
-    return (TyData x lcontext' lname' ltyvars' k cons' Nothing) 
+    return (TyData x lcontext' (keepL lname) ltyvars' k cons' Nothing) 
  
   TySynonym lname ltyvars ltype -> do
-    lname' <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     ltype' <- renameLType ltype
-    return (TySynonym lname' ltyvars' ltype')
+    return (TySynonym (keepL lname) ltyvars' ltype')
 
   ClassDecl lcontext lname ltyvars lfundeps lsigs _ _ -> do
     lcontext' <- renameLContext lcontext
-    lname' <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     lfundeps' <- mapM renameLFunDep lfundeps 
     lsigs' <- mapM renameLSig lsigs
     -- we don't need the default methods or the already collected doc entities
-    return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag [])
+    return (ClassDecl lcontext' (keepL lname) ltyvars' lfundeps' lsigs' emptyBag [])
  
   where
     renameLCon (L loc con) = return . L loc =<< renameCon con
     renameCon (ConDecl lname expl ltyvars lcontext details restype mbldoc) = do
-      lname' <- renameL lname 
       ltyvars' <- mapM renameLTyVarBndr ltyvars
       lcontext' <- renameLContext lcontext
       details' <- renameDetails details
       restype' <- renameResType restype
       mbldoc' <- mapM renameLDoc mbldoc
-      return (ConDecl lname' expl ltyvars' lcontext' details' restype' mbldoc') 
+      return (ConDecl (keepL lname) expl ltyvars' lcontext' details' restype' mbldoc') 
 
     renameDetails (RecCon fields) = return . RecCon =<< mapM renameField fields
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
@@ -264,27 +264,22 @@ renameTyClD d = case d of
       return (InfixCon a' b')
   
     renameField (HsRecField id arg doc) = do
-      id' <- renameL id
       arg' <- renameLType arg
       doc' <- mapM renameLDoc doc 
-      return (HsRecField id' arg' doc')
+      return (HsRecField (keepL id) arg' doc')
 
     renameResType (ResTyH98) = return ResTyH98
     renameResType (ResTyGADT t) = return . ResTyGADT =<< renameLType t
 
-    renameLFunDep (L loc (xs, ys)) = do
-      xs' <- mapM rename xs
-      ys' <- mapM rename ys
-      return (L loc (xs', ys'))
+    renameLFunDep (L loc (xs, ys)) = return (L loc (map keep xs, map keep ys))
    
     renameLSig (L loc sig) = return . L loc =<< renameSig sig
       
 renameSig sig = case sig of 
-  TypeSig lname ltype -> do 
-    lname' <- renameL lname
+  TypeSig (L loc name) ltype -> do 
     ltype' <- renameLType ltype
-    return (TypeSig lname' ltype')
-  SpecSig lname ltype x -> do
+    return (TypeSig (L loc (keep name)) ltype')
+{-  SpecSig lname ltype x -> do
     lname' <- renameL lname
     ltype' <- renameLType ltype
     return (SpecSig lname' ltype' x)
@@ -297,15 +292,14 @@ renameSig sig = case sig of
     renameFixitySig (FixitySig lname x) = do
       lname' <- renameL lname
       return (FixitySig lname' x)
+-}
 
 renameForD (ForeignImport lname ltype x y) = do
-  lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignImport lname' ltype' x y)
+  return (ForeignImport (keepL lname) ltype' x y)
 renameForD (ForeignExport lname ltype x y) = do
-  lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignExport lname' ltype' x y)
+  return (ForeignExport (keepL lname) ltype' x y)
 
 renameExportItem :: ExportItem2 Name -> RnM (ExportItem2 DocName)
 renameExportItem item = case item of 

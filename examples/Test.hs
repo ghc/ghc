@@ -96,8 +96,7 @@ module Test (
  $ a non /literal/ line $
 -}
 
-	f',
-        hej
+	f'
    ) where
 
 import Hidden
@@ -105,8 +104,6 @@ import Visible
 import Data.Maybe
 
 bla = Nothing
-
-hej = visible
 
 -- | This comment applies to the /following/ declaration
 -- and it continues until the next non-comment line
