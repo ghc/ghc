@@ -6,17 +6,18 @@ import Control.Monad.Fix
 import Data.Array.IO
 import Monad
 
-norm a = mdo s <- ioaA 1 s 0
+norm a = mdo (_, sz) <- getBounds a
+	     s <- ioaA 1 s sz 0
 	     return ()
-    where (_, sz) = bounds a
-    	  ioaA i s acc
+    where 
+    	  ioaA i s sz acc
 	   | i > sz = return acc
 	   | True   = do v <- readArray a i
 	                 writeArray a i (v / s)
-		         ioaA (i+1) s $! (v + acc)
+		         ioaA (i+1) s sz $! (v + acc)
 
-toList a = mapM (\i -> readArray a i) [1..sz]
-     where (_, sz) = bounds a
+toList a = do (_, sz) <- getBounds a
+	      mapM (\i -> readArray a i) [1..sz]
 
 test    :: Int -> IO ()
 test sz = do
