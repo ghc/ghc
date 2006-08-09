@@ -17,6 +17,7 @@ SRC_HC_OPTS += -Istage$(stage)
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts -fno-generics -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser
+SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
 
 ifeq "$(GhcWithInterpreter)" "YES"
 SRC_HC_OPTS += -DGHCI -DBREAKPOINT
