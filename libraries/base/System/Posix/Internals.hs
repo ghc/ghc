@@ -21,7 +21,6 @@
 -- #hide
 module System.Posix.Internals where
 
-#include "ghcconfig.h"
 #include "HsBaseConfig.h"
 
 import Control.Monad
