@@ -39,7 +39,7 @@ ALL_DIRS = \
 	Text/Read
 
 PACKAGE = base
-VERSION = 1.0
+VERSION = 2.0
 
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude -"\#include" HsBase.h
 SRC_HSC2HS_OPTS += -Iinclude -I$(GHC_INCLUDE_DIR)
