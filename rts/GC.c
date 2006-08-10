@@ -827,8 +827,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	copied +=  mut_list_size;
 
 	debugTrace(DEBUG_gc,
-		   "mut_list_size: %ld (%d vars, %d arrays, %d others)",
-		   mut_list_size * sizeof(W_), 
+		   "mut_list_size: %lu (%d vars, %d arrays, %d others)",
+		   (unsigned long)(mut_list_size * sizeof(W_)),
 		   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS);
     }
 
@@ -4650,7 +4650,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 	    if (closure_IND(bh) || bh->header.info == &stg_BLACKHOLE_info) {
 		debugTrace(DEBUG_squeeze,
 			   "suspending duplicate work: %ld words of stack",
-			   (StgPtr)frame - tso->sp);
+			   (long)((StgPtr)frame - tso->sp));
 
 		// If this closure is already an indirection, then
 		// suspend the computation up to this point:

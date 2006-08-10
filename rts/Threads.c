@@ -707,8 +707,8 @@ printThreadBlockage(StgTSO *tso)
     debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
     break;
   case BlockedOnException:
-    debugBelch("is blocked on delivering an exception to thread %d",
-	    tso->block_info.tso->id);
+    debugBelch("is blocked on delivering an exception to thread %lu",
+	       (unsigned long)tso->block_info.tso->id);
     break;
   case BlockedOnBlackHole:
     debugBelch("is blocked on a black hole");
@@ -744,7 +744,7 @@ printThreadBlockage(StgTSO *tso)
 void
 printThreadStatus(StgTSO *t)
 {
-    debugBelch("\tthread %4d @ %p ", t->id, (void *)t);
+  debugBelch("\tthread %4lu @ %p ", (unsigned long)t->id, (void *)t);
     {
       void *label = lookupThreadLabel(t->id);
       if (label) debugBelch("[\"%s\"] ",(char *)label);

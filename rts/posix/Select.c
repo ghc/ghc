@@ -65,7 +65,7 @@ wakeUpSleepingThreads(lnat ticks)
 	sleeping_queue = tso->link;
 	tso->why_blocked = NotBlocked;
 	tso->link = END_TSO_QUEUE;
-	IF_DEBUG(scheduler,debugBelch("Waking up sleeping thread %d\n", tso->id));
+	IF_DEBUG(scheduler,debugBelch("Waking up sleeping thread %lu\n", (unsigned long)tso->id));
 	// MainCapability: this code is !THREADED_RTS
 	pushOnRunQueue(&MainCapability,tso);
 	flag = rtsTrue;
@@ -251,7 +251,7 @@ awaitEvent(rtsBool wait)
 	      }
       
 	      if (ready) {
-		  IF_DEBUG(scheduler,debugBelch("Waking up blocked thread %d\n", tso->id));
+		IF_DEBUG(scheduler,debugBelch("Waking up blocked thread %lu\n", (unsigned long)tso->id));
 		  tso->why_blocked = NotBlocked;
 		  tso->link = END_TSO_QUEUE;
 		  pushOnRunQueue(&MainCapability,tso);

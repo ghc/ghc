@@ -365,8 +365,8 @@ checkFreeListSanity(void)
 
   for (bd = free_list; bd != NULL; bd = bd->link) {
     IF_DEBUG(block_alloc,
-	     debugBelch("group at 0x%p, length %d blocks\n", 
-			bd->start, bd->blocks));
+	     debugBelch("group at 0x%p, length %ld blocks\n", 
+			bd->start, (long)bd->blocks));
     ASSERT(bd->blocks > 0);
     checkWellFormedGroup(bd);
     if (bd->link != NULL) {

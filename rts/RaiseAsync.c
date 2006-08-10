@@ -154,8 +154,8 @@ throwTo (Capability *cap,	// the Capability we hold
 	// ASSERT(get_itbl(target)->type == TSO);
     }
 
-    debugTrace(DEBUG_sched, "throwTo: from thread %d to thread %d",
-	       source->id, target->id);
+    debugTrace(DEBUG_sched, "throwTo: from thread %lu to thread %lu",
+	       (unsigned long)source->id, (unsigned long)target->id);
 
 #ifdef DEBUG
     if (traceClass(DEBUG_sched)) {
@@ -459,7 +459,7 @@ check_target:
 static void
 blockedThrowTo (StgTSO *source, StgTSO *target)
 {
-    debugTrace(DEBUG_sched, "throwTo: blocking on thread %d", target->id);
+    debugTrace(DEBUG_sched, "throwTo: blocking on thread %lu", (unsigned long)target->id);
     source->link = target->blocked_exceptions;
     target->blocked_exceptions = source;
     dirtyTSO(target); // we modified the blocked_exceptions queue

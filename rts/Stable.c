@@ -412,15 +412,15 @@ gcStablePtrTable( void )
 		if (p->sn_obj == NULL) {
 		    // StableName object is dead
 		    freeStableName(p);
-		    debugTrace(DEBUG_stable, "GC'd Stable name %ld", 
-			       p - stable_ptr_table);
+		    debugTrace(DEBUG_stable, "GC'd Stable name %ld",
+			       (long)(p - stable_ptr_table));
 		    continue;
 		    
 		} else {
 		  p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
 		  debugTrace(DEBUG_stable, 
 			     "stable name %ld still alive at %p, ref %ld\n",
-			     p - stable_ptr_table, p->addr, p->ref);
+			     (long)(p - stable_ptr_table), p->addr, p->ref);
 		}
 	    }
 	}

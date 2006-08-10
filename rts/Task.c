@@ -192,7 +192,7 @@ discardTask (Task *task)
 {
     ASSERT_LOCK_HELD(&sched_mutex);
     if (!task->stopped) {
-	debugTrace(DEBUG_sched, "discarding task %ld", TASK_ID(task));
+	debugTrace(DEBUG_sched, "discarding task %ld", (long)TASK_ID(task));
 	task->cap = NULL;
 	task->tso = NULL;
 	task->stopped = rtsTrue;
@@ -316,7 +316,7 @@ printAllTasks(void)
 		debugBelch("on capability %d, ", task->cap->no);
 	    }
 	    if (task->tso) {
-		debugBelch("bound to thread %d", task->tso->id);
+	      debugBelch("bound to thread %lu", (unsigned long)task->tso->id);
 	    } else {
 		debugBelch("worker");
 	    }

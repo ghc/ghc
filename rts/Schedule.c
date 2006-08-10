@@ -535,11 +535,11 @@ schedule (Capability *initialCapability, Task *task)
 	if (bound) {
 	    if (bound == task) {
 		debugTrace(DEBUG_sched,
-			   "### Running thread %d in bound thread", t->id);
+			   "### Running thread %lu in bound thread", (unsigned long)t->id);
 		// yes, the Haskell thread is bound to the current native thread
 	    } else {
 		debugTrace(DEBUG_sched,
-			   "### thread %d bound to another OS thread", t->id);
+			   "### thread %lu bound to another OS thread", (unsigned long)t->id);
 		// no, bound to a different Haskell thread: pass to that thread
 		pushOnRunQueue(cap,t);
 		continue;
@@ -548,7 +548,7 @@ schedule (Capability *initialCapability, Task *task)
 	    // The thread we want to run is unbound.
 	    if (task->tso) { 
 		debugTrace(DEBUG_sched,
-			   "### this OS thread cannot run thread %d", t->id);
+			   "### this OS thread cannot run thread %lu", (unsigned long)t->id);
 		// no, the current native thread is bound to a different
 		// Haskell thread, so pass it to any worker thread
 		pushOnRunQueue(cap,t);
@@ -649,8 +649,8 @@ run_thread:
     // immediately and return to normaility.
     if (ret == ThreadBlocked) {
 	debugTrace(DEBUG_sched,
-		   "--<< thread %d (%s) stopped: blocked",
-		   t->id, whatNext_strs[t->what_next]);
+		   "--<< thread %lu (%s) stopped: blocked",
+		   (unsigned long)t->id, whatNext_strs[t->what_next]);
 	continue;
     }
 #endif
@@ -812,7 +812,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		    prev->link = t;
 		    prev = t;
 		} else {
-		    debugTrace(DEBUG_sched, "pushing thread %d to capability %d", t->id, free_caps[i]->no);
+		    debugTrace(DEBUG_sched, "pushing thread %lu to capability %d", (unsigned long)t->id, free_caps[i]->no);
 		    appendToRunQueue(free_caps[i],t);
 		    if (t->bound) { t->bound->cap = free_caps[i]; }
 		    t->cap = free_caps[i];
@@ -1780,8 +1780,8 @@ scheduleHandleThreadBlocked( StgTSO *t
 
 #ifdef DEBUG
     if (traceClass(DEBUG_sched)) {
-	debugTraceBegin("--<< thread %d (%s) stopped: ", 
-		   t->id, whatNext_strs[t->what_next]);
+	debugTraceBegin("--<< thread %lu (%s) stopped: ", 
+			(unsigned long)t->id, whatNext_strs[t->what_next]);
 	printThreadBlockage(t);
 	debugTraceEnd();
     }
@@ -1807,8 +1807,8 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
      * We also end up here if the thread kills itself with an
      * uncaught exception, see Exception.cmm.
      */
-    debugTrace(DEBUG_sched, "--++ thread %d (%s) finished", 
-	       t->id, whatNext_strs[t->what_next]);
+    debugTrace(DEBUG_sched, "--++ thread %lu (%s) finished", 
+	       (unsigned long)t->id, whatNext_strs[t->what_next]);
 
 #if defined(GRAN)
       endThread(t, CurrentProc); // clean-up the thread
@@ -2294,8 +2294,8 @@ suspendThread (StgRegTable *reg)
   tso = cap->r.rCurrentTSO;
 
   debugTrace(DEBUG_sched, 
-	     "thread %d did a safe foreign call", 
-	     cap->r.rCurrentTSO->id);
+	     "thread %lu did a safe foreign call", 
+	     (unsigned long)cap->r.rCurrentTSO->id);
 
   // XXX this might not be necessary --SDM
   tso->what_next = ThreadRunGHC;
@@ -2325,7 +2325,7 @@ suspendThread (StgRegTable *reg)
   /* Preparing to leave the RTS, so ensure there's a native thread/task
      waiting to take over.
   */
-  debugTrace(DEBUG_sched, "thread %d: leaving RTS", tso->id);
+  debugTrace(DEBUG_sched, "thread %lu: leaving RTS", (unsigned long)tso->id);
 #endif
 
   errno = saved_errno;
@@ -2353,7 +2353,7 @@ resumeThread (void *task_)
     tso = task->suspended_tso;
     task->suspended_tso = NULL;
     tso->link = END_TSO_QUEUE;
-    debugTrace(DEBUG_sched, "thread %d: re-entering RTS", tso->id);
+    debugTrace(DEBUG_sched, "thread %lu: re-entering RTS", (unsigned long)tso->id);
     
     if (tso->why_blocked == BlockedOnCCall) {
 	awakenBlockedExceptionQueue(cap,tso);
@@ -2429,7 +2429,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
 
     appendToRunQueue(cap,tso);
 
-    debugTrace(DEBUG_sched, "new bound thread (%d)", tso->id);
+    debugTrace(DEBUG_sched, "new bound thread (%lu)", (unsigned long)tso->id);
 
 #if defined(GRAN)
     /* GranSim specific init */
@@ -2443,7 +2443,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
     ASSERT(task->stat != NoStatus);
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    debugTrace(DEBUG_sched, "bound thread (%d) finished", task->tso->id);
+    debugTrace(DEBUG_sched, "bound thread (%lu) finished", (unsigned long)task->tso->id);
     return cap;
 }
 
@@ -2640,7 +2640,7 @@ GetRoots( evac_fn evac )
 	for (task = cap->suspended_ccalling_tasks; task != NULL; 
 	     task=task->next) {
 	    debugTrace(DEBUG_sched,
-		       "evac'ing suspended TSO %d", task->suspended_tso->id);
+		       "evac'ing suspended TSO %lu", (unsigned long)task->suspended_tso->id);
 	    evac((StgClosure **)(void *)&task->suspended_tso);
 	}
 
@@ -3102,7 +3102,7 @@ resurrectThreads (StgTSO *threads)
 	next = tso->global_link;
 	tso->global_link = all_threads;
 	all_threads = tso;
-	debugTrace(DEBUG_sched, "resurrecting thread %d", tso->id);
+	debugTrace(DEBUG_sched, "resurrecting thread %lu", (unsigned long)tso->id);
 	
 	// Wake up the thread on the Capability it was last on
 	cap = tso->cap;
