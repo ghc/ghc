@@ -31,7 +31,6 @@ ALL_DIRS = \
 	System/Process \
 	System/Directory \
 	Text \
-	Text/Html \
 	Text/PrettyPrint \
 	Text/ParserCombinators \
 	Text/Regex \

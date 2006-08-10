@@ -137,8 +137,6 @@ exposed-modules:
 	System.Process.Internals,
 	System.Random,
 	System.Time,
-	Text.Html,
-	Text.Html.BlockTable,
 	Text.ParserCombinators.ReadP,
 	Text.ParserCombinators.ReadPrec,
 	Text.PrettyPrint,
