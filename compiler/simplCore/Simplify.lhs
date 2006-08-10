@@ -364,6 +364,7 @@ simplNonRecX env bndr new_rhs thing_inside
     let body' = wrapFloats floats body in 
     returnSmpl (emptyFloats env, Case new_rhs bndr' (exprType body') [(DEFAULT, [], body')])
 
+{- No, no, no!  Do not try preInlineUnconditionally 
   | preInlineUnconditionally env NotTopLevel bndr new_rhs
   	-- This happens; for example, the case_bndr during case of
 	-- known constructor:  case (a,b) of x { (p,q) -> ... }
@@ -374,6 +375,7 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- e.g.  case (f x, g y) of (a,b) -> ....
 	-- If a,b occur once we can avoid constructing the let binding for them.
   = thing_inside (extendIdSubst env bndr (DoneEx new_rhs))
+-}
 
   | otherwise
   = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
