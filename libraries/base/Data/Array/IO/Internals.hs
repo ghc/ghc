@@ -50,7 +50,7 @@ INSTANCE_TYPEABLE2(IOArray,iOArrayTc,"IOArray")
 
 instance MArray IOArray e IO where
 #if defined(__HUGS__)
-    getBound    = return . boundsIOArray
+    getBounds   = return . boundsIOArray
 #elif defined(__GLASGOW_HASKELL__)
     {-# INLINE getBounds #-}
     getBounds (IOArray marr) = stToIO $ getBounds marr

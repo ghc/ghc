@@ -226,10 +226,11 @@ illegalBufferSize handle fn sz =
 
 #else /* !__GLASGOW_HASKELL__ */
 hGetArray :: Handle -> IOUArray Int Word8 -> Int -> IO Int
-hGetArray handle arr count
-  | count < 0 || count > rangeSize (bounds arr)
-  = illegalBufferSize handle "hGetArray" count
-  | otherwise = get 0
+hGetArray handle arr count = do
+	bds <- getBounds arr
+	if count < 0 || count > rangeSize bds
+	   then illegalBufferSize handle "hGetArray" count
+	   else get 0
  where
   get i | i == count = return i
 	| otherwise = do
@@ -243,10 +244,11 @@ hGetArray handle arr count
 			get (i+1)
 
 hPutArray :: Handle -> IOUArray Int Word8 -> Int -> IO ()
-hPutArray handle arr count
-  | count < 0 || count > rangeSize (bounds arr)
-  = illegalBufferSize handle "hPutArray" count
-  | otherwise = put 0
+hPutArray handle arr count = do
+	bds <- getBounds arr
+	if count < 0 || count > rangeSize bds
+	   then illegalBufferSize handle "hPutArray" count
+	   else put 0
  where
   put i | i == count = return ()
 	| otherwise = do
