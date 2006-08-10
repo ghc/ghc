@@ -14,6 +14,7 @@
 #include "SMP.h"
 #include "Schedule.h"
 #include "Storage.h"
+#include "LdvProfile.h"
 #include "Updates.h"
 #include "STM.h"
 #include "Sanity.h"
