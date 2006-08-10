@@ -25,6 +25,7 @@ SUBDIRS += Cabal
 ifneq "$(GhcBootLibs)" "YES"
 SUBDIRS += $(wildcard parsec)
 SUBDIRS += $(wildcard haskell-src)
+SUBDIRS += $(wildcard html)
 SUBDIRS += $(wildcard network)
 SUBDIRS += $(wildcard QuickCheck)
 SUBDIRS += $(wildcard HUnit)
@@ -38,7 +39,6 @@ SUBDIRS += $(wildcard GLUT)
 SUBDIRS += $(wildcard OpenAL)
 SUBDIRS += $(wildcard ALUT)
 SUBDIRS += $(wildcard stm)
-SUBDIRS += $(wildcard html)
 ifeq "$(GhcLibsWithObjectIO)" "YES"
 SUBDIRS += $(wildcard ObjectIO)
 endif
