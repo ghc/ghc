@@ -695,7 +695,13 @@ our new view that inlining is like a RULE, so I'm sticking to the 'active'
 story for now.
 
 \begin{code}
-postInlineUnconditionally :: SimplEnv -> TopLevelFlag -> OutId -> OccInfo -> OutExpr -> Unfolding -> Bool
+postInlineUnconditionally 
+    :: SimplEnv -> TopLevelFlag
+    -> InId		-- The binder (an OutId would be fine too)
+    -> OccInfo 		-- From the InId
+    -> OutExpr
+    -> Unfolding
+    -> Bool
 postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | not active		   = False
   | isLoopBreaker occ_info = False
@@ -703,19 +709,28 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | exprIsTrivial rhs 	   = True
   | otherwise
   = case occ_info of
-      OneOcc in_lam one_br int_cxt
-	->     (one_br || smallEnoughToInline unfolding)	-- Small enough to dup
+	-- The point of examining occ_info here is that for *non-values* 
+	-- that occur outside a lambda, the call-site inliner won't have
+	-- a chance (becuase it doesn't know that the thing
+	-- only occurs once).   The pre-inliner won't have gotten
+	-- it either, if the thing occurs in more than one branch
+	-- So the main target is things like
+	--	let x = f y in
+	--	case v of
+	--	   True  -> case x of ...
+	--	   False -> case x of ...
+	-- I'm not sure how important this is in practice
+      OneOcc in_lam one_br int_cxt	-- OneOcc => no work-duplication issue
+	->     smallEnoughToInline unfolding	-- Small enough to dup
 			-- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 			--
-		 	-- NB: Do we want to inline arbitrarily big things becuase
-			-- one_br is True? that can lead to inline cascades.  But
-			-- preInlineUnconditionlly has dealt with all the common cases
-			-- so perhaps it's worth the risk. Here's an example
-			--	let f = if b then Left (\x.BIG) else Right (\y.BIG)
-			--	in \y. ....f....
-			-- We can't preInlineUnconditionally because that woud invalidate
-			-- the occ info for b.  Yet f is used just once, and duplicating
-			-- the case work is fine (exprIsCheap).
+		 	-- NB: Do NOT inline arbitrarily big things, even if one_br is True
+			-- Reason: doing so risks exponential behaviour.  We simplify a big
+			--	   expression, inline it, and simplify it again.  But if the
+			--	   very same thing happens in the big expression, we get 
+			--	   exponential cost!
+			-- PRINCIPLE: when we've already simplified an expression once, 
+			-- make sure that we only inline it if it's reasonably small.
 
 	   &&  ((isNotTopLevel top_lvl && not in_lam) || 
 			-- But outside a lambda, we want to be reasonably aggressive
@@ -732,17 +747,19 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 			-- good reason.  See the notes on int_cxt in preInlineUnconditionally
 
       other -> False
-	-- The point here is that for *non-values* that occur
-	-- outside a lambda, the call-site inliner won't have
-	-- a chance (becuase it doesn't know that the thing
-	-- only occurs once).   The pre-inliner won't have gotten
-	-- it either, if the thing occurs in more than one branch
-	-- So the main target is things like
-	--	let x = f y in
-	--	case v of
-	--	   True  -> case x of ...
-	--	   False -> case x of ...
-	-- I'm not sure how important this is in practice
+
+-- Here's an example that we don't handle well:
+--	let f = if b then Left (\x.BIG) else Right (\y.BIG)
+--	in \y. ....case f of {...} ....
+-- Here f is used just once, and duplicating the case work is fine (exprIsCheap).
+-- But
+-- * We can't preInlineUnconditionally because that woud invalidate
+--   the occ info for b.  
+-- * We can't postInlineUnconditionally because the RHS is big, and
+--   that risks exponential behaviour
+-- * We can't call-site inline, because the rhs is big
+-- Alas!
+
   where
     active = case getMode env of
 		   SimplGently  -> isAlwaysActive prag
