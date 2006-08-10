@@ -365,7 +365,9 @@ simplNonRecX env bndr new_rhs thing_inside
     returnSmpl (emptyFloats env, Case new_rhs bndr' (exprType body') [(DEFAULT, [], body')])
 
 {- No, no, no!  Do not try preInlineUnconditionally 
-  | preInlineUnconditionally env NotTopLevel bndr new_rhs
+   Doing so risks exponential behaviour, because new_rhs has been simplified once already
+   In the cases described by the folowing commment, postInlineUnconditionally will 
+   catch many of the relevant cases.
   	-- This happens; for example, the case_bndr during case of
 	-- known constructor:  case (a,b) of x { (p,q) -> ... }
 	-- Here x isn't mentioned in the RHS, so we don't want to
@@ -374,6 +376,7 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- Similarly, single occurrences can be inlined vigourously
 	-- e.g.  case (f x, g y) of (a,b) -> ....
 	-- If a,b occur once we can avoid constructing the let binding for them.
+  | preInlineUnconditionally env NotTopLevel bndr new_rhs
   = thing_inside (extendIdSubst env bndr (DoneEx new_rhs))
 -}
 

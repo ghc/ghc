@@ -748,6 +748,11 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 			-- int_cxt to prevent us inlining inside a lambda without some 
 			-- good reason.  See the notes on int_cxt in preInlineUnconditionally
 
+      IAmDead -> True	-- This happens; for example, the case_bndr during case of
+			-- known constructor:  case (a,b) of x { (p,q) -> ... }
+			-- Here x isn't mentioned in the RHS, so we don't want to
+			-- create the (dead) let-binding  let x = (a,b) in ...
+
       other -> False
 
 -- Here's an example that we don't handle well:
