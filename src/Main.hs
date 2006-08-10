@@ -292,7 +292,7 @@ run flags files = do
   printSDoc (ppr (map hmod_rn_export_items haddockModules'')) defaultUserStyle 
   mapM_ putStrLn messages'
 
-  let visibleModules = [ m | m <- haddockModules', OptHide `notElem` (hmod_options m) ]
+  let visibleModules = [ m | m <- haddockModules'', OptHide `notElem` (hmod_options m) ]
  
   updateHTMLXRefs [] []
 
@@ -398,20 +398,6 @@ run flags files = do
       where modules' = [ (mod, (a,b,c,d), f) | (mod, CheckedModule a (Just b) (Just c) (Just d), f) <- modules ] 
 
 print_ x = printSDoc (ppr x) defaultUserStyle        
-
-instance (Outputable a, OutputableBndr a) => Outputable (ExportItem2 a) where
-  ppr (ExportDecl2 n decl doc instns) = text "ExportDecl" <+> ppr n <+> ppr decl <+> ppr doc <+> ppr instns
-  ppr (ExportNoDecl2 n1 n2 ns) = text "ExportNoDecl (org name, link name, sub names)" <+> ppr n1 <+> ppr n2 <+> ppr ns
-  ppr (ExportGroup2 lev id doc) = text "ExportGroup (lev, id, doc)" <+> ppr lev <+> ppr doc
-  ppr (ExportDoc2 doc) = text "ExportDoc" <+> ppr doc
-  ppr (ExportModule2 mod) = text "ExportModule" <+> ppr mod 	
-
---instance Outputable DocName where
---  ppr (Link name) = ppr name
---  ppr (NoLink name) = ppr name
-
-instance OutputableBndr DocName where
-  pprBndr _ d = ppr d
 
 instance Outputable (DocEntity Name) where
   ppr (DocEntity d) = ppr d

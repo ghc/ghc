@@ -32,6 +32,7 @@ import Data.List ( sortBy )
 import Data.Maybe ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
+import Debug.Trace ( trace )
 
 import GHC 
 import Name
@@ -41,7 +42,7 @@ import SrcLoc
 import FastString ( unpackFS )
 import BasicTypes ( IPName(..), Boxity(..) )
 import Kind
---import Outputable ( ppr, defaultUserStyle )
+import Outputable ( ppr, defaultUserStyle )
 
 -- the base, module and entity URLs for the source code and wiki links.
 type SourceURLs = (Maybe String, Maybe String, Maybe String)
@@ -556,7 +557,7 @@ hmodToHtml maybe_source_url maybe_wiki_url hmod
 
 	no_doc_at_all = not (any has_doc exports)
 
-	contents = td << vanillaTable << ppModuleContents exports
+ 	contents = td << vanillaTable << ppModuleContents exports
 
 	description
           = case hmod_rn_doc hmod of
@@ -715,7 +716,10 @@ ppTyVars tvs = map ppName (tyvarNames tvs)
 tyvarNames = map f 
   where f x = let NoLink n = hsTyVarName (unLoc x) in n
   
-ppFor = undefined
+ppFor summary links loc mbDoc (ForeignImport lname ltype _ _)
+  = ppSig summary links loc mbDoc (TypeSig lname ltype)
+ppFor _ _ _ _ _ = error "ppFor"
+
 ppDataDecl = undefined
 
 ppTySyn summary links loc mbDoc (TySynonym lname ltyvars ltype) 
