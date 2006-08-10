@@ -561,8 +561,8 @@ tcLHsConResTy res_ty
     get_largs (L _ ty) args = get_args ty args
     get_args (HsAppTy fun arg) 		  args = get_largs fun (arg:args)
     get_args (HsParTy ty)      		  args = get_largs ty  args
-    get_args (HsOpTy ty1 (L span tc) ty2) args = get_args (HsTyVar tc) (ty1:ty2:args)
-    get_args ty  	     		  args = (ty, reverse args)
+    get_args (HsOpTy ty1 (L span tc) ty2) args = (HsTyVar tc, ty1:ty2:args)
+    get_args ty  	     		  args = (ty, args)
 
 gadtResCtxt ty
   = hang (ptext SLIT("In the result type of a data constructor:"))
