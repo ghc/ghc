@@ -215,16 +215,6 @@ typedef struct StgTSO_ {
       (tso->sp is left pointing at the top word on the stack so that
       the return value or exception will be retained by a GC).
 
-   tso->blocked_exceptions is either:
-
-      NULL             if async exceptions are unblocked.
-
-      END_TSO_QUEUE    if async exceptions are blocked, but no threads
-                       are currently waiting to deliver.
-
-      (StgTSO *)tso    if threads are currently awaiting delivery of
-                       exceptions to this thread.
-
    The 2 cases BlockedOnGA and BlockedOnGA_NoSend are needed in a GUM
    setup only. They mark a TSO that has entered a FETCH_ME or
    FETCH_ME_BQ closure, respectively; only the first TSO hitting the 
