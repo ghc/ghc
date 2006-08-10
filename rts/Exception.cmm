@@ -123,6 +123,9 @@ unblockAsyncExceptionszh_fast
 	foreign "C" awakenBlockedExceptionQueue(MyCapability() "ptr", 
 						CurrentTSO "ptr") [R1];
 
+	StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
+	   ~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
+
 	/* avoid growing the stack unnecessarily */
 	if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {
 	    Sp_adj(1);
