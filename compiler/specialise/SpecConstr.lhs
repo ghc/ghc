@@ -93,9 +93,36 @@ In Core, by the time we've w/wd (f is strict in i) we get
 
 At the call to f, we see that the argument, n is know to be (I# n#),
 and n is evaluated elsewhere in the body of f, so we can play the same
-trick as above.  However we don't want to do that if the boxed version
-of n is needed (else we'd avoid the eval but pay more for re-boxing n).
-So in this case we want that the *only* uses of n are in case statements.
+trick as above.  
+
+
+Note [Reboxing]
+~~~~~~~~~~~~~~~
+We must be careful not to allocate the same constructor twice.  Consider
+	f p = (...(case p of (a,b) -> e)...p...,
+	       ...let t = (r,s) in ...t...(f t)...)
+At the recursive call to f, we can see that t is a pair.  But we do NOT want
+to make a specialised copy:
+	f' a b = let p = (a,b) in (..., ...)
+because now t is allocated by the caller, then r and s are passed to the
+recursive call, which allocates the (r,s) pair again.
+
+This happens if
+  (a) the argument p is used in other than a case-scrutinsation way.
+  (b) the argument to the call is not a 'fresh' tuple; you have to
+	look into its unfolding to see that it's a tuple
+
+Hence the "OR" part of Note [Good arguments] below.
+
+ALTERNATIVE: pass both boxed and unboxed versions.  This no longer saves
+allocation, but does perhaps save evals. In the RULE we'd have
+something like
+
+  f (I# x#) = f' (I# x#) x#
+
+If at the call site the (I# x) was an unfolding, then we'd have to
+rely on CSE to eliminate the duplicate allocation.... This alternative
+doesn't look attractive enough to pursue.
 
 
 Note [Good arguments]
@@ -121,7 +148,7 @@ So we look for
       That same parameter is scrutinised by a case somewhere in 
       the RHS of the function
 	AND
-      Those are the only uses of the parameter
+      Those are the only uses of the parameter (see Note [Reboxing])
 
 
 What to abstract over
@@ -198,6 +225,85 @@ chew on; and it virtually guarantees no shadowing.
 
 Here are notes arising from Roman's work that I don't want to lose.
 
+Specialising for constant parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This one is about specialising on a *constant* (but not necessarily
+constructor) argument
+
+    foo :: Int -> (Int -> Int) -> Int
+    foo 0 f = 0
+    foo m f = foo (f m) (+1)
+
+It produces
+
+    lvl_rmV :: GHC.Base.Int -> GHC.Base.Int
+    lvl_rmV =
+      \ (ds_dlk :: GHC.Base.Int) ->
+        case ds_dlk of wild_alH { GHC.Base.I# x_alG ->
+        GHC.Base.I# (GHC.Prim.+# x_alG 1)
+
+    T.$wfoo :: GHC.Prim.Int# -> (GHC.Base.Int -> GHC.Base.Int) ->
+    GHC.Prim.Int#
+    T.$wfoo =
+      \ (ww_sme :: GHC.Prim.Int#) (w_smg :: GHC.Base.Int -> GHC.Base.Int) ->
+        case ww_sme of ds_Xlw {
+          __DEFAULT ->
+    	case w_smg (GHC.Base.I# ds_Xlw) of w1_Xmo { GHC.Base.I# ww1_Xmz ->
+    	T.$wfoo ww1_Xmz lvl_rmV
+    	};
+          0 -> 0
+        }
+
+The recursive call has lvl_rmV as its argument, so we could create a specialised copy
+with that argument baked in; that is, not passed at all.   Now it can perhaps be inlined.
+
+When is this worth it?  Call the constant 'lvl'
+- If 'lvl' has an unfolding that is a constructor, see if the corresponding
+  parameter is scrutinised anywhere in the body.
+
+- If 'lvl' has an unfolding that is a inlinable function, see if the corresponding
+  parameter is applied (...to enough arguments...?)
+
+  Also do this is if the function has RULES?
+
+Also 	
+
+Specialising for lambdas
+~~~~~~~~~~~~~~~~~~~~~~~~
+    foo :: Int -> (Int -> Int) -> Int
+    foo 0 f = 0
+    foo m f = foo (f m) (\n -> n-m)
+
+This is subtly different from the previous one in that we get an
+explicit lambda as the argument:
+
+    T.$wfoo :: GHC.Prim.Int# -> (GHC.Base.Int -> GHC.Base.Int) ->
+    GHC.Prim.Int#
+    T.$wfoo =
+      \ (ww_sm8 :: GHC.Prim.Int#) (w_sma :: GHC.Base.Int -> GHC.Base.Int) ->
+        case ww_sm8 of ds_Xlr {
+          __DEFAULT ->
+    	case w_sma (GHC.Base.I# ds_Xlr) of w1_Xmf { GHC.Base.I# ww1_Xmq ->
+    	T.$wfoo
+    	  ww1_Xmq
+    	  (\ (n_ad3 :: GHC.Base.Int) ->
+    	     case n_ad3 of wild_alB { GHC.Base.I# x_alA ->
+    	     GHC.Base.I# (GHC.Prim.-# x_alA ds_Xlr)
+    	     })
+    	};
+          0 -> 0
+        }
+
+I wonder if SpecConstr couldn't be extended to handle this? After all,
+lambda is a sort of constructor for functions and perhaps it already
+has most of the necessary machinery?
+
+Furthermore, there's an immediate win, because you don't need to allocate the lamda
+at the call site; and if perchance it's called in the recursive call, then you
+may avoid allocating it altogether.  Just like for constructors.
+
+Looks cool, but probably rare...but it might be easy to implement.
+
 Example 1
 ~~~~~~~~~
     data T a = T !a
@@ -264,69 +370,9 @@ We get two specialisations:
 		  = Foo.$s$wfoo y_aFp sc_sGC ;
 
 But perhaps the first one isn't good.  After all, we know that tpl_B2 is
-a T (I# x) really!
+a T (I# x) really, because T is strict and Int has one constructor.  (We can't
+unbox the strict fields, becuase T is polymorphic!)
 
-
-Example 3
-~~~~~~~~~
-This one is about specialising on a *lambda* argument
-
-    foo :: Int -> (Int -> Int) -> Int
-    foo 0 f = 0
-    foo m f = foo (f m) (+1)
-
-It produces
-
-    lvl_rmV :: GHC.Base.Int -> GHC.Base.Int
-    lvl_rmV =
-      \ (ds_dlk :: GHC.Base.Int) ->
-        case ds_dlk of wild_alH { GHC.Base.I# x_alG ->
-        GHC.Base.I# (GHC.Prim.+# x_alG 1)
-
-    T.$wfoo :: GHC.Prim.Int# -> (GHC.Base.Int -> GHC.Base.Int) ->
-    GHC.Prim.Int#
-    T.$wfoo =
-      \ (ww_sme :: GHC.Prim.Int#) (w_smg :: GHC.Base.Int -> GHC.Base.Int) ->
-        case ww_sme of ds_Xlw {
-          __DEFAULT ->
-    	case w_smg (GHC.Base.I# ds_Xlw) of w1_Xmo { GHC.Base.I# ww1_Xmz ->
-    	T.$wfoo ww1_Xmz lvl_rmV
-    	};
-          0 -> 0
-        }
-
-Of course, it would be much nicer if the optimiser specialised $wfoo for
-when lvl_rmV is passed as the second argument and then inlined it.
-
-Example 4
-~~~~~~~~~
-    foo :: Int -> (Int -> Int) -> Int
-    foo 0 f = 0
-    foo m f = foo (f m) (\n -> n-m)
-
-This is subtly different from the previous one in that we get an
-explicit lambda as the argument:
-
-    T.$wfoo :: GHC.Prim.Int# -> (GHC.Base.Int -> GHC.Base.Int) ->
-    GHC.Prim.Int#
-    T.$wfoo =
-      \ (ww_sm8 :: GHC.Prim.Int#) (w_sma :: GHC.Base.Int -> GHC.Base.Int) ->
-        case ww_sm8 of ds_Xlr {
-          __DEFAULT ->
-    	case w_sma (GHC.Base.I# ds_Xlr) of w1_Xmf { GHC.Base.I# ww1_Xmq ->
-    	T.$wfoo
-    	  ww1_Xmq
-    	  (\ (n_ad3 :: GHC.Base.Int) ->
-    	     case n_ad3 of wild_alB { GHC.Base.I# x_alA ->
-    	     GHC.Base.I# (GHC.Prim.-# x_alA ds_Xlr)
-    	     })
-    	};
-          0 -> 0
-        }
-
-I wonder if SpecConstr couldn't be extended to handle this? After all,
-lambda is a sort of constructor for functions and perhaps it already
-has most of the necessary machinery?
 
 
 %************************************************************************
