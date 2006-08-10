@@ -16,6 +16,7 @@ base
 fgl
 haskell-src
 haskell98
+html
 monads
 mtl
 network

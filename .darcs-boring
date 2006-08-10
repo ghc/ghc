@@ -45,6 +45,7 @@
 ^libraries/fgl/
 ^libraries/haskell-src/
 ^libraries/haskell98/
+^libraries/html/
 ^libraries/monads/
 ^libraries/mtl/
 ^libraries/network/
