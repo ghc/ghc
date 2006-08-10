@@ -14,6 +14,7 @@
 #include "Hash.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(DEBUG)
 /* to the end */
