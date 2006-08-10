@@ -708,7 +708,7 @@ simplExprF env (Var v)	        cont = simplVar env v cont
 simplExprF env (Lit lit)	cont = rebuild env (Lit lit) cont
 simplExprF env expr@(Lam _ _)   cont = simplLam env expr cont
 simplExprF env (Note note expr) cont = simplNote env note expr cont
-simplExprF env (App fun arg)    cont = simplExprF env fun (ApplyTo NoDup arg env cont)
+simplExprF env (App fun arg)    cont = simplExprF env fun (ApplyTo NoDup arg (Just env) cont)
 
 simplExprF env (Type ty) cont
   = ASSERT( contIsRhsOrArg cont )
@@ -768,25 +768,32 @@ simplLam env fun cont
     cont_ty = contResultType cont
 
       	-- Type-beta reduction
-    go env (Lam bndr body) (ApplyTo _ (Type ty_arg) arg_se body_cont)
+    go env (Lam bndr body) (ApplyTo _ (Type ty_arg) mb_arg_se body_cont)
       =	ASSERT( isTyVar bndr )
-	tick (BetaReduction bndr)			`thenSmpl_`
-	simplType (setInScope arg_se env) ty_arg 	`thenSmpl` \ ty_arg' ->
-	go (extendTvSubst env bndr ty_arg') body body_cont
+	do { tick (BetaReduction bndr)
+	   ; ty_arg' <- case mb_arg_se of
+			  Just arg_se -> simplType (setInScope arg_se env) ty_arg
+			  Nothing     -> return ty_arg
+	   ; go (extendTvSubst env bndr ty_arg') body body_cont }
 
 	-- Ordinary beta reduction
-    go env (Lam bndr body) cont@(ApplyTo _ arg arg_se body_cont)
-      = tick (BetaReduction bndr)				`thenSmpl_`
-	simplNonRecBind env (zap_it bndr) arg arg_se cont_ty	$ \ env -> 
-	go env body body_cont
+    go env (Lam bndr body) cont@(ApplyTo _ arg (Just arg_se) body_cont)
+      = do { tick (BetaReduction bndr)	
+	   ; simplNonRecBind env (zap_it bndr) arg arg_se cont_ty	$ \ env -> 
+	     go env body body_cont }
+
+    go env (Lam bndr body) cont@(ApplyTo _ arg Nothing body_cont)
+      = do { tick (BetaReduction bndr)	
+	   ; simplNonRecX env (zap_it bndr) arg 	$ \ env -> 
+	     go env body body_cont }
 
 	-- Not enough args, so there are real lambdas left to put in the result
     go env lam@(Lam _ _) cont
-      = simplLamBndrs env bndrs		`thenSmpl` \ (env, bndrs') ->
-	simplExpr env body 		`thenSmpl` \ body' ->
-	mkLam env bndrs' body' cont	`thenSmpl` \ (floats, new_lam) ->
-	addFloats env floats		$ \ env -> 
-	rebuild env new_lam cont
+      = do { (env, bndrs') <- simplLamBndrs env bndrs
+	   ; body' <- simplExpr env body
+	   ; (floats, new_lam) <- mkLam env bndrs' body' cont
+	   ; addFloats env floats		$ \ env -> 
+	     rebuild env new_lam cont }
       where
 	(bndrs,body) = collectBinders lam
 
@@ -836,7 +843,7 @@ simplNote env (Coerce to from) body cont
 	  | otherwise           = CoerceIt t1 cont	-- They don't cancel, but 
 							-- the inner one is redundant
 
-	addCoerce t1t2 s1s2 (ApplyTo dup arg arg_se cont)
+	addCoerce t1t2 s1s2 (ApplyTo dup arg mb_arg_se cont)
 	  | not (isTypeArg arg),	-- This whole case only works for value args
 					-- Could upgrade to have equiv thing for type apps too	
  	    Just (s1, s2) <- splitFunTy_maybe s1s2
@@ -853,10 +860,12 @@ simplNote env (Coerce to from) body cont
 		-- But it isn't a common case.
 	  = let 
 		(t1,t2) = splitFunTy t1t2
-		new_arg = mkCoerce2 s1 t1 (substExpr arg_env arg)
-		arg_env = setInScope arg_se env
+		new_arg = mkCoerce2 s1 t1 arg'
+		arg' = case mb_arg_se of
+			  Nothing -> arg
+			  Just arg_se -> substExpr (setInScope arg_se env) arg
 	    in
-	    ApplyTo dup new_arg (zapSubstEnv env) (addCoerce t2 s2 cont)
+	    ApplyTo dup new_arg Nothing (addCoerce t2 s2 cont)
 			
 	addCoerce to' _ cont = CoerceIt to' cont
     in
@@ -993,7 +1002,7 @@ completeCall env var occ_info cont
 			text "Cont:  " <+> ppr call_cont])
 		 else
 			id)		$
-	      makeThatCall env var unfolding args call_cont
+	      simplExprF env unfolding (pushContArgs args call_cont)
 
 	;
 	Nothing -> 		-- No inlining!
@@ -1001,43 +1010,7 @@ completeCall env var occ_info cont
 	-- Done
     rebuild env (mkApps (Var var) args) call_cont
     }}
-
-makeThatCall :: SimplEnv
-	     -> Id
-	     -> InExpr		-- Inlined function rhs 
-	     -> [OutExpr]	-- Arguments, already simplified
-	     -> SimplCont	-- After the call
-	     -> SimplM FloatsWithExpr
--- Similar to simplLam, but this time 
--- the arguments are already simplified
-makeThatCall orig_env var fun@(Lam _ _) args cont
-  = go orig_env fun args
-  where
-    zap_it = mkLamBndrZapper fun (length args)
-
-      	-- Type-beta reduction
-    go env (Lam bndr body) (Type ty_arg : args)
-      =	ASSERT( isTyVar bndr )
-	tick (BetaReduction bndr)			`thenSmpl_`
-	go (extendTvSubst env bndr ty_arg) body args
-
-	-- Ordinary beta reduction
-    go env (Lam bndr body) (arg : args)
-      = tick (BetaReduction bndr)			`thenSmpl_`
-	simplNonRecX env (zap_it bndr) arg 		$ \ env -> 
-	go env body args
-
-	-- Not enough args, so there are real lambdas left to put in the result
-    go env fun args
-      = simplExprF env fun (pushContArgs orig_env args cont)
-	-- NB: orig_env; the correct environment to capture with
-	-- the arguments.... env has been augmented with substitutions 
-	-- from the beta reductions.
-
-makeThatCall env var fun args cont
-  = simplExprF env fun (pushContArgs env args cont)
-\end{code}		   
-
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1052,7 +1025,7 @@ makeThatCall env var fun args cont
 simplifyArgs :: SimplEnv 
 	     -> OutType				-- Type of the function
 	     -> Bool				-- True if the fn has RULES
-	     -> [(InExpr, SimplEnv, Bool)]	-- Details of the arguments
+	     -> [(InExpr, Maybe SimplEnv, Bool)] -- Details of the arguments
 	     -> OutType				-- Type of the continuation
 	     -> (SimplEnv -> [OutExpr] -> SimplM FloatsWithExpr)
 	     -> SimplM FloatsWithExpr
@@ -1090,11 +1063,14 @@ simplifyArgs env fn_ty has_rules args cont_ty thing_inside
 					   go env (applyTypeToArg fn_ty arg') args 	$ \ env args' ->
 					   thing_inside env (arg':args')
 
-simplifyArg env fn_ty has_rules (Type ty_arg, se, _) cont_ty thing_inside
+simplifyArg env fn_ty has_rules (arg, Nothing, _) cont_ty thing_inside
+  = thing_inside env arg	-- Already simplified
+
+simplifyArg env fn_ty has_rules (Type ty_arg, Just se, _) cont_ty thing_inside
   = simplType (setInScope se env) ty_arg 	`thenSmpl` \ new_ty_arg ->
     thing_inside env (Type new_ty_arg)
 
-simplifyArg env fn_ty has_rules (val_arg, arg_se, is_strict) cont_ty thing_inside 
+simplifyArg env fn_ty has_rules (val_arg, Just arg_se, is_strict) cont_ty thing_inside 
   | is_strict 
   = simplStrictArg AnArg env val_arg arg_se arg_ty cont_ty thing_inside
 
@@ -1255,11 +1231,15 @@ rebuild env expr (Stop _ _ _)		      = rebuildDone env expr
 rebuild env expr (ArgOf _ _ _ cont_fn)	      = cont_fn env expr
 rebuild env expr (CoerceIt to_ty cont)	      = rebuild env (mkCoerce to_ty expr) cont
 rebuild env expr (Select _ bndr alts se cont) = rebuildCase (setInScope se env) expr bndr alts cont
-rebuild env expr (ApplyTo _ arg se cont)      = rebuildApp  (setInScope se env) expr arg cont
+rebuild env expr (ApplyTo _ arg mb_se cont)   = rebuildApp  env expr arg mb_se cont
 
-rebuildApp env fun arg cont
-  = simplExpr env arg	`thenSmpl` \ arg' ->
-    rebuild env (App fun arg') cont
+rebuildApp env fun arg mb_se cont
+  = do	{ arg' <- simplArg env arg mb_se
+	; rebuild env (App fun arg') cont }
+
+simplArg :: SimplEnv -> CoreExpr -> Maybe SimplEnv -> SimplM CoreExpr
+simplArg env arg Nothing        = return arg	-- The arg is already simplified
+simplArg env arg (Just arg_env) = simplExpr (setInScope arg_env env) arg
 
 rebuildDone env expr = returnSmpl (emptyFloats env, expr)
 \end{code}
@@ -1832,16 +1812,16 @@ mkDupableCont env cont@(ArgOf _ arg_ty _ _)
 	--		let $j = \a -> ...strict-fn...
 	--		in $j [...hole...]
 
-mkDupableCont env (ApplyTo _ arg se cont)
+mkDupableCont env (ApplyTo _ arg mb_se cont)
   = 	-- e.g. 	[...hole...] (...arg...)
 	--	==>
 	--		let a = ...arg... 
 	--		in [...hole...] a
     do	{ (floats, (dup_cont, nondup_cont)) <- mkDupableCont env cont
 	; addFloats env floats $ \ env -> do
-	{ arg1 <- simplExpr (setInScope se env) arg
+	{ arg1 <- simplArg env arg mb_se
 	; (floats2, arg2) <- mkDupableArg env arg1
-	; return (floats2, (ApplyTo OkToDup arg2 (zapSubstEnv se) dup_cont, nondup_cont)) }}
+	; return (floats2, (ApplyTo OkToDup arg2 Nothing dup_cont, nondup_cont)) }}
 
 mkDupableCont env (Select _ case_bndr alts se cont)
   = 	-- e.g.		(case [...hole...] of { pi -> ei })

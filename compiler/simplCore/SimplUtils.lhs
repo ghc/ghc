@@ -79,8 +79,10 @@ data SimplCont		-- Strict contexts
 	     SimplCont
 
   | ApplyTo  DupFlag 
-	     InExpr SimplEnv		-- The argument, as yet unsimplified, 
-	     SimplCont			-- and its environment
+	     CoreExpr		-- The argument
+	     (Maybe SimplEnv)   -- (Just se) => the arg is un-simplified and this is its subst-env
+				-- Nothing   => the arg is already simplified; don't repeatedly simplify it!
+	     SimplCont		-- and its environment
 
   | Select   DupFlag 
 	     InId [InAlt] SimplEnv	-- The case binder, alts, and subst-env
@@ -181,18 +183,18 @@ countArgs (ApplyTo _ arg se cont) = 1 + countArgs cont
 countArgs other			  = 0
 
 -------------------
-pushContArgs :: SimplEnv -> [OutArg] -> SimplCont -> SimplCont
+pushContArgs ::[OutArg] -> SimplCont -> SimplCont
 -- Pushes args with the specified environment
-pushContArgs env []           cont = cont
-pushContArgs env (arg : args) cont = ApplyTo NoDup arg env (pushContArgs env args cont)
+pushContArgs []           cont = cont
+pushContArgs (arg : args) cont = ApplyTo NoDup arg Nothing (pushContArgs args cont)
 \end{code}
 
 
 \begin{code}
 getContArgs :: SwitchChecker
 	    -> OutId -> SimplCont 
-	    -> ([(InExpr, SimplEnv, Bool)],	-- Arguments; the Bool is true for strict args
-		SimplCont)			-- Remaining continuation
+	    -> ([(InExpr, Maybe SimplEnv, Bool)],	-- Arguments; the Bool is true for strict args
+		SimplCont)				-- Remaining continuation
 -- getContArgs id k = (args, k', inl)
 -- 	args are the leading ApplyTo items in k
 --	(i.e. outermost comes first)
@@ -374,12 +376,12 @@ interestingCallContext :: Bool 		-- False <=> no args at all
 interestingCallContext some_args some_val_args cont
   = interesting cont
   where
-    interesting (Select _ _ _ _ _)       = some_args
-    interesting (ApplyTo _ _ _ _)        = True	-- Can happen if we have (coerce t (f x)) y
+    interesting (Select {})              = some_args
+    interesting (ApplyTo {})             = True	-- Can happen if we have (coerce t (f x)) y
 						-- Perhaps True is a bit over-keen, but I've
 						-- seen (coerce f) x, where f has an INLINE prag,
 						-- So we have to give some motivaiton for inlining it
-    interesting (ArgOf _ _ _ _)	         = some_val_args
+    interesting (ArgOf {})	         = some_val_args
     interesting (Stop ty _ interesting)  = some_val_args && interesting
     interesting (CoerceIt _ cont)        = interesting cont
 	-- If this call is the arg of a strict function, the context
