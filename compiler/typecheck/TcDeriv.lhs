@@ -952,7 +952,7 @@ genTaggeryBinds infos
 \begin{code}
 derivingThingErr clas tys tycon tyvars why
   = sep [hsep [ptext SLIT("Can't make a derived instance of"), quotes (ppr pred)],
-	 parens why]
+	 nest 2 (parens why)]
   where
     pred = mkClassPred clas (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars)])
 
