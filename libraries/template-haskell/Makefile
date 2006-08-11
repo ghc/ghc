@@ -6,7 +6,7 @@ include $(TOP)/mk/boilerplate.mk
 
 ALL_DIRS     = Language/Haskell Language/Haskell/TH
 PACKAGE      = template-haskell
-VERSION	     = 1.0
+VERSION	     = 2.0
 PACKAGE_DEPS = base
 
 Language/Haskell/TH/Syntax_HC_OPTS += -fglasgow-exts
