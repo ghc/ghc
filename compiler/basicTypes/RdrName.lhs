@@ -45,7 +45,7 @@ import Module   ( ModuleName, mkModuleNameFS, Module, moduleName )
 import Name	( Name, NamedThing(getName), nameModule, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
 import Maybes	( mapCatMaybes )
-import SrcLoc	( isGoodSrcLoc, SrcSpan )
+import SrcLoc	( isGoodSrcLoc, isGoodSrcSpan, SrcSpan )
 import FastString ( FastString )
 import Outputable
 import Util	( thenCmp )
@@ -538,7 +538,10 @@ ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
 	     | otherwise	= empty
 
 instance Outputable ImportSpec where
-   ppr imp_spec@(ImpSpec imp_decl _)
-     = ptext SLIT("imported from") <+> ppr (is_mod imp_decl) 
-	<+> ptext SLIT("at") <+> ppr (importSpecLoc imp_spec)
+   ppr imp_spec
+     = ptext SLIT("imported from") <+> ppr (importSpecModule imp_spec) 
+	<+> if isGoodSrcSpan loc then ptext SLIT("at") <+> ppr loc
+				 else empty
+     where
+       loc = importSpecLoc imp_spec
 \end{code}
