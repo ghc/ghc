@@ -1,5 +1,5 @@
 
 rnfail029.hs:2:20:
     Conflicting exports for `map':
-      `List.map' exports `GHC.Base.map' imported from List at rnfail029.hs:3:0-20
-      `module ShouldFail' exports `ShouldFail.map' defined at rnfail029.hs:4:0
+      `List.map' exports `map' imported from List at rnfail029.hs:3:0-20
+      `module ShouldFail' exports `map' defined at rnfail029.hs:4:0

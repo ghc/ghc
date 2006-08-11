@@ -1,9 +1,9 @@
 TYPE SIGNATURES
 Tycons with generics:
 Dependent modules: []
-Dependent packages: [base-1.0]
+Dependent packages: [base]
 TYPE SIGNATURES
-    f :: forall t t1 t2. (C t (t1, t2)) => t -> t1
+    f :: forall a a1 b. (C a (a1, b)) => a -> a1
 Tycons with generics:
 Dependent modules: []
-Dependent packages: [base-1.0]
+Dependent packages: [base]

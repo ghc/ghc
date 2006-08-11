@@ -3,4 +3,4 @@ drvfail007.hs:4:5:
     No instance for (Eq (Int -> Int))
       arising from the 'deriving' clause of a data type declaration at drvfail007.hs:4:5
     Possible fix: add an instance declaration for (Eq (Int -> Int))
-    When deriving the `Eq' instance for type `Foo'
+    When deriving the instance for `Eq Foo'

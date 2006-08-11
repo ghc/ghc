@@ -9,4 +9,4 @@ drvfail002.hs:18:5:
     Can't derive instances where the instance context mentions
     type variables that are not data type parameters
       Offending constraint: X T c
-    When deriving the `Show' instance for type `S'
+    When deriving the instance for `Show S'

@@ -4,4 +4,4 @@ mod56.hs:4:5:
     (`T' has non-nullary constructors
        and
      `T' has more than one constructor)
-    When deriving instances for type `T'
+    When deriving instances for `T'

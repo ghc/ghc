@@ -2,9 +2,9 @@
 drvfail010.hs:6:5:
     Can't make a derived instance of `Typeable (A a b c d e f g h i j)'
     (`A' has too many arguments)
-    When deriving instances for type `A'
+    When deriving instances for `A'
 
 drvfail010.hs:9:5:
     Can't make a derived instance of `Typeable (B a b)'
     (`B' has arguments of kind other than `*')
-    When deriving instances for type `B'
+    When deriving instances for `B'

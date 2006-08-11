@@ -3,4 +3,4 @@ drvfail008.hs:10:8:
     Can't make a derived instance of `Monad M'
     (`Monad' is not a derivable class
      Try -fglasgow-exts for GHC's newtype-deriving extension)
-    When deriving instances for type `M'
+    When deriving instances for `M'
