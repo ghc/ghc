@@ -157,7 +157,7 @@ instance Outputable SrcLoc where
 	   hcat [text "{-# LINE ", int src_line, space,
 		 char '\"', ftext src_path, text " #-}"]
 
-    ppr (ImportedLoc mod) = ptext SLIT("Imported from") <+> text mod
+    ppr (ImportedLoc mod) = ptext SLIT("Defined in") <+> text mod
     ppr (UnhelpfulLoc s)  = ftext s
 \end{code}
 
@@ -354,7 +354,7 @@ pprUserSpan (SrcSpanPoint src_path line col)
 	   char ':', int col
 	 ]
 
-pprUserSpan (ImportedSpan mod) = ptext SLIT("Imported from") <+> quotes (text mod)
+pprUserSpan (ImportedSpan mod) = ptext SLIT("Defined in") <+> text mod
 pprUserSpan (UnhelpfulSpan s)  = ftext s
 \end{code}
 
