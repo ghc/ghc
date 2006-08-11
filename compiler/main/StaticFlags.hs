@@ -488,8 +488,13 @@ way_details :: [ (WayName, Way) ]
 way_details =
   [ (WayThreaded, Way "thr" True "Threaded" [
 #if defined(freebsd_TARGET_OS)
-	  "-optc-pthread"
-        , "-optl-pthread"
+--	  "-optc-pthread"
+--      , "-optl-pthread"
+	-- FreeBSD's default threading library is the KSE-based M:N libpthread,
+	-- which GHC has some problems with.  It's currently not clear whether
+	-- the problems are our fault or theirs, but it seems that using the
+	-- alternative 1:1 threading library libthr works around it:
+	  "-optl-lthr"
 #elif defined(solaris2_TARGET_OS)
           "-optl-lrt"
 #endif
