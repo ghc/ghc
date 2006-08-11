@@ -15,4 +15,4 @@ hidden-modules: B, "C.D", "C.E"
 import-dirs: /usr/local/lib/testpkg,  "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg, "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0
-depends: base-1.0, haskell-src, Cabal
+depends: base-2.0, haskell-src, Cabal
