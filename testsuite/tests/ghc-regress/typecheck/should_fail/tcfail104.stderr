@@ -1,16 +1,20 @@
 
-tcfail104.hs:9:7:
-    Inferred type is less polymorphic than expected
-      Quantified type variable `a' escapes
-      Expected type: forall a1. a1 -> a1
-      Inferred type: a -> a
-    When checking the pattern: x :: forall a. a -> a
-    In a lambda abstraction: \ (x :: forall a. a -> a) -> x
+tcfail104.hs:11:6:
+    Cannot match a monotype with `forall a. a -> a'
+    In a lambda abstraction: \ x -> x
+    In the call ((if v then
+		      (\ (x :: forall a. a -> a) -> x)
+		  else
+		      (\ x -> x)) id 'c')
+    In the expression:
+	(if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'
 
-tcfail104.hs:15:7:
-    Inferred type is less polymorphic than expected
-      Quantified type variable `a' escapes
-      Expected type: forall a1. a1 -> a1
-      Inferred type: a -> a
-    When checking the pattern: x :: forall a. a -> a
-    In a lambda abstraction: \ (x :: forall a. a -> a) -> x
+tcfail104.hs:17:6:
+    Cannot match a monotype with `forall a. a -> a'
+    In a lambda abstraction: \ x -> x
+    In the call ((if v then
+		      (\ (x :: forall a. a -> a) -> x)
+		  else
+		      (\ x -> x)) id 'c')
+    In the expression:
+	(if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'

@@ -1,5 +1,5 @@
 
 tcfail037.hs:7:10:
     Ambiguous occurrence `+'
-    It could refer to either `ShouldFail.+', defined at tcfail037.hs:10:4
-		          or `GHC.Num.+', imported from Prelude at Implicit import declaration
+    It could refer to either `+', defined at tcfail037.hs:10:4
+		          or `+', imported from Prelude

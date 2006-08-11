@@ -1,0 +1,7 @@
+
+tcfail160.hs:7:7:
+    Kind mis-match
+    Expected kind `* -> *', but `Int' has kind `*'
+    In the type `T Int'
+    In the type signature for `g':
+      g :: T Int
