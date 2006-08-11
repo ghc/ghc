@@ -156,6 +156,8 @@ instance OutputableBndr id => Outputable (HsValBinds id) where
 -- 'where' include a list of HsBindGroups and we don't want
 -- several groups of bindings each with braces around.
 -- Sort by location before printing
+pprValBindsForUser :: (OutputableBndr id1, OutputableBndr id2)
+		   => LHsBinds id1 -> [LSig id2] -> SDoc
 pprValBindsForUser binds sigs
   = vcat (map snd (sort_by_loc decls))
   where
