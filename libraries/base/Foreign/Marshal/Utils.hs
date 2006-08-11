@@ -44,10 +44,6 @@ module Foreign.Marshal.Utils (
   --
   copyBytes,     -- :: Ptr a -> Ptr a -> Int -> IO ()
   moveBytes,     -- :: Ptr a -> Ptr a -> Int -> IO ()
-
-  -- ** DEPRECATED FUNCTIONS (don\'t use; they may disappear at any time)
-  --
-  withObject     -- :: Storable a => a -> (Ptr a -> IO b) -> IO b
 ) where
 
 import Data.Maybe
@@ -98,12 +94,6 @@ with val f  =
     poke ptr val
     res <- f ptr
     return res
-
--- old DEPRECATED name (don't use; may disappear at any time)
---
-withObject :: Storable a => a -> (Ptr a -> IO b) -> IO b
-{-# DEPRECATED withObject "use `with' instead" #-}
-withObject  = with
 
 
 -- marshalling of Boolean values (non-zero corresponds to 'True')
