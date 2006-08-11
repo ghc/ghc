@@ -55,7 +55,7 @@ include $(TOP)/mk/target.mk
 
 ifneq "$(NO_HADDOCK_DOCS)" "YES"
 
-HTML_DIR = html
+HTML_DIR = html-docs
 
 # ATTENTION, incomprehensible shell stuff ahead: Automagically create the
 # prologue for the combined index via a header, the package prologues (in
