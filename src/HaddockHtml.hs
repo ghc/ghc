@@ -22,8 +22,8 @@ import HaddockUtil
 import HaddockVersion
 import Html
 import qualified Html
-import Map ( Map )
-import qualified Map hiding ( Map )
+import Data.Map ( Map )
+import qualified Data.Map as Map hiding ( Map )
 
 import Control.Exception ( bracket )
 import Control.Monad ( when, unless )
@@ -720,8 +720,6 @@ ppFor summary links loc mbDoc (ForeignImport lname ltype _ _)
   = ppSig summary links loc mbDoc (TypeSig lname ltype)
 ppFor _ _ _ _ _ = error "ppFor"
 
-ppDataDecl = undefined
-
 ppTySyn summary links loc mbDoc (TySynonym lname ltyvars ltype) 
   = declWithDoc summary links loc n mbDoc (
     hsep ([keyword "type", ppHsBinder summary n]
@@ -834,6 +832,8 @@ ppInstHead (ctxt, n, ts) = ppPreds ctxt <+> ppAsst n ts
 
 ppAsst n ts = ppDocName n <+> hsep (map ppType ts)
 
+ppDataDecl = undefined
+
 {-
 -- -----------------------------------------------------------------------------
 -- Converting declarations to HTML
@@ -901,9 +901,8 @@ ppShortDataDecl _ _ _ d =
     error $ "HaddockHtml.ppShortDataDecl: unexpected decl " ++ show d
 
 -- The rest of the cases:
-ppHsDataDecl :: Ord key => Bool	-> LinksInfo -> [InstHead] -> Bool -> key -> HsDecl -> HtmlTable
-ppHsDataDecl summary links instances is_newty 
-     x decl@(HsDataDecl loc _ nm args cons _ doc)
+ppDataDecl :: Ord key => Bool -> LinksInfo -> [InstHead2 DocName] -> key -> TyClDecl DocName -> HtmlTable
+ppDataDecl summary links instances x decl@(DataDecl loc _ nm args cons _ doc)
   | summary = declWithDoc summary links loc nm doc (ppShortDataDecl summary links is_newty decl)
 
   | otherwise
@@ -1159,16 +1158,6 @@ ppHsBinder False nm = linkTarget nm +++ bold << ppHsBinder' nm
 ppHsBinder' :: Name -> Html
 ppHsBinder' name = toHtml (getOccString name)
 
-{-
-ppHsBinder' :: HsName -> Html
-ppHsBinder' (HsTyClsName id0) = ppHsBindIdent id0
-ppHsBinder' (HsVarName id0)   = ppHsBindIdent id0
-
-ppHsBindIdent :: HsIdentifier -> Html
-ppHsBindIdent (HsIdent str)   =  toHtml str
-ppHsBindIdent (HsSymbol str)  =  parens (toHtml str)
-ppHsBindIdent (HsSpecial str) =  toHtml str
--}
 linkId :: GHC.Module -> Maybe Name -> Html -> Html
 linkId mod mbName = anchor ! [href hr]
   where 
@@ -1211,9 +1200,6 @@ htmlRdrMarkup = parHtmlMarkup ppRdrName
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).
-{-docToHtml :: Doc -> Html
-docToHtml doc = markup htmlMarkup (unParagraph (markup htmlCleanup doc))
--}
 docToHtml :: GHC.HsDoc DocName -> Html
 docToHtml doc = markup htmlMarkup (unParagraph (markup htmlCleanup doc))
 

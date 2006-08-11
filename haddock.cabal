@@ -58,10 +58,8 @@ hs-source-dirs: src
 main-is: Main.hs
 extensions: CPP
 other-modules:
-	Binary2
-	BlockTable
-	Digraph2
 	FastMutInt2
+	BlockTable
 	HaddockDB
 	HaddockDevHelp
 	HaddockHH
@@ -73,10 +71,5 @@ other-modules:
 	HaddockTypes
 	HaddockUtil
 	HaddockVersion
-	HsLexer
-	HsParseMonad
-	HsSyn2
 	Html
 	Main
-	Map
-	Set

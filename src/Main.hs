@@ -7,7 +7,6 @@
 
 module Main (main) where
 
---import HsSyn2
 import HaddockHtml
 import HaddockHoogle
 import HaddockRename

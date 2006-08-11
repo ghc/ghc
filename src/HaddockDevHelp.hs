@@ -3,16 +3,13 @@ module HaddockDevHelp(ppDevHelpFile) where
 import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
-import HsSyn2 hiding (Doc, Module)
-import qualified Map
 
 import Module ( moduleString, Module )
 import Name   ( Name, nameModule, getOccString )
 
-
 import Data.Maybe ( fromMaybe )
+import qualified Data.Map as Map
 import Text.PrettyPrint
-
 
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [HaddockModule] -> IO ()
 ppDevHelpFile odir doctitle maybe_package modules = do
