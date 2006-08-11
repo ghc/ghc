@@ -19,7 +19,8 @@ module Finder (
     findObjectLinkableMaybe,
     findObjectLinkable,
 
-    cantFindError,
+    cannotFindModule,
+    cannotFindInterface,
   ) where
 
 #include "HsVersions.h"
@@ -144,10 +145,10 @@ findExactModule hsc_env mod =
 this `orIfNotFound` or_this = do
   res <- this
   case res of
-    NotFound here -> do
+    NotFound here _ -> do
 	res2 <- or_this
 	case res2 of
-	   NotFound or_here -> return (NotFound (here ++ or_here))
+	   NotFound or_here pkg -> return (NotFound (here ++ or_here) pkg)
 	   _other -> return res2
     _other -> return res
 
@@ -168,7 +169,7 @@ homeSearchCache hsc_env mod_name do_this = do
 findExposedPackageModule :: HscEnv -> ModuleName -> IO FindResult
 findExposedPackageModule hsc_env mod_name
         -- not found in any package:
-  | null found = return (NotFound [])
+  | null found = return (NotFound [] Nothing)
         -- found in just one exposed package:
   | [(pkg_conf, _)] <- found_exposed
         = let pkgid = mkPackageId (package pkg_conf) in      
@@ -329,7 +330,7 @@ searchPathExts paths mod exts
 	              file = base `joinFileExt` ext
 		]
 
-    search [] = return (NotFound (map fst to_search))
+    search [] = return (NotFound (map fst to_search) (Just (modulePackageId mod)))
     search ((file, mk_result) : rest) = do
       b <- doesFileExist file
       if b 
@@ -505,14 +506,19 @@ dots_to_slashes = map (\c -> if c == '.' then '/' else c)
 -- -----------------------------------------------------------------------------
 -- Error messages
 
-cantFindError :: DynFlags -> ModuleName -> FindResult -> SDoc
-cantFindError dflags mod_name (FoundMultiple pkgs)
-  = hang (ptext SLIT("Cannot import") <+> quotes (ppr mod_name) <> colon) 2 (
+cannotFindModule :: DynFlags -> ModuleName -> FindResult -> SDoc
+cannotFindModule = cantFindErr SLIT("Could not find module")
+
+cannotFindInterface  :: DynFlags -> ModuleName -> FindResult -> SDoc
+cannotFindInterface = cantFindErr SLIT("Failed to load interface for")
+
+cantFindErr cannot_find dflags mod_name (FoundMultiple pkgs)
+  = hang (ptext cannot_find <+> quotes (ppr mod_name) <> colon) 2 (
        sep [ptext SLIT("it was found in multiple packages:"),
 		hsep (map (text.packageIdString) pkgs)]
     )
-cantFindError dflags mod_name find_result
-  = hang (ptext SLIT("Could not find module") <+> quotes (ppr mod_name) <> colon)
+cantFindErr cannot_find dflags mod_name find_result
+  = hang (ptext cannot_find <+> quotes (ppr mod_name) <> colon)
        2 more_info
   where
     more_info
@@ -529,17 +535,31 @@ cantFindError dflags mod_name find_result
 		-> ptext SLIT("no package matching") <+> ppr pkg <+>
 		   ptext SLIT("was found")
 
-	    NotFound files
+	    NotFound files mb_pkg
 		| null files
 		-> ptext SLIT("it is not a module in the current program, or in any known package.")
-		| verbosity dflags < 3 
-		-> ptext SLIT("use -v to see a list of the files searched for")
-		| otherwise 
-		-> hang (ptext SLIT("locations searched:")) 
-		      2 (vcat (map text files))
+		| Just pkg <- mb_pkg, pkg /= thisPackage dflags, build_tag /= ""
+		-> let 
+		     build = if build_tag == "p" then "profiling" 
+						 else "\"" ++ build_tag ++ "\""
+		   in
+		   ptext SLIT("Perhaps you haven't installed the ") <> text build <>
+		   ptext SLIT(" libraries for package ") <> ppr pkg <> char '?' $$
+		   not_found files
+
+		| otherwise
+		-> not_found files
 
 	    NotFoundInPackage pkg
 		-> ptext SLIT("it is not in package") <+> ppr pkg
 
 	    _ -> panic "cantFindErr"
+
+    build_tag = buildTag dflags
+
+    not_found files
+	| verbosity dflags < 3
+	= ptext SLIT("Use -v to see a list of the files searched for.")
+	| otherwise 
+	= hang (ptext SLIT("locations searched:")) 2 (vcat (map text files))
 \end{code}

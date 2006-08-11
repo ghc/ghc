@@ -48,7 +48,7 @@ import SrcLoc		( importedSrcLoc )
 import Maybes		( MaybeErr(..) )
 import ErrUtils         ( Message )
 import Finder		( findImportedModule, findExactModule,  
-			  FindResult(..), cantFindError )
+			  FindResult(..), cannotFindInterface )
 import UniqFM
 import Outputable
 import BinIface		( readBinIface )
@@ -81,14 +81,11 @@ loadSrcInterface doc mod want_boot  = do
     Found _ mod -> do
       mb_iface <- initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
       case mb_iface of
-	Failed err      -> failWithTc (elaborate err)
+	Failed err      -> failWithTc err
 	Succeeded iface -> return iface
     err ->
         let dflags = hsc_dflags hsc_env in
-	failWithTc (elaborate (cantFindError dflags mod err))
-  where
-    elaborate err = hang (ptext SLIT("Failed to load interface for") <+> 
-			  quotes (ppr mod) <> colon) 4 err
+	failWithTc (cannotFindInterface dflags mod err)
 
 -- | Load interfaces for a collection of orphan modules.
 loadOrphanModules :: [Module] -> TcM ()
@@ -420,7 +417,8 @@ findAndReadIface doc_str mod hi_boot_file
 	      Failed err -> do
 		{ traceIf (ptext SLIT("...not found"))
 		; dflags <- getDOpts
-		; returnM (Failed (cantFindError dflags (moduleName mod) err)) } ;
+		; returnM (Failed (cannotFindInterface dflags 
+					(moduleName mod) err)) } ;
 
 	      Succeeded file_path -> do 
 

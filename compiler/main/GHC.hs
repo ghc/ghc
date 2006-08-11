@@ -1631,7 +1631,7 @@ preprocessFile dflags src_fn mb_phase (Just (buf, time))
 noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> IO ab
 -- ToDo: we don't have a proper line number for this error
 noModError dflags loc wanted_mod err
-  = throwDyn $ mkPlainErrMsg loc $ cantFindError dflags wanted_mod err
+  = throwDyn $ mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
 				
 noHsFileErr loc path
   = throwDyn $ mkPlainErrMsg loc $ text "Can't find" <+> text path
@@ -1850,7 +1850,7 @@ findModule' hsc_env mod_name maybe_pkg =
 	  case res of
 	    Found _ m | modulePackageId m /= this_pkg -> return m
                         -- not allowed to be a home module
-	    err -> let msg = cantFindError dflags mod_name err in
+	    err -> let msg = cannotFindModule dflags mod_name err in
 		   throwDyn (CmdLineError (showSDoc msg))
 
 #ifdef GHCI

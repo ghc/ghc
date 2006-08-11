@@ -323,8 +323,8 @@ data FindResult
   | ModuleHidden  PackageId
 	-- for an explicit source import: the package containing the module is
 	-- exposed, but the module itself is hidden.
-  | NotFound [FilePath]
-	-- the module was not found, the specified places were searched.
+  | NotFound [FilePath] (Maybe PackageId)
+	-- the module was not found, the specified places were searched
   | NotFoundInPackage PackageId
 	-- the module was not found in this package
 
