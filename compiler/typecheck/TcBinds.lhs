@@ -499,7 +499,8 @@ checkStrictBinds top_lvl rec_group mbind mono_tys infos
     check_sig other	       = return ()
 
 strictBindErr flavour unlifted mbind
-  = hang (text flavour <+> msg <+> ptext SLIT("aren't allowed:")) 4 (ppr mbind)
+  = hang (text flavour <+> msg <+> ptext SLIT("aren't allowed:")) 
+	 4 (pprLHsBinds mbind)
   where
     msg | unlifted  = ptext SLIT("bindings for unlifted types")
 	| otherwise = ptext SLIT("bang-pattern bindings")

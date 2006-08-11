@@ -1515,7 +1515,7 @@ notMonoType ty
   = do	{ ty' <- zonkTcType ty
 	; env0 <- tcInitTidyEnv
 	; let (env1, tidy_ty) = tidyOpenType env0 ty'
-	      msg = ptext SLIT("Cannot match a monotype with") <+> ppr tidy_ty
+	      msg = ptext SLIT("Cannot match a monotype with") <+> quotes (ppr tidy_ty)
 	; failWithTcM (env1, msg) }
 
 occurCheck tyvar ty
