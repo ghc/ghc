@@ -1,4 +1,6 @@
 
 tcfail127.hs:3:0:
-    Illegal polymorphic or qualified type: (Num a) => a -> a
-    In the type signature: foo :: IO ((Num a) => a -> a)
+    All of the type variables in the constraint `Num a' are already in scope
+	(at least one must be universally quantified here)
+    In the type signature for `foo':
+      foo :: IO ((Num a) => a -> a)

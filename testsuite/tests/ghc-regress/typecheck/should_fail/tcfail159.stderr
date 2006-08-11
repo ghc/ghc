@@ -1,7 +1,7 @@
 
 tcfail159.hs:9:3:
     Couldn't match kind `(#)' against `*'
-    When matching the kinds of `(# Int, Int #) :: (#)' and `bx :: *'
-      Expected type: bx
+    When matching the kinds of `(# Int, Int #) :: (#)' and `t :: *'
+      Expected type: t
       Inferred type: (# Int, Int #)
     In the pattern: ~(# p, q #)

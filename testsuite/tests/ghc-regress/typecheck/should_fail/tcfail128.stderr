@@ -1,11 +1,10 @@
 
 tcfail128.hs:18:8:
-    No instance for (Data.Array.Base.MArray t FlatVector IO)
+    No instance for (Data.Array.Base.MArray b FlatVector IO)
       arising from use of `thaw' at tcfail128.hs:18:8-15
     Possible fix:
-      add an instance declaration for (Data.Array.Base.MArray t
-							      FlatVector
-							      IO)
+      add an instance declaration for
+      (Data.Array.Base.MArray b FlatVector IO)
     In the call (thaw tmp)
     In a 'do' expression: v <- thaw tmp
     In the expression:

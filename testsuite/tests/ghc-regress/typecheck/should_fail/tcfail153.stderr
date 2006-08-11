@@ -1,11 +1,9 @@
 
-tcfail153.hs:6:6:
-    Couldn't match the rigid variable `a' against `Bool'
-      `a' is bound by the type signature for `f'
-      Expected type: [a]
-      Inferred type: [Bool]
-    In the application `g x'
-    In the definition of `f':
-	f x = g x
-	    where
-		g y = if y then [] else [y]
+tcfail153.hs:6:8:
+    Couldn't match expected type `Bool'
+	   against inferred type `a' (a rigid variable)
+      `a' is bound by the type signature for `f' at tcfail153.hs:5:5
+      Expected type: Bool
+      Inferred type: a
+    In the first argument of `g', namely `x'
+    In the call (g x)

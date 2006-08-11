@@ -1,8 +1,10 @@
 
 tcfail117.hs:5:8:
-    Can't make a derived instance of `Enum N1' (`N1' has non-nullary constructors)
-    When deriving instances for type `N1'
+    Can't make a derived instance of `Enum N1'
+      (`N1' has non-nullary constructors)
+    When deriving instances for `N1'
 
 tcfail117.hs:6:8:
-    Can't make a derived instance of `Enum N2' (`N2' has non-nullary constructors)
-    When deriving instances for type `N2'
+    Can't make a derived instance of `Enum N2'
+      (`N2' has non-nullary constructors)
+    When deriving instances for `N2'

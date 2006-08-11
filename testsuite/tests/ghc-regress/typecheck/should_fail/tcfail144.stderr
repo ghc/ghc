@@ -1,5 +1,5 @@
 
-tcfail144.hs:8:2:
+tcfail144.hs:9:2:
     Couldn't match expected type `{Ord a}'
 	   against inferred type `{Eq a1}'
     When matching the contexts of the signatures for
