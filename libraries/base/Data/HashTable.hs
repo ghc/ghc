@@ -56,6 +56,8 @@ import GHC.IOBase	( IO, IOArray, newIOArray,
 #else
 import Data.Char	( ord )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+import System.IO.Unsafe	( unsafePerformIO )
+import Data.Int		( Int64 )
 #  if defined(__HUGS__)
 import Hugs.IOArray	( IOArray, newIOArray,
 			  unsafeReadIOArray, unsafeWriteIOArray )
