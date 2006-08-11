@@ -1,3 +1,6 @@
+{-# OPTIONS -fno-mono-pat-binds #-}
+	-- Disable experimetal monomorphic pattern bindings
+
 -- Nasty test for type signatures
 -- In both groups of declarations below, the type variables 'a' and 'b'
 -- end up being unified together.
@@ -12,7 +15,6 @@ module ShouldCompile where
   y = z
 
   z = x
-
 -------------
   p :: [a]
   q :: b
