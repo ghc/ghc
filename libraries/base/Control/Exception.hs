@@ -518,7 +518,8 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
           withCString msg $ \cmsg ->
             errorBelch cfmt cmsg
 
-foreign import ccall unsafe errorBelch :: CString -> CString -> IO ()
+foreign import ccall unsafe "RtsMessages.h errorBelch"
+   errorBelch :: CString -> CString -> IO ()
 
 setUncaughtExceptionHandler :: (Exception -> IO ()) -> IO ()
 setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler

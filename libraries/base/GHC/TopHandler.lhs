@@ -127,12 +127,12 @@ safeExit r = unsafeCoerce# (shutdownHaskellAndExit r)
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
 -- re-enter Haskell land through finalizers.
-foreign import ccall "shutdownHaskellAndExit" 
+foreign import ccall "Rts.h shutdownHaskellAndExit"
   shutdownHaskellAndExit :: Int -> IO ()
 
 fastExit :: Int -> IO a
 fastExit r = unsafeCoerce# (stg_exit (fromIntegral r))
 
-foreign import ccall "stg_exit" 
+foreign import ccall "Rts.h stg_exit"
   stg_exit :: CInt -> IO ()
 \end{code}

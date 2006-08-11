@@ -40,7 +40,8 @@ putTraceMsg msg = do
      withCString msg  $ \cmsg ->
       debugBelch cfmt cmsg
 
-foreign import ccall unsafe debugBelch :: CString -> CString -> IO ()
+foreign import ccall unsafe "RtsMessages.h debugBelch"
+   debugBelch :: CString -> CString -> IO ()
 #endif
 
 {-# NOINLINE trace #-}
