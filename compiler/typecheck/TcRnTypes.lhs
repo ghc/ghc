@@ -798,7 +798,8 @@ data InstOrigin
 \begin{code}
 pprInstLoc :: InstLoc -> SDoc
 pprInstLoc (InstLoc orig locn _)
-  = hsep [text "arising from", pp_orig orig, text "at", ppr locn]
+  = sep [text "arising from" <+> pp_orig orig, 
+	 text "at" <+> ppr locn]
   where
     pp_orig (OccurrenceOf name)  = hsep [ptext SLIT("use of"), quotes (ppr name)]
     pp_orig (IPOccOrigin name)   = hsep [ptext SLIT("use of implicit parameter"), quotes (ppr name)]

@@ -2451,8 +2451,8 @@ addNoInstanceErrs mb_what givens dicts
 			        ptext SLIT("to the") <+> what] ]
 
     	fix2 | null instance_dicts = []
-	     | otherwise	   = [ ptext SLIT("add an instance declaration for")
-				       <+> pprDictsTheta instance_dicts ]
+	     | otherwise	   = [ sep [ptext SLIT("add an instance declaration for"),
+				            pprDictsTheta instance_dicts] ]
 	instance_dicts = [d | d <- dicts, isClassDict d, not (isTyVarDict d)]
 		-- Insts for which it is worth suggesting an adding an instance declaration
 		-- Exclude implicit parameters, and tyvar dicts
