@@ -200,9 +200,13 @@ newMetaTyVar box_info kind
  	; ref <- newMutVar Flexi ;
 	; let name = mkSysTvName uniq fs 
 	      fs = case box_info of
-			BoxTv   -> FSLIT("bx")
+			BoxTv   -> FSLIT("t")
 			TauTv   -> FSLIT("t")
 			SigTv _ -> FSLIT("a")
+		-- We give BoxTv and TauTv the same string, because
+		-- otherwise we get user-visible differences in error
+		-- messages, which are confusing.  If you want to see
+		-- the box_info of each tyvar, use -dppr-debug
 	; return (mkTcTyVar name kind (MetaTv box_info ref)) }
 
 instMetaTyVar :: BoxInfo -> TyVar -> TcM TcTyVar
