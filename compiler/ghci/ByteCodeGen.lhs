@@ -1102,7 +1102,6 @@ pushAtom d p (AnnLit lit)
 				      pokeByteOff ptr n (fromIntegral (ord '\0') :: Word8)
                                       return ptr
                                    )
-                         other -> panic "ByteCodeGen.pushAtom.pushStr"
              in
                 getMallocvilleAddr `thenBc` \ addr ->
                 -- Get the addr on the stack, untaggedly

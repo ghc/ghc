@@ -839,10 +839,8 @@ hscKcType hsc_env str
   = do	{ maybe_type <- hscParseType (hsc_dflags hsc_env) str
 	; let icontext = hsc_IC hsc_env
 	; case maybe_type of {
-	     Just ty	-> tcRnType hsc_env icontext ty ;
-	     Just other -> do { errorMsg (hsc_dflags hsc_env) (text "not an type:" <+> quotes (text str)) ;
-			        return Nothing } ;
-      	     Nothing    -> return Nothing } }
+	     Just ty -> tcRnType hsc_env icontext ty ;
+      	     Nothing -> return Nothing } }
 #endif
 \end{code}
 
