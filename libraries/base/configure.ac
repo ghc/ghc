@@ -8,8 +8,17 @@ AC_CONFIG_HEADERS([include/HsBaseConfig.h])
 # do we have long longs?
 AC_CHECK_TYPES([long long])
 
+dnl ** Working vfork?
+AC_FUNC_FORK
+
+dnl ** determine whether or not const works
+AC_C_CONST
+
+dnl ** check for full ANSI header (.h) files
+AC_HEADER_STDC
+
 # check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS([ctype.h fcntl.h signal.h sys/resource.h termios.h time.h])
+AC_CHECK_HEADERS([ctype.h dirent.h errno.h fcntl.h limits.h signal.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h])
 
 # Enable large file support. Do this before testing the types ino_t, off_t, and
 # rlim_t, because it will affect the result of that test.
@@ -26,7 +35,7 @@ dnl functions if it's really there.
 AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
 
 AC_CHECK_FUNCS([ftime gmtime_r localtime_r lstat readdir_r])
-
+AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer times])
 AC_CHECK_FUNCS([_chsize ftruncate])
 
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>

@@ -3,15 +3,14 @@
  *
  * Win32 Console API support
  */
-#include "ghcconfig.h"
-#if defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32) || defined(__CYGWIN__)
 /* to the end */
 
 #include "consUtils.h"
 #include <windows.h>
 #include <io.h>
 
-#if defined(cygwin32_HOST_OS)
+#if defined(__CYGWIN__)
 #define _get_osfhandle get_osfhandle
 #endif
 
@@ -86,4 +85,4 @@ flush_input_console__(int fd)
     return -1;
 }
 
-#endif /* defined(mingw32_HOST_OS) || ... */
+#endif /* defined(__MINGW32__) || ... */

@@ -4,6 +4,7 @@
  * Directory Runtime Support
  */
 
+/* needed only for solaris2_HOST_OS */
 #include "ghcconfig.h"
 
 // The following is required on Solaris to force the POSIX versions of
@@ -14,7 +15,7 @@
 
 #include "HsBase.h"
 
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
 #include <windows.h>
 
 static
@@ -117,7 +118,7 @@ HsInt
 __hscore_renameFile( HsAddr src,
 		     HsAddr dest)
 {
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
     static int forNT = -1;
     
     /* ToDo: propagate error codes back */
@@ -179,7 +180,7 @@ __hscore_renameFile( HsAddr src,
  * that have shell32's lacking that particular API.
  *
  */
-#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
 typedef HRESULT (*HSCORE_GETAPPFOLDERFUNTY)(HWND,int,HANDLE,DWORD,char*);
 int
 __hscore_getFolderPath(HWND hwndOwner,

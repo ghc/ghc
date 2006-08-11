@@ -6,7 +6,7 @@
  * stdin/stout/stderr Runtime Support
  */
 
-#ifndef mingw32_HOST_OS
+#if !(defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32))
 
 #include "HsBase.h"
 #include "Rts.h"

@@ -17,10 +17,10 @@ int
 inputReady(int fd, int msecs, int isSock)
 {
     if 
-#ifndef mingw32_HOST_OS
-    ( 1 ) {
-#else
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
     ( isSock ) {
+#else
+    ( 1 ) {
 #endif
 	int maxfd, ready;
 	fd_set rfd;
@@ -45,7 +45,7 @@ inputReady(int fd, int msecs, int isSock)
 	/* 1 => Input ready, 0 => not ready, -1 => error */
 	return (ready);
     }
-#ifdef mingw32_HOST_OS
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
     else {
 	DWORD rc;
 	HANDLE hFile = (HANDLE)_get_osfhandle(fd);

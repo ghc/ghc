@@ -9,8 +9,6 @@
 #ifndef __HSBASE_H__
 #define __HSBASE_H__
 
-#include "ghcconfig.h"
-
 #include "HsBaseConfig.h"
 
 /* ultra-evil... */
