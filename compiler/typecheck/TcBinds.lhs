@@ -643,9 +643,21 @@ tcLhs sig_fn (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matches = m
 
 tcLhs sig_fn bind@(PatBind { pat_lhs = pat, pat_rhs = grhss })
   = do	{ mb_sigs <- mapM (tcInstSig_maybe sig_fn) names
+	; mono_pat_binds <- doptM Opt_MonoPatBinds
+		-- With -fmono-pat-binds, we do no generalisation of pattern bindings
+		-- But the signature can still be polymoprhic!
+		--	data T = MkT (forall a. a->a)
+		--	x :: forall a. a->a
+		--	MkT x = <rhs>
+		-- The function get_sig_ty decides whether the pattern-bound variables
+		-- should have exactly the type in the type signature (-fmono-pat-binds), 
+		-- or the instantiated version (-fmono-pat-binds)
 
 	; let nm_sig_prs  = names `zip` mb_sigs
-	      tau_sig_env = mkNameEnv [ (name, sig_tau sig) | (name, Just sig) <- nm_sig_prs]
+	      get_sig_ty | mono_pat_binds = idType . sig_id
+			 | otherwise	  = sig_tau
+	      tau_sig_env = mkNameEnv [ (name, get_sig_ty sig) 
+				      | (name, Just sig) <- nm_sig_prs]
 	      sig_tau_fn  = lookupNameEnv tau_sig_env
 
 	      tc_pat exp_ty = tcPat (LetPat sig_tau_fn) pat exp_ty unitTy $ \ _ ->
