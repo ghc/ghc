@@ -936,10 +936,6 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
 	RawDevice -> 
 		mkFileHandle fd is_socket filepath ha_type binary
 
-	_ ->
-	  ioException (IOError Nothing UnsupportedOperation "openFd"
-			           "unknown file type" Nothing) 
-
 fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
    mode <- fdGetMode fd
