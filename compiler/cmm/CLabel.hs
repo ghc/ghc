@@ -805,27 +805,31 @@ asmTempLabelPrefix =
 pprDynamicLinkerAsmLabel :: DynamicLinkerLabelInfo -> CLabel -> SDoc
 
 #if darwin_TARGET_OS
-pprDynamicLinkerAsmLabel SymbolPtr lbl
-  = char 'L' <> pprCLabel lbl <> text "$non_lazy_ptr"
 pprDynamicLinkerAsmLabel CodeStub lbl
   = char 'L' <> pprCLabel lbl <> text "$stub"
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = char 'L' <> pprCLabel lbl <> text "$non_lazy_ptr"
+pprDynamicLinkerAsmLabel _ _
+  = panic "pprDynamicLinkerAsmLabel"
 #elif powerpc_TARGET_ARCH && linux_TARGET_OS
 pprDynamicLinkerAsmLabel CodeStub lbl
   = pprCLabel lbl <> text "@plt"
 pprDynamicLinkerAsmLabel SymbolPtr lbl
   = text ".LC_" <> pprCLabel lbl
+pprDynamicLinkerAsmLabel _ _
+  = panic "pprDynamicLinkerAsmLabel"
 #elif linux_TARGET_OS
 pprDynamicLinkerAsmLabel CodeStub lbl
   = pprCLabel lbl <> text "@plt"
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = text ".LC_" <> pprCLabel lbl
 pprDynamicLinkerAsmLabel GotSymbolPtr lbl
   = pprCLabel lbl <> text "@got"
 pprDynamicLinkerAsmLabel GotSymbolOffset lbl
   = pprCLabel lbl <> text "@gotoff"
-pprDynamicLinkerAsmLabel SymbolPtr lbl
-  = text ".LC_" <> pprCLabel lbl
 #elif mingw32_TARGET_OS
 pprDynamicLinkerAsmLabel SymbolPtr lbl
   = text "__imp_" <> pprCLabel lbl
-#endif
 pprDynamicLinkerAsmLabel _ _
   = panic "pprDynamicLinkerAsmLabel"
+#endif
