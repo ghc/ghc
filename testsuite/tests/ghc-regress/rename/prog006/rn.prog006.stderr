@@ -1,5 +1,0 @@
-A.hi:
-  Interface file inconsistency:
-    home-package module `B.C' is mentioned,
-    but does not appear in the dependencies of the interface
-Cannot continue after interface file error
