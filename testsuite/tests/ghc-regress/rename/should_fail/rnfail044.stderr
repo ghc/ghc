@@ -1,5 +1,5 @@
 
 rnfail044.hs:5:11:
     Ambiguous occurrence `splitAt'
-    It could refer to either `A.splitAt', defined at rnfail044.hs:8:2
-		          or `GHC.List.splitAt', imported from Prelude at Implicit import declaration
+    It could refer to either `splitAt', defined at rnfail044.hs:8:2
+		          or `splitAt', imported from Prelude

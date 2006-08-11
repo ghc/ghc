@@ -1,4 +1,5 @@
 
 mod53.hs:4:5:
-    Can't make a derived instance of `C T' (`C' is not a derivable class)
-    When deriving instances for type `T'
+    Can't make a derived instance of `C T'
+      (`C' is not a derivable class)
+    When deriving instances for `T'
