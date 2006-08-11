@@ -2,7 +2,7 @@ module Main where
 
 import Control.Concurrent
 
-foreign import "sleep" threadsafe sleepBlock :: Int -> IO ()
+foreign import ccall safe "sleep" sleepBlock :: Int -> IO ()
 
 main :: IO ()
 main = do

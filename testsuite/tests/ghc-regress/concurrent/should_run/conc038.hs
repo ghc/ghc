@@ -5,9 +5,9 @@ import Control.Concurrent
 haskellFun :: Int -> IO ()
 haskellFun c = putStrLn ("Haskell: " ++ show c)
 
-foreign export "hFun"  haskellFun :: Int -> IO ()
-foreign import "hFun"  safe hFun :: Int -> IO ()
-foreign import "sleep" safe sleepBlock :: Int -> IO ()
+foreign export ccall "hFun"  haskellFun :: Int -> IO ()
+foreign import ccall safe "hFun"  hFun :: Int -> IO ()
+foreign import ccall safe "sleep" sleepBlock :: Int -> IO ()
 
 main :: IO ()
 main = do
