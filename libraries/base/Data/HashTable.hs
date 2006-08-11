@@ -41,86 +41,132 @@ import Prelude	hiding	( lookup )
 import Data.Tuple	( fst )
 import Data.Bits
 import Data.Maybe
-import Data.List	( maximumBy, filter, length, concat, foldl, reverse )
+import Data.List	( maximumBy, length, concat, foldl', partition )
 import Data.Int		( Int32 )
 
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Num
-import GHC.Real		( Integral(..), fromIntegral )
+import GHC.Real		( fromIntegral )
+import GHC.Show		( Show(..) )
+import GHC.Int		( Int64 )
 
-import GHC.IOBase	( IO, IOArray, newIOArray, readIOArray, writeIOArray,
-			  unsafeReadIOArray, unsafeWriteIOArray,
+import GHC.IOBase	( IO, IOArray, newIOArray,
+			  unsafeReadIOArray, unsafeWriteIOArray, unsafePerformIO,
 			  IORef, newIORef, readIORef, writeIORef )
-import GHC.Err		( undefined )
 #else
 import Data.Char	( ord )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 #  if defined(__HUGS__)
-import Hugs.IOArray	( IOArray, newIOArray, readIOArray, writeIOArray,
+import Hugs.IOArray	( IOArray, newIOArray,
 			  unsafeReadIOArray, unsafeWriteIOArray )
 #  elif defined(__NHC__)
-import NHC.IOExtras	( IOArray, newIOArray, readIOArray, writeIOArray)
+import NHC.IOExtras	( IOArray, newIOArray )
 #  endif
 #endif
-import Control.Monad	( when, mapM, sequence_ )
+import Control.Monad	( mapM, mapM_, sequence_ )
 
 
 -----------------------------------------------------------------------
-myReadArray  :: IOArray Int32 a -> Int32 -> IO a
-myWriteArray :: IOArray Int32 a -> Int32 -> a -> IO ()
+
+iNSTRUMENTED :: Bool
+iNSTRUMENTED = False
+
+-----------------------------------------------------------------------
+
+readHTArray  :: HTArray a -> Int32 -> IO a
+writeMutArray :: MutArray a -> Int32 -> a -> IO ()
+freezeArray  :: MutArray a -> IO (HTArray a)
+thawArray    :: HTArray a -> IO (MutArray a)
+newMutArray   :: (Int32, Int32) -> a -> IO (MutArray a)
 #if defined(DEBUG) || defined(__NHC__)
-myReadArray  = readIOArray
-myWriteArray = writeIOArray
+type MutArray a = IOArray Int32 a
+type HTArray a = MutArray a
+newMutArray = newArray
+readHTArray  = readArray
+writeMutArray = writeArray
+freezeArray = return
+thawArray = return
 #else
-myReadArray arr i = unsafeReadIOArray arr (fromIntegral i)
-myWriteArray arr i x = unsafeWriteIOArray arr (fromIntegral i) x
+type MutArray a = IOArray Int32 a
+type HTArray a = MutArray a -- Array Int32 a
+newMutArray = newIOArray
+readHTArray arr i = readMutArray arr i -- return $! (unsafeAt arr (fromIntegral i))
+readMutArray  :: MutArray a -> Int32 -> IO a
+readMutArray arr i = unsafeReadIOArray arr (fromIntegral i)
+writeMutArray arr i x = unsafeWriteIOArray arr (fromIntegral i) x
+freezeArray = return -- unsafeFreeze
+thawArray = return -- unsafeThaw
 #endif
 
--- | A hash table mapping keys of type @key@ to values of type @val@.
---
--- The implementation will grow the hash table as necessary, trying to
--- maintain a reasonable average load per bucket in the table.
---
-newtype HashTable key val = HashTable (IORef (HT key val))
+data HashTable key val = HashTable {
+	                             cmp     :: !(key -> key -> Bool),
+	                             hash_fn :: !(key -> Int32),
+                                     tab     :: !(IORef (HT key val))
+                                   }
 -- TODO: the IORef should really be an MVar.
 
 data HT key val
   = HT {
-	split  :: !Int32, -- Next bucket to split when expanding
-	max_bucket :: !Int32, -- Max bucket of smaller table
-	mask1  :: !Int32, -- Mask for doing the mod of h_1 (smaller table)
-	mask2  :: !Int32, -- Mask for doing the mod of h_2 (larger table)
-	kcount :: !Int32, -- Number of keys
-	bcount :: !Int32, -- Number of buckets
-	dir    :: !(IOArray Int32 (IOArray Int32 [(key,val)])),
-	hash_fn :: key -> Int32,
-	cmp    :: key -> key -> Bool
-   }
+	kcount  :: !Int32,              -- Total number of keys.
+        bmask   :: !Int32,
+	buckets :: !(HTArray [(key,val)])
+       }
 
-{-
-ALTERNATIVE IMPLEMENTATION:
+-- ------------------------------------------------------------
+-- Instrumentation for performance tuning
 
-This works out slightly slower, because there's a tradeoff between
-allocating a complete new HT structure each time a modification is
-made (in the version above), and allocating new Int32s each time one
-of them is modified, as below.  Using FastMutInt instead of IORef
-Int32 helps, but yields an implementation which has about the same
-performance as the version above (and is more complex).
+-- This ought to be roundly ignored after optimization when
+-- iNSTRUMENTED=False.
 
-data HashTable key val
-  = HashTable {
-	split  :: !(IORef Int32), -- Next bucket to split when expanding
-	max_bucket :: !(IORef Int32), -- Max bucket of smaller table
-	mask1  :: !(IORef Int32), -- Mask for doing the mod of h_1 (smaller table)
-	mask2  :: !(IORef Int32), -- Mask for doing the mod of h_2 (larger table)
-	kcount :: !(IORef Int32), -- Number of keys
-	bcount :: !(IORef Int32), -- Number of buckets
-	dir    :: !(IOArray Int32 (IOArray Int32 [(key,val)])),
-	hash_fn :: key -> Int32,
-	cmp    :: key -> key -> Bool
-   }
--}
+-- STRICT version of modifyIORef!
+modifyIORef :: IORef a -> (a -> a) -> IO ()
+modifyIORef r f = do
+  v <- readIORef r
+  let z = f v in z `seq` writeIORef r z
 
+data HashData = HD {
+  tables :: !Integer,
+  insertions :: !Integer,
+  lookups :: !Integer,
+  totBuckets :: !Integer,
+  maxEntries :: !Int32,
+  maxChain :: !Int,
+  maxBuckets :: !Int32
+} deriving (Eq, Show)
+
+{-# NOINLINE hashData #-}
+hashData :: IORef HashData
+hashData =  unsafePerformIO (newIORef (HD { tables=0, insertions=0, lookups=0,
+                                            totBuckets=0, maxEntries=0,
+                                            maxChain=0, maxBuckets=tABLE_MIN } ))
+
+instrument :: (HashData -> HashData) -> IO ()
+instrument i | iNSTRUMENTED = modifyIORef hashData i
+             | otherwise    = return ()
+
+recordNew :: IO ()
+recordNew = instrument rec
+  where rec hd@HD{ tables=t, totBuckets=b } =
+               hd{ tables=t+1, totBuckets=b+fromIntegral tABLE_MIN }
+
+recordIns :: Int32 -> Int32 -> [a] -> IO ()
+recordIns i sz bkt = instrument rec
+  where rec hd@HD{ insertions=ins, maxEntries=mx, maxChain=mc } =
+               hd{ insertions=ins+fromIntegral i, maxEntries=mx `max` sz,
+                   maxChain=mc `max` length bkt }
+
+recordResize :: Int32 -> Int32 -> IO ()
+recordResize older newer = instrument rec
+  where rec hd@HD{ totBuckets=b, maxBuckets=mx } =
+               hd{ totBuckets=b+fromIntegral (newer-older),
+                   maxBuckets=mx `max` newer }
+
+recordLookup :: IO ()
+recordLookup = instrument lkup
+  where lkup hd@HD{ lookups=l } = hd{ lookups=l+1 }
+
+-- stats :: IO String
+-- stats =  fmap show $ readIORef hashData
 
 -- -----------------------------------------------------------------------------
 -- Sample hash functions
@@ -137,40 +183,55 @@ data HashTable key val
 --
 -- We provide some sample hash functions for 'Int' and 'String' below.
 
--- | A sample hash function for 'Int', implemented as simply @(x `mod` P)@
--- where P is a suitable prime (currently 1500007).  Should give
--- reasonable results for most distributions of 'Int' values, except
--- when the keys are all multiples of the prime!
---
-hashInt :: Int -> Int32
-hashInt = (`rem` prime) . fromIntegral
+golden :: Int32
+golden = -1640531527
 
--- | A sample hash function for 'String's.  The implementation is:
+-- | A sample (and useful) hash function for Int and Int32,
+-- implemented by extracting the uppermost 32 bits of the 64-bit
+-- result of multiplying by a 32-bit constant.  The constant is from
+-- Knuth, derived from the golden ratio:
+-- > golden = round ((sqrt 5 - 1) * 2^31) :: Int
+hashInt :: Int -> Int32
+hashInt x = mulHi (fromIntegral x) golden
+
+-- hi 32 bits of a x-bit * 32 bit -> 64-bit multiply
+mulHi :: Int32 -> Int32 -> Int32
+mulHi a b = fromIntegral (r `shiftR` 32)
+  where r :: Int64
+        r = fromIntegral a * fromIntegral b :: Int64
+
+-- | A sample hash function for Strings.  We keep multiplying by the
+-- golden ratio and adding.  The implementation is:
 --
--- >    hashString = fromIntegral . foldr f 0
--- >      where f c m = ord c + (m * 128) `rem` 1500007
+-- > hashString = foldl' f 0
+-- >   where f m c = fromIntegral (ord c) + mulHi m golden
 --
--- which seems to give reasonable results.
---
+-- Note that this has not been extensively tested for reasonability,
+-- but Knuth argues that repeated multiplication by the golden ratio
+-- will minimize gaps in the hash space.
 hashString :: String -> Int32
-hashString = fromIntegral . foldl f 0
-  where f m c = ord c + (m * 128) `rem` fromIntegral prime
+hashString = foldl' f 0
+  where f m c = fromIntegral (ord c) + mulHi m golden
 
 -- | A prime larger than the maximum hash table size
 prime :: Int32
-prime = 1500007
+prime = 33554467
 
 -- -----------------------------------------------------------------------------
 -- Parameters
 
-sEGMENT_SIZE  = 1024  :: Int32  -- Size of a single hash table segment
-sEGMENT_SHIFT = 10    :: Int  -- derived
-sEGMENT_MASK  = 0x3ff :: Int32  -- derived
+tABLE_MAX :: Int32
+tABLE_MAX  = 32 * 1024 * 1024   -- Maximum size of hash table
+tABLE_MIN :: Int32
+tABLE_MIN  = 8
 
-dIR_SIZE = 1024  :: Int32  -- Size of the segment directory
-	-- Maximum hash table size is sEGMENT_SIZE * dIR_SIZE
+hLOAD :: Int32
+hLOAD = 7                       -- Maximum average load of a single hash bucket
 
-hLOAD = 4 :: Int32 -- Maximum average load of a single hash bucket
+hYSTERESIS :: Int32
+hYSTERESIS = 64                 -- entries to ignore in load computation
+
+{- Hysteresis favors long association-list-like behavior for small tables. -}
 
 -- -----------------------------------------------------------------------------
 -- Creating a new hash table
@@ -185,31 +246,24 @@ new
   -> (key -> Int32)	     -- ^ @hash@: A hash function on keys
   -> IO (HashTable key val)  -- ^ Returns: an empty hash table
 
-new cmp hash_fn = do
+new cmpr hash = do
+  recordNew
   -- make a new hash table with a single, empty, segment
-  dir     <- newIOArray (0,dIR_SIZE-1) undefined
-  segment <- newIOArray (0,sEGMENT_SIZE-1) []
-  myWriteArray dir 0 segment
+  let mask = tABLE_MIN-1
+  bkts'  <- newMutArray (0,mask) []
+  bkts   <- freezeArray bkts'
 
   let
-    split  = 0
-    max    = sEGMENT_SIZE
-    mask1  = (sEGMENT_SIZE - 1)
-    mask2  = (2 * sEGMENT_SIZE - 1)
-    kcount = 0
-    bcount = sEGMENT_SIZE
+    kcnt = 0
+    ht = HT {  buckets=bkts, kcount=kcnt, bmask=mask }
 
-    ht = HT {  dir=dir, split=split, max_bucket=max, mask1=mask1, mask2=mask2,
-	       kcount=kcount, bcount=bcount, hash_fn=hash_fn, cmp=cmp
-	  }
-  
   table <- newIORef ht
-  return (HashTable table)
+  return (HashTable { tab=table, hash_fn=hash, cmp=cmpr })
 
 -- -----------------------------------------------------------------------------
 -- Inserting a key\/value pair into the hash table
 
--- | Inserts an key\/value mapping into the hash table.  
+-- | Inserts a key\/value mapping into the hash table.
 --
 -- Note that 'insert' doesn't remove the old entry from the table -
 -- the behaviour is like an association list, where 'lookup' returns
@@ -219,112 +273,125 @@ new cmp hash_fn = do
 --
 insert :: HashTable key val -> key -> val -> IO ()
 
-insert (HashTable ref) key val = do
-  table@HT{ kcount=k, bcount=b, dir=dir } <- readIORef ref
-  let table1 = table{ kcount = k+1 }
-  table2 <-
-	if (k > hLOAD * b)
-	   then expandHashTable table1
-	   else return table1
+insert ht key val =
+  updatingBucket CanInsert (\bucket -> ((key,val):bucket, 1, ())) ht key
+
+
+-- ------------------------------------------------------------
+-- The core of the implementation is lurking down here, in findBucket,
+-- updatingBucket, and expandHashTable.
+
+tooBig :: Int32 -> Int32 -> Bool
+tooBig k b = k-hYSTERESIS > hLOAD * b
+
+-- index of bucket within table.
+bucketIndex :: Int32 -> Int32 -> Int32
+bucketIndex mask h = h .&. mask
+
+-- find the bucket in which the key belongs.
+-- returns (key equality, bucket index, bucket)
+--
+-- This rather grab-bag approach gives enough power to do pretty much
+-- any bucket-finding thing you might want to do.  We rely on inlining
+-- to throw away the stuff we don't want.  I'm proud to say that this
+-- plus updatingBucket below reduce most of the other definitions to a
+-- few lines of code, while actually speeding up the hashtable
+-- implementation when compared with a version which does everything
+-- from scratch.
+{-# INLINE findBucket #-}
+findBucket :: HashTable key val -> key -> IO (HT key val, Int32, [(key,val)])
+findBucket HashTable{ tab=ref, hash_fn=hash} key = do
+  table@HT{ buckets=bkts, bmask=b } <- readIORef ref
+  let indx = bucketIndex b (hash key)
+  bucket <- readHTArray bkts indx
+  return (table, indx, bucket)
+
+data Inserts = CanInsert
+             | Can'tInsert
+             deriving (Eq)
+
+-- updatingBucket is the real workhorse of all single-element table
+-- updates.  It takes a hashtable and a key, along with a function
+-- describing what to do with the bucket in which that key belongs.  A
+-- flag indicates whether this function may perform table insertions.
+-- The function returns the new contents of the bucket, the number of
+-- bucket entries inserted (negative if entries were deleted), and a
+-- value which becomes the return value for the function as a whole.
+-- The table sizing is enforced here, calling out to expandSubTable as
+-- necessary.
+
+-- This function is intended to be inlined and specialized for every
+-- calling context (eg every provided bucketFn).
+{-# INLINE updatingBucket #-}
+
+updatingBucket :: Inserts -> ([(key,val)] -> ([(key,val)], Int32, a)) ->
+                  HashTable key val -> key ->
+                  IO a
+updatingBucket canEnlarge bucketFn
+               ht@HashTable{ tab=ref, hash_fn=hash } key = do
+  (table@HT{ kcount=k, buckets=bkts, bmask=b },
+   indx, bckt) <- findBucket ht key
+  (bckt', inserts, result) <- return $ bucketFn bckt
+  let k' = k + inserts
+      table1 = table { kcount=k' }
+  bkts' <- thawArray bkts
+  writeMutArray bkts' indx bckt'
+  freezeArray bkts'
+  table2 <- if canEnlarge == CanInsert && inserts > 0 then do
+               recordIns inserts k' bckt'
+               if tooBig k' b
+                  then expandHashTable hash table1
+                  else return table1
+            else return table1
   writeIORef ref table2
-  (segment_index,segment_offset) <- tableLocation table2 key
-  segment <- myReadArray dir segment_index
-  bucket <- myReadArray segment segment_offset
-  myWriteArray segment segment_offset ((key,val):bucket)
-  return ()
+  return result
 
-bucketIndex :: HT key val -> key -> IO Int32
-bucketIndex HT{ hash_fn=hash_fn,
-		split=split,
-		mask1=mask1,
-		mask2=mask2 } key = do
-  let
-    h = fromIntegral (hash_fn key)
-    small_bucket = h .&. mask1
-    large_bucket = h .&. mask2
-  --
-  if small_bucket < split
-	then return large_bucket
-  	else return small_bucket
-
-tableLocation :: HT key val -> key -> IO (Int32,Int32)
-tableLocation table key = do
-  bucket_index <- bucketIndex table key
-  let
-    segment_index  = bucket_index `shiftR` sEGMENT_SHIFT
-    segment_offset = bucket_index .&. sEGMENT_MASK
-  --
-  return (segment_index,segment_offset)
-
-expandHashTable :: HT key val -> IO (HT key val)
-expandHashTable
-      table@HT{ dir=dir,
-		split=split,
-		max_bucket=max,
-		bcount=bcount,
-		mask2=mask2 } = do
-  let
-      oldsegment = split `shiftR` sEGMENT_SHIFT
-      oldindex   = split .&. sEGMENT_MASK
-
-      newbucket  = max + split
-      newsegment = newbucket `shiftR` sEGMENT_SHIFT
-      newindex   = newbucket .&. sEGMENT_MASK
-  --
-  if newsegment >= dIR_SIZE	-- make sure we don't overflow the table.
-	then return table
-	else do
-  --
-   when (newindex == 0) $
-	do segment <- newIOArray (0,sEGMENT_SIZE-1) []
-	   writeIOArray dir newsegment segment
-	   -- doesn't happen very often, so we might as well use a safe
-	   -- array index here.
-  --
-   let table' =
-  	if (split+1) < max
-     	    then table{ split = split+1,
-			bcount = bcount+1 }
-     		-- we've expanded all the buckets in this table, so start from
-		-- the beginning again.
-     	    else table{ split = 0,
-			bcount = bcount+1,
-			max_bucket = max * 2,
-			mask1 = mask2,
-			mask2 = mask2 `shiftL` 1 .|. 1 }
+expandHashTable :: (key -> Int32) -> HT key val -> IO (HT key val)
+expandHashTable hash table@HT{ buckets=bkts, bmask=mask } = do
    let
-    split_bucket old new [] = do
-	segment <- myReadArray dir oldsegment
-	myWriteArray segment oldindex (reverse old)
-	segment <- myReadArray dir newsegment
-	myWriteArray segment newindex (reverse new)
-    split_bucket old new ((k,v):xs) = do
-	h <- bucketIndex table' k
-	if h == newbucket
-		then split_bucket old ((k,v):new) xs
-		else split_bucket ((k,v):old) new xs
-  --
-   segment <- myReadArray dir oldsegment
-   bucket <- myReadArray segment oldindex
-   split_bucket [] [] bucket
-   return table'
+      oldsize = mask + 1
+      newmask = mask + mask + 1
+   recordResize oldsize (newmask+1)
+   --
+   if newmask > tABLE_MAX-1
+      then return table
+      else do
+   --
+   newbkts' <- newMutArray (0,newmask) []
+
+   let
+    splitBucket oldindex = do
+      bucket <- readHTArray bkts oldindex
+      let (oldb,newb) =
+              partition ((oldindex==). bucketIndex newmask . hash . fst) bucket
+      writeMutArray newbkts' oldindex oldb
+      writeMutArray newbkts' (oldindex + oldsize) newb
+   mapM_ splitBucket [0..mask]
+
+   newbkts <- freezeArray newbkts'
+
+   return ( table{ buckets=newbkts, bmask=newmask } )
 
 -- -----------------------------------------------------------------------------
 -- Deleting a mapping from the hash table
+
+-- Remove a key from a bucket
+deleteBucket :: (key -> Bool) -> [(key,val)] -> ([(key, val)], Int32, ())
+deleteBucket _   [] = ([],0,())
+deleteBucket del (pair@(k,_):bucket) =
+  case deleteBucket del bucket of
+    (bucket', dels, _) | del k     -> dels' `seq` (bucket', dels', ())
+                       | otherwise -> (pair:bucket', dels, ())
+      where dels' = dels - 1
 
 -- | Remove an entry from the hash table.
 delete :: HashTable key val -> key -> IO ()
 
-delete (HashTable ref) key = do
-  table@HT{ dir=dir, cmp=cmp } <- readIORef ref
-  (segment_index,segment_offset) <- tableLocation table key
-  segment <- myReadArray dir segment_index
-  bucket <- myReadArray segment segment_offset
-  myWriteArray segment segment_offset (filter (not.(key `cmp`).fst) bucket)
-  return ()
+delete ht@HashTable{ cmp=eq } key =
+  updatingBucket Can'tInsert (deleteBucket (eq key)) ht key
 
 -- -----------------------------------------------------------------------------
--- Deleting a mapping from the hash table
+-- Updating a mapping in the hash table
 
 -- | Updates an entry in the hash table, returning 'True' if there was
 -- already an entry for this key, or 'False' otherwise.  After 'update'
@@ -336,29 +403,11 @@ delete (HashTable ref) key = do
 -- by 'insert'.
 update :: HashTable key val -> key -> val -> IO Bool
 
-update (HashTable ref) key val = do
-  table@HT{ kcount=k, bcount=b, dir=dir, cmp=cmp } <- readIORef ref
-  let table1 = table{ kcount = k+1 }
-  -- optimistically expand the table
-  table2 <-
-	if (k > hLOAD * b)
-	   then expandHashTable table1
-	   else return table1
-  writeIORef ref table2
-  (segment_index,segment_offset) <- tableLocation table2 key
-  segment <- myReadArray dir segment_index
-  bucket <- myReadArray segment segment_offset
-  let 
-    (deleted,bucket') = foldr filt (0::Int32,[]) bucket
-    filt pair@(k,v) (deleted,bucket)
-	| key `cmp` k = (deleted+1, bucket)
-	| otherwise   = (deleted,   pair:bucket)
-  -- in  
-  myWriteArray segment segment_offset ((key,val):bucket')
-  -- update the table load, taking into account the number of
-  -- items we just deleted.
-  writeIORef ref table2{ kcount = kcount table2 - deleted }
-  return (deleted /= 0)
+update ht@HashTable{ cmp=eq } key val =
+  updatingBucket CanInsert
+    (\bucket -> let (bucket', dels, _) = deleteBucket (eq key) bucket
+                in  ((key,val):bucket', 1+dels, dels/=0))
+    ht key
 
 -- -----------------------------------------------------------------------------
 -- Looking up an entry in the hash table
@@ -366,14 +415,12 @@ update (HashTable ref) key val = do
 -- | Looks up the value of a key in the hash table.
 lookup :: HashTable key val -> key -> IO (Maybe val)
 
-lookup (HashTable ref) key = do
-  table@HT{ dir=dir, cmp=cmp } <- readIORef ref
-  (segment_index,segment_offset) <- tableLocation table key
-  segment <- myReadArray dir segment_index
-  bucket <- myReadArray segment segment_offset
-  case [ val | (key',val) <- bucket, cmp key key' ] of
-	[] -> return Nothing
-	(v:_) -> return (Just v)
+lookup ht@HashTable{ cmp=eq } key = do
+  recordLookup
+  (_, _, bucket) <- findBucket ht key
+  let firstHit (k,v) r | eq key k  = Just v
+                       | otherwise = r
+  return (foldr firstHit Nothing bucket)
 
 -- -----------------------------------------------------------------------------
 -- Converting to/from lists
@@ -381,53 +428,36 @@ lookup (HashTable ref) key = do
 -- | Convert a list of key\/value pairs into a hash table.  Equality on keys
 -- is taken from the Eq instance for the key type.
 --
-fromList :: Eq key => (key -> Int32) -> [(key,val)] -> IO (HashTable key val)
-fromList hash_fn list = do
-  table <- new (==) hash_fn
+fromList :: (Eq key) => (key -> Int32) -> [(key,val)] -> IO (HashTable key val)
+fromList hash list = do
+  table <- new (==) hash
   sequence_ [ insert table k v | (k,v) <- list ]
   return table
 
 -- | Converts a hash table to a list of key\/value pairs.
 --
 toList :: HashTable key val -> IO [(key,val)]
-toList (HashTable ref) = do
-  HT{ dir=dir, max_bucket=max, split=split } <- readIORef ref
-  --
-  let
-    max_segment = (max + split - 1) `quot` sEGMENT_SIZE
-  --
-  segments <- mapM (segmentContents dir) [0 .. max_segment]
-  return (concat segments)
- where
-   segmentContents dir seg_index = do
-     segment <- myReadArray dir seg_index
-     bs <- mapM (myReadArray segment) [0 .. sEGMENT_SIZE-1]
-     return (concat bs)
+toList = mapReduce id concat
+
+{-# INLINE mapReduce #-}
+mapReduce :: ([(key,val)] -> r) -> ([r] -> r) -> HashTable key val -> IO r
+mapReduce m r HashTable{ tab=ref } = do
+  HT{ buckets=bckts, bmask=b } <- readIORef ref
+  fmap r (mapM (fmap m . readHTArray bckts) [0..b])
 
 -- -----------------------------------------------------------------------------
 -- Diagnostics
 
--- | This function is useful for determining whether your hash function
--- is working well for your data set.  It returns the longest chain
--- of key\/value pairs in the hash table for which all the keys hash to
--- the same bucket.  If this chain is particularly long (say, longer
--- than 10 elements), then it might be a good idea to try a different
--- hash function.
+-- | This function is useful for determining whether your hash
+-- function is working well for your data set.  It returns the longest
+-- chain of key\/value pairs in the hash table for which all the keys
+-- hash to the same bucket.  If this chain is particularly long (say,
+-- longer than 14 elements or so), then it might be a good idea to try
+-- a different hash function.
 --
 longestChain :: HashTable key val -> IO [(key,val)]
-longestChain (HashTable ref) = do
-  HT{ dir=dir, max_bucket=max, split=split } <- readIORef ref
-  --
-  let
-    max_segment = (max + split - 1) `quot` sEGMENT_SIZE
-  --
-  --trace ("maxChainLength: max = " ++ show max ++ ", split = " ++ show split ++ ", max_segment = " ++ show max_segment) $ do
-  segments <- mapM (segmentMaxChainLength dir) [0 .. max_segment]
-  return (maximumBy lengthCmp segments)
- where
-   segmentMaxChainLength dir seg_index = do
-     segment <- myReadArray dir seg_index
-     bs <- mapM (myReadArray segment) [0 .. sEGMENT_SIZE-1]
-     return (maximumBy lengthCmp bs)
-
-   lengthCmp x y = length x `compare` length y
+longestChain = mapReduce id (maximumBy lengthCmp)
+  where lengthCmp (_:x)(_:y) = lengthCmp x y
+        lengthCmp []   []    = EQ
+        lengthCmp []   _     = LT
+        lengthCmp _    []    = GT
