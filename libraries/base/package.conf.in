@@ -1,3 +1,5 @@
+#include "ghcconfig.h"
+
 name:		PACKAGE
 version:	VERSION
 license:	BSD3
@@ -181,7 +183,7 @@ library-dirs:	LIB_DIR
 hs-libraries:   "HSbase"
 
 extra-libraries:  "HSbase_cbits"
-#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__) || defined(_MSC_VER)
 	     , "wsock32", "msvcrt", "kernel32", "user32", "shell32"
 #endif
 
