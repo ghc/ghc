@@ -812,7 +812,8 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
         s8 </> methHdr </>
         tda [theclass "body"] << vanillaTable << (
           abovesSep s8 [ ppSig summary links loc mbDoc sig
-                         | L _ sig@(TypeSig (L _ (NoLink n)) t) <- lsigs, let mbDoc = Map.lookup n docMap ]
+                         | L _ sig@(TypeSig n _) <- lsigs, 
+                         let mbDoc = Map.lookup (orig n) docMap ]
         )
 
     instId = collapseId nm

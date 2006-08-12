@@ -278,16 +278,16 @@ run flags files = do
 
   let (haddockModules'', messages') = runWriter $ mapM (renameModule env) haddockModules'
   
-  putStrLn "pass 1 messages:"
+--  putStrLn "pass 1 messages:"
   print messages
-  putStrLn "pass 1 export items:"
+{-  putStrLn "pass 1 export items:"
   printSDoc (ppr (map hmod_export_items haddockModules')) defaultUserStyle 
   
   putStrLn "pass 2 env:"
   printSDoc (ppr (Map.toList env)) defaultUserStyle
 
   putStrLn "pass 2 export items:"
-  printSDoc (ppr (map hmod_rn_export_items haddockModules'')) defaultUserStyle 
+  printSDoc (ppr (map hmod_rn_export_items haddockModules'')) defaultUserStyle -}
   mapM_ putStrLn messages'
 
   let visibleModules = [ m | m <- haddockModules'', OptHide `notElem` (hmod_options m) ]
@@ -401,10 +401,21 @@ instance Outputable (DocEntity Name) where
   ppr (DocEntity d) = ppr d
   ppr (DeclEntity name) = ppr name
 
+instance Show Name where
+  show name = show (ppr name defaultUserStyle)
+
+instance Show a => Show (DocDecl a) where
+  show (DocCommentNext doc) = "next" ++ show doc
+  show (DocCommentPrev doc) = "prev" ++ show doc
+  show _ = "other" 
+
 type FullyCheckedModule = (ParsedSource, 
                            RenamedSource, 
                            TypecheckedSource, 
                            ModuleInfo)
+
+printEntity (DocEntity doc) = show doc
+printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
 pass1 :: [(Module, FullyCheckedModule, FilePath)] -> [Flag] -> Maybe String-> ErrMsgM ModuleMap2
 pass1 modules flags package = worker modules (Map.empty) flags
@@ -419,8 +430,9 @@ pass1 modules flags package = worker modules (Map.empty) flags
       opts <- mk_doc_opts mb_doc_opts
 
       let (group, _, mb_exports, mbModDoc, haddockModInfo) = renamed_source
-          entities = nubBy sameName (hs_docs group)
-          exports = fmap (map unLoc) mb_exports 
+
+          entities = (reverse . nubBy sameName . hs_docs) group 
+          exports = fmap (reverse . map unLoc) mb_exports
  
           -- lots of names
           exportedNames = modInfoExports moduleInfo
@@ -431,12 +443,13 @@ pass1 modules flags package = worker modules (Map.empty) flags
           scopeNames = fromJust $ modInfoTopLevelScope moduleInfo 
       
           subMap = mk_sub_map_from_group group
-        
+
+      -- tell (map printEntity entities)
       theseVisibleNames <- visibleNames mod moduleMap localNames scopeNames subMap exports opts
 
       let exportedDeclMap = mkDeclMap exportedNames group
           localDeclMap = mkDeclMap theseEntityNames group
-          docMap = mkDocMap group
+          docMap = mkDocMap group 
 
           ignoreAllExports = Flag_IgnoreAllExports `elem` flags
       
@@ -494,13 +507,26 @@ sameName (DocEntity _) _ = False
 sameName (DeclEntity _) (DocEntity _) = False
 sameName (DeclEntity a) (DeclEntity b) = a == b
 
-mkDocMap :: HsGroup Name -> Map Name (HsDoc Name)
-mkDocMap group = Map.fromList $
-  collectDocs (hs_docs group) ++ collectDocsFromClassMeths (getClasses group)
+-- This map includes everything that can be exported separately,
+-- that means: top declarations, class methods and record selectors
+-- TODO: merge this with mkDeclMap and the extractXXX functions 
+mkDocMap :: HsGroup Name ->  Map Name (HsDoc Name)
+mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
   where
-    getClasses group = filter isClassDecl (map unLoc (hs_tyclds group))
-    collectDocsFromClassMeths classes = concatMap (collectDocs . tcdDocs) classes
-          
+    tyclds      = map unLoc (hs_tyclds group)
+    classes     = filter isClassDecl tyclds 
+    datadecls   = filter isDataDecl tyclds
+    constrs     = [ con | d <- datadecls, L _ con <- tcdCons d ]
+    fields      = concat [ fields | RecCon fields <- map con_details constrs]
+
+    topDeclDocs = collectDocs (reverse (hs_docs group))
+ 
+    classMethDocs  
+      = concatMap (collectDocs . tcdDocs) classes
+
+    recordFieldDocs = [ (unLoc lname, doc) | 
+                        HsRecField lname _ (Just (L _ doc)) <- fields ]
+
 collectDocs :: [DocEntity Name] -> [(Name, HsDoc Name)]
 collectDocs entities = collect Nothing DocEmpty entities
 
@@ -511,19 +537,19 @@ collect d doc_so_far [] =
         Just d0  -> finishedDoc d0 doc_so_far []
 
 collect d doc_so_far (e:es) =
-   case e of
-      DocEntity (DocCommentNext str) ->
-        case d of
-           Nothing -> collect d (docAppend doc_so_far str) es
-           Just d0 -> finishedDoc d0 doc_so_far (collect Nothing str es)
+  case e of
+    DocEntity (DocCommentNext str) ->
+      case d of
+        Nothing -> collect d (docAppend doc_so_far str) es
+        Just d0 -> finishedDoc d0 doc_so_far (collect Nothing str es)
 
-      DocEntity (DocCommentPrev str) -> collect d (docAppend doc_so_far str) es
+    DocEntity (DocCommentPrev str) -> collect d (docAppend doc_so_far str) es
 
-      _other ->
-        case d of
-            Nothing -> collect (Just e) doc_so_far es
-            Just d0 -> finishedDoc d0 doc_so_far
-                           (collect (Just e) DocEmpty es)
+    _ -> case d of
+      Nothing -> collect (Just e) doc_so_far es
+      Just d0
+        | sameName d0 e -> collect d doc_so_far es  
+        | otherwise -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
 
 finishedDoc :: DocEntity Name -> HsDoc Name -> [(Name, HsDoc Name)] -> [(Name, HsDoc Name)]
 finishedDoc d DocEmpty rest = rest

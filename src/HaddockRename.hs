@@ -99,7 +99,7 @@ renameDoc doc = case doc of
     lkp <- getLookupRn
     case [ n | (True, n) <- map lkp ids ] of
       ids'@(_:_) -> return (DocIdentifier ids')
-      [] -> return (DocIdentifier (map Link ids))
+      [] -> return (DocIdentifier (map NoLink ids))
   DocModule str -> return (DocModule str)
   DocEmphasis doc -> do
     doc' <- renameDoc doc

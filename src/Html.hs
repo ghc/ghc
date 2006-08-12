@@ -81,10 +81,10 @@ class ADDATTRS a where
       (!) :: a -> [HtmlAttr] -> a
 
 instance (ADDATTRS b) => ADDATTRS (a -> b) where
-      fn ! attr = \ arg -> fn arg ! attr
+      (!) fn attr = \ arg -> fn arg ! attr
 
 instance ADDATTRS Html where
-      (Html htmls) ! attr = Html (map addAttrs htmls)
+      (!) (Html htmls) attr = Html (map addAttrs htmls)
         where
               addAttrs html =
                   case html of
