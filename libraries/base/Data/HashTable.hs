@@ -192,6 +192,7 @@ golden = -1640531527
 -- implemented by extracting the uppermost 32 bits of the 64-bit
 -- result of multiplying by a 32-bit constant.  The constant is from
 -- Knuth, derived from the golden ratio:
+--
 -- > golden = round ((sqrt 5 - 1) * 2^31) :: Int
 hashInt :: Int -> Int32
 hashInt x = mulHi (fromIntegral x) golden
