@@ -147,6 +147,8 @@ install ::
 	-mkdir $(prefix)/include/mingw
 	-cp -rp $(GccDir)../include/* $(prefix)/include/mingw
 	-cp -rp $(GccDir)../lib/gcc-lib/mingw32/$(GccVersion)/* $(prefix)/gcc-lib
+	-cp -rp $(GccDir)../lib/gcc/mingw32/$(GccVersion)/* $(prefix)/gcc-lib
+	-cp -rp $(GccDir)../libexec/gcc/mingw32/$(GccVersion)/* $(prefix)/gcc-lib
 	-cp $(GccDir)../lib/*.* $(prefix)/gcc-lib
 	-cp $(GccDir)gcc.exe $(prefix)
 	-cp $(GccDir)as.exe $(prefix)/gcc-lib
