@@ -22,8 +22,6 @@ import HaddockUtil
 import HaddockVersion
 import Html
 import qualified Html
-import Data.Map ( Map )
-import qualified Data.Map as Map hiding ( Map )
 
 import Control.Exception ( bracket )
 import Control.Monad ( when, unless )
@@ -33,6 +31,8 @@ import Data.Maybe ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
 import Debug.Trace ( trace )
+import Data.Map ( Map )
+import qualified Data.Map as Map hiding ( Map )
 
 import GHC 
 import Name
@@ -661,7 +661,7 @@ doDecl summary links x (L loc d) mbDoc instances docMap = doDecl d
     doDecl (SigD s) = ppSig summary links loc mbDoc s
     doDecl (ForD d) = ppFor summary links loc mbDoc d
 
-    doTyClD d0@(TyData {}) = ppDataDecl summary links instances x mbDoc d0
+    doTyClD d0@(TyData {}) = ppDataDecl summary links instances x loc mbDoc d0
     doTyClD d0@(TySynonym {}) = ppTySyn summary links loc mbDoc d0
     doTyClD d0@(ClassDecl {}) = ppClassDecl summary links instances x loc mbDoc docMap d0
 
@@ -669,7 +669,7 @@ ppSig :: Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) -> Sig DocName ->
 ppSig summary links loc mbDoc (TypeSig lname ltype) 
   | summary || noArgDocs t = 
     declWithDoc summary links loc n mbDoc (ppTypeSig summary n t)
-  | otherwise = topDeclBox links loc n (ppHsBinder False n) </>
+  | otherwise = topDeclBox links loc n (ppBinder False n) </>
     (tda [theclass "body"] << vanillaTable <<  (
       do_args dcolon t </>
         (case mbDoc of 
@@ -722,7 +722,7 @@ ppFor _ _ _ _ _ = error "ppFor"
 
 ppTySyn summary links loc mbDoc (TySynonym lname ltyvars ltype) 
   = declWithDoc summary links loc n mbDoc (
-    hsep ([keyword "type", ppHsBinder summary n]
+    hsep ([keyword "type", ppBinder summary n]
     ++ ppTyVars ltyvars) <+> equals <+> ppLType ltype)
   where NoLink n = unLoc lname
 
@@ -743,7 +743,7 @@ ppPred (HsIParam (Linear  n) t)
   = toHtml "%" +++ ppDocName n <+> dcolon <+> ppLType t
 
 ppTypeSig :: Bool -> Name -> (HsType DocName) -> Html
-ppTypeSig summary nm ty = ppHsBinder summary nm <+> dcolon <+> ppType ty
+ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
 
 -- -----------------------------------------------------------------------------
 -- Class declarations
@@ -751,11 +751,11 @@ ppTypeSig summary nm ty = ppHsBinder summary nm <+> dcolon <+> ppType ty
 --ppClassHdr :: Bool -> HsContext -> HsName -> [HsName] -> [HsFunDep] -> Html
 ppClassHdr summ (L _ []) n tvs fds = 
   keyword "class"
-	<+> ppHsBinder summ n <+> hsep (ppTyVars tvs)
+	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
 	<+> ppFds fds
 ppClassHdr summ lctxt n tvs fds = 
   keyword "class" <+> ppLContext lctxt <+> darrow
-	<+> ppHsBinder summ n <+> hsep (ppTyVars tvs)
+	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
 	<+> ppFds fds
 
 --ppFds :: [HsFunDep] -> Html
@@ -790,7 +790,7 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
   | otherwise
     = classheader </>
       tda [theclass "body"] << vanillaTable << (
-        classdoc </> methods_bit </> instances_bit
+        classdoc </> methodsBit </> instancesBit
       )
   where 
     classheader
@@ -806,24 +806,24 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
       Nothing -> Html.emptyTable
       Just d -> ndocBox (docToHtml d)
 
-    methods_bit
+    methodsBit
       | null lsigs = Html.emptyTable
       | otherwise  = 
-        s8 </> meth_hdr </>
+        s8 </> methHdr </>
         tda [theclass "body"] << vanillaTable << (
           abovesSep s8 [ ppSig summary links loc mbDoc sig
                          | L _ sig@(TypeSig (L _ (NoLink n)) t) <- lsigs, let mbDoc = Map.lookup n docMap ]
         )
 
-    inst_id = collapseId nm
-    instances_bit
+    instId = collapseId nm
+    instancesBit
       | null instances = Html.emptyTable
       | otherwise 
-        =  s8 </> inst_hdr inst_id </>
+        =  s8 </> instHdr instId </>
            tda [theclass "body"] << 
-             collapsed thediv inst_id (
+             collapsed thediv instId (
              spacedTable1 << (
-               aboves (map (declBox.ppInstHead) instances)
+               aboves (map (declBox . ppInstHead) instances)
              ))
 
 ppInstHead :: InstHead2 DocName -> Html
@@ -832,157 +832,154 @@ ppInstHead (ctxt, n, ts) = ppPreds ctxt <+> ppAsst n ts
 
 ppAsst n ts = ppDocName n <+> hsep (map ppType ts)
 
-ppDataDecl = undefined
-
-{-
--- -----------------------------------------------------------------------------
--- Converting declarations to HTML
-
-declWithDoc :: Bool -> LinksInfo -> SrcLoc -> HsName -> Maybe Doc -> Html -> HtmlTable
-declWithDoc True  _     _   _  _          html_decl = declBox html_decl
-declWithDoc False links loc nm Nothing    html_decl = topDeclBox links loc nm html_decl
-declWithDoc False links loc nm (Just doc) html_decl = 
-		topDeclBox links loc nm html_decl </> docBox (docToHtml doc)
-
-doDecl :: Bool -> LinksInfo -> HsQName -> HsDecl -> [InstHead] -> HtmlTable
-doDecl summary links x d instances = do_decl d
-  where
-     do_decl (HsTypeSig loc [nm] ty doc) 
-	= ppFunSig summary links loc nm ty doc
-
-     do_decl (HsForeignImport loc _ _ _ n ty doc)
-	= ppFunSig summary links loc n ty doc
-
-     do_decl (HsTypeDecl loc nm args ty doc)
-	= declWithDoc summary links loc nm doc (
-	      hsep ([keyword "type", ppHsBinder summary nm]
-		 ++ map ppHsName args) <+> equals <+> ppHsType ty)
-
-     do_decl (HsNewTypeDecl loc ctx nm args con drv doc)
-	= ppHsDataDecl summary links instances True{-is newtype-} x
-		(HsDataDecl loc ctx nm args [con] drv doc)
-	  -- print it as a single-constructor datatype
-
-     do_decl d0@(HsDataDecl{})
-	= ppHsDataDecl summary links instances False{-not newtype-} x d0
-
-     do_decl d0@(HsClassDecl{})
-	= ppHsClassDecl summary links instances x d0
-
-     do_decl (HsDocGroup _ lev str)
-	= if summary then Html.emptyTable 
-		     else ppDocGroup lev (docToHtml str)
-
-     do_decl _ = nrror ("do_decl: " ++ show d)
-
-
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
 
-ppShortDataDecl :: Bool -> LinksInfo -> Bool -> HsDecl -> Html
-ppShortDataDecl summary _ is_newty 
-	(HsDataDecl _ _ nm args [con] _ _doc) =
-   ppHsDataHeader summary is_newty nm args      
-     <+> equals <+> ppShortConstr summary con
-ppShortDataDecl summary _ is_newty
-	(HsDataDecl _ _ nm args [] _ _doc) = 
-   ppHsDataHeader summary is_newty nm args
-ppShortDataDecl summary links is_newty
-	(HsDataDecl loc _ nm args cons _ _doc) = 
-   vanillaTable << (
-	(if summary then declBox else topDeclBox links loc nm)
-          (ppHsDataHeader summary is_newty nm args) </>
-	tda [theclass "body"] << vanillaTable << (
-	  aboves (zipWith do_constr ('=':repeat '|') cons)
-        )
-   )
-  where do_constr c con = declBox (toHtml [c] <+> ppShortConstr summary con)
-ppShortDataDecl _ _ _ d =
-    error $ "HaddockHtml.ppShortDataDecl: unexpected decl " ++ show d
+orig (L _ (NoLink name)) = name
+orig _ = error "org"
+
+
+-- TODO: print contexts
+ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> 
+                   Maybe (HsDoc DocName) -> TyClDecl DocName -> Html
+ppShortDataDecl summary links loc mbDoc dataDecl 
+
+  | [lcon] <- cons = 
+    ppDataHeader summary NewType name tyVars
+    <+> equals <+> ppShortConstr summary (unLoc lcon)
+
+  | [] <- cons = ppDataHeader summary NewType name tyVars
+
+  | otherwise = vanillaTable << (
+      (if summary then declBox else topDeclBox links loc name)
+      (ppDataHeader summary newOrData name tyVars) </>
+      tda [theclass "body"] << vanillaTable << (
+        aboves (zipWith doConstr ('=':repeat '|') cons)
+      )
+    )
+  
+  where
+    doConstr c con = declBox (toHtml [c] <+> ppShortConstr summary (unLoc con))
+
+    name      = orig (tcdLName dataDecl)
+    context   = unLoc (tcdCtxt dataDecl)
+    newOrData = tcdND dataDecl
+    tyVars    = tyvarNames (tcdTyVars dataDecl)
+    mbKSig    = tcdKindSig dataDecl
+    cons      = tcdCons dataDecl
 
 -- The rest of the cases:
-ppDataDecl :: Ord key => Bool -> LinksInfo -> [InstHead2 DocName] -> key -> TyClDecl DocName -> HtmlTable
-ppDataDecl summary links instances x decl@(DataDecl loc _ nm args cons _ doc)
-  | summary = declWithDoc summary links loc nm doc (ppShortDataDecl summary links is_newty decl)
-
-  | otherwise
-        = dataheader </> 
-	    tda [theclass "body"] << vanillaTable << (
-		datadoc </> 
-		constr_bit </>
-		instances_bit
-            )
+ppDataDecl :: Ord key => Bool -> LinksInfo -> [InstHead2 DocName] -> key -> 
+              SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> HtmlTable
+ppDataDecl summary links instances x loc mbDoc dataDecl
+  
+  | summary = declWithDoc summary links loc name mbDoc 
+              (ppShortDataDecl summary links loc mbDoc dataDecl)
+  
+  | otherwise = dataheader </> 
+    tda [theclass "body"] << vanillaTable << (
+      datadoc </> 
+      constrBit </>
+      instancesBit
+    )
+  
   where
-	dataheader = topDeclBox links loc nm (ppHsDataHeader False is_newty nm args)
+    name      = orig (tcdLName dataDecl)
+    context   = unLoc (tcdCtxt dataDecl)
+    newOrData = tcdND dataDecl
+    tyVars    = tyvarNames (tcdTyVars dataDecl)
+    mbKSig    = tcdKindSig dataDecl
+    cons      = tcdCons dataDecl
+         
+    dataheader = topDeclBox links loc name 
+                 (ppDataHeader False newOrData name tyVars)
 
-	constr_table
-	 	| any isRecDecl cons  = spacedTable5
-	  	| otherwise           = spacedTable1
+    constrTable
+      | any isRecCon cons = spacedTable5
+      | otherwise         = spacedTable1
 
-	datadoc | isJust doc = ndocBox (docToHtml (fromJust doc))
-	  	| otherwise  = Html.emptyTable
+    datadoc = case mbDoc of
+      Just doc -> ndocBox (docToHtml doc)
+      Nothing -> Html.emptyTable
 
-	constr_bit 
-		| null cons = Html.emptyTable
-		| otherwise = 
-			constr_hdr </>
-			(tda [theclass "body"] << constr_table << 
-			 aboves (map ppSideBySideConstr cons)
-			)
+    constrBit 
+      | null cons = Html.emptyTable
+      | otherwise = constrHdr </> ( 
+          tda [theclass "body"] << constrTable << 
+	  aboves (map ppSideBySideConstr cons)
+        )
 
-	inst_id = collapseId nm
+    instId = collapseId name
 
-	instances_bit
-	   | null instances = Html.emptyTable
-	   | otherwise
-	   =  inst_hdr inst_id </>
-		 tda [theclass "body"] << 
-		    collapsed thediv inst_id (
-			spacedTable1 << (
-			   aboves (map (declBox.ppInstHead) instances)
-		        )
- 		   )
+    instancesBit
+      | null instances = Html.emptyTable
+      | otherwise 
+        = instHdr instId </>
+	  tda [theclass "body"] << 
+          collapsed thediv instId (
+            spacedTable1 << (
+              aboves (map (declBox . ppInstHead) instances)
+            )
+          )
 
-ppHsDataDecl _ _ _ _ _ d =
-    error $ "HaddockHtml.ppHsDataDecl: unexpected decl " ++ show d
+isRecCon lcon = case con_details (unLoc lcon) of 
+  RecCon _ -> True
+  _ -> False
 
-isRecDecl :: HsConDecl -> Bool
-isRecDecl (HsRecDecl{}) = True
-isRecDecl _             = False
+ppShortConstr :: Bool -> ConDecl DocName -> Html
+ppShortConstr summary con = case con_res con of 
 
-ppShortConstr :: Bool -> HsConDecl -> Html
-ppShortConstr summary (HsConDecl _ nm tvs ctxt typeList _maybe_doc) = 
-   ppHsConstrHdr tvs ctxt +++
-	hsep (ppHsBinder summary nm : map ppHsBangType typeList)
-ppShortConstr summary (HsRecDecl _ nm tvs ctxt fields _) =
-   ppHsConstrHdr tvs ctxt +++
-   ppHsBinder summary nm <+>
-   braces (vanillaTable << aboves (map (ppShortField summary) fields))
+  ResTyH98 -> case con_details con of 
+    PrefixCon args -> header +++ hsep (ppBinder summary name : map ppLType args)
+    RecCon fields -> header +++ ppBinder summary name <+>
+      braces (vanillaTable << aboves (map (ppShortField summary) fields))
 
-ppHsConstrHdr :: [HsName] -> HsContext -> Html
-ppHsConstrHdr tvs ctxt
- = (if null tvs then noHtml else keyword "forall" <+> 
-				 hsep (map ppHsName tvs) <+> 
-				 toHtml ". ")
+  ResTyGADT ltype -> error "GADTs not supported yet" 
+
+  where 
+    header  = ppConstrHdr forall tyVars context
+    name    = orig (con_name con)
+    tyVars  = tyvarNames (con_qvars con)
+    context = unLoc (con_cxt con)
+    forall  = con_explicit con
+
+ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Html
+ppConstrHdr forall tvs ctxt
+ = (if null tvs then noHtml else ppForall)
    +++
    (if null ctxt then noHtml else ppContext ctxt <+> toHtml "=> ")
+  where
+    ppForall = case forall of 
+      Explicit -> keyword "forall" <+> hsep (map ppName tvs) <+> toHtml ". "
+      Implicit -> empty
 
-ppSideBySideConstr :: HsConDecl -> HtmlTable
-ppSideBySideConstr (HsConDecl _ nm tvs ctxt typeList doc) =
-  argBox (hsep ((ppHsConstrHdr tvs ctxt +++ 
-		ppHsBinder False nm) : map ppHsBangType typeList)) <->
-  maybeRDocBox doc
-ppSideBySideConstr (HsRecDecl _ nm tvs ctxt fields doc) =
-  argBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm) <->
-  maybeRDocBox doc </>
-  (tda [theclass "body"] << spacedTable1 <<
-     aboves (map ppSideBySideField fields))
+ppSideBySideConstr :: LConDecl DocName -> HtmlTable
+ppSideBySideConstr (L _ con) = case con_res con of 
+ 
+  ResTyH98 -> case con_details con of 
+    PrefixCon args -> argBox (hsep ((header +++ 
+		      ppBinder False name) : map ppLType args)) <->
+                      maybeRDocBox mbLDoc  
+    RecCon fields -> argBox (header +++ ppBinder False name) <->
+                     maybeRDocBox mbLDoc </>
+                     (tda [theclass "body"] << spacedTable1 <<
+                     aboves (map ppSideBySideField fields))
+ 
+  ResTyGADT ltype -> error "GADTs not supported yet"
+ 
+ where 
+    header  = ppConstrHdr forall tyVars context
+    name    = orig (con_name con)
+    tyVars  = tyvarNames (con_qvars con)
+    context = unLoc (con_cxt con)
+    forall  = con_explicit con
+    mbLDoc  = con_doc con
 
-ppSideBySideField :: HsFieldDecl -> HtmlTable
-ppSideBySideField (HsFieldDecl ns ty doc) =
-  argBox (hsep (punctuate comma (map (ppHsBinder False) ns))
-	   <+> dcolon <+> ppHsBangType ty) <->
-  maybeRDocBox doc
+ppSideBySideField :: HsRecField DocName (LHsType DocName) -> HtmlTable
+ppSideBySideField (HsRecField lname ltype mbLDoc) =
+  argBox (ppBinder False (orig lname)
+    <+> dcolon <+> ppLType ltype) <->
+  maybeRDocBox mbLDoc
 
 {-
 ppHsFullConstr :: HsConDecl -> Html
@@ -1011,12 +1008,12 @@ ppHsFullConstr (HsRecDecl _ nm tvs ctxt fields doc) =
 		)
 -}
 
-ppShortField :: Bool -> HsFieldDecl -> HtmlTable
-ppShortField summary (HsFieldDecl ns ty _doc) 
+ppShortField :: Bool -> HsRecField DocName (LHsType DocName)-> HtmlTable
+ppShortField summary (HsRecField lname ltype mbLDoc) 
   = tda [theclass "recfield"] << (
-	  hsep (punctuate comma (map (ppHsBinder summary) ns))
-	    <+> dcolon <+> ppHsBangType ty
-   )
+      ppBinder summary (orig lname)
+      <+> dcolon <+> ppLType ltype
+    )
 
 {-
 ppFullField :: HsFieldDecl -> Html
@@ -1030,62 +1027,10 @@ expandField :: HsFieldDecl -> [HsFieldDecl]
 expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 -}
 
-ppHsDataHeader :: Bool -> Bool -> HsName -> [HsName] -> Html
-ppHsDataHeader summary is_newty nm args = 
-  (if is_newty then keyword "newtype" else keyword "data") <+> 
-	ppHsBinder summary nm <+> hsep (map ppHsName args)
-
-ppHsBangType :: HsBangType -> Html
-ppHsBangType (HsBangedTy ty) = char '!' +++ ppHsAType ty
-ppHsBangType (HsUnBangedTy ty) = ppHsAType ty
-
--- ----------------------------------------------------------------------------
--- Type signatures
-
-ppFunSig :: Bool -> LinksInfo -> SrcLoc -> HsName -> HsType -> Maybe Doc -> HtmlTable
-ppFunSig summary links loc nm ty0 doc
-  | summary || no_arg_docs ty0 = 
-      declWithDoc summary links loc nm doc (ppTypeSig summary nm ty0)
-
-  | otherwise   = 
-	topDeclBox links loc nm (ppHsBinder False nm) </>
-	(tda [theclass "body"] << vanillaTable <<  (
-	   do_args dcolon ty0 </>
-	   (if (isJust doc) 
-		then ndocBox (docToHtml (fromJust doc))
-		else Html.emptyTable)
-	))
-  where
-	no_arg_docs (HsForAllType _ _ ty) = no_arg_docs ty
-	no_arg_docs (HsTyFun (HsTyDoc _ _) _) = False
-	no_arg_docs (HsTyFun _ r) = no_arg_docs r
-	no_arg_docs (HsTyDoc _ _) = False
- 	no_arg_docs _ = True
-
-	do_args :: Html -> HsType -> HtmlTable
-	do_args leader (HsForAllType (Just tvs) ctxt ty)
-	  = (argBox (
-		leader <+> 
-		hsep (keyword "forall" : map ppHsName tvs ++ [toHtml "."]) <+>
-		ppHsIPContext ctxt)
-	      <-> rdocBox noHtml) </> 
-	    do_args darrow ty
-	do_args leader (HsForAllType Nothing ctxt ty)
-	  = (argBox (leader <+> ppHsIPContext ctxt)
-		<-> rdocBox noHtml) </> 
-	    do_args darrow ty
-	do_args leader (HsTyFun (HsTyDoc ty doc0) r)
-	  = (argBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
-            </> do_args arrow r
-	do_args leader (HsTyFun ty r)
-	  = (argBox (leader <+> ppHsBType ty) <-> rdocBox noHtml) </>
-	    do_args arrow r
-	do_args leader (HsTyDoc ty doc0)
-	  = (argBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
-	do_args leader ty
-	  = argBox (leader <+> ppHsBType ty) <-> rdocBox (noHtml)
-
--}
+ppDataHeader :: Bool -> NewOrData -> Name -> [Name] -> Html
+ppDataHeader summary newOrData name tyvars = 
+  (if newOrData == NewType then keyword "newtype" else keyword "data") <+> 
+  ppBinder summary name <+> hsep (map ppName tyvars)
 
 -- ----------------------------------------------------------------------------
 -- Types and contexts
@@ -1149,14 +1094,14 @@ linkTarget name = namedAnchor (anchorNameStr name) << toHtml ""
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)
 
-ppHsBinder :: Bool -> Name -> Html
+ppBinder :: Bool -> Name -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
-ppHsBinder True nm = linkedAnchor (anchorNameStr nm) << ppHsBinder' nm
-ppHsBinder False nm = linkTarget nm +++ bold << ppHsBinder' nm
+ppBinder True nm = linkedAnchor (anchorNameStr nm) << ppBinder' nm
+ppBinder False nm = linkTarget nm +++ bold << ppBinder' nm
 
-ppHsBinder' :: Name -> Html
-ppHsBinder' name = toHtml (getOccString name)
+ppBinder' :: Name -> Html
+ppBinder' name = toHtml (getOccString name)
 
 linkId :: GHC.Module -> Maybe Name -> Html -> Html
 linkId mod mbName = anchor ! [href hr]
@@ -1334,9 +1279,9 @@ ndocBox html = tda [theclass "ndoc"] << html
 rdocBox :: Html -> HtmlTable
 rdocBox html = tda [theclass "rdoc"] << html
 
-maybeRDocBox :: Maybe (GHC.HsDoc DocName) -> HtmlTable
+maybeRDocBox :: Maybe (GHC.LHsDoc DocName) -> HtmlTable
 maybeRDocBox Nothing = rdocBox (noHtml)
-maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
+maybeRDocBox (Just ldoc) = rdocBox (docToHtml (unLoc ldoc))
 
 -- a box for the buttons at the top of the page
 topButBox :: Html -> HtmlTable
@@ -1353,12 +1298,12 @@ spacedTable1, spacedTable5 :: Html -> Html
 spacedTable1 = table ! [theclass "vanilla",  cellspacing 1, cellpadding 0]
 spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 
-constr_hdr, meth_hdr :: HtmlTable
-constr_hdr  = tda [ theclass "section4" ] << toHtml "Constructors"
-meth_hdr    = tda [ theclass "section4" ] << toHtml "Methods"
+constrHdr, methHdr :: HtmlTable
+constrHdr  = tda [ theclass "section4" ] << toHtml "Constructors"
+methHdr    = tda [ theclass "section4" ] << toHtml "Methods"
 
-inst_hdr :: String -> HtmlTable
-inst_hdr id = 
+instHdr :: String -> HtmlTable
+instHdr id = 
   tda [ theclass "section4" ] << (collapsebutton id +++ toHtml " Instances")
 
 dcolon, arrow, darrow :: Html

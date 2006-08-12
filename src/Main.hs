@@ -36,13 +36,12 @@ import Data.Maybe
 import Data.List ( nubBy )
 import Data.FunctorM ( fmapM )
 
-import qualified GHC as GHC
 import GHC
 import Outputable
 import SrcLoc
 import qualified Digraph as Digraph
 import Name
-import Module (moduleString)-- TODO: add an export to GHC API? 
+import Module ( moduleString ) 
 import InstEnv
 import Class
 import TypeRep
