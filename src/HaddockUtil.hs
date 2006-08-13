@@ -27,6 +27,9 @@ module HaddockUtil (
   -- * HsDoc markup 
   markup, 
   idMarkup,
+
+  -- * Binary extras
+--  FormatVersion, mkFormatVersion  
  ) where
 
 import HaddockTypes
@@ -37,12 +40,15 @@ import GHC
 import SrcLoc
 import Name
 import OccName
+import Binary
 
 import Control.Monad ( liftM, MonadPlus(..) )
 import Data.Char ( isAlpha, isSpace, toUpper, ord )
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( intersect, isSuffixOf, intersperse )
 import Data.Maybe ( maybeToList, fromMaybe, isJust, fromJust )
+import Data.Word ( Word8 )
+import Data.Bits ( testBit )
 import Network.URI
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
@@ -282,3 +288,33 @@ idMarkup = Markup {
 -- the same thing, modifying only the identifiers embedded in it.
 
 mapIdent f = idMarkup { markupIdentifier = f }
+
+-----------------------------------------------------------------------------
+-- put here temporarily
+
+newtype FormatVersion = FormatVersion Int deriving (Eq,Ord)
+
+nullFormatVersion :: FormatVersion
+nullFormatVersion = mkFormatVersion 0
+
+mkFormatVersion :: Int -> FormatVersion
+mkFormatVersion i = FormatVersion i
+
+instance Binary FormatVersion where
+   put_ bh (FormatVersion i) =
+      case compare i 0 of
+         EQ -> return ()
+         GT -> put_ bh (-i)
+         LT -> error (
+            "Binary.hs: negative FormatVersion " ++ show i 
+               ++ " is not allowed")
+   get bh =
+      do
+         w8 :: Word8 <- get bh   
+         if testBit w8 7
+            then
+               do
+                  i <- get bh
+                  return (FormatVersion (-i))
+            else
+               return nullFormatVersion
