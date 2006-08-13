@@ -15,9 +15,11 @@
 
 -- #hide
 module System.Process.Internals (
+#ifndef __HUGS__
 	ProcessHandle(..), ProcessHandle__(..), 
 	PHANDLE, closePHANDLE, mkProcessHandle, 
 	withProcessHandle, withProcessHandle_,
+#endif
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 	 pPrPr_disableITimers, c_execvpe,
 # ifdef __GLASGOW_HASKELL__
@@ -75,6 +77,7 @@ import System.Directory.Internals ( parseSearchPath, joinFileName )
 
 #include "HsBaseConfig.h"
 
+#ifndef __HUGS__
 -- ----------------------------------------------------------------------------
 -- ProcessHandle type
 
@@ -140,6 +143,7 @@ foreign import stdcall unsafe "CloseHandle"
 	:: PHANDLE
 	-> IO ()
 #endif
+#endif /* !__HUGS__ */
 
 -- ----------------------------------------------------------------------------
 
