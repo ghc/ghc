@@ -18,6 +18,9 @@
 #include "Updates.h"
 #include "STM.h"
 #include "Sanity.h"
+#if defined(mingw32_HOST_OS)
+#include "win32/IOManager.h"
+#endif
 
 static void raiseAsync (Capability *cap,
 			StgTSO *tso,
