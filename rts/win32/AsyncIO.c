@@ -161,7 +161,7 @@ startupAsyncIO()
     completed_hw = 0;
     if ( !(completed_table_sema = CreateSemaphore (NULL, MAX_REQUESTS, MAX_REQUESTS, NULL)) ) {
 	DWORD rc = GetLastError();
-	fprintf(stderr, "startupAsyncIO: CreateSemaphore failed 0x%x\n", rc);
+	fprintf(stderr, "startupAsyncIO: CreateSemaphore failed 0x%x\n", (int)rc);
 	fflush(stderr);
     }
 
@@ -300,7 +300,7 @@ start:
 	    /* Signal that there's completed table slots available */
 	    if ( !ReleaseSemaphore(completed_table_sema, 1, NULL) ) {
 		DWORD dw = GetLastError();
-		fprintf(stderr, "awaitRequests: failed to signal semaphore (error code=0x%x)\n", dw);
+		fprintf(stderr, "awaitRequests: failed to signal semaphore (error code=0x%x)\n", (int)dw);
 		fflush(stderr);
 	    }
 	}
