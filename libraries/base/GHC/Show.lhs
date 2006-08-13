@@ -421,5 +421,6 @@ itos n# cs
 
 \begin{code}
 instance Show Unknown where
- show _ = "This is an untyped object. You can use seq to force its evaluation and then :print to recover its type"
+ show _ = "This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type"
+ showList _ = ("This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type" ++)
 \end{code}
