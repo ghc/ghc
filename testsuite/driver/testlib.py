@@ -518,7 +518,7 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    expected_stderr_file = platform_wordsize_qualify(name, 'stderr')
+    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
     actual_stderr = normalise_errmsg(open(actual_stderr_file).read())
 
@@ -887,7 +887,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
 def check_stdout_ok( name ):
    actual_stdout_file   = qualify(name, 'run.stdout')
-   expected_stdout_file = platform_wordsize_qualify(name, 'stdout')
+   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(name, 'stdout')
 
    if os.path.exists(expected_stdout_file):
        expected_stdout = open(expected_stdout_file).read()
@@ -896,7 +896,9 @@ def check_stdout_ok( name ):
        expected_stdout_file = ''
 
    if os.path.exists(actual_stdout_file):
-       actual_stdout = normalise_output(open(actual_stdout_file).read())
+       actual_stdout = open(actual_stdout_file).read()
+       if not platform_specific:
+           actual_stdout = normalise_output(actual_stdout)
    else:
        actual_stdout = ''
        actual_stdout_file = ''
@@ -908,7 +910,7 @@ def check_stdout_ok( name ):
 
 def check_stderr_ok( name ):
    actual_stderr_file   = qualify(name, 'run.stderr')
-   expected_stderr_file = platform_wordsize_qualify(name, 'stderr')
+   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
 
    if os.path.exists(expected_stderr_file):
        expected_stderr = open(expected_stderr_file).read()
@@ -917,7 +919,9 @@ def check_stderr_ok( name ):
        expected_stderr_file = ''
 
    if os.path.exists(actual_stderr_file):
-       actual_stderr = normalise_output(open(actual_stderr_file).read())
+       actual_stderr = open(actual_stderr_file).read()
+       if not platform_specific:
+           actual_stderr = normalise_output(actual_stderr)
    else:
        actual_stderr = ''
        actual_stderr_file = ''
@@ -1033,13 +1037,13 @@ def platform_wordsize_qualify( name, suff ):
     compiler_type_path = path + '-' + config.compiler_type
     wordsize_path = path + '-ws-' + config.wordsize
     if os.path.exists(platform_path):
-        return platform_path
+        return (1,platform_path)
     elif os.path.exists(compiler_type_path):
-        return compiler_type_path
+        return (0,compiler_type_path)
     elif os.path.exists(wordsize_path):
-        return wordsize_path
+        return (0,wordsize_path)
     else:
-        return path
+        return (0,path)
 
 # Clean up prior to the test, so that we can't spuriously conclude
 # that it passed on the basis of old run outputs.
