@@ -1826,6 +1826,43 @@ mkDupableCont env (ApplyTo _ arg mb_se cont)
 	; (floats2, arg2) <- mkDupableArg env arg1
 	; return (floats2, (ApplyTo OkToDup arg2 Nothing dup_cont, nondup_cont)) }}
 
+mkDupableCont env cont@(Select _ case_bndr [_] _ _)
+  = returnSmpl (emptyFloats env, (mkBoringStop scrut_ty, cont))
+  where
+    scrut_ty = substTy env (idType case_bndr)
+	-- This case is just like the previous one.  Here's an example:
+	--	data T a = MkT !a
+	--	...(MkT (abs x))...
+	-- Then we get
+	--	case (case x of I# x' -> 
+	--	      case x' <# 0# of
+	--		True  -> I# (negate# x')
+	--		False -> I# x') of y {
+	--	  DEFAULT -> MkT y
+	-- Because the (case x) has only one alternative, we'll transform to
+	--	case x of I# x' ->
+	--	case (case x' <# 0# of
+	--		True  -> I# (negate# x')
+	--		False -> I# x') of y {
+	--	  DEFAULT -> MkT y
+	-- But now we do *NOT* want to make a join point etc, giving 
+	--	case x of I# x' ->
+	--	let $j = \y -> MkT y
+	--	in case x' <# 0# of
+	--		True  -> $j (I# (negate# x'))
+	--		False -> $j (I# x')
+	-- In this case the $j will inline again, but suppose there was a big
+	-- strict computation enclosing the orginal call to MkT.  Then, it won't
+	-- "see" the MkT any more, because it's big and won't get duplicated.
+	-- And, what is worse, nothing was gained by the case-of-case transform.
+	--
+	-- NB: Originally I matched [(DEFAULT,_,_)], but in the common
+	-- case of Int, the alternative-filling-in code turned the outer case into
+	--	case (...) of y { I# _ -> MkT y }
+	-- and that doesn't match the DEFAULT!
+	-- Now I match on any single-alternative case. 
+	-- I hope that is the right thing to do!
+
 mkDupableCont env (Select _ case_bndr alts se cont)
   = 	-- e.g.		(case [...hole...] of { pi -> ei })
 	--	===>
