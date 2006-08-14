@@ -502,8 +502,8 @@ occAnal env expr@(Lam _ _)
     is_one_shot b   = isId b && isOneShotBndr b
 
 occAnal env (Case scrut bndr ty alts)
-  = case occ_anal_scrut scrut alts		of { (scrut_usage, scrut') ->
-    case mapAndUnzip (occAnalAlt env bndr) alts of { (alts_usage_s, alts')   -> 
+  = case occ_anal_scrut scrut alts		    of { (scrut_usage, scrut') ->
+    case mapAndUnzip (occAnalAlt alt_env bndr) alts of { (alts_usage_s, alts')   -> 
     let
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
 	alts_usage' = addCaseBndrUsage alts_usage
@@ -522,6 +522,10 @@ occAnal env (Case scrut bndr ty alts)
     addCaseBndrUsage usage = case lookupVarEnv usage bndr of
 				Nothing  -> usage
 				Just occ -> extendVarEnv usage bndr (markMany occ)
+
+    alt_env = setVanillaCtxt env
+	-- Consider 	x = case v of { True -> (p,q); ... }
+	-- Then it's fine to inline p and q
 
     occ_anal_scrut (Var v) (alt1 : other_alts)
 				| not (null other_alts) || not (isDefaultAlt alt1)
@@ -545,7 +549,6 @@ Applications are dealt with specially because we want
 the "build hack" to work.
 
 \begin{code}
--- Hack for build, fold, runST
 occAnalApp env (Var fun, args) is_rhs
   = case args_stuff of { (args_uds, args') ->
     let
@@ -566,6 +569,8 @@ occAnalApp env (Var fun, args) is_rhs
   where
     fun_uniq = idUnique fun
     fun_uds  = mkOneOcc env fun (valArgCount args > 0)
+
+		-- Hack for build, fold, runST
     args_stuff	| fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
 		| fun_uniq == augmentIdKey  = appSpecial env 2 [True,True]  args
 		| fun_uniq == foldrIdKey    = appSpecial env 3 [False,True] args
@@ -684,6 +689,10 @@ rhsCtxt     = OccEnv OccRhs     []
 
 isRhsEnv (OccEnv OccRhs     _) = True
 isRhsEnv (OccEnv OccVanilla _) = False
+
+setVanillaCtxt :: OccEnv -> OccEnv
+setVanillaCtxt (OccEnv OccRhs ctxt_ty) = OccEnv OccVanilla ctxt_ty
+setVanillaCtxt other_env	       = other_env
 
 setCtxt :: OccEnv -> CtxtTy -> OccEnv
 setCtxt (OccEnv encl _) ctxt = OccEnv encl ctxt
