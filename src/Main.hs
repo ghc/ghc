@@ -60,13 +60,21 @@ import Packages
 -----------------------------------------------------------------------------
 -- Top-level stuff
 
+type CheckedMods = [(Module, FullyCheckedMod, FilePath)]
+
 main :: IO ()
 main = do
   args <- getArgs
-  (libDir, rest)        <- getLibDir args 
-  (session, nonGHCOpts) <- startGHC libDir rest
-  (flags, args)         <- parseHaddockOpts nonGHCOpts
-  run flags args session
+  (libDir, rest) <- getLibDir args 
+  (session, ghcFlags, nonGHCOpts) <- startGHC libDir rest
+  (flags, args) <- parseHaddockOpts nonGHCOpts
+  handleEagerFlags flags
+  modules <- sortAndCheckModules session ghcFlags args
+  (ifaces, htmls) <- getIfacesAndHtmls flags ghcFlags  
+  let (modss, envs) = unzip ifaces
+  updateHTMLXRefs htmls modss
+  -- TODO: continue to break up the run function into parts
+  run flags modules envs
 
 parseHaddockOpts :: [String] -> IO ([Flag], [String])
 parseHaddockOpts words =
@@ -76,15 +84,18 @@ parseHaddockOpts words =
       prog <- getProgramName
       die (concat errors ++ usageInfo (usageHeader prog) (options False))
 
+usageHeader :: String -> String
+usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
+
 getLibDir :: [String] -> IO (String, [String])
 getLibDir ("-B":dir:rest) = return (dir, rest)
 getLibDir (('-':'B':dir):rest) | not (null dir) = return (dir, rest)
 getLibDir _ = die "Missing GHC lib dir option: -B <dir>\n"
 
--- | Initialize GHC, then parse the passed in strings and set the corresponding
+-- | Initialize GHC, parse the passed in strings and set the corresponding
 -- GHC flags (if any). Also add the -haddock flag. Return the Session handle
 -- and the strings that were not GHC flags.
-startGHC :: String -> [String] -> IO (Session, [String])
+startGHC :: String -> [String] -> IO (Session, DynFlags, [String])
 startGHC libDir possibleOpts = do
   GHC.init (Just libDir)
   let ghcMode = JustTypecheck
@@ -94,10 +105,48 @@ startGHC libDir possibleOpts = do
   (flags'', nonOpts) <- parseDynamicFlags flags' possibleOpts
   let flags''' = dopt_set flags'' Opt_Haddock 
   setSessionDynFlags session flags'''
-  return (session, nonOpts)
+  return (session, flags''', nonOpts)
 
-usageHeader :: String -> String
-usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
+sortAndCheckModules :: Session -> DynFlags -> [FilePath] -> 
+                       IO [(Module, FullyCheckedMod, FilePath)]
+sortAndCheckModules session flags files = defaultErrorHandler flags $ do 
+  targets <- mapM (\s -> guessTarget s Nothing) files
+  setTargets session targets 
+  mbModGraph <- depanal session [] True
+  moduleGraph <- case mbModGraph of 
+    Just mg -> return mg 
+    Nothing -> die "Failed to load all modules\n"
+  let 
+    modSumFile    = fromJust . ml_hs_file . ms_location
+    sortedGraph   = topSortModuleGraph False moduleGraph Nothing
+    sortedModules = concatMap Digraph.flattenSCC sortedGraph 
+    modsAndFiles  = [ (ms_mod modsum, modSumFile modsum) | 
+                      modsum <- sortedModules, 
+                      modSumFile modsum `elem` files ]
+  checkedMods <- mapM (\(mod, file) -> do
+    mbMod <- checkModule session mod
+    checkedMod <- case mbMod of 
+      Just m  -> return m
+      Nothing -> die ("Failed to load module: " ++ moduleString mod)
+    return (mod, checkedMod, file)) modsAndFiles
+  ensureFullyChecked checkedMods
+  where
+    ensureFullyChecked modules 
+      | length modules' == length modules = return modules'
+      | otherwise = die "Fail to check all modules properly\n" 
+      where modules' = [ (mod, (a,b,c,d), f) | 
+                         (mod, CheckedModule a (Just b) (Just c) (Just d), f) 
+                         <- modules ] 
+
+getIfacesAndHtmls :: [Flag] -> DynFlags -> IO ([Interface], [FilePath])
+getIfacesAndHtmls flags dynflags = do
+  packageFiles <- getPackageFiles dynflags
+  let 
+    readIfaceFlags = [ parseIfaceOption str | Flag_ReadInterface str <- flags ]
+    totalFiles = packageFiles ++ readIfaceFlags
+    (htmlPaths, ifacePaths) = unzip totalFiles
+  ifaces <- mapM readIface ifacePaths
+  return (ifaces, htmlPaths)
 
 data Flag
   = Flag_CSS String
@@ -198,19 +247,23 @@ options backwardsCompat =
 	"the modules being processed depend on PACKAGE"
   ]
 
-run :: [Flag] -> [FilePath] -> Session -> IO ()
-run flags files session = do
-  
+handleEagerFlags flags = do
   whenFlag Flag_Help $ do
     prog <- getProgramName
     bye (usageInfo (usageHeader prog) (options False))
-
   whenFlag Flag_Version $
     bye ("Haddock version " ++ projectVersion ++ 
          ", (c) Simon Marlow 2003; port to GHC-api by David Waern 2006\n")
+  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
+        && Flag_Html `elem` flags) $
+    die ("-h cannot be used with --gen-index or --gen-contents")
+  where 
+    whenFlag flag action = when (flag `elem` flags) action 
 
+
+run :: [Flag] -> CheckedMods -> [Map Name Name] -> IO ()
+run flags modules extEnvs = do
   let
-
     title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
 		(t:_) -> t
@@ -245,8 +298,6 @@ run flags files session = do
 		  	[] -> Nothing
 		  	fs -> Just (last fs)
 
-    readIfaceFlags = [ parseIfaceOption str | Flag_ReadInterface str <- flags ]
-
     maybe_contents_url = 
       case [url | Flag_UseContents url <- flags] of
         [] -> Nothing
@@ -264,88 +315,36 @@ run flags files session = do
 
   prologue <- getPrologue flags
 
-  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
-	&& Flag_Html `elem` flags) $
-	die ("-h cannot be used with --gen-index or --gen-contents")
-
-  ghcFlags <- getSessionDynFlags session
- 
-  sorted_checked_modules <- defaultErrorHandler ghcFlags $ do 
-    targets <- mapM (\s -> guessTarget s Nothing) files
-    setTargets session targets 
-    maybe_module_graph <- depanal session [] True
-    module_graph <- case maybe_module_graph of 
-      Just module_graph -> return module_graph 
-      Nothing -> die "Failed to load modules 1\n"
-
-    let 
-      modSumFile = fromJust . ml_hs_file . ms_location
-      sorted_modules = concatMap Digraph.flattenSCC (topSortModuleGraph False module_graph Nothing) 
-      (modules, filenames) = unzip [ (ms_mod modsum, modSumFile modsum)  | modsum <- sorted_modules,
-                                     modSumFile modsum `elem` files ]
-
-    --print_ modules
-    mb_checked_modules <- mapM (checkModule session) modules
-    let checked_modules = catMaybes mb_checked_modules
-    if length checked_modules /= length mb_checked_modules
-      then die "Failed to load all modules 2\n" 
-      else return (zip3 modules checked_modules filenames)
-  
-  sorted_checked_modules' <- remove_maybes sorted_checked_modules
-
-  let (modMap, messages) = runWriter (pass1 sorted_checked_modules' flags package) 
-
-      haddockModules = catMaybes [ Map.lookup mod modMap | 
-                                   (mod, _, file) <- sorted_checked_modules',
-                                   file `elem` files ]
-
-  packageFiles <- getPackageFiles ghcFlags
-  --print packageFiles
   let 
-    totalFiles = packageFiles ++ readIfaceFlags
-    (htmlPaths, ifacePaths) = unzip totalFiles
-  ifaces <- mapM readIface ifacePaths
-
-  let 
-    (moduless, extEnvs) = unzip ifaces
-    homeEnv = buildGlobalDocEnv haddockModules
+    (modMap, messages) = runWriter (pass1 modules flags package) 
+    haddockMods = catMaybes [ Map.lookup mod modMap | (mod,_,_) <- modules ]
+    homeEnv = buildGlobalDocEnv haddockMods
     env = Map.unions (homeEnv:extEnvs)
-    haddockModules' = attachInstances haddockModules
-    (haddockModules'', messages') = runWriter $ mapM (renameModule env) haddockModules'
+    haddockMods' = attachInstances haddockMods
+    (haddockMods'', messages') = runWriter $ mapM (renameModule env) haddockMods'
   
-  updateHTMLXRefs htmlPaths moduless 
- 
---  putStrLn "pass 1 messages:"
   mapM_ putStrLn messages
-{-  putStrLn "pass 1 export items:"
-  printSDoc (ppr (map hmod_export_items haddockModules')) defaultUserStyle 
-  
-  putStrLn "pass 2 env:"
-  printSDoc (ppr (Map.toList env)) defaultUserStyle
-
-  putStrLn "pass 2 export items:"
-  printSDoc (ppr (map hmod_rn_export_items haddockModules'')) defaultUserStyle -}
   mapM_ putStrLn messages'
 
-  let visibleModules = [ m | m <- haddockModules'', OptHide `notElem` (hmod_options m) ]
+  let visibleMods = [ m | m <- haddockMods'', OptHide `notElem` (hmod_options m) ]
  
   when (Flag_GenIndex `elem` flags) $ do
 	ppHtmlIndex odir title package maybe_html_help_format
                 maybe_contents_url maybe_source_urls maybe_wiki_urls
-                visibleModules
+                visibleMods
 	copyHtmlBits odir libdir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
-    ppHtmlHelpFiles title package visibleModules odir maybe_html_help_format []
+    ppHtmlHelpFiles title package visibleMods odir maybe_html_help_format []
 
   when (Flag_GenContents `elem` flags) $ do
 	ppHtmlContents odir title package maybe_html_help_format
 	               maybe_index_url maybe_source_urls maybe_wiki_urls
-	               visibleModules prologue
+	               visibleMods prologue
 	copyHtmlBits odir libdir css_file
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title package visibleModules odir
+    ppHtml title package visibleMods odir
                 prologue maybe_html_help_format
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url
@@ -356,18 +355,12 @@ run flags files session = do
   -- dump an interface if requested
   case dumpIface of
     Nothing -> return ()
-    Just fn -> dumpInterfaces env (map hmod_mod visibleModules) fn
+    Just fn -> dumpInterfaces env (map hmod_mod visibleMods) fn
   where
-    whenFlag flag action = when (flag `elem` flags) action 
-
     pprList [] = []
     pprList [x] = show x
     pprList (x:xs) = show x ++ ", " ++ pprList xs
  
-    remove_maybes modules | length modules' == length modules = return modules'
-                          | otherwise = die "Missing checked module phase information\n" 
-      where modules' = [ (mod, (a,b,c,d), f) | (mod, CheckedModule a (Just b) (Just c) (Just d), f) <- modules ] 
-
 print_ x = printSDoc (ppr x) defaultUserStyle        
 
 instance Outputable (DocEntity Name) where
@@ -382,18 +375,18 @@ instance Show a => Show (DocDecl a) where
   show (DocCommentPrev doc) = "prev" ++ show doc
   show _ = "other" 
 
-type FullyCheckedModule = (ParsedSource, 
-                           RenamedSource, 
-                           TypecheckedSource, 
-                           ModuleInfo)
+type FullyCheckedMod = (ParsedSource, 
+                        RenamedSource, 
+                        TypecheckedSource, 
+                        ModuleInfo)
 
 printEntity (DocEntity doc) = show doc
 printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
-pass1 :: [(Module, FullyCheckedModule, FilePath)] -> [Flag] -> Maybe String -> ErrMsgM ModuleMap2
+pass1 :: [(Module, FullyCheckedMod, FilePath)] -> [Flag] -> Maybe String -> ErrMsgM ModuleMap2
 pass1 modules flags package = worker modules (Map.empty) flags
   where
-    worker :: [(Module, FullyCheckedModule, FilePath)] -> ModuleMap2 -> [Flag] -> ErrMsgM ModuleMap2
+    worker :: [(Module, FullyCheckedMod, FilePath)] -> ModuleMap2 -> [Flag] -> ErrMsgM ModuleMap2
     worker [] moduleMap _ = return moduleMap
     worker ((mod, checked_mod, filename):rest_modules) moduleMap flags = do
  
@@ -1075,7 +1068,7 @@ getPackageFiles dynflags = do
 
       ifaceExists <- doesFileExist iface
       when (not ifaceExists) $ 
-        throwIO (ErrorCall ("Interace " ++ iface ++ " does not exist.")) 
+        throwIO (ErrorCall ("Interface " ++ iface ++ " does not exist.")) 
 
       return (html, iface)
       where
@@ -1117,7 +1110,9 @@ mkName mdl occ = mkExternalName (mkUnique 'X' 0) mdl occ Nothing noSrcLoc
 --type StoredInterface2 =
 --   (Module,Maybe Doc,Maybe String,Bool,[(HsName,Module)], [(HsName,[HsName])])
 
-readIface :: FilePath -> IO ([Module], Map Name Name)
+type Interface = ([Module], Map Name Name)
+
+readIface :: FilePath -> IO Interface
 readIface fileName = do
   bh <- readBinMem fileName
   formatVersion <- get bh
