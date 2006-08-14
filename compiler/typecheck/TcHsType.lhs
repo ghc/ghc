@@ -191,8 +191,7 @@ kcHsSigType ty 	     = kcTypeType ty
 kcHsLiftedSigType ty = kcLiftedType ty
 
 tcHsKindedType :: LHsType Name -> TcM Type
-  -- Don't do kind checking, nor validity checking, 
-  -- 	but do hoist for-alls to the top
+  -- Don't do kind checking, nor validity checking.
   -- This is used in type and class decls, where kinding is
   -- done in advance, and validity checking is done later
   -- [Validity checking done later because of knot-tying issues.]
@@ -242,15 +241,23 @@ kcCheckHsType (L span ty) exp_kind
 		-- because checkExpectedKind already mentions
 		-- 'ty' by name in any error message
 
-	; checkExpectedKind ty act_kind exp_kind
+	; checkExpectedKind (strip ty) act_kind exp_kind
 	; return (L span ty') }
   where
-	-- Wrap a context around only if we want to
-	-- show that contexts.  Omit invisble ones
-	-- and ones user's won't grok (HsPred p).
-    add_ctxt (HsPredTy p)		    	   thing = thing
-    add_ctxt (HsForAllTy Implicit tvs (L _ []) ty) thing = thing
+	-- Wrap a context around only if we want to show that contexts.  
+	-- Omit invisble ones and ones user's won't grok (HsPred p).
+    add_ctxt (HsPredTy p)		    	         thing = thing
+    add_ctxt (HsForAllTy Implicit tvs (L _ []) (L _ ty)) thing = add_ctxt ty thing
     add_ctxt other_ty thing = addErrCtxt (typeCtxt ty) thing
+
+	-- We infer the kind of the type, and then complain if it's
+	-- not right.  But we don't want to complain about
+	--	(ty) or !(ty) or forall a. ty
+	-- when the real difficulty is with the 'ty' part.
+    strip (HsParTy (L _ ty))          = strip ty
+    strip (HsBangTy _ (L _ ty))       = strip ty
+    strip (HsForAllTy _ _ _ (L _ ty)) = strip ty
+    strip ty			      = ty
 \end{code}
 
 	Here comes the main function
