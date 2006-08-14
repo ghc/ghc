@@ -39,6 +39,8 @@ SUBDIRS += $(wildcard GLUT)
 SUBDIRS += $(wildcard OpenAL)
 SUBDIRS += $(wildcard ALUT)
 SUBDIRS += $(wildcard stm)
+SUBDIRS += $(wildcard xhtml)
+SUBDIRS += $(wildcard cgi)
 ifeq "$(GhcLibsWithObjectIO)" "YES"
 SUBDIRS += $(wildcard ObjectIO)
 endif

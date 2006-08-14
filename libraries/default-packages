@@ -13,6 +13,7 @@ Win32
 X11
 arrows
 base
+cgi
 fgl
 haskell-src
 haskell98
@@ -26,3 +27,4 @@ stm
 template-haskell
 time
 unix
+xhtml
