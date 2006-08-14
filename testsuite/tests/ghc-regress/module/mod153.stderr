@@ -2,4 +2,4 @@
 mod153.hs:2:10:
     Ambiguous occurrence `id'
     It could refer to either `id', defined at mod153.hs:2:20
-		          or `id', imported from Prelude at Implicit import declaration
+		          or `id', imported from Prelude

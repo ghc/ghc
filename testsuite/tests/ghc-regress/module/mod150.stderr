@@ -2,4 +2,4 @@
 mod150.hs:2:10:
     Conflicting exports for `id':
       `module M' exports `id' defined at mod150.hs:2:41
-      `module Prelude' exports `id' imported from Prelude at Implicit import declaration
+      `module Prelude' exports `id' imported from Prelude

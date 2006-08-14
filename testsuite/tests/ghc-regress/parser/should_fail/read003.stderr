@@ -1,9 +1,8 @@
 
 read003.hs:4:23:
-    Occurs check: cannot construct the infinite type:
-      bx = (bx, [a], bx1)
-      Expected type: (bx, [a], bx1)
-      Inferred type: bx
+    Occurs check: cannot construct the infinite type: t = (t, [a], t1)
+      Expected type: (t, [a], t1)
+      Inferred type: t
     In the expression: a
     In a pattern binding:
 	~(a, b, c)
