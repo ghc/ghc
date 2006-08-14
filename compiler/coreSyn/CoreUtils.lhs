@@ -418,14 +418,14 @@ because sharing will make sure it is only evaluated once.
 
 \begin{code}
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap (Lit lit) 		    = True
-exprIsCheap (Type _)        	    = True
-exprIsCheap (Var _)         	    = True
-exprIsCheap (Note InlineMe e)  	    = True
-exprIsCheap (Note _ e)      	    = exprIsCheap e
-exprIsCheap (Lam x e)               = isRuntimeVar x || exprIsCheap e
-exprIsCheap (Case e _ _ alts)       = exprIsCheap e && 
-				    and [exprIsCheap rhs | (_,_,rhs) <- alts]
+exprIsCheap (Lit lit) 	      = True
+exprIsCheap (Type _)          = True
+exprIsCheap (Var _)           = True
+exprIsCheap (Note InlineMe e) = True
+exprIsCheap (Note _ e)        = exprIsCheap e
+exprIsCheap (Lam x e)         = isRuntimeVar x || exprIsCheap e
+exprIsCheap (Case e _ _ alts) = exprIsCheap e && 
+				and [exprIsCheap rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
 	-- (and case __coerce x etc.)
 	-- This improves arities of overloaded functions where
@@ -436,43 +436,51 @@ exprIsCheap (Let (NonRec x _) e)
 	-- strict lets always have cheap right hand sides,
 	-- and do no allocation.
 
-exprIsCheap other_expr 
-  = go other_expr 0 True
+exprIsCheap other_expr 	-- Applications and variables
+  = go other_expr []
   where
-    go (Var f) n_args args_cheap 
-	= (idAppIsCheap f n_args && args_cheap)
-			-- A constructor, cheap primop, or partial application
+	-- Accumulate value arguments, then decide
+    go (App f a) val_args | isRuntimeArg a = go f (a:val_args)
+			  | otherwise      = go f val_args
 
-	  || idAppIsBottom f n_args 
+    go (Var f) [] = True	-- Just a type application of a variable
+				-- (f t1 t2 t3) counts as WHNF
+    go (Var f) args
+ 	= case globalIdDetails f of
+		RecordSelId {} -> go_sel args
+		ClassOpId _    -> go_sel args
+		PrimOpId op    -> go_primop op args
+
+		DataConWorkId _ -> go_pap args
+		other | length args < idArity f -> go_pap args
+
+	        other -> isBottomingId f
 			-- Application of a function which
 			-- always gives bottom; we treat this as cheap
 			-- because it certainly doesn't need to be shared!
 	
-    go (App f a) n_args args_cheap 
-	| not (isRuntimeArg a) = go f n_args 	   args_cheap
-	| otherwise            = go f (n_args + 1) (exprIsCheap a && args_cheap)
-
-    go other   n_args args_cheap = False
-
-idAppIsCheap :: Id -> Int -> Bool
-idAppIsCheap id n_val_args 
-  | n_val_args == 0 = True	-- Just a type application of
-				-- a variable (f t1 t2 t3)
-				-- counts as WHNF
-  | otherwise 
-  = case globalIdDetails id of
-	DataConWorkId _ -> True
-	RecordSelId {}  -> n_val_args == 1 	-- I'm experimenting with making record selection
-	ClassOpId _     -> n_val_args == 1 	-- look cheap, so we will substitute it inside a
-						-- lambda.  Particularly for dictionary field selection.
-		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
-		--	there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
-
-	PrimOpId op   -> primOpIsCheap op	-- In principle we should worry about primops
-						-- that return a type variable, since the result
-						-- might be applied to something, but I'm not going
-						-- to bother to check the number of args
-	other	      -> n_val_args < idArity id
+    go other args = False
+ 
+    --------------
+    go_pap args = all exprIsTrivial args
+ 	-- For constructor applications and primops, check that all
+ 	-- the args are trivial.  We don't want to treat as cheap, say,
+ 	-- 	(1:2:3:4:5:[])
+ 	-- We'll put up with one constructor application, but not dozens
+ 	
+    --------------
+    go_primop op args = primOpIsCheap op && all exprIsCheap args
+ 	-- In principle we should worry about primops
+ 	-- that return a type variable, since the result
+ 	-- might be applied to something, but I'm not going
+ 	-- to bother to check the number of args
+ 
+    --------------
+    go_sel [arg] = exprIsTrivial arg	-- I'm experimenting with making record selection
+    go_sel other = False 	 	-- look cheap, so we will substitute it inside a
+ 					-- lambda.  Particularly for dictionary field selection.
+  		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
+  		--	there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
 \end{code}
 
 exprOkForSpeculation returns True of an expression that it is
