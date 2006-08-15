@@ -12,7 +12,7 @@ module SpecConstr(
 
 import CoreSyn
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType, tcEqExpr, mkPiTypes )
+import CoreUtils	( exprType, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
 import CoreSubst	( Subst, mkSubst, substExpr )
 import CoreTidy		( tidyRules )
@@ -20,9 +20,10 @@ import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, isVanillaDataCon )
 import Type		( tyConAppArgs, tyVarsOfTypes )
+import Rules		( matchN )
 import Unify		( coreRefineTys )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
-			  mkUserLocal, mkSysLocal, idUnfolding )
+			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
 import Var		( Var )
 import VarEnv
 import VarSet
@@ -32,12 +33,13 @@ import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags		( DynFlags, DynFlag(..) )
 import BasicTypes	( Activation(..) )
-import Maybes		( orElse )
-import Util		( mapAccumL, lengthAtLeast, notNull )
+import Maybes		( orElse, catMaybes, isJust )
+import Util		( zipWithEqual, lengthAtLeast, notNull )
 import List		( nubBy, partition )
 import UniqSupply
 import Outputable
 import FastString
+import UniqFM
 \end{code}
 
 -----------------------------------------------------
@@ -219,14 +221,8 @@ is to run deShadowBinds before running SpecConstr, but instead we run the
 simplifier.  That gives the simplest possible program for SpecConstr to
 chew on; and it virtually guarantees no shadowing.
 
------------------------------------------------------
-		Stuff not yet handled
------------------------------------------------------
-
-Here are notes arising from Roman's work that I don't want to lose.
-
-Specialising for constant parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Specialising for constant parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This one is about specialising on a *constant* (but not necessarily
 constructor) argument
 
@@ -268,8 +264,8 @@ When is this worth it?  Call the constant 'lvl'
 
 Also 	
 
-Specialising for lambdas
-~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Specialising for lambda parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     foo :: Int -> (Int -> Int) -> Int
     foo 0 f = 0
     foo m f = foo (f m) (\n -> n-m)
@@ -303,6 +299,12 @@ at the call site; and if perchance it's called in the recursive call, then you
 may avoid allocating it altogether.  Just like for constructors.
 
 Looks cool, but probably rare...but it might be easy to implement.
+
+-----------------------------------------------------
+		Stuff not yet handled
+-----------------------------------------------------
+
+Here are notes arising from Roman's work that I don't want to lose.
 
 Example 1
 ~~~~~~~~~
@@ -410,11 +412,13 @@ specConstrProgram dflags us binds
 %************************************************************************
 
 \begin{code}
-data ScEnv = SCE { scope :: VarEnv HowBound,
+data ScEnv = SCE { scope :: InScopeEnv,
 			-- Binds all non-top-level variables in scope
 
 		   cons  :: ConstrEnv
 	     }
+
+type InScopeEnv = VarEnv HowBound
 
 type ConstrEnv = IdEnv ConValue
 data ConValue  = CV AltCon [CoreArg]
@@ -489,7 +493,6 @@ extendCaseBndrs env case_bndr scrut con@(DataAlt data_con) alt_bndrs
 	 | otherwise = env { cons = refineConstrEnv subst (cons env) }
 
 
-
 extendAlt :: ScEnv -> Id -> CoreExpr -> ConValue -> [Var] -> ScEnv
 extendAlt env case_bndr scrut val alt_bndrs
   = let 
@@ -545,18 +548,47 @@ combineUsage u1 u2 = SCU { calls = plusVarEnv_C (++) (calls u1) (calls u2),
 combineUsages [] = nullUsage
 combineUsages us = foldr1 combineUsage us
 
-data ArgOcc = CaseScrut 
-	    | OtherOcc
-	    | Both
+lookupOcc :: ScUsage -> Var -> (ScUsage, ArgOcc)
+lookupOcc (SCU { calls = sc_calls, occs = sc_occs }) bndr
+  = (SCU {calls = sc_calls, occs = delVarEnv sc_occs bndr},
+     lookupVarEnv sc_occs bndr `orElse` NoOcc)
+
+lookupOccs :: ScUsage -> [Var] -> (ScUsage, [ArgOcc])
+lookupOccs (SCU { calls = sc_calls, occs = sc_occs }) bndrs
+  = (SCU {calls = sc_calls, occs = delVarEnvList sc_occs bndrs},
+     [lookupVarEnv sc_occs b `orElse` NoOcc | b <- bndrs])
+
+data ArgOcc = NoOcc	-- Doesn't occur at all; or a type argument
+	    | UnkOcc	-- Used in some unknown way
+
+	    | ScrutOcc (UniqFM [ArgOcc])	-- Only taken apart or applied
+		-- ScrutOcc emptyUFM for functions, literals
+		-- ScrutOcc subs for data constructors;
+		--	the [ArgOcc] gives usage of the *value* components,
+		-- The domain of the UniqFM is the Unique of the data constructor
+
+	    | BothOcc	-- Definitely taken apart, *and* perhaps used in some other way
+
 
 instance Outputable ArgOcc where
-  ppr CaseScrut = ptext SLIT("case-scrut")
-  ppr OtherOcc  = ptext SLIT("other-occ")
-  ppr Both      = ptext SLIT("case-scrut and other")
+  ppr (ScrutOcc xs) = ptext SLIT("scrut-occ") <+> ppr xs
+  ppr UnkOcc 	    = ptext SLIT("unk-occ")
+  ppr BothOcc 	    = ptext SLIT("both-occ")
+  ppr NoOcc    	    = ptext SLIT("no-occ")
 
-combineOcc CaseScrut CaseScrut = CaseScrut
-combineOcc OtherOcc  OtherOcc  = OtherOcc
-combineOcc _	     _	       = Both
+combineOcc NoOcc	 occ 	       = occ
+combineOcc occ 		 NoOcc	       = occ
+combineOcc (ScrutOcc xs) (ScrutOcc ys) = ScrutOcc (plusUFM_C combineOccs xs ys)
+combineOcc UnkOcc        UnkOcc        = UnkOcc
+combineOcc _	    _	     	       = BothOcc
+
+combineOccs :: [ArgOcc] -> [ArgOcc] -> [ArgOcc]
+combineOccs xs ys = zipWithEqual "combineOccs" combineOcc xs ys
+
+subOccs :: ArgOcc -> AltCon -> [ArgOcc]
+-- Find usage of components of data con; returns [UnkOcc...] if unknown
+subOccs (ScrutOcc fm) (DataAlt dc) = lookupUFM fm dc `orElse` repeat UnkOcc
+subOccs other	      dc           = repeat UnkOcc
 \end{code}
 
 
@@ -576,25 +608,31 @@ scExpr :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr)
 
 scExpr env e@(Type t) = returnUs (nullUsage, e)
 scExpr env e@(Lit l)  = returnUs (nullUsage, e)
-scExpr env e@(Var v)  = returnUs (varUsage env v OtherOcc, e)
+scExpr env e@(Var v)  = returnUs (varUsage env v UnkOcc, e)
 scExpr env (Note n e) = scExpr env e	`thenUs` \ (usg,e') ->
 			returnUs (usg, Note n e')
 scExpr env (Lam b e)  = scExpr (extendBndr env b) e	`thenUs` \ (usg,e') ->
 			returnUs (usg, Lam b e')
 
 scExpr env (Case scrut b ty alts) 
-  = sc_scrut scrut		`thenUs` \ (scrut_usg, scrut') ->
-    mapAndUnzipUs sc_alt alts	`thenUs` \ (alts_usgs, alts') ->
-    returnUs (combineUsages alts_usgs `combineUsage` scrut_usg,
-	      Case scrut' b ty alts')
+  = do	{ (alt_usgs, alt_occs, alts') <- mapAndUnzip3Us sc_alt alts
+	; let (alt_usg, b_occ) = lookupOcc (combineUsages alt_usgs) b
+	      scrut_occ = foldr combineOcc b_occ alt_occs
+		-- The combined usage of the scrutinee is given
+		-- by scrut_occ, which is passed to scScrut, which
+		-- in turn treats a bare-variable scrutinee specially
+	; (scrut_usg, scrut') <- scScrut env scrut scrut_occ
+	; return (alt_usg `combineUsage` scrut_usg,
+		  Case scrut' b ty alts') }
   where
-    sc_scrut e@(Var v) = returnUs (varUsage env v CaseScrut, e)
-    sc_scrut e	       = scExpr env e
-
-    sc_alt (con,bs,rhs) = scExpr env1 rhs	`thenUs` \ (usg,rhs') ->
-			  returnUs (usg, (con,bs,rhs'))
-			where
-			  env1 = extendCaseBndrs env b scrut con bs
+    sc_alt (con,bs,rhs)
+      = do { let env1 = extendCaseBndrs env b scrut con bs
+	   ; (usg,rhs') <- scExpr env1 rhs
+	   ; let (usg', arg_occs) = lookupOccs usg bs
+		 scrut_occ = case con of
+				DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
+				other	   -> ScrutOcc emptyUFM
+	   ; return (usg', scrut_occ, (con,bs,rhs')) }
 
 scExpr env (Let bind body)
   = scBind env bind	`thenUs` \ (env', bind_usg, bind') ->
@@ -602,22 +640,33 @@ scExpr env (Let bind body)
     returnUs (bind_usg `combineUsage` body_usg, Let bind' body')
 
 scExpr env e@(App _ _) 
-  = let 
-	(fn, args) = collectArgs e
-    in
-    mapAndUnzipUs (scExpr env) (fn:args)	`thenUs` \ (usgs, (fn':args')) ->
+  = do	{ let (fn, args) = collectArgs e
+	; (fn_usg, fn') <- scScrut env fn (ScrutOcc emptyUFM)
 	-- Process the function too.   It's almost always a variable,
 	-- but not always.  In particular, if this pass follows float-in,
 	-- which it may, we can get 
 	--	(let f = ...f... in f) arg1 arg2
-    let
-	call_usg = case fn of
-		 	Var f | Just RecFun <- lookupScopeEnv env f
-			      -> SCU { calls = unitVarEnv f [(cons env, args)], 
-				       occs  = emptyVarEnv }
-			other -> nullUsage
-    in
-    returnUs (combineUsages usgs `combineUsage` call_usg, mkApps fn' args')
+	-- We use scScrut to record the fact that the function is called
+	-- Perhpas we should check that it has at least one value arg, 
+	-- but currently we don't bother
+
+	; (arg_usgs, args') <- mapAndUnzipUs (scExpr env) args
+	; let call_usg = case fn of
+		 	   Var f | Just RecFun <- lookupScopeEnv env f
+			         -> SCU { calls = unitVarEnv f [(cons env, args)], 
+				          occs  = emptyVarEnv }
+			   other -> nullUsage
+	; return (combineUsages arg_usgs `combineUsage` fn_usg 
+				         `combineUsage` call_usg,
+	          mkApps fn' args') }
+
+
+----------------------
+scScrut :: ScEnv -> CoreExpr -> ArgOcc -> UniqSM (ScUsage, CoreExpr)
+-- Used for the scrutinee of a case, 
+-- or the function of an application
+scScrut env e@(Var v) occ = returnUs (varUsage env v occ, e)
+scScrut env e	      occ = scExpr env e
 
 
 ----------------------
@@ -675,49 +724,51 @@ specialise :: ScEnv
 	   -> UniqSM ([CoreRule], 	-- Rules
 		      [(Id,CoreExpr)])	-- Bindings
 
-specialise env fn bndrs body (SCU {calls=calls, occs=occs})
-  = getUs		`thenUs` \ us ->
-    let
-	all_calls = lookupVarEnv calls fn `orElse` []
+specialise env fn bndrs body body_usg
+  = do	{ let (_, bndr_occs) = lookupOccs body_usg bndrs
 
-	good_calls :: [[CoreArg]]
-	good_calls = [ pats
-		     | (con_env, call_args) <- all_calls,
-		       call_args `lengthAtLeast` n_bndrs,	    -- App is saturated
-		       let call = bndrs `zip` call_args,
-		       any (good_arg con_env occs) call,    -- At least one arg is a constr app
-		       let (_, pats) = argsToPats con_env us call_args
-		     ]
+	; mb_calls <- mapM (callToPats (scope env) bndr_occs)
+		   	   (lookupVarEnv (calls body_usg) fn `orElse` [])
+
+	; let good_calls :: [([Var], [CoreArg])]
+	      good_calls = catMaybes mb_calls
+	      in_scope = mkInScopeSet $ unionVarSets $
+			 [ exprsFreeVars pats `delVarSetList` vs 
+			 | (vs,pats) <- good_calls ]
+	      uniq_calls = nubBy (same_call in_scope) good_calls
     in
     mapAndUnzipUs (spec_one env fn (mkLams bndrs body)) 
-		  (nubBy same_call good_calls `zip` [1..])
+		  (uniq_calls `zip` [1..]) }
   where
-    n_bndrs  = length bndrs
-    same_call as1 as2 = and (zipWith tcEqExpr as1 as2)
+	-- Two calls are the same if they match both ways
+    same_call in_scope (vs1,as1)(vs2,as2)
+	 =  isJust (matchN in_scope vs1 as1 as2)
+ 	 && isJust (matchN in_scope vs2 as2 as1)
 
----------------------
-good_arg :: ConstrEnv -> IdEnv ArgOcc -> (CoreBndr, CoreArg) -> Bool
--- See Note [Good arguments] above
-good_arg con_env arg_occs (bndr, arg)
-  = case is_con_app_maybe con_env arg of	
-	Just _ ->  bndr_usg_ok arg_occs bndr arg
-	other   -> False
-
-bndr_usg_ok :: IdEnv ArgOcc -> Var -> CoreArg -> Bool
-bndr_usg_ok arg_occs bndr arg
-  = case lookupVarEnv arg_occs bndr of
-	Just CaseScrut -> True			-- Used only by case scrutiny
-	Just Both      -> case arg of		-- Used by case and elsewhere
-			    App _ _ -> True	-- so the arg should be an explicit con app
-			    other   -> False
-	other -> False				-- Not used, or used wonkily
-    
+callToPats :: InScopeEnv -> [ArgOcc] -> Call
+	   -> UniqSM (Maybe ([Var], [CoreExpr]))
+	-- The VarSet is the variables to quantify over in the rule
+	-- The [CoreExpr] are the argument patterns for the rule
+callToPats in_scope bndr_occs (con_env, args)
+  | length args < length bndr_occs	-- Check saturated
+  = return Nothing
+  | otherwise
+  = do	{ prs <- argsToPats in_scope con_env (args `zip` bndr_occs)
+	; let (good_pats, pats) = unzip prs
+	      pat_fvs = varSetElems (exprsFreeVars pats)
+	      qvars   = filter (not . (`elemVarEnv` in_scope)) pat_fvs
+		-- Quantify over variables that are not in sccpe
+		-- See Note [Shadowing] at the top
+		
+	; if or good_pats 
+	  then return (Just (qvars, pats))
+	  else return Nothing }
 
 ---------------------
 spec_one :: ScEnv
 	 -> Id					-- Function
 	 -> CoreExpr				-- Rhs of the original function
-	 -> ([CoreArg], Int)
+	 -> (([Var], [CoreArg]), Int)
 	 -> UniqSM (CoreRule, (Id,CoreExpr))	-- Rule and binding
 
 -- spec_one creates a specialised copy of the function, together
@@ -741,17 +792,13 @@ spec_one :: ScEnv
 	    f (b,c) ((:) (a,(b,c)) (x,v) hw) = f_spec b c v hw
 -}
 
-spec_one env fn rhs (pats, rule_number)
+spec_one env fn rhs ((vars_to_bind, pats), rule_number)
   = getUniqueUs 		`thenUs` \ spec_uniq ->
     let 
 	fn_name      = idName fn
 	fn_loc       = nameSrcLoc fn_name
 	spec_occ     = mkSpecOcc (nameOccName fn_name)
-	pat_fvs	     = varSetElems (exprsFreeVars pats)
-	vars_to_bind = filter not_avail pat_fvs
-		-- See Note [Shadowing] at the top
 
-	not_avail v  = not (v `elemVarEnv` scope env)
 		-- Put the type variables first; the type of a term
 		-- variable may mention a type variable
 	(tvs, ids)   = partition isTyVar vars_to_bind
@@ -792,6 +839,24 @@ specConstrActivation = ActiveAfter 0	-- Baked in; see comments above
 This code deals with analysing call-site arguments to see whether
 they are constructor applications.
 
+---------------------
+good_arg :: ConstrEnv -> IdEnv ArgOcc -> (CoreBndr, CoreArg) -> Bool
+-- See Note [Good arguments] above
+good_arg con_env arg_occs (bndr, arg)
+  = case is_con_app_maybe con_env arg of	
+	Just _ ->  bndr_usg_ok arg_occs bndr arg
+	other   -> False
+
+bndr_usg_ok :: IdEnv ArgOcc -> Var -> CoreArg -> Bool
+bndr_usg_ok arg_occs bndr arg
+  = case lookupVarEnv arg_occs bndr of
+	Just ScrutOcc -> True			-- Used only by case scrutiny
+	Just Both     -> case arg of		-- Used by case and elsewhere
+			    App _ _ -> True	-- so the arg should be an explicit con app
+			    other   -> False
+	other -> False				-- Not used, or used wonkily
+    
+
 \begin{code}
     -- argToPat takes an actual argument, and returns an abstracted
     -- version, consisting of just the "constructor skeleton" of the
@@ -799,27 +864,61 @@ they are constructor applications.
     -- placeholder variables.  For example:
     --    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
 
-argToPat   :: ConstrEnv -> UniqSupply -> CoreArg -> (UniqSupply, CoreExpr)
-argToPat env us (Type ty) 
-  = (us, Type ty)
+argToPat :: InScopeEnv			-- What's in scope at the fn defn site
+	 -> ConstrEnv			-- ConstrEnv at the call site
+	 -> CoreArg			-- A call arg (or component thereof)
+	 -> ArgOcc
+	 -> UniqSM (Bool, CoreArg)
+-- Returns (interesting, pat), 
+-- where pat is the pattern derived from the argument
+--	      intersting=True if the pattern is non-trivial (not a variable or type)
+-- E.g.		x:xs	     --> (True, x:xs)
+--		f xs         --> (False, w)	   where w is a fresh wildcard
+--		(f xs, 'c')  --> (True, (w, 'c'))  where w is a fresh wildcard
+--		\x. x+y      --> (True, \x. x+y)
+--		lvl7	     --> (True, lvl7)	   if lvl7 is bound 
+--						   somewhere further out
 
-argToPat env us arg
-  | Just (CV dc args) <- is_con_app_maybe env arg
-  = let
-	(us',args') = argsToPats env us args
-    in
-    (us', mk_con_app dc args')
+argToPat in_scope con_env arg@(Type ty) arg_occ
+  = return (False, arg)
 
-argToPat env us (Var v)	-- Don't uniqify existing vars,
-  = (us, Var v)		-- so that we can spot when we pass them twice
-
-argToPat env us arg
-  = (us1, Var (mkSysLocal FSLIT("sc") (uniqFromSupply us2) (exprType arg)))
+argToPat in_scope con_env (Var v) arg_occ	-- Don't uniqify existing vars,
+  = return (interesting, Var v)	-- so that we can spot when we pass them twice
   where
-    (us1,us2) = splitUniqSupply us
+    interesting = not (isLocalId v) || v `elemVarEnv` in_scope
 
-argsToPats :: ConstrEnv -> UniqSupply -> [CoreArg] -> (UniqSupply, [CoreExpr])
-argsToPats env us args = mapAccumL (argToPat env) us args
+argToPat in_scope con_env arg arg_occ
+  | is_value_lam arg
+  = return (True, arg)
+  where
+    is_value_lam (Lam v e) 	-- Spot a value lambda, even if 
+	| isId v = True		-- it is inside a type lambda
+	| otherwise = is_value_lam e
+    is_value_lam other = False
+
+argToPat in_scope con_env arg arg_occ
+  | Just (CV dc args) <- is_con_app_maybe con_env arg
+  , case arg_occ of
+	ScrutOcc _ -> True		-- Used only by case scrutinee
+	BothOcc    -> case arg of	-- Used by case scrut
+			App {} -> True	-- ...and elsewhere...
+			other  -> False
+	other	   -> False	-- No point; the arg is not decomposed
+  = do	{ args' <- argsToPats in_scope con_env (args `zip` subOccs arg_occ dc)
+	; return (True, mk_con_app dc (map snd args')) }
+
+argToPat in_scope con_env arg arg_occ
+  = do	{ uniq <- getUniqueUs
+	; let id = mkSysLocal FSLIT("sc") uniq (exprType arg)
+	; return (False, Var id) }
+
+argsToPats :: InScopeEnv -> ConstrEnv
+	   -> [(CoreArg, ArgOcc)]
+	   -> UniqSM [(Bool, CoreArg)]
+argsToPats in_scope con_env args
+  = mapUs do_one args
+  where
+    do_one (arg,occ) = argToPat in_scope con_env arg occ
 \end{code}
 
 
@@ -836,8 +935,8 @@ is_con_app_maybe env (Var v)
 		-> is_con_app_maybe env (unfoldingTemplate unf)
 		where
 		  unf = idUnfolding v
-		-- However we do want to consult the unfolding as well,
-		-- for let-bound constructors!
+		-- However we do want to consult the unfolding 
+		-- as well, for let-bound constructors!
 
 	other  -> Nothing
 
