@@ -10,6 +10,8 @@ module Rules (
 
 	mkSpecInfo, extendSpecInfo, addSpecInfo,
 	rulesOfBinds, addIdSpecialisations, 
+	
+	matchN,
 
         lookupRule, mkLocalRule, roughTopNames
     ) where
@@ -239,7 +241,7 @@ findBest :: (Id, [CoreExpr])
 findBest target (rule,ans)   [] = (rule,ans)
 findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
-  | rule2 `isMoreSpecific` rule1 = findBest target (rule1,ans1) prs
+  | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
 #ifdef DEBUG
   | otherwise = pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
 			 (vcat [ptext SLIT("Expression to match:") <+> ppr fn <+> sep (map ppr args),
@@ -459,7 +461,7 @@ match menv subst e1 (Lam x2 e2)
 match menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
   = do	{ subst1 <- match_ty menv subst ty1 ty2
 	; subst2 <- match menv subst1 e1 e2
-	; let menv' = menv { me_env = rnBndr2 (me_env menv) x2 x2 }
+	; let menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
 	; match_alts menv' subst2 alts1 alts2	-- Alts are both sorted
 	}
 
