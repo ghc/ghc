@@ -6,7 +6,7 @@
  * lockFile header
  */
 
-#ifndef mingw32_HOST_OS
+#if !(defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32))
 
 int lockFile(int fd, int for_writing, int exclusive);
 int unlockFile(int fd);

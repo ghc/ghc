@@ -4,14 +4,14 @@
    Interface for code in runProcess.c (providing support for System.Process)
    ------------------------------------------------------------------------- */
 
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+#if !(defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32))
 typedef pid_t ProcHandle;
 #else
 // Should really be intptr_t, but we don't have that type on the Haskell side
 typedef long ProcHandle;
 #endif
 
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
+#if !(defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32))
 
 extern ProcHandle runProcess( char *const args[], 
 			      char *workingDirectory, char **environment, 

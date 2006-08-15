@@ -9,7 +9,7 @@
 extern HsInt __hscore_readdir(HsAddr dirPtr, HsAddr pDirEnt);
 extern HsInt __hscore_renameFile(HsAddr src, HsAddr dest);
 
-#if defined(mingw32_HOST_OS)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
 extern int __hscore_getFolderPath(HWND hwndOwner,
 				  int nFolder,
 				  HANDLE hToken,

@@ -89,7 +89,7 @@
 #if HAVE_SYS_TIMES_H
 #include <sys/times.h>
 #endif
-#if HAVE_WINSOCK_H && defined(mingw32_HOST_OS)
+#if HAVE_WINSOCK_H && defined(__MINGW32__)
 #include <winsock.h>
 #endif
 #if HAVE_LIMITS_H
@@ -104,16 +104,18 @@
 # include <stdint.h>
 #endif
 
-#if !defined(mingw32_HOST_OS) && !defined(irix_HOST_OS)
+#if !defined(__MINGW32__) && !defined(irix_HOST_OS)
 # if HAVE_SYS_RESOURCE_H
 #  include <sys/resource.h>
 # endif
 #endif
 
-#ifdef hpux_HOST_OS
-#include <sys/syscall.h>
-#define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
-#define HAVE_GETRUSAGE
+#if !HAVE_GETRUSAGE && HAVE_SYS_SYSCALL_H
+# include <sys/syscall.h>
+# if defined(SYS_GETRUSAGE)	/* hpux_HOST_OS */
+#  define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
+#  define HAVE_GETRUSAGE 1
+# endif
 #endif
 
 /* For System */
@@ -129,7 +131,7 @@
 
 #include "runProcess.h"
 
-#if defined(mingw32_HOST_OS)
+#if defined(__MINGW32__)
 #include <io.h>
 #include <fcntl.h>
 #include "timeUtils.h"
@@ -147,7 +149,7 @@ int inputReady(int fd, int msecs, int isSock);
 /* in Signals.c */
 extern HsInt nocldstop;
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
 /* in execvpe.c */
 extern int execvpe(char *name, char *const argv[], char **envp);
 extern void pPrPr_disableITimers (void);
@@ -239,7 +241,7 @@ INLINE int __hscore_s_issock(m) { return S_ISSOCK(m); }
 #endif
 #endif
 
-#if !defined(mingw32_HOST_OS) && !defined(_MSC_VER)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
 INLINE int
 __hscore_sigemptyset( sigset_t *set )
 { return sigemptyset(set); }
@@ -272,7 +274,7 @@ __hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
 INLINE HsBool
 __hscore_supportsTextMode()
 {
-#if defined(mingw32_HOST_OS)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
   return HS_BOOL_FALSE;
 #else
   return HS_BOOL_TRUE;
@@ -418,7 +420,7 @@ __hscore_ftruncate( int fd, off_t where )
 INLINE HsInt
 __hscore_setmode( HsInt fd, HsBool toBin )
 {
-#if defined(mingw32_HOST_OS) || defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
   return 0;
@@ -440,7 +442,7 @@ __hscore_PrelHandle_read( HsInt fd, HsAddr ptr, HsInt off, int sz )
 
 }
 
-#if defined(mingw32_HOST_OS) || defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
 INLINE HsInt
 __hscore_PrelHandle_send( HsInt fd, HsAddr ptr, HsInt off, int sz )
 {
@@ -459,7 +461,7 @@ __hscore_PrelHandle_recv( HsInt fd, HsAddr ptr, HsInt off, int sz )
 INLINE HsInt
 __hscore_mkdir( HsAddr pathName, HsInt mode )
 {
-#if defined(mingw32_HOST_OS) || defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
   return mkdir(pathName);
 #else
   return mkdir(pathName,mode);
@@ -551,7 +553,7 @@ __hscore_ptr_c_cc( struct termios* ts )
 INLINE HsInt
 __hscore_sizeof_termios( void )
 {
-#ifndef mingw32_HOST_OS
+#ifndef __MINGW32__
   return sizeof(struct termios);
 #else
   return 0;
@@ -559,7 +561,7 @@ __hscore_sizeof_termios( void )
 }
 #endif
 
-#if !defined(mingw32_HOST_OS) && !defined(_MSC_VER)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
 INLINE HsInt
 __hscore_sizeof_sigset_t( void )
 {
@@ -671,7 +673,7 @@ extern void __hscore_set_saved_termios(int fd, void* ts);
 INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
 
 INLINE int __hscore_open(char *file, int how, mode_t mode) {
-#ifdef mingw32_HOST_OS
+#ifdef __MINGW32__
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
 	  return _sopen(file,how,_SH_DENYRW,mode);
 	else
@@ -699,7 +701,7 @@ INLINE int __hscore_fstat(int fd, struct stat *buf) {
 
 // select-related stuff
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(__MINGW32__)
 INLINE int  hsFD_SETSIZE(void) { return FD_SETSIZE; }
 INLINE void hsFD_CLR(int fd, fd_set *fds) { FD_CLR(fd, fds); }
 INLINE int  hsFD_ISSET(int fd, fd_set *fds) { return FD_ISSET(fd, fds); }
@@ -710,7 +712,7 @@ extern void hsFD_ZERO(fd_set *fds);
 
 // gettimeofday()-related
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(__MINGW32__)
 #define TICK_FREQ  50
 
 INLINE HsInt sizeofTimeVal(void) { return sizeof(struct timeval); }
@@ -728,11 +730,11 @@ INLINE void setTimevalTicks(struct timeval *p, HsInt ticks)
     p->tv_sec  = ticks / TICK_FREQ;
     p->tv_usec = (ticks % TICK_FREQ) * (1000000 / TICK_FREQ);
 }
-#endif /* !defined(mingw32_HOST_OS) */
+#endif /* !defined(__MINGW32__) */
 
 // Directory-related
 
-#if defined(mingw32_HOST_OS)
+#if defined(__MINGW32__)
 
 /* Make sure we've got the reqd CSIDL_ constants in scope;
  * w32api header files are lagging a bit in defining the full set.
@@ -756,7 +758,7 @@ INLINE int __hscore_CSIDL_WINDOWS()  { return CSIDL_WINDOWS;  }
 INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
 #endif
 
-#if defined(mingw32_HOST_OS)
+#if defined(__MINGW32__)
 INLINE unsigned int __hscore_get_osver(void) { return _osver; }
 #endif
 
