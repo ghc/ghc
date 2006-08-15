@@ -303,6 +303,18 @@ listLengthCmp = atLength atLen atEnd
   atLen []     = EQ
   atLen _      = GT
 
+equalLength :: [a] -> [b] -> Bool
+equalLength [] []         = True
+equalLength (_:xs) (_:ys) = equalLength xs ys
+equalLength xs    ys      = False
+
+compareLength :: [a] -> [b] -> Ordering
+compareLength [] []         = EQ
+compareLength (_:xs) (_:ys) = compareLength xs ys
+compareLength [] _ys        = LT
+compareLength _xs []        = GT
+
+----------------------------
 singleton :: a -> [a]
 singleton x = [x]
 
@@ -647,17 +659,6 @@ eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool
 eqListBy eq []     []     = True
 eqListBy eq (x:xs) (y:ys) = eq x y && eqListBy eq xs ys
 eqListBy eq xs     ys     = False
-
-equalLength :: [a] -> [b] -> Bool
-equalLength [] []         = True
-equalLength (_:xs) (_:ys) = equalLength xs ys
-equalLength xs    ys      = False
-
-compareLength :: [a] -> [b] -> Ordering
-compareLength [] []         = EQ
-compareLength (_:xs) (_:ys) = compareLength xs ys
-compareLength [] _ys        = LT
-compareLength _xs []        = GT
 
 cmpList :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
     -- `cmpList' uses a user-specified comparer
