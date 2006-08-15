@@ -1826,10 +1826,10 @@ mkDupableCont env (ApplyTo _ arg mb_se cont)
 	; (floats2, arg2) <- mkDupableArg env arg1
 	; return (floats2, (ApplyTo OkToDup arg2 Nothing dup_cont, nondup_cont)) }}
 
-mkDupableCont env cont@(Select _ case_bndr [_] _ _)
+mkDupableCont env cont@(Select _ case_bndr [_] se _)
   = returnSmpl (emptyFloats env, (mkBoringStop scrut_ty, cont))
   where
-    scrut_ty = substTy env (idType case_bndr)
+    scrut_ty = substTy se (idType case_bndr)
 	-- This case is just like the previous one.  Here's an example:
 	--	data T a = MkT !a
 	--	...(MkT (abs x))...
