@@ -6,7 +6,7 @@ module Generics ( canDoGenerics, mkTyConGenericBinds,
 
 
 import HsSyn
-import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
+import Type             ( Type, isUnLiftedType, tyVarsOfType,
 			  isTyVarTy, getTyVar_maybe, funTyCon
 			)
 import TcHsSyn		( mkSimpleHsAlt )
@@ -202,9 +202,10 @@ validGenericMethodType ty
     (local_tvs, _, tau) = tcSplitSigmaTy ty
 
     valid ty
-      | isTyVarTy ty    = True
-      | no_tyvars_in_ty	= True
-      | otherwise	= case tcSplitTyConApp_maybe ty of
+      | not (isTauTy ty) = False 	-- Note [Higher ramk methods]
+      | isTyVarTy ty     = True
+      | no_tyvars_in_ty	 = True
+      | otherwise	 = case tcSplitTyConApp_maybe ty of
 				Just (tc,tys) -> valid_tycon tc && all valid tys
 				Nothing	      -> False
       where
@@ -452,6 +453,24 @@ By the time the type checker has done its stuff we'll get
 	instance Foo T where
 	   op = \b. \dict::Ord b. toOp b (op Trep b dict)
 
+Note [Higher rank methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Higher-rank method types don't work, because we'd generate a bimap that
+needs impredicative polymorphism.  In principle that should be possible
+(with boxy types and all) but it would take a bit of working out.   Here's
+an example:
+  class ChurchEncode k where 
+    match :: k -> z 
+       	  -> (forall a b z. a -> b -> z)  {- product -} 
+       	  -> (forall a   z. a -> z)       {- left -} 
+       	  -> (forall a   z. a -> z)       {- right -} 
+       	  -> z 
+  
+    match {| Unit    |} Unit      unit prod left right = unit 
+    match {| a :*: b |} (x :*: y) unit prod left right = prod x y 
+    match {| a :+: b |} (Inl l)   unit prod left right = left l 
+    match {| a :+: b |} (Inr r)   unit prod left right = right r 
+
 \begin{code}
 mkGenericRhs :: Id -> TyVar -> TyCon -> LHsExpr RdrName
 mkGenericRhs sel_id tyvar tycon
@@ -486,26 +505,25 @@ generate_bimap :: EPEnv
 	       -> EP (LHsExpr RdrName)
 -- Top level case - splitting the TyCon.
 generate_bimap env@(tv,ep,local_tvs) ty 
-  = case getTyVar_maybe ty of
-	Just tv1 |  tv == tv1 -> ep				-- The class tyvar
-		 |  otherwise -> ASSERT( tv1 `elem` local_tvs)	-- One of the polymorphic tyvars of the method
-				 idEP	
-	Nothing	 -> bimapApp env (tcSplitTyConApp_maybe ty)
+  | all (`elem` local_tvs) (varSetElems (tyVarsOfType ty))
+  = idEP	-- A constant type
+
+  | Just tv1 <- getTyVar_maybe ty
+  = ASSERT( tv == tv1 ) ep					-- The class tyvar
+
+  | Just (tycon, ty_args) <- tcSplitTyConApp_maybe ty
+  = bimapTyCon tycon (map (generate_bimap env) ty_args)
+
+  | otherwise
+  = pprPanic "generate_bimap" (ppr ty)
 
 -------------------
-bimapApp :: EPEnv -> Maybe (TyCon, [Type]) -> EP (LHsExpr RdrName)
-bimapApp env Nothing		    = panic "TcClassDecl: Type Application!"
-bimapApp env (Just (tycon, ty_args)) 
+bimapTyCon :: TyCon -> [EP  (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
+bimapTyCon tycon arg_eps 
   | tycon == funTyCon       = bimapArrow arg_eps
   | tycon == listTyCon      = bimapList arg_eps
   | isBoxedTupleTyCon tycon = bimapTuple arg_eps
-  | otherwise		    =	-- Otherwise validGenericMethodType will 
-				-- have checked that the type is a constant type
-			      ASSERT( all (`elem` local_tvs) (varSetElems (tyVarsOfTypes ty_args)) )
-			      idEP
-    where
-      arg_eps = map (generate_bimap env) ty_args
-      (_,_,local_tvs) = env
+  | otherwise		    = pprPanic "bimapTyCon" (ppr tycon)
 
 -------------------
 -- bimapArrow :: [EP a a', EP b b'] -> EP (a->b) (a'->b')
