@@ -98,14 +98,19 @@ uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily (I# n) : uniqsFromS
 %************************************************************************
 
 \begin{code}
-type UniqSM result = UniqSupply -> (result, UniqSupply)
+newtype UniqSM result = USM { unUSM :: UniqSupply -> (result, UniqSupply) }
+
+instance Monad UniqSM where
+  return = returnUs
+  (>>=) = thenUs
+  (>>)  = thenUs_
 
 -- the initUs function also returns the final UniqSupply; initUs_ drops it
 initUs :: UniqSupply -> UniqSM a -> (a,UniqSupply)
-initUs init_us m = case m init_us of { (r,us) -> (r,us) }
+initUs init_us m = case unUSM m init_us of { (r,us) -> (r,us) }
 
 initUs_ :: UniqSupply -> UniqSM a -> a
-initUs_ init_us m = case m init_us of { (r,us) -> r }
+initUs_ init_us m = case unUSM m init_us of { (r,us) -> r }
 
 {-# INLINE thenUs #-}
 {-# INLINE lazyThenUs #-}
@@ -116,38 +121,38 @@ initUs_ init_us m = case m init_us of { (r,us) -> r }
 @thenUs@ is where we split the @UniqSupply@.
 \begin{code}
 fixUs :: (a -> UniqSM a) -> UniqSM a
-fixUs m us
-  = (r,us')  where  (r,us') = m r us
+fixUs m = USM (\us -> let (r,us') = unUSM (m r) us in (r,us'))
 
 thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
-thenUs expr cont us
-  = case (expr us) of { (result, us') -> cont result us' }
+thenUs (USM expr) cont
+  = USM (\us -> case (expr us) of 
+		   (result, us') -> unUSM (cont result) us')
 
 lazyThenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
-lazyThenUs expr cont us
-  = let (result, us') = expr us in cont result us'
+lazyThenUs (USM expr) cont
+  = USM (\us -> let (result, us') = expr us in unUSM (cont result) us')
 
 thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
-thenUs_ expr cont us
-  = case (expr us) of { (_, us') -> cont us' }
+thenUs_ (USM expr) (USM cont)
+  = USM (\us -> case (expr us) of { (_, us') -> cont us' })
 
 
 returnUs :: a -> UniqSM a
-returnUs result us = (result, us)
+returnUs result = USM (\us -> (result, us))
 
 withUs :: (UniqSupply -> (a, UniqSupply)) -> UniqSM a
-withUs f us = f us	-- Ha ha!
+withUs f = USM (\us -> f us)	-- Ha ha!
 		
 getUs :: UniqSM UniqSupply
-getUs us = splitUniqSupply us
+getUs = USM (\us -> splitUniqSupply us)
 
 getUniqueUs :: UniqSM Unique
-getUniqueUs us = case splitUniqSupply us of
-		   (us1,us2) -> (uniqFromSupply us1, us2)
+getUniqueUs = USM (\us -> case splitUniqSupply us of
+			   (us1,us2) -> (uniqFromSupply us1, us2))
 
 getUniquesUs :: UniqSM [Unique]
-getUniquesUs us = case splitUniqSupply us of
-		      (us1,us2) -> (uniqsFromSupply us1, us2)
+getUniquesUs = USM (\us -> case splitUniqSupply us of
+			      (us1,us2) -> (uniqsFromSupply us1, us2))
 \end{code}
 
 \begin{code}

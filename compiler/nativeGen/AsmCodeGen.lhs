@@ -309,17 +309,17 @@ reorder id accum (b@(block,id',out) : rest)
 
 genMachCode :: CmmTop -> UniqSM ([NatCmmTop], [CLabel])
 
-genMachCode cmm_top initial_us
-  = let initial_st             = mkNatM_State initial_us 0
-        (new_tops, final_st)   = initNat initial_st (cmmTopCodeGen cmm_top)
-        final_us               = natm_us final_st
-        final_delta            = natm_delta final_st
-	final_imports          = natm_imports final_st
-    in
-        if   final_delta == 0
-        then ((new_tops, final_imports), final_us)
-        else pprPanic "genMachCode: nonzero final delta"
-                      (int final_delta)
+genMachCode cmm_top
+  = do	{ initial_us <- getUs
+	; let initial_st           = mkNatM_State initial_us 0
+	      (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
+	      final_us             = natm_us final_st
+	      final_delta          = natm_delta final_st
+	      final_imports        = natm_imports final_st
+	; if   final_delta == 0
+          then return (new_tops, final_imports)
+          else pprPanic "genMachCode: nonzero final delta" (int final_delta)
+    }
 
 -- -----------------------------------------------------------------------------
 -- Fixup assignments to global registers so that they assign to 
