@@ -1,0 +1,21 @@
+
+tcfail163.hs:11:0:
+    Generic method type is too complex
+	match :: forall k.
+		 (ChurchEncode k) =>
+		 forall z.
+		 k
+		 -> z
+		 -> (forall a b z. a -> b -> z)
+		 -> (forall a z. a -> z)
+		 -> (forall a z. a -> z)
+		 -> z
+	You can only use type variables, arrows, lists, and tuples
+    When checking the class method:
+      match :: k
+	       -> z
+	       -> (forall a b z. a -> b -> z)
+	       -> (forall a z. a -> z)
+	       -> (forall a z. a -> z)
+	       -> z
+    In the class declaration for `ChurchEncode'
