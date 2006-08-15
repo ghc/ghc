@@ -816,12 +816,14 @@ can be given abstractly, by omitting the '=' sign and everything that follows.  
 <programlisting>
   data R (x :: * -&#62; *) y
 </programlisting>
+You cannot use <literal>deriving</literal> on a data type declaration; write in
+<literal>instance</literal> declaration instead.
 </para></listitem>
 <listitem><para> Class declarations is exactly as in Haskell, except that you may not put
-default method declarations.  You can also omit all the class methods entirely.
+default method declarations.  You can also omit all the superclasses and class
+methods entirely; but you must either omit them all or put them all in.
 </para></listitem>
-<listitem><para> Do not include instance declarations. There is a complication to do with
-how the dictionary functions are named.  It may well work, but it's not a well-tested feature.
+<listitem><para> You can include instance declarations just as in Haskell; but omit the "where" part.
  </para></listitem>
 </itemizedlist>
 </para>

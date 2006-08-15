@@ -27,7 +27,7 @@ module IfaceSyn (
 
 	-- Equality
 	IfaceEq(..), (&&&), bool, eqListBy, eqMaybeBy,
-	eqIfDecl, eqIfInst, eqIfRule, 
+	eqIfDecl, eqIfInst, eqIfRule, checkBootDecl,
 	
 	-- Pretty printing
 	pprIfaceExpr, pprIfaceDecl, pprIfaceDeclHead 
@@ -732,6 +732,11 @@ bool :: Bool -> IfaceEq
 bool True  = Equal
 bool False = NotEqual
 
+toBool :: IfaceEq -> Bool
+toBool Equal     = True
+toBool (EqBut _) = True
+toBool NotEqual  = False
+
 zapEq :: IfaceEq -> IfaceEq	-- Used to forget EqBut information
 zapEq (EqBut _) = Equal
 zapEq other	= other
@@ -756,6 +761,43 @@ eqIfExt n1 n2 = NotEqual
 
 
 \begin{code}
+---------------------
+checkBootDecl :: IfaceDecl 	-- The boot decl
+	      -> IfaceDecl	-- The real decl
+	      -> Bool		-- True <=> compatible
+checkBootDecl (IfaceId s1 t1 _) (IfaceId s2 t2 _)
+  = ASSERT( s1==s2 ) toBool (t1 `eqIfType` t2)
+
+checkBootDecl d1@(IfaceForeign {}) d2@(IfaceForeign {})
+  = ASSERT (ifName d1 == ifName d2 ) ifExtName d1 == ifExtName d2
+
+checkBootDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
+  = ASSERT( ifName d1 == ifName d2 )
+    toBool $ eqWith (ifTyVars d1) (ifTyVars d2) $ \ env -> 
+          eq_ifType env (ifSynRhs d1) (ifSynRhs d2)
+
+checkBootDecl d1@(IfaceData {}) d2@(IfaceData {})
+-- We don't check the recursion flags because the boot-one is
+-- recursive, to be conservative, but the real one may not be.
+-- I'm not happy with the way recursive flags are dealt with.
+  = ASSERT( ifName d1    == ifName d2 ) 
+    toBool $ eqWith (ifTyVars d1) (ifTyVars d2) $ \ env -> 
+	eq_ifContext env (ifCtxt d1) (ifCtxt d2) &&& 
+	case ifCons d1 of
+	    IfAbstractTyCon -> Equal
+	    cons1	    -> eq_hsCD env cons1 (ifCons d2)
+
+checkBootDecl d1@(IfaceClass {}) d2@(IfaceClass {})
+  = ASSERT( ifName d1 == ifName d2 )
+    toBool $ eqWith (ifTyVars d1) (ifTyVars d2) $ \ env -> 
+	  eqListBy (eq_hsFD env)    (ifFDs d1)  (ifFDs d2) &&&
+	  case (ifCtxt d1, ifSigs d1) of
+	     ([], [])      -> Equal
+	     (cxt1, sigs1) -> eq_ifContext env cxt1 (ifCtxt d2)  &&&
+			      eqListBy (eq_cls_sig env) sigs1 (ifSigs d2)
+
+checkBootDecl _ _ = False	-- default case
+
 ---------------------
 eqIfDecl :: IfaceDecl -> IfaceDecl -> IfaceEq
 eqIfDecl (IfaceId s1 t1 i1) (IfaceId s2 t2 i2)

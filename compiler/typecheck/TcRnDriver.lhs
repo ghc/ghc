@@ -38,7 +38,7 @@ import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv )
 import TcHsSyn		( zonkTopDecls )
 import TcExpr 		( tcInferRho )
 import TcRnMonad
-import TcType		( tidyTopType, tcEqType, mkTyVarTys, substTyWith )
+import TcType		( tidyTopType, tcEqType )
 import Inst		( showLIE )
 import InstEnv		( extendInstEnvList, Instance, pprInstances, instanceDFunId )
 import TcBinds		( tcTopBinds, tcHsBootSigs )
@@ -48,6 +48,7 @@ import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcIface		( tcExtCoreBindings, tcHiBootIface )
+import IfaceSyn		( checkBootDecl, tyThingToIfaceDecl, IfaceExtName(..) )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
@@ -58,7 +59,6 @@ import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
 import PprCore		( pprRules, pprCoreBindings )
 import CoreSyn		( CoreRule, bindersOfBinds )
-import DataCon		( dataConWrapId )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
 import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
@@ -66,16 +66,16 @@ import Module
 import UniqFM		( elemUFM, eltsUFM )
 import OccName		( mkVarOccFS, plusOccEnv )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
-			  mkExternalName )
+			  nameModule, nameOccName, isImplicitName, mkExternalName )
 import NameSet
-import TyCon		( tyConHasGenerics, isSynTyCon, synTyConDefn, tyConKind )
+import TyCon		( tyConHasGenerics )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import DriverPhases	( HscSource(..), isHsBoot )
 import HscTypes		( ModGuts(..), ModDetails(..), emptyModDetails,
 			  HscEnv(..), ExternalPackageState(..),
 			  IsBootInterface, noDependencies, 
 			  Deprecs( NoDeprecs ), plusDeprecs,
-			  ForeignStubs(NoStubs), TyThing(..), 
+			  ForeignStubs(NoStubs), 
 			  TypeEnv, lookupTypeEnv, hptInstances, 
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, typeEnvElts,
 			  emptyFixityEnv
@@ -113,7 +113,7 @@ import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
 import Kind		( Kind )
 import Var		( globaliseId )
-import Name		( nameOccName, nameModule, isBuiltInSyntax, isInternalName )
+import Name		( nameModule, isBuiltInSyntax, isInternalName )
 import OccName		( isTcOcc )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
@@ -509,24 +509,35 @@ checkHiBootIface :: TcGblEnv -> ModDetails -> TcM (LHsBinds Id)
 checkHiBootIface
 	(TcGblEnv { tcg_insts = local_insts, tcg_type_env = local_type_env })
 	(ModDetails { md_insts = boot_insts, md_types = boot_type_env })
-  = do	{ mapM_ check_one (typeEnvElts boot_type_env)
+  = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts)) ;
+	; mapM_ check_one (typeEnvElts boot_type_env)
 	; dfun_binds <- mapM check_inst boot_insts
 	; return (unionManyBags dfun_binds) }
   where
     check_one boot_thing
       | no_check name
       = return ()	
-      | otherwise	
-      = case lookupTypeEnv local_type_env name of
-	  Nothing 	  -> addErrTc (missingBootThing boot_thing)
-	  Just real_thing -> check_thing boot_thing real_thing
+      | Just real_thing <- lookupTypeEnv local_type_env name
+      = do { let boot_decl = tyThingToIfaceDecl ext_nm boot_thing
+	         real_decl = tyThingToIfaceDecl ext_nm real_thing
+	   ; checkTc (checkBootDecl boot_decl real_decl)
+		     (bootMisMatch boot_thing boot_decl real_decl) }
+		-- The easiest way to check compatibility is to convert to
+		-- iface syntax, where we already have good comparison functions
+      | otherwise
+      = addErrTc (missingBootThing boot_thing)
       where
 	name = getName boot_thing
+
+    ext_nm name = ExtPkg (nameModule name) (nameOccName name)
+	-- Just enough to compare; no versions etc needed
 
     no_check name = isWiredInName name	-- No checking for wired-in names.  In particular,
 					-- 'error' is handled by a rather gross hack
 					-- (see comments in GHC.Err.hs-boot)
 		  || name `elem` dfun_names
+		  || isImplicitName name	-- Has a parent, which we'll check
+
     dfun_names = map getName boot_insts
 
     check_inst boot_inst
@@ -541,35 +552,9 @@ checkHiBootIface
 	  local_boot_dfun = mkExportedLocalId (idName boot_dfun) boot_inst_ty
 
 ----------------
-check_thing (ATyCon boot_tc) (ATyCon real_tc)
-  | isSynTyCon boot_tc && isSynTyCon real_tc,
-    defn1 `tcEqType` substTyWith tvs2 (mkTyVarTys tvs1) defn2
-  = return ()
-
-  | tyConKind boot_tc == tyConKind real_tc
-  = return ()
-  where
-    (tvs1, defn1) = synTyConDefn boot_tc
-    (tvs2, defn2) = synTyConDefn boot_tc
-
-check_thing (AnId boot_id) (AnId real_id)
-  | idType boot_id `tcEqType` idType real_id
-  = return ()
-
-check_thing (ADataCon dc1) (ADataCon dc2)
-  | idType (dataConWrapId dc1) `tcEqType` idType (dataConWrapId dc2)
-  = return ()
-
-	-- Can't declare a class in a hi-boot file
-
-check_thing boot_thing real_thing	-- Default case; failure
-  = addErrAt (srcLocSpan (getSrcLoc real_thing))
-	     (bootMisMatch real_thing)
-
-----------------
 missingBootThing thing
   = ppr thing <+> ptext SLIT("is defined in the hs-boot file, but not in the module")
-bootMisMatch thing
+bootMisMatch thing boot_decl real_decl
   = ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file")
 instMisMatch inst
   = hang (ppr inst)

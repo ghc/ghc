@@ -323,7 +323,6 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt,  tcdSigs = sigs})
   = kcTyClDeclBody decl	$ \ tvs' ->
     do	{ is_boot <- tcIsHsBoot
-	; checkTc (not is_boot) badBootClassDeclErr
 	; ctxt' <- kcHsContext ctxt	
 	; sigs' <- mappM (wrapLocM kc_sig) sigs
 	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs'}) }
@@ -824,6 +823,4 @@ newtypeFieldErr con_name n_flds
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
 	 nest 2 $ ptext SLIT("(-fglasgow-exts permits this)")]
-
-badBootClassDeclErr = ptext SLIT("Illegal class declaration in hs-boot file")
 \end{code}

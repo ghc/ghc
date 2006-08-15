@@ -376,6 +376,8 @@ tcIfaceDecl (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
 tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bndrs, 
 			 ifFDs = rdr_fds, ifSigs = rdr_sigs, 
 			 ifVrcs = tc_vrcs, ifRec = tc_isrec })
+-- ToDo: in hs-boot files we should really treat abstract classes specially,
+--	 as we do abstract tycons
   = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
     { cls_name <- lookupIfaceTop occ_name
     ; ctxt <- tcIfaceCtxt rdr_ctxt
