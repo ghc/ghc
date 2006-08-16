@@ -1,5 +1,4 @@
 module Main where
-import System
 import Char
 import List
 import IO
@@ -34,17 +33,20 @@ main = do
 	   putStr $ usageInfo usageString options
 	   exitWith (ExitFailure 1)
          else return ()
-	let mode = getMode modes
+        let mode = getMode (Append `delete` modes)
+        let openFileMode = if elem Append modes
+			   then AppendMode
+			   else WriteMode
 	filedata <- mapM findthings filenames
         if mode == BothTags || mode == CTags
          then do 
-           ctagsfile <- openFile "tags" WriteMode
+           ctagsfile <- openFile "tags" openFileMode
 	   writectagsfile ctagsfile filedata
            hClose ctagsfile
          else return ()
 	if mode == BothTags || mode == ETags 
          then do
-           etagsfile <- openFile "TAGS" WriteMode
+           etagsfile <- openFile "TAGS" openFileMode
 	   writeetagsfile etagsfile filedata
            hClose etagsfile
          else return ()
@@ -58,7 +60,7 @@ getMode [x] = x
 getMode (x:xs) = max x (getMode xs)
 
 
-data Mode = ETags | CTags | BothTags | Help deriving (Ord, Eq, Show)
+data Mode = ETags | CTags | BothTags | Append | Help deriving (Ord, Eq, Show)
 
 options :: [OptDescr Mode]
 options = [ Option "c" ["ctags"]
@@ -67,6 +69,8 @@ options = [ Option "c" ["ctags"]
 	    (NoArg ETags) "generate ETAGS file (etags)"
 	  , Option "b" ["both"]
 	    (NoArg BothTags) ("generate both CTAGS and ETAGS")
+	  , Option "a" ["append"]
+	    (NoArg Append) ("append to existing CTAGS and/or ETAGS file(s)")
 	  , Option "h" ["help"] (NoArg Help) "This help"
 	  ]
 
