@@ -1414,17 +1414,18 @@ simplCaseBinder env (Var v) case_bndr
 -- Failed try [see Note 2 above]
 --     not (isEvaldUnfolding (idUnfolding v))
 
-  = simplBinder env (zap case_bndr)		`thenSmpl` \ (env, case_bndr') ->
+  = simplBinder env (zapOccInfo case_bndr)		`thenSmpl` \ (env, case_bndr') ->
     returnSmpl (modifyInScope env v case_bndr', case_bndr')
 	-- We could extend the substitution instead, but it would be
 	-- a hack because then the substitution wouldn't be idempotent
 	-- any more (v is an OutId).  And this does just as well.
-  where
-    zap b = b `setIdOccInfo` NoOccInfo
 	    
 simplCaseBinder env other_scrut case_bndr 
   = simplBinder env case_bndr 		`thenSmpl` \ (env, case_bndr') ->
     returnSmpl (env, case_bndr')
+
+zapOccInfo :: InId -> InId
+zapOccInfo b = b `setIdOccInfo` NoOccInfo
 \end{code}
 
 
@@ -1694,8 +1695,9 @@ simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
 	-- If the case binder is alive, then we add the unfolding
 	--	case_bndr = C vs
 	-- to the envt; so vs are now very much alive
+	-- Note [Aug06] I can't see why this actually matters
     zap_occ_info | isDeadBinder case_bndr' = \id -> id
-		 | otherwise		   = \id -> id `setIdOccInfo` NoOccInfo
+		 | otherwise		   = zapOccInfo
 
 mk_rhs_env env case_bndr' case_bndr_unf
   = modifyInScope env case_bndr' (case_bndr' `setIdUnfolding` case_bndr_unf)
@@ -1742,7 +1744,7 @@ knownCon env scrut con args bndr alts cont
 
 	(DataAlt dc, bs, rhs)  
 		-> ASSERT( n_drop_tys + length bs == length args )
-		   bind_args env bs (drop n_drop_tys args)	$ \ env ->
+		   bind_args env dead_bndr bs (drop n_drop_tys args)	$ \ env ->
 		   let
 			-- It's useful to bind bndr to scrut, rather than to a fresh
 			-- binding 	x = Con arg1 .. argn
@@ -1761,23 +1763,29 @@ knownCon env scrut con args bndr alts cont
 		   simplNonRecX env bndr bndr_rhs		$ \ env ->
 		   simplExprF env rhs cont
 	        where
+		   dead_bndr = isDeadBinder bndr
 		   n_drop_tys | isVanillaDataCon dc = tyConArity (dataConTyCon dc)
 			      | otherwise	    = 0
 			-- Vanilla data constructors lack type arguments in the pattern
 
 -- Ugh!
-bind_args env [] _ thing_inside = thing_inside env
+bind_args env dead_bndr [] _ thing_inside = thing_inside env
 
-bind_args env (b:bs) (Type ty : args) thing_inside
+bind_args env dead_bndr (b:bs) (Type ty : args) thing_inside
   = ASSERT( isTyVar b )
-    bind_args (extendTvSubst env b ty) bs args thing_inside
+    bind_args (extendTvSubst env b ty) dead_bndr bs args thing_inside
     
-bind_args env (b:bs) (arg : args) thing_inside
--- Note that the binder might be "dead", because it doesn't occur in the RHS
--- Nevertheless we bind it here, in case we need it for the con_app for the case_bndr
+bind_args env dead_bndr (b:bs) (arg : args) thing_inside
   = ASSERT( isId b )
-    simplNonRecX env b arg	$ \ env ->
-    bind_args env bs args thing_inside
+    let
+	b' = if dead_bndr then b else zapOccInfo b
+		-- Note that the binder might be "dead", because it doesn't occur 
+		-- in the RHS; and simplNonRecX may therefore discard it via postInlineUnconditionally
+		-- Nevertheless we must keep it if the case-binder is alive, because it may
+		-- be used in teh con_app
+    in
+    simplNonRecX env b' arg	$ \ env ->
+    bind_args env dead_bndr bs args thing_inside
 \end{code}
 
 
