@@ -632,15 +632,22 @@ is rather like
 If e turns out to be (e1,e2) we indeed get something like
 	let a = e1; b = e2; x = (a,b) in rhs
 
+Note [Aug 06]: I don't think this is necessary any more, and it helpe
+	       to know when binders are unused.  See esp the call to
+	       isDeadBinder in Simplify.mkDupableAlt
+
 \begin{code}
 occAnalAlt env case_bndr (con, bndrs, rhs)
   = case occAnal env rhs of { (rhs_usage, rhs') ->
     let
         (final_usage, tagged_bndrs) = tagBinders rhs_usage bndrs
+	final_bndrs = tagged_bndrs	-- See Note [Aug06] above
+{-
 	final_bndrs | case_bndr `elemVarEnv` final_usage = bndrs
 		    | otherwise				= tagged_bndrs
 		-- Leave the binders untagged if the case 
 		-- binder occurs at all; see note above
+-}
     in
     (final_usage, (con, final_bndrs, rhs')) }
 \end{code}

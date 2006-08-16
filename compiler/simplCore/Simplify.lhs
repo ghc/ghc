@@ -1758,6 +1758,8 @@ bind_args env (b:bs) (Type ty : args) thing_inside
     bind_args (extendTvSubst env b ty) bs args thing_inside
     
 bind_args env (b:bs) (arg : args) thing_inside
+-- Note that the binder might be "dead", because it doesn't occur in the RHS
+-- Nevertheless we bind it here, in case we need it for the con_app for the case_bndr
   = ASSERT( isId b )
     simplNonRecX env b arg	$ \ env ->
     bind_args env bs args thing_inside
@@ -1834,42 +1836,74 @@ mkDupableCont env (ApplyTo _ arg mb_se cont)
 	; (floats2, arg2) <- mkDupableArg env arg1
 	; return (floats2, (ApplyTo OkToDup arg2 Nothing dup_cont, nondup_cont)) }}
 
-mkDupableCont env cont@(Select _ case_bndr [_] se _)
+mkDupableCont env cont@(Select _ case_bndr [(_,bs,rhs)] se case_cont)
+--   | not (exprIsDupable rhs && contIsDupable case_cont)	-- See notes below
+--  | not (isDeadBinder case_bndr)
+  | all isDeadBinder bs
   = returnSmpl (emptyFloats env, (mkBoringStop scrut_ty, cont))
   where
     scrut_ty = substTy se (idType case_bndr)
-	-- This case is just like the previous one.  Here's an example:
-	--	data T a = MkT !a
-	--	...(MkT (abs x))...
-	-- Then we get
-	--	case (case x of I# x' -> 
-	--	      case x' <# 0# of
-	--		True  -> I# (negate# x')
-	--		False -> I# x') of y {
-	--	  DEFAULT -> MkT y
-	-- Because the (case x) has only one alternative, we'll transform to
-	--	case x of I# x' ->
-	--	case (case x' <# 0# of
-	--		True  -> I# (negate# x')
-	--		False -> I# x') of y {
-	--	  DEFAULT -> MkT y
-	-- But now we do *NOT* want to make a join point etc, giving 
-	--	case x of I# x' ->
-	--	let $j = \y -> MkT y
-	--	in case x' <# 0# of
-	--		True  -> $j (I# (negate# x'))
-	--		False -> $j (I# x')
-	-- In this case the $j will inline again, but suppose there was a big
-	-- strict computation enclosing the orginal call to MkT.  Then, it won't
-	-- "see" the MkT any more, because it's big and won't get duplicated.
-	-- And, what is worse, nothing was gained by the case-of-case transform.
-	--
-	-- NB: Originally I matched [(DEFAULT,_,_)], but in the common
-	-- case of Int, the alternative-filling-in code turned the outer case into
-	--	case (...) of y { I# _ -> MkT y }
-	-- and that doesn't match the DEFAULT!
-	-- Now I match on any single-alternative case. 
-	-- I hope that is the right thing to do!
+
+{-	Note [Single-alternative cases]
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This case is just like the ArgOf case.  Here's an example:
+	data T a = MkT !a
+	...(MkT (abs x))...
+Then we get
+	case (case x of I# x' -> 
+	      case x' <# 0# of
+		True  -> I# (negate# x')
+		False -> I# x') of y {
+	  DEFAULT -> MkT y
+Because the (case x) has only one alternative, we'll transform to
+	case x of I# x' ->
+	case (case x' <# 0# of
+		True  -> I# (negate# x')
+		False -> I# x') of y {
+	  DEFAULT -> MkT y
+But now we do *NOT* want to make a join point etc, giving 
+	case x of I# x' ->
+	let $j = \y -> MkT y
+	in case x' <# 0# of
+		True  -> $j (I# (negate# x'))
+		False -> $j (I# x')
+In this case the $j will inline again, but suppose there was a big
+strict computation enclosing the orginal call to MkT.  Then, it won't
+"see" the MkT any more, because it's big and won't get duplicated.
+And, what is worse, nothing was gained by the case-of-case transform.
+
+When should use this case of mkDupableCont?  
+However, matching on *any* single-alternative case is a *disaster*;
+  e.g.	case (case ....) of (a,b) -> (# a,b #)
+  We must push the outer case into the inner one!
+Other choices:
+
+   * Match [(DEFAULT,_,_)], but in the common case of Int, 
+     the alternative-filling-in code turned the outer case into
+		case (...) of y { I# _ -> MkT y }
+
+   * Match on single alternative plus (not (isDeadBinder case_bndr))
+     Rationale: pushing the case inwards won't eliminate the construction.
+     But there's a risk of
+		case (...) of y { (a,b) -> let z=(a,b) in ... }
+     Now y looks dead, but it'll come alive again.  Still, this
+     seems like the best option at the moment.
+
+   * Match on single alternative plus (all (isDeadBinder bndrs))
+     Rationale: this is essentially  seq.
+
+   * Match when the rhs is *not* duplicable, and hence would lead to a
+     join point.  This catches the disaster-case above.  We can test
+     the *un-simplified* rhs, which is fine.  It might get bigger or
+     smaller after simplification; if it gets smaller, this case might
+     fire next time round.  NB also that we must test contIsDupable
+     case_cont *btoo, because case_cont might be big!
+
+     HOWEVER: I found that this version doesn't work well, because
+     we can get 	let x = case (...) of { small } in ...case x...
+     When x is inlined into its full context, we find that it was a bad
+     idea to have pushed the outer case inside the (...) case.
+-}
 
 mkDupableCont env (Select _ case_bndr alts se cont)
   = 	-- e.g.		(case [...hole...] of { pi -> ei })
