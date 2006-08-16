@@ -18,7 +18,7 @@ import CoreSubst	( Subst, mkSubst, substExpr )
 import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
-import DataCon		( dataConRepArity, isVanillaDataCon )
+import DataCon		( dataConRepArity, isVanillaDataCon, dataConTyVars )
 import Type		( tyConAppArgs, tyVarsOfTypes )
 import Rules		( matchN )
 import Unify		( coreRefineTys )
@@ -561,14 +561,26 @@ lookupOccs (SCU { calls = sc_calls, occs = sc_occs }) bndrs
 data ArgOcc = NoOcc	-- Doesn't occur at all; or a type argument
 	    | UnkOcc	-- Used in some unknown way
 
-	    | ScrutOcc (UniqFM [ArgOcc])	-- Only taken apart or applied
-		-- ScrutOcc emptyUFM for functions, literals
-		-- ScrutOcc subs for data constructors;
-		--	the [ArgOcc] gives usage of the *value* components,
-		-- The domain of the UniqFM is the Unique of the data constructor
+	    | ScrutOcc (UniqFM [ArgOcc])	-- See Note [ScrutOcc]
 
 	    | BothOcc	-- Definitely taken apart, *and* perhaps used in some other way
 
+{-	Note  [ScrutOcc]
+
+An occurrence of ScrutOcc indicates that the thing is *only* taken apart or applied.
+
+  Functions, litersl: ScrutOcc emptyUFM
+  Data constructors:  ScrutOcc subs,
+
+where (subs :: UniqFM [ArgOcc]) gives usage of the *pattern-bound* components,
+The domain of the UniqFM is the Unique of the data constructor
+
+The [ArgOcc] is the occurrences of the *pattern-bound* components 
+of the data structure.  E.g.
+	data T a = forall b. MkT a b (b->a)
+A pattern binds b, x::a, y::b, z::b->a, but not 'a'!
+
+-}
 
 instance Outputable ArgOcc where
   ppr (ScrutOcc xs) = ptext SLIT("scrut-occ") <+> ppr xs
@@ -585,10 +597,18 @@ combineOcc _	    _	     	       = BothOcc
 combineOccs :: [ArgOcc] -> [ArgOcc] -> [ArgOcc]
 combineOccs xs ys = zipWithEqual "combineOccs" combineOcc xs ys
 
-subOccs :: ArgOcc -> AltCon -> [ArgOcc]
+conArgOccs :: ArgOcc -> AltCon -> [ArgOcc]
 -- Find usage of components of data con; returns [UnkOcc...] if unknown
-subOccs (ScrutOcc fm) (DataAlt dc) = lookupUFM fm dc `orElse` repeat UnkOcc
-subOccs other	      dc           = repeat UnkOcc
+-- See Note [ScrutOcc] for the extra UnkOccs in the vanilla datacon case
+
+conArgOccs (ScrutOcc fm) (DataAlt dc) 
+  | Just pat_arg_occs <- lookupUFM fm dc
+  = tyvar_unks ++ pat_arg_occs
+  where
+    tyvar_unks | isVanillaDataCon dc = [UnkOcc | tv <- dataConTyVars dc]
+	       | otherwise	     = []
+
+conArgOccs other con = repeat UnkOcc
 \end{code}
 
 
@@ -904,7 +924,7 @@ argToPat in_scope con_env arg arg_occ
 			App {} -> True	-- ...and elsewhere...
 			other  -> False
 	other	   -> False	-- No point; the arg is not decomposed
-  = do	{ args' <- argsToPats in_scope con_env (args `zip` subOccs arg_occ dc)
+  = do	{ args' <- argsToPats in_scope con_env (args `zip` conArgOccs arg_occ dc)
 	; return (True, mk_con_app dc (map snd args')) }
 
 argToPat in_scope con_env arg arg_occ
