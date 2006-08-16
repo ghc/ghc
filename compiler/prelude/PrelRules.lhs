@@ -30,7 +30,7 @@ import Literal		( Literal(..), mkMachInt, mkMachWord
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 			, float2DoubleLit, double2FloatLit
 			)
-import PrimOp		( PrimOp(..), primOpOcc )
+import PrimOp		( PrimOp(..), primOpOcc, tagToEnumKey )
 import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
@@ -386,7 +386,7 @@ For dataToTag#, we can reduce if either
 
 \begin{code}
 dataToTagRule [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag]
-  | Just TagToEnumOp <- isPrimOpId_maybe tag_to_enum
+  | tag_to_enum `hasKey` tagToEnumKey
   , ty1 `coreEqType` ty2
   = Just tag	-- dataToTag (tagToEnum x)   ==>   x
 

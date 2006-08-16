@@ -9,6 +9,8 @@ module PrimOp (
 	primOpType, primOpSig,
 	primOpTag, maxPrimOpTag, primOpOcc,
 
+	tagToEnumKey,
+
 	primOpOutOfLine, primOpNeedsWrapper, 
 	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
 
@@ -27,6 +29,7 @@ import TyCon		( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
 			  typePrimRep )
 import BasicTypes	( Arity, Boxity(..) )
+import Unique		( Unique, mkPrimOpIdUnique )
 import Outputable
 import FastTypes
 \end{code}
@@ -83,6 +86,13 @@ allThePrimOps :: [PrimOp]
 allThePrimOps =
 #include "primop-list.hs-incl"
 \end{code}
+
+\begin{code}
+tagToEnumKey :: Unique
+tagToEnumKey = mkPrimOpIdUnique (primOpTag TagToEnumOp)
+\end{code}
+
+
 
 %************************************************************************
 %*									*

@@ -37,31 +37,34 @@ import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, TcMatchCtxt(..) )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( tcOverloadedLit, badFieldCon )
-import TcMType		( tcInstTyVars, newFlexiTyVarTy, newBoxyTyVars, readFilledBox, 
-			  tcInstBoxyTyVar, tcInstTyVar )
+import TcMType		( tcInstTyVars, newFlexiTyVarTy, newBoxyTyVars, readFilledBox, zonkTcTypes )
 import TcType		( TcType, TcSigmaType, TcRhoType, 
 			  BoxySigmaType, BoxyRhoType, ThetaType,
-			  mkTyVarTys, mkFunTys, tcMultiSplitSigmaTy, tcSplitFunTysN, 
+			  mkTyVarTys, mkFunTys, 
+			  tcMultiSplitSigmaTy, tcSplitFunTysN, tcSplitTyConApp_maybe,
 			  isSigmaTy, mkFunTy, mkTyConApp, isLinearPred,
-			  exactTyVarsOfType, exactTyVarsOfTypes, mkTyVarTy, 
-			  zipTopTvSubst, zipOpenTvSubst, substTys, substTyVar, lookupTyVar
+			  exactTyVarsOfType, exactTyVarsOfTypes, 
+			  zipTopTvSubst, zipOpenTvSubst, substTys, substTyVar
 			)
 import Kind		( argTypeKind )
 
-import Id		( idType, idName, recordSelectorFieldLabel, isRecordSelector, 
-			  isNaughtyRecordSelector, isDataConId_maybe )
+import Id		( Id, idType, idName, recordSelectorFieldLabel, 
+			  isRecordSelector, isNaughtyRecordSelector, isDataConId_maybe )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
 			  dataConWrapId, isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
 import Name		( Name )
-import TyCon		( FieldLabel, tyConStupidTheta, tyConDataCons )
+import TyCon		( FieldLabel, tyConStupidTheta, tyConDataCons, isEnumerationTyCon )
 import Type		( substTheta, substTy )
 import Var		( TyVar, tyVarKind )
 import VarSet		( emptyVarSet, elemVarSet, unionVarSet )
 import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
 import PrelNames	( enumFromName, enumFromThenName, 
 			  enumFromToName, enumFromThenToName,
-			  enumFromToPName, enumFromThenToPName, negateName
+			  enumFromToPName, enumFromThenToPName, negateName,
+			  hasKey
 			)
+import PrimOp		( tagToEnumKey )
+
 import DynFlags
 import StaticFlags	( opt_NoMethodSharing )
 import HscTypes		( TyThing(..) )
@@ -252,6 +255,7 @@ tcExpr in_expr@(SectionR lop@(L loc op) arg2) res_ty
     tc_args arg1_ty' [arg1_ty, arg2_ty] 
 	= do { boxyUnify arg1_ty' arg1_ty
 	     ; tcArg lop (arg2, arg2_ty, 2) }
+    tc_args arg1_ty' other = panic "tcExpr SectionR"
 \end{code}
 
 \begin{code}
@@ -761,7 +765,10 @@ instFun fun_id qtvs qtv_tys []
   = return (HsVar fun_id)	-- Common short cut
 
 instFun fun_id qtvs qtv_tys tv_theta_prs
-  = do 	{ let subst = zipOpenTvSubst qtvs qtv_tys
+  = do 	{ 	-- Horrid check for tagToEnum; see Note [tagToEnum#]
+	  checkBadTagToEnumCall fun_id qtv_tys
+
+	; let subst = zipOpenTvSubst qtvs qtv_tys
 	      ty_theta_prs' = map subst_pr tv_theta_prs
 	      subst_pr (tvs, theta) = (map (substTyVar subst) tvs, 
 				       substTheta subst theta)
@@ -872,6 +879,44 @@ tcArg fun (arg, ty, arg_no) = addErrCtxt (funAppCtxt fun arg arg_no) $
 			      tcPolyExprNC arg ty
 \end{code}
 
+
+Note [tagToEnum#]
+~~~~~~~~~~~~~~~~~
+Nasty check to ensure that tagToEnum# is applied to a type that is an
+enumeration TyCon.  Unification may refine the type later, but this
+check won't see that, alas.  It's crude but it works.
+
+Here's are two cases that should fail
+ 	f :: forall a. a
+	f = tagToEnum# 0	-- Can't do tagToEnum# at a type variable
+
+	g :: Int
+	g = tagToEnum# 0	-- Int is not an enumeration
+
+
+\begin{code}
+checkBadTagToEnumCall :: Id -> [TcType] -> TcM ()
+checkBadTagToEnumCall fun_id tys
+  | fun_id `hasKey` tagToEnumKey
+  = do	{ tys' <- zonkTcTypes tys
+	; checkTc (ok tys') (tagToEnumError tys')
+	}
+  | otherwise    -- Vastly common case
+  = return ()
+  where
+    ok [] 	= False
+    ok (ty:tys) = case tcSplitTyConApp_maybe ty of
+			Just (tc,_) -> isEnumerationTyCon tc
+			Nothing     -> False
+
+tagToEnumError tys
+  = hang (ptext SLIT("Bad call to tagToEnum#") <+> at_type)
+	 2 (vcat [ptext SLIT("Specify the type by giving a type signature"),
+		  ptext SLIT("e.g. (tagToEnum# x) :: Bool")])
+  where
+    at_type | null tys = empty	-- Probably never happens
+	    | otherwise = ptext SLIT("at type") <+> ppr (head tys)
+\end{code}
 
 %************************************************************************
 %*									*
