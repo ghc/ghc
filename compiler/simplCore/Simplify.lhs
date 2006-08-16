@@ -1273,11 +1273,11 @@ rebuildCase env scrut case_bndr alts cont
   | Just (con,args) <- exprIsConApp_maybe scrut	
 	-- Works when the scrutinee is a variable with a known unfolding
 	-- as well as when it's an explicit constructor application
-  = knownCon env (DataAlt con) args case_bndr alts cont
+  = knownCon env scrut (DataAlt con) args case_bndr alts cont
 
   | Lit lit <- scrut	-- No need for same treatment as constructors
 			-- because literals are inlined more vigorously
-  = knownCon env (LitAlt lit) [] case_bndr alts cont
+  = knownCon env scrut (LitAlt lit) [] case_bndr alts cont
 
   | otherwise
   = 	-- Prepare the continuation;
@@ -1707,37 +1707,43 @@ and then
 All this should happen in one sweep.
 
 \begin{code}
-knownCon :: SimplEnv -> AltCon -> [OutExpr]
+knownCon :: SimplEnv -> OutExpr -> AltCon -> [OutExpr]
 	 -> InId -> [InAlt] -> SimplCont
 	 -> SimplM FloatsWithExpr
 
-knownCon env con args bndr alts cont
-  = tick (KnownBranch bndr)	`thenSmpl_`
+knownCon env scrut con args bndr alts cont
+  = tick (KnownBranch bndr)		`thenSmpl_`
     case findAlt con alts of
 	(DEFAULT, bs, rhs)     -> ASSERT( null bs )
 				  simplNonRecX env bndr scrut	$ \ env ->
-					-- This might give rise to a binding with non-atomic args
-					-- like x = Node (f x) (g x)
-					-- but no harm will be done
+				-- This might give rise to a binding with non-atomic args
+				-- like x = Node (f x) (g x)
+				-- but simplNonRecX will atomic-ify it
 				  simplExprF env rhs cont
-				where
-				  scrut = case con of
-					    LitAlt lit -> Lit lit
-					    DataAlt dc -> mkConApp dc args
 
 	(LitAlt lit, bs, rhs) ->  ASSERT( null bs )
-				  simplNonRecX env bndr (Lit lit)	$ \ env ->
+				  simplNonRecX env bndr scrut	$ \ env ->
 				  simplExprF env rhs cont
 
 	(DataAlt dc, bs, rhs)  
 		-> ASSERT( n_drop_tys + length bs == length args )
 		   bind_args env bs (drop n_drop_tys args)	$ \ env ->
 		   let
-			con_app  = mkConApp dc (take n_drop_tys args ++ con_args)
+			-- It's useful to bind bndr to scrut, rather than to a fresh
+			-- binding 	x = Con arg1 .. argn
+			-- because very often the scrut is a variable, so we avoid
+			-- creating, and then subsequently eliminating, a let-binding
+			-- BUT, if scrut is a not a variable, we must be careful
+			-- about duplicating the arg redexes; in that case, make
+			-- a new con-app from the args
+			bndr_rhs  = case scrut of
+					Var v -> scrut
+					other -> con_app
+			con_app = mkConApp dc (take n_drop_tys args ++ con_args)
 			con_args = [substExpr env (varToCoreExpr b) | b <- bs]
 					-- args are aready OutExprs, but bs are InIds
 		   in
-		   simplNonRecX env bndr con_app		$ \ env ->
+		   simplNonRecX env bndr bndr_rhs		$ \ env ->
 		   simplExprF env rhs cont
 	        where
 		   n_drop_tys | isVanillaDataCon dc = tyConArity (dataConTyCon dc)
