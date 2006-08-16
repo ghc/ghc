@@ -19,7 +19,7 @@ import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, isVanillaDataCon, dataConTyVars )
-import Type		( tyConAppArgs, tyVarsOfTypes )
+import Type		( Type, tyConAppArgs, tyVarsOfTypes )
 import Rules		( matchN )
 import Unify		( coreRefineTys )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
@@ -588,7 +588,7 @@ A pattern binds b, x::a, y::b, z::b->a, but not 'a'!
 -}
 
 instance Outputable ArgOcc where
-  ppr (ScrutOcc xs) = ptext SLIT("scrut-occ") <+> ppr xs
+  ppr (ScrutOcc xs) = ptext SLIT("scrut-occ") <> parens (ppr xs)
   ppr UnkOcc 	    = ptext SLIT("unk-occ")
   ppr BothOcc 	    = ptext SLIT("both-occ")
   ppr NoOcc    	    = ptext SLIT("no-occ")
@@ -864,23 +864,6 @@ specConstrActivation = ActiveAfter 0	-- Baked in; see comments above
 This code deals with analysing call-site arguments to see whether
 they are constructor applications.
 
----------------------
-good_arg :: ConstrEnv -> IdEnv ArgOcc -> (CoreBndr, CoreArg) -> Bool
--- See Note [Good arguments] above
-good_arg con_env arg_occs (bndr, arg)
-  = case is_con_app_maybe con_env arg of	
-	Just _ ->  bndr_usg_ok arg_occs bndr arg
-	other   -> False
-
-bndr_usg_ok :: IdEnv ArgOcc -> Var -> CoreArg -> Bool
-bndr_usg_ok arg_occs bndr arg
-  = case lookupVarEnv arg_occs bndr of
-	Just ScrutOcc -> True			-- Used only by case scrutiny
-	Just Both     -> case arg of		-- Used by case and elsewhere
-			    App _ _ -> True	-- so the arg should be an explicit con app
-			    other   -> False
-	other -> False				-- Not used, or used wonkily
-    
 
 \begin{code}
     -- argToPat takes an actual argument, and returns an abstracted
@@ -907,10 +890,17 @@ argToPat :: InScopeEnv			-- What's in scope at the fn defn site
 argToPat in_scope con_env arg@(Type ty) arg_occ
   = return (False, arg)
 
-argToPat in_scope con_env (Var v) arg_occ	-- Don't uniqify existing vars,
-  = return (interesting, Var v)	-- so that we can spot when we pass them twice
-  where
-    interesting = not (isLocalId v) || v `elemVarEnv` in_scope
+argToPat in_scope con_env (Var v) arg_occ
+  | not (isLocalId v) || v `elemVarEnv` in_scope
+  = 	-- The recursive call passes a variable that 
+	-- is in scope at the function definition site
+	-- It's worth specialising on this if
+	--	(a) it's used in an interesting way in the body
+	--	(b) we know what its value is
+    if    (case arg_occ of { UnkOcc -> False; other -> True })	-- (a)
+       && isValueUnfolding (idUnfolding v)			-- (b)
+    then return (True, Var v)
+    else wildCardPat (idType v)
 
 argToPat in_scope con_env arg arg_occ
   | is_value_lam arg
@@ -932,10 +922,20 @@ argToPat in_scope con_env arg arg_occ
   = do	{ args' <- argsToPats in_scope con_env (args `zip` conArgOccs arg_occ dc)
 	; return (True, mk_con_app dc (map snd args')) }
 
-argToPat in_scope con_env arg arg_occ
-  = do	{ uniq <- getUniqueUs
-	; let id = mkSysLocal FSLIT("sc") uniq (exprType arg)
-	; return (False, Var id) }
+argToPat in_scope con_env (Var v) arg_occ
+  = 	-- A variable bound inside the function. 
+	-- Don't make a wild-card, because we may usefully share
+	--	e.g.  f a = let x = ... in f (x,x)
+	-- NB: this case follows the lambda and con-app cases!!
+    return (False, Var v)
+
+-- The default case: make a wild-card
+argToPat in_scope con_env arg arg_occ = wildCardPat (exprType arg)
+
+wildCardPat :: Type -> UniqSM (Bool, CoreArg)
+wildCardPat ty = do { uniq <- getUniqueUs
+		    ; let id = mkSysLocal FSLIT("sc") uniq ty
+		    ; return (False, Var id) }
 
 argsToPats :: InScopeEnv -> ConstrEnv
 	   -> [(CoreArg, ArgOcc)]
