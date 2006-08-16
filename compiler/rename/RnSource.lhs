@@ -357,16 +357,27 @@ rnHsRuleDecl (HsRule rule_name act vars lhs fv_lhs rhs fv_rhs)
     rn_var (RuleBndrSig (L loc v) t, id)
 	= rnHsTypeFVs doc t	`thenM` \ (t', fvs) ->
 	  returnM (RuleBndrSig (L loc id) t', fvs)
+
+badRuleVar name var
+  = sep [ptext SLIT("Rule") <+> doubleQuotes (ftext name) <> colon,
+	 ptext SLIT("Forall'd variable") <+> quotes (ppr var) <+> 
+		ptext SLIT("does not appear on left hand side")]
 \end{code}
 
-Check the shape of a transformation rule LHS.  Currently
-we only allow LHSs of the form @(f e1 .. en)@, where @f@ is
-not one of the @forall@'d variables.  We also restrict the form of the LHS so
-that it may be plausibly matched.  Basically you only get to write ordinary 
-applications.  (E.g. a case expression is not allowed: too elaborate.)
+Note [Rule LHS validity checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check the shape of a transformation rule LHS.  Currently we only allow
+LHSs of the form @(f e1 .. en)@, where @f@ is not one of the
+@forall@'d variables.  
 
-NB: if you add new cases here, make sure you add new ones to TcRule.ruleLhsTvs
+We used restrict the form of the 'ei' to prevent you writing rules
+with LHSs with a complicated desugaring (and hence unlikely to match);
+(e.g. a case expression is not allowed: too elaborate.)
 
+But there are legitimate non-trivial args ei, like sections and
+lambdas.  So it seems simmpler not to check at all, and that is why
+check_e is commented out.
+	
 \begin{code}
 validRuleLhs :: [Name] -> LHsExpr Name -> Maybe (HsExpr Name)
 -- Nothing => OK
@@ -381,8 +392,10 @@ validRuleLhs foralls lhs
     check (HsVar v) | v `notElem` foralls = Nothing
     check other				  = Just other 	-- Failure
 
-    checkl_e (L loc e) = check_e e
+	-- Check an argument
+    checkl_e (L loc e) = Nothing 	-- Was (check_e e); see Note [Rule LHS validity checking]
 
+{-	Commented out; see Note [Rule LHS validity checking] above 
     check_e (HsVar v)     = Nothing
     check_e (HsPar e) 	  = checkl_e e
     check_e (HsLit e) 	  = Nothing
@@ -396,6 +409,7 @@ validRuleLhs foralls lhs
     check_e other		 = Just other	-- Fails
 
     checkl_es es = foldr (seqMaybe . checkl_e) Nothing es
+-}
 
 badRuleLhsErr name lhs (Just bad_e)
   = sep [ptext SLIT("Rule") <+> ftext name <> colon,
@@ -403,11 +417,6 @@ badRuleLhsErr name lhs (Just bad_e)
 		       ptext SLIT("in left-hand side:") <+> ppr lhs])]
     $$
     ptext SLIT("LHS must be of form (f e1 .. en) where f is not forall'd")
-
-badRuleVar name var
-  = sep [ptext SLIT("Rule") <+> doubleQuotes (ftext name) <> colon,
-	 ptext SLIT("Forall'd variable") <+> quotes (ppr var) <+> 
-		ptext SLIT("does not appear on left hand side")]
 \end{code}
 
 
