@@ -437,16 +437,16 @@ refineConstrEnv subst env = mapVarEnv refine_con_value env
 
 emptyScEnv = SCE { scope = emptyVarEnv, cons = emptyVarEnv }
 
-data HowBound = RecFun		-- These are the recursive functions for which 
-				-- we seek interesting call patterns
+data HowBound = RecFun	-- These are the recursive functions for which 
+			-- we seek interesting call patterns
 
-	      | RecArg		-- These are those functions' arguments; we are
-				-- interested to see if those arguments are scrutinised
+	      | RecArg	-- These are those functions' arguments, or their sub-components; 
+			-- we gather occurrence information for these
 
-	      | Other		-- We track all others so we know what's in scope
-				-- This is used in spec_one to check what needs to be
-				-- passed as a parameter and what is in scope at the 
-				-- function definition site
+	      | Other	-- We track all others so we know what's in scope
+			-- This is used in spec_one to check what needs to be
+			-- passed as a parameter and what is in scope at the 
+			-- function definition site
 
 instance Outputable HowBound where
   ppr RecFun = text "RecFun"
@@ -463,51 +463,56 @@ extendBndr  env bndr  = env { scope = extendVarEnv (scope env) bndr Other }
     --	    C x y -> ...
     -- we want to bind b, and perhaps scrut too, to (C x y)
 extendCaseBndrs :: ScEnv -> Id -> CoreExpr -> AltCon -> [Var] -> ScEnv
-extendCaseBndrs env case_bndr scrut DEFAULT alt_bndrs
-  = extendBndrs env (case_bndr : alt_bndrs)
-
-extendCaseBndrs env case_bndr scrut con@(LitAlt lit) alt_bndrs
-  = ASSERT( null alt_bndrs ) extendAlt env case_bndr scrut (CV con []) []
-
-extendCaseBndrs env case_bndr scrut con@(DataAlt data_con) alt_bndrs
-  | isVanillaDataCon data_con
-  = extendAlt env case_bndr scrut (CV con vanilla_args) alt_bndrs
-    
-  | otherwise	-- GADT
-  = extendAlt env1 case_bndr scrut (CV con gadt_args) alt_bndrs
+extendCaseBndrs env case_bndr scrut con alt_bndrs
+  = case con of
+	DEFAULT    -> env1
+	LitAlt lit -> extendCons env1 scrut case_bndr (CV con [])
+	DataAlt dc -> extend_data_con dc
   where
-    vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
-		   map varToCoreExpr alt_bndrs
+    cur_scope = scope env
+    env1 = env { scope = extendVarEnvList cur_scope 
+				[(b,how_bound) | b <- case_bndr:alt_bndrs] }
 
-    gadt_args = map (substExpr subst . varToCoreExpr) alt_bndrs
-	-- This call generates some bogus warnings from substExpr,
-	-- because it's inconvenient to put all the Ids in scope
-	-- Will be fixed when we move to FC
+	-- Record RecArg for the components iff the scrutinee is RecArg
+	--	[This comment looks plain wrong to me, so I'm ignoring it
+	-- 	     "Also forget if the scrutinee is a RecArg, because we're
+	-- 	     now in the branch of a case, and we don't want to
+	-- 	     record a non-scrutinee use of v if we have
+	-- 	     	case v of { (a,b) -> ...(f v)... }" ]
+    how_bound = case scrut of
+		  Var v -> lookupVarEnv cur_scope v `orElse` Other
+		  other -> Other
 
-    (alt_tvs, _) = span isTyVar alt_bndrs
-    Just (tv_subst, is_local) = coreRefineTys data_con alt_tvs (idType case_bndr)
-    subst = mkSubst in_scope tv_subst emptyVarEnv	-- No Id substitition
-    in_scope = mkInScopeSet (tyVarsOfTypes (varEnvElts tv_subst))
+    extend_data_con data_con
+	| isVanillaDataCon data_con = extendCons env1 scrut case_bndr (CV con vanilla_args)
+	| otherwise		    = extendCons env2 scrut case_bndr (CV con gadt_args)
+		-- Note env2 for GADTs
+	where
+    
+	    vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
+			   map varToCoreExpr alt_bndrs
 
-    env1 | is_local  = env
-	 | otherwise = env { cons = refineConstrEnv subst (cons env) }
+	    gadt_args = map (substExpr subst . varToCoreExpr) alt_bndrs
+		-- This call generates some bogus warnings from substExpr,
+		-- because it's inconvenient to put all the Ids in scope
+		-- Will be fixed when we move to FC
+
+	    (alt_tvs, _) = span isTyVar alt_bndrs
+	    Just (tv_subst, is_local) = coreRefineTys data_con alt_tvs (idType case_bndr)
+	    subst = mkSubst in_scope tv_subst emptyVarEnv	-- No Id substitition
+	    in_scope = mkInScopeSet (tyVarsOfTypes (varEnvElts tv_subst))
+	
+	    env2 | is_local  = env1
+		 | otherwise = env1 { cons = refineConstrEnv subst (cons env) }
 
 
-extendAlt :: ScEnv -> Id -> CoreExpr -> ConValue -> [Var] -> ScEnv
-extendAlt env case_bndr scrut val alt_bndrs
-  = let 
-       env1 = SCE { scope = extendVarEnvList (scope env) [(b,Other) | b <- case_bndr : alt_bndrs],
-		    cons  = extendVarEnv     (cons  env) case_bndr val }
-    in
-    case scrut of
-	Var v ->   -- Bind the scrutinee in the ConstrEnv if it's a variable
-		   -- Also forget if the scrutinee is a RecArg, because we're
-		   -- now in the branch of a case, and we don't want to
-		   -- record a non-scrutinee use of v if we have
-		   --	case v of { (a,b) -> ...(f v)... }
-		 SCE { scope = extendVarEnv (scope env1) v Other,
-		       cons  = extendVarEnv (cons env1)  v val }
-	other -> env1
+extendCons :: ScEnv -> CoreExpr -> Id -> ConValue -> ScEnv
+extendCons env scrut case_bndr val
+  = case scrut of
+	Var v -> env { cons = extendVarEnv cons1 v val }
+	other -> env { cons = cons1 }
+  where
+    cons1 = extendVarEnv (cons env) case_bndr val
 
     -- When we encounter a recursive function binding
     --	f = \x y -> ...
