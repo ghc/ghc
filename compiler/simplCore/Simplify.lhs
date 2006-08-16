@@ -320,13 +320,7 @@ simplNonRecBind' env bndr rhs rhs_se cont_ty thing_inside
     let
 	(env2,bndr2) = addLetIdInfo env1 bndr bndr1
     in
-    if needsCaseBinding bndr_ty rhs1
-    then
-      thing_inside env2					`thenSmpl` \ (floats, body) ->
-      returnSmpl (emptyFloats env2, Case rhs1 bndr2 (exprType body) 
-					[(DEFAULT, [], wrapFloats floats body)])
-    else
-      completeNonRecX env2 True {- strict -} bndr bndr2 rhs1 thing_inside
+    completeNonRecX env2 True {- strict -} bndr bndr2 rhs1 thing_inside
 
   | otherwise							-- Normal, lazy case
   =  	-- Don't use simplBinder because that doesn't keep 
@@ -351,7 +345,21 @@ simplNonRecX :: SimplEnv
 	     -> SimplM FloatsWithExpr
 
 simplNonRecX env bndr new_rhs thing_inside
-  | needsCaseBinding (idType bndr) new_rhs
+  = do	{ (env, bndr') <- simplBinder env bndr
+	; completeNonRecX env False {- Non-strict; pessimistic -} 
+		          bndr bndr' new_rhs thing_inside }
+
+
+completeNonRecX :: SimplEnv
+		-> Bool			-- Strict binding
+	        -> InId 		-- Old binder
+		-> OutId		-- New binder
+	     	-> OutExpr		-- Simplified RHS
+	     	-> (SimplEnv -> SimplM FloatsWithExpr)
+	     	-> SimplM FloatsWithExpr
+
+completeNonRecX env is_strict old_bndr new_bndr new_rhs thing_inside
+  | needsCaseBinding (idType new_bndr) new_rhs
 	-- Make this test *before* the preInlineUnconditionally
 	-- Consider 	case I# (quotInt# x y) of 
 	--		  I# v -> let w = J# v in ...
@@ -359,12 +367,21 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- extra thunk:
 	--		  let w = J# (quotInt# x y) in ...
 	-- because quotInt# can fail.
-  = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
-    thing_inside env 		`thenSmpl` \ (floats, body) ->
-    let body' = wrapFloats floats body in 
-    returnSmpl (emptyFloats env, Case new_rhs bndr' (exprType body') [(DEFAULT, [], body')])
+  = do	{ (floats, body) <- thing_inside env
+	; let body' = wrapFloats floats body
+	; return (emptyFloats env, Case new_rhs new_bndr (exprType body) 
+					[(DEFAULT, [], body')]) }
 
-{- No, no, no!  Do not try preInlineUnconditionally 
+  | otherwise
+  = 	-- Make the arguments atomic if necessary, 
+	-- adding suitable bindings
+    -- pprTrace "completeNonRecX" (ppr new_bndr <+> ppr new_rhs) $
+    mkAtomicArgsE env is_strict new_rhs		$ \ env new_rhs ->
+    completeLazyBind env NotTopLevel
+		     old_bndr new_bndr new_rhs	`thenSmpl` \ (floats, env) ->
+    addFloats env floats thing_inside
+
+{- No, no, no!  Do not try preInlineUnconditionally in completeNonRecX
    Doing so risks exponential behaviour, because new_rhs has been simplified once already
    In the cases described by the folowing commment, postInlineUnconditionally will 
    catch many of the relevant cases.
@@ -381,23 +398,6 @@ simplNonRecX env bndr new_rhs thing_inside
 
   -- NB: completeLazyBind uses postInlineUnconditionally; no need to do that here
 -}
-
-  | otherwise
-  = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
-    completeNonRecX env False {- Non-strict; pessimistic -} 
-		    bndr bndr' new_rhs thing_inside
-
-completeNonRecX env is_strict old_bndr new_bndr new_rhs thing_inside
-  = mkAtomicArgs is_strict 
-		 True {- OK to float unlifted -} 
-		 new_rhs			`thenSmpl` \ (aux_binds, rhs2) ->
-
-	-- Make the arguments atomic if necessary, 
-	-- adding suitable bindings
-    addAtomicBindsE env (fromOL aux_binds)	$ \ env ->
-    completeLazyBind env NotTopLevel
-		     old_bndr new_bndr rhs2	`thenSmpl` \ (floats, env) ->
-    addFloats env floats thing_inside
 \end{code}
 
 
@@ -596,6 +596,7 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
   | postInlineUnconditionally env top_lvl new_bndr occ_info new_rhs unfolding
   = 		-- Drop the binding
     tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
+    -- pprTrace "Inline unconditionally" (ppr old_bndr <+> ppr new_bndr <+> ppr new_rhs) $
     returnSmpl (emptyFloats env, extendIdSubst env old_bndr (DoneEx new_rhs))
 		-- Use the substitution to make quite, quite sure that the substitution
 		-- will happen, since we are going to discard the binding
@@ -634,6 +635,7 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 		-- These seqs forces the Id, and hence its IdInfo,
 		-- and hence any inner substitutions
     final_id					`seq`
+    -- pprTrace "Binding" (ppr final_id <+> ppr unfolding) $
     returnSmpl (unitFloat env final_id new_rhs, env)
 
   where 
@@ -1155,6 +1157,38 @@ a *strict* let, then it would be a good thing to do.  Hence the
 context information.
 
 \begin{code}
+mkAtomicArgsE :: SimplEnv 
+	      -> Bool	-- A strict binding
+ 	      -> OutExpr						-- The rhs
+	      -> (SimplEnv -> OutExpr -> SimplM FloatsWithExpr)
+	      -> SimplM FloatsWithExpr
+
+mkAtomicArgsE env is_strict rhs thing_inside
+  | (Var fun, args) <- collectArgs rhs,				-- It's an application
+    isDataConWorkId fun || valArgCount args < idArity fun	-- And it's a constructor or PAP
+  = go env (Var fun) args
+
+  | otherwise = thing_inside env rhs
+
+  where
+    go env fun [] = thing_inside env fun
+
+    go env fun (arg : args) 
+	|  exprIsTrivial arg 	-- Easy case
+	|| no_float_arg		-- Can't make it atomic
+	= go env (App fun arg) args
+
+	| otherwise
+	= do { arg_id <- newId FSLIT("a") arg_ty
+	     ; completeNonRecX env False {- pessimistic -} arg_id arg_id arg $ \env ->
+	       go env (App fun (Var arg_id)) args }
+	where
+	  arg_ty = exprType arg
+	  no_float_arg = not is_strict && (isUnLiftedType arg_ty) && not (exprOkForSpeculation arg)
+
+
+-- Old code: consider rewriting to be more like mkAtomicArgsE
+
 mkAtomicArgs :: Bool	-- A strict binding
 	     -> Bool	-- OK to float unlifted args
 	     -> OutExpr
@@ -1201,25 +1235,6 @@ addAtomicBinds :: SimplEnv -> [(OutId,OutExpr)]
 addAtomicBinds env []         thing_inside = thing_inside env
 addAtomicBinds env ((v,r):bs) thing_inside = addAuxiliaryBind env (NonRec v r) $ \ env -> 
 					     addAtomicBinds env bs thing_inside
-
-addAtomicBindsE :: SimplEnv -> [(OutId,OutExpr)]
-	 	-> (SimplEnv -> SimplM FloatsWithExpr)
-		-> SimplM FloatsWithExpr
--- Same again, but this time we're in an expression context,
--- and may need to do some case bindings
-
-addAtomicBindsE env [] thing_inside 
-  = thing_inside env
-addAtomicBindsE env ((v,r):bs) thing_inside 
-  | needsCaseBinding (idType v) r
-  = addAtomicBindsE (addNewInScopeIds env [v]) bs thing_inside	`thenSmpl` \ (floats, expr) ->
-    WARN( exprIsTrivial expr, ppr v <+> pprCoreExpr expr )
-    (let body = wrapFloats floats expr in 
-     returnSmpl (emptyFloats env, Case r v (exprType body) [(DEFAULT,[],body)]))
-
-  | otherwise
-  = addAuxiliaryBind env (NonRec v r) 	$ \ env -> 
-    addAtomicBindsE env bs thing_inside
 \end{code}
 
 
