@@ -378,6 +378,8 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- If a,b occur once we can avoid constructing the let binding for them.
   | preInlineUnconditionally env NotTopLevel bndr new_rhs
   = thing_inside (extendIdSubst env bndr (DoneEx new_rhs))
+
+  -- NB: completeLazyBind uses postInlineUnconditionally; no need to do that here
 -}
 
   | otherwise
