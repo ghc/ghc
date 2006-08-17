@@ -2,16 +2,15 @@
 module TcMatches where
 import HsSyn	( GRHSs, MatchGroup, ExprCoFn )
 import Name	( Name )
-import Var	( Id )
 import TcType	( BoxyRhoType )
-import TcRnTypes( TcM )
+import TcRnTypes( TcM, TcId )
 
 tcGRHSsPat    :: GRHSs Name
 	      -> BoxyRhoType
-	      -> TcM (GRHSs Id)
+	      -> TcM (GRHSs TcId)
 
 tcMatchesFun :: Name
 	     -> MatchGroup Name
 	     -> BoxyRhoType
-	     -> TcM (ExprCoFn, MatchGroup Id)
+	     -> TcM (ExprCoFn, MatchGroup TcId)
 \end{code}

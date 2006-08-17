@@ -1,14 +1,14 @@
 \begin{code}
 module Match where
 import Var	( Id )
-import TcType	( TcType )
+import TcType	( Type )
 import DsMonad	( DsM, EquationInfo, MatchResult )
 import CoreSyn	( CoreExpr )
 import HsSyn	( LPat, HsMatchContext, MatchGroup )
 import Name	( Name )
 
 match 	:: [Id]
-        -> TcType
+        -> Type
 	-> [EquationInfo]
 	-> DsM MatchResult
 
@@ -29,7 +29,7 @@ matchSinglePat
 	:: CoreExpr
 	-> HsMatchContext Name
 	-> LPat Id
-        -> TcType
+        -> Type
 	-> MatchResult
 	-> DsM MatchResult
 \end{code}
