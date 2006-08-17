@@ -121,6 +121,11 @@ module Data.IntMap  (
             , partition
             , partitionWithKey
 
+            , mapMaybe
+            , mapMaybeWithKey
+            , mapEither
+            , mapEitherWithKey
+
             , split         
             , splitLookup   
 
@@ -847,6 +852,36 @@ partitionWithKey pred t
         | otherwise -> (Nil,t)
       Nil -> (Nil,Nil)
 
+-- | /O(n)/. Map values and collect the 'Just' results.
+mapMaybe :: (a -> Maybe b) -> IntMap a -> IntMap b
+mapMaybe f m
+  = mapMaybeWithKey (\k x -> f x) m
+
+-- | /O(n)/. Map keys\/values and collect the 'Just' results.
+mapMaybeWithKey :: (Key -> a -> Maybe b) -> IntMap a -> IntMap b
+mapMaybeWithKey f (Bin p m l r)
+  = bin p m (mapMaybeWithKey f l) (mapMaybeWithKey f r)
+mapMaybeWithKey f (Tip k x) = case f k x of
+  Just y  -> Tip k y
+  Nothing -> Nil
+mapMaybeWithKey f Nil = Nil
+
+-- | /O(n)/. Map values and separate the 'Left' and 'Right' results.
+mapEither :: (a -> Either b c) -> IntMap a -> (IntMap b, IntMap c)
+mapEither f m
+  = mapEitherWithKey (\k x -> f x) m
+
+-- | /O(n)/. Map keys\/values and separate the 'Left' and 'Right' results.
+mapEitherWithKey :: (Key -> a -> Either b c) -> IntMap a -> (IntMap b, IntMap c)
+mapEitherWithKey f (Bin p m l r)
+  = (bin p m l1 r1, bin p m l2 r2)
+  where
+    (l1,l2) = mapEitherWithKey f l
+    (r1,r2) = mapEitherWithKey f r
+mapEitherWithKey f (Tip k x) = case f k x of
+  Left y  -> (Tip k y, Nil)
+  Right z -> (Nil, Tip k z)
+mapEitherWithKey f Nil = (Nil, Nil)
 
 -- | /O(log n)/. The expression (@'split' k map@) is a pair @(map1,map2)@
 -- where all keys in @map1@ are lower than @k@ and all keys in

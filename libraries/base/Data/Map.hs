@@ -123,6 +123,11 @@ module Data.Map  (
             , partition
             , partitionWithKey
 
+            , mapMaybe
+            , mapMaybeWithKey
+            , mapEither
+            , mapEitherWithKey
+
             , split         
             , splitLookup   
 
@@ -870,6 +875,33 @@ partitionWithKey p (Bin _ kx x l r)
     (l1,l2) = partitionWithKey p l
     (r1,r2) = partitionWithKey p r
 
+-- | /O(n)/. Map values and collect the 'Just' results.
+mapMaybe :: Ord k => (a -> Maybe b) -> Map k a -> Map k b
+mapMaybe f m
+  = mapMaybeWithKey (\k x -> f x) m
+
+-- | /O(n)/. Map keys\/values and collect the 'Just' results.
+mapMaybeWithKey :: Ord k => (k -> a -> Maybe b) -> Map k a -> Map k b
+mapMaybeWithKey f Tip = Tip
+mapMaybeWithKey f (Bin _ kx x l r) = case f kx x of
+  Just y  -> join kx y (mapMaybeWithKey f l) (mapMaybeWithKey f r)
+  Nothing -> merge (mapMaybeWithKey f l) (mapMaybeWithKey f r)
+
+-- | /O(n)/. Map values and separate the 'Left' and 'Right' results.
+mapEither :: Ord k => (a -> Either b c) -> Map k a -> (Map k b, Map k c)
+mapEither f m
+  = mapEitherWithKey (\k x -> f x) m
+
+-- | /O(n)/. Map keys\/values and separate the 'Left' and 'Right' results.
+mapEitherWithKey :: Ord k =>
+  (k -> a -> Either b c) -> Map k a -> (Map k b, Map k c)
+mapEitherWithKey f Tip = (Tip, Tip)
+mapEitherWithKey f (Bin _ kx x l r) = case f kx x of
+  Left y  -> (join kx y l1 r1, merge l2 r2)
+  Right z -> (merge l1 r1, join kx z l2 r2)
+  where
+    (l1,l2) = mapEitherWithKey f l
+    (r1,r2) = mapEitherWithKey f r
 
 {--------------------------------------------------------------------
   Mapping
