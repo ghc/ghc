@@ -11,8 +11,7 @@ module CSE (
 #include "HsVersions.h"
 
 import DynFlags	( DynFlag(..), DynFlags )
-import Id		( Id, idType, idWorkerInfo )
-import IdInfo		( workerExists )
+import Id		( Id, idType, idInlinePragma )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
@@ -20,6 +19,7 @@ import CoreSyn
 import VarEnv	
 import CoreLint		( showPass, endPass )
 import Outputable
+import BasicTypes	( isAlwaysActive )
 import Util		( mapAccumL, lengthExceeds )
 import UniqFM
 \end{code}
@@ -107,6 +107,65 @@ Instead, we shoudl replace (f x) by (# a,b #).  That is, the "reverse mapping" i
 	f x --> (# a,b #)
 That is why the CSEMap has pairs of expressions.
 
+Note [INLINE and NOINLINE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are careful to do no CSE inside functions that the user has marked as
+INLINE or NOINLINE.  In terms of Core, that means 
+
+	a) we do not do CSE inside (Note InlineMe e)
+
+	b) we do not do CSE on the RHS of a binding b=e
+	   unless b's InlinePragma is AlwaysActive
+
+Here's why (examples from Roman Leshchinskiy).  Consider
+
+	yes :: Int
+	{-# NOINLINE yes #-}
+	yes = undefined
+
+	no :: Int
+	{-# NOINLINE no #-}
+	no = undefined
+
+	foo :: Int -> Int -> Int
+	{-# NOINLINE foo #-}
+	foo m n = n
+
+	{-# RULES "foo/no" foo no = id #-}
+
+	bar :: Int -> Int
+	bar = foo yes
+
+We do not expect the rule to fire.  But if we do CSE, then we get
+yes=no, and the rule does fire.  Worse, whether we get yes=no or
+no=yes depends on the order of the definitions.
+
+In general, CSE should probably never touch things with INLINE pragmas
+as this could lead to surprising results.  Consider
+
+	{-# INLINE foo #-}
+	foo = <rhs>
+
+	{-# NOINLINE bar #-}
+	bar = <rhs>	-- Same rhs as foo
+
+If CSE produces
+	foo = bar
+then foo will never be inlined (when it should be); but if it produces
+	bar = foo
+bar will be inlined (when it should not be). Even if we remove INLINE foo,
+we'd still like foo to be inlined if rhs is small. This won't happen
+with foo = bar.
+
+Not CSE-ing inside INLLINE also solves an annoying bug in CSE. Consider
+a worker/wrapper, in which the worker has turned into a single variable:
+	$wf = h
+	f = \x -> ...$wf...
+Now CSE may transoform to
+	f = \x -> ...h...
+But the WorkerInfo for f still says $wf, which is now dead!  This won't
+happen now that we don't look inside INLINEs (which wrappers are).
+
 
 %************************************************************************
 %*									*
@@ -145,17 +204,9 @@ do_one env (id, rhs)
 	Nothing             -> (addCSEnvItem env' rhs' (Var id'), (id', rhs'))
   where
     (env', id') = addBinder env id
-    rhs' | not (workerExists (idWorkerInfo id)) = cseExpr env' rhs
-
-		-- Hack alert: don't do CSE on wrapper RHSs.
-		-- Otherwise we find:
-		--	$wf = h
-		--	f = \x -> ...$wf...
-		-- ===>
-		--	f = \x -> ...h...
-		-- But the WorkerInfo for f still says $wf, which is now dead!
-	  | otherwise = rhs
-
+    rhs' | isAlwaysActive (idInlinePragma id) = cseExpr env' rhs
+	 | otherwise			      = rhs
+		-- See Note [INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> CoreExpr -> CoreExpr
 tryForCSE env (Type t) = Type t
@@ -170,6 +221,7 @@ cseExpr env (Type t)		   = Type t
 cseExpr env (Lit lit)		   = Lit lit
 cseExpr env (Var v)		   = Var (lookupSubst env v)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
+cseExpr evn (Note InlineMe e)	   = Note InlineMe e	-- See Note [INLINE and NOINLINE]
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
