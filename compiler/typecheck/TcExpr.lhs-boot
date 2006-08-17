@@ -2,27 +2,26 @@
 module TcExpr where
 import HsSyn	( HsExpr, LHsExpr )
 import Name	( Name )
-import Var	( Id )
-import TcType	( TcType, BoxySigmaType, BoxyRhoType )
-import TcRnTypes( TcM, InstOrigin )
+import TcType	( TcType, TcRhoType, BoxySigmaType, BoxyRhoType )
+import TcRnTypes( TcM, TcId, InstOrigin )
 
 tcPolyExpr :: 
 	  LHsExpr Name
        -> BoxySigmaType
-       -> TcM (LHsExpr Id)
+       -> TcM (LHsExpr TcId)
 
 tcMonoExpr :: 
   	  LHsExpr Name
        -> BoxyRhoType
-       -> TcM (LHsExpr Id)
+       -> TcM (LHsExpr TcId)
 
 tcInferRho :: 
   	  LHsExpr Name
-       -> TcM (LHsExpr Id, TcType)
+       -> TcM (LHsExpr TcId, TcRhoType)
 
 tcSyntaxOp :: 
 	  InstOrigin
        -> HsExpr Name
        -> TcType
-       -> TcM (HsExpr Id)
+       -> TcM (HsExpr TcId)
 \end{code}
