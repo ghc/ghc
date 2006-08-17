@@ -335,15 +335,9 @@ rnHsRuleDecl (HsRule rule_name act vars lhs fv_lhs rhs fv_rhs)
 
     rnLExpr lhs					`thenM` \ (lhs', fv_lhs') ->
     rnLExpr rhs					`thenM` \ (rhs', fv_rhs') ->
-    let
-	mb_bad = validRuleLhs ids lhs'
-    in
-    checkErr (isNothing mb_bad)
-	     (badRuleLhsErr rule_name lhs' mb_bad)	`thenM_`
-    let
-	bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs')]
-    in
-    mappM (addErr . badRuleVar rule_name) bad_vars	`thenM_`
+
+    checkValidRule rule_name ids lhs' fv_lhs'	`thenM_`
+
     returnM (HsRule rule_name act vars' lhs' fv_lhs' rhs' fv_rhs',
 	     fv_vars `plusFV` fv_lhs' `plusFV` fv_rhs')
   where
@@ -379,6 +373,16 @@ lambdas.  So it seems simmpler not to check at all, and that is why
 check_e is commented out.
 	
 \begin{code}
+checkValidRule rule_name ids lhs' fv_lhs'
+  = do 	{ 	-- Check for the form of the LHS
+	  case (validRuleLhs ids lhs') of
+		Nothing  -> return ()
+		Just bad -> failWithTc (badRuleLhsErr rule_name lhs' bad)
+
+		-- Check that LHS vars are all bound
+	; let bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs')]
+	; mappM (addErr . badRuleVar rule_name) bad_vars }
+
 validRuleLhs :: [Name] -> LHsExpr Name -> Maybe (HsExpr Name)
 -- Nothing => OK
 -- Just e  => Not ok, and e is the offending expression
@@ -411,7 +415,7 @@ validRuleLhs foralls lhs
     checkl_es es = foldr (seqMaybe . checkl_e) Nothing es
 -}
 
-badRuleLhsErr name lhs (Just bad_e)
+badRuleLhsErr name lhs bad_e
   = sep [ptext SLIT("Rule") <+> ftext name <> colon,
 	 nest 4 (vcat [ptext SLIT("Illegal expression:") <+> ppr bad_e, 
 		       ptext SLIT("in left-hand side:") <+> ppr lhs])]
