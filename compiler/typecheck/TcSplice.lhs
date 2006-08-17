@@ -97,7 +97,7 @@ tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 %************************************************************************
 
 \begin{code}
-tcBracket :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr Id)
+tcBracket :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr TcId)
 tcBracket brack res_ty
   = getStage 				`thenM` \ level ->
     case bracketOK level of {
