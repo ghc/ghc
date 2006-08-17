@@ -28,7 +28,7 @@ SRCS	= \
 	Foreign/Marshal/Pool.hs Foreign/Marshal.hs \
 	Foreign/C/String.hs Foreign/C/Error.hs Foreign/C.hs Foreign.hs \
 	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
-	Text/Html/BlockTable.hs Text/Html.hs Text/Printf.hs \
+	Text/Printf.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
 	Text/Regex/Posix.hsc Text/Regex.hs \
