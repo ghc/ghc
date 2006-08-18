@@ -35,7 +35,6 @@ import CString
 #endif
 #endif
 
-
 #if __GLASGOW_HASKELL__ >= 604
 import System.Process           ( runProcess, waitForProcess )
 import System.IO                ( openFile, IOMode(..), hClose )
@@ -118,7 +117,6 @@ options = [
         "display this help and exit",
     Option ['V'] ["version"]    (NoArg  Version)
         "output version information and exit" ]
-    
 
 main :: IO ()
 main = do
@@ -129,11 +127,11 @@ main = do
 
 	-- If there is no Template flag explicitly specified, try
 	-- to find one by looking near the executable.  This only
-	-- works on Win32 or Hugs (getExecDir). On Unix, there's a wrapper 
+	-- works on Win32 or Hugs (getExecDir). On Unix, there's a wrapper
 	-- script which specifies an explicit template flag.
     flags_w_tpl <- if any template_flag flags then
 			return flags
-		   else	
+		   else
 #ifdef __HUGS__
 			do mb_path <- getExecDir "/Main.hs"
 #else
@@ -145,10 +143,10 @@ main = do
 			      Just path -> do
 				let templ = path ++ "/template-hsc.h"
 				flg <- doesFileExist templ
-				if flg 
+				if flg
 				 then return ((Template templ):)
 				 else return id
-		           return (add_opt flags) 
+		           return (add_opt flags)
     case (files, errs) of
         (_, _)
             | any isHelp    flags_w_tpl -> bye (usageInfo header options)
@@ -172,7 +170,7 @@ die :: String -> IO a
 die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 
 processFile :: [Flag] -> String -> IO ()
-processFile flags name 
+processFile flags name
   = do let file_name = dosifyPath name
        s <- readFile file_name
        case parser of
@@ -505,7 +503,7 @@ splitExt name =
 
 output :: [Flag] -> String -> [Token] -> IO ()
 output flags name toks = do
-    
+
     (outName, outDir, outBase) <- case [f | Output f <- flags] of
         [] -> if not (null ext) && last ext == 'c'
                  then return (dir++base++init ext,  dir, base)
@@ -521,7 +519,7 @@ output flags name toks = do
             (base, _)    = splitExt file
             in return (f, dir, base)
         _ -> onlyOne "output file"
-    
+
     let cProgName    = outDir++outBase++"_hsc_make.c"
         oProgName    = outDir++outBase++"_hsc_make.o"
         progName     = outDir++outBase++"_hsc_make"
@@ -533,18 +531,18 @@ output flags name toks = do
 	outHFile     = outBase++"_hsc.h"
         outHName     = outDir++outHFile
         outCName     = outDir++outBase++"_hsc.c"
-	
+
 	beVerbose    = any (\ x -> case x of { Verbose -> True; _ -> False}) flags
 
     let execProgName
             | null outDir = dosifyPath ("./" ++ progName)
             | otherwise   = progName
-    
+
     let specials = [(pos, key, arg) | Special pos key arg <- toks]
-    
+
     let needsC = any (\(_, key, _) -> key == "def") specials
         needsH = needsC
-    
+
     let includeGuard = map fixChar outHName
             where
             fixChar c | isAlphaNum c = toUpper c
@@ -555,7 +553,7 @@ output flags name toks = do
         []  -> return "gcc"
         [c] -> return c
         _   -> onlyOne "compiler"
-    
+
     linker <- case [l | Linker l <- flags] of
         []  -> return compiler
         [l] -> return l
@@ -570,15 +568,15 @@ output flags name toks = do
 	      Just x  -> do
 	         let ghc_path = dosifyPath (x ++ "bin/ghc.exe")
 	         flg <- doesFileExist ghc_path
-		 if flg 
+		 if flg
 		  then return ghc_path
 		  else return def
-    
-	-- On a Win32 installation we execute the hsc2hs binary directly, 
+
+	-- On a Win32 installation we execute the hsc2hs binary directly,
 	-- with no --cc flags, so we'll call locateGhc here, which will
 	-- succeed, via getExecDir.
 	--
-	-- On a Unix installation, we'll run the wrapper script hsc2hs.sh 
+	-- On a Unix installation, we'll run the wrapper script hsc2hs.sh
 	-- (called plain hsc2hs in the installed tree), which will pass
 	-- a suitable C compiler via --cc
 	--
@@ -588,7 +586,7 @@ output flags name toks = do
         []  -> locateGhc "ghc"
         [c] -> return c
         _   -> onlyOne "compiler"
-    
+
     linker <- case [l | Linker l <- flags] of
         []  -> locateGhc compiler
         [l] -> return l
@@ -603,14 +601,12 @@ output flags name toks = do
         outHsLine (SourcePos name 0)++
         concatMap outTokenHs toks++
         "    return 0;\n}\n"
-    
+
     -- NOTE: hbc compiles "[() | NoCompile <- flags]" into wrong code,
     -- so we use something slightly more complicated.   :-P
     when (any (\x -> case x of NoCompile -> True; _ -> False) flags) $
        exitWith ExitSuccess
 
-
-    
     rawSystemL ("compiling " ++ cProgName) beVerbose compiler
 	(  ["-c"]
         ++ [f | CompFlag f <- flags]
@@ -618,17 +614,17 @@ output flags name toks = do
         ++ ["-o", oProgName]
 	)
     removeFile cProgName
-    
+
     rawSystemL ("linking " ++ oProgName) beVerbose linker
         (  [f | LinkFlag f <- flags]
         ++ [oProgName]
         ++ ["-o", progName]
 	)
     removeFile oProgName
-    
+
     rawSystemWithStdOutL ("running " ++ execProgName) beVerbose execProgName [] outName
     removeFile progName
-    
+
     when needsH $ writeFile outHName $
         "#ifndef "++includeGuard++"\n" ++
         "#define "++includeGuard++"\n" ++
@@ -643,7 +639,7 @@ output flags name toks = do
         concatMap outFlagH flags++
         concatMap outTokenH specials++
         "#endif\n"
-    
+
     when needsC $ writeFile outCName $
         "#include \""++outHFile++"\"\n"++
         concatMap outTokenC specials
@@ -886,8 +882,6 @@ showCString = concatMap showCChar
                       intToDigit (ord c `quot` 64),
                       intToDigit (ord c `quot` 8 `mod` 8),
                       intToDigit (ord c          `mod` 8)]
-
-
 
 -----------------------------------------
 -- Modified version from ghc/compiler/SysTools
