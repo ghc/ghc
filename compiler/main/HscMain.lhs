@@ -25,11 +25,11 @@ module HscMain
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..), LHsExpr, LStmt, LHsType )
-import Module		( Module )
+import HsSyn		( Stmt(..), LStmt, LHsType )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
+import CoreSyn		( CoreExpr )
 import CoreTidy		( tidyExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
@@ -41,7 +41,7 @@ import PrelNames	( iNTERACTIVE )
 import Kind		( Kind )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
-import SrcLoc		( noSrcLoc, getLoc )
+import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan )
 import VarEnv		( emptyTidyEnv )
 #endif
 
@@ -462,10 +462,7 @@ hscFileFrontEnd =
                          -------------------
                          -- DESUGAR
                          -------------------
-                         -> do (warns, maybe_ds_result) <- {-# SCC "DeSugar" #-}
-                                                           deSugar hsc_env tc_result
-                               printBagOfWarnings dflags warns
-                               return maybe_ds_result
+                         -> {-# SCC "DeSugar" #-} deSugar hsc_env tc_result
 
 --------------------------------------------------------------
 -- Simplifiers
@@ -805,14 +802,22 @@ hscStmt hsc_env stmt
 		Nothing -> return Nothing ;
 		Just (new_ic, bound_names, tc_expr) -> do {
 
+
+	 	-- Desugar it
+	; let rdr_env  = ic_rn_gbl_env new_ic
+	      type_env = ic_type_env new_ic
+	; mb_ds_expr <- deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
+	
+	; case mb_ds_expr of {
+		Nothing -> return Nothing ;
+		Just ds_expr -> do {
+
 		-- Then desugar, code gen, and link it
-	; hval <- compileExpr hsc_env iNTERACTIVE 
-			      (ic_rn_gbl_env new_ic) 
-			      (ic_type_env new_ic)
-			      tc_expr
+	; let src_span = srcLocSpan interactiveSrcLoc
+	; hval <- compileExpr hsc_env src_span ds_expr
 
 	; return (Just (hsc_env{ hsc_IC=new_ic }, bound_names, hval))
-	}}}}}
+	}}}}}}}
 
 hscTcExpr	-- Typecheck an expression (but don't run it)
   :: HscEnv
@@ -892,19 +897,12 @@ hscParseThing parser dflags str
 
 \begin{code}
 #ifdef GHCI
-compileExpr :: HscEnv 
-	    -> Module -> GlobalRdrEnv -> TypeEnv
-	    -> LHsExpr Id
-	    -> IO HValue
+compileExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO HValue
 
-compileExpr hsc_env this_mod rdr_env type_env tc_expr
+compileExpr hsc_env srcspan ds_expr
   = do	{ let { dflags  = hsc_dflags hsc_env ;
-		lint_on = dopt Opt_DoCoreLinting dflags ;
-		!srcspan = getLoc tc_expr }
+		lint_on = dopt Opt_DoCoreLinting dflags }
 	      
-	 	-- Desugar it
-	; ds_expr <- deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
-	
 		-- Flatten it
 	; flat_expr <- flattenExpr hsc_env ds_expr
 

@@ -124,13 +124,14 @@ import HscTypes		( InteractiveContext(..),
 			  Dependencies(..) )
 import BasicTypes	( Fixity, RecFlag(..) )
 import SrcLoc		( unLoc )
+import Data.Maybe	( isNothing )
 #endif
 
 import FastString	( mkFastString )
 import Util		( sortLe )
 import Bag		( unionBags, snocBag, emptyBag, unitBag, unionManyBags )
 
-import Data.Maybe	( isJust, isNothing )
+import Data.Maybe	( isJust )
 \end{code}
 
 

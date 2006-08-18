@@ -55,6 +55,8 @@ import Id		( idName, globalIdDetails )
 import IdInfo		( GlobalIdDetails(..) )
 import TysWiredIn	( mkListTy )
 import DsMeta		( expQTyConName, typeQTyConName, decTyConName, qTyConName, nameTyConName )
+import DsExpr		( dsLExpr )
+import DsMonad		( initDsTc )
 import ErrUtils		( Message )
 import SrcLoc		( SrcSpan, noLoc, unLoc, getLoc )
 import Outputable
@@ -368,17 +370,14 @@ runMeta :: (SrcSpan -> th_syn -> Either Message hs_syn)
 	-> LHsExpr Id 		-- Of type X
 	-> TcM hs_syn		-- Of type t
 runMeta convert expr
-  = do	{ hsc_env <- getTopEnv
-	; tcg_env <- getGblEnv
-	; this_mod <- getModule
-	; let type_env = tcg_type_env tcg_env
-	      rdr_env  = tcg_rdr_env tcg_env
+  = do	{ 	-- Desugar
+	  ds_expr <- initDsTc (dsLExpr expr)
 
 	-- Compile and link it; might fail if linking fails
+	; hsc_env <- getTopEnv
+	; src_span <- getSrcSpanM
 	; either_hval <- tryM $ ioToTcRn $
-			 HscMain.compileExpr 
-				      hsc_env this_mod 
-			              rdr_env type_env expr
+			 HscMain.compileExpr hsc_env src_span ds_expr
 	; case either_hval of {
 	    Left exn   -> failWithTc (mk_msg "compile and link" exn) ;
 	    Right hval -> do

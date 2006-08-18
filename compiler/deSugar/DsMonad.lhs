@@ -6,7 +6,7 @@
 \begin{code}
 module DsMonad (
 	DsM, mappM, mapAndUnzipM,
-	initDs, returnDs, thenDs, listDs, fixDs, mapAndUnzipDs, 
+	initDs, initDsTc, returnDs, thenDs, listDs, fixDs, mapAndUnzipDs, 
 	foldlDs, foldrDs,
 
 	newTyVarsDs, newLocalName,
@@ -22,7 +22,7 @@ module DsMonad (
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
 	-- Warnings
-	DsWarning, dsWarn, 
+	DsWarning, warnDs, failWithDs,
 
 	-- Data types
 	DsMatchContext(..),
@@ -37,9 +37,9 @@ import CoreSyn		( CoreExpr )
 import HsSyn		( HsExpr, HsMatchContext, Pat )
 import TcIface		( tcIfaceGlobal )
 import RdrName		( GlobalRdrEnv )
-import HscTypes		( TyThing(..), TypeEnv, HscEnv, 
+import HscTypes		( TyThing(..), TypeEnv, HscEnv(..), 
 			  tyThingId, tyThingTyCon, tyThingDataCon, mkPrintUnqualified )
-import Bag		( emptyBag, snocBag, Bag )
+import Bag		( emptyBag, snocBag )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Id		( mkSysLocal, setIdUnique, Id )
@@ -53,9 +53,8 @@ import Name		( Name, nameOccName )
 import NameEnv
 import OccName          ( occNameFS )
 import DynFlags	( DynFlags )
-import ErrUtils		( WarnMsg, mkWarnMsg )
-import Bag		( mapBag )
-
+import ErrUtils		( Messages, mkWarnMsg, mkErrMsg, 
+			  printErrorsAndWarnings, errorsFound )
 import DATA_IOREF	( newIORef, readIORef )
 
 infixr 9 `thenDs`
@@ -131,7 +130,8 @@ type DsWarning = (SrcSpan, SDoc)
 
 data DsGblEnv = DsGblEnv {
 	ds_mod	   :: Module,       		-- For SCC profiling
-	ds_warns   :: IORef (Bag DsWarning),	-- Warning messages
+	ds_unqual  :: PrintUnqualified,
+	ds_msgs    :: IORef Messages,		-- Warning messages
 	ds_if_env  :: (IfGblEnv, IfLclEnv)	-- Used for looking up global, 
 						-- possibly-imported things
     }
@@ -153,33 +153,57 @@ data DsMetaVal
    | Splice (HsExpr Id)	-- These bindings are introduced by
 			-- the PendingSplices on a HsBracketOut
 
--- initDs returns the UniqSupply out the end (not just the result)
-
 initDs  :: HscEnv
 	-> Module -> GlobalRdrEnv -> TypeEnv
 	-> DsM a
-	-> IO (a, Bag WarnMsg)
+	-> IO (Maybe a)
+-- Print errors and warnings, if any arise
 
 initDs hsc_env mod rdr_env type_env thing_inside
-  = do 	{ warn_var <- newIORef emptyBag
-	; let { if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
-	      ; if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
-	      ; gbl_env = DsGblEnv { ds_mod = mod, 
-				     ds_if_env = (if_genv, if_lenv),
-				     ds_warns = warn_var }
-	      ; lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
-				     ds_loc = noSrcSpan } }
+  = do 	{ msg_var <- newIORef (emptyBag, emptyBag)
+	; let (ds_gbl_env, ds_lcl_env) = mkDsEnvs mod rdr_env type_env msg_var
 
-	; res <- initTcRnIf 'd' hsc_env gbl_env lcl_env thing_inside
+	; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
+		        tryM thing_inside	-- Catch exceptions (= errors during desugaring)
 
-	; warns <- readIORef warn_var
-	; return (res, mapBag mk_warn warns)
-	}
-   where
-    print_unqual = mkPrintUnqualified rdr_env
+	-- Display any errors and warnings 
+	-- Note: if -Werror is used, we don't signal an error here.
+	; let dflags = hsc_dflags hsc_env
+	; msgs <- readIORef msg_var
+        ; printErrorsAndWarnings dflags msgs 
 
-    mk_warn :: (SrcSpan,SDoc) -> WarnMsg
-    mk_warn (loc,sdoc) = mkWarnMsg loc print_unqual sdoc
+	; let final_res | errorsFound dflags msgs = Nothing
+		        | otherwise = case either_res of
+				        Right res -> Just res
+				        Left exn -> pprPanic "initDs" (text (show exn))
+		-- The (Left exn) case happens when the thing_inside throws
+		-- a UserError exception.  Then it should have put an error
+		-- message in msg_var, so we just discard the exception
+
+	; return final_res }
+
+initDsTc :: DsM a -> TcM a
+initDsTc thing_inside
+  = do	{ this_mod <- getModule
+	; tcg_env  <- getGblEnv
+	; msg_var  <- getErrsVar
+	; let type_env = tcg_type_env tcg_env
+	      rdr_env  = tcg_rdr_env tcg_env
+	; setEnvs (mkDsEnvs this_mod rdr_env type_env msg_var) thing_inside }
+
+mkDsEnvs :: Module -> GlobalRdrEnv -> TypeEnv
+	 -> IORef Messages -> (DsGblEnv, DsLclEnv)
+mkDsEnvs mod rdr_env type_env msg_var
+  = (gbl_env, lcl_env)
+  where
+    if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
+    if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
+    gbl_env = DsGblEnv { ds_mod = mod, 
+    			 ds_if_env = (if_genv, if_lenv),
+    			 ds_unqual = mkPrintUnqualified rdr_env,
+    			 ds_msgs = msg_var }
+    lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
+			 ds_loc = noSrcSpan }
 \end{code}
 
 %************************************************************************
@@ -241,12 +265,22 @@ getSrcSpanDs = do { env <- getLclEnv; return (ds_loc env) }
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) thing_inside
 
-dsWarn :: SDoc -> DsM ()
-dsWarn warn = do { env <- getGblEnv 
+warnDs :: SDoc -> DsM ()
+warnDs warn = do { env <- getGblEnv 
 		 ; loc <- getSrcSpanDs
-		 ; updMutVar (ds_warns env) (`snocBag` (loc,msg)) }
+		 ; let msg = mkWarnMsg loc (ds_unqual env) 
+				      (ptext SLIT("Warning:") <+> warn)
+		 ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 	    where
-	      msg = ptext SLIT("Warning:") <+> warn
+
+failWithDs :: SDoc -> DsM a
+failWithDs err 
+  = do	{ env <- getGblEnv 
+	; loc <- getSrcSpanDs
+	; let msg = mkErrMsg loc (ds_unqual env) err
+	; updMutVar (ds_msgs env) (\ (w,e) -> (w, e `snocBag` msg))
+	; failM }
+	where
 \end{code}
 
 \begin{code}

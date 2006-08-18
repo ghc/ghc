@@ -220,7 +220,7 @@ dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
     | HsVar funId <- fun
     , idName funId `elem` [breakpointJumpName, breakpointCondJumpName]
     , ids <- filter (isValidType . idType) (extractIds arg)
-    = do dsWarn (text "Extracted ids:" <+> ppr ids <+> ppr (map idType ids))
+    = do warnDs (text "Extracted ids:" <+> ppr ids <+> ppr (map idType ids))
          stablePtr <- ioToIOEnv $ newStablePtr ids
          -- Yes, I know... I'm gonna burn in hell.
          let Ptr addr# = castStablePtrToPtr stablePtr

@@ -91,7 +91,7 @@ The next two functions create the warning message.
 \begin{code}
 dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
 dsShadowWarn ctx@(DsMatchContext kind loc) qs
-  = putSrcSpanDs loc (dsWarn warn)
+  = putSrcSpanDs loc (warnDs warn)
   where
     warn | qs `lengthExceeds` maximum_output
          = pp_context ctx (ptext SLIT("are overlapped"))
@@ -104,7 +104,7 @@ dsShadowWarn ctx@(DsMatchContext kind loc) qs
 
 dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
 dsIncompleteWarn ctx@(DsMatchContext kind loc) pats 
-  = putSrcSpanDs loc (dsWarn warn)
+  = putSrcSpanDs loc (warnDs warn)
 	where
 	  warn = pp_context ctx (ptext SLIT("are non-exhaustive"))
                     	    (\f -> hang (ptext SLIT("Patterns not matched:"))

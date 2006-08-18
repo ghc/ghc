@@ -236,7 +236,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 	      mb_lhs  	    = decomposeRuleLhs (bndrs ++ const_dicts) body
 
 	; case mb_lhs of
-	    Nothing -> do { dsWarn msg; return Nothing }
+	    Nothing -> do { warnDs msg; return Nothing }
 
 	    Just (bndrs', var, args) -> return (Just (addInlineInfo inl spec_id spec_rhs, rule))
 		where

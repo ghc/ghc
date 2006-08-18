@@ -32,15 +32,12 @@ import PackageConfig	( thPackageId )
 import RdrName	 	( GlobalRdrEnv )
 import NameSet
 import VarSet
-import Bag		( Bag, isEmptyBag, emptyBag )
 import Rules		( roughTopNames )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( ruleRhsFreeVars, exprsFreeNames )
-import ErrUtils		( doIfSet, dumpIfSet_dyn, printBagOfWarnings, 
-			  errorsFound, WarnMsg )
+import ErrUtils		( doIfSet, dumpIfSet_dyn )
 import ListSetOps	( insertList )
 import Outputable
-import UniqSupply	( mkSplitUniqSupply )
 import SrcLoc		( Located(..) )
 import DATA_IOREF	( readIORef )
 import Maybes		( catMaybes )
@@ -55,7 +52,7 @@ import Util		( sortLe )
 %************************************************************************
 
 \begin{code}
-deSugar :: HscEnv -> TcGblEnv -> IO (Bag WarnMsg, Maybe ModGuts)
+deSugar :: HscEnv -> TcGblEnv -> IO (Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env 
@@ -78,9 +75,8 @@ deSugar hsc_env
   = do	{ showPass dflags "Desugar"
 
 	-- Desugar the program
-	; ((all_prs, ds_rules, ds_fords), warns) 
-		<- case ghcMode (hsc_dflags hsc_env) of
-	             JustTypecheck -> return (([], [], NoStubs), emptyBag)
+	; mb_res <- case ghcMode dflags of
+	             JustTypecheck -> return (Just ([], [], NoStubs))
 	             _             -> initDs hsc_env mod rdr_env type_env $ do
 		                        { core_prs <- dsTopLHsBinds auto_scc binds
 		                        ; (ds_fords, foreign_prs) <- dsForeigns fords
@@ -89,11 +85,9 @@ deSugar hsc_env
 		                        ; ds_rules <- mappM (dsRule mod local_bndrs) rules
 		                        ; return (all_prs, catMaybes ds_rules, ds_fords)
 		                        }
-
-	-- If warnings are considered errors, leave.
-	; if errorsFound dflags (warns, emptyBag)
-	   then return (warns, Nothing)
-	   else do
+	; case mb_res of {
+	   Nothing -> return Nothing ;
+	   Just (all_prs, ds_rules, ds_fords) -> do
 
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
@@ -161,40 +155,37 @@ deSugar hsc_env
 		mg_binds    = ds_binds,
 		mg_foreign  = ds_fords }
 	
-        ; return (warns, Just mod_guts)
-	}}
+        ; return (Just mod_guts)
+	}}}
 
   where
-    dflags       = hsc_dflags hsc_env
-    ghci_mode    = ghcMode (hsc_dflags hsc_env)
+    dflags    = hsc_dflags hsc_env
+    ghci_mode = ghcMode (hsc_dflags hsc_env)
     auto_scc | opt_SccProfilingOn = TopLevel
 	     | otherwise          = NoSccs
 
 deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
  	    -> LHsExpr Id
-	    -> IO CoreExpr
+	    -> IO (Maybe CoreExpr)
+-- Prints its own errors; returns Nothing if error occurred
+
 deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
-  = do	{ showPass dflags "Desugar"
-	; us <- mkSplitUniqSupply 'd'
+  = do	{ let dflags = hsc_dflags hsc_env
+	; showPass dflags "Desugar"
 
 	-- Do desugaring
-	; (core_expr, ds_warns) <- initDs hsc_env this_mod rdr_env type_env $
-				   dsLExpr tc_expr
+	; mb_core_expr <- initDs hsc_env this_mod rdr_env type_env $
+			  dsLExpr tc_expr
 
-	-- Display any warnings 
-	-- Note: if -Werror is used, we don't signal an error here.
-        ; doIfSet (not (isEmptyBag ds_warns))
-		  (printBagOfWarnings dflags ds_warns)
+	; case mb_core_expr of {
+	    Nothing   -> return Nothing ;
+	    Just expr -> do {
 
-	-- Dump output
-	; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr core_expr)
+		-- Dump output
+	  dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr expr)
 
-        ; return core_expr
-	}
-  where
-    dflags       = hsc_dflags hsc_env
-
+        ; return (Just expr) } } }
 
 --		addExportFlags
 -- Set the no-discard flag if either 
@@ -267,7 +258,7 @@ dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
 	; rhs'  <- dsLExpr rhs
 
 	; case decomposeRuleLhs bndrs lhs' of {
-		Nothing -> do { dsWarn msg; return Nothing } ;
+		Nothing -> do { warnDs msg; return Nothing } ;
 		Just (bndrs', fn_id, args) -> do
 	
 	-- Substitute the dict bindings eagerly,

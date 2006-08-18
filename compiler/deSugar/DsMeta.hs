@@ -214,7 +214,7 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
 
 -- Un-handled cases
 repTyClD (L loc d) = putSrcSpanDs loc $
-		     do { dsWarn (hang ds_msg 4 (ppr d))
+		     do { warnDs (hang ds_msg 4 (ppr d))
 			; return Nothing }
 
 -- represent fundeps
@@ -256,20 +256,22 @@ repForD (L loc (ForeignImport name typ (CImport cc s ch cn cis)))
       MkC typ' <- repLTy typ
       MkC cc' <- repCCallConv cc
       MkC s' <- repSafety s
+      cis' <- conv_cimportspec cis
       MkC str <- coreStringLit $ static
                               ++ unpackFS ch ++ " "
                               ++ unpackFS cn ++ " "
-                              ++ conv_cimportspec cis
+                              ++ cis'
       dec <- rep2 forImpDName [cc', s', str, name', typ']
       return (loc, dec)
  where
-    conv_cimportspec (CLabel cls) = panic "repForD': CLabel Not handled"
-    conv_cimportspec (CFunction DynamicTarget) = "dynamic"
-    conv_cimportspec (CFunction (StaticTarget fs)) = unpackFS fs
-    conv_cimportspec CWrapper = "wrapper"
+    conv_cimportspec (CLabel cls) = notHandled "Foreign label" (doubleQuotes (ppr cls))
+    conv_cimportspec (CFunction DynamicTarget) = return "dynamic"
+    conv_cimportspec (CFunction (StaticTarget fs)) = return (unpackFS fs)
+    conv_cimportspec CWrapper = return "wrapper"
     static = case cis of
                  CFunction (StaticTarget _) -> "static "
                  _ -> ""
+repForD decl = notHandled "Foreign declaration" (ppr decl)
 
 repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
 repCCallConv CCallConv = rep2 cCallName []
@@ -299,9 +301,8 @@ repC (L loc (ConDecl con expl tvs (L cloc ctxt) details ResTyH98))
          }
        }
 repC (L loc con_decl)		-- GADTs
-  = putSrcSpanDs loc $ 
-    do	{ dsWarn (hang ds_msg 4 (ppr con_decl))
-	; return (panic "DsMeta:repC") }
+  = putSrcSpanDs loc $
+    notHandled "GADT declaration" (ppr con_decl) 
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
 repBangTy ty= do 
@@ -326,7 +327,7 @@ repDerivs (Just ctxt)
     rep_deriv :: LHsType Name -> DsM (Core TH.Name)
 	-- Deriving clauses must have the simple H98 form
     rep_deriv (L _ (HsPredTy (HsClassP cls []))) = lookupOcc cls
-    rep_deriv other		  		 = panic "rep_deriv"
+    rep_deriv other = notHandled "Non-H98 deriving clause" (ppr other)
 
 
 -------------------------------------------------------
@@ -396,8 +397,7 @@ repPred (HsClassP cls tys) = do
 			       tcon <- repTy (HsTyVar cls)
 			       tys1 <- repLTys tys
 			       repTapps tcon tys1
-repPred (HsIParam _ _)     = 
-  panic "DsMeta.repTy: Can't represent predicates with implicit parameters"
+repPred p@(HsIParam _ _) = notHandled "Implicit parameter constraint" (ppr p)
 
 -- yield the representation of a list of types
 --
@@ -448,11 +448,9 @@ repTy (HsTupleTy tc tys)	  = do
 repTy (HsOpTy ty1 n ty2) 	  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1) 
 					   `nlHsAppTy` ty2)
 repTy (HsParTy t)  	       	  = repLTy t
-repTy (HsNumTy i)                 =
-  panic "DsMeta.repTy: Can't represent number types (for generics)"
 repTy (HsPredTy pred)             = repPred pred
-repTy (HsKindSig ty kind)	  = 
-  panic "DsMeta.repTy: Can't represent explicit kind signatures yet"
+repTy ty@(HsNumTy _)              = notHandled "Number types (for generics)" (ppr ty)
+repTy ty			  = notHandled "Exotic form of type" (ppr ty)
 
 
 -----------------------------------------------------------------------------
@@ -467,7 +465,7 @@ repLEs es = do { es'  <- mapM repLE es ;
 --	  unless we can make sure that constructs, which are plainly not
 --	  supported in TH already lead to error messages at an earlier stage
 repLE :: LHsExpr Name -> DsM (Core TH.ExpQ)
-repLE (L _ e) = repE e
+repLE (L loc e) = putSrcSpanDs loc (repE e)
 
 repE :: HsExpr Name -> DsM (Core TH.ExpQ)
 repE (HsVar x)            =
@@ -478,7 +476,7 @@ repE (HsVar x)            =
 	Just (Bound y)   -> repVarOrCon x (coreVar y)
 	Just (Splice e)  -> do { e' <- dsExpr e
 			       ; return (MkC e') } }
-repE (HsIPVar x) = panic "DsMeta.repE: Can't represent implicit parameters"
+repE e@(HsIPVar x) = notHandled "Implicit parameters" (ppr e)
 
 	-- Remember, we're desugaring renamer output here, so
 	-- HsOverlit can definitely occur
@@ -524,13 +522,12 @@ repE (HsDo ListComp sts body ty)
 	ret	<- repNoBindSt body';	
         e       <- repComp (nonEmptyCoreList (zs ++ [ret]));
         wrapGenSyns ss e }
-repE (HsDo _ _ _ _) = panic "DsMeta.repE: Can't represent mdo and [: :] yet"
+repE e@(HsDo _ _ _ _) = notHandled "mdo and [: :]" (ppr e)
 repE (ExplicitList ty es) = do { xs <- repLEs es; repListExp xs } 
-repE (ExplicitPArr ty es) = 
-  panic "DsMeta.repE: No explicit parallel arrays yet"
-repE (ExplicitTuple es boxed) 
+repE e@(ExplicitPArr ty es) = notHandled "Parallel arrays" (ppr e)
+repE e@(ExplicitTuple es boxed) 
   | isBoxed boxed         = do { xs <- repLEs es; repTup xs }
-  | otherwise		  = panic "DsMeta.repE: Can't represent unboxed tuples"
+  | otherwise		  = notHandled "Unboxed tuples" (ppr e)
 repE (RecordCon c _ flds)
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
@@ -557,18 +554,19 @@ repE (ArithSeq _ aseq) =
 			     ds2 <- repLE e2
 			     ds3 <- repLE e3
 			     repFromThenTo ds1 ds2 ds3
-repE (PArrSeq _ aseq)     = panic "DsMeta.repE: parallel array seq.s missing"
-repE (HsCoreAnn _ _)      = panic "DsMeta.repE: Can't represent CoreAnn" -- hdaume: core annotations
-repE (HsSCC _ _)          = panic "DsMeta.repE: Can't represent SCC"
-repE (HsBracketOut _ _)   = panic "DsMeta.repE: Can't represent Oxford brackets"
 repE (HsSpliceE (HsSplice n _)) 
   = do { mb_val <- dsLookupMetaEnv n
        ; case mb_val of
 		 Just (Splice e) -> do { e' <- dsExpr e
 				       ; return (MkC e') }
-		 other	     -> pprPanic "HsSplice" (ppr n) }
+		 other -> pprPanic "HsSplice" (ppr n) }
+			-- Should not happen; statically checked
 
-repE e = pprPanic "DsMeta.repE: Illegal expression form" (ppr e)
+repE e@(PArrSeq {})      = notHandled "Parallel arrays" (ppr e)
+repE e@(HsCoreAnn {})    = notHandled "Core annotations" (ppr e)
+repE e@(HsSCC {})        = notHandled "Cost centres" (ppr e)
+repE e@(HsBracketOut {}) = notHandled "TH brackets" (ppr e)
+repE e 			 = notHandled "Expression form" (ppr e)
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt, 
@@ -583,6 +581,7 @@ repMatchTup (L _ (Match [p] ty (GRHSs guards wheres))) =
      ; gs    <- repGuards guards
      ; match <- repMatch p1 gs ds
      ; wrapGenSyns (ss1++ss2) match }}}
+repMatchTup other = panic "repMatchTup: case alt with more than one arg"
 
 repClauseTup ::  LMatch Name -> DsM (Core TH.ClauseQ)
 repClauseTup (L _ (Match ps ty (GRHSs guards wheres))) =
@@ -669,8 +668,8 @@ repSts (ExprStmt e _ _ : ss) =
       ; z <- repNoBindSt e2 
       ; (ss2,zs) <- repSts ss
       ; return (ss2, z : zs) }
-repSts [] = return ([],[])
-repSts other = panic "Exotic Stmt in meta brackets"      
+repSts []    = return ([],[])
+repSts other = notHandled "Exotic statement" (ppr other)
 
 
 -----------------------------------------------------------
@@ -682,8 +681,7 @@ repBinds EmptyLocalBinds
   = do	{ core_list <- coreList decQTyConName []
 	; return ([], core_list) }
 
-repBinds (HsIPBinds _)
-  = panic "DsMeta:repBinds: can't do implicit parameters"
+repBinds b@(HsIPBinds _) = notHandled "Implicit parameters" (ppr b)
 
 repBinds (HsValBinds decs)
  = do	{ let { bndrs = map unLoc (collectHsValBinders decs) }
@@ -703,6 +701,8 @@ rep_val_binds (ValBindsOut binds sigs)
  = do { core1 <- rep_binds' (unionManyBags (map snd binds))
       ;	core2 <- rep_sigs' sigs
       ;	return (core1 ++ core2) }
+rep_val_binds (ValBindsOut binds sigs)
+ = panic "rep_val_binds: ValBindsOut"
 
 rep_binds :: LHsBinds Name -> DsM [Core TH.DecQ]
 rep_binds binds = do { binds_w_locs <- rep_binds' binds
@@ -750,6 +750,8 @@ rep_bind (L loc (VarBind { var_id = v, var_rhs = e}))
         ; ans <- repVal patcore x empty_decls
         ; return (srcLocSpan (getSrcLoc v), ans) }
 
+rep_bind other = panic "rep_bind: AbsBinds"
+
 -----------------------------------------------------------------------------
 -- Since everything in a Bind is mutually recursive we need rename all
 -- all the variables simultaneously. For example: 
@@ -782,7 +784,7 @@ repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [] e)] EmptyLocalBinds)))
 		do { xs <- repLPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyns ss lam }
 
-repLambda z = panic "Can't represent a guarded lambda in Template Haskell"  
+repLambda (L _ m) = notHandled "Guarded labmdas" (pprMatch LambdaExpr m)
 
   
 -----------------------------------------------------------------------------
@@ -822,10 +824,17 @@ repP (ConPatIn dc details)
                                 p2' <- repLP p2;
                                 repPinfix p1' con_str p2' }
    }
-repP (NPat l (Just _) _ _) = panic "Can't cope with negative overloaded patterns yet (repP (NPat _ (Just _)))"
 repP (NPat l Nothing _ _)  = do { a <- repOverloadedLiteral l; repPlit a }
-repP (SigPatIn p t)  = do { p' <- repLP p; t' <- repLTy t; repPsig p' t' }
-repP other = panic "Exotic pattern inside meta brackets"
+repP p@(NPat l (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
+repP p@(SigPatIn {})  = notHandled "Type signatures in patterns" (ppr p)
+	-- The problem is to do with scoped type variables.
+	-- To implement them, we have to implement the scoping rules
+	-- here in DsMeta, and I don't want to do that today!
+	--	 do { p' <- repLP p; t' <- repLTy t; repPsig p' t' }
+	--	repPsig :: Core TH.PatQ -> Core TH.TypeQ -> DsM (Core TH.PatQ)
+	--	repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
+
+repP other = notHandled "Exotic pattern" (ppr other)
 
 ----------------------------------------------------------
 -- Declaration ordering helpers
@@ -878,7 +887,9 @@ lookupBinder n
   = do { mb_val <- dsLookupMetaEnv n;
 	 case mb_val of
 	    Just (Bound x) -> return (coreVar x)
-	    other	   -> pprPanic "DsMeta: failed binder lookup when desugaring a TH bracket:" (ppr n) }
+	    other	   -> failWithDs msg }
+  where
+    msg = ptext SLIT("DsMeta: failed binder lookup when desugaring a TH bracket:") <+> ppr n
 
 -- Look up a name that is either locally bound or a global name
 --
@@ -1029,9 +1040,6 @@ repPwild = rep2 wildPName []
 
 repPlist :: Core [TH.PatQ] -> DsM (Core TH.PatQ)
 repPlist (MkC ps) = rep2 listPName [ps]
-
-repPsig :: Core TH.PatQ -> Core TH.TypeQ -> DsM (Core TH.PatQ)
-repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core TH.Name -> DsM (Core TH.ExpQ)
@@ -1239,20 +1247,20 @@ repLiteral lit
                    HsDoublePrim r -> mk_rational r
                    _ -> return lit
        lit_expr <- dsLit lit'
-       rep2 lit_name [lit_expr]
+       case mb_lit_name of
+	  Just lit_name -> rep2 lit_name [lit_expr]
+	  Nothing -> notHandled "Exotic literal" (ppr lit)
   where
-    lit_name = case lit of
-		 HsInteger _ _  -> integerLName
-		 HsInt     _    -> integerLName
-		 HsIntPrim _    -> intPrimLName
-		 HsFloatPrim _  -> floatPrimLName
-		 HsDoublePrim _ -> doublePrimLName
-		 HsChar _       -> charLName
-		 HsString _     -> stringLName
-		 HsRat _ _      -> rationalLName
-		 other 	        -> uh_oh
-    uh_oh = pprPanic "DsMeta.repLiteral: trying to represent exotic literal"
-		    (ppr lit)
+    mb_lit_name = case lit of
+		 HsInteger _ _  -> Just integerLName
+		 HsInt     _    -> Just integerLName
+		 HsIntPrim _    -> Just intPrimLName
+		 HsFloatPrim _  -> Just floatPrimLName
+		 HsDoublePrim _ -> Just doublePrimLName
+		 HsChar _       -> Just charLName
+		 HsString _     -> Just stringLName
+		 HsRat _ _      -> Just rationalLName
+		 other 	        -> Nothing
 
 mk_integer  i = do integer_ty <- lookupType integerTyConName
                    return $ HsInteger i integer_ty
@@ -1307,6 +1315,12 @@ coreIntLit i = return (MkC (mkIntExpr (fromIntegral i)))
 coreVar :: Id -> Core TH.Name	-- The Id has type Name
 coreVar id = MkC (Var id)
 
+----------------- Failure -----------------------
+notHandled :: String -> SDoc -> DsM a
+notHandled what doc = failWithDs msg
+  where
+    msg = hang (text what <+> ptext SLIT("not (yet) handled by Template Haskell")) 
+	     2 doc
 
 
 -- %************************************************************************
