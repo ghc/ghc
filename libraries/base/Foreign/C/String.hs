@@ -168,10 +168,8 @@ newCStringLen = newCAStringLen
 withCString :: String -> (CString -> IO a) -> IO a
 withCString = withCAString
 
--- | Marshal a Haskell string into a NUL terminated C string using temporary
--- storage.
---
--- * the Haskell string may /not/ contain any NUL characters
+-- | Marshal a Haskell string into a C string (ie, character array)
+-- in temporary storage, with explicit length information.
 --
 -- * the memory is freed when the subcomputation terminates (either
 --   normally or via an exception), so the pointer to the temporary
@@ -309,10 +307,8 @@ withCAString str f =
       f ptr
 #endif
 
--- | Marshal a Haskell string into a NUL terminated C string using temporary
--- storage.
---
--- * the Haskell string may /not/ contain any NUL characters
+-- | Marshal a Haskell string into a C string (ie, character array)
+-- in temporary storage, with explicit length information.
 --
 -- * the memory is freed when the subcomputation terminates (either
 --   normally or via an exception), so the pointer to the temporary
