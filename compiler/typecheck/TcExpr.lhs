@@ -190,7 +190,7 @@ tcExpr (HsApp e1 e2) res_ty
     go :: LHsExpr Name -> [LHsExpr Name] -> TcM (HsExpr TcId)
     go (L _ (HsApp e1 e2)) args = go e1 (e2:args)
     go lfun@(L loc fun) args
-	= do { (fun', args') <- addErrCtxt (callCtxt lfun args) $
+	= do { (fun', args') <- -- addErrCtxt (callCtxt lfun args) $
 				tcApp fun (length args) (tcArgs lfun args) res_ty
 	     ; return (unLoc (foldl mkHsApp (L loc fun') args')) }
 
