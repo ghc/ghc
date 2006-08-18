@@ -360,20 +360,20 @@ expandHashTable hash table@HT{ buckets=bkts, bmask=mask } = do
       then return table
       else do
    --
-   newbkts' <- newMutArray (0,newmask) []
+    newbkts' <- newMutArray (0,newmask) []
 
-   let
-    splitBucket oldindex = do
-      bucket <- readHTArray bkts oldindex
-      let (oldb,newb) =
+    let
+     splitBucket oldindex = do
+       bucket <- readHTArray bkts oldindex
+       let (oldb,newb) =
               partition ((oldindex==). bucketIndex newmask . hash . fst) bucket
-      writeMutArray newbkts' oldindex oldb
-      writeMutArray newbkts' (oldindex + oldsize) newb
-   mapM_ splitBucket [0..mask]
+       writeMutArray newbkts' oldindex oldb
+       writeMutArray newbkts' (oldindex + oldsize) newb
+    mapM_ splitBucket [0..mask]
 
-   newbkts <- freezeArray newbkts'
+    newbkts <- freezeArray newbkts'
 
-   return ( table{ buckets=newbkts, bmask=newmask } )
+    return ( table{ buckets=newbkts, bmask=newmask } )
 
 -- -----------------------------------------------------------------------------
 -- Deleting a mapping from the hash table
