@@ -62,7 +62,7 @@ import Data.Int		( Int64 )
 import Hugs.IOArray	( IOArray, newIOArray,
 			  unsafeReadIOArray, unsafeWriteIOArray )
 #  elif defined(__NHC__)
-import NHC.IOExtras	( IOArray, newIOArray )
+import NHC.IOExtras	( IOArray, newIOArray, readIOArray, writeIOArray )
 #  endif
 #endif
 import Control.Monad	( mapM, mapM_, sequence_ )
@@ -83,9 +83,9 @@ newMutArray   :: (Int32, Int32) -> a -> IO (MutArray a)
 #if defined(DEBUG) || defined(__NHC__)
 type MutArray a = IOArray Int32 a
 type HTArray a = MutArray a
-newMutArray = newArray
-readHTArray  = readArray
-writeMutArray = writeArray
+newMutArray = newIOArray
+readHTArray  = readIOArray
+writeMutArray = writeIOArray
 freezeArray = return
 thawArray = return
 #else
