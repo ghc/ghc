@@ -24,7 +24,7 @@ module TcHsType (
 #include "HsVersions.h"
 
 import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, 
-			  LHsContext, HsPred(..), LHsPred, HsExplicitForAll(..) )
+			  LHsContext, HsPred(..), LHsPred )
 import RnHsSyn		( extractHsTyVars )
 import TcRnMonad
 import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnvTvs, 
@@ -245,10 +245,14 @@ kcCheckHsType (L span ty) exp_kind
 	; return (L span ty') }
   where
 	-- Wrap a context around only if we want to show that contexts.  
+    add_ctxt (HsPredTy p)		 thing = thing
 	-- Omit invisble ones and ones user's won't grok (HsPred p).
-    add_ctxt (HsPredTy p)		    	         thing = thing
-    add_ctxt (HsForAllTy Implicit tvs (L _ []) (L _ ty)) thing = add_ctxt ty thing
-    add_ctxt other_ty thing = addErrCtxt (typeCtxt ty) thing
+    add_ctxt (HsForAllTy _ _ (L _ []) _) thing = thing
+	-- Omit wrapping if the theta-part is empty
+	-- Reason: the recursive call to kcLiftedType, in the ForAllTy
+	--	   case of kc_hs_type, will do the wrapping instead
+	--	   and we don't want to duplicate
+    add_ctxt other_ty thing = addErrCtxt (typeCtxt other_ty) thing
 
 	-- We infer the kind of the type, and then complain if it's
 	-- not right.  But we don't want to complain about
@@ -333,17 +337,18 @@ kc_hs_type (HsPredTy pred)
 
 kc_hs_type (HsForAllTy exp tv_names context ty)
   = kcHsTyVars tv_names		$ \ tv_names' ->
-    kcHsContext context		`thenM`	\ ctxt' ->
-    kcLiftedType ty		`thenM` \ ty' ->
-	-- The body of a forall is usually a type, but in principle
-	-- there's no reason to prohibit *unlifted* types.
-	-- In fact, GHC can itself construct a function with an
-	-- unboxed tuple inside a for-all (via CPR analyis; see 
-	-- typecheck/should_compile/tc170)
-	--
-	-- Still, that's only for internal interfaces, which aren't
-	-- kind-checked, so we only allow liftedTypeKind here
-    returnM (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind)
+    do	{ ctxt' <- kcHsContext context
+	; ty'   <- kcLiftedType ty
+	     -- The body of a forall is usually a type, but in principle
+	     -- there's no reason to prohibit *unlifted* types.
+	     -- In fact, GHC can itself construct a function with an
+	     -- unboxed tuple inside a for-all (via CPR analyis; see 
+	     -- typecheck/should_compile/tc170)
+	     --
+	     -- Still, that's only for internal interfaces, which aren't
+	     -- kind-checked, so we only allow liftedTypeKind here
+
+  	; return (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind) }
 
 kc_hs_type (HsBangTy b ty)
   = do { (ty', kind) <- kcHsType ty
@@ -500,6 +505,8 @@ ds_type full_ty@(HsForAllTy exp tv_names ctxt ty)
     mappM dsHsLPred (unLoc ctxt)	`thenM` \ theta ->
     dsHsType ty				`thenM` \ tau ->
     returnM (mkSigmaTy tyvars theta tau)
+
+ds_type (HsSpliceTy {}) = panic "ds_type: HsSpliceTy"
 
 dsHsTypes arg_tys = mappM dsHsType arg_tys
 \end{code}
