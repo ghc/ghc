@@ -2505,7 +2505,7 @@ function that called it. For example, our <literal>sort</literal> function might
 to pick out the least value in a list:
 <programlisting>
   least   :: (?cmp :: a -> a -> Bool) => [a] -> a
-  least xs = fst (sort xs)
+  least xs = head (sort xs)
 </programlisting>
 Without lifting a finger, the <literal>?cmp</literal> parameter is
 propagated to become a parameter of <literal>least</literal> as well. With explicit
