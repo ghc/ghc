@@ -8,4 +8,4 @@ tcfail065.hs:29:19:
       Expected type: x
       Inferred type: x1
     In the first argument of `X', namely `x'
-    In the call (X x)
+    In the expression: X x

@@ -5,7 +5,6 @@ tcfail128.hs:18:8:
     Possible fix:
       add an instance declaration for
       (Data.Array.Base.MArray b FlatVector IO)
-    In the call (thaw tmp)
     In a 'do' expression: v <- thaw tmp
     In the expression:
 	do
@@ -17,3 +16,13 @@ tcfail128.hs:18:8:
 	      tmp = listVector (1, dim) help
 	  v <- thaw tmp
 	  return ()
+    In the definition of `main':
+	main = do
+		 let sL = [1, 4, 6, 3, 2, 5]
+		     dim = length sL
+		     help :: [FlatVector]
+		     help = [... | s <- ...]
+		     tmp :: Vector FlatVector
+		     tmp = listVector (1, dim) help
+		 v <- thaw tmp
+		 return ()

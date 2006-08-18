@@ -5,7 +5,8 @@ tcfail133.hs:67:13:
     Possible fix:
       add an instance declaration for
       (AddDigit ((:@) Zero ((:@) One One)) One a)
-    In the call (add (One :@ Zero) (One :@ One))
     In the second argument of `($)', namely
 	`add (One :@ Zero) (One :@ One)'
     In the expression: show $ (add (One :@ Zero) (One :@ One))
+    In the definition of `foo':
+	foo = show $ (add (One :@ Zero) (One :@ One))

@@ -6,4 +6,4 @@ tcfail153.hs:6:8:
       Expected type: Bool
       Inferred type: a
     In the first argument of `g', namely `x'
-    In the call (g x)
+    In the expression: g x

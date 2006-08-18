@@ -27,7 +27,8 @@ tcfail067.hs:46:11:
 
 tcfail067.hs:60:0:
     Could not deduce (Show (SubRange a)) from the context (Num a)
-      arising from the superclasses of an instance declaration at tcfail067.hs:60:0
+      arising from the superclasses of an instance declaration
+      at tcfail067.hs:60:0
     Possible fix:
       add (Show (SubRange a))
       to the instance declaration superclass context
@@ -55,20 +56,18 @@ tcfail067.hs:65:18:
       arising from use of `SubRange' at tcfail067.hs:65:18-72
     Possible fix:
       add (Ord a) to the class or instance method `fromInteger'
-    In the call (SubRange (fromInteger a, fromInteger a)
-			  (fromInteger a))
     In the expression:
 	SubRange (fromInteger a, fromInteger a) (fromInteger a)
     In the definition of `fromInteger':
 	fromInteger a = SubRange (fromInteger a, fromInteger a)
 				 (fromInteger a)
+    In the definition for method `fromInteger'
 
 tcfail067.hs:74:4:
     Could not deduce (Ord a) from the context (Num a)
       arising from use of `SubRange' at tcfail067.hs:74:4-35
     Possible fix:
       add (Ord a) to the type signature(s) for `numSubRangeBinOp'
-    In the call (SubRange (result, result) result)
     In the expression: SubRange (result, result) result
     In the definition of `numSubRangeBinOp':
 	numSubRangeBinOp op a b

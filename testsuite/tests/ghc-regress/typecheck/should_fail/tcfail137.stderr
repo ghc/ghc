@@ -3,6 +3,5 @@ tcfail137.hs:8:4:
     No instance for (Floating Bool)
       arising from use of `Test' at tcfail137.hs:8:4-21
     Possible fix: add an instance declaration for (Floating Bool)
-    In the call (Test [False, True])
     In the expression: Test [False, True]
     In the definition of `x': x = Test [False, True]

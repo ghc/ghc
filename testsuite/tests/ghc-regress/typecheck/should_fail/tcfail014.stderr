@@ -2,5 +2,5 @@
 tcfail014.hs:5:30:
     Occurs check: cannot construct the infinite type: t = t -> t1
     Probable cause: `z' is applied to too many arguments
-    In the call (z z)
     In the expression: z z
+    In the definition of `h': h z = z z

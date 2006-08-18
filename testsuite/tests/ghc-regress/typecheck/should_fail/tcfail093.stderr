@@ -3,6 +3,5 @@ tcfail093.hs:15:9:
     No instance for (Call (IO Int) h)
       arising from use of `call' at tcfail093.hs:15:9-20
     Possible fix: add an instance declaration for (Call (IO Int) h)
-    In the call (call primDup)
     In the expression: call primDup
     In the definition of `dup': dup () = call primDup

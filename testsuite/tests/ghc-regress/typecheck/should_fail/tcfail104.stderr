@@ -2,19 +2,21 @@
 tcfail104.hs:11:6:
     Cannot match a monotype with `forall a. a -> a'
     In a lambda abstraction: \ x -> x
-    In the call ((if v then
-		      (\ (x :: forall a. a -> a) -> x)
-		  else
-		      (\ x -> x)) id 'c')
     In the expression:
 	(if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'
+    In the definition of `f':
+	f v = (if v then
+		   (\ (x :: forall a. a -> a) -> x)
+	       else
+		   (\ x -> x)) id 'c'
 
 tcfail104.hs:17:6:
     Cannot match a monotype with `forall a. a -> a'
     In a lambda abstraction: \ x -> x
-    In the call ((if v then
-		      (\ (x :: forall a. a -> a) -> x)
-		  else
-		      (\ x -> x)) id 'c')
     In the expression:
 	(if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'
+    In the definition of `g':
+	g v = (if v then
+		   (\ (x :: forall a. a -> a) -> x)
+	       else
+		   (\ x -> x)) id 'c'

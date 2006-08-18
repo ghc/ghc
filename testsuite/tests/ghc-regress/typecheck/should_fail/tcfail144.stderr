@@ -12,5 +12,5 @@ tcfail144.hs:14:32:
     Couldn't match expected type `[Char]' against inferred type `Bool'
       Expected type: [Char] -> Bool
       Inferred type: Bool -> Bool
-    In the call (g2 "Yes")
     In the second argument of `(||)', namely `g2 "Yes"'
+    In the second argument of `(||)', namely `(g2 True) || (g2 "Yes")'

@@ -10,5 +10,5 @@ tcfail076.hs:18:67:
 	       at tcfail076.hs:18:13-81
       Expected type: m res
       Inferred type: m res1
-    In the call (cont a)
     In the expression: cont a
+    In a lambda abstraction: \ cont' -> cont a
