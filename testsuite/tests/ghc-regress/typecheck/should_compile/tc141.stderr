@@ -1,0 +1,4 @@
+
+tc141.hs:11:14: Not in scope: type variable `a'
+
+tc141.hs:11:19: Not in scope: type variable `a'

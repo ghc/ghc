@@ -4,6 +4,7 @@
 -- This should *fail* on GHC 5.02 and lower, 
 -- It's a post-5.02 enhancements to allow them.
 
+-- It's an error again in GHC 6.6!
 
 module ShouldCompile where
 

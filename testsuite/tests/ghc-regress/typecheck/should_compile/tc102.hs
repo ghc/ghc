@@ -9,4 +9,5 @@
 
 module ShouldCompile where
 
+p :: forall a. a -> a
 p = let y = p in \ (x::a) -> x

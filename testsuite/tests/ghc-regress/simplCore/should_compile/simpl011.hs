@@ -36,7 +36,7 @@ newtype HashTable key val arr ref m = HashTable (ref (HT key val arr ref m))
 
 data HT key val arr (ref :: * -> *) (m :: * -> *) = HT { dir :: (arr Int32 (arr Int32 [(key,val)])) }
 
-new :: (MutHash arr ref m) => m (HashTable key val arr ref m)
+new :: forall arr ref m key val. (MutHash arr ref m) => m (HashTable key val arr ref m)
 new = do
   (dir::arr Int32 (arr Int32 [(key,val)]))  <- newMHArray (0,0) undefined
   (segment::arr Int32 [(key,val)])          <- return undefined
