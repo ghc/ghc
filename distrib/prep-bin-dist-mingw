@@ -128,10 +128,11 @@ cp $mingw_bin/ar.exe bin/
 # Note: later versions of dlltool.exe depend on a bfd helper DLL.
 cp $mingw_bin/dllwrap.exe gcc-lib/
 cp $mingw_bin/dlltool.exe gcc-lib/
-# Remove unused cruft
+# Remove worthy, but unused tools
 rm gcc-lib/f771.exe || echo "good - f771.exe not found"
 rm gcc-lib/gnat1.exe || echo "good - gnat1.exe not found"
 rm gcc-lib/jc1.exe || echo "good - jc1.exe not found"
+rm gcc-lib/libgcj* || echo "good - libgcj libs not found"
 rm gcc-lib/jvgenmain.exe || echo "good - jvgenmain.exe not found"
 
 echo "extra header files inside of include/"
