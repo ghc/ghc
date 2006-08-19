@@ -31,7 +31,7 @@ module HsTypes (
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import Type		( Type )
-import Kind		( {- instance Outputable Kind -}, Kind,
+import Kind		( {- instance Outputable Kind -} Kind,
 			  pprParendKind, pprKind, isLiftedTypeKind )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import SrcLoc		( Located(..), unLoc, noSrcSpan )

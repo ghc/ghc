@@ -26,7 +26,7 @@ import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
 import TcHsSyn		( hsLitType )
 import TcRnMonad
 import TcUnify		( tcInfer, tcSubExp, tcFunResTy, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
-			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, preSubType,, 
+			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, preSubType,
 			  unBox )
 import BasicTypes	( Arity, isMarkedStrict )
 import Inst		( newMethodFromName, newIPDict, instToId,

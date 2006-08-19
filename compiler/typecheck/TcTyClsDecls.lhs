@@ -11,7 +11,7 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
-			  ConDecl(..),   Sig(..), , NewOrData(..), ResType(..),
+			  ConDecl(..),   Sig(..), NewOrData(..), ResType(..),
 			  tyClDeclTyVars, isSynDecl, hsConArgs,
 			  LTyClDecl, tcdName, hsTyVarName, LHsTyVarBndr
 			)
