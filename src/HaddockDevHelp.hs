@@ -4,18 +4,18 @@ import HaddockModuleTree
 import HaddockTypes
 import HaddockUtil
 
-import Module ( moduleString, Module )
-import Name   ( Name, nameModule, getOccString )
+import Module        ( moduleName, moduleNameString, Module, mkModule, mkModuleName )
+import PackageConfig ( stringToPackageId )
+import Name          ( Name, nameModule, getOccString )
 
-import Data.Maybe ( fromMaybe )
+import Data.Maybe    ( fromMaybe )
 import qualified Data.Map as Map
 import Text.PrettyPrint
 
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [HaddockModule] -> IO ()
 ppDevHelpFile odir doctitle maybe_package modules = do
   let devHelpFile = package++".devhelp"
-      tree = mkModuleTree [ (hmod_mod mod, hmod_package mod, toDescription mod)
-			    | mod <- modules ]
+      tree = mkModuleTree True [ (hmod_mod mod, toDescription mod) | mod <- modules ]
       doc =
         text "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>" $$
         (text "<book xmlns=\"http://www.devhelp.net/book\" title=\""<>text doctitle<>
@@ -37,7 +37,7 @@ ppDevHelpFile odir doctitle maybe_package modules = do
     ppModuleTree _  []     = error "HaddockHH.ppHHContents.fn: no module trees given"
 
     ppNode :: [String] -> ModuleTree -> Doc
-    ppNode ss (Node s leaf _pkg _short ts) =
+    ppNode ss (Node s leaf _ _short ts) =
         case ts of
           [] -> text "<sub"<+>ppAttribs<>text "/>"
           ts -> 
@@ -45,7 +45,8 @@ ppDevHelpFile odir doctitle maybe_package modules = do
             nest 4 (ppModuleTree (s:ss) ts) $+$
             text "</sub>"
         where
-          ppLink | leaf      = text (moduleHtmlFile mdl)
+          ppLink | leaf      = text (moduleHtmlFile (mkModule (stringToPackageId "") 
+                                                              (mkModuleName mdl)))
                  | otherwise = empty
 
           ppAttribs = text "name="<>doubleQuotes (text s)<+>text "link="<>doubleQuotes ppLink
@@ -69,6 +70,6 @@ ppDevHelpFile odir doctitle maybe_package modules = do
 
     ppReference :: Name -> [Module] -> Doc
     ppReference name [] = empty
-    ppReference name (mod:refs) = let modName = moduleString mod in 
-      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef modName name)<>text"\"/>" $$
+    ppReference name (mod:refs) =  
+      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef mod name)<>text"\"/>" $$
       ppReference name refs

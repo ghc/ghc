@@ -37,6 +37,7 @@ import qualified Data.Map as Map hiding ( Map )
 import GHC 
 import Name
 import Module
+import PackageConfig ( stringToPackageId )
 import RdrName hiding ( Qual )
 import SrcLoc   
 import FastString ( unpackFS )
@@ -73,8 +74,8 @@ ppHtml doctitle maybe_package hmods odir prologue maybe_html_help_format
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package
         maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
-	[ hmod { hmod_package = Nothing } | hmod <- visible_hmods ]
-	-- we don't want to display the packages in a single-package contents
+	visible_hmods
+	False -- we don't want to display the packages in a single-package contents
 	prologue
 
   when (not (isJust maybe_index_url)) $ 
@@ -137,7 +138,8 @@ copyHtmlBits odir libdir maybe_css = do
 	css_destination = pathJoin [odir, cssFile]
 	copyLibFile f = do
 	   copyFile (pathJoin [libhtmldir, f]) (pathJoin [odir, f])
- 
+  print css_file 
+  print css_destination
   copyFile css_file css_destination
   mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile ]
 
@@ -167,7 +169,7 @@ spliceURL maybe_file maybe_mod maybe_name url = run url
   file = fromMaybe "" maybe_file
   mod = case maybe_mod of
           Nothing           -> ""
-          Just mod -> moduleString mod  
+          Just mod -> moduleString mod 
   
   (name, kind) =
     case maybe_name of
@@ -290,13 +292,13 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [HaddockModule] -> Maybe (GHC.HsDoc GHC.RdrName)
+   -> [HaddockModule] -> Bool -> Maybe (GHC.HsDoc GHC.RdrName)
    -> IO ()
 ppHtmlContents odir doctitle
   maybe_package maybe_html_help_format maybe_index_url
-  maybe_source_url maybe_wiki_url modules prologue = do
-  let tree = mkModuleTree 
-         [(hmod_mod mod, hmod_package mod, toDescription mod) | mod <- modules]
+  maybe_source_url maybe_wiki_url modules showPkgs prologue = do
+  let tree = mkModuleTree showPkgs
+         [(hmod_mod mod, toDescription mod) | mod <- modules]
       html = 
 	header 
 		(documentCharacterEncoding +++
@@ -365,12 +367,14 @@ mkNode ss (Node s leaf pkg short ts) depth id = htmlNode
 	Just doc -> tda [theclass "rdoc"] (origDocToHtml doc)
 
     htmlModule 
-      | leaf      = ppModule mdl
+      | leaf      = ppModule (mkModule (stringToPackageId pkgName) 
+                                       (mkModuleName mdl)) ""
       | otherwise = toHtml s
 
-    htmlPkg = case pkg of
-      Nothing -> td << empty
-      Just p  -> td << toHtml p
+    -- ehm.. TODO: change the ModuleTree type
+    (htmlPkg, pkgName) = case pkg of
+      Nothing -> (td << empty, "")
+      Just p  -> (td << toHtml p, p)
 
     mdl = foldr (++) "" (s' : map ('.':) ss')
     (s':ss') = reverse (s:ss)
@@ -540,7 +544,7 @@ ppHtmlModule odir doctitle
 	    hmodToHtml maybe_source_url maybe_wiki_url hmod </> s15 </>
 	    footer
          )
-  writeFile (pathJoin [odir, moduleHtmlFile mdl]) (renderHtml html)
+  writeFile (pathJoin [odir, moduleHtmlFile mod]) (renderHtml html)
 
 hmodToHtml :: SourceURLs -> WikiURLs -> HaddockModule -> HtmlTable
 hmodToHtml maybe_source_url maybe_wiki_url hmod
@@ -633,7 +637,7 @@ processExport summmary _ _ (ExportNoDecl2 _ y subs)
 processExport _ _ _ (ExportDoc2 doc)
   = docBox (docToHtml doc)
 processExport _ _ _ (ExportModule2 mod)
-  = declBox (toHtml "module" <+> ppModule (moduleString mod))
+  = declBox (toHtml "module" <+> ppModule mod "")
 
 forSummary :: (ExportItem2 DocName) -> Bool
 forSummary (ExportGroup2 _ _ _) = False
@@ -716,7 +720,7 @@ ppTyVars tvs = map ppName (tyvarNames tvs)
 tyvarNames = map f 
   where f x = let NoLink n = hsTyVarName (unLoc x) in n
   
-ppFor summary links loc mbDoc (ForeignImport lname ltype _ _)
+ppFor summary links loc mbDoc (ForeignImport lname ltype _)
   = ppSig summary links loc mbDoc (TypeSig lname ltype)
 ppFor _ _ _ _ _ = error "ppFor"
 
@@ -1104,18 +1108,16 @@ ppBinder False nm = linkTarget nm +++ bold << ppBinder' nm
 ppBinder' :: Name -> Html
 ppBinder' name = toHtml (getOccString name)
 
-linkId :: GHC.Module -> Maybe Name -> Html -> Html
+linkId :: Module -> Maybe Name -> Html -> Html
 linkId mod mbName = anchor ! [href hr]
   where 
     hr = case mbName of
-      Nothing   -> moduleHtmlFile modName
-      Just name -> nameHtmlRef modName name
-    modName = moduleString mod   
+      Nothing   -> moduleHtmlFile mod
+      Just name -> nameHtmlRef mod name
 
-ppModule :: String -> Html
-ppModule mdl = anchor ! [href ((moduleHtmlFile modname) ++ ref)] << toHtml mdl
-  where 
-        (modname,ref) = break (== '#') mdl
+ppModule :: Module -> String -> Html
+ppModule mod ref = anchor ! [href ((moduleHtmlFile mod) ++ ref)] 
+                   << toHtml (moduleString mod)
 
 -- -----------------------------------------------------------------------------
 -- * Doc Markup
@@ -1127,7 +1129,7 @@ parHtmlMarkup ppId = Markup {
   markupString        = toHtml,
   markupAppend        = (+++),
   markupIdentifier    = tt . ppId . head,
-  markupModule        = ppModule,
+  markupModule        = \m -> ppModule (mkModuleNoPkg m) "",
   markupEmphasis      = emphasize . toHtml,
   markupMonospaced    = tt . toHtml,
   markupUnorderedList = ulist . concatHtml . map (li <<),

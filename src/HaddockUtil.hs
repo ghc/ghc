@@ -20,6 +20,7 @@ module HaddockUtil (
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
+  moduleString, mkModuleNoPkg,
 
   -- * HTML cross reference mapping
   html_xrefs_ref,
@@ -41,6 +42,8 @@ import SrcLoc
 import Name
 import OccName
 import Binary
+import Module
+import PackageConfig ( stringToPackageId )
 
 import Control.Monad ( liftM, MonadPlus(..) )
 import Data.Char ( isAlpha, isSpace, toUpper, ord )
@@ -144,15 +147,16 @@ isPathSeparator ch =
   ch == '/'
 #endif
 
-moduleHtmlFile :: String -> FilePath
+moduleHtmlFile :: Module -> FilePath
 moduleHtmlFile mdl =
-  case Map.lookup (mkModule mdl) html_xrefs of
+  case Map.lookup mdl html_xrefs of
     Nothing  -> mdl' ++ ".html"
     Just fp0 -> pathJoin [fp0, mdl' ++ ".html"]
   where
-   mdl' = map (\c -> if c == '.' then '-' else c) mdl
+   mdl' = map (\c -> if c == '.' then '-' else c) 
+              (moduleNameString (moduleName mdl))
 
-nameHtmlRef :: String -> Name -> String	
+nameHtmlRef :: Module -> Name -> String	
 nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (anchorNameStr str)
 
 contentsHtmlFile, indexHtmlFile :: String
@@ -223,6 +227,12 @@ escapeStr = flip escapeString unreserved
 #else
 escapeStr = escapeURIString isUnreserved
 #endif
+
+moduleString :: Module -> String
+moduleString = moduleNameString . moduleName 
+
+mkModuleNoPkg :: String -> Module
+mkModuleNoPkg str = mkModule (stringToPackageId "") (mkModuleName str)
 
 -----------------------------------------------------------------------------
 -- HTML cross references

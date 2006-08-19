@@ -22,7 +22,7 @@ import Control.Monad ( when, liftM )
 import Control.Monad.Writer ( Writer, runWriter, tell )
 import Data.Char ( isSpace )
 import Data.IORef ( writeIORef )
-import Data.List ( nub, (\\), foldl', sortBy, foldl1 )
+import Data.List ( nub, (\\), foldl', sortBy, foldl1, init, mapAccumL, find )
 import Data.Maybe ( isJust, isNothing, maybeToList, listToMaybe )
 --import Debug.Trace
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
@@ -39,12 +39,13 @@ import Data.Maybe
 import Data.List ( nubBy )
 import Data.FunctorM ( fmapM )
 
-import GHC
+import qualified GHC ( init )
+import GHC hiding ( init )
 import Outputable
 import SrcLoc
 import qualified Digraph as Digraph
 import Name
-import Module ( moduleString, mkModule ) 
+import Module ( mkModule ) 
 import InstEnv
 import Class
 import TypeRep
@@ -54,27 +55,103 @@ import PrelNames
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
 import DynFlags hiding ( Option )
+import StaticFlags ( parseStaticFlags )
 import Unique ( mkUnique )
 import Packages
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
 
-type CheckedMods = [(Module, FullyCheckedMod, FilePath)]
+type CheckedMod = (Module, FullyCheckedMod, FilePath)
 
 main :: IO ()
 main = do
   args <- getArgs
   (libDir, rest) <- getLibDir args 
-  (session, ghcFlags, nonGHCOpts) <- startGHC libDir rest
-  (flags, args) <- parseHaddockOpts nonGHCOpts
-  handleEagerFlags flags
-  modules <- sortAndCheckModules session ghcFlags args
-  (ifaces, htmls) <- getIfacesAndHtmls flags ghcFlags  
+  let (isGHCMode, rest') = parseModeFlag rest
+  (session, dynflags) <- startGHC libDir
+
+  (dynflags', rest'') <- if isGHCMode 
+    then parseGHCFlags_GHCMode     dynflags rest'   
+    else parseGHCFlags_HaddockMode dynflags rest' 
+
+  (flags, fileArgs) <- parseHaddockOpts rest''
+
+  mbPkgName <- handleEagerFlags flags  
+  let dynflags'' = case mbPkgName of
+        Just name -> setPackageName name dynflags'
+        Nothing -> dynflags'
+
+  setSessionDynFlags session dynflags''
+ 
+  modules <- sortAndCheckModules session dynflags' fileArgs
+  (ifaces, htmls) <- getIfacesAndHtmls flags dynflags'
   let (modss, envs) = unzip ifaces
-  updateHTMLXRefs htmls modss
+  updateHTMLXRefs htmls modss 
   -- TODO: continue to break up the run function into parts
   run flags modules envs
+
+parseModeFlag :: [String] -> (Bool, [String])
+parseModeFlag ("--ghc-flags":rest) = (True, rest)
+parseModeFlag rest = (False, rest)
+
+parseGHCFlags_GHCMode :: DynFlags -> [String] -> IO (DynFlags, [String])
+parseGHCFlags_GHCMode dynflags args = do
+  (dynflags', rest) <- parseDynamicFlags dynflags args
+  rest' <- parseStaticFlags rest
+  return (dynflags', rest')
+
+parseGHCFlags_HaddockMode = parseGHCFlags
+
+parseGHCFlags :: DynFlags -> [String] -> IO (DynFlags, [String])
+parseGHCFlags dynflags args = case args of
+  [] -> return (dynflags, args)
+  ("-g":rest) -> worker rest 
+  (('-':'-':'g':'h':'c':'-':'f':'l':'a':'g':[]):rest) -> worker rest
+  (x:xs) -> do 
+    (flags, rest) <- parseGHCFlags dynflags xs
+    return (flags, x:rest)
+  where 
+    worker rest = do
+      (mbFlags, rest') <- parseGHCFlag dynflags rest
+      case mbFlags of 
+        Just flags -> parseGHCFlags flags rest'
+        Nothing -> parseGHCFlags dynflags rest'
+ 
+parseGHCFlag :: DynFlags -> [String] -> IO (Maybe DynFlags, [String])
+parseGHCFlag _ [] = die "No GHC flag supplied\n"
+parseGHCFlag dynflags args = do
+  mbDyn <- findDynamic
+  case mbDyn of 
+    Just (dynflags', rest) -> return (Just dynflags', rest)   
+    Nothing -> do
+      mbStat <- findStatic
+      case mbStat of
+        Just (_, rest) -> return (Nothing, rest)
+        Nothing -> die ("Not a GHC flag: " ++ (head args) ++ "\n")
+  where
+    findDynamic = findFlag (
+        \xs -> 
+        (do 
+           (fs, xs') <- parseDynamicFlags dynflags xs
+           if xs' /= xs then return (Just fs) else return Nothing
+        ) 
+        `catch` (\_ -> return Nothing) 
+      ) 
+    findStatic = findFlag (\xs -> do 
+      xs' <- parseStaticFlags xs
+      if xs /= xs' then return (Just ()) else return Nothing)
+
+    findFlag p = do 
+      xs <- (sequence . snd) (mapAccumL (f p) [] args)
+      case [ (x, index) | Just x <- xs | index <- [1..] ] of
+        ((x, index):_) -> return (Just (x, drop index args))
+        _ -> return Nothing
+
+    f :: ([String] -> IO a) -> [String] -> String -> ([String], IO a)
+    f parser previousArgs arg = 
+      let args' = previousArgs ++ [arg]
+      in (args', parser args')
 
 parseHaddockOpts :: [String] -> IO ([Flag], [String])
 parseHaddockOpts words =
@@ -92,23 +169,20 @@ getLibDir ("-B":dir:rest) = return (dir, rest)
 getLibDir (('-':'B':dir):rest) | not (null dir) = return (dir, rest)
 getLibDir _ = die "Missing GHC lib dir option: -B <dir>\n"
 
--- | Initialize GHC, parse the passed in strings and set the corresponding
--- GHC flags (if any). Also add the -haddock flag. Return the Session handle
--- and the strings that were not GHC flags.
-startGHC :: String -> [String] -> IO (Session, DynFlags, [String])
-startGHC libDir possibleOpts = do
+extractGHCFlags :: [Flag] -> [String]
+extractGHCFlags flags = [ flag | Flag_GHCFlag flag <- flags ]
+
+startGHC :: String -> IO (Session, DynFlags)
+startGHC libDir = do
   GHC.init (Just libDir)
   let ghcMode = JustTypecheck
   session <- newSession ghcMode
   flags   <- getSessionDynFlags session
   flags'  <- initPackages flags
-  (flags'', nonOpts) <- parseDynamicFlags flags' possibleOpts
-  let flags''' = dopt_set flags'' Opt_Haddock 
-  setSessionDynFlags session flags'''
-  return (session, flags''', nonOpts)
+  let flags'' = dopt_set flags' Opt_Haddock 
+  return (session, flags'')
 
-sortAndCheckModules :: Session -> DynFlags -> [FilePath] -> 
-                       IO [(Module, FullyCheckedMod, FilePath)]
+sortAndCheckModules :: Session -> DynFlags -> [FilePath] -> IO [CheckedMod]
 sortAndCheckModules session flags files = defaultErrorHandler flags $ do 
   targets <- mapM (\s -> guessTarget s Nothing) files
   setTargets session targets 
@@ -124,7 +198,7 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
                       modsum <- sortedModules, 
                       modSumFile modsum `elem` files ]
   checkedMods <- mapM (\(mod, file) -> do
-    mbMod <- checkModule session mod
+    mbMod <- checkModule session (moduleName mod)
     checkedMod <- case mbMod of 
       Just m  -> return m
       Nothing -> die ("Failed to load module: " ++ moduleString mod)
@@ -133,7 +207,7 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
   where
     ensureFullyChecked modules 
       | length modules' == length modules = return modules'
-      | otherwise = die "Fail to check all modules properly\n" 
+      | otherwise = die "Failed to check all modules properly\n" 
       where modules' = [ (mod, (a,b,c,d), f) | 
                          (mod, CheckedModule a (Just b) (Just c) (Just d), f) 
                          <- modules ] 
@@ -179,6 +253,7 @@ data Flag
   | Flag_IgnoreAllExports
   | Flag_HideModule String
   | Flag_UsePackage String
+  | Flag_GHCFlag String
   deriving (Eq)
 
 options :: Bool -> [OptDescr Flag]
@@ -244,31 +319,34 @@ options backwardsCompat =
     Option [] ["hide"] (ReqArg Flag_HideModule "MODULE")
 	"behave as if MODULE has the hide attribute",
     Option [] ["use-package"] (ReqArg Flag_UsePackage "PACKAGE")
-	"the modules being processed depend on PACKAGE"
+	"the modules being processed depend on PACKAGE",
+    Option ['g'] ["ghc-flag"] (ReqArg Flag_GHCFlag "FLAG")
+ 	"send a flag to the Glasgow Haskell Compiler"       
   ]
 
 handleEagerFlags flags = do
   whenFlag Flag_Help $ do
     prog <- getProgramName
     bye (usageInfo (usageHeader prog) (options False))
+
   whenFlag Flag_Version $
     bye ("Haddock version " ++ projectVersion ++ 
          ", (c) Simon Marlow 2003; port to GHC-api by David Waern 2006\n")
+
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
     die ("-h cannot be used with --gen-index or --gen-contents")
+
+  return (listToMaybe [str | Flag_Package str <- flags])
   where 
     whenFlag flag action = when (flag `elem` flags) action 
 
-
-run :: [Flag] -> CheckedMods -> [Map Name Name] -> IO ()
+run :: [Flag] -> [CheckedMod] -> [Map Name Name] -> IO ()
 run flags modules extEnvs = do
   let
     title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
 		(t:_) -> t
-
-    package = listToMaybe [str | Flag_Package str <- flags]
 
     maybe_source_urls = (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
                         ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
@@ -316,7 +394,7 @@ run flags modules extEnvs = do
   prologue <- getPrologue flags
 
   let 
-    (modMap, messages) = runWriter (pass1 modules flags package) 
+    (modMap, messages) = runWriter (pass1 modules flags) 
     haddockMods = catMaybes [ Map.lookup mod modMap | (mod,_,_) <- modules ]
     homeEnv = buildGlobalDocEnv haddockMods
     env = Map.unions (homeEnv:extEnvs)
@@ -326,25 +404,28 @@ run flags modules extEnvs = do
   mapM_ putStrLn messages
   mapM_ putStrLn messages'
 
-  let visibleMods = [ m | m <- haddockMods'', OptHide `notElem` (hmod_options m) ]
+  let 
+    visibleMods = [ m | m <- haddockMods'', OptHide `notElem` (hmod_options m) ]
+    packageName = (Just . packageIdString . modulePackageId . 
+                   hmod_mod . head) visibleMods
  
   when (Flag_GenIndex `elem` flags) $ do
-	ppHtmlIndex odir title package maybe_html_help_format
+	ppHtmlIndex odir title packageName maybe_html_help_format
                 maybe_contents_url maybe_source_urls maybe_wiki_urls
                 visibleMods
 	copyHtmlBits odir libdir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
-    ppHtmlHelpFiles title package visibleMods odir maybe_html_help_format []
+    ppHtmlHelpFiles title packageName visibleMods odir maybe_html_help_format []
 
   when (Flag_GenContents `elem` flags) $ do
-	ppHtmlContents odir title package maybe_html_help_format
+	ppHtmlContents odir title packageName maybe_html_help_format
 	               maybe_index_url maybe_source_urls maybe_wiki_urls
-	               visibleMods prologue
+	               visibleMods True prologue
 	copyHtmlBits odir libdir css_file
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title package visibleMods odir
+    ppHtml title packageName visibleMods odir
                 prologue maybe_html_help_format
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url
@@ -355,7 +436,7 @@ run flags modules extEnvs = do
   -- dump an interface if requested
   case dumpIface of
     Nothing -> return ()
-    Just fn -> dumpInterfaces env (map hmod_mod visibleMods) fn
+    Just fn -> dumpInterfaces env (map hmod_mod visibleMods) fn 
   where
     pprList [] = []
     pprList [x] = show x
@@ -383,10 +464,9 @@ type FullyCheckedMod = (ParsedSource,
 printEntity (DocEntity doc) = show doc
 printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
-pass1 :: [(Module, FullyCheckedMod, FilePath)] -> [Flag] -> Maybe String -> ErrMsgM ModuleMap2
-pass1 modules flags package = worker modules (Map.empty) flags
+pass1 :: [CheckedMod] -> [Flag] -> ErrMsgM ModuleMap2
+pass1 modules flags = worker modules (Map.empty) flags
   where
-    worker :: [(Module, FullyCheckedMod, FilePath)] -> ModuleMap2 -> [Flag] -> ErrMsgM ModuleMap2
     worker [] moduleMap _ = return moduleMap
     worker ((mod, checked_mod, filename):rest_modules) moduleMap flags = do
  
@@ -405,7 +485,8 @@ pass1 modules flags package = worker modules (Map.empty) flags
           theseEntityNames = entityNames entities 
           subNames = allSubnamesInGroup group
           localNames = theseEntityNames ++ subNames
-          -- guaranteed to be Just, since the module has been compiled from scratch 
+          -- guaranteed to be Just, since the module has been compiled from 
+          -- scratch 
           scopeNames = fromJust $ modInfoTopLevelScope moduleInfo 
       
           subMap = mk_sub_map_from_group group
@@ -415,13 +496,17 @@ pass1 modules flags package = worker modules (Map.empty) flags
           docMap = mkDocMap group 
 
           ignoreAllExports = Flag_IgnoreAllExports `elem` flags
+  
+          packageId = modulePackageId mod
       
       theseVisibleNames <- visibleNames mod moduleMap localNames scopeNames 
-                                        subMap exports opts localDeclMap
+                                        subMap exports opts localDeclMap 
+                                        packageId
 
       exportItems <- mkExportItems moduleMap mod exportedNames
-                                   exportedDeclMap localDeclMap subMap entities opts  
-                                   exports ignoreAllExports docMap
+                                   exportedDeclMap localDeclMap subMap entities 
+                                   opts exports ignoreAllExports docMap 
+                                   packageId
 
      -- prune the export list to just those declarations that have
      -- documentation, if the 'prune' option is on.
@@ -447,8 +532,7 @@ pass1 modules flags package = worker modules (Map.empty) flags
             hmod_exports            = exportedNames,
             hmod_visible_exports    = theseVisibleNames, 
             hmod_exported_decl_map  = exportedDeclMap,
-            hmod_instances          = instances,
-            hmod_package            = package
+            hmod_instances          = instances
           }
 
           moduleMap' = Map.insert mod haddock_module moduleMap
@@ -493,7 +577,8 @@ mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
 collectDocs :: [DocEntity Name] -> [(Name, HsDoc Name)]
 collectDocs entities = collect Nothing DocEmpty entities
 
-collect :: Maybe (DocEntity Name) -> HsDoc Name -> [DocEntity Name] -> [(Name, HsDoc Name)]
+collect :: Maybe (DocEntity Name) -> HsDoc Name -> [DocEntity Name] -> 
+           [(Name, HsDoc Name)]
 collect d doc_so_far [] =
    case d of
         Nothing -> []
@@ -592,8 +677,8 @@ getDeclFromGroup group name =
       _      -> Nothing
       where
         matching = [ for | for <- lfors, forName (unLoc for) == name ]
-        forName (ForeignExport n _ _ _) = unLoc n
-        forName (ForeignImport n _ _ _) = unLoc n
+        forName (ForeignExport n _ _) = unLoc n
+        forName (ForeignImport n _ _) = unLoc n
  
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
@@ -613,9 +698,9 @@ getPrologue flags
 	[filename] -> do
 	   str <- readFile filename
 	   case parseHaddockComment str of
-		Left err -> dieMsg err
+		Left err -> die err
 		Right doc -> return (Just doc)
-	_otherwise -> dieMsg "multiple -p/--prologue options"
+	_otherwise -> die "multiple -p/--prologue options"
 
 -- -----------------------------------------------------------------------------
 -- Phase 2
@@ -675,10 +760,11 @@ mkExportItems
 	-> Maybe [IE Name]
 	-> Bool				-- --ignore-all-exports flag
         -> Map Name (HsDoc Name)
+        -> PackageId
 	-> ErrMsgM [ExportItem2 Name]
 
 mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_map entities
-              opts maybe_exps ignore_all_exports docMap
+              opts maybe_exps ignore_all_exports docMap packageId
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
   | Just specs <- maybe_exps = do 
@@ -692,7 +778,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
     lookupExport (IEThingAbs t)        = declWith t
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t cs)    = declWith t
-    lookupExport (IEModuleContents m)  = fullContentsOf m
+    lookupExport (IEModuleContents m)  = fullContentsOf (mkModule packageId m)
     lookupExport (IEGroup lev doc)     = return [ ExportGroup2 lev "" doc ]
     lookupExport (IEDoc doc)           = return [ ExportDoc2 doc ] 
     lookupExport (IEDocNamed str)
@@ -827,9 +913,10 @@ visibleNames :: Module
              -> Maybe [IE Name]
              -> [DocOption]
              -> Map Name (LHsDecl Name)
+             -> PackageId
              -> ErrMsgM [Name]
 
-visibleNames mdl modMap localNames scope subMap maybeExps opts declMap
+visibleNames mdl modMap localNames scope subMap maybeExps opts declMap packageId
   -- if no export list, just return all local names 
   | Nothing <- maybeExps         = return (filter hasDecl localNames)
   | OptIgnoreExports `elem` opts = return localNames
@@ -853,17 +940,21 @@ visibleNames mdl modMap localNames scope subMap maybeExps opts declMap
     IEThingWith t cs -> return (t : cs)
 	
     IEModuleContents m
-	| m == mdl -> return localNames 
-	| otherwise ->
-	  case Map.lookup m modMap of
+	| mkModule packageId m == mdl -> return localNames 
+	| otherwise -> let m' = mkModule packageId m in
+	  case Map.lookup m' modMap of
 	    Just mod
 		| OptHide `elem` hmod_options mod ->
 		    return (filter (`elem` scope) (hmod_exports mod))
 		| otherwise -> return []
 	    Nothing
-		-> tell ["Can not reexport a package module"] >> return []
-
+		-> tell (exportModuleMissingErr mdl m') >> return []
+  
     _ -> return []
+
+exportModuleMissingErr this mdl 
+  = ["Warning: in export list of " ++ show (moduleString this)
+	 ++ ": module not found: " ++ show (moduleString mdl)]
 
 -- for a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
@@ -1046,9 +1137,12 @@ type ErrMsgM a = Writer [ErrMsg] a
 getPackageFiles :: DynFlags -> IO [(String, String)]
 getPackageFiles dynflags = do
   packages <- getExplicitPackagesAnd dynflags []
-  mbFiles <- mapM check packages
+  mbFiles <- mapM check (filter notRTS packages)
   return [ pair | Just pair <- mbFiles ]
   where
+    -- no better way to do this?
+    notRTS p = pkgName (package p) /= packageIdString rtsPackageId  
+
     check p = (do
       pair <- check' p
       return (Just pair)) `catch` (\e -> do  
@@ -1080,7 +1174,7 @@ getPackageFiles dynflags = do
 
 -- -----------------------------------------------------------------------------
 -- The interface file format
--- ehhm. this is a hack...
+-- ehhm. this is a temporary hack...
 
 thisFormatVersion :: FormatVersion
 thisFormatVersion = mkFormatVersion 3
@@ -1155,9 +1249,13 @@ instance Binary OccName where
     return (mkOccName (decodeNS ns) string)
 
 instance Binary Module where
-  put_ bh m = put_ bh (moduleString m)
-  get bh = do m <- get bh; return (mkModule m)
-
+  put_ bh m = do
+    put_ bh (moduleString m)
+    put_ bh ((packageIdString . modulePackageId) m)
+  get bh = do 
+    m <- get bh
+    p <- get bh
+    return (mkModule (stringToPackageId p) (mkModuleName m))
 {-
 thisFormatVersion :: FormatVersion
 thisFormatVersion = mkFormatVersion 2

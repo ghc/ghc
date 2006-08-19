@@ -294,12 +294,12 @@ renameSig sig = case sig of
       return (FixitySig lname' x)
 -}
 
-renameForD (ForeignImport lname ltype x y) = do
+renameForD (ForeignImport lname ltype x) = do
   ltype' <- renameLType ltype
-  return (ForeignImport (keepL lname) ltype' x y)
-renameForD (ForeignExport lname ltype x y) = do
+  return (ForeignImport (keepL lname) ltype' x)
+renameForD (ForeignExport lname ltype x) = do
   ltype' <- renameLType ltype
-  return (ForeignExport (keepL lname) ltype' x y)
+  return (ForeignExport (keepL lname) ltype' x)
 
 renameExportItem :: ExportItem2 Name -> RnM (ExportItem2 DocName)
 renameExportItem item = case item of 

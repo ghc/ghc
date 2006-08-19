@@ -119,9 +119,7 @@ data HaddockModule = HM {
 
 -- | The instances exported by this module
 
-  hmod_instances          :: [Instance],
-
-  hmod_package            :: Maybe String
+  hmod_instances          :: [Instance]
 }
 
 data DocMarkup id a = Markup {
