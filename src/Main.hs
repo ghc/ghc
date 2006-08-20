@@ -110,7 +110,7 @@ parseGHCFlags :: DynFlags -> [String] -> IO (DynFlags, [String])
 parseGHCFlags dynflags args = case args of
   [] -> return (dynflags, args)
   ("-g":rest) -> worker rest 
-  (('-':'-':'g':'h':'c':'-':'f':'l':'a':'g':[]):rest) -> worker rest
+  ("--ghc-flag":rest) -> worker rest
   (x:xs) -> do 
     (flags, rest) <- parseGHCFlags dynflags xs
     return (flags, x:rest)
@@ -580,8 +580,8 @@ mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
     constrs   = [ con | d <- datadecls, L _ con <- tcdCons d ]
     fields    = concat [ fields | RecCon fields <- map con_details constrs]
 
-    topDeclDocs = collectDocs (reverse (hs_docs group))
-    classMethDocs = concatMap (collectDocs . tcdDocs) classes
+    topDeclDocs     = collectDocs (reverse (hs_docs group))
+    classMethDocs   = concatMap (collectDocs . tcdDocs) classes
     recordFieldDocs = [ (unLoc lname, doc) | 
                         HsRecField lname _ (Just (L _ doc)) <- fields ]
 
