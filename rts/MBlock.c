@@ -308,147 +308,194 @@ freeAllMBlocks(void)
 
 #else /* defined(mingw32_HOST_OS) || defined(cygwin32_HOST_OS) */
 
-/*
- On Win32 platforms we make use of the two-phased virtual memory API
- to allocate mega blocks. We proceed as follows:
-
- Reserve a large chunk of VM (256M at the time, or what the user asked
- for via the -M option), but don't supply a base address that's aligned on
- a MB boundary. Instead we round up to the nearest mblock from the chunk of
- VM we're handed back from the OS (at the moment we just leave the 'slop' at
- the beginning of the reserved chunk unused - ToDo: reuse it .)
-
- Reserving memory doesn't allocate physical storage (not even in the
- page file), this is done later on by committing pages (or mega-blocks in
- our case).
+/* alloc_rec keeps the info we need to have matching VirtualAlloc and
+   VirtualFree calls.
 */
+typedef struct alloc_rec_ {
+    char* base;     /* non-aligned base address, directly from VirtualAlloc */
+    int size;       /* Size in bytes */
+    struct alloc_rec_* next;
+} alloc_rec;
 
-static char* base_non_committed = (char*)0;
-static char* end_non_committed = (char*)0;
+typedef struct block_rec_ {
+    char* base;         /* base address, non-MBLOCK-aligned */
+    int size;           /* size in bytes */
+    struct block_rec_* next;
+} block_rec;
 
-static void *membase;
+static alloc_rec* allocs = 0;
+static block_rec* free_blocks = 0;
 
-/* Default is to reserve 256M of VM to minimise the slop cost. */
-#define SIZE_RESERVED_POOL  ( 256 * 1024 * 1024 )
+static
+alloc_rec*
+allocNew(nat n) {
+    alloc_rec* rec = (alloc_rec*)malloc(sizeof(alloc_rec));
+    rec->size = (n+1)*MBLOCK_SIZE;
+    rec->base = 
+        VirtualAlloc(NULL, rec->size, MEM_RESERVE, PAGE_READWRITE);
+    if(rec->base==0) {
+        free((void*)rec);
+        rec=0;
+        errorBelch(
+            "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed with: %ld\n"
+            , n, GetLastError());
+    } else {
+        if(allocs==0) {
+            allocs=rec;
+            rec->next=0;
+        } else {
+            alloc_rec* it=allocs;
+            for(; it->next!=0 && it->next->base<rec->base; it=it->next) ;
+            rec->next=it->next;
+            it->next=rec;
+        }
+        debugTrace(DEBUG_gc, "allocated %d megablock(s) at 0x%x",n,(nat)rec->base);
+    }
+    return rec;
+}
 
-/* Number of bytes reserved */
-static unsigned long size_reserved_pool = SIZE_RESERVED_POOL;
+static
+void
+insertFree(char* alloc_base, int alloc_size) {
+    block_rec temp;
+    temp.base=0; temp.size=0; temp.next=free_blocks;
+
+    block_rec* it = free_blocks;
+    block_rec* prev = &temp;
+    for( ; it!=0 && it->base<alloc_base; prev=it, it=it->next) ;
+
+    if(it!=0 && alloc_base+alloc_size == it->base) {
+        if(prev->base + prev->size == alloc_base) {        /* Merge it, alloc, prev */
+            prev->size += alloc_size + it->size;
+            prev->next = it->next;
+            free(it);
+        } else {                                            /* Merge it, alloc */
+            it->base = alloc_base;
+            it->size += alloc_size;
+        }
+    } else if(prev->base + prev->size == alloc_base) {     /* Merge alloc, prev */
+        prev->size += alloc_size;
+    } else {                                                /* Merge none */
+        block_rec* rec = (block_rec*)malloc(sizeof(block_rec));
+        /* TODO: Check malloc failure */
+        rec->base=alloc_base;
+        rec->size=alloc_size;
+        rec->next = it;
+        prev->next=rec;
+    }
+    free_blocks=temp.next;
+}
+
+static
+void*
+findFreeBlocks(nat n) {
+    void* ret=0;
+    block_rec* it=free_blocks;
+    int required_size = n*MBLOCK_SIZE;
+    /* TODO: Don't just take first block, find smallest sufficient block */
+    block_rec temp;
+    temp.next=free_blocks; temp.base=0; temp.size=0;
+    block_rec* prev=&temp;
+    for( ; it!=0 && it->size<required_size; prev=it, it=it->next ) ;
+    if(it!=0) {
+        if( (((unsigned long)it->base) & MBLOCK_MASK) == 0) { /* MBlock aligned */
+            ret = (void*)it->base;
+            if(it->size==required_size) {
+                prev->next=0;
+                free(it);
+            } else {
+                it->base += required_size;
+                it->size -=required_size;
+            }
+        } else {
+            char* need_base = (char*)(((unsigned long)it->base) & ((unsigned long)~MBLOCK_MASK)) + MBLOCK_SIZE;
+            block_rec* next = (block_rec*)malloc(sizeof(block_rec));
+            /* TODO: Check malloc failure */
+            int new_size = need_base - it->base;
+            next->base = need_base +required_size;
+            next->size = it->size - (new_size+required_size);
+            it->size = new_size;
+            next->next = it->next;
+            it->next = next;
+            ret=(void*)need_base;
+        }
+    }
+    free_blocks=temp.next;
+    return ret;
+}
+
+/* VirtualAlloc MEM_COMMIT can't cross boundaries of VirtualAlloc MEM_RESERVE,
+   so we might need to do many VirtualAlloc MEM_COMMITs.  We simply walk the
+   (ordered) allocated blocks. */
+static void
+commitBlocks(char* base, int size) {
+    alloc_rec* it=allocs;
+    for( ; it!=0 && (it->base+it->size)<base; it=it->next ) ;
+    for( ; it!=0 && size>0; it=it->next ) {
+        int size_delta = it->size - (base-it->base);
+        if(size_delta>size) size_delta=size;
+        void* temp = VirtualAlloc(base, size_delta, MEM_COMMIT, PAGE_READWRITE);
+        if(temp==0)
+            debugBelch("getMBlocks: VirtualAlloc MEM_COMMIT failed: %ld", GetLastError());
+        size-=size_delta;
+        base+=size_delta;
+    }
+}
 
 void *
-getMBlocks(nat n)
-{
-  static char* base_mblocks       = (char*)0;
-  static char* next_request       = (char*)0;
-  void* ret                       = (void*)0;
-  nat i;
-
-  lnat size = MBLOCK_SIZE * n;
-  
-  if ( (base_non_committed == 0) || (next_request + size > end_non_committed) ) {
-    if (base_non_committed) {
-	/* Tacky, but if no user-provided -M option is in effect,
-	 * set it to the default (==256M) in time for the heap overflow PSA.
-	 */
-	if (RtsFlags.GcFlags.maxHeapSize == 0) {
-	    RtsFlags.GcFlags.maxHeapSize = size_reserved_pool / BLOCK_SIZE;
-	}
-	heapOverflow();
+getMBlocks(nat n) {
+    void* ret=0;
+    ret = findFreeBlocks(n);
+    if(ret==0) {
+        alloc_rec* alloc = allocNew(n);
+        /* We already belch in allocNew if it fails */
+        if(alloc) {
+            insertFree(alloc->base, alloc->size);
+            ret = findFreeBlocks(n);
+        }
     }
-    if (RtsFlags.GcFlags.maxHeapSize != 0) {
-      size_reserved_pool = BLOCK_SIZE * RtsFlags.GcFlags.maxHeapSize;
-      if (size_reserved_pool < MBLOCK_SIZE) {
-	size_reserved_pool = 2*MBLOCK_SIZE;
-      }
+
+    if(ret!=0) {
+        /* (In)sanity tests */
+        if (((W_)ret & MBLOCK_MASK) != 0) barf("getMBlocks: misaligned block returned");
+
+        commitBlocks(ret, MBLOCK_SIZE*n);
+
+        /* Global bookkeeping */
+        mblocks_allocated += n;
+        int i=0;
+        for(; i<(int)n; ++i)
+            markHeapAlloced( ret + i * MBLOCK_SIZE );
     }
-    base_non_committed = VirtualAlloc ( NULL
-                                      , size_reserved_pool
-				      , MEM_RESERVE
-				      , PAGE_READWRITE
-				      );
-    membase = base_non_committed;
-    if ( base_non_committed == 0 ) {
-         errorBelch("getMBlocks: VirtualAlloc MEM_RESERVE %lu failed with: %ld\n", size_reserved_pool, GetLastError());
-       ret=(void*)-1;
-    } else {
-      end_non_committed = (char*)base_non_committed + (unsigned long)size_reserved_pool;
-      /* The returned pointer is not aligned on a mega-block boundary. Make it. */
-      base_mblocks = (char*)((unsigned long)base_non_committed & (unsigned long)~MBLOCK_MASK) + MBLOCK_SIZE;
-#      if 0
-       debugBelch("getMBlocks: Dropping %d bytes off of 256M chunk\n", 
-		  (unsigned)base_mblocks - (unsigned)base_non_committed);
-#      endif
 
-       if ( ((char*)base_mblocks + size) > end_non_committed ) {
-          debugBelch("getMBlocks: oops, committed too small a region to start with.");
-	  ret=(void*)-1;
-       } else {
-          next_request = base_mblocks;
-       }
-    }
-  }
-  /* Commit the mega block(s) to phys mem */
-  if ( ret != (void*)-1 ) {
-     ret = VirtualAlloc(next_request, size, MEM_COMMIT, PAGE_READWRITE);
-     if (ret == NULL) {
-        debugBelch("getMBlocks: VirtualAlloc MEM_COMMIT %lu failed with: %ld\n", size, GetLastError());
-        ret=(void*)-1;
-     }
-  }
-
-  if (ret == (void*)-1) {
-     barf("getMBlocks: unknown memory allocation failure on Win32.");
-  }
-
-  if (((W_)ret & MBLOCK_MASK) != 0) {
-    barf("getMBlocks: misaligned block returned");
-  }
-
-  debugTrace(DEBUG_gc, "allocated %d megablock(s) at 0x%x",n,(nat)ret);
-  next_request = (char*)next_request + size;
-
-  mblocks_allocated += n;
-  
-  // fill in the table
-  for (i = 0; i < n; i++) {
-      markHeapAlloced( ret + i * MBLOCK_SIZE );
-  }
-
-  return ret;
+    return ret;
 }
 
 void
 freeAllMBlocks(void)
 {
-  BOOL rc;
-
-  rc = VirtualFree(membase, 0, MEM_RELEASE);
-  
-  if (rc == FALSE) {
-     debugBelch("freeAllMBlocks: VirtualFree failed with: %ld\n", GetLastError());
-  }
+    {
+        block_rec* next = 0;
+        block_rec* it = free_blocks;
+        for(; it!=0; ) {
+            if(!VirtualFree((void*)it->base, it->size, MEM_DECOMMIT))
+                debugBelch("freeAllMBlocks: VirtualFree MEM_DECOMMIT failed with %ld", GetLastError());
+            next = it->next;
+            free(it);
+            it=next;
+        }
+    }
+    {
+        alloc_rec* next = 0;
+        alloc_rec* it = allocs;
+        for(; it!=0; ) {
+            if(!VirtualFree((void*)it->base, 0, MEM_RELEASE))
+                debugBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed with %ld", GetLastError());
+            next = it->next;
+            free(it);
+            it=next;
+        }
+    }
 }
-
-/* Hand back the physical memory that is allocated to a mega-block. 
-   ToDo: chain the released mega block onto some list so that
-         getMBlocks() can get at it.
-
-   Currently unused.
-*/
-#if 0
-void
-freeMBlock(void* p, nat n)
-{
-  BOOL rc;
-
-  rc = VirtualFree(p, n * MBLOCK_SIZE , MEM_DECOMMIT );
-  
-  if (rc == FALSE) {
-#    ifdef DEBUG
-     debugBelch("freeMBlocks: VirtualFree failed with: %d\n", GetLastError());
-#    endif
-  }
-
-}
-#endif
 
 #endif
