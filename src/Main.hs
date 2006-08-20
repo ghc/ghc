@@ -13,50 +13,53 @@ import HaddockRename
 import HaddockTypes
 import HaddockUtil
 import HaddockVersion
-import Paths_haddock	( getDataDir )
-import Binary2
+import Paths_haddock         ( getDataDir )
+import Interface             ( Interface, dumpInterface, readInterface )
 
-import Control.Exception ( bracket, throwIO, catch, Exception(..) )
 import Prelude hiding ( catch )
-import Control.Monad ( when, liftM )
-import Control.Monad.Writer ( Writer, runWriter, tell )
-import Data.Char ( isSpace )
-import Data.IORef ( writeIORef )
-import Data.List ( nub, (\\), foldl', sortBy, foldl1, init, mapAccumL, find )
-import Data.Maybe ( isJust, isNothing, maybeToList, listToMaybe )
---import Debug.Trace
-import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), ArgDescr(..) )
-import System.Environment ( getArgs )
-import System.IO ( stderr, IOMode(..), openFile, hClose, hGetContents, hPutStrLn )
-import System.Directory ( doesFileExist, doesDirectoryExist )
+import Control.Exception     ( bracket, throwIO, catch, Exception(..) )
+import Control.Monad         ( when, liftM )
+import Control.Monad.Writer  ( Writer, runWriter, tell )
+import Data.Char             ( isSpace )
+import Data.IORef            ( writeIORef )
+import Data.List             ( nub, nubBy, (\\), foldl', sortBy, foldl1, init, 
+                               mapAccumL, find )
+import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList, 
+                               listToMaybe, fromJust, catMaybes )
+import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
+                               ArgDescr(..) )
+import System.Environment    ( getArgs )
+import System.IO             ( stderr, IOMode(..), openFile, hClose, 
+                               hGetContents, hPutStrLn )
+import System.Directory      ( doesFileExist, doesDirectoryExist )
 #if defined(mingw32_HOST_OS)
 import Foreign
 import Foreign.C
 #endif
 import qualified Data.Map as Map
-import Data.Map (Map)
-import Data.Maybe
-import Data.List ( nubBy )
-import Data.FunctorM ( fmapM )
+import Data.Map              (Map)
+import Data.FunctorM         ( fmapM )
 
-import qualified GHC ( init )
-import GHC hiding ( init )
+import qualified GHC         ( init )
+import GHC hiding ( init ) 
 import Outputable
 import SrcLoc
 import qualified Digraph as Digraph
 import Name
-import Module ( mkModule ) 
+import Module                ( mkModule ) 
 import InstEnv
 import Class
 import TypeRep
 import Var hiding ( varName )
 import TyCon
 import PrelNames
+
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
+
 import DynFlags hiding ( Option )
-import StaticFlags ( parseStaticFlags )
-import Unique ( mkUnique )
+import StaticFlags           ( parseStaticFlags )
+import Unique                ( mkUnique )
 import Packages
 
 -----------------------------------------------------------------------------
@@ -130,17 +133,16 @@ parseGHCFlag dynflags args = do
         Just (_, rest) -> return (Nothing, rest)
         Nothing -> die ("Not a GHC flag: " ++ (head args) ++ "\n")
   where
-    findDynamic = findFlag (
-        \xs -> 
-        (do 
-           (fs, xs') <- parseDynamicFlags dynflags xs
-           if xs' /= xs then return (Just fs) else return Nothing
-        ) 
-        `catch` (\_ -> return Nothing) 
+    findDynamic = findFlag (\xs -> (do 
+          (fs, xs') <- parseDynamicFlags dynflags xs
+          if xs' /= xs then return (Just fs) else return Nothing
+        ) `catch` (\_ -> return Nothing) 
       ) 
+
     findStatic = findFlag (\xs -> do 
-      xs' <- parseStaticFlags xs
-      if xs /= xs' then return (Just ()) else return Nothing)
+        xs' <- parseStaticFlags xs
+        if xs /= xs' then return (Just ()) else return Nothing
+      )
 
     findFlag p = do 
       xs <- (sequence . snd) (mapAccumL (f p) [] args)
@@ -219,8 +221,17 @@ getIfacesAndHtmls flags dynflags = do
     readIfaceFlags = [ parseIfaceOption str | Flag_ReadInterface str <- flags ]
     totalFiles = packageFiles ++ readIfaceFlags
     (htmlPaths, ifacePaths) = unzip totalFiles
-  ifaces <- mapM readIface ifacePaths
-  return (ifaces, htmlPaths)
+  files <- mapM (\(htmlPath, ifacePath) -> do 
+    htmlExist <- doesDirectoryExist htmlPath
+    ifaceExist <- doesFileExist ifacePath
+    if htmlExist && ifaceExist 
+      then do
+        iface <- readInterface ifacePath
+        return (Just (iface, htmlPath))
+      else return Nothing
+    ) totalFiles
+  
+  return (unzip (catMaybes files))
 
 data Flag
   = Flag_CSS String
@@ -436,7 +447,7 @@ run flags modules extEnvs = do
   -- dump an interface if requested
   case dumpIface of
     Nothing -> return ()
-    Just fn -> dumpInterfaces env (map hmod_mod visibleMods) fn 
+    Just fn -> dumpInterface env (map hmod_mod visibleMods) fn 
   where
     pprList [] = []
     pprList [x] = show x
@@ -901,7 +912,6 @@ pruneExportItems items = filter hasDoc items
   where hasDoc (ExportDecl2 _ _ d _) = isJust d
 	hasDoc _ = True
 
-
 -- -----------------------------------------------------------------------------
 -- Gather a list of original names exported from this module
 
@@ -1131,8 +1141,9 @@ toHsType t = case t of
 type ErrMsg = String
 type ErrMsgM a = Writer [ErrMsg] a
 
--- -----------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Packages 
+--------------------------------------------------------------------------------
 
 getPackageFiles :: DynFlags -> IO [(String, String)]
 getPackageFiles dynflags = do
@@ -1171,221 +1182,3 @@ getPackageFiles dynflags = do
         
         first []    = []
         first (x:_) = x    
-
--- -----------------------------------------------------------------------------
--- The interface file format
--- ehhm. this is a temporary hack...
-
-thisFormatVersion :: FormatVersion
-thisFormatVersion = mkFormatVersion 3
-
-dumpInterfaces :: Map Name Name -> [Module] -> FilePath -> IO ()
-dumpInterfaces globalDocEnv modules fileName = do
-  bh <- openBinMem 100000
-  put_ bh thisFormatVersion
-  mapM (put_ bh) modules
-  putDocEnv bh globalDocEnv
-  writeBinMem bh fileName
-
-putDocEnv :: BinHandle -> Map Name Name -> IO ()
-putDocEnv bh env = put_ bh list 
-  where 
-    list = [ (nameModule o, nameOccName o, nameModule e)  | 
-             (o, e) <- Map.toList env ]
-
-getDocEnv :: BinHandle -> IO (Map Name Name)
-getDocEnv bh = do
-  list <- get bh
-  return (Map.fromList [(mkName mdl1 occ, mkName mdl2 occ) | 
-                        (mdl1,occ,mdl2) <- list])
-
-mkName mdl occ = mkExternalName (mkUnique 'X' 0) mdl occ Nothing noSrcLoc
-
---type StoredInterface2 =
---   (Module,Maybe Doc,Maybe String,Bool,[(HsName,Module)], [(HsName,[HsName])])
-
-type Interface = ([Module], Map Name Name)
-
-readIface :: FilePath -> IO Interface
-readIface fileName = do
-  bh <- readBinMem fileName
-  formatVersion <- get bh
-  case formatVersion of
-    v | v == thisFormatVersion -> do
-      modules::[Module] <- get bh 
-      env <- getDocEnv bh
-      return (modules, env)
---    v | v == mkFormatVersion 2 -> do
---      (stuff :: [StoredInterface2]) <- get bh
---      doc_env <- getDocEnv bh
---      return (map to_interface2 stuff, doc_env)
-    otherwise -> do
-            noDieMsg (
-               "Warning: The interface file " ++ show fileName 
-                  ++ " could not be read.\n"
-                  ++ "Interface files from earlier version of Haddock are not "
-                  ++ "supported yet.\n")
-            return ([],Map.empty)
-
-encodeNS n 
-  | isVarOcc  n = 0
-  | isDataOcc n = 1
-  | isTvOcc   n = 2         
-  | isTcOcc   n = 3
-
-decodeNS n = case n of 
-  0 -> varName
-  1 -> dataName
-  2 -> tvName
-  _ -> tcClsName
-
-instance Binary OccName where
-  put_ bh n = do
-    put_ bh (occNameString n)
-    putByte bh (encodeNS n)
-  get bh = do
-    string <- get bh
-    ns <- getByte bh
-    return (mkOccName (decodeNS ns) string)
-
-instance Binary Module where
-  put_ bh m = do
-    put_ bh (moduleString m)
-    put_ bh ((packageIdString . modulePackageId) m)
-  get bh = do 
-    m <- get bh
-    p <- get bh
-    return (mkModule (stringToPackageId p) (mkModuleName m))
-{-
-thisFormatVersion :: FormatVersion
-thisFormatVersion = mkFormatVersion 2
-
--- | How we store interfaces.  Not everything is stored.
-type StoredInterface2 =
-   (Module,Maybe Doc,Maybe String,Bool,[(HsName,Module)], [(HsName,[HsName])])
-
--- | How we store interfaces.  Not everything is stored.
-type StoredInterface1 =
-   (Module,Maybe Doc,Maybe String,Bool,[(HsName,HsQName)],[(HsName,HsQName)],
-      [(HsName,[HsName])])
-
--- | How we used to store interfaces.
-type NullVersionStoredInterface = 
-   (Module,Maybe String,Bool,[(HsName,HsQName)],[(HsName,HsQName)],
-      [(HsName,[HsName])])
-
-dumpInterfaces :: [Interface] -> Map HsQName HsQName -> FilePath -> IO ()
-dumpInterfaces interfaces global_doc_env fileName =
-   do
-      let
-         preparedInterfaces :: [StoredInterface2]
-         preparedInterfaces = map from_interface interfaces
-
-      bh <- openBinMem 100000
-      put_ bh thisFormatVersion
-      put_ bh preparedInterfaces
-      putDocEnv bh global_doc_env
-      writeBinMem bh fileName
-
-
-readIface :: FilePath -> IO ([Interface], Map HsQName HsQName)
-readIface fileName = do
-   bh <- readBinMem fileName
-   formatVersion <- get bh
-   case formatVersion of
-     v | v == thisFormatVersion -> do
-            (stuff :: [StoredInterface2]) <- get bh
-	    doc_env <- getDocEnv bh
-            return (map to_interface2 stuff, doc_env)
-     v | v == mkFormatVersion 1 -> do
-            (stuff :: [StoredInterface1]) <- get bh
-            return (map to_interface1 stuff, Map.empty)
-     v | v == nullFormatVersion -> do
-            (stuff :: [NullVersionStoredInterface]) <- get bh
-            return (map nullVersion_to_interface stuff, Map.empty)
-     otherwise -> do
-            noDieMsg (
-               "Warning: The interface file " ++ show fileName 
-                  ++ " could not be read.\n"
-                  ++ "Maybe it's from a later version of Haddock?\n")
-            return ([], Map.empty)
-
-from_interface :: Interface -> StoredInterface2
-from_interface iface =
-   (  iface_module iface,
-      toDescription iface,iface_package iface,
-      OptHide `elem` iface_options iface,
-      [(n,mdl) | (n,Qual mdl n') <- Map.toAscList (iface_env iface),
-		 if n /= n' then error "help!" else True], 
-      Map.toAscList (iface_sub iface)
-      )
-
-getDocEnv :: BinHandle -> IO (Map HsQName HsQName)
-getDocEnv bh = do
-   doc_env_list <- get bh
-   return (Map.fromList [(Qual mdl1 nm,Qual mdl2 nm) | 
-			 (mdl1,nm,mdl2) <- doc_env_list])
-
-to_interface1 :: StoredInterface1 -> Interface
-to_interface1 (mdl,descriptionOpt,package, hide, env, _, sub) = 
-   Interface { 
-      iface_module	 = mdl,
-      iface_filename     = "",
-      iface_orig_filename= "",
-      iface_package      = package,
-      iface_env          = Map.fromList env,
-      iface_sub          = Map.fromList sub,
-      iface_reexported   = [],
-      iface_exports      = [],
-      iface_orig_exports = [],
-      iface_insts        = [],
-      iface_decls        = Map.empty,
-      iface_info         = toModuleInfo descriptionOpt,
-      iface_doc          = Nothing,
-      iface_options      = if hide then [OptHide] else []
-      }
-
-to_interface2 :: StoredInterface2 -> Interface
-to_interface2 (mdl,descriptionOpt,package, hide, env, sub) =
-   Interface { 
-      iface_module	 = mdl,
-      iface_filename     = "",
-      iface_orig_filename= "",
-      iface_package      = package,
-      iface_env          = 
-	Map.fromList [(n,Qual mdl n) | (n,mdl) <- env],
-      iface_sub          = Map.fromList sub,
-      iface_reexported   = [],
-      iface_exports      = [],
-      iface_orig_exports = [],
-      iface_insts        = [],
-      iface_decls        = Map.empty,
-      iface_info         = toModuleInfo descriptionOpt,
-      iface_doc          = Nothing,
-      iface_options      = if hide then [OptHide] else []
-      }
-
-nullVersion_to_interface :: NullVersionStoredInterface -> Interface
-nullVersion_to_interface (mdl, package, hide, env, reexported, sub) = 
-   Interface { 
-      iface_module	 = mdl,
-      iface_filename     = "",
-      iface_orig_filename= "",
-      iface_package      = package,
-      iface_env          = Map.fromList env,
-      iface_sub          = Map.fromList sub,
-      iface_reexported   = [],
-      iface_exports      = [],
-      iface_orig_exports = [],
-      iface_insts        = [],
-      iface_decls        = Map.empty,
-      iface_info         = emptyModuleInfo,
-      iface_doc          = Nothing,
-      iface_options      = if hide then [OptHide] else []
-      }
-
-toModuleInfo :: Maybe Doc -> ModuleInfo
-toModuleInfo descriptionOpt = 
-   emptyModuleInfo {description = descriptionOpt}
-
--}

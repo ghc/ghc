@@ -71,5 +71,6 @@ other-modules:
 	HaddockTypes
 	HaddockUtil
 	HaddockVersion
+        Interface
 	Html
 	Main
