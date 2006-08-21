@@ -42,6 +42,7 @@
 ^libraries/X11/
 ^libraries/arrows/
 ^libraries/base/
+^libraries/cgi/
 ^libraries/fgl/
 ^libraries/haskell-src/
 ^libraries/haskell98/
@@ -55,6 +56,7 @@
 ^libraries/template-haskell/
 ^libraries/time/
 ^libraries/unix/
+^libraries/xhtml/
 # Boring file regexps:
 \.hi$
 \.o$
