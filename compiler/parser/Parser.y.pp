@@ -342,7 +342,11 @@ maybeexports :: { Maybe [LIE RdrName] }
 	:  '(' exportlist ')'			{ Just $2 }
 	|  {- empty -}				{ Nothing }
 
-exportlist :: { [LIE RdrName] }
+exportlist  :: { [LIE RdrName] }
+	: ','					{ [] }
+	| exportlist1				{ $1 }
+
+exportlist1 :: { [LIE RdrName] }
 	:  export				{ [$1] }
 	|  export ',' exportlist		{ $1 : $3 }
 	|  {- empty -}				{ [] }
@@ -398,8 +402,8 @@ maybeimpspec :: { Located (Maybe (Bool, [LIE RdrName])) }
 	| {- empty -}				{ noLoc Nothing }
 
 impspec :: { Located (Bool, [LIE RdrName]) }
-	:  '(' exportlist ')'  			{ LL (False, reverse $2) }
-	|  'hiding' '(' exportlist ')' 		{ LL (True,  reverse $3) }
+	:  '(' exportlist ')'  			{ LL (False, $2) }
+	|  'hiding' '(' exportlist ')' 		{ LL (True,  $3) }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations
