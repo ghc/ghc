@@ -25,21 +25,27 @@
 module Control.Applicative (
 	-- * Applicative functors
 	Applicative(..),
+	-- * Alternatives
+	Alternative(..),
 	-- * Instances
-	WrappedMonad(..), Const(..), ZipList(..),
+	Const(..), WrappedMonad(..), WrappedArrow(..), ZipList(..),
 	-- * Utility functions
 	(<$>), (<$), (*>), (<*), (<**>),
-	liftA, liftA2, liftA3
+	liftA, liftA2, liftA3,
+	optional, some, many
 	) where
 
 #ifdef __HADDOCK__
 import Prelude
 #endif
 
-import Control.Monad (liftM, ap)
+import Control.Arrow
+	(Arrow(arr, (>>>), (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
+import Control.Monad (liftM, ap, MonadPlus(..))
 import Control.Monad.Instances ()
 import Data.Monoid (Monoid(..))
 
+infixl 3 <|>
 infixl 4 <$>, <$
 infixl 4 <*>, <*, *>, <**>
 
@@ -74,15 +80,31 @@ class Functor f => Applicative f where
         -- | Sequential application.
 	(<*>) :: f (a -> b) -> f a -> f b
 
+-- | A monoid on applicative functors.
+class Applicative f => Alternative f where
+	-- | The identity of '<|>'
+	empty :: f a
+	-- | An associative binary operation
+	(<|>) :: f a -> f a -> f a
+
 -- instances for Prelude types
 
 instance Applicative Maybe where
 	pure = return
 	(<*>) = ap
 
+instance Alternative Maybe where
+	empty = Nothing
+	Nothing <|> p = p
+	Just x <|> _ = Just x
+
 instance Applicative [] where
 	pure = return
 	(<*>) = ap
+
+instance Alternative [] where
+	empty = []
+	(<|>) = (++)
 
 instance Applicative IO where
 	pure = return
@@ -98,6 +120,15 @@ instance Monoid a => Applicative ((,) a) where
 
 -- new instances
 
+newtype Const a b = Const { getConst :: a }
+
+instance Functor (Const m) where
+	fmap _ (Const v) = Const v
+
+instance Monoid m => Applicative (Const m) where
+	pure _ = Const mempty
+	Const f <*> Const v = Const (f `mappend` v)
+
 newtype WrappedMonad m a = WrapMonad { unwrapMonad :: m a }
 
 instance Monad m => Functor (WrappedMonad m) where
@@ -107,14 +138,22 @@ instance Monad m => Applicative (WrappedMonad m) where
 	pure = WrapMonad . return
 	WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
 
-newtype Const a b = Const { getConst :: a }
+instance MonadPlus m => Alternative (WrappedMonad m) where
+	empty = WrapMonad mzero
+	WrapMonad u <|> WrapMonad v = WrapMonad (u `mplus` v)
 
-instance Functor (Const m) where
-	fmap _ (Const v) = Const v
+newtype WrappedArrow a b c = WrapArrow { unwrapArrow :: a b c }
 
-instance Monoid m => Applicative (Const m) where
-	pure _ = Const mempty
-	Const f <*> Const v = Const (f `mappend` v)
+instance Arrow a => Functor (WrappedArrow a b) where
+	fmap f (WrapArrow a) = WrapArrow (a >>> arr f)
+
+instance Arrow a => Applicative (WrappedArrow a b) where
+	pure x = WrapArrow (arr (const x))
+	WrapArrow f <*> WrapArrow v = WrapArrow (f &&& v >>> arr (uncurry id))
+
+instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
+	empty = WrapArrow zeroArrow
+	WrapArrow u <|> WrapArrow v = WrapArrow (u <+> v)
 
 -- | Lists, but with an 'Applicative' functor based on zipping, so that
 --
@@ -163,3 +202,19 @@ liftA2 f a b = f <$> a <*> b
 -- | Lift a ternary function to actions.
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
 liftA3 f a b c = f <$> a <*> b <*> c
+
+-- | One or none.
+optional :: Alternative f => f a -> f (Maybe a)
+optional v = Just <$> v <|> pure Nothing
+
+-- | One or more.
+some :: Alternative f => f a -> f [a]
+some v = some_v
+  where many_v = some_v <|> pure []
+	some_v = (:) <$> v <*> many_v
+
+-- | Zero or more.
+many :: Alternative f => f a -> f [a]
+many v = many_v
+  where many_v = some_v <|> pure []
+	some_v = (:) <$> v <*> many_v
