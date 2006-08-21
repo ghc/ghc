@@ -2,19 +2,21 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.ConsoleHandler
--- Copyright   :  whatevah
+-- Copyright   :  (c) The University of Glasgow
 -- License     :  see libraries/base/LICENSE
 -- 
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
+-- NB. the contents of this module are only available on Windows.
+--
 -- Installing Win32 console handlers.
 -- 
 -----------------------------------------------------------------------------
 
 module GHC.ConsoleHandler
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS) && !defined(__HADDOCK__)
 	where
 import Prelude -- necessary to get dependencies right
 #else /* whole file */
