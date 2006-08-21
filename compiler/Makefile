@@ -639,6 +639,18 @@ ifneq "$(BootingFromHc)" "YES"
 depend :: $(PRIMOP_BITS)
 endif
 
+# This is an ugly hack: we need stage1/$(PLATFORM_H) built before we
+# preprocess primops.txt.pp, but we don't want to just add that
+# dependency because we don't want $(PLATFORM_H) built during normal
+# operations, because we don't have have dependencies from the .hs
+# sources on it, and we don't want those dependencies because that
+# would cause everything to be rebuilt every time the Makefile
+# changed.  So here we add the required dependency only when making
+# boot or depend:
+ifneq "$(findstring boot, $(MAKECMDGOALS))$(findstring depend, $(MAKECMDGOALS))" ""
+prelude/primops.txt.pp : stage1/$(PLATFORM_H)
+endif
+
 primop-data-decl.hs-incl: prelude/primops.txt
 	$(GENPRIMOP) --data-decl          < $< > $@
 primop-tag.hs-incl: prelude/primops.txt
