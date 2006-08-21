@@ -396,7 +396,7 @@ else
 ifneq "$(findstring $(stage), 2 3)" ""
 bootstrapped = YES
 else
-bootstrapped = $(shell if (test $(GhcCanonVersion) -eq $(ProjectVersionInt) -a $(GhcPatchLevel) -eq $(ProjectPatchLevel)); then echo YES; else echo NO; fi)
+bootstrapped = NO
 endif
 endif
 
