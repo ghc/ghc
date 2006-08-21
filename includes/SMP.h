@@ -76,8 +76,9 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         "       stwcx.    %2, 0, %3\n"
         "       bne-      1b\n"
         "2:"
-        :"=r" (result)
+        :"=&r" (result)
         :"r" (o), "r" (n), "r" (p)
+        :"cc", "memory"
     );
     return result;
 #else
