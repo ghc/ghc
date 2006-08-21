@@ -478,8 +478,6 @@ freeAllMBlocks(void)
         block_rec* next = 0;
         block_rec* it = free_blocks;
         for(; it!=0; ) {
-            if(!VirtualFree((void*)it->base, it->size, MEM_DECOMMIT))
-                debugBelch("freeAllMBlocks: VirtualFree MEM_DECOMMIT failed with %ld", GetLastError());
             next = it->next;
             free(it);
             it=next;
