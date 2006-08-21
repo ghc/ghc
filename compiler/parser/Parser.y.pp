@@ -343,9 +343,8 @@ maybeexports :: { Maybe [LIE RdrName] }
 	|  {- empty -}				{ Nothing }
 
 exportlist :: { [LIE RdrName] }
- 	:  exportlist ',' export		{ $3 : $1 }
-	|  exportlist ','			{ $1 }
- 	|  export				{ [$1]  }
+	:  export				{ [$1] }
+	|  export ',' exportlist		{ $1 : $3 }
 	|  {- empty -}				{ [] }
 
    -- No longer allow things like [] and (,,,) to be exported
