@@ -105,6 +105,6 @@ $MAKE -C libraries boot all
 # The reconfigure step updates a few files, which can lead to
 # unnecessary recompilations.  Touch a bunch of things here to avoid
 # having to recompile stuff that we've already built.
-(cd compiler; touch $PRIMOP_BITS parser/hschooks.o prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
+(cd compiler; touch $PRIMOP_BITS stage1/parser/hschooks.o stage1/prelude/PrimOp.o main/Config.hs stage1/main/Config.o stage1/ghc-* ghc-*)
 
-# At this point, the tree should be safe to do 'make install' in.
+# At this point, the tree should be safe to do 'make install stage=1' in.
