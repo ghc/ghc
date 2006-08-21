@@ -567,9 +567,7 @@ utils/Digraph_HC_OPTS		= -fglasgow-exts
 
 basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 
-ifeq "$(bootstrapped)" "YES"
 utils/Binary_HC_OPTS		= -funbox-strict-fields
-endif
 
 # We always optimise some low-level modules, otherwise performance of
 # a non-optimised compiler is severely affected.
