@@ -246,7 +246,7 @@
       <varlistentry>
 	<term>
 	  <option>-I</option><replaceable>seconds</replaceable>
-	  <indexterm><primary><option>-H</option></primary>
+	  <indexterm><primary><option>-I</option></primary>
 	    <secondary>RTS option</secondary>
 	  </indexterm>
 	  <indexterm><primary>idle GC</primary>
