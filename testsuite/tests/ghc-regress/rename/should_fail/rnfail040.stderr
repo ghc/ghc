@@ -1,6 +1,6 @@
 
 rnfail040.hs:7:11:
     Conflicting exports for `nub':
-      `module M' exports `nub' imported from List at rnfail040.hs:10:1-16
       `module M' exports `nub' imported from Rnfail040_A at rnfail040.hs:11:1-23
 				 (defined at Rnfail040_A.hs:2:2)
+      `module M' exports `nub' imported from List at rnfail040.hs:10:1-16
