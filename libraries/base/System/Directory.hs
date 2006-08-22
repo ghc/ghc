@@ -510,23 +510,14 @@ If the /new/ file already exists, it is atomically replaced by the /old/ file.
 Neither path may refer to an existing directory.
 -}
 copyFile :: FilePath -> FilePath -> IO ()
-copyFile fromFPath toFPath = do
-	-- We try removing the target file before opening it for
-	-- writing.  In the event that the target file is locked or in
-	-- use, this allows us to replace it safely.  However, it
-	-- leaves a race condition: someone else might create the file
-	-- after we delete it, but there isn't much we can do about
-	-- that.
+copyFile fromFPath toFPath =
 #if (!(defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ > 600))
-	contents <- readFile fromFPath
-	try (removeFile toFPath)
-	writeFile toFPath contents
-	try (copyPermissions fromFPath toFPath)
-	return ()
+	do readFile fromFPath >>= writeFile toFPath
+	   try (copyPermissions fromFPath toFPath)
+	   return ()
 #else
-	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom -> do
-	 try (removeFile toFPath)
-	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo -> do
+	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
+	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
 	 allocaBytes bufferSize $ \buffer -> do
 		copyContents hFrom hTo buffer
 		try (copyPermissions fromFPath toFPath)
