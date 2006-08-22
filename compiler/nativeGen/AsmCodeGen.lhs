@@ -141,12 +141,14 @@ nativeCodeGen dflags cmms us
                 -- stack so add the note in:
             Pretty.$$ Pretty.text ".section .note.GNU-stack,\"\",@progbits"
 #endif
+#if !defined(darwin_TARGET_OS)
                 -- And just because every other compiler does, lets stick in
 		-- an identifier directive: .ident "GHC x.y.z"
 	    Pretty.$$ let compilerIdent = Pretty.text "GHC" Pretty.<+>
 	                                  Pretty.text cProjectVersion
                        in Pretty.text ".ident" Pretty.<+>
                           Pretty.doubleQuotes compilerIdent
+#endif
             )
    }
 
