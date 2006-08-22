@@ -165,10 +165,15 @@
 	  supported method, and you may encounter difficulties.  Full
 	  instructions are in <xref linkend="sec-porting-ghc"/>.</para>
 
-	  <para>Which version of GHC you need will depend on the
-	  packages you intend to build.  GHC itself will normally
-	  build using one of several older versions of itself - check
-	  the announcement or release notes for details.</para>
+	  <para>GHC can be built using either an earlier released
+	  version of GHC (currently 5.04 and later are supported), or
+	  bootstrapped using a GHC built from exactly the same
+	  sources.  Note that this means you cannot in general build
+	  GHC using an arbitrary development snapshot, or a build from
+	  say last week.  It might work, it might not - we don't
+	  guarantee anything.  To be on the safe side, start your
+	  build using the most recently released stable version of
+	  GHC.</para>
 	</listitem>
       </varlistentry>
 
