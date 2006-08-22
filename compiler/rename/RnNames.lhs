@@ -725,7 +725,7 @@ check_occs ie occs names
 
 	    | otherwise		-- Same occ name but different names: an error
 	    ->	do { global_env <- getGlobalRdrEnv ;
-  		     addErr (exportClashErr global_env name name' ie ie') ;
+  		     addErr (exportClashErr global_env name' name ie' ie) ;
 		     returnM occs }
       where
 	name_occ = nameOccName name
