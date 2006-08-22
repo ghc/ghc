@@ -1,10 +1,10 @@
 
-mod152.hs:2:10:
-    Conflicting exports for `id':
-      `module Prelude' exports `id' imported from Prelude
-      `id' exports `id' defined at mod152.hs:2:35
-
 mod152.hs:2:25:
     Ambiguous occurrence `id'
     It could refer to either `id', defined at mod152.hs:2:35
 		          or `id', imported from Prelude
+
+mod152.hs:2:25:
+    Conflicting exports for `id':
+      `module Prelude' exports `id' imported from Prelude
+      `id' exports `id' defined at mod152.hs:2:35

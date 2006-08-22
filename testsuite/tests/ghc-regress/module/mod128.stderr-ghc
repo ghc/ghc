@@ -1,2 +1,2 @@
 
-./Mod128_A.hs:2:16: Warning: `T' is exported by `T' and `T(Con)'
+Mod128_A.hs:2:18: Warning: `T' is exported by `T(Con)' and `T'

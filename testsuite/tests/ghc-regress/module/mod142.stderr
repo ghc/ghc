@@ -1,5 +1,5 @@
 
-mod142.hs:2:10:
+mod142.hs:2:20:
     Conflicting exports for `x':
       `module M' exports `x' defined at mod142.hs:6:0
       `module Mod142_A' exports `x' imported from Mod142_A at mod142.hs:4:0-14

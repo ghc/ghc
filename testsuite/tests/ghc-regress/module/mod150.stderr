@@ -1,5 +1,5 @@
 
-mod150.hs:2:10:
+mod150.hs:2:19:
     Conflicting exports for `id':
       `module M' exports `id' defined at mod150.hs:2:41
       `module Prelude' exports `id' imported from Prelude
