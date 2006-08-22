@@ -567,16 +567,14 @@ utils/Digraph_HC_OPTS		= -fglasgow-exts
 
 basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 
-utils/Binary_HC_OPTS		= -funbox-strict-fields
-
 # We always optimise some low-level modules, otherwise performance of
 # a non-optimised compiler is severely affected.
 main/BinIface_HC_OPTS		+= -O
-utils/Binary_HC_OPTS		+= -O
+utils/Binary_HC_OPTS		+= -O -funbox-strict-fields
 utils/FastMutInt_HC_OPTS	+= -O
 utils/Encoding_HC_OPTS		+= -O
-utils/StringBuffer_HC_OPTS	+= -O
-utils/FastString_HC_OPTS	+= -O
+utils/StringBuffer_HC_OPTS	+= -O -funbox-strict-fields
+utils/FastString_HC_OPTS	+= -O -funbox-strict-fields
 
 # ---- Profiling ----
 #simplCore/Simplify_HC_OPTS = -auto-all
