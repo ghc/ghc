@@ -149,7 +149,7 @@ Full optimisation
 -----------------
 
 To turn up everything to the max, for running performance tests for
-example, try theses:
+example, try these:
 
   SRC_HC_OPTS  = -H64m -O2 
   GhcLibHcOpts = -O2
