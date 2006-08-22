@@ -1849,7 +1849,9 @@ findModule' hsc_env mod_name maybe_pkg =
 	  res <- findImportedModule hsc_env mod_name Nothing
 	  case res of
 	    Found _ m | modulePackageId m /= this_pkg -> return m
-                        -- not allowed to be a home module
+		      | otherwise -> throwDyn (CmdLineError (showSDoc $
+					text "module" <+> pprModule m <+>
+					text "is not loaded"))
 	    err -> let msg = cannotFindModule dflags mod_name err in
 		   throwDyn (CmdLineError (showSDoc msg))
 
