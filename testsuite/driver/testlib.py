@@ -9,6 +9,8 @@ import re
 import traceback
 import copy
 import glob
+import threading
+import thread
 
 from string import join
 from testutil import *
@@ -73,6 +75,9 @@ class TestConfig:
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
+        
+        # threads
+        self.threads = 1
 
 global config
 config = TestConfig()
@@ -100,6 +105,10 @@ class TestRun:
        self.unexpected_passes = {}
        self.n_unexpected_failures = 0
        self.unexpected_failures = {}
+       
+       self.lock = threading.Lock()
+       self.thread_pool = threading.Condition(self.lock)
+       self.running_threads = 0
 
 global t
 t = TestRun()
@@ -146,7 +155,8 @@ class TestOptions:
        # should we clean up after ourselves?
        self.cleanup = ''
 
-
+       # should we run this test alone, ie disable THREADS
+       self.nothreads = 0
 
 # The default set of options
 global default_testopts
@@ -164,15 +174,15 @@ def getThisDirTestOpts():
 
 # Options valid for the current test only (these get reset to
 # testdir_testopts after each test).
-global testopts
-testopts = TestOptions()
+global testopts_local
+testopts_local = threading.local()
 
 def getTestOpts():
-    return testopts
+    return testopts_local.x
 
-def resetTestOpts():
-    global testopts
-    testopts = copy.copy(thisdir_testopts)
+def setLocalTestOpts(opts):
+    global testopts_local
+    testopts_local.x=opts
 
 # This can be called at the top of a file of tests, to set default test options
 # for the following tests.
@@ -298,6 +308,10 @@ def skip_if_fast(opts):
   if config.fast:
       opts.skip = 1
 
+# ---
+def nothreads(opts):
+    opts.nothreads=1
+
 # ----
 # Function for composing two opt-fns together
 
@@ -328,15 +342,48 @@ def getTestDir():
 
 # name  :: String
 # setup :: TestOpts -> IO ()  
-def test( name, setup, func, args ):
-    t.total_tests = t.total_tests + 1
+def test ( name, setup, func, args):
+    return test_common(0,name,setup,func,args)
 
-    # Reset the test-local options to the options for this "set"
-    resetTestOpts()
+def test_alone (name, setup, func, args):
+    return test_common(1,name,setup,func,args)
 
-    # Set our test-local options
-    setup(testopts)
+def test_common (ser, name, setup, func, args):
+    n = 1
+    opts = copy.copy(thisdir_testopts)
+    setup(opts)
+    if ser or opts.nothreads:
+        n = config.threads
+
+    ok = 0
+    t.thread_pool.acquire()
+    try:
+        while config.threads<(t.running_threads+n):
+            t.thread_pool.wait()
+        t.running_threads = t.running_threads+n
+        ok=1
+        t.thread_pool.release()
+        thread.start_new_thread(test_common_thread, (n, name, opts, func, args))
+    except:
+        if not ok:
+            t.thread_pool.release()
+
+def test_common_thread(n, name, opts, func, args):
+    t.lock.acquire()
+    try:
+        test_common_work(name,opts,func,args)
+    finally:
+        t.lock.release()
+        t.thread_pool.acquire()
+        t.running_threads = t.running_threads - n
+        t.thread_pool.notify()
+        t.thread_pool.release()
+            
+
     
+def test_common_work (name, opts, func, args):
+    t.total_tests = t.total_tests+1
+    setLocalTestOpts(opts)
     # All the ways we might run this test
     if func == compile or func == multimod_compile:
         all_ways = config.compile_ways
@@ -353,10 +400,10 @@ def test( name, setup, func, args ):
     t.total_test_cases = t.total_test_cases + len(all_ways)
 
     ok_way = lambda way: \
-        not testopts.skip \
+        not getTestOpts().skip \
         and (config.only == [] or name in config.only) \
-        and (testopts.only_ways == [] or way in testopts.only_ways) \
-        and way not in testopts.omit_ways
+        and (getTestOpts().only_ways == [] or way in getTestOpts().only_ways) \
+        and way not in getTestOpts().omit_ways
 
     # Which ways we are asked to skip
     do_ways = filter (ok_way,all_ways)
@@ -387,7 +434,7 @@ def clean_o_hi():
     clean_full_paths(glob.glob(in_testdir('*.o')) + glob.glob(in_testdir('*.hi')))
 
 def clean_full_paths(names):
-    if testopts.cleanup != '':
+    if getTestOpts().cleanup != '':
         for name in names:
             if os.access(name, os.F_OK) :
                 os.remove(name)
@@ -398,15 +445,19 @@ def do_test(name, way, func, args):
     try:
         print '=====>', full_name
         
-        result = apply(func, [name,way] + args)
+        t.lock.release()
+        try:
+            result = apply(func, [name,way] + args)
+        finally:
+            t.lock.acquire()
         
-        if testopts.expect != 'pass' and testopts.expect != 'fail' or \
+        if getTestOpts().expect != 'pass' and getTestOpts().expect != 'fail' or \
            result != 'pass' and result != 'fail':
             framework_fail(full_name)
 
         if result == 'pass':
-            if testopts.expect == 'pass' \
-               and way not in testopts.expect_fail_for:
+            if getTestOpts().expect == 'pass' \
+               and way not in getTestOpts().expect_fail_for:
                 t.n_expected_passes = t.n_expected_passes + 1
                 if name in t.expected_passes:
                     t.expected_passes[name].append(way)
@@ -420,8 +471,8 @@ def do_test(name, way, func, args):
                 else:
                     t.unexpected_passes[name] = [way]
         else:
-            if testopts.expect == 'pass' \
-               and way not in testopts.expect_fail_for:
+            if getTestOpts().expect == 'pass' \
+               and way not in getTestOpts().expect_fail_for:
                 print '*** unexpected failure for', full_name
                 t.n_unexpected_failures = t.n_unexpected_failures + 1
                 if name in t.unexpected_failures:
@@ -484,7 +535,7 @@ def ghci_script( name, way, script ):
           ' --interactive -v0 ' + \
           join(flags,' ')
 
-    testopts.stdin = script
+    getTestOpts().stdin = script
     return simple_run( name, way, cmd, '', 0 )
 
 # -----------------------------------------------------------------------------
@@ -554,7 +605,7 @@ def compile_and_run( name, way, extra_hc_opts ):
             return 'fail'
 
         # we don't check the compiler's stderr for a compile-and-run test
-        return simple_run( name, way, './'+name, testopts.extra_run_opts, 0 )
+        return simple_run( name, way, './'+name, getTestOpts().extra_run_opts, 0 )
 
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
@@ -571,7 +622,7 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
         return 'fail'
 
     # we don't check the compiler's stderr for a compile-and-run test
-    return simple_run( name, way, './'+name, testopts.extra_run_opts, 0 )
+    return simple_run( name, way, './'+name, getTestOpts().extra_run_opts, 0 )
 
 def multimod_compile_and_run_ignore_output( name, way, top_mod, extra_hc_opts ):
     pretest_cleanup(name)
@@ -588,7 +639,7 @@ def multimod_compile_and_run_ignore_output( name, way, top_mod, extra_hc_opts ):
         return 'fail'
 
     # we don't check the compiler's stderr for a compile-and-run test
-    return simple_run( name, way, './'+name, testopts.extra_run_opts, 1 )
+    return simple_run( name, way, './'+name, getTestOpts().extra_run_opts, 1 )
 
 # -----------------------------------------------------------------------------
 # Build a single-module program
@@ -608,7 +659,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
         to_do = '--make -o ' + name
     elif link:
         to_do = '-o ' + name
-    elif testopts.compile_to_hc:
+    elif getTestOpts().compile_to_hc:
         to_do = '-C'
     else:
         to_do = '-c' # just compile
@@ -620,7 +671,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
           + to_do + ' ' + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
-          + testopts.extra_hc_opts + ' ' \
+          + getTestOpts().extra_hc_opts + ' ' \
           + '>' + errname + ' 2>&1'
 
     result = runCmd(cmd)
@@ -643,8 +694,8 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
 
 def simple_run( name, way, prog, args, ignore_output_files ):
    # figure out what to use for stdin
-   if testopts.stdin != '':
-       use_stdin = testopts.stdin
+   if getTestOpts().stdin != '':
+       use_stdin = getTestOpts().stdin
    else:
        stdin_file = add_suffix(name, 'stdin')
        if os.path.exists(in_testdir(stdin_file)):
@@ -672,8 +723,8 @@ def simple_run( name, way, prog, args, ignore_output_files ):
    signal    = result & 0xff
 
    # check the exit code
-   if exit_code != testopts.exit_code:
-       print 'Wrong exit code (expected', testopts.exit_code, ', actual', exit_code, ')'
+   if exit_code != getTestOpts().exit_code:
+       print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
        return 'fail'
 
    if ignore_output_files or (check_stdout_ok(name) and check_stderr_ok(name)):
@@ -718,7 +769,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         # set the prog name and command-line args to match the compiled
         # environment.
         script.write(':set prog ' + name + '\n')
-        script.write(':set args ' + testopts.extra_run_opts + '\n')
+        script.write(':set args ' + getTestOpts().extra_run_opts + '\n')
         # Add marker lines to the stdout and stderr output files, so we
         # can separate GHCi's output from the program's.
         script.write(':! echo ' + delimiter)
@@ -731,8 +782,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     script.close()
 
     # figure out what to use for stdin
-    if testopts.stdin != '':
-        stdin_file = in_testdir(testopts.stdin)
+    if getTestOpts().stdin != '':
+        stdin_file = in_testdir(getTestOpts().stdin)
     else:
         stdin_file = qualify(name, 'stdin')
 
@@ -748,7 +799,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
           + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
-          + testopts.extra_hc_opts + ' ' \
+          + getTestOpts().extra_hc_opts + ' ' \
           + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
 
     result = runCmd(cmd)
@@ -757,8 +808,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     signal    = result & 0xff
 
     # check the exit code
-    if exit_code != testopts.exit_code:
-        print 'Wrong exit code (expected', testopts.exit_code, ', actual', exit_code, ')'
+    if exit_code != getTestOpts().exit_code:
+        print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
         return 'fail'
 
     # split the stdout into compilation/program output
@@ -831,7 +882,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
           + join(config.compiler_always_flags,' ') + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
-          + testopts.extra_hc_opts \
+          + getTestOpts().extra_hc_opts \
           + to_do \
           + '>' + errname + ' 2>&1'
     result = runCmd(cmd)
@@ -861,7 +912,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
           + join(config.compiler_always_flags,' ') + ' ' \
           + to_compile + ' ' \
           + extra_hc_opts + ' ' \
-          + testopts.extra_hc_opts + ' ' \
+          + getTestOpts().extra_hc_opts + ' ' \
           + flags                   \
           + ' -fglasgow-exts -o ' + name \
           + '>' + errname + ' 2>&1'
@@ -880,7 +931,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail ( qcorefilename )
     rm_no_fail ( depsfilename )
     
-    return simple_run ( name, way, './'+name, testopts.extra_run_opts, 0 )
+    return simple_run ( name, way, './'+name, getTestOpts().extra_run_opts, 0 )
 
 # -----------------------------------------------------------------------------
 # Utils

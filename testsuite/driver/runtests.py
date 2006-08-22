@@ -10,14 +10,15 @@ import sys
 import os
 import string
 import getopt
+import threading
 
 from testlib import *
 
 global config
 config = getConfig() # get it from testlib
 
-global testopts
-testopts = getTestOpts()
+global testopts_local
+testopts_local.x = TestOptions()
 
 global thisdir_testopts
 thisdir_testopts = getThisDirTestOpts()
@@ -31,6 +32,7 @@ long_options = [
   "output-summary=", 	# file in which to save the (human-readable) summary
   "only=",		# just this test (can be give multiple --only= flags)
   "way=",		# just this way
+  "threads=",           # threads to run simultaneously
   ]
 
 opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
@@ -60,6 +62,9 @@ for opt,arg in opts:
             sys.exit(1)
         config.run_ways = filter(eq(arg), config.run_ways + config.other_ways)
         config.compile_ways = filter(eq(arg), config.compile_ways + config.other_ways)
+
+    if opt == '--threads':
+        config.threads = int(arg)
 # -----------------------------------------------------------------------------
 # The main dude
 
@@ -80,11 +85,16 @@ for file in t_files:
     print '====> Running', file
     newTestDir(os.path.dirname(file))
     try:
+        t.running_threads=0
         execfile(file)
+        t.thread_pool.acquire()
+        while t.running_threads>0:
+            t.thread_pool.wait()
+        t.thread_pool.release()
     except:
         print '*** found an error while executing ', file, ':'
         traceback.print_exc()
-
+        
 summary(t, sys.stdout)
 
 if config.output_summary != '':

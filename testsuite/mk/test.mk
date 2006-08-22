@@ -13,6 +13,7 @@
 #	EXTRA_RUNTEST_OPTS -- extra flags to give the test driver
 #	CONFIG		-- use a different configuration file
 #	COMPILER	-- select a configuration file from config/
+#       THREADS         -- run n tests at once
 #
 # -----------------------------------------------------------------------------
 
@@ -73,6 +74,10 @@ ifeq "$(filter thr, $(GhcRTSWays))" "thr"
 RUNTEST_OPTS += -e ghc_with_threaded_rts=1
 else
 RUNTEST_OPTS += -e ghc_with_threaded_rts=0
+endif
+
+ifneq "$(THREADS)" ""
+RUNTEST_OPTS += --thread=$(THREADS)
 endif
 
 RUNTEST_OPTS +=  \
