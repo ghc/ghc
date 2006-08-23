@@ -485,8 +485,8 @@ mkPrompt toplevs exports prompt
         f (x:xs) = char x <> f xs
         f [] = empty
     
-        perc_s = hsep (map (\m -> char '*' <> pprModule m) toplevs) <+>
-                 hsep (map pprModule exports)
+        perc_s = hsep (map (\m -> char '*' <> ppr (GHC.moduleName m)) toplevs) <+>
+                 hsep (map (ppr . GHC.moduleName) exports)
              
 
 #ifdef USE_READLINE
