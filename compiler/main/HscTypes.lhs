@@ -1064,7 +1064,7 @@ showModMsg target recomp mod_summary
                       _other     -> text (msObjFilePath mod_summary),
 		    char ')'])
  where 
-    mod     = ms_mod mod_summary 
+    mod     = moduleName (ms_mod mod_summary)
     mod_str = showSDoc (ppr mod) ++ hscSourceString (ms_hsc_src mod_summary)
 \end{code}
 
