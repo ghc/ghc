@@ -1,5 +1,4 @@
 
 ghcpkg04.hs:1:0:
     Failed to load interface for `A':
-	Cannot import `A':
-	  it was found in multiple packages: testpkg-1.2.3.4 newtestpkg-2.0
+      it was found in multiple packages: testpkg-1.2.3.4 newtestpkg-2.0

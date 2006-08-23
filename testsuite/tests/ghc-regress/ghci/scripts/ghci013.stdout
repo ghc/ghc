@@ -1,1 +1,1 @@
-f :: (Monad m) => (m a, bx) -> m b
+f :: (Monad m) => (m a, t) -> m b
