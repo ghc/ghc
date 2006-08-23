@@ -1,6 +1,4 @@
-{-# OPTIONS_GHC -cpp -optc-O1 -fno-warn-orphans #-}
---
--- -optc-O2 breaks with 4.0.4 gcc on debian
+{-# OPTIONS_GHC -cpp -fno-warn-orphans #-}
 --
 -- Module      : Data.ByteString.Lazy.Char8
 -- Copyright   : (c) Don Stewart 2006
@@ -102,10 +100,6 @@ module Data.ByteString.Lazy.Char8 (
         inits,                  -- :: ByteString -> [ByteString]
         tails,                  -- :: ByteString -> [ByteString]
 
-        -- ** Breaking and dropping on specific Chars
-        breakChar,              -- :: Char -> ByteString -> (ByteString, ByteString)
-        spanChar,               -- :: Char -> ByteString -> (ByteString, ByteString)
-
         -- ** Breaking into many substrings
         split,                  -- :: Char -> ByteString -> [ByteString]
         splitWith,              -- :: (Char -> Bool) -> ByteString -> [ByteString]
@@ -119,7 +113,6 @@ module Data.ByteString.Lazy.Char8 (
 
         -- ** Joining strings
         join,                   -- :: ByteString -> [ByteString] -> ByteString
-        joinWithChar,           -- :: Char -> ByteString -> ByteString -> ByteString
 
         -- * Predicates
         isPrefixOf,             -- :: ByteString -> ByteString -> Bool
@@ -130,8 +123,6 @@ module Data.ByteString.Lazy.Char8 (
         -- ** Searching by equality
         elem,                   -- :: Char -> ByteString -> Bool
         notElem,                -- :: Char -> ByteString -> Bool
-        filterChar,             -- :: Char -> ByteString -> ByteString
-        filterNotChar,          -- :: Char -> ByteString -> ByteString
 
         -- ** Searching with a predicate
         find,                   -- :: (Char -> Bool) -> ByteString -> Maybe Char
@@ -154,6 +145,8 @@ module Data.ByteString.Lazy.Char8 (
         -- * Ordered ByteStrings
 --        sort,                   -- :: ByteString -> ByteString
 
+        copy,                   -- :: ByteString -> ByteString
+
         -- * Reading from ByteStrings
         readInt,
 
@@ -172,27 +165,23 @@ module Data.ByteString.Lazy.Char8 (
 
         -- ** I\/O with Handles
         hGetContents,           -- :: Handle -> IO ByteString
-        hGetContentsN,          -- :: Int -> Handle -> IO ByteString
         hGet,                   -- :: Handle -> Int64 -> IO ByteString
-        hGetN,                  -- :: Int -> Handle -> Int64 -> IO ByteString
         hPut,                   -- :: Handle -> ByteString -> IO ()
-#if defined(__GLASGOW_HASKELL__)
         hGetNonBlocking,        -- :: Handle -> IO ByteString
-        hGetNonBlockingN,       -- :: Int -> Handle -> IO ByteString
-#endif
+
+--      hGetN,                  -- :: Int -> Handle -> Int64 -> IO ByteString
+--      hGetContentsN,          -- :: Int -> Handle -> IO ByteString
+--      hGetNonBlockingN,       -- :: Int -> Handle -> IO ByteString
   ) where
 
 -- Functions transparently exported
 import Data.ByteString.Lazy 
         (ByteString(..)
         ,empty,null,length,tail,init,append,reverse,transpose
-        ,concat,take,drop,splitAt,join,isPrefixOf,group,inits, tails
-        ,hGetContentsN, hGetN, hGetContents, hGet, hPut, getContents
-#if defined(__GLASGOW_HASKELL__)
-        ,hGetNonBlocking, hGetNonBlockingN
-#endif
-        ,putStr, putStrLn
-        ,readFile, writeFile, appendFile)
+        ,concat,take,drop,splitAt,join,isPrefixOf,group,inits,tails,copy
+        ,hGetContents, hGet, hPut, getContents
+        ,hGetNonBlocking
+        ,putStr, putStrLn, interact)
 
 -- Functions we need to wrap.
 import qualified Data.ByteString.Lazy as L
@@ -209,7 +198,10 @@ import Prelude hiding
         ,concat,any,take,drop,splitAt,takeWhile,dropWhile,span,break,elem,filter
         ,unwords,words,maximum,minimum,all,concatMap,scanl,scanl1,foldl1,foldr1
         ,readFile,writeFile,appendFile,replicate,getContents,getLine,putStr,putStrLn
-        ,zip,zipWith,unzip,notElem,repeat,iterate)
+        ,zip,zipWith,unzip,notElem,repeat,iterate,interact)
+
+import System.IO            (hClose,openFile,IOMode(..))
+import Control.Exception    (bracket)
 
 #define STRICT1(f) f a | a `seq` False = undefined
 #define STRICT2(f) f a b | a `seq` b `seq` False = undefined
@@ -226,11 +218,11 @@ singleton = L.singleton . c2w
 
 -- | /O(n)/ Convert a 'String' into a 'ByteString'. 
 pack :: [Char] -> ByteString
-pack = L.packWith c2w
+pack = L.pack. P.map c2w
 
 -- | /O(n)/ Converts a 'ByteString' to a 'String'.
 unpack :: ByteString -> [Char]
-unpack = L.unpackWith w2c
+unpack = P.map w2c . L.unpack
 {-# INLINE unpack #-}
 
 -- | /O(n)/ 'cons' is analogous to (:) for lists, but of different
@@ -406,6 +398,7 @@ span :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
 span f = L.span (f . w2c)
 {-# INLINE span #-}
 
+{-
 -- | 'breakChar' breaks its ByteString argument at the first occurence
 -- of the specified Char. It is more efficient than 'break' as it is
 -- implemented with @memchr(3)@. I.e.
@@ -425,6 +418,11 @@ breakChar = L.breakByte . c2w
 spanChar :: Char -> ByteString -> (ByteString, ByteString)
 spanChar = L.spanByte . c2w
 {-# INLINE spanChar #-}
+-}
+
+--
+-- TODO, more rules for breakChar*
+--
 
 -- | /O(n)/ Break a 'ByteString' into pieces separated by the byte
 -- argument, consuming the delimiter. I.e.
@@ -469,13 +467,6 @@ tokens f = L.tokens (f . w2c)
 -- | The 'groupBy' function is the non-overloaded version of 'group'.
 groupBy :: (Char -> Char -> Bool) -> ByteString -> [ByteString]
 groupBy k = L.groupBy (\a b -> k (w2c a) (w2c b))
-
--- | /O(n)/ joinWithChar. An efficient way to join to two ByteStrings with a
--- char. Around 4 times faster than the generalised join.
---
-joinWithChar :: Char -> ByteString -> ByteString -> ByteString
-joinWithChar = L.joinWithByte . c2w
-{-# INLINE joinWithChar #-}
 
 -- | /O(1)/ 'ByteString' index (subscript) operator, starting from 0.
 index :: ByteString -> Int64 -> Char
@@ -540,6 +531,7 @@ find :: (Char -> Bool) -> ByteString -> Maybe Char
 find f ps = w2c `fmap` L.find (f . w2c) ps
 {-# INLINE find #-}
 
+{-
 -- | /O(n)/ A first order equivalent of /filter . (==)/, for the common
 -- case of filtering a single Char. It is more efficient to use
 -- filterChar in this case.
@@ -565,6 +557,7 @@ filterChar c = L.filterByte (c2w c)
 filterNotChar :: Char -> ByteString -> ByteString
 filterNotChar c = L.filterNotByte (c2w c)
 {-# INLINE filterNotChar #-}
+-}
 
 -- | /O(n)/ 'zip' takes two ByteStrings and returns a list of
 -- corresponding pairs of Chars. If one input ByteString is short,
@@ -691,3 +684,18 @@ readInt (LPS (x:xs)) =
                                        | otherwise = ps:pss
                                 in n' `seq` ps' `seq` Just $! (n', LPS ps')
 
+
+-- | Read an entire file /lazily/ into a 'ByteString'. Use 'text mode'
+-- on Windows to interpret newlines
+readFile :: FilePath -> IO ByteString
+readFile f = openFile f ReadMode >>= hGetContents
+
+-- | Write a 'ByteString' to a file.
+writeFile :: FilePath -> ByteString -> IO ()
+writeFile f txt = bracket (openFile f WriteMode) hClose
+    (\hdl -> hPut hdl txt)
+
+-- | Append a 'ByteString' to a file.
+appendFile :: FilePath -> ByteString -> IO ()
+appendFile f txt = bracket (openFile f AppendMode) hClose
+    (\hdl -> hPut hdl txt)

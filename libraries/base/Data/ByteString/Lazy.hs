@@ -1,6 +1,4 @@
-{-# OPTIONS_GHC -cpp -optc-O1 -fffi -fglasgow-exts -fno-warn-incomplete-patterns #-}
---
--- -optc-O2 breaks with 4.0.4 gcc on debian
+{-# OPTIONS_GHC -cpp -fglasgow-exts -fno-warn-orphans -fno-warn-incomplete-patterns #-}
 --
 -- Module      : ByteString.Lazy
 -- Copyright   : (c) Don Stewart 2006
@@ -52,8 +50,6 @@ module Data.ByteString.Lazy (
         singleton,               -- :: Word8   -> ByteString
         pack,                   -- :: [Word8] -> ByteString
         unpack,                 -- :: ByteString -> [Word8]
-        packWith,               -- :: (a -> Word8) -> [a] -> ByteString
-        unpackWith,             -- :: (Word8 -> a) -> ByteString -> [a]
 
         -- * Basic interface
         cons,                   -- :: Word8 -> ByteString -> ByteString
@@ -97,6 +93,7 @@ module Data.ByteString.Lazy (
 
         -- ** Accumulating maps
         mapAccumL,  -- :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
+        mapAccumR,  -- :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
         mapIndexed, -- :: (Int64 -> Word8 -> Word8) -> ByteString -> ByteString
 
         -- ** Infinite ByteStrings
@@ -123,10 +120,6 @@ module Data.ByteString.Lazy (
         inits,                  -- :: ByteString -> [ByteString]
         tails,                  -- :: ByteString -> [ByteString]
 
-        -- ** Breaking and dropping on specific bytes
-        breakByte,              -- :: Word8 -> ByteString -> (ByteString, ByteString)
-        spanByte,               -- :: Word8 -> ByteString -> (ByteString, ByteString)
-
         -- ** Breaking into many substrings
         split,                  -- :: Word8 -> ByteString -> [ByteString]
         splitWith,              -- :: (Word8 -> Bool) -> ByteString -> [ByteString]
@@ -134,7 +127,6 @@ module Data.ByteString.Lazy (
 
         -- ** Joining strings
         join,                   -- :: ByteString -> [ByteString] -> ByteString
-        joinWithByte,           -- :: Word8 -> ByteString -> ByteString -> ByteString
 
         -- * Predicates
         isPrefixOf,             -- :: ByteString -> ByteString -> Bool
@@ -145,8 +137,6 @@ module Data.ByteString.Lazy (
         -- ** Searching by equality
         elem,                   -- :: Word8 -> ByteString -> Bool
         notElem,                -- :: Word8 -> ByteString -> Bool
-        filterByte,             -- :: Word8 -> ByteString -> ByteString
-        filterNotByte,          -- :: Word8 -> ByteString -> ByteString
 
         -- ** Searching with a predicate
         find,                   -- :: (Word8 -> Bool) -> ByteString -> Maybe Word8
@@ -169,6 +159,8 @@ module Data.ByteString.Lazy (
         -- * Ordered ByteStrings
 --        sort,                   -- :: ByteString -> ByteString
 
+        copy,                   -- :: ByteString -> ByteString
+
         -- * I\/O with 'ByteString's
 
         -- ** Standard input and output
@@ -184,14 +176,12 @@ module Data.ByteString.Lazy (
 
         -- ** I\/O with Handles
         hGetContents,           -- :: Handle -> IO ByteString
-        hGetContentsN,          -- :: Int -> Handle -> IO ByteString
         hGet,                   -- :: Handle -> Int -> IO ByteString
-        hGetN,                  -- :: Int -> Handle -> Int -> IO ByteString
         hPut,                   -- :: Handle -> ByteString -> IO ()
-#if defined(__GLASGOW_HASKELL__)
         hGetNonBlocking,        -- :: Handle -> IO ByteString
-        hGetNonBlockingN,       -- :: Int -> Handle -> IO ByteString
-#endif
+--      hGetN,                  -- :: Int -> Handle -> Int -> IO ByteString
+--      hGetContentsN,          -- :: Int -> Handle -> IO ByteString
+--      hGetNonBlockingN,       -- :: Int -> Handle -> IO ByteString
 
   ) where
 
@@ -213,9 +203,14 @@ import Data.Monoid              (Monoid(..))
 
 import Data.Word                (Word8)
 import Data.Int                 (Int64)
-import System.IO (Handle,stdin,stdout,openBinaryFile,IOMode(..),hClose)
+import System.IO                (Handle,stdin,stdout,openBinaryFile,IOMode(..)
+                                ,hClose,hWaitForInput,hIsEOF)
 import System.IO.Unsafe
 import Control.Exception        (bracket)
+
+import Foreign.ForeignPtr       (withForeignPtr)
+import Foreign.Ptr
+import Foreign.Storable
 
 #if defined(__GLASGOW_HASKELL__)
 import Data.Generics            (Data(..), Typeable(..))
@@ -304,12 +299,14 @@ _abstr (LPS xs) = P.concat xs
 -- and need to share the cache with other programs.
 --
 defaultChunkSize :: Int
-defaultChunkSize = 64 * k
+defaultChunkSize = 32 * k - overhead
    where k = 1024
+         overhead = 2 * sizeOf (undefined :: Int)
 
 smallChunkSize :: Int
-smallChunkSize = 4 * k
+smallChunkSize = 4 * k - overhead
    where k = 1024
+         overhead = 2 * sizeOf (undefined :: Int)
 
 -- defaultChunkSize = 1
 
@@ -372,6 +369,7 @@ unpack (LPS ss) = L.concatMap P.unpack ss
 
 ------------------------------------------------------------------------
 
+{-
 -- | /O(n)/ Convert a '[a]' into a 'ByteString' using some
 -- conversion function
 packWith :: (a -> Word8) -> [a] -> ByteString
@@ -384,6 +382,7 @@ unpackWith :: (Word8 -> a) -> ByteString -> [a]
 unpackWith k (LPS ss) = L.concatMap (P.unpackWith k) ss
 {-# INLINE unpackWith #-}
 {-# SPECIALIZE unpackWith :: (Word8 -> Char) -> ByteString -> [Char] #-}
+-}
 
 -- ---------------------------------------------------------------------
 -- Basic interface
@@ -391,12 +390,12 @@ unpackWith k (LPS ss) = L.concatMap (P.unpackWith k) ss
 -- | /O(1)/ Test whether a ByteString is empty.
 null :: ByteString -> Bool
 null (LPS []) = True
-null (_)      = False  -- TODO: guarantee this invariant is maintained
+null (_)      = False
 {-# INLINE null #-}
 
 -- | /O(n\/c)/ 'length' returns the length of a ByteString as an 'Int64'
 length :: ByteString -> Int64
-length (LPS ss) = L.sum (L.map (fromIntegral.P.length) ss)
+length (LPS ss) = L.foldl' (\n ps -> n + fromIntegral (P.length ps)) 0 ss
 
 -- avoid the intermediate list?
 -- length (LPS ss) = L.foldl lengthF 0 ss
@@ -445,7 +444,7 @@ last (LPS []) = errorEmptyList "last"
 last (LPS xs) = P.last (L.last xs)
 {-# INLINE last #-}
 
--- | /O(1)/ Return all the elements of a 'ByteString' except the last one.
+-- | /O(n\/c)/ Return all the elements of a 'ByteString' except the last one.
 init :: ByteString -> ByteString
 init (LPS []) = errorEmptyList "init"
 init (LPS xs)
@@ -473,7 +472,13 @@ map f = LPS . P.loopArr . loopL (P.mapEFL f) P.NoAcc . unLPS
 
 -- | /O(n)/ 'reverse' @xs@ efficiently returns the elements of @xs@ in reverse order.
 reverse :: ByteString -> ByteString
-reverse (LPS xs) = LPS (L.reverse . L.map P.reverse $ xs)
+reverse (LPS ps) = LPS (rev [] ps)
+  where rev a []     = a
+        rev a (x:xs) = rev (P.reverse x:a) xs
+-- note, here is one example where the extra element lazyness is an advantage.
+-- we can reerse the list of chunks strictly but reverse each chunk lazily
+-- so while we may force the whole lot into memory we do not need to copy
+-- each chunk until it is used.
 {-# INLINE reverse #-}
 
 -- The 'intersperse' function takes a 'Word8' and a 'ByteString' and
@@ -567,14 +572,14 @@ all f (LPS xs) = L.and (L.map (P.all f) xs)
 
 -- | /O(n)/ 'maximum' returns the maximum value from a 'ByteString'
 maximum :: ByteString -> Word8
-maximum (LPS []) = errorEmptyList "maximum"
-maximum (LPS xs) = L.maximum (L.map P.maximum xs)
+maximum (LPS [])     = errorEmptyList "maximum"
+maximum (LPS (x:xs)) = L.foldl' (\n ps -> n `max` P.maximum ps) (P.maximum x) xs
 {-# INLINE maximum #-}
 
 -- | /O(n)/ 'minimum' returns the minimum value from a 'ByteString'
 minimum :: ByteString -> Word8
-minimum (LPS []) = errorEmptyList "minimum"
-minimum (LPS xs) = L.minimum (L.map P.minimum xs)
+minimum (LPS [])     = errorEmptyList "minimum"
+minimum (LPS (x:xs)) = L.foldl' (\n ps -> n `min` P.minimum ps) (P.minimum x) xs
 {-# INLINE minimum #-}
 
 -- | The 'mapAccumL' function behaves like a combination of 'map' and
@@ -583,6 +588,9 @@ minimum (LPS xs) = L.minimum (L.map P.minimum xs)
 -- final value of this accumulator together with the new ByteString.
 mapAccumL :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
 mapAccumL f z = (\(a :*: ps) -> (a, LPS ps)) . loopL (P.mapAccumEFL f) z . unLPS
+
+mapAccumR :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
+mapAccumR = error "mapAccumR unimplemented"
 
 -- | /O(n)/ map Word8 functions, provided with the index at each position
 mapIndexed :: (Int -> Word8 -> Word8) -> ByteString -> ByteString
@@ -704,7 +712,7 @@ takeWhile :: (Word8 -> Bool) -> ByteString -> ByteString
 takeWhile f (LPS ps) = LPS (takeWhile' ps)
   where takeWhile' []     = []
         takeWhile' (x:xs) =
-          case P.findIndexOrEnd (not . f) x of
+          case findIndexOrEnd (not . f) x of
             0                  -> []
             n | n < P.length x -> P.take n x : []
               | otherwise      -> x : takeWhile' xs
@@ -714,7 +722,7 @@ dropWhile :: (Word8 -> Bool) -> ByteString -> ByteString
 dropWhile f (LPS ps) = LPS (dropWhile' ps)
   where dropWhile' []     = []
         dropWhile' (x:xs) =
-          case P.findIndexOrEnd (not . f) x of
+          case findIndexOrEnd (not . f) x of
             n | n < P.length x -> P.drop n x : xs
               | otherwise      -> dropWhile' xs
 
@@ -723,12 +731,19 @@ break :: (Word8 -> Bool) -> ByteString -> (ByteString, ByteString)
 break f (LPS ps) = case (break' ps) of (a,b) -> (LPS a, LPS b)
   where break' []     = ([], [])
         break' (x:xs) =
-          case P.findIndexOrEnd f x of
+          case findIndexOrEnd f x of
             0                  -> ([], x : xs)
             n | n < P.length x -> (P.take n x : [], P.drop n x : xs)
               | otherwise      -> let (xs', xs'') = break' xs
                                    in (x : xs', xs'')
 
+--
+-- TODO
+--
+-- Add rules
+--
+
+{-
 -- | 'breakByte' breaks its ByteString argument at the first occurence
 -- of the specified byte. It is more efficient than 'break' as it is
 -- implemented with @memchr(3)@. I.e.
@@ -760,6 +775,7 @@ spanByte c (LPS ps) = case (spanByte' ps) of (a,b) -> (LPS a, LPS b)
                       | P.null x'' -> let (xs', xs'') = spanByte' xs
                                        in (x : xs', xs'')
                       | otherwise  -> (x' : [], x'' : xs)
+-}
 
 -- | 'span' @p xs@ breaks the ByteString into two segments. It is
 -- equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
@@ -860,6 +876,8 @@ group xs
 -- | The 'groupBy' function is the non-overloaded version of 'group'.
 --
 groupBy :: (Word8 -> Word8 -> Bool) -> ByteString -> [ByteString]
+groupBy = error "Data.ByteString.Lazy.groupBy: unimplemented"
+{-
 groupBy _ (LPS [])     = []
 groupBy k (LPS (a:as)) = groupBy' [] 0 (P.groupBy k a) as
   where groupBy' :: [P.ByteString] -> Word8 -> [P.ByteString] -> [P.ByteString] -> [ByteString]
@@ -869,6 +887,7 @@ groupBy k (LPS (a:as)) = groupBy' [] 0 (P.groupBy k a) as
         groupBy' []  _ (s:[]) (x:xs)   = groupBy' (s:[]) (P.unsafeHead s) (P.groupBy k x) xs
         groupBy' acc c (s:[]) (x:xs)   = groupBy' (s:acc) c (P.groupBy k x) xs
         groupBy' acc _ (s:ss) xs       = LPS (L.reverse (s : acc)) : groupBy' [] 0 ss xs
+-}
 
 {-
 TODO: check if something like this might be faster
@@ -886,12 +905,6 @@ groupBy k xs
 -- argument between each element of the list.
 join :: ByteString -> [ByteString] -> ByteString
 join s = concat . (L.intersperse s)
-
--- | /O(n)/ joinWithByte. An efficient way to join to two ByteStrings
--- with a char.
---
-joinWithByte :: Word8 -> ByteString -> ByteString -> ByteString
-joinWithByte c x y = append x (cons c y)
 
 -- ---------------------------------------------------------------------
 -- Indexing ByteStrings
@@ -953,7 +966,7 @@ elemIndices c (LPS ps) = elemIndices' 0 ps
 --
 -- But more efficiently than using length on the intermediate list.
 count :: Word8 -> ByteString -> Int64
-count w (LPS xs) = L.sum (L.map (fromIntegral . P.count w) xs)
+count w (LPS xs) = L.foldl' (\n ps -> n + fromIntegral (P.count w ps)) 0 xs
 
 -- | The 'findIndex' function takes a predicate and a 'ByteString' and
 -- returns the index of the first element in the ByteString
@@ -1008,6 +1021,7 @@ filter :: (Word8 -> Bool) -> ByteString -> ByteString
 filter p = LPS . P.loopArr . loopL (P.filterEFL p) P.NoAcc . unLPS
 {-# INLINE filter #-}
 
+{-
 -- | /O(n)/ and /O(n\/c) space/ A first order equivalent of /filter .
 -- (==)/, for the common case of filtering a single byte. It is more
 -- efficient to use /filterByte/ in this case.
@@ -1029,6 +1043,7 @@ filterByte w ps = replicate (count w ps) w
 -- filterNotByte is around 2x faster than its filter equivalent.
 filterNotByte :: Word8 -> ByteString -> ByteString
 filterNotByte w (LPS xs) = LPS (filterMap (P.filterNotByte w) xs)
+-}
 
 -- ---------------------------------------------------------------------
 -- Searching for substrings
@@ -1114,6 +1129,20 @@ tails = tails' . unLPS
           | otherwise       = LPS xs : tails' (P.unsafeTail x : xs')
 
 -- ---------------------------------------------------------------------
+-- Low level constructors
+
+-- | /O(n)/ Make a copy of the 'ByteString' with its own storage.
+--   This is mainly useful to allow the rest of the data pointed
+--   to by the 'ByteString' to be garbage collected, for example
+--   if a large string has been read in, and only a small part of it
+--   is needed in the rest of the program.
+copy :: ByteString -> ByteString
+copy (LPS lps) = LPS (L.map P.copy lps)
+--TODO, we could coalese small blocks here
+--FIXME: probably not strict enough, if we're doing this to avoid retaining
+-- the parent blocks then we'd better copy strictly.
+
+-- ---------------------------------------------------------------------
 
 -- TODO defrag func that concatenates block together that are below a threshold
 -- defrag :: Int -> ByteString -> ByteString
@@ -1122,17 +1151,26 @@ tails = tails' . unLPS
 -- Lazy ByteString IO
 
 -- | Read entire handle contents /lazily/ into a 'ByteString'. Chunks
--- are read on demand, in @k@-sized chunks.
+-- are read on demand, in at most @k@-sized chunks. It does not block
+-- waiting for a whole @k@-sized chunk, so if less than @k@ bytes are
+-- available then they will be returned immediately as a smaller chunk.
 hGetContentsN :: Int -> Handle -> IO ByteString
 hGetContentsN k h = lazyRead >>= return . LPS
   where
-    lazyRead = unsafeInterleaveIO $ do
-        ps <- P.hGet h k
-        case P.length ps of
-            0         -> return []
-            n | n < k -> return [ps]
-            _         -> do pss <- lazyRead
-                            return (ps : pss)
+    lazyRead = unsafeInterleaveIO loop
+
+    loop = do
+        ps <- P.hGetNonBlocking h k
+        --TODO: I think this should distinguish EOF from no data available
+        -- the otherlying POSIX call makes this distincion, returning either
+        -- 0 or EAGAIN
+        if P.null ps
+          then do eof <- hIsEOF h
+                  if eof then return []
+                         else hWaitForInput h (-1)
+                           >> loop
+          else do pss <- lazyRead
+                  return (ps : pss)
 
 -- | Read @n@ bytes into a 'ByteString', directly from the
 -- specified 'Handle', in chunks of size @k@.
@@ -1144,26 +1182,27 @@ hGetN k h n = readChunks n >>= return . LPS
     readChunks i = do
         ps <- P.hGet h (min k i)
         case P.length ps of
-            0          -> return []
-            m | m == i -> return [ps]
-            m          -> do pss <- readChunks (i - m)
-                             return (ps : pss)
+            0 -> return []
+            m -> do pss <- readChunks (i - m)
+                    return (ps : pss)
 
-#if defined(__GLASGOW_HASKELL__)
 -- | hGetNonBlockingN is similar to 'hGetContentsN', except that it will never block
 -- waiting for data to become available, instead it returns only whatever data
 -- is available. Chunks are read on demand, in @k@-sized chunks.
 hGetNonBlockingN :: Int -> Handle -> Int -> IO ByteString
+#if defined(__GLASGOW_HASKELL__)
 hGetNonBlockingN _ _ 0 = return empty
 hGetNonBlockingN k h n = readChunks n >>= return . LPS
   where
+    STRICT1(readChunks)
     readChunks i = do
         ps <- P.hGetNonBlocking h (min k i)
         case P.length ps of
-            0         -> return []
-            m | fromIntegral m < i -> return [ps]
-            m         -> do pss <- readChunks (i - m)
-                            return (ps : pss)
+            0 -> return []
+            m -> do pss <- readChunks (i - m)
+                    return (ps : pss)
+#else
+hGetNonBlockingN = hGetN
 #endif
 
 -- | Read entire handle contents /lazily/ into a 'ByteString'. Chunks
@@ -1175,14 +1214,15 @@ hGetContents = hGetContentsN defaultChunkSize
 hGet :: Handle -> Int -> IO ByteString
 hGet = hGetN defaultChunkSize
 
-#if defined(__GLASGOW_HASKELL__)
 -- | hGetNonBlocking is similar to 'hGet', except that it will never block
 -- waiting for data to become available, instead it returns only whatever data
 -- is available.
+#if defined(__GLASGOW_HASKELL__)
 hGetNonBlocking :: Handle -> Int -> IO ByteString
 hGetNonBlocking = hGetNonBlockingN defaultChunkSize
+#else
+hGetNonBlocking = hGet
 #endif
-
 
 -- | Read an entire file /lazily/ into a 'ByteString'.
 readFile :: FilePath -> IO ByteString
@@ -1244,3 +1284,16 @@ filterMap f (x:xs) = case f x of
                       | otherwise -> y : filterMap f xs
 {-# INLINE filterMap #-}
 
+
+-- | 'findIndexOrEnd' is a variant of findIndex, that returns the length
+-- of the string if no element is found, rather than Nothing.
+findIndexOrEnd :: (Word8 -> Bool) -> P.ByteString -> Int
+findIndexOrEnd k (P.PS x s l) = P.inlinePerformIO $ withForeignPtr x $ \f -> go (f `plusPtr` s) 0
+  where
+    STRICT2(go)
+    go ptr n | n >= l    = return l
+             | otherwise = do w <- peek ptr
+                              if k w
+                                then return n
+                                else go (ptr `plusPtr` 1) (n+1)
+{-# INLINE findIndexOrEnd #-}

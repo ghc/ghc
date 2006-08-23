@@ -27,9 +27,11 @@ module Data.ByteString.Base (
         unsafeDrop,             -- :: Int -> ByteString -> ByteString
 
         -- * Low level introduction and elimination
+        empty,                  -- :: ByteString
         create,                 -- :: Int -> (Ptr Word8 -> IO ()) -> IO ByteString
         createAndTrim,          -- :: Int -> (Ptr Word8 -> IO Int) -> IO  ByteString
         createAndTrim',         -- :: Int -> (Ptr Word8 -> IO (Int, Int, a)) -> IO (ByteString, a)
+        mallocByteString,       -- :: Int -> IO (ForeignPtr a)
 
         unsafeCreate,           -- :: Int -> (Ptr Word8 -> IO ()) ->  ByteString
         unsafeUseAsCString,     -- :: ByteString -> (CString -> IO a) -> IO a
@@ -47,6 +49,7 @@ module Data.ByteString.Base (
 
         -- * Utilities
         inlinePerformIO,            -- :: IO a -> a
+        nullForeignPtr,             -- :: ForeignPtr Word8
 
         countOccurrences,           -- :: (Storable a, Num a) => Ptr a -> Ptr Word8 -> Int -> IO ()
 
@@ -54,10 +57,7 @@ module Data.ByteString.Base (
         c_strlen,                   -- :: CString -> IO CInt
         c_malloc,                   -- :: CInt -> IO (Ptr Word8)
         c_free,                     -- :: Ptr Word8 -> IO ()
-
-#if !defined(__GLASGOW_HASKELL__)
         c_free_finalizer,           -- :: FunPtr (Ptr Word8 -> IO ())
-#endif
 
         memchr,                     -- :: Ptr Word8 -> Word8 -> CSize -> IO Ptr Word8
         memcmp,                     -- :: Ptr Word8 -> Ptr Word8 -> CSize -> IO CInt
@@ -74,7 +74,6 @@ module Data.ByteString.Base (
 
         -- * Internal GHC magic
 #if defined(__GLASGOW_HASKELL__)
-        getProgArgv,                -- :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
         memcpy_ptr_baoff,           -- :: Ptr a -> RawBuffer -> CInt -> CSize -> IO (Ptr ())
 #endif
 
@@ -83,10 +82,10 @@ module Data.ByteString.Base (
 
   ) where
 
-import Foreign.ForeignPtr
-import Foreign.Ptr
+import Foreign.ForeignPtr       (ForeignPtr, newForeignPtr_, withForeignPtr)
+import Foreign.Ptr              (Ptr, FunPtr, plusPtr, castPtr)
 import Foreign.Storable         (Storable(..))
-import Foreign.C.Types
+import Foreign.C.Types          (CInt, CSize, CULong)
 import Foreign.C.String         (CString, CStringLen)
 
 import Control.Exception        (assert)
@@ -95,21 +94,30 @@ import Data.Char                (ord)
 import Data.Word                (Word8)
 
 #if defined(__GLASGOW_HASKELL__)
+import qualified Foreign.ForeignPtr as FC (finalizeForeignPtr)
 import qualified Foreign.Concurrent as FC (newForeignPtr)
 
 import Data.Generics            (Data(..), Typeable(..))
 import GHC.Prim                 (Addr#)
 import GHC.Ptr                  (Ptr(..))
 import GHC.Base                 (realWorld#,unsafeChr)
-import GHC.IOBase
-
-#if defined(__GLASGOW_HASKELL__) && !defined(SLOW_FOREIGN_PTR)
-import GHC.ForeignPtr           (mallocPlainForeignPtrBytes)
-#endif
-
+import GHC.IOBase               (IO(IO), unsafePerformIO, RawBuffer)
 #else
 import Data.Char                (chr)
 import System.IO.Unsafe         (unsafePerformIO)
+#endif
+
+#if __GLASGOW_HASKELL__ >= 605 && !defined(SLOW_FOREIGN_PTR)
+import GHC.ForeignPtr           (mallocPlainForeignPtrBytes)
+#else
+import Foreign.ForeignPtr       (mallocForeignPtrBytes)
+#endif
+
+#if __GLASGOW_HASKELL__>=605
+import GHC.ForeignPtr           (ForeignPtr(ForeignPtr))
+import GHC.Base                 (nullAddr#)
+#else
+import Foreign.Ptr              (nullPtr)
 #endif
 
 -- CFILES stuff is Hugs only
@@ -139,6 +147,18 @@ data ByteString = PS {-# UNPACK #-} !(ForeignPtr Word8)
 
 #if defined(__GLASGOW_HASKELL__)
     deriving (Data, Typeable)
+#endif
+
+-- | /O(1)/ The empty 'ByteString'
+empty :: ByteString
+empty = PS nullForeignPtr 0 0
+
+nullForeignPtr :: ForeignPtr Word8
+#if __GLASGOW_HASKELL__>=605
+nullForeignPtr = ForeignPtr nullAddr# undefined --TODO: should ForeignPtrContents be strict?
+#else
+nullForeignPtr = unsafePerformIO $ newForeignPtr_ nullPtr
+{-# NOINLINE nullForeignPtr #-}
 #endif
 
 -- ---------------------------------------------------------------------
@@ -201,14 +221,10 @@ unsafeCreate :: Int -> (Ptr Word8 -> IO ()) -> ByteString
 unsafeCreate l f = unsafePerformIO (create l f)
 {-# INLINE unsafeCreate #-}
 
--- | Wrapper of mallocForeignPtrBytes.
+-- | Create ByteString of size @l@ and use action @f@ to fill it's contents.
 create :: Int -> (Ptr Word8 -> IO ()) -> IO ByteString
 create l f = do
-#if defined(SLOW_FOREIGN_PTR) || !defined(__GLASGOW_HASKELL__)
-    fp <- mallocForeignPtrBytes l
-#else
-    fp <- mallocPlainForeignPtrBytes l
-#endif
+    fp <- mallocByteString l
     withForeignPtr fp $ \p -> f p
     return $! PS fp 0 l
 
@@ -222,11 +238,7 @@ create l f = do
 --
 createAndTrim :: Int -> (Ptr Word8 -> IO Int) -> IO ByteString
 createAndTrim l f = do
-#if defined(SLOW_FOREIGN_PTR) || !defined(__GLASGOW_HASKELL__)
-    fp <- mallocForeignPtrBytes l
-#else
-    fp <- mallocPlainForeignPtrBytes l
-#endif
+    fp <- mallocByteString l
     withForeignPtr fp $ \p -> do
         l' <- f p
         if assert (l' <= l) $ l' >= l
@@ -235,11 +247,7 @@ createAndTrim l f = do
 
 createAndTrim' :: Int -> (Ptr Word8 -> IO (Int, Int, a)) -> IO (ByteString, a)
 createAndTrim' l f = do
-#if defined(SLOW_FOREIGN_PTR) || !defined(__GLASGOW_HASKELL__)
-    fp <- mallocForeignPtrBytes l
-#else
-    fp <- mallocPlainForeignPtrBytes l
-#endif
+    fp <- mallocByteString l
     withForeignPtr fp $ \p -> do
         (off, l', res) <- f p
         if assert (l' <= l) $ l' >= l
@@ -247,6 +255,16 @@ createAndTrim' l f = do
             else do ps <- create l' $ \p' ->
                             memcpy p' (p `plusPtr` off) (fromIntegral l')
                     return $! (ps, res)
+
+-- | Wrapper of mallocForeignPtrBytes with faster implementation
+-- for GHC 6.5 builds newer than 06/06/06
+mallocByteString :: Int -> IO (ForeignPtr a)
+mallocByteString l = do
+#if __GLASGOW_HASKELL__ >= 605 && !defined(SLOW_FOREIGN_PTR)
+    mallocPlainForeignPtrBytes l
+#else
+    mallocForeignPtrBytes l
+#endif
 
 #if defined(__GLASGOW_HASKELL__)
 -- | /O(n)/ Pack a null-terminated sequence of bytes, pointed to by an
@@ -300,7 +318,7 @@ packCStringFinalizer p l f = do
 -- this, you need to have a proof of some kind that all 'ByteString's
 -- ever generated from the underlying byte array are no longer live.
 unsafeFinalize :: ByteString -> IO ()
-unsafeFinalize (PS p _ _) = finalizeForeignPtr p
+unsafeFinalize (PS p _ _) = FC.finalizeForeignPtr p
 
 #endif
 
@@ -373,12 +391,9 @@ unsafeUseAsCString :: ByteString -> (CString -> IO a) -> IO a
 unsafeUseAsCString (PS ps s _) ac = withForeignPtr ps $ \p -> ac (castPtr p `plusPtr` s)
 
 -- | /O(1) construction/ Use a @ByteString@ with a function requiring a
--- @CStringLen@.  Warning: modifying the @CStringLen@ will affect the
--- @ByteString@.  This is analogous to unsafeUseAsCString, and comes
--- with the same safety requirements. The user must ensure there is a
--- null byte at the end of the string.
+-- @CStringLen@.
 unsafeUseAsCStringLen :: ByteString -> (CStringLen -> IO a) -> IO a
-unsafeUseAsCStringLen (PS ps s l) ac = withForeignPtr ps $ \p -> ac (castPtr p `plusPtr` s,l)
+unsafeUseAsCStringLen (PS ps s l) f = withForeignPtr ps $ \p -> f (castPtr p `plusPtr` s,l)
 
 -- ---------------------------------------------------------------------
 -- 
@@ -386,18 +401,16 @@ unsafeUseAsCStringLen (PS ps s l) ac = withForeignPtr ps $ \p -> ac (castPtr p `
 --
 
 foreign import ccall unsafe "string.h strlen" c_strlen
-    :: CString -> IO CInt
+    :: CString -> IO CSize
 
 foreign import ccall unsafe "stdlib.h malloc" c_malloc
-    :: CInt -> IO (Ptr Word8)
+    :: CSize -> IO (Ptr Word8)
 
 foreign import ccall unsafe "static stdlib.h free" c_free
     :: Ptr Word8 -> IO ()
 
-#if !defined(__GLASGOW_HASKELL__)
 foreign import ccall unsafe "static stdlib.h &free" c_free_finalizer
     :: FunPtr (Ptr Word8 -> IO ())
-#endif
 
 foreign import ccall unsafe "string.h memchr" memchr
     :: Ptr Word8 -> Word8 -> CSize -> IO (Ptr Word8)
@@ -421,19 +434,19 @@ foreign import ccall unsafe "string.h memset" memset
 --
 
 foreign import ccall unsafe "static fpstring.h fps_reverse" c_reverse
-    :: Ptr Word8 -> Ptr Word8 -> CInt -> IO ()
+    :: Ptr Word8 -> Ptr Word8 -> CULong -> IO ()
 
 foreign import ccall unsafe "static fpstring.h fps_intersperse" c_intersperse
-    :: Ptr Word8 -> Ptr Word8 -> CInt -> Word8 -> IO ()
+    :: Ptr Word8 -> Ptr Word8 -> CULong -> Word8 -> IO ()
 
 foreign import ccall unsafe "static fpstring.h fps_maximum" c_maximum
-    :: Ptr Word8 -> CInt -> IO Word8
+    :: Ptr Word8 -> CULong -> IO Word8
 
 foreign import ccall unsafe "static fpstring.h fps_minimum" c_minimum
-    :: Ptr Word8 -> CInt -> IO Word8
+    :: Ptr Word8 -> CULong -> IO Word8
 
 foreign import ccall unsafe "static fpstring.h fps_count" c_count
-    :: Ptr Word8 -> CInt -> Word8 -> IO CInt
+    :: Ptr Word8 -> CULong -> Word8 -> IO CULong
 
 -- ---------------------------------------------------------------------
 -- MMap
@@ -455,9 +468,6 @@ foreign import ccall unsafe "static sys/mman.h munmap" c_munmap
 -- Internal GHC Haskell magic
 
 #if defined(__GLASGOW_HASKELL__)
-foreign import ccall unsafe "RtsAPI.h getProgArgv"
-    getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
-
 foreign import ccall unsafe "__hscore_memcpy_src_off"
    memcpy_ptr_baoff :: Ptr a -> RawBuffer -> CInt -> CSize -> IO (Ptr ())
 #endif
