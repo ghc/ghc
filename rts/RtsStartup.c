@@ -28,6 +28,7 @@
 #include "ThreadLabels.h"
 #include "BlockAlloc.h"
 #include "Trace.h"
+#include "RtsTypeable.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -195,6 +196,9 @@ hs_init(int *argc, char **argv[])
 
     /* initialise the stable pointer table */
     initStablePtrTable();
+
+    /* initialise the shared Typeable store */
+    initTypeableStore();
 
 #if defined(DEBUG)
     /* initialise thread label table (tso->char*) */
@@ -390,6 +394,9 @@ hs_exit(void)
     // also outputs the stats (+RTS -s) info.
     exitStorage();
     
+    /* free shared Typeable store */
+    exitTypeableStore();
+
     /* initialise the stable pointer table */
     exitStablePtrTable();
 

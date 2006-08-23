@@ -27,6 +27,7 @@
 #include "Schedule.h"
 #include "Storage.h"
 #include "Sparks.h"
+#include "RtsTypeable.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -508,6 +509,7 @@ typedef struct _RtsSymbolVal {
       SymX(forkOS_createThread)			\
       SymX(freeHaskellFunctionPtr)		\
       SymX(freeStablePtr)		        \
+      SymX(getOrSetTypeableStore)		\
       SymX(gcdIntegerzh_fast)			\
       SymX(gcdIntegerIntzh_fast)		\
       SymX(gcdIntzh_fast)			\
