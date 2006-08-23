@@ -329,12 +329,12 @@ static block_rec* free_blocks = 0;
 static
 alloc_rec*
 allocNew(nat n) {
-    alloc_rec* rec = (alloc_rec*)malloc(sizeof(alloc_rec));
+    alloc_rec* rec = (alloc_rec*)stgMallocBytes(sizeof(alloc_rec),"getMBlocks: allocNew");
     rec->size = (n+1)*MBLOCK_SIZE;
     rec->base = 
         VirtualAlloc(NULL, rec->size, MEM_RESERVE, PAGE_READWRITE);
     if(rec->base==0) {
-        free((void*)rec);
+        stgFree((void*)rec);
         rec=0;
         errorBelch(
             "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed with: %ld\n"
@@ -368,7 +368,7 @@ insertFree(char* alloc_base, int alloc_size) {
         if(prev->base + prev->size == alloc_base) {        /* Merge it, alloc, prev */
             prev->size += alloc_size + it->size;
             prev->next = it->next;
-            free(it);
+            stgFree(it);
         } else {                                            /* Merge it, alloc */
             it->base = alloc_base;
             it->size += alloc_size;
@@ -376,8 +376,7 @@ insertFree(char* alloc_base, int alloc_size) {
     } else if(prev->base + prev->size == alloc_base) {     /* Merge alloc, prev */
         prev->size += alloc_size;
     } else {                                                /* Merge none */
-        block_rec* rec = (block_rec*)malloc(sizeof(block_rec));
-        /* TODO: Check malloc failure */
+        block_rec* rec = (block_rec*)stgMallocBytes(sizeof(block_rec),"getMBlocks: insertFree");
         rec->base=alloc_base;
         rec->size=alloc_size;
         rec->next = it;
@@ -402,15 +401,17 @@ findFreeBlocks(nat n) {
             ret = (void*)it->base;
             if(it->size==required_size) {
                 prev->next=0;
-                free(it);
+                stgFree(it);
             } else {
                 it->base += required_size;
                 it->size -=required_size;
             }
         } else {
             char* need_base = (char*)(((unsigned long)it->base) & ((unsigned long)~MBLOCK_MASK)) + MBLOCK_SIZE;
-            block_rec* next = (block_rec*)malloc(sizeof(block_rec));
-            /* TODO: Check malloc failure */
+            block_rec* next
+                = (block_rec*)stgMallocBytes(
+                    sizeof(block_rec)
+                    , "getMBlocks: findFreeBlocks: splitting");
             int new_size = need_base - it->base;
             next->base = need_base +required_size;
             next->size = it->size - (new_size+required_size);
@@ -479,7 +480,7 @@ freeAllMBlocks(void)
         block_rec* it = free_blocks;
         for(; it!=0; ) {
             next = it->next;
-            free(it);
+            stgFree(it);
             it=next;
         }
     }
@@ -490,7 +491,7 @@ freeAllMBlocks(void)
             if(!VirtualFree((void*)it->base, 0, MEM_RELEASE))
                 debugBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed with %ld", GetLastError());
             next = it->next;
-            free(it);
+            stgFree(it);
             it=next;
         }
     }
