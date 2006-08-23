@@ -2584,6 +2584,7 @@ exitScheduler( void )
 	boundTaskExiting(task);
 	stopTaskManager();
     }
+    closeMutex(&sched_mutex);
 #endif
 }
 

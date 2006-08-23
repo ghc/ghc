@@ -169,6 +169,9 @@ exitStablePtrTable(void)
     stgFree(stable_ptr_table);
   stable_ptr_table = NULL;
   SPT_size = 0;
+#ifdef THREADED_RTS
+  closeMutex(&stable_mutex);
+#endif
 }
 
 /*

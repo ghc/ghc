@@ -161,6 +161,7 @@ extern rtsBool waitCondition      ( Condition* pCond,
 // Mutexes
 //
 extern void initMutex             ( Mutex* pMut );
+extern void closeMutex            ( Mutex* pMut );
 
 //
 // Thread-local storage

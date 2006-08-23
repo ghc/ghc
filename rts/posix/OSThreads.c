@@ -106,6 +106,11 @@ initMutex(Mutex* pMut)
 #endif
     return;
 }
+void
+closeMutex(Mutex* pMut)
+{
+    pthread_mutex_destroy(pMut);
+}
 
 void
 newThreadLocalKey (ThreadLocalKey *key)

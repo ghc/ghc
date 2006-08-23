@@ -116,6 +116,11 @@ initMutex (Mutex* pMut)
 {
     InitializeCriticalSectionAndSpinCount(pMut,4000);
 }
+void
+closeMutex (Mutex* pMut)
+{
+    DeleteCriticalSection(pMut);
+}
 #else
 void
 initMutex (Mutex* pMut)
@@ -126,6 +131,11 @@ initMutex (Mutex* pMut)
 			   );
   *pMut = h;
   return;
+}
+void
+closeMutex (Mutex* pMut)
+{
+    CloseHandle(*pMut);
 }
 #endif
 

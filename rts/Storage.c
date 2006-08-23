@@ -279,6 +279,10 @@ freeStorage (void)
       stgFree(generations[g].steps);
     stgFree(generations);
     freeAllMBlocks();
+#if defined(THREADED_RTS)
+    closeMutex(&sm_mutex);
+    closeMutex(&atomic_modify_mutvar_mutex);
+#endif
 }
 
 /* -----------------------------------------------------------------------------

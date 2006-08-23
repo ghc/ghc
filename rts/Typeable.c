@@ -20,7 +20,7 @@ void
 exitTypeableStore()
 {
 #ifdef THREADED_RTS
-    /* TODO: Free Mutex! */
+    closeMutex(&typeableStoreLock);
 #endif
     if(typeableStore!=0) {
         freeStablePtr((StgStablePtr)typeableStore);

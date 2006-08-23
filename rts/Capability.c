@@ -671,6 +671,9 @@ shutdownCapability (Capability *cap, Task *task)
     }
     // we now have the Capability, its run queue and spare workers
     // list are both empty.
+
+    // We end up here only in THREADED_RTS
+    closeMutex(&cap->lock);
 }
 
 /* ----------------------------------------------------------------------------
