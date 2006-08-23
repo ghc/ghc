@@ -507,7 +507,37 @@ renameFile opath npath =
 
 {- |@'copyFile' old new@ copies the existing file from /old/ to /new/.
 If the /new/ file already exists, it is atomically replaced by the /old/ file.
-Neither path may refer to an existing directory.
+Neither path may refer to an existing directory.  The permissions of /old/ are
+copied to /new/, if possible.
+-}
+
+{- NOTES:
+
+It's tempting to try to remove the target file before opening it for
+writing.  This could be useful: for example if the target file is an
+executable that is in use, writing will fail, but unlinking first
+would succeed.
+
+However, it certainly isn't always what you want.
+
+ * if the target file is hardlinked, removing it would break
+   the hard link, but just opening would preserve it.
+
+ * opening and truncating will preserve permissions and
+   ACLs on the target.
+
+ * If the destination file is read-only in a writable directory,
+   we might want copyFile to fail.  Removing the target first
+   would succeed, however.
+
+ * If the destination file is special (eg. /dev/null), removing
+   it is probably not the right thing.  Copying to /dev/null
+   should leave /dev/null intact, not replace it with a plain
+   file.
+
+ * There's a small race condition between removing the target and
+   opening it for writing during which time someone might
+   create it again.
 -}
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
