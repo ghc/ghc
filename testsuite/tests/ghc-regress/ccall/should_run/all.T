@@ -90,4 +90,4 @@ test('ffi014', only_ways(['threaded']), compile_and_run, ['ffi014_cbits.c'])
 test('ffi015', omit_ways(['ghci']), compile_and_run, ['ffi015_cbits.c'])
 
 # GHCi can't handle foreign import "&"
-test('ffi016', omit_ways(['ghci]), compile_and_run, [''])
+test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
