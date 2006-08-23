@@ -113,7 +113,10 @@ import GHC.ST		( ST )
 import GHC.STRef	( STRef )
 import GHC.Ptr          ( Ptr, FunPtr )
 import GHC.ForeignPtr   ( ForeignPtr )
-import GHC.Stable       ( StablePtr )
+import GHC.Stable	( StablePtr, newStablePtr, freeStablePtr,
+			  deRefStablePtr, castStablePtrToPtr,
+			  castPtrToStablePtr )
+import GHC.Exception	( block )
 import GHC.Arr		( Array, STArray )
 
 #endif
@@ -602,14 +605,33 @@ data Cache = Cache { next_key :: !(IORef Key),	-- Not used by GHC (calls genSym 
 		     ap_tbl   :: !(HT.HashTable KeyPr Key) }
 
 {-# NOINLINE cache #-}
+#ifdef __GLASGOW_HASKELL__
+foreign import ccall unsafe "RtsTypeable.h getOrSetTypeableStore"
+    getOrSetTypeableStore :: Ptr a -> IO (Ptr a)
+#endif
+
 cache :: Cache
 cache = unsafePerformIO $ do
 		empty_tc_tbl <- HT.new (==) HT.hashString
 		empty_ap_tbl <- HT.new (==) hashKP
 		key_loc      <- newIORef (Key 1) 
-		return (Cache { next_key = key_loc,
-				tc_tbl = empty_tc_tbl, 
-				ap_tbl = empty_ap_tbl })
+		let ret = Cache {	next_key = key_loc,
+					tc_tbl = empty_tc_tbl, 
+					ap_tbl = empty_ap_tbl }
+#ifdef __GLASGOW_HASKELL__
+		block $ do
+			stable_ref <- newStablePtr ret
+			let ref = castStablePtrToPtr stable_ref
+			ref2 <- getOrSetTypeableStore ref
+			if ref==ref2
+				then deRefStablePtr stable_ref
+				else do
+					freeStablePtr stable_ref
+					deRefStablePtr
+						(castPtrToStablePtr ref2)
+#else
+		return ret
+#endif
 
 newKey :: IORef Key -> IO Key
 #ifdef __GLASGOW_HASKELL__
