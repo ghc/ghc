@@ -78,7 +78,7 @@ module GHC (
 	RunResult(..),
 	runStmt,
 	showModule,
-	compileExpr, HValue,
+	compileExpr, HValue, dynCompileExpr,
 	lookupName,
 #endif
 
@@ -175,6 +175,7 @@ module GHC (
 
 #ifdef GHCI
 import qualified Linker
+import Data.Dynamic     ( Dynamic )
 import Linker		( HValue, extendLinkEnv )
 import TcRnDriver	( tcRnLookupRdrName, tcRnGetInfo,
 			  tcRnLookupName, getModuleExports )
@@ -230,7 +231,7 @@ import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
 import Module
 import UniqFM
-import PackageConfig    ( PackageId )
+import PackageConfig    ( PackageId, stringToPackageId )
 import FiniteMap
 import Panic
 import Digraph
@@ -2019,6 +2020,27 @@ compileExpr s expr = withSession s $ \hsc_env -> do
 		case (names,hvals) of
 		  ([n],[hv]) -> return (Just hv)
 		  _ 	     -> panic "compileExpr"
+
+-- -----------------------------------------------------------------------------
+-- Compile an expression into a dynamic
+
+dynCompileExpr :: Session -> String -> IO (Maybe Dynamic)
+dynCompileExpr ses expr = do
+    (full,exports) <- getContext ses
+    setContext ses full $
+        (mkModule
+            (stringToPackageId "base") (mkModuleName "Data.Dynamic")
+        ):exports
+    let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
+    res <- withSession ses (flip hscStmt stmt)
+    setContext ses full exports
+    case res of
+        Nothing -> return Nothing
+        Just (_, names, hvals) -> do
+            vals <- (unsafeCoerce# hvals :: IO [Dynamic])
+            case (names,vals) of
+                (_:[], v:[])    -> return (Just v)
+                _               -> panic "dynCompileExpr"
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
