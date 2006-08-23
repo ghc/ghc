@@ -329,7 +329,8 @@ static block_rec* free_blocks = 0;
 static
 alloc_rec*
 allocNew(nat n) {
-    alloc_rec* rec = (alloc_rec*)stgMallocBytes(sizeof(alloc_rec),"getMBlocks: allocNew");
+    alloc_rec* rec;
+    rec = (alloc_rec*)stgMallocBytes(sizeof(alloc_rec),"getMBlocks: allocNew");
     rec->size = (n+1)*MBLOCK_SIZE;
     rec->base = 
         VirtualAlloc(NULL, rec->size, MEM_RESERVE, PAGE_READWRITE);
@@ -344,7 +345,8 @@ allocNew(nat n) {
             allocs=rec;
             rec->next=0;
         } else {
-            alloc_rec* it=allocs;
+            alloc_rec* it;
+            it=allocs;
             for(; it->next!=0 && it->next->base<rec->base; it=it->next) ;
             rec->next=it->next;
             it->next=rec;
@@ -358,11 +360,13 @@ static
 void
 insertFree(char* alloc_base, int alloc_size) {
     block_rec temp;
-    temp.base=0; temp.size=0; temp.next=free_blocks;
+    block_rec* it;
+    block_rec* prev;
 
-    block_rec* it = free_blocks;
-    block_rec* prev = &temp;
-    for( ; it!=0 && it->base<alloc_base; prev=it, it=it->next) ;
+    temp.base=0; temp.size=0; temp.next=free_blocks;
+    it = free_blocks;
+    prev = &temp;
+    for( ; it!=0 && it->base<alloc_base; prev=it, it=it->next) {}
 
     if(it!=0 && alloc_base+alloc_size == it->base) {
         if(prev->base + prev->size == alloc_base) {        /* Merge it, alloc, prev */
@@ -376,7 +380,8 @@ insertFree(char* alloc_base, int alloc_size) {
     } else if(prev->base + prev->size == alloc_base) {     /* Merge alloc, prev */
         prev->size += alloc_size;
     } else {                                                /* Merge none */
-        block_rec* rec = (block_rec*)stgMallocBytes(sizeof(block_rec),"getMBlocks: insertFree");
+        block_rec* rec;
+        rec = (block_rec*)stgMallocBytes(sizeof(block_rec),"getMBlocks: insertFree");
         rec->base=alloc_base;
         rec->size=alloc_size;
         rec->next = it;
@@ -389,13 +394,17 @@ static
 void*
 findFreeBlocks(nat n) {
     void* ret=0;
-    block_rec* it=free_blocks;
-    int required_size = n*MBLOCK_SIZE;
-    /* TODO: Don't just take first block, find smallest sufficient block */
+    block_rec* it;
     block_rec temp;
+    block_rec* prev;
+
+    int required_size;
+    it=free_blocks;
+    required_size = n*MBLOCK_SIZE;
     temp.next=free_blocks; temp.base=0; temp.size=0;
-    block_rec* prev=&temp;
-    for( ; it!=0 && it->size<required_size; prev=it, it=it->next ) ;
+    prev=&temp;
+    /* TODO: Don't just take first block, find smallest sufficient block */
+    for( ; it!=0 && it->size<required_size; prev=it, it=it->next ) {}
     if(it!=0) {
         if( (((unsigned long)it->base) & MBLOCK_MASK) == 0) { /* MBlock aligned */
             ret = (void*)it->base;
@@ -407,12 +416,14 @@ findFreeBlocks(nat n) {
                 it->size -=required_size;
             }
         } else {
-            char* need_base = (char*)(((unsigned long)it->base) & ((unsigned long)~MBLOCK_MASK)) + MBLOCK_SIZE;
-            block_rec* next
-                = (block_rec*)stgMallocBytes(
+            char* need_base;
+            block_rec* next;
+            int new_size;
+            need_base = (char*)(((unsigned long)it->base) & ((unsigned long)~MBLOCK_MASK)) + MBLOCK_SIZE;
+            next = (block_rec*)stgMallocBytes(
                     sizeof(block_rec)
                     , "getMBlocks: findFreeBlocks: splitting");
-            int new_size = need_base - it->base;
+            new_size = need_base - it->base;
             next->base = need_base +required_size;
             next->size = it->size - (new_size+required_size);
             it->size = new_size;
@@ -430,12 +441,15 @@ findFreeBlocks(nat n) {
    (ordered) allocated blocks. */
 static void
 commitBlocks(char* base, int size) {
-    alloc_rec* it=allocs;
-    for( ; it!=0 && (it->base+it->size)<base; it=it->next ) ;
+    alloc_rec* it;
+    it=allocs;
+    for( ; it!=0 && (it->base+it->size)<base; it=it->next ) {}
     for( ; it!=0 && size>0; it=it->next ) {
-        int size_delta = it->size - (base-it->base);
+        int size_delta;
+        void* temp;
+        size_delta = it->size - (base-it->base);
         if(size_delta>size) size_delta=size;
-        void* temp = VirtualAlloc(base, size_delta, MEM_COMMIT, PAGE_READWRITE);
+        temp = VirtualAlloc(base, size_delta, MEM_COMMIT, PAGE_READWRITE);
         if(temp==0)
             debugBelch("getMBlocks: VirtualAlloc MEM_COMMIT failed: %ld", GetLastError());
         size-=size_delta;
@@ -445,12 +459,13 @@ commitBlocks(char* base, int size) {
 
 void *
 getMBlocks(nat n) {
-    void* ret=0;
+    void* ret;
     ret = findFreeBlocks(n);
     if(ret==0) {
-        alloc_rec* alloc = allocNew(n);
+        alloc_rec* alloc;
+        alloc = allocNew(n);
         /* We already belch in allocNew if it fails */
-        if(alloc) {
+        if(alloc!=0) {
             insertFree(alloc->base, alloc->size);
             ret = findFreeBlocks(n);
         }
@@ -458,15 +473,18 @@ getMBlocks(nat n) {
 
     if(ret!=0) {
         /* (In)sanity tests */
-        if (((W_)ret & MBLOCK_MASK) != 0) barf("getMBlocks: misaligned block returned");
+        if (((W_)ret & MBLOCK_MASK) != 0) {
+            barf("getMBlocks: misaligned block returned");
+        }
 
         commitBlocks(ret, MBLOCK_SIZE*n);
 
         /* Global bookkeeping */
         mblocks_allocated += n;
-        int i=0;
-        for(; i<(int)n; ++i)
+        int i;
+        for(i=0; i<(int)n; ++i) {
             markHeapAlloced( ret + i * MBLOCK_SIZE );
+        }
     }
 
     return ret;
@@ -476,8 +494,10 @@ void
 freeAllMBlocks(void)
 {
     {
-        block_rec* next = 0;
-        block_rec* it = free_blocks;
+        block_rec* next;
+        block_rec* it;
+        next=0;
+        it = free_blocks;
         for(; it!=0; ) {
             next = it->next;
             stgFree(it);
@@ -485,11 +505,14 @@ freeAllMBlocks(void)
         }
     }
     {
-        alloc_rec* next = 0;
-        alloc_rec* it = allocs;
+        alloc_rec* next;
+        alloc_rec* it;
+        next=0;
+        it=allocs;
         for(; it!=0; ) {
-            if(!VirtualFree((void*)it->base, 0, MEM_RELEASE))
+            if(!VirtualFree((void*)it->base, 0, MEM_RELEASE)) {
                 debugBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed with %ld", GetLastError());
+            }
             next = it->next;
             stgFree(it);
             it=next;
