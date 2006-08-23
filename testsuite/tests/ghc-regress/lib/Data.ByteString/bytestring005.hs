@@ -427,9 +427,9 @@ prop_breakspan xs c = L.break (==c) xs == L.span (/=c) xs
 
 prop_span xs a = (span (/=a) xs) == (let (x,y) = L.span (/=a) (pack xs) in (unpack x, unpack y))
 
-prop_breakByte xs c = L.break (== c) xs == L.breakByte c xs
+-- prop_breakByte xs c = L.break (== c) xs == L.breakByte c xs
 
-prop_spanByte c xs = (L.span (==c) xs) == L.spanByte c xs
+-- prop_spanByte c xs = (L.span (==c) xs) == L.spanByte c xs
 
 prop_split c xs = (map L.unpack . map checkInvariant . L.split c $ xs)
                == (map P.unpack . P.split c . P.pack . L.unpack $ xs)
@@ -443,9 +443,9 @@ prop_splitWith f xs = (l1 == l2 || l1 == l2+1) &&
 prop_joinsplit c xs = L.join (pack [c]) (L.split c xs) == id xs
 
 prop_group xs       = group xs == (map unpack . L.group . pack) xs
-prop_groupBy  f xs  = groupBy f xs == (map unpack . L.groupBy f . pack) xs
+-- prop_groupBy  f xs  = groupBy f xs == (map unpack . L.groupBy f . pack) xs
 
-prop_joinjoinByte xs ys c = L.joinWithByte c xs ys == L.join (L.singleton c) [xs,ys]
+-- prop_joinjoinByte xs ys c = L.joinWithByte c xs ys == L.join (L.singleton c) [xs,ys]
 
 prop_index xs =
   not (null xs) ==>
@@ -465,11 +465,11 @@ prop_elem    xs c = (c `elem` xs)    == (c `L.elem` (pack xs))
 prop_notElem xs c = (c `notElem` xs) == (L.notElem c (pack xs))
 prop_elem_notelem xs c = c `L.elem` xs == not (c `L.notElem` xs)
 
-prop_filterByte  xs c = L.filterByte c xs == L.filter (==c) xs
-prop_filterByte2 xs c = unpack (L.filterByte c xs) == filter (==c) (unpack xs)
+-- prop_filterByte  xs c = L.filterByte c xs == L.filter (==c) xs
+-- prop_filterByte2 xs c = unpack (L.filterByte c xs) == filter (==c) (unpack xs)
 
-prop_filterNotByte  xs c = L.filterNotByte c xs == L.filter (/=c) xs
-prop_filterNotByte2 xs c = unpack (L.filterNotByte c xs) == filter (/=c) (unpack xs)
+-- prop_filterNotByte  xs c = L.filterNotByte c xs == L.filter (/=c) xs
+-- prop_filterNotByte2 xs c = unpack (L.filterNotByte c xs) == filter (/=c) (unpack xs)
 
 prop_find p xs = find p xs == L.find p (pack xs)
 
@@ -575,17 +575,17 @@ prop_splitWithBB f xs = (l1 == l2 || l1 == l2+1) &&
 
 prop_joinsplitBB c xs = P.join (P.pack [c]) (P.split c xs) == xs
 
-prop_linessplitBB xs =
-    (not . C.null) xs ==>
-    C.lines' xs == C.split '\n' xs
+-- prop_linessplitBB xs =
+--     (not . C.null) xs ==>
+--     C.lines' xs == C.split '\n' xs
 
 prop_linessplit2BB xs =
     C.lines xs == C.split '\n' xs ++ (if C.last xs == '\n' then [C.empty] else [])
 
 prop_splitsplitWithBB c xs = P.split c xs == P.splitWith (== c) xs
 
-prop_bijectionBB  c = (C.w2c . C.c2w) c == id c
-prop_bijectionBB' w = (C.c2w . C.w2c) w == id w
+prop_bijectionBB  c = (P.w2c . P.c2w) c == id c
+prop_bijectionBB' w = (P.c2w . P.w2c) w == id w
 
 prop_packunpackBB  s = (P.unpack . P.pack) s == id s
 prop_packunpackBB' s = (P.pack . P.unpack) s == id s
@@ -635,7 +635,7 @@ prop_append3BB xs ys = P.append xs ys == P.pack (P.unpack xs ++ P.unpack ys)
 prop_map1BB f xs   = P.map f (P.pack xs)    == P.pack (map f xs)
 prop_map2BB f g xs = P.map f (P.map g xs) == P.map (f . g) xs
 prop_map3BB f xs   = map f xs == (P.unpack . P.map f .  P.pack) xs
-prop_mapBB' f xs   = P.map' f (P.pack xs) == P.pack (map f xs)
+-- prop_mapBB' f xs   = P.map' f (P.pack xs) == P.pack (map f xs)
 
 prop_filter1BB xs   = (filter (=='X') xs) == (C.unpack $ C.filter (=='X') (C.pack xs))
 prop_filter2BB p xs = (filter p xs) == (P.unpack $ P.filter p (P.pack xs))
@@ -725,7 +725,7 @@ prop_unlinesBB xs = (unlines.lines) xs == (C.unpack. C.unlines . C.lines .C.pack
 
 prop_wordsBB xs =
     (words xs) == ((map C.unpack) . C.words . C.pack) xs
-prop_wordstokensBB xs = C.words xs == C.tokens isSpace xs
+-- prop_wordstokensBB xs = C.words xs == C.tokens isSpace xs
 
 prop_unwordsBB xs =
     (C.pack.unwords.words) xs == (C.unwords . C.words .C.pack) xs
@@ -741,7 +741,7 @@ prop_joinBB xs ys = (concat . (intersperse ys) . lines) xs ==
 prop_elemIndex1BB xs   = (elemIndex 'X' xs) == (C.elemIndex 'X' (C.pack xs))
 prop_elemIndex2BB xs c = (elemIndex c xs) == (C.elemIndex c (C.pack xs))
 
-prop_lineIndices1BB xs = C.elemIndices '\n' xs == C.lineIndices xs
+-- prop_lineIndices1BB xs = C.elemIndices '\n' xs == C.lineIndices xs
 
 prop_countBB c xs = length (P.elemIndices c xs) == P.count c xs
 
@@ -779,13 +779,13 @@ prop_transposeBB xs = (transpose xs) == ((map P.unpack) . P.transpose .  (map P.
 prop_maximumBB xs = (not (null xs)) ==> (maximum xs) == (P.maximum ( P.pack xs ))
 prop_minimumBB xs = (not (null xs)) ==> (minimum xs) == (P.minimum ( P.pack xs ))
 
-prop_dropSpaceBB xs    = dropWhile isSpace xs == C.unpack (C.dropSpace (C.pack xs))
-prop_dropSpaceEndBB xs = (C.reverse . (C.dropWhile isSpace) . C.reverse) (C.pack xs) ==
-                       (C.dropSpaceEnd (C.pack xs))
+-- prop_dropSpaceBB xs    = dropWhile isSpace xs == C.unpack (C.dropSpace (C.pack xs))
+-- prop_dropSpaceEndBB xs = (C.reverse . (C.dropWhile isSpace) . C.reverse) (C.pack xs) ==
+--                        (C.dropSpaceEnd (C.pack xs))
 
-prop_breakSpaceBB xs =
-    (let (x,y) = C.breakSpace (C.pack xs)
-     in (C.unpack x, C.unpack y)) == (break isSpace xs)
+-- prop_breakSpaceBB xs =
+--     (let (x,y) = C.breakSpace (C.pack xs)
+--      in (C.unpack x, C.unpack y)) == (break isSpace xs)
 
 prop_spanEndBB xs =
         (C.spanEnd (not . isSpace) (C.pack xs)) ==
@@ -793,22 +793,22 @@ prop_spanEndBB xs =
 
 prop_breakEndBB p xs = P.breakEnd (not.p) xs == P.spanEnd p xs
 
-prop_breakCharBB c xs =
-        (break (==c) xs) ==
-        (let (x,y) = C.breakChar c (C.pack xs) in (C.unpack x, C.unpack y))
+-- prop_breakCharBB c xs =
+--         (break (==c) xs) ==
+--         (let (x,y) = C.breakChar c (C.pack xs) in (C.unpack x, C.unpack y))
 
-prop_spanCharBB c xs =
-        (break (/=c) xs) ==
-        (let (x,y) = C.spanChar c (C.pack xs) in (C.unpack x, C.unpack y))
+-- prop_spanCharBB c xs =
+--         (break (/=c) xs) ==
+--         (let (x,y) = C.spanChar c (C.pack xs) in (C.unpack x, C.unpack y))
 
-prop_spanChar_1BB c xs =
-        (C.span (==c) xs) == C.spanChar c xs
+-- prop_spanChar_1BB c xs =
+--         (C.span (==c) xs) == C.spanChar c xs
 
-prop_wordsBB' xs =
-    (C.unpack . C.unwords  . C.words' . C.pack) xs ==
-    (map (\c -> if isSpace c then ' ' else c) xs)
+-- prop_wordsBB' xs =
+--     (C.unpack . C.unwords  . C.words' . C.pack) xs ==
+--     (map (\c -> if isSpace c then ' ' else c) xs)
 
-prop_linesBB' xs = (C.unpack . C.unlines' . C.lines' . C.pack) xs == (xs)
+-- prop_linesBB' xs = (C.unpack . C.unlines' . C.lines' . C.pack) xs == (xs)
 
 prop_unfoldrBB c n =
     (fst $ C.unfoldrN n fn c) == (C.pack $ take n $ unfoldr fn c)
@@ -849,20 +849,20 @@ prop_readint2BB s =
     let s' = filter (\c -> c `notElem` ['0'..'9']) s
     in C.readInt (C.pack s') == Nothing
 
-prop_filterChar1BB c xs = (filter (==c) xs) == ((C.unpack . C.filterChar c . C.pack) xs)
-prop_filterChar2BB c xs = (C.filter (==c) (C.pack xs)) == (C.filterChar c (C.pack xs))
-prop_filterChar3BB c xs = C.filterChar c xs == C.replicate (C.count c xs) c
+-- prop_filterChar1BB c xs = (filter (==c) xs) == ((C.unpack . C.filterChar c . C.pack) xs)
+-- prop_filterChar2BB c xs = (C.filter (==c) (C.pack xs)) == (C.filterChar c (C.pack xs))
+-- prop_filterChar3BB c xs = C.filterChar c xs == C.replicate (C.count c xs) c
 
-prop_filterNotChar1BB c xs = (filter (/=c) xs) == ((C.unpack . C.filterNotChar c . C.pack) xs)
-prop_filterNotChar2BB c xs = (C.filter (/=c) (C.pack xs)) == (C.filterNotChar c (C.pack xs))
+-- prop_filterNotChar1BB c xs = (filter (/=c) xs) == ((C.unpack . C.filterNotChar c . C.pack) xs)
+-- prop_filterNotChar2BB c xs = (C.filter (/=c) (C.pack xs)) == (C.filterNotChar c (C.pack xs))
 
-prop_joinjoinpathBB xs ys c = C.joinWithChar c xs ys == C.join (C.singleton c) [xs,ys]
+-- prop_joinjoinpathBB xs ys c = C.joinWithChar c xs ys == C.join (C.singleton c) [xs,ys]
 
 prop_zipBB  xs ys = zip xs ys == P.zip (P.pack xs) (P.pack ys)
 prop_zip1BB xs ys = P.zip xs ys == zip (P.unpack xs) (P.unpack ys)
 
 prop_zipWithBB xs ys = P.zipWith (,) xs ys == P.zip xs ys
-prop_zipWith'BB xs ys = P.pack (P.zipWith (+) xs ys) == P.zipWith' (+) xs ys
+-- prop_zipWith'BB xs ys = P.pack (P.zipWith (+) xs ys) == P.zipWith' (+) xs ys
 
 prop_unzipBB x = let (xs,ys) = unzip x in (P.pack xs, P.pack ys) == P.unzip x
 
@@ -981,18 +981,18 @@ bb_tests =
     ,    ("intersperse",    mytest prop_intersperseBB)
     ,    ("maximum",        mytest prop_maximumBB)
     ,    ("minimum",        mytest prop_minimumBB)
-    ,    ("breakChar",      mytest prop_breakCharBB)
-    ,    ("spanChar 1",     mytest prop_spanCharBB)
-    ,    ("spanChar 2",     mytest prop_spanChar_1BB)
-    ,    ("breakSpace",     mytest prop_breakSpaceBB)
-    ,    ("dropSpace",      mytest prop_dropSpaceBB)
+--  ,    ("breakChar",      mytest prop_breakCharBB)
+--  ,    ("spanChar 1",     mytest prop_spanCharBB)
+--  ,    ("spanChar 2",     mytest prop_spanChar_1BB)
+--  ,    ("breakSpace",     mytest prop_breakSpaceBB)
+--  ,    ("dropSpace",      mytest prop_dropSpaceBB)
     ,    ("spanEnd",        mytest prop_spanEndBB)
     ,    ("breakEnd",       mytest prop_breakEndBB)
     ,    ("elemIndexEnd 1",mytest prop_elemIndexEnd1BB)
     ,    ("elemIndexEnd 2",mytest prop_elemIndexEnd2BB)
-    ,    ("words'",         mytest prop_wordsBB')
-    ,    ("lines'",         mytest prop_linesBB')
-    ,    ("dropSpaceEnd",   mytest prop_dropSpaceEndBB)
+--  ,    ("words'",         mytest prop_wordsBB')
+--  ,    ("lines'",         mytest prop_linesBB')
+--  ,    ("dropSpaceEnd",   mytest prop_dropSpaceEndBB)
     ,    ("unfoldr",        mytest prop_unfoldrBB)
     ,    ("prefix",         mytest prop_prefixBB)
     ,    ("suffix",         mytest prop_suffixBB)
@@ -1006,15 +1006,15 @@ bb_tests =
     ,    ("readInt",        mytest prop_readintBB)
     ,    ("readInt 2",      mytest prop_readint2BB)
     ,    ("Lazy.readInt",   mytest prop_readintLL)
-    ,    ("filterChar1",    mytest prop_filterChar1BB)
-    ,    ("filterChar2",    mytest prop_filterChar2BB)
-    ,    ("filterChar3",    mytest prop_filterChar3BB)
-    ,    ("filterNotChar1", mytest prop_filterNotChar1BB)
-    ,    ("filterNotChar2", mytest prop_filterNotChar2BB)
+--  ,    ("filterChar1",    mytest prop_filterChar1BB)
+--  ,    ("filterChar2",    mytest prop_filterChar2BB)
+--  ,    ("filterChar3",    mytest prop_filterChar3BB)
+--  ,    ("filterNotChar1", mytest prop_filterNotChar1BB)
+--  ,    ("filterNotChar2", mytest prop_filterNotChar2BB)
     ,    ("tail",           mytest prop_tailSBB)
     ,    ("index",          mytest prop_indexBB)
     ,    ("unsafeIndex",    mytest prop_unsafeIndexBB)
-    ,    ("map'",           mytest prop_mapBB')
+--  ,    ("map'",           mytest prop_mapBB')
     ,    ("filter",         mytest prop_filterBB)
     ,    ("elem",           mytest prop_elemSBB)
     ,    ("take",           mytest prop_takeSBB)
@@ -1031,18 +1031,18 @@ bb_tests =
     ,    ("unlines ",       mytest prop_unlinesSBB)
     ,    ("words ",         mytest prop_wordsSBB)
     ,    ("unwords ",       mytest prop_unwordsSBB)
-    ,    ("wordstokens",    mytest prop_wordstokensBB)
+--  ,    ("wordstokens",    mytest prop_wordstokensBB)
     ,    ("splitWith",      mytest prop_splitWithBB)
     ,    ("joinsplit",      mytest prop_joinsplitBB)
-    ,    ("lineIndices",    mytest prop_lineIndices1BB)
+--  ,    ("lineIndices",    mytest prop_lineIndices1BB)
     ,    ("count",          mytest prop_countBB)
-    ,    ("linessplit",     mytest prop_linessplitBB)
+--  ,    ("linessplit",     mytest prop_linessplitBB)
     ,    ("splitsplitWith", mytest prop_splitsplitWithBB)
-    ,    ("joinjoinpath",   mytest prop_joinjoinpathBB)
+--  ,    ("joinjoinpath",   mytest prop_joinjoinpathBB)
     ,    ("zip",            mytest prop_zipBB)
     ,    ("zip1",           mytest prop_zip1BB)
     ,    ("zipWith",        mytest prop_zipWithBB)
-    ,    ("zipWith'",       mytest prop_zipWith'BB)
+--  ,    ("zipWith'",       mytest prop_zipWith'BB)
     ,    ("unzip",          mytest prop_unzipBB)
     ,    ("concatMap",      mytest prop_concatMapBB)
     ]
@@ -1122,14 +1122,14 @@ ll_tests =
     ,("break",              mytest prop_break)
     ,("span",               mytest prop_span)
     ,("break/span",         mytest prop_breakspan)
-    ,("break/breakByte",    mytest prop_breakByte)
-    ,("span/spanByte",      mytest prop_spanByte)
+--  ,("break/breakByte",    mytest prop_breakByte)
+--  ,("span/spanByte",      mytest prop_spanByte)
     ,("split",              mytest prop_split)
     ,("splitWith",          mytest prop_splitWith)
     ,("join.split/id",      mytest prop_joinsplit)
-    ,("join/joinByte",      mytest prop_joinjoinByte)
+--  ,("join/joinByte",      mytest prop_joinjoinByte)
     ,("group",              mytest prop_group)
-    ,("groupBy",            mytest prop_groupBy)
+--  ,("groupBy",            mytest prop_groupBy)
     ,("index",              mytest prop_index)
     ,("elemIndex",          mytest prop_elemIndex)
     ,("elemIndices",        mytest prop_elemIndices)
@@ -1141,10 +1141,10 @@ ll_tests =
     ,("elem",               mytest prop_elem)
     ,("notElem",            mytest prop_notElem)
     ,("elem/notElem",       mytest prop_elem_notelem)
-    ,("filterByte 1",       mytest prop_filterByte)
-    ,("filterByte 2",       mytest prop_filterByte2)
-    ,("filterNotByte 1",    mytest prop_filterNotByte)
-    ,("filterNotByte 2",    mytest prop_filterNotByte2)
+--  ,("filterByte 1",       mytest prop_filterByte)
+--  ,("filterByte 2",       mytest prop_filterByte2)
+--  ,("filterNotByte 1",    mytest prop_filterNotByte)
+--  ,("filterNotByte 2",    mytest prop_filterNotByte2)
     ,("isPrefixOf",         mytest prop_isPrefixOf)
     ,("concatMap",          mytest prop_concatMap)
     ]
