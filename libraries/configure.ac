@@ -32,6 +32,9 @@ fi
 if test -d time; then
   AC_CONFIG_SUBDIRS(time)
 fi
+if test -d unix; then
+  AC_CONFIG_SUBDIRS(unix)
+fi
 if test -d regex-posix; then
   AC_CONFIG_SUBDIRS(regex-posix)
 fi
