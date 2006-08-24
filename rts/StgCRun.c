@@ -328,12 +328,15 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	    ".align 4\n"
             ".global " STG_RETURN "\n"
        	    STG_RETURN ":"
-	    : : : "l0","l1","l2","l3","l4","l5","l6","l7");
+	    : : "p" (space) : "l0","l1","l2","l3","l4","l5","l6","l7");
     /* we tell the C compiler that l0-l7 are clobbered on return to
      * StgReturn, otherwise it tries to use these to save eg. the
      * address of space[100] across the call.  The correct thing
      * to do would be to save all the callee-saves regs, but we
      * can't be bothered to do that.
+     *
+     * We also explicitly mark space as used since gcc eliminates it
+     * otherwise.
      *
      * The code that gcc generates for this little fragment is now
      * terrible.  We could do much better by coding it directly in
