@@ -314,7 +314,6 @@ isStaticFlag f =
 	"fsemi-tagging",
 	"flet-no-escape",
 	"femit-extern-decls",
-	"fglobalise-toplev-names",
 	"fgransim",
 	"fno-hi-version-check",
 	"dno-black-holing",
