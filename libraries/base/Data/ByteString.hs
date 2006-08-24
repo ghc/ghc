@@ -1009,10 +1009,10 @@ break p ps = case findIndexOrEnd p ps of n -> (unsafeTake n ps, unsafeDrop n ps)
   #-}
 
 #if __GLASGOW_HASKELL__ >= 605
--- {-# RULES
--- "FPS specialise break (==x)" forall x.
---     break (==x) = breakByte x
---   #-}
+{-# RULES
+"FPS specialise break (==x)" forall x.
+    break (==x) = breakByte x
+  #-}
 #endif
 
 -- | 'breakByte' breaks its ByteString argument at the first occurence
@@ -1063,10 +1063,10 @@ spanByte c ps@(PS x s l) = inlinePerformIO $ withForeignPtr x $ \p ->
   #-}
 
 #if __GLASGOW_HASKELL__ >= 605
--- {-# RULES
--- "FPS specialise span (==x)" forall x.
---     span (==x) = spanByte x
---   #-}
+{-# RULES
+"FPS specialise span (==x)" forall x.
+    span (==x) = spanByte x
+  #-}
 #endif
 
 -- | 'spanEnd' behaves like 'span' but from the end of the 'ByteString'.
@@ -1435,6 +1435,14 @@ filterByte w ps = replicate (count w ps) w
   "FPS specialise filter (== x)" forall x.
       filter ((==) x) = filterByte x
   #-}
+
+#if __GLASGOW_HASKELL__ >= 605
+{-# RULES
+"FPS specialise filter (== x)" forall x.
+    filter (== x) = filterByte x
+  #-}
+#endif
+
 --
 -- | /O(n)/ A first order equivalent of /filter . (\/=)/, for the common
 -- case of filtering a single byte out of a list. It is more efficient
@@ -1448,9 +1456,17 @@ filterNotByte w = filter (/= w)
 {-# INLINE filterNotByte #-}
 
 {-# RULES
-"FPS specialise filter (/= x)" forall x.
+"FPS specialise filter (x /=)" forall x.
     filter ((/=) x) = filterNotByte x
   #-}
+
+#if __GLASGOW_HASKELL__ >= 605
+{-# RULES
+"FPS specialise filter (/= x)" forall x.
+    filter (/= x) = filterNotByte x
+  #-}
+#endif
+
 -- | /O(n)/ The 'find' function takes a predicate and a ByteString,
 -- and returns the first element in matching the predicate, or 'Nothing'
 -- if there is no such element.
