@@ -26,6 +26,11 @@ to get the other repositories:
    $ cd ghc
    $ sh darcs-all
 
+This grabs the "core" packages by default.  To get the full set of
+packages (which will probably take a long time to build), instead say
+
+   $ sh darcs-all --extra get
+
 
 Building & Installing
 =====================
