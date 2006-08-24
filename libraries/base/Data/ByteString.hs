@@ -453,7 +453,7 @@ unpackList (PS fp off len) = withPtr fp $ \p -> do
     loop (p `plusPtr` off) (len-1) []
 
 {-# RULES
-"unpack-list"  [1]  forall p  . unpackFoldr p (:) [] = unpackList p
+    "FPS unpack-list"  [1]  forall p  . unpackFoldr p (:) [] = unpackList p
  #-}
 
 #endif
@@ -513,7 +513,7 @@ lengthU = foldl' (const . (+1)) (0::Int)
 {-# RULES
 
 -- v2 fusion
-"length/loop" forall loop s .
+"FPS length/loop" forall loop s .
   length  (loopArr (loopWrapper loop s)) =
   lengthU (loopArr (loopWrapper loop s))
 
@@ -819,11 +819,11 @@ minimumU = foldl1' min
 
 {-# RULES
 
-"minimum/loop" forall loop s .
+"FPS minimum/loop" forall loop s .
   minimum  (loopArr (loopWrapper loop s)) =
   minimumU (loopArr (loopWrapper loop s))
 
-"maximum/loop" forall loop s .
+"FPS maximum/loop" forall loop s .
   maximum  (loopArr (loopWrapper loop s)) =
   maximumU (loopArr (loopWrapper loop s))
 
@@ -1438,8 +1438,8 @@ filterByte w ps = replicate (count w ps) w
 
 #if __GLASGOW_HASKELL__ >= 605
 {-# RULES
-"FPS specialise filter (== x)" forall x.
-    filter (== x) = filterByte x
+  "FPS specialise filter (== x)" forall x.
+     filter (== x) = filterByte x
   #-}
 #endif
 
@@ -1582,6 +1582,9 @@ zipWith :: (Word8 -> Word8 -> a) -> ByteString -> ByteString -> [a]
 zipWith f ps qs
     | null ps || null qs = []
     | otherwise = f (unsafeHead ps) (unsafeHead qs) : zipWith f (unsafeTail ps) (unsafeTail qs)
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] zipWith #-}
+#endif
 
 --
 -- | A specialised version of zipWith for the common case of a
@@ -1613,6 +1616,7 @@ zipWith' f (PS fp s l) (PS fq t m) = inlinePerformIO $
 
 "FPS specialise zipWith" forall (f :: Word8 -> Word8 -> Word8) p q .
     zipWith f p q = unpack (zipWith' f p q)
+
   #-}
 
 -- | /O(n)/ 'unzip' transforms a list of pairs of bytes into a pair of

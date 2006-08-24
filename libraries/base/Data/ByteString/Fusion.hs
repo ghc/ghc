@@ -233,7 +233,7 @@ loopU f start (PS z s i) = unsafePerformIO $ withForeignPtr z $ \a -> do
 
 {-# RULES
 
-"loop/loop fusion!" forall em1 em2 start1 start2 arr.
+"FPS loop/loop fusion!" forall em1 em2 start1 start2 arr.
   loopU em2 start2 (loopArr (loopU em1 start1 arr)) =
     loopSndAcc (loopU (em1 `fuseEFL` em2) (start1 :*: start2) arr)
 
@@ -260,7 +260,7 @@ loopL f = loop
 
 {-# RULES
 
-"lazy loop/loop fusion!" forall em1 em2 start1 start2 arr.
+"FPS lazy loop/loop fusion!" forall em1 em2 start1 start2 arr.
   loopL em2 start2 (loopArr (loopL em1 start1 arr)) =
     loopSndAcc (loopL (em1 `fuseEFL` em2) (start1 :*: start2) arr)
 
@@ -430,13 +430,13 @@ sequenceLoops loop1 loop2 src dest len0 = do
 
 {-# RULES
 
-"loopArr/loopSndAcc" forall x.
+"FPS loopArr/loopSndAcc" forall x.
   loopArr (loopSndAcc x) = loopArr x
 
-"seq/NoAcc" forall (u::NoAcc) e.
+"FPS seq/NoAcc" forall (u::NoAcc) e.
   u `seq` e = e
 
-"loop/loop wrapper elimination" forall loop1 loop2 arr.
+"FPS loop/loop wrapper elimination" forall loop1 loop2 arr.
   loopWrapper loop2 (loopArr (loopWrapper loop1 arr)) =
     loopSndAcc (loopWrapper (sequenceLoops loop1 loop2) arr)
 
@@ -445,95 +445,95 @@ sequenceLoops loop1 loop2 src dest len0 = do
 -- is monadic, so its really n >> m fusion (i.e. m.n), not n . m fusion.
 --
 
-"up/up loop fusion" forall f1 f2 acc1 acc2.
+"FPS up/up loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doUpLoop f1 acc1) (doUpLoop f2 acc2) =
     doUpLoop (f1 `fuseAccAccEFL` f2) (acc1 :*: acc2)
 
-"map/map loop fusion" forall f1 f2 acc1 acc2.
+"FPS map/map loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doMapLoop f1 acc1) (doMapLoop f2 acc2) =
     doMapLoop (f1 `fuseMapMapEFL` f2) (acc1 :*: acc2)
 
-"filter/filter loop fusion" forall f1 f2 acc1 acc2.
+"FPS filter/filter loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doFilterLoop f1 acc1) (doFilterLoop f2 acc2) =
     doFilterLoop (f1 `fuseFilterFilterEFL` f2) (acc1 :*: acc2)
 
-"map/filter loop fusion" forall f1 f2 acc1 acc2.
+"FPS map/filter loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doMapLoop f1 acc1) (doFilterLoop f2 acc2) =
     doNoAccLoop (f1 `fuseMapFilterEFL` f2) (acc1 :*: acc2)
 
-"filter/map loop fusion" forall f1 f2 acc1 acc2.
+"FPS filter/map loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doFilterLoop f1 acc1) (doMapLoop f2 acc2) =
     doNoAccLoop (f1 `fuseFilterMapEFL` f2) (acc1 :*: acc2)
 
-"map/up loop fusion" forall f1 f2 acc1 acc2.
+"FPS map/up loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doMapLoop f1 acc1) (doUpLoop f2 acc2) =
     doUpLoop (f1 `fuseMapAccEFL` f2) (acc1 :*: acc2)
 
-"up/map loop fusion" forall f1 f2 acc1 acc2.
+"FPS up/map loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doUpLoop f1 acc1) (doMapLoop f2 acc2) =
     doUpLoop (f1 `fuseAccMapEFL` f2) (acc1 :*: acc2)
 
-"filter/up loop fusion" forall f1 f2 acc1 acc2.
+"FPS filter/up loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doFilterLoop f1 acc1) (doUpLoop f2 acc2) =
     doUpLoop (f1 `fuseFilterAccEFL` f2) (acc1 :*: acc2)
 
-"up/filter loop fusion" forall f1 f2 acc1 acc2.
+"FPS up/filter loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doUpLoop f1 acc1) (doFilterLoop f2 acc2) =
     doUpLoop (f1 `fuseAccFilterEFL` f2) (acc1 :*: acc2)
 
-"down/down loop fusion" forall f1 f2 acc1 acc2.
+"FPS down/down loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doDownLoop f1 acc1) (doDownLoop f2 acc2) =
     doDownLoop (f1 `fuseAccAccEFL` f2) (acc1 :*: acc2)
 
-"map/down fusion" forall f1 f2 acc1 acc2.
+"FPS map/down fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doMapLoop f1 acc1) (doDownLoop f2 acc2) =
     doDownLoop (f1 `fuseMapAccEFL` f2) (acc1 :*: acc2)
 
-"down/map loop fusion" forall f1 f2 acc1 acc2.
+"FPS down/map loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doDownLoop f1 acc1) (doMapLoop f2 acc2) =
     doDownLoop (f1 `fuseAccMapEFL` f2) (acc1 :*: acc2)
 
-"filter/down fusion" forall f1 f2 acc1 acc2.
+"FPS filter/down fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doFilterLoop f1 acc1) (doDownLoop f2 acc2) =
     doDownLoop (f1 `fuseFilterAccEFL` f2) (acc1 :*: acc2)
 
-"down/filter loop fusion" forall f1 f2 acc1 acc2.
+"FPS down/filter loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doDownLoop f1 acc1) (doFilterLoop f2 acc2) =
     doDownLoop (f1 `fuseAccFilterEFL` f2) (acc1 :*: acc2)
 
-"noAcc/noAcc loop fusion" forall f1 f2 acc1 acc2.
+"FPS noAcc/noAcc loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doNoAccLoop f1 acc1) (doNoAccLoop f2 acc2) =
     doNoAccLoop (f1 `fuseNoAccNoAccEFL` f2) (acc1 :*: acc2)
 
-"noAcc/up loop fusion" forall f1 f2 acc1 acc2.
+"FPS noAcc/up loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doNoAccLoop f1 acc1) (doUpLoop f2 acc2) =
     doUpLoop (f1 `fuseNoAccAccEFL` f2) (acc1 :*: acc2)
 
-"up/noAcc loop fusion" forall f1 f2 acc1 acc2.
+"FPS up/noAcc loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doUpLoop f1 acc1) (doNoAccLoop f2 acc2) =
     doUpLoop (f1 `fuseAccNoAccEFL` f2) (acc1 :*: acc2)
 
-"map/noAcc loop fusion" forall f1 f2 acc1 acc2.
+"FPS map/noAcc loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doMapLoop f1 acc1) (doNoAccLoop f2 acc2) =
     doNoAccLoop (f1 `fuseMapNoAccEFL` f2) (acc1 :*: acc2)
 
-"noAcc/map loop fusion" forall f1 f2 acc1 acc2.
+"FPS noAcc/map loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doNoAccLoop f1 acc1) (doMapLoop f2 acc2) =
     doNoAccLoop (f1 `fuseNoAccMapEFL` f2) (acc1 :*: acc2)
 
-"filter/noAcc loop fusion" forall f1 f2 acc1 acc2.
+"FPS filter/noAcc loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doFilterLoop f1 acc1) (doNoAccLoop f2 acc2) =
     doNoAccLoop (f1 `fuseFilterNoAccEFL` f2) (acc1 :*: acc2)
 
-"noAcc/filter loop fusion" forall f1 f2 acc1 acc2.
+"FPS noAcc/filter loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doNoAccLoop f1 acc1) (doFilterLoop f2 acc2) =
     doNoAccLoop (f1 `fuseNoAccFilterEFL` f2) (acc1 :*: acc2)
 
-"noAcc/down loop fusion" forall f1 f2 acc1 acc2.
+"FPS noAcc/down loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doNoAccLoop f1 acc1) (doDownLoop f2 acc2) =
     doDownLoop (f1 `fuseNoAccAccEFL` f2) (acc1 :*: acc2)
 
-"down/noAcc loop fusion" forall f1 f2 acc1 acc2.
+"FPS down/noAcc loop fusion" forall f1 f2 acc1 acc2.
   sequenceLoops (doDownLoop f1 acc1) (doNoAccLoop f2 acc2) =
     doDownLoop (f1 `fuseAccNoAccEFL` f2) (acc1 :*: acc2)
 

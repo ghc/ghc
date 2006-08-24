@@ -307,15 +307,14 @@ pack str = B.unsafeCreate (P.length str) $ \(Ptr p) -> stToIO (go p str)
     writeByte p c = ST $ \s# ->
         case writeWord8OffAddr# p 0# c s# of s2# -> (# s2#, () #)
     {-# INLINE writeByte #-}
+{-# INLINE [1] pack #-}
 
 {-# RULES
-"pack/packAddress" forall s# .
-                   pack (unpackCString# s#) = B.packAddress s#
+    "FPS pack/packAddress" forall s .
+       pack (unpackCString# s) = B.packAddress s
  #-}
 
 #endif
-
-{-# INLINE pack #-}
 
 -- | /O(n)/ Converts a 'ByteString' to a 'String'.
 unpack :: ByteString -> [Char]
@@ -520,12 +519,16 @@ takeWhile f = B.takeWhile (f . w2c)
 -- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@.
 dropWhile :: (Char -> Bool) -> ByteString -> ByteString
 dropWhile f = B.dropWhile (f . w2c)
-{-# INLINE dropWhile #-}
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] dropWhile #-}
+#endif
 
 -- | 'break' @p@ is equivalent to @'span' ('not' . p)@.
 break :: (Char -> Bool) -> ByteString -> (ByteString, ByteString)
 break f = B.break (f . w2c)
-{-# INLINE break #-}
+#if defined(__GLASGOW_HASKELL__)
+{-# INLINE [1] break #-}
+#endif
 
 -- | 'span' @p xs@ breaks the ByteString into two segments. It is
 -- equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
