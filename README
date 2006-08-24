@@ -16,20 +16,48 @@ Information for developers of GHC can be found here:
 Getting the Source
 ==================
 
-First get the GHC darcs repository:
+There are two ways to get a source tree:
 
-   $ darcs get http://darcs.haskell.org/ghc/
+  1. Download source tarballs
+  ---------------------------
 
-Then run the darcs-all shell script in that repository 
-to get the other repositories:
+  The GHC source distribution comes in two parts:
 
-   $ cd ghc
-   $ sh darcs-all
+      ghc-<version>-src.tar.bz2
+      ghc-<version>-src-extralibs.tar.bz2
 
-This grabs the "core" packages by default.  To get the full set of
-packages (which will probably take a long time to build), instead say
+  You only need the first one, which contains GHC itself and
+  the "core" libraries.  
 
-   $ sh darcs-all --extra get
+  The extralibs package contains a bunch of optional libraries.  If
+  you want, you can unpack this over the top of your source tree, and
+  these extra libraries will be built and installed automatically.
+  Make sure you unpack the extralibs package before running configure
+  (see below).
+
+  If you don't build extralibs now, you can add them later by building
+  and installing individual packages using Cabal.
+
+  2. Get the source from darcs
+  ----------------------------
+
+  First get the GHC darcs repository:
+
+    $ darcs get http://darcs.haskell.org/ghc/
+
+  Then run the darcs-all shell script in that repository 
+  to get the other repositories:
+
+     $ cd ghc
+     $ sh darcs-all get
+
+  This grabs the "core" packages by default.  To get the full set of
+  packages, instead say
+
+     $ sh darcs-all --extra get
+
+  This also downloads the libraries that are normally bundled in the
+  "extralibs" package (see above).
 
 
 Building & Installing
