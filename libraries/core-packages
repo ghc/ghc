@@ -1,0 +1,11 @@
+base
+Cabal
+haskell98
+readline
+regex-base
+regex-compat
+regex-posix
+stm
+template-haskell
+unix
+Win32

@@ -28,7 +28,7 @@ darcsall()
 	message "== $dir not present or not a repository; skipping"
     fi
   done
-  for pkg in `cat libraries/default-packages`; do
+  for pkg in `cat libraries/core-packages libraries/extra-packages`; do
     if test -d libraries/$pkg; then
 	message "== running darcs $* in libraries/$pkg"
 	darcs $* --repodir libraries/$pkg
@@ -52,7 +52,14 @@ darcsget()
   esac
 
   cd libraries
-  for pkg in `cat default-packages`; do
+
+  if test "$extra" = "YES"; then
+      packages=`cat core-packages extra-packages`
+  else
+      packages=`cat core-packages`
+  fi
+
+  for pkg in $packages; do
     if test -d $pkg; then
 	echo "warning: $pkg already present; omitting"
     else
@@ -70,6 +77,13 @@ fi
 
 case $* in
   *-q*) quiet=YES;;
+esac
+
+# --extra says we grab the extra libs with 'get'.  It has no effect on
+# the other commands.
+extra=NO;
+case $1 in
+  --extra) shift; extra=YES;
 esac
 
 case $1 in
