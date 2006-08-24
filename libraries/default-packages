@@ -23,6 +23,9 @@ mtl
 network
 parsec
 readline
+regex-base
+regex-posix
+regex-compat
 stm
 template-haskell
 time

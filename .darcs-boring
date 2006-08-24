@@ -52,6 +52,9 @@
 ^libraries/network/
 ^libraries/parsec/
 ^libraries/readline/
+^libraries/regex-base/
+^libraries/regex-compat/
+^libraries/regex-posix/
 ^libraries/stm/
 ^libraries/template-haskell/
 ^libraries/time/
