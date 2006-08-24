@@ -137,9 +137,12 @@ exposed-modules: Network.BSD,
 	    <literal>base</literal>) need to be explicitly exposed using
 	    <option>-package</option> options.</para>
 
-	  <para>This is a good way to insulate your program from differences
-	    in the globally exposed packages, and being explicit about package
-	    dependencies is a Good Thing.</para>
+	  <para>This is a good way to insulate your program from
+	    differences in the globally exposed packages, and being
+	    explicit about package dependencies is a Good Thing.
+	    Cabal always passes the
+	    <option>-hide-all-packages</option> flag to GHC, for
+	    exactly this reason.</para>
 	</listitem>
       </varlistentry>
 
@@ -181,27 +184,31 @@ exposed-modules: Network.BSD,
   </sect2>
 
   <sect2 id="package-overlaps">
-    <title>The module overlap restriction</title>
+    <title>Consequences of packages</title>
 
-    <para>The module names in a Haskell program must be distinct.
-      This doesn't sound like a severe restriction, but in a Haskell program
-      using multiple packages with interdependencies, difficulties can start to
-      arise.  You should be aware of what the module overlap
-      restriction means, and how to avoid it.</para>
+    <para>It is possible that by using packages you might end up with
+    a program that contains two modules with the same name: perhaps
+    you used a package P that has a <emphasis>hidden</emphasis> module
+    M, and there is also a module M in your program.  Or perhaps the
+    dependencies of packages that you used contain some overlapping
+    modules.  Perhaps the program even contains multiple versions of a
+    certain package, due to dependencies from other packages.</para>
 
-    <para>GHC knows which packages are <emphasis>in use</emphasis> by your
-      program: a package is in use if you imported something from it, or if it
-      is a dependency of some other package in use.  There must be no conflicts
-      between the packages in use; a conflict is when two packages contain
-      a module with the same name.  If
-      GHC detects a conflict, it will issue a message stating which packages
-      are in conflict, and which modules are overlapping.</para>
+    <para>None of these scenarios gives rise to an error on its
+    own<footnote><para>it used to in GHC 6.4, but not since
+    6.6</para></footnote>, but they may have some interesting
+    consequences.  For instance, if you have a type
+    <literal>M.T</literal> from version 1 of package
+    <literal>P</literal>, then this is <emphasis>not</emphasis> the
+    same as the type <literal>M.T</literal> from version 2 of package
+    <literal>P</literal>, and GHC will report an error if you try to
+    use one where the other is expected.</para>
 
-    <para>For example, a conflict might arise if you use two packages, say P
-      and Q, which respectively depend on two different versions of another
-      package, say <literal>R-1.0</literal> and <literal>R-2.0</literal>.  The
-      two versions of <literal>R</literal> are likely to contain at least some
-      of the same modules, so this situation would be a conflict.</para>
+    <para>Formally speaking, in Haskell 98, an entity (function, type
+    or class) in a program is uniquely identified by the pair of the
+    module name in which it is defined and its name.  In GHC, an
+    entity is uniquely defined by a triple: package, module, and
+    name.</para>
   </sect2>
 
   <sect2 id="package-databases">
@@ -371,11 +378,41 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       </listitem>
     </itemizedlist>
     
+      <para>To compile a module which is to be part of a new package,
+      use the <literal>-package-name</literal> option:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><option>-package-name <replaceable>foo</replaceable></option></term>
+	  <indexterm><primary><literal>-package-name</literal></primary>
+	    <secondary>option</secondary></indexterm>
+	  <listitem>
+	    <para>This option is added to the command line when
+	    compiling a module that is destined to be part of package
+	    <literal>foo</literal>.  If this flag is omitted then the
+	    default package <literal>main</literal> is assumed.</para>
+
+            <para>Note: the argument to <option>-package-name</option>
+            should be the full package identifier for the package,
+            that is it should include the version number.  For example:
+            <literal>-package mypkg-1.2</literal>.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>Failure to use the <literal>-package-name</literal> option
+      when compiling a package will probably result in disaster, but
+      you will only discover later when you attempt to import modules
+      from the package.  At this point GHC will complain that the
+      package name it was expecting the module to come from is not the
+      same as the package name stored in the <literal>.hi</literal>
+      file.</para>
+
     <para>It is worth noting that on Windows, when each package
       is built as a DLL, since a reference to a DLL costs an extra
       indirection, intra-package references are cheaper than
       inter-package references. Of course, this applies to the
-      <filename>Main</filename> package as well.</para>
+      <filename>main</filename> package as well.</para>
     </sect2>
 
   <sect2 id="package-management">
