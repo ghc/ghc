@@ -1318,12 +1318,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-package</option> <replaceable>name</replaceable></entry>
-	      <entry>Link in package <replaceable>name</replaceable></entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-split-objs</option></entry>
 	      <entry>Split objects (for libraries)</entry>
 	      <entry>dynamic</entry>
