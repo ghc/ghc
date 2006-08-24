@@ -1,0 +1,9 @@
+-- Instrumentation of mdo notation 
+                                   
+:set -fdebugging
+:set -fglasgow-exts
+:l ../mdo.hs
+:break add Main 13
+:break add Main 12
+:break add Main 11
+:break add Main 10

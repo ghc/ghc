@@ -1,0 +1,4 @@
+
+../mdo.hs:30:29:
+    Warning: Extracted ids: [x, f, xs, c, l]
+			    [a, N a, [a], N a, N a]

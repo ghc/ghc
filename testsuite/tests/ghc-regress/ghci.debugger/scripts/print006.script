@@ -1,0 +1,19 @@
+-- Recovery of types, opaque types
+-- This scenario demands propagation of types up in the tree of terms
+
+:set -fglasgow-exts
+:l ../Test 
+let t = O (map Just [[1,1],[2,2]])
+:p t
+seq _t1 ()  -- The contents of the opaque
+:p t
+seq _t3 ()  -- The tail of the list
+:p t
+seq _t5 ()  -- The 2nd element of the list
+:p t
+seq _t8 ()  -- The 1st element of the list inside the Just
+:p t
+seq _t11 () -- The 1st element of the outer list
+
+:p t       
+ -- The 1st Just must be completely typed, as we know the type of the list

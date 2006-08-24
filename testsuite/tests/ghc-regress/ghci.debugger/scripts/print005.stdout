@@ -1,0 +1,13 @@
+Breakpoint set at (5,15)
+Local bindings in scope:
+  as :: [a], a :: a, left :: [a], right :: [a]
+../QSort.hs:5:15-50> ../QSort.hs:5:15-50> right = (_t1::[a])
+../QSort.hs:5:15-50> ()
+../QSort.hs:5:15-50> right = [42 | (_t2::[Integer])]
+../QSort.hs:5:15-50> left = (_t3::[a])
+../QSort.hs:5:15-50> ()
+../QSort.hs:5:15-50> left = [4 | (_t4::[Integer])]
+../QSort.hs:5:15-50> 1
+../QSort.hs:5:15-50> left = [4]
+../QSort.hs:5:15-50> Returning to normal execution...
+You may need to reload your modules

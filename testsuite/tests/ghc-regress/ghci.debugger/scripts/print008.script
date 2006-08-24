@@ -1,0 +1,14 @@
+--Handling of polymorphic types: 
+-- testing that tyvars are instantiated to unknown
+
+:set -fglasgow-exts
+:l ../Test
+let t = O (map Just [[1,1],[2,2]])
+
+:p t
+:t _t1
+seq _t1 ()
+:p t
+seq _t2 ()
+:p t
+:t _t4

@@ -1,0 +1,9 @@
+-- Test polymorphic types in a breakpoint
+:set -fno-debugging
+:l A
+g 5
+:t a 
+:t b 
+:t c 
+:t d
+:p a b c d

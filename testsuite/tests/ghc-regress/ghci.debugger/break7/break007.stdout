@@ -1,0 +1,3 @@
+Local bindings in scope:
+  x :: a, f :: N a, xs :: [a], c :: N a, l :: N a
+../mdo.hs:30:29-38> Returning to normal execution...

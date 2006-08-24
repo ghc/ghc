@@ -1,0 +1,34 @@
+:set -fglasgow-exts
+:l ../Test
+:set -fdebugging
+:l ../QSort
+
+:break del 1        
+-- Illegal: empty breakpoint list
+
+:break del QSort 1   
+-- Illegal: no breakpoint at line 1 in Main
+
+:break del QSort 1 1 
+-- Illegal: no breakpoint at (1,1) in Main
+
+:break add 1       
+ -- Illegal syntax
+
+:break add NonModule 1
+-- Illegal: I don't know this module
+
+:break add Test 1      
+-- Illegal: this module was not loaded under -fdebugging
+
+:break add QSort 1 1    
+-- Error: No breakpoint here
+
+:break list             
+-- Show an empty list
+
+qsort [8, 4, 42, 16, 15, 23]  
+-- Should run normally
+
+-- Testing that ghci commands work normally
+:i map                    

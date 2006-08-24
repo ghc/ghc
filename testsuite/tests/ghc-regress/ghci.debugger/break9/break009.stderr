@@ -1,0 +1,15 @@
+
+A.hs:4:6:
+    Warning: Extracted ids: [i]
+			    [Bool]
+
+A.hs:4:18:
+    Warning: Extracted ids: [i]
+			    [Bool]
+
+A.hs:7:6:
+    Warning: Extracted ids: [i]
+			    [Bool]
+A.hs:9:6:
+    Warning: Extracted ids: []
+			    []

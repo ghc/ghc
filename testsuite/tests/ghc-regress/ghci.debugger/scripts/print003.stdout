@@ -1,0 +1,8 @@
+t = O (_t1::a)
+()
+t = O [(_t2::a) | (_t3::[a])]
+()
+t = O [Just [(_t4::Maybe [a]),(_t5::Maybe [a])] | (_t6::[Maybe [a]])]
+()
+t = O [Just [1,1] | (_t7::[Maybe [Integer]])]
+_t7 :: [Maybe [Integer]]

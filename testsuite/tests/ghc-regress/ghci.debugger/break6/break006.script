@@ -1,0 +1,6 @@
+-- Check -fignore-breakpoints
+
+:set -fignore-breakpoints
+:l A
+f 1
+g 1

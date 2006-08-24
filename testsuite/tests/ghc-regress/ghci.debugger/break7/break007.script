@@ -1,0 +1,6 @@
+-- Check mdo statements: availability of local bindings.
+-- Maybe we should not want to put in scope the things binded in the mdo scope, to avoid silliness. 
+
+:set -fglasgow-exts
+:l ../mdo.hs
+l2dll "hello world"

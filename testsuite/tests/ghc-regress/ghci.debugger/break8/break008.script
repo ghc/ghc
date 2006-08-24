@@ -1,0 +1,7 @@
+-- Check breakpointCond
+
+:l A
+f 1
+f 4
+:p i
+:q

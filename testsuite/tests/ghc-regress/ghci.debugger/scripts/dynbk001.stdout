@@ -1,0 +1,12 @@
+Not a valid breakpoint #. Use :breakpoint list to see the current breakpoints.
+*** Exception: No suitable breakpoint site found
+*** Exception: No suitable breakpoint site found
+syntax: :breakpoint add Module line [col]
+Could not find module `NonModule':
+  Use -v to see a list of the files searched for.
+Could not find module `Test':
+  Use -v to see a list of the files searched for.
+*** Exception: No suitable breakpoint site found
+There are no enabled breakpoints
+[4,8,15,16,23,42]
+map :: forall a b. (a -> b) -> [a] -> [b] 	-- Defined in GHC.Base

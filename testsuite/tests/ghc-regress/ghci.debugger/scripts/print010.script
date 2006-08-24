@@ -1,0 +1,12 @@
+-- Another tricky type reconstruction case
+
+:set -fglasgow-exts
+:l ../Test
+
+let o = O (map id [0..3])
+:p o
+seq _t1 ()
+:p o
+seq _t2 ()
+length _t3
+:p o

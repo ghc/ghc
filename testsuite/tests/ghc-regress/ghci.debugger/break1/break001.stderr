@@ -1,0 +1,4 @@
+
+A.hs:8:9:
+    Warning: Extracted ids: [a, c, b, i, d]
+			    [a, (), forall a. a -> a, a, Integer -> Integer -> Integer]

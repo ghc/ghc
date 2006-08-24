@@ -1,0 +1,30 @@
+-- Handling of unboxed fields
+-- There seems to be a problem with -funbox-strict-fields
+-- and interpreted code.
+-- dataConRepArgTys says they are unboxed,
+-- but they seem to be not.
+-- So this test fails with wrong output
+:set  -fglasgow-exts
+:l ../Test
+
+let s = S2 'a' 'b'
+seq s ()
+:p s
+
+:set -funbox-strict-fields 
+:l
+:l ../Test
+
+let s = S2 'a' 'b'
+seq s ()
+:p s
+
+
+:set -funbox-strict-fields -O
+:l
+:l ../Test
+
+let s = S2 'a' 'b'
+seq s ()
+:p s
+

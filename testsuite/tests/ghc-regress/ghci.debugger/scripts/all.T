@@ -1,0 +1,16 @@
+
+test('print001', normal, ghci_script, ['print001.script'])
+test('print002', normal, ghci_script, ['print002.script'])
+test('print003', normal, ghci_script, ['print003.script'])
+test('print004', normal, ghci_script, ['print004.script'])
+test('print005', normal, ghci_script, ['print005.script'])
+test('print006', normal, ghci_script, ['print006.script'])
+test('print007', normal, ghci_script, ['print007.script'])
+test('print008', normal, ghci_script, ['print008.script'])
+test('print009', normal, ghci_script, ['print009.script'])
+test('print010', normal, ghci_script, ['print010.script'])
+
+test('dynbk001', normal, ghci_script, ['dynbk001.script'])
+test('dynbk002', normal, ghci_script, ['dynbk002.script'])
+test('dynbk003', normal, ghci_script, ['dynbk003.script'])
+test('dynbk004', normal, ghci_script, ['dynbk004.script'])

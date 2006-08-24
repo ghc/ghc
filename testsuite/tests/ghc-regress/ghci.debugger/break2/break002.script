@@ -1,0 +1,4 @@
+-- Available bindings at where(s)
+
+:set -fno-debugging
+:l A

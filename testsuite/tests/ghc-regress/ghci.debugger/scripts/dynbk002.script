@@ -1,0 +1,8 @@
+-- :breakpoint stop stops a debugging session 
+
+:set -fdebugging
+:l ../QSort
+:break add QSort 5
+run
+:break stop
+:q

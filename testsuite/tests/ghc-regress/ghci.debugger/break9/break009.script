@@ -1,0 +1,4 @@
+-- Check that coalescing of 'auto' breakpoints does not interfere with user breakpoints
+
+:set -fno-debugging
+:l A

@@ -1,0 +1,5 @@
+Breakpoint set at (5,15)
+Local bindings in scope:
+  as :: [a], a :: a, left :: [a], right :: [a]
+../QSort.hs:5:15-50> Returning to normal execution...
+You may need to reload your modules

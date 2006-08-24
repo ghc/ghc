@@ -1,0 +1,16 @@
+-- printing of Showables
+
+let f = Just (1.2::Float)
+f
+:p f
+
+let i = Just (10::Integer)
+:p i
+
+:set -fglasgow-exts
+:l ../Test.hs
+
+let s = S1 'a' 'b' 'c'
+s
+:p s
+:sp s

@@ -1,0 +1,8 @@
+-- :breakpoint stop in the top level should be a no-op
+
+
+:breakpoint stop
+
+:set -fdebugging
+
+:breakpoint stop

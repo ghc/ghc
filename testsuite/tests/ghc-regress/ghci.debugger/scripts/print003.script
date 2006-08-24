@@ -1,0 +1,12 @@
+-- Simple Recovery of types - opaque types
+:set -fglasgow-exts
+:l ../Test
+let t = O (map Just [[1,1],[2,2]])
+:p t
+seq _t1 ()
+:p t
+seq _t2 ()
+:p t
+seq _t4 ()
+:p t
+:t _t7

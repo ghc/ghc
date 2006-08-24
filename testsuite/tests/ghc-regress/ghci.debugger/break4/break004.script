@@ -1,0 +1,7 @@
+-- Availability of Implicit params
+
+:set -fimplicit-params
+:l A
+
+g 5
+?flag
