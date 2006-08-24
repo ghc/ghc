@@ -134,8 +134,6 @@ exposed-modules:
 	Text.Printf,
 	Text.Read,
 	Text.Read.Lex,
-	Text.Regex,
-	Text.Regex.Posix,
 	Text.Show,
 	Text.Show.Functions
 include-dirs:	include, ../../ghc/includes

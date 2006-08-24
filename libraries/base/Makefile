@@ -33,7 +33,6 @@ ALL_DIRS = \
 	Text \
 	Text/PrettyPrint \
 	Text/ParserCombinators \
-	Text/Regex \
 	Text/Show \
 	Text/Read
 
