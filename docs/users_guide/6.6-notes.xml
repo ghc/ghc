@@ -1,26 +1,1844 @@
-Compiler:
-- SMP support
-- GHC API
-- better GC for IORef/IOArray and lots of threads
-- loosen rules on instance decls
-- impredicative types
-- completion in GHCi
-- UTF-8 source files
-- bang patterns
-- :main
-- breakpoints
-- -split-objs now works with --make and Cabal
-- relaxed dependency analysis (with -fglasgow-exts)
-- old syntax for FFI declarations is no longer accepted
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-6-6">
+  <title>Release notes for version 6.6</title>
 
-Libraries:
-- Data.ByteString
-- hslibs removed
+  <sect2>
+    <title>User-visible compiler changes</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+            The following flags (and, where appropriate, their inverses)
+            used to be static (can only be given on
+            the command line) but are now dynamic (can also be given in
+            a <literal>GHC_OPTIONS</literal> pragma or with
+            <literal>:set</literal> in GHCi):
+            <option>-c</option>,
+            <option>-hcsuf</option>,
+            <option>-hidir</option>,
+            <option>-hisuf</option>,
+            <option>-o</option>,
+            <option>-odir</option>,
+            <option>-ohi</option>,
+            <option>-osuf</option>,
+            <option>-keep-hc-file</option>,
+            <option>-keep-s-file</option>,
+            <option>-keep-raw-s-file</option>,
+            <option>-keep-tmp-files</option>,
+            <option>-tmpdir</option>,
+            <option>-i</option>,
+            <option>-package</option>,
+            <option>-hide-package</option>,
+            <option>-ignore-package</option>,
+            <option>-package-conf</option>,
+            <option>-no-user-package-conf</option>,
+            <option>-fcontext-stack</option>,
+            <option>-fexcess-precision</option>,
+            <option>-fignore-asserts</option>,
+            <option>-fignore-interface-pragmas</option>,
+            <option>-I</option>,
+            <option>-framework</option>,
+            <option>-framework-path</option>,
+            <option>-l</option>,
+            <option>-L</option>,
+            <option>-main-is</option>,
+            <option>-no-hs-main</option>,
+            <option>-split-objs</option>,
+            <option>-pgmL</option>,
+            <option>-pgmP</option>,
+            <option>-pgmc</option>,
+            <option>-pgma</option>,
+            <option>-pgml</option>,
+            <option>-pgmdll</option>,
+            <option>-pgmdep</option>,
+            <option>-pgmF</option>,
+            <option>-optl</option>,
+            <option>-optdll</option>,
+            <option>-optdep</option>,
+            <option>-fno-asm-mangling</option>.
+            See <xref linkend="static-dynamic-flags" /> for more on
+            the meaning of static and dynamic flags, and
+            <xref linkend="flag-reference" /> for more on the flags
+            themselves.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          There is a new flag <option>-x</option> for overriding the
+          default behaviour for source files; see
+          <xref linkend="overriding-suffixes" /> details.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The <option>-fglobalise-toplev-names</option>
+          flag has been removed.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The <option>-fallow-overlapping-instances</option> flag is
+          implied by the <option>-fallow-incoherent-instances</option>
+          flag.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The directory that the <filename>foo_stub.c</filename> and
+          <filename>foo_stub.h</filename> files are put in can now be
+          controlled with the <option>-stubdir</option> flag.
+          See <xref linkend="options-output" /> for more details.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The equality test performed when pattern matching against
+          an overloaded numeric literal now uses the
+          <literal>(==)</literal> in scope, rather than the one from
+          <literal>Prelude</literal>. Likewise, the subtraction and
+          inequality test performed when pattern matching against
+          <literal>n+k</literal> patterns uses the
+          <literal>(-)</literal> and <literal>(>=)</literal> in scope.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          With the exception of the arrow syntax, the types of functions
+          used by sugar (such as do notation, numeric literal patterns)
+          need not match the types of the <literal>Prelude</literal>
+          functions normally used.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GADTs can now use record syntax. Also, if the datatype could
+          have been declared with Haskell 98 syntax then deriving
+          clauses are permitted. For more info see <xref linkend="gadt" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          There is a new pragma <literal>LANGUAGE</literal> which allows
+          extensions to be specified portably, i.e. without having to
+          resort to the <literal>OPTIONS_GHC</literal> pragma and giving
+          GHC-specific options. The arguments to the pragma are the same
+          extensions that Cabal knows about. More info in
+          <xref linkend="language-pragma" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now allows more generalisation when typing mutually
+          recursive bindings, resulting in more programs being accepted.
+          See <xref linkend="typing-binds" /> for more details.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The <literal>InstalledPackageInfo</literal> syntax has
+          changed. Now
+          instead of <literal>extra-libs</literal> we have
+          <literal>extra-libraries</literal>,
+          instead of <literal>extra-hugs-opts</literal> we have
+          <literal>hugs-options</literal>,
+          instead of <literal>extra-cc-opts</literal> we have
+          <literal>cc-options</literal>,
+          instead of <literal>extra-ld-opts</literal> we have
+          <literal>ld-options</literal>,
+          and instead of <literal>extra-frameworks</literal> we have
+          <literal>frameworks</literal>.
+          See <xref linkend="installed-pkg-info" /> for details.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now treats source files as UTF-8 (ASCII is a strict
+          subset of UTF-8, so ASCII source files will continue to
+          work as before). However, invalid UTF-8 sequences are
+          ignored in comments, so ASCII code with comments in, for
+          example, Latin-1 will also work.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          When you use <command>ghc --make</command>, GHC will now take
+          the executable filename from the name of the file containing
+          the <literal>Main</literal> module rather than using
+          <filename>a.out</filename>. The <filename>.exe</filename>
+          extension is appended on Windows, and it can of course be
+          overridden with <option>-o</option>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          If you <literal>newtype</literal> the IO monad, e.g.
+          <programlisting>
+    newtype MyIO a = MyIO (IO a)</programlisting>
+          then GHC will now allow you to have FFI calls return
+          <literal>MyIO <replaceable>t</replaceable></literal>
+          rather than just
+          <literal>IO <replaceable>t</replaceable></literal>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          By default, pattern bindings in GHC are now monomorphic.
+          This means that some valid Haskell 98 programs will get
+          rejected, but we believe they will be few in number.
+          To revert to the old behaviour use the
+          <option>-fno-mono-pat-binds</option> flag.
+          More details are in <xref linkend="options-language" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHCi already does more defaulting than Haskell 98 so that, for
+          example, <literal>reverse []</literal> shows a result rather
+          than giving an ambiguous type variable error. There is now a
+          flag <option>-fextended-default-rules</option> to use these
+          defaulting rules with GHC too.
+          More details are in <xref linkend="extended-default-rules" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          You can now give both class and instance declarations in
+          <filename>.hs-boot</filename> files. More details in
+          <xref linkend="mutual-recursion" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          It is now possible, with the <literal>-I</literal> RTS flag,
+          to control the amount of idle time that happens before a major
+          GC is performed.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now includes the package name in symbol names; the upshot
+          of this is that it is possible to link a program that uses
+          multiple packages each containing a module of the same name.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHCi now has a <literal>:main</literal> command that allows
+          you to call the <literal>main</literal> function with
+          command-line arguments.
+          See <xref linkend="ghci-commands" /> for more information.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHCi now has <literal>:ctags</literal> and
+          <literal>:etags</literal> commands to generate tags files for
+          vi-style and emacs-style editors respectively.
+          See <xref linkend="ghci-commands" /> for more information.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The rules for instance declarations have been further relaxed.
+          You are now permitted to have instances whose heads contain
+          only type variables, e.g.
+          <programlisting>
+    instance C a</programlisting>
+          and instances whose constraints are not only type variables,
+          e.g.
+          <programlisting>
+    instance C2 Int a => C3 [a] b</programlisting>
+          For more details, see <xref linkend="instance-rules" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHCi now allows tab completion of in-scope names.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The old syntax for FFI declarations (deprecated since 5.04)
+          is no longer accepted.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The <option>-split-objs</option> flag can now be used with
+          <option>--make</option>, and hence can be used by cabal.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now supports bang patterns to require a function is strict
+          in a given argument, e.g.
+          <programlisting>
+    f (!x, y) = [x,y]</programlisting>
+          is equivalent to
+          <programlisting>
+    f (x, y) | x `seq` False = undefined
+             | otherwise = [x,y]</programlisting>
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now handles impredicative polymorphism; see
+          <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
+          for more details.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC's modules are now also bundled into a
+          <literal>ghc</literal> package, allowing programs to make use
+          of GHC as a library. The interface has not yet been properly
+          designed, so is subject to change.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC's garbage collector now deals more intelligently with
+          mutable data, so you no longer need to worry about GC
+          performance when a lot of memory is taken up by
+          <literal>STArray</literal>s, <literal>IOArray</literal>s,
+          <literal>STRef</literal>s or <literal>IORef</literal>s.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now supports SMP:
+          when you compile with <option>-threaded</option>, you now get
+          an RTS flag <option>-N</option> that allows you to specify the
+          number of OS threads that GHC should use. Defaults to 1.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
 
-Internals/Source tree:
-- NCG handles loops
-- unknown calls take args in registers, if available
-- x86_64: more argument regs
-- refactored HscMain
-- darcs
-- source tree flattened
+  <sect2>
+    <title>Libraries</title>
+    <para>
+      Libraries are now divided into core libraries (those that are
+      necessary to build GHC) and extra libraries. Decoupling the extra
+      libraries means that they can release independently of GHC
+      releases, and makes development builds of GHC quicker as they no
+      longer need to build unnecessary libraries.
+    </para>
+
+    <para>
+      The hslibs libraries have finally been removed.
+    </para>
+  </sect2>
+
+  <sect2>
+    <title>Core Libraries</title>
+    <sect3>
+      <title>base</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            We now have <literal>Read</literal> and
+            <literal>Show</literal> instances for up to 15-tuples (used
+            to be up to 5-tuples).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            New module <literal>Control.Applicative</literal> that
+            describes a structure intermediate between a functor and
+            a monad: it provides pure expressions and sequencing, but
+            no binding.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Control.Exception</literal> now exports
+            <literal>bracketOnError</literal>, which behaves like
+            <literal>bracket</literal> but only runs the final
+            action if the main action raised an error.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module
+            <literal>Control.Monad.Instances</literal> which
+            provides <literal>Monad</literal> and
+            <literal>Functor</literal> instances for
+            <literal>((->) r)</literal> (were in
+            <literal>mtl</literal>'s
+            <literal>Control.Monad.Reader</literal>), 
+            a <literal>Functor</literal> instance for
+            <literal>(Either a)</literal> (was in <literal>mtl</literal>'s
+            <literal>Control.Monad.Error</literal>) and a
+            <literal>Functor</literal> instance for
+            <literal>((,) a)</literal> (new).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>MonadFix</literal> instance for
+            <literal>((->) r)</literal> is now in
+            <literal>Control.Monad.Fix</literal> (was in
+            <literal>mtl</literal>'s
+            <literal>Control.Monad.Reader</literal>).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Control.Monad.ST</literal> now exports
+            <literal>unsafeSTToIO</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>HasBounds</literal> class has been removed from
+            <literal>Data.Array.Base</literal>, and its
+            <literal>bounds</literal> method is now in the
+            <literal>IArray</literal> class. The
+            <literal>MArray</literal> class
+            has also gained a method <literal>getBounds</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Array.Base</literal> now provides an
+            <literal>MArray (STArray s) e (Lazy.ST s)</literal>
+            instance.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Array.Storable</literal> now exports a
+            function <literal>unsafeForeignPtrToStorableArray</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The new <literal>Data.ByteString</literal> hierarchy
+            provides time and space-efficient byte vectors.
+            The old <literal>Data.PackedString</literal> module is now
+            deprecated as a result, although there is not yet a
+            replacement if you need full unicode support.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>GHC.Exts</literal> now provides a function
+            <literal>inline</literal> which, provided the RHS is visible
+            to the compiler, forcibly inlines its argument.
+            Otherwise, it acts like <literal>id</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>GHC.Exts</literal> now provides a function
+            <literal>lazy</literal> which forces GHC to think that its
+            argument is lazy in its first argument.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.FiniteMap</literal> has been removed
+            (deprecated since 6.4). Use <literal>Data.Map</literal>
+            instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Char</literal> now exports
+            <literal>isLetter</literal>,
+            <literal>isMark</literal>,
+            <literal>isNumber</literal>,
+            <literal>isPunctuation</literal>,
+            <literal>isSymbol</literal>,
+            <literal>isSeparator</literal>,
+            <literal>isAsciiUpper</literal>,
+            <literal>isAsciiLower</literal> and
+            <literal>toTitle</literal>.
+            It also exports a function
+            <literal>generalCategory</literal> that tells you the
+            category of a character in terms of a datatype
+            <literal>GeneralCategory</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Dynamic</literal> now exports a function
+            <literal>dynTypeRep</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Data.Eq</literal> which
+            just exports the <literal>Eq</literal> class.
+            Likewise, a new module <literal>Data.Ord</literal>
+            exports the <literal>Ord</literal> class, as well as the
+            handy <literal>comparing</literal> function.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Data.Fixed</literal>
+            providing fixed-precision arithmetic.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Data.Foldable</literal>
+            providing a class for foldable datatypes. It gives instances
+            for <literal>Maybe</literal>, <literal>[]</literal> and
+            <literal>Array i</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Data.Traversable</literal>
+            providing a class for data structures that can be traversed
+            from left to right. It gives instances
+            for <literal>Maybe</literal>, <literal>[]</literal> and
+            <literal>Array i</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.FunctorM</literal> has been deprecated;
+            use <literal>Data.Foldable</literal> and
+            <literal>Data.Traversable</literal> instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>toConstr</literal> definitions for tuples in
+            <literal>Data.Generics.Instances</literal> now actually
+            evaluate their arguments to tuples before returning
+            anything.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.IntMap</literal> now exports
+            <literal>notMember</literal>,
+            <literal>alter</literal>,
+            <literal>mapMaybe</literal>,
+            <literal>mapMaybeWithKey</literal>,
+            <literal>mapEither</literal> and
+            <literal>mapEitherWithKey</literal>.
+            It also has <literal>Monoid</literal>,
+            <literal>Foldable</literal> and <literal>Read</literal>
+            instances.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.IntSet</literal> now exports
+            <literal>notMember</literal>. It also has
+            <literal>Monoid</literal> and <literal>Read</literal>
+            instances.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Map</literal> now exports
+            <literal>notMember</literal>,
+            <literal>alter</literal>,
+            <literal>mapMaybe</literal>,
+            <literal>mapMaybeWithKey</literal>,
+            <literal>mapEither</literal>,
+            <literal>mapEitherWithKey</literal>,
+            <literal>minView</literal> and
+            <literal>maxView</literal>.
+            It also has <literal>Monoid</literal>,
+            <literal>Traversable</literal>, <literal>Foldable</literal>
+            and <literal>Read</literal> instances.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Set</literal> now exports
+            <literal>notMember</literal>,
+            <literal>minView</literal> and
+            <literal>maxView</literal>.
+            It also has <literal>Monoid</literal>,
+            <literal>Foldable</literal>
+            and <literal>Read</literal> instances.
+          </para>
+
+          <para>
+            The old, deprecated (since 6.4) interface consisting of
+            <literal>emptySet</literal>,
+            <literal>mkSet</literal>,
+            <literal>setToList</literal>,
+            <literal>unitSet</literal>,
+            <literal>elementOf</literal>,
+            <literal>isEmptySet</literal>,
+            <literal>cardinality</literal>,
+            <literal>unionManySets</literal>,
+            <literal>minusSet</literal>,
+            <literal>mapSet</literal>,
+            <literal>intersect</literal>,
+            <literal>addToSet</literal> and
+            <literal>delFromSet</literal> has been removed.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Monoid</literal> no longer contains the
+            <literal>Monoid</literal>
+            instances for <literal>Map</literal>,
+            <literal>IntMap</literal>, <literal>Set</literal> and
+            <literal>IntSet</literal>. They have been moved to their own
+            modules, as above. The <literal>(a -> a)</literal> instance
+            has been replaced with a
+            <literal>Monoid b => Monoid (a -> b)</literal> instance.
+            The module also now exports
+            <literal>Dual</literal>,
+            <literal>Endo</literal>,
+            <literal>All</literal>,
+            <literal>Any</literal>,
+            <literal>Sum</literal> and
+            <literal>Product</literal> types, and
+            <literal>Monoid</literal> instances for them.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Data.Sequence</literal>
+            for finite sequences. The <literal>Data.Queue</literal>
+            module is now deprecated in favour of this faster, more
+            featureful replacement.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Tree</literal> now has
+            <literal>Data</literal>, <literal>Typeable</literal>,
+            <literal>Traversable</literal> and
+            <literal>Foldable</literal>
+            instances for the
+            <literal>Tree</literal> datatype.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Typeable</literal> now uses
+            <option>-fallow-overlapping-instances</option>, so the
+            generic instances can be overriden for your own datatypes.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Debug.Trace</literal> now exports
+            <literal>traceShow</literal>, which is the same as
+            <literal>trace</literal> except its first argument can be
+            any showable thing rather than being required to be a
+            string.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Foreign.C.Types</literal> now also defines
+            <literal>CIntPtr</literal>,
+            <literal>CUIntPtr</literal>,
+            <literal>CIntMax</literal> and
+            <literal>CUIntMax</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Foreign.ForeignPtr</literal> now exports
+            <literal>FinalizerEnvPtr</literal>,
+            <literal>newForeignPtrEnv</literal> and
+            <literal>addForeignPtrFinalizerEnv</literal>.
+            Together, these allow the use of finalizers which are passed
+            an additional environment parameter.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Foreign.Marshal.Utils</literal> no longer exports
+            the <literal>withObject</literal> function, deprecated since
+            5.04; use <literal>with</literal> instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Foreign.Ptr now also defines
+            <literal>IntPtr</literal>,
+            <literal>ptrToIntPtr</literal>,
+            <literal>intPtrToPtr</literal>,
+            <literal>WordPtr</literal>,
+            <literal>ptrToWordPtr</literal> and
+            <literal>wordPtrToPtr</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There are now <literal>Bounded</literal> instances for up to
+            15-tuples (used to be up to 4-tuples).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>Text.Html</literal> and
+            <literal>Text.Html.BlockTable</literal> modules have now
+            been removed, with the new <literal>html</literal> and
+            <literal>xhtml</literal> packages providing replacements.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Text.Read</literal> now exports a function
+            <literal>parens</literal> which parses a value in an
+            arbitrary number of parentheses.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>ForeignPtr</literal> datatype has been altered
+            to make it more efficient. There are also new functions
+            <literal>mallocPlainForeignPtr</literal> and
+            <literal>mallocPlainForeignPtrBytes</literal> which
+            do not allow you to attach a finalizer to the
+            <literal>ForeignPtr</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>Cabal</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.1.5 (was 1.1.4).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Support for JHC, symmetric to the support for the other
+            implementations, has been added throughout.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Support for object splitting and building in-place
+            has been added throughout.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Added a <filename>debianTemplate</filename> directory with
+            templates for building Debian packages from Cabal packages.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Added <filename>cabal-setup</filename>, a user interface to
+            building and installing Cabal packages.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Added <filename>cabal-install</filename>, an automated
+            installer for cabal packages.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is now a <literal>Network.Hackage</literal> hierarchy
+            for code needed by hackage, the package server.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There are now modules
+            <literal>Distribution.Simple.<replaceable>compiler</replaceable></literal>
+            for each of <literal>GHC</literal>, <literal>NHC</literal>,
+            <literal>Hugs</literal> and <literal>JHC</literal>.
+            The <literal>Distribution.Simple.Build</literal> and
+            <literal>Distribution.Simple.Install</literal> modules have
+            shrunk correspondingly.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Distribution.GetOpt</literal> is no longer a
+            visible module.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Distribution.Simple</literal> exports a function
+            <literal>defaultMainArgs</literal>, which is identical to
+            <literal>defaultMain</literal> except that the arguments are
+            given as a list of strings rather than being retrieved with
+            <literal>getArgs</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Distribution.Simple.Configure</literal>
+            no longer exports
+            <literal>LocalBuildInfo</literal>,
+            but does now export
+            <literal>configDependency</literal> and
+            <literal>configCompilerAux</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Distribution.Simple.LocalBuildInfo</literal> now
+            exports <literal>mkHaddockDir</literal>,
+            <literal>distPref</literal>,
+            <literal>srcPref</literal>,
+            <literal>autogenModulesDir</literal> and
+            <literal>mkIncludeDir</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Distribution.PackageDescription</literal> now
+            exports <literal>haddockName</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Distribution.Simple.Utils</literal> now exports
+            <literal>copyDirectoryRecursiveVerbose</literal>,
+            <literal>dirOf</literal>,
+            <literal>distPref</literal>,
+            <literal>haddockPref</literal> and
+            <literal>srcPref</literal>.
+            It no longer exports <literal>mkGHCiLibName</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>haskell98</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>readline</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>stm</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            A new module <literal>Control.Monad.STM</literal>
+            contains the
+            <literal>MonadPlus</literal> instance for
+            <literal>STM</literal> and the function
+            <literal>check</literal> (both used to be in
+            <literal>Control.Concurrent.STM</literal>).
+            It also re-exports
+            <literal>STM</literal>,
+            <literal>atomically</literal>,
+            <literal>retry</literal>,
+            <literal>orElse</literal> and
+            <literal>catchSTM</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module
+            <literal>Control.Sequential.STM</literal> for non-concurrent
+            transactions which nevertheless need to be atomic in the
+            face of exceptions.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            A new module
+            <literal>Control.Concurrent.STM.TArray</literal> defines
+            <literal>TArray</literal>, a transactional array, and makes
+            it an instance of <literal>MArray</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Control.Concurrent.STM.TChan</literal> now provides
+            a function <literal>newTChanIO</literal>, which allows
+            <literal>TChan</literal>s to be created in the IO monad.
+            Similarly, <literal>Control.Concurrent.STM.TMVar</literal>
+            provides <literal>newTMVarIO</literal> and
+            <literal>newEmptyTMVarIO</literal>, and
+            <literal>Control.Concurrent.STM.TVar</literal> exports
+            <literal>newTVarIO</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Control.Concurrent.STM.TVar</literal> exports
+            <literal>registerDelay</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>Control.Concurrent.STM</literal> module has been
+            updated to re-export all the new modules.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>template-haskell</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            A <literal>Show</literal> instance is now derived for
+            <literal>Info</literal>, <literal>Fixity</literal> and
+            <literal>FixityDirection</literal> in
+            <literal>Language.Haskell.TH.Syntax</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Language.Haskell.TH.Syntax</literal>, there is
+            a type <literal>PkgName</literal> and functions
+            <literal>mkPkgName</literal> and
+            <literal>pkgString</literal>
+            for dealing with package names.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>patGE</literal> function in
+            <literal>Language.Haskell.TH.Lib</literal> now takes the
+            final expression separately to the list of statements
+            rather than splitting it off itself.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>unix</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>Win32</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Now maintained by Esa Ilari Vuokko.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module
+            <literal>System.Win32.Console</literal>
+            providing an interface to the Windows Console API.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module
+            <literal>System.Win32.DebugApi</literal>
+            providing an interface to the Windows DebugApi.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module
+            <literal>System.Win32.FileMapping</literal>
+            for working with memory-mapped files.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module
+            <literal>System.Win32.SimpleMAPI</literal>
+            for using the Windows mail API.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module
+            <literal>System.Win32.Time</literal>
+            for using the Windows time API.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>iNVALID_HANDLE_VALUE</literal> has moved from
+            <literal>Graphics.Win32.Misc</literal> to
+            <literal>System.Win32.Types</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>System.Win32.File</literal> has a new
+            function <literal>getFileInformationByHandle</literal>
+            and associated data types.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>System.Win32.Info</literal> has a new
+            function <literal>getSystemInfo</literal> and associated
+            data types.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>System.Win32.Process</literal> now has many more
+            exports.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>System.Win32.Types</literal> has new types
+            <literal>LARGE_INTEGER</literal>, <literal>DDWORD</literal>
+            and <literal>SIZE_T</literal>. It also has new helper
+            functions <literal>ddwordToDwords</literal> and
+            <literal>dwordsToDdword</literal> to split and combine
+            ddwords into high and low components.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>System.Win32</literal> re-exports
+            <literal>System.Win32.FileMapping</literal>,
+            <literal>System.Win32.Time</literal>
+            and <literal>System.Win32.Console</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>System.Win32</literal> no longer exports
+            <literal>LCID</literal>,
+            <literal>LANGID</literal>,
+            <literal>SortID</literal>,
+            <literal>SubLANGID</literal>,
+            <literal>PrimaryLANGID</literal>,
+            <literal>mAKELCID</literal>,
+            <literal>lANGIDFROMLCID</literal>,
+            <literal>sORTIDFROMLCID</literal>,
+            <literal>mAKELANGID</literal>,
+            <literal>pRIMARYLANGID</literal> or
+            <literal>sUBLANGID</literal> from
+            <literal>System.Win32.NLS</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Extra Libraries</title>
+    <sect3>
+      <title>ALUT</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Sound.ALUT.BuiltInSounds</literal> has been removed.
+            Its <literal>Phase</literal> and <literal>Duration</literal>
+            exports are now exported by
+            <literal>Sound.ALUT.Loaders</literal> and its
+            <literal>helloWorld</literal>,
+            <literal>sine</literal>,
+            <literal>square</literal>,
+            <literal>sawtooth</literal>,
+            <literal>impulse</literal> and
+            <literal>whiteNoise</literal>
+            exports are now constructors of the
+            <literal>Sound.ALUT.Loaders.SoundDataSource</literal>
+            datatype.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>arrows</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number remains 0.1.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Control.Sequence</literal> has been removed in
+            favour of the new <literal>Control.Applicative</literal>
+            module in <literal>base</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>cgi</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version 2006.8.14.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>cgi</literal> is a new package, developing on
+            what used to be <literal>Network.CGI</literal> in the
+            <literal>network</literal> package.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>fgl</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 5.3 (was 5.2).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Graph.Inductive.Graph</literal> no longer
+            exports <literal>UContext</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Data.Graph.Inductive.Graph</literal> now exports
+            <literal>delLEdge</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>GLUT</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number remains 2.0.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Graphics.UI.GLUT.Initialization</literal>,
+            <literal>DisplayMode</literal> has a new constructor
+            <literal>WithAuxBuffers</literal> and
+            <literal>DisplayCapability</literal> has a new constructor
+            <literal>DisplayAux</literal>. These represent freeglut-only
+            features.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There are new examples in
+            <filename>BOGLGP/Chapter03/OnYourOwn1.hs</filename>,
+            <filename>RedBook/AAIndex.hs</filename>,
+            <filename>RedBook/AARGB.hs</filename>,
+            <filename>RedBook/AccAnti.hs</filename>,
+            <filename>RedBook/AccPersp.hs</filename>,
+            <filename>RedBook/Alpha3D.hs</filename>,
+            <filename>RedBook/DOF.hs</filename>,
+            <filename>RedBook/FogIndex.hs</filename>,
+            <filename>RedBook/Multisamp.hs</filename>,
+            <filename>RedBook/PointP.hs</filename>,
+            <filename>RedBook/PolyOff.hs</filename>,
+            <filename>RedBook/Stencil.hs</filename>,
+            <filename>RedBook/Stroke.hs</filename> and
+            <filename>RedBook/Torus.hs</filename>,
+            and the examples in
+            <filename>RedBook/Font.hs</filename> and
+            <filename>RedBook/Histogram.hs</filename> have been
+            improved.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>haskell-src</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>HaXml</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.16 (was 1.12.1).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There are now lazy versions of the parsing modules
+            <literal>Text.XML.HaXml.ParseLazy</literal>
+            (a lazy non-validating XML parser) and
+            <literal>Text.XML.HaXml.Html.ParseLazy</literal>
+            (a lazy HTML parser).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There are lazy versions of two of the example tools,
+            <literal>CanonicaliseLazy</literal> and
+            <literal>XtractLazy</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Text.XML.HaXml.Haskell2Xml</literal> and
+            <literal>Text.XML.HaXml.Xml2Haskell</literal> have been
+            removed, with <literal>Text.XML.HaXml.XmlContent</literal>
+            replacing them.
+            You must now use <literal>{-! derive : XmlContent !-}</literal>
+            rather than <literal>{-! derive :Haskell2Xml !-}</literal>
+            to have instances derived for your classes.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Now also provides the
+            <literal>Text.ParserCombinators.HuttonMeijer</literal>
+            monadic parser combinator library.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Provides another new set of parser combinators, as well as a lazy
+            variant, a variant that carries around state, and a
+            variant that does both. The modules are
+            <literal>Text.ParserCombinators.Poly</literal>,
+            <literal>Text.ParserCombinators.PolyLazy</literal>,
+            <literal>Text.ParserCombinators.PolyState</literal> and
+            <literal>Text.ParserCombinators.PolyStateLazy</literal>
+            respectively.
+            It also provides
+            <literal>Text.ParserCombinators.TextParser</literal>, which
+            is the <literal>Poly</literal> parser combinators
+            specialised for strings.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Now provides a SAX-like parser in
+            <literal>Text.XML.HaXml.SAX</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Now provides a module
+            <literal>Text.XML.HaXml.TypeMapping</literal>, which
+            defines an explicit representation for Haskell types.
+            This allows generation of a DTD from a Haskell value.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>Posn</literal> type has been pulled out from
+            <literal>Text.XML.HaXml.Lex</literal> into its own module
+            <literal>Text.XML.HaXml.Posn</literal>. Some helper
+            functions are also exported.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The APIs to the pre-existing modules have also substantially
+            changed.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>HGL</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 3.1).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>html</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version 1.0.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>html</literal> is a new package, developing on
+            what used to be <literal>Text.Html</literal> and
+            <literal>Text.Html.BlockTable</literal> in the
+            <literal>base</literal> package.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Text.Html.BlockTable</literal> exports a new
+            function <literal>empty</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>HUnit</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.1).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>Japi</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>monads</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0.1 (was 1.1).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Monad.Id</literal>, <literal>run</literal> has
+            been renamed <literal>runId</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>Monad.BackT</literal> module has been removed;
+            use the new <literal>Monad.SearchT</literal> module instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Monad.ForEach</literal>
+            containing a class <literal>ForEach</literal>, for
+            applying a monadic function to each element in a container.
+            It provides instances for <literal>[]</literal> and
+            <literal>Maybe</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The following combinators have been moved from
+            <literal>Monad.Prelude</literal> to a new module
+            <literal>Monad.Combinators</literal>:
+            <literal>(@@)</literal>,
+            <literal>(#)</literal>,
+            <literal>(&lt;#)</literal>,
+            <literal>(&lt;##)</literal>,
+            <literal>concatMap</literal> and
+            <literal>partitionM</literal>.
+            <literal>Monad.Combinators</literal> also defines the
+            following new combinators:
+            <literal>ifM</literal>,
+            <literal>whenM</literal>,
+            <literal>andM</literal>,
+            <literal>orM</literal>,
+            <literal>allM</literal>,
+            <literal>anyM</literal>,
+            <literal>forEach2</literal>,
+            <literal>forEach2_</literal>,
+            <literal>forEach3</literal> and
+            <literal>forEach3_</literal>, and re-exports
+            <literal>Control.Monad</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The modules
+            <literal>Monad.Cont</literal>,
+            <literal>Monad.Except</literal>,
+            <literal>Monad.Reader</literal>,
+            <literal>Monad.State</literal> and
+            <literal>Monad.Writer</literal> have been removed, but their
+            monad transformer counterparts remain. If you want the
+            monads then just transform the identity monad instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>Monad.ExceptT</literal> module now also exports
+            runExceptWith and unsafeRunExcept. It also now defines an
+            instance <literal>ContM (ExceptT x m)</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Monad.Prelude</literal>, the
+            <literal>get</literal> method of the
+            <literal>ReaderM</literal> module has been renamed
+            <literal>getR</literal>. The <literal>local</literal> method
+            has been removed with a new class
+            <literal>ReadUpdM</literal>, with methods
+            <literal>updateR</literal> 
+            and <literal>setR</literal>, taking its place.
+            The <literal>letLocal</literal> function has also been removed.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Monad.Prelude</literal>,
+            <literal>update</literal> has been made a method of
+            <literal>StateM</literal>.
+            The
+            <literal>peek</literal> and <literal>poke</literal> methods
+            have been renamed <literal>get</literal> and
+            <literal>set</literal> respectively, and both have a default
+            definition in terms of <literal>update</literal>.
+            The <literal>poke_</literal> function has also been renamed
+            <literal>set_</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Monad.Prelude</literal>,
+            <literal>handle</literal> has been taken out of the
+            <literal>ExceptM</literal> class and put into a new
+            class <literal>HandlerM</literal> along with a new method
+            <literal>checkExcept</literal>.
+            There are also new functions <literal>withHandler</literal>
+            and <literal>handle_</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>TakeWriterM</literal> class has been renamed
+            <literal>CollectorM</literal>, and rather than a single
+            method <literal>takeFrom</literal> it has methods
+            <literal>censor</literal> and <literal>collect</literal>
+            with default definitions in terms of each other.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Monad.Prelude</literal> defines a type
+            <literal>Cont</literal> and functions
+            <literal>returnCC</literal> and <literal>cJump</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Monad.Prelude</literal> exports functions
+            <literal>inReader</literal>,
+            <literal>inWriter</literal>,
+            <literal>inState</literal> and
+            <literal>inExcept</literal>.
+            These make it easy to turn a pure representation of an
+            effectful computation into an actual computation.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>zipWith3M</literal> and
+            <literal>zipWith3M_</literal> functions have been removed
+            from <literal>Monad.Prelude</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Monad.Prelude</literal> now re-exports
+            <literal>Monad.Combinators</literal> and
+            <literal>Monad.ForEach</literal>, but no longer re-exports
+            <literal>Monad</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            There is a new module <literal>Monad.Transformers</literal>
+            which re-exports
+            <literal>Monad.Id</literal>,
+            <literal>Monad.ReaderT</literal>,
+            <literal>Monad.WriterT</literal>,
+            <literal>Monad.StateT</literal>,
+            <literal>Monad.ExceptT</literal>,
+            <literal>Monad.SearchT</literal> and
+            <literal>Monad.ContT</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>mtl</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>network</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Network.CGI</literal> has been removed; use the
+            <literal>cgi</literal> package instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Network.BSD</literal> no longer exports
+            <literal>symlink</literal> or <literal>readlink</literal>;
+            use
+            <literal>System.Posix.Files.createSymbolicLink</literal> and
+            <literal>System.Posix.Files.readSymbolicLink</literal>
+            instead.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Network.BSD</literal> now exports
+            <literal>defaultProtocol</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Network.Socket.SocketStatus</literal> now has a
+            constructor <literal>ConvertedToHandle</literal> for sockets
+            that have been converted to handles.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Network.Socket.Family</literal> now has the
+            following additional constructors:
+            <literal>AF_NETROM</literal>,
+            <literal>AF_BRIDGE</literal>,
+            <literal>AF_ATMPVC</literal>,
+            <literal>AF_ROSE</literal>,
+            <literal>AF_NETBEUI</literal>,
+            <literal>AF_SECURITY</literal>,
+            <literal>AF_PACKET</literal>,
+            <literal>AF_ASH</literal>,
+            <literal>AF_ECONET</literal>,
+            <literal>AF_ATMSVC</literal>,
+            <literal>AF_IRDA</literal>,
+            <literal>AF_PPPOX</literal>,
+            <literal>AF_WANPIPE</literal> and
+            <literal>AF_BLUETOOTH</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Network.URI</literal>,
+            <literal>parseabsoluteURI</literal> has been deprecated with
+            a new function <literal>parseAbsoluteURI</literal> taking
+            its place.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>ObjectIO</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>OpenAL</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 1.3 (was 1.2).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            No other change.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>OpenGL</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.1 (was 2.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            No other change.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>parsec</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            No other change.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>QuickCheck</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>time</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version 1.0.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>time</literal> is a new package, for dealing with
+            dates, times and time intervals.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>X11</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number remains 1.1.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Graphics.X11.Xlib.Types</literal>,
+            <literal>XGCValues</literal> has been renamed
+            <literal>GCValues</literal> and
+            <literal>XSetWindowAttributes</literal> has been renamed
+            <literal>SetWindowAttributes</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            In <literal>Graphics.X11.Xlib.Misc</literal>,
+            <literal>allocaXSetWindowAttributes</literal> has been
+            renamed <literal>allocaSetWindowAttributes</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>FontStruct</literal> type has moved from
+            <literal>Graphics.X11.Xlib.Types</literal> to
+            <literal>Graphics.X11.Xlib.Font</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The
+            <literal>Point</literal>,
+            <literal>Rectangle</literal>,
+            <literal>Arc</literal>,
+            <literal>Segment</literal> and
+            <literal>Color</literal> types in
+            <literal>Graphics.X11.Xlib.Types</literal>
+            are now proper datatypes rather than synonyms for tuples.
+            They all have a <literal>Storable</literal> instance.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            The <literal>Byte</literal> and <literal>Short</literal>
+            types from <literal>Graphics.X11.Xlib.Types</literal> have
+            been removed.
+            The following type synonyms, which had already been marked
+            &quot;Backwards compatibility&quot;, have also been removed:
+            <literal>ListPoint</literal>,
+            <literal>ListRectangle</literal>,
+            <literal>ListArc</literal>,
+            <literal>ListSegment</literal> and
+            <literal>ListColor</literal>.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>Eq</literal>,
+            <literal>Ord</literal>,
+            <literal>Show</literal>,
+            <literal>Typeable</literal> and
+            <literal>Data</literal> are now derived for:
+            <literal>XEvent</literal>,
+            <literal>FdSet</literal> and
+            <literal>TimeZone</literal> in
+            <literal>Graphics.X11.Xlib.Event</literal>,
+            <literal>FontStruct</literal> in
+            <literal>Graphics.X11.Xlib.Font</literal>,
+            <literal>XErrorEvent</literal>,
+            <literal>XComposeStatus</literal> and
+            <literal>XTextProperty</literal> in
+            <literal>Graphics.X11.Xlib.Misc</literal>,
+            <literal>Region</literal> in
+            <literal>Graphics.X11.Xlib.Region</literal>,
+            <literal>Display</literal>,
+            <literal>Screen</literal>,
+            <literal>Visual</literal>,
+            <literal>GC</literal>,
+            <literal>GCValues</literal>,
+            <literal>SetWindowAttributes</literal>,
+            <literal>Point</literal>,
+            <literal>Rectangle</literal>,
+            <literal>Arc</literal>,
+            <literal>Segment</literal> and
+            <literal>Color</literal> in
+            <literal>Graphics.X11.Xlib.Types</literal>.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>xhtml</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version 2006.8.14.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <literal>xhtml</literal> is a new package, developing on
+            what used to be <literal>Text.Html</literal> and
+            <literal>Text.Html.BlockTable</literal> in the
+            <literal>base</literal> package.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+  </sect2>
+
+  <sect2>
+    <title>Internal changes</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          GHC development now has its own integrated
+          <ulink url="http://hackage.haskell.org/trac/ghc">wiki and bug
+          tracker</ulink>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC has now moved to darcs. See
+          <ulink
+          url="http://hackage.haskell.org/trac/ghc/wiki/GhcDarcs">the
+          wiki</ulink> for more details. The sources have moved around a
+          bit within the tree as a result, most notably the GHC sources
+          are no longer kept within a <filename>ghc/</filename>
+          subdirectory.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The native code generator is now capable of compiling loops,
+          which gets us a big step closer to being able to compile
+          entirely without gcc on well-supported arches.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>
+

@@ -2,7 +2,7 @@
 <!ENTITY flags          SYSTEM "flags.xml">
 <!ENTITY license        SYSTEM "license.xml">
 <!ENTITY intro          SYSTEM "intro.xml" >
-<!ENTITY relnotes       SYSTEM "6.0-notes.xml" >
+<!ENTITY relnotes       SYSTEM "6.6-notes.xml" >
 <!ENTITY installing     SYSTEM "installing.xml" >
 <!ENTITY using          SYSTEM "using.xml" >
 <!ENTITY runtime        SYSTEM "runtime_control.xml" >
