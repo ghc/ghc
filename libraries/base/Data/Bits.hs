@@ -66,6 +66,10 @@ The 'Bits' class defines bitwise operations over integral types.
 
 * Bits are numbered from 0 with bit 0 being the least
   significant bit.
+
+Minimal complete definition: '.&.', '.|.', 'xor', 'complement',
+('shift' or ('shiftL' and 'shiftR')), ('rotate' or ('rotateL' and 'rotateR')),
+'bitSize' and 'isSigned'.
 -}
 class Num a => Bits a where
     -- | Bitwise \"and\"
