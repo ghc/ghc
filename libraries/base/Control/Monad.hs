@@ -32,6 +32,8 @@ module Control.Monad
 
     , mapM          -- :: (Monad m) => (a -> m b) -> [a] -> m [b]
     , mapM_         -- :: (Monad m) => (a -> m b) -> [a] -> m ()
+    , forM          -- :: (Monad m) => [a] -> (a -> m b) -> m [b]
+    , forM_         -- :: (Monad m) => [a] -> (a -> m b) -> m ()
     , sequence      -- :: (Monad m) => [m a] -> m [a]
     , sequence_     -- :: (Monad m) => [m a] -> m ()
     , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
@@ -108,6 +110,7 @@ mapM f as       =  sequence (map f as)
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 {-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
+
 #endif  /* __GLASGOW_HASKELL__ */
 
 -- -----------------------------------------------------------------------------
@@ -153,6 +156,16 @@ filterM p (x:xs) =  do
    flg <- p x
    ys  <- filterM p xs
    return (if flg then x:ys else ys)
+
+-- | @'forM' f@ is @'mapM'@ with its arguments flipped
+forM            :: Monad m => [a] -> (a -> m b) -> m [b]
+{-# INLINE forM #-}
+forM            = flip mapM
+
+-- | @'forM_' f@ is @'mapM_'@ with its arguments flipped
+forM_           :: Monad m => [a] -> (a -> m b) -> m ()
+{-# INLINE forM_ #-}
+forM_           = flip mapM_
 
 -- | This generalizes the list-based 'concat' function.
 
