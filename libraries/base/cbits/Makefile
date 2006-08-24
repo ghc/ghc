@@ -2,18 +2,10 @@
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
--include ../config.mk
 
 HC = $(GHC_INPLACE)
 
 UseGhcForCc = YES
-
-# If there is no system-supplied POSIX regex library, use our own
-ifneq "$(HavePosixRegex)" "YES"
-ALL_DIRS      += regex
-SRC_CC_OPTS   += -Iregex
-EXCLUDED_SRCS += regex/engine.c
-endif
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 EXCLUDED_SRCS += consUtils.c

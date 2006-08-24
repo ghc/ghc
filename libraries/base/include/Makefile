@@ -3,16 +3,11 @@
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
--include ../config.mk
 
 H_FILES = $(wildcard *.h)
 
 includedir = $(libdir)/include
 INSTALL_INCLUDES = $(H_FILES)
-
-ifneq "$(HavePosixRegex)" "YES"
-INSTALL_INCLUDES += ./regex/regex.h
-endif
 
 DIST_CLEAN_FILES += HsBaseConfig.h
 

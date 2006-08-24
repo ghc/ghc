@@ -24,11 +24,6 @@ AC_CHECK_HEADERS([ctype.h dirent.h errno.h fcntl.h limits.h signal.h sys/resourc
 # rlim_t, because it will affect the result of that test.
 AC_SYS_LARGEFILE
 
-dnl ** check for POSIX regex
-HavePosixRegex=NO
-AC_CHECK_HEADERS([regex.h], [AC_CHECK_FUNCS(regcomp, [HavePosixRegex=YES])])
-AC_SUBST(HavePosixRegex)
-
 dnl ** check for wide-char classifications
 dnl FreeBSD has an emtpy wctype.h, so test one of the affected
 dnl functions if it's really there.
@@ -104,7 +99,5 @@ FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 
 # Check for idiosyncracies in some mingw impls of directory handling.
 FP_READDIR_EOF_ERRNO
-
-AC_CONFIG_FILES([config.mk])
 
 AC_OUTPUT

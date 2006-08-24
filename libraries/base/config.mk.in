@@ -1,4 +1,0 @@
-# Regex library
-# (if present in libc use that one, otherwise use the one in the tree)
-#
-HavePosixRegex  = @HavePosixRegex@
