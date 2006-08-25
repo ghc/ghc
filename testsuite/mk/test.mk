@@ -76,6 +76,12 @@ else
 RUNTEST_OPTS += -e ghc_with_threaded_rts=0
 endif
 
+ifeq "$(GhcWithSMP)" "YES"
+RUNTEST_OPTS += -e ghc_with_smp=1
+else
+RUNTEST_OPTS += -e ghc_with_smp=0
+endif
+
 ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --thread=$(THREADS)
 endif

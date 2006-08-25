@@ -35,7 +35,8 @@ if (ghc_with_interpreter == 1):
 
 if (ghc_with_threaded_rts == 1):
 	config.run_ways.append('threaded1')
-	config.run_ways.append('threaded2')
+	if (ghc_with_smp == 1):
+		config.run_ways.append('threaded2')
 
 config.way_flags = {
 	'normal'     : [],
