@@ -398,11 +398,12 @@
   </sect2>
 
   <sect2>
-    <title>RTS options for profiling and Concurrent/Parallel Haskell</title>
+    <title>RTS options for profiling and parallelism</title>
 
     <para>The RTS options related to profiling are described in <xref
-    linkend="rts-options-heap-prof"/>; and those for concurrent/parallel
-    stuff, in <xref linkend="parallel-rts-opts"/>.</para>
+    linkend="rts-options-heap-prof"/>, those for concurrency in
+      <xref linkend="sec-using-concurrent" />, and those for parallelism in
+      <xref linkend="parallel-options"/>.</para>
   </sect2>
 
   <sect2 id="rts-options-debugging">

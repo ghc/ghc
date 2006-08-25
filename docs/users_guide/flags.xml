@@ -1093,45 +1093,6 @@
     </sect2>
 
     <sect2>
-      <title>Parallelism options</title>
-
-      <para><xref linkend="sec-using-parallel"/></para>
-
-      <informaltable>
-	<tgroup cols="4" align="left" colsep="1" rowsep="1">
-	  <thead>
-	    <row>
-	      <entry>Flag</entry>
-	      <entry>Description</entry>
-	      <entry>Static/Dynamic</entry>
-	      <entry>Reverse</entry>
-	    </row>
-	  </thead>
-	  <tbody>
-	    <row>
-	      <entry><option>-gransim</option></entry>
-	      <entry>Enable GRANSIM</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-parallel</option></entry>
-	      <entry>Enable Parallel Haskell</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-smp</option></entry>
-	      <entry>Enable SMP support</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	  </tbody>
-	</tgroup>
-      </informaltable>
-    </sect2>
-
-    <sect2>
       <title>C pre-processor options</title>
 
       <para><xref linkend="c-pre-processor"/></para>

@@ -1533,353 +1533,86 @@ f "2"    = 2
     </variablelist>
   </sect1>
 
-<sect1 id="sec-using-parallel">
-<title>Using parallel Haskell</title>
+  <sect1 id="sec-using-smp">
+    <title>Using SMP parallelism</title>
+    <indexterm><primary>parallelism</primary>
+    </indexterm>
+    <indexterm><primary>SMP</primary>
+    </indexterm>
 
-<para>
-<indexterm><primary>Parallel Haskell</primary><secondary>using</secondary></indexterm>
-&lsqb;NOTE: GHC does not support Parallel Haskell by default, you need to
-      obtain a special version of GHC from the <ulink
-	url="http://www.cee.hw.ac.uk/~dsg/gph/">GPH</ulink> site.  Also,
-you won't be able to execute parallel Haskell programs unless PVM3
-(parallel Virtual Machine, version 3) is installed at your site.&rsqb;
-</para>
+    <para>GHC supports running Haskell programs in parallel on an SMP
+      (symmetric multiprocessor).</para>
 
-<para>
-To compile a Haskell program for parallel execution under PVM, use the
-<option>-parallel</option> option,<indexterm><primary>-parallel
-option</primary></indexterm> both when compiling <emphasis>and
-linking</emphasis>.  You will probably want to <literal>import
-Control.Parallel</literal> into your Haskell modules.
-</para>
+    <para>There's a fine distinction between
+      <emphasis>concurrency</emphasis> and <emphasis>parallelism</emphasis>:
+      parallelism is all about making your program run
+      <emphasis>faster</emphasis> by making use of multiple processors
+      simultaneously.  Concurrency, on the other hand, is a means of
+      abstraction: it is a convenient way to structure a program that must
+      respond to multiple asynchronous events.</para>
 
-<para>
-To run your parallel program, once PVM is going, just invoke it
-&ldquo;as normal&rdquo;.  The main extra RTS option is
-<option>-qp&lt;n&gt;</option>, to say how many PVM
-&ldquo;processors&rdquo; your program to run on.  (For more details of
-all relevant RTS options, please see <xref
-linkend="parallel-rts-opts"/>.)
-</para>
+    <para>However, the two terms are certainly related.  By making use of
+      multiple CPUs it is possible to run concurrent threads in parallel,
+      and this is exactly what GHC's SMP parallelism support does.  But it
+      is also possible to obtain performance improvements with parallelism
+      on programs that do not use concurrency.  This section describes how to
+      use GHC to compile and run parallel programs, in <xref
+	linkend="lang-parallel" /> we desribe the language features that affect
+    parallelism.</para>
+    
+    <sect2 id="parallel-options">
+      <title>Options to enable SMP parallelism</title>
 
-<para>
-In truth, running parallel Haskell programs and getting information
-out of them (e.g., parallelism profiles) is a battle with the vagaries of
-PVM, detailed in the following sections.
-</para>
+      <para>In order to make use of multiple CPUs, your program must be
+	linked with the <option>-threaded</option> option (see <xref
+	  linkend="options-linker" />).  Then, to run a program on multiple
+	CPUs, use the RTS <option>-N</option> option:</para>
+      
+      <variablelist>
+	<varlistentry>
+	  <term><option>-N<replaceable>x</replaceable></option></term>
+	  <listitem>
+	    <para><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm>
+	      Use <replaceable>x</replaceable> simultaneous threads when
+	      running the program.  Normally <replaceable>x</replaceable>
+	      should be chosen to match the number of CPU cores on the machine.
+	      There is no means (currently) by which this value may vary after
+	      the program has started.</para> 
+	    
+	    <para>For example, on a dual-core machine we would probably use
+	      <literal>+RTS -N2 -RTS</literal>.</para>
+	    
+	    <para>Whether hyperthreading cores should be counted or not is an
+	      open question; please feel free to experiment and let us know what
+	      results you find.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
+      
+    <sect2>
+      <title>Hints for using SMP parallelism</title>
 
-<sect2 id="pvm-dummies">
-<title>Dummy's guide to using PVM</title>
+      <para>Add the <literal>-sstderr</literal> RTS option when
+	running the program to see timing stats, which will help to tell you
+	whether your program got faster by using more CPUs or not.  If the user
+	time is greater than
+	the elapsed time, then the program used more than one CPU.  You should
+	also run the program without <literal>-N</literal> for comparison.</para>
 
-<para>
-<indexterm><primary>PVM, how to use</primary></indexterm>
-<indexterm><primary>parallel Haskell&mdash;PVM use</primary></indexterm>
-Before you can run a parallel program under PVM, you must set the
-required environment variables (PVM's idea, not ours); something like,
-probably in your <filename>.cshrc</filename> or equivalent:
-
-<programlisting>
-setenv PVM_ROOT /wherever/you/put/it
-setenv PVM_ARCH `$PVM_ROOT/lib/pvmgetarch`
-setenv PVM_DPATH $PVM_ROOT/lib/pvmd
-</programlisting>
-
-</para>
-
-<para>
-Creating and/or controlling your &ldquo;parallel machine&rdquo; is a purely-PVM
-business; nothing specific to parallel Haskell. The following paragraphs
-describe how to configure your parallel machine interactively.
-</para>
-
-<para>
-If you use parallel Haskell regularly on the same machine configuration it
-is a good idea to maintain a file with all machine names and to make the
-environment variable PVM_HOST_FILE point to this file. Then you can avoid
-the interactive operations described below by just saying
-</para>
-
-<programlisting>
-pvm $PVM_HOST_FILE
-</programlisting>
-
-<para>
-You use the <command>pvm</command><indexterm><primary>pvm command</primary></indexterm> command to start PVM on your
-machine.  You can then do various things to control/monitor your
-&ldquo;parallel machine;&rdquo; the most useful being:
-</para>
-
-<para>
-<informaltable>
-<tgroup cols="2">
-<colspec align="left"/>
-<tbody>
-
-<row>
-<entry><keycombo><keycap>Control</keycap><keycap>D</keycap></keycombo></entry>
-<entry>exit <command>pvm</command>, leaving it running</entry>
-</row>
-
-<row>
-<entry><command>halt</command></entry>
-<entry>kill off this &ldquo;parallel machine&rdquo; &amp; exit</entry>
-</row>
-
-<row>
-<entry><command>add &lt;host&gt;</command></entry>
-<entry>add <command>&lt;host&gt;</command> as a processor</entry>
-</row>
-
-<row>
-<entry><command>delete &lt;host&gt;</command></entry>
-<entry>delete <command>&lt;host&gt;</command></entry>
-</row>
-
-<row>
-<entry><command>reset</command></entry>
-<entry>kill what's going, but leave PVM up</entry>
-</row>
-
-<row>
-<entry><command>conf</command></entry>
-<entry>list the current configuration</entry>
-</row>
-
-<row>
-<entry><command>ps</command></entry>
-<entry>report processes' status</entry>
-</row>
-
-<row>
-<entry><command>pstat &lt;pid&gt;</command></entry>
-<entry>status of a particular process</entry>
-</row>
-
-</tbody>
-</tgroup>
-</informaltable>
-</para>
-
-<para>
-The PVM documentation can tell you much, much more about <command>pvm</command>!
-</para>
-
-</sect2>
-
-<sect2 id="par-profiles">
-<title>parallelism profiles</title>
-
-<para>
-<indexterm><primary>parallelism profiles</primary></indexterm>
-<indexterm><primary>profiles, parallelism</primary></indexterm>
-<indexterm><primary>visualisation tools</primary></indexterm>
-</para>
-
-<para>
-With parallel Haskell programs, we usually don't care about the
-results&mdash;only with &ldquo;how parallel&rdquo; it was!  We want pretty pictures.
-</para>
-
-<para>
-parallelism profiles (&agrave; la <command>hbcpp</command>) can be generated with the
-<option>-qP</option><indexterm><primary>-qP RTS option</primary></indexterm> RTS option.  The
-per-processor profiling info is dumped into files named
-<filename>&lt;full-path&gt;&lt;program&gt;.gr</filename>.  These are then munged into a PostScript picture,
-which you can then display.  For example, to run your program
-<filename>a.out</filename> on 8 processors, then view the parallelism profile, do:
-</para>
-
-<para>
-
-<screen>
-<prompt>&dollar;</prompt> ./a.out +RTS -qP -qp8
-<prompt>&dollar;</prompt> grs2gr *.???.gr &#62; temp.gr # combine the 8 .gr files into one
-<prompt>&dollar;</prompt> gr2ps -O temp.gr              # cvt to .ps; output in temp.ps
-<prompt>&dollar;</prompt> ghostview -seascape temp.ps   # look at it!
-</screen>
-
-</para>
-
-<para>
-The scripts for processing the parallelism profiles are distributed
-in <filename>ghc/utils/parallel/</filename>.
-</para>
-
-</sect2>
-
-<sect2>
-<title>Other useful info about running parallel programs</title>
-
-<para>
-The &ldquo;garbage-collection statistics&rdquo; RTS options can be useful for
-seeing what parallel programs are doing.  If you do either
-<option>+RTS -Sstderr</option><indexterm><primary>-Sstderr RTS option</primary></indexterm> or <option>+RTS -sstderr</option>, then
-you'll get mutator, garbage-collection, etc., times on standard
-error. The standard error of all PE's other than the `main thread'
-appears in <filename>/tmp/pvml.nnn</filename>, courtesy of PVM.
-</para>
-
-<para>
-Whether doing <option>+RTS -Sstderr</option> or not, a handy way to watch
-what's happening overall is: <command>tail -f /tmp/pvml.nnn</command>.
-</para>
-
-</sect2>
-
-<sect2 id="parallel-rts-opts">
-<title>RTS options for Parallel Haskell
-</title>
-
-<para>
-<indexterm><primary>RTS options, parallel</primary></indexterm>
-<indexterm><primary>parallel Haskell&mdash;RTS options</primary></indexterm>
-</para>
-
-<para>
-Besides the usual runtime system (RTS) options
-(<xref linkend="runtime-control"/>), there are a few options particularly
-for parallel execution.
-</para>
-
-<para>
-<variablelist>
-
-<varlistentry>
-<term><option>-qp&lt;N&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-qp&lt;N&gt; RTS option</primary></indexterm>
-(paraLLEL ONLY) Use <literal>&lt;N&gt;</literal> PVM processors to run this program;
-the default is 2.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-C[&lt;s&gt;]</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-C&lt;s&gt; RTS option</primary></indexterm> Sets
-the context switch interval to <literal>&lt;s&gt;</literal> seconds.
-A context switch will occur at the next heap block allocation after
-the timer expires (a heap block allocation occurs every 4k of
-allocation).  With <option>-C0</option> or <option>-C</option>,
-context switches will occur as often as possible (at every heap block
-allocation).  By default, context switches occur every 20ms.  Note that GHC's internal timer ticks every 20ms, and
-the context switch timer is always a multiple of this timer, so 20ms
-is the maximum granularity available for timed context switches.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-q[v]</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-q RTS option</primary></indexterm>
-(paraLLEL ONLY) Produce a quasi-parallel profile of thread activity,
-in the file <filename>&lt;program&gt;.qp</filename>.  In the style of <command>hbcpp</command>, this profile
-records the movement of threads between the green (runnable) and red
-(blocked) queues.  If you specify the verbose suboption (<option>-qv</option>), the
-green queue is split into green (for the currently running thread
-only) and amber (for other runnable threads).  We do not recommend
-that you use the verbose suboption if you are planning to use the
-<command>hbcpp</command> profiling tools or if you are context switching at every heap
-check (with <option>-C</option>).
--->
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-qt&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-qt&lt;num&gt; RTS option</primary></indexterm>
-(paraLLEL ONLY) Limit the thread pool size, i.e. the number of 
-threads per processor to <literal>&lt;num&gt;</literal>.  The default is
-32.  Each thread requires slightly over 1K <emphasis>words</emphasis> in
-the heap for thread state and stack objects.  (For 32-bit machines, this
-translates to 4K bytes, and for 64-bit machines, 8K bytes.)
-</para>
-</listitem>
-</varlistentry>
-<!-- no more -HWL
-<varlistentry>
-<term><option>-d</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-d RTS option (parallel)</primary></indexterm>
-(paraLLEL ONLY) Turn on debugging.  It pops up one xterm (or GDB, or
-something&hellip;) per PVM processor.  We use the standard <command>debugger</command>
-script that comes with PVM3, but we sometimes meddle with the
-<command>debugger2</command> script.  We include ours in the GHC distribution,
-in <filename>ghc/utils/pvm/</filename>.
-</para>
-</listitem>
-</varlistentry>
--->
-<varlistentry>
-<term><option>-qe&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-qe&lt;num&gt; RTS option
-(parallel)</primary></indexterm> (paraLLEL ONLY) Limit the spark pool size
-i.e. the number of pending sparks per processor to
-<literal>&lt;num&gt;</literal>. The default is 100. A larger number may be
-appropriate if your program generates large amounts of parallelism
-initially.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-qQ&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-qQ&lt;num&gt; RTS option (parallel)</primary></indexterm>
-(paraLLEL ONLY) Set the size of packets transmitted between processors
-to <literal>&lt;num&gt;</literal>. The default is 1024 words. A larger number may be
-appropriate if your machine has a high communication cost relative to
-computation speed.
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-qh&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-qh&lt;num&gt; RTS option (parallel)</primary></indexterm>
-(paraLLEL ONLY) Select a packing scheme. Set the number of non-root thunks to pack in one packet to
-&lt;num&gt;-1 (0 means infinity). By default GUM uses full-subgraph
-packing, i.e. the entire subgraph with the requested closure as root is
-transmitted (provided it fits into one packet). Choosing a smaller value
-reduces the amount of pre-fetching of work done in GUM. This can be
-advantageous for improving data locality but it can also worsen the balance
-of the load in the system. 
-</para>
-</listitem>
-</varlistentry>
-<varlistentry>
-<term><option>-qg&lt;num&gt;</option>:</term>
-<listitem>
-<para>
-<indexterm><primary>-qg&lt;num&gt; RTS option
-(parallel)</primary></indexterm> (paraLLEL ONLY) Select a globalisation
-scheme. This option affects the
-generation of global addresses when transferring data. Global addresses are
-globally unique identifiers required to maintain sharing in the distributed
-graph structure. Currently this is a binary option. With &lt;num&gt;=0 full globalisation is used
-(default). This means a global address is generated for every closure that
-is transmitted. With &lt;num&gt;=1 a thunk-only globalisation scheme is
-used, which generated global address only for thunks. The latter case may
-lose sharing of data but has a reduced overhead in packing graph structures
-and maintaining internal tables of global addresses.
-</para>
-</listitem>
-</varlistentry>
-</variablelist>
-</para>
-
-</sect2>
-
-</sect1>
+      <para>GHC's parallelism support is new and experimental.  It may make your
+	program go faster, or it might slow it down - either way, we'd be
+	interested to hear from you.</para>
+      
+      <para>One significant limitation with the current implementation is that
+	the garbage collector is still single-threaded, and all execution must
+	stop when GC takes place.  This can be a significant bottleneck in a
+	parallel program, especially if your program does a lot of GC.  If this
+	happens to you, then try reducing the cost of GC by tweaking the GC
+	settings (<xref linkend="rts-options-gc" />): enlarging the heap or the
+	allocation area size is a good start.</para>
+    </sect2>
+  </sect1>
 
   <sect1 id="options-platform">
     <title>Platform-specific Flags</title>

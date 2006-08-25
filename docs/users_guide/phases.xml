@@ -839,26 +839,43 @@ $ cat foo.hspp</screen>
           <indexterm><primary><option>-threaded</option></primary></indexterm>
         </term>
         <listitem>
-          <para>Link the program with the "threaded" runtime system.
-          This version of the runtime is designed to be used in
-          programs that use multiple operating-system threads.  It
-          supports calls to foreign-exported functions from multiple
-          OS threads.  Calls to foreign functions are made using the
-          same OS thread that created the Haskell thread (if it was
-          created by a call-in), or an arbitrary OS thread otherwise
-          (if the Haskell thread was created by
+          <para>Link the program with the "threaded" version of the
+          runtime system.  The threaded runtime system is so-called
+          because it manages multiple OS threads, as opposed to the
+          default runtime system which is purely
+          single-threaded.</para>
+
+          <para>Note that you do <emphasis>not</emphasis> need
+          <option>-threaded</option> in order to use concurrency; the
+          single-threaded runtime supports concurrency between Haskell
+          threads just fine.</para>
+
+          <para>The threaded runtime system provides the following
+          benefits:</para>
+
+          <itemizedlist> 
+            <listitem>
+              <para>Parallelism<indexterm><primary>parallelism</primary></indexterm> on a multiprocessor<indexterm><primary>multiprocessor</primary></indexterm><indexterm><primary>SMP</primary></indexterm> or multicore<indexterm><primary>multicore</primary></indexterm>
+              machine.  See <xref linkend="sec-using-smp" />.</para>
+
+              <para>The ability to make a foreign call that does not
+              block all other Haskell threads.</para>.
+
+              <para>The ability to invoke foreign exported Haskell
+              functions from multiple OS threads.</para>
+            </listitem>
+          </itemizedlist>
+
+          <para>With <option>-threaded</option>, calls to foreign
+          functions are made using the same OS thread that created the
+          Haskell thread (if it was created by a call to a foreign
+          exported Haskell function), or an arbitrary OS thread
+          otherwise (if the Haskell thread was created by
           <literal>forkIO</literal>).</para>
 
           <para>More details on the use of "bound threads" in the
           threaded runtime can be found in the <ulink
           url="../libraries/base/Control.Concurrent.html"><literal>Control.Concurrent</literal></ulink> module.</para>
-
-          <para>The threaded RTS does <emphasis>not</emphasis>
-          support using multiple CPUs to speed up execution of a
-          multi-threaded Haskell program.  The GHC runtime platform
-          is still single-threaded, but using the
-          <option>-threaded</option> option it can be used safely in
-          a multi-threaded environment.</para>
         </listitem>
       </varlistentry>
     </variablelist>
