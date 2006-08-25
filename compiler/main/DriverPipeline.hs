@@ -859,6 +859,15 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		       ++ map SysTools.Option (
 		          md_c_flags
                        ++ pic_c_flags
+#ifdef sparc_TARGET_ARCH
+        -- We only support SparcV9 and better because V8 lacks an atomic CAS
+        -- instruction. Note that the user can still override this
+	-- (e.g., -mcpu=ultrasparc) as GCC picks the "best" -mcpu flag
+	-- regardless of the ordering.
+        --
+        -- This is a temporary hack.
+                       ++ ["-mcpu=v9"]
+#endif
 		       ++ (if hcc && mangle
 		  	     then md_regd_c_flags
 		  	     else [])
@@ -946,6 +955,16 @@ runPhase As stop dflags _basename _suff input_fn get_output_fn maybe_loc
 	SysTools.runAs dflags	
 		       (map SysTools.Option as_opts
 		       ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
+#ifdef sparc_TARGET_ARCH
+        -- We only support SparcV9 and better because V8 lacks an atomic CAS
+	-- instruction so we have to make sure that the assembler accepts the
+        -- instruction set. Note that the user can still override this
+	-- (e.g., -mcpu=ultrasparc). GCC picks the "best" -mcpu flag
+	-- regardless of the ordering.
+	--
+	-- This is a temporary hack.
+		       ++ [ SysTools.Option "-mcpu=v9" ]
+#endif
 		       ++ [ SysTools.Option "-c"
 		          , SysTools.FileOption "" input_fn
 			  , SysTools.Option "-o"
