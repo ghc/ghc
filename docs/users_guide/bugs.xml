@@ -102,7 +102,10 @@ main = do args &lt;- getArgs
     <sect3 id="infelicities-decls">
       <title>Declarations and bindings</title>
 
-      <para>None known.</para>
+      <para>GHC's typechecker makes all pattern bindings monomorphic
+      by default; this behaviour can be disabled with
+      <option>-fno-mono-pat-binds</option>.  See <xref
+      linkend="options-language" />.</para>
     </sect3>
       
       <sect3 id="infelicities-Modules">
