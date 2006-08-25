@@ -959,14 +959,6 @@
         </listitem>
         <listitem>
           <para>
-            There is a new module
-            <literal>Control.Sequential.STM</literal> for non-concurrent
-            transactions which nevertheless need to be atomic in the
-            face of exceptions.
-          </para>
-        </listitem>
-        <listitem>
-          <para>
             A new module
             <literal>Control.Concurrent.STM.TArray</literal> defines
             <literal>TArray</literal>, a transactional array, and makes
