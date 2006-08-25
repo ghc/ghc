@@ -636,6 +636,8 @@
 #define REG_Hp	    	i3
 #define REG_HpLim	i4
 
+#define REG_Base	i1
+
 #define NCG_SpillTmp_I1	g1
 #define NCG_SpillTmp_I2	g2
 #define NCG_SpillTmp_F1	f26
