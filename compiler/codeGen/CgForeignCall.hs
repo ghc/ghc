@@ -110,13 +110,14 @@ emitForeignCall' safety results target args vols
   | otherwise = do
     id <- newTemp wordRep
     temp_args <- load_args_into_temps args
+    temp_target <- load_target_into_temp target
     emitSaveThreadState
     stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
 			[(id,PtrHint)]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
 			vols
 			)
-    stmtC (CmmCall target results temp_args vols)
+    stmtC (CmmCall temp_target results temp_args vols)
     stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
 			[ (CmmGlobal BaseReg, PtrHint) ]
 				-- Assign the result to BaseReg: we
@@ -139,16 +140,25 @@ resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("resumeThread")))
 --
 -- This is a HACK; really it should be done in the back end, but
 -- it's easier to generate the temporaries here.
-load_args_into_temps args = mapM maybe_assignTemp args
+load_args_into_temps = mapM arg_assign_temp
+  where arg_assign_temp (e,hint) = do
+	   tmp <- maybe_assign_temp e
+	   return (tmp,hint)
 	
-maybe_assignTemp (e, hint)
-  | hasNoGlobalRegs e = return (e, hint)
+load_target_into_temp (CmmForeignCall expr conv) = do 
+  tmp <- maybe_assign_temp expr
+  return (CmmForeignCall tmp conv)
+load_target_info_temp other_target =
+  return other_target
+
+maybe_assign_temp e
+  | hasNoGlobalRegs e = return e
   | otherwise          = do 
 	-- don't use assignTemp, it uses its own notion of "trivial"
 	-- expressions, which are wrong here
 	reg <- newTemp (cmmExprRep e)
 	stmtC (CmmAssign reg e)
-	return (CmmReg reg, hint)
+	return (CmmReg reg)
 
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
