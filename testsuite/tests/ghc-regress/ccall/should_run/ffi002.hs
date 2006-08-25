@@ -1,6 +1,6 @@
 module Foo where
 
-foreign export foo :: Int -> IO Int
+foreign export ccall foo :: Int -> IO Int
 
 foo :: Int -> IO Int
 foo n = return (length (f n))
