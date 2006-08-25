@@ -646,7 +646,13 @@ shutdownCapability (Capability *cap, Task *task)
 
     task->cap = cap;
 
-    for (i = 0; i < 50; i++) {
+    // Loop indefinitely until all the workers have exited and there
+    // are no Haskell threads left.  We used to bail out after 50
+    // iterations of this loop, but that occasionally left a worker
+    // running which caused problems later (the closeMutex() below
+    // isn't safe, for one thing).
+
+    for (i = 0; /* i < 50 */; i++) {
 	debugTrace(DEBUG_sched, 
 		   "shutting down capability %d, attempt %d", cap->no, i);
 	ACQUIRE_LOCK(&cap->lock);
