@@ -333,7 +333,7 @@ struct PartCapability_ {
 /* No such thing as a MainCapability under THREADED_RTS - each thread must have
  * its own Capability.
  */
-#if IN_STG_CODE && !defined(THREADED_RTS)
+#if IN_STG_CODE && !(defined(THREADED_RTS) && !defined(NOSMP))
 extern W_ MainCapability[];
 #endif
 
@@ -349,7 +349,7 @@ extern W_ MainCapability[];
 GLOBAL_REG_DECL(StgRegTable *,BaseReg,REG_Base)
 #define ASSIGN_BaseReg(e) (BaseReg = (e))
 #else
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS) && !defined(NOSMP)
 #error BaseReg must be in a register for THREADED_RTS
 #endif
 #define BaseReg (&((struct PartCapability_ *)MainCapability)->r)

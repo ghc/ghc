@@ -85,11 +85,13 @@ register double fake_f9 __asm__("$f9");
 StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
     while (f) {
+        /* XXX Disabled due to RtsFlags[]/RtsFlags mismatch
 	IF_DEBUG(interpreter,
 	    debugBelch("Jumping to ");
 	    printPtr((P_)f); fflush(stdout);
 	    debugBelch("\n");
 	    );
+        */
 	f = (StgFunPtr) (f)();
     }
     return (StgRegTable *)R1.p;

@@ -257,6 +257,14 @@ GhcWithJavaGen=NO
 
 HaveLibDL = @HaveLibDL@
 
+ArchSupportsSMP=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64)))
+
+ifeq "$(ArchSupportsSMP)" "YES"
+GhcWithSMP=YES
+else
+GhcWithSMP=NO
+endif
+
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
 

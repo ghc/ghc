@@ -48,6 +48,9 @@ xchg(StgPtr p, StgWord w)
         :"=r" (result)
         :"r" (w), "r" (p)
     );
+#elif !defined(WITHSMP)
+    result = *p;
+    *p = w;
 #else
 #error xchg() unimplemented on this architecture
 #endif
@@ -81,6 +84,13 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         :"cc", "memory"
     );
     return result;
+#elif !defined(WITHSMP)
+    StgWord result;
+    result = *p;
+    if (result == o) {
+        *p = n;
+    }
+    return result;
 #else
 #error cas() unimplemented on this architecture
 #endif
@@ -102,6 +112,8 @@ write_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif powerpc_HOST_ARCH
     __asm__ __volatile__ ("lwsync" : : : "memory");
+#elif !defined(WITHSMP)
+    return;
 #else
 #error memory barriers unimplemented on this architecture
 #endif
@@ -117,7 +129,6 @@ write_barrier(void) {
 INLINE_HEADER StgInfoTable *
 lockClosure(StgClosure *p)
 {
-#if i386_HOST_ARCH || x86_64_HOST_ARCH || powerpc_HOST_ARCH
     StgWord info;
     do {
 	nat i = 0;
@@ -127,21 +138,14 @@ lockClosure(StgClosure *p)
 	} while (++i < SPIN_COUNT);
 	yieldThread();
     } while (1);
-#else
-   ACQUIRE_SM_LOCK
-#endif
 }
 
 INLINE_HEADER void
 unlockClosure(StgClosure *p, StgInfoTable *info)
 {
-#if i386_HOST_ARCH || x86_64_HOST_ARCH || powerpc_HOST_ARCH
     // This is a strictly ordered write, so we need a wb():
     write_barrier();
     p->header.info = info;
-#else
-    RELEASE_SM_LOCK;
-#endif
 }
 
 #else /* !THREADED_RTS */

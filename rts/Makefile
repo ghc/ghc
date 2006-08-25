@@ -119,6 +119,11 @@ SRC_CC_OPTS += $(STANDARD_OPTS)
 SRC_CC_OPTS += $(GhcRtsCcOpts)
 SRC_HC_OPTS += $(GhcRtsHcOpts)
 
+ifneq "$(GhcWithSMP)" "YES"
+SRC_CC_OPTS += -DNOSMP
+SRC_HC_OPTS += -optc-DNOSMP
+endif
+
 ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
 endif

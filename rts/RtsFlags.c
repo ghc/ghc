@@ -418,7 +418,7 @@ usage_text[] = {
 "  -Dz  DEBUG: stack squezing",
 "",
 #endif /* DEBUG */
-#if defined(THREADED_RTS)
+#if defined(THREADED_RTS) && !defined(NOSMP)
 "  -N<n>     Use <n> OS threads (default: 1)",
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qw       Migrate a thread to the current CPU when it is woken up",
@@ -1019,7 +1019,7 @@ error = rtsTrue;
 		}
     	    	break;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS) && !defined(NOSMP)
 	      case 'N':
 		THREADED_BUILD_ONLY(
 		if (rts_argv[arg][2] != '\0') {

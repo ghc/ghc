@@ -17,6 +17,10 @@ endif
 
 SRC_CC_OPTS += -I. -I../rts
 
+ifneq "$(GhcWithSMP)" "YES"
+SRC_CC_OPTS += -DNOSMP
+endif
+
 #
 # Header file built from the configure script's findings
 #
