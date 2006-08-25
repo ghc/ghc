@@ -2,7 +2,7 @@ module Scheduler
 ( runTIO
 , module Event
 , module Thread
-, TTree,
+, TTree
 , TIO
 ) 
 where
