@@ -5,11 +5,11 @@ import Foreign.Ptr
 type CInt  = Int32
 type CSize = Word32
 
-foreign export dynamic 
+foreign import ccall "wrapper"
    mkComparator :: (Ptr Int -> Ptr Int -> IO CInt) 
 		-> IO (Ptr (Ptr Int -> Ptr Int -> IO CInt))
 
-foreign import 
+foreign import ccall
    qsort :: Ptr Int -> CSize -> CSize -> Ptr (Ptr Int -> Ptr Int -> IO CInt) 
 	 -> IO ()
 
