@@ -9,7 +9,8 @@ include $(TOP)/mk/boilerplate.mk
 # want the Makefile.
 MFLAGS += -f Makefile
 
-SUBDIRS = base haskell98 template-haskell readline regex-base regex-posix regex-compat
+SUBDIRS = base haskell98 template-haskell readline \
+	  regex-base regex-posix regex-compat parsec Cabal
 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -18,12 +19,9 @@ ifeq "$(Windows)" "YES"
 SUBDIRS += $(wildcard Win32)
 endif
 
-SUBDIRS += Cabal
-
 # Set GhcBootLibs=YES from the command line to work with just the libraries
 # needed to bootstrap GHC.
 ifneq "$(GhcBootLibs)" "YES"
-SUBDIRS += $(wildcard parsec)
 SUBDIRS += $(wildcard haskell-src)
 SUBDIRS += $(wildcard html)
 SUBDIRS += $(wildcard network)
