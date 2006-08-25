@@ -48,6 +48,13 @@ xchg(StgPtr p, StgWord w)
         :"=r" (result)
         :"r" (w), "r" (p)
     );
+#elif sparc_HOST_ARCH
+    result = w;
+    __asm__ __volatile__ (
+        "swap %1,%0"
+	: "+r" (result), "+m" (*p)
+	: /* no input-only operands */
+      );
 #elif !defined(WITHSMP)
     result = *p;
     *p = w;
@@ -84,6 +91,14 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         :"cc", "memory"
     );
     return result;
+#elif sparc_HOST_ARCH
+    __asm__ __volatile__ (
+	"cas [%1], %2, %0"
+	: "+r" (n)
+	: "r" (p), "r" (o)
+	: "memory"
+    );
+    return n;
 #elif !defined(WITHSMP)
     StgWord result;
     result = *p;
@@ -112,6 +127,9 @@ write_barrier(void) {
     __asm__ __volatile__ ("" : : : "memory");
 #elif powerpc_HOST_ARCH
     __asm__ __volatile__ ("lwsync" : : : "memory");
+#elif sparc_HOST_ARCH
+    /* Sparc in TSO mode does not require write/write barriers. */
+    __asm__ __volatile__ ("" : : : "memory");
 #elif !defined(WITHSMP)
     return;
 #else
