@@ -397,10 +397,6 @@
 
 #define REG(x) __asm__("$" #x)
 
-#define CALLER_SAVES_R1
-#define CALLER_SAVES_R2
-#define CALLER_SAVES_R3
-#define CALLER_SAVES_R4
 #define CALLER_SAVES_R5
 #define CALLER_SAVES_R6
 #define CALLER_SAVES_R7
@@ -408,14 +404,14 @@
 
 #define CALLER_SAVES_USER
 
-#define REG_R1		9
-#define REG_R2    	10
-#define REG_R3    	11
-#define REG_R4    	12
-#define REG_R5    	13
-#define REG_R6    	14
-#define REG_R7    	15
-#define REG_R8    	24
+#define REG_R1		16
+#define REG_R2    	17
+#define REG_R3    	18
+#define REG_R4    	19
+#define REG_R5    	12
+#define REG_R6    	13
+#define REG_R7    	14
+#define REG_R8    	15
 
 #define REG_F1		f20
 #define REG_F2		f22
@@ -425,11 +421,13 @@
 #define REG_D1		f28
 #define REG_D2		f30
 
-#define REG_Sp    	16
-#define REG_SpLim    	18
+#define REG_Sp    	20
+#define REG_SpLim    	21
 
-#define REG_Hp	    	19
-#define REG_HpLim	20
+#define REG_Hp	    	22
+#define REG_HpLim	23
+
+#define REG_Base	30
 
 #endif /* mipse[lb] */
 

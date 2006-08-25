@@ -242,6 +242,29 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
 #endif
 
 /* -----------------------------------------------------------------------------
+   Tail calling on MIPS
+   -------------------------------------------------------------------------- */
+
+#ifdef mips_HOST_ARCH
+
+#if IN_STG_CODE
+register void *_procedure __asm__("$25");
+#endif
+
+#define JMP_(cont)				\
+    {						\
+       _procedure = (void *)(cont);		\
+       __DISCARD__();				\
+       goto *_procedure;			\
+    }
+
+/* Don't need these for MIPS mangling */
+#define FB_
+#define FE_
+
+#endif /* mips_HOST_ARCH */
+
+/* -----------------------------------------------------------------------------
   FUNBEGIN and FUNEND.
 
   These are markers indicating the start and end of Real Code in a

@@ -899,4 +899,37 @@ StgRunIsImplementedInAssembler(void)
 
 #endif
 
+/* -----------------------------------------------------------------------------
+   MIPS architecture
+   -------------------------------------------------------------------------- */
+
+#ifdef mips_HOST_ARCH
+
+StgThreadReturnCode
+StgRun(StgFunPtr f, StgRegTable *basereg)
+{
+    register StgThreadReturnCode __v0 __asm__("$2");
+
+    __asm__ __volatile__(
+	"	la	$25, %1			\n"
+	"	move	$30, %2			\n"
+	"	jr	%1			\n"
+	"	.align 3			\n"
+	"	.globl " STG_RETURN "		\n"
+	"	.aent " STG_RETURN "		\n"
+	STG_RETURN ":				\n"
+	"	move	%0, $16			\n"
+	"	move	$3, $17			\n"
+	: "=r" (__v0),
+	: "r" (f), "r" (basereg)
+	"$16", "$17", "$18", "$19", "$20", "$21", "$22", "$23",
+	"$25", "$28", "$30",
+	"$f20", "$f22", "$f24", "$f26", "$f28", "$f30",
+	"memory");
+
+    return __v0;
+}
+
+#endif /* mips_HOST_ARCH */
+
 #endif /* !USE_MINIINTERPRETER */
