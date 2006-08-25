@@ -17,6 +17,5 @@ html
 monads
 mtl
 network
-parsec
 time
 xhtml
