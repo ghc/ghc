@@ -46,6 +46,14 @@ initUserSignals(void)
     return;
 }
 
+void
+finiUserSignals(void)
+{
+    if (hConsoleEvent != INVALID_HANDLE_VALUE) {
+        CloseHandle(hConsoleEvent);
+    }
+}
+
 /*
  * Function: shutdown_handler()
  *

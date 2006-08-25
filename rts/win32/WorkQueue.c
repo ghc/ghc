@@ -45,8 +45,7 @@ NewWorkQueue()
     return wq;
   }
     
-  wq->head   = 0;
-  wq->tail   = 0;
+  memset(wq, 0, sizeof *wq);
   
   InitializeCriticalSection(&wq->queueLock);
   wq->workAvailable = newSemaphore(0, WORKQUEUE_SIZE);
@@ -65,6 +64,15 @@ NewWorkQueue()
 void
 FreeWorkQueue ( WorkQueue* pq )
 {
+  int i;
+
+  /* Free any remaining work items. */
+  for (i = 0; i < WORKQUEUE_SIZE; i++) {
+    if (pq->items[i] != NULL) {
+      free(pq->items[i]);
+    }
+  }
+
   /* Close the semaphores; any threads blocked waiting
    * on either will as a result be woken up.
    */ 
@@ -72,7 +80,7 @@ FreeWorkQueue ( WorkQueue* pq )
     CloseHandle(pq->workAvailable);
   }
   if ( pq->roomAvailable ) {
-    CloseHandle(pq->workAvailable);
+    CloseHandle(pq->roomAvailable);
   }
   free(pq);
   return;

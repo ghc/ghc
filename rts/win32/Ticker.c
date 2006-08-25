@@ -115,6 +115,7 @@ stopTicker(void)
 	    }
 	    if (exitCode != STILL_ACTIVE) {
 		tickThread = INVALID_HANDLE_VALUE;
+		CloseHandle(hStopEvent);
 		return 0;
 	    }
 	    TerminateThread(tickThread, 0);

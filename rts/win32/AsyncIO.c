@@ -45,8 +45,8 @@ typedef struct CompletedReq {
 #define MAX_REQUESTS 200
 
 static CRITICAL_SECTION queue_lock;
-static HANDLE           completed_req_event;
-static HANDLE           abandon_req_wait;
+static HANDLE           completed_req_event = INVALID_HANDLE_VALUE;
+static HANDLE           abandon_req_wait = INVALID_HANDLE_VALUE;
 static HANDLE           wait_handles[2];
 static CompletedReq     completedTable[MAX_REQUESTS];
 static int              completed_hw;
@@ -173,7 +173,18 @@ startupAsyncIO()
 void
 shutdownAsyncIO()
 {
-    CloseHandle(completed_req_event);
+    if (completed_req_event != INVALID_HANDLE_VALUE) {
+        CloseHandle(completed_req_event);
+	completed_req_event = INVALID_HANDLE_VALUE;
+    }
+    if (abandon_req_wait != INVALID_HANDLE_VALUE) {
+        CloseHandle(abandon_req_wait);
+	abandon_req_wait = INVALID_HANDLE_VALUE;
+    }
+    if (completed_table_sema != NULL) {
+        CloseHandle(completed_table_sema);
+	completed_table_sema = NULL;
+    }
     ShutdownIOManager();
 }
 

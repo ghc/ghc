@@ -80,6 +80,9 @@ IOWorkerProc(PVOID param)
 
 	if (rc == WAIT_OBJECT_0) {
 	    // we received the exit event
+	    EnterCriticalSection(&iom->manLock);
+	    ioMan->numWorkers--;
+	    LeaveCriticalSection(&iom->manLock);
 	    return 0;
 	}
 
@@ -435,12 +438,23 @@ AddProcRequest ( void* proc,
 
 void ShutdownIOManager ( void )
 {
-  SetEvent(ioMan->hExitEvent);
-  // ToDo: we can't free this now, because the worker thread(s)
-  // haven't necessarily finished with it yet.  Perhaps it should
-  // have a reference count or something.
-  // free(ioMan);
-  // ioMan = NULL;
+    int num;
+
+    SetEvent(ioMan->hExitEvent);
+  
+    /* Wait for all worker threads to die. */
+    for (;;) {
+        EnterCriticalSection(&ioMan->manLock);
+	num = ioMan->numWorkers;
+	LeaveCriticalSection(&ioMan->manLock);
+	if (num == 0)
+	    break;
+	Sleep(10);
+    }
+    FreeWorkQueue(ioMan->workQueue);
+    CloseHandle(ioMan->hExitEvent);
+    free(ioMan);
+    ioMan = NULL;
 }
 
 /* Keep track of WorkItems currently being serviced. */
