@@ -831,6 +831,22 @@
     </sect3>
 
     <sect3>
+      <title>parsec</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version number 2.0 (was 1.0).
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            No other change.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
       <title>readline</title>
       <itemizedlist>
         <listitem>
@@ -1642,22 +1658,6 @@
         <listitem>
           <para>
             Version number 2.1 (was 2.0).
-          </para>
-        </listitem>
-        <listitem>
-          <para>
-            No other change.
-          </para>
-        </listitem>
-      </itemizedlist>
-    </sect3>
-
-    <sect3>
-      <title>parsec</title>
-      <itemizedlist>
-        <listitem>
-          <para>
-            Version number 2.0 (was 1.0).
           </para>
         </listitem>
         <listitem>
