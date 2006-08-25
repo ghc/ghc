@@ -971,6 +971,9 @@ mkBreakpointExpr' breakpointFunc scope
 
 srcSpanLit :: SrcSpan -> HsExpr Name
 srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
+
+srcSpanPrimLit :: SrcSpan -> HsExpr Name
+srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDoc (ppr span))))
 \end{code}
 
 %************************************************************************
@@ -986,7 +989,7 @@ mkAssertErrorExpr
   = getSrcSpanM    			`thenM` \ sloc ->
     let
 	expr = HsApp (L sloc (HsVar assertErrorName)) 
-		     (L sloc (srcSpanLit sloc))
+		     (L sloc (srcSpanPrimLit sloc))
     in
     returnM (expr, emptyFVs)
 \end{code}
