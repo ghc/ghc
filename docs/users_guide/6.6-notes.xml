@@ -7,6 +7,120 @@
     <itemizedlist>
       <listitem>
         <para>
+          GHC now supports SMP:
+          when you compile with <option>-threaded</option>, you now get
+          an RTS flag <option>-N</option> that allows you to specify the
+          number of OS threads that GHC should use. Defaults to 1.
+          See <xref linkend="sec-using-smp" /> and <xref
+          linkend="lang-parallel" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC's modules are now also bundled into a
+          <literal>ghc</literal> package, allowing programs to make use
+          of GHC as a library. The interface has not yet been properly
+          designed, so is subject to change.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now handles impredicative polymorphism and there are
+          changes to the way scoped type variables work; see
+          <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
+          for more details.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now supports bang patterns to require a function is strict
+          in a given argument, e.g.
+          <programlisting>
+    f (!x, y) = [x,y]</programlisting>
+          is equivalent to
+          <programlisting>
+    f (x, y) | x `seq` False = undefined
+             | otherwise = [x,y]</programlisting>
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The restriction that you cannot use two packages together if
+          they contain a module with the same name has been removed.
+          In implementation terms, the package name is now included in
+          every exported symbol name in the object file, so that
+          modules with the same name in different packages do not
+          clash.  See <xref linkend="package-overlaps" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now treats source files as UTF-8 (ASCII is a strict
+          subset of UTF-8, so ASCII source files will continue to
+          work as before). However, invalid UTF-8 sequences are
+          ignored in comments, so ASCII code with comments in, for
+          example, Latin-1 will also work.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GADTs can now use record syntax. Also, if the datatype could
+          have been declared with Haskell 98 syntax then deriving
+          clauses are permitted. For more info see <xref linkend="gadt" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          There is a new pragma <literal>LANGUAGE</literal> which allows
+          extensions to be specified portably, i.e. without having to
+          resort to the <literal>OPTIONS_GHC</literal> pragma and giving
+          GHC-specific options. The arguments to the pragma are the same
+          extensions that Cabal knows about. More info in
+          <xref linkend="language-pragma" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          When you use <command>ghc --make</command>, GHC will now take
+          the executable filename from the name of the file containing
+          the <literal>Main</literal> module rather than using
+          <filename>a.out</filename>. The <filename>.exe</filename>
+          extension is appended on Windows, and it can of course be
+          overridden with <option>-o</option>.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC's garbage collector now deals more intelligently with
+          mutable data, so you mostly no longer need to worry about GC
+          performance when a lot of memory is taken up by
+          <literal>STArray</literal>s, <literal>IOArray</literal>s,
+          <literal>STRef</literal>s or <literal>IORef</literal>s.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          GHC now allows more generalisation when typing mutually
+          recursive bindings, resulting in more programs being accepted.
+          See <xref linkend="typing-binds" /> for more details.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The rules for instance declarations have been further relaxed.
+          You are now permitted to have instances whose heads contain
+          only type variables, e.g.
+          <programlisting>
+    instance C a</programlisting>
+          and instances whose constraints are not only type variables,
+          e.g.
+          <programlisting>
+    instance C2 Int a => C3 [a] b</programlisting>
+          For more details, see <xref linkend="instance-rules" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
             The following flags (and, where appropriate, their inverses)
             used to be static (can only be given on
             the command line) but are now dynamic (can also be given in
@@ -91,8 +205,9 @@
       </listitem>
       <listitem>
         <para>
-          The equality test performed when pattern matching against
-          an overloaded numeric literal now uses the
+          When the <option>-fno-implicit-prelude</option> is given,
+          the equality test performed when pattern matching against an
+          overloaded numeric literal now uses the
           <literal>(==)</literal> in scope, rather than the one from
           <literal>Prelude</literal>. Likewise, the subtraction and
           inequality test performed when pattern matching against
@@ -102,34 +217,11 @@
       </listitem>
       <listitem>
         <para>
-          With the exception of the arrow syntax, the types of functions
-          used by sugar (such as do notation, numeric literal patterns)
-          need not match the types of the <literal>Prelude</literal>
-          functions normally used.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GADTs can now use record syntax. Also, if the datatype could
-          have been declared with Haskell 98 syntax then deriving
-          clauses are permitted. For more info see <xref linkend="gadt" />.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          There is a new pragma <literal>LANGUAGE</literal> which allows
-          extensions to be specified portably, i.e. without having to
-          resort to the <literal>OPTIONS_GHC</literal> pragma and giving
-          GHC-specific options. The arguments to the pragma are the same
-          extensions that Cabal knows about. More info in
-          <xref linkend="language-pragma" />.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHC now allows more generalisation when typing mutually
-          recursive bindings, resulting in more programs being accepted.
-          See <xref linkend="typing-binds" /> for more details.
+          Another change to <option>-fno-implicit-prelude</option>:
+          with the exception of the arrow syntax, the types of
+          functions used by sugar (such as do notation, numeric
+          literal patterns) need not match the types of the
+          <literal>Prelude</literal> functions normally used.
         </para>
       </listitem>
       <listitem>
@@ -147,25 +239,6 @@
           and instead of <literal>extra-frameworks</literal> we have
           <literal>frameworks</literal>.
           See <xref linkend="installed-pkg-info" /> for details.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHC now treats source files as UTF-8 (ASCII is a strict
-          subset of UTF-8, so ASCII source files will continue to
-          work as before). However, invalid UTF-8 sequences are
-          ignored in comments, so ASCII code with comments in, for
-          example, Latin-1 will also work.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          When you use <command>ghc --make</command>, GHC will now take
-          the executable filename from the name of the file containing
-          the <literal>Main</literal> module rather than using
-          <filename>a.out</filename>. The <filename>.exe</filename>
-          extension is appended on Windows, and it can of course be
-          overridden with <option>-o</option>.
         </para>
       </listitem>
       <listitem>
@@ -215,9 +288,27 @@
       </listitem>
       <listitem>
         <para>
-          GHC now includes the package name in symbol names; the upshot
-          of this is that it is possible to link a program that uses
-          multiple packages each containing a module of the same name.
+          The old syntax for FFI declarations (deprecated since 5.04)
+          is no longer accepted.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          The <option>-split-objs</option> flag can now be used with
+          <option>--make</option>, and hence can be used by cabal.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>GHCi changes</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          GHCi now allows tab completion of in-scope names and modules
+          on platforms that use readline (i.e. not Windows).
         </para>
       </listitem>
       <listitem>
@@ -234,81 +325,6 @@
           <literal>:etags</literal> commands to generate tags files for
           vi-style and emacs-style editors respectively.
           See <xref linkend="ghci-commands" /> for more information.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          The rules for instance declarations have been further relaxed.
-          You are now permitted to have instances whose heads contain
-          only type variables, e.g.
-          <programlisting>
-    instance C a</programlisting>
-          and instances whose constraints are not only type variables,
-          e.g.
-          <programlisting>
-    instance C2 Int a => C3 [a] b</programlisting>
-          For more details, see <xref linkend="instance-rules" />.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHCi now allows tab completion of in-scope names.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          The old syntax for FFI declarations (deprecated since 5.04)
-          is no longer accepted.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          The <option>-split-objs</option> flag can now be used with
-          <option>--make</option>, and hence can be used by cabal.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHC now supports bang patterns to require a function is strict
-          in a given argument, e.g.
-          <programlisting>
-    f (!x, y) = [x,y]</programlisting>
-          is equivalent to
-          <programlisting>
-    f (x, y) | x `seq` False = undefined
-             | otherwise = [x,y]</programlisting>
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHC now handles impredicative polymorphism; see
-          <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
-          for more details.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHC's modules are now also bundled into a
-          <literal>ghc</literal> package, allowing programs to make use
-          of GHC as a library. The interface has not yet been properly
-          designed, so is subject to change.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHC's garbage collector now deals more intelligently with
-          mutable data, so you no longer need to worry about GC
-          performance when a lot of memory is taken up by
-          <literal>STArray</literal>s, <literal>IOArray</literal>s,
-          <literal>STRef</literal>s or <literal>IORef</literal>s.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
-          GHC now supports SMP:
-          when you compile with <option>-threaded</option>, you now get
-          an RTS flag <option>-N</option> that allows you to specify the
-          number of OS threads that GHC should use. Defaults to 1.
         </para>
       </listitem>
     </itemizedlist>
