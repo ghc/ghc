@@ -706,6 +706,16 @@
             <literal>ForeignPtr</literal>.
           </para>
         </listitem>
+        <listitem>
+          <para>
+            The <literal>Text.Regex</literal> and
+            <literal>Text.Regex.Posix</literal> modules have been removed.
+            Instead, use the new <literal>regex-compat</literal> package
+            for a drop-in <literal>Text.Regex</literal> replacement, or
+            the new library in the new <literal>regex-posix</literal>
+            package.
+          </para>
+        </listitem>
       </itemizedlist>
     </sect3>
 
@@ -852,6 +862,56 @@
         <listitem>
           <para>
             No change (version 1.0).
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>regex-base</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version 0.71.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            New library that provides common functions for different
+            regex backends.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>regex-compat</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version 0.71.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            New package providing a replacement
+            <literal>Text.Regex</literal> module.
+          </para>
+        </listitem>
+      </itemizedlist>
+    </sect3>
+
+    <sect3>
+      <title>regex-posix</title>
+      <itemizedlist>
+        <listitem>
+          <para>
+            Version 0.71.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            A new package providing POSIX regexes.
           </para>
         </listitem>
       </itemizedlist>
