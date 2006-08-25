@@ -387,6 +387,15 @@ mips-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
+mipsel-*-linux*)
+        HostPlatform=mipsel-unknown-linux # hack again
+        TargetPlatform=mipsel-unknown-linux
+        BuildPlatform=mipsel-unknown-linux
+        HostPlatform_CPP='mipsel_unknown_linux'
+        HostArch_CPP='mipsel'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+        ;;
 mips-dec-ultrix*)
         HostPlatform_CPP='mips_dec_ultrix'
         HostArch_CPP='mipsel'   # NB a little different
