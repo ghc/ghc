@@ -832,4 +832,7 @@ pprDynamicLinkerAsmLabel SymbolPtr lbl
   = text "__imp_" <> pprCLabel lbl
 pprDynamicLinkerAsmLabel _ _
   = panic "pprDynamicLinkerAsmLabel"
+#else
+pprDynamicLinkerAsmLabel _ _
+  = panic "pprDynamicLinkerAsmLabel"
 #endif
