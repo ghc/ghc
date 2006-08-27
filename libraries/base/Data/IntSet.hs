@@ -10,10 +10,11 @@
 --
 -- An efficient implementation of integer sets.
 --
--- This module is intended to be imported @qualified@, to avoid name
--- clashes with "Prelude" functions.  eg.
+-- Since many function names (but not the type name) clash with
+-- "Prelude" names, this module is usually imported @qualified@, e.g.
 --
--- >  import Data.IntSet as Set
+-- >  import Data.IntSet (IntSet)
+-- >  import qualified Data.IntSet as IntSet
 --
 -- The implementation is based on /big-endian patricia trees/.  This data
 -- structure performs especially well on binary operations like 'union'

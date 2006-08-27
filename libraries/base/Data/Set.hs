@@ -9,10 +9,11 @@
 --
 -- An efficient implementation of sets.
 --
--- This module is intended to be imported @qualified@, to avoid name
--- clashes with "Prelude" functions.  eg.
+-- Since many function names (but not the type name) clash with
+-- "Prelude" names, this module is usually imported @qualified@, e.g.
 --
--- >  import Data.Set as Set
+-- >  import Data.Set (Set)
+-- >  import qualified Data.Set as Set
 --
 -- The implementation of 'Set' is based on /size balanced/ binary trees (or
 -- trees of /bounded balance/) as described by:

@@ -11,10 +11,11 @@
 --
 -- An efficient implementation of maps from keys to values (dictionaries).
 --
--- This module is intended to be imported @qualified@, to avoid name
--- clashes with Prelude functions.  eg.
+-- Since many function names (but not the type name) clash with
+-- "Prelude" names, this module is usually imported @qualified@, e.g.
 --
--- >  import Data.Map as Map
+-- >  import Data.Map (Map)
+-- >  import qualified Data.Map as Map
 --
 -- The implementation of 'Map' is based on /size balanced/ binary trees (or
 -- trees of /bounded balance/) as described by:
