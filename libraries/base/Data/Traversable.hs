@@ -8,7 +8,8 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Class of data structures that can be traversed from left to right.
+-- Class of data structures that can be traversed from left to right,
+-- performing an action on each element.
 --
 -- See also
 --
@@ -20,6 +21,11 @@
 --    by Jeremy Gibbons and Bruno Oliveira,
 --    in /Mathematically-Structured Functional Programming/, 2006, and online at
 --    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
+--
+-- Note that the functions 'mapM' and 'sequence' generalize "Prelude"
+-- functions of the same names from lists to any 'Traversable' functor.
+-- To avoid ambiguity, either import the "Prelude" hiding these names
+-- or qualify uses of these function names with an alias for this module.
 
 module Data.Traversable (
 	Traversable(..),
