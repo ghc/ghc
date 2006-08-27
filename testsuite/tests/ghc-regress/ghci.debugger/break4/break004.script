@@ -1,7 +1,7 @@
--- Availability of Implicit params
+-- implicit params availability in breakpoints
 
 :set -fimplicit-params
 :l A
 
 g 5
-?flag
+_flag

@@ -1,0 +1,6 @@
+-- TH generated code does not get instrumented
+
+:set -fglasgow-exts
+:set -fdebugging
+:l A
+:show bkptTable

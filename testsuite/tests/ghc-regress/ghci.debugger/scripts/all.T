@@ -10,7 +10,3 @@ test('print008', normal, ghci_script, ['print008.script'])
 test('print009', normal, ghci_script, ['print009.script'])
 test('print010', normal, ghci_script, ['print010.script'])
 
-test('dynbk001', normal, ghci_script, ['dynbk001.script'])
-test('dynbk002', normal, ghci_script, ['dynbk002.script'])
-test('dynbk003', normal, ghci_script, ['dynbk003.script'])
-test('dynbk004', normal, ghci_script, ['dynbk004.script'])

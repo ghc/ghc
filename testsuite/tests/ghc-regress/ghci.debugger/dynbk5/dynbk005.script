@@ -1,0 +1,8 @@
+-- TH generated code does not get instrumented
+-- This test fails and proves that -fdebugging is not compatible with TH codeope
+
+:set -fglasgow-exts
+:set -fth
+:set -fdebugging
+:l A
+:show bkptTable

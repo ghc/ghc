@@ -3,5 +3,7 @@
 :set -fdebugging
 :l A
 
-:breakpoint add Main 4
-:breakpoint add Main 8
+:breakpoint add Main 3
+:breakpoint add Main 6
+:breakpoint add Main 10
+:breakpoint add Main 14
