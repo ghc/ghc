@@ -8,7 +8,8 @@
 -- Tested with : GHC 6.4.1 and Hugs March 2005
 -- 
 
---
+-- #hide
+
 -- | Functional array fusion for ByteStrings. 
 --
 -- Originally based on code from the Data Parallel Haskell project, 
