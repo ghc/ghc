@@ -32,5 +32,3 @@ HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
 $(odir)/main/Main.o : libHSghc$(_way).a
 
 include $(TOP)/mk/target.mk
-
--include .depend-$(stage)
