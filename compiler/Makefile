@@ -124,7 +124,8 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 	done
 else
 	for i in */*hi-boot*; do \
-	    $(LN_S) -f ../../$$i stage$(stage)/$$i || true ; \
+	    ($(RM) -f stage$(stage)/$$i \
+	       && $(LN_S) ../../$$i stage$(stage)/$$i) || true ; \
 	done
 endif
 endif
@@ -708,7 +709,7 @@ $(odir)/ghc-inplace : $(GHC_PROG)
 	chmod 755 $@
 
 ghc-inplace : stage1/ghc-inplace
-	$(LN_S) -f $< $@
+	$(RM) -f $@ && $(LN_S) $< $@
 
 ifeq "$(stage)" "1"
 CLEAN_FILES += ghc-inplace
