@@ -438,6 +438,9 @@ check_target:
     case BlockedOnRead:
     case BlockedOnWrite:
     case BlockedOnDelay:
+#if defined(mingw32_HOST_OS)
+    case BlockedOnDoProc:
+#endif
 	if ((target->flags & TSO_BLOCKEX) &&
 	    ((target->flags & TSO_INTERRUPTIBLE) == 0)) {
 	    blockedThrowTo(source,target);
