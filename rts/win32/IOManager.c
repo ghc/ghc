@@ -340,7 +340,7 @@ depositWorkItem( unsigned int reqID,
 	if ( (ioMan->workersIdle < ioMan->queueSize) ) {
 	    /* No, go ahead and create another. */
 	    ioMan->numWorkers++;
-	    if (NewIOWorkerThread(ioMan)) {
+	    if (!NewIOWorkerThread(ioMan)) {
 		ioMan->numWorkers--;
 	    }
 	}
