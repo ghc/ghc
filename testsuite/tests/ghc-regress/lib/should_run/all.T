@@ -21,6 +21,7 @@ test('exceptions001', 	normal, compile_and_run, [''])
 test('exceptions002', 	normal, compile_and_run, [''])
 test('list001'	,	skip_if_fast, compile_and_run, [''])
 test('list002', skip_if_fast, compile_and_run, [''])
+test('list003', skip_if_fast, compile_and_run, [''])
 
 test('memo001', compose(skip_if_fast,extra_run_opts('+RTS -A10k -RTS')), \
 	multimod_compile_and_run, ['memo001',''])
