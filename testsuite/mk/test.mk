@@ -93,9 +93,11 @@ RUNTEST_OPTS +=  \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	-e config.wordsize=\"$(WORDSIZE)\" \
 	-e default_testopts.cleanup=\"$(CLEANUP)\" \
+	-e "if '$(USETHREADS)': config.use_threads=int($(USETHREADS))" \
 	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
 	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
 	$(EXTRA_RUNTEST_OPTS)
+
 
 ifeq "$(fast)" "YES"
 setfast = -e config.fast=1

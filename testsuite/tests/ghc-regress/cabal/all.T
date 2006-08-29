@@ -1,4 +1,4 @@
-setTestOpts(compose(nothreads,only_compiler_types(['ghc'])))
+setTestOpts(compose(alone,only_compiler_types(['ghc'])))
 
 test('ghcpkg01', skip_if_fast, run_command_ignore_output, ['$MAKE ghcpkg01'])
 test('ghcpkg02', skip_if_fast, run_command_ignore_output, ['$MAKE ghcpkg02'])

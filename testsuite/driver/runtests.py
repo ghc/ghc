@@ -10,18 +10,12 @@ import sys
 import os
 import string
 import getopt
-import threading
 
-from testlib import *
+from testutil import *
+from testglobals import *
 
 global config
-config = getConfig() # get it from testlib
-
-global testopts_local
-testopts_local.x = TestOptions()
-
-global thisdir_testopts
-thisdir_testopts = getThisDirTestOpts()
+config = getConfig() # get it from testglobals
 
 # -----------------------------------------------------------------------------
 # cmd-line options
@@ -65,6 +59,22 @@ for opt,arg in opts:
 
     if opt == '--threads':
         config.threads = int(arg)
+
+# Can't import this earlier as we need to know if threading will be
+# enabled or not
+from testlib import *
+
+global testopts_local
+testopts_local.x = TestOptions()
+
+global thisdir_testopts
+thisdir_testopts = getThisDirTestOpts()
+
+if config.use_threads:
+    t.lock = threading.Lock()
+    t.thread_pool = threading.Condition(t.lock)
+    t.running_threads = 0
+
 # -----------------------------------------------------------------------------
 # The main dude
 
@@ -85,12 +95,14 @@ for file in t_files:
     print '====> Running', file
     newTestDir(os.path.dirname(file))
     try:
-        t.running_threads=0
+        if config.use_threads:
+            t.running_threads=0
         execfile(file)
-        t.thread_pool.acquire()
-        while t.running_threads>0:
-            t.thread_pool.wait()
-        t.thread_pool.release()
+        if config.use_threads:
+            t.thread_pool.acquire()
+            while t.running_threads>0:
+                t.thread_pool.wait()
+            t.thread_pool.release()
     except:
         print '*** found an error while executing ', file, ':'
         traceback.print_exc()
