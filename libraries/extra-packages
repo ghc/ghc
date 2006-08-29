@@ -2,8 +2,6 @@ ALUT
 GLUT
 HGL
 HUnit
-HaXml
-Japi
 ObjectIO
 OpenAL
 OpenGL
@@ -14,7 +12,6 @@ cgi
 fgl
 haskell-src
 html
-monads
 mtl
 network
 time
