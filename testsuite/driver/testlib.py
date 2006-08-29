@@ -425,7 +425,7 @@ def test_common_work (name, opts, func, args):
                '.comp.stderr', '.comp.stdout',
                '.interp.stderr', '.interp.stdout',
                '.hi', '.o', '.prof', '.hc', '_stub.h', '_stub.c',
-                '_stub.o']))
+               '_stub.o', '.hp']))
 
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
