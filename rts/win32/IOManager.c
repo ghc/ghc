@@ -220,10 +220,16 @@ IOWorkerProc(PVOID param)
 		free(work);
 	    } else {
 		fprintf(stderr, "unable to fetch work; fatal.\n"); fflush(stderr);
+		EnterCriticalSection(&iom->manLock);
+		ioMan->numWorkers--;
+		LeaveCriticalSection(&iom->manLock);
 		return 1;
 	    }
 	} else {
 	    fprintf(stderr, "waiting failed (%lu); fatal.\n", rc); fflush(stderr);
+	    EnterCriticalSection(&iom->manLock);
+	    ioMan->numWorkers--;
+	    LeaveCriticalSection(&iom->manLock);
 	    return 1;
 	}
     }
@@ -334,14 +340,12 @@ depositWorkItem( unsigned int reqID,
 	if ( (ioMan->workersIdle < ioMan->queueSize) ) {
 	    /* No, go ahead and create another. */
 	    ioMan->numWorkers++;
-	    LeaveCriticalSection(&ioMan->manLock);
-	    NewIOWorkerThread(ioMan);
-	} else {
-	    LeaveCriticalSection(&ioMan->manLock);
+	    if (NewIOWorkerThread(ioMan)) {
+		ioMan->numWorkers--;
+	    }
 	}
-    } else {
-	LeaveCriticalSection(&ioMan->manLock);
     }
+    LeaveCriticalSection(&ioMan->manLock);
   
     if (SubmitWork(ioMan->workQueue,wItem)) {
 	/* Note: the work item has potentially been consumed by a worker thread
