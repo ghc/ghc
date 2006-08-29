@@ -259,7 +259,7 @@ HaveLibDL = @HaveLibDL@
 
 ArchSupportsSMP=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64 sparc)))
 
-ifeq "$(ArchSupportsSMP)" "YES"
+ifeq "$(ArchSupportsSMP)$(GhcUnregisterised)" "YESNO"
 GhcWithSMP=YES
 else
 GhcWithSMP=NO
