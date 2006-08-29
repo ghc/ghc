@@ -51,20 +51,7 @@ test('conc020', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc021', compose(omit_ways(['ghci']), exit_code(1)),
 	compile_and_run, [''])
 test('conc022', only_compiler_types(['ghc']), compile_and_run, [''])
-
-# conc023 fails on Windows for the non-threaded ways due to the async IO
-# subsystem allocating too many threads and running out of memory (also
-# something fails to catch the out of memory condition and the RTS hangs,
-# which is another issue).
-if config.platform == "i386-unknown-mingw32":
-	opts23 = only_ways(['threaded1','threaded2'])
-else:
-	opts23 = normal
-
-test('conc023', compose(skip_if_fast,
-		compose(only_compiler_types(['ghc']),
-		opts23)), compile_and_run, [''])
-
+test('conc023', compose(skip_if_fast,only_compiler_types(['ghc'])), compile_and_run, [''])
 test('conc024', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc025', normal, compile_and_run, [''])
 test('conc026', only_compiler_types(['ghc']), compile_and_run, [''])
