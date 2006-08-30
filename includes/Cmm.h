@@ -328,6 +328,7 @@
   if (bdescr_link(CurrentNursery) == NULL || CInt[alloc_blocks] >= CInt[alloc_blocks_lim]) {		\
 	R9  = liveness;					\
         R10 = reentry;					\
+        HpAlloc = 0;					\
         jump stg_gc_gen_hp;				\
    }
 
