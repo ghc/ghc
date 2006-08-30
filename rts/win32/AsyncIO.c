@@ -173,6 +173,7 @@ startupAsyncIO()
 void
 shutdownAsyncIO()
 {
+    ShutdownIOManager();
     if (completed_req_event != INVALID_HANDLE_VALUE) {
         CloseHandle(completed_req_event);
 	completed_req_event = INVALID_HANDLE_VALUE;
@@ -185,7 +186,6 @@ shutdownAsyncIO()
         CloseHandle(completed_table_sema);
 	completed_table_sema = NULL;
     }
-    ShutdownIOManager();
 }
 
 /*
