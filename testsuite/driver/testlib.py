@@ -170,6 +170,15 @@ def skip_if_fast(opts):
   if config.fast:
       opts.skip = 1
 
+# -----
+
+def skip_if_platform( plat ):
+   return lambda opts, p=plat: _skip_if_platform(opts, p)
+
+def _skip_if_platform( opts, plat ):
+    if config.platform == plat:
+	opts.skip = 1
+	
 # ---
 def alone(opts):
     opts.alone = 1
