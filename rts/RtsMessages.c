@@ -10,6 +10,8 @@
 #include "Rts.h"
 
 #include <stdio.h>
+#include <string.h>
+#include <errno.h>
 
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
