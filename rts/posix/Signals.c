@@ -506,7 +506,7 @@ initDefaultHandlers()
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGINT, &action, &oact) != 0) {
-	errorBelch("warning: failed to install SIGINT handler");
+	sysErrorBelch("warning: failed to install SIGINT handler");
     }
 
 #if defined(HAVE_SIGINTERRUPT)
@@ -518,7 +518,7 @@ initDefaultHandlers()
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGCONT, &action, &oact) != 0) {
-	errorBelch("warning: failed to install SIGCONT handler");
+	sysErrorBelch("warning: failed to install SIGCONT handler");
     }
 
     // install the SIGFPE handler
@@ -536,7 +536,7 @@ initDefaultHandlers()
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGFPE, &action, &oact) != 0) {
-	errorBelch("warning: failed to install SIGFPE handler");
+	sysErrorBelch("warning: failed to install SIGFPE handler");
     }
 #endif
 

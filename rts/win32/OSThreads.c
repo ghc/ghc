@@ -38,7 +38,8 @@ initCondition( Condition* pCond )
 			  NULL); /* unnamed => process-local. */
   
   if ( h == NULL ) {
-    errorBelch("initCondition: unable to create");
+      sysErrorBelch("initCondition: unable to create");
+      stg_exit(EXIT_FAILURE);
   }
   *pCond = h;
   return;
@@ -48,7 +49,7 @@ void
 closeCondition( Condition* pCond )
 {
   if ( CloseHandle(*pCond) == 0 ) {
-    errorBelch("closeCondition: failed to close");
+      sysErrorBelch("closeCondition: failed to close");
   }
   return;
 }
@@ -64,7 +65,8 @@ rtsBool
 signalCondition ( Condition* pCond )
 {
     if (SetEvent(*pCond) == 0) {
-	barf("SetEvent: %d", GetLastError());
+	sysErrorBelch("SetEvent");
+	stg_exit(EXIT_FAILURE);
     }
     return rtsTrue;
 }

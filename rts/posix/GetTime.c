@@ -89,7 +89,7 @@ void getProcessTimes(Ticks *user, Ticks *elapsed)
 	long ticks;
 	ticks = sysconf(_SC_CLK_TCK);
 	if ( ticks == -1 ) {
-	    errorBelch("sysconf\n");
+	    sysErrorBelch("sysconf");
 	    stg_exit(EXIT_FAILURE);
 	}
 	ClockFreq = ticks;

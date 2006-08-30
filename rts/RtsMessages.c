@@ -28,6 +28,7 @@
 RtsMsgFunction *fatalInternalErrorFn = rtsFatalInternalErrorFn;
 RtsMsgFunction *debugMsgFn           = rtsDebugMsgFn;
 RtsMsgFunction *errorMsgFn           = rtsErrorMsgFn;
+RtsMsgFunction *sysErrorMsgFn        = rtsSysErrorMsgFn;
 
 void
 barf(const char*s, ...)
@@ -68,6 +69,21 @@ verrorBelch(const char*s, va_list ap)
 }
 
 void
+sysErrorBelch(const char*s, ...)
+{
+  va_list ap;
+  va_start(ap,s);
+  (*sysErrorMsgFn)(s,ap);
+  va_end(ap);
+}
+
+void
+vsysErrorBelch(const char*s, va_list ap)
+{
+  (*sysErrorMsgFn)(s,ap);
+}
+
+void
 debugBelch(const char*s, ...)
 {
   va_list ap;
@@ -90,7 +106,7 @@ vdebugBelch(const char*s, va_list ap)
 
 #if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
 static int
-isGUIApp()
+isGUIApp(void)
 {
   PIMAGE_DOS_HEADER pDOSHeader;
   PIMAGE_NT_HEADERS pPEHeader;
@@ -175,6 +191,61 @@ rtsErrorMsgFn(const char *s, va_list ap)
      vfprintf(stderr, s, ap);
      fprintf(stderr, "\n");
   }
+}
+
+void
+rtsSysErrorMsgFn(const char *s, va_list ap)
+{
+    char *syserr;
+
+#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
+    FormatMessage( 
+	FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+	FORMAT_MESSAGE_FROM_SYSTEM | 
+	FORMAT_MESSAGE_IGNORE_INSERTS,
+	NULL,
+	GetLastError(),
+	MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+	(LPTSTR) &syserr,
+	0,
+	NULL );
+
+    if (isGUIApp())
+    {
+	char buf[BUFSIZE];
+	int r;
+	
+	r = vsnprintf(buf, BUFSIZE, s, ap);
+	if (r > 0 && r < BUFSIZE) {
+	    r = vsnprintf(buf+r, BUFSIZE-r, ": %s", syserr);
+	    MessageBox(NULL /* hWnd */,
+		       buf,
+		       prog_name,
+		       MB_OK | MB_ICONERROR | MB_TASKMODAL
+		);
+	}
+    }
+    else
+#else
+    syserr = strerror(errno);
+    // ToDo: use strerror_r() if available
+#endif
+    {
+	/* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+	if (prog_argv != NULL && prog_name != NULL) {
+	    fprintf(stderr, "%s: ", prog_name);
+	}
+	vfprintf(stderr, s, ap);
+	if (syserr) {
+	    fprintf(stderr, ": %s\n", syserr);
+	} else {
+	    fprintf(stderr, "\n");
+	}
+    }
+
+#if defined(cygwin32_HOST_OS) || defined (mingw32_HOST_OS)
+    if (syserr) LocalFree(syserr);
+#endif
 }
 
 void

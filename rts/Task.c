@@ -283,7 +283,8 @@ startWorkerTask (Capability *cap,
 
   r = createOSThread(&tid, (OSThreadProc *)taskStart, task);
   if (r != 0) {
-    barf("startTask: Can't create new task");
+    sysErrorBelch("failed to create OS thread");
+    stg_exit(EXIT_FAILURE);
   }
 
   debugTrace(DEBUG_sched, "new worker task (taskCount: %d)", taskCount);

@@ -47,6 +47,20 @@ extern void errorBelch(const char *s, ...)
 extern void verrorBelch(const char *s, va_list ap);
 
 /*
+ * An error condition which is caused by and/or can be corrected by
+ * the user, and which has an associated error condition reported
+ * by the system (in errno on Unix, and GetLastError() on Windows).
+ * The system error message is appended to the message generated
+ * from the supplied format string.
+ *
+ * sysErrorBelch() invokes (*sysErrorMsgFn)().
+ */
+extern void sysErrorBelch(const char *s, ...)
+   GNUC3_ATTRIBUTE(format (printf, 1, 2));
+
+extern void vsysErrorBelch(const char *s, va_list ap);
+
+/*
  * A debugging message.  Debugging messages are generated either as a
  * virtue of having DEBUG turned on, or by being explicitly selected
  * via RTS options (eg. +RTS -Ds).
@@ -72,5 +86,6 @@ extern RtsMsgFunction *errorMsgFn;
 extern RtsMsgFunction rtsFatalInternalErrorFn;
 extern RtsMsgFunction rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
+extern RtsMsgFunction rtsSysErrorMsgFn;
 
 #endif /* RTSMESSAGES_H */

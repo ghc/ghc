@@ -337,9 +337,8 @@ allocNew(nat n) {
     if(rec->base==0) {
         stgFree((void*)rec);
         rec=0;
-        errorBelch(
-            "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed with: %ld\n"
-            , n, GetLastError());
+        sysErrorBelch(
+            "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed", n);
     } else {
         if(allocs==0) {
             allocs=rec;
@@ -451,7 +450,7 @@ commitBlocks(char* base, int size) {
         if(size_delta>size) size_delta=size;
         temp = VirtualAlloc(base, size_delta, MEM_COMMIT, PAGE_READWRITE);
         if(temp==0) {
-            errorBelch("getMBlocks: VirtualAlloc MEM_COMMIT failed: %ld\n", GetLastError());
+            sysErrorBelch("getMBlocks: VirtualAlloc MEM_COMMIT failed");
 	    stg_exit(EXIT_FAILURE);
 	}
         size-=size_delta;
@@ -515,7 +514,7 @@ freeAllMBlocks(void)
         it=allocs;
         for(; it!=0; ) {
             if(!VirtualFree((void*)it->base, 0, MEM_RELEASE)) {
-                errorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed with %ld", GetLastError());
+                sysErrorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed");
 		stg_exit(EXIT_FAILURE);
             }
             next = it->next;
