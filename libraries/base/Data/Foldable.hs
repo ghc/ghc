@@ -10,11 +10,11 @@
 --
 -- Class of data structures that can be folded to a summary value.
 --
--- Many of these functions generalize "Prelude" and "Data.List"
--- functions of the same names from lists to any 'Foldable' functor.
--- To avoid ambiguity, either import the "Prelude" and "Data.List"
--- hiding these names or qualify uses of these function names with an
--- alias for this module.
+-- Many of these functions generalize "Prelude", "Control.Monad" and
+-- "Data.List" functions of the same names from lists to any 'Foldable'
+-- functor.  To avoid ambiguity, either import those modules hiding
+-- these names or qualify uses of these function names with an alias
+-- for this module.
 
 module Data.Foldable (
 	-- * Folds
@@ -25,12 +25,16 @@ module Data.Foldable (
 	foldrM,
 	foldlM,
 	-- ** Folding actions
+	-- *** Applicative actions
 	traverse_,
 	for_,
+	sequenceA_,
+	asum,
+	-- *** Monadic actions
 	mapM_,
 	forM_,
-	sequenceA_,
 	sequence_,
+	msum,
 	-- ** Specialized folds
 	toList,
 	concat,
@@ -56,6 +60,7 @@ import Prelude hiding (foldl, foldr, foldl1, foldr1, mapM_, sequence_,
 		sum, product, maximum, minimum)
 import qualified Prelude (foldl, foldr, foldl1, foldr1)
 import Control.Applicative
+import Control.Monad (MonadPlus(..))
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Monoid
 import Data.Array
@@ -196,6 +201,16 @@ sequenceA_ = foldr (*>) (pure ())
 sequence_ :: (Foldable t, Monad m) => t (m a) -> m ()
 sequence_ = foldr (>>) (return ())
 
+-- | The sum of a collection of actions, generalizing 'concat'.
+asum :: (Foldable t, Alternative f) => t (f a) -> f a
+{-# INLINE asum #-}
+asum = foldr (<|>) empty
+
+-- | The sum of a collection of actions, generalizing 'concat'.
+msum :: (Foldable t, MonadPlus m) => t (m a) -> m a
+{-# INLINE msum #-}
+msum = foldr mplus mzero
+
 -- These use foldr rather than foldMap to avoid repeated concatenation.
 
 -- | List of elements of a structure.
@@ -208,10 +223,12 @@ toList = foldr (:) []
 
 -- | The concatenation of all the elements of a container of lists.
 concat :: Foldable t => t [a] -> [a]
-concat = foldr (++) []
+concat = fold
 
+-- | Map a function over all the elements of a container and concatenate
+-- the resulting lists.
 concatMap :: Foldable t => (a -> [b]) -> t a -> [b]
-concatMap f = foldr ((++) . f) []
+concatMap = foldMap
 
 -- | 'and' returns the conjunction of a container of Bools.  For the
 -- result to be 'True', the container must be finite; 'False', however,
@@ -241,20 +258,24 @@ sum = getSum . foldMap Sum
 product :: (Foldable t, Num a) => t a -> a
 product = getProduct . foldMap Product
 
--- | The largest element of the structure.
+-- | The largest element of a non-empty structure.
 maximum :: (Foldable t, Ord a) => t a -> a
 maximum = foldr1 max
 
+-- | The largest element of a non-empty structure with respect to the
+-- given comparison function.
 maximumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
 maximumBy cmp = foldr1 max'
   where max' x y = case cmp x y of
 			GT -> x
 			_  -> y
 
--- | The least element of the structure.
+-- | The least element of a non-empty structure.
 minimum :: (Foldable t, Ord a) => t a -> a
 minimum = foldr1 min
 
+-- | The least element of a non-empty structure with respect to the
+-- given comparison function.
 minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
 minimumBy cmp = foldr1 min'
   where min' x y = case cmp x y of
@@ -265,6 +286,7 @@ minimumBy cmp = foldr1 min'
 elem :: (Foldable t, Eq a) => a -> t a -> Bool
 elem = any . (==)
 
+-- | 'notElem' is the negation of 'elem'.
 notElem :: (Foldable t, Eq a) => a -> t a -> Bool
 notElem x = not . elem x
 
