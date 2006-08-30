@@ -12,7 +12,14 @@ main = do
      error "wibble"
 	`Control.Exception.catch`
 	    (\e -> do putMVar m (); sum [1..10000] `seq` putStrLn "done.")
-     threadDelay 500000
+     myDelay 500000
    )
     `Control.Exception.catch` (\e -> putStrLn ("caught: " ++ show e))
+
+-- compensate for the fact that threadDelay is non-interruptible
+-- on Windows with the threaded RTS in 6.6.
+myDelay usec = do
+  m <- newEmptyMVar
+  forkIO $ do threadDelay usec; putMVar m ()
+  takeMVar m
 

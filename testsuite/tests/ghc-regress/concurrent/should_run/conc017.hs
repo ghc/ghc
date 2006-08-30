@@ -21,7 +21,7 @@ main = do
 	(do putMVar m1 () 
 	    unblock (
 		-- unblocked, "foo" delivered to "caught1"
-	       threadDelay 100000
+	       myDelay 100000
 	     )
 	 ) `Control.Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
 	putMVar m2 ()
@@ -33,3 +33,10 @@ main = do
     takeMVar m3
    ) 
    `Control.Exception.catch` (\e -> putStrLn ("caught3: " ++ show e))
+
+-- compensate for the fact that threadDelay is non-interruptible
+-- on Windows with the threaded RTS in 6.6.
+myDelay usec = do
+  m <- newEmptyMVar
+  forkIO $ do threadDelay usec; putMVar m ()
+  takeMVar m

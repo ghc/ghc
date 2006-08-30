@@ -129,3 +129,11 @@ test('conc055', exit_code(1), compile_and_run, ['-package stm'])
 test('conc056', only_ways(['threaded1','threaded2']), compile_and_run, ['-package stm -package network'])
 
 test('conc057', only_ways(['threaded2']), compile_and_run, ['-O0'])
+
+if config.platform == "i386-unknown-mingw32":
+    config058 = expect_fail_for(['ghci','threaded1','threaded2'])
+else:
+    config058 = normal
+
+test('conc058', compose(only_compiler_types(['ghc']), config058),
+	 compile_and_run, [''])

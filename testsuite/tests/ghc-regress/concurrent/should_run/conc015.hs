@@ -23,10 +23,17 @@ main = do
     block (do
 	putMVar m ()
 	sum [1..10000] `seq` -- give 'foo' a chance to be raised
-  	  (unblock (threadDelay 500000))
+  	  (unblock (myDelay 500000))
 		`Control.Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
      )
     takeMVar m2
    )
     `Control.Exception.catch`
     (\e -> putStrLn ("caught2: " ++ show e))
+
+-- compensate for the fact that threadDelay is non-interruptible
+-- on Windows with the threaded RTS in 6.6.
+myDelay usec = do
+  m <- newEmptyMVar
+  forkIO $ do threadDelay usec; putMVar m ()
+  takeMVar m
