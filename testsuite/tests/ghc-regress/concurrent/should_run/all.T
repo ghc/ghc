@@ -120,7 +120,10 @@ test('conc050', skip, compile_and_run, ['-package stm'])
 test('conc051', normal, compile_and_run, [''])
 
 test('conc052', normal, compile_and_run, ['-package stm'])
-test('conc053', only_ways(['threaded1','threaded2']), compile_and_run, ['-package stm'])
+
+test('conc053', compose(only_ways(['threaded1','threaded2']),
+			skip_if_platform('i386-unknown-mingw32')),
+		 compile_and_run, ['-package stm'])
 test('conc054', normal, compile_and_run, ['-package stm'])
 test('conc055', exit_code(1), compile_and_run, ['-package stm'])
 test('conc056', only_ways(['threaded1','threaded2']), compile_and_run, ['-package stm -package network'])
