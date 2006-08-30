@@ -157,12 +157,12 @@ filterM p (x:xs) =  do
    ys  <- filterM p xs
    return (if flg then x:ys else ys)
 
--- | @'forM' f@ is @'mapM'@ with its arguments flipped
+-- | 'forM' is 'mapM' with its arguments flipped
 forM            :: Monad m => [a] -> (a -> m b) -> m [b]
 {-# INLINE forM #-}
 forM            = flip mapM
 
--- | @'forM_' f@ is @'mapM_'@ with its arguments flipped
+-- | 'forM_' is 'mapM_' with its arguments flipped
 forM_           :: Monad m => [a] -> (a -> m b) -> m ()
 {-# INLINE forM_ #-}
 forM_           = flip mapM_
