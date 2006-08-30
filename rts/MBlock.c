@@ -340,16 +340,16 @@ allocNew(nat n) {
         sysErrorBelch(
             "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed", n);
     } else {
-        if(allocs==0) {
-            allocs=rec;
-            rec->next=0;
-        } else {
-            alloc_rec* it;
-            it=allocs;
-            for(; it->next!=0 && it->next->base<rec->base; it=it->next) ;
-            rec->next=it->next;
-            it->next=rec;
-        }
+		alloc_rec temp;
+		temp.base=0; temp.size=0; temp.next=allocs;
+
+        alloc_rec* it;
+        it=&temp;
+        for(; it->next!=0 && it->next->base<rec->base; it=it->next) ;
+        rec->next=it->next;
+        it->next=rec;
+
+		allocs=temp.next;
         debugTrace(DEBUG_gc, "allocated %d megablock(s) at 0x%x",n,(nat)rec->base);
     }
     return rec;
