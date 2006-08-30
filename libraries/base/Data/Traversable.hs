@@ -29,6 +29,8 @@
 
 module Data.Traversable (
 	Traversable(..),
+	for,
+	forM,
 	fmapDefault,
 	foldMapDefault,
 	) where
@@ -105,6 +107,16 @@ instance Ix i => Traversable (Array i) where
 	traverse f arr = listArray (bounds arr) <$> traverse f (elems arr)
 
 -- general functions
+
+-- | 'for' is 'traverse' with its arguments flipped.
+for :: (Traversable t, Applicative f) => t a -> (a -> f b) -> f (t b)
+{-# INLINE for #-}
+for = flip traverse
+
+-- | 'forM' is 'mapM' with its arguments flipped.
+forM :: (Traversable t, Monad m) => t a -> (a -> m b) -> m (t b)
+{-# INLINE forM #-}
+forM = flip mapM
 
 -- | This function may be used as a value for `fmap` in a `Functor` instance.
 fmapDefault :: Traversable t => (a -> b) -> t a -> t b

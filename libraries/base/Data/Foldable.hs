@@ -26,7 +26,9 @@ module Data.Foldable (
 	foldlM,
 	-- ** Folding actions
 	traverse_,
+	for_,
 	mapM_,
+	forM_,
 	sequenceA_,
 	sequence_,
 	-- ** Specialized folds
@@ -169,10 +171,20 @@ foldlM f z xs = foldr f' return xs z
 traverse_ :: (Foldable t, Applicative f) => (a -> f b) -> t a -> f ()
 traverse_ f = foldr ((*>) . f) (pure ())
 
+-- | 'for_' is 'traverse_' with its arguments flipped.
+for_ :: (Foldable t, Applicative f) => t a -> (a -> f b) -> f ()
+{-# INLINE for_ #-}
+for_ = flip traverse_
+
 -- | Map each element of a structure to an monadic action, evaluate
 -- these actions from left to right, and ignore the results.
 mapM_ :: (Foldable t, Monad m) => (a -> m b) -> t a -> m ()
 mapM_ f = foldr ((>>) . f) (return ())
+
+-- | 'forM_' is 'mapM_' with its arguments flipped.
+forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
+{-# INLINE forM_ #-}
+forM_ = flip mapM_
 
 -- | Evaluate each action in the structure from left to right,
 -- and ignore the results.
