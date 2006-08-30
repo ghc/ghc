@@ -84,6 +84,8 @@ endif
 
 ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --thread=$(THREADS)
+else
+USETHREADS=0
 endif
 
 RUNTEST_OPTS +=  \
