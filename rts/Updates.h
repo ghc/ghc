@@ -233,6 +233,10 @@ FILL_SLOP(StgClosure *p)
     switch (inf->type) {
     case BLACKHOLE:
     case CAF_BLACKHOLE:
+	goto no_slop;
+	// we already filled in the slop when we overwrote the thunk
+	// with BLACKHOLE, and also an evacuated BLACKHOLE is only the
+	// size of an IND.
     case THUNK_SELECTOR:
 	sz = sizeofW(StgSelector) - sizeofW(StgThunkHeader);
 	break;
@@ -249,6 +253,8 @@ FILL_SLOP(StgClosure *p)
     for (i = 0; i < sz; i++) {
 	((StgThunk *)p)->payload[i] = 0;
     }
+no_slop:
+    ;
 }
 
 #endif /* CMINUSMINUS */
