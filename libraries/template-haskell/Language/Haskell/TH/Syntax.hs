@@ -420,8 +420,7 @@ instance Show Name where
   show (Name occ (NameU u))      = occString occ ++ "_" ++ show (I# u)
   show (Name occ (NameQ m))      = modString m ++ "." ++ occString occ
   show (Name occ (NameL u))      = occString occ ++ "_" ++ show (I# u)
-  show (Name occ (NameG ns p m)) = pkgString p ++ ":" ++ modString m
-                                          ++ "." ++ occString occ
+  show (Name occ (NameG ns p m)) = modString m ++ "." ++ occString occ
 
 
 -- 	Tuple data and type constructors
