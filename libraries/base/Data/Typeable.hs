@@ -25,15 +25,6 @@
 -- and type-safe cast (but not dynamics) to support the \"Scrap your
 -- boilerplate\" style of generic programming.
 --
--- Note, only relevant if you use dynamic linking. If you have a program
--- that is statically linked with Data.Typeable, and then dynamically link
--- a program that also uses Data.Typeable, you'll get two copies of the module.
--- That's fine, but behind the scenes, the module uses a mutable variable to
--- allocate unique Ids to type constructors.  So in the situation described,
--- there'll be two separate Id allocators, which aren't comparable to each other.
--- This can lead to chaos.  (It's a bug that we will fix.)  None of
--- this matters if you aren't using dynamic linking.
---
 -----------------------------------------------------------------------------
 
 module Data.Typeable
@@ -643,16 +634,6 @@ newKey kloc = do { k@(Key i) <- readIORef kloc ;
 #endif
 
 #ifdef __GLASGOW_HASKELL__
--- In GHC we use the RTS's genSym function to get a new unique,
--- because in GHCi we might have two copies of the Data.Typeable
--- library running (one in the compiler and one in the running
--- program), and we need to make sure they don't share any keys.  
---
--- This is really a hack.  A better solution would be to centralise the
--- whole mutable state used by this module, i.e. both hashtables.  But
--- the current solution solves the immediate problem, which is that
--- dynamics generated in one world with one type were erroneously
--- being recognised by the other world as having a different type.
 foreign import ccall unsafe "genSymZh"
   genSym :: IO Int
 #endif
