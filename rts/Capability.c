@@ -678,8 +678,10 @@ shutdownCapability (Capability *cap, Task *task)
     // we now have the Capability, its run queue and spare workers
     // list are both empty.
 
-    // We end up here only in THREADED_RTS
-    closeMutex(&cap->lock);
+    // ToDo: we can't drop this mutex, because there might still be
+    // threads performing foreign calls that will eventually try to 
+    // return via resumeThread() and attempt to grab cap->lock.
+    // closeMutex(&cap->lock);
 }
 
 /* ----------------------------------------------------------------------------
