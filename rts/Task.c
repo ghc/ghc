@@ -76,11 +76,11 @@ stopTaskManager (void)
     ACQUIRE_LOCK(&sched_mutex);
     for (task = task_free_list; task != NULL; task = next) {
         next = task->next;
-        stgFree(task);
 #if defined(THREADED_RTS)
         closeCondition(&task->cond);
         closeMutex(&task->lock);
 #endif
+        stgFree(task);
     }
     task_free_list = NULL;
     RELEASE_LOCK(&sched_mutex);
