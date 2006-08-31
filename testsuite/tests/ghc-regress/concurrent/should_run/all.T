@@ -137,3 +137,8 @@ else:
 
 test('conc058', compose(only_compiler_types(['ghc']), config058),
 	 compile_and_run, [''])
+
+test('conc059', compose(only_compiler_types(['ghc']),
+			only_ways(['threaded1','threaded2'])),
+	compile_and_run, ['conc059_c.c'])
+
