@@ -100,6 +100,7 @@ module Data.List
    -- ** Predicates
    , isPrefixOf        -- :: (Eq a) => [a] -> [a] -> Bool
    , isSuffixOf        -- :: (Eq a) => [a] -> [a] -> Bool
+   , isInfixOf         -- :: (Eq a) => [a] -> [a] -> Bool
 
    -- * Searching lists
 
@@ -265,6 +266,17 @@ isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
 -- Both lists must be finite.
 isSuffixOf              :: (Eq a) => [a] -> [a] -> Bool
 isSuffixOf x y          =  reverse x `isPrefixOf` reverse y
+
+-- | The 'isInfixOf' function takes two lists and returns 'True'
+-- iff the first list is contained, wholly and intact,
+-- anywhere within the second.
+--
+-- Example:
+--
+-- >isInfixOf "Haskell" "I really like Haskell." -> True
+-- >isInfixOf "Ial" "I really like Haskell." -> False
+isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
+isInfixOf needle haystack = isJust $ find (isPrefixOf needle) (tails haystack)
 
 -- | The 'nub' function removes duplicate elements from a list.
 -- In particular, it keeps only the first occurrence of each element.
