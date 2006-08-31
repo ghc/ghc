@@ -408,7 +408,7 @@ findFreeBlocks(nat n) {
         if( (((unsigned long)it->base) & MBLOCK_MASK) == 0) { /* MBlock aligned */
             ret = (void*)it->base;
             if(it->size==required_size) {
-                prev->next=0;
+                prev->next=it->next;
                 stgFree(it);
             } else {
                 it->base += required_size;
