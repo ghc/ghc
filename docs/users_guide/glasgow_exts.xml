@@ -2061,6 +2061,11 @@ something more specific does not:
     op = ... -- Default
 </programlisting>
 </para>
+<para>You can find lots of background material about the reason for these
+restrictions in the paper <ulink
+url="http://research.microsoft.com/%7Esimonpj/papers/fd%2Dchr/">
+Understanding functional dependencies via Constraint Handling Rules</ulink>.
+</para>
 </sect3>
 
 <sect3 id="undecidable-instances">
