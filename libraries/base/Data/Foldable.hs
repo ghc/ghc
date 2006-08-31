@@ -59,12 +59,15 @@ import Prelude hiding (foldl, foldr, foldl1, foldr1, mapM_, sequence_,
 		elem, notElem, concat, concatMap, and, or, any, all,
 		sum, product, maximum, minimum)
 import qualified Prelude (foldl, foldr, foldl1, foldr1)
-import Control.Arrow (ArrowZero(..))
 import Control.Applicative
 import Control.Monad (MonadPlus(..))
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Monoid
 import Data.Array
+
+#ifdef __NHC__
+import Control.Arrow (ArrowZero(..)) -- work around nhc98 typechecker problem
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exts (build)
