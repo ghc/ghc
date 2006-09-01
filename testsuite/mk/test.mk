@@ -31,8 +31,6 @@ GHC_STAGE1_ABS	= $(GHC_COMPILER_DIR_ABS)/stage1/ghc-inplace
 GHC_STAGE2_ABS	= $(GHC_COMPILER_DIR_ABS)/stage2/ghc-inplace
 GHC_STAGE3_ABS	= $(GHC_COMPILER_DIR_ABS)/stage3/ghc-inplace
 
-EXTRA_HC_OPTS += -D$(HostPlatform_CPP)
-  # ideally TargetPlatform_CPP, but that doesn't exist; they're always the same anyway
 RUNTESTS     = $(TOP)/driver/runtests.py
 COMPILER     = ghc
 CONFIG       = $(TOP)/config/$(COMPILER)
@@ -91,6 +89,7 @@ endif
 RUNTEST_OPTS +=  \
 	--config=$(CONFIG) \
 	-e config.compiler=\"$(TEST_HC)\" \
+	-e config.compiler_always_flags.append"(\"-D$(HostPlatform_CPP)\")" \
 	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	-e config.wordsize=\"$(WORDSIZE)\" \
@@ -100,6 +99,8 @@ RUNTEST_OPTS +=  \
 	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
 	$(EXTRA_RUNTEST_OPTS)
 
+# HostPlatform_CPP should ideally be TargetPlatform_CPP, but that
+# doesn't exist; they're always the same anyway
 
 ifeq "$(fast)" "YES"
 setfast = -e config.fast=1
