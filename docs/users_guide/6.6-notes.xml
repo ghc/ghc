@@ -1132,23 +1132,6 @@
             and <literal>System.Win32.Console</literal>.
           </para>
         </listitem>
-        <listitem>
-          <para>
-            <literal>System.Win32</literal> no longer exports
-            <literal>LCID</literal>,
-            <literal>LANGID</literal>,
-            <literal>SortID</literal>,
-            <literal>SubLANGID</literal>,
-            <literal>PrimaryLANGID</literal>,
-            <literal>mAKELCID</literal>,
-            <literal>lANGIDFROMLCID</literal>,
-            <literal>sORTIDFROMLCID</literal>,
-            <literal>mAKELANGID</literal>,
-            <literal>pRIMARYLANGID</literal> or
-            <literal>sUBLANGID</literal> from
-            <literal>System.Win32.NLS</literal>.
-          </para>
-        </listitem>
       </itemizedlist>
     </sect3>
   </sect2>
