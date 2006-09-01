@@ -413,14 +413,19 @@ instance Ord NameFlavour where
   (NameG _ _ _)    `compare` other	  = GT
 
 instance Show Name where
-	-- For now, we make the NameQ and NameG print the same, 
-	-- and ditto NameU and NameL.  We may well want to
-	-- distinguish them in the end.
-  show (Name occ NameS)          = occString occ
-  show (Name occ (NameU u))      = occString occ ++ "_" ++ show (I# u)
+  show (Name occ NameS) = occString occ
+
+	-- For now, we make the NameQ and NameG print the same, even though
+	-- NameQ is a qualified name (so what it means depends on what the
+	-- current scope is), and NameG is an original name (so its meaning
+	-- should be independent of what's in scope.
+	-- We may well want to distinguish them in the end.
   show (Name occ (NameQ m))      = modString m ++ "." ++ occString occ
-  show (Name occ (NameL u))      = occString occ ++ "_" ++ show (I# u)
   show (Name occ (NameG ns p m)) = modString m ++ "." ++ occString occ
+
+	-- Ditto NameU and NameL  
+  show (Name occ (NameU u)) = occString occ ++ "_" ++ show (I# u)
+  show (Name occ (NameL u)) = occString occ ++ "_" ++ show (I# u)
 
 
 -- 	Tuple data and type constructors
