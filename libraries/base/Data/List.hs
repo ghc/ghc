@@ -276,7 +276,7 @@ isSuffixOf x y          =  reverse x `isPrefixOf` reverse y
 -- >isInfixOf "Haskell" "I really like Haskell." -> True
 -- >isInfixOf "Ial" "I really like Haskell." -> False
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
-isInfixOf needle haystack = isJust $ find (isPrefixOf needle) (tails haystack)
+isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
 -- | The 'nub' function removes duplicate elements from a list.
 -- In particular, it keeps only the first occurrence of each element.
