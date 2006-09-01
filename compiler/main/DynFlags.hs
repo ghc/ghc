@@ -1042,8 +1042,7 @@ glasgowExtsFlags = [
   Opt_GlasgowExts, 
   Opt_FFI, 
   Opt_ImplicitParams, 
-  Opt_ScopedTypeVariables,
-  Opt_BangPatterns ]
+  Opt_ScopedTypeVariables ]
 
 isFFlag f = f `elem` (map fst fFlags)
 getFFlag f = fromJust (lookup f fFlags)
