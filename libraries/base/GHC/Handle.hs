@@ -1565,9 +1565,10 @@ dupHandle other_side h_ = do
 
 dupHandleTo other_side hto_ h_ = do
   flushBuffer h_
-  new_fd <- throwErrnoIfMinus1 "dupHandleTo" $ 
-	        c_dup2 (fromIntegral (haFD h_)) (fromIntegral (haFD hto_))
-  dupHandle_ other_side h_ new_fd
+  -- Windows' dup2 does not return the new descriptor, unlike Unix
+  throwErrnoIfMinus1 "dupHandleTo" $ 
+	c_dup2 (fromIntegral (haFD h_)) (fromIntegral (haFD hto_))
+  dupHandle_ other_side h_ (haFD hto_)
 
 dupHandle_ other_side h_ new_fd = do
   buffer <- allocateBuffer dEFAULT_BUFFER_SIZE (initBufferState (haType h_))
