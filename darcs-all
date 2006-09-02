@@ -4,7 +4,7 @@ set -e
 
 top_dirs="nofib testsuite"
 
-default_repo_root="http://darcs.haskell.org/"
+default_repo_root="http://darcs.haskell.org/ghc-6.6/"
 default_lib_repo_root=$default_repo_root/packages
 
 quiet=NO
