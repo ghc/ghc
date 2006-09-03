@@ -174,7 +174,7 @@ helpText =
  "   :show bindings              show the current bindings made at the prompt\n" ++
  "\n" ++
  "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
- "   :etags [<file>]           	 create tags file for Emacs (defauilt: \"TAGS\")\n" ++
+ "   :etags [<file>]             create tags file for Emacs (defauilt: \"TAGS\")\n" ++
  "   :type <expr>                show the type of <expr>\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
  "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
