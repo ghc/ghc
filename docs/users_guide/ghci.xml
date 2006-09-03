@@ -873,10 +873,8 @@ $ ghci -lm
     <para>GHCi commands all begin with
     &lsquo;<literal>:</literal>&rsquo; and consist of a single command
     name followed by zero or more parameters.  The command name may be
-    abbreviated, as long as the abbreviation is not ambiguous.  All of
-    the builtin commands, with the exception of
-    <literal>:unset</literal> and <literal>:undef</literal>, may be
-    abbreviated to a single letter.</para>
+    abbreviated, with ambiguities being resolved in favour of the more
+    commonly used commands.</para>
 
     <variablelist>
       <varlistentry>
