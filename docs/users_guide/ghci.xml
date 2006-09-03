@@ -792,22 +792,15 @@ $ ghci Main.hs
       package be loaded by using the <literal>-package</literal> flag:</para>
 
 <screen>
-$ ghci -package data
+$ ghci -package readline
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 5.05, for Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 6.6, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package base ... linking ... done.
-Loading package haskell98 ... linking ... done.
-Loading package lang ... linking ... done.
-Loading package concurrent ... linking ... done.
-Loading package readline ... linking ... done.
-Loading package unix ... linking ... done.
-Loading package posix ... linking ... done.
-Loading package util ... linking ... done.
-Loading package data ... linking ... done.
+Loading package readline-1.0 ... linking ... done.
 Prelude> 
 </screen>
 
