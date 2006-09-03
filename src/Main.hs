@@ -489,7 +489,7 @@ pass1 modules flags = worker modules (Map.empty) flags
       let (group, _, mb_exports, mbModDoc, haddockModInfo) = renamed_source
 
           entities = (reverse . nubBy sameName . hs_docs) group 
-          exports = fmap (reverse . map unLoc) mb_exports
+          exports = fmap (map unLoc) mb_exports
  
           -- lots of names
           exportedNames = modInfoExports moduleInfo
