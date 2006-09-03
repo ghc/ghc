@@ -561,9 +561,9 @@ Compiling Main             ( Main.hs, interpreted )
 
 <screen>
 Prelude> :module +IO
-Prelude,IO> hPutStrLn stdout "hello\n"
+Prelude IO> hPutStrLn stdout "hello\n"
 hello
-Prelude,IO>
+Prelude IO>
 </screen>
 
       <para>(Note: <literal>:module</literal> can be shortened to
@@ -593,7 +593,7 @@ Prelude,IO>
       <literal>Bar</literal>, then the scope will be set to
       <literal>*Bar</literal> if <literal>Bar</literal> is
       interpreted, or if <literal>Bar</literal> is compiled it will be
-      set to <literal>Prelude,Bar</literal> (GHCi automatically adds
+      set to <literal>Prelude Bar</literal> (GHCi automatically adds
       <literal>Prelude</literal> if it isn't present and there aren't
       any <literal>*</literal>-form modules).</para>
 
