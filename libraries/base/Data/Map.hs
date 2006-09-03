@@ -250,7 +250,12 @@ size t
       Bin sz k x l r  -> sz
 
 
--- | /O(log n)/. Lookup the value at a key in the map.
+-- | /O(log n)/. Lookup the value at a key in the map. 
+--
+-- The function will 
+-- @return@ the result in the monad or @fail@ in it the key isn't in the 
+-- map. Often, the monad to use is 'Maybe', so you get either 
+-- @('Just' result)@ or @'Nothing'@.
 lookup :: (Monad m,Ord k) => k -> Map k a -> m a
 lookup k t = case lookup' k t of
     Just x -> return x
