@@ -191,20 +191,20 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
   mbModGraph <- depanal session [] True
   moduleGraph <- case mbModGraph of 
     Just mg -> return mg 
-    Nothing -> die "Failed to load all modules\n"
+    Nothing -> die "Failed to load all modules\n" 
   let 
     modSumFile    = fromJust . ml_hs_file . ms_location
     sortedGraph   = topSortModuleGraph False moduleGraph Nothing
     sortedModules = concatMap Digraph.flattenSCC sortedGraph 
     modsAndFiles  = [ (ms_mod modsum, modSumFile modsum) | 
                       modsum <- sortedModules, 
-                      modSumFile modsum `elem` files ]
+                      modSumFile modsum `elem` files ] 
   checkedMods <- mapM (\(mod, file) -> do
     mbMod <- checkModule session (moduleName mod)
     checkedMod <- case mbMod of 
       Just m  -> return m
       Nothing -> die ("Failed to load module: " ++ moduleString mod)
-    return (mod, checkedMod, file)) modsAndFiles
+    return (mod, checkedMod, file)) modsAndFiles 
   ensureFullyChecked checkedMods
   where
     ensureFullyChecked modules 

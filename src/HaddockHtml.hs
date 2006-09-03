@@ -841,8 +841,7 @@ ppAsst n ts = ppDocName n <+> hsep (map ppType ts)
 -- Data & newtype declarations
 
 orig (L _ (NoLink name)) = name
-orig _ = error "org"
-
+orig _ = error "orig"
 
 -- TODO: print contexts
 ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> 
@@ -856,14 +855,23 @@ ppShortDataDecl summary links loc mbDoc dataDecl
   | [] <- cons = ppDataHeader summary NewType name tyVars
 
   | otherwise = vanillaTable << (
-      (if summary then declBox else topDeclBox links loc name)
-      (ppDataHeader summary newOrData name tyVars) </>
-      tda [theclass "body"] << vanillaTable << (
-        aboves (zipWith doConstr ('=':repeat '|') cons)
-      )
+      case resTy of 
+        ResTyH98 -> dataHeader </> 
+          tda [theclass "body"] << vanillaTable << (
+            aboves (zipWith doConstr ('=':repeat '|') cons)
+          )
+        ResTyGADT _ -> dataHeader </> 
+          tda [theclass "body"] << vanillaTable << (
+            aboves (zipWith doConstr (repeat "::") cons)
+          )
     )
   
   where
+    dataHeader = 
+      (if summary then declBox else topDeclBox links loc name)
+      ((ppDataHeader summary newOrData name tyVars) <+> 
+      case resTy of ResTyGADT _ -> keyword "where"; _ -> empty)
+
     doConstr c con = declBox (toHtml [c] <+> ppShortConstr summary (unLoc con))
 
     name      = orig (tcdLName dataDecl)
@@ -872,6 +880,7 @@ ppShortDataDecl summary links loc mbDoc dataDecl
     tyVars    = tyvarNames (tcdTyVars dataDecl)
     mbKSig    = tcdKindSig dataDecl
     cons      = tcdCons dataDecl
+    resTy     = (con_res . unLoc . head) cons 
 
 -- The rest of the cases:
 ppDataDecl :: Ord key => Bool -> LinksInfo -> [InstHead2 DocName] -> key -> 
@@ -881,7 +890,7 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
   | summary = declWithDoc summary links loc name mbDoc 
               (ppShortDataDecl summary links loc mbDoc dataDecl)
   
-  | otherwise = dataheader </> 
+  | otherwise = dataHeader </> 
     tda [theclass "body"] << vanillaTable << (
       datadoc </> 
       constrBit </>
@@ -895,9 +904,17 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
     tyVars    = tyvarNames (tcdTyVars dataDecl)
     mbKSig    = tcdKindSig dataDecl
     cons      = tcdCons dataDecl
-         
-    dataheader = topDeclBox links loc name 
-                 (ppDataHeader False newOrData name tyVars)
+    resTy     = (con_res . unLoc . head) cons 
+      
+    dataHeader = 
+      (if summary then declBox else topDeclBox links loc name)
+      ((ppDataHeader summary newOrData name tyVars) <+> whereBit)
+
+    whereBit 
+      | null cons = empty 
+      | otherwise = case resTy of 
+        ResTyGADT _ -> keyword "where"
+        _ -> empty                         
 
     constrTable
       | any isRecCon cons = spacedTable5
@@ -939,14 +956,19 @@ ppShortConstr summary con = case con_res con of
     RecCon fields -> header +++ ppBinder summary name <+>
       braces (vanillaTable << aboves (map (ppShortField summary) fields))
 
-  ResTyGADT ltype -> error "GADTs not supported yet" 
-
+  ResTyGADT resTy -> case con_details con of 
+    PrefixCon args -> ppName name <+> dcolon <+> hsep [
+                        ppForAll forall ltvs lcontext,
+                        ppLType (foldr mkFunTy resTy args) ]
   where 
-    header  = ppConstrHdr forall tyVars context
-    name    = orig (con_name con)
-    tyVars  = tyvarNames (con_qvars con)
-    context = unLoc (con_cxt con)
-    forall  = con_explicit con
+    header   = ppConstrHdr forall tyVars context
+    name     = orig (con_name con)
+    ltvs     = con_qvars con
+    tyVars   = tyvarNames ltvs 
+    lcontext = con_cxt con
+    context  = unLoc (con_cxt con)
+    forall   = con_explicit con
+    mkFunTy a b = noLoc (HsFunTy a b)
 
 ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Html
 ppConstrHdr forall tvs ctxt
@@ -970,7 +992,7 @@ ppSideBySideConstr (L _ con) = case con_res con of
                      (tda [theclass "body"] << spacedTable1 <<
                      aboves (map ppSideBySideField fields))
  
-  ResTyGADT ltype -> error "GADTs not supported yet"
+  ResTyGADT ltype -> emptyTable --error "GADTs not supported yet"
  
  where 
     header  = ppConstrHdr forall tyVars context
@@ -1054,13 +1076,15 @@ ppCtxtPart (L _ ctxt)
   | null ctxt = empty 
   | otherwise = hsep [ppContext ctxt, darrow]
 
-ppForAll (HsForAllTy Implicit _ lctxt _) = ppCtxtPart lctxt
-ppForAll (HsForAllTy Explicit ltvs lctxt _) = 
+ppForAllTy (HsForAllTy expl ltvs lctxt _) = ppForAll expl ltvs lctxt 
+
+ppForAll Implicit _ lctxt = ppCtxtPart lctxt
+ppForAll Explicit ltvs lctxt = 
   hsep (keyword "forall" : ppTyVars ltvs ++ [toHtml "."]) <+> ppCtxtPart lctxt 
 
 ppType :: HsType DocName -> Html
 ppType t = case t of
-  t@(HsForAllTy expl ltvs lcontext ltype) -> ppForAll t <+> ppLType ltype
+  t@(HsForAllTy expl ltvs lcontext ltype) -> ppForAllTy t <+> ppLType ltype
   HsTyVar n -> ppDocName n
   HsBangTy HsStrict lt -> toHtml "!" <+> ppLType lt
   HsBangTy HsUnbox lt -> toHtml "!!" <+> ppLType lt
