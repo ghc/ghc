@@ -350,7 +350,7 @@ Ok, modules loaded: A, B, C, D.
 </screen>
 
     <para>HINT: since GHCi will only use a compiled object file if it
-    can sure that the compiled version is up-to-date, a good technique
+    can be sure that the compiled version is up-to-date, a good technique
     when working on a large program is to occasionally run
     <literal>ghc &ndash;&ndash;make</literal> to compile the whole project (say
     before you go for lunch :-), then continue working in the
