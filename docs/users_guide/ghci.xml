@@ -604,6 +604,12 @@ Prelude IO>
       behaves in the same way for expressions typed at the
       prompt.</para>
 
+      <para>
+        Hint: GHCi will tab-complete names that are in scope; for
+        example, if you run GHCi and type <literal>J&lt;tab&gt;</literal>
+        then GHCi will expand it to <literal>Just </literal>.
+      </para>
+
       <sect3>
 	<title>Qualified names</title>
 
