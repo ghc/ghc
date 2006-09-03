@@ -633,9 +633,9 @@ Prelude> it * 2
     expression, and if it doesn't have an <literal>IO</literal> type,
     then it transforms it as follows: an expression
     <replaceable>e</replaceable> turns into 
-<screen>     
-             let it = <replaceable>e</replaceable>;
-             print it
+<screen>
+let it = <replaceable>e</replaceable>;
+print it
 </screen>
     which is then run as an IO-action.</para>
 
@@ -644,10 +644,14 @@ Prelude> it * 2
     complain:</para>
 
 <screen>
-Prelude> id
-No instance for `Show (a -> a)'
-arising from use of `print'
-in a `do' expression pattern binding: print it
+Prelude&gt; id
+
+&lt;interactive&gt;:1:0:
+    No instance for (Show (a -&gt; a))
+      arising from use of `print' at &lt;interactive&gt;:1:0-1
+    Possible fix: add an instance declaration for (Show (a -> a))
+    In the expression: print it
+    In a 'do' expression: print it
 </screen>
 
     <para>The error message contains some clues as to the
@@ -659,14 +663,15 @@ in a `do' expression pattern binding: print it
       which is of type <literal>a</literal>.  eg.:</para>
 <screen>
 Prelude> Time.getClockTime
+Wed Mar 14 12:23:13 GMT 2001
 Prelude> print it
 Wed Mar 14 12:23:13 GMT 2001
 </screen>
 
       <para>The corresponding translation for an IO-typed
       <replaceable>e</replaceable> is
-<screen>     
-             it &lt;- <replaceable>e</replaceable>
+<screen>
+it &lt;- <replaceable>e</replaceable>
 </screen>
       </para>
 
