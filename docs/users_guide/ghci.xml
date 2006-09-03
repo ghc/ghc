@@ -612,6 +612,34 @@ Prelude IO>
         qualified</literal> declaration for every module in every
         package, and every module currently loaded into GHCi.</para>
       </sect3>
+
+      <sect3>
+        <title>The <literal>:main</literal> command</title>
+
+        <para>
+          When a program is compiled and executed, it can use the
+          <literal>getArgs</literal> function to access the
+          command-line arguments.
+          However, we cannot simply pass the arguments to the
+          <literal>main</literal> function while we are testing in ghci,
+          as the <literal>main</literal> function doesn't take its
+          directly.
+        </para>
+
+        <para>
+          Instead, we can use the <literal>:main</literal> command.
+          This runs whatever <literal>main</literal> is in scope, with
+          any arguments being treated the same as command-line arguments,
+          e.g.:
+        </para>
+
+<screen>
+Prelude> let main = System.Environment.getArgs >>= print
+Prelude> :main foo bar
+["foo","bar"]
+</screen>
+
+      </sect3>
     </sect2>
   
 
