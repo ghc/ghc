@@ -177,7 +177,7 @@ extractGHCFlags flags = [ flag | Flag_GHCFlag flag <- flags ]
 startGHC :: String -> IO (Session, DynFlags)
 startGHC libDir = do
   GHC.init (Just libDir)
-  let ghcMode = JustTypecheck
+  let ghcMode = BatchCompile
   session <- newSession ghcMode
   flags   <- getSessionDynFlags session
   flags'  <- initPackages flags
