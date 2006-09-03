@@ -28,12 +28,11 @@
 $ ghci
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 5.04, for Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 6.6, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package base ... linking ... done.
-Loading package haskell98 ... linking ... done.
 Prelude> 
 </screen>
 
@@ -45,40 +44,41 @@ Prelude>
 <screen>
  Commands available from the prompt:
 
-   &lt;stmt&gt;                     evaluate/run &lt;stmt&gt;
-   :add &lt;filename&gt; ...        add module(s) to the current target set
-   :browse [*]&lt;module&gt;        display the names defined by &lt;module&gt;
-   :cd &lt;dir&gt;                  change directory to &lt;dir&gt;
-   :def &lt;cmd&gt; &lt;expr&gt;          define a command :&lt;cmd&gt;
-   :help, :?                  display this list of commands
-   :info [&lt;name&gt; ...]         display information about the given names
-   :load &lt;filename&gt; ...       load module(s) and their dependents
-   :module [+/-] [*]&lt;mod&gt; ... set the context for expression evaluation
-   :reload                    reload the current module set
+   &lt;stmt&gt;                      evaluate/run &lt;stmt&gt;
+   :add &lt;filename&gt; ...         add module(s) to the current target set
+   :browse [*]&lt;module&gt;         display the names defined by &lt;module&gt;
+   :cd &lt;dir&gt;                   change directory to &lt;dir&gt;
+   :def &lt;cmd&gt; &lt;expr&gt;           define a command :&lt;cmd&gt;
+   :help, :?                   display this list of commands
+   :info [&lt;name&gt; ...]          display information about the given names
+   :load &lt;filename&gt; ...        load module(s) and their dependents
+   :module [+/-] [*]&lt;mod&gt; ...  set the context for expression evaluation
+   :main [&lt;arguments&gt; ...]     run the main function with the given arguments
+   :reload                     reload the current module set
 
-   :set &lt;option&gt; ...          set options
-   :set args &lt;arg&gt; ...        set the arguments returned by System.getArgs
-   :set prog &lt;progname&gt;       set the value returned by System.getProgName
-   :set prompt &lt;prompt&gt;       set the prompt used in GHCi
- 
-   :show modules              show the currently loaded modules
-   :show bindings             show the current bindings made at the prompt
+   :set &lt;option&gt; ...           set options
+   :set args &lt;arg&gt; ...         set the arguments returned by System.getArgs
+   :set prog &lt;progname&gt;        set the value returned by System.getProgName
+   :set prompt &lt;prompt&gt;        set the prompt used in GHCi
 
-   :ctags [&lt;file&gt;]            create tags file for Vi (default: "tags")
-   :etags [&lt;file&gt;]            create tags file for Emacs (default: "TAGS")
-   :type &lt;expr&gt;               show the type of &lt;expr&gt;
-   :kind &lt;type&gt;               show the kind of &lt;type&gt;
-   :undef &lt;cmd&gt;               undefine user-defined command :&lt;cmd&gt;
-   :unset &lt;option&gt; ...        unset options
-   :quit                      exit GHCi
-   :!&lt;command&gt;                run the shell command &lt;command&gt;
+   :show modules               show the currently loaded modules
+   :show bindings              show the current bindings made at the prompt
 
- Options for `:set' and `:unset':
+   :ctags [&lt;file&gt;]             create tags file for Vi (default: "tags")
+   :etags [&lt;file&gt;]             create tags file for Emacs (defauilt: "TAGS")
+   :type &lt;expr&gt;                show the type of &lt;expr&gt;
+   :kind &lt;type&gt;                show the kind of &lt;type&gt;
+   :undef &lt;cmd&gt;                undefine user-defined command :&lt;cmd&gt;
+   :unset &lt;option&gt; ...         unset options
+   :quit                       exit GHCi
+   :!&lt;command&gt;                 run the shell command &lt;command&gt;
 
-    +r                 revert top-level expressions after each evaluation
-    +s                 print timing/memory stats after each evaluation
-    +t                 print type after evaluation
-    -&lt;flags&gt;           most GHC command line flags can also be set here
+ Options for ':set' and ':unset':
+
+    +r            revert top-level expressions after each evaluation
+    +s            print timing/memory stats after each evaluation
+    +t            print type after evaluation
+    -&lt;flags&gt;      most GHC command line flags can also be set here
                          (eg. -v2, -fglasgow-exts, etc.)
 </screen>
 
