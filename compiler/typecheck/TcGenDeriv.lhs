@@ -354,6 +354,8 @@ gen_Ord_binds tycon
 	      = let eq_expr = nested_compare_expr tys as bs
 		in  careful_compare_Case tycon ty eq_expr (nlHsVar a) (nlHsVar b)
 
+	    nested_compare_expr _ _ _ = panic "nested_compare_expr"	-- Args always equal length
+
 	default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
 								-- inexhaustive patterns
 		    | otherwise		= eqTag_Expr		-- Some nullary constructors;
@@ -755,24 +757,29 @@ gen_Read_binds get_fixity tycon
     	    [con] -> [nlHsDo DoExpr [bindLex (ident_pat (data_con_str con))]
 				    (result_expr con [])]
             _     -> [nlHsApp (nlHsVar choose_RDR) 
-    		   	    (nlList (map mk_pair nullary_cons))]
+    		   	      (nlList (map mk_pair nullary_cons))]
     
-    mk_pair con = nlTuple [nlHsLit (mkHsString (data_con_str con)),
-    		   		   nlHsApp (nlHsVar returnM_RDR) (nlHsVar (getRdrName con))]
-				   Boxed
+    mk_pair con = nlTuple [nlHsLit (mkHsString (data_con_str con)), 
+			   result_expr con []]
+			  Boxed
     
     read_non_nullary_con data_con
-      = nlHsApps prec_RDR [nlHsIntLit prec, nlHsDo DoExpr stmts body]
+      | is_infix  = mk_parser infix_prec  infix_stmts  body
+      | is_record = mk_parser record_prec record_stmts body
+--		Using these two lines instead allows the derived
+--		read for infix and record bindings to read the prefix form
+--      | is_infix  = mk_alt prefix_parser (mk_parser infix_prec  infix_stmts  body)
+--      | is_record = mk_alt prefix_parser (mk_parser record_prec record_stmts body)
+      | otherwise = prefix_parser
       where
-       	stmts | is_infix  = infix_stmts
-     	      | is_record = lbl_stmts
-     	      | otherwise = prefix_stmts
-     
 	body = result_expr data_con as_needed
 	con_str = data_con_str data_con
 	
+	prefix_parser = mk_parser prefix_prec prefix_stmts body
        	prefix_stmts		-- T a b c
-       	  = [bindLex (ident_pat (wrapOpParens con_str))]
+       	  = (if not (isSym con_str) then
+		  [bindLex (ident_pat con_str)]
+	     else [read_punc "(", bindLex (symbol_pat con_str), read_punc ")"])
        	    ++ read_args
      	 
        	infix_stmts 		-- a %% b, or  a `T` b 
@@ -782,7 +789,7 @@ gen_Read_binds get_fixity tycon
 		 else [read_punc "`", bindLex (ident_pat con_str), read_punc "`"])
 	    ++ [read_a2]
      
-       	lbl_stmts		-- T { f1 = a, f2 = b }
+       	record_stmts		-- T { f1 = a, f2 = b }
        	  = [bindLex (ident_pat (wrapOpParens con_str)),
        	     read_punc "{"]
        	    ++ concat (intersperse [read_punc ","] field_stmts)
@@ -798,18 +805,20 @@ gen_Read_binds get_fixity tycon
        	as_needed    = take con_arity as_RDRs
 	read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (dataConOrigArgTys data_con)
        	(read_a1:read_a2:_) = read_args
-       	prec | is_infix  = getPrecedence get_fixity dc_nm
-	     | is_record = appPrecedence + 1	-- Record construction binds even more tightly
-						-- than application; e.g. T2 T1 {x=2} means T2 (T1 {x=2})
-	     | otherwise = appPrecedence
+	
+	prefix_prec = appPrecedence
+       	infix_prec  = getPrecedence get_fixity dc_nm
+	record_prec = appPrecedence + 1	-- Record construction binds even more tightly
+					-- than application; e.g. T2 T1 {x=2} means T2 (T1 {x=2})
 
     ------------------------------------------------------------------------
     --		Helpers
     ------------------------------------------------------------------------
-    mk_alt e1 e2     = genOpApp e1 alt_RDR e2
-    bindLex pat	     = noLoc (mkBindStmt pat (nlHsVar lexP_RDR))
-    con_app c as     = nlHsVarApps (getRdrName c) as
-    result_expr c as = nlHsApp (nlHsVar returnM_RDR) (con_app c as)
+    mk_alt e1 e2       = genOpApp e1 alt_RDR e2					-- e1 +++ e2
+    mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p, nlHsDo DoExpr ss b]	-- prec p (do { ss ; b })
+    bindLex pat	       = noLoc (mkBindStmt pat (nlHsVar lexP_RDR))		-- pat <- lexP
+    con_app con as     = nlHsVarApps (getRdrName con) as			-- con as
+    result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as)		-- return (con as)
     
     punc_pat s   = nlConPat punc_RDR   [nlLitPat (mkHsString s)]  -- Punc 'c'
     ident_pat s  = nlConPat ident_RDR  [nlLitPat (mkHsString s)]  -- Ident "foo"
@@ -1376,6 +1385,7 @@ showParen_Expr e1 e2 = nlHsApp (nlHsApp (nlHsVar showParen_RDR) e1) e2
 
 nested_compose_Expr :: [LHsExpr RdrName] -> LHsExpr RdrName
 
+nested_compose_Expr []  = panic "nested_compose_expr"	-- Arg is always non-empty
 nested_compose_Expr [e] = parenify e
 nested_compose_Expr (e:es)
   = nlHsApp (nlHsApp (nlHsVar compose_RDR) (parenify e)) (nested_compose_Expr es)
