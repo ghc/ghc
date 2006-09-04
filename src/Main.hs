@@ -482,7 +482,7 @@ pass1 modules flags = worker modules (Map.empty) flags
     worker ((mod, checked_mod, filename):rest_modules) moduleMap flags = do
  
       let (parsed_source, renamed_source, _, moduleInfo) = checked_mod
-          (mb_doc_opts, _, _) = get_module_stuff parsed_source
+          (mb_doc_opts, _, _) = getModuleStuff parsed_source
 
       opts <- mkDocOpts mb_doc_opts
 
@@ -551,7 +551,7 @@ pass1 modules flags = worker modules (Map.empty) flags
       worker rest_modules moduleMap' flags 
       
       where 
-        get_module_stuff source = 
+        getModuleStuff source = 
           let HsModule _ _ _ _ _ mb_opts info mb_doc = unLoc source
           in (mb_opts, info, mb_doc)
 
