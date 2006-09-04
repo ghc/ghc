@@ -287,6 +287,13 @@
       </listitem>
       <listitem>
         <para>
+          Linear implicit parameters have been scheduled for removal for some
+          time.  In 6.6 we've removed them from the user manual, and they may
+	  well disappear from the compiler itself in 6.6.1.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
           It is now possible, with the <literal>-I</literal> RTS flag,
           to control the amount of idle time that happens before a major
           GC is performed.

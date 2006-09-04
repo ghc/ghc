@@ -2642,6 +2642,11 @@ inner binding of <literal>?x</literal>, so <literal>(f 9)</literal> will return
 </sect3>
 </sect2>
 
+    <!--   ======================= COMMENTED OUT ========================
+
+    We intend to remove linear implicit parameters, so I'm at least removing
+    them from the 6.6 user manual
+
 <sect2 id="linear-implicit-parameters">
 <title>Linear implicit parameters</title>
 <para>
@@ -2657,7 +2662,7 @@ problem that monads seem over-kill for certain sorts of problem, notably:
 
 <para>
 Linear implicit parameters are just like ordinary implicit parameters,
-except that they are "linear" -- that is, they cannot be copied, and
+except that they are "linear"; that is, they cannot be copied, and
 must be explicitly "split" instead.  Linear implicit parameters are
 written '<literal>%x</literal>' instead of '<literal>?x</literal>'.  
 (The '/' in the '%' suggests the split!)
@@ -2811,6 +2816,8 @@ and you'd be right.  That is why they are an experimental feature.
 </sect3>
 
 </sect2>
+
+================ END OF Linear Implicit Parameters commented out -->
 
 <sect2 id="sec-kinding">
 <title>Explicitly-kinded quantification</title>
