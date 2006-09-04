@@ -116,39 +116,11 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
-          <option>-fno-monomorphism-restriction</option>:
-          <indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
+          <option>-fno-monomorphism-restriction</option>,<option>-fno-monomorphism-restriction</option>:
         </term>
 	<listitem>
-	  <para> Switch off the Haskell 98 monomorphism restriction.
-          Independent of the <option>-fglasgow-exts</option>
-          flag. </para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-fno-mono-pat-binds</option>:
-          <indexterm><primary><option>-fno-mono-pat-binds</option></primary></indexterm>
-          <indexterm><primary><option>-fmono-pat-binds</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para> As an experimental change, we are exploring the possibility of
-	  making pattern bindings monomorphic; that is, not generalised at all.  
-	    A pattern binding is a binding whose LHS has no function arguments,
-	    and is not a simple variable.  For example:
-<programlisting>
-  f x = x                    -- Not a pattern binding
-  f = \x -> x                -- Not a pattern binding
-  f :: Int -> Int = \x -> x  -- Not a pattern binding
-
-  (g,h) = e                  -- A pattern binding
-  (f) = e                    -- A pattern binding
-  [x] = e                    -- A pattern binding
-</programlisting>
-Experimentally, GHC now makes pattern bindings monomorphic <emphasis>by
-default</emphasis>.  Use <option>-fno-mono-pat-binds</option> to recover the
-standard behaviour.
+	  <para> These two flags control how generalisation is done in
+	    See <xlink linkend="monomorphism"/>.
           </para>
 	</listitem>
       </varlistentry>
@@ -4816,6 +4788,150 @@ Because the preprocessor targets Haskell (rather than Core),
 
 </sect1>
 
+<!-- ==================== BANG PATTERNS =================  -->
+
+<sect1 id="sec-bang-patterns">
+<title>Bang patterns
+<indexterm><primary>Bang patterns</primary></indexterm>
+</title>
+<para>GHC supports an extension of pattern matching called <emphasis>bang
+patterns</emphasis>.   Bang patterns are under consideration for Haskell Prime.
+The <ulink
+url="http://hackage.haskell.org/trac/haskell-prime/wiki/BangPatterns">the
+Haskell prime feature description</ulink> contains more discussion and examples
+than the material below.
+</para>
+<para>
+Bang patterns are enabled by the flag <option>-fbang-patterns</option>.
+</para>
+
+<sect2 id="sec-bang-patterns-informal">
+<title>Informal description of bang patterns
+</title>
+<para>
+The main idea is to add a single new production to the syntax of patterns:
+<programlisting>
+  pat ::= !pat
+</programlisting>
+Matching an expression <literal>e</literal> against a pattern <literal>!p</literal> is done by first
+evaluating <literal>e</literal> (to WHNF) and then matching the result against <literal>p</literal>.
+Example:
+<programlisting>
+f1 !x = True
+</programlisting>
+This definition makes <literal>f1</literal> is strict in <literal>x</literal>,
+whereas without the bang it would be lazy.
+Bang patterns can be nested of course:
+<programlisting>
+f2 (!x, y) = [x,y]
+</programlisting>
+Here, <literal>f2</literal> is strict in <literal>x</literal> but not in
+<literal>y</literal>.  
+A bang only really has an effect if it precedes a variable or wild-card pattern:
+<programlisting>
+f3 !(x,y) = [x,y]
+f4 (x,y)  = [x,y]
+</programlisting>
+Here, <literal>f3</literal> and <literal>f4</literal> are identical; putting a bang before a pattern that
+forces evaluation anyway does nothing.
+</para><para>
+Bang patterns work in <literal>case</literal> expressions too, of course:
+<programlisting>
+g5 x = let y = f x in body
+g6 x = case f x of { y -&gt; body }
+g7 x = case f x of { !y -&gt; body }
+</programlisting>
+The functions <literal>g5</literal> and <literal>g6</literal> mean exactly the same thing.  
+But <literal>g7</literal> evalutes <literal>(f x)</literal>, binds <literal>y</literal> to the
+result, and then evaluates <literal>body</literal>.
+</para><para>
+Bang patterns work in <literal>let</literal> and <literal>where</literal>
+definitions too. For example:
+<programlisting>
+let ![x,y] = e in b
+</programlisting>
+is a strict pattern: operationally, it evaluates <literal>e</literal>, matches
+it against the pattern <literal>[x,y]</literal>, and then evaluates <literal>b</literal>
+The "<literal>!</literal>" should not be regarded as part of the pattern; after all,
+in a function argument <literal>![x,y]</literal> means the 
+same as <literal>[x,y]</literal>.  Rather, the "<literal>!</literal>" 
+is part of the syntax of <literal>let</literal> bindings.
+</para>
+</sect2>
+
+
+<sect2 id="sec-bang-patterns-sem">
+<title>Syntax and semantics
+</title>
+<para>
+
+We add a single new production to the syntax of patterns:
+<programlisting>
+  pat ::= !pat
+</programlisting>
+There is one problem with syntactic ambiguity.  Consider:
+<programlisting>
+f !x = 3
+</programlisting>
+Is this a definition of the infix function "<literal>(!)</literal>",
+or of the "<literal>f</literal>" with a bang pattern? GHC resolves this
+ambiguity inf favour of the latter.  If you want to define
+<literal>(!)</literal> with bang-patterns enabled, you have to do so using
+prefix notation:
+<programlisting>
+(!) f x = 3
+</programlisting>
+The semantics of Haskell pattern matching is described in <ulink
+url="http://haskell.org/onlinereport/exps.html#sect3.17.2">
+Section 3.17.2</ulink> of the Haskell Report.  To this description add 
+one extra item 10, saying:
+<itemizedlist><listitem><para>Matching
+the pattern <literal>!pat</literal> against a value <literal>v</literal> behaves as follows:
+<itemizedlist><listitem><para>if <literal>v</literal> is bottom, the match diverges</para></listitem>
+		<listitem><para>otherwise, <literal>pat</literal> is matched against
+		<literal>v</literal></para></listitem>
+</itemizedlist>
+</para></listitem></itemizedlist>
+Similarly, in Figure 4 of  <ulink url="http://haskell.org/onlinereport/exps.html#sect3.17.3">
+Section 3.17.3</ulink>, add a new case (t):
+<programlisting>
+case v of { !pat -> e; _ -> e' }
+   = v `seq` case v of { pat -> e; _ -> e' }
+</programlisting>
+</para><para>
+That leaves let expressions, whose translation is given in 
+<ulink url="http://haskell.org/onlinereport/exps.html#sect3.12">Section
+3.12</ulink>
+of the Haskell Report.
+In the translation box, first apply 
+the following transformation:  for each pattern <literal>pi</literal> that is of 
+form <literal>!qi = ei</literal>, transform it to <literal>(xi,!qi) = ((),ei)</literal>, and and replace <literal>e0</literal> 
+by <literal>(xi `seq` e0)</literal>.  Then, when none of the left-hand-side patterns
+have a bang at the top, apply the rules in the existing box.
+</para>
+<para>The effect of the let rule is to force complete matching of the pattern
+<literal>qi</literal> before evaluation of the body is begun.  The bang is
+retained in the translated form in case <literal>qi</literal> is a variable,
+thus:
+<programlisting>
+  let !y = f x in b
+</programlisting>
+
+</para>
+<para>
+The let-binding can be recursive.  However, it is much more common for
+the let-binding to be non-recursive, in which case the following law holds:
+<literal>(let !p = rhs in body)</literal>
+     is equivalent to
+<literal>(case rhs of !p -> body)</literal>
+</para>
+<para>
+A pattern with a bang at the outermost level is not allowed at the top level of
+a module.
+</para>
+</sect2>
+</sect1>
+
 <!-- ==================== ASSERTIONS =================  -->
 
 <sect1 id="sec-assertions">
@@ -6411,6 +6527,51 @@ Just to finish with, here's another example I rather like:
     tag {| a :+: b |} (Inl x) = tag x
     tag {| a :+: b |} (Inr y) = nCons (bot::a) + tag y
 </programlisting>
+</para>
+</sect2>
+</sect1>
+
+<sect1 id="monomorphism">
+<title>Control over monomorphism</title>
+
+<para>GHC supports two flags that control the way in which generalisation is
+carried out at let and where bindings.
+</para>
+
+<sect2>
+<title>Switching off the dreaded Monomorphism Restriction</title>
+          <indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
+
+<para>Haskell's monomorphism restriction (see 
+<ulink url="http://haskell.org/onlinereport/decls.html#sect4.5.5">Section
+4.5.5</ulink>
+of the Haskell Report)
+can be completely switched off by
+<option>-fno-monomorphism-restriction</option>.
+</para>
+</sect2>
+
+<sect2>
+<title>Monomorphic patteern bindings</title>
+          <indexterm><primary><option>-fno-mono-pat-binds</option></primary></indexterm>
+          <indexterm><primary><option>-fmono-pat-binds</option></primary></indexterm>
+
+	  <para> As an experimental change, we are exploring the possibility of
+	  making pattern bindings monomorphic; that is, not generalised at all.  
+	    A pattern binding is a binding whose LHS has no function arguments,
+	    and is not a simple variable.  For example:
+<programlisting>
+  f x = x                    -- Not a pattern binding
+  f = \x -> x                -- Not a pattern binding
+  f :: Int -> Int = \x -> x  -- Not a pattern binding
+
+  (g,h) = e                  -- A pattern binding
+  (f) = e                    -- A pattern binding
+  [x] = e                    -- A pattern binding
+</programlisting>
+Experimentally, GHC now makes pattern bindings monomorphic <emphasis>by
+default</emphasis>.  Use <option>-fno-mono-pat-binds</option> to recover the
+standard behaviour.
 </para>
 </sect2>
 </sect1>
