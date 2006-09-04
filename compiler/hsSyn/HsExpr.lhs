@@ -287,10 +287,14 @@ ppr_expr (HsVar v)	 = pprHsVar v
 ppr_expr (HsIPVar v)     = ppr v
 ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
+ppr_expr (HsPar e)	 = parens (ppr_lexpr e)
+
+ppr_expr (HsCoreAnn s e)
+  = vcat [ptext SLIT("HsCoreAnn") <+> ftext s, ppr_lexpr e]
 
 ppr_expr (HsApp e1 e2)
   = let (fun, args) = collect_args e1 [e2] in
-    (ppr_lexpr fun) <+> (sep (map pprParendExpr args))
+    hang (ppr_lexpr fun) 2 (sep (map pprParendExpr args))
   where
     collect_args (L _ (HsApp fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)
@@ -304,14 +308,12 @@ ppr_expr (OpApp e1 op fixity e2)
     pp_e2 = pprParendExpr e2
 
     pp_prefixly
-      = hang (ppr op) 4 (sep [pp_e1, pp_e2])
+      = hang (ppr op) 2 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [pp_e1, hsep [pprInfix v, pp_e2]]
+      = sep [nest 2 pp_e1, pprInfix v, nest 2 pp_e2]
 
 ppr_expr (NegApp e _) = char '-' <+> pprParendExpr e
-
-ppr_expr (HsPar e) = parens (ppr_lexpr e)
 
 ppr_expr (SectionL expr op)
   = case unLoc op of
@@ -619,6 +621,8 @@ data Match id
 	(GRHSs id)
 
 matchGroupArity :: MatchGroup id -> Arity
+matchGroupArity (MatchGroup [] _) 
+  = panic "matchGroupArity"	-- MatchGroup is never empty
 matchGroupArity (MatchGroup (match:matches) _)
   = ASSERT( all ((== n_pats) . length . hsLMatchPats) matches )
 	-- Assertion just checks that all the matches have the same number of pats
@@ -799,10 +803,11 @@ pprStmt (ParStmt stmtss)          = hsep (map (\stmts -> ptext SLIT("| ") <> ppr
 pprStmt (RecStmt segment _ _ _ _) = ptext SLIT("rec") <+> braces (vcat (map ppr segment))
 
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
-pprDo DoExpr      stmts body = hang (ptext SLIT("do"))  2 (vcat (map ppr stmts) $$ ppr body)
-pprDo (MDoExpr _) stmts body = hang (ptext SLIT("mdo")) 3 (vcat (map ppr stmts) $$ ppr body)
+pprDo DoExpr      stmts body = ptext SLIT("do")  <+> (vcat (map ppr stmts) $$ ppr body)
+pprDo (MDoExpr _) stmts body = ptext SLIT("mdo") <+> (vcat (map ppr stmts) $$ ppr body)
 pprDo ListComp    stmts body = pprComp brackets    stmts body
 pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
+pprDo other	  stmts body = panic "pprDo" 	-- PatGuard, ParStmtCxt
 
 pprComp :: OutputableBndr id => (SDoc -> SDoc) -> [LStmt id] -> LHsExpr id -> SDoc
 pprComp brack quals body
@@ -938,13 +943,6 @@ pprMatchContext LambdaExpr   	  = ptext SLIT("a lambda abstraction")
 pprMatchContext ProcExpr   	  = ptext SLIT("an arrow abstraction")
 pprMatchContext (StmtCtxt ctxt)   = ptext SLIT("a pattern binding in") $$ pprStmtContext ctxt
 
-pprMatchRhsContext (FunRhs fun) = ptext SLIT("a right-hand side of function") <+> quotes (ppr fun)
-pprMatchRhsContext CaseAlt	= ptext SLIT("the body of a case alternative")
-pprMatchRhsContext PatBindRhs	= ptext SLIT("the right-hand side of a pattern binding")
-pprMatchRhsContext LambdaExpr	= ptext SLIT("the body of a lambda")
-pprMatchRhsContext ProcExpr	= ptext SLIT("the body of a proc")
-pprMatchRhsContext RecUpd	= panic "pprMatchRhsContext"
-
 pprStmtContext (ParStmtCtxt c) = sep [ptext SLIT("a parallel branch of"), pprStmtContext c]
 pprStmtContext (PatGuard ctxt) = ptext SLIT("a pattern guard for") $$ pprMatchContext ctxt
 pprStmtContext DoExpr          = ptext SLIT("a 'do' expression")
@@ -952,12 +950,20 @@ pprStmtContext (MDoExpr _)     = ptext SLIT("an 'mdo' expression")
 pprStmtContext ListComp        = ptext SLIT("a list comprehension")
 pprStmtContext PArrComp        = ptext SLIT("an array comprehension")
 
+{- 
+pprMatchRhsContext (FunRhs fun) = ptext SLIT("a right-hand side of function") <+> quotes (ppr fun)
+pprMatchRhsContext CaseAlt	= ptext SLIT("the body of a case alternative")
+pprMatchRhsContext PatBindRhs	= ptext SLIT("the right-hand side of a pattern binding")
+pprMatchRhsContext LambdaExpr	= ptext SLIT("the body of a lambda")
+pprMatchRhsContext ProcExpr	= ptext SLIT("the body of a proc")
+pprMatchRhsContext other	= panic "pprMatchRhsContext"	-- RecUpd, StmtCtxt
+
 -- Used for the result statement of comprehension
 -- e.g. the 'e' in	[ e | ... ]
 --	or the 'r' in   f x = r
 pprStmtResultContext (PatGuard ctxt) = pprMatchRhsContext ctxt
 pprStmtResultContext other	     = ptext SLIT("the result of") <+> pprStmtContext other
-
+-}
 
 -- Used to generate the string for a *runtime* error message
 matchContextErrString (FunRhs fun)    	      	 = "function " ++ showSDoc (ppr fun)
