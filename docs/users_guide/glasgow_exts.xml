@@ -119,7 +119,7 @@ documentation</ulink> describes all the libraries that come with GHC.
           <option>-fno-monomorphism-restriction</option>,<option>-fno-monomorphism-restriction</option>:
         </term>
 	<listitem>
-	  <para> These two flags control how generalisation is done in
+	  <para> These two flags control how generalisation is done.
 	    See <xref linkend="monomorphism"/>.
           </para>
 	</listitem>
@@ -4804,8 +4804,8 @@ Because the preprocessor targets Haskell (rather than Core),
 <para>GHC supports an extension of pattern matching called <emphasis>bang
 patterns</emphasis>.   Bang patterns are under consideration for Haskell Prime.
 The <ulink
-url="http://hackage.haskell.org/trac/haskell-prime/wiki/BangPatterns">the
-Haskell prime feature description</ulink> contains more discussion and examples
+url="http://hackage.haskell.org/trac/haskell-prime/wiki/BangPatterns">Haskell
+prime feature description</ulink> contains more discussion and examples
 than the material below.
 </para>
 <para>
@@ -6559,7 +6559,7 @@ can be completely switched off by
 </sect2>
 
 <sect2>
-<title>Monomorphic patteern bindings</title>
+<title>Monomorphic pattern bindings</title>
           <indexterm><primary><option>-fno-mono-pat-binds</option></primary></indexterm>
           <indexterm><primary><option>-fmono-pat-binds</option></primary></indexterm>
 
