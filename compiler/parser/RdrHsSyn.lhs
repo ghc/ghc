@@ -530,8 +530,12 @@ checkAPat loc e = case e of
    NegApp (L _ (HsOverLit pos_lit)) _ 
 			-> return (mkNPat pos_lit (Just noSyntaxExpr))
    
-   SectionR (L _ (HsVar bang)) e 
- 	| bang == bang_RDR -> checkLPat e >>= (return . BangPat)
+   SectionR (L _ (HsVar bang)) e 	-- (! x)
+ 	| bang == bang_RDR 
+	-> do { bang_on <- extension bangPatEnabled
+	      ; if bang_on then checkLPat e >>= (return . BangPat)
+		else parseError loc "Illegal bang-pattern (use -fbang-patterns)" }
+
    ELazyPat e	      -> checkLPat e >>= (return . LazyPat)
    EAsPat n e	      -> checkLPat e >>= (return . AsPat n)
    ExprWithTySig e t  -> checkLPat e >>= \e ->
