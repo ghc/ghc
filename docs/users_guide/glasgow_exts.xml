@@ -120,7 +120,7 @@ documentation</ulink> describes all the libraries that come with GHC.
         </term>
 	<listitem>
 	  <para> These two flags control how generalisation is done in
-	    See <xlink linkend="monomorphism"/>.
+	    See <xref linkend="monomorphism"/>.
           </para>
 	</listitem>
       </varlistentry>

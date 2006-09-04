@@ -54,7 +54,7 @@ the <option>-fglasgow-exts</option><indexterm><primary><option>-fglasgow-exts</o
       and <literal>ByteArray#</literal>.</para>
     </sect2>
 
-    <sect2>
+    <sect2 id="ffi-newtype-io">
       <title>Newtype wrapping of the IO monad</title>
       <para>The FFI spec requires the IO monad to appear in various  places,
       but it can sometimes be convenient to wrap the IO monad in a

@@ -250,8 +250,14 @@
           <literal>MyIO <replaceable>t</replaceable></literal>
           rather than just
           <literal>IO <replaceable>t</replaceable></literal>.
+	  See <xref linkend="ffi-newtype-io"/>
         </para>
       </listitem>
+      <listitem> <para> GHC's mechansim for deriving user-defined classes
+	  for newtypes has been further generalised, to multi-parameter type
+	  classes and higher-kinded types.  See <xref
+	  linkend="newtype-deriving"/>.
+	  </para></listitem>
       <listitem>
         <para>
           By default, pattern bindings in GHC are now monomorphic.
