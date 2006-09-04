@@ -80,8 +80,10 @@ test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 # Omit for GHCi: firstly GHCi doesn't have unsafe FFI calls, and secondly
 # the main thread cannot receive the deadlock exception because it can be
 # woken up by ^C.
+# Omit for threaded2: this test is really bogus and fails to do anything
+# sensible for more than one CPU.
 test('conc036', compose(skip_if_fast,
-		  compose(omit_ways(['ghci']),
+		  compose(omit_ways(['ghci','threaded2']),
 		    only_compiler_types(['ghc']))), compile_and_run, [''])
 
 test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
