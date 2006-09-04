@@ -820,7 +820,9 @@ coreSyn/CorePrep_HC_OPTS += -auto-all
 # package build system framework more or less does the right thing for
 # us here.
 
+# 		All this section is stage-2 only!
 ifeq "$(stage)" "2"
+
 PACKAGE = ghc
 HIERARCHICAL_LIB = NO
 VERSION = $(ProjectVersion)
@@ -848,16 +850,19 @@ HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 # Haddock can't handle recursive modules currently, so we disable it for now.
 NO_HADDOCK_DOCS = YES
 
-# Don't build the GHC binary as normal, because we need to link it
-# against the GHC package.  The GHC binary itself is built by
-# compiling Main.o separately and linking it with -package ghc.  This is
-# done using a separate Makefile:
+# The stage 2 GHC binary itself is built by  compiling main/Main.hs 
+# (the same as used in stage 1) against the GHC package.
+#
+# This is done by compiling Main.hs separately and linking it with 
+# -package ghc.  This is done using a separate Makefile, Makefile.ghcbin
+# Why? See comments in Makefile.ghcbin
 
 all :: $(GHC_PROG)
 
 $(GHC_PROG) : libHS$(PACKAGE)$(_way).a main/Main.hs
 	$(MAKE) -f Makefile.ghcbin $(MFLAGS) HS_PROG=$(GHC_PROG) $@
 
+# Propagate standard targets to Makefile.ghcbin
 docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html chm HxS ps dvi txt::
 	$(MAKE) -f Makefile.ghcbin $(MFLAGS) $@
 endif
