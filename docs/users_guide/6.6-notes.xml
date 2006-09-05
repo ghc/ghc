@@ -311,6 +311,14 @@
           <option>--make</option>, and hence can be used by cabal.
         </para>
       </listitem>
+      <listitem>
+        <para>
+          Template Haskell used to have limited support for type signatures in 
+	  patterns, but since that design is in flux for Haskell (let alone
+	  Template Haskell), we've removed type signatures in patterns from
+	  Template Haskell.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
