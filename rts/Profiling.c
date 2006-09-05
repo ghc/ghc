@@ -277,7 +277,7 @@ initProfilingLogFile(void)
     if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
 	/* dump the time, and the profiling interval */
 	fprintf(prof_file, "\"%s\"\n", time_str());
-	fprintf(prof_file, "\"%d ms\"\n", TICK_MILLISECS);
+	fprintf(prof_file, "\"%d ms\"\n", RtsFlags.MiscFlags.tickInterval);
 	
 	/* declare all the cost centres */
 	{
@@ -732,8 +732,10 @@ reportCCSProfiling( void )
     fprintf(prof_file, "\n\n");
 
     fprintf(prof_file, "\ttotal time  = %11.2f secs   (%lu ticks @ %d ms)\n",
-	    total_prof_ticks / (StgFloat) TICK_FREQUENCY, 
-	    total_prof_ticks, TICK_MILLISECS);
+	    (double) total_prof_ticks *
+        (double) RtsFlags.MiscFlags.tickInterval / 1000,
+	    (unsigned long) total_prof_ticks,
+        (int) RtsFlags.MiscFlags.tickInterval);
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
 	    ullong_format_string(total_alloc * sizeof(W_),

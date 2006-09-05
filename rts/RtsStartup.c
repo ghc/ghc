@@ -210,7 +210,7 @@ hs_init(int *argc, char **argv[])
 #endif
 
     /* start the virtual timer 'subsystem'. */
-    startTimer(TICK_MILLISECS);
+    startTimer();
 
     /* Initialise the stats department */
     initStats();

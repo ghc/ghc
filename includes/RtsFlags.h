@@ -42,7 +42,7 @@ struct GC_FLAGS {
     rtsBool ringBell;
     rtsBool frontpanel;
 
-    int idleGCDelayTicks;	/* in milliseconds */
+    int idleGCDelayTime;	/* in milliseconds */
 };
 
 struct DEBUG_FLAGS {  
@@ -110,6 +110,10 @@ struct PROFILING_FLAGS {
 struct CONCURRENT_FLAGS {
     int ctxtSwitchTime;		/* in milliseconds */
     int ctxtSwitchTicks;	/* derived */
+};
+
+struct MISC_FLAGS {
+    int tickInterval;     /* in milliseconds */
 };
 
 #ifdef PAR
@@ -300,6 +304,7 @@ typedef struct _RTS_FLAGS {
     /* The first portion of RTS_FLAGS is invariant. */
     struct GC_FLAGS	     GcFlags;
     struct CONCURRENT_FLAGS  ConcFlags;
+    struct MISC_FLAGS        MiscFlags;
     struct DEBUG_FLAGS	     DebugFlags;
     struct COST_CENTRE_FLAGS CcFlags;
     struct PROFILING_FLAGS   ProfFlags;

@@ -374,6 +374,8 @@ main(int argc, char *argv[])
 		  RTS_FLAGS, DebugFlags.weak);
     struct_field_("RtsFlags_GcFlags_initialStkSize",
 		  RTS_FLAGS, GcFlags.initialStkSize);
+    struct_field_("RtsFlags_MiscFlags_tickInterval",
+		  RTS_FLAGS, MiscFlags.tickInterval);
 
     struct_size(StgFunInfoExtraFwd);
     struct_field(StgFunInfoExtraFwd, slow_apply);

@@ -513,8 +513,6 @@
    Misc junk
    -------------------------------------------------------------------------- */
 
-#define TICK_MILLISECS   (1000/TICK_FREQUENCY)   /* ms per tick */
-
 #define NO_TREC        stg_NO_TREC_closure
 #define END_TSO_QUEUE  stg_END_TSO_QUEUE_closure
 

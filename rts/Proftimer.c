@@ -57,9 +57,6 @@ initProfTimer( void )
 {
     performHeapProfile = rtsFalse;
 
-    RtsFlags.ProfFlags.profileIntervalTicks = 
-	RtsFlags.ProfFlags.profileInterval / TICK_MILLISECS;
-
     ticks_to_heap_profile = RtsFlags.ProfFlags.profileIntervalTicks;
 
     startHeapProfTimer();

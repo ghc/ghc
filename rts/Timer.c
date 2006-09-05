@@ -54,20 +54,22 @@ handle_tick(int unused STG_UNUSED)
 
 #if defined(THREADED_RTS)
   /* 
-   * If we've been inactive for idleGCDelayTicks (set by +RTS
+   * If we've been inactive for idleGCDelayTime (set by +RTS
    * -I), tell the scheduler to wake up and do a GC, to check
    * for threads that are deadlocked.
    */
   switch (recent_activity) {
   case ACTIVITY_YES:
       recent_activity = ACTIVITY_MAYBE_NO;
-      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
+      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
+                    RtsFlags.MiscFlags.tickInterval;
       break;
   case ACTIVITY_MAYBE_NO:
       if (ticks_to_gc == 0) break; /* 0 ==> no idle GC */
       ticks_to_gc--;
       if (ticks_to_gc == 0) {
-	  ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTicks;
+	  ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
+                        RtsFlags.MiscFlags.tickInterval;
 	  recent_activity = ACTIVITY_INACTIVE;
 	  blackholes_need_checking = rtsTrue;
 	  /* hack: re-use the blackholes_need_checking flag */
@@ -81,17 +83,17 @@ handle_tick(int unused STG_UNUSED)
 }
 
 int
-startTimer(nat ms)
+startTimer(void)
 {
 #ifdef PROFILING
   initProfTimer();
 #endif
 
-  return startTicker(ms, handle_tick);
+  return startTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
 }
 
 int
-stopTimer()
+stopTimer(void)
 {
   return stopTicker();
 }

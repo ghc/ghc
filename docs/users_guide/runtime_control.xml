@@ -85,6 +85,34 @@
 
   </sect2>
 
+  <sect2 id="rts-options-misc">
+    <title>Miscellaneous RTS options</title>
+
+    <variablelist>
+     <varlistentry>
+       <term><option>-V<replaceable>secs</replaceable></option></term>
+       <indexterm><primary><option>-V</option></primary><secondary>RTS
+       option</secondary></indexterm>
+       <listitem>
+         <para>Sets the interval that the RTS clock ticks at.  The
+         runtime uses a single timer signal to count ticks; this timer
+         signal is used to control the context switch timer (<xref
+         linkend="sec-using-concurrent" />) and the heap profiling
+         timer <xref linkend="rts-options-heap-prof" />.  Also, the
+         time profiler uses the RTS timer signal directly to record
+         time profiling samples.</para>
+
+         <para>Normally, setting the <option>-V</option> option
+         directly is not necessary: the resolution of the RTS timer is
+         adjusted automatically if a short interval is requested with
+         the <option>-C</option> or <option>-i</option> options.
+         However, setting <option>-V</option> is required in order to
+         increase the resolution of the time profiler.</para>
+       </listitem>
+     </varlistentry>
+    </variablelist>
+  </sect2>
+
   <sect2 id="rts-options-gc">
     <title>RTS options to control the garbage collector</title>
 

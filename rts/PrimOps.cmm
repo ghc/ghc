@@ -1975,8 +1975,8 @@ delayzh_fast
 #else
 
     W_ time;
-    time = foreign "C" getourtimeofday();
-    target = (R1 / (TICK_MILLISECS*1000)) + time;
+    time = foreign "C" getourtimeofday() [R1];
+    target = (R1 / (TO_W_(RtsFlags_MiscFlags_tickInterval(RtsFlags))*1000)) + time;
     StgTSO_block_info(CurrentTSO) = target;
 
     /* Insert the new thread in the sleeping queue. */

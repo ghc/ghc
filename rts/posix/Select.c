@@ -126,7 +126,7 @@ awaitEvent(rtsBool wait)
 	  min = 0;
       } else if (sleeping_queue != END_TSO_QUEUE) {
 	  min = (sleeping_queue->block_info.target - ticks) 
-	      * TICK_MILLISECS * 1000;
+	      * RtsFlags.MiscFlags.tickInterval * 1000;
       } else {
 	  min = 0x7ffffff;
       }

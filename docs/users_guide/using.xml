@@ -1524,10 +1524,7 @@ f "2"    = 2
 	    every 4k of allocation).  With <option>-C0</option> or
 	    <option>-C</option>, context switches will occur as often as
 	    possible (at every heap block allocation).  By default, context
-	    switches occur every 20ms.  Note that GHC's internal timer ticks
-	    every 20ms, and the context switch timer is always a multiple of
-	    this timer, so 20ms is the maximum granularity available for timed
-	    context switches.</para>
+	    switches occur every 20ms.</para>
 	</listitem>
       </varlistentry>
     </variablelist>

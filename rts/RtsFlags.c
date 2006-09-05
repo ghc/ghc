@@ -12,7 +12,6 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
-#include "Timer.h"		/* CS_MIN_MILLISECS */
 #include "Profiling.h"
 
 #ifdef HAVE_CTYPE_H
@@ -150,7 +149,7 @@ void initRtsFlagsDefaults(void)
 #ifdef RTS_GTK_FRONTPANEL
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
 #endif
-    RtsFlags.GcFlags.idleGCDelayTicks   = 300 / TICK_MILLISECS; /* ticks */
+    RtsFlags.GcFlags.idleGCDelayTime    = 300; /* millisecs */
 
 #ifdef DEBUG
     RtsFlags.DebugFlags.scheduler	= rtsFalse;
@@ -191,7 +190,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
 #endif
 
-    RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
+    RtsFlags.MiscFlags.tickInterval	= 50;  /* In milliseconds */
+    RtsFlags.ConcFlags.ctxtSwitchTime	= 50;  /* In milliseconds */
 
 #ifdef THREADED_RTS
     RtsFlags.ParFlags.nNodes	        = 1;
@@ -790,14 +790,9 @@ error = rtsTrue;
 		} else {
 		    I_ cst; /* tmp */
 
-		    /* Convert to ticks */
+		    /* Convert to millisecs */
 		    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
-		    if (cst > 0 && cst < TICK_MILLISECS) {
-			cst = TICK_MILLISECS;
-		    } else {
-			cst = cst / TICK_MILLISECS;
-		    }
-		    RtsFlags.GcFlags.idleGCDelayTicks = cst;
+		    RtsFlags.GcFlags.idleGCDelayTime = cst;
 		}
 		break;
 
@@ -993,10 +988,6 @@ error = rtsTrue;
 
 		    /* Convert to milliseconds */
 		    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
-		    cst = (cst / CS_MIN_MILLISECS) * CS_MIN_MILLISECS;
-		    if (cst != 0 && cst < CS_MIN_MILLISECS)
-			cst = CS_MIN_MILLISECS;
-
 		    RtsFlags.ProfFlags.profileInterval = cst;
 		}
 		break;
@@ -1011,13 +1002,22 @@ error = rtsTrue;
 
 		    /* Convert to milliseconds */
 		    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
-		    cst = (cst / CS_MIN_MILLISECS) * CS_MIN_MILLISECS;
-		    if (cst != 0 && cst < CS_MIN_MILLISECS)
-			cst = CS_MIN_MILLISECS;
-
 		    RtsFlags.ConcFlags.ctxtSwitchTime = cst;
 		}
     	    	break;
+
+              case 'V': /* master tick interval */
+                if (rts_argv[arg][2] == '\0') {
+                    // turns off ticks completely
+                    RtsFlags.MiscFlags.tickInterval = 0;
+                } else {
+                    I_ cst; /* tmp */
+
+                    /* Convert to milliseconds */
+                    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
+                    RtsFlags.MiscFlags.tickInterval = cst;
+                }
+                break;
 
 #if defined(THREADED_RTS) && !defined(NOSMP)
 	      case 'N':
@@ -1153,6 +1153,47 @@ error = rtsTrue;
 	    }
 	}
     }
+
+    // Determine what tick interval we should use for the RTS timer
+    // by taking the shortest of the various intervals that we need to
+    // monitor.
+    if (RtsFlags.MiscFlags.tickInterval <= 0) {
+        RtsFlags.MiscFlags.tickInterval = 50;
+    }
+
+    if (RtsFlags.ConcFlags.ctxtSwitchTime > 0) {
+        RtsFlags.MiscFlags.tickInterval =
+            stg_min(RtsFlags.ConcFlags.ctxtSwitchTime,
+                    RtsFlags.MiscFlags.tickInterval);
+    }
+
+    if (RtsFlags.GcFlags.idleGCDelayTime > 0) {
+        RtsFlags.MiscFlags.tickInterval =
+            stg_min(RtsFlags.GcFlags.idleGCDelayTime,
+                    RtsFlags.MiscFlags.tickInterval);
+    }
+
+#ifdef PROFILING
+    if (RtsFlags.ProfFlags.profileInterval > 0) {
+        RtsFlags.MiscFlags.tickInterval =
+            stg_min(RtsFlags.ProfFlags.profileInterval,
+                    RtsFlags.MiscFlags.tickInterval);
+    }
+#endif
+
+    if (RtsFlags.ConcFlags.ctxtSwitchTime > 0) {
+        RtsFlags.ConcFlags.ctxtSwitchTicks =
+            RtsFlags.ConcFlags.ctxtSwitchTime /
+            RtsFlags.MiscFlags.tickInterval;
+    } else {
+        RtsFlags.ConcFlags.ctxtSwitchTicks = 0;
+    }
+
+#ifdef PROFILING
+    RtsFlags.ProfFlags.profileIntervalTicks =
+        RtsFlags.ProfFlags.profileInterval / RtsFlags.MiscFlags.tickInterval;
+#endif
+
     if (error) {
 	const char **p;
 

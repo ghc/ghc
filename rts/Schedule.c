@@ -2509,9 +2509,6 @@ initScheduler(void)
   context_switch = 0;
   sched_state    = SCHED_RUNNING;
 
-  RtsFlags.ConcFlags.ctxtSwitchTicks =
-      RtsFlags.ConcFlags.ctxtSwitchTime / TICK_MILLISECS;
-      
 #if defined(THREADED_RTS)
   /* Initialise the mutex and condition variables used by
    * the scheduler. */
