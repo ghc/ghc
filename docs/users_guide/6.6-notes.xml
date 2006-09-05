@@ -761,7 +761,7 @@
       <itemizedlist>
         <listitem>
           <para>
-            Version number 1.1.5 (was 1.1.4).
+            Version number 1.1.6 (was 1.1.4).
           </para>
         </listitem>
         <listitem>
@@ -780,24 +780,6 @@
           <para>
             Added a <filename>debianTemplate</filename> directory with
             templates for building Debian packages from Cabal packages.
-          </para>
-        </listitem>
-        <listitem>
-          <para>
-            Added <filename>cabal-setup</filename>, a user interface to
-            building and installing Cabal packages.
-          </para>
-        </listitem>
-        <listitem>
-          <para>
-            Added <filename>cabal-install</filename>, an automated
-            installer for cabal packages.
-          </para>
-        </listitem>
-        <listitem>
-          <para>
-            There is now a <literal>Network.Hackage</literal> hierarchy
-            for code needed by hackage, the package server.
           </para>
         </listitem>
         <listitem>
