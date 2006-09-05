@@ -1,2 +1,4 @@
-Loading package base ... linking ... done.
-Loading package template-haskell ... linking ... done.
+
+TH_repPatSig.hs:10:2:
+    Type signatures in patterns not (yet) handled by Template Haskell
+      x :: Int

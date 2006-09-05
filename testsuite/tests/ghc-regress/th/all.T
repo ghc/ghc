@@ -16,7 +16,7 @@ test('TH_repPrim', normal, compile, [''])
 test('TH_repPrimOutput', normal, compile_and_run, [''])
 test('TH_repGuard', normal, compile, [''])
 test('TH_repGuardOutput', normal, compile_and_run, [''])
-test('TH_repPatSig', normal, compile, [''])
+test('TH_repPatSig', normal, compile_fail, [''])
 
 test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5', '-v0'])
 clean(['TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o'])
