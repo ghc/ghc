@@ -2194,8 +2194,20 @@ some other constraint.  But if the instance declaration was compiled with
 check for that declaration.
 </para></listitem>
 </itemizedlist>
-All this makes it possible for a library author to design a library that relies on 
-overlapping instances without the library client having to know.
+These rules make it possible for a library author to design a library that relies on 
+overlapping instances without the library client having to know.  
+</para>
+<para>
+If an instance declaration is compiled without
+<option>-fallow-overlapping-instances</option>,
+then that instance can never be overlapped.  This could perhaps be
+inconvenient.  Perhaps the rule should instead say that the
+<emphasis>overlapping</emphasis> instance declaration should be compiled in
+this way, rather than the <emphasis>overlapped</emphasis> one.  Perhaps overlap
+at a usage site should be permitted regardless of how the instance declarations
+are compiled, if the <option>-fallow-overlapping-instances</option> flag is
+used at the usage site.  (Mind you, the exact usage site can occasionally be
+hard to pin down.)  We are interested to receive feedback on these points.
 </para>
 <para>The <option>-fallow-incoherent-instances</option> flag implies the
 <option>-fallow-overlapping-instances</option> flag, but not vice versa.
