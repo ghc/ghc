@@ -5,13 +5,16 @@ import System.Mem
 import Control.Concurrent
 
 foreign export ccall "performGC_" performGC' :: IO ()
-performGC' = do yield; performGC
+performGC' = do putMVar m (); yield; performGC
 
 foreign import ccall "performGC_" f :: IO ()
 
+{-# NOINLINE m #-}
+m = unsafePerformIO newEmptyMVar
+
 main = do
   forkIO f
-  yield
+  takeMVar m
 
 -- This tests for a bug in the garbage collector, whereby a main
 -- thread that has completed may be GC'd before its return value is
