@@ -32,7 +32,7 @@ data DocOption
 
 data ExportItem2 name
   = ExportDecl2
-      Name	               -- ^ The original name
+      Name                 -- ^ The original name
       (LHsDecl name)       -- ^ A declaration
       (Maybe (HsDoc name)) -- ^ Maybe a doc comment
       [InstHead2 name]	   -- ^ Instances relevant to this declaration
