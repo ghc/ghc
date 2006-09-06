@@ -1,0 +1,2 @@
+
+rnfail046.hs:4:12: Qualified name in binding position: Map.Map
