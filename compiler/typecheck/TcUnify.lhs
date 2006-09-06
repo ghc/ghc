@@ -180,6 +180,7 @@ subFunTys error_herald n_pats res_ty thing_inside
 			     ; return (idCoercion, res) } }
 	where
 	  mk_res_ty (res_ty' : arg_tys') = mkFunTys arg_tys' res_ty'
+	  mk_res_ty [] = panic "TcUnify.mk_res_ty1"
 	  kinds = openTypeKind : take n (repeat argTypeKind)
 		-- Note argTypeKind: the args can have an unboxed type,
 		-- but not an unboxed tuple.
@@ -268,6 +269,7 @@ boxySplitAppTy orig_ty
 				 ; return (fun_ty, arg_ty) } }
       where
         mk_res_ty [fun_ty', arg_ty'] = mkAppTy fun_ty' arg_ty'
+	mk_res_ty other = panic "TcUnify.mk_res_ty2"
 	tv_kind = tyVarKind tv
 	kinds = [mkArrowKind liftedTypeKind (defaultKind tv_kind),
 					 	-- m :: * -> k
@@ -460,6 +462,8 @@ boxy_match_s tmpl_tvs [] boxy_tvs [] subst
 boxy_match_s tmpl_tvs (t_ty:t_tys) boxy_tvs (b_ty:b_tys) subst
   = boxy_match tmpl_tvs t_ty boxy_tvs b_ty $
     boxy_match_s tmpl_tvs t_tys boxy_tvs b_tys subst
+boxy_match_s tmpl_tvs _ boxy_tvs _ subst
+  = panic "boxy_match_s"	-- Lengths do not match
     
 
 ------------
@@ -689,6 +693,7 @@ tc_sub outer act_sty act_ty@(FunTy act_arg act_res) exp_sty (TyVarTy exp_tv)
  			      ; tc_sub_funs act_arg act_res arg_ty res_ty } }
  where
     mk_res_ty [arg_ty', res_ty'] = mkFunTy arg_ty' res_ty'
+    mk_res_ty other = panic "TcUnify.mk_res_ty3"
     fun_kinds = [argTypeKind, openTypeKind]
 
 -- Everything else: defer to boxy matching

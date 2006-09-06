@@ -700,9 +700,9 @@ tcSplitFunTysN ty n_args
   | otherwise
   = ([], ty)
 
-tcFunArgTy    ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> arg }
-tcFunResultTy ty = case tcSplitFunTy_maybe ty of { Just (arg,res) -> res }
-
+tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)
+tcFunArgTy    ty = fst (tcSplitFunTy ty)
+tcFunResultTy ty = snd (tcSplitFunTy ty)
 
 -----------------------
 tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -750,6 +750,7 @@ tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead tau  
   = case tcSplitPredTy_maybe tau of 
 	Just (ClassP clas tys) -> (clas, tys)
+	other -> panic "tcSplitDFunHead"
 
 tcValidInstHeadTy :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
@@ -816,6 +817,7 @@ getClassPredTys_maybe _		        = Nothing
 
 getClassPredTys :: PredType -> (Class, [Type])
 getClassPredTys (ClassP clas tys) = (clas, tys)
+getClassPredTys other = panic "getClassPredTys"
 
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = mkPredTy (ClassP clas tys)
@@ -869,6 +871,7 @@ dataConsStupidTheta (con1:cons)
 		    | con <- cons
 		    , let Just subst = tcMatchTys tvs1 res_tys1 (dataConResTys con)
 		    , pred <- dataConStupidTheta con ]
+dataConsStupidTheta [] = panic "dataConsStupidTheta"
 \end{code}
 
 
@@ -1117,12 +1120,14 @@ toDNType :: Type -> DNType
 toDNType ty
   | isStringTy ty = DNString
   | isFFIDotnetObjTy ty = DNObject
-  | Just (tc,argTys) <- tcSplitTyConApp_maybe ty = 
-     case lookup (getUnique tc) dn_assoc of
+  | Just (tc,argTys) <- tcSplitTyConApp_maybe ty 
+  =  case lookup (getUnique tc) dn_assoc of
        Just x  -> x
        Nothing 
          | tc `hasKey` ioTyConKey -> toDNType (head argTys)
-	 | otherwise -> pprPanic ("toDNType: unsupported .NET type") (pprType ty <+> parens (hcat (map pprType argTys)) <+> ppr tc)
+	 | otherwise -> pprPanic ("toDNType: unsupported .NET type") 
+			  (pprType ty <+> parens (hcat (map pprType argTys)) <+> ppr tc)
+  | otherwise = panic "toDNType"	-- Is this right?
     where
       dn_assoc :: [ (Unique, DNType) ]
       dn_assoc = [ (unitTyConKey,   DNUnit)
