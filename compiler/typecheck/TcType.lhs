@@ -284,14 +284,14 @@ The trouble is that the occurrences of z in the RHS force a* and b* to
 be the *same*, so we can't make them into skolem constants that don't unify
 with each other.  Alas.
 
-On the other hand, we *must* use skolems for signature type variables, 
-becuase GADT type refinement refines skolems only.  
-
 One solution would be insist that in the above defn the programmer uses
 the same type variable in both type signatures.  But that takes explanation.
 
 The alternative (currently implemented) is to have a special kind of skolem
-constant, SigSkokTv, which can unify with other SigSkolTvs.  
+constant, SigTv, which can unify with other SigTvs.  These are *not* treated
+as righd for the purposes of GADTs.  And they are used *only* for pattern 
+bindings and mutually recursive function bindings.  See the function
+TcBinds.tcInstSig, and its use_skols parameter.
 
 
 \begin{code}
@@ -420,15 +420,23 @@ pprUserTypeCtxt SpecInstCtxt    = ptext SLIT("a SPECIALISE instance pragma")
 tidySkolemTyVar :: TidyEnv -> TcTyVar -> (TidyEnv, TcTyVar)
 -- Tidy the type inside a GenSkol, preparatory to printing it
 tidySkolemTyVar env tv
-  = ASSERT( isSkolemTyVar tv )
+  = ASSERT( isSkolemTyVar tv || isSigTyVar tv )
     (env1, mkTcTyVar (tyVarName tv) (tyVarKind tv) info1)
   where
     (env1, info1) = case tcTyVarDetails tv of
-		      SkolemTv (GenSkol tvs ty loc) -> (env2, SkolemTv (GenSkol tvs1 ty1 loc))
+			SkolemTv info -> (env1, SkolemTv info')
+				where
+				  (env1, info') = tidy_skol_info env info
+			MetaTv (SigTv info) box -> (env1, MetaTv (SigTv info') box)
+				where
+				  (env1, info') = tidy_skol_info env info
+			info -> (env, info)
+
+    tidy_skol_info env (GenSkol tvs ty loc) = (env2, GenSkol tvs1 ty1 loc)
 			    where
 			      (env1, tvs1) = tidyOpenTyVars env tvs
 			      (env2, ty1)  = tidyOpenType env1 ty
-		      info -> (env, info)
+    tidy_skol_info env info = (env, info)
 		     
 pprSkolTvBinding :: TcTyVar -> SDoc
 -- Print info about the binding of a skolem tyvar, 

@@ -48,9 +48,9 @@ import TcType		( TcKind, TcType, TcTyVar, BoxyTyVar, TcTauType,
 			  tcSplitForAllTys, tcSplitAppTy_maybe, tcSplitFunTys, mkTyVarTys,
 			  tcSplitSigmaTy, tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy, 
 			  typeKind, mkForAllTys, mkAppTy, isBoxyTyVar,
-			  exactTyVarsOfType, 
+			  tcView, exactTyVarsOfType, 
 			  tidyOpenType, tidyOpenTyVar, tidyOpenTyVars,
-			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar, tcView, 
+			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar, isSigTyVar,
 			  TvSubst, mkTvSubst, zipTyEnv, zipOpenTvSubst, emptyTvSubst, 
 			  substTy, substTheta, 
 			  lookupTyVar, extendTvSubst )
@@ -1501,8 +1501,8 @@ ppr_ty env ty
 	     simple_result  = (env1, quotes (ppr tidy_ty), empty)
        ; case tidy_ty of
 	   TyVarTy tv 
-		| isSkolemTyVar tv -> return (env2, pp_rigid tv',
-					      pprSkolTvBinding tv')
+		| isSkolemTyVar tv || isSigTyVar tv
+		-> return (env2, pp_rigid tv', pprSkolTvBinding tv')
 		| otherwise -> return simple_result
 		where
 		  (env2, tv') = tidySkolemTyVar env1 tv

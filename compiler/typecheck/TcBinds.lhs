@@ -1041,9 +1041,15 @@ tcInstSig_maybe sig_fn name
 
 tcInstSig :: Bool -> Name -> [Name] -> TcM TcSigInfo
 -- Instantiate the signature, with either skolems or meta-type variables
--- depending on the use_skols boolean
+-- depending on the use_skols boolean.  This variable is set True
+-- when we are typechecking a single function binding; and False for
+-- pattern bindigs and a group of several function bindings.
+-- Reason: in the latter cases, the "skolems" can be unified together, 
+-- 	   so they aren't properly rigid in the type-refinement sense.
+-- NB: unless we are doing H98, each function with a sig will be done
+--     separately, even if it's mutually recursive, so use_skols will be True
 --
--- We always instantiate with freshs uniques,
+-- We always instantiate with fresh uniques,
 -- although we keep the same print-name
 --	
 --	type T = forall a. [a] -> [a]
