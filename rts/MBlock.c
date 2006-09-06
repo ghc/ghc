@@ -442,7 +442,7 @@ static void
 commitBlocks(char* base, int size) {
     alloc_rec* it;
     it=allocs;
-    for( ; it!=0 && (it->base+it->size)<base; it=it->next ) {}
+    for( ; it!=0 && (it->base+it->size)<=base; it=it->next ) {}
     for( ; it!=0 && size>0; it=it->next ) {
         int size_delta;
         void* temp;
