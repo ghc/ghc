@@ -745,6 +745,10 @@ sameGroup (PgN l1)   (PgN l2)   = True		-- Needs conditionals
 sameGroup (PgNpK l1) (PgNpK l2) = l1==l2	-- Order is significant
 						-- See Note [Order of n+k]
 sameGroup (PgCo	t1)  (PgCo t2)  = t1 `coreEqType` t2
+	-- CoPats are in the same goup only if the type of the
+	-- enclosed pattern is the same. The patterns outside the CoPat
+	-- always have the same type, so this boils down to saying that
+	-- the two coercions are identical.
 sameGroup _          _          = False
  
 patGroup :: Pat Id -> PatGroup
