@@ -7,6 +7,9 @@ top_dirs="nofib testsuite"
 default_repo_root="http://darcs.haskell.org/ghc-6.6/"
 default_lib_repo_root=$default_repo_root/packages
 
+default_extra_repo_root="http://darcs.haskell.org/"
+default_extra_lib_repo_root=$default_extra_repo_root/packages
+
 quiet=NO
 
 message()
@@ -53,13 +56,7 @@ darcsget()
 
   cd libraries
 
-  if test "$extra" = "YES"; then
-      packages=`cat core-packages extra-packages`
-  else
-      packages=`cat core-packages`
-  fi
-
-  for pkg in $packages; do
+  for pkg in `cat core-packages`; do
     if test -d $pkg; then
 	echo "warning: $pkg already present; omitting"
     else
@@ -68,6 +65,18 @@ darcsget()
 	darcs get --partial $* $repo
     fi
   done
+
+  if test "$extra" = "YES"; then
+  for pkg in `cat extra-packages`; do
+    if test -d $pkg; then
+	echo "warning: $pkg already present; omitting"
+    else
+	repo=$default_extra_lib_repo_root/$pkg
+	message "== running darcs get --partial $* $repo"
+	darcs get --partial $* $repo
+    fi
+  done
+  fi
 }
 
 if test ! -d _darcs -o ! -d compiler; then
