@@ -476,7 +476,7 @@ exprIsCheap other_expr 	-- Applications and variables
  	-- to bother to check the number of args
  
     --------------
-    go_sel [arg] = exprIsTrivial arg	-- I'm experimenting with making record selection
+    go_sel [arg] = exprIsCheap arg	-- I'm experimenting with making record selection
     go_sel other = False 	 	-- look cheap, so we will substitute it inside a
  					-- lambda.  Particularly for dictionary field selection.
   		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
