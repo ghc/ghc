@@ -3201,224 +3201,80 @@ for rank-2 types.
 
 
 <sect2 id="scoped-type-variables">
-<title>Scoped type variables
+<title>Lexically scoped type variables
 </title>
 
+<para>
+GHC supports <emphasis>lexically scoped type variables</emphasis>, without
+which some type signatures are simply impossible to write. For example:
+<programlisting>
+f :: forall a. [a] -> [a]
+f xs = ys ++ ys
+     where
+       ys :: [a]
+       ys = reverse xs
+</programlisting>
+The type signature for <literal>f</literal> brings the type variable <literal>a</literal> into scope; it scopes over
+the entire definition of <literal>f</literal>.
+In particular, it is in scope at the type signature for <varname>y</varname>. 
+In Haskell 98 it is not possible to declare
+a type for <varname>ys</varname>; a major benefit of scoped type variables is that
+it becomes possible to do so.
+</para>
+<para>Lexically-scoped type variables are enabled by
+<option>-fglasgow-exts</option>.
+</para>
+<para>Note: GHC 6.6 contains substantial changes to the way that scoped type
+variables work, compared to earlier releases.  Read this section
+carefully!</para>
+
+<sect3>
+<title>Overview</title>
+
+<para>The design follows the following principles
+<itemizedlist>
+<listitem><para>A scoped type variable stands for a type <emphasis>variable</emphasis>, and not for
+a <emphasis>type</emphasis>. (This is a change from GHC's earlier
+design.)</para></listitem>
+<listitem><para>Furthermore, distinct lexical type variables stand for distinct
+type variables.  This means that every programmer-written type signature
+(includin one that contains free scoped type variables) denotes a
+<emphasis>rigid</emphasis> type; that is, the type is fully known to the type
+checker, and no inference is involved.</para></listitem>
+<listitem><para>Lexical type variables may be alpha-renamed freely, without
+changing the program.</para></listitem>
+</itemizedlist>
+</para>
 <para>
 A <emphasis>lexically scoped type variable</emphasis> can be bound by:
 <itemizedlist>
 <listitem><para>A declaration type signature (<xref linkend="decl-type-sigs"/>)</para></listitem>
 <listitem><para>A pattern type signature (<xref linkend="pattern-type-sigs"/>)</para></listitem>
-<listitem><para>A result type signature (<xref linkend="result-type-sigs"/>)</para></listitem>
+<listitem><para>Class and instance declarations (<xref linkend="cls-inst-scoped-tyvars"/>)</para></listitem>
 </itemizedlist>
-For example:
+In addition, GHC supports result type signatures (<xref
+linkend="result-type-sigs"/>), although they never bind type variables.
+</para>
+<para>
+In Haskell, a programmer-written type signature is implicitly quantifed over
+its free type variables (<ulink
+url="http://haskell.org/onlinereport/decls.html#sect4.1.2">Section
+4.1.2</ulink> 
+of the Haskel Report).
+Lexically scoped type variables affect this implicit quantification rules
+as follows: any type variable that is in scope is <emphasis>not</emphasis> universally
+quantified. For example, if type variable <literal>a</literal> is in scope,
+then
 <programlisting>
-f (xs::[a]) = ys ++ ys
-           where
-              ys :: [a]
-              ys = reverse xs
+  (e :: a -> a)     means     (e :: a -> a)
+  (e :: b -> b)     means     (e :: forall b. b->b)
+  (e :: a -> b)     means     (e :: forall b. a->b)
 </programlisting>
-The pattern <literal>(xs::[a])</literal> includes a type signature for <varname>xs</varname>.
-This brings the type variable <literal>a</literal> into scope; it scopes over
-all the patterns and right hand sides for this equation for <function>f</function>.
-In particular, it is in scope at the type signature for <varname>y</varname>.
 </para>
 
-<para>
-At ordinary type signatures, such as that for <varname>ys</varname>, any type variables
-mentioned in the type signature <emphasis>that are not in scope</emphasis> are
-implicitly universally quantified.  (If there are no type variables in
-scope, all type variables mentioned in the signature are universally
-quantified, which is just as in Haskell 98.)  In this case, since <varname>a</varname>
-is in scope, it is not universally quantified, so the type of <varname>ys</varname> is
-the same as that of <varname>xs</varname>.  In Haskell 98 it is not possible to declare
-a type for <varname>ys</varname>; a major benefit of scoped type variables is that
-it becomes possible to do so.
-</para>
-
-<para>
-Scoped type variables are implemented in both GHC and Hugs.  Where the
-implementations differ from the specification below, those differences
-are noted.
-</para>
-
-<para>
-So much for the basic idea.  Here are the details.
-</para>
-
-<sect3>
-<title>What a scoped type variable means</title>
-<para>
-A lexically-scoped type variable is simply
-the name for a type.   The restriction it expresses is that all occurrences
-of the same name mean the same type.  For example:
-<programlisting>
-  f :: [Int] -> Int -> Int
-  f (xs::[a]) (y::a) = (head xs + y) :: a
-</programlisting>
-The pattern type signatures on the left hand side of
-<literal>f</literal> express the fact that <literal>xs</literal>
-must be a list of things of some type <literal>a</literal>; and that <literal>y</literal>
-must have this same type.  The type signature on the expression <literal>(head xs)</literal>
-specifies that this expression must have the same type <literal>a</literal>.
-<emphasis>There is no requirement that the type named by "<literal>a</literal>" is
-in fact a type variable</emphasis>.  Indeed, in this case, the type named by "<literal>a</literal>" is
-<literal>Int</literal>.  (This is a slight liberalisation from the original rather complex
-rules, which specified that a pattern-bound type variable should be universally quantified.)
-For example, all of these are legal:</para>
-
-<programlisting>
-  t (x::a) (y::a) = x+y*2
-
-  f (x::a) (y::b) = [x,y]       -- a unifies with b
-
-  g (x::a) = x + 1::Int         -- a unifies with Int
-
-  h x = let k (y::a) = [x,y]    -- a is free in the
-        in k x                  -- environment
-
-  k (x::a) True    = ...        -- a unifies with Int
-  k (x::Int) False = ...
-
-  w :: [b] -> [b]
-  w (x::a) = x                  -- a unifies with [b]
-</programlisting>
 
 </sect3>
 
-<sect3>
-<title>Scope and implicit quantification</title>
-
-<para>
-
-<itemizedlist>
-<listitem>
-
-<para>
-All the type variables mentioned in a pattern,
-that are not already in scope,
-are brought into scope by the pattern.  We describe this set as
-the <emphasis>type variables bound by the pattern</emphasis>.
-For example:
-<programlisting>
-  f (x::a) = let g (y::(a,b)) = fst y
-             in
-             g (x,True)
-</programlisting>
-The pattern <literal>(x::a)</literal> brings the type variable
-<literal>a</literal> into scope, as well as the term 
-variable <literal>x</literal>.  The pattern <literal>(y::(a,b))</literal>
-contains an occurrence of the already-in-scope type variable <literal>a</literal>,
-and brings into scope the type variable <literal>b</literal>.
-</para>
-</listitem>
-
-<listitem>
-<para>
-The type variable(s) bound by the pattern have the same scope
-as the term variable(s) bound by the pattern.  For example:
-<programlisting>
-  let
-    f (x::a) = &lt;...rhs of f...>
-    (p::b, q::b) = (1,2)
-  in &lt;...body of let...>
-</programlisting>
-Here, the type variable <literal>a</literal> scopes over the right hand side of <literal>f</literal>,
-just like <literal>x</literal> does; while the type variable <literal>b</literal> scopes over the
-body of the <literal>let</literal>, and all the other definitions in the <literal>let</literal>,
-just like <literal>p</literal> and <literal>q</literal> do.
-Indeed, the newly bound type variables also scope over any ordinary, separate
-type signatures in the <literal>let</literal> group.
-</para>
-</listitem>
-
-
-<listitem>
-<para>
-The type variables bound by the pattern may be 
-mentioned in ordinary type signatures or pattern 
-type signatures anywhere within their scope.
-
-</para>
-</listitem>
-
-<listitem>
-<para>
- In ordinary type signatures, any type variable mentioned in the
-signature that is in scope is <emphasis>not</emphasis> universally quantified.
-
-</para>
-</listitem>
-
-<listitem>
-
-<para>
- Ordinary type signatures do not bring any new type variables
-into scope (except in the type signature itself!). So this is illegal:
-
-<programlisting>
-  f :: a -> a
-  f x = x::a
-</programlisting>
-
-It's illegal because <varname>a</varname> is not in scope in the body of <function>f</function>,
-so the ordinary signature <literal>x::a</literal> is equivalent to <literal>x::forall a.a</literal>;
-and that is an incorrect typing.
-
-</para>
-</listitem>
-
-<listitem>
-<para>
-The pattern type signature is a monotype:
-</para>
-
-<itemizedlist>
-<listitem> <para> 
-A pattern type signature cannot contain any explicit <literal>forall</literal> quantification.
-</para> </listitem>
-
-<listitem>  <para> 
-The type variables bound by a pattern type signature can only be instantiated to monotypes,
-not to type schemes.
-</para> </listitem>
-
-<listitem>  <para> 
-There is no implicit universal quantification on pattern type signatures (in contrast to
-ordinary type signatures).
-</para> </listitem>
-
-</itemizedlist>
-
-</listitem>
-
-<listitem>
-<para>
-
-The type variables in the head of a <literal>class</literal> or <literal>instance</literal> declaration
-scope over the methods defined in the <literal>where</literal> part.  For example:
-
-
-<programlisting>
-  class C a where
-    op :: [a] -> a
-
-    op xs = let ys::[a]
-                ys = reverse xs
-            in
-            head ys
-</programlisting>
-
-
-(Not implemented in Hugs yet, Dec 98).
-</para>
-</listitem>
-
-</itemizedlist>
-
-</para>
-
-</sect3>
 
 <sect3 id="decl-type-sigs">
 <title>Declaration type signatures</title>
@@ -3447,179 +3303,122 @@ quantification rules.
 </sect3>
 
 <sect3 id="pattern-type-sigs">
-<title>Where a pattern type signature can occur</title>
-
+<title>Pattern type signatures</title>
 <para>
-A pattern type signature can occur in any pattern.  For example:
-<itemizedlist>
-
-<listitem>
-<para>
-A pattern type signature can be on an arbitrary sub-pattern, not
-just on a variable:
-
-
-<programlisting>
-  f ((x,y)::(a,b)) = (y,x) :: (b,a)
-</programlisting>
-
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- Pattern type signatures, including the result part, can be used
-in lambda abstractions:
-
-<programlisting>
-  (\ (x::a, y) :: a -> x)
-</programlisting>
-</para>
-</listitem>
-<listitem>
-
-<para>
- Pattern type signatures, including the result part, can be used
-in <literal>case</literal> expressions:
-
-<programlisting>
-  case e of { ((x::a, y) :: (a,b)) -> x }
-</programlisting>
-
-Note that the <literal>-&gt;</literal> symbol in a case alternative
-leads to difficulties when parsing a type signature in the pattern: in
-the absence of the extra parentheses in the example above, the parser
-would try to interpret the <literal>-&gt;</literal> as a function
-arrow and give a parse error later.
-
-</para>
-
-</listitem>
-
-<listitem>
-<para>
-To avoid ambiguity, the type after the &ldquo;<literal>::</literal>&rdquo; in a result
-pattern signature on a lambda or <literal>case</literal> must be atomic (i.e. a single
-token or a parenthesised type of some sort).  To see why,
-consider how one would parse this:
-
-
-<programlisting>
-  \ x :: a -> b -> x
-</programlisting>
-
-
-</para>
-</listitem>
-
-<listitem>
-
-<para>
- Pattern type signatures can bind existential type variables.
+A type signature may occur in any pattern; this is a <emphasis>pattern type
+signature</emphasis>.  
 For example:
-
-
+<programlisting>
+  -- f and g assume that 'a' is already in scope
+  f = \(x::Int, y) -> x
+  g (x::a) = x
+  h ((x,y) :: (Int,Bool)) = (y,x)
+</programlisting>
+In the case where all the type variables in the pattern type sigature are
+already in scope (i.e. bound by the enclosing context), matters are simple: the
+signature simply constrains the type of the pattern in the obvious way.
+</para>
+<para>
+There is only one situation in which you can write a pattern type signature that
+mentions a type variable that is not already in scope, namely in pattern match
+of an existential data constructor.  For example:
 <programlisting>
   data T = forall a. MkT [a]
 
-  f :: T -> T
-  f (MkT [t::a]) = MkT t3
+  k :: T -> T
+  k (MkT [t::a]) = MkT t3
                  where
                    t3::[a] = [t,t,t]
 </programlisting>
-
-
+Here, the pattern type signature <literal>(t::a)</literal> mentions a lexical type
+variable that is not already in scope.  Indeed, it cannot already be in scope,
+because it is bound by the pattern match.  GHC's rule is that in this situation
+(and only then), a pattern type signature can mention a type variable that is
+not already in scope; the effect is to bring it into scope, standing for the
+existentially-bound type variable.
 </para>
-</listitem>
-
-
-<listitem>
-
 <para>
-Pattern type signatures 
-can be used in pattern bindings:
-
-<programlisting>
-  f x = let (y, z::a) = x in ...
-  f1 x                = let (y, z::Int) = x in ...
-  f2 (x::(Int,a))     = let (y, z::a)   = x in ...
-  f3 :: (b->b)        = \x -> x
-</programlisting>
-
-In all such cases, the binding is not generalised over the pattern-bound
-type variables.  Thus <literal>f3</literal> is monomorphic; <literal>f3</literal>
-has type <literal>b -&gt; b</literal> for some type <literal>b</literal>, 
-and <emphasis>not</emphasis> <literal>forall b. b -&gt; b</literal>.
-In contrast, the binding
-<programlisting>
-  f4 :: b->b
-  f4 = \x -> x
-</programlisting>
-makes a polymorphic function, but <literal>b</literal> is not in scope anywhere
-in <literal>f4</literal>'s scope.
-
+If this seems a little odd, we think so too.  But we must have
+<emphasis>some</emphasis> way to bring such type variables into scope, else we
+could not name existentially-bound type variables in subequent type signatures.
 </para>
-</listitem>
-</itemizedlist>
+<para>
+This is (now) the <emphasis>only</emphasis> situation in which a pattern type 
+signature is allowed to mention a lexical variable that is not already in
+scope.
+For example, both <literal>f</literal> and <literal>g</literal> would be
+illegal if <literal>a</literal> was not already in scope.
 </para>
-<para>Pattern type signatures are completely orthogonal to ordinary, separate
-type signatures.  The two can be used independently or together.</para>
+
 
 </sect3>
-
 <sect3 id="result-type-sigs">
 <title>Result type signatures</title>
 
 <para>
-The result type of a function can be given a signature, thus:
-
-
-<programlisting>
-  f (x::a) :: [a] = [x,x,x]
-</programlisting>
-
-
-The final <literal>:: [a]</literal> after all the patterns gives a signature to the
-result type.  Sometimes this is the only way of naming the type variable
-you want:
-
+The result type of a function, lambda, or case expression alternative can be given a signature, thus:
 
 <programlisting>
-  f :: Int -> [a] -> [a]
-  f n :: ([a] -> [a]) = let g (x::a, y::a) = (y,x)
-                        in \xs -> map g (reverse xs `zip` xs)
-</programlisting>
+  -- f assumes that 'a' is already in scope
+  f x y :: [a] = [x,y,x]
 
+  g = \ x :: [Int] -> [3,4]
+
+  h :: forall a. [a] -> a
+  h xs = case xs of
+	    (y:ys) :: a -> y
+</programlisting>
+The final <literal>:: [a]</literal> after the patterns of <literal>f</literal> gives the type of 
+the result of the function.  Similarly, the body of the lambda in the RHS of
+<literal>g</literal> is <literal>[Int]</literal>, and the RHS of the case
+alternative in <literal>h</literal> is <literal>a</literal>.
 </para>
+<para> A result type signature never brings new type variables into scope.</para>
 <para>
-The type variables bound in a result type signature scope over the right hand side
-of the definition. However, consider this corner-case:
+There are a couple of syntactic wrinkles.  First, notice that all three
+examples would parse quite differently with parentheses:
 <programlisting>
-  rev1 :: [a] -> [a] = \xs -> reverse xs
+  -- f assumes that 'a' is already in scope
+  f x (y :: [a]) = [x,y,x]
 
-  foo ys = rev (ys::[a])
+  g = \ (x :: [Int]) -> [3,4]
+
+  h :: forall a. [a] -> a
+  h xs = case xs of
+	    ((y:ys) :: a) -> y
 </programlisting>
-The signature on <literal>rev1</literal> is considered a pattern type signature, not a result
-type signature, and the type variables it binds have the same scope as <literal>rev1</literal>
-itself (i.e. the right-hand side of <literal>rev1</literal> and the rest of the module too).
-In particular, the expression <literal>(ys::[a])</literal> is OK, because the type variable <literal>a</literal>
-is in scope (otherwise it would mean <literal>(ys::forall a.[a])</literal>, which would be rejected).  
-</para>
-<para>
-As mentioned above, <literal>rev1</literal> is made monomorphic by this scoping rule.
-For example, the following program would be rejected, because it claims that <literal>rev1</literal>
-is polymorphic:
+Now the signature is on the <emphasis>pattern</emphasis>; and
+<literal>h</literal> would certainly be ill-typed (since the pattern
+<literal>(y:ys)</literal> cannot have the type <literal>a</literal>.
+
+Second, to avoid ambiguity, the type after the &ldquo;<literal>::</literal>&rdquo; in a result
+pattern signature on a lambda or <literal>case</literal> must be atomic (i.e. a single
+token or a parenthesised type of some sort).  To see why,
+consider how one would parse this:
 <programlisting>
-  rev1 :: [b] -> [b]
-  rev1 :: [a] -> [a] = \xs -> reverse xs
+  \ x :: a -> b -> x
 </programlisting>
 </para>
+</sect3>
 
+<sect3 id="cls-inst-scoped-tyvars">
+<title>Class and instance declarations</title>
 <para>
-Result type signatures are not yet implemented in Hugs.
-</para>
 
+The type variables in the head of a <literal>class</literal> or <literal>instance</literal> declaration
+scope over the methods defined in the <literal>where</literal> part.  For example:
+
+
+<programlisting>
+  class C a where
+    op :: [a] -> a
+
+    op xs = let ys::[a]
+                ys = reverse xs
+            in
+            head ys
+</programlisting>
+</para>
 </sect3>
 
 </sect2>
