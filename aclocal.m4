@@ -235,8 +235,11 @@ else
 fi;
 changequote([, ])dnl
 ])
-FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.15],
-  [AC_MSG_ERROR([Happy version 1.15 or later is required to compile GHC.])])[]dnl
+if test ! -f compiler/parser/Parser.hs || test ! -f compiler/main/ParsePkgConf.hs || test ! -f compiler/cmm/CmmParse.hs || test ! -f compiler/parser/ParserCore.hs
+then
+    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.15],
+      [AC_MSG_ERROR([Happy version 1.15 or later is required to compile GHC.])])[]dnl
+fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
 ])
@@ -271,8 +274,11 @@ else
 fi;
 changequote([, ])dnl
 ])
-FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0],
-  [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])[]dnl
+if test ! -f compiler/cmm/CmmLex.hs || test ! -f compiler/parser/Lexer.hs
+then
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.0],
+      [AC_MSG_ERROR([Alex version 2.0 or later is required to compile GHC.])])[]dnl
+fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 ])
