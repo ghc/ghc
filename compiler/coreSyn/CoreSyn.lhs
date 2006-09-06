@@ -112,7 +112,8 @@ type Arg b = Expr b		-- Can be a Type
 
 type Alt b = (AltCon, [b], Expr b)	-- (DEFAULT, [], rhs) is the default alternative
 
-data AltCon = DataAlt DataCon
+data AltCon = DataAlt DataCon	-- Invariant: the DataCon is always from 
+				-- a *data* type, and never from a *newtype*
 	    | LitAlt  Literal
 	    | DEFAULT
 	 deriving (Eq, Ord)
