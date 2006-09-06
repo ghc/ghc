@@ -87,14 +87,14 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	--	data T = (,) Int Int
 	-- unless we are in GHC.Tup
     ASSERT2( isExternalName name,  ppr name )
-    do	checkErr (this_mod == nameModule name)
-	         (badOrigBinding rdr_name)
-	returnM name
+    do	{ checkM (this_mod == nameModule name)
+	         (addErrAt loc (badOrigBinding rdr_name))
+	; return name }
 
 
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = do	checkErr (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
-	         (badOrigBinding rdr_name)
+  = do	{ checkM (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
+	         (addErrAt loc (badOrigBinding rdr_name))
 	-- When reading External Core we get Orig names as binders, 
 	-- but they should agree with the module gotten from the monad
 	--
@@ -112,11 +112,15 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	-- the RdrName, not from the environment.  In principle, it'd be fine to 
 	-- have an arbitrary mixture of external core definitions in a single module,
 	-- (apart from module-initialisation issues, perhaps).
-	newGlobalBinder rdr_mod rdr_occ mb_parent 
-	    	        (srcSpanStart loc) --TODO, should pass the whole span
+	; newGlobalBinder rdr_mod rdr_occ mb_parent (srcSpanStart loc) }
+		--TODO, should pass the whole span
 
   | otherwise
-  = newGlobalBinder this_mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc)
+  = do	{ checkM (not (isQual rdr_name))
+	         (addErrAt loc (badQualBndrErr rdr_name))
+	 	-- Binders should not be qualified; if they are, and with a different
+		-- module name, we we get a confusing "M.T is not in scope" error later
+	; newGlobalBinder this_mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc) }
 \end{code}
 
 %*********************************************************
@@ -445,10 +449,9 @@ lookupFixityRn name
 ---------------
 lookupTyFixityRn :: Located Name -> RnM Fixity
 lookupTyFixityRn (L loc n)
-  = doptM Opt_GlasgowExts 			`thenM` \ glaExts ->
-    when (not glaExts) 
-    	 (setSrcSpan loc $ addWarn (infixTyConWarn n))	`thenM_`
-    lookupFixityRn n
+  = do	{ glaExts <- doptM Opt_GlasgowExts
+	; when (not glaExts) (addWarnAt loc (infixTyConWarn n))
+	; lookupFixityRn n }
 
 ---------------
 dataTcOccs :: RdrName -> [RdrName]
@@ -676,7 +679,7 @@ checkShadowing doc_str loc_rdr_names
       check_shadow (L loc rdr_name)
 	|  rdr_name `elemLocalRdrEnv` local_env 
  	|| not (null (lookupGRE_RdrName rdr_name global_env ))
-	= setSrcSpan loc $ addWarn (shadowedNameWarn doc_str rdr_name)
+	= addWarnAt loc (shadowedNameWarn doc_str rdr_name)
         | otherwise = returnM ()
     in
     mappM_ check_shadow loc_rdr_names
@@ -710,7 +713,7 @@ warnUnusedModules :: [(ModuleName,SrcSpan)] -> RnM ()
 warnUnusedModules mods
   = ifOptM Opt_WarnUnusedImports (mappM_ bleat mods)
   where
-    bleat (mod,loc) = setSrcSpan loc $ addWarn (mk_warn mod)
+    bleat (mod,loc) = addWarnAt loc (mk_warn mod)
     mk_warn m = vcat [ptext SLIT("Module") <+> quotes (ppr m)
 			<+> text "is imported, but nothing from it is used,",
 		      nest 2 (ptext SLIT("except perhaps instances visible in") 
@@ -765,10 +768,11 @@ warnUnusedName (name, prov)
 \end{code}
 
 \begin{code}
-addNameClashErrRn rdr_name (np1:nps)
+addNameClashErrRn rdr_name names
   = addErr (vcat [ptext SLIT("Ambiguous occurrence") <+> quotes (ppr rdr_name),
 		  ptext SLIT("It could refer to") <+> vcat (msg1 : msgs)])
   where
+    (np1:nps) = names
     msg1 = ptext  SLIT("either") <+> mk_ref np1
     msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
     mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
@@ -793,10 +797,9 @@ badOrigBinding name
 
 dupNamesErr :: SDoc -> [Located RdrName] -> RnM ()
 dupNamesErr descriptor located_names
-  = setSrcSpan big_loc $
-    addErr (vcat [ptext SLIT("Conflicting definitions for") <+> quotes (ppr name1),
-		  locations,
-		  descriptor])
+  = addErrAt big_loc $
+    vcat [ptext SLIT("Conflicting definitions for") <+> quotes (ppr name1),
+	  locations, descriptor]
   where
     L _ name1 = head located_names
     locs      = map getLoc located_names
@@ -805,6 +808,9 @@ dupNamesErr descriptor located_names
     locations | one_line  = empty 
 	      | otherwise = ptext SLIT("Bound at:") <+> 
 			    vcat (map ppr (sortLe (<=) locs))
+
+badQualBndrErr rdr_name
+  = ptext SLIT("Qualified name in binding position:") <+> ppr rdr_name
 
 infixTyConWarn op
   = vcat [ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op),

@@ -151,10 +151,9 @@ rnImportDecl' iface decl_spec (ImportDecl mod_name want_boot qual_only as_mod (J
          return $ ImportDecl mod_name want_boot qual_only as_mod (Just (want_hiding,rn_import_items))
     where
     srcSpanWrapper (L span ieRdr)
-        = setSrcSpan span $
-          case get_item ieRdr of
+        = case get_item ieRdr of
             Nothing
-                -> do addErr (badImportItemErr iface decl_spec ieRdr)
+                -> do addErrAt span (badImportItemErr iface decl_spec ieRdr)
                       return Nothing
             Just ieNames
                 -> return (Just [L span ie | ie <- ieNames])
@@ -753,8 +752,8 @@ reportDeprecations dflags tcg_env
     check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_)})
       | name `elemNameSet` used_names
       ,	Just deprec_txt <- lookupDeprec dflags hpt pit name
-      = setSrcSpan (importSpecLoc imp_spec) $
-	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
+      = addWarnAt (importSpecLoc imp_spec)
+		  (sep [ptext SLIT("Deprecated use of") <+> 
 			pprNonVarNameSpace (occNameSpace (nameOccName name)) <+> 
 		 	quotes (ppr name),
 		      (parens imp_msg) <> colon,

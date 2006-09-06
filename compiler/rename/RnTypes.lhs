@@ -752,12 +752,10 @@ checkTupSize tup_size
 
 forAllWarn doc ty (L loc tyvar)
   = ifOptM Opt_WarnUnusedMatches 	$
-    setSrcSpan loc $
-    addWarn (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
-		   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
+    addWarnAt loc (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
+		 	nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
 		   $$
-		   doc
-                )
+		   doc)
 
 bogusCharError c
   = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''
