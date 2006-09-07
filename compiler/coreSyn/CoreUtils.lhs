@@ -496,6 +496,9 @@ It returns True iff
 	soon, 
 	without raising an exception,
 	without causing a side effect (e.g. writing a mutable variable)
+
+NB: if exprIsHNF e, then exprOkForSpecuation e
+
 E.G.
 	let x = case y# +# 1# of { r# -> I# r# }
 	in E
@@ -621,7 +624,7 @@ exprIsHNF other	     = False
 
 -- There is at least one value argument
 app_is_value (Var fun) args
-  |  isDataConWorkId fun 			-- Constructor apps are values
+  |  isDataConWorkId fun 		-- Constructor apps are values
   || idArity fun > valArgCount args	-- Under-applied function
   = check_args (idType fun) args
 app_is_value (App f a) as = app_is_value f (a:as)
