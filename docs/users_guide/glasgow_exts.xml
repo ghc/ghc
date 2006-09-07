@@ -3198,7 +3198,27 @@ for rank-2 types.
 </sect2>
 
 
-
+<sect2 id="impredicative-polymorphism">
+<title>Impredicative polymorphism
+</title>
+<para>GHC supports <emphasis>impredicative polymorphism</emphasis>.  This means
+that you can call a polymorphic function at a polymorphic type, and
+parameterise data structures over polymorphic types.  For example:
+<programlisting>
+  f :: Maybe (forall a. [a] -> [a]) -> Maybe ([Int], [Char])
+  f (Just g) = Just (g [3], g "hello")
+  f Nothing  = Nothing
+</programlisting>
+Notice here that the <literal>Maybe</literal> type is parameterised by the
+<emphasis>polymorphic</emphasis> type <literal>(forall a. [a] ->
+[a])</literal>.
+</para>
+<para>The technical details of this extension are described in the paper
+<ulink url="http://research.microsoft.com/%7Esimonpj/papers/boxy">Boxy types:
+type inference for higher-rank types and impredicativity</ulink>,
+which appeared at ICFP 2006.  
+</para>
+</sect2>
 
 <sect2 id="scoped-type-variables">
 <title>Lexically scoped type variables
@@ -3753,7 +3773,13 @@ for these <literal>Terms</literal>:
 </programlisting>
 These and many other examples are given in papers by Hongwei Xi, and Tim Sheard.
 </para>
-<para> The extensions to GHC are these:
+<para>
+The rest of this section outlines the extensions to GHC that support GADTs. 
+It is far from comprehensive, but the design closely follows that described in
+the paper <ulink
+url="http://research.microsoft.com/%7Esimonpj/papers/gadt/index.htm">Simple
+unification-based type inference for GADTs</ulink>,
+which appeared in ICFP 2006.
 <itemizedlist>
 <listitem><para>
   Data type declarations have a 'where' form, as exemplified above.  The type signature of
@@ -3896,19 +3922,26 @@ the result type of the <literal>case</literal> expression.  Hence the addition <
 <sect1 id="template-haskell">
 <title>Template Haskell</title>
 
-<para>Template Haskell allows you to do compile-time meta-programming in Haskell.  There is a "home page" for
-Template Haskell at <ulink url="http://www.haskell.org/th/">
-http://www.haskell.org/th/</ulink>, while
-the background to
+<para>Template Haskell allows you to do compile-time meta-programming in
+Haskell.  
+The background to
 the main technical innovations is discussed in "<ulink
 url="http://research.microsoft.com/~simonpj/papers/meta-haskell">
 Template Meta-programming for Haskell</ulink>" (Proc Haskell Workshop 2002).
-The details of the Template Haskell design are still in flux.  Make sure you
-consult the <ulink url="http://www.haskell.org/ghc/docs/latest/html/libraries/index.html">online library reference material</ulink> 
+</para>
+<para>
+There is a Wiki page about
+Template Haskell at <ulink url="http://haskell.org/haskellwiki/Template_Haskell">
+http://www.haskell.org/th/</ulink>, and that is the best place to look for
+further details.
+You may also 
+consult the <ulink
+url="http://www.haskell.org/ghc/docs/latest/html/libraries/index.html">online
+Haskell library reference material</ulink> 
 (search for the type ExpQ).
 [Temporary: many changes to the original design are described in 
       <ulink url="http://research.microsoft.com/~simonpj/tmp/notes2.ps">"http://research.microsoft.com/~simonpj/tmp/notes2.ps"</ulink>.
-Not all of these changes are in GHC 6.2.]
+Not all of these changes are in GHC 6.6.]
 </para>
 
 <para> The first example from that paper is set out below as a worked example to help get you started. 
