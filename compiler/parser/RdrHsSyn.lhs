@@ -596,6 +596,10 @@ checkValDef :: LHsExpr RdrName
 	    -> Located (GRHSs RdrName)
 	    -> P (HsBind RdrName)
 
+checkValDef lhs (Just sig) grhss
+   	-- x :: ty = rhs  parses as a *pattern* binding
+  = checkPatBind (L (combineLocs lhs sig) (ExprWithTySig lhs sig)) grhss
+
 checkValDef lhs opt_sig grhss
   = do	{ mb_fun <- isFunLhs lhs
 	; case mb_fun of

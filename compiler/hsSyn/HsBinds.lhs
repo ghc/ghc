@@ -59,13 +59,14 @@ type LHsBind  id  = Located (HsBind id)
 data HsBind id
   = FunBind {	-- FunBind is used for both functions 	f x = e
 		-- and variables			f = \x -> e
--- Reason 1: the Match stuff lets us have an optional
---	   result type sig	f :: a->a = ...mentions a...
+-- Reason 1: Special case for type inference: see TcBinds.tcMonoBinds
 --
--- Reason 2: Special case for type inference: see TcBinds.tcMonoBinds
---
--- Reason 3: instance decls can only have FunBinds, which is convenient
+-- Reason 2: instance decls can only have FunBinds, which is convenient
 --	     If you change this, you'll need tochange e.g. rnMethodBinds
+
+-- But note that the form	f :: a->a = ...
+-- parses as a pattern binding, just like
+--			(f :: a -> a) = ... 
 
 	fun_id :: Located id,
 

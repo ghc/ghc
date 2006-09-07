@@ -23,10 +23,8 @@ import HsSyn		( HsExpr(..), LHsExpr, MatchGroup(..),
 			  ExprCoFn )
 
 import TcRnMonad
-import TcHsType		( tcPatSig, UserTypeCtxt(..) )
 import Inst		( newMethodFromName )
-import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendIdEnv, 
-			  tcExtendTyVarEnv2 )
+import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendIdEnv )
 import TcPat		( PatCtxt(..), tcPats, tcPat )
 import TcMType		( newFlexiTyVarTy, newFlexiTyVarTys ) 
 import TcType		( TcType, TcRhoType, 
@@ -165,15 +163,16 @@ tcMatch ctxt pat_tys rhs_ty match
       = addErrCtxt (matchCtxt (mc_what ctxt) match)	$	
         do { (pats', grhss') <- tcPats LamPat pats pat_tys rhs_ty $
     			        tc_grhss ctxt maybe_rhs_sig grhss
-	   ; returnM (Match pats' Nothing grhss') }
+	   ; return (Match pats' Nothing grhss') }
 
     tc_grhss ctxt Nothing grhss rhs_ty 
       = tcGRHSs ctxt grhss rhs_ty	-- No result signature
 
+	-- Result type sigs are no longer supported
     tc_grhss ctxt (Just res_sig) grhss rhs_ty 
-      = do { (inner_ty, sig_tvs) <- tcPatSig ResSigCtxt res_sig rhs_ty
-	   ; tcExtendTyVarEnv2 sig_tvs $
-    	     tcGRHSs ctxt grhss inner_ty }
+      = do { addErr (ptext SLIT("Ignoring (deprecated) result type signature")
+			<+> ppr res_sig)
+	   ; tcGRHSs ctxt grhss rhs_ty }
 
 -------------
 tcGRHSs :: TcMatchCtxt -> GRHSs Name -> BoxyRhoType -> TcM (GRHSs TcId)
@@ -500,6 +499,7 @@ checkArgs fun (MatchGroup (match1:matches) _)
 
     args_in_match :: LMatch Name -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
+checkArgs fun other = panic "TcPat.checkArgs"	-- Matches always non-empty
 \end{code}
 
 \begin{code}
