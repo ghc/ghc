@@ -223,7 +223,7 @@ else
     $PostScriptLines
     hit='NO'
     for out_file in @PgmStdoutFile ; do
-	if diff --strip-trailing-cr \$out_file $TmpPrefix/runtest$$.1 > /dev/null 2>&1 ; then
+	if sed "s/\\r\$//" $TmpPrefix/runtest$$.1 | cmp -s \$out_file - ; then
 	    hit='YES'
 	fi
     done
@@ -249,7 +249,7 @@ fi
 
 hit='NO'
 for out_file in @PgmStderrFile ; do
-    if diff --strip-trailing-cr \$out_file $TmpPrefix/runtest$$.2 > /dev/null 2>&1 ; then
+    if sed "s/\\r\$//" $TmpPrefix/runtest$$.2 | cmp -s \$out_file - ; then
 	hit='YES'
     fi
 done
