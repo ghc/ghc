@@ -133,7 +133,10 @@ test('tc130', normal, compile, [''])
 test('tc131', normal, compile, [''])
 test('tc132', normal, compile, [''])
 test('tc133', normal, compile, [''])
-test('tc134', only_compiler_types(['ghc']), compile_fail, [''])
+
+# tc134 tested result type signatures, which aren't supported any more
+# test('tc134', only_compiler_types(['ghc']), compile_fail, [''])
+
 test('tc135', only_compiler_types(['ghc']), compile, [''])
 test('tc136', normal, compile, [''])
 test('tc137', normal, compile, [''])
