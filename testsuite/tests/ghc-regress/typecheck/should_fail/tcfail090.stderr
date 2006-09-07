@@ -1,7 +1,7 @@
 
 tcfail090.hs:8:8:
-    Couldn't match kind `*' against `#'
-    When matching the kinds of `a :: *' and `ByteArray# :: #'
+    Couldn't match kind `*' against `!'
+    When matching the kinds of `a :: *' and `ByteArray# :: !'
       Expected type: ByteArray#
       Inferred type: a
     In the expression: undefined
