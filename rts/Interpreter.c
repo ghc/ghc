@@ -1249,7 +1249,8 @@ run_BCO:
 	    
 	    // Errors
 	default: 
-	    barf("interpretBCO: unknown or unimplemented opcode");
+	    barf("interpretBCO: unknown or unimplemented opcode %d",
+                 (int)BCO_NEXT);
 
 	} /* switch on opcode */
     }
