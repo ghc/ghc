@@ -7,4 +7,4 @@ gadt7.hs:12:40:
       Inferred type: T a
     In the first argument of `(\ t1 y1 -> case t1 of K -> y1)', namely
 	`t'
-    In the call ((\ t1 y1 -> case t1 of K -> y1) t y)
+    In the expression: (\ t1 y1 -> case t1 of K -> y1) t y
