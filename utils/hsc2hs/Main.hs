@@ -13,7 +13,7 @@
 #include "../../includes/ghcconfig.h"
 #endif
 
-#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114 || __HUGS__
+#if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
 import System.Console.GetOpt
 #else
 import GetOpt
@@ -26,7 +26,7 @@ import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit
 import List          (intersperse, isSuffixOf)
 import IO            (hPutStr, hPutStrLn, stderr)
 
-#if defined(mingw32_HOST_OS) && !__HUGS__
+#if defined(mingw32_HOST_OS)
 import Foreign
 #if __GLASGOW_HASKELL__ >= 504 || __NHC__ >= 114
 import Foreign.C.String
@@ -44,14 +44,14 @@ import System.IO                ( openFile, IOMode(..), hClose )
 #if defined(__GLASGOW_HASKELL__) && !defined(BUILD_NHC)
 import Compat.RawSystem 	( rawSystem )
 #define HAVE_rawSystem
-#elif __HUGS__ || __NHC__ >= 117
+#elif __NHC__ >= 117
 import System.Cmd	 	( rawSystem )
 #define HAVE_rawSystem
 #endif
 
 #if !defined(HAVE_runProcess) || !defined(HAVE_rawSystem)
 -- we need system
-#if __HUGS__ || __NHC__ >= 117 || __GLASGOW_HASKELL__ >= 600
+#if __NHC__ >= 117 || __GLASGOW_HASKELL__ >= 600
 import System.Cmd	 	( system )
 #else
 import System                   ( system )
@@ -132,11 +132,7 @@ main = do
     flags_w_tpl <- if any template_flag flags then
 			return flags
 		   else
-#ifdef __HUGS__
-			do mb_path <- getExecDir "/Main.hs"
-#else
 			do mb_path <- getExecDir "/bin/hsc2hs.exe"
-#endif
 			   add_opt <-
 			    case mb_path of
 			      Nothing   -> return id
@@ -548,17 +544,6 @@ output flags name toks = do
             fixChar c | isAlphaNum c = toUpper c
                       | otherwise    = '_'
 
-#ifdef __HUGS__
-    compiler <- case [c | Compiler c <- flags] of
-        []  -> return "gcc"
-        [c] -> return c
-        _   -> onlyOne "compiler"
-
-    linker <- case [l | Linker l <- flags] of
-        []  -> return compiler
-        [l] -> return l
-        _   -> onlyOne "linker"
-#else
         -- Try locating GHC..on Win32, look in the vicinity of hsc2hs.
 	-- Returns a native-format path
         locateGhc def = do
@@ -591,7 +576,6 @@ output flags name toks = do
         []  -> locateGhc compiler
         [l] -> return l
         _   -> onlyOne "linker"
-#endif
 
     writeFile cProgName $
         concatMap outFlagHeaderCProg flags++
@@ -909,9 +893,7 @@ getExecDir cmd =
           removeCmdSuffix = return . Just . initN (length cmd) . unDosifyPath
 
 getExecPath :: IO (Maybe String)
-#if defined(__HUGS__)
-getExecPath = liftM Just getProgName
-#elif defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 getExecPath =
      allocaArray len $ \buf -> do
          ret <- getModuleFileName nullPtr buf len
