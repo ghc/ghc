@@ -1,1 +1,1 @@
-[(Left [],File []),(Left ["home"],File ["home"])]
+fromList [(Left [],File []),(Left ["home"],File ["home"])]

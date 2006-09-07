@@ -7,7 +7,7 @@
 module Main where
 
 import Data.List
-import Data.FiniteMap
+import Data.Map
 
 class (Ord oid) => Object o oid | o -> oid where
 
@@ -32,11 +32,11 @@ data LinuxObject = File [String] deriving (Eq, Show)
 instance Object LinuxObject LinuxObjectId
 
 data LinuxSecurityModel =
-    LinuxSecurityModel { lsmObjectSet   :: FiniteMap LinuxObjectId LinuxObject }
+    LinuxSecurityModel { lsmObjectSet   :: Map LinuxObjectId LinuxObject }
 
 
--- Now defined in Data.FiniteMap, don't think this affects the bug:
--- instance (Show a, Show b) => Show (FiniteMap a b) where
+-- Now defined in Data.Map, don't think this affects the bug:
+-- instance (Show a, Show b) => Show (Map a b) where
 --     show fm = show (fmToList fm)
 
 instance Show LinuxSecurityModel where
@@ -47,8 +47,8 @@ instance SecurityModel LinuxSecurityModel LinuxObject LinuxObjectId
 data LinuxSecurityPolicy = LinuxSecurityPolicy
 instance SecurityPolicy LinuxSecurityPolicy LinuxSecurityModel LinuxObject LinuxObjectId
 
-model :: FiniteMap LinuxObjectId LinuxObject
-model =  listToFM [ (Left [], File []), (Left ["home"], File ["home"]) ]
+model :: Map LinuxObjectId LinuxObject
+model =  fromList [ (Left [], File []), (Left ["home"], File ["home"]) ]
 
 
 -- 	works
