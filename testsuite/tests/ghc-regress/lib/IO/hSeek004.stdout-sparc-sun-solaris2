@@ -1,5 +1,0 @@
-Left illegal operation
-Action: hSeek
-Handle: {loc=hSeek004.out,type=writable (append),binary=False,buffering=block (1024)}
-Reason: handle is not seekable
-File: hSeek004.out

@@ -1,16 +1,4 @@
-Left inappropriate type
-Action: openFile
-Reason: is a directory
-File: .
-Left invalid argument
-Action: openFile
-Reason: Invalid argument
-File: .
-Left invalid argument
-Action: openFile
-Reason: Invalid argument
-File: .
-Left invalid argument
-Action: openFile
-Reason: Invalid argument
-File: .
+Left .: openFile: inappropriate type (is a directory)
+Left .: openFile: invalid argument (Invalid argument)
+Left .: openFile: invalid argument (Invalid argument)
+Left .: openFile: invalid argument (Invalid argument)
