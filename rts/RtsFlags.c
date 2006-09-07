@@ -394,9 +394,12 @@ usage_text[] = {
 "  -N<n>     Use <n> PVMish processors in parallel (default: 2)",
 /* NB: the -N<n> is implemented by the driver!! */
 #endif
-"  -C<secs>  Context-switch interval in seconds",
-"                (0 or no argument means switch as often as possible)",
-"                the default is .02 sec; resolution is .02 sec",
+"  -C<secs>  Context-switch interval in seconds.",
+"            0 or no argument means switch as often as possible.",
+"            Default: 0.02 sec; resolution is set by -V below.",
+"  -V<secs>  Master tick interval in seconds.",
+"            This sets the resolution for -C and the profile timer -i.",
+"            Default: 0.02 sec.",
 "",
 "  -vs       Trace scheduler events (see also -Ds with -debug)",
 "  -vt       Time-stamp trace messages",
