@@ -387,10 +387,10 @@ $(HTML_DOC) : $(HS_PPS)
 CLEAN_FILES += $(PACKAGE).haddock
 
 %.raw-hs : %.lhs
-	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -optP-P $< -o $@
+	$(HC) $(HC_OPTS) -D__HADDOCK__ -E $< -o $@
 
 %.raw-hs : %.hs
-	$(HC) $(HC_OPTS) -D__HADDOCK__ -E -optP-P $< -o $@
+	$(HC) $(HC_OPTS) -D__HADDOCK__ -E $< -o $@
 
 HTML_INSTALL_DIR = $(datadir)/html/libraries/$(PACKAGE)
 #  NOT the same as HTML_DIR_INSTALLED when BIN_DIST is on
