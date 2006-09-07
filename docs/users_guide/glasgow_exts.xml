@@ -3236,7 +3236,7 @@ f xs = ys ++ ys
 </programlisting>
 The type signature for <literal>f</literal> brings the type variable <literal>a</literal> into scope; it scopes over
 the entire definition of <literal>f</literal>.
-In particular, it is in scope at the type signature for <varname>y</varname>. 
+In particular, it is in scope at the type signature for <varname>ys</varname>. 
 In Haskell 98 it is not possible to declare
 a type for <varname>ys</varname>; a major benefit of scoped type variables is that
 it becomes possible to do so.
