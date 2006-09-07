@@ -10,7 +10,7 @@
 module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"
-#include "NCG.h"
+#include "nativeGen/NCG.h"
 
 import MachInstrs
 import MachRegs

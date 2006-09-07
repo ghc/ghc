@@ -477,7 +477,7 @@ SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts -fno-generics -Rghc-timing \
-  -I. -IcodeGen -InativeGen -Iparser
+  -I. -Iparser
 
 # Omitted: 	-I$(GHC_INCLUDE_DIR)
 # We should have -I$(GHC_INCLUDE_DIR) in SRC_HC_OPTS, 
@@ -852,6 +852,49 @@ TAGS_HS_SRCS = parser/Parser.y.pp $(filter-out $(DERIVED_SRCS) main/Config.hs pa
 
 
 include $(TOP)/mk/target.mk
+
+# -----------------------------------------------------------------------------
+# Explicit dependencies
+
+# Some .hs files #include other source files, but since ghc -M doesn't spit out
+# these dependencies we have to include them manually.
+
+# We don't add dependencies on HsVersions.h, ghcautoconf.h, or ghc_boot_platform.h,
+# because then modifying one of these files would force recompilation of everything,
+# which is probably not what you want.  However, it does mean you have to be
+# careful to recompile stuff you need if you reconfigure or change HsVersions.h.
+
+$(odir)/codeGen/Bitmap.hs	:  ../includes/MachDeps.h
+$(odir)/codeGen/CgCallConv.hs	:  ../includes/StgFun.h
+$(odir)/codeGen/CgProf.hs	:  ../includes/MachDeps.h
+$(odir)/codeGen/CgProf.hs	:  ../includes/Constants.h
+$(odir)/codeGen/CgProf.hs	:  ../includes/DerivedConstants.h
+$(odir)/codeGen/CgTicky.hs	:  ../includes/DerivedConstants.h
+$(odir)/codeGen/ClosureInfo.lhs	:  ../includes/MachDeps.h
+$(odir)/codeGen/SMRep.lhs	:  ../includes/MachDeps.h
+$(odir)/codeGen/SMRep.lhs	:  ../includes/ClosureTypes.h
+$(odir)/ghci/ByteCodeAsm.lhs	:  ../includes/Bytecodes.h
+$(odir)/ghci/ByteCodeFFI.lhs	:  nativeGen/NCG.h
+$(odir)/ghci/ByteCodeInstr.lhs	:  ../includes/MachDeps.h
+$(odir)/ghci/ByteCodeItbls.lhs	:  ../includes/ClosureTypes.h
+$(odir)/ghci/ByteCodeItbls.lhs	:  nativeGen/NCG.h
+$(odir)/main/Constants.lhs	:  ../includes/MachRegs.h
+$(odir)/main/Constants.lhs	:  ../includes/Constants.h
+$(odir)/main/Constants.lhs	:  ../includes/MachDeps.h
+$(odir)/main/Constants.lhs	:  ../includes/DerivedConstants.h
+$(odir)/main/Constants.lhs	:  ../includes/GHCConstants.h
+$(odir)/nativeGen/AsmCodeGen.lhs :  nativeGen/NCG.h
+$(odir)/nativeGen/MachCodeGen.hs :  nativeGen/NCG.h
+$(odir)/nativeGen/MachCodeGen.hs : ../includes/MachDeps.h
+$(odir)/nativeGen/MachInstrs.hs	:  nativeGen/NCG.h
+$(odir)/nativeGen/MachRegs.lhs	:  nativeGen/NCG.h
+$(odir)/nativeGen/MachRegs.lhs	:  ../includes/MachRegs.h
+$(odir)/nativeGen/PositionIndependentCode.hs :  nativeGen/NCG.h
+$(odir)/nativeGen/PprMach.hs	:  nativeGen/NCG.h
+$(odir)/nativeGen/RegAllocInfo.hs :  nativeGen/NCG.h
+$(odir)/typecheck/TcForeign.lhs	:  nativeGen/NCG.h
+$(odir)/utils/Binary.hs		:  ../includes/MachDeps.h
+$(odir)/utils/FastMutInt.lhs	:  ../includes/MachDeps.h
 
 # -----------------------------------------------------------------------------
 # Dependencies
