@@ -21,4 +21,4 @@ main = do
   a   <- new (55 :: Int)
   env <- new (66 :: Int)
   fp  <- newForeignPtrEnv finptr env a
-  foldl' (+) 0 [1..500000] `seq` return ()
+  foldl' (+) 0 [1..1000000] `seq` return ()
