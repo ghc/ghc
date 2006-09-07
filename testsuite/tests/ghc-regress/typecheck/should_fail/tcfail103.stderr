@@ -1,10 +1,10 @@
 
-tcfail103.hs:15:0:
-    Inferred type is less polymorphic than expected
-      Quantified type variable `t' is mentioned in the environment:
-	Scoped type variable `s' = t (bound at: tcfail103.hs:15:7)
-    When trying to generalise the type inferred for `f'
-      Signature type:     forall t. ST t Int
-      Type to generalise: ST t Int
-    In the type signature for `f'
-    When generalising the type(s) for `f'
+tcfail103.hs:15:22:
+    Couldn't match expected type `s' (a rigid variable)
+	   against inferred type `t' (a rigid variable)
+      `s' is bound by the type signature for `g' at tcfail103.hs:13:16
+      `t' is bound by the type signature for `f' at tcfail103.hs:10:7
+      Expected type: STRef s Int
+      Inferred type: STRef t t1
+    In the first argument of `readSTRef', namely `v'
+    In the expression: readSTRef v
