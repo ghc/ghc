@@ -3252,8 +3252,6 @@ A <emphasis>lexically scoped type variable</emphasis> can be bound by:
 <listitem><para>A pattern type signature (<xref linkend="pattern-type-sigs"/>)</para></listitem>
 <listitem><para>Class and instance declarations (<xref linkend="cls-inst-scoped-tyvars"/>)</para></listitem>
 </itemizedlist>
-In addition, GHC supports result type signatures (<xref
-linkend="result-type-sigs"/>), although they never bind type variables.
 </para>
 <para>
 In Haskell, a programmer-written type signature is implicitly quantifed over
@@ -3352,6 +3350,9 @@ illegal if <literal>a</literal> was not already in scope.
 
 
 </sect3>
+
+<!-- ==================== Commented out part about result type signatures 
+
 <sect3 id="result-type-sigs">
 <title>Result type signatures</title>
 
@@ -3359,7 +3360,7 @@ illegal if <literal>a</literal> was not already in scope.
 The result type of a function, lambda, or case expression alternative can be given a signature, thus:
 
 <programlisting>
-  -- f assumes that 'a' is already in scope
+  {- f assumes that 'a' is already in scope -}
   f x y :: [a] = [x,y,x]
 
   g = \ x :: [Int] -> [3,4]
@@ -3378,7 +3379,7 @@ alternative in <literal>h</literal> is <literal>a</literal>.
 There are a couple of syntactic wrinkles.  First, notice that all three
 examples would parse quite differently with parentheses:
 <programlisting>
-  -- f assumes that 'a' is already in scope
+  {- f assumes that 'a' is already in scope -}
   f x (y :: [a]) = [x,y,x]
 
   g = \ (x :: [Int]) -> [3,4]
@@ -3400,6 +3401,8 @@ consider how one would parse this:
 </programlisting>
 </para>
 </sect3>
+
+ -->
 
 <sect3 id="cls-inst-scoped-tyvars">
 <title>Class and instance declarations</title>
