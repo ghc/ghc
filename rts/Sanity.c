@@ -307,8 +307,6 @@ checkClosure( StgClosure* p )
     case STABLE_NAME:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
     case CONSTR_NOCAF_STATIC:
     case THUNK_STATIC:

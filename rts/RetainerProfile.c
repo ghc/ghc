@@ -612,8 +612,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case AP_STACK:
     case TSO:
     case IND_STATIC:
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
     case CONSTR_NOCAF_STATIC:
 	// stack objects
     case UPDATE_FRAME:
@@ -974,8 +972,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case AP_STACK:
 	case TSO:
 	case IND_STATIC:
-	case CONSTR_INTLIKE:
-	case CONSTR_CHARLIKE:
 	case CONSTR_NOCAF_STATIC:
 	    // stack objects
 	case RET_DYN:
@@ -1139,10 +1135,8 @@ isRetainer( StgClosure *c )
 	//
 	// IND_STATIC cannot be *c, *cp, *r in the retainer profiling loop.
     case IND_STATIC:
-	// CONSTR_INTLIKE, CONSTR_CHARLIKE, and CONSTR_NOCAF_STATIC
+	// CONSTR_NOCAF_STATIC
 	// cannot be *c, *cp, *r in the retainer profiling loop.
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
     case CONSTR_NOCAF_STATIC:
 	// Stack objects are invalid because they are never treated as
 	// legal objects during retainer profiling.
@@ -1609,8 +1603,6 @@ inner_loop:
 #ifdef DEBUG_RETAINER
     switch (typeOfc) {
     case IND_STATIC:
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
     case CONSTR_NOCAF_STATIC:
     case CONSTR_STATIC:
     case THUNK_STATIC:
@@ -1648,8 +1640,6 @@ inner_loop:
 	// We just skip IND_STATIC, so its retainer set is never computed.
 	c = ((StgIndStatic *)c)->indirectee;
 	goto inner_loop;
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
 	// static objects with no pointers out, so goto loop.
     case CONSTR_NOCAF_STATIC:
 	// It is not just enough not to compute the retainer set for *c; it is
@@ -1880,8 +1870,6 @@ computeRetainerSet( void )
 		    case IND_STATIC:
 			// no cost involved
 			break;
-		    case CONSTR_INTLIKE:
-		    case CONSTR_CHARLIKE:
 		    case CONSTR_NOCAF_STATIC:
 		    case CONSTR_STATIC:
 		    case THUNK_STATIC:
@@ -2012,8 +2000,6 @@ retainerProfile(void)
   pcostArrayLinear(FUN_STATIC);
   pcostArrayLinear(CONSTR_STATIC);
   pcostArrayLinear(CONSTR_NOCAF_STATIC);
-  pcostArrayLinear(CONSTR_INTLIKE);
-  pcostArrayLinear(CONSTR_CHARLIKE);
 */
 #endif
 

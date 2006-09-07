@@ -133,8 +133,6 @@ printClosure( StgClosure *obj )
     case CONSTR:
     case CONSTR_1_0: case CONSTR_0_1:
     case CONSTR_1_1: case CONSTR_0_2: case CONSTR_2_0:
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
     case CONSTR_NOCAF_STATIC:
         {
@@ -657,8 +655,6 @@ static char *closure_type_names[] = {
     "CONSTR_2",
     "CONSTR_1",
     "CONSTR_0",
-    "CONSTR_INTLIKE",
-    "CONSTR_CHARLIKE",
     "CONSTR_STATIC",
     "CONSTR_NOCAF_STATIC",
     "FUN",

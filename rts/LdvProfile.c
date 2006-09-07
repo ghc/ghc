@@ -168,8 +168,6 @@ processHeapClosureForDead( StgClosure *c )
     case CONSTR_STATIC:
     case FUN_STATIC:
     case THUNK_STATIC:
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
     case CONSTR_NOCAF_STATIC:
 	// stack objects
     case UPDATE_FRAME:

@@ -261,8 +261,6 @@ eval_obj:
     case CONSTR_2_0:
     case CONSTR_1_1:
     case CONSTR_0_2:
-    case CONSTR_INTLIKE:
-    case CONSTR_CHARLIKE:
     case CONSTR_STATIC:
     case CONSTR_NOCAF_STATIC:
     case FUN:

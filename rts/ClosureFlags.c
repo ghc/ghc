@@ -33,8 +33,6 @@ StgWord16 closure_flags[] = {
 /* CONSTR_2_0	   	= */ (_HNF|     _NS                           	 ),
 /* CONSTR_1_1	   	= */ (_HNF|     _NS                           	 ),
 /* CONSTR_0_2	   	= */ (_HNF|     _NS                           	 ),
-/* CONSTR_INTLIKE 	= */ (_HNF|     _NS|_STA                      	 ),
-/* CONSTR_CHARLIKE  	= */ (_HNF|     _NS|_STA                      	 ),
 /* CONSTR_STATIC	= */ (_HNF|     _NS|_STA                      	 ),
 /* CONSTR_NOCAF_STATIC  = */ (_HNF|     _NS|_STA                      	 ),
 /* FUN		   	= */ (_HNF|     _NS|                  _SRT    	 ),
@@ -101,7 +99,6 @@ StgWord16 closure_flags[] = {
 /* CATCH_STM_FRAME      = */ (     _BTM                                  )
 };
 
-#if N_CLOSURE_TYPES != 73
+#if N_CLOSURE_TYPES != 71
 #error Closure types changed: update ClosureFlags.c!
 #endif
-

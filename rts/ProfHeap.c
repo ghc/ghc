@@ -114,8 +114,6 @@ static void dumpCensus( Census *census );
 static char *type_names[] = {
       "INVALID_OBJECT"
     , "CONSTR"
-    , "CONSTR_INTLIKE"
-    , "CONSTR_CHARLIKE"
     , "CONSTR_STATIC"
     , "CONSTR_NOCAF_STATIC"
 
@@ -905,8 +903,6 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case SE_CAF_BLACKHOLE:
 	    case SE_BLACKHOLE:
 	    case BLACKHOLE:
-	    case CONSTR_INTLIKE:
-	    case CONSTR_CHARLIKE:
 	    case FUN_1_0:
 	    case FUN_0_1:
 	    case FUN_1_1:

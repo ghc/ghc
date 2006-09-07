@@ -1898,8 +1898,6 @@ loop:
 	  }
 	  return q;
 	  
-      case CONSTR_INTLIKE:
-      case CONSTR_CHARLIKE:
       case CONSTR_NOCAF_STATIC:
 	  /* no need to put these on the static linked list, they don't need
 	   * to be scavenged.
