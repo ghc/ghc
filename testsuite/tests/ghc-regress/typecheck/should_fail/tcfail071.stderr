@@ -1,5 +1,5 @@
 
-tcfail071.hs:8:0:
+tcfail071.hs:9:0:
     Contexts differ in length
     When matching the contexts of the signatures for
       f :: forall d. (Ord d) => d -> d
@@ -7,10 +7,10 @@ tcfail071.hs:8:0:
     The signature contexts in a mutually recursive group should all be identical
     When generalising the type(s) for f, g
 
-tcfail071.hs:10:21:
-    Couldn't match the rigid variable `e' against `a -> b -> b'
-      `e' is bound by the type signature for `g'
-      Expected type: a -> b -> b
-      Inferred type: e
-    In the first argument of `f', namely `c'
+tcfail071.hs:10:19:
+    Couldn't match expected type `a -> b -> b'
+	   against inferred type `e' (a rigid variable)
+      `e' is bound by the type signature for `g' at tcfail071.hs:8:5
     In the first argument of `foldr', namely `(f c)'
+    In the expression: foldr (f c) [] []
+    In the definition of `p': p = foldr (f c) [] []
