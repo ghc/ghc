@@ -11,6 +11,14 @@ endif
 
 HS_PROG = timeout
 
+ifeq "$(findstring thr,$(GhcRTSWays))" "thr"
 boot :: $(HS_PROG)
+else
+boot :: python-timeout
+endif
+
+python-timeout:
+	cp timeout.py timeout
+	chmod +x timeout
 
 include $(TOP)/mk/target.mk
