@@ -29,7 +29,7 @@ module RdrName (
 	GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv, 
 	lookupGlobalRdrEnv, extendGlobalRdrEnv,
 	pprGlobalRdrEnv, globalRdrEnvElts,
-	lookupGRE_RdrName, lookupGRE_Name,
+	lookupGRE_RdrName, lookupGRE_Name, hideSomeUnquals,
 
 	-- GlobalRdrElt, Provenance, ImportSpec
 	GlobalRdrElt(..), isLocalGRE, unQualOK, 
@@ -45,7 +45,7 @@ import Module   ( ModuleName, mkModuleNameFS, Module, moduleName )
 import Name	( Name, NamedThing(getName), nameModule, nameParent_maybe,
 		  nameOccName, isExternalName, nameSrcLoc )
 import Maybes	( mapCatMaybes )
-import SrcLoc	( isGoodSrcLoc, isGoodSrcSpan, SrcSpan )
+import SrcLoc	( isGoodSrcLoc, isGoodSrcSpan, srcLocSpan, SrcSpan )
 import FastString ( FastString )
 import Outputable
 import Util	( thenCmp )
@@ -428,6 +428,35 @@ plusGRE :: GlobalRdrElt -> GlobalRdrElt -> GlobalRdrElt
 plusGRE g1 g2
   = GRE { gre_name = gre_name g1,
 	  gre_prov = gre_prov g1 `plusProv` gre_prov g2 }
+
+hideSomeUnquals :: GlobalRdrEnv -> [OccName] -> GlobalRdrEnv
+-- Hide any unqualified bindings for the specified OccNames
+-- This is used in TH, when renaming a declaration bracket
+--	[d| foo = ... |]
+-- We want unqualified 'foo' in "..." to mean this foo, not
+-- the one from the enclosing module.  But the *qualified* name
+-- from the enclosing moudule must certainly still be avaialable
+-- 	Seems like 5 times as much work as it deserves!
+hideSomeUnquals rdr_env occs
+  = foldr hide rdr_env occs
+  where
+    hide occ env 
+	| Just gres <- lookupOccEnv env occ = extendOccEnv env occ (map qual_gre gres)
+	| otherwise			    = env
+    qual_gre gre@(GRE { gre_name = name, gre_prov = LocalDef })
+	= GRE { gre_name = name, gre_prov = Imported [imp_spec] }
+	where	-- Local defs get transfomed to (fake) imported things
+	  mod = moduleName (nameModule name)
+	  imp_spec = ImpSpec { is_item = ImpAll, is_decl = decl_spec }
+	  decl_spec = ImpDeclSpec { is_mod = mod, is_as = mod, 
+				    is_qual = True, 
+				    is_dloc = srcLocSpan (nameSrcLoc name) }
+
+    qual_gre gre@(GRE { gre_prov = Imported specs })
+	= gre { gre_prov = Imported (map qual_spec specs) }
+
+    qual_spec spec@(ImpSpec { is_decl = decl_spec })
+  	= spec { is_decl = decl_spec { is_qual = True } }
 \end{code}
 
 
@@ -529,8 +558,10 @@ pprNameProvenance :: GlobalRdrElt -> SDoc
 -- Print out the place where the name was imported
 pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
-pprNameProvenance (GRE {gre_name = name, gre_prov = Imported (why:whys)})
-  = sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
+pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
+  = case whys of
+	(why:whys) -> sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
+	[] -> panic "pprNameProvenance"
 
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".

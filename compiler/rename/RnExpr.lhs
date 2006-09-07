@@ -43,7 +43,7 @@ import Name             ( isTyVarName )
 #endif
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
-import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv )
+import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
 import LoadIface	( loadInterfaceForName )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
@@ -573,25 +573,26 @@ rnBracket (DecBr group)
 	-- confuse the Names for the current module.  
 	-- By using a pretend module, thFAKE, we keep them safely out of the way.
 
-	; names    <- getLocalDeclBinders gbl_env1 group
-	; rdr_env' <- extendRdrEnvRn emptyGlobalRdrEnv names
-	-- Furthermore, the names in the bracket shouldn't conflict with
-	-- existing top-level names E.g.
+	; names <- getLocalDeclBinders gbl_env1 group
+
+	; let new_occs = map nameOccName names
+	      trimmed_rdr_env = hideSomeUnquals (tcg_rdr_env gbl_env) new_occs
+
+	; rdr_env' <- extendRdrEnvRn trimmed_rdr_env names
+	-- In this situation we want to *shadow* top-level bindings.
 	--	foo = 1
 	--	bar = [d| foo = 1|]
-	-- But both 'foo's get a LocalDef provenance, so we'd get a complaint unless
-	-- we start with an emptyGlobalRdrEnv
+	-- If we don't shadow, we'll get an ambiguity complaint when we do 
+	-- a lookupTopBndrRn (which uses lookupGreLocalRn) on the binder of the 'foo'
+	--
+	-- Furthermore, arguably if the splice does define foo, that should hide
+	-- any foo's further out
+	--
+	-- The shadowing is acheived by the call to hideSomeUnquals, which removes
+	-- the unqualified bindings of things defined by the bracket
 
-	; setGblEnv (gbl_env { tcg_rdr_env = tcg_rdr_env gbl_env1 `plusOccEnv` rdr_env',
+	; setGblEnv (gbl_env { tcg_rdr_env = rdr_env',
 			       tcg_dus = emptyDUs }) $ do
-		-- Notice plusOccEnv, not plusGlobalRdrEnv.  In this situation we want
-		-- to *shadow* top-level bindings.  (See the 'foo' example above.)
-		-- If we don't shadow, we'll get an ambiguity complaint when we do 
-		-- a lookupTopBndrRn (which uses lookupGreLocalRn) on the binder of the 'foo'
-		--
-		-- Furthermore, arguably if the splice does define foo, that should hide
-		-- any foo's further out
-		--
 		-- The emptyDUs is so that we just collect uses for this group alone
 
 	{ (tcg_env, group') <- rnSrcDecls group
