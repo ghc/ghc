@@ -6132,9 +6132,6 @@ that it is well typed.
 <sect1 id="generic-classes">
 <title>Generic classes</title>
 
-    <para>(Note: support for generic classes is currently broken in
-    GHC 5.02).</para>
-
 <para>
 The ideas behind this extension are described in detail in "Derivable type classes",
 Ralf Hinze and Simon Peyton Jones, Haskell Workshop, Montreal Sept 2000, pp94-105.
