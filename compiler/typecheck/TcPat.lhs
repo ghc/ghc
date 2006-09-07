@@ -33,7 +33,7 @@ import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType,
 			  emptyTvSubst, substTyVar, substTy, mkTopTvSubst, zipTopTvSubst, zipOpenTvSubst,
 			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy,
 			  mkFunTy, mkFunTys, exactTyVarsOfTypes,
-			  tidyOpenTypes )
+			  tidyOpenType, tidyOpenTypes )
 import VarSet		( elemVarSet, mkVarSet )
 import Kind		( liftedTypeKind, openTypeKind )
 import TcUnify		( boxySplitTyConApp, boxySplitListTy, 
@@ -129,7 +129,7 @@ tcCheckExistentialPat (LetPat _) pats ex_tvs pat_tys body_ty
   = failWithTc (existentialExplode pats)
 
 tcCheckExistentialPat ctxt pats ex_tvs pat_tys body_ty
-  = addErrCtxtM (sigPatCtxt (collectPatsBinders pats) ex_tvs pat_tys)	$
+  = addErrCtxtM (sigPatCtxt (collectPatsBinders pats) ex_tvs pat_tys body_ty)	$
     checkSigTyVarsWrt (tcTyVarsOfTypes (body_ty:pat_tys)) ex_tvs
 
 data PatState = PS {
@@ -410,6 +410,8 @@ tc_pat pstate pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
     
 	; res <- tcExtendIdEnv1 name bndr_id (thing_inside pstate)
 	; returnM (NPlusKPat (L nm_loc bndr_id) lit' ge' minus', [], res) }
+
+tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- DictPat, ConPatOut, SigPatOut, VarPatOut
 \end{code}
 
 
@@ -779,19 +781,18 @@ existentialExplode pats
 		text "In the binding group for"])
 	4 (vcat (map ppr pats))
 
-sigPatCtxt bound_ids bound_tvs tys tidy_env 
-  = 	-- tys is (body_ty : pat_tys)  
-    mapM zonkTcType tys		`thenM` \ tys' ->
-    let
-	(env1,  tidy_tys) = tidyOpenTypes tidy_env (map idType show_ids)
-	(_env2, tidy_body_ty : tidy_pat_tys) = tidyOpenTypes env1 tys'
-    in
-    returnM (env1,
+sigPatCtxt bound_ids bound_tvs pat_tys body_ty tidy_env 
+  = do	{ pat_tys' <- mapM zonkTcType pat_tys
+	; body_ty' <- zonkTcType body_ty
+	; let (env1,  tidy_tys)    = tidyOpenTypes tidy_env (map idType show_ids)
+	      (env2, tidy_pat_tys) = tidyOpenTypes env1 pat_tys'
+	      (env3, tidy_body_ty) = tidyOpenType  env2 body_ty'
+	; return (env3,
 		 sep [ptext SLIT("When checking an existential match that binds"),
 		      nest 4 (vcat (zipWith ppr_id show_ids tidy_tys)),
 		      ptext SLIT("The pattern(s) have type(s):") <+> vcat (map ppr tidy_pat_tys),
 		      ptext SLIT("The body has type:") <+> ppr tidy_body_ty
-		])
+		]) }
   where
     show_ids = filter is_interesting bound_ids
     is_interesting id = any (`elemVarSet` idFreeTyVars id) bound_tvs
