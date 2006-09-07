@@ -864,37 +864,41 @@ include $(TOP)/mk/target.mk
 # which is probably not what you want.  However, it does mean you have to be
 # careful to recompile stuff you need if you reconfigure or change HsVersions.h.
 
-$(odir)/codeGen/Bitmap.hs	:  ../includes/MachDeps.h
-$(odir)/codeGen/CgCallConv.hs	:  ../includes/StgFun.h
-$(odir)/codeGen/CgProf.hs	:  ../includes/MachDeps.h
-$(odir)/codeGen/CgProf.hs	:  ../includes/Constants.h
-$(odir)/codeGen/CgProf.hs	:  ../includes/DerivedConstants.h
-$(odir)/codeGen/CgTicky.hs	:  ../includes/DerivedConstants.h
-$(odir)/codeGen/ClosureInfo.lhs	:  ../includes/MachDeps.h
-$(odir)/codeGen/SMRep.lhs	:  ../includes/MachDeps.h
-$(odir)/codeGen/SMRep.lhs	:  ../includes/ClosureTypes.h
-$(odir)/ghci/ByteCodeAsm.lhs	:  ../includes/Bytecodes.h
-$(odir)/ghci/ByteCodeFFI.lhs	:  nativeGen/NCG.h
-$(odir)/ghci/ByteCodeInstr.lhs	:  ../includes/MachDeps.h
-$(odir)/ghci/ByteCodeItbls.lhs	:  ../includes/ClosureTypes.h
-$(odir)/ghci/ByteCodeItbls.lhs	:  nativeGen/NCG.h
-$(odir)/main/Constants.lhs	:  ../includes/MachRegs.h
-$(odir)/main/Constants.lhs	:  ../includes/Constants.h
-$(odir)/main/Constants.lhs	:  ../includes/MachDeps.h
-$(odir)/main/Constants.lhs	:  ../includes/DerivedConstants.h
-$(odir)/main/Constants.lhs	:  ../includes/GHCConstants.h
-$(odir)/nativeGen/AsmCodeGen.lhs :  nativeGen/NCG.h
-$(odir)/nativeGen/MachCodeGen.hs :  nativeGen/NCG.h
-$(odir)/nativeGen/MachCodeGen.hs : ../includes/MachDeps.h
-$(odir)/nativeGen/MachInstrs.hs	:  nativeGen/NCG.h
-$(odir)/nativeGen/MachRegs.lhs	:  nativeGen/NCG.h
-$(odir)/nativeGen/MachRegs.lhs	:  ../includes/MachRegs.h
-$(odir)/nativeGen/PositionIndependentCode.hs :  nativeGen/NCG.h
-$(odir)/nativeGen/PprMach.hs	:  nativeGen/NCG.h
-$(odir)/nativeGen/RegAllocInfo.hs :  nativeGen/NCG.h
-$(odir)/typecheck/TcForeign.lhs	:  nativeGen/NCG.h
-$(odir)/utils/Binary.hs		:  ../includes/MachDeps.h
-$(odir)/utils/FastMutInt.lhs	:  ../includes/MachDeps.h
+# Aargh, these don't work properly anyway, because GHC's recompilation checker
+# just reports "compilation NOT required".  Do we have to add -no-recomp for each
+# of these .hs files?  I haven't done anything about this yet.
+
+$(odir)/codeGen/Bitmap.$(way_)o		:  ../includes/MachDeps.h
+$(odir)/codeGen/CgCallConv.$(way_)o	:  ../includes/StgFun.h
+$(odir)/codeGen/CgProf.$(way_)o		:  ../includes/MachDeps.h
+$(odir)/codeGen/CgProf.$(way_)o		:  ../includes/Constants.h
+$(odir)/codeGen/CgProf.$(way_)o		:  ../includes/DerivedConstants.h
+$(odir)/codeGen/CgTicky.$(way_)o	:  ../includes/DerivedConstants.h
+$(odir)/codeGen/ClosureInfo.$(way_)o	:  ../includes/MachDeps.h
+$(odir)/codeGen/SMRep.$(way_)o		:  ../includes/MachDeps.h
+$(odir)/codeGen/SMRep.$(way_)o		:  ../includes/ClosureTypes.h
+$(odir)/ghci/ByteCodeAsm.$(way_)o	:  ../includes/Bytecodes.h
+$(odir)/ghci/ByteCodeFFI.$(way_)o	:  nativeGen/NCG.h
+$(odir)/ghci/ByteCodeInstr.$(way_)o	:  ../includes/MachDeps.h
+$(odir)/ghci/ByteCodeItbls.$(way_)o	:  ../includes/ClosureTypes.h
+$(odir)/ghci/ByteCodeItbls.$(way_)o	:  nativeGen/NCG.h
+$(odir)/main/Constants.$(way_)o		:  ../includes/MachRegs.h
+$(odir)/main/Constants.$(way_)o		:  ../includes/Constants.h
+$(odir)/main/Constants.$(way_)o		:  ../includes/MachDeps.h
+$(odir)/main/Constants.$(way_)o		:  ../includes/DerivedConstants.h
+$(odir)/main/Constants.$(way_)o		:  ../includes/GHCConstants.h
+$(odir)/nativeGen/AsmCodeGen.$(way_)o 	:  nativeGen/NCG.h
+$(odir)/nativeGen/MachCodeGen.$(way_)o 	:  nativeGen/NCG.h
+$(odir)/nativeGen/MachCodeGen.$(way_)o 	: ../includes/MachDeps.h
+$(odir)/nativeGen/MachInstrs.$(way_)o	:  nativeGen/NCG.h
+$(odir)/nativeGen/MachRegs.$(way_)o	:  nativeGen/NCG.h
+$(odir)/nativeGen/MachRegs.$(way_)o	:  ../includes/MachRegs.h
+$(odir)/nativeGen/PositionIndependentCode.$(way_)o :  nativeGen/NCG.h
+$(odir)/nativeGen/PprMach.$(way_)o	:  nativeGen/NCG.h
+$(odir)/nativeGen/RegAllocInfo.$(way_)o :  nativeGen/NCG.h
+$(odir)/typecheck/TcForeign.$(way_)o	:  nativeGen/NCG.h
+$(odir)/utils/Binary.$(way_)o		:  ../includes/MachDeps.h
+$(odir)/utils/FastMutInt.$(way_)o	:  ../includes/MachDeps.h
 
 # -----------------------------------------------------------------------------
 # Dependencies
