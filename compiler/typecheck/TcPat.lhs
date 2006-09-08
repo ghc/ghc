@@ -26,17 +26,16 @@ import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
 			  tcLookupClass, tcLookupDataCon, tcLookupId, refineEnvironment,
 			  tcMetaTy )
 import TcMType 		( newFlexiTyVarTy, arityErr, tcInstSkolTyVars, newBoxyTyVar, zonkTcType )
-import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, 
+import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, BoxyType,
 			  SkolemInfo(PatSkol), 
-			  BoxySigmaType, BoxyRhoType, 
+			  BoxySigmaType, BoxyRhoType, argTypeKind, typeKind,
 			  pprSkolTvBinding, isRefineableTy, isRigidTy, tcTyVarsOfTypes, mkTyVarTy, lookupTyVar, 
 			  emptyTvSubst, substTyVar, substTy, mkTopTvSubst, zipTopTvSubst, zipOpenTvSubst,
-			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy,
-			  mkFunTy, mkFunTys, exactTyVarsOfTypes,
-			  tidyOpenType, tidyOpenTypes )
+			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy, isArgTypeKind, isUnboxedTupleType,
+			  mkFunTy, mkFunTys, exactTyVarsOfTypes, tidyOpenType, tidyOpenTypes )
 import VarSet		( elemVarSet, mkVarSet )
 import Kind		( liftedTypeKind, openTypeKind )
-import TcUnify		( boxySplitTyConApp, boxySplitListTy, 
+import TcUnify		( boxySplitTyConApp, boxySplitListTy, unifyType,
 			  unBox, stripBoxyType, zapToMonotype,
 		  	  boxyMatchTypes, boxyUnify, boxyUnifyList, checkSigTyVarsWrt )
 import TcHsType		( UserTypeCtxt(..), tcPatSig )
@@ -157,7 +156,7 @@ patSigCtxt other			= LamPatSigCtxt
 \begin{code}
 tcPatBndr :: PatState -> Name -> BoxySigmaType -> TcM TcId
 tcPatBndr (PS { pat_ctxt = LamPat }) bndr_name pat_ty
-  = do	{ pat_ty' <- unBox pat_ty
+  = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
 		-- We have an undecorated binder, so we do rule ABS1,
 		-- by unboxing the boxy type, forcing any un-filled-in
 		-- boxes to become monotypes
@@ -175,7 +174,7 @@ tcPatBndr (PS { pat_ctxt = LetPat lookup_sig }) bndr_name pat_ty
 	; return (mkLocalId mono_name mono_ty) }
 
   | otherwise
-  = do	{ pat_ty' <- unBox pat_ty
+  = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
 	; mono_name <- newLocalName bndr_name
 	; return (mkLocalId mono_name pat_ty') }
 
@@ -189,6 +188,31 @@ bindInstsOfPatId id thing_inside
   = do	{ (res, lie) <- getLIE thing_inside
 	; binds <- bindInstsOfLocalFuns lie [id]
 	; return (res, binds) }
+
+-------------------
+unBoxPatBndrType  ty name = unBoxArgType ty (ptext SLIT("The variable") <+> quotes (ppr name))
+unBoxWildCardType ty      = unBoxArgType ty (ptext SLIT("A wild-card pattern"))
+
+unBoxArgType :: BoxyType -> SDoc -> TcM TcType
+-- In addition to calling unbox, unBoxArgType ensures that the type is of ArgTypeKind; 
+-- that is, it can't be an unboxed tuple.  For example, 
+--	case (f x) of r -> ...
+-- should fail if 'f' returns an unboxed tuple.
+unBoxArgType ty pp_this
+  = do	{ ty' <- unBox ty	-- Returns a zonked type
+
+	-- Neither conditional is strictly necesssary (the unify alone will do)
+	-- but they improve error messages, and allocate fewer tyvars
+	; if isUnboxedTupleType ty' then
+		failWithTc msg
+	  else if isArgTypeKind (typeKind ty') then
+		return ty'
+	  else do 	-- OpenTypeKind, so constrain it
+	{ ty2 <- newFlexiTyVarTy argTypeKind
+	; unifyType ty' ty2
+	; return ty' }}
+  where
+    msg = pp_this <+> ptext SLIT("cannot be bound to an unboxed tuple")
 \end{code}
 
 
@@ -304,7 +328,7 @@ tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
 	; return (LazyPat pat', [], res) }
 
 tc_pat pstate (WildPat _) pat_ty thing_inside
-  = do	{ pat_ty' <- unBox pat_ty	-- Make sure it's filled in with monotypes
+  = do	{ pat_ty' <- unBoxWildCardType pat_ty	-- Make sure it's filled in with monotypes
 	; res <- thing_inside pstate
 	; return (WildPat pat_ty', [], res) }
 

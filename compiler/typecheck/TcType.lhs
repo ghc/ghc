@@ -88,7 +88,7 @@ module TcType (
   --------------------------------
   -- Rexported from Type
   Kind, 	-- Stuff to do with kinds is insensitive to pre/post Tc
-  unliftedTypeKind, liftedTypeKind, unboxedTypeKind,
+  unliftedTypeKind, liftedTypeKind, unboxedTypeKind, argTypeKind,
   openTypeKind, mkArrowKind, mkArrowKinds, 
   isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, 
   isArgTypeKind, isSubKind, defaultKind, 
@@ -132,7 +132,7 @@ import TypeRep		( Type(..), funTyCon )  -- friend
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 			  tyVarsOfTheta, Kind, PredType(..),
-			  ThetaType, unliftedTypeKind, unboxedTypeKind,
+			  ThetaType, unliftedTypeKind, unboxedTypeKind, argTypeKind,
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 		  	  isLiftedTypeKind, isUnliftedTypeKind, 
 			  mkArrowKinds, mkForAllTy, mkForAllTys,
