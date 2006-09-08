@@ -43,12 +43,11 @@ data Mod s a = Mod {value::a} deriving (Eq, Show)
 data Modulus a = forall s. TypeVal a s => Modulus (a -> Mod s a) (Mod s a -> a)
 
 mkModulus :: (ValToType a, Integral a) => a -> Modulus a
-mkModulus x = case valToType x of {Wrapper y ->
-	      case y of {(_ :: t) ->
-	      Modulus normalize (value :: Mod t a -> a)}}
+mkModulus x = case valToType x of {Wrapper (y :: t) ->
+	      Modulus normalize (value :: Mod t a -> a)}
 
-normalize :: (TypeVal a s, Integral a) => a -> Mod s a
-normalize x :: (Mod s a) = (Mod (x `mod` typeToVal (undefined::s)))
+normalize :: forall a s. (TypeVal a s, Integral a) => a -> Mod s a
+normalize x = (Mod (x `mod` typeToVal (undefined::s)))
 
 inModulus :: Modulus a -> (forall s . TypeVal a s =>  Mod s a -> Mod s a)
 	        -> a -> a
