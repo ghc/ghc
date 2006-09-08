@@ -1,28 +1,13 @@
 {-# OPTIONS -fglasgow-exts #-}
 
--- This program should fail type checking because 'r' is an unboxed tuple.
--- In 5.05.1 we instead got:
---   ghc-5.04.1: panic! (the `impossible' happened, GHC version 5.04.1):
---	  codeGen/CgRetConv.lhs:83: Non-exhaustive patterns in function
---	  dataReturnConvPrim
---
--- In 6.0, it compiles and crashes at runtime because it enters R1
---
--- Should fail in typechecking
+-- Unboxed tuples; c.f. tcfail120, tc209
 
 module ShouldFail where
 
 type T a = Int -> (# Int, Int #)
 
+g t =  case t of r -> (r :: (# Int, Int #)) 
+
 f :: T a -> T a
 f t = \x -> case t x of r -> r
 
-f2 :: T a -> T a
-f2 t = \x -> case t x of _ -> (# 3,4 #)
-  -- OK, because nothing is bound to the unboxed tuple
-
-g t =  case t of r -> (r :: (# Int, Int #))
-  -- Bad
-
--- Should be ok
-h t = \x -> case t x of (# r, s #) -> r

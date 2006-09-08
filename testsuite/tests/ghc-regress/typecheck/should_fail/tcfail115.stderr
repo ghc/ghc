@@ -1,21 +1,13 @@
 
-tcfail115.hs:18:24:
+tcfail115.hs:9:23:
     Couldn't match kind `??' against `(#)'
     When matching the kinds of `t :: ??' and `(# Int, Int #) :: (#)'
-      Expected type: t
-      Inferred type: (# Int, Int #)
-    In a case alternative: r -> r
-
-tcfail115.hs:21:25:
-    Couldn't match kind `??' against `(#)'
-    When matching the kinds of `t :: ??' and `(# Int, Int #) :: (#)'
-      Expected type: t
-      Inferred type: (# Int, Int #)
-    When checking the pattern: _
-
-tcfail115.hs:24:23:
-    Couldn't match kind `(#)' against `??'
-    When matching the kinds of `(# Int, Int #) :: (#)' and `t :: ??'
       Expected type: (# Int, Int #)
       Inferred type: t
-    In the expression: r :: (# Int, Int #)
+    In the expression: r
+
+tcfail115.hs:12:24:
+    The variable `r' cannot be bound to an unboxed tuple
+    In a case alternative: r -> r
+    In the expression: case t x of r -> r
+    In a lambda abstraction: \ x -> case t x of r -> r
