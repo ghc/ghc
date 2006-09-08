@@ -324,25 +324,27 @@ depthOfConstr p (t::TypeVal a) c
 ------------------------------------------------------------------------------
 
 shallowTerm :: (forall a. Data a => Maybe a) -> (forall b. Data b => b)
-shallowTerm cust :: b
-  =
-    maybe gdefault id cust
+shallowTerm cust
+  = result
+  where
+    result :: forall b. Data b => b
+	-- Need a type signature here to bring 'b' into scope
+    result = maybe gdefault id cust
+	 where
 
- where
+	  -- The worker, also used for type disambiguation
+	  gdefault :: b
+	  gdefault = case con of
+	              Just (con, Just _) -> fromConstrB (shallowTerm cust) con
+	              _ -> error "no shallow term!"
 
-  -- The worker, also used for type disambiguation
-  gdefault :: b
-  gdefault = case con of
-              Just (con, Just _) -> fromConstrB (shallowTerm cust) con
-              _ -> error "no shallow term!"
+	  -- The type to be constructed
+	  typeVal :: TypeVal b
+	  typeVal = val2type gdefault
 
-  -- The type to be constructed
-  typeVal :: TypeVal b
-  typeVal = val2type gdefault
-
-  -- The most shallow constructor if any 
-  con :: Maybe (Constr, Maybe Int)
-  con = depthOfType (const True) typeVal
+          -- The most shallow constructor if any 
+          con :: Maybe (Constr, Maybe Int)
+          con = depthOfType (const True) typeVal
 
 
 
