@@ -28,7 +28,7 @@
           GHC now handles impredicative polymorphism and there are
           changes to the way scoped type variables work; see
           <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
-          for more details.
+          for more details of the change, or <xref linkend="impredicative-polymorphism" /> for the documentation.
         </para>
       </listitem>
       <listitem>
@@ -41,6 +41,7 @@
           <programlisting>
     f (x, y) | x `seq` False = undefined
              | otherwise = [x,y]</programlisting>
+          See <xref linkend="sec-bang-patterns" /> for more details.
         </para>
       </listitem>
       <listitem>
@@ -96,6 +97,8 @@
           performance when a lot of memory is taken up by
           <literal>STArray</literal>s, <literal>IOArray</literal>s,
           <literal>STRef</literal>s or <literal>IORef</literal>s.
+          For more details see
+          <ulink url="http://hackage.haskell.org/trac/ghc/ticket/650">trac bug #650</ulink>.
         </para>
       </listitem>
       <listitem>
@@ -296,7 +299,8 @@
         <para>
           It is now possible, with the <literal>-I</literal> RTS flag,
           to control the amount of idle time that happens before a major
-          GC is performed.
+          GC is performed. There is more detail in
+          <xref linkend="rts-options-gc" />.
         </para>
       </listitem>
       <listitem>
@@ -307,8 +311,10 @@
       </listitem>
       <listitem>
         <para>
-          The <option>-split-objs</option> flag can now be used with
-          <option>--make</option>, and hence can be used by cabal.
+          The <option>-split-objs</option> flag, which makes libraries
+          smaller, can now be used with <option>--make</option> and hence
+          can be used by cabal.
+          See <xref linkend="options-linker" /> for more information.
         </para>
       </listitem>
       <listitem>
@@ -317,6 +323,12 @@
 	  patterns, but since that design is in flux for Haskell (let alone
 	  Template Haskell), we've removed type signatures in patterns from
 	  Template Haskell.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          Parallel arrays, as enabled by <literal>-fparr</literal>, no
+          longer work.
         </para>
       </listitem>
     </itemizedlist>
