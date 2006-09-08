@@ -6030,7 +6030,7 @@ r)
                    GHCziBase.ZMZN GHCziBase.Char -> GHCziBase.ZMZN GHCziBase.Cha
 r) ->
               tpl2})
-        (%note "foo"
+        (%note "bar"
          eta);
 </programlisting>
 
