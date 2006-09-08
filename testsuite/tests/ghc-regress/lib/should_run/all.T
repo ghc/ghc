@@ -25,9 +25,11 @@ test('list003', skip_if_fast, compile_and_run, [''])
 
 test('memo001', compose(skip_if_fast,extra_run_opts('+RTS -A10k -RTS')), \
 	multimod_compile_and_run, ['memo001',''])
+clean(['Memo.hi', 'Memo.o'])
 
 test('memo002', compose(skip_if_fast,extra_run_opts('20')), \
 	multimod_compile_and_run, ['memo002',''])
+clean(['Memo.hi', 'Memo.o'])
 
 test('packedstring001', normal, compile_and_run, [''])
 

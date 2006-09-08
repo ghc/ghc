@@ -1,3 +1,5 @@
 test('process001', normal, compile_and_run, [''])
+clean(['output'])
 test('process002', normal, compile_and_run, [''])
+clean(['output'])
 test('process003', omit_ways(['ghci']), compile_and_run, [''])
