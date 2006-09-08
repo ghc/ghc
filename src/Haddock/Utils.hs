@@ -46,14 +46,10 @@ import Module
 import PackageConfig ( stringToPackageId )
 
 import Control.Monad ( liftM, MonadPlus(..) )
-import Data.Map ( Map )
-import qualified Data.Map as Map hiding ( Map )
-import Data.Char
+import Data.Char ( isAlpha, isSpace, toUpper, ord )
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( intersect, isSuffixOf, intersperse )
-import Data.Maybe ( maybeToList, fromMaybe, isJust, fromJust )
-import Data.Word ( Word8 )
-import Data.Bits ( testBit )
+import Data.Maybe ( maybeToList, fromMaybe )
 import Network.URI
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
@@ -233,11 +229,36 @@ mapMaybeM _ Nothing = return Nothing
 mapMaybeM f (Just a) = f a >>= return . Just
 
 escapeStr :: String -> String
-#if __GLASGOW_HASKELL__ < 603
-escapeStr = flip escapeString unreserved
-#else
 escapeStr = escapeURIString isUnreserved
-#endif
+
+-- Following few functions are copy'n'pasted from Network.URI module
+-- to avoid depending on the network lib, since doing so gives a
+-- circular build dependency between haddock and network
+-- (at least if you want to build network with haddock docs)
+
+escapeURIChar :: (Char -> Bool) -> Char -> String
+escapeURIChar p c
+    | p c       = [c]
+    | otherwise = '%' : myShowHex (ord c) ""
+    where
+        myShowHex :: Int -> ShowS
+        myShowHex n r =  case showIntAtBase 16 (toChrHex) n r of
+            []  -> "00"
+            [c] -> ['0',c]
+            cs  -> cs
+        toChrHex d
+            | d < 10    = chr (ord '0' + fromIntegral d)
+            | otherwise = chr (ord 'A' + fromIntegral (d - 10))
+
+escapeURIString :: (Char -> Bool) -> String -> String
+escapeURIString p s = concatMap (escapeURIChar p) s
+
+isUnreserved :: Char -> Bool
+isUnreserved c = isAlphaNumChar c || (c `elem` "-_.~")
+
+isAlphaChar c    = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+isDigitChar c    = (c >= '0' && c <= '9')
+isAlphaNumChar c = isAlphaChar c || isDigitChar c
 
 
 -----------------------------------------------------------------------------
