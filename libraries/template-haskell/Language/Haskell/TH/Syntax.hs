@@ -202,6 +202,14 @@ instance Lift Bool where
   lift True  = return (ConE trueName)
   lift False = return (ConE falseName)
 
+instance Lift a => Lift (Maybe a) where
+  lift Nothing  = return (ConE nothingName)
+  lift (Just x) = liftM (ConE justName `AppE`) (lift x)
+
+instance (Lift a, Lift b) => Lift (Either a b) where
+  lift (Left x)  = liftM (ConE leftName  `AppE`) (lift x)
+  lift (Right y) = liftM (ConE rightName `AppE`) (lift y)
+
 instance Lift a => Lift [a] where
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
 
@@ -244,6 +252,14 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
 trueName, falseName :: Name
 trueName  = mkNameG DataName "base" "GHC.Base" "True"
 falseName = mkNameG DataName "base" "GHC.Base" "False"
+
+nothingName, justName :: Name
+nothingName = mkNameG DataName "base" "Data.Maybe" "Nothing"
+justName    = mkNameG DataName "base" "Data.Maybe" "Just"
+
+leftName, rightName :: Name
+leftName  = mkNameG DataName "base" "Data.Either" "Left"
+rightName = mkNameG DataName "base" "Data.Either" "Right"
 
 
 -----------------------------------------------------
