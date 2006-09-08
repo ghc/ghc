@@ -355,6 +355,15 @@ DLLized=@EnableWin32DLLs@
 #
 StripLibraries=NO
 
+# These are the URL patterns that Haddock uses to generate the "Source
+# File" links on each page.
+CorePackageSourceURL = http://darcs.haskell.org/ghc-6.6/packages/$(PACKAGE)/%{FILE}
+ExtraPackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
+
+# These are the packages required to be present in order to bootstrap GHC
+# NB. must be synced with libraries/core-packages
+CorePackages = base Cabal haskell98 readline regex-base regex-compat \
+	       regex-posix parsec stm template-haskell unix Win32
 
 # ----------------------------------------------------------------------------
 # Object-file splitting

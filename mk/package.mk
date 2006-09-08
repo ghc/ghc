@@ -375,12 +375,19 @@ html :: $(HTML_DOC)
 extraclean :: 
 	$(RM) -rf $(HTML_DIR)
 
+ifneq "$(findstring $(PACKAGE), $(CorePackages))" ""
+HaddockSourceURL = $(CorePackageSourceURL)
+else
+HaddockSourceURL = $(ExtraPackageSourceURL)
+endif
+
 $(HTML_DOC) : $(HS_PPS)
 	@$(INSTALL_DIR) $(HTML_DIR)
 	$(HADDOCK) $(HADDOCK_OPTS) -h -o $(HTML_DIR) $(HS_PPS) \
 		--package=$(PACKAGE) \
 		--dump-interface=$(PACKAGE).haddock \
 		--use-index=../doc-index.html --use-contents=../index.html \
+		--source-module=$(HaddockSourceURL) \
 		$(foreach pkg, $(PACKAGE_DEPS), \
 		   --read-interface=../$(pkg),../$(pkg)/$(pkg).haddock)
 
