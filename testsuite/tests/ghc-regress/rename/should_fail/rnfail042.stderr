@@ -1,8 +1,8 @@
 
-rnfail042.hs:1:0: Illegal binding of built-in syntax: :
+rnfail042.hs:5:10: Illegal binding of built-in syntax: ()
 
-rnfail042.hs:1:0: Illegal binding of built-in syntax: []
+rnfail042.hs:6:9: Illegal binding of built-in syntax: (,,,)
 
-rnfail042.hs:1:0: Illegal binding of built-in syntax: (,,,)
+rnfail042.hs:7:11: Illegal binding of built-in syntax: []
 
-rnfail042.hs:1:0: Illegal binding of built-in syntax: ()
+rnfail042.hs:8:16: Illegal binding of built-in syntax: :
