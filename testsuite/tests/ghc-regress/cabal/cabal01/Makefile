@@ -9,6 +9,7 @@ clean:
 	find . -name "*.hi" |xargs rm -f
 	rm -fr install-tmp
 	rm -fr install
+	rm -f .setup-config .installed-pkg-config
 
 setup : Setup.lhs
 	$(TEST_HC) --make -o setup Setup.lhs

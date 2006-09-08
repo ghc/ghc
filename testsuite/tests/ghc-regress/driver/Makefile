@@ -250,6 +250,7 @@ test052:
 	@$(RM) obj/R/S$(OBJSUFFIX)
 	@$(RM) d1/P/Q.hi
 	@$(RM) obj/P/Q$(OBJSUFFIX)
+	@$(MKDIRHIER) obj
 	$(TEST_HC) --make -id1 -id2 -odir obj R.S 
 	test -f d2/R/S.hi
 	test -f obj/R/S$(OBJSUFFIX)
