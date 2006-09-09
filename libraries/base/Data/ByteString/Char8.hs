@@ -162,7 +162,8 @@ module Data.ByteString.Char8 (
         sort,                   -- :: ByteString -> ByteString
 
         -- * Reading from ByteStrings
-        readInt,                -- :: ByteString -> Maybe Int
+        readInt,                -- :: ByteString -> Maybe (Int, ByteString)
+        readInteger,            -- :: ByteString -> Maybe (Integer, ByteString)
 
         -- * Low level CString conversions
 
@@ -930,6 +931,51 @@ readInt as
           end _    0 _ _  = Nothing
           end True _ n ps = Just (negate n, ps)
           end _    _ n ps = Just (n, ps)
+
+-- | readInteger reads an Integer from the beginning of the ByteString.  If
+-- there is no integer at the beginning of the string, it returns Nothing,
+-- otherwise it just returns the int read, and the rest of the string.
+readInteger :: ByteString -> Maybe (Integer, ByteString)
+readInteger as
+    | null as   = Nothing
+    | otherwise =
+        case unsafeHead as of
+            '-' -> first (unsafeTail as) >>= \(n, bs) -> return (-n, bs)
+            '+' -> first (unsafeTail as)
+            _   -> first as
+
+    where first ps | null ps   = Nothing
+                   | otherwise =
+                       case B.unsafeHead ps of
+                        w | w >= 0x30 && w <= 0x39 -> Just $
+                            loop 1 (fromIntegral w - 0x30) [] (unsafeTail ps)
+                          | otherwise              -> Nothing
+
+          loop :: Int -> Int -> [Integer]
+               -> ByteString -> (Integer, ByteString)
+          STRICT4(loop)
+          loop d acc ns ps
+              | null ps   = combine d acc ns empty
+              | otherwise =
+                  case B.unsafeHead ps of
+                   w | w >= 0x30 && w <= 0x39 ->
+                       if d == 9 then loop 1 (fromIntegral w - 0x30)
+                                           (toInteger acc : ns)
+                                           (unsafeTail ps)
+                                 else loop (d+1)
+                                           (10*acc + (fromIntegral w - 0x30))
+                                           ns (unsafeTail ps)
+                     | otherwise -> combine d acc ns ps
+
+          combine _ acc [] ps = (toInteger acc, ps)
+          combine d acc ns ps =
+              ((10^d * combine1 1000000000 ns + toInteger acc), ps)
+
+          combine1 _ [n] = n
+          combine1 b ns  = combine1 (b*b) $ combine2 b ns
+
+          combine2 b (n:m:ns) = let t = m*b + n in t `seq` (t : combine2 b ns)
+          combine2 _ ns       = ns
 
 -- | Read an entire file strictly into a 'ByteString'.  This is far more
 -- efficient than reading the characters into a 'String' and then using

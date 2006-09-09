@@ -20,7 +20,7 @@
 -- without requiring the entire vector be resident in memory.
 --
 -- Some operations, such as concat, append, reverse and cons, have
--- better complexity than their "Data.ByteString" equivalents, as due to
+-- better complexity than their "Data.ByteString" equivalents, due to
 -- optimisations resulting from the list spine structure. And for other
 -- operations Lazy ByteStrings are usually within a few percent of
 -- strict ones, but with better heap usage. For data larger than the
@@ -43,13 +43,15 @@
 module Data.ByteString.Lazy (
 
         -- * The @ByteString@ type
-        ByteString(..),         -- instances: Eq, Ord, Show, Read, Data, Typeable
+        ByteString,             -- instances: Eq, Ord, Show, Read, Data, Typeable
 
         -- * Introducing and eliminating 'ByteString's
         empty,                  -- :: ByteString
-        singleton,               -- :: Word8   -> ByteString
+        singleton,              -- :: Word8   -> ByteString
         pack,                   -- :: [Word8] -> ByteString
         unpack,                 -- :: ByteString -> [Word8]
+        fromChunks,             -- :: [Strict.ByteString] -> ByteString
+        toChunks,               -- :: ByteString -> [Strict.ByteString]
 
         -- * Basic interface
         cons,                   -- :: Word8 -> ByteString -> ByteString
@@ -93,7 +95,6 @@ module Data.ByteString.Lazy (
 
         -- ** Accumulating maps
         mapAccumL,  -- :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
-        mapAccumR,  -- :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
         mapIndexed, -- :: (Int64 -> Word8 -> Word8) -> ByteString -> ByteString
 
         -- ** Infinite ByteStrings
@@ -123,7 +124,6 @@ module Data.ByteString.Lazy (
         -- ** Breaking into many substrings
         split,                  -- :: Word8 -> ByteString -> [ByteString]
         splitWith,              -- :: (Word8 -> Bool) -> ByteString -> [ByteString]
-        tokens,                 -- :: (Word8 -> Bool) -> ByteString -> [ByteString]
 
         -- ** Joining strings
         join,                   -- :: ByteString -> [ByteString] -> ByteString
@@ -179,6 +179,7 @@ module Data.ByteString.Lazy (
         hGet,                   -- :: Handle -> Int -> IO ByteString
         hPut,                   -- :: Handle -> ByteString -> IO ()
         hGetNonBlocking,        -- :: Handle -> IO ByteString
+
 --      hGetN,                  -- :: Int -> Handle -> Int -> IO ByteString
 --      hGetContentsN,          -- :: Int -> Handle -> IO ByteString
 --      hGetNonBlockingN,       -- :: Int -> Handle -> IO ByteString
@@ -196,6 +197,7 @@ import Prelude hiding
 import qualified Data.List              as L  -- L for list/lazy
 import qualified Data.ByteString        as P  -- P for packed
 import qualified Data.ByteString.Base   as P
+import Data.ByteString.Base (LazyByteString(..))
 import qualified Data.ByteString.Fusion as P
 import Data.ByteString.Fusion (PairS(..),loopL)
 
@@ -212,10 +214,6 @@ import Foreign.ForeignPtr       (withForeignPtr)
 import Foreign.Ptr
 import Foreign.Storable
 
-#if defined(__GLASGOW_HASKELL__)
-import Data.Generics            (Data(..), Typeable(..))
-#endif
-
 -- -----------------------------------------------------------------------------
 --
 -- Useful macros, until we have bang patterns
@@ -229,17 +227,7 @@ import Data.Generics            (Data(..), Typeable(..))
 
 -- -----------------------------------------------------------------------------
 
--- | A space-efficient representation of a Word8 vector, supporting many
--- efficient operations.  A 'ByteString' contains 8-bit characters only.
---
--- Instances of Eq, Ord, Read, Show, Data, Typeable
---
-newtype ByteString = LPS [P.ByteString] -- LPS for lazy packed string
-    deriving (Show,Read
-#if defined(__GLASGOW_HASKELL__)
-                        ,Data, Typeable
-#endif
-             )
+type ByteString = LazyByteString
 
 --
 -- hmm, what about getting the PS constructor unpacked into the cons cell?
@@ -366,6 +354,14 @@ chunk size xs = case L.splitAt size xs of (xs', xs'') -> xs' : chunk size xs''
 unpack :: ByteString -> [Word8]
 unpack (LPS ss) = L.concatMap P.unpack ss
 {-# INLINE unpack #-}
+
+-- | /O(c)/ Convert a list of strict 'ByteString' into a lazy 'ByteString'
+fromChunks :: [P.ByteString] -> ByteString
+fromChunks ls = LPS $ L.filter (not . P.null) ls
+
+-- | /O(n)/ Convert a lazy 'ByteString' into a list of strict 'ByteString'
+toChunks :: ByteString -> [P.ByteString]
+toChunks (LPS s) = s
 
 ------------------------------------------------------------------------
 
@@ -588,9 +584,6 @@ minimum (LPS (x:xs)) = L.foldl' (\n ps -> n `min` P.minimum ps) (P.minimum x) xs
 -- final value of this accumulator together with the new ByteString.
 mapAccumL :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
 mapAccumL f z = (\(a :*: ps) -> (a, LPS ps)) . loopL (P.mapAccumEFL f) z . unLPS
-
-mapAccumR :: (acc -> Word8 -> (acc, Word8)) -> acc -> ByteString -> (acc, ByteString)
-mapAccumR = error "mapAccumR unimplemented"
 
 -- | /O(n)/ map Word8 functions, provided with the index at each position
 mapIndexed :: (Int -> Word8 -> Word8) -> ByteString -> ByteString
@@ -834,6 +827,7 @@ split c (LPS (a:as)) = comb [] (P.split c a) as
         {-# INLINE cons' #-}
 {-# INLINE split #-}
 
+{-
 -- | Like 'splitWith', except that sequences of adjacent separators are
 -- treated as a single separator. eg.
 -- 
@@ -841,6 +835,7 @@ split c (LPS (a:as)) = comb [] (P.split c a) as
 --
 tokens :: (Word8 -> Bool) -> ByteString -> [ByteString]
 tokens f = L.filter (not.null) . splitWith f
+-}
 
 -- | The 'group' function takes a ByteString and returns a list of
 -- ByteStrings such that the concatenation of the result is equal to the

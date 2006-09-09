@@ -291,12 +291,6 @@ instance Eq  ByteString
 instance Ord ByteString
     where compare = compareBytes
 
-instance Show ByteString where
-    showsPrec p ps r = showsPrec p (unpackWith w2c ps) r
-
-instance Read ByteString where
-    readsPrec p str = [ (packWith c2w x, y) | (x, y) <- readsPrec p str ]
-
 instance Monoid ByteString where
     mempty  = empty
     mappend = append
@@ -457,31 +451,6 @@ unpackList (PS fp off len) = withPtr fp $ \p -> do
  #-}
 
 #endif
-
-------------------------------------------------------------------------
-
--- | /O(n)/ Convert a '[a]' into a 'ByteString' using some
--- conversion function
-packWith :: (a -> Word8) -> [a] -> ByteString
-packWith k str = unsafeCreate (P.length str) $ \p -> go p str
-    where
-        STRICT2(go)
-        go _ []     = return ()
-        go p (x:xs) = poke p (k x) >> go (p `plusPtr` 1) xs -- less space than pokeElemOff
-{-# INLINE packWith #-}
-{-# SPECIALIZE packWith :: (Char -> Word8) -> [Char] -> ByteString #-}
-
--- | /O(n)/ Converts a 'ByteString' to a '[a]', using a conversion function.
-unpackWith :: (Word8 -> a) -> ByteString -> [a]
-unpackWith _ (PS _  _ 0) = []
-unpackWith k (PS ps s l) = inlinePerformIO $ withForeignPtr ps $ \p ->
-        go (p `plusPtr` s) (l - 1) []
-    where
-        STRICT3(go)
-        go p 0 acc = peek p          >>= \e -> return (k e : acc)
-        go p n acc = peekByteOff p n >>= \e -> go p (n-1) (k e : acc)
-{-# INLINE unpackWith #-}
-{-# SPECIALIZE unpackWith :: (Word8 -> Char) -> ByteString -> [Char] #-}
 
 -- ---------------------------------------------------------------------
 -- Basic interface
@@ -1778,9 +1747,7 @@ hGetLines h = go
 
 hGetLine :: Handle -> IO ByteString
 #if !defined(__GLASGOW_HASKELL__)
-hGetLine h = do
-  string <- System.IO.hGetLine h
-  return $ packWith c2w string
+hGetLine h = System.IO.hGetLine h >>= return . pack . P.map c2w
 #else
 hGetLine h = wantReadableHandle "Data.ByteString.hGetLine" h $ \ handle_ -> do
     case haBufferMode handle_ of

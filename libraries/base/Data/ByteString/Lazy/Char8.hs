@@ -24,13 +24,15 @@
 module Data.ByteString.Lazy.Char8 (
 
         -- * The @ByteString@ type
-        ByteString(..),         -- instances: Eq, Ord, Show, Read, Data, Typeable
+        ByteString,            -- instances: Eq, Ord, Show, Read, Data, Typeable
 
         -- * Introducing and eliminating 'ByteString's
         empty,                  -- :: ByteString
         singleton,               -- :: Char   -> ByteString
         pack,                   -- :: String -> ByteString
         unpack,                 -- :: ByteString -> String
+        fromChunks,             -- :: [Strict.ByteString] -> ByteString
+        toChunks,               -- :: ByteString -> [Strict.ByteString]
 
         -- * Basic interface
         cons,                   -- :: Char -> ByteString -> ByteString
@@ -103,7 +105,6 @@ module Data.ByteString.Lazy.Char8 (
         -- ** Breaking into many substrings
         split,                  -- :: Char -> ByteString -> [ByteString]
         splitWith,              -- :: (Char -> Bool) -> ByteString -> [ByteString]
-        tokens,                 -- :: (Char -> Bool) -> ByteString -> [ByteString]
 
         -- ** Breaking into lines and words
         lines,                  -- :: ByteString -> [ByteString]
@@ -149,6 +150,7 @@ module Data.ByteString.Lazy.Char8 (
 
         -- * Reading from ByteStrings
         readInt,
+        readInteger,
 
         -- * I\/O with 'ByteString's
 
@@ -176,7 +178,7 @@ module Data.ByteString.Lazy.Char8 (
 
 -- Functions transparently exported
 import Data.ByteString.Lazy 
-        (ByteString(..)
+        (ByteString, fromChunks, toChunks
         ,empty,null,length,tail,init,append,reverse,transpose
         ,concat,take,drop,splitAt,join,isPrefixOf,group,inits,tails,copy
         ,hGetContents, hGet, hPut, getContents
@@ -187,6 +189,8 @@ import Data.ByteString.Lazy
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base as B
+import Data.ByteString.Base (LazyByteString(LPS))
+
 import Data.ByteString.Base (w2c, c2w, isSpaceWord8)
 
 import Data.Int (Int64)
@@ -455,15 +459,6 @@ splitWith :: (Char -> Bool) -> ByteString -> [ByteString]
 splitWith f = L.splitWith (f . w2c)
 {-# INLINE splitWith #-}
 
--- | Like 'splitWith', except that sequences of adjacent separators are
--- treated as a single separator. eg.
--- 
--- > tokens (=='a') "aabbaca" == ["bb","c"]
---
-tokens :: (Char -> Bool) -> ByteString -> [ByteString]
-tokens f = L.tokens (f . w2c)
-{-# INLINE tokens #-}
-
 -- | The 'groupBy' function is the non-overloaded version of 'group'.
 groupBy :: (Char -> Char -> Bool) -> ByteString -> [ByteString]
 groupBy k = L.groupBy (\a b -> k (w2c a) (w2c b))
@@ -643,7 +638,7 @@ unlines ss = (concat $ List.intersperse nl ss) `append` nl -- half as much space
 -- > tokens isSpace = words
 --
 words :: ByteString -> [ByteString]
-words = L.tokens isSpaceWord8
+words = P.filter (not . L.null) . L.splitWith isSpaceWord8
 {-# INLINE words #-}
 
 -- | The 'unwords' function is analogous to the 'unlines' function, on words.
@@ -684,6 +679,60 @@ readInt (LPS (x:xs)) =
                                        | otherwise = ps:pss
                                 in n' `seq` ps' `seq` Just $! (n', LPS ps')
 
+
+-- | readInteger reads an Integer from the beginning of the ByteString.  If
+-- there is no integer at the beginning of the string, it returns Nothing,
+-- otherwise it just returns the int read, and the rest of the string.
+readInteger :: ByteString -> Maybe (Integer, ByteString)
+readInteger (LPS []) = Nothing
+readInteger (LPS (x:xs)) =
+        case w2c (B.unsafeHead x) of
+            '-' -> first (B.unsafeTail x) xs >>= \(n, bs) -> return (-n, bs)
+            '+' -> first (B.unsafeTail x) xs
+            _   -> first x xs
+
+    where first ps pss
+              | B.null ps = case pss of
+                  []         -> Nothing
+                  (ps':pss') -> first' ps' pss'
+              | otherwise = first' ps pss
+
+          first' ps pss = case B.unsafeHead ps of
+              w | w >= 0x30 && w <= 0x39 -> Just $
+                  loop 1 (fromIntegral w - 0x30) [] (B.unsafeTail ps) pss
+                | otherwise              -> Nothing
+
+          loop :: Int -> Int -> [Integer]
+               -> B.ByteString -> [B.ByteString] -> (Integer, ByteString)
+          STRICT5(loop)
+          loop d acc ns ps pss
+              | B.null ps = case pss of
+                                []         -> combine d acc ns ps pss
+                                (ps':pss') -> loop d acc ns ps' pss'
+              | otherwise =
+                  case B.unsafeHead ps of
+                   w | w >= 0x30 && w <= 0x39 ->
+                       if d < 9 then loop (d+1)
+                                          (10*acc + (fromIntegral w - 0x30))
+                                          ns (B.unsafeTail ps) pss
+                                else loop 1 (fromIntegral w - 0x30)
+                                          (fromIntegral acc : ns)
+                                          (B.unsafeTail ps) pss
+                     | otherwise -> combine d acc ns ps pss
+
+          combine _ acc [] ps pss = end (fromIntegral acc) ps pss
+          combine d acc ns ps pss =
+              end (10^d * combine1 1000000000 ns + fromIntegral acc) ps pss
+
+          combine1 _ [n] = n
+          combine1 b ns  = combine1 (b*b) $ combine2 b ns
+
+          combine2 b (n:m:ns) = let t = n+m*b in t `seq` (t : combine2 b ns)
+          combine2 _ ns       = ns
+
+          end n ps pss = let ps' | B.null ps =    pss
+                                 | otherwise = ps:pss
+                          in ps' `seq` (n, LPS ps')
 
 -- | Read an entire file /lazily/ into a 'ByteString'. Use 'text mode'
 -- on Windows to interpret newlines
