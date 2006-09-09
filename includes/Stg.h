@@ -127,8 +127,8 @@ typedef StgWord64       LW_;
 #define EF_(f)		extern F_ f(void)
 
 typedef StgWord StgWordArray[];
-#define EI_             extern StgWordArray
-#define II_             static StgWordArray
+#define EI_(X)          extern StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+#define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
 
 /* -----------------------------------------------------------------------------
    Tail calls
