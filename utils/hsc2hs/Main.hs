@@ -24,7 +24,7 @@ import Directory     (removeFile,doesFileExist)
 import Monad         (MonadPlus(..), liftM, liftM2, when)
 import Char          (isAlpha, isAlphaNum, isSpace, isDigit, toUpper, intToDigit, ord)
 import List          (intersperse, isSuffixOf)
-import IO            (hPutStr, hPutStrLn, stderr)
+import IO            (hPutStr, hPutStrLn, stderr, bracket_)
 
 #if defined(mingw32_HOST_OS)
 import Foreign
@@ -597,17 +597,17 @@ output flags name toks = do
         ++ [cProgName]
         ++ ["-o", oProgName]
 	)
-    removeFile cProgName
+    finallyRemove cProgName $ do
 
     rawSystemL ("linking " ++ oProgName) beVerbose linker
         (  [f | LinkFlag f <- flags]
         ++ [oProgName]
         ++ ["-o", progName]
 	)
-    removeFile oProgName
+    finallyRemove oProgName $ do
 
     rawSystemWithStdOutL ("running " ++ execProgName) beVerbose execProgName [] outName
-    removeFile progName
+    finallyRemove progName $ do
 
     when needsH $ writeFile outHName $
         "#ifndef "++includeGuard++"\n" ++
@@ -659,6 +659,19 @@ rawSystemWithStdOutL action flg prog args outFile = do
     ExitFailure _ -> die $ action ++ " failed\ncommand was: " ++ cmdLine ++ "\n"
     _             -> return ()
 
+
+-- delay the cleanup of generated files until the end; attempts to
+-- get around intermittent failure to delete files which has
+-- just been exec'ed by a sub-process (Win32 only.)
+finallyRemove :: FilePath -> IO a -> IO a
+finallyRemove fp act = 
+  bracket_ (return fp)
+           (const $ noisyRemove fp)
+           act
+ where
+  noisyRemove fpath =
+    catch (removeFile fpath)
+          (\ e -> hPutStrLn stderr ("Failed to remove file " ++ fpath ++ "; error= " ++ show e))
 onlyOne :: String -> IO a
 onlyOne what = die ("Only one "++what++" may be specified\n")
 
