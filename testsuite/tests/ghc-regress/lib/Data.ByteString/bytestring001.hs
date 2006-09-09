@@ -32,6 +32,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Fusion
 import qualified Data.ByteString      as P
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Base as L (LazyByteString(..))
 
 import qualified Data.ByteString.Char8      as PC
 import qualified Data.ByteString.Lazy.Char8 as LC
@@ -954,8 +955,8 @@ fusion_tests =
 --
 
 invariant :: L.ByteString -> Bool
-invariant (LPS []) = True
-invariant (LPS xs) = all (not . P.null) xs
+invariant (L.LPS []) = True
+invariant (L.LPS xs) = all (not . P.null) xs
 
 prop_invariant = invariant
 

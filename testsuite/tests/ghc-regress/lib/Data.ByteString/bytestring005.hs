@@ -27,6 +27,7 @@ import Foreign.Ptr
 
 import Data.ByteString.Lazy (ByteString(..), pack , unpack)
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Base as L (LazyByteString(..))
 
 import Data.ByteString.Fusion
 import qualified Data.ByteString      as P
@@ -285,8 +286,8 @@ instance IsNull P.ByteString where isNull = P.null
 --
 
 invariant :: L.ByteString -> Bool
-invariant (LPS []) = True
-invariant (LPS xs) = all (not . P.null) xs
+invariant (L.LPS []) = True
+invariant (L.LPS xs) = all (not . P.null) xs
 
 prop_invariant = invariant
 
