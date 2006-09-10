@@ -23,6 +23,10 @@
 
 #include <string.h>
 
+#ifdef DEBUG
+#include "Trace.h"
+#endif
+
 /*
  * Profiling allocation arena.
  */
