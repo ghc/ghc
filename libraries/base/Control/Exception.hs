@@ -152,7 +152,7 @@ import Data.Dynamic
 -- argument.  Otherwise, the result is returned as normal.  For example:
 --
 -- >   catch (openFile f ReadMode) 
--- >       (\e -> hPutStr stderr (\"Couldn\'t open \"++f++\": \" ++ show e))
+-- >       (\e -> hPutStr stderr ("Couldn't open "++f++": " ++ show e))
 --
 -- For catching exceptions in pure (non-'IO') expressions, see the
 -- function 'evaluate'.
@@ -251,7 +251,7 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- @('Right' a)@ if no exception was raised, or @('Left' e)@ if an
 -- exception was raised and its value is @e@.
 --
--- >  try a = catch (Right \`liftM\` a) (return . Left)
+-- >  try a = catch (Right `liftM` a) (return . Left)
 --
 -- Note: as with 'catch', it is only polite to use this variant if you intend
 -- to re-throw the exception after performing whatever cleanup is needed.

@@ -106,10 +106,12 @@ unblock (IO io) = IO $ unblockAsyncExceptions# io
 -- the 'IO' monad.  It can be used to order evaluation with respect to
 -- other 'IO' operations; its semantics are given by
 --
--- >   evaluate undefined `seq` return ()  ==> return ()
--- >   catch (evaluate undefined) (\e -> return ())  ==> return ()
+-- >   evaluate x `seq` y    ==>  y
+-- >   evaluate x `catch` f  ==>  (return $! x) `catch` f
+-- >   evaluate x >>= f      ==>  (return $! x) >>= f
 --
--- NOTE: @(evaluate a)@ is /not/ the same as @(a \`seq\` return a)@.
+-- /Note:/ the first equation implies that @(evaluate x)@ is /not/ the
+-- same as @(return $! x)@.
 evaluate :: a -> IO a
 evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
         -- NB. can't write  

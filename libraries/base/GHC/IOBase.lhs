@@ -815,8 +815,8 @@ throw exception = raise# exception
 -- Although 'throwIO' has a type that is an instance of the type of 'throw', the
 -- two functions are subtly different:
 --
--- > throw e   `seq` return ()  ===> throw e
--- > throwIO e `seq` return ()  ===> return ()
+-- > throw e   `seq` x  ===> throw e
+-- > throwIO e `seq` x  ===> x
 --
 -- The first example will cause the exception @e@ to be raised,
 -- whereas the second one won\'t.  In fact, 'throwIO' will only cause
