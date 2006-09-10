@@ -3082,7 +3082,7 @@ outOfLineFloatOp mop res args vols
           code2 <- stmtToInstrs (CmmAssign res (CmmReg tmp))
           return (code1 `appOL` code2)
   where
-	lbl = mkForeignLabel fn Nothing True
+	lbl = mkForeignLabel fn Nothing False
 
 	fn = case mop of
 	      MO_F32_Sqrt  -> FSLIT("sqrtf")
