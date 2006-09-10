@@ -56,6 +56,7 @@ module Data.Map  (
             -- ** Insertion
             , insert
             , insertWith, insertWithKey, insertLookupWithKey
+            , insertWith', insertWithKey'
             
             -- ** Delete\/Update
             , delete
@@ -348,6 +349,12 @@ insertWith :: Ord k => (a -> a -> a) -> k -> a -> Map k a -> Map k a
 insertWith f k x m          
   = insertWithKey (\k x y -> f x y) k x m
 
+-- | Same as 'insertWith', but the combining function is applied strictly.
+insertWith' :: Ord k => (a -> a -> a) -> k -> a -> Map k a -> Map k a
+insertWith' f k x m          
+  = insertWithKey' (\k x y -> f x y) k x m
+
+
 -- | /O(log n)/. Insert with a combining function.
 -- @'insertWithKey' f key value mp@ 
 -- will insert the pair (key, value) into @mp@ if key does
@@ -363,6 +370,18 @@ insertWithKey f kx x t
                LT -> balance ky y (insertWithKey f kx x l) r
                GT -> balance ky y l (insertWithKey f kx x r)
                EQ -> Bin sy kx (f kx x y) l r
+
+-- | Same as 'insertWithKey', but the combining function is applied strictly.
+insertWithKey' :: Ord k => (k -> a -> a -> a) -> k -> a -> Map k a -> Map k a
+insertWithKey' f kx x t
+  = case t of
+      Tip -> singleton kx x
+      Bin sy ky y l r
+          -> case compare kx ky of
+               LT -> balance ky y (insertWithKey' f kx x l) r
+               GT -> balance ky y l (insertWithKey' f kx x r)
+               EQ -> let x' = f kx x y in seq x' (Bin sy kx x' l r)
+
 
 -- | /O(log n)/. The expression (@'insertLookupWithKey' f k x map@)
 -- is a pair where the first element is equal to (@'lookup' k map@)
