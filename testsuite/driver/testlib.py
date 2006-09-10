@@ -289,11 +289,11 @@ def test_common_work (name, opts, func, args):
             skiptest (name,way)
 
     clean(map (lambda suff: name + suff,
-              ['', '.genscript', '.run.stderr', '.run.stdout',
+              ['', '.exe', '.genscript', '.run.stderr', '.run.stdout',
                '.comp.stderr', '.comp.stdout',
                '.interp.stderr', '.interp.stdout',
-               '.hi', '.o', '.prof', '.hc', '_stub.h', '_stub.c',
-               '_stub.o', '.hp']))
+               '.hi', '.o', '.prof', '.exe.prof', '.hc', '_stub.h', '_stub.c',
+               '_stub.o', '.hp', '.exe.hp']))
 
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
