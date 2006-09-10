@@ -304,8 +304,10 @@ def clean_o_hi():
 def clean_full_paths(names):
     if getTestOpts().cleanup != '':
         for name in names:
-            if os.access(name, os.F_OK) :
+            try:
                 os.remove(name)
+            except OSError:
+                pass
 
 def do_test(name, way, func, args):
     full_name = name + '(' + way + ')'
