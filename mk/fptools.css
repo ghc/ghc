@@ -24,10 +24,13 @@ pre.screen         { color: #006400 }
 pre.programlisting { color: maroon }
 
 div.example {
-  background-color: #fffcf5;
   margin: 1ex 0em;
   border: solid #412e25 1px;
   padding: 0ex 0.4em
+}
+
+div.example, div.example-contents {
+  background-color: #fffcf5
 }
 
 a:link    { color:      #0000C8 }
