@@ -386,9 +386,9 @@ printSample(rtsBool beginSample, StgDouble sampleValue)
 {
     StgDouble fractionalPart, integralPart;
     fractionalPart = modf(sampleValue, &integralPart);
-    fprintf(hp_file, "%s %d.%02d\n",
+    fprintf(hp_file, "%s %" FMT_Word64 ".%02" FMT_Word64 "\n",
             (beginSample ? "BEGIN_SAMPLE" : "END_SAMPLE"),
-            (int)integralPart, (int)(fractionalPart * 100));
+            (StgWord64)integralPart, (StgWord64)(fractionalPart * 100));
 }
 
 /* --------------------------------------------------------------------------

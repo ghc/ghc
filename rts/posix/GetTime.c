@@ -44,7 +44,7 @@ Ticks getProcessCPUTime(void)
 {
     struct rusage t;
     getrusage(RUSAGE_SELF, &t);
-    return (t.ru_utime.tv_sec * TICKS_PER_SECOND + 
+    return ((Ticks)t.ru_utime.tv_sec * TICKS_PER_SECOND + 
 	    ((Ticks)t.ru_utime.tv_usec * TICKS_PER_SECOND)/1000000);
 }
 
@@ -52,7 +52,7 @@ Ticks getProcessElapsedTime(void)
 {
     struct timeval tv;
     gettimeofday(&tv, (struct timezone *) NULL);
-    return (tv.tv_sec * TICKS_PER_SECOND +
+    return ((Ticks)tv.tv_sec * TICKS_PER_SECOND +
 	    ((Ticks)tv.tv_usec * TICKS_PER_SECOND)/1000000);
 }
 
@@ -120,7 +120,7 @@ Ticks getThreadCPUTime(void)
     // reliable on Linux, but it's the best we have.
     struct timespec ts;
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-    return (ts.tv_sec * TICKS_PER_SECOND + 
+    return ((Ticks)ts.tv_sec * TICKS_PER_SECOND + 
 	    ((Ticks)ts.tv_nsec * TICKS_PER_SECOND) / 1000000000);
 #else
     return getProcessCPUTime();
