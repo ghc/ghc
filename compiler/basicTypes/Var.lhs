@@ -74,7 +74,7 @@ data Var
 	tcTyVarDetails :: TcTyVarDetails }
 
   | GlobalId { 			-- Used for imported Ids, dict selectors etc
-	varName    :: !Name,
+	varName    :: !Name,	-- Always an External or WiredIn Name
 	realUnique :: FastInt,
    	idType     :: Type,
 	idInfo     :: IdInfo,
