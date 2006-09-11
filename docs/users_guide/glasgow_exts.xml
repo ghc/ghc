@@ -905,6 +905,38 @@ fromInteger :: Integer -> Bool -> Bool
 	     you should be all right.</para>
 
 </sect2>
+
+<sect2 id="postfix-operators">
+<title>Postfix operators</title>
+
+<para>
+GHC allows a small extension to the syntax of left operator sections, which
+allows you to define postfix operators.  The extension is this:  the left section
+<programlisting>
+  (e !)
+</programlisting> 
+is equivalent (from the point of view of both type checking and execution) to the expression
+<programlisting>
+  ((!) e)
+</programlisting> 
+(for any expression <literal>e</literal> and operator <literal>(!)</literal>.
+The strict Haskell 98 interpretation is that the section is equivalent to
+<programlisting>
+  (\y -> (!) e y)
+</programlisting> 
+That is, the operator must be a function of two arguments.  GHC allows it to
+take only one argument, and that in turn allows you to write the function
+postfix.
+</para>
+<para>Since this extension goes beyond Haskell 98, it should really be enabled
+by a flag; but in fact it is enabled all the time.  (No Haskell 98 programs
+change their behaviour, of course.)
+</para>
+<para>The extension does not extend to the left-hand side of function
+definitions; you must define such a function in prefix form.</para>
+
+</sect2>
+
 </sect1>
 
 
