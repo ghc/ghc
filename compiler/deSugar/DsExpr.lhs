@@ -281,20 +281,10 @@ dsExpr (OpApp e1 op _ e2)
     dsLExpr e2				`thenDs` \ y_core ->
     returnDs (mkApps core_op [x_core, y_core])
     
-dsExpr (SectionL expr op)
-  = dsLExpr op						`thenDs` \ core_op ->
-    -- for the type of y, we need the type of op's 2nd argument
-    let
-	(x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
-	-- Must look through an implicit-parameter type; 
-	-- newtype impossible; hence Type.splitFunTys
-    in
-    dsLExpr expr				`thenDs` \ x_core ->
-    newSysLocalDs x_ty			`thenDs` \ x_id ->
-    newSysLocalDs y_ty			`thenDs` \ y_id ->
-
-    returnDs (bindNonRec x_id x_core $
-	      Lam y_id (mkApps core_op [Var x_id, Var y_id]))
+dsExpr (SectionL expr op)	-- Desugar (e !) to ((!) e)
+  = dsLExpr op				`thenDs` \ core_op ->
+    dsLExpr expr			`thenDs` \ x_core ->
+    returnDs (App core_op x_core)
 
 -- dsLExpr (SectionR op expr)	-- \ x -> op x expr
 dsExpr (SectionR op expr)
