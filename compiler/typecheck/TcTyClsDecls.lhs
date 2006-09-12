@@ -630,7 +630,7 @@ checkValidTyCon tc
     get_fields con = dataConFieldLabels con `zip` repeat con
 	-- dataConFieldLabels may return the empty list, which is fine
 
-    -- XXX - autrijus - Make this far more complex to acommodate 
+    -- Note: The complicated checkOne logic below is there to accomodate
     --       for different return types.  Add res_ty to the mix,
     --       comparing them in two steps, all for good error messages.
     --       Plan: Use Unify.tcMatchTys to compare the first candidate's

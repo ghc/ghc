@@ -107,7 +107,7 @@ con	:: { LConDecl RdrName }
 	: d_pat_occ attv_bndrs hs_atys 
 		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) Explicit $2 (noLoc []) (PrefixCon $3) ResTyH98}
         | d_pat_occ '::' ty
-                -- XXX - autrijus - $3 needs to be split into argument and return types!
+                -- XXX - audreyt - $3 needs to be split into argument and return types!
                 -- also not sure whether the [] below (quantified vars) appears.
                 -- also the "PrefixCon []" is wrong.
                 -- also we want to munge $3 somehow.

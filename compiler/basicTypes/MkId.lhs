@@ -413,10 +413,10 @@ type (e.g. 'b' in T2).
 
 \begin{code}
 
--- XXX - autrijus -
--- Plan: 1. Determine naughtiness by comparing field type vs result type
---       2. Install naughty ones with selector_ty of type _|_ and fill in mzero for info
---       3. If it's not naughty, do the normal plan.
+-- Steps for handling "naughty" vs "non-naughty" selectors:
+--  1. Determine naughtiness by comparing field type vs result type
+--  2. Install naughty ones with selector_ty of type _|_ and fill in mzero for info
+--  3. If it's not naughty, do the normal plan.
 
 mkRecordSelId :: TyCon -> FieldLabel -> Id
 mkRecordSelId tycon field_label
