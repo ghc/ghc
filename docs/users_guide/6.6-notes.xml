@@ -327,8 +327,14 @@
       </listitem>
       <listitem>
         <para>
+          GHC now supports postfix operators, as a simple generalisation of
+          left sections (<xref linkend="postfix-operators"/>).
+        </para>
+      </listitem>
+      <listitem>
+        <para>
           Parallel arrays, as enabled by <literal>-fparr</literal>, no
-          longer work.
+          longer work.  They'll be coming back shortly, in full glory.
         </para>
       </listitem>
     </itemizedlist>
