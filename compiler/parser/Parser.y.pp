@@ -753,7 +753,7 @@ gadt_constr :: { LConDecl RdrName }
               { LL (mkGadtDecl $1 $3) } 
         -- Syntax: Maybe merge the record stuff with the single-case above?
         --         (to kill the mostly harmless reduce/reduce error)
-        -- XXX revisit autrijus
+        -- XXX revisit audreyt
 	| constr_stuff_record '::' sigtype
 		{ let (con,details) = unLoc $1 in 
 		  LL (ConDecl con Implicit [] (noLoc []) details (ResTyGADT $3)) }
