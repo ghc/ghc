@@ -42,8 +42,9 @@ import Name		( Name {-instance NamedThing-}, getOccName,
 import NameEnv
 import MkId		( seqId )
 import Module
-import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc, mkClassDataConOcc,
-			  mkSuperDictSelOcc, mkDataConWrapperOcc, mkDataConWorkerOcc )
+import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc,
+                          mkClassDataConOcc, mkSuperDictSelOcc, 
+                          mkDataConWrapperOcc, mkDataConWorkerOcc )
 import SrcLoc		( importedSrcLoc )
 import Maybes		( MaybeErr(..) )
 import ErrUtils         ( Message )
