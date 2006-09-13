@@ -1,7 +1,6 @@
 #Top-level dirs:
 ^alex/
 ^common-rts/
-^compiler/
 ^CONTRIB/
 ^dll/
 ^greencard/
