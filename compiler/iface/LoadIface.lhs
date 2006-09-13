@@ -334,7 +334,9 @@ ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
 -- Deeply revolting, because it has to predict what gets bound,
 -- especially the question of whether there's a wrapper for a datacon
 
-ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, ifSigs = sigs })
+ifaceDeclSubBndrs IfaceClass { ifCtxt = sc_ctxt, 
+                               ifName = cls_occ, 
+                               ifSigs = sigs }
   = [tc_occ, dc_occ, dcww_occ] ++
     [op | IfaceClassOp op _ _ <- sigs] ++
     [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] 
@@ -347,12 +349,13 @@ ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, ifSigs = sigs
 	     | otherwise  = mkDataConWorkerOcc dc_occ	-- Otherwise worker but no wrapper
     is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
 
-ifaceDeclSubBndrs (IfaceData {ifCons = IfAbstractTyCon}) 
+ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}
   = []
 -- Newtype
-ifaceDeclSubBndrs (IfaceData {ifCons = IfNewTyCon (IfVanillaCon { ifConOcc = con_occ, 
-								  ifConFields = fields})}) 
-  = fields ++ [con_occ, mkDataConWrapperOcc con_occ] 	
+ifaceDeclSubBndrs IfaceData {ifCons = IfNewTyCon (IfVanillaCon { 
+                                                      ifConOcc = con_occ,
+                                                      ifConFields = fields})}
+  = fields ++ [con_occ, mkDataConWrapperOcc con_occ]
 	-- Wrapper, no worker; see MkId.mkDataConIds
 
 ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
@@ -360,7 +363,7 @@ ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
     ++ concatMap dc_occs cons
   where
     fld_occs (IfVanillaCon { ifConFields = fields }) = fields
-    fld_occs (IfGadtCon {}) 			     = []
+    fld_occs (IfGadtCon {})                          = []
     dc_occs con_decl
 	| has_wrapper = [con_occ, work_occ, wrap_occ]
 	| otherwise   = [con_occ, work_occ]
