@@ -77,15 +77,10 @@ main = do
 
   (flags, fileArgs) <- parseHaddockOpts rest''
 
-  mbPkgName <- handleEagerFlags flags  
-  let dynflags'' = case mbPkgName of
-        Just name -> setPackageName name dynflags'
-        Nothing -> dynflags'
+  setSessionDynFlags session dynflags'
+  modules <- sortAndCheckModules session dynflags' fileArgs
 
-  setSessionDynFlags session dynflags''
-  modules <- sortAndCheckModules session dynflags'' fileArgs
-
-  packages <- getPackages session dynflags''
+  packages <- getPackages session dynflags'
   updateHTMLXRefs packages
   let env = packagesDocEnv packages
 
