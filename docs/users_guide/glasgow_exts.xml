@@ -3903,8 +3903,8 @@ declaration, but only if the data type could also have been declared in
 Haskell-98 syntax.   For example, these two declarations are equivalent
 <programlisting>
   data Maybe1 a where {
-      Nothing1 :: Maybe a ;
-      Just1    :: a -> Maybe a
+      Nothing1 :: Maybe1 a ;
+      Just1    :: a -> Maybe1 a
     } deriving( Eq, Ord )
 
   data Maybe2 a = Nothing2 | Just2 a 
