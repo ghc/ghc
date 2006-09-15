@@ -676,12 +676,7 @@ updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
   where
     mapping = [ (mod, html) | 
                 (PackageData _ mods html) <- packages, (mod, _) <- mods ] 
-{-
-updateHTMLXRefs :: [FilePath] -> [[Module]] -> IO ()
-updateHTMLXRefs paths modss = writeIORef html_xrefs_ref (Map.fromList mapping)
-  where
-    mapping = [ (mod, fpath) | (fpath, mods) <- zip paths modss, mod <- mods ]
--}
+
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))
 getPrologue flags
   = case [filename | Flag_Prologue filename <- flags ] of
