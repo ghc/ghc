@@ -38,6 +38,7 @@ module RdrHsSyn (
 	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkTyVars,          -- [LHsType RdrName] -> Bool -> P ()
 	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], Maybe [LHsType RdrName])
+	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
 	checkTopTypeD,	      -- LTyClDecl RdrName -> P (HsDecl RdrName)
 	checkInstType,	      -- HsType -> P HsType
 	checkPattern,	      -- HsExp -> P HsPat
@@ -213,7 +214,7 @@ cvBindsAndSigs :: OrdList (LHsDecl RdrName)
   -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
--- associated data or synonym definitions
+-- associated type declarations
 cvBindsAndSigs  fb = go (fromOL fb)
   where
     go [] 		   = (emptyBag, [], [])
@@ -505,6 +506,17 @@ extractTyVars tvs = collects [] tvs
     collects tvs (t:ts) = do
 			    tvs' <- collects tvs ts
 			    collect tvs' t
+
+-- Check that associated type declarations of a class are all kind signatures.
+--
+checkKindSigs :: [LTyClDecl RdrName] -> P ()
+checkKindSigs = mapM_ check
+  where
+    check (L l tydecl) 
+      | isKindSigDecl tydecl
+        || isSynDecl tydecl  = return ()
+      | otherwise	     = 
+	parseError l "Type declaration in a class must be a kind signature or synonym default"
 
 -- Wrap a toplevel type or data declaration into 'TyClD' and ensure for 
 -- data declarations that all type parameters are variables only (which is in

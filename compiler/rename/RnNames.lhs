@@ -17,7 +17,7 @@ import DynFlags		( DynFlag(..), GhcMode(..), DynFlags(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
 			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
-			  instDeclATs,
+			  instDeclATs, isIdxTyDecl,
 			  LIE )
 import RnEnv
 import IfaceEnv		( ifaceExportNames )
@@ -446,13 +446,14 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
     new_tc tc_decl 
 	= do { main_name <- newTopSrcBinder mod Nothing main_rdr
 	     ; sub_names <- mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs
-	     ; return (main_name : sub_names) }
+	     ; if isIdxTyDecl (unLoc tc_decl)	   -- index type definitions
+	       then return (            sub_names) -- are usage occurences
+	       else return (main_name : sub_names) }
 	where
 	  (main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
 
     inst_ats inst_decl 
-	= mappM (liftM tail . new_tc) (instDeclATs (unLoc inst_decl))
-		       -- drop main_rdr (already declared in class)
+	= mappM new_tc (instDeclATs (unLoc inst_decl))
 \end{code}
 
 

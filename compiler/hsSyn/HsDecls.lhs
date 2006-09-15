@@ -451,7 +451,9 @@ isKindSigDecl (TyData     {tcdKindSig = Just _,
 isKindSigDecl other                              = False
 
 -- definition of an instance of an indexed type
-isIdxTyDecl = isJust . tcdTyPats
+isIdxTyDecl tydecl
+   | isSynDecl tydecl || isDataDecl tydecl = isJust (tcdTyPats tydecl)
+   | otherwise				   = False
 \end{code}
 
 Dealing with names
@@ -467,9 +469,7 @@ tyClDeclNames :: Eq name => TyClDecl name -> [Located name]
 -- We use the equality to filter out duplicate field names
 
 tyClDeclNames (TyFunction  {tcdLName = name})    = [name]
-tyClDeclNames (TySynonym   {tcdLName = name,
-			    tcdTyPats= Nothing}) = [name]
-tyClDeclNames (TySynonym   {}                  ) = []     -- type equation
+tyClDeclNames (TySynonym   {tcdLName = name})    = [name]
 tyClDeclNames (ForeignType {tcdLName = name})    = [name]
 
 tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})

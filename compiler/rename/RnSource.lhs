@@ -333,20 +333,32 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	     --     to remove the context).
 \end{code}
 
-Renaming of the associated data definitions requires adding the instance
-context, as the rhs of an AT declaration may use ATs from classes in the
-context.
+Renaming of the associated type definitions in instances.  
+
+* In the case of associated data and newtype definitions we add the instance
+  context.
+* We raise an error if we encounter a kind signature in an instance.
 
 \begin{code}
 rnATDefs :: HsContext RdrName -> [LTyClDecl RdrName] 
 	  -> RnM ([LTyClDecl Name], FreeVars)
 rnATDefs ctxt atDecls = 
-  mapFvRn (wrapLocFstM addCtxtAndRename) atDecls
+  mapFvRn (wrapLocFstM rnAtDef) atDecls
   where
-    -- The parser won't accept anything, but a data declaration
-    addCtxtAndRename ty@TyData {tcdCtxt = L l tyCtxt} = 
-      rnTyClDecl (ty {tcdCtxt = L l (ctxt ++ tyCtxt)})
-      -- The source loc is somewhat half hearted... -=chak
+    rnAtDef tydecl@TyFunction {}                 = 
+      do
+        addErr noKindSig
+	rnTyClDecl tydecl
+    rnAtDef tydecl@TySynonym  {}                 = rnTyClDecl tydecl
+    rnAtDef tydecl@TyData {tcdCtxt = L l tyCtxt} = 
+      do
+        checkM (not . isKindSigDecl $ tydecl) $ addErr noKindSig
+        rnTyClDecl (tydecl {tcdCtxt = L l (ctxt ++ tyCtxt)})
+          -- The source loc is somewhat half hearted... -=chak
+    rnAtDef _ =
+      panic "RnSource.rnATDefs: not a type declaration"
+
+noKindSig = text "Instances cannot have kind signatures"
 \end{code}
 
 For the method bindings in class and instance decls, we extend the 
@@ -769,15 +781,17 @@ needOneIdx = text "Kind signature requires at least one type index"
 
 -- Rename associated type declarations (in classes)
 --
--- * This can be data declarations, type function signatures, and (default)
---   type function equations.
+-- * This can be kind signatures and (default) type function equations.
 --
 rnATs :: [LTyClDecl RdrName] -> RnM ([LTyClDecl Name], FreeVars)
 rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
   where
     rn_at (tydecl@TyData     {}) = rnTySig tydecl lookupIdxVars
     rn_at (tydecl@TyFunction {}) = rnTySig tydecl lookupIdxVars
-    rn_at (tydecl@TySynonym  {}) = rnTyClDecl tydecl
+    rn_at (tydecl@TySynonym  {}) = 
+      do
+        checkM (isNothing (tcdTyPats tydecl)) $ addErr noPatterns
+        rnTyClDecl tydecl
     rn_at _                      = panic "RnSource.rnATs: invalid TyClDecl"
 
     lookupIdxVars _ tyvars cont = mappM lookupIdxVar tyvars >>= cont
@@ -788,6 +802,9 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
       do
 	name' <- lookupOccRn (hsTyVarName tyvar)
 	return $ L l (replaceTyVarName tyvar name')
+
+noPatterns = text "Default definition for an associated synonym cannot have"
+	     <+> text "type pattern"
 
 -- This data decl will parse OK
 --	data T = a Int

@@ -470,6 +470,7 @@ cl_decl :: { LTyClDecl RdrName }
 			        cvBindsAndSigs (unLoc $4)
 		            ; (ctxt, tc, tvs, tparms) = unLoc $2}
                       ; checkTyVars tparms False  -- only type vars allowed
+		      ; checkKindSigs ats
 		      ; return $ L (comb4 $1 $2 $3 $4) 
 				   (mkClassDecl (ctxt, tc, tvs) 
 					        (unLoc $3) sigs binds ats) } }
