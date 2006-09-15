@@ -17,14 +17,10 @@
 ^mhms/
 ^mkworld/
 ^nofib/
-^includes/
 ^lib/
 ^misc/
 ^mkworld/
 ^runtime/
-^utils/
-^driver/
-^testsuite/
 #Packages:
 ^libraries/Cabal/
 ^libraries/ALUT/
