@@ -31,10 +31,10 @@ import RnEnv		( bindLocalNames )
 import HscTypes		( FixityEnv )
 
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
-import Type		( zipOpenTvSubst, substTheta, pprThetaArrow, pprClassPred )
+import Type		( zipOpenTvSubst, substTheta, pprThetaArrow, pprClassPred, mkTyVarTy )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
-import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConOrigArgTys )
+import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConOrigArgTys, dataConInstOrigArgTys )
 import Maybes		( catMaybes )
 import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
@@ -568,7 +568,7 @@ mkDataTypeEqn tycon clas
     ordinary_constraints
       = [ mkClassPred clas [arg_ty] 
         | data_con <- tyConDataCons tycon,
-          arg_ty   <- dataConOrigArgTys data_con,
+          arg_ty <- dataConInstOrigArgTys data_con (map mkTyVarTy (tyConTyVars tycon)),
           not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
         ]
 
