@@ -53,7 +53,7 @@ extra-source-files:
 	haskell.vim
 	src/haddock.sh
 
-executable: haddock-ghc
+executable: haddock-ghc-nolib
 hs-source-dirs: src
 main-is: Main.hs
 extensions: CPP, PatternGuards
