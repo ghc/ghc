@@ -176,9 +176,8 @@ tcLocalInstDecl1 :: LInstDecl Name
 	--
 	-- We check for respectable instance type, and context
 tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
+  -- !!!TODO: Handle the `ats' parameter!!! -=chak
   =	-- Prime error recovery, set source location
-    ASSERT( null ats )
-      -- !!!TODO: Handle the `ats' parameter!!! -=chak
     recoverM (returnM Nothing)		$
     setSrcSpan loc			$
     addErrCtxt (instDeclCtxt1 poly_ty)	$

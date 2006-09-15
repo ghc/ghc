@@ -15,8 +15,9 @@ module RnSource (
 import {-# SOURCE #-} RnExpr( rnLExpr )
 
 import HsSyn
-import RdrName		( RdrName, isRdrDataCon, isRdrTyVar, elemLocalRdrEnv, 
-			  globalRdrEnvElts, GlobalRdrElt(..), isLocalGRE )
+import RdrName		( RdrName, isRdrDataCon, isRdrTyVar, rdrNameOcc, 
+			  elemLocalRdrEnv, globalRdrEnvElts, GlobalRdrElt(..),
+			  isLocalGRE )
 import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
@@ -41,7 +42,7 @@ import Outputable
 import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
-import Maybe            ( isNothing )
+import Maybe            ( isNothing, catMaybes )
 import Monad		( liftM )
 import BasicTypes       ( Boxity(..) )
 \end{code}
@@ -513,7 +514,7 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
 	     	   deriv_fvs) }
 
   | otherwise	-- GADT
-  = ASSERT( null typats )       -- GADTs cannot have type patterns for now
+  = ASSERT( none typatsMaybe )    -- GADTs cannot have type patterns for now
     do	{ tycon' <- lookupLocatedTopBndrRn tycon
 	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
     	; tyvars' <- bindTyVarsRn data_doc tyvars 
@@ -535,6 +536,10 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
 		     [] 		   -> True
 		     L _ (ConDecl { con_res = ResTyH98 }) : _  -> True
 		     other		   -> False
+
+    none Nothing   = True
+    none (Just []) = True
+    none _         = False
 
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
     con_names = map con_names_helper condecls

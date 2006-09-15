@@ -153,7 +153,7 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
 	*** See "THE NAMING STORY" in HsDecls ****
   
 \begin{code}
-mkClassDecl (cxt, cname, tyvars) fds sigs mbinds
+mkClassDecl (cxt, cname, tyvars) fds sigs mbinds ats
   = ClassDecl { tcdCtxt = cxt, tcdLName = cname, tcdTyVars = tyvars,
 		tcdFDs = fds,  
 		tcdSigs = sigs,
