@@ -455,6 +455,11 @@ occAnal env (Note note body)
   = case occAnal env body of { (usage, body') ->
     (usage, Note note body')
     }
+
+occAnal env (Cast expr co)
+  = case occAnal env expr of { (usage, expr') ->
+    (usage, Cast expr' co)
+    }
 \end{code}
 
 \begin{code}

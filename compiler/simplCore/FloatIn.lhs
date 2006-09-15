@@ -139,6 +139,8 @@ fiExpr to_drop (_, AnnVar v) = mkCoLets' to_drop (Var v)
 
 fiExpr to_drop (_, AnnType ty) = ASSERT( null to_drop )
 				 Type ty
+fiExpr to_drop (_, AnnCast expr co)
+  = Cast (fiExpr to_drop expr) co	-- Just float in past coercion
 
 fiExpr to_drop (_, AnnLit lit) = Lit lit
 \end{code}
@@ -211,10 +213,6 @@ fiExpr to_drop (_, AnnNote note@(SCC cc) expr)
 fiExpr to_drop (_, AnnNote InlineMe expr)
   = 	-- Ditto... don't float anything into an INLINE expression
     mkCoLets' to_drop (Note InlineMe (fiExpr [] expr))
-
-fiExpr to_drop (_, AnnNote note@(Coerce _ _) expr)
-  = 	-- Just float in past coercion
-    Note note (fiExpr to_drop expr)
 
 fiExpr to_drop (_, AnnNote note@(CoreNote _) expr)
   = Note note (fiExpr to_drop expr)

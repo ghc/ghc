@@ -223,6 +223,7 @@ cseExpr env (Var v)		   = Var (lookupSubst env v)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
 cseExpr evn (Note InlineMe e)	   = Note InlineMe e	-- See Note [INLINE and NOINLINE]
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
+cseExpr env (Cast e co)            = Cast (cseExpr env e) co
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind

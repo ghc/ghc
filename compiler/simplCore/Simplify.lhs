@@ -13,7 +13,7 @@ import DynFlags	( dopt, DynFlag(Opt_D_dump_inlinings),
 			)
 import SimplMonad
 import SimplEnv	
-import SimplUtils	( mkCase, mkLam,
+import SimplUtils	( mkCase, mkLam, mkDataConAlt,
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 			  mkRhsStop, mkBoringStop,  mkLazyArgStop, pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
@@ -34,9 +34,8 @@ import IdInfo		( OccInfo(..), isLoopBreaker,
 			  occInfo
 			)
 import NewDemand	( isStrictDmd )
-import Unify		( coreRefineTys, dataConCanMatch )
-import DataCon		( DataCon, dataConTyCon, dataConRepStrictness, isVanillaDataCon,
-			  dataConInstArgTys, dataConTyVars )
+import TcGadt		( dataConCanMatch )
+import DataCon		( DataCon, dataConTyCon, dataConRepStrictness )
 import TyCon		( tyConArity, isAlgTyCon, isNewTyCon, tyConDataCons_maybe )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
@@ -45,15 +44,18 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, exprIsHNF, findDefault, mergeAlts,
 			  exprOkForSpeculation, exprArity, 
-			  mkCoerce, mkCoerce2, mkSCC, mkInlineMe, applyTypeToArg
+			  mkCoerce, mkSCC, mkInlineMe, applyTypeToArg
 			)
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
 			  splitFunTy_maybe, splitFunTy, coreEqType, splitTyConApp_maybe,
-			  isTyVarTy, mkTyVarTys
+			  isTyVarTy, mkTyVarTys, isFunTy, tcEqType
 			)
+import Coercion         ( Coercion, coercionKind,
+                          mkTransCoercion, mkLeftCoercion, mkRightCoercion, 
+                          mkSymCoercion, splitCoercionKind_maybe, decomposeCo  )
 import Var		( tyVarKind, mkTyVar )
 import VarEnv		( elemVarEnv, emptyVarEnv )
 import TysPrim		( realWorldStatePrimTy )
@@ -61,8 +63,6 @@ import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
 			  RecFlag(..), isNonRec
 			)
-import Name		( mkSysTvName )
-import StaticFlags	( opt_PprStyle_Debug )
 import OrdList
 import List		( nub )
 import Maybes		( orElse )
@@ -715,7 +715,9 @@ simplExprF env (Var v)	        cont = simplVar env v cont
 simplExprF env (Lit lit)	cont = rebuild env (Lit lit) cont
 simplExprF env expr@(Lam _ _)   cont = simplLam env expr cont
 simplExprF env (Note note expr) cont = simplNote env note expr cont
-simplExprF env (App fun arg)    cont = simplExprF env fun (ApplyTo NoDup arg (Just env) cont)
+simplExprF env (Cast body co)   cont = simplCast env body co cont
+simplExprF env (App fun arg)    cont = simplExprF env fun 
+				         (ApplyTo NoDup arg (Just env) cont)
 
 simplExprF env (Type ty) cont
   = ASSERT( contIsRhsOrArg cont )
@@ -760,6 +762,66 @@ simplType env ty
     new_ty = substTy env ty
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Lambdas}
+%*									*
+%************************************************************************
+
+\begin{code}
+simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont -> SimplM FloatsWithExpr
+simplCast env body co cont
+  = let
+       addCoerce co cont 
+         | (s1, k1) <- coercionKind co
+         , s1 `tcEqType` k1 = cont
+       addCoerce co1 (CoerceIt co2 cont)
+         | (s1, k1) <- coercionKind co1
+         , (l1, t1) <- coercionKind co2
+                -- 	coerce T1 S1 (coerce S1 K1 e)
+		-- ==>
+		--	e, 			if T1=K1
+		--	coerce T1 K1 e,		otherwise
+		--
+		-- For example, in the initial form of a worker
+		-- we may find 	(coerce T (coerce S (\x.e))) y
+		-- and we'd like it to simplify to e[y/x] in one round 
+		-- of simplification
+         , s1 `coreEqType` t1  = cont		 -- The coerces cancel out  
+         | otherwise           = CoerceIt (mkTransCoercion co1 co2) cont
+    
+       addCoerce co (ApplyTo dup arg arg_se cont)
+         | not (isTypeArg arg)    -- This whole case only works for value args
+	                        -- Could upgrade to have equiv thing for type apps too	
+         , Just (s1s2, t1t2) <- splitCoercionKind_maybe co
+         , isFunTy s1s2
+                -- co : s1s2 :=: t1t2
+		--	(coerce (T1->T2) (S1->S2) F) E
+		-- ===> 
+		--	coerce T2 S2 (F (coerce S1 T1 E))
+		--
+		-- t1t2 must be a function type, T1->T2, because it's applied
+		-- to something but s1s2 might conceivably not be
+		--
+		-- When we build the ApplyTo we can't mix the out-types
+		-- with the InExpr in the argument, so we simply substitute
+		-- to make it all consistent.  It's a bit messy.
+		-- But it isn't a common case.
+         = result
+         where
+           -- we split coercion t1->t2 :=: s1->s2 into t1 :=: s1 and 
+           -- t2 :=: s2 with left and right on the curried form: 
+           --    (->) t1 t2 :=: (->) s1 s2
+           [co1, co2] = decomposeCo 2 co
+           new_arg    = mkCoerce (mkSymCoercion co1) (substExpr arg_env arg)
+           arg_env    = setInScope arg_se env
+           result     = ApplyTo dup new_arg (zapSubstEnv env) (addCoerce co2 cont)
+       addCoerce co cont = CoerceIt co cont
+    in
+    simplType env co		`thenSmpl` \ co' ->
+    simplExprF env body (addCoerce co' cont)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -829,56 +891,6 @@ mkLamBndrZapper fun n_args
 %************************************************************************
 
 \begin{code}
-simplNote env (Coerce to from) body cont
-  = let
-	addCoerce s1 k1 cont 	-- Drop redundant coerces.  This can happen if a polymoprhic
-				-- (coerce a b e) is instantiated with a=ty1 b=ty2 and the
-				-- two are the same. This happens a lot in Happy-generated parsers
-	  | s1 `coreEqType` k1 = cont
-
-	addCoerce s1 k1 (CoerceIt t1 cont)
-		-- 	coerce T1 S1 (coerce S1 K1 e)
-		-- ==>
-		--	e, 			if T1=K1
-		--	coerce T1 K1 e,		otherwise
-		--
-		-- For example, in the initial form of a worker
-		-- we may find 	(coerce T (coerce S (\x.e))) y
-		-- and we'd like it to simplify to e[y/x] in one round 
-		-- of simplification
-	  | t1 `coreEqType` k1  = cont		 	-- The coerces cancel out
-	  | otherwise           = CoerceIt t1 cont	-- They don't cancel, but 
-							-- the inner one is redundant
-
-	addCoerce t1t2 s1s2 (ApplyTo dup arg mb_arg_se cont)
-	  | not (isTypeArg arg),	-- This whole case only works for value args
-					-- Could upgrade to have equiv thing for type apps too	
- 	    Just (s1, s2) <- splitFunTy_maybe s1s2
-		--	(coerce (T1->T2) (S1->S2) F) E
-		-- ===> 
-		--	coerce T2 S2 (F (coerce S1 T1 E))
-		--
-		-- t1t2 must be a function type, T1->T2, because it's applied to something
-		-- but s1s2 might conceivably not be
-		--
-		-- When we build the ApplyTo we can't mix the out-types
-		-- with the InExpr in the argument, so we simply substitute
-		-- to make it all consistent.  It's a bit messy.
-		-- But it isn't a common case.
-	  = let 
-		(t1,t2) = splitFunTy t1t2
-		new_arg = mkCoerce2 s1 t1 arg'
-		arg' = case mb_arg_se of
-			  Nothing -> arg
-			  Just arg_se -> substExpr (setInScope arg_se env) arg
-	    in
-	    ApplyTo dup new_arg Nothing (addCoerce t2 s2 cont)
-			
-	addCoerce to' _ cont = CoerceIt to' cont
-    in
-    simplType env to		`thenSmpl` \ to' ->
-    simplType env from		`thenSmpl` \ from' ->
-    simplExprF env body (addCoerce to' from' cont)
 
 		
 -- Hack: we only distinguish subsumed cost centre stacks for the purposes of
@@ -1249,7 +1261,7 @@ rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM FloatsWithExpr
 
 rebuild env expr (Stop _ _ _)		      = rebuildDone env expr
 rebuild env expr (ArgOf _ _ _ cont_fn)	      = cont_fn env expr
-rebuild env expr (CoerceIt to_ty cont)	      = rebuild env (mkCoerce to_ty expr) cont
+rebuild env expr (CoerceIt co cont)	      = rebuild env (mkCoerce co expr) cont
 rebuild env expr (Select _ bndr alts se cont) = rebuildCase (setInScope se env) expr bndr alts cont
 rebuild env expr (ApplyTo _ arg mb_se cont)   = rebuildApp  env expr arg mb_se cont
 
@@ -1536,7 +1548,8 @@ simplDefault env case_bndr' imposs_cons cont (Just rhs)
 				-- altogether if it can't match
 
 	[con] -> 	-- It matches exactly one constructor, so fill it in
-		 do { con_alt <- mkDataConAlt case_bndr' con inst_tys rhs
+		 do { tick (FillInCaseDefault case_bndr')
+		    ; con_alt <- mkDataConAlt con inst_tys rhs
 		    ; Just (_, alt') <- simplAlt env [] case_bndr' cont con_alt
 			-- The simplAlt must succeed with Just because we have
 			-- already filtered out construtors that can't match
@@ -1554,29 +1567,6 @@ simplDefault env case_bndr' imposs_cons cont (Just rhs)
 		-- Record the constructors that the case-binder *can't* be.
 	     ; rhs' <- simplExprC env' rhs cont
 	     ; return [(DEFAULT, [], rhs')] }
-
-mkDataConAlt :: Id -> DataCon -> [OutType] -> InExpr -> SimplM InAlt
--- Make a data-constructor alternative to replace the DEFAULT case
--- NB: there's something a bit bogus here, because we put OutTypes into an InAlt
-mkDataConAlt case_bndr con tys rhs
-  = do 	{ tick (FillInCaseDefault case_bndr)
-	; args <- mk_args con tys
-	; return (DataAlt con, args, rhs) }
-  where
-    mk_args con inst_tys
-      = do { (tv_bndrs, inst_tys') <- mk_tv_bndrs con inst_tys
-	   ; let arg_tys = dataConInstArgTys con inst_tys'
-	   ; arg_ids <- mapM (newId FSLIT("a")) arg_tys
-	   ; returnSmpl (tv_bndrs ++ arg_ids) }
-
-    mk_tv_bndrs con inst_tys
-      | isVanillaDataCon con
-      = return ([], inst_tys)
-      | otherwise
-      = do { tv_uniqs <- getUniquesSmpl
-	   ; let new_tvs    = zipWith mk tv_uniqs (dataConTyVars con)
- 	 	 mk uniq tv = mkTyVar (mkSysTvName uniq FSLIT("t")) (tyVarKind tv)
-	   ; return (new_tvs, mkTyVarTys new_tvs) }
 
 simplAlt :: SimplEnv
 	 -> [AltCon]	-- These constructors can't be present when
@@ -1612,7 +1602,6 @@ simplAlt env handled_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
     env' = mk_rhs_env env case_bndr' (mkUnfolding False (Lit lit))
 
 simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
-  | isVanillaDataCon con
   = 	-- Deal with the pattern-bound variables
 	-- Mark the ones that are in ! positions in the data constructor
 	-- as certainly-evaluated.
@@ -1624,50 +1613,11 @@ simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
 		-- Bind the case-binder to (con args)
     let unf       = mkUnfolding False (mkConApp con con_args)
 	inst_tys' = tyConAppArgs (idType case_bndr')
-	con_args  = map Type inst_tys' ++ map varToCoreExpr vs' 
+	con_args  = map Type inst_tys' ++ varsToCoreExprs vs' 
 	env'      = mk_rhs_env env case_bndr' unf
     in
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
     returnSmpl (Just (emptyVarEnv, (DataAlt con, vs', rhs')))
-
-  | otherwise	-- GADT case
-  = let
-	(tvs,ids) = span isTyVar vs
-    in
-    simplBinders env tvs			`thenSmpl` \ (env1, tvs') ->
-    case coreRefineTys con tvs' (idType case_bndr') of {
-	Nothing 	-- Inaccessible
-	    | opt_PprStyle_Debug	-- Hack: if debugging is on, generate an error case 
-					--  	 so we can see it
-	    ->	let rhs' = mkApps (Var eRROR_ID) 
-				[Type (substTy env (exprType rhs)),
-				 Lit (mkStringLit "Impossible alternative (GADT)")]
-		in 
-		simplBinders env1 ids		`thenSmpl` \ (env2, ids') -> 
-		returnSmpl (Just (emptyVarEnv, (DataAlt con, tvs' ++ ids', rhs'))) 
-
-	    | otherwise	-- Filter out the inaccessible branch
-	    -> return Nothing ;	
-
-	Just refine@(tv_subst_env, _) -> 	-- The normal case
-
-    let 
-	env2 = refineSimplEnv env1 refine
-	-- Simplify the Ids in the refined environment, so their types
-	-- reflect the refinement.  Usually this doesn't matter, but it helps
-	-- in mkDupableAlt, when we want to float a lambda that uses these binders
-	-- Furthermore, it means the binders contain maximal type information
-    in
-    simplBinders env2 (add_evals con ids)	`thenSmpl` \ (env3, ids') ->
-    let unf        = mkUnfolding False con_app
-	con_app    = mkConApp con con_args
-	con_args   = map varToCoreExpr vs' 	-- NB: no inst_tys'
-	env_w_unf  = mk_rhs_env env3 case_bndr' unf
-	vs'	   = tvs' ++ ids'
-    in
-    simplExprC env_w_unf rhs cont'	`thenSmpl` \ rhs' ->
-    returnSmpl (Just (tv_subst_env, (DataAlt con, vs', rhs'))) }
-
   where
 	-- add_evals records the evaluated-ness of the bound variables of
 	-- a case pattern.  This is *important*.  Consider
@@ -1763,10 +1713,7 @@ knownCon env scrut con args bndr alts cont
 		   simplNonRecX env bndr bndr_rhs		$ \ env ->
 		   simplExprF env rhs cont
 	        where
-		   dead_bndr = isDeadBinder bndr
-		   n_drop_tys | isVanillaDataCon dc = tyConArity (dataConTyCon dc)
-			      | otherwise	    = 0
-			-- Vanilla data constructors lack type arguments in the pattern
+		   n_drop_tys = tyConArity (dataConTyCon dc)
 
 -- Ugh!
 bind_args env dead_bndr [] _ thing_inside = thing_inside env
@@ -2063,7 +2010,7 @@ mkDupableAlt env case_bndr' cont alt
 	then newId FSLIT("w") realWorldStatePrimTy  	`thenSmpl` \ rw_id ->
 	     returnSmpl ([rw_id], [Var realWorldPrimId])
 	else 
-	     returnSmpl (used_bndrs', map varToCoreExpr used_bndrs')
+	     returnSmpl (used_bndrs', varsToCoreExprs used_bndrs')
     )							`thenSmpl` \ (final_bndrs', final_args) ->
 
 	-- See comment about "$j" name above

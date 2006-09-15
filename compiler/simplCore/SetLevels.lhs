@@ -290,6 +290,10 @@ lvlExpr ctxt_lvl env (_, AnnNote note expr)
   = lvlExpr ctxt_lvl env expr 		`thenLvl` \ expr' ->
     returnLvl (Note note expr')
 
+lvlExpr ctxt_lvl env (_, AnnCast expr co)
+  = lvlExpr ctxt_lvl env expr		`thenLvl` \ expr' ->
+    returnLvl (Cast expr' co)
+
 -- We don't split adjacent lambdas.  That is, given
 --	\x y -> (x+1,y)
 -- we don't float to give 

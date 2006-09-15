@@ -5,7 +5,7 @@
 
 \begin{code}
 module SimplUtils (
-	mkLam, mkCase,
+	mkLam, mkCase, mkDataConAlt,
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, activeInline, activeRule,
@@ -31,23 +31,29 @@ import StaticFlags	( opt_UF_UpdateInPlace, opt_SimplNoPreInlining,
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, 
-			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce2,
-			  findDefault, exprOkForSpeculation, exprIsHNF, mergeAlts
+			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce,
+			  findDefault, exprOkForSpeculation, exprIsHNF, mergeAlts,
+                          applyTypeToArgs
 			)
 import Literal		( mkStringLit )
 import CoreUnfold	( smallEnoughToInline )
-import MkId		( eRROR_ID )
+import MkId		( eRROR_ID, wrapNewTypeBody )
 import Id		( Id, idType, isDataConWorkId, idOccInfo, isDictId, 
-			  isDeadBinder, idNewDemandInfo, isExportedId,
+			  isDeadBinder, idNewDemandInfo, isExportedId, mkSysLocal,
 			  idUnfolding, idNewStrictness, idInlinePragma, idHasRules
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
+import Var              ( tyVarKind, mkTyVar )
+import Name             ( mkSysTvName )
 import Type		( Type, splitFunTys, dropForAlls, isStrictType,
-			  splitTyConApp_maybe, tyConAppArgs 
+			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys ) 
+import Coercion         ( isEqPredTy
 			)
-import TyCon		( tyConDataCons_maybe )
-import DataCon		( dataConRepArity )
+import Coercion         ( Coercion, mkUnsafeCoercion, coercionKind )
+import TyCon		( tyConDataCons_maybe, isNewTyCon )
+import DataCon		( DataCon, dataConRepArity, dataConExTyVars, 
+                          dataConInstArgTys, dataConTyCon )
 import VarSet
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
 			  Activation, isAlwaysActive, isActive )
@@ -75,7 +81,7 @@ data SimplCont		-- Strict contexts
 			-- (b) This is an argument of a function that has RULES
 			--     Inlining the call might allow the rule to fire
 
-  | CoerceIt OutType			-- The To-type, simplified
+  | CoerceIt OutCoercion		-- The coercion simplified
 	     SimplCont
 
   | ApplyTo  DupFlag 
@@ -114,13 +120,14 @@ instance Outputable SimplCont where
   ppr (ArgOf _ _ _ _)   	     = ptext SLIT("ArgOf...")
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont
-  ppr (CoerceIt ty cont)	     = (ptext SLIT("CoerceIt") <+> ppr ty) $$ ppr cont
+  ppr (CoerceIt co cont)	     = (ptext SLIT("CoerceIt") <+> ppr co) $$ ppr cont
 
 data DupFlag = OkToDup | NoDup
 
 instance Outputable DupFlag where
   ppr OkToDup = ptext SLIT("ok")
   ppr NoDup   = ptext SLIT("nodup")
+
 
 
 -------------------
@@ -156,13 +163,15 @@ discardableCont (Stop _ _ _)	    = False
 discardableCont (CoerceIt _ cont)   = discardableCont cont
 discardableCont other		    = True
 
-discardCont :: SimplCont	-- A continuation, expecting
+discardCont :: Type             -- The type expected
+            -> SimplCont	-- A continuation, expecting the previous type
 	    -> SimplCont	-- Replace the continuation with a suitable coerce
-discardCont cont = case cont of
+discardCont from_ty cont = case cont of
 		     Stop to_ty is_rhs _ -> cont
-		     other               -> CoerceIt to_ty (mkBoringStop to_ty)
+		     other               -> CoerceIt co (mkBoringStop to_ty)
 		 where
-		   to_ty = contResultType cont
+                   co      = mkUnsafeCoercion from_ty to_ty
+		   to_ty   = contResultType cont
 
 -------------------
 contResultType :: SimplCont -> OutType
@@ -230,17 +239,22 @@ getContArgs chkr fun orig_cont
 	-- Then, especially in the first of these cases, we'd like to discard
 	-- the continuation, leaving just the bottoming expression.  But the
 	-- type might not be right, so we may have to add a coerce.
-    go acc ss cont 
-	| null ss && discardableCont cont = (reverse acc, discardCont cont)
-	| otherwise			  = (reverse acc, cont)
 
+    go acc ss cont 
+	| null ss && discardableCont cont = (args, discardCont hole_ty cont)
+	| otherwise			  = (args, cont)
+	where
+	  args = reverse acc
+	  hole_ty = applyTypeToArgs (Var fun) (idType fun)
+				    [substExpr se arg | (arg,se,_) <- args]
+    
     ----------------------------
     vanilla_stricts, computed_stricts :: [Bool]
     vanilla_stricts  = repeat False
     computed_stricts = zipWith (||) fun_stricts arg_stricts
 
     ----------------------------
-    (val_arg_tys, _) = splitFunTys (dropForAlls (idType fun))
+    (val_arg_tys, res_ty) = splitFunTys (dropForAlls (idType fun))
     arg_stricts      = map isStrictType val_arg_tys ++ repeat False
 	-- These argument types are used as a cheap and cheerful way to find
 	-- unboxed arguments, which must be strict.  But it's an InType
@@ -1123,6 +1137,28 @@ tryRhsTyLam env tyvars body 		-- Only does something if there's a let
 %*									*
 %************************************************************************
 
+\begin{code}
+mkDataConAlt :: DataCon -> [OutType] -> InExpr -> SimplM InAlt
+-- Make a data-constructor alternative to replace the DEFAULT case
+-- NB: there's something a bit bogus here, because we put OutTypes into an InAlt
+mkDataConAlt con inst_tys rhs
+  = do 	{ tv_uniqs <- getUniquesSmpl 
+	; arg_uniqs <- getUniquesSmpl
+	; let tv_bndrs  = zipWith mk_tv_bndr (dataConExTyVars con) tv_uniqs
+	      arg_tys   = dataConInstArgTys con (inst_tys ++ mkTyVarTys tv_bndrs)
+	      arg_bndrs = zipWith mk_arg arg_tys arg_uniqs
+	; return (DataAlt con, tv_bndrs ++ arg_bndrs, rhs) }
+  where
+    mk_arg arg_ty uniq	-- Equality predicates get a TyVar
+			-- while dictionaries and others get an Id
+      | isEqPredTy arg_ty = mk_tv arg_ty uniq
+      | otherwise	  = mk_id arg_ty uniq
+
+    mk_tv_bndr tv uniq = mk_tv (tyVarKind tv) uniq
+    mk_tv kind uniq = mkTyVar (mkSysTvName uniq FSLIT("t")) kind
+    mk_id ty   uniq = mkSysLocal FSLIT("a") uniq ty
+\end{code}
+
 mkCase puts a case expression back together, trying various transformations first.
 
 \begin{code}
@@ -1449,11 +1485,16 @@ mkCase1 scrut case_bndr ty alts	-- Identity case
   where
     identity_alt (con, args, rhs) = de_note rhs `cheapEqExpr` identity_rhs con args
 
-    identity_rhs (DataAlt con) args = mkConApp con (arg_tys ++ map varToCoreExpr args)
+    identity_rhs (DataAlt con) args
+      | isNewTyCon (dataConTyCon con) 
+      = wrapNewTypeBody (dataConTyCon con) arg_tys (varToCoreExpr $ head args)
+      | otherwise
+      = pprTrace "mkCase1" (ppr con) $ mkConApp con (arg_ty_exprs ++ varsToCoreExprs args)
     identity_rhs (LitAlt lit)  _    = Lit lit
     identity_rhs DEFAULT       _    = Var case_bndr
 
-    arg_tys = map Type (tyConAppArgs (idType case_bndr))
+    arg_tys = (tyConAppArgs (idType case_bndr))
+    arg_ty_exprs = map Type arg_tys
 
 	-- We've seen this:
 	--	case coerce T e of x { _ -> coerce T' x }
@@ -1465,8 +1506,12 @@ mkCase1 scrut case_bndr ty alts	-- Identity case
 
 	-- re_note wraps a coerce if it might be necessary
     re_note scrut = case head alts of
-			(_,_,rhs1@(Note _ _)) -> mkCoerce2 (exprType rhs1) (idType case_bndr) scrut
+			(_,_,rhs1@(Note _ _)) -> 
+                            let co = mkUnsafeCoercion (idType case_bndr) (exprType rhs1) in 
+                               -- this unsafeCoercion is bad, make this better
+                            mkCoerce co scrut
 			other		      -> scrut
+
 
 
 --------------------------------------------------

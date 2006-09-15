@@ -315,6 +315,10 @@ floatExpr lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr lvl expr)    of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Note note expr') }
 
+floatExpr lvl (Cast expr co)
+  = case (floatExpr lvl expr)	of { (fs, floating_defns, expr') ->
+    (fs, floating_defns, Cast expr' co) }
+
 floatExpr lvl (Let (NonRec (TB bndr bndr_lvl) rhs) body)
   | isUnLiftedType (idType bndr)	-- Treat unlifted lets just like a case
   = case floatExpr lvl rhs	of { (fs, rhs_floats, rhs') ->
