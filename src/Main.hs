@@ -39,6 +39,7 @@ import Foreign.C
 import qualified Data.Map as Map
 import Data.Map              (Map)
 import Data.FunctorM         ( fmapM )
+import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
 
 import qualified GHC         ( init )
 import GHC hiding ( init ) 
@@ -60,7 +61,7 @@ import FastString
 import DynFlags hiding ( Option )
 import StaticFlags           ( parseStaticFlags )
 import Unique                ( mkUnique )
-import Packages
+import Packages hiding ( package ) 
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
@@ -86,13 +87,14 @@ main = do
         Nothing -> dynflags'
 
   setSessionDynFlags session dynflags''
- 
-  modules <- sortAndCheckModules session dynflags' fileArgs
-  (ifaces, htmls) <- getIfacesAndHtmls flags dynflags'
-  let (modss, envs) = unzip ifaces
-  updateHTMLXRefs htmls modss 
+  modules <- sortAndCheckModules session dynflags'' fileArgs
+
+  packages <- getPackages session dynflags''
+  updateHTMLXRefs packages
+  let env = packagesDocEnv packages
+
   -- TODO: continue to break up the run function into parts
-  run flags modules envs
+  run flags modules env
 
 parseModeFlag :: [String] -> (Bool, [String])
 parseModeFlag ("--ghc-flags":rest) = (True, rest)
@@ -214,25 +216,6 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
                          (mod, CheckedModule a (Just b) (Just c) (Just d), f) 
                          <- modules ] 
 
-getIfacesAndHtmls :: [Flag] -> DynFlags -> IO ([Interface], [FilePath])
-getIfacesAndHtmls flags dynflags = do
-  packageFiles <- getPackageFiles dynflags
-  let 
-    readIfaceFlags = [ parseIfaceOption str | Flag_ReadInterface str <- flags ]
-    totalFiles = packageFiles ++ readIfaceFlags
-    (htmlPaths, ifacePaths) = unzip totalFiles
-  files <- mapM (\(htmlPath, ifacePath) -> do 
-    htmlExist <- doesDirectoryExist htmlPath
-    ifaceExist <- doesFileExist ifacePath
-    if htmlExist && ifaceExist 
-      then do
-        iface <- readInterface ifacePath
-        return (Just (iface, htmlPath))
-      else return Nothing
-    ) totalFiles
-  
-  return (unzip (catMaybes files))
-
 data Flag
   = Flag_CSS String
   | Flag_Debug
@@ -352,8 +335,8 @@ handleEagerFlags flags = do
   where 
     whenFlag flag action = when (flag `elem` flags) action 
 
-run :: [Flag] -> [CheckedMod] -> [Map Name Name] -> IO ()
-run flags modules extEnvs = do
+run :: [Flag] -> [CheckedMod] -> Map Name Name -> IO ()
+run flags modules extEnv = do
   let
     title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
@@ -408,7 +391,7 @@ run flags modules extEnvs = do
     (modMap, messages) = runWriter (pass1 modules flags) 
     haddockMods = catMaybes [ Map.lookup mod modMap | (mod,_,_) <- modules ]
     homeEnv = buildGlobalDocEnv haddockMods
-    env = Map.unions (homeEnv:extEnvs)
+    env = homeEnv `Map.union` extEnv
     haddockMods' = attachInstances haddockMods
     (haddockMods'', messages') = runWriter $ mapM (renameModule env) haddockMods'
   
@@ -696,12 +679,18 @@ parseIfaceOption s =
   case break (==',') s of
 	(fpath,',':file) -> (fpath,file)
 	(file, _)        -> ("", file)
-		
+	
+updateHTMLXRefs :: [PackageData] -> IO ()
+updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
+  where
+    mapping = [ (mod, html) | 
+                (PackageData _ mods html) <- packages, (mod, _) <- mods ] 
+{-
 updateHTMLXRefs :: [FilePath] -> [[Module]] -> IO ()
 updateHTMLXRefs paths modss = writeIORef html_xrefs_ref (Map.fromList mapping)
   where
     mapping = [ (mod, fpath) | (fpath, mods) <- zip paths modss, mod <- mods ]
-
+-}
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))
 getPrologue flags
   = case [filename | Flag_Prologue filename <- flags ] of
@@ -1145,40 +1134,87 @@ type ErrMsgM a = Writer [ErrMsg] a
 -- Packages 
 --------------------------------------------------------------------------------
 
-getPackageFiles :: DynFlags -> IO [(String, String)]
-getPackageFiles dynflags = do
-  packages <- getExplicitPackagesAnd dynflags []
-  mbFiles <- mapM check (filter notRTS packages)
-  return [ pair | Just pair <- mbFiles ]
+-- | Recreate exposed modules from an InstalledPackageInfo
+packageModules :: InstalledPackageInfo -> [Module]
+packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
+  where moduleNames = map mkModuleName (exposedModules pkgInfo)
+
+pkgId :: InstalledPackageInfo -> PackageId
+pkgId = mkPackageId . package 
+
+-- | Get the ModuleInfo for each exposed module in a package 
+getPackageModuleInfo :: Session -> InstalledPackageInfo -> 
+                        IO (Maybe [(Module, ModuleInfo)])
+getPackageModuleInfo session pkgInfo = do
+  mbInfos <- (flip mapM) (packageModules pkgInfo) $ \mod -> do
+    mbModInfo <- getModuleInfo session mod 
+    case mbModInfo of 
+      Nothing -> return Nothing
+      Just modInfo -> return (Just (mod, modInfo))
+  return (sequence mbInfos)
+
+-- | Get the Haddock HTML directory path for a package
+getHtml :: InstalledPackageInfo -> IO (Either String FilePath)
+getHtml pkgInfo = case haddockHTMLs pkgInfo of 
+  (path:_) | not (null path) -> do
+    dirExists <- doesDirectoryExist path
+    if dirExists then return (Right path) else return $
+       Left ("HTML directory " ++ path ++ " does not exist.")
+  _ -> return (Left "No Haddock documentation installed.")
+ 
+data PackageData = PackageData {
+  pdPackageId  :: PackageId,
+  pdModuleInfo :: [(Module, ModuleInfo)],
+  pdHtmlPath   :: FilePath
+}
+
+-- | Retrieve a PackageData for a package in the session  
+getPackageData :: Session -> InstalledPackageInfo -> 
+                  IO (Either String PackageData) 
+getPackageData session pkgInfo = do
+  eHtml <- getHtml pkgInfo
+  mbModInfo <- getPackageModuleInfo session pkgInfo
+  let eModInfo = toEither "Could not get ModuleInfo for all exposed modules." 
+                 mbModInfo
+  return $ do -- in the Either monad
+    html <- eHtml
+    modInfo <- eModInfo
+    return $ PackageData {
+      pdPackageId  = pkgId pkgInfo, 
+      pdModuleInfo = modInfo,
+      pdHtmlPath   = html
+    }
+  where 
+    toEither err = maybe (Left err) Right
+
+-- | Retrieve a PackageData for each package in the session except for rts.
+-- Print a warning on stdout if a PackageData could not be retrieved.
+getPackages :: Session -> DynFlags -> IO [PackageData]
+getPackages session dynflags = do
+  pkgInfos <- getExplicitPackagesAnd dynflags []
+  let pkgInfos' = filter notRTS pkgInfos
+  liftM catMaybes (mapM getPackage pkgInfos')
   where
     -- no better way to do this?
     notRTS p = pkgName (package p) /= packageIdString rtsPackageId  
 
-    check p = (do
-      pair <- check' p
-      return (Just pair)) `catch` (\e -> do  
-        putStrLn ("Warning: Cannot use package " ++ pkg ++ ":")
-        putStrLn ("   " ++ show e)
-        return Nothing)          
-      where 
-        pkg = showPackageId (package p)
+    getPackage pkgInfo = do
+      result <- getPackageData session pkgInfo
+      case result of
+        Left err -> do
+          let pkgName = showPackageId (package pkgInfo)
+          putStrLn ("Warning: Cannot use package " ++ pkgName ++ ":")
+          putStrLn ("   " ++ show err)
+          return Nothing
+        Right pkgInfo -> return (Just pkgInfo)
 
-    check' p = do
-      when (null html || null iface) $ 
-        throwIO (ErrorCall "No Haddock documentation installed.")
+packagesDocEnv :: [PackageData] -> Map Name Name
+packagesDocEnv packages = Map.fromList (concatMap packageDocEnv packages)
 
-      htmlExists <- doesDirectoryExist html
-      when (not htmlExists) $ 
-        throwIO (ErrorCall ("HTML directory " ++ html ++ " does not exist.")) 
+packageDocEnv :: PackageData -> [(Name, Name)]
+packageDocEnv package = concatMap moduleInfoDocEnv modInfo  
+  where modInfo = pdModuleInfo package
 
-      ifaceExists <- doesFileExist iface
-      when (not ifaceExists) $ 
-        throwIO (ErrorCall ("Interface " ++ iface ++ " does not exist.")) 
-
-      return (html, iface)
-      where
-        html  = first (haddockHTMLs p)
-        iface = first (haddockInterfaces p)
-        
-        first []    = []
-        first (x:_) = x    
+moduleInfoDocEnv :: (Module, ModuleInfo) -> [(Name, Name)]
+moduleInfoDocEnv (mod, modInfo) = [ (n, nameSetMod n mod) | n <- names ]
+  where names = modInfoExports modInfo
