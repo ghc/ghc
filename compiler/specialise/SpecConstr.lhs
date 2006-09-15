@@ -18,10 +18,9 @@ import CoreSubst	( Subst, mkSubst, substExpr )
 import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
-import DataCon		( dataConRepArity, isVanillaDataCon, dataConTyVars )
+import DataCon		( dataConRepArity, dataConTyVars )
 import Type		( Type, tyConAppArgs, tyVarsOfTypes )
 import Rules		( matchN )
-import Unify		( coreRefineTys )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
 			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
 import Var		( Var )
@@ -483,28 +482,11 @@ extendCaseBndrs env case_bndr scrut con alt_bndrs
 		  Var v -> lookupVarEnv cur_scope v `orElse` Other
 		  other -> Other
 
-    extend_data_con data_con
-	| isVanillaDataCon data_con = extendCons env1 scrut case_bndr (CV con vanilla_args)
-	| otherwise		    = extendCons env2 scrut case_bndr (CV con gadt_args)
-		-- Note env2 for GADTs
+    extend_data_con data_con = 
+      extendCons env1 scrut case_bndr (CV con vanilla_args)
 	where
-    
 	    vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
-			   map varToCoreExpr alt_bndrs
-
-	    gadt_args = map (substExpr subst . varToCoreExpr) alt_bndrs
-		-- This call generates some bogus warnings from substExpr,
-		-- because it's inconvenient to put all the Ids in scope
-		-- Will be fixed when we move to FC
-
-	    (alt_tvs, _) = span isTyVar alt_bndrs
-	    Just (tv_subst, is_local) = coreRefineTys data_con alt_tvs (idType case_bndr)
-	    subst = mkSubst in_scope tv_subst emptyVarEnv	-- No Id substitition
-	    in_scope = mkInScopeSet (tyVarsOfTypes (varEnvElts tv_subst))
-	
-	    env2 | is_local  = env1
-		 | otherwise = env1 { cons = refineConstrEnv subst (cons env) }
-
+			   varsToCoreExprs alt_bndrs
 
 extendCons :: ScEnv -> CoreExpr -> Id -> ConValue -> ScEnv
 extendCons env scrut case_bndr val

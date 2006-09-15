@@ -25,6 +25,7 @@ import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX )
 import PprCore		( pprRules )
 import Type		( TvSubstEnv )
+import Coercion         ( coercionKind )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
 import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName,
@@ -468,7 +469,9 @@ match menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
 match menv subst (Type ty1) (Type ty2)
   = match_ty menv subst ty1 ty2
 
-match menv subst (Note (Coerce to1 from1) e1) (Note (Coerce to2 from2) e2)
+match menv subst (Cast e1 co1) (Cast e2 co2)
+  | (from1, to1) <- coercionKind co1
+  , (from2, to2) <- coercionKind co2
   = do	{ subst1 <- match_ty menv subst  to1   to2
 	; subst2 <- match_ty menv subst1 from1 from2
 	; match menv subst2 e1 e2 }

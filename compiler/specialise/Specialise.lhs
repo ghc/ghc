@@ -624,7 +624,9 @@ specExpr :: Subst -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 specExpr subst (Type ty) = returnSM (Type (substTy subst ty), emptyUDs)
 specExpr subst (Var v)   = returnSM (specVar subst v,         emptyUDs)
 specExpr subst (Lit lit) = returnSM (Lit lit, 		      emptyUDs)
-
+specExpr subst (Cast e co) =
+  specExpr subst e              `thenSM` \ (e', uds) ->
+  returnSM ((Cast e' (substTy subst co)), uds)
 specExpr subst (Note note body)
   = specExpr subst body 	`thenSM` \ (body', uds) ->
     returnSM (Note (specNote subst note) body', uds)
@@ -688,7 +690,6 @@ specExpr subst (Let bind body)
     returnSM (foldr Let body' binds', uds)
 
 -- Must apply the type substitution to coerceions
-specNote subst (Coerce t1 t2) = Coerce (substTy subst t1) (substTy subst t2)
 specNote subst note	      = note
 \end{code}
 
