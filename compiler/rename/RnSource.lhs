@@ -42,7 +42,7 @@ import Outputable
 import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
-import Maybe            ( isNothing, catMaybes )
+import Maybe            ( isNothing, isJust )
 import Monad		( liftM )
 import BasicTypes       ( Boxity(..) )
 \end{code}
@@ -569,7 +569,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
     bindTyVarsRn cls_doc tyvars			( \ tyvars' ->
 	rnContext cls_doc context	`thenM` \ context' ->
 	rnFds cls_doc fds		`thenM` \ fds' ->
-	rnATs tyvars' ats		`thenM` \ (ats', ats_fvs) ->
+	rnATs ats			`thenM` \ (ats', ats_fvs) ->
 	renameSigs okClsDclSig sigs	`thenM` \ sigs' ->
 	returnM   (tyvars', context', fds', (ats', ats_fvs), sigs')
     )	`thenM` \ (tyvars', context', fds', (ats', ats_fvs), sigs') ->
@@ -639,7 +639,7 @@ badGadtStupidTheta tycon
 %*********************************************************
 
 \begin{code}
--- Although, we are processing type patterns here, all type variables should
+-- Although, we are processing type patterns here, all type variables will
 -- already be in scope (they are the same as in the 'tcdTyVars' field of the
 -- type declaration to which these patterns belong)
 --
@@ -749,76 +749,74 @@ rnFds doc fds
 rnHsTyVars doc tvs  = mappM (rnHsTyvar doc) tvs
 rnHsTyvar doc tyvar = lookupOccRn tyvar
 
--- Rename associated data type declarations
+-- Rename kind signatures (signatures of indexed data types/newtypes and
+-- signatures of type functions)
 --
-rnATs :: [LHsTyVarBndr Name] -> [LTyClDecl RdrName] 
-      -> RnM ([LTyClDecl Name], FreeVars)
-rnATs classLTyVars ats
-  = mapFvRn (wrapLocFstM rn_at) ats
-  where
-    -- The parser won't accept anything, but a data declarations
-    rn_at (tydecl@TyData {tcdCtxt = L ctxtL ctxt, tcdLName = tycon, 
-			  tcdTyPats = Just typats, tcdCons = condecls,
-			  tcdDerivs = derivs}) =
-      do { checkM (null ctxt    ) $ addErr atNoCtxt	-- no context
-         ; checkM (null condecls) $ addErr atNoCons	-- no constructors
-	 -- check and collect type parameters
-         ; let (idxParms, excessParms) = splitAt (length classLTyVars) typats
-	 ; zipWithM_ cmpTyVar idxParms classLTyVars
-	 ; excessTyVars <- liftM catMaybes $ mappM chkTyVar excessParms
-	 -- bind excess parameters
-	 ; bindTyVarsRn data_doc excessTyVars	$ \ excessTyVars' -> do {
+-- * This function is parametrised by the routine handling the index
+--   variables.  On the toplevel, these are defining occurences, whereas they
+--   are usage occurences for associated types.
+--
+rnTySig :: TyClDecl RdrName 
+        -> (SDoc -> [LHsTyVarBndr RdrName] -> 
+	    ([LHsTyVarBndr Name] -> RnM (TyClDecl Name, FreeVars)) ->
+	    RnM (TyClDecl Name, FreeVars))
+        -> RnM (TyClDecl Name, FreeVars)
+
+rnTySig (tydecl@TyData {tcdCtxt = context, tcdLName = tycon, 
+			tcdTyVars = tyvars, tcdTyPats = mb_typats,
+			tcdCons = condecls, tcdKindSig = sig, 
+			tcdDerivs = derivs}) 
+        bindIdxVars =
+      ASSERT( null condecls )	    -- won't have constructors
+      ASSERT( isNothing mb_typats ) -- won't have type patterns
+      ASSERT( isNothing derivs )    -- won't have deriving
+      ASSERT( isJust sig )          -- will have kind signature
+      do { checkM (not . null $ tyvars) $ addErr needOneIdx   -- #indexes >= 1
+	 ; bindIdxVars (ksig_doc tycon) tyvars $ \tyvars' -> do {
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
-	 ; (derivs', deriv_fvs) <- rn_derivs derivs
-	 ; returnM (TyData {tcdND = tcdND tydecl, tcdCtxt = L ctxtL [], 
-			    tcdLName = tycon', 
-			    tcdTyVars = classLTyVars ++ excessTyVars',
-			    tcdTyPats = Nothing, tcdKindSig = Nothing, 
-			    tcdCons = [], tcdDerivs = derivs'}, 
-		    delFVs (map hsLTyVarName (classLTyVars ++ excessTyVars')) $
-	     	    deriv_fvs) } }
+	 ; context' <- rnContext (ksig_doc tycon) context
+	 ; returnM (TyData {tcdND = tcdND tydecl, tcdCtxt = context', 
+			    tcdLName = tycon', tcdTyVars = tyvars',
+			    tcdTyPats = Nothing, tcdKindSig = sig, 
+			    tcdCons = [], tcdDerivs = Nothing}, 
+		    delFVs (map hsLTyVarName tyvars') $
+	     	    extractHsCtxtTyNames context') } }
       where
-	    -- Check that the name space is correct!
-	cmpTyVar (L l ty@(HsTyVar tv)) classTV =      -- just a type variable
-	  checkM (rdrNameOcc tv == nameOccName classTVName) $ 
-	    mustMatchErr l ty classTVName
-          where
-	    classTVName = hsLTyVarName classTV
-	cmpTyVar (L l ty@(HsKindSig (L _ (HsTyVar tv)) k)) _ | isRdrTyVar tv = 
-	  noKindSigErr l tv   -- additional kind sig not allowed at class parms
-	cmpTyVar (L l otherTy) _ = 
-	  tyVarExpectedErr l  -- parameter must be a type variable
 
-	    -- Check that the name space is correct!
-	chkTyVar (L l (HsKindSig (L _ (HsTyVar tv)) k))
-	  | isRdrTyVar tv      = return $ Just (L l (KindedTyVar tv k))
-	chkTyVar (L l (HsTyVar tv))
-	  | isRdrTyVar tv      = return $ Just (L l (UserTyVar tv))
-	chkTyVar (L l otherTy) = tyVarExpectedErr l >> return Nothing
-				 -- drop parameter; we stop after renaming anyways
+rnTySig (tydecl@TyFunction {tcdLName = tycon, tcdTyVars = tyvars, 
+			    tcdKind = sig}) 
+        bindIdxVars =
+      do { checkM (not . null $ tyvars) $ addErr needOneIdx   -- #indexes >= 1
+	 ; bindIdxVars (ksig_doc tycon) tyvars $ \tyvars' -> do {
+	 ; tycon' <- lookupLocatedTopBndrRn tycon
+	 ; returnM (TyFunction {tcdLName = tycon', tcdTyVars = tyvars',
+			        tcdIso = tcdIso tydecl, tcdKind = sig}, 
+		    emptyFVs) } }
 
-        rn_derivs Nothing   = returnM (Nothing, emptyFVs)
-        rn_derivs (Just ds) = do
-			        ds' <- rnLHsTypes data_doc ds
-				returnM (Just ds', extractHsTyNames_s ds')
-    
-        atNoCtxt = text "Associated data type declarations cannot have a context"
-        atNoCons = text "Associated data type declarations cannot have any constructors"
-        data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
+ksig_doc tycon = text "In the kind signature for" <+> quotes (ppr tycon)
+needOneIdx = text "Kind signature requires at least one type index"
 
-noKindSigErr l ty =
-  addErrAt l $
-    sep [ptext SLIT("No kind signature allowed at copies of class parameters:"),
-         nest 2 $ ppr ty]
+-- Rename associated type declarations (in classes)
+--
+-- * This can be data declarations, type function signatures, and (default)
+--   type function equations.
+--
+rnATs :: [LTyClDecl RdrName] -> RnM ([LTyClDecl Name], FreeVars)
+rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
+  where
+    rn_at (tydecl@TyData     {}) = rnTySig tydecl lookupIdxVars
+    rn_at (tydecl@TyFunction {}) = rnTySig tydecl lookupIdxVars
+    rn_at (tydelc@TySynonym  {}) = panic "!!!TODO: case not impl yet"
+    rn_at _                      = panic "RnSource.rnATs: invalid TyClDecl"
 
-mustMatchErr l ty classTV =
-  addErrAt l $
-    sep [ptext SLIT("Type variable"), quotes (ppr ty), 
-	 ptext SLIT("must match corresponding class parameter"), 
-	 quotes (ppr classTV)]
-
-tyVarExpectedErr l = 
-  addErrAt l (ptext SLIT("Type found where type variable expected"))
+    lookupIdxVars _ tyvars cont = mappM lookupIdxVar tyvars >>= cont
+    --
+    -- Type index variables must be class parameters, which are the only
+    -- type variables in scope at this point.
+    lookupIdxVar (L l tyvar) =
+      do
+	name' <- lookupOccRn (hsTyVarName tyvar)
+	return $ L l (replaceTyVarName tyvar name')
 \end{code}
 
 
