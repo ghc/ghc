@@ -12,7 +12,6 @@ module HaddockHtml (
 
 import Prelude hiding (div)
 
-import Binary2 ( openBinaryFile )
 import HaddockDevHelp
 import HaddockHH
 import HaddockHH2
@@ -29,7 +28,7 @@ import Data.Char ( isUpper, toUpper )
 import Data.List ( sortBy )
 import Data.Maybe ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
-import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf )
+import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
 import Debug.Trace ( trace )
 import Data.Map ( Map )
 import qualified Data.Map as Map hiding ( Map )
@@ -114,8 +113,8 @@ ppHtmlHelpFiles doctitle maybe_package hmods odir maybe_html_help_format pkg_pat
 
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
-	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
-	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
+	(bracket (openFile fromFPath ReadMode) hClose $ \hFrom ->
+	 bracket (openFile toFPath WriteMode) hClose $ \hTo ->
 	 allocaBytes bufferSize $ \buffer ->
 		copyContents hFrom hTo buffer)
 	where

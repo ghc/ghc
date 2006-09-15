@@ -14,7 +14,6 @@ import HaddockTypes
 import HaddockUtil
 import HaddockVersion
 import Paths_haddock         ( getDataDir )
-import Interface             ( Interface, dumpInterface, readInterface )
 
 import Prelude hiding ( catch )
 import Control.Exception     ( bracket, throwIO, catch, Exception(..) )
@@ -415,13 +414,6 @@ run flags modules extEnv = do
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
-
-  return ()
-
-  -- dump an interface if requested
-  case dumpIface of
-    Nothing -> return ()
-    Just fn -> dumpInterface env (map hmod_mod visibleMods) fn 
   where
     pprList [] = []
     pprList [x] = show x
