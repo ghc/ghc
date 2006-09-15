@@ -467,7 +467,7 @@ cl_decl :: { LTyClDecl RdrName }
 	: 'class' tycl_hdr fds where
 		{% do { let { (binds, sigs, ats)           = 
 			        cvBindsAndSigs (unLoc $4)
-		            ; (ctxt, tc, tvs, Just tparms) = unLoc $2}
+		            ; (ctxt, tc, tvs, tparms) = unLoc $2}
                       ; checkTyVars tparms False  -- only type vars allowed
 		      ; return $ L (comb4 $1 $2 $3 $4) 
 				   (mkClassDecl (ctxt, tc, tvs) 
@@ -505,19 +505,25 @@ ty_decl :: { LTyClDecl RdrName }
 
         -- data type or newtype declaration
 	| data_or_newtype tycl_hdr constrs deriving
-		{ L (comb4 $1 $2 $3 $4)	-- We need the location on tycl_hdr 
-					-- in case constrs and deriving are
-					-- both empty
-		    (mkTyData (unLoc $1) (unLoc $2) Nothing 
-		       (reverse (unLoc $3)) (unLoc $4)) }
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                      ; tpats <- checkTyVars tparms True -- can have type pats
+		      ; return $
+			  L (comb4 $1 $2 $3 $4)
+			           -- We need the location on tycl_hdr in case 
+				   -- constrs and deriving are both empty
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, tpats) 
+			     Nothing (reverse (unLoc $3)) (unLoc $4)) } }
 
         -- GADT declaration
         | data_or_newtype tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
-		{ L (comb4 $1 $2 $4 $5)
-		    (mkTyData (unLoc $1) (unLoc $2) $3
-		       (reverse (unLoc $5)) (unLoc $6)) }
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                      ; tpats <- checkTyVars tparms True -- can have type pats
+		      ; return $
+			  L (comb4 $1 $2 $4 $5)
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, tpats) $3
+			     (reverse (unLoc $5)) (unLoc $6)) } }
 
 opt_iso :: { Bool }
 	:       { False }
@@ -540,7 +546,7 @@ opt_kind_sig :: { Maybe Kind }
 	: 				{ Nothing }
 	| '::' kind			{ Just (unLoc $2) }
 
--- tycl_hdr parses the header of a type decl,
+-- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
 --	T a b
 -- 	Eq a => T a
@@ -550,7 +556,7 @@ opt_kind_sig :: { Maybe Kind }
 tycl_hdr :: { Located (LHsContext RdrName, 
 		       Located RdrName, 
 		       [LHsTyVarBndr RdrName],
-		       Maybe [LHsType RdrName]) }
+		       [LHsType RdrName]) }
 	: context '=>' type		{% checkTyClHdr $1         $3 >>= return.LL }
 	| type				{% checkTyClHdr (noLoc []) $1 >>= return.L1 }
 

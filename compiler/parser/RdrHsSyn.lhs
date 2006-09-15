@@ -35,7 +35,7 @@ module RdrHsSyn (
 	checkPrecP, 	      -- Int -> P Int
 	checkContext,	      -- HsType -> P HsContext
 	checkPred,	      -- HsType -> P HsPred
-	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName])
+	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkTyVars,          -- [LHsType RdrName] -> Bool -> P ()
 	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], Maybe [LHsType RdrName])
 	checkTopTyClD,	      -- LTyClDecl RdrName -> P (HsDecl RdrName)
@@ -401,7 +401,8 @@ checkTyVars tparms nonVarsOk =
 
 -- Check whether the type arguments in a type synonym head are simply
 -- variables.  If not, we have a type equation of a type function and return
--- all patterns.
+-- all patterns.  If yes, we return 'Nothing' as the third component to
+-- indicate a vanilla type synonym.
 --
 checkSynHdr :: LHsType RdrName 
 	    -> Bool                             -- non-variables admitted?
@@ -409,7 +410,7 @@ checkSynHdr :: LHsType RdrName
 	          [LHsTyVarBndr RdrName],	-- parameters
 		  Maybe [LHsType RdrName])	-- type patterns
 checkSynHdr ty nonVarsOk = 
-  do { (_, tc, tvs, Just tparms) <- checkTyClHdr (noLoc []) ty
+  do { (_, tc, tvs, tparms) <- checkTyClHdr (noLoc []) ty
      ; typats <- checkTyVars tparms nonVarsOk
      ; return (tc, tvs, typats) }
 
@@ -420,8 +421,7 @@ checkTyClHdr :: LHsContext RdrName -> LHsType RdrName
   -> P (LHsContext RdrName,	     -- the type context
         Located RdrName,	     -- the head symbol (type or class name)
 	[LHsTyVarBndr RdrName],	     -- free variables of the non-context part
-	Maybe [LHsType RdrName])     -- parameters of head symbol; wrapped into
-				     -- 'Maybe' for 'mkTyData'
+	[LHsType RdrName])           -- parameters of head symbol
 -- The header of a type or class decl should look like
 --	(C a, D b) => T a b
 -- or	T a b
@@ -437,7 +437,7 @@ checkTyClHdr :: LHsContext RdrName -> LHsType RdrName
 checkTyClHdr (L l cxt) ty
   = do (tc, tvs, parms) <- gol ty []
        mapM_ chk_pred cxt
-       return (L l cxt, tc, tvs, Just parms)
+       return (L l cxt, tc, tvs, parms)
   where
     gol (L l ty) acc = go l ty acc
 

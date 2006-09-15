@@ -329,6 +329,24 @@ Interface file code:
 -- for a module.  That's why (despite the misnomer) IfaceSig and ForeignType
 -- are both in TyClDecl
 
+-- Representation of type functions and associated data types & synonyms
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- 'TyData' and 'TySynonym' have a field 'tcdPats::Maybe [LHsType name]', with
+-- the following meaning:
+--
+--   * If it is 'Nothing', we have a *vanilla* data type declaration or type
+--     synonym declaration and 'tcdVars' contains the type parameters of the
+--     type constructor.
+--
+--   * If it is 'Just pats', we have the definition of an associated data type
+--     or a type function equations (toplevel or nested in an instance
+--     declarations).  Then, 'pats' are type patterns for the type-indexes of
+--     the type constructor and 'tcdVars' are the variables in those
+--     patterns.  Hence, the arity of the type constructor is 'length tcdPats'
+--     and *not* 'length tcdVars'.
+--
+-- In both cases, 'tcdVars' collects all variables we need to quantify over.
+
 type LTyClDecl name = Located (TyClDecl name)
 
 data TyClDecl name
@@ -368,6 +386,8 @@ data TyClDecl name
   | TySynonym {	tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
 		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
+							-- 'Nothing' => vanilla
+							--   type synonym
 		tcdSynRhs :: LHsType name	        -- synonym expansion
     }
 
@@ -378,7 +398,8 @@ data TyClDecl name
 		tcdSigs    :: [LSig name],		-- Methods' signatures
 		tcdMeths   :: LHsBinds name,		-- Default methods
 		tcdATs	   :: [LTyClDecl name]		-- Associated types; ie
-							--   only 'TyData'
+							--   only 'TyData',
+							--   'TyFunction',
 							--   and 'TySynonym'
     }
 
@@ -653,7 +674,8 @@ data InstDecl name
 				-- figures out the quantified type variables for us.
 		(LHsBinds name)
 		[LSig name]	-- User-supplied pragmatic info
-		[LTyClDecl name]-- Associated types
+		[LTyClDecl name]-- Associated types (ie, 'TyData' and
+				-- 'TySynonym' only)
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
 
