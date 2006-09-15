@@ -49,6 +49,8 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 	      	("DefaultMethods   ", default_method_ds),
 	      	("InstDecls        ", inst_ds),
 	      	("InstMethods      ", inst_method_ds),
+	      	("InstType         ", inst_type_ds),
+	      	("InstData         ", inst_data_ds),
 	      	("TypeSigs         ", bind_tys),
 	      	("ValBinds         ", val_bind_ds),
 	      	("FunBinds         ", fn_bind_ds),
@@ -99,8 +101,8 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 	= foldr add2 (0,0) (map data_info tycl_decls)
     (class_method_ds, default_method_ds)
 	= foldr add2 (0,0) (map class_info tycl_decls)
-    (inst_method_ds, method_specs, method_inlines)
-	= foldr add3 (0,0,0) (map inst_info inst_decls)
+    (inst_method_ds, method_specs, method_inlines, inst_type_ds, inst_data_ds)
+	= foldr add5 (0,0,0,0,0) (map inst_info inst_decls)
 
     count_bind (PatBind { pat_lhs = L _ (VarPat n) }) = (1,0)
     count_bind (PatBind {})                           = (0,1)
@@ -135,21 +137,30 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 	       (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
     class_info other = (0,0)
 
-    inst_info (InstDecl _ inst_meths inst_sigs _)  -- !!!TODO: ATs info -=chak
+    inst_info (InstDecl _ inst_meths inst_sigs ats)
 	= case count_sigs (map unLoc inst_sigs) of
 	    (_,_,ss,is) ->
-	       (addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList inst_meths))), ss, is)
+	      case foldr add2 (0, 0) (map (countATDecl . unLoc) ats) of
+	        (tyDecl, dtDecl) ->
+	          (addpr (foldr add2 (0,0) 
+			   (map (count_bind.unLoc) (bagToList inst_meths))), 
+                   ss, is, tyDecl, dtDecl)
+        where
+	  countATDecl (TyData    {}) = (0, 1)
+	  countATDecl (TySynonym {}) = (1, 0)
 
     addpr :: (Int,Int) -> Int
     add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)
     add3  :: (Int,Int,Int) -> (Int,Int,Int) -> (Int, Int, Int)
     add4  :: (Int,Int,Int,Int) -> (Int,Int,Int,Int) -> (Int, Int, Int, Int)
+    add5  :: (Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int)
     add6  :: (Int,Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int, Int)
 
     addpr (x,y) = x+y
     add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)
     add3 (x1,x2,x3) (y1,y2,y3) = (x1+y1,x2+y2,x3+y3)
     add4 (x1,x2,x3,x4) (y1,y2,y3,y4) = (x1+y1,x2+y2,x3+y3,x4+y4)
+    add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
     add6 (x1,x2,x3,x4,x5,x6) (y1,y2,y3,y4,y5,y6) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6)
 \end{code}
 

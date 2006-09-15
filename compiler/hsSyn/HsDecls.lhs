@@ -18,7 +18,8 @@ module HsDecls (
 	DeprecDecl(..),  LDeprecDecl,
 	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
-	isClassDecl, isTFunDecl, isSynDecl, isTEqnDecl, isDataDecl, 
+	isClassDecl, isTFunDecl, isSynDecl, isDataDecl, isKindSigDecl,
+	isIdxTyDecl,
 	countTyClDecls,
 	conDetailsTys,
 	instDeclATs,
@@ -52,6 +53,7 @@ import Outputable
 import Util		( count )
 import SrcLoc		( Located(..), unLoc, noLoc )
 import FastString
+import Maybe            ( isJust )
 \end{code}
 
 
@@ -329,21 +331,28 @@ Interface file code:
 -- for a module.  That's why (despite the misnomer) IfaceSig and ForeignType
 -- are both in TyClDecl
 
--- Representation of type functions and associated data types & synonyms
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- 'TyData' and 'TySynonym' have a field 'tcdPats::Maybe [LHsType name]', with
--- the following meaning:
+-- Representation of indexed types
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Kind signatures of indexed types come in two flavours:
+--
+-- * kind signatures for type functions: variant `TyFunction' and
+--
+-- * kind signatures for indexed data types and newtypes : variant `TyData'
+--   iff a kind is present in `tcdKindSig' and there are no constructors in
+--   `tcdCons'.
+--
+-- Indexed types are represented by 'TyData' and 'TySynonym' using the field
+-- 'tcdTyPats::Maybe [LHsType name]', with the following meaning:
 --
 --   * If it is 'Nothing', we have a *vanilla* data type declaration or type
 --     synonym declaration and 'tcdVars' contains the type parameters of the
 --     type constructor.
 --
---   * If it is 'Just pats', we have the definition of an associated data type
---     or a type function equations (toplevel or nested in an instance
---     declarations).  Then, 'pats' are type patterns for the type-indexes of
---     the type constructor and 'tcdVars' are the variables in those
---     patterns.  Hence, the arity of the type constructor is 'length tcdPats'
---     and *not* 'length tcdVars'.
+--   * If it is 'Just pats', we have the definition of an indexed type Then,
+--     'pats' are type patterns for the type-indexes of the type constructor
+--     and 'tcdVars' are the variables in those patterns.  Hence, the arity of
+--     the indexed type (ie, the number of indexes) is 'length tcdTyPats' and
+--     *not* 'length tcdVars'.
 --
 -- In both cases, 'tcdVars' collects all variables we need to quantify over.
 
@@ -414,7 +423,7 @@ data NewOrData
 Simple classifiers
 
 \begin{code}
-isTFunDecl, isDataDecl, isSynDecl, isTEqnDecl, isClassDecl :: 
+isTFunDecl, isDataDecl, isSynDecl, isClassDecl, isKindSigDecl, isIdxTyDecl ::
   TyClDecl name -> Bool
 
 -- type function kind signature
@@ -434,6 +443,15 @@ isDataDecl other       = False
 
 isClassDecl (ClassDecl {}) = True
 isClassDecl other	   = False
+
+-- kind signature (for an indexed type)
+isKindSigDecl (TyFunction {}                   ) = True
+isKindSigDecl (TyData     {tcdKindSig = Just _,
+			   tcdCons    = []    }) = True
+isKindSigDecl other                              = False
+
+-- definition of an instance of an indexed type
+isIdxTyDecl = isJust . tcdTyPats
 \end{code}
 
 Dealing with names

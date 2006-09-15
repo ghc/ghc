@@ -491,10 +491,13 @@ rnTyClDecl (ForeignType {tcdLName = name, tcdFoType = fo_type, tcdExtName = ext_
     returnM (ForeignType {tcdLName = name', tcdFoType = fo_type, tcdExtName = ext_name},
 	     emptyFVs)
 
-rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
-		    tcdTyVars = tyvars, tcdTyPats = typatsMaybe, 
-		    tcdCons = condecls, tcdKindSig = sig, tcdDerivs = derivs})
-  | is_vanilla	-- Normal Haskell data type decl
+rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context, 
+			   tcdLName = tycon, tcdTyVars = tyvars, 
+			   tcdTyPats = typatsMaybe, tcdCons = condecls, 
+			   tcdKindSig = sig, tcdDerivs = derivs})
+  | isKindSigDecl tydecl  -- kind signature of indexed type
+  = rnTySig tydecl bindTyVarsRn
+  | is_vanilla	          -- Normal Haskell data type decl
   = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
 				-- data type is syntactically illegal
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
@@ -513,7 +516,7 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
 	     	   plusFVs (map conDeclFVs condecls')   `plusFV`
 	     	   deriv_fvs) }
 
-  | otherwise	-- GADT
+  | otherwise	          -- GADT
   = ASSERT( none typatsMaybe )    -- GADTs cannot have type patterns for now
     do	{ tycon' <- lookupLocatedTopBndrRn tycon
 	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
@@ -549,14 +552,19 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
     rn_derivs Nothing   = returnM (Nothing, emptyFVs)
     rn_derivs (Just ds) = rnLHsTypes data_doc ds	`thenM` \ ds' -> 
 			  returnM (Just ds', extractHsTyNames_s ds')
-    
-rnTyClDecl (TySynonym {tcdLName = name, tcdTyVars = tyvars, tcdSynRhs = ty})
-  = lookupLocatedTopBndrRn name			`thenM` \ name' ->
-    bindTyVarsRn syn_doc tyvars 		$ \ tyvars' ->
-    rnHsTypeFVs syn_doc ty			`thenM` \ (ty', fvs) ->
-    returnM (TySynonym {tcdLName = name', tcdTyVars = tyvars', 
-			tcdSynRhs = ty'},
-	     delFVs (map hsLTyVarName tyvars') fvs)
+
+rnTyClDecl (tydecl@TyFunction {}) =
+  rnTySig tydecl bindTyVarsRn
+
+rnTyClDecl (TySynonym {tcdLName = name, tcdTyVars = tyvars,
+		       tcdTyPats = typatsMaybe, tcdSynRhs = ty})
+  = bindTyVarsRn syn_doc tyvars		        $ \ tyvars' ->
+    do { name' <- lookupLocatedTopBndrRn name
+       ; typats' <- rnTyPats syn_doc typatsMaybe
+       ; (ty', fvs) <- rnHsTypeFVs syn_doc ty
+       ; returnM (TySynonym {tcdLName = name', tcdTyVars = tyvars', 
+			     tcdTyPats = typats', tcdSynRhs = ty'},
+	          delFVs (map hsLTyVarName tyvars') fvs) }
   where
     syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
 
@@ -712,43 +720,6 @@ rnField doc (name, ty)
     rnLHsType doc ty		`thenM` \ new_ty ->
     returnM (new_name, new_ty) 
 
--- This data decl will parse OK
---	data T = a Int
--- treating "a" as the constructor.
--- It is really hard to make the parser spot this malformation.
--- So the renamer has to check that the constructor is legal
---
--- We can get an operator as the constructor, even in the prefix form:
---	data T = :% Int Int
--- from interface files, which always print in prefix form
-
-checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
-
-badDataCon name
-   = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Support code to rename types}
-%*							*
-%*********************************************************
-
-\begin{code}
-rnFds :: SDoc -> [Located (FunDep RdrName)] -> RnM [Located (FunDep Name)]
-
-rnFds doc fds
-  = mappM (wrapLocM rn_fds) fds
-  where
-    rn_fds (tys1, tys2)
-      =	rnHsTyVars doc tys1		`thenM` \ tys1' ->
-	rnHsTyVars doc tys2		`thenM` \ tys2' ->
-	returnM (tys1', tys2')
-
-rnHsTyVars doc tvs  = mappM (rnHsTyvar doc) tvs
-rnHsTyvar doc tyvar = lookupOccRn tyvar
-
 -- Rename kind signatures (signatures of indexed data types/newtypes and
 -- signatures of type functions)
 --
@@ -806,7 +777,7 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
   where
     rn_at (tydecl@TyData     {}) = rnTySig tydecl lookupIdxVars
     rn_at (tydecl@TyFunction {}) = rnTySig tydecl lookupIdxVars
-    rn_at (tydelc@TySynonym  {}) = panic "!!!TODO: case not impl yet"
+    rn_at (tydecl@TySynonym  {}) = rnTyClDecl tydecl
     rn_at _                      = panic "RnSource.rnATs: invalid TyClDecl"
 
     lookupIdxVars _ tyvars cont = mappM lookupIdxVar tyvars >>= cont
@@ -817,6 +788,43 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
       do
 	name' <- lookupOccRn (hsTyVarName tyvar)
 	return $ L l (replaceTyVarName tyvar name')
+
+-- This data decl will parse OK
+--	data T = a Int
+-- treating "a" as the constructor.
+-- It is really hard to make the parser spot this malformation.
+-- So the renamer has to check that the constructor is legal
+--
+-- We can get an operator as the constructor, even in the prefix form:
+--	data T = :% Int Int
+-- from interface files, which always print in prefix form
+
+checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
+
+badDataCon name
+   = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
+\end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Support code to rename types}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnFds :: SDoc -> [Located (FunDep RdrName)] -> RnM [Located (FunDep Name)]
+
+rnFds doc fds
+  = mappM (wrapLocM rn_fds) fds
+  where
+    rn_fds (tys1, tys2)
+      =	rnHsTyVars doc tys1		`thenM` \ tys1' ->
+	rnHsTyVars doc tys2		`thenM` \ tys2' ->
+	returnM (tys1', tys2')
+
+rnHsTyVars doc tvs  = mappM (rnHsTyvar doc) tvs
+rnHsTyvar doc tyvar = lookupOccRn tyvar
 \end{code}
 
 
