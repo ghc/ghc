@@ -55,9 +55,9 @@ import FastString
 #define FSLIT(x) (mkFastString# (x#))
 
 import DynFlags hiding ( Option )
+import Packages hiding ( package ) 
 import StaticFlags           ( parseStaticFlags )
 import Unique                ( mkUnique )
-import Packages hiding ( package ) 
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
@@ -714,9 +714,12 @@ renameModule renamingEnv mod =
       (finalModuleDoc, missingNames3)
         = runRnFM localEnv (renameMaybeDoc (hmod_doc mod))
 
-      missingNames = nub $ filter isExternalName 
-                     (missingNames1 ++ missingNames2 ++ missingNames3)
-      strings = map (showSDoc . ppr) missingNames 
+      missingNames = nub $ filter isExternalName
+                    (missingNames1 ++ missingNames2 ++ missingNames3)
+
+      -- I haven't found the Name constant for () in the GHC API, so we have to
+      -- filter out the "()" string instead
+      strings = filter (/= "()") (map (showSDoc . ppr) missingNames) 
      
   in do
   -- report things that we couldn't link to. Only do this for non-hidden modules.
@@ -728,7 +731,7 @@ renameModule renamingEnv mod =
     return $ mod { hmod_rn_doc = finalModuleDoc,
                    hmod_rn_doc_map = rnDocMap,
                    hmod_rn_export_items = renamedExportItems }
- 
+
 -- -----------------------------------------------------------------------------
 -- Build the list of items that will become the documentation, from the
 -- export list.  At this point, the list of ExportItems is in terms of
