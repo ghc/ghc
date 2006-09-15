@@ -15,8 +15,8 @@ module RnSource (
 import {-# SOURCE #-} RnExpr( rnLExpr )
 
 import HsSyn
-import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, globalRdrEnvElts,
-			  GlobalRdrElt(..), isLocalGRE )
+import RdrName		( RdrName, isRdrDataCon, isRdrTyVar, elemLocalRdrEnv, 
+			  globalRdrEnvElts, GlobalRdrElt(..), isLocalGRE )
 import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
@@ -42,6 +42,7 @@ import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
 import Maybe            ( isNothing )
+import Monad		( liftM )
 import BasicTypes       ( Boxity(..) )
 \end{code}
 
@@ -109,8 +110,10 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	   <- mapFvRn (wrapLocFstM rnDefaultDecl) default_decls ;
 	
 	let {
+           rn_at_decls = concat 
+			   [ats | L _ (InstDecl _ _ _ ats) <- rn_inst_decls] ;
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
-			    	hs_tyclds = rn_tycl_decls,
+			    	hs_tyclds = rn_tycl_decls ++ rn_at_decls,
 			    	hs_instds = rn_inst_decls,
 			    	hs_fixds  = rn_fix_decls,
 			    	hs_depds  = [],
@@ -270,9 +273,20 @@ fo_decl_msg name = ptext SLIT("In the foreign declaration for") <+> ppr name
 %*********************************************************
 
 \begin{code}
-rnSrcInstDecl (InstDecl inst_ty mbinds uprags)
+rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- Used for both source and interface file decls
   = rnHsSigType (text "an instance decl") inst_ty	`thenM` \ inst_ty' ->
+
+	-- Rename the associated types
+	-- The typechecker (not the renamer) checks that all 
+	-- the declarations are for the right class
+    let
+	at_doc   = text "In the associated types in an instance declaration"
+	at_names = map (head . tyClDeclNames . unLoc) ats
+	(_, rdrCtxt, _, _) = splitHsInstDeclTy (unLoc inst_ty)
+    in
+    checkDupNames at_doc at_names		`thenM_`
+    rnATDefs rdrCtxt ats			`thenM` \ (ats', at_fvs) ->
 
 	-- Rename the bindings
 	-- The typechecker (not the renamer) checks that all 
@@ -302,9 +316,36 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags)
     in
     bindLocalNames binders (renameSigs ok_sig uprags)	`thenM` \ uprags' ->
 
-    returnM (InstDecl inst_ty' mbinds' uprags',
-	     meth_fvs `plusFV` hsSigsFVs uprags'
+    returnM (InstDecl inst_ty' mbinds' uprags' ats',
+	     meth_fvs `plusFV` at_fvs
+		      `plusFV` hsSigsFVs uprags'
 		      `plusFV` extractHsTyNames inst_ty')
+             -- We return the renamed associated data type declarations so
+             -- that they can be entered into the list of type declarations
+             -- for the binding group, but we also keep a copy in the instance.
+             -- The latter is needed for well-formedness checks in the type
+             -- checker (eg, to ensure that all ATs of the instance actually
+             -- receive a declaration). 
+	     -- NB: Even the copies in the instance declaration carry copies of
+	     --     the instance context after renaming.  This is a bit
+	     --     strange, but should not matter (and it would be more work
+	     --     to remove the context).
+\end{code}
+
+Renaming of the associated data definitions requires adding the instance
+context, as the rhs of an AT declaration may use ATs from classes in the
+context.
+
+\begin{code}
+rnATDefs :: HsContext RdrName -> [LTyClDecl RdrName] 
+	  -> RnM ([LTyClDecl Name], FreeVars)
+rnATDefs ctxt atDecls = 
+  mapFvRn (wrapLocFstM addCtxtAndRename) atDecls
+  where
+    -- The parser won't accept anything, but a data declaration
+    addCtxtAndRename ty@TyData {tcdCtxt = L l tyCtxt} = 
+      rnTyClDecl (ty {tcdCtxt = L l (ctxt ++ tyCtxt)})
+      -- The source loc is somewhat half hearted... -=chak
 \end{code}
 
 For the method bindings in class and instance decls, we extend the 
@@ -450,27 +491,30 @@ rnTyClDecl (ForeignType {tcdLName = name, tcdFoType = fo_type, tcdExtName = ext_
 	     emptyFVs)
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
-		    tcdTyVars = tyvars, tcdCons = condecls, 
-		    tcdKindSig = sig, tcdDerivs = derivs})
+		    tcdTyVars = tyvars, tcdTyPats = typatsMaybe, 
+		    tcdCons = condecls, tcdKindSig = sig, tcdDerivs = derivs})
   | is_vanilla	-- Normal Haskell data type decl
   = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
 				-- data type is syntactically illegal
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
     do	{ tycon' <- lookupLocatedTopBndrRn tycon
 	; context' <- rnContext data_doc context
+	; typats' <- rnTyPats data_doc typatsMaybe
 	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; checkDupNames data_doc con_names
 	; condecls' <- rnConDecls (unLoc tycon') condecls
-	; returnM (TyData {tcdND = new_or_data, tcdCtxt = context', tcdLName = tycon',
-			   tcdTyVars = tyvars', tcdKindSig = Nothing, tcdCons = condecls', 
-			   tcdDerivs = derivs'}, 
+	; returnM (TyData {tcdND = new_or_data, tcdCtxt = context', 
+			   tcdLName = tycon', tcdTyVars = tyvars', 
+			   tcdTyPats = typats', tcdKindSig = Nothing, 
+			   tcdCons = condecls', tcdDerivs = derivs'}, 
 		   delFVs (map hsLTyVarName tyvars')	$
 	     	   extractHsCtxtTyNames context'	`plusFV`
-	     	   plusFVs (map conDeclFVs condecls') `plusFV`
+	     	   plusFVs (map conDeclFVs condecls')   `plusFV`
 	     	   deriv_fvs) }
 
   | otherwise	-- GADT
-  = do	{ tycon' <- lookupLocatedTopBndrRn tycon
+  = ASSERT( null typats )       -- GADTs cannot have type patterns for now
+    do	{ tycon' <- lookupLocatedTopBndrRn tycon
 	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
     	; tyvars' <- bindTyVarsRn data_doc tyvars 
 				  (\ tyvars' -> return tyvars')
@@ -480,9 +524,10 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
 	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; checkDupNames data_doc con_names
 	; condecls' <- rnConDecls (unLoc tycon') condecls
-	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], tcdLName = tycon',
-			   tcdTyVars = tyvars', tcdCons = condecls', tcdKindSig = sig,
-			   tcdDerivs = derivs'}, 
+	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
+			   tcdLName = tycon', tcdTyVars = tyvars', 
+			   tcdTyPats = Nothing, tcdKindSig = sig,
+			   tcdCons = condecls', tcdDerivs = derivs'}, 
 	     	   plusFVs (map conDeclFVs condecls') `plusFV` deriv_fvs) }
 
   where
@@ -512,16 +557,23 @@ rnTyClDecl (TySynonym {tcdLName = name, tcdTyVars = tyvars, tcdSynRhs = ty})
 
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname, 
 		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
-		       tcdMeths = mbinds})
+		       tcdMeths = mbinds, tcdATs = ats})
   = lookupLocatedTopBndrRn cname		`thenM` \ cname' ->
 
 	-- Tyvars scope over superclass context and method signatures
     bindTyVarsRn cls_doc tyvars			( \ tyvars' ->
 	rnContext cls_doc context	`thenM` \ context' ->
 	rnFds cls_doc fds		`thenM` \ fds' ->
+	rnATs tyvars' ats		`thenM` \ (ats', ats_fvs) ->
 	renameSigs okClsDclSig sigs	`thenM` \ sigs' ->
-	returnM   (tyvars', context', fds', sigs')
-    )	`thenM` \ (tyvars', context', fds', sigs') ->
+	returnM   (tyvars', context', fds', (ats', ats_fvs), sigs')
+    )	`thenM` \ (tyvars', context', fds', (ats', ats_fvs), sigs') ->
+
+	-- Check for duplicates among the associated types
+    let
+      at_rdr_names_w_locs      = [tcdLName ty | L _ ty <- ats]
+    in
+    checkDupNames at_doc at_rdr_names_w_locs   `thenM_`
 
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
@@ -555,17 +607,20 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
    	 rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds
     ) `thenM` \ (mbinds', meth_fvs) ->
 
-    returnM (ClassDecl { tcdCtxt = context', tcdLName = cname', tcdTyVars = tyvars',
-			 tcdFDs = fds', tcdSigs = sigs', tcdMeths = mbinds'},
+    returnM (ClassDecl { tcdCtxt = context', tcdLName = cname', 
+			 tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
+			 tcdMeths = mbinds', tcdATs = ats'},
 	     delFVs (map hsLTyVarName tyvars')	$
 	     extractHsCtxtTyNames context'	    `plusFV`
 	     plusFVs (map extractFunDepNames (map unLoc fds'))  `plusFV`
 	     hsSigsFVs sigs'		  	    `plusFV`
-	     meth_fvs)
+	     meth_fvs				    `plusFV`
+	     ats_fvs)
   where
     meth_doc = text "In the default-methods for class"	<+> ppr cname
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
     sig_doc  = text "In the signatures for class"  	<+> ppr cname
+    at_doc   = text "In the associated types for class"	<+> ppr cname
 
 badGadtStupidTheta tycon
   = vcat [ptext SLIT("No context is allowed on a GADT-style data declaration"),
@@ -579,6 +634,14 @@ badGadtStupidTheta tycon
 %*********************************************************
 
 \begin{code}
+-- Although, we are processing type patterns here, all type variables should
+-- already be in scope (they are the same as in the 'tcdTyVars' field of the
+-- type declaration to which these patterns belong)
+--
+rnTyPats :: SDoc -> Maybe [LHsType RdrName] -> RnM (Maybe [LHsType Name])
+rnTyPats _   Nothing       = return Nothing
+rnTyPats doc (Just typats) = liftM Just $ rnLHsTypes doc typats
+
 rnConDecls :: Name -> [LConDecl RdrName] -> RnM [LConDecl Name]
 rnConDecls tycon condecls
   = mappM (wrapLocM rnConDecl) condecls
@@ -680,6 +743,77 @@ rnFds doc fds
 
 rnHsTyVars doc tvs  = mappM (rnHsTyvar doc) tvs
 rnHsTyvar doc tyvar = lookupOccRn tyvar
+
+-- Rename associated data type declarations
+--
+rnATs :: [LHsTyVarBndr Name] -> [LTyClDecl RdrName] 
+      -> RnM ([LTyClDecl Name], FreeVars)
+rnATs classLTyVars ats
+  = mapFvRn (wrapLocFstM rn_at) ats
+  where
+    -- The parser won't accept anything, but a data declarations
+    rn_at (tydecl@TyData {tcdCtxt = L ctxtL ctxt, tcdLName = tycon, 
+			  tcdTyPats = Just typats, tcdCons = condecls,
+			  tcdDerivs = derivs}) =
+      do { checkM (null ctxt    ) $ addErr atNoCtxt	-- no context
+         ; checkM (null condecls) $ addErr atNoCons	-- no constructors
+	 -- check and collect type parameters
+         ; let (idxParms, excessParms) = splitAt (length classLTyVars) typats
+	 ; zipWithM_ cmpTyVar idxParms classLTyVars
+	 ; excessTyVars <- liftM catMaybes $ mappM chkTyVar excessParms
+	 -- bind excess parameters
+	 ; bindTyVarsRn data_doc excessTyVars	$ \ excessTyVars' -> do {
+	 ; tycon' <- lookupLocatedTopBndrRn tycon
+	 ; (derivs', deriv_fvs) <- rn_derivs derivs
+	 ; returnM (TyData {tcdND = tcdND tydecl, tcdCtxt = L ctxtL [], 
+			    tcdLName = tycon', 
+			    tcdTyVars = classLTyVars ++ excessTyVars',
+			    tcdTyPats = Nothing, tcdKindSig = Nothing, 
+			    tcdCons = [], tcdDerivs = derivs'}, 
+		    delFVs (map hsLTyVarName (classLTyVars ++ excessTyVars')) $
+	     	    deriv_fvs) } }
+      where
+	    -- Check that the name space is correct!
+	cmpTyVar (L l ty@(HsTyVar tv)) classTV =      -- just a type variable
+	  checkM (rdrNameOcc tv == nameOccName classTVName) $ 
+	    mustMatchErr l ty classTVName
+          where
+	    classTVName = hsLTyVarName classTV
+	cmpTyVar (L l ty@(HsKindSig (L _ (HsTyVar tv)) k)) _ | isRdrTyVar tv = 
+	  noKindSigErr l tv   -- additional kind sig not allowed at class parms
+	cmpTyVar (L l otherTy) _ = 
+	  tyVarExpectedErr l  -- parameter must be a type variable
+
+	    -- Check that the name space is correct!
+	chkTyVar (L l (HsKindSig (L _ (HsTyVar tv)) k))
+	  | isRdrTyVar tv      = return $ Just (L l (KindedTyVar tv k))
+	chkTyVar (L l (HsTyVar tv))
+	  | isRdrTyVar tv      = return $ Just (L l (UserTyVar tv))
+	chkTyVar (L l otherTy) = tyVarExpectedErr l >> return Nothing
+				 -- drop parameter; we stop after renaming anyways
+
+        rn_derivs Nothing   = returnM (Nothing, emptyFVs)
+        rn_derivs (Just ds) = do
+			        ds' <- rnLHsTypes data_doc ds
+				returnM (Just ds', extractHsTyNames_s ds')
+    
+        atNoCtxt = text "Associated data type declarations cannot have a context"
+        atNoCons = text "Associated data type declarations cannot have any constructors"
+        data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
+
+noKindSigErr l ty =
+  addErrAt l $
+    sep [ptext SLIT("No kind signature allowed at copies of class parameters:"),
+         nest 2 $ ppr ty]
+
+mustMatchErr l ty classTV =
+  addErrAt l $
+    sep [ptext SLIT("Type variable"), quotes (ppr ty), 
+	 ptext SLIT("must match corresponding class parameter"), 
+	 quotes (ppr classTV)]
+
+tyVarExpectedErr l = 
+  addErrAt l (ptext SLIT("Type found where type variable expected"))
 \end{code}
 
 

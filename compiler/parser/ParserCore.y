@@ -88,10 +88,18 @@ tdefs	:: { [TyClDecl RdrName] }
 
 tdef	:: { TyClDecl RdrName }
 	: '%data' q_tc_name tv_bndrs '=' '{' cons '}'
-                { mkTyData DataType (noLoc [], noLoc (ifaceExtRdrName $2), map toHsTvBndr $3) Nothing $6 Nothing }
+                { mkTyData DataType ( noLoc []
+				    , noLoc (ifaceExtRdrName $2)
+				    , map toHsTvBndr $3
+				    , Nothing
+				    ) Nothing $6 Nothing }
 	| '%newtype' q_tc_name tv_bndrs trep 
 		{ let tc_rdr = ifaceExtRdrName $2 in
-                  mkTyData NewType (noLoc [], noLoc tc_rdr, map toHsTvBndr $3) Nothing ($4 (rdrNameOcc tc_rdr)) Nothing }
+                  mkTyData NewType ( noLoc []
+				   , noLoc tc_rdr
+				   , map toHsTvBndr $3
+				   , Nothing
+				   ) Nothing ($4 (rdrNameOcc tc_rdr)) Nothing }
 
 -- For a newtype we have to invent a fake data constructor name
 -- It doesn't matter what it is, because it won't be used

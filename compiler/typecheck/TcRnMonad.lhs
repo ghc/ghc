@@ -50,7 +50,8 @@ import Outputable
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupply )
 import UniqFM		( unitUFM )
 import Unique		( Unique )
-import DynFlags		( DynFlags(..), DynFlag(..), dopt, dopt_set, GhcMode )
+import DynFlags		( DynFlags(..), DynFlag(..), dopt, dopt_set,
+			  dopt_unset, GhcMode ) 
 import StaticFlags	( opt_PprStyle_Debug )
 import Bag		( snocBag, unionBags )
 import Panic		( showException )
@@ -267,6 +268,10 @@ doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 setOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = dopt_set (hsc_dflags top) flag}} )
+
+unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 
 ifOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()	-- Do it flag is true
 ifOptM flag thing_inside = do { b <- doptM flag; 

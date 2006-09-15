@@ -128,14 +128,18 @@ cvtTop (ClassD ctxt cl tvs fds decs)
   = do	{ stuff <- cvt_tycl_hdr ctxt cl tvs
 	; fds'  <- mapM cvt_fundep fds
 	; (binds', sigs') <- cvtBindsAndSigs decs
-	; returnL $ TyClD $ mkClassDecl stuff fds' sigs' binds' }
+	; returnL $ TyClD $ mkClassDecl stuff fds' sigs' binds' []  
+							     -- ^^no ATs in TH
+	}
 
 cvtTop (InstanceD tys ty decs)
   = do 	{ (binds', sigs') <- cvtBindsAndSigs decs
 	; ctxt' <- cvtContext tys
 	; L loc pred' <- cvtPred ty
 	; inst_ty' <- returnL $ mkImplicitHsForAllTy ctxt' (L loc (HsPredTy pred'))
-	; returnL $ InstD (InstDecl inst_ty' binds' sigs') }
+	; returnL $ InstD (InstDecl inst_ty' binds' sigs' [])
+						       -- ^^no ATs in TH
+	}
 
 cvtTop (ForeignD ford) = do { ford' <- cvtForD ford; returnL $ ForD ford' }
 
@@ -143,7 +147,7 @@ cvt_tycl_hdr cxt tc tvs
   = do	{ cxt' <- cvtContext cxt
 	; tc'  <- tconNameL tc
 	; tvs' <- cvtTvs tvs
-	; return (cxt', tc', tvs') }
+	; return (cxt', tc', tvs', Nothing) }
 
 ---------------------------------------------------
 -- 	Data types

@@ -231,7 +231,7 @@ repLFunDep (L _ (xs, ys)) = do xs' <- mapM lookupBinder xs
                                ys_list <- coreList nameTyConName ys'
                                repFunDep xs_list ys_list
 
-repInstD' (L loc (InstDecl ty binds _))		-- Ignore user pragmas for now
+repInstD' (L loc (InstDecl ty binds _ _))		-- Ignore user pragmas for now
  = do	{ i <- addTyVarBinds tvs $ \tv_bndrs ->
 		-- We must bring the type variables into scope, so their occurrences
 		-- don't fail,  even though the binders don't appear in the resulting 

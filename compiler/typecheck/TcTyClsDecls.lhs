@@ -12,7 +12,7 @@ module TcTyClsDecls (
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  ConDecl(..),   Sig(..), NewOrData(..), ResType(..),
-			  tyClDeclTyVars, isSynDecl, hsConArgs,
+			  tyClDeclTyVars, isSynDecl, isClassDecl, hsConArgs,
 			  LTyClDecl, tcdName, hsTyVarName, LHsTyVarBndr
 			)
 import HsTypes          ( HsBang(..), getBangStrictness )
@@ -127,7 +127,12 @@ tcTyAndClassDecls boot_details decls
 	; traceTc (text "tcTyAndCl" <+> ppr mod)
 	; (syn_tycons, alg_tyclss) <- fixM (\ ~(rec_syn_tycons, rec_alg_tyclss) ->
 	  do	{ let {	-- Calculate variances and rec-flag
-		      ; (syn_decls, alg_decls) = partition (isSynDecl . unLoc) decls }
+		      ; (syn_decls, alg_decls_pre) = partition (isSynDecl . unLoc) decls
+                      ; alg_decls = alg_decls_pre ++ 
+				    concat [tcdATs decl        -- add AT decls
+					   | declLoc <- alg_decls_pre
+					   , let decl = unLoc declLoc
+					   , isClassDecl decl] }
 
 			-- Extend the global env with the knot-tied results
 			-- for data types and classes
@@ -320,6 +325,7 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	-- going to remove the constructor while coercing it to a lifted type.
 	-- And newtypes can't be bang'd
 
+-- !!!TODO -=chak
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt,  tcdSigs = sigs})
   = kcTyClDeclBody decl	$ \ tvs' ->
     do	{ is_boot <- tcIsHsBoot
@@ -434,10 +440,11 @@ tcTyClDecl1 calc_vrcs calc_isrec
 tcTyClDecl1 calc_vrcs calc_isrec 
   (ClassDecl {tcdLName = L _ class_name, tcdTyVars = tvs, 
 	      tcdCtxt = ctxt, tcdMeths = meths,
-	      tcdFDs = fundeps, tcdSigs = sigs} )
+	      tcdFDs = fundeps, tcdSigs = sigs, tcdATs = ats} )
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM (addLocM tc_fundep) fundeps
+  -- !!!TODO: process `ats`; what do we want to store in the `Class'? -=chak
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
 		let 	-- This little knot is just so we can get
@@ -704,11 +711,15 @@ checkValidClass cls
 	-- class has only one parameter.  We can't do generic
 	-- multi-parameter type classes!
 	; checkTc (unary || no_generics) (genericMultiParamErr cls)
+
+    	-- Check that the class has no associated types, unless GlaExs
+	; checkTc (gla_exts || no_ats) (badATDecl cls)
 	}
   where
     (tyvars, theta, _, op_stuff) = classBigSig cls
     unary 	= isSingleton tyvars
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
+    no_ats      = True -- !!!TODO: determine whether the class has ATs -=chak
 
     check_op gla_exts (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -819,6 +830,10 @@ newtypeExError con
 newtypeFieldErr con_name n_flds
   = sep [ptext SLIT("The constructor of a newtype must have exactly one field"), 
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con_name) <+> ptext SLIT("has") <+> speakN n_flds]
+
+badATDecl cl_name
+  = vcat [ ptext SLIT("Illegal associated type declaration in") <+> quotes (ppr cl_name)
+	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow ATs")) ]
 
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),

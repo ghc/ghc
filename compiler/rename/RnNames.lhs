@@ -17,6 +17,7 @@ import DynFlags		( DynFlag(..), GhcMode(..), DynFlags(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
 			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
+			  instDeclATs,
 			  LIE )
 import RnEnv
 import IfaceEnv		( ifaceExportNames )
@@ -57,6 +58,7 @@ import DriverPhases	( isHsBoot )
 import Util		( notNull )
 import List		( partition )
 import IO		( openFile, IOMode(..) )
+import Monad		( liftM )
 \end{code}
 
 
@@ -409,14 +411,24 @@ used for source code.
 
 	*** See "THE NAMING STORY" in HsDecls ****
 
+Associated data types: Instances declarations may contain definitions of
+associated data types whose data constructors we need to collect, too.
+However, we need to be careful with the handling of the data type constructor
+of each asscociated type, as it is already defined in the corresponding
+class.  We make a new name for it, but don't return it in the 'AvailInfo' (to
+avoid raising a duplicate declaration error; see the helper
+'unavail_main_name').
+
 \begin{code}
 getLocalDeclBinders :: TcGblEnv -> HsGroup RdrName -> RnM [Name]
 getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs, 
 				      hs_tyclds = tycl_decls, 
+				      hs_instds = inst_decls,
 				      hs_fords = foreign_decls })
   = do	{ tc_names_s <- mappM new_tc tycl_decls
+	; at_names_s <- mappM inst_ats inst_decls
 	; val_names  <- mappM new_simple val_bndrs
-	; return (foldr (++) val_names tc_names_s) }
+	; return (foldr (++) val_names (tc_names_s ++ concat at_names_s)) }
   where
     mod        = tcg_mod gbl_env
     is_hs_boot = isHsBoot (tcg_src gbl_env) ;
@@ -437,6 +449,10 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
 	     ; return (main_name : sub_names) }
 	where
 	  (main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
+
+    inst_ats inst_decl 
+	= mappM (liftM tail . new_tc) (instDeclATs (unLoc inst_decl))
+		       -- drop main_rdr (already declared in class)
 \end{code}
 
 

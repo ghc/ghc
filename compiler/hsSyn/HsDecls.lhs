@@ -21,6 +21,7 @@ module HsDecls (
 	isClassDecl, isSynDecl, isDataDecl, 
 	countTyClDecls,
 	conDetailsTys,
+	instDeclATs,
 	collectRuleBndrSigTys, 
     ) where
 
@@ -341,7 +342,8 @@ data TyClDecl name
 		tcdCtxt   :: LHsContext name,	 	-- Context
 		tcdLName  :: Located name,	 	-- Type constructor
 		tcdTyVars :: [LHsTyVarBndr name], 	-- Type variables
-		tcdKindSig :: Maybe Kind,		-- Optional kind sig; 
+		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
+		tcdKindSig:: Maybe Kind,		-- Optional kind sig; 
 							-- (only for the 'where' form)
 
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
@@ -367,7 +369,10 @@ data TyClDecl name
 		tcdTyVars  :: [LHsTyVarBndr name],	-- Class type variables
 		tcdFDs     :: [Located (FunDep name)],	-- Functional deps
 		tcdSigs    :: [LSig name],		-- Methods' signatures
-		tcdMeths   :: LHsBinds name		-- Default methods
+		tcdMeths   :: LHsBinds name,		-- Default methods
+		tcdATs	   :: [LTyClDecl name]		-- Associated types; ie
+							--   only 'TyData'
+							--   and 'TySynonym'
     }
 
 data NewOrData
@@ -406,8 +411,9 @@ tyClDeclNames :: Eq name => TyClDecl name -> [Located name]
 tyClDeclNames (TySynonym   {tcdLName = name})  = [name]
 tyClDeclNames (ForeignType {tcdLName = name})  = [name]
 
-tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs})
-  = cls_name : [n | L _ (TypeSig n _) <- sigs]
+tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
+  = cls_name : 
+    concatMap (tyClDeclNames . unLoc) ats ++ [n | L _ (TypeSig n _) <- sigs]
 
 tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
   = tc_name : conDeclsNames (map unLoc cons)
@@ -442,38 +448,51 @@ instance OutputableBndr name
 	= hsep [ptext SLIT("foreign import type dotnet"), ppr ltycon]
 
     ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdSynRhs = mono_ty})
-      = hang (ptext SLIT("type") <+> pp_decl_head [] ltycon tyvars <+> equals)
+      = hang (ptext SLIT("type") <+> pp_decl_head [] ltycon tyvars Nothing <+> equals)
 	     4 (ppr mono_ty)
 
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = ltycon,
-		 tcdTyVars = tyvars, tcdKindSig = mb_sig, tcdCons = condecls, 
-		 tcdDerivs = derivings})
-      = pp_tydecl (ppr new_or_data <+> pp_decl_head (unLoc context) ltycon tyvars <+> ppr_sig mb_sig)
+		 tcdTyVars = tyvars, tcdTyPats = typats, tcdKindSig = mb_sig, 
+		 tcdCons = condecls, tcdDerivs = derivings})
+      = pp_tydecl (ppr new_or_data <+> 
+		   pp_decl_head (unLoc context) ltycon tyvars typats <+> 
+		   ppr_sig mb_sig)
 		  (pp_condecls condecls)
 		  derivings
       where
 	ppr_sig Nothing = empty
 	ppr_sig (Just kind) = dcolon <+> pprKind kind
 
-    ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, tcdFDs = fds,
-		    tcdSigs = sigs, tcdMeths = methods})
-      | null sigs	-- No "where" part
+    ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, 
+		    tcdFDs = fds, 
+		    tcdSigs = sigs, tcdMeths = methods, tcdATs = ats})
+      | null sigs && null ats  -- No "where" part
       = top_matter
 
       | otherwise	-- Laid out
       = sep [hsep [top_matter, ptext SLIT("where {")],
-	     nest 4 (sep [sep (map ppr_sig sigs), pprLHsBinds methods, char '}'])]
+	     nest 4 (sep [ sep (map ppr_semi ats)
+			 , sep (map ppr_semi sigs)
+			 , pprLHsBinds methods
+			 , char '}'])]
       where
-        top_matter  = ptext SLIT("class") <+> pp_decl_head (unLoc context) lclas tyvars <+> pprFundeps (map unLoc fds)
-	ppr_sig sig = ppr sig <> semi
+        top_matter    =     ptext SLIT("class") 
+		        <+> pp_decl_head (unLoc context) lclas tyvars Nothing
+		        <+> pprFundeps (map unLoc fds)
+	ppr_semi decl = ppr decl <> semi
 
 pp_decl_head :: OutputableBndr name
    => HsContext name
    -> Located name
    -> [LHsTyVarBndr name]
+   -> Maybe [LHsType name]
    -> SDoc
-pp_decl_head context thing tyvars
+pp_decl_head context thing tyvars Nothing	-- no explicit type patterns
   = hsep [pprHsContext context, ppr thing, interppSP tyvars]
+pp_decl_head context thing _      (Just typats) -- explicit type patterns
+  = hsep [ pprHsContext context, ppr thing
+	 , hsep (map (pprParendHsType.unLoc) typats)]
+
 pp_condecls cs@(L _ ConDecl{ con_res = ResTyGADT _ } : _) -- In GADT syntax
   = hang (ptext SLIT("where")) 2 (vcat (map ppr cs))
 pp_condecls cs 			  -- In H98 syntax
@@ -595,14 +614,21 @@ data InstDecl name
 				-- Using a polytype means that the renamer conveniently
 				-- figures out the quantified type variables for us.
 		(LHsBinds name)
-		[LSig name]		-- User-supplied pragmatic info
+		[LSig name]	-- User-supplied pragmatic info
+		[LTyClDecl name]-- Associated types
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
 
-    ppr (InstDecl inst_ty binds uprags)
+    ppr (InstDecl inst_ty binds uprags ats)
       = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
+	      nest 4 (ppr ats),
 	      nest 4 (ppr uprags),
 	      nest 4 (pprLHsBinds binds) ]
+
+-- Extract the declarations of associated types from an instance
+--
+instDeclATs :: InstDecl name -> [LTyClDecl name]
+instDeclATs (InstDecl _ _ _ ats) = ats
 \end{code}
 
 %************************************************************************

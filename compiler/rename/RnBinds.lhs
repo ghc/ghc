@@ -468,6 +468,7 @@ rnMethodBind cls sig_fn gen_tyvars mbind@(L loc (PatBind other_pat _ _ _))
 \end{code}
 
 
+
 %************************************************************************
 %*									*
 \subsubsection[dep-Sigs]{Signatures (and user-pragmas for values)}

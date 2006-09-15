@@ -132,7 +132,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 	       (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
     class_info other = (0,0)
 
-    inst_info (InstDecl _ inst_meths inst_sigs)
+    inst_info (InstDecl _ inst_meths inst_sigs _)  -- !!!TODO: ATs info -=chak
 	= case count_sigs (map unLoc inst_sigs) of
 	    (_,_,ss,is) ->
 	       (addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList inst_meths))), ss, is)

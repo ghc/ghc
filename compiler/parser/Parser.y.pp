@@ -45,6 +45,17 @@ import GLAEXTS
 
 {-
 -----------------------------------------------------------------------------
+26 July 2006
+
+Conflicts: 37 shift/reduce
+           1 reduce/reduce
+
+The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
+would think the two should never occur in the same context.
+
+  -=chak
+
+-----------------------------------------------------------------------------
 Conflicts: 36 shift/reduce (1.25)
 
 10 for abiguity in 'if x then y else z + 1'		[State 178]
@@ -430,10 +441,12 @@ topdecls :: { OrdList (LHsDecl RdrName) }
 	| topdecl			{ $1 }
 
 topdecl :: { OrdList (LHsDecl RdrName) }
-  	: tycl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
+  	: cl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
+  	| ty_decl			{% checkTopTyClD $1 >>= return.unitOL.L1 }
 	| 'instance' inst_type where
-		{ let (binds,sigs) = cvBindsAndSigs (unLoc $3)
-		  in unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs))) }
+		{ let (binds, sigs, ats) = cvBindsAndSigs (unLoc $3)
+		  in unitOL (L (comb3 $1 $2 $3) 
+			    (InstD (InstDecl $2 binds sigs ats))) }
 	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
 	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
 	| '{-# DEPRECATED' deprecations '#-}'	{ $2 }
@@ -446,7 +459,21 @@ topdecl :: { OrdList (LHsDecl RdrName) }
 							L1 $ HsVar (mkUnqual varName (getTH_ID_SPLICE $1))
 						  )) }
 
-tycl_decl :: { LTyClDecl RdrName }
+-- Type classes
+--
+cl_decl :: { LTyClDecl RdrName }
+	: 'class' tycl_hdr fds where
+		{% do { let { (binds, sigs, ats)           = 
+			        cvBindsAndSigs (unLoc $4)
+		            ; (ctxt, tc, tvs, Just tparms) = unLoc $2}
+                      ; checkTyVars tparms
+		      ; return $ L (comb4 $1 $2 $3 $4) 
+				   (mkClassDecl (ctxt, tc, tvs) 
+					        (unLoc $3) sigs binds ats) } }
+
+-- Type declarations
+--
+ty_decl :: { LTyClDecl RdrName }
  	: 'type' type '=' ctype	
 		-- Note type on the left of the '='; this allows
 		-- infix type constructors to be declared
@@ -469,13 +496,6 @@ tycl_decl :: { LTyClDecl RdrName }
 		{ L (comb4 $1 $2 $4 $5)
 		    (mkTyData (unLoc $1) (unLoc $2) $3 (reverse (unLoc $5)) (unLoc $6)) }
 
-	| 'class' tycl_hdr fds where
-		{ let 
-			(binds,sigs) = cvBindsAndSigs (unLoc $4)
-		  in
-	 	  L (comb4 $1 $2 $3 $4) (mkClassDecl (unLoc $2) (unLoc $3) sigs 
-					  binds) }
-
 data_or_newtype :: { Located NewOrData }
 	: 'data'	{ L1 DataType }
 	| 'newtype'	{ L1 NewType }
@@ -484,18 +504,48 @@ opt_kind_sig :: { Maybe Kind }
 	: 				{ Nothing }
 	| '::' kind			{ Just $2 }
 
--- tycl_hdr parses the header of a type or class decl,
+-- tycl_hdr parses the header of a type decl,
 -- which takes the form
 --	T a b
 -- 	Eq a => T a
 --	(Eq a, Ord b) => T a b
+--      T Int [a]			-- for associated types
 -- Rather a lot of inlining here, else we get reduce/reduce errors
-tycl_hdr :: { Located (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName]) }
+tycl_hdr :: { Located (LHsContext RdrName, 
+		       Located RdrName, 
+		       [LHsTyVarBndr RdrName],
+		       Maybe [LHsType RdrName]) }
 	: context '=>' type		{% checkTyClHdr $1         $3 >>= return.LL }
 	| type				{% checkTyClHdr (noLoc []) $1 >>= return.L1 }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
+
+-- Type declaration or value declaration
+--
+tydecl  :: { Located (OrdList (LHsDecl RdrName)) }
+tydecl  : ty_decl		        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
+	| decl                          { $1 }
+
+tydecls	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+	: tydecls ';' tydecl		{ LL (unLoc $1 `appOL` unLoc $3) }
+	| tydecls ';'			{ LL (unLoc $1) }
+	| tydecl			{ $1 }
+	| {- empty -}			{ noLoc nilOL }
+
+
+tydecllist 
+        :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+	: '{'            tydecls '}'	{ LL (unLoc $2) }
+	|     vocurly    tydecls close	{ $2 }
+
+-- Form of the body of class and instance declarations
+--
+where 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+				-- No implicit parameters
+				-- May have type declarations
+	: 'where' tydecllist		{ LL (unLoc $2) }
+	| {- empty -}			{ noLoc nilOL }
 
 decls 	:: { Located (OrdList (LHsDecl RdrName)) }	
 	: decls ';' decl		{ LL (unLoc $1 `appOL` unLoc $3) }
@@ -508,17 +558,16 @@ decllist :: { Located (OrdList (LHsDecl RdrName)) }
 	: '{'            decls '}'	{ LL (unLoc $2) }
 	|     vocurly    decls close	{ $2 }
 
-where 	:: { Located (OrdList (LHsDecl RdrName)) }
-				-- No implicit parameters
-	: 'where' decllist		{ LL (unLoc $2) }
-	| {- empty -}			{ noLoc nilOL }
-
+-- Binding groups other than those of class and instance declarations
+--
 binds 	::  { Located (HsLocalBinds RdrName) } 		-- May have implicit parameters
+						-- No type declarations
 	: decllist			{ L1 (HsValBinds (cvBindGroup (unLoc $1))) }
 	| '{'            dbinds '}'	{ LL (HsIPBinds (IPBinds (unLoc $2) emptyLHsBinds)) }
 	|     vocurly    dbinds close	{ L (getLoc $2) (HsIPBinds (IPBinds (unLoc $2) emptyLHsBinds)) }
 
 wherebinds :: { Located (HsLocalBinds RdrName) }	-- May have implicit parameters
+						-- No type declarations
 	: 'where' binds			{ LL (unLoc $2) }
 	| {- empty -}			{ noLoc emptyLocalBinds }
 
