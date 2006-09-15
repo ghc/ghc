@@ -113,6 +113,7 @@ and LL.  Each of these macros can be thought of as having type
 They each add a SrcSpan to their argument.
 
    L0	adds 'noSrcSpan', used for empty productions
+     -- This doesn't seem to work anymore -=chak
 
    L1   for a production with a single token on the lhs.  Grabs the SrcSpan
 	from that token.
@@ -175,7 +176,7 @@ incorrect.
  'where' 	{ L _ ITwhere }
  '_scc_'	{ L _ ITscc }	      -- ToDo: remove
 
- 'forall'	{ L _ ITforall }			-- GHC extension keywords
+ 'forall'	{ L _ ITforall }		-- GHC extension keywords
  'foreign'	{ L _ ITforeign }
  'export'	{ L _ ITexport }
  'label'	{ L _ ITlabel } 
@@ -184,6 +185,7 @@ incorrect.
  'threadsafe'	{ L _ ITthreadsafe }
  'unsafe'	{ L _ ITunsafe }
  'mdo'		{ L _ ITmdo }
+ 'iso'		{ L _ ITiso }
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
  'dotnet'       { L _ ITdotnet }
@@ -466,7 +468,7 @@ cl_decl :: { LTyClDecl RdrName }
 		{% do { let { (binds, sigs, ats)           = 
 			        cvBindsAndSigs (unLoc $4)
 		            ; (ctxt, tc, tvs, Just tparms) = unLoc $2}
-                      ; checkTyVars tparms
+                      ; checkTyVars tparms False  -- only type vars allowed
 		      ; return $ L (comb4 $1 $2 $3 $4) 
 				   (mkClassDecl (ctxt, tc, tvs) 
 					        (unLoc $3) sigs binds ats) } }
@@ -474,27 +476,61 @@ cl_decl :: { LTyClDecl RdrName }
 -- Type declarations
 --
 ty_decl :: { LTyClDecl RdrName }
- 	: 'type' type '=' ctype	
-		-- Note type on the left of the '='; this allows
-		-- infix type constructors to be declared
+        -- type function signature and equations (w/ type synonyms as special
+        -- case); we need to handle all this in one rule to avoid a large
+        -- number of shift/reduce conflicts (due to the generality of `type')
+        : 'type' opt_iso type kind_or_ctype
+	        --
+		-- Note the use of type for the head; this allows
+		-- infix type constructors to be declared and type
+		-- patterns for type function equations
 		-- 
-		-- Note ctype, not sigtype, on the right
-		-- We allow an explicit for-all but we don't insert one
-		-- in 	type Foo a = (b,b)
-		-- Instead we just say b is out of scope
- 		{% do { (tc,tvs) <- checkSynHdr $2
-		      ; return (LL (TySynonym tc tvs $4)) } }
+		-- We have that `typats :: Maybe [LHsType name]' is `Nothing'
+		-- (in the second case alternative) when all arguments are
+		-- variables (and we thus have a vanilla type synonym
+		-- declaration); otherwise, it contains all arguments as type
+		-- patterns.
+		--
+ 		{% case $4 of 
+		     Left kind -> 
+		       do { (tc, tvs, _) <- checkSynHdr $3 False
+		          ; return (L (comb3 $1 $3 kind) 
+				      (TyFunction tc tvs $2 (unLoc kind)))
+		          } 
+		     Right ty  -> 
+		       do { (tc, tvs, typats) <- checkSynHdr $3 True
+		          ; return (L (comb2 $1 ty) 
+				      (TySynonym tc tvs typats ty)) }
+                }
 
+        -- data type or newtype declaration
 	| data_or_newtype tycl_hdr constrs deriving
 		{ L (comb4 $1 $2 $3 $4)	-- We need the location on tycl_hdr 
-					-- in case constrs and deriving are both empty
-		    (mkTyData (unLoc $1) (unLoc $2) Nothing (reverse (unLoc $3)) (unLoc $4)) }
+					-- in case constrs and deriving are
+					-- both empty
+		    (mkTyData (unLoc $1) (unLoc $2) Nothing 
+		       (reverse (unLoc $3)) (unLoc $4)) }
 
+        -- GADT declaration
         | data_or_newtype tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
 		{ L (comb4 $1 $2 $4 $5)
-		    (mkTyData (unLoc $1) (unLoc $2) $3 (reverse (unLoc $5)) (unLoc $6)) }
+		    (mkTyData (unLoc $1) (unLoc $2) $3
+		       (reverse (unLoc $5)) (unLoc $6)) }
+
+opt_iso :: { Bool }
+	:       { False }
+	| 'iso'	{ True  }
+
+kind_or_ctype :: { Either (Located (Maybe Kind)) (LHsType RdrName) }
+	: 		{ Left  (noLoc Nothing)           }
+        | '::' kind	{ Left  (LL    (Just (unLoc $2))) }
+	| '=' ctype	{ Right (LL    (unLoc $2))        }
+		-- Note ctype, not sigtype, on the right of '='
+		-- We allow an explicit for-all but we don't insert one
+		-- in 	type Foo a = (b,b)
+		-- Instead we just say b is out of scope
 
 data_or_newtype :: { Located NewOrData }
 	: 'data'	{ L1 DataType }
@@ -502,7 +538,7 @@ data_or_newtype :: { Located NewOrData }
 
 opt_kind_sig :: { Maybe Kind }
 	: 				{ Nothing }
-	| '::' kind			{ Just $2 }
+	| '::' kind			{ Just (unLoc $2) }
 
 -- tycl_hdr parses the header of a type decl,
 -- which takes the form
@@ -719,7 +755,7 @@ atype :: { LHsType RdrName }
 	| '[' ctype ']'			{ LL $ HsListTy  $2 }
 	| '[:' ctype ':]'		{ LL $ HsPArrTy  $2 }
 	| '(' ctype ')'		        { LL $ HsParTy   $2 }
-	| '(' ctype '::' kind ')'	{ LL $ HsKindSig $2 $4 }
+	| '(' ctype '::' kind ')'	{ LL $ HsKindSig $2 (unLoc $4) }
 -- Generics
         | INTEGER                       { L1 (HsNumTy (getINTEGER $1)) }
 
@@ -748,7 +784,8 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
 	: tyvar				{ L1 (UserTyVar (unLoc $1)) }
-	| '(' tyvar '::' kind ')'	{ LL (KindedTyVar (unLoc $2) $4) }
+	| '(' tyvar '::' kind ')'	{ LL (KindedTyVar (unLoc $2) 
+							  (unLoc $4)) }
 
 fds :: { Located [Located ([RdrName], [RdrName])] }
 	: {- empty -}			{ noLoc [] }
@@ -769,14 +806,14 @@ varids0	:: { Located [RdrName] }
 -----------------------------------------------------------------------------
 -- Kinds
 
-kind	:: { Kind }
+kind	:: { Located Kind }
 	: akind			{ $1 }
-	| akind '->' kind	{ mkArrowKind $1 $3 }
+	| akind '->' kind	{ LL (mkArrowKind (unLoc $1) (unLoc $3)) }
 
-akind	:: { Kind }
-	: '*'			{ liftedTypeKind }
-	| '!'			{ unliftedTypeKind }
-	| '(' kind ')'		{ $2 }
+akind	:: { Located Kind }
+	: '*'			{ L1 liftedTypeKind }
+	| '!'			{ L1 unliftedTypeKind }
+	| '(' kind ')'		{ LL (unLoc $2) }
 
 
 -----------------------------------------------------------------------------

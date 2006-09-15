@@ -36,8 +36,8 @@ module RdrHsSyn (
 	checkContext,	      -- HsType -> P HsContext
 	checkPred,	      -- HsType -> P HsPred
 	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName])
-	checkTyVars,          -- [LHsType RdrName] -> P ()
-	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName])
+	checkTyVars,          -- [LHsType RdrName] -> Bool -> P ()
+	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], Maybe [LHsType RdrName])
 	checkTopTyClD,	      -- LTyClDecl RdrName -> P (HsDecl RdrName)
 	checkInstType,	      -- HsType -> P HsType
 	checkPattern,	      -- HsExp -> P HsPat
@@ -377,25 +377,45 @@ checkInstType (L l t)
 	ty ->   do dict_ty <- checkDictTy (L l ty)
 	      	   return (L l (HsForAllTy Implicit [] (noLoc []) dict_ty))
 
--- Check that the given list of type parameters are all type variables
--- (possibly with a kind signature).
+-- Check whether the given list of type parameters are all type variables
+-- (possibly with a kind signature).  If the second argument is `False', we
+-- only type variables are allowed and we raise an error on encountering a
+-- non-variable; otherwise, we return the entire list parameters iff at least
+-- one is not a variable.
 --
-checkTyVars :: [LHsType RdrName] -> P ()
-checkTyVars tvs = mapM_ chk tvs
+checkTyVars :: [LHsType RdrName] -> Bool -> P (Maybe [LHsType RdrName])
+checkTyVars tparms nonVarsOk = 
+  do
+    areVars <- mapM chk tparms
+    return $ if and areVars then Nothing else Just tparms
   where
 	-- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-	| isRdrTyVar tv = return ()
+	| isRdrTyVar tv    = return True
     chk (L l (HsTyVar tv))
-        | isRdrTyVar tv = return ()
+        | isRdrTyVar tv    = return True
     chk (L l other)
-	= parseError l "Type found where type variable expected"
+        | nonVarsOk        = return False
+        | otherwise        = 
+	  parseError l "Type found where type variable expected"
 
-checkSynHdr :: LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName])
-checkSynHdr ty = do { (_, tc, tvs, Just tparms) <- checkTyClHdr (noLoc []) ty
-		    ; checkTyVars tparms
-		    ; return (tc, tvs) }
+-- Check whether the type arguments in a type synonym head are simply
+-- variables.  If not, we have a type equation of a type function and return
+-- all patterns.
+--
+checkSynHdr :: LHsType RdrName 
+	    -> Bool                             -- non-variables admitted?
+	    -> P (Located RdrName,		-- head symbol
+	          [LHsTyVarBndr RdrName],	-- parameters
+		  Maybe [LHsType RdrName])	-- type patterns
+checkSynHdr ty nonVarsOk = 
+  do { (_, tc, tvs, Just tparms) <- checkTyClHdr (noLoc []) ty
+     ; typats <- checkTyVars tparms nonVarsOk
+     ; return (tc, tvs, typats) }
 
+
+-- Well-formedness check and decomposition of type and class heads.
+--
 checkTyClHdr :: LHsContext RdrName -> LHsType RdrName
   -> P (LHsContext RdrName,	     -- the type context
         Located RdrName,	     -- the head symbol (type or class name)
@@ -493,7 +513,7 @@ extractTyVars tvs = collects [] tvs
 checkTopTyClD :: LTyClDecl RdrName -> P (HsDecl RdrName)
 checkTopTyClD (L _ d@TyData {tcdTyPats = Just typats}) = 
   do
-    checkTyVars typats
+    checkTyVars typats False
     return $ TyClD d {tcdTyPats = Nothing}
 checkTopTyClD (L _ d)                             = return $ TyClD d
 

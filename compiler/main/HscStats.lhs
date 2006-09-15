@@ -38,6 +38,8 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 		("FixityDecls      ", fixity_sigs),
 		("DefaultDecls     ", default_ds),
 	      	("TypeDecls        ", type_ds),
+	      	("TypeFunDecls     ", type_fun_ds),
+	      	("TypeEquations    ", type_equs),
 	      	("DataDecls        ", data_ds),
 	      	("NewTypeDecls     ", newt_ds),
 	      	("DataConstrs      ", data_constrs),
@@ -73,7 +75,8 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
 		-- in class decls.  ToDo
 
     tycl_decls  = [d | TyClD d <- decls]
-    (class_ds, type_ds, data_ds, newt_ds) = countTyClDecls tycl_decls
+    (class_ds, type_ds, type_fun_ds, type_equs, data_ds, newt_ds) = 
+      countTyClDecls tycl_decls
 
     inst_decls  = [d | InstD d <- decls]
     inst_ds     = length inst_decls

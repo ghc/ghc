@@ -18,7 +18,7 @@ module HsDecls (
 	DeprecDecl(..),  LDeprecDecl,
 	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
-	isClassDecl, isSynDecl, isDataDecl, 
+	isClassDecl, isTFunDecl, isSynDecl, isTEqnDecl, isDataDecl, 
 	countTyClDecls,
 	conDetailsTys,
 	instDeclATs,
@@ -359,8 +359,15 @@ data TyClDecl name
 			-- are non-empty for the newtype-deriving case
     }
 
+  | TyFunction {tcdLName  :: Located name,	        -- type constructor
+		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
+		tcdIso    :: Bool,	                -- injective type?
+		tcdKindSig:: Maybe Kind			-- result kind
+    }
+
   | TySynonym {	tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
+		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
 		tcdSynRhs :: LHsType name	        -- synonym expansion
     }
 
@@ -384,10 +391,20 @@ data NewOrData
 Simple classifiers
 
 \begin{code}
-isDataDecl, isSynDecl, isClassDecl :: TyClDecl name -> Bool
+isTFunDecl, isDataDecl, isSynDecl, isTEqnDecl, isClassDecl :: 
+  TyClDecl name -> Bool
 
-isSynDecl (TySynonym {}) = True
-isSynDecl other		 = False
+-- type function kind signature
+isTFunDecl (TyFunction {}) = True
+isTFunDecl other	   = False
+
+-- vanilla Haskell type synonym
+isSynDecl (TySynonym {tcdTyPats = Nothing}) = True
+isSynDecl other		                    = False
+
+-- type equation (of a type function)
+isTEqnDecl (TySynonym {tcdTyPats = Just _}) = True
+isTEqnDecl other		            = False
 
 isDataDecl (TyData {}) = True
 isDataDecl other       = False
@@ -408,8 +425,11 @@ tyClDeclNames :: Eq name => TyClDecl name -> [Located name]
 -- For record fields, the first one counts as the SrcLoc
 -- We use the equality to filter out duplicate field names
 
-tyClDeclNames (TySynonym   {tcdLName = name})  = [name]
-tyClDeclNames (ForeignType {tcdLName = name})  = [name]
+tyClDeclNames (TyFunction  {tcdLName = name})    = [name]
+tyClDeclNames (TySynonym   {tcdLName = name,
+			    tcdTyPats= Nothing}) = [name]
+tyClDeclNames (TySynonym   {}                  ) = []     -- type equation
+tyClDeclNames (ForeignType {tcdLName = name})    = [name]
 
 tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
   = cls_name : 
@@ -418,18 +438,22 @@ tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
 tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
   = tc_name : conDeclsNames (map unLoc cons)
 
-tyClDeclTyVars (TySynonym {tcdTyVars = tvs}) = tvs
-tyClDeclTyVars (TyData    {tcdTyVars = tvs}) = tvs
-tyClDeclTyVars (ClassDecl {tcdTyVars = tvs}) = tvs
-tyClDeclTyVars (ForeignType {})		     = []
+tyClDeclTyVars (TyFunction  {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (TySynonym   {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (TyData      {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (ClassDecl   {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (ForeignType {})		       = []
 \end{code}
 
 \begin{code}
-countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int)
-	-- class, data, newtype, synonym decls
+countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int, Int)
+	-- class, synonym decls, type function signatures,
+	-- type function equations, data, newtype
 countTyClDecls decls 
  = (count isClassDecl     decls,
     count isSynDecl       decls,
+    count isTFunDecl      decls,
+    count isTEqnDecl      decls,
     count isDataTy        decls,
     count isNewTy         decls) 
  where
@@ -447,8 +471,22 @@ instance OutputableBndr name
     ppr (ForeignType {tcdLName = ltycon})
 	= hsep [ptext SLIT("foreign import type dotnet"), ppr ltycon]
 
-    ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdSynRhs = mono_ty})
-      = hang (ptext SLIT("type") <+> pp_decl_head [] ltycon tyvars Nothing <+> equals)
+    ppr (TyFunction {tcdLName = ltycon, tcdTyVars = tyvars, tcdIso = iso, 
+		     tcdKindSig = mb_sig})
+      = typeMaybeIso <+> pp_decl_head [] ltycon tyvars Nothing <+> 
+	ppr_sig mb_sig
+        where
+	  typeMaybeIso = if iso 
+			 then ptext SLIT("type iso") 
+			 else ptext SLIT("type")
+
+	  ppr_sig Nothing     = empty
+	  ppr_sig (Just kind) = dcolon <+> pprKind kind
+
+    ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdTyPats = typats,
+		    tcdSynRhs = mono_ty})
+      = hang (ptext SLIT("type") <+> pp_decl_head [] ltycon tyvars typats <+> 
+	      equals)
 	     4 (ppr mono_ty)
 
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = ltycon,

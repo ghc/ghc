@@ -376,6 +376,7 @@ data Token
   | ITccallconv
   | ITdotnet
   | ITmdo
+  | ITiso
 
 	-- Pragmas
   | ITinline_prag Bool		-- True <=> INLINE, False <=> NOINLINE
@@ -499,6 +500,7 @@ isSpecial ITunsafe    	= True
 isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
 isSpecial ITmdo		= True
+isSpecial ITiso		= True
 isSpecial _             = False
 
 -- the bitmap provided as the third component indicates whether the
@@ -539,6 +541,7 @@ reservedWordsFM = listToUFM $
 
       	( "forall",	ITforall,	 bit tvBit),
 	( "mdo",	ITmdo,		 bit glaExtsBit),
+	( "iso",	ITiso,		 bit glaExtsBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
