@@ -71,13 +71,11 @@ mkHsAppTy t1 t2 = addCLoc t1 t2 (HsAppTy t1 t2)
 mkHsApp :: LHsExpr name -> LHsExpr name -> LHsExpr name
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
 
-mkHsTyApp :: LHsExpr name -> [Type] -> LHsExpr name
-mkHsTyApp expr []  = expr
-mkHsTyApp expr tys = L (getLoc expr) (TyApp expr tys)
+nlHsTyApp :: name -> [Type] -> LHsExpr name
+nlHsTyApp fun_id tys = noLoc (HsCoerce (CoTyApps tys) (HsVar fun_id))
 
-mkHsDictApp :: LHsExpr name -> [name] -> LHsExpr name
-mkHsDictApp expr []	 = expr
-mkHsDictApp expr dict_vars = L (getLoc expr) (DictApp expr dict_vars)
+mkLHsCoerce :: ExprCoFn -> LHsExpr id -> LHsExpr id
+mkLHsCoerce co_fn (L loc e) = L loc (mkHsCoerce co_fn e)
 
 mkHsCoerce :: ExprCoFn -> HsExpr id -> HsExpr id
 mkHsCoerce co_fn e | isIdCoercion co_fn = e
@@ -91,12 +89,6 @@ mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
 mkMatchGroup :: [LMatch id] -> MatchGroup id
 mkMatchGroup matches = MatchGroup matches placeHolderType
 
-mkHsTyLam []     expr = expr
-mkHsTyLam tyvars expr = L (getLoc expr) (TyLam tyvars expr)
-
-mkHsDictLam []    expr = expr
-mkHsDictLam dicts expr = L (getLoc expr) (DictLam dicts expr)
-
 mkHsDictLet :: LHsBinds Id -> LHsExpr Id -> LHsExpr Id
 -- Used for the dictionary bindings gotten from TcSimplify
 -- We make them recursive to be on the safe side
@@ -109,7 +101,7 @@ mkHsDictLet binds expr
 mkHsConApp :: DataCon -> [Type] -> [HsExpr Id] -> LHsExpr Id
 -- Used for constructing dictinoary terms etc, so no locations 
 mkHsConApp data_con tys args 
-  = foldl mk_app (noLoc (HsVar (dataConWrapId data_con)) `mkHsTyApp` tys) args
+  = foldl mk_app (nlHsTyApp (dataConWrapId data_con) tys) args
   where
     mk_app f a = noLoc (HsApp f (noLoc a))
 
@@ -385,7 +377,9 @@ collectl (L l pat) bndrs
     go (TuplePat pats _ _)  	  = foldr collectl bndrs pats
 				  
     go (ConPatIn c ps)   	  = foldr collectl bndrs (hsConArgs ps)
-    go (ConPatOut c _ ds bs ps _) = map noLoc ds
+    go (ConPatOut { pat_dicts = ds, 
+		    pat_binds = bs, pat_args = ps })
+				  = map noLoc ds
 				    ++ collectHsBindLocatedBinders bs
 				    ++ foldr collectl bndrs (hsConArgs ps)
     go (LitPat _)	      	  = bndrs

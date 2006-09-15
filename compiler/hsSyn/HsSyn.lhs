@@ -32,8 +32,7 @@ import HsImpExp
 import HsLit
 import HsPat
 import HsTypes
-import HscTypes		( DeprecTxt )
-import BasicTypes	( Fixity )
+import BasicTypes	( Fixity, DeprecTxt )
 import HsUtils
 
 -- others:

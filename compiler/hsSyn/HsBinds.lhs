@@ -16,7 +16,9 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr, LHsExpr,
 import {-# SOURCE #-} HsPat  ( LPat )
 
 import HsTypes		( LHsType, PostTcType )
-import Type		( Type )
+import PprCore		( {- instances -} )
+import Coercion		( Coercion )
+import Type		( Type, pprParendType )
 import Name		( Name )
 import NameSet		( NameSet, elemNameSet )
 import BasicTypes	( IPName, RecFlag(..), InlineSpec(..), Fixity )
@@ -296,20 +298,43 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
 %************************************************************************
 
 \begin{code}
--- A Coercion is an expression with a hole in it
+-- A ExprCoFn is an expression with a hole in it
 -- We need coercions to have concrete form so that we can zonk them
 
 data ExprCoFn
   = CoHole			-- The identity coercion
-  | CoCompose ExprCoFn ExprCoFn
-  | CoApps ExprCoFn [Id]		-- Non-empty list
-  | CoTyApps ExprCoFn [Type]		--   in all of these
-  | CoLams [Id] ExprCoFn		--   so that the identity coercion
-  | CoTyLams [TyVar] ExprCoFn		--   is just Hole
-  | CoLet (LHsBinds Id) ExprCoFn	-- Would be nicer to be core bindings
+
+  | CoCompose ExprCoFn ExprCoFn	-- (\a1..an. []) `CoCompose` (\x1..xn. [])
+				--	= (\a1..an \x1..xn. [])
+
+  | ExprCoFn Coercion		-- A cast:  [] `cast` co
+				-- Guaranteedn not the identity coercion
+
+	-- Non-empty list in all of these, so that the identity coercion
+	-- is always exactly CoHole, not, say, (CoTyLams [])
+  | CoApps [Var]		-- [] x1 .. xn; the xi are dicts or coercions
+  | CoTyApps [Type]		-- [] t1 .. tn
+  | CoLams [Id] 		-- \x1..xn. []; the xi are dicts or coercions
+  | CoTyLams [TyVar] 		-- \a1..an. []
+  | CoLet (LHsBinds Id)		-- Would be nicer to be core bindings
+
+instance Outputable ExprCoFn where
+  ppr CoHole	     = ptext SLIT("<>")
+  ppr (ExprCoFn co)  = ppr co
+  ppr (CoApps ids)   = ppr CoHole <+> interppSP ids
+  ppr (CoTyApps tys) = ppr CoHole <+> hsep (map pprParendType tys)
+  ppr (CoTyLams tvs) = sep [ptext SLIT("/\\") <> hsep (map (pprBndr LambdaBind) tvs),
+		 	    ptext SLIT("->") <+> ppr CoHole]
+  ppr (CoLams ids)   = sep [ptext SLIT("\\") <> hsep (map (pprBndr LambdaBind) ids),
+			    ptext SLIT("->") <+> ppr CoHole]
+  ppr (CoLet binds)  = sep [ptext SLIT("let") <+> braces (ppr binds),
+			    ppr CoHole]
+  ppr (CoCompose co1 co2) = sep [ppr co1, ptext SLIT("<.>"), ppr co2]
 
 (<.>) :: ExprCoFn -> ExprCoFn -> ExprCoFn
-(<.>) = CoCompose
+CoHole <.> c = c
+c <.> CoHole = c
+c1 <.> c2    = c1 `CoCompose` c2
 
 idCoercion :: ExprCoFn
 idCoercion = CoHole

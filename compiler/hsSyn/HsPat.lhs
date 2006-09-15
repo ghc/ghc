@@ -5,11 +5,11 @@
 
 \begin{code}
 module HsPat (
-	Pat(..), InPat, OutPat, LPat,
+	Pat(..), InPat, OutPat, LPat, 
 	
 	HsConDetails(..), hsConArgs,
 
-	mkPrefixConPat, mkCharLitPat, mkNilPat, 
+	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat,
 
 	isBangHsBind,	
 	patsAreAllCons, isConPat, isSigPat, isWildPat,
@@ -22,7 +22,7 @@ module HsPat (
 import {-# SOURCE #-} HsExpr		( SyntaxExpr )
 
 -- friends:
-import HsBinds		( DictBinds, HsBind(..), emptyLHsBinds, pprLHsBinds )
+import HsBinds		( DictBinds, HsBind(..), ExprCoFn, isIdCoercion, emptyLHsBinds, pprLHsBinds )
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
 import BasicTypes	( Boxity, tupleParens )
@@ -81,12 +81,15 @@ data Pat id
   | ConPatIn	(Located id)
 		(HsConDetails id (LPat id))
 
-  | ConPatOut	(Located DataCon)
-		[TyVar]			-- Existentially bound type variables
-		[id]			-- Ditto dictionaries
-		(DictBinds id)		-- Bindings involving those dictionaries
-		(HsConDetails id (LPat id))
-		Type    		-- The type of the pattern
+  | ConPatOut {
+	pat_con   :: Located DataCon,
+	pat_tvs   :: [TyVar],		-- Existentially bound type variables
+					--   including any bound coercion variables
+	pat_dicts :: [id],		-- Ditto dictionaries
+	pat_binds :: DictBinds id,	-- Bindings involving those dictionaries
+	pat_args  :: HsConDetails id (LPat id),
+	pat_ty	  :: Type   		-- The type of the pattern
+    }
 
 	------------ Literal and n+k patterns ---------------
   | LitPat	    HsLit		-- Used for *non-overloaded* literal patterns:
@@ -120,6 +123,12 @@ data Pat id
   | DictPat	    -- Used when destructing Dictionaries with an explicit case
 		    [id]			-- superclass dicts
 		    [id]			-- methods
+
+	------------ Pattern coercions (translation only) ---------------
+  | CoPat 	ExprCoFn		-- If co::t1 -> t2, p::t2, 
+					-- then (CoPat co p) :: t1
+		(Pat id)		-- No nested location reqd
+	    	Type	
 \end{code}
 
 HsConDetails is use both for patterns and for data type declarations
@@ -169,7 +178,8 @@ pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
 pprPat (TuplePat pats bx _) = tupleParens bx (interpp'SP pats)
 
 pprPat (ConPatIn con details) = pprUserCon con details
-pprPat (ConPatOut con tvs dicts binds details _) 
+pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts, 
+		    pat_binds = binds, pat_args = details })
   = getPprStyle $ \ sty ->	-- Tiresome; in TcBinds.tcRhs we print out a 
     if debugStyle sty then 	-- typechecked Pat in an error message, 
 				-- and we want to make sure it prints nicely
@@ -182,6 +192,7 @@ pprPat (NPat l Nothing  _ _)  = ppr l
 pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
 pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
+pprPat (CoPat co pat _)	      = parens (ppr co) <+> ptext SLIT("`cast`") <+> ppr pat
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
 pprPat (DictPat ds ms)	      = parens (sep [ptext SLIT("{-dict-}"),
@@ -214,13 +225,21 @@ pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \begin{code}
 mkPrefixConPat :: DataCon -> [OutPat id] -> Type -> OutPat id
 -- Make a vanilla Prefix constructor pattern
-mkPrefixConPat dc pats ty = noLoc $ ConPatOut (noLoc dc) [] [] emptyLHsBinds (PrefixCon pats) ty
+mkPrefixConPat dc pats ty 
+  = noLoc $ ConPatOut { pat_con = noLoc dc, pat_tvs = [], pat_dicts = [],
+			pat_binds = emptyLHsBinds, pat_args = PrefixCon pats, 
+			pat_ty = ty }
 
 mkNilPat :: Type -> OutPat id
 mkNilPat ty = mkPrefixConPat nilDataCon [] ty
 
 mkCharLitPat :: Char -> OutPat id
 mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] charTy
+
+mkCoPat :: ExprCoFn -> OutPat id -> Type -> OutPat id
+mkCoPat co lpat@(L loc pat) ty
+  | isIdCoercion co = lpat
+  | otherwise = L loc (CoPat co pat ty)
 \end{code}
 
 
@@ -260,14 +279,14 @@ isWildPat other	      = False
 patsAreAllCons :: [Pat id] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
-isConPat (AsPat _ pat)		 = isConPat (unLoc pat)
-isConPat (ConPatIn _ _)		 = True
-isConPat (ConPatOut _ _ _ _ _ _) = True
-isConPat (ListPat _ _)		 = True
-isConPat (PArrPat _ _)		 = True
-isConPat (TuplePat _ _ _)	 = True
-isConPat (DictPat ds ms)	 = (length ds + length ms) > 1
-isConPat other			 = False
+isConPat (AsPat _ pat)	 = isConPat (unLoc pat)
+isConPat (ConPatIn {})	 = True
+isConPat (ConPatOut {})  = True
+isConPat (ListPat {})	 = True
+isConPat (PArrPat {})	 = True
+isConPat (TuplePat {})	 = True
+isConPat (DictPat ds ms) = (length ds + length ms) > 1
+isConPat other		 = False
 
 isSigPat (SigPatIn _ _)  = True
 isSigPat (SigPatOut _ _) = True
@@ -301,6 +320,7 @@ isIrrefutableHsPat pat
     go1 (VarPatOut _ _)     = True
     go1 (LazyPat pat)       = True
     go1 (BangPat pat)       = go pat
+    go1 (CoPat _ pat _)     = go1 pat
     go1 (ParPat pat)        = go pat
     go1 (AsPat _ pat)       = go pat
     go1 (SigPatIn pat _)    = go pat
@@ -310,7 +330,7 @@ isIrrefutableHsPat pat
     go1 (PArrPat pats _)    = False	-- ?
 
     go1 (ConPatIn _ _) = False	-- Conservative
-    go1 (ConPatOut (L _ con) _ _ _ details _) 
+    go1 (ConPatOut{ pat_con = L _ con, pat_args = details }) 
 	=  isProductTyCon (dataConTyCon con)
 	&& all go (hsConArgs details)
 

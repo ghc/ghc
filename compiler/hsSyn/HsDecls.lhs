@@ -39,16 +39,14 @@ import HsPat		( HsConDetails(..), hsConArgs )
 import HsImpExp		( pprHsVar )
 import HsTypes
 import NameSet          ( NameSet )
-import HscTypes		( DeprecTxt )
 import CoreSyn		( RuleName )
-import Kind		( Kind, pprKind )
-import BasicTypes	( Activation(..) )
+import {- Kind parts of -} Type		( Kind, pprKind )
+import BasicTypes	( Activation(..), DeprecTxt )
 import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
 			  CExportSpec(..), CLabelString ) 
 
 -- others:
-import FunDeps		( pprFundeps )
-import Class		( FunDep )
+import Class		( FunDep, pprFundeps )
 import Outputable	
 import Util		( count )
 import SrcLoc		( Located(..), unLoc, noLoc )
