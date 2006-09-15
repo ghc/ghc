@@ -137,8 +137,6 @@ copyHtmlBits odir libdir maybe_css = do
 	css_destination = pathJoin [odir, cssFile]
 	copyLibFile f = do
 	   copyFile (pathJoin [libhtmldir, f]) (pathJoin [odir, f])
-  print css_file 
-  print css_destination
   copyFile css_file css_destination
   mapM_ copyLibFile [ iconFile, plusFile, minusFile, jsFile ]
 
