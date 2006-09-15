@@ -37,7 +37,7 @@ data ExportItem2 name
       (Maybe (HsDoc name)) -- ^ Maybe a doc comment
       [InstHead2 name]	   -- ^ Instances relevant to this declaration
 
-  | ExportNoDecl2	         -- ^ An exported entity for which we have no 
+  | ExportNoDecl2          -- ^ An exported entity for which we have no 
                            -- documentation (perhaps because it resides in
                            -- another package)
       Name                 -- ^ The original name

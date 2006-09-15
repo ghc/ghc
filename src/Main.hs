@@ -32,10 +32,6 @@ import System.Environment    ( getArgs )
 import System.IO             ( stderr, IOMode(..), openFile, hClose, 
                                hGetContents, hPutStrLn )
 import System.Directory      ( doesFileExist, doesDirectoryExist )
-#if defined(mingw32_HOST_OS)
-import Foreign
-import Foreign.C
-#endif
 import qualified Data.Map as Map
 import Data.Map              (Map)
 import Data.FunctorM         ( fmapM )
