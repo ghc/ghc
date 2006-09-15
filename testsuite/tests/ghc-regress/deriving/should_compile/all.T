@@ -9,4 +9,4 @@ test('drv008', normal, compile, [''])
 test('drv009', normal, compile, [''])
 test('drv010', normal, compile, [''])
 test('drv011', normal, compile, [''])
-
+test('drv012', normal, compile, [''])
