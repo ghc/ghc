@@ -362,7 +362,9 @@ data TyClDecl name
 		tcdTyVars :: [LHsTyVarBndr name], 	-- Type variables
 		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
 		tcdKindSig:: Maybe Kind,		-- Optional kind sig; 
-							-- (only for the 'where' form)
+							-- (only for the 
+							-- 'where' form and
+							-- indexed type sigs)
 
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
 			-- For data T a = T1 | T2 a          the LConDecls all have ResTyH98
@@ -380,7 +382,7 @@ data TyClDecl name
   | TyFunction {tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
 		tcdIso    :: Bool,	                -- injective type?
-		tcdKindSig:: Maybe Kind			-- result kind
+		tcdKind   :: Kind			-- result kind
     }
 
   | TySynonym {	tcdLName  :: Located name,	        -- type constructor
@@ -493,16 +495,13 @@ instance OutputableBndr name
 	= hsep [ptext SLIT("foreign import type dotnet"), ppr ltycon]
 
     ppr (TyFunction {tcdLName = ltycon, tcdTyVars = tyvars, tcdIso = iso, 
-		     tcdKindSig = mb_sig})
+		     tcdKind = kind})
       = typeMaybeIso <+> pp_decl_head [] ltycon tyvars Nothing <+> 
-	ppr_sig mb_sig
+	dcolon <+> pprKind kind
         where
 	  typeMaybeIso = if iso 
 			 then ptext SLIT("type iso") 
 			 else ptext SLIT("type")
-
-	  ppr_sig Nothing     = empty
-	  ppr_sig (Just kind) = dcolon <+> pprKind kind
 
     ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdTyPats = typats,
 		    tcdSynRhs = mono_ty})

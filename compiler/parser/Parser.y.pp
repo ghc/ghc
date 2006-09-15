@@ -444,7 +444,8 @@ topdecls :: { OrdList (LHsDecl RdrName) }
 
 topdecl :: { OrdList (LHsDecl RdrName) }
   	: cl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
-  	| ty_decl			{% checkTopTyClD $1 >>= return.unitOL.L1 }
+  	| ty_decl			{% checkTopTypeD $1 >>=
+					   return.unitOL.L1 }
 	| 'instance' inst_type where
 		{ let (binds, sigs, ats) = cvBindsAndSigs (unLoc $3)
 		  in unitOL (L (comb3 $1 $2 $3) 
@@ -478,7 +479,7 @@ cl_decl :: { LTyClDecl RdrName }
 ty_decl :: { LTyClDecl RdrName }
         -- type function signature and equations (w/ type synonyms as special
         -- case); we need to handle all this in one rule to avoid a large
-        -- number of shift/reduce conflicts (due to the generality of `type')
+        -- number of shift/reduce conflicts
         : 'type' opt_iso type kind_or_ctype
 	        --
 		-- Note the use of type for the head; this allows
@@ -497,16 +498,28 @@ ty_decl :: { LTyClDecl RdrName }
 		          ; return (L (comb3 $1 $3 kind) 
 				      (TyFunction tc tvs $2 (unLoc kind)))
 		          } 
-		     Right ty  -> 
+		     Right ty | not $2 -> 
 		       do { (tc, tvs, typats) <- checkSynHdr $3 True
 		          ; return (L (comb2 $1 ty) 
 				      (TySynonym tc tvs typats ty)) }
+		     Right ty | otherwise -> 
+		       parseError (comb2 $1 ty) 
+		         "iso tag is only allowed in kind signatures"
                 }
+
+        -- kind signature of indexed type
+        | data_or_newtype tycl_hdr '::' kind
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                      ; checkTyVars tparms False  -- no type pattern
+		      ; return $
+			  L (comb3 $1 $2 $4)
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
+			     (Just (unLoc $4)) [] Nothing) } }
 
         -- data type or newtype declaration
 	| data_or_newtype tycl_hdr constrs deriving
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; tpats <- checkTyVars tparms True -- can have type pats
+                      ; tpats <- checkTyVars tparms True  -- can have type pats
 		      ; return $
 			  L (comb4 $1 $2 $3 $4)
 			           -- We need the location on tycl_hdr in case 
@@ -529,10 +542,9 @@ opt_iso :: { Bool }
 	:       { False }
 	| 'iso'	{ True  }
 
-kind_or_ctype :: { Either (Located (Maybe Kind)) (LHsType RdrName) }
-	: 		{ Left  (noLoc Nothing)           }
-        | '::' kind	{ Left  (LL    (Just (unLoc $2))) }
-	| '=' ctype	{ Right (LL    (unLoc $2))        }
+kind_or_ctype :: { Either (Located Kind) (LHsType RdrName) }
+        : '::' kind     { Left  (LL (unLoc $2)) }
+	| '=' ctype	{ Right (LL (unLoc $2)) }
 		-- Note ctype, not sigtype, on the right of '='
 		-- We allow an explicit for-all but we don't insert one
 		-- in 	type Foo a = (b,b)
