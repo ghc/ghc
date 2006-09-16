@@ -65,22 +65,38 @@ type CheckedMod = (Module, FullyCheckedMod, FilePath)
 
 main :: IO ()
 main = do
+
+  -- first, get the GHC library dir (-B option)
   args <- getArgs
   (libDir, rest) <- getLibDir args 
+
+  -- find out which flag mode we are in
   let (isGHCMode, rest') = parseModeFlag rest
+
+  -- initialize GHC 
   (session, dynflags) <- startGHC libDir
 
+  -- parse GHC flags given to the program 
   (dynflags', rest'') <- if isGHCMode 
     then parseGHCFlags_GHCMode     dynflags rest'   
     else parseGHCFlags_HaddockMode dynflags rest' 
+  setSessionDynFlags session dynflags'
 
+  -- parse Haddock specific flags
   (flags, fileArgs) <- parseHaddockOpts rest''
 
-  setSessionDynFlags session dynflags'
+  -- try to sort and check the input files using the GHC API 
   modules <- sortAndCheckModules session dynflags' fileArgs
 
+  -- create a PackageData for each external package in the session
+  -- using the GHC API. The PackageData contains an html path,
+  -- a doc env and a list of module names.
   packages <- getPackages session dynflags'
+
+  -- update the html references (module -> html file mapping)
   updateHTMLXRefs packages
+
+  -- combine the doc envs of the external packages into one
   let env = packagesDocEnv packages
 
   -- TODO: continue to break up the run function into parts
