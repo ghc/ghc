@@ -711,8 +711,8 @@ renameModule renamingEnv mod =
       docs = Map.toList (hmod_doc_map mod)
       renameMapElem (k,d) = do d' <- renameDoc d; return (k, d') 
 
-  -- rename names in the exported declarations to point to things that
-  -- are closer to, or maybe even exported by, the current module.
+      -- rename names in the exported declarations to point to things that
+      -- are closer to, or maybe even exported by, the current module.
       (renamedExportItems, missingNames1)
         = runRnFM localEnv (renameExportItems (hmod_export_items mod))
 
@@ -722,15 +722,18 @@ renameModule renamingEnv mod =
       (finalModuleDoc, missingNames3)
         = runRnFM localEnv (renameMaybeDoc (hmod_doc mod))
 
+      -- combine the missing names and filter out the built-ins, which would
+      -- otherwise allways be missing. 
       missingNames = nub $ filter isExternalName
                     (missingNames1 ++ missingNames2 ++ missingNames3)
 
-      -- I haven't found the Name constant for () in the GHC API, so we have to
-      -- filter out the "()" string instead
+      -- filter out the "()" string (I haven't found the Name constant for ()
+      -- in the GHC API)
       strings = filter (/= "()") (map (showSDoc . ppr) missingNames) 
      
   in do
-  -- report things that we couldn't link to. Only do this for non-hidden modules.
+    -- report things that we couldn't link to. Only do this for non-hidden
+    -- modules.
     when (OptHide `notElem` hmod_options mod && not (null strings)) $
 	  tell ["Warning: " ++ show (ppr (hmod_mod mod) defaultUserStyle) ++ 
 		": could not find link destinations for:\n"++
@@ -1094,14 +1097,18 @@ funTyConName = mkWiredInName gHC_PRIM
                         (ATyCon funTyCon)       -- Relevant TyCon
                         BuiltInSyntax
 
+
 toHsInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead2 Name
 toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsType ts) 
+
 
 toHsPred :: PredType -> HsPred Name 
 toHsPred (ClassP cls ts) = HsClassP (className cls) (map toLHsType ts)
 toHsPred (IParam n t) = HsIParam n (toLHsType t)
 
+
 toLHsType = noLoc . toHsType
+
  
 toHsType :: Type -> HsType Name
 toHsType t = case t of 
@@ -1120,6 +1127,7 @@ toHsType t = case t of
     cvForAll vs (ForAllTy v t) = cvForAll (v:vs) t
     cvForAll vs t = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType t)
     tyvarbinders vs = map (noLoc . UserTyVar . tyVarName) vs
+
 
 -- -----------------------------------------------------------------------------
 -- A monad which collects error messages
