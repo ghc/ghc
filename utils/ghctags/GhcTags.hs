@@ -31,10 +31,12 @@ placateGhc = defaultErrorHandler defaultDynFlags $ do
 main :: IO ()
 main = do
         progName <- getProgName
+        let usageString =
+              "Usage: " ++ progName ++ " [OPTION...] [-- GHC OPTION... --] [files...]"
 	args <- getArgs
-        let usageString = "Usage: " ++ progName ++ " [OPTION...] [files...]"
-	let (modes, filenames, errs) = getOpt Permute options args
-	if errs /= [] || elem Help modes || filenames == []
+        let (ghcArgs, ourArgs, unbalanced) = splitArgs args
+	let (modes, filenames, errs) = getOpt Permute options ourArgs
+	if unbalanced || errs /= [] || elem Help modes || filenames == []
          then do
            putStr $ unlines errs 
 	   putStr $ usageInfo usageString options
@@ -49,7 +51,7 @@ main = do
           session <- newSession JustTypecheck
           print "created a session"
           flags <- getSessionDynFlags session
-          (flags, _) <- parseDynamicFlags flags ["-package", "ghc"]
+          (flags, _) <- parseDynamicFlags flags ghcArgs
           GHC.defaultCleanupHandler flags $ do
             flags <- initPackages flags
             setSessionDynFlags session flags
@@ -75,6 +77,13 @@ getMode [] = BothTags
 getMode [x] = x
 getMode (x:xs) = max x (getMode xs)
 
+
+splitArgs :: [String] -> ([String], [String], Bool)
+-- pull out arguments between -- for GHC
+splitArgs args = split [] [] False args
+    where split ghc' tags' unbal ("--" : args) = split tags' ghc' (not unbal) args
+          split ghc' tags' unbal (arg : args) = split ghc' (arg:tags') unbal args
+          split ghc' tags' unbal [] = (reverse ghc', reverse tags', unbal)
 
 data Mode = ETags | CTags | BothTags | Append | Help deriving (Ord, Eq, Show)
 
@@ -205,53 +214,32 @@ fileData filename (group, imports, lie) =
 
 boundValues :: HsGroup Name -> [FoundThing]    
 boundValues group =
-  case hs_valds group of
-    ValBindsOut nest sigs ->
-        [ x | (_rec, binds) <- nest, bind <- bagToList binds, x <- boundThings bind ]
+  let vals = case hs_valds group of
+               ValBindsOut nest sigs ->
+                   [ x | (_rec, binds) <- nest, bind <- bagToList binds, x <- boundThings bind ]
+      tys = concat $ map tyBound (hs_tyclds group)
+            where tyBound ltcd = case unLoc ltcd of
+                                   ForeignType { tcdLName = n } -> [foundOfLName n]
+                                   TyData { tcdLName = n } -> [foundOfLName n]
+                                   TySynonym { tcdLName = n } -> [foundOfLName n]
+                                   ClassDecl {	tcdLName = n } -> [foundOfLName n]
+      fors = concat $ map forBound (hs_fords group)
+             where forBound lford = case unLoc lford of
+                                      ForeignImport n _ _ -> [foundOfLName n]
+                                      ForeignExport { } -> []
+  in vals ++ tys ++ fors
 
 posOfLocated :: Located a -> Pos
 posOfLocated lHs = srcLocToPos $ srcSpanStart $ getLoc lHs
 
+foundOfLName :: Located Name -> FoundThing
+foundOfLName id = FoundThing (getOccString $ unLoc id) (posOfLocated id)
+
 boundThings :: LHsBind Name -> [FoundThing]
 boundThings lbinding = 
-  let thing id = FoundThing (getOccString $ unLoc id) (posOfLocated id)
+  let thing = foundOfLName
   in  case unLoc lbinding of
         FunBind { fun_id = id } -> [thing id]
-        PatBind { pat_lhs = lhs } -> patBoundIds lhs
---        VarBind { var_id = id } -> [thing id]
-        _ -> []
-                                     
-
-patBoundIds :: a -> b
-patBoundIds _ = panic "not on your life"
-	
--- actually pick up definitions
-
-findstuff :: [Token] -> [FoundThing]
-findstuff ((Token "data" _):(Token name pos):xs) = 
-	FoundThing name pos : (getcons xs) ++ (findstuff xs)
-findstuff ((Token "newtype" _):(Token name pos):xs) = 
-	FoundThing name pos : findstuff xs
-findstuff ((Token "type" _):(Token name pos):xs) = 
-	FoundThing name pos : findstuff xs
-findstuff ((Token name pos):(Token "::" _):xs) = 
-	FoundThing name pos : findstuff xs
-findstuff (x:xs) = findstuff xs
-findstuff [] = []
-
-
--- get the constructor definitions, knowing that a datatype has just started
-
-getcons :: [Token] -> [FoundThing]
-getcons ((Token "=" _):(Token name pos):xs) = 
-	FoundThing name pos : getcons2 xs
-getcons (x:xs) = getcons xs
-getcons [] = []
-
-
-getcons2 ((Token "=" _):xs) = []
-getcons2 ((Token "|" _):(Token name pos):xs) = 
-	FoundThing name pos : getcons2 xs
-getcons2 (x:xs) = getcons2 xs
-getcons2 [] = []
-
+        PatBind { pat_lhs = lhs } -> panic "Pattern at top level"
+        VarBind { var_id = id } -> [FoundThing (getOccString id) (posOfLocated lbinding)]
+        AbsBinds { } -> [] -- nothing interesting in a type abstraction
