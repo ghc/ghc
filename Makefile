@@ -66,7 +66,18 @@ endif
 
 SUBDIRS = $(SUBDIRS_NOLIB) libraries
 
-stage1 :
+# Sanity check that all the core libraries are in the tree, to catch
+# failure to run darcs-all.
+check-packages :
+	@for d in `cat libraries/core-packages`; do \
+	  if test ! -d libraries/$$d; then \
+	     echo "Looks like you're missing libraries/$$d,"; \
+	     echo "maybe you haven't done 'sh darcs-all get'?"; \
+	     exit 1; \
+	  fi \
+	done
+
+stage1 : check-packages
 	$(MAKE) -C utils/mkdependC boot
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_NOLIB); do \
@@ -88,11 +99,11 @@ stage1 :
 	@$(MAKE) -C libraries boot
 	@$(MAKE) -C libraries all
 
-stage2 :
+stage2 : check-packages
 	$(MAKE) -C compiler boot stage=2
 	$(MAKE) -C compiler stage=2
 
-stage3 :
+stage3 : check-packages
 	$(MAKE) -C compiler boot stage=3
 	$(MAKE) -C compiler stage=3
 
@@ -118,7 +129,7 @@ INSTALL_STAGE =
 endif
 
 # Same as default rule, but we pass $(INSTALL_STAGE) to $(MAKE) too
-install ::
+install :: check-packages
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
