@@ -22,7 +22,7 @@ import Control.Monad.Writer  ( Writer, runWriter, tell )
 import Data.Char             ( isSpace )
 import Data.IORef            ( writeIORef )
 import Data.List             ( nub, nubBy, (\\), foldl', sortBy, foldl1, init, 
-                               mapAccumL, find )
+                               mapAccumL, find, isPrefixOf )
 import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList, 
                                listToMaybe, fromJust, catMaybes )
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
@@ -683,7 +683,7 @@ updateHTMLXRefs :: [PackageData] -> IO ()
 updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
   where
     mapping = [ (mod, html) | 
-                (PackageData _ mods html) <- packages, (mod, _) <- mods ] 
+                (PackageData mods _ html) <- packages, mod <- mods ] 
 
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))
 getPrologue flags
@@ -1139,16 +1139,17 @@ packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
 pkgId :: InstalledPackageInfo -> PackageId
 pkgId = mkPackageId . package 
 
--- | Get the ModuleInfo for each exposed module in a package 
-getPackageModuleInfo :: Session -> InstalledPackageInfo -> 
-                        IO (Maybe [(Module, ModuleInfo)])
-getPackageModuleInfo session pkgInfo = do
-  mbInfos <- (flip mapM) (packageModules pkgInfo) $ \mod -> do
-    mbModInfo <- getModuleInfo session mod 
-    case mbModInfo of 
-      Nothing -> return Nothing
-      Just modInfo -> return (Just (mod, modInfo))
-  return (sequence mbInfos)
+-- | Topologically sort a list of modules that belong to an external package,
+-- using the dependency information available in the ModIface structure for 
+-- each module. 
+sortPackageModules :: [Module] -> IO [Module]
+sortPackageModules = undefined
+
+-- | For each module in the list, try to retrieve a ModuleInfo structure  
+moduleInfo :: Session -> [Module] -> IO (Maybe [ModuleInfo])
+moduleInfo session modules = do
+  mbModInfo <- mapM (getModuleInfo session) modules
+  return (sequence mbModInfo)
 
 -- | Get the Haddock HTML directory path for a package
 getHtml :: InstalledPackageInfo -> IO (Either String FilePath)
@@ -1158,45 +1159,66 @@ getHtml pkgInfo = case haddockHTMLs pkgInfo of
     if dirExists then return (Right path) else return $
        Left ("HTML directory " ++ path ++ " does not exist.")
   _ -> return (Left "No Haddock documentation installed.")
- 
+
 data PackageData = PackageData {
-  pdPackageId  :: PackageId,
-  pdModuleInfo :: [(Module, ModuleInfo)],
-  pdHtmlPath   :: FilePath
+  pdModules  :: [Module],
+  pdDocEnv   :: [(Name, Name)],
+  pdHtmlPath :: FilePath
 }
 
--- | Retrieve a PackageData for a package in the session  
-getPackageData :: Session -> InstalledPackageInfo -> 
-                  IO (Either String PackageData) 
-getPackageData session pkgInfo = do
+-- | Try to create a PackageData structure for a package
+getPackage :: Session -> InstalledPackageInfo -> IO (Either String PackageData) 
+getPackage session pkgInfo = do
+
+  -- try to get the html path to the documentation
   eHtml <- getHtml pkgInfo
-  mbModInfo <- getPackageModuleInfo session pkgInfo
+
+  -- get a sorted list of the exposed modules  
+  let modules = packageModules pkgInfo
+  modules' <- sortPackageModules modules
+
+  -- try to get a ModuleInfo struct for each module
+  mbModInfo <- moduleInfo session modules'
+  let toEither err = maybe (Left err) Right
   let eModInfo = toEither "Could not get ModuleInfo for all exposed modules." 
                  mbModInfo
-  return $ do -- in the Either monad
+
+  -- build the PackageData structure in the Either monad
+  return $ do 
     html <- eHtml
     modInfo <- eModInfo
     return $ PackageData {
-      pdPackageId  = pkgId pkgInfo, 
-      pdModuleInfo = modInfo,
-      pdHtmlPath   = html
-    }
-  where 
-    toEither err = maybe (Left err) Right
+      pdModules  = modules',
+      pdDocEnv   = packageDocEnv modules' modInfo,
+      pdHtmlPath = html
+    } 
 
--- | Retrieve a PackageData for each package in the session except for rts.
--- Print a warning on stdout if a PackageData could not be retrieved.
+-- | Build a package doc env out of a topologically sorted list of modules
+packageDocEnv :: [Module] -> [ModuleInfo] -> [(Name, Name)]
+packageDocEnv mods infos = concatMap moduleDocEnv (zip mods infos)
+  where
+    moduleDocEnv (mod, modInfo) 
+      | "GHC" `isPrefixOf` moduleString mod = []
+      | otherwise = [ (n, nameSetMod n mod) | n <- (modInfoExports modInfo) ]
+
+-- | Try to create a PackageData for each package in the session except for 
+-- rts. Print a warning on stdout if a PackageData could not be created.
 getPackages :: Session -> DynFlags -> IO [PackageData]
 getPackages session dynflags = do
+
+  -- get InstalledPackageInfo's for every package in the session
   pkgInfos <- getExplicitPackagesAnd dynflags []
+
+  -- return a list of those packages that we could create PackageData's for 
   let pkgInfos' = filter notRTS pkgInfos
-  liftM catMaybes (mapM getPackage pkgInfos')
+  liftM catMaybes (mapM tryGetPackage pkgInfos')
+
   where
     -- no better way to do this?
     notRTS p = pkgName (package p) /= packageIdString rtsPackageId  
 
-    getPackage pkgInfo = do
-      result <- getPackageData session pkgInfo
+    tryGetPackage pkgInfo = do
+      result <- getPackage session pkgInfo
       case result of
         Left err -> do
           let pkgName = showPackageId (package pkgInfo)
@@ -1205,13 +1227,6 @@ getPackages session dynflags = do
           return Nothing
         Right pkgInfo -> return (Just pkgInfo)
 
+-- | Build one big doc env out of a list of packages
 packagesDocEnv :: [PackageData] -> Map Name Name
-packagesDocEnv packages = Map.fromList (concatMap packageDocEnv packages)
-
-packageDocEnv :: PackageData -> [(Name, Name)]
-packageDocEnv package = concatMap moduleInfoDocEnv modInfo  
-  where modInfo = pdModuleInfo package
-
-moduleInfoDocEnv :: (Module, ModuleInfo) -> [(Name, Name)]
-moduleInfoDocEnv (mod, modInfo) = [ (n, nameSetMod n mod) | n <- names ]
-  where names = modInfoExports modInfo
+packagesDocEnv packages = Map.fromList (concatMap pdDocEnv packages)
