@@ -15,6 +15,11 @@ dnl
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.5], [glasgow-haskell-bugs@haskell.org], [ghc])
 
+if test ! -f mk/config.h.in; then
+   echo "mk/config.h.in doesn't exist: perhaps you haven't run 'autoreconf'?"
+   exit 1
+fi
+
 FP_SETUP_PROJECT_VERSION
 
 # Hmmm, we fix the RPM release number to 1 here... Is this convenient?
