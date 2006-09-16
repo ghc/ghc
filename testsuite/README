@@ -5,7 +5,13 @@ NOTE: you need Python (any version >= 1.5 will probably do) in order
 to use the testsuite.
 
 To run the test suite against stage 1 of a GHC build in the same
-source tree:
+source tree, first:
+
+        cd testsuite
+        make boot
+
+This sets up the testsuite and builds the timeout tool which is used
+when running tests.  Then:
 
 	cd tests/ghc-regress
 	make
