@@ -19,6 +19,9 @@
 
 include $(TOP)/mk/wordsize.mk
 
+$(TOP)/mk/wordsize.mk : $(TOP)/mk/wordsize.mk.in
+	$(CPP) $(RAWCPP_FLAGS) -x c $(TOP)/mk/wordsize.mk.in > $(TOP)/mk/wordsize.mk
+
 ifeq "$(PYTHON)" ""
 $(error Python must be installed in order to use the testsuite)
 endif
@@ -120,7 +123,13 @@ WAY =
 
 all :: test
 
-test:
+timeout : $(TOP)/timeout/timeout$(exeext)
+
+$(TOP)/timeout/timeout$(exeext) :
+	@echo "Looks like you don't have timeout, building it first..."
+	cd $(TOP)/timeout && $(MAKE) $(MFLAGS) all
+
+test: timeout
 	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
