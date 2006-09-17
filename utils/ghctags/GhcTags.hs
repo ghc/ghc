@@ -220,7 +220,8 @@ boundValues group =
       tys = concat $ map tyBound (hs_tyclds group)
             where tyBound ltcd = case unLoc ltcd of
                                    ForeignType { tcdLName = n } -> [foundOfLName n]
-                                   TyData { tcdLName = n } -> [foundOfLName n]
+                                   TyData { tcdLName = tycon, tcdCons = cons } ->
+                                       dataNames tycon cons
                                    TySynonym { tcdLName = n } -> [foundOfLName n]
                                    ClassDecl {	tcdLName = n } -> [foundOfLName n]
       fors = concat $ map forBound (hs_fords group)
@@ -228,6 +229,8 @@ boundValues group =
                                       ForeignImport n _ _ -> [foundOfLName n]
                                       ForeignExport { } -> []
   in vals ++ tys ++ fors
+  where dataNames tycon cons = foundOfLName tycon : map conName cons
+        conName td = foundOfLName $ con_name $ unLoc td
 
 posOfLocated :: Located a -> Pos
 posOfLocated lHs = srcLocToPos $ srcSpanStart $ getLoc lHs
@@ -243,3 +246,4 @@ boundThings lbinding =
         PatBind { pat_lhs = lhs } -> panic "Pattern at top level"
         VarBind { var_id = id } -> [FoundThing (getOccString id) (posOfLocated lbinding)]
         AbsBinds { } -> [] -- nothing interesting in a type abstraction
+
