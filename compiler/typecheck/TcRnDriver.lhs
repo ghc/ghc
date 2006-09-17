@@ -428,6 +428,7 @@ tc_rn_src_decls boot_details ds
 	-- Rename the splice expression, and get its supporting decls
 	(rn_splice_expr, splice_fvs) <- rnLExpr splice_expr ;
 	failIfErrsM ;	-- Don't typecheck if renaming failed
+	rnDump (ppr rn_splice_expr) ;
 
 	-- Execute the splice
 	spliced_decls <- tcSpliceDecls rn_splice_expr ;
