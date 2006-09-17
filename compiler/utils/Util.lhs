@@ -757,29 +757,45 @@ looksLikeModuleName (c:cs) = isUpper c && go cs
 	go (c:cs)   = (isAlphaNum c || c == '_') && go cs
 \end{code}
 
-Akin to @Prelude.words@, but sensitive to dquoted entities treating
-them as single words.
+Akin to @Prelude.words@, but acts like the Bourne shell, treating
+quoted strings and escaped characters within the input as solid blocks
+of characters.  Doesn't raise any exceptions on malformed escapes or
+quoting.
 
 \begin{code}
 toArgs :: String -> [String]
 toArgs "" = []
 toArgs s  =
-  case break (\ ch -> isSpace ch || ch == '"') (dropWhile isSpace s) of -- "
-    (w,aft) ->
-       (\ ws -> if null w then ws else w : ws) $
-       case aft of
-	 []           -> []
-	 (x:xs)
-	   | x /= '"'  -> toArgs xs
-	   | otherwise ->
-             case lex aft of
-	       ((str,rs):_) -> stripQuotes str : toArgs rs
-	       _            -> [aft]
+  case dropWhile isSpace s of  -- drop initial spacing
+    [] -> []  -- empty, so no more tokens
+    rem -> let (tok,aft) = token rem [] in tok : toArgs aft
  where
-    -- strip away dquotes; assume first and last chars contain quotes.
-   stripQuotes :: String -> String
-   stripQuotes ('"':xs)  = init xs
-   stripQuotes xs        = xs
+   -- Grab a token off the string, given that the first character exists and
+   -- isn't whitespace.  The second argument is an accumulator which has to be
+   -- reversed at the end.
+  token [] acc = (reverse acc,[])            -- out of characters
+  token ('\\':c:aft) acc                     -- escapes
+               = token aft ((escape c) : acc)
+  token (q:aft) acc | q == '"' || q == '\''  -- open quotes
+               = let (aft',acc') = quote q aft acc in token aft' acc'
+  token (c:aft) acc | isSpace c              -- unescaped, unquoted spacing
+               = (reverse acc,aft)
+  token (c:aft) acc                          -- anything else goes in the token
+               = token aft (c:acc)
+
+   -- Get the appropriate character for a single-character escape.
+  escape 'n' = '\n'
+  escape 't' = '\t'
+  escape 'r' = '\r'
+  escape c   = c
+
+   -- Read into accumulator until a quote character is found.
+  quote qc =
+    let quote' [] acc                  = ([],acc)
+        quote' ('\\':c:aft) acc        = quote' aft ((escape c) : acc)
+        quote' (c:aft) acc | c == qc   = (aft,acc)
+        quote' (c:aft) acc             = quote' aft (c:acc)
+    in quote'
 \end{code}
 
 -- -----------------------------------------------------------------------------
