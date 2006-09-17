@@ -40,6 +40,7 @@ module RdrHsSyn (
 	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
 	checkInstType,	      -- HsType -> P HsType
+        checkDerivDecl,       -- LDerivDecl RdrName -> P (LDerivDecl RdrName)
 	checkPattern,	      -- HsExp -> P HsPat
 	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
 	checkDo,	      -- [Stmt] -> P [Stmt]
@@ -56,7 +57,7 @@ import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc,
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
 import BasicTypes	( maxPrecedence, Activation, InlineSpec(..), alwaysInlineSpec, neverInlineSpec )
-import Lexer		( P, failSpanMsgP, extension, bangPatEnabled )
+import Lexer		( P, failSpanMsgP, extension, glaExtsEnabled, bangPatEnabled )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
@@ -558,6 +559,16 @@ checkDictTy (L spn ty) = check ty []
   check (HsAppTy l r) args = check (unLoc l) (r:args)
   check (HsParTy t)   args = check (unLoc t) args
   check _ _ = parseError spn "Malformed context in instance header"
+
+
+---------------------------------------------------------------------------
+-- Checking stand-alone deriving declarations
+
+checkDerivDecl :: LDerivDecl RdrName -> P (LDerivDecl RdrName)
+checkDerivDecl d@(L loc _) = 
+    do glaExtOn <- extension glaExtsEnabled
+       if glaExtOn then return d
+	 else parseError loc "Illegal stand-alone deriving declaration (use -fglasgow-exts)"
 
 ---------------------------------------------------------------------------
 -- Checking statements in a do-expression

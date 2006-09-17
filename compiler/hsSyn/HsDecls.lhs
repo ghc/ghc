@@ -9,7 +9,7 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 \begin{code}
 module HsDecls (
 	HsDecl(..), LHsDecl, TyClDecl(..), LTyClDecl, 
-	InstDecl(..), LInstDecl, NewOrData(..),
+	InstDecl(..), LInstDecl, DerivDecl(..), LDerivDecl, NewOrData(..),
 	RuleDecl(..), LRuleDecl, RuleBndr(..),
 	DefaultDecl(..), LDefaultDecl, SpliceDecl(..),
 	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
@@ -67,6 +67,7 @@ type LHsDecl id = Located (HsDecl id)
 data HsDecl id
   = TyClD	(TyClDecl id)
   | InstD	(InstDecl  id)
+  | DerivD      (DerivDecl id)
   | ValD	(HsBind id)
   | SigD	(Sig id)
   | DefD	(DefaultDecl id)
@@ -153,6 +154,7 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (ValD binds) = ppr binds
     ppr (DefD def)   = ppr def
     ppr (InstD inst) = ppr inst
+    ppr (DerivD deriv) = ppr deriv
     ppr (ForD fd)    = ppr fd
     ppr (SigD sd)    = ppr sd
     ppr (RuleD rd)   = ppr rd
@@ -711,6 +713,23 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
 --
 instDeclATs :: InstDecl name -> [LTyClDecl name]
 instDeclATs (InstDecl _ _ _ ats) = ats
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[DerivDecl]{A stand-alone instance deriving declaration
+%*									*
+%************************************************************************
+
+\begin{code}
+type LDerivDecl name = Located (DerivDecl name)
+
+data DerivDecl name
+  = DerivDecl (Located name) (LHsType name)
+
+instance (OutputableBndr name) => Outputable (DerivDecl name) where
+    ppr (DerivDecl cls ty)
+      = hsep [ptext SLIT("deriving"), ppr cls, ppr ty]
 \end{code}
 
 %************************************************************************

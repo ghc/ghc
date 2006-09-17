@@ -455,9 +455,8 @@ topdecl :: { OrdList (LHsDecl RdrName) }
   	: cl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
   	| ty_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
 	| 'instance' inst_type where
-		{ let (binds, sigs, ats) = cvBindsAndSigs (unLoc $3)
-		  in unitOL (L (comb3 $1 $2 $3) 
-			    (InstD (InstDecl $2 binds sigs ats))) }
+		{ let (binds,sigs) = cvBindsAndSigs (unLoc $3)
+		  in unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs))) }
 	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
 	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
 	| '{-# DEPRECATED' deprecations '#-}'	{ $2 }

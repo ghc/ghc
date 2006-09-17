@@ -27,7 +27,7 @@ module Lexer (
    failLocMsgP, failSpanMsgP, srcParseFail,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
-   extension, bangPatEnabled
+   extension, glaExtsEnabled, bangPatEnabled
   ) where
 
 #include "HsVersions.h"
