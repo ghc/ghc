@@ -1,11 +1,12 @@
 {-# OPTIONS -cpp #-}
 
 -- Used to present a consistent shell view for :! commands in GHCi
--- scripts.  We're assuming cygwin is installed in C:/cygwin.
+-- scripts.  We're assuming that sh.exe is in the path and that it
+-- is a Bourne-compatible shell.
 
 import System.Cmd
 #ifdef mingw32_HOST_OS
-shell s = system ("c:/cygwin/bin/sh.exe -c '" ++ s ++ "'")
+shell s = system ("sh.exe -c '" ++ s ++ "'")
 #else
 shell s = system s
 #endif

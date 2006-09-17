@@ -81,7 +81,10 @@ main = do
         forkIO (do threadDelay (read secs * 1000000)
                    putMVar m Nothing
                )
-        forkIO (do p <- runCommand cmd
+	-- Assume sh.exe is in the path
+        forkIO (do p <- runProcess
+                            "sh" ["-c",cmd]
+                            Nothing Nothing Nothing Nothing Nothing
 		   putMVar mp p
 		   r <- waitForProcess p
 		   putMVar m (Just r))
@@ -93,7 +96,7 @@ main = do
                 exitWith (ExitFailure 99)
           Just r -> do
                 exitWith r
-    _other -> do hPutStrLn stderr "timeout: bad arguments"
+    _other -> do hPutStrLn stderr $ "timeout: bad arguments " ++ show args
                  exitWith (ExitFailure 1)
 
 killProcess p = do

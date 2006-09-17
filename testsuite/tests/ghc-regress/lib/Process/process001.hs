@@ -3,7 +3,7 @@ import System.IO
 import System.Process
 
 #ifdef mingw32_HOST_OS
-cmd = "c:/cygwin/bin/ls"
+cmd = "ls"
 #else
 cmd = "/bin/ls"
 #endif

@@ -922,16 +922,20 @@ def guess_compiler_flags():
 
 def runCmd( cmd ):
     if_verbose( 1, cmd )
-    # On Windows, we need to run the command via the cygwin shell here,
-    # rather than CMD.EXE.  os.system() does the right thing (as long as
-    # Python is the cygwin Python), but our timeout program doesn't.  So
-    # We disable the use of the timeout program on Windows, for now.
-    if (config.timeout_prog == '' or config.platform == 'i386-unknown-mingw32'):
-        return os.system( cmd )
+    r = 0
+    if config.platform == 'i386-unknown-mingw32':
+	# On MinGW, we will always have timeout
+        assert config.timeout_prog!=''
+        # We need to add " around the command, because
+        # (like Windows programs usually) timeout parses the commandline.
+        r = os.spawnl(os.P_WAIT, config.timeout_prog,
+		      config.timeout_prog,`config.timeout`,'"%s"'%cmd )
+    elif config.timeout_prog!='':
+    	r = os.spawnv(os.P_WAIT, config.timeout_prog,
+		      [config.timeout_prog,`config.timeout`,cmd] )
     else:
-        r = os.spawnv(os.P_WAIT, config.timeout_prog,
-                         [config.timeout_prog,`config.timeout`,cmd] )
-        return r << 8
+        r = os.system(cmd)
+    return r << 8
 
 def rm_no_fail( file ):
    try:
