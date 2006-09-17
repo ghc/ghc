@@ -68,6 +68,7 @@ rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		      hs_tyclds = tycl_decls,
 		      hs_instds = inst_decls,
+                      hs_derivds = deriv_decls,
 		      hs_fixds  = fix_decls,
 		      hs_depds  = deprec_decls,
 		      hs_fords  = foreign_decls,
@@ -102,6 +103,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	   <- mapFvRn (wrapLocFstM rnTyClDecl) tycl_decls ;
 	(rn_inst_decls,    src_fvs2)
 	   <- mapFvRn (wrapLocFstM rnSrcInstDecl) inst_decls ;
+	(rn_deriv_decls,    src_fvs_deriv)
+	   <- mapFvRn (wrapLocFstM rnSrcDerivDecl) deriv_decls ;
 	(rn_rule_decls,    src_fvs3)
 	   <- mapFvRn (wrapLocFstM rnHsRuleDecl) rule_decls ;
 	(rn_foreign_decls, src_fvs4)
@@ -113,13 +116,14 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
 			    	hs_tyclds = rn_tycl_decls,
 			    	hs_instds = rn_inst_decls,
+                                hs_derivds = rn_deriv_decls,
 			    	hs_fixds  = rn_fix_decls,
 			    	hs_depds  = [],
 			    	hs_fords  = rn_foreign_decls,
 			    	hs_defds  = rn_default_decls,
 			    	hs_ruleds = rn_rule_decls } ;
 
-	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs3, 
+	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs_deriv, src_fvs3, 
 				src_fvs4, src_fvs5] ;
 	   src_dus = bind_dus `plusDU` usesOnly other_fvs 
 		-- Note: src_dus will contain *uses* for locally-defined types
@@ -365,6 +369,20 @@ extendTyVarEnvForMethodBinds tyvars thing_inside
 	thing_inside
 \end{code}
 
+%*********************************************************
+%*							*
+\subsection{Stand-alone deriving declarations}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
+rnSrcDerivDecl (DerivDecl cls ty)
+  = do cls' <- lookupLocatedOccRn cls
+       ty' <- rnLHsType (text "a deriving decl") ty
+       let fvs = extractHsTyNames ty'
+       return (DerivDecl cls' ty', fvs)
+\end{code}
 
 %*********************************************************
 %*							*

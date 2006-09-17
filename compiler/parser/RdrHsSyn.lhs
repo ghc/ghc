@@ -312,6 +312,8 @@ add gp@(HsGroup {hs_valds  = ts}) l (ValD d) ds
 -- The rest are routine
 add gp@(HsGroup {hs_instds = ts})  l (InstD d) ds
   = addl (gp { hs_instds = L l d : ts }) ds
+add gp@(HsGroup {hs_derivds = ts})  l (DerivD d) ds
+  = addl (gp { hs_derivds = L l d : ts }) ds
 add gp@(HsGroup {hs_defds  = ts})  l (DefD d) ds
   = addl (gp { hs_defds = L l d : ts }) ds
 add gp@(HsGroup {hs_fords  = ts})  l (ForD d) ds

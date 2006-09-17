@@ -96,6 +96,7 @@ data HsGroup id
 	hs_valds  :: HsValBinds id,
 	hs_tyclds :: [LTyClDecl id],
 	hs_instds :: [LInstDecl id],
+        hs_derivds :: [LDerivDecl id],
 
 	hs_fixds  :: [LFixitySig id],
 		-- Snaffled out of both top-level fixity signatures,
@@ -111,7 +112,7 @@ emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
-emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [],
+emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], hs_derivds = [],
 		       hs_fixds = [], hs_defds = [], hs_fords = [], 
 		       hs_depds = [], hs_ruleds = [],
 		       hs_valds = error "emptyGroup hs_valds: Can't happen" }
@@ -122,6 +123,7 @@ appendGroups
 	hs_valds  = val_groups1,
 	hs_tyclds = tyclds1, 
 	hs_instds = instds1,
+        hs_derivds = derivds1,
 	hs_fixds  = fixds1, 
 	hs_defds  = defds1,
 	hs_fords  = fords1, 
@@ -131,6 +133,7 @@ appendGroups
 	hs_valds  = val_groups2,
 	hs_tyclds = tyclds2, 
 	hs_instds = instds2,
+        hs_derivds = derivds2,
 	hs_fixds  = fixds2, 
 	hs_defds  = defds2,
 	hs_fords  = fords2, 
@@ -141,6 +144,7 @@ appendGroups
 	hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
 	hs_tyclds = tyclds1 ++ tyclds2, 
 	hs_instds = instds1 ++ instds2,
+        hs_derivds = derivds1 ++ derivds2,
 	hs_fixds  = fixds1 ++ fixds2, 
 	hs_defds  = defds1 ++ defds2,
 	hs_fords  = fords1 ++ fords2, 
@@ -165,6 +169,7 @@ instance OutputableBndr name => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,
 		   hs_tyclds = tycl_decls,
 		   hs_instds = inst_decls,
+                   hs_derivds = deriv_decls,
 		   hs_fixds  = fix_decls,
 		   hs_depds  = deprec_decls,
 		   hs_fords  = foreign_decls,
@@ -174,6 +179,7 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 		ppr_ds deprec_decls, ppr_ds rule_decls,
 		ppr val_decls,
 		ppr_ds tycl_decls, ppr_ds inst_decls,
+                ppr_ds deriv_decls,
 		ppr_ds foreign_decls]
 	where
 	  ppr_ds [] = empty
