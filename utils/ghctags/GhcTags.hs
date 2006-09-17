@@ -201,12 +201,10 @@ graphData session graph =
     where foundthings ms =
               let filename = msHsFilePath ms
               in  do mod <- checkModule session (moduleName $ ms_mod ms)
-                     return $ case mod of
-                       Nothing -> FileData filename []
-                       Just m -> case renamedSource m of
-                                   Nothing -> FileData filename []
-                                   Just s -> fileData filename s
-
+                     return $ maybe (FileData filename []) id $ do
+                       m <- mod
+                       s <- renamedSource m
+                       return $ fileData filename s
 
 fileData :: FileName -> RenamedSource -> FileData
 fileData filename (group, imports, lie) =
