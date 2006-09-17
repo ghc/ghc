@@ -39,6 +39,8 @@ test('records', skip_if_fast, compile_and_run, [''])
 test('ubx-records', skip_if_fast, compile_and_run, [''])
 test('records-fail1', normal, compile_fail, [''])
 
+test('doaitse', normal, compile, [''])
+
 # New ones from Dimitrios
 
 # test('gadt-dim1', normal, compile, [''])
