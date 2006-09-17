@@ -113,28 +113,11 @@ type FileName = String
 
 type ThingName = String
 
--- The position of a token or definition
-data Pos = Pos 
-		FileName 	-- file name
-		Int			-- line number 
-		Int     	-- token number
-		String 		-- string that makes up that line
-	deriving Show
-
-srcLocToPos :: SrcLoc -> Pos
-srcLocToPos loc =
-    Pos (unpackFS $ srcLocFile loc) (srcLocLine loc) (srcLocCol loc) "bogus"
-
 -- A definition we have found
-data FoundThing = FoundThing ThingName Pos
-	deriving Show
+data FoundThing = FoundThing ModuleName ThingName SrcLoc
 
 -- Data we have obtained from a file
 data FileData = FileData FileName [FoundThing]
-
-data Token = Token String Pos
-	deriving Show
-
 
 -- stuff for dealing with ctags output format
 
@@ -147,8 +130,10 @@ getfoundthings :: FileData -> [FoundThing]
 getfoundthings (FileData filename things) = things
 
 dumpthing :: FoundThing -> String
-dumpthing (FoundThing name (Pos filename line _ _)) = 
+dumpthing (FoundThing modname name loc) =
 	name ++ "\t" ++ filename ++ "\t" ++ (show $ line + 1)
+    where line = srcLocLine loc
+          filename = unpackFS $ srcLocFile loc
 
 
 -- stuff for dealing with etags output format
@@ -165,10 +150,11 @@ e_dumpfiledata (FileData filename things) =
 		thingslength = length thingsdump
 
 e_dumpthing :: FoundThing -> String
-e_dumpthing (FoundThing name (Pos filename line token fullline)) =
-	---- (concat $ take (token + 1) $ spacedwords fullline) 
-        name
-	++ "\x7f" ++ (show line) ++ "," ++ (show $ line+1) ++ "\n"
+e_dumpthing (FoundThing modname name loc) =
+    tagline name ++ tagline (moduleNameString modname ++ "." ++ name)
+    where tagline n = n ++ "\x7f" ++ (show line) ++ "," ++ (show $ line+1) ++ "\n"
+          line = srcLocLine loc
+	
 	
 	
 -- like "words", but keeping the whitespace, and so letting us build
@@ -200,50 +186,53 @@ graphData session graph =
     mapM foundthings graph
     where foundthings ms =
               let filename = msHsFilePath ms
-              in  do mod <- checkModule session (moduleName $ ms_mod ms)
+                  modname = moduleName $ ms_mod ms
+              in  do mod <- checkModule session modname
                      return $ maybe (FileData filename []) id $ do
                        m <- mod
                        s <- renamedSource m
-                       return $ fileData filename s
+                       return $ fileData filename modname s
 
-fileData :: FileName -> RenamedSource -> FileData
-fileData filename (group, imports, lie) =
+fileData :: FileName -> ModuleName -> RenamedSource -> FileData
+fileData filename modname (group, imports, lie) =
     -- lie is related to type checking and so is irrelevant
     -- imports contains import declarations and no definitions
-    FileData filename (boundValues group)
+    FileData filename (boundValues modname group)
 
-boundValues :: HsGroup Name -> [FoundThing]    
-boundValues group =
+boundValues :: ModuleName -> HsGroup Name -> [FoundThing]    
+boundValues mod group =
   let vals = case hs_valds group of
                ValBindsOut nest sigs ->
-                   [ x | (_rec, binds) <- nest, bind <- bagToList binds, x <- boundThings bind ]
+                   [ x | (_rec, binds) <- nest, bind <- bagToList binds,
+                              x <- boundThings mod bind ]
       tys = concat $ map tyBound (hs_tyclds group)
             where tyBound ltcd = case unLoc ltcd of
-                                   ForeignType { tcdLName = n } -> [foundOfLName n]
+                                   ForeignType { tcdLName = n } -> [found n]
                                    TyData { tcdLName = tycon, tcdCons = cons } ->
                                        dataNames tycon cons
-                                   TySynonym { tcdLName = n } -> [foundOfLName n]
-                                   ClassDecl {	tcdLName = n } -> [foundOfLName n]
+                                   TySynonym { tcdLName = n } -> [found n]
+                                   ClassDecl {	tcdLName = n } -> [found n]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of
-                                      ForeignImport n _ _ -> [foundOfLName n]
+                                      ForeignImport n _ _ -> [found n]
                                       ForeignExport { } -> []
   in vals ++ tys ++ fors
-  where dataNames tycon cons = foundOfLName tycon : map conName cons
-        conName td = foundOfLName $ con_name $ unLoc td
+  where dataNames tycon cons = found tycon : map conName cons
+        conName td = found $ con_name $ unLoc td
+        found = foundOfLName mod
 
-posOfLocated :: Located a -> Pos
-posOfLocated lHs = srcLocToPos $ srcSpanStart $ getLoc lHs
+startOfLocated :: Located a -> SrcLoc
+startOfLocated lHs = srcSpanStart $ getLoc lHs
 
-foundOfLName :: Located Name -> FoundThing
-foundOfLName id = FoundThing (getOccString $ unLoc id) (posOfLocated id)
+foundOfLName :: ModuleName -> Located Name -> FoundThing
+foundOfLName mod id = FoundThing mod (getOccString $ unLoc id) (startOfLocated id)
 
-boundThings :: LHsBind Name -> [FoundThing]
-boundThings lbinding = 
-  let thing = foundOfLName
+boundThings :: ModuleName -> LHsBind Name -> [FoundThing]
+boundThings modname lbinding = 
+  let thing = foundOfLName modname
   in  case unLoc lbinding of
         FunBind { fun_id = id } -> [thing id]
         PatBind { pat_lhs = lhs } -> panic "Pattern at top level"
-        VarBind { var_id = id } -> [FoundThing (getOccString id) (posOfLocated lbinding)]
+        VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
         AbsBinds { } -> [] -- nothing interesting in a type abstraction
 
