@@ -56,7 +56,16 @@ main = do
           GHC.defaultCleanupHandler flags $ do
             flags <- initPackages flags
             setSessionDynFlags session flags
-          filedata <- mapM (findthings session) filenames
+          setTargets session (map fileTarget filenames)
+          print "set targets"
+          success <- load session LoadAllTargets  --- bring module graph up to date
+          filedata <- case success of
+                        Failed -> do { putStr "Load failed"; exitWith (ExitFailure 2) }
+                        Succeeded -> do
+                                     print "loaded all targets"
+                                     graph <- getModuleGraph session
+                                     print "got modules graph"
+                                     graphData session graph
           if mode == BothTags || mode == CTags
            then do 
              ctagsfile <- openFile "tags" openFileMode
@@ -183,28 +192,20 @@ modsummary graph n =
 modname :: ModSummary -> ModuleName
 modname summary = moduleName $ ms_mod $ summary
 
-findthings :: Session -> FileName -> IO FileData
-findthings session filename = do
-  setTargets session [Target (TargetFile filename Nothing) Nothing]
-  print "set targets"
-  success <- load session LoadAllTargets  --- bring module graph up to date
-  case success of
-    Failed -> do { print "load failed"; return emptyFileData }
-    Succeeded ->
-      do print "loaded all targets"
-         graph <- getModuleGraph session
-         print "got modules graph"
-         case  modsummary graph filename of
-           Nothing -> panic "loaded a module from a file but then could not find its summary"
-           Just ms -> do
-             mod <- checkModule session (modname ms)
-             print "got the module"
-             case mod of
-               Nothing -> return emptyFileData
-               Just m -> case renamedSource m of
-                           Nothing -> return emptyFileData
-                           Just s -> return $ fileData filename s
-  where emptyFileData = FileData filename []
+fileTarget :: FileName -> Target
+fileTarget filename = Target (TargetFile filename Nothing) Nothing
+
+graphData :: Session -> ModuleGraph -> IO [FileData]
+graphData session graph =
+    mapM foundthings graph
+    where foundthings ms =
+              let filename = msHsFilePath ms
+              in  do mod <- checkModule session (moduleName $ ms_mod ms)
+                     return $ case mod of
+                       Nothing -> FileData filename []
+                       Just m -> case renamedSource m of
+                                   Nothing -> FileData filename []
+                                   Just s -> fileData filename s
 
 
 fileData :: FileName -> RenamedSource -> FileData
