@@ -974,7 +974,7 @@ mkFileHandle fd is_stream filepath ha_type binary = do
   -- On Windows, if this is a read/write handle and we are in text mode,
   -- turn off buffering.  We don't correctly handle the case of switching
   -- from read mode to write mode on a buffered text-mode handle, see bug
-  -- #679.
+  -- \#679.
   bmode <- case ha_type of
       		ReadWriteHandle | not binary -> return NoBuffering
 		_other			     -> return bmode
