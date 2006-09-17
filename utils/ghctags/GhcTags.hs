@@ -51,7 +51,8 @@ main = do
           session <- newSession JustTypecheck
           print "created a session"
           flags <- getSessionDynFlags session
-          (flags, _) <- parseDynamicFlags flags ghcArgs
+          (pflags, _) <- parseDynamicFlags flags ghcArgs
+          let flags = pflags { hscTarget = HscNothing }
           GHC.defaultCleanupHandler flags $ do
             flags <- initPackages flags
             setSessionDynFlags session flags
