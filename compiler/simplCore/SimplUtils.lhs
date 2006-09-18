@@ -5,7 +5,7 @@
 
 \begin{code}
 module SimplUtils (
-	mkLam, mkCase, mkDataConAlt,
+	mkLam, mkCase, 
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, activeInline, activeRule,

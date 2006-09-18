@@ -13,7 +13,7 @@ import DynFlags	( dopt, DynFlag(Opt_D_dump_inlinings),
 			)
 import SimplMonad
 import SimplEnv	
-import SimplUtils	( mkCase, mkLam, mkDataConAlt,
+import SimplUtils	( mkCase, mkLam, 
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 			  mkRhsStop, mkBoringStop,  mkLazyArgStop, pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
