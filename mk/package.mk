@@ -119,8 +119,8 @@ boot all :: $(STAMP_PKG_CONF)
 endif
 
 $(STAMP_PKG_CONF) : package.conf.inplace package.conf.installed
-	$(GHC_PKG_INPLACE) --force --update-package <package.conf.inplace
-	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --force --update-package <package.conf.installed
+	$(GHC_PKG_INPLACE) update - --force-files <package.conf.inplace
+	$(GHC_PKG_INPLACE) update - -f $(GHC_DRIVER_DIR)/package.conf --force-files <package.conf.installed
 	@touch $(STAMP_PKG_CONF)
 
 CLEAN_FILES += package.conf.installed package.conf.inplace 
