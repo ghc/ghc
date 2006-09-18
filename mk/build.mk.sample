@@ -10,12 +10,6 @@
 #BuildFlavour = devel
 #BuildFlavour = perf
 
-# -------- Misc. settings -----------------------------------------------------
-
-# Not necessary to set this, but useful if you have other projects checked-out
-# in your source tree:
-# ProjectsToBuild = glafp-utils ghc libraries hslibs
-
 # Which warnings we like to use
 MyWarningOpts   = -W -fno-warn-unused-matches -fwarn-unused-imports
 
@@ -25,10 +19,15 @@ ifeq "$(BuildFlavour)" "devel"
 
 GhcCompilerWays =
 
-SRC_HC_OPTS   = -H32m -O0 $(MyWarningOpts)
-GhcHcOpts     = -Rghc-timing -DDEBUG
-GhcLibHcOpts  = -O -dcore-lint $(MyWarningOpts) -keep-hc-files 
-GhcLibWays    =
+SRC_HC_OPTS     = -H32m -O -fasm $(MyWarningOpts)
+GhcLibHcOpts    = -O -dcore-lint $(MyWarningOpts)
+GhcLibWays      =
+
+# If you're working on the stage1 compiler, build stage1 with debugging:
+GhcStage1HcOpts = -Rghc-timing -O0 -DDEBUG
+
+# alternatively, to work on the stage 2 compiler:
+# GhcStage2HcOpts = -Rghc-timing -O0 -DDEBUG
 
 # profiled RTS
 #GhcRtsCcOpts =  -pg -g
