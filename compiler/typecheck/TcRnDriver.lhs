@@ -473,7 +473,8 @@ tcRnHsBootDecls decls
 
 		-- Typecheck instance decls
 	; traceTc (text "Tc3")
-	; (tcg_env, inst_infos, _binds) <- tcInstDecls1 tycl_decls (hs_instds rn_group)
+	; (tcg_env, inst_infos, _binds) 
+            <- tcInstDecls1 tycl_decls (hs_instds rn_group) (hs_derivds rn_group)
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck value declarations
@@ -629,6 +630,7 @@ tcTopSrcDecls :: ModDetails -> HsGroup Name -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls boot_details
 	(HsGroup { hs_tyclds = tycl_decls, 
 		   hs_instds = inst_decls,
+                   hs_derivds = deriv_decls,
 		   hs_fords  = foreign_decls,
 		   hs_defds  = default_decls,
 		   hs_ruleds = rule_decls,
@@ -649,7 +651,8 @@ tcTopSrcDecls boot_details
 		-- Source-language instances, including derivings,
 		-- and import the supporting declarations
         traceTc (text "Tc3") ;
-	(tcg_env, inst_infos, deriv_binds) <- tcInstDecls1 tycl_decls inst_decls ;
+	(tcg_env, inst_infos, deriv_binds) 
+            <- tcInstDecls1 tycl_decls inst_decls deriv_decls;
 	setGblEnv tcg_env	$ do {
 
 	        -- Foreign import declarations next.  No zonking necessary

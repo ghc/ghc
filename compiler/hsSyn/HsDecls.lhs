@@ -731,11 +731,11 @@ instDeclATs (InstDecl _ _ _ ats) = ats
 type LDerivDecl name = Located (DerivDecl name)
 
 data DerivDecl name
-  = DerivDecl (Located name) (LHsType name)
+  = DerivDecl (LHsType name) (Located name)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
-    ppr (DerivDecl cls ty)
-      = hsep [ptext SLIT("deriving"), ppr cls, ppr ty]
+    ppr (DerivDecl ty n) 
+        = hsep [ptext SLIT("deriving"), ppr ty, ptext SLIT("for"), ppr n]
 \end{code}
 
 %************************************************************************

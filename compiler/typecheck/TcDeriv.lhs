@@ -18,7 +18,7 @@ import TcRnMonad
 import TcMType		( checkValidInstance )
 import TcEnv		( newDFunName, pprInstInfoDetails, 
 			  InstInfo(..), InstBindings(..), simpleInstInfoClsTy,
-			  tcLookupClass, tcLookupTyCon, tcExtendTyVarEnv
+			  tcLookupClass, tcLookupTyCon, tcLookupLocatedTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
 import InstEnv		( Instance, OverlapFlag, mkLocalInstance, instanceHead, extendInstEnvList )
@@ -41,7 +41,7 @@ import Name		( Name, getSrcLoc )
 import NameSet		( duDefs )
 import Type		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
-			  tyConStupidTheta, isProductTyCon, isDataTyCon, newTyConRhs,
+			  tyConStupidTheta, isProductTyCon, isDataTyCon, isNewTyCon, newTyConRhs,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
@@ -50,7 +50,7 @@ import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
 import Var		( TyVar, tyVarKind, varName )
 import VarSet		( mkVarSet, disjointVarSet )
 import PrelNames
-import SrcLoc		( srcLocSpan, Located(..) )
+import SrcLoc		( srcLocSpan, Located(..), unLoc )
 import Util		( zipWithEqual, sortLe, notNull )
 import ListSetOps	( removeDups,  assocMaybe )
 import Outputable
@@ -206,15 +206,17 @@ And then translate it to:
 
 \begin{code}
 tcDeriving  :: [LTyClDecl Name]	-- All type constructors
+            -> [LDerivDecl Name] -- All stand-alone deriving declarations
 	    -> TcM ([InstInfo],		-- The generated "instance decls"
 		    HsValBinds Name)	-- Extra generated top-level bindings
 
-tcDeriving tycl_decls
+tcDeriving tycl_decls deriv_decls
   = recoverM (returnM ([], emptyValBindsOut)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- and make the necessary "equations".
 	  overlap_flag <- getOverlapFlag
-	; (ordinary_eqns, newtype_inst_info) <- makeDerivEqns overlap_flag tycl_decls
+	; (ordinary_eqns, newtype_inst_info) 
+            <- makeDerivEqns overlap_flag tycl_decls deriv_decls
 
 	; (ordinary_inst_info, deriv_binds) 
 		<- extendLocalInstEnv (map iSpec newtype_inst_info)  $
@@ -337,12 +339,15 @@ when the dict is constructed in TcInstDcls.tcInstDecl2
 \begin{code}
 makeDerivEqns :: OverlapFlag
 	      -> [LTyClDecl Name] 
+	      -> [LDerivDecl Name] 
 	      -> TcM ([DerivEqn],	-- Ordinary derivings
 		      [InstInfo])	-- Special newtype derivings
 
-makeDerivEqns overlap_flag tycl_decls
-  = mapAndUnzipM mk_eqn derive_these	 	`thenM` \ (maybe_ordinaries, maybe_newtypes) ->
-    returnM (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
+makeDerivEqns overlap_flag tycl_decls deriv_decls
+  = do derive_these_top_level <- mapM top_level_deriv deriv_decls >>= return . catMaybes
+       (maybe_ordinaries, maybe_newtypes) 
+           <- mapAndUnzipM mk_eqn (derive_these ++ derive_these_top_level)
+       return (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
   where
     ------------------------------------------------------------------
     derive_these :: [(NewOrData, Name, LHsType Name)]
@@ -352,7 +357,15 @@ makeDerivEqns overlap_flag tycl_decls
 			          tcdDerivs = Just preds }) <- tycl_decls,
 		     pred <- preds ]
 
+    top_level_deriv :: LDerivDecl Name -> TcM (Maybe (NewOrData, Name, LHsType Name))
+    top_level_deriv d@(L l (DerivDecl inst ty_name)) = recoverM (returnM Nothing) $ setSrcSpan l $ 
+        do tycon <- tcLookupLocatedTyCon ty_name
+           let new_or_data = if isNewTyCon tycon then NewType else DataType
+           traceTc (text "Stand-alone deriving:" <+> ppr (new_or_data, unLoc ty_name, inst))
+           return $ Just (new_or_data, unLoc ty_name, inst)
+
     ------------------------------------------------------------------
+    -- takes (whether newtype or data, name of data type, partially applied type class)
     mk_eqn :: (NewOrData, Name, LHsType Name) -> TcM (Maybe DerivEqn, Maybe InstInfo)
 	-- We swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation

@@ -146,12 +146,13 @@ Gather up the instance declarations from their various sources
 tcInstDecls1	-- Deal with both source-code and imported instance decls
    :: [LTyClDecl Name]		-- For deriving stuff
    -> [LInstDecl Name]		-- Source code instance decls
+   -> [LDerivDecl Name]		-- Source code stand-alone deriving decls
    -> TcM (TcGblEnv,		-- The full inst env
 	   [InstInfo],		-- Source-code instance decls to process; 
 				-- contains all dfuns for this module
 	   HsValBinds Name)	-- Supporting bindings for derived instances
 
-tcInstDecls1 tycl_decls inst_decls
+tcInstDecls1 tycl_decls inst_decls deriv_decls
   = checkNoErrs $
     do {        -- Stop if addInstInfos etc discovers any errors
 		-- (they recover, so that we get more than one error each
@@ -178,14 +179,11 @@ tcInstDecls1 tycl_decls inst_decls
 	        -- (3) Instances from generic class declarations
        ; generic_inst_info <- getGenericInstances clas_decls
 
-	        -- Next, construct the instance environment so far, consisting
-	        -- of 
-		--   a) local instance decls
-		--   b) generic instances
-		--   c) local family instance decls
-       ; addInsts local_info         $ do {
-       ; addInsts generic_inst_info  $ do {
-       ; addFamInsts at_idx_tycon    $ do {
+	-- (3) Compute instances from "deriving" clauses; 
+	-- This stuff computes a context for the derived instance decl, so it
+	-- needs to know about all the instances possible; hence inst_env4
+    tcDeriving tycl_decls	`thenM` \ (deriv_inst_info, deriv_binds) ->
+    addInsts deriv_inst_info	$
 
 	        -- (4) Compute instances from "deriving" clauses; 
 		-- This stuff computes a context for the derived instance

@@ -159,6 +159,7 @@ incorrect.
  'deriving' 	{ L _ ITderiving }
  'do' 		{ L _ ITdo }
  'else' 	{ L _ ITelse }
+ 'for' 	        { L _ ITfor }
  'hiding' 	{ L _ IThiding }
  'if' 		{ L _ ITif }
  'import' 	{ L _ ITimport }
@@ -660,6 +661,16 @@ tycl_hdr :: { Located (LHsContext RdrName,
 		       [LHsType RdrName]) }
 	: context '=>' type		{% checkTyClHdr $1         $3 >>= return.LL }
 	| type				{% checkTyClHdr (noLoc []) $1 >>= return.L1 }
+
+-----------------------------------------------------------------------------
+-- Stand-alone deriving
+
+-- Glasgow extension: stand-alone deriving declarations
+stand_alone_deriving :: { LDerivDecl RdrName }
+  	: 'deriving' qtycon            'for' qtycon  {% do { p <- checkInstType (fmap HsTyVar $2)
+				                           ; checkDerivDecl (LL (DerivDecl p $4)) } }
+
+        | 'deriving' '(' inst_type ')' 'for' qtycon  {% checkDerivDecl (LL (DerivDecl $3 $6)) }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
