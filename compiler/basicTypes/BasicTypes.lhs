@@ -295,6 +295,7 @@ data OverlapFlag
 		-- Without the Incoherent flag, we'd complain that
 		-- instantiating 'b' would change which instance 
 		-- was chosen
+  deriving( Eq )
 
 instance Outputable OverlapFlag where
    ppr NoOverlap  = empty
