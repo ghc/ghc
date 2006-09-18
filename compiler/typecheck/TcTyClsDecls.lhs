@@ -127,13 +127,8 @@ tcTyAndClassDecls boot_details decls
 	; traceTc (text "tcTyAndCl" <+> ppr mod)
 	; (syn_tycons, alg_tyclss) <- fixM (\ ~(rec_syn_tycons, rec_alg_tyclss) ->
 	  do	{ let {	-- Calculate variances and rec-flag
-		      ; (syn_decls, alg_decls_pre) = partition (isSynDecl . unLoc) decls
-                      ; alg_decls = alg_decls_pre ++ 
-				    concat [tcdATs decl        -- add AT decls
-					   | declLoc <- alg_decls_pre
-					   , let decl = unLoc declLoc
-					   , isClassDecl decl] }
-
+		      ; (syn_decls, alg_decls) = partition (isSynDecl . unLoc)
+						   decls }
 			-- Extend the global env with the knot-tied results
 			-- for data types and classes
 			-- 

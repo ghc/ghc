@@ -111,10 +111,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	   <- mapFvRn (wrapLocFstM rnDefaultDecl) default_decls ;
 	
 	let {
-           rn_at_decls = concat 
-			   [ats | L _ (InstDecl _ _ _ ats) <- rn_inst_decls] ;
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
-			    	hs_tyclds = rn_tycl_decls ++ rn_at_decls,
+			    	hs_tyclds = rn_tycl_decls,
 			    	hs_instds = rn_inst_decls,
 			    	hs_fixds  = rn_fix_decls,
 			    	hs_depds  = [],
@@ -284,10 +282,9 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
     let
 	at_doc   = text "In the associated types in an instance declaration"
 	at_names = map (head . tyClDeclNames . unLoc) ats
-	(_, rdrCtxt, _, _) = splitHsInstDeclTy (unLoc inst_ty)
     in
     checkDupNames at_doc at_names		`thenM_`
-    rnATDefs rdrCtxt ats			`thenM` \ (ats', at_fvs) ->
+    rnATInsts ats				`thenM` \ (ats', at_fvs) ->
 
 	-- Rename the bindings
 	-- The typechecker (not the renamer) checks that all 
@@ -333,30 +330,26 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	     --     to remove the context).
 \end{code}
 
-Renaming of the associated type definitions in instances.  
+Renaming of the associated types in instances.  
 
-* In the case of associated data and newtype definitions we add the instance
-  context.
 * We raise an error if we encounter a kind signature in an instance.
 
 \begin{code}
-rnATDefs :: HsContext RdrName -> [LTyClDecl RdrName] 
-	  -> RnM ([LTyClDecl Name], FreeVars)
-rnATDefs ctxt atDecls = 
-  mapFvRn (wrapLocFstM rnAtDef) atDecls
+rnATInsts :: [LTyClDecl RdrName] -> RnM ([LTyClDecl Name], FreeVars)
+rnATInsts atDecls = 
+  mapFvRn (wrapLocFstM rnATInst) atDecls
   where
-    rnAtDef tydecl@TyFunction {}                 = 
+    rnATInst tydecl@TyFunction {} = 
       do
         addErr noKindSig
 	rnTyClDecl tydecl
-    rnAtDef tydecl@TySynonym  {}                 = rnTyClDecl tydecl
-    rnAtDef tydecl@TyData {tcdCtxt = L l tyCtxt} = 
+    rnATInst tydecl@TySynonym  {} = rnTyClDecl tydecl
+    rnATInst tydecl@TyData     {} = 
       do
         checkM (not . isKindSigDecl $ tydecl) $ addErr noKindSig
-        rnTyClDecl (tydecl {tcdCtxt = L l (ctxt ++ tyCtxt)})
-          -- The source loc is somewhat half hearted... -=chak
-    rnAtDef _ =
-      panic "RnSource.rnATDefs: not a type declaration"
+        rnTyClDecl tydecl
+    rnATInst _                    =
+      panic "RnSource.rnATInsts: not a type declaration"
 
 noKindSig = text "Instances cannot have kind signatures"
 \end{code}
