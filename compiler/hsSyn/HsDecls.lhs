@@ -517,19 +517,23 @@ instance OutputableBndr name
 	dcolon <+> pprKind kind
         where
 	  typeMaybeIso = if iso 
-			 then ptext SLIT("type iso") 
-			 else ptext SLIT("type")
+			 then ptext SLIT("type family iso") 
+			 else ptext SLIT("type family")
 
     ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdTyPats = typats,
 		    tcdSynRhs = mono_ty})
-      = hang (ptext SLIT("type") <+> pp_decl_head [] ltycon tyvars typats <+> 
+      = hang (ptext SLIT("type") <+> 
+	      (if isJust typats then ptext SLIT("instance") else empty) <+>
+	      pp_decl_head [] ltycon tyvars typats <+> 
 	      equals)
 	     4 (ppr mono_ty)
 
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = ltycon,
 		 tcdTyVars = tyvars, tcdTyPats = typats, tcdKindSig = mb_sig, 
 		 tcdCons = condecls, tcdDerivs = derivings})
-      = pp_tydecl (ppr new_or_data <+> 
+      = pp_tydecl (null condecls && isJust mb_sig) 
+                  (ppr new_or_data <+> 
+		   (if isJust typats then ptext SLIT("instance") else empty) <+>
 		   pp_decl_head (unLoc context) ltycon tyvars typats <+> 
 		   ppr_sig mb_sig)
 		  (pp_condecls condecls)
@@ -573,12 +577,14 @@ pp_condecls cs@(L _ ConDecl{ con_res = ResTyGADT _ } : _) -- In GADT syntax
 pp_condecls cs 			  -- In H98 syntax
   = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
 
-pp_tydecl pp_head pp_decl_rhs derivings
+pp_tydecl True pp_head pp_decl_rhs derivings
+  = pp_head
+pp_tydecl False pp_head pp_decl_rhs derivings
   = hang pp_head 4 (sep [
-	pp_decl_rhs,
-	case derivings of
-	  Nothing 	   -> empty
-	  Just ds	   -> hsep [ptext SLIT("deriving"), parens (interpp'SP ds)]
+      pp_decl_rhs,
+      case derivings of
+        Nothing -> empty
+	Just ds -> hsep [ptext SLIT("deriving"), parens (interpp'SP ds)]
     ])
 
 instance Outputable NewOrData where
