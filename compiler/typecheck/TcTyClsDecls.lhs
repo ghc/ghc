@@ -24,8 +24,8 @@ import TcRnMonad
 import TcEnv		( TyThing(..), 
 			  tcLookupLocated, tcLookupLocatedGlobal, 
 			  tcExtendGlobalEnv, tcExtendKindEnv, tcExtendKindEnvTvs,
-			  tcExtendRecEnv, tcLookupTyVar )
-import TcTyDecls	( calcTyConArgVrcs, calcRecFlags, calcClassCycles, calcSynCycles )
+			  tcExtendRecEnv, tcLookupTyVar, InstInfo )
+import TcTyDecls	( calcRecFlags, calcClassCycles, calcSynCycles )
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
 			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext,
@@ -42,7 +42,7 @@ import Type		( splitTyConApp_maybe,
 import Kind		( mkArrowKinds, splitKindFunTys )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
-import TyCon		( TyCon, ArgVrcs, AlgTyConRhs( AbstractTyCon ),
+import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName )
 import DataCon		( DataCon, dataConWrapId, dataConName, 
@@ -111,9 +111,39 @@ Step 7:		checkValidTyCl
 	to check all the side conditions on validity.  We could not
 	do this before because we were in a mutually recursive knot.
 
-
+Identification of recursive TyCons
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
-@TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
+@TyThing@s.
+
+Identifying a TyCon as recursive serves two purposes
+
+1.  Avoid infinite types.  Non-recursive newtypes are treated as
+"transparent", like type synonyms, after the type checker.  If we did
+this for all newtypes, we'd get infinite types.  So we figure out for
+each newtype whether it is "recursive", and add a coercion if so.  In
+effect, we are trying to "cut the loops" by identifying a loop-breaker.
+
+2.  Avoid infinite unboxing.  This is nothing to do with newtypes.
+Suppose we have
+        data T = MkT Int T
+        f (MkT x t) = f t
+Well, this function diverges, but we don't want the strictness analyser
+to diverge.  But the strictness analyser will diverge because it looks
+deeper and deeper into the structure of T.   (I believe there are
+examples where the function does something sane, and the strictness
+analyser still diverges, but I can't see one now.)
+
+Now, concerning (1), the FC2 branch currently adds a coercion for ALL
+newtypes.  I did this as an experiment, to try to expose cases in which
+the coercions got in the way of optimisations.  If it turns out that we
+can indeed always use a coercion, then we don't risk recursive types,
+and don't need to figure out what the loop breakers are.
+
+For newtype *families* though, we will always have a coercion, so they
+are always loop breakers!  So you can easily adjust the current
+algorithm by simply treating all newtype families as loop breakers (and
+indeed type families).  I think.
 
 \begin{code}
 tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
@@ -141,11 +171,10 @@ tcTyAndClassDecls boot_details decls
 			-- Kind-check the declarations
 		{ (kc_syn_decls, kc_alg_decls) <- kcTyClDecls syn_decls alg_decls
 
-		; let {	calc_vrcs = calcTyConArgVrcs (rec_syn_tycons ++ rec_alg_tyclss)
-		      ; calc_rec  = calcRecFlags boot_details rec_alg_tyclss
-		      ; tc_decl   = addLocM (tcTyClDecl calc_vrcs calc_rec) }
+		; let {	calc_rec  = calcRecFlags boot_details rec_alg_tyclss
+		      ; tc_decl   = addLocM (tcTyClDecl calc_rec) }
 			-- Type-check the type synonyms, and extend the envt
-		; syn_tycons <- tcSynDecls calc_vrcs kc_syn_decls
+		; syn_tycons <- tcSynDecls kc_syn_decls
 		; tcExtendGlobalEnv syn_tycons $ do
 
 			-- Type-check the data types and classes
@@ -363,28 +392,27 @@ kcTyClDeclBody decl thing_inside
 %************************************************************************
 
 \begin{code}
-tcSynDecls :: (Name -> ArgVrcs) -> [LTyClDecl Name] -> TcM [TyThing]
-tcSynDecls calc_vrcs [] = return []
-tcSynDecls calc_vrcs (decl : decls) 
-  = do { syn_tc <- addLocM (tcSynDecl calc_vrcs) decl
-       ; syn_tcs <- tcExtendGlobalEnv [syn_tc] (tcSynDecls calc_vrcs decls)
+tcSynDecls :: [LTyClDecl Name] -> TcM [TyThing]
+tcSynDecls [] = return []
+tcSynDecls (decl : decls) 
+  = do { syn_tc <- addLocM tcSynDecl decl
+       ; syn_tcs <- tcExtendGlobalEnv [syn_tc] (tcSynDecls decls)
        ; return (syn_tc : syn_tcs) }
 
-tcSynDecl calc_vrcs 
+tcSynDecl
   (TySynonym {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { traceTc (text "tcd1" <+> ppr tc_name) 
     ; rhs_ty' <- tcHsKindedType rhs_ty
-    ; return (ATyCon (buildSynTyCon tc_name tvs' rhs_ty' (calc_vrcs tc_name))) }
+    ; return (ATyCon (buildSynTyCon tc_name tvs' rhs_ty')) }
 
 --------------------
-tcTyClDecl :: (Name -> ArgVrcs) -> (Name -> RecFlag) 
-	   -> TyClDecl Name -> TcM TyThing
+tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM TyThing
 
-tcTyClDecl calc_vrcs calc_isrec decl
-  = tcAddDeclCtxt decl (tcTyClDecl1 calc_vrcs calc_isrec decl)
+tcTyClDecl calc_isrec decl
+  = tcAddDeclCtxt decl (tcTyClDecl1 calc_isrec decl)
 
-tcTyClDecl1 calc_vrcs calc_isrec 
+tcTyClDecl1 calc_isrec 
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
 	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = cons})
   = tcTyVarBndrs tvs	$ \ tvs' -> do 
@@ -420,19 +448,18 @@ tcTyClDecl1 calc_vrcs calc_isrec
 			DataType -> mkDataTyConRhs data_cons
 			NewType  -> ASSERT( isSingleton data_cons )
 				    mkNewTyConRhs tycon (head data_cons)
-	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs arg_vrcs is_rec
+	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
 			(want_generic && canDoGenerics data_cons)
 	})
   ; return (ATyCon tycon)
   }
   where
-    arg_vrcs = calc_vrcs tc_name
     is_rec   = calc_isrec tc_name
     h98_syntax = case cons of 	-- All constructors have same shape
 			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
 			other -> True
 
-tcTyClDecl1 calc_vrcs calc_isrec 
+tcTyClDecl1 calc_isrec 
   (ClassDecl {tcdLName = L _ class_name, tcdTyVars = tvs, 
 	      tcdCtxt = ctxt, tcdMeths = meths,
 	      tcdFDs = fundeps, tcdSigs = sigs, tcdATs = ats} )
@@ -447,10 +474,9 @@ tcTyClDecl1 calc_vrcs calc_isrec
 			-- need to look up its recursiveness and variance
 		    tycon_name = tyConName (classTyCon clas)
 		    tc_isrec = calc_isrec tycon_name
-		    tc_vrcs  = calc_vrcs  tycon_name
 		in
 		buildClass class_name tvs' ctxt' fds' 
-			   sig_stuff tc_isrec tc_vrcs)
+			   sig_stuff tc_isrec)
   ; return (AClass clas) }
   where
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mappM tcLookupTyVar tvs1 ;
@@ -458,9 +484,9 @@ tcTyClDecl1 calc_vrcs calc_isrec
 				; return (tvs1', tvs2') }
 
 
-tcTyClDecl1 calc_vrcs calc_isrec 
+tcTyClDecl1 calc_isrec 
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
-  = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0 []))
+  = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0))
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields

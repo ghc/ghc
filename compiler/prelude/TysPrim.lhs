@@ -47,7 +47,7 @@ module TysPrim(
 import Var		( TyVar, mkTyVar )
 import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
 import OccName		( mkOccNameFS, tcName, mkTyVarOcc )
-import TyCon		( TyCon, ArgVrcs, mkPrimTyCon, mkLiftedPrimTyCon,
+import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unliftedTypeKind, unboxedTypeKind, 
@@ -171,15 +171,6 @@ openAlphaTyVars :: [TyVar]
 openAlphaTyVars@(openAlphaTyVar:_) = tyVarList openTypeKind
 
 openAlphaTy = mkTyVarTy openAlphaTyVar
-
-vrcPos,vrcZero :: (Bool,Bool)
-vrcPos  = (True,False)
-vrcZero = (False,False)
-
-vrcsP,vrcsZ,vrcsZP :: ArgVrcs
-vrcsP  = [vrcPos]
-vrcsZ  = [vrcZero]
-vrcsZP = [vrcZero,vrcPos]
 \end{code}
 
 
@@ -191,11 +182,10 @@ vrcsZP = [vrcZero,vrcPos]
 
 \begin{code}
 -- only used herein
-pcPrimTyCon :: Name -> ArgVrcs -> PrimRep -> TyCon
-pcPrimTyCon name arg_vrcs rep
-  = mkPrimTyCon name kind arity arg_vrcs rep
+pcPrimTyCon :: Name -> Int -> PrimRep -> TyCon
+pcPrimTyCon name arity rep
+  = mkPrimTyCon name kind arity rep
   where
-    arity       = length arg_vrcs
     kind        = mkArrowKinds (replicate arity liftedTypeKind) result_kind
     result_kind = case rep of 
 		    PtrRep -> unliftedTypeKind
@@ -203,7 +193,7 @@ pcPrimTyCon name arg_vrcs rep
 
 pcPrimTyCon0 :: Name -> PrimRep -> TyCon
 pcPrimTyCon0 name rep
-  = mkPrimTyCon name result_kind 0 [] rep
+  = mkPrimTyCon name result_kind 0 rep
   where
     result_kind = case rep of 
 		    PtrRep -> unliftedTypeKind
@@ -258,7 +248,7 @@ keep different state threads separate.  It is represented by nothing at all.
 
 \begin{code}
 mkStatePrimTy ty = mkTyConApp statePrimTyCon [ty]
-statePrimTyCon	 = pcPrimTyCon statePrimTyConName vrcsZ VoidRep
+statePrimTyCon	 = pcPrimTyCon statePrimTyConName 1 VoidRep
 \end{code}
 
 RealWorld is deeply magical.  It is *primitive*, but it is not
@@ -266,7 +256,7 @@ RealWorld is deeply magical.  It is *primitive*, but it is not
 RealWorld; it's only used in the type system, to parameterise State#.
 
 \begin{code}
-realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind 0 [] PtrRep
+realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind 0 PtrRep
 realWorldTy	     = mkTyConTy realWorldTyCon
 realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}
@@ -282,10 +272,10 @@ defined in \tr{TysWiredIn.lhs}, not here.
 %************************************************************************
 
 \begin{code}
-arrayPrimTyCon		  = pcPrimTyCon  arrayPrimTyConName	       vrcsP  PtrRep
-mutableArrayPrimTyCon	  = pcPrimTyCon  mutableArrayPrimTyConName     vrcsZP PtrRep
-mutableByteArrayPrimTyCon = pcPrimTyCon  mutableByteArrayPrimTyConName vrcsZ  PtrRep
-byteArrayPrimTyCon	  = pcPrimTyCon0 byteArrayPrimTyConName	              PtrRep
+arrayPrimTyCon		  = pcPrimTyCon  arrayPrimTyConName	       1 PtrRep
+mutableArrayPrimTyCon	  = pcPrimTyCon  mutableArrayPrimTyConName     2 PtrRep
+mutableByteArrayPrimTyCon = pcPrimTyCon  mutableByteArrayPrimTyConName 1 PtrRep
+byteArrayPrimTyCon	  = pcPrimTyCon0 byteArrayPrimTyConName	         PtrRep
 
 mkArrayPrimTy elt    	    = mkTyConApp arrayPrimTyCon [elt]
 byteArrayPrimTy	    	    = mkTyConTy byteArrayPrimTyCon
@@ -300,7 +290,7 @@ mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 %************************************************************************
 
 \begin{code}
-mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName vrcsZP PtrRep
+mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName 2 PtrRep
 
 mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 \end{code}
@@ -312,7 +302,7 @@ mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName vrcsZP PtrRep
+mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName 2 PtrRep
 
 mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 \end{code}
@@ -324,7 +314,7 @@ mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-tVarPrimTyCon = pcPrimTyCon tVarPrimTyConName vrcsZP PtrRep
+tVarPrimTyCon = pcPrimTyCon tVarPrimTyConName 2 PtrRep
 
 mkTVarPrimTy s elt 	    = mkTyConApp tVarPrimTyCon [s, elt]
 \end{code}
@@ -336,7 +326,7 @@ mkTVarPrimTy s elt 	    = mkTyConApp tVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName vrcsP AddrRep
+stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName 1 AddrRep
 
 mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 \end{code}
@@ -348,7 +338,7 @@ mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 %************************************************************************
 
 \begin{code}
-stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName vrcsP PtrRep
+stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName 1 PtrRep
 
 mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
 \end{code}
@@ -371,7 +361,7 @@ bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName PtrRep
 %************************************************************************
 
 \begin{code}
-weakPrimTyCon = pcPrimTyCon weakPrimTyConName vrcsP PtrRep
+weakPrimTyCon = pcPrimTyCon weakPrimTyConName 1 PtrRep
 
 mkWeakPrimTy v = mkTyConApp weakPrimTyCon [v]
 \end{code}

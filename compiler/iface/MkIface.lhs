@@ -186,7 +186,7 @@ import Class		( classExtraBigSig, classTyCon )
 import TyCon		( TyCon, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCon,
 			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
 			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
-			  tyConHasGenerics, tyConArgVrcs, synTyConRhs, isGadtSyntaxTyCon,
+			  tyConHasGenerics, synTyConRhs, isGadtSyntaxTyCon,
 			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
 import DataCon		( dataConName, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, dataConUnivTyVars, dataConExTyVars, dataConEqSpec,
@@ -995,8 +995,7 @@ tyThingToIfaceDecl ext (AClass clas)
 		 ifTyVars = toIfaceTvBndrs clas_tyvars,
 		 ifFDs    = map toIfaceFD clas_fds,
 		 ifSigs	  = map toIfaceClassOp op_stuff,
-	  	 ifRec    = boolToRecFlag (isRecursiveTyCon tycon),
-		 ifVrcs   = tyConArgVrcs tycon }
+	  	 ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
   where
     (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
     tycon = classTyCon clas
@@ -1019,7 +1018,6 @@ tyThingToIfaceDecl ext (ATyCon tycon)
   | isSynTyCon tycon
   = IfaceSyn {	ifName   = getOccName tycon,
 		ifTyVars = toIfaceTvBndrs tyvars,
-		ifVrcs    = tyConArgVrcs tycon,
 		ifSynRhs = toIfaceType ext syn_ty }
 
   | isAlgTyCon tycon
@@ -1029,7 +1027,6 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
-		ifVrcs    = tyConArgVrcs tycon,
 		ifGeneric = tyConHasGenerics tycon }
 
   | isForeignTyCon tycon
@@ -1044,8 +1041,7 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 		ifCons    = IfAbstractTyCon,
 		ifGadtSyntax = False,
 		ifGeneric = False,
-		ifRec     = NonRecursive,
-		ifVrcs    = tyConArgVrcs tycon }
+		ifRec     = NonRecursive}
 
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where

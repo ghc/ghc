@@ -354,7 +354,7 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
 			ifTyVars = tv_bndrs, 
 			ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
 			ifCons = rdr_cons, 
-			ifVrcs = arg_vrcs, ifRec = is_rec, 
+			ifRec = is_rec, 
 			ifGeneric = want_generic })
   = do	{ tc_name <- lookupIfaceTop occ_name
 	; bindIfaceTyVars tv_bndrs $ \ tyvars -> do
@@ -363,23 +363,23 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
 	    { stupid_theta <- tcIfaceCtxt ctxt
 	    ; cons  <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
 	    ; buildAlgTyCon tc_name tyvars stupid_theta
-			    cons arg_vrcs is_rec want_generic gadt_syn
+			    cons is_rec want_generic gadt_syn
 	    })
         ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
 	; return (ATyCon tycon)
     }}
 
 tcIfaceDecl (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
-		       ifSynRhs = rdr_rhs_ty, ifVrcs = arg_vrcs})
+		       ifSynRhs = rdr_rhs_ty})
    = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
      { tc_name <- lookupIfaceTop occ_name
      ; rhs_ty <- tcIfaceType rdr_rhs_ty
-     ; return (ATyCon (buildSynTyCon tc_name tyvars rhs_ty arg_vrcs))
+     ; return (ATyCon (buildSynTyCon tc_name tyvars rhs_ty))
      }
 
 tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bndrs, 
 			 ifFDs = rdr_fds, ifSigs = rdr_sigs, 
-			 ifVrcs = tc_vrcs, ifRec = tc_isrec })
+			 ifRec = tc_isrec })
 -- ToDo: in hs-boot files we should really treat abstract classes specially,
 --	 as we do abstract tycons
   = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
@@ -387,7 +387,7 @@ tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bnd
     ; ctxt <- tcIfaceCtxt rdr_ctxt
     ; sigs <- mappM tc_sig rdr_sigs
     ; fds  <- mappM tc_fd rdr_fds
-    ; cls  <- buildClass cls_name tyvars ctxt fds sigs tc_isrec tc_vrcs
+    ; cls  <- buildClass cls_name tyvars ctxt fds sigs tc_isrec
     ; return (AClass cls) }
   where
    tc_sig (IfaceClassOp occ dm rdr_ty)
@@ -407,7 +407,7 @@ tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bnd
 tcIfaceDecl (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
   = do	{ name <- lookupIfaceTop rdr_name
 	; return (ATyCon (mkForeignTyCon name ext_name 
-					 liftedTypeKind 0 [])) }
+					 liftedTypeKind 0)) }
 
 tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of

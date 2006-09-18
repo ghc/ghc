@@ -5,7 +5,7 @@
 
 \begin{code}
 module TyCon(
-	TyCon, ArgVrcs, FieldLabel,
+	TyCon, FieldLabel,
 
 	PrimRep(..),
 	tyConPrimRep,
@@ -41,7 +41,6 @@ module TyCon(
 	tyConKind,
 	tyConUnique,
 	tyConTyVars,
-	tyConArgVrcs,
 	algTyConRhs, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
 	tyConSelIds,
 	tyConStupidTheta,
@@ -97,8 +96,6 @@ data TyCon
 	tyConTyVars :: [TyVar],		-- Scopes over (a) the [PredType] in AlgTyConRhs.DataTyCon
 					--	       (b) the cached types in AlgTyConRhs.NewTyCon
 					-- But not over the data constructors
-	argVrcs     :: ArgVrcs,
-
 	algTcSelIds :: [Id],  		-- Its record selectors (empty if none): 
 
 	algTcGadtSyntax  :: Bool,	-- True <=> the data type was declared using GADT syntax
@@ -138,10 +135,9 @@ data TyCon
 	tyConArity  :: Arity,
 
 	tyConTyVars :: [TyVar],		-- Bound tyvars
-	synTcRhs    :: Type,		-- Right-hand side, mentioning these type vars.
+	synTcRhs    :: Type		-- Right-hand side, mentioning these type vars.
 					-- Acts as a template for the expansion when
 					-- the tycon is applied to some types.
-	argVrcs :: ArgVrcs
     }
 
   | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
@@ -151,7 +147,6 @@ data TyCon
 	tyConName     :: Name,
 	tyConKind     :: Kind,
 	tyConArity    :: Arity,
-	argVrcs       :: ArgVrcs,
 
 	primTyConRep  :: PrimRep,
 			-- Many primitive tycons are unboxed, but some are
@@ -181,9 +176,6 @@ type KindCon = TyCon
 type SuperKindCon = TyCon
 
 type FieldLabel = Name
-
-type ArgVrcs = [(Bool,Bool)]  -- Tyvar variance info: [(occPos,occNeg)]
-	-- [] means "no information, assume the worst"
 
 data AlgTyConRhs
   = AbstractTyCon	-- We know nothing about this data type, except 
@@ -359,14 +351,13 @@ mkFunTyCon name kind
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars argvrcs stupid rhs sel_ids is_rec gen_info gadt_syn
+mkAlgTyCon name kind tyvars stupid rhs sel_ids is_rec gen_info gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
 	tyConKind	 = kind,
 	tyConArity	 = length tyvars,
 	tyConTyVars	 = tyvars,
-	argVrcs		 = argvrcs,
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
 	algTcSelIds	 = sel_ids,
@@ -376,14 +367,13 @@ mkAlgTyCon name kind tyvars argvrcs stupid rhs sel_ids is_rec gen_info gadt_syn
 	hasGenerics = gen_info
     }
 
-mkClassTyCon name kind tyvars argvrcs rhs clas is_rec
+mkClassTyCon name kind tyvars rhs clas is_rec
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
 	tyConKind	 = kind,
 	tyConArity	 = length tyvars,
 	tyConTyVars	 = tyvars,
-	argVrcs		 = argvrcs,
 	algTcStupidTheta = [],
 	algTcRhs	 = rhs,
 	algTcSelIds	 = [],
@@ -410,13 +400,12 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
 -- as primitive, but *lifted*, TyCons for now. They are lifted
 -- because the Haskell type T representing the (foreign) .NET
 -- type T is actually implemented (in ILX) as a thunk<T>
-mkForeignTyCon name ext_name kind arity arg_vrcs
+mkForeignTyCon name ext_name kind arity
   = PrimTyCon {
 	tyConName    = name,
 	tyConUnique  = nameUnique name,
 	tyConKind    = kind,
 	tyConArity   = arity,
-        argVrcs      = arg_vrcs,
 	primTyConRep = PtrRep, -- they all do
 	isUnLifted   = False,
 	tyConExtName = ext_name
@@ -424,37 +413,35 @@ mkForeignTyCon name ext_name kind arity arg_vrcs
 
 
 -- most Prim tycons are lifted
-mkPrimTyCon name kind arity arg_vrcs rep
-  = mkPrimTyCon' name kind arity arg_vrcs rep True  
+mkPrimTyCon name kind arity rep
+  = mkPrimTyCon' name kind arity rep True  
 
-mkVoidPrimTyCon name kind arity arg_vrcs 
-  = mkPrimTyCon' name kind arity arg_vrcs VoidRep True  
+mkVoidPrimTyCon name kind arity 
+  = mkPrimTyCon' name kind arity VoidRep True  
 
 -- but RealWorld is lifted
-mkLiftedPrimTyCon name kind arity arg_vrcs rep
-  = mkPrimTyCon' name kind arity arg_vrcs rep False
+mkLiftedPrimTyCon name kind arity rep
+  = mkPrimTyCon' name kind arity rep False
 
-mkPrimTyCon' name kind arity arg_vrcs rep is_unlifted
+mkPrimTyCon' name kind arity rep is_unlifted
   = PrimTyCon {
 	tyConName    = name,
 	tyConUnique  = nameUnique name,
 	tyConKind    = kind,
 	tyConArity   = arity,
-        argVrcs      = arg_vrcs,
 	primTyConRep = rep,
 	isUnLifted   = is_unlifted,
 	tyConExtName = Nothing
     }
 
-mkSynTyCon name kind tyvars rhs argvrcs
+mkSynTyCon name kind tyvars rhs
   = SynTyCon {	
 	tyConName = name,
 	tyConUnique = nameUnique name,
 	tyConKind = kind,
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
-	synTcRhs = rhs,
-	argVrcs      = argvrcs
+	synTcRhs = rhs
     }
 
 mkCoercionTyCon name arity kindRule
@@ -709,19 +696,6 @@ tyConStupidTheta :: TyCon -> [PredType]
 tyConStupidTheta (AlgTyCon {algTcStupidTheta = stupid}) = stupid
 tyConStupidTheta (TupleTyCon {})			= []
 tyConStupidTheta tycon = pprPanic "tyConStupidTheta" (ppr tycon)
-\end{code}
-
-@tyConArgVrcs_maybe@ gives a list of (occPos,occNeg) flags, one for
-each tyvar, if available.  See @calcAlgTyConArgVrcs@ for how this is
-actually computed (in another file).
-
-\begin{code}
-tyConArgVrcs :: TyCon -> ArgVrcs
-tyConArgVrcs (FunTyCon   {})		       = [(False,True),(True,False)]
-tyConArgVrcs (AlgTyCon   {argVrcs = oi})       = oi
-tyConArgVrcs (PrimTyCon  {argVrcs = oi})       = oi
-tyConArgVrcs (TupleTyCon {tyConArity = arity}) = (replicate arity (True,False))
-tyConArgVrcs (SynTyCon   {argVrcs = oi})       = oi
 \end{code}
 
 \begin{code}

@@ -38,7 +38,6 @@ import IfaceType
 import NewDemand	( StrictSig, pprIfaceStrictSig )
 import TcType		( deNoteType )
 import Class		( FunDep, DefMeth, pprFundeps )
-import TyCon		( ArgVrcs )
 import OccName		( OccName, parenSymOcc, occNameFS,
 			  OccSet, unionOccSets, unitOccSet )
 import UniqFM           ( UniqFM, emptyUFM, addToUFM, lookupUFM )
@@ -76,7 +75,6 @@ data IfaceDecl
 		ifCtxt	     :: IfaceContext,	-- The "stupid theta"
 		ifCons	     :: IfaceConDecls,	-- Includes new/data info
 	        ifRec	     :: RecFlag,	-- Recursive or not?
-		ifVrcs       :: ArgVrcs,
 		ifGadtSyntax :: Bool,		-- True <=> declared using GADT syntax
 		ifGeneric    :: Bool		-- True <=> generic converter functions available
     }						-- We need this for imported data decls, since the
@@ -85,7 +83,6 @@ data IfaceDecl
 
   | IfaceSyn  {	ifName   :: OccName,		-- Type constructor
 		ifTyVars :: [IfaceTvBndr],	-- Type variables
-		ifVrcs   :: ArgVrcs,
 		ifSynRhs :: IfaceType		-- synonym expansion
     }
 
@@ -94,8 +91,7 @@ data IfaceDecl
 		 ifTyVars  :: [IfaceTvBndr],	-- Type variables
 		 ifFDs     :: [FunDep FastString], -- Functional dependencies
 		 ifSigs    :: [IfaceClassOp],	-- Method signatures
-	         ifRec	   :: RecFlag,		-- Is newtype/datatype associated with the class recursive?
-		 ifVrcs    :: ArgVrcs		-- ... and what are its argument variances ...
+	         ifRec	   :: RecFlag		-- Is newtype/datatype associated with the class recursive?
     }
 
   | IfaceForeign { ifName :: OccName,		-- Needs expanding when we move beyond .NET
@@ -233,16 +229,15 @@ pprIfaceDecl (IfaceId {ifName = var, ifType = ty, ifIdInfo = info})
 pprIfaceDecl (IfaceForeign {ifName = tycon})
   = hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
 
-pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty, ifVrcs = vrcs})
+pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty})
   = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (vcat [equals <+> ppr mono_ty,
-		pprVrcs vrcs])
+       4 (equals <+> ppr mono_ty)
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 			 ifTyVars = tyvars, ifCons = condecls, 
-			 ifRec = isrec, ifVrcs = vrcs})
+			 ifRec = isrec})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       4 (vcat [pprVrcs vrcs, pprRec isrec, pprGen gen, pp_condecls tycon condecls])
+       4 (vcat [pprRec isrec, pprGen gen, pp_condecls tycon condecls])
   where
     pp_nd = case condecls of
 		IfAbstractTyCon -> ptext SLIT("data")
@@ -250,13 +245,11 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 		IfNewTyCon _  	-> ptext SLIT("newtype")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
-			  ifFDs = fds, ifSigs = sigs, ifVrcs = vrcs, ifRec = isrec})
+			  ifFDs = fds, ifSigs = sigs, ifRec = isrec})
   = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars <+> pprFundeps fds)
-       4 (vcat [pprVrcs vrcs, 
-		pprRec isrec,
+       4 (vcat [pprRec isrec,
 	        sep (map ppr sigs)])
 
-pprVrcs vrcs = ptext SLIT("Variances") <+> ppr vrcs
 pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
 pprGen True  = ptext SLIT("Generics: yes")
 pprGen False = ptext SLIT("Generics: no")
@@ -514,7 +507,6 @@ eqIfDecl d1@(IfaceForeign {}) d2@(IfaceForeign {})
 eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
   = bool (ifName d1    == ifName d2 && 
 	  ifRec d1     == ifRec   d2 && 
-	  ifVrcs d1    == ifVrcs   d2 && 
 	  ifGadtSyntax d1 == ifGadtSyntax   d2 && 
 	  ifGeneric d1 == ifGeneric d2) &&&
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
@@ -533,8 +525,7 @@ eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
 
 eqIfDecl d1@(IfaceClass {}) d2@(IfaceClass {})
   = bool (ifName d1 == ifName d2 && 
-	  ifRec d1  == ifRec  d2 && 
-	  ifVrcs d1 == ifVrcs d2) &&&
+	  ifRec d1  == ifRec  d2) &&&
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
    	  eq_ifContext env (ifCtxt d1) (ifCtxt d2)  &&&
 	  eqListBy (eq_hsFD env)    (ifFDs d1)  (ifFDs d2) &&&

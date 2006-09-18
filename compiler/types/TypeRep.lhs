@@ -324,7 +324,7 @@ eqCoercionKindTyCon =
   mkCoercionTyCon eqCoercionKindTyConName 2 (\ _ -> coSuperKind)
 
 mkKindTyCon :: Name -> TyCon
-mkKindTyCon name = mkVoidPrimTyCon name tySuperKind 0 [] 
+mkKindTyCon name = mkVoidPrimTyCon name tySuperKind 0
 
 --------------------------
 -- ... and now their names

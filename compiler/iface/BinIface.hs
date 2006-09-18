@@ -903,7 +903,7 @@ instance Binary IfaceDecl where
 	    put_ bh idinfo
     put_ bh (IfaceForeign ae af) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8) = do
+    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7) = do
 	    putByte bh 2
 	    put_ bh a1
 	    put_ bh a2
@@ -912,15 +912,13 @@ instance Binary IfaceDecl where
 	    put_ bh a5
 	    put_ bh a6
 	    put_ bh a7
-	    put_ bh a8
 
-    put_ bh (IfaceSyn aq ar as at) = do
+    put_ bh (IfaceSyn aq ar as) = do
 	    putByte bh 3
 	    put_ bh aq
 	    put_ bh ar
 	    put_ bh as
-	    put_ bh at
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7) = do
+    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6) = do
 	    putByte bh 4
 	    put_ bh a1
 	    put_ bh a2
@@ -928,7 +926,6 @@ instance Binary IfaceDecl where
 	    put_ bh a4
 	    put_ bh a5
 	    put_ bh a6
-	    put_ bh a7
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -945,14 +942,12 @@ instance Binary IfaceDecl where
 		    a5 <- get bh
 		    a6 <- get bh
 		    a7 <- get bh
-		    a8 <- get bh
-		    return (IfaceData a1 a2 a3 a4 a5 a6 a7 a8)
+		    return (IfaceData a1 a2 a3 a4 a5 a6 a7)
 	      3 -> do
 		    aq <- get bh
 		    ar <- get bh
 		    as <- get bh
-		    at <- get bh
-		    return (IfaceSyn aq ar as at)
+		    return (IfaceSyn aq ar as)
 	      _ -> do
 		    a1 <- get bh
 		    a2 <- get bh
@@ -960,8 +955,7 @@ instance Binary IfaceDecl where
 		    a4 <- get bh
 		    a5 <- get bh
 		    a6 <- get bh
-		    a7 <- get bh
-		    return (IfaceClass a1 a2 a3 a4 a5 a6 a7)
+		    return (IfaceClass a1 a2 a3 a4 a5 a6)
 
 instance Binary IfaceInst where
     put_ bh (IfaceInst cls tys dfun flag orph) = do

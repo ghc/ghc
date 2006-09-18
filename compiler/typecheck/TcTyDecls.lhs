@@ -2,9 +2,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
 %
 
-Analysis functions over data types.  Specficially
-	a) detecting recursive types
-	b) computing argument variances
+Analysis functions over data types.  Specficially, detecting recursive types.
 
 This stuff is only used for source-code decls; it's recorded in interface
 files for imported data types.
@@ -12,7 +10,6 @@ files for imported data types.
 
 \begin{code}
 module TcTyDecls(
-        calcTyConArgVrcs,
 	calcRecFlags, 
 	calcClassCycles, calcSynCycles
     ) where
@@ -24,9 +21,9 @@ import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl, isClassDecl )
 import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep, tcView )
 import HscTypes		( TyThing(..), ModDetails(..) )
-import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons, tyConTyVars,
+import TyCon            ( TyCon, tyConArity, tyConDataCons, tyConTyVars,
                           synTyConDefn, isSynTyCon, isAlgTyCon, 
-			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs, newTyConRhs )
+			  tyConName, isNewTyCon, isProductTyCon, newTyConRhs )
 import Class		( classTyCon )
 import DataCon          ( dataConOrigArgTys )
 import Var              ( TyVar )
@@ -319,155 +316,4 @@ tcTyConsOfType ty
 
      go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
-\end{code}
-
-
-%************************************************************************
-%*									*
-	Compuing TyCon argument variances
-%*									*
-%************************************************************************
-
-Computing the tyConArgVrcs info
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-@tyConArgVrcs@ gives a list of (occPos,occNeg) flags, one for each
-tyvar.  For @AlgTyCon@s and @SynTyCon@s, this info must be precomputed
-separately.  Note that this is information about occurrences of type
-variables, not usages of term variables.
-
-The function @calcTyConArgVrcs@ must be passed a list of *algebraic or
-syntycons only* such that all tycons referred to (by mutual recursion)
-appear in the list.  The fixpointing will be done on this set of
-tycons as a whole.  It returns a list of @tyconVrcInfo@ data, ready to
-be (knot-tyingly?) stuck back into the appropriate fields.
-
-\begin{code}
-calcTyConArgVrcs :: [TyThing] -> Name -> ArgVrcs
--- Gives arg variances for TyCons, 
--- including the class TyCon of a class
-calcTyConArgVrcs tyclss
-  = get_vrc
-  where
-    tycons = map getTyCon tyclss
-
-	-- We should only look up things that are in the map
-    get_vrc n = case lookupNameEnv final_oi n of
-		  Just (_, pms) -> pms
-		  Nothing -> pprPanic "calcVrcs" (ppr n)
-
-	-- We are going to fold over this map,
-	-- so we need the TyCon in the range
-    final_oi :: NameEnv (TyCon, ArgVrcs)
-    final_oi = tcaoFix initial_oi
-
-    initial_oi :: NameEnv (TyCon, ArgVrcs)
-    initial_oi = mkNameEnv [(tyConName tc, (tc, initial tc))
-			   | tc <- tycons]
-    initial tc = replicate (tyConArity tc) (False,False)
-
-    tcaoFix :: NameEnv (TyCon, ArgVrcs)   -- initial ArgVrcs per tycon
-	    -> NameEnv (TyCon, ArgVrcs)   -- fixpointed ArgVrcs per tycon
-    tcaoFix oi 
-	| changed   = tcaoFix oi'
-	| otherwise = oi'
-	where
-	 (changed,oi') = foldNameEnv iterate (False,oi) oi
-
-    iterate (tc, pms) (changed,oi')
-      =	(changed || (pms /= pms'),
-	 extendNameEnv oi' (tyConName tc) (tc, pms'))
-      where
-	pms' = tcaoIter oi' tc  -- seq not simult
-
-    tcaoIter :: NameEnv (TyCon, ArgVrcs)  -- reference ArgVrcs (initial)
-	     -> TyCon                     -- tycon to update
-	     -> ArgVrcs                   -- new ArgVrcs for tycon
-
-    tcaoIter oi tc | isAlgTyCon tc
-      = map (\v -> anyVrc (vrcInTy (lookup oi) v) argtys) vs
-      where
-       	data_cons = tyConDataCons tc
-       	vs        = tyConTyVars tc
-       	argtys    = concatMap dataConOrigArgTys data_cons	-- Rep? or Orig?
-
-    tcaoIter oi tc | isSynTyCon tc
-      = let (tyvs,ty) = synTyConDefn tc
-                        -- we use the already-computed result for tycons not in this SCC
-        in  map (\v -> vrcInTy (lookup oi) v ty) tyvs
-
-    lookup oi tc = case lookupNameEnv oi (tyConName tc) of
-			Just (_, pms) -> pms
-			Nothing	      -> tyConArgVrcs tc
-	 -- We use the already-computed result for tycons not in this SCC
-\end{code}
-
-
-Variance of tyvars in a type
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A general variance-check function.  We pass a function for determining
-the @ArgVrc@s of a tycon; when fixpointing this refers to the current
-value; otherwise this should be looked up from the tycon's own
-tyConArgVrcs.  Again, it knows the representation of Types.
-
-\begin{code}
-vrcInTy :: (TyCon -> ArgVrcs)  -- function to get argVrcs of a tycon (break out of recursion)
-        -> TyVar               -- tyvar to check Vrcs of
-        -> Type                -- type to check for occ in
-        -> (Bool,Bool)         -- (occurs positively, occurs negatively)
-
-vrcInTy fao v (NoteTy (FTVNote ftv) ty) = if elemVarSet v ftv
-    					  then vrcInTy fao v ty
-    					  else (False,False)
-    			-- note that ftv cannot be calculated as occPos||occNeg,
-    			-- since if a tyvar occurs only as unused tyconarg,
-    			-- occPos==occNeg==False, but ftv=True
-
-vrcInTy fao v (TyVarTy v')              = if v==v'
-    					  then (True,False)
-    					  else (False,False)
-
-vrcInTy fao v (AppTy ty1 ty2)           = if vrcInTy fao v ty2 /= (False,False)
-                                          then (True,True)
-                                          else vrcInTy fao v ty1
-                        -- ty1 is probably unknown (or it would have been beta-reduced);
-                        -- hence if v occurs in ty2 at all then it could occur with
-                        -- either variance.  Otherwise it occurs as it does in ty1.
-
-vrcInTy fao v (FunTy ty1 ty2)           = negVrc (vrcInTy fao v ty1)
-                                          `orVrc`
-                                          vrcInTy fao v ty2
-					 
-vrcInTy fao v (ForAllTy v' ty)          = if v==v'
-					  then (False,False)
-    					  else vrcInTy fao v ty
-
-vrcInTy fao v (TyConApp tc tys)         = let pms1 = map (vrcInTy fao v) tys
-    					      pms2 = fao tc
-    				          in  orVrcs (zipWith timesVrc pms1 pms2)
-
-vrcInTy fao v (PredTy st) = vrcInTy fao v (predTypeRep st)
-\end{code}
-
-Variance algebra
-~~~~~~~~~~~~~~~~
-
-\begin{code}
-orVrc :: (Bool,Bool) -> (Bool,Bool) -> (Bool,Bool)
-orVrc (p1,m1) (p2,m2) = (p1||p2,m1||m2)
-
-orVrcs :: [(Bool,Bool)] -> (Bool,Bool)
-orVrcs = foldl orVrc (False,False)
-
-negVrc :: (Bool,Bool) -> (Bool,Bool)
-negVrc (p1,m1) = (m1,p1)
-
-anyVrc :: (a -> (Bool,Bool)) -> [a] -> (Bool,Bool)
-anyVrc p as = foldl (\ pm a -> pm `orVrc` p a)
-                    (False,False) as
-
-timesVrc :: (Bool,Bool) -> (Bool,Bool) -> (Bool,Bool)
-timesVrc (p1,m1) (p2,m2) = (p1 && p2 || m1 && m2,
-    			    p1 && m2 || m1 && p2)
 \end{code}

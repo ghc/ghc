@@ -961,7 +961,7 @@ mkArbitraryType tv
 
 	  | otherwise
 	  = pprTrace "Urk! Inventing strangely-kinded void TyCon:" (ppr tc_name $$ ppr kind) $
-	    mkPrimTyCon tc_name kind 0 [] VoidRep
+	    mkPrimTyCon tc_name kind 0 VoidRep
 		-- Same name as the tyvar, apart from making it start with a colon (sigh)
 		-- I dread to think what will happen if this gets out into an 
 		-- interface file.  Catastrophe likely.  Major sigh.

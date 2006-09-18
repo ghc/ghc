@@ -195,13 +195,12 @@ funKindTyCon_RDR          = nameRdrName funKindTyConName
 pcNonRecDataTyCon = pcTyCon False NonRecursive
 pcRecDataTyCon    = pcTyCon False Recursive
 
-pcTyCon is_enum is_rec name tyvars argvrcs cons
+pcTyCon is_enum is_rec name tyvars cons
   = tycon
   where
     tycon = mkAlgTyCon name
 		(mkArrowKinds (map tyVarKind tyvars) liftedTypeKind)
                 tyvars
-                argvrcs
                 []		-- No stupid theta
 		(DataTyCon cons is_enum)
 		[] 		-- No record selectors
@@ -328,7 +327,7 @@ voidTy = unitTy
 \begin{code}
 charTy = mkTyConTy charTyCon
 
-charTyCon   = pcNonRecDataTyCon charTyConName [] [] [charDataCon]
+charTyCon   = pcNonRecDataTyCon charTyConName [] [charDataCon]
 charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
 stringTy = mkListTy charTy -- convenience only
@@ -337,21 +336,21 @@ stringTy = mkListTy charTy -- convenience only
 \begin{code}
 intTy = mkTyConTy intTyCon 
 
-intTyCon = pcNonRecDataTyCon intTyConName [] [] [intDataCon]
+intTyCon = pcNonRecDataTyCon intTyConName [] [intDataCon]
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
 \end{code}
 
 \begin{code}
 floatTy	= mkTyConTy floatTyCon
 
-floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [] [floatDataCon]
+floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [floatDataCon]
 floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
 \end{code}
 
 \begin{code}
 doubleTy = mkTyConTy doubleTyCon
 
-doubleTyCon   = pcNonRecDataTyCon doubleTyConName   [] [] [doubleDataCon]
+doubleTyCon   = pcNonRecDataTyCon doubleTyConName   [] [doubleDataCon]
 doubleDataCon = pcDataCon	  doubleDataConName [] [doublePrimTy] doubleTyCon
 \end{code}
 
@@ -408,7 +407,7 @@ primitive counterpart.
 boolTy = mkTyConTy boolTyCon
 
 boolTyCon = pcTyCon True NonRecursive boolTyConName
-		    [] [] [falseDataCon, trueDataCon]
+		    [] [falseDataCon, trueDataCon]
 
 falseDataCon = pcDataCon falseDataConName [] [] boolTyCon
 trueDataCon  = pcDataCon trueDataConName  [] [] boolTyCon
@@ -436,8 +435,7 @@ data (,) a b = (,,) a b
 mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
-listTyCon = pcRecDataTyCon listTyConName
-			alpha_tyvar [(True,False)] [nilDataCon, consDataCon]
+listTyCon = pcRecDataTyCon listTyConName alpha_tyvar [nilDataCon, consDataCon]
 
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
@@ -525,7 +523,7 @@ mkPArrTy ty  = mkTyConApp parrTyCon [ty]
 --     `PrelPArr'.
 --
 parrTyCon :: TyCon
-parrTyCon  = pcNonRecDataTyCon parrTyConName alpha_tyvar [(True, False)] [parrDataCon]
+parrTyCon  = pcNonRecDataTyCon parrTyConName alpha_tyvar [parrDataCon]
 
 parrDataCon :: DataCon
 parrDataCon  = pcDataCon 

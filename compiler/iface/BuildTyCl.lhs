@@ -29,7 +29,7 @@ import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
 import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
 			  tyConDataCons, isNewTyCon, mkClassTyCon, TyCon( tyConTyVars ),
 			  isRecursiveTyCon, tyConArity,
-			  ArgVrcs, AlgTyConRhs(..), newTyConRhs )
+			  AlgTyConRhs(..), newTyConRhs )
 import Type		( mkArrowKinds, liftedTypeKind, typeKind, 
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 			  splitTyConApp_maybe, splitAppTy_maybe, getTyVar_maybe,
@@ -45,8 +45,8 @@ import List		( nub )
 
 \begin{code}
 ------------------------------------------------------
-buildSynTyCon name tvs rhs_ty arg_vrcs
-  = mkSynTyCon name kind tvs rhs_ty arg_vrcs
+buildSynTyCon name tvs rhs_ty
+  = mkSynTyCon name kind tvs rhs_ty
   where
     kind = mkArrowKinds (map tyVarKind tvs) (typeKind rhs_ty)
 
@@ -55,13 +55,13 @@ buildSynTyCon name tvs rhs_ty arg_vrcs
 buildAlgTyCon :: Name -> [TyVar] 
 	      -> ThetaType		-- Stupid theta
 	      -> AlgTyConRhs
-	      -> ArgVrcs -> RecFlag
+	      -> RecFlag
 	      -> Bool			-- True <=> want generics functions
 	      -> Bool			-- True <=> was declared in GADT syntax
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs stupid_theta rhs arg_vrcs is_rec want_generics gadt_syn
-  = do	{ let { tycon = mkAlgTyCon tc_name kind tvs arg_vrcs stupid_theta
+buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
+  = do	{ let { tycon = mkAlgTyCon tc_name kind tvs stupid_theta
 				   rhs fields is_rec want_generics gadt_syn
 	      ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 	      ; fields  = mkTyConSelIds tycon rhs
@@ -207,10 +207,10 @@ mkTyConSelIds tycon rhs
 buildClass :: Name -> [TyVar] -> ThetaType
 	   -> [FunDep TyVar]		-- Functional dependencies
 	   -> [(Name, DefMeth, Type)]	-- Method info
-	   -> RecFlag -> ArgVrcs	-- Info for type constructor
+	   -> RecFlag			-- Info for type constructor
 	   -> TcRnIf m n Class
 
-buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
+buildClass class_name tvs sc_theta fds sig_stuff tc_isrec
   = do	{ tycon_name <- newImplicitBinder class_name mkClassTyConOcc
 	; datacon_name <- newImplicitBinder class_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
@@ -253,7 +253,7 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
 	; let {	clas_kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 
  	      ; tycon = mkClassTyCon tycon_name clas_kind tvs
-                             tc_vrcs rhs rec_clas tc_isrec
+                             rhs rec_clas tc_isrec
 		-- A class can be recursive, and in the case of newtypes 
 		-- this matters.  For example
 		-- 	class C a where { op :: C b => a -> b -> Int }
