@@ -1101,14 +1101,15 @@ funTyConName = mkWiredInName gHC_PRIM
 toHsInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead2 Name
 toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsType ts) 
 
+--------------------------------------------------------------------------------
+-- Type -> HsType conversion
+--------------------------------------------------------------------------------
 
 toHsPred :: PredType -> HsPred Name 
 toHsPred (ClassP cls ts) = HsClassP (className cls) (map toLHsType ts)
 toHsPred (IParam n t) = HsIParam n (toLHsType t)
 
-
 toLHsType = noLoc . toHsType
-
  
 toHsType :: Type -> HsType Name
 toHsType t = case t of 
@@ -1127,7 +1128,6 @@ toHsType t = case t of
     cvForAll vs (ForAllTy v t) = cvForAll (v:vs) t
     cvForAll vs t = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType t)
     tyvarbinders vs = map (noLoc . UserTyVar . tyVarName) vs
-
 
 -- -----------------------------------------------------------------------------
 -- A monad which collects error messages
@@ -1225,6 +1225,7 @@ getPackages session dynflags = do
     -- no better way to do this?
     notRTS p = pkgName (package p) /= packageIdString rtsPackageId  
 
+    -- try to get a PackageData, warn if we can't
     tryGetPackage pkgInfo = do
       result <- getPackage session pkgInfo
       case result of
