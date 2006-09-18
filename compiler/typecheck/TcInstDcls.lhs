@@ -303,8 +303,75 @@ First comes the easy case of a non-local instance decl.
 
 \begin{code}
 tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
+-- Returns a binding for the dfun
 
-tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
+		** Explain superclass stuff ***
+
+-- Derived newtype instances
+-- In the case of a newtype, things are rather easy
+-- 	class Show a => Foo a b where ...
+-- 	newtype T a = MkT (Tree [a]) deriving( Foo Int )
+-- The newtype gives an FC axiom looking like
+--	axiom CoT a :: Tree [a] = T a
+--
+-- So all need is to generate a binding looking like
+-- 	dfunFooT :: forall a. (Show (T a), Foo Int (Tree [a]) => Foo Int (T a)
+--	dfunFooT = /\a. \(ds:Show (T a) (df:Foo (Tree [a])).
+--		  case df `cast` (Foo Int (CoT a)) of
+--		     Foo _ op1 .. opn -> Foo ds op1 .. opn
+
+tcInstDecl2 (InstInfo { iSpec = ispec, 
+			iBinds = NewTypeDerived rep_tys })
+  = do	{ let dfun_id = instanceDFunId ispec 
+	      rigid_info = InstSkol dfun_id
+	      origin	 = SigOrigin rigid_info
+	      inst_ty    = idType dfun_id
+	; (tvs, theta, inst_head) <- tcSkolSigType rigid_info inst_ty
+	; ASSERT( isSingleton theta )	-- Always the case for NewTypeDerived
+	  rep_dict <- newDict origin (head theta)
+
+	; let rep_dict_id = instToId rep_dict
+	      cast = 
+	      co_fn = CoTyLams tvs <.> CoLams [rep_dict_id] <.> ExprCoFn cast
+
+	; return (unitBag (VarBind dfun_id (HsCoerce co_fn (HsVar rep_dict_id))))
+
+tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
+	  avail_insts op_items (NewTypeDerived rep_tys)
+  = getInstLoc origin				`thenM` \ inst_loc ->
+    mapAndUnzip3M (do_one inst_loc) op_items	`thenM` \ (meth_ids, meth_binds, rhs_insts) ->
+    
+    tcSimplifyCheck
+	 (ptext SLIT("newtype derived instance"))
+	 inst_tyvars' avail_insts rhs_insts	`thenM` \ lie_binds ->
+
+	-- I don't think we have to do the checkSigTyVars thing
+
+    returnM (meth_ids, lie_binds `unionBags` listToBag meth_binds)
+
+  where
+    do_one inst_loc (sel_id, _)
+	= -- The binding is like "op @ NewTy = op @ RepTy"
+		-- Make the *binder*, like in mkMethodBind
+	  tcInstClassOp inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
+
+		-- Make the *occurrence on the rhs*
+	  tcInstClassOp inst_loc sel_id rep_tys'	`thenM` \ rhs_inst ->
+	  let
+	     meth_id = instToId meth_inst
+	  in
+	  return (meth_id, noLoc (VarBind meth_id (nlHsVar (instToId rhs_inst))), rhs_inst)
+
+	-- Instantiate rep_tys with the relevant type variables
+	-- This looks a bit odd, because inst_tyvars' are the skolemised version
+	-- of the type variables in the instance declaration; but rep_tys doesn't
+	-- have the skolemised version, so we substitute them in here
+    rep_tys' = substTys subst rep_tys
+    subst    = zipOpenTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
+
+
+
+tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
   = let 
 	dfun_id    = instanceDFunId ispec
 	rigid_info = InstSkol dfun_id
@@ -341,7 +408,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
     in
     tcMethods origin clas inst_tyvars' 
 	      dfun_theta' inst_tys' avail_insts 
-	      op_items binds		`thenM` \ (meth_ids, meth_binds) ->
+	      op_items monobinds uprags		`thenM` \ (meth_ids, meth_binds) ->
 
 	-- Figure out bindings for the superclass context
 	-- Don't include this_dict in the 'givens', else
@@ -356,12 +423,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
     checkSigTyVars inst_tyvars' 	`thenM_`
 
 	-- Deal with 'SPECIALISE instance' pragmas 
-    let
-	specs = case binds of
-		  VanillaInst _ prags -> filter isSpecInstLSig prags
-		  other	 	      -> []
-    in
-    tcPrags dfun_id specs			`thenM` \ prags -> 
+    tcPrags dfun_id (filter isSpecInstLSig prags)	`thenM` \ prags -> 
     
 	-- Create the result bindings
     let
@@ -405,7 +467,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = binds })
 
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
-	  avail_insts op_items (VanillaInst monobinds uprags)
+	  avail_insts op_items monobinds uprags
   = 	-- Check that all the method bindings come from this class
     let
 	sel_names = [idName sel_id | (sel_id, _) <- op_items]
@@ -461,41 +523,6 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
     mapM tc_method_bind meth_infos		`thenM` \ meth_binds_s ->
    
     returnM (meth_ids, unionManyBags meth_binds_s)
-
-
--- Derived newtype instances
-tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
-	  avail_insts op_items (NewTypeDerived rep_tys)
-  = getInstLoc origin				`thenM` \ inst_loc ->
-    mapAndUnzip3M (do_one inst_loc) op_items	`thenM` \ (meth_ids, meth_binds, rhs_insts) ->
-    
-    tcSimplifyCheck
-	 (ptext SLIT("newtype derived instance"))
-	 inst_tyvars' avail_insts rhs_insts	`thenM` \ lie_binds ->
-
-	-- I don't think we have to do the checkSigTyVars thing
-
-    returnM (meth_ids, lie_binds `unionBags` listToBag meth_binds)
-
-  where
-    do_one inst_loc (sel_id, _)
-	= -- The binding is like "op @ NewTy = op @ RepTy"
-		-- Make the *binder*, like in mkMethodBind
-	  tcInstClassOp inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
-
-		-- Make the *occurrence on the rhs*
-	  tcInstClassOp inst_loc sel_id rep_tys'	`thenM` \ rhs_inst ->
-	  let
-	     meth_id = instToId meth_inst
-	  in
-	  return (meth_id, noLoc (VarBind meth_id (nlHsVar (instToId rhs_inst))), rhs_inst)
-
-	-- Instantiate rep_tys with the relevant type variables
-	-- This looks a bit odd, because inst_tyvars' are the skolemised version
-	-- of the type variables in the instance declaration; but rep_tys doesn't
-	-- have the skolemised version, so we substitute them in here
-    rep_tys' = substTys subst rep_tys
-    subst    = zipOpenTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
 \end{code}
 
 

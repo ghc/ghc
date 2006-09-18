@@ -252,6 +252,20 @@ This TyCon is a CoercionTyCon, so it does not have a kind on its own;
 it basically has its own typing rule for the fully-applied version.
 If the newtype T has k type variables then CoT has arity k.
 
+In the paper we'd write
+	axiom CoT : (forall t. [t]) :=: (forall t. T t)
+and then when we used CoT at a particular type, s, we'd say
+	CoT @ s
+which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
+
+But in GHC we instead make CoT into a new piece of type syntax
+(like instCoercionTyCon, symCoercionTyCon etc), which must always
+be saturated, but which encodes as
+	TyConAp CoT [s]
+In the vocabulary of the paper it's as if we had axiom declarations
+like
+	axiom CoT t : ([t] :=: T t)
+
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
 Consider

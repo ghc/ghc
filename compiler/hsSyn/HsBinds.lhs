@@ -316,7 +316,8 @@ data ExprCoFn
   | CoTyApps [Type]		-- [] t1 .. tn
   | CoLams [Id] 		-- \x1..xn. []; the xi are dicts or coercions
   | CoTyLams [TyVar] 		-- \a1..an. []
-  | CoLet (LHsBinds Id)		-- Would be nicer to be core bindings
+  | CoLet (LHsBinds Id)		-- let binds in []
+				-- (ould be nicer to be core bindings)
 
 instance Outputable ExprCoFn where
   ppr CoHole	     = ptext SLIT("<>")
