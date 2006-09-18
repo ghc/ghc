@@ -125,6 +125,7 @@ oclose preds fixed_tvs
 
 \begin{code}
 grow :: [PredType] -> TyVarSet -> TyVarSet
+-- See Note [Ambiguity] in TcSimplify
 grow preds fixed_tvs 
   | null preds = fixed_tvs
   | otherwise  = loop fixed_tvs

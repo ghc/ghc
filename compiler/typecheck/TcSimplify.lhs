@@ -86,6 +86,24 @@ import DynFlags		( DynFlags(ctxtStkDepth),
 	Notes on functional dependencies (a bug)
 	--------------------------------------
 
+Consider this:
+
+	class C a b | a -> b
+	class D a b | a -> b
+
+	instance D a b => C a b	-- Undecidable 
+				-- (Not sure if it's crucial to this eg)
+	f :: C a b => a -> Bool
+	f _ = True
+	
+	g :: C a b => a -> Bool
+	g = f
+
+Here f typechecks, but g does not!!  Reason: before doing improvement,
+we reduce the (C a b1) constraint from the call of f to (D a b1).
+
+Here is a more complicated example:
+
 | > class Foo a b | a->b
 | >
 | > class Bar a b | a->b
@@ -257,9 +275,9 @@ any other type variables.
 
 
 
-	--------------------------------------
-		Notes on ambiguity
-	--------------------------------------
+-------------------------------------
+	Note [Ambiguity]
+-------------------------------------
 
 It's very hard to be certain when a type is ambiguous.  Consider
 
