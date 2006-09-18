@@ -597,33 +597,48 @@ tcSubExp :: BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
 	-- (tcSub act exp) checks that 
 	--	act <= exp
 tcSubExp actual_ty expected_ty
-  = addErrCtxtM (unifyCtxt actual_ty expected_ty)
-		(tc_sub True actual_ty actual_ty expected_ty expected_ty)
+  = -- addErrCtxtM (unifyCtxt actual_ty expected_ty) $
+    -- Adding the error context here leads to some very confusing error
+    -- messages, such as "can't match foarall a. a->a with forall a. a->a"
+    -- So instead I'm adding it when moving from tc_sub to u_tys
+    tc_sub Nothing actual_ty actual_ty False expected_ty expected_ty
 
 tcFunResTy :: Name -> BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
 tcFunResTy fun actual_ty expected_ty
-  = addErrCtxtM (checkFunResCtxt fun actual_ty expected_ty) $
-		(tc_sub True actual_ty actual_ty expected_ty expected_ty)
+  = tc_sub (Just fun) actual_ty actual_ty False expected_ty expected_ty
 		   
 -----------------
-tc_sub :: Outer			-- See comments with uTys
+tc_sub :: Maybe Name		-- Just fun => we're looking at a function result type
        -> BoxySigmaType		-- actual_ty, before expanding synonyms
        -> BoxySigmaType		-- 		..and after
+       -> InBox			-- True <=> expected_ty is inside a box
        -> BoxySigmaType		-- expected_ty, before
        -> BoxySigmaType		-- 		..and after
        -> TcM ExprCoFn
+				-- The acual_ty is never inside a box
+-- IMPORTANT pre-condition: if the args contain foralls, the bound type 
+--			    variables are visible non-monadically
+--			    (i.e. tha args are sufficiently zonked)
+-- This invariant is needed so that we can "see" the foralls, ad
+-- e.g. in the SPEC rule where we just use splitSigmaTy 
+	
+tc_sub mb_fun act_sty act_ty exp_ib exp_sty exp_ty
+  = tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
+	-- This indirection is just here to make 
+	-- it easy to insert a debug trace!
 
-tc_sub outer act_sty act_ty exp_sty exp_ty
-  | Just exp_ty' <- tcView exp_ty = tc_sub False act_sty act_ty exp_sty exp_ty'
-tc_sub outer act_sty act_ty exp_sty exp_ty
-  | Just act_ty' <- tcView act_ty = tc_sub False act_sty act_ty' exp_sty exp_ty
+tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
+  | Just exp_ty' <- tcView exp_ty = tc_sub mb_fun act_sty act_ty exp_ib exp_sty exp_ty'
+tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
+  | Just act_ty' <- tcView act_ty = tc_sub mb_fun act_sty act_ty' exp_ib exp_sty exp_ty
 
 -----------------------------------
 -- Rule SBOXY, plus other cases when act_ty is a type variable
 -- Just defer to boxy matching
 -- This rule takes precedence over SKOL!
-tc_sub outer act_sty (TyVarTy tv) exp_sty exp_ty
-  = do	{ uVar outer False tv False exp_sty exp_ty
+tc_sub1 mb_fun act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
+  = do	{ addErrCtxtM (subCtxt mb_fun act_sty exp_sty) $
+	  uVar True False tv exp_ib exp_sty exp_ty
 	; return idCoercion }
 
 -----------------------------------
@@ -637,10 +652,11 @@ tc_sub outer act_sty (TyVarTy tv) exp_sty exp_ty
 --	     g :: Ord b => b->b
 -- Consider  f g !
 
-tc_sub outer act_sty act_ty exp_sty exp_ty
-  | isSigmaTy exp_ty
+tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
+  | not exp_ib, 	-- SKOL does not apply if exp_ty is inside a box
+    isSigmaTy exp_ty	
   = do	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ body_exp_ty ->
-			     tc_sub False act_sty act_ty body_exp_ty body_exp_ty
+			     tc_sub mb_fun act_sty act_ty False body_exp_ty body_exp_ty
 	; return (gen_fn <.> co_fn) }
   where
     act_tvs = tyVarsOfType act_ty
@@ -653,7 +669,7 @@ tc_sub outer act_sty act_ty exp_sty exp_ty
 --	expected_ty: Int -> Int
 --	co_fn e =    e Int dOrdInt
 
-tc_sub outer act_sty actual_ty exp_sty expected_ty
+tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
 -- Implements the new SPEC rule in the Appendix of the paper
 -- "Boxy types: inference for higher rank types and impredicativity"
 -- (This appendix isn't in the published version.)
@@ -667,12 +683,19 @@ tc_sub outer act_sty actual_ty exp_sty expected_ty
 		-- boxy tyvars if pre-subsumption gives no info
 	  let (tyvars, theta, tau) = tcSplitSigmaTy actual_ty
 	      tau_tvs = exactTyVarsOfType tau
-	; inst_tys <- preSubType tyvars tau_tvs tau expected_ty
+	; inst_tys <- if exp_ib then	-- Inside a box, do not do clever stuff
+			do { tyvars' <- mapM tcInstBoxyTyVar tyvars
+			   ; return (mkTyVarTys tyvars') }
+		      else 		-- Outside, do clever stuff
+			preSubType tyvars tau_tvs tau expected_ty
 	; let subst' = zipOpenTvSubst tyvars inst_tys
 	      tau'   = substTy subst' tau
 
 		-- Perform a full subsumption check
-	; co_fn <- tc_sub False tau' tau' exp_sty expected_ty
+	; traceTc (text "tc_sub_spec" <+> vcat [ppr actual_ty, 
+						ppr tyvars <+> ppr theta <+> ppr tau,
+						ppr tau'])
+	; co_fn <- tc_sub mb_fun tau' tau' exp_ib exp_sty expected_ty
 
 		-- Deal with the dictionaries
 	; dicts <- newDicts InstSigOrigin (substTheta subst' theta)
@@ -683,33 +706,33 @@ tc_sub outer act_sty actual_ty exp_sty expected_ty
 
 -----------------------------------
 -- Function case (rule F1)
-tc_sub _ _ (FunTy act_arg act_res) _ (FunTy exp_arg exp_res)
-  = tc_sub_funs act_arg act_res exp_arg exp_res
+tc_sub1 mb_fun _ (FunTy act_arg act_res) exp_ib _ (FunTy exp_arg exp_res)
+  = tc_sub_funs mb_fun act_arg act_res exp_ib exp_arg exp_res
 
 -- Function case (rule F2)
-tc_sub outer act_sty act_ty@(FunTy act_arg act_res) exp_sty (TyVarTy exp_tv)
+tc_sub1 mb_fun act_sty act_ty@(FunTy act_arg act_res) _ exp_sty (TyVarTy exp_tv)
   | isBoxyTyVar exp_tv
   = do	{ cts <- readMetaTyVar exp_tv
 	; case cts of
-	    Indirect ty -> do { u_tys outer False act_sty act_ty True exp_sty ty
-			      ; return idCoercion }
+	    Indirect ty -> tc_sub mb_fun act_sty act_ty True exp_sty ty
 	    Flexi       -> do { [arg_ty,res_ty] <- withMetaTvs exp_tv fun_kinds mk_res_ty
- 			      ; tc_sub_funs act_arg act_res arg_ty res_ty } }
+ 			      ; tc_sub_funs mb_fun act_arg act_res True arg_ty res_ty } }
  where
     mk_res_ty [arg_ty', res_ty'] = mkFunTy arg_ty' res_ty'
     mk_res_ty other = panic "TcUnify.mk_res_ty3"
     fun_kinds = [argTypeKind, openTypeKind]
 
 -- Everything else: defer to boxy matching
-tc_sub outer act_sty actual_ty exp_sty expected_ty
-  = do	{ u_tys outer False act_sty actual_ty False exp_sty expected_ty
+tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
+  = do	{ addErrCtxtM (subCtxt mb_fun act_sty exp_sty) $
+	  u_tys True False act_sty actual_ty exp_ib exp_sty expected_ty
 	; return idCoercion }
 
 
 -----------------------------------
-tc_sub_funs act_arg act_res exp_arg exp_res
-  = do	{ uTys False act_arg False exp_arg
-	; co_fn_res <- tc_sub False act_res act_res exp_res exp_res
+tc_sub_funs mb_fun act_arg act_res exp_ib exp_arg exp_res
+  = do	{ uTys False act_arg exp_ib exp_arg
+	; co_fn_res <- tc_sub mb_fun act_res act_res exp_ib exp_res exp_res
 	; wrapFunResCoercion [exp_arg] co_fn_res }
 
 -----------------------------------
@@ -880,8 +903,12 @@ de-synonym'd version.  This way we get better error messages.
 We call the first one \tr{ps_ty1}, \tr{ps_ty2} for ``possible synomym''.
 
 \begin{code}
-type NoBoxes = Bool	-- True  <=> definitely no boxes in this type
-			-- False <=> there might be boxes (always safe)
+type InBox = Bool	-- True  <=> we are inside a box
+			-- False <=> we are outside a box
+	-- The importance of this is that if we get "filled-box meets 
+	-- filled-box", we'll look into the boxes and unify... but
+	-- we must not allow polytypes.  But if we are in a box on
+	-- just one side, then we can allow polytypes
 
 type Outer = Bool	-- True <=> this is the outer level of a unification
 			--	    so that the types being unified are the
@@ -891,16 +918,16 @@ type Outer = Bool	-- True <=> this is the outer level of a unification
 -- pop the context to remove the "Expected/Acutal" context
 
 uTysOuter, uTys
-     :: NoBoxes -> TcType	-- ty1 is the *expected* type
-     -> NoBoxes -> TcType	-- ty2 is the *actual* type
+     :: InBox -> TcType	-- ty1 is the *expected* type
+     -> InBox -> TcType	-- ty2 is the *actual* type
      -> TcM ()
 uTysOuter nb1 ty1 nb2 ty2 = u_tys True nb1 ty1 ty1 nb2 ty2 ty2
 uTys      nb1 ty1 nb2 ty2 = u_tys False nb1 ty1 ty1 nb2 ty2 ty2
 
 
 --------------
-uTys_s :: NoBoxes -> [TcType]	-- ty1 is the *actual* types
-       -> NoBoxes -> [TcType]	-- ty2 is the *expected* types
+uTys_s :: InBox -> [TcType]	-- ty1 is the *actual* types
+       -> InBox -> [TcType]	-- ty2 is the *expected* types
        -> TcM ()
 uTys_s nb1 []	 	nb2 []	       = returnM ()
 uTys_s nb1 (ty1:tys1) nb2 (ty2:tys2) = do { uTys nb1 ty1 nb2 ty2
@@ -909,8 +936,8 @@ uTys_s nb1 ty1s nb2 ty2s = panic "Unify.uTys_s: mismatched type lists!"
 
 --------------
 u_tys :: Outer
-      -> NoBoxes -> TcType -> TcType	-- ty1 is the *actual* type
-      -> NoBoxes -> TcType -> TcType	-- ty2 is the *expected* type
+      -> InBox -> TcType -> TcType	-- ty1 is the *actual* type
+      -> InBox -> TcType -> TcType	-- ty2 is the *expected* type
       -> TcM ()
 
 u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
@@ -963,9 +990,12 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 	           subst2   = mkTvSubst in_scope (zipTyEnv tvs2 tys)
 	     ; uTys nb1 (substTy subst1 body1) nb2 (substTy subst2 body2)
 
-		-- If both sides are inside a box, we should not have
-		-- a polytype at all.  This check comes last, because
-		-- the error message is extremely unhelpful.
+		-- If both sides are inside a box, we are in a "box-meets-box"
+		-- situation, and we should not have a polytype at all.  
+		-- If we get here we have two boxes, already filled with
+		-- the same polytype... but it should be a monotype.
+		-- This check comes last, because the error message is 
+		-- extremely unhelpful.  
 	     ; ifM (nb1 && nb2) (notMonoType ty1)
 	     }
       where
@@ -1062,7 +1092,7 @@ uVar :: Outer
      -> Bool		-- False => tyvar is the "expected"
 			-- True  => ty    is the "expected" thing
      -> TcTyVar
-     -> NoBoxes		-- True <=> definitely no boxes in t2
+     -> InBox		-- True <=> definitely no boxes in t2
      -> TcTauType -> TcTauType	-- printing and real versions
      -> TcM ()
 
@@ -1078,25 +1108,24 @@ uVar outer swapped tv1 nb2 ps_ty2 ty2
 	    IndirectTv ty1 
 		| swapped   -> u_tys outer nb2  ps_ty2 ty2 True ty1    ty1	-- Swap back
 		| otherwise -> u_tys outer True ty1    ty1 nb2  ps_ty2 ty2	-- Same order
-			-- The 'True' here says that ty1 
-			-- is definitely box-free
-	    DoneTv details1 -> uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 ty2
+			-- The 'True' here says that ty1 is now inside a box
+	    DoneTv details1 -> uUnfilledVar outer swapped tv1 details1 ps_ty2 ty2
 	}
 
 ----------------
 uUnfilledVar :: Outer
 	     -> Bool 				-- Args are swapped
-     	     -> TcTyVar -> TcTyVarDetails		-- Tyvar 1
-     	     -> NoBoxes -> TcTauType -> TcTauType	-- Type 2
+     	     -> TcTyVar -> TcTyVarDetails	-- Tyvar 1
+     	     -> TcTauType -> TcTauType		-- Type 2
      	     -> TcM ()
 -- Invariant: tyvar 1 is not unified with anything
 
-uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 ty2
+uUnfilledVar outer swapped tv1 details1 ps_ty2 ty2
   | Just ty2' <- tcView ty2
   = 	-- Expand synonyms; ignore FTVs
-    uUnfilledVar False swapped tv1 details1 nb2 ps_ty2 ty2'
+    uUnfilledVar False swapped tv1 details1 ps_ty2 ty2'
 
-uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 (TyVarTy tv2)
+uUnfilledVar outer swapped tv1 details1 ps_ty2 (TyVarTy tv2)
   | tv1 == tv2	-- Same type variable => no-op (but watch out for the boxy case)
   = case details1 of
 	MetaTv BoxTv ref1  -- A boxy type variable meets itself;
@@ -1109,14 +1138,14 @@ uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 (TyVarTy tv2)
   | otherwise
   = do	{ lookup2 <- lookupTcTyVar tv2
 	; case lookup2 of
-	    IndirectTv ty2' -> uUnfilledVar  outer swapped tv1 details1 True ty2' ty2'
+	    IndirectTv ty2' -> uUnfilledVar  outer swapped tv1 details1 ty2' ty2'
 	    DoneTv details2 -> uUnfilledVars outer swapped tv1 details1 tv2 details2
 	}
 
-uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 non_var_ty2	-- ty2 is not a type variable
+uUnfilledVar outer swapped tv1 details1 ps_ty2 non_var_ty2	-- ty2 is not a type variable
   = case details1 of
 	MetaTv (SigTv _) ref1 -> mis_match	-- Can't update a skolem with a non-type-variable
-	MetaTv info ref1      -> uMetaVar swapped tv1 info ref1 nb2 ps_ty2 non_var_ty2
+	MetaTv info ref1      -> uMetaVar swapped tv1 info ref1 ps_ty2 non_var_ty2
 	skolem_details        -> mis_match
   where
     mis_match = unifyMisMatch outer swapped (TyVarTy tv1) ps_ty2
@@ -1124,12 +1153,12 @@ uUnfilledVar outer swapped tv1 details1 nb2 ps_ty2 non_var_ty2	-- ty2 is not a t
 ----------------
 uMetaVar :: Bool
 	 -> TcTyVar -> BoxInfo -> IORef MetaDetails
-	 -> NoBoxes -> TcType -> TcType
+	 -> TcType -> TcType
 	 -> TcM ()
 -- tv1 is an un-filled-in meta type variable (maybe boxy, maybe tau)
 -- ty2 is not a type variable
 
-uMetaVar swapped tv1 BoxTv ref1 nb2 ps_ty2 non_var_ty2
+uMetaVar swapped tv1 BoxTv ref1 ps_ty2 non_var_ty2
   = 	-- tv1 is a BoxTv.  So we must unbox ty2, to ensure
 	-- that any boxes in ty2 are filled with monotypes
 	-- 
@@ -1147,7 +1176,7 @@ uMetaVar swapped tv1 BoxTv ref1 nb2 ps_ty2 non_var_ty2
 #endif
 	; checkUpdateMeta swapped tv1 ref1 final_ty }
 
-uMetaVar swapped tv1 info1 ref1 nb2 ps_ty2 non_var_ty2
+uMetaVar swapped tv1 info1 ref1 ps_ty2 non_var_ty2
   = do	{ final_ty <- checkTauTvUpdate tv1 ps_ty2	-- Occurs check + monotype check
 	; checkUpdateMeta swapped tv1 ref1 final_ty }
 
@@ -1448,7 +1477,7 @@ mkExpectedActualMsg act_ty exp_ty
 ----------------
 -- If an error happens we try to figure out whether the function
 -- function has been given too many or too few arguments, and say so.
-checkFunResCtxt fun actual_res_ty expected_res_ty tidy_env
+subCtxt mb_fun actual_res_ty expected_res_ty tidy_env
   = do	{ exp_ty' <- zonkTcType expected_res_ty
 	; act_ty' <- zonkTcType actual_res_ty
 	; let
@@ -1460,9 +1489,10 @@ checkFunResCtxt fun actual_res_ty expected_res_ty tidy_env
 	      len_act_args     = length act_args
 	      len_exp_args     = length exp_args
 
-	      message | len_exp_args < len_act_args = wrongArgsCtxt "too few"  fun
-	              | len_exp_args > len_act_args = wrongArgsCtxt "too many" fun
-		      | otherwise		    = mkExpectedActualMsg act_ty'' exp_ty''
+	      message = case mb_fun of
+			  Just fun | len_exp_args < len_act_args -> wrongArgsCtxt "too few"  fun
+			           | len_exp_args > len_act_args -> wrongArgsCtxt "too many" fun
+			  other -> mkExpectedActualMsg act_ty'' exp_ty''
 	; return (env2, message) }
 
   where
