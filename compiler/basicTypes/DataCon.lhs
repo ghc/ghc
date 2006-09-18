@@ -8,10 +8,11 @@ module DataCon (
 	DataCon, DataConIds(..),
 	ConTag, fIRST_TAG,
 	mkDataCon,
-	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
-	dataConTyVars, dataConResTys,
-	dataConStupidTheta, 
-	dataConInstArgTys, dataConOrigArgTys, dataConInstResTy,
+	dataConRepType, dataConSig, dataConFullSig,
+	dataConName, dataConTag, dataConTyCon, dataConUserType,
+	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, dataConResTys,
+	dataConEqSpec, dataConTheta, dataConStupidTheta, 
+	dataConInstArgTys, dataConOrigArgTys, 
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
 	dataConStrictMarks, dataConExStricts,
@@ -27,21 +28,25 @@ module DataCon (
 
 #include "HsVersions.h"
 
-import Type		( Type, ThetaType, substTyWith, substTy, zipOpenTvSubst,
-			  mkForAllTys, mkFunTys, mkTyConApp,
+import Type		( Type, ThetaType, 
+			  substTyWith, substTyVar, mkTopTvSubst, 
+			  mkForAllTys, mkFunTys, mkTyConApp, mkTyVarTy, mkTyVarTys, 
 			  splitTyConApp_maybe, 
 			  mkPredTys, isStrictPred, pprType
 			)
+import Coercion		( isEqPred, mkEqPred )
 import TyCon		( TyCon, FieldLabel, tyConDataCons, 
-			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon )
+			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon,
+                          isNewTyCon )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique )
 import Var		( TyVar, Id )
 import BasicTypes	( Arity, StrictnessMark(..) )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
-import ListSetOps	( assoc )
+import ListSetOps	( assoc, minusList )
 import Util		( zipEqual, zipWithEqual )
+import List		( partition )
 import Maybes           ( expectJust )
 \end{code}
 
@@ -184,68 +189,77 @@ data DataCon
 
 	-- Running example:
 	--
-	--	data Eq a => T a = forall b. Ord b => MkT a [b]
+	-- 	*** As declared by the user
+	--  data T a where
+	--    MkT :: forall x y. (Ord x) => x -> y -> T (x,y)
 
+	-- 	*** As represented internally
+	--  data T a where
+	--    MkT :: forall a. forall x y. (a:=:(x,y), Ord x) => x -> y -> T a
+	-- 
 	-- The next six fields express the type of the constructor, in pieces
 	-- e.g.
 	--
-	--	dcTyVars      = [a,b]
-	-- 	dcStupidTheta = [Eq a]
-	--	dcTheta       = [Ord b]
+	--	dcUnivTyVars  = [a]
+	--	dcExTyVars    = [x,y]
+	--	dcEqSpec      = [a:=:(x,y)]
+	--	dcTheta       = [Ord x]
 	--	dcOrigArgTys  = [a,List b]
 	--	dcTyCon       = T
-	--	dcTyArgs      = [a,b]
 
 	dcVanilla :: Bool,	-- True <=> This is a vanilla Haskell 98 data constructor
 				--	    Its type is of form
 				--	        forall a1..an . t1 -> ... tm -> T a1..an
-				-- 	    No existentials, no GADTs, nothing.
-				--
-				-- NB1: the order of the forall'd variables does matter;
-				--	for a vanilla constructor, we assume that if the result
-				--	type is (T t1 ... tn) then we can instantiate the constr
-				--	at types [t1, ..., tn]
-				--
-				-- NB2: a vanilla constructor can still be declared in GADT-style 
-				--	syntax, provided its type looks like the above.
+				-- 	    No existentials, no coercions, nothing.
+				-- That is: dcExTyVars = dcEqSpec = dcTheta = []
+		-- NB 1: newtypes always have a vanilla data con
+		-- NB 2: a vanilla constructor can still be declared in GADT-style 
+		--	 syntax, provided its type looks like the above.
+		--       The declaration format is held in the TyCon (algTcGadtSyntax)
 
-	dcTyVars :: [TyVar],	-- Universally-quantified type vars 
-				-- for the data constructor.
-		-- See NB1 on dcVanilla for the conneciton between dcTyVars and dcResTys
-		-- 
-		-- In general, the dcTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
+	dcUnivTyVars :: [TyVar],	-- Universally-quantified type vars 
+	dcExTyVars   :: [TyVar],	-- Existentially-quantified type vars 
+		-- In general, the dcUnivTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
 		-- FOR THE PARENT TyCon. With GADTs the data con might not even have 
 		-- the same number of type variables.
 		-- [This is a change (Oct05): previously, vanilla datacons guaranteed to
 		--  have the same type variables as their parent TyCon, but that seems ugly.]
 
-	dcStupidTheta  ::  ThetaType,	-- This is a "thinned" version of 
-					-- the context of the data decl.  
+	dcEqSpec :: [(TyVar,Type)],	-- Equalities derived from the result type, 
+					-- *as written by the programmer*
+		-- This field allows us to move conveniently between the two ways
+		-- of representing a GADT constructor's type:
+		--	MkT :: forall a b. (a :=: [b]) => b -> T a
+		--	MkT :: forall b. b -> T [b]
+		-- Each equality is of the form (a :=: ty), where 'a' is one of 
+		-- the universally quantified type variables
+					
+	dcTheta  :: ThetaType,		-- The context of the constructor
+		-- In GADT form, this is *exactly* what the programmer writes, even if
+		-- the context constrains only universally quantified variables
+		--	MkT :: forall a. Eq a => a -> T a
+		-- It may contain user-written equality predicates too
+
+	dcStupidTheta :: ThetaType,	-- The context of the data type declaration 
+					--	data Eq a => T a = ...
+					-- or, rather, a "thinned" version thereof
 		-- "Thinned", because the Report says
 		-- to eliminate any constraints that don't mention
 		-- tyvars free in the arg types for this constructor
 		--
-		-- "Stupid", because the dictionaries aren't used for anything.  
+		-- INVARIANT: the free tyvars of dcStupidTheta are a subset of dcUnivTyVars
+		-- Reason: dcStupidTeta is gotten by thinning the stupid theta from the tycon
 		-- 
-		-- Indeed, [as of March 02] they are no 
-		-- longer in the type of the wrapper Id, because
-		-- that makes it harder to use the wrap-id to rebuild
-		-- values after record selection or in generics.
-		--
-		-- Fact: the free tyvars of dcStupidTheta are a subset of
-		--	 the free tyvars of dcResTys
-		-- Reason: dcStupidTeta is gotten by instantiating the 
-		--	   stupid theta from the tycon (see BuildTyCl.mkDataConStupidTheta)
+		-- "Stupid", because the dictionaries aren't used for anything.  
+		-- Indeed, [as of March 02] they are no longer in the type of 
+		-- the wrapper Id, because that makes it harder to use the wrap-id 
+		-- to rebuild values after record selection or in generics.
 
-	dcTheta  :: ThetaType,		-- The existentially quantified stuff
-					
 	dcOrigArgTys :: [Type],		-- Original argument types
-					-- (before unboxing and flattening of
-					--  strict fields)
+					-- (before unboxing and flattening of strict fields)
 
 	-- Result type of constructor is T t1..tn
 	dcTyCon  :: TyCon,		-- Result tycon, T
-	dcResTys :: [Type],		-- Result type args, t1..tn
 
 	-- Now the strictness annotations and field labels of the constructor
 	dcStrictMarks :: [StrictnessMark],
@@ -266,10 +280,9 @@ data DataCon
 	dcRepStrictness :: [StrictnessMark],	-- One for each *representation* argument	
 
 	dcRepType   :: Type,	-- Type of the constructor
-				-- 	forall a b . Ord b => a -> [b] -> MkT a
+				-- 	forall a x y. (a:=:(x,y), Ord x) => x -> y -> MkT a
 				-- (this is *not* of the constructor wrapper Id:
-				--  see notes after this data type declaration)
-				--
+				--  see Note [Data con representation] below)
 	-- Notice that the existential type parameters come *second*.  
 	-- Reason: in a case expression we may find:
 	--	case (e :: T t) of { MkT b (d:Ord b) (x:t) (xs:[b]) -> ... }
@@ -321,6 +334,8 @@ fIRST_TAG :: ConTag
 fIRST_TAG =  1	-- Tags allocated from here for real constructors
 \end{code}
 
+Note [Data con representation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The dcRepType field contains the type of the representation of a contructor
 This may differ from the type of the contructor *Id* (built
 by MkId.mkDataConId) for two reasons:
@@ -379,29 +394,36 @@ instance Show DataCon where
 \begin{code}
 mkDataCon :: Name 
 	  -> Bool	-- Declared infix
-	  -> Bool	-- Vanilla (see notes with dcVanilla)
 	  -> [StrictnessMark] -> [FieldLabel]
-	  -> [TyVar] -> ThetaType -> ThetaType
-	  -> [Type] -> TyCon -> [Type]
-	  -> DataConIds
+	  -> [TyVar] -> [TyVar] 
+	  -> [(TyVar,Type)] -> ThetaType
+	  -> [Type] -> TyCon
+	  -> ThetaType -> DataConIds
 	  -> DataCon
   -- Can get the tag from the TyCon
 
-mkDataCon name declared_infix vanilla
+mkDataCon name declared_infix
 	  arg_stricts	-- Must match orig_arg_tys 1-1
 	  fields
-	  tyvars stupid_theta theta orig_arg_tys tycon res_tys
-	  ids
+	  univ_tvs ex_tvs 
+	  eq_spec theta
+	  orig_arg_tys tycon
+	  stupid_theta ids
   = con
   where
-    con = MkData {dcName = name, 
-		  dcUnique = nameUnique name, dcVanilla = vanilla,
-	  	  dcTyVars = tyvars, dcStupidTheta = stupid_theta, dcTheta = theta,
-		  dcOrigArgTys = orig_arg_tys, dcTyCon = tycon, dcResTys = res_tys,
+    is_vanilla = null ex_tvs && null eq_spec && null theta
+    con = ASSERT( is_vanilla || not (isNewTyCon tycon) )
+		-- Invariant: newtypes have a vanilla data-con
+     	  MkData {dcName = name, dcUnique = nameUnique name, 
+		  dcVanilla = is_vanilla, dcInfix = declared_infix,
+	  	  dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, 
+		  dcEqSpec = eq_spec, 
+		  dcStupidTheta = stupid_theta, dcTheta = theta,
+		  dcOrigArgTys = orig_arg_tys, dcTyCon = tycon, 
 		  dcRepArgTys = rep_arg_tys,
 		  dcStrictMarks = arg_stricts, dcRepStrictness = rep_arg_stricts,
 		  dcFields = fields, dcTag = tag, dcRepType = ty,
-		  dcIds = ids, dcInfix = declared_infix}
+		  dcIds = ids }
 
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
@@ -410,18 +432,26 @@ mkDataCon name declared_infix vanilla
 	-- The 'arg_stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
+    (more_eq_preds, dict_preds) = partition isEqPred theta
     dict_tys     = mkPredTys theta
     real_arg_tys = dict_tys                      ++ orig_arg_tys
-    real_stricts = map mk_dict_strict_mark theta ++ arg_stricts
+    real_stricts = map mk_dict_strict_mark dict_preds ++ arg_stricts
 
 	-- Representation arguments and demands
+	-- To do: eliminate duplication with MkId
     (rep_arg_stricts, rep_arg_tys) = computeRep real_stricts real_arg_tys
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
-    ty  = mkForAllTys tyvars (mkFunTys rep_arg_tys result_ty)
-		-- NB: the existential dict args are already in rep_arg_tys
+    ty  = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $ 
+	  mkFunTys (mkPredTys (eqSpecPreds eq_spec)) $
+		-- NB:	the dict args are already in rep_arg_tys
+		--	because they might be flattened..
+		--	but the equality predicates are not
+	  mkFunTys rep_arg_tys $
+	  mkTyConApp tycon (mkTyVarTys univ_tvs)
 
-    result_ty = mkTyConApp tycon res_tys
+eqSpecPreds :: [(TyVar,Type)] -> ThetaType
+eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
 
 mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
 		         | otherwise	     = NotMarkedStrict
@@ -443,8 +473,21 @@ dataConRepType = dcRepType
 dataConIsInfix :: DataCon -> Bool
 dataConIsInfix = dcInfix
 
-dataConTyVars :: DataCon -> [TyVar]
-dataConTyVars = dcTyVars
+dataConUnivTyVars :: DataCon -> [TyVar]
+dataConUnivTyVars = dcUnivTyVars
+
+dataConExTyVars :: DataCon -> [TyVar]
+dataConExTyVars = dcExTyVars
+
+dataConAllTyVars :: DataCon -> [TyVar]
+dataConAllTyVars (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs })
+  = univ_tvs ++ ex_tvs
+
+dataConEqSpec :: DataCon -> [(TyVar,Type)]
+dataConEqSpec = dcEqSpec
+
+dataConTheta :: DataCon -> ThetaType
+dataConTheta = dcTheta
 
 dataConWorkId :: DataCon -> Id
 dataConWorkId dc = case dcIds dc of
@@ -505,18 +548,41 @@ dataConRepStrictness :: DataCon -> [StrictnessMark]
 	-- Core constructor application (Con dc args)
 dataConRepStrictness dc = dcRepStrictness dc
 
-dataConSig :: DataCon -> ([TyVar], ThetaType,
-			  [Type], TyCon, [Type])
+dataConSig :: DataCon -> ([TyVar], ThetaType, [Type])
+dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
+		    dcTheta  = theta, dcOrigArgTys = arg_tys, dcTyCon = tycon})
+  = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ theta, arg_tys)
 
-dataConSig (MkData {dcTyVars = tyvars, dcTheta  = theta,
-		    dcOrigArgTys = arg_tys, dcTyCon = tycon, dcResTys = res_tys})
-  = (tyvars, theta, arg_tys, tycon, res_tys)
+dataConFullSig :: DataCon 
+	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, [Type])
+dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
+			dcTheta  = theta, dcOrigArgTys = arg_tys, dcTyCon = tycon})
+  = (univ_tvs, ex_tvs, eq_spec, theta, arg_tys)
 
 dataConStupidTheta :: DataCon -> ThetaType
 dataConStupidTheta dc = dcStupidTheta dc
 
 dataConResTys :: DataCon -> [Type]
-dataConResTys dc = dcResTys dc
+dataConResTys dc = [substTyVar env tv | tv <- dcUnivTyVars dc]
+  where
+    env = mkTopTvSubst (dcEqSpec dc)
+
+dataConUserType :: DataCon -> Type
+-- The user-declared type of the data constructor
+-- in the nice-to-read form 
+--	T :: forall a. a -> T [a]
+-- rather than
+--	T :: forall b. forall a. (a=[b]) => a -> T b
+dataConUserType  (MkData { dcUnivTyVars = univ_tvs, 
+			   dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
+			   dcTheta = theta, dcOrigArgTys = arg_tys,
+			   dcTyCon = tycon })
+  = mkForAllTys ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs) $
+    mkFunTys (mkPredTys theta) $
+    mkFunTys arg_tys $
+    mkTyConApp tycon (map (substTyVar subst) univ_tvs)
+  where
+    subst = mkTopTvSubst eq_spec
 
 dataConInstArgTys :: DataCon
 	      	  -> [Type] 	-- Instantiated at these types
@@ -525,22 +591,23 @@ dataConInstArgTys :: DataCon
 				-- NB: these INCLUDE the existentially quantified dict args
 				--     but EXCLUDE the data-decl context which is discarded
 				-- It's all post-flattening etc; this is a representation type
-dataConInstArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars}) inst_tys
+dataConInstArgTys (MkData {dcRepArgTys = arg_tys, 
+			   dcUnivTyVars = univ_tvs, 
+			   dcExTyVars = ex_tvs}) inst_tys
  = ASSERT( length tyvars == length inst_tys )
    map (substTyWith tyvars inst_tys) arg_tys
-
-dataConInstResTy :: DataCon -> [Type] -> Type
-dataConInstResTy (MkData {dcTyVars = tyvars, dcTyCon = tc, dcResTys = res_tys}) inst_tys
- = ASSERT( length tyvars == length inst_tys )
-   substTy (zipOpenTvSubst tyvars inst_tys) (mkTyConApp tc res_tys)
-	-- res_tys can't currently contain any foralls,
-	-- but might in future; hence zipOpenTvSubst
+ where
+   tyvars = univ_tvs ++ ex_tvs
 
 -- And the same deal for the original arg tys
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
-dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars}) inst_tys
+dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys,
+			       dcUnivTyVars = univ_tvs, 
+			       dcExTyVars = ex_tvs}) inst_tys
  = ASSERT( length tyvars == length inst_tys )
    map (substTyWith tyvars inst_tys) arg_tys
+ where
+   tyvars = univ_tvs ++ ex_tvs
 \end{code}
 
 These two functions get the real argument types of the constructor,

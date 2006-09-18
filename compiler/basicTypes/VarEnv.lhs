@@ -20,7 +20,8 @@ module VarEnv (
 
 	-- InScopeSet
 	InScopeSet, emptyInScopeSet, mkInScopeSet, delInScopeSet,
-	extendInScopeSet, extendInScopeSetList, modifyInScopeSet,
+	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
+	modifyInScopeSet,
 	getInScopeVars, lookupInScope, elemInScopeSet, uniqAway, 
 	mapInScopeSet,
 
@@ -79,6 +80,10 @@ extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
    = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
 		    (n +# iUnbox (length vs))
+
+extendInScopeSetSet :: InScopeSet -> VarEnv Var -> InScopeSet
+extendInScopeSetSet (InScope in_scope n) vs
+   = InScope (in_scope `plusVarEnv` vs) (n +# iUnbox (sizeUFM vs))
 
 modifyInScopeSet :: InScopeSet -> Var -> Var -> InScopeSet
 -- Exploit the fact that the in-scope "set" is really a map

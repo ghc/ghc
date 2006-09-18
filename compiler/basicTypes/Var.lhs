@@ -12,8 +12,11 @@ module Var (
 	-- TyVars
 	TyVar, mkTyVar, mkTcTyVar,
 	tyVarName, tyVarKind,
-	setTyVarName, setTyVarUnique,
+	setTyVarName, setTyVarUnique, setTyVarKind,
 	tcTyVarDetails,
+
+        -- CoVars
+        CoVar, coVarName, setCoVarUnique, setCoVarName, mkCoVar, isCoVar,
 
 	-- Ids
 	Id, DictId,
@@ -32,14 +35,13 @@ module Var (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TypeRep( Type )
+import {-# SOURCE #-}	TypeRep( Type, Kind, isCoSuperKind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, IdInfo, seqIdInfo )
 
 import Name		( Name, NamedThing(..),
 			  setNameUnique, nameUnique
 			)
-import Kind		( Kind )
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey# )
 import FastTypes
 import Outputable
@@ -68,19 +70,23 @@ data Var
 	tyVarKind :: Kind }
 
   | TcTyVar { 				-- Used only during type inference
+					-- Used for kind variables during 
+					-- inference, as well
 	varName        :: !Name,
 	realUnique     :: FastInt,
 	tyVarKind      :: Kind,
 	tcTyVarDetails :: TcTyVarDetails }
 
   | GlobalId { 			-- Used for imported Ids, dict selectors etc
+ 				-- See Note [GlobalId/LocalId] below
 	varName    :: !Name,	-- Always an External or WiredIn Name
 	realUnique :: FastInt,
    	idType     :: Type,
 	idInfo     :: IdInfo,
 	gblDetails :: GlobalIdDetails }
 
-  | LocalId { 			-- Used for locally-defined Ids (see NOTE below)
+  | LocalId { 			-- Used for locally-defined Ids 
+				-- See Note [GlobalId/LocalId] below
 	varName    :: !Name,
 	realUnique :: FastInt,
    	idType     :: Type,
@@ -94,17 +100,20 @@ data LocalIdDetails
   -- NotExported things may be discarded as dead code.
 \end{code}
 
-LocalId and GlobalId
-~~~~~~~~~~~~~~~~~~~~
+Note [GlobalId/LocalId]
+~~~~~~~~~~~~~~~~~~~~~~~
 A GlobalId is
   * always a constant (top-level)
   * imported, or data constructor, or primop, or record selector
   * has a Unique that is globally unique across the whole
     GHC invocation (a single invocation may compile multiple modules)
+  * never treated as a candidate by the free-variable finder;
+	it's a constant!
 
 A LocalId is 
   * bound within an expression (lambda, case, local let(rec))
   * or defined at top level in the module being compiled
+  * always treated as a candidate by the free-variable finder
 
 After CoreTidy, top-level LocalIds are turned into GlobalIds
  
@@ -169,6 +178,9 @@ tyVarName = varName
 
 setTyVarUnique = setVarUnique
 setTyVarName   = setVarName
+
+setTyVarKind :: TyVar -> Kind -> TyVar
+setTyVarKind tv k = tv {tyVarKind = k}
 \end{code}
 
 \begin{code}
@@ -187,6 +199,26 @@ mkTcTyVar name kind details
 	}
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Coercion variables}
+%*									*
+%************************************************************************
+
+\begin{code}
+type CoVar = Var	-- A coercion variable is simply a type 
+			-- variable of kind (ty1 :=: ty2)
+coVarName = varName
+
+setCoVarUnique = setVarUnique
+setCoVarName   = setVarName
+
+mkCoVar :: Name -> Kind -> CoVar
+mkCoVar name kind = mkTyVar name kind
+
+isCoVar :: TyVar -> Bool
+isCoVar ty = isCoSuperKind (tyVarKind ty)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -246,11 +278,9 @@ modifyIdInfo fn id
     new_info = fn (idInfo id)
 
 -- maybeModifyIdInfo tries to avoid unnecesary thrashing
-maybeModifyIdInfo :: (IdInfo -> Maybe IdInfo) -> Id -> Id
-maybeModifyIdInfo fn id
-  = case fn (idInfo id) of
-	Nothing       -> id
-	Just new_info -> id {idInfo = new_info}
+maybeModifyIdInfo :: Maybe IdInfo -> Id -> Id
+maybeModifyIdInfo (Just new_info) id = id {idInfo = new_info}
+maybeModifyIdInfo Nothing	  id = id
 \end{code}
 
 %************************************************************************

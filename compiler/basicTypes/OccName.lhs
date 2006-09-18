@@ -28,6 +28,7 @@ module OccName (
 
 	-- ** Derived OccNames
 	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
+        mkNewTyCoOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
@@ -425,7 +426,7 @@ mk_deriv occ_sp sys_prefix str = mkOccName occ_sp (sys_prefix ++ str)
 mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
-	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc
+	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
@@ -440,6 +441,7 @@ mkDictOcc	    = mk_simple_deriv varName  "$d"
 mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
+mkNewTyCoOcc        = mk_simple_deriv tcName  "Co"
 
 -- Generic derivable classes
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"

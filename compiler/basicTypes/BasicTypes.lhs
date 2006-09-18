@@ -31,6 +31,8 @@ module BasicTypes(
 
 	TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
+	OverlapFlag(..), 
+
 	Boxity(..), isBoxed, 
 
 	TupCon(..), tupleParens,
@@ -217,7 +219,7 @@ instance Outputable TopLevelFlag where
 
 %************************************************************************
 %*									*
-\subsection[Top-level/local]{Top-level/not-top level flag}
+		Top-level/not-top level flag
 %*									*
 %************************************************************************
 
@@ -235,7 +237,7 @@ isBoxed Unboxed = False
 
 %************************************************************************
 %*									*
-\subsection[Recursive/Non-Recursive]{Recursive/Non-Recursive flag}
+		Recursive/Non-Recursive flag
 %*									*
 %************************************************************************
 
@@ -259,6 +261,46 @@ boolToRecFlag False = NonRecursive
 instance Outputable RecFlag where
   ppr Recursive    = ptext SLIT("Recursive")
   ppr NonRecursive = ptext SLIT("NonRecursive")
+\end{code}
+
+%************************************************************************
+%*									*
+		Instance overlap flag
+%*									*
+%************************************************************************
+
+\begin{code}
+data OverlapFlag
+  = NoOverlap	-- This instance must not overlap another
+
+  | OverlapOk	-- Silently ignore this instance if you find a 
+		-- more specific one that matches the constraint
+		-- you are trying to resolve
+		--
+		-- Example: constraint (Foo [Int])
+		-- 	    instances  (Foo [Int])
+		--		       (Foo [a])	OverlapOk
+		-- Since the second instance has the OverlapOk flag,
+		-- the first instance will be chosen (otherwise 
+		-- its ambiguous which to choose)
+
+  | Incoherent	-- Like OverlapOk, but also ignore this instance 
+		-- if it doesn't match the constraint you are
+		-- trying to resolve, but could match if the type variables
+		-- in the constraint were instantiated
+		--
+		-- Example: constraint (Foo [b])
+		--	    instances  (Foo [Int])	Incoherent
+		--		       (Foo [a])
+		-- Without the Incoherent flag, we'd complain that
+		-- instantiating 'b' would change which instance 
+		-- was chosen
+
+instance Outputable OverlapFlag where
+   ppr NoOverlap  = empty
+   ppr OverlapOk  = ptext SLIT("[overlap ok]")
+   ppr Incoherent = ptext SLIT("[incoherent]")
+
 \end{code}
 
 %************************************************************************

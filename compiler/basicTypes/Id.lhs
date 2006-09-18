@@ -525,8 +525,8 @@ clearOneShotLambda id
 
 \begin{code}
 zapLamIdInfo :: Id -> Id
-zapLamIdInfo id = maybeModifyIdInfo zapLamInfo id
+zapLamIdInfo id = maybeModifyIdInfo (zapLamInfo (idInfo id)) id
 
-zapDemandIdInfo id = maybeModifyIdInfo zapDemandInfo id
+zapDemandIdInfo id = maybeModifyIdInfo (zapDemandInfo (idInfo id)) id
 \end{code}
 

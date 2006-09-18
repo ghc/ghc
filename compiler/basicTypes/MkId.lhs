@@ -20,7 +20,7 @@ module MkId (
 	mkRecordSelId, 
 	mkPrimOpId, mkFCallId,
 
-	mkReboxingAlt, mkNewTypeBody,
+	mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
 
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds, ghcPrimIds,
@@ -46,6 +46,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes )
+import Coercion         ( mkSymCoercion, mkUnsafeCoercion )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, 
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
@@ -56,7 +57,8 @@ import CoreUtils	( exprType )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
-                          tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
+                          tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon,
+                          newTyConCo, tyConArity )
 import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
@@ -64,7 +66,7 @@ import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
 import OccName		( mkOccNameFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
-import DataCon		( DataCon, DataConIds(..), dataConTyVars,
+import DataCon		( DataCon, DataConIds(..), dataConTyCon, dataConUnivTyVars,
 			  dataConFieldLabels, dataConRepArity, dataConResTys,
 			  dataConRepArgTys, dataConRepType, 
 			  dataConSig, dataConStrictMarks, dataConExStricts, 
@@ -184,8 +186,6 @@ Notice that
 
 \begin{code}
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
-	-- Makes the *worker* for the data constructor; that is, the function
-	-- that takes the reprsentation arguments and builds the constructor.
 mkDataConIds wrap_name wkr_name data_con
   | isNewTyCon tycon
   = NewDC nt_wrap_id
@@ -196,18 +196,23 @@ mkDataConIds wrap_name wkr_name data_con
   | otherwise					-- Algebraic, no wrapper
   = AlgDC Nothing wrk_id
   where
-    (tyvars, theta, orig_arg_tys, tycon, res_tys) = dataConSig data_con
+    (tvs, theta, orig_arg_tys) = dataConSig data_con
+    tycon       = dataConTyCon data_con
 
     dict_tys    = mkPredTys theta
     all_arg_tys = dict_tys ++ orig_arg_tys
-    result_ty   = mkTyConApp tycon res_tys
+    tycon_args  = dataConUnivTyVars data_con
+    result_ty_args = (mkTyVarTys tycon_args)
+    result_ty   = mkTyConApp tycon result_ty_args
 
-    wrap_ty = mkForAllTys tyvars (mkFunTys all_arg_tys result_ty)
+    wrap_ty = mkForAllTys tvs (mkFunTys all_arg_tys result_ty)
 	-- We used to include the stupid theta in the wrapper's args
 	-- but now we don't.  Instead the type checker just injects these
 	-- extra constraints where necessary.
 
 	----------- Worker (algebraic data types only) --------------
+	-- The *worker* for the data constructor is the function that
+	-- takes the representation arguments and builds the constructor.
     wrk_id = mkGlobalId (DataConWorkId data_con) wkr_name
 	 		(dataConRepType data_con) wkr_info
 
@@ -253,8 +258,9 @@ mkDataConIds wrap_name wkr_name data_con
 	  	   -- No existentials on a newtype, but it can have a context
 	  	   -- e.g. 	newtype Eq a => T a = MkT (...)
 	  	   mkCompulsoryUnfolding $ 
-	  	   mkLams tyvars $ Lam id_arg1 $ 
-	  	   mkNewTypeBody tycon result_ty (Var id_arg1)
+	  	   mkLams tvs $ Lam id_arg1 $ 
+	  	   wrapNewTypeBody tycon result_ty_args
+                       (Var id_arg1)
 
     id_arg1 = mkTemplateLocal 1 (head orig_arg_tys)
 
@@ -282,14 +288,14 @@ mkDataConIds wrap_name wkr_name data_con
 	-- we want to see that w is strict in its two arguments
 
     alg_unf = mkTopUnfolding $ Note InlineMe $
-	      mkLams tyvars $ 
+	      mkLams tvs $ 
 	      mkLams dict_args $ mkLams id_args $
 	      foldr mk_case con_app 
 		    (zip (dict_args ++ id_args) all_strict_marks)
 		    i3 []
 
     con_app i rep_ids = mkApps (Var wrk_id)
-			       (map varToCoreExpr (tyvars ++ reverse rep_ids))
+			       (map varToCoreExpr (tvs ++ reverse rep_ids))
 
     (dict_args,i2) = mkLocals 1  dict_tys
     (id_args,i3)   = mkLocals i2 orig_arg_tys
@@ -391,11 +397,13 @@ We obviously can't define
 Nevertheless we *do* put a RecordSelId into the type environment
 so that if the user tries to use 'x' as a selector we can bleat
 helpfully, rather than saying unhelpfully that 'x' is not in scope.
-Hence the sel_naughty flag, to identify record selcectors that don't really exist.
+Hence the sel_naughty flag, to identify record selectors that don't really exist.
 
 In general, a field is naughty if its type mentions a type variable that
 isn't in the result type of the constructor.
 
+Note [GADT record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For GADTs, we require that all constructors with a common field 'f' have the same
 result type (modulo alpha conversion).  [Checked in TcTyClsDecls.checkValidTyCon]
 E.g. 
@@ -424,7 +432,7 @@ mkRecordSelId tycon field_label
   | is_naughty = naughty_id
   | otherwise  = sel_id
   where
-    is_naughty = not (tyVarsOfType field_ty `subVarSet` tyvar_set)
+    is_naughty = not (tyVarsOfType field_ty `subVarSet` res_tv_set)
     sel_id_details = RecordSelId tycon field_label is_naughty
 
     -- Escapist case here for naughty construcotrs
@@ -440,8 +448,8 @@ mkRecordSelId tycon field_label
 
     con1	= head data_cons_w_field
     res_tys	= dataConResTys con1
-    tyvar_set	= tyVarsOfTypes res_tys
-    tyvars	= varSetElems tyvar_set
+    res_tv_set	= tyVarsOfTypes res_tys
+    res_tvs	= varSetElems res_tv_set
     data_ty	= mkTyConApp tycon res_tys
     field_ty	= dataConFieldType con1 field_label
     
@@ -475,7 +483,7 @@ mkRecordSelId tycon field_label
 	--	op (R op) = op
 
     selector_ty :: Type
-    selector_ty  = mkForAllTys tyvars $ mkForAllTys field_tyvars $
+    selector_ty  = mkForAllTys res_tvs $ mkForAllTys field_tyvars $
 		   mkFunTys stupid_dict_tys  $  mkFunTys field_dict_tys $
 		   mkFunTy data_ty field_tau
       
@@ -515,11 +523,13 @@ mkRecordSelId tycon field_label
     caf_info    | no_default = NoCafRefs
 	        | otherwise  = MayHaveCafRefs
 
-    sel_rhs = mkLams tyvars   $ mkLams field_tyvars $ 
+    sel_rhs = mkLams res_tvs $ mkLams field_tyvars $ 
 	      mkLams stupid_dict_ids $ mkLams field_dict_ids $
-	      Lam data_id     $ sel_body
+	      Lam data_id     $ mk_result sel_body
 
-    sel_body | isNewTyCon tycon = mk_result (mkNewTypeBody tycon field_ty (Var data_id))
+	-- NB: A newtype always has a vanilla DataCon; no existentials etc
+	--     res_tys will simply be the dataConUnivTyVars
+    sel_body | isNewTyCon tycon = unwrapNewTypeBody tycon res_tys (Var data_id)
 	     | otherwise	= Case (Var data_id) data_id field_tau (default_alt ++ the_alts)
 
     mk_result poly_result = mkVarApps (mkVarApps poly_result field_tyvars) field_dict_ids
@@ -533,18 +543,17 @@ mkRecordSelId tycon field_label
     mk_alt data_con 
       = 	-- In the non-vanilla case, the pattern must bind type variables and
 		-- the context stuff; hence the arg_prefix binding below
-	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids)
-			(mk_result (Var the_arg_id))
+	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) (Var the_arg_id)
       where
 	(arg_prefix, arg_ids)
 	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
 	   = ([], mkTemplateLocalsNum arg_base (dataConInstOrigArgTys data_con res_tys))
 	   | otherwise		-- The case pattern binds type variables, which are used
 				-- in the types of the arguments of the pattern
-	   = (dc_tyvars ++ mkTemplateLocalsNum arg_base (mkPredTys dc_theta),
+	   = (dc_tvs ++ mkTemplateLocalsNum arg_base (mkPredTys dc_theta),
 	      mkTemplateLocalsNum arg_base' dc_arg_tys)
 
-	(dc_tyvars, dc_theta, dc_arg_tys, _, _) = dataConSig data_con
+	(dc_tvs, dc_theta, dc_arg_tys) = dataConSig data_con
 	arg_base' = arg_base + length dc_theta
 
 	unpack_base = arg_base' + length dc_arg_tys
@@ -602,12 +611,17 @@ mkReboxingAlt us con args rhs
     go (arg:args) (str:stricts) us
       | isMarkedUnboxed str
       = let
-	  (_, tycon_args, pack_con, con_arg_tys)
-	 	 = splitProductType "mkReboxingAlt" (idType arg)
+          ty = idType arg
+          
+	  (tycon, tycon_args, pack_con, con_arg_tys)
+	 	 = splitProductType "mkReboxingAlt" ty
 
 	  unpacked_args  = zipWith (mkSysLocal FSLIT("rb")) us con_arg_tys
 	  (binds, args') = go args stricts (dropList con_arg_tys us)
-	  con_app	 = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
+	  con_app | isNewTyCon tycon = ASSERT( isSingleton unpacked_args )
+				       wrapNewTypeBody tycon tycon_args (Var (head unpacked_args))
+					-- ToDo: is this right?  Jun06
+		  | otherwise = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
 	in
 	(NonRec arg con_app : binds, unpacked_args ++ args')
 
@@ -672,26 +686,58 @@ mkDictSelId name clas
 
     tycon      = classTyCon clas
     [data_con] = tyConDataCons tycon
-    tyvars     = dataConTyVars data_con
-    arg_tys    = dataConRepArgTys data_con
+    tyvars     = dataConUnivTyVars data_con
+    arg_tys    = ASSERT( isVanillaDataCon data_con ) dataConRepArgTys data_con
     the_arg_id = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` arg_ids) name
 
     pred	      = mkClassPred clas (mkTyVarTys tyvars)
     (dict_id:arg_ids) = mkTemplateLocals (mkPredTy pred : arg_tys)
 
-    rhs | isNewTyCon tycon = mkLams tyvars $ Lam dict_id $ 
-			     mkNewTypeBody tycon (head arg_tys) (Var dict_id)
-	| otherwise	   = mkLams tyvars $ Lam dict_id $
-			     Case (Var dict_id) dict_id (idType the_arg_id)
-			     	  [(DataAlt data_con, arg_ids, Var the_arg_id)]
+    rhs = mkLams tyvars (Lam dict_id rhs_body)
+    rhs_body | isNewTyCon tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
+	     | otherwise	= Case (Var dict_id) dict_id (idType the_arg_id)
+			     	       [(DataAlt data_con, arg_ids, Var the_arg_id)]
 
-mkNewTypeBody tycon result_ty result_expr
-	-- Adds a coerce where necessary
-	-- Used for both wrapping and unwrapping
-  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
-  = Note (Coerce result_ty (exprType result_expr)) result_expr
-  | otherwise			-- Normal case
-  = result_expr
+wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+-- The wrapper for the data constructor for a newtype looks like this:
+--	newtype T a = MkT (a,Int)
+--	MkT :: forall a. (a,Int) -> T a
+--	MkT = /\a. \(x:(a,Int)). x `cast` CoT a
+-- where CoT is the coercion TyCon assoicated with the newtype
+--
+-- The call (wrapNewTypeBody T [a] e) returns the
+-- body of the wrapper, namely
+--	e `cast` CoT [a]
+--
+-- For non-recursive newtypes, GHC currently treats them like type
+-- synonyms, so no cast is necessary.  This function is the only
+-- place in the compiler that generates 
+--
+wrapNewTypeBody tycon args result_expr
+--  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
+  = Cast result_expr co
+--  | otherwise
+--  = result_expr
+  where
+    co = mkTyConApp (newTyConCo tycon) args
+
+unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+unwrapNewTypeBody tycon args result_expr
+--  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
+  = Cast result_expr sym_co
+--  | otherwise
+--  = result_expr
+  where
+    sym_co = mkSymCoercion co
+    co     = mkTyConApp (newTyConCo tycon) args
+
+-- Old Definition of mkNewTypeBody
+-- Used for both wrapping and unwrapping
+--mkNewTypeBody tycon result_ty result_expr
+--  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
+--  = Note (Coerce result_ty (exprType result_expr)) result_expr
+--  | otherwise			-- Normal case
+--  = result_expr
 \end{code}
 
 
@@ -882,7 +928,8 @@ unsafeCoerceId
 		      (mkFunTy openAlphaTy openBetaTy)
     [x] = mkTemplateLocals [openAlphaTy]
     rhs = mkLams [openAlphaTyVar,openBetaTyVar,x] $
-	  Note (Coerce openBetaTy openAlphaTy) (Var x)
+--       Note (Coerce openBetaTy openAlphaTy) (Var x)
+         Cast (Var x) (mkUnsafeCoercion openAlphaTy openBetaTy)
 
 -- nullAddr# :: Addr#
 -- The reason is is here is because we don't provide 
