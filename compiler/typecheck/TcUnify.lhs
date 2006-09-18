@@ -339,7 +339,7 @@ withBox kind thing_inside
 \begin{code}
 preSubType :: [TcTyVar]		-- Quantified type variables
 	   -> TcTyVarSet	-- Subset of quantified type variables
-				-- that can be instantiated with boxy types
+				--   see Note [Pre-sub boxy]
 	    -> TcType		-- The rho-type part; quantified tyvars scopes over this
 	    -> BoxySigmaType	-- Matching type from the context
 	    -> TcM [TcType]	-- Types to instantiate the tyvars
@@ -348,13 +348,17 @@ preSubType :: [TcTyVar]		-- Quantified type variables
 --	info from the pre-subsumption, if there is any
 --	a boxy type variable otherwise
 --
--- The 'btvs' are a subset of 'qtvs'.  They are the ones we can
--- instantiate to a boxy type variable, because they'll definitely be
--- filled in later.  This isn't always the case; sometimes we have type 
--- variables mentioned in the context of the type, but not the body; 
---		f :: forall a b. C a b => a -> a
--- Then we may land up with an unconstrained 'b', so we want to 
--- instantiate it to a monotype (non-boxy) type variable
+-- Note [Pre-sub boxy]
+--   The 'btvs' are a subset of 'qtvs'.  They are the ones we can
+--   instantiate to a boxy type variable, because they'll definitely be
+--   filled in later.  This isn't always the case; sometimes we have type 
+--   variables mentioned in the context of the type, but not the body; 
+-- 		  f :: forall a b. C a b => a -> a
+--   Then we may land up with an unconstrained 'b', so we want to 
+--   instantiate it to a monotype (non-boxy) type variable
+--
+-- The 'qtvs' that are *neither* fixed by the pre-subsumption, *nor* are in 'btvs',
+-- are instantiated to TauTv meta variables.
 	
 preSubType qtvs btvs qty expected_ty
   = do { tys <- mapM inst_tv qtvs
