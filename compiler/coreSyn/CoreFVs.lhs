@@ -157,6 +157,7 @@ expr_fvs (Lit lit)	 = noVars
 expr_fvs (Note _ expr)   = expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
+expr_fvs (Cast expr co)  = expr_fvs expr `union` someVars (tyVarsOfType co)
 
 expr_fvs (Case scrut bndr ty alts)
   = expr_fvs scrut `union` someVars (tyVarsOfType ty) `union` addBndr bndr  
@@ -217,7 +218,8 @@ exprFreeNames e
     go (Type ty)   	    = tyClsNamesOfType ty	-- Don't need free tyvars
     go (App e1 e2) 	    = go e1 `unionNameSets` go e2
     go (Lam v e)   	    = go e `delFromNameSet` varName v
-    go (Note n e)  	    = go e   
+    go (Note n e)  	    = go e  
+    go (Cast e co)          = go e `unionNameSets` tyClsNamesOfType co
     go (Let (NonRec b r) e) = go e `unionNameSets` go r
     go (Let (Rec prs) e)    = exprsFreeNames (map snd prs) `unionNameSets` go e
     go (Case e b ty as)     = go e `unionNameSets` tyClsNamesOfType ty 
@@ -404,13 +406,12 @@ freeVars (Let (Rec binds) body)
     body2     = freeVars body
     body_fvs  = freeVarsOf body2
 
-freeVars (Note (Coerce to_ty from_ty) expr)
-  = (freeVarsOf expr2 `unionFVs` tfvs1 `unionFVs` tfvs2,
-     AnnNote (Coerce to_ty from_ty) expr2)
+
+freeVars (Cast expr co)
+  = (freeVarsOf expr2 `unionFVs` cfvs, AnnCast expr2 co)
   where
-    expr2  = freeVars expr
-    tfvs1  = tyVarsOfType from_ty
-    tfvs2  = tyVarsOfType to_ty
+    expr2 = freeVars expr
+    cfvs  = tyVarsOfType co
 
 freeVars (Note other_note expr)
   = (freeVarsOf expr2, AnnNote other_note expr2)

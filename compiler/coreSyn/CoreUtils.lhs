@@ -6,7 +6,7 @@
 \begin{code}
 module CoreUtils (
 	-- Construction
-	mkInlineMe, mkSCC, mkCoerce, mkCoerce2,
+	mkInlineMe, mkSCC, mkCoerce, 
 	bindNonRec, needsCaseBinding,
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
@@ -42,7 +42,7 @@ import GLAEXTS		-- For `xori`
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
-import Var		( Var )
+import Var		( Var, TyVar )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName )
@@ -51,8 +51,9 @@ import Packages		( isDllName )
 #endif
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
-import DataCon		( DataCon, dataConRepArity, dataConInstArgTys,
-			  isVanillaDataCon, dataConTyCon )
+import DataCon		( DataCon, dataConRepArity, 
+			  isVanillaDataCon, dataConTyCon, dataConRepArgTys,
+                          dataConUnivTyVars )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
@@ -65,8 +66,12 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  splitFunTy, tcEqTypeX,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitRecNewType_maybe, 
-			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy
+			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy,
+                          substTyWith
 			)
+import Coercion         ( Coercion, mkTransCoercion, coercionKind,
+                          splitRecNewTypeCo_maybe, mkSymCoercion, mkLeftCoercion,
+                          mkRightCoercion, decomposeCo, coercionKindTyConApp )
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -93,7 +98,8 @@ exprType (Var var)		= idType var
 exprType (Lit lit)		= literalType lit
 exprType (Let _ body)	   	= exprType body
 exprType (Case _ _ ty alts)     = ty
-exprType (Note (Coerce ty _) e) = ty  --  **! should take usage from e
+exprType (Cast e co) 
+  = let (_, ty) = coercionKind co in ty
 exprType (Note other_note e)    = exprType e
 exprType (Lam binder expr)      = mkPiType binder (exprType expr)
 exprType e@(App _ _)
@@ -145,7 +151,7 @@ applyTypeToArgs e op_ty (Type ty : args)
 applyTypeToArgs e op_ty (other_arg : args)
   = case (splitFunTy_maybe op_ty) of
 	Just (_, res_ty) -> applyTypeToArgs e res_ty args
-	Nothing -> pprPanic "applyTypeToArgs" (pprCoreExpr e)
+	Nothing -> pprPanic "applyTypeToArgs" (pprCoreExpr e $$ ppr op_ty)
 \end{code}
 
 
@@ -161,7 +167,6 @@ mkNote removes redundant coercions, and SCCs where possible
 \begin{code}
 #ifdef UNUSED
 mkNote :: Note -> CoreExpr -> CoreExpr
-mkNote (Coerce to_ty from_ty) expr = mkCoerce2 to_ty from_ty expr
 mkNote (SCC cc)	expr		   = mkSCC cc expr
 mkNote InlineMe expr		   = mkInlineMe expr
 mkNote note     expr		   = Note note expr
@@ -197,18 +202,20 @@ mkInlineMe e	   = Note InlineMe e
 
 
 \begin{code}
-mkCoerce :: Type -> CoreExpr -> CoreExpr
-mkCoerce to_ty expr = mkCoerce2 to_ty (exprType expr) expr
+mkCoerce :: Coercion -> CoreExpr -> CoreExpr
+mkCoerce co (Cast expr co2)
+  = ASSERT(let { (from_ty, to_ty) = coercionKind co; 
+                 (from_ty2, to_ty2) = coercionKind co2} in
+           from_ty `coreEqType` to_ty2 )
+    mkCoerce (mkTransCoercion co2 co) expr
 
-mkCoerce2 :: Type -> Type -> CoreExpr -> CoreExpr
-mkCoerce2 to_ty from_ty (Note (Coerce to_ty2 from_ty2) expr)
-  = ASSERT( from_ty `coreEqType` to_ty2 )
-    mkCoerce2 to_ty from_ty2 expr
-
-mkCoerce2 to_ty from_ty expr
-  | to_ty `coreEqType` from_ty = expr
-  | otherwise	  	   = ASSERT( from_ty `coreEqType` exprType expr )
-			     Note (Coerce to_ty from_ty) expr
+mkCoerce co expr 
+  = let (from_ty, to_ty) = coercionKind co in
+--    if to_ty `coreEqType` from_ty
+--    then expr
+--    else 
+        ASSERT2(from_ty `coreEqType` (exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ ppr (coercionKindTyConApp co))
+         (Cast expr co)
 \end{code}
 
 \begin{code}
@@ -219,6 +226,7 @@ mkSCC cc (Lit lit)  	    = Lit lit
 mkSCC cc (Lam x e)  	    = Lam x (mkSCC cc e)  -- Move _scc_ inside lambda
 mkSCC cc (Note (SCC cc') e) = Note (SCC cc) (Note (SCC cc') e)
 mkSCC cc (Note n e) 	    = Note n (mkSCC cc e) -- Move _scc_ inside notes
+mkSCC cc (Cast e co)        = Cast (mkSCC cc e) co -- Move _scc_ inside cast
 mkSCC cc expr	    	    = Note (SCC cc) expr
 \end{code}
 
@@ -256,7 +264,7 @@ mkAltExpr :: AltCon -> [CoreBndr] -> [Type] -> CoreExpr
 	-- This guy constructs the value that the scrutinee must have
 	-- when you are in one particular branch of a case
 mkAltExpr (DataAlt con) args inst_tys
-  = mkConApp con (map Type inst_tys ++ map varToCoreExpr args)
+  = mkConApp con (map Type inst_tys ++ varsToCoreExprs args)
 mkAltExpr (LitAlt lit) [] []
   = Lit lit
 
@@ -353,6 +361,7 @@ exprIsTrivial (Lit lit)    = litIsTrivial lit
 exprIsTrivial (App e arg)  = not (isRuntimeArg arg) && exprIsTrivial e
 exprIsTrivial (Note (SCC _) e) = False		-- See notes above
 exprIsTrivial (Note _       e) = exprIsTrivial e
+exprIsTrivial (Cast e co)  = exprIsTrivial e
 exprIsTrivial (Lam b body) = not (isRuntimeVar b) && exprIsTrivial body
 exprIsTrivial other	   = False
 \end{code}
@@ -375,6 +384,7 @@ exprIsDupable (Var v)	     	= True
 exprIsDupable (Lit lit)      	= litIsDupable lit
 exprIsDupable (Note InlineMe e) = True
 exprIsDupable (Note _ e)        = exprIsDupable e
+exprIsDupable (Cast e co)       = exprIsDupable e
 exprIsDupable expr	     
   = go expr 0
   where
@@ -423,6 +433,7 @@ exprIsCheap (Type _)          = True
 exprIsCheap (Var _)           = True
 exprIsCheap (Note InlineMe e) = True
 exprIsCheap (Note _ e)        = exprIsCheap e
+exprIsCheap (Cast e co)       = exprIsCheap e
 exprIsCheap (Lam x e)         = isRuntimeVar x || exprIsCheap e
 exprIsCheap (Case e _ _ alts) = exprIsCheap e && 
 				and [exprIsCheap rhs | (_,_,rhs) <- alts]
@@ -513,10 +524,11 @@ side effects, and can't diverge or raise an exception.
 
 \begin{code}
 exprOkForSpeculation :: CoreExpr -> Bool
-exprOkForSpeculation (Lit _)    = True
-exprOkForSpeculation (Type _)   = True
-exprOkForSpeculation (Var v)    = isUnLiftedType (idType v)
-exprOkForSpeculation (Note _ e) = exprOkForSpeculation e
+exprOkForSpeculation (Lit _)     = True
+exprOkForSpeculation (Type _)    = True
+exprOkForSpeculation (Var v)     = isUnLiftedType (idType v)
+exprOkForSpeculation (Note _ e)  = exprOkForSpeculation e
+exprOkForSpeculation (Cast e co) = exprOkForSpeculation e
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
 	(Var f, args) -> spec_ok (globalIdDetails f) args
@@ -567,6 +579,7 @@ exprIsBottom e = go 0 e
 	       where
 		-- n is the number of args
 		 go n (Note _ e)     = go n e
+                 go n (Cast e co)    = go n e
 		 go n (Let _ e)      = go n e
 		 go n (Case e _ _ _) = go 0 e	-- Just check the scrut
 		 go n (App e _)      = go (n+1) e
@@ -618,6 +631,7 @@ exprIsHNF (Type ty)	     = True	-- Types are honorary Values;
 					-- we don't mind copying them
 exprIsHNF (Lam b e)  	     = isRuntimeVar b || exprIsHNF e
 exprIsHNF (Note _ e) 	     = exprIsHNF e
+exprIsHNF (Cast e co)        = exprIsHNF e
 exprIsHNF (App e (Type _)) = exprIsHNF e
 exprIsHNF (App e a)        = app_is_value e [a]
 exprIsHNF other	     = False
@@ -643,8 +657,27 @@ check_args fun_ty (arg : args)
 \end{code}
 
 \begin{code}
+-- deep applies a TyConApp coercion as a substitution to a reflexive coercion
+-- deepCast t [a1,...,an] co corresponds to deep(t, [a1,...,an], co) from
+-- FC paper
+deepCast :: Type -> [TyVar] -> Coercion -> Coercion
+deepCast ty tyVars co 
+  = ASSERT( let {(lty, rty) = coercionKind co;
+                 Just (tc1, lArgs) = splitTyConApp_maybe lty;
+		 Just (tc2, rArgs) = splitTyConApp_maybe rty} 
+            in
+              tc1 == tc2 && length lArgs == length rArgs &&
+              length lArgs == length tyVars )
+    substTyWith tyVars coArgs ty
+  where
+    -- coArgs = [right (left (left co)), right (left co), right co]
+    coArgs = decomposeCo (length tyVars) co
+
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
-exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
+-- Returns (Just (dc, [x1..xn])) if the argument expression is 
+-- a constructor application of the form (dc x1 .. xn)
+
+exprIsConApp_maybe (Cast expr co)
   = 	-- Maybe this is over the top, but here we try to turn
 	-- 	coerce (S,T) ( x, y )
 	-- effectively into 
@@ -654,6 +687,7 @@ exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
 	--	  (# r, s #) -> ...
 	-- where the memcpy is in the IO monad, but the call is in
 	-- the (ST s) monad
+    let (from_ty, to_ty) = coercionKind co in
     case exprIsConApp_maybe expr of {
 	Nothing 	  -> Nothing ;
 	Just (dc, args)   -> 
@@ -666,14 +700,15 @@ exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
 		-- Type constructor must match
 		-- We knock out existentials to keep matters simple(r)
     let
-	arity   	 = tyConArity tc
-	val_args	 = drop arity args
-	to_arg_tys 	 = dataConInstArgTys dc tc_arg_tys
-	mk_coerce ty arg = mkCoerce ty arg
-	new_val_args	 = zipWith mk_coerce to_arg_tys val_args
+	arity   	    = tyConArity tc
+	val_args	    = drop arity args
+        arg_tys 	    = dataConRepArgTys dc
+	dc_tyvars	    = dataConUnivTyVars dc
+        deep arg_ty         = deepCast arg_ty dc_tyvars co
+	new_val_args	    = zipWith mkCoerce (map deep arg_tys) val_args
     in
     ASSERT( all isTypeArg (take arity args) )
-    ASSERT( equalLength val_args to_arg_tys )
+    ASSERT( equalLength val_args arg_tys )
     Just (dc, map Type tc_arg_tys ++ new_val_args)
     }}
 
@@ -823,6 +858,8 @@ arityType dflags (Note n e) = arityType dflags e
 --  | ok_note n = arityType dflags e
 --  | otherwise = ATop
 
+arityType dflags (Cast e co) = arityType dflags e
+
 arityType dflags (Var v) 
   = mk (idArity v) (arg_tys (idType v))
   where
@@ -933,7 +970,8 @@ etaExpand :: Arity	  	-- Result should have this number of value args
 
 etaExpand n us expr ty
   | manifestArity expr >= n = expr		-- The no-op case
-  | otherwise 		    = eta_expand n us expr ty
+  | otherwise 		    
+  = eta_expand n us expr ty
   where
 
 -- manifestArity sees how many leading value lambdas there are
@@ -941,6 +979,7 @@ manifestArity :: CoreExpr -> Arity
 manifestArity (Lam v e) | isId v    = 1 + manifestArity e
 			| otherwise = manifestArity e
 manifestArity (Note _ e)	    = manifestArity e
+manifestArity (Cast e _)            = manifestArity e
 manifestArity e			    = 0
 
 -- etaExpand deals with for-alls. For example:
@@ -987,7 +1026,8 @@ eta_expand n us (Lam v body) ty
 --	and round we go
 
 eta_expand n us expr ty
-  = case splitForAllTy_maybe ty of { 
+  = ASSERT2 (exprType expr `coreEqType` ty, ppr (exprType expr) $$ ppr ty)
+    case splitForAllTy_maybe ty of { 
  	  Just (tv,ty') -> Lam tv (eta_expand n us (App expr (Type (mkTyVarTy tv))) ty')
 
  	; Nothing ->
@@ -1006,11 +1046,10 @@ eta_expand n us expr ty
 		--  	eta_expand 1 e T
 		-- We want to get
 		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
-		-- Only try this for recursive newtypes; the non-recursive kind
-		-- are transparent anyway
 
-    	case splitRecNewType_maybe ty of {
- 	  Just ty' -> mkCoerce2 ty ty' (eta_expand n us (mkCoerce2 ty' ty expr) ty') ;
+    	case splitRecNewTypeCo_maybe ty of {
+ 	  Just(ty1,co) -> 
+              mkCoerce co (eta_expand n us (mkCoerce (mkSymCoercion co) expr) ty1) ;
  	  Nothing  -> 
 
 	-- We have an expression of arity > 0, but its type isn't a function
@@ -1053,6 +1092,7 @@ exprArity e = go e
 	      go (Lam x e) | isId x    	   = go e + 1
 			   | otherwise 	   = go e
 	      go (Note n e) 		   = go e
+              go (Cast e _)                = go e
 	      go (App e (Type t))      	   = go e
 	      go (App f a) | exprIsCheap a = (go f - 1) `max` 0
 		-- NB: exprIsCheap a!  
@@ -1129,13 +1169,13 @@ tcEqExprX env (Case e1 v1 t1 a1)
 				       env' = rnBndr2 env v1 v2
 
 tcEqExprX env (Note n1 e1) (Note n2 e2) = eq_note env n1 n2 && tcEqExprX env e1 e2
+tcEqExprX env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && tcEqExprX env e1 e2
 tcEqExprX env (Type t1)    (Type t2)    = tcEqTypeX env t1 t2
 tcEqExprX env e1		e2	= False
 				         
 eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && tcEqExprX (rnBndrs2 env vs1  vs2) r1 r2
 
 eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
-eq_note env (Coerce t1 f1) (Coerce t2 f2) = tcEqTypeX env t1 t2 && tcEqTypeX env f1 f2
 eq_note env (CoreNote s1)  (CoreNote s2)  = s1 == s2
 eq_note env other1	       other2	  = False
 \end{code}
@@ -1160,11 +1200,11 @@ exprSize (App f a)       = exprSize f + exprSize a
 exprSize (Lam b e)       = varSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
 exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
+exprSize (Cast e co)     = (seqType co `seq` 1) + exprSize e
 exprSize (Note n e)      = noteSize n + exprSize e
 exprSize (Type t)        = seqType t `seq` 1
 
 noteSize (SCC cc)       = cc `seq` 1
-noteSize (Coerce t1 t2) = seqType t1 `seq` seqType t2 `seq` 1
 noteSize InlineMe       = 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
 
@@ -1193,12 +1233,21 @@ altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
 
 \begin{code}
 hashExpr :: CoreExpr -> Int
+-- Two expressions that hash to the same Int may be equal (but may not be)
+-- Two expressions that hash to the different Ints are definitely unequal
+-- 
+-- But "unequal" here means "not identical"; two alpha-equivalent 
+-- expressions may hash to the different Ints
+--
+-- The emphasis is on a crude, fast hash, rather than on high precision
+
 hashExpr e | hash < 0  = 77	-- Just in case we hit -maxInt
 	   | otherwise = hash
 	   where
 	     hash = abs (hash_expr e)	-- Negative numbers kill UniqFM
 
 hash_expr (Note _ e)   		  = hash_expr e
+hash_expr (Cast e co)             = hash_expr e
 hash_expr (Let (NonRec b r) e)    = hashId b
 hash_expr (Let (Rec ((b,r):_)) e) = hashId b
 hash_expr (Case _ b _ _)	  = hashId b
@@ -1304,6 +1353,7 @@ rhsIsStatic this_pkg rhs = is_static False rhs
   
   is_static in_arg (Note (SCC _) e) = False
   is_static in_arg (Note _ e)       = is_static in_arg e
+  is_static in_arg (Cast e co)      = is_static in_arg e
   
   is_static in_arg (Lit lit)
     = case lit of
@@ -1346,6 +1396,7 @@ rhsIsStatic this_pkg rhs = is_static False rhs
 
     go (Note (SCC _) f) n_val_args = False
     go (Note _ f) n_val_args       = go f n_val_args
+    go (Cast e co) n_val_args      = go e n_val_args
 
     go other n_val_args = False
 
