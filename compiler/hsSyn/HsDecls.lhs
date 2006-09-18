@@ -450,8 +450,9 @@ isKindSigDecl other                              = False
 
 -- definition of an instance of an indexed type
 isIdxTyDecl tydecl
-   | isSynDecl tydecl || isDataDecl tydecl = isJust (tcdTyPats tydecl)
-   | otherwise				   = False
+   | isTEqnDecl tydecl = True
+   | isDataDecl tydecl = isJust (tcdTyPats tydecl)
+   | otherwise	       = False
 \end{code}
 
 Dealing with names
