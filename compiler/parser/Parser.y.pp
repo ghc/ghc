@@ -186,6 +186,7 @@ incorrect.
  'unsafe'	{ L _ ITunsafe }
  'mdo'		{ L _ ITmdo }
  'iso'		{ L _ ITiso }
+ 'family'	{ L _ ITfamily }
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
  'dotnet'       { L _ ITdotnet }
@@ -468,7 +469,7 @@ cl_decl :: { LTyClDecl RdrName }
 		{% do { let { (binds, sigs, ats)           = 
 			        cvBindsAndSigs (unLoc $4)
 		            ; (ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; checkTyVars tparms False  -- only type vars allowed
+                      ; checkTyVars tparms      -- only type vars allowed
 		      ; checkKindSigs ats
 		      ; return $ L (comb4 $1 $2 $3 $4) 
 				   (mkClassDecl (ctxt, tc, tvs) 
@@ -477,78 +478,96 @@ cl_decl :: { LTyClDecl RdrName }
 -- Type declarations
 --
 ty_decl :: { LTyClDecl RdrName }
-        -- type function signature and equations (w/ type synonyms as special
-        -- case); we need to handle all this in one rule to avoid a large
-        -- number of shift/reduce conflicts
-        : 'type' opt_iso type kind_or_ctype
-	        --
-		-- Note the use of type for the head; this allows
-		-- infix type constructors to be declared and type
-		-- patterns for type function equations
-		-- 
-		-- We have that `typats :: Maybe [LHsType name]' is `Nothing'
-		-- (in the second case alternative) when all arguments are
-		-- variables (and we thus have a vanilla type synonym
-		-- declaration); otherwise, it contains all arguments as type
-		-- patterns.
-		--
- 		{% case $4 of 
-		     Left kind -> 
-		       do { (tc, tvs, _) <- checkSynHdr $3 False
-		          ; return (L (comb3 $1 $3 kind) 
-				      (TyFunction tc tvs $2 (unLoc kind)))
-		          } 
-		     Right ty | not $2 -> 
-		       do { (tc, tvs, typats) <- checkSynHdr $3 True
-		          ; return (L (comb2 $1 ty) 
-				      (TySynonym tc tvs typats ty)) }
-		     Right ty | otherwise -> 
-		       parseError (comb2 $1 ty) 
-		         "iso tag is only allowed in kind signatures"
-                }
-
-        -- kind signature of indexed type
-        | data_or_newtype tycl_hdr '::' kind
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; checkTyVars tparms False  -- no type pattern
-		      ; return $
-			  L (comb3 $1 $2 $4)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
-			     (Just (unLoc $4)) [] Nothing) } }
-
-        -- data type or newtype declaration
-	| data_or_newtype tycl_hdr constrs deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; tpats <- checkTyVars tparms True  -- can have type pats
-		      ; return $
-			  L (comb4 $1 $2 $3 $4)
-			           -- We need the location on tycl_hdr in case 
-				   -- constrs and deriving are both empty
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, tpats) 
-			     Nothing (reverse (unLoc $3)) (unLoc $4)) } }
-
-        -- GADT declaration
-        | data_or_newtype tycl_hdr opt_kind_sig 
-		 'where' gadt_constrlist
-		 deriving
-		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; tpats <- checkTyVars tparms True -- can have type pats
-		      ; return $
-			  L (comb4 $1 $2 $4 $5)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, tpats) $3
-			     (reverse (unLoc $5)) (unLoc $6)) } }
-
-opt_iso :: { Bool }
-	:       { False }
-	| 'iso'	{ True  }
-
-kind_or_ctype :: { Either (Located Kind) (LHsType RdrName) }
-        : '::' kind     { Left  (LL (unLoc $2)) }
-	| '=' ctype	{ Right (LL (unLoc $2)) }
+           -- ordinary type synonyms
+        : 'type' type '=' ctype
 		-- Note ctype, not sigtype, on the right of '='
 		-- We allow an explicit for-all but we don't insert one
 		-- in 	type Foo a = (b,b)
 		-- Instead we just say b is out of scope
+	        --
+		-- Note the use of type for the head; this allows
+		-- infix type constructors to be declared 
+ 		{% do { (tc, tvs, _) <- checkSynHdr $2 False
+		      ; return (L (comb2 $1 $4) 
+				  (TySynonym tc tvs Nothing $4)) 
+                      } }
+
+           -- type family declarations
+        | 'type' 'family' opt_iso type '::' kind
+		-- Note the use of type for the head; this allows
+		-- infix type constructors to be declared
+		--
+ 		{% do { (tc, tvs, _) <- checkSynHdr $4 False
+		      ; return (L (comb3 $1 $4 $6) 
+				  (TyFunction tc tvs $3 (unLoc $6)))
+		      } }
+
+           -- type instance declarations
+        | 'type' 'instance' type '=' ctype
+		-- Note the use of type for the head; this allows
+		-- infix type constructors and type patterns
+		--
+ 		{% do { (tc, tvs, typats) <- checkSynHdr $3 True
+		      ; return (L (comb2 $1 $5) 
+				  (TySynonym tc tvs (Just typats) $5)) 
+                      } }
+
+        -- ordinary data type or newtype declaration
+	| data_or_newtype tycl_hdr constrs deriving
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                      ; checkTyVars tparms    -- no type pattern
+		      ; return $
+			  L (comb4 $1 $2 $3 $4)
+			           -- We need the location on tycl_hdr in case 
+				   -- constrs and deriving are both empty
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
+			       Nothing (reverse (unLoc $3)) (unLoc $4)) } }
+
+        -- ordinary GADT declaration
+        | data_or_newtype tycl_hdr opt_kind_sig 
+		 'where' gadt_constrlist
+		 deriving
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                      ; checkTyVars tparms    -- can have type pats
+		      ; return $
+			  L (comb4 $1 $2 $4 $5)
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) $3
+			      (reverse (unLoc $5)) (unLoc $6)) } }
+
+        -- data/newtype family
+        | data_or_newtype 'family' tycl_hdr '::' kind
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
+                      ; checkTyVars tparms    -- no type pattern
+		      ; return $
+			  L (comb3 $1 $2 $5)
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
+			      (Just (unLoc $5)) [] Nothing) } }
+
+        -- data/newtype instance declaration
+	| data_or_newtype 'instance' tycl_hdr constrs deriving
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
+                                             -- can have type pats
+		      ; return $
+			  L (comb4 $1 $3 $4 $5)
+			           -- We need the location on tycl_hdr in case 
+				   -- constrs and deriving are both empty
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
+			      Nothing (reverse (unLoc $4)) (unLoc $5)) } }
+
+        -- GADT instance declaration
+        | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
+		 'where' gadt_constrlist
+		 deriving
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
+                                             -- can have type pats
+		      ; return $
+			  L (comb4 $1 $3 $6 $7)
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
+			       $4 (reverse (unLoc $6)) (unLoc $7)) } }
+
+opt_iso :: { Bool }
+	:       { False }
+	| 'iso'	{ True  }
 
 data_or_newtype :: { Located NewOrData }
 	: 'data'	{ L1 DataType }
@@ -1444,6 +1463,8 @@ varid_no_unsafe :: { Located RdrName }
 	: VARID			{ L1 $! mkUnqual varName (getVARID $1) }
 	| special_id		{ L1 $! mkUnqual varName (unLoc $1) }
 	| 'forall'		{ L1 $! mkUnqual varName FSLIT("forall") }
+	| 'iso'                 { L1 $! mkUnqual varName FSLIT("iso") }
+	| 'family'              { L1 $! mkUnqual varName FSLIT("family") }
 
 qvarsym :: { Located RdrName }
 	: varsym		{ $1 }
@@ -1467,7 +1488,8 @@ varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 
 -- These special_ids are treated as keywords in various places, 
 -- but as ordinary ids elsewhere.   'special_id' collects all these
--- except 'unsafe' and 'forall' whose treatment differs depending on context
+-- except 'unsafe', 'forall', 'family', and 'iso' whose treatment differs
+-- depending on context 
 special_id :: { Located FastString }
 special_id
 	: 'as'			{ L1 FSLIT("as") }
@@ -1478,7 +1500,6 @@ special_id
 	| 'dynamic'		{ L1 FSLIT("dynamic") }
 	| 'stdcall'             { L1 FSLIT("stdcall") }
 	| 'ccall'               { L1 FSLIT("ccall") }
-	| 'iso'                 { L1 FSLIT("iso") }
 
 special_sym :: { Located FastString }
 special_sym : '!'	{ L1 FSLIT("!") }

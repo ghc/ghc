@@ -36,8 +36,8 @@ module RdrHsSyn (
 	checkContext,	      -- HsType -> P HsContext
 	checkPred,	      -- HsType -> P HsPred
 	checkTyClHdr,         -- LHsContext RdrName -> LHsType RdrName -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
-	checkTyVars,          -- [LHsType RdrName] -> Bool -> P ()
-	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], Maybe [LHsType RdrName])
+	checkTyVars,          -- [LHsType RdrName] -> P ()
+	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], [LHsType RdrName])
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
 	checkInstType,	      -- HsType -> P HsType
 	checkPattern,	      -- HsExp -> P HsPat
@@ -70,6 +70,7 @@ import FastString
 import Panic
 
 import List		( isSuffixOf, nubBy )
+import Monad		( unless )
 \end{code}
 
 
@@ -378,25 +379,20 @@ checkInstType (L l t)
 	      	   return (L l (HsForAllTy Implicit [] (noLoc []) dict_ty))
 
 -- Check whether the given list of type parameters are all type variables
--- (possibly with a kind signature).  If the second argument is `False', we
+-- (possibly with a kind signature).  If the second argument is `False',
 -- only type variables are allowed and we raise an error on encountering a
--- non-variable; otherwise, we return the entire list parameters iff at least
--- one is not a variable.
+-- non-variable; otherwise, we allow non-variable arguments and return the
+-- entire list of parameters.
 --
-checkTyVars :: [LHsType RdrName] -> Bool -> P (Maybe [LHsType RdrName])
-checkTyVars tparms nonVarsOk = 
-  do
-    areVars <- mapM chk tparms
-    return $ if and areVars then Nothing else Just tparms
+checkTyVars :: [LHsType RdrName] -> P ()
+checkTyVars tparms = mapM_ chk tparms
   where
 	-- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-	| isRdrTyVar tv    = return True
+	| isRdrTyVar tv    = return ()
     chk (L l (HsTyVar tv))
-        | isRdrTyVar tv    = return True
-    chk (L l other)
-        | nonVarsOk        = return False
-        | otherwise        = 
+        | isRdrTyVar tv    = return ()
+    chk (L l other)        =
 	  parseError l "Type found where type variable expected"
 
 -- Check whether the type arguments in a type synonym head are simply
@@ -405,14 +401,14 @@ checkTyVars tparms nonVarsOk =
 -- indicate a vanilla type synonym.
 --
 checkSynHdr :: LHsType RdrName 
-	    -> Bool                             -- non-variables admitted?
+	    -> Bool                             -- is type instance?
 	    -> P (Located RdrName,		-- head symbol
 	          [LHsTyVarBndr RdrName],	-- parameters
-		  Maybe [LHsType RdrName])	-- type patterns
-checkSynHdr ty nonVarsOk = 
+		  [LHsType RdrName])	        -- type patterns
+checkSynHdr ty isTyInst = 
   do { (_, tc, tvs, tparms) <- checkTyClHdr (noLoc []) ty
-     ; typats <- checkTyVars tparms nonVarsOk
-     ; return (tc, tvs, typats) }
+     ; unless isTyInst $ checkTyVars tparms
+     ; return (tc, tvs, tparms) }
 
 
 -- Well-formedness check and decomposition of type and class heads.
