@@ -411,17 +411,20 @@ used for source code.
 
 	*** See "THE NAMING STORY" in HsDecls ****
 
-Associated data types: Instances declarations may contain definitions of
-associated data types whose data constructors we need to collect, too.
-However, we need to be careful with the handling of the data type constructor
-of each asscociated type, as it is already defined in the corresponding
-class.  We make a new name for it, but don't return it in the 'AvailInfo' (to
-avoid raising a duplicate declaration error; see the helper
-'unavail_main_name').
+Instances of indexed types
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Indexed data/newtype instances contain data constructors that we need to
+collect, too.  Moreover, we need to descend into the data/newtypes instances
+of associated families.
+
+We need to be careful with the handling of the type constructor of each type
+instance as the family constructor is already defined, and we want to avoid
+raising a duplicate declaration error.  So, we make a new name for it, but
+don't return it in the 'AvailInfo'.
 
 \begin{code}
 getLocalDeclBinders :: TcGblEnv -> HsGroup RdrName -> RnM [Name]
-getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs, 
+getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
 				      hs_tyclds = tycl_decls, 
 				      hs_instds = inst_decls,
 				      hs_fords = foreign_decls })
