@@ -444,8 +444,7 @@ topdecls :: { OrdList (LHsDecl RdrName) }
 
 topdecl :: { OrdList (LHsDecl RdrName) }
   	: cl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
-  	| ty_decl			{% checkTopTypeD $1 >>=
-					   return.unitOL.L1 }
+  	| ty_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
 	| 'instance' inst_type where
 		{ let (binds, sigs, ats) = cvBindsAndSigs (unLoc $3)
 		  in unitOL (L (comb3 $1 $2 $3) 

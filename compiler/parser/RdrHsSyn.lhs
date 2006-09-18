@@ -39,7 +39,6 @@ module RdrHsSyn (
 	checkTyVars,          -- [LHsType RdrName] -> Bool -> P ()
 	checkSynHdr,	      -- LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName], Maybe [LHsType RdrName])
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
-	checkTopTypeD,	      -- LTyClDecl RdrName -> P (HsDecl RdrName)
 	checkInstType,	      -- HsType -> P HsType
 	checkPattern,	      -- HsExp -> P HsPat
 	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -517,22 +516,6 @@ checkKindSigs = mapM_ check
         || isSynDecl tydecl  = return ()
       | otherwise	     = 
 	parseError l "Type declaration in a class must be a kind signature or synonym default"
-
--- Wrap a toplevel type or data declaration into 'TyClD' and ensure for 
--- data declarations that all type parameters are variables only (which is in
--- contrast to type functions and associated type declarations).
---
-checkTopTypeD :: LTyClDecl RdrName -> P (HsDecl RdrName)
-checkTopTypeD (L _ d@TyData {tcdTyPats = Just typats}) = 
-  do
-    -- `tcdTyPats' will only be of the form `Just typats' if `typats' contains
-    -- a non-variable pattern.  We call `checkTyPats' instead of raising an
-    -- error straight away, as `checkTyPats' raises the error at the location
-    -- of that non-variable pattern.
-    --
-    checkTyVars typats False
-    panic "checkTopTypeD: check on previous line should fail w/ a parse error"
-checkTopTypeD (L _ d) = return $ TyClD d
 
 checkContext :: LHsType RdrName -> P (LHsContext RdrName)
 checkContext (L l t)
