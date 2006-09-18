@@ -301,6 +301,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_dicts = dicts,
 			abs_exports = new_exports, abs_binds = new_val_bind })
   where
     zonkExport env (tyvars, global, local, prags)
+	-- The tyvars are already zonked
 	= zonkIdBndr env global			`thenM` \ new_global ->
 	  mapM zonk_prag prags			`thenM` \ new_prags -> 
 	  returnM (tyvars, new_global, zonkIdOcc env local, new_prags)

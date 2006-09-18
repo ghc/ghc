@@ -41,7 +41,7 @@ import TcPat		( tcPat, PatCtxt(..) )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcMType		( newFlexiTyVarTy, zonkQuantifiedTyVar, zonkSigTyVar,
 			  tcInstSigTyVars, tcInstSkolTyVars, tcInstType, 
-			  zonkTcType, zonkTcTypes, zonkTcTyVars )
+			  zonkTcType, zonkTcTypes, zonkTcTyVar )
 import TcType		( TcType, TcTyVar, TcThetaType, 
 			  SkolemInfo(SigSkol), UserTypeCtxt(FunSigCtxt), 
 			  TcTauType, TcSigmaType, isUnboxedTupleType,
@@ -364,43 +364,47 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
   ; exports <- mapM (mkExport prag_fn tyvars_to_gen' (map idType dict_ids))
 		    mono_bind_infos
 
-	-- ZONK THE poly_ids, because they are used to extend the type 
-	-- environment; see the invariant on TcEnv.tcExtendIdEnv 
   ; let	poly_ids = [poly_id | (_, poly_id, _, _) <- exports]
-  ; zonked_poly_ids <- mappM zonkId poly_ids
-
-  ; traceTc (text "binding:" <+> ppr (zonked_poly_ids `zip` map idType zonked_poly_ids))
+  ; traceTc (text "binding:" <+> ppr (poly_ids `zip` map idType poly_ids))
 
   ; let abs_bind = L loc $ AbsBinds tyvars_to_gen'
 	 		            dict_ids exports
 	 		    	    (dict_binds `unionBags` binds')
 
-  ; return ([unitBag abs_bind], zonked_poly_ids)
+  ; return ([unitBag abs_bind], poly_ids)	-- poly_ids are guaranteed zonked by mkExport
   } }
 
 
 --------------
 mkExport :: TcPragFun -> [TyVar] -> [TcType] -> MonoBindInfo
 	 -> TcM ([TyVar], Id, Id, [Prag])
+-- mkExport generates exports with 
+--	zonked type variables, 
+--	zonked poly_ids
+-- The former is just because no further unifications will change
+-- the quantified type variables, so we can fix their final form
+-- right now.
+-- The latter is needed because the poly_ids are used to extend the
+-- type environment; see the invariant on TcEnv.tcExtendIdEnv 
+
+-- Pre-condition: the inferred_tvs are already zonked
+
 mkExport prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
-  = case mb_sig of
-      Nothing  -> do { prags <- tcPrags poly_id (prag_fn poly_name)
-		     ; return (inferred_tvs, poly_id, mono_id, prags) }
-	  where
-	    poly_id = mkLocalId poly_name poly_ty
-	    poly_ty = mkForAllTys inferred_tvs
-				       $ mkFunTys dict_tys 
-				       $ idType mono_id
+  = do	{ (tvs, poly_id) <- mk_poly_id mb_sig
 
-      Just sig -> do { let poly_id = sig_id sig
-		     ; prags <- tcPrags poly_id (prag_fn poly_name)
-		     ; sig_tys <- zonkTcTyVars (sig_tvs sig)
-		     ; let sig_tvs' = map (tcGetTyVar "mkExport") sig_tys
-		     ; return (sig_tvs', poly_id, mono_id, prags) }
-		-- We zonk the sig_tvs here so that the export triple
-		-- always has zonked type variables; 
-		-- a convenient invariant
+	; poly_id' <- zonkId poly_id
+	; prags <- tcPrags poly_id' (prag_fn poly_name)
+		-- tcPrags requires a zonked poly_id
 
+	; return (tvs, poly_id', mono_id, prags) }
+  where
+    poly_ty = mkForAllTys inferred_tvs (mkFunTys dict_tys (idType mono_id))
+
+    mk_poly_id Nothing    = return (inferred_tvs, mkLocalId poly_name poly_ty)
+    mk_poly_id (Just sig) = do { tvs <- mapM zonk_tv (sig_tvs sig)
+			       ; return (tvs,  sig_id sig) }
+
+    zonk_tv tv = do { ty <- zonkTcTyVar tv; return (tcGetTyVar "mkExport" ty) }
 
 ------------------------
 type TcPragFun = Name -> [LSig Name]
@@ -423,6 +427,8 @@ tcPrags poly_id prags = mapM tc_prag prags
 pragSigCtxt prag = hang (ptext SLIT("In the pragma")) 2 (ppr prag)
 
 tcPrag :: TcId -> Sig Name -> TcM Prag
+-- Pre-condition: the poly_id is zonked
+-- Reason: required by tcSubExp
 tcPrag poly_id (SpecSig orig_name hs_ty inl) = tcSpecPrag poly_id hs_ty inl
 tcPrag poly_id (SpecInstSig hs_ty)	     = tcSpecPrag poly_id hs_ty defaultInlineSpec
 tcPrag poly_id (InlineSig v inl)             = return (InlinePrag inl)
