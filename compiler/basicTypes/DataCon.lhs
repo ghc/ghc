@@ -409,7 +409,10 @@ mkDataCon name declared_infix
 	  eq_spec theta
 	  orig_arg_tys tycon
 	  stupid_theta ids
-  = con
+  = ASSERT( not (any isEqPred theta) )
+	-- We don't currently allow any equality predicates on
+	-- a data constructor (apart from the GADT ones in eq_spec)
+    con
   where
     is_vanilla = null ex_tvs && null eq_spec && null theta
     con = ASSERT( is_vanilla || not (isNewTyCon tycon) )
@@ -432,10 +435,9 @@ mkDataCon name declared_infix
 	-- The 'arg_stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
-    (more_eq_preds, dict_preds) = partition isEqPred theta
     dict_tys     = mkPredTys theta
     real_arg_tys = dict_tys                      ++ orig_arg_tys
-    real_stricts = map mk_dict_strict_mark dict_preds ++ arg_stricts
+    real_stricts = map mk_dict_strict_mark theta ++ arg_stricts
 
 	-- Representation arguments and demands
 	-- To do: eliminate duplication with MkId
