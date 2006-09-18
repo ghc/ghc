@@ -603,10 +603,10 @@ dataConInstArgTys (MkData {dcRepArgTys = arg_tys,
 
 -- And the same deal for the original arg tys
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
-dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys,
+dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
 			       dcUnivTyVars = univ_tvs, 
 			       dcExTyVars = ex_tvs}) inst_tys
- = ASSERT( length tyvars == length inst_tys )
+ = ASSERT2( length tyvars == length inst_tys, ptext SLIT("dataConInstOrigArgTys") <+> ppr dc <+> ppr inst_tys )
    map (substTyWith tyvars inst_tys) arg_tys
  where
    tyvars = univ_tvs ++ ex_tvs

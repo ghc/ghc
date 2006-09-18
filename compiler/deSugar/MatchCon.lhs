@@ -12,7 +12,7 @@ import {-# SOURCE #-} Match	( match )
 
 import HsSyn		( Pat(..), LPat, HsConDetails(..) )
 import DsBinds		( dsLHsBinds )
-import DataCon		( DataCon, dataConInstOrigArgTys, 
+import DataCon		( DataCon, dataConInstOrigArgTys, dataConEqSpec,
 			  dataConFieldLabels, dataConSourceArity )
 import TcType		( tcTyConAppArgs )
 import Type		( mkTyVarTys )
@@ -100,7 +100,8 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
 	        pat_tvs = tvs1, pat_dicts = dicts1 } = firstPat eqn1
 	
     arg_tys  = dataConInstOrigArgTys con inst_tys
-    inst_tys = tcTyConAppArgs pat_ty1 ++ mkTyVarTys tvs1
+    n_co_args = length (dataConEqSpec con)
+    inst_tys = tcTyConAppArgs pat_ty1 ++ (drop n_co_args $ mkTyVarTys tvs1)
 	-- Newtypes opaque, hence tcTyConAppArgs
 
     shift eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds, 
