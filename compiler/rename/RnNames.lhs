@@ -29,7 +29,7 @@ import PrelNames
 import Module
 import Name		( Name, nameSrcLoc, nameOccName, nameModule, isWiredInName,
 			  nameParent, nameParent_maybe, isExternalName,
-			  isBuiltInSyntax )
+			  isBuiltInSyntax, isTyConName )
 import NameSet
 import NameEnv
 import OccName		( srcDataName, isTcOcc, pprNonVarNameSpace,
@@ -58,7 +58,7 @@ import DriverPhases	( isHsBoot )
 import Util		( notNull )
 import List		( partition )
 import IO		( openFile, IOMode(..) )
-import Monad		( liftM )
+import Monad		( liftM, when )
 \end{code}
 
 
@@ -535,7 +535,11 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_names
         = succeed_with True [name]
 
     get_item (IEThingWith name names)
-        = succeed_with True (name:names)
+        = do { optIdxTypes <- doptM Opt_IndexedTypes
+	     ; when (not optIdxTypes && any isTyConName names) $
+	         addErr (typeItemErr (head . filter isTyConName $ names )
+				     (text "in import list"))
+	     ; succeed_with True (name:names) }
     get_item (IEVar name)
         = succeed_with True [name]
 
@@ -578,33 +582,40 @@ rnExports :: Maybe [LIE RdrName]
           -> RnM (Maybe [LIE Name])
 rnExports Nothing = return Nothing
 rnExports (Just exports)
-    = do TcGblEnv { tcg_imports = ImportAvails { imp_env = imp_env } } <- getGblEnv
-         let sub_env :: NameEnv [Name]	-- Classify each name by its parent
-             sub_env = mkSubNameEnv (foldUFM unionNameSets emptyNameSet imp_env)
-             rnExport (IEVar rdrName)
-                 = do name <- lookupGlobalOccRn rdrName
-                      return (IEVar name)
-             rnExport (IEThingAbs rdrName)
-                 = do name <- lookupGlobalOccRn rdrName
-                      return (IEThingAbs name)
-             rnExport (IEThingAll rdrName)
-                 = do name <- lookupGlobalOccRn rdrName
-                      return (IEThingAll name)
-             rnExport ie@(IEThingWith rdrName rdrNames)
-                 = do name <- lookupGlobalOccRn rdrName
-                      if isUnboundName name
-                         then return (IEThingWith name [])
-                         else do
-                      let env = mkOccEnv [(nameOccName s, s) | s <- subNames sub_env name]
-                          mb_names = map (lookupOccEnv env . rdrNameOcc) rdrNames
-                      if any isNothing mb_names
-                         then do addErr (exportItemErr ie)
-                                 return (IEThingWith name [])
-                         else return (IEThingWith name (catMaybes mb_names))
-             rnExport (IEModuleContents mod)
-                 = return (IEModuleContents mod)
-         rn_exports <- mapM (wrapLocM rnExport) exports
-         return (Just rn_exports)
+  = do TcGblEnv { tcg_imports = ImportAvails { imp_env = imp_env } } <- getGblEnv
+       let sub_env :: NameEnv [Name]	-- Classify each name by its parent
+	   sub_env = mkSubNameEnv (foldUFM unionNameSets emptyNameSet imp_env)
+	   rnExport (IEVar rdrName)
+	       = do name <- lookupGlobalOccRn rdrName
+		    return (IEVar name)
+	   rnExport (IEThingAbs rdrName)
+	       = do name <- lookupGlobalOccRn rdrName
+		    return (IEThingAbs name)
+	   rnExport (IEThingAll rdrName)
+	       = do name <- lookupGlobalOccRn rdrName
+		    return (IEThingAll name)
+	   rnExport ie@(IEThingWith rdrName rdrNames)
+	       = do name <- lookupGlobalOccRn rdrName
+		    if isUnboundName name
+		       then return (IEThingWith name [])
+		       else do
+		    let env = mkOccEnv [(nameOccName s, s) | s <- subNames sub_env name]
+			mb_names = map (lookupOccEnv env . rdrNameOcc) rdrNames
+		    if any isNothing mb_names
+		      then do addErr (exportItemErr ie)
+			      return (IEThingWith name [])
+		      else do let names = catMaybes mb_names
+			      optIdxTypes <- doptM Opt_IndexedTypes
+			      when (not optIdxTypes && any isTyConName names) $
+			        addErr (typeItemErr (  head 
+						     . filter isTyConName 
+						     $ names )
+						     (text "in export list"))
+			      return (IEThingWith name names)
+	   rnExport (IEModuleContents mod)
+	       = return (IEModuleContents mod)
+       rn_exports <- mapM (wrapLocM rnExport) exports
+       return (Just rn_exports)
 
 mkExportNameSet :: Bool  -- False => no 'module M(..) where' header at all
                 -> Maybe ([LIE Name], [LIE RdrName]) -- Nothing => no explicit export list
@@ -1116,6 +1127,10 @@ modExportErr mod
 exportItemErr export_item
   = sep [ ptext SLIT("The export item") <+> quotes (ppr export_item),
 	  ptext SLIT("attempts to export constructors or class methods that are not visible here") ]
+
+typeItemErr name wherestr
+  = sep [ ptext SLIT("Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
+	  ptext SLIT("Use -findexed-types to enable this extension") ]
 
 exportClashErr global_env name1 name2 ie1 ie2
   = vcat [ ptext SLIT("Conflicting exports for") <+> quotes (ppr occ) <> colon

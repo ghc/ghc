@@ -24,7 +24,7 @@ module Name (
 	nameSrcLoc, nameParent, nameParent_maybe, isImplicitName, 
 
 	isSystemName, isInternalName, isExternalName,
-	isTyVarName, isWiredInName, isBuiltInSyntax,
+	isTyVarName, isTyConName, isWiredInName, isBuiltInSyntax,
 	wiredInNameTyThing_maybe, 
 	nameIsLocalOrFrom,
 	
@@ -179,6 +179,9 @@ nameIsLocalOrFrom from name
 
 isTyVarName :: Name -> Bool
 isTyVarName name = isTvOcc (nameOccName name)
+
+isTyConName :: Name -> Bool
+isTyConName name = isTcOcc (nameOccName name)
 
 isSystemName (Name {n_sort = System}) = True
 isSystemName other		      = False

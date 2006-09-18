@@ -376,12 +376,20 @@ export 	:: { LIE RdrName }
 	|  'module' modid		{ LL (IEModuleContents (unLoc $2)) }
 
 qcnames :: { [RdrName] }
-	:  qcnames ',' qcname			{ unLoc $3 : $1 }
-	|  qcname				{ [unLoc $1]  }
+	:  qcnames ',' qcname_ext	{ unLoc $3 : $1 }
+	|  qcname_ext			{ [unLoc $1]  }
 
+qcname_ext :: { Located RdrName }	-- Variable or data constructor
+					-- or tagged type constructor
+	:  qcname			{ $1 }
+	|  'type' qcon			{ sL (comb2 $1 $2) 
+					     (setRdrNameSpace (unLoc $2) 
+							      tcClsName)  }
+
+-- Cannot pull into qcname_ext, as qcname is also used in expression.
 qcname 	:: { Located RdrName }	-- Variable or data constructor
-	:  qvar					{ $1 }
-	|  qcon					{ $1 }
+	:  qvar				{ $1 }
+	|  qcon				{ $1 }
 
 -----------------------------------------------------------------------------
 -- Import Declarations
