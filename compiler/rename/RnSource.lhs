@@ -43,7 +43,7 @@ import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
 import Maybe            ( isNothing, isJust )
-import Monad		( liftM )
+import Monad		( liftM, when )
 import BasicTypes       ( Boxity(..) )
 \end{code}
 
@@ -787,8 +787,11 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
         rnTyClDecl tydecl
     rn_at _                      = panic "RnSource.rnATs: invalid TyClDecl"
 
-    lookupIdxVars _ tyvars cont = mappM lookupIdxVar tyvars >>= cont
-    --
+    lookupIdxVars _ tyvars cont = 
+      do { checkForDups tyvars;
+	 ; tyvars' <- mappM lookupIdxVar tyvars
+	 ; cont tyvars'
+	 }
     -- Type index variables must be class parameters, which are the only
     -- type variables in scope at this point.
     lookupIdxVar (L l tyvar) =
@@ -796,8 +799,26 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
 	name' <- lookupOccRn (hsTyVarName tyvar)
 	return $ L l (replaceTyVarName tyvar name')
 
+    -- Type variable may only occur once.
+    --
+    checkForDups [] = return ()
+    checkForDups (L loc tv:ltvs) = 
+      do { setSrcSpan loc $
+	     when (hsTyVarName tv `ltvElem` ltvs) $
+	       addErr (repeatedTyVar tv)
+	 ; checkForDups ltvs
+	 }
+
+    rdrName `ltvElem` [] = False
+    rdrName `ltvElem` (L _ tv:ltvs)
+      | rdrName == hsTyVarName tv = True
+      | otherwise		  = rdrName `ltvElem` ltvs
+
 noPatterns = text "Default definition for an associated synonym cannot have"
 	     <+> text "type pattern"
+
+repeatedTyVar tv = ptext SLIT("Illegal repeated type variable") <+>
+		   quotes (ppr tv)
 
 -- This data decl will parse OK
 --	data T = a Int
