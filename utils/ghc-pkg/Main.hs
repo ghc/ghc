@@ -106,6 +106,7 @@ data Flag
   | FlagConfig	FilePath
   | FlagGlobalConfig FilePath
   | FlagForce
+  | FlagForceFiles
   | FlagAutoGHCiLibs
   | FlagDefinedName String String
   | FlagSimpleOutput
@@ -123,6 +124,8 @@ flags = [
 	"location of the global package config",
   Option [] ["force"] (NoArg FlagForce)
  	"ignore missing dependencies, directories, and libraries",
+  Option [] ["force-files"] (NoArg FlagForceFiles)
+ 	"ignore missing directories and libraries only",
   Option ['g'] ["auto-ghci-libs"] (NoArg FlagAutoGHCiLibs)
 	"automatically build libs for GHCi (with register)",
   Option ['?'] ["help"] (NoArg FlagHelp)
@@ -191,11 +194,16 @@ substProg prog (c:xs) = c : substProg prog xs
 -- -----------------------------------------------------------------------------
 -- Do the business
 
+data Force = ForceAll | ForceFiles | NoForce
+
 runit :: [Flag] -> [String] -> IO ()
 runit cli nonopts = do
   prog <- getProgramName
   let
-	force = FlagForce `elem` cli
+        force 
+          | FlagForce `elem` cli        = ForceAll 
+          | FlagForceFiles `elem` cli   = ForceFiles
+          | otherwise                   = NoForce
 	auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
         defines = [ (nm,val) | FlagDefinedName nm val <- cli ]
   --
@@ -377,7 +385,7 @@ registerPackage :: FilePath
 	        -> [Flag]
 		-> Bool		-- auto_ghci_libs
 		-> Bool		-- update
-		-> Bool		-- force
+		-> Force
 		-> IO ()
 registerPackage input defines flags auto_ghci_libs update force = do
   db_stack <- getPkgDatabases True flags
@@ -397,7 +405,7 @@ registerPackage input defines flags auto_ghci_libs update force = do
 
   expanded <- expandEnvVars s defines force
 
-  pkg0 <- parsePackageInfo expanded defines force
+  pkg0 <- parsePackageInfo expanded defines
   putStrLn "done."
 
   let pkg = resolveDeps db_stack pkg0
@@ -410,9 +418,8 @@ registerPackage input defines flags auto_ghci_libs update force = do
 parsePackageInfo
 	:: String
 	-> [(String,String)]
-	-> Bool
 	-> IO InstalledPackageInfo
-parsePackageInfo str defines force =
+parsePackageInfo str defines =
   case parseInstalledPackageInfo str of
     ParseOk _warns ok -> return ok
     ParseFailed err -> die (showError err)
@@ -610,11 +617,11 @@ validatePackageConfig :: InstalledPackageInfo
 		      -> PackageDBStack
 		      -> Bool	-- auto-ghc-libs
 		      -> Bool	-- update
-		      -> Bool	-- force
+		      -> Force
 		      -> IO ()
 validatePackageConfig pkg db_stack auto_ghci_libs update force = do
   checkPackageId pkg
-  checkDuplicates db_stack pkg update force
+  checkDuplicates db_stack pkg update
   mapM_	(checkDep db_stack force) (depends pkg)
   mapM_	(checkDir force) (importDirs pkg)
   mapM_	(checkDir force) (libraryDirs pkg)
@@ -662,9 +669,8 @@ resolveDeps db_stack p = updateDeps p
 		[]	-> dep_pkgid	-- No installed package; use 
 					-- the version-less one
 
-checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Bool
-	 -> IO ()
-checkDuplicates db_stack pkg update force = do
+checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> IO ()
+checkDuplicates db_stack pkg update = do
   let
 	pkgid = package pkg
 	(_top_db_name, pkgs) : _  = db_stack
@@ -676,37 +682,40 @@ checkDuplicates db_stack pkg update force = do
 
 
 
-checkDir :: Bool -> String -> IO ()
+checkDir :: Force -> String -> IO ()
 checkDir force d
  | "$topdir" `isPrefixOf` d = return ()
 	-- can't check this, because we don't know what $topdir is
  | otherwise = do
    there <- doesDirectoryExist d
    when (not there)
-       (dieOrForce force (d ++ " doesn't exist or isn't a directory"))
+       (dieOrForceFile force (d ++ " doesn't exist or isn't a directory"))
 
-checkDep :: PackageDBStack -> Bool -> PackageIdentifier -> IO ()
+checkDep :: PackageDBStack -> Force -> PackageIdentifier -> IO ()
 checkDep db_stack force pkgid
-  | not real_version || pkgid `elem` pkgids = return ()
-  | otherwise = dieOrForce force ("dependency " ++ showPackageId pkgid
+  | pkgid `elem` pkgids || (not real_version && name_exists) = return ()
+  | otherwise = dieOrForceAll force ("dependency " ++ showPackageId pkgid
 					++ " doesn't exist")
   where
 	-- for backwards compat, we treat 0.0 as a special version,
 	-- and don't check that it actually exists.
  	real_version = realVersion pkgid
 	
+        name_exists = any (\p -> pkgName (package p) == name) all_pkgs
+        name = pkgName pkgid
+
 	all_pkgs = concat (map snd db_stack)
 	pkgids = map package all_pkgs
 
 realVersion :: PackageIdentifier -> Bool
 realVersion pkgid = versionBranch (pkgVersion pkgid) /= []
 
-checkHSLib :: [String] -> Bool -> Bool -> String -> IO ()
+checkHSLib :: [String] -> Bool -> Force -> String -> IO ()
 checkHSLib dirs auto_ghci_libs force lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
   bs <- mapM (doesLibExistIn batch_lib_file) dirs
   case [ dir | (exists,dir) <- zip bs dirs, exists ] of
-	[] -> dieOrForce force ("cannot find " ++ batch_lib_file ++
+	[] -> dieOrForceFile force ("cannot find " ++ batch_lib_file ++
 				 " on library path") 
 	(dir:_) -> checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
 
@@ -859,7 +868,7 @@ oldRunit clis = do
 	 where isAuto OF_AutoGHCiLibs = True; isAuto _ = False
       input_file = my_head "inp" ([ f | (OF_Input f) <- clis] ++ ["-"])
 
-      force = OF_Force `elem` clis
+      force = if OF_Force `elem` clis then ForceAll else NoForce
       
       defines = [ (nm,val) | OF_DefinedName nm val <- clis ]
 
@@ -889,7 +898,7 @@ my_head s (x:xs) = x
 -- ---------------------------------------------------------------------------
 -- expanding environment variables in the package configuration
 
-expandEnvVars :: String -> [(String, String)] -> Bool -> IO String
+expandEnvVars :: String -> [(String, String)] -> Force -> IO String
 expandEnvVars str defines force = go str ""
  where
    go "" acc = return $! reverse acc
@@ -906,7 +915,7 @@ expandEnvVars str defines force = go str ""
        Just x | not (null x) -> return x
        _      -> 
 	catch (System.getEnv nm)
-	   (\ _ -> do dieOrForce force ("Unable to expand variable " ++ 
+	   (\ _ -> do dieOrForceAll force ("Unable to expand variable " ++ 
 					show nm)
 		      return "")
 
@@ -928,10 +937,20 @@ die s = do
   hPutStrLn stderr (prog ++ ": " ++ s)
   exitWith (ExitFailure 1)
 
-dieOrForce :: Bool -> String -> IO ()
-dieOrForce force s 
-  | force     = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
-  | otherwise = die (s ++ " (use --force to override)")
+dieOrForceAll :: Force -> String -> IO ()
+dieOrForceAll ForceAll s = ignoreError s
+dieOrForceAll _other s   = dieForcible s
+
+dieOrForceFile :: Force -> String -> IO ()
+dieOrForceFile ForceAll   s = ignoreError s
+dieOrForceFile ForceFiles s = ignoreError s
+dieOrForceFile _other     s = dieForcible s
+
+ignoreError :: String -> IO ()
+ignoreError s = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
+
+dieForcible :: String -> IO ()
+dieForcible s = die (s ++ " (use --force to override)")
 
 -----------------------------------------
 --	Cut and pasted from ghc/compiler/SysTools
