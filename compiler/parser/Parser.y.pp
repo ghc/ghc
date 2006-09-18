@@ -1104,6 +1104,8 @@ alts1 	:: { Located [LMatch RdrName] }
 alt 	:: { LMatch RdrName }
 	: infixexp opt_sig alt_rhs	{%  checkPattern $1 >>= \p ->
 			    		    return (LL (Match [p] $2 (unLoc $3))) }
+	| '!' infixexp opt_sig alt_rhs	{%  checkPattern $2 >>= \p ->
+			    		    return (LL (Match [LL $ BangPat p] $3 (unLoc $4))) }
 
 alt_rhs :: { Located (GRHSs RdrName) }
 	: ralt wherebinds		{ LL (GRHSs (unLoc $1) (unLoc $2)) }
