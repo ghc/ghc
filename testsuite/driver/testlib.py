@@ -297,7 +297,7 @@ def test_common_work (name, opts, func, args):
                '.comp.stderr', '.comp.stdout',
                '.interp.stderr', '.interp.stdout',
                '.hi', '.o', '.prof', '.exe.prof', '.hc', '_stub.h', '_stub.c',
-               '_stub.o', '.hp', '.exe.hp']))
+               '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr']))
 
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))
@@ -584,10 +584,14 @@ def simple_run( name, way, prog, args, ignore_output_files ):
 
    rm_no_fail(qualify(name,'run.stdout'))
    rm_no_fail(qualify(name,'run.stderr'))
+   rm_no_fail(qualify(name, 'hp'))
+   rm_no_fail(qualify(name,'ps'))
+   
+   my_rts_flags = rts_flags(way)
 
    cmd = 'cd ' + testdir + ' && ' \
 	  + prog + ' ' + args + ' ' \
-          + rts_flags(way) + ' ' \
+          + my_rts_flags + ' ' \
           + ' <' + use_stdin \
           + ' >' + run_stdout \
           + ' 2>' + run_stderr
@@ -603,7 +607,11 @@ def simple_run( name, way, prog, args, ignore_output_files ):
        print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
        return 'fail'
 
-   if ignore_output_files or (check_stdout_ok(name) and check_stderr_ok(name)):
+   check_hp = my_rts_flags.find("-h") != -1
+
+   if ignore_output_files or (check_stdout_ok(name) and 
+                              check_stderr_ok(name) and
+                              (not check_hp or check_hp_ok(name))):
        return 'pass'
    else:
        return 'fail'
@@ -859,6 +867,31 @@ def check_stderr_ok( name ):
        return 1
 
 
+def check_hp_ok(name):
+
+    # do not qualify for hp2ps because we should be in the right directory
+    hp2psCmd = 'cd ' + testdir + ' && ' + config.hp2ps + ' ' + name 
+
+    hp2psResult = runCmdExitCode(hp2psCmd)
+
+    actual_ps_file = qualify(name, 'ps')
+    
+    if(hp2psResult == 0):
+        if (os.path.exists(actual_ps_file)):
+            if gs_working:
+                gsResult = runCmdExitCode(genGSCmd(actual_ps_file))
+                if (gsResult == 0):
+                    return (True)
+                else:
+                    print "hp2ps output for " + name + "is not valid PostScript"
+            else: return (True) # assume postscript is valid without ghostscript
+        else: 
+            print "hp2ps did not generate PostScript for" + name
+            return (False) 
+    else:
+        print "hp2ps error when processing heap profile for " + name
+        return(False)
+
 def different_outputs( str1, str2 ):
    # On Windows, remove '\r' characters from the output
    return re.sub('\r', '', str1) != re.sub('\r', '', str2)
@@ -940,6 +973,36 @@ def runCmd( cmd ):
     else:
         r = os.system(cmd)
     return r << 8
+
+def runCmdExitCode( cmd ):
+    return (runCmd(cmd) >> 8);
+
+
+# -----------------------------------------------------------------------------
+# checking if ghostscript is available for checking the output of hp2ps
+
+def genGSCmd(psfile):
+    return (config.gs + ' -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE ' + psfile);
+
+def gsNotWorking():
+    global gs_working 
+    print "GhostScript not available for hp2ps tests"
+    gs_working = 0;
+
+global gs_working
+if config.gs != '':
+    resultGood = runCmdExitCode(genGSCmd(config.confdir + '/good.ps'));
+    if resultGood == 0:
+        resultBad = runCmdExitCode(genGSCmd(config.confdir + '/bad.ps'));
+        if resultBad != 0:
+            print "GhostScript available for hp2ps tests"
+            gs_working = 1;
+        else:
+            gsNotWorking();
+    else:
+        gsNotWorking();
+else:
+    gsNotWorking();
 
 def rm_no_fail( file ):
    try:

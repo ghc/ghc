@@ -6,6 +6,10 @@ config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
 config.compiler_always_flags = ['-no-recomp', '-dcore-lint', '-dcmm-lint']
 
+config.hp2ps		     = 'hp2ps'
+config.gs		     = 'gs'
+config.confdir               = '.'
+
 # By default, we test the 'normal', 'opt' and 'hpc' ways.
 # 'optasm' is added by mk/test.mk if the compiler has a native code gen,
 # 'prof'   is added by mk/test.mk if the profiling way is enabled.

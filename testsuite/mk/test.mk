@@ -33,10 +33,13 @@ export MAKE
 GHC_STAGE1_ABS	= $(GHC_COMPILER_DIR_ABS)/stage1/ghc-inplace
 GHC_STAGE2_ABS	= $(GHC_COMPILER_DIR_ABS)/stage2/ghc-inplace
 GHC_STAGE3_ABS	= $(GHC_COMPILER_DIR_ABS)/stage3/ghc-inplace
+HP2PS_ABS	= $(GHC_HP2PS_DIR_ABS)/hp2ps
+GS = gs
 
 RUNTESTS     = $(TOP)/driver/runtests.py
 COMPILER     = ghc
-CONFIG       = $(TOP)/config/$(COMPILER)
+CONFIGDIR    = $(TOP)/config
+CONFIG       = $(CONFIGDIR)/$(COMPILER)
 
 # can be overriden from the command line
 ifneq "$(stage)" ""
@@ -91,9 +94,12 @@ endif
 
 RUNTEST_OPTS +=  \
 	--config=$(CONFIG) \
+	-e config.confdir=\"$(CONFIGDIR)\" \
 	-e config.compiler=\"$(TEST_HC)\" \
 	-e config.compiler_always_flags.append"(\"-D$(HostPlatform_CPP)\")" \
 	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
+	-e config.hp2ps=\"$(HP2PS_ABS)\" \
+	-e config.gs=\"$(GS)\" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	-e config.wordsize=\"$(WORDSIZE)\" \
 	-e default_testopts.cleanup=\"$(CLEANUP)\" \
