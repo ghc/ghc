@@ -127,7 +127,6 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc docs/users_guide/users_guide
 %doc html/*
 %doc libraries/Cabal/doc/Cabal
-%{prefix}/bin/cabal-setup
 %{prefix}/bin/ghc
 %{prefix}/bin/ghc-%{version}
 %{prefix}/bin/ghc-pkg
