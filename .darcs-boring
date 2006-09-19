@@ -61,7 +61,15 @@
 ^libraries/xhtml/
 # Boring file regexps:
 \.hi$
+\.hi-boot$
+\.o-boot$
+\.p_o$
+\.debug_o$
+\.thr_o$
+\.thr_p_o$
+\.thr_debug_o$
 \.o$
+\.a$
 \.o\.cmd$
 # *.ko files aren't boring by default because they might
 # be Korean translations rather than kernel modules.
@@ -93,3 +101,31 @@
 \#
 \.cvsignore$
 (^|/)Thumbs\.db$
+\.depend$
+\.depend-.*$
+^compiler/primop-
+^compiler/cmm/CmmLex.hs$
+^compiler/cmm/CmmParse.hs$
+^compiler/main/Config.hs$
+^compiler/parser/ParsePkgConf.hs$
+^compiler/parser/Parser.y$
+^compiler/parser/Parser.hs$
+^compiler/parser/Lexer.hs$
+^compiler/parser/ParserCore.hs$
+^compiler/prelude/primops.txt$
+^compiler/stage1
+^compiler/stage2
+^compiler/stage3
+^mk/build.mk$
+^mk/config.h.in$
+^mk/config.h$
+^mk/config.mk$
+^mk/stamp-h$
+(^|/)autom4te.cache($|/)
+^rts/AutoApply.*cmm$
+package.conf.inplace$
+package.conf.installed$
+(^|/)config.log$
+(^|/)config.status$
+(^|/)configure$
+^ghc.spec$
