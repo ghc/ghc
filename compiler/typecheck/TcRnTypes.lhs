@@ -799,6 +799,7 @@ data InstOrigin
   | RecordUpdOrigin
   | InstScOrigin	-- Typechecking superclasses of an instance declaration
   | DerivOrigin		-- Typechecking deriving
+  | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin	-- Typechecking a default decl
   | DoOrigin		-- Arising from a do expression
   | ProcOrigin		-- Arising from a proc expression
@@ -820,6 +821,7 @@ pprInstLoc (InstLoc orig locn _)
     pp_orig InstSigOrigin	 = ptext SLIT("instantiating a type signature")
     pp_orig InstScOrigin	 = ptext SLIT("the superclasses of an instance declaration")
     pp_orig DerivOrigin	 	 = ptext SLIT("the 'deriving' clause of a data type declaration")
+    pp_orig StandAloneDerivOrigin = ptext SLIT("a 'deriving' declaration")
     pp_orig DefaultOrigin	 = ptext SLIT("a 'default' declaration")
     pp_orig DoOrigin		 = ptext SLIT("a do statement")
     pp_orig ProcOrigin		 = ptext SLIT("a proc expression")

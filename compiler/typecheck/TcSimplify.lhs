@@ -2151,17 +2151,18 @@ a,b,c are type variables.  This is required for the context of
 instance declarations.
 
 \begin{code}
-tcSimplifyDeriv :: TyCon
+tcSimplifyDeriv :: InstOrigin
+                -> TyCon
 		-> [TyVar]	
 		-> ThetaType		-- Wanted
 	        -> TcM ThetaType	-- Needed
 
-tcSimplifyDeriv tc tyvars theta
+tcSimplifyDeriv orig tc tyvars theta
   = tcInstTyVars tyvars			`thenM` \ (tvs, _, tenv) ->
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
-    newDictBndrsO DerivOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
+    newDicts DerivOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
     simpleReduceLoop doc reduceMe wanteds		`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 

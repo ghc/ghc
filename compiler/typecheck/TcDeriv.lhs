@@ -25,6 +25,7 @@ import InstEnv		( Instance, OverlapFlag, mkLocalInstance, instanceHead, extendIn
 import Inst		( getOverlapFlag )
 import TcHsType		( tcHsDeriv )
 import TcSimplify	( tcSimplifyDeriv )
+import TypeRep          ( PredType )
 
 import RnBinds		( rnMethodBinds, rnTopBinds )
 import RnEnv		( bindLocalNames )
@@ -50,7 +51,7 @@ import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
 import Var		( TyVar, tyVarKind, varName )
 import VarSet		( mkVarSet, disjointVarSet )
 import PrelNames
-import SrcLoc		( srcLocSpan, Located(..), unLoc )
+import SrcLoc		( SrcSpan, srcLocSpan, Located(..), unLoc )
 import Util		( zipWithEqual, sortLe, notNull )
 import ListSetOps	( removeDups,  assocMaybe )
 import Outputable
@@ -142,12 +143,13 @@ this by simplifying the RHS to a form in which
 So, here are the synonyms for the ``equation'' structures:
 
 \begin{code}
-type DerivEqn = (Name, Class, TyCon, [TyVar], DerivRhs)
+type DerivEqn = (SrcSpan, InstOrigin, Name, Class, TyCon, [TyVar], DerivRhs)
 		-- The Name is the name for the DFun we'll build
 		-- The tyvars bind all the variables in the RHS
 
-pprDerivEqn (n,c,tc,tvs,rhs)
-  = parens (hsep [ppr n, ppr c, ppr tc, ppr tvs] <+> equals <+> ppr rhs)
+pprDerivEqn :: DerivEqn -> SDoc
+pprDerivEqn (l,_,n,c,tc,tvs,rhs)
+  = parens (hsep [ppr l, ppr n, ppr c, ppr tc, ppr tvs] <+> equals <+> ppr rhs)
 
 type DerivRhs  = ThetaType
 type DerivSoln = DerivRhs
@@ -350,52 +352,48 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
        return (catMaybes maybe_ordinaries, catMaybes maybe_newtypes)
   where
     ------------------------------------------------------------------
-    derive_these :: [(NewOrData, Name, LHsType Name)]
+    derive_these :: [(SrcSpan, InstOrigin, NewOrData, Name, LHsType Name)]
 	-- Find the (nd, TyCon, Pred) pairs that must be `derived'
-    derive_these = [ (nd, tycon, pred) 
+    derive_these = [ (srcLocSpan (getSrcLoc tycon), DerivOrigin, nd, tycon, pred) 
 		   | L _ (TyData { tcdND = nd, tcdLName = L _ tycon, 
 			          tcdDerivs = Just preds }) <- tycl_decls,
 		     pred <- preds ]
 
-    top_level_deriv :: LDerivDecl Name -> TcM (Maybe (NewOrData, Name, LHsType Name))
+    top_level_deriv :: LDerivDecl Name -> TcM (Maybe (SrcSpan, InstOrigin, NewOrData, Name, LHsType Name))
     top_level_deriv d@(L l (DerivDecl inst ty_name)) = recoverM (returnM Nothing) $ setSrcSpan l $ 
         do tycon <- tcLookupLocatedTyCon ty_name
            let new_or_data = if isNewTyCon tycon then NewType else DataType
            traceTc (text "Stand-alone deriving:" <+> ppr (new_or_data, unLoc ty_name, inst))
-           return $ Just (new_or_data, unLoc ty_name, inst)
+           return $ Just (l, StandAloneDerivOrigin, new_or_data, unLoc ty_name, inst)
 
     ------------------------------------------------------------------
     -- takes (whether newtype or data, name of data type, partially applied type class)
-    mk_eqn :: (NewOrData, Name, LHsType Name) -> TcM (Maybe DerivEqn, Maybe InstInfo)
+    mk_eqn :: (SrcSpan, InstOrigin, NewOrData, Name, LHsType Name) -> TcM (Maybe DerivEqn, Maybe InstInfo)
 	-- We swizzle the tyvars and datacons out of the tycon
 	-- to make the rest of the equation
 	--
 	-- The "deriv_ty" is a LHsType to take account of the fact that for newtype derivign
 	-- we allow deriving (forall a. C [a]).
 
-    mk_eqn (new_or_data, tycon_name, hs_deriv_ty)
+    mk_eqn (loc, orig, new_or_data, tycon_name, hs_deriv_ty)
       = tcLookupTyCon tycon_name		`thenM` \ tycon ->
-	setSrcSpan (srcLocSpan (getSrcLoc tycon))		$
+	setSrcSpan loc		$
         addErrCtxt (derivCtxt tycon)		$
 	tcExtendTyVarEnv (tyConTyVars tycon)	$	-- Deriving preds may (now) mention
 							-- the type variables for the type constructor
 	tcHsDeriv hs_deriv_ty			`thenM` \ (deriv_tvs, clas, tys) ->
 	doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
-        mk_eqn_help gla_exts new_or_data tycon deriv_tvs clas tys
+        mk_eqn_help loc orig gla_exts new_or_data tycon deriv_tvs clas tys
 
     ------------------------------------------------------------------
-    -- data/newtype T a = ... deriving( C t1 t2 )
-    --   leads to a call to mk_eqn_help with
-    --		tycon = T, deriv_tvs = ftv(t1,t2), clas = C, tys = [t1,t2]
-
     mk_eqn_help gla_exts DataType tycon deriv_tvs clas tys
       | Just err <- checkSideConditions gla_exts tycon deriv_tvs clas tys
       = bale_out (derivingThingErr clas tys tycon (tyConTyVars tycon) err)
       | otherwise 
-      = do { eqn <- mkDataTypeEqn tycon clas
+      = do { eqn <- mkDataTypeEqn loc orig tycon clas
 	   ; returnM (Just eqn, Nothing) }
 
-    mk_eqn_help gla_exts NewType tycon deriv_tvs clas tys
+    mk_eqn_help loc orig gla_exts NewType tycon deriv_tvs clas tys
       | can_derive_via_isomorphism && (gla_exts || std_class_via_iso clas)
       =	do { traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)
 	   ; 	-- Go ahead and use the isomorphism
@@ -403,7 +401,7 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
 	   ; return (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
 					       iBinds = NewTypeDerived ntd_info })) }
       | std_class gla_exts clas
-      = mk_eqn_help gla_exts DataType tycon deriv_tvs clas tys	-- Go via bale-out route
+      = mk_eqn_help loc orig gla_exts DataType tycon deriv_tvs clas tys	-- Go via bale-out route
 
       | otherwise 				-- Non-standard instance
       = bale_out (if gla_exts then	
@@ -579,8 +577,8 @@ new_dfun_name clas tycon 	-- Just a simple wrapper
 	-- a suitable string; hence the empty type arg list
 
 ------------------------------------------------------------------
-mkDataTypeEqn :: TyCon -> Class -> TcM DerivEqn
-mkDataTypeEqn tycon clas
+mkDataTypeEqn :: SrcSpan -> InstOrigin -> TyCon -> Class -> TcM DerivEqn
+mkDataTypeEqn loc orig tycon clas
   | clas `hasKey` typeableClassKey
   =	-- The Typeable class is special in several ways
 	-- 	  data T a b = ... deriving( Typeable )
@@ -593,11 +591,11 @@ mkDataTypeEqn tycon clas
 	--	Typeable; it depends on the arity of the type
     do	{ real_clas <- tcLookupClass (typeableClassNames !! tyConArity tycon)
 	; dfun_name <- new_dfun_name real_clas tycon
-  	; return (dfun_name, real_clas, tycon, [], []) }
+  	; return (loc, orig, dfun_name, real_clas, tycon, [], []) }
 
   | otherwise
   = do	{ dfun_name <- new_dfun_name clas tycon
-  	; return (dfun_name, clas, tycon, tyvars, constraints) }
+  	; return (loc, orig, dfun_name, clas, tycon, tyvars, constraints) }
   where
     tyvars            = tyConTyVars tycon
     constraints       = extra_constraints ++ ordinary_constraints
@@ -765,11 +763,12 @@ solveDerivEqns overlap_flag orig_eqns
 	    iterateDeriv (n+1) new_solns
 
     ------------------------------------------------------------------
-    gen_soln (_, clas, tc,tyvars,deriv_rhs)
-      = setSrcSpan (srcLocSpan (getSrcLoc tc))	$
+    gen_soln :: DerivEqn -> TcM [PredType]
+    gen_soln (loc, orig, _, clas, tc,tyvars,deriv_rhs)
+      = setSrcSpan loc	$
 	do { let inst_tys = [mkTyConApp tc (mkTyVarTys tyvars)]
 	   ; theta <- addErrCtxt (derivInstCtxt1 clas inst_tys) $
-		      tcSimplifyDeriv tc tyvars deriv_rhs
+		      tcSimplifyDeriv orig tc tyvars deriv_rhs
 	   ; addErrCtxt (derivInstCtxt2 theta clas inst_tys) $
 	     checkValidInstance tyvars theta clas inst_tys
 	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the soluction
@@ -777,7 +776,8 @@ solveDerivEqns overlap_flag orig_eqns
 	
 
     ------------------------------------------------------------------
-    mk_inst_spec (dfun_name, clas, tycon, tyvars, _) theta
+    mk_inst_spec :: DerivEqn -> DerivSoln -> Instance
+    mk_inst_spec (loc, orig, dfun_name, clas, tycon, tyvars, _) theta
 	= mkLocalInstance dfun overlap_flag
 	where
 	  dfun = mkDictFunId dfun_name tyvars theta clas
