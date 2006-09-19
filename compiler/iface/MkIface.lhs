@@ -11,8 +11,10 @@ module MkIface (
 
 	writeIfaceFile,	-- Write the interface file
 
-	checkOldIface	-- See if recompilation is required, by
+	checkOldIface,	-- See if recompilation is required, by
 			-- comparing version information
+
+        tyThingToIfaceDecl -- Converting things to their Iface equivalents
  ) where
 \end{code}
 
