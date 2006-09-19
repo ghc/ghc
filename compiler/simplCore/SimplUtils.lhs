@@ -246,7 +246,9 @@ getContArgs chkr fun orig_cont
 	where
 	  args = reverse acc
 	  hole_ty = applyTypeToArgs (Var fun) (idType fun)
-				    [substExpr se arg | (arg,se,_) <- args]
+				    [substExpr_mb se arg | (arg,se,_) <- args]
+          substExpr_mb Nothing   arg = arg
+	  substExpr_mb (Just se) arg = substExpr se arg
     
     ----------------------------
     vanilla_stricts, computed_stricts :: [Bool]
