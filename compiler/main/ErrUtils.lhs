@@ -38,7 +38,6 @@ import SrcLoc		( srcSpanStart, noSrcSpan )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_ErrorSpans )
 import System		( ExitCode(..), exitWith )
-import DATA_IOREF
 import IO		( hPutStrLn, stderr )
 import DYNAMIC
 
