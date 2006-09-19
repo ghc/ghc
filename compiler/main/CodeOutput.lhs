@@ -126,7 +126,7 @@ outputC dflags filenm mod location flat_absC
        --   * -#include options from the cmdline and OPTIONS pragmas
        --   * the _stub.h file, if there is one.
        --
-       pkg_configs <- getExplicitPackagesAnd dflags packages
+       pkg_configs <- getPreloadPackagesAnd dflags packages
        let pkg_names = map (showPackageId.package) pkg_configs
 
        c_includes <- getPackageCIncludes pkg_configs

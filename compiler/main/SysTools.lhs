@@ -11,10 +11,6 @@ module SysTools (
 	-- Initialisation
 	initSysTools,
 
-	getTopDir,		-- IO String	-- The value of $topdir
-	getPackageConfigPath,	-- IO String	-- Where package.conf is
-        getUsageMsgPaths,       -- IO (String,String)
-
 	-- Interface to system tools
 	runUnlit, runCpp, runCc, -- [Option] -> IO ()
 	runPp,                   -- [Option] -> IO ()
@@ -35,9 +31,6 @@ module SysTools (
 	-- System interface
 	system, 		-- String -> IO ExitCode
 
-	-- Misc
-	getSysMan,		-- IO String	Parallel system only
-	
 	Option(..)
 
  ) where
@@ -168,34 +161,6 @@ stuff.
 		End of NOTES
 ---------------------------------------------
 
-
-%************************************************************************
-%*									*
-\subsection{Global variables to contain system programs}
-%*									*
-%************************************************************************
-
-All these pathnames are maintained IN THE NATIVE FORMAT OF THE HOST MACHINE.
-(See remarks under pathnames below)
-
-\begin{code}
-GLOBAL_VAR(v_Pgm_T,    error "pgm_T",    String)	-- touch
-GLOBAL_VAR(v_Pgm_CP,   error "pgm_CP", 	 String)	-- cp
-
-GLOBAL_VAR(v_Path_package_config, error "path_package_config", String)
-GLOBAL_VAR(v_Path_usages,  	  error "ghc_usage.txt",       (String,String))
-
-GLOBAL_VAR(v_TopDir,	error "TopDir",	String)		-- -B<dir>
-
--- Parallel system only
-GLOBAL_VAR(v_Pgm_sysman, error "pgm_sysman", String)	-- system manager
-
--- ways to get at some of these variables from outside this module
-getPackageConfigPath = readIORef v_Path_package_config
-getTopDir	     = readIORef v_TopDir
-\end{code}
-
-
 %************************************************************************
 %*									*
 \subsection{Initialisation}
@@ -214,11 +179,11 @@ initSysTools :: Maybe String	-- Maybe TopDir path (without the '-B' prefix)
 
 initSysTools mbMinusB dflags
   = do  { (am_installed, top_dir) <- findTopDir mbMinusB
-	; writeIORef v_TopDir top_dir
 		-- top_dir
 		-- 	for "installed" this is the root of GHC's support files
 		--	for "in-place" it is the root of the build tree
-		-- NB: top_dir is assumed to be in standard Unix format '/' separated
+		-- NB: top_dir is assumed to be in standard Unix
+		-- format, '/' separated
 
 	; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm   =  pgmPath top_dir pgm
@@ -368,19 +333,11 @@ initSysTools mbMinusB dflags
 	; let	(as_prog,as_args)  = (gcc_prog,gcc_args)
 		(ld_prog,ld_args)  = (gcc_prog,gcc_args)
 
-	-- Initialise the global vars
-	; writeIORef v_Path_package_config pkgconfig_path
-	; writeIORef v_Path_usages 	   (ghc_usage_msg_path,
-					    ghci_usage_msg_path)
-
-	; writeIORef v_Pgm_sysman	   (top_dir ++ "/ghc/rts/parallel/SysMan")
-		-- Hans: this isn't right in general, but you can 
-		-- elaborate it in the same way as the others
-
-	; writeIORef v_Pgm_T   	 	   touch_path
-	; writeIORef v_Pgm_CP  	 	   cp_path
-
 	; return dflags1{
+                        ghcUsagePath = ghc_usage_msg_path,
+                        ghciUsagePath = ghci_usage_msg_path,
+                        topDir  = top_dir,
+                        systemPackageConfig = pkgconfig_path,
 			pgm_L	= unlit_path,
 			pgm_P	= cpp_path,
 			pgm_F	= "",
@@ -389,7 +346,12 @@ initSysTools mbMinusB dflags
 			pgm_s   = (split_prog,split_args),
 			pgm_a   = (as_prog,as_args),
 			pgm_l	= (ld_prog,ld_args),
-			pgm_dll = (mkdll_prog,mkdll_args) }
+			pgm_dll = (mkdll_prog,mkdll_args),
+                        pgm_T   = touch_path,
+                        pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan"
+        		-- Hans: this isn't right in general, but you can 
+        		-- elaborate it in the same way as the others
+                }
 	}
 
 #if defined(mingw32_HOST_OS)
@@ -509,9 +471,8 @@ runMkDLL dflags args = do
   runSomething dflags "Make DLL" p (args0++args)
 
 touch :: DynFlags -> String -> String -> IO ()
-touch dflags purpose arg =  do 
-  p <- readIORef v_Pgm_T
-  runSomething dflags purpose p [FileOption "" arg]
+touch dflags purpose arg =
+  runSomething dflags purpose (pgm_T dflags) [FileOption "" arg]
 
 copy :: DynFlags -> String -> String -> String -> IO ()
 copy dflags purpose from to = do
@@ -522,21 +483,7 @@ copy dflags purpose from to = do
 	    	      -- ToDo: speed up via slurping.
   hPutStr h ls
   hClose h
-
 \end{code}
-
-\begin{code}
-getSysMan :: IO String	-- How to invoke the system manager 
-			-- (parallel system only)
-getSysMan = readIORef v_Pgm_sysman
-\end{code}
-
-\begin{code}
-getUsageMsgPaths :: IO (FilePath,FilePath)
-	  -- the filenames of the usage messages (ghc, ghci)
-getUsageMsgPaths = readIORef v_Path_usages
-\end{code}
-
 
 %************************************************************************
 %*									*

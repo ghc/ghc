@@ -21,7 +21,6 @@ import CmdLineParser
 import MkIface		( showIface )
 import DriverPipeline	( oneShot, compileFile )
 import DriverMkDepend	( doMkDependHS )
-import SysTools		( getTopDir, getUsageMsgPaths )
 #ifdef GHCI
 import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
 #endif
@@ -64,11 +63,18 @@ import Maybe
 main =
   GHC.defaultErrorHandler defaultDynFlags $ do
   
+  -- 1. extract the -B flag from the args
   argv0 <- getArgs
-  argv1 <- parseStaticFlags =<< GHC.initFromArgs argv0
+
+  let
+        (minusB_args, argv1) = partition (prefixMatch "-B") argv0
+        mbMinusB | null minusB_args = Nothing
+                 | otherwise = Just (drop 2 (last minusB_args))
+
+  argv2 <- parseStaticFlags argv1
 
   -- 2. Parse the "mode" flags (--make, --interactive etc.)
-  (cli_mode, argv2) <- parseModeFlags argv1
+  (cli_mode, argv3) <- parseModeFlags argv2
 
   let mode = case cli_mode of
 		DoInteractive	-> Interactive
@@ -78,7 +84,7 @@ main =
 		_		-> OneShot
 
   -- start our GHC session
-  session <- GHC.newSession mode
+  session <- GHC.newSession mode mbMinusB
 
   dflags0 <- GHC.getSessionDynFlags session
 
@@ -102,20 +108,17 @@ main =
 
 	-- The rest of the arguments are "dynamic"
 	-- Leftover ones are presumably files
-  (dflags2, fileish_args) <- GHC.parseDynamicFlags dflags1 argv2
+  (dflags, fileish_args) <- GHC.parseDynamicFlags dflags1 argv3
 
 	-- make sure we clean up after ourselves
-  GHC.defaultCleanupHandler dflags2 $ do
+  GHC.defaultCleanupHandler dflags $ do
 
 	-- Display banner
-  showBanner cli_mode dflags2
-
-	-- Read the package config(s), and process the package-related
-	-- command-line flags
-  dflags <- initPackages dflags2
+  showBanner cli_mode dflags
 
   -- we've finished manipulating the DynFlags, update the session
   GHC.setSessionDynFlags session dflags
+  dflags <- GHC.getSessionDynFlags session
 
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right 
@@ -140,8 +143,8 @@ main =
 
 	---------------- Do the business -----------
   case cli_mode of
-	ShowUsage       -> showGhcUsage cli_mode
-	PrintLibdir     -> do d <- getTopDir; putStrLn d
+	ShowUsage       -> showGhcUsage dflags cli_mode
+	PrintLibdir     -> putStrLn (topDir dflags)
 	ShowVersion     -> showVersion
         ShowNumVersion  -> putStrLn cProjectVersion
         ShowInterface f -> showIface f
@@ -421,11 +424,10 @@ showVersion = do
   putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
   exitWith ExitSuccess
 
-showGhcUsage cli_mode = do 
-  (ghc_usage_path,ghci_usage_path) <- getUsageMsgPaths
+showGhcUsage dflags cli_mode = do 
   let usage_path 
-	| DoInteractive <- cli_mode = ghci_usage_path
-	| otherwise		    = ghc_usage_path
+	| DoInteractive <- cli_mode = ghcUsagePath dflags
+	| otherwise		    = ghciUsagePath dflags
   usage <- readFile usage_path
   dump usage
   exitWith ExitSuccess

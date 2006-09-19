@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-missing-fields #-}
 -----------------------------------------------------------------------------
 --
 -- Dynamic flags
@@ -63,6 +64,7 @@ import Config
 import CmdLineParser
 import Constants	( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic		( panic, GhcException(..) )
+import UniqFM           ( UniqFM )
 import Util		( notNull, splitLongestPrefix, normalisePath )
 import Maybes		( fromJust, orElse )
 import SrcLoc           ( SrcSpan )
@@ -246,6 +248,9 @@ data DynFlags = DynFlags {
   cmdlineFrameworks	:: [String],	-- ditto
   tmpDir		:: String,	-- no trailing '/'
   
+  ghcUsagePath          :: FilePath,    -- Filled in by SysTools
+  ghciUsagePath         :: FilePath,    -- ditto
+
   -- options for particular phases
   opt_L			:: [String],
   opt_P			:: [String],
@@ -267,16 +272,23 @@ data DynFlags = DynFlags {
   pgm_a			:: (String,[Option]),
   pgm_l			:: (String,[Option]),
   pgm_dll		:: (String,[Option]),
+  pgm_T                 :: String,
+  pgm_sysman            :: String,
 
-  --  ** Package flags
+  --  Package flags
   extraPkgConfs		:: [FilePath],
+  topDir                :: FilePath,    -- filled in by SysTools
+  systemPackageConfig   :: FilePath,    -- ditto
 	-- The -package-conf flags given on the command line, in the order
 	-- they appeared.
 
   packageFlags		:: [PackageFlag],
 	-- The -package and -hide-package flags from the command-line
 
-  --  ** Package state
+  -- Package state
+  -- NB. do not modify this field, it is calculated by 
+  -- Packages.initPackages and Packages.updatePackages.
+  pkgDatabase           :: Maybe (UniqFM InstalledPackageInfo),
   pkgState		:: PackageState,
 
   -- hsc dynamic flags
@@ -322,6 +334,7 @@ data PackageFlag
   = ExposePackage  String
   | HidePackage    String
   | IgnorePackage  String
+  deriving Eq
 
 defaultHscTarget
   | cGhcWithNativeCodeGen == "YES" 	=  HscAsm
@@ -359,10 +372,6 @@ defaultDynFlags =
 	ctxtStkDepth		= mAX_CONTEXT_REDUCTION_DEPTH,
 
 	thisPackage		= mainPackageId,
-	
-	wayNames		= panic "ways",
-	buildTag		= panic "buildTag",
-	rtsBuildTag		= panic "rtsBuildTag",
 
 	objectDir		= Nothing,
 	hiDir			= Nothing,
@@ -390,19 +399,10 @@ defaultDynFlags =
 	opt_dll			= [],
 	opt_dep			= [],
 	
-	pgm_L			= panic "pgm_L",
-	pgm_P			= panic "pgm_P",
-	pgm_F			= panic "pgm_F",
-	pgm_c			= panic "pgm_c",
-	pgm_m			= panic "pgm_m",
-	pgm_s			= panic "pgm_s",
-	pgm_a			= panic "pgm_a",
-	pgm_l			= panic "pgm_l",
-	pgm_dll			= panic "pgm_mkdll",
-	
 	extraPkgConfs		= [],
 	packageFlags		= [],
-	pkgState		= panic "pkgState",
+        pkgDatabase             = Nothing,
+        pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
 	
 	flags = [ 
     	    Opt_RecompChecking,

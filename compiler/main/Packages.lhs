@@ -1,8 +1,8 @@
+ %
+% (c) The University of Glasgow, 2006
 %
-% (c) The University of Glasgow, 2000
+% Package manipulation
 %
-\section{Package manipulation}
-
 \begin{code}
 module Packages (
 	module PackageConfig,
@@ -25,7 +25,7 @@ module Packages (
 	getPackageExtraCcOpts,
 	getPackageFrameworkPath,
 	getPackageFrameworks,
-	getExplicitPackagesAnd,
+	getPreloadPackagesAnd,
 
 	-- * Utils
 	isDllName
@@ -35,7 +35,6 @@ where
 #include "HsVersions.h"
 
 import PackageConfig	
-import SysTools		( getTopDir, getPackageConfigPath )
 import ParsePkgConf	( loadPackageConfig )
 import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..) )
 import StaticFlags	( opt_Static )
@@ -86,7 +85,7 @@ import ErrUtils         ( debugTraceMsg, putMsg, Message )
 --     Let depExposedPackages be the transitive closure from exposedPackages of
 --     their dependencies.
 --
---   * When searching for a module from an explicit import declaration,
+--   * When searching for a module from an preload import declaration,
 --     only the exposed modules in exposedPackages are valid.
 --
 --   * When searching for a module from an implicit import, all modules
@@ -95,7 +94,7 @@ import ErrUtils         ( debugTraceMsg, putMsg, Message )
 --   * When linking in a comp manager mode, we link in packages the
 --     program depends on (the compiler knows this list by the
 --     time it gets to the link step).  Also, we link in all packages
---     which were mentioned with explicit -package flags on the command-line,
+--     which were mentioned with preload -package flags on the command-line,
 --     or are a transitive dependency of same, or are "base"/"rts".
 --     The reason for (b) is that we might need packages which don't
 --     contain any Haskell modules, and therefore won't be discovered
@@ -111,19 +110,17 @@ import ErrUtils         ( debugTraceMsg, putMsg, Message )
 -- in a different DLL, by setting the DLL flag.
 
 data PackageState = PackageState {
+  origPkgIdMap		:: PackageConfigMap, -- PackageId   -> PackageConfig
+        -- The on-disk package database
 
-  explicitPackages      :: [PackageId],
+  pkgIdMap		:: PackageConfigMap, -- PackageId   -> PackageConfig
+	-- The exposed flags are adjusted according to -package and
+	-- -hide-package flags, and -ignore-package removes packages.
+
+  preloadPackages      :: [PackageId],
 	-- The packages we're going to link in eagerly.  This list
 	-- should be in reverse dependency order; that is, a package
 	-- is always mentioned before the packages it depends on.
-
-  origPkgIdMap	        :: PackageConfigMap, -- PackageId   -> PackageConfig
-	-- the full package database
-
-  pkgIdMap		:: PackageConfigMap, -- PackageId   -> PackageConfig
-	-- Derived from origPkgIdMap.
-	-- The exposed flags are adjusted according to -package and
-	-- -hide-package flags, and -ignore-package removes packages.
 
   moduleToPkgConfAll 	:: UniqFM [(PackageConfig,Bool)] -- ModuleEnv mapping
 	-- Derived from pkgIdMap.	
@@ -153,14 +150,29 @@ getPackageDetails dflags ps = expectJust "getPackageDetails" (lookupPackage (pkg
 -- ----------------------------------------------------------------------------
 -- Loading the package config files and building up the package state
 
--- | Call this after parsing the DynFlags.  It reads the package
+-- | Call this after 'DynFlags.parseDynFlags'.  It reads the package
 -- configuration files, and sets up various internal tables of package
 -- information, according to the package-related flags on the
 -- command-line (@-package@, @-hide-package@ etc.)
-initPackages :: DynFlags -> IO DynFlags
+--
+-- Returns a list of packages to link in if we're doing dynamic linking.
+-- This list contains the packages that the user explicitly mentioned with
+-- -package flags.
+--
+-- 'initPackages' can be called again subsequently after updating the
+-- 'packageFlags' field of the 'DynFlags', and it will update the
+-- 'packageState' in 'DynFlags' and return a list of packages to
+-- link in.
+initPackages :: DynFlags -> IO (DynFlags, [PackageId])
 initPackages dflags = do 
-  pkg_map <- readPackageConfigs dflags; 
-  mkPackageState dflags pkg_map
+  pkg_db <- case pkgDatabase dflags of
+                Nothing -> readPackageConfigs dflags
+                Just db -> return db
+  (pkg_state, preload, this_pkg)       
+        <- mkPackageState dflags pkg_db [] (thisPackage dflags)
+  return (dflags{ pkgState = pkg_state,
+                  thisPackage = this_pkg },
+          preload)
 
 -- -----------------------------------------------------------------------------
 -- Reading the package database(s)
@@ -189,7 +201,7 @@ readPackageConfigs dflags = do
 getSystemPackageConfigs :: DynFlags -> IO [FilePath]
 getSystemPackageConfigs dflags = do
 	-- System one always comes first
-   system_pkgconf <- getPackageConfigPath
+   let system_pkgconf = systemPackageConfig dflags
 
 	-- allow package.conf.d to contain a bunch of .conf files
 	-- containing package specifications.  This is an easier way
@@ -229,8 +241,8 @@ readPackageConfig
 readPackageConfig dflags pkg_map conf_file = do
   debugTraceMsg dflags 2 (text "Using package config file:" <+> text conf_file)
   proto_pkg_configs <- loadPackageConfig conf_file
-  top_dir 	    <- getTopDir
-  let pkg_configs1 = mungePackagePaths top_dir proto_pkg_configs
+  let top_dir = topDir dflags
+      pkg_configs1 = mungePackagePaths top_dir proto_pkg_configs
       pkg_configs2 = maybeHidePackages dflags pkg_configs1
   return (extendPackageConfigMap pkg_map pkg_configs2)
 
@@ -259,91 +271,105 @@ mungePackagePaths top_dir ps = map munge_pkg ps
 
 
 -- -----------------------------------------------------------------------------
--- When all the command-line options are in, we can process our package
--- settings and populate the package state.
+-- Modify our copy of the package database based on a package flag
+-- (-package, -hide-package, -ignore-package).
 
-mkPackageState :: DynFlags -> PackageConfigMap -> IO DynFlags
-mkPackageState dflags orig_pkg_db = do
-  --
-  -- Modify the package database according to the command-line flags
-  -- (-package, -hide-package, -ignore-package, -hide-all-packages).
-  --
-  -- Also, here we build up a set of the packages mentioned in -package
-  -- flags on the command line; these are called the "explicit" packages.
-  -- we link these packages in eagerly.  The explicit set should contain
-  -- at least rts & base, which is why we pretend that the command line
-  -- contains -package rts & -package base.
-  --
-  let
-	flags = reverse (packageFlags dflags)
+applyPackageFlag
+   :: [PackageConfig]           -- Initial database
+   -> PackageFlag               -- flag to apply
+   -> IO [PackageConfig]        -- new database
 
-	procflags pkgs expl [] = return (pkgs,expl)
-	procflags pkgs expl (ExposePackage str : flags) = do
-	   case pick str pkgs of
+applyPackageFlag pkgs flag = 
+  case flag of
+        ExposePackage str ->
+	   case matchingPackages str pkgs of
 		Nothing -> missingPackageErr str
-		Just (p,ps) -> procflags (p':ps') expl' flags
+		Just (p:ps,qs) -> return (p':ps')
 		  where p' = p {exposed=True}
-		        ps' = hideAll (pkgName (package p)) ps
-			expl' = package p : expl
-	procflags pkgs expl (HidePackage str : flags) = do
-	   case partition (matches str) pkgs of
-		([],_)   -> missingPackageErr str
-		(ps,qs) -> procflags (map hide ps ++ qs) expl flags
+		        ps' = hideAll (pkgName (package p)) (ps++qs)
+
+	HidePackage str ->
+           case matchingPackages str pkgs of
+                Nothing -> missingPackageErr str
+                Just (ps,qs) -> return (map hide ps ++ qs)
 		  where hide p = p {exposed=False}
-	procflags pkgs expl (IgnorePackage str : flags) = do
-	   case partition (matches str) pkgs of
-		(ps,qs) -> procflags qs expl flags
+
+	IgnorePackage str ->
+           case matchingPackages str pkgs of
+                Nothing -> return pkgs
+                Just (ps,qs) -> return qs
 		-- missing package is not an error for -ignore-package,
 		-- because a common usage is to -ignore-package P as
 		-- a preventative measure just in case P exists.
-
-	pick str pkgs
-	  = case partition (matches str) pkgs of
-		([],_) -> Nothing
-		(ps,rest) -> 
-		   case sortByVersion ps of
-			(p:ps) -> Just (p, ps ++ rest)
-			_ -> panic "Packages.pick"
-
-        sortByVersion = sortBy (flip (comparing (pkgVersion.package)))
-        comparing f a b = f a `compare` f b
-
-	-- A package named on the command line can either include the
-	-- version, or just the name if it is unambiguous.
-	matches str p
-		=  str == showPackageId (package p)
-		|| str == pkgName (package p)
-
+   where
 	-- When a package is requested to be exposed, we hide all other
 	-- packages with the same name.
 	hideAll name ps = map maybe_hide ps
 	  where maybe_hide p | pkgName (package p) == name = p {exposed=False}
 			     | otherwise                   = p
-  --
-  (pkgs1,explicit) <- procflags (eltsUFM orig_pkg_db) [] flags
-  --
-  -- hide all packages for which there is also a later version
-  -- that is already exposed.  This just makes it non-fatal to have two
-  -- versions of a package exposed, which can happen if you install a
-  -- later version of a package in the user database, for example.
-  --
-  let maybe_hide p
+
+
+matchingPackages :: String -> [PackageConfig]
+         -> Maybe ([PackageConfig], [PackageConfig])
+matchingPackages str pkgs
+  = case partition (matches str) pkgs of
+	([],_)    -> Nothing
+	(ps,rest) -> Just (sortByVersion ps, rest)
+  where
+        -- A package named on the command line can either include the
+	-- version, or just the name if it is unambiguous.
+	matches str p
+		=  str == showPackageId (package p)
+		|| str == pkgName (package p)
+
+
+pickPackages pkgs strs = 
+  [ p | p <- strs, Just (p:ps,_) <- [matchingPackages p pkgs] ]
+
+sortByVersion = sortBy (flip (comparing (pkgVersion.package)))
+comparing f a b = f a `compare` f b
+
+-- -----------------------------------------------------------------------------
+-- Hide old versions of packages
+
+--
+-- hide all packages for which there is also a later version
+-- that is already exposed.  This just makes it non-fatal to have two
+-- versions of a package exposed, which can happen if you install a
+-- later version of a package in the user database, for example.
+--
+hideOldPackages :: DynFlags -> [PackageConfig] -> IO [PackageConfig]
+hideOldPackages dflags pkgs = mapM maybe_hide pkgs
+  where maybe_hide p
 	   | not (exposed p) = return p
 	   | (p' : _) <- later_versions = do
 		debugTraceMsg dflags 2 $
-		   (ptext SLIT("hiding package") <+> text (showPackageId (package p)) <+>
+		   (ptext SLIT("hiding package") <+> 
+                    text (showPackageId (package p)) <+>
 		    ptext SLIT("to avoid conflict with later version") <+>
 		    text (showPackageId (package p')))
 		return (p {exposed=False})
 	   | otherwise = return p
 	  where myname = pkgName (package p)
 		myversion = pkgVersion (package p)
-		later_versions = [ p | p <- pkgs1, exposed p,
+		later_versions = [ p | p <- pkgs, exposed p,
 				    let pkg = package p,
 				    pkgName pkg == myname,
 				    pkgVersion pkg > myversion ]
 
-  pkgs2 <- mapM maybe_hide pkgs1
+-- -----------------------------------------------------------------------------
+-- Wired-in packages
+
+findWiredInPackages
+   :: DynFlags
+   -> [PackageConfig]           -- database
+   -> [PackageIdentifier]       -- preload packages
+   -> PackageId 		-- this package
+   -> IO ([PackageConfig],
+          [PackageIdentifier],
+          PackageId)
+
+findWiredInPackages dflags pkgs preload this_package = do
   --
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base).
@@ -391,7 +417,7 @@ mkPackageState dflags orig_pkg_db = do
 			return (Just (package pkg))
 
 
-  mb_wired_in_ids <- mapM (findWiredInPackage pkgs2) wired_in_names
+  mb_wired_in_ids <- mapM (findWiredInPackage pkgs) wired_in_names
   let 
         wired_in_ids = catMaybes mb_wired_in_ids
 
@@ -407,79 +433,122 @@ mkPackageState dflags orig_pkg_db = do
 				[] -> pid
 				(x:_) -> x{ pkgVersion = Version [] [] }
 
-        pkgs3 = deleteOtherWiredInPackages pkgs2
+        pkgs1 = deleteOtherWiredInPackages pkgs
 
-        pkgs4 = updateWiredInDependencies pkgs3
+        pkgs2 = updateWiredInDependencies pkgs1
 
-        explicit1 = map upd_pid explicit
+        preload1 = map upd_pid preload
 
         -- we must return an updated thisPackage, just in case we
         -- are actually compiling one of the wired-in packages
-        Just old_this_pkg = unpackPackageId (thisPackage dflags)
+        Just old_this_pkg = unpackPackageId this_package
         new_this_pkg = mkPackageId (upd_pid old_this_pkg)
 
-  --
-  -- Eliminate any packages which have dangling dependencies (perhaps
-  -- because the package was removed by -ignore-package).
-  --
-  let
-	elimDanglingDeps pkgs = 
-	   case partition (not.null.snd) (map (getDanglingDeps pkgs) pkgs) of
-	      ([],ps) -> return (map fst ps)
-	      (ps,qs) -> do
-		 mapM_ reportElim ps
-		 elimDanglingDeps (map fst qs)
+  return (pkgs2, preload1, new_this_pkg)
 
-	reportElim (p, deps) = 
-		debugTraceMsg dflags 2 $
-		   (ptext SLIT("package") <+> pprPkg p <+> 
-			ptext SLIT("will be ignored due to missing dependencies:") $$ 
-		    nest 2 (hsep (map (text.showPackageId) deps)))
+-- -----------------------------------------------------------------------------
+--
+-- Eliminate any packages which have dangling dependencies (
+-- because the dependency was removed by -ignore-package).
+--
+elimDanglingDeps
+   :: DynFlags
+   -> [PackageConfig]
+   -> [PackageId]       -- ignored packages
+   -> IO [PackageConfig]
 
-	getDanglingDeps pkgs p = (p, filter dangling (depends p))
-	  where dangling pid = pid `notElem` all_pids
-		all_pids = map package pkgs
+elimDanglingDeps dflags pkgs ignored = 
+   case partition (not.null.snd) (map (getDanglingDeps pkgs ignored) pkgs) of
+        ([],ps) -> return (map fst ps)
+        (ps,qs) -> do
+            mapM_ reportElim ps
+            elimDanglingDeps dflags (map fst qs)
+                (ignored ++ map packageConfigId (map fst ps))
+ where
+   reportElim (p, deps) = 
+        debugTraceMsg dflags 2 $
+             (ptext SLIT("package") <+> pprPkg p <+> 
+                  ptext SLIT("will be ignored due to missing dependencies:") $$ 
+	      nest 2 (hsep (map (text.showPackageId) deps)))
+
+   getDanglingDeps pkgs ignored p = (p, filter dangling (depends p))
+        where dangling pid = mkPackageId pid `elem` ignored
+
+-- -----------------------------------------------------------------------------
+-- When all the command-line options are in, we can process our package
+-- settings and populate the package state.
+
+mkPackageState
+    :: DynFlags
+    -> PackageConfigMap         -- initial database
+    -> [PackageId]              -- preloaded packages
+    -> PackageId                -- this package
+    -> IO (PackageState,
+           [PackageId],         -- new packages to preload
+           PackageId) -- this package, might be modified if the current
+
+                      -- package is a wired-in package.
+
+mkPackageState dflags orig_pkg_db preload0 this_package = do
   --
-  pkgs <- elimDanglingDeps pkgs4
+  -- Modify the package database according to the command-line flags
+  -- (-package, -hide-package, -ignore-package, -hide-all-packages).
+  --
+  let flags = reverse (packageFlags dflags)
+  let pkgs0 = eltsUFM orig_pkg_db
+  pkgs1 <- foldM applyPackageFlag pkgs0 flags
+
+  -- Here we build up a set of the packages mentioned in -package
+  -- flags on the command line; these are called the "preload"
+  -- packages.  we link these packages in eagerly.  The preload set
+  -- should contain at least rts & base, which is why we pretend that
+  -- the command line contains -package rts & -package base.
+  --
+  let new_preload_packages = 
+        map package (pickPackages pkgs0 [ p | ExposePackage p <- flags ])
+
+  -- hide packages that are subsumed by later versions
+  pkgs2 <- hideOldPackages dflags pkgs1
+
+  -- sort out which packages are wired in
+  (pkgs3, preload1, new_this_pkg)
+        <- findWiredInPackages dflags pkgs2 new_preload_packages this_package
+
+  let ignored = map packageConfigId $
+                   pickPackages pkgs0 [ p | IgnorePackage p <- flags ]
+  pkgs <- elimDanglingDeps dflags pkgs3 ignored
+
   let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs
-  --
-  -- Find the transitive closure of dependencies of exposed
-  --
-  let exposed_pkgids = [ packageConfigId p | p <- pkgs, exposed p ]
-  dep_exposed <- closeDeps pkg_db exposed_pkgids
-  let
-	-- add base & rts to the explicit packages
-	basicLinkedPackages = filter (flip elemUFM pkg_db)
-				 [basePackageId,rtsPackageId]
-	explicit2 = addListToUniqSet (mkUniqSet (map mkPackageId explicit1))
-                                     basicLinkedPackages
-  --
-  -- Close the explicit packages with their dependencies
-  --
-  dep_explicit <- closeDeps pkg_db (uniqSetToList explicit2)
-  --
-  -- Build up a mapping from Module -> PackageConfig for all modules.
-  -- Discover any conflicts at the same time, and factor in the new exposed
-  -- status of each package.
-  --
-  let mod_map = mkModuleMap pkg_db dep_exposed
+      pkgids = map packageConfigId pkgs
 
-      pstate = PackageState{ explicitPackages     = dep_explicit,
-		             origPkgIdMap	    = orig_pkg_db,
-		             pkgIdMap   	    = pkg_db,
-		             moduleToPkgConfAll   = mod_map
+      -- add base & rts to the preload packages
+      basicLinkedPackages = filter (flip elemUFM pkg_db)
+				 [basePackageId,rtsPackageId]
+      preload2 = nub (basicLinkedPackages ++ map mkPackageId preload1)
+
+  -- Close the preload packages with their dependencies
+  dep_preload <- closeDeps pkg_db (zip preload2 (repeat Nothing))
+  let new_dep_preload = filter (`notElem` preload0) dep_preload
+
+  let pstate = PackageState{ preloadPackages     = dep_preload,
+                             origPkgIdMap        = orig_pkg_db,
+		             pkgIdMap   	 = pkg_db,
+		             moduleToPkgConfAll  = mkModuleMap pkg_db
 		           }
 
-  return dflags{ pkgState = pstate, thisPackage = new_this_pkg }
-  -- done!
+  return (pstate, new_dep_preload, new_this_pkg)
 
+
+-- -----------------------------------------------------------------------------
+-- Make the mapping from module to package info
 
 mkModuleMap
   :: PackageConfigMap
-  -> [PackageId]
   -> UniqFM [(PackageConfig, Bool)]
-mkModuleMap pkg_db pkgs = foldr extend_modmap emptyUFM pkgs
+mkModuleMap pkg_db = foldr extend_modmap emptyUFM pkgids
   where
+        pkgids = map packageConfigId (eltsUFM pkg_db)
+        
 	extend_modmap pkgid modmap =
 		addListToUFM_C (++) modmap 
 		    [(m, [(pkg, m `elem` exposed_mods)]) | m <- all_mods]
@@ -500,12 +569,12 @@ pprPkg p = text (showPackageId (package p))
 -- i.e. those packages that were found to be depended on by the
 -- current module/program.  These can be auto or non-auto packages, it
 -- doesn't really matter.  The list is always combined with the list
--- of explicit (command-line) packages to determine which packages to
+-- of preload (command-line) packages to determine which packages to
 -- use.
 
 getPackageIncludePath :: DynFlags -> [PackageId] -> IO [String]
 getPackageIncludePath dflags pkgs = do
-  ps <- getExplicitPackagesAnd dflags pkgs
+  ps <- getPreloadPackagesAnd dflags pkgs
   return (nub (filter notNull (concatMap includeDirs ps)))
 
 	-- includes are in reverse dependency order (i.e. rts first)
@@ -515,12 +584,12 @@ getPackageCIncludes pkg_configs = do
 
 getPackageLibraryPath :: DynFlags -> [PackageId] -> IO [String]
 getPackageLibraryPath dflags pkgs = do 
-  ps <- getExplicitPackagesAnd dflags pkgs
+  ps <- getPreloadPackagesAnd dflags pkgs
   return (nub (filter notNull (concatMap libraryDirs ps)))
 
 getPackageLinkOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageLinkOpts dflags pkgs = do
-  ps <- getExplicitPackagesAnd dflags pkgs
+  ps <- getPreloadPackagesAnd dflags pkgs
   let tag = buildTag dflags
       rts_tag = rtsBuildTag dflags
   let 
@@ -549,17 +618,17 @@ getPackageLinkOpts dflags pkgs = do
 
 getPackageExtraCcOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageExtraCcOpts dflags pkgs = do
-  ps <- getExplicitPackagesAnd dflags pkgs
+  ps <- getPreloadPackagesAnd dflags pkgs
   return (concatMap ccOptions ps)
 
 getPackageFrameworkPath  :: DynFlags -> [PackageId] -> IO [String]
 getPackageFrameworkPath dflags pkgs = do
-  ps <- getExplicitPackagesAnd dflags pkgs
+  ps <- getPreloadPackagesAnd dflags pkgs
   return (nub (filter notNull (concatMap frameworkDirs ps)))
 
 getPackageFrameworks  :: DynFlags -> [PackageId] -> IO [String]
 getPackageFrameworks dflags pkgs = do
-  ps <- getExplicitPackagesAnd dflags pkgs
+  ps <- getPreloadPackagesAnd dflags pkgs
   return (concatMap frameworks ps)
 
 -- -----------------------------------------------------------------------------
@@ -574,19 +643,21 @@ lookupModuleInAllPackages dflags m =
 	Nothing -> []
 	Just ps -> ps
 
-getExplicitPackagesAnd :: DynFlags -> [PackageId] -> IO [PackageConfig]
-getExplicitPackagesAnd dflags pkgids =
+getPreloadPackagesAnd :: DynFlags -> [PackageId] -> IO [PackageConfig]
+getPreloadPackagesAnd dflags pkgids =
   let 
       state   = pkgState dflags
       pkg_map = pkgIdMap state
-      expl    = explicitPackages state
+      preload = preloadPackages state
+      pairs = zip pkgids (repeat Nothing)
   in do
-  all_pkgs <- throwErr (foldM (add_package pkg_map) expl pkgids)
+  all_pkgs <- throwErr (foldM (add_package pkg_map) preload pairs)
   return (map (getPackageDetails state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
 -- in reverse dependency order (a package appears before those it depends on).
-closeDeps :: PackageConfigMap -> [PackageId] -> IO [PackageId]
+closeDeps :: PackageConfigMap -> [(PackageId, Maybe PackageId)]
+        -> IO [PackageId]
 closeDeps pkg_map ps = throwErr (closeDepsErr pkg_map ps)
 
 throwErr :: MaybeErr Message a -> IO a
@@ -594,26 +665,31 @@ throwErr m = case m of
 		Failed e    -> throwDyn (CmdLineError (showSDoc e))
 		Succeeded r -> return r
 
-closeDepsErr :: PackageConfigMap -> [PackageId]
+closeDepsErr :: PackageConfigMap -> [(PackageId,Maybe PackageId)]
 	-> MaybeErr Message [PackageId]
 closeDepsErr pkg_map ps = foldM (add_package pkg_map) [] ps
 
 -- internal helper
-add_package :: PackageConfigMap -> [PackageId] -> PackageId 
+add_package :: PackageConfigMap -> [PackageId] -> (PackageId,Maybe PackageId)
 	-> MaybeErr Message [PackageId]
-add_package pkg_db ps p
+add_package pkg_db ps (p, mb_parent)
   | p `elem` ps = return ps	-- Check if we've already added this package
   | otherwise =
       case lookupPackage pkg_db p of
-        Nothing -> Failed (missingPackageMsg (packageIdString p))
+        Nothing -> Failed (missingPackageMsg (packageIdString p) <> 
+                           missingDependencyMsg mb_parent)
         Just pkg -> do
     	   -- Add the package's dependents also
 	   let deps = map mkPackageId (depends pkg)
-    	   ps' <- foldM (add_package pkg_db) ps deps
+    	   ps' <- foldM (add_package pkg_db) ps (zip deps (repeat (Just p)))
     	   return (p : ps')
 
 missingPackageErr p = throwDyn (CmdLineError (showSDoc (missingPackageMsg p)))
 missingPackageMsg p = ptext SLIT("unknown package:") <+> text p
+
+missingDependencyMsg Nothing = empty
+missingDependencyMsg (Just parent)
+  = space <> parens (ptext SLIT("dependency of") <+> ftext (packageIdFS parent))
 
 -- -----------------------------------------------------------------------------
 

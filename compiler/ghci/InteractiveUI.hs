@@ -25,7 +25,8 @@ import NameEnv          ( delListFromNameEnv )
 import TcType           ( tidyTopType )
 import qualified Id     ( setIdType )
 import IdInfo           ( GlobalIdDetails(..) )
-import Linker           ( HValue, extendLinkEnv, withExtendedLinkEnv,initDynLinker  )
+import Linker           ( HValue, extendLinkEnv, withExtendedLinkEnv,
+                          initDynLinker, linkPackages )
 import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 #endif
 
@@ -1198,20 +1199,27 @@ setOptions wds =
 
       -- then, dynamic flags
       dflags <- getDynFlags
+      let pkg_flags = packageFlags dflags
       (dflags',leftovers) <- io $ GHC.parseDynamicFlags dflags minus_opts
-      setDynFlags dflags'
-
-        -- update things if the users wants more packages
-{- TODO:
-        let new_packages = pkgs_after \\ pkgs_before
-        when (not (null new_packages)) $
-  	   newPackages new_packages
--}
 
       if (not (null leftovers))
 		then throwDyn (CmdLineError ("unrecognised flags: " ++ 
 						unwords leftovers))
 		else return ()
+
+      new_pkgs <- setDynFlags dflags'
+
+      -- if the package flags changed, we should reset the context
+      -- and link the new packages.
+      dflags <- getDynFlags
+      when (packageFlags dflags /= pkg_flags) $ do
+        io $ hPutStrLn stderr "package flags have changed, ressetting and loading new packages..."
+        session <- getSession
+        io (GHC.setTargets session [])
+        io (GHC.load session LoadAllTargets)
+        io (linkPackages dflags new_pkgs)
+        setContextAfterLoad session []
+      return ()
 
 
 unsetOptions :: String -> GHCi ()
@@ -1258,16 +1266,6 @@ optToStr :: GHCiOption -> String
 optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
-
-{- ToDo
-newPackages new_pkgs = do	-- The new packages are already in v_Packages
-  session <- getSession
-  io (GHC.setTargets session [])
-  io (GHC.load session Nothing)
-  dflags   <- getDynFlags
-  io (linkPackages dflags new_pkgs)
-  setContextAfterLoad []
--}
 
 -- ---------------------------------------------------------------------------
 -- code for `:show'

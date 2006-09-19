@@ -29,7 +29,7 @@ module DriverPipeline (
 import Packages
 import HeaderInfo
 import DriverPhases
-import SysTools		( newTempName, addFilesToClean, getSysMan, copy )
+import SysTools		( newTempName, addFilesToClean, copy )
 import qualified SysTools	
 import HscMain
 import Finder
@@ -1044,9 +1044,9 @@ runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
 -- we don't need the generality of a phase (MoveBinary is always
 -- done after linking and makes only sense in a parallel setup)   -- HWL
 
-runPhase_MoveBinary input_fn
+runPhase_MoveBinary dflags input_fn
   = do	
-        sysMan   <- getSysMan
+        let sysMan = pgm_sysman dflags
         pvm_root <- getEnv "PVM_ROOT"
         pvm_arch <- getEnv "PVM_ARCH"
         let 
@@ -1243,7 +1243,7 @@ staticLink dflags o_files dep_packages = do
 
     -- parallel only: move binary to another dir -- HWL
     when (WayPar `elem` ways)
-	 (do success <- runPhase_MoveBinary output_fn
+	 (do success <- runPhase_MoveBinary dflags output_fn
              if success then return ()
                         else throwDyn (InstallationError ("cannot move binary to PVM dir")))
 

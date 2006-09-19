@@ -11,13 +11,11 @@ module GHC (
 	Session,
 	defaultErrorHandler,
 	defaultCleanupHandler,
-	init, initFromArgs,
 	newSession,
 
 	-- * Flags and settings
 	DynFlags(..), DynFlag(..), Severity(..), GhcMode(..), HscTarget(..), dopt,
 	parseDynamicFlags,
-	initPackages,
 	getSessionDynFlags,
 	setSessionDynFlags,
 
@@ -166,8 +164,6 @@ module GHC (
  ToDo:
 
   * inline bits of HscMain here to simplify layering: hscTcExpr, hscStmt.
-  * we need to expose DynFlags, so should parseDynamicFlags really be
-    part of this interface?
   * what StaticFlags should we expose, if any?
 -}
 
@@ -322,46 +318,19 @@ defaultCleanupHandler dflags inner =
     inner
 
 
--- | Initialises GHC.  This must be done /once/ only.  Takes the
--- TopDir path without the '-B' prefix.
-
-init :: Maybe String -> IO ()
-init mbMinusB = do
-   -- catch ^C
-   main_thread <- myThreadId
-   putMVar interruptTargetThread [main_thread]
-   installSignalHandlers
-
-   dflags0 <- initSysTools mbMinusB defaultDynFlags
-   writeIORef v_initDynFlags dflags0
-
--- | Initialises GHC. This must be done /once/ only. Takes the
--- command-line arguments.  All command-line arguments which aren't
--- understood by GHC will be returned.
-
-initFromArgs :: [String] -> IO [String]
-initFromArgs args
-    = do init mbMinusB
-         return argv1
-    where -- Grab the -B option if there is one
-          (minusB_args, argv1) = partition (prefixMatch "-B") args
-          mbMinusB | null minusB_args
-                       = Nothing
-                   | otherwise
-                       = Just (drop 2 (last minusB_args))
-
-GLOBAL_VAR(v_initDynFlags, error "initDynFlags", DynFlags)
-	-- stores the DynFlags between the call to init and subsequent
-	-- calls to newSession.
-
 -- | Starts a new session.  A session consists of a set of loaded
 -- modules, a set of options (DynFlags), and an interactive context.
 -- ToDo: GhcMode should say "keep typechecked code" and\/or "keep renamed
 -- code".
-newSession :: GhcMode -> IO Session
-newSession mode = do
-  dflags0 <- readIORef v_initDynFlags
-  dflags <- initDynFlags dflags0
+newSession :: GhcMode -> Maybe FilePath -> IO Session
+newSession mode mb_top_dir = do
+  -- catch ^C
+  main_thread <- myThreadId
+  putMVar interruptTargetThread [main_thread]
+  installSignalHandlers
+
+  dflags0 <- initSysTools mb_top_dir defaultDynFlags
+  dflags  <- initDynFlags dflags0
   env <- newHscEnv dflags{ ghcMode=mode }
   ref <- newIORef env
   return (Session ref)
@@ -384,9 +353,23 @@ modifySession (Session ref) f = do h <- readIORef ref; writeIORef ref $! f h
 getSessionDynFlags :: Session -> IO DynFlags
 getSessionDynFlags s = withSession s (return . hsc_dflags)
 
--- | Updates the DynFlags in a Session
-setSessionDynFlags :: Session -> DynFlags -> IO ()
-setSessionDynFlags s dflags = modifySession s (\h -> h{ hsc_dflags = dflags })
+-- | Updates the DynFlags in a Session.  This also reads
+-- the package database (unless it has already been read),
+-- and prepares the compilers knowledge about packages.  It
+-- can be called again to load new packages: just add new
+-- package flags to (packageFlags dflags).
+--
+-- Returns a list of new packages that may need to be linked in using
+-- the dynamic linker (see 'linkPackages') as a result of new package
+-- flags.  If you are not doing linking or doing static linking, you
+-- can ignore the list of packages returned.
+--
+setSessionDynFlags :: Session -> DynFlags -> IO [PackageId]
+setSessionDynFlags (Session ref) dflags = do
+  hsc_env <- readIORef ref
+  (dflags', preload) <- initPackages dflags
+  writeIORef ref $! hsc_env{ hsc_dflags = dflags' }
+  return preload
 
 -- | If there is no -o option, guess the name of target executable
 -- by using top-level source file name as a base.

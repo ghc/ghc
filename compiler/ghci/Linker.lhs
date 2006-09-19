@@ -224,7 +224,7 @@ reallyInitDynLinker dflags
 	; initObjLinker 
 
 		-- (b) Load packages from the command-line
-	; linkPackages dflags (explicitPackages (pkgState dflags))
+	; linkPackages dflags (preloadPackages (pkgState dflags))
 
 	   	-- (c) Link libraries from the command-line
 	; let optl = getOpts dflags opt_l
