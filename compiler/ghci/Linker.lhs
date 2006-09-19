@@ -196,7 +196,6 @@ We initialise the dynamic linker by
 a) calling the C initialisation procedure
 
 b) Loading any packages specified on the command line,
-   now held in v_ExplicitPackages
 
 c) Loading any packages specified on the command line,
    now held in the -l options in v_Opt_l
