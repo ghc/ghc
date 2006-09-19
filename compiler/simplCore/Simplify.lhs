@@ -814,9 +814,12 @@ simplCast env body co cont
            -- t2 :=: s2 with left and right on the curried form: 
            --    (->) t1 t2 :=: (->) s1 s2
            [co1, co2] = decomposeCo 2 co
-           new_arg    = mkCoerce (mkSymCoercion co1) (substExpr arg_env arg)
-           arg_env    = setInScope arg_se env
-           result     = ApplyTo dup new_arg (zapSubstEnv env) (addCoerce co2 cont)
+           new_arg    = mkCoerce (mkSymCoercion co1) arg'
+	   arg'       = case arg_se of
+			  Nothing     -> arg
+			  Just arg_se -> substExpr (setInScope arg_se env) arg
+           result     = ApplyTo dup new_arg (Just $ zapSubstEnv env) 
+				(addCoerce co2 cont)
        addCoerce co cont = CoerceIt co cont
     in
     simplType env co		`thenSmpl` \ co' ->
@@ -1713,6 +1716,7 @@ knownCon env scrut con args bndr alts cont
 		   simplNonRecX env bndr bndr_rhs		$ \ env ->
 		   simplExprF env rhs cont
 	        where
+		   dead_bndr  = isDeadBinder bndr
 		   n_drop_tys = tyConArity (dataConTyCon dc)
 
 -- Ugh!
