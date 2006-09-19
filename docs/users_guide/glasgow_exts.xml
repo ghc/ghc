@@ -3727,6 +3727,33 @@ the standard method is used or the one described here.)
 
 </sect2>
 
+<sect2 id="stand-alone-deriving">
+<title>Stand-alone deriving declarations</title>
+
+<para>
+GHC now allows stand-alone <literal>deriving</literal> declarations:
+</para>
+
+<programlisting>
+  data Foo = Bar Int | Baz String
+
+  deriving Eq for Foo
+</programlisting>
+
+<para>Deriving instances of multi-parameter type classes for newtypes is
+also allowed:</para>
+
+<programlisting>
+  newtype Foo a = MkFoo (State Int a)
+
+  deriving (MonadState Int) for Foo
+</programlisting>
+
+<para>
+</para>
+
+</sect2>
+
 <sect2 id="typing-binds">
 <title>Generalised typing of mutually recursive bindings</title>
 
