@@ -129,3 +129,4 @@ package.conf.installed$
 (^|/)config.status$
 (^|/)configure$
 ^ghc.spec$
+^docs/users_guide/ug-book.xml$
