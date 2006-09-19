@@ -107,7 +107,7 @@
 ^compiler/cmm/CmmLex.hs$
 ^compiler/cmm/CmmParse.hs$
 ^compiler/main/Config.hs$
-^compiler/parser/ParsePkgConf.hs$
+^compiler/main/ParsePkgConf.hs$
 ^compiler/parser/Parser.y$
 ^compiler/parser/Parser.hs$
 ^compiler/parser/Lexer.hs$
