@@ -18,7 +18,8 @@ import CoreSubst	( Subst, mkSubst, substExpr )
 import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
-import DataCon		( dataConRepArity, dataConTyVars )
+import DataCon		( dataConRepArity, isVanillaDataCon, 
+			  dataConUnivTyVars )
 import Type		( Type, tyConAppArgs, tyVarsOfTypes )
 import Rules		( matchN )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
@@ -592,7 +593,7 @@ conArgOccs (ScrutOcc fm) (DataAlt dc)
   | Just pat_arg_occs <- lookupUFM fm dc
   = tyvar_unks ++ pat_arg_occs
   where
-    tyvar_unks | isVanillaDataCon dc = [UnkOcc | tv <- dataConTyVars dc]
+    tyvar_unks | isVanillaDataCon dc = [UnkOcc | tv <- dataConUnivTyVars dc]
 	       | otherwise	     = []
 
 conArgOccs other con = repeat UnkOcc
