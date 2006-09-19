@@ -44,8 +44,8 @@ import BasicTypes	( SuccessFlag(..), succeeded, failed )
 import Outputable
 import PackageConfig    ( rtsPackageId )
 import Panic            ( GhcException(..) )
-import Util             ( zipLazy, global, joinFileExt, joinFileName, suffixOf,
-			  replaceFilenameSuffix )
+import Util             ( zipLazy, global, joinFileExt, joinFileName, 
+                          replaceFilenameSuffix )
 import StaticFlags	( v_Ld_inputs, v_Build_tag )
 import ErrUtils         ( debugTraceMsg, mkLocMessage )
 import DriverPhases	( phaseInputExt, Phase(..) )
