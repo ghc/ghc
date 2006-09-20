@@ -104,21 +104,55 @@ data constructor.  The type checker translates it into either the wrapper Id
 
 The data con has one or two Ids associated with it:
 
-  The "worker Id", is the actual data constructor.
-	Its type may be different to the Haskell source constructor
-	because:
-		- useless dict args are dropped
-		- strict args may be flattened
-	The worker is very like a primop, in that it has no binding.
+The "worker Id", is the actual data constructor.
+* Every data constructor (newtype or data type) has a worker
 
+* The worker is very like a primop, in that it has no binding.
 
+* For a *data* type, the worker *is* the data constructor;
+  it has no unfolding
 
-  The "wrapper Id", $WC, whose type is exactly what it looks like
-	in the source program. It is an ordinary function,
-	and it gets a top-level binding like any other function.
+* For a *newtype*, the worker has a compulsory unfolding which 
+  does a cast, e.g.
+	newtype T = MkT Int
+	The worker for MkT has unfolding
+		\(x:Int). x `cast` sym CoT
+  Here CoT is the type constructor, witnessing the FC axiom
+	axiom CoT : T = Int
 
-	The wrapper Id isn't generated for a data type if the worker
-	and wrapper are identical. 
+The "wrapper Id", $WC, goes as follows
+
+* Its type is exactly what it looks like in the source program. 
+
+* It is an ordinary function, and it gets a top-level binding 
+  like any other function.
+
+* The wrapper Id isn't generated for a data type if there is
+  nothing for the wrapper to do.  That is, if its defn would be
+	$wC = C
+
+Why might the wrapper have anything to do?  Two reasons:
+
+* Unboxing strict fields (with -funbox-strict-fields)
+	data T = MkT !(Int,Int)
+	$wMkT :: (Int,Int) -> T
+	$wMkT (x,y) = MkT x y
+  Notice that the worker has two fields where the wapper has 
+  just one.  That is, the worker has type
+		MkT :: Int -> Int -> T
+
+* Equality constraints for GADTs
+	data T a where { MkT :: a -> T [a] }
+
+  The worker gets a type with explicit equality
+  constraints, thus:
+	MkT :: forall a b. (a=[b]) => b -> T a
+
+  The wrapper has the programmer-specified type:
+	$wMkT :: a -> T [a]
+	$wMkT a x = MkT [a] a [a] x
+  The third argument is a coerion
+	[a] :: [a]:=:[a]
 
 
 
