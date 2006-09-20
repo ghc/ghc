@@ -98,7 +98,7 @@ cgExpr (StgLit lit)
   = do  { cmm_lit <- cgLit lit
 	; performPrimReturn rep (CmmLit cmm_lit) }
   where
-    rep = typeCgRep (literalType lit)
+    rep = (typeCgRep) (literalType lit)
 \end{code}
 
 

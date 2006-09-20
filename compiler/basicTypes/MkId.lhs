@@ -49,7 +49,7 @@ import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType,
 			  mkTopTvSubst, substTyVar )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
-                          splitNewTypeRepCo_maybe )
+                          splitNewTypeRepCo_maybe, isEqPred )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, 
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
@@ -63,7 +63,7 @@ import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon,
                           newTyConCo, tyConArity )
 import Class		( Class, classTyCon, classSelIds )
-import Var		( Id, TyVar, Var, setIdType )
+import Var		( Id, TyVar, Var, setIdType, mkWildCoVar )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
 import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
 import OccName		( mkOccNameFS, varName )
@@ -468,7 +468,14 @@ mkRecordSelId tycon field_label
     stupid_dict_tys = mkPredTys (dataConsStupidTheta data_cons_w_field)
     n_stupid_dicts  = length stupid_dict_tys
 
-    (field_tyvars,field_theta,field_tau) = tcSplitSigmaTy field_ty
+    (pre_field_tyvars,pre_field_theta,field_tau) = tcSplitSigmaTy field_ty
+      -- tcSplitSigmaTy puts tyvars with EqPred kinds in with the theta, but
+      -- this is not what we want here, so we need to split out the EqPreds
+      -- as new wild tyvars
+    field_tyvars = pre_field_tyvars ++ eq_vars
+    eq_vars      = map (mkWildCoVar . mkPredTy)
+                       (filter isEqPred pre_field_theta)
+    field_theta  = filter (not . isEqPred) pre_field_theta
     field_dict_tys			 = mkPredTys field_theta
     n_field_dict_tys			 = length field_dict_tys
 	-- If the field has a universally quantified type we have to 
@@ -547,7 +554,7 @@ mkRecordSelId tycon field_label
     mk_alt data_con 
       = 	-- In the non-vanilla case, the pattern must bind type variables and
 		-- the context stuff; hence the arg_prefix binding below
-	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) (Var the_arg_id)
+	  pprTrace "mkReboxingAlt" (ppr data_con <+> ppr (arg_prefix ++ arg_ids)) $ mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) (Var the_arg_id)
       where
 	(arg_prefix, arg_ids)
 	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
@@ -557,7 +564,11 @@ mkRecordSelId tycon field_label
 	   = (dc_tvs ++ mkTemplateLocalsNum arg_base (mkPredTys dc_theta),
 	      mkTemplateLocalsNum arg_base' dc_arg_tys)
 
-	(dc_tvs, dc_theta, dc_arg_tys) = dataConSig data_con
+	(pre_dc_tvs, pre_dc_theta, dc_arg_tys) = dataConSig data_con
+           -- again we need to pull the EqPreds out of dc_theta, into dc_tvs
+        dc_eqvars = map (mkWildCoVar . mkPredTy) (filter isEqPred pre_dc_theta)
+        dc_tvs    = drop (length (dataConUnivTyVars data_con)) pre_dc_tvs ++ dc_eqvars
+        dc_theta  = filter (not . isEqPred) pre_dc_theta
 	arg_base' = arg_base + length dc_theta
 
 	unpack_base = arg_base' + length dc_arg_tys
