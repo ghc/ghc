@@ -172,10 +172,10 @@ tcMatch ctxt pat_tys rhs_ty match
       = tcGRHSs ctxt grhss rhs_ty	-- No result signature
 
 	-- Result type sigs are no longer supported
-    tc_grhss ctxt (Just res_sig) grhss (co,rhs_ty)
+    tc_grhss ctxt (Just res_sig) grhss (co, rhs_ty)
       = do { addErr (ptext SLIT("Ignoring (deprecated) result type signature")
 			<+> ppr res_sig)
-    	     tcGRHSs ctxt grhss (co, inner_ty) }
+    	   ; tcGRHSs ctxt grhss (co, rhs_ty) }
 
 -------------
 tcGRHSs :: TcMatchCtxt -> GRHSs Name -> (Refinement, BoxyRhoType) 

@@ -772,8 +772,8 @@ instFun orig fun subst []
   = return fun		-- Common short cut
 
 instFun orig fun subst tv_theta_prs
-  = do 	{-- !!!SPJ: 	-- Horrid check for tagToEnum; see Note [tagToEnum#]
-	 -- !!!SPJ: checkBadTagToEnumCall fun_id qtv_tys
+  = do 	{ -- !!!SPJ: 	-- Horrid check for tagToEnum; see Note [tagToEnum#]
+	  -- !!!SPJ: checkBadTagToEnumCall fun_id qtv_tys
 
 	; let ty_theta_prs' = map subst_pr tv_theta_prs
 
