@@ -301,7 +301,6 @@ loadDecl ignore_prags mod (_version, decl)
 	  main_name      <- mk_new_bndr mod Nothing (ifName decl)
 	; implicit_names <- mapM (mk_new_bndr mod (Just main_name)) 
 				 (ifaceDeclSubBndrs decl)
-        ; at_names       <- mapM (mk_new_bndr mod  (Just main_name)) (atNames decl)
 
 	-- Typecheck the thing, lazily
 	-- NB. firstly, the laziness is there in case we never need the
@@ -318,7 +317,6 @@ loadDecl ignore_prags mod (_version, decl)
 						  ppr n $$ ppr (stripped_decl))
 
 	; returnM $ (main_name, thing) :  [(n, lookup n) | n <- implicit_names]
-				       ++ zip at_names (atThings thing)
 	}
 		-- We build a list from the *known* names, with (lookup n) thunks
 		-- as the TyThings.  That way we can extend the PTE without poking the
@@ -336,12 +334,6 @@ loadDecl ignore_prags mod (_version, decl)
 	= newGlobalBinder mod occ mb_parent 
 			  (importedSrcLoc (showSDoc (ppr (moduleName mod))))
 			-- ToDo: qualify with the package name if necessary
-
-    atNames (IfaceClass {ifATs = ats}) = [ifName at | at <- ats]
-    atNames _                          = []
-
-    atThings (AClass cla) = [ATyCon at | at <- classATs cla]
-    atThings _            = []
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 
@@ -364,12 +356,12 @@ ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
 --
 -- If you change this, make sure you change HscTypes.implicitTyThings in sync
 
-ifaceDeclSubBndrs IfaceClass { ifCtxt = sc_ctxt, 
-                               ifName = cls_occ, 
-                               ifSigs = sigs }
+ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, 
+			       ifSigs = sigs, ifATs = ats })
   = co_occs ++
     [tc_occ, dc_occ, dcww_occ] ++
-    [op | IfaceClassOp op _ _ <- sigs] ++
+    [op | IfaceClassOp op  _ _ <- sigs] ++
+    [ifName at | at <- ats ] ++
     [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] 
   where
     n_ctxt = length sc_ctxt

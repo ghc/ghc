@@ -213,12 +213,20 @@ tcTyAndClassDecls boot_details allDecls
 	-- Add the implicit things;
 	-- we want them in the environment because 
 	-- they may be mentioned in interface files
+	-- NB: All associated types and their implicit things will be added a
+	--     second time here.  This doesn't matter as the definitions are
+	--     the same.
 	; let {	implicit_things = concatMap implicitTyThings alg_tyclss }
 	; traceTc ((text "Adding" <+> ppr alg_tyclss) 
 		   $$ (text "and" <+> ppr implicit_things))
   	; tcExtendGlobalEnv implicit_things getGblEnv
     }}
   where
+    -- Pull associated types out of class declarations, to tie them into the
+    -- knot above.  
+    -- NB: We put them in the same place in the list as `tcTyClDecl' will
+    --	   eventually put the matching `TyThing's.  That's crucial; otherwise,
+    --	   the two argument lists of `mkGlobalThings' don't match up.
     addATs decl@(L _ (ClassDecl {tcdATs = ats})) = decl : ats
     addATs decl				         = [decl]
 

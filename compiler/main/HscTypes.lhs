@@ -82,7 +82,7 @@ import CoreSyn		( CoreBind )
 import Id		( Id )
 import Type		( TyThing(..) )
 
-import Class		( Class, classSelIds, classTyCon )
+import Class		( Class, classSelIds, classATs, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons, isNewTyCon,
 			  newTyConCo_maybe, tyConFamilyCoercion_maybe )
 import DataCon		( dataConImplicitIds )
@@ -634,10 +634,11 @@ implicitTyThings (ATyCon tc) = implicitCoTyCon tc ++
 					 (tyConDataCons tc)
 		     
 	-- For classes, add the class TyCon too (and its extras)
-	-- and the class selector Ids
+	-- and the class selector Ids and the associated types (they don't
+	-- have extras as these are only the family decls)
 implicitTyThings (AClass cl) = map AnId (classSelIds cl) ++
+			       map ATyCon (classATs cl) ++
 			       extras_plus (ATyCon (classTyCon cl))
-			 
 
 	-- For data cons add the worker and wrapper (if any)
 implicitTyThings (ADataCon dc) = map AnId (dataConImplicitIds dc)
