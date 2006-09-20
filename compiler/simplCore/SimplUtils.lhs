@@ -1462,36 +1462,31 @@ mkCase1 scrut case_bndr ty [(con,bndrs,rhs)]
 mkCase1 scrut case_bndr ty alts	-- Identity case
   | all identity_alt alts
   = tick (CaseIdentity case_bndr)		`thenSmpl_`
-    returnSmpl (re_note scrut)
+    returnSmpl (re_cast scrut)
   where
-    identity_alt (con, args, rhs) = de_note rhs `cheapEqExpr` identity_rhs con args
+    identity_alt (con, args, rhs) = de_cast rhs `cheapEqExpr` mk_id_rhs con args
 
-    identity_rhs (DataAlt con) args
-      | isClosedNewTyCon (dataConTyCon con) 
-      = wrapNewTypeBody (dataConTyCon con) arg_tys (varToCoreExpr $ head args)
-      | otherwise
-      = mkConApp con (arg_ty_exprs ++ varsToCoreExprs args)
-    identity_rhs (LitAlt lit)  _    = Lit lit
-    identity_rhs DEFAULT       _    = Var case_bndr
+    mk_id_rhs (DataAlt con) args = mkConApp con (arg_tys ++ varsToCoreExprs args)
+    mk_id_rhs (LitAlt lit)  _    = Lit lit
+    mk_id_rhs DEFAULT       _    = Var case_bndr
 
-    arg_tys = (tyConAppArgs (idType case_bndr))
-    arg_ty_exprs = map Type arg_tys
+    arg_tys = map Type (tyConAppArgs (idType case_bndr))
 
 	-- We've seen this:
-	--	case coerce T e of x { _ -> coerce T' x }
-	-- And we definitely want to eliminate this case!
-	-- So we throw away notes from the RHS, and reconstruct
-	-- (at least an approximation) at the other end
-    de_note (Note _ e) = de_note e
-    de_note e	       = e
+	--	case e of x { _ -> x `cast` c }
+	-- And we definitely want to eliminate this case, to give
+	--	e `cast` c
+	-- So we throw away the cast from the RHS, and reconstruct
+	-- it at the other end.  All the RHS casts must be the same
+	-- if (all identity_alt alts) holds.
+	-- 
+	-- Don't worry about nested casts, because the simplifier combines them
+    de_cast (Cast e _) = e
+    de_cast e	       = e
 
-	-- re_note wraps a coerce if it might be necessary
-    re_note scrut = case head alts of
-			(_,_,rhs1@(Note _ _)) -> 
-                            let co = mkUnsafeCoercion (idType case_bndr) (exprType rhs1) in 
-                               -- this unsafeCoercion is bad, make this better
-                            mkCoerce co scrut
-			other		      -> scrut
+    re_cast scrut = case head alts of
+			(_,_,Cast _ co) -> Cast scrut co
+			other	        -> scrut
 
 
 
