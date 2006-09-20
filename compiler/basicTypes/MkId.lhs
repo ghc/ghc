@@ -54,8 +54,8 @@ import HsBinds          ( ExprCoFn(..), isIdCoercion )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
                           splitNewTypeRepCo_maybe, isEqPred )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
-			  mkTyConApp, mkTyVarTys, mkClassPred, 
-			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
+			  mkTyConApp, mkTyVarTys, mkClassPred, isPredTy,
+			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, tcEqType,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  tcSplitFunTys, tcSplitForAllTys, dataConsStupidTheta
 			)
@@ -553,39 +553,34 @@ mkRecordSelId tycon field_label
     mk_alt data_con 
       = 	-- In the non-vanilla case, the pattern must bind type variables and
 		-- the context stuff; hence the arg_prefix binding below
-	  mkReboxingAlt uniqs' data_con (arg_prefix ++ arg_ids) rhs
+	  ASSERT2( res_ty `tcEqType` field_tau, ppr data_con $$ ppr res_ty $$ ppr field_tau )
+	  mkReboxingAlt rebox_uniqs data_con (ex_tvs ++ co_tvs ++ arg_vs) rhs
       where
-	(arg_prefix, arg_ids)
-	   = (ex_tvs ++ co_tvs ++ dict_vs, field_vs)
-
            -- get pattern binders with types appropriately instantiated
-        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat uniqs data_con res_tys
-        n_vars = (length ex_tvs + length co_tvs + length arg_vs)
-           -- separate dicts vars and field vars so we can associate field lbls
-        (dict_vs, field_vs) = splitAt (length dc_theta) arg_vs
+	arg_uniqs = map mkBuiltinUnique [arg_base..]
+        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat arg_uniqs data_con res_tys
 
-	(_, pre_dc_theta, dc_arg_tys) = dataConSig data_con
-        dc_theta  = filter (not . isEqPred) pre_dc_theta
+	rebox_base  = arg_base + length ex_tvs + length co_tvs + length arg_vs
+	rebox_uniqs = map mkBuiltinUnique [rebox_base..]
 
-	arg_base' = arg_base + length dc_theta
-
-	unpack_base = arg_base' + length dc_arg_tys
-
-	uniq_list = map mkBuiltinUnique [unpack_base..]
+	-- data T :: *->* where T1 { fld :: Maybe b } -> T [b]
+	--	Hence T1 :: forall a b. (a=[b]) => b -> T a
+	-- fld :: forall b. T [b] -> Maybe b
+	-- fld = /\b.\(t:T[b]). case t of 
+	--		T1 b' (c : [b]=[b']) (x:Maybe b') 
+	--			-> x `cast` Maybe (sym (right c))
 
         Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs
-        (co_fn, _)      = refineType refinement (idType the_arg_id)
+        (co_fn, res_ty) = refineType refinement (idType the_arg_id)
+		-- Generate the refinement for b'=b, 
+		-- and apply to (Maybe b'), to get (Maybe b)
 
-        rhs = perform_co co_fn (Var the_arg_id)
+        rhs = case co_fn of
+		ExprCoFn co -> Cast (Var the_arg_id) co
+		id_co	    -> ASSERT(isIdCoercion id_co) Var the_arg_id
 
-        perform_co (ExprCoFn co) expr = Cast expr co
-        perform_co id_co expr = ASSERT(isIdCoercion id_co) expr
-
-          -- split the uniq_list into two
-        uniqs  = uniq_list
-        uniqs' = drop n_vars uniqs
-
-    	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` arg_ids) field_label
+	field_vs    = filter (not . isPredTy . idType) arg_vs 
+    	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` field_vs) field_label
     	field_lbls  = dataConFieldLabels data_con
 
     error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_tau full_msg
@@ -611,7 +606,7 @@ unboxProduct i arg arg_ty body res_ty
   = result
   where 
     result = mkUnpackCase the_id arg arg_ty con_args boxing_con rhs
-    (tycon, tycon_args, boxing_con, tys) = deepSplitProductType "unboxProduct" arg_ty
+    (_tycon, _tycon_args, boxing_con, tys) = deepSplitProductType "unboxProduct" arg_ty
     ([the_id], i') = mkLocals i [arg_ty]
     (con_args, i'') = mkLocals i' tys
     rhs = body i'' con_args
@@ -641,7 +636,7 @@ reboxProduct :: [Unique]     -- uniques to create new local binders
                  [Id])       -- Ids being boxed into product
 reboxProduct us ty
   = let 
-	(tycon, tycon_args, pack_con, con_arg_tys) = deepSplitProductType "reboxProduct" ty
+	(_tycon, _tycon_args, _pack_con, con_arg_tys) = deepSplitProductType "reboxProduct" ty
  
         us' = dropList con_arg_tys us
 
@@ -656,7 +651,7 @@ mkProductBox :: [Id] -> Type -> CoreExpr
 mkProductBox arg_ids ty 
   = result_expr
   where 
-    (tycon, tycon_args, pack_con, con_arg_tys) = splitProductType "mkProductBox" ty
+    (tycon, tycon_args, pack_con, _con_arg_tys) = splitProductType "mkProductBox" ty
 
     result_expr
       | isNewTyCon tycon && not (isRecursiveTyCon tycon) 
