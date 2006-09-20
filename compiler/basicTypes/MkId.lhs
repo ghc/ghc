@@ -192,14 +192,14 @@ Notice that
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
 mkDataConIds wrap_name wkr_name data_con
   | isNewTyCon tycon
-  = NewDC nt_wrap_id
+  = DCIds Nothing nt_work_id                    -- Newtype, only has a worker
 
   | any isMarkedStrict all_strict_marks		-- Algebraic, needs wrapper
     || not (null eq_spec)
-  = AlgDC (Just alg_wrap_id) wrk_id
+  = DCIds (Just alg_wrap_id) wrk_id
 
   | otherwise					-- Algebraic, no wrapper
-  = AlgDC Nothing wrk_id
+  = DCIds Nothing wrk_id
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys) = dataConFullSig data_con
     tycon = dataConTyCon data_con
@@ -257,8 +257,8 @@ mkDataConIds wrap_name wkr_name data_con
 	-- that is, not unboxed tuples or [non-recursive] newtypes
 
 	----------- Wrappers for newtypes --------------
-    nt_wrap_id   = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty nt_wrap_info
-    nt_wrap_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
+    nt_work_id   = mkGlobalId (DataConWrapId data_con) wkr_name wrap_ty nt_work_info
+    nt_work_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
 		  `setArityInfo` 1	-- Arity 1
 		  `setUnfoldingInfo`     newtype_unf
     newtype_unf  = ASSERT( isVanillaDataCon data_con &&

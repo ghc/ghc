@@ -442,9 +442,7 @@ mkLets	      :: [Bind b] -> Expr b -> Expr b
 mkLams	      :: [b] -> Expr b -> Expr b
 
 mkLit lit	  = Lit lit
-mkConApp con args 
-  | isNewTyCon (dataConTyCon con) = mkApps (Var (dataConWrapId con)) args
-  | otherwise = mkApps (Var (dataConWorkId con)) args
+mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
 mkLams binders body = foldr Lam body binders
 mkLets binds body   = foldr Let body binds

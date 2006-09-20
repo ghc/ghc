@@ -111,7 +111,6 @@ The data con has one or two Ids associated with it:
 		- strict args may be flattened
 	The worker is very like a primop, in that it has no binding.
 
-	Newtypes have no worker Id
 
 
   The "wrapper Id", $WC, whose type is exactly what it looks like
@@ -119,7 +118,7 @@ The data con has one or two Ids associated with it:
 	and it gets a top-level binding like any other function.
 
 	The wrapper Id isn't generated for a data type if the worker
-	and wrapper are identical.  It's always generated for a newtype.
+	and wrapper are identical. 
 
 
 
@@ -308,10 +307,9 @@ data DataCon
   }
 
 data DataConIds
-  = NewDC Id			-- Newtypes have only a wrapper, but no worker
-  | AlgDC (Maybe Id) Id 	-- Algebraic data types always have a worker, and
+  = DCIds (Maybe Id) Id 	-- Algebraic data types always have a worker, and
 				-- may or may not have a wrapper, depending on whether
-				-- the wrapper does anything.
+				-- the wrapper does anything.  Newtypes just have a worker
 
 	-- _Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
 
@@ -319,7 +317,7 @@ data DataConIds
 	-- The worker takes dcRepArgTys as its arguments
 	-- If the worker is absent, dcRepArgTys is the same as dcOrigArgTys
 
-	-- The 'Nothing' case of AlgDC is important
+	-- The 'Nothing' case of DCIds is important
 	-- Not only is this efficient,
 	-- but it also ensures that the wrapper is replaced
 	-- by the worker (becuase it *is* the wroker)
@@ -496,28 +494,24 @@ dataConTheta = dcTheta
 
 dataConWorkId :: DataCon -> Id
 dataConWorkId dc = case dcIds dc of
-			AlgDC _ wrk_id -> wrk_id
-			NewDC _ -> pprPanic "dataConWorkId" (ppr dc)
+			DCIds _ wrk_id -> wrk_id
 
 dataConWrapId_maybe :: DataCon -> Maybe Id
 -- Returns Nothing if there is no wrapper for an algebraic data con
 --		   and also for a newtype (whose constructor is inlined compulsorily)
 dataConWrapId_maybe dc = case dcIds dc of
-				AlgDC mb_wrap _ -> mb_wrap
-				NewDC wrap	-> Nothing
+				DCIds mb_wrap _ -> mb_wrap
 
 dataConWrapId :: DataCon -> Id
 -- Returns an Id which looks like the Haskell-source constructor
 dataConWrapId dc = case dcIds dc of
-			AlgDC (Just wrap) _   -> wrap
-			AlgDC Nothing     wrk -> wrk	    -- worker=wrapper
-			NewDC wrap	      -> wrap
+			DCIds (Just wrap) _   -> wrap
+			DCIds Nothing     wrk -> wrk	    -- worker=wrapper
 
 dataConImplicitIds :: DataCon -> [Id]
 dataConImplicitIds dc = case dcIds dc of
-			  AlgDC (Just wrap) work -> [wrap,work]
-			  AlgDC Nothing     work -> [work]
-			  NewDC wrap		 -> [wrap]
+			  DCIds (Just wrap) work -> [wrap,work]
+			  DCIds Nothing     work -> [work]
 
 dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConFieldLabels = dcFields
