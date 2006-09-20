@@ -31,7 +31,7 @@ import Type		( liftedTypeKind, splitTyConApp, mkTyConApp,
 			  mkTyVarTys, ThetaType )
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName, SynTyConRhs(..), 
-			  AlgTyConParent(..) )
+			  AlgTyConParent(..), setTyConArgPoss )
 import HscTypes		( ExternalPackageState(..), 
 			  TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
@@ -69,6 +69,8 @@ import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, equalLength, splitAtList )
 import DynFlags		( DynFlag(..), isOneShot )
 
+import List		( elemIndex)
+import Maybe		( catMaybes )
 import Monad		( liftM )
 \end{code}
 
@@ -393,8 +395,9 @@ tcIfaceDecl (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      ; return (ATyCon (buildSynTyCon tc_name tyvars rhs))
      }
 
-tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bndrs, 
-			 ifFDs = rdr_fds, ifSigs = rdr_sigs, 
+tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, 
+			 ifTyVars = tv_bndrs, ifFDs = rdr_fds, 
+			 ifATs = rdr_ats, ifSigs = rdr_sigs, 
 			 ifRec = tc_isrec })
 -- ToDo: in hs-boot files we should really treat abstract classes specially,
 --	 as we do abstract tycons
@@ -403,7 +406,9 @@ tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bnd
     ; ctxt <- tcIfaceCtxt rdr_ctxt
     ; sigs <- mappM tc_sig rdr_sigs
     ; fds  <- mappM tc_fd rdr_fds
-    ; cls  <- buildClass cls_name tyvars ctxt fds sigs tc_isrec
+    ; ats'  <- mappM tcIfaceDecl rdr_ats
+    ; let ats = zipWith setTyThingPoss ats' (map ifTyVars rdr_ats)
+    ; cls  <- buildClass cls_name tyvars ctxt fds ats sigs tc_isrec
     ; return (AClass cls) }
   where
    tc_sig (IfaceClassOp occ dm rdr_ty)
@@ -419,6 +424,19 @@ tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bnd
    tc_fd (tvs1, tvs2) = do { tvs1' <- mappM tcIfaceTyVar tvs1
 			   ; tvs2' <- mappM tcIfaceTyVar tvs2
 			   ; return (tvs1', tvs2') }
+
+   -- For each AT argument compute the position of the corresponding class
+   -- parameter in the class head.  This will later serve as a permutation
+   -- vector when checking the validity of instance declarations.
+   setTyThingPoss (ATyCon tycon) atTyVars = 
+     let classTyVars = map fst tv_bndrs
+	 poss        =   catMaybes 
+		       . map ((`elemIndex` classTyVars) . fst) 
+		       $ atTyVars
+		    -- There will be no Nothing, as we already passed renaming
+     in 
+     ATyCon (setTyConArgPoss tycon poss)
+   setTyThingPoss _		  _ = panic "TcIface.setTyThingPoss"
 
 tcIfaceDecl (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
   = do	{ name <- lookupIfaceTop rdr_name

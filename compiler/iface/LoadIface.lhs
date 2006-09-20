@@ -35,6 +35,8 @@ import HscTypes		( ModIface(..), TyThing, IfaceExport, Usage(..),
 import BasicTypes	( Version, initialVersion,
 			  Fixity(..), FixityDirection(..), isMarkedStrict )
 import TcRnMonad
+import Type             ( TyThing(..) )
+import Class		( classATs )
 
 import PrelNames	( gHC_PRIM )
 import PrelInfo		( ghcPrimExports )
@@ -269,6 +271,10 @@ badDepMsg mod
 -- each binder with the right package info in it
 -- All subsequent lookups, including crucially lookups during typechecking
 -- the declaration itself, will find the fully-glorious Name
+--
+-- We handle ATs specially.  They are not main declarations, but also not
+-- implict things (in particular, adding them to `implicitTyThings' would mess
+-- things up in the renaming/type checking of source programs).
 -----------------------------------------------------
 
 addDeclsToPTE :: PackageTypeEnv -> [(Name,TyThing)] -> PackageTypeEnv
@@ -292,7 +298,9 @@ loadDecl ignore_prags mod (_version, decl)
   = do 	{ 	-- Populate the name cache with final versions of all 
 		-- the names associated with the decl
 	  main_name      <- mk_new_bndr mod Nothing (ifName decl)
-	; implicit_names <- mapM (mk_new_bndr mod (Just main_name)) (ifaceDeclSubBndrs decl)
+	; implicit_names <- mapM (mk_new_bndr mod (Just main_name)) 
+				 (ifaceDeclSubBndrs decl)
+        ; at_names       <- mapM (mk_new_bndr mod Nothing) (atNames decl)
 
 	-- Typecheck the thing, lazily
 	-- NB. firstly, the laziness is there in case we never need the
@@ -304,9 +312,13 @@ loadDecl ignore_prags mod (_version, decl)
 	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
 	      lookup n = case lookupOccEnv mini_env (getOccName n) of
 			   Just thing -> thing
-			   Nothing    -> pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (stripped_decl) )
+			   Nothing    -> 
+			     pprPanic "loadDecl" (ppr main_name <+> 
+						  ppr n $$ ppr (stripped_decl))
 
-	; returnM ((main_name, thing) : [(n, lookup n) | n <- implicit_names]) }
+	; returnM $ (main_name, thing) :  [(n, lookup n) | n <- implicit_names]
+				       ++ zip at_names (atThings thing)
+	}
 		-- We build a list from the *known* names, with (lookup n) thunks
 		-- as the TyThings.  That way we can extend the PTE without poking the
 		-- thunks
@@ -323,6 +335,12 @@ loadDecl ignore_prags mod (_version, decl)
 	= newGlobalBinder mod occ mb_parent 
 			  (importedSrcLoc (showSDoc (ppr (moduleName mod))))
 			-- ToDo: qualify with the package name if necessary
+
+    atNames (IfaceClass {ifATs = ats}) = [ifName at | at <- ats]
+    atNames _                          = []
+
+    atThings (AClass cla) = [ATyCon at | at <- classATs cla]
+    atThings _            = []
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 

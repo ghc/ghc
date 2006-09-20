@@ -506,7 +506,9 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
   = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
 				-- data type is syntactically illegal
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
-    do	{ tycon' <- lookupLocatedTopBndrRn tycon
+    do	{ tycon' <- if isIdxTyDecl tydecl
+		    then lookupLocatedOccRn     tycon -- may be imported family
+		    else lookupLocatedTopBndrRn tycon
 	; context' <- rnContext data_doc context
 	; typats' <- rnTyPats data_doc typatsMaybe
 	; (derivs', deriv_fvs) <- rn_derivs derivs
@@ -519,11 +521,17 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		   delFVs (map hsLTyVarName tyvars')	$
 	     	   extractHsCtxtTyNames context'	`plusFV`
 	     	   plusFVs (map conDeclFVs condecls')   `plusFV`
-	     	   deriv_fvs) }
+	     	   deriv_fvs				`plusFV`
+		   (if isIdxTyDecl tydecl
+		   then unitFV (unLoc tycon')	-- type instance => use
+		   else emptyFVs)) 
+        }
 
   | otherwise	          -- GADT
   = ASSERT( none typatsMaybe )    -- GADTs cannot have type patterns for now
-    do	{ tycon' <- lookupLocatedTopBndrRn tycon
+    do	{ tycon' <- if isIdxTyDecl tydecl
+		    then lookupLocatedOccRn     tycon -- may be imported family
+		    else lookupLocatedTopBndrRn tycon
 	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
     	; tyvars' <- bindTyVarsRn data_doc tyvars 
 				  (\ tyvars' -> return tyvars')
@@ -537,8 +545,12 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = Nothing, tcdKindSig = sig,
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
-	     	   plusFVs (map conDeclFVs condecls') `plusFV` deriv_fvs) }
-
+	     	   plusFVs (map conDeclFVs condecls') `plusFV` 
+		   deriv_fvs			      `plusFV`
+		   (if isIdxTyDecl tydecl
+		   then unitFV (unLoc tycon')	-- type instance => use
+		   else emptyFVs))
+        }
   where
     is_vanilla = case condecls of	-- Yuk
 		     [] 		   -> True
@@ -561,15 +573,22 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 rnTyClDecl (tydecl@TyFunction {}) =
   rnTySig tydecl bindTyVarsRn
 
-rnTyClDecl (TySynonym {tcdLName = name, tcdTyVars = tyvars,
-		       tcdTyPats = typatsMaybe, tcdSynRhs = ty})
+rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
+			      tcdTyPats = typatsMaybe, tcdSynRhs = ty})
   = bindTyVarsRn syn_doc tyvars		        $ \ tyvars' ->
-    do { name' <- lookupLocatedTopBndrRn name
+    do { name' <- if isIdxTyDecl tydecl
+		  then lookupLocatedOccRn     name -- may be imported family
+		  else lookupLocatedTopBndrRn name
        ; typats' <- rnTyPats syn_doc typatsMaybe
        ; (ty', fvs) <- rnHsTypeFVs syn_doc ty
        ; returnM (TySynonym {tcdLName = name', tcdTyVars = tyvars', 
 			     tcdTyPats = typats', tcdSynRhs = ty'},
-	          delFVs (map hsLTyVarName tyvars') fvs) }
+	          delFVs (map hsLTyVarName tyvars') $
+		  fvs			      `plusFV`
+		   (if isIdxTyDecl tydecl
+		   then unitFV (unLoc name')	-- type instance => use
+		   else emptyFVs))
+       }
   where
     syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
 
@@ -756,7 +775,8 @@ rnTySig (tydecl@TyData {tcdCtxt = context, tcdLName = tycon,
 			    tcdTyPats = Nothing, tcdKindSig = sig, 
 			    tcdCons = [], tcdDerivs = Nothing}, 
 		    delFVs (map hsLTyVarName tyvars') $
-	     	    extractHsCtxtTyNames context') } }
+	     	    extractHsCtxtTyNames context') 
+         } }
       where
 
 rnTySig (tydecl@TyFunction {tcdLName = tycon, tcdTyVars = tyvars, 
@@ -767,7 +787,8 @@ rnTySig (tydecl@TyFunction {tcdLName = tycon, tcdTyVars = tyvars,
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
 	 ; returnM (TyFunction {tcdLName = tycon', tcdTyVars = tyvars',
 			        tcdIso = tcdIso tydecl, tcdKind = sig}, 
-		    emptyFVs) } }
+		    emptyFVs) 
+         } }
 
 ksig_doc tycon = text "In the kind signature for" <+> quotes (ppr tycon)
 needOneIdx = text "Kind signature requires at least one type index"

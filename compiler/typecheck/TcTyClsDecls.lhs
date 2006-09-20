@@ -737,6 +737,9 @@ tcTyClDecl1 calc_isrec
 				; tvs2' <- mappM tcLookupTyVar tvs2 ;
 				; return (tvs1', tvs2') }
 
+    -- For each AT argument compute the position of the corresponding class
+    -- parameter in the class head.  This will later serve as a permutation
+    -- vector when checking the validity of instance declarations.
     setTyThingPoss [ATyCon tycon] atTyVars = 
       let classTyVars = hsLTyVarNames tvs
 	  poss        =   catMaybes 
@@ -746,8 +749,7 @@ tcTyClDecl1 calc_isrec
 		     -- There will be no Nothing, as we already passed renaming
       in 
       ATyCon (setTyConArgPoss tycon poss)
-    setTyThingPoss _		  _ = panic "setTyThingPoss"
-
+    setTyThingPoss _		  _ = panic "TcTyClsDecls.setTyThingPoss"
 
 tcTyClDecl1 calc_isrec 
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
