@@ -39,7 +39,8 @@ import Type		( tidyTopType )
 import TcType		( isFFITy )
 import DataCon		( dataConName, dataConFieldLabels, dataConWrapId_maybe )
 import TyCon		( TyCon, makeTyConAbstract, tyConDataCons, isNewTyCon, 
-			  newTyConRep, tyConSelIds, isAlgTyCon, isEnumerationTyCon )
+			  newTyConRep, tyConSelIds, isAlgTyCon,
+			  isEnumerationTyCon, isOpenTyCon )
 import Class		( classSelIds )
 import Module		( Module )
 import HscTypes		( HscEnv(..), NameCache( nsUniqs ), CgGuts(..),
@@ -351,6 +352,8 @@ mustExposeTyCon exports tc
   | isEnumerationTyCon tc	-- For an enumeration, exposing the constructors
   = True			-- won't lead to the need for further exposure
 				-- (This includes data types with no constructors.)
+  | isOpenTyCon tc		-- open type family
+  = True
   | otherwise			-- Newtype, datatype
   = any exported_con (tyConDataCons tc)
 	-- Expose rep if any datacon or field is exported

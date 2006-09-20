@@ -615,7 +615,8 @@ tcTyClDecl calc_isrec decl
 tcTyClDecl1 _calc_isrec 
   (TyFunction {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = kind})
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
-  { gla_exts <- doptM Opt_GlasgowExts
+  { traceTc (text "type family: " <+> ppr tc_name) 
+  ; gla_exts <- doptM Opt_GlasgowExts
 
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc gla_exts $ badSigTyDecl tc_name
@@ -626,9 +627,10 @@ tcTyClDecl1 _calc_isrec
   -- kind signature for an indexed data type
 tcTyClDecl1 _calc_isrec 
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
-	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = []})
+	   tcdLName = L _ tc_name, tcdKindSig = Just ksig, tcdCons = []})
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
-  { extra_tvs <- tcDataKindSig mb_ksig
+  { traceTc (text "data/newtype family: " <+> ppr tc_name) 
+  ; extra_tvs <- tcDataKindSig (Just ksig)
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
 
   ; checkTc (null . unLoc $ ctxt) $ badKindSigCtxt tc_name
