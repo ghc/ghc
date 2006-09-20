@@ -21,9 +21,9 @@ import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID,
                           mkUnpackCase, mkProductBox )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
-			  splitForAllTys, splitFunTys, splitRecNewType_maybe, isAlgType
+			  splitForAllTys, splitFunTys, isAlgType
 			)
-import Coercion         ( Coercion, mkSymCoercion, splitNewTypeRepCo_maybe )
+import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniquesUs, UniqSM )
@@ -132,7 +132,7 @@ mkWwBodies fun_ty demands res_info one_shots
 	mkWWcpr res_ty res_info
      else
 	returnUs (id, id, res_ty)
-    )					`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) ->
+    )					`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty) ->
 
     returnUs ([idNewDemandInfo v | v <- work_args, isId v],
 	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
@@ -341,13 +341,13 @@ mkWWstr_one arg
 
 	-- Unpack case
       Eval (Prod cs)
-	| Just (arg_tycon, tycon_arg_tys, data_con, inst_con_arg_tys) 
+	| Just (_arg_tycon, _tycon_arg_tys, data_con, inst_con_arg_tys) 
 		<- deepSplitProductType_maybe (idType arg)
 	-> getUniquesUs 		`thenUs` \ uniqs ->
 	   let
 	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
 	     unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
-	     unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) (idType arg) unpk_args data_con
+	     unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
 	     rebox_fn	    = Let (NonRec arg con_app) 
 	     con_app	    = mkProductBox unpk_args (idType arg)
 	   in
@@ -431,7 +431,7 @@ mkWWcpr body_ty RetCPR
 	con_app   = mkProductBox [arg] body_ty
       in
       returnUs (\ wkr_call -> Case wkr_call (arg) (exprType con_app) [(DEFAULT, [], con_app)],
-		\ body     -> workerCase (work_wild) body body_ty [arg] data_con (Var arg),
+		\ body     -> workerCase (work_wild) body [arg] data_con (Var arg),
 		con_arg_ty1)
 
     | otherwise		-- The general case
@@ -447,10 +447,10 @@ mkWWcpr body_ty RetCPR
         con_app			       = mkProductBox args body_ty
       in
       returnUs (\ wkr_call -> Case wkr_call (wrap_wild) (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)],
-		\ body     -> workerCase (work_wild) body body_ty args data_con ubx_tup_app,
+		\ body     -> workerCase (work_wild) body args data_con ubx_tup_app,
 		ubx_tup_ty)
     where
-      (_, tycon_arg_tys, data_con, con_arg_tys) = deepSplitProductType "mkWWcpr" body_ty
+      (_arg_tycon, _tycon_arg_tys, data_con, con_arg_tys) = deepSplitProductType "mkWWcpr" body_ty
       n_con_args  = length con_arg_tys
       con_arg_ty1 = head con_arg_tys
 
@@ -468,8 +468,8 @@ mkWWcpr body_ty other		-- No CPR info
 -- This transform doesn't move work or allocation
 -- from one cost centre to another
 
-workerCase bndr (Note (SCC cc) e) ty args con body = Note (SCC cc) (mkUnpackCase bndr e ty args con body)
-workerCase bndr e ty args con body = mkUnpackCase bndr e ty args con body
+workerCase bndr (Note (SCC cc) e) args con body = Note (SCC cc) (mkUnpackCase bndr e args con body)
+workerCase bndr e args con body = mkUnpackCase bndr e args con body
 \end{code}
 
 

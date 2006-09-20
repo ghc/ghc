@@ -46,13 +46,11 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
-import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType,
-                          PredType(..),
-			  mkTopTvSubst, substTyVar )
+import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, 
+ 			  newTyConInstRhs, mkTopTvSubst, substTyVar )
 import TcGadt           ( gadtRefine, refineType, emptyRefinement )
 import HsBinds          ( ExprCoFn(..), isIdCoercion )
-import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
-                          splitNewTypeRepCo_maybe, isEqPred )
+import Coercion         ( mkSymCoercion, mkUnsafeCoercion, isEqPred )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, isPredTy,
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, tcEqType,
@@ -64,25 +62,24 @@ import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon,
-                          newTyConCo, tyConArity )
+                          newTyConCo )
 import Class		( Class, classTyCon, classSelIds )
-import Var		( Id, TyVar, Var, setIdType, mkCoVar, mkWildCoVar )
+import Var		( Id, TyVar, Var, setIdType )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
-import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..),
-                          mkSysTvName )
+import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..))
 import OccName		( mkOccNameFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, DataConIds(..), dataConTyCon, dataConUnivTyVars,
 			  dataConFieldLabels, dataConRepArity, dataConResTys,
 			  dataConRepArgTys, dataConRepType, dataConFullSig,
-			  dataConSig, dataConStrictMarks, dataConExStricts, 
+			  dataConStrictMarks, dataConExStricts, 
 			  splitProductType, isVanillaDataCon, dataConFieldType,
-			  dataConInstOrigArgTys, deepSplitProductType
+			  deepSplitProductType
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, 
 			  mkTemplateLocals, mkTemplateLocalsNum, mkExportedLocalId,
-			  mkTemplateLocal, idName, mkWildId
+			  mkTemplateLocal, idName
 			)
 import IdInfo		( IdInfo, noCafIdInfo,  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo, setCafInfo,
@@ -305,7 +302,7 @@ mkDataConIds wrap_name wkr_name data_con
 		    (zip (dict_args ++ id_args) all_strict_marks)
 		    i3 []
 
-    con_app i rep_ids = Var wrk_id `mkTyApps`  result_ty_args
+    con_app _ rep_ids = Var wrk_id `mkTyApps`  result_ty_args
 				   `mkVarApps` ex_tvs
 				   `mkTyApps`  map snd eq_spec
 				   `mkVarApps` reverse rep_ids
@@ -329,7 +326,7 @@ mkDataConIds wrap_name wkr_name data_con
 			Case (Var arg) arg result_ty [(DEFAULT,[], body i (arg:rep_args))]
 
 		MarkedUnboxed
-		   -> unboxProduct i (Var arg) (idType arg) the_body result_ty
+		   -> unboxProduct i (Var arg) (idType arg) the_body 
                       where
                         the_body i con_args = body i (reverse con_args ++ rep_args)
 
@@ -599,28 +596,28 @@ mkRecordSelId tycon field_label
 --     PairInt a b -> body [a,b]
 --
 -- The Ints passed around are just for creating fresh locals
-unboxProduct :: Int -> CoreExpr -> Type -> (Int -> [Id] -> CoreExpr) -> Type -> CoreExpr
-unboxProduct i arg arg_ty body res_ty
+unboxProduct :: Int -> CoreExpr -> Type -> (Int -> [Id] -> CoreExpr) -> CoreExpr
+unboxProduct i arg arg_ty body
   = result
   where 
-    result = mkUnpackCase the_id arg arg_ty con_args boxing_con rhs
+    result = mkUnpackCase the_id arg con_args boxing_con rhs
     (_tycon, _tycon_args, boxing_con, tys) = deepSplitProductType "unboxProduct" arg_ty
     ([the_id], i') = mkLocals i [arg_ty]
     (con_args, i'') = mkLocals i' tys
     rhs = body i'' con_args
 
-mkUnpackCase ::  Id -> CoreExpr -> Type -> [Id] -> DataCon -> CoreExpr -> CoreExpr
+mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
 -- (mkUnpackCase x e args Con body)
 --	returns
 -- case (e `cast` ...) of bndr { Con args -> body }
 -- 
 -- the type of the bndr passed in is irrelevent
-mkUnpackCase bndr arg arg_ty unpk_args boxing_con body
+mkUnpackCase bndr arg unpk_args boxing_con body
   = Case cast_arg (setIdType bndr bndr_ty) (exprType body) [(DataAlt boxing_con, unpk_args, body)]
   where
   (cast_arg, bndr_ty) = go (idType bndr) arg
   go ty arg 
-    | res@(tycon, tycon_args, _, _)  <- splitProductType "mkUnpackCase" ty
+    | (tycon, tycon_args, _, _)  <- splitProductType "mkUnpackCase" ty
     , isNewTyCon tycon && not (isRecursiveTyCon tycon)
     = go (newTyConInstRhs tycon tycon_args) 
          (unwrapNewTypeBody tycon tycon_args arg)
@@ -692,7 +689,7 @@ mkReboxingAlt us con args rhs
   where
     stricts = dataConExStricts con ++ dataConStrictMarks con
 
-    go [] stricts us = ([], [])
+    go [] _stricts _us = ([], [])
 
 	-- Type variable case
     go (arg:args) stricts us 
