@@ -15,8 +15,8 @@ module TyCon(
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
-	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon, isAssocTyCon,
-	makeTyConAssoc,
+	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
+	assocTyConArgPoss_maybe, isTyConAssoc, setTyConArgPoss,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
 	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConCo,
 	isHiBootTyCon, isSuperKindTyCon,
@@ -68,6 +68,7 @@ import Class		( Class )
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
 import Name		( Name, nameUnique, NamedThing(getName) )
 import PrelNames	( Unique, Uniquable(..) )
+import Maybe		( isJust )
 import Maybes		( orElse )
 import Outputable
 import FastString
@@ -101,7 +102,12 @@ data TyCon
 					--		   algTyConRhs.NewTyCon
 					-- But not over the data constructors
 
-        tyConIsAssoc :: Bool,           -- for families: declared in a class?
+        tyConArgPoss :: Maybe [Int],    -- for associated families: for each
+					-- tyvar in the AT decl, gives the
+					-- position of that tyvar in the class
+					-- argument list (starting from 0).
+					-- NB: Length is less than tyConArity
+					--     if higher kind signature.
 	
 	algTcSelIds :: [Id],  		-- Its record selectors (empty if none)
 
@@ -143,7 +149,14 @@ data TyCon
 	tyConArity   :: Arity,
 
 	tyConTyVars  :: [TyVar],	-- Bound tyvars
-        tyConIsAssoc :: Bool,           -- for families: declared in a class?
+
+        tyConArgPoss :: Maybe [Int],    -- for associated families: for each
+					-- tyvar in the AT decl, gives the
+					-- position of that tyvar in the class
+					-- argument list (starting from 0).
+					-- NB: Length is less than tyConArity
+					--     if higher kind signature.
+	
 	synTcRhs     :: SynTyConRhs	-- Expanded type in here
     }
 
@@ -404,7 +417,7 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
 	tyConKind	 = kind,
 	tyConArity	 = length tyvars,
 	tyConTyVars	 = tyvars,
-	tyConIsAssoc	 = False,
+	tyConArgPoss	 = Nothing,
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
 	algTcSelIds	 = sel_ids,
@@ -474,7 +487,7 @@ mkSynTyCon name kind tyvars rhs
 	tyConKind = kind,
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
-	tyConIsAssoc = False,
+	tyConArgPoss = Nothing,
 	synTcRhs = rhs
     }
 
@@ -580,15 +593,18 @@ isOpenTyCon (AlgTyCon {algTcRhs = OpenDataTyCon }) = True
 isOpenTyCon (AlgTyCon {algTcRhs = OpenNewTyCon  }) = True
 isOpenTyCon _					   = False
 
-isAssocTyCon :: TyCon -> Bool
-isAssocTyCon (AlgTyCon { tyConIsAssoc = isAssoc }) = isAssoc
-isAssocTyCon (SynTyCon { tyConIsAssoc = isAssoc }) = isAssoc
-isAssocTyCon _                                     = False
+assocTyConArgPoss_maybe :: TyCon -> Maybe [Int]
+assocTyConArgPoss_maybe (AlgTyCon { tyConArgPoss = poss }) = poss
+assocTyConArgPoss_maybe (SynTyCon { tyConArgPoss = poss }) = poss
+assocTyConArgPoss_maybe _                                  = Nothing
 
-makeTyConAssoc :: TyCon -> TyCon
-makeTyConAssoc tc@(AlgTyCon {}) = tc { tyConIsAssoc = True }
-makeTyConAssoc tc@(SynTyCon {}) = tc { tyConIsAssoc = True }
-makeTyConAssoc tc = pprPanic "makeTyConAssoc" (ppr tc)
+isTyConAssoc :: TyCon -> Bool
+isTyConAssoc = isJust . assocTyConArgPoss_maybe
+
+setTyConArgPoss :: TyCon -> [Int] -> TyCon
+setTyConArgPoss tc@(AlgTyCon {}) poss = tc { tyConArgPoss = Just poss }
+setTyConArgPoss tc@(SynTyCon {}) poss = tc { tyConArgPoss = Just poss }
+setTyConArgPoss tc _ = pprPanic "setTyConArgPoss" (ppr tc)
 
 isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon

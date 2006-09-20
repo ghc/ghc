@@ -17,7 +17,7 @@ import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  hsTyVarName, LHsTyVarBndr, LHsType, HsType(..),
 			  mkHsAppTy
 			)
-import HsTypes          ( HsBang(..), getBangStrictness )
+import HsTypes          ( HsBang(..), getBangStrictness, hsLTyVarNames )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
 import HscTypes		( implicitTyThings, ModDetails )
 import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
@@ -51,7 +51,7 @@ import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon, OpenDataTyCon,
 			  tyConDataCons, mkForeignTyCon, isProductTyCon,
 			  isRecursiveTyCon, isOpenTyCon,
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
-                          isNewTyCon, tyConKind, makeTyConAssoc, isAssocTyCon )
+                          isNewTyCon, tyConKind, setTyConArgPoss ) 
 import DataCon		( DataCon, dataConUserType, dataConName, 
 			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
 			  dataConFieldType, dataConResTys )
@@ -59,11 +59,11 @@ import Var		( TyVar, idType, idName )
 import VarSet		( elemVarSet, mkVarSet )
 import Name		( Name, getSrcLoc )
 import Outputable
-import Maybe		( isJust, fromJust, isNothing )
+import Maybe		( isJust, fromJust, isNothing, catMaybes )
 import Maybes		( expectJust )
 import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
-import List		( partition )
+import List		( partition, elemIndex )
 import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan )
 import ListSetOps	( equivClasses, minusList )
 import List		( delete )
@@ -707,7 +707,7 @@ tcTyClDecl1 calc_isrec
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM (addLocM tc_fundep) fundeps
   ; atss <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
-  ; let ats' = map makeTyThingAssoc . concat $ atss
+  ; let ats' = zipWith setTyThingPoss atss (map (tcdTyVars . unLoc) ats)
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
 		let 	-- This little knot is just so we can get
@@ -726,8 +726,17 @@ tcTyClDecl1 calc_isrec
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mappM tcLookupTyVar tvs1 ;
 				; tvs2' <- mappM tcLookupTyVar tvs2 ;
 				; return (tvs1', tvs2') }
-    makeTyThingAssoc (ATyCon tycon) = ATyCon (makeTyConAssoc tycon)
-    makeTyThingAssoc _		    = panic "makeTyThingAssoc"
+
+    setTyThingPoss [ATyCon tycon] atTyVars = 
+      let classTyVars = hsLTyVarNames tvs
+	  poss        =   catMaybes 
+			. map (`elemIndex` classTyVars) 
+			. hsLTyVarNames 
+			$ atTyVars
+		     -- There will be no Nothing, as we already passed renaming
+      in 
+      ATyCon (setTyConArgPoss tycon poss)
+    setTyThingPoss _		  _ = panic "setTyThingPoss"
 
 
 tcTyClDecl1 calc_isrec 

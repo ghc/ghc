@@ -14,9 +14,11 @@ import TcTyClsDecls     ( tcIdxTyInstDecl )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, badATErr,
 			  omittedATWarn, tcClassDecl2, getGenericInstances )
 import TcRnMonad       
-import TcMType		( tcSkolSigType, checkValidInstance, checkValidInstHead )
-import TcType		( mkClassPred, tcSplitSigmaTy, tcSplitDFunHead, 
-                          SkolemInfo(InstSkol), tcSplitDFunTy, mkFunTy )
+import TcMType		( tcSkolSigType, checkValidInstance,
+			  checkValidInstHead )
+import TcType		( TcType, mkClassPred, tcSplitSigmaTy,
+			  tcSplitDFunHead,  SkolemInfo(InstSkol),
+			  tcSplitDFunTy, mkFunTy ) 
 import Inst		( newDictBndr, newDictBndrs, instToId, showLIE, 
 			  getOverlapFlag, tcExtendLocalInstEnv )
 import InstEnv		( mkLocalInstance, instanceDFunId )
@@ -28,23 +30,28 @@ import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifySuperClasses )
 import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
-                          splitFunTys, TyThing(ATyCon) )
+                          splitFunTys, TyThing(ATyCon), isTyVarTy, tcEqType,
+                          substTys, emptyTvSubst, extendTvSubst )
 import Coercion         ( mkSymCoercion )
 import TyCon            ( TyCon, tyConName, newTyConCo, tyConTyVars,
-			  isAssocTyCon, tyConFamInst_maybe )
+			  isTyConAssoc, tyConFamInst_maybe,
+			  assocTyConArgPoss_maybe )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
-import Class		( classBigSig, classATs )
-import Var		( TyVar, Id, idName, idType, tyVarKind )
+import Class		( Class, classBigSig, classATs )
+import Var		( TyVar, Id, idName, idType, tyVarKind, tyVarName )
+import VarEnv           ( rnBndrs2, mkRnEnv2, emptyInScopeSet )
 import Id               ( mkSysLocal )
 import UniqSupply       ( uniqsFromSupply, splitUniqSupply )
 import MkId		( mkDictFunId )
-import Name		( Name, getSrcLoc )
-import NameSet		( NameSet, addListToNameSet, emptyNameSet,
-			  minusNameSet, nameSetToList )
+import Name		( Name, getSrcLoc, nameOccName )
+import NameSet		( addListToNameSet, emptyNameSet, minusNameSet,
+			  nameSetToList ) 
 import Maybe		( isNothing, fromJust, catMaybes )
 import Monad		( when )
+import List		( find )
 import DynFlags		( DynFlag(Opt_WarnMissingMethods) )
-import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
+import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart,
+			  getLoc)
 import ListSetOps	( minusList )
 import Outputable
 import Bag
@@ -149,8 +156,8 @@ tcInstDecls1 tycl_decls inst_decls
 		-- (they recover, so that we get more than one error each
 		-- round) 
 
-		-- (1) Do the ordinary instance declarations and instances of
-		--     indexed types
+		-- (1) Do class instance declarations and instances of indexed
+		--     types 
        ; let { idxty_decls = filter (isIdxTyDecl . unLoc) tycl_decls }
        ; local_info_tycons <- mappM tcLocalInstDecl1  inst_decls
        ; idxty_info_tycons <- mappM tcIdxTyInstDeclTL idxty_decls
@@ -205,13 +212,13 @@ tcInstDecls1 tycl_decls inst_decls
     isAssocFamily (Just (ATyCon tycon)) =
       case tyConFamInst_maybe tycon of
         Nothing       -> panic "isAssocFamily: no family?!?"
-	Just (fam, _) -> isAssocTyCon fam
+	Just (fam, _) -> isTyConAssoc fam
     isAssocFamily (Just _	      ) = panic "isAssocFamily: no tycon?!?"
     isAssocFamily Nothing               = False
 
 assocInClassErr name = 
-  ptext SLIT("Associated type must be inside class instance") <+> 
-  quotes (ppr name)
+  ptext SLIT("Associated type") <+> quotes (ppr name) <+> 
+  ptext SLIT("must be inside a class instance")
 
 addInsts :: [InstInfo] -> TcM a -> TcM a
 addInsts infos thing_inside
@@ -247,7 +254,8 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	-- Now, check the validity of the instance.
 	; (clas, inst_tys) <- checkValidInstHead tau
 	; checkValidInstance tyvars theta clas inst_tys
-	; checkValidOrMissingAT clas
+	; checkValidAndMissingATs clas (tyvars, inst_tys) 
+				  (zip ats idxty_info_tycons)
 
 	-- Finally, construct the Core representation of the instance.
 	-- (This no longer includes the associated types.)
@@ -264,20 +272,99 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 		  catMaybes idxty_tycons)
         }
   where
-    checkValidOrMissingAT clas
-      = do { let classDefATs =  addListToNameSet emptyNameSet 
-			      . map tyConName 
-			      . classATs 
-			      $ clas
-                 definedATs =   addListToNameSet emptyNameSet 
-			      . map (tcdName . unLoc)
-			      $ ats
-                 omitted    = classDefATs   `minusNameSet` definedATs
-                 excess     = definedATs `minusNameSet` classDefATs
-           ; mapM_ (addErrTc . badATErr clas) (nameSetToList excess)
+    -- We pass in the source form and the type checked form of the ATs.  We
+    -- really need the source form only to be able to produce more informative
+    -- error messages.
+    checkValidAndMissingATs :: Class
+			    -> ([TyVar], [TcType])     -- instance types
+			    -> [(LTyClDecl Name,       -- source form of AT
+			         (Maybe InstInfo,      -- Core form for type
+				  Maybe TyThing))]     -- Core form for data
+			    -> TcM ()
+    checkValidAndMissingATs clas inst_tys ats
+      = do { -- Issue a warning for each class AT that is not defined in this
+	     -- instance.
+	   ; let classDefATs = listToNameSet . map tyConName . classATs $ clas
+                 definedATs  = listToNameSet . map (tcdName.unLoc.fst)  $ ats
+		 omitted     = classDefATs `minusNameSet` definedATs
 	   ; warn <- doptM Opt_WarnMissingMethods
 	   ; mapM_ (warnTc warn . omittedATWarn) (nameSetToList omitted)
+	   
+	     -- Ensure that all AT indexes that correspond to class parameters
+	     -- coincide with the types in the instance head.  All remaining
+	     -- AT arguments must be variables.  Also raise an error for any
+	     -- type instances that are not associated with this class.
+	   ; mapM_ (checkIndexes clas inst_tys) ats
 	   }
+
+    checkIndexes _    _        (hsAT, (Nothing, Nothing))              = 
+      return ()	   -- skip, we already had an error here
+    checkIndexes clas inst_tys (hsAT, (Just _  , Nothing            )) = 
+      panic "do impl for AT syns"  -- !!!TODO: also call checkIndexes'
+    checkIndexes clas inst_tys (hsAT, (Nothing , Just (ATyCon tycon))) = 
+      checkIndexes' clas inst_tys hsAT 
+		    (tyConTyVars tycon, 
+		     snd . fromJust . tyConFamInst_maybe $ tycon)
+    checkIndexes _ _ _ = panic "checkIndexes"
+
+    checkIndexes' clas (instTvs, instTys) hsAT (atTvs, atTys)
+      = let atName = tcdName . unLoc $ hsAT
+	in
+	setSrcSpan (getLoc hsAT)       $
+	addErrCtxt (atInstCtxt atName) $
+	case find ((atName ==) . tyConName) (classATs clas) of
+	  Nothing     -> addErrTc $ badATErr clas atName  -- not in this class
+	  Just atDecl -> 
+	    case assocTyConArgPoss_maybe atDecl of
+	      Nothing   -> panic "checkIndexes': AT has no args poss?!?"
+	      Just poss -> 
+
+	        -- The following is tricky!  We need to deal with three
+	        -- complications: (1) The AT possibly only uses a subset of
+	        -- the class parameters as indexes and those it uses may be in
+	        -- a different order; (2) the AT may have extra arguments,
+	        -- which must be type variables; and (3) variables in AT and
+	        -- instance head will be different `Name's even if their
+	        -- source lexemes are identical.
+		--
+		-- Re (1), `poss' contains a permutation vector to extract the
+		-- class parameters in the right order.
+		--
+		-- Re (2), we wrap the (permuted) class parameters in a Maybe
+		-- type and use Nothing for any extra AT arguments.  (First
+		-- equation of `checkIndex' below.)
+		--
+		-- Re (3), we replace any type variable in the AT parameters
+		-- that has the same source lexeme as some variable in the
+		-- instance types with the instance type variable sharing its
+		-- source lexeme.
+		--
+	        let relevantInstTys = map (instTys !!) poss
+		    instArgs	    = map Just relevantInstTys ++ 
+				      repeat Nothing  -- extra arguments
+		    renaming        = substSameTyVar atTvs instTvs
+		in
+	        zipWithM_ checkIndex (substTys renaming atTys) instArgs
+
+    checkIndex ty Nothing 
+      | isTyVarTy ty         = return ()
+      | otherwise            = addErrTc $ mustBeVarArgErr ty
+    checkIndex ty (Just instTy) 
+      | ty `tcEqType` instTy = return ()
+      | otherwise            = addErrTc $ wrongATArgErr ty instTy
+
+    listToNameSet = addListToNameSet emptyNameSet 
+
+    substSameTyVar []       _            = emptyTvSubst
+    substSameTyVar (tv:tvs) replacingTvs = 
+      let replacement = case find (tv `sameLexeme`) replacingTvs of
+			  Nothing  -> mkTyVarTy tv
+			  Just rtv -> mkTyVarTy rtv
+          --
+          tv1 `sameLexeme` tv2 = 
+	    nameOccName (tyVarName tv1) == nameOccName (tyVarName tv2)
+      in
+      extendTvSubst (substSameTyVar tvs replacingTvs) tv replacement
 \end{code}
 
 
@@ -741,4 +828,18 @@ instDeclCtxt2 dfun_ty
 inst_decl_ctxt doc = ptext SLIT("In the instance declaration for") <+> quotes doc
 
 superClassCtxt = ptext SLIT("When checking the super-classes of an instance declaration")
+
+atInstCtxt name = ptext SLIT("In the associated type instance for") <+> 
+		  quotes (ppr name)
+
+mustBeVarArgErr ty = 
+  sep [ ptext SLIT("Arguments that do not correspond to a class parameter")
+      , ptext SLIT("must be variables:") <+> ppr ty
+      ]
+
+wrongATArgErr ty instTy =
+  sep [ ptext SLIT("Type indexes must match class instance head")
+      , ptext SLIT("Found") <+> ppr ty <+> ptext SLIT("but expected") <+>
+         ppr instTy
+      ]
 \end{code}
