@@ -833,8 +833,9 @@ atInstCtxt name = ptext SLIT("In the associated type instance for") <+>
 		  quotes (ppr name)
 
 mustBeVarArgErr ty = 
-  sep [ ptext SLIT("Arguments that do not correspond to a class parameter")
-      , ptext SLIT("must be variables:") <+> ppr ty
+  sep [ ptext SLIT("Arguments that do not correspond to a class parameter") <+>
+        ptext SLIT("must be variables")
+      , ptext SLIT("Instead of a variable, found") <+> ppr ty
       ]
 
 wrongATArgErr ty instTy =
