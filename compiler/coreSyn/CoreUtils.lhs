@@ -682,6 +682,32 @@ dataConInstPat :: [Unique]                  -- An infinite list of uniques
                -> DataCon
 	       -> [Type]                    -- Types to instantiate the universally quantified tyvars
 	       -> ([TyVar], [CoVar], [Id])  -- Return instantiated variables
+-- dataConInstPat us con inst_tys returns a triple (ex_tvs, co_tvs, arg_ids),
+--
+--   ex_tvs are intended to be used as binders for existential type args
+--
+--   co_tvs are intended to be used as binders for coercion args and the kinds
+--     of these vars have been instantiated by the inst_tys and the ex_tys
+--
+--   arg_ids are indended to be used as binders for value arguments, including
+--     dicts, and have their types instantiated with inst_tys and ex_tys
+--
+-- Example.
+--  The following constructor T1
+--
+--  data T a where
+--    T1 :: forall b. Int -> b -> T(a,b)
+--    ...
+--
+--  has representation type 
+--   forall a. forall a1. forall a2. forall b. (a :=: (a1,a2)) => 
+--     Int -> b -> T a
+--
+--  dataConInstPat us T1 (a1',a2') will return
+--
+--  ([a1'', a2'', b''],[c :: (a1',a2'):=:(a1'',a2'')],[x :: Int,y :: b''])
+--
+--  where the double-primed variables are created from the unique list input
 dataConInstPat uniqs con inst_tys 
   = (ex_bndrs, co_bndrs, id_bndrs)
   where 
@@ -706,7 +732,7 @@ dataConInstPat uniqs con inst_tys
       -- make the instantiation substitution
     inst_subst = substTyWith (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
 
-      -- make a new coercion vars, instantiating kind
+      -- make new coercion vars, instantiating kind
     mk_co_var uniq eq_pred = mkCoVar new_name (inst_subst (mkPredTy eq_pred))
        where
          new_name = mkSysTvName uniq FSLIT("co")
@@ -1106,7 +1132,11 @@ eta_expand n us (Lam v body) ty
 eta_expand n us expr ty
   = ASSERT2 (exprType expr `coreEqType` ty, ppr (exprType expr) $$ ppr ty)
     case splitForAllTy_maybe ty of { 
- 	  Just (tv,ty') -> Lam tv (eta_expand n us (App expr (Type (mkTyVarTy tv))) ty')
+ 	  Just (tv,ty') -> 
+              Lam lam_tv (eta_expand n us2 (App expr (Type (mkTyVarTy lam_tv))) (substTyWith [tv] [mkTyVarTy lam_tv] ty'))
+                  where 
+                    lam_tv = mkTyVar (mkSysTvName uniq FSLIT("etaT")) (tyVarKind tv)
+                    (uniq:us2) = us
 
  	; Nothing ->
   

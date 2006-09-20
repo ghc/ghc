@@ -44,7 +44,8 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, exprIsHNF, findDefault, mergeAlts,
 			  exprOkForSpeculation, exprArity, 
-			  mkCoerce, mkSCC, mkInlineMe, applyTypeToArg
+			  mkCoerce, mkSCC, mkInlineMe, applyTypeToArg,
+                          dataConInstPat
 			)
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
