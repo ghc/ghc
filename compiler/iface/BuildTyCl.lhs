@@ -37,6 +37,7 @@ import Type		( mkArrowKinds, liftedTypeKind, typeKind,
 			  splitTyConApp_maybe, splitAppTy_maybe,
 			  getTyVar_maybe, 
 			  mkPredTys, mkTyVarTys, ThetaType, Type, Kind,
+			  TyThing(..), 
 			  substTyWith, zipTopTvSubst, substTheta, mkForAllTys,
                           mkTyConApp, mkTyVarTy )
 import Coercion         ( mkNewTypeCoercion )
@@ -231,11 +232,12 @@ mkTyConSelIds tycon rhs
 \begin{code}
 buildClass :: Name -> [TyVar] -> ThetaType
 	   -> [FunDep TyVar]		-- Functional dependencies
+	   -> [TyThing]			-- Associated types
 	   -> [(Name, DefMeth, Type)]	-- Method info
 	   -> RecFlag			-- Info for type constructor
 	   -> TcRnIf m n Class
 
-buildClass class_name tvs sc_theta fds sig_stuff tc_isrec
+buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
   = do	{ tycon_name <- newImplicitBinder class_name mkClassTyConOcc
 	; datacon_name <- newImplicitBinder class_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
@@ -285,10 +287,12 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec
 		-- Because C has only one operation, it is represented by
 		-- a newtype, and it should be a *recursive* newtype.
 		-- [If we don't make it a recursive newtype, we'll expand the
-		-- newtype like a synonym, but that will lead to an infinite type]
+		-- newtype like a synonym, but that will lead to an infinite
+		-- type]
+	      ; atTyCons = [tycon | ATyCon tycon <- ats]
 	      }
-	; return (mkClass class_name tvs fds
-		       sc_theta sc_sel_ids op_items
+	; return (mkClass class_name tvs fds 
+		       sc_theta sc_sel_ids atTyCons op_items
 		       tycon)
 	})}
 \end{code}

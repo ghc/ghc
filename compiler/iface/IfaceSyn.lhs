@@ -93,6 +93,7 @@ data IfaceDecl
 		 ifName    :: OccName,		-- Name of the class
 		 ifTyVars  :: [IfaceTvBndr],	-- Type variables
 		 ifFDs     :: [FunDep FastString], -- Functional dependencies
+		 ifATs	   :: [IfaceDecl],	-- Associated type families
 		 ifSigs    :: [IfaceClassOp],	-- Method signatures
 	         ifRec	   :: RecFlag		-- Is newtype/datatype associated with the class recursive?
     }
@@ -260,10 +261,12 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 		IfOpenNewTyCon 	-> ptext SLIT("newtype family")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
-			  ifFDs = fds, ifSigs = sigs, ifRec = isrec})
+			  ifFDs = fds, ifATs = ats, ifSigs = sigs, 
+			  ifRec = isrec})
   = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars <+> pprFundeps fds)
        4 (vcat [pprRec isrec,
-	        sep (map ppr sigs)])
+	        sep (map ppr ats),
+		sep (map ppr sigs)])
 
 pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
 pprGen True  = ptext SLIT("Generics: yes")
@@ -546,6 +549,7 @@ eqIfDecl d1@(IfaceClass {}) d2@(IfaceClass {})
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
    	  eq_ifContext env (ifCtxt d1) (ifCtxt d2)  &&&
 	  eqListBy (eq_hsFD env)    (ifFDs d1)  (ifFDs d2) &&&
+	  eqListBy eqIfDecl         (ifATs d1)  (ifATs d2) &&&
 	  eqListBy (eq_cls_sig env) (ifSigs d1) (ifSigs d2)
        )
 

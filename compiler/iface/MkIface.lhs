@@ -997,10 +997,12 @@ tyThingToIfaceDecl ext (AClass clas)
 		 ifName	  = getOccName clas,
 		 ifTyVars = toIfaceTvBndrs clas_tyvars,
 		 ifFDs    = map toIfaceFD clas_fds,
+		 ifATs	  = map (tyThingToIfaceDecl ext . ATyCon) clas_ats,
 		 ifSigs	  = map toIfaceClassOp op_stuff,
 	  	 ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
   where
-    (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
+    (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff) 
+      = classExtraBigSig clas
     tycon = classTyCon clas
 
     toIfaceClassOp (sel_id, def_meth)

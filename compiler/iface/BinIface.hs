@@ -919,7 +919,7 @@ instance Binary IfaceDecl where
 	    put_ bh ar
 	    put_ bh as
 	    put_ bh at
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6) = do
+    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7) = do
 	    putByte bh 4
 	    put_ bh a1
 	    put_ bh a2
@@ -927,6 +927,7 @@ instance Binary IfaceDecl where
 	    put_ bh a4
 	    put_ bh a5
 	    put_ bh a6
+	    put_ bh a7
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -957,7 +958,8 @@ instance Binary IfaceDecl where
 		    a4 <- get bh
 		    a5 <- get bh
 		    a6 <- get bh
-		    return (IfaceClass a1 a2 a3 a4 a5 a6)
+		    a7 <- get bh
+		    return (IfaceClass a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceInst where
     put_ bh (IfaceInst cls tys dfun flag orph) = do

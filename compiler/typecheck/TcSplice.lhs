@@ -631,7 +631,7 @@ reifyClass cls
 	; ops <- mapM reify_op op_stuff
 	; return (TH.ClassI $ TH.ClassD cxt (reifyName cls) (reifyTyVars tvs) fds' ops) }
   where
-    (tvs, fds, theta, _, op_stuff) = classExtraBigSig cls
+    (tvs, fds, theta, _, _, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
     reify_op (op, _) = do { ty <- reifyType (idType op)
 			  ; return (TH.SigD (reifyName op) ty) }

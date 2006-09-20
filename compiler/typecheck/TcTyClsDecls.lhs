@@ -256,11 +256,11 @@ tcIdxTyInstDecl1 :: TyClDecl Name -> TcM (Maybe InstInfo)  -- Nothing if error
 
 tcIdxTyInstDecl1 (decl@TySynonym {})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind ->
-    do { -- kind check the right hand side of the type equation
+    do { -- (1) kind check the right hand side of the type equation
        ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
 
-         -- type check type equation
-       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {
+         -- (2) type check type equation
+       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
        ; t_typats <- mappM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
 
@@ -272,17 +272,16 @@ tcIdxTyInstDecl1 (decl@TySynonym {})
 tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
 			       tcdCons = cons})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind ->
-    do { -- kind check the data declaration as usual
+    do { -- (1) kind check the data declaration as usual
        ; k_decl <- kcDataDecl decl k_tvs
-       ; k_typats <- mappM tcHsKindedType k_typats
        ; let k_ctxt = tcdCtxt decl
 	     k_cons = tcdCons decl
 
          -- result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr tc_name
 
-         -- type check indexed data type declaration
-       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {
+         -- (2) type check indexed data type declaration
+       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
        ; unbox_strict <- doptM Opt_UnboxStrictFields
 
 	 -- Check that we don't use GADT syntax for indexed types
@@ -292,6 +291,7 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
        ; checkTc (new_or_data == DataType || isSingleton cons) $
 	   newtypeConError tc_name (length cons)
 
+       ; t_typats     <- mappM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
@@ -691,7 +691,6 @@ tcTyClDecl1 calc_isrec
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM (addLocM tc_fundep) fundeps
   ; ats' <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
- -- ^^^^ !!!TODO: what to do with this?  Need to generate FC tyfun decls.
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
 		let 	-- This little knot is just so we can get
@@ -700,7 +699,7 @@ tcTyClDecl1 calc_isrec
 		    tycon_name = tyConName (classTyCon clas)
 		    tc_isrec = calc_isrec tycon_name
 		in
-		buildClass class_name tvs' ctxt' fds' 
+		buildClass class_name tvs' ctxt' fds' ats'
 			   sig_stuff tc_isrec)
   ; return (AClass clas) }
   where

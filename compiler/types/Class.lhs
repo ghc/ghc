@@ -11,7 +11,7 @@ module Class (
 	FunDep,	pprFundeps,
 
 	mkClass, classTyVars, classArity,
-	classKey, className, classSelIds, classTyCon, classMethods,
+	classKey, className, classATs, classSelIds, classTyCon, classMethods,
 	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
@@ -38,24 +38,27 @@ A @Class@ corresponds to a Greek kappa in the static semantics:
 \begin{code}
 data Class
   = Class {
-	classKey  :: Unique,			-- Key for fast comparison
+	classKey  :: Unique,		-- Key for fast comparison
 	className :: Name,
 	
-	classTyVars  :: [TyVar],		-- The class type variables
-	classFunDeps :: [FunDep TyVar],		-- The functional dependencies
+	classTyVars  :: [TyVar],	-- The class type variables
+	classFunDeps :: [FunDep TyVar],	-- The functional dependencies
 
-	classSCTheta :: [PredType],		-- Immediate superclasses, and the
-	classSCSels  :: [Id],			-- corresponding selector functions to
-						-- extract them from a dictionary of this
-						-- class
+	classSCTheta :: [PredType],	-- Immediate superclasses, and the
+	classSCSels  :: [Id],		-- corresponding selector functions
+					-- to extract them from a dictionary
+					-- of this class
 
-	classOpStuff :: [ClassOpItem],		-- Ordered by tag
+        classATs     :: [TyCon],	-- Associated type families
 
-	classTyCon :: TyCon		-- The data type constructor for dictionaries
-  }					-- of this class
+	classOpStuff :: [ClassOpItem],	-- Ordered by tag
 
-type FunDep a	  = ([a],[a])	--  e.g. class C a b c |  a b -> c, a c -> b  where ...
-				--  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
+	classTyCon :: TyCon		-- The data type constructor for
+					-- dictionaries of this class
+     }
+
+type FunDep a = ([a],[a])  --  e.g. class C a b c | a b -> c, a c -> b where...
+			   --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 
 type ClassOpItem = (Id, DefMeth)
 	-- Selector function; contains unfolding
@@ -73,11 +76,12 @@ The @mkClass@ function fills in the indirect superclasses.
 mkClass :: Name -> [TyVar]
 	-> [([TyVar], [TyVar])]
 	-> [PredType] -> [Id]
+	-> [TyCon]
 	-> [ClassOpItem]
 	-> TyCon
 	-> Class
 
-mkClass name tyvars fds super_classes superdict_sels
+mkClass name tyvars fds super_classes superdict_sels ats 
 	op_stuff tycon
   = Class {	classKey = getUnique name, 
 		className = name,
@@ -85,6 +89,7 @@ mkClass name tyvars fds super_classes superdict_sels
 		classFunDeps = fds,
 		classSCTheta = super_classes,
 		classSCSels = superdict_sels,
+		classATs = ats,
 		classOpStuff = op_stuff,
 		classTyCon = tycon }
 \end{code}
@@ -118,8 +123,8 @@ classBigSig (Class {classTyVars = tyvars, classSCTheta = sc_theta,
   = (tyvars, sc_theta, sc_sels, op_stuff)
 classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
 			 classSCTheta = sc_theta, classSCSels = sc_sels,
-			 classOpStuff = op_stuff})
-  = (tyvars, fundeps, sc_theta, sc_sels, op_stuff)
+			 classATs = ats, classOpStuff = op_stuff})
+  = (tyvars, fundeps, sc_theta, sc_sels, ats, op_stuff)
 \end{code}
 
 

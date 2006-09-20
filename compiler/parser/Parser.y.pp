@@ -39,6 +39,7 @@ import OrdList
 
 import FastString
 import Maybes		( orElse )
+import Monad            ( when )
 import Outputable
 import GLAEXTS
 }
@@ -483,7 +484,7 @@ cl_decl :: { LTyClDecl RdrName }
 				   (mkClassDecl (ctxt, tc, tvs) 
 					        (unLoc $3) sigs binds ats) } }
 
--- Type declarations
+-- Type declarations (toplevel)
 --
 ty_decl :: { LTyClDecl RdrName }
            -- ordinary type synonyms
@@ -520,7 +521,7 @@ ty_decl :: { LTyClDecl RdrName }
 				  (TySynonym tc tvs (Just typats) $5)) 
                       } }
 
-        -- ordinary data type or newtype declaration
+          -- ordinary data type or newtype declaration
 	| data_or_newtype tycl_hdr constrs deriving
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
                       ; checkTyVars tparms    -- no type pattern
@@ -531,7 +532,7 @@ ty_decl :: { LTyClDecl RdrName }
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
 			       Nothing (reverse (unLoc $3)) (unLoc $4)) } }
 
-        -- ordinary GADT declaration
+          -- ordinary GADT declaration
         | data_or_newtype tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
@@ -542,7 +543,7 @@ ty_decl :: { LTyClDecl RdrName }
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) $3
 			      (reverse (unLoc $5)) (unLoc $6)) } }
 
-        -- data/newtype family
+          -- data/newtype family
         | data_or_newtype 'family' tycl_hdr '::' kind
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
                       ; checkTyVars tparms    -- no type pattern
@@ -551,7 +552,7 @@ ty_decl :: { LTyClDecl RdrName }
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
 			      (Just (unLoc $5)) [] Nothing) } }
 
-        -- data/newtype instance declaration
+          -- data/newtype instance declaration
 	| data_or_newtype 'instance' tycl_hdr constrs deriving
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
                                              -- can have type pats
@@ -562,7 +563,7 @@ ty_decl :: { LTyClDecl RdrName }
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
 			      Nothing (reverse (unLoc $4)) (unLoc $5)) } }
 
-        -- GADT instance declaration
+          -- GADT instance declaration
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
 		 'where' gadt_constrlist
 		 deriving
@@ -572,6 +573,62 @@ ty_decl :: { LTyClDecl RdrName }
 			  L (comb4 $1 $3 $6 $7)
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
 			       $4 (reverse (unLoc $6)) (unLoc $7)) } }
+
+-- Associate type declarations
+--
+at_decl :: { LTyClDecl RdrName }
+           -- type family declarations
+        : 'type' opt_iso type '::' kind
+		-- Note the use of type for the head; this allows
+		-- infix type constructors to be declared
+		--
+ 		{% do { (tc, tvs, _) <- checkSynHdr $3 False
+		      ; return (L (comb3 $1 $3 $5) 
+				  (TyFunction tc tvs $2 (unLoc $5)))
+		      } }
+
+           -- type instance declarations
+        | 'type' opt_iso type '=' ctype
+		-- Note the use of type for the head; this allows
+		-- infix type constructors and type patterns
+		--
+ 		{% do { when $2 $ 
+			  parseError (comb2 $1 $>) "Misplaced iso keyword"
+		      ; (tc, tvs, typats) <- checkSynHdr $3 True
+		      ; return (L (comb2 $1 $5) 
+				  (TySynonym tc tvs (Just typats) $5)) 
+                      } }
+
+          -- data/newtype family
+        | data_or_newtype tycl_hdr '::' kind
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                      ; checkTyVars tparms    -- no type pattern
+		      ; return $
+			  L (comb3 $1 $2 $4)
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
+			      (Just (unLoc $4)) [] Nothing) } }
+
+        -- data/newtype instance declaration
+	| data_or_newtype tycl_hdr constrs deriving
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                                             -- can have type pats
+		      ; return $
+			  L (comb4 $1 $2 $3 $4)
+			           -- We need the location on tycl_hdr in case 
+				   -- constrs and deriving are both empty
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
+			      Nothing (reverse (unLoc $3)) (unLoc $4)) } }
+
+        -- GADT instance declaration
+        | data_or_newtype tycl_hdr opt_kind_sig 
+		 'where' gadt_constrlist
+		 deriving
+		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
+                                             -- can have type pats
+		      ; return $
+			  L (comb4 $1 $2 $5 $6)
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
+			     $3 (reverse (unLoc $5)) (unLoc $6)) } }
 
 opt_iso :: { Bool }
 	:       { False }
@@ -605,7 +662,7 @@ tycl_hdr :: { Located (LHsContext RdrName,
 -- Type declaration or value declaration
 --
 tydecl  :: { Located (OrdList (LHsDecl RdrName)) }
-tydecl  : ty_decl		        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
+tydecl  : at_decl		        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
 	| decl                          { $1 }
 
 tydecls	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
