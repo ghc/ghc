@@ -12,7 +12,7 @@ module TcExpr ( tcPolyExpr, tcPolyExprNC,
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
 import HsSyn		( nlHsVar )
-import Id		( Id )
+import Id		( Id, idName )
 import Name		( isExternalName )
 import TcType		( isTauTy )
 import TcEnv		( checkWellStaged )
@@ -54,7 +54,7 @@ import {- Kind parts of -}
 
 import Id		( Id, idType, recordSelectorFieldLabel,
 			  isRecordSelector, isNaughtyRecordSelector,
-			  isDataConId_maybe, idName )
+			  isDataConId_maybe )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks,
 			  dataConSourceArity, 
 			  dataConWrapId, isVanillaDataCon, dataConUnivTyVars,
@@ -965,15 +965,9 @@ thLocalId orig id id_ty th_bind_lvl
 	; case use_stage of
 	    Brack use_lvl ps_var lie_var | use_lvl > th_bind_lvl
 		  -> thBrackId orig id ps_var lie_var
-	    other -> checkWellStaged (quotes (ppr id)) th_bind_lvl use_stage
+	    other -> do { checkWellStaged (quotes (ppr id)) th_bind_lvl use_stage
+			; return id }
 	}
-
-thLocalId orig id_name id th_bind_lvl (Brack use_lvl ps_var lie_var)
-  | use_lvl > th_bind_lvl
-  = thBrackId 
-thLocalId orig id_name id th_bind_lvl use_stage
-  = do	{ checkWellStaged 
-	; return id }
 
 --------------------------------------
 thBrackId orig id ps_var lie_var

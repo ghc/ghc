@@ -88,7 +88,7 @@ import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..),
 			  HsLocalBinds(..), HsValBinds(..),
 			  LStmt, LHsExpr, LHsType, mkMatch, emptyLocalBinds,
 			  collectLStmtsBinders, collectLStmtBinders, nlVarPat,
-		   	  mkFunBind, placeHolderType, noSyntaxExpr )
+		   	  mkFunBind, placeHolderType, noSyntaxExpr, nlHsTyApp )
 import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
 			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
 import RnSource		( addTcgDUs )
@@ -97,6 +97,7 @@ import TcHsType		( kcHsType )
 import TcMType		( zonkTcType, zonkQuantifiedTyVar )
 import TcMatches	( tcStmts, tcDoStmt )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
+import TcGadt		( emptyRefinement )
 import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, isTauTy,
 			  isUnLiftedType, tyClsNamesOfDFunHead, tyClsNamesOfType, isUnitTy )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
@@ -113,7 +114,7 @@ import MkId		( unsafeCoerceId )
 import TyCon		( tyConName )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
-import {- Kind parts of -} Type		( Kind, eqKind )
+import {- Kind parts of -} Type		( Kind )
 import Var		( globaliseId )
 import Name		( isBuiltInSyntax, isInternalName )
 import OccName		( isTcOcc )
@@ -983,6 +984,8 @@ tcGhciStmts stmts
 	    io_ty     = mkTyConApp ioTyCon [] ;
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
+	    tc_io_stmts stmts = tcStmts DoExpr (tcDoStmt io_ty) stmts 
+				        (emptyRefinement, io_ret_ty) ;
 
 	    names = map unLoc (collectLStmtsBinders stmts) ;
 
@@ -997,19 +1000,16 @@ tcGhciStmts stmts
 		-- then the type checker would instantiate x..z, and we wouldn't
 		-- get their *polymorphic* values.  (And we'd get ambiguity errs
 		-- if they were overloaded, since they aren't applied to anything.)
-	    mk_return ids = nlHsApp (mkHsTyApp ret_id [ret_ty]) 
+	    mk_return ids = nlHsApp (nlHsTyApp ret_id [ret_ty]) 
 			 	    (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
-	    mk_item id = nlHsApp (noLoc $ unsafeCoerce)
-		    	         (nlHsVar id)
- 
-            unsafeCoerce x = Cast x (mkUnsafeCoercion [idType id, unitTy]) 
+	    mk_item id = nlHsApp (nlHsTyApp unsafeCoerceId [idType id, unitTy])
+		    	         (nlHsVar id) 
 	 } ;
 
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
-	((tc_stmts, ids), lie) <- getLIE $ 
-				  tcStmts DoExpr (tcDoStmt io_ty) stmts io_ret_ty $ \ _ ->
-				  mappM tcLookupId names ;
+	((tc_stmts, ids), lie) <- getLIE $ tc_io_stmts stmts $ \ _ ->
+					   mappM tcLookupId names ;
 					-- Look up the names right in the middle,
 					-- where they will all be in scope
 
