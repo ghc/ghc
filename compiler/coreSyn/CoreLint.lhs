@@ -500,21 +500,25 @@ lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) =
 lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
   | isNewTyCon (dataConTyCon con) = addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
-  = lintBinders args $ \ args -> 
-    
-      do	{ addLoc (CasePat alt) $ do
-	    {    -- Check the pattern
+  = addLoc (CaseAlt alt) $  do
+    {   -- First instantiate the universally quantified 
+	-- type variables of the data constructor
+      con_payload_ty <- lintCoreArgs (dataConRepType con) (map Type tycon_arg_tys)
+
+	-- And now bring the new binders into scope
+    ; lintBinders args $ \ args -> do
+    { addLoc (CasePat alt) $ do
+	  {    -- Check the pattern
 		 -- Scrutinee type must be a tycon applicn; checked by caller
 		 -- This code is remarkably compact considering what it does!
 		 -- NB: args must be in scope here so that the lintCoreArgs line works.
 	         -- NB: relies on existential type args coming *after* ordinary type args
 
-	  ; con_result_ty <- lintCoreArgs (dataConRepType con)
-					        (map Type tycon_arg_tys ++ varsToCoreExprs args)
+	  ; con_result_ty <- lintCoreArgs con_payload_ty (varsToCoreExprs args)
 	  ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
  	  }
 	       -- Check the RHS
-	; checkAltExpr rhs alt_ty }
+    ; checkAltExpr rhs alt_ty } }
 
   | otherwise	-- Scrut-ty is wrong shape
   = addErrL (mkBadAltMsg scrut_ty alt)
@@ -599,6 +603,21 @@ newtype LintM a =
 				     -- both Ids and TyVars
 	    Bag Message ->           -- Error messages so far
 	    (Maybe a, Bag Message) } -- Result and error messages (if any)
+
+{-	Note [Type substitution]
+	~~~~~~~~~~~~~~~~~~~~~~~~
+Why do we need a type substitution?  Consider
+	/\(a:*). \(x:a). /\(a:*). id a x
+This is ill typed, because (renaming variables) it is really
+	/\(a:*). \(x:a). /\(b:*). id b x
+Hence, when checking an application, we can't naively compare x's type
+(at its binding site) with its expected type (at a use site).  So we
+rename type binders as we go, maintaining a substitution.
+
+The same substitution also supports let-type, current expressed as
+	(/\(a:*). body) ty
+Here we substitute 'ty' for 'a' in 'body', on the fly.
+-}
 
 instance Monad LintM where
   return x = LintM (\ loc subst errs -> (Just x, errs))
