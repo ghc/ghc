@@ -238,12 +238,20 @@ The NewTyCon field nt_co is a a TyCon (a coercion constructor in fact)
 which is used for coercing from the representation type of the
 newtype, to the newtype itself. For example,
 
-   newtype T a = MkT [a]
+   newtype T a = MkT (a -> a)
 
-the NewTyCon for T will contain nt_co = CoT where CoT t : T t :=: [t].
-This TyCon is a CoercionTyCon, so it does not have a kind on its own;
-it basically has its own typing rule for the fully-applied version.
-If the newtype T has k type variables then CoT has arity k.
+the NewTyCon for T will contain nt_co = CoT where CoT t : T t :=: t ->
+t.  This TyCon is a CoercionTyCon, so it does not have a kind on its
+own; it basically has its own typing rule for the fully-applied
+version.  If the newtype T has k type variables then CoT has arity at
+most k.  In the case that the right hand side is a type application
+ending with the same type variables as the left hand side, we
+"eta-contract" the coercion.  So if we had
+
+   newtype S a = MkT [a]
+
+then we would generate the arity 0 coercion CoS : S :=: [].  The
+primary reason we do this is to make newtype deriving cleaner.
 
 In the paper we'd write
 	axiom CoT : (forall t. T t) :=: (forall t. [t])
