@@ -587,6 +587,9 @@ unboxProduct i arg arg_ty body res_ty
     rhs = body i'' con_args
 
 mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
+-- (mkUnpackCase x e args Con body)
+--	returns
+-- case (e `cast` ...) of bndr { Con args -> body }
 mkUnpackCase bndr arg unpk_args boxing_con body
   = Case cast_arg bndr (exprType body) [(DataAlt boxing_con, unpk_args, body)]
   where
