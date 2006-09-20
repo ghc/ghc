@@ -33,7 +33,7 @@ module CoreUtils (
 	-- Equality
 	cheapEqExpr, tcEqExpr, tcEqExprX, applyTypeToArgs, applyTypeToArg,
 
-        dataConInstPat
+        dataConInstPat, dataConOccInstPat
     ) where
 
 #include "HsVersions.h"
@@ -46,6 +46,7 @@ import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
 import Var		( Var, TyVar, CoVar, isCoVar, tyVarKind, setVarUnique,
                           mkCoVar, mkTyVar, mkCoVar )
+import OccName          ( OccName, occNameFS, mkVarOcc )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName, mkSysTvName )
@@ -86,6 +87,7 @@ import Outputable
 import DynFlags		( DynFlags, DynFlag(Opt_DictsCheap), dopt )
 import TysPrim		( alphaTy )	-- Debugging only
 import Util             ( equalLength, lengthAtLeast, foldl2 )
+import FastString       ( mkFastString )
 \end{code}
 
 
@@ -678,7 +680,7 @@ deepCast ty tyVars co
     coArgs = decomposeCo (length tyVars) co
 
 -- This goes here to avoid circularity between DataCon and Id
-dataConInstPat :: [Unique]                  -- An infinite list of uniques
+dataConInstPat :: [Unique]                  -- A long enough list of uniques, at least one for each binder
                -> DataCon
 	       -> [Type]                    -- Types to instantiate the universally quantified tyvars
 	       -> ([TyVar], [CoVar], [Id])  -- Return instantiated variables
@@ -709,6 +711,23 @@ dataConInstPat :: [Unique]                  -- An infinite list of uniques
 --
 --  where the double-primed variables are created from the unique list input
 dataConInstPat uniqs con inst_tys 
+  = dataConOccInstPat uniqs occs con inst_tys
+  where
+     -- dataConOccInstPat doesn't actually make use of the OccName directly for
+     -- existential and coercion variable binders, so it is right to just
+     -- use the VarName namespace for all of the OccNames
+    occs      = mk_occs 1
+    mk_occs n = mkVarOcc ("ipv" ++ show n) : mk_occs (n+1)
+
+dataConOccInstPat :: [Unique]                  -- A long enough list of uniques, at least one for each binder
+                  -> [OccName]                 -- An equally long list of OccNames to use
+                  -> DataCon
+	          -> [Type]                    -- Types to instantiate the universally quantified tyvars
+	       -> ([TyVar], [CoVar], [Id])  -- Return instantiated variables
+-- This function actually does the job specified in the comment for 
+-- dataConInstPat, but uses the specified list of OccNames.  This is 
+-- is necessary for use in e.g. tcIfaceDataAlt
+dataConOccInstPat uniqs occs con inst_tys 
   = (ex_bndrs, co_bndrs, id_bndrs)
   where 
     univ_tvs = dataConUnivTyVars con
@@ -721,29 +740,34 @@ dataConInstPat uniqs con inst_tys
     n_co = length eq_spec
     n_id = length arg_tys
 
-      -- split the uniques
-    (ex_uniqs, uniqs') = splitAt n_ex uniqs
+      -- split the Uniques and OccNames
+    (ex_uniqs, uniqs')   = splitAt n_ex uniqs
     (co_uniqs, id_uniqs) = splitAt n_co uniqs'
 
+    (ex_occs, occs')     = splitAt n_ex occs
+    (co_occs, id_occs)   = splitAt n_co occs'
+
       -- make existential type variables
-    mk_ex_var uniq var = setVarUnique var uniq
-    ex_bndrs = zipWith mk_ex_var ex_uniqs ex_tvs
+    mk_ex_var uniq occ var = mkTyVar new_name kind
+      where
+        new_name = mkSysTvName uniq (occNameFS occ)
+        kind     = tyVarKind var
+
+    ex_bndrs = zipWith3 mk_ex_var ex_uniqs ex_occs ex_tvs
 
       -- make the instantiation substitution
     inst_subst = substTyWith (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
 
       -- make new coercion vars, instantiating kind
-    mk_co_var uniq eq_pred = mkCoVar new_name (inst_subst (mkPredTy eq_pred))
+    mk_co_var uniq occ eq_pred = mkCoVar new_name (inst_subst (mkPredTy eq_pred))
        where
-         new_name = mkSysTvName uniq FSLIT("co")
+         new_name = mkSysTvName uniq (occNameFS occ)
 
-    co_bndrs               = zipWith mk_co_var co_uniqs eq_preds
+    co_bndrs               = zipWith3 mk_co_var co_uniqs co_occs eq_preds
 
       -- make value vars, instantiating types
-    mk_id_var uniq ty = mkSysLocal FSLIT("ca") uniq (inst_subst ty)
-
-    id_bndrs = zipWith mk_id_var id_uniqs arg_tys
-
+    mk_id_var uniq occ ty = mkUserLocal occ uniq (inst_subst ty) noSrcLoc
+    id_bndrs = zipWith3 mk_id_var id_uniqs id_occs arg_tys
 
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 -- Returns (Just (dc, [x1..xn])) if the argument expression is 
@@ -1133,6 +1157,7 @@ eta_expand n us expr ty
   = ASSERT2 (exprType expr `coreEqType` ty, ppr (exprType expr) $$ ppr ty)
     case splitForAllTy_maybe ty of { 
  	  Just (tv,ty') -> 
+
               Lam lam_tv (eta_expand n us2 (App expr (Type (mkTyVarTy lam_tv))) (substTyWith [tv] [mkTyVarTy lam_tv] ty'))
                   where 
                     lam_tv = mkTyVar (mkSysTvName uniq FSLIT("etaT")) (tyVarKind tv)

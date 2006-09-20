@@ -35,7 +35,7 @@ import HscTypes		( ExternalPackageState(..),
 			  emptyModDetails, lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( Instance(..), mkImportedInstance )
 import CoreSyn
-import CoreUtils	( exprType, dataConInstPat )
+import CoreUtils	( exprType, dataConOccInstPat )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
@@ -680,7 +680,7 @@ tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
 tcIfaceDataAlt con inst_tys arg_strs rhs
   = do	{ us <- newUniqueSupply
 	; let uniqs = uniqsFromSupply us
-	; let	(ex_tvs, co_tvs, arg_ids) = dataConInstPat uniqs con inst_tys
+	; let	(ex_tvs, co_tvs, arg_ids) = dataConOccInstPat uniqs arg_occs con inst_tys
                 all_tvs                   = ex_tvs ++ co_tvs
 
 	; rhs' <- extendIfaceTyVarEnv all_tvs	$
