@@ -46,7 +46,8 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
-import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType )
+import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType,
+			  mkTopTvSubst, substTyVar )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
                           splitNewTypeRepCo_maybe )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
@@ -70,7 +71,7 @@ import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, DataConIds(..), dataConTyCon, dataConUnivTyVars,
 			  dataConFieldLabels, dataConRepArity, dataConResTys,
-			  dataConRepArgTys, dataConRepType, 
+			  dataConRepArgTys, dataConRepType, dataConFullSig,
 			  dataConSig, dataConStrictMarks, dataConExStricts, 
 			  splitProductType, isVanillaDataCon, dataConFieldType,
 			  dataConInstOrigArgTys, deepSplitProductType
@@ -95,7 +96,7 @@ import PrelNames
 import Util             ( dropList, isSingleton )
 import Outputable
 import FastString
-import ListSetOps	( assoc )
+import ListSetOps	( assoc, minusList )
 \end{code}		
 
 %************************************************************************
@@ -193,24 +194,28 @@ mkDataConIds wrap_name wkr_name data_con
   = NewDC nt_wrap_id
 
   | any isMarkedStrict all_strict_marks		-- Algebraic, needs wrapper
+    || not (null eq_spec)
   = AlgDC (Just alg_wrap_id) wrk_id
 
   | otherwise					-- Algebraic, no wrapper
   = AlgDC Nothing wrk_id
   where
-    (tvs, theta, orig_arg_tys) = dataConSig data_con
-    tycon       = dataConTyCon data_con
+    (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys) = dataConFullSig data_con
+    tycon = dataConTyCon data_con
 
-    dict_tys    = mkPredTys theta
-    all_arg_tys = dict_tys ++ orig_arg_tys
-    tycon_args  = dataConUnivTyVars data_con
-    result_ty_args = (mkTyVarTys tycon_args)
-    result_ty   = mkTyConApp tycon result_ty_args
-
-    wrap_ty = mkForAllTys tvs (mkFunTys all_arg_tys result_ty)
+	----------- Wrapper --------------
 	-- We used to include the stupid theta in the wrapper's args
 	-- but now we don't.  Instead the type checker just injects these
 	-- extra constraints where necessary.
+    wrap_tvs = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
+    subst	   = mkTopTvSubst eq_spec
+    dict_tys       = mkPredTys theta
+    result_ty_args = map (substTyVar subst) univ_tvs
+    result_ty      = mkTyConApp tycon result_ty_args
+    wrap_ty        = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
+	             mkFunTys orig_arg_tys $ result_ty
+	-- NB: watch out here if you allow user-written equality 
+	--     constraints in data constructor signatures
 
 	----------- Worker (algebraic data types only) --------------
 	-- The *worker* for the data constructor is the function that
@@ -260,7 +265,7 @@ mkDataConIds wrap_name wkr_name data_con
 	  	   -- No existentials on a newtype, but it can have a context
 	  	   -- e.g. 	newtype Eq a => T a = MkT (...)
 	  	   mkCompulsoryUnfolding $ 
-	  	   mkLams tvs $ Lam id_arg1 $ 
+	  	   mkLams wrap_tvs $ Lam id_arg1 $ 
 	  	   wrapNewTypeBody tycon result_ty_args
                        (Var id_arg1)
 
@@ -290,14 +295,16 @@ mkDataConIds wrap_name wkr_name data_con
 	-- we want to see that w is strict in its two arguments
 
     alg_unf = mkTopUnfolding $ Note InlineMe $
-	      mkLams tvs $ 
+	      mkLams wrap_tvs $ 
 	      mkLams dict_args $ mkLams id_args $
 	      foldr mk_case con_app 
 		    (zip (dict_args ++ id_args) all_strict_marks)
 		    i3 []
 
-    con_app i rep_ids = mkApps (Var wrk_id)
-			       (map varToCoreExpr (tvs ++ reverse rep_ids))
+    con_app i rep_ids = Var wrk_id `mkTyApps`  result_ty_args
+				   `mkVarApps` ex_tvs
+				   `mkTyApps`  map snd eq_spec
+				   `mkVarApps` reverse rep_ids
 
     (dict_args,i2) = mkLocals 1  dict_tys
     (id_args,i3)   = mkLocals i2 orig_arg_tys
