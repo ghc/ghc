@@ -19,6 +19,7 @@ import SrcLoc           ( noSrcLoc  )
 import TysWiredIn       ( intTy, stringTy, mkListTy, unitTy, boolTy )
 import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 import NameEnv          ( mkNameEnv )
+import TcEnv            ( tcExtendIdEnv )
 #endif
 
 import HsSyn		( emptyLHsBinds )
@@ -187,7 +188,7 @@ addBreakpointBindings thing_inside
                     = mkGlobalId VanillaGlobal breakpointCondJumpName
                                  (basicType (FunTy boolTy)) vanillaIdInfo
 	  }
-	; extendIdEnv [breakpointJumpId, breakpointCondJumpId] thing_inside}
+	; tcExtendIdEnv [breakpointJumpId, breakpointCondJumpId] thing_inside}
 #else
    = thing_inside
 #endif
