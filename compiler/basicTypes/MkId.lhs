@@ -26,7 +26,7 @@ module MkId (
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds, ghcPrimIds,
 	unsafeCoerceId, realWorldPrimId, voidArgId, nullAddrId, seqId,
-	lazyId, lazyIdUnfolding, lazyIdKey,
+	lazyId, lazyIdUnfolding, lazyIdKey, 
 
 	mkRuntimeErrorApp,
 	rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID, rUNTIME_ERROR_ID,
@@ -46,7 +46,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
-import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs )
+import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
                           splitRecNewTypeCo_maybe )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
@@ -62,7 +62,7 @@ import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon,
                           newTyConCo, tyConArity )
 import Class		( Class, classTyCon, classSelIds )
-import Var		( Id, TyVar, Var )
+import Var		( Id, TyVar, Var, setIdType )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
 import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
 import OccName		( mkOccNameFS, varName )
@@ -579,27 +579,30 @@ mkRecordSelId tycon field_label
 -- The Ints passed around are just for creating fresh locals
 unboxProduct :: Int -> CoreExpr -> Type -> (Int -> [Id] -> CoreExpr) -> Type -> CoreExpr
 unboxProduct i arg arg_ty body res_ty
-  = mkUnpackCase the_id arg con_args boxing_con rhs
+  = result
   where 
-    (_, _, boxing_con, tys) = deepSplitProductType "unboxProduct" arg_ty
+    result = mkUnpackCase the_id arg arg_ty con_args boxing_con rhs
+    (tycon, tycon_args, boxing_con, tys) = deepSplitProductType "unboxProduct" arg_ty
     ([the_id], i') = mkLocals i [arg_ty]
     (con_args, i'') = mkLocals i' tys
     rhs = body i'' con_args
 
-mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
+mkUnpackCase ::  Id -> CoreExpr -> Type -> [Id] -> DataCon -> CoreExpr -> CoreExpr
 -- (mkUnpackCase x e args Con body)
 --	returns
 -- case (e `cast` ...) of bndr { Con args -> body }
-mkUnpackCase bndr arg unpk_args boxing_con body
-  = Case cast_arg bndr (exprType body) [(DataAlt boxing_con, unpk_args, body)]
+-- 
+-- the type of the bndr passed in is irrelevent
+mkUnpackCase bndr arg arg_ty unpk_args boxing_con body
+  = Case cast_arg (setIdType bndr bndr_ty) (exprType body) [(DataAlt boxing_con, unpk_args, body)]
   where
-  cast_arg = go (idType bndr) arg
+  (cast_arg, bndr_ty) = go (idType bndr) arg
   go ty arg 
     | res@(tycon, tycon_args, _, _)  <- splitProductType "mkUnpackCase" ty
     , isNewTyCon tycon && not (isRecursiveTyCon tycon)
     = go (newTyConInstRhs tycon tycon_args) 
          (unwrapNewTypeBody tycon tycon_args arg)
-    | otherwise = arg
+    | otherwise = (arg, ty)
 
 -- ...and the dual
 reboxProduct :: [Unique]     -- uniques to create new local binders
