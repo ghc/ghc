@@ -203,13 +203,15 @@ mkTcTyVar name kind details
 	}
 
 mkWildCoVar :: Kind -> TyVar
+-- A type variable that is never referred to,
+-- so its unique doesn't matter
 mkWildCoVar kind 
   = TyVar { varName = mkSysTvName wild_uniq FSLIT("co_wild"),
             realUnique = _ILIT(1),
             tyVarKind = kind,
             isCoercionVar = True }
   where
-    wild_uniq = (mkBuiltinUnique 1)
+    wild_uniq = mkBuiltinUnique 1
 \end{code}
 
 %************************************************************************

@@ -192,8 +192,11 @@ data Type
 	TyVar
 	Type	
 
-  | PredTy		-- A high level source type 
-	PredType	-- ...can be expanded to a representation type...
+  | PredTy		-- The type of evidence for a type predictate
+	PredType	-- Can be expanded to a representation type.
+	-- NB: A PredTy (EqPred _ _) can appear only as the kind
+	--     of a coercion variable; never as the argument or result
+	--     of a FunTy (unlike ClassP, IParam)
 
   | NoteTy 		-- A type with a note attached
 	TyNote
