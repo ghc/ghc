@@ -53,7 +53,8 @@ import Var		( TyVar, mkTyVar, tyVarKind )
 import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
  			  nameOccName, wiredInNameTyThing_maybe )
 import NameEnv
-import OccName		( OccName, mkVarOccFS, mkTyVarOccoccNameSpace, pprNameSpace, occNameFS  )
+import OccName		( OccName, mkVarOccFS, mkTyVarOcc, occNameSpace, 
+			  pprNameSpace, occNameFS  )
 import FastString       ( FastString )
 import Module		( Module, moduleName )
 import UniqFM		( lookupUFM )
@@ -452,7 +453,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 tcIfaceEqSpec spec
   = mapM do_item spec
   where
-    do_item (occ, if_ty) = do { tv <- tcIfaceTyVar occ
+    do_item (occ, if_ty) = do { tv <- tcIfaceTyVar (occNameFS occ)
                               ; ty <- tcIfaceType if_ty
                               ; return (tv,ty) }
 \end{code}	
@@ -680,8 +681,9 @@ tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
 tcIfaceDataAlt con inst_tys arg_strs rhs
   = do	{ us <- newUniqueSupply
 	; let uniqs = uniqsFromSupply us
-	; let	(ex_tvs, co_tvs, arg_ids) = dataConRepFSInstPat (map occNameFS arg_strs) uniqs con inst_tys
-                all_tvs                   = ex_tvs ++ co_tvs
+	; let (ex_tvs, co_tvs, arg_ids) = 
+	        dataConRepFSInstPat arg_strs uniqs con inst_tys
+              all_tvs                   = ex_tvs ++ co_tvs
 
 	; rhs' <- extendIfaceTyVarEnv all_tvs	$
 		  extendIfaceIdEnv arg_ids	$
@@ -967,7 +969,5 @@ mk_iface_tyvar :: Name -> IfaceKind -> IfL TyVar
 mk_iface_tyvar name ifKind = do { kind <- tcIfaceType ifKind
                                 ; return (mkTyVar name kind)
                                 }
-
-mk_iface_tyvar name kind = mkTyVar name kind
 \end{code}
 

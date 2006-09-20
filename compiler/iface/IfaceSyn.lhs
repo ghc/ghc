@@ -195,7 +195,7 @@ data IfaceNote = IfaceSCC CostCentre
                | IfaceCoreNote String
 
 type IfaceAlt = (IfaceConAlt, [FastString], IfaceExpr)
-	-- Note: OccName, not IfaceBndr (and same with the case binder)
+	-- Note: FastString, not IfaceBndr (and same with the case binder)
 	-- We reconstruct the kind/type of the thing from the context
 	-- thus saving bulk in interface files
 
