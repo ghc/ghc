@@ -72,7 +72,7 @@ import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan,
 import ListSetOps	( equivClasses, minusList )
 import Digraph		( SCC(..) )
 import DynFlags		( DynFlag( Opt_GlasgowExts, Opt_Generics, 
-					Opt_UnboxStrictFields ) )
+				   Opt_UnboxStrictFields, Opt_IndexedTypes ) )
 \end{code}
 
 
@@ -266,9 +266,9 @@ tcIdxTyInstDecl (L loc decl)
     recoverM (returnM (Nothing, Nothing))	$
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
-    do { -- indexed data types require -fglasgow-exts and can't be in an
+    do { -- indexed data types require -findexed-types and can't be in an
 	 -- hs-boot file
-       ; gla_exts <- doptM Opt_GlasgowExts
+       ; gla_exts <- doptM Opt_IndexedTypes
        ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
        ; checkTc gla_exts      $ badIdxTyDecl (tcdLName decl)
        ; checkTc (not is_boot) $ badBootTyIdxDeclErr
@@ -635,7 +635,7 @@ tcTyClDecl1 _calc_isrec
   (TyFunction {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = kind})
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
   { traceTc (text "type family: " <+> ppr tc_name) 
-  ; gla_exts <- doptM Opt_GlasgowExts
+  ; gla_exts <- doptM Opt_IndexedTypes
 
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc gla_exts $ badSigTyDecl tc_name
@@ -653,7 +653,7 @@ tcTyClDecl1 _calc_isrec
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
 
   ; checkTc (null . unLoc $ ctxt) $ badKindSigCtxt tc_name
-  ; gla_exts <- doptM Opt_GlasgowExts
+  ; gla_exts <- doptM Opt_IndexedTypes
 
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc gla_exts $ badSigTyDecl tc_name

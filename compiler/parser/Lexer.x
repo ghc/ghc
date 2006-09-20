@@ -543,8 +543,7 @@ reservedWordsFM = listToUFM $
 
       	( "forall",	ITforall,	 bit tvBit),
 	( "mdo",	ITmdo,		 bit glaExtsBit),
-	( "iso",	ITiso,		 bit glaExtsBit),
-	( "family",	ITfamily,	 bit glaExtsBit),
+	( "family",	ITfamily,	 bit idxTysBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
@@ -578,8 +577,9 @@ reservedSymsFM = listToUFM $
        ,("-",	ITminus, 	0)
        ,("!",	ITbang, 	0)
 
-       ,("*",	ITstar,		bit glaExtsBit)	-- For data T (a::*) = MkT
-       ,(".",	ITdot,		bit tvBit)	-- For 'forall a . t'
+       ,("*",	ITstar,		bit glaExtsBit .|. 
+				bit idxTysBit)	    -- For data T (a::*) = MkT
+       ,(".",	ITdot,		bit tvBit)	    -- For 'forall a . t'
 
        ,("-<",	ITlarrowtail,	bit arrowsBit)
        ,(">-",	ITrarrowtail,	bit arrowsBit)
@@ -1314,6 +1314,7 @@ ipBit      = 6
 tvBit	   = 7	-- Scoped type variables enables 'forall' keyword
 bangPatBit = 8	-- Tells the parser to understand bang-patterns
 		-- (doesn't affect the lexer)
+idxTysBit  = 9	-- indexed type families: 'family' keyword and kind sigs
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled flags = testBit flags glaExtsBit
@@ -1324,6 +1325,7 @@ thEnabled      flags = testBit flags thBit
 ipEnabled      flags = testBit flags ipBit
 tvEnabled      flags = testBit flags tvBit
 bangPatEnabled flags = testBit flags bangPatBit
+idxTysEnabled  flags = testBit flags idxTysBit
 
 -- PState for parsing options pragmas
 --
@@ -1365,6 +1367,7 @@ mkPState buf loc flags  =
 	       .|. ipBit      `setBitIf` dopt Opt_ImplicitParams flags
 	       .|. tvBit      `setBitIf` dopt Opt_ScopedTypeVariables flags
 	       .|. bangPatBit `setBitIf` dopt Opt_BangPatterns flags
+	       .|. idxTysBit  `setBitIf` dopt Opt_IndexedTypes flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
