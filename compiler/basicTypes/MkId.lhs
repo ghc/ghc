@@ -47,7 +47,8 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, 
- 			  newTyConInstRhs, mkTopTvSubst, substTyVar, substTy )
+ 			  newTyConInstRhs, mkTopTvSubst, substTyVar, substTy,
+ 			  substTys, zipTopTvSubst )
 import TcGadt           ( gadtRefine, refineType, emptyRefinement )
 import HsBinds          ( ExprCoFn(..), isIdCoercion )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, isEqPred )
@@ -60,7 +61,8 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy,
 import CoreUtils	( exprType, dataConOrigInstPat, mkCoerce )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
-import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
+import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
+			  FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon,
                           isRecursiveTyCon, isFamInstTyCon,
                           tyConFamInst_maybe, tyConFamilyCoercion_maybe,
@@ -240,6 +242,12 @@ mkDataConIds wrap_name wkr_name data_con
 	-- extra constraints where necessary.
     wrap_tvs = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
     subst	   = mkTopTvSubst eq_spec
+    famSubst	   = ASSERT( length (tyConTyVars tycon  ) ==  
+			     length (mkTyVarTys univ_tvs)   )
+		     zipTopTvSubst (tyConTyVars tycon) (mkTyVarTys univ_tvs)
+		     -- substitution mapping the type constructor's type
+		     -- arguments to the universals of the data constructor
+		     -- (crucial when type checking interfaces)
     dict_tys       = mkPredTys theta
     result_ty_args = map (substTyVar subst) univ_tvs
     result_ty      = case tyConFamInst_maybe tycon of
@@ -248,7 +256,9 @@ mkDataConIds wrap_name wkr_name data_con
 		         -- family instance constructor
 		       Just (familyTyCon, 
 			     instTys)     -> 
-		         mkTyConApp familyTyCon (map (substTy subst) instTys)
+		         mkTyConApp familyTyCon ( substTys subst 
+						. substTys famSubst 
+						$ instTys)
     wrap_ty        = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
 	             mkFunTys orig_arg_tys $ result_ty
 	-- NB: watch out here if you allow user-written equality 

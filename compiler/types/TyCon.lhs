@@ -101,6 +101,8 @@ data TyCon
 	tyConTyVars :: [TyVar],		-- Scopes over (a) the algTcStupidTheta
 					--	       (b) the cached types in
 					--		   algTyConRhs.NewTyCon
+					--	       (c) the family instance
+					--		   types if present
 					-- But not over the data constructors
 
         tyConArgPoss :: Maybe [Int],    -- for associated families: for each
