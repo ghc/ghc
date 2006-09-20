@@ -319,7 +319,7 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 --	axiom CoT a :: Tree [a] = T a
 --
 -- So all need is to generate a binding looking like
--- 	dfunFooT :: forall a. (Show (T a), Foo Int (Tree [a]) => Foo Int (T a)
+-- 	dfunFooT :: forall a. (Foo Int (Tree [a], Show (T a)) => Foo Int (T a)
 --	dfunFooT = /\a. \(ds:Show (T a)) (df:Foo (Tree [a])).
 --		  case df `cast` (Foo Int (CoT a)) of
 --		     Foo _ op1 .. opn -> Foo ds op1 .. opn
@@ -332,25 +332,37 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
 	      inst_ty      = idType dfun_id
               maybe_co_con = newTyConCo tycon
 	; (tvs, theta, inst_head) <- tcSkolSigType rigid_info inst_ty
-	; rep_dict <- newDict origin (head theta)
-        ; if isSingleton theta then
-              return (unitBag (VarBind dfun_id $
-                case maybe_co_con of
-                  Nothing -> rep_dict
-                  Just co_con -> mkCoerce rep_dict $
-                                 mkAppCoercion (mkAppsCoercion tycon rep_tys) 
-                                               (mkTyConApp co_con tvs)))
-          else do
-	  let rep_dict_id  = instToId rep_dict
-              coerced_dict = case maybe_co_con of
-                               Nothing -> rep_dict_id
-                               Just co_con -> mkCoerce rep_dict_id $
-                                 mkAppCoercion (mkAppsCoercion tycon rep_tys) 
-                                               (mkTyConApp co_con tvs)
-        ; return (unitBag (VarBind dfun_id 
-          co_fn = CoTyLams tvs <.> CoLams [rep_dict_id] <.> ExprCoFn cast
+	; dicts <- newDicts origin theta
+	; uniqs <- newUniqueSupply
+	; let (rep_dict_id:sc_dict_ids) = map instToId dicts
+		-- (Here, wee are relying on the order of dictionary 
+		-- arguments built by NewTypeDerived in TcDeriv.)
 
-	; return (unitBag (VarBind dfun_id (HsCoerce co_fn (HsVar rep_dict_id))))
+              wrap_fn = CoTyLams tvs <.> CoLams dict_ids
+	 
+	      coerced_rep_dict = mkHsCoerce co_fn (HsVar rep_dict_id)
+
+	      body | null sc_dicts = coerced_rep_dict
+		   | otherwise = HsCase coerced_rep_dict $
+				 MatchGroup [the_match] inst_head
+	      the_match = mkSimpleMatch [the_pat] the_rhs
+	      op_ids = zipWith (mkSysLocal FSLIT("op"))
+			       (uniqsFromSupply uniqs) op_tys
+	      the_pat = ConPatOut { pat_con = cls_data_con, pat_tvs = [],
+				    pat_dicts = map (WildPat . idType) sc_dict_ids,
+				    pat_binds = emptyDictBinds,
+				    pat_args = PrefixCon (map VarPat op_ids), 
+				    pat_ty = <type of pattern> }
+	      the_rhs = mkHsApps (dataConWrapId cls_data_con) types sc_dict_ids (map HsVar op_ids)
+
+        ; return (unitBag (VarBind dfun_id (mkHsCoerce wrap_fn body))) }
+  where
+    co_fn :: ExprCoFn
+    co_fn | Just co_con <- newTyConCo tycon
+	  = ExprCoFn (mkAppCoercion (mkAppsCoercion tycon rep_tys) 
+                       		    (mkTyConApp co_con tvs))
+	  | otherwise
+	  = idCoerecion
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
 	  avail_insts op_items (NewTypeDerived rep_tys)
