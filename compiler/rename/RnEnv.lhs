@@ -5,7 +5,7 @@
 
 \begin{code}
 module RnEnv ( 
-	newTopSrcBinder, 
+	newTopSrcBinder, lookupFamInstDeclBndr,
 	lookupLocatedBndrRn, lookupBndrRn, 
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
 	lookupLocatedOccRn, lookupOccRn, 
@@ -221,6 +221,28 @@ lookupInstDeclBndr cls_name rdr_name
 
 newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
 newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
+
+-- Looking up family names in type instances is a subtle affair.  The family
+-- may be imported, in which case we need to lookup the occurence of a global
+-- name.  Alternatively, the family may be in the same binding group (and in
+-- fact in a declaration processed later), and we need to create a new top
+-- source binder.
+--
+-- So, also this is strictly speaking an occurence, we cannot raise an error
+-- message yet for instances without a family declaration.  This will happen
+-- during renaming the type instance declaration in RnSource.rnTyClDecl.
+--
+lookupFamInstDeclBndr :: Module -> Located RdrName -> RnM Name
+lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
+  | not (isSrcRdrName rdr_name)
+  = lookupImportedName rdr_name	
+
+  | otherwise
+  =	-- First look up the name in the normal environment.
+   lookupGreRn rdr_name			`thenM` \ mb_gre ->
+   case mb_gre of {
+	Just gre -> returnM (gre_name gre) ;
+	Nothing  -> newTopSrcBinder mod Nothing lrdr_name }
 
 --------------------------------------------------
 --		Occurrences

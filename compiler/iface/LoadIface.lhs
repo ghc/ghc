@@ -20,8 +20,9 @@ import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRule, tcIfaceInst )
 
 import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
-			  IfaceConDecls(..), IfaceIdInfo(..) )
-import IfaceEnv		( newGlobalBinder )
+			  IfaceConDecls(..), IfaceFamInst(..), 
+			  IfaceIdInfo(..) )
+import IfaceEnv		( newGlobalBinder, lookupIfaceTc )
 import HscTypes		( ModIface(..), TyThing, IfaceExport, Usage(..), 
 			  Deprecs(..), Dependencies(..),
 			  emptyModIface, EpsStats(..), GenAvailInfo(..),
@@ -290,16 +291,19 @@ loadDecls ignore_prags ver_decls
 	; return (concat thingss)
 	}
 
-loadDecl :: Bool			-- Don't load pragmas into the decl pool
+loadDecl :: Bool		    -- Don't load pragmas into the decl pool
 	 -> Module
 	  -> (Version, IfaceDecl)
-	  -> IfL [(Name,TyThing)]	-- The list can be poked eagerly, but the
-					-- TyThings are forkM'd thunks
+	  -> IfL [(Name,TyThing)]   -- The list can be poked eagerly, but the
+				    -- TyThings are forkM'd thunks
 loadDecl ignore_prags mod (_version, decl)
   = do 	{ 	-- Populate the name cache with final versions of all 
 		-- the names associated with the decl
 	  main_name      <- mk_new_bndr mod Nothing (ifName decl)
-	; implicit_names <- mapM (mk_new_bndr mod (Just main_name)) 
+	; parent_name    <- case ifFamily decl of  -- make family the parent
+			      Just famTyCon -> lookupIfaceTc famTyCon
+			      _             -> return main_name
+	; implicit_names <- mapM (mk_new_bndr mod (Just parent_name)) 
 				 (ifaceDeclSubBndrs decl)
 
 	-- Typecheck the thing, lazily
@@ -334,6 +338,11 @@ loadDecl ignore_prags mod (_version, decl)
 	= newGlobalBinder mod occ mb_parent 
 			  (importedSrcLoc (showSDoc (ppr (moduleName mod))))
 			-- ToDo: qualify with the package name if necessary
+
+    ifFamily (IfaceData {
+	        ifFamInst = Just (IfaceFamInst {ifFamInstTyCon = famTyCon})})
+               = Just famTyCon
+    ifFamily _ = Nothing
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 

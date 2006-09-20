@@ -672,11 +672,13 @@ hscFileCheck hsc_env mod_summary = do {
 	; case maybe_tc_result of {
       	     Nothing -> return (Just (HscChecked rdr_module Nothing Nothing));
       	     Just tc_result -> do
-		let md = ModDetails { 
-				md_types   = tcg_type_env tc_result,
-				md_exports = tcg_exports  tc_result,
-				md_insts   = tcg_insts    tc_result,
-				md_rules   = [panic "no rules"] }
+		let type_env = tcg_type_env tc_result
+		    md = ModDetails { 
+				md_types     = type_env,
+				md_exports   = tcg_exports  tc_result,
+				md_insts     = tcg_insts    tc_result,
+				md_fam_insts = mkDetailsFamInstCache type_env,
+				md_rules     = [panic "no rules"] }
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker
                     rnInfo = do decl <- tcg_rn_decls tc_result

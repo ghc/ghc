@@ -30,7 +30,7 @@ module HscTypes (
 	icPrintUnqual, mkPrintUnqualified,
 
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
-	emptyIfaceDepCache, 
+	emptyIfaceDepCache, mkIfaceFamInstsCache, mkDetailsFamInstCache,
 
 	Deprecs(..), IfaceDeprecs,
 
@@ -42,6 +42,7 @@ module HscTypes (
 	TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
 	extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
 	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
+	typeEnvDataCons,
 
 	WhetherHasOrphans, IsBootInterface, Usage(..), 
 	Dependencies(..), noDependencies,
@@ -77,6 +78,7 @@ import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv,
 			  extendOccEnv )
 import Module
 import InstEnv		( InstEnv, Instance )
+import FamInstEnv	( FamInst, extractFamInsts )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import Id		( Id )
@@ -85,7 +87,7 @@ import Type		( TyThing(..) )
 import Class		( Class, classSelIds, classATs, classTyCon )
 import TyCon		( TyCon, tyConSelIds, tyConDataCons, isNewTyCon,
 			  newTyConCo_maybe, tyConFamilyCoercion_maybe )
-import DataCon		( dataConImplicitIds )
+import DataCon		( DataCon, dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
 import Packages		( PackageId )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
@@ -93,7 +95,8 @@ import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
 
-import IfaceSyn		( IfaceInst, IfaceRule, IfaceDecl(ifName) )
+import IfaceSyn		( IfaceInst, IfaceFamInst, IfaceRule, 
+			  IfaceDecl(ifName), extractIfFamInsts )
 
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
@@ -407,9 +410,12 @@ data ModIface
 		-- HomeModInfo, but that leads to more plumbing.
 
 		-- Instance declarations and rules
-	mi_insts     :: [IfaceInst],	-- Sorted
-	mi_rules     :: [IfaceRule],	-- Sorted
-	mi_rule_vers :: !Version,	-- Version number for rules and instances combined
+	mi_insts     :: [IfaceInst],			-- Sorted
+	mi_fam_insts :: [(IfaceFamInst, IfaceDecl)],     -- Cached value
+					-- ...from mi_decls (not in iface file)
+	mi_rules     :: [IfaceRule],			-- Sorted
+	mi_rule_vers :: !Version,	-- Version number for rules and 
+					-- instances combined
 
 		-- Cached environments for easy lookup
 		-- These are computed (lazily) from other fields
@@ -422,20 +428,34 @@ data ModIface
 			-- seeing if we are up to date wrt the old interface
      }
 
+-- Pre-compute the set of type instances from the declaration list.
+mkIfaceFamInstsCache :: [IfaceDecl] -> [(IfaceFamInst, IfaceDecl)]
+mkIfaceFamInstsCache = extractIfFamInsts
+
 -- Should be able to construct ModDetails from mi_decls in ModIface
 data ModDetails
    = ModDetails {
 	-- The next three fields are created by the typechecker
-	md_exports  :: NameSet,
-        md_types    :: !TypeEnv,
-        md_insts    :: ![Instance],	-- Dfun-ids for the instances in this module
-        md_rules    :: ![CoreRule]	-- Domain may include Ids from other modules
+	md_exports   :: NameSet,
+        md_types     :: !TypeEnv,
+        md_fam_insts :: ![FamInst],	-- Cached value extracted from md_types
+        md_insts     :: ![Instance],    -- Dfun-ids for the instances in this 
+					-- module
+
+        md_rules     :: ![CoreRule]	-- Domain may include Ids from other 
+					-- modules
+
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_exports = emptyNameSet,
-			       md_insts = [],
-			       md_rules = [] }
+			       md_insts     = [],
+			       md_rules     = [],
+			       md_fam_insts = [] }
+
+-- Pre-compute the set of type instances from the type environment.
+mkDetailsFamInstCache :: TypeEnv -> [FamInst]
+mkDetailsFamInstCache = extractFamInsts . typeEnvElts
 
 -- A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
@@ -539,10 +559,11 @@ emptyModIface mod
 	       mi_exp_vers = initialVersion,
 	       mi_fixities = [],
 	       mi_deprecs  = NoDeprecs,
-	       mi_insts = [],
-	       mi_rules = [],
-	       mi_decls = [],
-	       mi_globals  = Nothing,
+	       mi_insts     = [],
+	       mi_fam_insts = [],
+	       mi_rules     = [],
+	       mi_decls     = [],
+	       mi_globals   = Nothing,
 	       mi_rule_vers = initialVersion,
 	       mi_dep_fn = emptyIfaceDepCache,
 	       mi_fix_fn = emptyIfaceFixCache,
@@ -664,18 +685,20 @@ extendTypeEnvWithIds env ids
 \begin{code}
 type TypeEnv = NameEnv TyThing
 
-emptyTypeEnv   :: TypeEnv
-typeEnvElts    :: TypeEnv -> [TyThing]
-typeEnvClasses :: TypeEnv -> [Class]
-typeEnvTyCons  :: TypeEnv -> [TyCon]
-typeEnvIds     :: TypeEnv -> [Id]
-lookupTypeEnv  :: TypeEnv -> Name -> Maybe TyThing
+emptyTypeEnv    :: TypeEnv
+typeEnvElts     :: TypeEnv -> [TyThing]
+typeEnvClasses  :: TypeEnv -> [Class]
+typeEnvTyCons   :: TypeEnv -> [TyCon]
+typeEnvIds      :: TypeEnv -> [Id]
+typeEnvDataCons :: TypeEnv -> [DataCon]
+lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
 
-emptyTypeEnv 	   = emptyNameEnv
-typeEnvElts    env = nameEnvElts env
-typeEnvClasses env = [cl | AClass cl <- typeEnvElts env]
-typeEnvTyCons  env = [tc | ATyCon tc <- typeEnvElts env] 
-typeEnvIds     env = [id | AnId id   <- typeEnvElts env] 
+emptyTypeEnv 	    = emptyNameEnv
+typeEnvElts     env = nameEnvElts env
+typeEnvClasses  env = [cl | AClass cl   <- typeEnvElts env]
+typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env] 
+typeEnvIds      env = [id | AnId id     <- typeEnvElts env] 
+typeEnvDataCons env = [dc | ADataCon dc <- typeEnvElts env] 
 
 mkTypeEnv :: [TyThing] -> TypeEnv
 mkTypeEnv things = extendTypeEnvList emptyTypeEnv things
@@ -707,7 +730,6 @@ lookupType dflags hpt pte name
   where mod = nameModule name
 	this_pkg = thisPackage dflags
 \end{code}
-
 
 \begin{code}
 tyThingTyCon (ATyCon tc) = tc

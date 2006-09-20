@@ -46,7 +46,9 @@ import Module		( Module )
 import HscTypes		( HscEnv(..), NameCache( nsUniqs ), CgGuts(..),
 			  TypeEnv, typeEnvIds, typeEnvElts, typeEnvTyCons, 
 			  extendTypeEnvWithIds, lookupTypeEnv,
-			  ModGuts(..), TyThing(..), ModDetails(..), Dependencies(..)
+			  mkDetailsFamInstCache,
+			  ModGuts(..), TyThing(..), ModDetails(..),
+			  Dependencies(..)
 			)
 import Maybes		( orElse, mapCatMaybes )
 import ErrUtils		( showPass, dumpIfSet_core )
@@ -135,10 +137,11 @@ mkBootModDetails hsc_env (ModGuts { mg_module = mod,
 	      ; type_env' = extendTypeEnvWithIds type_env2
 				(map instanceDFunId ispecs')
 	      }
-	; return (ModDetails { md_types = type_env',
-			       md_insts = ispecs',
-			       md_rules = [],
-			       md_exports = exports })
+	; return (ModDetails { md_types     = type_env',
+			       md_insts     = ispecs',
+			       md_fam_insts = mkDetailsFamInstCache type_env',
+			       md_rules     = [],
+			       md_exports   = exports })
 	}
   where
 
@@ -290,6 +293,8 @@ tidyProgram hsc_env
 		   ModDetails { md_types = tidy_type_env,
 				md_rules = tidy_rules,
 				md_insts = tidy_ispecs,
+				md_fam_insts = mkDetailsFamInstCache 
+					         tidy_type_env,
 				md_exports = exports })
 	}
 

@@ -17,10 +17,10 @@ module IfaceSyn (
 	IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceConDecls(..),
 	IfaceExpr(..), IfaceAlt, IfaceNote(..),
 	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..),
-	IfaceInfoItem(..), IfaceRule(..), IfaceInst(..), 
+	IfaceInfoItem(..), IfaceRule(..), IfaceInst(..), IfaceFamInst(..),
 
 	-- Misc
-	visibleIfConDecls,
+	visibleIfConDecls, extractIfFamInsts,
 
 	-- Equality
 	IfaceEq(..), (&&&), bool, eqListBy, eqMaybeBy,
@@ -85,9 +85,8 @@ data IfaceDecl
     						-- been compiled with
     						-- different flags to the
     						-- current compilation unit 
-                ifFamInst    :: Maybe           -- Just _ <=> instance of fam
-				  (IfaceTyCon,  --   Family tycon
-				   [IfaceType]) --   Instance types
+                ifFamInst    :: Maybe IfaceFamInst
+                                                -- Just <=> instance of family
     }
 
   | IfaceSyn  {	ifName    :: OccName,		-- Type constructor
@@ -154,6 +153,16 @@ data IfaceInst
 	-- and we don't want that to wobble gratuitously
 	-- If this instance decl is *used*, we'll record a usage on the dfun;
 	-- and if the head does not change it won't be used if it wasn't before
+
+data IfaceFamInst
+  = IfaceFamInst { ifFamInstTyCon :: IfaceTyCon	  -- Family tycon
+		 , ifFamInstTys   :: [IfaceType]  -- Instance types
+		 }
+
+extractIfFamInsts :: [IfaceDecl] -> [(IfaceFamInst, IfaceDecl)]
+extractIfFamInsts decls = 
+  [(famInst, decl) | decl@IfaceData {ifFamInst = Just famInst} <- decls]
+		     -- !!!TODO: we also need a similar case for synonyms
 
 data IfaceRule
   = IfaceRule { 
@@ -283,9 +292,8 @@ pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
 pprGen True  = ptext SLIT("Generics: yes")
 pprGen False = ptext SLIT("Generics: no")
 
-pprFamily Nothing           = ptext SLIT("FamilyInstance: none")
-pprFamily (Just (fam, tys)) = ptext SLIT("FamilyInstance:") <+> 
-			      ppr fam <+> hsep (map ppr tys)
+pprFamily Nothing        = ptext SLIT("FamilyInstance: none")
+pprFamily (Just famInst) = ptext SLIT("FamilyInstance:") <+> ppr famInst
 
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
@@ -342,6 +350,10 @@ instance Outputable IfaceInst where
     where
       ppr_mb Nothing   = dot
       ppr_mb (Just tc) = ppr tc
+
+instance Outputable IfaceFamInst where
+  ppr (IfaceFamInst {ifFamInstTyCon = tycon, ifFamInstTys = tys})
+    = ppr tycon <+> hsep (map ppr tys)
 \end{code}
 
 
@@ -554,10 +566,11 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	-- over the constructors (any more), but they do scope
 	-- over the stupid context in the IfaceConDecls
   where
-    Nothing             `eqIfTc_fam` Nothing             = Equal
-    (Just (fam1, tys1)) `eqIfTc_fam` (Just (fam2, tys2)) = 
+    Nothing             `eqIfTc_fam` Nothing                         = Equal
+    (Just (IfaceFamInst fam1 tys1)) 
+                        `eqIfTc_fam` (Just (IfaceFamInst fam2 tys2)) = 
       fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2
-    _		        `eqIfTc_fam` _                   = NotEqual
+    _		        `eqIfTc_fam` _                               = NotEqual
 
 eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
   = bool (ifName d1 == ifName d2) &&&

@@ -177,12 +177,13 @@ instance Binary ModIface where
 		 mi_decls     = decls,
 		 mi_globals   = Nothing,
 		 mi_insts     = insts,
+		 mi_fam_insts = mkIfaceFamInstsCache . map snd $ decls,
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers,
 			-- And build the cached values
-		 mi_dep_fn = mkIfaceDepCache deprecs,
-		 mi_fix_fn = mkIfaceFixCache fixities,
-		 mi_ver_fn = mkIfaceVerCache decls })
+		 mi_dep_fn    = mkIfaceDepCache deprecs,
+		 mi_fix_fn    = mkIfaceFixCache fixities,
+		 mi_ver_fn    = mkIfaceVerCache decls })
 
 GLOBAL_VAR(v_IgnoreHiWay, False, Bool)
 
@@ -975,6 +976,14 @@ instance Binary IfaceInst where
 		flag <- get bh
 		orph <- get bh
 		return (IfaceInst cls tys dfun flag orph)
+
+instance Binary IfaceFamInst where
+    put_ bh (IfaceFamInst tycon tys) = do
+	    put_ bh tycon
+	    put_ bh tys
+    get bh = do tycon <- get bh
+		tys   <- get bh
+		return (IfaceFamInst tycon tys)
 
 instance Binary OverlapFlag where
     put_ bh NoOverlap  = putByte bh 0

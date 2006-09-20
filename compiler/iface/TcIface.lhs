@@ -35,8 +35,10 @@ import TyCon		( TyCon, tyConName, SynTyConRhs(..),
 import HscTypes		( ExternalPackageState(..), 
 			  TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
-			  emptyModDetails, lookupTypeEnv, lookupType, typeEnvIds )
+			  emptyModDetails, lookupTypeEnv, lookupType,
+			  typeEnvIds, mkDetailsFamInstCache )
 import InstEnv		( Instance(..), mkImportedInstance )
+import FamInstEnv	( extractFamInsts )
 import CoreSyn
 import CoreUtils	( exprType, dataConRepFSInstPat )
 import CoreUnfold
@@ -223,10 +225,12 @@ typecheckIface iface
 	; exports <-  ifaceExportNames (mi_exports iface)
 
 		-- Finished
-	; return (ModDetails {	md_types = type_env, 
-				md_insts = dfuns,
-				md_rules = rules,
-				md_exports = exports }) 
+	; return $ ModDetails { md_types     = type_env
+			      , md_insts     = dfuns
+			      , md_fam_insts = mkDetailsFamInstCache type_env
+			      , md_rules     = rules
+			      , md_exports   = exports 
+			      }
     }
 \end{code}
 
@@ -372,7 +376,9 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
 	    ; famInst <- 
 	        case mb_family of
 		  Nothing         -> return Nothing
-		  Just (fam, tys) -> 
+		  Just (IfaceFamInst { ifFamInstTyCon = fam
+				     , ifFamInstTys   = tys
+				     }) -> 
 		    do { famTyCon <- tcIfaceTyCon fam
 		       ; insttys <- mapM tcIfaceType tys
 		       ; return $ Just (famTyCon, insttys)

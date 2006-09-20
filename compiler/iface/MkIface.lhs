@@ -202,10 +202,11 @@ import TysPrim		( alphaTyVars )
 import InstEnv		( Instance(..) )
 import TcRnMonad
 import HscTypes		( ModIface(..), ModDetails(..), 
-			  ModGuts(..), HscEnv(..), hscEPS, Dependencies(..), FixItem(..),
+			  ModGuts(..), HscEnv(..), hscEPS, Dependencies(..),
+			  FixItem(..), 
 			  ModSummary(..), msHiFilePath, 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
-			  typeEnvElts, 
+			  typeEnvElts, mkIfaceFamInstsCache,
 			  GenAvailInfo(..), availName, 
 			  ExternalPackageState(..),
 			  Usage(..), IsBootInterface,
@@ -266,17 +267,18 @@ mkIface :: HscEnv
 				--	    is identical, so no need to write it
 
 mkIface hsc_env maybe_old_iface 
-	(ModGuts{     mg_module  = this_mod,
-		      mg_boot    = is_boot,
-		      mg_usages  = usages,
-		      mg_deps    = deps,
-		      mg_rdr_env = rdr_env,
-		      mg_fix_env = fix_env,
-		      mg_deprecs = src_deprecs })
-	(ModDetails{  md_insts 	 = insts, 
-		      md_rules 	 = rules,
-		      md_types 	 = type_env,
-		      md_exports = exports })
+	(ModGuts{     mg_module   = this_mod,
+		      mg_boot     = is_boot,
+		      mg_usages   = usages,
+		      mg_deps     = deps,
+		      mg_rdr_env  = rdr_env,
+		      mg_fix_env  = fix_env,
+		      mg_deprecs  = src_deprecs })
+	(ModDetails{  md_insts 	  = insts, 
+		      md_fam_insts= _fam_inst,  -- we use the type_env instead
+		      md_rules 	  = rules,
+		      md_types 	  = type_env,
+		      md_exports  = exports })
 	
 -- NB:	notice that mkIface does not look at the bindings
 --	only at the TypeEnv.  The previous Tidy phase has
@@ -294,10 +296,13 @@ mkIface hsc_env maybe_old_iface
 		    	-- Don't put implicit Ids and class tycons in the interface file
 			-- Nor wired-in things; the compiler knows about them anyhow
 
-		; fixities    = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
-		; deprecs     = mkIfaceDeprec src_deprecs
-		; iface_rules = map (coreRuleToIfaceRule ext_nm_lhs ext_nm_rhs) rules
-		; iface_insts = map (instanceToIfaceInst ext_nm_lhs) insts
+		; fixities        = [ (occ,fix) 
+				    | FixItem occ fix _ <- nameEnvElts fix_env]
+		; deprecs         = mkIfaceDeprec src_deprecs
+		; iface_rules     = map (coreRuleToIfaceRule 
+					   ext_nm_lhs ext_nm_rhs) rules
+		; iface_insts     = map (instanceToIfaceInst ext_nm_lhs) insts
+		; iface_fam_insts = extractIfFamInsts decls
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -306,6 +311,7 @@ mkIface hsc_env maybe_old_iface
 			mi_usages   = usages,
 			mi_exports  = mkIfaceExports exports,
 			mi_insts    = sortLe le_inst iface_insts,
+			mi_fam_insts= mkIfaceFamInstsCache decls,
 			mi_rules    = sortLe le_rule iface_rules,
 			mi_fixities = fixities,
 			mi_deprecs  = deprecs,
@@ -339,8 +345,8 @@ mkIface hsc_env maybe_old_iface
 
 	; return (new_iface, no_change_at_all) }
   where
-     r1 `le_rule` r2 = ifRuleName r1 <= ifRuleName r2
-     i1 `le_inst` i2 = ifDFun     i1 <= ifDFun     i2
+     r1      `le_rule`     r2      = ifRuleName r1 <= ifRuleName r2
+     i1      `le_inst`     i2      = ifDFun     i1 <= ifDFun     i2
 
      dflags = hsc_dflags hsc_env
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
@@ -1089,7 +1095,9 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 
     famInstToIface Nothing                    = Nothing
     famInstToIface (Just (famTyCon, instTys)) = 
-      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys)
+      Just $ IfaceFamInst { ifFamInstTyCon = toIfaceTyCon ext famTyCon
+			  , ifFamInstTys   = map (toIfaceType ext) instTys
+			  }
 
 tyThingToIfaceDecl ext (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier

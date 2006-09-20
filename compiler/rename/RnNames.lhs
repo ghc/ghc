@@ -447,13 +447,18 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
     for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
 
     new_tc tc_decl 
+      | isIdxTyDecl (unLoc tc_decl)
+	= do { main_name <- lookupFamInstDeclBndr mod main_rdr
+	     ; sub_names <- 
+	         mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs
+	     ; return sub_names }	-- main_name is not declared here!
+      | otherwise
 	= do { main_name <- newTopSrcBinder mod Nothing main_rdr
-	     ; sub_names <- mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs
-	     ; if isIdxTyDecl (unLoc tc_decl)	   -- index type definitions
-	       then return (            sub_names) -- are usage occurences
-	       else return (main_name : sub_names) }
-	where
-	  (main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
+	     ; sub_names <- 
+	         mappM (newTopSrcBinder mod (Just main_name)) sub_rdrs
+	     ; return (main_name : sub_names) }
+      where
+	(main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
 
     inst_ats inst_decl 
 	= mappM new_tc (instDeclATs (unLoc inst_decl))
