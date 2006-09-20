@@ -24,7 +24,7 @@ module Type (
 
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
         isUbxTupleKind, isArgTypeKind, isKind, isTySuperKind, 
-        isCoSuperKind, isSuperKind, isCoercionKind,
+        isCoSuperKind, isSuperKind, isCoercionKind, isEqPred,
 	mkArrowKind, mkArrowKinds,
 
         isSubArgTypeKind, isSubOpenTypeKind, isSubKind, defaultKind, eqKind,
@@ -106,7 +106,7 @@ import TypeRep
 
 -- friends:
 import Var	( Var, TyVar, tyVarKind, tyVarName, 
-		  setTyVarName, setTyVarKind )
+		  setTyVarName, setTyVarKind, mkWildTyVar )
 import VarEnv
 import VarSet
 
@@ -164,7 +164,9 @@ coreView :: Type -> Maybe Type
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView (NoteTy _ ty) 	   = Just ty
-coreView (PredTy p)    	   = Just (predTypeRep p)
+coreView (PredTy p)
+  | isEqPred p             = Nothing
+  | otherwise    	   = Just (predTypeRep p)
 coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys 
 			   = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 				-- Its important to use mkAppTys, rather than (foldl AppTy),
@@ -305,10 +307,11 @@ splitAppTys ty = split ty ty []
 
 \begin{code}
 mkFunTy :: Type -> Type -> Type
+mkFunTy (PredTy (EqPred ty1 ty2)) res = mkForAllTy (mkWildTyVar (PredTy (EqPred ty1 ty2))) res
 mkFunTy arg res = FunTy arg res
 
 mkFunTys :: [Type] -> Type -> Type
-mkFunTys tys ty = foldr FunTy ty tys
+mkFunTys tys ty = foldr mkFunTy ty tys
 
 isFunTy :: Type -> Bool 
 isFunTy ty = isJust (splitFunTy_maybe ty)
@@ -596,6 +599,7 @@ predTypeRep (IParam _ ty)     = ty
 predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 	-- Result might be a newtype application, but the consumer will
 	-- look through that too if necessary
+predTypeRep (EqPred ty1 ty2) = pprPanic "predTypeRep" (ppr (EqPred ty1 ty2))
 \end{code}
 
 
@@ -1423,6 +1427,8 @@ isSubKind :: Kind -> Kind -> Bool
 -- (k1 `isSubKind` k2) checks that k1 <: k2
 isSubKind (TyConApp kc1 []) (TyConApp kc2 []) = kc1 `isSubKindCon` kc1
 isSubKind (FunTy a1 r1) (FunTy a2 r2)	      = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
+isSubKind (PredTy (EqPred ty1 ty2)) (PredTy (EqPred ty1' ty2')) 
+  = ty1 `tcEqType` ty1' && ty2 `tcEqType` ty2'
 isSubKind k1 		k2 		      = False
 
 eqKind :: Kind -> Kind -> Bool
@@ -1465,4 +1471,8 @@ isCoercionKind :: Kind -> Bool
 isCoercionKind k | Just k' <- kindView k = isCoercionKind k'
 isCoercionKind (PredTy (EqPred {})) 	 = True
 isCoercionKind other			 = False
+
+isEqPred :: PredType -> Bool
+isEqPred (EqPred _ _) = True
+isEqPred other	      = False
 \end{code}

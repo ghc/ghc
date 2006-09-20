@@ -1696,7 +1696,7 @@ knownCon env scrut con args bndr alts cont
 				  simplExprF env rhs cont
 
 	(DataAlt dc, bs, rhs)  
-		-> ASSERT( n_drop_tys + length bs == length args )
+		-> -- ASSERT( n_drop_tys + length bs == length args )
 		   bind_args env dead_bndr bs (drop n_drop_tys args)	$ \ env ->
 		   let
 			-- It's useful to bind bndr to scrut, rather than to a fresh

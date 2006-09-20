@@ -54,7 +54,7 @@ import {- Kind parts of -}
 
 import Id		( Id, idType, recordSelectorFieldLabel,
 			  isRecordSelector, isNaughtyRecordSelector,
-			  isDataConId_maybe )
+			  isDataConId_maybe, idName )
 import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks,
 			  dataConSourceArity, 
 			  dataConWrapId, isVanillaDataCon, dataConUnivTyVars,

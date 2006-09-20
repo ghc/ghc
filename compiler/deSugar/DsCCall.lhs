@@ -34,7 +34,7 @@ import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
 			  splitRecNewType_maybe, splitForAllTy_maybe,
 			  isUnboxedTupleType
 			)
-import Coercion         ( Coercion, splitRecNewTypeCo_maybe, mkSymCoercion )
+import Coercion         ( Coercion, splitNewTypeRepCo_maybe, mkSymCoercion )
 import PrimOp		( PrimOp(..) )
 import TysPrim		( realWorldStatePrimTy, intPrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
@@ -160,7 +160,7 @@ unboxArg arg
   = returnDs (arg, \body -> body)
 
   -- Recursive newtypes
-  | Just(rep_ty, co) <- splitRecNewTypeCo_maybe arg_ty
+  | Just(rep_ty, co) <- splitNewTypeRepCo_maybe arg_ty
   = unboxArg (mkCoerce (mkSymCoercion co) arg)
       
   -- Booleans
@@ -399,7 +399,7 @@ resultWrapper result_ty
 				    (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 
   -- Recursive newtypes
-  | Just (rep_ty, co) <- splitRecNewTypeCo_maybe result_ty
+  | Just (rep_ty, co) <- splitNewTypeRepCo_maybe result_ty
   = resultWrapper rep_ty `thenDs` \ (maybe_ty, wrapper) ->
     returnDs (maybe_ty, \e -> mkCoerce co (wrapper e))
 

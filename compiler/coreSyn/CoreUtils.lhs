@@ -42,7 +42,7 @@ import GLAEXTS		-- For `xori`
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
-import Var		( Var, TyVar )
+import Var		( Var, TyVar, isCoVar, tyVarKind )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName )
@@ -53,7 +53,7 @@ import Literal		( hashLiteral, literalType, litIsDupable,
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, 
 			  isVanillaDataCon, dataConTyCon, dataConRepArgTys,
-                          dataConUnivTyVars )
+                          dataConUnivTyVars, dataConExTyVars )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
@@ -70,8 +70,9 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
                           substTyWith
 			)
 import Coercion         ( Coercion, mkTransCoercion, coercionKind,
-                          splitRecNewTypeCo_maybe, mkSymCoercion, mkLeftCoercion,
-                          mkRightCoercion, decomposeCo, coercionKindTyConApp )
+                          splitNewTypeRepCo_maybe, mkSymCoercion, mkLeftCoercion,
+                          mkRightCoercion, decomposeCo, coercionKindTyConApp,
+                          splitCoercionKind )
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -687,30 +688,62 @@ exprIsConApp_maybe (Cast expr co)
 	--	  (# r, s #) -> ...
 	-- where the memcpy is in the IO monad, but the call is in
 	-- the (ST s) monad
-    let (from_ty, to_ty) = coercionKind co in
     case exprIsConApp_maybe expr of {
 	Nothing 	  -> Nothing ;
 	Just (dc, args)   -> 
+
+    let (from_ty, to_ty) = coercionKind co in
   
     case splitTyConApp_maybe to_ty of {
 	Nothing -> Nothing ;
 	Just (tc, tc_arg_tys) | tc /= dataConTyCon dc     -> Nothing
-			      | not (isVanillaDataCon dc) -> Nothing
+			    --  | not (isVanillaDataCon dc) -> Nothing
 			      | otherwise	          ->
-		-- Type constructor must match
-		-- We knock out existentials to keep matters simple(r)
+		-- Type constructor must match datacon
+
+    case splitTyConApp_maybe from_ty of {
+        Nothing -> Nothing ;
+        Just (tc', tc_arg_tys') | tc /= tc' -> Nothing 
+                -- Both sides of coercion must have the same type constructor
+                               | otherwise ->
+
     let
+        -- here we do the PushC reduction rule as described in the FC paper
 	arity   	    = tyConArity tc
-	val_args	    = drop arity args
+        n_ex_tvs            = length dc_ex_tyvars
+
+        (univ_args, rest)   = splitAt arity args
+        (ex_args, val_args) = splitAt n_ex_tvs rest
+
         arg_tys 	    = dataConRepArgTys dc
 	dc_tyvars	    = dataConUnivTyVars dc
+        dc_ex_tyvars        = dataConExTyVars dc
+
         deep arg_ty         = deepCast arg_ty dc_tyvars co
+
+          -- first we appropriately cast the value arguments
+        arg_cos             = map deep arg_tys 
 	new_val_args	    = zipWith mkCoerce (map deep arg_tys) val_args
+
+          -- then we cast the existential coercion arguments
+        orig_tvs            = dc_tyvars ++ dc_ex_tyvars
+        gammas              = decomposeCo arity co
+        new_tys             = gammas ++ (map (\ (Type t) -> t) ex_args)
+        theta               = substTyWith orig_tvs new_tys
+        cast_ty tv (Type ty) 
+          | isCoVar tv
+          , (ty1, ty2) <- splitCoercionKind (tyVarKind tv)
+          = Type $ mkTransCoercion (mkSymCoercion (theta ty1)) 
+            (mkTransCoercion ty (theta ty2))
+          | otherwise       
+          = Type ty
+        new_ex_args         = zipWith cast_ty dc_ex_tyvars ex_args
+  
     in
     ASSERT( all isTypeArg (take arity args) )
     ASSERT( equalLength val_args arg_tys )
-    Just (dc, map Type tc_arg_tys ++ new_val_args)
-    }}
+    Just (dc, map Type tc_arg_tys ++ new_ex_args ++ new_val_args)
+    }}}
 
 exprIsConApp_maybe (Note _ expr)
   = exprIsConApp_maybe expr
@@ -1047,7 +1080,7 @@ eta_expand n us expr ty
 		-- We want to get
 		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
 
-    	case splitRecNewTypeCo_maybe ty of {
+    	case splitNewTypeRepCo_maybe ty of {
  	  Just(ty1,co) -> 
               mkCoerce co (eta_expand n us (mkCoerce (mkSymCoercion co) expr) ty1) ;
  	  Nothing  -> 

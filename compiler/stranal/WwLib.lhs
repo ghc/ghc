@@ -23,7 +23,7 @@ import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys, splitRecNewType_maybe, isAlgType
 			)
-import Coercion         ( Coercion, mkSymCoercion, splitRecNewTypeCo_maybe )
+import Coercion         ( Coercion, mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniquesUs, UniqSM )
@@ -225,7 +225,7 @@ mkWWargs :: Type
 		     Type)			-- Type of wrapper body
 
 mkWWargs fun_ty demands one_shots
-  | Just (rep_ty, co) <- splitRecNewTypeCo_maybe fun_ty
+  | Just (rep_ty, co) <- splitNewTypeRepCo_maybe fun_ty
    	-- The newtype case is for when the function has
 	-- a recursive newtype after the arrow (rare)
 	-- We check for arity >= 0 to avoid looping in the case

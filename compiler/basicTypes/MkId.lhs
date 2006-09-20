@@ -48,7 +48,7 @@ import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
-                          splitRecNewTypeCo_maybe )
+                          splitNewTypeRepCo_maybe )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, 
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 

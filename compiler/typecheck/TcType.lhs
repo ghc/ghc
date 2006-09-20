@@ -170,9 +170,10 @@ import Type		(	-- Re-exports
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
 import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, synTyConDefn, tyConUnique )
+import Coercion         ( splitForAllCo_maybe )
 import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
 import Class		( Class )
-import Var		( TyVar, Id, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
+import Var		( TyVar, Id, isCoVar, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
 import ForeignCall	( Safety, DNType(..) )
 import Unify		( tcMatchTys )
 import VarSet
@@ -642,7 +643,8 @@ tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty = split ty ty []
    where
      split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
-     split orig_ty (ForAllTy tv ty) tvs = split ty ty (tv:tvs)
+     split orig_ty (ForAllTy tv ty) tvs 
+       | not (isCoVar tv) = split ty ty (tv:tvs)
      split orig_ty t		    tvs = (reverse tvs, orig_ty)
 
 tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
@@ -655,6 +657,8 @@ tcSplitPhiTy ty = split ty ty []
   split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
   split orig_ty (FunTy arg res) ts 
 	| Just p <- tcSplitPredTy_maybe arg = split res res (p:ts)
+  split orig_ty ty ts
+        | Just (p, ty') <- splitForAllCo_maybe ty = split ty' ty' (p:ts) 
   split orig_ty ty		ts = (reverse ts, orig_ty)
 
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)

@@ -10,7 +10,7 @@ module Var (
 	setVarName, setVarUnique, 
 
 	-- TyVars
-	TyVar, mkTyVar, mkTcTyVar,
+	TyVar, mkTyVar, mkTcTyVar, mkWildTyVar,
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique, setTyVarKind,
 	tcTyVarDetails,
@@ -40,9 +40,10 @@ import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, IdInfo, seqIdInfo )
 
 import Name		( Name, NamedThing(..),
-			  setNameUnique, nameUnique
+			  setNameUnique, nameUnique, mkSysTvName
 			)
-import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey# )
+import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey#,
+                          mkBuiltinUnique )
 import FastTypes
 import Outputable
 \end{code}
@@ -197,6 +198,14 @@ mkTcTyVar name kind details
 		tyVarKind  = kind,
 		tcTyVarDetails = details
 	}
+
+mkWildTyVar :: Kind -> TyVar
+mkWildTyVar kind 
+  = TyVar { varName = mkSysTvName wild_uniq FSLIT("co_wild"),
+            realUnique = _ILIT(1),
+            tyVarKind = kind }
+  where
+    wild_uniq = (mkBuiltinUnique 1)
 \end{code}
 
 %************************************************************************
