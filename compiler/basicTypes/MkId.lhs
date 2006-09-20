@@ -555,6 +555,7 @@ mkRecordSelId tycon field_label
 		-- the context stuff; hence the arg_prefix binding below
 	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) rhs
       where
+	-- TODO: this is *not* right; Orig vs Rep tys
 	(arg_prefix, arg_ids)
 	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
 	   = ([], mkTemplateLocalsNum arg_base (dataConInstOrigArgTys data_con res_tys))

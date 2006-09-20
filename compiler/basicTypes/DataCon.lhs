@@ -11,7 +11,7 @@ module DataCon (
 	dataConRepType, dataConSig, dataConFullSig,
 	dataConName, dataConTag, dataConTyCon, dataConUserType,
 	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, dataConResTys,
-	dataConEqSpec, dataConTheta, dataConStupidTheta, 
+	dataConEqSpec, eqSpecPreds, dataConTheta, dataConStupidTheta, 
 	dataConInstArgTys, dataConOrigArgTys, 
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
@@ -32,7 +32,7 @@ module DataCon (
 import Type		( Type, ThetaType, 
 			  substTyWith, substTyVar, mkTopTvSubst, 
 			  mkForAllTys, mkFunTys, mkTyConApp, mkTyVarTy, mkTyVarTys, 
-			  splitTyConApp_maybe, newTyConInstRhs,
+			  splitTyConApp_maybe, newTyConInstRhs, 
 			  mkPredTys, isStrictPred, pprType, mkPredTy
 			)
 import Coercion		( isEqPred, mkEqPred )

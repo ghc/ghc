@@ -122,14 +122,16 @@ data Pat id
 
 	------------ Dictionary patterns (translation only) ---------------
   | DictPat	    -- Used when destructing Dictionaries with an explicit case
-		    [id]			-- superclass dicts
-		    [id]			-- methods
+		    [id]		-- Superclass dicts
+		    [id]		-- Methods
 
 	------------ Pattern coercions (translation only) ---------------
   | CoPat 	ExprCoFn		-- If co::t1 -> t2, p::t2, 
 					-- then (CoPat co p) :: t1
-		(Pat id)		-- No nested location reqd
-	    	Type	
+		(Pat id)		-- Why not LPat?  Ans: existing locn will do
+	    	Type
+	-- During desugaring a (CoPat co pat) turns into a cast with 'co' on 
+	-- the scrutinee, followed by a match on 'pat'
 \end{code}
 
 HsConDetails is use both for patterns and for data type declarations

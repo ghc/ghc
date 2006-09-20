@@ -242,7 +242,7 @@ ppr_case_pat con@(DataAlt dc) args
     tc = dataConTyCon dc
 
 ppr_case_pat con args
-  = ppr con <+> hsep (map ppr_bndr args) <+> arrow
+  = ppr con <+> sep (map ppr_bndr args) <+> arrow
   where
     ppr_bndr = pprBndr CaseBind
 

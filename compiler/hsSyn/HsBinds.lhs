@@ -318,7 +318,7 @@ data ExprCoFn
 	-- Non-empty bindings, so that the identity coercion
 	-- is always exactly CoHole
   | CoLet (LHsBinds Id)		-- let binds in []
-				-- (ould be nicer to be core bindings)
+				-- (would be nicer to be core bindings)
 
 instance Outputable ExprCoFn where 
   ppr co_fn = pprCoFn (ptext SLIT("<>")) co_fn

@@ -55,7 +55,7 @@ import Packages		( isDllName )
 #endif
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
-import DataCon		( DataCon, dataConRepArity, 
+import DataCon		( DataCon, dataConRepArity, eqSpecPreds, 
 			  isVanillaDataCon, dataConTyCon, dataConRepArgTys,
                           dataConUnivTyVars, dataConExTyVars, dataConEqSpec )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
@@ -734,7 +734,7 @@ dataConOccInstPat uniqs occs con inst_tys
     ex_tvs   = dataConExTyVars con
     arg_tys  = dataConRepArgTys con
     eq_spec  = dataConEqSpec con
-    eq_preds = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- eq_spec ]
+    eq_preds = eqSpecPreds eq_spec
 
     n_ex = length ex_tvs
     n_co = length eq_spec
@@ -763,7 +763,7 @@ dataConOccInstPat uniqs occs con inst_tys
        where
          new_name = mkSysTvName uniq (occNameFS occ)
 
-    co_bndrs               = zipWith3 mk_co_var co_uniqs co_occs eq_preds
+    co_bndrs = zipWith3 mk_co_var co_uniqs co_occs eq_preds
 
       -- make value vars, instantiating types
     mk_id_var uniq occ ty = mkUserLocal occ uniq (inst_subst ty) noSrcLoc
