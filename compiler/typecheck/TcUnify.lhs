@@ -702,7 +702,7 @@ tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
 	; co_fn2 <- tc_sub mb_fun tau' tau' exp_ib exp_sty expected_ty
 
 		-- Deal with the dictionaries
-	; co_fn1 <- instCall InstSigOrigin inst_tys (substTy subst' theta)
+	; co_fn1 <- instCall InstSigOrigin inst_tys (substTheta subst' theta)
  	; return (co_fn2 <.> co_fn1) }
 
 -----------------------------------
