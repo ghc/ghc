@@ -33,15 +33,16 @@ import Type		( Type, ThetaType,
 			  substTyWith, substTyVar, mkTopTvSubst, 
 			  mkForAllTys, mkFunTys, mkTyConApp, mkTyVarTy, mkTyVarTys, 
 			  splitTyConApp_maybe, newTyConInstRhs,
-			  mkPredTys, isStrictPred, pprType
+			  mkPredTys, isStrictPred, pprType, mkPredTy
 			)
 import Coercion		( isEqPred, mkEqPred )
 import TyCon		( TyCon, FieldLabel, tyConDataCons, 
 			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon,
                           isNewTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon )
-import Name		( Name, NamedThing(..), nameUnique )
-import Var		( TyVar, Id )
+import Name		( Name, NamedThing(..), nameUnique, mkSysTvName, mkSystemName )
++ import Var		( TyVar, CoVar, Id, mkTyVar, tyVarKind, setVarUnique,
++                           mkCoVar )
 import BasicTypes	( Arity, StrictnessMark(..) )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
@@ -49,6 +50,7 @@ import ListSetOps	( assoc, minusList )
 import Util		( zipEqual, zipWithEqual )
 import List		( partition )
 import Maybes           ( expectJust )
+import FastString
 \end{code}
 
 
@@ -601,6 +603,7 @@ dataConInstArgTys (MkData {dcRepArgTys = arg_tys,
    map (substTyWith tyvars inst_tys) arg_tys
  where
    tyvars = univ_tvs ++ ex_tvs
+
 
 -- And the same deal for the original arg tys
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]

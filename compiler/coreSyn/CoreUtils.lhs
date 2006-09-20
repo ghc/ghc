@@ -31,7 +31,9 @@ module CoreUtils (
 	hashExpr,
 
 	-- Equality
-	cheapEqExpr, tcEqExpr, tcEqExprX, applyTypeToArgs, applyTypeToArg
+	cheapEqExpr, tcEqExpr, tcEqExprX, applyTypeToArgs, applyTypeToArg,
+
+        dataConInstPat
     ) where
 
 #include "HsVersions.h"
@@ -42,10 +44,11 @@ import GLAEXTS		-- For `xori`
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
-import Var		( Var, TyVar, isCoVar, tyVarKind )
+import Var		( Var, TyVar, CoVar, isCoVar, tyVarKind, setVarUnique,
+                          mkCoVar, mkTyVar, mkCoVar )
 import VarSet		( unionVarSet )
 import VarEnv
-import Name		( hashName )
+import Name		( hashName, mkSysTvName )
 #if mingw32_TARGET_OS
 import Packages		( isDllName )
 #endif
@@ -53,7 +56,7 @@ import Literal		( hashLiteral, literalType, litIsDupable,
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, 
 			  isVanillaDataCon, dataConTyCon, dataConRepArgTys,
-                          dataConUnivTyVars, dataConExTyVars )
+                          dataConUnivTyVars, dataConExTyVars, dataConEqSpec )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
@@ -67,12 +70,12 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitRecNewType_maybe, 
 			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy,
-                          substTyWith
+                          substTyWith, mkPredTy
 			)
 import Coercion         ( Coercion, mkTransCoercion, coercionKind,
                           splitNewTypeRepCo_maybe, mkSymCoercion, mkLeftCoercion,
                           mkRightCoercion, decomposeCo, coercionKindPredTy,
-                          splitCoercionKind )
+                          splitCoercionKind, mkEqPred )
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -673,6 +676,48 @@ deepCast ty tyVars co
   where
     -- coArgs = [right (left (left co)), right (left co), right co]
     coArgs = decomposeCo (length tyVars) co
+
+-- This goes here to avoid circularity between DataCon and Id
+dataConInstPat :: [Unique]                  -- An infinite list of uniques
+               -> DataCon
+	       -> [Type]                    -- Types to instantiate the universally quantified tyvars
+	       -> ([TyVar], [CoVar], [Id])  -- Return instantiated variables
+dataConInstPat uniqs con inst_tys 
+  = (ex_bndrs, co_bndrs, id_bndrs)
+  where 
+    univ_tvs = dataConUnivTyVars con
+    ex_tvs   = dataConExTyVars con
+    arg_tys  = dataConRepArgTys con
+    eq_spec  = dataConEqSpec con
+    eq_preds = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- eq_spec ]
+
+    n_ex = length ex_tvs
+    n_co = length eq_spec
+    n_id = length arg_tys
+
+      -- split the uniques
+    (ex_uniqs, uniqs') = splitAt n_ex uniqs
+    (co_uniqs, id_uniqs) = splitAt n_co uniqs'
+
+      -- make existential type variables
+    mk_ex_var uniq var = setVarUnique var uniq
+    ex_bndrs = zipWith mk_ex_var ex_uniqs ex_tvs
+
+      -- make the instantiation substitution
+    inst_subst = substTyWith (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
+
+      -- make a new coercion vars, instantiating kind
+    mk_co_var uniq eq_pred = mkCoVar new_name (inst_subst (mkPredTy eq_pred))
+       where
+         new_name = mkSysTvName uniq FSLIT("co")
+
+    co_bndrs               = zipWith mk_co_var co_uniqs eq_preds
+
+      -- make value vars, instantiating types
+    mk_id_var uniq ty = mkSysLocal FSLIT("ca") uniq (inst_subst ty)
+
+    id_bndrs = zipWith mk_id_var id_uniqs arg_tys
+
 
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 -- Returns (Just (dc, [x1..xn])) if the argument expression is 

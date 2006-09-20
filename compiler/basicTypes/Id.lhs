@@ -160,12 +160,13 @@ mkLocalId :: Name -> Type -> Id
 mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 
 -- SysLocal: for an Id being created by the compiler out of thin air...
+mkSysLocal :: FastString -> Unique -> Type -> Id
+mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
+
+
 -- UserLocal: an Id with a name the user might recognize...
 mkUserLocal :: OccName -> Unique -> Type -> SrcLoc -> Id
-mkSysLocal  :: FastString  -> Unique -> Type -> Id
 mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
-
-mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
 
 mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName    uniq occ loc) ty
 mkVanillaGlobal 	    = mkGlobalId VanillaGlobal

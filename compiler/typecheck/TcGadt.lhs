@@ -387,21 +387,21 @@ uUnrefined subst co tv1 ty2 (TyVarTy tv2)
   = do	{ b1 <- tvBindFlag tv1
 	; b2 <- tvBindFlag tv2
 	; case (b1,b2) of
-	    (BindMe, _) 	 -> bind tv1 ty2
+	    (BindMe, _) 	 -> bind False tv1 ty2
 
-	    (AvoidMe, BindMe)	 -> bind tv2 ty1
-	    (AvoidMe, _)	 -> bind tv1 ty2
+	    (AvoidMe, BindMe)	 -> bind True tv2 ty1
+	    (AvoidMe, _)	 -> bind False tv1 ty2
 
 	    (WildCard, WildCard) -> return subst
 	    (WildCard, Skolem)   -> return subst
-	    (WildCard, _)	 -> bind tv2 ty1
+	    (WildCard, _)	 -> bind True tv2 ty1
 
 	    (Skolem, WildCard)	 -> return subst
 	    (Skolem, Skolem)	 -> failWith (misMatch ty1 ty2)
-	    (Skolem, _)		 -> bind tv2 ty1
+	    (Skolem, _)		 -> bind True tv2 ty1
 	}
 
-  | k1 `isSubKind` k2 = bindTv subst co tv2 ty1	-- Must update tv2
+  | k1 `isSubKind` k2 = bindTv subst (mkSymCoercion co) tv2 ty1	-- Must update tv2
   | k2 `isSubKind` k1 = bindTv subst co tv1 ty2	-- Must update tv1
 
   | otherwise = failWith (kindMisMatch tv1 ty2)
@@ -409,7 +409,9 @@ uUnrefined subst co tv1 ty2 (TyVarTy tv2)
     ty1 = TyVarTy tv1
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
-    bind tv ty = return (extendVarEnv subst tv (co,ty))
+    bind swap tv ty = return (extendVarEnv subst tv (co',ty))
+      where
+        co' = if swap then mkSymCoercion co else co
 
 uUnrefined subst co tv1 ty2 ty2'	-- ty2 is not a type variable
   | tv1 `elemVarSet` substTvSet subst (tyVarsOfType ty2')

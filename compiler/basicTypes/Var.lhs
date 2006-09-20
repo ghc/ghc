@@ -22,7 +22,7 @@ module Var (
 	Id, DictId,
 	idName, idType, idUnique, idInfo, modifyIdInfo, maybeModifyIdInfo,
 	setIdName, setIdUnique, setIdType, setIdInfo, lazySetIdInfo, 
-	setIdExported, setIdNotExported, 
+	setIdExported, setIdNotExported,
 
 	globalIdDetails, globaliseId, 
 
@@ -40,12 +40,14 @@ import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, IdInfo, seqIdInfo )
 
 import Name		( Name, NamedThing(..),
-			  setNameUnique, nameUnique, mkSysTvName
+			  setNameUnique, nameUnique, mkSysTvName, 
+                          mkSystemVarName
 			)
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey#,
                           mkBuiltinUnique )
 import FastTypes
-import Outputable
+import FastString
+import Outputable       
 \end{code}
 
 

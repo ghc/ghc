@@ -49,6 +49,8 @@ import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType,
                           PredType(..),
 			  mkTopTvSubst, substTyVar )
+import TcGadt           ( gadtRefine, refineType, emptyRefinement )
+import HsBinds          ( ExprCoFn(..), isIdCoercion )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
                           splitNewTypeRepCo_maybe, isEqPred )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
@@ -57,16 +59,17 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  tcSplitFunTys, tcSplitForAllTys, dataConsStupidTheta
 			)
-import CoreUtils	( exprType )
+import CoreUtils	( exprType, dataConInstPat )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon,
                           newTyConCo, tyConArity )
 import Class		( Class, classTyCon, classSelIds )
-import Var		( Id, TyVar, Var, setIdType, mkWildCoVar )
+import Var		( Id, TyVar, Var, setIdType, mkCoVar, mkWildCoVar )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
-import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
+import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..),
+                          mkSysTvName )
 import OccName		( mkOccNameFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
@@ -469,13 +472,12 @@ mkRecordSelId tycon field_label
     stupid_dict_tys = mkPredTys (dataConsStupidTheta data_cons_w_field)
     n_stupid_dicts  = length stupid_dict_tys
 
-    (pre_field_tyvars,pre_field_theta,field_tau) = tcSplitSigmaTy field_ty
-      -- tcSplitSigmaTy puts tyvars with EqPred kinds in with the theta, but
-      -- this is not what we want here, so we need to split out the EqPreds
-      -- as new wild tyvars
-    field_tyvars = pre_field_tyvars ++ eq_vars
-    eq_vars      = map (mkWildCoVar . mkPredTy)
+    (field_tyvars,pre_field_theta,field_tau) = tcSplitSigmaTy field_ty
+  
+    mk_co_var k  = mkWildCoVar k
+    eq_vars      = map (mk_co_var . mkPredTy)
                        (filter isEqPred pre_field_theta)
+
     field_theta  = filter (not . isEqPred) pre_field_theta
     field_dict_tys			 = mkPredTys field_theta
     n_field_dict_tys			 = length field_dict_tys
@@ -555,30 +557,42 @@ mkRecordSelId tycon field_label
     mk_alt data_con 
       = 	-- In the non-vanilla case, the pattern must bind type variables and
 		-- the context stuff; hence the arg_prefix binding below
-	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) (Var the_arg_id)
+	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) rhs
       where
 	(arg_prefix, arg_ids)
 	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
 	   = ([], mkTemplateLocalsNum arg_base (dataConInstOrigArgTys data_con res_tys))
 	   | otherwise		-- The case pattern binds type variables, which are used
 				-- in the types of the arguments of the pattern
-	   = (dc_tvs ++ mkTemplateLocalsNum arg_base (mkPredTys dc_theta),
-	      mkTemplateLocalsNum arg_base' dc_arg_tys)
+	   = (ex_tvs ++ co_tvs ++ dict_vs, field_vs)
 
-	(pre_dc_tvs, pre_dc_theta, dc_arg_tys) = dataConSig data_con
-           -- again we need to pull the EqPreds out of dc_theta, into dc_tvs
-        dc_eqvars = map (mkWildCoVar . mkPredTy . fixEqPred) (filter isEqPred pre_dc_theta)
-          -- The type of the record selector Id does not contain the univ tvs
-          -- but rather their substitution according to the eq_spec.  Therefore
-          -- the coercion arguments bound in the case alternative will just
-          -- have reflexive coercion kinds
-        fixEqPred (EqPred ty1 ty2) = EqPred ty2 ty2
-        dc_tvs    = drop (length (dataConUnivTyVars data_con)) pre_dc_tvs ++ dc_eqvars
+        (ex_tvs, co_tvs, arg_vs) = dataConInstPat uniqs' data_con res_tys
+        (dict_vs, field_vs) = splitAt (length dc_theta) arg_vs
+
+	(_, pre_dc_theta, dc_arg_tys) = dataConSig data_con
         dc_theta  = filter (not . isEqPred) pre_dc_theta
+
 	arg_base' = arg_base + length dc_theta
 
 	unpack_base = arg_base' + length dc_arg_tys
-	uniqs = map mkBuiltinUnique [unpack_base..]
+
+	uniq_list = map mkBuiltinUnique [unpack_base..]
+
+        Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs
+        (co_fn, out_ty) = refineType refinement (idType the_arg_id)
+
+        rhs = ASSERT(out_ty `coreEqType` field_tau) perform_co co_fn (Var the_arg_id)
+
+        perform_co (ExprCoFn co) expr = Cast expr co
+        perform_co id_co expr = ASSERT(isIdCoercion id_co) expr
+
+          -- split the uniq_list into two
+        uniqs  = takeHalf uniq_list
+        uniqs' = takeHalf (drop 1 uniq_list)
+
+        takeHalf [] = []
+        takeHalf (h:_:t) = h:(takeHalf t)  
+        takeHalf (h:t) = [h]
 
     	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` arg_ids) field_label
     	field_lbls  = dataConFieldLabels data_con

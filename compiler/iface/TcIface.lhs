@@ -35,7 +35,7 @@ import HscTypes		( ExternalPackageState(..),
 			  emptyModDetails, lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( Instance(..), mkImportedInstance )
 import CoreSyn
-import CoreUtils	( exprType )
+import CoreUtils	( exprType, dataConInstPat )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
@@ -57,7 +57,7 @@ import OccName		( OccName, mkVarOccFS, mkTyVarOccoccNameSpace, pprNameSpace  )
 import FastString       ( FastString )
 import Module		( Module, moduleName )
 import UniqFM		( lookupUFM )
-import UniqSupply	( initUs_ )
+import UniqSupply	( initUs_, uniqsFromSupply )
 import Outputable	
 import ErrUtils		( Message )
 import Maybes		( MaybeErr(..) )
@@ -678,18 +678,12 @@ tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
 	; tcIfaceDataAlt data_con inst_tys arg_occs rhs }
 
 tcIfaceDataAlt con inst_tys arg_strs rhs
-  = do	{ arg_names <- newIfaceNames (map mkVarOccFS arg_strs)
-        ; let (tyvar_strs, id_strs) = splitAtList (dataConTyVars con) arg_strs
-        ; tyvar_names <- mapM (newIfaceName . mkTyVarOcc) tyvar_strs
-        ; id_names    <- mapM (newIfaceName . mkVarOccFS) id_strs
-	; let	ex_tvs  = [ mkTyVar name (tyVarKind tv) 
-			   | (name,tv) <- tyvar_names `zip` dataConExTyVars con ]
-		arg_tys	 = dataConInstArgTys con (inst_tys ++ mkTyVarTys ex_tvs)
-		arg_ids  = ASSERT2( equalLength id_names arg_tys,
-				    ppr (con, tyvar_names++id_names, rhs) $$ ppr ex_tvs $$ ppr arg_tys )
-			   zipWith mkLocalId id_names arg_tys
-		
-	; rhs' <- extendIfaceTyVarEnv ex_tvs	$
+  = do	{ us <- newUniqueSupply
+	; let uniqs = uniqsFromSupply us
+	; let	(ex_tvs, co_tvs, arg_ids) = dataConInstPat uniqs con inst_tys
+                all_tvs                   = ex_tvs ++ co_tvs
+
+	; rhs' <- extendIfaceTyVarEnv all_tvs	$
 		  extendIfaceIdEnv arg_ids	$
 		  tcIfaceExpr rhs
 	; return (DataAlt con, ex_tvs ++ arg_ids, rhs') }

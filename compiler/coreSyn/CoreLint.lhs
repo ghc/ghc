@@ -500,7 +500,7 @@ lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) =
 lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
   | isNewTyCon (dataConTyCon con) = addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
-  = addLoc (CaseAlt alt) $  lintBinders args $ \ args -> 
+  = lintBinders args $ \ args -> 
     
       do	{ addLoc (CasePat alt) $ do
 	    {    -- Check the pattern
