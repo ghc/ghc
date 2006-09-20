@@ -553,17 +553,15 @@ mkRecordSelId tycon field_label
     mk_alt data_con 
       = 	-- In the non-vanilla case, the pattern must bind type variables and
 		-- the context stuff; hence the arg_prefix binding below
-	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) rhs
+	  mkReboxingAlt uniqs' data_con (arg_prefix ++ arg_ids) rhs
       where
-	-- TODO: this is *not* right; Orig vs Rep tys
 	(arg_prefix, arg_ids)
-	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
-	   = ([], mkTemplateLocalsNum arg_base (dataConInstOrigArgTys data_con res_tys))
-	   | otherwise		-- The case pattern binds type variables, which are used
-				-- in the types of the arguments of the pattern
 	   = (ex_tvs ++ co_tvs ++ dict_vs, field_vs)
 
-        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat uniqs' data_con res_tys
+           -- get pattern binders with types appropriately instantiated
+        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat uniqs data_con res_tys
+        n_vars = (length ex_tvs + length co_tvs + length arg_vs)
+           -- separate dicts vars and field vars so we can associate field lbls
         (dict_vs, field_vs) = splitAt (length dc_theta) arg_vs
 
 	(_, pre_dc_theta, dc_arg_tys) = dataConSig data_con
@@ -584,12 +582,8 @@ mkRecordSelId tycon field_label
         perform_co id_co expr = ASSERT(isIdCoercion id_co) expr
 
           -- split the uniq_list into two
-        uniqs  = takeHalf uniq_list
-        uniqs' = takeHalf (drop 1 uniq_list)
-
-        takeHalf [] = []
-        takeHalf (h:_:t) = h:(takeHalf t)  
-        takeHalf (h:t) = [h]
+        uniqs  = uniq_list
+        uniqs' = drop n_vars uniqs
 
     	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` arg_ids) field_label
     	field_lbls  = dataConFieldLabels data_con
