@@ -35,6 +35,7 @@ import Type		( Type )
 import TcType		( tcIsTyVarTy, tcGetTyVar )
 import NameEnv		( extendNameEnvList, nameEnvElts )
 import InstEnv		( emptyInstEnv )
+import FamInstEnv	( emptyFamInstEnv )
 
 import Var		( setTyVarName )
 import VarSet		( emptyVarSet )
@@ -102,6 +103,7 @@ initTc hsc_env hsc_src mod do_this
 		tcg_type_env = hsc_global_type_env hsc_env,
 		tcg_type_env_var = type_env_var,
 		tcg_inst_env  = emptyInstEnv,
+		tcg_fam_inst_env  = emptyFamInstEnv,
 		tcg_inst_uses = dfuns_var,
 		tcg_th_used   = th_var,
 		tcg_exports  = emptyNameSet,

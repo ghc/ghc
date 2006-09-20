@@ -51,8 +51,10 @@ import HscTypes		( FixityEnv,
 import Packages		( PackageId )
 import Type		( Type, pprTyThingCategory )
 import TcType		( TcTyVarSet, TcType, TcThetaType, SkolemInfo, TvSubst,
-			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes, pprSkolInfo )
+			  TcPredType, TcKind, tcCmpPred, tcCmpType,
+			  tcCmpTypes, pprSkolInfo )
 import InstEnv		( Instance, InstEnv )
+import FamInstEnv	( FamInst, FamInstEnv )
 import IOEnv
 import RdrName		( GlobalRdrEnv, LocalRdrEnv )
 import Name		( Name )
@@ -153,8 +155,11 @@ data TcGblEnv
 		-- bound in this module when dealing with hi-boot recursions
 		-- Updated at intervals (e.g. after dealing with types and classes)
 	
-	tcg_inst_env :: InstEnv,	-- Instance envt for *home-package* modules
-					-- Includes the dfuns in tcg_insts
+	tcg_inst_env     :: InstEnv,	-- Instance envt for *home-package* 
+					-- modules; Includes the dfuns in 
+					-- tcg_insts
+	tcg_fam_inst_env :: FamInstEnv,	-- Ditto for family instances
+
 		-- Now a bunch of things about this module that are simply 
 		-- accumulated, but never consulted until the end.  
 		-- Nevertheless, it's convenient to accumulate them along 

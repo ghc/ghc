@@ -344,6 +344,7 @@ data SkolemInfo
 	-- The rest are for non-scoped skolems
   | ClsSkol Class	-- Bound at a class decl
   | InstSkol Id		-- Bound at an instance decl
+  | FamInstSkol TyCon	-- Bound at a family instance decl
   | PatSkol DataCon	-- An existential type variable bound by a pattern for
 	    SrcSpan	-- a data constructor with an existential type. E.g.
 			--	data T = forall a. Eq a => MkT a
@@ -486,8 +487,13 @@ pprSkolTvBinding tv
 pprSkolInfo :: SkolemInfo -> SDoc
 pprSkolInfo (SigSkol ctxt)   = ptext SLIT("is bound by") <+> pprUserTypeCtxt ctxt
 pprSkolInfo (ClsSkol cls)    = ptext SLIT("is bound by the class declaration for") <+> quotes (ppr cls)
-pprSkolInfo (InstSkol df)    = ptext SLIT("is bound by the instance declaration at") <+> ppr (getSrcLoc df)
-pprSkolInfo (ArrowSkol loc)  = ptext SLIT("is bound by the arrow form at") <+> ppr loc
+pprSkolInfo (InstSkol df)    = 
+  ptext SLIT("is bound by the instance declaration at") <+> ppr (getSrcLoc df)
+pprSkolInfo (FamInstSkol tc) = 
+  ptext SLIT("is bound by the family instance declaration at") <+> 
+  ppr (getSrcLoc tc)
+pprSkolInfo (ArrowSkol loc)  = 
+  ptext SLIT("is bound by the arrow form at") <+> ppr loc
 pprSkolInfo (PatSkol dc loc) = sep [ptext SLIT("is bound by the pattern for") <+> quotes (ppr dc),
            		            nest 2 (ptext SLIT("at") <+> ppr loc)]
 pprSkolInfo (GenSkol tvs ty loc) = sep [sep [ptext SLIT("is bound by the polymorphic type"), 

@@ -22,6 +22,8 @@ import TcType		( TcType, mkClassPred, tcSplitSigmaTy,
 import Inst		( newDictBndr, newDictBndrs, instToId, showLIE, 
 			  getOverlapFlag, tcExtendLocalInstEnv )
 import InstEnv		( mkLocalInstance, instanceDFunId )
+import FamInst		( tcExtendLocalFamInstEnv )
+import FamInstEnv	( extractFamInsts )
 import TcDeriv		( tcDeriving )
 import TcEnv		( InstInfo(..), InstBindings(..), 
 			  newDFunName, tcExtendIdEnv, tcExtendGlobalEnv
@@ -160,22 +162,19 @@ tcInstDecls1 tycl_decls inst_decls
 		--     types 
        ; let { idxty_decls = filter (isIdxTyDecl . unLoc) tycl_decls }
        ; local_info_tycons <- mappM tcLocalInstDecl1  inst_decls
-       ; idxty_info_tycons <- mappM tcIdxTyInstDeclTL idxty_decls
+       ; idx_tycons        <- mappM tcIdxTyInstDeclTL idxty_decls
 
        ; let { (local_infos,
-	        local_tycons)    = unzip local_info_tycons
-	     ; (idxty_infos, 
-	        idxty_tycons)    = unzip idxty_info_tycons
-	     ; local_idxty_info  = concat local_infos ++ catMaybes idxty_infos
-	     ; local_idxty_tycon = concat local_tycons ++ 
-				   catMaybes idxty_tycons
-	     ; clas_decls        = filter (isClassDecl.unLoc) tycl_decls 
-	     ; implicit_things   = concatMap implicitTyThings local_idxty_tycon
+	        at_tycons)     = unzip local_info_tycons
+	     ; local_info      = concat local_infos
+	     ; at_idx_tycon    = concat at_tycons ++ catMaybes idx_tycons
+	     ; clas_decls      = filter (isClassDecl.unLoc) tycl_decls 
+	     ; implicit_things = concatMap implicitTyThings at_idx_tycon
 	     }
 
-	        -- (2) Add the tycons of associated types and their implicit
+	        -- (2) Add the tycons of indexed types and their implicit
 	        --     tythings to the global environment
-       ; tcExtendGlobalEnv (local_idxty_tycon ++ implicit_things) $ do {
+       ; tcExtendGlobalEnv (at_idx_tycon ++ implicit_things) $ do {
 
 	        -- (3) Instances from generic class declarations
        ; generic_inst_info <- getGenericInstances clas_decls
@@ -184,8 +183,10 @@ tcInstDecls1 tycl_decls inst_decls
 	        -- of 
 		--   a) local instance decls
 		--   b) generic instances
-       ; addInsts local_idxty_info  $ do {
-       ; addInsts generic_inst_info $ do {
+		--   c) local family instance decls
+       ; addInsts local_info         $ do {
+       ; addInsts generic_inst_info  $ do {
+       ; addFamInsts at_idx_tycon    $ do {
 
 	        -- (4) Compute instances from "deriving" clauses; 
 		-- This stuff computes a context for the derived instance
@@ -195,19 +196,19 @@ tcInstDecls1 tycl_decls inst_decls
 
        ; gbl_env <- getGblEnv
        ; returnM (gbl_env, 
-		  generic_inst_info ++ deriv_inst_info ++ local_idxty_info,
+		  generic_inst_info ++ deriv_inst_info ++ local_info,
 		  deriv_binds) 
-    }}}}}
+    }}}}}}
   where
     -- Make sure that toplevel type instance are not for associated types.
-    -- !!!TODO: Need to perform this check for the InstInfo structures of type
-    --		functions, too.
+    -- !!!TODO: Need to perform this check for the TyThing of type functions,
+    --		too.
     tcIdxTyInstDeclTL ldecl@(L loc decl) =
-      do { (info, tything) <- tcIdxTyInstDecl ldecl
+      do { tything <- tcIdxTyInstDecl ldecl
 	 ; setSrcSpan loc $
 	     when (isAssocFamily tything) $
 	       addErr $ assocInClassErr (tcdName decl)
-	 ; return (info, tything)
+	 ; return tything
 	 }
     isAssocFamily (Just (ATyCon tycon)) =
       case tyConFamInst_maybe tycon of
@@ -223,6 +224,10 @@ assocInClassErr name =
 addInsts :: [InstInfo] -> TcM a -> TcM a
 addInsts infos thing_inside
   = tcExtendLocalInstEnv (map iSpec infos) thing_inside
+
+addFamInsts :: [TyThing] -> TcM a -> TcM a
+addFamInsts tycons thing_inside
+  = tcExtendLocalFamInstEnv (extractFamInsts tycons) thing_inside
 \end{code} 
 
 \begin{code}
@@ -249,13 +254,13 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; let (tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
 	
 	-- Next, process any associated types.
-	; idxty_info_tycons <- mappM tcIdxTyInstDecl ats
+	; idx_tycons <- mappM tcIdxTyInstDecl ats
 
 	-- Now, check the validity of the instance.
 	; (clas, inst_tys) <- checkValidInstHead tau
 	; checkValidInstance tyvars theta clas inst_tys
 	; checkValidAndMissingATs clas (tyvars, inst_tys) 
-				  (zip ats idxty_info_tycons)
+				  (zip ats idx_tycons)
 
 	-- Finally, construct the Core representation of the instance.
 	-- (This no longer includes the associated types.)
@@ -263,13 +268,10 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; overlap_flag <- getOverlapFlag
 	; let dfun           = mkDictFunId dfun_name tyvars theta clas inst_tys
 	      ispec          = mkLocalInstance dfun overlap_flag
-	      (idxty_infos, 
-	       idxty_tycons) = unzip idxty_info_tycons
 
 	; return ([InstInfo { iSpec  = ispec, 
-			      iBinds = VanillaInst binds uprags }] ++
-                  catMaybes idxty_infos,
-		  catMaybes idxty_tycons)
+			      iBinds = VanillaInst binds uprags }],
+		  catMaybes idx_tycons)
         }
   where
     -- We pass in the source form and the type checked form of the ATs.  We
@@ -278,8 +280,7 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
     checkValidAndMissingATs :: Class
 			    -> ([TyVar], [TcType])     -- instance types
 			    -> [(LTyClDecl Name,       -- source form of AT
-			         (Maybe InstInfo,      -- Core form for type
-				  Maybe TyThing))]     -- Core form for data
+			         Maybe TyThing)]       -- Core form of AT
 			    -> TcM ()
     checkValidAndMissingATs clas inst_tys ats
       = do { -- Issue a warning for each class AT that is not defined in this
@@ -297,11 +298,10 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	   ; mapM_ (checkIndexes clas inst_tys) ats
 	   }
 
-    checkIndexes _    _        (hsAT, (Nothing, Nothing))              = 
+    checkIndexes _    _        (hsAT, Nothing)             = 
       return ()	   -- skip, we already had an error here
-    checkIndexes clas inst_tys (hsAT, (Just _  , Nothing            )) = 
-      panic "do impl for AT syns"  -- !!!TODO: also call checkIndexes'
-    checkIndexes clas inst_tys (hsAT, (Nothing , Just (ATyCon tycon))) = 
+    checkIndexes clas inst_tys (hsAT, Just (ATyCon tycon)) = 
+-- !!!TODO: check that this does the Right Thing for indexed synonyms, too!
       checkIndexes' clas inst_tys hsAT 
 		    (tyConTyVars tycon, 
 		     snd . fromJust . tyConFamInst_maybe $ tycon)

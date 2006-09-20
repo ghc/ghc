@@ -27,8 +27,7 @@ import TcEnv		( TyThing(..),
 			  tcLookupLocated, tcLookupLocatedGlobal, 
 			  tcExtendGlobalEnv, tcExtendKindEnv,
 			  tcExtendKindEnvTvs, newFamInstTyConName,
-			  tcExtendRecEnv, tcLookupTyVar, InstInfo,
-			  tcLookupLocatedTyCon )
+			  tcExtendRecEnv, tcLookupTyVar, tcLookupLocatedTyCon )
 import TcTyDecls	( calcRecFlags, calcClassCycles, calcSynCycles )
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
@@ -260,11 +259,10 @@ they share a lot of kinding and type checking code with ordinary algebraic
 data types (and GADTs).
 
 \begin{code}
-tcIdxTyInstDecl :: LTyClDecl Name 
-		-> TcM (Maybe InstInfo, Maybe TyThing)	-- Nothing if error
+tcIdxTyInstDecl :: LTyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
 tcIdxTyInstDecl (L loc decl)
   =	-- Prime error recovery, set source location
-    recoverM (returnM (Nothing, Nothing))	$
+    recoverM (returnM Nothing)		        $
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
     do { -- indexed data types require -findexed-types and can't be in an
@@ -278,8 +276,7 @@ tcIdxTyInstDecl (L loc decl)
        ; tcIdxTyInstDecl1 decl
        }
 
-tcIdxTyInstDecl1 :: TyClDecl Name 
-		 -> TcM (Maybe InstInfo, Maybe TyThing)	-- Nothing if error
+tcIdxTyInstDecl1 :: TyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
 
 tcIdxTyInstDecl1 (decl@TySynonym {})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
@@ -295,9 +292,8 @@ tcIdxTyInstDecl1 (decl@TySynonym {})
        ; t_typats <- mappM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
 
-         -- construct type rewrite rule
          -- !!!of the form: forall t_tvs. (tcdLName decl) t_typats = t_rhs
-       ; return (Nothing, Nothing) -- !!!TODO: need InstInfo for eq axioms
+       ; return Nothing     -- !!!TODO: need TyThing for indexed synonym
        }}
       
 tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
@@ -350,7 +346,7 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	     })
 
          -- construct result
-       ; return (Nothing, Just (ATyCon tycon))
+       ; return $ Just (ATyCon tycon)
        }}
        where
 	 h98_syntax = case cons of 	-- All constructors have same shape
