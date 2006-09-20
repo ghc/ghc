@@ -27,7 +27,8 @@ import TcEnv		( TyThing(..),
 			  tcLookupLocated, tcLookupLocatedGlobal, 
 			  tcExtendGlobalEnv, tcExtendKindEnv,
 			  tcExtendKindEnvTvs, newFamInstTyConName,
-			  tcExtendRecEnv, tcLookupTyVar, InstInfo )
+			  tcExtendRecEnv, tcLookupTyVar, InstInfo,
+			  tcLookupLocatedTyCon )
 import TcTyDecls	( calcRecFlags, calcClassCycles, calcSynCycles )
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
@@ -371,10 +372,8 @@ kcIdxTyPats :: TyClDecl Name
 	    -> TcM a
 kcIdxTyPats decl thing_inside
   = kcHsTyVars (tcdTyVars decl) $ \tvs -> 
-    do { tc_ty_thing <- tcLookupLocated (tcdLName decl)
-       ; let { family = case tc_ty_thing of 
-		          AGlobal (ATyCon family) -> family
-             ; (kinds, resKind) = splitKindFunTys (tyConKind family)
+    do { family <- tcLookupLocatedTyCon (tcdLName decl)
+       ; let { (kinds, resKind) = splitKindFunTys (tyConKind family)
 	     ; hs_typats	= fromJust $ tcdTyPats decl }
 
          -- we may not have more parameters than the kind indicates
