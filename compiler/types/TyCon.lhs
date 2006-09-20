@@ -47,7 +47,7 @@ module TyCon(
 	tyConStupidTheta,
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
-	isFamInstTyCon, tyConFamily_maybe,
+	isFamInstTyCon, tyConFamInst_maybe, tyConFamilyCoercion_maybe,
 	synTyConDefn, synTyConRhs, synTyConType, synTyConResKind,
 	tyConExtName,		-- External name for foreign types
 
@@ -237,9 +237,24 @@ visibleDataCons OpenNewTyCon		      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 
-data AlgTyConParent = NoParentTyCon		-- ordinary data type
-		    | ClassTyCon    Class	-- class dictionary
-		    | FamilyTyCon   TyCon	-- instance of type family
+-- Both type classes as well as data/newtype family instances imply implicit
+-- type constructors.  These implicit type constructors refer to their parent
+-- structure (ie, the class or family from which they derive) using a type of
+-- the following form.
+--
+data AlgTyConParent = -- An ordinary type constructor has no parent.
+		      NoParentTyCon
+
+		      -- Type constructors representing a class dictionary.
+		    | ClassTyCon    Class	
+
+		      -- Type constructors representing an instances of a type
+		      -- family.
+		    | FamilyTyCon   TyCon	-- the type family
+				    [Type]	-- instance types
+				    TyCon	-- a *coercion* identifying
+						-- the representation type
+						-- with the type instance
 
 data SynTyConRhs
   = OpenSynTyCon Kind	-- Type family: *result* kind given
@@ -754,12 +769,20 @@ tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas}) = Just clas
 tyConClass_maybe ther_tycon				    = Nothing
 
 isFamInstTyCon :: TyCon -> Bool
-isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _}) = True
-isFamInstTyCon other_tycon			        = False
+isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _ _ _}) = True
+isFamInstTyCon other_tycon			            = False
 
-tyConFamily_maybe :: TyCon -> Maybe TyCon
-tyConFamily_maybe (AlgTyCon {algTcParent = FamilyTyCon fam}) = Just fam
-tyConFamily_maybe ther_tycon				     = Nothing
+tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
+tyConFamInst_maybe (AlgTyCon {algTcParent = FamilyTyCon fam instTys _}) = 
+  Just (fam, instTys)
+tyConFamInst_maybe ther_tycon				                = 
+  Nothing
+
+tyConFamilyCoercion_maybe :: TyCon -> Maybe TyCon
+tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = FamilyTyCon _ _ coe}) = 
+  Just coe
+tyConFamilyCoercion_maybe ther_tycon 				         = 
+  Nothing
 \end{code}
 
 

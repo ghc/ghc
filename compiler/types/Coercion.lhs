@@ -22,7 +22,7 @@ module Coercion (
         mkSymCoercion, mkTransCoercion,
         mkLeftCoercion, mkRightCoercion, mkInstCoercion, mkAppCoercion,
         mkForAllCoercion, mkFunCoercion, mkInstsCoercion, mkUnsafeCoercion,
-        mkNewTypeCoercion, mkAppsCoercion,
+        mkNewTypeCoercion, mkDataInstCoercion, mkAppsCoercion,
 
         splitNewTypeRepCo_maybe, decomposeCo,
 
@@ -323,7 +323,31 @@ mkNewTypeCoercion name tycon tvs rhs_ty
     rhs_eta
       | (ty, ty_args) <- splitAppTys rhs_ty
       = mkAppTys ty (reverse (drop n_eta_tys (reverse ty_args)))
- 
+
+-- Coercion identifying a data/newtype representation type and its family
+-- instance.  It has the form `Co tvs :: F ts :=: R tvs', where `Co' is the
+-- coercion tycon built here, `F' the family tycon and `R' the (derived)
+-- representation tycon.
+--
+mkDataInstCoercion :: Name	-- unique name for the coercion tycon
+		   -> [TyVar]	-- type parameters of the coercion (`tvs')
+		   -> TyCon	-- family tycon (`F')
+		   -> [Type]	-- type instance (`ts')
+		   -> TyCon	-- representation tycon (`R')
+		   -> TyCon	-- => coercion tycon (`Co')
+mkDataInstCoercion name tvs family instTys rep_tycon
+  = mkCoercionTyCon name coArity (mkKindingFun rule)
+  where
+    coArity = length tvs
+
+    rule args = (substTyWith tvs tys $		-- with sigma = [tys/tvs],
+		   TyConApp family instTys,	--     sigma (F ts)
+		 TyConApp rep_tycon instTys,	-- :=: R tys
+		 rest)				-- surplus arguments
+      where
+        tys  = take coArity args
+        rest = drop coArity args
+
 --------------------------------------
 -- Coercion Type Constructors...
 

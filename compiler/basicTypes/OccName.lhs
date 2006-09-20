@@ -27,12 +27,13 @@ module OccName (
 	setOccNameSpace,
 
 	-- ** Derived OccNames
-	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
-        mkNewTyCoOcc,
+	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc,
+	mkDerivedTyConOcc, mkNewTyCoOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
-	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc,
+	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
+	mkInstTyCoOcc, 
 
 	-- ** Deconstruction
 	occNameFS, occNameString, occNameSpace, 
@@ -477,6 +478,26 @@ mkLocalOcc uniq occ
 	-- that need encoding (e.g. 'z'!)
 \end{code}
 
+\begin{code}
+
+-- Derive a name for the representation type constructor of a data/newtype
+-- instance.
+--
+mkInstTyTcOcc :: Unique 		-- Unique
+	      -> OccName		-- Local name (e.g. "Map")
+	      -> OccName		-- Nice unique version (":T23Map")
+mkInstTyTcOcc uniq occ
+   = mk_deriv varName (":T" ++ show uniq) (occNameString occ)
+
+-- Derive a name for the coercion of a data/newtype instance.
+--
+mkInstTyCoOcc :: Unique 		-- Unique
+	      -> OccName		-- Local name (e.g. "Map")
+	      -> OccName		-- Nice unique version ("Co23Map")
+mkInstTyCoOcc uniq occ
+   = mk_deriv varName ("Co" ++ show uniq) (occNameString occ)
+
+\end{code}
 
 \begin{code}
 mkDFunOcc :: String		-- Typically the class and type glommed together e.g. "OrdMaybe"

@@ -191,11 +191,11 @@ import TyCon		( TyCon, AlgTyConRhs(..), SynTyConRhs(..),
 			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
 			  tyConHasGenerics, synTyConRhs, isGadtSyntaxTyCon,
 			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName,
-			  tyConFamily_maybe )
+			  tyConFamInst_maybe )
 import DataCon		( dataConName, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, dataConUnivTyVars,
 			  dataConExTyVars, dataConEqSpec, dataConTheta,
-			  dataConOrigArgTys, dataConInstTys ) 
+			  dataConOrigArgTys ) 
 import Type		( TyThing(..), splitForAllTys, funResultTy )
 import TcType		( deNoteType )
 import TysPrim		( alphaTyVars )
@@ -1036,7 +1036,7 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
 		ifGeneric = tyConHasGenerics tycon,
-		ifFamily  = fmap (toIfaceTyCon ext) $ tyConFamily_maybe tycon }
+		ifFamInst = famInstToIface $ tyConFamInst_maybe tycon }
 
   | isForeignTyCon tycon
   = IfaceForeign { ifName    = getOccName tycon,
@@ -1051,7 +1051,7 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 		ifGadtSyntax = False,
 		ifGeneric = False,
 		ifRec     = NonRecursive,
-		ifFamily  = Nothing }
+		ifFamInst = Nothing }
 
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where
@@ -1083,11 +1083,13 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 				       (dataConOrigArgTys data_con),
 		    ifConFields  = map getOccName 
 				       (dataConFieldLabels data_con),
-		    ifConStricts = dataConStrictMarks data_con,
-		    ifConInstTys = fmap (map (toIfaceType ext)) 
-					(dataConInstTys data_con) }
+		    ifConStricts = dataConStrictMarks data_con }
 
     to_eq_spec spec = [(getOccName tv, toIfaceType ext ty) | (tv,ty) <- spec]
+
+    famInstToIface Nothing                    = Nothing
+    famInstToIface (Just (famTyCon, instTys)) = 
+      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys)
 
 tyThingToIfaceDecl ext (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier

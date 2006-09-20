@@ -232,7 +232,6 @@ pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
 		[]	-- No equality spec
 		[]	-- No theta
 		arg_tys tycon
-		Nothing -- not a data instance
 		[]	-- No stupid theta
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
 		

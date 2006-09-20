@@ -311,7 +311,7 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
-					      tycon t_tvs (Just t_typats)))
+					      tycon t_tvs))
 				  k_cons
 	     ; tc_rhs <-
 		 case new_or_data of
@@ -320,7 +320,7 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			    ASSERT( isSingleton data_cons )
 			    mkNewTyConRhs tc_name tycon (head data_cons)
 	     ; buildAlgTyCon tc_name t_tvs stupid_theta tc_rhs Recursive
-			     False h98_syntax (Just family)
+			     False h98_syntax (Just (family, t_typats))
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
@@ -329,7 +329,6 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	     })
 
          -- construct result
-	 -- !!!TODO: missing eq axiom
        ; return (Nothing, Just (ATyCon tycon))
        }}
        where
@@ -679,7 +678,7 @@ tcTyClDecl1 calc_isrec
 
   ; tycon <- fixM (\ tycon -> do 
 	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
-						 tycon final_tvs Nothing)) 
+						 tycon final_tvs)) 
 			     cons
 	; tc_rhs <-
 	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
@@ -737,11 +736,10 @@ tcTyClDecl1 calc_isrec
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> NewOrData 
 	  -> TyCon -> [TyVar] 
-	  -> Maybe [Type]       -- Just ts <=> type patterns of instance type
 	  -> ConDecl Name 
 	  -> TcM DataCon
 
-tcConDecl unbox_strict NewType tycon tc_tvs mb_typats	-- Newtypes
+tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
 	  (ConDecl name _ ex_tvs ex_ctxt details ResTyH98)
   = do	{ let tc_datacon field_lbls arg_ty
 		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
@@ -751,8 +749,7 @@ tcConDecl unbox_strict NewType tycon tc_tvs mb_typats	-- Newtypes
 			   	    tc_tvs []  -- No existentials
 				    [] []      -- No equalities, predicates
 				    [arg_ty']
-				    tycon 
-				    mb_typats}
+				    tycon }
 
 		-- Check that a newtype has no existential stuff
 	; checkTc (null ex_tvs && null (unLoc ex_ctxt)) (newtypeExError name)
@@ -765,7 +762,7 @@ tcConDecl unbox_strict NewType tycon tc_tvs mb_typats	-- Newtypes
 			-- Check that the constructor has exactly one field
 	}
 
-tcConDecl unbox_strict DataType tycon tc_tvs mb_typats	-- Data types
+tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty)
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
@@ -778,8 +775,7 @@ tcConDecl unbox_strict DataType tycon tc_tvs mb_typats	-- Data types
     		    (argStrictness unbox_strict tycon bangs arg_tys)
     		    (map unLoc field_lbls)
     		    univ_tvs ex_tvs eq_preds ctxt' arg_tys
-		    data_tc 
-		    mb_typats}
+		    data_tc }
 		-- NB:	we put data_tc, the type constructor gotten from the
 		--	constructor type signature into the data constructor;
 		--	that way checkValidDataCon can complain if it's wrong.

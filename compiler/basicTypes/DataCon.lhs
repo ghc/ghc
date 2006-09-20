@@ -11,7 +11,6 @@ module DataCon (
 	dataConRepType, dataConSig, dataConFullSig,
 	dataConName, dataConTag, dataConTyCon, dataConUserType,
 	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, dataConResTys,
-	dataConInstTys,
 	dataConEqSpec, eqSpecPreds, dataConTheta, dataConStupidTheta, 
 	dataConInstArgTys, dataConOrigArgTys, 
 	dataConInstOrigArgTys, dataConRepArgTys, 
@@ -39,7 +38,7 @@ import Type		( Type, ThetaType,
 import Coercion		( isEqPred, mkEqPred )
 import TyCon		( TyCon, FieldLabel, tyConDataCons, 
 			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon,
-                          isNewTyCon, isRecursiveTyCon, tyConFamily_maybe )
+                          isNewTyCon, isRecursiveTyCon, tyConFamInst_maybe )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique, mkSysTvName, mkSystemName )
 import Var		( TyVar, CoVar, Id, mkTyVar, tyVarKind, setVarUnique,
@@ -336,13 +335,9 @@ data DataCon
 	-- An entirely separate wrapper function is built in TcTyDecls
 	dcIds :: DataConIds,
 
-	dcInfix :: Bool,	-- True <=> declared infix
+	dcInfix :: Bool		-- True <=> declared infix
 				-- Used for Template Haskell and 'deriving' only
 				-- The actual fixity is stored elsewhere
-
-        dcInstTys :: Maybe [Type]  -- If this data constructor is part of a
-				   -- data instance, then these are the type
-				   -- patterns of the instance.
   }
 
 data DataConIds
@@ -438,7 +433,6 @@ mkDataCon :: Name
 	  -> [TyVar] -> [TyVar] 
 	  -> [(TyVar,Type)] -> ThetaType
 	  -> [Type] -> TyCon
-	  -> Maybe [Type]
 	  -> ThetaType -> DataConIds
 	  -> DataCon
   -- Can get the tag from the TyCon
@@ -449,7 +443,6 @@ mkDataCon name declared_infix
 	  univ_tvs ex_tvs 
 	  eq_spec theta
 	  orig_arg_tys tycon
-	  mb_typats
 	  stupid_theta ids
   = ASSERT( not (any isEqPred theta) )
 	-- We don't currently allow any equality predicates on
@@ -469,8 +462,7 @@ mkDataCon name declared_infix
 		  dcStrictMarks = arg_stricts, 
 		  dcRepStrictness = rep_arg_stricts,
 		  dcFields = fields, dcTag = tag, dcRepType = ty,
-		  dcIds = ids,
-		  dcInstTys = mb_typats }
+		  dcIds = ids }
 
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
@@ -609,9 +601,6 @@ dataConResTys dc = [substTyVar env tv | tv <- dcUnivTyVars dc]
   where
     env = mkTopTvSubst (dcEqSpec dc)
 
-dataConInstTys :: DataCon -> Maybe [Type]
-dataConInstTys = dcInstTys
-
 dataConUserType :: DataCon -> Type
 -- The user-declared type of the data constructor
 -- in the nice-to-read form 
@@ -623,18 +612,13 @@ dataConUserType :: DataCon -> Type
 dataConUserType  (MkData { dcUnivTyVars = univ_tvs, 
 			   dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
 			   dcTheta = theta, dcOrigArgTys = arg_tys,
-			   dcTyCon = tycon, dcInstTys = mb_insttys })
+			   dcTyCon = tycon })
   = mkForAllTys ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs) $
     mkFunTys (mkPredTys theta) $
     mkFunTys arg_tys $
-    case mb_insttys of
-      Nothing      -> mkTyConApp tycon (map (substTyVar subst) univ_tvs)
-      Just insttys -> mkTyConApp ftycon insttys	    -- data instance
-        where
-	  ftycon = case tyConFamily_maybe tycon of
-		     Just ftycon -> ftycon
-		     Nothing     -> panic err
-          err    = "dataConUserType: type patterns without family tycon"
+    case tyConFamInst_maybe tycon of
+      Nothing             -> mkTyConApp tycon (map (substTyVar subst) univ_tvs)
+      Just (ftc, insttys) -> mkTyConApp ftc insttys	    -- data instance
   where
     subst = mkTopTvSubst eq_spec
 

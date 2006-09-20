@@ -85,7 +85,9 @@ data IfaceDecl
     						-- been compiled with
     						-- different flags to the
     						-- current compilation unit 
-                ifFamily     :: Maybe IfaceTyCon-- Just fam <=> instance of fam
+                ifFamInst    :: Maybe           -- Just _ <=> instance of fam
+				  (IfaceTyCon,  --   Family tycon
+				   [IfaceType]) --   Instance types
     }
 
   | IfaceSyn  {	ifName    :: OccName,		-- Type constructor
@@ -137,9 +139,8 @@ data IfaceConDecl
 	ifConCtxt    :: IfaceContext,		-- Non-stupid context
 	ifConArgTys  :: [IfaceType],		-- Arg types
 	ifConFields  :: [OccName],		-- ...ditto... (field labels)
-	ifConStricts :: [StrictnessMark],	-- Empty (meaning all lazy),
+	ifConStricts :: [StrictnessMark]}	-- Empty (meaning all lazy),
 						-- or 1-1 corresp with arg tys
-        ifConInstTys :: Maybe [IfaceType] }     -- instance types
 
 data IfaceInst 
   = IfaceInst { ifInstCls  :: IfaceExtName,		-- See comments with
@@ -258,10 +259,10 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 			 ifTyVars = tyvars, ifCons = condecls, 
-			 ifRec = isrec, ifFamily = mbFamily})
+			 ifRec = isrec, ifFamInst = mbFamInst})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       4 (vcat [pprRec isrec, pprGen gen, pprFamily mbFamily, 
-	        pp_condecls tycon condecls])
+       4 (vcat [pprRec isrec, pprGen gen, pp_condecls tycon condecls,
+	        pprFamily mbFamInst])
   where
     pp_nd = case condecls of
 		IfAbstractTyCon -> ptext SLIT("data")
@@ -282,15 +283,17 @@ pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
 pprGen True  = ptext SLIT("Generics: yes")
 pprGen False = ptext SLIT("Generics: no")
 
-pprFamily Nothing    = ptext SLIT("DataFamily: none")
-pprFamily (Just fam) = ptext SLIT("DataFamily:") <+> ppr fam
+pprFamily Nothing           = ptext SLIT("FamilyInstance: none")
+pprFamily (Just (fam, tys)) = ptext SLIT("FamilyInstance:") <+> 
+			      ppr fam <+> hsep (map ppr tys)
 
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
 
 pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
-pprIfaceDeclHead context thing tyvars 
-  = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing), pprIfaceTvBndrs tyvars]
+pprIfaceDeclHead context thing tyvars
+  = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing), 
+	  pprIfaceTvBndrs tyvars]
 
 pp_condecls tc IfAbstractTyCon  = ptext SLIT("{- abstract -}")
 pp_condecls tc IfOpenNewTyCon   = empty
@@ -542,7 +545,7 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	  ifRec d1     == ifRec   d2 && 
 	  ifGadtSyntax d1 == ifGadtSyntax   d2 && 
 	  ifGeneric d1 == ifGeneric d2) &&&
-    ifFamily d1 `eqIfTc_mb` ifFamily d2 &&&
+    ifFamInst d1 `eqIfTc_fam` ifFamInst d2 &&&
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
 	    eq_ifContext env (ifCtxt d1) (ifCtxt d2) &&& 
     	    eq_hsCD env (ifCons d1) (ifCons d2) 
@@ -551,9 +554,10 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	-- over the constructors (any more), but they do scope
 	-- over the stupid context in the IfaceConDecls
   where
-    Nothing     `eqIfTc_mb` Nothing     = Equal
-    (Just fam1) `eqIfTc_mb` (Just fam2) = fam1 `eqIfTc` fam2
-    _		`eqIfTc_mb` _           = NotEqual
+    Nothing             `eqIfTc_fam` Nothing             = Equal
+    (Just (fam1, tys1)) `eqIfTc_fam` (Just (fam2, tys2)) = 
+      fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2
+    _		        `eqIfTc_fam` _                   = NotEqual
 
 eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
   = bool (ifName d1 == ifName d2) &&&

@@ -62,7 +62,8 @@ import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon,
-                          isRecursiveTyCon, tyConFamily_maybe, newTyConCo )
+                          isRecursiveTyCon, isFamInstTyCon,
+                          tyConFamInst_maybe, newTyConCo ) 
 import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var, setIdType )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
@@ -71,7 +72,7 @@ import OccName		( mkOccNameFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, DataConIds(..), dataConTyCon,
-			  dataConUnivTyVars, dataConInstTys,
+			  dataConUnivTyVars, 
 			  dataConFieldLabels, dataConRepArity, dataConResTys,
 			  dataConRepArgTys, dataConRepType, dataConFullSig,
 			  dataConStrictMarks, dataConExStricts, 
@@ -189,6 +190,9 @@ Notice that
   Making an explicit case expression allows the simplifier to eliminate
   it in the (common) case where the constructor arg is already evaluated.
 
+In the case of data instances, the wrapper also applies the coercion turning
+the representation type into the family instance type to cast the result of
+the wrapper.
 
 \begin{code}
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
@@ -198,7 +202,7 @@ mkDataConIds wrap_name wkr_name data_con
 
   | any isMarkedStrict all_strict_marks		-- Algebraic, needs wrapper
     || not (null eq_spec)
-    || isInst
+    || isFamInstTyCon tycon
   = DCIds (Just alg_wrap_id) wrk_id
 
   | otherwise					-- Algebraic, no wrapper
@@ -207,13 +211,6 @@ mkDataConIds wrap_name wkr_name data_con
     (univ_tvs, ex_tvs, eq_spec, 
      theta, orig_arg_tys)          = dataConFullSig data_con
     tycon                          = dataConTyCon data_con
-    (isInst, instTys, familyTyCon) = 
-      case dataConInstTys data_con of
-        Nothing      -> (False, []     , familyTyCon)
-	Just instTys -> (True , instTys, familyTyCon)
-	  where
-	    familyTyCon = fromJust $ tyConFamily_maybe tycon
-			  -- this is defined whenever `isInst'
 
 	----------- Wrapper --------------
 	-- We used to include the stupid theta in the wrapper's args
@@ -223,10 +220,13 @@ mkDataConIds wrap_name wkr_name data_con
     subst	   = mkTopTvSubst eq_spec
     dict_tys       = mkPredTys theta
     result_ty_args = map (substTyVar subst) univ_tvs
-    familyArgs     = map (substTy    subst) instTys
-    result_ty      = if isInst
-		     then mkTyConApp familyTyCon familyArgs  -- instance con
-		     else mkTyConApp tycon result_ty_args    -- ordinary con
+    result_ty      = case tyConFamInst_maybe tycon of
+		         -- ordinary constructor
+		       Nothing            -> mkTyConApp tycon result_ty_args
+		         -- family instance constructor
+		       Just (familyTyCon, 
+			     instTys)     -> 
+		         mkTyConApp familyTyCon (map (substTy subst) instTys)
     wrap_ty        = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
 	             mkFunTys orig_arg_tys $ result_ty
 	-- NB: watch out here if you allow user-written equality 
@@ -316,10 +316,11 @@ mkDataConIds wrap_name wkr_name data_con
 		    (zip (dict_args ++ id_args) all_strict_marks)
 		    i3 []
 
-    con_app _ rep_ids = Var wrk_id `mkTyApps`  result_ty_args
-				   `mkVarApps` ex_tvs
-				   `mkTyApps`  map snd eq_spec
-				   `mkVarApps` reverse rep_ids
+    con_app _ rep_ids = wrapFamInstBody tycon result_ty_args $
+			  Var wrk_id `mkTyApps`  result_ty_args
+				     `mkVarApps` ex_tvs
+				     `mkTyApps`  map snd eq_spec
+				     `mkVarApps` reverse rep_ids
 
     (dict_args,i2) = mkLocals 1  dict_tys
     (id_args,i3)   = mkLocals i2 orig_arg_tys
@@ -358,6 +359,19 @@ mAX_CPR_SIZE = 10
 mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
 	       where
 		 n = length tys
+
+-- If the type constructor is a representation type of a data instance, wrap
+-- the expression into a cast adjusting the expression type, which is an
+-- instance of the representation type, to the corresponding instance of the
+-- family instance type.
+--
+wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+wrapFamInstBody tycon args result_expr
+  | Just (co_con, _) <- tyConFamInst_maybe tycon
+  = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
+  | otherwise
+  = result_expr
+
 \end{code}
 
 

@@ -25,7 +25,8 @@ import BasicTypes	( RecFlag, StrictnessMark(..) )
 import Name		( Name )
 import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc,
 			  mkClassTyConOcc, mkClassDataConOcc,
-			  mkSuperDictSelOcc, mkNewTyCoOcc, mkLocalOcc ) 
+			  mkSuperDictSelOcc, mkNewTyCoOcc, mkInstTyTcOcc,
+			  mkInstTyCoOcc ) 
 import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
 import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons,
@@ -41,7 +42,7 @@ import Type		( mkArrowKinds, liftedTypeKind, typeKind,
 			  TyThing(..), 
 			  substTyWith, zipTopTvSubst, substTheta, mkForAllTys,
                           mkTyConApp, mkTyVarTy )
-import Coercion         ( mkNewTypeCoercion )
+import Coercion         ( mkNewTypeCoercion, mkDataInstCoercion )
 import Outputable
 import List		( nub )
 
@@ -68,27 +69,55 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> RecFlag
 	      -> Bool			-- True <=> want generics functions
 	      -> Bool			-- True <=> was declared in GADT syntax
-	      -> Maybe TyCon		-- Just family <=> instance of `family'
+	      -> Maybe (TyCon, [Type])	-- Just (family, tys) 
+					-- <=> instance of `family' at `tys'
 	      -> TcRnIf m n TyCon
 
 buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
 	      mb_family
-  = do	{ -- In case of a type instance, we need to invent a new name for the
-	  -- instance type, as `tc_name' is the family name.
-	; uniq <- newUnique
-	; (final_name, parent) <- 
-	    case mb_family of
-	      Nothing     -> return (tc_name, NoParentTyCon)
-	      Just family -> 
-	        do { final_name <- newImplicitBinder tc_name (mkLocalOcc uniq)
-		   ; return (final_name, FamilyTyCon family)
-		   }
-	; let { tycon = mkAlgTyCon final_name kind tvs stupid_theta rhs
-				   fields parent is_rec want_generics gadt_syn
-	      ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
-	      ; fields  = mkTyConSelIds tycon rhs
-	  }
-	; return tycon }
+  = do { -- We need to tie a knot as the coercion of a data instance depends
+	 -- on the instance representation tycon and vice versa.
+       ; tycon <- fixM (\ tycon_rec -> do 
+	 { (final_name, parent) <- maybeComputeFamilyInfo mb_family tycon_rec
+	 ; let { tycon = mkAlgTyCon final_name kind tvs stupid_theta rhs
+				    fields parent is_rec want_generics gadt_syn
+	       ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
+	       ; fields  = mkTyConSelIds tycon rhs
+	       }
+         ; return tycon
+         })
+       ; return tycon 
+       }
+  where
+    -- If a family tycon with instance types is given, the current tycon is an
+    -- instance of that family and we have to perform three extra tasks:
+    --
+    -- (1) The instance tycon (representing the family at a particular type
+    --     instance) need to get a new, derived name - we may not reuse the
+    --     family name.
+    -- (2) Create a coercion that identifies the family instance type and the
+    --     representation type from Step (1); ie, it is of the form 
+    --	   `Co tvs :: F ts :=: R tvs', where `Co' is the name of the coercion,
+    --	   `F' the family tycon and `R' the (derived) representation tycon.
+    -- (3) Produce a `AlgTyConParent' value containing the parent and coercion
+    --     information.
+    --
+    maybeComputeFamilyInfo Nothing                  rep_tycon = 
+      return (tc_name, NoParentTyCon)
+    maybeComputeFamilyInfo (Just (family, instTys)) rep_tycon =
+      do { -- (1) New, derived name for the instance tycon
+	 ; uniq <- newUnique
+	 ; final_name <- newImplicitBinder tc_name (mkInstTyTcOcc uniq)
+
+	   -- (2) Create the coercion.
+	 ; co_tycon_name <- newImplicitBinder tc_name (mkInstTyCoOcc uniq)
+	 ; let co_tycon = mkDataInstCoercion co_tycon_name tvs
+					     family instTys rep_tycon
+
+	   -- (3) Produce parent information.
+	 ; return (final_name, FamilyTyCon family instTys co_tycon)
+	 }
+    
 
 ------------------------------------------------------
 mkAbstractTyConRhs :: AlgTyConRhs
@@ -190,14 +219,13 @@ buildDataCon :: Name -> Bool
 	    -> ThetaType		-- Does not include the "stupid theta"
 					-- or the GADT equalities
 	    -> [Type] -> TyCon
-	    -> Maybe [Type]		-- Just ts <=> type pats of inst type
 	    -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
 buildDataCon src_name declared_infix arg_stricts field_lbls
-	     univ_tvs ex_tvs eq_spec ctxt arg_tys tycon mb_typats
+	     univ_tvs ex_tvs eq_spec ctxt arg_tys tycon
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
 	-- This last one takes the name of the data constructor in the source
@@ -209,7 +237,7 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 		data_con = mkDataCon src_name declared_infix
 				     arg_stricts field_lbls
 				     univ_tvs ex_tvs eq_spec ctxt
-				     arg_tys tycon mb_typats
+				     arg_tys tycon
 				     stupid_ctxt dc_ids
 		dc_ids = mkDataConIds wrap_name work_name data_con
 
@@ -286,7 +314,7 @@ buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
 				   tvs [{- no existentials -}]
                                    [{- No equalities -}] [{-No context-}] 
                                    dict_component_tys 
-				   rec_tycon Nothing
+				   rec_tycon
 
 	; rhs <- case dict_component_tys of
 			    [rep_ty] -> mkNewTyConRhs tycon_name rec_tycon dict_con
