@@ -47,6 +47,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs, coreEqType,
+                          PredType(..),
 			  mkTopTvSubst, substTyVar )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
                           splitNewTypeRepCo_maybe, isEqPred )
@@ -554,7 +555,7 @@ mkRecordSelId tycon field_label
     mk_alt data_con 
       = 	-- In the non-vanilla case, the pattern must bind type variables and
 		-- the context stuff; hence the arg_prefix binding below
-	  pprTrace "mkReboxingAlt" (ppr data_con <+> ppr (arg_prefix ++ arg_ids)) $ mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) (Var the_arg_id)
+	  mkReboxingAlt uniqs data_con (arg_prefix ++ arg_ids) (Var the_arg_id)
       where
 	(arg_prefix, arg_ids)
 	   | isVanillaDataCon data_con	 	-- Instantiate from commmon base
@@ -566,7 +567,12 @@ mkRecordSelId tycon field_label
 
 	(pre_dc_tvs, pre_dc_theta, dc_arg_tys) = dataConSig data_con
            -- again we need to pull the EqPreds out of dc_theta, into dc_tvs
-        dc_eqvars = map (mkWildCoVar . mkPredTy) (filter isEqPred pre_dc_theta)
+        dc_eqvars = map (mkWildCoVar . mkPredTy . fixEqPred) (filter isEqPred pre_dc_theta)
+          -- The type of the record selector Id does not contain the univ tvs
+          -- but rather their substitution according to the eq_spec.  Therefore
+          -- the coercion arguments bound in the case alternative will just
+          -- have reflexive coercion kinds
+        fixEqPred (EqPred ty1 ty2) = EqPred ty2 ty2
         dc_tvs    = drop (length (dataConUnivTyVars data_con)) pre_dc_tvs ++ dc_eqvars
         dc_theta  = filter (not . isEqPred) pre_dc_theta
 	arg_base' = arg_base + length dc_theta

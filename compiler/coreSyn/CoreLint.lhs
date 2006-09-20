@@ -509,8 +509,7 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 		 -- NB: args must be in scope here so that the lintCoreArgs line works.
 	         -- NB: relies on existential type args coming *after* ordinary type args
 
-	  ; con_result_ty <-  
-                               lintCoreArgs (dataConRepType con)
+	  ; con_result_ty <- lintCoreArgs (dataConRepType con)
 					        (map Type tycon_arg_tys ++ varsToCoreExprs args)
 	  ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
  	  }

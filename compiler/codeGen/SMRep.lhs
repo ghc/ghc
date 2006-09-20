@@ -158,13 +158,13 @@ primRepHint FloatRep	= FloatHint
 primRepHint DoubleRep	= FloatHint
 
 idCgRep :: Id -> CgRep
-idCgRep = typeCgRep . idType
+idCgRep x = typeCgRep . idType $ x
 
 tyConCgRep :: TyCon -> CgRep
 tyConCgRep = primRepToCgRep . tyConPrimRep
 
 typeCgRep :: Type -> CgRep
-typeCgRep = primRepToCgRep . typePrimRep
+typeCgRep = primRepToCgRep . typePrimRep 
 
 typeHint :: Type -> MachHint
 typeHint = primRepHint . typePrimRep
