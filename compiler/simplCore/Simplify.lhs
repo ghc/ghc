@@ -1553,7 +1553,10 @@ simplDefault env case_bndr' imposs_cons cont (Just rhs)
 
 	[con] -> 	-- It matches exactly one constructor, so fill it in
 		 do { tick (FillInCaseDefault case_bndr')
-		    ; con_alt <- mkDataConAlt con inst_tys rhs
+                    ; us <- getUniquesSmpl
+                    ; let (ex_tvs, co_tvs, arg_ids) =
+                              dataConInstPat us con inst_tys
+                    ; let con_alt = (DataAlt con, ex_tvs ++ co_tvs ++ arg_ids, rhs)
 		    ; Just (_, alt') <- simplAlt env [] case_bndr' cont con_alt
 			-- The simplAlt must succeed with Just because we have
 			-- already filtered out construtors that can't match

@@ -474,10 +474,6 @@ mkRecordSelId tycon field_label
 
     (field_tyvars,pre_field_theta,field_tau) = tcSplitSigmaTy field_ty
   
-    mk_co_var k  = mkWildCoVar k
-    eq_vars      = map (mk_co_var . mkPredTy)
-                       (filter isEqPred pre_field_theta)
-
     field_theta  = filter (not . isEqPred) pre_field_theta
     field_dict_tys			 = mkPredTys field_theta
     n_field_dict_tys			 = length field_dict_tys

@@ -1139,28 +1139,6 @@ tryRhsTyLam env tyvars body 		-- Only does something if there's a let
 %*									*
 %************************************************************************
 
-\begin{code}
-mkDataConAlt :: DataCon -> [OutType] -> InExpr -> SimplM InAlt
--- Make a data-constructor alternative to replace the DEFAULT case
--- NB: there's something a bit bogus here, because we put OutTypes into an InAlt
-mkDataConAlt con inst_tys rhs
-  = ASSERT(not (isNewTyCon (dataConTyCon con)))
-    do 	{ tv_uniqs <- getUniquesSmpl 
-	; arg_uniqs <- getUniquesSmpl
-	; let tv_bndrs  = zipWith mk_tv_bndr (dataConExTyVars con) tv_uniqs
-	      arg_tys   = dataConInstArgTys con (inst_tys ++ mkTyVarTys tv_bndrs)
-	      arg_bndrs = zipWith mk_arg arg_tys arg_uniqs
-	; return (DataAlt con, tv_bndrs ++ arg_bndrs, rhs) }
-  where
-    mk_arg arg_ty uniq	-- Equality predicates get a TyVar
-			-- while dictionaries and others get an Id
-      | isEqPredTy arg_ty = mk_tv arg_ty uniq
-      | otherwise	  = mk_id arg_ty uniq
-
-    mk_tv_bndr tv uniq = mk_tv (tyVarKind tv) uniq
-    mk_tv kind uniq = mkTyVar (mkSysTvName uniq FSLIT("t")) kind
-    mk_id ty   uniq = mkSysLocal FSLIT("a") uniq ty
-\end{code}
 
 mkCase puts a case expression back together, trying various transformations first.
 
