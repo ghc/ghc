@@ -739,8 +739,12 @@ tcAddDeclCtxt decl thing_inside
      thing = case decl of
 	   	ClassDecl {}		  -> "class"
 		TySynonym {}		  -> "type synonym"
-		TyData {tcdND = NewType}  -> "newtype"
-		TyData {tcdND = DataType} -> "data type"
+		TyFunction {}		  -> "type function signature"
+		TyData {tcdND = NewType}  -> "newtype" ++ maybeSig
+		TyData {tcdND = DataType} -> "data type" ++ maybeSig
+
+     maybeSig | isKindSigDecl decl = " signature"
+	      | otherwise	   = ""
 
      ctxt = hsep [ptext SLIT("In the"), text thing, 
 		  ptext SLIT("declaration for"), quotes (ppr (tcdName decl))]

@@ -10,6 +10,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
 import HsSyn
 import TcBinds		( mkPragFun, tcPrags, badBootDeclErr )
+import TcTyClsDecls     ( tcIdxTyInstDecl )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
@@ -138,35 +139,41 @@ tcInstDecls1	-- Deal with both source-code and imported instance decls
 
 tcInstDecls1 tycl_decls inst_decls
   = checkNoErrs $
-	-- Stop if addInstInfos etc discovers any errors
-	-- (they recover, so that we get more than one error each round)
+    do {        -- Stop if addInstInfos etc discovers any errors
+		-- (they recover, so that we get more than one error each
+		-- round) 
 
-   	-- (1) Do the ordinary instance declarations
-    mappM tcLocalInstDecl1 inst_decls    `thenM` \ local_inst_infos ->
+		-- (1) Do the ordinary instance declarations and instances of
+		--     indexed types
+       ; let { idxty_decls = filter (isIdxTyDecl . unLoc) tycl_decls }
+       ; local_inst_infos <- mappM tcLocalInstDecl1 inst_decls
+       ; idxty_inst_infos <- mappM tcIdxTyInstDecl idxty_decls
 
-    let
-	local_inst_info = catMaybes local_inst_infos
-	clas_decls	= filter (isClassDecl.unLoc) tycl_decls
-    in
-	-- (2) Instances from generic class declarations
-    getGenericInstances clas_decls	`thenM` \ generic_inst_info -> 
+       ; let { local_inst_info = concat local_inst_infos ++ 
+				 catMaybes idxty_inst_infos
+	     ; clas_decls      = filter (isClassDecl.unLoc) tycl_decls }
 
-	-- Next, construct the instance environment so far, consisting of
-	--	a) local instance decls
-	--	b) generic instances
-    addInsts local_inst_info	$
-    addInsts generic_inst_info	$
+	        -- (2) Instances from generic class declarations
+       ; generic_inst_info <- getGenericInstances clas_decls
 
-	-- (3) Compute instances from "deriving" clauses; 
-	-- This stuff computes a context for the derived instance decl, so it
-	-- needs to know about all the instances possible; hence inst_env4
-    tcDeriving tycl_decls	`thenM` \ (deriv_inst_info, deriv_binds) ->
-    addInsts deriv_inst_info	$
+	        -- Next, construct the instance environment so far, consisting
+	        -- of 
+		--   a) local instance decls
+		--   b) generic instances
+       ; addInsts local_inst_info   $ do {
+       ; addInsts generic_inst_info $ do {
 
-    getGblEnv			`thenM` \ gbl_env ->
-    returnM (gbl_env, 
-	     generic_inst_info ++ deriv_inst_info ++ local_inst_info,
-	     deriv_binds)
+	        -- (3) Compute instances from "deriving" clauses; 
+		-- This stuff computes a context for the derived instance
+		-- decl, so it needs to know about all the instances possible
+       ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls
+       ; addInsts deriv_inst_info   $ do {
+
+       ; gbl_env <- getGblEnv
+       ; returnM (gbl_env, 
+		  generic_inst_info ++ deriv_inst_info ++ local_inst_info,
+		  deriv_binds) 
+    }}}}
 
 addInsts :: [InstInfo] -> TcM a -> TcM a
 addInsts infos thing_inside
@@ -175,15 +182,14 @@ addInsts infos thing_inside
 
 \begin{code}
 tcLocalInstDecl1 :: LInstDecl Name 
-		 -> TcM (Maybe InstInfo)	-- Nothing if there was an error
+		 -> TcM [InstInfo]	-- [] if there was an error
 	-- A source-file instance declaration
 	-- Type-check all the stuff before the "where"
 	--
 	-- We check for respectable instance type, and context
 tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
-  -- !!!TODO: Handle the `ats' parameter!!! -=chak
   =	-- Prime error recovery, set source location
-    recoverM (returnM Nothing)		$
+    recoverM (returnM [])		$
     setSrcSpan loc			$
     addErrCtxt (instDeclCtxt1 poly_ty)	$
 
@@ -197,15 +203,23 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; poly_ty'  <- tcHsKindedType kinded_ty
 	; let (tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
 	
+	-- Now, check the validity of the instance.
 	; (clas, inst_tys) <- checkValidInstHead tau
 	; checkValidInstance tyvars theta clas inst_tys
 
+	-- Next, process any associated types.
+	; idxty_inst_info <- mappM tcIdxTyInstDecl ats
+
+	-- Finally, construct the Core representation of the instance.
+	-- (This no longer includes the associated types.)
 	; dfun_name <- newDFunName clas inst_tys (srcSpanStart loc)
 	; overlap_flag <- getOverlapFlag
 	; let dfun  = mkDictFunId dfun_name tyvars theta clas inst_tys
 	      ispec = mkLocalInstance dfun overlap_flag
 
-	; return (Just (InstInfo { iSpec = ispec, iBinds = VanillaInst binds uprags })) }
+	; return $ [InstInfo { iSpec  = ispec, 
+			       iBinds = VanillaInst binds uprags }] ++
+                   catMaybes idxty_inst_info }
 \end{code}
 
 

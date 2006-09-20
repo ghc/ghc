@@ -5,15 +5,16 @@
 
 \begin{code}
 module TcTyClsDecls (
-	tcTyAndClassDecls
+	tcTyAndClassDecls, tcIdxTyInstDecl
     ) where
 
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  ConDecl(..),   Sig(..), NewOrData(..), ResType(..),
-			  tyClDeclTyVars, isSynDecl, isClassDecl, hsConArgs,
-			  LTyClDecl, tcdName, hsTyVarName, LHsTyVarBndr
+			  tyClDeclTyVars, isSynDecl, isClassDecl, isIdxTyDecl,
+			  isKindSigDecl, hsConArgs, LTyClDecl, tcdName,
+			  hsTyVarName, LHsTyVarBndr, LHsType
 			)
 import HsTypes          ( HsBang(..), getBangStrictness )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
@@ -29,7 +30,8 @@ import TcTyDecls	( calcRecFlags, calcClassCycles, calcSynCycles )
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
 import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
 			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext,
-			  kcHsSigType, tcHsBangType, tcLHsConResTy, tcDataKindSig )
+			  kcHsSigType, tcHsBangType, tcLHsConResTy,
+			  tcDataKindSig, kcCheckHsType )
 import TcMType		( newKindVar, checkValidTheta, checkValidType, 
 			  -- checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
@@ -37,7 +39,7 @@ import TcType		( TcKind, TcType, Type, tyVarsOfType, mkPhiTy,
 			  mkArrowKind, liftedTypeKind, mkTyVarTys, 
 			  tcSplitSigmaTy, tcEqTypes, tcGetTyVar_maybe )
 import Type		( PredType(..), splitTyConApp_maybe, mkTyVarTy,
-                          newTyConInstRhs
+                          newTyConInstRhs, isLiftedTypeKind, Kind
 			  -- pprParendType, pprThetaArrow
 			)
 import Generics		( validGenericMethodType, canDoGenerics )
@@ -53,7 +55,7 @@ import Var		( TyVar, idType, idName )
 import VarSet		( elemVarSet, mkVarSet )
 import Name		( Name, getSrcLoc )
 import Outputable
-import Maybe		( isJust )
+import Maybe		( isJust, fromJust, isNothing )
 import Maybes		( expectJust )
 import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
@@ -150,10 +152,14 @@ indeed type families).  I think.
 tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
    	           -> TcM TcGblEnv 	-- Input env extended by types and classes 
 					-- and their implicit Ids,DataCons
-tcTyAndClassDecls boot_details decls
-  = do	{ 	-- First check for cyclic type synonysm or classes
+tcTyAndClassDecls boot_details allDecls
+  = do	{       -- Omit instances of indexed types; they are handled together
+		-- with the *heads* of class instances
+        ; let decls = filter (not . isIdxTyDecl . unLoc) allDecls
+
+        	-- First check for cyclic type synonysm or classes
 		-- See notes with checkCycleErrs
-	  checkCycleErrs decls
+	; checkCycleErrs decls
 	; mod <- getModule
 	; traceTc (text "tcTyAndCl" <+> ppr mod)
 	; (syn_tycons, alg_tyclss) <- fixM (\ ~(rec_syn_tycons, rec_alg_tyclss) ->
@@ -216,6 +222,137 @@ mkGlobalThings decls things
 
 %************************************************************************
 %*									*
+\subsection{Type checking instances of indexed types}
+%*									*
+%************************************************************************
+
+Instances of indexed types are somewhat of a hybrid.  They are processed
+together with class instance heads, but can contain data constructors and hence
+they share a lot of kinding and type checking code with ordinary algebraic
+data types (and GADTs).
+
+\begin{code}
+tcIdxTyInstDecl :: LTyClDecl Name -> TcM (Maybe InstInfo)  -- Nothing if error
+tcIdxTyInstDecl (L loc decl)
+  =	-- Prime error recovery, set source location
+    recoverM (returnM Nothing)	$
+    setSrcSpan loc		$
+    tcAddDeclCtxt decl		$
+    do { -- indexed data types require -fglasgow-exts and can't be in an
+	 -- hs-boot file
+       ; gla_exts <- doptM Opt_GlasgowExts
+       ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
+       ; checkTc gla_exts      $ badIdxTyDecl (tcdLName decl)
+       ; checkTc (not is_boot) $ badBootTyIdxDeclErr
+
+	 -- perform kind and type checking
+       ; tcIdxTyInstDecl1 decl
+       }
+
+tcIdxTyInstDecl1 :: TyClDecl Name -> TcM (Maybe InstInfo)  -- Nothing if error
+
+tcIdxTyInstDecl1 (decl@TySynonym {})
+  = kcIdxTyPats decl $ \k_tvs k_typats resKind ->
+    do { -- kind check the right hand side of the type equation
+       ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
+
+         -- type check type equation
+       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {
+       ; t_typats <- mappM tcHsKindedType k_typats
+       ; t_rhs    <- tcHsKindedType k_rhs
+
+         -- construct type rewrite rule
+         -- !!!of the form: forall t_tvs. (tcdLName decl) t_typats = t_rhs
+       ; return Nothing -- !!!TODO: need InstInfo for indexed types
+       }}
+      
+tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
+			       tcdCons = cons})
+  = kcIdxTyPats decl $ \k_tvs k_typats resKind ->
+    do { -- kind check the data declaration as usual
+       ; k_decl <- kcDataDecl decl k_tvs
+       ; k_typats <- mappM tcHsKindedType k_typats
+       ; let k_ctxt = tcdCtxt decl
+	     k_cons = tcdCons decl
+
+         -- result kind must be '*' (otherwise, we have too few patterns)
+       ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr tc_name
+
+         -- type check indexed data type declaration
+       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {
+       ; unbox_strict <- doptM Opt_UnboxStrictFields
+
+	 -- Check that we don't use GADT syntax for indexed types
+       ; checkTc h98_syntax (badGadtIdxTyDecl tc_name)
+
+	 -- Check that a newtype has exactly one constructor
+       ; checkTc (new_or_data == DataType || isSingleton cons) $
+	   newtypeConError tc_name (length cons)
+
+       ; stupid_theta <- tcHsKindedContext k_ctxt
+       ; tycon <- fixM (\ tycon -> do 
+	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
+						      tycon t_tvs)) 
+				  k_cons
+	     ; tc_rhs <-
+		 case new_or_data of
+		   DataType -> return (mkDataTyConRhs data_cons)
+		   NewType  -> 
+			    ASSERT( isSingleton data_cons )
+			    mkNewTyConRhs tc_name tycon (head data_cons)
+                           --vvvvvvv !!! need a new derived tc_name here
+	     ; buildAlgTyCon tc_name t_tvs stupid_theta tc_rhs Recursive
+			     False h98_syntax
+                 -- We always assume that indexed types are recursive.  Why?
+                 -- (1) Due to their open nature, we can never be sure that a
+                 -- further instance might not introduce a new recursive
+                 -- dependency.  (2) They are always valid loop breakers as
+                 -- they involve a coercion.
+	     })
+
+         -- construct result
+	 -- !!!twofold: (1) (ATyCon tycon) and (2) an equality axiom
+       ; return Nothing -- !!!TODO: need InstInfo for indexed types
+       }}
+       where
+	 h98_syntax = case cons of 	-- All constructors have same shape
+			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
+			other -> True
+
+-- Kind checking of indexed types
+-- -
+
+-- Kind check type patterns and kind annotate the embedded type variables.
+--
+-- * Here we check that a type instance matches its kind signature, but we do
+--   not check whether there is a pattern for each type index; the latter
+--   check is only required for type functions.
+--
+kcIdxTyPats :: TyClDecl Name
+	    -> ([LHsTyVarBndr Name] -> [LHsType Name] -> Kind -> TcM a)
+	       -- ^^kinded tvs         ^^kinded ty pats  ^^res kind
+	    -> TcM a
+kcIdxTyPats decl thing_inside
+  = kcHsTyVars (tcdTyVars decl) $ \tvs -> 
+    do { tc_ty_thing <- tcLookupLocated (tcdLName decl)
+       ; let tc_kind          = case tc_ty_thing of { AThing k -> k }
+	     (kinds, resKind) = splitKindFunTys tc_kind
+	     hs_typats	      = fromJust $ tcdTyPats decl
+
+         -- we may not have more parameters than the kind indicates
+       ; checkTc (length kinds >= length hs_typats) $
+	   tooManyParmsErr (tcdLName decl)
+
+         -- type functions can have a higher-kinded result
+       ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
+       ; typats <- zipWithM kcCheckHsType hs_typats kinds
+       ; thing_inside tvs typats resultKind
+       }
+\end{code}
+
+
+%************************************************************************
+%*									*
 		Kind checking
 %*									*
 %************************************************************************
@@ -242,11 +379,24 @@ So we must infer their kinds from their right-hand sides *first* and then
 use them, whereas for the mutually recursive data types D we bring into
 scope kind bindings D -> k, where k is a kind variable, and do inference.
 
+Indexed Types
+~~~~~~~~~~~~~
+This treatment of type synonyms only applies to Haskell 98-style synonyms.
+General type functions can be recursive, and hence, appear in `alg_decls'.
+
+The kind of an indexed type is solely determinded by its kind signature;
+hence, only kind signatures participate in the construction of the initial
+kind environment (as constructed by `getInitialKind').  In fact, we ignore
+instances of indexed types altogether in the following.  However, we need to
+include the kind signatures of associated types into the construction of the
+initial kind environment.  (This is handled by `allDecls').
+
 \begin{code}
 kcTyClDecls syn_decls alg_decls
-  = do	{ 	-- First extend the kind env with each data 
-		-- type and class, mapping them to a type variable
-	  alg_kinds <- mappM getInitialKind alg_decls
+  = do	{ 	-- First extend the kind env with each data type, class, and
+		-- indexed type, mapping them to a type variable
+          let initialKindDecls = concat [allDecls decl | L _ decl <- alg_decls]
+	; alg_kinds <- mappM getInitialKind initialKindDecls
 	; tcExtendKindEnv alg_kinds $ do
 
 		-- Now kind-check the type synonyms, in dependency order
@@ -258,18 +408,29 @@ kcTyClDecls syn_decls alg_decls
 	{ (kc_syn_decls, syn_kinds) <- kcSynDecls (calcSynCycles syn_decls)
 	; tcExtendKindEnv syn_kinds $  do
 
-		-- Now kind-check the data type and class declarations, 
-		-- returning kind-annotated decls
-	{ kc_alg_decls <- mappM (wrapLocM kcTyClDecl) alg_decls
+		-- Now kind-check the data type, class, and kind signatures,
+		-- returning kind-annotated decls; we don't kind-check
+		-- instances of indexed types yet, but leave this to
+		-- `tcInstDecls1'
+	{ kc_alg_decls <- mappM (wrapLocM kcTyClDecl) 
+			    (filter (not . isIdxTyDecl . unLoc) alg_decls)
 
 	; return (kc_syn_decls, kc_alg_decls) }}}
+  where
+    -- get all declarations relevant for determining the initial kind
+    -- environment
+    allDecls (decl@ClassDecl {tcdATs = ats}) = decl : [ at 
+						      | L _ at <- ats
+						      , isKindSigDecl at]
+    allDecls decl | isIdxTyDecl decl         = []
+		  | otherwise		     = [decl]
 
 ------------------------------------------------------------------------
-getInitialKind :: LTyClDecl Name -> TcM (Name, TcKind)
--- Only for data type and class declarations
--- Get as much info as possible from the data or class decl,
+getInitialKind :: TyClDecl Name -> TcM (Name, TcKind)
+-- Only for data type, class, and indexed type declarations
+-- Get as much info as possible from the data, class, or indexed type decl,
 -- so as to maximise usefulness of error messages
-getInitialKind (L _ decl)
+getInitialKind decl
   = do 	{ arg_kinds <- mapM (mk_arg_kind . unLoc) (tyClDeclTyVars decl)
 	; res_kind  <- mk_res_kind decl
 	; return (tcdName decl, mkArrowKinds arg_kinds res_kind) }
@@ -277,8 +438,10 @@ getInitialKind (L _ decl)
     mk_arg_kind (UserTyVar _)        = newKindVar
     mk_arg_kind (KindedTyVar _ kind) = return kind
 
-    mk_res_kind (TyData { tcdKindSig = Just kind }) = return kind
-	-- On GADT-style declarations we allow a kind signature
+    mk_res_kind (TyFunction { tcdKind    = kind      }) = return kind
+    mk_res_kind (TyData     { tcdKindSig = Just kind }) = return kind
+	-- On GADT-style and data signature declarations we allow a kind 
+	-- signature
 	--	data T :: *->* where { ... }
     mk_res_kind other = return liftedTypeKind
 
@@ -319,11 +482,60 @@ kindedTyVarKind (L _ (KindedTyVar _ k)) = k
 kcTyClDecl :: TyClDecl Name -> TcM (TyClDecl Name)
 	-- Not used for type synonyms (see kcSynDecl)
 
-kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
+kcTyClDecl decl@(TyData {})
+  = ASSERT( not . isJust $ tcdTyPats decl )   -- must not be instance of idx ty
+    kcTyClDeclBody decl	$
+      kcDataDecl decl
+
+kcTyClDecl decl@(TyFunction {})
+  = kcTyClDeclBody decl $ \ tvs' ->
+      return (decl {tcdTyVars = tvs'})
+
+kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
   = kcTyClDeclBody decl	$ \ tvs' ->
-    do	{ ctxt' <- kcHsContext ctxt	
+    do	{ is_boot <- tcIsHsBoot
+	; ctxt' <- kcHsContext ctxt	
+	; ats'  <- mappM (wrapLocM kcTyClDecl) ats
+	; sigs' <- mappM (wrapLocM kc_sig    ) sigs
+	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs',
+		        tcdATs = ats'}) }
+  where
+    kc_sig (TypeSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
+				   ; return (TypeSig nm op_ty') }
+    kc_sig other_sig	      = return other_sig
+
+kcTyClDecl decl@(ForeignType {})
+  = return decl
+
+kcTyClDeclBody :: TyClDecl Name
+	       -> ([LHsTyVarBndr Name] -> TcM a)
+	       -> TcM a
+-- getInitialKind has made a suitably-shaped kind for the type or class
+-- Unpack it, and attribute those kinds to the type variables
+-- Extend the env with bindings for the tyvars, taken from
+-- the kind of the tycon/class.  Give it to the thing inside, and 
+-- check the result kind matches
+kcTyClDeclBody decl thing_inside
+  = tcAddDeclCtxt decl		$
+    do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
+	; let tc_kind	 = case tc_ty_thing of { AThing k -> k }
+	      (kinds, _) = splitKindFunTys tc_kind
+	      hs_tvs 	 = tcdTyVars decl
+	      kinded_tvs = ASSERT( length kinds >= length hs_tvs )
+			   [ L loc (KindedTyVar (hsTyVarName tv) k)
+			   | (L loc tv, k) <- zip hs_tvs kinds]
+	; tcExtendKindEnvTvs kinded_tvs (thing_inside kinded_tvs) }
+
+-- Kind check a data declaration, assuming that we already extended the
+-- kind environment with the type variables of the left-hand side (these
+-- kinded type variables are also passed as the second parameter).
+--
+kcDataDecl :: TyClDecl Name -> [LHsTyVarBndr Name] -> TcM (TyClDecl Name)
+kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
+	   tvs
+  = do	{ ctxt' <- kcHsContext ctxt	
 	; cons' <- mappM (wrapLocM kc_con_decl) cons
-	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdCons = cons'}) }
+	; return (decl {tcdTyVars = tvs, tcdCtxt = ctxt', tcdCons = cons'}) }
   where
     kc_con_decl (ConDecl name expl ex_tvs ex_ctxt details res) = do
       kcHsTyVars ex_tvs $ \ex_tvs' -> do
@@ -349,40 +561,6 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	-- Can't allow an unlifted type for newtypes, because we're effectively
 	-- going to remove the constructor while coercing it to a lifted type.
 	-- And newtypes can't be bang'd
-
--- !!!TODO -=chak
-kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt,  tcdSigs = sigs})
-  = kcTyClDeclBody decl	$ \ tvs' ->
-    do	{ is_boot <- tcIsHsBoot
-	; ctxt' <- kcHsContext ctxt	
-	; sigs' <- mappM (wrapLocM kc_sig) sigs
-	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs'}) }
-  where
-    kc_sig (TypeSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
-				   ; return (TypeSig nm op_ty') }
-    kc_sig other_sig	      = return other_sig
-
-kcTyClDecl decl@(ForeignType {})
-  = return decl
-
-kcTyClDeclBody :: TyClDecl Name
-	       -> ([LHsTyVarBndr Name] -> TcM a)
-	       -> TcM a
--- getInitialKind has made a suitably-shaped kind for the type or class
--- Unpack it, and attribute those kinds to the type variables
--- Extend the env with bindings for the tyvars, taken from
--- the kind of the tycon/class.  Give it to the thing inside, and 
- -- check the result kind matches
-kcTyClDeclBody decl thing_inside
-  = tcAddDeclCtxt decl		$
-    do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
-	; let tc_kind	 = case tc_ty_thing of { AThing k -> k }
-	      (kinds, _) = splitKindFunTys tc_kind
-	      hs_tvs 	 = tcdTyVars decl
-	      kinded_tvs = ASSERT( length kinds >= length hs_tvs )
-			   [ L loc (KindedTyVar (hsTyVarName tv) k)
-			   | (L loc tv, k) <- zip hs_tvs kinds]
-	; tcExtendKindEnvTvs kinded_tvs (thing_inside kinded_tvs) }
 \end{code}
 
 
@@ -413,7 +591,21 @@ tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM TyThing
 tcTyClDecl calc_isrec decl
   = tcAddDeclCtxt decl (tcTyClDecl1 calc_isrec decl)
 
-tcTyClDecl1 calc_isrec 
+  -- kind signature for a type functions
+tcTyClDecl1 _calc_isrec 
+  (TyFunction {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = kind})
+  = tcKindSigDecl tc_name tvs kind
+
+  -- kind signature for an indexed data type
+tcTyClDecl1 _calc_isrec 
+  (TyData {tcdCtxt = ctxt, tcdTyVars = tvs,
+	   tcdLName = L _ tc_name, tcdKindSig = Just kind, tcdCons = []})
+  = do
+  { checkTc (null . unLoc $ ctxt) $ badKindSigCtxt tc_name
+  ; tcKindSigDecl tc_name tvs kind
+  }
+
+tcTyClDecl1 calc_isrec
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
 	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = cons})
   = tcTyVarBndrs tvs	$ \ tvs' -> do 
@@ -427,6 +619,9 @@ tcTyClDecl1 calc_isrec
 
 	-- Check that we don't use GADT syntax in H98 world
   ; checkTc (gla_exts || h98_syntax) (badGadtDecl tc_name)
+
+	-- Check that we don't use kind signatures without Glasgow extensions
+  ; checkTc (gla_exts || isNothing mb_ksig) (badSigTyDecl tc_name)
 
 	-- Check that the stupid theta is empty for a GADT-style declaration
   ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
@@ -470,12 +665,13 @@ tcTyClDecl1 calc_isrec
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM (addLocM tc_fundep) fundeps
-  -- !!!TODO: process `ats`; what do we want to store in the `Class'? -=chak
+  ; ats' <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
+ -- ^^^^ !!!TODO: what to do with this?  Need to generate FC tyfun decls.
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
 		let 	-- This little knot is just so we can get
 			-- hold of the name of the class TyCon, which we
-			-- need to look up its recursiveness and variance
+			-- need to look up its recursiveness
 		    tycon_name = tyConName (classTyCon clas)
 		    tc_isrec = calc_isrec tycon_name
 		in
@@ -491,6 +687,28 @@ tcTyClDecl1 calc_isrec
 tcTyClDecl1 calc_isrec 
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
   = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0))
+
+-----------------------------------
+tcKindSigDecl :: Name -> [LHsTyVarBndr Name] -> Kind -> TcM TyThing
+tcKindSigDecl tc_name tvs kind
+  = tcTyVarBndrs tvs  $ \ tvs' -> do 
+  { gla_exts <- doptM Opt_GlasgowExts
+
+	-- Check that we don't use kind signatures without Glasgow extensions
+  ; checkTc gla_exts $ badSigTyDecl tc_name
+
+    -- !!!TODO
+    -- We need to extend TyCon.TyCon with a new variant representing indexed
+    -- type constructors (ie, IdxTyCon).  We will use them for both indexed
+    -- data types as well as type functions.  In the case of indexed *data*
+    -- types, they are *abstract*; ie, won't be rewritten.  OR do we just want
+    -- to make another variant of AlgTyCon (after all synonyms are also
+    -- AlgTyCons...)
+    -- We need an additional argument to this functions, which determines
+    -- whether the type constructor is abstract.
+  ; tycon <- error "TcTyClsDecls.tcKindSigDecl: IdxTyCon not implemented yet."
+  ; return (ATyCon tycon)
+  }
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
@@ -762,15 +980,11 @@ checkValidClass cls
 	-- class has only one parameter.  We can't do generic
 	-- multi-parameter type classes!
 	; checkTc (unary || no_generics) (genericMultiParamErr cls)
-
-    	-- Check that the class has no associated types, unless GlaExs
-	; checkTc (gla_exts || no_ats) (badATDecl cls)
 	}
   where
     (tyvars, theta, _, op_stuff) = classBigSig cls
     unary 	= isSingleton tyvars
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
-    no_ats      = True -- !!!TODO: determine whether the class has ATs -=chak
 
     check_op gla_exts (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -885,9 +1099,35 @@ newtypeFieldErr con_name n_flds
   = sep [ptext SLIT("The constructor of a newtype must have exactly one field"), 
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con_name) <+> ptext SLIT("has") <+> speakN n_flds]
 
-badATDecl cl_name
-  = vcat [ ptext SLIT("Illegal associated type declaration in") <+> quotes (ppr cl_name)
-	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow ATs")) ]
+badSigTyDecl tc_name
+  = vcat [ ptext SLIT("Illegal kind signature") <+>
+	   quotes (ppr tc_name)
+	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow indexed types")) ]
+
+badKindSigCtxt tc_name
+  = vcat [ ptext SLIT("Illegal context in kind signature") <+>
+	   quotes (ppr tc_name)
+	 , nest 2 (parens $ ptext SLIT("Currently, kind signatures cannot have a context")) ]
+
+badIdxTyDecl tc_name
+  = vcat [ ptext SLIT("Illegal indexed type instance for") <+>
+	   quotes (ppr tc_name)
+	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow indexed types")) ]
+
+badGadtIdxTyDecl tc_name
+  = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+>
+	   quotes (ppr tc_name)
+	 , nest 2 (parens $ ptext SLIT("Indexed types cannot use GADT declarations")) ]
+
+tooManyParmsErr tc_name
+  = ptext SLIT("Indexed type instance has too many parameters:") <+> 
+    quotes (ppr tc_name)
+
+tooFewParmsErr tc_name
+  = ptext SLIT("Indexed type instance has too few parameters:") <+> 
+    quotes (ppr tc_name)
+
+badBootTyIdxDeclErr = ptext SLIT("Illegal indexed type instance in hs-boot file")
 
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),

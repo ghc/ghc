@@ -280,7 +280,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- The typechecker (not the renamer) checks that all 
 	-- the declarations are for the right class
     let
-	at_doc   = text "In the associated types in an instance declaration"
+	at_doc   = text "In the associated types of an instance declaration"
 	at_names = map (head . tyClDeclNames . unLoc) ats
     in
     checkDupNames at_doc at_names		`thenM_`
