@@ -681,14 +681,14 @@ tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
 tcIfaceDataAlt con inst_tys arg_strs rhs
   = do	{ us <- newUniqueSupply
 	; let uniqs = uniqsFromSupply us
-	; let (ex_tvs, co_tvs, arg_ids) = 
-	        dataConRepFSInstPat arg_strs uniqs con inst_tys
-              all_tvs                   = ex_tvs ++ co_tvs
+	; let (ex_tvs, co_tvs, arg_ids)
+	              = dataConRepFSInstPat arg_strs uniqs con inst_tys
+              all_tvs = ex_tvs ++ co_tvs
 
 	; rhs' <- extendIfaceTyVarEnv all_tvs	$
 		  extendIfaceIdEnv arg_ids	$
 		  tcIfaceExpr rhs
-	; return (DataAlt con, ex_tvs ++ arg_ids, rhs') }
+	; return (DataAlt con, all_tvs ++ arg_ids, rhs') }
 \end{code}
 
 
