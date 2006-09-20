@@ -7,7 +7,7 @@
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    getGenericInstances, 
 		    MethodSpec, tcMethodBind, mkMethodBind, 
-		    tcAddDeclCtxt, badMethodErr
+		    tcAddDeclCtxt, badMethodErr, badATErr, omittedATWarn
 		  ) where
 
 #include "HsVersions.h"
@@ -759,8 +759,15 @@ badMethodErr clas op
   = hsep [ptext SLIT("Class"), quotes (ppr clas), 
 	  ptext SLIT("does not have a method"), quotes (ppr op)]
 
+badATErr clas at
+  = hsep [ptext SLIT("Class"), quotes (ppr clas), 
+	  ptext SLIT("does not have an associated type"), quotes (ppr at)]
+
 omittedMethodWarn sel_id
   = ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id)
+
+omittedATWarn at
+  = ptext SLIT("No explicit AT declaration for") <+> quotes (ppr at)
 
 badGenericInstance sel_id because
   = sep [ptext SLIT("Can't derive generic code for") <+> quotes (ppr sel_id),

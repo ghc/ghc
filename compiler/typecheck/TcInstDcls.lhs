@@ -11,8 +11,8 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 import HsSyn
 import TcBinds		( mkPragFun, tcPrags, badBootDeclErr )
 import TcTyClsDecls     ( tcIdxTyInstDecl )
-import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
-			  tcClassDecl2, getGenericInstances )
+import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, badATErr,
+			  omittedATWarn, tcClassDecl2, getGenericInstances )
 import TcRnMonad       
 import TcMType		( tcSkolSigType, checkValidInstance, checkValidInstHead )
 import TcType		( mkClassPred, tcSplitSigmaTy, tcSplitDFunHead, 
@@ -33,14 +33,17 @@ import Coercion         ( mkSymCoercion )
 import TyCon            ( TyCon, tyConName, newTyConCo, tyConTyVars,
 			  isAssocTyCon, tyConFamInst_maybe )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
-import Class		( classBigSig )
+import Class		( classBigSig, classATs )
 import Var		( TyVar, Id, idName, idType, tyVarKind )
 import Id               ( mkSysLocal )
 import UniqSupply       ( uniqsFromSupply, splitUniqSupply )
 import MkId		( mkDictFunId )
 import Name		( Name, getSrcLoc )
+import NameSet		( NameSet, addListToNameSet, emptyNameSet,
+			  minusNameSet, nameSetToList )
 import Maybe		( isNothing, fromJust, catMaybes )
 import Monad		( when )
+import DynFlags		( DynFlag(Opt_WarnMissingMethods) )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
 import Outputable
@@ -238,12 +241,13 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; poly_ty'  <- tcHsKindedType kinded_ty
 	; let (tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
 	
+	-- Next, process any associated types.
+	; idxty_info_tycons <- mappM tcIdxTyInstDecl ats
+
 	-- Now, check the validity of the instance.
 	; (clas, inst_tys) <- checkValidInstHead tau
 	; checkValidInstance tyvars theta clas inst_tys
-
-	-- Next, process any associated types.
-	; idxty_info_tycons <- mappM tcIdxTyInstDecl ats
+	; checkValidOrMissingAT clas
 
 	-- Finally, construct the Core representation of the instance.
 	-- (This no longer includes the associated types.)
@@ -259,6 +263,21 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
                   catMaybes idxty_infos,
 		  catMaybes idxty_tycons)
         }
+  where
+    checkValidOrMissingAT clas
+      = do { let classDefATs =  addListToNameSet emptyNameSet 
+			      . map tyConName 
+			      . classATs 
+			      $ clas
+                 definedATs =   addListToNameSet emptyNameSet 
+			      . map (tcdName . unLoc)
+			      $ ats
+                 omitted    = classDefATs   `minusNameSet` definedATs
+                 excess     = definedATs `minusNameSet` classDefATs
+           ; mapM_ (addErrTc . badATErr clas) (nameSetToList excess)
+	   ; warn <- doptM Opt_WarnMissingMethods
+	   ; mapM_ (warnTc warn . omittedATWarn) (nameSetToList omitted)
+	   }
 \end{code}
 
 
