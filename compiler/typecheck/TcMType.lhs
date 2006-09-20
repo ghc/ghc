@@ -368,7 +368,8 @@ data LookupTyVarResult	-- The result of a lookupTcTyVar call
 
 lookupTcTyVar :: TcTyVar -> TcM LookupTyVarResult
 lookupTcTyVar tyvar 
-  = case details of
+  = ASSERT( isTcTyVar tyvar )
+    case details of
       SkolemTv _   -> return (DoneTv details)
       MetaTv _ ref -> do { meta_details <- readMutVar ref
 			 ; case meta_details of

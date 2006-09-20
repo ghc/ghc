@@ -399,6 +399,7 @@ mkKindName unique = mkSystemName unique kind_var_occ
 
 kindVarRef :: KindVar -> IORef MetaDetails
 kindVarRef tc = 
+  ASSERT ( isTcTyVar tc )
   case tcTyVarDetails tc of
     MetaTv TauTv ref -> ref
     other            -> pprPanic "kindVarRef" (ppr tc)
@@ -472,7 +473,8 @@ pprSkolTvBinding :: TcTyVar -> SDoc
 -- Print info about the binding of a skolem tyvar, 
 -- or nothing if we don't have anything useful to say
 pprSkolTvBinding tv
-  = ppr_details (tcTyVarDetails tv)
+  = ASSERT ( isTcTyVar tv )
+    ppr_details (tcTyVarDetails tv)
   where
     ppr_details (MetaTv TauTv _)   = quotes (ppr tv) <+> ptext SLIT("is a meta type variable")
     ppr_details (MetaTv BoxTv _)   = quotes (ppr tv) <+> ptext SLIT("is a boxy type variable")
