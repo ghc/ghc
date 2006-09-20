@@ -387,8 +387,10 @@ uUnrefined :: Bool                -- Whether the input is swapped
            -> UM InternalReft
 
 -- We know that tv1 isn't refined
--- PRE-CONDITION: in the call (uUnrefined r co tv ty ty'), we know that
---	co :: tv:=:ty
+-- PRE-CONDITION: in the call (uUnrefined False r co tv1 ty2 ty2'), we know that
+--	co :: tv1:=:ty2
+-- and if the first argument is True instead, we know
+--      co :: ty2:=:tv1
 
 uUnrefined swap subst co tv1 ty2 ty2'
   | Just ty2'' <- tcView ty2'

@@ -37,7 +37,7 @@ import TypeRep
 import Type	  ( Type, Kind, PredType, substTyWith, mkAppTy, mkForAllTy,
                     mkFunTy, splitAppTy_maybe, splitForAllTy_maybe, coreView,
                     kindView, mkTyConApp, isCoercionKind, isEqPred, mkAppTys,
-                    coreEqType
+                    coreEqType, splitAppTys, isTyVarTy, splitTyConApp_maybe
                   )
 import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isNewTyCon,
                     newTyConRhs, newTyConCo, 
@@ -165,19 +165,42 @@ mkAppsCoercion   co1 tys = foldl mkAppTy co1 tys
 mkForAllCoercion tv  co  = ASSERT ( isTyVar tv ) mkForAllTy tv co
 mkFunCoercion    co1 co2 = mkFunTy co1 co2
 
+
+-- This smart constructor creates a sym'ed version its argument,
+-- but tries to push the sym's down to the leaves.  If we come to
+-- sym tv or sym tycon then we can drop the sym because tv and tycon
+-- are reflexive coercions
 mkSymCoercion co      
   | Just co2 <- splitSymCoercion_maybe co = co2
-  | Just (co1, co2) <- splitAppCoercion_maybe co 
-    -- should make this case better
-  = mkAppCoercion (mkSymCoercion co1) (mkSymCoercion co2)
+     -- sym (sym co) --> co
+  | Just (co1, arg_tys) <- splitTyConApp_maybe co
+  , not (isCoercionTyCon co1) = mkTyConApp co1 (map mkSymCoercion arg_tys)
+     -- we can drop the sym for a TyCon 
+     -- sym (ty [t1, ..., tn]) --> ty [sym t1, ..., sym tn] 
+  | (co1, arg_tys) <- splitAppTys co
+  , isTyVarTy co1 = mkAppTys (maybe_drop co1) (map mkSymCoercion arg_tys)
+     -- sym (tv [t1, ..., tn]) --> tv [sym t1, ..., sym tn]
+     --   if tv type variable
+     -- sym (cv [t1, ..., tn]) --> (sym cv) [sym t1, ..., sym tn]
+     --   if cv is a coercion variable
+     -- fall through if head is a CoercionTyCon
   | Just (co1, co2) <- splitTransCoercion_maybe co
+     -- sym (co1 `trans` co2) --> (sym co2) `trans (sym co2)
   = mkTransCoercion (mkSymCoercion co2) (mkSymCoercion co1)
   | Just (co, ty) <- splitInstCoercion_maybe co
+     -- sym (co @ ty) --> (sym co) @ ty
   = mkInstCoercion (mkSymCoercion co) ty
   | Just co <- splitLeftCoercion_maybe co
+     -- sym (left co) --> left (sym co)
   = mkLeftCoercion (mkSymCoercion co)
   | Just co <- splitRightCoercion_maybe co
+     -- sym (right co) --> right (sym co)
   = mkRightCoercion (mkSymCoercion co)
+  where
+    maybe_drop (TyVarTy tv) 
+        | isCoVar tv = mkCoercion symCoercionTyCon [TyVarTy tv]
+        | otherwise  = TyVarTy tv
+    maybe_drop other = other
 mkSymCoercion (ForAllTy tv ty) = ForAllTy tv (mkSymCoercion ty)
 -- for atomic types and constructors, we can just ignore sym since these
 -- are reflexive coercions
@@ -185,7 +208,6 @@ mkSymCoercion (TyVarTy tv)
   | isCoVar tv = mkCoercion symCoercionTyCon [TyVarTy tv]
   | otherwise  = TyVarTy tv
 mkSymCoercion co = mkCoercion symCoercionTyCon [co] 
-                   -- this should not happen but does
 
 -- Smart constructors for left and right
 mkLeftCoercion co 
