@@ -261,7 +261,7 @@ instCallDicts loc [] = return ([], idCoercion)
 instCallDicts loc (EqPred ty1 ty2 : preds)
   = do  { unifyType ty1 ty2	-- For now, we insist that they unify right away 
 				-- Later on, when we do associated types, 
-				-- unifyType might return a coercion
+				-- unifyType :: Type -> Type -> TcM ([Inst], Coercion)
 	; (dicts, co_fn) <- instCallDicts loc preds
 	; return (dicts, co_fn <.> CoTyApp ty1) }
 	-- We use type application to apply the function to the 
