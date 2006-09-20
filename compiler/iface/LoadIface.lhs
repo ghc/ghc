@@ -578,7 +578,6 @@ pprModIface :: ModIface -> SDoc
 -- Show a ModIface
 pprModIface iface
  = vcat [ ptext SLIT("interface")
-		<+> ppr_package (mi_package iface)
 		<+> ppr (mi_module iface) <+> pp_boot 
 		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
@@ -596,8 +595,6 @@ pprModIface iface
   where
     pp_boot | mi_boot iface = ptext SLIT("[boot]")
 	    | otherwise     = empty
-    ppr_package HomePackage = empty
-    ppr_package (ExtPackage id) = doubleQuotes (ppr id)
 
     exp_vers  = mi_exp_vers iface
     rule_vers = mi_rule_vers iface
