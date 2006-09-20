@@ -551,9 +551,7 @@ mkRecordSelId tycon field_label
 	--	foo = /\a. \t:T. case t of { MkT f -> f a }
 
     mk_alt data_con 
-      = 	-- In the non-vanilla case, the pattern must bind type variables and
-		-- the context stuff; hence the arg_prefix binding below
-	  ASSERT2( res_ty `tcEqType` field_tau, ppr data_con $$ ppr res_ty $$ ppr field_tau )
+      =   ASSERT2( res_ty `tcEqType` field_tau, ppr data_con $$ ppr res_ty $$ ppr field_tau )
 	  mkReboxingAlt rebox_uniqs data_con (ex_tvs ++ co_tvs ++ arg_vs) rhs
       where
            -- get pattern binders with types appropriately instantiated

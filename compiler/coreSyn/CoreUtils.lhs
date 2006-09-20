@@ -33,7 +33,7 @@ module CoreUtils (
 	-- Equality
 	cheapEqExpr, tcEqExpr, tcEqExprX, applyTypeToArgs, applyTypeToArg,
 
-        dataConOrigInstPat, dataConRepInstPat, dataConRepOccInstPat
+        dataConOrigInstPat, dataConRepInstPat, dataConRepFSInstPat
     ) where
 
 #include "HsVersions.h"
@@ -46,7 +46,7 @@ import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
 import Var		( Var, TyVar, CoVar, isCoVar, tyVarKind, setVarUnique,
                           mkCoVar, mkTyVar, mkCoVar )
-import OccName          ( OccName, occNameFS, mkVarOcc )
+import OccName          ( OccName, occNameFS, mkVarOccFS )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName, mkSysTvName )
@@ -88,7 +88,7 @@ import Outputable
 import DynFlags		( DynFlags, DynFlag(Opt_DictsCheap), dopt )
 import TysPrim		( alphaTy )	-- Debugging only
 import Util             ( equalLength, lengthAtLeast, foldl2 )
-import FastString       ( mkFastString )
+import FastString       ( FastString )
 \end{code}
 
 
@@ -681,16 +681,18 @@ deepCast ty tyVars co
     coArgs = decomposeCo (length tyVars) co
 
 -- These InstPat functions go here to avoid circularity between DataCon and Id
-dataConOrigInstPat   = dataConInstPat dataConOrigArgTys
-dataConRepInstPat    = dataConInstPat dataConRepArgTys
-dataConRepOccInstPat = dataConOccInstPat dataConRepArgTys
+dataConOrigInstPat   = dataConInstPat dataConOrigArgTys (repeat (FSLIT("ipv")))
+dataConRepInstPat    = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
+dataConRepFSInstPat = dataConInstPat dataConRepArgTys
 
-dataConInstPat :: (DataCon -> [Type])       -- function used to find arg tys
-               -> [Unique]                  -- A long enough list of uniques, at least one for each binder
-               -> DataCon
-	       -> [Type]                    -- Types to instantiate the universally quantified tyvars
-	       -> ([TyVar], [CoVar], [Id])  -- Return instantiated variables
--- dataConInstPat us con inst_tys returns a triple (ex_tvs, co_tvs, arg_ids),
+dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
+                  -> [FastString]          -- A long enough list of FSs to use for names
+                  -> [Unique]              -- An equally long list of uniques, at least one for each binder
+                  -> DataCon
+	          -> [Type]                -- Types to instantiate the universally quantified tyvars
+	       -> ([TyVar], [CoVar], [Id]) -- Return instantiated variables
+-- dataConInstPat arg_fun us fss con inst_tys returns a triple 
+-- (ex_tvs, co_tvs, arg_ids),
 --
 --   ex_tvs are intended to be used as binders for existential type args
 --
@@ -716,25 +718,8 @@ dataConInstPat :: (DataCon -> [Type])       -- function used to find arg tys
 --  ([a1'', a2'', b''],[c :: (a1',a2'):=:(a1'',a2'')],[x :: Int,y :: b''])
 --
 --  where the double-primed variables are created from the unique list input
-dataConInstPat arg_fun uniqs con inst_tys 
-  = dataConOccInstPat arg_fun uniqs occs con inst_tys
-  where
-     -- dataConOccInstPat doesn't actually make use of the OccName directly for
-     -- existential and coercion variable binders, so it is right to just
-     -- use the VarName namespace for all of the OccNames
-    occs      = mk_occs 1
-    mk_occs n = mkVarOcc ("ipv" ++ show n) : mk_occs (n+1)
-
-dataConOccInstPat :: (DataCon -> [Type])       -- function used to find arg tys
-                  -> [Unique]                  -- A long enough list of uniques, at least one for each binder
-                  -> [OccName]                 -- An equally long list of OccNames to use
-                  -> DataCon
-	          -> [Type]                    -- Types to instantiate the universally quantified tyvars
-	       -> ([TyVar], [CoVar], [Id])  -- Return instantiated variables
--- This function actually does the job specified in the comment for 
--- dataConInstPat, but uses the specified list of OccNames.  This is 
--- is necessary for use in e.g. tcIfaceDataAlt
-dataConOccInstPat arg_fun uniqs occs con inst_tys 
+--  getting names from the FS list input
+dataConInstPat arg_fun fss uniqs con inst_tys 
   = (ex_bndrs, co_bndrs, id_bndrs)
   where 
     univ_tvs = dataConUnivTyVars con
@@ -747,34 +732,34 @@ dataConOccInstPat arg_fun uniqs occs con inst_tys
     n_co = length eq_spec
     n_id = length arg_tys
 
-      -- split the Uniques and OccNames
+      -- split the Uniques and FastStrings
     (ex_uniqs, uniqs')   = splitAt n_ex uniqs
     (co_uniqs, id_uniqs) = splitAt n_co uniqs'
 
-    (ex_occs, occs')     = splitAt n_ex occs
-    (co_occs, id_occs)   = splitAt n_co occs'
+    (ex_fss, fss')     = splitAt n_ex fss
+    (co_fss, id_fss)   = splitAt n_co fss'
 
       -- make existential type variables
-    mk_ex_var uniq occ var = mkTyVar new_name kind
+    mk_ex_var uniq fs var = mkTyVar new_name kind
       where
-        new_name = mkSysTvName uniq (occNameFS occ)
+        new_name = mkSysTvName uniq fs
         kind     = tyVarKind var
 
-    ex_bndrs = zipWith3 mk_ex_var ex_uniqs ex_occs ex_tvs
+    ex_bndrs = zipWith3 mk_ex_var ex_uniqs ex_fss ex_tvs
 
       -- make the instantiation substitution
     inst_subst = substTyWith (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
 
       -- make new coercion vars, instantiating kind
-    mk_co_var uniq occ eq_pred = mkCoVar new_name (inst_subst (mkPredTy eq_pred))
+    mk_co_var uniq fs eq_pred = mkCoVar new_name (inst_subst (mkPredTy eq_pred))
        where
-         new_name = mkSysTvName uniq (occNameFS occ)
+         new_name = mkSysTvName uniq fs
 
-    co_bndrs = zipWith3 mk_co_var co_uniqs co_occs eq_preds
+    co_bndrs = zipWith3 mk_co_var co_uniqs co_fss eq_preds
 
       -- make value vars, instantiating types
-    mk_id_var uniq occ ty = mkUserLocal occ uniq (inst_subst ty) noSrcLoc
-    id_bndrs = zipWith3 mk_id_var id_uniqs id_occs arg_tys
+    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (inst_subst ty) noSrcLoc
+    id_bndrs = zipWith3 mk_id_var id_uniqs id_fss arg_tys
 
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 -- Returns (Just (dc, [x1..xn])) if the argument expression is 
