@@ -483,20 +483,19 @@ mkLocalOcc uniq occ
 -- Derive a name for the representation type constructor of a data/newtype
 -- instance.
 --
-mkInstTyTcOcc :: Unique 		-- Unique
+mkInstTyTcOcc :: Int			-- Index
 	      -> OccName		-- Local name (e.g. "Map")
 	      -> OccName		-- Nice unique version (":R23Map")
-mkInstTyTcOcc uniq occ
-   = mk_deriv varName (":R" ++ show uniq) (occNameString occ)
+mkInstTyTcOcc index occ
+   = mk_deriv varName (":R" ++ show index) (occNameString occ)
 
 -- Derive a name for the coercion of a data/newtype instance.
 --
-mkInstTyCoOcc :: Unique 		-- Unique
+mkInstTyCoOcc :: Int			-- Index
 	      -> OccName		-- Local name (e.g. "Map")
-	      -> OccName		-- Nice unique version ("Co23Map")
-mkInstTyCoOcc uniq occ
-   = mk_deriv varName ("Co" ++ show uniq) (occNameString occ)
-
+	      -> OccName		-- Nice unique version (":Co23Map")
+mkInstTyCoOcc index occ
+   = mk_deriv varName (":Co" ++ show index) (occNameString occ)
 \end{code}
 
 \begin{code}

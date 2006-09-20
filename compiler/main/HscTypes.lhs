@@ -83,7 +83,8 @@ import Id		( Id )
 import Type		( TyThing(..) )
 
 import Class		( Class, classSelIds, classTyCon )
-import TyCon		( TyCon, tyConSelIds, tyConDataCons, isNewTyCon, newTyConCo )
+import TyCon		( TyCon, tyConSelIds, tyConDataCons, isNewTyCon,
+			  newTyConCo_maybe, tyConFamilyCoercion_maybe )
 import DataCon		( dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
 import Packages		( PackageId )
@@ -105,6 +106,7 @@ import FastString	( FastString )
 
 import DATA_IOREF	( IORef, readIORef )
 import StringBuffer	( StringBuffer )
+import Maybe            ( catMaybes )
 import Time		( ClockTime )
 \end{code}
 
@@ -626,9 +628,10 @@ implicitTyThings (AnId id)   = []
 	-- and the selectors and generic-programming Ids too
 	--
 	-- Newtypes don't have a worker Id, so don't generate that?
-implicitTyThings (ATyCon tc) = implicitNewCoTyCon tc ++
+implicitTyThings (ATyCon tc) = implicitCoTyCon tc ++
 			       map AnId (tyConSelIds tc) ++ 
-			       concatMap (extras_plus . ADataCon) (tyConDataCons tc)
+			       concatMap (extras_plus . ADataCon) 
+					 (tyConDataCons tc)
 		     
 	-- For classes, add the class TyCon too (and its extras)
 	-- and the class selector Ids
@@ -639,10 +642,10 @@ implicitTyThings (AClass cl) = map AnId (classSelIds cl) ++
 	-- For data cons add the worker and wrapper (if any)
 implicitTyThings (ADataCon dc) = map AnId (dataConImplicitIds dc)
 
-	-- For newtypes, add the implicit coercion tycon
-implicitNewCoTyCon tc 
-  | isNewTyCon tc, Just co_con <- newTyConCo tc = [ATyCon co_con]
-  | otherwise = []
+	-- For newtypes and indexed data types, add the implicit coercion tycon
+implicitCoTyCon tc 
+  = map ATyCon . catMaybes $ [newTyConCo_maybe tc, 
+			      tyConFamilyCoercion_maybe tc]
 
 extras_plus thing = thing : implicitTyThings thing
 

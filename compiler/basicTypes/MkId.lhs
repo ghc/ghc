@@ -64,7 +64,7 @@ import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon,
                           isRecursiveTyCon, isFamInstTyCon,
                           tyConFamInst_maybe, tyConFamilyCoercion_maybe,
-                          newTyConCo )
+                          newTyConCo_maybe )
 import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var, setIdType )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
@@ -220,14 +220,14 @@ This coercion is conditionally applied by wrapFamInstBody.
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
 mkDataConIds wrap_name wkr_name data_con
   | isNewTyCon tycon
-  = DCIds Nothing nt_work_id                    -- Newtype, only has a worker
+  = DCIds Nothing nt_work_id                 -- Newtype, only has a worker
 
-  | any isMarkedStrict all_strict_marks		-- Algebraic, needs wrapper
-    || not (null eq_spec)
-    || isFamInstTyCon tycon
+  | any isMarkedStrict all_strict_marks	     -- Algebraic, needs wrapper
+    || not (null eq_spec)		     -- NB: LoadIface.ifaceDeclSubBndrs
+    || isFamInstTyCon tycon		     --     depends on this test
   = DCIds (Just alg_wrap_id) wrk_id
 
-  | otherwise					-- Algebraic, no wrapper
+  | otherwise				     -- Algebraic, no wrapper
   = DCIds Nothing wrk_id
   where
     (univ_tvs, ex_tvs, eq_spec, 
@@ -860,7 +860,7 @@ wrapNewTypeBody tycon args result_expr
   = wrapFamInstBody tycon args inner
   where
     inner
-      | Just co_con <- newTyConCo tycon
+      | Just co_con <- newTyConCo_maybe tycon
       = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
       | otherwise
       = result_expr
@@ -872,7 +872,7 @@ wrapNewTypeBody tycon args result_expr
 --
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
-  | Just co_con <- newTyConCo tycon
+  | Just co_con <- newTyConCo_maybe tycon
   = mkCoerce (mkTyConApp co_con args) result_expr
   | otherwise
   = result_expr

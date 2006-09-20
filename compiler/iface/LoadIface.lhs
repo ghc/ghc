@@ -49,9 +49,9 @@ import NameEnv
 import MkId		( seqId )
 import Module
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc,
-                          mkClassDataConOcc, mkSuperDictSelOcc,
-                          mkDataConWrapperOcc, mkDataConWorkerOcc,
-                          mkNewTyCoOcc )
+			  mkClassDataConOcc, mkSuperDictSelOcc,
+			  mkDataConWrapperOcc, mkDataConWorkerOcc,
+			  mkNewTyCoOcc, mkInstTyTcOcc, mkInstTyCoOcc ) 
 import SrcLoc		( importedSrcLoc )
 import Maybes		( MaybeErr(..) )
 import ErrUtils         ( Message )
@@ -64,6 +64,7 @@ import BinIface		( readBinIface, v_IgnoreHiWay )
 import Binary		( getBinFileWithDict )
 import Panic		( ghcError, tryMost, showException, GhcException(..) )
 import List		( nub )
+import Maybe            ( isJust )
 import DATA_IOREF	( writeIORef )
 \end{code}
 
@@ -300,7 +301,7 @@ loadDecl ignore_prags mod (_version, decl)
 	  main_name      <- mk_new_bndr mod Nothing (ifName decl)
 	; implicit_names <- mapM (mk_new_bndr mod (Just main_name)) 
 				 (ifaceDeclSubBndrs decl)
-        ; at_names       <- mapM (mk_new_bndr mod Nothing) (atNames decl)
+        ; at_names       <- mapM (mk_new_bndr mod  (Just main_name)) (atNames decl)
 
 	-- Typecheck the thing, lazily
 	-- NB. firstly, the laziness is there in case we never need the
@@ -387,12 +388,18 @@ ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}
 ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
 			      ifCons = IfNewTyCon (
 				         IfCon { ifConOcc = con_occ, 
-						 ifConFields = fields})})
-  = fields ++ [con_occ, mkDataConWrapperOcc con_occ, mkNewTyCoOcc tc_occ]
+							   ifConFields = fields
+							 }),
+			      ifFamInst = famInst}) 
+  = fields ++ [con_occ, mkDataConWorkerOcc con_occ, mkNewTyCoOcc tc_occ]
+    ++ famInstCo famInst tc_occ
 
-ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
+ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
+			      ifCons = IfDataTyCon cons, 
+			      ifFamInst = famInst})
   = nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields
     ++ concatMap dc_occs cons
+    ++ famInstCo famInst tc_occ
   where
     dc_occs con_decl
 	| has_wrapper = [con_occ, work_occ, wrap_occ]
@@ -403,9 +410,16 @@ ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
 	  wrap_occ = mkDataConWrapperOcc con_occ
 	  work_occ = mkDataConWorkerOcc con_occ
 	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
+			|| not (null . ifConEqSpec $ con_decl)
+			|| isJust famInst
 		-- ToDo: may miss strictness in existential dicts
 
 ifaceDeclSubBndrs _other = []
+
+-- coercion for data/newtype family instances
+famInstCo Nothing              baseOcc = []
+famInstCo (Just (_, _, index)) baseOcc = [mkInstTyTcOcc index baseOcc,
+				          mkInstTyCoOcc index baseOcc]
 \end{code}
 
 

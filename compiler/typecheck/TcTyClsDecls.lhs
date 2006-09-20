@@ -319,6 +319,7 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; t_typats     <- mappM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
+       ; index <- nextDFunIndex		   -- to generate unique names
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
 					      tycon t_tvs))
@@ -330,7 +331,7 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			    ASSERT( isSingleton data_cons )
 			    mkNewTyConRhs tc_name tycon (head data_cons)
 	     ; buildAlgTyCon tc_name t_tvs stupid_theta tc_rhs Recursive
-			     False h98_syntax (Just (family, t_typats))
+			     False h98_syntax (Just (family, t_typats, index))
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive

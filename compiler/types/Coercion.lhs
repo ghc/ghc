@@ -41,7 +41,7 @@ import Type	  ( Type, Kind, PredType, substTyWith, mkAppTy, mkForAllTy,
                     tyVarsOfType, mkTyVarTys
                   )
 import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isClosedNewTyCon,
-                    newTyConRhs, newTyConCo, 
+                    newTyConRhs, newTyConCo_maybe, 
                     isCoercionTyCon, isCoercionTyCon_maybe )
 import Var	  ( Var, TyVar, isTyVar, tyVarKind )
 import VarSet     ( elemVarSet )
@@ -459,6 +459,6 @@ splitNewTypeRepCo_maybe (TyConApp tc tys)
               ASSERT( length tvs == length tys )
 	      Just (substTyWith tvs tys rep_ty, mkTyConApp co_con tys)
   where
-    co_con = maybe (pprPanic "splitNewTypeRepCo_maybe" (ppr tc)) id (newTyConCo tc)
+    co_con = maybe (pprPanic "splitNewTypeRepCo_maybe" (ppr tc)) id (newTyConCo_maybe tc)
 splitNewTypeRepCo_maybe other = Nothing
 \end{code}

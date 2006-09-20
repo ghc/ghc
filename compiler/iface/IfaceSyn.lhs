@@ -87,7 +87,8 @@ data IfaceDecl
     						-- current compilation unit 
                 ifFamInst    :: Maybe           -- Just _ <=> instance of fam
 				  (IfaceTyCon,  --   Family tycon
-				   [IfaceType]) --   Instance types
+				   [IfaceType], --   Instance types
+				   Int    )     --   Unique index for naming
     }
 
   | IfaceSyn  {	ifName    :: OccName,		-- Type constructor
@@ -283,9 +284,10 @@ pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
 pprGen True  = ptext SLIT("Generics: yes")
 pprGen False = ptext SLIT("Generics: no")
 
-pprFamily Nothing           = ptext SLIT("FamilyInstance: none")
-pprFamily (Just (fam, tys)) = ptext SLIT("FamilyInstance:") <+> 
-			      ppr fam <+> hsep (map ppr tys)
+pprFamily Nothing                  = ptext SLIT("FamilyInstance: none")
+pprFamily (Just (fam, tys, index)) = ptext SLIT("FamilyInstance:") <+> 
+			             ppr fam <+> hsep (map ppr tys) <+>
+				     brackets (ppr index)
 
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
@@ -554,10 +556,10 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	-- over the constructors (any more), but they do scope
 	-- over the stupid context in the IfaceConDecls
   where
-    Nothing             `eqIfTc_fam` Nothing             = Equal
-    (Just (fam1, tys1)) `eqIfTc_fam` (Just (fam2, tys2)) = 
-      fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2
-    _		        `eqIfTc_fam` _                   = NotEqual
+    Nothing                  `eqIfTc_fam` Nothing                  = Equal
+    (Just (fam1, tys1, co1)) `eqIfTc_fam` (Just (fam2, tys2, co2)) = 
+      fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2 &&& bool (co1 == co2)
+    _		             `eqIfTc_fam` _                        = NotEqual
 
 eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
   = bool (ifName d1 == ifName d2) &&&

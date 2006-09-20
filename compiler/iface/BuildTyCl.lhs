@@ -69,7 +69,8 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> RecFlag
 	      -> Bool			-- True <=> want generics functions
 	      -> Bool			-- True <=> was declared in GADT syntax
-	      -> Maybe (TyCon, [Type])	-- Just (family, tys) 
+	      -> Maybe (TyCon, [Type], 
+		        Int)            -- Just (family, tys, index) 
 					-- <=> instance of `family' at `tys'
 	      -> TcRnIf m n TyCon
 
@@ -102,20 +103,19 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
     -- (3) Produce a `AlgTyConParent' value containing the parent and coercion
     --     information.
     --
-    maybeComputeFamilyInfo Nothing                  rep_tycon = 
+    maybeComputeFamilyInfo Nothing                         rep_tycon = 
       return (tc_name, NoParentTyCon)
-    maybeComputeFamilyInfo (Just (family, instTys)) rep_tycon =
+    maybeComputeFamilyInfo (Just (family, instTys, index)) rep_tycon =
       do { -- (1) New, derived name for the instance tycon
-	 ; uniq <- newUnique
-	 ; final_name <- newImplicitBinder tc_name (mkInstTyTcOcc uniq)
+	 ; final_name <- newImplicitBinder tc_name (mkInstTyTcOcc index)
 
 	   -- (2) Create the coercion.
-	 ; co_tycon_name <- newImplicitBinder tc_name (mkInstTyCoOcc uniq)
+	 ; co_tycon_name <- newImplicitBinder tc_name (mkInstTyCoOcc index)
 	 ; let co_tycon = mkDataInstCoercion co_tycon_name tvs
 					     family instTys rep_tycon
 
 	   -- (3) Produce parent information.
-	 ; return (final_name, FamilyTyCon family instTys co_tycon)
+	 ; return (final_name, FamilyTyCon family instTys co_tycon index)
 	 }
     
 

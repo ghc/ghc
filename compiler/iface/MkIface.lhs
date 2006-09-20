@@ -191,7 +191,7 @@ import TyCon		( TyCon, AlgTyConRhs(..), SynTyConRhs(..),
 			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
 			  tyConHasGenerics, synTyConRhs, isGadtSyntaxTyCon,
 			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName,
-			  tyConFamInst_maybe )
+			  tyConFamInst_maybe, tyConFamInstIndex )
 import DataCon		( dataConName, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, dataConUnivTyVars,
 			  dataConExTyVars, dataConEqSpec, dataConTheta,
@@ -379,17 +379,17 @@ mkExtNameFn hsc_env eps this_mod
     	occ	 = nameOccName name
     	par_occ  = nameOccName (nameParent name)
     		-- The version of the *parent* is the one want
-    	vers     = lookupVersion mod par_occ
+    	vers     = lookupVersion mod par_occ occ
     	      
-    lookupVersion :: Module -> OccName -> Version
+    lookupVersion :: Module -> OccName -> OccName -> Version
 	-- Even though we're looking up a home-package thing, in
 	-- one-shot mode the imported interfaces may be in the PIT
-    lookupVersion mod occ
-      = mi_ver_fn iface occ `orElse` 
-        pprPanic "lookupVers1" (ppr mod <+> ppr occ)
+    lookupVersion mod par_occ occ
+      = mi_ver_fn iface par_occ `orElse` 
+        pprPanic "lookupVers1" (ppr mod <+> ppr par_occ <+> ppr occ)
       where
         iface = lookupIfaceByModule (hsc_dflags hsc_env) hpt pit mod `orElse` 
-	        pprPanic "lookupVers2" (ppr mod <+> ppr occ)
+	        pprPanic "lookupVers2" (ppr mod <+> ppr par_occ <+> ppr occ)
 
 
 ---------------------
@@ -1036,7 +1036,8 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
 		ifGeneric = tyConHasGenerics tycon,
-		ifFamInst = famInstToIface $ tyConFamInst_maybe tycon }
+		ifFamInst = famInstToIface (tyConFamInst_maybe tycon)
+					   (tyConFamInstIndex tycon) }
 
   | isForeignTyCon tycon
   = IfaceForeign { ifName    = getOccName tycon,
@@ -1087,9 +1088,9 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 
     to_eq_spec spec = [(getOccName tv, toIfaceType ext ty) | (tv,ty) <- spec]
 
-    famInstToIface Nothing                    = Nothing
-    famInstToIface (Just (famTyCon, instTys)) = 
-      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys)
+    famInstToIface Nothing                    _     = Nothing
+    famInstToIface (Just (famTyCon, instTys)) index = 
+      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys, index)
 
 tyThingToIfaceDecl ext (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier

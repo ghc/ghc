@@ -33,7 +33,7 @@ import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
                           splitFunTys, TyThing(ATyCon), isTyVarTy, tcEqType,
                           substTys, emptyTvSubst, extendTvSubst )
 import Coercion         ( mkSymCoercion )
-import TyCon            ( TyCon, tyConName, newTyConCo, tyConTyVars,
+import TyCon            ( TyCon, tyConName, newTyConCo_maybe, tyConTyVars,
 			  isTyConAssoc, tyConFamInst_maybe,
 			  assocTyConArgPoss_maybe )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
@@ -550,7 +550,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
   where
   	-- For newtype T a = MkT <ty>
 	-- The returned coercion has kind :: C (T a):=:C <ty>
-    co_fn tvs cls_tycon cls_inst_tys | Just co_con <- newTyConCo tycon
+    co_fn tvs cls_tycon cls_inst_tys | Just co_con <- newTyConCo_maybe tycon
           = ExprCoFn (mkTyConApp cls_tycon (drop_tail 1 cls_inst_tys ++
                       [mkSymCoercion (mkTyConApp co_con (map mkTyVarTy tvs))]))
           | otherwise
