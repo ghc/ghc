@@ -1,4 +1,4 @@
-%
+
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{Dealing with interface files}
@@ -9,7 +9,9 @@ module LoadIface (
 	loadSrcInterface, loadSysInterface, loadOrphanModules, 
 	findAndReadIface, readIface,	-- Used when reading the module's old interface
 	loadDecls, ifaceStats, discardDeclPrags,
-	initExternalPackageState
+	initExternalPackageState,
+
+	pprModIface, showIface 	-- Print the iface in Foo.hi
    ) where
 
 #include "HsVersions.h"
@@ -20,7 +22,9 @@ import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
 			  IfaceConDecls(..), IfaceIdInfo(..) )
 import IfaceEnv		( newGlobalBinder )
-import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..),
+import HscTypes		( ModIface(..), TyThing, IfaceExport, Usage(..), 
+			  Deprecs(..), Dependencies(..),
+			  emptyModIface, EpsStats(..), GenAvailInfo(..),
 			  addEpsInStats, ExternalPackageState(..),
 			  PackageTypeEnv, emptyTypeEnv,  HscEnv(..),
 			  lookupIfaceByModule, emptyPackageIfaceTable,
@@ -28,8 +32,8 @@ import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..),
 			  implicitTyThings 
 			 )
 
-import BasicTypes	( Version, Fixity(..), FixityDirection(..),
-			  isMarkedStrict )
+import BasicTypes	( Version, initialVersion,
+			  Fixity(..), FixityDirection(..), isMarkedStrict )
 import TcRnMonad
 
 import PrelNames	( gHC_PRIM )
@@ -43,18 +47,22 @@ import NameEnv
 import MkId		( seqId )
 import Module
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc,
-                          mkClassDataConOcc, mkSuperDictSelOcc, 
-                          mkDataConWrapperOcc, mkDataConWorkerOcc )
+                          mkClassDataConOcc, mkSuperDictSelOcc,
+                          mkDataConWrapperOcc, mkDataConWorkerOcc,
+                          mkNewTyCoOcc )
 import SrcLoc		( importedSrcLoc )
 import Maybes		( MaybeErr(..) )
 import ErrUtils         ( Message )
 import Finder		( findImportedModule, findExactModule,  
 			  FindResult(..), cannotFindInterface )
 import UniqFM
+import StaticFlags	( opt_HiVersion )
 import Outputable
-import BinIface		( readBinIface )
+import BinIface		( readBinIface, v_IgnoreHiWay )
+import Binary		( getBinFileWithDict )
 import Panic		( ghcError, tryMost, showException, GhcException(..) )
 import List		( nub )
+import DATA_IOREF	( writeIORef )
 \end{code}
 
 
@@ -296,7 +304,7 @@ loadDecl ignore_prags mod (_version, decl)
 	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
 	      lookup n = case lookupOccEnv mini_env (getOccName n) of
 			   Just thing -> thing
-			   Nothing    -> pprPanic "loadDecl" (ppr main_name <+> ppr n)
+			   Nothing    -> pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (stripped_decl) )
 
 	; returnM ((main_name, thing) : [(n, lookup n) | n <- implicit_names]) }
 		-- We build a list from the *known* names, with (lookup n) thunks
@@ -334,6 +342,8 @@ ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
 -- Deeply revolting, because it has to predict what gets bound,
 -- especially the question of whether there's a wrapper for a datacon
+--
+-- If you change this, make sure you change HscTypes.implicitTyThings in sync
 
 ifaceDeclSubBndrs IfaceClass { ifCtxt = sc_ctxt, 
                                ifName = cls_occ, 
@@ -356,18 +366,17 @@ ifaceDeclSubBndrs IfaceClass { ifCtxt = sc_ctxt,
 ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}
   = []
 -- Newtype
-ifaceDeclSubBndrs IfaceData {ifCons = IfNewTyCon (IfVanillaCon { 
-                                                      ifConOcc = con_occ,
-                                                      ifConFields = fields})}
-  = fields ++ [con_occ, mkDataConWrapperOcc con_occ]
+ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
+			      ifCons = IfNewTyCon (
+				         IfCon { ifConOcc = con_occ, 
+						 ifConFields = fields})})
+  = fields ++ [con_occ, mkDataConWrapperOcc con_occ, mkNewTyCoOcc tc_occ]
 	-- Wrapper, no worker; see MkId.mkDataConIds
 
 ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
-  = nub (concatMap fld_occs cons) 	-- Eliminate duplicate fields
+  = nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields
     ++ concatMap dc_occs cons
   where
-    fld_occs (IfVanillaCon { ifConFields = fields }) = fields
-    fld_occs (IfGadtCon {})                          = []
     dc_occs con_decl
 	| has_wrapper = [con_occ, work_occ, wrap_occ]
 	| otherwise   = [con_occ, work_occ]
@@ -379,8 +388,7 @@ ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
 	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
 		-- ToDo: may miss strictness in existential dicts
 
-ifaceDeclSubBndrs _other 		      = []
-
+ifaceDeclSubBndrs _other = []
 \end{code}
 
 
@@ -546,6 +554,123 @@ ifaceStats eps
 \end{code}    
 
 
+%************************************************************************
+%*				 					*
+		Printing interfaces
+%*				 					*
+%************************************************************************
+
+\begin{code}
+showIface :: FilePath -> IO ()
+-- Read binary interface, and print it out
+showIface filename = do
+   -- skip the version check; we don't want to worry about profiled vs.
+   -- non-profiled interfaces, for example.
+   writeIORef v_IgnoreHiWay True
+   iface <- Binary.getBinFileWithDict filename
+   printDump (pprModIface iface)
+ where
+\end{code}
+
+
+\begin{code}
+pprModIface :: ModIface -> SDoc
+-- Show a ModIface
+pprModIface iface
+ = vcat [ ptext SLIT("interface")
+		<+> ppr_package (mi_package iface)
+		<+> ppr (mi_module iface) <+> pp_boot 
+		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
+		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
+		<+> int opt_HiVersion
+		<+> ptext SLIT("where")
+	, vcat (map pprExport (mi_exports iface))
+	, pprDeps (mi_deps iface)
+	, vcat (map pprUsage (mi_usages iface))
+	, pprFixities (mi_fixities iface)
+	, vcat (map pprIfaceDecl (mi_decls iface))
+	, vcat (map ppr (mi_insts iface))
+	, vcat (map ppr (mi_rules iface))
+	, pprDeprecs (mi_deprecs iface)
+	]
+  where
+    pp_boot | mi_boot iface = ptext SLIT("[boot]")
+	    | otherwise     = empty
+    ppr_package HomePackage = empty
+    ppr_package (ExtPackage id) = doubleQuotes (ppr id)
+
+    exp_vers  = mi_exp_vers iface
+    rule_vers = mi_rule_vers iface
+
+    pp_sub_vers | exp_vers == initialVersion && rule_vers == initialVersion = empty
+		| otherwise = brackets (ppr exp_vers <+> ppr rule_vers)
+\end{code}
+
+When printing export lists, we print like this:
+	Avail   f		f
+	AvailTC C [C, x, y]	C(x,y)
+	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
+
+\begin{code}
+pprExport :: IfaceExport -> SDoc
+pprExport (mod, items)
+ = hsep [ ptext SLIT("export"), ppr mod, hsep (map pp_avail items) ]
+  where
+    pp_avail :: GenAvailInfo OccName -> SDoc
+    pp_avail (Avail occ)    = ppr occ
+    pp_avail (AvailTC _ []) = empty
+    pp_avail (AvailTC n (n':ns)) 
+	| n==n'     = ppr n <> pp_export ns
+ 	| otherwise = ppr n <> char '|' <> pp_export (n':ns)
+    
+    pp_export []    = empty
+    pp_export names = braces (hsep (map ppr names))
+
+pprUsage :: Usage -> SDoc
+pprUsage usage
+  = hsep [ptext SLIT("import"), ppr (usg_name usage), 
+	  int (usg_mod usage), 
+	  pp_export_version (usg_exports usage),
+	  int (usg_rules usage),
+	  pp_versions (usg_entities usage) ]
+  where
+    pp_versions nvs = hsep [ ppr n <+> int v | (n,v) <- nvs ]
+    pp_export_version Nothing  = empty
+    pp_export_version (Just v) = int v
+
+pprDeps :: Dependencies -> SDoc
+pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs})
+  = vcat [ptext SLIT("module dependencies:") <+> fsep (map ppr_mod mods),
+	  ptext SLIT("package dependencies:") <+> fsep (map ppr pkgs), 
+	  ptext SLIT("orphans:") <+> fsep (map ppr orphs)
+	]
+  where
+    ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot
+    ppr_boot True  = text "[boot]"
+    ppr_boot False = empty
+
+pprIfaceDecl :: (Version, IfaceDecl) -> SDoc
+pprIfaceDecl (ver, decl)
+  = ppr_vers ver <+> ppr decl
+  where
+	-- Print the version for the decl
+    ppr_vers v | v == initialVersion = empty
+	       | otherwise	     = int v
+
+pprFixities :: [(OccName, Fixity)] -> SDoc
+pprFixities []    = empty
+pprFixities fixes = ptext SLIT("fixities") <+> pprWithCommas pprFix fixes
+		  where
+		    pprFix (occ,fix) = ppr fix <+> ppr occ 
+
+pprDeprecs NoDeprecs	    = empty
+pprDeprecs (DeprecAll txt)  = ptext SLIT("Deprecate all") <+> doubleQuotes (ftext txt)
+pprDeprecs (DeprecSome prs) = ptext SLIT("Deprecate") <+> vcat (map pprDeprec prs)
+			    where
+			      pprDeprec (name, txt) = ppr name <+> doubleQuotes (ftext txt)
+\end{code}
+
+
 %*********************************************************
 %*						 	 *
 \subsection{Errors}
@@ -579,3 +704,4 @@ wrongIfaceModErr iface mod_name file_path
 	]
   where iface_file = doubleQuotes (text file_path)
 \end{code}
+
