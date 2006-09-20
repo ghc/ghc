@@ -2533,7 +2533,7 @@ monomorphism_fix = ptext SLIT("Probable fix:") <+>
     
 warnDefault dicts default_ty
   = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
-    addInstCtxt (instLoc (head dicts)) (warnTc warn_flag warn_msg)
+    addInstCtxt (instLoc (head (dicts))) (warnTc warn_flag warn_msg)
   where
 	-- Tidy them first
     (_, tidy_dicts) = tidyInsts dicts

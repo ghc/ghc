@@ -138,7 +138,7 @@ mkNewTyConRep tc rhs_ty
                     if isRecursiveTyCon tc then
 			go (tc:tcs) (substTyWith tvs tys rhs_ty)
                     else
-                        go tcs (head tys)
+                        substTyWith tvs tys rhs_ty
 		where
 		  (tvs, rhs_ty) = newTyConRhs tc
 

@@ -76,6 +76,7 @@ import Char             ( ord )
 %************************************************************************
 
 \begin{code}
+
 data PprStyle
   = PprUser PrintUnqualified Depth
 		-- Pretty-print in a way that will make sense to the

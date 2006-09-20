@@ -465,7 +465,7 @@ makeDerivEqns overlap_flag tycl_decls
 		-- If there are no tyvars, there's no need
 		-- to abstract over the dictionaries we need
 	dict_tvs = deriv_tvs ++ tc_tvs
-	dict_args | null dict_tvs = []
+	dict_args -- | null dict_tvs = []
 		  | otherwise     = rep_pred : sc_theta
 
 		-- Finally! Here's where we build the dictionary Id

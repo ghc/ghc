@@ -608,7 +608,7 @@ We know the list must have at least one @Match@ in it.
 
 \begin{code}
 pprMatches :: (OutputableBndr id) => HsMatchContext id -> MatchGroup id -> SDoc
-pprMatches ctxt (MatchGroup matches _) = vcat (map (pprMatch ctxt) (map unLoc matches))
+pprMatches ctxt (MatchGroup matches ty) = (ppr ty) $$ vcat (map (pprMatch ctxt) (map unLoc matches))
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
 pprFunBind :: (OutputableBndr id) => id -> MatchGroup id -> SDoc

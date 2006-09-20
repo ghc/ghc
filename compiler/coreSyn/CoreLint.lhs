@@ -396,12 +396,13 @@ lintCoreArg fun_ty a@(Type arg_ty) =
 lintCoreArg fun_ty arg = 
        -- Make sure function type matches argument
   do { arg_ty <- lintCoreExpr arg
-     ; let err = mkAppMsg fun_ty arg_ty arg
+     ; let err1 =  mkAppMsg fun_ty arg_ty arg
+           err2 = mkNonFunAppMsg fun_ty arg_ty arg
      ; case splitFunTy_maybe fun_ty of
         Just (arg,res) -> 
-          do { checkTys arg arg_ty err 
+          do { checkTys arg arg_ty err1
              ; return res }
-        _ -> addErrL err }
+        _ -> addErrL err2 }
 \end{code}
 
 \begin{code}
@@ -815,6 +816,13 @@ mkNewTyDataConAltMsg scrut_ty alt
 mkAppMsg :: Type -> Type -> CoreExpr -> Message
 mkAppMsg fun_ty arg_ty arg
   = vcat [ptext SLIT("Argument value doesn't match argument type:"),
+	      hang (ptext SLIT("Fun type:")) 4 (ppr fun_ty),
+	      hang (ptext SLIT("Arg type:")) 4 (ppr arg_ty),
+	      hang (ptext SLIT("Arg:")) 4 (ppr arg)]
+
+mkNonFunAppMsg :: Type -> Type -> CoreExpr -> Message
+mkNonFunAppMsg fun_ty arg_ty arg
+  = vcat [ptext SLIT("Non-function type in function position"),
 	      hang (ptext SLIT("Fun type:")) 4 (ppr fun_ty),
 	      hang (ptext SLIT("Arg type:")) 4 (ppr arg_ty),
 	      hang (ptext SLIT("Arg:")) 4 (ppr arg)]

@@ -107,6 +107,7 @@ import Outputable
 
 import Control.Monad	( when )
 import Data.List	( (\\) )
+
 \end{code}
 
 
