@@ -374,11 +374,12 @@ uVar swap subst co tv1 ty
 	-> unify subst (mkTransCoercion (mkSymCoercion co') co) ty' ty
 
      -- No, continue
-     Nothing -> uUnrefined subst (if swap then mkSymCoercion co else co)
+     Nothing -> uUnrefined swap subst co
 			   tv1 ty ty
 
 
-uUnrefined :: InternalReft        -- An existing substitution to extend
+uUnrefined :: Bool                -- Whether the input is swapped
+           -> InternalReft        -- An existing substitution to extend
 	   -> Coercion
            -> TyVar               -- Type variable to be unified
            -> Type                -- with this type
@@ -386,65 +387,60 @@ uUnrefined :: InternalReft        -- An existing substitution to extend
            -> UM InternalReft
 
 -- We know that tv1 isn't refined
--- PRE-CONDITION: in the call (uUnrefined r co tv1 ty2 ty2'), we know that
---	co :: tv1:=:ty2
+-- PRE-CONDITION: in the call (uUnrefined r co tv ty ty'), we know that
+--	co :: tv:=:ty
 
-uUnrefined subst co tv1 ty2 ty2'
+uUnrefined swap subst co tv1 ty2 ty2'
   | Just ty2'' <- tcView ty2'
-  = uUnrefined subst co tv1 ty2 ty2''	-- Unwrap synonyms
+  = uUnrefined swap subst co tv1 ty2 ty2''	-- Unwrap synonyms
 		-- This is essential, in case we have
 		--	type Foo a = a
 		-- and then unify a :=: Foo a
 
-uUnrefined subst co tv1 ty2 (TyVarTy tv2)
+uUnrefined swap subst co tv1 ty2 (TyVarTy tv2)
   | tv1 == tv2		-- Same type variable
   = return subst
 
     -- Check to see whether tv2 is refined
   | Just (co',ty') <- lookupVarEnv subst tv2	-- co' :: tv2:=:ty'
-  = uUnrefined subst (mkTransCoercion co co') tv1 ty' ty'
+  = uUnrefined False subst (mkTransCoercion (doSwap swap co) co') tv1 ty' ty'
 
   -- So both are unrefined; next, see if the kinds force the direction
   | eqKind k1 k2	-- Can update either; so check the bind-flags
   = do	{ b1 <- tvBindFlag tv1
 	; b2 <- tvBindFlag tv2
 	; case (b1,b2) of
-	    (BindMe, _) 	 -> bind False tv1 ty2
+	    (BindMe, _) 	 -> bind swap tv1 ty2
 
-	    (AvoidMe, BindMe)	 -> bind True tv2 ty1
-	    (AvoidMe, _)	 -> bind False tv1 ty2
+	    (AvoidMe, BindMe)	 -> bind (not swap) tv2 ty1
+	    (AvoidMe, _)	 -> bind swap tv1 ty2
 
 	    (WildCard, WildCard) -> return subst
 	    (WildCard, Skolem)   -> return subst
-	    (WildCard, _)	 -> bind True tv2 ty1
+	    (WildCard, _)	 -> bind (not swap) tv2 ty1
 
 	    (Skolem, WildCard)	 -> return subst
 	    (Skolem, Skolem)	 -> failWith (misMatch ty1 ty2)
-	    (Skolem, _)		 -> bind True tv2 ty1
+	    (Skolem, _)		 -> bind (not swap) tv2 ty1
 	}
 
-  | k1 `isSubKind` k2 = bindTv subst (mkSymCoercion co) tv2 ty1	-- Must update tv2
-  | k2 `isSubKind` k1 = bindTv subst co tv1 ty2	-- Must update tv1
+  | k1 `isSubKind` k2 = bindTv (not swap) subst co tv2 ty1  -- Must update tv2
+  | k2 `isSubKind` k1 = bindTv swap subst co tv1 ty2	    -- Must update tv1
 
   | otherwise = failWith (kindMisMatch tv1 ty2)
   where
     ty1 = TyVarTy tv1
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
-    bind swap tv ty = 
-        ASSERT2( (coercionKindPredTy co1 `tcEqType` mkCoKind (mkTyVarTy tv) ty)
-               , (text "Refinement invariant failure: co = " <+> ppr co  <+> ppr (coercionKindPredTy co) $$ text "subst = " <+> ppr tv <+> ppr (mkCoKind (mkTyVarTy tv) ty)))
-        return (extendVarEnv subst tv (co1,ty))
-      where
-        co1 = if swap then mkSymCoercion co else co
+    bind swap tv ty = extendReft swap subst tv co ty
 
-uUnrefined subst co tv1 ty2 ty2'	-- ty2 is not a type variable
+uUnrefined swap subst co tv1 ty2 ty2'	-- ty2 is not a type variable
   | tv1 `elemVarSet` substTvSet subst (tyVarsOfType ty2')
   = failWith (occursCheck tv1 ty2)	-- Occurs check
   | not (k2 `isSubKind` k1)
   = failWith (kindMisMatch tv1 ty2)	-- Kind check
   | otherwise
-  = bindTv subst co tv1 ty2		-- Bind tyvar to the synonym if poss
+  = bindTv swap subst co tv1 ty2		-- Bind tyvar to the synonym if poss
   where
     k1 = tyVarKind tv1
     k2 = typeKind ty2'
@@ -459,15 +455,30 @@ substTvSet subst tvs
 		Nothing	    -> unitVarSet tv
 		Just (_,ty) -> substTvSet subst (tyVarsOfType ty)
 
-bindTv subst co tv ty	-- ty is not a type variable
-  = ASSERT2( (coercionKindPredTy co `tcEqType` mkCoKind (mkTyVarTy tv) ty), 
-          (text "Refinement invariant failure: co = " <+> ppr co  <+> ppr (coercionKindPredTy co) $$ text "subst = " <+> ppr tv <+> ppr (mkCoKind (mkTyVarTy tv) ty))  )
-    do  { b <- tvBindFlag tv
+bindTv swap subst co tv ty	-- ty is not a type variable
+  = do  { b <- tvBindFlag tv
 	; case b of
 	    Skolem   -> failWith (misMatch (TyVarTy tv) ty)
 	    WildCard -> return subst
-	    other    -> return (extendVarEnv subst tv (co,ty))
+	    other    -> extendReft swap subst tv co ty
 	}
+
+doSwap :: Bool -> Coercion -> Coercion
+doSwap swap co = if swap then mkSymCoercion co else co
+
+extendReft :: Bool 
+           -> InternalReft 
+           -> TyVar 
+           -> Coercion 
+           -> Type 
+           -> UM InternalReft
+extendReft swap subst tv  co ty
+  = ASSERT2( (coercionKindPredTy co1 `tcEqType` mkCoKind (mkTyVarTy tv) ty), 
+          (text "Refinement invariant failure: co = " <+> ppr co1  <+> ppr (coercionKindPredTy co1) $$ text "subst = " <+> ppr tv <+> ppr (mkCoKind (mkTyVarTy tv) ty)) )
+    return (extendVarEnv subst tv (co1, ty))
+  where
+    co1 = doSwap swap co
+
 \end{code}
 
 %************************************************************************
