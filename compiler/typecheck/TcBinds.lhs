@@ -28,7 +28,7 @@ import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
 import TcHsSyn		( zonkId )
 
 import TcRnMonad
-import Inst		( newDictsAtLoc, newIPDict, instToId )
+import Inst		( newDictBndrs, newIPDict, instToId )
 import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, 
 			  pprBinders, tcLookupId,
 			  tcGetGlobalTyVars )
@@ -773,7 +773,7 @@ might not otherwise be related.  This is a rather subtle issue.
 unifyCtxts :: [TcSigInfo] -> TcM [Inst]
 unifyCtxts (sig1 : sigs) 	-- Argument is always non-empty
   = do	{ mapM unify_ctxt sigs
-	; newDictsAtLoc (sig_loc sig1) (sig_theta sig1) }
+	; newDictBndrs (sig_loc sig1) (sig_theta sig1) }
   where
     theta1 = sig_theta sig1
     unify_ctxt :: TcSigInfo -> TcM ()

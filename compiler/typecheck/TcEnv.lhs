@@ -45,19 +45,19 @@ module TcEnv(
 
 import HsSyn		( LRuleDecl, LHsBinds, LSig, 
 			  LHsTyVarBndr, HsTyVarBndr(..), pprLHsBinds,
-		 	  ExprCoFn(..), idCoercion, (<.>) )
+		 	  idCoercion, (<.>) )
 import TcIface		( tcImportDecl )
 import IfaceEnv		( newGlobalBinder )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
-import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType, TvSubst,
-			  substTy, substTyVar, tyVarsOfType, tcTyVarsOfTypes, mkTyConApp,
+import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType, 
+			  substTy, tyVarsOfType, tcTyVarsOfTypes, mkTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
 			  tidyOpenType, isRefineableTy
 			)
 import TcGadt		( Refinement, refineType )
 import qualified Type	( getTyVar_maybe )
-import Id		( idName, isLocalId, setIdType )
+import Id		( idName, isLocalId )
 import Var		( TyVar, Id, idType, tyVarName )
 import VarSet
 import VarEnv

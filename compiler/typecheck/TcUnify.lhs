@@ -25,7 +25,8 @@ module TcUnify (
 
 #include "HsVersions.h"
 
-import HsSyn		( ExprCoFn(..), idCoercion, isIdCoercion, (<.>) )
+import HsSyn		( ExprCoFn(..), idCoercion, isIdCoercion, (<.>),
+			  mkCoLams, mkCoTyLams, mkCoApps )
 import TypeRep		( Type(..), PredType(..) )
 
 import TcMType		( lookupTcTyVar, LookupTyVarResult(..),
@@ -61,7 +62,7 @@ import Type		( Kind, SimpleKind, KindVar,
 			  isSubKind, pprKind, splitKindFunTys, isSubKindCon,
                           isOpenTypeKind, isArgTypeKind )
 import TysPrim		( alphaTy, betaTy )
-import Inst		( newDicts, instToId, mkInstCoFn )
+import Inst		( newDictBndrsO, instCall, instToId )
 import TyCon		( TyCon, tyConArity, tyConTyVars, isSynTyCon )
 import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
@@ -698,13 +699,12 @@ tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
 	; traceTc (text "tc_sub_spec" <+> vcat [ppr actual_ty, 
 						ppr tyvars <+> ppr theta <+> ppr tau,
 						ppr tau'])
-	; co_fn <- tc_sub mb_fun tau' tau' exp_ib exp_sty expected_ty
+	; co_fn2 <- tc_sub mb_fun tau tau exp_ib exp_sty expected_ty
 
 		-- Deal with the dictionaries
-	; dicts <- newDicts InstSigOrigin (substTheta subst' theta)
-	; extendLIEs dicts
-	; let inst_fn = mkInstCoFn inst_tys dicts
-	; return (co_fn <.> inst_fn) }
+ 	; co_fn1 <- instCall InstSigOrigin (mkTyVarTys tyvars) theta
+ 	; co_fn2 <- tc_sub False tau tau exp_sty expected_ty
+ 	; return (co_fn2 <.> co_fn1) }
 
 -----------------------------------
 -- Function case (rule F1)
@@ -748,7 +748,7 @@ wrapFunResCoercion arg_tys co_fn_res
   | otherwise 	       
   = do	{ us <- newUniqueSupply
 	; let arg_ids = zipWith (mkSysLocal FSLIT("sub")) (uniqsFromSupply us) arg_tys
-	; return (CoLams arg_ids <.> co_fn_res <.> CoApps arg_ids) }
+	; return (mkCoLams arg_ids <.> co_fn_res <.> mkCoApps arg_ids) }
 \end{code}
 
 
@@ -802,7 +802,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	-- Conclusion: include the free vars of the expected_ty in the
 	-- list of "free vars" for the signature check.
 
-	; dicts <- newDicts (SigOrigin skol_info) theta
+	; dicts <- newDictBndrsO (SigOrigin skol_info) theta
 	; inst_binds <- tcSimplifyCheck sig_msg forall_tvs dicts lie
 
 	; checkSigTyVarsWrt free_tvs forall_tvs
@@ -811,7 +811,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	; let
 	    -- The CoLet binds any Insts which came out of the simplification.
 		dict_ids = map instToId dicts
-		co_fn = CoTyLams forall_tvs <.> CoLams dict_ids <.> CoLet inst_binds
+		co_fn = mkCoTyLams forall_tvs <.> mkCoLams dict_ids <.> CoLet inst_binds
 	; returnM (co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
@@ -1331,6 +1331,7 @@ checkTauTvUpdate orig_tv orig_ty
 
     go_pred (ClassP c tys) = do { tys' <- mapM go tys; return (ClassP c tys') }
     go_pred (IParam n ty)  = do { ty' <- go ty;        return (IParam n ty') }
+    go_pred (EqPred t1 t2) = do { t1' <- go t1; t2' <- go t2; return (EqPred t1' t2') }
 
     go_tyvar tv (SkolemTv _) = return (TyVarTy tv)
     go_tyvar tv (MetaTv box ref)

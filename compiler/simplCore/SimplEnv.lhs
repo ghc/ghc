@@ -42,9 +42,9 @@ module SimplEnv (
 import SimplMonad	
 import Id		( Id, idType, idOccInfo, idUnfolding, setIdUnfolding )
 import IdInfo		( IdInfo, vanillaIdInfo, occInfo, setOccInfo, specInfo, setSpecInfo,
-			  arityInfo, setArityInfo, workerInfo, setWorkerInfo, 
+			  arityInfo, workerInfo, setWorkerInfo, 
 			  unfoldingInfo, setUnfoldingInfo, isEmptySpecInfo,
-			  unknownArity, workerExists
+			  workerExists
 			    )
 import CoreSyn
 import Rules		( RuleBase )
@@ -58,7 +58,7 @@ import OrdList
 import qualified CoreSubst	( Subst, mkSubst, substExpr, substSpec, substWorker )
 import qualified Type		( substTy, substTyVarBndr )
 
-import Type             ( Type, TvSubst(..), TvSubstEnv, composeTvSubst,
+import Type             ( Type, TvSubst(..), TvSubstEnv,
 			  isUnLiftedType, seqType, tyVarsOfType )
 import Coercion         ( Coercion )
 import BasicTypes	( OccInfo(..), isFragileOcc )
@@ -556,8 +556,7 @@ substIdInfo subst info
 		    not (workerExists old_wrkr) &&
 		    not (hasUnfolding (unfoldingInfo info))
     
-    keep_occ   = not (isFragileOcc old_occ)
-    old_arity = arityInfo info
+    keep_occ  = not (isFragileOcc old_occ)
     old_occ   = occInfo info
     old_rules = specInfo info
     old_wrkr  = workerInfo info

@@ -21,19 +21,19 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyType )
-import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, 
+import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, mkCoTyApps,
 			  ExprCoFn(..), (<.>), nlHsTyApp, emptyLHsBinds )
 import TcHsSyn		( mkHsApp )
 
 import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
-			  tyVarsOfInst, fdPredsOfInsts, newDicts, 
+			  tyVarsOfInst, fdPredsOfInsts,
 			  isDict, isClassDict, isLinearInst, linearInstType,
 			  isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
-			  fdPredsOfInst, mkInstCoFn,
-			  newDictsAtLoc, tcInstClassOp,
+			  fdPredsOfInst, 
+			  newDictBndrs, newDictBndrsO, tcInstClassOp,
 			  getDictClassTys, isTyVarDict, instLoc,
 			  zonkInst, tidyInsts, tidyMoreInsts,
 			  pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
@@ -1912,7 +1912,7 @@ addSCs :: (TcPredType -> Bool) -> Avails -> Inst -> TcM Avails
 	-- Invariant: the Inst is already in Avails.
 
 addSCs is_loop avails dict
-  = do	{ sc_dicts <- newDictsAtLoc (instLoc dict) sc_theta'
+  = do	{ sc_dicts <- newDictBndrs (instLoc dict) sc_theta'
 	; foldlM add_sc avails (zipEqual "add_scs" sc_dicts sc_sels) }
   where
     (clas, tys) = getDictClassTys dict
@@ -1925,7 +1925,7 @@ addSCs is_loop avails dict
       | otherwise		   = addSCs is_loop avails' sc_dict
       where
 	sc_sel_rhs = L (instSpan dict) (HsCoerce co_fn (HsVar sc_sel))
-	co_fn	   = mkInstCoFn tys [dict]
+	co_fn	   = CoApp (instToId dict) <.> mkCoTyApps tys
 	avails'    = addToFM avails sc_dict (Rhs sc_sel_rhs [dict])
 
     is_given :: Inst -> Bool
@@ -2279,7 +2279,7 @@ tcSimplifyDeriv tc tyvars theta
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
-    newDicts DerivOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
+    newDictBndrsO DerivOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
     simpleReduceLoop doc reduceMe wanteds		`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 
@@ -2325,7 +2325,7 @@ tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 		  -> TcM ()
 
 tcSimplifyDefault theta
-  = newDicts DefaultOrigin theta		`thenM` \ wanteds ->
+  = newDictBndrsO DefaultOrigin theta		`thenM` \ wanteds ->
     simpleReduceLoop doc reduceMe wanteds	`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )	-- try_me never returns Free
     addNoInstanceErrs Nothing []  irreds 	`thenM_`

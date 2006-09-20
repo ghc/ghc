@@ -513,8 +513,8 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_
     let
 	left_id  = HsVar (dataConWrapId left_con)
 	right_id = HsVar (dataConWrapId right_con)
-	left_expr  ty1 ty2 e = noLoc $ HsApp (noLoc $ HsCoerce (CoTyApps [ty1, ty2]) left_id ) e
-	right_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ HsCoerce (CoTyApps [ty1, ty2]) right_id) e
+	left_expr  ty1 ty2 e = noLoc $ HsApp (noLoc $ HsCoerce (mkCoTyApps [ty1, ty2]) left_id ) e
+	right_expr ty1 ty2 e = noLoc $ HsApp (noLoc $ HsCoerce (mkCoTyApps [ty1, ty2]) right_id) e
 
 	-- Prefix each tuple with a distinct series of Left's and Right's,
 	-- in a balanced way, keeping track of the types.

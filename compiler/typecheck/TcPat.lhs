@@ -5,7 +5,7 @@
 
 \begin{code}
 module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
-	       badFieldCon, polyPatSig ) where
+	       addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
@@ -17,7 +17,7 @@ import HsSyn		( Pat(..), LPat, HsConDetails(..), HsLit(..), HsOverLit(..), HsExp
 import TcHsSyn		( TcId, hsLitType )
 import TcRnMonad
 import Inst		( InstOrigin(..), shortCutFracLit, shortCutIntLit, 
-			  newDicts, instToId, tcInstStupidTheta, isHsVar
+			  newDictBndrs, instToId, instStupidTheta, isHsVar
 			)
 import Id		( Id, idType, mkLocalId )
 import CoreFVs		( idFreeTyVars )
@@ -47,7 +47,8 @@ import Type		( substTys, substTheta )
 import StaticFlags	( opt_IrrefutableTuples )
 import TyCon		( TyCon, FieldLabel )
 import DataCon		( DataCon, dataConTyCon, dataConFullSig, dataConName,
-			  dataConFieldLabels, dataConSourceArity )
+			  dataConFieldLabels, dataConSourceArity, 
+			  dataConStupidTheta, dataConUnivTyVars )
 import PrelNames	( integralClassName, fromIntegerName, integerTyConName, 
 			  fromRationalName, rationalTyConName )
 import BasicTypes	( isBoxed )
@@ -460,8 +461,7 @@ tc_pat pstate pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
 	-- The Report says that n+k patterns must be in Integral
 	-- We may not want this when using re-mappable syntax, though (ToDo?)
 	; icls <- tcLookupClass integralClassName
-	; dicts <- newDicts orig [mkClassPred icls [pat_ty']]	
-	; extendLIEs dicts
+	; instStupidTheta orig [mkClassPred icls [pat_ty']]	
     
 	; res <- tcExtendIdEnv1 name bndr_id (thing_inside pstate)
 	; returnM (NPlusKPat (L nm_loc bndr_id) lit' ge' minus', [], res) }
@@ -490,6 +490,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
   = do	{ span <- getSrcSpanM	-- Span for the whole pattern
 	; let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys) = dataConFullSig data_con
 	      skol_info = PatSkol data_con span
+	      origin    = SigOrigin skol_info
 
 	  -- Instantiate the constructor type variables [a->ty]
 	; ctxt_res_tys <- boxySplitTyConApp tycon pat_ty
@@ -506,10 +507,11 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
 		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
 
-	; dicts <- newDicts (SigOrigin skol_info) theta'
+	; loc <- getInstLoc origin
+	; dicts <- newDictBndrs loc theta'
 	; dict_binds <- tcSimplifyCheck doc ex_tvs' dicts lie_req
 
-	; tcInstStupidTheta data_con ctxt_res_tys
+	; addDataConStupidTheta origin data_con ctxt_res_tys
 
 	; return (ConPatOut { pat_con = L con_span data_con, 
 			      pat_tvs = ex_tvs' ++ co_vars,
@@ -587,6 +589,19 @@ tcConArg (arg_pat, arg_ty) pstate thing_inside
 	-- NB: the tc_lpat will refine pat_ty if necessary
 	--     based on the current pstate, which may include
 	--     refinements from peer argument patterns to the left
+\end{code}
+
+\begin{code}
+addDataConStupidTheta :: InstOrigin -> DataCon -> [TcType] -> TcM ()
+-- Instantiate the "stupid theta" of the data con, and throw 
+-- the constraints into the constraint set
+addDataConStupidTheta origin data_con inst_tys
+  | null stupid_theta = return ()
+  | otherwise	      = instStupidTheta origin inst_theta
+  where
+    stupid_theta = dataConStupidTheta data_con
+    tenv = zipTopTvSubst (dataConUnivTyVars data_con) inst_tys
+    inst_theta = substTheta tenv stupid_theta
 \end{code}
 
 

@@ -29,15 +29,15 @@ import TcUnify		( tcInfer, tcSubExp, tcFunResTy, tcGen, boxyUnify, subFunTys, za
 			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, preSubType,
 			  unBox )
 import BasicTypes	( Arity, isMarkedStrict )
-import Inst		( newMethodFromName, newIPDict, mkInstCoFn,
-			  newDicts, newMethodWithGivenTy, tcInstStupidTheta )
+import Inst		( newMethodFromName, newIPDict, instCall,
+			  newMethodWithGivenTy, instStupidTheta )
 import TcBinds		( tcLocalBinds )
 import TcEnv		( tcLookup, tcLookupDataCon, tcLookupField )
 import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcBody,
 			  TcMatchCtxt(..) )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcPat		( tcOverloadedLit, badFieldCon )
+import TcPat		( tcOverloadedLit, addDataConStupidTheta, badFieldCon )
 import TcMType		( tcInstTyVars, newFlexiTyVarTy, newBoxyTyVars,
 			  readFilledBox, zonkTcTypes )
 import TcType		( TcType, TcSigmaType, TcRhoType, TvSubst,
@@ -489,14 +489,11 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	-- dictionaries for the data type context, since we are going to
 	-- do pattern matching over the data cons.
 	--
-	-- What dictionaries do we need?  
-	-- We just take the context of the first data constructor
-	-- This isn't right, but I just can't bear to union up all the relevant ones
+	-- What dictionaries do we need?  The tyConStupidTheta tells us.
     let
 	theta' = substTheta inst_env (tyConStupidTheta tycon)
     in
-    newDicts RecordUpdOrigin theta'	`thenM` \ dicts ->
-    extendLIEs dicts			`thenM_`
+    instStupidTheta RecordUpdOrigin theta'	`thenM_`
 
 	-- Phew!
     returnM (mkHsCoerce co_fn (RecordUpd record_expr' rbinds' record_ty result_record_ty))
@@ -791,7 +788,8 @@ instFun orig fun subst tv_theta_prs
 	= (map (substTyVar subst) tvs, substTheta subst theta)
 
     inst_stupid (HsVar fun_id) ((tys,_):_)
-	| Just con <- isDataConId_maybe fun_id = tcInstStupidTheta con tys
+	| Just con <- isDataConId_maybe fun_id 
+	= addDataConStupidTheta orig con tys
     inst_stupid _ _ = return ()
 
     go _ fun [] = return fun
@@ -804,9 +802,7 @@ instFun orig fun subst tv_theta_prs
 		-- of newMethod: see Note [Multiple instantiation]
 
     go _ fun ((tys, theta) : prs)
-	= do { dicts <- newDicts orig theta
-	     ; extendLIEs dicts
-	     ; let co_fn = mkInstCoFn tys dicts
+	= do { co_fn <- instCall orig tys theta
 	     ; go False (HsCoerce co_fn fun) prs }
 
 	-- 	Hack Alert (want_method_inst)!

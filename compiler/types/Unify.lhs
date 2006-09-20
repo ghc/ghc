@@ -11,13 +11,10 @@ module Unify (
 import Var		( Var, TyVar, tyVarKind )
 import VarEnv
 import VarSet
-import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, mkTyVarTys,
-			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), substTy, tcEqTypeX,
-			  mkOpenTvSubst, tcView, isSubKind, eqKind, repSplitAppTy_maybe )
-import TypeRep          ( Type(..), PredType(..), funTyCon )
-import DataCon 		( DataCon, dataConResTys )
-import Util		( snocView )
-import ErrUtils		( Message )
+import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, 
+			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), tcEqTypeX,
+			  tcView, isSubKind, repSplitAppTy_maybe )
+import TypeRep          ( Type(..), PredType(..) )
 import Outputable
 import Maybes
 \end{code}

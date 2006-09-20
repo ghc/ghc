@@ -187,7 +187,7 @@ import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), Arity, ipNameName )
 import SrcLoc		( SrcLoc, SrcSpan )
-import Util		( snocView, equalLength )
+import Util		( equalLength )
 import Maybes		( maybeToBool, expectJust, mapCatMaybes )
 import ListSetOps	( hasNoDups )
 import List		( nubBy )
@@ -988,8 +988,9 @@ tcTyVarsOfTypes :: [Type] -> TyVarSet
 tcTyVarsOfTypes tys = foldr (unionVarSet.tcTyVarsOfType) emptyVarSet tys
 
 tcTyVarsOfPred :: PredType -> TyVarSet
-tcTyVarsOfPred (IParam _ ty)  = tcTyVarsOfType ty
-tcTyVarsOfPred (ClassP _ tys) = tcTyVarsOfTypes tys
+tcTyVarsOfPred (IParam _ ty)  	= tcTyVarsOfType ty
+tcTyVarsOfPred (ClassP _ tys) 	= tcTyVarsOfTypes tys
+tcTyVarsOfPred (EqPred ty1 ty2) = tcTyVarsOfType ty1 `unionVarSet` tcTyVarsOfType ty2
 \end{code}
 
 Note [Silly type synonym]
@@ -1026,8 +1027,9 @@ exactTyVarsOfType ty
     go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
     go (ForAllTy tyvar ty)  	  = delVarSet (go ty) tyvar
 
-    go_pred (IParam _ ty)  = go ty
-    go_pred (ClassP _ tys) = exactTyVarsOfTypes tys
+    go_pred (IParam _ ty)    = go ty
+    go_pred (ClassP _ tys)   = exactTyVarsOfTypes tys
+    go_pred (EqPred ty1 ty2) = go ty1 `unionVarSet` go ty2
 
 exactTyVarsOfTypes :: [TcType] -> TyVarSet
 exactTyVarsOfTypes tys = foldr (unionVarSet . exactTyVarsOfType) emptyVarSet tys
@@ -1043,6 +1045,7 @@ tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNa
 tyClsNamesOfType (NoteTy _ ty2) 	    = tyClsNamesOfType ty2
 tyClsNamesOfType (PredTy (IParam n ty))     = tyClsNamesOfType ty
 tyClsNamesOfType (PredTy (ClassP cl tys))   = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
+tyClsNamesOfType (PredTy (EqPred ty1 ty2))  = tyClsNamesOfType ty1 `unionNameSets` tyClsNamesOfType ty2
 tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res
 tyClsNamesOfType (AppTy fun arg)	    = tyClsNamesOfType fun `unionNameSets` tyClsNamesOfType arg
 tyClsNamesOfType (ForAllTy tyvar ty)	    = tyClsNamesOfType ty

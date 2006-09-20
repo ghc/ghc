@@ -310,32 +310,47 @@ data ExprCoFn
   | ExprCoFn Coercion		-- A cast:  [] `cast` co
 				-- Guaranteedn not the identity coercion
 
-	-- Non-empty list in all of these, so that the identity coercion
-	-- is always exactly CoHole, not, say, (CoTyLams [])
-  | CoApps [Var]		-- [] x1 .. xn; the xi are dicts or coercions
-  | CoTyApps [Type]		-- [] t1 .. tn
-  | CoLams [Id] 		-- \x1..xn. []; the xi are dicts or coercions
-  | CoTyLams [TyVar] 		-- \a1..an. []
+  | CoApp Var			-- [] x; the xi are dicts or coercions
+  | CoTyApp Type		-- [] t
+  | CoLam Id	 		-- \x. []; the xi are dicts or coercions
+  | CoTyLam TyVar 		-- \a. []
+
+	-- Non-empty bindings, so that the identity coercion
+	-- is always exactly CoHole
   | CoLet (LHsBinds Id)		-- let binds in []
 				-- (ould be nicer to be core bindings)
 
-instance Outputable ExprCoFn where
-  ppr CoHole	     = ptext SLIT("<>")
-  ppr (ExprCoFn co)  = ppr co
-  ppr (CoApps ids)   = ppr CoHole <+> interppSP ids
-  ppr (CoTyApps tys) = ppr CoHole <+> hsep (map pprParendType tys)
-  ppr (CoTyLams tvs) = sep [ptext SLIT("/\\") <> hsep (map (pprBndr LambdaBind) tvs),
-		 	    ptext SLIT("->") <+> ppr CoHole]
-  ppr (CoLams ids)   = sep [ptext SLIT("\\") <> hsep (map (pprBndr LambdaBind) ids),
-			    ptext SLIT("->") <+> ppr CoHole]
-  ppr (CoLet binds)  = sep [ptext SLIT("let") <+> braces (ppr binds),
-			    ppr CoHole]
-  ppr (CoCompose co1 co2) = sep [ppr co1, ptext SLIT("<.>"), ppr co2]
+instance Outputable ExprCoFn where 
+  ppr co_fn = pprCoFn (ptext SLIT("<>")) co_fn
+
+pprCoFn it CoHole = it
+pprCoFn it (CoCompose f1 f2) = pprCoFn (pprCoFn it f2) f1
+pprCoFn it (ExprCoFn co)     = it <+> ptext SLIT("`cast`") <+> pprParendType co
+pprCoFn it (CoApp id)    = it <+> ppr id
+pprCoFn it (CoTyApp ty)  = it <+> ptext SLIT("@") <+> pprParendType ty
+pprCoFn it (CoLam id)    = ptext SLIT("\\") <> pprBndr LambdaBind id <> dot <+> it
+pprCoFn it (CoTyLam tv)  = ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot <+> it
+pprCoFn it (CoLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
 
 (<.>) :: ExprCoFn -> ExprCoFn -> ExprCoFn
 CoHole <.> c = c
 c <.> CoHole = c
 c1 <.> c2    = c1 `CoCompose` c2
+
+mkCoTyApps :: [Type] -> ExprCoFn
+mkCoTyApps tys = mk_co_fn CoTyApp (reverse tys)
+
+mkCoApps :: [Id] -> ExprCoFn
+mkCoApps ids = mk_co_fn CoApp (reverse ids)
+
+mkCoTyLams :: [TyVar] -> ExprCoFn
+mkCoTyLams ids = mk_co_fn CoTyLam ids
+
+mkCoLams :: [Id] -> ExprCoFn
+mkCoLams ids = mk_co_fn CoLam ids
+
+mk_co_fn :: (a -> ExprCoFn) -> [a] -> ExprCoFn
+mk_co_fn f as = foldr (CoCompose . f) CoHole as
 
 idCoercion :: ExprCoFn
 idCoercion = CoHole

@@ -106,18 +106,15 @@ import TypeRep
 
 -- friends:
 import Var	( Var, TyVar, tyVarKind, tyVarName, 
-		  setTyVarName, setTyVarKind, mkTyVar, isTyVar )
-import Name	( Name(..) )
-import Unique	( Unique )
+		  setTyVarName, setTyVarKind )
 import VarEnv
 import VarSet
 
 import OccName	( tidyOccName )
-import Name	( NamedThing(..), mkInternalName, tidyNameOcc )
+import Name	( NamedThing(..), tidyNameOcc )
 import Class	( Class, classTyCon )
 import PrelNames( openTypeKindTyConKey, unliftedTypeKindTyConKey, 
-                  ubxTupleKindTyConKey, argTypeKindTyConKey, 
-                  eqCoercionKindTyConKey )
+                  ubxTupleKindTyConKey, argTypeKindTyConKey )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
@@ -129,7 +126,6 @@ import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 
 -- others
 import StaticFlags	( opt_DictsStrict )
-import SrcLoc		( noSrcLoc )
 import Util		( mapAccumL, seqList, lengthIs, snocView, thenCmp, isEqual, all2 )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
@@ -681,8 +677,9 @@ tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet.tyVarsOfType) emptyVarSet tys
 
 tyVarsOfPred :: PredType -> TyVarSet
-tyVarsOfPred (IParam _ ty)  = tyVarsOfType ty
-tyVarsOfPred (ClassP _ tys) = tyVarsOfTypes tys
+tyVarsOfPred (IParam _ ty)    = tyVarsOfType ty
+tyVarsOfPred (ClassP _ tys)   = tyVarsOfTypes tys
+tyVarsOfPred (EqPred ty1 ty2) = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
 tyVarsOfTheta :: ThetaType -> TyVarSet
 tyVarsOfTheta = foldr (unionVarSet . tyVarsOfPred) emptyVarSet
@@ -756,6 +753,7 @@ tidyTypes env tys = map (tidyType env) tys
 tidyPred :: TidyEnv -> PredType -> PredType
 tidyPred env (IParam n ty)     = IParam n (tidyType env ty)
 tidyPred env (ClassP clas tys) = ClassP clas (tidyTypes env tys)
+tidyPred env (EqPred ty1 ty2)  = EqPred (tidyType env ty1) (tidyType env ty2)
 \end{code}
 
 
@@ -874,8 +872,9 @@ seqNote :: TyNote -> ()
 seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 
 seqPred :: PredType -> ()
-seqPred (ClassP c tys) = c  `seq` seqTypes tys
-seqPred (IParam n ty)  = n  `seq` seqType ty
+seqPred (ClassP c tys)   = c `seq` seqTypes tys
+seqPred (IParam n ty)    = n `seq` seqType ty
+seqPred (EqPred ty1 ty2) = seqType ty1 `seq` seqType ty2
 \end{code}
 
 

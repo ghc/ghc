@@ -264,7 +264,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		-- the s1..sm and check each cmd
 	; cmds' <- mapM (tc_cmd w_tv) cmds_w_tys
 
-	; returnM (HsArrForm (noLoc $ HsCoerce (CoTyLams [w_tv]) 
+	; returnM (HsArrForm (noLoc $ HsCoerce (CoTyLam w_tv) 
 					       (unLoc $ mkHsDictLet inst_binds expr')) 
 			     fixity cmds')
 	}

@@ -72,7 +72,7 @@ mkHsApp :: LHsExpr name -> LHsExpr name -> LHsExpr name
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
 
 nlHsTyApp :: name -> [Type] -> LHsExpr name
-nlHsTyApp fun_id tys = noLoc (HsCoerce (CoTyApps tys) (HsVar fun_id))
+nlHsTyApp fun_id tys = noLoc (HsCoerce (mkCoTyApps tys) (HsVar fun_id))
 
 mkLHsCoerce :: ExprCoFn -> LHsExpr id -> LHsExpr id
 mkLHsCoerce co_fn (L loc e) = L loc (mkHsCoerce co_fn e)

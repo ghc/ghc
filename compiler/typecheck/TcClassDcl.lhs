@@ -16,7 +16,7 @@ import HsSyn
 import RnHsSyn		( maybeGenericMatch, extractHsTyVars )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupTopBndrRn, lookupImportedName )
-import Inst		( instToId, newDicts, newDictsAtLoc, newMethod, getOverlapFlag )
+import Inst		( instToId, newDictBndr, newDictBndrs, newMethod, getOverlapFlag )
 import InstEnv		( mkLocalInstance )
 import TcEnv		( tcLookupLocatedClass, 
 			  tcExtendTyVarEnv, tcExtendIdEnv,
@@ -246,9 +246,13 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	-- default methods.  Better to make separate AbsBinds for each
     let
 	(tyvars, _, _, op_items) = classBigSig clas
+	rigid_info  		 = ClsSkol clas
+	origin 			 = SigOrigin rigid_info
 	prag_fn			 = mkPragFun sigs
 	sig_fn			 = mkTcSigFun sigs
-	tc_dm			 = tcDefMeth clas tyvars default_binds sig_fn prag_fn
+	clas_tyvars		 = tcSkolSigTyVars rigid_info tyvars
+	tc_dm			 = tcDefMeth origin clas clas_tyvars
+					     default_binds sig_fn prag_fn
 
 	dm_sel_ids		 = [sel_id | (sel_id, DefMeth) <- op_items]
 	-- Generate code for polymorphic default methods only
@@ -261,19 +265,17 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
     mapAndUnzipM tc_dm dm_sel_ids	`thenM` \ (defm_binds, dm_ids_s) ->
     returnM (listToBag defm_binds, concat dm_ids_s)
     
-tcDefMeth clas tyvars binds_in sig_fn prag_fn sel_id
+tcDefMeth origin clas tyvars binds_in sig_fn prag_fn sel_id
   = do	{ dm_name <- lookupTopBndrRn (mkDefMethRdrName sel_id)
-	; let	rigid_info  = ClsSkol clas
-		clas_tyvars = tcSkolSigTyVars rigid_info tyvars
-		inst_tys    = mkTyVarTys clas_tyvars
+	; let	inst_tys    = mkTyVarTys tyvars
 		dm_ty       = idType sel_id	-- Same as dict selector!
-	        theta       = [mkClassPred clas inst_tys]
+	        cls_pred    = mkClassPred clas inst_tys
 		local_dm_id = mkDefaultMethodId dm_name dm_ty
-		origin 	    = SigOrigin rigid_info
 
 	; (_, meth_info) <- mkMethodBind origin clas inst_tys binds_in (sel_id, DefMeth)
-	; [this_dict] <- newDicts origin theta
-	; (defm_bind, insts_needed) <- getLIE (tcMethodBind clas_tyvars theta [this_dict]
+	; loc <- getInstLoc origin
+	; this_dict <- newDictBndr loc cls_pred
+	; (defm_bind, insts_needed) <- getLIE (tcMethodBind tyvars [cls_pred] [this_dict]
 							    sig_fn prag_fn meth_info)
     
 	; addErrCtxt (defltMethCtxt clas) $ do
@@ -281,12 +283,12 @@ tcDefMeth clas tyvars binds_in sig_fn prag_fn sel_id
         -- Check the context
 	{ dict_binds <- tcSimplifyCheck
 			        (ptext SLIT("class") <+> ppr clas)
-				clas_tyvars
+				tyvars
 			        [this_dict]
 			        insts_needed
 
 	-- Simplification can do unification
-	; checkSigTyVars clas_tyvars
+	; checkSigTyVars tyvars
     
 	-- Inline pragmas 
 	-- We'll have an inline pragma on the local binding, made by tcMethodBind
@@ -297,9 +299,9 @@ tcDefMeth clas tyvars binds_in sig_fn prag_fn sel_id
 	      inline_prags     = filter isInlineLSig (prag_fn sel_name)
 	; prags <- tcPrags dm_inst_id inline_prags
 
-	; let full_bind = AbsBinds  clas_tyvars
+	; let full_bind = AbsBinds  tyvars
 		    		    [instToId this_dict]
-		    		    [(clas_tyvars, local_dm_id, dm_inst_id, prags)]
+		    		    [(tyvars, local_dm_id, dm_inst_id, prags)]
 		    		    (dict_binds `unionBags` defm_bind)
 	; returnM (noLoc full_bind, [local_dm_id]) }}
 
@@ -374,7 +376,7 @@ tcMethodBind inst_tyvars inst_theta avail_insts sig_fn prag_fn
     in
 
     addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id))	$
-    newDictsAtLoc (sig_loc sig) (sig_theta sig)		`thenM` \ meth_dicts ->
+    newDictBndrs (sig_loc sig) (sig_theta sig)		`thenM` \ meth_dicts ->
     let
 	meth_tvs   = sig_tvs sig
 	all_tyvars = meth_tvs ++ inst_tyvars

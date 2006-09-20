@@ -14,9 +14,9 @@ import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr,
 			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
 import TcMType		( tcSkolSigType, checkValidInstance, checkValidInstHead )
-import TcType		( mkClassPred, tcSplitSigmaTy, tcSplitDFunHead, mkTyVarTys,
+import TcType		( mkClassPred, tcSplitSigmaTy, tcSplitDFunHead, 
                           SkolemInfo(InstSkol), tcSplitDFunTy, mkFunTy )
-import Inst		( tcInstClassOp, newDicts, instToId, showLIE, 
+import Inst		( newDictBndr, newDictBndrs, instToId, showLIE, 
 			  getOverlapFlag, tcExtendLocalInstEnv )
 import InstEnv		( mkLocalInstance, instanceDFunId )
 import TcDeriv		( tcDeriving )
@@ -25,19 +25,19 @@ import TcEnv		( InstInfo(..), InstBindings(..),
 			)
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
-import TcSimplify	( tcSimplifyCheck, tcSimplifySuperClasses )
-import Type		( zipOpenTvSubst, substTheta, substTys, mkTyConApp, mkTyVarTy )
+import TcSimplify	( tcSimplifySuperClasses )
+import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy )
 import Coercion         ( mkAppCoercion, mkAppsCoercion )
 import TyCon            ( TyCon, newTyConCo )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
-import Class		( classBigSig, classMethods )
+import Class		( classBigSig )
 import Var		( TyVar, Id, idName, idType )
 import Id               ( mkSysLocal )
 import UniqSupply       ( uniqsFromSupply, splitUniqSupply )
 import MkId		( mkDictFunId )
 import Name		( Name, getSrcLoc )
 import Maybe		( catMaybes )
-import SrcLoc		( noSrcSpan, srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
+import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
 import Outputable
 import Bag
@@ -309,7 +309,7 @@ First comes the easy case of a non-local instance decl.
 tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 -- Returns a binding for the dfun
 
---
+------------------------
 -- Derived newtype instances
 --
 -- We need to make a copy of the dictionary we are deriving from
@@ -334,22 +334,20 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
 	      rigid_info   = InstSkol dfun_id
 	      origin	   = SigOrigin rigid_info
 	      inst_ty      = idType dfun_id
-              maybe_co_con = newTyConCo tycon
+	; inst_loc <- getInstLoc origin
 	; (tvs, theta, inst_head) <- tcSkolSigType rigid_info inst_ty
-	; dicts <- newDicts origin theta
+	; dicts <- newDictBndrs inst_loc theta
         ; uniqs <- newUniqueSupply
         ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head
-        ; [this_dict] <- newDicts origin [mkClassPred cls rep_tys]
-        ; let (rep_dict_id:sc_dict_ids) =
-                 if null dicts then
-                     [instToId this_dict]
-                 else
-                     map instToId dicts
+        ; this_dict <- newDictBndr inst_loc (mkClassPred cls rep_tys)
+        ; let (rep_dict_id:sc_dict_ids)
+                 | null dicts = [instToId this_dict]
+ 		 | otherwise  = map instToId dicts
 
 		-- (Here, we are relying on the order of dictionary 
 		-- arguments built by NewTypeDerived in TcDeriv.)
 
-              wrap_fn = CoTyLams tvs <.> CoLams (rep_dict_id:sc_dict_ids)
+              wrap_fn = mkCoTyLams tvs <.> mkCoLams (rep_dict_id:sc_dict_ids)
 	 
               coerced_rep_dict = mkHsCoerce (co_fn tvs cls_tycon) (HsVar rep_dict_id)
 
@@ -358,7 +356,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
 				 MatchGroup [the_match] (mkFunTy in_dict_ty inst_head)
 	      in_dict_ty = mkTyConApp cls_tycon cls_inst_tys
 
-              the_match = mkSimpleMatch [the_pat] the_rhs
+              the_match = mkSimpleMatch [noLoc the_pat] the_rhs
+	      the_rhs = mkHsConApp cls_data_con cls_inst_tys (map HsVar (sc_dict_ids ++ op_ids))
 
 	      (uniqs1, uniqs2) = splitUniqSupply uniqs
 
@@ -368,23 +367,21 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
               dict_ids = zipWith (mkSysLocal FSLIT("dict"))
                           (uniqsFromSupply uniqs2) (map idType sc_dict_ids)
 
-	      the_pat = noLoc $
-                        ConPatOut { pat_con = noLoc cls_data_con, pat_tvs = [],
+	      the_pat = ConPatOut { pat_con = noLoc cls_data_con, pat_tvs = [],
 				    pat_dicts = dict_ids,
 				    pat_binds = emptyLHsBinds,
 				    pat_args = PrefixCon (map nlVarPat op_ids),
 				    pat_ty = in_dict_ty} 
 
               cls_data_con = classDataCon cls
-              cls_tycon = dataConTyCon cls_data_con
-              cls_arg_tys = dataConInstArgTys cls_data_con cls_inst_tys 
+              cls_tycon    = dataConTyCon cls_data_con
+              cls_arg_tys  = dataConInstArgTys cls_data_con cls_inst_tys 
               
               n_dict_args = if length dicts == 0 then 0 else length dicts - 1
               op_tys = drop n_dict_args cls_arg_tys
               
-	      the_rhs = mkHsConApp cls_data_con cls_inst_tys (map HsVar (sc_dict_ids ++ op_ids))
-              dict = (mkHsCoerce wrap_fn body)
-        ; return (unitBag (noLoc $ VarBind (dfun_id) (noLoc dict))) }
+              dict    = mkHsCoerce wrap_fn body
+        ; return (unitBag (noLoc $ VarBind dfun_id (noLoc dict))) }
   where
     co_fn :: [TyVar] -> TyCon -> ExprCoFn
     co_fn tvs cls_tycon | Just co_con <- newTyConCo tycon
@@ -394,6 +391,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
                        		    (mkTyConApp co_con (map mkTyVarTy tvs)))
 	  | otherwise
 	  = idCoercion
+
+------------------------
+-- Ordinary instances
 
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
   = let 
@@ -420,9 +420,11 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	origin	  = SigOrigin rigid_info
     in
 	 -- Create dictionary Ids from the specified instance contexts.
-    newDicts InstScOrigin sc_theta'			`thenM` \ sc_dicts ->
-    newDicts origin dfun_theta'				`thenM` \ dfun_arg_dicts ->
-    newDicts origin [mkClassPred clas inst_tys'] 	`thenM` \ [this_dict] ->
+    getInstLoc InstScOrigin				`thenM` \ sc_loc -> 
+    newDictBndrs sc_loc sc_theta'			`thenM` \ sc_dicts ->
+    getInstLoc origin					`thenM` \ inst_loc -> 
+    newDictBndrs inst_loc dfun_theta'			`thenM` \ dfun_arg_dicts ->
+    newDictBndr inst_loc (mkClassPred clas inst_tys') 	`thenM` \ this_dict ->
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 

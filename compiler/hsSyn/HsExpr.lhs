@@ -14,7 +14,8 @@ import HsPat		( LPat )
 import HsLit		( HsLit(..), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
 import HsImpExp		( isOperator, pprHsVar )
-import HsBinds		( HsLocalBinds, DictBinds, ExprCoFn, isEmptyLocalBinds )
+import HsBinds		( HsLocalBinds, DictBinds, isEmptyLocalBinds,
+			  ExprCoFn, pprCoFn )
 
 -- others:
 import Type		( Type, pprParendType )
@@ -379,10 +380,8 @@ ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
 ppr_expr (HsSCC lbl expr)
   = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ftext lbl), pprParendExpr expr ]
 
-ppr_expr (HsCoerce co_fn e)
-  = ppr_expr e <+> ptext SLIT("`cast`") <+> ppr co_fn
-
-ppr_expr (HsType id) = ppr id
+ppr_expr (HsCoerce co_fn e) = pprCoFn (ppr_expr e) co_fn
+ppr_expr (HsType id)	    = ppr id
 
 ppr_expr (HsSpliceE s)       = pprSplice s
 ppr_expr (HsBracket b)       = pprHsBracket b

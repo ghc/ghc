@@ -424,14 +424,14 @@ dsCoercion CoHole 	     thing_inside = thing_inside
 dsCoercion (CoCompose c1 c2) thing_inside = dsCoercion c1 (dsCoercion c2 thing_inside)
 dsCoercion (ExprCoFn co)     thing_inside = do { expr <- thing_inside
 					       ; return (Cast expr co) }
-dsCoercion (CoLams ids)      thing_inside = do { expr <- thing_inside
-					       ; return (mkLams ids expr) }
-dsCoercion (CoTyLams tvs)    thing_inside = do { expr <- thing_inside
-					       ; return (mkLams tvs expr) }
-dsCoercion (CoApps ids)      thing_inside = do { expr <- thing_inside
-					       ; return (mkVarApps expr ids) }
-dsCoercion (CoTyApps tys)    thing_inside = do { expr <- thing_inside
-					       ; return (mkTyApps expr tys) }
+dsCoercion (CoLam id)        thing_inside = do { expr <- thing_inside
+					       ; return (Lam id expr) }
+dsCoercion (CoTyLam tv)      thing_inside = do { expr <- thing_inside
+					       ; return (Lam tv expr) }
+dsCoercion (CoApp id)        thing_inside = do { expr <- thing_inside
+					       ; return (App expr (Var id)) }
+dsCoercion (CoTyApp ty)      thing_inside = do { expr <- thing_inside
+					       ; return (App expr (Type ty)) }
 dsCoercion (CoLet bs)        thing_inside = do { prs <- dsLHsBinds bs
 					       ; expr <- thing_inside
 					       ; return (Let (Rec prs) expr) }

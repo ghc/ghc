@@ -537,14 +537,14 @@ zonkCoFn env (ExprCoFn co)     = do { co' <- zonkTcTypeToType env co
 zonkCoFn env (CoCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
 				    ; return (env2, CoCompose c1' c2') }
-zonkCoFn env (CoLams ids)   = do { ids' <- zonkIdBndrs env ids
-				 ; let env1 = extendZonkEnv env ids'
-				 ; return (env1, CoLams ids') }
-zonkCoFn env (CoTyLams tvs) = ASSERT( all isImmutableTyVar tvs )
-			      do { return (env, CoTyLams tvs) }
-zonkCoFn env (CoApps ids)   = do { return (env, CoApps (zonkIdOccs env ids)) }
-zonkCoFn env (CoTyApps tys) = do { tys' <- zonkTcTypeToTypes env tys
-				 ; return (env, CoTyApps tys') }
+zonkCoFn env (CoLam id)     = do { id' <- zonkIdBndr env id
+				 ; let env1 = extendZonkEnv1 env id'
+				 ; return (env1, CoLam id') }
+zonkCoFn env (CoTyLam tv)   = ASSERT( isImmutableTyVar tv )
+			      do { return (env, CoTyLam tv) }
+zonkCoFn env (CoApp id)     = do { return (env, CoApp (zonkIdOcc env id)) }
+zonkCoFn env (CoTyApp ty)   = do { ty' <- zonkTcTypeToType env ty
+				 ; return (env, CoTyApp ty') }
 zonkCoFn env (CoLet bs)     = do { (env1, bs') <- zonkRecMonoBinds env bs
 				 ; return (env1, CoLet bs') }
 
