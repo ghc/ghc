@@ -551,44 +551,6 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
     mapM tc_method_bind meth_infos		`thenM` \ meth_binds_s ->
    
     returnM (meth_ids, unionManyBags meth_binds_s)
-v v v v v v v
-*************
-
-
--- Derived newtype instances
-tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
-	  avail_insts op_items (NewTypeDerived maybe_co rep_tys)
-  = getInstLoc origin				`thenM` \ inst_loc ->
-    mapAndUnzip3M (do_one inst_loc) op_items	`thenM` \ (meth_ids, meth_binds, rhs_insts) ->
-    
-    tcSimplifyCheck
-	 (ptext SLIT("newtype derived instance"))
-	 inst_tyvars' avail_insts rhs_insts	`thenM` \ lie_binds ->
-
-	-- I don't think we have to do the checkSigTyVars thing
-
-    returnM (meth_ids, lie_binds `unionBags` listToBag meth_binds)
-
-  where
-    do_one inst_loc (sel_id, _)
-	= -- The binding is like "op @ NewTy = op @ RepTy"
-		-- Make the *binder*, like in mkMethodBind
-	  tcInstClassOp inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
-
-		-- Make the *occurrence on the rhs*
-	  tcInstClassOp inst_loc sel_id rep_tys'	`thenM` \ rhs_inst ->
-	  let
-	     meth_id = instToId meth_inst
-	  in
-	  return (meth_id, noLoc (VarBind meth_id (nlHsVar (instToId rhs_inst))), rhs_inst)
-
-	-- Instantiate rep_tys with the relevant type variables
-	-- This looks a bit odd, because inst_tyvars' are the skolemised version
-	-- of the type variables in the instance declaration; but rep_tys doesn't
-	-- have the skolemised version, so we substitute them in here
-    rep_tys' = substTys subst rep_tys
-    subst    = zipOpenTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
-^ ^ ^ ^ ^ ^ ^
 \end{code}
 
 
