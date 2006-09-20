@@ -84,9 +84,7 @@ data HsBind id
 				-- (with a free type variable a').  The coercion will take
 				-- a CoreExpr of this type and convert it to a CoreExpr of
 				-- type 	Int -> forall a'. a' -> a'
-				-- Notice that the coercion captures the free a'.  That's
-				-- why coercions are (CoreExpr -> CoreExpr), rather than
-				-- just CoreExpr (with a functional type)
+				-- Notice that the coercion captures the free a'.
 
 	bind_fvs :: NameSet	-- After the renamer, this contains a superset of the 
 				-- Names of the other binders in this binding group that 

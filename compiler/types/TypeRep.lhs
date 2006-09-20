@@ -193,7 +193,7 @@ data Type
 	Type	
 
   | PredTy		-- The type of evidence for a type predictate
-	PredType	-- Can be expanded to a representation type.
+	PredType	-- See Note [PredTy], and Note [Equality predicates]
 	-- NB: A PredTy (EqPred _ _) can appear only as the kind
 	--     of a coercion variable; never as the argument or result
 	--     of a FunTy (unlike ClassP, IParam)
@@ -219,7 +219,7 @@ data TyNote = FTVNote TyVarSet	-- The free type variables of the noted expressio
 \end{code}
 
 -------------------------------------
- 		Source types
+ 		Note [PredTy]
 
 A type of the form
 	PredTy p
@@ -258,6 +258,24 @@ represented using
 The predicate really does turn into a real extra argument to the
 function.  If the argument has type (PredTy p) then the predicate p is
 represented by evidence (a dictionary, for example, of type (predRepTy p).
+
+Note [Equality predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+	forall a b. (a :=: S b) => a -> b
+could be represented by
+	ForAllTy a (ForAllTy b (FunTy (PredTy (EqPred a (S b))) ...))
+OR
+	ForAllTy a (ForAllTy b (ForAllTy (c::PredTy (EqPred a (S b))) ...))
+
+The latter is what we do.  (Unlike for class and implicit parameter
+constraints, which do use FunTy.)
+
+Reason:
+	* FunTy is always a *value* function
+	* ForAllTy is discarded at runtime
+
+We often need to make a "wildcard" (c::PredTy..).  We always use the same
+name (wildCoVarName), since it's not mentioned.
 
 
 %************************************************************************
