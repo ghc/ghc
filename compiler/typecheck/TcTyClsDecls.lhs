@@ -166,22 +166,30 @@ tcTyAndClassDecls boot_details allDecls
 	; mod <- getModule
 	; traceTc (text "tcTyAndCl" <+> ppr mod)
 	; (syn_tycons, alg_tyclss) <- fixM (\ ~(rec_syn_tycons, rec_alg_tyclss) ->
-	  do	{ let {	-- Calculate variances and rec-flag
+	  do	{ let {	-- Seperate ordinary synonyms from all other type and
+			-- class declarations and add all associated type
+			-- declarations from type classes.  The latter is
+			-- required so that the temporary environment for the
+			-- knot includes all associated family declarations.
 		      ; (syn_decls, alg_decls) = partition (isSynDecl . unLoc)
-						   decls }
+						   decls
+		      ; alg_at_decls           = concatMap addATs alg_decls
+		      }
 			-- Extend the global env with the knot-tied results
 			-- for data types and classes
 			-- 
-			-- We must populate the environment with the loop-tied T's right
-			-- away, because the kind checker may "fault in" some type 
-			-- constructors that recursively mention T
-		; let { gbl_things = mkGlobalThings alg_decls rec_alg_tyclss }
+			-- We must populate the environment with the loop-tied
+			-- T's right away, because the kind checker may "fault
+			-- in" some type  constructors that recursively
+			-- mention T
+		; let gbl_things = mkGlobalThings alg_at_decls rec_alg_tyclss
 		; tcExtendRecEnv gbl_things $ do
 
 			-- Kind-check the declarations
 		{ (kc_syn_decls, kc_alg_decls) <- kcTyClDecls syn_decls alg_decls
 
-		; let {	calc_rec  = calcRecFlags boot_details rec_alg_tyclss
+		; let {	-- Calculate rec-flag
+		      ; calc_rec  = calcRecFlags boot_details rec_alg_tyclss
 		      ; tc_decl   = addLocM (tcTyClDecl calc_rec) }
 			-- Type-check the type synonyms, and extend the envt
 		; syn_tycons <- tcSynDecls kc_syn_decls
@@ -189,7 +197,7 @@ tcTyAndClassDecls boot_details allDecls
 
 			-- Type-check the data types and classes
 		{ alg_tyclss <- mappM tc_decl kc_alg_decls
-		; return (syn_tycons, alg_tyclss)
+		; return (syn_tycons, concat alg_tyclss)
 	    }}})
 	-- Finished with knot-tying now
 	-- Extend the environment with the finished things
@@ -204,9 +212,13 @@ tcTyAndClassDecls boot_details allDecls
 	-- we want them in the environment because 
 	-- they may be mentioned in interface files
 	; let {	implicit_things = concatMap implicitTyThings alg_tyclss }
-	; traceTc ((text "Adding" <+> ppr alg_tyclss) $$ (text "and" <+> ppr implicit_things))
+	; traceTc ((text "Adding" <+> ppr alg_tyclss) 
+		   $$ (text "and" <+> ppr implicit_things))
   	; tcExtendGlobalEnv implicit_things getGblEnv
     }}
+  where
+    addATs decl@(L _ (ClassDecl {tcdATs = ats})) = decl : ats
+    addATs decl				         = [decl]
 
 mkGlobalThings :: [LTyClDecl Name] 	-- The decls
 	       -> [TyThing]		-- Knot-tied, in 1-1 correspondence with the decls
@@ -591,7 +603,7 @@ tcSynDecl
     ; return (ATyCon (buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty'))) }
 
 --------------------
-tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM TyThing
+tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
 
 tcTyClDecl calc_isrec decl
   = tcAddDeclCtxt decl (tcTyClDecl1 calc_isrec decl)
@@ -605,7 +617,7 @@ tcTyClDecl1 _calc_isrec
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc gla_exts $ badSigTyDecl tc_name
 
-  ; return (ATyCon (buildSynTyCon tc_name tvs' (OpenSynTyCon kind)))
+  ; return [ATyCon (buildSynTyCon tc_name tvs' (OpenSynTyCon kind))]
   }
 
   -- kind signature for an indexed data type
@@ -627,7 +639,7 @@ tcTyClDecl1 _calc_isrec
 		  DataType -> OpenDataTyCon
 		  NewType  -> OpenNewTyCon)
 	       Recursive False True
-  ; return (ATyCon tycon)
+  ; return [ATyCon tycon]
   }
 
 tcTyClDecl1 calc_isrec
@@ -675,7 +687,7 @@ tcTyClDecl1 calc_isrec
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
 			(want_generic && canDoGenerics data_cons) h98_syntax
 	})
-  ; return (ATyCon tycon)
+  ; return [ATyCon tycon]
   }
   where
     is_rec   = calc_isrec tc_name
@@ -690,7 +702,8 @@ tcTyClDecl1 calc_isrec
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM (addLocM tc_fundep) fundeps
-  ; ats' <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
+  ; atss <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
+  ; let ats' = concat atss
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
 		let 	-- This little knot is just so we can get
@@ -701,7 +714,10 @@ tcTyClDecl1 calc_isrec
 		in
 		buildClass class_name tvs' ctxt' fds' ats'
 			   sig_stuff tc_isrec)
-  ; return (AClass clas) }
+  ; return (AClass clas : ats')
+      -- NB: Order is important due to the call to `mkGlobalThings' when
+      --     tying the the type and class declaration type checking knot.
+  }
   where
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mappM tcLookupTyVar tvs1 ;
 				; tvs2' <- mappM tcLookupTyVar tvs2 ;
@@ -710,7 +726,7 @@ tcTyClDecl1 calc_isrec
 
 tcTyClDecl1 calc_isrec 
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
-  = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0))
+  = returnM [ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0)]
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
