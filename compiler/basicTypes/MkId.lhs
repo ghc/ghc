@@ -530,7 +530,7 @@ mkRecordSelId tycon field_label
 	-- NB: A newtype always has a vanilla DataCon; no existentials etc
 	--     res_tys will simply be the dataConUnivTyVars
     sel_body | isNewTyCon tycon = unwrapNewTypeBody tycon res_tys (Var data_id)
-	     | otherwise	= Case (Var data_id) data_id field_tau (default_alt ++ the_alts)
+	     | otherwise	= Case (Var data_id) data_id field_ty (default_alt ++ the_alts)
 
     mk_result poly_result = mkVarApps (mkVarApps poly_result field_tyvars) field_dict_ids
 	-- We pull the field lambdas to the top, so we need to 

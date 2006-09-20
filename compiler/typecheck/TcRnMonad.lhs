@@ -187,7 +187,7 @@ addBreakpointBindings thing_inside
                     = mkGlobalId VanillaGlobal breakpointCondJumpName
                                  (basicType (FunTy boolTy)) vanillaIdInfo
 	  }
-	; extendIdEnv [breakpoingJumpId, breakpointCondJumpId] thing_inside}
+	; extendIdEnv [breakpointJumpId, breakpointCondJumpId] thing_inside}
 #else
    = thing_inside
 #endif
