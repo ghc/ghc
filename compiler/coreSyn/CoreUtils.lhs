@@ -46,6 +46,7 @@ import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
 import Var		( Var, TyVar, CoVar, isCoVar, tyVarKind, mkCoVar, mkTyVar )
 import OccName          ( mkVarOccFS )
+import SrcLoc		( noSrcLoc )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName, mkSysTvName )
@@ -61,7 +62,8 @@ import DataCon		( DataCon, dataConRepArity, eqSpecPreds,
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
-			  isOneShotBndr, isStateHackType, isDataConWorkId_maybe, mkSysLocal,
+			  isOneShotBndr, isStateHackType, 
+			  isDataConWorkId_maybe, mkSysLocal, mkUserLocal,
 			  isDataConWorkId, isBottomingId, isDictId
 			)
 import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo )
