@@ -50,7 +50,7 @@ import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon, OpenDataTyCon,
 			  tyConDataCons, mkForeignTyCon, isProductTyCon,
 			  isRecursiveTyCon, isOpenTyCon,
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
-                          isNewTyCon )
+                          isNewTyCon, tyConKind )
 import DataCon		( DataCon, dataConUserType, dataConName, 
 			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
 			  dataConFieldType, dataConResTys )
@@ -338,9 +338,10 @@ kcIdxTyPats :: TyClDecl Name
 kcIdxTyPats decl thing_inside
   = kcHsTyVars (tcdTyVars decl) $ \tvs -> 
     do { tc_ty_thing <- tcLookupLocated (tcdLName decl)
-       ; let tc_kind          = case tc_ty_thing of { AThing k -> k }
-	     (kinds, resKind) = splitKindFunTys tc_kind
-	     hs_typats	      = fromJust $ tcdTyPats decl
+       ; let { tc_kind = case tc_ty_thing of 
+		           AGlobal (ATyCon tycon) -> tyConKind tycon
+             ; (kinds, resKind) = splitKindFunTys tc_kind
+	     ; hs_typats	= fromJust $ tcdTyPats decl }
 
          -- we may not have more parameters than the kind indicates
        ; checkTc (length kinds >= length hs_typats) $
@@ -351,6 +352,7 @@ kcIdxTyPats decl thing_inside
        ; typats <- zipWithM kcCheckHsType hs_typats kinds
        ; thing_inside tvs typats resultKind
        }
+  where
 \end{code}
 
 
