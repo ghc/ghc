@@ -132,33 +132,8 @@ initTc hsc_env hsc_src mod do_this
    
 	-- OK, here's the business end!
 	maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
-		     do {
-#if defined(GHCI) && defined(BREAKPOINT)
-                          unique <- newUnique ;
-                          let { var = mkInternalName unique (mkOccName tvName "a") noSrcLoc;
-                                tyvar = mkTyVar var liftedTypeKind;
-                                basicType extra = (FunTy intTy
-                                                   (FunTy (mkListTy unitTy)
-                                                    (FunTy stringTy
-                                                     (ForAllTy tyvar
-                                                      (extra
-                                                       (FunTy (TyVarTy tyvar)
-                                                        (TyVarTy tyvar)))))));
-                                breakpointJumpType
-                                    = mkGlobalId VanillaGlobal breakpointJumpName
-                                                 (basicType id) vanillaIdInfo;
-                                breakpointCondJumpType
-                                    = mkGlobalId VanillaGlobal breakpointCondJumpName
-                                                 (basicType (FunTy boolTy)) vanillaIdInfo;
-                                new_env = mkNameEnv [(breakpointJumpName
-                                                     , ATcId breakpointJumpType topLevel False)
-                                                     ,(breakpointCondJumpName
-                                                     , ATcId breakpointCondJumpType topLevel False)];
-                              };
-                          r <- tryM (updLclEnv (\gbl -> gbl{tcl_env=new_env}) do_this)
-#else
-                          r <- tryM do_this
-#endif
+		     addBreakpointBindings $
+		     do { r <- tryM do_this
 			; case r of
 			  Right res -> return (Just res)
 			  Left _    -> return Nothing } ;
@@ -191,6 +166,32 @@ initTcPrintErrors env mod todo = do
   return res
 \end{code}
 
+\begin{code}
+addBreakpointBindings :: TcM a -> TcM a
+addBreakpointBindings thing_inside
+#if defined(GHCI) && defined(BREAKPOINT)
+  = do	{ unique <- newUnique
+        ; let { var = mkInternalName unique (mkOccName tvName "a") noSrcLoc;
+                tyvar = mkTyVar var liftedTypeKind;
+                basicType extra = (FunTy intTy
+                                   (FunTy (mkListTy unitTy)
+                                    (FunTy stringTy
+                                     (ForAllTy tyvar
+                                      (extra
+                                       (FunTy (TyVarTy tyvar)
+                                        (TyVarTy tyvar)))))));
+                breakpointJumpId
+                    = mkGlobalId VanillaGlobal breakpointJumpName
+                                 (basicType id) vanillaIdInfo;
+                breakpointCondJumpId
+                    = mkGlobalId VanillaGlobal breakpointCondJumpName
+                                 (basicType (FunTy boolTy)) vanillaIdInfo
+	  }
+	; extendIdEnv [breakpoingJumpId, breakpointCondJumpId] thing_inside}
+#else
+   = thing_inside
+#endif
+\end{code}
 
 %************************************************************************
 %*									*

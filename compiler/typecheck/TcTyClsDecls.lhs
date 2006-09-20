@@ -33,21 +33,20 @@ import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType,
 import TcMType		( newKindVar, checkValidTheta, checkValidType, 
 			  -- checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
-import TcType		( TcKind, TcType, tyVarsOfType, mkPhiTy,
+import TcType		( TcKind, TcType, Type, tyVarsOfType, mkPhiTy,
 			  mkArrowKind, liftedTypeKind, mkTyVarTys, 
 			  tcSplitSigmaTy, tcEqTypes, tcGetTyVar_maybe )
-import Type		( splitTyConApp_maybe, 
+import Type		( PredType(..), splitTyConApp_maybe, mkTyVarTy
 			  -- pprParendType, pprThetaArrow
 			)
-import Kind		( mkArrowKinds, splitKindFunTys )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName )
-import DataCon		( DataCon, dataConWrapId, dataConName, 
-			  dataConFieldLabels, dataConTyCon,
-			  dataConTyVars, dataConFieldType, dataConResTys )
+import DataCon		( DataCon, dataConUserType, dataConName, 
+			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
+			  dataConFieldType, dataConResTys )
 import Var		( TyVar, idType, idName )
 import VarSet		( elemVarSet, mkVarSet )
 import Name		( Name, getSrcLoc )
@@ -58,7 +57,7 @@ import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
 import List		( partition )
 import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan )
-import ListSetOps	( equivClasses )
+import ListSetOps	( equivClasses, minusList )
 import List		( delete )
 import Digraph		( SCC(..) )
 import DynFlags		( DynFlag( Opt_GlasgowExts, Opt_Generics, 
@@ -427,8 +426,11 @@ tcTyClDecl1 calc_isrec
 	-- Check that we don't use GADT syntax in H98 world
   ; checkTc (gla_exts || h98_syntax) (badGadtDecl tc_name)
 
+	-- Check that the stupid theta is empty for a GADT-style declaration
+  ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
+
 	-- Check that there's at least one condecl,
-	-- or else we're reading an interface file, or -fglasgow-exts
+	-- or else we're reading an hs-boot file, or -fglasgow-exts
   ; checkTc (not (null cons) || gla_exts || is_boot)
 	    (emptyConDeclsErr tc_name)
     
@@ -440,16 +442,16 @@ tcTyClDecl1 calc_isrec
 	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
 						 tycon final_tvs)) 
 			     cons
-	; let tc_rhs 
-		| null cons && is_boot 	-- In a hs-boot file, empty cons means
-		= AbstractTyCon		-- "don't know"; hence Abstract
-		| otherwise
-		= case new_or_data of
-			DataType -> mkDataTyConRhs data_cons
-			NewType  -> ASSERT( isSingleton data_cons )
-				    mkNewTyConRhs tycon (head data_cons)
+	; tc_rhs <-
+	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
+	    then return AbstractTyCon	-- "don't know"; hence Abstract
+	    else case new_or_data of
+		   DataType -> return (mkDataTyConRhs data_cons)
+		   NewType  -> 
+                       ASSERT( isSingleton data_cons )
+                       mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-			(want_generic && canDoGenerics data_cons)
+			(want_generic && canDoGenerics data_cons) h98_syntax
 	})
   ; return (ATyCon tycon)
   }
@@ -498,10 +500,12 @@ tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
   = do	{ let tc_datacon field_lbls arg_ty
 		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
 		     ; buildDataCon (unLoc name) False {- Prefix -} 
-				    True {- Vanilla -} [NotMarkedStrict]
+				    [NotMarkedStrict]
 		    		    (map unLoc field_lbls)
-			   	    tc_tvs [] [arg_ty']
-				    tycon (mkTyVarTys tc_tvs) }
+			   	    tc_tvs []  -- No existentials
+				    [] []      -- No equalities, predicates
+				    [arg_ty']
+				    tycon }
 
 		-- Check that a newtype has no existential stuff
 	; checkTc (null ex_tvs && null (unLoc ex_ctxt)) (newtypeExError name)
@@ -517,27 +521,16 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty)
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
-    ; (data_tc, res_ty_args) <- tcResultType tycon tc_tvs res_ty
+    ; (univ_tvs, ex_tvs, eq_preds, data_tc) <- tcResultType tycon tc_tvs tvs' res_ty
     ; let 
-	con_tvs = case res_ty of
-		    ResTyH98    -> tc_tvs ++ tvs'
-		    ResTyGADT _ -> tryVanilla tvs' res_ty_args
-
-	-- Vanilla iff result type matches the quantified vars exactly,
-	-- and there is no existential context
-	-- Must check the context too because of implicit params; e.g.
-	--  	data T = (?x::Int) => MkT Int
-	is_vanilla = res_ty_args `tcEqTypes` mkTyVarTys con_tvs
-		     && null (unLoc ctxt)
-
 	tc_datacon is_infix field_lbls btys
 	  = do { let bangs = map getBangStrictness btys
 	       ; arg_tys <- mappM tcHsBangType btys
-    	       ; buildDataCon (unLoc name) is_infix is_vanilla
+    	       ; buildDataCon (unLoc name) is_infix
     		    (argStrictness unbox_strict tycon bangs arg_tys)
     		    (map unLoc field_lbls)
-    		    con_tvs ctxt' arg_tys
-		    data_tc res_ty_args }
+    		    univ_tvs ex_tvs eq_preds ctxt' arg_tys
+		    data_tc }
 		-- NB:	we put data_tc, the type constructor gotten from the constructor 
 		--	type signature into the data constructor; that way 
 		--	checkValidDataCon can complain if it's wrong.
@@ -551,19 +544,48 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
                               
     }
 
-tcResultType :: TyCon -> [TyVar] -> ResType Name -> TcM (TyCon, [TcType])
-tcResultType tycon tvs ResTyH98           = return (tycon, mkTyVarTys tvs)
-tcResultType _     _   (ResTyGADT res_ty) = tcLHsConResTy res_ty
+tcResultType :: TyCon
+	     -> [TyVar] 	-- data T a b c = ...
+	     -> [TyVar] 	-- where MkT :: forall a b c. ...
+	     -> ResType Name
+	     -> TcM ([TyVar],	 	-- Universal
+		     [TyVar],		-- Existential
+		     [(TyVar,Type)],	-- Equality predicates
+		     TyCon)		-- TyCon given in the ResTy
+	-- We don't check that the TyCon given in the ResTy is
+	-- the same as the parent tycon, becuase we are in the middle
+	-- of a recursive knot; so it's postponed until checkValidDataCon
 
-tryVanilla :: [TyVar] -> [TcType] -> [TyVar]
--- (tryVanilla tvs tys) returns a permutation of tvs.
--- It tries to re-order the tvs so that it exactly 
--- matches the [Type], if that is possible
-tryVanilla tvs (ty:tys) | Just tv <- tcGetTyVar_maybe ty	-- The type is a tyvar
-			, tv `elem` tvs				-- That tyvar is in the list
-			= tv : tryVanilla (delete tv tvs) tys
-tryVanilla tvs tys = tvs	-- Fall through case
+tcResultType decl_tycon tc_tvs dc_tvs ResTyH98
+  = return (tc_tvs, dc_tvs, [], decl_tycon)
+	-- In H98 syntax the dc_tvs are the existential ones
+	--	data T a b c = forall d e. MkT ...
+	-- The {a,b,c} are tc_tvs, and {d,e} are dc_tvs
 
+tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
+	-- E.g.  data T a b c where
+	--	   MkT :: forall x y z. T (x,y) z z
+	-- Then we generate
+	--	([a,z,c], [x,y], [a:=:(x,y), c:=:z], T)
+
+  = do	{ (dc_tycon, res_tys) <- tcLHsConResTy res_ty
+		-- NB: tc_tvs and dc_tvs are distinct
+	; let univ_tvs = choose_univs [] tc_tvs res_tys
+		-- Each univ_tv is either a dc_tv or a tc_tv
+	      ex_tvs = dc_tvs `minusList` univ_tvs
+	      eq_spec = [ (tv, ty) | (tv,ty) <- univ_tvs `zip` res_tys, 
+				      tv `elem` tc_tvs]
+	; return (univ_tvs, ex_tvs, eq_spec, dc_tycon) }
+  where
+  	-- choose_univs uses the res_ty itself if it's a type variable
+	-- and hasn't already been used; otherwise it uses one of the tc_tvs
+    choose_univs used tc_tvs []
+	= ASSERT( null tc_tvs ) []
+    choose_univs used (tc_tv:tc_tvs) (res_ty:res_tys) 
+	| Just tv <- tcGetTyVar_maybe res_ty, not (tv `elem` used)
+	= tv    : choose_univs (tv:used) tc_tvs res_tys
+	| otherwise
+	= tc_tv : choose_univs used tc_tvs res_tys
 
 -------------------
 argStrictness :: Bool		-- True <=> -funbox-strict_fields
@@ -634,7 +656,7 @@ checkValidTyCl decl
 -- of the constructor.
 
 checkValidTyCon :: TyCon -> TcM ()
-checkValidTyCon tc
+checkValidTyCon tc 
   | isSynTyCon tc 
   = checkValidType syn_ctxt syn_rhs
   | otherwise
@@ -658,14 +680,20 @@ checkValidTyCon tc
     get_fields con = dataConFieldLabels con `zip` repeat con
 	-- dataConFieldLabels may return the empty list, which is fine
 
-    -- Note: The complicated checkOne logic below is there to accomodate
-    --       for different return types.  Add res_ty to the mix,
-    --       comparing them in two steps, all for good error messages.
-    --       Plan: Use Unify.tcMatchTys to compare the first candidate's
-    --             result type against other candidates' types (check bothways).
-    --             If they magically agrees, take the substitution and
-    --             apply them to the latter ones, and see if they match perfectly.
-    -- check_fields fields@((first_field_label, field_ty) : other_fields)
+    -- See Note [GADT record selectors] in MkId.lhs
+    -- We must check (a) that the named field has the same 
+    --                   type in each constructor
+    --               (b) that those constructors have the same result type
+    --
+    -- However, the constructors may have differently named type variable
+    -- and (worse) we don't know how the correspond to each other.  E.g.
+    --     C1 :: forall a b. { f :: a, g :: b } -> T a b
+    --     C2 :: forall d c. { f :: c, g :: c } -> T c d
+    -- 
+    -- So what we do is to ust Unify.tcMatchTys to compare the first candidate's
+    -- result type against other candidates' types BOTH WAYS ROUND.
+    -- If they magically agrees, take the substitution and
+    -- apply them to the latter ones, and see if they match perfectly.
     check_fields fields@((label, con1) : other_fields)
 	-- These fields all have the same name, but are from
 	-- different constructors in the data type
@@ -674,7 +702,7 @@ checkValidTyCon tc
 		-- NB: this check assumes that all the constructors of a given
 		-- data type use the same type variables
         where
-        tvs1 = mkVarSet (dataConTyVars con1)
+        tvs1 = mkVarSet (dataConAllTyVars con1)
         res1 = dataConResTys con1
         fty1 = dataConFieldType con1 label
 
@@ -682,7 +710,7 @@ checkValidTyCon tc
 	    = do { checkFieldCompat label con1 con2 tvs1 res1 res2 fty1 fty2
 		 ; checkFieldCompat label con2 con1 tvs2 res2 res1 fty2 fty1 }
 	    where        
-                tvs2 = mkVarSet (dataConTyVars con2)
+                tvs2 = mkVarSet (dataConAllTyVars con2)
 		res2 = dataConResTys con2 
                 fty2 = dataConFieldType con2 label
 
@@ -699,18 +727,9 @@ checkValidDataCon tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))	$
     addErrCtxt (dataConCtxt con)		$ 
     do	{ checkTc (dataConTyCon con == tc) (badDataConTyCon con)
-	; checkValidType ctxt (idType (dataConWrapId con)) }
-
-		-- This checks the argument types and
-		-- ambiguity of the existential context (if any)
-		-- 
-		-- Note [Sept 04] Now that tvs is all the tvs, this
-		-- test doesn't actually check anything
---	; checkFreeness tvs ex_theta }
+	; checkValidType ctxt (dataConUserType con) }
   where
     ctxt = ConArgCtxt (dataConName con) 
---    (tvs, ex_theta, _, _, _) = dataConSig con
-
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -839,6 +858,9 @@ badDataConTyCon data_con
 badGadtDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow GADTs")) ]
+
+badStupidTheta tc_name
+  = ptext SLIT("A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
 
 newtypeConError tycon n
   = sep [ptext SLIT("A newtype must have exactly one constructor,"),

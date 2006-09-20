@@ -4,13 +4,14 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, tcPats, tcOverloadedLit,
-	       PatCtxt(..), badFieldCon, polyPatSig ) where
+module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
+	       badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TcExpr( tcSyntaxOp )
 import HsSyn		( Pat(..), LPat, HsConDetails(..), HsLit(..), HsOverLit(..), HsExpr(..),
+			  mkCoPat, idCoercion,
 			  LHsBinds, emptyLHsBinds, isEmptyLHsBinds, 
 			  collectPatsBinders, nlHsLit )
 import TcHsSyn		( TcId, hsLitType )
@@ -23,35 +24,37 @@ import CoreFVs		( idFreeTyVars )
 import Name		( Name, mkSystemVarName )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
-			  tcLookupClass, tcLookupDataCon, tcLookupId, refineEnvironment,
-			  tcMetaTy )
-import TcMType 		( newFlexiTyVarTy, arityErr, tcInstSkolTyVars, newBoxyTyVar, zonkTcType )
+			  tcLookupClass, tcLookupDataCon, refineEnvironment,
+			  tcLookupField, tcMetaTy )
+import TcMType 		( newFlexiTyVarTy, arityErr, tcInstSkolTyVars, 
++ 			  newCoVars, zonkTcType )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, BoxyType,
 			  SkolemInfo(PatSkol), 
 			  BoxySigmaType, BoxyRhoType, argTypeKind, typeKind,
-			  pprSkolTvBinding, isRefineableTy, isRigidTy, tcTyVarsOfTypes, mkTyVarTy, lookupTyVar, 
-			  emptyTvSubst, substTyVar, substTy, mkTopTvSubst, zipTopTvSubst, zipOpenTvSubst,
-			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy, isArgTypeKind, isUnboxedTupleType,
-			  mkFunTy, mkFunTys, exactTyVarsOfTypes, tidyOpenType, tidyOpenTypes )
-import VarSet		( elemVarSet, mkVarSet )
-import Kind		( liftedTypeKind, openTypeKind )
-import TcUnify		( boxySplitTyConApp, boxySplitListTy, unifyType,
-			  unBox, stripBoxyType, zapToMonotype,
-		  	  boxyMatchTypes, boxyUnify, boxyUnifyList, checkSigTyVarsWrt )
+			  pprSkolTvBinding, isRigidTy, tcTyVarsOfTypes, 
+			  zipTopTvSubst, isArgTypeKind, isUnboxedTupleType,
+			  mkTyVarTys, mkClassPred, isOverloadedTy, substEqSpec,
+			  mkFunTy, mkFunTys, tidyOpenType, tidyOpenTypes )
+import VarSet		( elemVarSet )
+import {- Kind parts of -} 
+       Type		( liftedTypeKind )
+import TcUnify		( boxySplitTyConApp, boxySplitListTy, unBox,
+			  zapToMonotype, boxyUnify, checkSigTyVarsWrt,
+			  unifyType )
 import TcHsType		( UserTypeCtxt(..), tcPatSig )
 import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
-import Unify		( MaybeErr(..), gadtRefineTys )
 import Type		( substTys, substTheta )
 import StaticFlags	( opt_IrrefutableTuples )
-import TyCon		( TyCon )
-import DataCon		( DataCon, dataConTyCon, isVanillaDataCon, 
-			  dataConFieldLabels, dataConSourceArity, dataConSig )
+import TyCon		( TyCon, FieldLabel )
+import DataCon		( DataCon, dataConTyCon, dataConFullSig, dataConName,
+			  dataConFieldLabels, dataConSourceArity )
 import PrelNames	( integralClassName, fromIntegerName, integerTyConName, 
 			  fromRationalName, rationalTyConName )
 import BasicTypes	( isBoxed )
 import SrcLoc		( Located(..), SrcSpan, noLoc )
 import ErrUtils		( Message )
-import Util		( takeList, zipEqual )
+import Util		( zipEqual )
+import Maybes		( MaybeErr(..) )
 import Outputable
 import FastString
 \end{code}
@@ -64,12 +67,26 @@ import FastString
 %************************************************************************
 
 \begin{code}
-tcPats	:: PatCtxt
-	-> [LPat Name]			-- Patterns,
-	-> [BoxySigmaType]		--   and their types
-	-> BoxyRhoType 			-- Result type,
-	-> (BoxyRhoType -> TcM a)	--   and the checker for the body
-	-> TcM ([LPat TcId], a)
+tcLetPat :: (Name -> Maybe TcRhoType)
+      	 -> LPat Name -> BoxySigmaType 
+      	 -> TcM a
+      	 -> TcM (LPat TcId, a)
+tcLetPat sig_fn pat pat_ty thing_inside
+  = do	{ let init_state = PS { pat_ctxt = LetPat sig_fn, 
+				pat_reft = emptyRefinement }
+	; (pat', ex_tvs, res) <- tc_lpat pat pat_ty init_state (\ _ -> thing_inside)
+
+	-- Don't know how to deal with pattern-bound existentials yet
+	; checkTc (null ex_tvs) (existentialExplode pat)
+
+	; return (pat', res) }
+
+-----------------
+tcLamPats :: [LPat Name]				-- Patterns,
+	  -> [BoxySigmaType]				--   and their types
+	  -> BoxyRhoType 				-- Result type,
+	  -> ((Refinement, BoxyRhoType) -> TcM a)	--   and the checker for the body
+	  -> TcM ([LPat TcId], a)
 
 -- This is the externally-callable wrapper function
 -- Typecheck the patterns, extend the environment to bind the variables,
@@ -79,36 +96,42 @@ tcPats	:: PatCtxt
 
 --   1. Initialise the PatState
 --   2. Check the patterns
---   3. Apply the refinement
+--   3. Apply the refinement to the environment and result type
 --   4. Check the body
 --   5. Check that no existentials escape
 
-tcPats ctxt pats tys res_ty thing_inside
-  =  do	{ let init_state = PS { pat_ctxt = ctxt, pat_reft = emptyTvSubst }
+tcLamPats pats tys res_ty thing_inside
+  = tc_lam_pats (zipEqual "tcLamPats" pats tys)
+	        (emptyRefinement, res_ty) thing_inside
 
-	; (pats', ex_tvs, res) <- tc_lpats init_state pats tys $ \ pstate' ->
+tcLamPat :: LPat Name -> BoxySigmaType 
+      	 -> (Refinement,BoxyRhoType)		-- Result type
+      	 -> ((Refinement,BoxyRhoType) -> TcM a)	-- Checker for body, given its result type
+      	 -> TcM (LPat TcId, a)
+tcLamPat pat pat_ty res_ty thing_inside
+  = do	{ ([pat'],thing) <- tc_lam_pats [(pat, pat_ty)] res_ty thing_inside
+	; return (pat', thing) }
+
+-----------------
+tc_lam_pats :: [(LPat Name,BoxySigmaType)]
+       	    -> (Refinement,BoxyRhoType)			-- Result type
+       	    -> ((Refinement,BoxyRhoType) -> TcM a)	-- Checker for body, given its result type
+       	    -> TcM ([LPat TcId], a)
+tc_lam_pats pat_ty_prs (reft, res_ty) thing_inside 
+  =  do	{ let init_state = PS { pat_ctxt = LamPat, pat_reft = reft }
+
+	; (pats', ex_tvs, res) <- tcMultiple tc_lpat_pr pat_ty_prs init_state $ \ pstate' ->
 				  refineEnvironment (pat_reft pstate') $
-	     			  thing_inside (refineType (pat_reft pstate') res_ty)
+	     			  thing_inside (pat_reft pstate', res_ty)
 
-	; tcCheckExistentialPat ctxt pats' ex_tvs tys res_ty
+	; let tys = map snd pat_ty_prs
+	; tcCheckExistentialPat pats' ex_tvs tys res_ty
 
 	; returnM (pats', res) }
 
 
 -----------------
-tcPat :: PatCtxt 
-      -> LPat Name -> BoxySigmaType 
-      -> BoxyRhoType		-- Result type
-      -> (BoxyRhoType -> TcM a)	-- Checker for body, given its result type
-      -> TcM (LPat TcId, a)
-tcPat ctxt pat pat_ty res_ty thing_inside
-  = do	{ ([pat'],thing) <- tcPats ctxt [pat] [pat_ty] res_ty thing_inside
-	; return (pat', thing) }
-
-
------------------
-tcCheckExistentialPat :: PatCtxt
-		      -> [LPat TcId]		-- Patterns (just for error message)
+tcCheckExistentialPat :: [LPat TcId]		-- Patterns (just for error message)
 		      -> [TcTyVar]		-- Existentially quantified tyvars bound by pattern
 		      -> [BoxySigmaType]	-- Types of the patterns
 		      -> BoxyRhoType		-- Type of the body of the match
@@ -120,20 +143,16 @@ tcCheckExistentialPat :: PatCtxt
 -- 	f (C g) x = g x
 -- Here, result_ty will be simply Int, but expected_ty is (C -> a -> Int).
 
-tcCheckExistentialPat ctxt pats [] pat_tys body_ty
+tcCheckExistentialPat pats [] pat_tys body_ty
   = return ()	-- Short cut for case when there are no existentials
 
-tcCheckExistentialPat (LetPat _) pats ex_tvs pat_tys body_ty
-	-- Don't know how to deal with pattern-bound existentials yet
-  = failWithTc (existentialExplode pats)
-
-tcCheckExistentialPat ctxt pats ex_tvs pat_tys body_ty
+tcCheckExistentialPat pats ex_tvs pat_tys body_ty
   = addErrCtxtM (sigPatCtxt (collectPatsBinders pats) ex_tvs pat_tys body_ty)	$
     checkSigTyVarsWrt (tcTyVarsOfTypes (body_ty:pat_tys)) ex_tvs
 
 data PatState = PS {
 	pat_ctxt :: PatCtxt,
-	pat_reft :: GadtRefinement	-- Binds rigid TcTyVars to their refinements
+	pat_reft :: Refinement	-- Binds rigid TcTyVars to their refinements
   }
 
 data PatCtxt 
@@ -235,46 +254,57 @@ Hence the getErrCtxt/setErrCtxt stuff in tc_lpats.
 
 \begin{code}
 --------------------
-tc_lpats :: PatState
-	 -> [LPat Name] 
-	 -> [BoxySigmaType]	
-	 -> (PatState -> TcM a)
-	 -> TcM ([LPat TcId], [TcTyVar], a)
+type Checker inp out =  forall r.
+			  inp
+		       -> PatState
+		       -> (PatState -> TcM r)
+		       -> TcM (out, [TcTyVar], r)
 
-tc_lpats pstate pats pat_tys thing_inside
+tcMultiple :: Checker inp out -> Checker [inp] [out]
+tcMultiple tc_pat args pstate thing_inside
   = do	{ err_ctxt <- getErrCtxt
-	; let loop pstate [] [] 
+	; let loop pstate []
 		= do { res <- thing_inside pstate
 		     ; return ([], [], res) }
 
-	      loop pstate (p:ps) (ty:tys)
+	      loop pstate (arg:args)
 		= do { (p', p_tvs, (ps', ps_tvs, res)) 
-				<- tc_lpat pstate p ty $ \ pstate' ->
+				<- tc_pat arg pstate $ \ pstate' ->
 				   setErrCtxt err_ctxt $
-				   loop pstate' ps tys
+				   loop pstate' args
 		-- setErrCtxt: restore context before doing the next pattern
 		-- See note [Nesting] above
 				
 		     ; return (p':ps', p_tvs ++ ps_tvs, res) }
 
-	      loop _ _ _ = pprPanic "tc_lpats" (ppr pats $$ ppr pat_tys)
-
-	; loop pstate pats pat_tys }
+	; loop pstate args }
 
 --------------------
-tc_lpat :: PatState
-	 -> LPat Name 
-	 -> BoxySigmaType
-	 -> (PatState -> TcM a)
-	 -> TcM (LPat TcId, [TcTyVar], a)
-tc_lpat pstate (L span pat) pat_ty thing_inside
+tc_lpat_pr :: (LPat Name, BoxySigmaType)
+	   -> PatState
+	   -> (PatState -> TcM a)
+	   -> TcM (LPat TcId, [TcTyVar], a)
+tc_lpat_pr (pat, ty) = tc_lpat pat ty
+
+tc_lpat :: LPat Name 
+	-> BoxySigmaType
+	-> PatState
+	-> (PatState -> TcM a)
+	-> TcM (LPat TcId, [TcTyVar], a)
+tc_lpat (L span pat) pat_ty pstate thing_inside
   = setSrcSpan span		  $
     maybeAddErrCtxt (patCtxt pat) $
-    do	{ let pat_ty' = refineType (pat_reft pstate) pat_ty
+    do	{ let (coercion, pat_ty') = refineType (pat_reft pstate) pat_ty
 		-- Make sure the result type reflects the current refinement
-	; (pat', tvs, res) <- tc_pat pstate pat pat_ty' thing_inside
-	; return (L span pat', tvs, res) }
+		-- We must do this here, so that it correctly ``sees'' all
+		-- the refinements to the left.  Example:
+		-- Suppose C :: forall a. T a -> a -> Foo
+		-- Pattern	C a p1 True
+		-- So p1 might refine 'a' to True, and the True 
+		-- pattern had better see it.
 
+	; (pat', tvs, res) <- tc_pat pstate pat pat_ty' thing_inside
+	; return (mkCoPat coercion (L span pat') pat_ty, tvs, res) }
 
 --------------------
 tc_pat	:: PatState
@@ -295,11 +325,11 @@ tc_pat pstate (VarPat name) pat_ty thing_inside
 	; return (pat', [], res) }
 
 tc_pat pstate (ParPat pat) pat_ty thing_inside
-  = do	{ (pat', tvs, res) <- tc_lpat pstate pat pat_ty thing_inside
+  = do	{ (pat', tvs, res) <- tc_lpat pat pat_ty pstate thing_inside
 	; return (ParPat pat', tvs, res) }
 
 tc_pat pstate (BangPat pat) pat_ty thing_inside
-  = do	{ (pat', tvs, res) <- tc_lpat pstate pat pat_ty thing_inside
+  = do	{ (pat', tvs, res) <- tc_lpat pat pat_ty pstate thing_inside
 	; return (BangPat pat', tvs, res) }
 
 -- There's a wrinkle with irrefutable patterns, namely that we
@@ -313,7 +343,7 @@ tc_pat pstate (BangPat pat) pat_ty thing_inside
 -- Nor should a lazy pattern bind any existential type variables
 -- because they won't be in scope when we do the desugaring
 tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
-  = do	{ (pat', pat_tvs, res) <- tc_lpat pstate pat pat_ty $ \ _ ->
+  = do	{ (pat', pat_tvs, res) <- tc_lpat pat pat_ty pstate $ \ _ ->
 				  thing_inside pstate
 					-- Ignore refined pstate',
 					-- revert to pstate
@@ -335,7 +365,7 @@ tc_pat pstate (WildPat _) pat_ty thing_inside
 tc_pat pstate (AsPat (L nm_loc name) pat) pat_ty thing_inside
   = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr pstate name pat_ty)
 	; (pat', tvs, res) <- tcExtendIdEnv1 name bndr_id $
-			      tc_lpat pstate pat (idType bndr_id) thing_inside
+			      tc_lpat pat (idType bndr_id) pstate thing_inside
 	    -- NB: if we do inference on:
 	    --		\ (y@(x::forall a. a->a)) = e
 	    -- we'll fail.  The as-pattern infers a monotype for 'y', which then
@@ -350,7 +380,7 @@ tc_pat pstate (AsPat (L nm_loc name) pat) pat_ty thing_inside
 tc_pat pstate (SigPatIn pat sig_ty) pat_ty thing_inside
   = do	{ (inner_ty, tv_binds) <- tcPatSig (patSigCtxt pstate) sig_ty pat_ty
 	; (pat', tvs, res) <- tcExtendTyVarEnv2 tv_binds $
-			      tc_lpat pstate pat inner_ty thing_inside
+			      tc_lpat pat inner_ty pstate thing_inside
 	; return (SigPatOut pat' inner_ty, tvs, res) }
 
 tc_pat pstate pat@(TypePat ty) pat_ty thing_inside
@@ -360,20 +390,21 @@ tc_pat pstate pat@(TypePat ty) pat_ty thing_inside
 -- Lists, tuples, arrays
 tc_pat pstate (ListPat pats _) pat_ty thing_inside
   = do	{ elt_ty <- boxySplitListTy pat_ty
-	; let elt_tys = takeList pats (repeat elt_ty) 
-	; (pats', pats_tvs, res) <- tc_lpats pstate pats elt_tys thing_inside
+	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
+					 	pats pstate thing_inside
  	; return (ListPat pats' elt_ty, pats_tvs, res) }
 
 tc_pat pstate (PArrPat pats _) pat_ty thing_inside
   = do	{ [elt_ty] <- boxySplitTyConApp parrTyCon pat_ty
- 	; let elt_tys = takeList pats (repeat elt_ty) 
-	; (pats', pats_tvs, res) <- tc_lpats pstate pats elt_tys thing_inside 
+	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
+						pats pstate thing_inside 
 	; ifM (null pats) (zapToMonotype pat_ty)	-- c.f. ExplicitPArr in TcExpr
 	; return (PArrPat pats' elt_ty, pats_tvs, res) }
 
 tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
   = do	{ arg_tys <- boxySplitTyConApp (tupleTyCon boxity (length pats)) pat_ty
-	; (pats', pats_tvs, res) <- tc_lpats pstate pats arg_tys thing_inside
+	; (pats', pats_tvs, res) <- tcMultiple tc_lpat_pr (pats `zip` arg_tys)
+					       pstate thing_inside
 
 	-- Under flag control turn a pattern (x,y,z) into ~(x,y,z)
 	-- so that we can experiment with lazy tuple-matching.
@@ -447,118 +478,82 @@ tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- DictPat, ConPatOut, SigPatOut, VarP
 %************************************************************************
 
 \begin{code}
+--	Running example:
+-- MkT :: forall a b c. (a:=:[b]) => b -> c -> T a
+-- 	 with scrutinee of type (T ty)
+
 tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon 
 	 -> BoxySigmaType	-- Type of the pattern
 	 -> HsConDetails Name (LPat Name) -> (PatState -> TcM a)
 	 -> TcM (Pat TcId, [TcTyVar], a)
 tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
-  | isVanillaDataCon data_con
-  = do	{ ty_args <- boxySplitTyConApp tycon pat_ty
-	; let (tvs, _, arg_tys, _, _) = dataConSig data_con
-	      arg_tvs  = exactTyVarsOfTypes arg_tys
-		-- See Note [Silly type synonyms in smart-app] in TcExpr
-		-- for why we must use exactTyVarsOfTypes
-	      inst_prs = zipEqual "tcConPat" tvs ty_args
-	      subst    = mkTopTvSubst inst_prs
-	      arg_tys' = substTys subst arg_tys
-	      unconstrained_ty_args = [ty_arg | (tv,ty_arg) <- inst_prs,
-						not (tv `elemVarSet` arg_tvs)]
-	; mapM unBox unconstrained_ty_args	-- Zap these to monotypes
-	; tcInstStupidTheta data_con ty_args
-	; traceTc (text "tcConPat" <+> vcat [ppr data_con, ppr ty_args, ppr arg_tys'])
-	; (arg_pats', tvs, res) <- tcConArgs pstate data_con arg_pats arg_tys' thing_inside
-	; return (ConPatOut (L con_span data_con) [] [] emptyLHsBinds 
-			    arg_pats' (mkTyConApp tycon ty_args),
-		  tvs, res) }
-
-  | otherwise	-- GADT case
-  = do	{ ty_args <- boxySplitTyConApp tycon pat_ty
-	; span <- getSrcSpanM	-- The whole pattern
-
-	-- Instantiate the constructor type variables and result type
-	; let (tvs, theta, arg_tys, _, res_tys) = dataConSig data_con
-	      arg_tvs = exactTyVarsOfTypes arg_tys
-		-- See Note [Silly type synonyms in smart-app] in TcExpr
-		-- for why we must use exactTyVarsOfTypes
+  = do	{ span <- getSrcSpanM	-- Span for the whole pattern
+	; let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys) = dataConFullSig data_con
 	      skol_info = PatSkol data_con span
-	      arg_flags = [ tv `elemVarSet` arg_tvs | tv <- tvs ]
-	; tvs' <- tcInstSkolTyVars skol_info tvs
-	; let res_tys' = substTys (zipTopTvSubst tvs (mkTyVarTys tvs')) res_tys
 
-	-- Do type refinement!
-	; traceTc (text "tcGadtPat" <+> vcat [ppr data_con, ppr tvs', ppr res_tys', 
-					      text "ty-args:" <+> ppr ty_args ])
-	; refineAlt pstate data_con tvs' arg_flags res_tys' ty_args 
-			$ \ pstate' tv_tys' -> do
+	  -- Instantiate the constructor type variables [a->ty]
+	; ctxt_res_tys <- boxySplitTyConApp tycon pat_ty
+	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs
+	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
+				      (ctxt_res_tys ++ mkTyVarTys ex_tvs')
+	      eq_spec' = substEqSpec tenv eq_spec
+	      theta'   = substTheta  tenv theta
+	      arg_tys' = substTys    tenv arg_tys
 
-	-- ToDo: arg_tys should be boxy, but I don't think theta' should be,
-	--	 or the tv_tys' in the call to tcInstStupidTheta
-	{ let tenv'    = zipTopTvSubst tvs tv_tys'
-	      theta'   = substTheta tenv' theta
-	      arg_tys' = substTys   tenv' arg_tys	-- Boxy types
+	; co_vars <- newCoVars eq_spec'	-- Make coercion variables
+	; pstate' <- refineAlt data_con pstate ex_tvs co_vars pat_ty
 
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
-		do { tcInstStupidTheta data_con tv_tys'
-			-- The stupid-theta mentions the newly-bound tyvars, so
-			-- it must live inside the getLIE, so that the
-			-- tcSimplifyCheck will apply the type refinement to it
-		   ; tcConArgs pstate' data_con arg_pats arg_tys' thing_inside }
+		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
 
 	; dicts <- newDicts (SigOrigin skol_info) theta'
-	; dict_binds <- tcSimplifyCheck doc tvs' dicts lie_req
+	; dict_binds <- tcSimplifyCheck doc ex_tvs' dicts lie_req
 
-	; return (ConPatOut (L con_span data_con)
-			    tvs' (map instToId dicts) dict_binds
-			    arg_pats' (mkTyConApp tycon ty_args),
-		  tvs' ++ inner_tvs, res) 
-	} }
+	; tcInstStupidTheta data_con ctxt_res_tys
+
+	; return (ConPatOut { pat_con = L con_span data_con, 
+			      pat_tvs = ex_tvs' ++ co_vars,
+			      pat_dicts = map instToId dicts, pat_binds = dict_binds,
+			      pat_args = arg_pats', pat_ty = pat_ty },
+		  ex_tvs' ++ inner_tvs, res) 
+	}
   where
     doc = ptext SLIT("existential context for") <+> quotes (ppr data_con)
 
-tcConArgs :: PatState -> DataCon 
-	   -> HsConDetails Name (LPat Name) -> [TcSigmaType]
-	   -> (PatState -> TcM a)
-	   -> TcM (HsConDetails TcId (LPat Id), [TcTyVar], a)
+tcConArgs :: DataCon -> [TcSigmaType]
+	  -> Checker (HsConDetails Name (LPat Name)) (HsConDetails Id (LPat Id))
 
-tcConArgs pstate data_con (PrefixCon arg_pats) arg_tys thing_inside
+tcConArgs data_con arg_tys (PrefixCon arg_pats) pstate thing_inside
   = do	{ checkTc (con_arity == no_of_args)	-- Check correct arity
 		  (arityErr "Constructor" data_con con_arity no_of_args)
-	; (arg_pats', tvs, res) <- tc_lpats pstate arg_pats arg_tys thing_inside
+	; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
+	; (arg_pats', tvs, res) <- tcMultiple tcConArg pats_w_tys
+					      pstate thing_inside 
 	; return (PrefixCon arg_pats', tvs, res) }
   where
     con_arity  = dataConSourceArity data_con
     no_of_args = length arg_pats
 
-tcConArgs pstate data_con (InfixCon p1 p2) arg_tys thing_inside
+tcConArgs data_con [arg_ty1,arg_ty2] (InfixCon p1 p2) pstate thing_inside
   = do	{ checkTc (con_arity == 2)	-- Check correct arity
 	 	  (arityErr "Constructor" data_con con_arity 2)
-	; ([p1',p2'], tvs, res) <- tc_lpats pstate [p1,p2] arg_tys thing_inside
+	; ([p1',p2'], tvs, res) <- tcMultiple tcConArg [(p1,arg_ty1),(p2,arg_ty2)]
+					      pstate thing_inside
 	; return (InfixCon p1' p2', tvs, res) }
   where
     con_arity  = dataConSourceArity data_con
 
-tcConArgs pstate data_con (RecCon rpats) arg_tys thing_inside
-  = do	{ (rpats', tvs, res) <- tc_fields pstate rpats thing_inside
+tcConArgs data_con arg_tys (RecCon rpats) pstate thing_inside
+  = do	{ (rpats', tvs, res) <- tcMultiple tc_field rpats pstate thing_inside
 	; return (RecCon rpats', tvs, res) }
   where
-    tc_fields :: PatState -> [(Located Name, LPat Name)]
-	      -> (PatState -> TcM a)
-	      -> TcM ([(Located TcId, LPat TcId)], [TcTyVar], a)
-    tc_fields pstate [] thing_inside
-      = do { res <- thing_inside pstate
-	   ; return ([], [], res) }
-
-    tc_fields pstate (rpat : rpats) thing_inside
-      =	do { (rpat', tvs1, (rpats', tvs2, res)) 
-		<- tc_field pstate rpat  $ \ pstate' ->
-		   tc_fields pstate' rpats thing_inside
-	   ; return (rpat':rpats', tvs1 ++ tvs2, res) }
-
-    tc_field pstate (field_lbl, pat) thing_inside
+    tc_field :: Checker (Located Name, LPat Name) (Located TcId, LPat TcId)
+    tc_field (field_lbl, pat) pstate thing_inside
       = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
-	   ; (pat', tvs, res) <- tc_lpat pstate pat pat_ty thing_inside
+	   ; (pat', tvs, res) <- tcConArg (pat, pat_ty) pstate thing_inside
 	   ; return ((sel_id, pat'), tvs, res) }
 
+    find_field_ty :: FieldLabel -> TcM (Id, TcType)
     find_field_ty field_lbl
 	= case [ty | (f,ty) <- field_tys, f == field_lbl] of
 
@@ -577,13 +572,21 @@ tcConArgs pstate data_con (RecCon rpats) arg_tys thing_inside
 		-- The normal case, when the field comes from the right constructor
 	   (pat_ty : extras) -> 
 		ASSERT( null extras )
-		do { sel_id <- tcLookupId field_lbl
+		do { sel_id <- tcLookupField field_lbl
 		   ; return (sel_id, pat_ty) }
 
+    field_tys :: [(FieldLabel, TcType)]
     field_tys = zip (dataConFieldLabels data_con) arg_tys
 	-- Don't use zipEqual! If the constructor isn't really a record, then
 	-- dataConFieldLabels will be empty (and each field in the pattern
 	-- will generate an error below).
+
+tcConArg :: Checker (LPat Name, BoxySigmaType) (LPat Id)
+tcConArg (arg_pat, arg_ty) pstate thing_inside
+  = tc_lpat arg_pat arg_ty pstate thing_inside
+	-- NB: the tc_lpat will refine pat_ty if necessary
+	--     based on the current pstate, which may include
+	--     refinements from peer argument patterns to the left
 \end{code}
 
 
@@ -594,69 +597,44 @@ tcConArgs pstate data_con (RecCon rpats) arg_tys thing_inside
 %************************************************************************
 
 \begin{code}
-refineAlt :: PatState 
-	  -> DataCon		-- For tracing only
-	  -> [TcTyVar]		-- Type variables from pattern
-	  -> [Bool]		-- Flags indicating which type variables occur
-				--	in the type of at least one argument
-	  -> [TcType]		-- Result types from the pattern
-	  -> [BoxySigmaType] 	-- Result types from the scrutinee (context)
-	  -> (PatState -> [BoxySigmaType] -> TcM a)
-			-- Possibly-refined existentials
-	  -> TcM a
-refineAlt pstate con pat_tvs arg_flags pat_res_tys ctxt_res_tys thing_inside
-  | not (all isRigidTy ctxt_res_tys)
-	-- The context is not a rigid type, so we do no type refinement here.  
-  = do	{ let arg_tvs = mkVarSet [ tv | (tv, True) <- pat_tvs `zip` arg_flags]
-	      subst = boxyMatchTypes arg_tvs pat_res_tys ctxt_res_tys
-	      
-	      res_tvs = tcTyVarsOfTypes pat_res_tys
-		-- The tvs are (already) all fresh skolems. We need a 
-		-- fresh skolem for each type variable (to bind in the pattern)
-		-- even if it's refined away by the type refinement
-	      find_inst tv 
-		| not (tv `elemVarSet` res_tvs)        = return (mkTyVarTy tv)
-		| Just boxy_ty <- lookupTyVar subst tv = return boxy_ty
-		| otherwise			       = do { tv <- newBoxyTyVar openTypeKind
-							    ; return (mkTyVarTy tv) }
-	; pat_tys' <- mapM find_inst pat_tvs
+refineAlt :: DataCon		-- For tracing only
+	  -> PatState 
+	  -> [TcTyVar]		-- Existentials
+	  -> [CoVar]		-- Equational constraints
+	  -> BoxySigmaType	-- Pattern type
+	  -> TcM PatState
 
-	-- Do the thing inside
-	; res <- thing_inside pstate pat_tys'
+refineAlt con pstate ex_tvs [] pat_ty
+  = return pstate	-- Common case: no equational constraints
 
-	-- Unbox the types that have been filled in by the thing_inside
-	-- I.e. the ones whose type variables are mentioned in at least one arg
-	; let strip ty in_arg_tv | in_arg_tv = stripBoxyType ty
-				 | otherwise = return ty
-	; pat_tys'' <- zipWithM strip pat_tys' arg_flags
-	; let subst = zipOpenTvSubst pat_tvs pat_tys''
-	; boxyUnifyList (substTys subst pat_res_tys) ctxt_res_tys
+refineAlt con pstate ex_tvs co_vars pat_ty
+  | not (isRigidTy pat_ty)
+  = failWithTc (nonRigidMatch con)
+	-- We are matching against a GADT constructor with non-trivial
+	-- constraints, but pattern type is wobbly.  For now we fail.
+	-- We can make sense of this, however:
+	-- Suppose MkT :: forall a b. (a:=:[b]) => b -> T a
+	--	(\x -> case x of { MkT v -> v })
+	-- We can infer that x must have type T [c], for some wobbly 'c'
+	-- and translate to
+	--	(\(x::T [c]) -> case x of
+	--			  MkT b (g::([c]:=:[b])) (v::b) -> v `cast` sym g
+	-- To implement this, we'd first instantiate the equational
+	-- constraints with *wobbly* type variables for the existentials;
+	-- then unify these constraints to make pat_ty the right shape;
+	-- then proceed exactly as in the rigid case
 
-	; return res }		-- All boxes now filled
-
-  | otherwise	-- The context is rigid, so we can do type refinement
-  = case gadtRefineTys (pat_reft pstate) con pat_tvs pat_res_tys ctxt_res_tys of
-	Failed msg -> failWithTc (inaccessibleAlt msg)
-	Succeeded (new_subst, all_bound_here) 
-	  | all_bound_here 	-- All the new bindings are for pat_tvs, so no need
-				-- to refine the environment or pstate
-	  -> do  { traceTc trace_msg
-		 ; thing_inside pstate pat_tvs' }
-	  | otherwise 	-- New bindings affect the context, so pass down pstate'.  
-			-- DO NOT refine the envt, because we might be inside a
-			-- lazy pattern
-	  -> do { traceTc trace_msg
-		; thing_inside pstate' pat_tvs' }
-	  where
-  	     pat_tvs' = map (substTyVar new_subst) pat_tvs
-	     pstate'  = pstate { pat_reft = new_subst }
-	     trace_msg = text "refineTypes:match" <+> ppr con <+> ppr new_subst
-
-refineType :: GadtRefinement -> BoxyRhoType -> BoxyRhoType
--- Refine the type if it is rigid
-refineType reft ty
-  | isRefineableTy ty = substTy reft ty
-  | otherwise	      = ty
+  | otherwise	-- In the rigid case, we perform type refinement
+  = case gadtRefine (pat_reft pstate) ex_tvs co_vars of {
+	    Failed msg     -> failWithTc (inaccessibleAlt msg) ;
+	    Succeeded reft -> do { traceTc trace_msg
+			  	 ; return (pstate { pat_reft = reft }) }
+	 	    -- DO NOT refine the envt right away, because we 
+		    -- might be inside a lazy pattern.  Instead, refine pstate
+	        where
+		    
+		    trace_msg = text "refineAlt:match" <+> ppr con <+> ppr reft
+	}
 \end{code}
 
 
@@ -799,11 +777,11 @@ patCtxt pat 	    = Just (hang (ptext SLIT("In the pattern:"))
 
 -----------------------------------------------
 
-existentialExplode pats
+existentialExplode pat
   = hang (vcat [text "My brain just exploded.",
 	        text "I can't handle pattern bindings for existentially-quantified constructors.",
 		text "In the binding group for"])
-	4 (vcat (map ppr pats))
+	4 (ppr pat)
 
 sigPatCtxt bound_ids bound_tvs pat_tys body_ty tidy_env 
   = do	{ pat_tys' <- mapM zonkTcType pat_tys
@@ -840,6 +818,10 @@ lazyPatErr pat tvs
   = failWithTc $
     hang (ptext SLIT("A lazy (~) pattern connot bind existential type variables"))
        2 (vcat (map pprSkolTvBinding tvs))
+
+nonRigidMatch con
+  =  hang (ptext SLIT("GADT pattern match in non-rigid context for") <+> quotes (ppr con))
+	2 (ptext SLIT("Tell GHC HQ if you'd like this to unify the context"))
 
 inaccessibleAlt msg
   = hang (ptext SLIT("Inaccessible case alternative:")) 2 msg

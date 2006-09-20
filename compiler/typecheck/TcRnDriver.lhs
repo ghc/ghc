@@ -113,7 +113,7 @@ import MkId		( unsafeCoerceId )
 import TyCon		( tyConName )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
-import Kind		( Kind )
+import {- Kind parts of -} Type		( Kind, eqKind )
 import Var		( globaliseId )
 import Name		( isBuiltInSyntax, isInternalName )
 import OccName		( isTcOcc )
@@ -997,10 +997,12 @@ tcGhciStmts stmts
 		-- then the type checker would instantiate x..z, and we wouldn't
 		-- get their *polymorphic* values.  (And we'd get ambiguity errs
 		-- if they were overloaded, since they aren't applied to anything.)
-	    mk_return ids = nlHsApp (noLoc $ TyApp (nlHsVar ret_id) [ret_ty]) 
+	    mk_return ids = nlHsApp (mkHsTyApp ret_id [ret_ty]) 
 			 	    (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
-	    mk_item id = nlHsApp (noLoc $ TyApp (nlHsVar unsafeCoerceId) [idType id, unitTy])
-		    	         (nlHsVar id) 
+	    mk_item id = nlHsApp (noLoc $ unsafeCoerce)
+		    	         (nlHsVar id)
+ 
+            unsafeCoerce x = Cast x (mkUnsafeCoercion [idType id, unitTy]) 
 	 } ;
 
 	-- OK, we're ready to typecheck the stmts

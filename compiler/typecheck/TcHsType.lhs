@@ -45,7 +45,7 @@ import TcType		( Type, PredType(..), ThetaType, BoxySigmaType,
 			  substTyWith, mkTyVarTys, tcEqType,
 		 	  tcIsTyVarTy, mkFunTy, mkSigmaTy, mkPredTy, 
 			  mkTyConApp, mkAppTys, typeKind )
-import Kind 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
+import {- Kind parts of -} Type 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
 			  openTypeKind, argTypeKind, splitKindFunTys )
 import Var		( TyVar, mkTyVar, tyVarName )
 import TyCon		( TyCon, tyConKind )

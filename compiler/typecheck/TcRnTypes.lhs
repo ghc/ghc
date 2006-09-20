@@ -21,7 +21,6 @@ module TcRnTypes(
 
 	-- Typechecker types
 	TcTyThing(..), pprTcTyThingCategory, 
-	GadtRefinement,
 
 	-- Template Haskell
 	ThStage(..), topStage, topSpliceStage,
@@ -44,7 +43,7 @@ module TcRnTypes(
 
 import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
 			  ArithSeqInfo, DictBinds, LHsBinds, LImportDecl, HsGroup,
-                          IE )
+                          ExprCoFn, IE )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
@@ -324,7 +323,6 @@ data TcLclEnv		-- Changes as we move inside an expression
 	tcl_lie   :: TcRef LIE		-- Place to accumulate type constraints
     }
 
-type GadtRefinement = TvSubst
 
 {- Note [Given Insts]
    ~~~~~~~~~~~~~~~~~~
@@ -419,9 +417,15 @@ escapeArrowScope
 data TcTyThing
   = AGlobal TyThing		-- Used only in the return type of a lookup
 
-  | ATcId   TcId 	 	-- Ids defined in this module; may not be fully zonked
-	    ThLevel 
-	    Bool		-- True <=> apply the type refinement to me
+  | ATcId   {		-- Ids defined in this module; may not be fully zonked
+	tct_id :: TcId,		
+	tct_co :: Maybe ExprCoFn,	-- Nothing <=>	Do not apply a GADT type refinement
+					--		I am wobbly, or have no free
+					--		type variables
+					-- Just co <=>  Apply any type refinement to me,
+					--		and record it in the coercion
+	tct_type  :: TcType,	-- Type of (coercion applied to id)
+	tct_level :: ThLevel }
 
   | ATyVar  Name TcType		-- The type to which the lexically scoped type vaiable
 				-- is currently refined. We only need the Name
@@ -432,8 +436,9 @@ data TcTyThing
 
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = ppr g
-   ppr (ATcId g tl rig) = text "Identifier" <> 
-			  ifPprDebug (brackets (ppr g <> comma <> ppr tl <+> ppr rig))
+   ppr elt@(ATcId {})   = text "Identifier" <> 
+			  ifPprDebug (brackets (ppr (tct_id elt) <> dcolon <> ppr (tct_type elt) <> comma
+				 <+> ppr (tct_level elt) <+> ppr (tct_co elt)))
    ppr (ATyVar tv _)    = text "Type variable" <+> quotes (ppr tv)
    ppr (AThing k)       = text "AThing" <+> ppr k
 

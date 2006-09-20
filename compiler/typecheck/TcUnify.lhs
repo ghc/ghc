@@ -54,13 +54,14 @@ import TcType		( TcKind, TcType, TcTyVar, BoxyTyVar, TcTauType,
 			  TvSubst, mkTvSubst, zipTyEnv, zipOpenTvSubst, emptyTvSubst, 
 			  substTy, substTheta, 
 			  lookupTyVar, extendTvSubst )
-import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
+import Type		( Kind, SimpleKind, KindVar, 
 			  openTypeKind, liftedTypeKind, unliftedTypeKind, 
 			  mkArrowKind, defaultKind,
-			  isOpenTypeKind, argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
-			  isSubKind, pprKind, splitKindFunTys )
+			  argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
+			  isSubKind, pprKind, splitKindFunTys, isSubKindCon,
+                          isOpenTypeKind, isArgTypeKind )
 import TysPrim		( alphaTy, betaTy )
-import Inst		( newDicts, instToId )
+import Inst		( newDicts, instToId, mkInstCoFn )
 import TyCon		( TyCon, tyConArity, tyConTyVars, isSynTyCon )
 import TysWiredIn	( listTyCon )
 import Id		( Id, mkSysLocal )
@@ -601,11 +602,13 @@ tcSubExp actual_ty expected_ty
     -- Adding the error context here leads to some very confusing error
     -- messages, such as "can't match foarall a. a->a with forall a. a->a"
     -- So instead I'm adding it when moving from tc_sub to u_tys
+    traceTc (text "tcSubExp" <+> ppr actual_ty <+> ppr expected_ty) >>
     tc_sub Nothing actual_ty actual_ty False expected_ty expected_ty
 
 tcFunResTy :: Name -> BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
 tcFunResTy fun actual_ty expected_ty
-  = tc_sub (Just fun) actual_ty actual_ty False expected_ty expected_ty
+  = traceTc (text "tcFunResTy" <+> ppr actual_ty <+> ppr expected_ty) >>
+    tc_sub (Just fun) actual_ty actual_ty False expected_ty expected_ty
 		   
 -----------------
 tc_sub :: Maybe Name		-- Just fun => we're looking at a function result type
@@ -700,8 +703,7 @@ tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
 		-- Deal with the dictionaries
 	; dicts <- newDicts InstSigOrigin (substTheta subst' theta)
 	; extendLIEs dicts
-	; let inst_fn = CoApps (CoTyApps CoHole inst_tys) 
-			       (map instToId dicts)
+	; let inst_fn = mkInstCoFn inst_tys dicts
 	; return (co_fn <.> inst_fn) }
 
 -----------------------------------
@@ -746,7 +748,7 @@ wrapFunResCoercion arg_tys co_fn_res
   | otherwise 	       
   = do	{ us <- newUniqueSupply
 	; let arg_ids = zipWith (mkSysLocal FSLIT("sub")) (uniqsFromSupply us) arg_tys
-	; return (CoLams arg_ids (co_fn_res <.> (CoApps CoHole arg_ids))) }
+	; return (CoLams arg_ids <.> co_fn_res <.> CoApps arg_ids) }
 \end{code}
 
 
@@ -807,11 +809,9 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	; traceTc (text "tcGen:done")
 
 	; let
-	    -- This HsLet binds any Insts which came out of the simplification.
-	    -- It's a bit out of place here, but using AbsBind involves inventing
-	    -- a couple of new names which seems worse.
-		dict_ids   = map instToId dicts
-		co_fn = CoTyLams forall_tvs $ CoLams dict_ids $ CoLet inst_binds CoHole 
+	    -- The CoLet binds any Insts which came out of the simplification.
+		dict_ids = map instToId dicts
+		co_fn = CoTyLams forall_tvs <.> CoLams dict_ids <.> CoLet inst_binds
 	; returnM (co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
@@ -921,8 +921,10 @@ uTysOuter, uTys
      :: InBox -> TcType	-- ty1 is the *expected* type
      -> InBox -> TcType	-- ty2 is the *actual* type
      -> TcM ()
-uTysOuter nb1 ty1 nb2 ty2 = u_tys True nb1 ty1 ty1 nb2 ty2 ty2
-uTys      nb1 ty1 nb2 ty2 = u_tys False nb1 ty1 ty1 nb2 ty2 ty2
+uTysOuter nb1 ty1 nb2 ty2 = do { traceTc (text "uTysOuter" <+> ppr ty1 <+> ppr ty2)
+			       ; u_tys True nb1 ty1 ty1 nb2 ty2 ty2 }
+uTys      nb1 ty1 nb2 ty2 = do { traceTc (text "uTys" <+> ppr ty1 <+> ppr ty2)
+			       ; u_tys False nb1 ty1 ty1 nb2 ty2 ty2 }
 
 
 --------------
@@ -1101,7 +1103,7 @@ uVar outer swapped tv1 nb2 ps_ty2 ty2
 			| otherwise = brackets (equals <+> ppr ty2)
 	; traceTc (text "uVar" <+> ppr swapped <+> 
 			sep [ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1 ),
-				nest 2 (ptext SLIT(" :=: ")),
+				nest 2 (ptext SLIT(" <-> ")),
 			     ppr ps_ty2 <+> dcolon <+> ppr (typeKind ty2) <+> expansion])
 	; details <- lookupTcTyVar tv1
 	; case details of
@@ -1581,20 +1583,15 @@ Unifying kinds is much, much simpler than unifying types.
 unifyKind :: TcKind		    -- Expected
 	  -> TcKind		    -- Actual
 	  -> TcM ()
-unifyKind LiftedTypeKind   LiftedTypeKind   = returnM ()
-unifyKind UnliftedTypeKind UnliftedTypeKind = returnM ()
+unifyKind (TyConApp kc1 []) (TyConApp kc2 []) 
+  | isSubKindCon kc2 kc1 = returnM ()
 
-unifyKind OpenTypeKind k2 | isOpenTypeKind k2 = returnM ()
-unifyKind ArgTypeKind  k2 | isArgTypeKind k2    = returnM ()
-  -- Respect sub-kinding
-
-unifyKind (FunKind a1 r1) (FunKind a2 r2)
- = do { unifyKind a2 a1; unifyKind r1 r2 }
+unifyKind (FunTy a1 r1) (FunTy a2 r2)
+  = do { unifyKind a2 a1; unifyKind r1 r2 }
 		-- Notice the flip in the argument,
 		-- so that the sub-kinding works right
-
-unifyKind (KindVar kv1) k2 = uKVar False kv1 k2
-unifyKind k1 (KindVar kv2) = uKVar True kv2 k1
+unifyKind (TyVarTy kv1) k2 = uKVar False kv1 k2
+unifyKind k1 (TyVarTy kv2) = uKVar True kv2 k1
 unifyKind k1 k2 = unifyKindMisMatch k1 k2
 
 unifyKinds :: [TcKind] -> [TcKind] -> TcM ()
@@ -1608,19 +1605,19 @@ uKVar :: Bool -> KindVar -> TcKind -> TcM ()
 uKVar swapped kv1 k2
   = do 	{ mb_k1 <- readKindVar kv1
 	; case mb_k1 of
-	    Nothing -> uUnboundKVar swapped kv1 k2
-	    Just k1 | swapped   -> unifyKind k2 k1
-		    | otherwise -> unifyKind k1 k2 }
+	    Flexi -> uUnboundKVar swapped kv1 k2
+	    Indirect k1 | swapped   -> unifyKind k2 k1
+		        | otherwise -> unifyKind k1 k2 }
 
 ----------------
 uUnboundKVar :: Bool -> KindVar -> TcKind -> TcM ()
-uUnboundKVar swapped kv1 k2@(KindVar kv2)
+uUnboundKVar swapped kv1 k2@(TyVarTy kv2)
   | kv1 == kv2 = returnM ()
   | otherwise	-- Distinct kind variables
   = do	{ mb_k2 <- readKindVar kv2
 	; case mb_k2 of
-	    Just k2 -> uUnboundKVar swapped kv1 k2
-	    Nothing -> writeKindVar kv1 k2 }
+	    Indirect k2 -> uUnboundKVar swapped kv1 k2
+	    Flexi       -> writeKindVar kv1 k2 }
 
 uUnboundKVar swapped kv1 non_var_k2
   = do	{ k2' <- zonkTcKind non_var_k2
@@ -1637,9 +1634,9 @@ uUnboundKVar swapped kv1 non_var_k2
 kindOccurCheck kv1 k2	-- k2 is zonked
   = checkTc (not_in k2) (kindOccurCheckErr kv1 k2)
   where
-    not_in (KindVar kv2)   = kv1 /= kv2
-    not_in (FunKind a2 r2) = not_in a2 && not_in r2
-    not_in other	   = True
+    not_in (TyVarTy kv2)   = kv1 /= kv2
+    not_in (FunTy a2 r2) = not_in a2 && not_in r2
+    not_in other         = True
 
 kindSimpleKind :: Bool -> Kind -> TcM SimpleKind
 -- (kindSimpleKind True k) returns a simple kind sk such that sk <: k
@@ -1649,14 +1646,16 @@ kindSimpleKind :: Bool -> Kind -> TcM SimpleKind
 kindSimpleKind orig_swapped orig_kind
   = go orig_swapped orig_kind
   where
-    go sw (FunKind k1 k2) = do { k1' <- go (not sw) k1
-			       ; k2' <- go sw k2
-			       ; return (FunKind k1' k2') }
-    go True OpenTypeKind = return liftedTypeKind
-    go True ArgTypeKind  = return liftedTypeKind
-    go sw LiftedTypeKind  = return liftedTypeKind
-    go sw UnliftedTypeKind = return unliftedTypeKind
-    go sw k@(KindVar _)	  = return k	-- KindVars are always simple
+    go sw (FunTy k1 k2) = do { k1' <- go (not sw) k1
+	                     ; k2' <- go sw k2
+	                     ; return (mkArrowKind k1' k2') }
+    go True k
+     | isOpenTypeKind k = return liftedTypeKind
+     | isArgTypeKind k  = return liftedTypeKind
+    go sw k
+     | isLiftedTypeKind k   = return liftedTypeKind
+     | isUnliftedTypeKind k = return unliftedTypeKind
+    go sw k@(TyVarTy _)	  = return k	-- KindVars are always simple
     go swapped kind = failWithTc (ptext SLIT("Unexpected kind unification failure:")
 				  <+> ppr orig_swapped <+> ppr orig_kind)
 	-- I think this can't actually happen
@@ -1685,17 +1684,18 @@ unifyKindMisMatch ty1 ty2
 unifyFunKind :: TcKind -> TcM (Maybe (TcKind, TcKind))
 -- Like unifyFunTy, but does not fail; instead just returns Nothing
 
-unifyFunKind (KindVar kvar)
-  = readKindVar kvar	`thenM` \ maybe_kind ->
+unifyFunKind (TyVarTy kvar)
+  = readKindVar kvar `thenM` \ maybe_kind ->
     case maybe_kind of
-	Just fun_kind -> unifyFunKind fun_kind
-	Nothing       -> do { arg_kind <- newKindVar
-			    ; res_kind <- newKindVar
-			    ; writeKindVar kvar (mkArrowKind arg_kind res_kind)
-			    ; returnM (Just (arg_kind,res_kind)) }
+      Indirect fun_kind -> unifyFunKind fun_kind
+      Flexi             -> 
+          do { arg_kind <- newKindVar
+             ; res_kind <- newKindVar
+             ; writeKindVar kvar (mkArrowKind arg_kind res_kind)
+             ; returnM (Just (arg_kind,res_kind)) }
     
-unifyFunKind (FunKind arg_kind res_kind) = returnM (Just (arg_kind,res_kind))
-unifyFunKind other	   	         = returnM Nothing
+unifyFunKind (FunTy arg_kind res_kind) = returnM (Just (arg_kind,res_kind))
+unifyFunKind other		       = returnM Nothing
 \end{code}
 
 %************************************************************************

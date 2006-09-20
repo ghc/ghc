@@ -39,14 +39,14 @@ import Maybes		( catMaybes )
 import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
 import NameSet		( duDefs )
-import Kind		( splitKindFunTys )
+import Type		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConStupidTheta, isProductTyCon, isDataTyCon, newTyConRhs,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
 			  isUnLiftedType, mkClassPred, tyVarsOfType,
-			  isArgTypeKind, tcEqTypes, tcSplitAppTys, mkAppTys )
+			  isSubArgTypeKind, tcEqTypes, tcSplitAppTys, mkAppTys )
 import Var		( TyVar, tyVarKind, varName )
 import VarSet		( mkVarSet, subVarSet )
 import PrelNames
@@ -653,7 +653,7 @@ cond_typeableOK :: Condition
 --	      (b) 7 or fewer args
 cond_typeableOK (gla_exts, tycon)
   | tyConArity tycon > 7				      = Just too_many
-  | not (all (isArgTypeKind . tyVarKind) (tyConTyVars tycon)) = Just bad_kind
+  | not (all (isSubArgTypeKind . tyVarKind) (tyConTyVars tycon)) = Just bad_kind
   | otherwise	  				              = Nothing
   where
     too_many = quotes (ppr tycon) <+> ptext SLIT("has too many arguments")

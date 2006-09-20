@@ -8,9 +8,9 @@ checker.
 
 \begin{code}
 module TcHsSyn (
-	mkHsTyApp, mkHsDictApp, mkHsConApp,
-	mkHsTyLam, mkHsDictLam, mkHsDictLet, mkHsApp,
-	hsLitType, hsPatType, mkHsAppTy, mkSimpleHsAlt,
+	mkHsConApp, mkHsDictLet, mkHsApp,
+	hsLitType, hsLPatType, hsPatType, 
+	mkHsAppTy, mkSimpleHsAlt,
 	nlHsIntLit, mkVanillaTuplePat,
 	
 
@@ -30,9 +30,8 @@ import HsSyn	-- oodles of it
 import Id	( idType, setIdType, Id )
 
 import TcRnMonad
-import Type	  ( Type )
+import Type	  ( Type, isLiftedTypeKind, liftedTypeKind, isSubKind, eqKind  )
 import TcType	  ( TcType, TcTyVar, mkTyVarTy, mkTyConApp, isImmutableTyVar )
-import Kind	  ( isLiftedTypeKind, liftedTypeKind, isSubKind )
 import qualified  Type
 import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, writeMetaTyVar )
 import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
@@ -42,7 +41,7 @@ import TysWiredIn ( charTy, stringTy, intTy,
 		    mkListTy, mkPArrTy, mkTupleTy, unitTy,
 		    voidTy, listTyCon, tupleTyCon )
 import TyCon	  ( mkPrimTyCon, tyConKind, PrimRep(..) )
-import Kind	  ( splitKindFunTys )
+import {- Kind parts of -} Type	  ( splitKindFunTys )
 import Name	  ( Name, getOccName, mkInternalName, mkDerivedTyConOcc )
 import Var	  ( Var, isId, isLocalVar, tyVarKind )
 import VarSet
@@ -63,33 +62,34 @@ import Outputable
 %*									*
 %************************************************************************
 
-Note: If @hsPatType@ doesn't bear a strong resemblance to @exprType@,
+Note: If @hsLPatType@ doesn't bear a strong resemblance to @exprType@,
 then something is wrong.
 \begin{code}
 mkVanillaTuplePat :: [OutPat Id] -> Boxity -> Pat Id
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
 mkVanillaTuplePat pats box 
-  = TuplePat pats box (mkTupleTy box (length pats) (map hsPatType pats))
+  = TuplePat pats box (mkTupleTy box (length pats) (map hsLPatType pats))
 
-hsPatType :: OutPat Id -> Type
-hsPatType (L _ pat) = pat_type pat
+hsLPatType :: OutPat Id -> Type
+hsLPatType (L _ pat) = hsPatType pat
 
-pat_type (ParPat pat)		   = hsPatType pat
-pat_type (WildPat ty)		   = ty
-pat_type (VarPat var)		   = idType var
-pat_type (VarPatOut var _)	   = idType var
-pat_type (BangPat pat)		   = hsPatType pat
-pat_type (LazyPat pat)		   = hsPatType pat
-pat_type (LitPat lit)		   = hsLitType lit
-pat_type (AsPat var pat)	   = idType (unLoc var)
-pat_type (ListPat _ ty)		   = mkListTy ty
-pat_type (PArrPat _ ty)		   = mkPArrTy ty
-pat_type (TuplePat pats box ty)	   = ty
-pat_type (ConPatOut _ _ _ _ _ ty)  = ty
-pat_type (SigPatOut pat ty)	   = ty
-pat_type (NPat lit _ _ ty)	   = ty
-pat_type (NPlusKPat id _ _ _)      = idType (unLoc id)
-pat_type (DictPat ds ms)           = case (ds ++ ms) of
+hsPatType (ParPat pat)		    = hsLPatType pat
+hsPatType (WildPat ty)		    = ty
+hsPatType (VarPat var)		    = idType var
+hsPatType (VarPatOut var _)	    = idType var
+hsPatType (BangPat pat)		    = hsLPatType pat
+hsPatType (LazyPat pat)		    = hsLPatType pat
+hsPatType (LitPat lit)		    = hsLitType lit
+hsPatType (AsPat var pat)	    = idType (unLoc var)
+hsPatType (ListPat _ ty)	    = mkListTy ty
+hsPatType (PArrPat _ ty)	    = mkPArrTy ty
+hsPatType (TuplePat pats box ty)    = ty
+hsPatType (ConPatOut{ pat_ty = ty })= ty
+hsPatType (SigPatOut pat ty)	    = ty
+hsPatType (NPat lit _ _ ty)	    = ty
+hsPatType (NPlusKPat id _ _ _)      = idType (unLoc id)
+hsPatType (CoPat _ _ ty)	    = ty
+hsPatType (DictPat ds ms)           = case (ds ++ ms) of
 				       []  -> unitTy
 				       [d] -> idType d
 				       ds  -> mkTupleTy Boxed (length ds) (map idType ds)
@@ -495,28 +495,6 @@ zonkExpr env (HsCoreAnn lbl expr)
   = zonkLExpr env expr   `thenM` \ new_expr ->
     returnM (HsCoreAnn lbl new_expr)
 
-zonkExpr env (TyLam tyvars expr)
-  = ASSERT( all isImmutableTyVar tyvars )
-    zonkLExpr env expr			`thenM` \ new_expr ->
-    returnM (TyLam tyvars new_expr)
-
-zonkExpr env (TyApp expr tys)
-  = zonkLExpr env expr    	`thenM` \ new_expr ->
-    zonkTcTypeToTypes env tys	`thenM` \ new_tys ->
-    returnM (TyApp new_expr new_tys)
-
-zonkExpr env (DictLam dicts expr)
-  = zonkIdBndrs env dicts	`thenM` \ new_dicts ->
-    let
-	env1 = extendZonkEnv env new_dicts
-    in
-    zonkLExpr env1 expr  	`thenM` \ new_expr ->
-    returnM (DictLam new_dicts new_expr)
-
-zonkExpr env (DictApp expr dicts)
-  = zonkLExpr env expr    	    	`thenM` \ new_expr ->
-    returnM (DictApp new_expr (zonkIdOccs env dicts))
-
 -- arrow notation extensions
 zonkExpr env (HsProc pat body)
   = do	{ (env1, new_pat) <- zonkPat env pat
@@ -554,24 +532,21 @@ zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> ExprCoFn -> TcM (ZonkEnv, ExprCoFn)
 zonkCoFn env CoHole = return (env, CoHole)
+zonkCoFn env (ExprCoFn co)     = do { co' <- zonkTcTypeToType env co
+				    ; return (env, ExprCoFn co') }
 zonkCoFn env (CoCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
 				    ; return (env2, CoCompose c1' c2') }
-zonkCoFn env (CoLams ids c) = do { ids' <- zonkIdBndrs env ids
+zonkCoFn env (CoLams ids)   = do { ids' <- zonkIdBndrs env ids
 				 ; let env1 = extendZonkEnv env ids'
-				 ; (env2, c') <- zonkCoFn env1 c
-				 ; return (env2, CoLams ids' c') }
-zonkCoFn env (CoTyLams tvs c) = ASSERT( all isImmutableTyVar tvs )
-				do { (env1, c') <- zonkCoFn env c
-				   ; return (env1, CoTyLams tvs c') }
-zonkCoFn env (CoApps c ids)   = do { (env1, c') <- zonkCoFn env c
-				   ; return (env1, CoApps c' (zonkIdOccs env ids)) }
-zonkCoFn env (CoTyApps c tys) = do { tys' <- zonkTcTypeToTypes env tys
-				   ; (env1, c') <- zonkCoFn env c
-				   ; return (env1, CoTyApps c' tys') }
-zonkCoFn env (CoLet bs c)     = do { (env1, bs') <- zonkRecMonoBinds env bs
-			 	   ; (env2, c')  <- zonkCoFn env1 c
-				   ; return (env2, CoLet bs' c') }
+				 ; return (env1, CoLams ids') }
+zonkCoFn env (CoTyLams tvs) = ASSERT( all isImmutableTyVar tvs )
+			      do { return (env, CoTyLams tvs) }
+zonkCoFn env (CoApps ids)   = do { return (env, CoApps (zonkIdOccs env ids)) }
+zonkCoFn env (CoTyApps tys) = do { tys' <- zonkTcTypeToTypes env tys
+				 ; return (env, CoTyApps tys') }
+zonkCoFn env (CoLet bs)     = do { (env1, bs') <- zonkRecMonoBinds env bs
+				 ; return (env1, CoLet bs') }
 
 
 -------------------------------------------------------------------------
@@ -739,14 +714,15 @@ zonk_pat env (TuplePat pats boxed ty)
 	; (env', pats') <- zonkPats env pats
 	; return (env', TuplePat pats' boxed ty') }
 
-zonk_pat env (ConPatOut n tvs dicts binds stuff ty)
-  = ASSERT( all isImmutableTyVar tvs )
+zonk_pat env p@(ConPatOut { pat_ty = ty, pat_dicts = dicts, pat_binds = binds, pat_args = args })
+  = ASSERT( all isImmutableTyVar (pat_tvs p) ) 
     do	{ new_ty <- zonkTcTypeToType env ty
 	; new_dicts <- zonkIdBndrs env dicts
 	; let env1 = extendZonkEnv env new_dicts
 	; (env2, new_binds) <- zonkRecMonoBinds env1 binds
-	; (env', new_stuff) <- zonkConStuff env2 stuff
-	; returnM (env', ConPatOut n tvs new_dicts new_binds new_stuff new_ty) }
+	; (env', new_args) <- zonkConStuff env2 args
+	; returnM (env', p { pat_ty = new_ty, pat_dicts = new_dicts, 
+			     pat_binds = new_binds, pat_args = new_args }) }
 
 zonk_pat env (LitPat lit) = return (env, LitPat lit)
 
@@ -953,7 +929,7 @@ mkArbitraryType tv
     kind       = tyVarKind tv
     (args,res) = splitKindFunTys kind
 
-    tycon | kind == tyConKind listTyCon 	--  *->*
+    tycon | eqKind kind (tyConKind listTyCon) 	--  *->*
 	  = listTyCon				-- No tuples this size
 
 	  | all isLiftedTypeKind args && isLiftedTypeKind res

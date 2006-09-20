@@ -19,7 +19,7 @@ module TcEnv(
 	tcExtendKindEnv, tcExtendKindEnvTvs,
 	tcExtendTyVarEnv, tcExtendTyVarEnv2, 
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
-	tcLookup, tcLookupLocated, tcLookupLocalIds, tcLookupLocalId_maybe,
+	tcLookup, tcLookupLocated, tcLookupLocalIds, 
 	tcLookupId, tcLookupTyVar, getScopedTyVarBinds,
 	lclEnvElts, getInLocalScope, findGlobals, 
 	wrongThingErr, pprBinders,
@@ -44,7 +44,8 @@ module TcEnv(
 #include "HsVersions.h"
 
 import HsSyn		( LRuleDecl, LHsBinds, LSig, 
-			  LHsTyVarBndr, HsTyVarBndr(..), pprLHsBinds )
+			  LHsTyVarBndr, HsTyVarBndr(..), pprLHsBinds,
+		 	  ExprCoFn(..), idCoercion, (<.>) )
 import TcIface		( tcImportDecl )
 import IfaceEnv		( newGlobalBinder )
 import TcRnMonad
@@ -54,6 +55,7 @@ import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType, TvSubst,
 			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
 			  tidyOpenType, isRefineableTy
 			)
+import TcGadt		( Refinement, refineType )
 import qualified Type	( getTyVar_maybe )
 import Id		( idName, isLocalId, setIdType )
 import Var		( TyVar, Id, idType, tyVarName )
@@ -216,21 +218,16 @@ tcLookupTyVar name
 	other	    -> pprPanic "tcLookupTyVar" (ppr name)
 
 tcLookupId :: Name -> TcM Id
--- Used when we aren't interested in the binding level
--- Never a DataCon. (Why does that matter? see TcExpr.tcId)
+-- Used when we aren't interested in the binding level, nor refinement. 
+-- The "no refinement" part means that we return the un-refined Id regardless
+-- 
+-- The Id is never a DataCon. (Why does that matter? see TcExpr.tcId)
 tcLookupId name
   = tcLookup name	`thenM` \ thing -> 
     case thing of
-	ATcId tc_id _ _	  -> returnM tc_id
-	AGlobal (AnId id) -> returnM id
-	other		  -> pprPanic "tcLookupId" (ppr name)
-
-tcLookupLocalId_maybe :: Name -> TcM (Maybe Id)
-tcLookupLocalId_maybe name
-  = getLclEnv 		`thenM` \ local_env ->
-    case lookupNameEnv (tcl_env local_env) name of
-	Just (ATcId tc_id _ _) -> return (Just tc_id)
-	other	 	       -> return Nothing
+	ATcId { tct_id = id} -> returnM id
+	AGlobal (AnId id)    -> returnM id
+	other		     -> pprPanic "tcLookupId" (ppr name)
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at
@@ -241,8 +238,9 @@ tcLookupLocalIds ns
   where
     lookup lenv lvl name 
 	= case lookupNameEnv lenv name of
-		Just (ATcId id lvl1 _) -> ASSERT( lvl == lvl1 ) id
-		other		       -> pprPanic "tcLookupLocalIds" (ppr name)
+		Just (ATcId { tct_id = id, tct_level = lvl1 }) 
+			-> ASSERT( lvl == lvl1 ) id
+		other	-> pprPanic "tcLookupLocalIds" (ppr name)
 
 lclEnvElts :: TcLclEnv -> [TcTyThing]
 lclEnvElts env = nameEnvElts (tcl_env env)
@@ -322,8 +320,13 @@ tcExtendIdEnv2 names_w_ids thing_inside
     let
 	extra_global_tyvars = tcTyVarsOfTypes [idType id | (_,id) <- names_w_ids]
 	th_lvl		    = thLevel (tcl_th_ctxt   env)
-	extra_env	    = [ (name, ATcId id th_lvl (isRefineableTy (idType id)))
-			      | (name,id) <- names_w_ids]
+	extra_env	    = [ (name, ATcId { tct_id = id, 
+					       tct_level = th_lvl,
+					       tct_type = id_ty, 
+					       tct_co = if isRefineableTy id_ty 
+							then Just idCoercion
+							else Nothing })
+			      | (name,id) <- names_w_ids, let id_ty = idType id]
 	le'		    = extendNameEnvList (tcl_env env) extra_env
 	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) [name | (name,_) <- names_w_ids]
     in
@@ -360,7 +363,7 @@ findGlobals tvs tidy_env
     ignore_it ty = not (tvs `intersectsVarSet` tyVarsOfType ty)
 
 -----------------------
-find_thing ignore_it tidy_env (ATcId id _ _)
+find_thing ignore_it tidy_env (ATcId { tct_id = id })
   = zonkTcType  (idType id)	`thenM` \ id_ty ->
     if ignore_it id_ty then
 	returnM (tidy_env, Nothing)
@@ -393,16 +396,20 @@ find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 \end{code}
 
 \begin{code}
-refineEnvironment :: TvSubst -> TcM a -> TcM a
+refineEnvironment :: Refinement -> TcM a -> TcM a
+-- I don't think I have to refine the set of global type variables in scope
+-- Reason: the refinement never increases that set
 refineEnvironment reft thing_inside
   = do	{ env <- getLclEnv
 	; let le' = mapNameEnv refine (tcl_env env)
-	; gtvs' <- refineGlobalTyVars reft (tcl_tyvars env) 
- 	; setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs'}) thing_inside }
+ 	; setLclEnv (env {tcl_env = le'}) thing_inside }
   where
-    refine (ATcId id lvl True) = ATcId (setIdType id (substTy reft (idType id))) lvl True
-    refine (ATyVar tv ty)      = ATyVar tv (substTy reft ty)
-    refine elt		       = elt
+    refine elt@(ATcId { tct_co = Just co, tct_type = ty })
+			  = let (co', ty') = refineType reft ty
+			    in elt { tct_co = Just (co' <.> co), tct_type = ty' }
+    refine (ATyVar tv ty) = ATyVar tv (snd (refineType reft ty))
+				-- Ignore the coercion that refineType returns
+    refine elt		  = elt
 \end{code}
 
 %************************************************************************
@@ -415,11 +422,6 @@ refineEnvironment reft thing_inside
 tc_extend_gtvs gtvs extra_global_tvs
   = readMutVar gtvs		`thenM` \ global_tvs ->
     newMutVar (global_tvs `unionVarSet` extra_global_tvs)
-
-refineGlobalTyVars :: GadtRefinement -> TcRef TcTyVarSet -> TcM (TcRef TcTyVarSet)
-refineGlobalTyVars reft gtv_var
-  = readMutVar gtv_var				`thenM` \ gbl_tvs ->
-    newMutVar (tcTyVarsOfTypes (map (substTyVar reft) (varSetElems gbl_tvs)))
 \end{code}
 
 @tcGetGlobalTyVars@ returns a fully-zonked set of tyvars free in the environment.

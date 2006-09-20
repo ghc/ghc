@@ -23,6 +23,10 @@ module TcMType (
   newBoxyTyVar, newBoxyTyVars, newBoxyTyVarTys, readFilledBox, 
 
   --------------------------------
+  -- Creating new coercion variables
+  newCoVars,
+
+  --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxyTyVar,
   tcInstSigTyVars, zonkSigTyVar,
@@ -58,10 +62,11 @@ import TypeRep		( Type(..), PredType(..),  -- Friend; can see representation
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
 			  MetaDetails(..), SkolemInfo(..), BoxInfo(..), 
-			  BoxyTyVar, BoxyType, UserTypeCtxt(..),
-			  isMetaTyVar, isSigTyVar, metaTvRef,
+			  BoxyTyVar, BoxyType, UserTypeCtxt(..), kindVarRef,
+			  mkKindVar, isMetaTyVar, isSigTyVar, metaTvRef,
 			  tcCmpPred, isClassPred, tcGetTyVar,
-			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
+			  tcSplitPhiTy, tcSplitPredTy_maybe,
+			  tcSplitAppTy_maybe,  
 			  tcValidInstHeadTy, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, 
 			  isUnLiftedType, isIPPred, 
@@ -70,21 +75,23 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tyVarsOfPred, getClassPredTys_maybe,
 			  tyVarsOfType, tyVarsOfTypes, tcView,
 			  pprPred, pprTheta, pprClassPred )
-import Kind		( Kind(..), KindVar, kindVarRef, mkKindVar, 
-			  isLiftedTypeKind, isArgTypeKind, isOpenTypeKind,
+import Type		( Kind, KindVar, 
+			  isLiftedTypeKind, isSubArgTypeKind, isSubOpenTypeKind,
 			  liftedTypeKind, defaultKind
 			)
 import Type		( TvSubst, zipTopTvSubst, substTy )
+import Coercion		( mkCoKind )
 import Class		( Class, classArity, className )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
 			  tyConArity, tyConName )
 import Var		( TyVar, tyVarKind, tyVarName, isTcTyVar, 
-			  mkTyVar, mkTcTyVar, tcTyVarDetails )
+			  mkTyVar, mkTcTyVar, tcTyVarDetails,
+			  CoVar, mkCoVar )
 
 	-- Assertions
 #ifdef DEBUG
 import TcType		( isFlexi, isBoxyTyVar, isImmutableTyVar )
-import Kind		( isSubKind )
+import Type		( isSubKind )
 #endif
 
 -- others:
@@ -95,6 +102,7 @@ import VarSet
 import DynFlags		( dopt, DynFlag(..) )
 import Util		( nOfThem, isSingleton, notNull )
 import ListSetOps	( removeDups )
+import UniqSupply	( uniqsFromSupply )
 import Outputable
 
 import Control.Monad	( when )
@@ -139,10 +147,17 @@ tcInstType inst_tyvars ty
 %************************************************************************
 
 \begin{code}
+newCoVars :: [(TcType,TcType)] -> TcM [CoVar]
+newCoVars spec
+  = do	{ us <- newUniqueSupply 
+	; return [ mkCoVar (mkSysTvName uniq FSLIT("co"))
+			   (mkCoKind ty1 ty2)
+		 | ((ty1,ty2), uniq) <- spec `zip` uniqsFromSupply us] }
+
 newKindVar :: TcM TcKind
 newKindVar = do	{ uniq <- newUnique
-		; ref <- newMutVar Nothing
-		; return (KindVar (mkKindVar uniq ref)) }
+		; ref <- newMutVar Flexi
+		; return (mkTyVarTy (mkKindVar uniq ref)) }
 
 newKindVars :: Int -> TcM [TcKind]
 newKindVars n = mappM (\ _ -> newKindVar) (nOfThem n ())
@@ -442,6 +457,10 @@ zonkTcPredType (ClassP c ts)
 zonkTcPredType (IParam n t)
   = zonkTcType t	`thenM` \ new_t ->
     returnM (IParam n new_t)
+zonkTcPredType (EqPred t1 t2)
+  = zonkTcType t1	`thenM` \ new_t1 ->
+    zonkTcType t2	`thenM` \ new_t2 ->
+    returnM (EqPred new_t1 new_t2)
 \end{code}
 
 -------------------  These ...ToType, ...ToKind versions
@@ -566,10 +585,13 @@ zonkType unbound_var_fn ty
 			     go ty		`thenM` \ ty' ->
 			     returnM (ForAllTy tyvar ty')
 
-    go_pred (ClassP c tys) = mappM go tys	`thenM` \ tys' ->
-			     returnM (ClassP c tys')
-    go_pred (IParam n ty)  = go ty		`thenM` \ ty' ->
-			     returnM (IParam n ty')
+    go_pred (ClassP c tys)   = mappM go tys	`thenM` \ tys' ->
+			       returnM (ClassP c tys')
+    go_pred (IParam n ty)    = go ty		`thenM` \ ty' ->
+			       returnM (IParam n ty')
+    go_pred (EqPred ty1 ty2) = go ty1		`thenM` \ ty1' ->
+			       go ty2		`thenM` \ ty2' ->
+			       returnM (EqPred ty1' ty2')
 
 zonk_tc_tyvar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variable
  	      -> TcTyVar -> TcM TcType
@@ -593,35 +615,20 @@ zonk_tc_tyvar unbound_var_fn tyvar
 %************************************************************************
 
 \begin{code}
-readKindVar  :: KindVar -> TcM (Maybe TcKind)
+readKindVar  :: KindVar -> TcM (MetaDetails)
 writeKindVar :: KindVar -> TcKind -> TcM ()
 readKindVar  kv = readMutVar (kindVarRef kv)
-writeKindVar kv val = writeMutVar (kindVarRef kv) (Just val)
+writeKindVar kv val = writeMutVar (kindVarRef kv) (Indirect val)
 
 -------------
 zonkTcKind :: TcKind -> TcM TcKind
-zonkTcKind (FunKind k1 k2) = do { k1' <- zonkTcKind k1
-				; k2' <- zonkTcKind k2
-				; returnM (FunKind k1' k2') }
-zonkTcKind k@(KindVar kv) = do { mb_kind <- readKindVar kv 
-			       ; case mb_kind of
-				    Nothing -> returnM k
-				    Just k  -> zonkTcKind k }
-zonkTcKind other_kind = returnM other_kind
+zonkTcKind k = zonkTcType k
 
 -------------
 zonkTcKindToKind :: TcKind -> TcM Kind
-zonkTcKindToKind (FunKind k1 k2) = do { k1' <- zonkTcKindToKind k1
-				      ; k2' <- zonkTcKindToKind k2
-				      ; returnM (FunKind k1' k2') }
-
-zonkTcKindToKind (KindVar kv) = do { mb_kind <- readKindVar kv 
-				   ; case mb_kind of
-				       Nothing -> return liftedTypeKind
-				       Just k  -> zonkTcKindToKind k }
-
-zonkTcKindToKind OpenTypeKind = returnM liftedTypeKind	-- An "Open" kind defaults to *
-zonkTcKindToKind other_kind   = returnM other_kind
+-- When zonking a TcKind to a kind, we need to instantiate kind variables,
+-- Haskell specifies that * is to be used, so we follow that.
+zonkTcKindToKind k = zonkType (\ _ -> return liftedTypeKind) k
 \end{code}
 			
 %************************************************************************
@@ -686,11 +693,11 @@ checkValidType ctxt ty
 
 	kind_ok = case ctxt of
 			TySynCtxt _  -> True	-- Any kind will do
-			ResSigCtxt   -> isOpenTypeKind 	 actual_kind
-			ExprSigCtxt  -> isOpenTypeKind 	 actual_kind
+			ResSigCtxt   -> isSubOpenTypeKind 	 actual_kind
+			ExprSigCtxt  -> isSubOpenTypeKind 	 actual_kind
 			GenPatCtxt   -> isLiftedTypeKind actual_kind
 			ForSigCtxt _ -> isLiftedTypeKind actual_kind
-			other	     -> isArgTypeKind    actual_kind
+			other	     -> isSubArgTypeKind    actual_kind
 	
 	ubx_tup | not gla_exts = UT_NotOk
 		| otherwise    = case ctxt of
@@ -776,7 +783,7 @@ check_tau_type rank ubx_tup ty@(FunTy (PredTy _) _) = failWithTc (forAllTyErr ty
 -- The Right Thing would be to fix the way that SPECIALISE instance pragmas
 -- are handled, but the quick thing is just to permit PredTys here.
 check_tau_type rank ubx_tup (PredTy sty) = getDOpts		`thenM` \ dflags ->
-					   check_source_ty dflags TypeCtxt sty
+					   check_pred_ty dflags TypeCtxt sty
 
 check_tau_type rank ubx_tup (TyVarTy _)       = returnM ()
 check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
@@ -888,12 +895,12 @@ check_valid_theta ctxt []
 check_valid_theta ctxt theta
   = getDOpts					`thenM` \ dflags ->
     warnTc (notNull dups) (dupPredWarn dups)	`thenM_`
-    mappM_ (check_source_ty dflags ctxt) theta
+    mappM_ (check_pred_ty dflags ctxt) theta
   where
     (_,dups) = removeDups tcCmpPred theta
 
 -------------------------
-check_source_ty dflags ctxt pred@(ClassP cls tys)
+check_pred_ty dflags ctxt pred@(ClassP cls tys)
   = 	-- Class predicates are valid in all contexts
     checkTc (arity == n_tys) arity_err		`thenM_`
 
@@ -909,7 +916,7 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
     arity_err  = arityErr "Class" class_name arity n_tys
     how_to_allow = parens (ptext SLIT("Use -fglasgow-exts to permit this"))
 
-check_source_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
+check_pred_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
 	-- Implicit parameters only allows in type
 	-- signatures; not in instance decls, superclasses etc
 	-- The reason for not allowing implicit params in instances is a bit subtle
@@ -920,7 +927,7 @@ check_source_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
 	-- instance decl would show up two uses of ?x.
 
 -- Catch-all
-check_source_ty dflags ctxt sty = failWithTc (badSourceTyErr sty)
+check_pred_ty dflags ctxt sty = failWithTc (badPredTyErr sty)
 
 -------------------------
 check_class_pred_tys dflags ctxt tys 
@@ -1024,7 +1031,7 @@ checkThetaCtxt ctxt theta
   = vcat [ptext SLIT("In the context:") <+> pprTheta theta,
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
 
-badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
+badPredTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
 predTyVarErr pred  = sep [ptext SLIT("Non type-variable argument"),
 			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
@@ -1184,6 +1191,7 @@ fvTypes tys                = concat (map fvType tys)
 fvPred :: PredType -> [TyVar]
 fvPred (ClassP _ tys')     = fvTypes tys'
 fvPred (IParam _ ty)       = fvType ty
+fvPred (EqPred ty1 ty2)    = fvType ty1 ++ fvType ty2
 
 -- Size of a type: the number of variables and constructors
 sizeType :: Type -> Int
@@ -1202,4 +1210,5 @@ sizeTypes xs               = sum (map sizeType xs)
 sizePred :: PredType -> Int
 sizePred (ClassP _ tys')   = sizeTypes tys'
 sizePred (IParam _ ty)     = sizeType ty
+sizePred (EqPred ty1 ty2)  = sizeType ty1 + sizeType ty2
 \end{code}

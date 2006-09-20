@@ -42,7 +42,7 @@ module TcType (
   tcSplitForAllTys, tcSplitPhiTy, 
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcSplitFunTysN,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
-  tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, 
+  tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, repSplitAppTy_maybe,
   tcValidInstHeadTy, tcGetTyVar_maybe, tcGetTyVar,
   tcSplitSigmaTy, tcMultiSplitSigmaTy, 
 
@@ -50,6 +50,7 @@ module TcType (
   -- Predicates. 
   -- Again, newtypes are opaque
   tcEqType, tcEqTypes, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred, tcEqTypeX,
+  eqKind, 
   isSigmaTy, isOverloadedTy, isRigidTy, isBoxyTy,
   isDoubleTy, isFloatTy, isIntTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy,
@@ -64,7 +65,7 @@ module TcType (
   ---------------------------------
   -- Predicate types  
   getClassPredTys_maybe, getClassPredTys, 
-  isClassPred, isTyVarClassPred, 
+  isClassPred, isTyVarClassPred, isEqPred, 
   mkDictTy, tcSplitPredTy_maybe, 
   isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
@@ -90,8 +91,9 @@ module TcType (
   Kind, 	-- Stuff to do with kinds is insensitive to pre/post Tc
   unliftedTypeKind, liftedTypeKind, unboxedTypeKind, argTypeKind,
   openTypeKind, mkArrowKind, mkArrowKinds, 
-  isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, 
-  isArgTypeKind, isSubKind, defaultKind, 
+  isLiftedTypeKind, isUnliftedTypeKind, isSubOpenTypeKind, 
+  isSubArgTypeKind, isSubKind, defaultKind,
+  kindVarRef, mkKindVar,  
 
   Type, PredType(..), ThetaType, 
   mkForAllTy, mkForAllTys, 
@@ -101,7 +103,7 @@ module TcType (
 
   -- Type substitutions
   TvSubst(..), 	-- Representation visible to a few friends
-  TvSubstEnv, emptyTvSubst,
+  TvSubstEnv, emptyTvSubst, substEqSpec,
   mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
   getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope, lookupTyVar,
   extendTvSubst, extendTvSubstList, isInScope, mkTvSubst, zipTyEnv,
@@ -127,16 +129,18 @@ module TcType (
 #include "HsVersions.h"
 
 -- friends:
-import TypeRep		( Type(..), funTyCon )  -- friend
+import TypeRep		( Type(..), funTyCon, Kind )  -- friend
 
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-			  tyVarsOfTheta, Kind, PredType(..),
-			  ThetaType, unliftedTypeKind, unboxedTypeKind, argTypeKind,
+			  tyVarsOfTheta, Kind, PredType(..), KindVar,
+			  ThetaType, isUnliftedTypeKind, unliftedTypeKind, 
+-- ???			  unboxedTypeKind,
+			  argTypeKind,
 			  liftedTypeKind, openTypeKind, mkArrowKind,
-		  	  isLiftedTypeKind, isUnliftedTypeKind, 
+		  	  tySuperKind, isLiftedTypeKind,
 			  mkArrowKinds, mkForAllTy, mkForAllTys,
-			  defaultKind, isArgTypeKind, isOpenTypeKind,
+			  defaultKind, isSubArgTypeKind, isSubOpenTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
 			  mkTyConApp, mkAppTy,
 			  mkAppTys, applyTy, applyTys,
@@ -151,7 +155,7 @@ import Type		(	-- Re-exports
 			  isSubKind, tcView,
 
 			  tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
-			  tcEqPred, tcCmpPred, tcEqTypeX, 
+			  tcEqPred, tcCmpPred, tcEqTypeX, eqKind,
 
 			  TvSubst(..),
 			  TvSubstEnv, emptyTvSubst, mkTvSubst, zipTyEnv,
@@ -161,7 +165,7 @@ import Type		(	-- Re-exports
 		  	  substTy, substTys, substTyWith, substTheta, 
 			  substTyVar, substTyVarBndr, substPred, lookupTyVar,
 
-			  typeKind, repType, coreView,
+			  typeKind, repType, coreView, repSplitAppTy_maybe,
 			  pprKind, pprParendKind,
 			  pprType, pprParendType, pprTyThingCategory,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
@@ -176,10 +180,10 @@ import VarSet
 
 -- others:
 import DynFlags		( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
-import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc )
+import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc, mkSystemName )
 import NameSet
 import VarEnv		( TidyEnv )
-import OccName		( OccName, mkDictOcc )
+import OccName		( OccName, mkDictOcc, mkOccName, tvName )
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), Arity, ipNameName )
@@ -385,6 +389,31 @@ data UserTypeCtxt
 -- will become	type T = forall a. a->a
 --
 -- With gla-exts that's right, but for H98 we should complain. 
+
+---------------------------------
+-- Kind variables:
+
+mkKindName :: Unique -> Name
+mkKindName unique = mkSystemName unique kind_var_occ
+
+kindVarRef :: KindVar -> IORef MetaDetails
+kindVarRef tc = 
+  case tcTyVarDetails tc of
+    MetaTv TauTv ref -> ref
+    other            -> pprPanic "kindVarRef" (ppr tc)
+
+mkKindVar :: Unique -> IORef MetaDetails -> KindVar
+mkKindVar u r 
+  = mkTcTyVar (mkKindName u)
+              tySuperKind  -- not sure this is right,
+                            -- do we need kind vars for
+                            -- coercions?
+              (MetaTv TauTv r)
+
+kind_var_occ :: OccName	-- Just one for all KindVars
+			-- They may be jiggled by tidying
+kind_var_occ = mkOccName tvName "k"
+\end{code}
 \end{code}
 
 %************************************************************************
@@ -708,13 +737,9 @@ tcFunResultTy ty = snd (tcSplitFunTy ty)
 -----------------------
 tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
 tcSplitAppTy_maybe ty | Just ty' <- tcView ty = tcSplitAppTy_maybe ty'
-tcSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
-tcSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
-tcSplitAppTy_maybe (TyConApp tc tys) = case snocView tys of
-					Just (tys', ty') -> Just (TyConApp tc tys', ty')
-					Nothing		 -> Nothing
-tcSplitAppTy_maybe other	     = Nothing
+tcSplitAppTy_maybe ty = repSplitAppTy_maybe ty
 
+tcSplitAppTy :: Type -> (Type, Type)
 tcSplitAppTy ty = case tcSplitAppTy_maybe ty of
 		    Just stuff -> stuff
 		    Nothing    -> pprPanic "tcSplitAppTy" (pprType ty)
@@ -820,6 +845,10 @@ getClassPredTys :: PredType -> (Class, [Type])
 getClassPredTys (ClassP clas tys) = (clas, tys)
 getClassPredTys other = panic "getClassPredTys"
 
+isEqPred :: PredType -> Bool
+isEqPred (EqPred {}) = True
+isEqPred _	     = False
+
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = mkPredTy (ClassP clas tys)
 
@@ -851,6 +880,13 @@ isInheritablePred other	     = False
 isLinearPred :: TcPredType -> Bool
 isLinearPred (IParam (Linear n) _) = True
 isLinearPred other		   = False
+\end{code}
+
+--------------------- Equality predicates ---------------------------------
+\begin{code}
+substEqSpec :: TvSubst -> [(TyVar,Type)] -> [(TcType,TcType)]
+substEqSpec subst eq_spec = [ (substTyVar subst tv, substTy subst ty)
+			    | (tv,ty) <- eq_spec]
 \end{code}
 
 --------------------- The stupid theta (sigh) ---------------------------------
@@ -937,7 +973,8 @@ deNoteType ty = ty
 
 \begin{code}
 tcTyVarsOfType :: Type -> TcTyVarSet
--- Just the tc type variables free in the type
+-- Just the *TcTyVars* free in the type
+-- (Types.tyVarsOfTypes finds all free TyVars)
 tcTyVarsOfType (TyVarTy tv)	    = if isTcTyVar tv then unitVarSet tv
 						      else emptyVarSet
 tcTyVarsOfType (TyConApp tycon tys) = tcTyVarsOfTypes tys

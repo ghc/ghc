@@ -21,39 +21,47 @@ import qualified DsMeta
 #endif
 
 import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
-			  HsMatchContext(..), HsRecordBinds, 
-			  mkHsCoerce, mkHsApp, mkHsDictApp, mkHsTyApp )
+			  HsMatchContext(..), HsRecordBinds, mkHsCoerce,
+			  mkHsApp )
 import TcHsSyn		( hsLitType )
 import TcRnMonad
 import TcUnify		( tcInfer, tcSubExp, tcFunResTy, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
 			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, preSubType,
 			  unBox )
 import BasicTypes	( Arity, isMarkedStrict )
-import Inst		( newMethodFromName, newIPDict, instToId,
+import Inst		( newMethodFromName, newIPDict, mkInstCoFn,
 			  newDicts, newMethodWithGivenTy, tcInstStupidTheta )
 import TcBinds		( tcLocalBinds )
-import TcEnv		( tcLookup, tcLookupId, tcLookupDataCon, tcLookupField )
+import TcEnv		( tcLookup, tcLookupDataCon, tcLookupField )
 import TcArrows		( tcProc )
-import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, TcMatchCtxt(..) )
+import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcBody,
+			  TcMatchCtxt(..) )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
 import TcPat		( tcOverloadedLit, badFieldCon )
-import TcMType		( tcInstTyVars, newFlexiTyVarTy, newBoxyTyVars, readFilledBox, zonkTcTypes )
-import TcType		( TcType, TcSigmaType, TcRhoType, 
+import TcMType		( tcInstTyVars, newFlexiTyVarTy, newBoxyTyVars,
+			  readFilledBox, zonkTcTypes )
+import TcType		( TcType, TcSigmaType, TcRhoType, TvSubst,
 			  BoxySigmaType, BoxyRhoType, ThetaType,
 			  mkTyVarTys, mkFunTys, 
-			  tcMultiSplitSigmaTy, tcSplitFunTysN, tcSplitTyConApp_maybe,
+			  tcMultiSplitSigmaTy, tcSplitFunTysN,
+			  tcSplitTyConApp_maybe, 
 			  isSigmaTy, mkFunTy, mkTyConApp, isLinearPred,
 			  exactTyVarsOfType, exactTyVarsOfTypes, 
 			  zipTopTvSubst, zipOpenTvSubst, substTys, substTyVar
 			)
-import Kind		( argTypeKind )
+import {- Kind parts of -} 
+       Type		( argTypeKind )
 
-import Id		( Id, idType, idName, recordSelectorFieldLabel, 
-			  isRecordSelector, isNaughtyRecordSelector, isDataConId_maybe )
-import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks, dataConSourceArity,
-			  dataConWrapId, isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
+import Id		( Id, idType, recordSelectorFieldLabel,
+			  isRecordSelector, isNaughtyRecordSelector,
+			  isDataConId_maybe )
+import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks,
+			  dataConSourceArity, 
+			  dataConWrapId, isVanillaDataCon, dataConUnivTyVars,
+			  dataConOrigArgTys ) 
 import Name		( Name )
-import TyCon		( FieldLabel, tyConStupidTheta, tyConDataCons, isEnumerationTyCon )
+import TyCon		( FieldLabel, tyConStupidTheta, tyConDataCons,
+			  isEnumerationTyCon ) 
 import Type		( substTheta, substTy )
 import Var		( TyVar, tyVarKind )
 import VarSet		( emptyVarSet, elemVarSet, unionVarSet )
@@ -68,7 +76,7 @@ import PrimOp		( tagToEnumKey )
 import DynFlags
 import StaticFlags	( opt_NoMethodSharing )
 import HscTypes		( TyThing(..) )
-import SrcLoc		( Located(..), unLoc, noLoc, getLoc )
+import SrcLoc		( Located(..), unLoc, getLoc )
 import Util
 import ListSetOps	( assocMaybe )
 import Maybes		( catMaybes )
@@ -282,7 +290,7 @@ tcExpr (HsCase scrut matches) exp_ty
 	; return (HsCase scrut' matches') }
  where
     match_ctxt = MC { mc_what = CaseAlt,
-		      mc_body = tcPolyExpr }
+		      mc_body = tcBody }
 
 tcExpr (HsIf pred b1 b2) res_ty
   = do	{ pred' <- addErrCtxt (predCtxt pred) $
@@ -440,7 +448,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 		-- A constructor is only relevant to this process if
 		-- it contains *all* the fields that are being updated
 	con1 		= head relevant_cons	-- A representative constructor
-	con1_tyvars 	= dataConTyVars con1
+	con1_tyvars 	= dataConUnivTyVars con1 
 	con1_flds       = dataConFieldLabels con1
 	con1_arg_tys    = dataConOrigArgTys con1
 	common_tyvars   = exactTyVarsOfTypes [ty | (fld,ty) <- con1_flds `zip` con1_arg_tys
@@ -633,10 +641,11 @@ tcIdApp :: Name					-- Function
 -- Then		fres <= bx_(k+1) -> ... -> bx_n -> res_ty
 
 tcIdApp fun_name n_args arg_checker res_ty
-  = do	{ fun_id <- lookupFun (OccurrenceOf fun_name) fun_name
+  = do	{ let orig = OccurrenceOf fun_name
+	; (fun, fun_ty) <- lookupFun orig fun_name
 
 	-- Split up the function type
-	; let (tv_theta_prs, rho) = tcMultiSplitSigmaTy (idType fun_id)
+	; let (tv_theta_prs, rho) = tcMultiSplitSigmaTy fun_ty
 	      (fun_arg_tys, fun_res_ty) = tcSplitFunTysN rho n_args
 
 	      qtvs = concatMap fst tv_theta_prs		-- Quantified tyvars
@@ -678,7 +687,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 	-- And pack up the results
 	-- By applying the coercion just to the *function* we can make
 	-- tcFun work nicely for OpApp and Sections too
-	; fun' <- instFun fun_id qtvs qtys'' tv_theta_prs
+	; fun' <- instFun orig fun res_subst tv_theta_prs
 	; co_fn' <- wrapFunResCoercion fun_arg_tys' co_fn
 	; return (mkHsCoerce co_fn' fun', args') }
 \end{code}
@@ -707,10 +716,10 @@ tcId :: InstOrigin
      -> TcM (HsExpr TcId)
 tcId orig fun_name res_ty
   = do	{ traceTc (text "tcId" <+> ppr fun_name <+> ppr res_ty)
-	; fun_id <- lookupFun orig fun_name
+	; (fun, fun_ty) <- lookupFun orig fun_name
 
 	-- Split up the function type
-	; let (tv_theta_prs, fun_tau) = tcMultiSplitSigmaTy (idType fun_id)
+	; let (tv_theta_prs, fun_tau) = tcMultiSplitSigmaTy fun_ty
 	      qtvs = concatMap fst tv_theta_prs	-- Quantified tyvars
 	      tau_qtvs = exactTyVarsOfType fun_tau	-- Mentioned in the tau part
 	; qtv_tys <- preSubType qtvs tau_qtvs fun_tau res_ty
@@ -722,7 +731,7 @@ tcId orig fun_name res_ty
 	; co_fn <- tcFunResTy fun_name fun_tau' res_ty
 
 	-- And pack up the results
-	; fun' <- instFun fun_id qtvs qtv_tys tv_theta_prs 
+	; fun' <- instFun orig fun res_subst tv_theta_prs 
 	; return (mkHsCoerce co_fn fun') }
 
 -- 	Note [Push result type in]
@@ -756,49 +765,49 @@ tcSyntaxOp orig (HsVar op) ty = tcId orig op ty
 tcSyntaxOp orig other 	   ty = pprPanic "tcSyntaxOp" (ppr other)
 
 ---------------------------
-instFun :: TcId
-	-> [TyVar] -> [TcType] 	-- Quantified type variables and 
-				-- their instantiating types
-	-> [([TyVar], ThetaType)] 	-- Stuff to instantiate
+instFun :: InstOrigin
+	-> HsExpr TcId
+	-> TvSubst		  -- The instantiating substitution
+	-> [([TyVar], ThetaType)] -- Stuff to instantiate
 	-> TcM (HsExpr TcId)	
-instFun fun_id qtvs qtv_tys []
-  = return (HsVar fun_id)	-- Common short cut
 
-instFun fun_id qtvs qtv_tys tv_theta_prs
-  = do 	{ 	-- Horrid check for tagToEnum; see Note [tagToEnum#]
-	  checkBadTagToEnumCall fun_id qtv_tys
+instFun orig fun subst []
+  = return fun		-- Common short cut
 
-	; let subst = zipOpenTvSubst qtvs qtv_tys
-	      ty_theta_prs' = map subst_pr tv_theta_prs
-	      subst_pr (tvs, theta) = (map (substTyVar subst) tvs, 
-				       substTheta subst theta)
+instFun orig fun subst tv_theta_prs
+  = do 	{-- !!!SPJ: 	-- Horrid check for tagToEnum; see Note [tagToEnum#]
+	 -- !!!SPJ: checkBadTagToEnumCall fun_id qtv_tys
 
-		-- The ty_theta_prs' is always non-empty
-	      ((tys1',theta1') : further_prs') = ty_theta_prs'
-		
+	; let ty_theta_prs' = map subst_pr tv_theta_prs
+
   		-- First, chuck in the constraints from 
 		-- the "stupid theta" of a data constructor (sigh)
-	; case isDataConId_maybe fun_id of
-		Just con -> tcInstStupidTheta con tys1'
-		Nothing  -> return ()
+	; inst_stupid fun ty_theta_prs'
 
-	; if want_method_inst theta1'
-	  then do { meth_id <- newMethodWithGivenTy orig fun_id tys1'
-			-- See Note [Multiple instantiation]
-		  ; go (HsVar meth_id) further_prs' }
-	  else go (HsVar fun_id) ty_theta_prs'
-	}
+		-- Now do normal instantiation
+	; go True fun ty_theta_prs' }
   where
-    orig = OccurrenceOf (idName fun_id)
+    subst_pr (tvs, theta) 
+	= (map (substTyVar subst) tvs, substTheta subst theta)
 
-    go fun [] = return fun
+    inst_stupid (HsVar fun_id) ((tys,_):_)
+	| Just con <- isDataConId_maybe fun_id = tcInstStupidTheta con tys
+    inst_stupid _ _ = return ()
 
-    go fun ((tys, theta) : prs)
+    go _ fun [] = return fun
+
+    go True (HsVar fun_id) ((tys,theta) : prs)
+	| want_method_inst theta
+	= do { meth_id <- newMethodWithGivenTy orig fun_id tys
+	     ; go False (HsVar meth_id) prs }
+		-- Go round with 'False' to prevent further use
+		-- of newMethod: see Note [Multiple instantiation]
+
+    go _ fun ((tys, theta) : prs)
 	= do { dicts <- newDicts orig theta
 	     ; extendLIEs dicts
-	     ; let the_app = unLoc $ mkHsDictApp (mkHsTyApp (noLoc fun) tys)
-						 (map instToId dicts)
-	     ; go the_app prs }
+	     ; let co_fn = mkInstCoFn tys dicts
+	     ; go False (HsCoerce co_fn fun) prs }
 
 	-- 	Hack Alert (want_method_inst)!
 	-- See Note [No method sharing]
@@ -925,40 +934,53 @@ tagToEnumError tys
 %************************************************************************
 
 \begin{code}
-lookupFun :: InstOrigin -> Name -> TcM TcId
+lookupFun :: InstOrigin -> Name -> TcM (HsExpr TcId, TcType)
 lookupFun orig id_name
   = do 	{ thing <- tcLookup id_name
 	; case thing of
-    	    AGlobal (ADataCon con) -> return (dataConWrapId con)
+    	    AGlobal (ADataCon con) -> return (HsVar wrap_id, idType wrap_id)
+				   where
+				      wrap_id = dataConWrapId con
 
     	    AGlobal (AnId id) 
 	    	| isNaughtyRecordSelector id -> failWithTc (naughtyRecordSel id)
-	    	| otherwise		     -> return id
+	    	| otherwise		     -> return (HsVar id, idType id)
 	    	-- A global cannot possibly be ill-staged
 	    	-- nor does it need the 'lifting' treatment
 
-#ifndef GHCI
-    	    ATcId id th_level _ -> return id			-- Non-TH case
-#else
-	    ATcId id th_level _ -> do { use_stage <- getStage	-- TH case
-				      ; thLocalId orig id_name id th_level use_stage }
-#endif
+    	    ATcId { tct_id = id, tct_type = ty, tct_co = mb_co, tct_level = lvl }
+		-> do { thLocalId orig id ty lvl
+		      ; case mb_co of
+			  Nothing -> return (HsVar id, ty)	-- Wobbly, or no free vars
+			  Just co -> return (mkHsCoerce co (HsVar id), ty) }	
 
     	    other -> failWithTc (ppr other <+> ptext SLIT("used where a value identifer was expected"))
     }
 
-#ifdef GHCI  /* GHCI and TH is on */
+#ifndef GHCI  /* GHCI and TH is off */
 --------------------------------------
 -- thLocalId : Check for cross-stage lifting
+thLocalId orig id id_ty th_bind_lvl
+  = return ()
+
+#else	      /* GHCI and TH is on */
+thLocalId orig id id_ty th_bind_lvl 
+  = do	{ use_stage <- getStage	-- TH case
+	; case use_stage of
+	    Brack use_lvl ps_var lie_var | use_lvl > th_bind_lvl
+		  -> thBrackId orig id ps_var lie_var
+	    other -> checkWellStaged (quotes (ppr id)) th_bind_lvl use_stage
+	}
+
 thLocalId orig id_name id th_bind_lvl (Brack use_lvl ps_var lie_var)
   | use_lvl > th_bind_lvl
-  = thBrackId orig id_name id ps_var lie_var
+  = thBrackId 
 thLocalId orig id_name id th_bind_lvl use_stage
-  = do	{ checkWellStaged (quotes (ppr id)) th_bind_lvl use_stage
+  = do	{ checkWellStaged 
 	; return id }
 
 --------------------------------------
-thBrackId orig id_name id ps_var lie_var
+thBrackId orig id ps_var lie_var
   | isExternalName id_name
   =	-- Top-level identifiers in this module,
 	-- (which have External Names)
@@ -1005,6 +1027,8 @@ thBrackId orig id_name id ps_var lie_var
 	; writeMutVar ps_var ((id_name, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)
 
 	; return id } }
+ where
+   id_name = idName id
 #endif /* GHCI */
 \end{code}
 
@@ -1048,7 +1072,7 @@ tcRecordBinds data_con arg_tys rbinds
       | Just field_ty <- assocMaybe flds_w_tys field_lbl
       = addErrCtxt (fieldCtxt field_lbl)	$
 	do { rhs'   <- tcPolyExprNC rhs field_ty
-	   ; sel_id <- tcLookupId field_lbl
+	   ; sel_id <- tcLookupField field_lbl
 	   ; ASSERT( isRecordSelector sel_id )
 	     return (Just (L loc sel_id, rhs')) }
       | otherwise

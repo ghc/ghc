@@ -30,14 +30,14 @@ import TcHsSyn		( zonkId )
 import TcRnMonad
 import Inst		( newDictsAtLoc, newIPDict, instToId )
 import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, 
-			  pprBinders, tcLookupLocalId_maybe, tcLookupId,
+			  pprBinders, tcLookupId,
 			  tcGetGlobalTyVars )
 import TcUnify		( tcInfer, tcSubExp, unifyTheta, 
 			  bleatEscapedTvs, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, 
 			  tcSimplifyRestricted, tcSimplifyIPs )
 import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcPat		( tcPat, PatCtxt(..) )
+import TcPat		( tcLetPat )
 import TcSimplify	( bindInstsOfLocalFuns )
 import TcMType		( newFlexiTyVarTy, zonkQuantifiedTyVar, zonkSigTyVar,
 			  tcInstSigTyVars, tcInstSkolTyVars, tcInstType, 
@@ -48,9 +48,8 @@ import TcType		( TcType, TcTyVar, TcThetaType,
 			  mkTyVarTy, mkForAllTys, mkFunTys, exactTyVarsOfType, 
 			  mkForAllTy, isUnLiftedType, tcGetTyVar, 
 			  mkTyVarTys, tidyOpenTyVar )
-import Kind		( argTypeKind )
+import {- Kind parts of -} Type		( argTypeKind )
 import VarEnv		( TyVarEnv, emptyVarEnv, lookupVarEnv, extendVarEnv ) 
-import TysWiredIn	( unitTy )
 import TysPrim		( alphaTyVar )
 import Id		( Id, mkLocalId, mkVanillaGlobal )
 import IdInfo		( vanillaIdInfo )
@@ -323,7 +322,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
     in
 	-- SET UP THE MAIN RECOVERY; take advantage of any type sigs
     setSrcSpan loc				$
-    recoverM (recoveryCode binder_names)	$ do 
+    recoverM (recoveryCode binder_names sig_fn)	$ do 
 
   { traceTc (ptext SLIT("------------------------------------------------"))
   ; traceTc (ptext SLIT("Bindings for") <+> ppr binder_names)
@@ -448,15 +447,14 @@ tcSpecPrag poly_id hs_ty inl
 -- If typechecking the binds fails, then return with each
 -- signature-less binder given type (forall a.a), to minimise 
 -- subsequent error messages
-recoveryCode binder_names
+recoveryCode binder_names sig_fn
   = do	{ traceTc (text "tcBindsWithSigs: error recovery" <+> ppr binder_names)
 	; poly_ids <- mapM mk_dummy binder_names
 	; return ([], poly_ids) }
   where
-    mk_dummy name = do { mb_id <- tcLookupLocalId_maybe name
-			; case mb_id of
-    		     	      Just id -> return id		-- Had signature, was in envt
-	    		      Nothing -> return (mkLocalId name forall_a_a) }    -- No signature
+    mk_dummy name 
+	| isJust (sig_fn name) = tcLookupId name	-- Had signature; look it up
+	| otherwise	       = return (mkLocalId name forall_a_a)    -- No signature
 
 forall_a_a :: TcType
 forall_a_a = mkForAllTy alphaTyVar (mkTyVarTy alphaTyVar)
@@ -651,9 +649,8 @@ tcLhs sig_fn bind@(PatBind { pat_lhs = pat, pat_rhs = grhss })
 				      | (name, Just sig) <- nm_sig_prs]
 	      sig_tau_fn  = lookupNameEnv tau_sig_env
 
-	      tc_pat exp_ty = tcPat (LetPat sig_tau_fn) pat exp_ty unitTy $ \ _ ->
+	      tc_pat exp_ty = tcLetPat sig_tau_fn pat exp_ty $
 			      mapM lookup_info nm_sig_prs
-		-- The unitTy is a bit bogus; it's the "result type" for lookup_info.  
 
 		-- After typechecking the pattern, look up the binder
 		-- names, which the pattern has brought into scope.

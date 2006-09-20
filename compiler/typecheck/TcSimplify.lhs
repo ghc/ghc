@@ -21,8 +21,9 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyType )
-import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, emptyLHsBinds )
-import TcHsSyn		( mkHsApp, mkHsTyApp, mkHsDictApp )
+import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, 
+			  ExprCoFn(..), (<.>), nlHsTyApp, emptyLHsBinds )
+import TcHsSyn		( mkHsApp )
 
 import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
@@ -31,7 +32,7 @@ import Inst		( lookupInst, LookupInstResult(..),
 			  isMethodFor, isMethod,
 			  instToId, tyVarsOfInsts,  cloneDict,
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
-			  fdPredsOfInst,
+			  fdPredsOfInst, mkInstCoFn,
 			  newDictsAtLoc, tcInstClassOp,
 			  getDictClassTys, isTyVarDict, instLoc,
 			  zonkInst, tidyInsts, tidyMoreInsts,
@@ -1468,6 +1469,7 @@ extractResults avails wanteds
 		   new_binds  = addBind binds w rhs
 		   new_avails = addToFM avails w (LinRhss rhss)
 
+	-- get_root is just used for Linear
     get_root irreds frees (Given id _) w = returnM (irreds, frees, id)
     get_root irreds frees Irred	       w = cloneDict w	`thenM` \ w' ->
 					   returnM (w':irreds, frees, instToId w')
@@ -1540,7 +1542,7 @@ split n split_id root_id wanted
 		       returnM (L span (VarBind x (mk_app span split_id rhs)),
 				[mk_fs_app span fst_id ty x, mk_fs_app span snd_id ty x])
 
-mk_fs_app span id ty var = L span (HsVar id) `mkHsTyApp` [ty,ty] `mkHsApp` (L span (HsVar var))
+mk_fs_app span id ty var = nlHsTyApp id [ty,ty] `mkHsApp` (L span (HsVar var))
 
 mk_app span id rhs = L span (HsApp (L span (HsVar id)) rhs)
 
@@ -1922,7 +1924,8 @@ addSCs is_loop avails dict
       | is_given sc_dict 	   = return avails
       | otherwise		   = addSCs is_loop avails' sc_dict
       where
-	sc_sel_rhs = mkHsDictApp (mkHsTyApp (L (instSpan dict) (HsVar sc_sel)) tys) [instToId dict]
+	sc_sel_rhs = L (instSpan dict) (HsCoerce co_fn (HsVar sc_sel))
+	co_fn	   = mkInstCoFn tys [dict]
 	avails'    = addToFM avails sc_dict (Rhs sc_sel_rhs [dict])
 
     is_given :: Inst -> Bool

@@ -12,7 +12,7 @@ module Inst (
 
 	tidyInsts, tidyMoreInsts,
 
-	newDicts, newDictAtLoc, newDictsAtLoc, cloneDict, 
+	newDicts, newDictsAtLoc, cloneDict, 
 	shortCutFracLit, shortCutIntLit, newIPDict, 
 	newMethod, newMethodFromName, newMethodWithGivenTy, 
 	tcInstClassOp, tcInstStupidTheta,
@@ -22,6 +22,7 @@ module Inst (
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
 	instLoc, getDictClassTys, dictPred,
 
+	mkInstCoFn, 
 	lookupInst, LookupInstResult(..), lookupPred, 
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
 
@@ -30,7 +31,7 @@ module Inst (
 	isTyVarDict, isMethodFor, 
 
 	zonkInst, zonkInsts,
-	instToId, instName,
+	instToId, instToVar, instName,
 
 	InstOrigin(..), InstLoc(..), pprInstLoc
     ) where
@@ -40,8 +41,8 @@ module Inst (
 import {-# SOURCE #-}	TcExpr( tcPolyExpr )
 
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, mkHsApp,
-		  nlHsLit, nlHsVar )
-import TcHsSyn	( mkHsTyApp, mkHsDictApp, zonkId )
+		  ExprCoFn(..), (<.>), nlHsLit, nlHsVar )
+import TcHsSyn	( zonkId )
 import TcRnMonad
 import TcEnv	( tcLookupId, checkWellStaged, topIdLvl, tcMetaTy )
 import InstEnv	( DFunId, InstEnv, Instance(..), OverlapFlag(..),
@@ -69,10 +70,11 @@ import Type	( TvSubst, substTy, substTyVar, substTyWith, substTheta, zipTopTvSub
 		  notElemTvSubst, extendTvSubstList )
 import Unify	( tcMatchTys )
 import Module	( modulePackageId )
-import Kind	( isSubKind )
+import {- Kind parts of -} Type	( isSubKind )
 import HscTypes	( ExternalPackageState(..), HscEnv(..) )
 import CoreFVs	( idFreeTyVars )
-import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName, dataConWrapId )
+import DataCon	( DataCon, dataConStupidTheta, dataConName, 
+                  dataConWrapId, dataConUnivTyVars )
 import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 		  isInternalName, setNameUnique )
@@ -95,13 +97,23 @@ import Outputable
 Selection
 ~~~~~~~~~
 \begin{code}
+mkInstCoFn :: [TcType] -> [Inst] -> ExprCoFn
+mkInstCoFn tys dicts = CoApps (map instToId dicts) <.> CoTyApps tys
+
 instName :: Inst -> Name
 instName inst = idName (instToId inst)
 
 instToId :: Inst -> TcId
-instToId (LitInst nm _ ty _) = mkLocalId nm ty
-instToId (Dict nm pred _)    = mkLocalId nm (mkPredTy pred)
-instToId (Method id _ _ _ _) = id
+instToId inst = ASSERT2( isId id, ppr inst ) id 
+	      where
+		id = instToVar inst
+
+instToVar :: Inst -> Var
+instToVar (LitInst nm _ ty _) = mkLocalId nm ty
+instToVar (Method id _ _ _ _) = id
+instToVar (Dict nm pred _)    
+  | isEqPred pred = mkTyVar nm (mkPredTy pred)
+  | otherwise	  = mkLocalId nm (mkPredTy pred)
 
 instLoc (Dict _ _       loc) = loc
 instLoc (Method _ _ _ _ loc) = loc
@@ -207,29 +219,28 @@ newDicts orig theta
   = getInstLoc orig		`thenM` \ loc ->
     newDictsAtLoc loc theta
 
-cloneDict :: Inst -> TcM Inst
+cloneDict :: Inst -> TcM Inst	-- Only used for linear implicit params
 cloneDict (Dict nm ty loc) = newUnique	`thenM` \ uniq ->
 			     returnM (Dict (setNameUnique nm uniq) ty loc)
 
-newDictAtLoc :: InstLoc -> TcPredType -> TcM Inst
-newDictAtLoc inst_loc pred
-  = do	{ uniq <- newUnique
-  	; return (mkDict inst_loc uniq pred) }
-
 newDictsAtLoc :: InstLoc -> TcThetaType -> TcM [Inst]
-newDictsAtLoc inst_loc theta
-  = newUniqueSupply		`thenM` \ us ->
-    returnM (zipWith (mkDict inst_loc) (uniqsFromSupply us) theta)
+newDictsAtLoc inst_loc theta = mapM (newDictAtLoc inst_loc) theta
 
-mkDict inst_loc uniq pred
-  = Dict name pred inst_loc
-  where
-    name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
+{-
+newDictOcc :: InstLoc -> TcPredType -> TcM Inst
+newDictOcc inst_loc (EqPred ty1 ty2)
+  = do	{ unifyType ty1 ty2	-- We insist that they unify right away
+	; return ty1 }		-- And return the relexive coercion
+-}
+newDictAtLoc inst_loc pred
+  = do 	{ uniq <- newUnique 
+	; let name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
+	; return (Dict name pred inst_loc) }
 
 -- For vanilla implicit parameters, there is only one in scope
 -- at any time, so we used to use the name of the implicit parameter itself
 -- But with splittable implicit parameters there may be many in 
--- scope, so we make up a new name.
+-- scope, so we make up a new namea.
 newIPDict :: InstOrigin -> IPName Name -> Type 
 	  -> TcM (IPName Id, Inst)
 newIPDict orig ip_name ty
@@ -265,7 +276,7 @@ tcInstStupidTheta data_con inst_tys
 	; extendLIEs stupid_dicts }
   where
     stupid_theta = dataConStupidTheta data_con
-    tenv = zipTopTvSubst (dataConTyVars data_con) inst_tys
+    tenv = zipTopTvSubst (dataConUnivTyVars data_con) inst_tys
 
 newMethodFromName :: InstOrigin -> BoxyRhoType -> Name -> TcM TcId
 newMethodFromName origin ty name
@@ -580,8 +591,9 @@ lookupInst :: Inst -> TcM LookupInstResult
 -- Methods
 
 lookupInst inst@(Method _ id tys theta loc)
-  = newDictsAtLoc loc theta		`thenM` \ dicts ->
-    returnM (GenInst dicts (mkHsDictApp (mkHsTyApp (L span (HsVar id)) tys) (map instToId dicts)))
+  = do	{ dicts <- newDictsAtLoc loc theta
+	; let co_fn = mkInstCoFn tys dicts
+	; return (GenInst dicts (L span $ HsCoerce co_fn (HsVar id))) }
   where
     span = instLocSrcSpan loc
 
@@ -654,14 +666,15 @@ lookupInst (Dict _ pred loc)
 		-- any nested for-alls in rho.  So the in-scope set is unchanged
     	dfun_rho   = substTy tenv' rho
     	(theta, _) = tcSplitPhiTy dfun_rho
-    	ty_app     = mkHsTyApp (L (instLocSrcSpan loc) (HsVar dfun_id)) 
-			       (map (substTyVar tenv') tyvars)
+	src_loc	   = instLocSrcSpan loc
+	dfun	   = HsVar dfun_id
+	tys	   = map (substTyVar tenv') tyvars
     ; if null theta then
-    	returnM (SimpleInst ty_app)
+    	returnM (SimpleInst (L src_loc $ HsCoerce (CoTyApps tys) dfun))
       else do
     { dicts <- newDictsAtLoc loc theta
-    ; let rhs = mkHsDictApp ty_app (map instToId dicts)
-    ; returnM (GenInst dicts rhs)
+    ; let co_fn = mkInstCoFn tys dicts
+    ; returnM (GenInst dicts (L src_loc $ HsCoerce co_fn dfun))
     }}}}
 
 ---------------
