@@ -575,9 +575,9 @@ mkRecordSelId tycon field_label
 	uniq_list = map mkBuiltinUnique [unpack_base..]
 
         Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs
-        (co_fn, out_ty) = refineType refinement (idType the_arg_id)
+        (co_fn, _)      = refineType refinement (idType the_arg_id)
 
-        rhs = ASSERT(out_ty `coreEqType` field_tau) perform_co co_fn (Var the_arg_id)
+        rhs = perform_co co_fn (Var the_arg_id)
 
         perform_co (ExprCoFn co) expr = Cast expr co
         perform_co id_co expr = ASSERT(isIdCoercion id_co) expr
