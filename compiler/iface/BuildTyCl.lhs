@@ -69,9 +69,7 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> RecFlag
 	      -> Bool			-- True <=> want generics functions
 	      -> Bool			-- True <=> was declared in GADT syntax
-	      -> Maybe (TyCon, [Type], 
-		        Int)            -- Just (family, tys, index) 
-					-- <=> instance of `family' at `tys'
+	      -> Maybe (TyCon, [Type])  -- family instance if applicable
 	      -> TcRnIf m n TyCon
 
 buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
@@ -79,8 +77,8 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
   = do { -- We need to tie a knot as the coercion of a data instance depends
 	 -- on the instance representation tycon and vice versa.
        ; tycon <- fixM (\ tycon_rec -> do 
-	 { (final_name, parent) <- maybeComputeFamilyInfo mb_family tycon_rec
-	 ; let { tycon = mkAlgTyCon final_name kind tvs stupid_theta rhs
+	 { parent <- parentInfo mb_family tycon_rec
+	 ; let { tycon = mkAlgTyCon tc_name kind tvs stupid_theta rhs
 				    fields parent is_rec want_generics gadt_syn
 	       ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 	       ; fields  = mkTyConSelIds tycon rhs
@@ -91,31 +89,24 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
        }
   where
     -- If a family tycon with instance types is given, the current tycon is an
-    -- instance of that family and we have to perform three extra tasks:
+    -- instance of that family and we need to
     --
-    -- (1) The instance tycon (representing the family at a particular type
-    --     instance) need to get a new, derived name - we may not reuse the
-    --     family name.
-    -- (2) Create a coercion that identifies the family instance type and the
+    -- (1) create a coercion that identifies the family instance type and the
     --     representation type from Step (1); ie, it is of the form 
     --	   `Co tvs :: F ts :=: R tvs', where `Co' is the name of the coercion,
-    --	   `F' the family tycon and `R' the (derived) representation tycon.
-    -- (3) Produce a `AlgTyConParent' value containing the parent and coercion
+    --	   `F' the family tycon and `R' the (derived) representation tycon,
+    --	   and
+    -- (2) produce a `AlgTyConParent' value containing the parent and coercion
     --     information.
     --
-    maybeComputeFamilyInfo Nothing                         rep_tycon = 
-      return (tc_name, NoParentTyCon)
-    maybeComputeFamilyInfo (Just (family, instTys, index)) rep_tycon =
-      do { -- (1) New, derived name for the instance tycon
-	 ; final_name <- newImplicitBinder tc_name (mkInstTyTcOcc index)
-
-	   -- (2) Create the coercion.
-	 ; co_tycon_name <- newImplicitBinder tc_name (mkInstTyCoOcc index)
+    parentInfo Nothing                  rep_tycon = 
+      return NoParentTyCon
+    parentInfo (Just (family, instTys)) rep_tycon =
+      do { -- Create the coercion
+	 ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
 	 ; let co_tycon = mkDataInstCoercion co_tycon_name tvs
 					     family instTys rep_tycon
-
-	   -- (3) Produce parent information.
-	 ; return (final_name, FamilyTyCon family instTys co_tycon index)
+	 ; return $ FamilyTyCon family instTys co_tycon
 	 }
     
 

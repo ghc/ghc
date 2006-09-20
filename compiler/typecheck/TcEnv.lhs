@@ -38,7 +38,7 @@ module TcEnv(
 	topIdLvl, 
 
 	-- New Ids
-	newLocalName, newDFunName
+	newLocalName, newDFunName, newFamInstTyConName
   ) where
 
 #include "HsVersions.h"
@@ -66,11 +66,13 @@ import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
-import Name		( Name, NamedThing(..), getSrcLoc, nameModule )
+import Name		( Name, NamedThing(..), getSrcLoc, nameModule,
+			  nameOccName )
 import PrelNames	( thFAKE )
 import NameEnv
-import OccName		( mkDFunOcc, occNameString )
-import HscTypes		( extendTypeEnvList, lookupType, TyThing(..), ExternalPackageState(..) )
+import OccName		( mkDFunOcc, occNameString, mkInstTyTcOcc )
+import HscTypes		( extendTypeEnvList, lookupType, TyThing(..),
+			  ExternalPackageState(..) )
 import SrcLoc		( SrcLoc, Located(..) )
 import Outputable
 \end{code}
@@ -609,6 +611,19 @@ newDFunName clas (ty:_) loc
 	; newGlobalBinder mod dfun_occ Nothing loc }
 
 newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
+\end{code}
+
+Make a name for the representation tycon of a data/newtype instance.  It's an
+*external* name, like otber top-level names, and hence must be made with
+newGlobalBinder.
+
+\begin{code}
+newFamInstTyConName :: Name -> SrcLoc -> TcM Name
+newFamInstTyConName tc_name loc
+  = do	{ index <- nextDFunIndex
+	; mod   <- getModule
+	; let occ = nameOccName tc_name
+	; newGlobalBinder mod (mkInstTyTcOcc index occ) Nothing loc }
 \end{code}
 
 

@@ -371,11 +371,11 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
 	    { stupid_theta <- tcIfaceCtxt ctxt
 	    ; famInst <- 
 	        case mb_family of
-		  Nothing                -> return Nothing
-		  Just (fam, tys, index) -> 
+		  Nothing         -> return Nothing
+		  Just (fam, tys) -> 
 		    do { famTyCon <- tcIfaceTyCon fam
 		       ; insttys <- mapM tcIfaceType tys
-		       ; return $ Just (famTyCon, insttys, index)
+		       ; return $ Just (famTyCon, insttys)
 		       }
 	    ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
 	    ; buildAlgTyCon tc_name tyvars stupid_theta

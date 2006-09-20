@@ -25,7 +25,8 @@ import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
 import TcRnMonad
 import TcEnv		( TyThing(..), 
 			  tcLookupLocated, tcLookupLocatedGlobal, 
-			  tcExtendGlobalEnv, tcExtendKindEnv, tcExtendKindEnvTvs,
+			  tcExtendGlobalEnv, tcExtendKindEnv,
+			  tcExtendKindEnvTvs, newFamInstTyConName,
 			  tcExtendRecEnv, tcLookupTyVar, InstInfo )
 import TcTyDecls	( calcRecFlags, calcClassCycles, calcSynCycles )
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
@@ -66,7 +67,8 @@ import Monad		( unless )
 import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
 import List		( partition, elemIndex )
-import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan )
+import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan, 
+			  srcSpanStart )
 import ListSetOps	( equivClasses, minusList )
 import Digraph		( SCC(..) )
 import DynFlags		( DynFlag( Opt_GlasgowExts, Opt_Generics, 
@@ -327,7 +329,7 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; t_typats     <- mappM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
-       ; index <- nextDFunIndex		   -- to generate unique names
+       ; rep_tc_name <- newFamInstTyConName tc_name (srcSpanStart loc)
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
 					      tycon t_tvs))
@@ -335,11 +337,10 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	     ; tc_rhs <-
 		 case new_or_data of
 		   DataType -> return (mkDataTyConRhs data_cons)
-		   NewType  -> 
-			    ASSERT( isSingleton data_cons )
-			    mkNewTyConRhs tc_name tycon (head data_cons)
-	     ; buildAlgTyCon tc_name t_tvs stupid_theta tc_rhs Recursive
-			     False h98_syntax (Just (family, t_typats, index))
+		   NewType  -> ASSERT( isSingleton data_cons )
+			       mkNewTyConRhs tc_name tycon (head data_cons)
+	     ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
+			     False h98_syntax (Just (family, t_typats))
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive

@@ -443,6 +443,7 @@ mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkNewTyCoOcc        = mk_simple_deriv tcName  "Co"
+mkInstTyCoOcc       = mk_simple_deriv tcName  "Co"      -- derived from rep ty
 
 -- Generic derivable classes
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"
@@ -478,24 +479,15 @@ mkLocalOcc uniq occ
 	-- that need encoding (e.g. 'z'!)
 \end{code}
 
-\begin{code}
+Derive a name for the representation type constructor of a data/newtype
+instance.
 
--- Derive a name for the representation type constructor of a data/newtype
--- instance.
---
+\begin{code}
 mkInstTyTcOcc :: Int			-- Index
-	      -> OccName		-- Local name (e.g. "Map")
+	      -> OccName		-- Family name (e.g. "Map")
 	      -> OccName		-- Nice unique version (":R23Map")
 mkInstTyTcOcc index occ
    = mk_deriv varName (":R" ++ show index) (occNameString occ)
-
--- Derive a name for the coercion of a data/newtype instance.
---
-mkInstTyCoOcc :: Int			-- Index
-	      -> OccName		-- Local name (e.g. "Map")
-	      -> OccName		-- Nice unique version (":Co23Map")
-mkInstTyCoOcc index occ
-   = mk_deriv varName (":Co" ++ show index) (occNameString occ)
 \end{code}
 
 \begin{code}

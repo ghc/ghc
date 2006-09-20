@@ -50,7 +50,6 @@ module TyCon(
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
 	isFamInstTyCon, tyConFamInst_maybe, tyConFamilyCoercion_maybe,
-	tyConFamInstIndex,
 	synTyConDefn, synTyConRhs, synTyConType, synTyConResKind,
 	tyConExtName,		-- External name for foreign types
 
@@ -275,9 +274,6 @@ data AlgTyConParent = -- An ordinary type constructor has no parent.
 				    TyCon	-- a *coercion* identifying
 						-- the representation type
 						-- with the type instance
-                                    Int         -- index to generate unique
-						-- name (needed here to put
-						-- into iface)
 
 data SynTyConRhs
   = OpenSynTyCon Kind	-- Type family: *result* kind given
@@ -817,25 +813,20 @@ tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas}) = Just clas
 tyConClass_maybe ther_tycon				    = Nothing
 
 isFamInstTyCon :: TyCon -> Bool
-isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _ _ _ _}) = True
-isFamInstTyCon other_tycon			              = False
+isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _ _ _ }) = True
+isFamInstTyCon other_tycon			             = False
 
 tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
-tyConFamInst_maybe (AlgTyCon {algTcParent = FamilyTyCon fam instTys _ _}) = 
+tyConFamInst_maybe (AlgTyCon {algTcParent = FamilyTyCon fam instTys _}) = 
   Just (fam, instTys)
-tyConFamInst_maybe ther_tycon				                  = 
+tyConFamInst_maybe ther_tycon				                = 
   Nothing
 
 tyConFamilyCoercion_maybe :: TyCon -> Maybe TyCon
-tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = FamilyTyCon _ _ coe _}) = 
+tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = FamilyTyCon _ _ coe}) = 
   Just coe
-tyConFamilyCoercion_maybe ther_tycon 				           = 
+tyConFamilyCoercion_maybe ther_tycon 				         = 
   Nothing
-
-tyConFamInstIndex :: TyCon -> Int
-tyConFamInstIndex (AlgTyCon {algTcParent = FamilyTyCon _ _ _ index}) = index
-tyConFamInstIndex _ 				                     = 
-  panic "tyConFamInstIndex"
 \end{code}
 
 

@@ -409,9 +409,8 @@ ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
 ifaceDeclSubBndrs _other = []
 
 -- coercion for data/newtype family instances
-famInstCo Nothing              baseOcc = []
-famInstCo (Just (_, _, index)) baseOcc = [mkInstTyTcOcc index baseOcc,
-				          mkInstTyCoOcc index baseOcc]
+famInstCo Nothing  baseOcc = []
+famInstCo (Just _) baseOcc = [mkInstTyCoOcc baseOcc]
 \end{code}
 
 

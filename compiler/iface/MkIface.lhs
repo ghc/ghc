@@ -191,7 +191,7 @@ import TyCon		( TyCon, AlgTyConRhs(..), SynTyConRhs(..),
 			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
 			  tyConHasGenerics, synTyConRhs, isGadtSyntaxTyCon,
 			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName,
-			  tyConFamInst_maybe, tyConFamInstIndex )
+			  tyConFamInst_maybe )
 import DataCon		( dataConName, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, dataConUnivTyVars,
 			  dataConExTyVars, dataConEqSpec, dataConTheta,
@@ -1036,8 +1036,7 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
 		ifGeneric = tyConHasGenerics tycon,
-		ifFamInst = famInstToIface (tyConFamInst_maybe tycon)
-					   (tyConFamInstIndex tycon) }
+		ifFamInst = famInstToIface (tyConFamInst_maybe tycon)}
 
   | isForeignTyCon tycon
   = IfaceForeign { ifName    = getOccName tycon,
@@ -1088,9 +1087,9 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 
     to_eq_spec spec = [(getOccName tv, toIfaceType ext ty) | (tv,ty) <- spec]
 
-    famInstToIface Nothing                    _     = Nothing
-    famInstToIface (Just (famTyCon, instTys)) index = 
-      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys, index)
+    famInstToIface Nothing                    = Nothing
+    famInstToIface (Just (famTyCon, instTys)) = 
+      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys)
 
 tyThingToIfaceDecl ext (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
