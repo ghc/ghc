@@ -412,6 +412,8 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
 # Yes, include the interepreter, readline, and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package template-haskell
+# -DBREAKPOINT causes a loop in stage2
+# SRC_HC_OPTS += -DGHCI -DBREAKPOINT -package template-haskell
 PKG_DEPENDS += template-haskell
 
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
