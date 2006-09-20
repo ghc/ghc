@@ -772,25 +772,16 @@ instFun orig fun subst []
   = return fun		-- Common short cut
 
 instFun orig fun subst tv_theta_prs
-  = do 	{ -- !!!SPJ: 	-- Horrid check for tagToEnum; see Note [tagToEnum#]
-	  -- !!!SPJ: checkBadTagToEnumCall fun_id qtv_tys
+  = do 	{ let ty_theta_prs' = map subst_pr tv_theta_prs
 
-	; let ty_theta_prs' = map subst_pr tv_theta_prs
-
-  		-- First, chuck in the constraints from 
-		-- the "stupid theta" of a data constructor (sigh)
-	; inst_stupid fun ty_theta_prs'
+                -- Make two ad-hoc checks 
+	; doStupidChecks orig fun ty_theta_prs'
 
 		-- Now do normal instantiation
 	; go True fun ty_theta_prs' }
   where
     subst_pr (tvs, theta) 
 	= (map (substTyVar subst) tvs, substTheta subst theta)
-
-    inst_stupid (HsVar fun_id) ((tys,_):_)
-	| Just con <- isDataConId_maybe fun_id 
-	= addDataConStupidTheta orig con tys
-    inst_stupid _ _ = return ()
 
     go _ fun [] = return fun
 
@@ -900,19 +891,32 @@ Here's are two cases that should fail
 
 
 \begin{code}
-checkBadTagToEnumCall :: Id -> [TcType] -> TcM ()
-checkBadTagToEnumCall fun_id tys
-  | fun_id `hasKey` tagToEnumKey
+doStupidChecks :: InstOrigin
+	       -> HsExpr TcId
+	       -> [([TcType], ThetaType)]
+	       -> TcM ()
+-- Check two tiresome and ad-hoc cases
+-- (a) the "stupid theta" for a data con; add the constraints
+--     from the "stupid theta" of a data constructor (sigh)
+-- (b) deal with the tagToEnum# problem: see Note [tagToEnum#]
+
+doStupidChecks orig (HsVar fun_id) ((tys,_):_)
+  | Just con <- isDataConId_maybe fun_id   -- (a)
+  = addDataConStupidTheta orig con tys
+
+  | fun_id `hasKey` tagToEnumKey           -- (b)
   = do	{ tys' <- zonkTcTypes tys
 	; checkTc (ok tys') (tagToEnumError tys')
 	}
-  | otherwise    -- Vastly common case
-  = return ()
   where
     ok [] 	= False
     ok (ty:tys) = case tcSplitTyConApp_maybe ty of
 			Just (tc,_) -> isEnumerationTyCon tc
 			Nothing     -> False
+
+doStupidChecks orig fun tv_theta_prs
+  = return () -- The common case
+				      
 
 tagToEnumError tys
   = hang (ptext SLIT("Bad call to tagToEnum#") <+> at_type)
