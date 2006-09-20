@@ -551,7 +551,7 @@ mkRecordSelId tycon field_label
 	--	foo = /\a. \t:T. case t of { MkT f -> f a }
 
     mk_alt data_con 
-      =   ASSERT2( res_ty `tcEqType` field_tau, ppr data_con $$ ppr res_ty $$ ppr field_tau )
+      =   ASSERT2( res_ty `tcEqType` field_ty, ppr data_con $$ ppr res_ty $$ ppr field_ty )
 	  mkReboxingAlt rebox_uniqs data_con (ex_tvs ++ co_tvs ++ arg_vs) rhs
       where
            -- get pattern binders with types appropriately instantiated
@@ -581,7 +581,7 @@ mkRecordSelId tycon field_label
     	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` field_vs) field_label
     	field_lbls  = dataConFieldLabels data_con
 
-    error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_tau full_msg
+    error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_ty full_msg
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id])
 
 -- unbox a product type...
