@@ -502,13 +502,16 @@ ty_decl :: { LTyClDecl RdrName }
                       } }
 
            -- type family declarations
-        | 'type' 'family' opt_iso type '::' kind
+        | 'type' 'family' type opt_kind_sig 
 		-- Note the use of type for the head; this allows
 		-- infix type constructors to be declared
 		--
- 		{% do { (tc, tvs, _) <- checkSynHdr $4 False
-		      ; return (L (comb3 $1 $4 $6) 
-				  (TyFunction tc tvs $3 (unLoc $6)))
+ 		{% do { (tc, tvs, _) <- checkSynHdr $3 False
+		      ; let kind = case unLoc $4 of
+				     Nothing -> liftedTypeKind
+				     Just ki -> ki
+		      ; return (L (comb3 $1 $3 $4) 
+				  (TyFunction tc tvs False kind))
 		      } }
 
            -- type instance declarations
@@ -540,17 +543,20 @@ ty_decl :: { LTyClDecl RdrName }
                       ; checkTyVars tparms    -- can have type pats
 		      ; return $
 			  L (comb4 $1 $2 $4 $5)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) $3
-			      (reverse (unLoc $5)) (unLoc $6)) } }
+			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
+			      (unLoc $3) (reverse (unLoc $5)) (unLoc $6)) } }
 
           -- data/newtype family
-        | data_or_newtype 'family' tycl_hdr '::' kind
+        | data_or_newtype 'family' tycl_hdr opt_kind_sig
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
                       ; checkTyVars tparms    -- no type pattern
+		      ; let kind = case unLoc $4 of
+				     Nothing -> liftedTypeKind
+				     Just ki -> ki
 		      ; return $
-			  L (comb3 $1 $2 $5)
+			  L (comb3 $1 $2 $4)
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
-			      (Just (unLoc $5)) [] Nothing) } }
+			      (Just kind) [] Nothing) } }
 
           -- data/newtype instance declaration
 	| data_or_newtype 'instance' tycl_hdr constrs deriving
@@ -572,31 +578,32 @@ ty_decl :: { LTyClDecl RdrName }
 		      ; return $
 			  L (comb4 $1 $3 $6 $7)
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
-			       $4 (reverse (unLoc $6)) (unLoc $7)) } }
+			       (unLoc $4) (reverse (unLoc $6)) (unLoc $7)) } }
 
 -- Associate type declarations
 --
 at_decl :: { LTyClDecl RdrName }
            -- type family declarations
-        : 'type' opt_iso type '::' kind
+        : 'type' type opt_kind_sig
 		-- Note the use of type for the head; this allows
 		-- infix type constructors to be declared
 		--
- 		{% do { (tc, tvs, _) <- checkSynHdr $3 False
-		      ; return (L (comb3 $1 $3 $5) 
-				  (TyFunction tc tvs $2 (unLoc $5)))
+ 		{% do { (tc, tvs, _) <- checkSynHdr $2 False
+		      ; let kind = case unLoc $3 of
+				     Nothing -> liftedTypeKind
+				     Just ki -> ki
+		      ; return (L (comb3 $1 $2 $3) 
+				  (TyFunction tc tvs False kind))
 		      } }
 
            -- type instance declarations
-        | 'type' opt_iso type '=' ctype
+        | 'type' type '=' ctype
 		-- Note the use of type for the head; this allows
 		-- infix type constructors and type patterns
 		--
- 		{% do { when $2 $ 
-			  parseError (comb2 $1 $>) "Misplaced iso keyword"
-		      ; (tc, tvs, typats) <- checkSynHdr $3 True
-		      ; return (L (comb2 $1 $5) 
-				  (TySynonym tc tvs (Just typats) $5)) 
+ 		{% do { (tc, tvs, typats) <- checkSynHdr $2 True
+		      ; return (L (comb2 $1 $4) 
+				  (TySynonym tc tvs (Just typats) $4)) 
                       } }
 
           -- data/newtype family
@@ -628,7 +635,7 @@ at_decl :: { LTyClDecl RdrName }
 		      ; return $
 			  L (comb4 $1 $2 $5 $6)
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
-			     $3 (reverse (unLoc $5)) (unLoc $6)) } }
+			     (unLoc $3) (reverse (unLoc $5)) (unLoc $6)) } }
 
 opt_iso :: { Bool }
 	:       { False }
@@ -638,9 +645,9 @@ data_or_newtype :: { Located NewOrData }
 	: 'data'	{ L1 DataType }
 	| 'newtype'	{ L1 NewType }
 
-opt_kind_sig :: { Maybe Kind }
-	: 				{ Nothing }
-	| '::' kind			{ Just (unLoc $2) }
+opt_kind_sig :: { Located (Maybe Kind) }
+	: 				{ noLoc Nothing }
+	| '::' kind			{ LL (Just (unLoc $2)) }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
