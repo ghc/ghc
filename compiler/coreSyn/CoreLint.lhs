@@ -37,7 +37,7 @@ import Type		( Type, tyVarsOfType, coreEqType,
 			  TvSubst, TvSubstEnv, mkTvSubst, setTvSubstEnv, substTy,
 			  extendTvSubst, composeTvSubst, substTyVarBndr, isInScope,
 			  getTvSubstEnv, getTvInScope, mkTyVarTy )
-import Coercion         ( Coercion, coercionKind, coercionKindTyConApp )
+import Coercion         ( Coercion, coercionKind, coercionKindPredTy )
 import TyCon		( isPrimTyCon, isNewTyCon )
 import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
 import StaticFlags	( opt_PprStyle_Debug )
@@ -431,7 +431,7 @@ checkKinds tyvar arg_ty
 	   (mkKindErrMsg tyvar arg_ty)
   where
     tyvar_kind = tyVarKind tyvar
-    arg_kind | isCoVar tyvar = coercionKindTyConApp arg_ty
+    arg_kind | isCoVar tyvar = coercionKindPredTy arg_ty
 	     | otherwise     = typeKind arg_ty
 \end{code}
 

@@ -71,7 +71,7 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			)
 import Coercion         ( Coercion, mkTransCoercion, coercionKind,
                           splitNewTypeRepCo_maybe, mkSymCoercion, mkLeftCoercion,
-                          mkRightCoercion, decomposeCo, coercionKindTyConApp,
+                          mkRightCoercion, decomposeCo, coercionKindPredTy,
                           splitCoercionKind )
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
@@ -215,7 +215,7 @@ mkCoerce co expr
 --    if to_ty `coreEqType` from_ty
 --    then expr
 --    else 
-        ASSERT2(from_ty `coreEqType` (exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ ppr (coercionKindTyConApp co))
+        ASSERT2(from_ty `coreEqType` (exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ ppr (coercionKindPredTy co))
          (Cast expr co)
 \end{code}
 

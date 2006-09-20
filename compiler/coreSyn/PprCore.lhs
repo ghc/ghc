@@ -40,7 +40,7 @@ import IdInfo		( cprInfo, ppCprInfo, strictnessInfo, ppStrictnessInfo )
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
 import Type		( pprParendType, pprType, pprParendKind )
-import Coercion         ( coercionKindTyConApp )
+import Coercion         ( coercionKindPredTy )
 import BasicTypes	( tupleParens, isNoOcc, isAlwaysActive )
 import Util             ( lengthIs )
 import Outputable
@@ -128,7 +128,7 @@ ppr_expr add_par (Cast expr co)
     sep [pprParendExpr expr, 
 	 ptext SLIT("`cast`") <+> parens (pprCo co)]
   where
-    pprCo co = sep [ppr co, dcolon <+> ppr (coercionKindTyConApp co)]
+    pprCo co = sep [ppr co, dcolon <+> ppr (coercionKindPredTy co)]
 	 
 
 ppr_expr add_par expr@(Lam _ _)
