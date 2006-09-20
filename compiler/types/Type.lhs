@@ -117,7 +117,8 @@ import PrelNames( openTypeKindTyConKey, unliftedTypeKindTyConKey,
                   ubxTupleKindTyConKey, argTypeKindTyConKey )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
+		  isFunTyCon, isNewTyCon, isOpenTyCon, newTyConRep,
+		  newTyConRhs, 
 		  isAlgTyCon, tyConArity, isSuperKindTyCon,
 		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique,
@@ -448,7 +449,7 @@ repType looks through
 	(b) synonyms
 	(c) predicates
 	(d) usage annotations
-	(e) all newtypes, including recursive ones
+	(e) all newtypes, including recursive ones, but not newtype families
 It's useful in the back end.
 
 \begin{code}
@@ -457,7 +458,8 @@ repType :: Type -> Type
 repType ty | Just ty' <- coreView ty = repType ty'
 repType (ForAllTy _ ty)  = repType ty
 repType (TyConApp tc tys)
-  | isNewTyCon tc 	 = -- Recursive newtypes are opaque to coreView
+  | isNewTyCon tc &&
+    not (isOpenTyCon tc) = -- Recursive newtypes are opaque to coreView
 			   -- but we must expand them here.  Sure to
 			   -- be saturated because repType is only applied
 			   -- to types of kind *

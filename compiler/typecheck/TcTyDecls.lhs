@@ -23,7 +23,8 @@ import Type		( predTypeRep, tcView )
 import HscTypes		( TyThing(..), ModDetails(..) )
 import TyCon            ( TyCon, tyConArity, tyConDataCons, tyConTyVars,
                           isSynTyCon, isAlgTyCon, 
-			  tyConName, isNewTyCon, isProductTyCon, newTyConRhs )
+			  tyConName, isNewTyCon, isProductTyCon, newTyConRhs,
+			  isOpenTyCon )
 import Class		( classTyCon )
 import DataCon          ( dataConOrigArgTys )
 import Var              ( TyVar )
@@ -238,7 +239,8 @@ calcRecFlags boot_details tyclss
 	-- rather less nice, so I'm not going to do that yet.
 
 	--------------- Newtypes ----------------------
-    new_tycons = filter isNewTyCon all_tycons
+    new_tycons = filter isNewTyConAndNotOpen all_tycons
+    isNewTyConAndNotOpen tycon = isNewTyCon tycon && not (isOpenTyCon tycon)
     nt_loop_breakers = mkNameSet (findLoopBreakers nt_edges)
     is_rec_nt tc = tyConName tc  `elemNameSet` nt_loop_breakers
 	-- is_rec_nt is a locally-used helper function

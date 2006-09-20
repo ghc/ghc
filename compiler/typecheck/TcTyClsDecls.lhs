@@ -51,7 +51,8 @@ import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon, OpenDataTyCon,
 			  tyConDataCons, mkForeignTyCon, isProductTyCon,
 			  isRecursiveTyCon, isOpenTyCon,
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
-                          isNewTyCon, tyConKind, setTyConArgPoss ) 
+                          isNewTyCon, isDataTyCon, tyConKind, 
+			  setTyConArgPoss )
 import DataCon		( DataCon, dataConUserType, dataConName, 
 			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
 			  dataConFieldType, dataConResTys )
@@ -61,12 +62,12 @@ import Name		( Name, getSrcLoc )
 import Outputable
 import Maybe		( isJust, fromJust, isNothing, catMaybes )
 import Maybes		( expectJust )
+import Monad		( unless )
 import Unify		( tcMatchTys, tcMatchTyX )
 import Util		( zipLazy, isSingleton, notNull, sortLe )
 import List		( partition, elemIndex )
 import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan )
 import ListSetOps	( equivClasses, minusList )
-import List		( delete )
 import Digraph		( SCC(..) )
 import DynFlags		( DynFlag( Opt_GlasgowExts, Opt_Generics, 
 					Opt_UnboxStrictFields ) )
@@ -270,8 +271,12 @@ tcIdxTyInstDecl1 :: TyClDecl Name
 		 -> TcM (Maybe InstInfo, Maybe TyThing)	-- Nothing if error
 
 tcIdxTyInstDecl1 (decl@TySynonym {})
-  = kcIdxTyPats decl $ \k_tvs k_typats resKind _ ->
-    do { -- (1) kind check the right hand side of the type equation
+  = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
+    do { -- check that the family declaration is for a synonym
+	 unless (isSynTyCon family) $
+	   addErr (wrongKindOfFamily family)
+
+       ; -- (1) kind check the right hand side of the type equation
        ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
 
          -- (2) type check type equation
@@ -287,7 +292,12 @@ tcIdxTyInstDecl1 (decl@TySynonym {})
 tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			       tcdCons = cons})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
-    do { -- (1) kind check the data declaration as usual
+    do { -- check that the family declaration is for the right kind
+	 unless (new_or_data == NewType  && isNewTyCon  family ||
+		 new_or_data == DataType && isDataTyCon family) $
+	   addErr (wrongKindOfFamily family)
+
+       ; -- (1) kind check the data declaration as usual
        ; k_decl <- kcDataDecl decl k_tvs
        ; let k_ctxt = tcdCtxt k_decl
 	     k_cons = tcdCons k_decl
@@ -1164,7 +1174,16 @@ tooFewParmsErr tc_name
   = ptext SLIT("Indexed type instance has too few parameters:") <+> 
     quotes (ppr tc_name)
 
-badBootTyIdxDeclErr = ptext SLIT("Illegal indexed type instance in hs-boot file")
+badBootTyIdxDeclErr = 
+  ptext SLIT("Illegal indexed type instance in hs-boot file")
+
+wrongKindOfFamily family =
+  ptext SLIT("Wrong category of type instance; declaration was for a") <+>
+  kindOfFamily
+  where
+    kindOfFamily | isSynTyCon  family = ptext SLIT("type synonym")
+		 | isDataTyCon family = ptext SLIT("data type")
+		 | isNewTyCon  family = ptext SLIT("newtype")
 
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),

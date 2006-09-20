@@ -550,13 +550,15 @@ isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})
 	OpenNewTyCon  -> False
 	NewTyCon {}   -> False
 	AbstractTyCon -> pprPanic "isDataTyCon" (ppr tc)
-
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
 isNewTyCon :: TyCon -> Bool
-isNewTyCon (AlgTyCon {algTcRhs = NewTyCon {}}) = True 
-isNewTyCon other			       = False
+isNewTyCon (AlgTyCon {algTcRhs = rhs}) = case rhs of
+					   OpenNewTyCon -> True
+					   NewTyCon {}  -> True
+					   _	        -> False
+isNewTyCon other			= False
 
 isProductTyCon :: TyCon -> Bool
 -- A "product" tycon
@@ -746,7 +748,10 @@ newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rep = rep }})
 newTyConRep tycon = pprPanic "newTyConRep" (ppr tycon)
 
 newTyConCo :: TyCon -> Maybe TyCon
-newTyConCo (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_co = co }}) = co
+newTyConCo (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_co = co }})
+  = co
+newTyConCo (AlgTyCon {tyConTyVars = tvs, algTcRhs = OpenNewTyCon})
+  = Nothing
 newTyConCo tycon = pprPanic "newTyConCo" (ppr tycon)
 
 tyConPrimRep :: TyCon -> PrimRep
