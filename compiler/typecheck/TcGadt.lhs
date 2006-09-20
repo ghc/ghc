@@ -19,22 +19,24 @@ module TcGadt (
 import HsSyn	( ExprCoFn(..), idCoercion, isIdCoercion )
 import Coercion	( Coercion, mkSymCoercion, mkTransCoercion, mkUnsafeCoercion,
 		  mkLeftCoercion, mkRightCoercion, mkCoKind, coercionKindPredTy,
-		  splitCoercionKind, decomposeCo )
+		  splitCoercionKind, decomposeCo, coercionKind )
 import TcType	( TvSubst(..), TvSubstEnv, substTy, mkTvSubst, 
 		  substTyVar, zipTopTvSubst, typeKind,
 		  eqKind, isSubKind, repSplitAppTy_maybe,
-		  tcView
+		  tcView, tcGetTyVar_maybe
 		)
 import Type	( Type, tyVarsOfType, tyVarsOfTypes, tcEqType, mkTyVarTy )
 import TypeRep	( Type(..), PredType(..) )
 import DataCon	( DataCon, dataConUnivTyVars, dataConEqSpec )
-import Var	( CoVar, TyVar, tyVarKind )
+import Var	( CoVar, TyVar, tyVarKind, varUnique )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
 import Maybes		( MaybeErr(..), isJust )
 import Control.Monad	( foldM )
 import Outputable
+import Unique		( Unique )
+import UniqFM		( ufmToList )
 
 #include "HsVersions.h"
 \end{code}
@@ -58,6 +60,7 @@ instance Outputable Refinement where
 
 emptyRefinement :: Refinement
 emptyRefinement = (Reft emptyInScopeSet emptyVarEnv)
+
 
 refineType :: Refinement -> Type -> (ExprCoFn, Type)
 -- Apply the refinement to the type.
@@ -140,7 +143,9 @@ gadtRefine (Reft in_scope env1)
 -- That is, the kinds of the co_vars are a
 -- fixed point of the  incoming refinement
 
-  = initUM (tryToBind tv_set) $
+  = ASSERT2( not $ any (`elemVarEnv` env1) (varSetElems $ tyVarsOfTypes $ map tyVarKind co_vars),
+	     ppr env1 $$ ppr co_vars $$ ppr (map tyVarKind co_vars) )
+    initUM (tryToBind tv_set) $
     do	{ 	-- Run the unifier, starting with an empty env
 	; env2 <- foldM do_one emptyInternalReft co_vars
 
@@ -148,7 +153,9 @@ gadtRefine (Reft in_scope env1)
 		-- non-idempotent substitution
 	; let tmp_env = env1 `plusVarEnv` env2
               out_env = fixTvCoEnv in_scope' tmp_env
-	; return (Reft in_scope' out_env) }
+	; WARN( not (null (badReftElts tmp_env)), ppr (badReftElts tmp_env) $$ ppr tmp_env )
+	  WARN( not (null (badReftElts out_env)), ppr (badReftElts out_env) $$ ppr out_env )
+	  return (Reft in_scope' out_env) }
   where
     tv_set = mkVarSet ex_tvs
     in_scope' = foldr extend in_scope co_vars
@@ -208,9 +215,7 @@ fixTvCoEnv in_scope env
       -- then use transitivity with the original coercion
       where
         (co_fn, ty') = refineType (Reft in_scope fixpt) ty
-        co1 | ExprCoFn co'' <- co_fn = mkTransCoercion co'' co
-                                         -- This trans looks backwards, but it
-                                         -- works somehow
+        co1 | ExprCoFn co'' <- co_fn = mkTransCoercion co co''
             | otherwise              = ASSERT( isIdCoercion co_fn ) co 
 
 -----------------------------
@@ -255,6 +260,19 @@ type InternalReft = TyVarEnv (Coercion, Type)
 
 -- INVARIANT:   a->(co,ty)   then   co :: (a:=:ty)
 -- Not necessarily idemopotent
+
+badReftElts :: InternalReft -> [(Unique, (Coercion,Type))]
+-- Return the BAD elements of the refinement
+-- Should be empty; used in asserions only
+badReftElts env
+  = filter (not . ok) (ufmToList env)
+  where
+    ok :: (Unique, (Coercion, Type)) -> Bool
+    ok (u, (co, ty)) | Just tv <- tcGetTyVar_maybe ty1
+		     = varUnique tv == u && ty `tcEqType` ty2 
+		     | otherwise = False
+	where
+	  (ty1,ty2) = coercionKind co
 
 emptyInternalReft :: InternalReft
 emptyInternalReft = emptyVarEnv
@@ -368,8 +386,8 @@ uUnrefined :: InternalReft        -- An existing substitution to extend
            -> UM InternalReft
 
 -- We know that tv1 isn't refined
--- PRE-CONDITION: in the call (uUnrefined r co tv ty ty'), we know that
---	co :: tv:=:ty
+-- PRE-CONDITION: in the call (uUnrefined r co tv1 ty2 ty2'), we know that
+--	co :: tv1:=:ty2
 
 uUnrefined subst co tv1 ty2 ty2'
   | Just ty2'' <- tcView ty2'
@@ -383,7 +401,7 @@ uUnrefined subst co tv1 ty2 (TyVarTy tv2)
   = return subst
 
     -- Check to see whether tv2 is refined
-  | Just (co',ty') <- lookupVarEnv subst tv2
+  | Just (co',ty') <- lookupVarEnv subst tv2	-- co' :: tv2:=:ty'
   = uUnrefined subst (mkTransCoercion co co') tv1 ty' ty'
 
   -- So both are unrefined; next, see if the kinds force the direction
