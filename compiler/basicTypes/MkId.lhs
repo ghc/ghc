@@ -316,7 +316,7 @@ mkDataConIds wrap_name wkr_name data_con
 			Case (Var arg) arg result_ty [(DEFAULT,[], body i (arg:rep_args))]
 
 		MarkedUnboxed
-		   -> case splitProductType "do_unbox" (idType arg) of
+		   ->case splitProductType "do_unbox" (idType arg) of
 			   (tycon, tycon_args, con, tys) ->
 				   Case (Var arg) arg result_ty  
 					[(DataAlt con, 

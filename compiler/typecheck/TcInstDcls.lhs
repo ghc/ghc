@@ -305,9 +305,13 @@ First comes the easy case of a non-local instance decl.
 tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 -- Returns a binding for the dfun
 
-		** Explain superclass stuff ***
-
+--
 -- Derived newtype instances
+--
+-- We need to make a copy of the dictionary we are deriving from
+-- because we may need to change some of the superclass dictionaries
+-- see Note [Newtype deriving superclasses] in TcDeriv.lhs
+--
 -- In the case of a newtype, things are rather easy
 -- 	class Show a => Foo a b where ...
 -- 	newtype T a = MkT (Tree [a]) deriving( Foo Int )
@@ -316,23 +320,35 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 --
 -- So all need is to generate a binding looking like
 -- 	dfunFooT :: forall a. (Show (T a), Foo Int (Tree [a]) => Foo Int (T a)
---	dfunFooT = /\a. \(ds:Show (T a) (df:Foo (Tree [a])).
+--	dfunFooT = /\a. \(ds:Show (T a)) (df:Foo (Tree [a])).
 --		  case df `cast` (Foo Int (CoT a)) of
 --		     Foo _ op1 .. opn -> Foo ds op1 .. opn
 
 tcInstDecl2 (InstInfo { iSpec = ispec, 
-			iBinds = NewTypeDerived rep_tys })
-  = do	{ let dfun_id = instanceDFunId ispec 
-	      rigid_info = InstSkol dfun_id
-	      origin	 = SigOrigin rigid_info
-	      inst_ty    = idType dfun_id
+			iBinds = NewTypeDerived tycon rep_tys })
+  = do	{ let dfun_id      = instanceDFunId ispec 
+	      rigid_info   = InstSkol dfun_id
+	      origin	   = SigOrigin rigid_info
+	      inst_ty      = idType dfun_id
+              maybe_co_con = newTyConCo tycon
 	; (tvs, theta, inst_head) <- tcSkolSigType rigid_info inst_ty
-	; ASSERT( isSingleton theta )	-- Always the case for NewTypeDerived
-	  rep_dict <- newDict origin (head theta)
-
-	; let rep_dict_id = instToId rep_dict
-	      cast = 
-	      co_fn = CoTyLams tvs <.> CoLams [rep_dict_id] <.> ExprCoFn cast
+	; rep_dict <- newDict origin (head theta)
+        ; if isSingleton theta then
+              return (unitBag (VarBind dfun_id $
+                case maybe_co_con of
+                  Nothing -> rep_dict
+                  Just co_con -> mkCoerce rep_dict $
+                                 mkAppCoercion (mkAppsCoercion tycon rep_tys) 
+                                               (mkTyConApp co_con tvs)))
+          else do
+	  let rep_dict_id  = instToId rep_dict
+              coerced_dict = case maybe_co_con of
+                               Nothing -> rep_dict_id
+                               Just co_con -> mkCoerce rep_dict_id $
+                                 mkAppCoercion (mkAppsCoercion tycon rep_tys) 
+                                               (mkTyConApp co_con tvs)
+        ; return (unitBag (VarBind dfun_id 
+          co_fn = CoTyLams tvs <.> CoLams [rep_dict_id] <.> ExprCoFn cast
 
 	; return (unitBag (VarBind dfun_id (HsCoerce co_fn (HsVar rep_dict_id))))
 

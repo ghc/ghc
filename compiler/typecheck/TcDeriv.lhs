@@ -314,6 +314,28 @@ or} has just one data constructor (e.g., tuples).
 [See Appendix~E in the Haskell~1.2 report.] This code here deals w/
 all those.
 
+Note [Newtype deriving superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The 'tys' here come from the partial application
+in the deriving clause. The last arg is the new
+instance type.
+
+We must pass the superclasses; the newtype might be an instance
+of them in a different way than the representation type
+E.g.		newtype Foo a = Foo a deriving( Show, Num, Eq )
+Then the Show instance is not done via isomorphism; it shows
+	Foo 3 as "Foo 3"
+The Num instance is derived via isomorphism, but the Show superclass
+dictionary must the Show instance for Foo, *not* the Show dictionary
+gotten from the Num dictionary. So we must build a whole new dictionary
+not just use the Num one.  The instance we want is something like:
+     instance (Num a, Show (Foo a), Eq (Foo a)) => Num (Foo a) where
+     	(+) = ((+)@a)
+     	...etc...
+There's no 'corece' needed because after the type checker newtypes
+are transparent.
+
 \begin{code}
 makeDerivEqns :: OverlapFlag
 	      -> [LTyClDecl Name] 
@@ -368,7 +390,7 @@ makeDerivEqns overlap_flag tycl_decls
 	   traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)	`thenM_`
        	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
 	   returnM (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
-					      iBinds = NewTypeDerived (newTyConCo tycon) rep_tys }))
+					      iBinds = NewTypeDerived tycon rep_tys }))
       | std_class gla_exts clas
       = mk_eqn_help gla_exts DataType tycon deriv_tvs clas tys	-- Go via bale-out route
 
@@ -430,26 +452,11 @@ makeDerivEqns overlap_flag tycl_decls
 	rep_pred = mkClassPred clas rep_tys
 		-- rep_pred is the representation dictionary, from where
 		-- we are gong to get all the methods for the newtype dictionary
+        -- here we are figuring out what superclass dictionaries to use
+        -- see Note [Newtype deriving superclasses] above
 
 	inst_tys = (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars_to_keep)])
-		-- The 'tys' here come from the partial application
-		-- in the deriving clause. The last arg is the new
-		-- instance type.
 
-		-- We must pass the superclasses; the newtype might be an instance
-		-- of them in a different way than the representation type
-		-- E.g.		newtype Foo a = Foo a deriving( Show, Num, Eq )
-		-- Then the Show instance is not done via isomorphism; it shows
-		-- 	Foo 3 as "Foo 3"
-		-- The Num instance is derived via isomorphism, but the Show superclass
-		-- dictionary must the Show instance for Foo, *not* the Show dictionary
-		-- gotten from the Num dictionary. So we must build a whole new dictionary
-		-- not just use the Num one.  The instance we want is something like:
-		--	instance (Num a, Show (Foo a), Eq (Foo a)) => Num (Foo a) where
-		--		(+) = ((+)@a)
-		--		...etc...
-		-- There's no 'corece' needed because after the type checker newtypes
-		-- are transparent.
 
 	sc_theta = substTheta (zipOpenTvSubst clas_tyvars inst_tys)
 			      (classSCTheta clas)

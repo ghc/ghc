@@ -566,7 +566,7 @@ data InstBindings
 				-- specialised instances
 
   | NewTypeDerived 		
-        (Maybe TyCon)           -- maybe a coercion for the newtype
+        TyCon                   -- tycon for the newtype
                                 -- Used for deriving instances of newtypes, where the
 	[Type]			-- witness dictionary is identical to the argument 
 				-- dictionary.  Hence no bindings, no pragmas
