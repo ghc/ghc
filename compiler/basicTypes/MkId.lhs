@@ -709,35 +709,23 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- body of the wrapper, namely
 --	e `cast` CoT [a]
 --
--- For non-recursive newtypes, GHC currently treats them like type
--- synonyms, so no cast is necessary.  This function is the only
--- place in the compiler that generates 
+-- If a coercion constructor is prodivided in the newtype, then we use
+-- it, otherwise the wrap/unwrap are both no-ops 
 --
 wrapNewTypeBody tycon args result_expr
---  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
-  = Cast result_expr co
---  | otherwise
---  = result_expr
-  where
-    co = mkTyConApp (newTyConCo tycon) args
+  | Just co_con <- newTyConCo tycon
+  = Cast result_expr (mkTyConApp co_con args)
+  | otherwise
+  = result_expr
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
---  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
-  = Cast result_expr sym_co
---  | otherwise
---  = result_expr
-  where
-    sym_co = mkSymCoercion co
-    co     = mkTyConApp (newTyConCo tycon) args
+  | Just co_con <- newTyConCo tycon
+  = Cast result_expr (mkSymCoercion (mkTyConApp co_con args))
+  | otherwise
+  = result_expr
 
--- Old Definition of mkNewTypeBody
--- Used for both wrapping and unwrapping
---mkNewTypeBody tycon result_ty result_expr
---  | isRecursiveTyCon tycon	-- Recursive case; use a coerce
---  = Note (Coerce result_ty (exprType result_expr)) result_expr
---  | otherwise			-- Normal case
---  = result_expr
+
 \end{code}
 
 

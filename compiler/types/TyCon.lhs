@@ -20,7 +20,7 @@ module TyCon(
 	isHiBootTyCon, isSuperKindTyCon,
         isCoercionTyCon_maybe, isCoercionTyCon,
 
-	tcExpandTyCon_maybe, coreExpandTyCon_maybe, stgExpandTyCon_maybe,
+	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 
 	makeTyConAbstract, isAbstractTyCon,
 
@@ -199,8 +199,9 @@ data AlgTyConRhs
 				--  = the representation type of the tycon
 				-- The free tyvars of this type are the tyConTyVars
       
-        nt_co :: TyCon,		-- The coercion used to create the newtype
+        nt_co :: Maybe TyCon,   -- The coercion used to create the newtype
                                 -- from the representation
+                                -- optional for non-recursive newtypes
 				-- See Note [Newtype coercions]
 
 	nt_etad_rhs :: ([TyVar], Type) ,
@@ -514,9 +515,10 @@ isProductTyCon :: TyCon -> Bool
 --	has *one* constructor, 
 --	is *not* existential
 -- but
---	may be  DataType or NewType, 
+--	may be  DataType, NewType
 -- 	may be  unboxed or not, 
 --	may be  recursive or not
+-- 
 isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
 				    DataTyCon{ data_cons = [data_con] } 
 						-> isVanillaDataCon data_con
@@ -606,24 +608,15 @@ tcExpandTyCon_maybe other_tycon tys = Nothing
 
 ---------------
 -- For the *Core* view, we expand synonyms only as well
-{-
+
 coreExpandTyCon_maybe (AlgTyCon {algTcRec = NonRecursive,	-- Not recursive
-         algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs }}) tys
+         algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs, nt_co = Nothing }}) tys
    = case etad_rhs of	-- Don't do this in the pattern match, lest we accidentally
 			-- match the etad_rhs of a *recursive* newtype
 	(tvs,rhs) -> expand tvs rhs tys
--}
+
 coreExpandTyCon_maybe tycon tys = tcExpandTyCon_maybe tycon tys
 
----------------
--- For the *STG* view, we expand synonyms *and* non-recursive newtypes
-stgExpandTyCon_maybe (AlgTyCon {algTcRec = NonRecursive,	-- Not recursive
-         algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs }}) tys
-   = case etad_rhs of	-- Don't do this in the pattern match, lest we accidentally
-			-- match the etad_rhs of a *recursive* newtype
-	(tvs,rhs) -> expand tvs rhs tys
-
-stgExpandTyCon_maybe tycon tys = coreExpandTyCon_maybe tycon tys
 
 ----------------
 expand	:: [TyVar] -> Type 			-- Template
@@ -682,7 +675,7 @@ newTyConRep :: TyCon -> ([TyVar], Type)
 newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rep = rep }}) = (tvs, rep)
 newTyConRep tycon = pprPanic "newTyConRep" (ppr tycon)
 
-newTyConCo :: TyCon -> TyCon
+newTyConCo :: TyCon -> Maybe TyCon
 newTyConCo (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_co = co }}) = co
 newTyConCo tycon = pprPanic "newTyConCo" (ppr tycon)
 

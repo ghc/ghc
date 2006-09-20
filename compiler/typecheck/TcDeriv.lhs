@@ -42,7 +42,8 @@ import NameSet		( duDefs )
 import Type		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConStupidTheta, isProductTyCon, isDataTyCon, newTyConRhs,
-			  isEnumerationTyCon, isRecursiveTyCon, TyCon
+			  isEnumerationTyCon, isRecursiveTyCon, TyCon, isNewTyCon,
+                          newTyConCo
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
 			  isUnLiftedType, mkClassPred, tyVarsOfType,
@@ -367,7 +368,7 @@ makeDerivEqns overlap_flag tycl_decls
 	   traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)	`thenM_`
        	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
 	   returnM (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
-					      iBinds = NewTypeDerived rep_tys }))
+					      iBinds = NewTypeDerived (newTyConCo tycon) rep_tys }))
       | std_class gla_exts clas
       = mk_eqn_help gla_exts DataType tycon deriv_tvs clas tys	-- Go via bale-out route
 

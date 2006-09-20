@@ -25,7 +25,7 @@ import BasicTypes	( IPName, RecFlag(..), InlineSpec(..), Fixity )
 import Outputable	
 import SrcLoc		( Located(..), SrcSpan, unLoc )
 import Util		( sortLe )
-import Var		( TyVar, DictId, Id )
+import Var		( TyVar, DictId, Id, Var )
 import Bag		( Bag, emptyBag, isEmptyBag, bagToList, unionBags, unionManyBags )
 \end{code}
 

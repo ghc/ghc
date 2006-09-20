@@ -179,7 +179,6 @@ make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
 make_kind k
   | isLiftedTypeKind k   = C.Klifted
   | isUnliftedTypeKind k = C.Kunlifted
---   | isUnboxedTypeKind k  = C.Kunboxed	Fix me
   | isOpenTypeKind k     = C.Kopen
 make_kind _ = error "MkExternalCore died: make_kind"
 

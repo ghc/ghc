@@ -640,8 +640,9 @@ implicitTyThings (AClass cl) = map AnId (classSelIds cl) ++
 implicitTyThings (ADataCon dc) = map AnId (dataConImplicitIds dc)
 
 	-- For newtypes, add the implicit coercion tycon
-implicitNewCoTyCon tc | isNewTyCon tc = [ATyCon (newTyConCo tc)]
-		      | otherwise     = []
+implicitNewCoTyCon tc 
+  | isNewTyCon tc, Just co_con <- newTyConCo tc = [ATyCon co_con]
+  | otherwise = []
 
 extras_plus thing = thing : implicitTyThings thing
 

@@ -47,7 +47,7 @@ module Type (
 	splitTyConApp_maybe, splitTyConApp, 
         splitNewTyConApp_maybe, splitNewTyConApp,
 
-	repType, typePrimRep, coreView, tcView, stgView, kindView,
+	repType, typePrimRep, coreView, tcView, kindView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
@@ -123,7 +123,6 @@ import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep, newTyConRhs,
 		  isAlgTyCon, tyConArity, isSuperKindTyCon,
 		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
-                  stgExpandTyCon_maybe,
 	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique,
                   isCoercionTyCon_maybe, isCoercionTyCon
 		)
@@ -177,19 +176,6 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc 
 				-- partially-applied type constructor; indeed, usually will!
 coreView ty		   = Nothing
 
-{-# INLINE stgView #-}
-stgView :: Type -> Maybe Type
--- When generating STG from Core it is important that we look through newtypes
--- but for the rest of Core we are just using coercions.  This does just what
--- coreView USED to do.
-stgView (NoteTy _ ty) 	   = Just ty
-stgView (PredTy p)    	   = Just (predTypeRep p)
-stgView (TyConApp tc tys) | Just (tenv, rhs, tys') <- stgExpandTyCon_maybe tc tys 
-			   = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
-				-- Its important to use mkAppTys, rather than (foldl AppTy),
-				-- because the function part might well return a 
-				-- partially-applied type constructor; indeed, usually will!
-stgView ty		   = Nothing
 
 
 -----------------------------------------------

@@ -1144,7 +1144,8 @@ mkDataConAlt :: DataCon -> [OutType] -> InExpr -> SimplM InAlt
 -- Make a data-constructor alternative to replace the DEFAULT case
 -- NB: there's something a bit bogus here, because we put OutTypes into an InAlt
 mkDataConAlt con inst_tys rhs
-  = do 	{ tv_uniqs <- getUniquesSmpl 
+  = ASSERT(not (isNewTyCon (dataConTyCon con)))
+    do 	{ tv_uniqs <- getUniquesSmpl 
 	; arg_uniqs <- getUniquesSmpl
 	; let tv_bndrs  = zipWith mk_tv_bndr (dataConExTyVars con) tv_uniqs
 	      arg_tys   = dataConInstArgTys con (inst_tys ++ mkTyVarTys tv_bndrs)
@@ -1491,7 +1492,7 @@ mkCase1 scrut case_bndr ty alts	-- Identity case
       | isNewTyCon (dataConTyCon con) 
       = wrapNewTypeBody (dataConTyCon con) arg_tys (varToCoreExpr $ head args)
       | otherwise
-      = pprTrace "mkCase1" (ppr con) $ mkConApp con (arg_ty_exprs ++ varsToCoreExprs args)
+      = mkConApp con (arg_ty_exprs ++ varsToCoreExprs args)
     identity_rhs (LitAlt lit)  _    = Lit lit
     identity_rhs DEFAULT       _    = Var case_bndr
 

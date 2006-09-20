@@ -50,7 +50,7 @@ import OccName		( mkOccNameFS, tcName, mkTyVarOcc )
 import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
-			  unliftedTypeKind, unboxedTypeKind, 
+			  unliftedTypeKind, 
 			  liftedTypeKind, openTypeKind, 
 			  Kind, mkArrowKinds,
 			  TyThing(..)
@@ -187,17 +187,13 @@ pcPrimTyCon name arity rep
   = mkPrimTyCon name kind arity rep
   where
     kind        = mkArrowKinds (replicate arity liftedTypeKind) result_kind
-    result_kind = case rep of 
-		    PtrRep -> unliftedTypeKind
-		    _other -> unboxedTypeKind
+    result_kind = unliftedTypeKind
 
 pcPrimTyCon0 :: Name -> PrimRep -> TyCon
 pcPrimTyCon0 name rep
   = mkPrimTyCon name result_kind 0 rep
   where
-    result_kind = case rep of 
-		    PtrRep -> unliftedTypeKind
-		    _other -> unboxedTypeKind
+    result_kind = unliftedTypeKind
 
 charPrimTy	= mkTyConTy charPrimTyCon
 charPrimTyCon	= pcPrimTyCon0 charPrimTyConName WordRep

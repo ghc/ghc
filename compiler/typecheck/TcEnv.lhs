@@ -565,7 +565,9 @@ data InstBindings
 	[LSig Name]		-- User pragmas recorded for generating 
 				-- specialised instances
 
-  | NewTypeDerived 		-- Used for deriving instances of newtypes, where the
+  | NewTypeDerived 		
+        (Maybe TyCon)           -- maybe a coercion for the newtype
+                                -- Used for deriving instances of newtypes, where the
 	[Type]			-- witness dictionary is identical to the argument 
 				-- dictionary.  Hence no bindings, no pragmas
 	-- The [Type] are the representation types
@@ -576,7 +578,7 @@ pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
     details (VanillaInst b _)  = pprLHsBinds b
-    details (NewTypeDerived _) = text "Derived from the representation type"
+    details (NewTypeDerived _  _) = text "Derived from the representation type"
 
 simpleInstInfoClsTy :: InstInfo -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of

@@ -611,7 +611,6 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 	-- means that we can avoid tests in exprIsConApp, for example.
 	-- This is important: if exprIsConApp says 'yes' for a recursive
 	-- thing, then we can get into an infinite loop
-
 	-- If the unfolding is a value, the demand info may
 	-- go pear-shaped, so we nuke it.  Example:
 	--	let x = (a,b) in
@@ -1520,6 +1519,7 @@ simplDefault :: SimplEnv
 
 simplDefault env case_bndr' imposs_cons cont Nothing
   = return []	-- No default branch
+
 simplDefault env case_bndr' imposs_cons cont (Just rhs)
   | 	-- This branch handles the case where we are 
 	-- scrutinisng an algebraic data type
@@ -1560,7 +1560,7 @@ simplDefault env case_bndr' imposs_cons cont (Just rhs)
 
 	two_or_more -> simplify_default (map DataAlt gadt_imposs ++ imposs_cons)
 
-  | otherwise
+  | otherwise 
   = simplify_default imposs_cons
   where
     cant_match tys data_con = not (dataConCanMatch data_con tys)

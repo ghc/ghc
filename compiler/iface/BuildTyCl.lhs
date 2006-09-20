@@ -84,7 +84,9 @@ mkNewTyConRhs tycon_name tycon con
   = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
 	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon tvs rhs_ty 
 	; return (NewTyCon { data_con = con, 
- 		       	     nt_co = co_tycon,
+ 		       	     nt_co = Just co_tycon, 
+                             -- Coreview looks through newtypes with a Nothing
+                             -- for nt_co, or uses explicit coercions otherwise
 		       	     nt_rhs = rhs_ty,
 		       	     nt_etad_rhs = eta_reduce tvs rhs_ty,
 		       	     nt_rep = mkNewTyConRep tycon rhs_ty }) }
@@ -116,9 +118,8 @@ mkNewTyConRep :: TyCon		-- The original type constructor
 -- Remember that the representation type is the *ultimate* representation
 -- type, looking through other newtypes.
 -- 
--- The non-recursive newtypes are easy, because they look transparent
--- to splitTyConApp_maybe, but recursive ones really are represented as
--- TyConApps (see TypeRep).
+-- splitTyConApp_maybe no longer looks through newtypes, so we must
+-- deal explicitly with this case
 -- 
 -- The trick is to to deal correctly with recursive newtypes
 -- such as	newtype T = MkT T
@@ -133,10 +134,11 @@ mkNewTyConRep tc rhs_ty
 	= case splitTyConApp_maybe rep_ty of
 	    Just (tc, tys)
 		| tc `elem` tcs -> unitTy	-- Recursive loop
-		| isNewTyCon tc -> ASSERT( isRecursiveTyCon tc )
-					-- Non-recursive ones have been 
-					-- dealt with by splitTyConApp_maybe
-				   go (tc:tcs) (substTyWith tvs tys rhs_ty)
+		| isNewTyCon tc -> 
+                    if isRecursiveTyCon tc then
+			go (tc:tcs) (substTyWith tvs tys rhs_ty)
+                    else
+                        go tcs (head tys)
 		where
 		  (tvs, rhs_ty) = newTyConRhs tc
 

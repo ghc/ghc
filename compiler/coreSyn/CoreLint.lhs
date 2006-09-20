@@ -38,7 +38,7 @@ import Type		( Type, tyVarsOfType, coreEqType,
 			  extendTvSubst, composeTvSubst, substTyVarBndr, isInScope,
 			  getTvSubstEnv, getTvInScope, mkTyVarTy )
 import Coercion         ( Coercion, coercionKind, coercionKindTyConApp )
-import TyCon		( isPrimTyCon )
+import TyCon		( isPrimTyCon, isNewTyCon )
 import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
 import StaticFlags	( opt_PprStyle_Debug )
 import DynFlags		( DynFlags, DynFlag(..), dopt )
@@ -497,6 +497,7 @@ lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) =
     lit_ty = literalType lit
 
 lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
+  | isNewTyCon (dataConTyCon con) = addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
   = addLoc (CaseAlt alt) $  lintBinders args $ \ args -> 
     
@@ -800,6 +801,13 @@ mkBadAltMsg scrut_ty alt
   = vcat [ text "Data alternative when scrutinee is not a tycon application",
 	   text "Scrutinee type:" <+> ppr scrut_ty,
 	   text "Alternative:" <+> pprCoreAlt alt ]
+
+mkNewTyDataConAltMsg :: Type -> CoreAlt -> Message
+mkNewTyDataConAltMsg scrut_ty alt
+  = vcat [ text "Data alternative for newtype datacon",
+	   text "Scrutinee type:" <+> ppr scrut_ty,
+	   text "Alternative:" <+> pprCoreAlt alt ]
+
 
 ------------------------------------------------------
 --	Other error messages

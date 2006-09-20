@@ -50,11 +50,13 @@ import StaticFlags	( opt_RuntimeTypes )
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
+import TyCon            ( isNewTyCon )
 import Coercion         ( Coercion )
 import Name		( Name )
 import OccName		( OccName )
 import Literal	        ( Literal, mkMachInt )
-import DataCon		( DataCon, dataConWorkId, dataConTag )
+import DataCon		( DataCon, dataConWorkId, dataConTag, dataConTyCon,
+                          dataConWrapId )
 import BasicTypes	( Activation )
 import FastString
 import Outputable
@@ -440,7 +442,9 @@ mkLets	      :: [Bind b] -> Expr b -> Expr b
 mkLams	      :: [b] -> Expr b -> Expr b
 
 mkLit lit	  = Lit lit
-mkConApp con args = pprTrace "mkConApp" (ppr con) $ mkApps (Var (dataConWorkId con)) args
+mkConApp con args 
+  | isNewTyCon (dataConTyCon con) = mkApps (Var (dataConWrapId con)) args
+  | otherwise = mkApps (Var (dataConWorkId con)) args
 
 mkLams binders body = foldr Lam body binders
 mkLets binds body   = foldr Let body binds

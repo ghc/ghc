@@ -43,7 +43,8 @@ import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
-			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName )
+			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
+                          isNewTyCon )
 import DataCon		( DataCon, dataConUserType, dataConName, 
 			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
 			  dataConFieldType, dataConResTys )
@@ -598,7 +599,9 @@ argStrictness unbox_strict tycon bangs arg_tys
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The field is marked '!!', or
 --   (ii) The field is marked '!', and the -funbox-strict-fields flag is on.
-
+--
+-- We have turned off unboxing of newtypes because coercions make unboxing 
+-- and reboxing more complicated
 chooseBoxingStrategy :: Bool -> TyCon -> TcType -> HsBang -> StrictnessMark
 chooseBoxingStrategy unbox_strict_fields tycon arg_ty bang
   = case bang of
@@ -609,7 +612,7 @@ chooseBoxingStrategy unbox_strict_fields tycon arg_ty bang
   where
     can_unbox = case splitTyConApp_maybe arg_ty of
 		   Nothing 	       -> False
-		   Just (arg_tycon, _) -> not (isRecursiveTyCon tycon) &&
+		   Just (arg_tycon, _) -> not (isNewTyCon arg_tycon) && not (isRecursiveTyCon tycon) &&
 					  isProductTyCon arg_tycon
 \end{code}
 

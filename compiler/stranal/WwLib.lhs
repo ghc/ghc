@@ -240,7 +240,6 @@ mkWWargs fun_ty demands one_shots
 	      \ e -> Cast (wrap_fn_args e) co,
 	      \ e -> work_fn_args (Cast e (mkSymCoercion co)),
 	      res_ty)
-
   | notNull demands
   = getUniquesUs 		`thenUs` \ wrap_uniqs ->
     let

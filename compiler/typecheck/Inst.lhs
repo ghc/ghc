@@ -71,6 +71,7 @@ import Type	( TvSubst, substTy, substTyVar, substTyWith, substTheta, zipTopTvSub
 import Unify	( tcMatchTys )
 import Module	( modulePackageId )
 import {- Kind parts of -} Type	( isSubKind )
+import Coercion ( isEqPred )
 import HscTypes	( ExternalPackageState(..), HscEnv(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConStupidTheta, dataConName, 
@@ -80,7 +81,7 @@ import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 		  isInternalName, setNameUnique )
 import NameSet	( addOneToNameSet )
 import Literal	( inIntRange )
-import Var	( TyVar, tyVarKind, setIdType )
+import Var	( Var, TyVar, tyVarKind, setIdType, mkTyVar )
 import VarEnv	( TidyEnv, emptyTidyEnv )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
