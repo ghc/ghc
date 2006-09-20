@@ -323,6 +323,7 @@ data ExprCoFn
 instance Outputable ExprCoFn where 
   ppr co_fn = pprCoFn (ptext SLIT("<>")) co_fn
 
+pprCoFn :: SDoc -> ExprCoFn -> SDoc
 pprCoFn it CoHole = it
 pprCoFn it (CoCompose f1 f2) = pprCoFn (pprCoFn it f2) f1
 pprCoFn it (ExprCoFn co)     = it <+> ptext SLIT("`cast`") <+> pprParendType co

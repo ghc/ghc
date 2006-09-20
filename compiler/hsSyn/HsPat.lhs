@@ -22,7 +22,8 @@ module HsPat (
 import {-# SOURCE #-} HsExpr		( SyntaxExpr )
 
 -- friends:
-import HsBinds		( DictBinds, HsBind(..), ExprCoFn, isIdCoercion, emptyLHsBinds, pprLHsBinds )
+import HsBinds		( DictBinds, HsBind(..), ExprCoFn, isIdCoercion, pprCoFn,
+			  emptyLHsBinds, pprLHsBinds )
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
 import BasicTypes	( Boxity, tupleParens )
@@ -192,7 +193,7 @@ pprPat (NPat l Nothing  _ _)  = ppr l
 pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
 pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
-pprPat (CoPat co pat _)	      = parens (ppr co) <+> ptext SLIT("`cast`") <+> ppr pat
+pprPat (CoPat co pat _)	      = parens (pprCoFn (ppr pat) co)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
 pprPat (DictPat ds ms)	      = parens (sep [ptext SLIT("{-dict-}"),
