@@ -26,12 +26,13 @@ import TcEnv		( InstInfo(..), InstBindings(..),
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifySuperClasses )
-import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy )
-import Coercion         ( mkAppCoercion, mkAppsCoercion, mkSymCoercion )
-import TyCon            ( TyCon, newTyConCo )
+import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
+                          splitFunTys )
+import Coercion         ( mkSymCoercion )
+import TyCon            ( TyCon, newTyConCo, tyConTyVars )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
 import Class		( classBigSig )
-import Var		( TyVar, Id, idName, idType )
+import Var		( TyVar, Id, idName, idType, tyVarKind )
 import Id               ( mkSysLocal )
 import UniqSupply       ( uniqsFromSupply, splitUniqSupply )
 import MkId		( mkDictFunId )
@@ -348,8 +349,13 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
 		-- arguments built by NewTypeDerived in TcDeriv.)
 
               wrap_fn = mkCoTyLams tvs <.> mkCoLams (rep_dict_id:sc_dict_ids)
-	 
-              coerced_rep_dict = mkHsCoerce (co_fn tvs cls_tycon) (HsVar rep_dict_id)
+	   
+                -- we need to find the kind that this class applies to
+                -- and drop trailing tvs appropriately
+              cls_kind = tyVarKind (head (reverse (tyConTyVars cls_tycon)))
+              the_tvs  = drop_tail (length (fst (splitFunTys cls_kind))) tvs
+
+              coerced_rep_dict = mkHsCoerce (co_fn the_tvs cls_tycon cls_inst_tys) (HsVar rep_dict_id)
 
 	      body | null sc_dict_ids = coerced_rep_dict
 		   | otherwise = HsCase (noLoc coerced_rep_dict) $
@@ -383,14 +389,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
               dict    = mkHsCoerce wrap_fn body
         ; return (unitBag (noLoc $ VarBind dfun_id (noLoc dict))) }
   where
-    co_fn :: [TyVar] -> TyCon -> ExprCoFn
-    co_fn tvs cls_tycon | Just co_con <- newTyConCo tycon
-	  = ExprCoFn (mkAppCoercion -- (mkAppsCoercion 
-                                     (mkTyConApp cls_tycon []) 
-                                     -- rep_tys)
-                       		    (mkSymCoercion (mkTyConApp co_con (map mkTyVarTy tvs))))
-	  | otherwise
-	  = idCoercion
+  	-- For newtype T a = MkT <ty>
+	-- The returned coercion has kind :: C (T a):=:C <ty>
+    co_fn tvs cls_tycon cls_inst_tys | Just co_con <- newTyConCo tycon
+          = ExprCoFn (mkTyConApp cls_tycon (drop_tail 1 cls_inst_tys ++
+                      [mkSymCoercion (mkTyConApp co_con (map mkTyVarTy tvs))]))
+          | otherwise
+          = idCoercion
+    drop_tail n l = take (length l - n) l
 
 ------------------------
 -- Ordinary instances
