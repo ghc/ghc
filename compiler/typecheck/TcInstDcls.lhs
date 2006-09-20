@@ -15,7 +15,7 @@ import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr,
 import TcRnMonad       
 import TcMType		( tcSkolSigType, checkValidInstance, checkValidInstHead )
 import TcType		( mkClassPred, tcSplitSigmaTy, tcSplitDFunHead, mkTyVarTys,
-			  SkolemInfo(InstSkol), tcSplitDFunTy )
+                          SkolemInfo(InstSkol), tcSplitDFunTy )
 import Inst		( tcInstClassOp, newDicts, instToId, showLIE, 
 			  getOverlapFlag, tcExtendLocalInstEnv )
 import InstEnv		( mkLocalInstance, instanceDFunId )
@@ -26,14 +26,18 @@ import TcEnv		( InstInfo(..), InstBindings(..),
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck, tcSimplifySuperClasses )
-import Type		( zipOpenTvSubst, substTheta, substTys )
-import DataCon		( classDataCon )
+import Type		( zipOpenTvSubst, substTheta, substTys, mkTyConApp, mkTyVarTy )
+import Coercion         ( mkAppCoercion, mkAppsCoercion )
+import TyCon            ( TyCon, newTyConCo )
+import DataCon		( classDataCon, dataConTyCon )
 import Class		( classBigSig )
-import Var		( Id, idName, idType )
+import Var		( TyVar, Id, idName, idType )
+import Id               ( mkSysLocal )
+import UniqSupply       ( uniqsFromSupply )
 import MkId		( mkDictFunId )
 import Name		( Name, getSrcLoc )
 import Maybe		( catMaybes )
-import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
+import SrcLoc		( noSrcSpan, srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
 import Outputable
 import Bag
@@ -335,69 +339,38 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
 	; dicts <- newDicts origin theta
 	; uniqs <- newUniqueSupply
 	; let (rep_dict_id:sc_dict_ids) = map instToId dicts
-		-- (Here, wee are relying on the order of dictionary 
+		-- (Here, we are relying on the order of dictionary 
 		-- arguments built by NewTypeDerived in TcDeriv.)
 
-              wrap_fn = CoTyLams tvs <.> CoLams dict_ids
+              wrap_fn = CoTyLams tvs <.> CoLams sc_dict_ids
 	 
-	      coerced_rep_dict = mkHsCoerce co_fn (HsVar rep_dict_id)
-
-	      body | null sc_dicts = coerced_rep_dict
-		   | otherwise = HsCase coerced_rep_dict $
+	      coerced_rep_dict = mkHsCoerce (co_fn tvs cls_tycon) (HsVar rep_dict_id)
+              mk_located a = L noSrcSpan a
+	      body | null sc_dict_ids = coerced_rep_dict
+		   | otherwise = HsCase (mk_located coerced_rep_dict) $
 				 MatchGroup [the_match] inst_head
 	      the_match = mkSimpleMatch [the_pat] the_rhs
 	      op_ids = zipWith (mkSysLocal FSLIT("op"))
-			       (uniqsFromSupply uniqs) op_tys
-	      the_pat = ConPatOut { pat_con = cls_data_con, pat_tvs = [],
-				    pat_dicts = map (WildPat . idType) sc_dict_ids,
-				    pat_binds = emptyDictBinds,
-				    pat_args = PrefixCon (map VarPat op_ids), 
-				    pat_ty = <type of pattern> }
-	      the_rhs = mkHsApps (dataConWrapId cls_data_con) types sc_dict_ids (map HsVar op_ids)
+                        	      (uniqsFromSupply uniqs) op_tys
+	      the_pat = mk_located $ ConPatOut { pat_con = mk_located cls_data_con, pat_tvs = [],
+				    pat_dicts = sc_dict_ids,
+				    pat_binds = emptyLHsBinds,
+				    pat_args = PrefixCon (map nlVarPat op_ids),
+				    pat_ty = inst_head }
+              (cls, op_tys) = tcSplitDFunHead inst_head
+              cls_data_con = classDataCon cls
+              cls_tycon = dataConTyCon cls_data_con
+              
+	      the_rhs = mkHsConApp (cls_data_con) (mkTyVarTys tvs) (map HsVar (sc_dict_ids ++ op_ids))
 
-        ; return (unitBag (VarBind dfun_id (mkHsCoerce wrap_fn body))) }
+        ; return (unitBag (mk_located $ VarBind (dfun_id) (mk_located (mkHsCoerce wrap_fn body)))) }
   where
-    co_fn :: ExprCoFn
-    co_fn | Just co_con <- newTyConCo tycon
-	  = ExprCoFn (mkAppCoercion (mkAppsCoercion tycon rep_tys) 
-                       		    (mkTyConApp co_con tvs))
+    co_fn :: [TyVar] -> TyCon -> ExprCoFn
+    co_fn tvs cls_tycon | Just co_con <- newTyConCo tycon
+	  = ExprCoFn (mkAppCoercion (mkAppsCoercion (mkTyConApp cls_tycon []) rep_tys) 
+                       		    (mkTyConApp co_con (map mkTyVarTy tvs)))
 	  | otherwise
-	  = idCoerecion
-
-tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
-	  avail_insts op_items (NewTypeDerived rep_tys)
-  = getInstLoc origin				`thenM` \ inst_loc ->
-    mapAndUnzip3M (do_one inst_loc) op_items	`thenM` \ (meth_ids, meth_binds, rhs_insts) ->
-    
-    tcSimplifyCheck
-	 (ptext SLIT("newtype derived instance"))
-	 inst_tyvars' avail_insts rhs_insts	`thenM` \ lie_binds ->
-
-	-- I don't think we have to do the checkSigTyVars thing
-
-    returnM (meth_ids, lie_binds `unionBags` listToBag meth_binds)
-
-  where
-    do_one inst_loc (sel_id, _)
-	= -- The binding is like "op @ NewTy = op @ RepTy"
-		-- Make the *binder*, like in mkMethodBind
-	  tcInstClassOp inst_loc sel_id inst_tys'	`thenM` \ meth_inst ->
-
-		-- Make the *occurrence on the rhs*
-	  tcInstClassOp inst_loc sel_id rep_tys'	`thenM` \ rhs_inst ->
-	  let
-	     meth_id = instToId meth_inst
-	  in
-	  return (meth_id, noLoc (VarBind meth_id (nlHsVar (instToId rhs_inst))), rhs_inst)
-
-	-- Instantiate rep_tys with the relevant type variables
-	-- This looks a bit odd, because inst_tyvars' are the skolemised version
-	-- of the type variables in the instance declaration; but rep_tys doesn't
-	-- have the skolemised version, so we substitute them in here
-    rep_tys' = substTys subst rep_tys
-    subst    = zipOpenTvSubst inst_tyvars' (mkTyVarTys inst_tyvars')
-
-
+	  = idCoercion
 
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
   = let 
@@ -451,7 +424,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
     checkSigTyVars inst_tyvars' 	`thenM_`
 
 	-- Deal with 'SPECIALISE instance' pragmas 
-    tcPrags dfun_id (filter isSpecInstLSig prags)	`thenM` \ prags -> 
+    tcPrags dfun_id (filter isSpecInstLSig uprags)	`thenM` \ prags -> 
     
 	-- Create the result bindings
     let
