@@ -487,7 +487,7 @@ mkInstTyTcOcc :: Int			-- Index
 	      -> OccName		-- Family name (e.g. "Map")
 	      -> OccName		-- Nice unique version (":R23Map")
 mkInstTyTcOcc index occ
-   = mk_deriv varName (":R" ++ show index) (occNameString occ)
+   = mk_deriv tcName (":R" ++ show index) (occNameString occ)
 \end{code}
 
 \begin{code}
