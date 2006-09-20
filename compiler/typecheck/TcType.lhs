@@ -170,7 +170,6 @@ import Type		(	-- Re-exports
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
 import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, synTyConDefn, tyConUnique )
-import Coercion         ( splitForAllCo_maybe )
 import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
 import Class		( Class )
 import Var		( TyVar, Id, isCoVar, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
@@ -645,20 +644,23 @@ tcSplitForAllTys ty = split ty ty []
      split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
      split orig_ty (ForAllTy tv ty) tvs 
        | not (isCoVar tv) = split ty ty (tv:tvs)
-     split orig_ty t		    tvs = (reverse tvs, orig_ty)
+     split orig_ty t tvs = (reverse tvs, orig_ty)
 
 tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
-tcIsForAllTy (ForAllTy tv ty) = True
+tcIsForAllTy (ForAllTy tv ty) = not (isCoVar tv)
 tcIsForAllTy t		      = False
 
 tcSplitPhiTy :: Type -> (ThetaType, Type)
 tcSplitPhiTy ty = split ty ty []
  where
   split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
+
+  split orig_ty (ForAllTy tv ty) ts
+        | isCoVar tv = split ty ty (eq_pred:ts)
+        where
+           PredTy eq_pred = tyVarKind tv
   split orig_ty (FunTy arg res) ts 
 	| Just p <- tcSplitPredTy_maybe arg = split res res (p:ts)
-  split orig_ty ty ts
-        | Just (p, ty') <- splitForAllCo_maybe ty = split ty' ty' (p:ts) 
   split orig_ty ty		ts = (reverse ts, orig_ty)
 
 tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
@@ -985,8 +987,13 @@ tcTyVarsOfType (NoteTy _ ty)	    = tcTyVarsOfType ty
 tcTyVarsOfType (PredTy sty)	    = tcTyVarsOfPred sty
 tcTyVarsOfType (FunTy arg res)	    = tcTyVarsOfType arg `unionVarSet` tcTyVarsOfType res
 tcTyVarsOfType (AppTy fun arg)	    = tcTyVarsOfType fun `unionVarSet` tcTyVarsOfType arg
-tcTyVarsOfType (ForAllTy tyvar ty)  = tcTyVarsOfType ty `delVarSet` tyvar
+tcTyVarsOfType (ForAllTy tyvar ty)  = (tcTyVarsOfType ty `delVarSet` tyvar)
+                                      `unionVarSet` tcTyVarsOfTyVar tyvar
 	-- We do sometimes quantify over skolem TcTyVars
+
+tcTyVarsOfTyVar :: TcTyVar -> TyVarSet
+tcTyVarsOfTyVar tv | isCoVar tv = tcTyVarsOfType (tyVarKind tv)
+                   | otherwise  = emptyVarSet
 
 tcTyVarsOfTypes :: [Type] -> TyVarSet
 tcTyVarsOfTypes tys = foldr (unionVarSet.tcTyVarsOfType) emptyVarSet tys
@@ -1030,10 +1037,14 @@ exactTyVarsOfType ty
     go (FunTy arg res)	    	  = go arg `unionVarSet` go res
     go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
     go (ForAllTy tyvar ty)  	  = delVarSet (go ty) tyvar
+                                    `unionVarSet` go_tv tyvar
 
     go_pred (IParam _ ty)    = go ty
     go_pred (ClassP _ tys)   = exactTyVarsOfTypes tys
     go_pred (EqPred ty1 ty2) = go ty1 `unionVarSet` go ty2
+
+    go_tv tyvar | isCoVar tyvar = go (tyVarKind tyvar)
+                | otherwise     = emptyVarSet
 
 exactTyVarsOfTypes :: [TcType] -> TyVarSet
 exactTyVarsOfTypes tys = foldr (unionVarSet . exactTyVarsOfType) emptyVarSet tys

@@ -175,6 +175,7 @@ make_ty (NoteTy _ t) 	= make_ty t
 
 
 make_kind :: Kind -> C.Kind
+make_kind (PredTy p) | isEqPred p = panic "coercion kinds in external core not implemented!"
 make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
 make_kind k
   | isLiftedTypeKind k   = C.Klifted

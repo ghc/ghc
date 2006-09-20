@@ -10,7 +10,7 @@ module Var (
 	setVarName, setVarUnique, 
 
 	-- TyVars
-	TyVar, mkTyVar, mkTcTyVar, mkWildTyVar,
+	TyVar, mkTyVar, mkTcTyVar, mkWildCoVar,
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique, setTyVarKind,
 	tcTyVarDetails,
@@ -68,7 +68,9 @@ data Var
 	realUnique :: FastInt,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
-	tyVarKind :: Kind }
+	tyVarKind :: Kind,
+        isCoercionVar :: Bool
+ }
 
   | TcTyVar { 				-- Used only during type inference
 					-- Used for kind variables during 
@@ -189,6 +191,7 @@ mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
 			  , realUnique = getKey# (nameUnique name)
 			  , tyVarKind  = kind
+                          , isCoercionVar    = False
 			}
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
@@ -199,11 +202,12 @@ mkTcTyVar name kind details
 		tcTyVarDetails = details
 	}
 
-mkWildTyVar :: Kind -> TyVar
-mkWildTyVar kind 
+mkWildCoVar :: Kind -> TyVar
+mkWildCoVar kind 
   = TyVar { varName = mkSysTvName wild_uniq FSLIT("co_wild"),
             realUnique = _ILIT(1),
-            tyVarKind = kind }
+            tyVarKind = kind,
+            isCoercionVar = True }
   where
     wild_uniq = (mkBuiltinUnique 1)
 \end{code}
@@ -223,10 +227,12 @@ setCoVarUnique = setVarUnique
 setCoVarName   = setVarName
 
 mkCoVar :: Name -> Kind -> CoVar
-mkCoVar name kind = mkTyVar name kind
+mkCoVar name kind = TyVar { varName    = name
+			  , realUnique = getKey# (nameUnique name)
+			  , tyVarKind  = kind
+                          , isCoercionVar    = True
+			}
 
-isCoVar :: TyVar -> Bool
-isCoVar ty = isCoSuperKind (tyVarKind ty)
 \end{code}
 
 %************************************************************************
@@ -341,6 +347,9 @@ isId other	   = False
 
 isLocalId (LocalId {}) = True
 isLocalId other	       = False
+
+isCoVar (v@(TyVar {})) = isCoercionVar v
+isCoVar other          = False
 
 -- isLocalVar returns True for type variables as well as local Ids
 -- These are the variables that we need to pay attention to when finding free

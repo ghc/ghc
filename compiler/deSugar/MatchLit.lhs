@@ -256,7 +256,7 @@ matchNPlusKPats all_vars@(var:vars) ty (eqn1:eqns)
 	; lit_expr    <- dsOverLit lit
 	; let pred_expr   = mkApps ge_expr [Var var, lit_expr]
 	      minusk_expr = mkApps minus_expr [Var var, lit_expr]
-	      (wraps, eqns') = mapAndUnzip (shift n1) eqns
+	      (wraps, eqns') = mapAndUnzip (shift n1) (eqn1:eqns)
 	; match_result <- match vars ty eqns'
 	; return  (mkGuardedMatchResult pred_expr 		$
 		   mkCoLetMatchResult (NonRec n1 minusk_expr)	$

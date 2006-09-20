@@ -313,7 +313,7 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] lif
 
 
 tySuperKindTyCon     = mkSuperKindTyCon tySuperKindTyConName
-coSuperKindTyCon = mkSuperKindTyCon coSuperKindTyConName
+coSuperKindTyCon     = mkSuperKindTyCon coSuperKindTyConName
 
 liftedTypeKindTyCon   = mkKindTyCon liftedTypeKindTyConName
 openTypeKindTyCon     = mkKindTyCon openTypeKindTyConName
@@ -329,8 +329,8 @@ mkKindTyCon name = mkVoidPrimTyCon name tySuperKind 0
 --------------------------
 -- ... and now their names
 
-tySuperKindTyConName     = mkPrimTyConName FSLIT("BOX") tySuperKindTyConKey tySuperKindTyCon
-coSuperKindTyConName = mkPrimTyConName FSLIT("COERCION") coSuperKindTyConKey coSuperKindTyCon
+tySuperKindTyConName      = mkPrimTyConName FSLIT("BOX") tySuperKindTyConKey tySuperKindTyCon
+coSuperKindTyConName      = mkPrimTyConName FSLIT("COERCION") coSuperKindTyConKey coSuperKindTyCon
 liftedTypeKindTyConName   = mkPrimTyConName FSLIT("*") liftedTypeKindTyConKey liftedTypeKindTyCon
 openTypeKindTyConName     = mkPrimTyConName FSLIT("?") openTypeKindTyConKey openTypeKindTyCon
 unliftedTypeKindTyConName = mkPrimTyConName FSLIT("#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
@@ -372,9 +372,11 @@ tySuperKind, coSuperKind :: SuperKind
 tySuperKind = kindTyConType tySuperKindTyCon 
 coSuperKind = kindTyConType coSuperKindTyCon 
 
+isTySuperKind (NoteTy _ ty)    = isTySuperKind ty
 isTySuperKind (TyConApp kc []) = kc `hasKey` tySuperKindTyConKey
 isTySuperKind other            = False
 
+isCoSuperKind (NoteTy _ ty)    = isCoSuperKind ty
 isCoSuperKind (TyConApp kc []) = kc `hasKey` coSuperKindTyConKey
 isCoSuperKind other            = False
 

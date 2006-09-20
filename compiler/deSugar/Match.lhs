@@ -254,7 +254,7 @@ match :: [Id]		  -- Variables rep'ing the exprs we're matching with
       -> DsM MatchResult  -- Desugared result!
 
 match [] ty eqns
-  = ASSERT( not (null eqns) )
+  = ASSERT2( not (null eqns), ppr ty )
     returnDs (foldr1 combineMatchResults match_results)
   where
     match_results = [ ASSERT( null (eqn_pats eqn) ) 
@@ -715,6 +715,9 @@ data PatGroup
 
 
 groupEquations :: [EquationInfo] -> [[(PatGroup, EquationInfo)]]
+-- If the result is of form [g1, g2, g3], 
+-- (a) all the (pg,eq) pairs in g1 have the same pg
+-- (b) none of the gi are empty
 groupEquations eqns
   = runs same_gp [(patGroup (firstPat eqn), eqn) | eqn <- eqns]
   where

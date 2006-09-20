@@ -82,15 +82,24 @@ mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 -- because the latter is part of a knot, whereas the former is not.
 mkNewTyConRhs tycon_name tycon con 
   = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
-	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon tvs rhs_ty 
+	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon tvs rhs_ty
+              cocon_maybe 
+                | all_coercions || isRecursiveTyCon tycon 
+                = Just co_tycon
+                | otherwise              
+                = Nothing
 	; return (NewTyCon { data_con = con, 
- 		       	     nt_co = Just co_tycon, 
+ 		       	     nt_co = cocon_maybe, 
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
 		       	     nt_rhs = rhs_ty,
 		       	     nt_etad_rhs = eta_reduce tvs rhs_ty,
 		       	     nt_rep = mkNewTyConRep tycon rhs_ty }) }
   where
+        -- if all_coercions is True then we use coercions for all newtypes
+        -- otherwise we use coercions for recursive newtypes and look through
+        -- non-recursive newtypes
+    all_coercions = True
     tvs    = tyConTyVars tycon
     rhs_ty = head (dataConInstOrigArgTys con (mkTyVarTys tvs))
 	-- Instantiate the data con with the 

@@ -106,7 +106,7 @@ import TypeRep
 
 -- friends:
 import Var	( Var, TyVar, tyVarKind, tyVarName, 
-		  setTyVarName, setTyVarKind, mkWildTyVar )
+		  setTyVarName, setTyVarKind, mkWildCoVar )
 import VarEnv
 import VarSet
 
@@ -307,7 +307,7 @@ splitAppTys ty = split ty ty []
 
 \begin{code}
 mkFunTy :: Type -> Type -> Type
-mkFunTy (PredTy (EqPred ty1 ty2)) res = mkForAllTy (mkWildTyVar (PredTy (EqPred ty1 ty2))) res
+mkFunTy (PredTy (EqPred ty1 ty2)) res = mkForAllTy (mkWildCoVar (PredTy (EqPred ty1 ty2))) res
 mkFunTy arg res = FunTy arg res
 
 mkFunTys :: [Type] -> Type -> Type

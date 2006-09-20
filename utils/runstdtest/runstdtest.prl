@@ -68,7 +68,7 @@ $DefaultStderrFile = "$TmpPrefix/no_stderr$$";
 @PgmStderrFile = ();
 $PreScript = '';
 $PostScript = '';
-$TimeCmd = '';
+$TimeCmd = 'time';
 $StatsFile = "$TmpPrefix/stats$$";
 $CachegrindStats = "cachegrind.out.summary";
 $SysSpecificTiming = '';
@@ -207,8 +207,8 @@ cat /dev/null > $DefaultStdoutFile
 cat /dev/null > $DefaultStderrFile
 $PreScriptLines
 $SpixifyLine1
-echo $TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
-$TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
+echo $TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile | dos2unix 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
+$TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile | dos2unix 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
 progexit=\$?
 if [ \$progexit -eq 0 ] && [ $PgmFail -ne 0 ]; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
