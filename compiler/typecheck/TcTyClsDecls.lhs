@@ -36,7 +36,8 @@ import TcMType		( newKindVar, checkValidTheta, checkValidType,
 import TcType		( TcKind, TcType, Type, tyVarsOfType, mkPhiTy,
 			  mkArrowKind, liftedTypeKind, mkTyVarTys, 
 			  tcSplitSigmaTy, tcEqTypes, tcGetTyVar_maybe )
-import Type		( PredType(..), splitTyConApp_maybe, mkTyVarTy
+import Type		( PredType(..), splitTyConApp_maybe, mkTyVarTy,
+                          newTyConInstRhs
 			  -- pprParendType, pprThetaArrow
 			)
 import Generics		( validGenericMethodType, canDoGenerics )
@@ -606,14 +607,21 @@ chooseBoxingStrategy :: Bool -> TyCon -> TcType -> HsBang -> StrictnessMark
 chooseBoxingStrategy unbox_strict_fields tycon arg_ty bang
   = case bang of
 	HsNoBang				    -> NotMarkedStrict
-	HsStrict | unbox_strict_fields && can_unbox -> MarkedUnboxed
-	HsUnbox  | can_unbox			    -> MarkedUnboxed
+	HsStrict | unbox_strict_fields 
+                   && can_unbox arg_ty 		    -> MarkedUnboxed
+	HsUnbox  | can_unbox arg_ty		    -> MarkedUnboxed
 	other					    -> MarkedStrict
   where
-    can_unbox = case splitTyConApp_maybe arg_ty of
-		   Nothing 	       -> False
-		   Just (arg_tycon, _) -> not (isNewTyCon arg_tycon) && not (isRecursiveTyCon tycon) &&
-					  isProductTyCon arg_tycon
+    -- we can unbox if the type is a chain of newtypes with a product tycon
+    -- at the end
+    can_unbox arg_ty = case splitTyConApp_maybe arg_ty of
+		   Nothing 	       		-> False
+		   Just (arg_tycon, tycon_args) -> 
+                       not (isRecursiveTyCon tycon) &&
+		       isProductTyCon arg_tycon &&
+                       (if isNewTyCon arg_tycon then 
+                            can_unbox (newTyConInstRhs arg_tycon tycon_args)
+                        else True)
 \end{code}
 
 %************************************************************************

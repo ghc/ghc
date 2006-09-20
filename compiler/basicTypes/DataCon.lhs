@@ -23,7 +23,8 @@ module DataCon (
 	isNullarySrcDataCon, isNullaryRepDataCon, isTupleCon, isUnboxedTupleCon,
 	isVanillaDataCon, classDataCon, 
 
-	splitProductType_maybe, splitProductType,
+	splitProductType_maybe, splitProductType, deepSplitProductType,
+        deepSplitProductType_maybe
     ) where
 
 #include "HsVersions.h"
@@ -31,13 +32,13 @@ module DataCon (
 import Type		( Type, ThetaType, 
 			  substTyWith, substTyVar, mkTopTvSubst, 
 			  mkForAllTys, mkFunTys, mkTyConApp, mkTyVarTy, mkTyVarTys, 
-			  splitTyConApp_maybe, 
+			  splitTyConApp_maybe, newTyConInstRhs,
 			  mkPredTys, isStrictPred, pprType
 			)
 import Coercion		( isEqPred, mkEqPred )
 import TyCon		( TyCon, FieldLabel, tyConDataCons, 
 			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon,
-                          isNewTyCon )
+                          isNewTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique )
 import Var		( TyVar, Id )
@@ -687,6 +688,20 @@ splitProductType str ty
 	Nothing    -> pprPanic (str ++ ": not a product") (pprType ty)
 
 
+deepSplitProductType_maybe ty
+  = do { (res@(tycon, tycon_args, _, _)) <- splitProductType_maybe ty
+       ; let {result 
+             | isNewTyCon tycon && not (isRecursiveTyCon tycon)
+             = deepSplitProductType_maybe (newTyConInstRhs tycon tycon_args)
+             | otherwise = Just res}
+       ; result
+       }
+          
+deepSplitProductType str ty 
+  = case deepSplitProductType_maybe ty of
+      Just stuff -> stuff
+      Nothing -> pprPanic (str ++ ": not a product") (pprType ty)
+
 computeRep :: [StrictnessMark]		-- Original arg strictness
 	   -> [Type]			-- and types
 	   -> ([StrictnessMark],	-- Representation arg strictness
@@ -698,6 +713,7 @@ computeRep stricts tys
     unbox NotMarkedStrict ty = [(NotMarkedStrict, ty)]
     unbox MarkedStrict    ty = [(MarkedStrict,    ty)]
     unbox MarkedUnboxed   ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
-			     where
-			       (_, _, arg_dc, arg_tys) = splitProductType "unbox_strict_arg_ty" ty
+                               where
+                                 (tycon, tycon_args, arg_dc, arg_tys) 
+                                     = deepSplitProductType "unbox_strict_arg_ty" ty
 \end{code}

@@ -56,7 +56,7 @@ module Type (
 	predTypeRep, mkPredTy, mkPredTys,
 
 	-- Newtypes
-	splitRecNewType_maybe,
+	splitRecNewType_maybe, newTyConInstRhs,
 
 	-- Lifting and boxity
 	isUnLiftedType, isUnboxedTupleType, isAlgType, isPrimitiveType,
@@ -409,6 +409,12 @@ splitNewTyConApp_maybe ty | Just ty' <- tcView ty = splitNewTyConApp_maybe ty'
 splitNewTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitNewTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitNewTyConApp_maybe other	      = Nothing
+
+-- get instantiated newtype rhs, the arguments had better saturate 
+-- the constructor
+newTyConInstRhs :: TyCon -> [Type] -> Type
+newTyConInstRhs tycon tys =
+    let (tvs, ty) = newTyConRhs tycon in substTyWith tvs tys ty
 
 \end{code}
 

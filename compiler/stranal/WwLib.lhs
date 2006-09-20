@@ -15,9 +15,10 @@ import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
                           setIdInfo
 			)
 import IdInfo		( vanillaIdInfo )
-import DataCon		( splitProductType_maybe, splitProductType )
+import DataCon		( deepSplitProductType_maybe, splitProductType )
 import NewDemand	( Demand(..), DmdResult(..), Demands(..) ) 
-import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID )
+import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID,
+                          mkUnpackCase, mkProductBox )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
 			  splitForAllTys, splitFunTys, splitRecNewType_maybe, isAlgType
@@ -341,17 +342,17 @@ mkWWstr_one arg
 	-- Unpack case
       Eval (Prod cs)
 	| Just (arg_tycon, tycon_arg_tys, data_con, inst_con_arg_tys) 
-		<- splitProductType_maybe (idType arg)
+		<- deepSplitProductType_maybe (idType arg)
 	-> getUniquesUs 		`thenUs` \ uniqs ->
 	   let
 	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
 	     unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
-	     unbox_fn       = mk_unpk_case arg unpk_args data_con arg_tycon
+	     unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
 	     rebox_fn	    = Let (NonRec arg con_app) 
-	     con_app	    = mkConApp data_con (map Type tycon_arg_tys ++ map Var unpk_args)
+	     con_app	    = mkProductBox unpk_args (idType arg)
 	   in
 	   mkWWstr unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-	   returnUs (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn)
+	   returnUs (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) 
 	  		   -- Don't pass the arg, rebox instead
 
 	-- `seq` demand; evaluate in wrapper in the hope
@@ -443,13 +444,13 @@ mkWWcpr body_ty RetCPR
 	ubx_tup_con		       = tupleCon Unboxed n_con_args
 	ubx_tup_ty		       = exprType ubx_tup_app
 	ubx_tup_app		       = mkConApp ubx_tup_con (map Type con_arg_tys   ++ arg_vars)
-        con_app			       = mkConApp data_con    (map Type tycon_arg_tys ++ arg_vars)
+        con_app			       = mkProductBox arg_vars body_ty
       in
       returnUs (\ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)],
 		\ body     -> workerCase body work_wild ubx_tup_ty [(DataAlt data_con,    args, ubx_tup_app)],
 		ubx_tup_ty)
     where
-      (_, tycon_arg_tys, data_con, con_arg_tys) = splitProductType "mkWWcpr" body_ty
+      (_, tycon_arg_tys, data_con, con_arg_tys) = deepSplitProductType "mkWWcpr" body_ty
       n_con_args  = length con_arg_tys
       con_arg_ty1 = head con_arg_tys
 
@@ -495,7 +496,7 @@ mk_unpk_case arg unpk_args boxing_con boxing_tycon body
   = Case (Var arg) 
 	 (sanitiseCaseBndr arg)
          (exprType body)
-	 [(DataAlt boxing_con, unpk_args, body)]
+	 [(DataAlt boxing_con, unpk_args, body) ]
 
 mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
 

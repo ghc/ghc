@@ -21,6 +21,7 @@ module MkId (
 	mkPrimOpId, mkFCallId,
 
 	mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
+        mkUnpackCase, mkProductBox,
 
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds, ghcPrimIds,
@@ -45,8 +46,9 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			)
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
-import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes )
-import Coercion         ( mkSymCoercion, mkUnsafeCoercion )
+import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, newTyConInstRhs )
+import Coercion         ( mkSymCoercion, mkUnsafeCoercion, 
+                          splitRecNewTypeCo_maybe )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, 
 			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, 
@@ -71,11 +73,11 @@ import DataCon		( DataCon, DataConIds(..), dataConTyCon, dataConUnivTyVars,
 			  dataConRepArgTys, dataConRepType, 
 			  dataConSig, dataConStrictMarks, dataConExStricts, 
 			  splitProductType, isVanillaDataCon, dataConFieldType,
-			  dataConInstOrigArgTys
+			  dataConInstOrigArgTys, deepSplitProductType
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, 
 			  mkTemplateLocals, mkTemplateLocalsNum, mkExportedLocalId,
-			  mkTemplateLocal, idName
+			  mkTemplateLocal, idName, mkWildId
 			)
 import IdInfo		( IdInfo, noCafIdInfo,  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo, setCafInfo,
@@ -316,14 +318,9 @@ mkDataConIds wrap_name wkr_name data_con
 			Case (Var arg) arg result_ty [(DEFAULT,[], body i (arg:rep_args))]
 
 		MarkedUnboxed
-		   ->case splitProductType "do_unbox" (idType arg) of
-			   (tycon, tycon_args, con, tys) ->
-				   Case (Var arg) arg result_ty  
-					[(DataAlt con, 
-					  con_args,
-					  body i' (reverse con_args ++ rep_args))]
-			      where 
-				(con_args, i') = mkLocals i tys
+		   -> unboxProduct i (Var arg) (idType arg) the_body result_ty
+                      where
+                        the_body i con_args = body i (reverse con_args ++ rep_args)
 
 mAX_CPR_SIZE :: Arity
 mAX_CPR_SIZE = 10
@@ -563,7 +560,75 @@ mkRecordSelId tycon field_label
     	field_lbls  = dataConFieldLabels data_con
 
     error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_tau full_msg
-    full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
+    full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id])
+
+-- unbox a product type...
+-- we will recurse into newtypes, casting along the way, and unbox at the
+-- first product data constructor we find. e.g.
+--  
+--   data PairInt = PairInt Int Int
+--   newtype S = MkS PairInt
+--   newtype T = MkT S
+--
+-- If we have e = MkT (MkS (PairInt 0 1)) and some body expecting a list of
+-- ids, we get (modulo int passing)
+--
+--   case (e `cast` (sym CoT)) `cast` (sym CoS) of
+--     PairInt a b -> body [a,b]
+--
+-- The Ints passed around are just for creating fresh locals
+unboxProduct :: Int -> CoreExpr -> Type -> (Int -> [Id] -> CoreExpr) -> Type -> CoreExpr
+unboxProduct i arg arg_ty body res_ty
+  = mkUnpackCase the_id arg con_args boxing_con rhs
+  where 
+    (_, _, boxing_con, tys) = deepSplitProductType "unboxProduct" arg_ty
+    ([the_id], i') = mkLocals i [arg_ty]
+    (con_args, i'') = mkLocals i' tys
+    rhs = body i'' con_args
+
+mkUnpackCase ::  Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
+mkUnpackCase bndr arg unpk_args boxing_con body
+  = Case cast_arg bndr (exprType body) [(DataAlt boxing_con, unpk_args, body)]
+  where
+  cast_arg = go (idType bndr) arg
+  go ty arg 
+    | res@(tycon, tycon_args, _, _)  <- splitProductType "mkUnpackCase" ty
+    , isNewTyCon tycon && not (isRecursiveTyCon tycon)
+    = go (newTyConInstRhs tycon tycon_args) 
+         (unwrapNewTypeBody tycon tycon_args arg)
+    | otherwise = arg
+
+-- ...and the dual
+reboxProduct :: [Unique]     -- uniques to create new local binders
+             -> Type         -- type of product to box
+             -> ([Unique],   -- remaining uniques
+                 CoreExpr,   -- boxed product
+                 [Id])       -- Ids being boxed into product
+reboxProduct us ty
+  = let 
+	(tycon, tycon_args, pack_con, con_arg_tys) = deepSplitProductType "reboxProduct" ty
+ 
+        us' = dropList con_arg_tys us
+
+	arg_ids  = zipWith (mkSysLocal FSLIT("rb")) us con_arg_tys
+
+        bind_rhs = mkProductBox arg_ids ty
+
+    in
+      (us', bind_rhs, arg_ids)
+
+mkProductBox :: [Id] -> Type -> CoreExpr
+mkProductBox arg_ids ty 
+  = result_expr
+  where 
+    (tycon, tycon_args, pack_con, con_arg_tys) = splitProductType "mkProductBox" ty
+
+    result_expr
+      | isNewTyCon tycon 
+      = wrap (mkProductBox arg_ids (newTyConInstRhs tycon tycon_args))
+      | otherwise = mkConApp pack_con (map Type tycon_args ++ map Var arg_ids)
+
+    wrap expr = wrapNewTypeBody tycon tycon_args expr
 
 
 -- (mkReboxingAlt us con xs rhs) basically constructs the case
@@ -610,21 +675,11 @@ mkReboxingAlt us con args rhs
 	-- Term variable case
     go (arg:args) (str:stricts) us
       | isMarkedUnboxed str
-      = let
-          ty = idType arg
-          
-	  (tycon, tycon_args, pack_con, con_arg_tys)
-	 	 = splitProductType "mkReboxingAlt" ty
-
-	  unpacked_args  = zipWith (mkSysLocal FSLIT("rb")) us con_arg_tys
-	  (binds, args') = go args stricts (dropList con_arg_tys us)
-	  con_app | isNewTyCon tycon = ASSERT( isSingleton unpacked_args )
-				       wrapNewTypeBody tycon tycon_args (Var (head unpacked_args))
-					-- ToDo: is this right?  Jun06
-		  | otherwise = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
-	in
-	(NonRec arg con_app : binds, unpacked_args ++ args')
-
+      = 
+        let (binds, unpacked_args')        = go args stricts us'
+            (us', bind_rhs, unpacked_args) = reboxProduct us (idType arg)
+        in
+            (NonRec arg bind_rhs : binds, unpacked_args ++ unpacked_args')
       | otherwise
       = let (binds, args') = go args stricts us
         in  (binds, arg:args')

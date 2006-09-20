@@ -171,10 +171,9 @@ dmdAnal sigs dmd (Cast e co)
     (dmd_ty, e') = dmdAnal sigs dmd' e
     to_co        = snd (coercionKind co)
     dmd'
---      | Just (tc, args) <- splitTyConApp_maybe to_co
-      = evalDmd
---      , isRecursiveTyCon tc = evalDmd
---      | otherwise           = dmd
+      | Just (tc, args) <- splitTyConApp_maybe to_co
+      , isRecursiveTyCon tc = evalDmd
+      | otherwise           = dmd
 	-- This coerce usually arises from a recursive
         -- newtype, and we don't want to look inside them
 	-- for exactly the same reason that we don't look
