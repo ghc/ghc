@@ -386,7 +386,11 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
         mk_eqn_help loc orig gla_exts new_or_data tycon deriv_tvs clas tys
 
     ------------------------------------------------------------------
-    mk_eqn_help gla_exts DataType tycon deriv_tvs clas tys
+    -- data/newtype T a = ... deriving( C t1 t2 )
+    --   leads to a call to mk_eqn_help with
+    --		tycon = T, deriv_tvs = ftv(t1,t2), clas = C, tys = [t1,t2]
+
+    mk_eqn_help loc orig gla_exts DataType tycon deriv_tvs clas tys
       | Just err <- checkSideConditions gla_exts tycon deriv_tvs clas tys
       = bale_out (derivingThingErr clas tys tycon (tyConTyVars tycon) err)
       | otherwise 

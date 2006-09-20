@@ -179,16 +179,19 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 	        -- (3) Instances from generic class declarations
        ; generic_inst_info <- getGenericInstances clas_decls
 
-	-- (3) Compute instances from "deriving" clauses; 
-	-- This stuff computes a context for the derived instance decl, so it
-	-- needs to know about all the instances possible; hence inst_env4
-    tcDeriving tycl_decls	`thenM` \ (deriv_inst_info, deriv_binds) ->
-    addInsts deriv_inst_info	$
+	        -- Next, construct the instance environment so far, consisting
+	        -- of 
+		--   a) local instance decls
+		--   b) generic instances
+		--   c) local family instance decls
+       ; addInsts local_info         $ do {
+       ; addInsts generic_inst_info  $ do {
+       ; addFamInsts at_idx_tycon    $ do {
 
 	        -- (4) Compute instances from "deriving" clauses; 
 		-- This stuff computes a context for the derived instance
 		-- decl, so it needs to know about all the instances possible
-       ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls
+       ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls deriv_decls
        ; addInsts deriv_inst_info   $ do {
 
        ; gbl_env <- getGblEnv

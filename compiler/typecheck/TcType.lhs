@@ -673,6 +673,7 @@ tcSplitPhiTy ty = split ty ty []
 	| Just p <- tcSplitPredTy_maybe arg = split res res (p:ts)
   split orig_ty ty		ts = (reverse ts, orig_ty)
 
+tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
 			(tvs, rho) -> case tcSplitPhiTy rho of
 					(theta, tau) -> (tvs, theta, tau)

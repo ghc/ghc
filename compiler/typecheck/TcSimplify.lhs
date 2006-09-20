@@ -2162,7 +2162,7 @@ tcSimplifyDeriv orig tc tyvars theta
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
-    newDicts DerivOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
+    newDictBndrsO orig (substTheta tenv theta)	`thenM` \ wanteds ->
     simpleReduceLoop doc reduceMe wanteds		`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 
