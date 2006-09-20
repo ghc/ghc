@@ -18,14 +18,14 @@ module TcGadt (
 
 import HsSyn	( ExprCoFn(..), idCoercion, isIdCoercion )
 import Coercion	( Coercion, mkSymCoercion, mkTransCoercion, mkUnsafeCoercion,
-		  mkLeftCoercion, mkRightCoercion,
+		  mkLeftCoercion, mkRightCoercion, mkCoKind, coercionKindPredTy,
 		  splitCoercionKind, decomposeCo )
 import TcType	( TvSubst(..), TvSubstEnv, substTy, mkTvSubst, 
 		  substTyVar, zipTopTvSubst, typeKind,
 		  eqKind, isSubKind, repSplitAppTy_maybe,
 		  tcView
 		)
-import Type	( Type, tyVarsOfType, tyVarsOfTypes )
+import Type	( Type, tyVarsOfType, tyVarsOfTypes, tcEqType, mkTyVarTy )
 import TypeRep	( Type(..), PredType(..) )
 import DataCon	( DataCon, dataConUnivTyVars, dataConEqSpec )
 import Var	( CoVar, TyVar, tyVarKind )
@@ -201,14 +201,16 @@ fixTvCoEnv in_scope env
   where
     fixpt         = mapVarEnv step env
 
-    step (co, ty) = (co', ty')
+    step (co, ty) = (co1, ty')
       -- Apply fixpt one step:
       -- Use refineType to get a substituted type, ty', and a coercion, co_fn,
       -- which justifies the substitution.  If the coercion is not the identity
       -- then use transitivity with the original coercion
       where
         (co_fn, ty') = refineType (Reft in_scope fixpt) ty
-        co' | ExprCoFn co'' <- co_fn = mkTransCoercion co co''
+        co1 | ExprCoFn co'' <- co_fn = mkTransCoercion co'' co
+                                         -- This trans looks backwards, but it
+                                         -- works somehow
             | otherwise              = ASSERT( isIdCoercion co_fn ) co 
 
 -----------------------------
@@ -237,6 +239,8 @@ dataConCanMatch con tys
 tryToBind :: TyVarSet -> TyVar -> BindFlag
 tryToBind tv_set tv | tv `elemVarSet` tv_set = BindMe
 		    | otherwise	             = AvoidMe
+
+
 \end{code}
 
 
@@ -409,9 +413,12 @@ uUnrefined subst co tv1 ty2 (TyVarTy tv2)
     ty1 = TyVarTy tv1
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
-    bind swap tv ty = return (extendVarEnv subst tv (co',ty))
+    bind swap tv ty = 
+        ASSERT2( (coercionKindPredTy co1 `tcEqType` mkCoKind (mkTyVarTy tv) ty)
+               , (text "Refinement invariant failure: co = " <+> ppr co  <+> ppr (coercionKindPredTy co) $$ text "subst = " <+> ppr tv <+> ppr (mkCoKind (mkTyVarTy tv) ty)))
+        return (extendVarEnv subst tv (co1,ty))
       where
-        co' = if swap then mkSymCoercion co else co
+        co1 = if swap then mkSymCoercion co else co
 
 uUnrefined subst co tv1 ty2 ty2'	-- ty2 is not a type variable
   | tv1 `elemVarSet` substTvSet subst (tyVarsOfType ty2')
@@ -435,7 +442,9 @@ substTvSet subst tvs
 		Just (_,ty) -> substTvSet subst (tyVarsOfType ty)
 
 bindTv subst co tv ty	-- ty is not a type variable
-  = do	{ b <- tvBindFlag tv
+  = ASSERT2( (coercionKindPredTy co `tcEqType` mkCoKind (mkTyVarTy tv) ty), 
+          (text "Refinement invariant failure: co = " <+> ppr co  <+> ppr (coercionKindPredTy co) $$ text "subst = " <+> ppr tv <+> ppr (mkCoKind (mkTyVarTy tv) ty))  )
+    do  { b <- tvBindFlag tv
 	; case b of
 	    Skolem   -> failWith (misMatch (TyVarTy tv) ty)
 	    WildCard -> return subst

@@ -36,7 +36,8 @@ module Coercion (
 import TypeRep
 import Type	  ( Type, Kind, PredType, substTyWith, mkAppTy, mkForAllTy,
                     mkFunTy, splitAppTy_maybe, splitForAllTy_maybe, coreView,
-                    kindView, mkTyConApp, isCoercionKind, isEqPred, mkAppTys
+                    kindView, mkTyConApp, isCoercionKind, isEqPred, mkAppTys,
+                    coreEqType
                   )
 import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isNewTyCon,
                     newTyConRhs, newTyConCo, 
@@ -309,7 +310,9 @@ symCoercionTyCon =
 transCoercionTyCon = 
   mkCoercionTyCon transCoercionTyConName 2 (mkKindingFun composeCoercionKindsOf)
   where
-    composeCoercionKindsOf (co1:co2:rest) = (a1, r2, rest)
+    composeCoercionKindsOf (co1:co2:rest) = 
+        WARN( not (r1 `coreEqType` a2), text "Strange! Type mismatch in trans coercion, probably a bug")
+        (a1, r2, rest)
       where
         (a1, r1) = coercionKind co1
         (a2, r2) = coercionKind co2 

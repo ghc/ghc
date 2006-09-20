@@ -1029,6 +1029,7 @@ cmpPredX env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` cmpTy
 cmpPredX env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` cmpTypesX env tys1 tys2
 cmpPredX env (IParam _ _)     (ClassP _ _)     = LT
 cmpPredX env (ClassP _ _)     (IParam _ _)     = GT
+cmpPredX env (EqPred ty1 ty2) (EqPred ty1' ty2') = (cmpTypeX env ty1 ty1') `thenCmp` (cmpTypeX env ty2 ty2')
 \end{code}
 
 PredTypes are used as a FM key in TcSimplify, 
