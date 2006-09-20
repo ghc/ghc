@@ -67,7 +67,7 @@ pprTyThingHdr exts (ATyCon tyCon)     = pprTyConHdr   exts tyCon
 pprTyThingHdr exts (AClass cls)       = pprClassHdr   exts cls
         
 pprTyConHdr exts tyCon =
-  ptext keyword <+> ppr_bndr tyCon <+> hsep (map ppr vars)
+  addFamily (ptext keyword) <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
     vars | GHC.isPrimTyCon tyCon || 
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
@@ -76,6 +76,10 @@ pprTyConHdr exts tyCon =
     keyword | GHC.isSynTyCon tyCon = SLIT("type")
             | GHC.isNewTyCon tyCon = SLIT("newtype")
             | otherwise            = SLIT("data")
+
+    addFamily keytext 
+      | GHC.isOpenTyCon tyCon = keytext <> ptext SLIT(" family")
+      | otherwise             = keytext
 
 pprDataConSig exts dataCon =
   ppr_bndr dataCon <+> dcolon <+> pprType exts (GHC.dataConType dataCon)
@@ -109,8 +113,12 @@ pprType False ty = ppr (GHC.dropForAlls ty)
 
 pprTyCon exts tyCon
   | GHC.isSynTyCon tyCon
-  = let rhs_type = GHC.synTyConRhs tyCon
-    in hang (pprTyConHdr exts tyCon <+> equals) 2 (pprType exts rhs_type)
+  = if GHC.isOpenTyCon tyCon
+    then pprTyConHdr exts tyCon <+> dcolon <+> 
+	 pprType exts (GHC.synTyConResKind tyCon)
+    else 
+      let rhs_type = GHC.synTyConType tyCon
+      in hang (pprTyConHdr exts tyCon <+> equals) 2 (pprType exts rhs_type)
   | otherwise
   = pprAlgTyCon exts tyCon (const True) (const True)
 

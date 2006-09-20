@@ -169,7 +169,8 @@ import Type		(	-- Re-exports
 			  pprType, pprParendType, pprTyThingCategory,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
-import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, synTyConDefn, tyConUnique )
+import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, isOpenTyCon,
+			  synTyConDefn, tyConUnique )	 
 import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
 import Class		( Class )
 import Var		( TyVar, Id, isCoVar, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
@@ -591,8 +592,9 @@ isTauTy other		  = False
 
 isTauTyCon :: TyCon -> Bool
 -- Returns False for type synonyms whose expansion is a polytype
-isTauTyCon tc | isSynTyCon tc = isTauTy (snd (synTyConDefn tc))
-	      | otherwise     = True
+isTauTyCon tc 
+  | isSynTyCon tc && not (isOpenTyCon tc) = isTauTy (snd (synTyConDefn tc))
+  | otherwise                             = True
 
 ---------------
 isBoxyTy :: TcType -> Bool

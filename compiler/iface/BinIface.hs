@@ -913,11 +913,12 @@ instance Binary IfaceDecl where
 	    put_ bh a6
 	    put_ bh a7
 
-    put_ bh (IfaceSyn aq ar as) = do
+    put_ bh (IfaceSyn aq ar as at) = do
 	    putByte bh 3
 	    put_ bh aq
 	    put_ bh ar
 	    put_ bh as
+	    put_ bh at
     put_ bh (IfaceClass a1 a2 a3 a4 a5 a6) = do
 	    putByte bh 4
 	    put_ bh a1
@@ -947,7 +948,8 @@ instance Binary IfaceDecl where
 		    aq <- get bh
 		    ar <- get bh
 		    as <- get bh
-		    return (IfaceSyn aq ar as)
+		    at <- get bh
+		    return (IfaceSyn aq ar as at)
 	      _ -> do
 		    a1 <- get bh
 		    a2 <- get bh
@@ -983,15 +985,19 @@ instance Binary OverlapFlag where
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon = putByte bh 0
-    put_ bh (IfDataTyCon cs) = do { putByte bh 1
+    put_ bh IfOpenDataTyCon = putByte bh 1
+    put_ bh IfOpenNewTyCon = putByte bh 2
+    put_ bh (IfDataTyCon cs) = do { putByte bh 3
 				  ; put_ bh cs }
-    put_ bh (IfNewTyCon c)  = do { putByte bh 2
+    put_ bh (IfNewTyCon c)  = do { putByte bh 4
 				  ; put_ bh c }
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> return IfAbstractTyCon
-	      1 -> do cs <- get bh
+	      1 -> return IfOpenDataTyCon
+	      2 -> return IfOpenNewTyCon
+	      3 -> do cs <- get bh
 		      return (IfDataTyCon cs)
 	      _ -> do aa <- get bh
 		      return (IfNewTyCon aa)

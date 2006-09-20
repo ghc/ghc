@@ -6,7 +6,8 @@
 module BuildTyCl (
 	buildSynTyCon, buildAlgTyCon, buildDataCon,
 	buildClass,
-	mkAbstractTyConRhs, mkNewTyConRhs, mkDataTyConRhs
+	mkAbstractTyConRhs, mkOpenDataTyConRhs, mkOpenNewTyConRhs,
+	mkNewTyConRhs, mkDataTyConRhs 
     ) where
 
 #include "HsVersions.h"
@@ -26,14 +27,16 @@ import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc, mkClassTyConOcc,
 			  mkClassDataConOcc, mkSuperDictSelOcc, mkNewTyCoOcc )
 import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
-import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
-			  tyConDataCons, isNewTyCon, mkClassTyCon, TyCon( tyConTyVars ),
-			  isRecursiveTyCon, tyConArity,
-			  AlgTyConRhs(..), newTyConRhs )
+import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons,
+			  tyConStupidTheta, tyConDataCons, isNewTyCon,
+			  mkClassTyCon, TyCon( tyConTyVars ),
+			  isRecursiveTyCon, tyConArity, AlgTyConRhs(..),
+			  SynTyConRhs(..), newTyConRhs )
 import Type		( mkArrowKinds, liftedTypeKind, typeKind, 
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-			  splitTyConApp_maybe, splitAppTy_maybe, getTyVar_maybe,
-			  mkPredTys, mkTyVarTys, ThetaType, Type, 
+			  splitTyConApp_maybe, splitAppTy_maybe,
+			  getTyVar_maybe, 
+			  mkPredTys, mkTyVarTys, ThetaType, Type, Kind,
 			  substTyWith, zipTopTvSubst, substTheta, mkForAllTys,
                           mkTyConApp, mkTyVarTy )
 import Coercion         ( mkNewTypeCoercion )
@@ -45,8 +48,13 @@ import List		( nub )
 
 \begin{code}
 ------------------------------------------------------
-buildSynTyCon name tvs rhs_ty
-  = mkSynTyCon name kind tvs rhs_ty
+buildSynTyCon :: Name -> [TyVar] -> SynTyConRhs -> TyCon
+buildSynTyCon name tvs rhs@(OpenSynTyCon rhs_ki)
+  = mkSynTyCon name kind tvs rhs
+  where
+    kind = mkArrowKinds (map tyVarKind tvs) rhs_ki
+buildSynTyCon name tvs rhs@(SynonymTyCon rhs_ty)
+  = mkSynTyCon name kind tvs rhs
   where
     kind = mkArrowKinds (map tyVarKind tvs) (typeKind rhs_ty)
 
@@ -71,6 +79,12 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
 ------------------------------------------------------
 mkAbstractTyConRhs :: AlgTyConRhs
 mkAbstractTyConRhs = AbstractTyCon
+
+mkOpenDataTyConRhs :: AlgTyConRhs
+mkOpenDataTyConRhs = OpenDataTyCon
+
+mkOpenNewTyConRhs :: AlgTyConRhs
+mkOpenNewTyConRhs = OpenNewTyCon
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons

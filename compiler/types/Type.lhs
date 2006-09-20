@@ -12,7 +12,7 @@ module Type (
 
 	-- Kinds
         Kind, SimpleKind, KindVar,
-        kindFunResult, splitKindFunTys, 
+        kindFunResult, splitKindFunTys, splitKindFunTysN,
 
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
         argTypeKindTyCon, ubxTupleKindTyCon,
@@ -1370,6 +1370,9 @@ kindFunResult k = funResultTy k
 
 splitKindFunTys :: Kind -> ([Kind],Kind)
 splitKindFunTys k = splitFunTys k
+
+splitKindFunTysN :: Int -> Kind -> ([Kind],Kind)
+splitKindFunTysN k = splitFunTysN k
 
 isUbxTupleKind, isOpenTypeKind, isArgTypeKind, isUnliftedTypeKind :: Kind -> Bool
 

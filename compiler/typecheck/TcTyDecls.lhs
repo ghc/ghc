@@ -22,7 +22,7 @@ import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep, tcView )
 import HscTypes		( TyThing(..), ModDetails(..) )
 import TyCon            ( TyCon, tyConArity, tyConDataCons, tyConTyVars,
-                          synTyConDefn, isSynTyCon, isAlgTyCon, 
+                          isSynTyCon, isAlgTyCon, 
 			  tyConName, isNewTyCon, isProductTyCon, newTyConRhs )
 import Class		( classTyCon )
 import DataCon          ( dataConOrigArgTys )

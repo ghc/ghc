@@ -109,7 +109,8 @@ module GHC (
 	TyCon, 
 	tyConTyVars, tyConDataCons, tyConArity,
 	isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon, isFunTyCon,
-	synTyConDefn, synTyConRhs,
+	isOpenTyCon,
+	synTyConDefn, synTyConType, synTyConResKind,
 
 	-- ** Type variables
 	TyVar,
@@ -203,8 +204,9 @@ import Id		( Id, idType, isImplicitId, isDeadBinder,
 import Var		( TyVar )
 import TysPrim		( alphaTyVars )
 import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon,
-			  isPrimTyCon, isFunTyCon, tyConArity,
-			  tyConTyVars, tyConDataCons, synTyConDefn, synTyConRhs )
+			  isPrimTyCon, isFunTyCon, isOpenTyCon, tyConArity,
+			  tyConTyVars, tyConDataCons, synTyConDefn,
+			  synTyConType, synTyConResKind )
 import Class		( Class, classSCTheta, classTvsFds, classMethods )
 import FunDeps		( pprFundeps )
 import DataCon		( DataCon, dataConWrapId, dataConSig, dataConTyCon,

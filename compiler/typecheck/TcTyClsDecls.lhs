@@ -44,8 +44,11 @@ import Type		( PredType(..), splitTyConApp_maybe, mkTyVarTy,
 			)
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
-import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon ),
-			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
+import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon, OpenDataTyCon, 
+					      OpenNewTyCon ), 
+			  SynTyConRhs( OpenSynTyCon, SynonymTyCon ),
+			  tyConDataCons, mkForeignTyCon, isProductTyCon,
+			  isRecursiveTyCon, isOpenTyCon,
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
                           isNewTyCon )
 import DataCon		( DataCon, dataConUserType, dataConName, 
@@ -583,7 +586,7 @@ tcSynDecl
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { traceTc (text "tcd1" <+> ppr tc_name) 
     ; rhs_ty' <- tcHsKindedType rhs_ty
-    ; return (ATyCon (buildSynTyCon tc_name tvs' rhs_ty')) }
+    ; return (ATyCon (buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty'))) }
 
 --------------------
 tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM TyThing
@@ -591,18 +594,38 @@ tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM TyThing
 tcTyClDecl calc_isrec decl
   = tcAddDeclCtxt decl (tcTyClDecl1 calc_isrec decl)
 
-  -- kind signature for a type functions
+  -- kind signature for a type function
 tcTyClDecl1 _calc_isrec 
   (TyFunction {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = kind})
-  = tcKindSigDecl tc_name tvs kind
+  = tcTyVarBndrs tvs  $ \ tvs' -> do 
+  { gla_exts <- doptM Opt_GlasgowExts
+
+	-- Check that we don't use kind signatures without Glasgow extensions
+  ; checkTc gla_exts $ badSigTyDecl tc_name
+
+  ; return (ATyCon (buildSynTyCon tc_name tvs' (OpenSynTyCon kind)))
+  }
 
   -- kind signature for an indexed data type
 tcTyClDecl1 _calc_isrec 
-  (TyData {tcdCtxt = ctxt, tcdTyVars = tvs,
-	   tcdLName = L _ tc_name, tcdKindSig = Just kind, tcdCons = []})
-  = do
-  { checkTc (null . unLoc $ ctxt) $ badKindSigCtxt tc_name
-  ; tcKindSigDecl tc_name tvs kind
+  (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
+	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = []})
+  = tcTyVarBndrs tvs  $ \ tvs' -> do 
+  { extra_tvs <- tcDataKindSig mb_ksig
+  ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
+
+  ; checkTc (null . unLoc $ ctxt) $ badKindSigCtxt tc_name
+  ; gla_exts <- doptM Opt_GlasgowExts
+
+	-- Check that we don't use kind signatures without Glasgow extensions
+  ; checkTc gla_exts $ badSigTyDecl tc_name
+
+  ; tycon <- buildAlgTyCon tc_name final_tvs [] 
+	       (case new_or_data of
+		  DataType -> OpenDataTyCon
+		  NewType  -> OpenNewTyCon)
+	       Recursive False True
+  ; return (ATyCon tycon)
   }
 
 tcTyClDecl1 calc_isrec
@@ -687,28 +710,6 @@ tcTyClDecl1 calc_isrec
 tcTyClDecl1 calc_isrec 
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
   = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0))
-
------------------------------------
-tcKindSigDecl :: Name -> [LHsTyVarBndr Name] -> Kind -> TcM TyThing
-tcKindSigDecl tc_name tvs kind
-  = tcTyVarBndrs tvs  $ \ tvs' -> do 
-  { gla_exts <- doptM Opt_GlasgowExts
-
-	-- Check that we don't use kind signatures without Glasgow extensions
-  ; checkTc gla_exts $ badSigTyDecl tc_name
-
-    -- !!!TODO
-    -- We need to extend TyCon.TyCon with a new variant representing indexed
-    -- type constructors (ie, IdxTyCon).  We will use them for both indexed
-    -- data types as well as type functions.  In the case of indexed *data*
-    -- types, they are *abstract*; ie, won't be rewritten.  OR do we just want
-    -- to make another variant of AlgTyCon (after all synonyms are also
-    -- AlgTyCons...)
-    -- We need an additional argument to this functions, which determines
-    -- whether the type constructor is abstract.
-  ; tycon <- error "TcTyClsDecls.tcKindSigDecl: IdxTyCon not implemented yet."
-  ; return (ATyCon tycon)
-  }
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
@@ -887,7 +888,9 @@ checkValidTyCl decl
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc 
   | isSynTyCon tc 
-  = checkValidType syn_ctxt syn_rhs
+  = case synTyConRhs tc of
+      OpenSynTyCon _  -> return ()
+      SynonymTyCon ty -> checkValidType syn_ctxt ty
   | otherwise
   = 	-- Check the context on the data decl
     checkValidTheta (DataTyCtxt name) (tyConStupidTheta tc)	`thenM_` 
@@ -901,7 +904,6 @@ checkValidTyCon tc
   where
     syn_ctxt  = TySynCtxt name
     name      = tyConName tc
-    syn_rhs   = synTyConRhs tc
     data_cons = tyConDataCons tc
 
     groups = equivClasses cmp_fld (concatMap get_fields data_cons)

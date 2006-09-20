@@ -185,7 +185,8 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 import NewDemand	( isTopSig )
 import CoreSyn
 import Class		( classExtraBigSig, classTyCon )
-import TyCon		( TyCon, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCon,
+import TyCon		( TyCon, AlgTyConRhs(..), SynTyConRhs(..),
+			  isRecursiveTyCon, isForeignTyCon, 
 			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
 			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
 			  tyConHasGenerics, synTyConRhs, isGadtSyntaxTyCon,
@@ -1018,9 +1019,10 @@ tyThingToIfaceDecl ext (AClass clas)
 
 tyThingToIfaceDecl ext (ATyCon tycon)
   | isSynTyCon tycon
-  = IfaceSyn {	ifName   = getOccName tycon,
-		ifTyVars = toIfaceTvBndrs tyvars,
-		ifSynRhs = toIfaceType ext syn_ty }
+  = IfaceSyn {	ifName    = getOccName tycon,
+		ifTyVars  = toIfaceTvBndrs tyvars,
+		ifOpenSyn = syn_isOpen,
+		ifSynRhs  = toIfaceType ext syn_tyki }
 
   | isAlgTyCon tycon
   = IfaceData {	ifName    = getOccName tycon,
@@ -1048,10 +1050,16 @@ tyThingToIfaceDecl ext (ATyCon tycon)
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where
     tyvars = tyConTyVars tycon
-    syn_ty = synTyConRhs tycon
+    (syn_isOpen, syn_tyki) = case synTyConRhs tycon of
+			       OpenSynTyCon ki -> (True , ki)
+			       SynonymTyCon ty -> (False, ty)
 
-    ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
-    ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls (NewTyCon { data_con = con })    = 
+      IfNewTyCon  (ifaceConDecl con)
+    ifaceConDecls (DataTyCon { data_cons = cons }) = 
+      IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls OpenDataTyCon                    = IfOpenDataTyCon
+    ifaceConDecls OpenNewTyCon                     = IfOpenNewTyCon
     ifaceConDecls AbstractTyCon			   = IfAbstractTyCon
 	-- The last case happens when a TyCon has been trimmed during tidying
 	-- Furthermore, tyThingToIfaceDecl is also used

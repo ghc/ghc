@@ -585,9 +585,12 @@ reifyTyCon tc
   | isFunTyCon tc  = return (TH.PrimTyConI (reifyName tc) 2 		  False)
   | isPrimTyCon tc = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
   | isSynTyCon tc
-  = do	{ let (tvs, rhs) = synTyConDefn tc
-	; rhs' <- reifyType rhs
-	; return (TH.TyConI $ TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
+  = case synTyConDefn tc of
+      Nothing         -> noTH SLIT("type family") (ppr tc)
+      Just (tvs, rhs) -> 
+        do { rhs' <- reifyType rhs
+	   ; return (TH.TyConI $ 
+		       TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
 
 reifyTyCon tc
   = do 	{ cxt <- reifyCxt (tyConStupidTheta tc)

@@ -19,8 +19,10 @@ import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder,
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
 			  tcIfaceTyVar, tcIfaceLclId, lookupIfaceTc, 
 			  newIfaceName, newIfaceNames, ifaceExportNames )
-import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
-			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
+import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon,
+			  buildClass, 
+			  mkAbstractTyConRhs, mkOpenDataTyConRhs,
+			  mkOpenNewTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
 import Type		( liftedTypeKind, splitTyConApp, mkTyConApp,
                           liftedTypeKindTyCon, unliftedTypeKindTyCon, 
@@ -28,7 +30,7 @@ import Type		( liftedTypeKind, splitTyConApp, mkTyConApp,
                           ubxTupleKindTyCon,
 			  mkTyVarTys, ThetaType )
 import TypeRep		( Type(..), PredType(..) )
-import TyCon		( TyCon, tyConName )
+import TyCon		( TyCon, tyConName, SynTyConRhs(..) )
 import HscTypes		( ExternalPackageState(..), 
 			  TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
@@ -371,11 +373,13 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
     }}
 
 tcIfaceDecl (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
-		       ifSynRhs = rdr_rhs_ty})
+		       ifOpenSyn = isOpen, ifSynRhs = rdr_rhs_ty})
    = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
      { tc_name <- lookupIfaceTop occ_name
-     ; rhs_ty <- tcIfaceType rdr_rhs_ty
-     ; return (ATyCon (buildSynTyCon tc_name tyvars rhs_ty))
+     ; rhs_tyki <- tcIfaceType rdr_rhs_ty
+     ; let rhs = if isOpen then OpenSynTyCon rhs_tyki 
+			   else SynonymTyCon rhs_tyki
+     ; return (ATyCon (buildSynTyCon tc_name tyvars rhs))
      }
 
 tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, ifTyVars = tv_bndrs, 
@@ -413,6 +417,8 @@ tcIfaceDecl (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
 tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
 	IfAbstractTyCon	 -> return mkAbstractTyConRhs
+	IfOpenDataTyCon	 -> return mkOpenDataTyConRhs
+	IfOpenNewTyCon	 -> return mkOpenNewTyConRhs
 	IfDataTyCon cons -> do 	{ data_cons <- mappM tc_con_decl cons
 				; return (mkDataTyConRhs data_cons) }
 	IfNewTyCon con	 -> do 	{ data_con <- tc_con_decl con

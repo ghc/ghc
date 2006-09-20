@@ -11,10 +11,11 @@ module TyCon(
 	tyConPrimRep,
 
 	AlgTyConRhs(..), visibleDataCons,
+	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
-	isEnumerationTyCon, isGadtSyntaxTyCon,
+	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
 	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConCo,
 	isHiBootTyCon, isSuperKindTyCon,
@@ -46,7 +47,7 @@ module TyCon(
 	tyConStupidTheta,
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
-	synTyConDefn, synTyConRhs,
+	synTyConDefn, synTyConRhs, synTyConType, synTyConResKind,
 	tyConExtName,		-- External name for foreign types
 
         maybeTyConSingleCon,
@@ -93,10 +94,11 @@ data TyCon
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
 	
-	tyConTyVars :: [TyVar],		-- Scopes over (a) the [PredType] in AlgTyConRhs.DataTyCon
-					--	       (b) the cached types in AlgTyConRhs.NewTyCon
+	tyConTyVars :: [TyVar],		-- Scopes over (a) the algTcStupidTheta
+					--	       (b) the cached types in
+					--		   algTyConRhs.NewTyCon
 					-- But not over the data constructors
-	algTcSelIds :: [Id],  		-- Its record selectors (empty if none): 
+	algTcSelIds :: [Id],  		-- Its record selectors (empty if none)
 
 	algTcGadtSyntax  :: Bool,	-- True <=> the data type was declared using GADT syntax
 					-- That doesn't mean it's a true GADT; only that the "where"
@@ -107,8 +109,8 @@ data TyCon
 
 	algTcRhs :: AlgTyConRhs,	-- Data constructors in here
 
-	algTcRec :: RecFlag,		-- Tells whether the data type is part of 
-					-- a mutually-recursive group or not
+	algTcRec :: RecFlag,		-- Tells whether the data type is part
+					-- of a mutually-recursive group or not
 
 	hasGenerics :: Bool,		-- True <=> generic to/from functions are available
 					-- (in the exports of the data type's source module)
@@ -135,9 +137,7 @@ data TyCon
 	tyConArity  :: Arity,
 
 	tyConTyVars :: [TyVar],		-- Bound tyvars
-	synTcRhs    :: Type		-- Right-hand side, mentioning these type vars.
-					-- Acts as a template for the expansion when
-					-- the tycon is applied to some types.
+	synTcRhs    :: SynTyConRhs	-- Expanded type in here
     }
 
   | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
@@ -183,6 +183,9 @@ data AlgTyConRhs
 			-- Used when we export a data type abstractly into
 			-- an hi file
 
+  | OpenDataTyCon       -- data family        (further instances can appear
+  | OpenNewTyCon        -- newtype family      at any time)
+
   | DataTyCon {
 	data_cons :: [DataCon],
 			-- The constructors; can be empty if the user declares
@@ -227,8 +230,16 @@ data AlgTyConRhs
 
 visibleDataCons :: AlgTyConRhs -> [DataCon]
 visibleDataCons AbstractTyCon      	      = []
+visibleDataCons OpenDataTyCon		      = []
+visibleDataCons OpenNewTyCon		      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
+
+data SynTyConRhs
+  = OpenSynTyCon Kind	-- Type family: *result* kind given
+  | SynonymTyCon Type   -- Mentioning head type vars.  Acts as a template for
+			--  the expansion when the tycon is applied to some
+			--  types.  
 \end{code}
 
 Note [Newtype coercions]
@@ -507,7 +518,9 @@ isDataTyCon :: TyCon -> Bool
 --		  unboxed tuples
 isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})  
   = case rhs of
+        OpenDataTyCon -> True
 	DataTyCon {}  -> True
+	OpenNewTyCon  -> False
 	NewTyCon {}   -> False
 	AbstractTyCon -> pprPanic "isDataTyCon" (ppr tc)
 
@@ -546,6 +559,12 @@ isGadtSyntaxTyCon other				       = False
 isEnumerationTyCon :: TyCon -> Bool
 isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon { is_enum = res }}) = res
 isEnumerationTyCon other				       	       = False
+
+isOpenTyCon :: TyCon -> Bool
+isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon _}) = True
+isOpenTyCon (AlgTyCon {algTcRhs = OpenDataTyCon }) = True
+isOpenTyCon (AlgTyCon {algTcRhs = OpenNewTyCon  }) = True
+isOpenTyCon _					   = False
 
 isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon
@@ -610,7 +629,8 @@ tcExpandTyCon_maybe, coreExpandTyCon_maybe
 		  [Type])		-- Leftover args
 
 -- For the *typechecker* view, we expand synonyms only
-tcExpandTyCon_maybe (SynTyCon {tyConTyVars = tvs, synTcRhs = rhs }) tys
+tcExpandTyCon_maybe (SynTyCon {tyConTyVars = tvs, 
+			       synTcRhs = SynonymTyCon rhs }) tys
    = expand tvs rhs tys
 tcExpandTyCon_maybe other_tycon tys = Nothing
 
@@ -701,11 +721,22 @@ tyConStupidTheta tycon = pprPanic "tyConStupidTheta" (ppr tycon)
 
 \begin{code}
 synTyConDefn :: TyCon -> ([TyVar], Type)
-synTyConDefn (SynTyCon {tyConTyVars = tyvars, synTcRhs = ty}) = (tyvars,ty)
+synTyConDefn (SynTyCon {tyConTyVars = tyvars, synTcRhs = SynonymTyCon ty}) 
+  = (tyvars, ty)
 synTyConDefn tycon = pprPanic "getSynTyConDefn" (ppr tycon)
 
-synTyConRhs :: TyCon -> Type
-synTyConRhs tc = synTcRhs tc
+synTyConRhs :: TyCon -> SynTyConRhs
+synTyConRhs (SynTyCon {synTcRhs = rhs}) = rhs
+synTyConRhs tc				= pprPanic "synTyConRhs" (ppr tc)
+
+synTyConType :: TyCon -> Type
+synTyConType tc = case synTcRhs tc of
+		    SynonymTyCon t -> t
+		    _		   -> pprPanic "synTyConType" (ppr tc)
+
+synTyConResKind :: TyCon -> Kind
+synTyConResKind (SynTyCon {synTcRhs = OpenSynTyCon kind}) = kind
+synTyConResKind tycon  = pprPanic "synTyConResKind" (ppr tycon)
 \end{code}
 
 \begin{code}

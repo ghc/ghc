@@ -81,9 +81,12 @@ data IfaceDecl
 						-- imported modules may have been compiled with
 						-- different flags to the current compilation unit
 
-  | IfaceSyn  {	ifName   :: OccName,		-- Type constructor
-		ifTyVars :: [IfaceTvBndr],	-- Type variables
-		ifSynRhs :: IfaceType		-- synonym expansion
+  | IfaceSyn  {	ifName    :: OccName,		-- Type constructor
+		ifTyVars  :: [IfaceTvBndr],	-- Type variables
+		ifOpenSyn :: Bool,		-- Is an open family?
+		ifSynRhs  :: IfaceType		-- Type for an ordinary
+						-- synonym and kind for an
+						-- open family
     }
 
   | IfaceClass { ifCtxt    :: IfaceContext, 	-- Context...
@@ -104,11 +107,15 @@ data IfaceClassOp = IfaceClassOp OccName DefMeth IfaceType
 
 data IfaceConDecls
   = IfAbstractTyCon		-- No info
+  | IfOpenDataTyCon		-- Open data family
+  | IfOpenNewTyCon		-- Open newtype family
   | IfDataTyCon [IfaceConDecl]	-- data type decls
   | IfNewTyCon  IfaceConDecl	-- newtype decls
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls IfAbstractTyCon  = []
+visibleIfConDecls IfOpenDataTyCon  = []
+visibleIfConDecls IfOpenNewTyCon   = []
 visibleIfConDecls (IfDataTyCon cs) = cs
 visibleIfConDecls (IfNewTyCon c)   = [c]
 
@@ -229,9 +236,15 @@ pprIfaceDecl (IfaceId {ifName = var, ifType = ty, ifIdInfo = info})
 pprIfaceDecl (IfaceForeign {ifName = tycon})
   = hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
 
-pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty})
+pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
+		        ifOpenSyn = False, ifSynRhs = mono_ty})
   = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (equals <+> ppr mono_ty)
+
+pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
+		        ifOpenSyn = True, ifSynRhs = mono_ty})
+  = hang (ptext SLIT("type family") <+> pprIfaceDeclHead [] tycon tyvars)
+       4 (dcolon <+> ppr mono_ty)
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 			 ifTyVars = tyvars, ifCons = condecls, 
@@ -241,8 +254,10 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
   where
     pp_nd = case condecls of
 		IfAbstractTyCon -> ptext SLIT("data")
+		IfOpenDataTyCon -> ptext SLIT("data family")
 		IfDataTyCon _   -> ptext SLIT("data")
 		IfNewTyCon _  	-> ptext SLIT("newtype")
+		IfOpenNewTyCon 	-> ptext SLIT("newtype family")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 			  ifFDs = fds, ifSigs = sigs, ifRec = isrec})
@@ -262,7 +277,9 @@ pprIfaceDeclHead context thing tyvars
   = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing), pprIfaceTvBndrs tyvars]
 
 pp_condecls tc IfAbstractTyCon  = ptext SLIT("{- abstract -}")
+pp_condecls tc IfOpenNewTyCon   = empty
 pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
+pp_condecls tc IfOpenDataTyCon  = empty
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |"))
 							     (map (pprIfaceConDecl tc) cs))
 
@@ -556,6 +573,8 @@ eq_hsCD env (IfDataTyCon c1) (IfDataTyCon c2)
 
 eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
 eq_hsCD env IfAbstractTyCon  IfAbstractTyCon  = Equal
+eq_hsCD env IfOpenDataTyCon  IfOpenDataTyCon  = Equal
+eq_hsCD env IfOpenNewTyCon   IfOpenNewTyCon   = Equal
 eq_hsCD env d1		     d2		      = NotEqual
 
 eq_ConDecl env c1 c2
