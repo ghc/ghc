@@ -73,7 +73,7 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, 
 			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy,
-                          substTyWith, mkPredTy
+                          substTyWith, mkPredTy, zipOpenTvSubst, substTy
 			)
 import Coercion         ( Coercion, mkTransCoercion, coercionKind,
                           splitNewTypeRepCo_maybe, mkSymCoercion,
@@ -742,27 +742,25 @@ dataConInstPat arg_fun fss uniqs con inst_tys
     (ex_fss, fss')     = splitAt n_ex fss
     (co_fss, id_fss)   = splitAt n_co fss'
 
-      -- make existential type variables
+      -- Make existential type variables
+    ex_bndrs = zipWith3 mk_ex_var ex_uniqs ex_fss ex_tvs
     mk_ex_var uniq fs var = mkTyVar new_name kind
       where
         new_name = mkSysTvName uniq fs
         kind     = tyVarKind var
 
-    ex_bndrs = zipWith3 mk_ex_var ex_uniqs ex_fss ex_tvs
+      -- Make the instantiating substitution
+    subst = zipOpenTvSubst (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
 
-      -- make the instantiation substitution
-    inst_subst = substTyWith (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
-
-      -- make new coercion vars, instantiating kind
+      -- Make new coercion vars, instantiating kind
+    co_bndrs = zipWith3 mk_co_var co_uniqs co_fss eq_preds
     mk_co_var uniq fs eq_pred = mkCoVar new_name co_kind
        where
          new_name = mkSysTvName uniq fs
-         co_kind  = inst_subst (mkPredTy eq_pred)
-
-    co_bndrs = zipWith3 mk_co_var co_uniqs co_fss eq_preds
+         co_kind  = substTy subst (mkPredTy eq_pred)
 
       -- make value vars, instantiating types
-    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (inst_subst ty) noSrcLoc
+    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (substTy subst ty) noSrcLoc
     id_bndrs = zipWith3 mk_id_var id_uniqs id_fss arg_tys
 
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
