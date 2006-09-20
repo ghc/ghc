@@ -41,7 +41,8 @@ import TcType		( TcKind, TcType, Type, tyVarsOfType, mkPhiTy,
 			  mkArrowKind, liftedTypeKind, mkTyVarTys, 
 			  tcSplitSigmaTy, tcEqTypes, tcGetTyVar_maybe )
 import Type		( PredType(..), splitTyConApp_maybe, mkTyVarTy,
-                          newTyConInstRhs, isLiftedTypeKind, Kind
+                          newTyConInstRhs, isLiftedTypeKind, Kind,
+                          splitKindFunTys, mkArrowKinds
 			  -- pprParendType, pprThetaArrow
 			)
 import Generics		( validGenericMethodType, canDoGenerics )
