@@ -41,8 +41,8 @@ import TyCon		( TyCon, FieldLabel, tyConDataCons,
                           isNewTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique, mkSysTvName, mkSystemName )
-+ import Var		( TyVar, CoVar, Id, mkTyVar, tyVarKind, setVarUnique,
-+                           mkCoVar )
+import Var		( TyVar, CoVar, Id, mkTyVar, tyVarKind, setVarUnique,
+                          mkCoVar )
 import BasicTypes	( Arity, StrictnessMark(..) )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
