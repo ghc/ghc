@@ -306,13 +306,12 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; checkTc (new_or_data == DataType || isSingleton k_cons) $
 	   newtypeConError tc_name (length k_cons)
 
-       ; final_tvs <- tcDataKindSig (Just $ tyConKind family)
        ; t_typats     <- mappM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
-					      tycon final_tvs (Just t_typats)))
+					      tycon t_tvs (Just t_typats)))
 				  k_cons
 	     ; tc_rhs <-
 		 case new_or_data of
