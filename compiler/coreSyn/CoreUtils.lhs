@@ -44,9 +44,8 @@ import GLAEXTS		-- For `xori`
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
-import Var		( Var, TyVar, CoVar, isCoVar, tyVarKind, setVarUnique,
-                          mkCoVar, mkTyVar, mkCoVar )
-import OccName          ( OccName, occNameFS, mkVarOccFS )
+import Var		( Var, TyVar, CoVar, isCoVar, tyVarKind, mkCoVar, mkTyVar )
+import OccName          ( mkVarOccFS )
 import VarSet		( unionVarSet )
 import VarEnv
 import Name		( hashName, mkSysTvName )
@@ -56,9 +55,9 @@ import Packages		( isDllName )
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, eqSpecPreds, 
-			  isVanillaDataCon, dataConTyCon, dataConRepArgTys,
+			  dataConTyCon, dataConRepArgTys,
                           dataConUnivTyVars, dataConExTyVars, dataConEqSpec,
-                          dataConOrigArgTys )
+                          dataConOrigArgTys, dataConTheta )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
@@ -70,14 +69,14 @@ import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  splitFunTy, tcEqTypeX,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
-			  splitForAllTy_maybe, isForAllTy, splitRecNewType_maybe, 
+			  splitForAllTy_maybe, isForAllTy, 
 			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy,
                           substTyWith, mkPredTy
 			)
 import Coercion         ( Coercion, mkTransCoercion, coercionKind,
-                          splitNewTypeRepCo_maybe, mkSymCoercion, mkLeftCoercion,
-                          mkRightCoercion, decomposeCo, coercionKindPredTy,
-                          splitCoercionKind, mkEqPred )
+                          splitNewTypeRepCo_maybe, mkSymCoercion,
+                          decomposeCo, coercionKindPredTy,
+                          splitCoercionKind )
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -211,8 +210,8 @@ mkInlineMe e	   = Note InlineMe e
 \begin{code}
 mkCoerce :: Coercion -> CoreExpr -> CoreExpr
 mkCoerce co (Cast expr co2)
-  = ASSERT(let { (from_ty, to_ty) = coercionKind co; 
-                 (from_ty2, to_ty2) = coercionKind co2} in
+  = ASSERT(let { (from_ty, _to_ty) = coercionKind co; 
+                 (_from_ty2, to_ty2) = coercionKind co2} in
            from_ty `coreEqType` to_ty2 )
     mkCoerce (mkTransCoercion co2 co) expr
 
@@ -681,9 +680,12 @@ deepCast ty tyVars co
     coArgs = decomposeCo (length tyVars) co
 
 -- These InstPat functions go here to avoid circularity between DataCon and Id
-dataConOrigInstPat  = dataConInstPat dataConOrigArgTys (repeat (FSLIT("ipv")))
 dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
 dataConRepFSInstPat = dataConInstPat dataConRepArgTys
+dataConOrigInstPat  = dataConInstPat dc_arg_tys       (repeat (FSLIT("ipv")))
+  where 
+    dc_arg_tys dc = map mkPredTy (dataConTheta dc) ++ dataConOrigArgTys dc
+	-- Remember to include the existential dictionaries
 
 dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
                   -> [FastString]          -- A long enough list of FSs to use for names
@@ -730,7 +732,6 @@ dataConInstPat arg_fun fss uniqs con inst_tys
 
     n_ex = length ex_tvs
     n_co = length eq_spec
-    n_id = length arg_tys
 
       -- split the Uniques and FastStrings
     (ex_uniqs, uniqs')   = splitAt n_ex uniqs
@@ -799,7 +800,7 @@ exprIsConApp_maybe (Cast expr co)
 	arity   	    = tyConArity tc
         n_ex_tvs            = length dc_ex_tyvars
 
-        (univ_args, rest)   = splitAt arity args
+        (_univ_args, rest)  = splitAt arity args
         (ex_args, val_args) = splitAt n_ex_tvs rest
 
         arg_tys 	    = dataConRepArgTys dc
@@ -809,7 +810,6 @@ exprIsConApp_maybe (Cast expr co)
         deep arg_ty         = deepCast arg_ty dc_tyvars co
 
           -- first we appropriately cast the value arguments
-        arg_cos             = map deep arg_tys 
 	new_val_args	    = zipWith mkCoerce (map deep arg_tys) val_args
 
           -- then we cast the existential coercion arguments
