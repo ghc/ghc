@@ -63,7 +63,8 @@ import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
                           tyConStupidTheta, isProductTyCon, isDataTyCon,
                           isRecursiveTyCon, isFamInstTyCon,
-                          tyConFamInst_maybe, newTyConCo ) 
+                          tyConFamInst_maybe, tyConFamilyCoercion_maybe,
+                          newTyConCo )
 import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var, setIdType )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
@@ -190,9 +191,30 @@ Notice that
   Making an explicit case expression allows the simplifier to eliminate
   it in the (common) case where the constructor arg is already evaluated.
 
+[Wrappers for data instance tycons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the case of data instances, the wrapper also applies the coercion turning
 the representation type into the family instance type to cast the result of
-the wrapper.
+the wrapper.  For example, consider the declarations
+
+  data family Map k :: * -> *
+  data instance Map (a, b) v = MapPair (Map a (Pair b v))
+
+The tycon to which the datacon MapPair belongs gets a unique internal name of
+the form :R123Map, and we call it the representation tycon.  In contrast, Map
+is the family tycon (accessible via tyConFamInst_maybe).  The wrapper and work
+of MapPair get the types
+
+  $WMapPair :: forall a b v. Map a (Map a b v) -> Map (a, b) v
+  $wMapPair :: forall a b v. Map a (Map a b v) -> :R123Map a b v
+
+which implies that the wrapper code will have to apply the coercion moving
+between representation and family type.  It is accessible via
+tyConFamilyCoercion_maybe and has kind
+
+  Co123Map a b v :: {Map (a, b) v :=: :R123Map a b v}
+
+This coercion is conditionally applied by wrapFamInstBody.
 
 \begin{code}
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
@@ -367,7 +389,7 @@ mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
 --
 wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args result_expr
-  | Just (co_con, _) <- tyConFamInst_maybe tycon
+  | Just co_con <- tyConFamilyCoercion_maybe tycon
   = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
   | otherwise
   = result_expr

@@ -485,9 +485,9 @@ mkLocalOcc uniq occ
 --
 mkInstTyTcOcc :: Unique 		-- Unique
 	      -> OccName		-- Local name (e.g. "Map")
-	      -> OccName		-- Nice unique version (":T23Map")
+	      -> OccName		-- Nice unique version (":R23Map")
 mkInstTyTcOcc uniq occ
-   = mk_deriv varName (":T" ++ show uniq) (occNameString occ)
+   = mk_deriv varName (":R" ++ show uniq) (occNameString occ)
 
 -- Derive a name for the coercion of a data/newtype instance.
 --

@@ -38,7 +38,7 @@ import Type	  ( Type, Kind, PredType, substTyWith, mkAppTy, mkForAllTy,
                     mkFunTy, splitAppTy_maybe, splitForAllTy_maybe, coreView,
                     kindView, mkTyConApp, isCoercionKind, isEqPred, mkAppTys,
                     coreEqType, splitAppTys, isTyVarTy, splitTyConApp_maybe,
-                    tyVarsOfType
+                    tyVarsOfType, mkTyVarTys
                   )
 import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isNewTyCon,
                     newTyConRhs, newTyConCo, 
@@ -340,10 +340,10 @@ mkDataInstCoercion name tvs family instTys rep_tycon
   where
     coArity = length tvs
 
-    rule args = (substTyWith tvs tys $		-- with sigma = [tys/tvs],
-		   TyConApp family instTys,	--     sigma (F ts)
-		 TyConApp rep_tycon instTys,	-- :=: R tys
-		 rest)				-- surplus arguments
+    rule args = (substTyWith tvs tys $		      -- with sigma = [tys/tvs]
+		   TyConApp family instTys,	      --       sigma (F ts)
+		 TyConApp rep_tycon (mkTyVarTys tvs), --   :=: R tys
+		 rest)				      -- surplus arguments
       where
         tys  = take coArity args
         rest = drop coArity args
