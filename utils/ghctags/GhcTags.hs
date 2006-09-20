@@ -229,10 +229,35 @@ foundOfLName mod id = FoundThing mod (getOccString $ unLoc id) (startOfLocated i
 
 boundThings :: ModuleName -> LHsBind Name -> [FoundThing]
 boundThings modname lbinding = 
-  let thing = foundOfLName modname
-  in  case unLoc lbinding of
-        FunBind { fun_id = id } -> [thing id]
-        PatBind { pat_lhs = lhs } -> panic "Pattern at top level"
-        VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
-        AbsBinds { } -> [] -- nothing interesting in a type abstraction
-
+  case unLoc lbinding of
+    FunBind { fun_id = id } -> [thing id]
+    PatBind { pat_lhs = lhs } -> patThings lhs []
+    VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
+    AbsBinds { } -> [] -- nothing interesting in a type abstraction
+  where thing = foundOfLName modname
+        patThings lpat tl =
+          let loc = startOfLocated lpat
+              lid id = FoundThing modname (getOccString id) loc
+          in case unLoc lpat of
+               WildPat _ -> tl
+               VarPat name -> lid name : tl
+               VarPatOut name _ -> lid name : tl -- XXX need help here
+               LazyPat p -> patThings p tl
+               AsPat id p -> patThings p (thing id : tl)
+               ParPat p -> patThings p tl
+               BangPat p -> patThings p tl
+               ListPat ps _ -> foldr patThings tl ps
+               TuplePat ps _ _ -> foldr patThings tl ps
+               PArrPat ps _ -> foldr patThings tl ps
+               ConPatIn _ conargs -> conArgs conargs tl
+               ConPatOut _ _ _ _ conargs _ -> conArgs conargs tl
+               LitPat _ -> tl
+               NPat _ _ _ _ -> tl -- form of literal pattern?
+               NPlusKPat id _ _ _ -> thing id : tl
+               TypePat _ -> tl -- XXX need help here
+               SigPatIn p _ -> patThings p tl
+               SigPatOut p _ -> patThings p tl
+               DictPat _ _ -> tl
+        conArgs (PrefixCon ps) tl = foldr patThings tl ps
+        conArgs (RecCon pairs) tl = foldr (\(_id, p) tl -> patThings p tl) tl pairs
+        conArgs (InfixCon p1 p2) tl = patThings p1 $ patThings p2 tl
