@@ -693,6 +693,7 @@ deepSplitProductType_maybe ty
        ; let {result 
              | isNewTyCon tycon && not (isRecursiveTyCon tycon)
              = deepSplitProductType_maybe (newTyConInstRhs tycon tycon_args)
+             | isNewTyCon tycon = Nothing  -- cannot unbox through recursive newtypes
              | otherwise = Just res}
        ; result
        }

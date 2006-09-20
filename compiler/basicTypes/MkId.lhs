@@ -630,7 +630,7 @@ mkProductBox arg_ids ty
     (tycon, tycon_args, pack_con, con_arg_tys) = splitProductType "mkProductBox" ty
 
     result_expr
-      | isNewTyCon tycon 
+      | isNewTyCon tycon && not (isRecursiveTyCon tycon) 
       = wrap (mkProductBox arg_ids (newTyConInstRhs tycon tycon_args))
       | otherwise = mkConApp pack_con (map Type tycon_args ++ map Var arg_ids)
 
