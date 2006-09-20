@@ -190,10 +190,12 @@ import TyCon		( TyCon, AlgTyConRhs(..), SynTyConRhs(..),
 			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
 			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
 			  tyConHasGenerics, synTyConRhs, isGadtSyntaxTyCon,
-			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName  )
+			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName,
+			  tyConFamily_maybe )
 import DataCon		( dataConName, dataConFieldLabels, dataConStrictMarks,
-			  dataConTyCon, dataConIsInfix, dataConUnivTyVars, dataConExTyVars, dataConEqSpec,
-			  dataConTheta, dataConOrigArgTys )
+			  dataConTyCon, dataConIsInfix, dataConUnivTyVars,
+			  dataConExTyVars, dataConEqSpec, dataConTheta,
+			  dataConOrigArgTys, dataConInstTys ) 
 import Type		( TyThing(..), splitForAllTys, funResultTy )
 import TcType		( deNoteType )
 import TysPrim		( alphaTyVars )
@@ -1033,7 +1035,8 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
-		ifGeneric = tyConHasGenerics tycon }
+		ifGeneric = tyConHasGenerics tycon,
+		ifFamily  = fmap (toIfaceTyCon ext) $ tyConFamily_maybe tycon }
 
   | isForeignTyCon tycon
   = IfaceForeign { ifName    = getOccName tycon,
@@ -1047,7 +1050,8 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 		ifCons    = IfAbstractTyCon,
 		ifGadtSyntax = False,
 		ifGeneric = False,
-		ifRec     = NonRecursive}
+		ifRec     = NonRecursive,
+		ifFamily  = Nothing }
 
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where
@@ -1075,9 +1079,13 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 		    ifConExTvs   = toIfaceTvBndrs (dataConExTyVars data_con),
 		    ifConEqSpec  = to_eq_spec (dataConEqSpec data_con),
 		    ifConCtxt    = toIfaceContext ext (dataConTheta data_con),
-		    ifConArgTys  = map (toIfaceType ext) (dataConOrigArgTys data_con),
-		    ifConFields  = map getOccName (dataConFieldLabels data_con),
-		    ifConStricts = dataConStrictMarks data_con }
+		    ifConArgTys  = map (toIfaceType ext) 
+				       (dataConOrigArgTys data_con),
+		    ifConFields  = map getOccName 
+				       (dataConFieldLabels data_con),
+		    ifConStricts = dataConStrictMarks data_con,
+		    ifConInstTys = fmap (map (toIfaceType ext)) 
+					(dataConInstTys data_con) }
 
     to_eq_spec spec = [(getOccName tv, toIfaceType ext ty) | (tv,ty) <- spec]
 

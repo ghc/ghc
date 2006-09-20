@@ -630,7 +630,8 @@ tcDataKindSig :: Maybe Kind -> TcM [TyVar]
 -- GADT decls can have a (perhaps partial) kind signature
 --	e.g.  data T :: * -> * -> * where ...
 -- This function makes up suitable (kinded) type variables for 
--- the argument kinds, and checks that the result kind is indeed *
+-- the argument kinds, and checks that the result kind is indeed *.
+-- We use it also to make up argument type variables for for data instances.
 tcDataKindSig Nothing = return []
 tcDataKindSig (Just kind)
   = do	{ checkTc (isLiftedTypeKind res_kind) (badKindSig kind)

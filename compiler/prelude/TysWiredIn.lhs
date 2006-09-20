@@ -67,7 +67,8 @@ import OccName		( mkOccNameFS, tcName, dataName, mkTupleOcc,
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
-			  mkTupleTyCon, mkAlgTyCon, tyConName )
+			  mkTupleTyCon, mkAlgTyCon, tyConName,
+			  AlgTyConParent(NoParentTyCon) )
 
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed,
 			  StrictnessMark(..) )
@@ -204,6 +205,7 @@ pcTyCon is_enum is_rec name tyvars cons
                 []		-- No stupid theta
 		(DataTyCon cons is_enum)
 		[] 		-- No record selectors
+		NoParentTyCon
                 is_rec
 		True		-- All the wired-in tycons have generics
 		False		-- Not in GADT syntax
@@ -230,6 +232,7 @@ pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
 		[]	-- No equality spec
 		[]	-- No theta
 		arg_tys tycon
+		Nothing -- not a data instance
 		[]	-- No stupid theta
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
 		

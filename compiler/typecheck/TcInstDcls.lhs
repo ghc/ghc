@@ -22,13 +22,13 @@ import Inst		( newDictBndr, newDictBndrs, instToId, showLIE,
 import InstEnv		( mkLocalInstance, instanceDFunId )
 import TcDeriv		( tcDeriving )
 import TcEnv		( InstInfo(..), InstBindings(..), 
-			  newDFunName, tcExtendIdEnv
+			  newDFunName, tcExtendIdEnv, tcExtendGlobalEnv
 			)
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifySuperClasses )
 import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
-                          splitFunTys )
+                          splitFunTys, TyThing )
 import Coercion         ( mkSymCoercion )
 import TyCon            ( TyCon, newTyConCo, tyConTyVars )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
@@ -44,6 +44,7 @@ import ListSetOps	( minusList )
 import Outputable
 import Bag
 import BasicTypes	( Activation( AlwaysActive ), InlineSpec(..) )
+import HscTypes		( implicitTyThings )
 import FastString
 \end{code}
 
@@ -146,24 +147,35 @@ tcInstDecls1 tycl_decls inst_decls
 		-- (1) Do the ordinary instance declarations and instances of
 		--     indexed types
        ; let { idxty_decls = filter (isIdxTyDecl . unLoc) tycl_decls }
-       ; local_inst_infos <- mappM tcLocalInstDecl1 inst_decls
-       ; idxty_inst_infos <- mappM tcIdxTyInstDecl idxty_decls
+       ; local_info_tycons <- mappM tcLocalInstDecl1 inst_decls
+       ; idxty_info_tycons <- mappM tcIdxTyInstDecl idxty_decls
 
-       ; let { local_inst_info = concat local_inst_infos ++ 
-				 catMaybes idxty_inst_infos
-	     ; clas_decls      = filter (isClassDecl.unLoc) tycl_decls }
+       ; let { (local_infos,
+	        local_tycons)    = unzip local_info_tycons
+	     ; (idxty_infos, 
+	        idxty_tycons)    = unzip idxty_info_tycons
+	     ; local_idxty_info  = concat local_infos ++ catMaybes idxty_infos
+	     ; local_idxty_tycon = concat local_tycons ++ 
+				   catMaybes idxty_tycons
+	     ; clas_decls        = filter (isClassDecl.unLoc) tycl_decls 
+	     ; implicit_things   = concatMap implicitTyThings local_idxty_tycon
+	     }
 
-	        -- (2) Instances from generic class declarations
+	        -- (2) Add the tycons of associated types and their implicit
+	        --     tythings to the global environment
+       ; tcExtendGlobalEnv (local_idxty_tycon ++ implicit_things) $ do {
+
+	        -- (3) Instances from generic class declarations
        ; generic_inst_info <- getGenericInstances clas_decls
 
 	        -- Next, construct the instance environment so far, consisting
 	        -- of 
 		--   a) local instance decls
 		--   b) generic instances
-       ; addInsts local_inst_info   $ do {
+       ; addInsts local_idxty_info  $ do {
        ; addInsts generic_inst_info $ do {
 
-	        -- (3) Compute instances from "deriving" clauses; 
+	        -- (4) Compute instances from "deriving" clauses; 
 		-- This stuff computes a context for the derived instance
 		-- decl, so it needs to know about all the instances possible
        ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls
@@ -171,9 +183,9 @@ tcInstDecls1 tycl_decls inst_decls
 
        ; gbl_env <- getGblEnv
        ; returnM (gbl_env, 
-		  generic_inst_info ++ deriv_inst_info ++ local_inst_info,
+		  generic_inst_info ++ deriv_inst_info ++ local_idxty_info,
 		  deriv_binds) 
-    }}}}
+    }}}}}
 
 addInsts :: [InstInfo] -> TcM a -> TcM a
 addInsts infos thing_inside
@@ -182,14 +194,14 @@ addInsts infos thing_inside
 
 \begin{code}
 tcLocalInstDecl1 :: LInstDecl Name 
-		 -> TcM [InstInfo]	-- [] if there was an error
+		 -> TcM ([InstInfo], [TyThing])	-- [] if there was an error
 	-- A source-file instance declaration
 	-- Type-check all the stuff before the "where"
 	--
 	-- We check for respectable instance type, and context
 tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
   =	-- Prime error recovery, set source location
-    recoverM (returnM [])		$
+    recoverM (returnM ([], []))		$
     setSrcSpan loc			$
     addErrCtxt (instDeclCtxt1 poly_ty)	$
 
@@ -208,18 +220,22 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; checkValidInstance tyvars theta clas inst_tys
 
 	-- Next, process any associated types.
-	; idxty_inst_info <- mappM tcIdxTyInstDecl ats
+	; idxty_info_tycons <- mappM tcIdxTyInstDecl ats
 
 	-- Finally, construct the Core representation of the instance.
 	-- (This no longer includes the associated types.)
 	; dfun_name <- newDFunName clas inst_tys (srcSpanStart loc)
 	; overlap_flag <- getOverlapFlag
-	; let dfun  = mkDictFunId dfun_name tyvars theta clas inst_tys
-	      ispec = mkLocalInstance dfun overlap_flag
+	; let dfun           = mkDictFunId dfun_name tyvars theta clas inst_tys
+	      ispec          = mkLocalInstance dfun overlap_flag
+	      (idxty_infos, 
+	       idxty_tycons) = unzip idxty_info_tycons
 
-	; return $ [InstInfo { iSpec  = ispec, 
-			       iBinds = VanillaInst binds uprags }] ++
-                   catMaybes idxty_inst_info }
+	; return ([InstInfo { iSpec  = ispec, 
+			      iBinds = VanillaInst binds uprags }] ++
+                  catMaybes idxty_infos,
+		  catMaybes idxty_tycons)
+        }
 \end{code}
 
 

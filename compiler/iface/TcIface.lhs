@@ -30,7 +30,8 @@ import Type		( liftedTypeKind, splitTyConApp, mkTyConApp,
                           ubxTupleKindTyCon,
 			  mkTyVarTys, ThetaType )
 import TypeRep		( Type(..), PredType(..) )
-import TyCon		( TyCon, tyConName, SynTyConRhs(..) )
+import TyCon		( TyCon, tyConName, SynTyConRhs(..), 
+			  AlgTyConParent(..) )
 import HscTypes		( ExternalPackageState(..), 
 			  TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
@@ -68,6 +69,7 @@ import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, equalLength, splitAtList )
 import DynFlags		( DynFlag(..), isOneShot )
 
+import Monad		( liftM )
 \end{code}
 
 This module takes
@@ -358,15 +360,22 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
 			ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
 			ifCons = rdr_cons, 
 			ifRec = is_rec, 
-			ifGeneric = want_generic })
+			ifGeneric = want_generic,
+			ifFamily = mb_family })
   = do	{ tc_name <- lookupIfaceTop occ_name
 	; bindIfaceTyVars tv_bndrs $ \ tyvars -> do
 
 	{ tycon <- fixM ( \ tycon -> do
 	    { stupid_theta <- tcIfaceCtxt ctxt
-	    ; cons  <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
+	    ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
+	    ; family <- case mb_family of
+			  Nothing  -> return Nothing
+			  Just fam -> 
+			    do { famTyCon <- tcIfaceTyCon fam
+			       ; return $ Just famTyCon
+			       }
 	    ; buildAlgTyCon tc_name tyvars stupid_theta
-			    cons is_rec want_generic gadt_syn
+			    cons is_rec want_generic gadt_syn family
 	    })
         ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
 	; return (ATyCon tycon)
@@ -428,7 +437,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 			 ifConUnivTvs = univ_tvs, ifConExTvs = ex_tvs,
 			 ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
 			 ifConArgTys = args, ifConFields = field_lbls,
-			 ifConStricts = stricts})
+			 ifConStricts = stricts, ifConInstTys = mb_insttys })
       = bindIfaceTyVars univ_tvs $ \ univ_tyvars -> do
 	bindIfaceTyVars ex_tvs	 $ \ ex_tyvars -> do
 	{ name  <- lookupIfaceTop occ
@@ -447,12 +456,17 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 	-- the component types unless they are really needed
  	; arg_tys <- forkM (mk_doc name) (mappM tcIfaceType args)
 	; lbl_names <- mappM lookupIfaceTop field_lbls
+ 	; mb_insttys' <- case mb_insttys of 
+			   Nothing      -> return Nothing 
+			   Just insttys -> liftM Just $ 
+					     mappM tcIfaceType insttys
 
 	; buildDataCon name is_infix {- Not infix -}
 		       stricts lbl_names
 		       univ_tyvars ex_tyvars 
                        eq_spec theta 
 		       arg_tys tycon
+		       mb_insttys'
 	}
     mk_doc con_name = ptext SLIT("Constructor") <+> ppr con_name
 

@@ -47,7 +47,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, 
- 			  newTyConInstRhs, mkTopTvSubst, substTyVar )
+ 			  newTyConInstRhs, mkTopTvSubst, substTyVar, substTy )
 import TcGadt           ( gadtRefine, refineType, emptyRefinement )
 import HsBinds          ( ExprCoFn(..), isIdCoercion )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, isEqPred )
@@ -61,8 +61,8 @@ import CoreUtils	( exprType, dataConOrigInstPat, mkCoerce )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
-                          tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon,
-                          newTyConCo )
+                          tyConStupidTheta, isProductTyCon, isDataTyCon,
+                          isRecursiveTyCon, tyConFamily_maybe, newTyConCo )
 import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var, setIdType )
 import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
@@ -70,12 +70,13 @@ import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..))
 import OccName		( mkOccNameFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
-import DataCon		( DataCon, DataConIds(..), dataConTyCon, dataConUnivTyVars,
+import DataCon		( DataCon, DataConIds(..), dataConTyCon,
+			  dataConUnivTyVars, dataConInstTys,
 			  dataConFieldLabels, dataConRepArity, dataConResTys,
 			  dataConRepArgTys, dataConRepType, dataConFullSig,
 			  dataConStrictMarks, dataConExStricts, 
 			  splitProductType, isVanillaDataCon, dataConFieldType,
-			  deepSplitProductType
+			  deepSplitProductType, 
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, 
 			  mkTemplateLocals, mkTemplateLocalsNum, mkExportedLocalId,
@@ -92,6 +93,7 @@ import NewDemand	( mkStrictSig, DmdResult(..),
 import DmdAnal		( dmdAnalTopRhs )
 import CoreSyn
 import Unique		( mkBuiltinUnique, mkPrimOpIdUnique )
+import Maybe		( fromJust )
 import Maybes
 import PrelNames
 import Util             ( dropList, isSingleton )
@@ -196,13 +198,22 @@ mkDataConIds wrap_name wkr_name data_con
 
   | any isMarkedStrict all_strict_marks		-- Algebraic, needs wrapper
     || not (null eq_spec)
+    || isInst
   = DCIds (Just alg_wrap_id) wrk_id
 
   | otherwise					-- Algebraic, no wrapper
   = DCIds Nothing wrk_id
   where
-    (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys) = dataConFullSig data_con
-    tycon = dataConTyCon data_con
+    (univ_tvs, ex_tvs, eq_spec, 
+     theta, orig_arg_tys)          = dataConFullSig data_con
+    tycon                          = dataConTyCon data_con
+    (isInst, instTys, familyTyCon) = 
+      case dataConInstTys data_con of
+        Nothing      -> (False, []     , familyTyCon)
+	Just instTys -> (True , instTys, familyTyCon)
+	  where
+	    familyTyCon = fromJust $ tyConFamily_maybe tycon
+			  -- this is defined whenever `isInst'
 
 	----------- Wrapper --------------
 	-- We used to include the stupid theta in the wrapper's args
@@ -212,7 +223,10 @@ mkDataConIds wrap_name wkr_name data_con
     subst	   = mkTopTvSubst eq_spec
     dict_tys       = mkPredTys theta
     result_ty_args = map (substTyVar subst) univ_tvs
-    result_ty      = mkTyConApp tycon result_ty_args
+    familyArgs     = map (substTy    subst) instTys
+    result_ty      = if isInst
+		     then mkTyConApp familyTyCon familyArgs  -- instance con
+		     else mkTyConApp tycon result_ty_args    -- ordinary con
     wrap_ty        = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
 	             mkFunTys orig_arg_tys $ result_ty
 	-- NB: watch out here if you allow user-written equality 
@@ -256,7 +270,7 @@ mkDataConIds wrap_name wkr_name data_con
 	-- RetCPR is only true for products that are real data types;
 	-- that is, not unboxed tuples or [non-recursive] newtypes
 
-	----------- Wrappers for newtypes --------------
+	----------- Workers for newtypes --------------
     nt_work_id   = mkGlobalId (DataConWrapId data_con) wkr_name wrap_ty nt_work_info
     nt_work_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
 		  `setArityInfo` 1	-- Arity 1

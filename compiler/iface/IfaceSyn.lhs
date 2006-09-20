@@ -70,16 +70,23 @@ data IfaceDecl
 	      ifType   :: IfaceType, 
 	      ifIdInfo :: IfaceIdInfo }
 
-  | IfaceData { ifName       :: OccName,		-- Type constructor
+  | IfaceData { ifName       :: OccName,	-- Type constructor
 		ifTyVars     :: [IfaceTvBndr],	-- Type variables
 		ifCtxt	     :: IfaceContext,	-- The "stupid theta"
 		ifCons	     :: IfaceConDecls,	-- Includes new/data info
 	        ifRec	     :: RecFlag,	-- Recursive or not?
-		ifGadtSyntax :: Bool,		-- True <=> declared using GADT syntax
-		ifGeneric    :: Bool		-- True <=> generic converter functions available
-    }						-- We need this for imported data decls, since the
-						-- imported modules may have been compiled with
-						-- different flags to the current compilation unit
+		ifGadtSyntax :: Bool,		-- True <=> declared using
+						-- GADT syntax 
+		ifGeneric    :: Bool,		-- True <=> generic converter
+						--          functions available
+    						-- We need this for imported
+    						-- data decls, since the
+    						-- imported modules may have
+    						-- been compiled with
+    						-- different flags to the
+    						-- current compilation unit 
+                ifFamily     :: Maybe IfaceTyCon-- Just fam <=> instance of fam
+    }
 
   | IfaceSyn  {	ifName    :: OccName,		-- Type constructor
 		ifTyVars  :: [IfaceTvBndr],	-- Type variables
@@ -130,8 +137,10 @@ data IfaceConDecl
 	ifConCtxt    :: IfaceContext,		-- Non-stupid context
 	ifConArgTys  :: [IfaceType],		-- Arg types
 	ifConFields  :: [OccName],		-- ...ditto... (field labels)
-	ifConStricts :: [StrictnessMark] }	-- Empty (meaning all lazy), or 1-1 corresp with arg types
-			
+	ifConStricts :: [StrictnessMark],	-- Empty (meaning all lazy),
+						-- or 1-1 corresp with arg tys
+        ifConInstTys :: Maybe [IfaceType] }     -- instance types
+
 data IfaceInst 
   = IfaceInst { ifInstCls  :: IfaceExtName,		-- See comments with
 		ifInstTys  :: [Maybe IfaceTyCon],	-- the defn of Instance
@@ -249,9 +258,10 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 			 ifTyVars = tyvars, ifCons = condecls, 
-			 ifRec = isrec})
+			 ifRec = isrec, ifFamily = mbFamily})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       4 (vcat [pprRec isrec, pprGen gen, pp_condecls tycon condecls])
+       4 (vcat [pprRec isrec, pprGen gen, pprFamily mbFamily, 
+	        pp_condecls tycon condecls])
   where
     pp_nd = case condecls of
 		IfAbstractTyCon -> ptext SLIT("data")
@@ -271,6 +281,9 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
 pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
 pprGen True  = ptext SLIT("Generics: yes")
 pprGen False = ptext SLIT("Generics: no")
+
+pprFamily Nothing    = ptext SLIT("DataFamily: none")
+pprFamily (Just fam) = ptext SLIT("DataFamily:") <+> ppr fam
 
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
@@ -529,6 +542,7 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	  ifRec d1     == ifRec   d2 && 
 	  ifGadtSyntax d1 == ifGadtSyntax   d2 && 
 	  ifGeneric d1 == ifGeneric d2) &&&
+    ifFamily d1 `eqIfTc_mb` ifFamily d2 &&&
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
 	    eq_ifContext env (ifCtxt d1) (ifCtxt d2) &&& 
     	    eq_hsCD env (ifCons d1) (ifCons d2) 
@@ -536,6 +550,10 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	-- The type variables of the data type do not scope
 	-- over the constructors (any more), but they do scope
 	-- over the stupid context in the IfaceConDecls
+  where
+    Nothing     `eqIfTc_mb` Nothing     = Equal
+    (Just fam1) `eqIfTc_mb` (Just fam2) = fam1 `eqIfTc` fam2
+    _		`eqIfTc_mb` _           = NotEqual
 
 eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
   = bool (ifName d1 == ifName d2) &&&

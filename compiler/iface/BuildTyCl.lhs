@@ -23,15 +23,16 @@ import VarSet		( isEmptyVarSet, intersectVarSet, elemVarSet )
 import TysWiredIn  	( unitTy )
 import BasicTypes	( RecFlag, StrictnessMark(..) )
 import Name		( Name )
-import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc, mkClassTyConOcc,
-			  mkClassDataConOcc, mkSuperDictSelOcc, mkNewTyCoOcc )
+import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc,
+			  mkClassTyConOcc, mkClassDataConOcc,
+			  mkSuperDictSelOcc, mkNewTyCoOcc, mkLocalOcc ) 
 import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
 import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons,
 			  tyConStupidTheta, tyConDataCons, isNewTyCon,
 			  mkClassTyCon, TyCon( tyConTyVars ),
 			  isRecursiveTyCon, tyConArity, AlgTyConRhs(..),
-			  SynTyConRhs(..), newTyConRhs )
+			  SynTyConRhs(..), newTyConRhs, AlgTyConParent(..) )
 import Type		( mkArrowKinds, liftedTypeKind, typeKind, 
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 			  splitTyConApp_maybe, splitAppTy_maybe,
@@ -67,11 +68,23 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> RecFlag
 	      -> Bool			-- True <=> want generics functions
 	      -> Bool			-- True <=> was declared in GADT syntax
+	      -> Maybe TyCon		-- Just family <=> instance of `family'
 	      -> TcRnIf m n TyCon
 
 buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
-  = do	{ let { tycon = mkAlgTyCon tc_name kind tvs stupid_theta
-				   rhs fields is_rec want_generics gadt_syn
+	      mb_family
+  = do	{ -- In case of a type instance, we need to invent a new name for the
+	  -- instance type, as `tc_name' is the family name.
+	; uniq <- newUnique
+	; (final_name, parent) <- 
+	    case mb_family of
+	      Nothing     -> return (tc_name, NoParentTyCon)
+	      Just family -> 
+	        do { final_name <- newImplicitBinder tc_name (mkLocalOcc uniq)
+		   ; return (final_name, FamilyTyCon family)
+		   }
+	; let { tycon = mkAlgTyCon final_name kind tvs stupid_theta rhs
+				   fields parent is_rec want_generics gadt_syn
 	      ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 	      ; fields  = mkTyConSelIds tycon rhs
 	  }
@@ -177,13 +190,14 @@ buildDataCon :: Name -> Bool
 	    -> ThetaType		-- Does not include the "stupid theta"
 					-- or the GADT equalities
 	    -> [Type] -> TyCon
+	    -> Maybe [Type]		-- Just ts <=> type pats of inst type
 	    -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
 buildDataCon src_name declared_infix arg_stricts field_lbls
-	     univ_tvs ex_tvs eq_spec ctxt arg_tys tycon
+	     univ_tvs ex_tvs eq_spec ctxt arg_tys tycon mb_typats
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
 	-- This last one takes the name of the data constructor in the source
@@ -195,7 +209,8 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 		data_con = mkDataCon src_name declared_infix
 				     arg_stricts field_lbls
 				     univ_tvs ex_tvs eq_spec ctxt
-				     arg_tys tycon stupid_ctxt dc_ids
+				     arg_tys tycon mb_typats
+				     stupid_ctxt dc_ids
 		dc_ids = mkDataConIds wrap_name work_name data_con
 
 	; returnM data_con }
@@ -271,7 +286,7 @@ buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
 				   tvs [{- no existentials -}]
                                    [{- No equalities -}] [{-No context-}] 
                                    dict_component_tys 
-				   rec_tycon
+				   rec_tycon Nothing
 
 	; rhs <- case dict_component_tys of
 			    [rep_ty] -> mkNewTyConRhs tycon_name rec_tycon dict_con

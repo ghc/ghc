@@ -10,7 +10,7 @@ module TyCon(
 	PrimRep(..),
 	tyConPrimRep,
 
-	AlgTyConRhs(..), visibleDataCons,
+	AlgTyConRhs(..), visibleDataCons, AlgTyConParent(..),
 	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
@@ -47,6 +47,7 @@ module TyCon(
 	tyConStupidTheta,
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
+	isFamInstTyCon, tyConFamily_maybe,
 	synTyConDefn, synTyConRhs, synTyConType, synTyConResKind,
 	tyConExtName,		-- External name for foreign types
 
@@ -115,8 +116,9 @@ data TyCon
 	hasGenerics :: Bool,		-- True <=> generic to/from functions are available
 					-- (in the exports of the data type's source module)
 
-	algTcClass :: Maybe Class
-		-- Just cl if this tycon came from a class declaration
+	algTcParent :: AlgTyConParent	-- Gives the class or family tycon for
+					-- derived tycons representing classes
+					-- or family instances, respectively.
     }
 
   | TupleTyCon {
@@ -234,6 +236,10 @@ visibleDataCons OpenDataTyCon		      = []
 visibleDataCons OpenNewTyCon		      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
+
+data AlgTyConParent = NoParentTyCon		-- ordinary data type
+		    | ClassTyCon    Class	-- class dictionary
+		    | FamilyTyCon   TyCon	-- instance of type family
 
 data SynTyConRhs
   = OpenSynTyCon Kind	-- Type family: *result* kind given
@@ -371,7 +377,7 @@ mkFunTyCon name kind
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars stupid rhs sel_ids is_rec gen_info gadt_syn
+mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
@@ -381,28 +387,14 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids is_rec gen_info gadt_syn
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
 	algTcSelIds	 = sel_ids,
-	algTcClass	 = Nothing,
+	algTcParent	 = parent,
 	algTcRec	 = is_rec,
 	algTcGadtSyntax  = gadt_syn,
 	hasGenerics = gen_info
     }
 
-mkClassTyCon name kind tyvars rhs clas is_rec
-  = AlgTyCon {	
-	tyConName 	 = name,
-	tyConUnique	 = nameUnique name,
-	tyConKind	 = kind,
-	tyConArity	 = length tyvars,
-	tyConTyVars	 = tyvars,
-	algTcStupidTheta = [],
-	algTcRhs	 = rhs,
-	algTcSelIds	 = [],
-	algTcClass	 = Just clas,
-	algTcRec	 = is_rec,
-	algTcGadtSyntax  = False,	-- Doesn't really matter
-	hasGenerics = False
-    }
-
+mkClassTyCon name kind tyvars rhs clas is_rec =
+  mkAlgTyCon name kind tyvars [] rhs [] (ClassTyCon clas) is_rec False False
 
 mkTupleTyCon name kind arity tyvars con boxed gen_info
   = TupleTyCon {
@@ -677,9 +669,11 @@ tyConDataCons_maybe (TupleTyCon {dataCon = con})	       		   = Just [con]
 tyConDataCons_maybe other			               		   = Nothing
 
 tyConFamilySize  :: TyCon -> Int
-tyConFamilySize (AlgTyCon {algTcRhs = DataTyCon { data_cons = cons }}) = length cons
-tyConFamilySize (AlgTyCon {algTcRhs = NewTyCon {}}) = 1
-tyConFamilySize (TupleTyCon {})	 		    = 1
+tyConFamilySize (AlgTyCon   {algTcRhs = DataTyCon {data_cons = cons}}) = 
+  length cons
+tyConFamilySize (AlgTyCon   {algTcRhs = NewTyCon {}})                  = 1
+tyConFamilySize (AlgTyCon   {algTcRhs = OpenDataTyCon})                = 0
+tyConFamilySize (TupleTyCon {})	 		                       = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
@@ -752,12 +746,20 @@ maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $ ppr
 
 \begin{code}
 isClassTyCon :: TyCon -> Bool
-isClassTyCon (AlgTyCon {algTcClass = Just _}) = True
-isClassTyCon other_tycon			 = False
+isClassTyCon (AlgTyCon {algTcParent = ClassTyCon _}) = True
+isClassTyCon other_tycon			     = False
 
 tyConClass_maybe :: TyCon -> Maybe Class
-tyConClass_maybe (AlgTyCon {algTcClass = maybe_clas}) = maybe_clas
-tyConClass_maybe ther_tycon				 = Nothing
+tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas}) = Just clas
+tyConClass_maybe ther_tycon				    = Nothing
+
+isFamInstTyCon :: TyCon -> Bool
+isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _}) = True
+isFamInstTyCon other_tycon			        = False
+
+tyConFamily_maybe :: TyCon -> Maybe TyCon
+tyConFamily_maybe (AlgTyCon {algTcParent = FamilyTyCon fam}) = Just fam
+tyConFamily_maybe ther_tycon				     = Nothing
 \end{code}
 
 

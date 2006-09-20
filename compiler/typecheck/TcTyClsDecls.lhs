@@ -14,7 +14,8 @@ import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  ConDecl(..),   Sig(..), NewOrData(..), ResType(..),
 			  tyClDeclTyVars, isSynDecl, isClassDecl, isIdxTyDecl,
 			  isKindSigDecl, hsConArgs, LTyClDecl, tcdName,
-			  hsTyVarName, LHsTyVarBndr, LHsType
+			  hsTyVarName, LHsTyVarBndr, LHsType, HsType(..),
+			  mkHsAppTy
 			)
 import HsTypes          ( HsBang(..), getBangStrictness )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
@@ -247,12 +248,13 @@ they share a lot of kinding and type checking code with ordinary algebraic
 data types (and GADTs).
 
 \begin{code}
-tcIdxTyInstDecl :: LTyClDecl Name -> TcM (Maybe InstInfo)  -- Nothing if error
+tcIdxTyInstDecl :: LTyClDecl Name 
+		-> TcM (Maybe InstInfo, Maybe TyThing)	-- Nothing if error
 tcIdxTyInstDecl (L loc decl)
   =	-- Prime error recovery, set source location
-    recoverM (returnM Nothing)	$
-    setSrcSpan loc		$
-    tcAddDeclCtxt decl		$
+    recoverM (returnM (Nothing, Nothing))	$
+    setSrcSpan loc				$
+    tcAddDeclCtxt decl				$
     do { -- indexed data types require -fglasgow-exts and can't be in an
 	 -- hs-boot file
        ; gla_exts <- doptM Opt_GlasgowExts
@@ -264,10 +266,11 @@ tcIdxTyInstDecl (L loc decl)
        ; tcIdxTyInstDecl1 decl
        }
 
-tcIdxTyInstDecl1 :: TyClDecl Name -> TcM (Maybe InstInfo)  -- Nothing if error
+tcIdxTyInstDecl1 :: TyClDecl Name 
+		 -> TcM (Maybe InstInfo, Maybe TyThing)	-- Nothing if error
 
 tcIdxTyInstDecl1 (decl@TySynonym {})
-  = kcIdxTyPats decl $ \k_tvs k_typats resKind ->
+  = kcIdxTyPats decl $ \k_tvs k_typats resKind _ ->
     do { -- (1) kind check the right hand side of the type equation
        ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
 
@@ -278,16 +281,16 @@ tcIdxTyInstDecl1 (decl@TySynonym {})
 
          -- construct type rewrite rule
          -- !!!of the form: forall t_tvs. (tcdLName decl) t_typats = t_rhs
-       ; return Nothing -- !!!TODO: need InstInfo for indexed types
+       ; return (Nothing, Nothing) -- !!!TODO: need InstInfo for eq axioms
        }}
       
-tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
+tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			       tcdCons = cons})
-  = kcIdxTyPats decl $ \k_tvs k_typats resKind ->
+  = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
     do { -- (1) kind check the data declaration as usual
        ; k_decl <- kcDataDecl decl k_tvs
-       ; let k_ctxt = tcdCtxt decl
-	     k_cons = tcdCons decl
+       ; let k_ctxt = tcdCtxt k_decl
+	     k_cons = tcdCons k_decl
 
          -- result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr tc_name
@@ -300,14 +303,16 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
        ; checkTc h98_syntax (badGadtIdxTyDecl tc_name)
 
 	 -- Check that a newtype has exactly one constructor
-       ; checkTc (new_or_data == DataType || isSingleton cons) $
-	   newtypeConError tc_name (length cons)
+       ; checkTc (new_or_data == DataType || isSingleton k_cons) $
+	   newtypeConError tc_name (length k_cons)
 
+       ; final_tvs <- tcDataKindSig (Just $ tyConKind family)
        ; t_typats     <- mappM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
+
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
-						      tycon t_tvs)) 
+					      tycon final_tvs (Just t_typats)))
 				  k_cons
 	     ; tc_rhs <-
 		 case new_or_data of
@@ -315,9 +320,8 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
 		   NewType  -> 
 			    ASSERT( isSingleton data_cons )
 			    mkNewTyConRhs tc_name tycon (head data_cons)
-                           --vvvvvvv !!! need a new derived tc_name here
 	     ; buildAlgTyCon tc_name t_tvs stupid_theta tc_rhs Recursive
-			     False h98_syntax
+			     False h98_syntax (Just family)
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
@@ -326,8 +330,8 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
 	     })
 
          -- construct result
-	 -- !!!twofold: (1) (ATyCon tycon) and (2) an equality axiom
-       ; return Nothing -- !!!TODO: need InstInfo for indexed types
+	 -- !!!TODO: missing eq axiom
+       ; return (Nothing, Just (ATyCon tycon))
        }}
        where
 	 h98_syntax = case cons of 	-- All constructors have same shape
@@ -344,15 +348,15 @@ tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L _ tc_name,
 --   check is only required for type functions.
 --
 kcIdxTyPats :: TyClDecl Name
-	    -> ([LHsTyVarBndr Name] -> [LHsType Name] -> Kind -> TcM a)
+	    -> ([LHsTyVarBndr Name] -> [LHsType Name] -> Kind -> TyCon -> TcM a)
 	       -- ^^kinded tvs         ^^kinded ty pats  ^^res kind
 	    -> TcM a
 kcIdxTyPats decl thing_inside
   = kcHsTyVars (tcdTyVars decl) $ \tvs -> 
     do { tc_ty_thing <- tcLookupLocated (tcdLName decl)
-       ; let { tc_kind = case tc_ty_thing of 
-		           AGlobal (ATyCon tycon) -> tyConKind tycon
-             ; (kinds, resKind) = splitKindFunTys tc_kind
+       ; let { family = case tc_ty_thing of 
+		          AGlobal (ATyCon family) -> family
+             ; (kinds, resKind) = splitKindFunTys (tyConKind family)
 	     ; hs_typats	= fromJust $ tcdTyPats decl }
 
          -- we may not have more parameters than the kind indicates
@@ -362,7 +366,7 @@ kcIdxTyPats decl thing_inside
          -- type functions can have a higher-kinded result
        ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
        ; typats <- zipWithM kcCheckHsType hs_typats kinds
-       ; thing_inside tvs typats resultKind
+       ; thing_inside tvs typats resultKind family
        }
   where
 \end{code}
@@ -638,7 +642,7 @@ tcTyClDecl1 _calc_isrec
 	       (case new_or_data of
 		  DataType -> OpenDataTyCon
 		  NewType  -> OpenNewTyCon)
-	       Recursive False True
+	       Recursive False True Nothing
   ; return [ATyCon tycon]
   }
 
@@ -674,7 +678,7 @@ tcTyClDecl1 calc_isrec
 
   ; tycon <- fixM (\ tycon -> do 
 	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
-						 tycon final_tvs)) 
+						 tycon final_tvs Nothing)) 
 			     cons
 	; tc_rhs <-
 	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
@@ -685,7 +689,7 @@ tcTyClDecl1 calc_isrec
                        ASSERT( isSingleton data_cons )
                        mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-			(want_generic && canDoGenerics data_cons) h98_syntax
+	    (want_generic && canDoGenerics data_cons) h98_syntax Nothing
 	})
   ; return [ATyCon tycon]
   }
@@ -730,10 +734,13 @@ tcTyClDecl1 calc_isrec
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
-	  -> NewOrData -> TyCon -> [TyVar]
-	  -> ConDecl Name -> TcM DataCon
+	  -> NewOrData 
+	  -> TyCon -> [TyVar] 
+	  -> Maybe [Type]       -- Just ts <=> type patterns of instance type
+	  -> ConDecl Name 
+	  -> TcM DataCon
 
-tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
+tcConDecl unbox_strict NewType tycon tc_tvs mb_typats	-- Newtypes
 	  (ConDecl name _ ex_tvs ex_ctxt details ResTyH98)
   = do	{ let tc_datacon field_lbls arg_ty
 		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
@@ -743,19 +750,21 @@ tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
 			   	    tc_tvs []  -- No existentials
 				    [] []      -- No equalities, predicates
 				    [arg_ty']
-				    tycon }
+				    tycon 
+				    mb_typats}
 
 		-- Check that a newtype has no existential stuff
 	; checkTc (null ex_tvs && null (unLoc ex_ctxt)) (newtypeExError name)
 
 	; case details of
-	    PrefixCon [arg_ty] -> tc_datacon [] arg_ty
+	    PrefixCon [arg_ty]           -> tc_datacon [] arg_ty
 	    RecCon [(field_lbl, arg_ty)] -> tc_datacon [field_lbl] arg_ty
-	    other -> failWithTc (newtypeFieldErr name (length (hsConArgs details)))
+	    other                        -> 
+	      failWithTc (newtypeFieldErr name (length (hsConArgs details)))
 			-- Check that the constructor has exactly one field
 	}
 
-tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
+tcConDecl unbox_strict DataType tycon tc_tvs mb_typats	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty)
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
@@ -768,10 +777,11 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
     		    (argStrictness unbox_strict tycon bangs arg_tys)
     		    (map unLoc field_lbls)
     		    univ_tvs ex_tvs eq_preds ctxt' arg_tys
-		    data_tc }
-		-- NB:	we put data_tc, the type constructor gotten from the constructor 
-		--	type signature into the data constructor; that way 
-		--	checkValidDataCon can complain if it's wrong.
+		    data_tc 
+		    mb_typats}
+		-- NB:	we put data_tc, the type constructor gotten from the
+		--	constructor type signature into the data constructor;
+		--	that way checkValidDataCon can complain if it's wrong.
 
     ; case details of
 	PrefixCon btys     -> tc_datacon False [] btys
