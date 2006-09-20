@@ -42,8 +42,7 @@ import NameSet		( duDefs )
 import Type		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConStupidTheta, isProductTyCon, isDataTyCon, newTyConRhs,
-			  isEnumerationTyCon, isRecursiveTyCon, TyCon, isNewTyCon,
-                          newTyConCo
+			  isEnumerationTyCon, isRecursiveTyCon, TyCon, isNewTyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
 			  isUnLiftedType, mkClassPred, tyVarsOfType,

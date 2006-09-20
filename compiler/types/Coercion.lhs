@@ -284,20 +284,13 @@ mkUnsafeCoercion ty1 ty2
   = mkCoercion unsafeCoercionTyCon [ty1, ty2]
 
 
--- Make the coercion associated with a newtype.  If we have
---
---   newtype T a b = MkT (Int, a, b)
---
--- Then (mkNewTypeCoercion CoT T [a,b] (Int, a, b)) creates the coercion
--- CoT, such kinding rule such that
---
---   CoT S U :: (Int, S, U) :=: T S U
+-- See note [Newtype coercions] in TyCon
 mkNewTypeCoercion :: Name -> TyCon -> [TyVar] -> Type -> TyCon
 mkNewTypeCoercion name tycon tvs rhs_ty 
   = ASSERT (length tvs == tyConArity tycon)
     mkCoercionTyCon name (tyConArity tycon) rule
   where
-    rule args = mkCoKind (substTyWith tvs args rhs_ty) (TyConApp tycon args)
+    rule args = mkCoKind (TyConApp tycon args) (substTyWith tvs args rhs_ty)
 
 --------------------------------------
 -- Coercion Type Constructors...

@@ -359,7 +359,7 @@ ifaceDeclSubBndrs IfaceClass { ifCtxt = sc_ctxt,
     dc_occ  = mkClassDataConOcc cls_occ	
     co_occs | is_newtype = [mkNewTyCoOcc tc_occ]
 	    | otherwise  = []
-    dcww_occ | is_newtype = mkDataConWrapperOcc dc_occ	-- Newtypes have wrapper but no worker
+    dcww_occ -- | is_newtype = mkDataConWrapperOcc dc_occ	-- Newtypes have wrapper but no worker
 	     | otherwise  = mkDataConWorkerOcc dc_occ	-- Otherwise worker but no wrapper
     is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
 
@@ -371,7 +371,6 @@ ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
 				         IfCon { ifConOcc = con_occ, 
 						 ifConFields = fields})})
   = fields ++ [con_occ, mkDataConWrapperOcc con_occ, mkNewTyCoOcc tc_occ]
-	-- Wrapper, no worker; see MkId.mkDataConIds
 
 ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
   = nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields

@@ -240,13 +240,13 @@ newtype, to the newtype itself. For example,
 
    newtype T a = MkT [a]
 
-the NewTyCon for T will contain nt_co = CoT where CoT t : [t] :=: T t.
+the NewTyCon for T will contain nt_co = CoT where CoT t : T t :=: [t].
 This TyCon is a CoercionTyCon, so it does not have a kind on its own;
 it basically has its own typing rule for the fully-applied version.
 If the newtype T has k type variables then CoT has arity k.
 
 In the paper we'd write
-	axiom CoT : (forall t. [t]) :=: (forall t. T t)
+	axiom CoT : (forall t. T t) :=: (forall t. [t])
 and then when we used CoT at a particular type, s, we'd say
 	CoT @ s
 which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
@@ -254,10 +254,10 @@ which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
 But in GHC we instead make CoT into a new piece of type syntax
 (like instCoercionTyCon, symCoercionTyCon etc), which must always
 be saturated, but which encodes as
-	TyConAp CoT [s]
+	TyConApp CoT [s]
 In the vocabulary of the paper it's as if we had axiom declarations
 like
-	axiom CoT t : ([t] :=: T t)
+	axiom CoT t :  T t :=: [t]
 
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~

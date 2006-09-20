@@ -161,7 +161,7 @@ unboxArg arg
 
   -- Recursive newtypes
   | Just(rep_ty, co) <- splitNewTypeRepCo_maybe arg_ty
-  = unboxArg (mkCoerce (mkSymCoercion co) arg)
+  = unboxArg (mkCoerce co arg)
       
   -- Booleans
   | Just (tc,_) <- splitTyConApp_maybe arg_ty, 
@@ -401,7 +401,7 @@ resultWrapper result_ty
   -- Recursive newtypes
   | Just (rep_ty, co) <- splitNewTypeRepCo_maybe result_ty
   = resultWrapper rep_ty `thenDs` \ (maybe_ty, wrapper) ->
-    returnDs (maybe_ty, \e -> mkCoerce co (wrapper e))
+    returnDs (maybe_ty, \e -> mkCoerce (mkSymCoercion co) (wrapper e))
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).

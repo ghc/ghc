@@ -27,7 +27,7 @@ import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifySuperClasses )
 import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy )
-import Coercion         ( mkAppCoercion, mkAppsCoercion )
+import Coercion         ( mkAppCoercion, mkAppsCoercion, mkSymCoercion )
 import TyCon            ( TyCon, newTyConCo )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
 import Class		( classBigSig )
@@ -320,12 +320,12 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 -- 	class Show a => Foo a b where ...
 -- 	newtype T a = MkT (Tree [a]) deriving( Foo Int )
 -- The newtype gives an FC axiom looking like
---	axiom CoT a :: Tree [a] = T a
+--	axiom CoT a ::  T a :=: Tree [a]
 --
 -- So all need is to generate a binding looking like
 -- 	dfunFooT :: forall a. (Foo Int (Tree [a], Show (T a)) => Foo Int (T a)
 --	dfunFooT = /\a. \(ds:Show (T a)) (df:Foo (Tree [a])).
---		  case df `cast` (Foo Int (CoT a)) of
+--		  case df `cast` (Foo Int (sym (CoT a))) of
 --		     Foo _ op1 .. opn -> Foo ds op1 .. opn
 
 tcInstDecl2 (InstInfo { iSpec = ispec, 
@@ -388,7 +388,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
 	  = ExprCoFn (mkAppCoercion -- (mkAppsCoercion 
                                      (mkTyConApp cls_tycon []) 
                                      -- rep_tys)
-                       		    (mkTyConApp co_con (map mkTyVarTy tvs)))
+                       		    (mkSymCoercion (mkTyConApp co_con (map mkTyVarTy tvs))))
 	  | otherwise
 	  = idCoercion
 

@@ -238,8 +238,8 @@ mkWWargs fun_ty demands one_shots
 	-- simply coerces.
   = mkWWargs rep_ty demands one_shots	`thenUs` \ (wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
     returnUs (wrap_args,
-	      \ e -> Cast (wrap_fn_args e) co,
-	      \ e -> work_fn_args (Cast e (mkSymCoercion co)),
+	      \ e -> Cast (wrap_fn_args e) (mkSymCoercion co),
+	      \ e -> work_fn_args (Cast e co),
 	      res_ty)
   | notNull demands
   = getUniquesUs 		`thenUs` \ wrap_uniqs ->

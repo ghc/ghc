@@ -681,8 +681,8 @@ deepCast ty tyVars co
     coArgs = decomposeCo (length tyVars) co
 
 -- These InstPat functions go here to avoid circularity between DataCon and Id
-dataConOrigInstPat   = dataConInstPat dataConOrigArgTys (repeat (FSLIT("ipv")))
-dataConRepInstPat    = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
+dataConOrigInstPat  = dataConInstPat dataConOrigArgTys (repeat (FSLIT("ipv")))
+dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
 dataConRepFSInstPat = dataConInstPat dataConRepArgTys
 
 dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
@@ -691,7 +691,7 @@ dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
                   -> DataCon
 	          -> [Type]                -- Types to instantiate the universally quantified tyvars
 	       -> ([TyVar], [CoVar], [Id]) -- Return instantiated variables
--- dataConInstPat arg_fun us fss con inst_tys returns a triple 
+-- dataConInstPat arg_fun fss us con inst_tys returns a triple 
 -- (ex_tvs, co_tvs, arg_ids),
 --
 --   ex_tvs are intended to be used as binders for existential type args
@@ -700,7 +700,7 @@ dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
 --     of these vars have been instantiated by the inst_tys and the ex_tys
 --
 --   arg_ids are indended to be used as binders for value arguments, including
---     dicts, and have their types instantiated with inst_tys and ex_tys
+--     dicts, and their types have been instantiated with inst_tys and ex_tys
 --
 -- Example.
 --  The following constructor T1
@@ -710,15 +710,15 @@ dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
 --    ...
 --
 --  has representation type 
---   forall a. forall a1. forall a2. forall b. (a :=: (a1,a2)) => 
+--   forall a. forall a1. forall b. (a :=: (a1,b)) => 
 --     Int -> b -> T a
 --
---  dataConInstPat us T1 (a1',a2') will return
+--  dataConInstPat fss us T1 (a1',b') will return
 --
---  ([a1'', a2'', b''],[c :: (a1',a2'):=:(a1'',a2'')],[x :: Int,y :: b''])
+--  ([a1'', b''], [c :: (a1', b'):=:(a1'', b'')], [x :: Int, y :: b''])
 --
---  where the double-primed variables are created from the unique list input
---  getting names from the FS list input
+--  where the double-primed variables are created with the FastStrings and
+--  Uniques given as fss and us
 dataConInstPat arg_fun fss uniqs con inst_tys 
   = (ex_bndrs, co_bndrs, id_bndrs)
   where 
@@ -751,9 +751,10 @@ dataConInstPat arg_fun fss uniqs con inst_tys
     inst_subst = substTyWith (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
 
       -- make new coercion vars, instantiating kind
-    mk_co_var uniq fs eq_pred = mkCoVar new_name (inst_subst (mkPredTy eq_pred))
+    mk_co_var uniq fs eq_pred = mkCoVar new_name co_kind
        where
          new_name = mkSysTvName uniq fs
+         co_kind  = inst_subst (mkPredTy eq_pred)
 
     co_bndrs = zipWith3 mk_co_var co_uniqs co_fss eq_preds
 
@@ -764,7 +765,6 @@ dataConInstPat arg_fun fss uniqs con inst_tys
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 -- Returns (Just (dc, [x1..xn])) if the argument expression is 
 -- a constructor application of the form (dc x1 .. xn)
-
 exprIsConApp_maybe (Cast expr co)
   = 	-- Maybe this is over the top, but here we try to turn
 	-- 	coerce (S,T) ( x, y )
@@ -1173,7 +1173,7 @@ eta_expand n us expr ty
 
     	case splitNewTypeRepCo_maybe ty of {
  	  Just(ty1,co) -> 
-              mkCoerce co (eta_expand n us (mkCoerce (mkSymCoercion co) expr) ty1) ;
+              mkCoerce (mkSymCoercion co) (eta_expand n us (mkCoerce co expr) ty1) ;
  	  Nothing  -> 
 
 	-- We have an expression of arity > 0, but its type isn't a function

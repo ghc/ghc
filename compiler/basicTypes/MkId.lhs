@@ -57,7 +57,7 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  tcSplitFunTys, tcSplitForAllTys, dataConsStupidTheta
 			)
-import CoreUtils	( exprType, dataConOrigInstPat )
+import CoreUtils	( exprType, dataConOrigInstPat, mkCoerce )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
@@ -592,7 +592,7 @@ mkRecordSelId tycon field_label
 -- If we have e = MkT (MkS (PairInt 0 1)) and some body expecting a list of
 -- ids, we get (modulo int passing)
 --
---   case (e `cast` (sym CoT)) `cast` (sym CoS) of
+--   case (e `cast` CoT) `cast` CoS of
 --     PairInt a b -> body [a,b]
 --
 -- The Ints passed around are just for creating fresh locals
@@ -782,26 +782,26 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- The wrapper for the data constructor for a newtype looks like this:
 --	newtype T a = MkT (a,Int)
 --	MkT :: forall a. (a,Int) -> T a
---	MkT = /\a. \(x:(a,Int)). x `cast` CoT a
+--	MkT = /\a. \(x:(a,Int)). x `cast` sym (CoT a)
 -- where CoT is the coercion TyCon assoicated with the newtype
 --
 -- The call (wrapNewTypeBody T [a] e) returns the
 -- body of the wrapper, namely
---	e `cast` CoT [a]
+--	e `cast` (CoT [a])
 --
 -- If a coercion constructor is prodivided in the newtype, then we use
 -- it, otherwise the wrap/unwrap are both no-ops 
 --
 wrapNewTypeBody tycon args result_expr
   | Just co_con <- newTyConCo tycon
-  = Cast result_expr (mkTyConApp co_con args)
+  = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
   | otherwise
   = result_expr
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   | Just co_con <- newTyConCo tycon
-  = Cast result_expr (mkSymCoercion (mkTyConApp co_con args))
+  = mkCoerce (mkTyConApp co_con args) result_expr
   | otherwise
   = result_expr
 
