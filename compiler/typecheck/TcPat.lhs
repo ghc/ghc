@@ -21,6 +21,7 @@ import Inst		( InstOrigin(..), shortCutFracLit, shortCutIntLit,
 			  newDictBndrs, instToId, instStupidTheta, isHsVar
 			)
 import Id		( Id, idType, mkLocalId )
+import Var		( CoVar )
 import CoreFVs		( idFreeTyVars )
 import Name		( Name, mkSystemVarName )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
@@ -28,14 +29,15 @@ import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
 			  tcLookupClass, tcLookupDataCon, refineEnvironment,
 			  tcLookupField, tcMetaTy )
 import TcMType 		( newFlexiTyVarTy, arityErr, tcInstSkolTyVars, 
-			  newCoVars, zonkTcType, tcInstTyVars )
+			  newCoVars, zonkTcType, tcInstTyVars, newBoxyTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, BoxyType,
 			  SkolemInfo(PatSkol), 
 			  BoxySigmaType, BoxyRhoType, argTypeKind, typeKind,
 			  pprSkolTvBinding, isRigidTy, tcTyVarsOfTypes, 
-			  zipTopTvSubst, isArgTypeKind, isUnboxedTupleType,
+			  zipTopTvSubst, isSubArgTypeKind, isUnboxedTupleType,
 			  mkTyVarTys, mkClassPred, isOverloadedTy, substEqSpec,
-			  mkFunTy, mkFunTys, tidyOpenType, tidyOpenTypes )
+			  mkFunTy, mkFunTys, tidyOpenType, tidyOpenTypes,
+			  mkTyVarTy )
 import VarSet		( elemVarSet )
 import {- Kind parts of -} 
        Type		( liftedTypeKind )
@@ -44,6 +46,7 @@ import TcUnify		( boxySplitTyConApp, boxySplitListTy, unBox,
 			  checkSigTyVarsWrt, unifyType )
 import TcHsType		( UserTypeCtxt(..), tcPatSig )
 import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
+import TcGadt		( Refinement, emptyRefinement, gadtRefine, refineType )
 import Type		( Type, mkTyConApp, substTys, substTheta )
 import StaticFlags	( opt_IrrefutableTuples )
 import TyCon		( TyCon, FieldLabel, tyConFamInst_maybe,
@@ -227,7 +230,7 @@ unBoxArgType ty pp_this
 	-- but they improve error messages, and allocate fewer tyvars
 	; if isUnboxedTupleType ty' then
 		failWithTc msg
-	  else if isArgTypeKind (typeKind ty') then
+	  else if isSubArgTypeKind (typeKind ty') then
 		return ty'
 	  else do 	-- OpenTypeKind, so constrain it
 	{ ty2 <- newFlexiTyVarTy argTypeKind
