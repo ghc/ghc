@@ -35,7 +35,7 @@ import HscTypes		( ExternalPackageState(..),
 			  emptyModDetails, lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( Instance(..), mkImportedInstance )
 import CoreSyn
-import CoreUtils	( exprType, dataConOccInstPat )
+import CoreUtils	( exprType, dataConRepOccInstPat )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )

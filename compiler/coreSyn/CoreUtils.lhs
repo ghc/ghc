@@ -33,7 +33,7 @@ module CoreUtils (
 	-- Equality
 	cheapEqExpr, tcEqExpr, tcEqExprX, applyTypeToArgs, applyTypeToArg,
 
-        dataConInstPat, dataConOccInstPat
+        dataConOrigInstPat, dataConRepInstPat, dataConRepOccInstPat
     ) where
 
 #include "HsVersions.h"
@@ -57,7 +57,8 @@ import Literal		( hashLiteral, literalType, litIsDupable,
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, eqSpecPreds, 
 			  isVanillaDataCon, dataConTyCon, dataConRepArgTys,
-                          dataConUnivTyVars, dataConExTyVars, dataConEqSpec )
+                          dataConUnivTyVars, dataConExTyVars, dataConEqSpec,
+                          dataConOrigArgTys )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
@@ -679,8 +680,13 @@ deepCast ty tyVars co
     -- coArgs = [right (left (left co)), right (left co), right co]
     coArgs = decomposeCo (length tyVars) co
 
--- This goes here to avoid circularity between DataCon and Id
-dataConInstPat :: [Unique]                  -- A long enough list of uniques, at least one for each binder
+-- These InstPat functions go here to avoid circularity between DataCon and Id
+dataConOrigInstPat   = dataConInstPat dataConOrigArgTys
+dataConRepInstPat    = dataConInstPat dataConRepArgTys
+dataConRepOccInstPat = dataConOccInstPat dataConRepArgTys
+
+dataConInstPat :: (DataCon -> [Type])       -- function used to find arg tys
+               -> [Unique]                  -- A long enough list of uniques, at least one for each binder
                -> DataCon
 	       -> [Type]                    -- Types to instantiate the universally quantified tyvars
 	       -> ([TyVar], [CoVar], [Id])  -- Return instantiated variables
@@ -710,8 +716,8 @@ dataConInstPat :: [Unique]                  -- A long enough list of uniques, at
 --  ([a1'', a2'', b''],[c :: (a1',a2'):=:(a1'',a2'')],[x :: Int,y :: b''])
 --
 --  where the double-primed variables are created from the unique list input
-dataConInstPat uniqs con inst_tys 
-  = dataConOccInstPat uniqs occs con inst_tys
+dataConInstPat arg_fun uniqs con inst_tys 
+  = dataConOccInstPat arg_fun uniqs occs con inst_tys
   where
      -- dataConOccInstPat doesn't actually make use of the OccName directly for
      -- existential and coercion variable binders, so it is right to just
@@ -719,7 +725,8 @@ dataConInstPat uniqs con inst_tys
     occs      = mk_occs 1
     mk_occs n = mkVarOcc ("ipv" ++ show n) : mk_occs (n+1)
 
-dataConOccInstPat :: [Unique]                  -- A long enough list of uniques, at least one for each binder
+dataConOccInstPat :: (DataCon -> [Type])       -- function used to find arg tys
+                  -> [Unique]                  -- A long enough list of uniques, at least one for each binder
                   -> [OccName]                 -- An equally long list of OccNames to use
                   -> DataCon
 	          -> [Type]                    -- Types to instantiate the universally quantified tyvars
@@ -727,12 +734,12 @@ dataConOccInstPat :: [Unique]                  -- A long enough list of uniques,
 -- This function actually does the job specified in the comment for 
 -- dataConInstPat, but uses the specified list of OccNames.  This is 
 -- is necessary for use in e.g. tcIfaceDataAlt
-dataConOccInstPat uniqs occs con inst_tys 
+dataConOccInstPat arg_fun uniqs occs con inst_tys 
   = (ex_bndrs, co_bndrs, id_bndrs)
   where 
     univ_tvs = dataConUnivTyVars con
     ex_tvs   = dataConExTyVars con
-    arg_tys  = dataConRepArgTys con
+    arg_tys  = arg_fun con
     eq_spec  = dataConEqSpec con
     eq_preds = eqSpecPreds eq_spec
 
@@ -1161,8 +1168,7 @@ eta_expand n us expr ty
               Lam lam_tv (eta_expand n us2 (App expr (Type (mkTyVarTy lam_tv))) (substTyWith [tv] [mkTyVarTy lam_tv] ty'))
                   where 
                     lam_tv = mkTyVar (mkSysTvName uniq FSLIT("etaT")) (tyVarKind tv)
-                    (uniq:us2) = us
-
+                    (uniq:us2) = us 
  	; Nothing ->
   
     	case splitFunTy_maybe ty of {

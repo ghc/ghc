@@ -45,7 +45,7 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprType, exprIsHNF, findDefault, mergeAlts,
 			  exprOkForSpeculation, exprArity, 
 			  mkCoerce, mkSCC, mkInlineMe, applyTypeToArg,
-                          dataConInstPat
+                          dataConRepInstPat
 			)
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
@@ -1555,7 +1555,7 @@ simplDefault env case_bndr' imposs_cons cont (Just rhs)
 		 do { tick (FillInCaseDefault case_bndr')
                     ; us <- getUniquesSmpl
                     ; let (ex_tvs, co_tvs, arg_ids) =
-                              dataConInstPat us con inst_tys
+                              dataConRepInstPat us con inst_tys
                     ; let con_alt = (DataAlt con, ex_tvs ++ co_tvs ++ arg_ids, rhs)
 		    ; Just (_, alt') <- simplAlt env [] case_bndr' cont con_alt
 			-- The simplAlt must succeed with Just because we have

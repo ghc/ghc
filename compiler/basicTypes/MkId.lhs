@@ -59,7 +59,7 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
 			  tcSplitFunTys, tcSplitForAllTys, dataConsStupidTheta
 			)
-import CoreUtils	( exprType, dataConInstPat )
+import CoreUtils	( exprType, dataConOrigInstPat )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, FieldLabel,
@@ -563,7 +563,7 @@ mkRecordSelId tycon field_label
 				-- in the types of the arguments of the pattern
 	   = (ex_tvs ++ co_tvs ++ dict_vs, field_vs)
 
-        (ex_tvs, co_tvs, arg_vs) = dataConInstPat uniqs' data_con res_tys
+        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat uniqs' data_con res_tys
         (dict_vs, field_vs) = splitAt (length dc_theta) arg_vs
 
 	(_, pre_dc_theta, dc_arg_tys) = dataConSig data_con
