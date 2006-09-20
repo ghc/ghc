@@ -338,36 +338,43 @@ tcInstDecl2 (InstInfo { iSpec = ispec,
 	; (tvs, theta, inst_head) <- tcSkolSigType rigid_info inst_ty
 	; dicts <- newDicts origin theta
 	; uniqs <- newUniqueSupply
-	; let (rep_dict_id:sc_dict_ids) = map instToId dicts
+        ; let (cls, op_tys) = tcSplitDFunHead inst_head
+        ; [this_dict] <- newDicts origin [mkClassPred cls op_tys]
+        ; let (rep_dict_id:sc_dict_ids) =
+                 if null dicts then
+                     [instToId this_dict]
+                 else
+                     map instToId dicts
+
 		-- (Here, we are relying on the order of dictionary 
 		-- arguments built by NewTypeDerived in TcDeriv.)
 
-              wrap_fn = CoTyLams tvs <.> CoLams sc_dict_ids
+              wrap_fn | null dicts = idCoercion
+                      | otherwise  = CoTyLams tvs <.> CoLams sc_dict_ids
 	 
-	      coerced_rep_dict = mkHsCoerce (co_fn tvs cls_tycon) (HsVar rep_dict_id)
-              mk_located a = L noSrcSpan a
-	      body | null sc_dict_ids = coerced_rep_dict
-		   | otherwise = HsCase (mk_located coerced_rep_dict) $
+              coerced_rep_dict = mkHsCoerce (co_fn tvs cls_tycon) (HsVar rep_dict_id)
+
+	      body | null dicts || null sc_dict_ids = coerced_rep_dict
+		   | otherwise = HsCase (noLoc coerced_rep_dict) $
 				 MatchGroup [the_match] inst_head
 	      the_match = mkSimpleMatch [the_pat] the_rhs
 	      op_ids = zipWith (mkSysLocal FSLIT("op"))
                         	      (uniqsFromSupply uniqs) op_tys
-	      the_pat = mk_located $ ConPatOut { pat_con = mk_located cls_data_con, pat_tvs = [],
+	      the_pat = noLoc $ ConPatOut { pat_con = noLoc cls_data_con, pat_tvs = [],
 				    pat_dicts = sc_dict_ids,
 				    pat_binds = emptyLHsBinds,
 				    pat_args = PrefixCon (map nlVarPat op_ids),
 				    pat_ty = inst_head }
-              (cls, op_tys) = tcSplitDFunHead inst_head
               cls_data_con = classDataCon cls
               cls_tycon = dataConTyCon cls_data_con
               
 	      the_rhs = mkHsConApp (cls_data_con) (mkTyVarTys tvs) (map HsVar (sc_dict_ids ++ op_ids))
-
-        ; return (unitBag (mk_located $ VarBind (dfun_id) (mk_located (mkHsCoerce wrap_fn body)))) }
+              dict = (mkHsCoerce wrap_fn body)
+        ; pprTrace "built dict:" (ppr dict) $ return (unitBag (noLoc $ VarBind (dfun_id) (noLoc dict))) }
   where
     co_fn :: [TyVar] -> TyCon -> ExprCoFn
     co_fn tvs cls_tycon | Just co_con <- newTyConCo tycon
-	  = ExprCoFn (mkAppCoercion (mkAppsCoercion (mkTyConApp cls_tycon []) rep_tys) 
+	  = ExprCoFn (mkAppCoercion (mkTyConApp cls_tycon []) 
                        		    (mkTyConApp co_con (map mkTyVarTy tvs)))
 	  | otherwise
 	  = idCoercion

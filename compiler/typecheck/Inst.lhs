@@ -76,7 +76,7 @@ import HscTypes	( ExternalPackageState(..), HscEnv(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon, dataConStupidTheta, dataConName, 
                   dataConWrapId, dataConUnivTyVars )
-import Id	( Id, idName, idType, mkUserLocal, mkLocalId )
+import Id	( Id, idName, idType, mkUserLocal, mkLocalId, isId )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
 		  isInternalName, setNameUnique )
 import NameSet	( addOneToNameSet )

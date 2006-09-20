@@ -333,8 +333,9 @@ not just use the Num one.  The instance we want is something like:
      instance (Num a, Show (Foo a), Eq (Foo a)) => Num (Foo a) where
      	(+) = ((+)@a)
      	...etc...
-There's no 'corece' needed because after the type checker newtypes
-are transparent.
+There may be a coercion needed which we get from the tycon for the newtype
+when the dict is constructed in TcInstDcls.tcInstDecl2
+
 
 \begin{code}
 makeDerivEqns :: OverlapFlag
