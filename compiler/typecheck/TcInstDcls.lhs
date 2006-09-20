@@ -28,9 +28,10 @@ import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifySuperClasses )
 import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
-                          splitFunTys, TyThing )
+                          splitFunTys, TyThing(ATyCon) )
 import Coercion         ( mkSymCoercion )
-import TyCon            ( TyCon, newTyConCo, tyConTyVars )
+import TyCon            ( TyCon, tyConName, newTyConCo, tyConTyVars,
+			  isAssocTyCon, tyConFamInst_maybe )
 import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
 import Class		( classBigSig )
 import Var		( TyVar, Id, idName, idType, tyVarKind )
@@ -38,7 +39,8 @@ import Id               ( mkSysLocal )
 import UniqSupply       ( uniqsFromSupply, splitUniqSupply )
 import MkId		( mkDictFunId )
 import Name		( Name, getSrcLoc )
-import Maybe		( catMaybes )
+import Maybe		( isNothing, fromJust, catMaybes )
+import Monad		( when )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
 import ListSetOps	( minusList )
 import Outputable
@@ -147,8 +149,8 @@ tcInstDecls1 tycl_decls inst_decls
 		-- (1) Do the ordinary instance declarations and instances of
 		--     indexed types
        ; let { idxty_decls = filter (isIdxTyDecl . unLoc) tycl_decls }
-       ; local_info_tycons <- mappM tcLocalInstDecl1 inst_decls
-       ; idxty_info_tycons <- mappM tcIdxTyInstDecl idxty_decls
+       ; local_info_tycons <- mappM tcLocalInstDecl1  inst_decls
+       ; idxty_info_tycons <- mappM tcIdxTyInstDeclTL idxty_decls
 
        ; let { (local_infos,
 	        local_tycons)    = unzip local_info_tycons
@@ -186,6 +188,27 @@ tcInstDecls1 tycl_decls inst_decls
 		  generic_inst_info ++ deriv_inst_info ++ local_idxty_info,
 		  deriv_binds) 
     }}}}}
+  where
+    -- Make sure that toplevel type instance are not for associated types.
+    -- !!!TODO: Need to perform this check for the InstInfo structures of type
+    --		functions, too.
+    tcIdxTyInstDeclTL ldecl@(L loc decl) =
+      do { (info, tything) <- tcIdxTyInstDecl ldecl
+	 ; setSrcSpan loc $
+	     when (isAssocFamily tything) $
+	       addErr $ assocInClassErr (tcdName decl)
+	 ; return (info, tything)
+	 }
+    isAssocFamily (Just (ATyCon tycon)) =
+      case tyConFamInst_maybe tycon of
+        Nothing       -> panic "isAssocFamily: no family?!?"
+	Just (fam, _) -> isAssocTyCon fam
+    isAssocFamily (Just _	      ) = panic "isAssocFamily: no tycon?!?"
+    isAssocFamily Nothing               = False
+
+assocInClassErr name = 
+  ptext SLIT("Associated type must be inside class instance") <+> 
+  quotes (ppr name)
 
 addInsts :: [InstInfo] -> TcM a -> TcM a
 addInsts infos thing_inside

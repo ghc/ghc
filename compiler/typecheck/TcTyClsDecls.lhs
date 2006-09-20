@@ -51,7 +51,7 @@ import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon, OpenDataTyCon,
 			  tyConDataCons, mkForeignTyCon, isProductTyCon,
 			  isRecursiveTyCon, isOpenTyCon,
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
-                          isNewTyCon, tyConKind )
+                          isNewTyCon, tyConKind, makeTyConAssoc, isAssocTyCon )
 import DataCon		( DataCon, dataConUserType, dataConName, 
 			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
 			  dataConFieldType, dataConResTys )
@@ -620,7 +620,7 @@ tcTyClDecl1 _calc_isrec
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc gla_exts $ badSigTyDecl tc_name
 
-  ; return [ATyCon (buildSynTyCon tc_name tvs' (OpenSynTyCon kind))]
+  ; return [ATyCon $ buildSynTyCon tc_name tvs' (OpenSynTyCon kind)]
   }
 
   -- kind signature for an indexed data type
@@ -707,7 +707,7 @@ tcTyClDecl1 calc_isrec
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM (addLocM tc_fundep) fundeps
   ; atss <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
-  ; let ats' = concat atss
+  ; let ats' = map makeTyThingAssoc . concat $ atss
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
 		let 	-- This little knot is just so we can get
@@ -726,6 +726,8 @@ tcTyClDecl1 calc_isrec
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mappM tcLookupTyVar tvs1 ;
 				; tvs2' <- mappM tcLookupTyVar tvs2 ;
 				; return (tvs1', tvs2') }
+    makeTyThingAssoc (ATyCon tycon) = ATyCon (makeTyConAssoc tycon)
+    makeTyThingAssoc _		    = panic "makeTyThingAssoc"
 
 
 tcTyClDecl1 calc_isrec 

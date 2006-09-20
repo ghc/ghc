@@ -15,7 +15,8 @@ module TyCon(
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
 	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
-	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
+	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon, isAssocTyCon,
+	makeTyConAssoc,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
 	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConCo,
 	isHiBootTyCon, isSuperKindTyCon,
@@ -94,11 +95,14 @@ data TyCon
 	tyConName   :: Name,
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
-	
+
 	tyConTyVars :: [TyVar],		-- Scopes over (a) the algTcStupidTheta
 					--	       (b) the cached types in
 					--		   algTyConRhs.NewTyCon
 					-- But not over the data constructors
+
+        tyConIsAssoc :: Bool,           -- for families: declared in a class?
+	
 	algTcSelIds :: [Id],  		-- Its record selectors (empty if none)
 
 	algTcGadtSyntax  :: Bool,	-- True <=> the data type was declared using GADT syntax
@@ -133,13 +137,14 @@ data TyCon
     }
 
   | SynTyCon {
-	tyConUnique :: Unique,
-	tyConName   :: Name,
-	tyConKind   :: Kind,
-	tyConArity  :: Arity,
+	tyConUnique  :: Unique,
+	tyConName    :: Name,
+	tyConKind    :: Kind,
+	tyConArity   :: Arity,
 
-	tyConTyVars :: [TyVar],		-- Bound tyvars
-	synTcRhs    :: SynTyConRhs	-- Expanded type in here
+	tyConTyVars  :: [TyVar],	-- Bound tyvars
+        tyConIsAssoc :: Bool,           -- for families: declared in a class?
+	synTcRhs     :: SynTyConRhs	-- Expanded type in here
     }
 
   | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
@@ -399,6 +404,7 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
 	tyConKind	 = kind,
 	tyConArity	 = length tyvars,
 	tyConTyVars	 = tyvars,
+	tyConIsAssoc	 = False,
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
 	algTcSelIds	 = sel_ids,
@@ -468,6 +474,7 @@ mkSynTyCon name kind tyvars rhs
 	tyConKind = kind,
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
+	tyConIsAssoc = False,
 	synTcRhs = rhs
     }
 
@@ -572,6 +579,16 @@ isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon _}) = True
 isOpenTyCon (AlgTyCon {algTcRhs = OpenDataTyCon }) = True
 isOpenTyCon (AlgTyCon {algTcRhs = OpenNewTyCon  }) = True
 isOpenTyCon _					   = False
+
+isAssocTyCon :: TyCon -> Bool
+isAssocTyCon (AlgTyCon { tyConIsAssoc = isAssoc }) = isAssoc
+isAssocTyCon (SynTyCon { tyConIsAssoc = isAssoc }) = isAssoc
+isAssocTyCon _                                     = False
+
+makeTyConAssoc :: TyCon -> TyCon
+makeTyConAssoc tc@(AlgTyCon {}) = tc { tyConIsAssoc = True }
+makeTyConAssoc tc@(SynTyCon {}) = tc { tyConIsAssoc = True }
+makeTyConAssoc tc = pprPanic "makeTyConAssoc" (ppr tc)
 
 isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon
