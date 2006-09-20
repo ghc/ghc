@@ -312,7 +312,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     arg_id1 	= head arg_ids1
     var_ty      = idType var
     (tc, ty_args) = splitNewTyConApp var_ty
-    newtype_rhs = unwrapNewTypeBody tycon ty_args (Var var)
+    newtype_rhs = unwrapNewTypeBody tc ty_args (Var var)
 		
 	-- Stuff for data types
     data_cons      = tyConDataCons tycon

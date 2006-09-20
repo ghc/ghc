@@ -117,8 +117,8 @@ import PrelNames( openTypeKindTyConKey, unliftedTypeKindTyConKey,
                   ubxTupleKindTyConKey, argTypeKindTyConKey )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, isNewTyCon, isOpenTyCon, newTyConRep,
-		  newTyConRhs, 
+		  isFunTyCon, isNewTyCon, isClosedNewTyCon, isOpenTyCon,
+		  newTyConRep, newTyConRhs, 
 		  isAlgTyCon, tyConArity, isSuperKindTyCon,
 		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique,
@@ -458,8 +458,7 @@ repType :: Type -> Type
 repType ty | Just ty' <- coreView ty = repType ty'
 repType (ForAllTy _ ty)  = repType ty
 repType (TyConApp tc tys)
-  | isNewTyCon tc &&
-    not (isOpenTyCon tc) = -- Recursive newtypes are opaque to coreView
+  | isClosedNewTyCon tc  = -- Recursive newtypes are opaque to coreView
 			   -- but we must expand them here.  Sure to
 			   -- be saturated because repType is only applied
 			   -- to types of kind *
@@ -618,7 +617,7 @@ splitRecNewType_maybe :: Type -> Maybe Type
 -- Only applied to types of kind *, hence the newtype is always saturated
 splitRecNewType_maybe ty | Just ty' <- coreView ty = splitRecNewType_maybe ty'
 splitRecNewType_maybe (TyConApp tc tys)
-  | isNewTyCon tc
+  | isClosedNewTyCon tc
   = ASSERT( tys `lengthIs` tyConArity tc )	-- splitRecNewType_maybe only be applied 
 						-- 	to *types* (of kind *)
     ASSERT( isRecursiveTyCon tc ) 		-- Guaranteed by coreView

@@ -394,6 +394,15 @@ wrapFamInstBody tycon args result_expr
   | otherwise
   = result_expr
 
+-- Apply the coercion in the opposite direction.
+--
+unwrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+unwrapFamInstBody tycon args result_expr
+  | Just co_con <- tyConFamilyCoercion_maybe tycon
+  = mkCoerce (mkTyConApp co_con args) result_expr
+  | otherwise
+  = result_expr
+
 \end{code}
 
 
@@ -842,12 +851,25 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- If a coercion constructor is prodivided in the newtype, then we use
 -- it, otherwise the wrap/unwrap are both no-ops 
 --
+-- If the we are dealing with a newtype instance, we have a second coercion
+-- identifying the family instance with the constructor of the newtype
+-- instance.  This coercion is applied in any case (ie, composed with the
+-- coercion constructor of the newtype or applied by itself).
+--
 wrapNewTypeBody tycon args result_expr
-  | Just co_con <- newTyConCo tycon
-  = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
-  | otherwise
-  = result_expr
+  = wrapFamInstBody tycon args inner
+  where
+    inner
+      | Just co_con <- newTyConCo tycon
+      = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
+      | otherwise
+      = result_expr
 
+-- When unwrapping, we do *not* apply any family coercion, because this will
+-- be done via a CoPat by the type checker.  We have to do it this way as
+-- computing the right type arguments for the coercion requires more than just
+-- a spliting operation (cf, TcPat.tcConPat).
+--
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   | Just co_con <- newTyConCo tycon

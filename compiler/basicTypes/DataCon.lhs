@@ -38,7 +38,8 @@ import Type		( Type, ThetaType,
 import Coercion		( isEqPred, mkEqPred )
 import TyCon		( TyCon, FieldLabel, tyConDataCons, 
 			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon,
-                          isNewTyCon, isRecursiveTyCon, tyConFamInst_maybe )
+                          isNewTyCon, isClosedNewTyCon, isRecursiveTyCon,
+                          tyConFamInst_maybe )
 import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique, mkSysTvName, mkSystemName )
 import Var		( TyVar, CoVar, Id, mkTyVar, tyVarKind, setVarUnique,
@@ -727,9 +728,10 @@ splitProductType str ty
 deepSplitProductType_maybe ty
   = do { (res@(tycon, tycon_args, _, _)) <- splitProductType_maybe ty
        ; let {result 
-             | isNewTyCon tycon && not (isRecursiveTyCon tycon)
+             | isClosedNewTyCon tycon && not (isRecursiveTyCon tycon)
              = deepSplitProductType_maybe (newTyConInstRhs tycon tycon_args)
-             | isNewTyCon tycon = Nothing  -- cannot unbox through recursive newtypes
+             | isNewTyCon tycon = Nothing  -- cannot unbox through recursive
+					   -- newtypes nor through families
              | otherwise = Just res}
        ; result
        }

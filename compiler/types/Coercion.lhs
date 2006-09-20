@@ -40,7 +40,7 @@ import Type	  ( Type, Kind, PredType, substTyWith, mkAppTy, mkForAllTy,
                     coreEqType, splitAppTys, isTyVarTy, splitTyConApp_maybe,
                     tyVarsOfType, mkTyVarTys
                   )
-import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isNewTyCon,
+import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isClosedNewTyCon,
                     newTyConRhs, newTyConCo, 
                     isCoercionTyCon, isCoercionTyCon_maybe )
 import Var	  ( Var, TyVar, isTyVar, tyVarKind )
@@ -451,7 +451,7 @@ splitNewTypeRepCo_maybe :: Type -> Maybe (Type, Coercion)
 splitNewTypeRepCo_maybe ty 
   | Just ty' <- coreView ty = splitNewTypeRepCo_maybe ty'
 splitNewTypeRepCo_maybe (TyConApp tc tys)
-  | isNewTyCon tc 
+  | isClosedNewTyCon tc 
   = ASSERT( tys `lengthIs` tyConArity tc )	-- splitNewTypeRepCo_maybe only be applied 
                                                 -- 	to *types* (of kind *)
         case newTyConRhs tc of

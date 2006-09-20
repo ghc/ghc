@@ -14,7 +14,8 @@ module TyCon(
 	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
-	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isPrimTyCon,
+	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isClosedNewTyCon,
+	isPrimTyCon, 
 	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
 	assocTyConArgPoss_maybe, isTyConAssoc, setTyConArgPoss,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
@@ -559,6 +560,14 @@ isNewTyCon (AlgTyCon {algTcRhs = rhs}) = case rhs of
 					   NewTyCon {}  -> True
 					   _	        -> False
 isNewTyCon other			= False
+
+-- This is an important refinement as typical newtype optimisations do *not*
+-- hold for newtype families.  Why?  Given a type `T a', if T is a newtype
+-- family, there is no unique right hand side by which `T a' can be replaced
+-- by a cast.
+--
+isClosedNewTyCon :: TyCon -> Bool
+isClosedNewTyCon tycon = isNewTyCon tycon && not (isOpenTyCon tycon)
 
 isProductTyCon :: TyCon -> Bool
 -- A "product" tycon

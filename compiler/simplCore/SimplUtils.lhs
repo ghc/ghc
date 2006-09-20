@@ -51,7 +51,7 @@ import Type		( Type, splitFunTys, dropForAlls, isStrictType,
 import Coercion         ( isEqPredTy
 			)
 import Coercion         ( Coercion, mkUnsafeCoercion, coercionKind )
-import TyCon		( tyConDataCons_maybe, isNewTyCon )
+import TyCon		( tyConDataCons_maybe, isClosedNewTyCon )
 import DataCon		( DataCon, dataConRepArity, dataConExTyVars, 
                           dataConInstArgTys, dataConTyCon )
 import VarSet
@@ -1467,7 +1467,7 @@ mkCase1 scrut case_bndr ty alts	-- Identity case
     identity_alt (con, args, rhs) = de_note rhs `cheapEqExpr` identity_rhs con args
 
     identity_rhs (DataAlt con) args
-      | isNewTyCon (dataConTyCon con) 
+      | isClosedNewTyCon (dataConTyCon con) 
       = wrapNewTypeBody (dataConTyCon con) arg_tys (varToCoreExpr $ head args)
       | otherwise
       = mkConApp con (arg_ty_exprs ++ varsToCoreExprs args)

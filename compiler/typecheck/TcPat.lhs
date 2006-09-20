@@ -47,7 +47,7 @@ import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
 import Type		( Type, mkTyConApp, substTys, substTheta )
 import StaticFlags	( opt_IrrefutableTuples )
 import TyCon		( TyCon, FieldLabel, tyConFamInst_maybe,
-			  tyConFamilyCoercion_maybe, tyConTyVars )
+			  tyConFamilyCoercion_maybe, tyConTyVars, isNewTyCon )
 import DataCon		( DataCon, dataConTyCon, dataConFullSig, dataConName,
 			  dataConFieldLabels, dataConSourceArity, 
 			  dataConStupidTheta, dataConUnivTyVars )
@@ -586,6 +586,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
     -- representation tycon.
     --
     boxySplitTyConAppWithFamily tycon pat_ty =
+      traceTc traceMsg >>
       case tyConFamInst_maybe tycon of
         Nothing                   -> boxySplitTyConApp tycon pat_ty
 	Just (fam_tycon, instTys) -> 
@@ -594,6 +595,12 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	     ; boxyUnifyList (substTys subst instTys) scrutinee_arg_tys
 	     ; return freshTvs
 	     }
+      where
+        traceMsg = sep [ text "tcConPat:boxySplitTyConAppWithFamily:" <+>
+		         ppr tycon <+> ppr pat_ty
+		       , text "  family instance:" <+> 
+			 ppr (tyConFamInst_maybe tycon)
+                       ]
 
     -- Wraps the pattern (which must be a ConPatOut pattern) in a coercion
     -- pattern if the tycon is an instance of a family.
@@ -601,6 +608,8 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
     unwrapFamInstScrutinee :: TyCon -> [Type] -> Pat Id -> Pat Id
     unwrapFamInstScrutinee tycon args pat
       | Just co_con <- tyConFamilyCoercion_maybe tycon 
+--      , not (isNewTyCon tycon)       -- newtypes are explicitly unwrapped by
+				     -- the desugarer
           -- NB: We can use CoPat directly, rather than mkCoPat, as we know the
           --	 coercion is not the identity; mkCoPat is inconvenient as it
           --	 wants a located pattern.
