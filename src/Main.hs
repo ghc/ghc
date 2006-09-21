@@ -33,7 +33,6 @@ import System.IO             ( stderr, IOMode(..), openFile, hClose,
 import System.Directory      ( doesFileExist, doesDirectoryExist )
 import qualified Data.Map as Map
 import Data.Map              (Map)
-import Data.FunctorM         ( fmapM )
 import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
 
 import qualified GHC         ( init )
