@@ -941,11 +941,6 @@ static int linker_init_done = 0 ;
 static void *dl_prog_handle;
 #endif
 
-/* dlopen(NULL,..) doesn't work so we grab libc explicitly */
-#if defined(openbsd_HOST_OS)
-static void *dl_libc_handle;
-#endif
-
 void
 initLinker( void )
 {
@@ -975,9 +970,6 @@ initLinker( void )
     dl_prog_handle = RTLD_DEFAULT;
 #   else
     dl_prog_handle = dlopen(NULL, RTLD_LAZY);
-#   if defined(openbsd_HOST_OS)
-    dl_libc_handle = dlopen("libc.so", RTLD_LAZY);
-#   endif
 #   endif /* RTLD_DEFAULT */
 #   endif
 }
@@ -1128,10 +1120,7 @@ lookupSymbol( char *lbl )
 
     if (val == NULL) {
 #       if defined(OBJFORMAT_ELF)
-#	if defined(openbsd_HOST_OS)
-	val = dlsym(dl_prog_handle, lbl);
-	return (val != NULL) ? val : dlsym(dl_libc_handle,lbl);
-#	elif defined(x86_64_HOST_ARCH)
+#	if defined(x86_64_HOST_ARCH)
 	val = dlsym(dl_prog_handle, lbl);
 	if (val >= (void *)0x80000000) {
 	    void *new_val;
@@ -1141,7 +1130,7 @@ lookupSymbol( char *lbl )
 	} else {
 	    return val;
 	}
-#	else /* not openbsd */
+#	else
 	return dlsym(dl_prog_handle, lbl);
 #	endif
 #       elif defined(OBJFORMAT_MACHO)

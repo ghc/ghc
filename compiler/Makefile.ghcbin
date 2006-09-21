@@ -18,6 +18,9 @@ SRC_HC_OPTS += \
   -cpp -fglasgow-exts -fno-generics -Rghc-timing \
   -I. -IcodeGen -InativeGen -Iparser
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
+ifeq "$(TargetOS_CPP)" "openbsd"
+SRC_HC_OPTS += -optl-Xlinker -optl-E
+endif
 
 ifeq "$(GhcWithInterpreter)" "YES"
 SRC_HC_OPTS += -DGHCI -DBREAKPOINT
