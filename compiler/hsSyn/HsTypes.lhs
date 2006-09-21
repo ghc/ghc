@@ -32,7 +32,7 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import Type		( Type )
 import {- Kind parts of -} 
-       Type	        ( {- instance Outputable Kind -}, Kind,
+       Type	        ( {- instance Outputable Kind -} Kind,
 			  pprParendKind, pprKind, isLiftedTypeKind )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import SrcLoc		( Located(..), unLoc, noSrcSpan )
