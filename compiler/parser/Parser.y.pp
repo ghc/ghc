@@ -1577,6 +1577,7 @@ special_id
 	: 'as'			{ L1 FSLIT("as") }
 	| 'qualified'		{ L1 FSLIT("qualified") }
 	| 'hiding'		{ L1 FSLIT("hiding") }
+        | 'for'                 { L1 FSLIT("for") }
 	| 'export'		{ L1 FSLIT("export") }
 	| 'label'		{ L1 FSLIT("label")  }
 	| 'dynamic'		{ L1 FSLIT("dynamic") }
