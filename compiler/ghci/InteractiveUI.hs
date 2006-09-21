@@ -26,7 +26,7 @@ import TcType           ( tidyTopType )
 import qualified Id     ( setIdType )
 import IdInfo           ( GlobalIdDetails(..) )
 import Linker           ( HValue, extendLinkEnv, withExtendedLinkEnv,
-                          initDynLinker, linkPackages )
+                          initDynLinker )
 import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
 #endif
 
@@ -56,7 +56,7 @@ import BasicTypes	( failed, successIf )
 import Panic 		( panic, installSignalHandlers )
 import Config
 import StaticFlags	( opt_IgnoreDotGhci )
-import Linker		( showLinkerState )
+import Linker		( showLinkerState, linkPackages )
 import Util		( removeSpaces, handle, global, toArgs,
 			  looksLikeModuleName, prefixMatch, sortLe )
 
