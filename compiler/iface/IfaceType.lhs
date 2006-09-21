@@ -123,6 +123,8 @@ data IfacePredType 	-- NewTypes are handled as ordinary TyConApps
 
 type IfaceContext = [IfacePredType]
 
+-- NB: If you add a data constructor, remember to add a case to
+--     IfaceSyn.eqIfTc!
 data IfaceTyCon 	-- Abbreviations for common tycons with known names
   = IfaceTc IfaceExtName	-- The common case
   | IfaceIntTc | IfaceBoolTc | IfaceCharTc

@@ -39,7 +39,7 @@ import NewDemand	( StrictSig, pprIfaceStrictSig )
 import TcType		( deNoteType )
 import Class		( FunDep, DefMeth, pprFundeps )
 import OccName		( OccName, parenSymOcc, occNameFS,
-			  OccSet, unionOccSets, unitOccSet )
+			  OccSet, unionOccSets, unitOccSet, occSetElts )
 import UniqFM           ( UniqFM, emptyUFM, addToUFM, lookupUFM )
 import Name		( Name, NamedThing(..), nameOccName, isExternalName )
 import CostCentre	( CostCentre, pprCostCentreCore )
@@ -474,6 +474,11 @@ data IfaceEq
   | NotEqual		-- Definitely different
   | EqBut OccSet	-- The same provided these local things have not changed
 
+instance Outputable IfaceEq where
+  ppr Equal          = ptext SLIT("Equal")
+  ppr NotEqual       = ptext SLIT("NotEqual")
+  ppr (EqBut occset) = ptext SLIT("EqBut") <+> ppr (occSetElts occset)
+
 bool :: Bool -> IfaceEq
 bool True  = Equal
 bool False = NotEqual
@@ -730,7 +735,12 @@ eqIfTc IfaceBoolTc   IfaceBoolTc   = Equal
 eqIfTc IfaceListTc   IfaceListTc   = Equal
 eqIfTc IfacePArrTc   IfacePArrTc   = Equal
 eqIfTc (IfaceTupTc bx1 ar1) (IfaceTupTc bx2 ar2) = bool (bx1==bx2 && ar1==ar2)
-eqIfTc _ _ = NotEqual
+eqIfTc IfaceLiftedTypeKindTc   IfaceLiftedTypeKindTc   = Equal
+eqIfTc IfaceOpenTypeKindTc     IfaceOpenTypeKindTc     = Equal
+eqIfTc IfaceUnliftedTypeKindTc IfaceUnliftedTypeKindTc = Equal
+eqIfTc IfaceUbxTupleKindTc     IfaceUbxTupleKindTc     = Equal
+eqIfTc IfaceArgTypeKindTc      IfaceArgTypeKindTc      = Equal
+eqIfTc _		       _		       = NotEqual
 \end{code}
 
 -----------------------------------------------------------
