@@ -11,9 +11,11 @@ type Coercion = Type
 
 type Kind = Type
 
-tySuperKind :: Kind
-coSuperKind :: Kind
+type SuperKind = Type
 
-isCoSuperKind :: Kind -> Bool
+tySuperKind :: SuperKind
+coSuperKind :: SuperKind
+
+isCoSuperKind :: SuperKind -> Bool
 \end{code}
 

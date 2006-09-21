@@ -397,6 +397,7 @@ isTySuperKind (NoteTy _ ty)    = isTySuperKind ty
 isTySuperKind (TyConApp kc []) = kc `hasKey` tySuperKindTyConKey
 isTySuperKind other            = False
 
+isCoSuperKind :: SuperKind -> Bool
 isCoSuperKind (NoteTy _ ty)    = isCoSuperKind ty
 isCoSuperKind (TyConApp kc []) = kc `hasKey` coSuperKindTyConKey
 isCoSuperKind other            = False
