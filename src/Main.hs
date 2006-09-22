@@ -1150,7 +1150,7 @@ pkgId = mkPackageId . package
 -- using the dependency information available in the ModIface structure for 
 -- each module. 
 sortPackageModules :: [Module] -> IO [Module]
-sortPackageModules = undefined
+sortPackageModules mods = return mods
 
 -- | For each module in the list, try to retrieve a ModuleInfo structure  
 moduleInfo :: Session -> [Module] -> IO (Maybe [ModuleInfo])
