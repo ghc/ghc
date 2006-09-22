@@ -1075,26 +1075,33 @@ ppDataHeader summary newOrData name tyvars =
 -- ----------------------------------------------------------------------------
 -- Types and contexts
 
+ppVar = ppOccName . kindVarOcc
+
+ppParendKind k@(FunKind _ _) = parens (ppKind k)
+ppParendKind k               = ppKind k
+
 ppKind kind = case kind of
   LiftedTypeKind   -> char '*'
   OpenTypeKind     -> char '?'
   UnboxedTypeKind  -> char '#'
   UnliftedTypeKind -> char '!'
-  UbxTupleKind     -> toHtml "(##)"
+  UbxTupleKind     -> toHtml "(#)"
   ArgTypeKind      -> toHtml "??"
-  FunKind k1 k2    -> hsep [ppKind k1, toHtml "->", ppKind k2] 
-  KindVar v        -> ppOccName (kindVarOcc v)
+  FunKind k1 k2    -> hsep [ppParendKind k1, arrow <+> ppKind k2] 
+  KindVar v        -> ppVar v 
 
-ppCtxtPart (L _ ctxt) 
-  | null ctxt = empty 
-  | otherwise = hsep [ppContext ctxt, darrow]
-
-ppForAllTy (HsForAllTy expl ltvs lctxt _) = ppForAll expl ltvs lctxt 
-
+{-
 ppForAll Implicit _ lctxt = ppCtxtPart lctxt
 ppForAll Explicit ltvs lctxt = 
-  hsep (keyword "forall" : ppTyVars ltvs ++ [toHtml "."]) <+> ppCtxtPart lctxt 
+  hsep (keyword "forall" : ppTyVars ltvs ++ [dot]) <+> ppCtxtPart lctxt 
+-}
 
+ppBang HsStrict = toHtml "!"
+ppBang HsUnbox  = toHtml "!!"
+
+tupleParens Boxed   = parenList
+tupleParens Unboxed = ubxParenList 
+{-
 ppType :: HsType DocName -> Html
 ppType t = case t of
   t@(HsForAllTy expl ltvs lcontext ltype) -> ppForAllTy t <+> ppLType ltype
@@ -1114,6 +1121,81 @@ ppType t = case t of
   HsKindSig t k -> hsep [ppLType t, dcolon, ppKind k]
   HsSpliceTy _ -> error "ppType"
   HsDocTy t _ -> ppLType t
+-}
+--------------------------------------------------------------------------------
+-- Rendering of HsType 
+--------------------------------------------------------------------------------
+
+pREC_TOP = (0 :: Int)   -- type in ParseIface.y in GHC
+pREC_FUN = (1 :: Int)   -- btype in ParseIface.y in GHC
+                        -- Used for LH arg of (->)
+pREC_OP  = (2 :: Int)   -- Used for arg of any infix operator
+                        -- (we don't keep their fixities around)
+pREC_CON = (3 :: Int)   -- Used for arg of type applicn:
+                        -- always parenthesise unless atomic
+
+maybeParen :: Int           -- Precedence of context
+           -> Int           -- Precedence of top-level operator
+           -> Html -> Html  -- Wrap in parens if (ctxt >= op)
+maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
+                               | otherwise            = p
+
+ppType ty       = ppr_mono_ty pREC_TOP (prepare ty)
+ppParendType ty = ppr_mono_ty pREC_CON ty
+
+-- Before printing a type
+-- (a) Remove outermost HsParTy parens
+-- (b) Drop top-level for-all type variables in user style
+--     since they are implicit in Haskell
+prepare (HsParTy ty) = prepare (unLoc ty)
+prepare ty           = ty
+
+ppForAll exp tvs cxt 
+  | show_forall = forall_part <+> ppLContext cxt
+  | otherwise   = ppLContext cxt
+  where
+    show_forall = not (null tvs) && is_explicit
+    is_explicit = case exp of {Explicit -> True; Implicit -> False}
+    forall_part = hsep (keyword "forall" : ppTyVars tvs) +++ dot 
+
+ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
+
+ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
+  = maybeParen ctxt_prec pREC_FUN $
+    hsep [ppForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
+
+-- gaw 2004
+ppr_mono_ty ctxt_prec (HsBangTy b ty)     = ppBang b +++ ppLType ty
+ppr_mono_ty ctxt_prec (HsTyVar name)      = ppDocName name
+ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
+ppr_mono_ty ctxt_prec (HsTupleTy con tys) = tupleParens con (map ppLType tys)
+ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> ppKind kind)
+ppr_mono_ty ctxt_prec (HsListTy ty)       = brackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (HsPArrTy ty)       = pabrackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty ctxt_prec (HsPredTy pred)     = parens (ppPred pred)
+ppr_mono_ty ctxt_prec (HsNumTy n)         = toHtml (show n) -- generics only
+ppr_mono_ty ctxt_prec (HsSpliceTy s)      = error "ppr_mono_ty-haddock"
+
+ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
+  = maybeParen ctxt_prec pREC_CON $
+    hsep [ppr_mono_lty pREC_FUN fun_ty, ppr_mono_lty pREC_CON arg_ty]
+
+ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
+  = maybeParen ctxt_prec pREC_OP $
+    ppr_mono_lty pREC_OP ty1 <+> ppLDocName op <+> ppr_mono_lty pREC_OP ty2
+
+ppr_mono_ty ctxt_prec (HsParTy ty)
+  = parens (ppr_mono_lty pREC_TOP ty)
+
+ppr_mono_ty ctxt_prec (HsDocTy ty doc)
+  = ppLType ty
+
+ppr_fun_ty ctxt_prec ty1 ty2
+  = let p1 = ppr_mono_lty pREC_FUN ty1
+        p2 = ppr_mono_lty pREC_TOP ty2
+    in
+    maybeParen ctxt_prec pREC_FUN $
+    hsep [p1, arrow <+> p2]
 
 -- ----------------------------------------------------------------------------
 -- Names
@@ -1236,6 +1318,7 @@ empty  = noHtml
 parens, brackets, braces :: Html -> Html
 parens h        = char '(' +++ h +++ char ')'
 brackets h      = char '[' +++ h +++ char ']'
+pabrackets h    = toHtml "[:" +++ h +++ toHtml ":]"
 braces h        = char '{' +++ h +++ char '}'
 
 punctuate :: Html -> [Html] -> [Html]
@@ -1350,6 +1433,7 @@ dcolon, arrow, darrow :: Html
 dcolon = toHtml "::"
 arrow  = toHtml "->"
 darrow = toHtml "=>"
+dot    = toHtml "."
 
 s8, s15 :: HtmlTable
 s8  = tda [ theclass "s8" ]  << noHtml
