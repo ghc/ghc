@@ -14,13 +14,11 @@ import CoreSyn
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
-import CoreSubst	( Subst, mkSubst, substExpr )
 import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
-import DataCon		( dataConRepArity, isVanillaDataCon, 
-			  dataConUnivTyVars )
-import Type		( Type, tyConAppArgs, tyVarsOfTypes )
+import DataCon		( dataConRepArity, dataConUnivTyVars )
+import Type		( Type, tyConAppArgs )
 import Rules		( matchN )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
 			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
@@ -429,12 +427,6 @@ data ConValue  = CV AltCon [CoreArg]
 instance Outputable ConValue where
    ppr (CV con args) = ppr con <+> interpp'SP args
 
-refineConstrEnv :: Subst -> ConstrEnv -> ConstrEnv
--- The substitution is a type substitution only
-refineConstrEnv subst env = mapVarEnv refine_con_value env
-  where
-    refine_con_value (CV con args) = CV con (map (substExpr subst) args)
-
 emptyScEnv = SCE { scope = emptyVarEnv, cons = emptyVarEnv }
 
 data HowBound = RecFun	-- These are the recursive functions for which 
@@ -746,9 +738,8 @@ specialise env fn bndrs body body_usg
 			 [ exprsFreeVars pats `delVarSetList` vs 
 			 | (vs,pats) <- good_calls ]
 	      uniq_calls = nubBy (same_call in_scope) good_calls
-    in
-    mapAndUnzipUs (spec_one env fn (mkLams bndrs body)) 
-		  (uniq_calls `zip` [1..]) }
+	; mapAndUnzipUs (spec_one env fn (mkLams bndrs body)) 
+			(uniq_calls `zip` [1..]) }
   where
 	-- Two calls are the same if they match both ways
     same_call in_scope (vs1,as1)(vs2,as2)
@@ -965,4 +956,5 @@ is_con_app_maybe env expr
 mk_con_app :: AltCon -> [CoreArg] -> CoreExpr
 mk_con_app (LitAlt lit)  []   = Lit lit
 mk_con_app (DataAlt con) args = mkConApp con args
+mk_con_app other args = panic "SpecConstr.mk_con_app"
 \end{code}
