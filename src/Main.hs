@@ -1116,14 +1116,14 @@ toHsType t = case t of
   AppTy a b -> HsAppTy (toLHsType a) (toLHsType b)
   TyConApp tc ts -> case ts of 
     [] -> HsTyVar (tyConName tc)
-    _  -> HsAppTy (tycon tc) (args ts)
+    _  -> app (tycon tc) ts
   FunTy a b -> HsFunTy (toLHsType a) (toLHsType b) 
   ForAllTy v t -> cvForAll [v] t 
   PredTy p -> HsPredTy (toHsPred p) 
   NoteTy _ t -> toHsType t
   where
-    tycon tc = noLoc (HsTyVar (tyConName tc))
-    args ts = foldl1 (\a b -> noLoc $ HsAppTy a b) (map toLHsType ts)
+    tycon tc = HsTyVar (tyConName tc)
+    app tc ts = foldl (\a b -> HsAppTy (noLoc a) (noLoc b)) tc (map toHsType ts)
     cvForAll vs (ForAllTy v t) = cvForAll (v:vs) t
     cvForAll vs t = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType t)
     tyvarbinders vs = map (noLoc . UserTyVar . tyVarName) vs
