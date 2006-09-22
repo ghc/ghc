@@ -875,6 +875,13 @@ argToPat in_scope con_env (Var v) arg_occ
     then return (True, Var v)
     else wildCardPat (idType v)
 
+argToPat in_scope con_env (Let _ arg) arg_occ
+  = argToPat in_scope con_env arg arg_occ
+	-- Look through let expressions
+	-- e.g.		f (let v = rhs in \y -> ...v...)
+	-- Here we can specialise for f (\y -> ...)
+	-- because the rule-matcher will look through the let.
+
 argToPat in_scope con_env arg arg_occ
   | is_value_lam arg
   = return (True, arg)
