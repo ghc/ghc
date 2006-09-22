@@ -22,27 +22,27 @@ import HaddockVersion
 import Html
 import qualified Html
 
-import Control.Exception ( bracket )
-import Control.Monad ( when, unless )
-import Data.Char ( isUpper, toUpper )
-import Data.List ( sortBy )
-import Data.Maybe ( fromJust, isJust, mapMaybe, fromMaybe )
+import Control.Exception     ( bracket )
+import Control.Monad         ( when, unless )
+import Data.Char             ( isUpper, toUpper )
+import Data.List             ( sortBy )
+import Data.Maybe            ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
-import System.IO ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
-import Debug.Trace ( trace )
-import Data.Map ( Map )
+import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
+import Debug.Trace           ( trace )
+import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 
 import GHC 
 import Name
 import Module
-import PackageConfig ( stringToPackageId )
+import PackageConfig         ( stringToPackageId )
 import RdrName hiding ( Qual )
 import SrcLoc   
-import FastString ( unpackFS )
-import BasicTypes ( IPName(..), Boxity(..) )
+import FastString            ( unpackFS )
+import BasicTypes            ( IPName(..), Boxity(..) )
 import Kind
-import Outputable ( ppr, defaultUserStyle )
+import Outputable            ( ppr, defaultUserStyle, showSDoc )
 
 -- the base, module and entity URLs for the source code and wiki links.
 type SourceURLs = (Maybe String, Maybe String, Maybe String)
