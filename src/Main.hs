@@ -16,7 +16,7 @@ import HaddockVersion
 import Paths_haddock         ( getDataDir )
 
 import Prelude hiding ( catch )
-import Control.Exception     ( bracket, throwIO, catch, Exception(..) )
+import Control.Exception     ( catch )
 import Control.Monad         ( when, liftM )
 import Control.Monad.Writer  ( Writer, runWriter, tell )
 import Data.Char             ( isSpace )
@@ -28,18 +28,18 @@ import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList,
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
                                ArgDescr(..) )
 import System.Environment    ( getArgs )
-import System.IO             ( stderr, IOMode(..), openFile, hClose, 
-                               hGetContents, hPutStrLn )
-import System.Directory      ( doesFileExist, doesDirectoryExist )
+import System.Directory      ( doesDirectoryExist )
+
 import qualified Data.Map as Map
 import Data.Map              (Map)
+
 import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
 
 import qualified GHC         ( init )
 import GHC hiding ( init ) 
 import Outputable
 import SrcLoc
-import qualified Digraph as Digraph
+import Digraph               ( flattenSCC )
 import Name
 import Module                ( mkModule ) 
 import InstEnv
@@ -202,7 +202,7 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
   let 
     modSumFile    = fromJust . ml_hs_file . ms_location
     sortedGraph   = topSortModuleGraph False moduleGraph Nothing
-    sortedModules = concatMap Digraph.flattenSCC sortedGraph 
+    sortedModules = concatMap flattenSCC sortedGraph 
     modsAndFiles  = [ (ms_mod modsum, modSumFile modsum) | 
                       modsum <- sortedModules, 
                       modSumFile modsum `elem` files ] 
