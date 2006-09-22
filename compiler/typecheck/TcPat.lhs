@@ -11,8 +11,8 @@ module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
 
 import {-# SOURCE #-}	TcExpr( tcSyntaxOp )
 import HsSyn		( Pat(..), LPat, HsConDetails(..), HsLit(..),
-			  HsOverLit(..), HsExpr(..), OutPat, ExprCoFn(..),
-			  mkCoPat, idCoercion,
+			  HsOverLit(..), HsExpr(..), ExprCoFn(..),
+			  mkCoPat, 
 			  LHsBinds, emptyLHsBinds, isEmptyLHsBinds, 
 			  collectPatsBinders, nlHsLit )
 import TcHsSyn		( TcId, hsLitType )
@@ -21,7 +21,7 @@ import Inst		( InstOrigin(..), shortCutFracLit, shortCutIntLit,
 			  newDictBndrs, instToId, instStupidTheta, isHsVar
 			)
 import Id		( Id, idType, mkLocalId )
-import Var		( CoVar )
+import Var		( CoVar, tyVarKind )
 import CoreFVs		( idFreeTyVars )
 import Name		( Name, mkSystemVarName )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
@@ -50,8 +50,8 @@ import TcGadt		( Refinement, emptyRefinement, gadtRefine, refineType )
 import Type		( Type, mkTyConApp, substTys, substTheta )
 import StaticFlags	( opt_IrrefutableTuples )
 import TyCon		( TyCon, FieldLabel, tyConFamInst_maybe,
-			  tyConFamilyCoercion_maybe, tyConTyVars, isNewTyCon )
-import DataCon		( DataCon, dataConTyCon, dataConFullSig, dataConName,
+			  tyConFamilyCoercion_maybe, tyConTyVars )
+import DataCon		( DataCon, dataConTyCon, dataConFullSig, 
 			  dataConFieldLabels, dataConSourceArity, 
 			  dataConStupidTheta, dataConUnivTyVars )
 import PrelNames	( integralClassName, fromIntegerName, integerTyConName, 
@@ -562,7 +562,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	      arg_tys' = substTys    tenv arg_tys
 
 	; co_vars <- newCoVars eq_spec'	-- Make coercion variables
-	; pstate' <- refineAlt data_con pstate ex_tvs co_vars pat_ty
+	; pstate' <- refineAlt data_con pstate ex_tvs' co_vars pat_ty
 
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
 		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
@@ -646,6 +646,9 @@ tcConArgs data_con [arg_ty1,arg_ty2] (InfixCon p1 p2) pstate thing_inside
 	; return (InfixCon p1' p2', tvs, res) }
   where
     con_arity  = dataConSourceArity data_con
+
+tcConArgs data_con other_args (InfixCon p1 p2) pstate thing_inside
+  = pprPanic "tcConArgs" (ppr data_con)	-- InfixCon always has two arguments
 
 tcConArgs data_con arg_tys (RecCon rpats) pstate thing_inside
   = do	{ (rpats', tvs, res) <- tcMultiple tc_field rpats pstate thing_inside
@@ -750,7 +753,10 @@ refineAlt con pstate ex_tvs co_vars pat_ty
 		    -- might be inside a lazy pattern.  Instead, refine pstate
 	        where
 		    
-		    trace_msg = text "refineAlt:match" <+> ppr con <+> ppr reft
+		    trace_msg = text "refineAlt:match" <+> 
+				vcat [ ppr con <+> ppr ex_tvs,
+				       ppr [(v, tyVarKind v) | v <- co_vars],
+				       ppr reft]
 	}
 \end{code}
 
