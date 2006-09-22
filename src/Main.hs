@@ -812,7 +812,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
 		| OptHide `elem` hmod_options hmod
 			-> return (hmod_export_items hmod)
 		| otherwise -> return [ ExportModule m ]
-	     Nothing -> return [] -- already emitted a warning in exportedNames
+	     Nothing -> return [] -- already emitted a warning in visibleNames
 
     findDecl :: Name -> (Maybe (LHsDecl Name), Maybe (HsDoc Name))
     findDecl n | not (isExternalName n) = error "This shouldn't happen"
