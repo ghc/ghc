@@ -76,7 +76,7 @@ keepL (L loc n) = L loc (NoLink n)
 rename = lookupRn id 
 renameL (L loc name) = return . L loc =<< rename name
 
-renameExportItems :: [ExportItem2 Name] -> RnM [ExportItem2 DocName]
+renameExportItems :: [ExportItem Name] -> RnM [ExportItem DocName]
 renameExportItems items = mapM renameExportItem items
 
 renameMaybeDoc :: Maybe (HsDoc Name) -> RnM (Maybe (HsDoc DocName))
@@ -199,7 +199,7 @@ renameLContext (L loc context) = do
   context' <- mapM renameLPred context
   return (L loc context')
 
-renameInstHead :: InstHead2 Name -> RnM (InstHead2 DocName)
+renameInstHead :: InstHead Name -> RnM (InstHead DocName)
 renameInstHead (preds, className, types) = do
   preds' <- mapM renamePred preds
   className' <- rename className
@@ -301,21 +301,21 @@ renameForD (ForeignExport lname ltype x) = do
   ltype' <- renameLType ltype
   return (ForeignExport (keepL lname) ltype' x)
 
-renameExportItem :: ExportItem2 Name -> RnM (ExportItem2 DocName)
+renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
 renameExportItem item = case item of 
-  ExportModule2 mod -> return (ExportModule2 mod)
-  ExportGroup2 lev id doc -> do
+  ExportModule mod -> return (ExportModule mod)
+  ExportGroup lev id doc -> do
     doc' <- renameDoc doc
-    return (ExportGroup2 lev id doc')
-  ExportDecl2 x decl doc instances -> do
+    return (ExportGroup lev id doc')
+  ExportDecl x decl doc instances -> do
     decl' <- renameLDecl decl
     doc' <- mapM renameDoc doc
     instances' <- mapM renameInstHead instances
-    return (ExportDecl2 x decl' doc' instances')
-  ExportNoDecl2 x y subs -> do
+    return (ExportDecl x decl' doc' instances')
+  ExportNoDecl x y subs -> do
     y' <- lookupRn id y
     subs' <- mapM (lookupRn id) subs
-    return (ExportNoDecl2 x y' subs')
-  ExportDoc2 doc -> do
+    return (ExportNoDecl x y' subs')
+  ExportDoc doc -> do
     doc' <- renameDoc doc
-    return (ExportDoc2 doc')
+    return (ExportDoc doc')

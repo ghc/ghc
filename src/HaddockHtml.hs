@@ -551,9 +551,9 @@ hmodToHtml maybe_source_url maybe_wiki_url hmod
  
 	exports = numberSectionHeadings (hmod_rn_export_items hmod)
 
-	has_doc (ExportDecl2 _ _ doc _) = isJust doc
-	has_doc (ExportNoDecl2 _ _ _) = False
-	has_doc (ExportModule2 _) = False
+	has_doc (ExportDecl _ _ doc _) = isJust doc
+	has_doc (ExportNoDecl _ _ _) = False
+	has_doc (ExportModule _) = False
 	has_doc _ = True
 
 	no_doc_at_all = not (any has_doc exports)
@@ -582,13 +582,13 @@ hmodToHtml maybe_source_url maybe_wiki_url hmod
 	maybe_doc_hdr
 	    = case exports of		   
 		   [] -> Html.emptyTable
-		   ExportGroup2 _ _ _ : _ -> Html.emptyTable
+		   ExportGroup _ _ _ : _ -> Html.emptyTable
 		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 
 	bdy  = map (processExport False linksInfo docMap) exports
 	linksInfo = (maybe_source_url, maybe_wiki_url, hmod)
 
-ppModuleContents :: [ExportItem2 DocName] -> HtmlTable
+ppModuleContents :: [ExportItem DocName] -> HtmlTable
 ppModuleContents exports
   | length sections == 0 = Html.emptyTable
   | otherwise            = tda [theclass "section4"] << bold << toHtml "Contents"
@@ -596,9 +596,9 @@ ppModuleContents exports
  where
   (sections, _leftovers{-should be []-}) = process 0 exports
 
-  process :: Int -> [ExportItem2 DocName] -> ([Html],[ExportItem2 DocName])
+  process :: Int -> [ExportItem DocName] -> ([Html],[ExportItem DocName])
   process _ [] = ([], [])
-  process n items@(ExportGroup2 lev id0 doc : rest) 
+  process n items@(ExportGroup lev id0 doc : rest) 
     | lev <= n  = ( [], items )
     | otherwise = ( html:secs, rest2 )
     where
@@ -613,32 +613,32 @@ ppModuleContents exports
 
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:
-numberSectionHeadings :: [ExportItem2 DocName] -> [ExportItem2 DocName]
+numberSectionHeadings :: [ExportItem DocName] -> [ExportItem DocName]
 numberSectionHeadings exports = go 1 exports
-  where go :: Int -> [ExportItem2 DocName] -> [ExportItem2 DocName]
+  where go :: Int -> [ExportItem DocName] -> [ExportItem DocName]
         go _ [] = []
-	go n (ExportGroup2 lev _ doc : es) 
-	  = ExportGroup2 lev (show n) doc : go (n+1) es
+	go n (ExportGroup lev _ doc : es) 
+	  = ExportGroup lev (show n) doc : go (n+1) es
 	go n (other:es)
 	  = other : go n es
 
-processExport :: Bool -> LinksInfo -> DocMap -> (ExportItem2 DocName) -> HtmlTable
-processExport _ _ _ (ExportGroup2 lev id0 doc)
+processExport :: Bool -> LinksInfo -> DocMap -> (ExportItem DocName) -> HtmlTable
+processExport _ _ _ (ExportGroup lev id0 doc)
   = ppDocGroup lev (namedAnchor id0 << docToHtml doc)
-processExport summary links docMap (ExportDecl2 x decl doc insts)
+processExport summary links docMap (ExportDecl x decl doc insts)
   = doDecl summary links x decl doc insts docMap
-processExport summmary _ _ (ExportNoDecl2 _ y [])
+processExport summmary _ _ (ExportNoDecl _ y [])
   = declBox (ppDocName y)
-processExport summmary _ _ (ExportNoDecl2 _ y subs)
+processExport summmary _ _ (ExportNoDecl _ y subs)
   = declBox (ppDocName y <+> parenList (map ppDocName subs))
-processExport _ _ _ (ExportDoc2 doc)
+processExport _ _ _ (ExportDoc doc)
   = docBox (docToHtml doc)
-processExport _ _ _ (ExportModule2 mod)
+processExport _ _ _ (ExportModule mod)
   = declBox (toHtml "module" <+> ppModule mod "")
 
-forSummary :: (ExportItem2 DocName) -> Bool
-forSummary (ExportGroup2 _ _ _) = False
-forSummary (ExportDoc2 _)       = False
+forSummary :: (ExportItem DocName) -> Bool
+forSummary (ExportGroup _ _ _) = False
+forSummary (ExportDoc _)       = False
 forSummary _                    = True
 
 ppDocGroup :: Int -> Html -> HtmlTable
@@ -655,7 +655,7 @@ declWithDoc False links loc nm (Just doc) html_decl =
 		topDeclBox links loc nm html_decl </> docBox (docToHtml doc)
 
 doDecl :: Bool -> LinksInfo -> Name -> LHsDecl DocName -> 
-          Maybe (HsDoc DocName) -> [InstHead2 DocName] -> DocMap -> HtmlTable
+          Maybe (HsDoc DocName) -> [InstHead DocName] -> DocMap -> HtmlTable
 doDecl summary links x (L loc d) mbDoc instances docMap = doDecl d
   where
     doDecl (TyClD d) = doTyClD d 
@@ -798,7 +798,7 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ _) loc docM
     hdr = ppClassHdr summary lctxt nm tvs fds
     NoLink nm = unLoc lname
 
-ppClassDecl :: Ord key => Bool -> LinksInfo -> [InstHead2 DocName] -> key -> SrcSpan ->
+ppClassDecl :: Ord key => Bool -> LinksInfo -> [InstHead DocName] -> key -> SrcSpan ->
                           Maybe (HsDoc DocName) -> DocMap -> TyClDecl DocName -> 
                           HtmlTable
 ppClassDecl summary links instances orig_c loc mbDoc docMap
@@ -844,7 +844,7 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
                aboves (map (declBox . ppInstHead) instances)
              ))
 
-ppInstHead :: InstHead2 DocName -> Html
+ppInstHead :: InstHead DocName -> Html
 ppInstHead ([],   n, ts) = ppAsst n ts 
 ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppAsst n ts 
 
@@ -896,7 +896,7 @@ ppShortDataDecl summary links loc mbDoc dataDecl
     resTy     = (con_res . unLoc . head) cons 
 
 -- The rest of the cases:
-ppDataDecl :: Ord key => Bool -> LinksInfo -> [InstHead2 DocName] -> key -> 
+ppDataDecl :: Ord key => Bool -> LinksInfo -> [InstHead DocName] -> key -> 
               SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> HtmlTable
 ppDataDecl summary links instances x loc mbDoc dataDecl
   

@@ -456,7 +456,7 @@ type FullyCheckedMod = (ParsedSource,
 printEntity (DocEntity doc) = show doc
 printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
-pass1 :: [CheckedMod] -> [Flag] -> ErrMsgM ModuleMap2
+pass1 :: [CheckedMod] -> [Flag] -> ErrMsgM ModuleMap
 pass1 modules flags = worker modules (Map.empty) flags
   where
     worker [] moduleMap _ = return moduleMap
@@ -748,7 +748,7 @@ renameModule renamingEnv mod =
 -- original names.
 
 mkExportItems
-        :: ModuleMap2
+        :: ModuleMap
 	-> Module			-- this module
 	-> [Name]			-- exported names (orig)
         -> Map Name (LHsDecl Name) -- maps exported names to declarations
@@ -760,7 +760,7 @@ mkExportItems
 	-> Bool				-- --ignore-all-exports flag
         -> Map Name (HsDoc Name)
         -> PackageId
-	-> ErrMsgM [ExportItem2 Name]
+	-> ErrMsgM [ExportItem Name]
 
 mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_map entities
               opts maybe_exps ignore_all_exports docMap packageId
@@ -778,22 +778,22 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t cs)    = declWith t
     lookupExport (IEModuleContents m)  = fullContentsOf (mkModule packageId m)
-    lookupExport (IEGroup lev doc)     = return [ ExportGroup2 lev "" doc ]
-    lookupExport (IEDoc doc)           = return [ ExportDoc2 doc ] 
+    lookupExport (IEGroup lev doc)     = return [ ExportGroup lev "" doc ]
+    lookupExport (IEDoc doc)           = return [ ExportDoc doc ] 
     lookupExport (IEDocNamed str)
 	= do r <- findNamedDoc str entities
 	     case r of
 		Nothing -> return []
-		Just found -> return [ ExportDoc2 found ]
+		Just found -> return [ ExportDoc found ]
  
     -- NOTE: I'm unsure about this. Currently only "External" names are considered.	
-    declWith :: Name -> ErrMsgM [ ExportItem2 Name ]
+    declWith :: Name -> ErrMsgM [ ExportItem Name ]
     declWith t | not (isExternalName t) = return []
     declWith t
 	| (Just decl, maybeDoc) <- findDecl t
-        = return [ ExportDecl2 t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
+        = return [ ExportDecl t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
 	| otherwise
-	= return [ ExportNoDecl2 t t subs ]
+	= return [ ExportNoDecl t t subs ]
 	-- can't find the decl (it might be from another package), but let's
 	-- list the entity anyway.  Later on, the renamer will change the
 	-- orig name into the import name, so we get a proper link to
@@ -811,7 +811,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
 	     Just hmod
 		| OptHide `elem` hmod_options hmod
 			-> return (hmod_export_items hmod)
-		| otherwise -> return [ ExportModule2 m ]
+		| otherwise -> return [ ExportModule m ]
 	     Nothing -> return [] -- already emitted a warning in exportedNames
 
     findDecl :: Name -> (Maybe (LHsDecl Name), Maybe (HsDoc Name))
@@ -827,13 +827,13 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
         m = nameModule n
 
 fullContentsOfThisModule :: Module -> [DocEntity Name] -> Map Name (LHsDecl Name) ->
-                            Map Name (HsDoc Name) -> [ExportItem2 Name]
+                            Map Name (HsDoc Name) -> [ExportItem Name]
 fullContentsOfThisModule module_ entities declMap docMap 
   = catMaybes (map mkExportItem entities)
   where 
-    mkExportItem (DocEntity (DocGroup lev doc)) = Just (ExportGroup2 lev "" doc)
+    mkExportItem (DocEntity (DocGroup lev doc)) = Just (ExportGroup lev "" doc)
     mkExportItem (DeclEntity name) = fmap mkExport (Map.lookup name declMap) 
-      where mkExport decl = ExportDecl2 name decl (Map.lookup name docMap) []
+      where mkExport decl = ExportDecl name decl (Map.lookup name docMap) []
 
 -- Sometimes the declaration we want to export is not the "main" declaration:
 -- it might be an individual record selector or a class method.  In these
@@ -895,16 +895,16 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
 -- -----------------------------------------------------------------------------
 -- Pruning
 
-pruneExportItems :: [ExportItem2 Name] -> [ExportItem2 Name]
+pruneExportItems :: [ExportItem Name] -> [ExportItem Name]
 pruneExportItems items = filter hasDoc items
-  where hasDoc (ExportDecl2 _ _ d _) = isJust d
+  where hasDoc (ExportDecl _ _ d _) = isJust d
 	hasDoc _ = True
 
 -- -----------------------------------------------------------------------------
 -- Gather a list of original names exported from this module
 
 visibleNames :: Module 
-             -> ModuleMap2  
+             -> ModuleMap  
              -> [Name] 
              -> [Name]
              -> Map Name [Name]
@@ -957,7 +957,7 @@ exportModuleMissingErr this mdl
 -- for a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
 -- class).
-allSubsOfName :: ModuleMap2 -> Name -> [Name]
+allSubsOfName :: ModuleMap -> Name -> [Name]
 allSubsOfName mod_map name 
   | isExternalName name =
     case Map.lookup (nameModule name) mod_map of
@@ -1043,8 +1043,8 @@ attachInstances modules = map attach modules
       where
         newItems = map attachExport (hmod_export_items mod)
 
-        attachExport (ExportDecl2 n decl doc _) =
-          ExportDecl2 n decl doc (case Map.lookup n instMap of
+        attachExport (ExportDecl n decl doc _) =
+          ExportDecl n decl doc (case Map.lookup n instMap of
                                    Nothing -> []
                                    Just instheads -> instheads)
         attachExport otherExport = otherExport
@@ -1097,7 +1097,7 @@ funTyConName = mkWiredInName gHC_PRIM
                         BuiltInSyntax
 
 
-toHsInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead2 Name
+toHsInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
 toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsType ts) 
 
 --------------------------------------------------------------------------------
