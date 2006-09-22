@@ -196,7 +196,6 @@ loadInterface doc_str mod from
 
 	-- READ THE MODULE IN
 	; read_result <- findAndReadIface doc_str mod hi_boot_file
-	; dflags <- getDOpts
 	; case read_result of {
 	    Failed err -> do
 	  	{ let fake_iface = emptyModIface mod
@@ -209,7 +208,7 @@ loadInterface doc_str mod from
 		; returnM (Failed err) } ;
 
 	-- Found and parsed!
-	    Succeeded (iface, file_path) 			-- Sanity check:
+	    Succeeded (iface, file_path) 	-- Sanity check:
 		| ImportBySystem <- from,	--   system-importing...
 		  modulePackageId (mi_module iface) == thisPackage dflags,
 		  				--   a home-package module...
