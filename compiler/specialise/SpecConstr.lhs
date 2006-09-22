@@ -583,10 +583,7 @@ conArgOccs :: ArgOcc -> AltCon -> [ArgOcc]
 
 conArgOccs (ScrutOcc fm) (DataAlt dc) 
   | Just pat_arg_occs <- lookupUFM fm dc
-  = tyvar_unks ++ pat_arg_occs
-  where
-    tyvar_unks | isVanillaDataCon dc = [UnkOcc | tv <- dataConUnivTyVars dc]
-	       | otherwise	     = []
+  = [UnkOcc | tv <- dataConUnivTyVars dc] ++ pat_arg_occs
 
 conArgOccs other con = repeat UnkOcc
 \end{code}
