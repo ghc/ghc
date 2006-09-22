@@ -694,12 +694,12 @@ ppSig summary links loc mbDoc (TypeSig lname ltype)
   do_args leader (HsForAllTy Explicit tvs lctxt ltype)
     = (argBox (
         leader <+> 
-        hsep (keyword "forall" : ppTyVars tvs ++ [toHtml "."]) <+>
-        ppLContext lctxt)
+        hsep (keyword "forall" : ppTyVars tvs ++ [dot]) <+>
+        ppLContextNoArrow lctxt)
           <-> rdocBox noHtml) </> 
           do_largs darrow ltype
   do_args leader (HsForAllTy Implicit _ lctxt ltype)
-    = (argBox (leader <+> ppLContext lctxt)
+    = (argBox (leader <+> ppLContextNoArrow lctxt)
         <-> rdocBox noHtml) </> 
         do_largs darrow ltype
   do_args leader (HsFunTy (L _ (HsDocTy lt ldoc)) r)
@@ -729,22 +729,38 @@ ppTySyn summary links loc mbDoc (TySynonym lname ltyvars ltype)
 
 ppLType (L _ t) = ppType t
 
-ppLContext (L _ c) = ppContext c
+ppTypeSig :: Bool -> Name -> (HsType DocName) -> Html
+ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
 
-ppContext = ppPreds . (map unLoc)
+--------------------------------------------------------------------------------
+-- Contexts 
+--------------------------------------------------------------------------------
 
-ppPreds []     = empty
-ppPreds [pred] = ppPred pred
-ppPreds preds  = parenList (map ppPred preds)
+ppLContext        = ppContext        . unLoc
+ppLContextNoArrow = ppContextNoArrow . unLoc
+
+ppContextNoArrow :: HsContext DocName -> Html
+ppContextNoArrow []  = empty
+ppContextNoArrow cxt = pp_hs_context (map unLoc cxt) 
+
+ppContextNoLocs :: [HsPred DocName] -> Html
+ppContextNoLocs []  = empty
+ppContextNoLocs cxt = pp_hs_context cxt <+> darrow  
+
+ppContext :: HsContext DocName -> Html
+ppContext cxt = ppContextNoLocs (map unLoc cxt)
+
+pp_hs_context []  = empty
+pp_hs_context [p] = ppPred p
+pp_hs_context cxt = parenList (map ppPred cxt) 
+
+ppLPred = ppPred . unLoc
 
 ppPred (HsClassP n ts) = ppDocName n <+> hsep (map ppLType ts)
 ppPred (HsIParam (Dupable n) t) 
   = toHtml "?" +++ ppDocName n <+> dcolon <+> ppLType t
 ppPred (HsIParam (Linear  n) t) 
   = toHtml "%" +++ ppDocName n <+> dcolon <+> ppLType t
-
-ppTypeSig :: Bool -> Name -> (HsType DocName) -> Html
-ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
 
 -- -----------------------------------------------------------------------------
 -- Class declarations
@@ -755,7 +771,7 @@ ppClassHdr summ (L _ []) n tvs fds =
 	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
 	<+> ppFds fds
 ppClassHdr summ lctxt n tvs fds = 
-  keyword "class" <+> ppLContext lctxt <+> darrow
+  keyword "class" <+> ppLContext lctxt
 	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
 	<+> ppFds fds
 
@@ -830,9 +846,9 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
 
 ppInstHead :: InstHead2 DocName -> Html
 ppInstHead ([],   n, ts) = ppAsst n ts 
-ppInstHead (ctxt, n, ts) = ppPreds ctxt <+> ppAsst n ts 
+ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppAsst n ts 
 
-ppAsst n ts = ppDocName n <+> hsep (map ppType ts)
+ppAsst n ts = ppDocName n <+> hsep (map ppParendType ts)
 
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
