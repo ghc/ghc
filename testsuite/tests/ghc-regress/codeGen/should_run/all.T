@@ -58,3 +58,4 @@ test('cg057', compose( only_ways(['prof','profasm']),
 		       extra_run_opts('+RTS -xc') ),
 	 compile_and_run, [''])
 
+test('cg058', normal, compile_and_run, [''])
