@@ -563,6 +563,7 @@ missingBootThing thing
   = ppr thing <+> ptext SLIT("is defined in the hs-boot file, but not in the module")
 bootMisMatch thing boot_decl real_decl
   = ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file")
+    $+$ (ppr boot_decl) $+$ (ppr real_decl)
 instMisMatch inst
   = hang (ppr inst)
        2 (ptext SLIT("is defined in the hs-boot file, but not in the module"))

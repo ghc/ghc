@@ -424,6 +424,9 @@ schemeE d s p (AnnCase scrut bndr _ alts)
 schemeE d s p (AnnNote note (_, body))
    = schemeE d s p body
 
+schemeE d s p (AnnCast (_, body) _)
+   = schemeE d s p body
+
 schemeE d s p other
    = pprPanic "ByteCodeGen.schemeE: unhandled case" 
                (pprCoreExpr (deAnnotate' other))
