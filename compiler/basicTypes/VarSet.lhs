@@ -10,7 +10,7 @@ module VarSet (
 	extendVarSet, extendVarSetList, extendVarSet_C,
 	elemVarSet, varSetElems, subVarSet,
 	unionVarSet, unionVarSets,
-	intersectVarSet, intersectsVarSet,
+	intersectVarSet, intersectsVarSet, disjointVarSet,
 	isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
 	minusVarSet, foldVarSet, filterVarSet,
 	lookupVarSet, mapVarSet, sizeVarSet, seqVarSet,
@@ -69,9 +69,10 @@ extendVarSetList= addListToUniqSet
 intersectVarSet	= intersectUniqSets
 
 intersectsVarSet:: VarSet -> VarSet -> Bool 	-- True if non-empty intersection
-	-- (s1 `intersectsVarSet` s2) doesn't compute s2 if s1 is empty
+disjointVarSet  :: VarSet -> VarSet -> Bool 	-- True if empty intersection
 subVarSet	:: VarSet -> VarSet -> Bool	-- True if first arg is subset of second
- 	-- (s1 `subVarSet` s2) doesn't compute s2 if s1 is empty
+	-- (s1 `intersectsVarSet` s2) doesn't compute s2 if s1 is empty; 
+	-- ditto disjointVarSet, subVarSet
 
 unionVarSet	= unionUniqSets
 unionVarSets	= unionManyUniqSets
@@ -94,8 +95,9 @@ elemVarSetByKey	= elemUniqSet_Directly
 
 \begin{code}
 -- See comments with type signatures
-intersectsVarSet s1 s2 = not (isEmptyVarSet (s1 `intersectVarSet` s2))
-a `subVarSet` b = isEmptyVarSet (a `minusVarSet` b)
+intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
+disjointVarSet   s1 s2 = isEmptyVarSet (s1 `intersectVarSet` s2)
+subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
 \end{code}
 
 \begin{code}

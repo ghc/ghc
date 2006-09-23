@@ -513,7 +513,7 @@ boxy_match tmpl_tvs orig_tmpl_ty boxy_tvs orig_boxy_ty subst
 
     go (TyVarTy tv) b_ty
  	| tv `elemVarSet` tmpl_tvs	-- Template type variable in the template
-	, not (intersectsVarSet boxy_tvs (tyVarsOfType orig_boxy_ty))
+	, boxy_tvs `disjointVarSet` tyVarsOfType orig_boxy_ty
 	, typeKind b_ty `isSubKind` tyVarKind tv  -- See Note [Matching kinds]
 	= extendTvSubst subst tv boxy_ty'
 	| otherwise

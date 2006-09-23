@@ -475,9 +475,9 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
       = find ms us rest
 
       | otherwise
-      = ASSERT2( not (tyVarsOfTypes tys `intersectsVarSet` tpl_tvs),
-		       (ppr cls <+> ppr tys <+> ppr all_tvs) $$
-		       (ppr dfun <+> ppr tpl_tvs <+> ppr tpl_tys)
+      = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
+		 (ppr cls <+> ppr tys <+> ppr all_tvs) $$
+		 (ppr dfun <+> ppr tpl_tvs <+> ppr tpl_tys)
 		)
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them

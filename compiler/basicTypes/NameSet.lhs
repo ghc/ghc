@@ -54,7 +54,7 @@ foldNameSet	   :: (Name -> b -> b) -> b -> NameSet -> b
 filterNameSet	   :: (Name -> Bool) -> NameSet -> NameSet
 intersectNameSet   :: NameSet -> NameSet -> NameSet
 intersectsNameSet  :: NameSet -> NameSet -> Bool 	-- True if non-empty intersection
-	-- (s1 `intersectsVarSet` s2) doesn't compute s2 if s1 is empty
+	-- (s1 `intersectsNameSet` s2) doesn't compute s2 if s1 is empty
 
 isEmptyNameSet    = isEmptyUniqSet
 emptyNameSet	  = emptyUniqSet

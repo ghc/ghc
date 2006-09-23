@@ -773,7 +773,7 @@ isFreeWhenChecking qtvs ips inst
   =  isFreeWrtTyVars qtvs inst
   && isFreeWrtIPs    ips inst
 
-isFreeWrtTyVars qtvs inst = not (tyVarsOfInst inst `intersectsVarSet` qtvs)
+isFreeWrtTyVars qtvs inst = tyVarsOfInst inst `disjointVarSet` qtvs
 isFreeWrtIPs     ips inst = not (any (`elemNameSet` ips) (ipNamesOfInst inst))
 \end{code}
 
@@ -2070,7 +2070,7 @@ tc_simplify_top doc use_extended_defaulting want_scs wanteds
 		-- up with one of the non-tyvar classes
 	    (default_gps, non_default_gps) = partition defaultable_group tv_groups
 	    defaultable_group ds
-		=  not (bad_tyvars `intersectsVarSet` tyVarsOfInst (head ds))
+		=  (bad_tyvars `disjointVarSet` tyVarsOfInst (head ds))
 		&& defaultable_classes (map get_clas ds)
 	    defaultable_classes clss 
 		| use_extended_defaulting = any isInteractiveClass clss
