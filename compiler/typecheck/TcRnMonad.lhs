@@ -32,12 +32,13 @@ import Module		( Module, moduleName )
 import RdrName		( GlobalRdrEnv, LocalRdrEnv, emptyLocalRdrEnv )
 import Name		( Name, mkInternalName, tidyNameOcc, nameOccName, getSrcLoc )
 import Type		( Type )
-import TcType		( tcIsTyVarTy, tcGetTyVar )
+import TcType		( TcType, tcIsTyVarTy, tcGetTyVar )
 import NameEnv		( extendNameEnvList, nameEnvElts )
 import InstEnv		( emptyInstEnv )
 import FamInstEnv	( emptyFamInstEnv )
 
 import Var		( setTyVarName )
+import Id		( mkSysLocal )
 import VarSet		( emptyVarSet )
 import VarEnv		( TidyEnv, emptyTidyEnv, extendVarEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
@@ -49,12 +50,13 @@ import NameSet		( NameSet, emptyDUs, emptyNameSet, unionNameSets, addOneToNameSe
 import OccName		( emptyOccEnv, tidyOccName )
 import Bag		( emptyBag )
 import Outputable
-import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupply )
+import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply )
 import UniqFM		( unitUFM )
 import Unique		( Unique )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt, dopt_set,
 			  dopt_unset, GhcMode ) 
 import StaticFlags	( opt_PprStyle_Debug )
+import FastString	( FastString )
 import Bag		( snocBag, unionBags )
 import Panic		( showException )
  
@@ -357,8 +359,13 @@ newUniqueSupply
 
 newLocalName :: Name -> TcRnIf gbl lcl Name
 newLocalName name	-- Make a clone
-  = newUnique		`thenM` \ uniq ->
-    returnM (mkInternalName uniq (nameOccName name) (getSrcLoc name))
+  = do	{ uniq <- newUnique
+	; return (mkInternalName uniq (nameOccName name) (getSrcLoc name)) }
+
+newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds fs tys
+  = do	{ us <- newUniqueSupply
+	; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
 \end{code}
 
 

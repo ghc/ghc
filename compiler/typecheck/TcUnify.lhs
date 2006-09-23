@@ -745,8 +745,7 @@ wrapFunResCoercion arg_tys co_fn_res
   | isIdCoercion co_fn_res = return idCoercion
   | null arg_tys	   = return co_fn_res
   | otherwise 	       
-  = do	{ us <- newUniqueSupply
-	; let arg_ids = zipWith (mkSysLocal FSLIT("sub")) (uniqsFromSupply us) arg_tys
+  = do	{ arg_ids <- newSysLocalIds FSLIT("sub") arg_tys
 	; return (mkCoLams arg_ids <.> co_fn_res <.> mkCoApps arg_ids) }
 \end{code}
 
