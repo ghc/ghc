@@ -37,10 +37,10 @@ static void    printStdObjPayload( StgClosure *obj );
 #ifdef USING_LIBBFD
 static void    reset_table   ( int size );
 static void    prepare_table ( void );
-static void    insert        ( unsigned value, const char *name );
+static void    insert        ( StgWord value, const char *name );
 #endif
 #if 0 /* unused but might be useful sometime */
-static rtsBool lookup_name   ( char *name, unsigned *result );
+static rtsBool lookup_name   ( char *name, StgWord *result );
 static void    enZcode       ( char *in, char *out );
 #endif
 static char    unZcode       ( char ch );
@@ -751,7 +751,7 @@ info_hdr_type(StgClosure *closure, char *res){
  * ------------------------------------------------------------------------*/
 
 struct entry {
-    nat value;
+    StgWord value;
     const char *name;
 };
 
@@ -773,7 +773,7 @@ static void prepare_table( void )
     /* Could sort it...  */
 }
 
-static void insert( unsigned value, const char *name )
+static void insert( StgWord value, const char *name )
 {
     if ( table_size >= max_table_size ) {
         barf( "Symbol table overflow\n" );
@@ -785,9 +785,9 @@ static void insert( unsigned value, const char *name )
 #endif
 
 #if 0
-static rtsBool lookup_name( char *name, unsigned *result )
+static rtsBool lookup_name( char *name, StgWord *result )
 {
-    int i;
+    nat i;
     for( i = 0; i < table_size && strcmp(name,table[i].name) != 0; ++i ) {
     }
     if (i < table_size) {
@@ -930,7 +930,7 @@ static void enZcode( char *in, char *out )
 const char *lookupGHCName( void *addr )
 {
     nat i;
-    for( i = 0; i < table_size && table[i].value != (unsigned) addr; ++i ) {
+    for( i = 0; i < table_size && table[i].value != (StgWord) addr; ++i ) {
     }
     if (i < table_size) {
         return table[i].name;
