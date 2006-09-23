@@ -37,15 +37,12 @@ module TypeRep (
         isTySuperKind, isCoSuperKind,
 	tySuperKindTyCon, coSuperKindTyCon,
         
-        isCoercionKindTyCon,
-
 	pprKind, pprParendKind
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-} DataCon( DataCon, dataConName )
-import Monad 	  ( guard )
 -- friends:
 
 import Var	  ( Var, Id, TyVar, tyVarKind )
@@ -53,7 +50,9 @@ import VarSet     ( TyVarSet )
 import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
 import OccName	  ( mkOccNameFS, tcName, parenSymOcc )
 import BasicTypes ( IPName, tupleParens )
-import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, isRecursiveTyCon, isNewTyCon, mkVoidPrimTyCon, mkSuperKindTyCon, isSuperKindTyCon, mkCoercionTyCon )
+import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, 
+		    isRecursiveTyCon, isNewTyCon, mkVoidPrimTyCon, 
+		    mkSuperKindTyCon )
 import Class	  ( Class )
 
 -- others
@@ -61,7 +60,7 @@ import PrelNames  ( gHC_PRIM, funTyConKey, tySuperKindTyConKey,
                     coSuperKindTyConKey, liftedTypeKindTyConKey,
                     openTypeKindTyConKey, unliftedTypeKindTyConKey,
                     ubxTupleKindTyConKey, argTypeKindTyConKey, listTyConKey, 
-                    parrTyConKey, hasKey, eqCoercionKindTyConKey )
+                    parrTyConKey, hasKey )
 import Outputable
 \end{code}
 
@@ -211,10 +210,6 @@ type Kind = Type 	-- Invariant: a kind is always
 type SuperKind = Type   -- Invariant: a super kind is always 
                         --   TyConApp SuperKindTyCon ...
 
-type Coercion = Type
-
-type CoercionKind = Kind
-
 data TyNote = FTVNote TyVarSet	-- The free type variables of the noted expression
 \end{code}
 
@@ -341,8 +336,6 @@ openTypeKindTyCon     = mkKindTyCon openTypeKindTyConName
 unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName
 ubxTupleKindTyCon     = mkKindTyCon ubxTupleKindTyConName
 argTypeKindTyCon      = mkKindTyCon argTypeKindTyConName
-eqCoercionKindTyCon = 
-  mkCoercionTyCon eqCoercionKindTyConName 2 (\ _ -> coSuperKind)
 
 mkKindTyCon :: Name -> TyCon
 mkKindTyCon name = mkVoidPrimTyCon name tySuperKind 0
@@ -359,10 +352,6 @@ ubxTupleKindTyConName     = mkPrimTyConName FSLIT("(##)") ubxTupleKindTyConKey u
 argTypeKindTyConName      = mkPrimTyConName FSLIT("??") argTypeKindTyConKey argTypeKindTyCon
 funTyConName              = mkPrimTyConName FSLIT("(->)") funTyConKey funTyCon
 
-eqCoercionKindTyConName   = mkWiredInName gHC_PRIM (mkOccNameFS tcName (FSLIT(":=:"))) 
-					eqCoercionKindTyConKey Nothing (ATyCon eqCoercionKindTyCon) 
-					BuiltInSyntax
- 
 mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ) 
 					      key 
 					      Nothing 		-- No parent object
@@ -401,9 +390,6 @@ isCoSuperKind :: SuperKind -> Bool
 isCoSuperKind (NoteTy _ ty)    = isCoSuperKind ty
 isCoSuperKind (TyConApp kc []) = kc `hasKey` coSuperKindTyConKey
 isCoSuperKind other            = False
-
-isCoercionKindTyCon kc = kc `hasKey` eqCoercionKindTyConKey
-
 
 -------------------
 -- lastly we need a few functions on Kinds

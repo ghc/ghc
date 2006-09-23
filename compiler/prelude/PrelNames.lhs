@@ -818,8 +818,6 @@ unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
 ubxTupleKindTyConKey                    = mkPreludeTyConUnique 90
 argTypeKindTyConKey                     = mkPreludeTyConUnique 91
 
-eqCoercionKindTyConKey                    = mkPreludeTyConUnique 92
-
 -- Coercion constructors
 symCoercionTyConKey                     = mkPreludeTyConUnique 93
 transCoercionTyConKey                   = mkPreludeTyConUnique 94
