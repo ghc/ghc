@@ -326,15 +326,6 @@ notNull :: [a] -> Bool
 notNull [] = False
 notNull _  = True
 
-snocView :: [a] -> Maybe ([a],a)
-	-- Split off the last element
-snocView [] = Nothing
-snocView xs = go [] xs
-	    where
-		-- Invariant: second arg is non-empty
-	      go acc [x]    = Just (reverse acc, x)
-	      go acc (x:xs) = go (x:acc) xs
-
 only :: [a] -> a
 #ifdef DEBUG
 only [a] = a
@@ -628,6 +619,15 @@ splitAtList _ xs@[]   = (xs, xs)
 splitAtList (_:xs) (y:ys) = (y:ys', ys'')
     where
       (ys', ys'') = splitAtList xs ys
+
+snocView :: [a] -> Maybe ([a],a)
+	-- Split off the last element
+snocView [] = Nothing
+snocView xs = go [] xs
+	    where
+		-- Invariant: second arg is non-empty
+	      go acc [x]    = Just (reverse acc, x)
+	      go acc (x:xs) = go (x:acc) xs
 
 split :: Char -> String -> [String]
 split c s = case rest of
