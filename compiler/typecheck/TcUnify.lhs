@@ -65,7 +65,7 @@ import TysPrim		( alphaTy, betaTy )
 import Inst		( newDictBndrsO, instCall, instToId )
 import TyCon		( TyCon, tyConArity, tyConTyVars, isSynTyCon )
 import TysWiredIn	( listTyCon )
-import Id		( Id, mkSysLocal )
+import Id		( Id )
 import Var		( Var, varName, tyVarKind, isTcTyVar, tcTyVarDetails )
 import VarSet
 import VarEnv
@@ -73,7 +73,6 @@ import Name		( Name, isSystemName )
 import ErrUtils		( Message )
 import Maybes		( expectJust, isNothing )
 import BasicTypes	( Arity )
-import UniqSupply	( uniqsFromSupply )
 import Util		( notNull, equalLength )
 import Outputable
 
