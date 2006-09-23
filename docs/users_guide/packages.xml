@@ -383,9 +383,9 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-package-name <replaceable>foo</replaceable></option></term>
+	  <term><option>-package-name <replaceable>foo</replaceable></option>
 	  <indexterm><primary><literal>-package-name</literal></primary>
-	    <secondary>option</secondary></indexterm>
+	    <secondary>option</secondary></indexterm></term>
 	  <listitem>
 	    <para>This option is added to the command line when
 	    compiling a module that is destined to be part of package

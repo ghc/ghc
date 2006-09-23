@@ -90,9 +90,9 @@
 
     <variablelist>
      <varlistentry>
-       <term><option>-V<replaceable>secs</replaceable></option></term>
+       <term><option>-V<replaceable>secs</replaceable></option>
        <indexterm><primary><option>-V</option></primary><secondary>RTS
-       option</secondary></indexterm>
+       option</secondary></indexterm></term>
        <listitem>
          <para>Sets the interval that the RTS clock ticks at.  The
          runtime uses a single timer signal to count ticks; this timer

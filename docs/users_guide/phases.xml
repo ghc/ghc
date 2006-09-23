@@ -859,7 +859,7 @@ $ cat foo.hspp</screen>
               machine.  See <xref linkend="sec-using-smp" />.</para>
 
               <para>The ability to make a foreign call that does not
-              block all other Haskell threads.</para>.
+              block all other Haskell threads.</para>
 
               <para>The ability to invoke foreign exported Haskell
               functions from multiple OS threads.</para>
