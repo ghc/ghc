@@ -253,6 +253,7 @@ schemeR fvs (nm, rhs)
    = schemeR_wrk fvs nm rhs (collect [] rhs)
 
 collect xs (_, AnnNote note e) = collect xs e
+collect xs (_, AnnCast e _)    = collect xs e
 collect xs (_, AnnLam x e)     = collect (if isTyVar x then xs else (x:xs)) e
 collect xs (_, not_lambda)     = (reverse xs, not_lambda)
 
@@ -425,13 +426,6 @@ schemeE d s p (AnnNote note (_, body))
    = schemeE d s p body
 
 schemeE d s p (AnnCast (_, body) _)
-   = schemeE d s p body
-
--- XXX - audreyt - After FC landed, this case of explicit eta-reduction
---       seems needed to make "data D = D deriving Typeable" work in GHCi.
---       however, how did AnnLam with a var (LocalId) survive until this place?
-schemeE d s p (AnnLam var (_, AnnApp (_, body) (_, AnnVar inner)))
-   | var == inner
    = schemeE d s p body
 
 schemeE d s p other
@@ -1117,6 +1111,9 @@ pushAtom d p (AnnLit lit)
                 -- Get the addr on the stack, untaggedly
                    returnBc (unitOL (PUSH_UBX (Right addr) 1), 1)
 
+pushAtom d p (AnnCast e _)
+   = pushAtom d p (snd e)
+
 pushAtom d p other
    = pprPanic "ByteCodeGen.pushAtom" 
               (pprCoreExpr (deAnnotate (undefined, other)))
@@ -1278,6 +1275,7 @@ splitApp (AnnApp (_,f) (_,a))
 	       | otherwise    = case splitApp f of 
 				     (f', as) -> (f', a:as)
 splitApp (AnnNote n (_,e))    = splitApp e
+splitApp (AnnCast (_,e) _)    = splitApp e
 splitApp e		      = (e, [])
 
 
@@ -1288,6 +1286,7 @@ isTypeAtom _           = False
 isVoidArgAtom :: AnnExpr' id ann -> Bool
 isVoidArgAtom (AnnVar v)        = typeCgRep (idType v) == VoidArg
 isVoidArgAtom (AnnNote n (_,e)) = isVoidArgAtom e
+isVoidArgAtom (AnnCast (_,e) _) = isVoidArgAtom e
 isVoidArgAtom _ 	        = False
 
 atomRep :: AnnExpr' Id ann -> CgRep
@@ -1296,6 +1295,7 @@ atomRep (AnnLit l)    = typeCgRep (literalType l)
 atomRep (AnnNote n b) = atomRep (snd b)
 atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
 atomRep (AnnLam x e) | isTyVar x = atomRep (snd e)
+atomRep (AnnCast b _) = atomRep (snd b)
 atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
 
 isPtrAtom :: AnnExpr' Id ann -> Bool
