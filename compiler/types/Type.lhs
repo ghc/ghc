@@ -1430,7 +1430,7 @@ isKind k = isSuperKind (typeKind k)
 
 isSubKind :: Kind -> Kind -> Bool
 -- (k1 `isSubKind` k2) checks that k1 <: k2
-isSubKind (TyConApp kc1 []) (TyConApp kc2 []) = kc1 `isSubKindCon` kc1
+isSubKind (TyConApp kc1 []) (TyConApp kc2 []) = kc1 `isSubKindCon` kc2
 isSubKind (FunTy a1 r1) (FunTy a2 r2)	      = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
 isSubKind (PredTy (EqPred ty1 ty2)) (PredTy (EqPred ty1' ty2')) 
   = ty1 `tcEqType` ty1' && ty2 `tcEqType` ty2'
