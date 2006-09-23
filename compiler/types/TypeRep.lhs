@@ -348,7 +348,7 @@ coSuperKindTyConName      = mkPrimTyConName FSLIT("COERCION") coSuperKindTyConKe
 liftedTypeKindTyConName   = mkPrimTyConName FSLIT("*") liftedTypeKindTyConKey liftedTypeKindTyCon
 openTypeKindTyConName     = mkPrimTyConName FSLIT("?") openTypeKindTyConKey openTypeKindTyCon
 unliftedTypeKindTyConName = mkPrimTyConName FSLIT("#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
-ubxTupleKindTyConName     = mkPrimTyConName FSLIT("(##)") ubxTupleKindTyConKey ubxTupleKindTyCon
+ubxTupleKindTyConName     = mkPrimTyConName FSLIT("(#)") ubxTupleKindTyConKey ubxTupleKindTyCon
 argTypeKindTyConName      = mkPrimTyConName FSLIT("??") argTypeKindTyConKey argTypeKindTyCon
 funTyConName              = mkPrimTyConName FSLIT("(->)") funTyConKey funTyCon
 
