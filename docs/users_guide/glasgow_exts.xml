@@ -3640,16 +3640,19 @@ declaration (after expansion of any type synonyms)
 where 
  <itemizedlist>
 <listitem><para>
-  The type <literal>t</literal> is an arbitrary type
-</para></listitem>
-<listitem><para>
-  The <literal>vk+1...vn</literal> are type variables which do not occur in 
-  <literal>t</literal>, and
-</para></listitem>
-<listitem><para>
   The <literal>ci</literal> are partial applications of
   classes of the form <literal>C t1'...tj'</literal>, where the arity of <literal>C</literal>
   is exactly <literal>j+1</literal>.  That is, <literal>C</literal> lacks exactly one type argument.
+</para></listitem>
+<listitem><para>
+  The <literal>k</literal> is chosen so that <literal>ci (T v1...vk)</literal> is well-kinded.
+</para></listitem>
+<listitem><para>
+  The type <literal>t</literal> is an arbitrary type.
+</para></listitem>
+<listitem><para>
+  The type variables <literal>vk+1...vn</literal> do not occur in <literal>t</literal>, 
+  nor in the <literal>ci</literal>, and
 </para></listitem>
 <listitem><para>
   None of the <literal>ci</literal> is <literal>Read</literal>, <literal>Show</literal>, 
@@ -3662,13 +3665,8 @@ where
 Then, for each <literal>ci</literal>, the derived instance
 declaration is:
 <programlisting> 
-  instance ci (t vk+1...v) => ci (T v1...vp)
+  instance ci t => ci (T v1...vk)
 </programlisting>
-where <literal>p</literal> is chosen so that <literal>T v1...vp</literal> is of the 
-right <emphasis>kind</emphasis> for the last parameter of class <literal>Ci</literal>.
-</para>
-<para>
-
 As an example which does <emphasis>not</emphasis> work, consider 
 <programlisting> 
   newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
