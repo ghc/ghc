@@ -34,7 +34,7 @@ import Class		( className, classArity, classKey, classTyVars, classSCTheta, Clas
 import Type		( zipOpenTvSubst, substTheta, pprThetaArrow, pprClassPred, mkTyVarTy )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
-import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConOrigArgTys, dataConInstOrigArgTys )
+import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConInstOrigArgTys )
 import Maybes		( catMaybes )
 import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
@@ -42,13 +42,13 @@ import NameSet		( duDefs )
 import Type		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
 			  tyConStupidTheta, isProductTyCon, isDataTyCon, newTyConRhs,
-			  isEnumerationTyCon, isRecursiveTyCon, TyCon, isNewTyCon
+			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
-			  isUnLiftedType, mkClassPred, tyVarsOfType,
+			  isUnLiftedType, mkClassPred, tyVarsOfType, tyVarsOfTypes,
 			  isSubArgTypeKind, tcEqTypes, tcSplitAppTys, mkAppTys )
 import Var		( TyVar, tyVarKind, varName )
-import VarSet		( mkVarSet, subVarSet )
+import VarSet		( mkVarSet, disjointVarSet )
 import PrelNames
 import SrcLoc		( srcLocSpan, Located(..) )
 import Util		( zipWithEqual, sortLe, notNull )
@@ -315,10 +315,8 @@ all those.
 
 Note [Newtype deriving superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The 'tys' here come from the partial application
-in the deriving clause. The last arg is the new
-instance type.
+The 'tys' here come from the partial application in the deriving
+clause. The last arg is the new instance type.
 
 We must pass the superclasses; the newtype might be an instance
 of them in a different way than the representation type
@@ -386,11 +384,11 @@ makeDerivEqns overlap_flag tycl_decls
 
     mk_eqn_help gla_exts NewType tycon deriv_tvs clas tys
       | can_derive_via_isomorphism && (gla_exts || std_class_via_iso clas)
-      =		-- Go ahead and use the isomorphism
-	   traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)	`thenM_`
-       	   new_dfun_name clas tycon  		`thenM` \ dfun_name ->
-	   returnM (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
-					      iBinds = NewTypeDerived tycon rep_tys }))
+      =	do { traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)
+	   ; 	-- Go ahead and use the isomorphism
+	     dfun_name <- new_dfun_name clas tycon
+	   ; return (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
+					       iBinds = NewTypeDerived ntd_info })) }
       | std_class gla_exts clas
       = mk_eqn_help gla_exts DataType tycon deriv_tvs clas tys	-- Go via bale-out route
 
@@ -401,22 +399,32 @@ makeDerivEqns overlap_flag tycl_decls
 			non_std_err)	-- Just complain about being a non-std instance
       where
 	-- Here is the plan for newtype derivings.  We see
-	--	  newtype T a1...an = T (t ak...an) deriving (.., C s1 .. sm, ...)
+	--	  newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
 	-- where t is a type,
-	-- 	 ak...an is a suffix of a1..an
-	--	 ak...an do not occur free in t, 
+	-- 	 ak+1...an is a suffix of a1..an
+	--	 ak+1...an do not occur free in t, nor in the s1..sm
 	-- 	 (C s1 ... sm) is a  *partial applications* of class C 
 	--			with the last parameter missing
+	--	 (T a1 .. ak) matches the kind of C's last argument
+	--		(and hence so does t)
 	--
-	-- We generate the instances
-	--	 instance C s1 .. sm (t ak...ap) => C s1 .. sm (T a1...ap)
-	-- where T a1...ap is the partial application of the LHS of the correct kind
-	-- and p >= k
+	-- We generate the instance
+	--	 instance forall ({a1..ak} u fvs(s1..sm)).
+	--		  C s1 .. sm t => C s1 .. sm (T a1...ak)
+	-- where T a1...ap is the partial application of 
+	-- 	 the LHS of the correct kind and p >= k
+	--
+	--	NB: the variables below are:
+	--		tc_tvs = [a1, ..., an]
+	--		tyvars_to_keep = [a1, ..., ak]
+	--		rep_ty = t ak .. an
+	--		deriv_tvs = fvs(s1..sm) \ tc_tvs
+	--		tys = [s1, ..., sm]
+	--		rep_fn' = t
 	--
 	-- Running example: newtype T s a = MkT (ST s a) deriving( Monad )
+	-- We generate the instance
 	--	instance Monad (ST s) => Monad (T s) where 
-	--	  fail = coerce ... (fail @ ST s)
-	-- (Actually we don't need the coerce, because non-rec newtypes are transparent
 
 	clas_tyvars = classTyVars clas
 	kind = tyVarKind (last clas_tyvars)
@@ -452,24 +460,28 @@ makeDerivEqns overlap_flag tycl_decls
 	rep_pred = mkClassPred clas rep_tys
 		-- rep_pred is the representation dictionary, from where
 		-- we are gong to get all the methods for the newtype dictionary
-        -- here we are figuring out what superclass dictionaries to use
-        -- see Note [Newtype deriving superclasses] above
 
-	inst_tys = (tys ++ [mkTyConApp tycon (mkTyVarTys tyvars_to_keep)])
+        -- Next we figure out what superclass dictionaries to use
+        -- See Note [Newtype deriving superclasses] above
 
-
+	inst_tys = tys ++ [mkTyConApp tycon (mkTyVarTys tyvars_to_keep)]
 	sc_theta = substTheta (zipOpenTvSubst clas_tyvars inst_tys)
 			      (classSCTheta clas)
 
 		-- If there are no tyvars, there's no need
 		-- to abstract over the dictionaries we need
-	dict_tvs = deriv_tvs ++ tc_tvs
-	dict_args -- | null dict_tvs = []
-		  | otherwise     = rep_pred : sc_theta
+		-- Example: 	newtype T = MkT Int deriving( C )
+		-- We get the derived instance
+		--		instance C T
+		-- rather than
+		--		instance C Int => C T
+	dict_tvs = deriv_tvs ++ tyvars_to_keep
+	all_preds = rep_pred : sc_theta		-- NB: rep_pred comes first
+	(dict_args, ntd_info) | null dict_tvs = ([], Just all_preds)
+			      | otherwise     = (all_preds, Nothing)
 
 		-- Finally! Here's where we build the dictionary Id
-	mk_inst_spec dfun_name 
-	  = mkLocalInstance dfun overlap_flag
+	mk_inst_spec dfun_name = mkLocalInstance dfun overlap_flag
 	  where
 	    dfun = mkDictFunId dfun_name dict_tvs dict_args clas inst_tys
 
@@ -505,10 +517,12 @@ makeDerivEqns overlap_flag tycl_decls
 
 	-- Check that eta reduction is OK
 	-- 	(a) the dropped-off args are identical
-	--	(b) the remaining type args mention 
-	--	    only the remaining type variables
+	--	(b) the remaining type args do not mention any of teh dropped type variables
+	--	(c) the type class args do not mention any of teh dropped type variables
+	dropped_tvs = mkVarSet tyvars_to_drop
 	eta_ok = (args_to_drop `tcEqTypes` mkTyVarTys tyvars_to_drop)
-	      && (tyVarsOfType rep_fn' `subVarSet` mkVarSet tyvars_to_keep) 
+	      && (tyVarsOfType rep_fn' `disjointVarSet` dropped_tvs)
+	      && (tyVarsOfTypes tys    `disjointVarSet` dropped_tvs)
 
 	cant_derive_err = derivingThingErr clas tys tycon tyvars_to_keep
 				(vcat [ptext SLIT("even with cunning newtype deriving:"),

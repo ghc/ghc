@@ -130,21 +130,20 @@ mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 -- because the latter is part of a knot, whereas the former is not.
 mkNewTyConRhs tycon_name tycon con 
   = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
-	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon tvs rhs_ty
-              cocon_maybe 
-                | all_coercions || isRecursiveTyCon tycon 
-                = Just co_tycon
-                | otherwise              
-                = Nothing
-	; return (NewTyCon { data_con = con, 
+	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon etad_rhs
+              cocon_maybe | all_coercions || isRecursiveTyCon tycon 
+		          = Just co_tycon
+                	  | otherwise              
+                	  = Nothing
+	; return (NewTyCon { data_con    = con, 
+		       	     nt_rhs      = rhs_ty,
+		       	     nt_etad_rhs = etad_rhs,
  		       	     nt_co = cocon_maybe, 
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
-		       	     nt_rhs = rhs_ty,
-		       	     nt_etad_rhs = eta_reduce tvs rhs_ty,
 		       	     nt_rep = mkNewTyConRep tycon rhs_ty }) }
   where
-        -- if all_coercions is True then we use coercions for all newtypes
+        -- If all_coercions is True then we use coercions for all newtypes
         -- otherwise we use coercions for recursive newtypes and look through
         -- non-recursive newtypes
     all_coercions = True
@@ -153,18 +152,20 @@ mkNewTyConRhs tycon_name tycon con
 	-- Instantiate the data con with the 
 	-- type variables from the tycon
 
-    eta_reduce [] ty = ([], ty)
-    eta_reduce (a:as) ty | null as', 
-			   Just (fun, arg) <- splitAppTy_maybe ty',
+    etad_rhs :: ([TyVar], Type)
+    etad_rhs = eta_reduce (reverse tvs) rhs_ty
+
+    eta_reduce :: [TyVar]		-- Reversed
+	       -> Type			-- Rhs type
+	       -> ([TyVar], Type)	-- Eta-reduced version (tyvars in normal order)
+    eta_reduce (a:as) ty | Just (fun, arg) <- splitAppTy_maybe ty,
 			   Just tv <- getTyVar_maybe arg,
 			   tv == a,
 			   not (a `elemVarSet` tyVarsOfType fun)
-			 = ([], fun)	-- Successful eta reduction
-			 | otherwise
-			 = (a:as', ty')
-	where
-  	  (as', ty') = eta_reduce as ty
+			 = eta_reduce as fun
+    eta_reduce tvs ty = (reverse tvs, ty)
 				
+
 mkNewTyConRep :: TyCon		-- The original type constructor
 	      -> Type		-- The arg type of its constructor
 	      -> Type		-- Chosen representation type

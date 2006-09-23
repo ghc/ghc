@@ -50,8 +50,8 @@ import TcIface		( tcImportDecl )
 import IfaceEnv		( newGlobalBinder )
 import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
-import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType, 
-			  substTy, tyVarsOfType, tcTyVarsOfTypes, mkTyConApp,
+import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType, PredType,
+			  tyVarsOfType, tcTyVarsOfTypes, mkTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
 			  tidyOpenType, isRefineableTy
 			)
@@ -362,7 +362,7 @@ findGlobals tvs tidy_env
 	  Just d  -> go tidy_env1 (d:acc) things
 	  Nothing -> go tidy_env1 acc     things
 
-    ignore_it ty = not (tvs `intersectsVarSet` tyVarsOfType ty)
+    ignore_it ty = tvs `disjointVarSet` tyVarsOfType ty
 
 -----------------------
 find_thing ignore_it tidy_env (ATcId { tct_id = id })
@@ -567,20 +567,26 @@ data InstBindings
 	[LSig Name]		-- User pragmas recorded for generating 
 				-- specialised instances
 
-  | NewTypeDerived 		
-        TyCon                   -- tycon for the newtype
-                                -- Used for deriving instances of newtypes, where the
-	[Type]			-- witness dictionary is identical to the argument 
-				-- dictionary.  Hence no bindings, no pragmas
-	-- The [Type] are the representation types
-	-- See notes in TcDeriv
+  | NewTypeDerived              -- Used for deriving instances of newtypes, where the
+				-- witness dictionary is identical to the argument 
+				-- dictionary.  Hence no bindings, no pragmas.
+	(Maybe [PredType])
+		-- Nothing      => The newtype-derived instance involves type variables,
+		--	           and the dfun has a type like df :: forall a. Eq a => Eq (T a)
+		-- Just (r:scs) => The newtype-defined instance has no type variables
+		--		   so the dfun is just a constant, df :: Eq T
+		-- 		   In this case we need to know waht the rep dict, r, and the 
+		--		   superclasses, scs, are.  (In the Nothing case these are in the
+		--		   dict fun's type.)
+		--		   Invariant: these PredTypes have no free variables
+		-- NB: In both cases, the representation dict is the *first* dict.
 
 pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))]
 
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
     details (VanillaInst b _)  = pprLHsBinds b
-    details (NewTypeDerived _  _) = text "Derived from the representation type"
+    details (NewTypeDerived _) = text "Derived from the representation type"
 
 simpleInstInfoClsTy :: InstInfo -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of

@@ -18,6 +18,7 @@ import TcMType		( tcSkolSigType, checkValidInstance,
 			  checkValidInstHead )
 import TcType		( TcType, mkClassPred, tcSplitSigmaTy,
 			  tcSplitDFunHead,  SkolemInfo(InstSkol),
+			  tcSplitTyConApp, 
 			  tcSplitDFunTy, mkFunTy ) 
 import Inst		( newDictBndr, newDictBndrs, instToId, showLIE, 
 			  getOverlapFlag, tcExtendLocalInstEnv )
@@ -32,29 +33,27 @@ import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifySuperClasses )
 import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
-                          splitFunTys, TyThing(ATyCon), isTyVarTy, tcEqType,
+                          TyThing(ATyCon), isTyVarTy, tcEqType,
                           substTys, emptyTvSubst, extendTvSubst )
 import Coercion         ( mkSymCoercion )
 import TyCon            ( TyCon, tyConName, newTyConCo_maybe, tyConTyVars,
 			  isTyConAssoc, tyConFamInst_maybe,
 			  assocTyConArgPoss_maybe )
-import DataCon		( classDataCon, dataConTyCon, dataConInstArgTys )
-import Class		( Class, classBigSig, classATs )
-import Var		( TyVar, Id, idName, idType, tyVarKind, tyVarName )
-import VarEnv           ( rnBndrs2, mkRnEnv2, emptyInScopeSet )
-import Id               ( mkSysLocal )
-import UniqSupply       ( uniqsFromSupply, splitUniqSupply )
+import DataCon		( classDataCon, dataConInstArgTys )
+import Class		( Class, classTyCon, classBigSig, classATs )
+import Var		( TyVar, Id, idName, idType, tyVarName )
 import MkId		( mkDictFunId )
 import Name		( Name, getSrcLoc, nameOccName )
 import NameSet		( addListToNameSet, emptyNameSet, minusNameSet,
 			  nameSetToList ) 
-import Maybe		( isNothing, fromJust, catMaybes )
+import Maybe		( fromJust, catMaybes )
 import Monad		( when )
 import List		( find )
 import DynFlags		( DynFlag(Opt_WarnMissingMethods) )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart,
 			  getLoc)
 import ListSetOps	( minusList )
+import Util		( snocView, dropList )
 import Outputable
 import Bag
 import BasicTypes	( Activation( AlwaysActive ), InlineSpec(..) )
@@ -472,90 +471,112 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 ------------------------
 -- Derived newtype instances
 --
--- We need to make a copy of the dictionary we are deriving from
--- because we may need to change some of the superclass dictionaries
--- see Note [Newtype deriving superclasses] in TcDeriv.lhs
---
 -- In the case of a newtype, things are rather easy
 -- 	class Show a => Foo a b where ...
 -- 	newtype T a = MkT (Tree [a]) deriving( Foo Int )
 -- The newtype gives an FC axiom looking like
 --	axiom CoT a ::  T a :=: Tree [a]
+--   (see Note [Newtype coercions] in TyCon for this unusual form of axiom)
 --
--- So all need is to generate a binding looking like
+-- So all need is to generate a binding looking like: 
 -- 	dfunFooT :: forall a. (Foo Int (Tree [a], Show (T a)) => Foo Int (T a)
 --	dfunFooT = /\a. \(ds:Show (T a)) (df:Foo (Tree [a])).
 --		  case df `cast` (Foo Int (sym (CoT a))) of
 --		     Foo _ op1 .. opn -> Foo ds op1 .. opn
+--
+-- If there are no superclasses, matters are simpler, because we don't need the case
+-- see Note [Newtype deriving superclasses] in TcDeriv.lhs
 
-tcInstDecl2 (InstInfo { iSpec = ispec, 
-			iBinds = NewTypeDerived tycon rep_tys })
+tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
   = do	{ let dfun_id      = instanceDFunId ispec 
 	      rigid_info   = InstSkol dfun_id
 	      origin	   = SigOrigin rigid_info
 	      inst_ty      = idType dfun_id
+	; (tvs, theta, inst_head_ty) <- tcSkolSigType rigid_info inst_ty
+		-- inst_head_ty is a PredType
+
 	; inst_loc <- getInstLoc origin
-	; (tvs, theta, inst_head) <- tcSkolSigType rigid_info inst_ty
-	; dicts <- newDictBndrs inst_loc theta
-        ; uniqs <- newUniqueSupply
-        ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head
-        ; this_dict <- newDictBndr inst_loc (mkClassPred cls rep_tys)
-        ; let (rep_dict_id:sc_dict_ids)
-                 | null dicts = [instToId this_dict]
- 		 | otherwise  = map instToId dicts
-
-		-- (Here, we are relying on the order of dictionary 
-		-- arguments built by NewTypeDerived in TcDeriv.)
-
-              wrap_fn = mkCoTyLams tvs <.> mkCoLams (rep_dict_id:sc_dict_ids)
+	; (rep_dict_id : sc_dict_ids, wrap_fn)
+		<- make_wrapper inst_loc tvs theta mb_preds
+		-- Here, we are relying on the order of dictionary 
+		-- arguments built by NewTypeDerived in TcDeriv; 
+		-- namely, that the rep_dict_id comes first
 	   
-                -- we need to find the kind that this class applies to
-                -- and drop trailing tvs appropriately
-              cls_kind = tyVarKind (head (reverse (tyConTyVars cls_tycon)))
-              the_tvs  = drop_tail (length (fst (splitFunTys cls_kind))) tvs
+        ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head_ty
+	      the_coercion     = make_coercion cls cls_inst_tys
+              coerced_rep_dict = mkHsCoerce the_coercion (HsVar rep_dict_id)
 
-              coerced_rep_dict = mkHsCoerce (co_fn the_tvs cls_tycon cls_inst_tys) (HsVar rep_dict_id)
-
-	      body | null sc_dict_ids = coerced_rep_dict
-		   | otherwise = HsCase (noLoc coerced_rep_dict) $
-				 MatchGroup [the_match] (mkFunTy in_dict_ty inst_head)
-	      in_dict_ty = mkTyConApp cls_tycon cls_inst_tys
-
-              the_match = mkSimpleMatch [noLoc the_pat] the_rhs
-	      the_rhs = mkHsConApp cls_data_con cls_inst_tys (map HsVar (sc_dict_ids ++ op_ids))
-
-	      (uniqs1, uniqs2) = splitUniqSupply uniqs
-
-	      op_ids = zipWith (mkSysLocal FSLIT("op"))
-                        	      (uniqsFromSupply uniqs1) op_tys
-
-              dict_ids = zipWith (mkSysLocal FSLIT("dict"))
-                          (uniqsFromSupply uniqs2) (map idType sc_dict_ids)
-
-	      the_pat = ConPatOut { pat_con = noLoc cls_data_con, pat_tvs = [],
-				    pat_dicts = dict_ids,
-				    pat_binds = emptyLHsBinds,
-				    pat_args = PrefixCon (map nlVarPat op_ids),
-				    pat_ty = in_dict_ty} 
-
-              cls_data_con = classDataCon cls
-              cls_tycon    = dataConTyCon cls_data_con
-              cls_arg_tys  = dataConInstArgTys cls_data_con cls_inst_tys 
+	; body <- make_body cls cls_inst_tys inst_head_ty sc_dict_ids coerced_rep_dict
               
-              n_dict_args = if length dicts == 0 then 0 else length dicts - 1
-              op_tys = drop n_dict_args cls_arg_tys
-              
-              dict    = mkHsCoerce wrap_fn body
-        ; return (unitBag (noLoc $ VarBind dfun_id (noLoc dict))) }
+        ; return (unitBag (noLoc $ VarBind dfun_id $ noLoc $ mkHsCoerce wrap_fn body)) }
   where
-  	-- For newtype T a = MkT <ty>
-	-- The returned coercion has kind :: C (T a):=:C <ty>
-    co_fn tvs cls_tycon cls_inst_tys | Just co_con <- newTyConCo_maybe tycon
-          = ExprCoFn (mkTyConApp cls_tycon (drop_tail 1 cls_inst_tys ++
-                      [mkSymCoercion (mkTyConApp co_con (map mkTyVarTy tvs))]))
-          | otherwise
-          = idCoercion
-    drop_tail n l = take (length l - n) l
+
+      -----------------------
+      -- 	make_wrapper
+      -- We distinguish two cases:
+      -- (a) there is no tyvar abstraction in the dfun, so all dicts are constant,
+      --     and the new dict can just be a constant
+      --	(mb_preds = Just preds)
+      -- (b) there are tyvars, so we must make a dict *fun*
+      --	(mb_preds = Nothing)
+      -- See the defn of NewTypeDerived for the meaning of mb_preds
+    make_wrapper inst_loc tvs theta (Just preds)	-- Case (a)
+      = ASSERT( null tvs && null theta )
+	do { dicts <- newDictBndrs inst_loc preds
+	   ; extendLIEs dicts
+	   ; return (map instToId dicts, idCoercion) }
+    make_wrapper inst_loc tvs theta Nothing 	-- Case (b)
+      = do { dicts <- newDictBndrs inst_loc theta
+	   ; let dict_ids = map instToId dicts
+	   ; return (dict_ids, mkCoTyLams tvs <.> mkCoLams dict_ids) }
+
+      -----------------------
+      -- 	make_coercion
+      -- The inst_head looks like (C s1 .. sm (T a1 .. ak))
+      -- But we want the coercion (C s1 .. sm (sym (CoT a1 .. ak)))
+      --	with kind (C s1 .. sm (T a1 .. ak)  :=:  C s1 .. sm <rep_ty>)
+      --	where rep_ty is the (eta-reduced) type rep of T
+      -- So we just replace T with CoT, and insert a 'sym'
+      -- NB: we know that k will be >= arity of CoT, because the latter fully eta-reduced
+
+    make_coercion cls cls_inst_tys
+	| Just (all_tys_but_last, last_ty) <- snocView cls_inst_tys
+	, (tycon, tc_args) <- tcSplitTyConApp last_ty	-- Should not fail
+	, Just co_con <- newTyConCo_maybe tycon
+	, let co = mkSymCoercion (mkTyConApp co_con tc_args)
+        = ExprCoFn (mkTyConApp cls_tycon (all_tys_but_last ++ [co]))
+        | otherwise	-- The newtype is transparent; no need for a cast
+        = idCoercion
+	where
+          cls_tycon = classTyCon cls
+
+      -----------------------
+      -- 	make_body
+      -- Two cases; see Note [Newtype deriving superclasses] in TcDeriv.lhs
+      -- (a) no superclasses; then we can just use the coerced dict
+      -- (b) one or more superclasses; then new need to do the unpack/repack
+	
+    make_body cls cls_inst_tys inst_head_ty sc_dict_ids coerced_rep_dict
+	| null sc_dict_ids		-- Case (a)
+	= return coerced_rep_dict
+	| otherwise 			-- Case (b)
+ 	= do { op_ids		 <- newSysLocalIds FSLIT("op") op_tys
+	     ; dummy_sc_dict_ids <- newSysLocalIds FSLIT("sc") (map idType sc_dict_ids)
+	     ; let the_pat = ConPatOut { pat_con = noLoc cls_data_con, pat_tvs = [],
+				    	 pat_dicts = dummy_sc_dict_ids,
+				    	 pat_binds = emptyLHsBinds,
+				    	 pat_args = PrefixCon (map nlVarPat op_ids),
+				    	 pat_ty = inst_head_ty} 
+	           the_match = mkSimpleMatch [noLoc the_pat] the_rhs
+	           the_rhs = mkHsConApp cls_data_con cls_inst_tys $
+			     map HsVar (sc_dict_ids ++ op_ids)
+
+	     ; return (HsCase (noLoc coerced_rep_dict) $
+		       MatchGroup [the_match] (mkFunTy inst_head_ty inst_head_ty)) }
+	where
+          cls_data_con = classDataCon cls
+          cls_arg_tys  = dataConInstArgTys cls_data_con cls_inst_tys 
+          op_tys       = dropList sc_dict_ids cls_arg_tys
 
 ------------------------
 -- Ordinary instances

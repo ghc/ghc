@@ -37,14 +37,12 @@ import TypeRep
 import Type	  ( Type, Kind, PredType, substTyWith, mkAppTy, mkForAllTy,
                     mkFunTy, splitAppTy_maybe, splitForAllTy_maybe, coreView,
                     kindView, mkTyConApp, isCoercionKind, isEqPred, mkAppTys,
-                    coreEqType, splitAppTys, isTyVarTy, splitTyConApp_maybe,
-                    tyVarsOfType, mkTyVarTys
+                    coreEqType, splitAppTys, isTyVarTy, splitTyConApp_maybe
                   )
 import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isClosedNewTyCon,
                     newTyConRhs, newTyConCo_maybe, 
                     isCoercionTyCon, isCoercionTyCon_maybe )
 import Var	  ( Var, TyVar, isTyVar, tyVarKind )
-import VarSet     ( elemVarSet )
 import Name       ( BuiltInSyntax(..), Name, mkWiredInName, tcName )
 import OccName    ( mkOccNameFS )
 import PrelNames  ( symCoercionTyConKey, 
@@ -287,42 +285,16 @@ mkUnsafeCoercion ty1 ty2
 
 
 -- See note [Newtype coercions] in TyCon
-mkNewTypeCoercion :: Name -> TyCon -> [TyVar] -> Type -> TyCon
-mkNewTypeCoercion name tycon tvs rhs_ty 
-  = ASSERT (length tvs == tyConArity tycon)
-    mkCoercionTyCon name co_con_arity (mkKindingFun rule)
+mkNewTypeCoercion :: Name -> TyCon -> ([TyVar], Type) -> TyCon
+mkNewTypeCoercion name tycon (tvs, rhs_ty)
+  = mkCoercionTyCon name co_con_arity (mkKindingFun rule)
   where
-    rule args = (TyConApp tycon tys, substTyWith tvs_eta tys rhs_eta, rest)
+    co_con_arity = length tvs
+
+    rule args = (TyConApp tycon tys, substTyWith tvs tys rhs_ty, rest)
         where
           tys  = take co_con_arity args
           rest = drop co_con_arity args
-
-      -- if the rhs_ty is a type application and it has a tail equal to a tail
-      -- of the tvs, then we eta-contract the type of the coercion
-    rhs_args = let (ty, ty_args) = splitAppTys rhs_ty in ty_args
-
-    n_eta_tys = count_eta (reverse rhs_args) (reverse tvs)
-
-    count_eta ((TyVarTy tv):rest_ty) (tv':rest_tv)
-      | tv == tv' && (not $ any (elemVarSet tv . tyVarsOfType) rest_ty)
-                  -- if the last types are the same, and not free anywhere else
-                  -- then eta contract
-      = 1 + (count_eta rest_ty rest_tv)
-      | otherwise -- don't 
-      = 0
-    count_eta _ _ = 0
-     
-
-    eqVar (TyVarTy tv) tv' = tv == tv'
-    eqVar _            _   = False
-
-    co_con_arity = (tyConArity tycon) - n_eta_tys
-
-    tvs_eta = (reverse (drop n_eta_tys (reverse tvs)))
-
-    rhs_eta
-      | (ty, ty_args) <- splitAppTys rhs_ty
-      = mkAppTys ty (reverse (drop n_eta_tys (reverse ty_args)))
 
 -- Coercion identifying a data/newtype representation type and its family
 -- instance.  It has the form `Co tvs :: F ts :=: R tvs', where `Co' is the
@@ -359,7 +331,8 @@ mkDataInstCoercion name tvs family instTys rep_tycon
 -- then ((sym c) (sym d) (sym e)) :: (p1 p2 p3)=(q1 q2 q3)
 --
 -- (mkKindingFun f) is given the args [c, sym d, sym e]
-mkKindingFun :: ([Type] -> (Type, Type, [Type])) -> [Type] -> Kind
+mkKindingFun :: ([Type] -> (Type, Type, [Type]))
+	     -> [Type] -> Kind
 mkKindingFun f args = 
   let (ty1, ty2, rest) = f args in 
   let (argtys1, argtys2) = unzip (map coercionKind rest) in
