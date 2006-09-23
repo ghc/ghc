@@ -33,7 +33,7 @@ import Type		( Type, ThetaType,
 			  substTyWith, substTyVar, mkTopTvSubst, 
 			  mkForAllTys, mkFunTys, mkTyConApp, mkTyVarTy, mkTyVarTys, 
 			  splitTyConApp_maybe, newTyConInstRhs, 
-			  mkPredTys, isStrictPred, pprType, mkPredTy
+			  mkPredTys, isStrictPred, pprType
 			)
 import Coercion		( isEqPred, mkEqPred )
 import TyCon		( TyCon, FieldLabel, tyConDataCons, 
@@ -41,15 +41,13 @@ import TyCon		( TyCon, FieldLabel, tyConDataCons,
                           isNewTyCon, isClosedNewTyCon, isRecursiveTyCon,
                           tyConFamInst_maybe )
 import Class		( Class, classTyCon )
-import Name		( Name, NamedThing(..), nameUnique, mkSysTvName, mkSystemName )
-import Var		( TyVar, CoVar, Id, mkTyVar, tyVarKind, setVarUnique,
-                          mkCoVar )
+import Name		( Name, NamedThing(..), nameUnique )
+import Var		( TyVar, Id )
 import BasicTypes	( Arity, StrictnessMark(..) )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import ListSetOps	( assoc, minusList )
 import Util		( zipEqual, zipWithEqual )
-import List		( partition )
 import Maybes           ( expectJust )
 import FastString
 \end{code}
@@ -445,15 +443,21 @@ mkDataCon name declared_infix
 	  eq_spec theta
 	  orig_arg_tys tycon
 	  stupid_theta ids
+-- Warning: mkDataCon is not a good place to check invariants. 
+-- If the programmer writes the wrong result type in the decl, thus:
+--	data T a where { MkT :: S }
+-- then it's possible that the univ_tvs may hit an assertion failure
+-- if you pull on univ_tvs.  This case is checked by checkValidDataCon,
+-- so the error is detected properly... it's just that asaertions here
+-- are a little dodgy.
+
   = ASSERT( not (any isEqPred theta) )
 	-- We don't currently allow any equality predicates on
 	-- a data constructor (apart from the GADT ones in eq_spec)
     con
   where
     is_vanilla = null ex_tvs && null eq_spec && null theta
-    con = ASSERT( is_vanilla || not (isNewTyCon tycon) )
-		-- Invariant: newtypes have a vanilla data-con
-     	  MkData {dcName = name, dcUnique = nameUnique name, 
+    con = MkData {dcName = name, dcUnique = nameUnique name, 
 		  dcVanilla = is_vanilla, dcInfix = declared_infix,
 	  	  dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, 
 		  dcEqSpec = eq_spec, 
@@ -753,6 +757,6 @@ computeRep stricts tys
     unbox MarkedStrict    ty = [(MarkedStrict,    ty)]
     unbox MarkedUnboxed   ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
                                where
-                                 (tycon, tycon_args, arg_dc, arg_tys) 
+                                 (_tycon, _tycon_args, arg_dc, arg_tys) 
                                      = deepSplitProductType "unbox_strict_arg_ty" ty
 \end{code}
