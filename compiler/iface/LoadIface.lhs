@@ -37,7 +37,6 @@ import BasicTypes	( Version, initialVersion,
 			  Fixity(..), FixityDirection(..), isMarkedStrict )
 import TcRnMonad
 import Type             ( TyThing(..) )
-import Class		( classATs )
 
 import PrelNames	( gHC_PRIM )
 import PrelInfo		( ghcPrimExports )
@@ -52,7 +51,7 @@ import Module
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc,
 			  mkClassDataConOcc, mkSuperDictSelOcc,
 			  mkDataConWrapperOcc, mkDataConWorkerOcc,
-			  mkNewTyCoOcc, mkInstTyTcOcc, mkInstTyCoOcc ) 
+			  mkNewTyCoOcc, mkInstTyCoOcc ) 
 import SrcLoc		( importedSrcLoc )
 import Maybes		( MaybeErr(..) )
 import ErrUtils         ( Message )

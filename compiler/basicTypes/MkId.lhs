@@ -47,7 +47,7 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 import TysWiredIn	( charTy, mkListTy )
 import PrelRules	( primOpRules )
 import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, 
- 			  newTyConInstRhs, mkTopTvSubst, substTyVar, substTy,
+ 			  newTyConInstRhs, mkTopTvSubst, substTyVar, 
  			  substTys, zipTopTvSubst )
 import TcGadt           ( gadtRefine, refineType, emptyRefinement )
 import HsBinds          ( ExprCoFn(..), isIdCoercion )
@@ -97,7 +97,6 @@ import NewDemand	( mkStrictSig, DmdResult(..),
 import DmdAnal		( dmdAnalTopRhs )
 import CoreSyn
 import Unique		( mkBuiltinUnique, mkPrimOpIdUnique )
-import Maybe		( fromJust )
 import Maybes
 import PrelNames
 import Util             ( dropList, isSingleton )

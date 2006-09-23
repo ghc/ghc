@@ -34,7 +34,7 @@ import SMRep		( argMachRep, primRepToCgRep, primRepHint )
 #endif
 import OccName		( mkForeignExportOcc )
 import Name		( Name, NamedThing(..), mkExternalName )
-import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
+import TcType		( Type, tcSplitFunTys, 
 			  tcSplitForAllTys, tcSplitIOType_maybe,
 			  isFFIArgumentTy, isFFIImportResultTy, 
 			  isFFIExportResultTy, isFFILabelTy,
@@ -45,7 +45,6 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 import ForeignCall	( CExportSpec(..), CCallTarget(..), 
 			  CLabelString, isCLabelString,
 			  isDynamicTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
-import PrelNames	( hasKey, ioTyConKey )
 import DynFlags		( DynFlags(..), HscTarget(..) )
 import Outputable
 import SrcLoc		( Located(..), srcSpanStart )

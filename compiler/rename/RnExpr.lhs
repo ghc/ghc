@@ -23,7 +23,6 @@ import HsSyn
 import RnHsSyn
 import TcRnMonad
 import RnEnv
-import OccName		( plusOccEnv )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, 
@@ -43,7 +42,7 @@ import Name             ( isTyVarName )
 #endif
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
-import RdrName		( RdrName, emptyGlobalRdrEnv, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
+import RdrName		( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
 import LoadIface	( loadInterfaceForName )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
@@ -968,10 +967,10 @@ mkBreakpointExpr' breakpointFunc scope
              mkScopeArg args = unLoc $ mkExpr undef (map HsVar args)
              msg = srcSpanLit sloc
          return (expr, emptyFVs)
-#endif
 
 srcSpanLit :: SrcSpan -> HsExpr Name
 srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
+#endif
 
 srcSpanPrimLit :: SrcSpan -> HsExpr Name
 srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDoc (ppr span))))

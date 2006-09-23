@@ -117,12 +117,12 @@ import PrelNames( openTypeKindTyConKey, unliftedTypeKindTyConKey,
                   ubxTupleKindTyConKey, argTypeKindTyConKey )
 import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, isNewTyCon, isClosedNewTyCon, isOpenTyCon,
+		  isFunTyCon, isNewTyCon, isClosedNewTyCon, 
 		  newTyConRep, newTyConRhs, 
 		  isAlgTyCon, tyConArity, isSuperKindTyCon,
 		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique,
-                  isCoercionTyCon_maybe, isCoercionTyCon
+                  isCoercionTyCon
 		)
 
 -- others

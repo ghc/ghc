@@ -15,8 +15,8 @@ import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique, idType )
 import IdInfo		( setArityInfo, vanillaIdInfo,
 			  newStrictnessInfo, setAllStrictnessInfo,
 			  newDemandInfo, setNewDemandInfo )
-import Type		( tidyType, tidyTyVarBndr, substTy )
-import Var		( Var, TyVar, varName )
+import Type		( tidyType, tidyTyVarBndr )
+import Var		( Var, varName )
 import VarEnv
 import UniqFM		( lookupUFM )
 import Name		( Name, getOccName )

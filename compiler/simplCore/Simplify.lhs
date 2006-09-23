@@ -26,8 +26,6 @@ import Id		( Id, idType, idInfo, idArity, isDataConWorkId,
 			  idNewDemandInfo, setIdInfo, 
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda
 			)
-import MkId		( eRROR_ID )
-import Literal		( mkStringLit )
 import IdInfo		( OccInfo(..), isLoopBreaker,
 			  setArityInfo, zapDemandInfo,
 			  setUnfoldingInfo, 
@@ -35,7 +33,7 @@ import IdInfo		( OccInfo(..), isLoopBreaker,
 			)
 import NewDemand	( isStrictDmd )
 import TcGadt		( dataConCanMatch )
-import DataCon		( DataCon, dataConTyCon, dataConRepStrictness )
+import DataCon		( dataConTyCon, dataConRepStrictness )
 import TyCon		( tyConArity, isAlgTyCon, isNewTyCon, tyConDataCons_maybe )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
@@ -51,13 +49,11 @@ import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, coreEqType, splitTyConApp_maybe,
-			  isTyVarTy, mkTyVarTys, isFunTy, tcEqType
+			  coreEqType, splitTyConApp_maybe,
+			  isTyVarTy, isFunTy, tcEqType
 			)
 import Coercion         ( Coercion, coercionKind,
-                          mkTransCoercion, mkLeftCoercion, mkRightCoercion, 
-                          mkSymCoercion, splitCoercionKind_maybe, decomposeCo  )
-import Var		( tyVarKind, mkTyVar )
+                          mkTransCoercion, mkSymCoercion, splitCoercionKind_maybe, decomposeCo  )
 import VarEnv		( elemVarEnv, emptyVarEnv )
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )

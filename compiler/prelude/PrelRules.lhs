@@ -20,7 +20,7 @@ module PrelRules ( primOpRules, builtinRules ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( mkWildId, isPrimOpId_maybe, idUnfolding )
+import Id		( mkWildId, idUnfolding )
 import Literal		( Literal(..), mkMachInt, mkMachWord
 			, literalType
 			, word2IntLit, int2WordLit

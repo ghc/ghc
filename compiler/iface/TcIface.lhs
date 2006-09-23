@@ -27,18 +27,15 @@ import TcRnMonad
 import Type		( liftedTypeKind, splitTyConApp, mkTyConApp,
                           liftedTypeKindTyCon, unliftedTypeKindTyCon, 
                           openTypeKindTyCon, argTypeKindTyCon, 
-                          ubxTupleKindTyCon,
-			  mkTyVarTys, ThetaType )
+                          ubxTupleKindTyCon, ThetaType )
 import TypeRep		( Type(..), PredType(..) )
-import TyCon		( TyCon, tyConName, SynTyConRhs(..), 
-			  AlgTyConParent(..), setTyConArgPoss )
+import TyCon		( TyCon, tyConName, SynTyConRhs(..), setTyConArgPoss )
 import HscTypes		( ExternalPackageState(..), 
 			  TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
 			  emptyModDetails, lookupTypeEnv, lookupType,
 			  typeEnvIds, mkDetailsFamInstCache )
 import InstEnv		( Instance(..), mkImportedInstance )
-import FamInstEnv	( extractFamInsts )
 import CoreSyn
 import CoreUtils	( exprType, dataConRepFSInstPat )
 import CoreUnfold
@@ -52,9 +49,9 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 			  vanillaIdInfo, newStrictnessInfo )
 import Class		( Class )
 import TyCon		( tyConDataCons, isTupleTyCon, mkForeignTyCon )
-import DataCon		( DataCon, dataConWorkId, dataConExTyVars, dataConInstArgTys )
+import DataCon		( DataCon, dataConWorkId )
 import TysWiredIn	( tupleCon, tupleTyCon, listTyCon, intTyCon, boolTyCon, charTyCon, parrTyCon )
-import Var		( TyVar, mkTyVar, tyVarKind )
+import Var		( TyVar, mkTyVar )
 import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
  			  nameOccName, wiredInNameTyThing_maybe )
 import NameEnv
@@ -68,12 +65,11 @@ import Outputable
 import ErrUtils		( Message )
 import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
-import Util		( zipWithEqual, equalLength, splitAtList )
+import Util		( zipWithEqual, equalLength )
 import DynFlags		( DynFlag(..), isOneShot )
 
 import List		( elemIndex)
 import Maybe		( catMaybes )
-import Monad		( liftM )
 \end{code}
 
 This module takes

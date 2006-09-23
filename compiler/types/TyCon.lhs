@@ -61,7 +61,7 @@ module TyCon(
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TypeRep ( Kind, Type, Coercion, PredType )
+import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
 
 import Var   		( TyVar, Id )
@@ -193,10 +193,6 @@ data TyCon
         tyConUnique :: Unique,
         tyConName   :: Name
     }
-
-type KindCon = TyCon
-
-type SuperKindCon = TyCon
 
 type FieldLabel = Name
 
