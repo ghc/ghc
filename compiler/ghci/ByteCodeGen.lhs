@@ -427,6 +427,13 @@ schemeE d s p (AnnNote note (_, body))
 schemeE d s p (AnnCast (_, body) _)
    = schemeE d s p body
 
+-- XXX - audreyt - After FC landed, this case of explicit eta-reduction
+--       seems needed to make "data D = D deriving Typeable" work in GHCi.
+--       however, how did AnnLam with a var (LocalId) survive until this place?
+schemeE d s p (AnnLam var (_, AnnApp (_, body) (_, AnnVar inner)))
+   | var == inner
+   = schemeE d s p body
+
 schemeE d s p other
    = pprPanic "ByteCodeGen.schemeE: unhandled case" 
                (pprCoreExpr (deAnnotate' other))
