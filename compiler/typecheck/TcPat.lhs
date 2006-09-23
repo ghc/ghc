@@ -51,7 +51,7 @@ import Type		( Type, mkTyConApp, substTys, substTheta )
 import StaticFlags	( opt_IrrefutableTuples )
 import TyCon		( TyCon, FieldLabel, tyConFamInst_maybe,
 			  tyConFamilyCoercion_maybe, tyConTyVars )
-import DataCon		( DataCon, dataConTyCon, dataConFullSig, 
+import DataCon		( DataCon, dataConTyCon, dataConFullSig, dataConName,
 			  dataConFieldLabels, dataConSourceArity, 
 			  dataConStupidTheta, dataConUnivTyVars )
 import PrelNames	( integralClassName, fromIntegerName, integerTyConName, 
@@ -571,7 +571,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	; dicts <- newDictBndrs loc theta'
 	; dict_binds <- tcSimplifyCheck doc ex_tvs' dicts lie_req
 
-	; addDataConStupidTheta origin data_con ctxt_res_tys
+	; addDataConStupidTheta data_con ctxt_res_tys
 
 	; return
 	    (unwrapFamInstScrutinee tycon ctxt_res_tys $
@@ -697,13 +697,16 @@ tcConArg (arg_pat, arg_ty) pstate thing_inside
 \end{code}
 
 \begin{code}
-addDataConStupidTheta :: InstOrigin -> DataCon -> [TcType] -> TcM ()
+addDataConStupidTheta :: DataCon -> [TcType] -> TcM ()
 -- Instantiate the "stupid theta" of the data con, and throw 
 -- the constraints into the constraint set
-addDataConStupidTheta origin data_con inst_tys
+addDataConStupidTheta data_con inst_tys
   | null stupid_theta = return ()
   | otherwise	      = instStupidTheta origin inst_theta
   where
+    origin = OccurrenceOf (dataConName data_con)
+	-- The origin should always report "occurrence of C"
+	-- even when C occurs in a pattern
     stupid_theta = dataConStupidTheta data_con
     tenv = zipTopTvSubst (dataConUnivTyVars data_con) inst_tys
     inst_theta = substTheta tenv stupid_theta

@@ -775,7 +775,7 @@ instFun orig fun subst tv_theta_prs
   = do 	{ let ty_theta_prs' = map subst_pr tv_theta_prs
 
                 -- Make two ad-hoc checks 
-	; doStupidChecks orig fun ty_theta_prs'
+	; doStupidChecks fun ty_theta_prs'
 
 		-- Now do normal instantiation
 	; go True fun ty_theta_prs' }
@@ -891,8 +891,7 @@ Here's are two cases that should fail
 
 
 \begin{code}
-doStupidChecks :: InstOrigin
-	       -> HsExpr TcId
+doStupidChecks :: HsExpr TcId
 	       -> [([TcType], ThetaType)]
 	       -> TcM ()
 -- Check two tiresome and ad-hoc cases
@@ -900,9 +899,9 @@ doStupidChecks :: InstOrigin
 --     from the "stupid theta" of a data constructor (sigh)
 -- (b) deal with the tagToEnum# problem: see Note [tagToEnum#]
 
-doStupidChecks orig (HsVar fun_id) ((tys,_):_)
+doStupidChecks (HsVar fun_id) ((tys,_):_)
   | Just con <- isDataConId_maybe fun_id   -- (a)
-  = addDataConStupidTheta orig con tys
+  = addDataConStupidTheta con tys
 
   | fun_id `hasKey` tagToEnumKey           -- (b)
   = do	{ tys' <- zonkTcTypes tys
@@ -914,7 +913,7 @@ doStupidChecks orig (HsVar fun_id) ((tys,_):_)
 			Just (tc,_) -> isEnumerationTyCon tc
 			Nothing     -> False
 
-doStupidChecks orig fun tv_theta_prs
+doStupidChecks fun tv_theta_prs
   = return () -- The common case
 				      
 
