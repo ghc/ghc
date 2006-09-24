@@ -712,6 +712,8 @@ tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
 tcSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 tcSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
+tcSplitTyConApp_maybe (AppTy arg res)   = Just (funTyCon, [arg,res])
+tcSplitTyConApp_maybe (PredTy (ClassP _ [ty']))   = tcSplitTyConApp_maybe ty'
 	-- Newtypes are opaque, so they may be split
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
