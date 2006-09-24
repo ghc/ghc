@@ -1,3 +1,4 @@
+{-# OPTIONS -fglasgow-exts #-}
 -- A simple GADT test from Roman
 -- which nevertheless showed up a bug at one stage
 
