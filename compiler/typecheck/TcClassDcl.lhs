@@ -632,6 +632,8 @@ get_generics decl@(ClassDecl {tcdLName = class_name, tcdMeths = def_methods})
 	--	f {| a+b |} ... = ...
 	--	f {| x+y |} ... = ...
 	-- Then at this point we'll have an InstInfo for each
+	--
+	-- The class should be unary, which is why simpleInstInfoTyCon should be ok
     let
 	tc_inst_infos :: [(TyCon, InstInfo)]
 	tc_inst_infos = [(simpleInstInfoTyCon i, i) | i <- inst_infos]

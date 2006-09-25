@@ -438,12 +438,12 @@ mb_neg (Just _) v = -v
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = unused_cons
      where
-       (ConPatOut { pat_ty = ty }) = head used_cons
-       ty_con 		      = tcTyConAppTyCon ty		-- Newtype observable
-       all_cons        	      = tyConDataCons ty_con
-       used_cons_as_id 	      = map (\ (ConPatOut{ pat_con = L _ d}) -> d) used_cons
-       unused_cons     	      = uniqSetToList
-		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
+       (ConPatOut { pat_con = l_con, pat_ty = ty }) = head used_cons
+       ty_con 	       = dataConTyCon (unLoc l_con)	-- Newtype observable
+       all_cons        = tyConDataCons ty_con
+       used_cons_as_id = map (\ (ConPatOut{ pat_con = L _ d}) -> d) used_cons
+       unused_cons     = uniqSetToList
+			 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
 all_vars :: [Pat Id] -> Bool
 all_vars []             = True

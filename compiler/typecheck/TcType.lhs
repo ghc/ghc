@@ -1,4 +1,4 @@
-
+%
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcType]{Types used in the typechecker}
@@ -698,10 +698,14 @@ tcMultiSplitSigmaTy sigma
 
 -----------------------
 tcTyConAppTyCon :: Type -> TyCon
-tcTyConAppTyCon ty = fst (tcSplitTyConApp ty)
+tcTyConAppTyCon ty = case tcSplitTyConApp_maybe ty of
+			Just (tc, _) -> tc
+			Nothing	     -> pprPanic "tcTyConAppTyCon" (pprType ty)
 
 tcTyConAppArgs :: Type -> [Type]
-tcTyConAppArgs ty = snd (tcSplitTyConApp ty)
+tcTyConAppArgs ty = case tcSplitTyConApp_maybe ty of
+			Just (_, args) -> args
+			Nothing	       -> pprPanic "tcTyConAppArgs" (pprType ty)
 
 tcSplitTyConApp :: Type -> (TyCon, [Type])
 tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
@@ -712,17 +716,9 @@ tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
 tcSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 tcSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-tcSplitTyConApp_maybe (AppTy arg res)   = Just (funTyCon, [arg,res])
 	-- Newtypes are opaque, so they may be split
 	-- However, predicates are not treated
 	-- as tycon applications by the type checker
-
--- XXX - 2006-09-24: This case is hard-coded in (rendering predicates opaque as well)
---       to make the newly reworked newtype-deriving work on the trivial case:
---              newtype T = T () deriving (Eq, Ord)
---       Please remove this if the newtype-deriving scheme no longer produces a PredTy.
-tcSplitTyConApp_maybe (PredTy (ClassP _ [ty']))   = tcSplitTyConApp_maybe ty'
-
 tcSplitTyConApp_maybe other	      	= Nothing
 
 -----------------------

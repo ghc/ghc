@@ -571,6 +571,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 	           the_rhs = mkHsConApp cls_data_con cls_inst_tys $
 			     map HsVar (sc_dict_ids ++ op_ids)
 
+		-- Warning: this HsCase scrutinises a value with a PredTy, which is
+		--	    never otherwise seen in Haskell source code. It'd be
+		-- 	    nicer to generate Core directly!
 	     ; return (HsCase (noLoc coerced_rep_dict) $
 		       MatchGroup [the_match] (mkFunTy inst_head_ty inst_head_ty)) }
 	where
