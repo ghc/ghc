@@ -98,6 +98,8 @@ rmdir bin/i386-unknown-mingw32
 strip bin/ghc.exe
 
 echo "rejig lib/"
+mv lib/i386-unknown-mingw32/include/* include/ 
+rmdir lib/i386-unknown-mingw32/include
 mv lib/i386-unknown-mingw32/* .
 rmdir lib/i386-unknown-mingw32
 rmdir lib
