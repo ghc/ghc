@@ -725,7 +725,12 @@ $ cat foo.hspp</screen>
           <para>Tell the linker to split the single object file that
           would normally be generated into multiple object files,
           one per top-level Haskell function or type in the module.
-          We use this feature for building GHC's libraries libraries
+          This only makes sense for libraries, where it means that
+          executables linked against the library are smaller as they only
+          link against the object files that they need. However, assembling
+          all the sections separately is expensive, so this is slower than
+          compiling normally.
+          We use this feature for building GHC's libraries
           (warning: don't use it unless you know what you're
           doing!).</para>
         </listitem>

@@ -17,14 +17,6 @@
       </listitem>
       <listitem>
         <para>
-          GHC's modules are now also bundled into a
-          <literal>ghc</literal> package, allowing programs to make use
-          of GHC as a library. The interface has not yet been properly
-          designed, so is subject to change.
-        </para>
-      </listitem>
-      <listitem>
-        <para>
           GHC now handles impredicative polymorphism and there are
           changes to the way scoped type variables work; see
           <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
@@ -297,10 +289,21 @@
       </listitem>
       <listitem>
         <para>
-          It is now possible, with the <literal>-I</literal> RTS flag,
-          to control the amount of idle time that happens before a major
-          GC is performed. There is more detail in
-          <xref linkend="rts-options-gc" />.
+          If the program is idle for a certain amount of time then GHC
+          will now take the opportunity to do a major garbage collection.
+          The amount of idle time that is required before that happens
+          is controlled by the new <literal>-I</literal> RTS flag.
+          There is more detail in <xref linkend="rts-options-gc" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+          It is now possible to control the frequency that the RTS clock
+          ticks at with the new <literal>-V</literal> RTS flag. This is
+          normally handled automatically by other flags, but this flag
+          is needed if you want to increase the resolution of the time
+          profiler.
+          For more details see <xref linkend="rts-options-misc" />.
         </para>
       </listitem>
       <listitem>
@@ -311,8 +314,9 @@
       </listitem>
       <listitem>
         <para>
-          The <option>-split-objs</option> flag, which makes libraries
-          smaller, can now be used with <option>--make</option> and hence
+          The <option>-split-objs</option> flag, which when used to compile
+          libraries means executables using the library will be smaller,
+          can now be used with <option>--make</option> and hence
           can be used by cabal.
           See <xref linkend="options-linker" /> for more information.
         </para>
@@ -486,6 +490,7 @@
             <literal>inline</literal> which, provided the RHS is visible
             to the compiler, forcibly inlines its argument.
             Otherwise, it acts like <literal>id</literal>.
+            For more details, see <xref linkend="special-ids" />.
           </para>
         </listitem>
         <listitem>
@@ -493,6 +498,7 @@
             <literal>GHC.Exts</literal> now provides a function
             <literal>lazy</literal> which forces GHC to think that its
             argument is lazy in its first argument.
+            For more details, see <xref linkend="special-ids" />.
           </para>
         </listitem>
         <listitem>
@@ -1610,6 +1616,24 @@
         </listitem>
       </itemizedlist>
     </sect3>
+  </sect2>
+
+  <sect2>
+    <title>GHC As A Library</title>
+      <para>
+        Version number 6.6.
+      </para>
+      <para>
+        The internal modules of GHC are now available as a library, package
+        name <literal>ghc</literal>.
+        The interface has not been designed with use by other programs
+        in mind, so expect the API to vary radically in future
+        releases.
+      </para>
+      <para>
+        An introduction to using the library can be found
+        <ulink url="http://haskell.org/haskellwiki/GHC/As_a_library">on the wiki</ulink>.
+      </para>
   </sect2>
 
   <sect2>

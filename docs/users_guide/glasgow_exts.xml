@@ -3778,9 +3778,9 @@ pattern binding must have the same context.  For example, this is fine:
 <!-- ====================== Generalised algebraic data types =======================  -->
 
 <sect1 id="gadt">
-<title>Generalised Algebraic Data Types</title>
+<title>Generalised Algebraic Data Types (GADTs)</title>
 
-<para>Generalised Algebraic Data Types (GADTs) generalise ordinary algebraic data types by allowing you
+<para>Generalised Algebraic Data Types generalise ordinary algebraic data types by allowing you
 to give the type signatures of constructors explicitly.  For example:
 <programlisting>
   data Term a where
@@ -3801,7 +3801,12 @@ for these <literal>Terms</literal>:
   eval (If b e1 e2) = if eval b then eval e1 else eval e2
   eval (Pair e1 e2) = (eval e1, eval e2)
 </programlisting>
-These and many other examples are given in papers by Hongwei Xi, and Tim Sheard.
+These and many other examples are given in papers by Hongwei Xi, and
+Tim Sheard. There is a longer introduction
+<ulink url="http://haskell.org/haskellwiki/GADT">on the wiki</ulink>,
+and Ralf Hinze's
+<ulink url="http://www.informatik.uni-bonn.de/~ralf/publications/With.pdf">Fun with phantom types</ulink> also has a number of examples. Note that papers
+may use different notation to that implemented in GHC.
 </para>
 <para>
 The rest of this section outlines the extensions to GHC that support GADTs. 
