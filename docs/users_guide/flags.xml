@@ -1100,6 +1100,36 @@
     </sect2>
 
     <sect2>
+      <title>Haskell pre-processor options</title>
+
+      <para><xref linkend="pre-processor"/></para>
+
+      <informaltable>
+	<tgroup cols="4" align="left" colsep="1" rowsep="1">
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-F</option></entry>
+	      <entry>
+                  Enable the use of a pre-processor
+                  (set with <option>-pgmF</option>)
+              </entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
       <title>C pre-processor options</title>
 
       <para><xref linkend="c-pre-processor"/></para>
