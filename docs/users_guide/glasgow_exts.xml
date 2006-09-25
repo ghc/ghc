@@ -3360,7 +3360,7 @@ signature</emphasis>.
 For example:
 <programlisting>
   -- f and g assume that 'a' is already in scope
-  f = \(x::Int, y) -> x
+  f = \(x::Int, y::a) -> x
   g (x::a) = x
   h ((x,y) :: (Int,Bool)) = (y,x)
 </programlisting>
