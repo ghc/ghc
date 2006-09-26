@@ -9,11 +9,11 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
---  This module defines bitwise operations for signed and unsigned
---  integers.  Instances of the class 'Bits' for the 'Int' and
---  'Integer' types are available from this module, and instances for
---  explicitly sized integral types are available from the
---  "Data.Int" and "Data.Word" modules.
+-- This module defines bitwise operations for signed and unsigned
+-- integers.  Instances of the class 'Bits' for the 'Int' and
+-- 'Integer' types are available from this module, and instances for
+-- explicitly sized integral types are available from the
+-- "Data.Int" and "Data.Word" modules.
 --
 -----------------------------------------------------------------------------
 
