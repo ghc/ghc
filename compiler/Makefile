@@ -719,8 +719,8 @@ all :: $(odir)/ghc-inplace ghc-inplace
 #   (On other system, -W isn't a pwd flag at all.)
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-#	MSys
-SCRIPT_SHELL = $(shell cd /bin; pwd -W)/sh
+#	MSys (...and cygwin with a mingw toolchain)
+SCRIPT_SHELL = $(shell cd /bin; pwd -W 2>/dev/null | echo "/bin")/sh
 else
 #	Cygwin and Unix
 SCRIPT_SHELL = /bin/sh
