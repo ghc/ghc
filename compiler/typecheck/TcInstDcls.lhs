@@ -37,7 +37,7 @@ import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
                           substTys, emptyTvSubst, extendTvSubst )
 import Coercion         ( mkSymCoercion )
 import TyCon            ( TyCon, tyConName, newTyConCo_maybe, tyConTyVars,
-			  isTyConAssoc, tyConFamInst_maybe,
+			  isTyConAssoc, tyConFamInst_maybe, tyConDataCons,
 			  assocTyConArgPoss_maybe )
 import DataCon		( classDataCon, dataConInstArgTys )
 import Class		( Class, classTyCon, classBigSig, classATs )
@@ -469,7 +469,7 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 -- Returns a binding for the dfun
 
 ------------------------
--- Derived newtype instances
+-- Derived newtype instances; surprisingly tricky!
 --
 -- In the case of a newtype, things are rather easy
 -- 	class Show a => Foo a b where ...
@@ -496,19 +496,20 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 		-- inst_head_ty is a PredType
 
 	; inst_loc <- getInstLoc origin
-	; (rep_dict_id : sc_dict_ids, wrap_fn)
+	; (rep_dict_id : sc_dict_ids, wrap_fn, sc_binds)
 		<- make_wrapper inst_loc tvs theta mb_preds
 		-- Here, we are relying on the order of dictionary 
 		-- arguments built by NewTypeDerived in TcDeriv; 
 		-- namely, that the rep_dict_id comes first
 	   
         ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head_ty
-	      the_coercion     = make_coercion cls cls_inst_tys
-              coerced_rep_dict = mkHsCoerce the_coercion (HsVar rep_dict_id)
+  	      cls_tycon		  = classTyCon cls
+	      the_coercion     	  = make_coercion cls_tycon cls_inst_tys
+              coerced_rep_dict 	  = mkHsCoerce the_coercion (HsVar rep_dict_id)
 
-	; body <- make_body cls cls_inst_tys inst_head_ty sc_dict_ids coerced_rep_dict
+	; body <- make_body cls_tycon cls_inst_tys sc_dict_ids coerced_rep_dict
               
-        ; return (unitBag (noLoc $ VarBind dfun_id $ noLoc $ mkHsCoerce wrap_fn body)) }
+        ; return (sc_binds `snocBag` (noLoc $ VarBind dfun_id $ noLoc $ mkHsCoerce wrap_fn body)) }
   where
 
       -----------------------
@@ -523,12 +524,15 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
     make_wrapper inst_loc tvs theta (Just preds)	-- Case (a)
       = ASSERT( null tvs && null theta )
 	do { dicts <- newDictBndrs inst_loc preds
-	   ; extendLIEs dicts
-	   ; return (map instToId dicts, idCoercion) }
+	   ; sc_binds <- addErrCtxt superClassCtxt (tcSimplifySuperClasses [] [] dicts)
+		-- Use tcSimplifySuperClasses to avoid creating loops, for the
+		-- same reason as Note [SUPERCLASS-LOOP 1] in TcSimplify
+	   ; return (map instToId dicts, idCoercion, sc_binds) }
+
     make_wrapper inst_loc tvs theta Nothing 	-- Case (b)
       = do { dicts <- newDictBndrs inst_loc theta
 	   ; let dict_ids = map instToId dicts
-	   ; return (dict_ids, mkCoTyLams tvs <.> mkCoLams dict_ids) }
+	   ; return (dict_ids, mkCoTyLams tvs <.> mkCoLams dict_ids, emptyBag) }
 
       -----------------------
       -- 	make_coercion
@@ -539,7 +543,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
       -- So we just replace T with CoT, and insert a 'sym'
       -- NB: we know that k will be >= arity of CoT, because the latter fully eta-reduced
 
-    make_coercion cls cls_inst_tys
+    make_coercion cls_tycon cls_inst_tys
 	| Just (all_tys_but_last, last_ty) <- snocView cls_inst_tys
 	, (tycon, tc_args) <- tcSplitTyConApp last_ty	-- Should not fail
 	, Just co_con <- newTyConCo_maybe tycon
@@ -547,8 +551,6 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
         = ExprCoFn (mkTyConApp cls_tycon (all_tys_but_last ++ [co]))
         | otherwise	-- The newtype is transparent; no need for a cast
         = idCoercion
-	where
-          cls_tycon = classTyCon cls
 
       -----------------------
       -- 	make_body
@@ -556,7 +558,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
       -- (a) no superclasses; then we can just use the coerced dict
       -- (b) one or more superclasses; then new need to do the unpack/repack
 	
-    make_body cls cls_inst_tys inst_head_ty sc_dict_ids coerced_rep_dict
+    make_body cls_tycon cls_inst_tys sc_dict_ids coerced_rep_dict
 	| null sc_dict_ids		-- Case (a)
 	= return coerced_rep_dict
 	| otherwise 			-- Case (b)
@@ -566,7 +568,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 				    	 pat_dicts = dummy_sc_dict_ids,
 				    	 pat_binds = emptyLHsBinds,
 				    	 pat_args = PrefixCon (map nlVarPat op_ids),
-				    	 pat_ty = inst_head_ty} 
+				    	 pat_ty = pat_ty} 
 	           the_match = mkSimpleMatch [noLoc the_pat] the_rhs
 	           the_rhs = mkHsConApp cls_data_con cls_inst_tys $
 			     map HsVar (sc_dict_ids ++ op_ids)
@@ -575,9 +577,10 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 		--	    never otherwise seen in Haskell source code. It'd be
 		-- 	    nicer to generate Core directly!
 	     ; return (HsCase (noLoc coerced_rep_dict) $
-		       MatchGroup [the_match] (mkFunTy inst_head_ty inst_head_ty)) }
+		       MatchGroup [the_match] (mkFunTy pat_ty pat_ty)) }
 	where
-          cls_data_con = classDataCon cls
+	  pat_ty       = mkTyConApp cls_tycon cls_inst_tys
+          cls_data_con = head (tyConDataCons cls_tycon)
           cls_arg_tys  = dataConInstArgTys cls_data_con cls_inst_tys 
           op_tys       = dropList sc_dict_ids cls_arg_tys
 
