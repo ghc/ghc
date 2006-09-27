@@ -53,6 +53,7 @@ module Data.Typeable
 	typeRepTyCon,	-- :: TypeRep -> TyCon
 	typeRepArgs,	-- :: TypeRep -> [TypeRep]
 	tyConString,	-- :: TyCon   -> String
+	typeRepKey,	-- :: TypeRep -> IO Int
 
 	-- * The other Typeable classes
 	-- | /Note:/ The general instances are provided for GHC only.
@@ -164,6 +165,18 @@ data TyCon = TyCon !Key String
 instance Eq TyCon where
   (TyCon t1 _) == (TyCon t2 _) = t1 == t2
 
+-- | Returns a unique integer associated with a 'TypeRep'.  This can
+-- be used for making a mapping ('Data.IntMap.IntMap') with TypeReps
+-- as the keys, for example.  It is guaranteed that @t1 == t2@ if and only if
+-- @typeRepKey t1 == typeRepKey t2@.
+--
+-- It is in the 'IO' monad because the actual value of the key may
+-- vary from run to run of the program.  You should only rely on
+-- the equality property, not any actual key value.  The relative ordering
+-- of keys has no meaning either.
+--
+typeRepKey :: TypeRep -> IO Int
+typeRepKey (TypeRep (Key i) _ _) = return i
 #endif
 
 	-- 
