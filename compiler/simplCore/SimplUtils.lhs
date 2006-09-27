@@ -52,8 +52,7 @@ import Coercion         ( isEqPredTy
 			)
 import Coercion         ( Coercion, mkUnsafeCoercion, coercionKind )
 import TyCon		( tyConDataCons_maybe, isClosedNewTyCon )
-import DataCon		( DataCon, dataConRepArity, dataConExTyVars, 
-                          dataConInstArgTys, dataConTyCon )
+import DataCon		( DataCon, dataConRepArity, dataConInstArgTys, dataConTyCon )
 import VarSet
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
 			  Activation, isAlwaysActive, isActive )

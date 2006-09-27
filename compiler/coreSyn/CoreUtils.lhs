@@ -44,7 +44,7 @@ import GLAEXTS		-- For `xori`
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import PprCore		( pprCoreExpr )
-import Var		( Var, TyVar, CoVar, isCoVar, tyVarKind, mkCoVar, mkTyVar )
+import Var		( Var, TyVar, CoVar, tyVarKind, mkCoVar, mkTyVar )
 import OccName          ( mkVarOccFS )
 import SrcLoc		( noSrcLoc )
 import VarSet		( unionVarSet )
@@ -72,13 +72,12 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  splitFunTy, tcEqTypeX,
 			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, 
-			  splitTyConApp_maybe, coreEqType, funResultTy, applyTy,
-                          substTyWith, mkPredTy, zipOpenTvSubst, substTy
+			  splitTyConApp_maybe, splitTyConApp, coreEqType, funResultTy, applyTy,
+                          substTyWith, mkPredTy, zipOpenTvSubst, substTy, substTyVar
 			)
 import Coercion         ( Coercion, mkTransCoercion, coercionKind,
                           splitNewTypeRepCo_maybe, mkSymCoercion,
-                          decomposeCo, coercionKindPredTy,
-                          splitCoercionKind )
+                          decomposeCo, coercionKindPredTy )
 import TyCon		( tyConArity )
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -665,22 +664,6 @@ check_args fun_ty (arg : args)
 \end{code}
 
 \begin{code}
--- deep applies a TyConApp coercion as a substitution to a reflexive coercion
--- deepCast t [a1,...,an] co corresponds to deep(t, [a1,...,an], co) from
--- FC paper
-deepCast :: Type -> [TyVar] -> Coercion -> Coercion
-deepCast ty tyVars co 
-  = ASSERT( let {(lty, rty) = coercionKind co;
-                 Just (tc1, lArgs) = splitTyConApp_maybe lty;
-		 Just (tc2, rArgs) = splitTyConApp_maybe rty} 
-            in
-              tc1 == tc2 && length lArgs == length rArgs &&
-              length lArgs == length tyVars )
-    substTyWith tyVars coArgs ty
-  where
-    -- coArgs = [right (left (left co)), right (left co), right co]
-    coArgs = decomposeCo (length tyVars) co
-
 -- These InstPat functions go here to avoid circularity between DataCon and Id
 dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
 dataConRepFSInstPat = dataConInstPat dataConRepArgTys
@@ -767,70 +750,65 @@ exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 -- Returns (Just (dc, [x1..xn])) if the argument expression is 
 -- a constructor application of the form (dc x1 .. xn)
 exprIsConApp_maybe (Cast expr co)
-  = 	-- Maybe this is over the top, but here we try to turn
-	-- 	coerce (S,T) ( x, y )
-	-- effectively into 
-	--	( coerce S x, coerce T y )
-	-- This happens in anger in PrelArrExts which has a coerce
-	--	case coerce memcpy a b of
-	--	  (# r, s #) -> ...
-	-- where the memcpy is in the IO monad, but the call is in
-	-- the (ST s) monad
+  =     -- Here we do the PushC reduction rule as described in the FC paper
     case exprIsConApp_maybe expr of {
-	Nothing 	  -> Nothing ;
-	Just (dc, args)   -> 
+	Nothing 	   -> Nothing ;
+	Just (dc, dc_args) -> 
 
-    let (from_ty, to_ty) = coercionKind co in
-  
+	-- The transformation applies iff we have
+	--	(C e1 ... en) `cast` co
+	-- where co :: (T t1 .. tn) :=: (T s1 ..sn)
+	-- That is, with a T at the top of both sides
+	-- The left-hand one must be a T, because exprIsConApp returned True
+	-- but the right-hand one might not be.  (Though it usually will.)
+
+    let (from_ty, to_ty)	    = coercionKind co
+	(from_tc, _from_tc_arg_tys) = splitTyConApp from_ty
+  		-- The inner one must be a TyConApp
+    in
+    ASSERT( from_tc == dataConTyCon dc )
+
     case splitTyConApp_maybe to_ty of {
 	Nothing -> Nothing ;
-	Just (tc, tc_arg_tys) | tc /= dataConTyCon dc     -> Nothing
-			    --  | not (isVanillaDataCon dc) -> Nothing
-			      | otherwise	          ->
-		-- Type constructor must match datacon
-
-    case splitTyConApp_maybe from_ty of {
-        Nothing -> Nothing ;
-        Just (tc', tc_arg_tys') | tc /= tc' -> Nothing 
-                -- Both sides of coercion must have the same type constructor
-                               | otherwise ->
-
+	Just (to_tc, _to_tc_arg_tys) | from_tc /= to_tc  -> Nothing
+	 		    	     | otherwise  ->
     let
-        -- here we do the PushC reduction rule as described in the FC paper
-	arity   	    = tyConArity tc
-        n_ex_tvs            = length dc_ex_tyvars
+	tc_arity = tyConArity from_tc
 
-        (_univ_args, rest)  = splitAt arity args
-        (ex_args, val_args) = splitAt n_ex_tvs rest
+        (univ_args, rest1)  = splitAt tc_arity dc_args
+        (ex_args, rest2)    = splitAt n_ex_tvs rest1
+	(co_args, val_args) = splitAt n_cos rest2
 
         arg_tys 	    = dataConRepArgTys dc
-	dc_tyvars	    = dataConUnivTyVars dc
+	dc_univ_tyvars	    = dataConUnivTyVars dc
         dc_ex_tyvars        = dataConExTyVars dc
+	dc_eq_spec	    = dataConEqSpec dc
+        dc_tyvars           = dc_univ_tyvars ++ dc_ex_tyvars
+        n_ex_tvs            = length dc_ex_tyvars
+	n_cos		    = length dc_eq_spec
 
-        deep arg_ty         = deepCast arg_ty dc_tyvars co
+	-- Make the "theta" from Fig 3 of the paper
+        gammas              = decomposeCo tc_arity co
+        new_tys             = gammas ++ map (\ (Type t) -> t) ex_args
+        theta               = zipOpenTvSubst dc_tyvars new_tys
 
-          -- first we appropriately cast the value arguments
-	new_val_args	    = zipWith mkCoerce (map deep arg_tys) val_args
-
-          -- then we cast the existential coercion arguments
-        orig_tvs            = dc_tyvars ++ dc_ex_tyvars
-        gammas              = decomposeCo arity co
-        new_tys             = gammas ++ (map (\ (Type t) -> t) ex_args)
-        theta               = substTyWith orig_tvs new_tys
-        cast_ty tv (Type ty) 
-          | isCoVar tv
-          , (ty1, ty2) <- splitCoercionKind (tyVarKind tv)
-          = Type $ mkTransCoercion (mkSymCoercion (theta ty1)) 
-            (mkTransCoercion ty (theta ty2))
-          | otherwise       
-          = Type ty
-        new_ex_args         = zipWith cast_ty dc_ex_tyvars ex_args
+          -- First we cast the existential coercion arguments
+        cast_co (tv,ty) (Type co) = Type $ mkSymCoercion (substTyVar theta tv)
+					   `mkTransCoercion` co
+					   `mkTransCoercion` (substTy theta ty)
+        new_co_args = zipWith cast_co dc_eq_spec co_args
   
+          -- ...and now value arguments
+	new_val_args = zipWith cast_arg arg_tys val_args
+	cast_arg arg_ty arg = mkCoerce (substTy theta arg_ty) arg
+
     in
-    ASSERT( all isTypeArg (take arity args) )
-    ASSERT( equalLength val_args arg_tys )
-    Just (dc, map Type tc_arg_tys ++ new_ex_args ++ new_val_args)
-    }}}
+    ASSERT( length univ_args == tc_arity )
+    ASSERT( all isTypeArg (univ_args ++ ex_args) )
+    ASSERT2( equalLength val_args arg_tys, ppr dc $$ ppr dc_tyvars $$ ppr dc_ex_tyvars $$ ppr arg_tys $$ ppr dc_args $$ ppr univ_args $$ ppr ex_args $$ ppr val_args $$ ppr arg_tys  )
+
+    Just (dc, univ_args ++ ex_args ++ new_co_args ++ new_val_args)
+    }}
 
 exprIsConApp_maybe (Note _ expr)
   = exprIsConApp_maybe expr
