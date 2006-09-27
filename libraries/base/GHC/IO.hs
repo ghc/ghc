@@ -910,12 +910,13 @@ readChunkNonBlocking fd is_stream ptr bytes = do
 		 else throwErrno "readChunk"
       else return r
 #else
-    (ssize, rc) <- asyncRead fd (fromIntegral $ fromEnum is_stream)
-   			       (fromIntegral bytes) ptr
-    let r = fromIntegral ssize :: Int
-    if r == (-1)
-     then ioError (errnoToIOError "hGetBufNonBlocking" (Errno (fromIntegral rc)) Nothing Nothing)
-     else return r
+    fromIntegral `liftM`
+        readRawBufferPtr "readChunkNonBlocking" (fromIntegral fd) is_stream 
+	   		    (castPtr ptr) 0 (fromIntegral bytes)
+
+    -- we don't have non-blocking read support on Windows, so just invoke
+    -- the ordinary low-level read which will block until data is available,
+    -- but won't wait for the whole buffer to fill.
 #endif
 
 slurpFile :: FilePath -> IO (Ptr (), Int)

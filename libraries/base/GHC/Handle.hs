@@ -594,7 +594,7 @@ writeRawBufferPtr loc fd is_stream buf off len
 
 -- ToDo: we don't have a non-blocking primitve read on Win32
 readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-readRawBufferNoBlock = readRawBufferNoBlock
+readRawBufferNoBlock = readRawBuffer
 
 -- Async versions of the read/write primitives, for the non-threaded RTS
 
