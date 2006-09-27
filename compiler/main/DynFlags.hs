@@ -195,6 +195,7 @@ data DynFlag
    | Opt_SplitObjs
    | Opt_StgStats
    | Opt_HideAllPackages
+   | Opt_PrintBindResult
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -433,6 +434,8 @@ defaultDynFlags =
     	    Opt_IgnoreInterfacePragmas,
     	    Opt_OmitInterfacePragmas
     
+	    -- on by default:
+	    Opt_PrintBindResult
                ] ++ standardWarnings,
                
         log_action = \severity srcSpan style msg -> 
@@ -1037,7 +1040,8 @@ fFlags = [
   ( "unbox-strict-fields",		Opt_UnboxStrictFields ),
   ( "dicts-cheap",			Opt_DictsCheap ),
   ( "excess-precision",			Opt_ExcessPrecision ),
-  ( "asm-mangling",			Opt_DoAsmMangling )
+  ( "asm-mangling",			Opt_DoAsmMangling ),
+  ( "print-bind-result",		Opt_PrintBindResult )
   ]
 
 glasgowExtsFlags = [ 

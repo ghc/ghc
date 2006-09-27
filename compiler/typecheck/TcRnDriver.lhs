@@ -965,15 +965,20 @@ mkPlan stmt@(L loc (BindStmt {}))
   | [L _ v] <- collectLStmtBinders stmt		-- One binder, for a bind stmt 
   = do	{ let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
 			          	   (HsVar thenIOName) placeHolderType
+
+	; print_bind_result <- doptM Opt_PrintBindResult
+	; let print_plan = do
+		  { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
+		  ; v_ty <- zonkTcType (idType v_id)
+		  ; ifM (isUnitTy v_ty || not (isTauTy v_ty)) failM
+		  ; return stuff }
+
 	-- The plans are:
 	--	[stmt; print v]		but not if v::()
 	--	[stmt]
-	; runPlans [do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
-		       ; v_ty <- zonkTcType (idType v_id)
-		       ; ifM (isUnitTy v_ty || not (isTauTy v_ty)) failM
-		       ; return stuff },
-		    tcGhciStmts [stmt]
-	  ]}
+	; runPlans ((if print_bind_result then [print_plan] else []) ++
+		    [tcGhciStmts [stmt]])
+	}
 
 mkPlan stmt
   = tcGhciStmts [stmt]

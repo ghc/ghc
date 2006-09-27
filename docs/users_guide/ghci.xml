@@ -402,7 +402,7 @@ hello
 </screen>
 </para></sect2>
 
-    <sect2>
+    <sect2 id="ghci-stmts">
       <title>Using <literal>do-</literal>notation at the prompt</title>
       <indexterm><primary>do-notation</primary><secondary>in GHCi</secondary></indexterm>
       <indexterm><primary>statements</primary><secondary>in GHCi</secondary></indexterm>
@@ -444,7 +444,13 @@ Prelude>
 	      <literal>Show</literal></para>
 	  </listitem>
 	</itemizedlist>
-      </para>
+      The automatic printing of binding results can be supressed with
+      <option>:set -fno-print-bind-result</option> (this does not
+      supress printing the result of non-binding statements).
+      <indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm><indexterm><primary><option>-fprint-bind-result</option></primary></indexterm>.
+      You might want to do this to prevent the result of binding
+      statements from being fully evaluated by the act of printing
+      them, for example.</para>
 
       <para>Of course, you can also bind normal non-IO expressions
       using the <literal>let</literal>-statement:</para>
