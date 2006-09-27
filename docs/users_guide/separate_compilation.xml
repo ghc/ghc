@@ -603,9 +603,9 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
       <variablelist>
 	<varlistentry>
 	  <term>
-            <option>-no-recomp</option>
-            <indexterm><primary><option>-recomp</option></primary></indexterm>
-            <indexterm><primary><option>-no-recomp</option></primary></indexterm>
+            <option>-fforce-recomp</option>
+            <indexterm><primary><option>-fforce-recomp</option></primary></indexterm>
+            <indexterm><primary><option>-fno-force-recomp</option></primary></indexterm>
           </term>
 	  <listitem>
 	    <para>Turn off recompilation checking (which is on by

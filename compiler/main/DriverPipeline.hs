@@ -144,8 +144,8 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
 				extCoreName = basename ++ ".hcr" }
 
    -- -no-recomp should also work with --make
-   let do_recomp = dopt Opt_RecompChecking dflags
-       source_unchanged = isJust maybe_old_linkable && do_recomp
+   let force_recomp = dopt Opt_ForceRecomp dflags
+       source_unchanged = isJust maybe_old_linkable && not force_recomp
        hsc_env' = hsc_env { hsc_dflags = dflags' }
        object_filename = ml_obj_file location
 
@@ -302,7 +302,7 @@ link BatchCompile dflags batch_attempt_linking hpt
 		| Right t <- e_exe_time = 
 			any (t <) (map linkableTime linkables)
 
-	if dopt Opt_RecompChecking dflags && not linking_needed
+	if not (dopt Opt_ForceRecomp dflags) && not linking_needed
 	   then do debugTraceMsg dflags 2 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
 		   return Succeeded
 	   else do
@@ -688,9 +688,9 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	src_timestamp <- getModificationTime (basename `joinFileExt` suff)
 
-	let do_recomp = dopt Opt_RecompChecking dflags
+	let force_recomp = dopt Opt_ForceRecomp dflags
 	source_unchanged <- 
-          if not do_recomp || not (isStopLn stop)
+          if force_recomp || not (isStopLn stop)
 		-- Set source_unchanged to False unconditionally if
 		--	(a) recompilation checker is off, or
 		-- 	(b) we aren't going all the way to .o file (e.g. ghc -S)

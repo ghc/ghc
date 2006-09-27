@@ -179,6 +179,16 @@
       </listitem>
       <listitem>
         <para>
+          The
+          <option>-no-recomp</option><indexterm><primary><option>-no-recomp</option></primary></indexterm>
+          option is now called
+          <option>-fforce-recomp</option><indexterm><primary><option>-fforce-recomp</option></primary></indexterm>.
+          (the old name is still accepted for backwards compatibility,
+          but will be removed in the future).
+        </para>
+      </listitem>
+      <listitem>
+        <para>
           The <option>-fglobalise-toplev-names</option>
           flag has been removed.
         </para>

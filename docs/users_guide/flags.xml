@@ -426,11 +426,11 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-no-recomp</option></entry>
+	      <entry><option>-fforce-recomp</option></entry>
 	      <entry>Turn off recompilation checking; implied by any
 	      <option>-ddump-X</option> option</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-recomp</option></entry>
+	      <entry><option>-fno-force-recomp</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>

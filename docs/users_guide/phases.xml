@@ -788,7 +788,7 @@ $ cat foo.hspp</screen>
 	    <literal>ghc</literal> is not clever 
 	    enough to figure out that they both need recompiling.  You can
 	    force recompilation by removing the object file, or by using the
-	    <option>-no-recomp</option> flag.
+	    <option>-fforce-recomp</option> flag.
             </para> 
         </listitem>
       </varlistentry>

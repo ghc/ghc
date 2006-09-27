@@ -186,7 +186,7 @@ data DynFlag
    -- misc opts
    | Opt_Cpp
    | Opt_Pp
-   | Opt_RecompChecking
+   | Opt_ForceRecomp
    | Opt_DryRun
    | Opt_DoAsmMangling
    | Opt_ExcessPrecision
@@ -407,7 +407,6 @@ defaultDynFlags =
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
 	
 	flags = [ 
-    	    Opt_RecompChecking,
     	    Opt_ReadUserPackageConf,
     
 	    Opt_MonoPatBinds, 	-- Experimentally, I'm making this non-standard
@@ -432,7 +431,7 @@ defaultDynFlags =
     
     	    -- and the default no-optimisation options:
     	    Opt_IgnoreInterfacePragmas,
-    	    Opt_OmitInterfacePragmas
+    	    Opt_OmitInterfacePragmas,
     
 	    -- on by default:
 	    Opt_PrintBindResult
@@ -876,9 +875,9 @@ dynamic_flags = [
   ,  ( "no-hs-main"     , NoArg (setDynFlag Opt_NoHsMain))
   ,  ( "main-is"   	, SepArg setMainIs )
 
-	------- recompilation checker --------------------------------------
-  ,  ( "recomp"		, NoArg (setDynFlag   Opt_RecompChecking) )
-  ,  ( "no-recomp"  	, NoArg (unSetDynFlag Opt_RecompChecking) )
+	------- recompilation checker (DEPRECATED, use -fforce-recomp) -----
+  ,  ( "recomp"		, NoArg (unSetDynFlag Opt_ForceRecomp) )
+  ,  ( "no-recomp"  	, NoArg (setDynFlag   Opt_ForceRecomp) )
 
         ------- Packages ----------------------------------------------------
   ,  ( "package-conf"   , HasArg extraPkgConf_ )
@@ -941,7 +940,7 @@ dynamic_flags = [
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
   ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting))
-  ,  ( "dshow-passes",           NoArg (do unSetDynFlag Opt_RecompChecking
+  ,  ( "dshow-passes",           NoArg (do setDynFlag Opt_ForceRecomp
 				           setVerbosity (Just 2)) )
   ,  ( "dfaststring-stats",	 NoArg (setDynFlag Opt_D_faststring_stats))
 
@@ -1041,8 +1040,10 @@ fFlags = [
   ( "dicts-cheap",			Opt_DictsCheap ),
   ( "excess-precision",			Opt_ExcessPrecision ),
   ( "asm-mangling",			Opt_DoAsmMangling ),
-  ( "print-bind-result",		Opt_PrintBindResult )
+  ( "print-bind-result",		Opt_PrintBindResult ),
+  ( "force-recomp",			Opt_ForceRecomp )
   ]
+
 
 glasgowExtsFlags = [ 
   Opt_GlasgowExts, 
@@ -1079,7 +1080,7 @@ unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 
 setDumpFlag :: DynFlag -> OptKind DynP
 setDumpFlag dump_flag 
-  = NoArg (unSetDynFlag Opt_RecompChecking >> setDynFlag dump_flag)
+  = NoArg (setDynFlag Opt_ForceRecomp >> setDynFlag dump_flag)
 	-- Whenver we -ddump, switch off the recompilation checker,
 	-- else you don't see the dump!
 
