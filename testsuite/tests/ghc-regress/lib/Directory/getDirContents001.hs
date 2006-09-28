@@ -9,3 +9,5 @@ ok name = "getDirContents" `isPrefixOf` name
 	  && not ("bak" `isSuffixOf` name)
 	  && not ("prof" `isSuffixOf` name)
 	  && not ("hp" `isSuffixOf` name)
+          && not ("ps" `isSuffixOf` name)
+          && not ("aux" `isSuffixOf` name)
