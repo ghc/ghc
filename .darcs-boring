@@ -21,6 +21,7 @@
 ^misc/
 ^mkworld/
 ^runtime/
+^testsuite/
 #Packages:
 ^libraries/Cabal/
 ^libraries/ALUT/
