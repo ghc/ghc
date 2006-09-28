@@ -84,7 +84,7 @@ import Data.Dynamic
 import Numeric
 import Data.List
 import Data.Int		( Int64 )
-import Data.Maybe	( isJust, fromMaybe, catMaybes )
+import Data.Maybe	( isJust, isNothing, fromMaybe, catMaybes )
 import System.Cmd
 import System.CPUTime
 import System.Environment
@@ -274,15 +274,19 @@ interactiveUI session srcs maybe_expr = do
    newStablePtr stdout
    newStablePtr stderr
 
-   hFlush stdout
-   hSetBuffering stdout NoBuffering
-
 	-- Initialise buffering for the *interpreted* I/O system
    initInterpBuffering session
 
+   when (isNothing maybe_expr) $ do
+	-- Only for GHCi (not runghc and ghc -e):
+	-- Turn buffering off for the compiled program's stdout/stderr
+	turnOffBuffering
+	-- Turn buffering off for GHCi's stdout
+	hFlush stdout
+	hSetBuffering stdout NoBuffering
 	-- We don't want the cmd line to buffer any input that might be
 	-- intended for the program, so unbuffer stdin.
-   hSetBuffering stdin NoBuffering
+	hSetBuffering stdin NoBuffering
 
 	-- initial context is just the Prelude
    prel_mod <- GHC.findModule session prel_name Nothing
@@ -648,8 +652,6 @@ initInterpBuffering session
       case maybe_hval of
 	Just hval -> writeIORef flush_interp (unsafeCoerce# hval :: IO ())
 	_         -> panic "interactiveUI:flush"
-
-      turnOffBuffering	-- Turn it off right now
 
       return ()
 
