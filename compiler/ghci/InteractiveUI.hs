@@ -266,8 +266,10 @@ jumpFunction session@(Session ref) (I# idsPtr) hValues location b
 findEditor = do
   getEnv "EDITOR" 
     `IO.catch` \_ -> do
-#ifdef mingw32_HOST_OS
-	GetWindowsDirectory ++ "\\notepad.exe", or something
+#if 0
+	-- ToDo: mingw32_HOST_OS
+	win <- getWindowsDirectory
+	return (win `joinFileName` "notepad.exe")
 #else
 	return ""
 #endif
