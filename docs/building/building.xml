@@ -2675,7 +2675,7 @@ $ make boot stage=2 &amp;&amp; make stage=2</screen>
 $ make clean
 $ rm .depend
 $ make boot UseStage1=YES EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'
-$ cd <replaceable>H</replaceable>/ghc/utils
+$ cd <replaceable>H</replaceable>/utils
 $ make clean
 $ make -k UseStage1=YES EXTRA_HC_OPTS='-O -fvia-C -keep-hc-files'</screen>
 	    </listitem>
