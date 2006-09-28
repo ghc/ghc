@@ -1013,6 +1013,21 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
+          <literal>:edit <optional><replaceable>file</replaceable></optional></literal>
+          <indexterm><primary><literal>:edit</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Opens an editor to edit the file
+	  <replaceable>file</replaceable>, or the most recently loaded
+	  module if <replaceable>file</replaceable> is omitted.  The
+	  editor to invoke is taken from the <literal>EDITOR</literal>
+	  environment variable, or a default editor on your system if
+	  <literal>EDITOR</literal> is not set.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:help</literal>
           <indexterm><primary><literal>:help</literal></primary></indexterm>
         </term>

@@ -123,6 +123,9 @@ builtin_commands = [
   ("browse",    keepGoing browseCmd,		False, completeModule),
   ("cd",    	keepGoing changeDirectory, 	False, completeFilename),
   ("def",	keepGoing defineMacro,		False, completeIdentifier),
+  ("e", 	keepGoing editFile,		False, completeFilename),
+	-- Hugs users are accustomed to :e, so make sure it doesn't overlap
+  ("edit",	keepGoing editFile,		False, completeFilename),
   ("help",	keepGoing help,			False, completeNone),
   ("?",		keepGoing help,			False, completeNone),
   ("info",      keepGoing info,			False, completeIdentifier),
@@ -159,6 +162,8 @@ helpText =
  "   :browse [*]<module>         display the names defined by <module>\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
+ "   :edit <file>                edit file\n" ++
+ "   :edit                       edit last module\n" ++
  "   :help, :?                   display this list of commands\n" ++
  "   :info [<name> ...]          display information about the given names\n" ++
  "   :load <filename> ...        load module(s) and their dependents\n" ++
@@ -170,6 +175,7 @@ helpText =
  "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
  "   :set prog <progname>        set the value returned by System.getProgName\n" ++
  "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
+ "   :set editor <cmd>           set the comand used for :edit\n" ++
  "\n" ++
  "   :show modules               show the currently loaded modules\n" ++
  "   :show bindings              show the current bindings made at the prompt\n" ++
@@ -242,17 +248,28 @@ jumpFunction session@(Session ref) (I# idsPtr) hValues location b
          writeIORef ref (hsc_env { hsc_IC = new_ic })
          is_tty <- hIsTerminalDevice stdin
          prel_mod <- GHC.findModule session prel_name Nothing
+	 default_editor <- findEditor
          withExtendedLinkEnv (zip names hValues) $
            startGHCi (interactiveLoop is_tty True)
                      GHCiState{ progname = "<interactive>",
                                 args = [],
                                 prompt = location++"> ",
+				editor = default_editor,
                                 session = session,
                                 options = [],
                                 prelude =  prel_mod }
          writeIORef ref hsc_env
          putStrLn $ "Returning to normal execution..."
          return b
+#endif
+
+findEditor = do
+  getEnv "EDITOR" 
+    `IO.catch` \_ -> do
+#ifdef mingw32_HOST_OS
+	GetWindowsDirectory ++ "\\notepad.exe", or something
+#else
+	return ""
 #endif
 
 interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe String -> IO ()
@@ -306,10 +323,13 @@ interactiveUI session srcs maybe_expr = do
    Readline.setCompleterWordBreakCharacters word_break_chars
 #endif
 
+   default_editor <- findEditor
+
    startGHCi (runGHCi srcs maybe_expr)
 	GHCiState{ progname = "<interactive>",
 		   args = [],
                    prompt = "%s> ",
+		   editor = default_editor,
 		   session = session,
 		   options = [],
                    prelude = prel_mod }
@@ -738,6 +758,27 @@ changeDirectory dir = do
   io (GHC.workingDirectoryChanged session)
   dir <- expandPath dir
   io (setCurrentDirectory dir)
+
+editFile :: String -> GHCi ()
+editFile str
+  | null str  = do
+	-- find the name of the "topmost" file loaded
+     session <- getSession
+     graph0 <- io (GHC.getModuleGraph session)
+     graph1 <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph0
+     let graph2 = flattenSCCs (GHC.topSortModuleGraph True graph1 Nothing)
+     case GHC.ml_hs_file (GHC.ms_location (last graph2)) of
+	Just file -> do_edit file
+	Nothing   -> throwDyn (CmdLineError "unknown file name")
+  | otherwise = do_edit str
+  where
+	do_edit file = do
+	   st <- getGHCiState
+	   let cmd = editor st
+	   when (null cmd) $ 
+		throwDyn (CmdLineError "editor not set, use :set editor")
+	   io $ system (cmd ++ ' ':file)
+           return ()
 
 defineMacro :: String -> GHCi ()
 defineMacro s = do
@@ -1169,11 +1210,13 @@ setCmd ""
    		   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
    	   ))
 setCmd str
-  = case words str of
+  = case toArgs str of
 	("args":args) -> setArgs args
 	("prog":prog) -> setProg prog
-        ("prompt":prompt) -> setPrompt (dropWhile isSpace $ drop 6 $ dropWhile isSpace str)
+        ("prompt":prompt) -> setPrompt (after 6)
+        ("editor":cmd) -> setEditor (after 6)
 	wds -> setOptions wds
+   where after n = dropWhile isSpace $ drop n $ dropWhile isSpace str
 
 setArgs args = do
   st <- getGHCiState
@@ -1184,6 +1227,10 @@ setProg [prog] = do
   setGHCiState st{ progname = prog }
 setProg _ = do
   io (hPutStrLn stderr "syntax: :set prog <progname>")
+
+setEditor cmd = do
+  st <- getGHCiState
+  setGHCiState st{ editor = cmd }
 
 setPrompt value = do
   st <- getGHCiState
@@ -1431,6 +1478,7 @@ data GHCiState = GHCiState
 	progname       :: String,
 	args	       :: [String],
         prompt         :: String,
+	editor         :: String,
 	session        :: GHC.Session,
 	options        :: [GHCiOption],
         prelude        :: Module
