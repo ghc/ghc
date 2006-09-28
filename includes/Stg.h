@@ -442,7 +442,9 @@ typedef union {
 
 /* Approximate version when we don't have long arithmetic (on 64-bit archs) */
 
-#define HALF_POS_INT  (((I_)1) << (BITS_IN (I_) / 2))
+/* If we have n-bit words then we have n-1 bits after accounting for the
+ * sign bit, so we can fit the result of multiplying 2 (n-1)/2-bit numbers */
+#define HALF_POS_INT  (((I_)1) << ((BITS_IN (I_) - 1) / 2))
 #define HALF_NEG_INT  (-HALF_POS_INT)
 
 #define mulIntMayOflo(a,b)			\
