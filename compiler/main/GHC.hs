@@ -233,9 +233,10 @@ import PackageConfig    ( PackageId, stringToPackageId )
 import FiniteMap
 import Panic
 import Digraph
-import Bag		( unitBag )
+import Bag		( unitBag, listToBag )
 import ErrUtils		( Severity(..), showPass, fatalErrorMsg, debugTraceMsg,
-			  mkPlainErrMsg, printBagOfErrors )
+			  mkPlainErrMsg, printBagOfErrors, printBagOfWarnings,
+			  WarnMsg )
 import qualified ErrUtils
 import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
@@ -563,6 +564,11 @@ load2 s@(Session ref) how_much mod_graph = do
         let mg2_with_srcimps :: [SCC ModSummary]
 	    mg2_with_srcimps = topSortModuleGraph True mod_graph Nothing
 
+	-- If we can determine that any of the {-# SOURCE #-} imports
+	-- are definitely unnecessary, then emit a warning.
+	warnUnnecessarySourceImports dflags mg2_with_srcimps
+
+ 	let
 	    -- check the stability property for each module.
 	    stable_mods@(stable_obj,stable_bco)
 		| BatchCompile <- ghci_mode = ([],[])
@@ -1231,12 +1237,28 @@ moduleGraphNodes drop_hs_boot_nodes summaries = (nodes, lookup_key)
 
 	-- We use integers as the keys for the SCC algorithm
 	nodes :: [(ModSummary, Int, [Int])]	
-	nodes = [(s, expectJust "topSort" (lookup_key (ms_hsc_src s) (ms_mod_name s)), 
+	nodes = [(s, expectJust "topSort" $ 
+			lookup_key (ms_hsc_src s) (ms_mod_name s),
 		     out_edge_keys hs_boot_key (map unLoc (ms_srcimps s)) ++
-		     out_edge_keys HsSrcFile   (map unLoc (ms_imps s))    )
+		     out_edge_keys HsSrcFile   (map unLoc (ms_imps s)) ++
+		     (-- see [boot-edges] below
+		      if drop_hs_boot_nodes || ms_hsc_src s == HsBootFile 
+			then [] 
+			else case lookup_key HsBootFile (ms_mod_name s) of
+				Nothing -> []
+				Just k  -> [k])
+		 )
 		| s <- summaries
 		, not (isBootSummary s && drop_hs_boot_nodes) ]
 		-- Drop the hi-boot ones if told to do so
+
+	-- [boot-edges] if this is a .hs and there is an equivalent
+	-- .hs-boot, add a link from the former to the latter.  This
+	-- has the effect of detecting bogus cases where the .hs-boot
+	-- depends on the .hs, by introducing a cycle.  Additionally,
+	-- it ensures that we will always process the .hs-boot before
+	-- the .hs, and so the HomePackageTable will always have the
+	-- most up to date information.
 
 	key_map :: NodeMap Int
 	key_map = listToFM ([(moduleName (ms_mod s), ms_hsc_src s)
@@ -1266,6 +1288,24 @@ nodeMapElts = eltsFM
 
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
+
+-- If there are {-# SOURCE #-} imports between strongly connected
+-- components in the topological sort, then those imports can
+-- definitely be replaced by ordinary non-SOURCE imports: if SOURCE
+-- were necessary, then the edge would be part of a cycle.
+warnUnnecessarySourceImports :: DynFlags -> [SCC ModSummary] -> IO ()
+warnUnnecessarySourceImports dflags sccs = 
+  printBagOfWarnings dflags (listToBag (concat (map (check.flattenSCC) sccs)))
+  where check ms =
+	   let mods_in_this_cycle = map ms_mod_name ms in
+	   [ warn m i | m <- ms, i <- ms_srcimps m,
+			unLoc i `notElem`  mods_in_this_cycle ]
+
+	warn :: ModSummary -> Located ModuleName -> WarnMsg
+	warn ms (L loc mod) = 
+	   mkPlainErrMsg loc
+		(ptext SLIT("Warning: {-# SOURCE #-} unnecessary in import of ")
+		 <+> quotes (ppr mod))
 
 -----------------------------------------------------------------------------
 -- Downsweep (dependency analysis)
