@@ -49,6 +49,8 @@ Prelude>
    :browse [*]&lt;module&gt;         display the names defined by &lt;module&gt;
    :cd &lt;dir&gt;                   change directory to &lt;dir&gt;
    :def &lt;cmd&gt; &lt;expr&gt;           define a command :&lt;cmd&gt;
+   :edit &lt;file&gt;                edit file
+   :edit                       edit last module
    :help, :?                   display this list of commands
    :info [&lt;name&gt; ...]          display information about the given names
    :load &lt;filename&gt; ...        load module(s) and their dependents
@@ -60,6 +62,7 @@ Prelude>
    :set args &lt;arg&gt; ...         set the arguments returned by System.getArgs
    :set prog &lt;progname&gt;        set the value returned by System.getProgName
    :set prompt &lt;prompt&gt;        set the prompt used in GHCi
+   :set editor &lt;cmd&gt;        set the command used for :edit
 
    :show modules               show the currently loaded modules
    :show bindings              show the current bindings made at the prompt
@@ -1022,7 +1025,8 @@ Prelude> :. cmds.ghci
 	  module if <replaceable>file</replaceable> is omitted.  The
 	  editor to invoke is taken from the <literal>EDITOR</literal>
 	  environment variable, or a default editor on your system if
-	  <literal>EDITOR</literal> is not set.</para>
+	  <literal>EDITOR</literal> is not set.  You can change the
+	  editor using <literal>:set editor</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -1189,6 +1193,16 @@ Prelude> :main foo bar
 	  program calls <literal>System.getArgs</literal><indexterm><primary>getArgs</primary>
 	    </indexterm>.</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+           <literal>:set</literal> <literal>editor</literal> <replaceable>cmd</replaceable>
+        </term>
+	<listitem>
+	  <para>Sets the command used by <literal>:edit</literal> to
+	  <replaceable>cmd</replaceable>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>

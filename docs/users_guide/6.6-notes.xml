@@ -390,6 +390,14 @@
       </listitem>
       <listitem>
         <para>
+          GHCi now has an <literal>:edit</literal> command which pops
+          up an editor on the most recently loaded file, or a
+          specified file.  See <xref linkend="ghci-commands" /> for
+          more information.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
           GHCi now invokes <literal>print</literal> by default on the
           result of IO actions and bindings at the prompt.  This is
           occasionally not what you want, so it can be disabled (at
