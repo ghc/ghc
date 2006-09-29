@@ -22,18 +22,17 @@ import IfaceType	( IfaceExtName(..), IfaceTyCon(..), ifaceTyConName )
 import TysWiredIn	( tupleTyCon, tupleCon )
 import HscTypes		( NameCache(..), HscEnv(..), GenAvailInfo(..), 
 			  IfaceExport, OrigNameCache )
-import Type		( mkOpenTvSubst, substTy )
 import TyCon		( TyCon, tyConName )
 import DataCon		( dataConWorkId, dataConName )
-import Var		( TyVar, Id, varName, setIdType, idType )
+import Var		( TyVar, Id, varName )
 import Name		( Name, nameUnique, nameModule, 
 			  nameOccName, nameSrcLoc, 
 			  getOccName, nameParent_maybe,
 		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
 import NameSet		( NameSet, emptyNameSet, addListToNameSet )
-import OccName		( OccName, isTupleOcc_maybe, tcName, dataName, mapOccEnv, occNameFS,
-			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
+import OccName		( OccName, isTupleOcc_maybe, tcName, dataName, occNameFS,
+			  lookupOccEnv, unitOccEnv, extendOccEnv )
 import PrelNames	( gHC_PRIM, dATA_TUP )
 import Module		( Module, emptyModuleEnv, ModuleName, modulePackageId,
 			  lookupModuleEnv, extendModuleEnv_C, mkModule )

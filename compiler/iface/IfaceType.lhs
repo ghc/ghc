@@ -26,12 +26,10 @@ module IfaceType (
 
 #include "HsVersions.h"
 
-import Type		( Kind )
-import Coercion         ( Coercion )
 import TypeRep		( TyThing(..), Type(..), PredType(..), ThetaType,
                           unliftedTypeKindTyConName, openTypeKindTyConName,
                           ubxTupleKindTyConName, argTypeKindTyConName,
-                          liftedTypeKindTyConName, isLiftedTypeKind )
+                          liftedTypeKindTyConName )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )

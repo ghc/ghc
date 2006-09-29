@@ -29,15 +29,15 @@ import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
 			  mkLocMessage, debugTraceMsg )
 import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
 import Type		( Type, tyVarsOfType, coreEqType,
-			  splitFunTy_maybe, mkTyVarTys,
+			  splitFunTy_maybe, 
 			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, mkForAllTy, mkFunTy,
 			  isUnboxedTupleType, isSubKind,
 			  substTyWith, emptyTvSubst, extendTvInScope, 
-			  TvSubst, TvSubstEnv, mkTvSubst, setTvSubstEnv, substTy,
-			  extendTvSubst, composeTvSubst, substTyVarBndr, isInScope,
-			  getTvSubstEnv, getTvInScope, mkTyVarTy )
-import Coercion         ( Coercion, coercionKind, coercionKindPredTy )
+			  TvSubst, substTy,
+			  extendTvSubst, substTyVarBndr, isInScope,
+			  getTvInScope )
+import Coercion         ( coercionKind, coercionKindPredTy )
 import TyCon		( isPrimTyCon, isNewTyCon )
 import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
 import StaticFlags	( opt_PprStyle_Debug )
@@ -415,12 +415,6 @@ lintTyApp ty arg_ty
         -> do	{ checkL (isTyVar tyvar) (mkTyAppMsg ty arg_ty)
 		; checkKinds tyvar arg_ty
 		; return (substTyWith [tyvar] [arg_ty] body) }
-
-lintTyApps fun_ty [] = return fun_ty
-
-lintTyApps fun_ty (arg_ty : arg_tys) = 
-  do { fun_ty' <- lintTyApp fun_ty arg_ty
-     ; lintTyApps fun_ty' arg_tys }
 
 checkKinds tyvar arg_ty
 	-- Arg type might be boxed for a function with an uncommitted

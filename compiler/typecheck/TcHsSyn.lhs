@@ -1,4 +1,4 @@
-%
+	%
 % (c) The AQUA Project, Glasgow University, 1996-1998
 %
 \section[TcHsSyn]{Specialisations of the @HsSyn@ syntax for the typechecker}
@@ -651,8 +651,7 @@ zonkRbinds env rbinds
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> IPName a -> TcM (IPName b)
-mapIPNameTc f (Dupable n) = f n  `thenM` \ r -> returnM (Dupable r)
-mapIPNameTc f (Linear  n) = f n  `thenM` \ r -> returnM (Linear r)
+mapIPNameTc f (IPName n) = f n  `thenM` \ r -> returnM (IPName r)
 \end{code}
 
 

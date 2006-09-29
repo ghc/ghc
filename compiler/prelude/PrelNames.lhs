@@ -192,9 +192,6 @@ basicKnownKeyNames
 	-- MonadFix
 	monadFixClassName, mfixName,
 
-	-- Splittable class
-	splittableClassName, splitName,
-
 	-- Other classes
 	randomClassName, randomGenClassName, monadPlusClassName,
 
@@ -627,10 +624,6 @@ newStablePtrName      = varQual  gHC_STABLE FSLIT("newStablePtr") newStablePtrId
 -- PrelST module
 runSTRepName	   = varQual gHC_ST  FSLIT("runSTRep") runSTRepIdKey
 
--- The "split" Id for splittable implicit parameters
-splittableClassName = clsQual gLA_EXTS FSLIT("Splittable") splittableClassKey
-splitName           = methName splittableClassName FSLIT("split") splitIdKey
-
 -- Recursive-do notation
 monadFixClassName  = clsQual mONAD_FIX FSLIT("MonadFix") monadFixClassKey
 mfixName	   = methName monadFixClassName FSLIT("mfix") mfixIdKey
@@ -723,7 +716,6 @@ typeable6ClassKey	= mkPreludeClassUnique 26
 typeable7ClassKey	= mkPreludeClassUnique 27
 
 monadFixClassKey	= mkPreludeClassUnique 28
-splittableClassKey	= mkPreludeClassUnique 29
 
 monadPlusClassKey	= mkPreludeClassUnique 30
 randomClassKey		= mkPreludeClassUnique 31
@@ -921,7 +913,6 @@ printIdKey		      = mkPreludeMiscIdUnique 43
 failIOIdKey		      = mkPreludeMiscIdUnique 44
 nullAddrIdKey		      = mkPreludeMiscIdUnique 46
 voidArgIdKey		      = mkPreludeMiscIdUnique 47
-splitIdKey		      = mkPreludeMiscIdUnique 48
 fstIdKey		      = mkPreludeMiscIdUnique 49
 sndIdKey		      = mkPreludeMiscIdUnique 50
 otherwiseIdKey		      = mkPreludeMiscIdUnique 51

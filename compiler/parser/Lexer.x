@@ -250,7 +250,6 @@ $white_no_nl+ 				;
 
 <0,glaexts> {
   \? @varid / { ifExtension ipEnabled }	{ skip_one_varid ITdupipvarid }
-  \% @varid / { ifExtension ipEnabled } { skip_one_varid ITsplitipvarid }
 }
 
 <glaexts> {
@@ -442,7 +441,6 @@ data Token
   | ITqconsym (FastString,FastString)
 
   | ITdupipvarid   FastString	-- GHC extension: implicit param: ?x
-  | ITsplitipvarid FastString	-- GHC extension: implicit param: %x
 
   | ITpragma StringBuffer
 

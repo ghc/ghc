@@ -24,7 +24,7 @@ module CoreSubst (
 
 #include "HsVersions.h"
 
-import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBind,
+import CoreSyn		( Expr(..), Bind(..), CoreExpr, CoreBind,
 			  CoreRule(..), hasUnfolding, noUnfolding
 			)
 import CoreFVs		( exprFreeVars )
@@ -43,7 +43,7 @@ import IdInfo		( IdInfo, SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo,
 import Unique		( Unique )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply )
 import Var		( Var, Id, TyVar, isTyVar )
-import Maybes		( orElse, isNothing )
+import Maybes		( orElse )
 import Outputable
 import PprCore		()		-- Instances
 import Util		( mapAccumL )

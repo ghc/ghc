@@ -15,9 +15,8 @@ module BuildTyCl (
 import IfaceEnv		( newImplicitBinder )
 import TcRnMonad
 
-import DataCon		( DataCon, isNullarySrcDataCon, dataConUnivTyVars,
-			  mkDataCon, dataConFieldLabels, dataConInstOrigArgTys,
-                          dataConTyCon )
+import DataCon		( DataCon, isNullarySrcDataCon, 
+			  mkDataCon, dataConFieldLabels, dataConInstOrigArgTys )
 import Var		( tyVarKind, TyVar, Id )
 import VarSet		( isEmptyVarSet, intersectVarSet, elemVarSet )
 import TysWiredIn  	( unitTy )
@@ -25,23 +24,22 @@ import BasicTypes	( RecFlag, StrictnessMark(..) )
 import Name		( Name )
 import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc,
 			  mkClassTyConOcc, mkClassDataConOcc,
-			  mkSuperDictSelOcc, mkNewTyCoOcc, mkInstTyTcOcc,
+			  mkSuperDictSelOcc, mkNewTyCoOcc, 
 			  mkInstTyCoOcc ) 
 import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
 import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons,
 			  tyConStupidTheta, tyConDataCons, isNewTyCon,
 			  mkClassTyCon, TyCon( tyConTyVars ),
-			  isRecursiveTyCon, tyConArity, AlgTyConRhs(..),
+			  isRecursiveTyCon, AlgTyConRhs(..),
 			  SynTyConRhs(..), newTyConRhs, AlgTyConParent(..) )
 import Type		( mkArrowKinds, liftedTypeKind, typeKind, 
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 			  splitTyConApp_maybe, splitAppTy_maybe,
 			  getTyVar_maybe, 
-			  mkPredTys, mkTyVarTys, ThetaType, Type, Kind,
+			  mkPredTys, mkTyVarTys, ThetaType, Type, 
 			  TyThing(..), 
-			  substTyWith, zipTopTvSubst, substTheta, mkForAllTys,
-                          mkTyConApp, mkTyVarTy )
+			  substTyWith, zipTopTvSubst, substTheta )
 import Coercion         ( mkNewTypeCoercion, mkDataInstCoercion )
 import Outputable
 import List		( nub )

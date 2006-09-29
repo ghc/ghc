@@ -45,7 +45,7 @@ import TcType		( TcType, TcSigmaType, TcRhoType, TvSubst,
 			  mkTyVarTys, mkFunTys, 
 			  tcMultiSplitSigmaTy, tcSplitFunTysN,
 			  tcSplitTyConApp_maybe, 
-			  isSigmaTy, mkFunTy, mkTyConApp, isLinearPred,
+			  isSigmaTy, mkFunTy, mkTyConApp, 
 			  exactTyVarsOfType, exactTyVarsOfTypes, 
 			  zipTopTvSubst, zipOpenTvSubst, substTys, substTyVar
 			)
@@ -796,19 +796,9 @@ instFun orig fun subst tv_theta_prs
 	= do { co_fn <- instCall orig tys theta
 	     ; go False (HsWrap co_fn fun) prs }
 
-	-- 	Hack Alert (want_method_inst)!
 	-- See Note [No method sharing]
-	-- If 	f :: (%x :: T) => Int -> Int
-	-- Then if we have two separate calls, (f 3, f 4), we cannot
-	-- make a method constraint that then gets shared, thus:
-	--	let m = f %x in (m 3, m 4)
-	-- because that loses the linearity of the constraint.
-	-- The simplest thing to do is never to construct a method constraint
-	-- in the first place that has a linear implicit parameter in it.
-    want_method_inst theta =  not (null theta)			-- Overloaded
-			   && not (any isLinearPred theta)	-- Not linear
+    want_method_inst theta =  not (null theta)	-- Overloaded
 		   	   && not opt_NoMethodSharing
-		-- See Note [No method sharing] below
 \end{code}
 
 Note [Multiple instantiation]

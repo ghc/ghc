@@ -255,7 +255,6 @@ incorrect.
  QCONSYM 	{ L _ (ITqconsym  _) }
 
  IPDUPVARID   	{ L _ (ITdupipvarid   _) }		-- GHC extension
- IPSPLITVARID  	{ L _ (ITsplitipvarid _) }		-- GHC extension
 
  CHAR		{ L _ (ITchar     _) }
  STRING		{ L _ (ITstring   _) }
@@ -1382,8 +1381,7 @@ dbind	:: { LIPBind RdrName }
 dbind	: ipvar '=' exp			{ LL (IPBind (unLoc $1) $3) }
 
 ipvar	:: { Located (IPName RdrName) }
-	: IPDUPVARID		{ L1 (Dupable (mkUnqual varName (getIPDUPVARID $1))) }
-	| IPSPLITVARID		{ L1 (Linear  (mkUnqual varName (getIPSPLITVARID $1))) }
+	: IPDUPVARID		{ L1 (IPName (mkUnqual varName (getIPDUPVARID $1))) }
 
 -----------------------------------------------------------------------------
 -- Deprecations
@@ -1648,7 +1646,6 @@ getQCONID  	(L _ (ITqconid   x)) = x
 getQVARSYM 	(L _ (ITqvarsym  x)) = x
 getQCONSYM 	(L _ (ITqconsym  x)) = x
 getIPDUPVARID   (L _ (ITdupipvarid   x)) = x
-getIPSPLITVARID (L _ (ITsplitipvarid x)) = x
 getCHAR		(L _ (ITchar     x)) = x
 getSTRING	(L _ (ITstring   x)) = x
 getINTEGER	(L _ (ITinteger  x)) = x

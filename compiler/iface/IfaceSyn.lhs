@@ -36,22 +36,17 @@ import CoreSyn
 import IfaceType
 
 import NewDemand	( StrictSig, pprIfaceStrictSig )
-import TcType		( deNoteType )
 import Class		( FunDep, DefMeth, pprFundeps )
 import OccName		( OccName, parenSymOcc, occNameFS,
 			  OccSet, unionOccSets, unitOccSet, occSetElts )
 import UniqFM           ( UniqFM, emptyUFM, addToUFM, lookupUFM )
-import Name		( Name, NamedThing(..), nameOccName, isExternalName )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
 import ForeignCall	( ForeignCall )
 import BasicTypes	( Arity, Activation(..), StrictnessMark, OverlapFlag,
-			  RecFlag(..), Boxity(..), 
-			  isAlwaysActive, tupleParens )
+			  RecFlag(..), Boxity(..), tupleParens )
 import Outputable
 import FastString
-import Maybes		( catMaybes )
-import Util		( lengthIs )
 
 infixl 3 &&&
 infix  4 `eqIfExt`, `eqIfIdInfo`, `eqIfType`

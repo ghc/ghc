@@ -28,7 +28,7 @@ module Inst (
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
 
 	isDict, isClassDict, isMethod, 
-	isLinearInst, linearInstType, isIPDict, isInheritableInst,
+	isIPDict, isInheritableInst,
 	isTyVarDict, isMethodFor, 
 
 	zonkInst, zonkInsts,
@@ -63,7 +63,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcPredType,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  mkPredTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
-		  isClassPred, isTyVarClassPred, isLinearPred, 
+		  isClassPred, isTyVarClassPred, 
 		  getClassPredTys, mkPredName,
 		  isInheritablePred, isIPPred, 
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
@@ -189,17 +189,6 @@ isMethod other	     = False
 isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method uniq id tys _ loc) = id `elemVarSet` ids
 isMethodFor ids inst			   = False
-
-isLinearInst :: Inst -> Bool
-isLinearInst (Dict _ pred _) = isLinearPred pred
-isLinearInst other	     = False
-	-- We never build Method Insts that have
-	-- linear implicit paramters in them.
-	-- Hence no need to look for Methods
-	-- See TcExpr.tcId 
-
-linearInstType :: Inst -> TcType	-- %x::t  -->  t
-linearInstType (Dict _ (IParam _ ty) _) = ty
 \end{code}
 
 

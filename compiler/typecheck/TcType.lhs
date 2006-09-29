@@ -68,7 +68,7 @@ module TcType (
   isClassPred, isTyVarClassPred, isEqPred, 
   mkDictTy, tcSplitPredTy_maybe, 
   isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
-  mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
+  mkClassPred, isInheritablePred, isIPPred, mkPredName, 
   dataConsStupidTheta, isRefineableTy,
 
   ---------------------------------
@@ -186,7 +186,7 @@ import VarEnv		( TidyEnv )
 import OccName		( OccName, mkDictOcc, mkOccName, tvName )
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
-import BasicTypes	( IPName(..), Arity, ipNameName )
+import BasicTypes	( Arity, ipNameName )
 import SrcLoc		( SrcLoc, SrcSpan )
 import Util		( equalLength )
 import Maybes		( maybeToBool, expectJust, mapCatMaybes )
@@ -895,10 +895,6 @@ isInheritablePred :: PredType -> Bool
 -- which can be free in g's rhs, and shared by both calls to g
 isInheritablePred (ClassP _ _) = True
 isInheritablePred other	     = False
-
-isLinearPred :: TcPredType -> Bool
-isLinearPred (IParam (Linear n) _) = True
-isLinearPred other		   = False
 \end{code}
 
 --------------------- Equality predicates ---------------------------------

@@ -50,11 +50,11 @@ import HscTypes		( FixityEnv,
 			  availName, IsBootInterface, Deprecations )
 import Packages		( PackageId )
 import Type		( Type, pprTyThingCategory )
-import TcType		( TcTyVarSet, TcType, TcThetaType, SkolemInfo, TvSubst,
+import TcType		( TcTyVarSet, TcType, TcThetaType, SkolemInfo, 
 			  TcPredType, TcKind, tcCmpPred, tcCmpType,
 			  tcCmpTypes, pprSkolInfo )
 import InstEnv		( Instance, InstEnv )
-import FamInstEnv	( FamInst, FamInstEnv )
+import FamInstEnv	( FamInstEnv )
 import IOEnv
 import RdrName		( GlobalRdrEnv, LocalRdrEnv )
 import Name		( Name )
@@ -67,7 +67,6 @@ import UniqFM
 import SrcLoc		( SrcSpan, SrcLoc, Located, srcSpanStart )
 import VarSet		( IdSet )
 import ErrUtils		( Messages, Message )
-import UniqFM           ( UniqFM )
 import UniqSupply	( UniqSupply )
 import BasicTypes	( IPName )
 import Util		( thenCmp )

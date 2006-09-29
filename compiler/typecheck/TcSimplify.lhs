@@ -22,44 +22,43 @@ module TcSimplify (
 
 import {-# SOURCE #-} TcUnify( unifyType )
 import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, mkWpTyApps,
-			  HsWrapper(..), (<.>), nlHsTyApp, emptyLHsBinds )
-import TcHsSyn		( mkHsApp )
+			  HsWrapper(..), (<.>), emptyLHsBinds )
 
 import TcRnMonad
 import Inst		( lookupInst, LookupInstResult(..),
 			  tyVarsOfInst, fdPredsOfInsts,
-			  isDict, isClassDict, isLinearInst, linearInstType,
+			  isDict, isClassDict, 
 			  isMethodFor, isMethod,
-			  instToId, tyVarsOfInsts,  cloneDict,
+			  instToId, tyVarsOfInsts,  
 			  ipNamesOfInsts, ipNamesOfInst, dictPred,
 			  fdPredsOfInst, 
-			  newDictBndrs, newDictBndrsO, tcInstClassOp,
+			  newDictBndrs, newDictBndrsO, 
 			  getDictClassTys, isTyVarDict, instLoc,
 			  zonkInst, tidyInsts, tidyMoreInsts,
 			  pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
 			  isInheritableInst, pprDictsTheta
 			)
-import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals, pprBinders,
+import TcEnv		( tcGetGlobalTyVars, findGlobals, pprBinders,
 			  lclEnvElts, tcMetaTy )
 import InstEnv		( lookupInstEnv, classInstances, pprInstances )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, zonkTcPredType  )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, tidyPred,
-                          mkClassPred, isOverloadedTy, mkTyConApp, isSkolemTyVar,
+                          mkClassPred, isOverloadedTy, isSkolemTyVar,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
 			  tyVarsOfPred, tcEqType, pprPred, mkPredTy, tcIsTyVarTy )
 import TcIface		( checkWiredInTyCon )
-import Id		( idType, mkUserLocal )
+import Id		( idType )
 import Var		( TyVar )
 import TyCon		( TyCon )
-import Name		( Name, getOccName, getSrcLoc )
+import Name		( Name )
 import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig, classKey )
 import FunDeps		( oclose, grow, improve, pprEquation )
 import PrelInfo		( isNumericClass, isStandardClass ) 
-import PrelNames	( splitName, fstName, sndName, integerTyConName,
+import PrelNames	( integerTyConName,
 			  showClassKey, eqClassKey, ordClassKey )
 import Type		( zipTopTvSubst, substTheta, substTy )
-import TysWiredIn	( pairTyCon, doubleTy, doubleTyCon )
+import TysWiredIn	( doubleTy, doubleTyCon )
 import ErrUtils		( Message )
 import BasicTypes	( TopLevelFlag, isNotTopLevel )
 import VarSet
@@ -1386,22 +1385,10 @@ data Avail
 
   | Given TcId 		-- Used for dictionaries for which we have a binding
 			-- e.g. those "given" in a signature
-	  Bool		-- True <=> actually consumed (splittable IPs only)
 
   | Rhs 		-- Used when there is a RHS
 	(LHsExpr TcId) 	-- The RHS
 	[Inst]		-- Insts free in the RHS; we need these too
-
-  | Linear 		-- Splittable Insts only.
-	Int		-- The Int is always 2 or more; indicates how
-			-- many copies are required
-	Inst 		-- The splitter
-	Avail		-- Where the "master copy" is
-
-  | LinRhss		-- Splittable Insts only; this is used only internally
-			-- 	by extractResults, where a Linear 
-			--	is turned into an LinRhss
-	[LHsExpr TcId]	-- A supply of suitable RHSs
 
 pprAvails avails = vcat [sep [ppr inst, nest 2 (equals <+> pprAvail avail)]
 			| (inst,avail) <- fmToList avails ]
@@ -1411,11 +1398,8 @@ instance Outputable Avail where
 
 pprAvail IsFree	       	= text "Free"
 pprAvail Irred	       	= text "Irred"
-pprAvail (Given x b)   	= text "Given" <+> ppr x <+> 
-		 	  if b then text "(used)" else empty
+pprAvail (Given x)   	= text "Given" <+> ppr x
 pprAvail (Rhs rhs bs)   = text "Rhs" <+> ppr rhs <+> braces (ppr bs)
-pprAvail (Linear n i a) = text "Linear" <+> ppr n <+> braces (ppr i) <+> ppr a
-pprAvail (LinRhss rhss) = text "LinRhss" <+> ppr rhss
 \end{code}
 
 Extracting the bindings from a bunch of Avails.
@@ -1445,8 +1429,8 @@ extractResults avails wanteds
 	  Just IsFree -> go (add_free avails w)  binds irreds     (w:frees) ws
 	  Just Irred  -> go (add_given avails w) binds (w:irreds) frees     ws
 
-	  Just (Given id _) -> go avails new_binds irreds frees ws
-			    where
+	  Just (Given id) -> go avails new_binds irreds frees ws
+			  where
 			       new_binds | id == instToId w = binds
 					 | otherwise        = addBind binds w (L (instSpan w) (HsVar id))
 		-- The sought Id can be one of the givens, via a superclass chain
@@ -1456,27 +1440,7 @@ extractResults avails wanteds
 			     where
 				new_binds = addBind binds w rhs
 
-	  Just (Linear n split_inst avail)	-- Transform Linear --> LinRhss
-	    -> get_root irreds frees avail w		`thenM` \ (irreds', frees', root_id) ->
-	       split n (instToId split_inst) root_id w	`thenM` \ (binds', rhss) ->
-	       go (addToFM avails w (LinRhss rhss))
-		  (binds `unionBags` binds')
-		  irreds' frees' (split_inst : w : ws)
-
-	  Just (LinRhss (rhs:rhss))		-- Consume one of the Rhss
-		-> go new_avails new_binds irreds frees ws
-		where		
-		   new_binds  = addBind binds w rhs
-		   new_avails = addToFM avails w (LinRhss rhss)
-
-	-- get_root is just used for Linear
-    get_root irreds frees (Given id _) w = returnM (irreds, frees, id)
-    get_root irreds frees Irred	       w = cloneDict w	`thenM` \ w' ->
-					   returnM (w':irreds, frees, instToId w')
-    get_root irreds frees IsFree       w = cloneDict w	`thenM` \ w' ->
-					   returnM (irreds, w':frees, instToId w')
-
-    add_given avails w = addToFM avails w (Given (instToId w) True)
+    add_given avails w = addToFM avails w (Given (instToId w))
 
     add_free avails w | isMethod w = avails
 		      | otherwise  = add_given avails w
@@ -1493,58 +1457,6 @@ extractResults avails wanteds
 	-- When simplifying with i,f free, we might still notice that
 	--   t1=t3; but alas, the binding for t2 (which mentions t1)
 	--   will continue to float out!
-
-split :: Int -> TcId -> TcId -> Inst 
-      -> TcM (TcDictBinds, [LHsExpr TcId])
--- (split n split_id root_id wanted) returns
---	* a list of 'n' expressions, all of which witness 'avail'
---	* a bunch of auxiliary bindings to support these expressions
---	* one or zero insts needed to witness the whole lot
---	  (maybe be zero if the initial Inst is a Given)
---
--- NB: 'wanted' is just a template
-
-split n split_id root_id wanted
-  = go n
-  where
-    ty      = linearInstType wanted
-    pair_ty = mkTyConApp pairTyCon [ty,ty]
-    id      = instToId wanted
-    occ     = getOccName id
-    loc     = getSrcLoc id
-    span    = instSpan wanted
-
-    go 1 = returnM (emptyBag, [L span $ HsVar root_id])
-
-    go n = go ((n+1) `div` 2)		`thenM` \ (binds1, rhss) ->
-	   expand n rhss		`thenM` \ (binds2, rhss') ->
-	   returnM (binds1 `unionBags` binds2, rhss')
-
-	-- (expand n rhss) 
-	-- Given ((n+1)/2) rhss, make n rhss, using auxiliary bindings
-	--  e.g.  expand 3 [rhs1, rhs2]
-	--	  = ( { x = split rhs1 },
-	--	      [fst x, snd x, rhs2] )
-    expand n rhss
-	| n `rem` 2 == 0 = go rhss 	-- n is even
-	| otherwise  	 = go (tail rhss)	`thenM` \ (binds', rhss') ->
-			   returnM (binds', head rhss : rhss')
-	where
-	  go rhss = mapAndUnzipM do_one rhss	`thenM` \ (binds', rhss') ->
-		    returnM (listToBag binds', concat rhss')
-
-	  do_one rhs = newUnique 			`thenM` \ uniq -> 
-		       tcLookupId fstName		`thenM` \ fst_id ->
-		       tcLookupId sndName		`thenM` \ snd_id ->
-		       let 
-			  x = mkUserLocal occ uniq pair_ty loc
-		       in
-		       returnM (L span (VarBind x (mk_app span split_id rhs)),
-				[mk_fs_app span fst_id ty x, mk_fs_app span snd_id ty x])
-
-mk_fs_app span id ty var = nlHsTyApp id [ty,ty] `mkHsApp` (L span (HsVar var))
-
-mk_app span id rhs = L span (HsApp (L span (HsVar id)) rhs)
 
 addBind binds inst rhs = binds `unionBags` unitBag (L (instLocSrcSpan (instLoc inst)) 
 						      (VarBind (instToId inst) rhs))
@@ -1759,11 +1671,7 @@ reduceList (n,stack) try_me wanteds state
 reduce stack try_me wanted avails
     -- It's the same as an existing inst, or a superclass thereof
   | Just avail <- isAvailable avails wanted
-  = if isLinearInst wanted then
-	addLinearAvailable avails avail wanted	`thenM` \ (avails', wanteds') ->
-	reduceList stack try_me wanteds' avails'
-    else
-	returnM avails		-- No op for non-linear things
+  = returnM avails	
 
   | otherwise
   = case try_me wanted of {
@@ -1814,32 +1722,6 @@ isAvailable avails wanted = lookupFM avails wanted
 	--  *not* by unique.  So
 	--	d1::C Int ==  d2::C Int
 
-addLinearAvailable :: Avails -> Avail -> Inst -> TcM (Avails, [Inst])
-addLinearAvailable avails avail wanted
-	-- avails currently maps [wanted -> avail]
-	-- Extend avails to reflect a neeed for an extra copy of avail
-
-  | Just avail' <- split_avail avail
-  = returnM (addToFM avails wanted avail', [])
-
-  | otherwise
-  = tcLookupId splitName			`thenM` \ split_id ->
-    tcInstClassOp (instLoc wanted) split_id 
-		  [linearInstType wanted]	`thenM` \ split_inst ->
-    returnM (addToFM avails wanted (Linear 2 split_inst avail), [split_inst])
-
-  where
-    split_avail :: Avail -> Maybe Avail
-	-- (Just av) if there's a modified version of avail that
-	-- 	     we can use to replace avail in avails
-	-- Nothing   if there isn't, so we need to create a Linear
-    split_avail (Linear n i a)		    = Just (Linear (n+1) i a)
-    split_avail (Given id used) | not used  = Just (Given id True)
-				| otherwise = Nothing
-    split_avail Irred			    = Nothing
-    split_avail IsFree			    = Nothing
-    split_avail other = pprPanic "addLinearAvailable" (ppr avail $$ ppr wanted $$ ppr avails)
-		  
 -------------------------
 addFree :: Avails -> Inst -> TcM Avails
 	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
@@ -1863,7 +1745,7 @@ addWanted want_scs avails wanted rhs_expr wanteds
     avail = Rhs rhs_expr wanteds
 
 addGiven :: Avails -> Inst -> TcM Avails
-addGiven avails given = addAvailAndSCs AddSCs avails given (Given (instToId given) False)
+addGiven avails given = addAvailAndSCs AddSCs avails given (Given (instToId given))
 	-- Always add superclasses for 'givens'
 	--
 	-- No ASSERT( not (given `elemFM` avails) ) because in an instance
@@ -1930,8 +1812,8 @@ addSCs is_loop avails dict
 
     is_given :: Inst -> Bool
     is_given sc_dict = case lookupFM avails sc_dict of
-			  Just (Given _ _) -> True	-- Given is cheaper than superclass selection
-			  other		   -> False	
+			  Just (Given _) -> True	-- Given is cheaper than superclass selection
+			  other		 -> False	
 \end{code}
 
 Note [SUPERCLASS-LOOP 2]

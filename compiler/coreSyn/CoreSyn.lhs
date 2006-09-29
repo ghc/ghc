@@ -50,13 +50,11 @@ import StaticFlags	( opt_RuntimeTypes )
 import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
-import TyCon            ( isNewTyCon )
 import Coercion         ( Coercion )
 import Name		( Name )
 import OccName		( OccName )
 import Literal	        ( Literal, mkMachInt )
-import DataCon		( DataCon, dataConWorkId, dataConTag, dataConTyCon,
-                          dataConWrapId )
+import DataCon		( DataCon, dataConWorkId, dataConTag )
 import BasicTypes	( Activation )
 import FastString
 import Outputable

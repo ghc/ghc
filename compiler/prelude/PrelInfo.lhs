@@ -28,7 +28,6 @@ import PrelNames	( basicKnownKeyNames,
 import PrimOp		( PrimOp, allThePrimOps, primOpOcc, primOpTag, maxPrimOpTag )
 import DataCon		( DataCon )
 import Id		( Id, idName )
-import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import Name		( nameOccName )
 import TysPrim		( primTyCons )

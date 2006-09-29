@@ -18,8 +18,7 @@ import HsBinds		( HsLocalBinds, DictBinds, isEmptyLocalBinds,
 			  HsWrapper, pprHsWrapper )
 
 -- others:
-import Type		( Type, pprParendType )
-import Var		( TyVar, Id )
+import Var		( Id )
 import Name		( Name )
 import BasicTypes	( IPName, Boxity, tupleParens, Arity, Fixity(..) )
 import SrcLoc		( Located(..), unLoc )

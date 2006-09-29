@@ -109,24 +109,18 @@ The @IPName@ type is here because it is used in TypeRep (i.e. very
 early in the hierarchy), but also in HsSyn.
 
 \begin{code}
-data IPName name
-  = Dupable   name	-- ?x: you can freely duplicate this implicit parameter
-  | Linear name		-- %x: you must use the splitting function to duplicate it
+newtype IPName name = IPName name	-- ?x
   deriving( Eq, Ord )	-- Ord is used in the IP name cache finite map
 			--	(used in HscTypes.OrigIParamCache)
 
-
 ipNameName :: IPName name -> name
-ipNameName (Dupable n) = n
-ipNameName (Linear  n) = n
+ipNameName (IPName n) = n
 
 mapIPName :: (a->b) -> IPName a -> IPName b
-mapIPName f (Dupable n) = Dupable (f n)
-mapIPName f (Linear  n) = Linear  (f n)
+mapIPName f (IPName n) = IPName (f n)
 
 instance Outputable name => Outputable (IPName name) where
-    ppr (Dupable n) = char '?' <> ppr n -- Ordinary implicit parameters
-    ppr (Linear  n) = char '%' <> ppr n -- Splittable implicit parameters
+    ppr (IPName n) = char '?' <> ppr n -- Ordinary implicit parameters
 \end{code}
 
 

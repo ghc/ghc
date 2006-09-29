@@ -18,11 +18,6 @@ import InstEnv		( OverlapFlag(..) )
 import Class		( DefMeth(..) )
 import CostCentre
 import StaticFlags	( opt_HiVersion, v_Build_tag )
-import Type		( Kind,
-                          isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
-			  isArgTypeKind, isUbxTupleKind, liftedTypeKind,
-			  unliftedTypeKind, openTypeKind, argTypeKind,  
-			  ubxTupleKind, mkArrowKind, splitFunTy_maybe )
 import Panic
 import Binary
 import Util
@@ -366,19 +361,9 @@ instance Binary Fixity where
 	  return (Fixity aa ab)
 
 instance (Binary name) => Binary (IPName name) where
-    put_ bh (Dupable aa) = do
-	    putByte bh 0
-	    put_ bh aa
-    put_ bh (Linear ab) = do
-	    putByte bh 1
-	    put_ bh ab
-    get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do aa <- get bh
-		      return (Dupable aa)
-	      _ -> do ab <- get bh
-		      return (Linear ab)
+    put_ bh (IPName aa) = put_ bh aa
+    get bh = do aa <- get bh
+	        return (IPName aa)
 
 -------------------------------------------------------------------------
 --		Types from: Demand
