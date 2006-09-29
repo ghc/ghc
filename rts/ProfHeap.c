@@ -541,10 +541,10 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat max_length)
 	    p += buf_append(p, ccs->cc->module, buf_end);
 	    p += buf_append(p, ".CAF", buf_end);
 	} else {
+	    p += buf_append(p, ccs->cc->label, buf_end);
 	    if (ccs->prevStack != NULL && ccs->prevStack != CCS_MAIN) {
 		p += buf_append(p, "/", buf_end);
 	    }
-	    p += buf_append(p, ccs->cc->label, buf_end);
 	}
 	
 	if (p >= buf_end) {
