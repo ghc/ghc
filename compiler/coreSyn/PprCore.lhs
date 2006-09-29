@@ -165,11 +165,9 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = add_par $
     sep [sep [ptext SLIT("case") <+> pprCoreExpr expr,
 	      ifPprDebug (braces (ppr ty)),
-	      hsep [ptext SLIT("of"),
-		    ppr_bndr var, 
-		    char '{',
-		    ppr_case_pat con args
-	  ]],
+	      sep [ptext SLIT("of") <+> ppr_bndr var, 
+		   char '{' <+> ppr_case_pat con args]
+	  ],
 	 pprCoreExpr rhs,
 	 char '}'
     ]
