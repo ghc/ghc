@@ -1461,6 +1461,7 @@ unBox (TyVarTy tv)
 
 unBoxPred (ClassP cls tys) = do { tys' <- mapM unBox tys; return (ClassP cls tys') }
 unBoxPred (IParam ip ty)   = do { ty' <- unBox ty; return (IParam ip ty') }
+unBoxPred (EqPred ty1 ty2) = do { ty1' <- unBox ty1; ty2' <- unBox ty2; return (EqPred ty1' ty2') }
 \end{code}
 
 
