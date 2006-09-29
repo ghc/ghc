@@ -121,7 +121,7 @@ ds_val_bind (NonRecursive, hsbinds) body
       FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn }
 	-> matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
-	   ASSERT( isIdCoercion co_fn )
+	   ASSERT( isIdHsWrapper co_fn )
 	   returnDs (bindNonRec fun rhs body_w_exports)
 
       PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }
@@ -205,7 +205,7 @@ dsExpr (HsVar var)     	      = returnDs (Var var)
 dsExpr (HsIPVar ip)    	      = returnDs (Var (ipNameName ip))
 dsExpr (HsLit lit)     	      = dsLit lit
 dsExpr (HsOverLit lit) 	      = dsOverLit lit
-dsExpr (HsCoerce co_fn e)     = dsCoercion co_fn (dsExpr e)
+dsExpr (HsWrap co_fn e)     = dsCoercion co_fn (dsExpr e)
 
 dsExpr (NegApp expr neg_expr) 
   = do	{ core_expr <- dsLExpr expr
@@ -217,7 +217,7 @@ dsExpr expr@(HsLam a_Match)
     returnDs (mkLams binders matching_code)
 
 #if defined(GHCI) && defined(BREAKPOINT)
-dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
+dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsWrap _ fun)) (L loc arg))) _)
     | HsVar funId <- fun
     , idName funId `elem` [breakpointJumpName, breakpointCondJumpName]
     , ids <- filter (isValidType . idType) (extractIds arg)
@@ -233,7 +233,7 @@ dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsCoerce _ fun)) (L loc arg))) _)
           extractIds (HsApp fn arg)
               | HsVar argId <- unLoc arg
               = argId:extractIds (unLoc fn)
-              | HsCoerce co_fn arg' <- unLoc arg
+              | HsWrap co_fn arg' <- unLoc arg
               , HsVar argId <- arg'		-- SLPJ: not sure what is going on here
               = error (showSDoc (ppr co_fn)) -- argId:extractIds (unLoc fn)
           extractIds x = []

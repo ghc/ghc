@@ -22,7 +22,7 @@ module HsPat (
 import {-# SOURCE #-} HsExpr		( SyntaxExpr )
 
 -- friends:
-import HsBinds		( DictBinds, HsBind(..), ExprCoFn, isIdCoercion, pprCoFn,
+import HsBinds		( DictBinds, HsBind(..), HsWrapper, isIdHsWrapper, pprHsWrapper,
 			  emptyLHsBinds, pprLHsBinds )
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
@@ -126,7 +126,7 @@ data Pat id
 		    [id]		-- Methods
 
 	------------ Pattern coercions (translation only) ---------------
-  | CoPat 	ExprCoFn		-- If co::t1 -> t2, p::t2, 
+  | CoPat 	HsWrapper		-- If co::t1 -> t2, p::t2, 
 					-- then (CoPat co p) :: t1
 		(Pat id)		-- Why not LPat?  Ans: existing locn will do
 	    	Type
@@ -195,7 +195,7 @@ pprPat (NPat l Nothing  _ _)  = ppr l
 pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
 pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
-pprPat (CoPat co pat _)	      = parens (pprCoFn (ppr pat) co)
+pprPat (CoPat co pat _)	      = parens (pprHsWrapper (ppr pat) co)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
 pprPat (DictPat ds ms)	      = parens (sep [ptext SLIT("{-dict-}"),
@@ -239,9 +239,9 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] ty
 mkCharLitPat :: Char -> OutPat id
 mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] charTy
 
-mkCoPat :: ExprCoFn -> OutPat id -> Type -> OutPat id
+mkCoPat :: HsWrapper -> OutPat id -> Type -> OutPat id
 mkCoPat co lpat@(L loc pat) ty
-  | isIdCoercion co = lpat
+  | isIdHsWrapper co = lpat
   | otherwise = L loc (CoPat co pat ty)
 \end{code}
 

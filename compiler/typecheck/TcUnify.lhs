@@ -25,8 +25,8 @@ module TcUnify (
 
 #include "HsVersions.h"
 
-import HsSyn		( ExprCoFn(..), idCoercion, isIdCoercion, (<.>),
-			  mkCoLams, mkCoTyLams, mkCoApps )
+import HsSyn		( HsWrapper(..), idHsWrapper, isIdHsWrapper, (<.>),
+			  mkWpLams, mkWpTyLams, mkWpApps )
 import TypeRep		( Type(..), PredType(..) )
 
 import TcMType		( lookupTcTyVar, LookupTyVarResult(..),
@@ -110,7 +110,7 @@ subFunTys :: SDoc  -- Somthing like "The function f has 3 arguments"
 	  -> Arity		-- Expected # of args
 	  -> BoxyRhoType	-- res_ty
 	  -> ([BoxySigmaType] -> BoxyRhoType -> TcM a)
-	  -> TcM (ExprCoFn, a)
+	  -> TcM (HsWrapper, a)
 -- Attempt to decompse res_ty to have enough top-level arrows to
 -- match the number of patterns in the match group
 -- 
@@ -154,7 +154,7 @@ subFunTys error_herald n_pats res_ty thing_inside
 
     loop 0 args_so_far res_ty 
 	= do { res <- thing_inside (reverse args_so_far) res_ty
-	     ; return (idCoercion, res) }
+	     ; return (idHsWrapper, res) }
 
     loop n args_so_far (FunTy arg_ty res_ty) 
 	= do { (co_fn, res) <- loop (n-1) (arg_ty:args_so_far) res_ty
@@ -178,7 +178,7 @@ subFunTys error_herald n_pats res_ty thing_inside
 		 Indirect ty -> loop n args_so_far ty
 		 Flexi -> do { (res_ty:arg_tys) <- withMetaTvs tv kinds mk_res_ty
 			     ; res <- thing_inside (reverse args_so_far ++ arg_tys) res_ty
-			     ; return (idCoercion, res) } }
+			     ; return (idHsWrapper, res) } }
 	where
 	  mk_res_ty (res_ty' : arg_tys') = mkFunTys arg_tys' res_ty'
 	  mk_res_ty [] = panic "TcUnify.mk_res_ty1"
@@ -594,7 +594,7 @@ expected_ty.
 
 \begin{code}
 -----------------
-tcSubExp :: BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
+tcSubExp :: BoxySigmaType -> BoxySigmaType -> TcM HsWrapper	-- Locally used only
 	-- (tcSub act exp) checks that 
 	--	act <= exp
 tcSubExp actual_ty expected_ty
@@ -612,7 +612,7 @@ tcSubExp actual_ty expected_ty
     traceTc (text "tcSubExp" <+> ppr actual_ty <+> ppr expected_ty) >>
     tc_sub SubOther actual_ty actual_ty False expected_ty expected_ty
 
-tcFunResTy :: Name -> BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
+tcFunResTy :: Name -> BoxySigmaType -> BoxySigmaType -> TcM HsWrapper	-- Locally used only
 tcFunResTy fun actual_ty expected_ty
   = traceTc (text "tcFunResTy" <+> ppr actual_ty <+> ppr expected_ty) >>
     tc_sub (SubFun fun) actual_ty actual_ty False expected_ty expected_ty
@@ -628,7 +628,7 @@ tc_sub :: SubCtxt		-- How to add an error-context
        -> InBox			-- True <=> expected_ty is inside a box
        -> BoxySigmaType		-- expected_ty, before
        -> BoxySigmaType		-- 		..and after
-       -> TcM ExprCoFn
+       -> TcM HsWrapper
 				-- The acual_ty is never inside a box
 -- IMPORTANT pre-condition: if the args contain foralls, the bound type 
 --			    variables are visible non-monadically
@@ -653,7 +653,7 @@ tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
 tc_sub1 sub_ctxt act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
   = do	{ addSubCtxt sub_ctxt act_sty exp_sty $
 	  uVar True False tv exp_ib exp_sty exp_ty
-	; return idCoercion }
+	; return idHsWrapper }
 
 -----------------------------------
 -- Skolemisation case (rule SKOL)
@@ -739,7 +739,7 @@ tc_sub1 sub_ctxt act_sty act_ty@(FunTy act_arg act_res) _ exp_sty (TyVarTy exp_t
 tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
   = do	{ addSubCtxt sub_ctxt act_sty exp_sty $
 	  u_tys True False act_sty actual_ty exp_ib exp_sty expected_ty
-	; return idCoercion }
+	; return idHsWrapper }
 
 
 -----------------------------------
@@ -751,14 +751,14 @@ tc_sub_funs act_arg act_res exp_ib exp_arg exp_res
 -----------------------------------
 wrapFunResCoercion 
 	:: [TcType]	-- Type of args
-	-> ExprCoFn 	-- HsExpr a -> HsExpr b
-	-> TcM ExprCoFn	-- HsExpr (arg_tys -> a) -> HsExpr (arg_tys -> b)
+	-> HsWrapper 	-- HsExpr a -> HsExpr b
+	-> TcM HsWrapper	-- HsExpr (arg_tys -> a) -> HsExpr (arg_tys -> b)
 wrapFunResCoercion arg_tys co_fn_res
-  | isIdCoercion co_fn_res = return idCoercion
+  | isIdHsWrapper co_fn_res = return idHsWrapper
   | null arg_tys	   = return co_fn_res
   | otherwise 	       
   = do	{ arg_ids <- newSysLocalIds FSLIT("sub") arg_tys
-	; return (mkCoLams arg_ids <.> co_fn_res <.> mkCoApps arg_ids) }
+	; return (mkWpLams arg_ids <.> co_fn_res <.> mkWpApps arg_ids) }
 \end{code}
 
 
@@ -775,7 +775,7 @@ tcGen :: BoxySigmaType				-- expected_ty
 						--	quantified tyvars of expected_ty
 						-- 	must not be unified
       -> (BoxyRhoType -> TcM result)		-- spec_ty
-      -> TcM (ExprCoFn, result)
+      -> TcM (HsWrapper, result)
 	-- The expression has type: spec_ty -> expected_ty
 
 tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall-type
@@ -819,9 +819,9 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	; traceTc (text "tcGen:done")
 
 	; let
-	    -- The CoLet binds any Insts which came out of the simplification.
+	    -- The WpLet binds any Insts which came out of the simplification.
 		dict_ids = map instToId dicts
-		co_fn = mkCoTyLams forall_tvs <.> mkCoLams dict_ids <.> CoLet inst_binds
+		co_fn = mkWpTyLams forall_tvs <.> mkWpLams dict_ids <.> WpLet inst_binds
 	; returnM (co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs

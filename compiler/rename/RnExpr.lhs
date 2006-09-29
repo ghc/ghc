@@ -329,7 +329,7 @@ rnExpr (HsArrForm op fixity cmds)
     returnM (HsArrForm op' fixity cmds', fvOp `plusFV` fvCmds)
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
-	-- HsCoerce
+	-- HsWrap
 \end{code}
 
 

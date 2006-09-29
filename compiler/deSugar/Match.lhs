@@ -392,7 +392,7 @@ tidy1 :: Id 			-- The Id being scrutinised
 
 tidy1 v (ParPat pat)      = tidy1 v (unLoc pat) 
 tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat) 
-tidy1 v (WildPat ty)      = returnDs (idWrapper, WildPat ty)
+tidy1 v (WildPat ty)      = returnDs (idDsWrapper, WildPat ty)
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
@@ -427,7 +427,7 @@ tidy1 v (LazyPat pat)
 	; returnDs (mkDsLets sel_binds, WildPat (idType v)) }
 
 tidy1 v (ListPat pats ty)
-  = returnDs (idWrapper, unLoc list_ConPat)
+  = returnDs (idDsWrapper, unLoc list_ConPat)
   where
     list_ty     = mkListTy ty
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] list_ty)
@@ -437,13 +437,13 @@ tidy1 v (ListPat pats ty)
 -- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
 tidy1 v (PArrPat pats ty)
-  = returnDs (idWrapper, unLoc parrConPat)
+  = returnDs (idDsWrapper, unLoc parrConPat)
   where
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
 tidy1 v (TuplePat pats boxity ty)
-  = returnDs (idWrapper, unLoc tuple_ConPat)
+  = returnDs (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats ty
@@ -459,16 +459,16 @@ tidy1 v (DictPat dicts methods)
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
 tidy1 v (LitPat lit)
-  = returnDs (idWrapper, tidyLitPat lit)
+  = returnDs (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 tidy1 v (NPat lit mb_neg eq lit_ty)
-  = returnDs (idWrapper, tidyNPat lit mb_neg eq lit_ty)
+  = returnDs (idDsWrapper, tidyNPat lit mb_neg eq lit_ty)
 
 -- Everything else goes through unchanged...
 
 tidy1 v non_interesting_pat
-  = returnDs (idWrapper, non_interesting_pat)
+  = returnDs (idDsWrapper, non_interesting_pat)
 \end{code}
 
 \noindent

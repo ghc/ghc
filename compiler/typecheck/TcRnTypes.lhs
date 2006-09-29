@@ -43,7 +43,7 @@ module TcRnTypes(
 
 import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
 			  ArithSeqInfo, DictBinds, LHsBinds, LImportDecl, HsGroup,
-                          ExprCoFn, IE )
+                          HsWrapper, IE )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
@@ -424,7 +424,7 @@ data TcTyThing
 
   | ATcId   {		-- Ids defined in this module; may not be fully zonked
 	tct_id :: TcId,		
-	tct_co :: Maybe ExprCoFn,	-- Nothing <=>	Do not apply a GADT type refinement
+	tct_co :: Maybe HsWrapper,	-- Nothing <=>	Do not apply a GADT type refinement
 					--		I am wobbly, or have no free
 					--		type variables
 					-- Just co <=>  Apply any type refinement to me,

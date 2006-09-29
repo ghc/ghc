@@ -43,7 +43,7 @@ import {-# SOURCE #-}	TcExpr( tcPolyExpr )
 import {-# SOURCE #-}	TcUnify( unifyType )
 
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, mkHsApp,
-		  ExprCoFn(..), (<.>), mkCoTyApps, idCoercion,
+		  HsWrapper(..), (<.>), mkWpTyApps, idHsWrapper,
 		  nlHsLit, nlHsVar )
 import TcHsSyn	( zonkId )
 import TcRnMonad
@@ -230,18 +230,18 @@ newDictBndr inst_loc pred
 	; return (Dict name pred inst_loc) }
 
 ----------------
-instCall :: InstOrigin -> [TcType] -> TcThetaType -> TcM ExprCoFn
+instCall :: InstOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
 -- Instantiate the constraints of a call
 --	(instCall o tys theta)
 -- (a) Makes fresh dictionaries as necessary for the constraints (theta)
 -- (b) Throws these dictionaries into the LIE
--- (c) Eeturns an ExprCoFn ([.] tys dicts)
+-- (c) Eeturns an HsWrapper ([.] tys dicts)
 
 instCall orig tys theta 
   = do	{ loc <- getInstLoc orig
 	; (dicts, dict_app) <- instCallDicts loc theta
 	; extendLIEs dicts
-	; return (dict_app <.> mkCoTyApps tys) }
+	; return (dict_app <.> mkWpTyApps tys) }
 
 ----------------
 instStupidTheta :: InstOrigin -> TcThetaType -> TcM ()
@@ -253,17 +253,17 @@ instStupidTheta orig theta
 	; extendLIEs dicts }
 
 ----------------
-instCallDicts :: InstLoc -> TcThetaType -> TcM ([Inst], ExprCoFn)
+instCallDicts :: InstLoc -> TcThetaType -> TcM ([Inst], HsWrapper)
 -- This is the key place where equality predicates 
 -- are unleashed into the world
-instCallDicts loc [] = return ([], idCoercion)
+instCallDicts loc [] = return ([], idHsWrapper)
 
 instCallDicts loc (EqPred ty1 ty2 : preds)
   = do  { unifyType ty1 ty2	-- For now, we insist that they unify right away 
 				-- Later on, when we do associated types, 
 				-- unifyType :: Type -> Type -> TcM ([Inst], Coercion)
 	; (dicts, co_fn) <- instCallDicts loc preds
-	; return (dicts, co_fn <.> CoTyApp ty1) }
+	; return (dicts, co_fn <.> WpTyApp ty1) }
 	-- We use type application to apply the function to the 
 	-- coercion; here ty1 *is* the appropriate identity coercion
 
@@ -272,7 +272,7 @@ instCallDicts loc (pred : preds)
 	; let name = mkPredName uniq (instLocSrcLoc loc) pred 
 	      dict = Dict name pred loc
 	; (dicts, co_fn) <- instCallDicts loc preds
-	; return (dict:dicts, co_fn <.> CoApp (instToId dict)) }
+	; return (dict:dicts, co_fn <.> WpApp (instToId dict)) }
 
 -------------
 cloneDict :: Inst -> TcM Inst	-- Only used for linear implicit params
@@ -620,8 +620,8 @@ lookupInst :: Inst -> TcM LookupInstResult
 
 lookupInst inst@(Method _ id tys theta loc)
   = do	{ (dicts, dict_app) <- instCallDicts loc theta
-	; let co_fn = dict_app <.> mkCoTyApps tys
-	; return (GenInst dicts (L span $ HsCoerce co_fn (HsVar id))) }
+	; let co_fn = dict_app <.> mkWpTyApps tys
+	; return (GenInst dicts (L span $ HsWrap co_fn (HsVar id))) }
   where
     span = instLocSrcSpan loc
 
@@ -698,11 +698,11 @@ lookupInst (Dict _ pred loc)
 	dfun	   = HsVar dfun_id
 	tys	   = map (substTyVar tenv') tyvars
     ; if null theta then
-    	returnM (SimpleInst (L src_loc $ HsCoerce (mkCoTyApps tys) dfun))
+    	returnM (SimpleInst (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
       else do
     { (dicts, dict_app) <- instCallDicts loc theta
-    ; let co_fn = dict_app <.> mkCoTyApps tys
-    ; returnM (GenInst dicts (L src_loc $ HsCoerce co_fn dfun))
+    ; let co_fn = dict_app <.> mkWpTyApps tys
+    ; returnM (GenInst dicts (L src_loc $ HsWrap co_fn dfun))
     }}}}
 
 ---------------

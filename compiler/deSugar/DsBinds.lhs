@@ -419,20 +419,20 @@ addDictScc var rhs = returnDs rhs
 
 
 \begin{code}
-dsCoercion :: ExprCoFn -> DsM CoreExpr -> DsM CoreExpr
-dsCoercion CoHole 	     thing_inside = thing_inside
-dsCoercion (CoCompose c1 c2) thing_inside = dsCoercion c1 (dsCoercion c2 thing_inside)
-dsCoercion (ExprCoFn co)     thing_inside = do { expr <- thing_inside
+dsCoercion :: HsWrapper -> DsM CoreExpr -> DsM CoreExpr
+dsCoercion WpHole 	     thing_inside = thing_inside
+dsCoercion (WpCompose c1 c2) thing_inside = dsCoercion c1 (dsCoercion c2 thing_inside)
+dsCoercion (WpCo co)     thing_inside = do { expr <- thing_inside
 					       ; return (Cast expr co) }
-dsCoercion (CoLam id)        thing_inside = do { expr <- thing_inside
+dsCoercion (WpLam id)        thing_inside = do { expr <- thing_inside
 					       ; return (Lam id expr) }
-dsCoercion (CoTyLam tv)      thing_inside = do { expr <- thing_inside
+dsCoercion (WpTyLam tv)      thing_inside = do { expr <- thing_inside
 					       ; return (Lam tv expr) }
-dsCoercion (CoApp id)        thing_inside = do { expr <- thing_inside
+dsCoercion (WpApp id)        thing_inside = do { expr <- thing_inside
 					       ; return (App expr (Var id)) }
-dsCoercion (CoTyApp ty)      thing_inside = do { expr <- thing_inside
+dsCoercion (WpTyApp ty)      thing_inside = do { expr <- thing_inside
 					       ; return (App expr (Type ty)) }
-dsCoercion (CoLet bs)        thing_inside = do { prs <- dsLHsBinds bs
+dsCoercion (WpLet bs)        thing_inside = do { prs <- dsLHsBinds bs
 					       ; expr <- thing_inside
 					       ; return (Let (Rec prs) expr) }
 \end{code}

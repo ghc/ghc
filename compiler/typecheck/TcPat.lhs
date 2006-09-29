@@ -11,7 +11,7 @@ module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
 
 import {-# SOURCE #-}	TcExpr( tcSyntaxOp )
 import HsSyn		( Pat(..), LPat, HsConDetails(..), HsLit(..),
-			  HsOverLit(..), HsExpr(..), ExprCoFn(..),
+			  HsOverLit(..), HsExpr(..), HsWrapper(..),
 			  mkCoPat, 
 			  LHsBinds, emptyLHsBinds, isEmptyLHsBinds, 
 			  collectPatsBinders, nlHsLit )
@@ -616,7 +616,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
           -- NB: We can use CoPat directly, rather than mkCoPat, as we know the
           --	 coercion is not the identity; mkCoPat is inconvenient as it
           --	 wants a located pattern.
-      = CoPat (ExprCoFn $ mkTyConApp co_con args)       -- co fam ty to repr ty
+      = CoPat (WpCo $ mkTyConApp co_con args)       -- co fam ty to repr ty
 	      (pat {pat_ty = mkTyConApp tycon args})    -- representation type
 	      pat_ty					-- family inst type
       | otherwise

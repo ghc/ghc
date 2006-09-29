@@ -505,11 +505,11 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
         ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head_ty
   	      cls_tycon		  = classTyCon cls
 	      the_coercion     	  = make_coercion cls_tycon cls_inst_tys
-              coerced_rep_dict 	  = mkHsCoerce the_coercion (HsVar rep_dict_id)
+              coerced_rep_dict 	  = mkHsWrap the_coercion (HsVar rep_dict_id)
 
 	; body <- make_body cls_tycon cls_inst_tys sc_dict_ids coerced_rep_dict
               
-        ; return (sc_binds `snocBag` (noLoc $ VarBind dfun_id $ noLoc $ mkHsCoerce wrap_fn body)) }
+        ; return (sc_binds `snocBag` (noLoc $ VarBind dfun_id $ noLoc $ mkHsWrap wrap_fn body)) }
   where
 
       -----------------------
@@ -527,12 +527,12 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 	   ; sc_binds <- addErrCtxt superClassCtxt (tcSimplifySuperClasses [] [] dicts)
 		-- Use tcSimplifySuperClasses to avoid creating loops, for the
 		-- same reason as Note [SUPERCLASS-LOOP 1] in TcSimplify
-	   ; return (map instToId dicts, idCoercion, sc_binds) }
+	   ; return (map instToId dicts, idHsWrapper, sc_binds) }
 
     make_wrapper inst_loc tvs theta Nothing 	-- Case (b)
       = do { dicts <- newDictBndrs inst_loc theta
 	   ; let dict_ids = map instToId dicts
-	   ; return (dict_ids, mkCoTyLams tvs <.> mkCoLams dict_ids, emptyBag) }
+	   ; return (dict_ids, mkWpTyLams tvs <.> mkWpLams dict_ids, emptyBag) }
 
       -----------------------
       -- 	make_coercion
@@ -548,9 +548,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 	, (tycon, tc_args) <- tcSplitTyConApp last_ty	-- Should not fail
 	, Just co_con <- newTyConCo_maybe tycon
 	, let co = mkSymCoercion (mkTyConApp co_con tc_args)
-        = ExprCoFn (mkTyConApp cls_tycon (all_tys_but_last ++ [co]))
+        = WpCo (mkTyConApp cls_tycon (all_tys_but_last ++ [co]))
         | otherwise	-- The newtype is transparent; no need for a cast
-        = idCoercion
+        = idHsWrapper
 
       -----------------------
       -- 	make_body

@@ -101,7 +101,7 @@ tcGuardedCmd :: CmdEnv -> LHsExpr Name -> CmdStack
 tcGuardedCmd env expr stk (reft, res_ty)
   = do	{ let (co, res_ty') = refineResType reft res_ty
     	; body <- tcCmd env expr (stk, res_ty')
-	; return (mkLHsCoerce co body) }
+	; return (mkLHsWrap co body) }
 
 tcCmd :: CmdEnv -> LHsExpr Name -> (CmdStack, TcTauType) -> TcM (LHsExpr TcId)
 	-- The main recursive function
@@ -264,7 +264,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		-- the s1..sm and check each cmd
 	; cmds' <- mapM (tc_cmd w_tv) cmds_w_tys
 
-	; returnM (HsArrForm (noLoc $ HsCoerce (CoTyLam w_tv) 
+	; returnM (HsArrForm (noLoc $ HsWrap (WpTyLam w_tv) 
 					       (unLoc $ mkHsDictLet inst_binds expr')) 
 			     fixity cmds')
 	}

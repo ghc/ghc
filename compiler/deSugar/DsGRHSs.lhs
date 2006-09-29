@@ -94,7 +94,7 @@ matchGuards [] ctx rhs rhs_ty
 	-- you don't get a "non-exhaustive eqns" message when the guards 
 	-- finish in "otherwise".
 	-- NB:	The success of this clause depends on the typechecker not
-	-- 	wrapping the 'otherwise' in empty HsTyApp or HsCoerce constructors
+	-- 	wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
 	--	If it does, you'll get bogus overlap warnings
 matchGuards (ExprStmt (L _ (HsVar v)) _ _ : stmts) ctx rhs rhs_ty
   |  v `hasKey` otherwiseIdKey

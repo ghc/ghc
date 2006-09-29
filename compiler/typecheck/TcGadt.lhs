@@ -16,7 +16,7 @@ module TcGadt (
 	tcUnifyTys, BindFlag(..)
   ) where
 
-import HsSyn	( ExprCoFn(..), idCoercion, isIdCoercion )
+import HsSyn	( HsWrapper(..), idHsWrapper, isIdHsWrapper )
 import Coercion	( Coercion, mkSymCoercion, mkTransCoercion, mkUnsafeCoercion,
 		  mkLeftCoercion, mkRightCoercion, mkCoKind, coercionKindPredTy,
 		  splitCoercionKind, decomposeCo, coercionKind )
@@ -62,29 +62,29 @@ emptyRefinement :: Refinement
 emptyRefinement = (Reft emptyInScopeSet emptyVarEnv)
 
 
-refineType :: Refinement -> Type -> (ExprCoFn, Type)
+refineType :: Refinement -> Type -> (HsWrapper, Type)
 -- Apply the refinement to the type.
 -- If (refineType r ty) = (co, ty')
 -- Then co :: ty:=:ty'
 refineType (Reft in_scope env) ty
   | not (isEmptyVarEnv env),		-- Common case
     any (`elemVarEnv` env) (varSetElems (tyVarsOfType ty))
-  = (ExprCoFn (substTy co_subst ty), substTy tv_subst ty)
+  = (WpCo (substTy co_subst ty), substTy tv_subst ty)
   | otherwise
-  = (idCoercion, ty)	-- The type doesn't mention any refined type variables
+  = (idHsWrapper, ty)	-- The type doesn't mention any refined type variables
   where
     tv_subst = mkTvSubst in_scope (mapVarEnv snd env)
     co_subst = mkTvSubst in_scope (mapVarEnv fst env)
  
-refineResType :: Refinement -> Type -> (ExprCoFn, Type)
+refineResType :: Refinement -> Type -> (HsWrapper, Type)
 -- Like refineType, but returns the 'sym' coercion
 -- If (refineResType r ty) = (co, ty')
 -- Then co :: ty':=:ty
 refineResType reft ty
   = case refineType reft ty of
-	(ExprCoFn co, ty1) -> (ExprCoFn (mkSymCoercion co), ty1)
-	(id_co,       ty1) -> ASSERT( isIdCoercion id_co )
-			      (idCoercion, ty1)
+	(WpCo co, ty1) -> (WpCo (mkSymCoercion co), ty1)
+	(id_co,   ty1) -> ASSERT( isIdHsWrapper id_co )
+			  (idHsWrapper, ty1)
 \end{code}
 
 
@@ -215,8 +215,8 @@ fixTvCoEnv in_scope env
       -- then use transitivity with the original coercion
       where
         (co_fn, ty') = refineType (Reft in_scope fixpt) ty
-        co1 | ExprCoFn co'' <- co_fn = mkTransCoercion co co''
-            | otherwise              = ASSERT( isIdCoercion co_fn ) co 
+        co1 | WpCo co'' <- co_fn = mkTransCoercion co co''
+            | otherwise          = ASSERT( isIdHsWrapper co_fn ) co 
 
 -----------------------------
 fixTvSubstEnv :: InScopeSet -> TvSubstEnv -> TvSubstEnv

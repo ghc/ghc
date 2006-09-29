@@ -76,7 +76,7 @@ data HsBind id
 
 	fun_matches :: MatchGroup id,	-- The payload
 
-	fun_co_fn :: ExprCoFn,	-- Coercion from the type of the MatchGroup to the type of
+	fun_co_fn :: HsWrapper,	-- Coercion from the type of the MatchGroup to the type of
 				-- the Id.  Example:
 				--	f :: Int -> forall a. a -> a
 				--	f x y = y
@@ -296,67 +296,67 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
 %************************************************************************
 
 \begin{code}
--- A ExprCoFn is an expression with a hole in it
+-- A HsWrapper is an expression with a hole in it
 -- We need coercions to have concrete form so that we can zonk them
 
-data ExprCoFn
-  = CoHole			-- The identity coercion
+data HsWrapper
+  = WpHole			-- The identity coercion
 
-  | CoCompose ExprCoFn ExprCoFn	-- (\a1..an. []) `CoCompose` (\x1..xn. [])
+  | WpCompose HsWrapper HsWrapper	-- (\a1..an. []) `WpCompose` (\x1..xn. [])
 				--	= (\a1..an \x1..xn. [])
 
-  | ExprCoFn Coercion		-- A cast:  [] `cast` co
+  | WpCo Coercion		-- A cast:  [] `cast` co
 				-- Guaranteedn not the identity coercion
 
-  | CoApp Var			-- [] x; the xi are dicts or coercions
-  | CoTyApp Type		-- [] t
-  | CoLam Id	 		-- \x. []; the xi are dicts or coercions
-  | CoTyLam TyVar 		-- \a. []
+  | WpApp Var			-- [] x; the xi are dicts or coercions
+  | WpTyApp Type		-- [] t
+  | WpLam Id	 		-- \x. []; the xi are dicts or coercions
+  | WpTyLam TyVar 		-- \a. []
 
 	-- Non-empty bindings, so that the identity coercion
-	-- is always exactly CoHole
-  | CoLet (LHsBinds Id)		-- let binds in []
+	-- is always exactly WpHole
+  | WpLet (LHsBinds Id)		-- let binds in []
 				-- (would be nicer to be core bindings)
 
-instance Outputable ExprCoFn where 
-  ppr co_fn = pprCoFn (ptext SLIT("<>")) co_fn
+instance Outputable HsWrapper where 
+  ppr co_fn = pprHsWrapper (ptext SLIT("<>")) co_fn
 
-pprCoFn :: SDoc -> ExprCoFn -> SDoc
-pprCoFn it CoHole = it
-pprCoFn it (CoCompose f1 f2) = pprCoFn (pprCoFn it f2) f1
-pprCoFn it (ExprCoFn co)     = it <+> ptext SLIT("`cast`") <+> pprParendType co
-pprCoFn it (CoApp id)    = it <+> ppr id
-pprCoFn it (CoTyApp ty)  = it <+> ptext SLIT("@") <+> pprParendType ty
-pprCoFn it (CoLam id)    = ptext SLIT("\\") <> pprBndr LambdaBind id <> dot <+> it
-pprCoFn it (CoTyLam tv)  = ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot <+> it
-pprCoFn it (CoLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
+pprHsWrapper :: SDoc -> HsWrapper -> SDoc
+pprHsWrapper it WpHole = it
+pprHsWrapper it (WpCompose f1 f2) = pprHsWrapper (pprHsWrapper it f2) f1
+pprHsWrapper it (WpCo co)     = it <+> ptext SLIT("`cast`") <+> pprParendType co
+pprHsWrapper it (WpApp id)    = it <+> ppr id
+pprHsWrapper it (WpTyApp ty)  = it <+> ptext SLIT("@") <+> pprParendType ty
+pprHsWrapper it (WpLam id)    = ptext SLIT("\\") <> pprBndr LambdaBind id <> dot <+> it
+pprHsWrapper it (WpTyLam tv)  = ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot <+> it
+pprHsWrapper it (WpLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
 
-(<.>) :: ExprCoFn -> ExprCoFn -> ExprCoFn
-CoHole <.> c = c
-c <.> CoHole = c
-c1 <.> c2    = c1 `CoCompose` c2
+(<.>) :: HsWrapper -> HsWrapper -> HsWrapper
+WpHole <.> c = c
+c <.> WpHole = c
+c1 <.> c2    = c1 `WpCompose` c2
 
-mkCoTyApps :: [Type] -> ExprCoFn
-mkCoTyApps tys = mk_co_fn CoTyApp (reverse tys)
+mkWpTyApps :: [Type] -> HsWrapper
+mkWpTyApps tys = mk_co_fn WpTyApp (reverse tys)
 
-mkCoApps :: [Id] -> ExprCoFn
-mkCoApps ids = mk_co_fn CoApp (reverse ids)
+mkWpApps :: [Id] -> HsWrapper
+mkWpApps ids = mk_co_fn WpApp (reverse ids)
 
-mkCoTyLams :: [TyVar] -> ExprCoFn
-mkCoTyLams ids = mk_co_fn CoTyLam ids
+mkWpTyLams :: [TyVar] -> HsWrapper
+mkWpTyLams ids = mk_co_fn WpTyLam ids
 
-mkCoLams :: [Id] -> ExprCoFn
-mkCoLams ids = mk_co_fn CoLam ids
+mkWpLams :: [Id] -> HsWrapper
+mkWpLams ids = mk_co_fn WpLam ids
 
-mk_co_fn :: (a -> ExprCoFn) -> [a] -> ExprCoFn
-mk_co_fn f as = foldr (CoCompose . f) CoHole as
+mk_co_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
+mk_co_fn f as = foldr (WpCompose . f) WpHole as
 
-idCoercion :: ExprCoFn
-idCoercion = CoHole
+idHsWrapper :: HsWrapper
+idHsWrapper = WpHole
 
-isIdCoercion :: ExprCoFn -> Bool
-isIdCoercion CoHole = True
-isIdCoercion other  = False
+isIdHsWrapper :: HsWrapper -> Bool
+isIdHsWrapper WpHole = True
+isIdHsWrapper other  = False
 \end{code}
 
 

@@ -512,10 +512,10 @@ zonkExpr env (HsArrForm op fixity args)
     mappM (zonkCmdTop env) args		`thenM` \ new_args ->
     returnM (HsArrForm new_op fixity new_args)
 
-zonkExpr env (HsCoerce co_fn expr)
+zonkExpr env (HsWrap co_fn expr)
   = zonkCoFn env co_fn	`thenM` \ (env1, new_co_fn) ->
     zonkExpr env1 expr	`thenM` \ new_expr ->
-    return (HsCoerce new_co_fn new_expr)
+    return (HsWrap new_co_fn new_expr)
 
 zonkExpr env other = pprPanic "zonkExpr" (ppr other)
 
@@ -530,23 +530,23 @@ zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
     returnM (HsCmdTop new_cmd new_stack_tys new_ty new_ids)
 
 -------------------------------------------------------------------------
-zonkCoFn :: ZonkEnv -> ExprCoFn -> TcM (ZonkEnv, ExprCoFn)
-zonkCoFn env CoHole = return (env, CoHole)
-zonkCoFn env (ExprCoFn co)     = do { co' <- zonkTcTypeToType env co
-				    ; return (env, ExprCoFn co') }
-zonkCoFn env (CoCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
+zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
+zonkCoFn env WpHole = return (env, WpHole)
+zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
-				    ; return (env2, CoCompose c1' c2') }
-zonkCoFn env (CoLam id)     = do { id' <- zonkIdBndr env id
+				    ; return (env2, WpCompose c1' c2') }
+zonkCoFn env (WpCo co)      = do { co' <- zonkTcTypeToType env co
+				 ; return (env, WpCo co') }
+zonkCoFn env (WpLam id)     = do { id' <- zonkIdBndr env id
 				 ; let env1 = extendZonkEnv1 env id'
-				 ; return (env1, CoLam id') }
-zonkCoFn env (CoTyLam tv)   = ASSERT( isImmutableTyVar tv )
-			      do { return (env, CoTyLam tv) }
-zonkCoFn env (CoApp id)     = do { return (env, CoApp (zonkIdOcc env id)) }
-zonkCoFn env (CoTyApp ty)   = do { ty' <- zonkTcTypeToType env ty
-				 ; return (env, CoTyApp ty') }
-zonkCoFn env (CoLet bs)     = do { (env1, bs') <- zonkRecMonoBinds env bs
-				 ; return (env1, CoLet bs') }
+				 ; return (env1, WpLam id') }
+zonkCoFn env (WpTyLam tv)   = ASSERT( isImmutableTyVar tv )
+			      do { return (env, WpTyLam tv) }
+zonkCoFn env (WpApp id)     = do { return (env, WpApp (zonkIdOcc env id)) }
+zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToType env ty
+				 ; return (env, WpTyApp ty') }
+zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkRecMonoBinds env bs
+				 ; return (env1, WpLet bs') }
 
 
 -------------------------------------------------------------------------

@@ -50,7 +50,7 @@ import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes,
  			  newTyConInstRhs, mkTopTvSubst, substTyVar, 
  			  substTys, zipTopTvSubst )
 import TcGadt           ( gadtRefine, refineType, emptyRefinement )
-import HsBinds          ( ExprCoFn(..), isIdCoercion )
+import HsBinds          ( HsWrapper(..), isIdHsWrapper )
 import Coercion         ( mkSymCoercion, mkUnsafeCoercion, isEqPred )
 import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
 			  mkTyConApp, mkTyVarTys, mkClassPred, isPredTy,
@@ -639,8 +639,8 @@ mkRecordSelId tycon field_label
 		-- and apply to (Maybe b'), to get (Maybe b)
 
         rhs = case co_fn of
-		ExprCoFn co -> Cast (Var the_arg_id) co
-		id_co	    -> ASSERT(isIdCoercion id_co) Var the_arg_id
+		WpCo co -> Cast (Var the_arg_id) co
+		id_co	    -> ASSERT(isIdHsWrapper id_co) Var the_arg_id
 
 	field_vs    = filter (not . isPredTy . idType) arg_vs 
     	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` field_vs) field_label

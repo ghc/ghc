@@ -22,7 +22,7 @@ import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
 			  LSig, Match(..), IPBind(..), Prag(..),
 			  HsType(..), LHsType, HsExplicitForAll(..), hsLTyVarNames, 
 			  isVanillaLSig, sigName, placeHolderNames, isPragLSig,
-			  LPat, GRHSs, MatchGroup(..), pprLHsBinds, mkHsCoerce,
+			  LPat, GRHSs, MatchGroup(..), pprLHsBinds, mkHsWrap,
 			  collectHsBindBinders, collectPatBinders, pprPatBind, isBangHsBind
 			)
 import TcHsSyn		( zonkId )
@@ -439,7 +439,7 @@ tcSpecPrag poly_id hs_ty inl
 	; (co_fn, lie) <- getLIE (tcSubExp (idType poly_id) spec_ty)
 	; extendLIEs lie
 	; let const_dicts = map instToId lie
-	; return (SpecPrag (mkHsCoerce co_fn (HsVar poly_id)) spec_ty const_dicts inl) }
+	; return (SpecPrag (mkHsWrap co_fn (HsVar poly_id)) spec_ty const_dicts inl) }
 	-- Most of the work of specialisation is done by 
 	-- the desugarer, guided by the SpecPrag
   

@@ -72,14 +72,14 @@ mkHsApp :: LHsExpr name -> LHsExpr name -> LHsExpr name
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp e1 e2)
 
 nlHsTyApp :: name -> [Type] -> LHsExpr name
-nlHsTyApp fun_id tys = noLoc (HsCoerce (mkCoTyApps tys) (HsVar fun_id))
+nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar fun_id))
 
-mkLHsCoerce :: ExprCoFn -> LHsExpr id -> LHsExpr id
-mkLHsCoerce co_fn (L loc e) = L loc (mkHsCoerce co_fn e)
+mkLHsWrap :: HsWrapper -> LHsExpr id -> LHsExpr id
+mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
-mkHsCoerce :: ExprCoFn -> HsExpr id -> HsExpr id
-mkHsCoerce co_fn e | isIdCoercion co_fn = e
-		   | otherwise		= HsCoerce co_fn e
+mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
+mkHsWrap co_fn e | isIdHsWrapper co_fn = e
+		 | otherwise	      = HsWrap co_fn e
 
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
@@ -224,7 +224,7 @@ nlHsFunTy a b		= noLoc (HsFunTy a b)
 mkFunBind :: Located id -> [LMatch id] -> HsBind id
 -- Not infix, with place holders for coercion and free vars
 mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False, fun_matches = mkMatchGroup ms,
-			    fun_co_fn = idCoercion, bind_fvs = placeHolderNames }
+			    fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames }
 
 
 mkVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName

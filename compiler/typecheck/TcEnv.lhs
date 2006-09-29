@@ -45,7 +45,7 @@ module TcEnv(
 
 import HsSyn		( LRuleDecl, LHsBinds, LSig, 
 			  LHsTyVarBndr, HsTyVarBndr(..), pprLHsBinds,
-		 	  idCoercion, (<.>) )
+		 	  idHsWrapper, (<.>) )
 import TcIface		( tcImportDecl )
 import IfaceEnv		( newGlobalBinder )
 import TcRnMonad
@@ -326,7 +326,7 @@ tcExtendIdEnv2 names_w_ids thing_inside
 					       tct_level = th_lvl,
 					       tct_type = id_ty, 
 					       tct_co = if isRefineableTy id_ty 
-							then Just idCoercion
+							then Just idHsWrapper
 							else Nothing })
 			      | (name,id) <- names_w_ids, let id_ty = idType id]
 	le'		    = extendNameEnvList (tcl_env env) extra_env

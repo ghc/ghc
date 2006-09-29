@@ -15,7 +15,7 @@ import HsLit		( HsLit(..), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
 import HsImpExp		( isOperator, pprHsVar )
 import HsBinds		( HsLocalBinds, DictBinds, isEmptyLocalBinds,
-			  ExprCoFn, pprCoFn )
+			  HsWrapper, pprHsWrapper )
 
 -- others:
 import Type		( Type, pprParendType )
@@ -240,7 +240,7 @@ The renamer translates them into the Right Thing.
 Everything from here on appears only in typechecker output.
 
 \begin{code}
-  |  HsCoerce	ExprCoFn 	-- TRANSLATION
+  |  HsWrap	HsWrapper 	-- TRANSLATION
 		(HsExpr id)
 
 type PendingSplice = (Name, LHsExpr Id)	-- Typechecked splices, waiting to be 
@@ -380,7 +380,7 @@ ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
 ppr_expr (HsSCC lbl expr)
   = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ftext lbl), pprParendExpr expr ]
 
-ppr_expr (HsCoerce co_fn e) = pprCoFn (ppr_expr e) co_fn
+ppr_expr (HsWrap co_fn e) = pprHsWrapper (ppr_expr e) co_fn
 ppr_expr (HsType id)	    = ppr id
 
 ppr_expr (HsSpliceE s)       = pprSplice s

@@ -21,8 +21,8 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyType )
-import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, mkCoTyApps,
-			  ExprCoFn(..), (<.>), nlHsTyApp, emptyLHsBinds )
+import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, mkWpTyApps,
+			  HsWrapper(..), (<.>), nlHsTyApp, emptyLHsBinds )
 import TcHsSyn		( mkHsApp )
 
 import TcRnMonad
@@ -1924,8 +1924,8 @@ addSCs is_loop avails dict
       | is_given sc_dict 	   = return avails
       | otherwise		   = addSCs is_loop avails' sc_dict
       where
-	sc_sel_rhs = L (instSpan dict) (HsCoerce co_fn (HsVar sc_sel))
-	co_fn	   = CoApp (instToId dict) <.> mkCoTyApps tys
+	sc_sel_rhs = L (instSpan dict) (HsWrap co_fn (HsVar sc_sel))
+	co_fn	   = WpApp (instToId dict) <.> mkWpTyApps tys
 	avails'    = addToFM avails sc_dict (Rhs sc_sel_rhs [dict])
 
     is_given :: Inst -> Bool

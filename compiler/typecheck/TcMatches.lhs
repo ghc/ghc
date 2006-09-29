@@ -18,10 +18,10 @@ import HsSyn		( HsExpr(..), LHsExpr, MatchGroup(..),
 			  Match(..), LMatch, GRHSs(..), GRHS(..), 
 			  Stmt(..), LStmt, HsMatchContext(..),
 			  HsStmtContext(..), 
-			  pprMatch, isIrrefutableHsPat, mkHsCoerce,
-			  mkLHsCoerce, pprMatchContext, pprStmtContext,  
+			  pprMatch, isIrrefutableHsPat, mkHsWrap,
+			  mkLHsWrap, pprMatchContext, pprStmtContext,  
 			  noSyntaxExpr, matchGroupArity, pprMatches,
-			  ExprCoFn )
+			  HsWrapper )
 
 import TcRnMonad
 import TcGadt		( Refinement, emptyRefinement, refineResType )
@@ -61,7 +61,7 @@ same number of arguments before using @tcMatches@ to do the work.
 tcMatchesFun :: Name
 	     -> MatchGroup Name
 	     -> BoxyRhoType 		-- Expected type of function
-	     -> TcM (ExprCoFn, MatchGroup TcId)	-- Returns type of body
+	     -> TcM (HsWrapper, MatchGroup TcId)	-- Returns type of body
 
 tcMatchesFun fun_name matches exp_ty
   = do	{  -- Check that they all have the same no of arguments
@@ -102,7 +102,7 @@ tcMatchesCase :: TcMatchCtxt		-- Case context
 tcMatchesCase ctxt scrut_ty matches res_ty
   = tcMatches ctxt [scrut_ty] res_ty matches
 
-tcMatchLambda :: MatchGroup Name -> BoxyRhoType -> TcM (ExprCoFn, MatchGroup TcId)
+tcMatchLambda :: MatchGroup Name -> BoxyRhoType -> TcM (HsWrapper, MatchGroup TcId)
 tcMatchLambda match res_ty 
   = subFunTys doc n_pats res_ty 	$ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
@@ -260,7 +260,7 @@ tcBody body (reft, res_ty)
   = do	{ traceTc (text "tcBody" <+> ppr res_ty <+> ppr reft)
 	; let (co, res_ty') = refineResType reft res_ty
 	; body' <- tcPolyExpr body res_ty'
-	; return (mkLHsCoerce co body') } 
+	; return (mkLHsWrap co body') } 
 \end{code}
 
 
@@ -477,7 +477,7 @@ tcMDoStmt tc_rhs ctxt (RecStmt stmts laterNames recNames _ _) res_ty thing_insid
 		-- poly_id may have a polymorphic type
 		-- but mono_ty is just a monomorphic type variable
 	     ; co_fn <- tcSubExp (idType poly_id) mono_ty
-	     ; return (mkHsCoerce co_fn (HsVar poly_id)) }
+	     ; return (mkHsWrap co_fn (HsVar poly_id)) }
 
 tcMDoStmt tc_rhs ctxt stmt res_ty thing_inside
   = pprPanic "tcMDoStmt: unexpected Stmt" (ppr stmt)
