@@ -723,6 +723,7 @@ GHC_SPLIT_DIR_ABS	= $(FPTOOLS_TOP_ABS)/$(GHC_SPLIT_DIR_REL)
 #      xxx		the executable relative to the current dir
 
 GHC_UNLIT_PGM		= unlit$(exeext)
+GHC_HP2PS_PGM		= hp2ps
 GHC_HSTAGS_PGM		= hasktags
 GHC_HSC2HS_INPLACE_PGM	= hsc2hs-inplace
 GHC_TOUCHY_PGM		= touchy$(exeext)
@@ -747,6 +748,7 @@ GHC_PERL		= $(PERL)
 endif
 
 UNLIT			= $(GHC_UNLIT_DIR)/$(GHC_UNLIT_PGM)
+HP2PS			= $(GHC_HP2PS_DIR)/$(GHC_HP2PS_PGM)
 HSTAGS			= $(GHC_HSTAGS_DIR)/$(GHC_HSTAGS_PGM)
 HSC2HS_INPLACE		= $(GHC_HSC2HS_DIR)/$(GHC_HSC2HS_INPLACE_PGM)
 MANGLER			= $(GHC_MANGLER_DIR)/$(GHC_MANGLER_PGM)
