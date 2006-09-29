@@ -762,16 +762,21 @@ exprIsConApp_maybe (Cast expr co)
 	-- The left-hand one must be a T, because exprIsConApp returned True
 	-- but the right-hand one might not be.  (Though it usually will.)
 
-    let (from_ty, to_ty)	    = coercionKind co
-	(from_tc, _from_tc_arg_tys) = splitTyConApp from_ty
+    let (from_ty, to_ty)	   = coercionKind co
+	(from_tc, from_tc_arg_tys) = splitTyConApp from_ty
   		-- The inner one must be a TyConApp
     in
-    ASSERT( from_tc == dataConTyCon dc )
-
     case splitTyConApp_maybe to_ty of {
 	Nothing -> Nothing ;
-	Just (to_tc, _to_tc_arg_tys) | from_tc /= to_tc  -> Nothing
-	 		    	     | otherwise  ->
+	Just (to_tc, to_tc_arg_tys) 
+		| from_tc /= to_tc -> Nothing
+		-- These two Nothing cases are possible; we might see 
+		--	(C x y) `cast` (g :: T a ~ S [a]),
+		-- where S is a type function.  In fact, exprIsConApp
+		-- will probably not be called in such circumstances,
+		-- but there't nothing wrong with it 
+
+	 	| otherwise  ->
     let
 	tc_arity = tyConArity from_tc
 
@@ -804,10 +809,12 @@ exprIsConApp_maybe (Cast expr co)
 
     in
     ASSERT( length univ_args == tc_arity )
+    ASSERT( from_tc == dataConTyCon dc )
+    ASSERT( and (zipWith coreEqType [t | Type t <- univ_args] from_tc_arg_tys) )
     ASSERT( all isTypeArg (univ_args ++ ex_args) )
     ASSERT2( equalLength val_args arg_tys, ppr dc $$ ppr dc_tyvars $$ ppr dc_ex_tyvars $$ ppr arg_tys $$ ppr dc_args $$ ppr univ_args $$ ppr ex_args $$ ppr val_args $$ ppr arg_tys  )
 
-    Just (dc, univ_args ++ ex_args ++ new_co_args ++ new_val_args)
+    Just (dc, map Type to_tc_arg_tys ++ ex_args ++ new_co_args ++ new_val_args)
     }}
 
 exprIsConApp_maybe (Note _ expr)
