@@ -384,21 +384,22 @@ pprIfaceExpr add_par e@(IfaceLam _ _)
     collect bs (IfaceLam b e) = collect (b:bs) e
     collect bs e              = (reverse bs, e)
 
--- gaw 2004 
 pprIfaceExpr add_par (IfaceCase scrut bndr ty [(con, bs, rhs)])
--- gaw 2004
-  = add_par (sep [ptext SLIT("case") <+> char '@' <+> pprParendIfaceType ty <+> pprIfaceExpr noParens scrut <+> ptext SLIT("of") 
+  = add_par (sep [ptext SLIT("case") <+> char '@' <+> pprParendIfaceType ty
+			<+> pprIfaceExpr noParens scrut <+> ptext SLIT("of") 
 			<+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
   		  pprIfaceExpr noParens rhs <+> char '}'])
 
--- gaw 2004
 pprIfaceExpr add_par (IfaceCase scrut bndr ty alts)
--- gaw 2004
-  = add_par (sep [ptext SLIT("case") <+> char '@' <+> pprParendIfaceType ty <+> pprIfaceExpr noParens scrut <+> ptext SLIT("of") 
+  = add_par (sep [ptext SLIT("case") <+> char '@' <+> pprParendIfaceType ty
+		 	<+> pprIfaceExpr noParens scrut <+> ptext SLIT("of") 
 			<+> ppr bndr <+> char '{',
   		  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
-pprIfaceExpr add_par (IfaceCast expr co) = add_par (ptext SLIT("cast") <+> ppr expr <+> ppr co)
+pprIfaceExpr add_par (IfaceCast expr co)
+  = sep [pprIfaceExpr parens expr,
+	 nest 2 (ptext SLIT("`cast`")),
+	 pprParendIfaceType co]
 
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
   = add_par (sep [ptext SLIT("let {"), 
