@@ -252,6 +252,7 @@ nmergeIO lss
 -- Bound Threads
 
 {- $boundthreads
+   #boundthreads#
 
 Support for multiple operating system threads and bound threads as described
 below is currently only available in the GHC runtime system if you use the
@@ -435,7 +436,7 @@ runInUnboundThread action = do
       worker OS threads.  If you need control over which particular OS
       thread is used to run a given Haskell thread, perhaps because
       you need to call a foreign library that uses OS-thread-local
-      state, then you need "bound threads" (see above).
+      state, then you need bound threads (see "Control.Concurrent#boundthreads").
 
       If you don't use the @-threaded@ option, then the runtime does
       not make use of multiple OS threads.  Foreign calls will block
