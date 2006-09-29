@@ -549,7 +549,7 @@ ppHtmlModule odir doctitle
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> HtmlTable
 ifaceToHtml maybe_source_url maybe_wiki_url iface
-  = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: bdy)
+  = abovesSep s15 (contents ++ description: synopsis: maybe_doc_hdr: bdy)
   where
     docMap = ifaceRnDocMap iface
  
@@ -562,7 +562,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
 
     no_doc_at_all = not (any has_doc exports)
 
-    contents = td << vanillaTable << ppModuleContents exports
+	contents = td << vanillaTable << ppModuleContents exports
 
     description
           = case ifaceRnDoc iface of
@@ -593,11 +593,11 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
     linksInfo = (maybe_source_url, maybe_wiki_url, iface)
 
 
-ppModuleContents :: [ExportItem DocName] -> HtmlTable
+ppModuleContents :: [ExportItem] -> HtmlTable
 ppModuleContents exports
-  | length sections == 0 = Html.emptyTable
-  | otherwise            = tda [theclass "section4"] << bold << toHtml "Contents"
-  		           </> td << dlist << concatHtml sections
+  | length sections == 0 = Nothing
+  | otherwise            = Just (tda [theclass "section4"] << bold << toHtml "Contents"
+  		                 </> td << dlist << concatHtml sections)
  where
   (sections, _leftovers{-should be []-}) = process 0 exports
 
