@@ -720,7 +720,7 @@ all :: $(odir)/ghc-inplace ghc-inplace
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 #	MSys (...and cygwin with a mingw toolchain)
-SCRIPT_SHELL = $(shell cd /bin; pwd -W 2>/dev/null | echo "/bin")/sh
+SCRIPT_SHELL = $(shell cd /bin; pwd -W 2>/dev/null || echo "/bin")/sh
 else
 #	Cygwin and Unix
 SCRIPT_SHELL = /bin/sh
