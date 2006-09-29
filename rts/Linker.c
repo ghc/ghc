@@ -2492,14 +2492,14 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    + sym->Value);
          } else {
             copyName ( sym->Name, strtab, symbol, 1000-1 );
-            (void*)S = lookupLocalSymbol( oc, symbol );
+            S = (UInt32) lookupLocalSymbol( oc, symbol );
             if ((void*)S != NULL) goto foundit;
-            (void*)S = lookupSymbol( symbol );
+            S = (UInt32) lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
             zapTrailingAtSign ( symbol );
-            (void*)S = lookupLocalSymbol( oc, symbol );
+            S = (UInt32) lookupLocalSymbol( oc, symbol );
             if ((void*)S != NULL) goto foundit;
-            (void*)S = lookupSymbol( symbol );
+            S = (UInt32) lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
 	    /* Newline first because the interactive linker has printed "linking..." */
             errorBelch("\n%s: unknown symbol `%s'", oc->fileName, symbol);
