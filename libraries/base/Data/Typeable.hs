@@ -164,6 +164,7 @@ data TyCon = TyCon !Key String
 
 instance Eq TyCon where
   (TyCon t1 _) == (TyCon t2 _) = t1 == t2
+#endif
 
 -- | Returns a unique integer associated with a 'TypeRep'.  This can
 -- be used for making a mapping ('Data.IntMap.IntMap') with TypeReps
@@ -177,7 +178,6 @@ instance Eq TyCon where
 --
 typeRepKey :: TypeRep -> IO Int
 typeRepKey (TypeRep (Key i) _ _) = return i
-#endif
 
 	-- 
 	-- let fTy = mkTyCon "Foo" in show (mkTyConApp (mkTyCon ",,")
