@@ -22,10 +22,13 @@
       </listitem>
       <listitem>
         <para>
-	  There are significant changes to the way scoped type variables work;
-	  see  <xref linkend="scoped-type-variables" />.
+	  There are significant changes to the way scoped type variables work,
+	  and some programs that used to compile may no longer do so.
+	  The new story is documented in  <xref linkend="scoped-type-variables" />.
           (<ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
-          gives some background.)
+          gives some background, but the user manual should be complete (tell
+          us if not), and
+          certainly takes precedence if there is any conflict.)
         </para>
       </listitem>
       <listitem>
