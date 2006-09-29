@@ -21,11 +21,8 @@ static void TitleOutlineBox PROTO((void)); /* forward */
 static void BigTitleText PROTO((void)); /* forward */
 static void TitleText PROTO((void)); /* forward */
 
-void
-PutPsFile()
+static void DoTitleAndBox()
 {
-    Prologue();
-    Variables();
     BorderOutlineBox();
 
     if (bflag) {
@@ -35,12 +32,35 @@ PutPsFile()
 	TitleOutlineBox();
 	TitleText();
     }
+}
+
+static void Landscape PROTO((void));			/* forward */
+static void Portrait  PROTO((void));			/* forward */
+
+void NextPage() {
+    fprintf(psfp, "showpage\n");
+    if (gflag) Portrait(); else Landscape();
+    DoTitleAndBox();
+}
+
+void
+PutPsFile()
+{
+    Prologue();
+    Variables();
 
     CurvesInit();
 
+    DoTitleAndBox();
+
+    if (multipageflag) {
+      Key(); // print multi-page key even if there are more than 20 bands 
+      NextPage();
+    }
+
     Axes();
 
-    if (TWENTY) Key();
+    if (!multipageflag && (TWENTY != 0)) Key();
 
     Curves();
 
@@ -52,8 +72,6 @@ PutPsFile()
 
 static void StandardSpecialComments PROTO((void));	/* forward */
 static void EPSFSpecialComments PROTO((floatish));	/* forward */
-static void Landscape PROTO((void));			/* forward */
-static void Portrait  PROTO((void));			/* forward */
 static void Scaling   PROTO((floatish));		/* forward */
 
 static void

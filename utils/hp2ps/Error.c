@@ -47,6 +47,7 @@ Usage(str)
    printf("      -ef[in|mm|pt] produce Encapsulated PostScript f units wide (f > 2 inches)\n");
    printf("      -g  produce output suitable for GHOSTSCRIPT previever\n");
    printf("      -i[+|-] sort by identifier string (-i+ gives greatest on top) \n"); 
+   printf("      -M  multi-page output (key separate from graph)\n");
    printf("      -mn print maximum of n bands (default & max 20)\n");
    printf("          -m0 removes the band limit altogether\n");
    printf("      -p  use previous scaling, shading and ordering\n");

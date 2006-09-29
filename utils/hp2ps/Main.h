@@ -64,6 +64,8 @@ extern int     mflag;
 extern boolish tflag;
 extern boolish cflag;
 
+extern boolish multipageflag;
+
 extern char *programname;
 
 extern char *hpfile;

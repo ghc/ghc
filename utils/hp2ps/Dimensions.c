@@ -51,7 +51,8 @@ Dimensions()
 	titleheight = TITLE_HEIGHT;
     } 
 
-    graphwidth  = titlewidth - graphx0 - (TWENTY ? KeyWidth() : 0);
+    boolish keyOnGraph = !multipageflag && TWENTY != 0;
+    graphwidth  = titlewidth - graphx0 - (keyOnGraph ? KeyWidth() : 0);
     graphheight = borderheight - titleheight - (2 * borderspace) - graphy0;
 }
 

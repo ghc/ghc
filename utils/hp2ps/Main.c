@@ -17,7 +17,7 @@
 #include "Utilities.h"
 
 boolish pflag = 0;	/* read auxiliary file			*/
-boolish eflag = 0;	/* scaled EPSF 				*/ 
+boolish eflag = 0;	/* scaled EPSF 				*/
 boolish dflag = 0;	/* sort by standard deviation		*/
 int     iflag = 0;	/* sort by identifier (3-way flag)      */
 boolish gflag = 0;	/* output suitable for previewer	*/
@@ -29,6 +29,7 @@ boolish tflag = 0;	/* ignored threshold specified          */
 boolish cflag = 0;      /* colour output                        */
 
 boolish filter;		/* true when running as a filter	*/
+boolish multipageflag = 0;  /* true when the output should be 2 pages - key and profile */ 
 
 static floatish WidthInPoints PROTO((char *));		  /* forward */
 static FILE *Fp PROTO((char *, char **, char *, char *)); /* forward */
@@ -107,9 +108,13 @@ char* argv[];
 	    case 'm':
 		mflag++;
 		TWENTY = atoi(*argv + 1);
-		if (TWENTY > DEFAULT_TWENTY)
-		    Usage(*argv-1);
+		// only 20 keys fit on a page
+		if (TWENTY > DEFAULT_TWENTY) 
+		   multipageflag++;
 		goto nextarg;
+	    case 'M':
+	        multipageflag++;
+                goto nextarg;
 	    case 't':
 		tflag++;
 		THRESHOLD_PERCENT = (floatish) atof(*argv + 1);
@@ -161,7 +166,8 @@ nextarg: ;
 
     if (pflag) Reorder();    /* ReOrders on aux file */
 
-    if (TWENTY) TopTwenty(); /* Selects top twenty (mflag) */
+    /* Selects top bands (mflag) - can be more than 20 now */
+    if (TWENTY != 0) TopTwenty(); 
 
     Dimensions();
 

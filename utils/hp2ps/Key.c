@@ -5,6 +5,7 @@
 #include "Dimensions.h"
 #include "HpFile.h"
 #include "Shade.h"
+#include "PsFile.h"
 
 /* own stuff */
 #include "Key.h"
@@ -20,12 +21,18 @@ void Key()
     for (i = 0; i < nidents; i++)    /* count identifiers */ 
 	;
 
-    c  = graphy0;
-    dc = graphheight / (floatish) (i + 1);
+    c  = multipageflag ? 0 : graphy0;
+    dc = graphheight / (floatish) ((i <= 20) ? (i + 1) : 20);
 
     for (i = 0; i < nidents; i++) {
 	c += dc;
 	KeyEntry(c, identtable[i]->name, ShadeOf(identtable[i]->name));
+        // if we have spit out 20 entries and we're going to output more
+        // advance the page
+	if (i % DEFAULT_TWENTY == (DEFAULT_TWENTY - 1) && i != nidents - 1) {
+	  c = 0;
+	  NextPage();
+	}
     }
 }
 
@@ -42,7 +49,7 @@ KeyEntry(centreline, name, colour)
     namebase = centreline - (floatish) (NORMAL_FONT / 2);
     keyboxbase = centreline - ((floatish) KEY_BOX_WIDTH / 2.0);
 
-    kstart = graphx0 + graphwidth;
+    kstart = graphx0 + (multipageflag ? 0 : graphwidth);
 
     fprintf(psfp, "%f %f moveto\n", kstart + borderspace, keyboxbase);
     fprintf(psfp, "0 %d rlineto\n", KEY_BOX_WIDTH);

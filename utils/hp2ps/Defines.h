@@ -10,7 +10,7 @@
 extern floatish _thresh_;
 
 #define TWENTY 		  _twenty_ /* show top 20 bands, grouping excess     */
-#define DEFAULT_TWENTY		20 /* this is default and absolute maximum   */
+#define DEFAULT_TWENTY		20 /* this is default and maximum per page   */
 extern int _twenty_;
 
 #define LARGE_FONT	        12  /* Helvetica 12pt 			     */
