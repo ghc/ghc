@@ -58,7 +58,8 @@ import Config
 import StaticFlags	( opt_IgnoreDotGhci )
 import Linker		( showLinkerState, linkPackages )
 import Util		( removeSpaces, handle, global, toArgs,
-			  looksLikeModuleName, prefixMatch, sortLe )
+			  looksLikeModuleName, prefixMatch, sortLe,
+			  joinFileName )
 
 #ifndef mingw32_HOST_OS
 import System.Posix
@@ -68,6 +69,7 @@ import System.Posix
 #else
 import GHC.ConsoleHandler ( flushConsole )
 import System.Win32	  ( setConsoleCP, setConsoleOutputCP )
+import qualified System.Win32
 #endif
 
 #ifdef USE_READLINE
@@ -266,9 +268,8 @@ jumpFunction session@(Session ref) (I# idsPtr) hValues location b
 findEditor = do
   getEnv "EDITOR" 
     `IO.catch` \_ -> do
-#if 0
-	-- ToDo: mingw32_HOST_OS
-	win <- getWindowsDirectory
+#if mingw32_HOST_OS
+	win <- System.Win32.getWindowsDirectory
 	return (win `joinFileName` "notepad.exe")
 #else
 	return ""
