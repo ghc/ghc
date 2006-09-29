@@ -600,18 +600,29 @@ tcSubExp :: BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
 tcSubExp actual_ty expected_ty
   = -- addErrCtxtM (unifyCtxt actual_ty expected_ty) $
     -- Adding the error context here leads to some very confusing error
-    -- messages, such as "can't match foarall a. a->a with forall a. a->a"
-    -- So instead I'm adding it when moving from tc_sub to u_tys
+    -- messages, such as "can't match forall a. a->a with forall a. a->a"
+    -- Example is tcfail165: 
+    --	    do var <- newEmptyMVar :: IO (MVar (forall a. Show a => a -> String))
+    --         putMVar var (show :: forall a. Show a => a -> String)
+    -- Here the info does not flow from the 'var' arg of putMVar to its 'show' arg
+    -- but after zonking it looks as if it does!
+    --
+    -- So instead I'm adding the error context when moving from tc_sub to u_tys
+
     traceTc (text "tcSubExp" <+> ppr actual_ty <+> ppr expected_ty) >>
-    tc_sub Nothing actual_ty actual_ty False expected_ty expected_ty
+    tc_sub SubOther actual_ty actual_ty False expected_ty expected_ty
 
 tcFunResTy :: Name -> BoxySigmaType -> BoxySigmaType -> TcM ExprCoFn	-- Locally used only
 tcFunResTy fun actual_ty expected_ty
   = traceTc (text "tcFunResTy" <+> ppr actual_ty <+> ppr expected_ty) >>
-    tc_sub (Just fun) actual_ty actual_ty False expected_ty expected_ty
+    tc_sub (SubFun fun) actual_ty actual_ty False expected_ty expected_ty
 		   
 -----------------
-tc_sub :: Maybe Name		-- Just fun => we're looking at a function result type
+data SubCtxt = SubDone 		-- Error-context already pushed
+	     | SubFun Name 	-- Context is tcFunResTy
+	     | SubOther		-- Context is something else
+
+tc_sub :: SubCtxt		-- How to add an error-context
        -> BoxySigmaType		-- actual_ty, before expanding synonyms
        -> BoxySigmaType		-- 		..and after
        -> InBox			-- True <=> expected_ty is inside a box
@@ -625,22 +636,22 @@ tc_sub :: Maybe Name		-- Just fun => we're looking at a function result type
 -- This invariant is needed so that we can "see" the foralls, ad
 -- e.g. in the SPEC rule where we just use splitSigmaTy 
 	
-tc_sub mb_fun act_sty act_ty exp_ib exp_sty exp_ty
-  = tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
+tc_sub sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+  = tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
 	-- This indirection is just here to make 
 	-- it easy to insert a debug trace!
 
-tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
-  | Just exp_ty' <- tcView exp_ty = tc_sub mb_fun act_sty act_ty exp_ib exp_sty exp_ty'
-tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
-  | Just act_ty' <- tcView act_ty = tc_sub mb_fun act_sty act_ty' exp_ib exp_sty exp_ty
+tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+  | Just exp_ty' <- tcView exp_ty = tc_sub sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty'
+tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+  | Just act_ty' <- tcView act_ty = tc_sub sub_ctxt act_sty act_ty' exp_ib exp_sty exp_ty
 
 -----------------------------------
 -- Rule SBOXY, plus other cases when act_ty is a type variable
 -- Just defer to boxy matching
 -- This rule takes precedence over SKOL!
-tc_sub1 mb_fun act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
-  = do	{ addErrCtxtM (subCtxt mb_fun act_sty exp_sty) $
+tc_sub1 sub_ctxt act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
+  = do	{ addSubCtxt sub_ctxt act_sty exp_sty $
 	  uVar True False tv exp_ib exp_sty exp_ty
 	; return idCoercion }
 
@@ -655,11 +666,11 @@ tc_sub1 mb_fun act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
 --	     g :: Ord b => b->b
 -- Consider  f g !
 
-tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
+tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
   | not exp_ib, 	-- SKOL does not apply if exp_ty is inside a box
     isSigmaTy exp_ty	
   = do	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ body_exp_ty ->
-			     tc_sub mb_fun act_sty act_ty False body_exp_ty body_exp_ty
+			     tc_sub sub_ctxt act_sty act_ty False body_exp_ty body_exp_ty
 	; return (gen_fn <.> co_fn) }
   where
     act_tvs = tyVarsOfType act_ty
@@ -672,7 +683,7 @@ tc_sub1 mb_fun act_sty act_ty exp_ib exp_sty exp_ty
 --	expected_ty: Int -> Int
 --	co_fn e =    e Int dOrdInt
 
-tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
+tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
 -- Implements the new SPEC rule in the Appendix of the paper
 -- "Boxy types: inference for higher rank types and impredicativity"
 -- (This appendix isn't in the published version.)
@@ -698,7 +709,7 @@ tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
 	; traceTc (text "tc_sub_spec" <+> vcat [ppr actual_ty, 
 						ppr tyvars <+> ppr theta <+> ppr tau,
 						ppr tau'])
-	; co_fn2 <- tc_sub mb_fun tau' tau' exp_ib exp_sty expected_ty
+	; co_fn2 <- tc_sub sub_ctxt tau' tau' exp_ib exp_sty expected_ty
 
 		-- Deal with the dictionaries
 	; co_fn1 <- instCall InstSigOrigin inst_tys (substTheta subst' theta)
@@ -706,33 +717,35 @@ tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
 
 -----------------------------------
 -- Function case (rule F1)
-tc_sub1 mb_fun _ (FunTy act_arg act_res) exp_ib _ (FunTy exp_arg exp_res)
-  = tc_sub_funs mb_fun act_arg act_res exp_ib exp_arg exp_res
+tc_sub1 sub_ctxt act_sty (FunTy act_arg act_res) exp_ib exp_sty (FunTy exp_arg exp_res)
+  = addSubCtxt sub_ctxt act_sty exp_sty $
+    tc_sub_funs act_arg act_res exp_ib exp_arg exp_res
 
 -- Function case (rule F2)
-tc_sub1 mb_fun act_sty act_ty@(FunTy act_arg act_res) _ exp_sty (TyVarTy exp_tv)
+tc_sub1 sub_ctxt act_sty act_ty@(FunTy act_arg act_res) _ exp_sty (TyVarTy exp_tv)
   | isBoxyTyVar exp_tv
-  = do	{ cts <- readMetaTyVar exp_tv
+  = addSubCtxt sub_ctxt act_sty exp_sty $
+    do	{ cts <- readMetaTyVar exp_tv
 	; case cts of
-	    Indirect ty -> tc_sub mb_fun act_sty act_ty True exp_sty ty
+	    Indirect ty -> tc_sub SubDone act_sty act_ty True exp_sty ty
 	    Flexi       -> do { [arg_ty,res_ty] <- withMetaTvs exp_tv fun_kinds mk_res_ty
- 			      ; tc_sub_funs mb_fun act_arg act_res True arg_ty res_ty } }
+ 			      ; tc_sub_funs act_arg act_res True arg_ty res_ty } }
  where
     mk_res_ty [arg_ty', res_ty'] = mkFunTy arg_ty' res_ty'
     mk_res_ty other = panic "TcUnify.mk_res_ty3"
     fun_kinds = [argTypeKind, openTypeKind]
 
 -- Everything else: defer to boxy matching
-tc_sub1 mb_fun act_sty actual_ty exp_ib exp_sty expected_ty
-  = do	{ addErrCtxtM (subCtxt mb_fun act_sty exp_sty) $
+tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
+  = do	{ addSubCtxt sub_ctxt act_sty exp_sty $
 	  u_tys True False act_sty actual_ty exp_ib exp_sty expected_ty
 	; return idCoercion }
 
 
 -----------------------------------
-tc_sub_funs mb_fun act_arg act_res exp_ib exp_arg exp_res
+tc_sub_funs act_arg act_res exp_ib exp_arg exp_res
   = do	{ uTys False act_arg exp_ib exp_arg
-	; co_fn_res <- tc_sub mb_fun act_res act_res exp_ib exp_res exp_res
+	; co_fn_res <- tc_sub SubDone act_res act_res exp_ib exp_res exp_res
 	; wrapFunResCoercion [exp_arg] co_fn_res }
 
 -----------------------------------
@@ -1477,25 +1490,28 @@ mkExpectedActualMsg act_ty exp_ty
 ----------------
 -- If an error happens we try to figure out whether the function
 -- function has been given too many or too few arguments, and say so.
-subCtxt mb_fun actual_res_ty expected_res_ty tidy_env
-  = do	{ exp_ty' <- zonkTcType expected_res_ty
-	; act_ty' <- zonkTcType actual_res_ty
-	; let
-	      (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
-	      (env2, act_ty'') = tidyOpenType env1     act_ty'
-	      (exp_args, _)    = tcSplitFunTys exp_ty''
-	      (act_args, _)    = tcSplitFunTys act_ty''
-	
-	      len_act_args     = length act_args
-	      len_exp_args     = length exp_args
-
-	      message = case mb_fun of
-			  Just fun | len_exp_args < len_act_args -> wrongArgsCtxt "too few"  fun
-			           | len_exp_args > len_act_args -> wrongArgsCtxt "too many" fun
-			  other -> mkExpectedActualMsg act_ty'' exp_ty''
-	; return (env2, message) }
-
+addSubCtxt SubDone actual_res_ty expected_res_ty thing_inside
+  = thing_inside
+addSubCtxt sub_ctxt actual_res_ty expected_res_ty thing_inside
+  = addErrCtxtM mk_err thing_inside
   where
+    mk_err tidy_env
+      = do { exp_ty' <- zonkTcType expected_res_ty
+	   ; act_ty' <- zonkTcType actual_res_ty
+	   ; let (env1, exp_ty'') = tidyOpenType tidy_env exp_ty'
+	         (env2, act_ty'') = tidyOpenType env1     act_ty'
+	         (exp_args, _)    = tcSplitFunTys exp_ty''
+	         (act_args, _)    = tcSplitFunTys act_ty''
+	
+	         len_act_args     = length act_args
+	         len_exp_args     = length exp_args
+
+	         message = case sub_ctxt of
+	   		  SubFun fun | len_exp_args < len_act_args -> wrongArgsCtxt "too few"  fun
+	   		             | len_exp_args > len_act_args -> wrongArgsCtxt "too many" fun
+	   		  other -> mkExpectedActualMsg act_ty'' exp_ty''
+	   ; return (env2, message) }
+
     wrongArgsCtxt too_many_or_few fun
       = ptext SLIT("Probable cause:") <+> quotes (ppr fun)
 	<+> ptext SLIT("is applied to") <+> text too_many_or_few 
