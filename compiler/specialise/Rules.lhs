@@ -48,7 +48,7 @@ import FastString
 import Maybes		( isJust, orElse )
 import OrdList
 import Bag
-import Util		( singleton, mapAccumL )
+import Util		( singleton )
 import List		( isPrefixOf )
 \end{code}
 
@@ -430,52 +430,6 @@ match menv subst e1 (Var v2)
 	-- Notice that we look up v2 in the in-scope set
 	-- See Note [Lookup in-scope]
 
-match menv subst (Lit lit1) (Lit lit2)
-  | lit1 == lit2
-  = Just subst
-
-match menv subst (App f1 a1) (App f2 a2)
-  = do 	{ subst' <- match menv subst f1 f2
-	; match menv subst' a1 a2 }
-
-match menv subst (Lam x1 e1) (Lam x2 e2)
-  = match menv' subst e1 e2
-  where
-    menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
-
--- This rule does eta expansion
---		(\x.M)  ~  N 	iff	M  ~  N x
-match menv subst (Lam x1 e1) e2
-  = match menv' subst e1 (App e2 (varToCoreExpr new_x))
-  where
-    (rn_env', new_x) = rnBndrL (me_env menv) x1
-    menv' = menv { me_env = rn_env' }
-
--- Eta expansion the other way
---	M  ~  (\y.N)	iff   M	y     ~  N
-match menv subst e1 (Lam x2 e2)
-  = match menv' subst (App e1 (varToCoreExpr new_x)) e2
-  where
-    (rn_env', new_x) = rnBndrR (me_env menv) x2
-    menv' = menv { me_env = rn_env' }
-
-match menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
-  = do	{ subst1 <- match_ty menv subst ty1 ty2
-	; subst2 <- match menv subst1 e1 e2
-	; let menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
-	; match_alts menv' subst2 alts1 alts2	-- Alts are both sorted
-	}
-
-match menv subst (Type ty1) (Type ty2)
-  = match_ty menv subst ty1 ty2
-
-match menv subst (Cast e1 co1) (Cast e2 co2)
-  | (from1, to1) <- coercionKind co1
-  , (from2, to2) <- coercionKind co2
-  = do	{ subst1 <- match_ty menv subst  to1   to2
-	; subst2 <- match_ty menv subst1 from1 from2
-	; match menv subst2 e1 e2 }
-
 -- Matching a let-expression.  Consider
 --	RULE forall x.  f (g x) = <rhs>
 -- and target expression
@@ -508,6 +462,58 @@ match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
     locally_bound x = inRnEnvR rn_env x
     rn_env' = extendRnInScopeList rn_env bndrs
 
+match menv subst (Lit lit1) (Lit lit2)
+  | lit1 == lit2
+  = Just subst
+
+match menv subst (App f1 a1) (App f2 a2)
+  = do 	{ subst' <- match menv subst f1 f2
+	; match menv subst' a1 a2 }
+
+match menv subst (Lam x1 e1) (Lam x2 e2)
+  = match menv' subst e1 e2
+  where
+    menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
+
+-- This rule does eta expansion
+--		(\x.M)  ~  N 	iff	M  ~  N x
+-- It's important that this is *after* the let rule,
+-- so that 	(\x.M)  ~  (let y = e in \y.N)
+-- does the let thing, and then gets the lam/lam rule above
+match menv subst (Lam x1 e1) e2
+  = match menv' subst e1 (App e2 (varToCoreExpr new_x))
+  where
+    (rn_env', new_x) = rnBndrL (me_env menv) x1
+    menv' = menv { me_env = rn_env' }
+
+-- Eta expansion the other way
+--	M  ~  (\y.N)	iff   M	y     ~  N
+match menv subst e1 (Lam x2 e2)
+  = match menv' subst (App e1 (varToCoreExpr new_x)) e2
+  where
+    (rn_env', new_x) = rnBndrR (me_env menv) x2
+    menv' = menv { me_env = rn_env' }
+
+match menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
+  = do	{ subst1 <- match_ty menv subst ty1 ty2
+	; subst2 <- match menv subst1 e1 e2
+	; let menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
+	; match_alts menv' subst2 alts1 alts2	-- Alts are both sorted
+	}
+
+match menv subst (Type ty1) (Type ty2)
+  = match_ty menv subst ty1 ty2
+
+match menv subst (Cast e1 co1) (Cast e2 co2)
+  | (from1, to1) <- coercionKind co1
+  , (from2, to2) <- coercionKind co2
+  = do	{ subst1 <- match_ty menv subst  to1   to2
+	; subst2 <- match_ty menv subst1 from1 from2
+	; match menv subst2 e1 e2 }
+
+{-	REMOVING OLD CODE: I think that the above handling for let is 
+			   better than the stuff here, which looks 
+			   pretty suspicious to me.  SLPJ Sept 06
 -- This is an interesting rule: we simply ignore lets in the 
 -- term being matched against!  The unfolding inside it is (by assumption)
 -- already inside any occurrences of the bound variables, so we'll expand
@@ -529,7 +535,7 @@ match menv subst e1 (Let bind e2)
 	-- We must not get success with x->y!  So we record that y is
 	-- locally bound (with rnBndrR), and proceed.  The Var case
 	-- will fail when trying to bind x->y
-	--
+-}
 
 -- Everything else fails
 match menv subst e1 e2 = Nothing
@@ -687,6 +693,7 @@ ruleCheck env (Lit l) 	    = emptyBag
 ruleCheck env (Type ty)     = emptyBag
 ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
 ruleCheck env (Note n e)    = ruleCheck env e
+ruleCheck env (Cast e co)   = ruleCheck env e
 ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
 ruleCheck env (Lam b e)     = ruleCheck env e
 ruleCheck env (Case e _ _ as) = ruleCheck env e `unionBags` 
