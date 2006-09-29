@@ -806,7 +806,7 @@ dumpCensus( Census *census )
 #ifdef PROFILING
 	switch (RtsFlags.ProfFlags.doHeapProfile) {
 	case HEAP_BY_CCS:
-	    fprint_ccs(hp_file, (CostCentreStack *)ctr->identity, 25);
+	    fprint_ccs(hp_file, (CostCentreStack *)ctr->identity, RtsFlags.ProfFlags.ccsLength);
 	    break;
 	case HEAP_BY_MOD:
 	case HEAP_BY_DESCR:

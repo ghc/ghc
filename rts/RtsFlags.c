@@ -177,6 +177,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.includeTSOs        = rtsFalse;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
+    RtsFlags.ProfFlags.ccsLength          = 25;
     RtsFlags.ProfFlags.modSelector        = NULL;
     RtsFlags.ProfFlags.descrSelector      = NULL;
     RtsFlags.ProfFlags.typeSelector       = NULL;
@@ -369,6 +370,9 @@ usage_text[] = {
 "    -hb<bio>...  closures with specified biographies (lag,drag,void,use)",
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
+"", 
+"  -L<chars>      Maximum length of a cost-centre stack in a heap profile",
+"                 (default: 25)",
 "",
 "  -i<sec>        Time between heap samples (seconds, default: 0.1)",
 "",
@@ -858,7 +862,13 @@ error = rtsTrue;
 		  PROFILING_BUILD_ONLY(
 		      RtsFlags.ProfFlags.maxRetainerSetSize = atof(rts_argv[arg]+2);
   	          ) break;
-
+	      case 'L':
+		  PROFILING_BUILD_ONLY(
+		      RtsFlags.ProfFlags.ccsLength = atof(rts_argv[arg]+2);
+                      if(RtsFlags.ProfFlags.ccsLength <= 0) {
+			bad_option(rts_argv[arg]);
+                      }
+		  ) break;
 	      case 'h': /* serial heap profile */
 #if !defined(PROFILING) && defined(DEBUG)
 		switch (rts_argv[arg][2]) {

@@ -97,6 +97,8 @@ struct PROFILING_FLAGS {
 
     nat                 maxRetainerSetSize;
 
+    nat                 ccsLength;
+
     char*               modSelector;
     char*               descrSelector;
     char*               typeSelector;
