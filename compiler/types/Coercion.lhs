@@ -108,8 +108,8 @@ type CoercionKind = Kind	-- A CoercionKind is always of form (ty1 :=: ty2)
 coercionKind :: Coercion -> (Type, Type)
 -- 	c :: (t1 :=: t2)
 -- Then (coercionKind c) = (t1,t2)
-coercionKind (TyVarTy a) | isCoVar a = splitCoercionKind (tyVarKind a)
-                         | otherwise = let t = (TyVarTy a) in (t, t)
+coercionKind ty@(TyVarTy a) | isCoVar a = splitCoercionKind (tyVarKind a)
+                            | otherwise = (ty, ty)
 coercionKind (AppTy ty1 ty2) 
   = let (t1, t2) = coercionKind ty1
         (s1, s2) = coercionKind ty2 in
@@ -117,10 +117,11 @@ coercionKind (AppTy ty1 ty2)
 coercionKind (TyConApp tc args)
   | Just (ar, rule) <- isCoercionTyCon_maybe tc 
     -- CoercionTyCons carry their kinding rule, so we use it here
-  = if length args >= ar 
-    then splitCoercionKind (rule args)
-    else pprPanic ("arity/arguments mismatch in coercionKind:") 
-             (ppr ar $$ ppr tc <+> ppr args)
+  = ASSERT( length args >= ar )	-- Always saturated
+    let (ty1,ty2)    = rule (take ar args)	-- Apply the rule to the right number of args
+	(tys1, tys2) = coercionKinds (drop ar args)
+    in (mkAppTys ty1 tys1, mkAppTys ty2 tys2)
+
   | otherwise
   = let (lArgs, rArgs) = coercionKinds args in
     (TyConApp tc lArgs, TyConApp tc rArgs)
@@ -287,14 +288,12 @@ mkUnsafeCoercion ty1 ty2
 -- See note [Newtype coercions] in TyCon
 mkNewTypeCoercion :: Name -> TyCon -> ([TyVar], Type) -> TyCon
 mkNewTypeCoercion name tycon (tvs, rhs_ty)
-  = mkCoercionTyCon name co_con_arity (mkKindingFun rule)
+  = mkCoercionTyCon name co_con_arity rule
   where
     co_con_arity = length tvs
 
-    rule args = (TyConApp tycon tys, substTyWith tvs tys rhs_ty, rest)
-        where
-          tys  = take co_con_arity args
-          rest = drop co_con_arity args
+    rule args = ASSERT( co_con_arity == length args )
+		(TyConApp tycon args, substTyWith tvs args rhs_ty)
 
 -- Coercion identifying a data/newtype representation type and its family
 -- instance.  It has the form `Co tvs :: F ts :=: R tvs', where `Co' is the
@@ -308,17 +307,12 @@ mkDataInstCoercion :: Name	-- unique name for the coercion tycon
 		   -> TyCon	-- representation tycon (`R')
 		   -> TyCon	-- => coercion tycon (`Co')
 mkDataInstCoercion name tvs family instTys rep_tycon
-  = mkCoercionTyCon name coArity (mkKindingFun rule)
+  = mkCoercionTyCon name coArity rule
   where
     coArity = length tvs
-
-    rule args = (substTyWith tvs tys $		     -- with sigma = [tys/tvs],
+    rule args = (substTyWith tvs args $		     -- with sigma = [tys/tvs],
 		   TyConApp family instTys,	     --       sigma (F ts)
-		 TyConApp rep_tycon tys,	     --   :=: R tys
-		 rest)				     -- surplus arguments
-      where
-        tys  = take coArity args
-        rest = drop coArity args
+		 TyConApp rep_tycon args)	     --   :=: R tys
 
 --------------------------------------
 -- Coercion Type Constructors...
@@ -329,15 +323,6 @@ mkDataInstCoercion name tvs family instTys rep_tycon
 --    sym d :: p2=q2
 --    sym e :: p3=q3
 -- then ((sym c) (sym d) (sym e)) :: (p1 p2 p3)=(q1 q2 q3)
---
--- (mkKindingFun f) is given the args [c, sym d, sym e]
-mkKindingFun :: ([Type] -> (Type, Type, [Type]))
-	     -> [Type] -> Kind
-mkKindingFun f args = 
-  let (ty1, ty2, rest) = f args in 
-  let (argtys1, argtys2) = unzip (map coercionKind rest) in
-  mkCoKind (mkAppTys ty1 argtys1) (mkAppTys ty2 argtys2)
-        
 
 symCoercionTyCon, transCoercionTyCon, leftCoercionTyCon, rightCoercionTyCon, instCoercionTyCon :: TyCon
 -- Each coercion TyCon is built with the special CoercionTyCon record and
@@ -345,33 +330,34 @@ symCoercionTyCon, transCoercionTyCon, leftCoercionTyCon, rightCoercionTyCon, ins
 -- by any TyConApp in which they are applied, however they may also be over
 -- applied (see example above) and the kinding function must deal with this.
 symCoercionTyCon = 
-  mkCoercionTyCon symCoercionTyConName 1 (mkKindingFun flipCoercionKindOf)
+  mkCoercionTyCon symCoercionTyConName 1 flipCoercionKindOf
   where
-    flipCoercionKindOf (co:rest) = (ty2, ty1, rest)
+    flipCoercionKindOf (co:rest) = ASSERT( null rest ) (ty2, ty1)
 	where
 	  (ty1, ty2) = coercionKind co
 
 transCoercionTyCon = 
-  mkCoercionTyCon transCoercionTyConName 2 (mkKindingFun composeCoercionKindsOf)
+  mkCoercionTyCon transCoercionTyConName 2 composeCoercionKindsOf
   where
-    composeCoercionKindsOf (co1:co2:rest) = 
+    composeCoercionKindsOf (co1:co2:rest)
+      = ASSERT( null rest )
         WARN( not (r1 `coreEqType` a2), text "Strange! Type mismatch in trans coercion, probably a bug")
-        (a1, r2, rest)
+        (a1, r2)
       where
         (a1, r1) = coercionKind co1
         (a2, r2) = coercionKind co2 
 
 leftCoercionTyCon =
-  mkCoercionTyCon leftCoercionTyConName 1 (mkKindingFun leftProjectCoercionKindOf)
+  mkCoercionTyCon leftCoercionTyConName 1 leftProjectCoercionKindOf
   where
-    leftProjectCoercionKindOf (co:rest) = (ty1, ty2, rest)
+    leftProjectCoercionKindOf (co:rest) = ASSERT( null rest ) (ty1, ty2)
       where
         (ty1,ty2) = fst (splitCoercionKindOf co)
 
 rightCoercionTyCon =
-  mkCoercionTyCon rightCoercionTyConName 1 (mkKindingFun rightProjectCoercionKindOf)
+  mkCoercionTyCon rightCoercionTyConName 1 rightProjectCoercionKindOf
   where
-    rightProjectCoercionKindOf (co:rest) = (ty1, ty2, rest)
+    rightProjectCoercionKindOf (co:rest) = ASSERT( null rest ) (ty1, ty2)
       where
         (ty1,ty2) = snd (splitCoercionKindOf co)
 
@@ -387,19 +373,20 @@ splitCoercionKindOf co
   = ((ty_fun1, ty_fun2),(ty_arg1, ty_arg2))
 
 instCoercionTyCon 
-  =  mkCoercionTyCon instCoercionTyConName 2 (mkKindingFun instCoercionKind)
+  =  mkCoercionTyCon instCoercionTyConName 2 instCoercionKind
   where
     instantiateCo t s =
       let Just (tv, ty) = splitForAllTy_maybe t in
       substTyWith [tv] [s] ty
 
-    instCoercionKind (co1:ty:rest) = (instantiateCo t1 ty, instantiateCo t2 ty, rest)
+    instCoercionKind (co1:ty:rest) = ASSERT( null rest )
+				     (instantiateCo t1 ty, instantiateCo t2 ty)
       where (t1, t2) = coercionKind co1
 
 unsafeCoercionTyCon 
-  = mkCoercionTyCon unsafeCoercionTyConName 2 (mkKindingFun unsafeCoercionKind)
+  = mkCoercionTyCon unsafeCoercionTyConName 2 unsafeCoercionKind
   where
-   unsafeCoercionKind (ty1:ty2:rest) = (ty1,ty2,rest) 
+   unsafeCoercionKind (ty1:ty2:rest) = ASSERT( null rest ) (ty1,ty2) 
         
 --------------------------------------
 -- ...and their names

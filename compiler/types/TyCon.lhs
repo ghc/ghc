@@ -185,8 +185,10 @@ data TyCon
 	tyConUnique :: Unique,
         tyConName   :: Name,
 	tyConArity  :: Arity,
-	coKindFun   :: [Type] -> Kind
-    }
+	coKindFun   :: [Type] -> (Type,Type)
+    }		-- INVARAINT: coKindFun is always applied to exactly 'arity' args
+		-- E.g. for trans (c1 :: ta=tb) (c2 :: tb=tc), the coKindFun returns 
+		--	the kind as a pair of types: (ta,tc)
 	
   | SuperKindTyCon {    -- Super Kinds, TY (box) and CO (diamond).
 			-- They have no kind; and arity zero
@@ -655,7 +657,7 @@ isSuperKindTyCon :: TyCon -> Bool
 isSuperKindTyCon (SuperKindTyCon {}) = True
 isSuperKindTyCon other               = False
 
-isCoercionTyCon_maybe :: TyCon -> Maybe (Arity, [Type] -> Kind)
+isCoercionTyCon_maybe :: TyCon -> Maybe (Arity, [Type] -> (Type,Type))
 isCoercionTyCon_maybe (CoercionTyCon {tyConArity = ar, coKindFun = rule}) 
   = Just (ar, rule)
 isCoercionTyCon_maybe other = Nothing
