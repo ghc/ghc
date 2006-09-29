@@ -17,10 +17,15 @@
       </listitem>
       <listitem>
         <para>
-          GHC now handles impredicative polymorphism and there are
-          changes to the way scoped type variables work; see
-          <ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
-          for more details of the change, or <xref linkend="impredicative-polymorphism" /> for the documentation.
+          GHC now handles impredicative polymorphism; see <xref linkend="impredicative-polymorphism" />.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
+	  There are significant changes to the way scoped type variables work;
+	  see  <xref linkend="scoped-type-variables" />.
+          (<ulink url="http://www.haskell.org/pipermail/glasgow-haskell-users/2006-January/009565.html"> Simon's e-mail</ulink>
+          gives some background.)
         </para>
       </listitem>
       <listitem>
