@@ -62,6 +62,11 @@
           ignored in comments, so ASCII code with comments in, for
           example, Latin-1 will also work.
         </para>
+
+        <para>
+          A way to have Latin-1 source files pre-processed by GHC is
+          described in <xref linkend="pre-processor" />.
+        </para>
       </listitem>
       <listitem>
         <para>

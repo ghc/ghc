@@ -486,6 +486,24 @@ $ cat foo.hspp</screen>
           are fed to <replaceable>cmd</replaceable> on the command
           line after the three standard input and output
           arguments.</para>
+
+          <para>
+          An example of a pre-processor is to convert your source files to the
+          input encoding that GHC expects, i.e. create a script
+          <literal>convert.sh</literal> containing the lines:
+          </para>
+
+<screen>#!/bin/sh
+( echo "{-# LINE 1 \"$2\" #-}" ; iconv -f l1 -t utf-8 $2 ) > $3</screen>
+
+          <para>and pass <literal>-F -pgmF convert.sh</literal> to GHC.
+          The <literal>-f l1</literal> option tells iconv to convert your
+          Latin-1 file, supplied in argument <literal>$2</literal>, while
+          the "-t utf-8" options tell iconv to return a UTF-8 encoded file.
+          The result is redirected into argument <literal>$3</literal>.
+          The <literal>echo "{-# LINE 1 \"$2\" #-}"</literal>
+          just makes sure that your error positions are reported as
+          in the original source file.</para>
         </listitem>
       </varlistentry>
     </variablelist>
