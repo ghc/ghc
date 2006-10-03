@@ -379,8 +379,8 @@ rnBind sig_fn trim (L loc (PatBind { pat_lhs = pat, pat_rhs = grhss }))
 
 	; let bndrs = collectPatBinders pat'
 
-	; (grhss', fvs) <- bindSigTyVarsFV (concatMap sig_fn bndrs) $
-			   rnGRHSs PatBindRhs grhss
+	; (grhss', fvs) <- rnGRHSs PatBindRhs grhss
+		-- No scoped type variables for pattern bindings
 
 	; return (L loc (PatBind { pat_lhs = pat', pat_rhs = grhss', 
 				   pat_rhs_ty = placeHolderType, bind_fvs = trim fvs }), 
@@ -392,6 +392,7 @@ rnBind sig_fn trim (L loc (FunBind { fun_id = name, fun_infix = inf, fun_matches
 	; let plain_name = unLoc new_name
 
 	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
+				-- bindSigTyVars tests for Opt_ScopedTyVars
 			     rnMatchGroup (FunRhs plain_name) matches
 
 	; checkPrecMatch inf plain_name matches'

@@ -14,7 +14,7 @@ module HsTypes (
 	LBangType, BangType, HsBang(..), 
         getBangType, getBangStrictness, 
 	
-	mkExplicitHsForAllTy, mkImplicitHsForAllTy, 
+	mkExplicitHsForAllTy, mkImplicitHsForAllTy, hsExplicitTvs,
 	hsTyVarName, hsTyVarNames, replaceTyVarName,
 	hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
 	splitHsInstDeclTy, splitHsFunType,
@@ -190,6 +190,12 @@ mk_forall_ty exp  tvs  ty			            = HsForAllTy exp tvs (L noSrcSpan []) ty
 Implicit `plus` Implicit = Implicit
 exp1     `plus` exp2     = Explicit
 
+hsExplicitTvs :: LHsType name -> [name]
+-- The explicitly-given forall'd type variables of a HsType
+hsExplicitTvs (L _ (HsForAllTy Explicit tvs _ _)) = hsLTyVarNames tvs
+hsExplicitTvs other   			          = []
+
+---------------------
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
 
 data HsTyVarBndr name

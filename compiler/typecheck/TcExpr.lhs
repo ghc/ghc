@@ -21,7 +21,7 @@ import qualified DsMeta
 #endif
 
 import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
-			  HsMatchContext(..), HsRecordBinds, mkHsWrap,
+			  HsMatchContext(..), HsRecordBinds, mkHsWrap, hsExplicitTvs,
 			  mkHsApp, mkLHsWrap )
 import TcHsSyn		( hsLitType )
 import TcRnMonad
@@ -32,7 +32,7 @@ import BasicTypes	( Arity, isMarkedStrict )
 import Inst		( newMethodFromName, newIPDict, instCall,
 			  newMethodWithGivenTy, instStupidTheta )
 import TcBinds		( tcLocalBinds )
-import TcEnv		( tcLookup, tcLookupDataCon, tcLookupField )
+import TcEnv		( tcLookup, tcLookupDataCon, tcLookupField, tcExtendTyVarEnv2 )
 import TcArrows		( tcProc )
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcBody,
 			  TcMatchCtxt(..) )
@@ -111,7 +111,7 @@ tcPolyExpr expr res_ty
 
 tcPolyExprNC expr res_ty 
   | isSigmaTy res_ty
-  = do	{ (gen_fn, expr') <- tcGen res_ty emptyVarSet (tcPolyExprNC expr)
+  = do	{ (gen_fn, expr') <- tcGen res_ty emptyVarSet (\_ -> tcPolyExprNC expr)
 		-- Note the recursive call to tcPolyExpr, because the
 		-- type may have multiple layers of for-alls
 	; return (mkLHsWrap gen_fn expr') }
@@ -208,9 +208,14 @@ tcExpr (HsLam match) res_ty
 
 tcExpr in_expr@(ExprWithTySig expr sig_ty) res_ty
  = do	{ sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
-	; expr' <- tcPolyExpr expr sig_tc_ty
+
+	-- Remember to extend the lexical type-variable environment
+	; (gen_fn, expr') <- tcGen sig_tc_ty emptyVarSet (\ skol_tvs res_ty ->
+		             tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
+			     tcPolyExprNC expr res_ty)
+
 	; co_fn <- tcSubExp sig_tc_ty res_ty
-	; return (mkHsWrap co_fn (ExprWithTySigOut expr' sig_ty)) }
+	; return (mkHsWrap co_fn (ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty)) }
 
 tcExpr (HsType ty) res_ty
   = failWithTc (text "Can't handle type argument:" <+> ppr ty)

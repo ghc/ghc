@@ -534,7 +534,6 @@ rnPatsAndThen ctxt pats thing_inside
     bindLocatedLocalsFV doc_pat bndrs	$ \ new_bndrs ->
     rnLPats pats			`thenM` \ (pats', pat_fvs) ->
     thing_inside pats'			`thenM` \ (res, res_fvs) ->
-
     let
 	unused_binders = filter (not . (`elemNameSet` res_fvs)) new_bndrs
     in

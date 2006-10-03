@@ -19,10 +19,9 @@ import DynFlags		( dopt, DynFlags,
 			  DynFlag(Opt_MonomorphismRestriction, Opt_MonoPatBinds, Opt_GlasgowExts) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
 			  HsLocalBinds(..), HsValBinds(..), HsIPBinds(..),
-			  LSig, Match(..), IPBind(..), Prag(..),
-			  HsType(..), LHsType, HsExplicitForAll(..), hsLTyVarNames, 
+			  LSig, Match(..), IPBind(..), Prag(..), LHsType,
 			  isVanillaLSig, sigName, placeHolderNames, isPragLSig,
-			  LPat, GRHSs, MatchGroup(..), pprLHsBinds, mkHsWrap,
+			  LPat, GRHSs, MatchGroup(..), pprLHsBinds, mkHsWrap, hsExplicitTvs,
 			  collectHsBindBinders, collectPatBinders, pprPatBind, isBangHsBind
 			)
 import TcHsSyn		( zonkId )
@@ -973,13 +972,12 @@ mkTcSigFun :: [LSig Name] -> TcSigFun
 -- Precondition: no duplicates
 mkTcSigFun sigs = lookupNameEnv env
   where
-    env = mkNameEnv [(name, scoped_tyvars hs_ty)
-		    | L span (TypeSig (L _ name) (L _ hs_ty)) <- sigs]
-    scoped_tyvars (HsForAllTy Explicit tvs _ _) = hsLTyVarNames tvs
-    scoped_tyvars other				= []
+    env = mkNameEnv [(name, hsExplicitTvs lhs_ty)
+		    | L span (TypeSig (L _ name) lhs_ty) <- sigs]
 	-- The scoped names are the ones explicitly mentioned
 	-- in the HsForAll.  (There may be more in sigma_ty, because
 	-- of nested type synonyms.  See Note [Scoped] with TcSigInfo.)
+	-- See Note [Only scoped tyvars are in the TyVarEnv]
 
 ---------------
 data TcSigInfo
@@ -998,6 +996,19 @@ data TcSigInfo
 	sig_loc    :: InstLoc	 	-- The location of the signature
     }
 
+
+--	Note [Only scoped tyvars are in the TyVarEnv]
+-- We are careful to keep only the *lexically scoped* type variables in
+-- the type environment.  Why?  After all, the renamer has ensured
+-- that only legal occurrences occur, so we could put all type variables
+-- into the type env.
+--
+-- But we want to check that two distinct lexically scoped type variables
+-- do not map to the same internal type variable.  So we need to know which
+-- the lexically-scoped ones are... and at the moment we do that by putting
+-- only the lexically scoped ones into the environment.
+
+
 -- 	Note [Scoped]
 -- There may be more instantiated type variables than scoped 
 -- ones.  For example:
@@ -1010,7 +1021,7 @@ data TcSigInfo
 -- and remember the names from the original HsForAllTy in sig_scoped
 
 -- 	Note [Instantiate sig]
--- It's vital to instantiate a type signature with fresh variable.
+-- It's vital to instantiate a type signature with fresh variables.
 -- For example:
 --	type S = forall a. a->a
 --	f,g :: S
@@ -1046,7 +1057,7 @@ tcInstSig :: Bool -> Name -> [Name] -> TcM TcSigInfo
 -- Instantiate the signature, with either skolems or meta-type variables
 -- depending on the use_skols boolean.  This variable is set True
 -- when we are typechecking a single function binding; and False for
--- pattern bindigs and a group of several function bindings.
+-- pattern bindings and a group of several function bindings.
 -- Reason: in the latter cases, the "skolems" can be unified together, 
 -- 	   so they aren't properly rigid in the type-refinement sense.
 -- NB: unless we are doing H98, each function with a sig will be done

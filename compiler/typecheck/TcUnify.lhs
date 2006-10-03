@@ -30,10 +30,10 @@ import HsSyn		( HsWrapper(..), idHsWrapper, isIdHsWrapper, (<.>),
 import TypeRep		( Type(..), PredType(..) )
 
 import TcMType		( lookupTcTyVar, LookupTyVarResult(..),
-                          tcInstSkolType, tcInstBoxyTyVar, newKindVar, newMetaTyVar,
+                          tcInstBoxyTyVar, newKindVar, newMetaTyVar,
 			  newBoxyTyVar, newBoxyTyVarTys, readFilledBox, 
 			  readMetaTyVar, writeMetaTyVar, newFlexiTyVarTy,
-			  tcInstSkolTyVars, tcInstTyVar,
+			  tcInstSkolTyVars, tcInstTyVar, tcInstSkolType,
 			  zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
 			  readKindVar, writeKindVar )
 import TcSimplify	( tcSimplifyCheck )
@@ -53,7 +53,7 @@ import TcType		( TcKind, TcType, TcTyVar, BoxyTyVar, TcTauType,
 			  tidyOpenType, tidyOpenTyVar, tidyOpenTyVars,
 			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar, isSigTyVar,
 			  TvSubst, mkTvSubst, zipTyEnv, zipOpenTvSubst, emptyTvSubst, 
-			  substTy, substTheta, 
+			  substTy, substTheta,
 			  lookupTyVar, extendTvSubst )
 import Type		( Kind, SimpleKind, KindVar, 
 			  openTypeKind, liftedTypeKind, unliftedTypeKind, 
@@ -148,7 +148,7 @@ subFunTys error_herald n_pats res_ty thing_inside
     loop n args_so_far res_ty
 	| isSigmaTy res_ty 	-- Do this before checking n==0, because we 
 				-- guarantee to return a BoxyRhoType, not a BoxySigmaType
-	= do { (gen_fn, (co_fn, res)) <- tcGen res_ty emptyVarSet $ \ res_ty' ->
+	= do { (gen_fn, (co_fn, res)) <- tcGen res_ty emptyVarSet $ \ _ res_ty' ->
 					 loop n args_so_far res_ty'
 	     ; return (gen_fn <.> co_fn, res) }
 
@@ -669,7 +669,7 @@ tc_sub1 sub_ctxt act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
 tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
   | not exp_ib, 	-- SKOL does not apply if exp_ty is inside a box
     isSigmaTy exp_ty	
-  = do	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ body_exp_ty ->
+  = do	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ _ body_exp_ty ->
 			     tc_sub sub_ctxt act_sty act_ty False body_exp_ty body_exp_ty
 	; return (gen_fn <.> co_fn) }
   where
@@ -774,7 +774,7 @@ tcGen :: BoxySigmaType				-- expected_ty
       -> TcTyVarSet				-- Extra tyvars that the universally
 						--	quantified tyvars of expected_ty
 						-- 	must not be unified
-      -> (BoxyRhoType -> TcM result)		-- spec_ty
+      -> ([TcTyVar] -> BoxyRhoType -> TcM result)
       -> TcM (HsWrapper, result)
 	-- The expression has type: spec_ty -> expected_ty
 
@@ -784,7 +784,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 		-- mention the *instantiated* tyvar names, so that we get a
 		-- good error message "Rigid variable 'a' is bound by (forall a. a->a)"
 		-- Hence the tiresome but innocuous fixM
-	  ((forall_tvs, theta, rho_ty), skol_info) <- fixM (\ ~(_, skol_info) ->
+	  ((tvs', theta', rho'), skol_info) <- fixM (\ ~(_, skol_info) ->
 		do { (forall_tvs, theta, rho_ty) <- tcInstSkolType skol_info expected_ty
 		   ; span <- getSrcSpanM
 		   ; let skol_info = GenSkol forall_tvs (mkPhiTy theta rho_ty) span
@@ -793,13 +793,12 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 #ifdef DEBUG
 	; traceTc (text "tcGen" <+> vcat [text "extra_tvs" <+> ppr extra_tvs,
 				    text "expected_ty" <+> ppr expected_ty,
-				    text "inst ty" <+> ppr forall_tvs <+> ppr theta <+> ppr rho_ty,
-				    text "free_tvs" <+> ppr free_tvs,
-				    text "forall_tvs" <+> ppr forall_tvs])
+				    text "inst ty" <+> ppr tvs' <+> ppr theta' <+> ppr rho',
+				    text "free_tvs" <+> ppr free_tvs])
 #endif
 
 	-- Type-check the arg and unify with poly type
-	; (result, lie) <- getLIE (thing_inside rho_ty)
+	; (result, lie) <- getLIE (thing_inside tvs' rho')
 
 	-- Check that the "forall_tvs" havn't been constrained
 	-- The interesting bit here is that we must include the free variables
@@ -812,16 +811,16 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	-- Conclusion: include the free vars of the expected_ty in the
 	-- list of "free vars" for the signature check.
 
-	; dicts <- newDictBndrsO (SigOrigin skol_info) theta
-	; inst_binds <- tcSimplifyCheck sig_msg forall_tvs dicts lie
+	; dicts <- newDictBndrsO (SigOrigin skol_info) theta'
+	; inst_binds <- tcSimplifyCheck sig_msg tvs' dicts lie
 
-	; checkSigTyVarsWrt free_tvs forall_tvs
+	; checkSigTyVarsWrt free_tvs tvs'
 	; traceTc (text "tcGen:done")
 
 	; let
 	    -- The WpLet binds any Insts which came out of the simplification.
 		dict_ids = map instToId dicts
-		co_fn = mkWpTyLams forall_tvs <.> mkWpLams dict_ids <.> WpLet inst_binds
+		co_fn = mkWpTyLams tvs' <.> mkWpLams dict_ids <.> WpLet inst_binds
 	; returnM (co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs

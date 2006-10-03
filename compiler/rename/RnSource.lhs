@@ -15,9 +15,8 @@ module RnSource (
 import {-# SOURCE #-} RnExpr( rnLExpr )
 
 import HsSyn
-import RdrName		( RdrName, isRdrDataCon, isRdrTyVar, rdrNameOcc, 
-			  elemLocalRdrEnv, globalRdrEnvElts, GlobalRdrElt(..),
-			  isLocalGRE )
+import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, 
+			  globalRdrEnvElts, GlobalRdrElt(..), isLocalGRE )
 import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )

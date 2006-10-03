@@ -3301,6 +3301,7 @@ changing the program.</para></listitem>
 A <emphasis>lexically scoped type variable</emphasis> can be bound by:
 <itemizedlist>
 <listitem><para>A declaration type signature (<xref linkend="decl-type-sigs"/>)</para></listitem>
+<listitem><para>An expression type signature (<xref linkend="exp-type-sigs"/>)</para></listitem>
 <listitem><para>A pattern type signature (<xref linkend="pattern-type-sigs"/>)</para></listitem>
 <listitem><para>Class and instance declarations (<xref linkend="cls-inst-scoped-tyvars"/>)</para></listitem>
 </itemizedlist>
@@ -3350,6 +3351,23 @@ over the definition of "<literal>f</literal>", so "<literal>x::a</literal>"
 means "<literal>x::forall a. a</literal>" by Haskell's usual implicit
 quantification rules.
 </para>
+</sect3>
+
+<sect3 id="exp-type-sigs">
+<title>Expression type signatures</title>
+
+<para>An expression type signature that has <emphasis>explicit</emphasis>
+quantification (using <literal>forall</literal>) brings into scope the
+explicitly-quantified
+type variables, in the annotated expression.  For example:
+<programlisting>
+  f = runST ( (op >>= \(x :: STRef s Int) -> g x) :: forall s. ST s Bool )
+</programlisting>
+Here, the type signature <literal>forall a. ST s Bool</literal> brings the 
+type variable <literal>s</literal> into scope, in the annotated expression 
+<literal>(op >>= \(x :: STRef s Int) -> g x)</literal>.
+</para>
+
 </sect3>
 
 <sect3 id="pattern-type-sigs">

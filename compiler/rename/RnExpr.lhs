@@ -248,9 +248,10 @@ rnExpr (RecordUpd expr rbinds _ _)
 	     fvExpr `plusFV` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)
-  = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
-    rnHsTypeFVs doc pty		`thenM` \ (pty', fvTy) ->
-    returnM (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy)
+  = do	{ (pty', fvTy) <- rnHsTypeFVs doc pty
+	; (expr', fvExpr) <- bindSigTyVarsFV (hsExplicitTvs pty') $
+		  	     rnLExpr expr
+	; return (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy) }
   where 
     doc = text "In an expression type signature"
 
