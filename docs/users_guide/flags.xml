@@ -769,7 +769,7 @@
 	  </row>
 
 	  <row>
-	    <entry><option>-fwarn-oprhans</option></entry>
+	    <entry><option>-fwarn-orphans</option></entry>
 	    <entry>warn when the module contains "orphan" instance declarations
 	    or rewrite rules</entry>
 	    <entry>dynamic</entry>
