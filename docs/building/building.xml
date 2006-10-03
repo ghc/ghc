@@ -2563,7 +2563,7 @@ $ ./configure --enable-hc-boot --enable-hc-boot-unregisterised</screen>
 	    </listitem>
   
 	    <listitem>
-<screen>$ cd <replaceable>T</replaceable>/ghc/includes
+<screen>$ cd <replaceable>T</replaceable>/includes
 $ make</screen>
 	    </listitem>
 	  </itemizedlist>
@@ -2598,7 +2598,8 @@ GhcWithInterpreter = NO
 GhcStage1HcOpts = -O
 GhcStage2HcOpts = -O -fvia-C -keep-hc-files
 SRC_HC_OPTS += -H32m
-GhcBootLibs = YES</programlisting>
+GhcBootLibs = YES
+GhcWithSMP = NO</programlisting>
 	    </listitem>
 
 	    <listitem>
@@ -2625,9 +2626,9 @@ GhcBootLibs = YES</programlisting>
 
 	    <listitem>
 	      <para>Copy
-	      <filename><replaceable>T</replaceable>/ghc/includes/ghcautoconf.h</filename>, <filename><replaceable>T</replaceable>/ghc/includes/DerivedConstants.h</filename>, and <filename><replaceable>T</replaceable>/ghc/includes/GHCConstants.h</filename>
+	      <filename><replaceable>T</replaceable>/includes/ghcautoconf.h</filename>, <filename><replaceable>T</replaceable>/includes/DerivedConstants.h</filename>, and <filename><replaceable>T</replaceable>/includes/GHCConstants.h</filename>
 	      to
-	      <filename><replaceable>H</replaceable>/ghc/includes</filename>.
+	      <filename><replaceable>H</replaceable>/includes</filename>.
 	      Note that we are building on the host machine, using the
 	      target machine's configuration files.  This
 	      is so that the intermediate C files generated here will
@@ -2637,28 +2638,20 @@ GhcBootLibs = YES</programlisting>
 	      <listitem>
 		<para>Touch the generated configuration files, just to make
 		sure they don't get replaced during the build:</para>
-<screen>$ cd <filename><replaceable>H</replaceable></filename>/ghc/includes
+<screen>$ cd <filename><replaceable>H</replaceable></filename>/includes
 $ touch ghcautoconf.h DerivedConstants.h GHCConstants.h mkDerivedConstants.c
 $ touch mkDerivedConstantsHdr mkDerivedConstants.o mkGHCConstants mkGHCConstants.o</screen>
 
-		<para>Note: it has been reported that these files still get
-		  overwritten during the next stage.  We have installed a fix
-		  for this in GHC 6.4.2, but if you are building a version
-		  before that you need to watch out for these files getting
-		  overwritte by the <literal>Makefile</literal> in
-		  <literal>ghc/includes</literal>.  If your system supports
-		  it, you might be able to prevent it by making them
-		  immutable:</para>
-<screen>$ chflags uchg  ghc/includes/{ghcautoconf.h,DerivedConstants.h,GHCConstants.h}</screen>
-	      </listitem>
-
 	    <listitem>
 		<para>Now build the compiler:</para>
-<screen>$ cd <replaceable>H</replaceable>/glafp-utils &amp;&amp; make boot &amp;&amp; make
-$ cd <replaceable>H</replaceable>/ghc &amp;&amp; make boot &amp;&amp; make</screen>
-	      <para>Don't worry if the build falls over in the RTS, we
-              don't need the RTS yet.</para>
+<screen>$ cd <replaceable>H</replaceable>/includes &amp;&amp; make boot &amp;&amp; make
+$ cd <replaceable>H</replaceable>/compat &amp;&amp; make boot &amp;&amp; make
+$ cd <replaceable>H</replaceable>/utils &amp;&amp; make boot &amp;&amp; make
+$ cd <replaceable>H</replaceable>/compiler &amp;&amp; make boot &amp;&amp; make</screen>
+$ cd <replaceable>H</replaceable>/rts &amp;&amp; make boot &amp;&amp; make</screen>
 	    </listitem>
+	    <para>Don't worry if the build falls over in the RTS, we
+	     don't need the RTS yet.</para>
 
 	    <listitem>
 <screen>$ cd <replaceable>H</replaceable>/libraries
@@ -2666,7 +2659,7 @@ $ make boot &amp;&amp; make</screen>
 	    </listitem>
 
 	    <listitem>
-<screen>$ cd <replaceable>H</replaceable>/ghc/compiler
+<screen>$ cd <replaceable>H</replaceable>/compiler
 $ make boot stage=2 &amp;&amp; make stage=2</screen>
 	    </listitem>
 

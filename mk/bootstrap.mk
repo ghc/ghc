@@ -92,6 +92,9 @@ HC_BOOT_LD_OPTS =				\
    -L$(FPTOOLS_TOP_ABS)/libraries/base/cbits	\
    -L$(FPTOOLS_TOP_ABS)/libraries/haskell98	\
    -L$(FPTOOLS_TOP_ABS)/libraries/parsec        \
+   -L$(FPTOOLS_TOP_ABS)/libraries/regex-base    \
+   -L$(FPTOOLS_TOP_ABS)/libraries/regex-posix   \
+   -L$(FPTOOLS_TOP_ABS)/libraries/regex-compat  \
    -L$(FPTOOLS_TOP_ABS)/libraries/Cabal
 
 ifeq "$(GhcWithInterpreter)" "YES"
@@ -103,36 +106,36 @@ HC_BOOT_LD_OPTS += \
 endif
 
 HC_BOOT_LD_OPTS += \
-   -u "$(UNDERSCORE)GHCziBase_Izh_static_info" \
-   -u "$(UNDERSCORE)GHCziBase_Czh_static_info" \
-   -u "$(UNDERSCORE)GHCziFloat_Fzh_static_info" \
-   -u "$(UNDERSCORE)GHCziFloat_Dzh_static_info" \
-   -u "$(UNDERSCORE)GHCziPtr_Ptr_static_info" \
-   -u "$(UNDERSCORE)GHCziWord_Wzh_static_info" \
-   -u "$(UNDERSCORE)GHCziInt_I8zh_static_info" \
-   -u "$(UNDERSCORE)GHCziInt_I16zh_static_info" \
-   -u "$(UNDERSCORE)GHCziInt_I32zh_static_info" \
-   -u "$(UNDERSCORE)GHCziInt_I64zh_static_info" \
-   -u "$(UNDERSCORE)GHCziWord_W8zh_static_info" \
-   -u "$(UNDERSCORE)GHCziWord_W16zh_static_info" \
-   -u "$(UNDERSCORE)GHCziWord_W32zh_static_info" \
-   -u "$(UNDERSCORE)GHCziWord_W64zh_static_info" \
-   -u "$(UNDERSCORE)GHCziStable_StablePtr_static_info" \
-   -u "$(UNDERSCORE)GHCziBase_Izh_con_info" \
-   -u "$(UNDERSCORE)GHCziBase_Czh_con_info" \
-   -u "$(UNDERSCORE)GHCziFloat_Fzh_con_info" \
-   -u "$(UNDERSCORE)GHCziFloat_Dzh_con_info" \
-   -u "$(UNDERSCORE)GHCziPtr_Ptr_con_info" \
-   -u "$(UNDERSCORE)GHCziStable_StablePtr_con_info" \
-   -u "$(UNDERSCORE)GHCziBase_False_closure" \
-   -u "$(UNDERSCORE)GHCziBase_True_closure" \
-   -u "$(UNDERSCORE)GHCziPack_unpackCString_closure" \
-   -u "$(UNDERSCORE)GHCziIOBase_stackOverflow_closure" \
-   -u "$(UNDERSCORE)GHCziIOBase_heapOverflow_closure" \
-   -u "$(UNDERSCORE)GHCziIOBase_NonTermination_closure" \
-   -u "$(UNDERSCORE)GHCziIOBase_BlockedOnDeadMVar_closure" \
-   -u "$(UNDERSCORE)GHCziIOBase_Deadlock_closure" \
-   -u "$(UNDERSCORE)GHCziWeak_runFinalizzerBatch_closure" \
+   -u "$(UNDERSCORE)base_GHCziBase_Izh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziBase_Czh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziFloat_Fzh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziFloat_Dzh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziPtr_Ptr_static_info" \
+   -u "$(UNDERSCORE)base_GHCziWord_Wzh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziInt_I8zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziInt_I16zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziInt_I32zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziInt_I64zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziWord_W8zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziWord_W16zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziWord_W32zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziWord_W64zh_static_info" \
+   -u "$(UNDERSCORE)base_GHCziStable_StablePtr_static_info" \
+   -u "$(UNDERSCORE)base_GHCziBase_Izh_con_info" \
+   -u "$(UNDERSCORE)base_GHCziBase_Czh_con_info" \
+   -u "$(UNDERSCORE)base_GHCziFloat_Fzh_con_info" \
+   -u "$(UNDERSCORE)base_GHCziFloat_Dzh_con_info" \
+   -u "$(UNDERSCORE)base_GHCziPtr_Ptr_con_info" \
+   -u "$(UNDERSCORE)base_GHCziStable_StablePtr_con_info" \
+   -u "$(UNDERSCORE)base_GHCziBase_False_closure" \
+   -u "$(UNDERSCORE)base_GHCziBase_True_closure" \
+   -u "$(UNDERSCORE)base_GHCziPack_unpackCString_closure" \
+   -u "$(UNDERSCORE)base_GHCziIOBase_stackOverflow_closure" \
+   -u "$(UNDERSCORE)base_GHCziIOBase_heapOverflow_closure" \
+   -u "$(UNDERSCORE)base_GHCziIOBase_NonTermination_closure" \
+   -u "$(UNDERSCORE)base_GHCziIOBase_BlockedOnDeadMVar_closure" \
+   -u "$(UNDERSCORE)base_GHCziIOBase_Deadlock_closure" \
+   -u "$(UNDERSCORE)base_GHCziWeak_runFinalizzerBatch_closure" \
    -u "$(UNDERSCORE)__stginit_Prelude"
 
 
@@ -142,7 +145,7 @@ ifeq "$(GhcWithInterpreter)" "YES"
 HC_BOOT_LIBS += -lHSreadline -lHStemplate-haskell -lHSunix -lHSunix_cbits
 endif
 
-HC_BOOT_LIBS +=  -lHSCabal -lHShaskell98 -lHSbase -lHSbase_cbits -lHSparsec -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
+HC_BOOT_LIBS +=  -lHSregex-compat -lHSregex-posix -lHSregex-base -lHSCabal -lHShaskell98 -lHSbase -lHSbase_cbits -lHSparsec -lHSrts -lgmp -lm -lrt $(EXTRA_HC_BOOT_LIBS)
 
 ifeq "$(GhcLibsWithReadline)" "YES"
 HC_BOOT_LIBS += $(patsubst %, -l%, $(LibsReadline))
