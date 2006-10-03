@@ -734,13 +734,6 @@
 	  </row>
 
 	  <row>
-	    <entry><option>-fwarn-misc</option></entry>
-	    <entry>enable miscellaneous warnings</entry>
-	    <entry>dynamic</entry>
-	    <entry><option>-fno-warn-misc</option></entry>
-	  </row>
-
-	  <row>
 	    <entry><option>-fwarn-missing-fields</option></entry>
 	    <entry>warn when fields of a record are uninitialised</entry>
 	    <entry>dynamic</entry>
@@ -1069,12 +1062,6 @@
 	      top-level functions</entry>
 	      <entry>static</entry>
 	      <entry><option>-no-auto-all</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-auto-dicts</option></entry>
-	      <entry>Auto-add <literal>_scc_</literal>s to all dictionaries</entry>
-	      <entry>static</entry>
-	      <entry><option>-no-auto-dicts</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-caf-all</option></entry>
@@ -1512,13 +1499,7 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-mv8</option></entry>
-	      <entry>(SPARC only) enable version 8 support</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-monly-[32]-regs</option></entry>
+	      <entry><option>-monly-[432]-regs</option></entry>
 	      <entry>(x86 only) give some registers back to the C compiler</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
@@ -1576,12 +1557,6 @@
 	    <row>
 	      <entry><option>-dcore-lint</option></entry>
 	      <entry>Turn on internal sanity checking</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-ddump-absC</option></entry>
-	      <entry>Dump abstract C</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1652,12 +1627,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-ddump-realC</option></entry>
-	      <entry>Dump &ldquo;real&rdquo; C</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-ddump-rn</option></entry>
 	      <entry>Dump renamer output</entry>
 	      <entry>dynamic</entry>
@@ -1666,12 +1635,6 @@
 	    <row>
 	      <entry><option>-ddump-rules</option></entry>
 	      <entry>Dump rules</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-ddump-sat</option></entry>
-	      <entry>Dump saturated output</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1718,12 +1681,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-ddump-usagesp</option></entry>
-	      <entry>Dump UsageSP analysis output</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-ddump-worker-wrapper</option></entry>
 	      <entry>Dump worker-wrapper output</entry>
 	      <entry>dynamic</entry>
@@ -1738,12 +1695,6 @@
 	    <row>
 	      <entry><option>-ddump-rn-stats</option></entry>
 	      <entry>Renamer stats</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-ddump-stix</option></entry>
-	      <entry>Native code generator intermediate form</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1786,12 +1737,6 @@
 	    <row>
 	      <entry><option>-dstg-stats</option></entry>
 	      <entry>Dump STG stats</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-dusagesp-lint</option></entry>
-	      <entry>UsageSP sanity checker</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>

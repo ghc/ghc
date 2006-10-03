@@ -136,16 +136,6 @@
 
 	    <varlistentry>
 	      <term>
-	        <option>-ddump-usagesp</option>:
-                <indexterm><primary><option>-ddump-usagesp</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para>UsageSP inference pre-inf and output</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
 	        <option>-ddump-cpranal</option>:
                 <indexterm><primary><option>-ddump-cpranal</option></primary></indexterm>
 	      </term>
@@ -196,16 +186,6 @@
 
 	    <varlistentry>
 	      <term>
-	        <option>-ddump-sat</option>:
-                <indexterm><primary><option>-ddump-sat</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para>output of &ldquo;saturate&rdquo; pass</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
 	        <option>-ddump-stg</option>:
                 <indexterm><primary><option>-ddump-stg</option></primary></indexterm>
 	      </term>
@@ -216,41 +196,11 @@
 
 	    <varlistentry>
 	      <term>
-	        <option>-ddump-absC</option>:
-                <indexterm><primary><option>-ddump-absC</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para><emphasis>un</emphasis>flattened Abstract&nbsp;C</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
 	        <option>-ddump-flatC</option>:
                 <indexterm><primary><option>-ddump-flatC</option></primary></indexterm>
 	      </term>
 	      <listitem>
 		<para><emphasis>flattened</emphasis> Abstract&nbsp;C</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
-	        <option>-ddump-realC</option>:
-                <indexterm><primary><option>-ddump-realC</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para>same as what goes to the C compiler</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
-	        <option>-ddump-stix</option>:
-                <indexterm><primary><option>-ddump-stix</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para>native-code generator intermediate form</para>
 	      </listitem>
 	    </varlistentry>
 
@@ -431,21 +381,6 @@
 	</listitem>
       </varlistentry>
 
-      <varlistentry>
-	<term>
-          <option>-dusagesp-lint</option>:
-          <indexterm><primary><option>-dstg-lint</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Turn on checks around UsageSP inference
-          (<option>-fusagesp</option>).  This verifies various simple
-          properties of the results of the inference, and also warns
-          if any identifier with a used-once annotation before the
-          inference has a used-many annotation afterwards; this could
-          indicate a non-worksafe transformation is being
-          applied.</para>
-	</listitem>
-      </varlistentry>
     </variablelist>
   </sect2>
 

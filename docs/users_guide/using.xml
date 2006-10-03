@@ -793,8 +793,7 @@ ghc -c Foo.hs</screen>
 	  <para>Provides the standard warnings plus
 	  <option>-fwarn-incomplete-patterns</option>,
 	  <option>-fwarn-unused-matches</option>,
-	  <option>-fwarn-unused-imports</option>,
-	  <option>-fwarn-misc</option>, and
+	  <option>-fwarn-unused-imports</option>, and
 	  <option>-fwarn-unused-binds</option>.</para>
 	</listitem>
       </varlistentry>
@@ -924,19 +923,6 @@ f foo = foo { x = 6 }
 	  <para>This option isn't enabled be default because it can be
           very noisy, and it often doesn't indicate a bug in the
           program.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-fwarn-misc</option>:
-          <indexterm><primary><option>-fwarn-misc</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Turns on warnings for various harmless but untidy
-	  things.  This currently includes: importing a type with
-	  <literal>(..)</literal> when the export is abstract, and
-	  listing duplicate class assertions in a qualified type.</para>
 	</listitem>
       </varlistentry>
 
@@ -1622,18 +1608,6 @@ f "2"    = 2
     platforms.</para>
 
     <variablelist>
-
-      <varlistentry>
-	<term><option>-mv8</option>:</term>
-	<listitem>
-	  <para>(SPARC machines)<indexterm><primary>-mv8 option (SPARC
-          only)</primary></indexterm> Means to pass the like-named
-          option to GCC; it says to use the Version 8 SPARC
-          instructions, notably integer multiply and divide.  The
-          similar <option>-m*</option> GCC options for SPARC also
-          work, actually.</para>
-	</listitem>
-      </varlistentry>
 
       <varlistentry>
 	<term><option>-monly-[32]-regs</option>:</term>

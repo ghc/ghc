@@ -536,8 +536,9 @@
         <listitem>
           <para>
             <literal>GHC.Exts</literal> now provides a function
-            <literal>lazy</literal> which forces GHC to think that its
-            argument is lazy in its first argument.
+            <literal>lazy</literal>, where <literal>lazy f</literal>
+            behaves like <literal>f</literal>, except GHC is forced
+            to believe that it is lazy in its first argument.
             For more details, see <xref linkend="special-ids" />.
           </para>
         </listitem>

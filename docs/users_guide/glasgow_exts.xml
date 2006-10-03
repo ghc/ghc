@@ -106,9 +106,7 @@ documentation</ulink> describes all the libraries that come with GHC.
         </term>
 	<listitem>
 	  <para>This option enables the language extension defined in the
-	  Haskell 98 Foreign Function Interface Addendum plus deprecated
-	  syntax of previous versions of the FFI for backwards
-	  compatibility.</para> 
+	  Haskell 98 Foreign Function Interface Addendum.</para>
 
 	  <para>New reserved words: <literal>foreign</literal>.</para>
 	</listitem>
@@ -116,7 +114,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
-          <option>-fno-monomorphism-restriction</option>,<option>-fno-monomorphism-restriction</option>:
+          <option>-fno-monomorphism-restriction</option>,<option>-fno-mono-pat-binds</option>:
         </term>
 	<listitem>
 	  <para> These two flags control how generalisation is done.
