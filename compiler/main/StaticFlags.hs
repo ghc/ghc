@@ -55,7 +55,6 @@ module StaticFlags (
 	-- misc opts
 	opt_IgnoreDotGhci,
 	opt_ErrorSpans,
-	opt_EmitCExternDecls,
 	opt_GranMacros,
 	opt_HiVersion,
 	opt_HistorySize,
@@ -262,7 +261,6 @@ opt_RulesOff			= lookUp  FSLIT("-frules-off")
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
-opt_EmitCExternDecls	        = lookUp  FSLIT("-femit-extern-decls")
 opt_GranMacros			= lookUp  FSLIT("-fgransim")
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
@@ -309,6 +307,8 @@ isStaticFlag f =
 	"firrefutable-tuples",
 	"fparallel",
 	"fflatten",
+	"fsemi-tagging",
+	"flet-no-escape",
 	"femit-extern-decls",
 	"fgransim",
 	"fno-hi-version-check",

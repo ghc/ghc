@@ -1778,12 +1778,6 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-femit-extern-decls</option></entry>
-	      <entry>???</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-fno-hi-version-check</option></entry>
 	      <entry>Don't complain about <literal>.hi</literal> file mismatches</entry>
 	      <entry>static</entry>
