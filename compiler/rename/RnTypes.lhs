@@ -21,7 +21,7 @@ module RnTypes (
 	dupFieldErr, patSigErr, checkTupSize
   ) where
 
-import DynFlags		( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts) )
+import DynFlags		( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts, Opt_ScopedTypeVariables ) )
 
 import HsSyn
 import RdrHsSyn		( extractHsRhoRdrTyVars )
@@ -121,17 +121,16 @@ rnHsType doc (HsTyVar tyvar)
   = lookupOccRn tyvar 		`thenM` \ tyvar' ->
     returnM (HsTyVar tyvar')
 
-rnHsType doc (HsOpTy ty1 (L loc op) ty2)
-  = setSrcSpan loc (
-      lookupOccRn op			`thenM` \ op' ->
-      let
-	l_op' = L loc op'
-      in
-      lookupTyFixityRn l_op'		`thenM` \ fix ->
-      rnLHsType doc ty1			`thenM` \ ty1' ->
-      rnLHsType doc ty2			`thenM` \ ty2' -> 
-      mkHsOpTyRn (\t1 t2 -> HsOpTy t1 l_op' t2) (ppr op') fix ty1' ty2'
-   )
+rnHsType doc ty@(HsOpTy ty1 (L loc op) ty2)
+  = setSrcSpan loc $ 
+    do	{ ty_ops_ok <- doptM Opt_ScopedTypeVariables	-- Badly named option
+	; checkErr ty_ops_ok (opTyErr op ty)
+	; op' <- lookupOccRn op
+	; let l_op' = L loc op'
+	; fix <- lookupTyFixityRn l_op'
+	; ty1' <- rnLHsType doc ty1
+	; ty2' <- rnLHsType doc ty2
+	; mkHsOpTyRn (\t1 t2 -> HsOpTy t1 l_op' t2) (ppr op') fix ty1' ty2' }
 
 rnHsType doc (HsParTy ty)
   = rnLHsType doc ty 	        `thenM` \ ty' ->
@@ -756,6 +755,10 @@ forAllWarn doc ty (L loc tyvar)
 		 	nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
 		   $$
 		   doc)
+
+opTyErr op ty 
+  = hang (ptext SLIT("Illegal operator") <+> quotes (ppr op) <+> ptext SLIT("in type") <+> quotes (ppr ty))
+	 2 (parens (ptext SLIT("Use -fscoped-type-variables to allow operators in types")))
 
 bogusCharError c
   = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''
