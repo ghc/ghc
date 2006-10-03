@@ -239,27 +239,6 @@
       
       <varlistentry>
 	<term>
-          <option>-dverbose-core2core</option>
-          <indexterm><primary><option>-dverbose-core2core</option></primary></indexterm>
-        </term>
-	<term>
-          <option>-dverbose-stg2stg</option>
-          <indexterm><primary><option>-dverbose-stg2stg</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Show the output of the intermediate Core-to-Core and
-        STG-to-STG passes, respectively.  (<emphasis>Lots</emphasis>
-        of output!) So: when we're really desperate:</para>
-
-	  <screen>
-% ghc -noC -O -ddump-simpl -dverbose-simpl -dcore-lint Foo.hs
-</screen>
-
-	</listitem>
-      </varlistentry>
-      
-      <varlistentry>
-	<term>
           <option>-ddump-simpl-iterations</option>:
           <indexterm><primary><option>-ddump-simpl-iterations</option></primary></indexterm>
         </term>
@@ -268,39 +247,6 @@
         of the simplifier (each run of the simplifier has a maximum
         number of iterations, normally 4).  Used when even
         <option>-dverbose-simpl</option> doesn't cut it.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-dppr-debug</option>
-          <indexterm><primary><option>-dppr-debug</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Debugging output is in one of several
-          &ldquo;styles.&rdquo; Take the printing of types, for
-          example.  In the &ldquo;user&rdquo; style (the default), the
-          compiler's internal ideas about types are presented in
-          Haskell source-level syntax, insofar as possible.  In the
-          &ldquo;debug&rdquo; style (which is the default for
-          debugging output), the types are printed in with explicit
-          foralls, and variables have their unique-id attached (so you
-          can check for things that look the same but aren't).  This
-          flag makes debugging output appear in the more verbose debug
-          style.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-dppr-user-length</option>
-          <indexterm><primary><option>-dppr-user-length</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>In error messages, expressions are printed to a
-	  certain &ldquo;depth&rdquo;, with subexpressions beyond the
-	  depth replaced by ellipses.  This flag sets the
-	  depth.</para>
 	</listitem>
       </varlistentry>
 
@@ -336,6 +282,60 @@
 	<listitem>
 	  <para>Print out summary of what kind of information the renamer
         had to bring in.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dverbose-core2core</option>
+          <indexterm><primary><option>-dverbose-core2core</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-dverbose-stg2stg</option>
+          <indexterm><primary><option>-dverbose-stg2stg</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Show the output of the intermediate Core-to-Core and
+        STG-to-STG passes, respectively.  (<emphasis>Lots</emphasis>
+        of output!) So: when we're really desperate:</para>
+
+	  <screen>
+% ghc -noC -O -ddump-simpl -dverbose-simpl -dcore-lint Foo.hs
+</screen>
+
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term>
+          <option>-dppr-debug</option>
+          <indexterm><primary><option>-dppr-debug</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Debugging output is in one of several
+          &ldquo;styles.&rdquo; Take the printing of types, for
+          example.  In the &ldquo;user&rdquo; style (the default), the
+          compiler's internal ideas about types are presented in
+          Haskell source-level syntax, insofar as possible.  In the
+          &ldquo;debug&rdquo; style (which is the default for
+          debugging output), the types are printed in with explicit
+          foralls, and variables have their unique-id attached (so you
+          can check for things that look the same but aren't).  This
+          flag makes debugging output appear in the more verbose debug
+          style.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dppr-user-length</option>
+          <indexterm><primary><option>-dppr-user-length</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>In error messages, expressions are printed to a
+	  certain &ldquo;depth&rdquo;, with subexpressions beyond the
+	  depth replaced by ellipses.  This flag sets the
+	  depth.</para>
 	</listitem>
       </varlistentry>
 
