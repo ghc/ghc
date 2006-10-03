@@ -51,12 +51,11 @@ import Id		( idType, Id, mkWildId, mkTemplateLocals, mkSysLocal )
 import Var		( Var )
 import Name		( Name )
 import Literal		( Literal(..), mkStringLit, inIntRange, tARGET_MAX_INT )
-import TyCon		( isNewTyCon, tyConDataCons, tyConArity )
-import DataCon		( DataCon, dataConSourceArity, dataConTyCon, dataConTag, dataConRepArgTys )
+import TyCon		( isNewTyCon, tyConDataCons )
+import DataCon		( DataCon, dataConSourceArity, dataConTyCon, dataConTag )
 import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp, mkTyVarTy,
                           splitNewTyConApp )
-import Coercion         ( Coercion, mkUnsafeCoercion )
-import TcType		( tcEqType )
+import Coercion         ( mkUnsafeCoercion )
 import TysPrim		( intPrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon, mkTupleTy,
