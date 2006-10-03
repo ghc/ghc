@@ -246,6 +246,7 @@ splitHsInstDeclTy inst_ty
   where
     split_tau tvs cxt (HsPredTy (HsClassP cls tys)) = (tvs, cxt, cls, tys)
     split_tau tvs cxt (HsParTy (L _ ty))	    = split_tau tvs cxt ty
+    split_tau _ _ other = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
 
 -- Splits HsType into the (init, last) parts
 -- Breaks up any parens in the result type: 
