@@ -1,0 +1,5 @@
+
+tcfail166.hs:5:20:
+    Illegal operator `.' in type `forall a . ((a -> Maybe (b, a))
+					      -> a -> c)'
+      (Use -fscoped-type-variables to allow operators in types)
