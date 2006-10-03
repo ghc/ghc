@@ -592,6 +592,18 @@ ghc -c Foo.hs</screen>
 
       <varlistentry>
 	<term>
+          <option>-n</option>
+          <indexterm><primary><option>-n</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Does a dry-run, i.e. GHC goes through all the motions
+          of compiling as normal, but does not actually run any
+          external commands.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-v</option>
           <indexterm><primary><option>-v</option></primary></indexterm>
         </term>
@@ -745,6 +757,20 @@ ghc -c Foo.hs</screen>
 	  follow existing convention (i.e. this is how Emacs does
 	  it).</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-H</option><replaceable>size</replaceable>
+        <indexterm><primary><option>-H</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Set the minimum size of the heap to
+          <replaceable>size</replaceable>.
+          This option is equivalent to
+          <literal>+RTS&nbsp;-H<replaceable>size</replaceable></literal>,
+          see <xref linkend="rts-options-gc" />.
+          </para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>

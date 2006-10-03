@@ -60,6 +60,27 @@
 
 	    <varlistentry>
 	      <term>
+	        <option>-ddump-tc</option>:
+                <indexterm><primary><option>-ddump-tc</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>typechecker output</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
+	        <option>-ddump-splices</option>:
+                <indexterm><primary><option>-ddump-splices</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>Dump Template Haskell expressions that we splice in,
+                and what Haskell code the expression evaluates to.</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
 	        <option>-ddump-types</option>:
                 <indexterm><primary><option>-ddump-types</option></primary></indexterm>
 	      </term>
@@ -186,6 +207,16 @@
 
 	    <varlistentry>
 	      <term>
+	        <option>-ddump-prep</option>:
+                <indexterm><primary><option>-ddump-prep</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>output of core preparation pass</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
 	        <option>-ddump-stg</option>:
                 <indexterm><primary><option>-ddump-stg</option></primary></indexterm>
 	      </term>
@@ -201,6 +232,26 @@
 	      </term>
 	      <listitem>
 		<para><emphasis>flattened</emphasis> Abstract&nbsp;C</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
+	        <option>-ddump-cmm</option>:
+                <indexterm><primary><option>-ddump-cmm</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>Print the C-- code out.</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
+	        <option>-ddump-opt-cmm</option>:
+                <indexterm><primary><option>-ddump-opt-cmm</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>Dump the results of C-- to C-- optimising passes.</para>
 	      </listitem>
 	    </varlistentry>
 
@@ -265,6 +316,28 @@
 
       <varlistentry>
 	<term>
+          <option>-ddump-if-trace</option>
+          <indexterm><primary><option>-ddump-if-trace</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Make the interface loader be *real* chatty about what it is
+	upto.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-ddump-tc-trace</option>
+          <indexterm><primary><option>-ddump-tc-trace</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Make the type checker be *real* chatty about what it is
+	upto.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-ddump-rn-trace</option>
           <indexterm><primary><option>-ddump-rn-trace</option></primary></indexterm>
         </term>
@@ -308,12 +381,22 @@
       
       <varlistentry>
 	<term>
+          <option>-dshow-passes</option>
+          <indexterm><primary><option>-dshow-passes</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Print out each pass name as it happens.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-dfaststring-stats</option>
           <indexterm><primary><option>-dfaststring-stats</option></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Show statistics for the usage of fast strings by the
-          compiler</para>
+          compiler.</para>
 	</listitem>
       </varlistentry>
 
@@ -389,6 +472,16 @@
         </term>
 	<listitem>
 	  <para>Ditto for STG level. (NOTE: currently doesn't work).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dcmm-lint</option>:
+          <indexterm><primary><option>-dcmm-lint</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Ditto for C-- level.</para>
 	</listitem>
       </varlistentry>
 

@@ -171,7 +171,6 @@
             <option>-pgma</option>,
             <option>-pgml</option>,
             <option>-pgmdll</option>,
-            <option>-pgmdep</option>,
             <option>-pgmF</option>,
             <option>-optl</option>,
             <option>-optdll</option>,

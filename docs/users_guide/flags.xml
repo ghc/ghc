@@ -36,6 +36,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-n</option></entry>
+	      <entry>do a dry run</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-v</option></entry>
 	      <entry>verbose mode (equivalent to <option>-v3</option>)</entry>
 	      <entry>dynamic</entry>
@@ -74,6 +80,12 @@
 	    <row>
 	      <entry><option>-ferror-spans</option></entry>
 	      <entry>output full span in error messages</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-H</option><replaceable>size</replaceable></entry>
+	      <entry>Set the minimum heap size to <replaceable>size</replaceable></entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
@@ -486,6 +498,12 @@
 	    </row>
 	  </thead>
 	  <tbody>
+	    <row>
+	      <entry><option>-package-name</option> <replaceable>P</replaceable></entry>
+	      <entry>Compile to be part of package <replaceable>P</replaceable></entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	    <row>
 	      <entry><option>-package</option> <replaceable>P</replaceable></entry>
 	      <entry>Expose package <replaceable>P</replaceable></entry>
@@ -1245,6 +1263,12 @@
 	  </thead>
 	  <tbody>
 	    <row>
+	      <entry><option>-fPIC</option></entry>
+	      <entry>Generate position-independent code (where available)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-dynamic</option></entry>
 	      <entry>Use dynamic Haskell libraries (if available)</entry>
 	      <entry>static</entry>
@@ -1367,6 +1391,18 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-pgmm</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the mangler</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgms</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the splitter</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-pgma</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the assembler</entry>
 	      <entry>dynamic</entry>
@@ -1385,12 +1421,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-pgmdep</option> <replaceable>cmd</replaceable></entry>
-	      <entry>Use <replaceable>cmd</replaceable> as the dependency generator</entry>
-	      <entry>dyanmic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-pgmF</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the pre-processor
 	      (with <option>-F</option> only)</entry>
@@ -1406,7 +1436,6 @@
       <indexterm><primary><option>-pgma</option></primary></indexterm>
       <indexterm><primary><option>-pgml</option></primary></indexterm>
       <indexterm><primary><option>-pgmdll</option></primary></indexterm>
-      <indexterm><primary><option>-pgmdep</option></primary></indexterm>
       <indexterm><primary><option>-pgmF</option></primary></indexterm>
 
     </sect2>
@@ -1450,6 +1479,12 @@
 	    <row>
 	      <entry><option>-optc</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to the C compiler</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optm</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to the mangler</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1573,6 +1608,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-cmm</option></entry>
+	      <entry>Dump C-- output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ddump-cpranal</option></entry>
 	      <entry>Dump output from CPR analysis</entry>
 	      <entry>dynamic</entry>
@@ -1621,8 +1662,20 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-opt-cmm</option></entry>
+	      <entry>Dump the results of C-- to C-- optimising passes</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ddump-parsed</option></entry>
 	      <entry>Dump parse tree</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-prep</option></entry>
+	      <entry>Dump prepared core</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1657,6 +1710,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-splices</option></entry>
+	      <entry>Dump TH splided expressions, and what they evaluate to</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ddump-stg</option></entry>
 	      <entry>Dump final STG</entry>
 	      <entry>dynamic</entry>
@@ -1683,6 +1742,18 @@
 	    <row>
 	      <entry><option>-ddump-worker-wrapper</option></entry>
 	      <entry>Dump worker-wrapper output</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-if-trace</option></entry>
+	      <entry>Trace interface files</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-tc-trace</option></entry>
+	      <entry>Trace typechecker</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1729,6 +1800,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-dcmm-lint</option></entry>
+	      <entry>C-- pass sanity checking</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-dstg-lint</option></entry>
 	      <entry>STG pass sanity checking</entry>
 	      <entry>dynamic</entry>
@@ -1749,6 +1826,12 @@
 	    <row>
 	      <entry><option>-dverbose-stg2stg</option></entry>
 	      <entry>Show output from each STG-to-STG pass</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dshow-passes</option></entry>
+	      <entry>Print out each pass name as it happens</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>

@@ -49,6 +49,28 @@
 
       <varlistentry>
         <term>
+          <option>-pgmm</option> <replaceable>cmd</replaceable>
+          <indexterm><primary><option>-pgmm</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use <replaceable>cmd</replaceable> as the
+          mangler.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-pgms</option> <replaceable>cmd</replaceable>
+          <indexterm><primary><option>-pgms</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use <replaceable>cmd</replaceable> as the
+          splitter.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <option>-pgma</option> <replaceable>cmd</replaceable>
           <indexterm><primary><option>-pgma</option></primary></indexterm>
         </term>
@@ -76,17 +98,6 @@
         </term>
         <listitem>
           <para>Use <replaceable>cmd</replaceable> as the DLL
-          generator.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
-          <option>-pgmdep</option> <replaceable>cmd</replaceable>
-          <indexterm><primary><option>-pgmdep</option></primary></indexterm>
-        </term>
-        <listitem>
-          <para>Use <replaceable>cmd</replaceable> as the dependency
           generator.</para>
         </listitem>
       </varlistentry>
@@ -151,6 +162,15 @@
         </term>
         <listitem>
           <para>Pass <replaceable>option</replaceable> to the C compiler.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>
+          <option>-optm</option>  <replaceable>option</replaceable>
+          <indexterm><primary><option>-optm</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Pass <replaceable>option</replaceable> to the mangler.</para>
         </listitem>
       </varlistentry>
       <varlistentry>
