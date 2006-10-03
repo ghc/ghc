@@ -365,12 +365,14 @@ defn of OccInfo here, safely at the bottom
 
 \begin{code}
 data OccInfo 
-  = NoOccInfo
+  = NoOccInfo		-- Many occurrences, or unknown
+
+  | RulesOnly		-- Occurs only in the RHS of one or more rules
 
   | IAmDead		-- Marks unused variables.  Sometimes useful for
 			-- lambda and case-bound variables.
 
-  | OneOcc !InsideLam
+  | OneOcc !InsideLam	-- Occurs exactly once, not inside a rule
  	   !OneBranch
 	   !InterestingCxt
 
@@ -422,6 +424,7 @@ isFragileOcc other	    = False
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
   ppr NoOccInfo  			  	  = empty
+  ppr RulesOnly  			  	  = ptext SLIT("RulesOnly")
   ppr IAmALoopBreaker 				  = ptext SLIT("LoopBreaker")
   ppr IAmDead					  = ptext SLIT("Dead")
   ppr (OneOcc inside_lam one_branch int_cxt)

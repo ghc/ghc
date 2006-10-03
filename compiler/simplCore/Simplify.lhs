@@ -633,7 +633,6 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
     final_id					`seq`
     -- pprTrace "Binding" (ppr final_id <+> ppr unfolding) $
     returnSmpl (unitFloat env final_id new_rhs, env)
-
   where 
     unfolding    = mkUnfolding (isTopLevel top_lvl) new_rhs
     loop_breaker = isLoopBreaker occ_info

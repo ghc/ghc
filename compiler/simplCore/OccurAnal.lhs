@@ -35,7 +35,7 @@ import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
-import UniqFM		( keysUFM )  
+import UniqFM		( keysUFM, lookupUFM_Directly )  
 import Util		( zipWithEqual, mapAndUnzip )
 import Outputable
 \end{code}
@@ -200,10 +200,23 @@ occAnalBind env (Rec pairs) body_usage
 	rhs_usages		       = [rhs_usage | (_, rhs_usage, _) <- details]
 	total_usage		       = foldr combineUsageDetails body_usage rhs_usages
 	(combined_usage, tagged_bndrs) = tagBinders total_usage bndrs
-	final_bind		       = Rec (reOrderRec env new_cycle)
+	final_bind		       = Rec (doReorder edges)
 
-	new_cycle = CyclicSCC (zipWithEqual "occAnalBind" mk_new_bind tagged_bndrs cycle)
-	mk_new_bind tagged_bndr ((_, _, rhs'), key, keys) = ((tagged_bndr, rhs'), key, keys)
+	-- Hopefully 'bndrs' is a relatively small group now
+	-- Now get ready for the loop-breaking phase, this time ignoring RulesOnly references
+	-- We've done dead-code elimination already, so no worries about un-referenced binders
+	edges :: [Node Details2]
+	edges = zipWithEqual "reorder" mk_edge tagged_bndrs details
+	keys = map idUnique bndrs
+ 	mk_edge tagged_bndr (_, rhs_usage, rhs')
+	  = ((tagged_bndr, rhs'), idUnique tagged_bndr, used) 
+	  where
+	    used = [key | key <- keys, used_outside_rule rhs_usage key ]
+
+	used_outside_rule usage uniq = case lookupUFM_Directly usage uniq of
+						Nothing		-> False
+						Just RulesOnly	-> False	-- Ignore rules
+						other		-> True
 \end{code}
 
 @reOrderRec@ is applied to the list of (binder,rhs) pairs for a cyclic
@@ -262,27 +275,29 @@ IMustNotBeINLINEd pragma is much much better.
 
 
 \begin{code}
-reOrderRec
-	:: OccEnv
-	-> SCC (Node Details2)
-	-> [Details2]
-			-- Sorted into a plausible order.  Enough of the Ids have
-			--	dontINLINE pragmas that there are no loops left.
+doReorder :: [Node Details2] -> [Details2]
+-- Sorted into a plausible order.  Enough of the Ids have
+--	dontINLINE pragmas that there are no loops left.
+doReorder nodes = concatMap reOrderRec (stronglyConnCompR nodes)
+
+reOrderRec :: SCC (Node Details2) -> [Details2]
 
 	-- Non-recursive case
-reOrderRec env (AcyclicSCC (bind, _, _)) = [bind]
+reOrderRec (AcyclicSCC (bind, _, _)) = [bind]
 
 	-- Common case of simple self-recursion
-reOrderRec env (CyclicSCC [bind])
+reOrderRec (CyclicSCC [])
+  = panic "reOrderRec"
+
+reOrderRec (CyclicSCC [bind])
   = [(setIdOccInfo tagged_bndr IAmALoopBreaker, rhs)]
   where
     ((tagged_bndr, rhs), _, _) = bind
 
-reOrderRec env (CyclicSCC (bind : binds))
+reOrderRec (CyclicSCC (bind : binds))
   = 	-- Choose a loop breaker, mark it no-inline,
 	-- do SCC analysis on the rest, and recursively sort them out
-    concat (map (reOrderRec env) (stronglyConnCompR unchosen))
-    ++ 
+    doReorder unchosen ++ 
     [(setIdOccInfo tagged_bndr IAmALoopBreaker, rhs)]
 
   where
@@ -398,7 +413,7 @@ addRuleUsage :: UsageDetails -> Id -> UsageDetails
 addRuleUsage usage id
   = foldVarSet add usage (idRuleVars id)
   where
-    add v u = addOneOcc u v NoOccInfo		-- Give a non-committal binder info
+    add v u = addOneOcc u v RulesOnly		-- Give a non-committal binder info
 						-- (i.e manyOcc) because many copies
 						-- of the specialised thing can appear
 \end{code}
@@ -824,20 +839,21 @@ markInsideLam occ		 	= occ
 
 addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
-addOccInfo IAmDead info2 = info2
-addOccInfo info1 IAmDead = info1
-addOccInfo info1 info2   = NoOccInfo
+addOccInfo IAmDead info2       = info2
+addOccInfo info1 IAmDead       = info1
+addOccInfo RulesOnly RulesOnly = RulesOnly
+addOccInfo info1 info2         = NoOccInfo
 
 -- (orOccInfo orig new) is used
 -- when combining occurrence info from branches of a case
 
 orOccInfo IAmDead info2 = info2
 orOccInfo info1 IAmDead = info1
+orOccInfo RulesOnly RulesOnly = RulesOnly
 orOccInfo (OneOcc in_lam1 one_branch1 int_cxt1)
 	  (OneOcc in_lam2 one_branch2 int_cxt2)
   = OneOcc (in_lam1 || in_lam2)
 	   False	-- False, because it occurs in both branches
 	   (int_cxt1 && int_cxt2)
-
 orOccInfo info1 info2 = NoOccInfo
 \end{code}

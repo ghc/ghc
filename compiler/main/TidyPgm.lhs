@@ -451,9 +451,10 @@ addExternal (id,rhs) needed
   = extendVarEnv (foldVarSet add_occ needed new_needed_ids)
 		 id show_unfold
   where
-    add_occ id needed = extendVarEnv needed id False
+    add_occ id needed | id `elemVarEnv` needed = needed
+		      | otherwise	       = extendVarEnv needed id False
 	-- "False" because we don't know we need the Id's unfolding
-	-- We'll override it later when we find the binding site
+	-- Don't override existing bindings; we might have already set it to True
 
     new_needed_ids = worker_ids	`unionVarSet`
 		     unfold_ids	`unionVarSet`
