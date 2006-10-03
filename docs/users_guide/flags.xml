@@ -1753,6 +1753,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-dfaststring-stats</option></entry>
+	      <entry>Show statistics for fast string usage when finished</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-unreg</option></entry>
 	      <entry>Enable unregisterised compilation</entry>
 	      <entry>static</entry>

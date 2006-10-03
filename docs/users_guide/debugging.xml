@@ -308,6 +308,17 @@
       
       <varlistentry>
 	<term>
+          <option>-dfaststring-stats</option>
+          <indexterm><primary><option>-dfaststring-stats</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Show statistics for the usage of fast strings by the
+          compiler</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-dppr-debug</option>
           <indexterm><primary><option>-dppr-debug</option></primary></indexterm>
         </term>
