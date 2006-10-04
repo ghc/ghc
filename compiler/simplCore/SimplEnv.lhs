@@ -308,7 +308,7 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   where
 	-- Get the most up-to-date thing from the in-scope set
 	-- Even though it isn't in the substitution, it may be in
-	-- the in-scope set better IdInfo
+	-- the in-scope set with better IdInfo
     refine v = case lookupInScope in_scope v of
 		 Just v' -> v'
 		 Nothing -> WARN( True, ppr v ) v	-- This is an error!

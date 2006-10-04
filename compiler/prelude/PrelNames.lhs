@@ -670,11 +670,13 @@ mk_known_key_name space mod str uniq
 		   Nothing noSrcLoc
 
 conName :: Name -> FastString -> Unique -> Name
+-- Be careful to ghve constructor names the right parent!
 conName tycon occ uniq
   = mkExternalName uniq (nameModule tycon) (mkOccNameFS dataName occ) 
 		   (Just tycon) noSrcLoc
 
 methName :: Name -> FastString -> Unique -> Name
+-- Be careful to ghve method names the right parent!
 methName cls occ uniq
   = mkExternalName uniq (nameModule cls) (mkVarOccFS occ) 
 		   (Just cls) noSrcLoc
