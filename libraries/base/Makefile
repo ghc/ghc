@@ -56,7 +56,7 @@ SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
 SRC_CPP_OPTS += ${GhcCppOpts}
 
 ifeq "$(BootingFromHc)" "YES"
-GHC/PrimopWrappers.hs: GHC/Prim.hs
+GHC/PrimopWrappers.hs:
 	touch GHC/PrimopWrappers.hs
 else
 GHC/PrimopWrappers.hs: $(GHC_COMPILER_DIR)/prelude/primops.txt GHC/Prim.hs
