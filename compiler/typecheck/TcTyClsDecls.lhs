@@ -802,7 +802,7 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
 	  = do { let bangs = map getBangStrictness btys
 	       ; arg_tys <- mappM tcHsBangType btys
     	       ; buildDataCon (unLoc name) is_infix
-    		    (argStrictness unbox_strict tycon bangs arg_tys)
+    		    (argStrictness unbox_strict bangs arg_tys)
     		    (map unLoc field_lbls)
     		    univ_tvs ex_tvs eq_preds ctxt' arg_tys
 		    data_tc }
@@ -876,11 +876,11 @@ tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
 
 	      -------------------
 argStrictness :: Bool		-- True <=> -funbox-strict_fields
-	      -> TyCon -> [HsBang]
+	      -> [HsBang]
 	      -> [TcType] -> [StrictnessMark]
-argStrictness unbox_strict tycon bangs arg_tys
+argStrictness unbox_strict bangs arg_tys
  = ASSERT( length bangs == length arg_tys )
-   zipWith (chooseBoxingStrategy unbox_strict tycon) arg_tys bangs
+   zipWith (chooseBoxingStrategy unbox_strict) arg_tys bangs
 
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The field is marked '!!', or
@@ -888,8 +888,8 @@ argStrictness unbox_strict tycon bangs arg_tys
 --
 -- We have turned off unboxing of newtypes because coercions make unboxing 
 -- and reboxing more complicated
-chooseBoxingStrategy :: Bool -> TyCon -> TcType -> HsBang -> StrictnessMark
-chooseBoxingStrategy unbox_strict_fields tycon arg_ty bang
+chooseBoxingStrategy :: Bool -> TcType -> HsBang -> StrictnessMark
+chooseBoxingStrategy unbox_strict_fields arg_ty bang
   = case bang of
 	HsNoBang				    -> NotMarkedStrict
 	HsStrict | unbox_strict_fields 
@@ -902,12 +902,20 @@ chooseBoxingStrategy unbox_strict_fields tycon arg_ty bang
     can_unbox arg_ty = case splitTyConApp_maybe arg_ty of
 		   Nothing 	       		-> False
 		   Just (arg_tycon, tycon_args) -> 
-                       not (isRecursiveTyCon tycon) &&
+                       not (isRecursiveTyCon arg_tycon) &&	-- Note [Recusive unboxing]
 		       isProductTyCon arg_tycon &&
                        (if isNewTyCon arg_tycon then 
                             can_unbox (newTyConInstRhs arg_tycon tycon_args)
                         else True)
 \end{code}
+
+Note [Recursive unboxing]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Be careful not to try to unbox this!
+	data T = MkT !T Int
+But it's the *argument* type that matters. This is fine:
+	data S = MkS S !Int
+because Int is non-recursive.
 
 %************************************************************************
 %*									*
