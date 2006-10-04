@@ -81,6 +81,15 @@ Similarly drop:
 
 Would like to pass n along unboxed.
 	
+Note [Scrutinee with cast]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+    f = \ t -> case (v `cast` co) of
+	         V a b -> a : f t
+
+Exactly the same optimistaion (unrolling one call to f) will work here, 
+despite the cast.  See mk_alt_env in the Case branch of libCase.
+
 
 To think about (Apr 94)
 ~~~~~~~~~~~~~~
@@ -238,10 +247,10 @@ libCase env (Let bind body)
 libCase env (Case scrut bndr ty alts)
   = Case (libCase env scrut) bndr ty (map (libCaseAlt env_alts) alts)
   where
-    env_alts = addBinders env_with_scrut [bndr]
-    env_with_scrut = case scrut of
-		  	Var scrut_var -> addScrutedVar env scrut_var
-			other	      -> env
+    env_alts = addBinders (mk_alt_env scrut) [bndr]
+    mk_alt_env (Var scrut_var) = addScrutedVar env scrut_var
+    mk_alt_env (Cast scrut _)  = mk_alt_env scrut	-- Note [Scrutinee with cast]
+    mk_alt_env otehr	       = env
 
 libCaseAlt env (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
 \end{code}
