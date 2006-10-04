@@ -78,10 +78,7 @@ data RdrName
 	-- We know exactly the Name. This is used 
 	--  (a) when the parser parses built-in syntax like "[]" 
 	--	and "(,)", but wants a RdrName from it
-	--  (b) when converting names to the RdrNames in IfaceTypes
-	--	Here an Exact RdrName always contains an External Name
-	--	(Internal Names are converted to simple Unquals)
-	--  (c) by Template Haskell, when TH has generated a unique name
+	--  (b) by Template Haskell, when TH has generated a unique name
 \end{code}
 
 
