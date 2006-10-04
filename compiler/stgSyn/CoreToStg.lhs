@@ -21,9 +21,6 @@ import TyCon		( isAlgTyCon )
 import Id
 import Var		( Var, globalIdDetails, idType )
 import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon, isHiBootTyCon )
-#ifdef ILX
-import MkId		( unsafeCoerceId )
-#endif
 import IdInfo
 import DataCon
 import CostCentre	( noCCS )
@@ -320,16 +317,6 @@ coreToStgExpr expr@(Lam _ _)
 coreToStgExpr (Note (SCC cc) expr)
   = coreToStgExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
     returnLne (StgSCC cc expr2, fvs, escs) )
-
-#ifdef ILX
--- For ILX, convert (__coerce__ to_ty from_ty e)
---         into    (coerce to_ty from_ty e)
--- where coerce is real function
-coreToStgExpr (Cast expr co)
-  = let (from_ty, ty_ty) = coercionKind co in
-    coreToStgExpr (mkApps (Var unsafeCoerceId)
-                         [Type from_ty, Type to_ty, expr])
-#endif
 
 coreToStgExpr (Note other_note expr)
   = coreToStgExpr expr

@@ -13,10 +13,6 @@ import UniqSupply	( mkSplitUniqSupply )
 import AsmCodeGen	( nativeCodeGen )
 #endif
 
-#ifdef ILX
-import IlxGen		( ilxGen )
-#endif
-
 #ifdef JAVA
 import JavaGen		( javaGen )
 import qualified PrintJava
@@ -93,13 +89,6 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
 			       outputJava dflags filenm mod_name tycons core_binds;
 #else
                                panic "Java support not compiled into this ghc";
-#endif
-	     HscILX         -> 
-#ifdef ILX
-			       let tycons = typeEnvTyCons type_env in
-	                       outputIlx dflags filenm mod_name tycons stg_binds;
-#else
-                               panic "ILX support not compiled into this ghc";
 #endif
 	  }
 	; return stubs_exist
@@ -205,22 +194,6 @@ outputJava dflags filenm mod tycons core_binds
 	-- Make sure we have up to date dead-var information
     java_code = javaGen mod [{- Should be imports-}] tycons occ_anal_binds
     pp_java   = PrintJava.compilationUnit java_code
-#endif
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Ilx}
-%*									*
-%************************************************************************
-
-\begin{code}
-#ifdef ILX
-outputIlx dflags filename mod tycons stg_binds
-  =  doOutput filename (\ f -> printForC f pp_ilx)
-  where
-    pp_ilx = ilxGen mod tycons stg_binds
 #endif
 \end{code}
 

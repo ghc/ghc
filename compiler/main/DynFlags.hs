@@ -304,7 +304,6 @@ data HscTarget
   = HscC
   | HscAsm
   | HscJava
-  | HscILX
   | HscInterpreted
   | HscNothing
   deriving (Eq, Show)
@@ -977,7 +976,6 @@ dynamic_flags = [
   ,  ( "fasm",		AnySuffix (\_ -> setTarget HscAsm) )
   ,  ( "fvia-c",	NoArg (setTarget HscC) )
   ,  ( "fvia-C",	NoArg (setTarget HscC) )
-  ,  ( "filx",		NoArg (setTarget HscILX) )
 
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
@@ -1105,12 +1103,11 @@ setPackageName p
   where
         pid = stringToPackageId p
 
--- we can only switch between HscC, HscAsmm, and HscILX with dynamic flags 
+-- we can only switch between HscC, and HscAsmm with dynamic flags 
 -- (-fvia-C, -fasm, -filx respectively).
 setTarget l = upd (\dfs -> case hscTarget dfs of
 					HscC   -> dfs{ hscTarget = l }
 					HscAsm -> dfs{ hscTarget = l }
-					HscILX -> dfs{ hscTarget = l }
 					_      -> dfs)
 
 setOptLevel :: Int -> DynFlags -> DynFlags

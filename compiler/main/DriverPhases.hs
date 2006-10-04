@@ -183,10 +183,6 @@ phaseInputExt SplitAs     	  = "split_s"   -- not really generated
 phaseInputExt CmmCpp	  	  = "cmm"
 phaseInputExt Cmm	  	  = "cmmcpp"
 phaseInputExt StopLn          	  = "o"
-#ifdef ILX
-phaseInputExt Ilx2Il      	  = "ilx"
-phaseInputExt Ilasm       	  = "il"
-#endif
 
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
 			       [ "hspp", "hscpp", "hcr", "cmm" ]

@@ -287,7 +287,6 @@ checkForeignRes non_io_result_ok pred_res_ty ty
 \end{code}
 
 \begin{code}
-checkDotnet HscILX = Nothing
 #if defined(mingw32_TARGET_OS)
 checkDotnet HscC   = Nothing
 checkDotnet _      = Just (text "requires C code generation (-fvia-C)")
@@ -308,10 +307,9 @@ checkCOrAsmOrInterp other
 
 checkCOrAsmOrDotNetOrInterp HscC           = Nothing
 checkCOrAsmOrDotNetOrInterp HscAsm         = Nothing
-checkCOrAsmOrDotNetOrInterp HscILX         = Nothing
 checkCOrAsmOrDotNetOrInterp HscInterpreted = Nothing
 checkCOrAsmOrDotNetOrInterp other  
-   = Just (text "requires interpreted, C, native or .NET ILX code generation")
+   = Just (text "requires interpreted, C or native code generation")
 
 checkCg check
  = getDOpts		`thenM` \ dflags ->
