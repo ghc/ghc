@@ -12,10 +12,9 @@ module TcTyClsDecls (
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
 			  ConDecl(..),   Sig(..), NewOrData(..), ResType(..),
-			  tyClDeclTyVars, isSynDecl, isClassDecl, isIdxTyDecl,
+			  tyClDeclTyVars, isSynDecl, isIdxTyDecl,
 			  isKindSigDecl, hsConArgs, LTyClDecl, tcdName,
-			  hsTyVarName, LHsTyVarBndr, LHsType, HsType(..),
-			  mkHsAppTy
+			  hsTyVarName, LHsTyVarBndr, LHsType
 			)
 import HsTypes          ( HsBang(..), getBangStrictness, hsLTyVarNames )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
@@ -38,9 +37,9 @@ import TcMType		( newKindVar, checkValidTheta, checkValidType,
 			  -- checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcType		( TcKind, TcType, Type, tyVarsOfType, mkPhiTy,
-			  mkArrowKind, liftedTypeKind, mkTyVarTys, 
-			  tcSplitSigmaTy, tcEqTypes, tcGetTyVar_maybe )
-import Type		( PredType(..), splitTyConApp_maybe, mkTyVarTy,
+			  mkArrowKind, liftedTypeKind, 
+			  tcSplitSigmaTy, tcGetTyVar_maybe )
+import Type		( splitTyConApp_maybe, 
                           newTyConInstRhs, isLiftedTypeKind, Kind,
                           splitKindFunTys, mkArrowKinds
 			  -- pprParendType, pprThetaArrow
@@ -51,22 +50,23 @@ import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon, OpenDataTyCon,
 					      OpenNewTyCon ), 
 			  SynTyConRhs( OpenSynTyCon, SynonymTyCon ),
 			  tyConDataCons, mkForeignTyCon, isProductTyCon,
-			  isRecursiveTyCon, isOpenTyCon,
+			  isRecursiveTyCon, 
 			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
                           isNewTyCon, isDataTyCon, tyConKind, 
 			  setTyConArgPoss )
 import DataCon		( DataCon, dataConUserType, dataConName, 
 			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
 			  dataConFieldType, dataConResTys )
-import Var		( TyVar, idType, idName )
+import Var		( TyVar, idType, idName, tyVarName, setTyVarName )
 import VarSet		( elemVarSet, mkVarSet )
-import Name		( Name, getSrcLoc )
+import Name		( Name, getSrcLoc, tidyNameOcc, getOccName )
+import OccName		( initTidyOccEnv, tidyOccName )
 import Outputable
 import Maybe		( isJust, fromJust, isNothing, catMaybes )
 import Maybes		( expectJust )
 import Monad		( unless )
 import Unify		( tcMatchTys, tcMatchTyX )
-import Util		( zipLazy, isSingleton, notNull, sortLe )
+import Util		( zipLazy, isSingleton, notNull, sortLe, mapAccumL )
 import List		( partition, elemIndex )
 import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan, 
 			  srcSpanStart )
@@ -797,6 +797,7 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
     { ctxt' <- tcHsKindedContext ctxt
     ; (univ_tvs, ex_tvs, eq_preds, data_tc) <- tcResultType tycon tc_tvs tvs' res_ty
     ; let 
+	-- Tiresome: tidy the tyvar binders, since tc_tvs and tvs' may have the same OccNames
 	tc_datacon is_infix field_lbls btys
 	  = do { let bangs = map getBangStrictness btys
 	       ; arg_tys <- mappM tcHsBangType btys
@@ -823,7 +824,7 @@ tcResultType :: TyCon
 	     -> [TyVar] 	-- where MkT :: forall a b c. ...
 	     -> ResType Name
 	     -> TcM ([TyVar],	 	-- Universal
-		     [TyVar],		-- Existential
+		     [TyVar],		-- Existential (distinct OccNames from univs)
 		     [(TyVar,Type)],	-- Equality predicates
 		     TyCon)		-- TyCon given in the ResTy
 	-- We don't check that the TyCon given in the ResTy is
@@ -843,8 +844,8 @@ tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
 	--	([a,z,c], [x,y], [a:=:(x,y), c:=:z], T)
 
   = do	{ (dc_tycon, res_tys) <- tcLHsConResTy res_ty
-		-- NB: tc_tvs and dc_tvs are distinct
-	; let univ_tvs = choose_univs [] tc_tvs res_tys
+
+	; let univ_tvs = choose_univs [] tidy_tc_tvs res_tys
 		-- Each univ_tv is either a dc_tv or a tc_tv
 	      ex_tvs = dc_tvs `minusList` univ_tvs
 	      eq_spec = [ (tv, ty) | (tv,ty) <- univ_tvs `zip` res_tys, 
@@ -861,7 +862,19 @@ tcResultType _ tc_tvs dc_tvs (ResTyGADT res_ty)
 	| otherwise
 	= tc_tv : choose_univs used tc_tvs res_tys
 
--------------------
+	-- NB: tc_tvs and dc_tvs are distinct, but
+	-- we want them to be *visibly* distinct, both for
+	-- interface files and general confusion.  So rename
+	-- the tc_tvs, since they are not used yet (no 
+	-- consequential renaming needed)
+    init_occ_env     = initTidyOccEnv (map getOccName dc_tvs)
+    (_, tidy_tc_tvs) = mapAccumL tidy_one init_occ_env tc_tvs
+    tidy_one env tv  = (env', setTyVarName tv (tidyNameOcc name occ'))
+	      where
+		 name = tyVarName tv
+		 (env', occ') = tidyOccName env (getOccName name) 
+
+	      -------------------
 argStrictness :: Bool		-- True <=> -funbox-strict_fields
 	      -> TyCon -> [HsBang]
 	      -> [TcType] -> [StrictnessMark]

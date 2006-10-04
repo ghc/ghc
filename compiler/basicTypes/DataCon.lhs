@@ -260,6 +260,9 @@ data DataCon
 		-- [This is a change (Oct05): previously, vanilla datacons guaranteed to
 		--  have the same type variables as their parent TyCon, but that seems ugly.]
 
+	-- INVARIANT: the UnivTyVars and ExTyVars all have distinct OccNames
+	-- Reason: less confusing, and easier to generate IfaceSyn
+
 	dcEqSpec :: [(TyVar,Type)],	-- Equalities derived from the result type, 
 					-- *as written by the programmer*
 		-- This field allows us to move conveniently between the two ways
