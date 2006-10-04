@@ -35,7 +35,7 @@ import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
-import UniqFM		( keysUFM, lookupUFM_Directly )  
+import UniqFM		( keysUFM )  
 import Util		( zipWithEqual, mapAndUnzip )
 import Outputable
 \end{code}
@@ -79,14 +79,6 @@ Bindings
 ~~~~~~~~
 
 \begin{code}
-type IdWithOccInfo = Id			-- An Id with fresh PragmaInfo attached
-
-type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the Unique,
-						-- which is gotten from the Id.
-type Details1	  = (Id, UsageDetails, CoreExpr)
-type Details2	  = (IdWithOccInfo, CoreExpr)
-
-
 occAnalBind :: OccEnv
 	    -> CoreBind
 	    -> UsageDetails		-- Usage details of scope
@@ -198,17 +190,22 @@ occAnalBind env (Rec pairs) body_usage
 	details			       = [details   | (details, _, _) <- cycle]
 	bndrs			       = [bndr      | (bndr, _, _)      <- details]
 	rhs_usages		       = [rhs_usage | (_, rhs_usage, _) <- details]
-	total_usage		       = foldr combineUsageDetails body_usage rhs_usages
+	rhs_usage		       = foldr1 combineUsageDetails rhs_usages
+	total_usage		       = rhs_usage `combineUsageDetails` body_usage
 	(combined_usage, tagged_bndrs) = tagBinders total_usage bndrs
-	final_bind		       = Rec (doReorder edges)
+
+	new_cycle :: [Node Details2]
+	new_cycle  = zipWithEqual "reorder" mk_node tagged_bndrs cycle
+	final_bind = Rec (reOrderCycle rhs_usage new_cycle)
+	mk_node tagged_bndr ((_, _, rhs'), key, keys) = ((tagged_bndr, rhs'), key, keys)
+
+{-	An alternative; rebuild the edges.  No semantic difference, but perf might change
 
 	-- Hopefully 'bndrs' is a relatively small group now
 	-- Now get ready for the loop-breaking phase, this time ignoring RulesOnly references
 	-- We've done dead-code elimination already, so no worries about un-referenced binders
-	edges :: [Node Details2]
-	edges = zipWithEqual "reorder" mk_edge tagged_bndrs details
 	keys = map idUnique bndrs
- 	mk_edge tagged_bndr (_, rhs_usage, rhs')
+ 	mk_node tagged_bndr (_, rhs_usage, rhs')
 	  = ((tagged_bndr, rhs'), idUnique tagged_bndr, used) 
 	  where
 	    used = [key | key <- keys, used_outside_rule rhs_usage key ]
@@ -217,15 +214,16 @@ occAnalBind env (Rec pairs) body_usage
 						Nothing		-> False
 						Just RulesOnly	-> False	-- Ignore rules
 						other		-> True
+-}
 \end{code}
 
 @reOrderRec@ is applied to the list of (binder,rhs) pairs for a cyclic
 strongly connected component (there's guaranteed to be a cycle).  It returns the
 same pairs, but 
 	a) in a better order,
-	b) with some of the Ids having a IMustNotBeINLINEd pragma
+	b) with some of the Ids having a IAmALoopBreaker pragma
 
-The "no-inline" Ids are sufficient to break all cycles in the SCC.  This means
+The "loop-breaker" Ids are sufficient to break all cycles in the SCC.  This means
 that the simplifier can guarantee not to loop provided it never records an inlining
 for these no-inline guys.
 
@@ -252,53 +250,34 @@ My solution was to make a=b bindings record b as Many, rather like INLINE bindin
 Perhaps something cleverer would suffice.
 ===============
 
-You might think that you can prevent non-termination simply by making
-sure that we simplify a recursive binding's RHS in an environment that
-simply clones the recursive Id.  But no.  Consider
-
-		letrec f = \x -> let z = f x' in ...
-
-		in
-		let n = f y
-		in
-		case n of { ... }
-
-We bind n to its *simplified* RHS, we then *re-simplify* it when
-we inline n.  Then we may well inline f; and then the same thing
-happens with z!
-
-I don't think it's possible to prevent non-termination by environment
-manipulation in this way.  Apart from anything else, successive
-iterations of the simplifier may unroll recursive loops in cases like
-that above.  The idea of beaking every recursive loop with an
-IMustNotBeINLINEd pragma is much much better.
-
 
 \begin{code}
-doReorder :: [Node Details2] -> [Details2]
+type IdWithOccInfo = Id			-- An Id with fresh PragmaInfo attached
+
+type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the Unique,
+						-- which is gotten from the Id.
+type Details1	  = (Id, UsageDetails, CoreExpr)
+type Details2	  = (IdWithOccInfo, CoreExpr)
+
+reOrderRec :: UsageDetails -> SCC (Node Details2) -> [Details2]
 -- Sorted into a plausible order.  Enough of the Ids have
---	dontINLINE pragmas that there are no loops left.
-doReorder nodes = concatMap reOrderRec (stronglyConnCompR nodes)
+--	IAmALoopBreaker pragmas that there are no loops left.
+reOrderRec rhs_usg (AcyclicSCC (bind, _, _)) = [bind]
+reOrderRec rhs_usg (CyclicSCC cycle)  	     = reOrderCycle rhs_usg cycle
 
-reOrderRec :: SCC (Node Details2) -> [Details2]
-
-	-- Non-recursive case
-reOrderRec (AcyclicSCC (bind, _, _)) = [bind]
-
-	-- Common case of simple self-recursion
-reOrderRec (CyclicSCC [])
-  = panic "reOrderRec"
-
-reOrderRec (CyclicSCC [bind])
-  = [(setIdOccInfo tagged_bndr IAmALoopBreaker, rhs)]
+reOrderCycle :: UsageDetails -> [Node Details2] -> [Details2]
+reOrderCycle rhs_usg []
+  = panic "reOrderCycle"
+reOrderCycle rhs_usg [bind]	-- Common case of simple self-recursion
+  = [(makeLoopBreaker rhs_usg tagged_bndr, rhs)]
   where
     ((tagged_bndr, rhs), _, _) = bind
 
-reOrderRec (CyclicSCC (bind : binds))
+reOrderCycle rhs_usg (bind : binds)
   = 	-- Choose a loop breaker, mark it no-inline,
 	-- do SCC analysis on the rest, and recursively sort them out
-    doReorder unchosen ++ 
-    [(setIdOccInfo tagged_bndr IAmALoopBreaker, rhs)]
+    concatMap (reOrderRec rhs_usg) (stronglyConnCompR unchosen) ++
+    [(makeLoopBreaker rhs_usg tagged_bndr, rhs)]
 
   where
     (chosen_pair, unchosen) = choose_loop_breaker bind (score bind) [] binds
@@ -355,6 +334,16 @@ reOrderRec (CyclicSCC (bind : binds))
 	-- But we won't because constructor args are marked "Many".
 
     not_fun_ty ty = not (isFunTy (dropForAlls ty))
+
+makeLoopBreaker :: UsageDetails -> Id -> Id
+-- Set the loop-breaker flag, recording whether the thing occurs only in 
+-- the RHS of a RULE (in this recursive group)
+makeLoopBreaker rhs_usg bndr
+  = setIdOccInfo bndr (IAmALoopBreaker rules_only)
+  where
+    rules_only = case lookupVarEnv rhs_usg bndr of
+		   Just RulesOnly -> True
+		   other	  -> False 
 \end{code}
 
 @occAnalRhs@ deals with the question of bindings where the Id is marked

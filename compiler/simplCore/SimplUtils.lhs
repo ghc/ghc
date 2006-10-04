@@ -721,7 +721,8 @@ postInlineUnconditionally
     -> Bool
 postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | not active		   = False
-  | isLoopBreaker occ_info = False
+  | isLoopBreaker occ_info = False	-- If it's a loop-breaker of any kind, dont' inline
+					-- because it might be referred to "earlier"
   | isExportedId bndr      = False
   | exprIsTrivial rhs 	   = True
   | otherwise

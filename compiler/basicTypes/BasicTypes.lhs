@@ -38,7 +38,7 @@ module BasicTypes(
 	TupCon(..), tupleParens,
 
 	OccInfo(..), seqOccInfo, isFragileOcc, isOneOcc, 
-	isDeadOcc, isLoopBreaker, isNoOcc,
+	isDeadOcc, isLoopBreaker, isNonRuleLoopBreaker, isNoOcc,
 
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch,
@@ -372,13 +372,40 @@ data OccInfo
   | IAmDead		-- Marks unused variables.  Sometimes useful for
 			-- lambda and case-bound variables.
 
-  | OneOcc !InsideLam	-- Occurs exactly once, not inside a rule
- 	   !OneBranch
-	   !InterestingCxt
+  | OneOcc		-- Occurs exactly once, not inside a rule
+	!InsideLam
+ 	!OneBranch
+	!InterestingCxt
 
   | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
 			-- in a group of recursive definitions
+	!Bool		-- True <=> This loop breaker occurs only the RHS of a RULE
+\end{code}
 
+Note [RulesOnly]
+~~~~~~~~~~~~~~~~
+The RulesOnly constructor records if an Id occurs only in the RHS of a Rule.
+Similarly, the boolean in IAmLoopbreaker True if the only reason the Id is a
+loop-breaker only because of recursion through a RULE. In that case,
+we can ignore the loop-breaker-ness for inlining purposes.  Example
+(from GHC.Enum):
+
+  eftInt :: Int# -> Int# -> [Int]
+  eftInt x y = ...(non-recursive)...
+
+  {-# INLINE [0] eftIntFB #-}
+  eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
+  eftIntFB c n x y = ...(non-recursive)...
+
+  {-# RULES
+  "eftInt"  [~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
+  "eftIntList"  [1] eftIntFB  (:) [] = eftInt
+   #-}
+
+The two look mutually recursive only because of their RULES;
+we don't want that to inhibit inlining!
+
+\begin{code}
 isNoOcc :: OccInfo -> Bool
 isNoOcc NoOccInfo = True
 isNoOcc other     = False
@@ -405,8 +432,12 @@ oneBranch    = True
 notOneBranch = False
 
 isLoopBreaker :: OccInfo -> Bool
-isLoopBreaker IAmALoopBreaker = True
-isLoopBreaker other	      = False
+isLoopBreaker (IAmALoopBreaker _) = True
+isLoopBreaker other	          = False
+
+isNonRuleLoopBreaker :: OccInfo -> Bool
+isNonRuleLoopBreaker (IAmALoopBreaker False) = True	-- Loop-breaker that breaks a non-rule cycle
+isNonRuleLoopBreaker other	             = False
 
 isDeadOcc :: OccInfo -> Bool
 isDeadOcc IAmDead = True
@@ -423,10 +454,10 @@ isFragileOcc other	    = False
 \begin{code}
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
-  ppr NoOccInfo  			  	  = empty
-  ppr RulesOnly  			  	  = ptext SLIT("RulesOnly")
-  ppr IAmALoopBreaker 				  = ptext SLIT("LoopBreaker")
-  ppr IAmDead					  = ptext SLIT("Dead")
+  ppr NoOccInfo  	   = empty
+  ppr RulesOnly  	   = ptext SLIT("RulesOnly")
+  ppr (IAmALoopBreaker ro) = ptext SLIT("LoopBreaker") <> if ro then char '!' else empty
+  ppr IAmDead		   = ptext SLIT("Dead")
   ppr (OneOcc inside_lam one_branch int_cxt)
 	= ptext SLIT("Once") <> pp_lam <> pp_br <> pp_args
 	where

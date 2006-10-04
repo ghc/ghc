@@ -26,10 +26,8 @@ import Id		( Id, idType, idInfo, idArity, isDataConWorkId,
 			  idNewDemandInfo, setIdInfo, 
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda
 			)
-import IdInfo		( OccInfo(..), isLoopBreaker,
-			  setArityInfo, zapDemandInfo,
-			  setUnfoldingInfo, 
-			  occInfo
+import IdInfo		( OccInfo(..), setArityInfo, zapDemandInfo,
+			  setUnfoldingInfo, occInfo
 			)
 import NewDemand	( isStrictDmd )
 import TcGadt		( dataConCanMatch )
@@ -58,7 +56,7 @@ import VarEnv		( elemVarEnv, emptyVarEnv )
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
-			  RecFlag(..), isNonRec
+			  RecFlag(..), isNonRec, isNonRuleLoopBreaker
 			)
 import OrdList
 import List		( nub )
@@ -600,14 +598,17 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 
   |  otherwise
   = let
-		-- Add arity info
+	-- 	Arity info
   	new_bndr_info = idInfo new_bndr `setArityInfo` exprArity new_rhs
 
+	-- 	Unfolding info
 	-- Add the unfolding *only* for non-loop-breakers
 	-- Making loop breakers not have an unfolding at all 
 	-- means that we can avoid tests in exprIsConApp, for example.
 	-- This is important: if exprIsConApp says 'yes' for a recursive
 	-- thing, then we can get into an infinite loop
+
+	-- 	Demand info
 	-- If the unfolding is a value, the demand info may
 	-- go pear-shaped, so we nuke it.  Example:
 	--	let x = (a,b) in
@@ -635,7 +636,7 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
     returnSmpl (unitFloat env final_id new_rhs, env)
   where 
     unfolding    = mkUnfolding (isTopLevel top_lvl) new_rhs
-    loop_breaker = isLoopBreaker occ_info
+    loop_breaker = isNonRuleLoopBreaker occ_info
     old_info     = idInfo old_bndr
     occ_info     = occInfo old_info
 \end{code}    

@@ -26,7 +26,7 @@ import Id		( idType, idInfo, idName, idCoreRules, isGlobalId,
 import IdInfo		{- loads of stuff -}
 import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
 import NewDemand	( isBottomingSig, topSig )
-import BasicTypes	( Arity, isNeverActive )
+import BasicTypes	( Arity, isNeverActive, isNonRuleLoopBreaker )
 import Name		( Name, getOccName, nameOccName, mkInternalName,
 		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe,
 			  isWiredInName, getName
@@ -462,7 +462,7 @@ addExternal (id,rhs) needed
 
     idinfo	   = idInfo id
     dont_inline	   = isNeverActive (inlinePragInfo idinfo)
-    loop_breaker   = isLoopBreaker (occInfo idinfo)
+    loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
     spec_ids	   = specInfoFreeVars (specInfo idinfo)
     worker_info	   = workerInfo idinfo
