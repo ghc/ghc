@@ -326,7 +326,6 @@ isStaticFlag f =
 	"static",
 	"funregisterised",
 	"fext-core",
-	"frule-check",
 	"frules-off",
 	"fcpr-off",
 	"ferror-spans",
