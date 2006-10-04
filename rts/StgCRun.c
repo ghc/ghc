@@ -50,6 +50,7 @@
  * in libc.a clobbers $s6.
  */
 #include "ghcconfig.h"
+#ifndef USE_MINIINTERPRETER
 #ifdef alpha_HOST_ARCH
 #define alpha_EXTRA_CAREFUL
 register long   fake_ra __asm__("$26");
@@ -58,6 +59,7 @@ register long   fake_gp __asm__("$29");
 register long   fake_s6 __asm__("$15");
 register double fake_f8 __asm__("$f8");
 register double fake_f9 __asm__("$f9");
+#endif
 #endif
 #endif
 
