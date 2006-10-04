@@ -65,7 +65,7 @@ import Outputable
 import ErrUtils		( Message )
 import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
-import Util		( zipWithEqual, equalLength )
+import Util		( zipWithEqual )
 import DynFlags		( DynFlag(..), isOneShot )
 
 import List		( elemIndex)
@@ -830,7 +830,7 @@ tcPragExpr name expr
 	get_in_scope_ids			`thenM` \ in_scope -> 
 	case lintUnfolding noSrcLoc in_scope core_expr' of
 	  Nothing       -> returnM ()
-	  Just fail_msg -> pprPanic "Iface Lint failure" (doc <+> fail_msg)
+	  Just fail_msg -> pprPanic "Iface Lint failure" (hang doc 2 fail_msg)
     )				`thenM_`
 
    returnM core_expr'	
