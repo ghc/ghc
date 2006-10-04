@@ -1341,8 +1341,8 @@ try to eliminate uses of v in the RHSs in favour of case_bndr; that
 way, there's a chance that v will now only be used once, and hence
 inlined.
 
-Note 1
-~~~~~~
+Note [no-case-of-case]
+~~~~~~~~~~~~~~~~~~~~~~
 There is a time we *don't* want to do that, namely when
 -fno-case-of-case is on.  This happens in the first simplifier pass,
 and enhances full laziness.  Here's the bad case:
@@ -1353,6 +1353,15 @@ in action in spectral/cichelli/Prog.hs:
 	 [(m,n) | m <- [1..max], n <- [1..max]]
 Hence the check for NoCaseOfCase.
 
+Note [Case of cast]
+~~~~~~~~~~~~~~~~~~~
+Consider 	case (v `cast` co) of x { I# ->
+		... (case (v `cast` co) of {...}) ...
+We'd like to eliminate the inner case.  We can get this neatly by 
+arranging that inside the outer case we add the unfolding
+	v |-> x `cast` (sym co)
+to v.  Then we should inline v at the inner case, cancel the casts, and away we go
+	
 Note 2
 ~~~~~~
 There is another situation when we don't want to do it.  If we have
@@ -1391,8 +1400,8 @@ eliminate the last case, we must either make sure that x (as well as
 x1) has unfolding MkT y1.  THe straightforward thing to do is to do
 the binder-swap.  So this whole note is a no-op.
 
-Note 3
-~~~~~~
+Note [zapOccInfo]
+~~~~~~~~~~~~~~~~~
 If we replace the scrutinee, v, by tbe case binder, then we have to nuke
 any occurrence info (eg IAmDead) in the case binder, because the
 case-binder now effectively occurs whenever v does.  AND we have to do
@@ -1418,23 +1427,31 @@ after the outer case, and that makes (a,b) alive.  At least we do unless
 the case binder is guaranteed dead.
 
 \begin{code}
-simplCaseBinder env (Var v) case_bndr
-  | not (switchIsOn (getSwitchChecker env) NoCaseOfCase)
+simplCaseBinder env scrut case_bndr
+  | switchIsOn (getSwitchChecker env) NoCaseOfCase
+	-- See Note [no-case-of-case]
+  = do	{ (env, case_bndr') <- simplBinder env case_bndr
+	; return (env, case_bndr') }
 
+simplCaseBinder env (Var v) case_bndr
 -- Failed try [see Note 2 above]
 --     not (isEvaldUnfolding (idUnfolding v))
-
-  = simplBinder env (zapOccInfo case_bndr)		`thenSmpl` \ (env, case_bndr') ->
-    returnSmpl (modifyInScope env v case_bndr', case_bndr')
+  = do	{ (env, case_bndr') <- simplBinder env (zapOccInfo case_bndr)
+	; return (modifyInScope env v case_bndr', case_bndr') }
 	-- We could extend the substitution instead, but it would be
 	-- a hack because then the substitution wouldn't be idempotent
 	-- any more (v is an OutId).  And this does just as well.
 	    
-simplCaseBinder env other_scrut case_bndr 
-  = simplBinder env case_bndr 		`thenSmpl` \ (env, case_bndr') ->
-    returnSmpl (env, case_bndr')
+simplCaseBinder env (Cast (Var v) co) case_bndr		-- Note [Case of cast]
+  = do	{ (env, case_bndr') <- simplBinder env (zapOccInfo case_bndr)
+  	; let rhs = Cast (Var case_bndr') (mkSymCoercion co)
+	; return (addBinderUnfolding env v rhs, case_bndr') }
 
-zapOccInfo :: InId -> InId
+simplCaseBinder env other_scrut case_bndr 
+  = do	{ (env, case_bndr') <- simplBinder env case_bndr
+	; return (env, case_bndr') }
+
+zapOccInfo :: InId -> InId	-- See Note [zapOccInfo]
 zapOccInfo b = b `setIdOccInfo` NoOccInfo
 \end{code}
 
@@ -1565,7 +1582,7 @@ simplDefault env case_bndr' imposs_cons cont (Just rhs)
     cant_match tys data_con = not (dataConCanMatch data_con tys)
 
     simplify_default imposs_cons
-	= do { let env' = mk_rhs_env env case_bndr' (mkOtherCon imposs_cons)
+	= do { let env' = addBinderOtherCon env case_bndr' imposs_cons
 		-- Record the constructors that the case-binder *can't* be.
 	     ; rhs' <- simplExprC env' rhs cont
 	     ; return [(DEFAULT, [], rhs')] }
@@ -1593,7 +1610,7 @@ simplAlt env handled_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
     returnSmpl (Just (emptyVarEnv, (DEFAULT, [], rhs')))
   where
-    env' = mk_rhs_env env case_bndr' (mkOtherCon handled_cons)
+    env' = addBinderOtherCon env case_bndr' handled_cons
 	-- Record the constructors that the case-binder *can't* be.
 
 simplAlt env handled_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
@@ -1601,7 +1618,7 @@ simplAlt env handled_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
     returnSmpl (Just (emptyVarEnv, (LitAlt lit, [], rhs')))
   where
-    env' = mk_rhs_env env case_bndr' (mkUnfolding False (Lit lit))
+    env' = addBinderUnfolding env case_bndr' (Lit lit)
 
 simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
   = 	-- Deal with the pattern-bound variables
@@ -1613,10 +1630,9 @@ simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
     simplBinders env (add_evals con vs)		`thenSmpl` \ (env, vs') ->
 
 		-- Bind the case-binder to (con args)
-    let unf       = mkUnfolding False (mkConApp con con_args)
-	inst_tys' = tyConAppArgs (idType case_bndr')
+    let inst_tys' = tyConAppArgs (idType case_bndr')
 	con_args  = map Type inst_tys' ++ varsToCoreExprs vs' 
-	env'      = mk_rhs_env env case_bndr' unf
+	env'      = addBinderUnfolding env case_bndr' (mkConApp con con_args)
     in
     simplExprC env' rhs cont'	`thenSmpl` \ rhs' ->
     returnSmpl (Just (emptyVarEnv, (DataAlt con, vs', rhs')))
@@ -1651,8 +1667,13 @@ simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
     zap_occ_info | isDeadBinder case_bndr' = \id -> id
 		 | otherwise		   = zapOccInfo
 
-mk_rhs_env env case_bndr' case_bndr_unf
-  = modifyInScope env case_bndr' (case_bndr' `setIdUnfolding` case_bndr_unf)
+addBinderUnfolding :: SimplEnv -> Id -> CoreExpr -> SimplEnv
+addBinderUnfolding env bndr rhs
+  = modifyInScope env bndr (bndr `setIdUnfolding` mkUnfolding False rhs)
+
+addBinderOtherCon :: SimplEnv -> Id -> [AltCon] -> SimplEnv
+addBinderOtherCon env bndr cons
+  = modifyInScope env bndr (bndr `setIdUnfolding` mkOtherCon cons)
 \end{code}
 
 
@@ -1732,7 +1753,7 @@ bind_args env dead_bndr (b:bs) (arg : args) thing_inside
 		-- Note that the binder might be "dead", because it doesn't occur 
 		-- in the RHS; and simplNonRecX may therefore discard it via postInlineUnconditionally
 		-- Nevertheless we must keep it if the case-binder is alive, because it may
-		-- be used in teh con_app
+		-- be used in the con_app.  See Note [zapOccInfo]
     in
     simplNonRecX env b' arg	$ \ env ->
     bind_args env dead_bndr bs args thing_inside
