@@ -69,7 +69,6 @@ module StaticFlags (
 
 #include "HsVersions.h"
 
-import Util		( consIORef )
 import CmdLineParser
 import Config		( cProjectVersionInt, cProjectPatchLevel,
 			  cGhcUnregisterised )
