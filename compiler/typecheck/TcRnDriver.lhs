@@ -380,7 +380,6 @@ tcRnSrcDecls decls
 	      TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
 		         tcg_rules = rules, tcg_fords = fords } = tcg_env } ;
 
-	tcDump tcg_env ;
 	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `unionBags` inst_binds)
 							   rules fords ;
 
