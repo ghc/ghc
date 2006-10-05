@@ -176,9 +176,9 @@ occAnalBind env (Rec pairs) body_usage
       | otherwise
       = (combined_usage, new_bind : binds_so_far)	
       where
-	total_usage       	      = combineUsageDetails body_usage rhs_usage
-	(combined_usage, tagged_bndr) = tagBinder total_usage bndr
-	new_bind		      = NonRec tagged_bndr rhs'
+	(body_usage', tagged_bndr) = tagBinder body_usage bndr
+	combined_usage       	   = combineUsageDetails body_usage' rhs_usage
+	new_bind		   = NonRec tagged_bndr rhs'
 
 	-- Recursive SCC
     do_final_bind (CyclicSCC cycle) (body_usage, binds_so_far)
