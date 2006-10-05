@@ -863,7 +863,6 @@ toTypeNoLoc lname = noLoc (HsTyVar (unLoc lname))
 rmLoc :: Located a -> Located a
 rmLoc a = noLoc (unLoc a)
 
--- originally expected unqualified 1:st name, now it doesn't
 extractClassDecl :: Name -> Module -> [Located Name] -> LSig Name -> LSig Name
 extractClassDecl c mdl tvs0 (L pos (TypeSig lname ltype)) = case ltype of
   L _ (HsForAllTy exp tvs (L _ preds) ty) -> 
@@ -879,7 +878,6 @@ extractRecSel :: Name -> Module -> Name -> [Located Name] -> [LConDecl Name]
               -> LSig Name
 extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 
--- originally expected unqualified 3:rd name, now it doesn't
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case con_details con of
     RecCon fields | (HsRecField n ty _ : _) <- matching_fields fields -> 
@@ -1213,7 +1211,7 @@ getPackages session dynflags = do
   -- get InstalledPackageInfos for every package in the session
   pkgInfos <- getPreloadPackagesAnd dynflags []
 
-  -- return a list of those packages that we could create PackageData's for 
+  -- return a list of those packages that we could create PackageDatas for 
   let pkgInfos' = filter notRTS pkgInfos
   liftM catMaybes (mapM tryGetPackage pkgInfos')
 
