@@ -723,9 +723,10 @@ renameModule renamingEnv mod =
       missingNames = nub $ filter isExternalName
                     (missingNames1 ++ missingNames2 ++ missingNames3)
 
-      -- filter out the "()" string (I haven't found the Name constant for ()
-      -- in the GHC API)
-      strings = filter (/= "()") (map (showSDoc . ppr) missingNames) 
+      -- filter out certain built in type constructors using their string 
+      -- representation. TODO: use the Name constants from the GHC API.
+      strings = filter (`notElem` ["()", "[]", "(->)"]) 
+                (map (showSDoc . ppr) missingNames) 
      
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
