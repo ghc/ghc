@@ -419,13 +419,7 @@ run flags modules extEnv = do
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
-  where
-    pprList [] = []
-    pprList [x] = show x
-    pprList (x:xs) = show x ++ ", " ++ pprList xs
- 
-print_ x = printSDoc (ppr x) defaultUserStyle        
-
+{- 
 instance Outputable (DocEntity Name) where
   ppr (DocEntity d) = ppr d
   ppr (DeclEntity name) = ppr name
@@ -437,7 +431,7 @@ instance Show a => Show (DocDecl a) where
   show (DocCommentNext doc) = "next" ++ show doc
   show (DocCommentPrev doc) = "prev" ++ show doc
   show _ = "other" 
-
+-}
 type FullyCheckedMod = (ParsedSource, 
                         RenamedSource, 
                         TypecheckedSource, 
