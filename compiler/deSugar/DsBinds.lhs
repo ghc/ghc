@@ -107,7 +107,7 @@ dsHsBind auto_scc rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = t
 --	M.f = f_lcl		-- Generated from "exports"
 -- But we don't want that, because if M.f isn't exported,
 -- it'll be inlined unconditionally at every call site (its rhs is 
--- trivial).  That woudl be ok unless it has RULES, which would 
+-- trivial).  That would be ok unless it has RULES, which would 
 -- thereby be completely lost.  Bad, bad, bad.
 --
 -- Instead we want to generate
