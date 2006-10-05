@@ -2641,17 +2641,19 @@ GhcWithSMP = NO</programlisting>
 <screen>$ cd <filename><replaceable>H</replaceable></filename>/includes
 $ touch ghcautoconf.h DerivedConstants.h GHCConstants.h mkDerivedConstants.c
 $ touch mkDerivedConstantsHdr mkDerivedConstants.o mkGHCConstants mkGHCConstants.o</screen>
+	      </listitem>
 
 	    <listitem>
 		<para>Now build the compiler:</para>
-<screen>$ cd <replaceable>H</replaceable>/includes &amp;&amp; make boot &amp;&amp; make
+<screen>$ cd <replaceable>H</replaceable>/utils/mkdependC &amp;&amp; make boot &amp;&amp; make
+$ cd <replaceable>H</replaceable>/includes &amp;&amp; make boot &amp;&amp; make
 $ cd <replaceable>H</replaceable>/compat &amp;&amp; make boot &amp;&amp; make
 $ cd <replaceable>H</replaceable>/utils &amp;&amp; make boot &amp;&amp; make
-$ cd <replaceable>H</replaceable>/compiler &amp;&amp; make boot &amp;&amp; make</screen>
+$ cd <replaceable>H</replaceable>/compiler &amp;&amp; make boot &amp;&amp; make
 $ cd <replaceable>H</replaceable>/rts &amp;&amp; make boot &amp;&amp; make</screen>
-	    </listitem>
 	    <para>Don't worry if the build falls over in the RTS, we
 	     don't need the RTS yet.</para>
+	    </listitem>
 
 	    <listitem>
 <screen>$ cd <replaceable>H</replaceable>/libraries
