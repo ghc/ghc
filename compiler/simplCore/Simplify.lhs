@@ -370,7 +370,6 @@ completeNonRecX env is_strict old_bndr new_bndr new_rhs thing_inside
   | otherwise
   = 	-- Make the arguments atomic if necessary, 
 	-- adding suitable bindings
-    -- pprTrace "completeNonRecX" (ppr new_bndr <+> ppr new_rhs) $
     mkAtomicArgsE env is_strict new_rhs		$ \ env new_rhs ->
     completeLazyBind env NotTopLevel
 		     old_bndr new_bndr new_rhs	`thenSmpl` \ (floats, env) ->

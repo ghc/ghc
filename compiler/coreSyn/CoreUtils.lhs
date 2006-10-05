@@ -633,15 +633,15 @@ exprIsHNF (Var v) 	-- NB: There are no value args at this point
 	-- A worry: what if an Id's unfolding is just itself: 
 	-- then we could get an infinite loop...
 
-exprIsHNF (Lit l)	     = True
-exprIsHNF (Type ty)	     = True	-- Types are honorary Values; 
-					-- we don't mind copying them
-exprIsHNF (Lam b e)  	     = isRuntimeVar b || exprIsHNF e
-exprIsHNF (Note _ e) 	     = exprIsHNF e
-exprIsHNF (Cast e co)        = exprIsHNF e
+exprIsHNF (Lit l)	   = True
+exprIsHNF (Type ty)	   = True	-- Types are honorary Values; 
+			   		-- we don't mind copying them
+exprIsHNF (Lam b e)  	   = isRuntimeVar b || exprIsHNF e
+exprIsHNF (Note _ e) 	   = exprIsHNF e
+exprIsHNF (Cast e co)      = exprIsHNF e
 exprIsHNF (App e (Type _)) = exprIsHNF e
 exprIsHNF (App e a)        = app_is_value e [a]
-exprIsHNF other	     = False
+exprIsHNF other	           = False
 
 -- There is at least one value argument
 app_is_value (Var fun) args
@@ -1240,6 +1240,7 @@ exprIsBig (Lit _)      = False
 exprIsBig (Var v)      = False
 exprIsBig (Type t)     = False
 exprIsBig (App f a)    = exprIsBig f || exprIsBig a
+exprIsBig (Cast e _)   = exprIsBig e	-- Hopefully coercions are not too big!
 exprIsBig other	       = True
 \end{code}
 
