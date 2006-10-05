@@ -19,6 +19,7 @@ import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, dataConUnivTyVars )
 import Type		( Type, tyConAppArgs )
+import Coercion		( coercionKind )
 import Rules		( matchN )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
 			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
@@ -298,6 +299,24 @@ may avoid allocating it altogether.  Just like for constructors.
 
 Looks cool, but probably rare...but it might be easy to implement.
 
+
+Note [SpecConstr for casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+    data family T a :: *
+    data instance T Int = T Int
+
+    foo n = ...
+       where
+         go (T 0) = 0
+         go (T n) = go (T (n-1))
+
+The recursive call ends up looking like 
+	go (T (I# ...) `cast` g)
+So we want to spot the construtor application inside the cast.
+That's why we have the Cast case in argToPat
+
+
 -----------------------------------------------------
 		Stuff not yet handled
 -----------------------------------------------------
@@ -466,14 +485,19 @@ extendCaseBndrs env case_bndr scrut con alt_bndrs
 				[(b,how_bound) | b <- case_bndr:alt_bndrs] }
 
 	-- Record RecArg for the components iff the scrutinee is RecArg
+	-- I think the only reason for this is to keep the usage envt small
+	-- so is it worth it at all?
 	--	[This comment looks plain wrong to me, so I'm ignoring it
 	-- 	     "Also forget if the scrutinee is a RecArg, because we're
 	-- 	     now in the branch of a case, and we don't want to
 	-- 	     record a non-scrutinee use of v if we have
 	-- 	     	case v of { (a,b) -> ...(f v)... }" ]
-    how_bound = case scrut of
-		  Var v -> lookupVarEnv cur_scope v `orElse` Other
-		  other -> Other
+    how_bound = get_how scrut
+	where
+	    get_how (Var v)    = lookupVarEnv cur_scope v `orElse` Other
+	    get_how (Cast e _) = get_how e
+	    get_how (Note _ e) = get_how e
+	    get_how other      = Other
 
     extend_data_con data_con = 
       extendCons env1 scrut case_bndr (CV con vanilla_args)
@@ -547,9 +571,10 @@ data ArgOcc = NoOcc	-- Doesn't occur at all; or a type argument
 
 {-	Note  [ScrutOcc]
 
-An occurrence of ScrutOcc indicates that the thing is *only* taken apart or applied.
+An occurrence of ScrutOcc indicates that the thing, or a `cast` version of the thing,
+is *only* taken apart or applied.
 
-  Functions, litersl: ScrutOcc emptyUFM
+  Functions, literal: ScrutOcc emptyUFM
   Data constructors:  ScrutOcc subs,
 
 where (subs :: UniqFM [ArgOcc]) gives usage of the *pattern-bound* components,
@@ -563,7 +588,7 @@ A pattern binds b, x::a, y::b, z::b->a, but not 'a'!
 -}
 
 instance Outputable ArgOcc where
-  ppr (ScrutOcc xs) = ptext SLIT("scrut-occ") <> parens (ppr xs)
+  ppr (ScrutOcc xs) = ptext SLIT("scrut-occ") <> ppr xs
   ppr UnkOcc 	    = ptext SLIT("unk-occ")
   ppr BothOcc 	    = ptext SLIT("both-occ")
   ppr NoOcc    	    = ptext SLIT("no-occ")
@@ -663,9 +688,12 @@ scExpr env e@(App _ _)
 ----------------------
 scScrut :: ScEnv -> CoreExpr -> ArgOcc -> UniqSM (ScUsage, CoreExpr)
 -- Used for the scrutinee of a case, 
--- or the function of an application
-scScrut env e@(Var v) occ = returnUs (varUsage env v occ, e)
-scScrut env e	      occ = scExpr env e
+-- or the function of an application.
+-- Remember to look through casts
+scScrut env e@(Var v)   occ = returnUs (varUsage env v occ, e)
+scScrut env (Cast e co) occ = do { (usg, e') <- scScrut env e occ
+				 ; returnUs (usg, Cast e' co) }
+scScrut env e	        occ = scExpr env e
 
 
 ----------------------
@@ -726,7 +754,8 @@ specialise :: ScEnv
 specialise env fn bndrs body body_usg
   = do	{ let (_, bndr_occs) = lookupOccs body_usg bndrs
 
-	; mb_calls <- mapM (callToPats (scope env) bndr_occs)
+	; mb_calls <- -- pprTrace "specialise" (ppr fn <+> ppr bndrs <+> ppr bndr_occs) $
+		      mapM (callToPats (scope env) bndr_occs)
 		   	   (lookupVarEnv (calls body_usg) fn `orElse` [])
 
 	; let good_calls :: [([Var], [CoreArg])]
@@ -881,6 +910,13 @@ argToPat in_scope con_env (Let _ arg) arg_occ
 	-- e.g.		f (let v = rhs in \y -> ...v...)
 	-- Here we can specialise for f (\y -> ...)
 	-- because the rule-matcher will look through the let.
+
+argToPat in_scope con_env (Cast arg co) arg_occ
+  = do	{ (interesting, arg') <- argToPat in_scope con_env arg arg_occ
+	; if interesting then 
+		return (interesting, Cast arg' co)
+	  else 
+		wildCardPat (snd (coercionKind co)) }
 
 argToPat in_scope con_env arg arg_occ
   | is_value_lam arg
