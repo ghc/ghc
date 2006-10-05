@@ -45,7 +45,7 @@ import Id		( Id, idType, isId,
 import DataCon		( isUnboxedTupleCon )
 import Literal		( litSize )
 import PrimOp		( primOpIsDupable, primOpOutOfLine )
-import IdInfo		( OccInfo(..), GlobalIdDetails(..) )
+import IdInfo		( GlobalIdDetails(..) )
 import Type		( isUnLiftedType )
 import PrelNames	( hasKey, buildIdKey, augmentIdKey )
 import Bag
@@ -502,14 +502,13 @@ StrictAnal.addStrictnessInfoToTopId
 \begin{code}
 callSiteInline :: DynFlags
 	       -> Bool			-- True <=> the Id can be inlined
-	       -> OccInfo
 	       -> Id			-- The Id
 	       -> [Bool]		-- One for each value arg; True if it is interesting
 	       -> Bool			-- True <=> continuation is interesting
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-callSiteInline dflags active_inline occ id arg_infos interesting_cont
+callSiteInline dflags active_inline id arg_infos interesting_cont
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon cs -> Nothing ;
@@ -531,11 +530,7 @@ callSiteInline dflags active_inline occ id arg_infos interesting_cont
 
  	yes_or_no 
 	  | not active_inline = False
-	  | otherwise = case occ of
-				IAmDead		      -> pprTrace "callSiteInline: dead" (ppr id) False
-				IAmALoopBreaker False -> False	-- Note [RulesOnly] in OccurAnal
-				--OneOcc in_lam _ _   -> (not in_lam || is_cheap) && consider_safe True
-				other		      -> is_cheap && consider_safe False
+	  | otherwise = is_cheap && consider_safe False
 		-- We consider even the once-in-one-branch
 		-- occurrences, because they won't all have been
 		-- caught by preInlineUnconditionally.  In particular,
@@ -596,7 +591,6 @@ callSiteInline dflags active_inline occ id arg_infos interesting_cont
     if dopt Opt_D_dump_inlinings dflags then
 	pprTrace "Considering inlining"
 		 (ppr id <+> vcat [text "active:" <+> ppr active_inline,
-				   text "occ info:" <+> ppr occ,
 			  	   text "arg infos" <+> ppr arg_infos,
 				   text "interesting continuation" <+> ppr interesting_cont,
 				   text "is value:" <+> ppr is_value,

@@ -124,7 +124,7 @@ type SimplIdSubst = IdEnv SimplSR	-- IdId |--> OutExpr
 
 data SimplSR
   = DoneEx OutExpr		-- Completed term
-  | DoneId OutId OccInfo	-- Completed term variable, with occurrence info
+  | DoneId OutId		-- Completed term variable
   | ContEx TvSubstEnv	 	-- A suspended substitution
 	   SimplIdSubst
 	   InExpr 	 
@@ -151,11 +151,6 @@ seIdSubst:
 		a77 -> a77
 	from the substitution, when we decide not to clone a77, but it's quite 
 	legitimate to put the mapping in the substitution anyway.
-	
-	Indeed, we do so when we want to pass fragile OccInfo to the
-	occurrences of the variable; we add a substitution
-		x77 -> DoneId x77 occ
-	to record x's occurrence information.]
 
 	Furthermore, consider 
 		let x = case k of I# x77 -> ... in
@@ -168,12 +163,9 @@ seIdSubst:
 	Of course, the substitution *must* applied! Things in its domain 
 	simply aren't necessarily bound in the result.
 
-* substId adds a binding (DoneId new_id occ) to the substitution if 
-	EITHER the Id's unique has changed
-	OR     the Id has interesting occurrence information
-  So in effect you can only get to interesting occurrence information
-  by looking up the *old* Id; it's not really attached to the new id
-  at all.
+* substId adds a binding (DoneId new_id) to the substitution if 
+	the Id's unique has changed
+
 
   Note, though that the substitution isn't necessarily extended
   if the type changes.  Why not?  Because of the next point:
@@ -292,19 +284,12 @@ getRules = seExtRules
 substId :: SimplEnv -> Id -> SimplSR
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v 
   | not (isLocalId v) 
-  = DoneId v NoOccInfo
+  = DoneId v
   | otherwise	-- A local Id
   = case lookupVarEnv ids v of
-	Just (DoneId v occ) -> DoneId (refine v) occ
-	Just res	    -> res
-	Nothing		    -> let v' = refine v
-			       in DoneId v' (idOccInfo v')
-		-- We don't put LoopBreakers in the substitution (unless then need
-		-- to be cloned for name-clash rasons), so the idOccInfo is
-		-- very important!  If isFragileOcc returned True for
-		-- loop breakers we could avoid this call, but at the expense
-		-- of adding more to the substitution, and building new Ids
-		-- a bit more often than really necessary
+	Just (DoneId v) -> DoneId (refine v)
+	Just res	-> res
+	Nothing		-> DoneId (refine v)
   where
 	-- Get the most up-to-date thing from the in-scope set
 	-- Even though it isn't in the substitution, it may be in
@@ -392,7 +377,7 @@ substIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst})
 	-- Extend the substitution if the unique has changed
 	-- See the notes with substTyVarBndr for the delSubstEnv
     new_subst | new_id /= old_id
-	      = extendVarEnv id_subst old_id (DoneId new_id (idOccInfo old_id))
+	      = extendVarEnv id_subst old_id (DoneId new_id)
 	      | otherwise 
 	      = delVarEnv id_subst old_id
 \end{code}
@@ -458,8 +443,8 @@ substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old
 	-- or there's some useful occurrence information
 	-- See the notes with substTyVarBndr for the delSubstEnv
     occ_info = occInfo (idInfo old_id)
-    new_subst | new_id /= old_id || isFragileOcc occ_info
-	      = extendVarEnv id_subst old_id (DoneId new_id occ_info)
+    new_subst | new_id /= old_id
+	      = extendVarEnv id_subst old_id (DoneId new_id)
 	      | otherwise 
 	      = delVarEnv id_subst old_id
 \end{code}
@@ -609,7 +594,7 @@ mkCoreSubst (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seIdSubst = id
     mk_subst tv_env id_env = CoreSubst.mkSubst in_scope tv_env (mapVarEnv fiddle id_env)
 
     fiddle (DoneEx e)       = e
-    fiddle (DoneId v occ)   = Var v
+    fiddle (DoneId v)       = Var v
     fiddle (ContEx tv id e) = CoreSubst.substExpr (mk_subst tv id) e
 
 substExpr :: SimplEnv -> CoreExpr -> CoreExpr

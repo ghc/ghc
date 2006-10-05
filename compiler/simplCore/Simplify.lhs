@@ -927,7 +927,7 @@ simplVar env var cont
   = case substId env var of
 	DoneEx e	 -> simplExprF (zapSubstEnv env) e cont
 	ContEx tvs ids e -> simplExprF (setSubstEnv env tvs ids) e cont
-	DoneId var1 occ  -> completeCall (zapSubstEnv env) var1 occ cont
+	DoneId var1      -> completeCall (zapSubstEnv env) var1 cont
 		-- Note [zapSubstEnv]
 		-- The template is already simplified, so don't re-substitute.
 		-- This is VITAL.  Consider
@@ -941,7 +941,7 @@ simplVar env var cont
 ---------------------------------------------------------
 --	Dealing with a call site
 
-completeCall env var occ_info cont
+completeCall env var cont
   =     -- Simplify the arguments
     getDOptsSmpl					`thenSmpl` \ dflags ->
     let
@@ -1006,8 +1006,8 @@ completeCall env var occ_info cont
 	interesting_cont = interestingCallContext (notNull args)
 						  (notNull arg_infos)
 						  call_cont
-    	active_inline = activeInline env var occ_info
-	maybe_inline  = callSiteInline dflags active_inline occ_info
+    	active_inline = activeInline env var
+	maybe_inline  = callSiteInline dflags active_inline
 				       var arg_infos interesting_cont
     in
     case maybe_inline of {

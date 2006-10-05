@@ -789,10 +789,10 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 		   SimplPhase n -> isActive n prag
     prag = idInlinePragma bndr
 
-activeInline :: SimplEnv -> OutId -> OccInfo -> Bool
-activeInline env id occ
+activeInline :: SimplEnv -> OutId -> Bool
+activeInline env id
   = case getMode env of
-      SimplGently -> isOneOcc occ && isAlwaysActive prag
+      SimplGently -> False
 	-- No inlining at all when doing gentle stuff,
 	-- except for local things that occur once
 	-- The reason is that too little clean-up happens if you 
