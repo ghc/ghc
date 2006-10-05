@@ -1152,7 +1152,6 @@ N  Y	Non-top-level and non-recursive,	Bind args of lifted type, or
 Y  Y	Non-top-level, non-recursive,		Bind all args
 		 and strict (demanded)
 	
-
 For example, given
 
 	x = MkC (y div# z)
@@ -1165,12 +1164,41 @@ because the (y div# z) can't float out of the let. But if it was
 a *strict* let, then it would be a good thing to do.  Hence the
 context information.
 
+Note [Float coercions]
+~~~~~~~~~~~~~~~~~~~~~~
+When we find the binding
+	x = e `cast` co
+we'd like to transform it to
+	x' = e
+	x = x `cast` co		-- A trivial binding
+There's a chance that e will be a constructor application or function, or something
+like that, so moving the coerion to the usage site may well cancel the coersions
+and lead to further optimisation.  Example:
+
+     data family T a :: *
+     data instance T Int = T Int
+
+     foo :: Int -> Int -> Int
+     foo m n = ...
+        where
+          x = T m
+          go 0 = 0
+          go n = case x of { T m -> go (n-m) }
+		-- This case should optimise
+
 \begin{code}
 mkAtomicArgsE :: SimplEnv 
-	      -> Bool	-- A strict binding
- 	      -> OutExpr						-- The rhs
+	      -> Bool		-- A strict binding
+ 	      -> OutExpr	-- The rhs
 	      -> (SimplEnv -> OutExpr -> SimplM FloatsWithExpr)
+				-- Consumer for the simpler rhs
 	      -> SimplM FloatsWithExpr
+
+mkAtomicArgsE env is_strict (Cast rhs co) thing_inside
+	-- Note [Float coersions]
+  = do	{ id <- newId FSLIT("a") (exprType rhs)
+	; completeNonRecX env False id id rhs $ \ env ->
+	  thing_inside env (Cast (Var id) co) }
 
 mkAtomicArgsE env is_strict rhs thing_inside
   | (Var fun, args) <- collectArgs rhs,				-- It's an application
@@ -1203,6 +1231,12 @@ mkAtomicArgs :: Bool	-- OK to float unlifted args
 	     -> SimplM (OrdList (OutId,OutExpr),  -- The floats (unusually) may include
 			OutExpr)		  -- things that need case-binding,
 						  -- if the strict-binding flag is on
+
+mkAtomicArgs ok_float_unlifted (Cast rhs co)
+	-- Note [Float coersions]
+  = do	{ id <- newId FSLIT("a") (exprType rhs)
+	; (binds, rhs') <- mkAtomicArgs ok_float_unlifted rhs
+	; return (binds `snocOL` (id, rhs'), Cast (Var id) co) }
 
 mkAtomicArgs ok_float_unlifted rhs
   | (Var fun, args) <- collectArgs rhs,				-- It's an application
