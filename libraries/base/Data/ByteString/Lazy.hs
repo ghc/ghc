@@ -663,10 +663,10 @@ unfoldr f = LPS . unfoldChunk 32
 -- | /O(n\/c)/ 'take' @n@, applied to a ByteString @xs@, returns the prefix
 -- of @xs@ of length @n@, or @xs@ itself if @n > 'length' xs@.
 take :: Int64 -> ByteString -> ByteString
-take n _ | n < 0 = empty
-take i (LPS ps)  = LPS (take' i ps)
-  where take' _ []     = []
-        take' 0 _      = []
+take i _ | i <= 0 = empty
+take i (LPS ps)   = LPS (take' i ps)
+  where take' 0 _      = []
+        take' _ []     = []
         take' n (x:xs) =
           if n < fromIntegral (P.length x)
             then P.take (fromIntegral n) x : []
@@ -677,8 +677,8 @@ take i (LPS ps)  = LPS (take' i ps)
 drop  :: Int64 -> ByteString -> ByteString
 drop i p | i <= 0 = p
 drop i (LPS ps) = LPS (drop' i ps)
-  where drop' _ []     = []
-        drop' 0 xs     = xs
+  where drop' 0 xs     = xs
+        drop' _ []     = []
         drop' n (x:xs) =
           if n < fromIntegral (P.length x)
             then P.drop (fromIntegral n) x : xs
@@ -688,8 +688,8 @@ drop i (LPS ps) = LPS (drop' i ps)
 splitAt :: Int64 -> ByteString -> (ByteString, ByteString)
 splitAt i p        | i <= 0 = (empty, p)
 splitAt i (LPS ps) = case splitAt' i ps of (a,b) -> (LPS a, LPS b)
-  where splitAt' _ []     = ([], [])
-        splitAt' 0 xs     = ([], xs)
+  where splitAt' 0 xs     = ([], xs)
+        splitAt' _ []     = ([], [])
         splitAt' n (x:xs) =
           if n < fromIntegral (P.length x)
             then (P.take (fromIntegral n) x : [], 
