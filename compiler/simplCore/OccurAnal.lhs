@@ -35,8 +35,8 @@ import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
-import UniqFM		( keysUFM )  
-import Util		( zipWithEqual, mapAndUnzip )
+import UniqFM		( keysUFM, intersectsUFM )  
+import Util		( mapAndUnzip, mapAccumL )
 import Outputable
 \end{code}
 
@@ -90,12 +90,11 @@ occAnalBind env (NonRec binder rhs) body_usage
   = (body_usage, [])
 
   | otherwise			-- It's mentioned in the body
-  = (final_body_usage `combineUsageDetails` rhs_usage,
+  = (body_usage' +++ addRuleUsage rhs_usage binder,	-- Note [RulesOnly]
      [NonRec tagged_binder rhs'])
-
   where
-    (final_body_usage, tagged_binder) = tagBinder body_usage binder
-    (rhs_usage, rhs')		      = occAnalRhs env tagged_binder rhs
+    (body_usage', tagged_binder) = tagBinder body_usage binder
+    (rhs_usage, rhs')		 = occAnalRhs env tagged_binder rhs
 \end{code}
 
 Dropping dead code for recursive bindings is done in a very simple way:
@@ -137,20 +136,20 @@ It isn't easy to do a perfect job in one blow.  Consider
 occAnalBind env (Rec pairs) body_usage
   = foldr (_scc_ "occAnalBind.dofinal" do_final_bind) (body_usage, []) sccs
   where
-    analysed_pairs :: [Details1]
+    analysed_pairs :: [Details]
     analysed_pairs  = [ (bndr, rhs_usage, rhs')
 		      | (bndr, rhs) <- pairs,
 			let (rhs_usage, rhs') = occAnalRhs env bndr rhs
 		      ]
 
-    sccs :: [SCC (Node Details1)]
+    sccs :: [SCC (Node Details)]
     sccs = _scc_ "occAnalBind.scc" stronglyConnCompR edges
 
 
     ---- stuff for dependency analysis of binds -------------------------------
-    edges :: [Node Details1]
+    edges :: [Node Details]
     edges = _scc_ "occAnalBind.assoc"
-	    [ (details, idUnique id, edges_from rhs_usage)
+	    [ (details, idUnique id, edges_from id rhs_usage)
 	    | details@(id, rhs_usage, rhs) <- analysed_pairs
 	    ]
 
@@ -163,46 +162,43 @@ occAnalBind env (Rec pairs) body_usage
 	--		 maybeToBool (lookupVarEnv rhs_usage bndr)]
 	-- which has n**2 cost, and this meant that edges_from alone 
 	-- consumed 10% of total runtime!
-    edges_from :: UsageDetails -> [Unique]
-    edges_from rhs_usage = _scc_ "occAnalBind.edges_from"
-			   keysUFM rhs_usage
+    edges_from :: Id -> UsageDetails -> [Unique]
+    edges_from bndr rhs_usage = _scc_ "occAnalBind.edges_from"
+			        keysUFM (addRuleUsage rhs_usage bndr)
 
-    ---- stuff to "re-constitute" bindings from dependency-analysis info ------
+    ---- Stuff to "re-constitute" bindings from dependency-analysis info ------
 
 	-- Non-recursive SCC
     do_final_bind (AcyclicSCC ((bndr, rhs_usage, rhs'), _, _)) (body_usage, binds_so_far)
       | not (bndr `usedIn` body_usage)
       = (body_usage, binds_so_far)			-- Dead code
       | otherwise
-      = (combined_usage, new_bind : binds_so_far)	
+      = (body_usage' +++ addRuleUsage rhs_usage bndr, new_bind : binds_so_far)	
       where
 	(body_usage', tagged_bndr) = tagBinder body_usage bndr
-	combined_usage       	   = combineUsageDetails body_usage' rhs_usage
 	new_bind		   = NonRec tagged_bndr rhs'
 
 	-- Recursive SCC
     do_final_bind (CyclicSCC cycle) (body_usage, binds_so_far)
       | not (any (`usedIn` body_usage) bndrs)		-- NB: look at body_usage, not total_usage
       = (body_usage, binds_so_far)			-- Dead code
-      | otherwise
-      = (combined_usage, final_bind:binds_so_far)
+      | otherwise					-- If any is used, they all are
+      = (final_usage, final_bind : binds_so_far)
       where
-	details			       = [details   | (details, _, _) <- cycle]
-	bndrs			       = [bndr      | (bndr, _, _)      <- details]
-	rhs_usages		       = [rhs_usage | (_, rhs_usage, _) <- details]
-	rhs_usage		       = foldr1 combineUsageDetails rhs_usages
-	total_usage		       = rhs_usage `combineUsageDetails` body_usage
-	(combined_usage, tagged_bndrs) = tagBinders total_usage bndrs
-
-	new_cycle :: [Node Details2]
-	new_cycle  = zipWithEqual "reorder" mk_node tagged_bndrs cycle
-	final_bind = Rec (reOrderCycle rhs_usage new_cycle)
-	mk_node tagged_bndr ((_, _, rhs'), key, keys) = ((tagged_bndr, rhs'), key, keys)
+	details			       = [details | (details, _, _) <- cycle]
+	bndrs			       = [bndr | (bndr, _, _) <- details]
+	bndr_usages		       = [addRuleUsage rhs_usage bndr | (bndr, rhs_usage, _) <- details]
+	total_usage		       = foldr (+++) body_usage bndr_usages
+	(final_usage, tagged_cycle) = mapAccumL tag_bind total_usage cycle
+	tag_bind usg ((bndr,rhs_usg,rhs),k,ks) = (usg', ((bndr',rhs_usg,rhs),k,ks))
+					   where
+					     (usg', bndr') = tagBinder usg bndr
+	final_bind = Rec (reOrderCycle (mkVarSet bndrs) tagged_cycle)
 
 {-	An alternative; rebuild the edges.  No semantic difference, but perf might change
 
 	-- Hopefully 'bndrs' is a relatively small group now
-	-- Now get ready for the loop-breaking phase, this time ignoring RulesOnly references
+	-- Now get ready for the loop-breaking phase
 	-- We've done dead-code elimination already, so no worries about un-referenced binders
 	keys = map idUnique bndrs
  	mk_node tagged_bndr (_, rhs_usage, rhs')
@@ -252,36 +248,35 @@ Perhaps something cleverer would suffice.
 
 
 \begin{code}
-type IdWithOccInfo = Id			-- An Id with fresh PragmaInfo attached
-
 type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the Unique,
 						-- which is gotten from the Id.
-type Details1	  = (Id, UsageDetails, CoreExpr)
-type Details2	  = (IdWithOccInfo, CoreExpr)
+type Details	  = (Id, UsageDetails, CoreExpr)
 
-reOrderRec :: UsageDetails -> SCC (Node Details2) -> [Details2]
+reOrderRec :: IdSet 	-- Binders of this group
+	   -> SCC (Node Details)
+	   -> [(Id,CoreExpr)]
 -- Sorted into a plausible order.  Enough of the Ids have
 --	IAmALoopBreaker pragmas that there are no loops left.
-reOrderRec rhs_usg (AcyclicSCC (bind, _, _)) = [bind]
-reOrderRec rhs_usg (CyclicSCC cycle)  	     = reOrderCycle rhs_usg cycle
+reOrderRec bndrs (AcyclicSCC ((bndr, _, rhs), _, _)) = [(bndr, rhs)]
+reOrderRec bndrs (CyclicSCC cycle)  		     = reOrderCycle bndrs cycle
 
-reOrderCycle :: UsageDetails -> [Node Details2] -> [Details2]
-reOrderCycle rhs_usg []
+reOrderCycle :: IdSet -> [Node Details] -> [(Id,CoreExpr)]
+reOrderCycle bndrs []
   = panic "reOrderCycle"
-reOrderCycle rhs_usg [bind]	-- Common case of simple self-recursion
-  = [(makeLoopBreaker rhs_usg tagged_bndr, rhs)]
+reOrderCycle bndrs [bind]	-- Common case of simple self-recursion
+  = [(makeLoopBreaker bndrs rhs_usg bndr, rhs)]
   where
-    ((tagged_bndr, rhs), _, _) = bind
+    ((bndr, rhs_usg, rhs), _, _) = bind
 
-reOrderCycle rhs_usg (bind : binds)
+reOrderCycle bndrs (bind : binds)
   = 	-- Choose a loop breaker, mark it no-inline,
 	-- do SCC analysis on the rest, and recursively sort them out
-    concatMap (reOrderRec rhs_usg) (stronglyConnCompR unchosen) ++
-    [(makeLoopBreaker rhs_usg tagged_bndr, rhs)]
+    concatMap (reOrderRec bndrs) (stronglyConnCompR unchosen) ++
+    [(makeLoopBreaker bndrs rhs_usg bndr, rhs)]
 
   where
-    (chosen_pair, unchosen) = choose_loop_breaker bind (score bind) [] binds
-    (tagged_bndr, rhs)      = chosen_pair
+    (chosen_bind, unchosen) = choose_loop_breaker bind (score bind) [] binds
+    (bndr, rhs_usg, rhs)  = chosen_bind
 
 	-- This loop looks for the bind with the lowest score
 	-- to pick as the loop  breaker.  The rest accumulate in 
@@ -297,8 +292,8 @@ reOrderCycle rhs_usg (bind : binds)
 	where
 	  sc = score bind
 	  
-    score :: Node Details2 -> Int	-- Higher score => less likely to be picked as loop breaker
-    score ((bndr, rhs), _, _)
+    score :: Node Details -> Int	-- Higher score => less likely to be picked as loop breaker
+    score ((bndr, _, rhs), _, _)
 	| exprIsTrivial rhs 	   = 4	-- Practically certain to be inlined
 		-- Used to have also: && not (isExportedId bndr)
 		-- But I found this sometimes cost an extra iteration when we have
@@ -335,15 +330,15 @@ reOrderCycle rhs_usg (bind : binds)
 
     not_fun_ty ty = not (isFunTy (dropForAlls ty))
 
-makeLoopBreaker :: UsageDetails -> Id -> Id
+makeLoopBreaker :: VarSet		-- Binders of this group
+		-> UsageDetails		-- Usage of this rhs (neglecting rules)
+		-> Id -> Id
 -- Set the loop-breaker flag, recording whether the thing occurs only in 
 -- the RHS of a RULE (in this recursive group)
-makeLoopBreaker rhs_usg bndr
+makeLoopBreaker bndrs rhs_usg bndr
   = setIdOccInfo bndr (IAmALoopBreaker rules_only)
   where
-    rules_only = case lookupVarEnv rhs_usg bndr of
-		   Just RulesOnly -> True
-		   other	  -> False 
+    rules_only = bndrs `intersectsUFM` rhs_usg
 \end{code}
 
 @occAnalRhs@ deals with the question of bindings where the Id is marked
@@ -365,9 +360,8 @@ occAnalRhs :: OccEnv
 	   -> (UsageDetails, CoreExpr)
 
 occAnalRhs env id rhs
-  = (final_usage, rhs')
+  = occAnal ctxt rhs
   where
-    (rhs_usage, rhs') = occAnal ctxt rhs
     ctxt | certainly_inline id = env
 	 | otherwise	       = rhsCtxt
 	-- Note that we generally use an rhsCtxt.  This tells the occ anal n
@@ -388,21 +382,47 @@ occAnalRhs env id rhs
     certainly_inline id = case idOccInfo id of
 			    OneOcc in_lam one_br _ -> not in_lam && one_br
 			    other		   -> False
+\end{code}
 
-	-- [March 98] A new wrinkle is that if the binder has specialisations inside
-	-- it then we count the specialised Ids as "extra rhs's".  That way
-	-- the "parent" keeps the specialised "children" alive.  If the parent
-	-- dies (because it isn't referenced any more), then the children will
-	-- die too unless they are already referenced directly.
+Note [RulesOnly]
+~~~~~~~~~~~~~~~~~~
+If the binder has RULES inside it then we count the specialised Ids as
+"extra rhs's".  That way the "parent" keeps the specialised "children"
+alive.  If the parent dies (because it isn't referenced any more),
+then the children will die too unless they are already referenced
+directly.
 
-    final_usage = addRuleUsage rhs_usage id
+That's the basic idea.  However in a recursive situation we want to be a bit
+cleverer. Example (from GHC.Enum):
+
+  eftInt :: Int# -> Int# -> [Int]
+  eftInt x y = ...(non-recursive)...
+
+  {-# INLINE [0] eftIntFB #-}
+  eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
+  eftIntFB c n x y = ...(non-recursive)...
+
+  {-# RULES
+  "eftInt"  [~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
+  "eftIntList"  [1] eftIntFB  (:) [] = eftInt
+   #-}
+
+The two look mutually recursive only because of their RULES; we don't want 
+that to inhibit inlining!
+
+So when we identify a LoopBreaker, we mark it to say whether it only mentions 
+the other binders in its recursive group in a RULE.  If so, we can inline it,
+because doing so will not expose new occurrences of binders in its group.
+
+
+\begin{code}
 
 addRuleUsage :: UsageDetails -> Id -> UsageDetails
 -- Add the usage from RULES in Id to the usage
 addRuleUsage usage id
   = foldVarSet add usage (idRuleVars id)
   where
-    add v u = addOneOcc u v RulesOnly		-- Give a non-committal binder info
+    add v u = addOneOcc u v NoOccInfo		-- Give a non-committal binder info
 						-- (i.e manyOcc) because many copies
 						-- of the specialised thing can appear
 \end{code}
@@ -517,7 +537,7 @@ occAnal env (Case scrut bndr ty alts)
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
 	alts_usage' = addCaseBndrUsage alts_usage
 	(alts_usage1, tagged_bndr) = tagBinder alts_usage' bndr
-        total_usage = scrut_usage `combineUsageDetails` alts_usage1
+        total_usage = scrut_usage +++ alts_usage1
     in
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
   where
@@ -549,7 +569,7 @@ occAnal env (Let bind body)
 
 occAnalArgs env args
   = case mapAndUnzip (occAnal arg_env) args of	{ (arg_uds_s, args') ->
-    (foldr combineUsageDetails emptyDetails arg_uds_s, args')}
+    (foldr (+++) emptyDetails arg_uds_s, args')}
   where
     arg_env = vanillaCtxt
 \end{code}
@@ -574,7 +594,7 @@ occAnalApp env (Var fun, args) is_rhs
 		= mapVarEnv markMany args_uds
 		| otherwise = args_uds
     in
-    (fun_uds `combineUsageDetails` final_args_uds, mkApps (Var fun) args') }
+    (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
   where
     fun_uniq = idUnique fun
     fun_uds  = mkOneOcc env fun (valArgCount args > 0)
@@ -604,7 +624,7 @@ occAnalApp env (fun, args) is_rhs
 
     case occAnalArgs env args of	{ (args_uds, args') ->
     let
-	final_uds = fun_uds `combineUsageDetails` args_uds
+	final_uds = fun_uds +++ args_uds
     in
     (final_uds, mkApps fun' args') }}
     
@@ -622,12 +642,12 @@ appSpecial env n ctxt args
     go 1 (arg:args)			-- The magic arg
       = case occAnal (setCtxt arg_env ctxt) arg of	{ (arg_uds, arg') ->
 	case occAnalArgs env args of			{ (args_uds, args') ->
-	(combineUsageDetails arg_uds args_uds, arg':args') }}
+	(arg_uds +++ args_uds, arg':args') }}
     
     go n (arg:args)
       = case occAnal arg_env arg of	{ (arg_uds, arg') ->
 	case go (n-1) args of		{ (args_uds, args') ->
-	(combineUsageDetails arg_uds args_uds, arg':args') }}
+	(arg_uds +++ args_uds, arg':args') }}
 \end{code}
 
     
@@ -745,10 +765,10 @@ addAppCtxt (OccEnv encl ctxt) args
 \begin{code}
 type UsageDetails = IdEnv OccInfo	-- A finite map from ids to their usage
 
-combineUsageDetails, combineAltsUsageDetails
+(+++), combineAltsUsageDetails
 	:: UsageDetails -> UsageDetails -> UsageDetails
 
-combineUsageDetails usage1 usage2
+(+++) usage1 usage2
   = plusVarEnv_C addOccInfo usage1 usage2
 
 combineAltsUsageDetails usage1 usage2
@@ -763,6 +783,8 @@ emptyDetails = (emptyVarEnv :: UsageDetails)
 
 usedIn :: Id -> UsageDetails -> Bool
 v `usedIn` details =  isExportedId v || v `elemVarEnv` details
+
+type IdWithOccInfo = Id
 
 tagBinders :: UsageDetails	    -- Of scope
 	   -> [Id]		    -- Binders
@@ -830,7 +852,6 @@ addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
 addOccInfo IAmDead info2       = info2
 addOccInfo info1 IAmDead       = info1
-addOccInfo RulesOnly RulesOnly = RulesOnly
 addOccInfo info1 info2         = NoOccInfo
 
 -- (orOccInfo orig new) is used
@@ -838,7 +859,6 @@ addOccInfo info1 info2         = NoOccInfo
 
 orOccInfo IAmDead info2 = info2
 orOccInfo info1 IAmDead = info1
-orOccInfo RulesOnly RulesOnly = RulesOnly
 orOccInfo (OneOcc in_lam1 one_branch1 int_cxt1)
 	  (OneOcc in_lam2 one_branch2 int_cxt2)
   = OneOcc (in_lam1 || in_lam2)

@@ -533,7 +533,7 @@ callSiteInline dflags active_inline occ id arg_infos interesting_cont
 	  | not active_inline = False
 	  | otherwise = case occ of
 				IAmDead		      -> pprTrace "callSiteInline: dead" (ppr id) False
-				IAmALoopBreaker False -> False	-- Note [RulesOnly] in BasicTypes
+				IAmALoopBreaker False -> False	-- Note [RulesOnly] in OccurAnal
 				--OneOcc in_lam _ _   -> (not in_lam || is_cheap) && consider_safe True
 				other		      -> is_cheap && consider_safe False
 		-- We consider even the once-in-one-branch

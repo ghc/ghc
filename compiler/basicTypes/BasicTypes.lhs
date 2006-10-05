@@ -367,8 +367,6 @@ defn of OccInfo here, safely at the bottom
 data OccInfo 
   = NoOccInfo		-- Many occurrences, or unknown
 
-  | RulesOnly		-- Occurs only in the RHS of one or more rules
-
   | IAmDead		-- Marks unused variables.  Sometimes useful for
 			-- lambda and case-bound variables.
 
@@ -379,31 +377,14 @@ data OccInfo
 
   | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
 			-- in a group of recursive definitions
-	!Bool		-- True <=> This loop breaker occurs only the RHS of a RULE
+	!RulesOnly	-- True <=> This loop breaker mentions the other binders
+			--	    in its recursive group only in its RULES, not
+			--	    in its rhs
+			--  See OccurAnal Note [RulesOnly]
+
+type RulesOnly = Bool
 \end{code}
 
-Note [RulesOnly]
-~~~~~~~~~~~~~~~~
-The RulesOnly constructor records if an Id occurs only in the RHS of a Rule.
-Similarly, the boolean in IAmLoopbreaker True if the only reason the Id is a
-loop-breaker only because of recursion through a RULE. In that case,
-we can ignore the loop-breaker-ness for inlining purposes.  Example
-(from GHC.Enum):
-
-  eftInt :: Int# -> Int# -> [Int]
-  eftInt x y = ...(non-recursive)...
-
-  {-# INLINE [0] eftIntFB #-}
-  eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
-  eftIntFB c n x y = ...(non-recursive)...
-
-  {-# RULES
-  "eftInt"  [~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
-  "eftIntList"  [1] eftIntFB  (:) [] = eftInt
-   #-}
-
-The two look mutually recursive only because of their RULES;
-we don't want that to inhibit inlining!
 
 \begin{code}
 isNoOcc :: OccInfo -> Bool
@@ -455,7 +436,6 @@ isFragileOcc other	    = False
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
   ppr NoOccInfo  	   = empty
-  ppr RulesOnly  	   = ptext SLIT("RulesOnly")
   ppr (IAmALoopBreaker ro) = ptext SLIT("LoopBreaker") <> if ro then char '!' else empty
   ppr IAmDead		   = ptext SLIT("Dead")
   ppr (OneOcc inside_lam one_branch int_cxt)
