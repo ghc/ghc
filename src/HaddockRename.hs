@@ -132,14 +132,10 @@ renamePred (HsClassP name types) = do
   name' <- rename name 
   types' <- mapM renameLType types
   return (HsClassP name' types')
-renamePred (HsIParam (Dupable name) t) = do
+renamePred (HsIParam (IPName name) t) = do
   name' <- rename name
   t' <- renameLType t
-  return (HsIParam (Dupable name') t')
-renamePred (HsIParam (Linear name) t) = do
-  name' <- rename name
-  t' <- renameLType t
-  return (HsIParam (Linear name') t')
+  return (HsIParam (IPName name') t')
 
 renameLType (L loc t) = return . L loc =<< renameType t
 
@@ -226,25 +222,28 @@ renameTyClD d = case d of
  --   name' <- renameL name
  --   return (ForeignType name' a b)
 
-  TyData x lcontext lname ltyvars k cons _ -> do
+  TyData x lcontext lname ltyvars _ k cons _ -> do
     lcontext' <- renameLContext lcontext
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     cons' <- mapM renameLCon cons
-    -- we don't need the derivings
-    return (TyData x lcontext' (keepL lname) ltyvars' k cons' Nothing) 
+    -- I don't think we need the derivings, so we return Nothing
+    -- We skip the type patterns too. TODO: find out what they are :-)
+    return (TyData x lcontext' (keepL lname) ltyvars' Nothing k cons' Nothing) 
  
-  TySynonym lname ltyvars ltype -> do
+  TySynonym lname ltyvars typat ltype -> do
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     ltype' <- renameLType ltype
-    return (TySynonym (keepL lname) ltyvars' ltype')
+    -- We skip type patterns here as well.
+    return (TySynonym (keepL lname) ltyvars' Nothing ltype')
 
-  ClassDecl lcontext lname ltyvars lfundeps lsigs _ _ -> do
+  ClassDecl lcontext lname ltyvars lfundeps lsigs _ _ _ -> do
     lcontext' <- renameLContext lcontext
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     lfundeps' <- mapM renameLFunDep lfundeps 
     lsigs' <- mapM renameLSig lsigs
     -- we don't need the default methods or the already collected doc entities
-    return (ClassDecl lcontext' (keepL lname) ltyvars' lfundeps' lsigs' emptyBag [])
+    -- we skip the ATs for now.
+    return (ClassDecl lcontext' (keepL lname) ltyvars' lfundeps' lsigs' emptyBag [] [])
  
   where
     renameLCon (L loc con) = return . L loc =<< renameCon con

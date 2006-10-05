@@ -41,7 +41,7 @@ import RdrName hiding ( Qual )
 import SrcLoc   
 import FastString            ( unpackFS )
 import BasicTypes            ( IPName(..), Boxity(..) )
-import Kind
+import Type                  ( Kind )
 import Outputable            ( ppr, defaultUserStyle, showSDoc )
 
 -- the base, module and entity URLs for the source code and wiki links.
@@ -721,7 +721,8 @@ ppFor summary links loc mbDoc (ForeignImport lname ltype _)
   = ppSig summary links loc mbDoc (TypeSig lname ltype)
 ppFor _ _ _ _ _ = error "ppFor"
 
-ppTySyn summary links loc mbDoc (TySynonym lname ltyvars ltype) 
+-- we skip type patterns for now
+ppTySyn summary links loc mbDoc (TySynonym lname ltyvars _ ltype) 
   = declWithDoc summary links loc n mbDoc (
     hsep ([keyword "type", ppBinder summary n]
     ++ ppTyVars ltyvars) <+> equals <+> ppLType ltype)
@@ -757,10 +758,9 @@ pp_hs_context cxt = parenList (map ppPred cxt)
 ppLPred = ppPred . unLoc
 
 ppPred (HsClassP n ts) = ppDocName n <+> hsep (map ppLType ts)
-ppPred (HsIParam (Dupable n) t) 
+-- TODO: find out what happened to the Dupable/Linear distinction
+ppPred (HsIParam (IPName n) t) 
   = toHtml "?" +++ ppDocName n <+> dcolon <+> ppLType t
-ppPred (HsIParam (Linear  n) t) 
-  = toHtml "%" +++ ppDocName n <+> dcolon <+> ppLType t
 
 -- -----------------------------------------------------------------------------
 -- Class declarations
@@ -783,8 +783,9 @@ ppFds fds =
 	fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> toHtml "->" <+>
 			       hsep (map ppDocName vars2)
 
+-- we skip ATs for now
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> DocMap -> HtmlTable
-ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ _) loc docMap = 
+ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ _ _) loc docMap = 
   if null sigs
     then (if summary then declBox else topDeclBox links loc nm) hdr
     else (if summary then declBox else topDeclBox links loc nm) (hdr <+> keyword "where")
@@ -798,11 +799,12 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ _) loc docM
     hdr = ppClassHdr summary lctxt nm tvs fds
     NoLink nm = unLoc lname
 
+-- we skip ATs for now
 ppClassDecl :: Ord key => Bool -> LinksInfo -> [InstHead DocName] -> key -> SrcSpan ->
                           Maybe (HsDoc DocName) -> DocMap -> TyClDecl DocName -> 
                           HtmlTable
 ppClassDecl summary links instances orig_c loc mbDoc docMap
-	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ _)
+	decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ _ _)
   | summary = ppShortClassDecl summary links decl loc docMap
   | otherwise
     = classheader </>
@@ -1075,20 +1077,7 @@ ppDataHeader summary newOrData name tyvars =
 -- ----------------------------------------------------------------------------
 -- Types and contexts
 
-ppVar = ppOccName . kindVarOcc
-
-ppParendKind k@(FunKind _ _) = parens (ppKind k)
-ppParendKind k               = ppKind k
-
-ppKind kind = case kind of
-  LiftedTypeKind   -> char '*'
-  OpenTypeKind     -> char '?'
-  UnboxedTypeKind  -> char '#'
-  UnliftedTypeKind -> char '!'
-  UbxTupleKind     -> toHtml "(#)"
-  ArgTypeKind      -> toHtml "??"
-  FunKind k1 k2    -> hsep [ppParendKind k1, arrow <+> ppKind k2] 
-  KindVar v        -> ppVar v 
+ppKind k = toHtml $ showSDoc (ppr k)
 
 {-
 ppForAll Implicit _ lctxt = ppCtxtPart lctxt

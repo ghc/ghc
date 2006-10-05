@@ -35,8 +35,7 @@ import Data.Map              (Map)
 
 import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
 
-import qualified GHC         ( init )
-import GHC hiding ( init ) 
+import GHC
 import Outputable
 import SrcLoc
 import Digraph               ( flattenSCC )
@@ -55,7 +54,6 @@ import FastString
 import DynFlags hiding ( Option )
 import Packages hiding ( package ) 
 import StaticFlags           ( parseStaticFlags )
-import Unique                ( mkUnique )
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
@@ -183,11 +181,10 @@ extractGHCFlags flags = [ flag | Flag_GHCFlag flag <- flags ]
 
 startGHC :: String -> IO (Session, DynFlags)
 startGHC libDir = do
-  GHC.init (Just libDir)
   let ghcMode = BatchCompile
-  session <- newSession ghcMode
+  session <- newSession ghcMode (Just libDir)
   flags   <- getSessionDynFlags session
-  flags'  <- initPackages flags
+  flags'  <- liftM fst (initPackages flags)
   let flags'' = dopt_set flags' Opt_Haddock 
   return (session, flags'')
 
@@ -1213,8 +1210,8 @@ packageDocEnv mods infos = concatMap moduleDocEnv (zip mods infos)
 getPackages :: Session -> DynFlags -> IO [PackageData]
 getPackages session dynflags = do
 
-  -- get InstalledPackageInfo's for every package in the session
-  pkgInfos <- getExplicitPackagesAnd dynflags []
+  -- get InstalledPackageInfos for every package in the session
+  pkgInfos <- getPreloadPackagesAnd dynflags []
 
   -- return a list of those packages that we could create PackageData's for 
   let pkgInfos' = filter notRTS pkgInfos
