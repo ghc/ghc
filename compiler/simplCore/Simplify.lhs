@@ -1195,7 +1195,9 @@ mkAtomicArgsE :: SimplEnv
 	      -> SimplM FloatsWithExpr
 
 mkAtomicArgsE env is_strict (Cast rhs co) thing_inside
+  | not (exprIsTrivial rhs)
 	-- Note [Float coersions]
+	-- See also Note [Take care] below
   = do	{ id <- newId FSLIT("a") (exprType rhs)
 	; completeNonRecX env False id id rhs $ \ env ->
 	  thing_inside env (Cast (Var id) co) }
@@ -1219,6 +1221,10 @@ mkAtomicArgsE env is_strict rhs thing_inside
 	= do { arg_id <- newId FSLIT("a") arg_ty
 	     ; completeNonRecX env False {- pessimistic -} arg_id arg_id arg $ \env ->
 	       go env (App fun (Var arg_id)) args }
+		-- Note [Take care]:
+		-- This is sightly delicate.  If completeNonRecX was to do a postInlineUnconditionally
+		-- (undoing the effect of introducing the let-binding), we'd find arg_id had
+		-- no binding.   The exprIsTrivial is the only time that'll happen, though.
 	where
 	  arg_ty = exprType arg
 	  no_float_arg = not is_strict && (isUnLiftedType arg_ty) && not (exprOkForSpeculation arg)
@@ -1233,6 +1239,7 @@ mkAtomicArgs :: Bool	-- OK to float unlifted args
 						  -- if the strict-binding flag is on
 
 mkAtomicArgs ok_float_unlifted (Cast rhs co)
+  | not (exprIsTrivial rhs)
 	-- Note [Float coersions]
   = do	{ id <- newId FSLIT("a") (exprType rhs)
 	; (binds, rhs') <- mkAtomicArgs ok_float_unlifted rhs

@@ -604,7 +604,6 @@ seqExpr (Lit lit)       = lit `seq` ()
 seqExpr (App f a)       = seqExpr f `seq` seqExpr a
 seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
--- gaw 2004
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
 seqExpr (Cast e co)     = seqExpr e `seq` seqType co
 seqExpr (Note n e)      = seqNote n `seq` seqExpr e
@@ -652,7 +651,6 @@ data AnnExpr' bndr annot
   | AnnLit	Literal
   | AnnLam	bndr (AnnExpr bndr annot)
   | AnnApp	(AnnExpr bndr annot) (AnnExpr bndr annot)
--- gaw 2004
   | AnnCase	(AnnExpr bndr annot) bndr Type [AnnAlt bndr annot]
   | AnnLet	(AnnBind bndr annot) (AnnExpr bndr annot)
   | AnnCast     (AnnExpr bndr annot) Coercion
@@ -684,7 +682,6 @@ deAnnotate' (AnnLet bind body)
     deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
     deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
--- gaw 2004
 deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
