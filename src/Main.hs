@@ -218,12 +218,10 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
                          (mod, f, CheckedModule a (Just b) (Just c) (Just d)) 
                          <- modules ] 
 
-
 data Flag
   = Flag_CSS String
   | Flag_Debug
 --  | Flag_DocBook
-  | Flag_DumpInterface FilePath
   | Flag_Heading String
   | Flag_Package String
   | Flag_Html
@@ -233,7 +231,6 @@ data Flag
   | Flag_NoImplicitPrelude
   | Flag_OutputDir FilePath
   | Flag_Prologue FilePath
-  | Flag_ReadInterface FilePath
   | Flag_SourceBaseURL   String
   | Flag_SourceModuleURL String
   | Flag_SourceEntityURL String
@@ -258,10 +255,6 @@ options backwardsCompat =
   [
     Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
-    Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
-	"read an interface from FILE",
-    Option ['D']  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
-        "dump an interface for these modules in FILE",
     Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
 	"location of Haddock's auxiliary files",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
@@ -368,11 +361,6 @@ run flags modules extEnv = do
 		fs -> return (last fs)
 
   let 
-
-    dumpIface = case [str | Flag_DumpInterface str <- flags] of
-		  	[] -> Nothing
-		  	fs -> Just (last fs)
-
     maybe_contents_url = 
       case [url | Flag_UseContents url <- flags] of
         [] -> Nothing
