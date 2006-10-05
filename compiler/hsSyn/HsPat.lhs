@@ -8,6 +8,7 @@ module HsPat (
 	Pat(..), InPat, OutPat, LPat, 
 	
 	HsConDetails(..), hsConArgs,
+	HsRecField(..), mkRecField,
 
 	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat,
 
@@ -26,6 +27,7 @@ import HsBinds		( DictBinds, HsBind(..), HsWrapper, isIdHsWrapper, pprHsWrapper,
 			  emptyLHsBinds, pprLHsBinds )
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
 import HsTypes		( LHsType, PostTcType )
+import HsDoc            ( LHsDoc, ppr_mbDoc )
 import BasicTypes	( Boxity, tupleParens )
 -- others:
 import PprCore		( {- instance OutputableBndr TyVar -} )
@@ -138,13 +140,21 @@ HsConDetails is use both for patterns and for data type declarations
 
 \begin{code}
 data HsConDetails id arg
-  = PrefixCon [arg]			-- C p1 p2 p3
-  | RecCon    [(Located id, arg)]	-- C { x = p1, y = p2 }
-  | InfixCon  arg arg			-- p1 `C` p2
+  = PrefixCon [arg]               -- C p1 p2 p3
+  | RecCon    [HsRecField id arg] -- C { x = p1, y = p2 }
+  | InfixCon  arg arg		  -- p1 `C` p2
+
+data HsRecField id arg = HsRecField {
+	hsRecFieldId  :: Located id,
+	hsRecFieldArg :: arg,
+	hsRecFieldDoc :: Maybe (LHsDoc id)
+}
+
+mkRecField id arg = HsRecField id arg Nothing
 
 hsConArgs :: HsConDetails id arg -> [arg]
 hsConArgs (PrefixCon ps)   = ps
-hsConArgs (RecCon fs)      = map snd fs
+hsConArgs (RecCon fs)      = map hsRecFieldArg fs
 hsConArgs (InfixCon p1 p2) = [p1,p2]
 \end{code}
 
@@ -209,13 +219,17 @@ pprConArgs (PrefixCon pats) = interppSP pats
 pprConArgs (InfixCon p1 p2) = interppSP [p1,p2]
 pprConArgs (RecCon rpats)   = braces (hsep (punctuate comma (map (pp_rpat) rpats)))
 			    where
-			      pp_rpat (v, p) = hsep [ppr v, char '=', ppr p]
-
+			      pp_rpat (HsRecField v p d) = 
+                                hsep [ppr d, ppr v, char '=', ppr p]
 
 -- add parallel array brackets around a document
 --
 pabrackets   :: SDoc -> SDoc
 pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
+
+instance (OutputableBndr id, Outputable arg) =>
+         Outputable (HsRecField id arg) where
+    ppr (HsRecField n ty doc) = ppr n <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
 \end{code}
 
 

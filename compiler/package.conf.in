@@ -112,6 +112,7 @@ exposed-modules:
 	HsSyn
 	HsTypes
 	HsUtils
+        HsDoc
 	HscMain
 	HscStats
 	HscTypes
@@ -256,6 +257,8 @@ exposed-modules:
 	VarSet
 	WorkWrap
 	WwLib
+	HaddockParse
+	HaddockLex
 
 #ifdef INSTALLING
 import-dirs:	PKG_LIBDIR"/hslibs-imports/ghc"

@@ -14,6 +14,7 @@ module RnEnv (
 	lookupFixityRn, lookupTyFixityRn, lookupLocatedSigOccRn, 
 	lookupLocatedInstDeclBndr,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
+	lookupGreRn,    
 
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV,

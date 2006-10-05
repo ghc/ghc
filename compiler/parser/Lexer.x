@@ -44,9 +44,9 @@ import Ctype
 import Util		( maybePrefixMatch, readRational )
 
 import DATA_BITS
-import Data.Char 	( chr )
+import Data.Char 	( chr, isSpace )
 import Ratio
---import TRACE
+import TRACE
 
 #if __GLASGOW_HASKELL__ >= 605
 import Data.Char 	( GeneralCategory(..), generalCategory, isPrint, isUpper )
@@ -86,6 +86,8 @@ $symchar   = [$symbol \:]
 $nl        = [\n\r]
 $idchar    = [$small $large $digit \']
 
+$docsym    = [\| \^ \* \$]
+
 @varid     = $small $idchar*
 @conid     = $large $idchar*
 
@@ -111,16 +113,48 @@ $white_no_nl+ 				;
 -- pragmas, "{-#", so that we don't accidentally treat them as comments.
 -- (this can happen even though pragmas will normally take precedence due to
 -- longest-match, because pragmas aren't valid in every state, but comments
--- are).
-"{-" / { notFollowedBy '#' }		{ nested_comment }
+-- are). We also rule out nested Haddock comments, if the -haddock flag is
+-- set.
+
+"{-" / { isNormalComment } { nested_comment lexToken }
 
 -- Single-line comments are a bit tricky.  Haskell 98 says that two or
 -- more dashes followed by a symbol should be parsed as a varsym, so we
 -- have to exclude those.
--- The regex says: "munch all the characters after the dashes, as long as
--- the first one is not a symbol".
-"--"\-* [^$symbol :] .*			;
-"--"\-* / { atEOL }			;
+
+-- Since Haddock comments aren't valid in every state, we need to rule them
+-- out here.  
+
+-- The following two rules match comments that begin with two dashes, but
+-- continue with a different character. The rules test that this character
+-- is not a symbol (in which case we'd have a varsym), and that it's not a
+-- space followed by a Haddock comment symbol (docsym) (in which case we'd
+-- have a Haddock comment). The rules then munch the rest of the line.
+
+"-- " ~$docsym .* ;
+"--" [^$symbol : \ ] .* ;
+
+-- Next, match Haddock comments if no -haddock flag
+
+"-- " $docsym .* / { ifExtension (not . haddockEnabled) } ;
+
+-- Now, when we've matched comments that begin with 2 dashes and continue
+-- with a different character, we need to match comments that begin with three
+-- or more dashes (which clearly can't be Haddock comments). We only need to
+-- make sure that the first non-dash character isn't a symbol, and munch the
+-- rest of the line.
+
+"---"\-* [^$symbol :] .* ;
+
+-- Since the previous rules all match dashes followed by at least one
+-- character, we also need to match a whole line filled with just dashes.
+
+"--"\-* / { atEOL } ;
+
+-- We need this rule since none of the other single line comment rules
+-- actually match this case.
+
+"-- " / { atEOL } ;
 
 -- 'bol' state: beginning of a line.  Slurp up all the whitespace (including
 -- blank lines) until we find a non-whitespace character, then do layout
@@ -202,7 +236,10 @@ $white_no_nl+ 				;
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
   "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
 
-  "{-#" 				{ nested_comment }
+  "{-#" $whitechar* (DOCOPTIONS|docoptions)
+  / { ifExtension haddockEnabled }     { lex_string_prag ITdocOptions }
+
+ "{-#"                                 { nested_comment lexToken }
 
   -- ToDo: should only be valid inside a pragma:
   "#-}" 				{ token ITclose_prag}
@@ -218,11 +255,18 @@ $white_no_nl+ 				;
 
 <0,option_prags,glaexts> {
 	-- This is to catch things like {-# OPTIONS OPTIONS_HUGS ... 
-  "{-#" $whitechar* $idchar+            { nested_comment }
+  "{-#" $whitechar* $idchar+		{ nested_comment lexToken }
 }
 
 -- '0' state: ordinary lexemes
 -- 'glaexts' state: glasgow extensions (postfix '#', etc.)
+
+-- Haddock comments
+
+<0,glaexts> {
+  "-- " / $docsym    { multiline_doc_comment }
+  "{-" \ ? / $docsym { nested_doc_comment }
+}
 
 -- "special" symbols
 
@@ -479,6 +523,14 @@ data Token
 
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token
+
+  -- Documentation annotations
+  | ITdocCommentNext  String     -- something beginning '-- |'
+  | ITdocCommentPrev  String     -- something beginning '-- ^'
+  | ITdocCommentNamed String     -- something beginning '-- $'
+  | ITdocSection      Int String -- a section heading
+  | ITdocOptions      String     -- doc options (prune, ignore-exports, etc)
+
 #ifdef DEBUG
   deriving Show -- debugging
 #endif
@@ -643,38 +695,144 @@ notFollowedBy char _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf /= char
 notFollowedBySymbol _ _ _ (AI _ _ buf)
   = atEnd buf || currentChar buf `notElem` "!#$%&*+./<=>?@\\^|-~"
 
+isNormalComment bits _ _ (AI _ _ buf)
+  = (if haddockEnabled bits then False else (followedBySpaceDoc buf))
+    || notFollowedByDocOrPragma
+  where 
+    notFollowedByDocOrPragma = not $ spaceAndP buf
+      (\buf' -> currentChar buf' `elem` "|^*$#")
+
+spaceAndP buf p = p buf || currentChar buf == ' ' && p buf'
+  where buf' = snd (nextChar buf)
+
+followedBySpaceDoc buf = spaceAndP buf followedByDoc
+
+followedByDoc buf = currentChar buf `elem` "|^*$"
+
+haddockDisabledAnd p bits _ _ (AI _ _ buf)
+  = if haddockEnabled bits then False else (p buf)
+
 atEOL _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf == '\n'
 
 ifExtension pred bits _ _ _ = pred bits
+
+multiline_doc_comment :: Action
+multiline_doc_comment span buf _len = withLexedDocType (worker "")
+  where
+    worker commentAcc input docType oneLine = case alexGetChar input of
+      Just ('\n', input') 
+        | oneLine -> docCommentEnd input commentAcc docType buf span
+        | otherwise -> case checkIfCommentLine input' of
+          Just input -> worker ('\n':commentAcc) input docType False
+          Nothing -> docCommentEnd input commentAcc docType buf span
+      Just (c, input) -> worker (c:commentAcc) input docType oneLine
+      Nothing -> docCommentEnd input commentAcc docType buf span
+      
+    checkIfCommentLine input = check (dropNonNewlineSpace input)
+      where
+        check input = case alexGetChar input of
+          Just ('-', input) -> case alexGetChar input of
+            Just ('-', input) -> case alexGetChar input of
+              Just (c, _) | c /= '-' -> Just input
+              _ -> Nothing
+            _ -> Nothing
+          _ -> Nothing
+
+        dropNonNewlineSpace input = case alexGetChar input of
+          Just (c, input') 
+            | isSpace c && c /= '\n' -> dropNonNewlineSpace input'
+            | otherwise -> input
+          Nothing -> input
 
 {-
   nested comments require traversing by hand, they can't be parsed
   using regular expressions.
 -}
-nested_comment :: Action
-nested_comment span _str _len = do
+nested_comment :: P (Located Token) -> Action
+nested_comment cont span _str _len = do
   input <- getInput
   go 1 input
-  where go 0 input = do setInput input; lexToken
-	go n input = do
-	  case alexGetChar input of
-	    Nothing  -> err input
-	    Just (c,input) -> do
-	      case c of
-	    	'-' -> do
-		  case alexGetChar input of
-		    Nothing  -> err input
-		    Just ('\125',input) -> go (n-1) input
-		    Just (c,_)          -> go n input
-	     	'\123' -> do
-		  case alexGetChar input of
-		    Nothing  -> err input
-		    Just ('-',input') -> go (n+1) input'
-		    Just (c,input)    -> go n input
-	    	c -> go n input
+  where
+    go 0 input = do setInput input; cont
+    go n input = case alexGetChar input of
+      Nothing -> errBrace input span
+      Just ('-',input) -> case alexGetChar input of
+        Nothing  -> errBrace input span
+        Just ('\125',input) -> go (n-1) input
+        Just (c,_)          -> go n input
+      Just ('\123',input) -> case alexGetChar input of
+        Nothing  -> errBrace input span
+        Just ('-',input) -> go (n+1) input
+        Just (c,_)       -> go n input
+      Just (c,input) -> go n input
 
-        err (AI end _ _) = failLocMsgP (srcSpanStart span) end "unterminated `{-'"
+nested_doc_comment :: Action
+nested_doc_comment span buf _len = withLexedDocType (go "")
+  where
+    go commentAcc input docType _ = case alexGetChar input of
+      Nothing -> errBrace input span
+      Just ('-',input) -> case alexGetChar input of
+        Nothing -> errBrace input span
+        Just ('\125',input@(AI end _ buf2)) ->
+          docCommentEnd input commentAcc docType buf span
+        Just (c,_) -> go ('-':commentAcc) input docType False
+      Just ('\123', input) -> case alexGetChar input of
+        Nothing  -> errBrace input span
+        Just ('-',input) -> do
+          setInput input
+          let cont = do input <- getInput; go commentAcc input docType False
+          nested_comment cont span buf _len
+        Just (c,_) -> go ('\123':commentAcc) input docType False
+      Just (c,input) -> go (c:commentAcc) input docType False
 
+withLexedDocType lexDocComment = do
+  input <- getInput
+  case alexGetChar input of
+    Nothing -> error "Can't happen"
+    Just ('|', input) -> lexDocComment input ITdocCommentNext False
+    Just ('^', input) -> lexDocComment input ITdocCommentPrev False
+    Just ('$', input) -> lexDocComment input ITdocCommentNamed False
+    Just ('*', input) -> lexDocSection 1 input 
+ where 
+    lexDocSection n input = case alexGetChar input of 
+      Just ('*', input) -> lexDocSection (n+1) input
+      Just (c, _) -> lexDocComment input (ITdocSection n) True
+      Nothing -> do setInput input; lexToken -- eof reached, lex it normally
+
+-- docCommentEnd
+-------------------------------------------------------------------------------
+-- This function is quite tricky. We can't just return a new token, we also
+-- need to update the state of the parser. Why? Because the token is longer
+-- than what was lexed by Alex, and the lexToken function doesn't know this, so 
+-- it writes the wrong token length to the parser state. This function is
+-- called afterwards, so it can just update the state. 
+
+-- This is complicated by the fact that Haddock tokens can span multiple lines, 
+-- which is something that the original lexer didn't account for. 
+-- I have added last_line_len in the parser state which represents the length 
+-- of the part of the token that is on the last line. It is now used for layout 
+-- calculation in pushCurrentContext instead of last_len. last_len is, like it 
+-- was before, the full length of the token, and it is now only used for error
+-- messages. /Waern 
+
+docCommentEnd :: AlexInput -> String -> (String -> Token) -> StringBuffer ->
+                 SrcSpan -> P (Located Token) 
+docCommentEnd input commentAcc docType buf span = do
+  setInput input
+  let (AI loc last_offs nextBuf) = input
+      comment = reverse commentAcc
+      span' = mkSrcSpan (srcSpanStart span) loc
+      last_len = byteDiff buf nextBuf
+      
+      last_line_len = if (last_offs - last_len < 0) 
+        then last_offs
+        else last_len  
+  
+  span `seq` setLastToken span' last_len last_line_len
+  return (L span' (docType comment))
+ 
+errBrace (AI end _ _) span = failLocMsgP (srcSpanStart span) end "unterminated `{-'"
+ 
 open_brace, close_brace :: Action
 open_brace span _str _len = do 
   ctx <- getContext
@@ -1146,6 +1304,7 @@ getCharOrFail =  do
 data LayoutContext
   = NoLayout
   | Layout !Int
+  deriving Show
 
 data ParseResult a
   = POk PState a
@@ -1162,6 +1321,7 @@ data PState = PState {
 				-- beginning of  the current line.
 				-- \t is equal to 8 spaces.
 	last_len   :: !Int,	-- len of previous token
+  last_line_len :: !Int,
         loc        :: SrcLoc,   -- current loc (end of prev token + 1)
 	extsBitmap :: !Int,	-- bitmap that determines permitted extensions
 	context	   :: [LayoutContext],
@@ -1213,8 +1373,12 @@ setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
 getSrcLoc :: P SrcLoc
 getSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 
-setLastToken :: SrcSpan -> Int -> P ()
-setLastToken loc len = P $ \s -> POk s{ last_loc=loc, last_len=len } ()
+setLastToken :: SrcSpan -> Int -> Int -> P ()
+setLastToken loc len line_len = P $ \s -> POk s { 
+  last_loc=loc, 
+  last_len=len,
+  last_line_len=line_len 
+} ()
 
 data AlexInput = AI SrcLoc {-#UNPACK#-}!Int StringBuffer
 
@@ -1316,6 +1480,7 @@ tvBit	   = 7	-- Scoped type variables enables 'forall' keyword
 bangPatBit = 8	-- Tells the parser to understand bang-patterns
 		-- (doesn't affect the lexer)
 idxTysBit  = 9	-- indexed type families: 'family' keyword and kind sigs
+haddockBit = 10 -- Lex and parse Haddock comments
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled flags = testBit flags glaExtsBit
@@ -1327,20 +1492,22 @@ ipEnabled      flags = testBit flags ipBit
 tvEnabled      flags = testBit flags tvBit
 bangPatEnabled flags = testBit flags bangPatBit
 idxTysEnabled  flags = testBit flags idxTysBit
+haddockEnabled flags = testBit flags haddockBit
 
 -- PState for parsing options pragmas
 --
 pragState :: StringBuffer -> SrcLoc -> PState
 pragState buf loc  = 
   PState {
-      buffer	 = buf,
-      last_loc   = mkSrcSpan loc loc,
-      last_offs  = 0,
-      last_len   = 0,
-      loc        = loc,
-      extsBitmap = 0,
-      context    = [],
-      lex_state  = [bol, option_prags, 0]
+      buffer	      = buf,
+      last_loc      = mkSrcSpan loc loc,
+      last_offs     = 0,
+      last_len      = 0,
+      last_line_len = 0,
+      loc           = loc,
+      extsBitmap    = 0,
+      context       = [],
+      lex_state     = [bol, option_prags, 0]
     }
 
 
@@ -1349,14 +1516,15 @@ pragState buf loc  =
 mkPState :: StringBuffer -> SrcLoc -> DynFlags -> PState
 mkPState buf loc flags  = 
   PState {
-      buffer	 = buf,
-      last_loc   = mkSrcSpan loc loc,
-      last_offs  = 0,
-      last_len   = 0,
-      loc        = loc,
-      extsBitmap = fromIntegral bitmap,
-      context    = [],
-      lex_state  = [bol, if glaExtsEnabled bitmap then glaexts else 0]
+      buffer	      = buf,
+      last_loc      = mkSrcSpan loc loc,
+      last_offs     = 0,
+      last_len      = 0,
+      last_line_len = 0,
+      loc           = loc,
+      extsBitmap    = fromIntegral bitmap,
+      context       = [],
+      lex_state     = [bol, if glaExtsEnabled bitmap then glaexts else 0]
 	-- we begin in the layout state if toplev_layout is set
     }
     where
@@ -1369,6 +1537,7 @@ mkPState buf loc flags  =
 	       .|. tvBit      `setBitIf` dopt Opt_ScopedTypeVariables flags
 	       .|. bangPatBit `setBitIf` dopt Opt_BangPatterns flags
 	       .|. idxTysBit  `setBitIf` dopt Opt_IndexedTypes flags
+	       .|. haddockBit `setBitIf` dopt Opt_Haddock     flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
@@ -1391,8 +1560,9 @@ popContext = P $ \ s@(PState{ buffer = buf, context = ctx,
 -- This is only used at the outer level of a module when the 'module'
 -- keyword is missing.
 pushCurrentContext :: P ()
-pushCurrentContext = P $ \ s@PState{ last_offs=offs, last_len=len, context=ctx } ->
-  POk s{context = Layout (offs-len) : ctx} ()
+pushCurrentContext = P $ \ s@PState{ last_offs=offs, last_line_len=len, context=ctx } -> 
+    POk s{context = Layout (offs-len) : ctx} ()
+--trace ("off: " ++ show offs ++ ", len: " ++ show len) $ POk s{context = Layout (offs-len) : ctx} ()
 
 getOffside :: P Ordering
 getOffside = P $ \s@PState{last_offs=offs, context=stk} ->
@@ -1438,8 +1608,8 @@ lexError str = do
 
 lexer :: (Located Token -> P a) -> P a
 lexer cont = do
-  tok@(L _ tok__) <- lexToken
-  --trace ("token: " ++ show tok__) $ do
+  tok@(L span tok__) <- lexToken
+--  trace ("token: " ++ show tok__) $ do
   cont tok
 
 lexToken :: P (Located Token)
@@ -1449,7 +1619,7 @@ lexToken = do
   exts <- getExts
   case alexScanUser exts inp sc of
     AlexEOF -> do let span = mkSrcSpan loc1 loc1
-		  setLastToken span 0
+		  setLastToken span 0 0
 		  return (L span ITeof)
     AlexError (AI loc2 _ buf) -> do 
 	reportLexError loc1 loc2 buf "lexical error"
@@ -1457,11 +1627,11 @@ lexToken = do
 	setInput inp2
 	lexToken
     AlexToken inp2@(AI end _ buf2) len t -> do
-	setInput inp2
-	let span = mkSrcSpan loc1 end
-	let bytes = byteDiff buf buf2
-	span `seq` setLastToken span bytes
-	t span buf bytes
+    setInput inp2
+    let span = mkSrcSpan loc1 end
+    let bytes = byteDiff buf buf2
+    span `seq` setLastToken span bytes bytes
+    t span buf bytes
 
 reportLexError loc1 loc2 buf str
   | atEnd buf = failLocMsgP loc1 loc2 (str ++ " at end of input")

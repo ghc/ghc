@@ -74,6 +74,7 @@ extractHsTyNames ty
 					 `unionNameSets` getl ty)
 					    `minusNameSet`
 				  mkNameSet (hsLTyVarNames tvs)
+    get (HsDocTy ty _)         = getl ty
 
 extractHsTyNames_s  :: [LHsType Name] -> NameSet
 extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet tys
@@ -129,7 +130,7 @@ conResTyFVs (ResTyGADT ty) = extractHsTyNames ty
 
 conDetailsFVs (PrefixCon btys)     = plusFVs (map bangTyFVs btys)
 conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2
-conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (_, bty) <- flds]
+conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (HsRecField _ bty  _) <- flds]
 
 bangTyFVs bty = extractHsTyNames (getBangType bty)
 \end{code}

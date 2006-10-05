@@ -357,6 +357,10 @@ kc_hs_type (HsBangTy b ty)
 kc_hs_type ty@(HsSpliceTy _)
   = failWithTc (ptext SLIT("Unexpected type splice:") <+> ppr ty)
 
+-- remove the doc nodes here, no need to worry about the location since
+-- its the same for a doc node and it's child type node
+kc_hs_type (HsDocTy ty _)
+  = kc_hs_type (unLoc ty) 
 
 ---------------------------
 kcApps :: TcKind			-- Function kind

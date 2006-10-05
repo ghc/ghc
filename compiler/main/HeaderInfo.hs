@@ -66,7 +66,7 @@ getImports dflags buf filename = do
 	PFailed span err -> parseError span err
 	POk _ rdr_module -> 
 	  case rdr_module of
-	    L _ (HsModule mod _ imps _ _) ->
+	    L _ (HsModule mod _ imps _ _ _ _ _) ->
 	      let
 		mod_name | Just located_mod <- mod = located_mod
 			 | otherwise               = L noSrcSpan mAIN_NAME

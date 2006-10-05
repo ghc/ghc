@@ -9,6 +9,8 @@ module HsImpExp where
 #include "HsVersions.h"
 
 import Module		( ModuleName )
+import HsDoc		( HsDoc )
+
 import Outputable
 import FastString
 import SrcLoc		( Located(..) )
@@ -68,11 +70,14 @@ ideclName (ImportDecl mod_nm _ _ _ _) = mod_nm
 type LIE name = Located (IE name)
 
 data IE name
-  = IEVar		name
-  | IEThingAbs          name		-- Class/Type (can't tell)
-  | IEThingAll          name		-- Class/Type plus all methods/constructors
-  | IEThingWith		name [name]	-- Class/Type plus some methods/constructors
-  | IEModuleContents    ModuleName	-- (Export Only)
+  = IEVar               name
+  | IEThingAbs          name		 -- Class/Type (can't tell)
+  | IEThingAll          name		 -- Class/Type plus all methods/constructors
+  | IEThingWith         name [name]	 -- Class/Type plus some methods/constructors
+  | IEModuleContents    ModuleName	 -- (Export Only)
+  | IEGroup             Int (HsDoc name) -- Doc section heading
+  | IEDoc               (HsDoc name)     -- Some documentation
+  | IEDocNamed          String           -- Reference to named doc
 \end{code}
 
 \begin{code}
@@ -88,6 +93,9 @@ ieNames (IEThingAbs       n   ) = [n]
 ieNames (IEThingAll       n   ) = [n]
 ieNames (IEThingWith      n ns) = n:ns
 ieNames (IEModuleContents _   ) = []
+ieNames (IEGroup          _ _ ) = []
+ieNames (IEDoc            _   ) = []
+ieNames (IEDocNamed       _   ) = []        
 \end{code}
 
 \begin{code}
@@ -99,6 +107,9 @@ instance (Outputable name) => Outputable (IE name) where
 	= ppr thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
     ppr (IEModuleContents mod)
 	= ptext SLIT("module") <+> ppr mod
+    ppr (IEGroup n doc)         = text ("<IEGroup: " ++ (show n) ++ ">") 
+    ppr (IEDoc doc)             = ppr doc
+    ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
 \end{code}
 
 \begin{code}

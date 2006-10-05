@@ -40,6 +40,9 @@ module GHC (
 	checkModule, CheckedModule(..),
 	TypecheckedSource, ParsedSource, RenamedSource,
 
+	-- * Parsing Haddock comments
+	parseHaddockComment,
+
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..), ms_mod_name, ModLocation(..),
 	getModuleGraph,
@@ -191,7 +194,7 @@ import NameSet		( NameSet, nameSetToList, elemNameSet )
 import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName(..), 
 			  globalRdrEnvElts, extendGlobalRdrEnv,
                           emptyGlobalRdrEnv )
-import HsSyn
+import HsSyn 
 import Type		( Kind, Type, dropForAlls, PredType, ThetaType,
 			  pprThetaArrow, pprParendType, splitForAllTys,
 			  funResultTy )
@@ -244,6 +247,8 @@ import Outputable
 import BasicTypes
 import TcType           ( tcSplitSigmaTy, isDictTy )
 import Maybes		( expectJust, mapCatMaybes )
+import HaddockParse     ( parseHaddockParagraphs, parseHaddockString )
+import HaddockLex       ( tokenise )
 
 import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist )
@@ -473,6 +478,12 @@ setGlobalTypeScope :: Session -> [Id] -> IO ()
 setGlobalTypeScope session ids
     = modifySession session $ \hscEnv ->
       hscEnv{ hsc_global_type_env = extendTypeEnvWithIds emptyTypeEnv ids }
+
+-- -----------------------------------------------------------------------------
+-- Parsing Haddock comments
+
+parseHaddockComment :: String -> Either String (HsDoc RdrName)
+parseHaddockComment string = parseHaddockParagraphs (tokenise string)
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -762,7 +773,8 @@ data CheckedModule =
 	--  fields within CheckedModule.
 
 type ParsedSource      = Located (HsModule RdrName)
-type RenamedSource     = (HsGroup Name, [LImportDecl Name], Maybe [LIE Name])
+type RenamedSource     = (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
+                          Maybe (HsDoc Name), HaddockModInfo Name)
 type TypecheckedSource = LHsBinds Id
 
 -- NOTE:

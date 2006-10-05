@@ -15,7 +15,7 @@ module RdrHsSyn (
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
 
 	cvBindGroup,
-	cvBindsAndSigs,
+        cvBindsAndSigs,
 	cvTopDecls,
 	findSplice, mkGroup,
 
@@ -119,6 +119,7 @@ extract_lty (L loc ty) acc
 					   extract_lctxt cx (extract_lty ty []))
 				where
 				   locals = hsLTyVarNames tvs
+      HsDocTy ty doc            -> extract_lty ty acc 
 
 extract_tv :: SrcSpan -> RdrName -> [Located RdrName] -> [Located RdrName]
 extract_tv loc tv acc | isRdrTyVar tv = L loc tv : acc
@@ -155,12 +156,13 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
 	*** See "THE NAMING STORY" in HsDecls ****
   
 \begin{code}
-mkClassDecl (cxt, cname, tyvars) fds sigs mbinds ats
+mkClassDecl (cxt, cname, tyvars) fds sigs mbinds ats docs
   = ClassDecl { tcdCtxt = cxt, tcdLName = cname, tcdTyVars = tyvars,
 		tcdFDs = fds,  
 		tcdSigs = sigs,
 		tcdMeths = mbinds,
-		tcdATs   = ats
+		tcdATs   = ats,
+		tcdDocs  = docs
 		}
 
 mkTyData new_or_data (context, tname, tyvars, typats) ksig data_cons maybe_deriv
@@ -203,29 +205,30 @@ cvTopDecls decls = go (fromOL decls)
 			    where (L l' b', ds') = getMonoBind (L l b) ds
     go (d : ds)   	    = d : go ds
 
--- Declaration list may only contain value bindings and signatures
---
+-- Declaration list may only contain value bindings and signatures.
 cvBindGroup :: OrdList (LHsDecl RdrName) -> HsValBinds RdrName
 cvBindGroup binding
   = case cvBindsAndSigs binding of
-      (mbs, sigs, []) ->                 -- list of type decls *always* empty
+      (mbs, sigs, [], _) ->                 -- list of type decls *always* empty
         ValBindsIn mbs sigs
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
-  -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName])
+  -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName], [DocEntity RdrName])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
--- associated type declarations
+-- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigs  fb = go (fromOL fb)
   where
-    go [] 		   = (emptyBag, [], [])
-    go (L l (SigD s) : ds) = (bs, L l s : ss, ts)
-			    where (bs, ss, ts) = go ds
-    go (L l (ValD b) : ds) = (b' `consBag` bs, ss, ts)
+    go [] 		   = (emptyBag, [], [], [])
+    go (L l x@(SigD s) : ds) = (bs, L l s : ss, ts, add_doc x docs)
+			    where (bs, ss, ts, docs) = go ds
+    go (L l x@(ValD b) : ds) = (b' `consBag` bs, ss, ts, add_doc x docs)
 			    where (b', ds')    = getMonoBind (L l b) ds
-				  (bs, ss, ts) = go ds'
-    go (L l (TyClD t): ds) = (bs, ss, L l t : ts)
-			    where (bs, ss, ts) = go ds
+				  (bs, ss, ts, docs) = go ds'
+    go (L l (TyClD t): ds) = (bs, ss, L l t : ts, docs)
+			    where (bs, ss, ts, docs) = go ds
+    go (L _ (DocD d) : ds)     =  (bs, ss, ts, DocEntity d : docs)
+			    where (bs, ss, ts, docs) = go ds
 
 -----------------------------------------------------------------------------
 -- Group function bindings into equation groups
@@ -240,21 +243,28 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 -- belong with b into a single MonoBinds, and ds' is the depleted
 -- list of parsed bindings.
 --
+-- All Haddock comments between equations inside the group are 
+-- discarded.
+--
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
 getMonoBind (L loc1 bind@(FunBind { fun_id = fun_id1@(L _ f1), fun_infix = is_infix1, 
 				   fun_matches = MatchGroup mtchs1 _ })) binds
   | has_args mtchs1
-  = go is_infix1 mtchs1 loc1 binds
+  = go is_infix1 mtchs1 loc1 binds []
   where
     go is_infix mtchs loc 
        (L loc2 (ValD (FunBind { fun_id = L _ f2, fun_infix = is_infix2,
-			        fun_matches = MatchGroup mtchs2 _ })) : binds)
+			        fun_matches = MatchGroup mtchs2 _ })) : binds) _
 	| f1 == f2 = go (is_infix || is_infix2) (mtchs2 ++ mtchs) 
-		        (combineSrcSpans loc loc2) binds
-    go is_infix mtchs loc binds
-	= (L loc (makeFunBind fun_id1 is_infix (reverse mtchs)), binds)
+		        (combineSrcSpans loc loc2) binds []
+    go is_infix mtchs loc (doc_decl@(L loc2 (DocD _)) : binds) doc_decls 
+	= let doc_decls' = doc_decl : doc_decls  
+          in go is_infix mtchs (combineSrcSpans loc loc2) binds doc_decls'
+    go is_infix mtchs loc binds doc_decls
+	= (L loc (makeFunBind fun_id1 is_infix (reverse mtchs)), (reverse doc_decls) ++ binds)
 	-- Reverse the final matches, to get it back in the right order
+        -- Do the same thing with the trailing doc comments
 
 getMonoBind bind binds = (bind, binds)
 
@@ -292,22 +302,26 @@ add :: HsGroup a -> SrcSpan -> HsDecl a -> [LHsDecl a]
 add gp l (SpliceD e) ds = (gp, Just (e, ds))
 
 -- Class declarations: pull out the fixity signatures to the top
-add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds
+add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs, hs_docs = docs}) 
+    l decl@(TyClD d) ds
 	| isClassDecl d = 	
 		let fsigs = [ L l f | L l (FixSig f) <- tcdSigs d ] in
-		addl (gp { hs_tyclds = L l d : ts, hs_fixds  = fsigs ++ fs }) ds
+		addl (gp { hs_tyclds = L l d : ts, 
+                           hs_fixds = fsigs ++ fs,
+                           hs_docs = add_doc decl docs}) ds
 	| otherwise =
-		addl (gp { hs_tyclds = L l d : ts }) ds
+		addl (gp { hs_tyclds = L l d : ts, 
+                           hs_docs = add_doc decl docs }) ds
 
 -- Signatures: fixity sigs go a different place than all others
 add gp@(HsGroup {hs_fixds = ts}) l (SigD (FixSig f)) ds
   = addl (gp {hs_fixds = L l f : ts}) ds
-add gp@(HsGroup {hs_valds = ts}) l (SigD d) ds
-  = addl (gp {hs_valds = add_sig (L l d) ts}) ds
+add gp@(HsGroup {hs_valds = ts, hs_docs = docs}) l x@(SigD d) ds
+  = addl (gp {hs_valds = add_sig (L l d) ts, hs_docs = add_doc x docs}) ds
 
 -- Value declarations: use add_bind
-add gp@(HsGroup {hs_valds  = ts}) l (ValD d) ds
-  = addl (gp { hs_valds = add_bind (L l d) ts }) ds
+add gp@(HsGroup {hs_valds  = ts, hs_docs = docs}) l x@(ValD d) ds
+  = addl (gp { hs_valds = add_bind (L l d) ts, hs_docs = add_doc x docs }) ds
 
 -- The rest are routine
 add gp@(HsGroup {hs_instds = ts})  l (InstD d) ds
@@ -316,13 +330,20 @@ add gp@(HsGroup {hs_derivds = ts})  l (DerivD d) ds
   = addl (gp { hs_derivds = L l d : ts }) ds
 add gp@(HsGroup {hs_defds  = ts})  l (DefD d) ds
   = addl (gp { hs_defds = L l d : ts }) ds
-add gp@(HsGroup {hs_fords  = ts})  l (ForD d) ds
-  = addl (gp { hs_fords = L l d : ts }) ds
+add gp@(HsGroup {hs_fords  = ts, hs_docs = docs}) l x@(ForD d) ds
+  = addl (gp { hs_fords = L l d : ts, hs_docs = add_doc x docs }) ds
 add gp@(HsGroup {hs_depds  = ts})  l (DeprecD d) ds
   = addl (gp { hs_depds = L l d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
 
+add gp l (DocD d) ds
+  = addl (gp { hs_docs = DocEntity d : (hs_docs gp) })  ds
+
+add_doc decl docs = case getMainDeclBinder decl of 
+  Just name -> DeclEntity name : docs
+  Nothing   -> docs
+ 
 add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
 add_sig  s (ValBindsIn bs sigs) = ValBindsIn bs	              (s:sigs) 
 \end{code}
@@ -353,11 +374,12 @@ mkPrefixCon ty tys
 				     return (data_con, PrefixCon ts)
    split (L l _) _ 		= parseError l "parse error in data/newtype declaration"
 
-mkRecCon :: Located RdrName -> [([Located RdrName], LBangType RdrName)]
-  -> P (Located RdrName, HsConDetails RdrName (LBangType RdrName))
+mkRecCon :: Located RdrName -> 
+            [([Located RdrName], LBangType RdrName, Maybe (LHsDoc RdrName))] ->
+            P (Located RdrName, HsConDetails RdrName (LBangType RdrName))
 mkRecCon (L loc con) fields
   = do data_con <- tyConToDataCon loc con
-       return (data_con, RecCon [ (l,t) | (ls,t) <- fields, l <- ls ])
+       return (data_con, RecCon [ (HsRecField l t d) | (ls, t, d) <- fields, l <- ls ])
 
 tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
 tyConToDataCon loc tc
@@ -682,7 +704,7 @@ checkAPat loc e = case e of
    			 return (TuplePat ps b placeHolderType)
    
    RecordCon c _ fs   -> mapM checkPatField fs >>= \fs ->
-			 return (ConPatIn c (RecCon fs))
+			 return (ConPatIn c (RecCon (map (uncurry mkRecField) fs))) 
 -- Generics 
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc
@@ -761,7 +783,8 @@ mk_gadt_con name qvars cxt ty
 	    , con_qvars    = qvars
 	    , con_cxt      = cxt
 	    , con_details  = PrefixCon []
-	    , con_res      = ResTyGADT ty }
+	    , con_res      = ResTyGADT ty
+            , con_doc      = Nothing }
   -- NB: we put the whole constr type into the ResTyGADT for now; 
   -- the renamer will unravel it once it has sorted out
   -- operator fixities

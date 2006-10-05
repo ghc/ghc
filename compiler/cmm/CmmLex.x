@@ -276,7 +276,7 @@ lexToken = do
   sc <- getLexState
   case alexScan inp sc of
     AlexEOF -> do let span = mkSrcSpan loc1 loc1
-		  setLastToken span 0
+		  setLastToken span 0 0
 		  return (L span CmmT_EOF)
     AlexError (loc2,_) -> do failLocMsgP loc1 loc2 "lexical error"
     AlexSkip inp2 _ -> do
@@ -285,7 +285,7 @@ lexToken = do
     AlexToken inp2@(end,buf2) len t -> do
 	setInput inp2
 	let span = mkSrcSpan loc1 end
-	span `seq` setLastToken span len
+	span `seq` setLastToken span len len
 	t span buf len
 
 -- -----------------------------------------------------------------------------

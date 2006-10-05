@@ -151,7 +151,7 @@ untidy b (L loc p) = L loc (untidy' b p)
 
 untidy_con (PrefixCon pats) = PrefixCon (map untidy_pars pats) 
 untidy_con (InfixCon p1 p2) = InfixCon  (untidy_pars p1) (untidy_pars p2)
-untidy_con (RecCon bs)      = RecCon    [(f,untidy_pars p) | (f,p) <- bs]
+untidy_con (RecCon bs)      = RecCon    [ HsRecField f (untidy_pars p) d | HsRecField f p d <- bs ]
 
 pars :: NeedPars -> WarningPat -> Pat Name
 pars True p = ParPat p
@@ -687,7 +687,7 @@ simplify_con con (RecCon fs)
   where
      -- pad out all the missing fields with WildPats.
     field_pats = map (\ f -> (f, nlWildPat)) (dataConFieldLabels con)
-    all_pats = foldr (\ (id,p) acc -> insertNm (getName (unLoc id)) p acc)
+    all_pats = foldr (\(HsRecField id p _) acc -> insertNm (getName (unLoc id)) p acc)
 		     field_pats fs
        
     insertNm nm p [] = [(nm,p)]

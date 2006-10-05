@@ -23,11 +23,12 @@ import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, mkSigTvFn )
 import RnEnv		( lookupLocalDataTcNames,
 			  lookupLocatedTopBndrRn, lookupLocatedOccRn,
-			  lookupOccRn, newLocalsRn, 
+			  lookupOccRn, lookupTopBndrRn, newLocalsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindLocalNames, checkDupNames, mapFvRn
 			)
+import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 
 import HscTypes		( FixityEnv, FixItem(..),
@@ -73,7 +74,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		      hs_depds  = deprec_decls,
 		      hs_fords  = foreign_decls,
 		      hs_defds  = default_decls,
-		      hs_ruleds = rule_decls })
+		      hs_ruleds = rule_decls,
+                      hs_docs   = docs })
 
  = do {		-- Deal with deprecations (returns only the extra deprecations)
 	deprecs <- rnSrcDeprecDecls deprec_decls ;
@@ -111,7 +113,9 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	   <- mapFvRn (wrapLocFstM rnHsForeignDecl) foreign_decls ;
 	(rn_default_decls, src_fvs5)
 	   <- mapFvRn (wrapLocFstM rnDefaultDecl) default_decls ;
-	
+
+	rn_docs <- mapM rnDocEntity docs ;
+
 	let {
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
 			    	hs_tyclds = rn_tycl_decls,
@@ -121,7 +125,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 			    	hs_depds  = [],
 			    	hs_fords  = rn_foreign_decls,
 			    	hs_defds  = rn_default_decls,
-			    	hs_ruleds = rn_rule_decls } ;
+			    	hs_ruleds = rn_rule_decls,
+                                hs_docs   = rn_docs } ;
 
 	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs_deriv, src_fvs3, 
 				src_fvs4, src_fvs5] ;
@@ -137,6 +142,28 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	tcg_env <- getGblEnv ;
 	return (tcg_env `addTcgDUs` src_dus, rn_group)
     }}}
+
+rnDocEntity :: DocEntity RdrName -> RnM (DocEntity Name)
+rnDocEntity (DocEntity docdecl) = do
+  rn_docdecl <- rnDocDecl docdecl
+  return (DocEntity rn_docdecl)
+rnDocEntity (DeclEntity name) = do
+  rn_name <- lookupTopBndrRn name
+  return (DeclEntity rn_name)
+
+rnDocDecl :: DocDecl RdrName -> RnM (DocDecl Name)
+rnDocDecl (DocCommentNext doc) = do 
+  rn_doc <- rnHsDoc doc
+  return (DocCommentNext rn_doc)
+rnDocDecl (DocCommentPrev doc) = do 
+  rn_doc <- rnHsDoc doc
+  return (DocCommentPrev rn_doc)
+rnDocDecl (DocCommentNamed str doc) = do
+  rn_doc <- rnHsDoc doc
+  return (DocCommentNamed str rn_doc)
+rnDocDecl (DocGroup lev doc) = do
+  rn_doc <- rnHsDoc doc
+  return (DocGroup lev rn_doc)
 
 rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
 rnTyClDecls tycl_decls = do 
@@ -611,7 +638,7 @@ rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname, 
 		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
-		       tcdMeths = mbinds, tcdATs = ats})
+		       tcdMeths = mbinds, tcdATs = ats, tcdDocs = docs})
   = lookupLocatedTopBndrRn cname		`thenM` \ cname' ->
 
 	-- Tyvars scope over superclass context and method signatures
@@ -620,8 +647,9 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	rnFds cls_doc fds		`thenM` \ fds' ->
 	rnATs ats			`thenM` \ (ats', ats_fvs) ->
 	renameSigs okClsDclSig sigs	`thenM` \ sigs' ->
-	returnM   (tyvars', context', fds', (ats', ats_fvs), sigs')
-    )	`thenM` \ (tyvars', context', fds', (ats', ats_fvs), sigs') ->
+        mapM rnDocEntity docs           `thenM` \ docs' ->
+	returnM   (tyvars', context', fds', (ats', ats_fvs), sigs', docs')
+    )	`thenM` \ (tyvars', context', fds', (ats', ats_fvs), sigs', docs') ->
 
 	-- Check for duplicates among the associated types
     let
@@ -663,7 +691,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 
     returnM (ClassDecl { tcdCtxt = context', tcdLName = cname', 
 			 tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
-			 tcdMeths = mbinds', tcdATs = ats'},
+			 tcdMeths = mbinds', tcdATs = ats', tcdDocs = docs'},
 	     delFVs (map hsLTyVarName tyvars')	$
 	     extractHsCtxtTyNames context'	    `plusFV`
 	     plusFVs (map extractFunDepNames (map unLoc fds'))  `plusFV`
@@ -701,7 +729,7 @@ rnConDecls tycon condecls
   = mappM (wrapLocM rnConDecl) condecls
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
-rnConDecl (ConDecl name expl tvs cxt details res_ty)
+rnConDecl (ConDecl name expl tvs cxt details res_ty mb_doc)
   = do	{ addLocM checkConName name
 
 	; new_name <- lookupLocatedTopBndrRn name
@@ -720,12 +748,14 @@ rnConDecl (ConDecl name expl tvs cxt details res_ty)
 	        	Explicit -> tvs
 		    	Implicit -> userHsTyVarBndrs implicit_tvs
 
+	; mb_doc' <- rnMbLHsDoc mb_doc 
+
 	; bindTyVarsRn doc tvs' $ \new_tyvars -> do
 	{ new_context <- rnContext doc cxt
         ; new_details <- rnConDetails doc details
         ; (new_details', new_res_ty)  <- rnConResult doc new_details res_ty
-        ; return (ConDecl new_name expl new_tyvars new_context new_details' new_res_ty) }}
-  where
+        ; return (ConDecl new_name expl new_tyvars new_context new_details' new_res_ty mb_doc') }}
+ where
     doc = text "In the definition of data constructor" <+> quotes (ppr name)
     get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy Boxed tys))
 
@@ -754,12 +784,14 @@ rnConDetails doc (RecCon fields)
     mappM (rnField doc) fields		`thenM` \ new_fields ->
     returnM (RecCon new_fields)
   where
-    field_names = [fld | (fld, _) <- fields]
+    field_names = [ name | HsRecField name _ _ <- fields ]
 
-rnField doc (name, ty)
+-- Document comments are renamed to Nothing here
+rnField doc (HsRecField name ty haddock_doc)
   = lookupLocatedTopBndrRn name	`thenM` \ new_name ->
     rnLHsType doc ty		`thenM` \ new_ty ->
-    returnM (new_name, new_ty) 
+    rnMbLHsDoc haddock_doc      `thenM` \ new_haddock_doc ->
+    returnM (HsRecField new_name new_ty new_haddock_doc) 
 
 -- Rename kind signatures (signatures of indexed data types/newtypes and
 -- signatures of type functions)

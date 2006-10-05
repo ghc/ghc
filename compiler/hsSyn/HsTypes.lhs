@@ -34,6 +34,7 @@ import Type		( Type )
 import {- Kind parts of -} 
        Type	        ( {- instance Outputable Kind -} Kind,
 			  pprParendKind, pprKind, isLiftedTypeKind )
+import HsDoc            ( LHsDoc, HsDoc )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import SrcLoc		( Located(..), unLoc, noSrcSpan )
 import StaticFlags	( opt_PprStyle_Debug )
@@ -156,6 +157,8 @@ data HsType name
 			Kind		-- A type with a kind signature
 
   | HsSpliceTy		(HsSplice name)
+
+  | HsDocTy             (LHsType name) (LHsDoc name) -- A documented type
 
 data HsExplicitForAll = Explicit | Implicit
 
@@ -362,6 +365,9 @@ ppr_mono_ty ctxt_prec (HsParTy ty)
   -- Put the parens in where the user did
   -- But we still use the precedence stuff to add parens because
   --	toHsType doesn't put in any HsParTys, so we may still need them
+
+ppr_mono_ty ctxt_prec (HsDocTy ty doc)
+  = ppr ty <+> ppr (unLoc doc)
 
 --------------------------
 ppr_fun_ty ctxt_prec ty1 ty2

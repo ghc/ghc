@@ -289,12 +289,12 @@ ds_msg = ptext SLIT("Cannot desugar this Template Haskell declaration:")
 -------------------------------------------------------
 
 repC :: LConDecl Name -> DsM (Core TH.ConQ)
-repC (L loc (ConDecl con expl [] (L _ []) details ResTyH98))
+repC (L loc (ConDecl con expl [] (L _ []) details ResTyH98 _))
   = do { con1 <- lookupLOcc con ;		-- See note [Binders and occurrences] 
 	 repConstr con1 details }
-repC (L loc (ConDecl con expl tvs (L cloc ctxt) details ResTyH98))
+repC (L loc (ConDecl con expl tvs (L cloc ctxt) details ResTyH98 doc))
   = do { addTyVarBinds tvs $ \bndrs -> do {
-             c' <- repC (L loc (ConDecl con expl [] (L cloc []) details ResTyH98));
+             c' <- repC (L loc (ConDecl con expl [] (L cloc []) details ResTyH98 doc));
              ctxt' <- repContext ctxt;
              bndrs' <- coreList nameTyConName bndrs;
              rep2 forallCName [unC bndrs', unC ctxt', unC c']
@@ -815,8 +815,8 @@ repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
          PrefixCon ps   -> do { qs <- repLPs ps; repPcon con_str qs }
-         RecCon pairs -> do { vs <- sequence $ map lookupLOcc (map fst pairs)
-                            ; ps <- sequence $ map repLP (map snd pairs)
+         RecCon pairs -> do { vs <- sequence $ map lookupLOcc (map hsRecFieldId pairs)
+                            ; ps <- sequence $ map repLP (map hsRecFieldArg pairs)
                             ; fps <- zipWithM (\x y -> rep2 fieldPatName [unC x,unC y]) vs ps
                             ; fps' <- coreList fieldPatQTyConName fps
                             ; repPrec con_str fps' }
@@ -1192,8 +1192,8 @@ repConstr con (PrefixCon ps)
          arg_tys1 <- coreList strictTypeQTyConName arg_tys
          rep2 normalCName [unC con, unC arg_tys1]
 repConstr con (RecCon ips)
-    = do arg_vs   <- mapM lookupLOcc (map fst ips)
-         arg_tys  <- mapM repBangTy (map snd ips)
+    = do arg_vs   <- mapM lookupLOcc (map hsRecFieldId ips)
+         arg_tys  <- mapM repBangTy (map hsRecFieldArg ips)
          arg_vtys <- zipWithM (\x y -> rep2 varStrictTypeName [unC x, unC y])
                               arg_vs arg_tys
          arg_vtys' <- coreList varStrictTypeQTyConName arg_vtys

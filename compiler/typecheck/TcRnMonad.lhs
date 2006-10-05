@@ -22,7 +22,7 @@ import NameEnv          ( mkNameEnv )
 import TcEnv            ( tcExtendIdEnv )
 #endif
 
-import HsSyn		( emptyLHsBinds )
+import HsSyn		( emptyLHsBinds, HaddockModInfo(..) )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
 			  TypeEnv, emptyTypeEnv, HscSource(..), isHsBoot,
 			  ExternalPackageState(..), HomePackageTable,
@@ -120,7 +120,9 @@ initTc hsc_env hsc_src mod do_this
 		tcg_rules    = [],
 		tcg_fords    = [],
 		tcg_dfun_n   = dfun_n_var,
-		tcg_keep     = keep_var
+		tcg_keep     = keep_var,
+		tcg_doc      = Nothing,
+		tcg_hmi      = HaddockModInfo Nothing Nothing Nothing Nothing
 	     } ;
 	     lcl_env = TcLclEnv {
 		tcl_errs       = errs_var,

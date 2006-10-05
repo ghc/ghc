@@ -29,7 +29,7 @@ import StaticFlags	( opt_PprStyle_Debug )
 import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
 			  SpliceDecl(..), HsBind(..), LHsBinds,
 			  emptyRdrGroup, emptyRnGroup, appendGroups, plusHsValBinds,
-			  nlHsApp, nlHsVar, pprLHsBinds )
+			  nlHsApp, nlHsVar, pprLHsBinds, HaddockModInfo(..) )
 import RdrHsSyn		( findSplice )
 
 import PrelNames	( runMainIOName, rootMainKey, rOOT_MAIN, mAIN,
@@ -59,6 +59,7 @@ import RnNames		( importsFromLocalDecls, rnImports, rnExports,
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
+import RnHsDoc          ( rnMbHsDoc )
 import PprCore		( pprRules, pprCoreBindings )
 import CoreSyn		( CoreRule, bindersOfBinds )
 import ErrUtils		( Messages, mkDumpDoc, showPass )
@@ -155,7 +156,7 @@ tcRnModule :: HscEnv
 
 tcRnModule hsc_env hsc_src save_rn_syntax
 	 (L loc (HsModule maybe_mod export_ies 
-			  import_decls local_decls mod_deprec))
+			  import_decls local_decls mod_deprec _ module_info maybe_doc))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_pkg = thisPackage (hsc_dflags hsc_env) ;
@@ -232,7 +233,15 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	reportDeprecations (hsc_dflags hsc_env) tcg_env ;
 
 		-- Process the export list
-	rn_exports <- rnExports export_ies;
+	rn_exports <- rnExports export_ies ;
+                 
+		-- Rename the Haddock documentation header 
+	rn_module_doc <- rnMbHsDoc maybe_doc ;
+
+		-- Rename the Haddock module info 
+	rn_description <- rnMbHsDoc (hmi_description module_info) ;
+	let { rn_module_info = module_info { hmi_description = rn_description } } ;
+
         let { liftM2' fn a b = do a' <- a; b' <- b; return (fn a' b') } ;
         exports <- mkExportNameSet (isJust maybe_mod) 
 				   (liftM2' (,) rn_exports export_ies) ;
@@ -248,7 +257,10 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                                                       else Nothing,
 				     tcg_dus = tcg_dus tcg_env `plusDU` usesOnly exports,
 				     tcg_deprecs = tcg_deprecs tcg_env `plusDeprecs` 
-						   mod_deprecs }
+						   mod_deprecs,
+				     tcg_doc = rn_module_doc, 
+				     tcg_hmi = rn_module_info
+				  }
 		-- A module deprecation over-rides the earlier ones
 	     } ;
 

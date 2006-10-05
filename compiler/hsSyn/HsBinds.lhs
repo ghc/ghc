@@ -439,13 +439,14 @@ sigForThisGroup ns sig
 	Just n  -> n `elemNameSet` ns
 
 sigName :: LSig name -> Maybe name
-sigName (L _ sig) = f sig
- where
-    f (TypeSig   n _)          = Just (unLoc n)
-    f (SpecSig   n _ _)        = Just (unLoc n)
-    f (InlineSig n _)          = Just (unLoc n)
-    f (FixSig (FixitySig n _)) = Just (unLoc n)
-    f other			= Nothing
+sigName (L _ sig) = sigNameNoLoc sig
+
+sigNameNoLoc :: Sig name -> Maybe name    
+sigNameNoLoc (TypeSig   n _)          = Just (unLoc n)
+sigNameNoLoc (SpecSig   n _ _)        = Just (unLoc n)
+sigNameNoLoc (InlineSig n _)          = Just (unLoc n)
+sigNameNoLoc (FixSig (FixitySig n _)) = Just (unLoc n)
+sigNameNoLoc other		                = Nothing
 
 isFixityLSig :: LSig name -> Bool
 isFixityLSig (L _ (FixSig {})) = True

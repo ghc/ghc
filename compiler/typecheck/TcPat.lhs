@@ -12,9 +12,10 @@ module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
 import {-# SOURCE #-}	TcExpr( tcSyntaxOp )
 import HsSyn		( Pat(..), LPat, HsConDetails(..), HsLit(..),
 			  HsOverLit(..), HsExpr(..), HsWrapper(..),
-			  mkCoPat, 
+			  mkCoPat, HsRecField(..), mkRecField,
 			  LHsBinds, emptyLHsBinds, isEmptyLHsBinds, 
-			  collectPatsBinders, nlHsLit )
+			  collectPatsBinders, nlHsLit,
+                          LHsDoc )
 import TcHsSyn		( TcId, hsLitType )
 import TcRnMonad
 import Inst		( InstOrigin(..), shortCutFracLit, shortCutIntLit, 
@@ -654,11 +655,12 @@ tcConArgs data_con arg_tys (RecCon rpats) pstate thing_inside
   = do	{ (rpats', tvs, res) <- tcMultiple tc_field rpats pstate thing_inside
 	; return (RecCon rpats', tvs, res) }
   where
-    tc_field :: Checker (Located Name, LPat Name) (Located TcId, LPat TcId)
-    tc_field (field_lbl, pat) pstate thing_inside
+    -- doc comments are typechecked to Nothing here
+    tc_field :: Checker (HsRecField FieldLabel (LPat Name)) (HsRecField TcId (LPat TcId))
+    tc_field (HsRecField field_lbl pat _) pstate thing_inside
       = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
 	   ; (pat', tvs, res) <- tcConArg (pat, pat_ty) pstate thing_inside
-	   ; return ((sel_id, pat'), tvs, res) }
+	   ; return (mkRecField sel_id pat', tvs, res) }
 
     find_field_ty :: FieldLabel -> TcM (Id, TcType)
     find_field_ty field_lbl

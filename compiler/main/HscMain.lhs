@@ -25,7 +25,8 @@ module HscMain
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..), LStmt, LHsType )
+import HsSyn		( Stmt(..), LHsExpr, LStmt, LHsType )
+import Module		( Module )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
@@ -48,7 +49,8 @@ import VarEnv		( emptyTidyEnv )
 import Var		( Id )
 import Module		( emptyModuleEnv, ModLocation(..) )
 import RdrName		( GlobalRdrEnv, RdrName, emptyGlobalRdrEnv )
-import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl )
+import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl, HsDoc,
+                          HaddockModInfo )
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
 import Parser
@@ -175,7 +177,8 @@ data HscChecked
         -- parsed
         (Located (HsModule RdrName))
         -- renamed
-        (Maybe (HsGroup Name,[LImportDecl Name],Maybe [LIE Name]))
+        (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
+                Maybe (HsDoc Name), HaddockModInfo Name))
         -- typechecked
         (Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
 
@@ -684,7 +687,9 @@ hscFileCheck hsc_env mod_summary = do {
                     rnInfo = do decl <- tcg_rn_decls tc_result
                                 imports <- tcg_rn_imports tc_result
                                 let exports = tcg_rn_exports tc_result
-                                return (decl,imports,exports)
+			        let doc = tcg_doc tc_result
+				    hmi = tcg_hmi tc_result
+                                return (decl,imports,exports,doc,hmi)
 		return (Just (HscChecked rdr_module 
                                    rnInfo
 				   (Just (tcg_binds tc_result,

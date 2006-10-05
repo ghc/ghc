@@ -10,7 +10,7 @@ module MatchCon ( matchConFamily ) where
 
 import {-# SOURCE #-} Match	( match )
 
-import HsSyn		( Pat(..), LPat, HsConDetails(..) )
+import HsSyn		( Pat(..), LPat, HsConDetails(..), HsRecField(..) )
 import DsBinds		( dsLHsBinds )
 import DataCon		( DataCon, dataConInstOrigArgTys, dataConEqSpec,
 			  dataConFieldLabels, dataConSourceArity )
@@ -132,7 +132,7 @@ conArgPats data_con arg_tys (RecCon rpats)
 	-- mk_pat picks a WildPat of the appropriate type for absent fields,
 	-- and the specified pattern for present fields
     mk_pat lbl arg_ty
-	= case [ pat | (sel_id,pat) <- rpats, idName (unLoc sel_id) == lbl] of
+	= case [ pat | HsRecField sel_id pat _ <- rpats, idName (unLoc sel_id) == lbl ] of
 	    (pat:pats) -> ASSERT( null pats ) unLoc pat
 	    []	       -> WildPat arg_ty
 \end{code}

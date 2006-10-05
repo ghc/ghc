@@ -22,6 +22,7 @@ import HsExpr
 import HsPat
 import HsTypes	
 import HsLit
+import HsDecls
 
 import RdrName		( RdrName, getRdrName, mkRdrUnqual )
 import Var		( Id )
@@ -415,4 +416,22 @@ collect_pat (PArrPat pats _)   	acc = foldr collect_lpat acc pats
 collect_pat (TuplePat pats _ _) acc = foldr collect_lpat acc pats
 collect_pat (ConPatIn c ps)     acc = foldr collect_lpat acc (hsConArgs ps)
 collect_pat other	        acc = acc 	-- Literals, vars, wildcard
+\end{code}
+
+%************************************************************************
+%*									*
+%* 	Getting the main binder name of a top declaration
+%*									*
+%************************************************************************
+
+\begin{code}
+
+getMainDeclBinder :: HsDecl name -> Maybe name
+getMainDeclBinder (TyClD d) = Just (tcdName d)
+getMainDeclBinder (ValD d) = Just ((unLoc . head) (collectAcc d []))
+getMainDeclBinder (SigD d) = sigNameNoLoc d
+getMainDeclBinder (ForD (ForeignImport name _ _)) = Just (unLoc name)
+getMainDeclBinder (ForD (ForeignExport name _ _)) = Just (unLoc name)
+getMainDeclBinder _ = Nothing
+
 \end{code}

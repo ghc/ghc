@@ -128,8 +128,8 @@ cvtTop (ClassD ctxt cl tvs fds decs)
   = do	{ (cxt', tc', tvs', _) <- cvt_tycl_hdr ctxt cl tvs
 	; fds'  <- mapM cvt_fundep fds
 	; (binds', sigs') <- cvtBindsAndSigs decs
-	; returnL $ TyClD $ mkClassDecl (cxt', tc', tvs') fds' sigs' binds' []
-							     -- no ATs in TH^^
+	; returnL $ TyClD $ mkClassDecl (cxt', tc', tvs') fds' sigs' binds' [] []
+						    -- no ATs or docs in TH ^^ ^^
 	}
 
 cvtTop (InstanceD tys ty decs)
@@ -158,20 +158,20 @@ cvtConstr (NormalC c strtys)
   = do	{ c'   <- cNameL c 
 	; cxt' <- returnL []
 	; tys' <- mapM cvt_arg strtys
-	; returnL $ ConDecl c' Explicit noExistentials cxt' (PrefixCon tys') ResTyH98 }
+	; returnL $ ConDecl c' Explicit noExistentials cxt' (PrefixCon tys') ResTyH98 Nothing }
 
 cvtConstr (RecC c varstrtys)
   = do 	{ c'    <- cNameL c 
 	; cxt'  <- returnL []
 	; args' <- mapM cvt_id_arg varstrtys
-	; returnL $ ConDecl c' Explicit noExistentials cxt' (RecCon args') ResTyH98 }
+	; returnL $ ConDecl c' Explicit noExistentials cxt' (RecCon args') ResTyH98 Nothing }
 
 cvtConstr (InfixC st1 c st2)
   = do 	{ c' <- cNameL c 
 	; cxt' <- returnL []
 	; st1' <- cvt_arg st1
 	; st2' <- cvt_arg st2
-	; returnL $ ConDecl c' Explicit noExistentials cxt' (InfixCon st1' st2') ResTyH98 }
+	; returnL $ ConDecl c' Explicit noExistentials cxt' (InfixCon st1' st2') ResTyH98 Nothing }
 
 cvtConstr (ForallC tvs ctxt (ForallC tvs' ctxt' con'))
   = cvtConstr (ForallC (tvs ++ tvs') (ctxt ++ ctxt') con')
@@ -181,8 +181,8 @@ cvtConstr (ForallC tvs ctxt con)
 	; tvs'  <- cvtTvs tvs
 	; ctxt' <- cvtContext ctxt
 	; case con' of
-	    ConDecl l _ [] (L _ []) x ResTyH98
-	      -> returnL $ ConDecl l Explicit tvs' ctxt' x ResTyH98
+	    ConDecl l _ [] (L _ []) x ResTyH98 _
+	      -> returnL $ ConDecl l Explicit tvs' ctxt' x ResTyH98 Nothing
 	    c -> panic "ForallC: Can't happen" }
 
 cvt_arg (IsStrict, ty)  = do { ty' <- cvtType ty; returnL $ HsBangTy HsStrict ty' }
@@ -190,7 +190,7 @@ cvt_arg (NotStrict, ty) = cvtType ty
 
 cvt_id_arg (i, str, ty) = do { i' <- vNameL i
 			     ; ty' <- cvt_arg (str,ty)
-			     ; return (i', ty') }
+			     ; return (mkRecField i' ty') }
 
 cvtDerivs [] = return Nothing
 cvtDerivs cs = do { cs' <- mapM cvt_one cs
@@ -458,7 +458,7 @@ cvtp (RecP c fs)      = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
 cvtp (ListP ps)       = do { ps' <- cvtPats ps; return $ ListPat ps' void }
 cvtp (SigP p t)       = do { p' <- cvtPat p; t' <- cvtType t; return $ SigPatIn p' t' }
 
-cvtPatFld (s,p) = do { s' <- vNameL s; p' <- cvtPat p; return (s',p') }
+cvtPatFld (s,p) = do { s' <- vNameL s; p' <- cvtPat p; return (mkRecField s' p') }
 
 -----------------------------------------------------------
 --	Types and type variables

@@ -11,7 +11,7 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
-			  ConDecl(..),   Sig(..), NewOrData(..), ResType(..),
+			  ConDecl(..), HsRecField(..), Sig(..), NewOrData(..), ResType(..),
 			  tyClDeclTyVars, isSynDecl, isIdxTyDecl,
 			  isKindSigDecl, hsConArgs, LTyClDecl, tcdName,
 			  hsTyVarName, LHsTyVarBndr, LHsType
@@ -572,14 +572,15 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	; cons' <- mappM (wrapLocM kc_con_decl) cons
 	; return (decl {tcdTyVars = tvs, tcdCtxt = ctxt', tcdCons = cons'}) }
   where
-    kc_con_decl (ConDecl name expl ex_tvs ex_ctxt details res) = do
+    -- doc comments are typechecked to Nothing here
+    kc_con_decl (ConDecl name expl ex_tvs ex_ctxt details res _) = do
       kcHsTyVars ex_tvs $ \ex_tvs' -> do
         ex_ctxt' <- kcHsContext ex_ctxt
         details' <- kc_con_details details 
         res'     <- case res of
           ResTyH98 -> return ResTyH98
           ResTyGADT ty -> do { ty' <- kcHsSigType ty; return (ResTyGADT ty') }
-        return (ConDecl name expl ex_tvs' ex_ctxt' details' res')
+        return (ConDecl name expl ex_tvs' ex_ctxt' details' res' Nothing)
 
     kc_con_details (PrefixCon btys) 
 	= do { btys' <- mappM kc_larg_ty btys ; return (PrefixCon btys') }
@@ -588,7 +589,7 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
     kc_con_details (RecCon fields) 
 	= do { fields' <- mappM kc_field fields; return (RecCon fields') }
 
-    kc_field (fld, bty) = do { bty' <- kc_larg_ty bty ; return (fld, bty') }
+    kc_field (HsRecField fld bty d) = do { bty' <- kc_larg_ty bty ; return (HsRecField fld bty' d) }
 
     kc_larg_ty bty = case new_or_data of
 			DataType -> kcHsSigType bty
@@ -769,7 +770,7 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> TcM DataCon
 
 tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
-	  (ConDecl name _ ex_tvs ex_ctxt details ResTyH98)
+	  (ConDecl name _ ex_tvs ex_ctxt details ResTyH98 _)
   = do	{ let tc_datacon field_lbls arg_ty
 		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
 		     ; buildDataCon (unLoc name) False {- Prefix -} 
@@ -785,14 +786,14 @@ tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
 
 	; case details of
 	    PrefixCon [arg_ty]           -> tc_datacon [] arg_ty
-	    RecCon [(field_lbl, arg_ty)] -> tc_datacon [field_lbl] arg_ty
+	    RecCon [HsRecField field_lbl arg_ty _] -> tc_datacon [field_lbl] arg_ty
 	    other                        -> 
 	      failWithTc (newtypeFieldErr name (length (hsConArgs details)))
 			-- Check that the constructor has exactly one field
 	}
 
 tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
-	  (ConDecl name _ tvs ctxt details res_ty)
+	  (ConDecl name _ tvs ctxt details res_ty _)
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
     ; (univ_tvs, ex_tvs, eq_preds, data_tc) <- tcResultType tycon tc_tvs tvs' res_ty
@@ -815,7 +816,7 @@ tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
 	InfixCon bty1 bty2 -> tc_datacon True  [] [bty1,bty2]
 	RecCon fields      -> tc_datacon False field_names btys
 			   where
-			      (field_names, btys) = unzip fields
+			      (field_names, btys) = unzip [ (n, t) | HsRecField n t _ <- fields ] 
                               
     }
 

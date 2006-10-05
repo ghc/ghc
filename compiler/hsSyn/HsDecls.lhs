@@ -15,6 +15,7 @@ module HsDecls (
 	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
 	ConDecl(..), ResType(..), LConDecl,	
+	DocDecl(..), LDocDecl, docDeclDoc, DocEntity(..),
 	DeprecDecl(..),  LDeprecDecl,
 	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
@@ -35,9 +36,10 @@ import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 import HsBinds		( HsValBinds(..), HsBind, LHsBinds, plusHsValBinds,
 			  Sig(..), LSig, LFixitySig, pprLHsBinds,
 			  emptyValBindsIn, emptyValBindsOut )
-import HsPat		( HsConDetails(..), hsConArgs )
+import HsPat		( HsConDetails(..), hsConArgs, HsRecField(..) )
 import HsImpExp		( pprHsVar )
 import HsTypes
+import HsDoc		( HsDoc, LHsDoc, ppr_mbDoc )
 import NameSet          ( NameSet )
 import CoreSyn		( RuleName )
 import {- Kind parts of -} Type		( Kind, pprKind )
@@ -53,7 +55,6 @@ import SrcLoc		( Located(..), unLoc, noLoc )
 import FastString
 import Maybe            ( isJust )
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -75,6 +76,8 @@ data HsDecl id
   | DeprecD	(DeprecDecl id)
   | RuleD	(RuleDecl id)
   | SpliceD	(SpliceDecl id)
+  | DocD	(DocDecl id)
+
 
 -- NB: all top-level fixity decls are contained EITHER
 -- EITHER SigDs
@@ -105,7 +108,11 @@ data HsGroup id
 	hs_defds  :: [LDefaultDecl id],
 	hs_fords  :: [LForeignDecl id],
 	hs_depds  :: [LDeprecDecl id],
-	hs_ruleds :: [LRuleDecl id]
+	hs_ruleds :: [LRuleDecl id],
+
+	hs_docs   :: [DocEntity id]
+                -- Used to remember the module structure,
+                -- which is needed to produce Haddock documentation
   }
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
@@ -115,7 +122,8 @@ emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], hs_derivds = [],
 		       hs_fixds = [], hs_defds = [], hs_fords = [], 
 		       hs_depds = [], hs_ruleds = [],
-		       hs_valds = error "emptyGroup hs_valds: Can't happen" }
+		       hs_valds = error "emptyGroup hs_valds: Can't happen",
+                       hs_docs = [] }
 
 appendGroups :: HsGroup a -> HsGroup a -> HsGroup a
 appendGroups 
@@ -128,7 +136,8 @@ appendGroups
 	hs_defds  = defds1,
 	hs_fords  = fords1, 
 	hs_depds  = depds1,
-	hs_ruleds = rulds1 }
+	hs_ruleds = rulds1,
+  hs_docs   = docs1 }
     HsGroup { 
 	hs_valds  = val_groups2,
 	hs_tyclds = tyclds2, 
@@ -138,7 +147,8 @@ appendGroups
 	hs_defds  = defds2,
 	hs_fords  = fords2, 
 	hs_depds  = depds2,
-	hs_ruleds = rulds2 }
+	hs_ruleds = rulds2,
+  hs_docs   = docs2 }
   = 
     HsGroup { 
 	hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
@@ -149,21 +159,23 @@ appendGroups
 	hs_defds  = defds1 ++ defds2,
 	hs_fords  = fords1 ++ fords2, 
 	hs_depds  = depds1 ++ depds2,
-	hs_ruleds = rulds1 ++ rulds2 }
+	hs_ruleds = rulds1 ++ rulds2,
+  hs_docs   = docs1  ++ docs2 }
 \end{code}
 
 \begin{code}
 instance OutputableBndr name => Outputable (HsDecl name) where
-    ppr (TyClD dcl)  = ppr dcl
-    ppr (ValD binds) = ppr binds
-    ppr (DefD def)   = ppr def
-    ppr (InstD inst) = ppr inst
-    ppr (DerivD deriv) = ppr deriv
-    ppr (ForD fd)    = ppr fd
-    ppr (SigD sd)    = ppr sd
-    ppr (RuleD rd)   = ppr rd
-    ppr (DeprecD dd) = ppr dd
-    ppr (SpliceD dd) = ppr dd
+    ppr (TyClD dcl)             = ppr dcl
+    ppr (ValD binds)            = ppr binds
+    ppr (DefD def)              = ppr def
+    ppr (InstD inst)            = ppr inst
+    ppr (DerivD deriv)          = ppr deriv
+    ppr (ForD fd)               = ppr fd
+    ppr (SigD sd)               = ppr sd
+    ppr (RuleD rd)              = ppr rd
+    ppr (DeprecD dd)            = ppr dd
+    ppr (SpliceD dd)            = ppr dd
+    ppr (DocD doc)              = ppr doc
 
 instance OutputableBndr name => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,
@@ -414,10 +426,11 @@ data TyClDecl name
 		tcdFDs     :: [Located (FunDep name)],	-- Functional deps
 		tcdSigs    :: [LSig name],		-- Methods' signatures
 		tcdMeths   :: LHsBinds name,		-- Default methods
-		tcdATs	   :: [LTyClDecl name]		-- Associated types; ie
+		tcdATs	   :: [LTyClDecl name],		-- Associated types; ie
 							--   only 'TyData',
 							--   'TyFunction',
 							--   and 'TySynonym'
+		tcdDocs    :: [DocEntity name]		-- Haddock docs
     }
 
 data NewOrData
@@ -638,6 +651,8 @@ data ConDecl name
     , con_details   :: HsConDetails name (LBangType name)	-- The main payload
 
     , con_res       :: ResType name         -- Result type of the constructor
+
+    , con_doc       :: Maybe (LHsDoc name)  -- A possible Haddock comment
     }
 
 data ResType name
@@ -657,7 +672,7 @@ conDeclsNames cons
     do_one (flds_seen, acc) (ConDecl { con_name = lname, con_details = RecCon flds })
 	= (map unLoc new_flds ++ flds_seen, lname : [f | f <- new_flds] ++ acc)
 	where
-	  new_flds = [ f | (f,_) <- flds, not (unLoc f `elem` flds_seen) ]
+	  new_flds = [ f | (HsRecField f _ _) <- flds, not (unLoc f `elem` flds_seen) ]
 
     do_one (flds_seen, acc) c
 	= (flds_seen, (con_name c):acc)
@@ -670,23 +685,23 @@ conDetailsTys details = map getBangType (hsConArgs details)
 instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
-pprConDecl (ConDecl con expl tvs cxt details ResTyH98)
-  = sep [pprHsForAll expl tvs cxt, ppr_details con details]
+pprConDecl (ConDecl con expl tvs cxt details ResTyH98 doc)
+  = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details con details]
   where
     ppr_details con (InfixCon t1 t2) = hsep [ppr t1, pprHsVar con, ppr t2]
     ppr_details con (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
     ppr_details con (RecCon fields)  = ppr con <+> ppr_fields fields
 
-pprConDecl (ConDecl con expl tvs cxt (PrefixCon arg_tys) (ResTyGADT res_ty))
+pprConDecl (ConDecl con expl tvs cxt (PrefixCon arg_tys) (ResTyGADT res_ty) _)
   = ppr con <+> dcolon <+> 
     sep [pprHsForAll expl tvs cxt, ppr (foldr mk_fun_ty res_ty arg_tys)]
   where
     mk_fun_ty a b = noLoc (HsFunTy a b)
-pprConDecl (ConDecl con expl tvs cxt (RecCon fields) (ResTyGADT res_ty))
-  = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr fields <+> dcolon <+> ppr res_ty]
 
-ppr_fields fields = braces (sep (punctuate comma (map ppr_field fields)))
-ppr_field (n, ty) = ppr n <+> dcolon <+> ppr ty
+pprConDecl (ConDecl con expl tvs cxt (RecCon fields) (ResTyGADT res_ty) _)
+  = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr_fields fields <+> dcolon <+> ppr res_ty]
+
+ppr_fields fields = braces (sep (punctuate comma (map ppr fields)))
 \end{code}
 
 %************************************************************************
@@ -909,6 +924,37 @@ instance OutputableBndr name => Outputable (RuleBndr name) where
    ppr (RuleBndrSig name ty) = ppr name <> dcolon <> ppr ty
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection[DocDecl]{Document comments}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+-- source code entities, for representing the module structure
+data DocEntity name
+  = DeclEntity name
+  | DocEntity (DocDecl name)
+ 
+type LDocDecl name = Located (DocDecl name)
+
+data DocDecl name
+  = DocCommentNext (HsDoc name)
+  | DocCommentPrev (HsDoc name)
+  | DocCommentNamed String (HsDoc name)
+  | DocGroup Int (HsDoc name)
+ 
+-- Okay, I need to reconstruct the document comments, but for now:
+instance Outputable (DocDecl name) where
+  ppr _ = text "<document comment>"
+
+docDeclDoc (DocCommentNext d) = d
+docDeclDoc (DocCommentPrev d) = d
+docDeclDoc (DocCommentNamed _ d) = d
+docDeclDoc (DocGroup _ d) = d
+
+\end{code}
 
 %************************************************************************
 %*									*

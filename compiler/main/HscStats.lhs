@@ -23,7 +23,7 @@ import Util             ( count )
 %************************************************************************
 
 \begin{code}
-ppSourceStats short (L _ (HsModule _ exports imports ldecls _))
+ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _ _))
  = (if short then hcat else vcat)
         (map pp_val
 	       [("ExportAll        ", export_all), -- 1 if no export list

@@ -771,16 +771,16 @@ zonkConStuff env (InfixCon p1 p2)
 	; return (env', InfixCon p1' p2') }
 
 zonkConStuff env (RecCon rpats)
-  = do	{ (env', pats') <- zonkPats env pats
-	; returnM (env', RecCon (fields `zip` pats')) }
-  where
-    (fields, pats) = unzip rpats
+  = do	{ let (fields, pats) = unzip [ (f, p) | HsRecField f p _  <- rpats ]
+	; (env', pats') <- zonkPats env pats
+	; let recCon = RecCon [ mkRecField f p | (f, p) <- zip fields pats' ]
+	; returnM (env', recCon) }
 
 ---------------------------
 zonkPats env []		= return (env, [])
 zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
-			     ; (env', pats') <- zonkPats env1 pats
-			     ; return (env', pat':pats') }
+		     ; (env', pats') <- zonkPats env1 pats
+		     ; return (env', pat':pats') }
 \end{code}
 
 %************************************************************************

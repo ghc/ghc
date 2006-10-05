@@ -43,7 +43,7 @@ module TcRnTypes(
 
 import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
 			  ArithSeqInfo, DictBinds, LHsBinds, LImportDecl, HsGroup,
-                          HsWrapper, IE )
+                          HsWrapper, IE, HsDoc, HaddockModInfo )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
 			  GenAvailInfo(..), AvailInfo, HscSource(..),
@@ -227,7 +227,10 @@ data TcGblEnv
 	tcg_deprecs :: Deprecations,		-- ...Deprecations 
 	tcg_insts   :: [Instance],		-- ...Instances
 	tcg_rules   :: [LRuleDecl Id],		-- ...Rules
-	tcg_fords   :: [LForeignDecl Id]	-- ...Foreign import & exports
+	tcg_fords   :: [LForeignDecl Id],	-- ...Foreign import & exports
+
+	tcg_doc :: Maybe (HsDoc Name), -- Maybe Haddock documentation
+        tcg_hmi :: HaddockModInfo Name -- Haddock module information
     }
 \end{code}
 

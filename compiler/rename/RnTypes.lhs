@@ -28,6 +28,7 @@ import RdrHsSyn		( extractHsRhoRdrTyVars )
 import RnHsSyn		( extractHsTyNames, parrTyCon_name, tupleTyCon_name, 
 			  listTyCon_name
 			)
+import RnHsDoc          ( rnLHsDoc )
 import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  lookupLocatedOccRn, lookupLocatedBndrRn,
 			  lookupLocatedGlobalOccRn, bindTyVarsRn, 
@@ -187,6 +188,11 @@ rnHsType doc (HsPredTy pred)
 rnHsType doc (HsSpliceTy _)
   = do	{ addErr (ptext SLIT("Type splices are not yet implemented"))
  	; failM }
+
+rnHsType doc (HsDocTy ty haddock_doc)
+  = rnLHsType doc ty 	        `thenM` \ ty' ->
+    rnLHsDoc haddock_doc	`thenM` \ haddock_doc' ->
+    returnM (HsDocTy ty' haddock_doc')
 
 rnLHsTypes doc tys = mappM (rnLHsType doc) tys
 \end{code}
@@ -667,21 +673,22 @@ rnConPat con (InfixCon pat1 pat2)
 -- -----------------------------------------------------------------------------
 -- rnRpats
 
-rnRpats :: [(Located RdrName, LPat RdrName)]
-        -> RnM ([(Located Name, LPat Name)], FreeVars)
+-- Haddock comments for record fields are renamed to Nothing here
+rnRpats :: [HsRecField RdrName (LPat RdrName)] 
+        -> RnM ([HsRecField Name (LPat Name)], FreeVars)
 rnRpats rpats
   = mappM_ field_dup_err dup_fields 	`thenM_`
     mapFvRn rn_rpat rpats		`thenM` \ (rpats', fvs) ->
     returnM (rpats', fvs)
   where
-    (_, dup_fields) = removeDups compare [ unLoc f | (f,_) <- rpats ]
+    (_, dup_fields) = removeDups compare [ unLoc f | HsRecField f _ _ <- rpats ]
 
     field_dup_err dups = addErr (dupFieldErr "pattern" dups)
 
-    rn_rpat (field, pat)
+    rn_rpat (HsRecField field pat _)
       = lookupLocatedGlobalOccRn field	`thenM` \ fieldname ->
 	rnLPat pat			`thenM` \ (pat', fvs) ->
-	returnM ((fieldname, pat'), fvs `addOneFV` unLoc fieldname)
+	returnM ((mkRecField fieldname pat'), fvs `addOneFV` unLoc fieldname)
 
 \end{code}
 

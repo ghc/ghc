@@ -20,6 +20,7 @@ import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  instDeclATs, isIdxTyDecl,
 			  LIE )
 import RnEnv
+import RnHsDoc          ( rnHsDoc )
 import IfaceEnv		( ifaceExportNames )
 import LoadIface	( loadSrcInterface )
 import TcRnMonad hiding (LIE)
@@ -547,7 +548,12 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_names
 	     ; succeed_with True (name:names) }
     get_item (IEVar name)
         = succeed_with True [name]
-
+    get_item (IEGroup _ _)
+        = succeed_with False []
+    get_item (IEDoc _)
+        = succeed_with False []
+    get_item (IEDocNamed _)
+        = succeed_with False []
 \end{code}
 
 
@@ -619,8 +625,24 @@ rnExports (Just exports)
 			      return (IEThingWith name names)
 	   rnExport (IEModuleContents mod)
 	       = return (IEModuleContents mod)
+	   rnExport (IEGroup lev doc) 
+	       = do rn_doc <- rnHsDoc doc
+		    return (IEGroup lev rn_doc)
+	   rnExport (IEDoc doc)
+	       = do rn_doc <- rnHsDoc doc
+		    return (IEDoc rn_doc)
+	   rnExport (IEDocNamed str)
+	       = return (IEDocNamed str)
+
        rn_exports <- mapM (wrapLocM rnExport) exports
        return (Just rn_exports)
+
+filterOutDocs = filter notDoc
+       where
+	 notDoc (L _ (IEGroup _ _))  = False
+	 notDoc (L _ (IEDoc _))      = False
+	 notDoc (L _ (IEDocNamed _)) = False 
+	 notDoc _                    = True
 
 mkExportNameSet :: Bool  -- False => no 'module M(..) where' header at all
                 -> Maybe ([LIE Name], [LIE RdrName]) -- Nothing => no explicit export list
@@ -650,7 +672,11 @@ mkExportNameSet explicit_mod exports
                                      return (Just ([noLoc (IEVar mainName)]
                                                   ,[noLoc (IEVar main_RDR_Unqual)]))
 		-- ToDo: the 'noLoc' here is unhelpful if 'main' turns out to be out of scope
-      exports_from_avail real_exports rdr_env imports
+
+      -- we don't want to include Haddock comments
+      let real_exports' = fmap (\(a,b) -> (filterOutDocs a, filterOutDocs b)) real_exports 
+
+      exports_from_avail real_exports' rdr_env imports
 
 
 exports_from_avail Nothing rdr_env imports

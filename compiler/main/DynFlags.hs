@@ -39,13 +39,14 @@ module DynFlags (
 	getVerbFlag,
 	updOptLevel,
 	setTmpDir,
+	setPackageName,
 	
 	-- parsing DynFlags
 	parseDynamicFlags,
         allFlags,
 
 	-- misc stuff
-	machdepCCOpts, picCCOpts,
+	machdepCCOpts, picCCOpts
   ) where
 
 #include "HsVersions.h"
@@ -196,6 +197,7 @@ data DynFlag
    | Opt_StgStats
    | Opt_HideAllPackages
    | Opt_PrintBindResult
+   | Opt_Haddock
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -812,7 +814,6 @@ dynamic_flags = [
   ,  ( "F"		, NoArg  (setDynFlag Opt_Pp))
   ,  ( "#include"	, HasArg (addCmdlineHCInclude) )
   ,  ( "v"		, OptIntSuffix setVerbosity )
-
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg (upd . setPgmL) )  
   ,  ( "pgmP"           , HasArg (upd . setPgmP) )  
@@ -873,6 +874,7 @@ dynamic_flags = [
 	------- Miscellaneous ----------------------------------------------
   ,  ( "no-hs-main"     , NoArg (setDynFlag Opt_NoHsMain))
   ,  ( "main-is"   	, SepArg setMainIs )
+  ,  ( "haddock"	, NoArg (setDynFlag Opt_Haddock) )
 
 	------- recompilation checker (DEPRECATED, use -fforce-recomp) -----
   ,  ( "recomp"		, NoArg (unSetDynFlag Opt_ForceRecomp) )
@@ -881,7 +883,7 @@ dynamic_flags = [
         ------- Packages ----------------------------------------------------
   ,  ( "package-conf"   , HasArg extraPkgConf_ )
   ,  ( "no-user-package-conf", NoArg (unSetDynFlag Opt_ReadUserPackageConf) )
-  ,  ( "package-name"   , HasArg setPackageName )
+  ,  ( "package-name"   , HasArg (upd . setPackageName) )
   ,  ( "package"        , HasArg exposePackage )
   ,  ( "hide-package"   , HasArg hidePackage )
   ,  ( "hide-all-packages", NoArg (setDynFlag Opt_HideAllPackages) )
@@ -1095,11 +1097,12 @@ hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p = 
   upd (\s -> s{ packageFlags = IgnorePackage p : packageFlags s })
+
 setPackageName p
   | Nothing <- unpackPackageId pid
   = throwDyn (CmdLineError ("cannot parse \'" ++ p ++ "\' as a package identifier"))
   | otherwise
-  = upd (\s -> s{ thisPackage = pid })
+  = \s -> s{ thisPackage = pid }
   where
         pid = stringToPackageId p
 
