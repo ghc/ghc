@@ -29,6 +29,7 @@ module UniqFM (
 	plusUFM,
 	plusUFM_C,
 	minusUFM,
+	intersectsUFM,
 	intersectUFM,
 	intersectUFM_C,
 	foldUFM,
@@ -107,6 +108,8 @@ minusUFM	:: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 intersectUFM	:: UniqFM elt -> UniqFM elt -> UniqFM elt
 intersectUFM_C	:: (elt1 -> elt2 -> elt3)
 		-> UniqFM elt1 -> UniqFM elt2 -> UniqFM elt3
+intersectsUFM	:: UniqFM elt1 -> UniqFM elt2 -> Bool
+
 foldUFM		:: (elt -> a -> a) -> a -> UniqFM elt -> a
 mapUFM		:: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
@@ -450,7 +453,8 @@ minusUFM fm1 fm2     = minus_trees fm1 fm2
 And taking the intersection of two UniqFM's.
 
 \begin{code}
-intersectUFM t1 t2 = intersectUFM_C use_snd t1 t2
+intersectUFM  t1 t2 = intersectUFM_C use_snd t1 t2
+intersectsUFM t1 t2 = isNullUFM (intersectUFM_C (\ _ _ -> error "urk") t1 t2)
 
 intersectUFM_C f EmptyUFM _ = EmptyUFM
 intersectUFM_C f _ EmptyUFM = EmptyUFM
