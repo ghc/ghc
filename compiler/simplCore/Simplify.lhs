@@ -488,8 +488,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
     else	
 
 	-- ANF-ise a constructor or PAP rhs
-    mkAtomicArgs False {- Not strict -} 
-		 ok_float_unlifted rhs1 		`thenSmpl` \ (aux_binds, rhs2) ->
+    mkAtomicArgs ok_float_unlifted rhs1 		`thenSmpl` \ (aux_binds, rhs2) ->
 
 	-- If the result is a PAP, float the floats out, else wrap them
 	-- By this time it's already been ANF-ised (if necessary)
@@ -618,7 +617,7 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 	-- and now x is not demanded (I'm assuming h is lazy)
 	-- This really happens.  Similarly
 	--	let f = \x -> e in ...f..f...
-	-- After inling f at some of its call sites the original binding may
+	-- After inlining f at some of its call sites the original binding may
 	-- (for example) be no longer strictly demanded.
 	-- The solution here is a bit ad hoc...
  	info_w_unf = new_bndr_info `setUnfoldingInfo` unfolding
@@ -1199,14 +1198,13 @@ mkAtomicArgsE env is_strict rhs thing_inside
 
 -- Old code: consider rewriting to be more like mkAtomicArgsE
 
-mkAtomicArgs :: Bool	-- A strict binding
-	     -> Bool	-- OK to float unlifted args
+mkAtomicArgs :: Bool	-- OK to float unlifted args
 	     -> OutExpr
 	     -> SimplM (OrdList (OutId,OutExpr),  -- The floats (unusually) may include
 			OutExpr)		  -- things that need case-binding,
 						  -- if the strict-binding flag is on
 
-mkAtomicArgs is_strict ok_float_unlifted rhs
+mkAtomicArgs ok_float_unlifted rhs
   | (Var fun, args) <- collectArgs rhs,				-- It's an application
     isDataConWorkId fun || valArgCount args < idArity fun	-- And it's a constructor or PAP
   = go fun nilOL [] args	-- Have a go
@@ -1228,14 +1226,13 @@ mkAtomicArgs is_strict ok_float_unlifted rhs
 
 	| otherwise	-- Don't forget to do it recursively
 			-- E.g.  x = a:b:c:[]
-	=  mkAtomicArgs is_strict ok_float_unlifted arg	`thenSmpl` \ (arg_binds, arg') ->
-	   newId FSLIT("a") arg_ty			`thenSmpl` \ arg_id ->
+	=  mkAtomicArgs ok_float_unlifted arg	`thenSmpl` \ (arg_binds, arg') ->
+	   newId FSLIT("a") arg_ty		`thenSmpl` \ arg_id ->
 	   go fun ((arg_binds `snocOL` (arg_id,arg')) `appOL` binds) 
 	      (Var arg_id : rev_args) args
 	where
 	  arg_ty        = exprType arg
-	  can_float_arg =  is_strict 
-			|| not (isUnLiftedType arg_ty)
+	  can_float_arg =  not (isUnLiftedType arg_ty)
 			|| (ok_float_unlifted && exprOkForSpeculation arg)
 
 
