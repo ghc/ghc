@@ -17,7 +17,7 @@ import Paths_haddock         ( getDataDir )
 
 import Prelude hiding ( catch )
 import Control.Exception     ( catch )
-import Control.Monad         ( when, liftM )
+import Control.Monad         ( when, liftM, foldM )
 import Control.Monad.Writer  ( Writer, runWriter, tell )
 import Data.Char             ( isSpace )
 import Data.IORef            ( writeIORef )
@@ -58,7 +58,7 @@ import StaticFlags           ( parseStaticFlags )
 -----------------------------------------------------------------------------
 -- Top-level stuff
 
-type CheckedMod = (Module, FullyCheckedMod, FilePath)
+type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
 main :: IO ()
 main = do
@@ -208,15 +208,16 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
     checkedMod <- case mbMod of 
       Just m  -> return m
       Nothing -> die ("Failed to load module: " ++ moduleString mod)
-    return (mod, checkedMod, file)) modsAndFiles 
+    return (mod, file, checkedMod)) modsAndFiles 
   ensureFullyChecked checkedMods
   where
     ensureFullyChecked modules 
       | length modules' == length modules = return modules'
       | otherwise = die "Failed to check all modules properly\n" 
-      where modules' = [ (mod, (a,b,c,d), f) | 
-                         (mod, CheckedModule a (Just b) (Just c) (Just d), f) 
+      where modules' = [ (mod, f, (a,b,c,d)) | 
+                         (mod, f, CheckedModule a (Just b) (Just c) (Just d)) 
                          <- modules ] 
+
 
 data Flag
   = Flag_CSS String
@@ -389,8 +390,12 @@ run flags modules extEnv = do
 
   prologue <- getPrologue flags
 
-  let 
-    (modMap, messages) = runWriter (pass1 modules flags) 
+  let
+    -- collect the data from GHC that we need for each home module
+    ghcModuleData = map moduleDataGHC modules
+    -- run pass 1 on this data
+    (modMap, messages) = runWriter (pass1 ghcModuleData flags) 
+
     haddockMods = catMaybes [ Map.lookup mod modMap | (mod,_,_) <- modules ]
     homeEnv = buildGlobalDocEnv haddockMods
     env = homeEnv `Map.union` extEnv
@@ -453,95 +458,115 @@ type FullyCheckedMod = (ParsedSource,
 printEntity (DocEntity doc) = show doc
 printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
-pass1 :: [CheckedMod] -> [Flag] -> ErrMsgM ModuleMap
-pass1 modules flags = worker modules (Map.empty) flags
+-- | This data structure collects all the information we need from the GHC API
+-- about a home package module
+data ModuleDataGHC = ModuleDataGHC {
+   ghcModule         :: Module,
+   ghcFilename       :: FilePath,
+   ghcMbDocOpts      :: Maybe String,
+   ghcHaddockModInfo :: HaddockModInfo Name,
+   ghcMbDoc          :: Maybe (HsDoc Name),
+   ghcGroup          :: HsGroup Name,
+   ghcMbExports      :: Maybe [LIE Name],
+   ghcExportedNames  :: [Name],
+   ghcNamesInScope   :: [Name],
+   ghcInstances      :: [Instance]
+}
+
+-- | Dig out what we want from the GHC API without altering anything
+moduleDataGHC :: CheckedMod -> ModuleDataGHC 
+moduleDataGHC (mod, file, checkedMod) = ModuleDataGHC {
+  ghcModule         = mod,
+  ghcFilename       = file,
+  ghcMbDocOpts      = mbOpts,
+  ghcHaddockModInfo = info,
+  ghcMbDoc          = mbDoc,
+  ghcGroup          = group,
+  ghcMbExports      = mbExports,
+  ghcExportedNames  = modInfoExports modInfo,
+  ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo, 
+  ghcInstances      = modInfoInstances modInfo
+}
   where
-    worker [] moduleMap _ = return moduleMap
-    worker ((mod, checked_mod, filename):rest_modules) moduleMap flags = do
+    HsModule _ _ _ _ _ mbOpts _ _      = unLoc parsed
+    (group, _, mbExports, mbDoc, info) = renamed
+    (parsed, renamed, _, modInfo)      = checkedMod 
+
+-- | Massage the data in ModuleDataGHC to produce something closer to what
+-- we want to render. To do this, we need access to modules before this one
+-- in the topological sort, to which we have already done this conversion. 
+-- That's what's in the ModuleMap.
+pass1data :: ModuleDataGHC -> [Flag] -> ModuleMap -> ErrMsgM HaddockModule
+pass1data modData flags modMap = do
+
+  let mod = ghcModule modData
+
+  opts <- mkDocOpts (ghcMbDocOpts modData) mod
+
+  let group        = ghcGroup modData
+      entities     = (reverse . nubBy sameName . hs_docs) group 
+      exports      = fmap (map unLoc) (ghcMbExports modData)
+      entityNames_ = entityNames entities
+      subNames     = allSubNames group
+      localNames   = entityNames_ ++ subNames
+      subMap       = mkSubMap group
+      expDeclMap   = mkDeclMap (ghcExportedNames modData) group
+      localDeclMap = mkDeclMap entityNames_ group
+      docMap       = mkDocMap group 
+      ignoreExps   = Flag_IgnoreAllExports `elem` flags
+
+  visibleNames <- mkVisibleNames mod modMap localNames (ghcNamesInScope modData) 
+                                 subMap exports opts localDeclMap 
+
+  exportItems <- mkExportItems modMap mod (ghcExportedNames modData)
+                               expDeclMap localDeclMap subMap entities 
+                               opts exports ignoreExps docMap 
+
+  -- prune the export list to just those declarations that have
+  -- documentation, if the 'prune' option is on.
+  let 
+    prunedExportItems
+      | OptPrune `elem` opts = pruneExportItems exportItems
+      | otherwise = exportItems
  
-      let (parsed_source, renamed_source, _, moduleInfo) = checked_mod
-          (mb_doc_opts, _, _) = getModuleStuff parsed_source
+  return HM {
+    hmod_mod                = mod,
+    hmod_orig_filename      = ghcFilename modData,
+    hmod_info               = ghcHaddockModInfo modData,
+    hmod_doc                = ghcMbDoc modData,
+    hmod_rn_doc             = Nothing,
+    hmod_options            = opts,
+    hmod_locals             = localNames,
+    hmod_doc_map            = docMap,
+    hmod_rn_doc_map         = Map.empty,
+    hmod_sub_map            = subMap,
+    hmod_export_items       = prunedExportItems,
+    hmod_rn_export_items    = [], 
+    hmod_exports            = ghcExportedNames modData,
+    hmod_visible_exports    = visibleNames, 
+    hmod_exported_decl_map  = expDeclMap,
+    hmod_instances          = ghcInstances modData
+  }
+  where
+    mkDocOpts mbOpts mod = do
+      opts <- case mbOpts of 
+        Just opts -> processOptions opts
+        Nothing -> return []
+      let opts' = if Flag_HideModule (moduleString mod) `elem` flags 
+            then OptHide : opts
+            else opts      
+      return opts'
 
-      opts <- mkDocOpts mb_doc_opts
+-- | Produce a map of HaddockModules with information that is close to 
+-- renderable.  What is lacking after this pass are the renamed export items.
+pass1 :: [ModuleDataGHC] -> [Flag] -> ErrMsgM ModuleMap
+pass1 modules flags = foldM produceAndInsert Map.empty modules
+  where
+    produceAndInsert modMap modData = do
+      resultMod <- pass1data modData flags modMap
+      let key = ghcModule modData
+      return (Map.insert key resultMod modMap)
 
-      let (group, _, mb_exports, mbModDoc, haddockModInfo) = renamed_source
-
-          entities = (reverse . nubBy sameName . hs_docs) group 
-          exports = fmap (map unLoc) mb_exports
- 
-          -- lots of names
-          exportedNames = modInfoExports moduleInfo
-          theseEntityNames = entityNames entities 
-          subNames = allSubnamesInGroup group
-          localNames = theseEntityNames ++ subNames
-          -- guaranteed to be Just, since the module has been compiled from 
-          -- scratch 
-          scopeNames = fromJust $ modInfoTopLevelScope moduleInfo 
-      
-          subMap = mk_sub_map_from_group group
-
-          exportedDeclMap = mkDeclMap exportedNames group
-          localDeclMap = mkDeclMap theseEntityNames group
-          docMap = mkDocMap group 
-
-          ignoreAllExports = Flag_IgnoreAllExports `elem` flags
-  
-          packageId = modulePackageId mod
-      
-      theseVisibleNames <- visibleNames mod moduleMap localNames scopeNames 
-                                        subMap exports opts localDeclMap 
-                                        packageId
-
-      exportItems <- mkExportItems moduleMap mod exportedNames
-                                   exportedDeclMap localDeclMap subMap entities 
-                                   opts exports ignoreAllExports docMap 
-                                   packageId
-
-     -- prune the export list to just those declarations that have
-     -- documentation, if the 'prune' option is on.
-      let prunedExportItems
-	    | OptPrune `elem` opts = pruneExportItems exportItems
-	    | otherwise = exportItems
- 
-          instances = modInfoInstances moduleInfo
-
-          haddock_module = HM {
-            hmod_mod                = mod,
-            hmod_orig_filename      = filename,
-            hmod_info               = haddockModInfo,
-            hmod_doc                = mbModDoc,
-            hmod_rn_doc             = Nothing,
-            hmod_options            = opts,
-            hmod_locals             = localNames,
-            hmod_doc_map            = docMap,
-            hmod_rn_doc_map         = Map.empty,
-            hmod_sub_map            = subMap,
-            hmod_export_items       = prunedExportItems,
-            hmod_rn_export_items    = [], 
-            hmod_exports            = exportedNames,
-            hmod_visible_exports    = theseVisibleNames, 
-            hmod_exported_decl_map  = exportedDeclMap,
-            hmod_instances          = instances
-          }
-
-          moduleMap' = Map.insert mod haddock_module moduleMap
-      
-      worker rest_modules moduleMap' flags 
-      
-      where 
-        getModuleStuff source = 
-          let HsModule _ _ _ _ _ mb_opts info mb_doc = unLoc source
-          in (mb_opts, info, mb_doc)
-
-        mkDocOpts mbOpts = do
-          opts <- case mbOpts of 
-            Just opts -> processOptions opts
-            Nothing -> return []
-          let opts' = if Flag_HideModule (moduleString mod) `elem` flags 
-                then OptHide : opts
-                else opts      
-          return opts'
- 
 sameName (DocEntity _) _ = False
 sameName (DeclEntity _) (DocEntity _) = False
 sameName (DeclEntity a) (DeclEntity b) = a == b
@@ -593,14 +618,13 @@ finishedDoc d DocEmpty rest = rest
 finishedDoc (DeclEntity name) doc rest = (name, doc) : rest
 finishedDoc _ _ rest = rest
         
-allSubnamesInGroup :: HsGroup Name -> [Name]
-allSubnamesInGroup group = 
+allSubNames :: HsGroup Name -> [Name]
+allSubNames group = 
   concat [ tail (map unLoc (tyClDeclNames tycld)) | L _ tycld <- hs_tyclds group ]
 
-mk_sub_map_from_group :: HsGroup Name -> Map Name [Name]
-mk_sub_map_from_group group =  
-  Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
-                 let name:subs = map unLoc (tyClDeclNames tycld) ]
+mkSubMap :: HsGroup Name -> Map Name [Name]
+mkSubMap group = Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
+ let name:subs = map unLoc (tyClDeclNames tycld) ]
 
 mkDeclMap :: [Name] -> HsGroup Name -> Map Name (LHsDecl Name) 
 mkDeclMap names group = Map.fromList [ (n,d)  | (n,Just d) <- maybeDecls ]
@@ -757,11 +781,10 @@ mkExportItems
 	-> Maybe [IE Name]
 	-> Bool				-- --ignore-all-exports flag
         -> Map Name (HsDoc Name)
-        -> PackageId
 	-> ErrMsgM [ExportItem Name]
 
 mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_map entities
-              opts maybe_exps ignore_all_exports docMap packageId
+              opts maybe_exps ignore_all_exports docMap
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
   | Just specs <- maybe_exps = do 
@@ -770,6 +793,8 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
   where
     everything_local_exported =  -- everything exported
       return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
+   
+    packageId = modulePackageId this_mod
 
     lookupExport (IEVar x)             = declWith x
     lookupExport (IEThingAbs t)        = declWith t
@@ -899,7 +924,7 @@ pruneExportItems items = filter hasDoc items
 -- -----------------------------------------------------------------------------
 -- Gather a list of original names exported from this module
 
-visibleNames :: Module 
+mkVisibleNames :: Module 
              -> ModuleMap  
              -> [Name] 
              -> [Name]
@@ -907,10 +932,9 @@ visibleNames :: Module
              -> Maybe [IE Name]
              -> [DocOption]
              -> Map Name (LHsDecl Name)
-             -> PackageId
              -> ErrMsgM [Name]
 
-visibleNames mdl modMap localNames scope subMap maybeExps opts declMap packageId
+mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap 
   -- if no export list, just return all local names 
   | Nothing <- maybeExps         = return (filter hasDecl localNames)
   | OptIgnoreExports `elem` opts = return localNames
@@ -934,8 +958,8 @@ visibleNames mdl modMap localNames scope subMap maybeExps opts declMap packageId
     IEThingWith t cs -> return (t : cs)
 	
     IEModuleContents m
-	| mkModule packageId m == mdl -> return localNames 
-	| otherwise -> let m' = mkModule packageId m in
+	| mkModule (modulePackageId mdl) m == mdl -> return localNames 
+	| otherwise -> let m' = mkModule (modulePackageId mdl) m in
 	  case Map.lookup m' modMap of
 	    Just mod
 		| OptHide `elem` hmod_options mod ->
