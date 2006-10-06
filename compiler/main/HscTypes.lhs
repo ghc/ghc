@@ -109,7 +109,7 @@ import FastString	( FastString )
 
 import DATA_IOREF	( IORef, readIORef )
 import StringBuffer	( StringBuffer )
-import Maybe            ( catMaybes )
+import Maybes           ( catMaybes, seqMaybe )
 import Time		( ClockTime )
 \end{code}
 
@@ -247,12 +247,21 @@ lookupIfaceByModule
 	-> Module
 	-> Maybe ModIface
 lookupIfaceByModule dflags hpt pit mod
-  -- in one-shot, we don't use the HPT
-  | not (isOneShot (ghcMode dflags)) && modulePackageId mod == this_pkg 
-  = fmap hm_iface (lookupUFM hpt (moduleName mod))
-  | otherwise
-  = lookupModuleEnv pit mod
-  where this_pkg = thisPackage dflags
+  | modulePackageId mod == thisPackage dflags
+  = 	-- The module comes from the home package, so look first
+	-- in the HPT.  If it's not from the home package it's wrong to look
+	-- in the HPT, because the HPT is indexed by *ModuleName* not Module
+    fmap hm_iface (lookupUFM hpt (moduleName mod)) 
+    `seqMaybe` lookupModuleEnv pit mod
+
+  | otherwise = lookupModuleEnv pit mod		-- Look in PIT only 
+
+-- If the module does come from the home package, why do we look in the PIT as well?
+-- (a) In OneShot mode, even home-package modules accumulate in the PIT
+-- (b) Even in Batch (--make) mode, there is *one* case where a home-package
+--     module is in the PIT, namely GHC.Prim when compiling the base package.
+-- We could eliminate (b) if we wanted, by making GHC.Prim belong to a packake
+-- of its own, but it doesn't seem worth the bother.
 \end{code}
 
 
