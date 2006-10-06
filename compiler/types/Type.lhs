@@ -115,22 +115,26 @@ import Name	( NamedThing(..), tidyNameOcc )
 import Class	( Class, classTyCon )
 import PrelNames( openTypeKindTyConKey, unliftedTypeKindTyConKey, 
                   ubxTupleKindTyConKey, argTypeKindTyConKey )
-import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
+import TyCon	( TyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, isClosedNewTyCon, 
 		  newTyConRep, newTyConRhs, 
-		  isAlgTyCon, tyConArity, isSuperKindTyCon,
+		  isAlgTyCon, isSuperKindTyCon,
 		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
-	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique,
-                  isCoercionTyCon
+	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique
 		)
 
 -- others
 import StaticFlags	( opt_DictsStrict )
-import Util		( mapAccumL, seqList, lengthIs, snocView, thenCmp, isEqual, all2 )
+import Util		( mapAccumL, seqList, snocView, thenCmp, isEqual, all2 )
 import Outputable
 import UniqSet		( sizeUniqSet )		-- Should come via VarSet
 import Maybe		( isJust )
+
+#ifdef DEBUG
+import TyCon	( isRecursiveTyCon, tyConArity, isCoercionTyCon )
+import Util	( lengthIs )
+#endif
 \end{code}
 
 

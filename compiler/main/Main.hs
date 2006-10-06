@@ -27,13 +27,13 @@ import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
 
 -- Various other random stuff that we need
 import Config		( cProjectVersion, cBooterVersion, cProjectName )
-import Packages		( dumpPackages, initPackages )
+import Packages		( dumpPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
 import StaticFlags	( staticFlags, v_Ld_inputs, parseStaticFlags )
 import DynFlags         ( defaultDynFlags )
 import BasicTypes	( failed )
-import ErrUtils		( Message, debugTraceMsg, putMsg )
+import ErrUtils		( putMsg )
 import FastString	( getFastStringTable, isZEncoded, hasZEncoding )
 import Outputable
 import Util

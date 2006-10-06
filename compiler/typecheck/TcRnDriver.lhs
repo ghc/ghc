@@ -35,7 +35,6 @@ import RdrHsSyn		( findSplice )
 import PrelNames	( runMainIOName, rootMainKey, rOOT_MAIN, mAIN,
 			  main_RDR_Unqual )
 import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv )
-import TyCon		( isOpenTyCon )
 import TcHsSyn		( zonkTopDecls )
 import TcExpr 		( tcInferRho )
 import TcRnMonad

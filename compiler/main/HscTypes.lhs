@@ -85,7 +85,7 @@ import Id		( Id )
 import Type		( TyThing(..) )
 
 import Class		( Class, classSelIds, classATs, classTyCon )
-import TyCon		( TyCon, tyConSelIds, tyConDataCons, isNewTyCon,
+import TyCon		( TyCon, tyConSelIds, tyConDataCons, 
 			  newTyConCo_maybe, tyConFamilyCoercion_maybe )
 import DataCon		( DataCon, dataConImplicitIds )
 import PrelNames	( gHC_PRIM )

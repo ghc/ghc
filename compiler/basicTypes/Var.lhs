@@ -35,14 +35,11 @@ module Var (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TypeRep( Type, Kind, isCoSuperKind )
+import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, IdInfo, seqIdInfo )
 
-import Name		( Name, NamedThing(..),
-			  setNameUnique, nameUnique, mkSysTvName, 
-                          mkSystemVarName
-			)
+import Name		( Name, NamedThing(..), setNameUnique, nameUnique, mkSysTvName )
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey#,
                           mkBuiltinUnique )
 import FastTypes
