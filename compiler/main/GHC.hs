@@ -654,6 +654,8 @@ load2 s@(Session ref) how_much mod_graph = do
 	let cleanup = cleanTempFilesExcept dflags
 			  (ppFilesFromSummaries (flattenSCCs mg2_with_srcimps))
 
+	debugTraceMsg dflags 2 (hang (text "Ready for upsweep") 
+				   2 (ppr mg))
         (upsweep_ok, hsc_env1, modsUpswept)
            <- upsweep (hsc_env { hsc_HPT = emptyHomePackageTable })
 			   pruned_hpt stable_mods cleanup mg

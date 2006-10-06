@@ -231,7 +231,6 @@ import Module
 import Outputable
 import BasicTypes	( Version, initialVersion, bumpVersion, isAlwaysActive,
 			  Activation(..), RecFlag(..), boolToRecFlag )
-import Outputable
 import Util		( createDirectoryHierarchy, directoryOf, sortLe, seqList, lengthIs )
 import BinIface		( writeBinIface )
 import Unique		( Unique, Uniquable(..) )
@@ -793,44 +792,42 @@ checkOldIface hsc_env mod_summary source_unchanged maybe_iface
      }
 
 check_old_iface hsc_env mod_summary source_unchanged maybe_iface
- = 	-- CHECK WHETHER THE SOURCE HAS CHANGED
-    ifM (not source_unchanged)
-	(traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
-					      	`thenM_`
+ =  do 	-- CHECK WHETHER THE SOURCE HAS CHANGED
+    { ifM (not source_unchanged)
+	   (traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
 
      -- If the source has changed and we're in interactive mode, avoid reading
      -- an interface; just return the one we might have been supplied with.
-    getGhcMode					`thenM` \ ghc_mode ->
-    if (ghc_mode == Interactive || ghc_mode == JustTypecheck) 
-	&& not source_unchanged then
-         returnM (outOfDate, maybe_iface)
-    else
+    ; ghc_mode <- getGhcMode
+    ; if (ghc_mode == Interactive || ghc_mode == JustTypecheck) 
+	 && not source_unchanged then
+         return (outOfDate, maybe_iface)
+      else
+      case maybe_iface of {
+        Just old_iface -> do -- Use the one we already have
+	  { traceIf (text "We already have the old interface for" <+> ppr (ms_mod mod_summary))
+	  ; recomp <- checkVersions hsc_env source_unchanged old_iface
+	  ; return (recomp, Just old_iface) }
 
-    case maybe_iface of {
-       Just old_iface -> do -- Use the one we already have
-	recomp <- checkVersions hsc_env source_unchanged old_iface
-	return (recomp, Just old_iface)
-
-    ;  Nothing ->
+      ; Nothing -> do
 
 	-- Try and read the old interface for the current module
 	-- from the .hi file left from the last time we compiled it
-    let
-	iface_path = msHiFilePath mod_summary
-    in
-    readIface (ms_mod mod_summary) iface_path False	`thenM` \ read_result ->
-    case read_result of {
-       Failed err ->	-- Old interface file not found, or garbled; give up
-		   traceIf (text "FYI: cannot read old interface file:"
-			   	 $$ nest 4 err) 	`thenM_`
-	           returnM (outOfDate, Nothing)
+    { let iface_path = msHiFilePath mod_summary
+    ; read_result <- readIface (ms_mod mod_summary) iface_path False
+    ; case read_result of {
+         Failed err -> do	-- Old interface file not found, or garbled; give up
+		{ traceIf (text "FYI: cannot read old interface file:"
+			   	 $$ nest 4 err)
+	        ; return (outOfDate, Nothing) }
 
-    ;  Succeeded iface ->	
+      ;  Succeeded iface -> do
 
 	-- We have got the old iface; check its versions
-    checkVersions hsc_env source_unchanged iface	`thenM` \ recomp ->
-    returnM (recomp, Just iface)
-    }}
+    { traceIf (text "Read the interface file" <+> text iface_path)
+    ; recomp <- checkVersions hsc_env source_unchanged iface
+    ; returnM (recomp, Just iface)
+    }}}}}
 \end{code}
 
 @recompileRequired@ is called from the HscMain.   It checks whether
@@ -863,7 +860,9 @@ checkVersions hsc_env source_unchanged iface
 	-- (in which case we are done with this module) or it'll fail (in which
 	-- case we'll compile the module from scratch anyhow).
 	--	
-	-- We do this regardless of compilation mode
+	-- We do this regardless of compilation mode, although in --make mode
+	-- all the dependent modules should be in the HPT already, so it's
+	-- quite redundant
 	; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
 
 	; let this_pkg = thisPackage (hsc_dflags hsc_env)
