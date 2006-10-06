@@ -4,8 +4,15 @@ set -e
 
 top_dirs="nofib testsuite"
 
-default_repo_root="http://darcs.haskell.org/"
-default_lib_repo_root=$default_repo_root/packages
+# Figure out where to get the other repositories from,
+# based on where this GHC repo came from.
+defaultrepo=`cat _darcs/prefs/defaultrepo`
+case $defaultrepo in
+  http://*) default_repo_root=`echo $defaultrepo | sed 's!/ghc$!!'`
+            default_lib_repo_root=$default_repo_root/packages;;
+  /*)       default_repo_root=$defaultrepo
+            default_lib_repo_root=$default_repo_root/libraries;;
+esac
 
 quiet=NO
 
