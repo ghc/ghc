@@ -114,6 +114,10 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	(rn_default_decls, src_fvs5)
 	   <- mapFvRn (wrapLocFstM rnDefaultDecl) default_decls ;
 
+	-- At this point, stop if we have found errors.  Otherwise
+	-- the rnDocEntity stuff reports the errors again.
+	failIfErrsM ;
+
 	rn_docs <- mapM rnDocEntity docs ;
 
 	let {
