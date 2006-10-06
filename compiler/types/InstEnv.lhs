@@ -67,65 +67,70 @@ data Instance
 					-- the decl of BasicTypes.OverlapFlag
 
 	     , is_orph :: Maybe OccName }
+\end{code}
 
--- The "rough-match" fields
--- ~~~~~~~~~~~~~~~~~~~~~~~~~
--- The is_cls, is_args fields allow a "rough match" to be done
--- without poking inside the DFunId.  Poking the DFunId forces
--- us to suck in all the type constructors etc it involves,
--- which is a total waste of time if it has no chance of matching
--- So the Name, [Maybe Name] fields allow us to say "definitely
--- does not match", based only on the Name.
---
--- In is_tcs, 
---     Nothing  means that this type arg is a type variable
---
---     (Just n) means that this type arg is a
--- 		TyConApp with a type constructor of n.
---		This is always a real tycon, never a synonym!
---		(Two different synonyms might match, but two
---		different real tycons can't.)
---		NB: newtypes are not transparent, though!
---
--- The "proper-match" fields
--- ~~~~~~~~~~~~~~~~~~~~~~~~~
--- The is_tvs, is_tys fields are simply cahced values, pulled
--- out (lazily) from the dfun id. They are cached here simply so 
--- that we don't need to decompose the DFunId each time we want 
--- to match it.  The hope is that the fast-match fields mean
--- that we often never poke th proper-match fields
---
--- However, note that:
---  * is_tvs must be a superset of the free vars of is_tys
---
---  * The is_dfun must itself be quantified over exactly is_tvs
---    (This is so that we can use the matching substitution to
---     instantiate the dfun's context.)
---
--- The "orphan" field
--- ~~~~~~~~~~~~~~~~~~
--- An instance is an orphan if its head (after the =>) mentions
--- nothing defined in this module.  
---
---    Just n	The head mentions n, which is defined in this module
---		This is used for versioning; the instance decl is
---		considered part of the defn of n when computing versions
---
---    Nothing 	The head mentions nothing defined in this module
---
--- If a module contains any orphans, then its interface file is read 
--- regardless, so that its instances are not missed. 
--- 
--- Functional dependencies worsen the situation a bit. Consider
---	class C a b | a -> b
--- In some other module we might have
---    module M where
---	data T = ...
---	instance C Int T where ...
--- This isn't considered an orphan, so we will only read M's interface
--- if something from M is used (e.g. T).  So there's a risk we'll
--- miss the improvement from the instance.  Workaround: import M.
+The "rough-match" fields
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The is_cls, is_args fields allow a "rough match" to be done
+without poking inside the DFunId.  Poking the DFunId forces
+us to suck in all the type constructors etc it involves,
+which is a total waste of time if it has no chance of matching
+So the Name, [Maybe Name] fields allow us to say "definitely
+does not match", based only on the Name.
 
+In is_tcs, 
+    Nothing  means that this type arg is a type variable
+
+    (Just n) means that this type arg is a
+		TyConApp with a type constructor of n.
+		This is always a real tycon, never a synonym!
+		(Two different synonyms might match, but two
+		different real tycons can't.)
+		NB: newtypes are not transparent, though!
+
+The "proper-match" fields
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The is_tvs, is_tys fields are simply cahced values, pulled
+out (lazily) from the dfun id. They are cached here simply so 
+that we don't need to decompose the DFunId each time we want 
+to match it.  The hope is that the fast-match fields mean
+that we often never poke th proper-match fields
+
+However, note that:
+ * is_tvs must be a superset of the free vars of is_tys
+
+ * The is_dfun must itself be quantified over exactly is_tvs
+   (This is so that we can use the matching substitution to
+    instantiate the dfun's context.)
+
+
+Note [Orphans]: the "is_orph" field
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An instance is an orphan if its head (after the =>) mentions
+nothing defined in this module.  
+
+   Just n	The head mentions n, which is defined in this module
+		This is used for versioning; the instance decl is
+		considered part of the defn of n when computing versions
+
+   Nothing 	The head mentions nothing defined in this module
+
+If a module contains any orphans, then its interface file is read 
+regardless, so that its instances are not missed. 
+
+Functional dependencies worsen the situation a bit. Consider
+	class C a b | a -> b
+In some other module we might have
+   module M where
+	data T = ...
+	instance C Int T where ...
+This isn't considered an orphan, so we will only read M's interface
+if something from M is used (e.g. T).  So there's a risk we'll
+miss the improvement from the instance.  Workaround: import M.
+
+Rules are orphans and versioned in much the same way.
+
+\begin{code}
 instanceDFunId :: Instance -> DFunId
 instanceDFunId = is_dfun
 

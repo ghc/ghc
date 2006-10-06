@@ -201,7 +201,7 @@ data CoreRule
 	ru_local :: Bool,	-- The fn at the head of the rule is
 				-- defined in the same module as the rule
 
-	-- Orphan-hood; see comments is InstEnv.Instance( is_orph )
+	-- Orphan-hood; see Note [Orphans] in InstEnv
 	ru_orph  :: Maybe OccName }
 
   | BuiltinRule {		-- Built-in rules are used for constant folding

@@ -59,7 +59,7 @@ import DriverPhases	( isHsBoot )
 import Util		( notNull )
 import List		( partition )
 import IO		( openFile, IOMode(..) )
-import Monad		( liftM, when )
+import Monad		( when )
 \end{code}
 
 

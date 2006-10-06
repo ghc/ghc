@@ -270,6 +270,9 @@ dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
 	      lhs_names = fn_name : nameSetToList (exprsFreeNames args)
 		-- No need to delete bndrs, because
 		-- exprsFreeNames finds only External names
+
+		-- A rule is an orphan only if none of the variables
+		-- mentioned on its left-hand side are locally defined
 	      orph = case filter (nameIsLocalOrFrom mod) lhs_names of
 			(n:ns) -> Just (nameOccName n)
 			[]     -> Nothing
