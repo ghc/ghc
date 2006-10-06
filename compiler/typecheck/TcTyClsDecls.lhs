@@ -196,6 +196,7 @@ tcTyAndClassDecls boot_details allDecls
 		; let {	-- Calculate rec-flag
 		      ; calc_rec  = calcRecFlags boot_details rec_alg_tyclss
 		      ; tc_decl   = addLocM (tcTyClDecl calc_rec) }
+
 			-- Type-check the type synonyms, and extend the envt
 		; syn_tycons <- tcSynDecls kc_syn_decls
 		; tcExtendGlobalEnv syn_tycons $ do

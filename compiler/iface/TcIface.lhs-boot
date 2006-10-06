@@ -6,8 +6,8 @@ import TcRnTypes ( IfL )
 import InstEnv	 ( Instance )
 import CoreSyn	 ( CoreRule )
 
-tcIfaceDecl  :: IfaceDecl -> IfL TyThing
+tcIfaceDecl  :: Bool -> IfaceDecl -> IfL TyThing
+tcIfaceRules :: Bool -> [IfaceRule] -> IfL [CoreRule]
 tcIfaceInst  :: IfaceInst -> IfL Instance
-tcIfaceRule  :: IfaceRule -> IfL CoreRule
 \end{code}
 

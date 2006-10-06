@@ -6,15 +6,14 @@
 \begin{code}
 module TcIface ( 
 	tcImportDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface, 
-	tcIfaceDecl, tcIfaceInst, tcIfaceRule, tcIfaceGlobal, 
+	tcIfaceDecl, tcIfaceInst, tcIfaceRules, tcIfaceGlobal, 
 	tcExtCoreBindings
  ) where
 
 #include "HsVersions.h"
 
 import IfaceSyn
-import LoadIface	( loadInterface, loadWiredInHomeIface,
-			  loadDecls, findAndReadIface )
+import LoadIface	( loadInterface, loadWiredInHomeIface, findAndReadIface, loadDecls )
 import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, 
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
 			  tcIfaceTyVar, tcIfaceLclId, lookupIfaceTc, 
@@ -57,7 +56,6 @@ import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
 import NameEnv
 import OccName		( OccName, mkVarOccFS, mkTyVarOcc, occNameSpace, 
 			  pprNameSpace, occNameFS  )
-import FastString       ( FastString )
 import Module		( Module, moduleName )
 import UniqFM		( lookupUFM )
 import UniqSupply	( initUs_, uniqsFromSupply )
@@ -67,6 +65,7 @@ import Maybes		( MaybeErr(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual )
 import DynFlags		( DynFlag(..), isOneShot )
+import Control.Monad	( unless )
 
 import List		( elemIndex)
 import Maybe		( catMaybes )
@@ -138,12 +137,11 @@ checkWiredInTyCon tc
   = return ()
   | otherwise
   = do	{ mod <- getModule
-	; if nameIsLocalOrFrom mod tc_name then
+	; unless (mod == nameModule tc_name)
+		 (initIfaceTcRn (loadWiredInHomeIface tc_name))
 		-- Don't look for (non-existent) Float.hi when
 		-- compiling Float.lhs, which mentions Float of course
-		return ()
-	  else	-- A bit yukky to call initIfaceTcRn here
-		initIfaceTcRn (loadWiredInHomeIface tc_name) 
+	  	-- A bit yukky to call initIfaceTcRn here
 	}
   where
     tc_name = tyConName tc
@@ -203,24 +201,24 @@ typecheckIface iface
 		-- to handle unboxed tuples, so it must not see unfoldings.
 	  ignore_prags <- doptM Opt_IgnoreInterfacePragmas
 
-		-- Load & typecheck the decls
-	; decl_things <- loadDecls ignore_prags (mi_decls iface)
-
-	; let type_env = mkNameEnv decl_things
+		-- Typecheck the decls.  This is done lazily, so that the knot-tying
+		-- within this single module work out right.  In the If monad there is
+		-- no global envt for the current interface; instead, the knot is tied
+		-- through the if_rec_types field of IfGblEnv
+	; names_w_things <- loadDecls ignore_prags (mi_decls iface)
+	; let type_env = mkNameEnv names_w_things
 	; writeMutVar tc_env_var type_env
 
 		-- Now do those rules and instances
-	; let { rules | ignore_prags = []
-		      | otherwise    = mi_rules iface
-	      ; dfuns = mi_insts iface
-	      } 
-	; dfuns <- mapM tcIfaceInst dfuns
-	; rules <- mapM tcIfaceRule rules
+	; dfuns <- mapM tcIfaceInst (mi_insts iface)
+	; rules <- tcIfaceRules ignore_prags (mi_rules iface)
 
 		-- Exports
-	; exports <-  ifaceExportNames (mi_exports iface)
+	; exports <- ifaceExportNames (mi_exports iface)
 
 		-- Finished
+	; traceIf (vcat [text "Finished typechecking interface for" <+> ppr (mi_module iface),
+			 text "Type envt:" <+> ppr type_env])
 	; return $ ModDetails { md_types     = type_env
 			      , md_insts     = dfuns
 			      , md_fam_insts = mkDetailsFamInstCache type_env
@@ -349,15 +347,18 @@ the forkM stuff.
 
 
 \begin{code}
-tcIfaceDecl :: IfaceDecl -> IfL TyThing
+tcIfaceDecl :: Bool	-- True <=> discard IdInfo on IfaceId bindings
+	    -> IfaceDecl
+	    -> IfL TyThing
 
-tcIfaceDecl (IfaceId {ifName = occ_name, ifType = iface_type, ifIdInfo = info})
+tcIfaceDecl ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type, ifIdInfo = info})
   = do	{ name <- lookupIfaceTop occ_name
 	; ty <- tcIfaceType iface_type
-	; info <- tcIdInfo name ty info
+	; info <- tcIdInfo ignore_prags name ty info
 	; return (AnId (mkVanillaGlobal name ty info)) }
 
-tcIfaceDecl (IfaceData {ifName = occ_name, 
+tcIfaceDecl ignore_prags 
+	    (IfaceData {ifName = occ_name, 
 			ifTyVars = tv_bndrs, 
 			ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
 			ifCons = rdr_cons, 
@@ -387,7 +388,8 @@ tcIfaceDecl (IfaceData {ifName = occ_name,
 	; return (ATyCon tycon)
     }}
 
-tcIfaceDecl (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
+tcIfaceDecl ignore_prags 
+	    (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
 		       ifOpenSyn = isOpen, ifSynRhs = rdr_rhs_ty})
    = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
      { tc_name <- lookupIfaceTop occ_name
@@ -397,7 +399,8 @@ tcIfaceDecl (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      ; return (ATyCon (buildSynTyCon tc_name tyvars rhs))
      }
 
-tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, 
+tcIfaceDecl ignore_prags
+	    (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name, 
 			 ifTyVars = tv_bndrs, ifFDs = rdr_fds, 
 			 ifATs = rdr_ats, ifSigs = rdr_sigs, 
 			 ifRec = tc_isrec })
@@ -408,7 +411,7 @@ tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name,
     ; ctxt <- tcIfaceCtxt rdr_ctxt
     ; sigs <- mappM tc_sig rdr_sigs
     ; fds  <- mappM tc_fd rdr_fds
-    ; ats'  <- mappM tcIfaceDecl rdr_ats
+    ; ats'  <- mappM (tcIfaceDecl ignore_prags) rdr_ats
     ; let ats = zipWith setTyThingPoss ats' (map ifTyVars rdr_ats)
     ; cls  <- buildClass cls_name tyvars ctxt fds ats sigs tc_isrec
     ; return (AClass cls) }
@@ -440,7 +443,7 @@ tcIfaceDecl (IfaceClass {ifCtxt = rdr_ctxt, ifName = occ_name,
      ATyCon (setTyConArgPoss tycon poss)
    setTyThingPoss _		  _ = panic "TcIface.setTyThingPoss"
 
-tcIfaceDecl (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
+tcIfaceDecl ignore_prags (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
   = do	{ name <- lookupIfaceTop rdr_name
 	; return (ATyCon (mkForeignTyCon name ext_name 
 					 liftedTypeKind 0)) }
@@ -529,6 +532,13 @@ are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
 
 \begin{code}
+tcIfaceRules :: Bool 		-- True <=> ignore rules
+	     -> [IfaceRule]
+	     -> IfL [CoreRule]
+tcIfaceRules ignore_prags if_rules
+  | ignore_prags = return []
+  | otherwise    = mapM tcIfaceRule if_rules
+
 tcIfaceRule :: IfaceRule -> IfL CoreRule
 tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
 			ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
@@ -760,9 +770,12 @@ do_one (IfaceRec pairs) thing_inside
 %************************************************************************
 
 \begin{code}
-tcIdInfo :: Name -> Type -> IfaceIdInfo -> IfL IdInfo
-tcIdInfo name ty NoInfo		= return vanillaIdInfo
-tcIdInfo name ty (HasInfo info) = foldlM tcPrag init_info info
+tcIdInfo :: Bool -> Name -> Type -> IfaceIdInfo -> IfL IdInfo
+tcIdInfo ignore_prags name ty info 
+  | ignore_prags = return vanillaIdInfo
+  | otherwise    = case info of
+			NoInfo       -> return vanillaIdInfo
+			HasInfo info -> foldlM tcPrag init_info info
   where
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
@@ -859,10 +872,7 @@ tcIfaceGlobal :: Name -> IfL TyThing
 tcIfaceGlobal name
   | Just thing <- wiredInNameTyThing_maybe name
 	-- Wired-in things include TyCons, DataCons, and Ids
-  = do { loadWiredInHomeIface name; return thing }
-	-- Even though we are in an interface file, we want to make
-	-- sure its instances are loaded (imagine f :: Double -> Double)
-	-- and its RULES are loaded too
+  = do { ifCheckWiredInThing name; return thing }
   | otherwise
   = do	{ (eps,hpt) <- getEpsAndHpt
  	; dflags <- getDOpts
@@ -888,6 +898,20 @@ tcIfaceGlobal name
 	    Failed err      -> failIfM err
 	    Succeeded thing -> return thing
     }}}}}
+
+ifCheckWiredInThing :: Name -> IfL ()
+-- Even though we are in an interface file, we want to make
+-- sure the instances of a wired-in thing are loaded (imagine f :: Double -> Double)
+-- Ditto want to ensure that RULES are loaded too
+ifCheckWiredInThing name 
+  = do	{ mod <- getIfModule
+		-- Check whether we are typechecking the interface for this
+		-- very module.  E.g when compiling the base library in --make mode
+		-- we may typecheck GHC.Base.hi. At that point, GHC.Base is not in
+		-- the HPT, so without the test we'll demand-load it into the PIT!
+		-- C.f. the same test in checkWiredInTyCon above
+	; unless (mod == nameModule name)
+		 (loadWiredInHomeIface name) }
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon IfaceIntTc       	= tcWiredInTyCon intTyCon
@@ -918,7 +942,7 @@ tcIfaceTyCon IfaceUbxTupleKindTc     = return ubxTupleKindTyCon
 -- sure the instances and RULES of this tycon are loaded 
 -- Imagine: f :: Double -> Double
 tcWiredInTyCon :: TyCon -> IfL TyCon
-tcWiredInTyCon tc = do { loadWiredInHomeIface (tyConName tc)
+tcWiredInTyCon tc = do { ifCheckWiredInThing (tyConName tc)
 		       ; return tc }
 
 tcIfaceClass :: IfaceExtName -> IfL Class

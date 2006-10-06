@@ -8,20 +8,19 @@ module LoadIface (
 	loadInterface, loadInterfaceForName, loadWiredInHomeIface, 
 	loadSrcInterface, loadSysInterface, loadOrphanModules, 
 	findAndReadIface, readIface,	-- Used when reading the module's old interface
-	loadDecls, ifaceStats, discardDeclPrags,
+	loadDecls,	-- Should move to TcIface and be renamed
 	initExternalPackageState,
 
-	pprModIface, showIface 	-- Print the iface in Foo.hi
+	ifaceStats, pprModIface, showIface 	-- Print the iface in Foo.hi
    ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRule, tcIfaceInst )
+import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst )
 
 import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
-			  IfaceConDecls(..), IfaceFamInst(..), 
-			  IfaceIdInfo(..) )
+			  IfaceConDecls(..), IfaceFamInst(..) )
 import IfaceEnv		( newGlobalBinder, lookupIfaceTc )
 import HscTypes		( ModIface(..), TyThing, IfaceExport, Usage(..), 
 			  Deprecs(..), Dependencies(..),
@@ -157,6 +156,9 @@ loadSysInterface doc mod_name
 loadInterface :: SDoc -> Module -> WhereFrom
 	      -> IfM lcl (MaybeErr Message ModIface)
 
+-- loadInterface looks in both the HPT and PIT for the required interface
+-- If not found, it loads it, and puts it in the PIT (always). 
+
 -- If it can't find a suitable interface file, we
 --	a) modify the PackageIfaceTable to have an empty entry
 --		(to avoid repeated complaints)
@@ -240,9 +242,7 @@ loadInterface doc_str mod from
 	; ignore_prags <- doptM Opt_IgnoreInterfacePragmas
 	; new_eps_decls <- loadDecls ignore_prags (mi_decls iface)
 	; new_eps_insts <- mapM tcIfaceInst (mi_insts iface)
-	; new_eps_rules <- if ignore_prags 
-			   then return []
-			   else mapM tcIfaceRule (mi_rules iface)
+	; new_eps_rules <- tcIfaceRules ignore_prags (mi_rules iface)
 
 	; let {	final_iface = iface {	mi_decls = panic "No mi_decls in PIT",
 					mi_insts = panic "No mi_insts in PIT",
@@ -261,8 +261,8 @@ loadInterface doc_str mod from
 
 badDepMsg mod 
   = hang (ptext SLIT("Interface file inconsistency:"))
-       2 (sep [ptext SLIT("home-package module") <+> quotes (ppr mod) <+> ptext SLIT("is mentioned,"), 
-	       ptext SLIT("but does not appear in the dependencies of the interface")])
+       2 (sep [ptext SLIT("home-package module") <+> quotes (ppr mod) <+> ptext SLIT("is mentioned is needed,"), 
+	       ptext SLIT("but is not among the dependencies of interfaces directly imported by the module being compiled")])
 
 -----------------------------------------------------
 --	Loading type/class/value decls
@@ -305,18 +305,21 @@ loadDecl ignore_prags mod (_version, decl)
 				 (ifaceDeclSubBndrs decl)
 
 	-- Typecheck the thing, lazily
-	-- NB. firstly, the laziness is there in case we never need the
+	-- NB. Firstly, the laziness is there in case we never need the
 	-- declaration (in one-shot mode), and secondly it is there so that 
 	-- we don't look up the occurrence of a name before calling mk_new_bndr
 	-- on the binder.  This is important because we must get the right name
 	-- which includes its nameParent.
-	; thing <- forkM doc (bumpDeclStats main_name >> tcIfaceDecl stripped_decl)
+
+	; thing <- forkM doc $ do { bumpDeclStats main_name
+				  ; tcIfaceDecl ignore_prags decl }
+
+	-- Populate the type environment with the implicitTyThings too
 	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
 	      lookup n = case lookupOccEnv mini_env (getOccName n) of
 			   Just thing -> thing
 			   Nothing    -> 
-			     pprPanic "loadDecl" (ppr main_name <+> 
-						  ppr n $$ ppr (stripped_decl))
+			     pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (decl))
 
 	; returnM $ (main_name, thing) :  [(n, lookup n) | n <- implicit_names]
 	}
@@ -324,9 +327,6 @@ loadDecl ignore_prags mod (_version, decl)
 		-- as the TyThings.  That way we can extend the PTE without poking the
 		-- thunks
   where
-    stripped_decl | ignore_prags = discardDeclPrags decl
-		  | otherwise    = decl
-
 	-- mk_new_bndr allocates in the name cache the final canonical
 	-- name for the thing, with the correct 
 	--	* parent
@@ -343,10 +343,6 @@ loadDecl ignore_prags mod (_version, decl)
     ifFamily _ = Nothing
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
-
-discardDeclPrags :: IfaceDecl -> IfaceDecl
-discardDeclPrags decl@(IfaceId {ifIdInfo = HasInfo _}) = decl { ifIdInfo = NoInfo }
-discardDeclPrags decl 		    	  	       = decl
 
 bumpDeclStats :: Name -> IfL ()		-- Record that one more declaration has actually been used
 bumpDeclStats name
