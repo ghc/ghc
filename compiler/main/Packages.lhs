@@ -107,9 +107,6 @@ import Control.Exception        ( throwDyn )
 -- in a different DLL, by setting the DLL flag.
 
 data PackageState = PackageState {
-  origPkgIdMap		:: PackageConfigMap, -- PackageId   -> PackageConfig
-        -- The on-disk package database
-
   pkgIdMap		:: PackageConfigMap, -- PackageId   -> PackageConfig
 	-- The exposed flags are adjusted according to -package and
 	-- -hide-package flags, and -ignore-package removes packages.
@@ -529,7 +526,6 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
   let new_dep_preload = filter (`notElem` preload0) dep_preload
 
   let pstate = PackageState{ preloadPackages     = dep_preload,
-                             origPkgIdMap        = orig_pkg_db,
 		             pkgIdMap   	 = pkg_db,
 		             moduleToPkgConfAll  = mkModuleMap pkg_db
 		           }
