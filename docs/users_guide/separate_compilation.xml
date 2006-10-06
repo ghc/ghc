@@ -114,7 +114,9 @@
 	  has been specified, then the object filename is
 	  <replaceable>dir</replaceable>/<replaceable>mod</replaceable>.<replaceable>osuf</replaceable>,
 	  where <replaceable>mod</replaceable> is the module name with
-	  dots replaced by slashes.</para>
+	  dots replaced by slashes.  GHC will silently create the necessary directory 
+          structure underneath <replaceable>dir</replaceable>, if it does not
+          already exist.</para> 
 	</listitem>
       </itemizedlist>
 
