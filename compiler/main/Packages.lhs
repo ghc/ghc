@@ -167,7 +167,8 @@ initPackages dflags = do
                 Just db -> return db
   (pkg_state, preload, this_pkg)       
         <- mkPackageState dflags pkg_db [] (thisPackage dflags)
-  return (dflags{ pkgState = pkg_state,
+  return (dflags{ pkgDatabase = Just pkg_db,
+		  pkgState = pkg_state,
                   thisPackage = this_pkg },
           preload)
 
