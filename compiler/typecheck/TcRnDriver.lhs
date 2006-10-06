@@ -574,8 +574,9 @@ checkHiBootIface
 missingBootThing thing
   = ppr thing <+> ptext SLIT("is defined in the hs-boot file, but not in the module")
 bootMisMatch thing boot_decl real_decl
-  = ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file")
-    $+$ (ppr boot_decl) $+$ (ppr real_decl)
+  = vcat [ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file"),
+	  ptext SLIT("Decl") <+> ppr real_decl,
+	  ptext SLIT("Boot file:") <+> ppr boot_decl]
 instMisMatch inst
   = hang (ppr inst)
        2 (ptext SLIT("is defined in the hs-boot file, but not in the module"))
