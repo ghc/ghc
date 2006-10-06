@@ -750,7 +750,7 @@ type EqEnv = UniqFM FastString	-- Tracks the mapping from L-variables to R-varia
 eqIfOcc :: EqEnv -> FastString -> FastString -> IfaceEq
 eqIfOcc env n1 n2 = case lookupUFM env n1 of
 			Just n1 -> bool (n1 == n2)
-			Nothing -> bool (show n1 == show n2)
+			Nothing -> bool (n1 == n2)
 
 extendEqEnv :: EqEnv -> FastString -> FastString -> EqEnv
 extendEqEnv env n1 n2 | n1 == n2  = env
