@@ -1200,7 +1200,7 @@ mkAtomicArgsE env is_strict (Cast rhs co) thing_inside
 	-- See also Note [Take care] below
   = do	{ id <- newId FSLIT("a") (exprType rhs)
 	; completeNonRecX env False id id rhs $ \ env ->
-	  thing_inside env (Cast (Var id) co) }
+	  thing_inside env (Cast (substExpr env (Var id)) co) }
 
 mkAtomicArgsE env is_strict rhs thing_inside
   | (Var fun, args) <- collectArgs rhs,				-- It's an application
@@ -1220,11 +1220,18 @@ mkAtomicArgsE env is_strict rhs thing_inside
 	| otherwise
 	= do { arg_id <- newId FSLIT("a") arg_ty
 	     ; completeNonRecX env False {- pessimistic -} arg_id arg_id arg $ \env ->
-	       go env (App fun (Var arg_id)) args }
+	       go env (App fun (substExpr env (Var arg_id))) args }
 		-- Note [Take care]:
-		-- This is sightly delicate.  If completeNonRecX was to do a postInlineUnconditionally
+		-- If completeNonRecX was to do a postInlineUnconditionally
 		-- (undoing the effect of introducing the let-binding), we'd find arg_id had
-		-- no binding.   The exprIsTrivial is the only time that'll happen, though.
+		-- no binding; hence the substExpr.  This happens if we see
+		--	C (D x `cast` g)
+		-- Then we start by making a variable a1, thus
+		--	let a1 = D x `cast` g in C a1
+		-- But then we deal with the rhs of a1, getting
+		--	let a2 = D x, a1 = a1 `cast` g in C a1
+		-- And now the preInlineUnconditionally kicks in, and we substitute for a1
+	
 	where
 	  arg_ty = exprType arg
 	  no_float_arg = not is_strict && (isUnLiftedType arg_ty) && not (exprOkForSpeculation arg)
