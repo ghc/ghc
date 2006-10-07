@@ -85,13 +85,15 @@
 #define RBH                     61
 #define EVACUATED               62
 #define REMOTE_REF              63
-#define TVAR_WAIT_QUEUE         64
-#define TVAR                    65
-#define TREC_CHUNK              66
-#define TREC_HEADER             67
-#define ATOMICALLY_FRAME        68
-#define CATCH_RETRY_FRAME       69
-#define CATCH_STM_FRAME         70
-#define N_CLOSURE_TYPES         71
+#define TVAR_WATCH_QUEUE        64
+#define INVARIANT_CHECK_QUEUE   65
+#define ATOMIC_INVARIANT        66
+#define TVAR                    67
+#define TREC_CHUNK              68
+#define TREC_HEADER             69
+#define ATOMICALLY_FRAME        70
+#define CATCH_RETRY_FRAME       71
+#define CATCH_STM_FRAME         72
+#define N_CLOSURE_TYPES         73
 
 #endif /* CLOSURETYPES_H */

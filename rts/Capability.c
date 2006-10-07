@@ -153,7 +153,8 @@ initCapability( Capability *cap, nat i )
 	cap->mut_lists[g] = NULL;
     }
 
-    cap->free_tvar_wait_queues = END_STM_WAIT_QUEUE;
+    cap->free_tvar_watch_queues = END_STM_WATCH_QUEUE;
+    cap->free_invariant_check_queues = END_INVARIANT_CHECK_QUEUE;
     cap->free_trec_chunks = END_STM_CHUNK_LIST;
     cap->free_trec_headers = NO_TREC;
     cap->transaction_tokens = 0;

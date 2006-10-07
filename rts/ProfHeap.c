@@ -987,9 +987,19 @@ heapCensusChain( Census *census, bdescr *bd )
 		size = sizeofW(StgTRecHeader);
 		break;
 
-	    case TVAR_WAIT_QUEUE:
+	    case TVAR_WATCH_QUEUE:
 		prim = rtsTrue;
-		size = sizeofW(StgTVarWaitQueue);
+		size = sizeofW(StgTVarWatchQueue);
+		break;
+		
+	    case INVARIANT_CHECK_QUEUE:
+		prim = rtsTrue;
+		size = sizeofW(StgInvariantCheckQueue);
+		break;
+		
+	    case ATOMIC_INVARIANT:
+		prim = rtsTrue;
+		size = sizeofW(StgAtomicInvariant);
 		break;
 		
 	    case TVAR:

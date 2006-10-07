@@ -66,14 +66,13 @@ extern StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *
 );
 
 /*
- * Exit the current transaction context, abandoning any read/write
- * operations performed within it and removing the thread from any
- * tvar wait queues if it was waitin.  Note that if nested transactions
- * are not fully supported then this may leave the enclosing
- * transaction contexts doomed to abort.
+ * Roll back the current transatcion context.  NB: if this is a nested tx
+ * then we merge its read set into its parents.  This is because a change
+ * to that read set could change whether or not the tx should abort.
  */
 
 extern void stmAbortTransaction(Capability *cap, StgTRecHeader *trec);
+extern void stmFreeAbortedTRec(Capability *cap, StgTRecHeader *trec);
 
 /*
  * Ensure that a subsequent commit / validation will fail.  We use this 
@@ -149,6 +148,18 @@ extern StgBool stmValidateNestOfTransactions(StgTRecHeader *trec);
 */
 
 /*
+ * Fill in the trec's list of invariants that might be violated by the current
+ * transaction.  
+ */
+
+extern StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, 
+						       StgTRecHeader *trec);
+
+extern void stmAddInvariantToCheck(Capability *cap, 
+				   StgTRecHeader *trec,
+				   StgClosure *code);
+
+/*
  * Test whether the current transaction context is valid and, if so,
  * commit its memory accesses to the heap.  stmCommitTransaction must
  * unblock any threads which are waiting on tvars that updates have
@@ -218,7 +229,8 @@ extern void stmWriteTVar(Capability *cap,
 
 /* NULLs */
 
-#define END_STM_WAIT_QUEUE ((StgTVarWaitQueue *)(void *)&stg_END_STM_WAIT_QUEUE_closure)
+#define END_STM_WATCH_QUEUE ((StgTVarWatchQueue *)(void *)&stg_END_STM_WATCH_QUEUE_closure)
+#define END_INVARIANT_CHECK_QUEUE ((StgInvariantCheckQueue *)(void *)&stg_END_INVARIANT_CHECK_QUEUE_closure)
 #define END_STM_CHUNK_LIST ((StgTRecChunk *)(void *)&stg_END_STM_CHUNK_LIST_closure)
 
 #define NO_TREC ((StgTRecHeader *)(void *)&stg_NO_TREC_closure)

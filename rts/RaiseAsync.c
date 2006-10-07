@@ -1020,6 +1020,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             StgTRecHeader *trec = tso -> trec;
             StgTRecHeader *outer = stmGetEnclosingTRec(trec);
             stmAbortTransaction(cap, trec);
+	    stmFreeAbortedTRec(cap, trec);
             tso -> trec = outer;
 	    break;
 	    

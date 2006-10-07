@@ -628,20 +628,20 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case TSO:
 	return thread_TSO((StgTSO *)p);
     
-    case TVAR_WAIT_QUEUE:
+    case TVAR_WATCH_QUEUE:
     {
-        StgTVarWaitQueue *wq = (StgTVarWaitQueue *)p;
-	thread_(&wq->waiting_tso);
+        StgTVarWatchQueue *wq = (StgTVarWatchQueue *)p;
+	thread_(&wq->closure);
 	thread_(&wq->next_queue_entry);
 	thread_(&wq->prev_queue_entry);
-	return p + sizeofW(StgTVarWaitQueue);
+	return p + sizeofW(StgTVarWatchQueue);
     }
     
     case TVAR:
     {
         StgTVar *tvar = (StgTVar *)p;
 	thread((void *)&tvar->current_value);
-	thread((void *)&tvar->first_wait_queue_entry);
+	thread((void *)&tvar->first_watch_queue_entry);
 	return p + sizeofW(StgTVar);
     }
     
@@ -650,6 +650,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
         StgTRecHeader *trec = (StgTRecHeader *)p;
 	thread_(&trec->enclosing_trec);
 	thread_(&trec->current_chunk);
+	thread_(&trec->invariants_to_check);
 	return p + sizeofW(StgTRecHeader);
     }
 
@@ -665,6 +666,23 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	  thread(&e->new_value);
 	}
 	return p + sizeofW(StgTRecChunk);
+    }
+
+    case ATOMIC_INVARIANT:
+    {
+        StgAtomicInvariant *invariant = (StgAtomicInvariant *)p;
+	thread_(&invariant->code);
+	thread_(&invariant->last_execution);
+	return p + sizeofW(StgAtomicInvariant);
+    }
+
+    case INVARIANT_CHECK_QUEUE:
+    {
+        StgInvariantCheckQueue *queue = (StgInvariantCheckQueue *)p;
+	thread_(&queue->invariant);
+	thread_(&queue->my_execution);
+	thread_(&queue->next_queue_entry);
+	return p + sizeofW(StgInvariantCheckQueue);
     }
 
     default:

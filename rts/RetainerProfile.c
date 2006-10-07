@@ -591,8 +591,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	    return;     // no child
 	break;
 	
-    case TVAR_WAIT_QUEUE:
-	*first_child = (StgClosure *)((StgTVarWaitQueue *)c)->waiting_tso;
+    case TVAR_WATCH_QUEUE:
+	*first_child = (StgClosure *)((StgTVarWatchQueue *)c)->closure;
 	se.info.next.step = 2;            // 2 = second
 	break;
     case TVAR:
@@ -830,13 +830,13 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    *r = se->c_child_r;
 	    return;
 
-	case TVAR_WAIT_QUEUE:
+	case TVAR_WATCH_QUEUE:
 	    if (se->info.next.step == 2) {
-		*c = (StgClosure *)((StgTVarWaitQueue *)se->c)->next_queue_entry;
+		*c = (StgClosure *)((StgTVarWatchQueue *)se->c)->next_queue_entry;
 		se->info.next.step++;             // move to the next step
 		// no popOff
 	    } else {
-		*c = (StgClosure *)((StgTVarWaitQueue *)se->c)->prev_queue_entry;
+		*c = (StgClosure *)((StgTVarWatchQueue *)se->c)->prev_queue_entry;
 		popOff();
 	    }
 	    *cp = se->c;
@@ -844,7 +844,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    return;
 
 	case TVAR:
-	    *c = (StgClosure *)((StgTVar *)se->c)->first_wait_queue_entry;
+	    *c = (StgClosure *)((StgTVar *)se->c)->first_watch_queue_entry;
 	    *cp = se->c;
 	    *r = se->c_child_r;
 	    popOff();
@@ -1125,7 +1125,7 @@ isRetainer( StgClosure *c )
     case BCO:
     case ARR_WORDS:
 	// STM
-    case TVAR_WAIT_QUEUE:
+    case TVAR_WATCH_QUEUE:
     case TREC_HEADER:
     case TREC_CHUNK:
 	return rtsFalse;

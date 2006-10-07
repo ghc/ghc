@@ -488,6 +488,7 @@ typedef struct _RtsSymbolVal {
       SymX(catchzh_fast)			\
       SymX(catchRetryzh_fast)			\
       SymX(catchSTMzh_fast)			\
+      SymX(checkzh_fast)                        \
       SymX(closure_flags)                       \
       SymX(cmp_thread)				\
       SymX(cmpIntegerzh_fast)	        	\

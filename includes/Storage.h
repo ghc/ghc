@@ -406,14 +406,18 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 	return tso_sizeW((StgTSO *)p);
     case BCO:
 	return bco_sizeW((StgBCO *)p);
-    case TVAR_WAIT_QUEUE:
-        return sizeofW(StgTVarWaitQueue);
+    case TVAR_WATCH_QUEUE:
+        return sizeofW(StgTVarWatchQueue);
     case TVAR:
         return sizeofW(StgTVar);
     case TREC_CHUNK:
         return sizeofW(StgTRecChunk);
     case TREC_HEADER:
         return sizeofW(StgTRecHeader);
+    case ATOMIC_INVARIANT:
+        return sizeofW(StgAtomicInvariant);
+    case INVARIANT_CHECK_QUEUE:
+        return sizeofW(StgInvariantCheckQueue);
     default:
 	return sizeW_fromITBL(info);
     }

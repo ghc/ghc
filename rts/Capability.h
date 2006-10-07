@@ -89,7 +89,8 @@ struct Capability_ {
 #endif
 
     // Per-capability STM-related data
-    StgTVarWaitQueue *free_tvar_wait_queues;
+    StgTVarWatchQueue *free_tvar_watch_queues;
+    StgInvariantCheckQueue *free_invariant_check_queues;
     StgTRecChunk *free_trec_chunks;
     StgTRecHeader *free_trec_headers;
     nat transaction_tokens;

@@ -3039,8 +3039,9 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
    This should either be a CATCH_RETRY_FRAME (if the retry# is within an orElse#) 
    or should be a ATOMICALLY_FRAME (if the retry# reaches the top level).  
 
-   We skip CATCH_STM_FRAMEs because retries are not considered to be exceptions,
-   despite the similar implementation.
+   We skip CATCH_STM_FRAMEs (aborting and rolling back the nested tx that they
+   create) because retries are not considered to be exceptions, despite the
+   similar implementation.
 
    We should not expect to see CATCH_FRAME or STOP_FRAME because those should
    not be created within memory transactions.
@@ -3060,7 +3061,7 @@ findRetryFrameHelper (StgTSO *tso)
       
     case ATOMICALLY_FRAME:
 	debugTrace(DEBUG_stm,
-		   "found ATOMICALLY_FRAME at %p during retrry", p);
+		   "found ATOMICALLY_FRAME at %p during retry", p);
 	tso->sp = p;
 	return ATOMICALLY_FRAME;
       
@@ -3070,7 +3071,20 @@ findRetryFrameHelper (StgTSO *tso)
 	tso->sp = p;
 	return CATCH_RETRY_FRAME;
       
-    case CATCH_STM_FRAME:
+    case CATCH_STM_FRAME: {
+        debugTrace(DEBUG_stm,
+		   "found CATCH_STM_FRAME at %p during retry", p);
+        StgTRecHeader *trec = tso -> trec;
+	StgTRecHeader *outer = stmGetEnclosingTRec(trec);
+        debugTrace(DEBUG_stm, "trec=%p outer=%p", trec, outer);
+	stmAbortTransaction(tso -> cap, trec);
+	stmFreeAbortedTRec(tso -> cap, trec);
+	tso -> trec = outer;
+        p = next; 
+        continue;
+    }
+      
+
     default:
       ASSERT(info->i.type != CATCH_FRAME);
       ASSERT(info->i.type != STOP_FRAME);

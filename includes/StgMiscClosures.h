@@ -136,11 +136,14 @@ RTS_INFO(stg_AP_info);
 RTS_INFO(stg_AP_STACK_info);
 RTS_INFO(stg_dummy_ret_info);
 RTS_INFO(stg_raise_info);
-RTS_INFO(stg_TVAR_WAIT_QUEUE_info);
+RTS_INFO(stg_TVAR_WATCH_QUEUE_info);
+RTS_INFO(stg_INVARIANT_CHECK_QUEUE_info);
+RTS_INFO(stg_ATOMIC_INVARIANT_info);
 RTS_INFO(stg_TVAR_info);
 RTS_INFO(stg_TREC_CHUNK_info);
 RTS_INFO(stg_TREC_HEADER_info);
-RTS_INFO(stg_END_STM_WAIT_QUEUE_info);
+RTS_INFO(stg_END_STM_WATCH_QUEUE_info);
+RTS_INFO(stg_END_INVARIANT_CHECK_QUEUE_info);
 RTS_INFO(stg_END_STM_CHUNK_LIST_info);
 RTS_INFO(stg_NO_TREC_info);
 
@@ -197,11 +200,14 @@ RTS_ENTRY(stg_AP_entry);
 RTS_ENTRY(stg_AP_STACK_entry);
 RTS_ENTRY(stg_dummy_ret_entry);
 RTS_ENTRY(stg_raise_entry);
-RTS_ENTRY(stg_END_STM_WAIT_QUEUE_entry);
+RTS_ENTRY(stg_END_STM_WATCH_QUEUE_entry);
+RTS_ENTRY(stg_END_INVARIANT_CHECK_QUEUE_entry);
 RTS_ENTRY(stg_END_STM_CHUNK_LIST_entry);
 RTS_ENTRY(stg_NO_TREC_entry);
 RTS_ENTRY(stg_TVAR_entry);
-RTS_ENTRY(stg_TVAR_WAIT_QUEUE_entry);
+RTS_ENTRY(stg_TVAR_WATCH_QUEUE_entry);
+RTS_ENTRY(stg_INVARIANT_CHECK_QUEUE_entry);
+RTS_ENTRY(stg_ATOMIC_INVARIANT_entry);
 RTS_ENTRY(stg_TREC_CHUNK_entry);
 RTS_ENTRY(stg_TREC_HEADER_entry);
 
@@ -224,7 +230,8 @@ RTS_CLOSURE(stg_NO_FINALIZER_closure);
 RTS_CLOSURE(stg_dummy_ret_closure);
 RTS_CLOSURE(stg_forceIO_closure);
 
-RTS_CLOSURE(stg_END_STM_WAIT_QUEUE_closure);
+RTS_CLOSURE(stg_END_STM_WATCH_QUEUE_closure);
+RTS_CLOSURE(stg_END_INVARIANT_CHECK_QUEUE_closure);
 RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
 RTS_CLOSURE(stg_NO_TREC_closure);
 
@@ -605,5 +612,6 @@ RTS_FUN(atomicallyzh_fast);
 RTS_FUN(newTVarzh_fast);
 RTS_FUN(readTVarzh_fast);
 RTS_FUN(writeTVarzh_fast);
+RTS_FUN(checkzh_fast);
 
 #endif /* STGMISCCLOSURES_H */

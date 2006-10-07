@@ -513,8 +513,9 @@
    Misc junk
    -------------------------------------------------------------------------- */
 
-#define NO_TREC        stg_NO_TREC_closure
-#define END_TSO_QUEUE  stg_END_TSO_QUEUE_closure
+#define NO_TREC                   stg_NO_TREC_closure
+#define END_TSO_QUEUE             stg_END_TSO_QUEUE_closure
+#define END_INVARIANT_CHECK_QUEUE stg_END_INVARIANT_CHECK_QUEUE_closure
 
 #define dirtyTSO(tso) \
     StgTSO_flags(tso) = StgTSO_flags(tso) | TSO_DIRTY::I32;

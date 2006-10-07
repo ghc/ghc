@@ -447,19 +447,36 @@ checkClosure( StgClosure* p )
 
 #endif
 
-    case TVAR_WAIT_QUEUE:
+    case TVAR_WATCH_QUEUE:
       {
-        StgTVarWaitQueue *wq = (StgTVarWaitQueue *)p;
+        StgTVarWatchQueue *wq = (StgTVarWatchQueue *)p;
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(wq->next_queue_entry));
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(wq->prev_queue_entry));
-        return sizeofW(StgTVarWaitQueue);
+        return sizeofW(StgTVarWatchQueue);
+      }
+
+    case INVARIANT_CHECK_QUEUE:
+      {
+        StgInvariantCheckQueue *q = (StgInvariantCheckQueue *)p;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(q->invariant));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(q->my_execution));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(q->next_queue_entry));
+        return sizeofW(StgInvariantCheckQueue);
+      }
+
+    case ATOMIC_INVARIANT:
+      {
+        StgAtomicInvariant *invariant = (StgAtomicInvariant *)p;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(invariant->code));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(invariant->last_execution));
+        return sizeofW(StgAtomicInvariant);
       }
 
     case TVAR:
       {
         StgTVar *tv = (StgTVar *)p;
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(tv->current_value));
-        ASSERT(LOOKS_LIKE_CLOSURE_PTR(tv->first_wait_queue_entry));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(tv->first_watch_queue_entry));
         return sizeofW(StgTVar);
       }
 

@@ -331,7 +331,7 @@ typedef struct {
  *  space for these data structures at the cost of more complexity in the
  *  implementation:
  *
- *   - In StgTVar, current_value and first_wait_queue_entry could be held in
+ *   - In StgTVar, current_value and first_watch_queue_entry could be held in
  *     the same field: if any thread is waiting then its expected_value for
  *     the tvar is the current value.  
  *
@@ -345,24 +345,33 @@ typedef struct {
  *     (it immediately switches on frame->waiting anyway).
  */
 
-typedef struct StgTVarWaitQueue_ {
+typedef struct StgTRecHeader_ StgTRecHeader;
+
+typedef struct StgTVarWatchQueue_ {
   StgHeader                  header;
-  struct StgTSO_            *waiting_tso;
-  struct StgTVarWaitQueue_  *next_queue_entry;
-  struct StgTVarWaitQueue_  *prev_queue_entry;
-} StgTVarWaitQueue;
+  StgClosure                *closure; // StgTSO or StgAtomicInvariant
+  struct StgTVarWatchQueue_ *next_queue_entry;
+  struct StgTVarWatchQueue_ *prev_queue_entry;
+} StgTVarWatchQueue;
 
 typedef struct {
   StgHeader                  header;
   StgClosure                *volatile current_value;
-  StgTVarWaitQueue          *volatile first_wait_queue_entry;
+  StgTVarWatchQueue         *volatile first_watch_queue_entry;
 #if defined(THREADED_RTS)
   StgInt                     volatile num_updates;
 #endif
 } StgTVar;
 
+typedef struct {
+  StgHeader      header;
+  StgClosure    *code;
+  StgTRecHeader *last_execution;
+  StgWord        lock;
+} StgAtomicInvariant;
+
 /* new_value == expected_value for read-only accesses */
-/* new_value is a StgTVarWaitQueue entry when trec in state TREC_WAITING */
+/* new_value is a StgTVarWatchQueue entry when trec in state TREC_WAITING */
 typedef struct {
   StgTVar                   *tvar;
   StgClosure                *expected_value;
@@ -389,29 +398,38 @@ typedef enum {
   TREC_WAITING,       /* Transaction currently waiting */
 } TRecState;
 
-typedef struct StgTRecHeader_ {
+typedef struct StgInvariantCheckQueue_ {
+  StgHeader                       header;
+  StgAtomicInvariant             *invariant;
+  StgTRecHeader                  *my_execution;
+  struct StgInvariantCheckQueue_ *next_queue_entry;
+} StgInvariantCheckQueue;
+
+struct StgTRecHeader_ {
   StgHeader                  header;
   TRecState                  state;
   struct StgTRecHeader_     *enclosing_trec;
   StgTRecChunk              *current_chunk;
-} StgTRecHeader;
+  StgInvariantCheckQueue    *invariants_to_check;
+};
 
 typedef struct {
-    StgHeader   header;
-    StgClosure *code;
+  StgHeader   header;
+  StgClosure *code;
+  StgTVarWatchQueue *next_invariant_to_check;
 } StgAtomicallyFrame;
 
 typedef struct {
-    StgHeader   header;
-    StgClosure *handler;
+  StgHeader   header;
+  StgClosure *code;
+  StgClosure *handler;
 } StgCatchSTMFrame;
 
 typedef struct {
-    StgHeader      header;
-    StgBool        running_alt_code;
-    StgClosure    *first_code;
-    StgClosure    *alt_code;
-    StgTRecHeader *first_code_trec;
+  StgHeader      header;
+  StgBool        running_alt_code;
+  StgClosure    *first_code;
+  StgClosure    *alt_code;
 } StgCatchRetryFrame;
 
 #if defined(PAR) || defined(GRAN)

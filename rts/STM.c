@@ -74,7 +74,7 @@
  * (d) release the locks on the TVars, writing updates to them in the case of a 
  * commit, (e) unlock the STM.
  *
- * Queues of waiting threads hang off the first_wait_queue_entry field of each
+ * Queues of waiting threads hang off the first_watch_queue_entry field of each
  * TVar.  This may only be manipulated when holding that TVar's lock.  In
  * particular, when a thread is putting itself to sleep, it mustn't release
  * the TVar's lock until it has added itself to the wait queue and marked its
@@ -146,7 +146,7 @@ static int shake(void) {
   StgTRecHeader *__t = (_t);                                                    \
   StgTRecChunk *__c = __t -> current_chunk;                                     \
   StgWord __limit = __c -> next_entry_idx;                                      \
-  TRACE("%p : FOR_EACH_ENTRY, current_chunk=%p limit=%ld\n", __t, __c, __limit); \
+  TRACE("%p : FOR_EACH_ENTRY, current_chunk=%p limit=%ld", __t, __c, __limit);  \
   while (__c != END_STM_CHUNK_LIST) {                                           \
     StgWord __i;                                                                \
     for (__i = 0; __i < __limit; __i ++) {                                      \
@@ -178,20 +178,20 @@ static int shake(void) {
 #if defined(STM_UNIPROC)
 #undef IF_STM_UNIPROC
 #define IF_STM_UNIPROC(__X)  do { __X } while (0)
-static const StgBool use_read_phase = FALSE;
+static const StgBool config_use_read_phase = FALSE;
 
 static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : lock_stm()\n", trec);
+  TRACE("%p : lock_stm()", trec);
 }
 
 static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : unlock_stm()\n", trec);
+  TRACE("%p : unlock_stm()", trec);
 }
 
 static StgClosure *lock_tvar(StgTRecHeader *trec STG_UNUSED, 
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
-  TRACE("%p : lock_tvar(%p)\n", trec, s);
+  TRACE("%p : lock_tvar(%p)", trec, s);
   result = s -> current_value;
   return result;
 }
@@ -200,7 +200,7 @@ static void unlock_tvar(StgTRecHeader *trec STG_UNUSED,
                         StgTVar *s STG_UNUSED,
                         StgClosure *c,
                         StgBool force_update) {
-  TRACE("%p : unlock_tvar(%p)\n", trec, s);
+  TRACE("%p : unlock_tvar(%p)", trec, s);
   if (force_update) {
     s -> current_value = c;
   }
@@ -210,10 +210,19 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
                               StgTVar *s STG_UNUSED,
                               StgClosure *expected) {
   StgClosure *result;
-  TRACE("%p : cond_lock_tvar(%p, %p)\n", trec, s, expected);
+  TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   result = s -> current_value;
-  TRACE("%p : %s\n", trec, (result == expected) ? "success" : "failure");
+  TRACE("%p : %s", trec, (result == expected) ? "success" : "failure");
   return (result == expected);
+}
+
+static StgBool lock_inv(StgAtomicInvariant *inv STG_UNUSED) {
+  // Nothing -- uniproc
+  return TRUE;
+}
+
+static void unlock_inv(StgAtomicInvariant *inv STG_UNUSED) { 
+  // Nothing -- uniproc
 }
 #endif
 
@@ -221,16 +230,16 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
 
 #undef IF_STM_CG_LOCK
 #define IF_STM_CG_LOCK(__X)  do { __X } while (0)
-static const StgBool use_read_phase = FALSE;
+static const StgBool config_use_read_phase = FALSE;
 static volatile StgTRecHeader *smp_locked = NULL;
 
 static void lock_stm(StgTRecHeader *trec) {
   while (cas(&smp_locked, NULL, trec) != NULL) { }
-  TRACE("%p : lock_stm()\n", trec);
+  TRACE("%p : lock_stm()", trec);
 }
 
 static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : unlock_stm()\n", trec);
+  TRACE("%p : unlock_stm()", trec);
   ASSERT (smp_locked == trec);
   smp_locked = 0;
 }
@@ -238,7 +247,7 @@ static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
 static StgClosure *lock_tvar(StgTRecHeader *trec STG_UNUSED, 
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
-  TRACE("%p : lock_tvar(%p)\n", trec, s);
+  TRACE("%p : lock_tvar(%p)", trec, s);
   ASSERT (smp_locked == trec);
   result = s -> current_value;
   return result;
@@ -248,7 +257,7 @@ static void *unlock_tvar(StgTRecHeader *trec STG_UNUSED,
                          StgTVar *s STG_UNUSED,
                          StgClosure *c,
                          StgBool force_update) {
-  TRACE("%p : unlock_tvar(%p, %p)\n", trec, s, c);
+  TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT (smp_locked == trec);
   if (force_update) {
     s -> current_value = c;
@@ -259,11 +268,20 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
                                StgTVar *s STG_UNUSED,
                                StgClosure *expected) {
   StgClosure *result;
-  TRACE("%p : cond_lock_tvar(%p, %p)\n", trec, s, expected);
+  TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   ASSERT (smp_locked == trec);
   result = s -> current_value;
-  TRACE("%p : %d\n", result ? "success" : "failure");
+  TRACE("%p : %d", result ? "success" : "failure");
   return (result == expected);
+}
+
+static StgBool lock_inv(StgAtomicInvariant *inv STG_UNUSED) {
+  // Nothing -- protected by STM lock
+  return TRUE;
+}
+
+static void unlock_inv(StgAtomicInvariant *inv STG_UNUSED) { 
+  // Nothing -- protected by STM lock
 }
 #endif
 
@@ -271,20 +289,20 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
 
 #undef IF_STM_FG_LOCKS
 #define IF_STM_FG_LOCKS(__X) do { __X } while (0)
-static const StgBool use_read_phase = TRUE;
+static const StgBool config_use_read_phase = TRUE;
 
 static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : lock_stm()\n", trec);
+  TRACE("%p : lock_stm()", trec);
 }
 
 static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
-  TRACE("%p : unlock_stm()\n", trec);
+  TRACE("%p : unlock_stm()", trec);
 }
 
 static StgClosure *lock_tvar(StgTRecHeader *trec, 
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
-  TRACE("%p : lock_tvar(%p)\n", trec, s);
+  TRACE("%p : lock_tvar(%p)", trec, s);
   do {
     do {
       result = s -> current_value;
@@ -298,7 +316,7 @@ static void unlock_tvar(StgTRecHeader *trec STG_UNUSED,
                         StgTVar *s,
                         StgClosure *c,
                         StgBool force_update STG_UNUSED) {
-  TRACE("%p : unlock_tvar(%p, %p)\n", trec, s, c);
+  TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(s -> current_value == (StgClosure *)trec);
   s -> current_value = c;
 }
@@ -308,23 +326,46 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec,
                               StgClosure *expected) {
   StgClosure *result;
   StgWord w;
-  TRACE("%p : cond_lock_tvar(%p, %p)\n", trec, s, expected);
+  TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   w = cas((void *)&(s -> current_value), (StgWord)expected, (StgWord)trec);
   result = (StgClosure *)w;
-  TRACE("%p : %s\n", trec, result ? "success" : "failure");
+  TRACE("%p : %s", trec, result ? "success" : "failure");
   return (result == expected);
+}
+
+static StgBool lock_inv(StgAtomicInvariant *inv) {
+  return (cas(&(inv -> lock), 0, 1) == 0);
+}
+
+static void unlock_inv(StgAtomicInvariant *inv) { 
+  ASSERT(inv -> lock == 1);
+  inv -> lock = 0;
 }
 #endif
 
 /*......................................................................*/
+ 
+static StgBool watcher_is_tso(StgTVarWatchQueue *q) {
+  StgClosure *c = q -> closure;
+  StgInfoTable *info = get_itbl(c);
+  return (info -> type) == TSO;
+}
 
+static StgBool watcher_is_invariant(StgTVarWatchQueue *q) {
+  StgClosure *c = q -> closure;
+  StgInfoTable *info = get_itbl(c);
+  return (info -> type) == ATOMIC_INVARIANT;
+}
+
+/*......................................................................*/
+ 
 // Helper functions for thread blocking and unblocking
 
 static void park_tso(StgTSO *tso) {
   ASSERT(tso -> why_blocked == NotBlocked);
   tso -> why_blocked = BlockedOnSTM;
   tso -> block_info.closure = (StgClosure *) END_TSO_QUEUE;
-  TRACE("park_tso on tso=%p\n", tso);
+  TRACE("park_tso on tso=%p", tso);
 }
 
 static void unpark_tso(Capability *cap, StgTSO *tso) {
@@ -337,21 +378,23 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
     // synchronise with throwTo().
     lockTSO(tso);
     if (tso -> why_blocked == BlockedOnSTM) {
-	TRACE("unpark_tso on tso=%p\n", tso);
+	TRACE("unpark_tso on tso=%p", tso);
 	unblockOne(cap,tso);
     } else {
-	TRACE("spurious unpark_tso on tso=%p\n", tso);
+	TRACE("spurious unpark_tso on tso=%p", tso);
     }
     unlockTSO(tso);
 }
 
 static void unpark_waiters_on(Capability *cap, StgTVar *s) {
-  StgTVarWaitQueue *q;
-  TRACE("unpark_waiters_on tvar=%p\n", s);
-  for (q = s -> first_wait_queue_entry; 
-       q != END_STM_WAIT_QUEUE; 
+  StgTVarWatchQueue *q;
+  TRACE("unpark_waiters_on tvar=%p", s);
+  for (q = s -> first_watch_queue_entry; 
+       q != END_STM_WATCH_QUEUE; 
        q = q -> next_queue_entry) {
-    unpark_tso(cap, q -> waiting_tso);
+    if (watcher_is_tso(q)) {
+      unpark_tso(cap, (StgTSO *)(q -> closure));
+    }
   }
 }
 
@@ -359,12 +402,22 @@ static void unpark_waiters_on(Capability *cap, StgTVar *s) {
 
 // Helper functions for downstream allocation and initialization
 
-static StgTVarWaitQueue *new_stg_tvar_wait_queue(Capability *cap,
-                                                 StgTSO *waiting_tso) {
-  StgTVarWaitQueue *result;
-  result = (StgTVarWaitQueue *)allocateLocal(cap, sizeofW(StgTVarWaitQueue));
-  SET_HDR (result, &stg_TVAR_WAIT_QUEUE_info, CCS_SYSTEM);
-  result -> waiting_tso = waiting_tso;
+static StgInvariantCheckQueue *new_stg_invariant_check_queue(Capability *cap,
+							     StgAtomicInvariant *invariant) {
+  StgInvariantCheckQueue *result;
+  result = (StgInvariantCheckQueue *)allocateLocal(cap, sizeofW(StgInvariantCheckQueue));
+  SET_HDR (result, &stg_INVARIANT_CHECK_QUEUE_info, CCS_SYSTEM);
+  result -> invariant = invariant;
+  result -> my_execution = NO_TREC;
+  return result;
+}
+
+static StgTVarWatchQueue *new_stg_tvar_watch_queue(Capability *cap,
+						   StgClosure *closure) {
+  StgTVarWatchQueue *result;
+  result = (StgTVarWatchQueue *)allocateLocal(cap, sizeofW(StgTVarWatchQueue));
+  SET_HDR (result, &stg_TVAR_WATCH_QUEUE_info, CCS_SYSTEM);
+  result -> closure = closure;
   return result;
 }
 
@@ -385,6 +438,7 @@ static StgTRecHeader *new_stg_trec_header(Capability *cap,
 
   result -> enclosing_trec = enclosing_trec;
   result -> current_chunk = new_stg_trec_chunk(cap);
+  result -> invariants_to_check = END_INVARIANT_CHECK_QUEUE;
 
   if (enclosing_trec == NO_TREC) {
     result -> state = TREC_ACTIVE;
@@ -402,24 +456,38 @@ static StgTRecHeader *new_stg_trec_header(Capability *cap,
 // Allocation / deallocation functions that retain per-capability lists
 // of closures that can be re-used
 
-static StgTVarWaitQueue *alloc_stg_tvar_wait_queue(Capability *cap,
-                                                   StgTSO *waiting_tso) {
-  StgTVarWaitQueue *result = NULL;
-  if (cap -> free_tvar_wait_queues == END_STM_WAIT_QUEUE) {
-    result = new_stg_tvar_wait_queue(cap, waiting_tso);
+static StgInvariantCheckQueue *alloc_stg_invariant_check_queue(Capability *cap,
+							       StgAtomicInvariant *invariant) {
+  StgInvariantCheckQueue *result = NULL;
+  if (cap -> free_invariant_check_queues == END_INVARIANT_CHECK_QUEUE) {
+    result = new_stg_invariant_check_queue(cap, invariant);
   } else {
-    result = cap -> free_tvar_wait_queues;
-    result -> waiting_tso = waiting_tso;
-    cap -> free_tvar_wait_queues = result -> next_queue_entry;
+    result = cap -> free_invariant_check_queues;
+    result -> invariant = invariant;
+    result -> my_execution = NO_TREC;
+    cap -> free_invariant_check_queues = result -> next_queue_entry;
   }
   return result;
 }
 
-static void free_stg_tvar_wait_queue(Capability *cap,
-                                     StgTVarWaitQueue *wq) {
+static StgTVarWatchQueue *alloc_stg_tvar_watch_queue(Capability *cap,
+						     StgClosure *closure) {
+  StgTVarWatchQueue *result = NULL;
+  if (cap -> free_tvar_watch_queues == END_STM_WATCH_QUEUE) {
+    result = new_stg_tvar_watch_queue(cap, closure);
+  } else {
+    result = cap -> free_tvar_watch_queues;
+    result -> closure = closure;
+    cap -> free_tvar_watch_queues = result -> next_queue_entry;
+  }
+  return result;
+}
+
+static void free_stg_tvar_watch_queue(Capability *cap,
+				      StgTVarWatchQueue *wq) {
 #if defined(REUSE_MEMORY)
-  wq -> next_queue_entry = cap -> free_tvar_wait_queues;
-  cap -> free_tvar_wait_queues = wq;
+  wq -> next_queue_entry = cap -> free_tvar_watch_queues;
+  cap -> free_tvar_watch_queues = wq;
 #endif
 }
 
@@ -454,6 +522,7 @@ static StgTRecHeader *alloc_stg_trec_header(Capability *cap,
     cap -> free_trec_headers = result -> enclosing_trec;
     result -> enclosing_trec = enclosing_trec;
     result -> current_chunk -> next_entry_idx = 0;
+    result -> invariants_to_check = END_INVARIANT_CHECK_QUEUE;
     if (enclosing_trec == NO_TREC) {
       result -> state = TREC_ACTIVE;
     } else {
@@ -484,66 +553,69 @@ static void free_stg_trec_header(Capability *cap,
 
 // Helper functions for managing waiting lists
 
-static void build_wait_queue_entries_for_trec(Capability *cap,
-                                      StgTSO *tso, 
-                                      StgTRecHeader *trec) {
+static void build_watch_queue_entries_for_trec(Capability *cap,
+					       StgTSO *tso, 
+					       StgTRecHeader *trec) {
   ASSERT(trec != NO_TREC);
   ASSERT(trec -> enclosing_trec == NO_TREC);
   ASSERT(trec -> state == TREC_ACTIVE);
 
-  TRACE("%p : build_wait_queue_entries_for_trec()\n", trec);
+  TRACE("%p : build_watch_queue_entries_for_trec()", trec);
 
   FOR_EACH_ENTRY(trec, e, {
     StgTVar *s;
-    StgTVarWaitQueue *q;
-    StgTVarWaitQueue *fq;
+    StgTVarWatchQueue *q;
+    StgTVarWatchQueue *fq;
     s = e -> tvar;
-    TRACE("%p : adding tso=%p to wait queue for tvar=%p\n", trec, tso, s);
+    TRACE("%p : adding tso=%p to watch queue for tvar=%p", trec, tso, s);
     ACQ_ASSERT(s -> current_value == (StgClosure *)trec);
     NACQ_ASSERT(s -> current_value == e -> expected_value);
-    fq = s -> first_wait_queue_entry;
-    q = alloc_stg_tvar_wait_queue(cap, tso);
+    fq = s -> first_watch_queue_entry;
+    q = alloc_stg_tvar_watch_queue(cap, (StgClosure*) tso);
     q -> next_queue_entry = fq;
-    q -> prev_queue_entry = END_STM_WAIT_QUEUE;
-    if (fq != END_STM_WAIT_QUEUE) {
+    q -> prev_queue_entry = END_STM_WATCH_QUEUE;
+    if (fq != END_STM_WATCH_QUEUE) {
       fq -> prev_queue_entry = q;
     }
-    s -> first_wait_queue_entry = q;
+    s -> first_watch_queue_entry = q;
     e -> new_value = (StgClosure *) q;
   });
 }
 
-static void remove_wait_queue_entries_for_trec(Capability *cap,
-                                               StgTRecHeader *trec) {
+static void remove_watch_queue_entries_for_trec(Capability *cap,
+						StgTRecHeader *trec) {
   ASSERT(trec != NO_TREC);
   ASSERT(trec -> enclosing_trec == NO_TREC);
   ASSERT(trec -> state == TREC_WAITING ||
          trec -> state == TREC_CONDEMNED);
 
-  TRACE("%p : remove_wait_queue_entries_for_trec()\n", trec);
+  TRACE("%p : remove_watch_queue_entries_for_trec()", trec);
 
   FOR_EACH_ENTRY(trec, e, {
     StgTVar *s;
-    StgTVarWaitQueue *pq;
-    StgTVarWaitQueue *nq;
-    StgTVarWaitQueue *q;
+    StgTVarWatchQueue *pq;
+    StgTVarWatchQueue *nq;
+    StgTVarWatchQueue *q;
     s = e -> tvar;
     StgClosure *saw = lock_tvar(trec, s);
-    q = (StgTVarWaitQueue *) (e -> new_value);
-    TRACE("%p : removing tso=%p from wait queue for tvar=%p\n", trec, q -> waiting_tso, s);
+    q = (StgTVarWatchQueue *) (e -> new_value);
+    TRACE("%p : removing tso=%p from watch queue for tvar=%p", 
+	  trec, 
+	  q -> closure, 
+	  s);
     ACQ_ASSERT(s -> current_value == (StgClosure *)trec);
     nq = q -> next_queue_entry;
     pq = q -> prev_queue_entry;
-    if (nq != END_STM_WAIT_QUEUE) {
+    if (nq != END_STM_WATCH_QUEUE) {
       nq -> prev_queue_entry = pq;
     }
-    if (pq != END_STM_WAIT_QUEUE) {
+    if (pq != END_STM_WATCH_QUEUE) {
       pq -> next_queue_entry = nq;
     } else {
-      ASSERT (s -> first_wait_queue_entry == q);
-      s -> first_wait_queue_entry = nq;
+      ASSERT (s -> first_watch_queue_entry == q);
+      s -> first_watch_queue_entry = nq;
     }
-    free_stg_tvar_wait_queue(cap, q);
+    free_stg_tvar_watch_queue(cap, q);
     unlock_tvar(trec, s, saw, FALSE);
   });
 }
@@ -595,7 +667,7 @@ static void merge_update_into(Capability *cap,
       found = TRUE;
       if (e -> expected_value != expected_value) {
         // Must abort if the two entries start from different values
-        TRACE("%p : entries inconsistent at %p (%p vs %p)\n", 
+        TRACE("%p : update entries inconsistent at %p (%p vs %p)", 
               t, tvar, e -> expected_value, expected_value);
         t -> state = TREC_CONDEMNED;
       } 
@@ -611,6 +683,41 @@ static void merge_update_into(Capability *cap,
     ne -> tvar = tvar;
     ne -> expected_value = expected_value;
     ne -> new_value = new_value;
+  }
+}
+
+/*......................................................................*/
+
+static void merge_read_into(Capability *cap,
+			    StgTRecHeader *t,
+			    StgTVar *tvar,
+			    StgClosure *expected_value) {
+  int found;
+  
+  // Look for an entry in this trec
+  found = FALSE;
+  FOR_EACH_ENTRY(t, e, {
+    StgTVar *s;
+    s = e -> tvar;
+    if (s == tvar) {
+      found = TRUE;
+      if (e -> expected_value != expected_value) {
+        // Must abort if the two entries start from different values
+        TRACE("%p : read entries inconsistent at %p (%p vs %p)", 
+              t, tvar, e -> expected_value, expected_value);
+        t -> state = TREC_CONDEMNED;
+      } 
+      BREAK_FOR_EACH;
+    }
+  });
+
+  if (!found) {
+    // No entry so far in this trec
+    TRecEntry *ne;
+    ne = get_new_entry(cap, t);
+    ne -> tvar = tvar;
+    ne -> expected_value = expected_value;
+    ne -> new_value = expected_value;
   }
 }
 
@@ -680,7 +787,7 @@ static StgBool validate_and_acquire_ownership (StgTRecHeader *trec,
   StgBool result;
 
   if (shake()) {
-    TRACE("%p : shake, pretending trec is invalid when it may not be\n", trec);
+    TRACE("%p : shake, pretending trec is invalid when it may not be", trec);
     return FALSE;
   }
 
@@ -693,28 +800,28 @@ static StgBool validate_and_acquire_ownership (StgTRecHeader *trec,
       StgTVar *s;
       s = e -> tvar;
       if (acquire_all || entry_is_update(e)) {
-        TRACE("%p : trying to acquire %p\n", trec, s);
+        TRACE("%p : trying to acquire %p", trec, s);
         if (!cond_lock_tvar(trec, s, e -> expected_value)) {
-          TRACE("%p : failed to acquire %p\n", trec, s);
+          TRACE("%p : failed to acquire %p", trec, s);
           result = FALSE;
           BREAK_FOR_EACH;
         }
       } else {
-        ASSERT(use_read_phase);
+        ASSERT(config_use_read_phase);
         IF_STM_FG_LOCKS({
-          TRACE("%p : will need to check %p\n", trec, s);
+          TRACE("%p : will need to check %p", trec, s);
           if (s -> current_value != e -> expected_value) {
-            TRACE("%p : doesn't match\n", trec);
+            TRACE("%p : doesn't match", trec);
             result = FALSE;
             BREAK_FOR_EACH;
           }
           e -> num_updates = s -> num_updates;
           if (s -> current_value != e -> expected_value) {
-            TRACE("%p : doesn't match (race)\n", trec);
+            TRACE("%p : doesn't match (race)", trec);
             result = FALSE;
             BREAK_FOR_EACH;
           } else {
-            TRACE("%p : need to check version %ld\n", trec, e -> num_updates);
+            TRACE("%p : need to check version %ld", trec, e -> num_updates);
           }
         });
       }
@@ -742,7 +849,7 @@ static StgBool validate_and_acquire_ownership (StgTRecHeader *trec,
 static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
   StgBool result = TRUE;
 
-  ASSERT (use_read_phase);
+  ASSERT (config_use_read_phase);
   IF_STM_FG_LOCKS({
     FOR_EACH_ENTRY(trec, e, {
       StgTVar *s;
@@ -751,7 +858,7 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
         TRACE("%p : check_read_only for TVar %p, saw %ld", trec, s, e -> num_updates);
         if (s -> num_updates != e -> num_updates) {
           // ||s -> current_value != e -> expected_value) {
-          TRACE("%p : mismatch\n", trec);
+          TRACE("%p : mismatch", trec);
           result = FALSE;
           BREAK_FOR_EACH;
         }
@@ -769,10 +876,10 @@ void stmPreGCHook() {
   nat i;
 
   lock_stm(NO_TREC);
-  TRACE("stmPreGCHook\n");
+  TRACE("stmPreGCHook");
   for (i = 0; i < n_capabilities; i ++) {
     Capability *cap = &capabilities[i];
-    cap -> free_tvar_wait_queues = END_STM_WAIT_QUEUE;
+    cap -> free_tvar_watch_queues = END_STM_WATCH_QUEUE;
     cap -> free_trec_chunks = END_STM_CHUNK_LIST;
     cap -> free_trec_headers = NO_TREC;
   }
@@ -799,6 +906,7 @@ static volatile StgBool token_locked = FALSE;
 static void getTokenBatch(Capability *cap) {
   while (cas((void *)&token_locked, FALSE, TRUE) == TRUE) { /* nothing */ }
   max_commits += TOKEN_BATCH_SIZE;
+  TRACE("%p : cap got token batch, max_commits=%lld", cap, max_commits);
   cap -> transaction_tokens = TOKEN_BATCH_SIZE;
   token_locked = FALSE;
 }
@@ -820,14 +928,14 @@ static void getToken(Capability *cap STG_UNUSED) {
 StgTRecHeader *stmStartTransaction(Capability *cap,
                                    StgTRecHeader *outer) {
   StgTRecHeader *t;
-  TRACE("%p : stmStartTransaction with %d tokens\n", 
+  TRACE("%p : stmStartTransaction with %d tokens", 
         outer, 
         cap -> transaction_tokens);
 
   getToken(cap);
 
   t = alloc_stg_trec_header(cap, outer);
-  TRACE("%p : stmStartTransaction()=%p\n", outer, t);
+  TRACE("%p : stmStartTransaction()=%p", outer, t);
   return t;
 }
 
@@ -835,31 +943,61 @@ StgTRecHeader *stmStartTransaction(Capability *cap,
 
 void stmAbortTransaction(Capability *cap,
                          StgTRecHeader *trec) {
-  TRACE("%p : stmAbortTransaction\n", trec);
+  TRACE("%p : stmAbortTransaction", trec);
   ASSERT (trec != NO_TREC);
   ASSERT ((trec -> state == TREC_ACTIVE) || 
           (trec -> state == TREC_WAITING) ||
           (trec -> state == TREC_CONDEMNED));
 
   lock_stm(trec);
-  if (trec -> state == TREC_WAITING) {
-    ASSERT (trec -> enclosing_trec == NO_TREC);
-    TRACE("%p : stmAbortTransaction aborting waiting transaction\n", trec);
-    remove_wait_queue_entries_for_trec(cap, trec);
+
+  StgTRecHeader *et = trec -> enclosing_trec;
+  if (et == NO_TREC) {
+    // We're a top-level transaction: remove any watch queue entries that
+    // we may have.
+    TRACE("%p : aborting top-level transaction", trec);
+
+    if (trec -> state == TREC_WAITING) {
+      ASSERT (trec -> enclosing_trec == NO_TREC);
+      TRACE("%p : stmAbortTransaction aborting waiting transaction", trec);
+      remove_watch_queue_entries_for_trec(cap, trec);
+    } 
+
+  } else {
+    // We're a nested transaction: merge our read set into our parent's
+    TRACE("%p : retaining read-set into parent %p", trec, et);
+
+    FOR_EACH_ENTRY(trec, e, {
+      StgTVar *s = e -> tvar;
+      merge_read_into(cap, et, s, e -> expected_value);
+    });
   } 
+
   trec -> state = TREC_ABORTED;
   unlock_stm(trec);
 
+  TRACE("%p : stmAbortTransaction done", trec);
+}
+
+/*......................................................................*/
+
+void stmFreeAbortedTRec(Capability *cap,
+			StgTRecHeader *trec) {
+  TRACE("%p : stmFreeAbortedTRec", trec);
+  ASSERT (trec != NO_TREC);
+  ASSERT ((trec -> state == TREC_CONDEMNED) ||
+	  (trec -> state == TREC_ABORTED));
+
   free_stg_trec_header(cap, trec);
 
-  TRACE("%p : stmAbortTransaction done\n", trec);
+  TRACE("%p : stmFreeAbortedTRec done", trec);
 }
 
 /*......................................................................*/
 
 void stmCondemnTransaction(Capability *cap,
                            StgTRecHeader *trec) {
-  TRACE("%p : stmCondemnTransaction\n", trec);
+  TRACE("%p : stmCondemnTransaction", trec);
   ASSERT (trec != NO_TREC);
   ASSERT ((trec -> state == TREC_ACTIVE) || 
           (trec -> state == TREC_WAITING) ||
@@ -868,22 +1006,22 @@ void stmCondemnTransaction(Capability *cap,
   lock_stm(trec);
   if (trec -> state == TREC_WAITING) {
     ASSERT (trec -> enclosing_trec == NO_TREC);
-    TRACE("%p : stmCondemnTransaction condemning waiting transaction\n", trec);
-    remove_wait_queue_entries_for_trec(cap, trec);
+    TRACE("%p : stmCondemnTransaction condemning waiting transaction", trec);
+    remove_watch_queue_entries_for_trec(cap, trec);
   } 
   trec -> state = TREC_CONDEMNED;
   unlock_stm(trec);
 
-  TRACE("%p : stmCondemnTransaction done\n", trec);
+  TRACE("%p : stmCondemnTransaction done", trec);
 }
 
 /*......................................................................*/
 
 StgTRecHeader *stmGetEnclosingTRec(StgTRecHeader *trec) {
   StgTRecHeader *outer;
-  TRACE("%p : stmGetEnclosingTRec\n", trec);
+  TRACE("%p : stmGetEnclosingTRec", trec);
   outer = trec -> enclosing_trec;
-  TRACE("%p : stmGetEnclosingTRec()=%p\n", trec, outer);
+  TRACE("%p : stmGetEnclosingTRec()=%p", trec, outer);
   return outer;
 }
 
@@ -893,7 +1031,7 @@ StgBool stmValidateNestOfTransactions(StgTRecHeader *trec) {
   StgTRecHeader *t;
   StgBool result;
 
-  TRACE("%p : stmValidateNestOfTransactions\n", trec);
+  TRACE("%p : stmValidateNestOfTransactions", trec);
   ASSERT(trec != NO_TREC);
   ASSERT((trec -> state == TREC_ACTIVE) || 
          (trec -> state == TREC_WAITING) ||
@@ -914,214 +1052,7 @@ StgBool stmValidateNestOfTransactions(StgTRecHeader *trec) {
 
   unlock_stm(trec);
 
-  TRACE("%p : stmValidateNestOfTransactions()=%d\n", trec, result);
-  return result;
-}
-
-/*......................................................................*/
-
-StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
-  int result;
-  StgInt64 max_commits_at_start = max_commits;
-
-  TRACE("%p : stmCommitTransaction()\n", trec);
-  ASSERT (trec != NO_TREC);
-
-  lock_stm(trec);
-
-  ASSERT (trec -> enclosing_trec == NO_TREC);
-  ASSERT ((trec -> state == TREC_ACTIVE) || 
-          (trec -> state == TREC_CONDEMNED));
-
-  result = validate_and_acquire_ownership(trec, (!use_read_phase), TRUE);
-  if (result) {
-    // We now know that all the updated locations hold their expected values.
-    ASSERT (trec -> state == TREC_ACTIVE);
-
-    if (use_read_phase) {
-      TRACE("%p : doing read check\n", trec);
-      result = check_read_only(trec);
-      TRACE("%p : read-check %s\n", trec, result ? "succeeded" : "failed");
-
-      StgInt64 max_commits_at_end = max_commits;
-      StgInt64 max_concurrent_commits;
-      max_concurrent_commits = ((max_commits_at_end - max_commits_at_start) +
-                                (n_capabilities * TOKEN_BATCH_SIZE));
-      if (((max_concurrent_commits >> 32) > 0) || shake()) {
-        result = FALSE;
-      }
-    }
-    
-    if (result) {
-      // We now know that all of the read-only locations held their exepcted values
-      // at the end of the call to validate_and_acquire_ownership.  This forms the
-      // linearization point of the commit.
-      
-      FOR_EACH_ENTRY(trec, e, {
-        StgTVar *s;
-        s = e -> tvar;
-        if (e -> new_value != e -> expected_value) {
-          // Entry is an update: write the value back to the TVar, unlocking it if
-          // necessary.
-
-          ACQ_ASSERT(tvar_is_locked(s, trec));
-          TRACE("%p : writing %p to %p, waking waiters\n", trec, e -> new_value, s);
-          unpark_waiters_on(cap,s);
-          IF_STM_FG_LOCKS({
-            s -> num_updates ++;
-          });
-          unlock_tvar(trec, s, e -> new_value, TRUE);
-        } 
-        ACQ_ASSERT(!tvar_is_locked(s, trec));
-      });
-    } else {
-      revert_ownership(trec, FALSE);
-    }
-  } 
-
-  unlock_stm(trec);
-
-  free_stg_trec_header(cap, trec);
-
-  TRACE("%p : stmCommitTransaction()=%d\n", trec, result);
-
-  return result;
-}
-
-/*......................................................................*/
-
-StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
-  StgTRecHeader *et;
-  int result;
-  ASSERT (trec != NO_TREC && trec -> enclosing_trec != NO_TREC);
-  TRACE("%p : stmCommitNestedTransaction() into %p\n", trec, trec -> enclosing_trec);
-  ASSERT ((trec -> state == TREC_ACTIVE) || (trec -> state == TREC_CONDEMNED));
-
-  lock_stm(trec);
-
-  et = trec -> enclosing_trec;
-  result = validate_and_acquire_ownership(trec, (!use_read_phase), TRUE);
-  if (result) {
-    // We now know that all the updated locations hold their expected values.
-
-    if (use_read_phase) {
-      TRACE("%p : doing read check\n", trec);
-      result = check_read_only(trec);
-    }
-    if (result) {
-      // We now know that all of the read-only locations held their exepcted values
-      // at the end of the call to validate_and_acquire_ownership.  This forms the
-      // linearization point of the commit.
-
-      if (result) {
-        TRACE("%p : read-check succeeded\n", trec);
-        FOR_EACH_ENTRY(trec, e, {
-          // Merge each entry into the enclosing transaction record, release all
-          // locks.
-
-          StgTVar *s;
-          s = e -> tvar;
-          if (entry_is_update(e)) {
-            unlock_tvar(trec, s, e -> expected_value, FALSE);
-          }
-          merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
-          ACQ_ASSERT(s -> current_value != (StgClosure *)trec);
-        });
-      } else {
-        revert_ownership(trec, FALSE);
-      }
-    }
-  } 
-
-  unlock_stm(trec);
-
-  free_stg_trec_header(cap, trec);
-
-  TRACE("%p : stmCommitNestedTransaction()=%d\n", trec, result);
-
-  return result;
-}
-
-/*......................................................................*/
-
-StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
-  int result;
-  TRACE("%p : stmWait(%p)\n", trec, tso);
-  ASSERT (trec != NO_TREC);
-  ASSERT (trec -> enclosing_trec == NO_TREC);
-  ASSERT ((trec -> state == TREC_ACTIVE) || 
-          (trec -> state == TREC_CONDEMNED));
-
-  lock_stm(trec);
-  result = validate_and_acquire_ownership(trec, TRUE, TRUE);
-  if (result) {
-    // The transaction is valid so far so we can actually start waiting.
-    // (Otherwise the transaction was not valid and the thread will have to
-    // retry it).
-
-    // Put ourselves to sleep.  We retain locks on all the TVars involved
-    // until we are sound asleep : (a) on the wait queues, (b) BlockedOnSTM
-    // in the TSO, (c) TREC_WAITING in the Trec.  
-    build_wait_queue_entries_for_trec(cap, tso, trec);
-    park_tso(tso);
-    trec -> state = TREC_WAITING;
-
-    // We haven't released ownership of the transaction yet.  The TSO
-    // has been put on the wait queue for the TVars it is waiting for,
-    // but we haven't yet tidied up the TSO's stack and made it safe
-    // to wake up the TSO.  Therefore, we must wait until the TSO is
-    // safe to wake up before we release ownership - when all is well,
-    // the runtime will call stmWaitUnlock() below, with the same
-    // TRec.
-
-  } else {
-    unlock_stm(trec);
-    free_stg_trec_header(cap, trec);
-  }
-
-  TRACE("%p : stmWait(%p)=%d\n", trec, tso, result);
-  return result;
-}
-
-
-void
-stmWaitUnlock(Capability *cap STG_UNUSED, StgTRecHeader *trec) {
-    revert_ownership(trec, TRUE);
-    unlock_stm(trec);
-}
-
-/*......................................................................*/
-
-StgBool stmReWait(Capability *cap, StgTSO *tso) {
-  int result;
-  StgTRecHeader *trec = tso->trec;
-
-  TRACE("%p : stmReWait\n", trec);
-  ASSERT (trec != NO_TREC);
-  ASSERT (trec -> enclosing_trec == NO_TREC);
-  ASSERT ((trec -> state == TREC_WAITING) || 
-          (trec -> state == TREC_CONDEMNED));
-
-  lock_stm(trec);
-  result = validate_and_acquire_ownership(trec, TRUE, TRUE);
-  TRACE("%p : validation %s\n", trec, result ? "succeeded" : "failed");
-  if (result) {
-    // The transaction remains valid -- do nothing because it is already on
-    // the wait queues
-    ASSERT (trec -> state == TREC_WAITING);
-    park_tso(tso);
-    revert_ownership(trec, TRUE);
-  } else {
-    // The transcation has become invalid.  We can now remove it from the wait
-    // queues.
-    if (trec -> state != TREC_CONDEMNED) {
-      remove_wait_queue_entries_for_trec (cap, trec);
-    }
-    free_stg_trec_header(cap, trec);
-  }
-  unlock_stm(trec);
-
-  TRACE("%p : stmReWait()=%d\n", trec, result);
+  TRACE("%p : stmValidateNestOfTransactions()=%d", trec, result);
   return result;
 }
 
@@ -1130,7 +1061,7 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
 static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeader **in) {
   TRecEntry *result = NULL;
 
-  TRACE("%p : get_entry_for TVar %p\n", trec, tvar);
+  TRACE("%p : get_entry_for TVar %p", trec, tvar);
   ASSERT(trec != NO_TREC);
 
   do {
@@ -1149,18 +1080,490 @@ static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeade
   return result;    
 }
 
+/*......................................................................*/
+
+/*
+ * Add/remove links between an invariant TVars.  The caller must have 
+ * locked the TVars involved and the invariant.
+ */
+
+static void disconnect_invariant(Capability *cap,
+				 StgAtomicInvariant *inv) {
+  StgTRecHeader *last_execution = inv -> last_execution;
+
+  TRACE("unhooking last execution inv=%p trec=%p", inv, last_execution);
+
+  FOR_EACH_ENTRY(last_execution, e, {
+    StgTVar *s = e -> tvar;
+    StgTVarWatchQueue *q = s -> first_watch_queue_entry;
+    StgBool found = FALSE;
+    TRACE("  looking for trec on tvar=%p", s);
+    for (q = s -> first_watch_queue_entry; 
+	 q != END_STM_WATCH_QUEUE; 
+	 q = q -> next_queue_entry) {
+      if (q -> closure == (StgClosure*)inv) {
+	StgTVarWatchQueue *pq;
+	StgTVarWatchQueue *nq;
+	nq = q -> next_queue_entry;
+	pq = q -> prev_queue_entry;
+	if (nq != END_STM_WATCH_QUEUE) {
+	  nq -> prev_queue_entry = pq;
+	}
+	if (pq != END_STM_WATCH_QUEUE) {
+	  pq -> next_queue_entry = nq;
+	} else {
+	  ASSERT (s -> first_watch_queue_entry == q);
+	  s -> first_watch_queue_entry = nq;
+	}
+	TRACE("  found it in watch queue entry %p", q);
+	free_stg_tvar_watch_queue(cap, q);
+	found = TRUE;
+	break;
+      }
+    }
+    ASSERT(found);
+  });
+  inv -> last_execution = NO_TREC;
+}
+
+static void connect_invariant_to_trec(Capability *cap,
+				      StgAtomicInvariant *inv, 
+				      StgTRecHeader *my_execution) {
+  TRACE("connecting execution inv=%p trec=%p", inv, my_execution);
+
+  ASSERT(inv -> last_execution == NO_TREC);
+
+  FOR_EACH_ENTRY(my_execution, e, {
+    StgTVar *s = e -> tvar;
+    StgTVarWatchQueue *q = alloc_stg_tvar_watch_queue(cap, (StgClosure*)inv);
+    StgTVarWatchQueue *fq = s -> first_watch_queue_entry;
+
+    // We leave "last_execution" holding the values that will be
+    // in the heap after the transaction we're in the process
+    // of committing has finished.
+    TRecEntry *entry = get_entry_for(my_execution -> enclosing_trec, s, NULL);
+    if (entry != NULL) {
+      e -> expected_value = entry -> new_value;
+      e -> new_value = entry -> new_value;
+    }
+
+    TRACE("  linking trec on tvar=%p value=%p q=%p", s, e -> expected_value, q);
+    q -> next_queue_entry = fq;
+    q -> prev_queue_entry = END_STM_WATCH_QUEUE;
+    if (fq != END_STM_WATCH_QUEUE) {
+      fq -> prev_queue_entry = q;
+    }
+    s -> first_watch_queue_entry = q;
+  });
+
+  inv -> last_execution = my_execution;
+}
+
+/*
+ * Add a new invariant to the trec's list of invariants to check on commit
+ */
+void stmAddInvariantToCheck(Capability *cap, 
+			    StgTRecHeader *trec,
+			    StgClosure *code) {
+  TRACE("%p : stmAddInvariantToCheck closure=%p", trec, code);
+  ASSERT(trec != NO_TREC);
+  ASSERT(trec -> state == TREC_ACTIVE ||
+	 trec -> state == TREC_CONDEMNED);
+
+  StgAtomicInvariant *invariant;
+  StgInvariantCheckQueue *q;
+
+  // 1. Allocate an StgAtomicInvariant, set last_execution to NO_TREC
+  //    to signal that this is a new invariant in the current atomic block
+
+  invariant = (StgAtomicInvariant *) allocateLocal(cap, sizeofW(StgAtomicInvariant));
+  TRACE("%p : stmAddInvariantToCheck allocated invariant=%p", trec, invariant);
+  SET_HDR (invariant, &stg_ATOMIC_INVARIANT_info, CCS_SYSTEM);
+  invariant -> code = code;
+  invariant -> last_execution = NO_TREC;
+
+  // 2. Allocate an StgInvariantCheckQueue entry, link it to the current trec
+
+  q = alloc_stg_invariant_check_queue(cap, invariant);
+  TRACE("%p : stmAddInvariantToCheck allocated q=%p", trec, q);
+  q -> invariant = invariant;
+  q -> my_execution = NO_TREC;
+  q -> next_queue_entry = trec -> invariants_to_check;
+  trec -> invariants_to_check = q;
+
+  TRACE("%p : stmAddInvariantToCheck done", trec);
+}
+
+/*
+ * Fill in the trec's list of invariants that might be violated by the 
+ * current transaction.  
+ */
+
+StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *trec) {
+  TRACE("%p : stmGetInvariantsToCheck, head was %p", 
+	trec,
+	trec -> invariants_to_check);
+
+  ASSERT(trec != NO_TREC);
+  ASSERT ((trec -> state == TREC_ACTIVE) || 
+	  (trec -> state == TREC_WAITING) ||
+	  (trec -> state == TREC_CONDEMNED));
+  ASSERT(trec -> enclosing_trec == NO_TREC);
+
+  lock_stm(trec);
+  StgTRecChunk *c = trec -> current_chunk;
+  while (c != END_STM_CHUNK_LIST) {
+    unsigned int i;
+    for (i = 0; i < c -> next_entry_idx; i ++) {
+      TRecEntry *e = &(c -> entries[i]);
+      if (entry_is_update(e)) {
+	StgTVar *s = e -> tvar;
+	StgClosure *old = lock_tvar(trec, s);
+		
+	// Pick up any invariants on the TVar being updated
+	// by entry "e"
+
+	TRACE("%p : checking for invariants on %p", trec, s);
+	StgTVarWatchQueue *q;
+	for (q = s -> first_watch_queue_entry;
+	     q != END_STM_WATCH_QUEUE;
+	     q = q -> next_queue_entry) {
+	  if (watcher_is_invariant(q)) {
+	    TRACE("%p : Touching invariant %p", trec, q -> closure);
+	    StgBool found = FALSE;
+	    StgInvariantCheckQueue *q2;
+	    for (q2 = trec -> invariants_to_check;
+		 q2 != END_INVARIANT_CHECK_QUEUE;
+		 q2 = q2 -> next_queue_entry) {
+	      if (q2 -> invariant == (StgAtomicInvariant*)(q -> closure)) {
+		TRACE("%p : Already found %p", trec, q -> closure);
+		found = TRUE;
+		break;
+	      }
+	    }
+	    
+	    if (!found) {
+	      TRACE("%p : Not already found %p", trec, q -> closure);
+	      StgInvariantCheckQueue *q3;
+	      q3 = alloc_stg_invariant_check_queue(cap,
+						   (StgAtomicInvariant*) q -> closure);
+	      q3 -> next_queue_entry = trec -> invariants_to_check;
+	      trec -> invariants_to_check = q3;
+	    }
+	  }
+	}
+
+	unlock_tvar(trec, s, old, FALSE);
+      }
+    }
+    c = c -> prev_chunk;
+  }
+
+  unlock_stm(trec);
+
+  TRACE("%p : stmGetInvariantsToCheck, head now %p", 
+	trec,
+	trec -> invariants_to_check);
+
+  return (trec -> invariants_to_check);
+}
+
+/*......................................................................*/
+
+StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
+  int result;
+  StgInt64 max_commits_at_start = max_commits;
+
+  TRACE("%p : stmCommitTransaction()", trec);
+  ASSERT (trec != NO_TREC);
+
+  lock_stm(trec);
+
+  ASSERT (trec -> enclosing_trec == NO_TREC);
+  ASSERT ((trec -> state == TREC_ACTIVE) || 
+          (trec -> state == TREC_CONDEMNED));
+
+  // touched_invariants is true if we've written to a TVar with invariants 
+  // attached to it, or if we're trying to add a new invariant to the system.
+
+  StgBool touched_invariants = (trec -> invariants_to_check != END_INVARIANT_CHECK_QUEUE);
+
+  // If we have touched invariants then (i) lock the invariant, and (ii) add
+  // the invariant's read set to our own.  Step (i) is needed to serialize
+  // concurrent transactions that attempt to make conflicting updates
+  // to the invariant's trec (suppose it read from t1 and t2, and that one
+  // concurrent transcation writes only to t1, and a second writes only to
+  // t2).  Step (ii) is needed so that both transactions will lock t1 and t2
+  // to gain access to their wait lists (and hence be able to unhook the
+  // invariant from both tvars).
+
+  if (touched_invariants) {
+    TRACE("%p : locking invariants", trec);
+    StgInvariantCheckQueue *q = trec -> invariants_to_check;
+    while (q != END_INVARIANT_CHECK_QUEUE) {
+      TRACE("%p : locking invariant %p", trec, q -> invariant);
+      StgAtomicInvariant *inv = q -> invariant;
+      if (!lock_inv(inv)) {
+        TRACE("%p : failed to lock %p", trec, inv);
+        trec -> state = TREC_CONDEMNED;
+        break;
+      }
+
+      StgTRecHeader *inv_old_trec = inv -> last_execution;
+      if (inv_old_trec != NO_TREC) {
+	StgTRecChunk *c = inv_old_trec -> current_chunk;
+	while (c != END_STM_CHUNK_LIST) {
+	  unsigned int i;
+	  for (i = 0; i < c -> next_entry_idx; i ++) {
+	    TRecEntry *e = &(c -> entries[i]);
+	    TRACE("%p : ensuring we lock TVars for %p", trec, e -> tvar);
+	    merge_read_into (cap, trec, e -> tvar, e -> expected_value);
+	  }
+	  c = c -> prev_chunk;
+	}
+      }
+      q = q -> next_queue_entry;
+    }
+    TRACE("%p : finished locking invariants", trec);
+  }
+
+  // Use a read-phase (i.e. don't lock TVars we've read but not updated) if
+  // (i) the configuration lets us use a read phase, and (ii) we've not
+  // touched or introduced any invariants.  
+  //
+  // In principle we could extend the implementation to support a read-phase
+  // and invariants, but it complicates the logic: the links between
+  // invariants and TVars are managed by the TVar watch queues which are
+  // protected by the TVar's locks.
+
+  StgBool use_read_phase = ((config_use_read_phase) && (!touched_invariants));
+
+  result = validate_and_acquire_ownership(trec, (!use_read_phase), TRUE);
+  if (result) {
+    // We now know that all the updated locations hold their expected values.
+    ASSERT (trec -> state == TREC_ACTIVE);
+
+    if (use_read_phase) {
+      TRACE("%p : doing read check", trec);
+      result = check_read_only(trec);
+      TRACE("%p : read-check %s", trec, result ? "succeeded" : "failed");
+
+      StgInt64 max_commits_at_end = max_commits;
+      StgInt64 max_concurrent_commits;
+      max_concurrent_commits = ((max_commits_at_end - max_commits_at_start) +
+                                (n_capabilities * TOKEN_BATCH_SIZE));
+      if (((max_concurrent_commits >> 32) > 0) || shake()) {
+        result = FALSE;
+      }
+    }
+    
+    if (result) {
+      // We now know that all of the read-only locations held their exepcted values
+      // at the end of the call to validate_and_acquire_ownership.  This forms the
+      // linearization point of the commit.
+
+      // 1. If we have touched or introduced any invariants then unhook them
+      //    from the TVars they depended on last time they were executed
+      //    and hook them on the TVars that they now depend on.
+      if (touched_invariants) {
+	StgInvariantCheckQueue *q = trec -> invariants_to_check;
+	while (q != END_INVARIANT_CHECK_QUEUE) {
+	  StgAtomicInvariant *inv = q -> invariant;
+	  if (inv -> last_execution != NO_TREC) {
+	    disconnect_invariant(cap, inv);
+	  }
+
+	  TRACE("%p : hooking up new execution trec=%p", trec, q -> my_execution);
+	  connect_invariant_to_trec(cap, inv, q -> my_execution);
+
+	  TRACE("%p : unlocking invariant %p", trec, inv);
+          unlock_inv(inv);
+
+	  q = q -> next_queue_entry;
+	}
+      }
+
+      // 2. Make the updates required by the transaction
+      FOR_EACH_ENTRY(trec, e, {
+        StgTVar *s;
+        s = e -> tvar;
+        if ((!use_read_phase) || (e -> new_value != e -> expected_value)) {
+          // Either the entry is an update or we're not using a read phase:
+	  // write the value back to the TVar, unlocking it if necessary.
+
+          ACQ_ASSERT(tvar_is_locked(s, trec));
+          TRACE("%p : writing %p to %p, waking waiters", trec, e -> new_value, s);
+          unpark_waiters_on(cap,s);
+          IF_STM_FG_LOCKS({
+            s -> num_updates ++;
+          });
+          unlock_tvar(trec, s, e -> new_value, TRUE);
+        } 
+        ACQ_ASSERT(!tvar_is_locked(s, trec));
+      });
+    } else {
+      revert_ownership(trec, FALSE);
+    }
+  } 
+
+  unlock_stm(trec);
+
+  free_stg_trec_header(cap, trec);
+
+  TRACE("%p : stmCommitTransaction()=%d", trec, result);
+
+  return result;
+}
+
+/*......................................................................*/
+
+StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
+  StgTRecHeader *et;
+  int result;
+  ASSERT (trec != NO_TREC && trec -> enclosing_trec != NO_TREC);
+  TRACE("%p : stmCommitNestedTransaction() into %p", trec, trec -> enclosing_trec);
+  ASSERT ((trec -> state == TREC_ACTIVE) || (trec -> state == TREC_CONDEMNED));
+
+  lock_stm(trec);
+
+  et = trec -> enclosing_trec;
+  result = validate_and_acquire_ownership(trec, (!config_use_read_phase), TRUE);
+  if (result) {
+    // We now know that all the updated locations hold their expected values.
+
+    if (config_use_read_phase) {
+      TRACE("%p : doing read check", trec);
+      result = check_read_only(trec);
+    }
+    if (result) {
+      // We now know that all of the read-only locations held their exepcted values
+      // at the end of the call to validate_and_acquire_ownership.  This forms the
+      // linearization point of the commit.
+
+      TRACE("%p : read-check succeeded", trec);
+      FOR_EACH_ENTRY(trec, e, {
+	// Merge each entry into the enclosing transaction record, release all
+	// locks.
+	
+	StgTVar *s;
+	s = e -> tvar;
+	if (entry_is_update(e)) {
+	  unlock_tvar(trec, s, e -> expected_value, FALSE);
+	}
+	merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
+	ACQ_ASSERT(s -> current_value != (StgClosure *)trec);
+      });
+    } else {
+      revert_ownership(trec, FALSE);
+    }
+  } 
+
+  unlock_stm(trec);
+
+  free_stg_trec_header(cap, trec);
+
+  TRACE("%p : stmCommitNestedTransaction()=%d", trec, result);
+
+  return result;
+}
+
+/*......................................................................*/
+
+StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
+  int result;
+  TRACE("%p : stmWait(%p)", trec, tso);
+  ASSERT (trec != NO_TREC);
+  ASSERT (trec -> enclosing_trec == NO_TREC);
+  ASSERT ((trec -> state == TREC_ACTIVE) || 
+          (trec -> state == TREC_CONDEMNED));
+
+  lock_stm(trec);
+  result = validate_and_acquire_ownership(trec, TRUE, TRUE);
+  if (result) {
+    // The transaction is valid so far so we can actually start waiting.
+    // (Otherwise the transaction was not valid and the thread will have to
+    // retry it).
+
+    // Put ourselves to sleep.  We retain locks on all the TVars involved
+    // until we are sound asleep : (a) on the wait queues, (b) BlockedOnSTM
+    // in the TSO, (c) TREC_WAITING in the Trec.  
+    build_watch_queue_entries_for_trec(cap, tso, trec);
+    park_tso(tso);
+    trec -> state = TREC_WAITING;
+
+    // We haven't released ownership of the transaction yet.  The TSO
+    // has been put on the wait queue for the TVars it is waiting for,
+    // but we haven't yet tidied up the TSO's stack and made it safe
+    // to wake up the TSO.  Therefore, we must wait until the TSO is
+    // safe to wake up before we release ownership - when all is well,
+    // the runtime will call stmWaitUnlock() below, with the same
+    // TRec.
+
+  } else {
+    unlock_stm(trec);
+    free_stg_trec_header(cap, trec);
+  }
+
+  TRACE("%p : stmWait(%p)=%d", trec, tso, result);
+  return result;
+}
+
+
+void
+stmWaitUnlock(Capability *cap STG_UNUSED, StgTRecHeader *trec) {
+    revert_ownership(trec, TRUE);
+    unlock_stm(trec);
+}
+
+/*......................................................................*/
+
+StgBool stmReWait(Capability *cap, StgTSO *tso) {
+  int result;
+  StgTRecHeader *trec = tso->trec;
+
+  TRACE("%p : stmReWait", trec);
+  ASSERT (trec != NO_TREC);
+  ASSERT (trec -> enclosing_trec == NO_TREC);
+  ASSERT ((trec -> state == TREC_WAITING) || 
+          (trec -> state == TREC_CONDEMNED));
+
+  lock_stm(trec);
+  result = validate_and_acquire_ownership(trec, TRUE, TRUE);
+  TRACE("%p : validation %s", trec, result ? "succeeded" : "failed");
+  if (result) {
+    // The transaction remains valid -- do nothing because it is already on
+    // the wait queues
+    ASSERT (trec -> state == TREC_WAITING);
+    park_tso(tso);
+    revert_ownership(trec, TRUE);
+  } else {
+    // The transcation has become invalid.  We can now remove it from the wait
+    // queues.
+    if (trec -> state != TREC_CONDEMNED) {
+      remove_watch_queue_entries_for_trec (cap, trec);
+    }
+    free_stg_trec_header(cap, trec);
+  }
+  unlock_stm(trec);
+
+  TRACE("%p : stmReWait()=%d", trec, result);
+  return result;
+}
+
+/*......................................................................*/
+
 static StgClosure *read_current_value(StgTRecHeader *trec STG_UNUSED, StgTVar *tvar) {
   StgClosure *result;
   result = tvar -> current_value;
 
 #if defined(STM_FG_LOCKS)
   while (GET_INFO(result) == &stg_TREC_HEADER_info) {
-    TRACE("%p : read_current_value(%p) saw %p\n", trec, tvar, result);
+    TRACE("%p : read_current_value(%p) saw %p", trec, tvar, result);
     result = tvar -> current_value;
   }
 #endif
 
-  TRACE("%p : read_current_value(%p)=%p\n", trec, tvar, result);
+  TRACE("%p : read_current_value(%p)=%p", trec, tvar, result);
   return result;
 }
 
@@ -1172,7 +1575,7 @@ StgClosure *stmReadTVar(Capability *cap,
   StgTRecHeader *entry_in;
   StgClosure *result = NULL;
   TRecEntry *entry = NULL;
-  TRACE("%p : stmReadTVar(%p)\n", trec, tvar);
+  TRACE("%p : stmReadTVar(%p)", trec, tvar);
   ASSERT (trec != NO_TREC);
   ASSERT (trec -> state == TREC_ACTIVE || 
           trec -> state == TREC_CONDEMNED);
@@ -1201,7 +1604,7 @@ StgClosure *stmReadTVar(Capability *cap,
     result = current_value;
   }
 
-  TRACE("%p : stmReadTVar(%p)=%p\n", trec, tvar, result);
+  TRACE("%p : stmReadTVar(%p)=%p", trec, tvar, result);
   return result;
 }
 
@@ -1214,7 +1617,7 @@ void stmWriteTVar(Capability *cap,
 
   StgTRecHeader *entry_in;
   TRecEntry *entry = NULL;
-  TRACE("%p : stmWriteTVar(%p, %p)\n", trec, tvar, new_value);
+  TRACE("%p : stmWriteTVar(%p, %p)", trec, tvar, new_value);
   ASSERT (trec != NO_TREC);
   ASSERT (trec -> state == TREC_ACTIVE || 
           trec -> state == TREC_CONDEMNED);
@@ -1241,7 +1644,7 @@ void stmWriteTVar(Capability *cap,
     new_entry -> new_value = new_value;
   }
 
-  TRACE("%p : stmWriteTVar done\n", trec);
+  TRACE("%p : stmWriteTVar done", trec);
 }
 
 /*......................................................................*/
@@ -1252,7 +1655,7 @@ StgTVar *stmNewTVar(Capability *cap,
   result = (StgTVar *)allocateLocal(cap, sizeofW(StgTVar));
   SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
   result -> current_value = new_value;
-  result -> first_wait_queue_entry = END_STM_WAIT_QUEUE;
+  result -> first_watch_queue_entry = END_STM_WATCH_QUEUE;
 #if defined(THREADED_RTS)
   result -> num_updates = 0;
 #endif

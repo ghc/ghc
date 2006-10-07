@@ -328,15 +328,26 @@ main(int argc, char *argv[])
 
     closure_size(StgAtomicallyFrame);
     closure_field(StgAtomicallyFrame, code);
+    closure_field(StgAtomicallyFrame, next_invariant_to_check);
+
+    closure_field(StgInvariantCheckQueue, invariant);
+    closure_field(StgInvariantCheckQueue, my_execution);
+    closure_field(StgInvariantCheckQueue, next_queue_entry);
+
+    closure_field(StgAtomicInvariant, code);
 
     closure_size(StgCatchSTMFrame);
     closure_field(StgCatchSTMFrame, handler);
+    closure_field(StgCatchSTMFrame, code);
 
     closure_size(StgCatchRetryFrame);
     closure_field(StgCatchRetryFrame, running_alt_code);
     closure_field(StgCatchRetryFrame, first_code);
     closure_field(StgCatchRetryFrame, alt_code);
-    closure_field(StgCatchRetryFrame, first_code_trec);
+
+    closure_field(StgTVarWatchQueue, closure);
+    closure_field(StgTVarWatchQueue, next_queue_entry);
+    closure_field(StgTVarWatchQueue, prev_queue_entry);
 
     closure_size(StgWeak);
     closure_field(StgWeak,link);

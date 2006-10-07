@@ -1282,6 +1282,13 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop  Check "check#" GenPrimOp
+      (State# RealWorld -> (# State# RealWorld, a #) )
+   -> (State# RealWorld -> (# State# RealWorld, () #) )
+   with 
+   out_of_line = True
+   has_side_effects = True
+
 primop	NewTVarOp "newTVar#" GenPrimOp
        a
     -> State# s -> (# State# s, TVar# s a #)
