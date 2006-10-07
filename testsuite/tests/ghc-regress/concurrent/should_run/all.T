@@ -145,3 +145,7 @@ test('conc059', compose(only_compiler_types(['ghc']),
 	compile_and_run, ['conc059_c.c'])
 clean(['conc059_c.o'])
 
+test('conc060', normal, compile_and_run, ['-package stm'])
+test('conc061', normal, compile_and_run, ['-package stm'])
+test('conc062', normal, compile_and_run, ['-package stm'])
+test('conc063', exit_code(1), compile_and_run, ['-package stm'])

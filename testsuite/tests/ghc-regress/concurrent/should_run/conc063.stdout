@@ -1,0 +1,15 @@
+
+Starting
+
+Attaching successful invariant that makes an update
+
+Attaching successful invariant that uses retry&orelse internally
+
+Attaching a failed invariant that makes an update
+Caught: exception :: [Char]
+
+Attaching an invariant that blocks
+
+Another update to the TVar with the blocking invariant
+
+Update the TVar to cause the invariant to block again (expect thread blocked indef)

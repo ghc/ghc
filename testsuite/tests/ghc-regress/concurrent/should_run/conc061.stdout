@@ -1,0 +1,15 @@
+Starting
+TVar contains 42
+Raising uncaught exn in atomic block
+Caught: exception :: [Char]
+TVar contains 42
+Trying a catchSTM without raising an exception
+TVar contains 17
+Raising caught and rethrown exn in atomic block
+Caught: exception :: [Char]
+TVar contains 17
+Raising caught and rethrown exn in atomic block
+TVar contained 0 at end of atomic block
+TVar contains 0
+Testing retry inside catchSTM
+TVar contains 0
