@@ -60,6 +60,8 @@ module GHC.Conc
 	, retry         -- :: STM a
 	, orElse        -- :: STM a -> STM a -> STM a
         , catchSTM      -- :: STM a -> (Exception -> STM a) -> STM a
+	, alwaysSucceeds -- :: STM a -> STM ()
+	, always        -- :: STM Bool -> STM ()
 	, TVar          -- abstract
 	, newTVar 	-- :: a -> STM (TVar a)
 	, newTVarIO 	-- :: a -> STM (TVar a)
@@ -363,6 +365,30 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 -- |Exception handling within STM actions.
 catchSTM :: STM a -> (Exception -> STM a) -> STM a
 catchSTM (STM m) k = STM $ \s -> catchSTM# m (\ex -> unSTM (k ex)) s
+
+-- | Low-level primitive on which always and alwaysSucceeds are built.
+-- checkInv differs form these in that (i) the invariant is not 
+-- checked when checkInv is called, only at the end of this and
+-- subsequent transcations, (ii) the invariant failure is indicated
+-- by raising an exception.
+checkInv :: STM a -> STM ()
+checkInv (STM m) = STM (\s -> (check# m) s)
+
+-- | alwaysSucceeds adds a new invariant that must be true when passed
+-- to alwaysSucceeds, at the end of the current transaction, and at
+-- the end of every subsequent transaction.  If it fails at any
+-- of those points then the transaction violating it is aborted
+-- and the exception raised by the invariant is propagated.
+alwaysSucceeds :: STM a -> STM ()
+alwaysSucceeds i = do ( do i ; retry ) `orElse` ( return () ) 
+                      checkInv i
+
+-- | always is a variant of alwaysSucceeds in which the invariant is
+-- expressed as an STM Bool action that must return True.  Returning
+-- False or raising an exception are both treated as invariant failures.
+always :: STM Bool -> STM ()
+always i = alwaysSucceeds ( do v <- i
+                               if (v) then return () else ( error "Transacional invariant violation" ) )
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)
