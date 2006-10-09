@@ -2,9 +2,9 @@ module TcMatches where
 
 tcGRHSsPat    :: HsExpr.GRHSs Name.Name
 	      -> TcType.BoxyRhoType
-	      -> TcRnTypes.TcM (HsExpr.GRHSs Var.Id)
+	      -> TcRnTypes.TcM (HsExpr.GRHSs TcRnTypes.TcId)
 
 tcMatchesFun :: Name.Name
 	     -> HsExpr.MatchGroup Name.Name
 	     -> TcType.BoxyRhoType
-	     -> TcRnTypes.TcM (HsBinds.ExprCoFn, HsExpr.MatchGroup Var.Id)
+	     -> TcRnTypes.TcM (HsBinds.HsWrapper, HsExpr.MatchGroup TcRnTypes.TcId)

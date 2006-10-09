@@ -1,0 +1,16 @@
+module HaddockLex where
+
+tokenise :: GHC.Base.String -> [Token]
+
+data Token
+  = TokPara
+  | TokNumber
+  | TokBullet
+  | TokDefStart
+  | TokDefEnd
+  | TokSpecial GHC.Base.Char
+  | TokIdent [RdrName.RdrName]
+  | TokString GHC.Base.String
+  | TokURL GHC.Base.String
+  | TokAName GHC.Base.String
+  | TokBirdTrack GHC.Base.String
