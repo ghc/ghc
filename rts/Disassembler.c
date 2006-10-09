@@ -31,6 +31,7 @@ int
 disInstr ( StgBCO *bco, int pc )
 {
    int i;
+   StgWord16 instr;
 
    StgWord16*     instrs      = (StgWord16*)(bco->instrs->payload);
 
@@ -43,7 +44,8 @@ disInstr ( StgBCO *bco, int pc )
    StgArrWords*   itbls_arr   = bco->itbls;
    StgInfoTable** itbls       = (StgInfoTable**)(&itbls_arr->payload[0]);
 
-   switch (instrs[pc++]) {
+   instr = instrs[pc++];
+   switch (instr) {
       case bci_SWIZZLE:
          debugBelch("SWIZZLE stkoff %d by %d\n",
                          instrs[pc], (signed int)instrs[pc+1]);
@@ -145,11 +147,15 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("ALLOC_AP  %d words\n", instrs[pc] );
          pc += 1; break;
       case bci_ALLOC_PAP:
-         debugBelch("ALLOC_PAP %d words, %d arity\n",
+         debugBelch("ALLOC_PAP %d arity, %d words\n",
 		 instrs[pc], instrs[pc+1] );
          pc += 2; break;
       case bci_MKAP:
          debugBelch("MKAP      %d words, %d stkoff\n", instrs[pc+1], 
+                                                           instrs[pc] );
+         pc += 2; break;
+      case bci_MKPAP:
+         debugBelch("MKPAP     %d words, %d stkoff\n", instrs[pc+1], 
                                                            instrs[pc] );
          pc += 2; break;
       case bci_UNPACK:
@@ -230,7 +236,7 @@ disInstr ( StgBCO *bco, int pc )
 	 break;
 
       default:
-         barf("disInstr: unknown opcode");
+         barf("disInstr: unknown opcode %u", (unsigned int) instr);
    }
    return pc;
 }
