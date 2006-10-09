@@ -192,6 +192,8 @@ class Num a => Bits a where
     x `rotateR` i = x `rotate` (-i)
 
 instance Bits Int where
+    {-# INLINE shift #-}
+
 #ifdef __GLASGOW_HASKELL__
     (I# x#) .&.   (I# y#)  = I# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I# x#) .|.   (I# y#)  = I# (word2Int# (int2Word# x# `or#`  int2Word# y#))

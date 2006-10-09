@@ -153,6 +153,8 @@ instance Read Word where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 
 instance Bits Word where
+    {-# INLINE shift #-}
+
     (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
     (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
     (W# x#) `xor` (W# y#)    = W# (x# `xor#` y#)
@@ -251,6 +253,8 @@ instance Read Word8 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
 instance Bits Word8 where
+    {-# INLINE shift #-}
+
     (W8# x#) .&.   (W8# y#)   = W8# (x# `and#` y#)
     (W8# x#) .|.   (W8# y#)   = W8# (x# `or#`  y#)
     (W8# x#) `xor` (W8# y#)   = W8# (x# `xor#` y#)
@@ -350,6 +354,8 @@ instance Read Word16 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
 
 instance Bits Word16 where
+    {-# INLINE shift #-}
+
     (W16# x#) .&.   (W16# y#)  = W16# (x# `and#` y#)
     (W16# x#) .|.   (W16# y#)  = W16# (x# `or#`  y#)
     (W16# x#) `xor` (W16# y#)  = W16# (x# `xor#` y#)
@@ -447,6 +453,8 @@ instance Integral Word32 where
         | otherwise                 = case word32ToInteger# x# of (# s, d #) -> J# s d
 
 instance Bits Word32 where
+    {-# INLINE shift #-}
+
     (W32# x#) .&.   (W32# y#)  = W32# (x# `and32#` y#)
     (W32# x#) .|.   (W32# y#)  = W32# (x# `or32#`  y#)
     (W32# x#) `xor` (W32# y#)  = W32# (x# `xor32#` y#)
@@ -576,6 +584,8 @@ instance Integral Word32 where
 #endif
 
 instance Bits Word32 where
+    {-# INLINE shift #-}
+
     (W32# x#) .&.   (W32# y#)  = W32# (x# `and#` y#)
     (W32# x#) .|.   (W32# y#)  = W32# (x# `or#`  y#)
     (W32# x#) `xor` (W32# y#)  = W32# (x# `xor#` y#)
@@ -703,6 +713,8 @@ instance Integral Word64 where
         | otherwise                 = case word64ToInteger# x# of (# s, d #) -> J# s d
 
 instance Bits Word64 where
+    {-# INLINE shift #-}
+
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and64#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or64#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor64#` y#)
@@ -833,6 +845,8 @@ instance Integral Word64 where
         i# = word2Int# x#
 
 instance Bits Word64 where
+    {-# INLINE shift #-}
+
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor#` y#)
