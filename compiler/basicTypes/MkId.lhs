@@ -402,16 +402,6 @@ wrapFamInstBody tycon args result_expr
   = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
   | otherwise
   = result_expr
-
--- Apply the coercion in the opposite direction.
---
-unwrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
-unwrapFamInstBody tycon args result_expr
-  | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCoerce (mkTyConApp co_con args) result_expr
-  | otherwise
-  = result_expr
-
 \end{code}
 
 
