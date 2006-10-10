@@ -26,7 +26,7 @@ Release:        %{release}
 License:        BSD-like
 Group:          Development/Languages/Haskell
 URL:            http://haskell.org/haddock/
-Source:         http://haskell.org/haddock/haddock-%{version}.tar.gz
+Source:         http://haskell.org/haddock/haddock-%{version}-src.tar.gz
 Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Prefix:         %{_prefix}
