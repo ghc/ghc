@@ -9,7 +9,9 @@ module Desugar ( deSugar, deSugarExpr ) where
 #include "HsVersions.h"
 
 import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
-import StaticFlags	( opt_SccProfilingOn )
+import StaticFlags	( opt_SccProfilingOn,
+			  opt_AutoSccsOnAllToplevs,
+			  opt_AutoSccsOnExportedToplevs )
 import DriverPhases	( isHsBoot )
 import HscTypes		( ModGuts(..), HscEnv(..), 
 			  Dependencies(..), ForeignStubs(..), TypeEnv, IsBootInterface )
@@ -76,6 +78,8 @@ deSugar hsc_env
   = do	{ showPass dflags "Desugar"
 
 	-- Desugar the program
+	; let auto_scc = mkAutoScc mod exports
+
 	; mb_res <- case ghcMode dflags of
 	             JustTypecheck -> return (Just ([], [], NoStubs))
 	             _             -> initDs hsc_env mod rdr_env type_env $ do
@@ -93,7 +97,7 @@ deSugar hsc_env
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
 	; let final_prs = addExportFlags ghci_mode exports keep_alive 
-				   	 all_prs ds_rules
+			   	 all_prs ds_rules
 	      ds_binds  = [Rec final_prs]
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
 	-- When compiling PrelFloat, which defines data Float = F# Float#
@@ -163,8 +167,18 @@ deSugar hsc_env
   where
     dflags    = hsc_dflags hsc_env
     ghci_mode = ghcMode (hsc_dflags hsc_env)
-    auto_scc | opt_SccProfilingOn = TopLevel
-	     | otherwise          = NoSccs
+
+mkAutoScc :: Module -> NameSet -> AutoScc
+mkAutoScc mod exports
+  | not opt_SccProfilingOn 	-- No profiling
+  = NoSccs		
+  | opt_AutoSccsOnAllToplevs 	-- Add auto-scc on all top-level things
+  = AddSccs mod (\id -> True)
+  | opt_AutoSccsOnExportedToplevs	-- Only on exported things
+  = AddSccs mod (\id -> idName id `elemNameSet` exports)
+  | otherwise
+  = NoSccs
+
 
 deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
