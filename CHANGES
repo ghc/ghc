@@ -1,5 +1,20 @@
 Changes in version 0.8:
 
+  * Haddock has a Cabal build system, and will build on Windows without
+    Cygwin or MSYS.  GHC 6.4 or later is required.
+
+  * New options: --comments-base, --comments-module, --comments-entity
+    for generating links to pages (eg. wiki) for collecting user comments.
+
+  * New options: --source-base, --source-module, --source-entity
+    for generating links to source code.  Haddock now understands
+    {-# LINE #-} pragmas, which means it can figure out the correct
+    name for the source file even if the file is preprocessed.
+
+  * Haddock generates output for populating the Hoogle search engine.
+
+  * New markup <<url>> for including images.
+
 -----------------------------------------------------------------------------
 
 Changes in version 0.7:
