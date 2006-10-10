@@ -66,8 +66,7 @@ import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class )
-import Name		( Name, NamedThing(..), getSrcLoc, nameModule,
-			  nameOccName )
+import Name		( Name, NamedThing(..), getSrcLoc, nameModule_maybe, nameOccName )
 import PrelNames	( thFAKE )
 import NameEnv
 import OccName		( mkDFunOcc, occNameString, mkInstTyTcOcc )
@@ -114,13 +113,15 @@ tcLookupGlobal name
 	    Nothing    -> do
 
 		-- Should it have been in the local envt?
-	{ let mod = nameModule name
-	; if mod == tcg_mod env || mod == thFAKE then
-		notFound name	-- It should be local, so panic
-				-- The thFAKE possibility is because it
-				-- might be in a declaration bracket
-	  else
-		tcImportDecl name	-- Go find it in an interface
+	{ case nameModule_maybe name of
+		Nothing -> notFound name	-- Internal names can happen in GHCi
+
+		Just mod | mod == tcg_mod env 	-- Names from this module 
+			 -> notFound name	-- should be in tcg_type_env
+			 | mod == thFAKE	-- Names bound in TH declaration brackets
+			 -> notFound name	-- should be in tcg_env
+			 | otherwise
+		         -> tcImportDecl name	-- Go find it in an interface
 	}}}}}
 
 tcLookupField :: Name -> TcM Id		-- Returns the selector Id
