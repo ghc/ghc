@@ -54,7 +54,7 @@ import TcType		( TcTyVarSet, TcType, TcThetaType, SkolemInfo,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType,
 			  tcCmpTypes, pprSkolInfo )
 import InstEnv		( Instance, InstEnv )
-import FamInstEnv	( FamInstEnv )
+import FamInstEnv	( FamInst, FamInstEnv )
 import IOEnv
 import RdrName		( GlobalRdrEnv, LocalRdrEnv )
 import Name		( Name )
@@ -223,11 +223,12 @@ data TcGblEnv
 	tcg_rn_decls :: Maybe (HsGroup Name),	-- renamed decls, maybe
 		-- Nothing <=> Don't retain renamed decls
 
-	tcg_binds   :: LHsBinds Id,		-- Value bindings in this module
-	tcg_deprecs :: Deprecations,		-- ...Deprecations 
-	tcg_insts   :: [Instance],		-- ...Instances
-	tcg_rules   :: [LRuleDecl Id],		-- ...Rules
-	tcg_fords   :: [LForeignDecl Id],	-- ...Foreign import & exports
+	tcg_binds     :: LHsBinds Id,	    -- Value bindings in this module
+	tcg_deprecs   :: Deprecations,	    -- ...Deprecations 
+	tcg_insts     :: [Instance],	    -- ...Instances
+	tcg_fam_insts :: [FamInst],	    -- ...Family instances
+	tcg_rules     :: [LRuleDecl Id],    -- ...Rules
+	tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
 
 	tcg_doc :: Maybe (HsDoc Name), -- Maybe Haddock documentation
         tcg_hmi :: HaddockModInfo Name -- Haddock module information

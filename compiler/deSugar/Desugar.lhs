@@ -71,7 +71,8 @@ deSugar hsc_env
 			    tcg_binds     = binds,
 			    tcg_fords     = fords,
 			    tcg_rules     = rules,
-		    	    tcg_insts     = insts })
+		    	    tcg_insts     = insts,
+		    	    tcg_fam_insts = fam_insts })
   = do	{ showPass dflags "Desugar"
 
 	-- Desugar the program
@@ -140,20 +141,21 @@ deSugar hsc_env
 		-- sort to get into canonical order
 
 	     mod_guts = ModGuts {	
-		mg_module   = mod,
-		mg_boot	    = isHsBoot hsc_src,
-		mg_exports  = exports,
-		mg_deps	    = deps,
-		mg_usages   = usages,
-		mg_dir_imps = [m | (m,_,_) <- moduleEnvElts dir_imp_mods],
-	        mg_rdr_env  = rdr_env,
-		mg_fix_env  = fix_env,
-		mg_deprecs  = deprecs,
-		mg_types    = type_env,
-		mg_insts    = insts,
-	        mg_rules    = ds_rules,
-		mg_binds    = ds_binds,
-		mg_foreign  = ds_fords }
+		mg_module    = mod,
+		mg_boot	     = isHsBoot hsc_src,
+		mg_exports   = exports,
+		mg_deps	     = deps,
+		mg_usages    = usages,
+		mg_dir_imps  = [m | (m,_,_) <- moduleEnvElts dir_imp_mods],
+	        mg_rdr_env   = rdr_env,
+		mg_fix_env   = fix_env,
+		mg_deprecs   = deprecs,
+		mg_types     = type_env,
+		mg_insts     = insts,
+		mg_fam_insts = fam_insts,
+	        mg_rules     = ds_rules,
+		mg_binds     = ds_binds,
+		mg_foreign   = ds_fords }
 	
         ; return (Just mod_guts)
 	}}}

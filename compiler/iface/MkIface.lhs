@@ -176,7 +176,8 @@ compiled with -O.  I think this is the case.]
 #include "HsVersions.h"
 
 import IfaceSyn		-- All of it
-import IfaceType	( toIfaceTvBndrs, toIfaceType, toIfaceContext )
+import IfaceType	( toIfaceTvBndrs, toIfaceType, toIfaceContext,
+			  ifaceTyConOccName )
 import LoadIface	( readIface, loadInterface, pprModIface )
 import Id		( Id, idName, idType, idInfo, idArity, isDataConWorkId_maybe, isFCallId_maybe )
 import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
@@ -200,13 +201,14 @@ import Type		( TyThing(..), splitForAllTys, funResultTy )
 import TcType		( deNoteType )
 import TysPrim		( alphaTyVars )
 import InstEnv		( Instance(..) )
+import FamInstEnv	( FamInst(..) )
 import TcRnMonad
 import HscTypes		( ModIface(..), ModDetails(..), 
 			  ModGuts(..), HscEnv(..), hscEPS, Dependencies(..),
 			  FixItem(..), 
 			  ModSummary(..), msHiFilePath, 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
-			  typeEnvElts, mkIfaceFamInstsCache,
+			  typeEnvElts,
 			  GenAvailInfo(..), availName, 
 			  ExternalPackageState(..),
 			  Usage(..), IsBootInterface,
@@ -266,18 +268,18 @@ mkIface :: HscEnv
 				--	    is identical, so no need to write it
 
 mkIface hsc_env maybe_old_iface 
-	(ModGuts{     mg_module   = this_mod,
-		      mg_boot     = is_boot,
-		      mg_usages   = usages,
-		      mg_deps     = deps,
-		      mg_rdr_env  = rdr_env,
-		      mg_fix_env  = fix_env,
-		      mg_deprecs  = src_deprecs })
-	(ModDetails{  md_insts 	  = insts, 
-		      md_fam_insts= _fam_inst,  -- we use the type_env instead
-		      md_rules 	  = rules,
-		      md_types 	  = type_env,
-		      md_exports  = exports })
+	(ModGuts{     mg_module    = this_mod,
+		      mg_boot      = is_boot,
+		      mg_usages    = usages,
+		      mg_deps      = deps,
+		      mg_rdr_env   = rdr_env,
+		      mg_fix_env   = fix_env,
+		      mg_deprecs   = src_deprecs })
+	(ModDetails{  md_insts 	   = insts, 
+		      md_fam_insts = fam_insts,
+		      md_rules 	   = rules,
+		      md_types 	   = type_env,
+		      md_exports   = exports })
 	
 -- NB:	notice that mkIface does not look at the bindings
 --	only at the TypeEnv.  The previous Tidy phase has
@@ -301,7 +303,8 @@ mkIface hsc_env maybe_old_iface
 		; iface_rules     = map (coreRuleToIfaceRule 
 					   ext_nm_lhs ext_nm_rhs) rules
 		; iface_insts     = map (instanceToIfaceInst ext_nm_lhs) insts
-		; iface_fam_insts = extractIfFamInsts decls
+		; iface_fam_insts = map (famInstToIfaceFamInst ext_nm_lhs) 
+					fam_insts
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -310,7 +313,7 @@ mkIface hsc_env maybe_old_iface
 			mi_usages   = usages,
 			mi_exports  = mkIfaceExports exports,
 			mi_insts    = sortLe le_inst iface_insts,
-			mi_fam_insts= mkIfaceFamInstsCache decls,
+			mi_fam_insts= sortLe le_fam_inst iface_fam_insts,
 			mi_rules    = sortLe le_rule iface_rules,
 			mi_fixities = fixities,
 			mi_deprecs  = deprecs,
@@ -344,11 +347,13 @@ mkIface hsc_env maybe_old_iface
 
 	; return (new_iface, no_change_at_all) }
   where
-     r1      `le_rule`     r2      = ifRuleName r1 <= ifRuleName r2
-     i1      `le_inst`     i2      = ifDFun     i1 <= ifDFun     i2
+     r1 `le_rule`     r2      = ifRuleName        r1 <= ifRuleName        r2
+     i1 `le_inst`     i2      = ifDFun            i1 <= ifDFun            i2
+     i1 `le_fam_inst` i2      = ifFamInstTyConOcc i1 <= ifFamInstTyConOcc i2
 
      dflags = hsc_dflags hsc_env
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
+     ifFamInstTyConOcc = ifaceTyConOccName . ifFamInstTyCon
 
 					      
 -----------------------------
@@ -1094,9 +1099,7 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 
     famInstToIface Nothing                    = Nothing
     famInstToIface (Just (famTyCon, instTys)) = 
-      Just $ IfaceFamInst { ifFamInstTyCon = toIfaceTyCon ext famTyCon
-			  , ifFamInstTys   = map (toIfaceType ext) instTys
-			  }
+      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys)
 
 tyThingToIfaceDecl ext (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
@@ -1112,6 +1115,17 @@ instanceToIfaceInst ext_lhs ispec@(Instance { is_dfun = dfun_id, is_flag = oflag
 		ifInstCls = ext_lhs cls,
 		ifInstTys = map do_rough mb_tcs,
 		ifInstOrph = orph }
+  where
+    do_rough Nothing  = Nothing
+    do_rough (Just n) = Just (toIfaceTyCon_name ext_lhs n)
+
+--------------------------
+famInstToIfaceFamInst :: (Name -> IfaceExtName) -> FamInst -> IfaceFamInst
+famInstToIfaceFamInst ext_lhs fi@(FamInst { fi_tycon = tycon,
+					    fi_fam = fam, fi_tcs = mb_tcs })
+  = IfaceFamInst { ifFamInstTyCon  = toIfaceTyCon ext_lhs tycon
+		 , ifFamInstFam    = ext_lhs fam
+		 , ifFamInstTys    = map do_rough mb_tcs }
   where
     do_rough Nothing  = Nothing
     do_rough (Just n) = Just (toIfaceTyCon_name ext_lhs n)

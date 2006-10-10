@@ -104,6 +104,7 @@ instance Binary ModIface where
 		 mi_deprecs   = deprecs,
 		 mi_decls     = decls,
 		 mi_insts     = insts,
+		 mi_fam_insts = fam_insts,
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers }) = do
 	put_ bh (show opt_HiVersion)
@@ -121,6 +122,7 @@ instance Binary ModIface where
 	lazyPut bh deprecs
         put_ bh decls
 	put_ bh insts
+	put_ bh fam_insts
 	lazyPut bh rules
 	put_ bh rule_vers
 
@@ -156,6 +158,7 @@ instance Binary ModIface where
 	deprecs   <- {-# SCC "bin_deprecs" #-} lazyGet bh
         decls 	  <- {-# SCC "bin_tycldecls" #-} get bh
 	insts     <- {-# SCC "bin_insts" #-} get bh
+	fam_insts <- {-# SCC "bin_fam_insts" #-} get bh
 	rules	  <- {-# SCC "bin_rules" #-} lazyGet bh
 	rule_vers <- get bh
 	return (ModIface {
@@ -172,7 +175,7 @@ instance Binary ModIface where
 		 mi_decls     = decls,
 		 mi_globals   = Nothing,
 		 mi_insts     = insts,
-		 mi_fam_insts = mkIfaceFamInstsCache . map snd $ decls,
+		 mi_fam_insts = fam_insts,
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers,
 			-- And build the cached values
@@ -963,12 +966,14 @@ instance Binary IfaceInst where
 		return (IfaceInst cls tys dfun flag orph)
 
 instance Binary IfaceFamInst where
-    put_ bh (IfaceFamInst tycon tys) = do
-	    put_ bh tycon
+    put_ bh (IfaceFamInst fam tys tycon) = do
+	    put_ bh fam
 	    put_ bh tys
-    get bh = do tycon <- get bh
+	    put_ bh tycon
+    get bh = do fam   <- get bh
 		tys   <- get bh
-		return (IfaceFamInst tycon tys)
+		tycon <- get bh
+		return (IfaceFamInst fam tys tycon)
 
 instance Binary OverlapFlag where
     put_ bh NoOverlap  = putByte bh 0

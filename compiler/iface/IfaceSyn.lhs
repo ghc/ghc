@@ -20,7 +20,7 @@ module IfaceSyn (
 	IfaceInfoItem(..), IfaceRule(..), IfaceInst(..), IfaceFamInst(..),
 
 	-- Misc
-	visibleIfConDecls, extractIfFamInsts,
+	visibleIfConDecls,
 
 	-- Equality
 	IfaceEq(..), (&&&), bool, eqListBy, eqMaybeBy,
@@ -80,7 +80,7 @@ data IfaceDecl
     						-- been compiled with
     						-- different flags to the
     						-- current compilation unit 
-                ifFamInst    :: Maybe IfaceFamInst
+                ifFamInst    :: Maybe (IfaceTyCon, [IfaceType])
                                                 -- Just <=> instance of family
     }
 
@@ -150,14 +150,10 @@ data IfaceInst
 	-- and if the head does not change it won't be used if it wasn't before
 
 data IfaceFamInst
-  = IfaceFamInst { ifFamInstTyCon :: IfaceTyCon	  -- Family tycon
-		 , ifFamInstTys   :: [IfaceType]  -- Instance types
+  = IfaceFamInst { ifFamInstFam   :: IfaceExtName        -- Family tycon
+		 , ifFamInstTys   :: [Maybe IfaceTyCon]  -- Rough match types
+		 , ifFamInstTyCon :: IfaceTyCon		 -- Instance decl
 		 }
-
-extractIfFamInsts :: [IfaceDecl] -> [(IfaceFamInst, IfaceDecl)]
-extractIfFamInsts decls = 
-  [(famInst, decl) | decl@IfaceData {ifFamInst = Just famInst} <- decls]
-		     -- !!!TODO: we also need a similar case for synonyms
 
 data IfaceRule
   = IfaceRule { 
@@ -325,7 +321,7 @@ pprIfaceConDecl tc
     con_tau = foldr1 IfaceFunTy (arg_tys ++ [tc_app])
     tc_app  = IfaceTyConApp (IfaceTc (LocalTop tc)) 
 			    [IfaceTyVar tv | (tv,_) <- univ_tvs]
-	-- Gruesome, but jsut for debug print
+	-- Gruesome, but just for debug print
 
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
@@ -340,15 +336,19 @@ instance Outputable IfaceInst where
   ppr (IfaceInst {ifDFun = dfun_id, ifOFlag = flag, 
 		  ifInstCls = cls, ifInstTys = mb_tcs})
     = hang (ptext SLIT("instance") <+> ppr flag 
-		<+> ppr cls <+> brackets (pprWithCommas ppr_mb mb_tcs))
+		<+> ppr cls <+> brackets (pprWithCommas ppr_rough mb_tcs))
          2 (equals <+> ppr dfun_id)
-    where
-      ppr_mb Nothing   = dot
-      ppr_mb (Just tc) = ppr tc
 
 instance Outputable IfaceFamInst where
-  ppr (IfaceFamInst {ifFamInstTyCon = tycon, ifFamInstTys = tys})
-    = ppr tycon <+> hsep (map ppr tys)
+  ppr (IfaceFamInst {ifFamInstFam = fam, ifFamInstTys = mb_tcs,
+		     ifFamInstTyCon = tycon_id})
+    = hang (ptext SLIT("family instance") <+> 
+	    ppr fam <+> brackets (pprWithCommas ppr_rough mb_tcs))
+         2 (equals <+> ppr tycon_id)
+
+ppr_rough :: Maybe IfaceTyCon -> SDoc
+ppr_rough Nothing   = dot
+ppr_rough (Just tc) = ppr tc
 \end{code}
 
 
@@ -567,11 +567,10 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	-- over the constructors (any more), but they do scope
 	-- over the stupid context in the IfaceConDecls
   where
-    Nothing             `eqIfTc_fam` Nothing                         = Equal
-    (Just (IfaceFamInst fam1 tys1)) 
-                        `eqIfTc_fam` (Just (IfaceFamInst fam2 tys2)) = 
+    Nothing             `eqIfTc_fam` Nothing             = Equal
+    (Just (fam1, tys1)) `eqIfTc_fam` (Just (fam2, tys2)) = 
       fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2
-    _		        `eqIfTc_fam` _                               = NotEqual
+    _		        `eqIfTc_fam` _                   = NotEqual
 
 eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
   = bool (ifName d1 == ifName d2) &&&

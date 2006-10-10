@@ -40,7 +40,9 @@ import TcExpr 		( tcInferRho )
 import TcRnMonad
 import TcType		( tidyTopType, tcEqType )
 import Inst		( showLIE )
-import InstEnv		( extendInstEnvList, Instance, pprInstances, instanceDFunId )
+import InstEnv		( extendInstEnvList, Instance, pprInstances,
+			  instanceDFunId ) 
+import FamInstEnv       ( FamInst, pprFamInsts )
 import TcBinds		( tcTopBinds, tcHsBootSigs )
 import TcDefaults	( tcDefaults )
 import TcEnv		( tcExtendGlobalValEnv, iDFunId )
@@ -134,6 +136,7 @@ import FastString	( mkFastString )
 import Util		( sortLe )
 import Bag		( unionBags, snocBag, emptyBag, unitBag, unionManyBags )
 
+import Control.Monad    ( unless )
 import Data.Maybe	( isJust )
 \end{code}
 
@@ -323,22 +326,23 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 	final_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) bndrs ;
 
-	mod_guts = ModGuts {	mg_module   = this_mod,
-				mg_boot	    = False,
-				mg_usages   = [],		-- ToDo: compute usage
-				mg_dir_imps = [],		-- ??
-				mg_deps     = noDependencies,	-- ??
-				mg_exports  = my_exports,
-				mg_types    = final_type_env,
-				mg_insts    = tcg_insts tcg_env,
-				mg_rules    = [],
-				mg_binds    = core_binds,
+	mod_guts = ModGuts {	mg_module    = this_mod,
+				mg_boot	     = False,
+				mg_usages    = [],		-- ToDo: compute usage
+				mg_dir_imps  = [],		-- ??
+				mg_deps      = noDependencies,	-- ??
+				mg_exports   = my_exports,
+				mg_types     = final_type_env,
+				mg_insts     = tcg_insts tcg_env,
+				mg_fam_insts = tcg_fam_insts tcg_env,
+				mg_rules     = [],
+				mg_binds     = core_binds,
 
 				-- Stubs
-				mg_rdr_env  = emptyGlobalRdrEnv,
-				mg_fix_env  = emptyFixityEnv,
-				mg_deprecs  = NoDeprecs,
-				mg_foreign  = NoStubs
+				mg_rdr_env   = emptyGlobalRdrEnv,
+				mg_fix_env   = emptyFixityEnv,
+				mg_deprecs   = NoDeprecs,
+				mg_foreign   = NoStubs
 		    } } ;
 
    tcCoreDump mod_guts ;
@@ -525,11 +529,19 @@ checkHiBootIface :: TcGblEnv -> ModDetails -> TcM (LHsBinds Id)
 -- hs-boot file, such as 	$fbEqT = $fEqT
 
 checkHiBootIface
-	(TcGblEnv { tcg_insts = local_insts, tcg_type_env = local_type_env })
-	(ModDetails { md_insts = boot_insts, md_types = boot_type_env })
+	(TcGblEnv { tcg_insts = local_insts, tcg_fam_insts = local_fam_insts,
+		    tcg_type_env = local_type_env })
+	(ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
+		      md_types = boot_type_env })
   = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts)) ;
 	; mapM_ check_one (typeEnvElts boot_type_env)
 	; dfun_binds <- mapM check_inst boot_insts
+	; unless (null boot_fam_insts) $
+	    panic ("TcRnDriver.checkHiBootIface: Cannot handle family " ++
+		   "instances in boot files yet...")
+            -- FIXME: Why?  The actual comparison is not hard, but what would
+            --	      be the equivalent to the dfun bindings returned for class
+            --	      instances?  We can't easily equate tycons...
 	; return (unionManyBags dfun_binds) }
   where
     check_one boot_thing
@@ -1288,12 +1300,14 @@ tcCoreDump mod_guts
 
 -- It's unpleasant having both pprModGuts and pprModDetails here
 pprTcGblEnv :: TcGblEnv -> SDoc
-pprTcGblEnv (TcGblEnv { tcg_type_env = type_env, 
-		        tcg_insts    = dfun_ids, 
-		        tcg_rules    = rules,
-			tcg_imports  = imports })
-  = vcat [ ppr_types dfun_ids type_env
-	 , ppr_insts dfun_ids
+pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env, 
+		        tcg_insts     = insts, 
+		        tcg_fam_insts = fam_insts, 
+		        tcg_rules     = rules,
+			tcg_imports   = imports })
+  = vcat [ ppr_types insts type_env
+	 , ppr_insts insts
+	 , ppr_fam_insts fam_insts
 	 , vcat (map ppr rules)
 	 , ppr_gen_tycons (typeEnvTyCons type_env)
 	 , ptext SLIT("Dependent modules:") <+> ppr (eltsUFM (imp_dep_mods imports))
@@ -1305,12 +1319,11 @@ pprModGuts (ModGuts { mg_types = type_env,
   = vcat [ ppr_types [] type_env,
 	   ppr_rules rules ]
 
-
 ppr_types :: [Instance] -> TypeEnv -> SDoc
-ppr_types ispecs type_env
+ppr_types insts type_env
   = text "TYPE SIGNATURES" $$ nest 4 (ppr_sigs ids)
   where
-    dfun_ids = map instanceDFunId ispecs
+    dfun_ids = map instanceDFunId insts
     ids = [id | id <- typeEnvIds type_env, want_sig id]
     want_sig id | opt_PprStyle_Debug = True
 	        | otherwise	     = isLocalId id && 
@@ -1324,6 +1337,11 @@ ppr_types ispecs type_env
 ppr_insts :: [Instance] -> SDoc
 ppr_insts []     = empty
 ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
+
+ppr_fam_insts :: [FamInst] -> SDoc
+ppr_fam_insts []        = empty
+ppr_fam_insts fam_insts = 
+  text "FAMILY INSTANCES" $$ nest 2 (pprFamInsts fam_insts)
 
 ppr_sigs :: [Var] -> SDoc
 ppr_sigs ids

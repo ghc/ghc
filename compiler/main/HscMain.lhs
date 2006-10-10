@@ -678,9 +678,9 @@ hscFileCheck hsc_env mod_summary = do {
 		let type_env = tcg_type_env tc_result
 		    md = ModDetails { 
 				md_types     = type_env,
-				md_exports   = tcg_exports  tc_result,
-				md_insts     = tcg_insts    tc_result,
-				md_fam_insts = mkDetailsFamInstCache type_env,
+				md_exports   = tcg_exports   tc_result,
+				md_insts     = tcg_insts     tc_result,
+				md_fam_insts = tcg_fam_insts tc_result,
 				md_rules     = [panic "no rules"] }
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker

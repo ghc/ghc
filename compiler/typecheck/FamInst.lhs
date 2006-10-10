@@ -7,12 +7,13 @@ module FamInst (
 
 #include "HsVersions.h"
 
+import HscTypes   ( ExternalPackageState(..) )
 import FamInstEnv ( FamInstEnv, FamInst(..), famInstTyCon, extendFamInstEnv,
 		    pprFamInst, pprFamInsts )
 import TcMType	  ( tcInstSkolType )
 import TcType	  ( SkolemInfo(..), tcSplitTyConApp )
 import TcRnMonad  ( TcM, TcGblEnv(..), setGblEnv, getGblEnv, foldlM,
-		    setSrcSpan, addErr )
+		    setSrcSpan, addErr, getEps )
 import TyCon      ( tyConFamInst_maybe )
 import Type	  ( mkTyConApp )
 import Name	  ( getSrcLoc )
@@ -34,7 +35,8 @@ tcExtendLocalFamInstEnv :: [FamInst] -> TcM a -> TcM a
 tcExtendLocalFamInstEnv fam_insts thing_inside
  = do { env <- getGblEnv
       ; inst_env' <- foldlM addLocalFamInst (tcg_fam_inst_env env) fam_insts
-      ; let env' = env { tcg_fam_inst_env = inst_env' }
+      ; let env' = env { tcg_fam_insts    = fam_insts ++ tcg_fam_insts env,
+			 tcg_fam_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
 
 
@@ -42,7 +44,7 @@ tcExtendLocalFamInstEnv fam_insts thing_inside
 -- and then add it to the home inst env
 addLocalFamInst :: FamInstEnv -> FamInst -> TcM FamInstEnv
 addLocalFamInst home_fie famInst
-  = do	{ 	-- Instantiate the family instance type extend the instance
+  = do	{ 	-- To instantiate the family instance type, extend the instance
 		-- envt with completely fresh template variables
 		-- This is important because the template variables must
 		-- not overlap with anything in the things being looked up
@@ -57,12 +59,12 @@ addLocalFamInst home_fie famInst
 
 	; let	(fam, tys') = tcSplitTyConApp tau'
 
-{- !!!TODO: Need to complete this:
 		-- Load imported instances, so that we report
 		-- overlaps correctly
 	; eps <- getEps
 	; let inst_envs = (eps_fam_inst_env eps, home_fie)
 
+{- !!!TODO: Need to complete this:
 		-- Check for overlapping instance decls
 	; let { (matches, _) = lookupFamInstEnv inst_envs fam tys'
 	      ;	dup_ispecs = [ dup_ispec   --!!!adapt

@@ -6,7 +6,7 @@
 \begin{code}
 module TcIface ( 
 	tcImportDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface, 
-	tcIfaceDecl, tcIfaceInst, tcIfaceRules, tcIfaceGlobal, 
+	tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules, tcIfaceGlobal, 
 	tcExtCoreBindings
  ) where
 
@@ -33,8 +33,9 @@ import HscTypes		( ExternalPackageState(..),
 			  TyThing(..), tyThingClass, tyThingTyCon, 
 			  ModIface(..), ModDetails(..), HomeModInfo(..),
 			  emptyModDetails, lookupTypeEnv, lookupType,
-			  typeEnvIds, mkDetailsFamInstCache )
+			  typeEnvIds )
 import InstEnv		( Instance(..), mkImportedInstance )
+import FamInstEnv	( FamInst(..), mkImportedFamInst )
 import CoreSyn
 import CoreUtils	( exprType, dataConRepFSInstPat )
 import CoreUnfold
@@ -210,8 +211,9 @@ typecheckIface iface
 	; writeMutVar tc_env_var type_env
 
 		-- Now do those rules and instances
-	; dfuns <- mapM tcIfaceInst (mi_insts iface)
-	; rules <- tcIfaceRules ignore_prags (mi_rules iface)
+	; insts     <- mapM tcIfaceInst    (mi_insts     iface)
+	; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+	; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
 
 		-- Exports
 	; exports <- ifaceExportNames (mi_exports iface)
@@ -220,8 +222,8 @@ typecheckIface iface
 	; traceIf (vcat [text "Finished typechecking interface for" <+> ppr (mi_module iface),
 			 text "Type envt:" <+> ppr type_env])
 	; return $ ModDetails { md_types     = type_env
-			      , md_insts     = dfuns
-			      , md_fam_insts = mkDetailsFamInstCache type_env
+			      , md_insts     = insts
+			      , md_fam_insts = fam_insts
 			      , md_rules     = rules
 			      , md_exports   = exports 
 			      }
@@ -373,9 +375,7 @@ tcIfaceDecl ignore_prags
 	    ; famInst <- 
 	        case mb_family of
 		  Nothing         -> return Nothing
-		  Just (IfaceFamInst { ifFamInstTyCon = fam
-				     , ifFamInstTys   = tys
-				     }) -> 
+		  Just (fam, tys) -> 
 		    do { famTyCon <- tcIfaceTyCon fam
 		       ; insttys <- mapM tcIfaceType tys
 		       ; return $ Just (famTyCon, insttys)
@@ -513,11 +513,22 @@ tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
   = do	{ dfun    <- forkM (ptext SLIT("Dict fun") <+> ppr dfun_occ) $
 		     tcIfaceExtId (LocalTop dfun_occ)
 	; cls'    <- lookupIfaceExt cls
-	; mb_tcs' <- mapM do_tc mb_tcs
+	; mb_tcs' <- mapM tc_rough mb_tcs
 	; return (mkImportedInstance cls' mb_tcs' orph dfun oflag) }
-  where
-    do_tc Nothing   = return Nothing
-    do_tc (Just tc) = do { tc' <- lookupIfaceTc tc; return (Just tc') }
+
+tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
+tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 
+			       ifFamInstFam = fam, ifFamInstTys = mb_tcs })
+--  = do	{ tycon'  <- forkM (ptext SLIT("Inst tycon") <+> ppr tycon) $
+-- ^^^this line doesn't work, but vvv this does => CPP in Haskell = evil!
+  = do	{ tycon'  <- forkM (text ("Inst tycon") <+> ppr tycon) $
+		     tcIfaceTyCon tycon
+	; fam'    <- lookupIfaceExt fam
+	; mb_tcs' <- mapM tc_rough mb_tcs
+	; return (mkImportedFamInst fam' mb_tcs' tycon') }
+
+tc_rough Nothing   = return Nothing
+tc_rough (Just tc) = do { tc' <- lookupIfaceTc tc; return (Just tc') }
 \end{code}
 
 

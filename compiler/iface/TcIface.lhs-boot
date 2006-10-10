@@ -1,13 +1,15 @@
 \begin{code}
 module TcIface where
-import IfaceSyn	 ( IfaceDecl, IfaceInst, IfaceRule )
-import TypeRep	 ( TyThing )
-import TcRnTypes ( IfL )
-import InstEnv	 ( Instance )
-import CoreSyn	 ( CoreRule )
+import IfaceSyn	  ( IfaceDecl, IfaceInst, IfaceFamInst, IfaceRule )
+import TypeRep	  ( TyThing )
+import TcRnTypes  ( IfL )
+import InstEnv	  ( Instance )
+import FamInstEnv ( FamInst )
+import CoreSyn	  ( CoreRule )
 
-tcIfaceDecl  :: Bool -> IfaceDecl -> IfL TyThing
-tcIfaceRules :: Bool -> [IfaceRule] -> IfL [CoreRule]
-tcIfaceInst  :: IfaceInst -> IfL Instance
+tcIfaceDecl    :: Bool -> IfaceDecl -> IfL TyThing
+tcIfaceRules   :: Bool -> [IfaceRule] -> IfL [CoreRule]
+tcIfaceInst    :: IfaceInst -> IfL Instance
+tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 \end{code}
 

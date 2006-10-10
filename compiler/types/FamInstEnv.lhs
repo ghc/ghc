@@ -2,28 +2,31 @@
 
 \begin{code}
 module FamInstEnv (
-	FamInst(..), famInstTyCon, extractFamInsts,
-	pprFamInst, pprFamInstHdr, pprFamInsts, 
-	{-famInstHead, mkLocalFamInst, mkImportedFamInst-}
+	FamInst(..), famInstTyCon, pprFamInst, pprFamInstHdr, pprFamInsts, 
+	famInstHead, mkLocalFamInst, mkImportedFamInst,
 
 	FamInstEnv, emptyFamInstEnv, extendFamInstEnv, extendFamInstEnvList, 
 	famInstEnvElts, familyInstances,
-	{-lookupFamInstEnv-}
+	lookupFamInstEnv
     ) where
 
 #include "HsVersions.h"
 
+import InstEnv          ( roughMatchTcs, instanceCantMatch )
+import Unify		( tcMatchTys )
 import TcType		( Type )
-import Type		( TyThing (ATyCon), pprParendType )
+import Type		( TvSubst, TyThing (ATyCon), pprParendType )
 import TyCon		( TyCon, isDataTyCon, isNewTyCon, isSynTyCon, 
 			  tyConName, tyConTyVars, tyConFamInst_maybe )
 import VarSet		( TyVarSet, mkVarSet )
+import Var		( TyVar )
 import Name		( Name, getOccName, NamedThing(..), getSrcLoc )
 import OccName		( parenSymOcc )
 import SrcLoc		( pprDefnLoc )
 import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C, eltsUFM )
 import Outputable
 
+import Maybe		( isJust, isNothing )
 import Monad		( mzero )
 \end{code}
 
@@ -37,6 +40,11 @@ import Monad		( mzero )
 \begin{code}
 data FamInst 
   = FamInst { fi_fam   :: Name		-- Family name
+
+		-- Used for "rough matching"; same idea as for class instances
+	    , fi_tcs   :: [Maybe Name]	-- Top of type args
+
+		-- Used for "proper matching"; ditto
 	    , fi_tvs   :: TyVarSet	-- Template tyvars for full match
 	    , fi_tys   :: [Type]	-- Full arg types
 
@@ -47,21 +55,6 @@ data FamInst
 --
 famInstTyCon :: FamInst -> TyCon
 famInstTyCon = fi_tycon
-
--- Extract all family instances.
---
-extractFamInsts :: [TyThing] -> [FamInst]
-extractFamInsts tythings
-  = do { ATyCon tycon <- tythings
-       ; case tyConFamInst_maybe tycon of
-           Nothing         -> mzero
-	   Just (fam, tys) -> 
-	     return $ FamInst { fi_fam   = tyConName fam
-			      , fi_tvs   = mkVarSet . tyConTyVars $ tycon
-			      , fi_tys   = tys
-			      , fi_tycon = tycon
-			      }
-       }
 \end{code}
 
 \begin{code}
@@ -90,6 +83,44 @@ pprFamInstHdr (FamInst {fi_fam = fam, fi_tys = tys, fi_tycon = tycon})
 
 pprFamInsts :: [FamInst] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
+
+famInstHead :: FamInst -> ([TyVar], TyCon, [Type])
+famInstHead (FamInst {fi_tycon = tycon})
+  = case tyConFamInst_maybe tycon of
+      Nothing         -> panic "FamInstEnv.famInstHead"
+      Just (fam, tys) -> (tyConTyVars tycon, fam, tys)
+
+-- Make a family instance representation from a tycon.  This is used for local
+-- instances, where we can safely pull on the tycon.
+--
+mkLocalFamInst :: TyCon -> FamInst
+mkLocalFamInst tycon
+  = case tyConFamInst_maybe tycon of
+           Nothing         -> panic "FamInstEnv.mkLocalFamInst"
+	   Just (fam, tys) -> 
+	     FamInst {
+	       fi_fam   = tyConName fam,
+	       fi_tcs   = roughMatchTcs tys,
+	       fi_tvs   = mkVarSet . tyConTyVars $ tycon,
+	       fi_tys   = tys,
+	       fi_tycon = tycon
+	     }
+
+-- Make a family instance representation from the information found in an
+-- unterface file.  In particular, we get the rough match info from the iface
+-- (instead of computing it here).
+--
+mkImportedFamInst :: Name -> [Maybe Name] -> TyCon -> FamInst
+mkImportedFamInst fam mb_tcs tycon
+  = FamInst {
+      fi_fam   = fam,
+      fi_tcs   = mb_tcs,
+      fi_tvs   = mkVarSet . tyConTyVars $ tycon,
+      fi_tys   = case tyConFamInst_maybe tycon of
+		   Nothing       -> panic "FamInstEnv.mkImportedFamInst"
+		   Just (_, tys) -> tys,
+      fi_tycon = tycon
+    }
 \end{code}
 
 
@@ -102,7 +133,13 @@ pprFamInsts finsts = vcat (map pprFamInst finsts)
 InstEnv maps a family name to the list of known instances for that family.
 
 \begin{code}
-type FamInstEnv = UniqFM [FamInst]	-- Maps a family to its instances
+type FamInstEnv = UniqFM FamilyInstEnv	-- Maps a family to its instances
+
+data FamilyInstEnv
+  = FamIE [FamInst]	-- The instances for a particular family, in any order
+  	  Bool 		-- True <=> there is an instance of form T a b c
+			-- 	If *not* then the common case of looking up
+			--	(T a b c) can fail immediately
 
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
@@ -112,23 +149,75 @@ emptyFamInstEnv :: FamInstEnv
 emptyFamInstEnv = emptyUFM
 
 famInstEnvElts :: FamInstEnv -> [FamInst]
-famInstEnvElts = concat . eltsUFM
+famInstEnvElts fi = [elt | FamIE elts _ <- eltsUFM fi, elt <- elts]
 
 familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam
   = get home_fie ++ get pkg_fie
   where
     get env = case lookupUFM env fam of
-		Just insts -> insts
-		Nothing	   -> []
+		Just (FamIE insts _) -> insts
+		Nothing	             -> []
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
 extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
 
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
-extendFamInstEnv inst_env ins_item@(FamInst {fi_fam = cls_nm})
-  = addToUFM_C add inst_env cls_nm [ins_item]
+extendFamInstEnv inst_env ins_item@(FamInst {fi_fam = cls_nm, fi_tcs = mb_tcs})
+  = addToUFM_C add inst_env cls_nm (FamIE [ins_item] ins_tyvar)
   where
-    add items _ = ins_item:items
+    add (FamIE items tyvar) _ = FamIE (ins_item:items)
+				      (ins_tyvar || tyvar)
+    ins_tyvar = not (any isJust mb_tcs)
 \end{code}		      
 
+%************************************************************************
+%*									*
+\subsection{Looking up a family instance}
+%*									*
+%************************************************************************
+
+@lookupFamInstEnv@ looks up in a @FamInstEnv@, using a one-way match.
+Multiple matches are only possible in case of type families (not data
+families), and then, it doesn't matter which match we choose (as the
+instances are guaranteed confluent).
+
+\begin{code}
+lookupFamInstEnv :: (FamInstEnv 	-- External package inst-env
+		    ,FamInstEnv) 	-- Home-package inst-env
+	         -> TyCon -> [Type]		-- What we are looking for
+	         -> [(TvSubst, FamInst)] 	-- Successful matches
+lookupFamInstEnv (pkg_ie, home_ie) fam tys
+  = home_matches ++ pkg_matches
+  where
+    rough_tcs    = roughMatchTcs tys
+    all_tvs      = all isNothing rough_tcs
+    home_matches = lookup home_ie 
+    pkg_matches  = lookup pkg_ie  
+
+    --------------
+    lookup env = case lookupUFM env fam of
+		   Nothing -> []	-- No instances for this class
+		   Just (FamIE insts has_tv_insts)
+		       -- Short cut for common case:
+		       --   The thing we are looking up is of form (C a
+		       --   b c), and the FamIE has no instances of
+		       --   that form, so don't bother to search 
+		     | all_tvs && not has_tv_insts -> []
+		     | otherwise                   -> find insts
+
+    --------------
+    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, 
+			  fi_tys = tpl_tys, fi_tycon = tycon }) : rest)
+	-- Fast check for no match, uses the "rough match" fields
+      | instanceCantMatch rough_tcs mb_tcs
+      = find rest
+
+        -- Proper check
+      | Just subst <- tcMatchTys tpl_tvs tpl_tys tys
+      = (subst, item) : find rest
+
+        -- No match => try next
+      | otherwise
+      = find rest
+\end{code}

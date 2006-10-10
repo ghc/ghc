@@ -24,7 +24,7 @@ import Inst		( newDictBndr, newDictBndrs, instToId, showLIE,
 			  getOverlapFlag, tcExtendLocalInstEnv )
 import InstEnv		( mkLocalInstance, instanceDFunId )
 import FamInst		( tcExtendLocalFamInstEnv )
-import FamInstEnv	( extractFamInsts )
+import FamInstEnv	( mkLocalFamInst )
 import TcDeriv		( tcDeriving )
 import TcEnv		( InstInfo(..), InstBindings(..), 
 			  newDFunName, tcExtendIdEnv, tcExtendGlobalEnv
@@ -227,7 +227,11 @@ addInsts infos thing_inside
 
 addFamInsts :: [TyThing] -> TcM a -> TcM a
 addFamInsts tycons thing_inside
-  = tcExtendLocalFamInstEnv (extractFamInsts tycons) thing_inside
+  = tcExtendLocalFamInstEnv (map mkLocalFamInstTyThing tycons) thing_inside
+  where
+    mkLocalFamInstTyThing (ATyCon tycon) = mkLocalFamInst tycon
+    mkLocalFamInstTyThing tything	 = pprPanic "TcInstDcls.addFamInsts"
+						    (ppr tything)
 \end{code} 
 
 \begin{code}

@@ -117,6 +117,7 @@ initTc hsc_env hsc_src mod do_this
 		tcg_binds    = emptyLHsBinds,
 		tcg_deprecs  = NoDeprecs,
 		tcg_insts    = [],
+		tcg_fam_insts= [],
 		tcg_rules    = [],
 		tcg_fords    = [],
 		tcg_dfun_n   = dfun_n_var,

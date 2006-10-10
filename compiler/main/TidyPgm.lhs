@@ -46,7 +46,6 @@ import Module		( Module )
 import HscTypes		( HscEnv(..), NameCache( nsUniqs ), CgGuts(..),
 			  TypeEnv, typeEnvIds, typeEnvElts, typeEnvTyCons, 
 			  extendTypeEnvWithIds, lookupTypeEnv,
-			  mkDetailsFamInstCache,
 			  ModGuts(..), TyThing(..), ModDetails(..),
 			  Dependencies(..)
 			)
@@ -124,24 +123,25 @@ mkBootModDetails :: HscEnv -> ModGuts -> IO ModDetails
 -- We don't look at the bindings at all -- there aren't any
 -- for hs-boot files
 
-mkBootModDetails hsc_env (ModGuts { mg_module = mod, 
-				    mg_exports = exports,
-				    mg_types = type_env, 	
-				    mg_insts = ispecs })
+mkBootModDetails hsc_env (ModGuts { mg_module    = mod
+				  , mg_exports   = exports
+				  , mg_types     = type_env
+				  , mg_insts     = insts
+				  , mg_fam_insts = fam_insts })
   = do	{ let dflags = hsc_dflags hsc_env 
 	; showPass dflags "Tidy [hoot] type env"
 
-	; let { ispecs'   = tidyInstances tidyExternalId ispecs
-	      ; type_env1 = filterNameEnv (not . isWiredInThing) type_env
-	      ; type_env2 = mapNameEnv tidyBootThing type_env1
-	      ; type_env' = extendTypeEnvWithIds type_env2
-				(map instanceDFunId ispecs')
+	; let { insts'     = tidyInstances tidyExternalId insts
+	      ; type_env1  = filterNameEnv (not . isWiredInThing) type_env
+	      ; type_env2  = mapNameEnv tidyBootThing type_env1
+	      ; type_env'  = extendTypeEnvWithIds type_env2
+				(map instanceDFunId insts')
 	      }
-	; return (ModDetails { md_types     = type_env',
-			       md_insts     = ispecs',
-			       md_fam_insts = mkDetailsFamInstCache type_env',
-			       md_rules     = [],
-			       md_exports   = exports })
+	; return (ModDetails { md_types     = type_env'
+			     , md_insts     = insts'
+			     , md_fam_insts = fam_insts
+			     , md_rules     = []
+			     , md_exports   = exports })
 	}
   where
 
@@ -238,7 +238,8 @@ RHSs, so that they print nicely in interfaces.
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env
 	    mod_impl@(ModGuts {	mg_module = mod, mg_exports = exports, 
-				mg_types = type_env, mg_insts = insts_tc, 
+				mg_types = type_env, 
+				mg_insts = insts, mg_fam_insts = fam_insts,
 				mg_binds = binds, 
 				mg_rules = imp_rules,
 				mg_dir_imps = dir_imps, mg_deps = deps, 
@@ -260,18 +261,22 @@ tidyProgram hsc_env
 		-- (It's a sort of mutual recursion.)
   	}
 
-	; (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod type_env ext_ids binds
+	; (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod type_env ext_ids 
+						 binds
 
-	; let { tidy_type_env = tidyTypeEnv omit_prags exports type_env tidy_binds
-	      ; tidy_ispecs   = tidyInstances (lookup_dfun tidy_type_env) insts_tc
+	; let { tidy_type_env = tidyTypeEnv omit_prags exports type_env 
+					    tidy_binds
+	      ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
 		-- A DFunId will have a binding in tidy_binds, and so
 		-- will now be in final_env, replete with IdInfo
 		-- Its name will be unchanged since it was born, but
-		-- we want Global, IdInfo-rich (or not) DFunId in the tidy_ispecs
+		-- we want Global, IdInfo-rich (or not) DFunId in the
+		-- tidy_insts
 
 	      ; tidy_rules = tidyRules tidy_env ext_rules
 		-- You might worry that the tidy_env contains IdInfo-rich stuff
-		-- and indeed it does, but if omit_prags is on, ext_rules is empty
+		-- and indeed it does, but if omit_prags is on, ext_rules is
+		-- empty
 
 	      ; implicit_binds = getImplicitBinds type_env
 	      ; all_tidy_binds = implicit_binds ++ tidy_binds
@@ -290,12 +295,11 @@ tidyProgram hsc_env
 			   cg_foreign  = foreign_stubs,
 			   cg_dep_pkgs = dep_pkgs deps }, 
 
-		   ModDetails { md_types = tidy_type_env,
-				md_rules = tidy_rules,
-				md_insts = tidy_ispecs,
-				md_fam_insts = mkDetailsFamInstCache 
-					         tidy_type_env,
-				md_exports = exports })
+		   ModDetails { md_types     = tidy_type_env,
+				md_rules     = tidy_rules,
+				md_insts     = tidy_insts,
+				md_fam_insts = fam_insts,
+				md_exports   = exports })
 	}
 
 lookup_dfun type_env dfun_id

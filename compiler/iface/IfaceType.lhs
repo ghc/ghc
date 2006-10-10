@@ -10,7 +10,7 @@ module IfaceType (
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 
 	IfaceExtName(..), mkIfaceExtName, isLocalIfaceExtName,
-	ifaceTyConName,
+	ifaceTyConName, ifaceTyConOccName,
 
 	-- Conversion from Type -> IfaceType
 	toIfaceType, toIfacePred, toIfaceContext, 
@@ -145,7 +145,9 @@ ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
 ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
 ifaceTyConName (IfaceTc ext)      = pprPanic "ifaceTyConName" (ppr ext)
 
-
+ifaceTyConOccName :: IfaceTyCon -> OccName	-- Works for all!
+ifaceTyConOccName (IfaceTc ext) = ifaceExtOcc ext
+ifaceTyConOccName tycon         = nameOccName . ifaceTyConName $ tycon
 \end{code}
 
 

@@ -16,7 +16,8 @@ module LoadIface (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst )
+import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst, 
+				 tcIfaceFamInst )
 
 import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
 import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
@@ -42,6 +43,7 @@ import PrelInfo		( ghcPrimExports )
 import PrelRules	( builtinRules )
 import Rules		( extendRuleBaseList, mkRuleBase )
 import InstEnv		( emptyInstEnv, extendInstEnvList )
+import FamInstEnv	( emptyFamInstEnv, extendFamInstEnvList )
 import Name		( Name {-instance NamedThing-}, getOccName,
 			  nameModule, nameIsLocalOrFrom, isWiredInName )
 import NameEnv
@@ -239,22 +241,29 @@ loadInterface doc_str mod from
 	--     If we do loadExport first the wrong info gets into the cache (unless we
 	-- 	explicitly tag each export which seems a bit of a bore)
 
-	; ignore_prags <- doptM Opt_IgnoreInterfacePragmas
-	; new_eps_decls <- loadDecls ignore_prags (mi_decls iface)
-	; new_eps_insts <- mapM tcIfaceInst (mi_insts iface)
-	; new_eps_rules <- tcIfaceRules ignore_prags (mi_rules iface)
+	; ignore_prags      <- doptM Opt_IgnoreInterfacePragmas
+	; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
+	; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
+	; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+	; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
 
 	; let {	final_iface = iface {	mi_decls = panic "No mi_decls in PIT",
 					mi_insts = panic "No mi_insts in PIT",
 					mi_rules = panic "No mi_rules in PIT" } }
 
 	; updateEps_  $ \ eps -> 
-	    eps { eps_PIT       = extendModuleEnv (eps_PIT eps) mod final_iface,
-		  eps_PTE       = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
-		  eps_rule_base = extendRuleBaseList (eps_rule_base eps) new_eps_rules,
-		  eps_inst_env  = extendInstEnvList  (eps_inst_env eps)  new_eps_insts,
-		  eps_stats     = addEpsInStats (eps_stats eps) (length new_eps_decls)
-						(length new_eps_insts) (length new_eps_rules) }
+	    eps { 
+	      eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+	      eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
+	      eps_rule_base    = extendRuleBaseList (eps_rule_base eps) 
+						    new_eps_rules,
+	      eps_inst_env     = extendInstEnvList (eps_inst_env eps)  
+						   new_eps_insts,
+	      eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
+						      new_eps_fam_insts,
+	      eps_stats        = addEpsInStats (eps_stats eps) 
+					       (length new_eps_decls)
+	      (length new_eps_insts) (length new_eps_rules) }
 
 	; return (Succeeded final_iface)
     }}}}
@@ -337,10 +346,8 @@ loadDecl ignore_prags mod (_version, decl)
 			  (importedSrcLoc (showSDoc (ppr (moduleName mod))))
 			-- ToDo: qualify with the package name if necessary
 
-    ifFamily (IfaceData {
-	        ifFamInst = Just (IfaceFamInst {ifFamInstTyCon = famTyCon})})
-               = Just famTyCon
-    ifFamily _ = Nothing
+    ifFamily (IfaceData {ifFamInst = Just (famTyCon, _)}) = Just famTyCon
+    ifFamily _						  = Nothing
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 
@@ -522,11 +529,12 @@ readIface wanted_mod file_path is_hi_boot_file
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState
   = EPS { 
-      eps_is_boot    = emptyUFM,
-      eps_PIT        = emptyPackageIfaceTable,
-      eps_PTE        = emptyTypeEnv,
-      eps_inst_env   = emptyInstEnv,
-      eps_rule_base  = mkRuleBase builtinRules,
+      eps_is_boot      = emptyUFM,
+      eps_PIT          = emptyPackageIfaceTable,
+      eps_PTE          = emptyTypeEnv,
+      eps_inst_env     = emptyInstEnv,
+      eps_fam_inst_env = emptyFamInstEnv,
+      eps_rule_base    = mkRuleBase builtinRules,
 	-- Initialise the EPS rule pool with the built-in rules
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
 			   , n_insts_in = 0, n_insts_out = 0

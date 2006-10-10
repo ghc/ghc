@@ -30,7 +30,7 @@ module HscTypes (
 	icPrintUnqual, mkPrintUnqualified,
 
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
-	emptyIfaceDepCache, mkIfaceFamInstsCache, mkDetailsFamInstCache,
+	emptyIfaceDepCache,
 
 	Deprecs(..), IfaceDeprecs,
 
@@ -78,7 +78,7 @@ import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv,
 			  extendOccEnv )
 import Module
 import InstEnv		( InstEnv, Instance )
-import FamInstEnv	( FamInst, extractFamInsts )
+import FamInstEnv	( FamInstEnv, FamInst )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import Id		( Id )
@@ -96,7 +96,7 @@ import BasicTypes	( Version, initialVersion, IPName,
 			  Fixity, defaultFixity, DeprecTxt )
 
 import IfaceSyn		( IfaceInst, IfaceFamInst, IfaceRule, 
-			  IfaceDecl(ifName), extractIfFamInsts )
+			  IfaceDecl(ifName) )
 
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
@@ -420,8 +420,7 @@ data ModIface
 
 		-- Instance declarations and rules
 	mi_insts     :: [IfaceInst],			-- Sorted
-	mi_fam_insts :: [(IfaceFamInst, IfaceDecl)],     -- Cached value
-					-- ...from mi_decls (not in iface file)
+	mi_fam_insts :: [IfaceFamInst],			-- Sorted
 	mi_rules     :: [IfaceRule],			-- Sorted
 	mi_rule_vers :: !Version,	-- Version number for rules and 
 					-- instances combined
@@ -436,10 +435,6 @@ data ModIface
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt the old interface
      }
-
--- Pre-compute the set of type instances from the declaration list.
-mkIfaceFamInstsCache :: [IfaceDecl] -> [(IfaceFamInst, IfaceDecl)]
-mkIfaceFamInstsCache = extractIfFamInsts
 
 -- Should be able to construct ModDetails from mi_decls in ModIface
 data ModDetails
@@ -462,10 +457,6 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_rules     = [],
 			       md_fam_insts = [] }
 
--- Pre-compute the set of type instances from the type environment.
-mkDetailsFamInstCache :: TypeEnv -> [FamInst]
-mkDetailsFamInstCache = extractFamInsts . typeEnvElts
-
 -- A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
 -- being compiled right now.  Once it is compiled, a ModIface and 
@@ -473,23 +464,26 @@ mkDetailsFamInstCache = extractFamInsts . typeEnvElts
 
 data ModGuts
   = ModGuts {
-        mg_module   :: !Module,
-	mg_boot     :: IsBootInterface, -- Whether it's an hs-boot module
-	mg_exports  :: !NameSet,	-- What it exports
-	mg_deps	    :: !Dependencies,	-- What is below it, directly or otherwise
-	mg_dir_imps :: ![Module],	-- Directly-imported modules; used to
-					--	generate initialisation code
-	mg_usages   :: ![Usage],	-- Version info for what it needed
+        mg_module    :: !Module,
+	mg_boot      :: IsBootInterface, -- Whether it's an hs-boot module
+	mg_exports   :: !NameSet,	 -- What it exports
+	mg_deps	     :: !Dependencies,	 -- What is below it, directly or
+					 --   otherwise 
+	mg_dir_imps  :: ![Module],	 -- Directly-imported modules; used to
+					 --	generate initialisation code
+	mg_usages    :: ![Usage],	 -- Version info for what it needed
 
-        mg_rdr_env  :: !GlobalRdrEnv,	-- Top-level lexical environment
-	mg_fix_env  :: !FixityEnv,	-- Fixity env, for things declared in this module
-	mg_deprecs  :: !Deprecations,	-- Deprecations declared in the module
+        mg_rdr_env   :: !GlobalRdrEnv,	 -- Top-level lexical environment
+	mg_fix_env   :: !FixityEnv,	 -- Fixity env, for things declared in
+					 --   this module 
+	mg_deprecs   :: !Deprecations,	 -- Deprecations declared in the module
 
-	mg_types    :: !TypeEnv,
-	mg_insts    :: ![Instance],	-- Instances 
-        mg_rules    :: ![CoreRule],	-- Rules from this module
-	mg_binds    :: ![CoreBind],	-- Bindings for this module
-	mg_foreign  :: !ForeignStubs
+	mg_types     :: !TypeEnv,
+	mg_insts     :: ![Instance],	 -- Instances 
+	mg_fam_insts :: ![FamInst],	 -- Instances 
+        mg_rules     :: ![CoreRule],	 -- Rules from this module
+	mg_binds     :: ![CoreBind],	 -- Bindings for this module
+	mg_foreign   :: !ForeignStubs
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -948,9 +942,10 @@ data Usage
 %************************************************************************
 
 \begin{code}
-type PackageTypeEnv  = TypeEnv
-type PackageRuleBase = RuleBase
-type PackageInstEnv  = InstEnv
+type PackageTypeEnv    = TypeEnv
+type PackageRuleBase   = RuleBase
+type PackageInstEnv    = InstEnv
+type PackageFamInstEnv = FamInstEnv
 
 data ExternalPackageState
   = EPS {
@@ -971,8 +966,8 @@ data ExternalPackageState
 		-- The ModuleIFaces for modules in external packages
 		-- whose interfaces we have opened
 		-- The declarations in these interface files are held in
-		-- eps_decls, eps_inst_env, eps_rules (below), not in the 
-		-- mi_decls fields of the iPIT.  
+		-- eps_decls, eps_inst_env, eps_fam_inst_env, eps_rules
+		-- (below), not in the mi_decls fields of the iPIT.  
 		-- What _is_ in the iPIT is:
 		--	* The Module 
 		--	* Version info
@@ -980,11 +975,13 @@ data ExternalPackageState
 		--	* Fixities
 		--	* Deprecations
 
-	eps_PTE :: !PackageTypeEnv,		-- Domain = external-package modules
+	eps_PTE :: !PackageTypeEnv,	   -- Domain = external-package modules
 
-	eps_inst_env :: !PackageInstEnv,	-- The total InstEnv accumulated from
-						--   all the external-package modules
-	eps_rule_base :: !PackageRuleBase,	-- Ditto RuleEnv
+	eps_inst_env     :: !PackageInstEnv,   -- The total InstEnv accumulated
+					       -- from all the external-package
+					       -- modules 
+	eps_fam_inst_env :: !PackageFamInstEnv,-- Ditto FamInstEnv
+	eps_rule_base    :: !PackageRuleBase,  -- Ditto RuleEnv
 
 	eps_stats :: !EpsStats
   }
