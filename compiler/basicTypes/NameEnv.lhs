@@ -7,7 +7,8 @@
 module NameEnv (
 	NameEnv, mkNameEnv,
 	emptyNameEnv, unitNameEnv, nameEnvElts, 
-	extendNameEnv_C, extendNameEnv_Acc, extendNameEnv, extendNameEnvList, 
+	extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
+        extendNameEnvList, extendNameEnvList_C,
 	foldNameEnv, filterNameEnv,
 	plusNameEnv, plusNameEnv_C, 
 	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
@@ -39,6 +40,7 @@ extendNameEnv  	   :: NameEnv a -> Name -> a -> NameEnv a
 plusNameEnv    	   :: NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_C  	   :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 extendNameEnvList  :: NameEnv a -> [(Name,a)] -> NameEnv a
+extendNameEnvList_C :: (a->a->a) -> NameEnv a -> [(Name,a)] -> NameEnv a
 delFromNameEnv 	   :: NameEnv a -> Name -> NameEnv a
 delListFromNameEnv :: NameEnv a -> [Name] -> NameEnv a
 elemNameEnv    	   :: Name -> NameEnv a -> Bool
@@ -59,6 +61,7 @@ extendNameEnv  	    = addToUFM
 plusNameEnv    	    = plusUFM
 plusNameEnv_C  	    = plusUFM_C
 extendNameEnvList   = addListToUFM
+extendNameEnvList_C = addListToUFM_C
 delFromNameEnv 	    = delFromUFM
 delListFromNameEnv  = delListFromUFM
 elemNameEnv    	    = elemUFM
