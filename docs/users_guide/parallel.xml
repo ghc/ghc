@@ -1,40 +1,113 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <sect1 id="lang-parallel">
-  <title>Parallel Haskell</title>
+  <title>Concurrent and Parallel Haskell</title>
   <indexterm><primary>parallelism</primary>
   </indexterm>
 
-  <para>There are two implementations of Parallel Haskell: SMP paralellism
-    <indexterm><primary>SMP</primary></indexterm>
-    which is built-in to GHC (see <xref linkend="sec-using-smp" />) and
-    supports running Parallel Haskell programs on a single multiprocessor
-    machine, and
-    Glasgow Parallel Haskell<indexterm><primary>Glasgow Parallel Haskell</primary></indexterm>
-    (GPH) which supports running Parallel Haskell
-    programs on both clusters of machines or single multiprocessors.  GPH is
-    developed and distributed
-    separately from GHC (see <ulink url="http://www.cee.hw.ac.uk/~dsg/gph/">The
-      GPH Page</ulink>).</para>
-  
-  <para>Ordinary single-threaded Haskell programs will not benefit from
-    enabling SMP parallelism alone.  You must expose parallelism to the
-    compiler in one of the following two ways.</para>
-  
-  <sect2>
-    <title>Running Concurrent Haskell programs in parallel</title>
+  <para>GHC implements some major extensions to Haskell to support 
+  concurrent and parallel programming.  Let us first etablish terminology:
+  <itemizedlist>
+	<listitem><para><emphasis>Parallelism</emphasis> means running
+	  a Haskell program on multiple processors, with the goal of improving
+	  performance.  Ideally, this should be done invisibly, and with no
+	  semantic changes.
+	    </para></listitem>
+	<listitem><para><emphasis>Concurrency</emphasis> means implementing 
+	  a program by using multiple I/O-performing threads.  While a
+	  concurrent Haskell program <emphasis>can</emphasis> run on a 
+	  parallel machine, the primary goal of using concurrency is not to gain
+	  performance, but rather because that is the simplest and most
+	  direct way to write the program.  Since the threads perform I/O,
+	  the semantics of the program is necessarily non-deterministic.
+	    </para></listitem>
+  </itemizedlist>
+  GHC supports both concurrency and parallelism. 
+  </para>
 
-    <para>The first possibility is to use concurrent threads to structure your
-      program, and make sure
-      that you spread computation amongst the threads.  The runtime will
+  <sect2 id="concurrent-haskell">
+    <title>Concurrent Haskell</title>
+
+  <para>Concurrent Haskell is the name given to GHC's concurrency extension.
+  It is enabled by default, so no special flags are required.
+   The <ulink
+	      url="http://research.microsoft.com/copyright/accept.asp?path=/users/simonpj/papers/concurrent-haskell.ps.gz">
+	      Concurrent Haskell paper</ulink> is still an excellent
+	      resource, as is <ulink
+	      url="http://research.microsoft.com/%7Esimonpj/papers/marktoberdorf">Tackling
+	      the awkward squad</ulink>.
+  </para><para>
+  To the programmer, Concurrent Haskell introduces no new language constructs;
+  rather, it appears simply as a library, <ulink
+  url="http://www.haskell.org/ghc/docs/latest/html/libraries/base/Control-Concurrent.html">
+	      Control.Concurrent</ulink>.  The functions exported by this
+	      library include:
+  <itemizedlist>
+<listitem><para>Forking and killing threads.</para></listitem>
+<listitem><para>Sleeping.</para></listitem>
+<listitem><para>Synchronised mutable variables, called <literal>MVars</literal></para></listitem>
+<listitem><para>Support for bound threads; see the paper <ulink
+url="http://research.microsoft.com/%7Esimonpj/Papers/conc-ffi/index.htm">Extending
+the FFI with concurrency</ulink>.</para></listitem>
+</itemizedlist>
+</para>
+</sect2>
+
+   <sect2><title>Software Transactional Memory</title>
+
+    <para>GHC now supports a new way to coordinate the activities of Concurrent
+    Haskell threads, called Software Transactional Memory (STM).  The 
+    <ulink
+    url="http://research.microsoft.com/%7Esimonpj/papers/stm/index.htm">STM
+    papers</ulink> are an excellent introduction to what STM is, and how to use
+    it.</para>
+
+   <para>The main library you need to use STM is <ulink
+  url="http://www.haskell.org/ghc/docs/latest/html/libraries/stm/Control-Concurrent-STM.html">
+	      Control.Concurrent.STM</ulink>. The main features supported are these:
+<itemizedlist>
+<listitem><para>Atomic blocks.</para></listitem>
+<listitem><para>Transactional variables.</para></listitem>
+<listitem><para>Operations for composing transactions:
+<literal>retry</literal>, and <literal>orElse</literal>.</para></listitem>
+<listitem><para>Data invariants.</para></listitem>
+</itemizedlist>
+All these features are described in the papers mentioned earlier.
+</para>
+</sect2>
+
+<sect2><title>Parallel Haskell</title>
+
+  <para>GHC includes support for running Haskell programs in parallel
+  on symmetric, shared-memory multi-processor 
+      (SMP)<indexterm><primary>SMP</primary></indexterm>.
+  By default GHC runs your program on one processor; if you
+     want it to run in parallel you must link your program
+      with the <option>-threaded</option>, and run it with the RTS
+      <option>-N</option> option; see  <xref linkend="sec-using-smp" />).
+      The runtime will
       schedule the running Haskell threads among the available OS
       threads, running as many in parallel as you specified with the
       <option>-N</option> RTS option.</para>
-  </sect2>
 
+  <para>GHC only supports parallelism on a shared-memory multiprocessor.
+    Glasgow Parallel Haskell<indexterm><primary>Glasgow Parallel Haskell</primary></indexterm>
+    (GPH) supports running Parallel Haskell
+    programs on both clusters of machines, and single multiprocessors.  GPH is
+    developed and distributed
+    separately from GHC (see <ulink url="http://www.cee.hw.ac.uk/~dsg/gph/">The
+      GPH Page</ulink>).  However, the current version of GPH is based on a much older
+    version of GHC (4.06).</para>
+
+  </sect2>
   <sect2>
     <title>Annotating pure code for parallelism</title>
 
-    <para>The simplest mechanism for extracting parallelism from pure code is
+  <para>Ordinary single-threaded Haskell programs will not benefit from
+    enabling SMP parallelism alone: you must expose parallelism to the
+    compiler.
+
+    One way to do so is forking threads using Concurrent Haskell (<xref
+    linkend="concurrent-haskell"/>), but the simplest mechanism for extracting parallelism from pure code is
       to use the <literal>par</literal> combinator, which is closely related to (and often used
       with) <literal>seq</literal>.  Both of these are available from <ulink
 	url="../libraries/base/Control-Parallel.html"><literal>Control.Parallel</literal></ulink>:</para>
