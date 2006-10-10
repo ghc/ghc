@@ -887,16 +887,30 @@ tcRnStmt hsc_env ictxt rdr_stmt
 	bound_names = map idName global_ids ;
 	new_rn_env  = extendLocalRdrEnv rn_env bound_names ;
 
-		-- Remove any shadowed bindings from the type_env;
-		-- they are inaccessible but might, I suppose, cause 
-		-- a space leak if we leave them there
+{- ---------------------------------------------
+   At one stage I removed any shadowed bindings from the type_env;
+   they are inaccessible but might, I suppose, cause a space leak if we leave them there.
+   However, with Template Haskell they aren't necessarily inaccessible.  Consider this
+   GHCi session
+	 Prelude> let f n = n * 2 :: Int
+	 Prelude> fName <- runQ [| f |]
+	 Prelude> $(return $ AppE fName (LitE (IntegerL 7)))
+	 14
+	 Prelude> let f n = n * 3 :: Int
+	 Prelude> $(return $ AppE fName (LitE (IntegerL 7)))
+   In the last line we use 'fName', which resolves to the *first* 'f'
+   in scope. If we delete it from the type env, GHCi crashes because
+   it doesn't expect that.
+ 
+   Hence this code is commented out
+
 	shadowed = [ n | name <- bound_names,
 			 let rdr_name = mkRdrUnqual (nameOccName name),
 			 Just n <- [lookupLocalRdrEnv rn_env rdr_name] ] ;
-
 	filtered_type_env = delListFromNameEnv type_env shadowed ;
-	new_type_env = extendTypeEnvWithIds filtered_type_env global_ids ;
+-------------------------------------------------- -}
 
+	new_type_env = extendTypeEnvWithIds type_env global_ids ;
 	new_ic = ictxt { ic_rn_local_env = new_rn_env, 
 		  	 ic_type_env     = new_type_env }
     } ;
