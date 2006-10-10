@@ -1,0 +1,2 @@
+[1 of 2] Skipping  GHC.Base         ( GHC/Base.hs, GHC/Base.o )
+[2 of 2] Compiling GHC.Foo          ( GHC/Foo.hs, GHC/Foo.o )
