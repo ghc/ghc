@@ -54,6 +54,25 @@ import Data.Word	( Word64 )
 \end{code}
 
 
+Note [Constant folding]
+~~~~~~~~~~~~~~~~~~~~~~~
+primOpRules generates the rewrite rules for each primop
+These rules do what is often called "constant folding"
+E.g. the rules for +# might say
+	     4 +# 5 = 9
+Well, of course you'd need a lot of rules if you did it 
+like that, so we use a BuiltinRule instead, so that we
+can match in any two literal values.  So the rule is really
+more like
+	     (Lit 4) +# (Lit y) = Lit (x+#y)
+where the (+#) on the rhs is done at compile time
+
+That is why these rules are built in here.  Other rules
+which don't need to be built in are in GHC.Base. For 
+example:
+	x +# 0 = x
+
+
 \begin{code}
 primOpRules :: PrimOp -> Name -> [CoreRule]
 primOpRules op op_name = primop_rule op
