@@ -1304,10 +1304,10 @@ pprInstr (FDIV size op1 op2) = pprSizeOpOp SLIT("div") size op1 op2
 
 pprInstr (CVTSS2SD from to) = pprRegReg SLIT("cvtss2sd") from to
 pprInstr (CVTSD2SS from to) = pprRegReg SLIT("cvtsd2ss") from to
-pprInstr (CVTSS2SI from to) = pprOpReg  SLIT("cvtss2si") from to
-pprInstr (CVTSD2SI from to) = pprOpReg  SLIT("cvtsd2si") from to
-pprInstr (CVTSI2SS from to) = pprOpReg  SLIT("cvtsi2ss") from to
-pprInstr (CVTSI2SD from to) = pprOpReg  SLIT("cvtsi2sd") from to
+pprInstr (CVTSS2SI from to) = pprOpReg  SLIT("cvtss2siq") from to
+pprInstr (CVTSD2SI from to) = pprOpReg  SLIT("cvtsd2siq") from to
+pprInstr (CVTSI2SS from to) = pprOpReg  SLIT("cvtsi2ssq") from to
+pprInstr (CVTSI2SD from to) = pprOpReg  SLIT("cvtsi2sdq") from to
 #endif
 
     -- FETCHGOT for PIC on ELF platforms
