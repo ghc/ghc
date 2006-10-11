@@ -354,10 +354,9 @@ pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
 pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 		ru_bndrs = tpl_vars, ru_args = tpl_args,
 		ru_rhs = rhs })
-  = doubleQuotes (ftext name) <+> ppr act <+>
-    sep [
-	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
-	  nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
-	  nest 2 (ptext SLIT("=") <+> pprCoreExpr rhs)
-    ] <+> semi
+  = hang (doubleQuotes (ftext name) <+> ppr act)
+       4 (sep [ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
+	       nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
+	       nest 2 (ptext SLIT("=") <+> pprCoreExpr rhs)
+	    ])
 \end{code}
