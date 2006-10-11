@@ -21,7 +21,7 @@ module Name (
 	tidyNameOcc, 
 	hashName, localiseName,
 
-	nameSrcLoc, nameParent, nameParent_maybe, isImplicitName, 
+	nameSrcLoc,
 
 	isSystemName, isInternalName, isExternalName,
 	isTyVarName, isTyConName, isWiredInName, isBuiltInSyntax,
@@ -40,13 +40,18 @@ import {-# SOURCE #-} TypeRep( TyThing )
 import OccName		-- All of it
 import Module		( Module )
 import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
+import UniqFM           ( lookupUFM, addToUFM )
 import Unique		( Unique, Uniquable(..), getKey, pprUnique,
                           mkUniqueGrimily, getKey# )
 import Maybes		( orElse, isJust )
+import Binary
+import FastMutInt
 import FastString	( FastString, zEncodeFS )
 import Outputable
 
+import DATA_IOREF
 import GLAEXTS          ( Int#, Int(..) )
+import Data.Array       ( (!) )
 \end{code}
 
 %************************************************************************
@@ -68,12 +73,9 @@ data Name = Name {
 -- the SrcLoc in a Name all that often.
 
 data NameSort
-  = External Module (Maybe Name)
-	-- (Just parent) => this Name is a subordinate name of 'parent'
-	-- e.g. data constructor of a data type, method of a class
-	-- Nothing => not a subordinate
+  = External Module
  
-  | WiredIn Module (Maybe Name) TyThing BuiltInSyntax
+  | WiredIn Module TyThing BuiltInSyntax
 	-- A variant of External, for wired-in things
 
   | Internal		-- A user-defined Id or TyVar
@@ -137,41 +139,26 @@ isExternalName	  :: Name -> Bool
 isSystemName	  :: Name -> Bool
 isWiredInName	  :: Name -> Bool
 
-isWiredInName (Name {n_sort = WiredIn _ _ _ _}) = True
-isWiredInName other			        = False
+isWiredInName (Name {n_sort = WiredIn _ _ _}) = True
+isWiredInName other			      = False
 
 wiredInNameTyThing_maybe :: Name -> Maybe TyThing
-wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ _ thing _}) = Just thing
-wiredInNameTyThing_maybe other				       = Nothing
+wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ thing _}) = Just thing
+wiredInNameTyThing_maybe other				     = Nothing
 
-isBuiltInSyntax (Name {n_sort = WiredIn _ _ _ BuiltInSyntax}) = True
-isBuiltInSyntax other			 		      = False
+isBuiltInSyntax (Name {n_sort = WiredIn _ _ BuiltInSyntax}) = True
+isBuiltInSyntax other			 	            = False
 
-isExternalName (Name {n_sort = External _ _})    = True
-isExternalName (Name {n_sort = WiredIn _ _ _ _}) = True
-isExternalName other	                         = False
+isExternalName (Name {n_sort = External _})    = True
+isExternalName (Name {n_sort = WiredIn _ _ _}) = True
+isExternalName other                           = False
 
 isInternalName name = not (isExternalName name)
 
-nameParent_maybe :: Name -> Maybe Name
-nameParent_maybe (Name {n_sort = External _ p})    = p
-nameParent_maybe (Name {n_sort = WiredIn _ p _ _}) = p
-nameParent_maybe other	                           = Nothing
-
-nameParent :: Name -> Name
-nameParent name = case nameParent_maybe name of
-			Just parent -> parent
-			Nothing     -> name
-
-isImplicitName :: Name -> Bool
--- An Implicit Name is one has a parent; that is, one whose definition
--- derives from the parent thing
-isImplicitName name = isJust (nameParent_maybe name)
-
 nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
-nameModule_maybe (Name { n_sort = External mod _})    = Just mod
-nameModule_maybe (Name { n_sort = WiredIn mod _ _ _}) = Just mod
-nameModule_maybe name				      = Nothing
+nameModule_maybe (Name { n_sort = External mod})    = Just mod
+nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
+nameModule_maybe name				    = Nothing
 
 nameIsLocalOrFrom from name
   | isExternalName name = from == nameModule name
@@ -206,16 +193,16 @@ mkInternalName uniq occ loc = Name { n_uniq = getKey# uniq, n_sort = Internal, n
 	--	* for interface files we tidyCore first, which puts the uniques
 	--	  into the print name (see setNameVisibility below)
 
-mkExternalName :: Unique -> Module -> OccName -> Maybe Name -> SrcLoc -> Name
-mkExternalName uniq mod occ mb_parent loc 
-  = Name { n_uniq = getKey# uniq, n_sort = External mod mb_parent,
+mkExternalName :: Unique -> Module -> OccName -> SrcLoc -> Name
+mkExternalName uniq mod occ loc 
+  = Name { n_uniq = getKey# uniq, n_sort = External mod,
            n_occ = occ, n_loc = loc }
 
-mkWiredInName :: Module -> OccName -> Unique 
-	      -> Maybe Name -> TyThing -> BuiltInSyntax -> Name
-mkWiredInName mod occ uniq mb_parent thing built_in
+mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax
+        -> Name
+mkWiredInName mod occ uniq thing built_in
   = Name { n_uniq = getKey# uniq,
-	   n_sort = WiredIn mod mb_parent thing built_in,
+	   n_sort = WiredIn mod thing built_in,
 	   n_occ = occ, n_loc = wiredInSrcLoc }
 
 mkSystemName :: Unique -> OccName -> Name
@@ -301,6 +288,33 @@ instance NamedThing Name where
     getName n = n
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Binary}
+%*									*
+%************************************************************************
+
+\begin{code}
+instance Binary Name where
+   put_ bh name = do
+      case getUserData bh of { 
+        UserData { ud_symtab_map = symtab_map_ref,
+                   ud_symtab_next = symtab_next } -> do
+         symtab_map <- readIORef symtab_map_ref
+         case lookupUFM symtab_map name of
+           Just (off,_) -> put_ bh off
+           Nothing -> do
+              off <- readFastMutInt symtab_next
+              writeFastMutInt symtab_next (off+1)
+              writeIORef symtab_map_ref
+                  $! addToUFM symtab_map name (off,name)
+              put_ bh off          
+     }
+
+   get bh = do
+        i <- get bh
+        return $! (ud_symtab (getUserData bh) ! i)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -318,8 +332,8 @@ instance OutputableBndr Name where
 pprName name@(Name {n_sort = sort, n_uniq = u#, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      WiredIn mod _ _ builtin -> pprExternal sty uniq mod occ True  builtin
-      External mod _  	      -> pprExternal sty uniq mod occ False UserSyntax
+      WiredIn mod _ builtin   -> pprExternal sty uniq mod occ True  builtin
+      External mod  	      -> pprExternal sty uniq mod occ False UserSyntax
       System   		      -> pprSystem sty uniq occ
       Internal    	      -> pprInternal sty uniq occ
   where uniq = mkUniqueGrimily (I# u#)

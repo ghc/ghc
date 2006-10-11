@@ -330,7 +330,7 @@ maybeExternaliseId dflags id
 			     ; returnFC (setIdName id (externalise mod)) }
   | otherwise		= returnFC id
   where
-    externalise mod = mkExternalName uniq mod new_occ Nothing loc
+    externalise mod = mkExternalName uniq mod new_occ loc
     name    = idName id
     uniq    = nameUnique name
     new_occ = mkLocalOcc uniq (nameOccName name)

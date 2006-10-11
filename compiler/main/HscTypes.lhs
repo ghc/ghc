@@ -1,5 +1,5 @@
-
-% (c) The University of Glasgow, 2000
+%
+% (c) The University of Glasgow, 2006
 %
 \section[HscTypes]{Types for the per-module compiler}
 
@@ -36,7 +36,7 @@ module HscTypes (
 
 	FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
 
-	implicitTyThings, 
+	implicitTyThings, isImplicitTyThing,
 
 	TyThing(..), tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId,
 	TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
@@ -47,7 +47,7 @@ module HscTypes (
 	WhetherHasOrphans, IsBootInterface, Usage(..), 
 	Dependencies(..), noDependencies,
 	NameCache(..), OrigNameCache, OrigIParamCache,
-	Avails, availsToNameSet, availName, availNames,
+	Avails, availsToNameSet, availsToNameEnv, availName, availNames,
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	IfaceExport,
 
@@ -81,12 +81,11 @@ import InstEnv		( InstEnv, Instance )
 import FamInstEnv	( FamInstEnv, FamInst )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
-import Id		( Id )
+import Id		( Id, isImplicitId )
 import Type		( TyThing(..) )
 
 import Class		( Class, classSelIds, classATs, classTyCon )
-import TyCon		( TyCon, tyConSelIds, tyConDataCons, 
-			  newTyConCo_maybe, tyConFamilyCoercion_maybe )
+import TyCon
 import DataCon		( DataCon, dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
 import Packages		( PackageId )
@@ -94,10 +93,7 @@ import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
-
-import IfaceSyn		( IfaceInst, IfaceFamInst, IfaceRule, 
-			  IfaceDecl(ifName) )
-
+import IfaceSyn
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
 import Maybes		( orElse, expectJust )
@@ -430,29 +426,27 @@ data ModIface
 		-- and are not put into the interface file
 	mi_dep_fn  :: Name -> Maybe DeprecTxt,	-- Cached lookup for mi_deprecs
 	mi_fix_fn  :: OccName -> Fixity,	-- Cached lookup for mi_fixities
-	mi_ver_fn  :: OccName -> Maybe Version	-- Cached lookup for mi_decls
+	mi_ver_fn  :: OccName -> Maybe (OccName, Version)
+                        -- Cached lookup for mi_decls
 			-- The Nothing in mi_ver_fn means that the thing
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt the old interface
+                        -- The 'OccName' is the parent of the name, if it has one.
      }
 
 -- Should be able to construct ModDetails from mi_decls in ModIface
 data ModDetails
    = ModDetails {
 	-- The next three fields are created by the typechecker
-	md_exports   :: NameSet,
-        md_types     :: !TypeEnv,
+	md_exports  :: [AvailInfo],
+        md_types    :: !TypeEnv,
         md_fam_insts :: ![FamInst],	-- Cached value extracted from md_types
-        md_insts     :: ![Instance],    -- Dfun-ids for the instances in this 
-					-- module
-
-        md_rules     :: ![CoreRule]	-- Domain may include Ids from other 
-					-- modules
-
+        md_insts    :: ![Instance],	-- Dfun-ids for the instances in this module
+        md_rules    :: ![CoreRule]	-- Domain may include Ids from other modules
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
-			       md_exports = emptyNameSet,
+			       md_exports = [],
 			       md_insts     = [],
 			       md_rules     = [],
 			       md_fam_insts = [] }
@@ -466,7 +460,7 @@ data ModGuts
   = ModGuts {
         mg_module    :: !Module,
 	mg_boot      :: IsBootInterface, -- Whether it's an hs-boot module
-	mg_exports   :: !NameSet,	 -- What it exports
+	mg_exports   :: ![AvailInfo],	 -- What it exports
 	mg_deps	     :: !Dependencies,	 -- What is below it, directly or
 					 --   otherwise 
 	mg_dir_imps  :: ![Module],	 -- Directly-imported modules; used to
@@ -667,6 +661,16 @@ implicitTyThings (AClass cl) = map AnId (classSelIds cl) ++
 	-- For data cons add the worker and wrapper (if any)
 implicitTyThings (ADataCon dc) = map AnId (dataConImplicitIds dc)
 
+-- | returns 'True' if there should be no interface-file declaration
+-- for this thing on its own: either it is built-in, or it is part
+-- of some other declaration, or it is generated implicitly by some
+-- other declaration.
+isImplicitTyThing :: TyThing -> Bool
+isImplicitTyThing (ADataCon _)  = True
+isImplicitTyThing (AnId     id) = isImplicitId id
+isImplicitTyThing (AClass   _)  = False
+isImplicitTyThing (ATyCon   tc) = isImplicitTyCon tc
+
 	-- For newtypes and indexed data types, add the implicit coercion tycon
 implicitCoTyCon tc 
   = map ATyCon . catMaybes $ [newTyConCo_maybe tc, 
@@ -758,14 +762,19 @@ These types are defined here because they are mentioned in ModDetails,
 but they are mostly elaborated elsewhere
 
 \begin{code}
-mkIfaceVerCache :: [(Version,IfaceDecl)] -> OccName -> Maybe Version
+mkIfaceVerCache :: [(Version,IfaceDecl)]
+                -> (OccName -> Maybe (OccName, Version))
 mkIfaceVerCache pairs 
   = \occ -> lookupOccEnv env occ
   where
-    env = foldl add emptyOccEnv pairs
-    add env (v,d) = extendOccEnv env (ifName d) v
+    env = foldr add_decl emptyOccEnv pairs
+    add_decl (v,d) env0 = foldr add_imp env1 (ifaceDeclSubBndrs d)
+      where
+          decl_name = ifName d
+          env1 = extendOccEnv env0 decl_name (decl_name, v)
+          add_imp bndr env = extendOccEnv env bndr (decl_name, v)
 
-emptyIfaceVerCache :: OccName -> Maybe Version
+emptyIfaceVerCache :: OccName -> Maybe (OccName, Version)
 emptyIfaceVerCache occ = Nothing
 
 ------------------ Deprecations -------------------------
@@ -824,9 +833,13 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 type IfaceExport = (Module, [GenAvailInfo OccName])
 
 availsToNameSet :: [AvailInfo] -> NameSet
-availsToNameSet avails = foldl add emptyNameSet avails
-		       where
-			 add set avail = addListToNameSet set (availNames avail)
+availsToNameSet avails = foldr add emptyNameSet avails
+      where add avail set = addListToNameSet set (availNames avail)
+
+availsToNameEnv :: [AvailInfo] -> NameEnv AvailInfo
+availsToNameEnv avails = foldr add emptyNameEnv avails
+     where add avail env = extendNameEnvList env
+                                (zip (availNames avail) (repeat avail))
 
 availName :: GenAvailInfo name -> name
 availName (Avail n)     = n
@@ -911,6 +924,7 @@ data Usage
   = Usage { usg_name     :: ModuleName,			-- Name of the module
 	    usg_mod      :: Version,			-- Module version
 	    usg_entities :: [(OccName,Version)],	-- Sorted by occurrence name
+                -- NB. usages are for parent names only, eg. tycon but not constructors.
 	    usg_exports  :: Maybe Version,		-- Export-list version, if we depend on it
 	    usg_rules    :: Version 			-- Orphan-rules version (for non-orphan
 							-- modules this will always be initialVersion)

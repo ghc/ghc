@@ -11,7 +11,7 @@ module LoadIface (
 	loadDecls,	-- Should move to TcIface and be renamed
 	initExternalPackageState,
 
-	ifaceStats, pprModIface, showIface 	-- Print the iface in Foo.hi
+	ifaceStats, pprModIface, showIface
    ) where
 
 #include "HsVersions.h"
@@ -20,9 +20,8 @@ import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst,
 				 tcIfaceFamInst )
 
 import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
-import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..),
-			  IfaceConDecls(..), IfaceFamInst(..) )
-import IfaceEnv		( newGlobalBinder, lookupIfaceTc )
+import IfaceSyn
+import IfaceEnv		( newGlobalBinder )
 import HscTypes		( ModIface(..), TyThing, IfaceExport, Usage(..), 
 			  Deprecs(..), Dependencies(..),
 			  emptyModIface, EpsStats(..), GenAvailInfo(..),
@@ -62,8 +61,8 @@ import UniqFM
 import StaticFlags	( opt_HiVersion )
 import Outputable
 import BinIface		( readBinIface, v_IgnoreHiWay )
-import Binary		( getBinFileWithDict )
-import Panic		( ghcError, tryMost, showException, GhcException(..) )
+import Binary
+import Panic		( ghcError, showException, GhcException(..) )
 import List		( nub )
 import Maybe            ( isJust )
 import DATA_IOREF	( writeIORef )
@@ -306,12 +305,9 @@ loadDecl :: Bool		    -- Don't load pragmas into the decl pool
 loadDecl ignore_prags mod (_version, decl)
   = do 	{ 	-- Populate the name cache with final versions of all 
 		-- the names associated with the decl
-	  main_name      <- mk_new_bndr mod Nothing (ifName decl)
-	; parent_name    <- case ifFamily decl of  -- make family the parent
-			      Just famTyCon -> lookupIfaceTc famTyCon
-			      _             -> return main_name
-	; implicit_names <- mapM (mk_new_bndr mod (Just parent_name)) 
-				 (ifaceDeclSubBndrs decl)
+	  main_name      <- mk_new_bndr mod (ifName decl)
+        ; traceIf (text "Loading decl for " <> ppr main_name)
+	; implicit_names <- mapM (mk_new_bndr mod) (ifaceDeclSubBndrs decl)
 
 	-- Typecheck the thing, lazily
 	-- NB. Firstly, the laziness is there in case we never need the
@@ -341,8 +337,8 @@ loadDecl ignore_prags mod (_version, decl)
 	--	* parent
 	--	* location
 	-- imported name, to fix the module correctly in the cache
-    mk_new_bndr mod mb_parent occ 
-	= newGlobalBinder mod occ mb_parent 
+    mk_new_bndr mod occ 
+	= newGlobalBinder mod occ 
 			  (importedSrcLoc (showSDoc (ppr (moduleName mod))))
 			-- ToDo: qualify with the package name if necessary
 
@@ -357,70 +353,6 @@ bumpDeclStats name
 	; updateEps_ (\eps -> let stats = eps_stats eps
 			      in eps { eps_stats = stats { n_decls_out = n_decls_out stats + 1 } })
 	}
-
------------------
-ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
---  *Excludes* the 'main' name, but *includes* the implicitly-bound names
--- Deeply revolting, because it has to predict what gets bound,
--- especially the question of whether there's a wrapper for a datacon
---
--- If you change this, make sure you change HscTypes.implicitTyThings in sync
-
-ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, 
-			       ifSigs = sigs, ifATs = ats })
-  = co_occs ++
-    [tc_occ, dc_occ, dcww_occ] ++
-    [op | IfaceClassOp op  _ _ <- sigs] ++
-    [ifName at | at <- ats ] ++
-    [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] 
-  where
-    n_ctxt = length sc_ctxt
-    n_sigs = length sigs
-    tc_occ  = mkClassTyConOcc cls_occ
-    dc_occ  = mkClassDataConOcc cls_occ	
-    co_occs | is_newtype = [mkNewTyCoOcc tc_occ]
-	    | otherwise  = []
-    dcww_occ -- | is_newtype = mkDataConWrapperOcc dc_occ	-- Newtypes have wrapper but no worker
-	     | otherwise  = mkDataConWorkerOcc dc_occ	-- Otherwise worker but no wrapper
-    is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
-
-ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}
-  = []
--- Newtype
-ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
-			      ifCons = IfNewTyCon (
-				         IfCon { ifConOcc = con_occ, 
-							   ifConFields = fields
-							 }),
-			      ifFamInst = famInst}) 
-  = fields ++ [con_occ, mkDataConWorkerOcc con_occ, mkNewTyCoOcc tc_occ]
-    ++ famInstCo famInst tc_occ
-
-ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
-			      ifCons = IfDataTyCon cons, 
-			      ifFamInst = famInst})
-  = nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields
-    ++ concatMap dc_occs cons
-    ++ famInstCo famInst tc_occ
-  where
-    dc_occs con_decl
-	| has_wrapper = [con_occ, work_occ, wrap_occ]
-	| otherwise   = [con_occ, work_occ]
-	where
-	  con_occ = ifConOcc con_decl
-	  strs    = ifConStricts con_decl
-	  wrap_occ = mkDataConWrapperOcc con_occ
-	  work_occ = mkDataConWorkerOcc con_occ
-	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
-			|| not (null . ifConEqSpec $ con_decl)
-			|| isJust famInst
-		-- ToDo: may miss strictness in existential dicts
-
-ifaceDeclSubBndrs _other = []
-
--- coercion for data/newtype family instances
-famInstCo Nothing  baseOcc = []
-famInstCo (Just _) baseOcc = [mkInstTyCoOcc baseOcc]
 \end{code}
 
 
@@ -504,8 +436,7 @@ readIface :: Module -> FilePath -> IsBootInterface
 
 readIface wanted_mod file_path is_hi_boot_file
   = do	{ dflags <- getDOpts
-	; ioToIOEnv $ do
-	{ res <- tryMost (readBinIface file_path)
+        ; res <- tryMostM $ readBinIface file_path
 	; case res of
 	    Right iface 
 		| wanted_mod == actual_mod -> return (Succeeded iface)
@@ -515,7 +446,7 @@ readIface wanted_mod file_path is_hi_boot_file
 		  err = hiModuleNameMismatchWarn wanted_mod actual_mod
 
 	    Left exn    -> return (Failed (text (showException exn)))
-    }}
+    }
 \end{code}
 
 
@@ -594,17 +525,15 @@ ifaceStats eps
 %************************************************************************
 
 \begin{code}
-showIface :: FilePath -> IO ()
--- Read binary interface, and print it out
-showIface filename = do
+-- | Read binary interface, and print it out
+showIface :: HscEnv -> FilePath -> IO ()
+showIface hsc_env filename = do
    -- skip the version check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
    writeIORef v_IgnoreHiWay True
-   iface <- Binary.getBinFileWithDict filename
+   iface <- initTcRnIf 's' hsc_env () () $ readBinIface  filename
    printDump (pprModIface iface)
- where
 \end{code}
-
 
 \begin{code}
 pprModIface :: ModIface -> SDoc

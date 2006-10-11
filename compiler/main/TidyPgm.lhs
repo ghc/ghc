@@ -28,7 +28,7 @@ import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( Arity, isNeverActive, isNonRuleLoopBreaker )
 import Name		( Name, getOccName, nameOccName, mkInternalName,
-		  	  localiseName, isExternalName, nameSrcLoc, nameParent_maybe,
+		  	  localiseName, isExternalName, nameSrcLoc,
 			  isWiredInName, getName
 			)
 import NameSet		( NameSet, elemNameSet )
@@ -43,12 +43,7 @@ import TyCon		( TyCon, makeTyConAbstract, tyConDataCons, isNewTyCon,
 			  isEnumerationTyCon, isOpenTyCon )
 import Class		( classSelIds )
 import Module		( Module )
-import HscTypes		( HscEnv(..), NameCache( nsUniqs ), CgGuts(..),
-			  TypeEnv, typeEnvIds, typeEnvElts, typeEnvTyCons, 
-			  extendTypeEnvWithIds, lookupTypeEnv,
-			  ModGuts(..), TyThing(..), ModDetails(..),
-			  Dependencies(..)
-			)
+import HscTypes
 import Maybes		( orElse, mapCatMaybes )
 import ErrUtils		( showPass, dumpIfSet_core )
 import PackageConfig	( PackageId )
@@ -264,7 +259,8 @@ tidyProgram hsc_env
 	; (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod type_env ext_ids 
 						 binds
 
-	; let { tidy_type_env = tidyTypeEnv omit_prags exports type_env 
+	; let { export_set = availsToNameSet exports
+              ; tidy_type_env = tidyTypeEnv omit_prags export_set type_env 
 					    tidy_binds
 	      ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
 		-- A DFunId will have a binding in tidy_binds, and so
@@ -664,7 +660,6 @@ tidyTopName mod nc_var ext_ids occ_env id
     global	= isExternalName name
     local	= not global
     internal	= not external
-    mb_parent   = nameParent_maybe name
     loc		= nameSrcLoc name
 
     (occ_env', occ') = tidyOccName occ_env (nameOccName name)
@@ -674,7 +669,7 @@ tidyTopName mod nc_var ext_ids occ_env id
 		      (us1, us2) = splitUniqSupply (nsUniqs nc)
 		      uniq	 = uniqFromSupply us1
 
-    mk_new_external nc = allocateGlobalBinder nc mod occ' mb_parent loc
+    mk_new_external nc = allocateGlobalBinder nc mod occ' loc
 	-- If we want to externalise a currently-local name, check
 	-- whether we have already assigned a unique for it.
 	-- If so, use it; if not, extend the table.

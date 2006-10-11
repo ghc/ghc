@@ -895,7 +895,7 @@ mkPrimOpId prim_op
     ty   = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op) 
 			 (mkPrimOpIdUnique (primOpTag prim_op))
-			 Nothing (AnId id) UserSyntax
+			 (AnId id) UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 		
     info = noCafIdInfo
@@ -1034,7 +1034,7 @@ another gun with which to shoot yourself in the foot.
 
 \begin{code}
 mkWiredInIdName mod fs uniq id
- = mkWiredInName mod (mkOccNameFS varName fs) uniq Nothing (AnId id) UserSyntax
+ = mkWiredInName mod (mkOccNameFS varName fs) uniq (AnId id) UserSyntax
 
 unsafeCoerceName = mkWiredInIdName gHC_PRIM FSLIT("unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName     = mkWiredInIdName gHC_PRIM FSLIT("nullAddr#")	   nullAddrIdKey      nullAddrId

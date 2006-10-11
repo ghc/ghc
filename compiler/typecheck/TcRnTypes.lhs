@@ -74,6 +74,7 @@ import Bag
 import Outputable
 import Maybe		( mapMaybe )
 import ListSetOps	( unionLists )
+import Data.List        ( nub )
 \end{code}
 
 
@@ -163,7 +164,7 @@ data TcGblEnv
 		-- accumulated, but never consulted until the end.  
 		-- Nevertheless, it's convenient to accumulate them along 
 		-- with the rest of the info from this module.
-	tcg_exports :: NameSet,		-- What is exported
+	tcg_exports :: [AvailInfo],	-- What is exported
 	tcg_imports :: ImportAvails,	-- Information about what was imported 
 					--    from where, including things bound
 					--    in this module
@@ -482,20 +483,21 @@ It is used 	* when processing the export list
 \begin{code}
 data ImportAvails 
    = ImportAvails {
-	imp_env :: ModuleNameEnv NameSet,
-		-- All the things imported, classified by 
+	imp_env :: ModuleNameEnv [AvailInfo],
+		-- All the things imported *unqualified*, classified by 
 		-- the *module qualifier* for its import
 		--   e.g.	 import List as Foo
 		-- would add a binding Foo |-> ...stuff from List...
 		-- to imp_env.
 		-- 
-		-- We need to classify them like this so that we can figure out 
-		-- "module M" export specifiers in an export list 
-		-- (see 1.4 Report Section 5.1.1).  Ultimately, we want to find 
-		-- everything that is unambiguously in scope as 'M.x'
-		-- and where plain 'x' is (perhaps ambiguously) in scope.
-		-- So the starting point is all things that are in scope as 'M.x',
-		-- which is what this field tells us.
+                -- This is exactly the list of things that will be exported
+                -- by a 'module M' specifier in the export list.
+		-- (see Haskell 98 Report Section 5.2).
+                --
+                -- Warning: there may be duplciates in this list,
+                -- duplicates are removed at the use site (rnExports).
+                -- We might consider turning this into a NameEnv at
+                -- some point.
 
 	imp_mods :: ModuleEnv (Module, Bool, SrcSpan),
 		-- Domain is all directly-imported modules
@@ -510,6 +512,11 @@ data ImportAvails
 		--       the interface file; if we import somethign we
 		--       need to recompile if the export version changes
 		--   (b) to specify what child modules to initialise
+                --
+                -- We need a full ModuleEnv rather than a ModuleNameEnv
+                -- here, because we might be importing modules of the
+                -- same name from different packages. (currently not the case,
+                -- but might be in the future).
 
 	imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
 		-- Home-package modules needed by the module being compiled
@@ -526,8 +533,14 @@ data ImportAvails
 		-- directly, or via other modules in this package, or via
 		-- modules imported from other packages.
 
- 	imp_orphs :: [Module]
+ 	imp_orphs :: [Module],
 		-- Orphan modules below us in the import tree
+
+        imp_parent :: NameEnv AvailInfo
+                -- for the names in scope in this module, tells us
+                -- the relationship between parents and children
+                -- (eg. a TyCon is the parent of its DataCons, a
+                -- class is the parent of its methods, etc.).
       }
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
@@ -541,20 +554,28 @@ emptyImportAvails = ImportAvails { imp_env 	= emptyUFM,
 				   imp_mods   	= emptyModuleEnv,
 				   imp_dep_mods = emptyUFM,
 				   imp_dep_pkgs = [],
-				   imp_orphs    = [] }
+				   imp_orphs    = [],
+                                   imp_parent   = emptyNameEnv }
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_env = env1, imp_mods = mods1,
-		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, imp_orphs = orphs1 })
+		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, 
+                  imp_orphs = orphs1, imp_parent = parent1 })
   (ImportAvails { imp_env = env2, imp_mods = mods2,
-		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2, imp_orphs = orphs2 })
-  = ImportAvails { imp_env      = plusUFM_C unionNameSets env1 env2, 
+		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
+                  imp_orphs = orphs2, imp_parent = parent2  })
+  = ImportAvails { imp_env      = plusUFM_C (++) env1 env2, 
 		   imp_mods     = mods1  `plusModuleEnv` mods2,	
 		   imp_dep_mods = plusUFM_C plus_mod_dep dmods1 dmods2,	
 		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
-		   imp_orphs    = orphs1 `unionLists` orphs2 }
+		   imp_orphs    = orphs1 `unionLists` orphs2,
+                   imp_parent   = plusNameEnv_C plus_avails parent1 parent2 }
   where
+    plus_avails (AvailTC tc subs1) (AvailTC _ subs2)
+                = AvailTC tc (nub (subs1 ++ subs2))
+    plus_avails avail _ = avail
+
     plus_mod_dep (m1, boot1) (m2, boot2) 
 	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
 		-- Check mod-names match

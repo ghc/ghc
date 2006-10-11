@@ -446,9 +446,9 @@ runMainIOName = varQual gHC_TOP_HANDLER FSLIT("runMainIO") runMainKey
 
 orderingTyConName = tcQual   gHC_BASE FSLIT("Ordering") orderingTyConKey
 
-eitherTyConName	  = tcQual  dATA_EITHER     FSLIT("Either") eitherTyConKey
-leftDataConName   = conName eitherTyConName FSLIT("Left")   leftDataConKey
-rightDataConName  = conName eitherTyConName FSLIT("Right")  rightDataConKey
+eitherTyConName	  = tcQual  dATA_EITHER FSLIT("Either") eitherTyConKey
+leftDataConName   = conName dATA_EITHER FSLIT("Left")   leftDataConKey
+rightDataConName  = conName dATA_EITHER FSLIT("Right")  rightDataConKey
 
 -- Generics
 crossTyConName     = tcQual   gHC_BASE FSLIT(":*:") crossTyConKey
@@ -466,18 +466,18 @@ eqStringName	 	= varQual gHC_BASE FSLIT("eqString")  eqStringIdKey
 inlineIdName	 	= varQual gHC_BASE FSLIT("inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
-eqClassName	  = clsQual gHC_BASE FSLIT("Eq")      eqClassKey
-eqName		  = methName eqClassName FSLIT("==")   eqClassOpKey
-ordClassName	  = clsQual gHC_BASE FSLIT("Ord")     ordClassKey
-geName		  = methName ordClassName FSLIT(">=")  geClassOpKey
-functorClassName  = clsQual gHC_BASE FSLIT("Functor") functorClassKey
+eqClassName	  = clsQual  gHC_BASE FSLIT("Eq")      eqClassKey
+eqName		  = methName gHC_BASE FSLIT("==")      eqClassOpKey
+ordClassName	  = clsQual  gHC_BASE FSLIT("Ord")     ordClassKey
+geName		  = methName gHC_BASE FSLIT(">=")      geClassOpKey
+functorClassName  = clsQual  gHC_BASE FSLIT("Functor") functorClassKey
 
 -- Class Monad
-monadClassName	   = clsQual gHC_BASE FSLIT("Monad")        monadClassKey
-thenMName	   = methName monadClassName FSLIT(">>")     thenMClassOpKey
-bindMName	   = methName monadClassName FSLIT(">>=")    bindMClassOpKey
-returnMName	   = methName monadClassName FSLIT("return") returnMClassOpKey
-failMName	   = methName monadClassName FSLIT("fail")   failMClassOpKey
+monadClassName	   = clsQual  gHC_BASE FSLIT("Monad")  monadClassKey
+thenMName	   = methName gHC_BASE FSLIT(">>")     thenMClassOpKey
+bindMName	   = methName gHC_BASE FSLIT(">>=")    bindMClassOpKey
+returnMName	   = methName gHC_BASE FSLIT("return") returnMClassOpKey
+failMName	   = methName gHC_BASE FSLIT("fail")   failMClassOpKey
 
 -- Random PrelBase functions
 otherwiseIdName   = varQual gHC_BASE FSLIT("otherwise")  otherwiseIdKey
@@ -506,25 +506,25 @@ fstName		  = varQual dATA_TUP FSLIT("fst") fstIdKey
 sndName		  = varQual dATA_TUP FSLIT("snd") sndIdKey
 
 -- Module PrelNum
-numClassName	  = clsQual gHC_NUM FSLIT("Num") numClassKey
-fromIntegerName   = methName numClassName FSLIT("fromInteger") fromIntegerClassOpKey
-minusName	  = methName numClassName FSLIT("-") minusClassOpKey
-negateName	  = methName numClassName FSLIT("negate") negateClassOpKey
-plusIntegerName   = varQual gHC_NUM FSLIT("plusInteger") plusIntegerIdKey
-timesIntegerName  = varQual gHC_NUM FSLIT("timesInteger") timesIntegerIdKey
-integerTyConName  = tcQual  gHC_NUM FSLIT("Integer") integerTyConKey
-smallIntegerDataConName = conName integerTyConName FSLIT("S#") smallIntegerDataConKey
-largeIntegerDataConName = conName integerTyConName FSLIT("J#") largeIntegerDataConKey
+numClassName	  = clsQual  gHC_NUM FSLIT("Num") numClassKey
+fromIntegerName   = methName gHC_NUM FSLIT("fromInteger") fromIntegerClassOpKey
+minusName	  = methName gHC_NUM FSLIT("-") minusClassOpKey
+negateName	  = methName gHC_NUM FSLIT("negate") negateClassOpKey
+plusIntegerName   = varQual  gHC_NUM FSLIT("plusInteger") plusIntegerIdKey
+timesIntegerName  = varQual  gHC_NUM FSLIT("timesInteger") timesIntegerIdKey
+integerTyConName  = tcQual   gHC_NUM FSLIT("Integer") integerTyConKey
+smallIntegerDataConName = conName gHC_NUM FSLIT("S#") smallIntegerDataConKey
+largeIntegerDataConName = conName gHC_NUM FSLIT("J#") largeIntegerDataConKey
 
 -- PrelReal types and classes
-rationalTyConName   = tcQual  gHC_REAL  FSLIT("Rational") rationalTyConKey
-ratioTyConName	    = tcQual  gHC_REAL  FSLIT("Ratio") ratioTyConKey
-ratioDataConName    = conName ratioTyConName FSLIT(":%") ratioDataConKey
-realClassName	    = clsQual gHC_REAL  FSLIT("Real") realClassKey
-integralClassName   = clsQual gHC_REAL  FSLIT("Integral") integralClassKey
-realFracClassName   = clsQual gHC_REAL  FSLIT("RealFrac") realFracClassKey
-fractionalClassName = clsQual gHC_REAL  FSLIT("Fractional") fractionalClassKey
-fromRationalName    = methName fractionalClassName  FSLIT("fromRational") fromRationalClassOpKey
+rationalTyConName   = tcQual  gHC_REAL FSLIT("Rational") rationalTyConKey
+ratioTyConName	    = tcQual  gHC_REAL FSLIT("Ratio") ratioTyConKey
+ratioDataConName    = conName gHC_REAL FSLIT(":%") ratioDataConKey
+realClassName	    = clsQual gHC_REAL FSLIT("Real") realClassKey
+integralClassName   = clsQual gHC_REAL FSLIT("Integral") integralClassKey
+realFracClassName   = clsQual gHC_REAL FSLIT("RealFrac") realFracClassKey
+fractionalClassName = clsQual gHC_REAL FSLIT("Fractional") fractionalClassKey
+fromRationalName    = methName gHC_REAL  FSLIT("fromRational") fromRationalClassOpKey
 
 -- PrelFloat classes
 floatingClassName  = clsQual  gHC_FLOAT FSLIT("Floating") floatingClassKey
@@ -555,10 +555,10 @@ assertErrorName	  = varQual gHC_ERR FSLIT("assertError") assertErrorIdKey
 
 -- Enum module (Enum, Bounded)
 enumClassName 	   = clsQual gHC_ENUM FSLIT("Enum") enumClassKey
-enumFromName	   = methName enumClassName FSLIT("enumFrom") enumFromClassOpKey
-enumFromToName	   = methName enumClassName FSLIT("enumFromTo") enumFromToClassOpKey
-enumFromThenName   = methName enumClassName FSLIT("enumFromThen") enumFromThenClassOpKey
-enumFromThenToName = methName enumClassName FSLIT("enumFromThenTo") enumFromThenToClassOpKey
+enumFromName	   = methName gHC_ENUM FSLIT("enumFrom") enumFromClassOpKey
+enumFromToName	   = methName gHC_ENUM FSLIT("enumFromTo") enumFromToClassOpKey
+enumFromThenName   = methName gHC_ENUM FSLIT("enumFromThen") enumFromThenClassOpKey
+enumFromThenToName = methName gHC_ENUM FSLIT("enumFromThenTo") enumFromThenToClassOpKey
 boundedClassName   = clsQual gHC_ENUM FSLIT("Bounded") boundedClassKey
 
 -- List functions
@@ -590,7 +590,7 @@ indexOfPName      = varQual gHC_PARR FSLIT("indexOfP")     indexOfPIdKey
 
 -- IOBase things
 ioTyConName	  = tcQual  gHC_IO_BASE FSLIT("IO") ioTyConKey
-ioDataConName     = conName ioTyConName  FSLIT("IO") ioDataConKey
+ioDataConName     = conName gHC_IO_BASE FSLIT("IO") ioDataConKey
 thenIOName	  = varQual gHC_IO_BASE FSLIT("thenIO") thenIOIdKey
 bindIOName	  = varQual gHC_IO_BASE FSLIT("bindIO") bindIOIdKey
 returnIOName	  = varQual gHC_IO_BASE FSLIT("returnIO") returnIOIdKey
@@ -611,7 +611,7 @@ word16TyConName   = tcQual  gHC_WORD FSLIT("Word16") word16TyConKey
 word32TyConName   = tcQual  gHC_WORD FSLIT("Word32") word32TyConKey
 word64TyConName   = tcQual  gHC_WORD FSLIT("Word64") word64TyConKey
 wordTyConName     = tcQual  gHC_WORD FSLIT("Word")   wordTyConKey
-wordDataConName   = conName wordTyConName FSLIT("W#") wordDataConKey
+wordDataConName   = conName gHC_WORD FSLIT("W#") wordDataConKey
 
 -- PrelPtr module
 ptrTyConName	  = tcQual   gHC_PTR FSLIT("Ptr") ptrTyConKey
@@ -626,7 +626,7 @@ runSTRepName	   = varQual gHC_ST  FSLIT("runSTRep") runSTRepIdKey
 
 -- Recursive-do notation
 monadFixClassName  = clsQual mONAD_FIX FSLIT("MonadFix") monadFixClassKey
-mfixName	   = methName monadFixClassName FSLIT("mfix") mfixIdKey
+mfixName	   = methName mONAD_FIX FSLIT("mfix") mfixIdKey
 
 -- Arrow notation
 arrAName	   = varQual aRROW FSLIT("arr")	  arrAIdKey
@@ -666,20 +666,15 @@ tcQual   = mk_known_key_name tcName
 clsQual  = mk_known_key_name clsName
 
 mk_known_key_name space mod str uniq 
-  = mkExternalName uniq mod (mkOccNameFS space str) 
-		   Nothing noSrcLoc
+  = mkExternalName uniq mod (mkOccNameFS space str) noSrcLoc
 
-conName :: Name -> FastString -> Unique -> Name
--- Be careful to ghve constructor names the right parent!
-conName tycon occ uniq
-  = mkExternalName uniq (nameModule tycon) (mkOccNameFS dataName occ) 
-		   (Just tycon) noSrcLoc
+conName :: Module -> FastString -> Unique -> Name
+conName mod occ uniq
+  = mkExternalName uniq mod (mkOccNameFS dataName occ) noSrcLoc
 
-methName :: Name -> FastString -> Unique -> Name
--- Be careful to ghve method names the right parent!
-methName cls occ uniq
-  = mkExternalName uniq (nameModule cls) (mkVarOccFS occ) 
-		   (Just cls) noSrcLoc
+methName :: Module -> FastString -> Unique -> Name
+methName mod occ uniq
+  = mkExternalName uniq mod (mkVarOccFS occ) noSrcLoc
 \end{code}
 
 %************************************************************************

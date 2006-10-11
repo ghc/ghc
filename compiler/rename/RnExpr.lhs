@@ -23,6 +23,8 @@ import HsSyn
 import RnHsSyn
 import TcRnMonad
 import RnEnv
+import HscTypes         ( availNames )
+import OccName		( plusOccEnv )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, 
@@ -573,7 +575,8 @@ rnBracket (DecBr group)
 	-- confuse the Names for the current module.  
 	-- By using a pretend module, thFAKE, we keep them safely out of the way.
 
-	; names <- getLocalDeclBinders gbl_env1 group
+	; avails <- getLocalDeclBinders gbl_env1 group
+        ; let names = concatMap availNames avails
 
 	; let new_occs = map nameOccName names
 	      trimmed_rdr_env = hideSomeUnquals (tcg_rdr_env gbl_env) new_occs

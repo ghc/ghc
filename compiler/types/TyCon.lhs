@@ -10,7 +10,8 @@ module TyCon(
 	PrimRep(..),
 	tyConPrimRep,
 
-	AlgTyConRhs(..), visibleDataCons, AlgTyConParent(..),
+	AlgTyConRhs(..), visibleDataCons, 
+        AlgTyConParent(..), hasParent,
 	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
@@ -22,6 +23,7 @@ module TyCon(
 	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConCo_maybe,
 	isHiBootTyCon, isSuperKindTyCon,
         isCoercionTyCon_maybe, isCoercionTyCon,
+        isImplicitTyCon,
 
 	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 
@@ -274,6 +276,10 @@ data AlgTyConParent = -- An ordinary type constructor has no parent.
 				    TyCon	-- a *coercion* identifying
 						-- the representation type
 						-- with the type instance
+
+hasParent :: AlgTyConParent -> Bool
+hasParent NoParentTyCon = False
+hasParent _other        = True
 
 data SynTyConRhs
   = OpenSynTyCon Kind	-- Type family: *result* kind given
@@ -662,8 +668,16 @@ isCoercionTyCon_maybe (CoercionTyCon {tyConArity = ar, coKindFun = rule})
   = Just (ar, rule)
 isCoercionTyCon_maybe other = Nothing
 
+isCoercionTyCon :: TyCon -> Bool
 isCoercionTyCon (CoercionTyCon {}) = True
 isCoercionTyCon other              = False
+
+isImplicitTyCon :: TyCon -> Bool
+isImplicitTyCon SynTyCon{}                     = False
+isImplicitTyCon AlgTyCon{algTcParent = parent} = hasParent parent
+isImplicitTyCon other                          = True
+        -- catches: FunTyCon, TupleTyCon, PrimTyCon, 
+        -- CoercionTyCon, SuperKindTyCon
 \end{code}
 
 

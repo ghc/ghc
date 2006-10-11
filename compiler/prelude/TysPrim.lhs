@@ -103,7 +103,6 @@ mkPrimTc :: FastString -> Unique -> TyCon -> Name
 mkPrimTc fs uniq tycon
   = mkWiredInName gHC_PRIM (mkOccNameFS tcName fs) 
 		  uniq
-		  Nothing 		-- No parent object
 		  (ATyCon tycon)	-- Relevant TyCon
 		  UserSyntax		-- None are built-in syntax
 

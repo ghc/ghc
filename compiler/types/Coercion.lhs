@@ -392,7 +392,7 @@ unsafeCoercionTyCon
 -- ...and their names
 
 mkCoConName occ key coCon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ)
-                            key Nothing (ATyCon coCon) BuiltInSyntax
+                            key (ATyCon coCon) BuiltInSyntax
 
 transCoercionTyConName = mkCoConName FSLIT("trans") transCoercionTyConKey transCoercionTyCon
 symCoercionTyConName   = mkCoConName FSLIT("sym") symCoercionTyConKey symCoercionTyCon

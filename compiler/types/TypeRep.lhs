@@ -354,7 +354,6 @@ funTyConName              = mkPrimTyConName FSLIT("(->)") funTyConKey funTyCon
 
 mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ) 
 					      key 
-					      Nothing 		-- No parent object
 					      (ATyCon tycon)
 					      BuiltInSyntax
 	-- All of the super kinds and kinds are defined in Prim and use BuiltInSyntax,

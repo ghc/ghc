@@ -20,14 +20,14 @@ module IfaceSyn (
 	IfaceInfoItem(..), IfaceRule(..), IfaceInst(..), IfaceFamInst(..),
 
 	-- Misc
-	visibleIfConDecls,
+        ifaceDeclSubBndrs, visibleIfConDecls,
 
 	-- Equality
-	IfaceEq(..), (&&&), bool, eqListBy, eqMaybeBy,
+	GenIfaceEq(..), IfaceEq, (&&&), bool, eqListBy, eqMaybeBy,
 	eqIfDecl, eqIfInst, eqIfRule, checkBootDecl,
 	
 	-- Pretty printing
-	pprIfaceExpr, pprIfaceDecl, pprIfaceDeclHead 
+	pprIfaceExpr, pprIfaceDeclHead 
     ) where
 
 #include "HsVersions.h"
@@ -37,16 +37,23 @@ import IfaceType
 
 import NewDemand	( StrictSig, pprIfaceStrictSig )
 import Class		( FunDep, DefMeth, pprFundeps )
-import OccName		( OccName, parenSymOcc, occNameFS,
-			  OccSet, unionOccSets, unitOccSet, occSetElts )
+import OccName
 import UniqFM           ( UniqFM, emptyUFM, addToUFM, lookupUFM )
+import Unique           ( mkBuiltinUnique )
+import NameSet 
+import Name		( Name, NamedThing(..), isExternalName,
+                          mkInternalName )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
 import ForeignCall	( ForeignCall )
-import BasicTypes	( Arity, Activation(..), StrictnessMark, OverlapFlag,
-			  RecFlag(..), Boxity(..), tupleParens )
+import SrcLoc           ( noSrcLoc )
+import BasicTypes
 import Outputable
 import FastString
+import Maybes		( catMaybes )
+
+import Data.List        ( nub )
+import Data.Maybe       ( isJust )
 
 infixl 3 &&&
 infix  4 `eqIfExt`, `eqIfIdInfo`, `eqIfType`
@@ -101,7 +108,8 @@ data IfaceDecl
 	         ifRec	   :: RecFlag		-- Is newtype/datatype associated with the class recursive?
     }
 
-  | IfaceForeign { ifName :: OccName,		-- Needs expanding when we move beyond .NET
+  | IfaceForeign { ifName :: OccName,           -- Needs expanding when we move
+                                                -- beyond .NET
 		   ifExtName :: Maybe FastString }
 
 data IfaceClassOp = IfaceClassOp OccName DefMeth IfaceType
@@ -125,7 +133,7 @@ visibleIfConDecls (IfNewTyCon c)   = [c]
 
 data IfaceConDecl 
   = IfCon {
-	ifConOcc     :: OccName,		-- Constructor name
+	ifConOcc     :: OccName,   		-- Constructor name
 	ifConInfix   :: Bool,			-- True <=> declared infix
 	ifConUnivTvs :: [IfaceTvBndr],		-- Universal tyvars
 	ifConExTvs   :: [IfaceTvBndr],		-- Existential tyvars
@@ -137,9 +145,9 @@ data IfaceConDecl
 						-- or 1-1 corresp with arg tys
 
 data IfaceInst 
-  = IfaceInst { ifInstCls  :: IfaceExtName,		-- See comments with
+  = IfaceInst { ifInstCls  :: Name,     		-- See comments with
 		ifInstTys  :: [Maybe IfaceTyCon],	-- the defn of Instance
-		ifDFun     :: OccName, 			-- The dfun
+		ifDFun     :: Name,     		-- The dfun
 		ifOFlag    :: OverlapFlag,		-- Overlap flag
 		ifInstOrph :: Maybe OccName }		-- See is_orph in defn of Instance
 	-- There's always a separate IfaceDecl for the DFun, which gives 
@@ -150,7 +158,7 @@ data IfaceInst
 	-- and if the head does not change it won't be used if it wasn't before
 
 data IfaceFamInst
-  = IfaceFamInst { ifFamInstFam   :: IfaceExtName        -- Family tycon
+  = IfaceFamInst { ifFamInstFam   :: Name                -- Family tycon
 		 , ifFamInstTys   :: [Maybe IfaceTyCon]  -- Rough match types
 		 , ifFamInstTyCon :: IfaceTyCon		 -- Instance decl
 		 }
@@ -160,7 +168,7 @@ data IfaceRule
 	ifRuleName   :: RuleName,
 	ifActivation :: Activation,
 	ifRuleBndrs  :: [IfaceBndr],	-- Tyvars and term vars
-	ifRuleHead   :: IfaceExtName,	-- Head of lhs
+	ifRuleHead   :: Name,   	-- Head of lhs
 	ifRuleArgs   :: [IfaceExpr],	-- Args of LHS
 	ifRuleRhs    :: IfaceExpr,
 	ifRuleOrph   :: Maybe OccName	-- Just like IfaceInst
@@ -186,7 +194,7 @@ data IfaceInfoItem
   | HsInline     Activation
   | HsUnfold	 IfaceExpr
   | HsNoCafRefs
-  | HsWorker	 IfaceExtName Arity	-- Worker, if any see IdInfo.WorkerInfo
+  | HsWorker	 Name Arity	-- Worker, if any see IdInfo.WorkerInfo
 					-- for why we want arity here.
 	-- NB: we need IfaceExtName (not just OccName) because the worker
 	--     can simplify to a function in another module.
@@ -196,7 +204,7 @@ data IfaceInfoItem
 --------------------------------
 data IfaceExpr
   = IfaceLcl 	FastString
-  | IfaceExt    IfaceExtName
+  | IfaceExt    Name
   | IfaceType   IfaceType
   | IfaceTuple 	Boxity [IfaceExpr]		-- Saturated; type arguments omitted
   | IfaceLam 	IfaceBndr IfaceExpr
@@ -218,25 +226,80 @@ type IfaceAlt = (IfaceConAlt, [FastString], IfaceExpr)
 	-- thus saving bulk in interface files
 
 data IfaceConAlt = IfaceDefault
- 		 | IfaceDataAlt OccName
+ 		 | IfaceDataAlt Name
 		 | IfaceTupleAlt Boxity
 		 | IfaceLitAlt Literal
 
 data IfaceBinding
   = IfaceNonRec	IfaceIdBndr IfaceExpr
   | IfaceRec 	[(IfaceIdBndr, IfaceExpr)]
-\end{code}
 
+-- -----------------------------------------------------------------------------
+-- Utils on IfaceSyn
 
-%************************************************************************
-%*									*
-\subsection[HsCore-print]{Printing Core unfoldings}
-%*									*
-%************************************************************************
+ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
+--  *Excludes* the 'main' name, but *includes* the implicitly-bound names
+-- Deeply revolting, because it has to predict what gets bound,
+-- especially the question of whether there's a wrapper for a datacon
 
------------------------------ Printing IfaceDecl ------------------------------------
+ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, 
+			       ifSigs = sigs, ifATs = ats })
+  = co_occs ++
+    [tc_occ, dc_occ, dcww_occ] ++
+    [op | IfaceClassOp op  _ _ <- sigs] ++
+    [ifName at | at <- ats ] ++
+    [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] 
+  where
+    n_ctxt = length sc_ctxt
+    n_sigs = length sigs
+    tc_occ  = mkClassTyConOcc cls_occ
+    dc_occ  = mkClassDataConOcc cls_occ	
+    co_occs | is_newtype = [mkNewTyCoOcc tc_occ]
+	    | otherwise  = []
+    dcww_occ -- | is_newtype = mkDataConWrapperOcc dc_occ	-- Newtypes have wrapper but no worker
+	     | otherwise  = mkDataConWorkerOcc dc_occ	-- Otherwise worker but no wrapper
+    is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
 
-\begin{code}
+ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}
+  = []
+-- Newtype
+ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
+			      ifCons = IfNewTyCon (
+				         IfCon { ifConOcc = con_occ, 
+							   ifConFields = fields
+							 }),
+			      ifFamInst = famInst}) 
+  = fields ++ [con_occ, mkDataConWorkerOcc con_occ, mkNewTyCoOcc tc_occ]
+    ++ famInstCo famInst tc_occ
+
+ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
+			      ifCons = IfDataTyCon cons, 
+			      ifFamInst = famInst})
+  = nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields
+    ++ concatMap dc_occs cons
+    ++ famInstCo famInst tc_occ
+  where
+    dc_occs con_decl
+	| has_wrapper = [con_occ, work_occ, wrap_occ]
+	| otherwise   = [con_occ, work_occ]
+	where
+	  con_occ = ifConOcc con_decl
+	  strs    = ifConStricts con_decl
+	  wrap_occ = mkDataConWrapperOcc con_occ
+	  work_occ = mkDataConWorkerOcc con_occ
+	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
+			|| not (null . ifConEqSpec $ con_decl)
+			|| isJust famInst
+		-- ToDo: may miss strictness in existential dicts
+
+ifaceDeclSubBndrs _other = []
+
+-- coercion for data/newtype family instances
+famInstCo Nothing  baseOcc = []
+famInstCo (Just _) baseOcc = [mkInstTyCoOcc baseOcc]
+
+----------------------------- Printing IfaceDecl ------------------------------
+
 instance Outputable IfaceDecl where
   ppr = pprIfaceDecl
 
@@ -319,9 +382,10 @@ pprIfaceConDecl tc
     eq_ctxt = [(IfaceEqPred (IfaceTyVar (occNameFS tv)) ty) 
 	      | (tv,ty) <- eq_spec] 
     con_tau = foldr1 IfaceFunTy (arg_tys ++ [tc_app])
-    tc_app  = IfaceTyConApp (IfaceTc (LocalTop tc)) 
+    tc_app  = IfaceTyConApp (IfaceTc tc_name)
 			    [IfaceTyVar tv | (tv,_) <- univ_tvs]
-	-- Gruesome, but just for debug print
+    tc_name = mkInternalName (mkBuiltinUnique 1) tc noSrcLoc
+	-- Really Gruesome, but just for debug print
 
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
@@ -457,23 +521,25 @@ ppr_hs_info (HsWorker w a)	= ptext SLIT("Worker:") <+> ppr w <+> int a
 %*									*
 %************************************************************************
 
-Equality over IfaceSyn returns an IfaceEq, not a Bool.  The new constructor is
-EqBut, which gives the set of *locally-defined* things whose version must be equal
-for the whole thing to be equal.  So the key function is eqIfExt, which compares
-IfaceExtNames.
+Equality over IfaceSyn returns an IfaceEq, not a Bool.  The new
+constructor is EqBut, which gives the set of things whose version must
+be equal for the whole thing to be equal.  So the key function is
+eqIfExt, which compares Names.
 
 Of course, equality is also done modulo alpha conversion.
 
 \begin{code}
-data IfaceEq 
+data GenIfaceEq a
   = Equal 		-- Definitely exactly the same
   | NotEqual		-- Definitely different
-  | EqBut OccSet	-- The same provided these local things have not changed
+  | EqBut a       -- The same provided these Names have not changed
+
+type IfaceEq = GenIfaceEq NameSet
 
 instance Outputable IfaceEq where
   ppr Equal          = ptext SLIT("Equal")
   ppr NotEqual       = ptext SLIT("NotEqual")
-  ppr (EqBut occset) = ptext SLIT("EqBut") <+> ppr (occSetElts occset)
+  ppr (EqBut occset) = ptext SLIT("EqBut") <+> ppr (nameSetToList occset)
 
 bool :: Bool -> IfaceEq
 bool True  = Equal
@@ -491,23 +557,18 @@ zapEq other	= other
 (&&&) :: IfaceEq -> IfaceEq -> IfaceEq
 Equal       &&& x 	    = x
 NotEqual    &&& x	    = NotEqual
-EqBut occs  &&& Equal       = EqBut occs
-EqBut occs  &&& NotEqual    = NotEqual
-EqBut occs1 &&& EqBut occs2 = EqBut (occs1 `unionOccSets` occs2)
+EqBut nms   &&& Equal       = EqBut nms
+EqBut nms   &&& NotEqual    = NotEqual
+EqBut nms1  &&& EqBut nms2  = EqBut (nms1 `unionNameSets` nms2)
 
----------------------
-eqIfExt :: IfaceExtName -> IfaceExtName -> IfaceEq
 -- This function is the core of the EqBut stuff
-eqIfExt (ExtPkg mod1 occ1)     (ExtPkg mod2 occ2)     = bool (mod1==mod2 && occ1==occ2)
-eqIfExt (HomePkg mod1 occ1 v1) (HomePkg mod2 occ2 v2) = bool (mod1==mod2 && occ1==occ2 && v1==v2)
-eqIfExt (LocalTop occ1)       (LocalTop occ2)      | occ1 == occ2 = EqBut (unitOccSet occ1)
-eqIfExt (LocalTopSub occ1 p1) (LocalTop occ2)      | occ1 == occ2 = EqBut (unitOccSet p1)
-eqIfExt (LocalTopSub occ1 p1) (LocalTopSub occ2 _) | occ1 == occ2 = EqBut (unitOccSet p1)
-eqIfExt n1 n2 = NotEqual
-\end{code}
+-- ASSUMPTION: The left-hand argument is the NEW CODE, and hence
+-- any Names in the left-hand arg have the correct parent in them.
+eqIfExt :: Name -> Name -> IfaceEq
+eqIfExt name1 name2 
+  | name1 == name2 = EqBut (unitNameSet name1)
+  | otherwise      = NotEqual
 
-
-\begin{code}
 ---------------------
 checkBootDecl :: IfaceDecl 	-- The boot decl
 	      -> IfaceDecl	-- The real decl

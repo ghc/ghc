@@ -28,6 +28,8 @@ module Binary
 
    isEOFBin,
 
+   putAt, getAt,
+
    -- for writing instances:
    putByte,
    getByte,
@@ -41,9 +43,9 @@ module Binary
    getByteArray,
    putByteArray,
 
-   getBinFileWithDict,	-- :: Binary a => FilePath -> IO a
-   putBinFileWithDict,	-- :: Binary a => FilePath -> ModuleName -> a -> IO ()
-
+   UserData(..), getUserData, setUserData,
+   newReadState, newWriteState,
+   putDictionary, getDictionary,
   ) where
 
 #include "HsVersions.h"
@@ -51,6 +53,7 @@ module Binary
 -- The *host* architecture version:
 #include "MachDeps.h"
 
+import {-# SOURCE #-} Name (Name)
 import FastString
 import Unique
 import Panic
@@ -68,7 +71,6 @@ import Data.IORef
 import Data.Char		( ord, chr )
 import Data.Array.Base  	( unsafeRead, unsafeWrite )
 import Control.Monad		( when )
-import Control.Exception	( throwDyn )
 import System.IO as IO
 import System.IO.Unsafe		( unsafeInterleaveIO )
 import System.IO.Error		( mkIOError, eofErrorType )
@@ -562,106 +564,57 @@ lazyGet bh = do
     seekBin bh p -- skip over the object for now
     return a
 
--- --------------------------------------------------------------
--- 	Main wrappers: getBinFileWithDict, putBinFileWithDict
---
---	This layer is built on top of the stuff above, 
---	and should not know anything about BinHandles
--- --------------------------------------------------------------
-
-initBinMemSize       = (1024*1024) :: Int
-
-#if   WORD_SIZE_IN_BITS == 32
-binaryInterfaceMagic = 0x1face :: Word32
-#elif WORD_SIZE_IN_BITS == 64
-binaryInterfaceMagic = 0x1face64 :: Word32
-#endif
-
-getBinFileWithDict :: Binary a => FilePath -> IO a
-getBinFileWithDict file_path = do
-  bh <- Binary.readBinMem file_path
-
-	-- Read the magic number to check that this really is a GHC .hi file
-	-- (This magic number does not change when we change 
-	--  GHC interface file format)
-  magic <- get bh
-  when (magic /= binaryInterfaceMagic) $
-	throwDyn (ProgramError (
-	   "magic number mismatch: old/corrupt interface file?"))
-
-	-- Read the dictionary
-	-- The next word in the file is a pointer to where the dictionary is
-	-- (probably at the end of the file)
-  dict_p <- Binary.get bh	-- Get the dictionary ptr
-  data_p <- tellBin bh		-- Remember where we are now
-  seekBin bh dict_p
-  dict <- getDictionary bh
-  seekBin bh data_p		-- Back to where we were before
-
-	-- Initialise the user-data field of bh
-  let bh' = setUserData bh (initReadState dict)
-	
-	-- At last, get the thing 
-  get bh'
-
-putBinFileWithDict :: Binary a => FilePath -> a -> IO ()
-putBinFileWithDict file_path the_thing = do
-  bh <- openBinMem initBinMemSize
-  put_ bh binaryInterfaceMagic
-
-	-- Remember where the dictionary pointer will go
-  dict_p_p <- tellBin bh
-  put_ bh dict_p_p	-- Placeholder for ptr to dictionary
-
-	-- Make some intial state
-  usr_state <- newWriteState
-
-	-- Put the main thing, 
-  put_ (setUserData bh usr_state) the_thing
-
-	-- Get the final-state
-  j <- readIORef  (ud_next usr_state)
-  fm <- readIORef (ud_map  usr_state)
-  dict_p <- tellBin bh	-- This is where the dictionary will start
-
-	-- Write the dictionary pointer at the fornt of the file
-  putAt bh dict_p_p dict_p	-- Fill in the placeholder
-  seekBin bh dict_p		-- Seek back to the end of the file
-
-	-- Write the dictionary itself
-  putDictionary bh j (constructDictionary j fm)
-
-	-- And send the result to the file
-  writeBinMem bh file_path
-  
 -- -----------------------------------------------------------------------------
 -- UserData
 -- -----------------------------------------------------------------------------
 
 data UserData = 
-   UserData { 	-- This field is used only when reading
-	      ud_dict :: Dictionary,
+   UserData {
+        -- for *deserialising* only:
+	ud_dict   :: Dictionary,
+        ud_symtab :: SymbolTable,
 
-		-- The next two fields are only used when writing
-	      ud_next :: IORef Int,	-- The next index to use
-	      ud_map  :: IORef (UniqFM (Int,FastString))
-	}
+        -- for *serialising* only:
+	ud_dict_next :: !FastMutInt,	-- The next index to use
+	ud_dict_map  :: !(IORef (UniqFM (Int,FastString))),
+                                -- indexed by FastString
 
-noUserData = error "Binary.UserData: no user data"
+        ud_symtab_next :: !FastMutInt, 	-- The next index to use
+	ud_symtab_map  :: !(IORef (UniqFM (Int,Name)))
+                                -- indexed by Name
+   }
 
-initReadState :: Dictionary -> UserData
-initReadState dict = UserData{ ud_dict = dict,
-			       ud_next = undef "next",
-			       ud_map  = undef "map" }
+newReadState :: Dictionary -> IO UserData
+newReadState dict = do
+  dict_next <- newFastMutInt
+  dict_map <- newIORef (undef "dict_map")
+  symtab_next <- newFastMutInt
+  symtab_map <- newIORef (undef "symtab_map")
+  return UserData { ud_dict = dict,
+                    ud_symtab = undef "symtab",
+                    ud_dict_next = dict_next,
+                    ud_dict_map = dict_map,
+                    ud_symtab_next = symtab_next,
+                    ud_symtab_map = symtab_map
+                   }
 
 newWriteState :: IO UserData
 newWriteState = do
-  j_r <- newIORef 0
-  out_r <- newIORef emptyUFM
-  return (UserData { ud_dict = panic "dict",
-		     ud_next = j_r,
-		     ud_map  = out_r })
+  dict_next <- newFastMutInt
+  writeFastMutInt dict_next 0
+  dict_map <- newIORef emptyUFM
+  symtab_next <- newFastMutInt
+  writeFastMutInt symtab_next 0
+  symtab_map <- newIORef emptyUFM
+  return UserData { ud_dict = undef "dict",
+                    ud_symtab = undef "symtab",
+                    ud_dict_next = dict_next,
+                    ud_dict_map = dict_map,
+                    ud_symtab_next = symtab_next,
+                    ud_symtab_map = symtab_map
+                   }
 
+noUserData = undef "UserData"
 
 undef s = panic ("Binary.UserData: no " ++ s)
 
@@ -672,10 +625,10 @@ undef s = panic ("Binary.UserData: no " ++ s)
 type Dictionary = Array Int FastString	-- The dictionary
 					-- Should be 0-indexed
 
-putDictionary :: BinHandle -> Int -> Dictionary -> IO ()
+putDictionary :: BinHandle -> Int -> UniqFM (Int,FastString) -> IO ()
 putDictionary bh sz dict = do
   put_ bh sz
-  mapM_ (putFS bh) (elems dict)
+  mapM_ (putFS bh) (elems (array (0,sz-1) (eltsUFM dict)))
 
 getDictionary :: BinHandle -> IO Dictionary
 getDictionary bh = do 
@@ -683,8 +636,14 @@ getDictionary bh = do
   elems <- sequence (take sz (repeat (getFS bh)))
   return (listArray (0,sz-1) elems)
 
-constructDictionary :: Int -> UniqFM (Int,FastString) -> Dictionary
-constructDictionary j fm = array (0,j-1) (eltsUFM fm)
+---------------------------------------------------------
+--		The Symbol Table
+---------------------------------------------------------
+
+-- On disk, the symbol table is an array of IfaceExtName, when
+-- reading it in we turn it into a SymbolTable.
+
+type SymbolTable = Array Int Name
 
 ---------------------------------------------------------
 --		Reading and writing FastStrings
@@ -739,16 +698,18 @@ instance Binary PackageId where
 instance Binary FastString where
   put_ bh f@(FastString id l _ fp _) =
     case getUserData bh of { 
-	UserData { ud_next = j_r, ud_map = out_r, ud_dict = dict} -> do
+	UserData { ud_dict_next = j_r, 
+                   ud_dict_map = out_r, 
+                   ud_dict = dict} -> do
     out <- readIORef out_r
     let uniq = getUnique f
     case lookupUFM out uniq of
 	Just (j,f)  -> put_ bh j
 	Nothing -> do
-	   j <- readIORef j_r
+	   j <- readFastMutInt j_r
 	   put_ bh j
-	   writeIORef j_r (j+1)
-	   writeIORef out_r (addToUFM out uniq (j,f))
+	   writeFastMutInt j_r (j+1)
+	   writeIORef out_r $! addToUFM out uniq (j,f)
     }
 
   get bh = do 

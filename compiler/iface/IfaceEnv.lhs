@@ -3,31 +3,31 @@
 \begin{code}
 module IfaceEnv (
 	newGlobalBinder, newIPName, newImplicitBinder, 
-	lookupIfaceTop, lookupIfaceExt,
-	lookupOrig, lookupIfaceTc,
+	lookupIfaceTop,
+	lookupOrig, lookupOrigNameCache, extendNameCache,
 	newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv, 
 	tcIfaceLclId,     tcIfaceTyVar, 
 
-	lookupAvail, ifaceExportNames,
+	ifaceExportNames,
 
 	-- Name-cache stuff
 	allocateGlobalBinder, initNameCache, 
+        getNameCache, setNameCache
    ) where
 
 #include "HsVersions.h"
 
 import TcRnMonad
-import IfaceType	( IfaceExtName(..), IfaceTyCon(..), ifaceTyConName )
 import TysWiredIn	( tupleTyCon, tupleCon )
 import HscTypes		( NameCache(..), HscEnv(..), GenAvailInfo(..), 
-			  IfaceExport, OrigNameCache )
+			  IfaceExport, OrigNameCache, AvailInfo )
+import Type		( mkOpenTvSubst, substTy )
 import TyCon		( TyCon, tyConName )
 import DataCon		( dataConWorkId, dataConName )
 import Var		( TyVar, Id, varName )
-import Name		( Name, nameUnique, nameModule, 
-			  nameOccName, nameSrcLoc, 
-			  getOccName, nameParent_maybe,
+import Name		( Name, nameUnique, nameModule,
+			  nameOccName, nameSrcLoc, getOccName,
 		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
 import NameSet		( NameSet, emptyNameSet, addListToNameSet )
@@ -54,7 +54,7 @@ import Outputable
 %*********************************************************
 
 \begin{code}
-newGlobalBinder :: Module -> OccName -> Maybe Name -> SrcLoc -> TcRnIf a b Name
+newGlobalBinder :: Module -> OccName -> SrcLoc -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
 --
@@ -62,25 +62,25 @@ newGlobalBinder :: Module -> OccName -> Maybe Name -> SrcLoc -> TcRnIf a b Name
 -- because we may have seen an occurrence before, but now is the
 -- moment when we know its Module and SrcLoc in their full glory
 
-newGlobalBinder mod occ mb_parent loc
+newGlobalBinder mod occ loc
   = do	{ mod `seq` occ `seq` return ()	-- See notes with lookupOrig_help
-	-- ; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
+	; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
     	; name_supply <- getNameCache
 	; let (name_supply', name) = allocateGlobalBinder 
 					name_supply mod occ
-					mb_parent loc
+					loc
 	; setNameCache name_supply'
 	; return name }
 
 allocateGlobalBinder
   :: NameCache 
-  -> Module -> OccName -> Maybe Name -> SrcLoc 
+  -> Module -> OccName -> SrcLoc 
   -> (NameCache, Name)
-allocateGlobalBinder name_supply mod occ mb_parent loc
+allocateGlobalBinder name_supply mod occ loc
   = case lookupOrigNameCache (nsNames name_supply) mod occ of
 	-- A hit in the cache!  We are at the binding site of the name.
-	-- This is the moment when we know the defining parent and SrcLoc
-	-- of the Name, so we set these fields in the Name we return.
+	-- This is the moment when we know the SrcLoc
+	-- of the Name, so we set this field in the Name we return.
 	--
 	-- Then (bogus) multiple bindings of the same Name
 	-- get different SrcLocs can can be reported as such.
@@ -98,8 +98,8 @@ allocateGlobalBinder name_supply mod occ mb_parent loc
 		  | otherwise -> (new_name_supply, name')
 		  where
 		    uniq      = nameUnique name
-		    name'     = mkExternalName uniq mod occ mb_parent loc
-		    new_cache = extend_name_cache (nsNames name_supply) mod occ name'
+		    name'     = mkExternalName uniq mod occ loc
+		    new_cache = extendNameCache (nsNames name_supply) mod occ name'
 		    new_name_supply = name_supply {nsNames = new_cache}		     
 
 	-- Miss in the cache!
@@ -108,8 +108,8 @@ allocateGlobalBinder name_supply mod occ mb_parent loc
 		where
 		  (us', us1)      = splitUniqSupply (nsUniqs name_supply)
 		  uniq   	  = uniqFromSupply us1
-		  name            = mkExternalName uniq mod occ mb_parent loc
-		  new_cache       = extend_name_cache (nsNames name_supply) mod occ name
+		  name            = mkExternalName uniq mod occ loc
+		  new_cache       = extendNameCache (nsNames name_supply) mod occ name
 		  new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
 
 
@@ -119,67 +119,34 @@ newImplicitBinder :: Name			-- Base name
 -- Called in BuildTyCl to allocate the implicit binders of type/class decls
 -- For source type/class decls, this is the first occurrence
 -- For iface ones, the LoadIface has alrady allocated a suitable name in the cache
---
--- An *implicit* name has the base-name as parent
 newImplicitBinder base_name mk_sys_occ
   = newGlobalBinder (nameModule base_name)
 		    (mk_sys_occ (nameOccName base_name))
-		    (Just parent_name)
 		    (nameSrcLoc base_name)    
-  where
-    parent_name = case nameParent_maybe base_name of
-		    Just parent_name  -> parent_name
-		    Nothing 	      -> base_name
 
-ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl NameSet
-ifaceExportNames exports 
-  = foldlM do_one emptyNameSet exports
-  where
-    do_one acc (mod, exports)  = foldlM (do_avail mod) acc exports
-    do_avail mod acc avail = do { ns <- lookupAvail mod avail
-				; return (addListToNameSet acc ns) }
+ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
+ifaceExportNames exports = do
+  mod_avails <- mapM (\(mod,avails) -> mapM (lookupAvail mod) avails) exports
+  return (concat mod_avails)
 
-lookupAvail :: Module -> GenAvailInfo OccName -> TcRnIf a b [Name]
--- Find all the names arising from an import
--- Make sure the parent info is correct, even though we may not
--- yet have read the interface for this module
-lookupAvail mod (Avail n) = do { n' <- lookupOrig mod n; 
-			       ; return [n'] }
-lookupAvail mod (AvailTC p_occ occs) 
-  = do { p_name <- lookupOrig mod p_occ
-       ; let lookup_sub occ | occ == p_occ = return p_name
-			    | otherwise	   = lookup_orig mod occ (Just p_name)
-       ; mappM lookup_sub occs }
+-- Convert OccNames in GenAvailInfo to Names.
+lookupAvail :: Module -> GenAvailInfo OccName -> TcRnIf a b AvailInfo
+lookupAvail mod (Avail n) = do 
+  n' <- lookupOrig mod n
+  return (Avail n')
+lookupAvail mod (AvailTC p_occ occs) = do
+  p_name <- lookupOrig mod p_occ
+  let lookup_sub occ | occ == p_occ = return p_name
+                     | otherwise    = lookupOrig mod occ
+  subs <- mappM lookup_sub occs
+  return (AvailTC p_name subs)
 	-- Remember that 'occs' is all the exported things, including
 	-- the parent.  It's possible to export just class ops without
-	-- the class, via C( op ). If the class was exported too we'd
-	-- have C( C, op )
+	-- the class, which shows up as C( op ) here. If the class was
+	-- exported too we'd have C( C, op )
 
-	-- The use of lookupOrigSub here (rather than lookupOrig) 
-	-- ensures that the subordinate names record their parent; 
-	-- and that in turn ensures that the GlobalRdrEnv
-	-- has the correct parent for all the names in its range.
-	-- For imported things, we may only suck in the interface later, if ever.
-	-- Reason for all this:
-	--   Suppose module M exports type A.T, and constructor A.MkT
-	--   Then, we know that A.MkT is a subordinate name of A.T,
-	--   even though we aren't at the binding site of A.T
-	--   And it's important, because we may simply re-export A.T
-	--   without ever sucking in the declaration itself.
-
-
-lookupOrig :: Module -> OccName -> TcRnIf a b Name
--- Even if we get a miss in the original-name cache, we 
--- make a new External Name. 
--- We fake up 
--- 	SrcLoc to noSrcLoc
---	Parent no Nothing
--- They'll be overwritten, in due course, by LoadIface.loadDecl.
-lookupOrig mod occ = lookup_orig mod occ Nothing
-
-lookup_orig :: Module -> OccName ->  Maybe Name -> TcRnIf a b Name
--- Used when we know the parent of the thing we are looking up
-lookup_orig mod occ mb_parent
+lookupOrig :: Module -> OccName ->  TcRnIf a b Name
+lookupOrig mod occ
   = do 	{ 	-- First ensure that mod and occ are evaluated
 		-- If not, chaos can ensue:
 		-- 	we read the name-cache
@@ -187,21 +154,22 @@ lookup_orig mod occ mb_parent
 		--	which does some stuff that modifies the name cache
 		-- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
 	  mod `seq` occ `seq` return ()	
+	; traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
     
-	; name_supply <- getNameCache
-    	; case lookupOrigNameCache (nsNames name_supply) mod occ of {
-	      Just name -> returnM name ;
-	      Nothing   -> do 
-
-	{ let { (us', us1)      = splitUniqSupply (nsUniqs name_supply)
-	      ;	uniq   	  	= uniqFromSupply us1
-	      ;	name            = mkExternalName uniq mod occ mb_parent noSrcLoc
-	      ;	new_cache       = extend_name_cache (nsNames name_supply) mod occ name
-	      ;	new_name_supply = name_supply {nsUniqs = us', nsNames = new_cache}
-	  }
-	; setNameCache new_name_supply
-	; return name }
-    }}
+	; name_cache <- getNameCache
+    	; case lookupOrigNameCache (nsNames name_cache) mod occ of {
+	      Just name -> returnM name;
+	      Nothing   ->
+              let
+                us        = nsUniqs name_cache
+                uniq      = uniqFromSupply us
+                name      = mkExternalName uniq mod occ noSrcLoc
+                new_cache = extendNameCache (nsNames name_cache) mod occ name
+              in
+              case splitUniqSupply us of { (us',_) -> do
+                setNameCache name_cache{ nsUniqs = us', nsNames = new_cache }
+                return name
+    }}}
 
 newIPName :: IPName OccName -> TcRnIf m n (IPName Name)
 newIPName occ_name_ip
@@ -246,10 +214,10 @@ lookupOrigNameCache nc mod occ	-- The normal case
 
 extendOrigNameCache :: OrigNameCache -> Name -> OrigNameCache
 extendOrigNameCache nc name 
-  = extend_name_cache nc (nameModule name) (nameOccName name) name
+  = extendNameCache nc (nameModule name) (nameOccName name) name
 
-extend_name_cache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
-extend_name_cache nc mod occ name
+extendNameCache :: OrigNameCache -> Module -> OccName -> Name -> OrigNameCache
+extendNameCache nc mod occ name
   = extendModuleEnv_C combine nc mod (unitOccEnv occ name)
   where
     combine occ_env _ = extendOccEnv occ_env occ name
@@ -324,16 +292,6 @@ extendIfaceTyVarEnv tyvars thing_inside
 %************************************************************************
 
 \begin{code}
-lookupIfaceTc :: IfaceTyCon -> IfL Name
-lookupIfaceTc (IfaceTc ext) = lookupIfaceExt ext
-lookupIfaceTc other_tc	    = return (ifaceTyConName other_tc)
-
-lookupIfaceExt :: IfaceExtName -> IfL Name
-lookupIfaceExt (ExtPkg  mod occ)   = lookupOrig mod occ
-lookupIfaceExt (HomePkg mod occ _) = lookupHomePackage mod occ
-lookupIfaceExt (LocalTop occ)	   = lookupIfaceTop occ
-lookupIfaceExt (LocalTopSub occ _) = lookupIfaceTop occ
-
 lookupIfaceTop :: OccName -> IfL Name
 -- Look up a top-level name from the current Iface module
 lookupIfaceTop occ

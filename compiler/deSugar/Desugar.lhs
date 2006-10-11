@@ -13,7 +13,7 @@ import StaticFlags	( opt_SccProfilingOn,
 			  opt_AutoSccsOnAllToplevs,
 			  opt_AutoSccsOnExportedToplevs )
 import DriverPhases	( isHsBoot )
-import HscTypes		( ModGuts(..), HscEnv(..), 
+import HscTypes		( ModGuts(..), HscEnv(..), availsToNameSet,
 			  Dependencies(..), ForeignStubs(..), TypeEnv, IsBootInterface )
 import HsSyn		( RuleDecl(..), RuleBndr(..), LHsExpr, LRuleDecl )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
@@ -78,7 +78,8 @@ deSugar hsc_env
   = do	{ showPass dflags "Desugar"
 
 	-- Desugar the program
-	; let auto_scc = mkAutoScc mod exports
+        ; let export_set = availsToNameSet exports
+	; let auto_scc = mkAutoScc mod export_set
 
 	; mb_res <- case ghcMode dflags of
 	             JustTypecheck -> return (Just ([], [], NoStubs))
@@ -96,8 +97,8 @@ deSugar hsc_env
 
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
-	; let final_prs = addExportFlags ghci_mode exports keep_alive 
-			   	 all_prs ds_rules
+	; let final_prs = addExportFlags ghci_mode export_set
+                                 keep_alive all_prs ds_rules
 	      ds_binds  = [Rec final_prs]
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
 	-- When compiling PrelFloat, which defines data Float = F# Float#

@@ -9,20 +9,39 @@ module BinIface ( writeBinIface, readBinIface, v_IgnoreHiWay ) where
 
 #include "HsVersions.h"
 
+import TcRnMonad        ( TcRnIf, ioToIOEnv )
+import IfaceEnv
 import HscTypes
 import BasicTypes
 import NewDemand
 import IfaceSyn
+import Module           ( ModuleName, mkModule, modulePackageId, moduleName )
+import Name
+import OccName          ( OccName )
 import VarEnv
 import InstEnv		( OverlapFlag(..) )
 import Class		( DefMeth(..) )
+import DynFlags         ( DynFlags )
+import UniqFM           ( UniqFM, eltsUFM )
+import UniqSupply       ( uniqFromSupply, splitUniqSupply )
 import CostCentre
 import StaticFlags	( opt_HiVersion, v_Build_tag )
+import Type		( Kind,
+                          isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
+			  isArgTypeKind, isUbxTupleKind, liftedTypeKind,
+			  unliftedTypeKind, openTypeKind, argTypeKind,  
+			  ubxTupleKind, mkArrowKind, splitFunTy_maybe )
+import PackageConfig    ( PackageId )
 import Panic
 import Binary
+import SrcLoc           ( noSrcLoc )
 import Util
+import ErrUtils         ( debugTraceMsg )
 import Config		( cGhcUnregisterised )
+import FastMutInt       ( readFastMutInt )
 
+import Data.Word        ( Word32 )
+import Data.Array       ( Array, array, elems, listArray, (!) )
 import DATA_IOREF
 import EXCEPTION	( throwDyn )
 import Monad		( when )
@@ -31,19 +50,164 @@ import Outputable
 #include "HsVersions.h"
 
 -- ---------------------------------------------------------------------------
-writeBinIface :: FilePath -> ModIface -> IO ()
-writeBinIface hi_path mod_iface
-  = putBinFileWithDict hi_path mod_iface
+-- Reading and writing binary interface files
 
-readBinIface :: FilePath -> IO ModIface
-readBinIface hi_path = getBinFileWithDict hi_path
+readBinIface :: FilePath -> TcRnIf a b ModIface
+readBinIface hi_path = do
+  nc <- getNameCache
+  (new_nc, iface) <- ioToIOEnv $ readBinIface_ hi_path nc
+  setNameCache new_nc
+  return iface
+
+readBinIface_ :: FilePath -> NameCache -> IO (NameCache, ModIface)
+readBinIface_ hi_path nc = do
+  bh <- Binary.readBinMem hi_path
+
+	-- Read the magic number to check that this really is a GHC .hi file
+	-- (This magic number does not change when we change 
+	--  GHC interface file format)
+  magic <- get bh
+  when (magic /= binaryInterfaceMagic) $
+	throwDyn (ProgramError (
+	   "magic number mismatch: old/corrupt interface file?"))
+
+	-- Read the dictionary
+	-- The next word in the file is a pointer to where the dictionary is
+	-- (probably at the end of the file)
+  dict_p <- Binary.get bh	-- Get the dictionary ptr
+  data_p <- tellBin bh		-- Remember where we are now
+  seekBin bh dict_p
+  dict <- getDictionary bh
+  seekBin bh data_p		-- Back to where we were before
+
+	-- Initialise the user-data field of bh
+  ud <- newReadState dict
+  bh <- return (setUserData bh ud)
+	
+  symtab_p <- Binary.get bh	-- Get the symtab ptr
+  data_p <- tellBin bh		-- Remember where we are now
+  seekBin bh symtab_p
+  (nc', symtab) <- getSymbolTable bh nc
+  seekBin bh data_p		-- Back to where we were before
+  let ud = getUserData bh
+  bh <- return $! setUserData bh ud{ud_symtab = symtab}
+  iface <- get bh
+  return (nc', iface)
 
 
--- %*********************************************************
--- %*						 	    *
--- 		All the Binary instances
--- %*							    *
--- %*********************************************************
+writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
+writeBinIface dflags hi_path mod_iface = do
+  bh <- openBinMem initBinMemSize
+  put_ bh binaryInterfaceMagic
+
+	-- Remember where the dictionary pointer will go
+  dict_p_p <- tellBin bh
+  put_ bh dict_p_p	-- Placeholder for ptr to dictionary
+
+        -- Remember where the symbol table pointer will go
+  symtab_p_p <- tellBin bh
+  put_ bh symtab_p_p
+
+	-- Make some intial state
+  ud <- newWriteState
+
+	-- Put the main thing, 
+  bh <- return $ setUserData bh ud
+  put_ bh mod_iface
+
+	-- Write the symtab pointer at the fornt of the file
+  symtab_p <- tellBin bh	        -- This is where the symtab will start
+  putAt bh symtab_p_p symtab_p	-- Fill in the placeholder
+  seekBin bh symtab_p		-- Seek back to the end of the file
+
+        -- Write the symbol table itself
+  symtab_next <- readFastMutInt (ud_symtab_next ud)
+  symtab_map  <- readIORef (ud_symtab_map  ud)
+  putSymbolTable bh symtab_next symtab_map
+  debugTraceMsg dflags 3 (text "writeBinIface:" <+> int symtab_next 
+                                <+> text "Names")
+
+        -- NB. write the dictionary after the symbol table, because
+        -- writing the symbol table may create more dictionary entries.
+
+	-- Write the dictionary pointer at the fornt of the file
+  dict_p <- tellBin bh	        -- This is where the dictionary will start
+  putAt bh dict_p_p dict_p	-- Fill in the placeholder
+  seekBin bh dict_p		-- Seek back to the end of the file
+
+	-- Write the dictionary itself
+  dict_next <- readFastMutInt (ud_dict_next ud)
+  dict_map  <- readIORef (ud_dict_map  ud)
+  putDictionary bh dict_next dict_map
+  debugTraceMsg dflags 3 (text "writeBinIface:" <+> int dict_next
+                                 <+> text "dict entries")
+
+	-- And send the result to the file
+  writeBinMem bh hi_path
+
+initBinMemSize       = (1024*1024) :: Int
+
+-- The *host* architecture version:
+#include "MachDeps.h"
+
+#if   WORD_SIZE_IN_BITS == 32
+binaryInterfaceMagic = 0x1face :: Word32
+#elif WORD_SIZE_IN_BITS == 64
+binaryInterfaceMagic = 0x1face64 :: Word32
+#endif
+  
+-- -----------------------------------------------------------------------------
+-- The symbol table
+
+putSymbolTable :: BinHandle -> Int -> UniqFM (Int,Name) -> IO ()
+putSymbolTable bh next_off symtab = do
+  put_ bh next_off
+  let names = elems (array (0,next_off-1) (eltsUFM symtab))
+  mapM_ (\n -> serialiseName bh n symtab) names
+
+getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, Array Int Name)
+getSymbolTable bh namecache = do
+  sz <- get bh
+  od_names <- sequence (replicate sz (get bh))
+  let 
+        arr = listArray (0,sz-1) names
+        (namecache', names) =    
+                mapAccumR (fromOnDiskName arr) namecache od_names
+  --
+  return (namecache', arr)
+
+type OnDiskName = (PackageId, ModuleName, OccName)
+
+fromOnDiskName
+   :: Array Int Name
+   -> NameCache
+   -> OnDiskName
+   -> (NameCache, Name)
+fromOnDiskName arr nc (pid, mod_name, occ) =
+  let 
+        mod   = mkModule pid mod_name
+        cache = nsNames nc
+  in
+  case lookupOrigNameCache cache  mod occ of
+     Just name -> (nc, name)
+     Nothing   -> 
+        let 
+                us        = nsUniqs nc
+                uniq      = uniqFromSupply us
+                name      = mkExternalName uniq mod occ noSrcLoc
+                new_cache = extendNameCache cache mod occ name
+        in        
+        case splitUniqSupply us of { (us',_) -> 
+        ( nc{ nsUniqs = us', nsNames = new_cache }, name )
+        }
+
+serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
+serialiseName bh name symtab = do
+  let mod = nameModule name
+  put_ bh (modulePackageId mod, moduleName mod, nameOccName name)
+
+-- -----------------------------------------------------------------------------
+-- All the binary instances
 
 -- BasicTypes
 {-! for IPName derive: Binary !-}
@@ -504,36 +668,6 @@ instance Binary CostCentre where
 --		IfaceTypes and friends
 -------------------------------------------------------------------------
 
-instance Binary IfaceExtName where
-    put_ bh (ExtPkg mod occ) = do
-	    putByte bh 0
-	    put_ bh mod
-	    put_ bh occ
-    put_ bh (HomePkg mod occ vers) = do
-	    putByte bh 1
-	    put_ bh mod
-	    put_ bh occ
-	    put_ bh vers
-    put_ bh (LocalTop occ) = do
-	    putByte bh 2
-	    put_ bh occ
-    put_ bh (LocalTopSub occ _) = do	-- Write LocalTopSub just like LocalTop
-	    putByte bh 2
-	    put_ bh occ
-
-    get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do mod <- get bh
-		      occ <- get bh
-		      return (ExtPkg mod occ)
-	      1 -> do mod <- get bh
-		      occ <- get bh
-		      vers <- get bh
-		      return (HomePkg mod occ vers)
-	      _ -> do occ <- get bh
-		      return (LocalTop occ)
-
 instance Binary IfaceBndr where
     put_ bh (IfaceIdBndr aa) = do
 	    putByte bh 0
@@ -884,17 +1018,23 @@ instance Binary IfaceNote where
 --		IfaceDecl and friends
 -------------------------------------------------------------------------
 
+-- A bit of magic going on here: there's no need to store the OccName
+-- for a decl on the disk, since we can infer the namespace from the
+-- context; however it is useful to have the OccName in the IfaceDecl
+-- to avoid re-building it in various places.  So we build the OccName
+-- when de-serialising.
+
 instance Binary IfaceDecl where
     put_ bh (IfaceId name ty idinfo) = do
 	    putByte bh 0
-	    put_ bh name
+	    put_ bh (occNameFS name)
 	    put_ bh ty
 	    put_ bh idinfo
     put_ bh (IfaceForeign ae af) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8) = do
 	    putByte bh 2
-	    put_ bh a1
+	    put_ bh (occNameFS a1)
 	    put_ bh a2
 	    put_ bh a3
 	    put_ bh a4
@@ -904,14 +1044,14 @@ instance Binary IfaceDecl where
 	    put_ bh a8
     put_ bh (IfaceSyn aq ar as at) = do
 	    putByte bh 3
-	    put_ bh aq
+	    put_ bh (occNameFS aq)
 	    put_ bh ar
 	    put_ bh as
 	    put_ bh at
     put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7) = do
 	    putByte bh 4
 	    put_ bh a1
-	    put_ bh a2
+	    put_ bh (occNameFS a2)
 	    put_ bh a3
 	    put_ bh a4
 	    put_ bh a5
@@ -923,7 +1063,8 @@ instance Binary IfaceDecl where
 	      0 -> do name   <- get bh
 		      ty     <- get bh
 		      idinfo <- get bh
-		      return (IfaceId name ty idinfo)
+                      occ <- return $! mkOccNameFS varName name
+		      return (IfaceId occ ty idinfo)
 	      1 -> error "Binary.get(TyClDecl): ForeignType"
 	      2 -> do
 		    a1 <- get bh
@@ -934,13 +1075,15 @@ instance Binary IfaceDecl where
 		    a6 <- get bh
 		    a7 <- get bh
 		    a8 <- get bh
-		    return (IfaceData a1 a2 a3 a4 a5 a6 a7 a8)
+                    occ <- return $! mkOccNameFS tcName a1
+		    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8)
 	      3 -> do
 		    aq <- get bh
 		    ar <- get bh
 		    as <- get bh
 		    at <- get bh
-		    return (IfaceSyn aq ar as at)
+                    occ <- return $! mkOccNameFS tcName aq
+		    return (IfaceSyn occ ar as at)
 	      _ -> do
 		    a1 <- get bh
 		    a2 <- get bh
@@ -949,7 +1092,8 @@ instance Binary IfaceDecl where
 		    a5 <- get bh
 		    a6 <- get bh
 		    a7 <- get bh
-		    return (IfaceClass a1 a2 a3 a4 a5 a6 a7)
+                    occ <- return $! mkOccNameFS clsName a2
+		    return (IfaceClass a1 occ a3 a4 a5 a6 a7)
 
 instance Binary IfaceInst where
     put_ bh (IfaceInst cls tys dfun flag orph) = do
@@ -1028,14 +1172,15 @@ instance Binary IfaceConDecl where
 
 instance Binary IfaceClassOp where
    put_ bh (IfaceClassOp n def ty) = do	
-	put_ bh n 
+	put_ bh (occNameFS n)
 	put_ bh def	
 	put_ bh ty
    get bh = do
 	n <- get bh
 	def <- get bh
 	ty <- get bh
-	return (IfaceClassOp n def ty)
+        occ <- return $! mkOccNameFS varName n
+	return (IfaceClassOp occ def ty)
 
 instance Binary IfaceRule where
     put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7) = do

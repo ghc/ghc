@@ -527,7 +527,7 @@ hscNormalIface simpl_result
 		<- {-# SCC "MkFinalIface" #-}
 		   mkIface hsc_env maybe_old_iface simpl_result details
 	-- Emit external core
-       emitExternalCore (hsc_dflags hsc_env) (mg_exports simpl_result) cg_guts -- Move this? --Lemmih 03/07/2006
+       emitExternalCore (hsc_dflags hsc_env) (availsToNameSet (mg_exports simpl_result)) cg_guts -- Move this? --Lemmih 03/07/2006
        dumpIfaceStats hsc_env
 
  	    -------------------
@@ -541,9 +541,11 @@ hscNormalIface simpl_result
 hscWriteIface :: (ModIface, Bool, ModDetails, a) -> Comp (ModIface, ModDetails, a)
 hscWriteIface (iface, no_change, details, a)
     = do mod_summary <- gets compModSummary
+         hsc_env <- gets compHscEnv
+         let dflags = hsc_dflags hsc_env
          liftIO $ do
          unless no_change
-           $ writeIfaceFile (ms_location mod_summary) iface
+           $ writeIfaceFile dflags (ms_location mod_summary) iface
          return (iface, details, a)
 
 hscIgnoreIface :: (ModIface, Bool, ModDetails, a) -> Comp (ModIface, ModDetails, a)

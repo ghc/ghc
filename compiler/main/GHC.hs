@@ -94,7 +94,7 @@ module GHC (
 
 	-- ** Names
 	Name, 
-	nameModule, nameParent_maybe, pprParenSymName, nameSrcLoc,
+	nameModule, pprParenSymName, nameSrcLoc,
 	NamedThing(..),
 	RdrName(Qual,Unqual),
 	
@@ -215,8 +215,7 @@ import FunDeps		( pprFundeps )
 import DataCon		( DataCon, dataConWrapId, dataConSig, dataConTyCon,
 			  dataConFieldLabels, dataConStrictMarks, 
 			  dataConIsInfix, isVanillaDataCon )
-import Name		( Name, nameModule, NamedThing(..), nameParent_maybe,
-			  nameSrcLoc )
+import Name		( Name, nameModule, NamedThing(..), nameSrcLoc )
 import OccName		( parenSymOcc )
 import NameEnv		( nameEnvElts )
 import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
@@ -821,7 +820,8 @@ checkModule session@(Session ref) mod = do
 			   (Just (tc_binds, rdr_env, details))) -> do
 		   let minf = ModuleInfo {
 				minf_type_env  = md_types details,
-				minf_exports   = md_exports details,
+				minf_exports   = availsToNameSet $
+                                                     md_exports details,
 				minf_rdr_env   = Just rdr_env,
 				minf_instances = md_insts details
 			      }
@@ -1730,7 +1730,7 @@ getPrintUnqual s = withSession s (return . icPrintUnqual . hsc_IC)
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
 	minf_type_env  :: TypeEnv,
-	minf_exports   :: NameSet,
+	minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
 	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
 	minf_instances :: [Instance]
 	-- ToDo: this should really contain the ModIface too
@@ -1785,7 +1785,7 @@ getHomeModuleInfo hsc_env mdl =
       let details = hm_details hmi
       return (Just (ModuleInfo {
 			minf_type_env  = md_types details,
-			minf_exports   = md_exports details,
+			minf_exports   = availsToNameSet (md_exports details),
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
 			minf_instances = md_insts details
 			}))

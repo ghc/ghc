@@ -20,7 +20,7 @@ import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
 import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl, isClassDecl )
 import RnHsSyn		( extractHsTyNames )
 import Type		( predTypeRep, tcView )
-import HscTypes		( TyThing(..), ModDetails(..) )
+import HscTypes		( TyThing(..), ModDetails(..), availsToNameSet )
 import TyCon            ( TyCon, tyConArity, tyConDataCons, tyConTyVars,
                           isSynTyCon, isAlgTyCon, 
 			  tyConName, isNewTyCon, isProductTyCon, newTyConRhs,
@@ -215,7 +215,7 @@ calcRecFlags boot_details tyclss
     is_rec n | n `elemNameSet` rec_names = Recursive
 	     | otherwise		 = NonRecursive
 
-    boot_name_set = md_exports boot_details
+    boot_name_set = availsToNameSet (md_exports boot_details)
     rec_names = boot_name_set	  `unionNameSets` 
 		nt_loop_breakers  `unionNameSets`
 	        prod_loop_breakers

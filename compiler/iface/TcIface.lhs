@@ -14,9 +14,9 @@ module TcIface (
 
 import IfaceSyn
 import LoadIface	( loadInterface, loadWiredInHomeIface, findAndReadIface, loadDecls )
-import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, 
+import IfaceEnv		( lookupIfaceTop, newGlobalBinder, 
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
-			  tcIfaceTyVar, tcIfaceLclId, lookupIfaceTc, 
+			  tcIfaceTyVar, tcIfaceLclId,
 			  newIfaceName, newIfaceNames, ifaceExportNames )
 import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon,
 			  buildClass, 
@@ -511,10 +511,9 @@ tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
 			 ifInstCls = cls, ifInstTys = mb_tcs,
 			 ifInstOrph = orph })
   = do	{ dfun    <- forkM (ptext SLIT("Dict fun") <+> ppr dfun_occ) $
-		     tcIfaceExtId (LocalTop dfun_occ)
-	; cls'    <- lookupIfaceExt cls
-	; mb_tcs' <- mapM tc_rough mb_tcs
-	; return (mkImportedInstance cls' mb_tcs' orph dfun oflag) }
+		     tcIfaceExtId dfun_occ
+        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+	; return (mkImportedInstance cls mb_tcs' orph dfun oflag) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 
@@ -523,12 +522,8 @@ tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon,
 -- ^^^this line doesn't work, but vvv this does => CPP in Haskell = evil!
   = do	{ tycon'  <- forkM (text ("Inst tycon") <+> ppr tycon) $
 		     tcIfaceTyCon tycon
-	; fam'    <- lookupIfaceExt fam
-	; mb_tcs' <- mapM tc_rough mb_tcs
-	; return (mkImportedFamInst fam' mb_tcs' tycon') }
-
-tc_rough Nothing   = return Nothing
-tc_rough (Just tc) = do { tc' <- lookupIfaceTc tc; return (Just tc') }
+        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+	; return (mkImportedFamInst fam mb_tcs' tycon') }
 \end{code}
 
 
@@ -554,20 +549,21 @@ tcIfaceRule :: IfaceRule -> IfL CoreRule
 tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
 			ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
 			ifRuleOrph = orph })
-  = do	{ fn' <- lookupIfaceExt fn
-	; ~(bndrs', args', rhs') <- 
+  = do	{ ~(bndrs', args', rhs') <- 
 		-- Typecheck the payload lazily, in the hope it'll never be looked at
 		forkM (ptext SLIT("Rule") <+> ftext name) $
 		bindIfaceBndrs bndrs 			  $ \ bndrs' ->
 		do { args' <- mappM tcIfaceExpr args
 		   ; rhs'  <- tcIfaceExpr rhs
 		   ; return (bndrs', args', rhs') }
-	; mb_tcs <- mapM ifTopFreeName args
-	; returnM (Rule { ru_name = name, ru_fn = fn', ru_act = act, 
+	; let mb_tcs = map ifTopFreeName args
+        ; lcl <- getLclEnv
+        ; let this_module = if_mod lcl
+	; returnM (Rule { ru_name = name, ru_fn = fn, ru_act = act, 
 			  ru_bndrs = bndrs', ru_args = args', 
 			  ru_rhs = rhs', ru_orph = orph,
 			  ru_rough = mb_tcs,
-			  ru_local = isLocalIfaceExtName fn }) }
+			  ru_local = nameModule fn == this_module }) }
   where
 	-- This function *must* mirror exactly what Rules.topFreeName does
 	-- We could have stored the ru_rough field in the iface file
@@ -576,14 +572,11 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 	-- type syononyms at the top of a type arg.  Since
 	-- we can't tell at this point, we are careful not
 	-- to write them out in coreRuleToIfaceRule
-    ifTopFreeName :: IfaceExpr -> IfL (Maybe Name)
-    ifTopFreeName (IfaceType (IfaceTyConApp tc _ ))
-	= do { n <- lookupIfaceTc tc
-	     ; return (Just n) }
-    ifTopFreeName (IfaceApp f a) = ifTopFreeName f
-    ifTopFreeName (IfaceExt ext) = do { n <- lookupIfaceExt ext
-				      ; return (Just n) }
-    ifTopFreeName other = return Nothing
+    ifTopFreeName :: IfaceExpr -> Maybe Name
+    ifTopFreeName (IfaceType (IfaceTyConApp tc _ )) = Just (ifaceTyConName tc)
+    ifTopFreeName (IfaceApp f a)                    = ifTopFreeName f
+    ifTopFreeName (IfaceExt n)                      = Just n
+    ifTopFreeName other                             = Nothing
 \end{code}
 
 
@@ -725,8 +718,7 @@ tcIfaceAlt _ (IfaceLitAlt lit, names, rhs)
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
 tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
-  = do	{ let tycon_mod = nameModule (tyConName tycon)
-	; con <- tcIfaceDataCon (ExtPkg tycon_mod data_occ)
+  = do	{ con <- tcIfaceDataCon data_occ
 	; ASSERT2( con `elem` tyConDataCons tycon,
 		   ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon) )
 	  tcIfaceDataAlt con inst_tys arg_strs rhs }
@@ -931,12 +923,11 @@ tcIfaceTyCon IfaceCharTc      	= tcWiredInTyCon charTyCon
 tcIfaceTyCon IfaceListTc      	= tcWiredInTyCon listTyCon
 tcIfaceTyCon IfacePArrTc      	= tcWiredInTyCon parrTyCon
 tcIfaceTyCon (IfaceTupTc bx ar) = tcWiredInTyCon (tupleTyCon bx ar)
-tcIfaceTyCon (IfaceTc ext_nm)   = do { name <- lookupIfaceExt ext_nm
-				     ; thing <- tcIfaceGlobal name 
+tcIfaceTyCon (IfaceTc name)     = do { thing <- tcIfaceGlobal name 
 				     ; return (check_tc (tyThingTyCon thing)) }
   where
 #ifdef DEBUG
-    check_tc tc = case toIfaceTyCon (error "urk") tc of
+    check_tc tc = case toIfaceTyCon tc of
 		   IfaceTc _ -> tc
 		   other     -> pprTrace "check_tc" (ppr tc) tc
 #else
@@ -956,24 +947,21 @@ tcWiredInTyCon :: TyCon -> IfL TyCon
 tcWiredInTyCon tc = do { ifCheckWiredInThing (tyConName tc)
 		       ; return tc }
 
-tcIfaceClass :: IfaceExtName -> IfL Class
-tcIfaceClass rdr_name = do { name <- lookupIfaceExt rdr_name
-			   ; thing <- tcIfaceGlobal name
-			   ; return (tyThingClass thing) }
+tcIfaceClass :: Name -> IfL Class
+tcIfaceClass name = do { thing <- tcIfaceGlobal name
+		       ; return (tyThingClass thing) }
 
-tcIfaceDataCon :: IfaceExtName -> IfL DataCon
-tcIfaceDataCon gbl = do { name <- lookupIfaceExt gbl
-			; thing <- tcIfaceGlobal name
-		 	; case thing of
+tcIfaceDataCon :: Name -> IfL DataCon
+tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
+		 	 ; case thing of
 				ADataCon dc -> return dc
-				other   -> pprPanic "tcIfaceExtDC" (ppr gbl $$ ppr name$$ ppr thing) }
+				other   -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
 
-tcIfaceExtId :: IfaceExtName -> IfL Id
-tcIfaceExtId gbl = do { name <- lookupIfaceExt gbl
-		      ; thing <- tcIfaceGlobal name
-		      ; case thing of
+tcIfaceExtId :: Name -> IfL Id
+tcIfaceExtId name = do { thing <- tcIfaceGlobal name
+		       ; case thing of
 			  AnId id -> return id
-			  other   -> pprPanic "tcIfaceExtId" (ppr gbl $$ ppr name$$ ppr thing) }
+			  other   -> pprPanic "tcIfaceExtId" (ppr name$$ ppr thing) }
 \end{code}
 
 %************************************************************************
@@ -1018,7 +1006,7 @@ bindIfaceIds bndrs thing_inside
 newExtCoreBndr :: IfaceIdBndr -> IfL Id
 newExtCoreBndr (var, ty)
   = do	{ mod <- getIfModule
-	; name <- newGlobalBinder mod (mkVarOccFS var) Nothing noSrcLoc
+	; name <- newGlobalBinder mod (mkVarOccFS var) noSrcLoc
 	; ty' <- tcIfaceType ty
 	; return (mkLocalId name ty') }
 

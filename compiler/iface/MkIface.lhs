@@ -176,8 +176,7 @@ compiled with -O.  I think this is the case.]
 #include "HsVersions.h"
 
 import IfaceSyn		-- All of it
-import IfaceType	( toIfaceTvBndrs, toIfaceType, toIfaceContext,
-			  ifaceTyConOccName )
+import IfaceType
 import LoadIface	( readIface, loadInterface, pprModIface )
 import Id		( Id, idName, idType, idInfo, idArity, isDataConWorkId_maybe, isFCallId_maybe )
 import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
@@ -209,41 +208,43 @@ import HscTypes		( ModIface(..), ModDetails(..),
 			  ModSummary(..), msHiFilePath, 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
 			  typeEnvElts,
-			  GenAvailInfo(..), availName, 
+			  GenAvailInfo(..), availName, AvailInfo,
 			  ExternalPackageState(..),
 			  Usage(..), IsBootInterface,
 			  Deprecs(..), IfaceDeprecs, Deprecations,
-			  lookupIfaceByModule
+			  lookupIfaceByModule, isImplicitTyThing
 			)
 
 
 import DynFlags		( GhcMode(..), DynFlags(..), DynFlag(..), dopt )
-import Name		( Name, nameModule, nameOccName, nameParent,
-			  isExternalName, isInternalName, nameParent_maybe, isWiredInName,
-			  isImplicitName, NamedThing(..) )
+import Name		( Name, nameModule, nameModule_maybe, nameOccName,
+			  isExternalName, isInternalName, isWiredInName,
+			  NamedThing(..) )
 import NameEnv
 import NameSet
 import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
 			  extendOccEnv_C,
 			  OccSet, emptyOccSet, elemOccSet, occSetElts, 
-			  extendOccSet, extendOccSetList,
+			  extendOccSet, extendOccSetList, mkOccSet,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
+                          unionOccSets, unitOccSet,
 			  occNameFS, isTcOcc )
 import Module
-import Outputable
-import BasicTypes	( Version, initialVersion, bumpVersion, isAlwaysActive,
-			  Activation(..), RecFlag(..), boolToRecFlag )
-import Util		( createDirectoryHierarchy, directoryOf, sortLe, seqList, lengthIs )
-import BinIface		( writeBinIface )
+import BinIface		( readBinIface, writeBinIface, v_IgnoreHiWay )
 import Unique		( Unique, Uniquable(..) )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Digraph		( stronglyConnComp, SCC(..) )
 import SrcLoc		( SrcSpan )
-import UniqFM
 import PackageConfig	( PackageId )
+import Outputable
+import BasicTypes       hiding ( SuccessFlag(..) )
+import UniqFM
+import Util             hiding ( eqListBy )
 import FiniteMap
 import FastString
 
+import Data.List        ( partition )
+import DATA_IOREF	( writeIORef )
 import Monad		( when )
 import List		( insert )
 import Maybes		( orElse, mapCatMaybes, isNothing, isJust, 
@@ -287,24 +288,20 @@ mkIface hsc_env maybe_old_iface
 --	to expose in the interface
 
   = do	{ eps <- hscEPS hsc_env
-	; let	{ ext_nm_rhs = mkExtNameFn hsc_env eps this_mod
-		; ext_nm_lhs = mkLhsNameFn this_mod
+	; let	{ entities = typeEnvElts type_env ;
+                  decls  = [ tyThingToIfaceDecl entity
+			   | entity <- entities,
+                             not (isImplicitTyThing entity
+                                  || isWiredInName (getName entity)) ]
+                        -- Don't put implicit Ids and class tycons in
+                        -- the interface file, Nor wired-in things; the
+                        -- compiler knows about them anyhow
 
-		; decls  = [ tyThingToIfaceDecl ext_nm_rhs thing 
-			   | thing <- typeEnvElts type_env, 
-			     let name = getName thing,
-			     not (isImplicitName name || isWiredInName name) ]
-		    	-- Don't put implicit Ids and class tycons in the interface file
-			-- Nor wired-in things; the compiler knows about them anyhow
-
-		; fixities        = [ (occ,fix) 
-				    | FixItem occ fix _ <- nameEnvElts fix_env]
-		; deprecs         = mkIfaceDeprec src_deprecs
-		; iface_rules     = map (coreRuleToIfaceRule 
-					   ext_nm_lhs ext_nm_rhs) rules
-		; iface_insts     = map (instanceToIfaceInst ext_nm_lhs) insts
-		; iface_fam_insts = map (famInstToIfaceFamInst ext_nm_lhs) 
-					fam_insts
+		; fixities    = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
+		; deprecs     = mkIfaceDeprec src_deprecs
+		; iface_rules = map coreRuleToIfaceRule rules
+		; iface_insts = map instanceToIfaceInst insts
+		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -333,9 +330,11 @@ mkIface hsc_env maybe_old_iface
 			mi_fix_fn = mkIfaceFixCache fixities }
 
 		-- Add version information
+                ; ext_ver_fn = mkParentVerFun hsc_env eps
 		; (new_iface, no_change_at_all, pp_diffs, pp_orphs) 
 			= _scc_ "versioninfo" 
-			 addVersionInfo maybe_old_iface intermediate_iface decls
+			 addVersionInfo ext_ver_fn maybe_old_iface
+                                         intermediate_iface decls
 		}
 
 		-- Debug printing
@@ -353,87 +352,61 @@ mkIface hsc_env maybe_old_iface
 
      dflags = hsc_dflags hsc_env
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
-     ifFamInstTyConOcc = ifaceTyConOccName . ifFamInstTyCon
+     ifFamInstTyConOcc = nameOccName . ifaceTyConName . ifFamInstTyCon
 
 					      
 -----------------------------
-writeIfaceFile :: ModLocation -> ModIface -> IO ()
-writeIfaceFile location new_iface
+writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()
+writeIfaceFile dflags location new_iface
     = do createDirectoryHierarchy (directoryOf hi_file_path)
-         writeBinIface hi_file_path new_iface
+         writeBinIface dflags hi_file_path new_iface
     where hi_file_path = ml_hi_file location
 
 
------------------------------
-mkExtNameFn :: HscEnv -> ExternalPackageState -> Module -> Name -> IfaceExtName
-mkExtNameFn hsc_env eps this_mod
-  = ext_nm
-  where
-    hpt = hsc_HPT hsc_env
-    pit = eps_PIT eps
+-- -----------------------------------------------------------------------------
+-- Look up parents and versions of Names
 
-    ext_nm name 
-      | mod == this_mod = case nameParent_maybe name of
-    				Nothing  -> LocalTop occ
-    				Just par -> LocalTopSub occ (nameOccName par)
-      | isWiredInName name       = ExtPkg  mod occ
-      | is_home mod		 = HomePkg mod_name occ vers
-      | otherwise	         = ExtPkg  mod occ
-      where
-	dflags = hsc_dflags hsc_env
-	this_pkg = thisPackage dflags
-	is_home mod = modulePackageId mod == this_pkg
+-- This is like a global version of the mi_ver_fn field in each ModIface.
+-- Given a Name, it finds the ModIface, and then uses mi_ver_fn to get
+-- the parent and version info.
 
-    	mod      = nameModule name
-        mod_name = moduleName mod
-    	occ	 = nameOccName name
-    	par_occ  = nameOccName (nameParent name)
-    		-- The version of the *parent* is the one want
-    	vers     = lookupVersion mod par_occ occ
-    	      
-    lookupVersion :: Module -> OccName -> OccName -> Version
-	-- Even though we're looking up a home-package thing, in
-	-- one-shot mode the imported interfaces may be in the PIT
-    lookupVersion mod par_occ occ
-      = mi_ver_fn iface par_occ `orElse` 
-        pprPanic "lookupVers1" (ppr mod <+> ppr par_occ <+> ppr occ)
-      where
+mkParentVerFun
+        :: HscEnv                       -- needed to look up versions
+        -> ExternalPackageState         -- ditto
+        -> (Name -> (OccName,Version))
+mkParentVerFun hsc_env eps
+  = \name -> 
+      let 
+        mod = nameModule name
+        occ = nameOccName name
         iface = lookupIfaceByModule (hsc_dflags hsc_env) hpt pit mod `orElse` 
-	        pprPanic "lookupVers2" (ppr mod <+> ppr par_occ <+> ppr occ)
-
-
----------------------
--- mkLhsNameFn ignores versioning info altogether
--- It is used for the LHS of instance decls and rules, where we 
--- there's no point in recording version info
-mkLhsNameFn :: Module -> Name -> IfaceExtName
-mkLhsNameFn this_mod name	
-  | isInternalName name = pprTrace "mkLhsNameFn: unexpected internal" (ppr name) $
-			  LocalTop occ	-- Should not happen
-  | mod == this_mod = LocalTop occ
-  | otherwise	    = ExtPkg mod occ
+                   pprPanic "lookupVers2" (ppr mod <+> ppr occ)
+      in  
+        mi_ver_fn iface occ `orElse` 
+                 pprPanic "lookupVers1" (ppr mod <+> ppr occ)
   where
-    mod = nameModule name
-    occ	= nameOccName name
+      hpt = hsc_HPT hsc_env
+      pit = eps_PIT eps
 
-
------------------------------
+-----------------------------------------------------------------------------
 -- Compute version numbers for local decls
 
-addVersionInfo :: Maybe ModIface	-- The old interface, read from M.hi
-	       -> ModIface		-- The new interface decls (lacking decls)
-	       -> [IfaceDecl]		-- The new decls
-	       -> (ModIface, 
-		   Bool,		-- True <=> no changes at all; no need to write new Iface
-		   SDoc,		-- Differences
-		   Maybe SDoc)		-- Warnings about orphans
+addVersionInfo
+        :: (Name -> (OccName,Version))  -- lookup parents and versions of names
+        -> Maybe ModIface  -- The old interface, read from M.hi
+        -> ModIface	   -- The new interface (lacking decls)
+        -> [IfaceDecl]	   -- The new decls
+        -> (ModIface,   -- Updated interface
+            Bool,	   -- True <=> no changes at all; no need to write Iface
+            SDoc,	   -- Differences
+            Maybe SDoc) -- Warnings about orphans
 
-addVersionInfo Nothing new_iface new_decls
+addVersionInfo ver_fn Nothing new_iface new_decls
 -- No old interface, so definitely write a new one!
   = (new_iface { mi_orphan = anyNothing ifInstOrph (mi_insts new_iface)
-			  || anyNothing ifRuleOrph (mi_rules new_iface),
-		 mi_decls  = [(initialVersion, decl) | decl <- new_decls],
-		 mi_ver_fn = \n -> Just initialVersion },
+                                || anyNothing ifRuleOrph (mi_rules new_iface),
+                mi_decls  = [(initialVersion, decl) | decl <- new_decls],
+                mi_ver_fn = mkIfaceVerCache (zip (repeat initialVersion) new_decls)},
      False, 
      ptext SLIT("No old interface file"),
      pprOrphans orph_insts orph_rules)
@@ -441,7 +414,8 @@ addVersionInfo Nothing new_iface new_decls
     orph_insts = filter (isNothing . ifInstOrph) (mi_insts new_iface)
     orph_rules = filter (isNothing . ifRuleOrph) (mi_rules new_iface)
 
-addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers, 
+addVersionInfo ver_fn (Just old_iface@(ModIface { 
+                                           mi_mod_vers  = old_mod_vers, 
 					   mi_exp_vers  = old_exp_vers, 
 					   mi_rule_vers = old_rule_vers, 
 				       	   mi_decls     = old_decls,
@@ -449,29 +423,35 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 				       	   mi_fix_fn    = old_fixities }))
 	       new_iface@(ModIface { mi_fix_fn = new_fixities })
 	       new_decls
-
-  | no_change_at_all = (old_iface,   True,  ptext SLIT("Interface file unchanged"), pp_orphs)
-  | otherwise	     = (final_iface, False, vcat [ptext SLIT("Interface file has changed"),
-						  nest 2 pp_diffs], pp_orphs)
-  where
-    final_iface = new_iface { mi_mod_vers  = bump_unless no_output_change old_mod_vers,
-			      mi_exp_vers  = bump_unless no_export_change old_exp_vers,
-			      mi_rule_vers = bump_unless no_rule_change   old_rule_vers,
-			      mi_orphan    = not (null new_orph_rules && null new_orph_insts),
-			      mi_decls     = decls_w_vers,
-			      mi_ver_fn    = mkIfaceVerCache decls_w_vers }
+ | no_change_at_all
+ = (old_iface,  True,   ptext SLIT("Interface file unchanged"), pp_orphs)
+ | otherwise
+ = (final_iface, False, vcat [ptext SLIT("Interface file has changed"),
+			      nest 2 pp_diffs], pp_orphs)
+ where
+    final_iface = new_iface { 
+                mi_mod_vers  = bump_unless no_output_change old_mod_vers,
+                mi_exp_vers  = bump_unless no_export_change old_exp_vers,
+                mi_rule_vers = bump_unless no_rule_change   old_rule_vers,
+                mi_orphan    = not (null new_orph_rules && null new_orph_insts),
+                mi_decls     = decls_w_vers,
+                mi_ver_fn    = mkIfaceVerCache decls_w_vers }
 
     decls_w_vers = [(add_vers decl, decl) | decl <- new_decls]
 
     -------------------
-    (old_non_orph_insts, old_orph_insts) = mkOrphMap ifInstOrph (mi_insts old_iface)
-    (new_non_orph_insts, new_orph_insts) = mkOrphMap ifInstOrph (mi_insts new_iface)
+    (old_non_orph_insts, old_orph_insts) = 
+        mkOrphMap ifInstOrph (mi_insts old_iface)
+    (new_non_orph_insts, new_orph_insts) = 
+        mkOrphMap ifInstOrph (mi_insts new_iface)
     same_insts occ = eqMaybeBy	(eqListBy eqIfInst) 
 				(lookupOccEnv old_non_orph_insts occ)
 				(lookupOccEnv new_non_orph_insts occ)
   
-    (old_non_orph_rules, old_orph_rules) = mkOrphMap ifRuleOrph (mi_rules old_iface)
-    (new_non_orph_rules, new_orph_rules) = mkOrphMap ifRuleOrph (mi_rules new_iface)
+    (old_non_orph_rules, old_orph_rules) = 
+        mkOrphMap ifRuleOrph (mi_rules old_iface)
+    (new_non_orph_rules, new_orph_rules) = 
+        mkOrphMap ifRuleOrph (mi_rules new_iface)
     same_rules occ = eqMaybeBy	(eqListBy eqIfRule)
 				(lookupOccEnv old_non_orph_rules occ)
 				(lookupOccEnv new_non_orph_rules occ)
@@ -479,10 +459,11 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
     -- Computing what changed
     no_output_change = no_decl_change   && no_rule_change && 
     		       no_export_change && no_deprec_change
-    no_export_change = mi_exports new_iface == mi_exports old_iface	-- Kept sorted
+    no_export_change = mi_exports new_iface == mi_exports old_iface
+                                -- Kept sorted
     no_decl_change   = isEmptyOccSet changed_occs
-    no_rule_change   = not (changedWrt changed_occs (eqListBy eqIfRule old_orph_rules new_orph_rules)
-	    		 || changedWrt changed_occs (eqListBy eqIfInst old_orph_insts new_orph_insts))
+    no_rule_change   = not (changedWrtNames changed_occs (eqListBy eqIfRule old_orph_rules new_orph_rules)
+	    		 || changedWrtNames changed_occs (eqListBy eqIfInst old_orph_insts new_orph_insts))
     no_deprec_change = mi_deprecs new_iface == mi_deprecs old_iface
 
 	-- If the usages havn't changed either, we don't need to write the interface file
@@ -506,28 +487,32 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 
     -------------------
     -- Adding version info
-    new_version = bumpVersion old_mod_vers	-- Start from the old module version, not from zero
-						-- so that if you remove f, and then add it again,
-						-- you don't thereby reduce f's version number
+    new_version = bumpVersion old_mod_vers
+                        -- Start from the old module version, not from
+                        -- zero so that if you remove f, and then add
+                        -- it again, you don't thereby reduce f's
+                        -- version number
+
     add_vers decl | occ `elemOccSet` changed_occs = new_version
-		  | otherwise = expectJust "add_vers" (old_decl_vers occ)
+		  | otherwise = snd (expectJust "add_vers" (old_decl_vers occ))
 				-- If it's unchanged, there jolly well 
 		  where		-- should be an old version number
 		    occ = ifName decl
 
     -------------------
-    changed_occs :: OccSet
-    changed_occs = computeChangedOccs eq_info
-
+    -- Deciding which declarations have changed
+            
+    -- For each local decl, the IfaceEq gives the list of things that
+    -- must be unchanged for the declaration as a whole to be unchanged.
     eq_info :: [(OccName, IfaceEq)]
     eq_info = map check_eq new_decls
-    check_eq new_decl | Just old_decl <- lookupOccEnv old_decl_env occ 
-		      = (occ, new_decl `eqIfDecl` old_decl &&&
-			      eq_indirects new_decl)
-		      | otherwise {- No corresponding old decl -}      
-		      = (occ, NotEqual)	
-		      where
-			occ = ifName new_decl
+    check_eq new_decl
+         | Just old_decl <- lookupOccEnv old_decl_env occ 
+	 = (occ, new_decl `eqIfDecl` old_decl &&& eq_indirects new_decl)
+         | otherwise {- No corresponding old decl -}      
+	 = (occ, NotEqual)	
+        where
+          occ = ifName new_decl
 
     eq_indirects :: IfaceDecl -> IfaceEq
 		-- When seeing if two decls are the same, remember to
@@ -544,7 +529,12 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
     eq_ind_occ :: OccName -> IfaceEq	-- For class ops and Ids; check fixity and rules
     eq_ind_occ occ = same_fixity occ &&& same_rules occ
     eq_ind_occs = foldr ((&&&) . eq_ind_occ) Equal 
-   
+     
+    -- The Occs of declarations that changed.
+    changed_occs :: OccSet
+    changed_occs = computeChangedOccs ver_fn (mi_module new_iface)
+                         (mi_usages old_iface) eq_info
+
     -------------------
     -- Diffs
     pp_decl_diffs :: SDoc	-- Nothing => no changes
@@ -564,9 +554,10 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 	where
 	  occ = ifName new_decl
 	  why = case lookupOccEnv eq_env occ of
-		    Just (EqBut occs) -> sep [ppr occ <> colon, ptext SLIT("Free vars (only) changed:"),
+		    Just (EqBut names) -> sep [ppr occ <> colon, ptext SLIT("Free vars (only) changed:"),
 					      nest 2 (braces (fsep (map ppr (occSetElts 
 						(occs `intersectOccSet` changed_occs)))))]
+                           where occs = mkOccSet (map nameOccName (nameSetToList names))
 		    Just NotEqual  
 			| Just old_decl <- lookupOccEnv old_decl_env occ 
 			-> vcat [ptext SLIT("Old:") <+> ppr old_decl,
@@ -576,6 +567,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 		    other -> pprPanic "MkIface.show_change" (ppr occ)
 	
     pp_orphs = pprOrphans new_orph_insts new_orph_rules
+
 
 pprOrphans insts rules
   | null insts && null rules = Nothing
@@ -589,31 +581,81 @@ pprOrphans insts rules
 		2 (vcat (map ppr rules))
     ]
 
-computeChangedOccs :: [(OccName, IfaceEq)] -> OccSet
-computeChangedOccs eq_info
+computeChangedOccs
+        :: (Name -> (OccName,Version))     -- get parents and versions
+        -> Module                       -- This module
+        -> [Usage]                      -- Usages from old iface
+        -> [(OccName, IfaceEq)]         -- decl names, equality conditions
+        -> OccSet                       -- set of things that have changed
+computeChangedOccs ver_fn this_module old_usages eq_info
   = foldl add_changes emptyOccSet (stronglyConnComp edges)
   where
-    edges :: [((OccName,IfaceEq), Unique, [Unique])]
+
+    -- return True if an external name has changed
+    name_changed :: Name -> Bool
+    name_changed nm
+        | Just ents <- lookupUFM usg_modmap (moduleName mod) 
+        = case lookupUFM ents parent_occ of
+                Nothing -> pprPanic "computeChangedOccs" (ppr nm)
+                Just v  -> v < new_version
+        | otherwise = False -- must be in another package
+      where
+         mod = nameModule nm
+         (parent_occ, new_version) = ver_fn nm
+
+    -- Turn the usages from the old ModIface into a mapping
+    usg_modmap = listToUFM [ (usg_mod usg, listToUFM (usg_entities usg))
+                           | usg <- old_usages ]
+
+    get_local_eq_info :: GenIfaceEq NameSet -> GenIfaceEq OccSet
+    get_local_eq_info Equal = Equal
+    get_local_eq_info NotEqual = NotEqual
+    get_local_eq_info (EqBut ns) = foldNameSet f Equal ns
+        where f name eq | nameModule name == this_module =         
+                          EqBut (unitOccSet (nameOccName name)) `and_occifeq` eq
+                        | name_changed name = NotEqual
+                        | otherwise = eq
+
+    local_eq_infos = mapSnd get_local_eq_info eq_info
+
+    edges :: [((OccName, OccIfaceEq), Unique, [Unique])]
     edges = [ (node, getUnique occ, map getUnique occs)
-	    | node@(occ, iface_eq) <- eq_info
+	    | node@(occ, iface_eq) <- local_eq_infos
 	    , let occs = case iface_eq of
 			   EqBut occ_set -> occSetElts occ_set
 			   other -> [] ]
 
     -- Changes in declarations
-    add_changes :: OccSet -> SCC (OccName, IfaceEq) -> OccSet
+    add_changes :: OccSet -> SCC (OccName, OccIfaceEq) -> OccSet
     add_changes so_far (AcyclicSCC (occ, iface_eq)) 
-	| changedWrt so_far iface_eq 				-- This one has changed
+	| changedWrt so_far iface_eq -- This one has changed
 	= extendOccSet so_far occ
     add_changes so_far (CyclicSCC pairs)
-	| changedWrt so_far (foldr1 (&&&) (map snd pairs)) 	-- One of this group has changed
-	= extendOccSetList so_far (map fst pairs)
+	| changedWrt so_far (foldr1 and_occifeq iface_eqs)
+        	-- One of this group has changed
+	= extendOccSetList so_far occs
+        where (occs, iface_eqs) = unzip pairs
     add_changes so_far other = so_far
 
-changedWrt :: OccSet -> IfaceEq -> Bool
+type OccIfaceEq = GenIfaceEq OccSet
+
+changedWrt :: OccSet -> OccIfaceEq -> Bool
 changedWrt so_far Equal        = False
 changedWrt so_far NotEqual     = True
 changedWrt so_far (EqBut kids) = so_far `intersectsOccSet` kids
+
+changedWrtNames :: OccSet -> IfaceEq -> Bool
+changedWrtNames so_far Equal        = False
+changedWrtNames so_far NotEqual     = True
+changedWrtNames so_far (EqBut kids) = 
+  so_far `intersectsOccSet` mkOccSet (map nameOccName (nameSetToList kids))
+
+and_occifeq :: OccIfaceEq -> OccIfaceEq -> OccIfaceEq
+Equal       `and_occifeq` x 	    = x
+NotEqual    `and_occifeq` x	    = NotEqual
+EqBut nms   `and_occifeq` Equal       = EqBut nms
+EqBut nms   `and_occifeq` NotEqual    = NotEqual
+EqBut nms1  `and_occifeq` EqBut nms2  = EqBut (nms1 `unionOccSets` nms2)
 
 ----------------------
 -- mkOrphMap partitions instance decls or rules into
@@ -672,28 +714,25 @@ mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
 	 -- don't get evaluated for a while and we can end up hanging on to
 	 -- the entire collection of Ifaces.
 
-mk_usage_info pit hsc_env dir_imp_mods dep_mods proto_used_names
+mk_usage_info pit hsc_env dir_imp_mods dep_mods used_names
   = mapCatMaybes mkUsage dep_mods
 	-- ToDo: do we need to sort into canonical order?
   where
     hpt = hsc_HPT hsc_env
     dflags = hsc_dflags hsc_env
 
-    used_names = mkNameSet $			-- Eliminate duplicates
-		 [ nameParent n			-- Just record usage on the 'main' names
-		 | n <- nameSetToList proto_used_names
-		 , not (isWiredInName n)	-- Don't record usages for wired-in names
-		 , isExternalName n		-- Ignore internal names
-		 ]
-
     -- ent_map groups together all the things imported and used
     -- from a particular module in this package
     ent_map :: ModuleEnv [OccName]
     ent_map  = foldNameSet add_mv emptyModuleEnv used_names
-    add_mv name mv_map = extendModuleEnv_C add_item mv_map mod [occ]
+    add_mv name mv_map
+        | isWiredInName name = mv_map  -- ignore wired-in names
+        | otherwise
+        = case nameModule_maybe name of
+             Nothing  -> mv_map         -- ignore internal names
+             Just mod -> extendModuleEnv_C add_item mv_map mod [occ]
     		   where
 		     occ = nameOccName name
-    		     mod = nameModule name
     		     add_item occs _ = occ:occs
     
     depend_on_exports mod = case lookupModuleEnv dir_imp_mods mod of
@@ -718,7 +757,7 @@ mk_usage_info pit hsc_env dir_imp_mods dep_mods proto_used_names
       = Just (Usage { usg_name     = mod_name,
     	  	      usg_mod      = mod_vers,
     		      usg_exports  = export_vers,
-    		      usg_entities = ent_vers,
+    		      usg_entities = fmToList ent_vers,
     		      usg_rules    = rules_vers })
       where
 	maybe_iface  = lookupIfaceByModule dflags hpt pit mod
@@ -735,40 +774,48 @@ mk_usage_info pit hsc_env dir_imp_mods dep_mods proto_used_names
         export_vers | depend_on_exports mod = Just (mi_exp_vers iface)
     		    | otherwise 	    = Nothing
     
-    	-- The sort is to put them into canonical order
         used_occs = lookupModuleEnv ent_map mod `orElse` []
-	ent_vers :: [(OccName,Version)]
-        ent_vers = [ (occ, version_env occ `orElse` initialVersion) 
-		   | occ <- sortLe (<=) used_occs]
+
+    	-- Making a FiniteMap here ensures that (a) we remove duplicates
+        -- when we have usages on several subordinates of a single parent,
+        -- and (b) that the usages emerge in a canonical order, which
+        -- is why we use FiniteMap rather than OccEnv: FiniteMap works
+        -- using Ord on the OccNames, which is a lexicographic ordering.
+	ent_vers :: FiniteMap OccName Version
+        ent_vers = listToFM (map lookup_occ used_occs)
+        
+        lookup_occ occ = 
+            case version_env occ of
+                Nothing -> pprTrace "hmm, strange" (ppr mod <+> ppr occ) $
+                           (occ, initialVersion) -- does this ever happen?
+                Just (parent, version) -> (parent, version)
 \end{code}
 
 \begin{code}
-mkIfaceExports :: NameSet -> [(Module, [GenAvailInfo OccName])]
+mkIfaceExports :: [AvailInfo]
+               -> [(Module, [GenAvailInfo OccName])]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
-mkIfaceExports exports 
-  = [ (mod, eltsUFM avails)
+mkIfaceExports exports
+  = [ (mod, eltsFM avails)
     | (mod, avails) <- fmToList groupFM
     ]
   where
-    groupFM :: ModuleEnv (UniqFM (GenAvailInfo OccName))
-	-- Deliberately use the FastString so we
+	-- Deliberately use FiniteMap rather than UniqFM so we
 	-- get a canonical ordering
-    groupFM = foldl add emptyModuleEnv (nameSetToList exports)
+    groupFM :: ModuleEnv (FiniteMap FastString (GenAvailInfo OccName))
+    groupFM = foldl add emptyModuleEnv exports
 
-    add env name = extendModuleEnv_C add_avail env mod
-			     		(unitUFM avail_fs avail)
+    add env avail
+      = extendModuleEnv_C add_avail env mod (unitFM avail_fs avail_occ)
       where
-	occ    = nameOccName name
-	mod    = nameModule name
-	avail | Just p <- nameParent_maybe name	= AvailTC (nameOccName p) [occ]
-	      | isTcOcc occ 			= AvailTC occ [occ]
-	      | otherwise			= Avail occ
-	avail_fs = occNameFS (availName avail)	    
-	add_avail avail_fm _ = addToUFM_C add_item avail_fm avail_fs avail
+	avail_occ = availToOccs avail
+	mod  = nameModule (availName avail)
+	avail_fs = occNameFS (availName avail_occ)
+	add_avail avail_fm _ = addToFM avail_fm avail_fs avail_occ
 
-	add_item (AvailTC p occs) _ = AvailTC p (List.insert occ occs)
-	add_item (Avail n)	  _ = pprPanic "MkIface.addAvail" (ppr n <+> ppr name)
+    availToOccs (Avail n) = Avail (nameOccName n)
+    availToOccs (AvailTC tc ns) = AvailTC (nameOccName tc) (map nameOccName ns)
 \end{code}
 
 
@@ -961,7 +1008,7 @@ checkEntityUsage new_vers (name,old_vers)
 	Nothing       -> 	-- We used it before, but it ain't there now
 			  out_of_date (sep [ptext SLIT("No longer exported:"), ppr name])
 
-	Just new_vers 	-- It's there, but is it up to date?
+	Just (_, new_vers) 	-- It's there, but is it up to date?
 	  | new_vers == old_vers -> traceHiDiffs (text "  Up to date" <+> ppr name <+> parens (ppr new_vers)) `thenM_`
 			  	    returnM upToDate
 	  | otherwise	 	 -> out_of_date_vers (ptext SLIT("  Out of date:") <+> ppr name)
@@ -990,26 +1037,26 @@ checkList (check:checks) = check	`thenM` \ recompile ->
 %************************************************************************
 
 \begin{code}
-tyThingToIfaceDecl :: (Name -> IfaceExtName) -> TyThing -> IfaceDecl
+tyThingToIfaceDecl :: TyThing -> IfaceDecl
 -- Assumption: the thing is already tidied, so that locally-bound names
 -- 	       (lambdas, for-alls) already have non-clashing OccNames
 -- Reason: Iface stuff uses OccNames, and the conversion here does
 --	   not do tidying on the way
-tyThingToIfaceDecl ext (AnId id)
-  = IfaceId { ifName   = getOccName id, 
-	      ifType   = toIfaceType ext (idType id),
+tyThingToIfaceDecl (AnId id)
+  = IfaceId { ifName   = getOccName id,
+	      ifType   = toIfaceType (idType id),
 	      ifIdInfo = info }
   where
-    info = case toIfaceIdInfo ext (idInfo id) of
+    info = case toIfaceIdInfo (idInfo id) of
 		[]    -> NoInfo
 		items -> HasInfo items
 
-tyThingToIfaceDecl ext (AClass clas)
-  = IfaceClass { ifCtxt	  = toIfaceContext ext sc_theta,
+tyThingToIfaceDecl (AClass clas)
+  = IfaceClass { ifCtxt	  = toIfaceContext sc_theta,
 		 ifName	  = getOccName clas,
 		 ifTyVars = toIfaceTvBndrs clas_tyvars,
 		 ifFDs    = map toIfaceFD clas_fds,
-		 ifATs	  = map (tyThingToIfaceDecl ext . ATyCon) clas_ats,
+		 ifATs	  = map (tyThingToIfaceDecl . ATyCon) clas_ats,
 		 ifSigs	  = map toIfaceClassOp op_stuff,
 	  	 ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
   where
@@ -1019,7 +1066,7 @@ tyThingToIfaceDecl ext (AClass clas)
 
     toIfaceClassOp (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
-	  IfaceClassOp (getOccName sel_id) def_meth (toIfaceType ext op_ty)
+	  IfaceClassOp (getOccName sel_id) def_meth (toIfaceType op_ty)
 	where
 		-- Be careful when splitting the type, because of things
 		-- like  	class Foo a where
@@ -1029,19 +1076,19 @@ tyThingToIfaceDecl ext (AClass clas)
 	  (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
 	  op_ty		       = funResultTy rho_ty
 
-    toIfaceFD (tvs1, tvs2) = (map (occNameFS.getOccName) tvs1, map (occNameFS.getOccName) tvs2)
+    toIfaceFD (tvs1, tvs2) = (map getFS tvs1, map getFS tvs2)
 
-tyThingToIfaceDecl ext (ATyCon tycon)
+tyThingToIfaceDecl (ATyCon tycon)
   | isSynTyCon tycon
-  = IfaceSyn {	ifName    = getOccName tycon,
-		ifTyVars  = toIfaceTvBndrs tyvars,
+  = IfaceSyn {	ifName   = getOccName tycon,
+		ifTyVars = toIfaceTvBndrs tyvars,
 		ifOpenSyn = syn_isOpen,
-		ifSynRhs  = toIfaceType ext syn_tyki }
+		ifSynRhs  = toIfaceType syn_tyki }
 
   | isAlgTyCon tycon
   = IfaceData {	ifName    = getOccName tycon,
 		ifTyVars  = toIfaceTvBndrs tyvars,
-		ifCtxt    = toIfaceContext ext (tyConStupidTheta tycon),
+		ifCtxt    = toIfaceContext (tyConStupidTheta tycon),
 		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
@@ -1088,51 +1135,52 @@ tyThingToIfaceDecl ext (ATyCon tycon)
 		    ifConUnivTvs = toIfaceTvBndrs (dataConUnivTyVars data_con),
 		    ifConExTvs   = toIfaceTvBndrs (dataConExTyVars data_con),
 		    ifConEqSpec  = to_eq_spec (dataConEqSpec data_con),
-		    ifConCtxt    = toIfaceContext ext (dataConTheta data_con),
-		    ifConArgTys  = map (toIfaceType ext) 
-				       (dataConOrigArgTys data_con),
+		    ifConCtxt    = toIfaceContext (dataConTheta data_con),
+		    ifConArgTys  = map toIfaceType (dataConOrigArgTys data_con),
 		    ifConFields  = map getOccName 
 				       (dataConFieldLabels data_con),
 		    ifConStricts = dataConStrictMarks data_con }
 
-    to_eq_spec spec = [(getOccName tv, toIfaceType ext ty) | (tv,ty) <- spec]
+    to_eq_spec spec = [(getOccName tv, toIfaceType ty) | (tv,ty) <- spec]
 
     famInstToIface Nothing                    = Nothing
     famInstToIface (Just (famTyCon, instTys)) = 
-      Just (toIfaceTyCon ext famTyCon, map (toIfaceType ext) instTys)
+      Just (toIfaceTyCon famTyCon, map toIfaceType instTys)
 
-tyThingToIfaceDecl ext (ADataCon dc)
+tyThingToIfaceDecl (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
 
 
+getFS x = occNameFS (getOccName x)
+
 --------------------------
-instanceToIfaceInst :: (Name -> IfaceExtName) -> Instance -> IfaceInst
-instanceToIfaceInst ext_lhs ispec@(Instance { is_dfun = dfun_id, is_flag = oflag,
-					      is_cls = cls, is_tcs = mb_tcs, 
-					      is_orph = orph })
-  = IfaceInst { ifDFun    = getOccName dfun_id, 
+instanceToIfaceInst :: Instance -> IfaceInst
+instanceToIfaceInst ispec@(Instance { is_dfun = dfun_id, is_flag = oflag,
+				      is_cls = cls, is_tcs = mb_tcs, 
+				      is_orph = orph })
+  = IfaceInst { ifDFun    = getName dfun_id,
 		ifOFlag   = oflag,
-		ifInstCls = ext_lhs cls,
+		ifInstCls = cls,
 		ifInstTys = map do_rough mb_tcs,
 		ifInstOrph = orph }
   where
     do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name ext_lhs n)
+    do_rough (Just n) = Just (toIfaceTyCon_name n)
 
 --------------------------
-famInstToIfaceFamInst :: (Name -> IfaceExtName) -> FamInst -> IfaceFamInst
-famInstToIfaceFamInst ext_lhs fi@(FamInst { fi_tycon = tycon,
+famInstToIfaceFamInst :: FamInst -> IfaceFamInst
+famInstToIfaceFamInst fi@(FamInst { fi_tycon = tycon,
 					    fi_fam = fam, fi_tcs = mb_tcs })
-  = IfaceFamInst { ifFamInstTyCon  = toIfaceTyCon ext_lhs tycon
-		 , ifFamInstFam    = ext_lhs fam
+  = IfaceFamInst { ifFamInstTyCon  = toIfaceTyCon tycon
+		 , ifFamInstFam    = fam
 		 , ifFamInstTys    = map do_rough mb_tcs }
   where
     do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name ext_lhs n)
+    do_rough (Just n) = Just (toIfaceTyCon_name n)
 
 --------------------------
-toIfaceIdInfo :: (Name -> IfaceExtName) -> IdInfo -> [IfaceInfoItem]
-toIfaceIdInfo ext id_info
+toIfaceIdInfo :: IdInfo -> [IfaceInfoItem]
+toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
 	       inline_hsinfo, wrkr_hsinfo,  unfold_hsinfo] 
   where
@@ -1158,7 +1206,7 @@ toIfaceIdInfo ext id_info
     has_worker  = case work_info of { HasWorker _ _ -> True; other -> False }
     wrkr_hsinfo = case work_info of
 		    HasWorker work_id wrap_arity -> 
-			Just (HsWorker (ext (idName work_id)) wrap_arity)
+			Just (HsWorker ((idName work_id)) wrap_arity)
 		    NoWorker -> Nothing
 
     ------------  Unfolding  --------------
@@ -1171,7 +1219,7 @@ toIfaceIdInfo ext id_info
 			-- unconditional NOINLINE, etc.  See TidyPgm.addExternal
     unfold_hsinfo | no_unfolding = Nothing			
 		  | has_worker   = Nothing	-- Unfolding is implicit
-		  | otherwise	 = Just (HsUnfold (toIfaceExpr ext rhs))
+		  | otherwise	 = Just (HsUnfold (toIfaceExpr rhs))
 					
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info
@@ -1182,63 +1230,61 @@ toIfaceIdInfo ext id_info
 		  | otherwise			   = Just (HsInline inline_prag)
 
 --------------------------
-coreRuleToIfaceRule :: (Name -> IfaceExtName) 	-- For the LHS names
-		    -> (Name -> IfaceExtName) 	-- For the RHS names
-		    -> CoreRule -> IfaceRule
-coreRuleToIfaceRule ext_lhs ext_rhs (BuiltinRule { ru_fn = fn})
+coreRuleToIfaceRule :: CoreRule -> IfaceRule
+coreRuleToIfaceRule (BuiltinRule { ru_fn = fn})
   = pprTrace "toHsRule: builtin" (ppr fn) $
-    bogusIfaceRule (mkIfaceExtName fn)
+    bogusIfaceRule fn
 
-coreRuleToIfaceRule ext_lhs ext_rhs
-    (Rule { ru_name = name, ru_fn = fn, ru_act = act, ru_bndrs = bndrs,
-	    ru_args = args, ru_rhs = rhs, ru_orph = orph })
+coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn, 
+                            ru_act = act, ru_bndrs = bndrs,
+	                    ru_args = args, ru_rhs = rhs, ru_orph = orph })
   = IfaceRule { ifRuleName  = name, ifActivation = act, 
-		ifRuleBndrs = map (toIfaceBndr ext_lhs) bndrs,
-		ifRuleHead  = ext_lhs fn, 
+		ifRuleBndrs = map toIfaceBndr bndrs,
+		ifRuleHead  = fn, 
 		ifRuleArgs  = map do_arg args,
-		ifRuleRhs   = toIfaceExpr ext_rhs rhs,
+		ifRuleRhs   = toIfaceExpr rhs,
 		ifRuleOrph  = orph }
   where
 	-- For type args we must remove synonyms from the outermost
 	-- level.  Reason: so that when we read it back in we'll
 	-- construct the same ru_rough field as we have right now;
 	-- see tcIfaceRule
-    do_arg (Type ty) = IfaceType (toIfaceType ext_lhs (deNoteType ty))
-    do_arg arg       = toIfaceExpr ext_lhs arg
+    do_arg (Type ty) = IfaceType (toIfaceType (deNoteType ty))
+    do_arg arg       = toIfaceExpr arg
 
-bogusIfaceRule :: IfaceExtName -> IfaceRule
+bogusIfaceRule :: Name -> IfaceRule
 bogusIfaceRule id_name
   = IfaceRule { ifRuleName = FSLIT("bogus"), ifActivation = NeverActive,  
 	ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [], 
 	ifRuleRhs = IfaceExt id_name, ifRuleOrph = Nothing }
 
 ---------------------
-toIfaceExpr :: (Name -> IfaceExtName) -> CoreExpr -> IfaceExpr
-toIfaceExpr ext (Var v)       = toIfaceVar ext v
-toIfaceExpr ext (Lit l)       = IfaceLit l
-toIfaceExpr ext (Type ty)     = IfaceType (toIfaceType ext ty)
-toIfaceExpr ext (Lam x b)     = IfaceLam (toIfaceBndr ext x) (toIfaceExpr ext b)
-toIfaceExpr ext (App f a)     = toIfaceApp ext f [a]
-toIfaceExpr ext (Case s x ty as) = IfaceCase (toIfaceExpr ext s) (occNameFS (getOccName x)) (toIfaceType ext ty) (map (toIfaceAlt ext) as)
-toIfaceExpr ext (Let b e)     = IfaceLet (toIfaceBind ext b) (toIfaceExpr ext e)
-toIfaceExpr ext (Cast e co)   = IfaceCast (toIfaceExpr ext e) (toIfaceType ext co)
-toIfaceExpr ext (Note n e)    = IfaceNote (toIfaceNote ext n) (toIfaceExpr ext e)
+toIfaceExpr :: CoreExpr -> IfaceExpr
+toIfaceExpr (Var v)       = toIfaceVar v
+toIfaceExpr (Lit l)       = IfaceLit l
+toIfaceExpr (Type ty)     = IfaceType (toIfaceType ty)
+toIfaceExpr (Lam x b)     = IfaceLam (toIfaceBndr x) (toIfaceExpr b)
+toIfaceExpr (App f a)     = toIfaceApp f [a]
+toIfaceExpr (Case s x ty as) = IfaceCase (toIfaceExpr s) (getFS x) (toIfaceType ty) (map toIfaceAlt as)
+toIfaceExpr (Let b e)     = IfaceLet (toIfaceBind b) (toIfaceExpr e)
+toIfaceExpr (Cast e co)   = IfaceCast (toIfaceExpr e) (toIfaceType co)
+toIfaceExpr (Note n e)    = IfaceNote (toIfaceNote n) (toIfaceExpr e)
 
 ---------------------
-toIfaceNote ext (SCC cc)      = IfaceSCC cc
-toIfaceNote ext InlineMe      = IfaceInlineMe
-toIfaceNote ext (CoreNote s)  = IfaceCoreNote s
+toIfaceNote (SCC cc)      = IfaceSCC cc
+toIfaceNote InlineMe      = IfaceInlineMe
+toIfaceNote (CoreNote s)  = IfaceCoreNote s
 
 ---------------------
-toIfaceBind ext (NonRec b r) = IfaceNonRec (toIfaceIdBndr ext b) (toIfaceExpr ext r)
-toIfaceBind ext (Rec prs)    = IfaceRec [(toIfaceIdBndr ext b, toIfaceExpr ext r) | (b,r) <- prs]
+toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceIdBndr b) (toIfaceExpr r)
+toIfaceBind (Rec prs)    = IfaceRec [(toIfaceIdBndr b, toIfaceExpr r) | (b,r) <- prs]
 
 ---------------------
-toIfaceAlt ext (c,bs,r) = (toIfaceCon c, map (occNameFS.getOccName) bs, toIfaceExpr ext r)
+toIfaceAlt (c,bs,r) = (toIfaceCon c, map getFS bs, toIfaceExpr r)
 
 ---------------------
 toIfaceCon (DataAlt dc) | isTupleTyCon tc = IfaceTupleAlt (tupleTyConBoxity tc)
-	   		| otherwise       = IfaceDataAlt (getOccName dc)
+	   		| otherwise       = IfaceDataAlt (getName dc)
 	   		where
 	   		  tc = dataConTyCon dc
 	   
@@ -1246,8 +1292,8 @@ toIfaceCon (LitAlt l) = IfaceLitAlt l
 toIfaceCon DEFAULT    = IfaceDefault
 
 ---------------------
-toIfaceApp ext (App f a) as = toIfaceApp ext f (a:as)
-toIfaceApp ext (Var v) as
+toIfaceApp (App f a) as = toIfaceApp f (a:as)
+toIfaceApp (Var v) as
   = case isDataConWorkId_maybe v of
 	-- We convert the *worker* for tuples into IfaceTuples
 	Just dc |  isTupleTyCon tc && saturated 
@@ -1255,22 +1301,22 @@ toIfaceApp ext (Var v) as
 	  where
 	    val_args  = dropWhile isTypeArg as
 	    saturated = val_args `lengthIs` idArity v
-	    tup_args  = map (toIfaceExpr ext) val_args
+	    tup_args  = map toIfaceExpr val_args
 	    tc	      = dataConTyCon dc
 
-        other -> mkIfaceApps ext (toIfaceVar ext v) as
+        other -> mkIfaceApps (toIfaceVar v) as
 
-toIfaceApp ext e as = mkIfaceApps ext (toIfaceExpr ext e) as
+toIfaceApp e as = mkIfaceApps (toIfaceExpr e) as
 
-mkIfaceApps ext f as = foldl (\f a -> IfaceApp f (toIfaceExpr ext a)) f as
+mkIfaceApps f as = foldl (\f a -> IfaceApp f (toIfaceExpr a)) f as
 
 ---------------------
-toIfaceVar :: (Name -> IfaceExtName) -> Id -> IfaceExpr
-toIfaceVar ext v 
-  | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType ext (idType v))
+toIfaceVar :: Id -> IfaceExpr
+toIfaceVar v 
+  | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType (idType v))
 	  -- Foreign calls have special syntax
-  | isExternalName name		    = IfaceExt (ext name)
-  | otherwise			    = IfaceLcl (occNameFS (nameOccName name))
+  | isExternalName name		    = IfaceExt name
+  | otherwise			    = IfaceLcl (getFS name)
   where
     name = idName v
 \end{code}

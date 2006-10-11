@@ -8,9 +8,7 @@
 module IfaceType (
 	IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
-
-	IfaceExtName(..), mkIfaceExtName, isLocalIfaceExtName,
-	ifaceTyConName, ifaceTyConOccName,
+	ifaceTyConName,
 
 	-- Conversion from Type -> IfaceType
 	toIfaceType, toIfacePred, toIfaceContext, 
@@ -42,50 +40,6 @@ import Outputable
 import FastString
 \end{code}
 
-	
-%************************************************************************
-%*									*
-		IfaceExtName
-%*									*
-%************************************************************************
-
-\begin{code}
-data IfaceExtName
-  = ExtPkg Module OccName
-	-- From an external package; no version # Also used for
-	-- wired-in things regardless of whether they are home-pkg or
-	-- not
-
-  | HomePkg ModuleName OccName Version
-	-- From another module in home package; has version #; in all
-	-- other respects, HomePkg and ExtPkg are the same. Since this
-	-- is a home package name, we use ModuleName rather than Module
-
-  | LocalTop OccName			-- Top-level from the same module as 
-					-- the enclosing IfaceDecl
-
-  | LocalTopSub		-- Same as LocalTop, but for a class method or constr
-	OccName		-- Class-meth/constr name
-	OccName		-- Parent class/datatype name
-	-- LocalTopSub is written into iface files as LocalTop; the parent 
-	-- info is only used when computing version information in MkIface
-
-isLocalIfaceExtName :: IfaceExtName -> Bool
-isLocalIfaceExtName (LocalTop _)      = True
-isLocalIfaceExtName (LocalTopSub _ _) = True
-isLocalIfaceExtName other	      = False
-
-mkIfaceExtName name = ExtPkg (nameModule name) (nameOccName name)
-	-- Local helper for wired-in names
-
-ifaceExtOcc :: IfaceExtName -> OccName
-ifaceExtOcc (ExtPkg _ occ)    	= occ
-ifaceExtOcc (HomePkg _ occ _) 	= occ
-ifaceExtOcc (LocalTop occ)    	= occ
-ifaceExtOcc (LocalTopSub occ _) = occ
-\end{code}
-
-
 %************************************************************************
 %*									*
 		Local (nested) binders
@@ -115,7 +69,7 @@ data IfaceType
   | IfaceFunTy  IfaceType IfaceType
 
 data IfacePredType 	-- NewTypes are handled as ordinary TyConApps
-  = IfaceClassP IfaceExtName [IfaceType]
+  = IfaceClassP Name [IfaceType]
   | IfaceIParam (IPName OccName) IfaceType
   | IfaceEqPred IfaceType IfaceType
 
@@ -124,14 +78,14 @@ type IfaceContext = [IfacePredType]
 -- NB: If you add a data constructor, remember to add a case to
 --     IfaceSyn.eqIfTc!
 data IfaceTyCon 	-- Abbreviations for common tycons with known names
-  = IfaceTc IfaceExtName	-- The common case
+  = IfaceTc Name	-- The common case
   | IfaceIntTc | IfaceBoolTc | IfaceCharTc
   | IfaceListTc | IfacePArrTc
   | IfaceTupTc Boxity Arity 
   | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
   | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
 
-ifaceTyConName :: IfaceTyCon -> Name	-- Works for all except IfaceTc
+ifaceTyConName :: IfaceTyCon -> Name
 ifaceTyConName IfaceIntTc  	  = intTyConName
 ifaceTyConName IfaceBoolTc 	  = boolTyConName
 ifaceTyConName IfaceCharTc 	  = charTyConName
@@ -143,11 +97,7 @@ ifaceTyConName IfaceOpenTypeKindTc     = openTypeKindTyConName
 ifaceTyConName IfaceUnliftedTypeKindTc = unliftedTypeKindTyConName
 ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
 ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
-ifaceTyConName (IfaceTc ext)      = pprPanic "ifaceTyConName" (ppr ext)
-
-ifaceTyConOccName :: IfaceTyCon -> OccName	-- Works for all!
-ifaceTyConOccName (IfaceTc ext) = ifaceExtOcc ext
-ifaceTyConOccName tycon         = nameOccName . ifaceTyConName $ tycon
+ifaceTyConName (IfaceTc ext)      = ext
 \end{code}
 
 
@@ -209,16 +159,6 @@ maybeParen ctxt_prec inner_prec pretty
 ----------------------------- Printing binders ------------------------------------
 
 \begin{code}
--- These instances are used only when printing for the user, either when
--- debugging, or in GHCi when printing the results of a :info command
-instance Outputable IfaceExtName where
-    ppr (ExtPkg mod occ)       = ppr mod <> dot <> ppr occ
-    ppr (HomePkg mod occ vers) = ppr mod <> dot <> ppr occ <> braces (ppr vers)
-    ppr (LocalTop occ)	       = ppr occ	-- Do we want to distinguish these 
-    ppr (LocalTopSub occ _)    = ppr occ	-- from an ordinary occurrence?
--- No need to worry about printing unqualified becuase that was handled
--- in the transiation to IfaceSyn 
-
 instance Outputable IfaceBndr where
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
     ppr (IfaceTvBndr bndr) = char '@' <+> pprIfaceTvBndr bndr
@@ -301,7 +241,7 @@ ppr_tc_app ctxt_prec tc tys
 
 ppr_tc :: IfaceTyCon -> SDoc
 -- Wrap infix type constructors in parens
-ppr_tc tc@(IfaceTc ext_nm) = parenSymOcc (ifaceExtOcc ext_nm) (ppr tc)
+ppr_tc tc@(IfaceTc ext_nm) = parenSymOcc (getOccName ext_nm) (ppr tc)
 ppr_tc tc		   = ppr tc
 
 -------------------
@@ -309,7 +249,7 @@ instance Outputable IfacePredType where
 	-- Print without parens
   ppr (IfaceEqPred ty1 ty2)= hsep [ppr ty1, ptext SLIT(":=:"), ppr ty2]
   ppr (IfaceIParam ip ty)  = hsep [ppr ip, dcolon, ppr ty]
-  ppr (IfaceClassP cls ts) = parenSymOcc (ifaceExtOcc cls) (ppr cls)
+  ppr (IfaceClassP cls ts) = parenSymOcc (getOccName cls) (ppr cls)
 			     <+> sep (map pprParendIfaceType ts)
 
 instance Outputable IfaceTyCon where
@@ -338,26 +278,32 @@ pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \begin{code}
 ----------------
 toIfaceTvBndr tyvar   = (occNameFS (getOccName tyvar), toIfaceKind (tyVarKind tyvar))
-toIfaceIdBndr ext id  = (occNameFS (getOccName id),    toIfaceType ext (idType id))
+toIfaceIdBndr id      = (occNameFS (getOccName id),    toIfaceType (idType id))
 toIfaceTvBndrs tyvars = map toIfaceTvBndr tyvars
 
-toIfaceBndr ext var
-  | isId var  = IfaceIdBndr (toIfaceIdBndr ext var)
+toIfaceBndr var
+  | isId var  = IfaceIdBndr (toIfaceIdBndr var)
   | otherwise = IfaceTvBndr (toIfaceTvBndr var)
 
--- we had better not have to use ext for kinds
-toIfaceKind = toIfaceType (\name -> pprPanic "toIfaceKind ext used on:" (ppr name))
+toIfaceKind = toIfaceType
 
 ---------------------
-toIfaceType :: (Name -> IfaceExtName) -> Type -> IfaceType
+toIfaceType :: Type -> IfaceType
 -- Synonyms are retained in the interface type
-toIfaceType ext (TyVarTy tv)     	     = IfaceTyVar (occNameFS (getOccName tv))
-toIfaceType ext (AppTy t1 t2)    	     = IfaceAppTy (toIfaceType ext t1) (toIfaceType ext t2)
-toIfaceType ext (FunTy t1 t2)    	     = IfaceFunTy (toIfaceType ext t1) (toIfaceType ext t2)
-toIfaceType ext (TyConApp tc tys) 	     = IfaceTyConApp (toIfaceTyCon ext tc) (toIfaceTypes ext tys)
-toIfaceType ext (ForAllTy tv t)  	     = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType ext t)
-toIfaceType ext (PredTy st)     	     = IfacePredTy (toIfacePred ext st)
-toIfaceType ext (NoteTy other_note ty)	     = toIfaceType ext ty
+toIfaceType (TyVarTy tv) =
+  IfaceTyVar (occNameFS (getOccName tv))
+toIfaceType (AppTy t1 t2) =
+  IfaceAppTy (toIfaceType t1) (toIfaceType t2)
+toIfaceType (FunTy t1 t2) =
+  IfaceFunTy (toIfaceType t1) (toIfaceType t2)
+toIfaceType (TyConApp tc tys) =
+  IfaceTyConApp (toIfaceTyCon tc) (toIfaceTypes tys)
+toIfaceType (ForAllTy tv t) =
+  IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
+toIfaceType (PredTy st) =
+  IfacePredTy (toIfacePred st)
+toIfaceType (NoteTy other_note ty) =
+  toIfaceType ty
 
 ----------------
 -- A little bit of (perhaps optional) trickiness here.  When
@@ -367,20 +313,20 @@ toIfaceType ext (NoteTy other_note ty)	     = toIfaceType ext ty
 -- Hence a tuple tycon may 'miss' in toIfaceTyCon, but then
 -- toIfaceTyCon_name will still catch it.
 
-toIfaceTyCon :: (Name -> IfaceExtName) -> TyCon -> IfaceTyCon
-toIfaceTyCon ext tc 
+toIfaceTyCon :: TyCon -> IfaceTyCon
+toIfaceTyCon tc 
   | isTupleTyCon tc = IfaceTupTc (tupleTyConBoxity tc) (tyConArity tc)
-  | otherwise	    = toIfaceTyCon_name ext (tyConName tc)
+  | otherwise	    = toIfaceTyCon_name (tyConName tc)
 
-toIfaceTyCon_name :: (Name -> IfaceExtName) -> Name -> IfaceTyCon
-toIfaceTyCon_name ext nm
+toIfaceTyCon_name :: Name -> IfaceTyCon
+toIfaceTyCon_name nm
   | Just (ATyCon tc) <- wiredInNameTyThing_maybe nm
-  = toIfaceWiredInTyCon ext tc nm
+  = toIfaceWiredInTyCon tc nm
   | otherwise
-  = IfaceTc (ext nm)
+  = IfaceTc nm
 
-toIfaceWiredInTyCon :: (Name -> IfaceExtName) -> TyCon -> Name -> IfaceTyCon
-toIfaceWiredInTyCon ext tc nm
+toIfaceWiredInTyCon :: TyCon -> Name -> IfaceTyCon
+toIfaceWiredInTyCon tc nm
   | isTupleTyCon tc                 =  IfaceTupTc (tupleTyConBoxity tc) (tyConArity tc)
   | nm == intTyConName              = IfaceIntTc
   | nm == boolTyConName             = IfaceBoolTc 
@@ -392,18 +338,21 @@ toIfaceWiredInTyCon ext tc nm
   | nm == openTypeKindTyConName     = IfaceOpenTypeKindTc
   | nm == argTypeKindTyConName      = IfaceArgTypeKindTc
   | nm == ubxTupleKindTyConName     = IfaceUbxTupleKindTc
-  | otherwise		            = IfaceTc (ext nm)
+  | otherwise		            = IfaceTc nm
 
 ----------------
-toIfaceTypes ext ts = map (toIfaceType ext) ts
+toIfaceTypes ts = map toIfaceType ts
 
 ----------------
-toIfacePred ext (ClassP cls ts)  = IfaceClassP (ext (getName cls)) (toIfaceTypes ext ts)
-toIfacePred ext (IParam ip t)    = IfaceIParam (mapIPName getOccName ip) (toIfaceType ext t)
-toIfacePred ext (EqPred ty1 ty2) = IfaceEqPred (toIfaceType ext ty1) (toIfaceType ext ty2)
+toIfacePred (ClassP cls ts) = 
+  IfaceClassP (getName cls) (toIfaceTypes ts)
+toIfacePred (IParam ip t) = 
+  IfaceIParam (mapIPName getOccName ip) (toIfaceType t)
+toIfacePred (EqPred ty1 ty2) =
+  IfaceEqPred (toIfaceType ty1) (toIfaceType ty2)
 
 ----------------
-toIfaceContext :: (Name -> IfaceExtName) -> ThetaType -> IfaceContext
-toIfaceContext ext cs = map (toIfacePred ext) cs
+toIfaceContext :: ThetaType -> IfaceContext
+toIfaceContext cs = map toIfacePred cs
 \end{code}
 

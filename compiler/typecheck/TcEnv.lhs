@@ -615,7 +615,7 @@ newDFunName clas (ty:_) loc
 			    occNameString (getDFunTyKey ty)
 	      dfun_occ = mkDFunOcc info_string is_boot index
 
-	; newGlobalBinder mod dfun_occ Nothing loc }
+	; newGlobalBinder mod dfun_occ loc }
 
 newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 \end{code}
@@ -630,7 +630,7 @@ newFamInstTyConName tc_name loc
   = do	{ index <- nextDFunIndex
 	; mod   <- getModule
 	; let occ = nameOccName tc_name
-	; newGlobalBinder mod (mkInstTyTcOcc index occ) Nothing loc }
+	; newGlobalBinder mod (mkInstTyTcOcc index occ) loc }
 \end{code}
 
 

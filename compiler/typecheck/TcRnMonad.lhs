@@ -108,7 +108,7 @@ initTc hsc_env hsc_src mod do_this
 		tcg_fam_inst_env  = emptyFamInstEnv,
 		tcg_inst_uses = dfuns_var,
 		tcg_th_used   = th_var,
-		tcg_exports  = emptyNameSet,
+		tcg_exports  = [],
 		tcg_imports  = init_imports,
 		tcg_dus      = emptyDUs,
                 tcg_rn_imports = Nothing,
@@ -156,8 +156,7 @@ initTc hsc_env hsc_src mod do_this
 	return (msgs, final_res)
     }
   where
-    init_imports = emptyImportAvails {imp_env = 
-					unitUFM (moduleName mod) emptyNameSet}
+    init_imports = emptyImportAvails {imp_env = unitUFM (moduleName mod) []}
 	-- Initialise tcg_imports with an empty set of bindings for
 	-- this module, so that if we see 'module M' in the export
 	-- list, and there are no bindings in M, we don't bleat 

@@ -42,7 +42,7 @@ module RdrName (
 
 import OccName
 import Module   ( ModuleName, mkModuleNameFS, Module, moduleName )
-import Name	( Name, NamedThing(getName), nameModule, nameParent_maybe,
+import Name	( Name, NamedThing(getName), nameModule,
 		  nameOccName, isExternalName, nameSrcLoc )
 import Maybes	( mapCatMaybes )
 import SrcLoc	( isGoodSrcLoc, isGoodSrcSpan, srcLocSpan, SrcSpan )
@@ -308,8 +308,7 @@ data GlobalRdrElt
     }
 
 instance Outputable GlobalRdrElt where
-  ppr gre = ppr name <+> pp_parent (nameParent_maybe name)
-		<+> parens (pprNameProvenance gre)
+  ppr gre = ppr name <+> parens (pprNameProvenance gre)
 	  where
 	    name = gre_name gre
 	    pp_parent (Just p) = brackets (text "parent:" <+> ppr p)

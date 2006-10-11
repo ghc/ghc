@@ -22,7 +22,7 @@ module DsMeta( dsBracket,
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
 import MatchLit	  ( dsLit )
-import DsUtils    ( mkListExpr, mkStringExpr, mkIntExpr )
+import DsUtils    ( mkListExpr, mkStringExpr, mkCoreTup, mkIntExpr )
 import DsMonad
 
 import qualified Language.Haskell.TH as TH
@@ -1305,6 +1305,9 @@ nonEmptyCoreList :: [Core a] -> Core [a]
   -- Otherwise use coreList
 nonEmptyCoreList [] 	      = panic "coreList: empty argument"
 nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
+
+corePair :: (Core a, Core b) -> Core (a,b)
+corePair (MkC x, MkC y) = MkC (mkCoreTup [x,y])
 
 coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }

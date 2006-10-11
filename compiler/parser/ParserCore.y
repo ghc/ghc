@@ -11,7 +11,7 @@ import Type ( Kind,
               liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
               argTypeKindTyCon, ubxTupleKindTyCon, mkArrowKind, mkTyConApp
             )
-import Name( nameOccName, nameModule )
+import Name( Name, nameOccName, nameModule )
 import Module
 import PackageConfig	( mainPackageId )
 import ParserCoreUtils
@@ -225,7 +225,7 @@ kind 	:: { IfaceKind }
 
 aexp    :: { IfaceExpr }
 	: var_occ	         { IfaceLcl $1 }
-        | modid '.' qd_occ	 { IfaceExt (ExtPkg $1 (mkVarOccFS $3)) }
+        | modid '.' qd_occ	 { IfaceExt undefined {-ToDo!!! (ExtPkg $1 (mkVarOccFS $3))-} }
 	| lit		{ IfaceLit $1 }
 	| '(' exp ')' 	{ $2 }
 
@@ -258,7 +258,7 @@ alts1	:: { [IfaceAlt] }
 
 alt	:: { IfaceAlt }
 	: modid '.' d_pat_occ bndrs '->' exp 
-		{ (IfaceDataAlt $3, map ifaceBndrName $4, $6) } 
+		{ (IfaceDataAlt undefined {-ToDo!!! $3 -}, map ifaceBndrName $4, $6) } 
                        -- The external syntax currently includes the types of the
 		       -- the args, but they aren't needed internally
                        -- Nor is the module qualifier
@@ -281,8 +281,8 @@ var_occ	:: { FastString }
 
 
 -- Type constructor
-q_tc_name	:: { IfaceExtName }
-        : modid '.' CNAME	{ ExtPkg $1 (mkOccName tcName $3) }
+q_tc_name	:: { Name }
+        : modid '.' CNAME	{ undefined {-ToDo!!! ExtPkg $1 (mkOccName tcName $3)-} }
 
 -- Data constructor in a pattern or data type declaration; use the dataName, 
 -- because that's what we expect in Core case patterns
@@ -318,10 +318,7 @@ convRatLit i aty
   = pprPanic "Unknown rational literal type" (ppr aty)
 
 eqTc :: IfaceTyCon -> TyCon -> Bool   -- Ugh!
-eqTc (IfaceTc (ExtPkg mod occ)) tycon
-  = mod == nameModule nm && occ == nameOccName nm
-  where
-    nm = tyConName tycon
+eqTc (IfaceTc name) tycon = name == tyConName tycon
 
 -- Tiresomely, we have to generate both HsTypes (in type/class decls) 
 -- and IfaceTypes (in Core expressions).  So we parse them as IfaceTypes,
@@ -361,8 +358,8 @@ ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
 toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOcc tv)) (toKind k)
 
-ifaceExtRdrName :: IfaceExtName -> RdrName
-ifaceExtRdrName (ExtPkg mod occ) = mkOrig mod occ
+ifaceExtRdrName :: Name -> RdrName
+ifaceExtRdrName name = mkOrig (nameModule name) (nameOccName name)
 ifaceExtRdrName other = pprPanic "ParserCore.ifaceExtRdrName" (ppr other)
 
 add_forall tv (L _ (HsForAllTy exp tvs cxt t))

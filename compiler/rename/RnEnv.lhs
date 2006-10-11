@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-2006
 %
 \section[RnEnv]{Environment manipulation for the renamer monad}
 
@@ -47,11 +47,13 @@ import RdrName		( RdrName, isQual, isUnqual, isOrig_maybe,
 			  Provenance(..), pprNameProvenance,
 			  importSpecLoc, importSpecModule
 			)
-import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
+import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity,
+                          AvailInfo, GenAvailInfo(..) )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
-			  nameSrcLoc, nameOccName, nameModule, nameParent, isExternalName )
+			  nameSrcLoc, nameOccName, nameModule, isExternalName )
 import NameSet
+import NameEnv          ( NameEnv, lookupNameEnv )
 import OccName		( tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
 			  reportIfUnused )
 import Module		( Module, ModuleName )
@@ -75,8 +77,8 @@ import DynFlags
 %*********************************************************
 
 \begin{code}
-newTopSrcBinder :: Module -> Maybe Name -> Located RdrName -> RnM Name
-newTopSrcBinder this_mod mb_parent (L loc rdr_name)
+newTopSrcBinder :: Module -> Located RdrName -> RnM Name
+newTopSrcBinder this_mod (L loc rdr_name)
   | Just name <- isExact_maybe rdr_name
   =	-- This is here to catch 
 	--   (a) Exact-name binders created by Template Haskell
@@ -113,7 +115,7 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	-- the RdrName, not from the environment.  In principle, it'd be fine to 
 	-- have an arbitrary mixture of external core definitions in a single module,
 	-- (apart from module-initialisation issues, perhaps).
-	; newGlobalBinder rdr_mod rdr_occ mb_parent (srcSpanStart loc) }
+	; newGlobalBinder rdr_mod rdr_occ (srcSpanStart loc) }
 		--TODO, should pass the whole span
 
   | otherwise
@@ -121,7 +123,7 @@ newTopSrcBinder this_mod mb_parent (L loc rdr_name)
 	         (addErrAt loc (badQualBndrErr rdr_name))
 	 	-- Binders should not be qualified; if they are, and with a different
 		-- module name, we we get a confusing "M.T is not in scope" error later
-	; newGlobalBinder this_mod (rdrNameOcc rdr_name) mb_parent (srcSpanStart loc) }
+	; newGlobalBinder this_mod (rdrNameOcc rdr_name) (srcSpanStart loc) }
 \end{code}
 
 %*********************************************************
@@ -173,7 +175,7 @@ lookupTopBndrRn rdr_name
 	-- we don't bother to call newTopSrcBinder first
 	-- We assume there is no "parent" name
   = do	{ loc <- getSrcSpanM
-	; newGlobalBinder rdr_mod rdr_occ Nothing (srcSpanStart loc) }
+	; newGlobalBinder rdr_mod rdr_occ (srcSpanStart loc) }
 
   | otherwise
   = do	{ mb_gre <- lookupGreLocalRn rdr_name
@@ -199,10 +201,18 @@ lookupLocatedSigOccRn = lookupLocatedBndrRn
 -- disambiguate.  
 
 lookupLocatedInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
-lookupLocatedInstDeclBndr cls = wrapLocM (lookupInstDeclBndr cls)
+lookupLocatedInstDeclBndr cls rdr = do
+   imp_avails <- getImports
+   wrapLocM (lookupInstDeclBndr (imp_parent imp_avails) cls) rdr
 
-lookupInstDeclBndr :: Name -> RdrName -> RnM Name
-lookupInstDeclBndr cls_name rdr_name
+lookupInstDeclBndr :: NameEnv AvailInfo -> Name -> RdrName -> RnM Name
+-- This is called on the method name on the left-hand side of an 
+-- instance declaration binding. eg.  instance Functor T where
+--                                       fmap = ...
+--                                       ^^^^ called on this
+-- Regardless of how many unqualified fmaps are in scope, we want
+-- the one that comes from the Functor class.
+lookupInstDeclBndr availenv cls_name rdr_name
   | isUnqual rdr_name	-- Find all the things the rdr-name maps to
   = do	{		-- and pick the one with the right parent name
 	  let { is_op gre     = cls_name == nameParent (gre_name gre)
@@ -219,6 +229,12 @@ lookupInstDeclBndr cls_name rdr_name
   = ASSERT2( not (isQual rdr_name), ppr rdr_name )
 	  -- NB: qualified names are rejected by the parser
     lookupImportedName rdr_name
+
+  where nameParent nm
+           | Just (AvailTC tc subs) <- lookupNameEnv availenv nm = tc
+           | otherwise = nm -- might be an Avail, if the Name is 
+                            -- in scope some other way
+                                   
 
 newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
 newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
@@ -243,7 +259,7 @@ lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
    lookupGreRn rdr_name			`thenM` \ mb_gre ->
    case mb_gre of {
 	Just gre -> returnM (gre_name gre) ;
-	Nothing  -> newTopSrcBinder mod Nothing lrdr_name }
+	Nothing  -> newTopSrcBinder mod lrdr_name }
 
 --------------------------------------------------
 --		Occurrences

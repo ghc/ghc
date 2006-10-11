@@ -19,6 +19,7 @@ import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
 import LoadIface	( showIface )
+import HscMain          ( newHscEnv )
 import DriverPipeline	( oneShot, compileFile )
 import DriverMkDepend	( doMkDependHS )
 #ifdef GHCI
@@ -147,7 +148,7 @@ main =
 	PrintLibdir     -> putStrLn (topDir dflags)
 	ShowVersion     -> showVersion
         ShowNumVersion  -> putStrLn cProjectVersion
-        ShowInterface f -> showIface f
+        ShowInterface f -> doShowIface dflags f
 	DoMake 	        -> doMake session srcs
 	DoMkDependHS    -> doMkDependHS session (map fst srcs)
 	StopBefore p    -> oneShot dflags p srcs
@@ -394,6 +395,15 @@ doMake sess srcs  = do
     ok_flag <- GHC.load sess LoadAllTargets
     when (failed ok_flag) (exitWith (ExitFailure 1))
     return ()
+
+
+-- ---------------------------------------------------------------------------
+-- --show-iface mode
+
+doShowIface :: DynFlags -> FilePath -> IO ()
+doShowIface dflags file = do
+  hsc_env <- newHscEnv dflags
+  showIface hsc_env file
 
 -- ---------------------------------------------------------------------------
 -- Various banners and verbosity output.

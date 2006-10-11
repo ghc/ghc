@@ -133,36 +133,34 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
 mkWiredInTyConName built_in mod fs uniq tycon
   = mkWiredInName mod (mkOccNameFS tcName fs) uniq
-		  Nothing 		-- No parent object
 		  (ATyCon tycon)	-- Relevant TyCon
 		  built_in
 
-mkWiredInDataConName :: BuiltInSyntax -> Module -> FastString -> Unique -> DataCon -> Name -> Name
-mkWiredInDataConName built_in mod fs uniq datacon parent
+mkWiredInDataConName :: BuiltInSyntax -> Module -> FastString -> Unique -> DataCon -> Name
+mkWiredInDataConName built_in mod fs uniq datacon
   = mkWiredInName mod (mkOccNameFS dataName fs) uniq
-		  (Just parent) 	-- Name of parent TyCon
 		  (ADataCon datacon)	-- Relevant DataCon
 		  built_in
 
 charTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Char") charTyConKey charTyCon
-charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("C#") charDataConKey charDataCon charTyConName
+charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("C#") charDataConKey charDataCon
 intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Int") intTyConKey   intTyCon
-intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("I#") intDataConKey  intDataCon intTyConName
+intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("I#") intDataConKey  intDataCon
 						  
 boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Bool") boolTyConKey boolTyCon
-falseDataConName  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("False") falseDataConKey falseDataCon boolTyConName
-trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("True")  trueDataConKey  trueDataCon  boolTyConName
+falseDataConName  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("False") falseDataConKey falseDataCon
+trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("True")  trueDataConKey  trueDataCon 
 listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_BASE FSLIT("[]") listTyConKey listTyCon
-nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT("[]") nilDataConKey nilDataCon  listTyConName
-consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT(":") consDataConKey consDataCon listTyConName
+nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT("[]") nilDataConKey nilDataCon 
+consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT(":") consDataConKey consDataCon
 
 floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_FLOAT FSLIT("Float") floatTyConKey floatTyCon
-floatDataConName   = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("F#") floatDataConKey floatDataCon floatTyConName
+floatDataConName   = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("F#") floatDataConKey floatDataCon
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_FLOAT FSLIT("Double") doubleTyConKey doubleTyCon
-doubleDataConName  = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("D#") doubleDataConKey doubleDataCon doubleTyConName
+doubleDataConName  = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("D#") doubleDataConKey doubleDataCon
 
 parrTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_PARR FSLIT("[::]") parrTyConKey parrTyCon 
-parrDataConName   = mkWiredInDataConName UserSyntax    gHC_PARR FSLIT("PArr") parrDataConKey parrDataCon parrTyConName
+parrDataConName   = mkWiredInDataConName UserSyntax    gHC_PARR FSLIT("PArr") parrDataConKey parrDataCon
 
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR	= nameRdrName falseDataConName
@@ -240,7 +238,6 @@ pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_key  = incrUnique (nameUnique dc_name)
     wrk_name = mkWiredInName mod wrk_occ wrk_key
-			     (Just (tyConName tycon))
 			     (AnId (dataConWorkId data_con)) UserSyntax
     bogus_wrap_name = pprPanic "Wired-in data wrapper id" (ppr dc_name)
 	-- Wired-in types are too simple to need wrappers
@@ -274,7 +271,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity gen_info 
 	mod	= mkTupleModule boxity arity
 	tc_name = mkWiredInName mod (mkTupleOcc tcName boxity arity) tc_uniq
-				Nothing (ATyCon tycon) BuiltInSyntax
+				(ATyCon tycon) BuiltInSyntax
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
 	res_kind | isBoxed boxity = liftedTypeKind
 		 | otherwise	  = ubxTupleKind
@@ -285,7 +282,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
 	tyvar_tys = mkTyVarTys tyvars
 	dc_name   = mkWiredInName mod (mkTupleOcc dataName boxity arity) dc_uniq
-				  (Just tc_name) (ADataCon tuple_con) BuiltInSyntax
+				  (ADataCon tuple_con) BuiltInSyntax
  	tc_uniq   = mkTupleTyConUnique   boxity arity
 	dc_uniq   = mkTupleDataConUnique boxity arity
 	gen_info  = True		-- Tuples all have generics..
@@ -569,7 +566,7 @@ mkPArrFakeCon arity  = data_con
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
 	name      = mkWiredInName gHC_PARR (mkOccNameFS dataName nameStr) uniq
-				  Nothing (ADataCon data_con) UserSyntax
+				  (ADataCon data_con) UserSyntax
 	uniq      = mkPArrDataConUnique arity
 
 -- checks whether a data constructor is a fake constructor for parallel arrays

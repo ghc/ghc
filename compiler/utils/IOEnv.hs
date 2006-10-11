@@ -17,7 +17,7 @@ module IOEnv (
 	getEnv, setEnv, updEnv,
 
 	runIOEnv, unsafeInterleaveM,			
-	tryM, tryAllM, fixM, 
+	tryM, tryAllM, tryMostM, fixM, 
 
 	-- I/O operations
 	ioToIOEnv,
@@ -25,7 +25,7 @@ module IOEnv (
   ) where
 #include "HsVersions.h"
 
-import Panic		( try, tryUser, Exception(..) )
+import Panic		( try, tryUser, tryMost, Exception(..) )
 import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
 import UNSAFE_IO	( unsafeInterleaveIO )
 import FIX_IO		( fixIO )
@@ -99,6 +99,9 @@ tryAllM :: IOEnv env r -> IOEnv env (Either Exception r)
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
 tryAllM (IOEnv thing) = IOEnv (\ env -> try (thing env))
+
+tryMostM :: IOEnv env r -> IOEnv env (Either Exception r)
+tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
 
 ---------------------------
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a

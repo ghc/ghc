@@ -51,12 +51,11 @@ import TcForeign	( tcForeignImports, tcForeignExports )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcIface		( tcExtCoreBindings, tcHiBootIface )
 import MkIface		( tyThingToIfaceDecl )
-import IfaceSyn		( checkBootDecl, IfaceExtName(..) )
+import IfaceSyn
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
 import RnNames		( importsFromLocalDecls, rnImports, rnExports,
-                          mkRdrEnvAndImports, mkExportNameSet,
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
 import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
@@ -70,8 +69,9 @@ import Module
 import UniqFM		( elemUFM, eltsUFM )
 import OccName		( mkVarOccFS, plusOccEnv )
 import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
-			  nameModule, nameOccName, isImplicitName, mkExternalName )
+			  nameModule, nameOccName, mkExternalName )
 import NameSet
+import NameEnv
 import TyCon		( tyConHasGenerics )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import DriverPhases	( HscSource(..), isHsBoot )
@@ -79,10 +79,10 @@ import HscTypes		( ModGuts(..), ModDetails(..), emptyModDetails,
 			  HscEnv(..), ExternalPackageState(..),
 			  IsBootInterface, noDependencies, 
 			  Deprecs( NoDeprecs ), plusDeprecs,
-			  ForeignStubs(NoStubs), 
+			  ForeignStubs(NoStubs), availsToNameSet,
 			  TypeEnv, lookupTypeEnv, hptInstances, 
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, typeEnvElts,
-			  emptyFixityEnv
+			  emptyFixityEnv, GenAvailInfo(..)
 			)
 import Outputable
 
@@ -121,7 +121,6 @@ import {- Kind parts of -} Type		( Kind )
 import Var		( globaliseId )
 import Name		( isBuiltInSyntax, isInternalName )
 import OccName		( isTcOcc )
-import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
 			  bindIOName, thenIOName, returnIOName )
 import HscTypes		( InteractiveContext(..),
@@ -171,8 +170,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
    setSrcSpan loc $
    do {
 		-- Deal with imports;
-	rn_imports <- rnImports import_decls ;
-        (rdr_env, imports) <- mkRdrEnvAndImports rn_imports ;
+	(rn_imports, rdr_env, imports) <- rnImports import_decls ;
 
 	let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
 	    ; dep_mods = imp_dep_mods imports
@@ -211,6 +209,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- Fail if there are any errors so far
 		-- The error printing (if needed) takes advantage 
 		-- of the tcg_env we have now set
+        traceIf (text "rdr_env: " <+> ppr rdr_env) ;
 	failIfErrsM ;
 
 		-- Load any orphan-module interfaces, so that
@@ -235,7 +234,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	reportDeprecations (hsc_dflags hsc_env) tcg_env ;
 
 		-- Process the export list
-	rn_exports <- rnExports export_ies ;
+	(rn_exports, exports) <- rnExports (isJust maybe_mod) export_ies ;
                  
 		-- Rename the Haddock documentation header 
 	rn_module_doc <- rnMbHsDoc maybe_doc ;
@@ -243,10 +242,6 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- Rename the Haddock module info 
 	rn_description <- rnMbHsDoc (hmi_description module_info) ;
 	let { rn_module_info = module_info { hmi_description = rn_description } } ;
-
-        let { liftM2' fn a b = do a' <- a; b' <- b; return (fn a' b') } ;
-        exports <- mkExportNameSet (isJust maybe_mod) 
-				   (liftM2' (,) rn_exports export_ies) ;
 
 		-- Check whether the entire module is deprecated
 		-- This happens only once per module
@@ -257,7 +252,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                                      tcg_rn_exports = if save_rn_syntax then
                                                          rn_exports
                                                       else Nothing,
-				     tcg_dus = tcg_dus tcg_env `plusDU` usesOnly exports,
+				     tcg_dus = tcg_dus tcg_env `plusDU` usesOnly (availsToNameSet exports),
 				     tcg_deprecs = tcg_deprecs tcg_env `plusDeprecs` 
 						   mod_deprecs,
 				     tcg_doc = rn_module_doc, 
@@ -321,7 +316,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	-- Wrap up
    let {
 	bndrs 	   = bindersOfBinds core_binds ;
-	my_exports = mkNameSet (map idName bndrs) ;
+	my_exports = map (Avail . idName) bndrs ;
 		-- ToDo: export the data types also?
 
 	final_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) bndrs ;
@@ -530,7 +525,7 @@ checkHiBootIface :: TcGblEnv -> ModDetails -> TcM (LHsBinds Id)
 
 checkHiBootIface
 	(TcGblEnv { tcg_insts = local_insts, tcg_fam_insts = local_fam_insts,
-		    tcg_type_env = local_type_env })
+		    tcg_type_env = local_type_env, tcg_imports = imports })
 	(ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
 		      md_types = boot_type_env })
   = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts)) ;
@@ -548,8 +543,8 @@ checkHiBootIface
       | no_check name
       = return ()	
       | Just real_thing <- lookupTypeEnv local_type_env name
-      = do { let boot_decl = tyThingToIfaceDecl ext_nm boot_thing
-	         real_decl = tyThingToIfaceDecl ext_nm real_thing
+      = do { let boot_decl = tyThingToIfaceDecl boot_thing
+	         real_decl = tyThingToIfaceDecl real_thing
 	   ; checkTc (checkBootDecl boot_decl real_decl)
 		     (bootMisMatch boot_thing boot_decl real_decl) }
 		-- The easiest way to check compatibility is to convert to
@@ -559,14 +554,16 @@ checkHiBootIface
       where
 	name = getName boot_thing
 
-    ext_nm name = ExtPkg (nameModule name) (nameOccName name)
-	-- Just enough to compare; no versions etc needed
+    avail_env = imp_parent imports
+    is_implicit name = case lookupNameEnv avail_env name of
+                         Just (AvailTC tc _) | tc /= name -> True
+                         _otherwise -> False
 
     no_check name = isWiredInName name	-- No checking for wired-in names.  In particular,
 					-- 'error' is handled by a rather gross hack
 					-- (see comments in GHC.Err.hs-boot)
 		  || name `elem` dfun_names
-		  || isImplicitName name	-- Has a parent, which we'll check
+		  || is_implicit name	-- Has a parent, which we'll check
 
     dfun_names = map getName boot_insts
 
@@ -785,7 +782,7 @@ check_main ghc_mode tcg_env main_mod main_fn
 
 	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
 				   (mkVarOccFS FSLIT("main")) 
-				   (Just main_name) (getSrcLoc main_name)
+				   (getSrcLoc main_name)
 	      ; root_main_id = mkExportedLocalId root_main_name ty
 	      ; main_bind    = noLoc (VarBind root_main_id main_expr) }
 
