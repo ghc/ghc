@@ -68,7 +68,7 @@ Prelude>
    :show bindings              show the current bindings made at the prompt
 
    :ctags [&lt;file&gt;]             create tags file for Vi (default: "tags")
-   :etags [&lt;file&gt;]             create tags file for Emacs (defauilt: "TAGS")
+   :etags [&lt;file&gt;]             create tags file for Emacs (default: "TAGS")
    :type &lt;expr&gt;                show the type of &lt;expr&gt;
    :kind &lt;type&gt;                show the kind of &lt;type&gt;
    :undef &lt;cmd&gt;                undefine user-defined command :&lt;cmd&gt;
