@@ -89,20 +89,21 @@ instToId inst = ASSERT2( isId id, ppr inst ) id
 		id = instToVar inst
 
 instToVar :: Inst -> Var
-instToVar (LitInst nm _ ty _) = mkLocalId nm ty
-instToVar (Method id _ _ _ _) = id
-instToVar (Dict nm pred _)    
+instToVar (LitInst {tci_name = nm, tci_ty = ty})
+  = mkLocalId nm ty
+instToVar (Method {tci_id = id}) 
+  = id
+instToVar (Dict {tci_name = nm, tci_pred = pred})    
   | isEqPred pred = Var.mkTyVar nm (mkPredTy pred)
   | otherwise	  = mkLocalId nm (mkPredTy pred)
 
-instLoc (Dict _ _       loc) = loc
-instLoc (Method _ _ _ _ loc) = loc
-instLoc (LitInst _ _ _  loc) = loc
+instLoc inst = tci_loc inst
 
-dictPred (Dict _ pred _ ) = pred
-dictPred inst		  = pprPanic "dictPred" (ppr inst)
+dictPred (Dict {tci_pred = pred}) = pred
+dictPred inst		          = pprPanic "dictPred" (ppr inst)
 
-getDictClassTys (Dict _ pred _) = getClassPredTys pred
+getDictClassTys (Dict {tci_pred = pred}) = getClassPredTys pred
+getDictClassTys inst		         = pprPanic "getDictClassTys" (ppr inst)
 
 -- fdPredsOfInst is used to get predicates that contain functional 
 -- dependencies *or* might do so.  The "might do" part is because
@@ -110,16 +111,16 @@ getDictClassTys (Dict _ pred _) = getClassPredTys pred
 -- Leaving these in is really important for the call to fdPredsOfInsts
 -- in TcSimplify.inferLoop, because the result is fed to 'grow',
 -- which is supposed to be conservative
-fdPredsOfInst (Dict _ pred _) 	     = [pred]
-fdPredsOfInst (Method _ _ _ theta _) = theta
-fdPredsOfInst other		     = []	-- LitInsts etc
+fdPredsOfInst (Dict {tci_pred = pred}) 	   = [pred]
+fdPredsOfInst (Method {tci_theta = theta}) = theta
+fdPredsOfInst other		           = []	-- LitInsts etc
 
 fdPredsOfInsts :: [Inst] -> [PredType]
 fdPredsOfInsts insts = concatMap fdPredsOfInst insts
 
-isInheritableInst (Dict _ pred _) 	 = isInheritablePred pred
-isInheritableInst (Method _ _ _ theta _) = all isInheritablePred theta
-isInheritableInst other			 = True
+isInheritableInst (Dict {tci_pred = pred})     = isInheritablePred pred
+isInheritableInst (Method {tci_theta = theta}) = all isInheritablePred theta
+isInheritableInst other			       = True
 
 
 ipNamesOfInsts :: [Inst] -> [Name]
@@ -128,16 +129,16 @@ ipNamesOfInst  :: Inst   -> [Name]
 -- NB: ?x and %x get different Names
 ipNamesOfInsts insts = [n | inst <- insts, n <- ipNamesOfInst inst]
 
-ipNamesOfInst (Dict _ (IParam n _) _) = [ipNameName n]
-ipNamesOfInst (Method _ _ _ theta _)  = [ipNameName n | IParam n _ <- theta]
-ipNamesOfInst other		      = []
+ipNamesOfInst (Dict {tci_pred = IParam n _}) = [ipNameName n]
+ipNamesOfInst (Method {tci_theta = theta})   = [ipNameName n | IParam n _ <- theta]
+ipNamesOfInst other		    	     = []
 
 tyVarsOfInst :: Inst -> TcTyVarSet
-tyVarsOfInst (LitInst _ _ ty _)    = tyVarsOfType  ty
-tyVarsOfInst (Dict _ pred _)       = tyVarsOfPred pred
-tyVarsOfInst (Method _ id tys _ _) = tyVarsOfTypes tys `unionVarSet` idFreeTyVars id
-					 -- The id might have free type variables; in the case of
-					 -- locally-overloaded class methods, for example
+tyVarsOfInst (LitInst {tci_ty = ty})  = tyVarsOfType  ty
+tyVarsOfInst (Dict {tci_pred = pred}) = tyVarsOfPred pred
+tyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) = tyVarsOfTypes tys `unionVarSet` idFreeTyVars id
+				 -- The id might have free type variables; in the case of
+				 -- locally-overloaded class methods, for example
 
 
 tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
@@ -148,28 +149,28 @@ Predicates
 ~~~~~~~~~~
 \begin{code}
 isDict :: Inst -> Bool
-isDict (Dict _ _ _) = True
-isDict other	    = False
+isDict (Dict {}) = True
+isDict other	 = False
 
 isClassDict :: Inst -> Bool
-isClassDict (Dict _ pred _) = isClassPred pred
-isClassDict other	    = False
+isClassDict (Dict {tci_pred = pred}) = isClassPred pred
+isClassDict other	    	     = False
 
 isTyVarDict :: Inst -> Bool
-isTyVarDict (Dict _ pred _) = isTyVarClassPred pred
-isTyVarDict other	    = False
+isTyVarDict (Dict {tci_pred = pred}) = isTyVarClassPred pred
+isTyVarDict other	    	     = False
 
 isIPDict :: Inst -> Bool
-isIPDict (Dict _ pred _) = isIPPred pred
-isIPDict other		 = False
+isIPDict (Dict {tci_pred = pred}) = isIPPred pred
+isIPDict other		 	  = False
 
 isMethod :: Inst -> Bool
 isMethod (Method {}) = True
 isMethod other	     = False
 
 isMethodFor :: TcIdSet -> Inst -> Bool
-isMethodFor ids (Method uniq id tys _ loc) = id `elemVarSet` ids
-isMethodFor ids inst			   = False
+isMethodFor ids (Method {tci_oid = id}) = id `elemVarSet` ids
+isMethodFor ids inst			= False
 \end{code}
 
 
@@ -197,7 +198,7 @@ newDictBndr :: InstLoc -> TcPredType -> TcM Inst
 newDictBndr inst_loc pred
   = do 	{ uniq <- newUnique 
 	; let name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
-	; return (Dict name pred inst_loc) }
+	; return (Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}) }
 
 ----------------
 instCall :: InstOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
@@ -240,14 +241,15 @@ instCallDicts loc (EqPred ty1 ty2 : preds)
 instCallDicts loc (pred : preds)
   = do	{ uniq <- newUnique
 	; let name = mkPredName uniq (instLocSrcLoc loc) pred 
-	      dict = Dict name pred loc
+	      dict = Dict {tci_name = name, tci_pred = pred, tci_loc = loc}
 	; (dicts, co_fn) <- instCallDicts loc preds
 	; return (dict:dicts, co_fn <.> WpApp (instToId dict)) }
 
 -------------
 cloneDict :: Inst -> TcM Inst	-- Only used for linear implicit params
-cloneDict (Dict nm ty loc) = newUnique	`thenM` \ uniq ->
-			     returnM (Dict (setNameUnique nm uniq) ty loc)
+cloneDict dict@(Dict nm ty loc) = do { uniq <- newUnique
+				     ; return (dict {tci_name = setNameUnique nm uniq}) }
+cloneDict other = pprPanic "cloneDict" (ppr other)
 
 -- For vanilla implicit parameters, there is only one in scope
 -- at any time, so we used to use the name of the implicit parameter itself
@@ -261,7 +263,7 @@ newIPDict orig ip_name ty
     let
 	pred = IParam ip_name ty
         name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
-	dict = Dict name pred inst_loc
+	dict = Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}
     in
     returnM (mapIPName (\n -> instToId dict) ip_name, dict)
 \end{code}
@@ -336,7 +338,8 @@ newMethod inst_loc id tys
     let
 	(theta,tau) = tcSplitPhiTy (applyTys (idType id) tys)
 	meth_id	    = mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
-	inst        = Method meth_id id tys theta inst_loc
+	inst        = Method {tci_id = meth_id, tci_oid = id, tci_tys = tys,
+			      tci_theta = theta, tci_loc = inst_loc}
 	loc         = instLocSrcLoc inst_loc
     in
     returnM inst
@@ -389,11 +392,11 @@ Zonking makes sure that the instance types are fully zonked.
 
 \begin{code}
 zonkInst :: Inst -> TcM Inst
-zonkInst (Dict name pred loc)
+zonkInst dict@(Dict { tci_pred = pred})
   = zonkTcPredType pred			`thenM` \ new_pred ->
-    returnM (Dict name new_pred loc)
+    returnM (dict {tci_pred = new_pred})
 
-zonkInst (Method m id tys theta loc) 
+zonkInst meth@(Method {tci_oid = id, tci_tys = tys, tci_theta = theta}) 
   = zonkId id			`thenM` \ new_id ->
 	-- Essential to zonk the id in case it's a local variable
 	-- Can't use zonkIdOcc because the id might itself be
@@ -401,11 +404,12 @@ zonkInst (Method m id tys theta loc)
 
     zonkTcTypes tys		`thenM` \ new_tys ->
     zonkTcThetaType theta	`thenM` \ new_theta ->
-    returnM (Method m new_id new_tys new_theta loc)
+    returnM (meth { tci_oid = new_id, tci_tys = new_tys, tci_theta = new_theta })
+	-- No need to zonk the tci_id
 
-zonkInst (LitInst nm lit ty loc)
+zonkInst lit@(LitInst {tci_ty = ty})
   = zonkTcType ty			`thenM` \ new_ty ->
-    returnM (LitInst nm lit new_ty loc)
+    returnM (lit {tci_ty = new_ty})
 
 zonkInsts insts = mappM zonkInst insts
 \end{code}
@@ -441,10 +445,10 @@ pprInsts insts  = brackets (interpp'SP insts)
 
 pprInst, pprInstInFull :: Inst -> SDoc
 -- Debugging: print the evidence :: type
-pprInst (LitInst nm lit ty loc) = ppr nm <+> dcolon <+> ppr ty
-pprInst (Dict nm pred loc)      = ppr nm <+> dcolon <+> pprPred pred
+pprInst (LitInst {tci_name = nm, tci_ty = ty})   = ppr nm <+> dcolon <+> ppr ty
+pprInst (Dict {tci_name = nm, tci_pred =  pred}) = ppr nm <+> dcolon <+> pprPred pred
 
-pprInst m@(Method inst_id id tys theta loc)
+pprInst (Method {tci_id = inst_id, tci_oid = id, tci_tys = tys})
   = ppr inst_id <+> dcolon <+> 
 	braces (sep [ppr id <+> ptext SLIT("at"),
 		     brackets (sep (map pprParendType tys))])
@@ -453,9 +457,9 @@ pprInstInFull inst
   = sep [quotes (pprInst inst), nest 2 (pprInstLoc (instLoc inst))]
 
 tidyInst :: TidyEnv -> Inst -> Inst
-tidyInst env (LitInst nm lit ty loc) 	 = LitInst nm lit (tidyType env ty) loc
-tidyInst env (Dict nm pred loc)     	 = Dict nm (tidyPred env pred) loc
-tidyInst env (Method u id tys theta loc) = Method u id (tidyTypes env tys) theta loc
+tidyInst env lit@(LitInst {tci_ty = ty})   = lit {tci_ty = tidyType env ty}
+tidyInst env dict@(Dict {tci_pred = pred}) = dict {tci_pred = tidyPred env pred}
+tidyInst env meth@(Method {tci_tys = tys}) = meth {tci_tys = tidyTypes env tys}
 
 tidyMoreInsts :: TidyEnv -> [Inst] -> (TidyEnv, [Inst])
 -- This function doesn't assume that the tyvars are in scope
@@ -588,7 +592,7 @@ lookupInst :: Inst -> TcM LookupInstResult
 
 -- Methods
 
-lookupInst inst@(Method _ id tys theta loc)
+lookupInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_loc = loc})
   = do	{ (dicts, dict_app) <- instCallDicts loc theta
 	; let co_fn = dict_app <.> mkWpTyApps tys
 	; return (GenInst dicts (L span $ HsWrap co_fn (HsVar id))) }
@@ -603,7 +607,7 @@ lookupInst inst@(Method _ id tys theta loc)
 -- [Same shortcut as in newOverloadedLit, but we
 --  may have done some unification by now] 		
 
-lookupInst inst@(LitInst _nm (HsIntegral i from_integer_name) ty loc)
+lookupInst (LitInst {tci_lit = HsIntegral i from_integer_name, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutIntLit i ty
   = returnM (GenInst [] (noLoc expr))	-- GenInst, not SimpleInst, because 
 					-- expr may be a constructor application
@@ -616,7 +620,7 @@ lookupInst inst@(LitInst _nm (HsIntegral i from_integer_name) ty loc)
 		     (mkHsApp (L (instLocSrcSpan loc)
 			   	 (HsVar (instToId method_inst))) integer_lit))
 
-lookupInst inst@(LitInst _nm (HsFractional f from_rat_name) ty loc)
+lookupInst (LitInst {tci_lit = HsFractional f from_rat_name, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutFracLit f ty
   = returnM (GenInst [] (noLoc expr))
 
@@ -629,7 +633,7 @@ lookupInst inst@(LitInst _nm (HsFractional f from_rat_name) ty loc)
 					       (HsVar (instToId method_inst))) rat_lit))
 
 -- Dictionaries
-lookupInst (Dict _ pred loc)
+lookupInst (Dict {tci_pred = pred, tci_loc = loc})
   = do 	{ mb_result <- lookupPred pred
 	; case mb_result of {
 	    Nothing -> return NoInstance ;

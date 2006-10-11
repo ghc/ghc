@@ -680,48 +680,52 @@ type Int, represented by
 
 \begin{code}
 data Inst
-  = Dict
-	Name
-	TcPredType
-	InstLoc
+  = Dict {
+	tci_name :: Name,
+	tci_pred :: TcPredType,
+	tci_loc  :: InstLoc 
+    }
 
-  | Method
-	Id
+  | Method {
+	tci_id :: TcId,		-- The Id for the Inst
 
-	TcId	-- The overloaded function
-			-- This function will be a global, local, or ClassOpId;
-			--   inside instance decls (only) it can also be an InstId!
-			-- The id needn't be completely polymorphic.
-			-- You'll probably find its name (for documentation purposes)
-			--	  inside the InstOrigin
+	tci_oid :: TcId,	-- The overloaded function
+		-- This function will be a global, local, or ClassOpId;
+		--   inside instance decls (only) it can also be an InstId!
+		-- The id needn't be completely polymorphic.
+		-- You'll probably find its name (for documentation purposes)
+		--	  inside the InstOrigin
 
-	[TcType]	-- The types to which its polymorphic tyvars
-			--	should be instantiated.
-			-- These types must saturate the Id's foralls.
+	tci_tys :: [TcType],	-- The types to which its polymorphic tyvars
+				--	should be instantiated.
+				-- These types must saturate the Id's foralls.
 
-	TcThetaType	-- The (types of the) dictionaries to which the function
+	tci_theta :: TcThetaType,	
+			-- The (types of the) dictionaries to which the function
 			-- must be applied to get the method
 
-	InstLoc
+	tci_loc :: InstLoc 
+    }
+	-- INVARIANT 1: in (Method m f tys theta tau loc)
+	--	type of m = type of (f tys dicts(from theta))
 
-	-- INVARIANT 1: in (Method u f tys theta tau loc)
-	--	type of (f tys dicts(from theta)) = tau
-
-	-- INVARIANT 2: tau must not be of form (Pred -> Tau)
+	-- INVARIANT 2: type of m must not be of form (Pred -> Tau)
 	--   Reason: two methods are considered equal if the 
 	--   	     base Id matches, and the instantiating types
 	--	     match.  The TcThetaType should then match too.
 	--   This only bites in the call to tcInstClassOp in TcClassDcl.mkMethodBind
 
-  | LitInst
-	Name
-	(HsOverLit Name)	-- The literal from the occurrence site
-				-- INVARIANT: never a rebindable-syntax literal
-				-- Reason: tcSyntaxName does unification, and we
-				--	   don't want to deal with that during tcSimplify,
-				--	   when resolving LitInsts
-	TcType		-- The type at which the literal is used
-	InstLoc
+  | LitInst {
+	tci_name :: Name,
+	tci_lit  :: HsOverLit Name,	-- The literal from the occurrence site
+			-- INVARIANT: never a rebindable-syntax literal
+			-- Reason: tcSyntaxName does unification, and we
+			--	   don't want to deal with that during tcSimplify,
+			--	   when resolving LitInsts
+
+	tci_ty :: TcType,	-- The type at which the literal is used
+	tci_loc :: InstLoc
+    }
 \end{code}
 
 @Insts@ are ordered by their class/type info, rather than by their
@@ -737,16 +741,18 @@ instance Eq Inst where
 	         EQ    -> True
 		 other -> False
 
-cmpInst (Dict _ pred1 _)     	(Dict _ pred2 _)	= pred1 `tcCmpPred` pred2
-cmpInst (Dict _ _ _)	     	other 		    	= LT
+cmpInst d1@(Dict {}) 	d2@(Dict {})	= tci_pred d1 `tcCmpPred` tci_pred d2
+cmpInst (Dict {})	other 		= LT
 
-cmpInst (Method _ _ _ _ _) 	(Dict _ _ _)	  	= GT
-cmpInst (Method _ id1 tys1 _ _) (Method _ id2 tys2 _ _) = (id1 `compare` id2) `thenCmp` (tys1 `tcCmpTypes` tys2)
-cmpInst (Method _ _ _ _ _)      other			= LT
+cmpInst (Method {}) 	(Dict {})	= GT
+cmpInst m1@(Method {}) 	m2@(Method {})	= (tci_oid m1 `compare` tci_oid m2) `thenCmp`
+					  (tci_tys m1 `tcCmpTypes` tci_tys m2)
+cmpInst (Method {})  	other		= LT
 
-cmpInst (LitInst _ _ _ _)	(Dict _ _ _) 		= GT
-cmpInst (LitInst _ _ _ _)	(Method _ _ _ _ _)	= GT
-cmpInst (LitInst _ lit1 ty1 _)	(LitInst _ lit2 ty2 _)  = (lit1 `compare` lit2) `thenCmp` (ty1 `tcCmpType` ty2)
+cmpInst (LitInst {})	(Dict {}) 	= GT
+cmpInst (LitInst {})	(Method {})	= GT
+cmpInst l1@(LitInst {})	l2@(LitInst {})	= (tci_lit l1 `compare` tci_lit l2) `thenCmp`
+					  (tci_ty l1 `tcCmpType` tci_ty l2)
 \end{code}
 
 

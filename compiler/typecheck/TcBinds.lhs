@@ -734,7 +734,8 @@ generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
 
     mkMethInst (TcSigInfo { sig_id = poly_id, sig_tvs = tvs, 
 		            sig_theta = theta, sig_loc = loc }) mono_id
-      = Method mono_id poly_id (mkTyVarTys tvs) theta loc
+      = Method {tci_id = mono_id, tci_oid = poly_id, tci_tys = mkTyVarTys tvs,
+		tci_theta = theta, tci_loc = loc}
 \end{code}
 
 unifyCtxts checks that all the signature contexts are the same
