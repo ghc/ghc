@@ -1,7 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP Project, Glasgow University, 1992-2000
 %
-\section{Panic error messages}
 
 Defines basic funtions for printing error messages.
 
@@ -39,24 +39,15 @@ import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 import GHC.ConsoleHandler
 #endif
 
-# if __GLASGOW_HASKELL__ < 500
-import EXCEPTION        ( raiseInThread )
-# else
-import EXCEPTION	( throwTo )
-# endif /* GHC < 500 */
-
-#if __GLASGOW_HASKELL__ > 408
-import EXCEPTION	( catchJust, tryJust, ioErrors )
-#endif
-
-import CONCURRENT	( myThreadId, MVar, ThreadId, withMVar, newEmptyMVar )
-import DYNAMIC
-import qualified EXCEPTION as Exception
-import TRACE		( trace )
-import UNSAFE_IO	( unsafePerformIO )
-import IO		( isUserError )
-
-import System
+import Control.Exception hiding (try)
+import Control.Concurrent ( myThreadId, MVar, ThreadId, withMVar, newEmptyMVar )
+import Data.Dynamic
+import qualified Control.Exception as Exception
+import Debug.Trace	( trace )
+import System.IO.Unsafe	( unsafePerformIO )
+import System.IO.Error	( isUserError )
+import System.Exit
+import System.Environment
 \end{code}
 
 GHC's own exception type.

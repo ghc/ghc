@@ -76,11 +76,11 @@ import Util
 import Maybes		( firstJust )
 import Panic		( GhcException(..), ghcError )
 
-import EXCEPTION	( throwDyn )
-import DATA_IOREF
-import UNSAFE_IO	( unsafePerformIO )
-import Monad		( when )
-import Char		( isDigit )
+import Control.Exception ( throwDyn )
+import Data.IORef
+import System.IO.Unsafe	( unsafePerformIO )
+import Control.Monad	( when )
+import Data.Char	( isDigit )
 import Data.List	( sort, intersperse, nub )
 
 -----------------------------------------------------------------------------

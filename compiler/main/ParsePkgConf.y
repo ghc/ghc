@@ -12,7 +12,7 @@ import ErrUtils  ( mkLocMessage )
 import SrcLoc
 import Outputable
 import Panic     ( GhcException(..) )
-import EXCEPTION ( throwDyn )
+import Control.Exception ( throwDyn )
 
 }
 

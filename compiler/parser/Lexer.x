@@ -43,10 +43,10 @@ import DynFlags
 import Ctype
 import Util		( maybePrefixMatch, readRational )
 
-import DATA_BITS
+import Data.Bits
 import Data.Char 	( chr, isSpace )
-import Ratio
-import TRACE
+import Data.Ratio
+import Debug.Trace
 
 #if __GLASGOW_HASKELL__ >= 605
 import Data.Char 	( GeneralCategory(..), generalCategory, isPrint, isUpper )

@@ -42,13 +42,13 @@ import Constants	( wORD_SIZE )
 
 #ifdef DEBUG
 import Outputable	( assertPanic )
-import TRACE		( trace )
+import Debug.Trace	( trace )
 #endif
 
 import Control.Monad	( mapAndUnzipM )
-import Maybe		( fromJust )
-import DATA_BITS
-import DATA_WORD
+import Data.Maybe	( fromJust )
+import Data.Bits
+import Data.Word
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector

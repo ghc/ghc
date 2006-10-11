@@ -17,9 +17,9 @@ module Ctype
 
 #include "HsVersions.h"
 
-import DATA_INT		( Int32 )
-import DATA_BITS	( Bits((.&.)) )
-import Char		( ord, chr )
+import Data.Int		( Int32 )
+import Data.Bits	( Bits((.&.)) )
+import Data.Char	( ord, chr )
 \end{code}
 
 Bit masks

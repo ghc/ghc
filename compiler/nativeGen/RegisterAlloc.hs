@@ -100,13 +100,13 @@ import UniqSupply
 import Outputable
 
 #ifndef DEBUG
-import Maybe		( fromJust )
+import Data.Maybe	( fromJust )
 #endif
-import Maybe		( fromMaybe )
-import List		( nub, partition, mapAccumL, groupBy )
-import Monad		( when )
-import DATA_WORD
-import DATA_BITS
+import Data.Maybe	( fromMaybe )
+import Data.List	( nub, partition, mapAccumL, groupBy )
+import Control.Monad	( when )
+import Data.Word
+import Data.Bits
 
 -- -----------------------------------------------------------------------------
 -- Some useful types

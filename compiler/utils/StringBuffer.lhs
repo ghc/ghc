@@ -1,7 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The University of Glasgow, 1997-2006
 %
-\section{String buffers}
 
 Buffers for scanning string input stored in external arrays.
 

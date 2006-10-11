@@ -34,14 +34,14 @@ import Panic		( catchJust, ioErrors )
 #endif
 import ErrUtils         ( debugTraceMsg, printErrorsAndWarnings )
 
-import DATA_IOREF	( IORef, readIORef, writeIORef )
-import EXCEPTION
-
-import System		( ExitCode(..), exitWith )
-import Directory
-import IO
-import Monad            ( when )
-import Maybe            ( isJust )
+import Data.IORef	( IORef, readIORef, writeIORef )
+import Control.Exception
+import System.Exit	( ExitCode(..), exitWith )
+import System.Directory
+import System.IO
+import SYSTEM_IO_ERROR  ( isEOFError )
+import Control.Monad    ( when )
+import Data.Maybe       ( isJust )
 
 -----------------------------------------------------------------
 --

@@ -1,3 +1,7 @@
+%
+% (c) The University of Glasgow 2006
+%
+
 \begin{code}
 module Digraph(
 
@@ -34,22 +38,20 @@ module Digraph(
 
 
 import Util	( sortLe )
+import Outputable
 
 -- Extensions
-import MONAD_ST
+import Control.Monad.ST
 
 -- std interfaces
-import Maybe
-import Array
-import List
-import Outputable
+import Data.Maybe
+import Data.Array
+import Data.List
 
 #if __GLASGOW_HASKELL__ > 604
 import Data.Array.ST
-#elif __GLASGOW_HASKELL__ >= 504
-import Data.Array.ST  hiding ( indices, bounds )
 #else
-import ST
+import Data.Array.ST  hiding ( indices, bounds )
 #endif
 \end{code}
 

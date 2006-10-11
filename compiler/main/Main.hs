@@ -41,13 +41,14 @@ import Util
 import Panic
 
 -- Standard Haskell libraries
-import EXCEPTION	( throwDyn )
-import IO
-import Directory	( doesDirectoryExist )
-import System		( getArgs, exitWith, ExitCode(..) )
-import Monad
-import List
-import Maybe
+import Control.Exception ( throwDyn )
+import System.IO
+import System.Directory	( doesDirectoryExist )
+import System.Environment
+import System.Exit
+import Control.Monad
+import Data.List
+import Data.Maybe
 
 -----------------------------------------------------------------------------
 -- ToDo:

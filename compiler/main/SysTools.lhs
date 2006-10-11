@@ -37,31 +37,27 @@ module SysTools (
 
 #include "HsVersions.h"
 
-import DriverPhases     ( isHaskellUserSrcFilename )
+import DriverPhases
 import Config
 import Outputable
-import ErrUtils		( putMsg, debugTraceMsg, showPass, Severity(..), Messages )
-import Panic		( GhcException(..) )
-import Util		( Suffix, global, notNull, consIORef, joinFileName,
-			  normalisePath, pgmPath, platformPath, joinFileExt )
-import DynFlags		( DynFlags(..), DynFlag(..), dopt, Option(..),
-			  setTmpDir, defaultDynFlags )
+import ErrUtils
+import Panic
+import Util
+import DynFlags
+import FiniteMap
 
-import EXCEPTION	( throwDyn, finally )
-import DATA_IOREF	( IORef, readIORef, writeIORef )
-import DATA_INT
-    
-import Monad		( when, unless )
-import System		( ExitCode(..), getEnv, system )
-import IO		( try, catch, hGetContents,
-			  openFile, hPutStr, hClose, hFlush, IOMode(..), 
-			  stderr, ioError, isDoesNotExistError,
-			  isAlreadyExistsError )
-import Directory	( doesFileExist, removeFile,
-			  createDirectory, removeDirectory )
-import Maybe		( isJust )
-import List             ( partition )
-import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, eltsFM )
+import Control.Exception
+import Data.IORef
+import Data.Int
+import Control.Monad
+import System.Exit
+import System.Cmd
+import System.Environment
+import System.IO
+import SYSTEM_IO_ERROR as IO
+import System.Directory
+import Data.Maybe
+import Data.List
 
 -- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
 -- lines on mingw32, so we disallow it now.
@@ -88,10 +84,8 @@ import Text.Regex
 -- rawSystem comes from libghccompat.a in stage1
 import Compat.RawSystem	( rawSystem )
 import GHC.IOBase       ( IOErrorType(..) ) 
-import System.IO.Error  ( ioeGetErrorType )
 #else
 import System.Process	( runInteractiveProcess, getProcessExitCode )
-import System.IO        ( hSetBuffering, hGetLine, BufferMode(..) )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
 import Data.Char        ( isSpace )
 import FastString       ( mkFastString )

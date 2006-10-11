@@ -53,10 +53,10 @@ import FastString
 import List		( intersperse )
 #endif
 
-import DATA_INT
-import DATA_WORD
-import DATA_BITS
-import GLAEXTS
+import Data.Int
+import Data.Word
+import Data.Bits
+import GHC.Exts
 
 {-
 The native-code generator has machine-independent and

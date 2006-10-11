@@ -69,20 +69,20 @@ import UniqFM           ( UniqFM )
 import Util		( notNull, splitLongestPrefix, normalisePath )
 import Maybes		( fromJust, orElse )
 import SrcLoc           ( SrcSpan )
+import Outputable
+import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
-import DATA_IOREF	( readIORef )
-import EXCEPTION	( throwDyn )
-import Monad		( when )
+import Data.IORef	( readIORef )
+import Control.Exception ( throwDyn )
+import Control.Monad	( when )
 #ifdef mingw32_TARGET_OS
 import Data.List	( isPrefixOf )
 #else
 import Util		( split )
 #endif
 
-import Char		( isDigit, isUpper )
-import Outputable
+import Data.Char	( isDigit, isUpper )
 import System.IO        ( hPutStrLn, stderr )
-import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
 -- -----------------------------------------------------------------------------
 -- DynFlags

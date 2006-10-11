@@ -22,6 +22,12 @@ you will screw up the layout where they are used in case expressions!
  * settings for the target plat instead). */
 #include "../includes/ghcautoconf.h"
 
+#if __GLASGOW_HASKELL__ >= 602
+#define SYSTEM_IO_ERROR System.IO.Error
+#else
+#define SYSTEM_IO_ERROR System.IO
+#endif
+
 #ifdef __GLASGOW_HASKELL__
 #define GLOBAL_VAR(name,value,ty)  \
 name = Util.global (value) :: IORef (ty); \

@@ -1,6 +1,6 @@
 {-# OPTIONS -cpp #-}
 --
--- (c) The University of Glasgow 2002
+-- (c) The University of Glasgow 2002-2006
 --
 -- Binary I/O library, with special tweaks for GHC
 --
@@ -59,7 +59,7 @@ import Unique
 import Panic
 import UniqFM
 import FastMutInt
-import PackageConfig		( PackageId, packageIdFS, fsToPackageId )
+import PackageConfig
 
 import Foreign
 import Data.Array.IO

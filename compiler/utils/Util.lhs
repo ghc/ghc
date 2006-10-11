@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The University of Glasgow 1992-2002
 %
 \section[Util]{Highly random utility functions}
@@ -82,26 +83,26 @@ module Util (
 import Panic		( panic, trace )
 import FastTypes
 
-import EXCEPTION	( Exception(..), finally, throwDyn, catchDyn, throw )
-import qualified EXCEPTION as Exception
-import DYNAMIC		( Typeable )
-import DATA_IOREF	( IORef, newIORef )
-import UNSAFE_IO	( unsafePerformIO )
-import DATA_IOREF	( readIORef, writeIORef )
+import Control.Exception ( Exception(..), finally, catchDyn, throw )
+import qualified Control.Exception as Exception
+import Data.Dynamic	( Typeable )
+import Data.IORef	( IORef, newIORef )
+import System.IO.Unsafe	( unsafePerformIO )
+import Data.IORef	( readIORef, writeIORef )
 
-import qualified List	( elem, notElem )
+import qualified Data.List as List ( elem, notElem )
 
 #ifndef DEBUG
-import List		( zipWith4 )
+import Data.List		( zipWith4 )
 #endif
 
-import Monad		( when )
-import IO		( catch, isDoesNotExistError )
-import Directory	( doesDirectoryExist, createDirectory )
-import Char		( isUpper, isAlphaNum, isSpace, ord, isDigit )
-import Ratio		( (%) )
-import Time		( ClockTime )
-import Directory	( getModificationTime )
+import Control.Monad	( when )
+import SYSTEM_IO_ERROR as IO ( catch, isDoesNotExistError )
+import System.Directory	( doesDirectoryExist, createDirectory,
+                          getModificationTime )
+import Data.Char	( isUpper, isAlphaNum, isSpace, ord, isDigit )
+import Data.Ratio	( (%) )
+import System.Time	( ClockTime )
 
 infixr 9 `thenCmp`
 \end{code}

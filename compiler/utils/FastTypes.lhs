@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow, 2000
+% (c) The University of Glasgow, 2000-2006
 %
 \section{Fast integers and booleans}
 
@@ -17,7 +17,7 @@ module FastTypes (
 #if defined(__GLASGOW_HASKELL__)
 
 -- Import the beggars
-import GLAEXTS
+import GHC.Exts
 	( Int(..), Int#, (+#), (-#), (*#), 
 	  quotInt#, negateInt#, (==#), (<#), (<=#), (>=#), (>#)
 	)

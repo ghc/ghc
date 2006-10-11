@@ -42,15 +42,12 @@ import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
 import UniqFM
 import Module
-import UniqSet
 import Util
 import Maybes		( expectJust, MaybeErr(..) )
 import Panic
 import Outputable
 
-#if __GLASGOW_HASKELL__ >= 603
-import System.Directory	( getAppUserDataDirectory )
-#else
+#if __GLASGOW_HASKELL__ < 603
 import Compat.Directory	( getAppUserDataDirectory )
 #endif
 
@@ -58,14 +55,14 @@ import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
-import System.Directory	( doesFileExist, doesDirectoryExist,
-			  getDirectoryContents )
-import Data.Maybe	( catMaybes )
-import Control.Monad	( foldM )
-import Data.List	( nub, partition, sortBy, isSuffixOf )
 import FastString
-import EXCEPTION	( throwDyn )
 import ErrUtils         ( debugTraceMsg, putMsg, Message )
+
+import System.Directory
+import Data.Maybe
+import Control.Monad
+import Data.List
+import Control.Exception        ( throwDyn )
 
 -- ---------------------------------------------------------------------------
 -- The Package state

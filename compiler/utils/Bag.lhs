@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[Bags]{@Bag@: an unordered collection with duplicates}
+
+Bag: an unordered collection with duplicates
 
 \begin{code}
 module Bag (
@@ -20,7 +22,8 @@ module Bag (
 
 import Outputable
 import Util		( isSingleton )
-import List		( partition )
+
+import Data.List	( partition )
 \end{code}
 
 

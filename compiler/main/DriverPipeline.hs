@@ -50,17 +50,18 @@ import ParserCoreUtils	( getCoreModuleName )
 import SrcLoc		( unLoc )
 import SrcLoc		( Located(..) )
 
-import EXCEPTION
-import DATA_IOREF	( readIORef, writeIORef, IORef )
-import GLAEXTS		( Int(..) )
-
-import Directory
-import System
-import IO
-import Monad
+import Control.Exception as Exception
+import Data.IORef	( readIORef, writeIORef, IORef )
+import GHC.Exts		( Int(..) )
+import System.Directory
+import System.IO
+import SYSTEM_IO_ERROR as IO
+import Control.Monad
 import Data.List	( isSuffixOf )
-import Maybe
-
+import Data.Maybe
+import System.Exit
+import System.Cmd
+import System.Environment
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -1133,7 +1134,7 @@ checkProcessArgsResult flags filename
 
 getHCFilePackages :: FilePath -> IO [PackageId]
 getHCFilePackages filename =
-  EXCEPTION.bracket (openFile filename ReadMode) hClose $ \h -> do
+  Exception.bracket (openFile filename ReadMode) hClose $ \h -> do
     l <- hGetLine h
     case l of
       '/':'*':' ':'G':'H':'C':'_':'P':'A':'C':'K':'A':'G':'E':'S':rest ->

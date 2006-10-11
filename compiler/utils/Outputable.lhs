@@ -1,10 +1,10 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-\section[Outputable]{Classes for pretty-printing}
 
-Defines classes for pretty-printing and forcing, both forms of
-``output.''
+Outputable: defines classes for pretty-printing and forcing, both
+forms of ``output.''
 
 \begin{code}
 
@@ -62,10 +62,9 @@ import qualified Pretty
 import Pretty		( Doc, Mode(..) )
 import Panic
 
-import DATA_WORD	( Word32 )
-
-import IO		( Handle, stderr, stdout, hFlush )
-import Char             ( ord )
+import Data.Word	( Word32 )
+import System.IO	( Handle, stderr, stdout, hFlush )
+import Data.Char        ( ord )
 \end{code}
 
 

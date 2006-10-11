@@ -1,7 +1,7 @@
-
+%
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
-\section[FiniteMap]{An implementation of finite maps}
 
 ``Finite maps'' are the heart of the compiler's
 lookup-tables/environments and its implementation of sets.  Important
@@ -62,7 +62,7 @@ import Bag	  ( Bag, foldrBag )
 import Util
 import Outputable
 
-import GLAEXTS
+import GHC.Exts
 
 #if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a

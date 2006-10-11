@@ -1,7 +1,9 @@
-%ilter
+%
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
-\section[UniqFM]{Specialised finite maps, for things with @Uniques@}
+
+UniqFM: Specialised finite maps, for things with @Uniques@
 
 Based on @FiniteMaps@ (as you would expect).
 
@@ -52,7 +54,7 @@ import Maybes		( maybeToBool )
 import FastTypes
 import Outputable
 
-import GLAEXTS		-- Lots of Int# operations
+import GHC.Exts		-- Lots of Int# operations
 \end{code}
 
 %************************************************************************

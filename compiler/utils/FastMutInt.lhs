@@ -1,6 +1,6 @@
 {-# OPTIONS -cpp #-}
 --
--- (c) The University of Glasgow 2002
+-- (c) The University of Glasgow 2002-2006
 --
 -- Unboxed mutable Ints
 
@@ -17,13 +17,8 @@ module FastMutInt(
 #endif
 
 
-#if __GLASGOW_HASKELL__ < 503
-import GlaExts
-import PrelIOBase
-#else
 import GHC.Base
 import GHC.IOBase
-#endif
 
 #if __GLASGOW_HASKELL__ < 411
 newByteArray# = newCharArray#

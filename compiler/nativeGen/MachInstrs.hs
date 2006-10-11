@@ -43,7 +43,7 @@ import Outputable
 import FastString
 import Constants       ( wORD_SIZE )
 
-import GLAEXTS
+import GHC.Exts
 
 
 -- -----------------------------------------------------------------------------

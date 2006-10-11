@@ -37,9 +37,10 @@ import qualified Pretty
 import SrcLoc		( srcSpanStart, noSrcSpan )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_ErrorSpans )
-import System		( ExitCode(..), exitWith )
-import IO		( hPutStrLn, stderr )
-import DYNAMIC
+
+import System.Exit	( ExitCode(..), exitWith )
+import System.IO	( hPutStrLn, stderr )
+import Data.Dynamic
 
 
 -- -----------------------------------------------------------------------------

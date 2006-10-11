@@ -42,10 +42,10 @@ import HaddockUtils
 
 import FastString
 import Maybes		( orElse )
-import Monad            ( when )
 import Outputable
-import GLAEXTS
 
+import Control.Monad    ( when )
+import GHC.Exts
 import Data.Char
 import Control.Monad    ( mplus )
 }

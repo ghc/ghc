@@ -1,4 +1,5 @@
--- (c) The University of Glasgow 2002
+--
+-- (c) The University of Glasgow 2002-2006
 --
 -- The IO Monad with an environment
 --
@@ -26,9 +27,10 @@ module IOEnv (
 #include "HsVersions.h"
 
 import Panic		( try, tryUser, tryMost, Exception(..) )
-import DATA_IOREF	( IORef, newIORef, readIORef, writeIORef )
-import UNSAFE_IO	( unsafeInterleaveIO )
-import FIX_IO		( fixIO )
+
+import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+import System.IO.Unsafe	( unsafeInterleaveIO )
+import System.IO	( fixIO )
 
 
 ----------------------------------------------------------------------

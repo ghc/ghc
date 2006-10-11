@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[UniqSet]{Specialised sets, for things with @Uniques@}

@@ -1,11 +1,11 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[Maybes]{The `Maybe' types and associated utility functions}
 
 \begin{code}
 module Maybes (
-	module Maybe,		-- Re-export all of Maybe
+	module Data.Maybe,	-- Re-export all of Maybe
 
 	MaybeErr(..),	-- Instance of Monad
 	failME, isSuccess,
@@ -22,8 +22,7 @@ module Maybes (
 
 #include "HsVersions.h"
 
-import Maybe
-
+import Data.Maybe
 
 infixr 4 `orElse`
 \end{code}

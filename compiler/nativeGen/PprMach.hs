@@ -39,20 +39,15 @@ import qualified Outputable
 
 import StaticFlags      ( opt_PIC, opt_Static )
 
-#if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
 import Data.Word	( Word8 )
-#else
-import MutableArray
-#endif
-
-import MONAD_ST
-import Char		( chr, ord )
-import Maybe            ( isJust )
+import Control.Monad.ST
+import Data.Char	( chr, ord )
+import Data.Maybe       ( isJust )
 
 #if powerpc_TARGET_ARCH || darwin_TARGET_OS
-import DATA_WORD(Word32)
-import DATA_BITS
+import Data.Word(Word32)
+import Data.Bits
 #endif
 
 -- -----------------------------------------------------------------------------

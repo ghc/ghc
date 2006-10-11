@@ -180,12 +180,10 @@ module Pretty (
 import BufWrite
 import FastString
 
-import GLAEXTS
+import GHC.Exts
 
 import Numeric (fromRat)
-import IO
-
-import System.IO	( hPutBuf )
+import System.IO
 
 import GHC.Base		( unpackCString# )
 import GHC.Ptr		( Ptr(..) )

@@ -2,7 +2,7 @@
 --
 -- Fast write-buffered Handles
 --
--- (c) The University of Glasgow 2005
+-- (c) The University of Glasgow 2005-2006
 --
 -- This is a simple abstraction over Handles that offers very fast write
 -- buffering, but without the thread safety that Handles provide.  It's used
@@ -26,16 +26,16 @@ import FastString
 import FastMutInt
 import Panic		( panic )
 
-import Monad		( when )
-import Char		( ord )
+import Control.Monad	( when )
+import Data.Char	( ord )
 import Foreign
-import IO
+import System.IO
 
 import GHC.IOBase	( IO(..) )
 import System.IO	( hPutBuf )
 import GHC.Ptr		( Ptr(..) )
 
-import GLAEXTS		( Int(..), Int#, Addr# )
+import GHC.Exts		( Int(..), Int#, Addr# )
 
 -- -----------------------------------------------------------------------------
 

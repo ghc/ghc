@@ -35,9 +35,9 @@ import Bag		( emptyBag, listToBag )
 
 import Distribution.Compiler
 
-import EXCEPTION	( throwDyn )
-import IO
-import List
+import Control.Exception
+import System.IO
+import Data.List
 
 #if __GLASGOW_HASKELL__ >= 601
 import System.IO		( openBinaryFile )

@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[ListSetOps]{Set-like operations on lists}
@@ -24,7 +25,8 @@ import Outputable
 import Unique	( Unique )
 import UniqFM	( eltsUFM, emptyUFM, addToUFM_C )
 import Util	( isn'tIn, isIn, mapAccumR, sortLe )
-import List	( partition )
+
+import Data.List ( partition )
 \end{code}
 
 

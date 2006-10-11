@@ -37,13 +37,12 @@ import FiniteMap
 import UniqFM
 import Maybes		( expectJust )
 
-import DATA_IOREF	( IORef, writeIORef, readIORef, modifyIORef )
-
+import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )
 import Data.List
 import System.Directory
 import System.IO
 import Control.Monad
-import Time		( ClockTime )
+import System.Time	( ClockTime )
 
 
 type FileExt = String	-- Filename extension
