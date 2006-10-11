@@ -375,7 +375,7 @@
 	      </listitem>
 	    </varlistentry>
 	    <varlistentry>
-	      <term><filename>haddock.js</filename></term>
+	      <term><filename>haddock-util.js</filename></term>
 	      <listitem>
 		<para>A small piece of JavaScript for collapsing sections
 		of the generated HTML.</para>

@@ -199,7 +199,7 @@ pathJoin = foldr join []
 cssFile, iconFile, jsFile, plusFile,minusFile :: String
 cssFile   = "haddock.css"
 iconFile  = "haskell_icon.gif"
-jsFile    = "haddock.js"
+jsFile    = "haddock-util.js"
 plusFile  = "plus.gif"
 minusFile = "minus.gif"
 

@@ -1,40 +1,21 @@
-build-type:           Simple
-name:                 haddock
-version:              2.0
-license:              BSD3
-license-file:         LICENSE
-copyright:            (c) Simon Marlow, David Waern
-author:               Simon Marlow, David Waern
-maintainer:           David Waern <davve@dtek.chalmers.se>
-stability:            stable
-homepage:             http://www.haskell.org/haddock/
-synopsis:             Haddock is a documentation-generation tool for Haskell
-                      libraries
-build-depends:
-  base,
-  haskell98,
-  ghc>=6.8,
-  Cabal,
-  filepath,
-  process,
-  directory,
-  pretty,
-  containers,
-  array
-extensions:           CPP, PatternGuards
-ghc-options:          -fglasgow-exts
-hs-source-dirs:       src
-exposed-modules:      Distribution.Haddock
-other-modules:
-  Haddock.Types
-  Haddock.InterfaceFile
-  Haddock.Exception
+name: haddock
+cabal-version: >=1.1.4
+version: 2.0
+license: BSD3
+license-file: LICENSE
+copyright: (c) Simon Marlow
+author: Simon Marlow
+maintainer: Simon Marlow <simonmar@microsoft.com>
+stability: stable
+homepage: http://www.haskell.org/haddock/
+synopsis: Haddock is a documentation-generation tool for Haskell libraries
+build-depends: base>=1.0, haskell98>=1.0, mtl>=1.0, network>=1.0
 data-files:
-  html/haddock-DEBUG.css
-  html/haddock.css
-  html/haddock.js
-  html/haskell_icon.gif
-  html/minus.gif
+	html/haddock-DEBUG.css
+	html/haddock.css
+	html/haddock.js
+	html/haskell_icon.gif
+	html/minus.gif
 	html/plus.gif
 extra-source-files:
 	CHANGES
@@ -72,30 +53,25 @@ extra-source-files:
 	haskell.vim
 	src/haddock.sh
 
-executable:           haddock
-hs-source-dirs:       src
-main-is:              Main.hs
-extensions:           CPP, PatternGuards
-ghc-options:          -fglasgow-exts -funbox-strict-fields -O2 -fasm
+executable: haddock-ghc
+hs-source-dirs: src
+main-is: Main.hs
+extensions: CPP, PatternGuards
 other-modules:
-  Haddock.Interface.Rename
-  Haddock.Interface.Create
-  Haddock.Interface.AttachInstances
-  Haddock.Utils.FastMutInt2
-  Haddock.Utils.BlockTable
-  Haddock.Utils.Html
-  Haddock.Utils
-  Haddock.Backends.HaddockDB
-  Haddock.Backends.DevHelp
-  Haddock.Backends.HH
-  Haddock.Backends.HH2
-  Haddock.Backends.Hoogle
-  Haddock.ModuleTree
-  Haddock.Types
-  Haddock.Version
-  Haddock.InterfaceFile        
-  Haddock.Exception
-  Haddock.Options
-  Haddock.GHC.Typecheck
-  Haddock.GHC.Utils
-  Haddock.GHC
+	FastMutInt2
+	BlockTable
+	HaddockDB
+	HaddockDevHelp
+	HaddockHH
+	HaddockHH2
+	HaddockHoogle
+	HaddockHtml
+	HaddockModuleTree
+	HaddockRename
+	HaddockTypes
+	HaddockUtil
+	HaddockVersion
+	Html
+	GHCUtils
+	Main
+ 
