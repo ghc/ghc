@@ -1,7 +1,8 @@
 %
-% (c) The University of Glasgow 2002
+% (c) The University of Glasgow 2002-2006
 %
-\section[ByteCodeLink]{Bytecode assembler and linker}
+
+ByteCodeLink: Bytecode assembler and linker
 
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
@@ -18,17 +19,17 @@ module ByteCodeAsm (
 #include "HsVersions.h"
 
 import ByteCodeInstr
-import ByteCodeItbls	( ItblEnv, mkITbls )
+import ByteCodeItbls
 
-import Name		( Name, getName )
+import Name
 import NameSet
-import FiniteMap	( addToFM, lookupFM, emptyFM )
-import Literal		( Literal(..) )
-import TyCon		( TyCon )
-import PrimOp		( PrimOp )
-import Constants	( wORD_SIZE )
-import FastString	( FastString(..) )
-import SMRep		( CgRep(..), StgWord )
+import FiniteMap
+import Literal
+import TyCon
+import PrimOp
+import Constants
+import FastString
+import SMRep
 import FiniteMap
 import Outputable
 

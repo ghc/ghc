@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TyCon]{The @TyCon@ datatype}
+
+The @TyCon@ datatype
 
 \begin{code}
 module TyCon(
@@ -66,13 +68,13 @@ module TyCon(
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
 import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
 
-import Var   		( TyVar, Id )
-import Class		( Class )
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
-import Name		( Name, nameUnique, NamedThing(getName) )
-import PrelNames	( Unique, Uniquable(..) )
-import Maybe		( isJust )
-import Maybes		( orElse )
+import Var
+import Class
+import BasicTypes
+import Name
+import PrelNames
+import Maybe
+import Maybes
 import Outputable
 import FastString
 \end{code}

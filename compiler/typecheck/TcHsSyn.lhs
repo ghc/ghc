@@ -1,7 +1,9 @@
-	%
+%
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1996-1998
 %
-\section[TcHsSyn]{Specialisations of the @HsSyn@ syntax for the typechecker}
+
+TcHsSyn: Specialisations of the @HsSyn@ syntax for the typechecker
 
 This module is an extension of @HsSyn@ syntax, for use in the type
 checker.
@@ -27,30 +29,26 @@ module TcHsSyn (
 import HsSyn	-- oodles of it
 
 -- others:
-import Id	( idType, setIdType, Id )
+import Id
 
 import TcRnMonad
-import Type	  ( Type, isLiftedTypeKind, liftedTypeKind, isSubKind, eqKind  )
-import TcType	  ( TcType, TcTyVar, mkTyVarTy, mkTyConApp, isImmutableTyVar )
+import Type
+import TcType
 import qualified  Type
-import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, writeMetaTyVar )
-import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
-		    doublePrimTy, addrPrimTy
-		  )
-import TysWiredIn ( charTy, stringTy, intTy, 
-		    mkListTy, mkPArrTy, mkTupleTy, unitTy,
-		    voidTy, listTyCon, tupleTyCon )
-import TyCon	  ( mkPrimTyCon, tyConKind, PrimRep(..) )
-import {- Kind parts of -} Type	  ( splitKindFunTys )
-import Name	  ( Name, getOccName, mkInternalName, mkDerivedTyConOcc )
-import Var	  ( Var, isId, isLocalVar, tyVarKind )
+import TcMType
+import TysPrim
+import TysWiredIn
+import TyCon
+import {- Kind parts of -} Type
+import Name
+import Var
 import VarSet
 import VarEnv
-import BasicTypes ( Boxity(..), IPName(..), ipNameName, mapIPName )
-import Maybes	  ( orElse )
-import Unique	  ( Uniquable(..) )
-import SrcLoc	  ( noSrcLoc, noLoc, Located(..), unLoc )
-import Util	  ( mapSnd )
+import BasicTypes
+import Maybes
+import Unique
+import SrcLoc
+import Util
 import Bag
 import Outputable
 \end{code}
@@ -120,7 +118,7 @@ hsLitType (HsDoublePrim d) = doublePrimTy
 zonkId :: TcId -> TcM TcId
 zonkId id
   = zonkTcType (idType id) `thenM` \ ty' ->
-    returnM (setIdType id ty')
+    returnM (Id.setIdType id ty')
 \end{code}
 
 The rest of the zonking is done *after* typechecking.
@@ -189,7 +187,7 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env id
   = zonkTcTypeToType env (idType id)	`thenM` \ ty' ->
-    returnM (setIdType id ty')
+    returnM (Id.setIdType id ty')
 
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
 zonkIdBndrs env ids = mappM (zonkIdBndr env) ids

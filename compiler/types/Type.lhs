@@ -1,8 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
-\section[Type]{Type - public interface}
 
+Type - public interface
 
 \begin{code}
 module Type (
@@ -105,36 +106,23 @@ module Type (
 import TypeRep
 
 -- friends:
-import Var	( Var, TyVar, tyVarKind, tyVarName, 
-		  setTyVarName, setTyVarKind, mkWildCoVar )
+import Var
 import VarEnv
 import VarSet
 
-import OccName	( tidyOccName )
-import Name	( NamedThing(..), tidyNameOcc )
-import Class	( Class, classTyCon )
-import PrelNames( openTypeKindTyConKey, unliftedTypeKindTyConKey, 
-                  ubxTupleKindTyConKey, argTypeKindTyConKey )
-import TyCon	( TyCon, isPrimTyCon,
-		  isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, isNewTyCon, isClosedNewTyCon, 
-		  newTyConRep, newTyConRhs, 
-		  isAlgTyCon, isSuperKindTyCon,
-		  tcExpandTyCon_maybe, coreExpandTyCon_maybe,
-	          tyConKind, PrimRep(..), tyConPrimRep, tyConUnique
-		)
+import OccName
+import Name
+import Class
+import PrelNames
+import TyCon
 
 -- others
-import StaticFlags	( opt_DictsStrict )
-import Util		( mapAccumL, seqList, snocView, thenCmp, isEqual, all2 )
+import StaticFlags
+import Util
 import Outputable
-import UniqSet		( sizeUniqSet )		-- Should come via VarSet
-import Maybe		( isJust )
+import UniqSet
 
-#ifdef DEBUG
-import TyCon	( isRecursiveTyCon, tyConArity, isCoercionTyCon )
-import Util	( lengthIs )
-#endif
+import Data.Maybe	( isJust )
 \end{code}
 
 

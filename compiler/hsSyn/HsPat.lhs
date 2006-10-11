@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[PatSyntax]{Abstract Haskell syntax---patterns}
@@ -23,21 +24,20 @@ module HsPat (
 import {-# SOURCE #-} HsExpr		( SyntaxExpr )
 
 -- friends:
-import HsBinds		( DictBinds, HsBind(..), HsWrapper, isIdHsWrapper, pprHsWrapper,
-			  emptyLHsBinds, pprLHsBinds )
-import HsLit		( HsLit(HsCharPrim), HsOverLit )
-import HsTypes		( LHsType, PostTcType )
-import HsDoc            ( LHsDoc, ppr_mbDoc )
-import BasicTypes	( Boxity, tupleParens )
+import HsBinds
+import HsLit
+import HsTypes
+import HsDoc
+import BasicTypes
 -- others:
 import PprCore		( {- instance OutputableBndr TyVar -} )
-import TysWiredIn	( nilDataCon, charDataCon, charTy )
-import Var		( TyVar )
-import DataCon		( DataCon, dataConTyCon )
-import TyCon		( isProductTyCon )
+import TysWiredIn
+import Var
+import DataCon
+import TyCon
 import Outputable	
-import Type		( Type )
-import SrcLoc		( Located(..), unLoc, noLoc )
+import Type
+import SrcLoc
 \end{code}
 
 

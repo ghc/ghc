@@ -1,4 +1,5 @@
-
+%
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
@@ -23,41 +24,26 @@ module TcHsType (
 
 #include "HsVersions.h"
 
-import HsSyn		( HsType(..), LHsType, HsTyVarBndr(..), LHsTyVarBndr, 
-			  LHsContext, HsPred(..), LHsPred )
-import RnHsSyn		( extractHsTyVars )
+import HsSyn
+import RnHsSyn
 import TcRnMonad
-import TcEnv		( tcExtendTyVarEnv, tcExtendKindEnvTvs, 
-			  tcLookup, tcLookupClass, tcLookupTyCon,
-		 	  TyThing(..), getInLocalScope, getScopedTyVarBinds,
-			  wrongThingErr
-			)
-import TcMType		( newKindVar, 
-			  zonkTcKindToKind, 
-			  tcInstBoxyTyVar, readFilledBox,
-			  checkValidType
-			)
-import TcUnify		( boxyUnify, unifyFunKind, checkExpectedKind )
-import TcIface		( checkWiredInTyCon )
-import TcType		( Type, PredType(..), ThetaType, BoxySigmaType,
-			  TcType, TcKind, isRigidTy,
-			  UserTypeCtxt(..), pprUserTypeCtxt,
-			  substTyWith, mkTyVarTys, tcEqType,
-		 	  tcIsTyVarTy, mkFunTy, mkSigmaTy, mkPredTy, 
-			  mkTyConApp, mkAppTys, typeKind )
-import {- Kind parts of -} Type 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
-			  openTypeKind, argTypeKind, splitKindFunTys )
-import Var		( TyVar, mkTyVar, tyVarName )
-import TyCon		( TyCon, tyConKind )
-import Class		( Class, classTyCon )
-import Name		( Name, mkInternalName )
-import OccName		( mkOccName, tvName )
+import TcEnv
+import TcMType
+import TcUnify
+import TcIface
+import TcType
+import {- Kind parts of -} Type
+import Var
+import TyCon
+import Class
+import Name
+import OccName
 import NameSet
-import PrelNames	( genUnitTyConName )
-import TysWiredIn	( mkListTy, listTyCon, mkPArrTy, parrTyCon, tupleTyCon )
-import BasicTypes	( Boxity(..) )
-import SrcLoc		( Located(..), unLoc, noLoc, getLoc, srcSpanStart )
-import UniqSupply	( uniqsFromSupply )
+import PrelNames
+import TysWiredIn
+import BasicTypes
+import SrcLoc
+import UniqSupply
 import Outputable
 \end{code}
 

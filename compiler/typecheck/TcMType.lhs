@@ -1,9 +1,12 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section{Monadic type operations}
 
-This module contains monadic operations over types that contain mutable type variables
+Monadic type operations
+
+This module contains monadic operations over types that contain
+mutable type variables
 
 \begin{code}
 module TcMType (
@@ -54,60 +57,29 @@ module TcMType (
 
 #include "HsVersions.h"
 
-
 -- friends:
-import TypeRep		( Type(..), PredType(..),  -- Friend; can see representation
-			  ThetaType
-			) 
-import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
-			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
-			  MetaDetails(..), SkolemInfo(..), BoxInfo(..), 
-			  BoxyTyVar, BoxyType, UserTypeCtxt(..), kindVarRef,
-			  mkKindVar, isMetaTyVar, isSigTyVar, metaTvRef,
-			  tcCmpPred, isClassPred, tcGetTyVar,
-			  tcSplitPhiTy, tcSplitPredTy_maybe,
-			  tcSplitAppTy_maybe,  
-			  tcValidInstHeadTy, tcSplitForAllTys,
-			  tcIsTyVarTy, tcSplitSigmaTy, 
-			  isUnLiftedType, isIPPred, 
-			  typeKind, isSkolemTyVar,
-			  mkAppTy, mkTyVarTy, mkTyVarTys, 
-			  tyVarsOfPred, getClassPredTys_maybe,
-			  tyVarsOfType, tyVarsOfTypes, tcView,
-			  pprPred, pprTheta, pprClassPred )
-import Type		( Kind, KindVar, 
-			  isLiftedTypeKind, isSubArgTypeKind, isSubOpenTypeKind,
-			  liftedTypeKind, defaultKind
-			)
-import Type		( TvSubst, zipTopTvSubst, substTy )
-import Coercion		( mkCoKind )
-import Class		( Class, classArity, className )
-import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
-			  tyConArity, tyConName )
-import Var		( TyVar, tyVarKind, tyVarName, isTcTyVar, 
-			  mkTyVar, mkTcTyVar, tcTyVarDetails,
-			  CoVar, mkCoVar )
-
-	-- Assertions
-#ifdef DEBUG
-import TcType		( isFlexi, isBoxyTyVar, isImmutableTyVar )
-import Type		( isSubKind )
-#endif
+import TypeRep
+import TcType
+import Type
+import Type
+import Coercion
+import Class
+import TyCon
+import Var
 
 -- others:
 import TcRnMonad          -- TcType, amongst others
-import FunDeps		( grow, checkInstCoverage )
-import Name		( Name, setNameUnique, mkSysTvName )
+import FunDeps
+import Name
 import VarSet
-import DynFlags		( dopt, DynFlag(..) )
-import Util		( nOfThem, isSingleton, notNull )
-import ListSetOps	( removeDups )
-import UniqSupply	( uniqsFromSupply )
+import DynFlags
+import Util
+import ListSetOps
+import UniqSupply
 import Outputable
 
 import Control.Monad	( when )
 import Data.List	( (\\) )
-
 \end{code}
 
 

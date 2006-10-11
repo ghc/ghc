@@ -1,25 +1,27 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1993-1998
 %
-\section[TcRules]{Typechecking transformation rules}
+
+TcRules: Typechecking transformation rules
 
 \begin{code}
 module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), mkHsDictLet )
+import HsSyn
 import TcRnMonad
-import TcSimplify	( tcSimplifyRuleLhs, tcSimplifyInferCheck )
-import TcMType		( newFlexiTyVarTy, zonkQuantifiedTyVar, tcSkolSigTyVars )
-import TcType		( tyVarsOfTypes, openTypeKind, SkolemInfo(..), substTyWith, mkTyVarTys )
-import TcHsType		( UserTypeCtxt(..), tcHsPatSigType )
-import TcExpr		( tcMonoExpr )
-import TcEnv		( tcExtendIdEnv, tcExtendTyVarEnv )
-import Inst		( instToId )
-import Id		( idType, mkLocalId )
-import Name		( Name )
-import SrcLoc		( noLoc, unLoc )
+import TcSimplify
+import TcMType
+import TcType
+import TcHsType
+import TcExpr
+import TcEnv
+import Inst
+import Id
+import Name
+import SrcLoc
 import Outputable
 \end{code}
 

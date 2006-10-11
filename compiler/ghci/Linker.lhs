@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2005
+% (c) The University of Glasgow 2005-2006
 %
 
 -- --------------------------------------
@@ -12,7 +12,6 @@ necessary.
 
 
 \begin{code}
-
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
 module Linker ( HValue, showLinkerState,
@@ -23,48 +22,43 @@ module Linker ( HValue, showLinkerState,
 
 #include "HsVersions.h"
 
-import ObjLink		( loadDLL, loadObj, unloadObj, resolveObjs, initObjLinker )
-import ByteCodeLink	( HValue, ClosureEnv, extendClosureEnv, linkBCO )
-import ByteCodeItbls	( ItblEnv )
-import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
+import ObjLink
+import ByteCodeLink
+import ByteCodeItbls
+import ByteCodeAsm
 
 import Packages
-import DriverPhases	( isObjectFilename, isDynLibFilename )
-import Finder		( findHomeModule, findObjectLinkableMaybe,
-                          FindResult(..) )
+import DriverPhases
+import Finder
 import HscTypes
-import Name		( Name, nameModule, isExternalName, isWiredInName )
+import Name
 import NameEnv
-import NameSet		( nameSetToList )
-import UniqFM           ( lookupUFM )
+import NameSet
+import UniqFM
 import Module
-import ListSetOps	( minusList )
-import DynFlags		( DynFlags(..), getOpts )
-import BasicTypes	( SuccessFlag(..), succeeded, failed )
+import ListSetOps
+import DynFlags
+import BasicTypes
 import Outputable
-import PackageConfig    ( rtsPackageId )
-import Panic            ( GhcException(..) )
-import Util             ( zipLazy, global, joinFileExt, joinFileName, 
-                          replaceFilenameSuffix )
-import StaticFlags	( v_Ld_inputs, v_Build_tag )
-import ErrUtils         ( debugTraceMsg, mkLocMessage )
-import DriverPhases	( phaseInputExt, Phase(..) )
-import SrcLoc		( SrcSpan )
+import PackageConfig
+import Panic
+import Util
+import StaticFlags
+import ErrUtils
+import DriverPhases
+import SrcLoc
 
 -- Standard libraries
-import Control.Monad	( when, filterM, foldM )
+import Control.Monad
  
-import Data.IORef	( IORef, readIORef, writeIORef, modifyIORef )
-import Data.List	( partition, nub )
+import Data.IORef
+import Data.List
 
-import System.IO	( putStr, putStrLn, hPutStrLn, stderr, fixIO )
-import System.Directory	( doesFileExist )
+import System.IO
+import System.Directory
 
-import Control.Exception ( block, throwDyn, bracket )
-import Maybe		( fromJust )
-#ifdef DEBUG
-import Maybe            ( isJust )
-#endif
+import Control.Exception
+import Data.Maybe
 
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.IOBase	( IO(..) )

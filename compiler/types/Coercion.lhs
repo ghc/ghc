@@ -1,5 +1,8 @@
+%
+% (c) The University of Glasgow 2006
+%
 
- Module for type coercions, as in System FC.
+Module for type coercions, as in System FC.
 
 Coercions are represented as types, and their kinds tell what types the 
 coercion works on. 
@@ -34,27 +37,16 @@ module Coercion (
 #include "HsVersions.h"
 
 import TypeRep
-import Type	  ( Type, Kind, PredType, substTyWith, mkAppTy, mkForAllTy,
-                    mkFunTy, splitAppTy_maybe, splitForAllTy_maybe, coreView,
-                    kindView, mkTyConApp, isCoercionKind, isEqPred, mkAppTys,
-                    coreEqType, splitAppTys, isTyVarTy, splitTyConApp_maybe
-                  )
-import TyCon      ( TyCon, tyConArity, mkCoercionTyCon, isClosedNewTyCon,
-                    newTyConRhs, newTyConCo_maybe, 
-                    isCoercionTyCon, isCoercionTyCon_maybe )
-import Var	  ( Var, TyVar, isTyVar, tyVarKind )
-import Name       ( BuiltInSyntax(..), Name, mkWiredInName, tcName )
-import OccName    ( mkOccNameFS )
-import PrelNames  ( symCoercionTyConKey, 
-                    transCoercionTyConKey, leftCoercionTyConKey,
-                    rightCoercionTyConKey, instCoercionTyConKey, 
-                    unsafeCoercionTyConKey, gHC_PRIM
-                  )
-import Util       ( lengthIs, snocView )
-import Unique     ( hasKey )
-import BasicTypes ( Arity )
+import Type
+import TyCon
+import Var hiding (isCoVar)
+import Name
+import OccName
+import PrelNames
+import Util
+import Unique
+import BasicTypes
 import Outputable
-
 
 
 ------------------------------

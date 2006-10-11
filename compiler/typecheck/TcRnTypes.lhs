@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP Project, Glasgow University, 1992-2002
 %
 \begin{code}
@@ -41,40 +42,34 @@ module TcRnTypes(
 
 #include "HsVersions.h"
 
-import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
-			  ArithSeqInfo, DictBinds, LHsBinds, LImportDecl, HsGroup,
-                          HsWrapper, IE, HsDoc, HaddockModInfo )
-import HscTypes		( FixityEnv,
-			  HscEnv, TypeEnv, TyThing, 
-			  GenAvailInfo(..), AvailInfo, HscSource(..),
-			  availName, IsBootInterface, Deprecations )
-import Packages		( PackageId )
-import Type		( Type, pprTyThingCategory )
-import TcType		( TcTyVarSet, TcType, TcThetaType, SkolemInfo, 
-			  TcPredType, TcKind, tcCmpPred, tcCmpType,
-			  tcCmpTypes, pprSkolInfo )
-import InstEnv		( Instance, InstEnv )
-import FamInstEnv	( FamInst, FamInstEnv )
+import HsSyn hiding (LIE)
+import HscTypes
+import Packages
+import Type
+import TcType
+import InstEnv
+import FamInstEnv
 import IOEnv
-import RdrName		( GlobalRdrEnv, LocalRdrEnv )
-import Name		( Name )
+import RdrName
+import Name
 import NameEnv
-import NameSet		( NameSet, unionNameSets, DefUses )
-import Var		( Id, TyVar )
-import VarEnv		( TidyEnv )
+import NameSet
+import Var
+import VarEnv
 import Module
 import UniqFM
-import SrcLoc		( SrcSpan, SrcLoc, Located, srcSpanStart )
-import VarSet		( IdSet )
-import ErrUtils		( Messages, Message )
-import UniqSupply	( UniqSupply )
-import BasicTypes	( IPName )
-import Util		( thenCmp )
+import SrcLoc
+import VarSet
+import ErrUtils
+import UniqSupply
+import BasicTypes
+import Util
 import Bag
 import Outputable
-import Maybe		( mapMaybe )
-import ListSetOps	( unionLists )
-import Data.List        ( nub )
+import ListSetOps
+
+import Data.Maybe
+import Data.List
 \end{code}
 
 

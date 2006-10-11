@@ -1,7 +1,9 @@
-
+%
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 2000
 %
-\section[FunDeps]{FunDeps - functional dependencies}
+
+FunDeps - functional dependencies
 
 It's better to read it as: "if we know these, then we're going to know these"
 
@@ -15,23 +17,22 @@ module FunDeps (
 
 #include "HsVersions.h"
 
-import Name		( Name, getSrcLoc )
-import Var		( TyVar )
-import Class		( Class, FunDep, pprFundeps, classTvsFds )
-import TcGadt		( tcUnifyTys, BindFlag(..) )
-import Type		( substTys, notElemTvSubst )
-import Coercion         ( isEqPred )
-import TcType		( Type, PredType(..), tcEqType, 
-			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
-import InstEnv		( Instance(..), InstEnv, instanceHead, classInstances,
-			  instanceCantMatch, roughMatchTcs )
+import Name
+import Var
+import Class
+import TcGadt
+import Type
+import Coercion
+import TcType
+import InstEnv
 import VarSet
 import VarEnv
 import Outputable
-import Util             ( notNull )
-import List		( tails )
-import Maybe		( isJust )
-import ListSetOps	( equivClassesByUniq )
+import Util
+import ListSetOps
+
+import Data.List	( tails )
+import Data.Maybe	( isJust )
 \end{code}
 
 

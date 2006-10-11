@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section{Type subsumption and unification}
+
+Type subsumption and unification
 
 \begin{code}
 module TcUnify (
@@ -25,61 +27,30 @@ module TcUnify (
 
 #include "HsVersions.h"
 
-import HsSyn		( HsWrapper(..), idHsWrapper, isIdHsWrapper, (<.>),
-			  mkWpLams, mkWpTyLams, mkWpApps )
-import TypeRep		( Type(..), PredType(..) )
+import HsSyn
+import TypeRep
 
-import TcMType		( lookupTcTyVar, LookupTyVarResult(..),
-                          tcInstBoxyTyVar, newKindVar, newMetaTyVar,
-			  newBoxyTyVar, newBoxyTyVarTys, readFilledBox, 
-			  readMetaTyVar, writeMetaTyVar, newFlexiTyVarTy,
-			  tcInstSkolTyVars, tcInstTyVar, tcInstSkolType,
-			  zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
-			  readKindVar, writeKindVar )
-import TcSimplify	( tcSimplifyCheck )
-import TcEnv		( tcGetGlobalTyVars, findGlobals )
-import TcIface		( checkWiredInTyCon )
+import TcMType
+import TcSimplify
+import TcEnv
+import TcIface
 import TcRnMonad         -- TcType, amongst others
-import TcType		( TcKind, TcType, TcTyVar, BoxyTyVar, TcTauType,
-			  BoxySigmaType, BoxyRhoType, BoxyType, 
-			  TcTyVarSet, TcThetaType, TcTyVarDetails(..), BoxInfo(..), 
-			  SkolemInfo( GenSkol, UnkSkol ), MetaDetails(..), isImmutableTyVar,
-			  pprSkolTvBinding, isTauTy, isTauTyCon, isSigmaTy, 
-			  mkFunTy, mkFunTys, mkTyConApp, isMetaTyVar,
-			  tcSplitForAllTys, tcSplitAppTy_maybe, tcSplitFunTys, mkTyVarTys,
-			  tcSplitSigmaTy, tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy, 
-			  typeKind, mkForAllTys, mkAppTy, isBoxyTyVar,
-			  tcView, exactTyVarsOfType, 
-			  tidyOpenType, tidyOpenTyVar, tidyOpenTyVars,
-			  pprType, tidyKind, tidySkolemTyVar, isSkolemTyVar, isSigTyVar,
-			  TvSubst, mkTvSubst, zipTyEnv, zipOpenTvSubst, emptyTvSubst, 
-			  substTy, substTheta,
-			  lookupTyVar, extendTvSubst )
-import Type		( Kind, SimpleKind, KindVar, 
-			  openTypeKind, liftedTypeKind, unliftedTypeKind, 
-			  mkArrowKind, defaultKind,
-			  argTypeKind, isLiftedTypeKind, isUnliftedTypeKind,
-			  isSubKind, pprKind, splitKindFunTys, isSubKindCon,
-                          isOpenTypeKind, isArgTypeKind )
-import TysPrim		( alphaTy, betaTy )
-import Inst		( newDictBndrsO, instCall, instToId )
-import TyCon		( TyCon, tyConArity, tyConTyVars, isSynTyCon )
-import TysWiredIn	( listTyCon )
-import Id		( Id )
-import Var		( Var, varName, tyVarKind, isTcTyVar, tcTyVarDetails )
+import TcType
+import Type
+import TysPrim
+import Inst
+import TyCon
+import TysWiredIn
+import Id
+import Var
 import VarSet
 import VarEnv
-import Name		( Name, isSystemName )
-import ErrUtils		( Message )
-import Maybes		( expectJust, isNothing )
-import BasicTypes	( Arity )
-import Util		( notNull, equalLength )
+import Name
+import ErrUtils
+import Maybes
+import BasicTypes
+import Util
 import Outputable
-
--- Assertion imports
-#ifdef DEBUG
-import TcType		( isBoxyTy, isFlexi )
-#endif
 \end{code}
 
 %************************************************************************
@@ -1261,7 +1232,7 @@ uUnfilledVars outer swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2)
     k1_sub_k2 = k1 `isSubKind` k2
     k2_sub_k1 = k2 `isSubKind` k1
 
-    nicer_to_update_tv1 = isSystemName (varName tv1)
+    nicer_to_update_tv1 = isSystemName (Var.varName tv1)
 	-- Try to update sys-y type variables in preference to ones
 	-- gotten (say) by instantiating a polymorphic function with
 	-- a user-written type sig

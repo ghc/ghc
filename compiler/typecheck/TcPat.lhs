@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcPat]{Typechecking patterns}
+
+TcPat: Typechecking patterns
 
 \begin{code}
 module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
@@ -10,58 +12,34 @@ module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TcExpr( tcSyntaxOp )
-import HsSyn		( Pat(..), LPat, HsConDetails(..), HsLit(..),
-			  HsOverLit(..), HsExpr(..), HsWrapper(..),
-			  mkCoPat, HsRecField(..), mkRecField,
-			  LHsBinds, emptyLHsBinds, isEmptyLHsBinds, 
-			  collectPatsBinders, nlHsLit,
-                          LHsDoc )
-import TcHsSyn		( TcId, hsLitType )
+
+import HsSyn
+import TcHsSyn
 import TcRnMonad
-import Inst		( InstOrigin(..), shortCutFracLit, shortCutIntLit, 
-			  newDictBndrs, instToId, instStupidTheta, isHsVar
-			)
-import Id		( Id, idType, mkLocalId )
-import Var		( CoVar, tyVarKind )
-import CoreFVs		( idFreeTyVars )
-import Name		( Name, mkSystemVarName )
-import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
-import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
-			  tcLookupClass, tcLookupDataCon, refineEnvironment,
-			  tcLookupField, tcMetaTy )
-import TcMType 		( newFlexiTyVarTy, arityErr, tcInstSkolTyVars, 
-			  newCoVars, zonkTcType, tcInstTyVars, newBoxyTyVar )
-import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, BoxyType,
-			  SkolemInfo(PatSkol), 
-			  BoxySigmaType, BoxyRhoType, argTypeKind, typeKind,
-			  pprSkolTvBinding, isRigidTy, tcTyVarsOfTypes, 
-			  zipTopTvSubst, isSubArgTypeKind, isUnboxedTupleType,
-			  mkTyVarTys, mkClassPred, isOverloadedTy, substEqSpec,
-			  mkFunTy, mkFunTys, tidyOpenType, tidyOpenTypes,
-			  mkTyVarTy )
-import VarSet		( elemVarSet )
-import {- Kind parts of -} 
-       Type		( liftedTypeKind )
-import TcUnify		( boxySplitTyConApp, boxySplitListTy, unBox,
-			  zapToMonotype, boxyUnify, boxyUnifyList,
-			  checkSigTyVarsWrt, unifyType )
-import TcHsType		( UserTypeCtxt(..), tcPatSig )
-import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
-import TcGadt		( Refinement, emptyRefinement, gadtRefine, refineType )
-import Type		( Type, mkTyConApp, substTys, substTheta )
-import StaticFlags	( opt_IrrefutableTuples )
-import TyCon		( TyCon, FieldLabel, tyConFamInst_maybe,
-			  tyConFamilyCoercion_maybe, tyConTyVars )
-import DataCon		( DataCon, dataConTyCon, dataConFullSig, dataConName,
-			  dataConFieldLabels, dataConSourceArity, 
-			  dataConStupidTheta, dataConUnivTyVars )
-import PrelNames	( integralClassName, fromIntegerName, integerTyConName, 
-			  fromRationalName, rationalTyConName )
-import BasicTypes	( isBoxed )
-import SrcLoc		( Located(..), SrcSpan, noLoc )
-import ErrUtils		( Message )
-import Util		( zipEqual )
-import Maybes		( MaybeErr(..) )
+import Inst
+import Id
+import Var
+import CoreFVs
+import Name
+import TcSimplify
+import TcEnv
+import TcMType
+import TcType
+import VarSet
+import TcUnify
+import TcHsType
+import TysWiredIn
+import TcGadt
+import Type
+import StaticFlags
+import TyCon
+import DataCon
+import PrelNames
+import BasicTypes hiding (SuccessFlag(..))
+import SrcLoc
+import ErrUtils
+import Util
+import Maybes
 import Outputable
 import FastString
 \end{code}
@@ -191,18 +169,18 @@ tcPatBndr (PS { pat_ctxt = LamPat }) bndr_name pat_ty
 		-- 	f t = case t of { MkT g -> ... }
 		-- Here, the 'g' must get type (forall a. a->a) from the
 		-- MkT context
-	; return (mkLocalId bndr_name pat_ty') }
+	; return (Id.mkLocalId bndr_name pat_ty') }
 
 tcPatBndr (PS { pat_ctxt = LetPat lookup_sig }) bndr_name pat_ty
   | Just mono_ty <- lookup_sig bndr_name
   = do	{ mono_name <- newLocalName bndr_name
 	; boxyUnify mono_ty pat_ty
-	; return (mkLocalId mono_name mono_ty) }
+	; return (Id.mkLocalId mono_name mono_ty) }
 
   | otherwise
   = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
 	; mono_name <- newLocalName bndr_name
-	; return (mkLocalId mono_name pat_ty') }
+	; return (Id.mkLocalId mono_name pat_ty') }
 
 
 -------------------

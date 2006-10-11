@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1998
 %
 \section[TcForeign]{Typechecking \tr{foreign} declarations}
@@ -22,37 +23,25 @@ module TcForeign
 import HsSyn
 
 import TcRnMonad
-import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcExpr		( tcPolyExpr )			
+import TcHsType
+import TcExpr
 
-import ForeignCall	( CCallConv(..) )
-import ErrUtils		( Message )
-import Id		( Id, mkLocalId, mkExportedLocalId )
+import ForeignCall
+import ErrUtils
+import Id
 #if alpha_TARGET_ARCH
-import Type		( typePrimRep )
-import SMRep		( argMachRep, primRepToCgRep, primRepHint )
+import Type
+import SMRep
+import MachOp
 #endif
-import OccName		( mkForeignExportOcc )
-import Name		( Name, NamedThing(..), mkExternalName )
-import TcType		( Type, tcSplitFunTys, 
-			  tcSplitForAllTys, tcSplitIOType_maybe,
-			  isFFIArgumentTy, isFFIImportResultTy, 
-			  isFFIExportResultTy, isFFILabelTy,
-			  isFFIExternalTy, isFFIDynArgumentTy,
-			  isFFIDynResultTy, isFFIDotnetTy, isFFIDotnetObjTy,
-			  toDNType
-			)
-import ForeignCall	( CExportSpec(..), CCallTarget(..), 
-			  CLabelString, isCLabelString,
-			  isDynamicTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
-import DynFlags		( DynFlags(..), HscTarget(..) )
+import OccName
+import Name
+import TcType
+import ForeignCall
+import DynFlags
 import Outputable
-import SrcLoc		( Located(..), srcSpanStart )
-import Bag		( consBag )
-
-#if alpha_TARGET_ARCH
-import MachOp		( machRepByteWidth, MachHint(FloatHint) )
-#endif
+import SrcLoc
+import Bag
 \end{code}
 
 \begin{code}

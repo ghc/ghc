@@ -1,7 +1,8 @@
 %
-% (c) The University of Glasgow 2002
+% (c) The University of Glasgow 2002-2006
 %
-\section[ByteCodeGen]{Generate bytecode from Core}
+
+ByteCodeGen: Generate bytecode from Core
 
 \begin{code}
 module ByteCodeGen ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
@@ -9,48 +10,41 @@ module ByteCodeGen ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 #include "HsVersions.h"
 
 import ByteCodeInstr
-import ByteCodeFFI	( mkMarshalCode, moan64 )
-import ByteCodeAsm	( CompiledByteCode(..), UnlinkedBCO, 
-			  assembleBCO, assembleBCOs, iNTERP_STACK_CHECK_THRESH )
-import ByteCodeLink	( lookupStaticPtr )
+import ByteCodeFFI
+import ByteCodeAsm
+import ByteCodeLink
 
 import Outputable
-import Name		( Name, getName, mkSystemVarName )
+import Name
 import Id
 import FiniteMap
-import ForeignCall	( ForeignCall(..), CCallTarget(..), CCallSpec(..) )
-import HscTypes		( TypeEnv, typeEnvTyCons, typeEnvClasses )
-import CoreUtils	( exprType )
+import ForeignCall
+import HscTypes
+import CoreUtils
 import CoreSyn
-import PprCore		( pprCoreExpr )
-import Literal		( Literal(..), literalType )
-import PrimOp		( PrimOp(..) )
-import CoreFVs		( freeVars )
-import Type		( isUnLiftedType, splitTyConApp_maybe )
-import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
-                          isUnboxedTupleCon, isNullaryRepDataCon, dataConWorkId,
-			  dataConRepArity )
-import TyCon		( TyCon, tyConFamilySize, isDataTyCon, 
-			  tyConDataCons, isUnboxedTupleTyCon )
-import Class		( Class, classTyCon )
-import Type		( Type, repType, splitFunTys, dropForAlls, pprType )
+import PprCore
+import Literal
+import PrimOp
+import CoreFVs
+import Type
+import DataCon
+import TyCon
+import Class
+import Type
 import Util
-import DataCon		( dataConRepArity )
-import Var		( isTyVar )
-import VarSet		( VarSet, varSetElems )
-import TysPrim		( arrayPrimTyCon, mutableArrayPrimTyCon,
-			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon
-			)
-import DynFlags	( DynFlags, DynFlag(..) )
-import ErrUtils		( showPass, dumpIfSet_dyn )
-import Unique		( mkPseudoUniqueE )
-import FastString	( FastString(..), unpackFS )
-import Panic		( GhcException(..) )
-import SMRep		( typeCgRep, arrWordsHdrSize, arrPtrsHdrSize, StgWord, 
-			  CgRep(..), cgRepSizeW, isFollowableArg, idCgRep )
-import Bitmap		( intsToReverseBitmap, mkBitmap )
+import DataCon
+import Var
+import VarSet
+import TysPrim
+import DynFlags
+import ErrUtils
+import Unique
+import FastString
+import Panic
+import SMRep
+import Bitmap
 import OrdList
-import Constants	( wORD_SIZE )
+import Constants
 
 import Data.List	( intersperse, sortBy, zip4, zip6, partition )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8,
@@ -101,7 +95,7 @@ coreExprToBCOs dflags expr
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) FSLIT("ExprTopLevel")
-          invented_id    = mkLocalId invented_name (panic "invented_id's type")
+          invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
 	  
       (BcM_State final_ctr mallocd, proto_bco) 
          <- runBc (schemeTopBind (invented_id, freeVars expr))

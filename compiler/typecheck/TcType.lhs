@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcType]{Types used in the typechecker}
@@ -129,34 +130,32 @@ module TcType (
 #include "HsVersions.h"
 
 -- friends:
-import TypeRep		( Type(..), funTyCon, Kind )  -- friend
-
-import Type
-import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, isOpenTyCon,
-			  synTyConDefn, tyConUnique )	 
-import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
-import Class		( Class )
-import Var		( TyVar, Id, isCoVar, isTcTyVar, mkTcTyVar, tyVarName, tyVarKind, tcTyVarDetails )
-import ForeignCall	( Safety, DNType(..) )
-import Unify		( tcMatchTys )
+import TypeRep
+import DataCon
+import Class
+import Var
+import ForeignCall
+import Unify
 import VarSet
+import Type
+import TyCon
 
 -- others:
-import DynFlags		( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
-import Name		( Name, NamedThing(..), mkInternalName, getSrcLoc, mkSystemName )
+import DynFlags
+import Name
 import NameSet
-import VarEnv		( TidyEnv )
-import OccName		( OccName, mkDictOcc, mkOccName, tvName )
-import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
-import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
-import BasicTypes	( Arity, ipNameName )
-import SrcLoc		( SrcLoc, SrcSpan )
-import Util		( equalLength )
-import Maybes		( maybeToBool, expectJust, mapCatMaybes )
-import ListSetOps	( hasNoDups )
-import List		( nubBy )
+import VarEnv
+import OccName
+import PrelNames
+import TysWiredIn
+import BasicTypes
+import SrcLoc
+import Util
+import Maybes
+import ListSetOps
 import Outputable
 
+import Data.List
 import Data.IORef
 \end{code}
 

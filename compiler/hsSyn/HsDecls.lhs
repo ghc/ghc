@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[HsDecls]{Abstract syntax: global declarations}
+
+HsDecls: Abstract syntax: global declarations
 
 Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
@@ -33,27 +35,25 @@ module HsDecls (
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
 
-import HsBinds		( HsValBinds(..), HsBind, LHsBinds, plusHsValBinds,
-			  Sig(..), LSig, LFixitySig, pprLHsBinds,
-			  emptyValBindsIn, emptyValBindsOut )
-import HsPat		( HsConDetails(..), hsConArgs, HsRecField(..) )
-import HsImpExp		( pprHsVar )
+import HsBinds
+import HsPat
+import HsImpExp
 import HsTypes
-import HsDoc		( HsDoc, LHsDoc, ppr_mbDoc )
-import NameSet          ( NameSet )
-import CoreSyn		( RuleName )
-import {- Kind parts of -} Type		( Kind, pprKind )
-import BasicTypes	( Activation(..), DeprecTxt )
-import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
-			  CExportSpec(..), CLabelString ) 
+import HsDoc
+import NameSet
+import CoreSyn
+import {- Kind parts of -} Type
+import BasicTypes
+import ForeignCall
 
 -- others:
-import Class		( FunDep, pprFundeps )
+import Class
 import Outputable	
-import Util		( count )
-import SrcLoc		( Located(..), unLoc, noLoc )
+import Util
+import SrcLoc
 import FastString
-import Maybe            ( isJust )
+
+import Data.Maybe       ( isJust )
 \end{code}
 
 %************************************************************************

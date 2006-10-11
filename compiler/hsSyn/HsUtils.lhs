@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow, 1992-2003
+% (c) The University of Glasgow, 1992-2006
 %
 
 Here we collect a variety of helper functions that construct or
@@ -24,17 +24,17 @@ import HsTypes
 import HsLit
 import HsDecls
 
-import RdrName		( RdrName, getRdrName, mkRdrUnqual )
-import Var		( Id )
-import Type		( Type )
-import DataCon		( DataCon, dataConWrapId, dataConSourceArity )
-import OccName		( mkVarOccFS )
-import Name		( Name )
-import BasicTypes	( RecFlag(..) )
+import RdrName
+import Var
+import Type
+import DataCon
+import OccName
+import Name
+import BasicTypes
 import SrcLoc
-import FastString	( mkFastString )
+import FastString
 import Outputable
-import Util		( nOfThem )
+import Util
 import Bag
 \end{code}
 

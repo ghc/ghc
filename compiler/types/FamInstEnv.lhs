@@ -1,4 +1,8 @@
-\section[FamInstEnv]{Type checked family instance declarations}
+%
+% (c) The University of Glasgow 2006
+%
+
+FamInstEnv: Type checked family instance declarations
 
 \begin{code}
 module FamInstEnv (
@@ -12,22 +16,21 @@ module FamInstEnv (
 
 #include "HsVersions.h"
 
-import InstEnv          ( roughMatchTcs, instanceCantMatch )
-import Unify		( tcMatchTys )
-import TcType		( Type )
-import Type		( TvSubst, TyThing (ATyCon), pprParendType )
-import TyCon		( TyCon, isDataTyCon, isNewTyCon, isSynTyCon, 
-			  tyConName, tyConTyVars, tyConFamInst_maybe )
-import VarSet		( TyVarSet, mkVarSet )
-import Var		( TyVar )
-import Name		( Name, getOccName, NamedThing(..), getSrcLoc )
-import OccName		( parenSymOcc )
-import SrcLoc		( pprDefnLoc )
-import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C, eltsUFM )
+import InstEnv
+import Unify
+import TcType
+import Type
+import TyCon
+import VarSet
+import Var
+import Name
+import OccName
+import SrcLoc
+import UniqFM
 import Outputable
 
-import Maybe		( isJust, isNothing )
-import Monad		( mzero )
+import Maybe
+import Monad
 \end{code}
 
 

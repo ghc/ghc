@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcGenDeriv]{Generating derived instance declarations}
+
+TcGenDeriv: Generating derived instance declarations
 
 This module is nominally ``subordinate'' to @TcDeriv@, which is the
 ``official'' interface to deriving-related things.
@@ -29,37 +31,29 @@ module TcGenDeriv (
 #include "HsVersions.h"
 
 import HsSyn
-import RdrName		( RdrName, mkVarUnqual, getRdrName, mkRdrUnqual,
-			   mkDerivedRdrName )
-import BasicTypes	( Fixity(..), maxPrecedence, Boxity(..) )
-import DataCon		( isNullarySrcDataCon, dataConTag,
-			  dataConOrigArgTys, dataConSourceArity, fIRST_TAG,
-			  DataCon, dataConName, dataConIsInfix,
-			  dataConFieldLabels )
-import Name		( getOccString, getSrcLoc, Name, NamedThing(..)	)
+import RdrName
+import BasicTypes
+import DataCon
+import Name
 
-import HscTypes		( FixityEnv, lookupFixity )
+import HscTypes
 import PrelInfo
 import PrelNames
-import MkId		( eRROR_ID )
-import PrimOp		( PrimOp(..) )
-import SrcLoc		( Located(..), noLoc, srcLocSpan )
-import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon, tyConArity,
-			  maybeTyConSingleCon, tyConFamilySize, tyConTyVars, tyConName
-			)
-import TcType		( isUnLiftedType, tcEqType, Type )
-import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
-			  intPrimTyCon )
-import TysWiredIn	( charDataCon, intDataCon, floatDataCon, doubleDataCon,
-			  intDataCon_RDR, true_RDR, false_RDR )
-import Util		( zipWithEqual, isSingleton,
-			  zipWith3Equal, nOfThem, zipEqual )
+import MkId
+import PrimOp
+import SrcLoc
+import TyCon
+import TcType
+import TysPrim
+import TysWiredIn
+import Util
 import Constants
-import List		( partition, intersperse )
 import Outputable
 import FastString
 import OccName
 import Bag
+
+import Data.List	( partition, intersperse )
 \end{code}
 
 %************************************************************************

@@ -1,7 +1,8 @@
 %
-% (c) The University of Glasgow 2001
+% (c) The University of Glasgow 2001-2006
 %
-\section[ByteCodeGen]{Generate machine-code sequences for foreign import}
+
+ByteCodeGen: Generate machine-code sequences for foreign import
 
 \begin{code}
 module ByteCodeFFI ( mkMarshalCode, moan64 ) where
@@ -9,21 +10,20 @@ module ByteCodeFFI ( mkMarshalCode, moan64 ) where
 #include "HsVersions.h"
 
 import Outputable
-import SMRep		( CgRep(..), cgRepSizeW )
-import ForeignCall	( CCallConv(..) )
+import SMRep
+import ForeignCall
 import Panic
 
 -- DON'T remove apparently unused imports here .. 
 -- there is ifdeffery below
 import Control.Exception ( throwDyn )
-import DATA_BITS	( Bits(..), shiftR, shiftL )
-import Foreign		( newArray )
+import Data.Bits	( Bits(..), shiftR, shiftL )
+import Foreign		( newArray, Ptr )
 import Data.List        ( mapAccumL )
 
-import DATA_WORD	( Word8, Word32 )
-import Foreign		( Ptr )
+import Data.Word	( Word8, Word32 )
 import System.IO.Unsafe ( unsafePerformIO )
-import IO		( hPutStrLn, stderr )
+import System.IO	( hPutStrLn, stderr )
 -- import Debug.Trace	( trace )
 \end{code}
 

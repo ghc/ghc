@@ -1,10 +1,9 @@
 %
-% (c) The University of Glasgow 2000
+% (c) The University of Glasgow 2000-2006
 %
-\section[ByteCodeItbls]{Generate infotables for interpreter-made bytecodes}
+ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 
 \begin{code}
-
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeItbls ( ItblEnv, ItblPtr, mkITbls ) where
@@ -23,14 +22,10 @@ import Util             ( lengthIs, listLengthCmp )
 
 import Foreign
 import Foreign.C
-import DATA_BITS	( Bits(..), shiftR )
+import Data.Bits	( Bits(..), shiftR )
 
 import GHC.Exts		( Int(I#), addr2Int# )
-#if __GLASGOW_HASKELL__ < 503
-import Ptr		( Ptr(..) )
-#else
 import GHC.Ptr		( Ptr(..) )
-#endif
 \end{code}
 
 %************************************************************************

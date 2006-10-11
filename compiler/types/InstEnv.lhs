@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[InstEnv]{Utilities for typechecking instance declarations}
@@ -20,27 +21,24 @@ module InstEnv (
 
 #include "HsVersions.h"
 
-import Class		( Class )
-import Var		( Id, TyVar, isTcTyVar )
+import Class
+import Var
 import VarSet
-import Name		( Name, NamedThing(..), getSrcLoc, nameIsLocalOrFrom, nameModule )
-import OccName		( OccName )
-import NameSet		( unionNameSets, unitNameSet, nameSetToList )
-import Type		( TvSubst )
-import TcType		( Type, PredType, tcEqType,
-			  tcSplitDFunTy, tyVarsOfTypes, isExistentialTyVar,
-			  pprThetaArrow, pprClassPred,
-			  tyClsNamesOfType, tcSplitTyConApp_maybe
-			)
-import TyCon		( tyConName )
-import TcGadt		( tcUnifyTys, BindFlag(..) )
-import Unify		( tcMatchTys )
+import Name
+import OccName
+import NameSet
+import Type
+import TcType
+import TyCon
+import TcGadt
+import Unify
 import Outputable
-import BasicTypes	( OverlapFlag(..) )
-import UniqFM		( UniqFM, lookupUFM, emptyUFM, addToUFM_C, eltsUFM )
-import Id		( idType, idName )
-import SrcLoc		( pprDefnLoc )
-import Maybe		( isJust, isNothing )
+import BasicTypes
+import UniqFM
+import Id
+import SrcLoc
+
+import Data.Maybe	( isJust, isNothing )
 \end{code}
 
 

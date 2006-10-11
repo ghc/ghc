@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcMatches]{Typecheck some @Matches@}
+
+TcMatches: Typecheck some @Matches@
 
 \begin{code}
 module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
@@ -14,36 +16,24 @@ module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 
 import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRho, tcMonoExpr, tcPolyExpr )
 
-import HsSyn		( HsExpr(..), LHsExpr, MatchGroup(..),
-			  Match(..), LMatch, GRHSs(..), GRHS(..), 
-			  Stmt(..), LStmt, HsMatchContext(..),
-			  HsStmtContext(..), 
-			  pprMatch, isIrrefutableHsPat, mkHsWrap,
-			  mkLHsWrap, pprMatchContext, pprStmtContext,  
-			  noSyntaxExpr, matchGroupArity, pprMatches,
-			  HsWrapper )
-
+import HsSyn
 import TcRnMonad
-import TcGadt		( Refinement, emptyRefinement, refineResType )
-import Inst		( newMethodFromName )
-import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendIdEnv )
-import TcPat		( tcLamPats, tcLamPat )
-import TcMType		( newFlexiTyVarTy, newFlexiTyVarTys ) 
-import TcType		( TcType, TcRhoType, 
-			  BoxySigmaType, BoxyRhoType, 
-			  mkFunTys, mkFunTy, mkAppTy, mkTyConApp,
-			  liftedTypeKind )
-import TcBinds		( tcLocalBinds )
-import TcUnify		( boxySplitAppTy, boxySplitTyConApp, boxySplitListTy,
-			  subFunTys, tcSubExp, withBox )
-import TcSimplify	( bindInstsOfLocalFuns )
-import Name		( Name )
-import TysWiredIn	( stringTy, boolTy, parrTyCon, listTyCon, mkListTy, mkPArrTy )
-import PrelNames	( bindMName, returnMName, mfixName, thenMName, failMName )
-import Id		( idType, mkLocalId )
-import TyCon		( TyCon )
+import TcGadt
+import Inst
+import TcEnv
+import TcPat
+import TcMType
+import TcType
+import TcBinds
+import TcUnify
+import TcSimplify
+import Name
+import TysWiredIn
+import PrelNames
+import Id
+import TyCon
 import Outputable
-import SrcLoc		( Located(..), getLoc )
+import SrcLoc
 \end{code}
 
 %************************************************************************

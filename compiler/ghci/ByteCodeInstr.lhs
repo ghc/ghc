@@ -1,7 +1,7 @@
 %
-% (c) The University of Glasgow 2000
+% (c) The University of Glasgow 2000-2006
 %
-\section[ByteCodeInstrs]{Bytecode instruction definitions}
+ByteCodeInstrs: Bytecode instruction definitions
 
 \begin{code}
 module ByteCodeInstr ( 
@@ -12,15 +12,16 @@ module ByteCodeInstr (
 #include "../includes/MachDeps.h"
 
 import Outputable
-import Name		( Name )
-import Id		( Id )
+import Name
+import Id
 import CoreSyn
-import PprCore		( pprCoreExpr, pprCoreAlt )
-import Literal		( Literal )
-import DataCon		( DataCon )
-import VarSet		( VarSet )
-import PrimOp		( PrimOp )
-import SMRep		( StgWord, CgRep )
+import PprCore
+import Literal
+import DataCon
+import VarSet
+import PrimOp
+import SMRep
+
 import GHC.Ptr
 
 -- ----------------------------------------------------------------------------

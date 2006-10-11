@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[HsBinds]{Abstract syntax: top-level bindings and signatures}
@@ -15,18 +16,18 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr, LHsExpr,
 			       GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
-import HsTypes		( LHsType, PostTcType )
-import PprCore		( {- instances -} )
-import Coercion		( Coercion )
-import Type		( Type, pprParendType )
-import Name		( Name )
-import NameSet		( NameSet, elemNameSet )
-import BasicTypes	( IPName, RecFlag(..), InlineSpec(..), Fixity )
+import HsTypes
+import PprCore
+import Coercion
+import Type
+import Name
+import NameSet
+import BasicTypes
 import Outputable	
-import SrcLoc		( Located(..), SrcSpan, unLoc )
-import Util		( sortLe )
-import Var		( TyVar, DictId, Id, Var )
-import Bag		( Bag, emptyBag, isEmptyBag, bagToList, unionBags, unionManyBags )
+import SrcLoc
+import Util
+import Var
+import Bag
 \end{code}
 
 %************************************************************************

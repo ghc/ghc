@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[HsTypes]{Abstract syntax: user-defined types}
+
+HsTypes: Abstract syntax: user-defined types
 
 \begin{code}
 module HsTypes (
@@ -30,14 +32,11 @@ module HsTypes (
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
-import Type		( Type )
-import {- Kind parts of -} 
-       Type	        ( {- instance Outputable Kind -} Kind,
-			  pprParendKind, pprKind, isLiftedTypeKind )
-import HsDoc            ( LHsDoc, HsDoc )
-import BasicTypes	( IPName, Boxity, tupleParens )
-import SrcLoc		( Located(..), unLoc, noSrcSpan )
-import StaticFlags	( opt_PprStyle_Debug )
+import Type
+import HsDoc
+import BasicTypes
+import SrcLoc
+import StaticFlags
 import Outputable
 \end{code}
 

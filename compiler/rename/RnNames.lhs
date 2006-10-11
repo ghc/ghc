@@ -154,7 +154,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 
 	-- Compiler sanity check: if the import didn't say
 	-- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) $ do
+    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) (do
 
 	-- Issue a user warning for a redundant {- SOURCE -} import
 	-- NB that we arrange to read all the ordinary imports before 
@@ -262,6 +262,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
                                          qual_only as_mod new_imp_details)
 
     returnM (new_imp_decl, gbl_env, filtered_avails, imports)
+    )
 
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {-# SOURCE #-} in the import of module")

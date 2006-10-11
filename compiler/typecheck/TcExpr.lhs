@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcExpr]{Typecheck an expression}
@@ -11,81 +12,42 @@ module TcExpr ( tcPolyExpr, tcPolyExprNC,
 
 #ifdef GHCI 	/* Only if bootstrapped */
 import {-# SOURCE #-}	TcSplice( tcSpliceExpr, tcBracket )
-import HsSyn		( nlHsVar )
-import Id		( Id, idName )
-import Name		( isExternalName )
-import TcType		( isTauTy )
-import TcEnv		( checkWellStaged )
-import HsSyn		( nlHsApp )
 import qualified DsMeta
 #endif
 
-import HsSyn		( HsExpr(..), LHsExpr, ArithSeqInfo(..), recBindFields,
-			  HsMatchContext(..), HsRecordBinds, mkHsWrap, hsExplicitTvs,
-			  mkHsApp, mkLHsWrap )
-import TcHsSyn		( hsLitType )
+import HsSyn
+import TcHsSyn
 import TcRnMonad
-import TcUnify		( tcInfer, tcSubExp, tcFunResTy, tcGen, boxyUnify, subFunTys, zapToMonotype, stripBoxyType,
-			  boxySplitListTy, boxySplitTyConApp, wrapFunResCoercion, preSubType,
-			  unBox )
-import BasicTypes	( Arity, isMarkedStrict )
-import Inst		( newMethodFromName, newIPDict, instCall,
-			  newMethodWithGivenTy, instStupidTheta )
-import TcBinds		( tcLocalBinds )
-import TcEnv		( tcLookup, tcLookupDataCon, tcLookupField, tcExtendTyVarEnv2 )
-import TcArrows		( tcProc )
-import TcMatches	( tcMatchesCase, tcMatchLambda, tcDoStmts, tcBody,
-			  TcMatchCtxt(..) )
-import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcPat		( tcOverloadedLit, addDataConStupidTheta, badFieldCon )
-import TcMType		( tcInstTyVars, newFlexiTyVarTy, newBoxyTyVars,
-			  readFilledBox, zonkTcTypes )
-import TcType		( TcType, TcSigmaType, TcRhoType, TvSubst,
-			  BoxySigmaType, BoxyRhoType, ThetaType,
-			  mkTyVarTys, mkFunTys, 
-			  tcMultiSplitSigmaTy, tcSplitFunTysN,
-			  tcSplitTyConApp_maybe, 
-			  isSigmaTy, mkFunTy, mkTyConApp, 
-			  exactTyVarsOfType, exactTyVarsOfTypes, 
-			  zipTopTvSubst, zipOpenTvSubst, substTys, substTyVar
-			)
-import {- Kind parts of -} 
-       Type		( argTypeKind )
-
-import Id		( idType, recordSelectorFieldLabel,
-			  isRecordSelector, isNaughtyRecordSelector,
-			  isDataConId_maybe )
-import DataCon		( DataCon, dataConFieldLabels, dataConStrictMarks,
-			  dataConSourceArity, 
-			  dataConWrapId, isVanillaDataCon, dataConUnivTyVars,
-			  dataConOrigArgTys ) 
-import Name		( Name )
-import TyCon		( FieldLabel, tyConStupidTheta, tyConDataCons,
-			  isEnumerationTyCon ) 
-import Type		( substTheta, substTy )
-import Var		( TyVar, tyVarKind )
-import VarSet		( emptyVarSet, elemVarSet, unionVarSet )
-import TysWiredIn	( boolTy, parrTyCon, tupleTyCon )
-import PrelNames	( enumFromName, enumFromThenName, 
-			  enumFromToName, enumFromThenToName,
-			  enumFromToPName, enumFromThenToPName, negateName,
-			  hasKey
-			)
-import PrimOp		( tagToEnumKey )
-
+import TcUnify
+import BasicTypes
+import Inst
+import TcBinds
+import TcEnv
+import TcArrows
+import TcMatches
+import TcHsType
+import TcPat
+import TcMType
+import TcType
+import Id
+import DataCon
+import Name
+import TyCon
+import Type
+import Var
+import VarSet
+import TysWiredIn
+import PrelNames
+import PrimOp
 import DynFlags
-import StaticFlags	( opt_NoMethodSharing )
-import HscTypes		( TyThing(..) )
-import SrcLoc		( Located(..), unLoc )
+import StaticFlags
+import HscTypes
+import SrcLoc
 import Util
-import ListSetOps	( assocMaybe )
-import Maybes		( catMaybes )
+import ListSetOps
+import Maybes
 import Outputable
 import FastString
-
-#ifdef DEBUG
-import TyCon		( tyConArity )
-#endif
 \end{code}
 
 %************************************************************************

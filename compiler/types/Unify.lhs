@@ -1,3 +1,7 @@
+%
+% (c) The University of Glasgow 2006
+%
+
 \begin{code}
 module Unify ( 
 	-- Matching of types: 
@@ -8,13 +12,11 @@ module Unify (
 
 #include "HsVersions.h"
 
-import Var		( Var, TyVar, tyVarKind )
+import Var
 import VarEnv
 import VarSet
-import Type		( typeKind, tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, 
-			  TvSubstEnv, emptyTvSubstEnv, TvSubst(..), tcEqTypeX,
-			  tcView, isSubKind, repSplitAppTy_maybe )
-import TypeRep          ( Type(..), PredType(..) )
+import Type
+import TypeRep
 import Outputable
 import Maybes
 \end{code}

@@ -69,10 +69,7 @@ import Outputable
 import DynFlags
 import TysPrim
 import FastString
-
-#ifdef DEBUG
 import Util
-#endif
 
 import GHC.Exts		-- For `xori` 
 \end{code}

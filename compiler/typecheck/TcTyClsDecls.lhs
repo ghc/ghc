@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1996-1998
 %
-\section[TcTyClsDecls]{Typecheck type and class declarations}
+
+TcTyClsDecls: Typecheck type and class declarations
 
 \begin{code}
 module TcTyClsDecls (
@@ -10,70 +12,38 @@ module TcTyClsDecls (
 
 #include "HsVersions.h"
 
-import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
-			  ConDecl(..), HsRecField(..), Sig(..), NewOrData(..), ResType(..),
-			  tyClDeclTyVars, isSynDecl, isIdxTyDecl,
-			  isKindSigDecl, hsConArgs, LTyClDecl, tcdName,
-			  hsTyVarName, LHsTyVarBndr, LHsType
-			)
-import HsTypes          ( HsBang(..), getBangStrictness, hsLTyVarNames )
-import BasicTypes	( RecFlag(..), StrictnessMark(..) )
-import HscTypes		( implicitTyThings, ModDetails )
-import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
-			  mkDataTyConRhs, mkNewTyConRhs )
+import HsSyn
+import HsTypes
+import BasicTypes
+import HscTypes
+import BuildTyCl
 import TcRnMonad
-import TcEnv		( TyThing(..), 
-			  tcLookupLocated, tcLookupLocatedGlobal, 
-			  tcExtendGlobalEnv, tcExtendKindEnv,
-			  tcExtendKindEnvTvs, newFamInstTyConName,
-			  tcExtendRecEnv, tcLookupTyVar, tcLookupLocatedTyCon )
-import TcTyDecls	( calcRecFlags, calcClassCycles, calcSynCycles )
-import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
-import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
-			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext,
-			  kcHsSigType, tcHsBangType, tcLHsConResTy,
-			  tcDataKindSig, kcCheckHsType )
-import TcMType		( newKindVar, checkValidTheta, checkValidType, 
-			  -- checkFreeness, 
-			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
-import TcType		( TcKind, TcType, Type, tyVarsOfType, mkPhiTy,
-			  mkArrowKind, liftedTypeKind, 
-			  tcSplitSigmaTy, tcGetTyVar_maybe )
-import Type		( splitTyConApp_maybe, 
-                          newTyConInstRhs, isLiftedTypeKind, Kind,
-                          splitKindFunTys, mkArrowKinds
-			  -- pprParendType, pprThetaArrow
-			)
-import Generics		( validGenericMethodType, canDoGenerics )
-import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
-import TyCon		( TyCon, AlgTyConRhs( AbstractTyCon, OpenDataTyCon, 
-					      OpenNewTyCon ), 
-			  SynTyConRhs( OpenSynTyCon, SynonymTyCon ),
-			  tyConDataCons, mkForeignTyCon, isProductTyCon,
-			  isRecursiveTyCon, 
-			  tyConStupidTheta, synTyConRhs, isSynTyCon, tyConName,
-                          isNewTyCon, isDataTyCon, tyConKind, 
-			  setTyConArgPoss )
-import DataCon		( DataCon, dataConUserType, dataConName, 
-			  dataConFieldLabels, dataConTyCon, dataConAllTyVars,
-			  dataConFieldType, dataConResTys )
-import Var		( TyVar, idType, idName, tyVarName, setTyVarName )
-import VarSet		( elemVarSet, mkVarSet )
-import Name		( Name, getSrcLoc, tidyNameOcc, getOccName )
-import OccName		( initTidyOccEnv, tidyOccName )
+import TcEnv
+import TcTyDecls
+import TcClassDcl
+import TcHsType
+import TcMType
+import TcType
+import Type
+import Generics
+import Class
+import TyCon
+import DataCon
+import Var
+import VarSet
+import Name
+import OccName
 import Outputable
-import Maybe		( isJust, fromJust, isNothing, catMaybes )
-import Maybes		( expectJust )
-import Monad		( unless )
-import Unify		( tcMatchTys, tcMatchTyX )
-import Util		( zipLazy, isSingleton, notNull, sortLe, mapAccumL )
-import List		( partition, elemIndex )
-import SrcLoc		( Located(..), unLoc, getLoc, srcLocSpan, 
-			  srcSpanStart )
-import ListSetOps	( equivClasses, minusList )
-import Digraph		( SCC(..) )
-import DynFlags		( DynFlag( Opt_GlasgowExts, Opt_Generics, 
-				   Opt_UnboxStrictFields, Opt_IndexedTypes ) )
+import Maybes
+import Monad
+import Unify
+import Util
+import SrcLoc
+import ListSetOps
+import Digraph
+import DynFlags
+
+import Data.List        ( partition, elemIndex )
 \end{code}
 
 
@@ -380,7 +350,7 @@ kcIdxTyPats decl thing_inside
 
          -- type functions can have a higher-kinded result
        ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
-       ; typats <- zipWithM kcCheckHsType hs_typats kinds
+       ; typats <- TcRnMonad.zipWithM kcCheckHsType hs_typats kinds
        ; thing_inside tvs typats resultKind family
        }
   where

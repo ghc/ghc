@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcModule]{Typechecking a whole module}
@@ -24,116 +25,70 @@ import IO
 import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 #endif
 
-import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
-import StaticFlags	( opt_PprStyle_Debug )
-import HsSyn		( HsModule(..), HsExtCore(..), HsGroup(..), LHsDecl,
-			  SpliceDecl(..), HsBind(..), LHsBinds,
-			  emptyRdrGroup, emptyRnGroup, appendGroups, plusHsValBinds,
-			  nlHsApp, nlHsVar, pprLHsBinds, HaddockModInfo(..) )
-import RdrHsSyn		( findSplice )
+import DynFlags
+import StaticFlags
+import HsSyn
+import RdrHsSyn
 
-import PrelNames	( runMainIOName, rootMainKey, rOOT_MAIN, mAIN,
-			  main_RDR_Unqual )
-import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv )
-import TcHsSyn		( zonkTopDecls )
-import TcExpr 		( tcInferRho )
+import PrelNames
+import RdrName
+import TcHsSyn
+import TcExpr
 import TcRnMonad
-import TcType		( tidyTopType, tcEqType )
-import Inst		( showLIE )
-import InstEnv		( extendInstEnvList, Instance, pprInstances,
-			  instanceDFunId ) 
-import FamInstEnv       ( FamInst, pprFamInsts )
-import TcBinds		( tcTopBinds, tcHsBootSigs )
-import TcDefaults	( tcDefaults )
-import TcEnv		( tcExtendGlobalValEnv, iDFunId )
-import TcRules		( tcRules )
-import TcForeign	( tcForeignImports, tcForeignExports )
-import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcIface		( tcExtCoreBindings, tcHiBootIface )
-import MkIface		( tyThingToIfaceDecl )
+import TcType
+import Inst
+import InstEnv
+import FamInstEnv
+import TcBinds
+import TcDefaults
+import TcEnv
+import TcRules
+import TcForeign
+import TcInstDcls
+import TcIface
+import MkIface
 import IfaceSyn
-import TcSimplify	( tcSimplifyTop )
-import TcTyClsDecls	( tcTyAndClassDecls )
-import LoadIface	( loadOrphanModules )
-import RnNames		( importsFromLocalDecls, rnImports, rnExports,
-			  reportUnusedNames, reportDeprecations )
-import RnEnv		( lookupSrcOcc_maybe )
-import RnSource		( rnSrcDecls, rnTyClDecls, checkModDeprec )
-import RnHsDoc          ( rnMbHsDoc )
-import PprCore		( pprRules, pprCoreBindings )
-import CoreSyn		( CoreRule, bindersOfBinds )
-import ErrUtils		( Messages, mkDumpDoc, showPass )
-import Id		( Id, mkExportedLocalId, isLocalId, idName, idType )
-import Var		( Var )
+import TcSimplify
+import TcTyClsDecls
+import LoadIface
+import RnNames
+import RnEnv
+import RnSource
+import RnHsDoc
+import PprCore
+import CoreSyn
+import ErrUtils
+import Id
+import Var
 import Module
-import UniqFM		( elemUFM, eltsUFM )
-import OccName		( mkVarOccFS, plusOccEnv )
-import Name		( Name, NamedThing(..), isExternalName, getSrcLoc, isWiredInName,
-			  nameModule, nameOccName, mkExternalName )
+import UniqFM
+import Name
 import NameSet
 import NameEnv
-import TyCon		( tyConHasGenerics )
-import SrcLoc		( srcLocSpan, Located(..), noLoc )
-import DriverPhases	( HscSource(..), isHsBoot )
-import HscTypes		( ModGuts(..), ModDetails(..), emptyModDetails,
-			  HscEnv(..), ExternalPackageState(..),
-			  IsBootInterface, noDependencies, 
-			  Deprecs( NoDeprecs ), plusDeprecs,
-			  ForeignStubs(NoStubs), availsToNameSet,
-			  TypeEnv, lookupTypeEnv, hptInstances, 
-			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, typeEnvElts,
-			  emptyFixityEnv, GenAvailInfo(..)
-			)
+import TyCon
+import SrcLoc
+import HscTypes
 import Outputable
 
 #ifdef GHCI
-import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), 
-			  HsLocalBinds(..), HsValBinds(..),
-			  LStmt, LHsExpr, LHsType, mkMatch, emptyLocalBinds,
-			  collectLStmtsBinders, collectLStmtBinders, nlVarPat,
-		   	  mkFunBind, placeHolderType, noSyntaxExpr, nlHsTyApp )
-import RdrName		( GlobalRdrElt(..), globalRdrEnvElts,
-			  unQualOK, lookupLocalRdrEnv, extendLocalRdrEnv )
-import RnSource		( addTcgDUs )
-import TcHsSyn		( mkHsDictLet, zonkTopLExpr, zonkTopBndrs )
-import TcHsType		( kcHsType )
-import TcMType		( zonkTcType, zonkQuantifiedTyVar )
-import TcMatches	( tcStmts, tcDoStmt )
-import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
-import TcGadt		( emptyRefinement )
-import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, isTauTy,
-			  isUnLiftedType, tyClsNamesOfDFunHead, tyClsNamesOfType, isUnitTy )
-import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
-import TypeRep		( TyThing(..) )
-import RnTypes		( rnLHsType )
-import Inst		( tcGetInstEnvs )
-import InstEnv		( classInstances, instEnvElts )
-import RnExpr		( rnStmts, rnLExpr )
-import LoadIface	( loadSysInterface )
-import IfaceEnv		( ifaceExportNames )
-import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
-import Id		( setIdType )
-import MkId		( unsafeCoerceId )
-import TyCon		( tyConName )
-import TysWiredIn	( mkListTy, unitTy )
-import IdInfo		( GlobalIdDetails(..) )
-import {- Kind parts of -} Type		( Kind )
-import Var		( globaliseId )
-import Name		( isBuiltInSyntax, isInternalName )
-import OccName		( isTcOcc )
-import PrelNames	( iNTERACTIVE, ioTyConName, printName, itName, 
-			  bindIOName, thenIOName, returnIOName )
-import HscTypes		( InteractiveContext(..),
-			  ModIface(..), icPrintUnqual,
-			  Dependencies(..) )
-import BasicTypes	( Fixity, RecFlag(..) )
-import SrcLoc		( unLoc )
-import Data.Maybe	( isNothing )
+import TcHsType
+import TcMType
+import TcMatches
+import TcGadt
+import RnTypes
+import RnExpr
+import IfaceEnv
+import MkId
+import TysWiredIn
+import IdInfo
+import {- Kind parts of -} Type
+import BasicTypes
+import Data.Maybe
 #endif
 
-import FastString	( mkFastString )
-import Util		( sortLe )
-import Bag		( unionBags, snocBag, emptyBag, unitBag, unionManyBags )
+import FastString
+import Util
+import Bag
 
 import Control.Monad    ( unless )
 import Data.Maybe	( isJust )
@@ -576,7 +531,7 @@ checkHiBootIface
 	where
 	  boot_dfun = instanceDFunId boot_inst
 	  boot_inst_ty = idType boot_dfun
-	  local_boot_dfun = mkExportedLocalId (idName boot_dfun) boot_inst_ty
+	  local_boot_dfun = Id.mkExportedLocalId (idName boot_dfun) boot_inst_ty
 
 ----------------
 missingBootThing thing
@@ -783,7 +738,7 @@ check_main ghc_mode tcg_env main_mod main_fn
 	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
 				   (mkVarOccFS FSLIT("main")) 
 				   (getSrcLoc main_name)
-	      ; root_main_id = mkExportedLocalId root_main_name ty
+	      ; root_main_id = Id.mkExportedLocalId root_main_name ty
 	      ; main_bind    = noLoc (VarBind root_main_id main_expr) }
 
 	; return (tcg_env { tcg_binds = tcg_binds tcg_env 
@@ -925,7 +880,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
 globaliseAndTidy :: Id -> Id
 globaliseAndTidy id
 -- Give the Id a Global Name, and tidy its type
-  = setIdType (globaliseId VanillaGlobal id) tidy_type
+  = Id.setIdType (globaliseId VanillaGlobal id) tidy_type
   where
     tidy_type = tidyTopType (idType id)
 \end{code}
@@ -1135,11 +1090,11 @@ tcRnType hsc_env ictxt rdr_type
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleExports :: HscEnv -> Module -> IO (Messages, Maybe NameSet)
+getModuleExports :: HscEnv -> Module -> IO (Messages, Maybe [AvailInfo])
 getModuleExports hsc_env mod
   = initTc hsc_env HsSrcFile iNTERACTIVE (tcGetModuleExports mod)
 
-tcGetModuleExports :: Module -> TcM NameSet
+tcGetModuleExports :: Module -> TcM [AvailInfo]
 tcGetModuleExports mod = do
   let doc = ptext SLIT("context for compiling statements")
   iface <- initIfaceTcRn $ loadSysInterface doc mod

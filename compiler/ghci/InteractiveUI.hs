@@ -3,7 +3,7 @@
 --
 -- GHC Interactive User Interface
 --
--- (c) The GHC Team 2005
+-- (c) The GHC Team 2005-2006
 --
 -----------------------------------------------------------------------------
 module InteractiveUI ( 
@@ -17,49 +17,40 @@ module InteractiveUI (
 import GHC.Exts         ( Int(..), Ptr(..), int2Addr# )
 import Foreign.StablePtr ( deRefStablePtr, castPtrToStablePtr )
 import System.IO.Unsafe ( unsafePerformIO )
-import Var              ( Id, globaliseId, idName, idType )
-import HscTypes         ( Session(..), InteractiveContext(..), HscEnv(..)
-                        , extendTypeEnvWithIds )
-import RdrName          ( extendLocalRdrEnv, mkRdrUnqual, lookupLocalRdrEnv )
-import NameEnv          ( delListFromNameEnv )
-import TcType           ( tidyTopType )
-import qualified Id     ( setIdType )
-import IdInfo           ( GlobalIdDetails(..) )
-import Linker           ( HValue, extendLinkEnv, withExtendedLinkEnv,
-                          initDynLinker )
-import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
+import Var
+import HscTypes
+import RdrName
+import NameEnv
+import TcType
+import qualified Id
+import IdInfo
+import PrelNames
 #endif
 
 -- The GHC interface
 import qualified GHC
-import GHC		( Session, dopt, DynFlag(..), Target(..),
-			  TargetId(..), DynFlags(..),
-			  pprModule, Type, Module, ModuleName, SuccessFlag(..),
-			  TyThing(..), Name, LoadHowMuch(..), Phase,
-			  GhcException(..), showGhcException,
-			  CheckedModule(..), SrcLoc )
-import DynFlags         ( allFlags )
-import Packages		( PackageState(..) )
-import PackageConfig	( InstalledPackageInfo(..) )
-import UniqFM		( eltsUFM )
+import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
+                          Type, Module, ModuleName, TyThing(..), Phase )
+import DynFlags
+import Packages
+import PackageConfig
+import UniqFM
 import PprTyThing
 import Outputable
 
--- for createtags (should these come via GHC?)
-import Name		( nameSrcLoc, nameModule, nameOccName )
-import OccName		( pprOccName )
-import SrcLoc		( isGoodSrcLoc, srcLocFile, srcLocLine, srcLocCol )
+-- for createtags
+import Name
+import OccName
+import SrcLoc
 
 -- Other random utilities
-import Digraph		( flattenSCCs )
-import BasicTypes	( failed, successIf )
-import Panic 		( panic, installSignalHandlers )
+import Digraph
+import BasicTypes
+import Panic hiding (showException)
 import Config
-import StaticFlags	( opt_IgnoreDotGhci )
-import Linker		( showLinkerState, linkPackages )
-import Util		( removeSpaces, handle, global, toArgs,
-			  looksLikeModuleName, prefixMatch, sortLe,
-			  joinFileName )
+import StaticFlags
+import Linker
+import Util
 
 #ifndef mingw32_HOST_OS
 import System.Posix
@@ -718,7 +709,8 @@ info s  = do { let names = words s
 filterOutChildren :: [Name] -> [Name]
 filterOutChildren names = filter (not . parent_is_there) names
  where parent_is_there n 
-	 | Just p <- GHC.nameParent_maybe n = p `elem` names
+--	 | Just p <- GHC.nameParent_maybe n = p `elem` names
+-- ToDo!!
 	 | otherwise		           = False
 
 pprInfo exts (thing, fixity, insts)
@@ -864,7 +856,7 @@ checkModule m = do
   case result of
     Nothing -> io $ putStrLn "Nothing"
     Just r  -> io $ putStrLn (showSDoc (
-	case checkedModuleInfo r of
+	case GHC.checkedModuleInfo r of
 	   Just cm | Just scope <- GHC.modInfoTopLevelScope cm -> 
 		let
 		    (local,global) = partition ((== modl) . GHC.moduleName . GHC.nameModule) scope

@@ -1,3 +1,7 @@
+%
+% (c) The University of Glasgow 2006
+%
+
 \begin{code}
 module Generics ( canDoGenerics, mkTyConGenericBinds,
 		  mkGenericRhs, 
@@ -6,30 +10,24 @@ module Generics ( canDoGenerics, mkTyConGenericBinds,
 
 
 import HsSyn
-import Type             ( Type, isUnLiftedType, tyVarsOfType,
-			  isTyVarTy, getTyVar_maybe, funTyCon
-			)
-import TcHsSyn		( mkSimpleHsAlt )
-import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitPhiTy, applyTy, 
-			  isTauTy, mkTyVarTy )
-import DataCon          ( DataCon, dataConOrigArgTys, isVanillaDataCon,
-			  dataConSourceArity )
+import Type
+import TcHsSyn
+import TcType
+import DataCon
 
-import TyCon            ( TyCon, tyConName, tyConDataCons, 
-			  isBoxedTupleTyCon
-			)
-import Name		( nameModule, nameOccName, getSrcLoc )
-import OccName		( mkGenOcc1, mkGenOcc2 )
-import RdrName		( RdrName, getRdrName, mkVarUnqual, mkOrig )
-import BasicTypes       ( EP(..), Boxity(..) )
-import Var              ( TyVar )
-import VarSet		( varSetElems )
-import Id               ( Id, idType )
-import TysWiredIn	( listTyCon )
+import TyCon
+import Name
+import OccName
+import RdrName
+import BasicTypes
+import Var
+import VarSet
+import Id
+import TysWiredIn
 import PrelNames
 	
-import SrcLoc		( srcLocSpan, noLoc, Located(..) )
-import Util             ( takeList, isSingleton )
+import SrcLoc
+import Util
 import Bag
 import Outputable 
 import FastString

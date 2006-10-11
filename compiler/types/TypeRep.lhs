@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
 \section[TypeRep]{Type - friends' interface}
@@ -43,24 +44,18 @@ module TypeRep (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} DataCon( DataCon, dataConName )
--- friends:
 
-import Var	  ( Var, Id, TyVar, tyVarKind )
-import VarSet     ( TyVarSet )
-import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
-import OccName	  ( mkOccNameFS, tcName, parenSymOcc )
-import BasicTypes ( IPName, tupleParens )
-import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, 
-		    isRecursiveTyCon, isNewTyCon, mkVoidPrimTyCon, 
-		    mkSuperKindTyCon )
-import Class	  ( Class )
+-- friends:
+import Var
+import VarSet
+import Name
+import OccName
+import BasicTypes
+import TyCon
+import Class
 
 -- others
-import PrelNames  ( gHC_PRIM, funTyConKey, tySuperKindTyConKey, 
-                    coSuperKindTyConKey, liftedTypeKindTyConKey,
-                    openTypeKindTyConKey, unliftedTypeKindTyConKey,
-                    ubxTupleKindTyConKey, argTypeKindTyConKey, listTyConKey, 
-                    parrTyConKey, hasKey )
+import PrelNames
 import Outputable
 \end{code}
 

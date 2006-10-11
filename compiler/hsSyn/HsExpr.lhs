@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[HsExpr]{Abstract Haskell syntax: expressions}
+
+HsExpr: Abstract Haskell syntax: expressions
 
 \begin{code}
 module HsExpr where
@@ -9,19 +11,18 @@ module HsExpr where
 #include "HsVersions.h"
 
 -- friends:
-import HsDecls		( HsGroup )
-import HsPat		( LPat )
-import HsLit		( HsLit(..), HsOverLit )
-import HsTypes		( LHsType, PostTcType )
-import HsImpExp		( isOperator, pprHsVar )
-import HsBinds		( HsLocalBinds, DictBinds, isEmptyLocalBinds,
-			  HsWrapper, pprHsWrapper )
+import HsDecls
+import HsPat
+import HsLit
+import HsTypes
+import HsImpExp
+import HsBinds
 
 -- others:
-import Var		( Id )
-import Name		( Name )
-import BasicTypes	( IPName, Boxity, tupleParens, Arity, Fixity(..) )
-import SrcLoc		( Located(..), unLoc )
+import Var
+import Name
+import BasicTypes
+import SrcLoc
 import Outputable	
 import FastString
 \end{code}

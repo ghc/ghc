@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
@@ -16,29 +17,26 @@ module TcGadt (
 	tcUnifyTys, BindFlag(..)
   ) where
 
-import HsSyn	( HsWrapper(..), idHsWrapper, isIdHsWrapper )
-import Coercion	( Coercion, mkSymCoercion, mkTransCoercion, mkUnsafeCoercion,
-		  mkLeftCoercion, mkRightCoercion, mkCoKind, coercionKindPredTy,
-		  splitCoercionKind, decomposeCo, coercionKind )
-import TcType	( TvSubst(..), TvSubstEnv, substTy, mkTvSubst, 
-		  substTyVar, zipTopTvSubst, typeKind,
-		  eqKind, isSubKind, repSplitAppTy_maybe,
-		  tcView, tcGetTyVar_maybe
-		)
-import Type	( Type, tyVarsOfType, tyVarsOfTypes, tcEqType, mkTyVarTy )
-import TypeRep	( Type(..), PredType(..) )
-import DataCon	( DataCon, dataConUnivTyVars, dataConEqSpec )
-import Var	( CoVar, TyVar, tyVarKind, varUnique )
+#include "HsVersions.h"
+
+import HsSyn
+import Coercion
+import Type
+import TypeRep
+import DataCon
+import Var
 import VarEnv
 import VarSet
-import ErrUtils		( Message )
-import Maybes		( MaybeErr(..), isJust )
-import Control.Monad	( foldM )
+import ErrUtils
+import Maybes
+import Control.Monad
 import Outputable
-import Unique		( Unique )
-import UniqFM		( ufmToList )
 
-#include "HsVersions.h"
+#ifdef DEBUG
+import Unique
+import UniqFM
+import TcType
+#endif
 \end{code}
 
 
@@ -261,6 +259,7 @@ type InternalReft = TyVarEnv (Coercion, Type)
 -- INVARIANT:   a->(co,ty)   then   co :: (a:=:ty)
 -- Not necessarily idemopotent
 
+#ifdef DEBUG
 badReftElts :: InternalReft -> [(Unique, (Coercion,Type))]
 -- Return the BAD elements of the refinement
 -- Should be empty; used in asserions only
@@ -273,6 +272,7 @@ badReftElts env
 		     | otherwise = False
 	where
 	  (ty1,ty2) = coercionKind co
+#endif
 
 emptyInternalReft :: InternalReft
 emptyInternalReft = emptyVarEnv

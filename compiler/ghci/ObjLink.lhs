@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow, 2000
+% (c) The University of Glasgow, 2000-2006
 %
 
 -- ---------------------------------------------------------------------------
@@ -22,15 +22,14 @@ module ObjLink (
    resolveObjs  	 -- :: IO SuccessFlag
   )  where
 
-import Monad            ( when )
-
-import Foreign.C
-import Foreign		( nullPtr )
 import Panic		( panic )
 import BasicTypes	( SuccessFlag, successIf )
 import Config		( cLeadingUnderscore )
 import Outputable
 
+import Control.Monad    ( when )
+import Foreign.C
+import Foreign		( nullPtr )
 import GHC.Exts         ( Ptr(..), unsafeCoerce# )
 
 -- ---------------------------------------------------------------------------

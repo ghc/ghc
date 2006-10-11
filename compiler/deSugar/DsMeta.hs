@@ -1412,14 +1412,10 @@ thLib = mkTHModule FSLIT("Language.Haskell.TH.Lib")
 
 mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
 
-mk_known_key_name mod space str uniq 
-  = mkExternalName uniq mod (mkOccNameFS space str) 
-	           Nothing noSrcLoc
-
-libFun = mk_known_key_name thLib OccName.varName
-libTc  = mk_known_key_name thLib OccName.tcName
-thFun  = mk_known_key_name thSyn OccName.varName
-thTc   = mk_known_key_name thSyn OccName.tcName
+libFun = mk_known_key_name OccName.varName thLib
+libTc  = mk_known_key_name OccName.tcName  thLib
+thFun  = mk_known_key_name OccName.varName thSyn
+thTc   = mk_known_key_name OccName.tcName  thSyn
 
 -------------------- TH.Syntax -----------------------
 qTyConName        = thTc FSLIT("Q")            qTyConKey

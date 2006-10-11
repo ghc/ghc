@@ -1756,15 +1756,15 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
 getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getPackageModuleInfo hsc_env mdl = do
 #ifdef GHCI
-  (_msgs, mb_names) <- getModuleExports hsc_env mdl
-  case mb_names of
+  (_msgs, mb_avails) <- getModuleExports hsc_env mdl
+  case mb_avails of
     Nothing -> return Nothing
-    Just names -> do
+    Just avails -> do
 	eps <- readIORef (hsc_EPS hsc_env)
 	let 
+            names  = availsToNameSet avails
 	    pte    = eps_PTE eps
-	    n_list = nameSetToList names
-	    tys    = [ ty | name <- n_list,
+	    tys    = [ ty | name <- concatMap availNames avails,
 			    Just ty <- [lookupTypeEnv pte name] ]
 	--
 	return (Just (ModuleInfo {
@@ -1925,8 +1925,8 @@ mkExportEnv hsc_env mods = do
   stuff <- mapM (getModuleExports hsc_env) mods
   let 
 	(_msgs, mb_name_sets) = unzip stuff
-	gres = [ nameSetToGlobalRdrEnv name_set (moduleName mod)
-  	       | (Just name_set, mod) <- zip mb_name_sets mods ]
+	gres = [ nameSetToGlobalRdrEnv (availsToNameSet avails) (moduleName mod)
+  	       | (Just avails, mod) <- zip mb_name_sets mods ]
   --
   return $! foldr plusGlobalRdrEnv emptyGlobalRdrEnv gres
 

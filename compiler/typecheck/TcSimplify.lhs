@@ -1,9 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcSimplify]{TcSimplify}
 
-
+TcSimplify
 
 \begin{code}
 module TcSimplify (
@@ -21,58 +21,39 @@ module TcSimplify (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TcUnify( unifyType )
-import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, mkWpTyApps,
-			  HsWrapper(..), (<.>), emptyLHsBinds )
+import HsSyn
 
 import TcRnMonad
-import Inst		( lookupInst, LookupInstResult(..),
-			  tyVarsOfInst, fdPredsOfInsts,
-			  isDict, isClassDict, 
-			  isMethodFor, isMethod,
-			  instToId, tyVarsOfInsts,  
-			  ipNamesOfInsts, ipNamesOfInst, dictPred,
-			  fdPredsOfInst, 
-			  newDictBndrs, newDictBndrsO, 
-			  getDictClassTys, isTyVarDict, instLoc,
-			  zonkInst, tidyInsts, tidyMoreInsts,
-			  pprInsts, pprDictsInFull, pprInstInFull, tcGetInstEnvs,
-			  isInheritableInst, pprDictsTheta
-			)
-import TcEnv		( tcGetGlobalTyVars, findGlobals, pprBinders,
-			  lclEnvElts, tcMetaTy )
-import InstEnv		( lookupInstEnv, classInstances, pprInstances )
-import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, zonkTcPredType  )
-import TcType		( TcTyVar, TcTyVarSet, ThetaType, TcPredType, tidyPred,
-                          mkClassPred, isOverloadedTy, isSkolemTyVar,
-			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
-			  tyVarsOfPred, tcEqType, pprPred, mkPredTy, tcIsTyVarTy )
-import TcIface		( checkWiredInTyCon )
-import Id		( idType )
-import Var		( TyVar )
-import TyCon		( TyCon )
-import Name		( Name )
-import NameSet		( NameSet, mkNameSet, elemNameSet )
-import Class		( classBigSig, classKey )
-import FunDeps		( oclose, grow, improve, pprEquation )
-import PrelInfo		( isNumericClass, isStandardClass ) 
-import PrelNames	( integerTyConName,
-			  showClassKey, eqClassKey, ordClassKey )
-import Type		( zipTopTvSubst, substTheta, substTy )
-import TysWiredIn	( doubleTy, doubleTyCon )
-import ErrUtils		( Message )
-import BasicTypes	( TopLevelFlag, isNotTopLevel )
+import Inst
+import TcEnv
+import InstEnv
+import TcMType
+import TcType
+import TcIface
+import Id
+import Var
+import TyCon
+import Name
+import NameSet
+import Class
+import FunDeps
+import PrelInfo
+import PrelNames
+import Type
+import TysWiredIn
+import ErrUtils
+import BasicTypes
 import VarSet
-import VarEnv		( TidyEnv )
+import VarEnv
 import FiniteMap
 import Bag
 import Outputable
-import ListSetOps	( equivClasses )
-import Util		( zipEqual, isSingleton )
-import List		( partition )
-import SrcLoc		( Located(..) )
-import DynFlags		( DynFlags(ctxtStkDepth), 
-			  DynFlag( Opt_GlasgowExts, Opt_AllowUndecidableInstances, 
-			  Opt_WarnTypeDefaults, Opt_ExtendedDefaultRules ) )
+import ListSetOps
+import Util
+import SrcLoc
+import DynFlags
+
+import Data.List
 \end{code}
 
 

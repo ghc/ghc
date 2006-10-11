@@ -1,77 +1,68 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcSplice]{Template Haskell splices}
+
+TcSplice: Template Haskell splices
 
 \begin{code}
 module TcSplice( tcSpliceExpr, tcSpliceDecls, tcBracket ) where
 
 #include "HsVersions.h"
 
-import HscMain		( compileExpr )
-import TcRnDriver	( tcTopSrcDecls )
+import HscMain
+import TcRnDriver
 	-- These imports are the reason that TcSplice 
 	-- is very high up the module hierarchy
+
+import HsSyn
+import Convert
+import RnExpr
+import RnEnv
+import RdrName
+import RnTypes
+import TcExpr
+import TcHsSyn
+import TcSimplify
+import TcUnify
+import TcType
+import TcEnv
+import TcMType
+import TcHsType
+import TcIface
+import TypeRep
+import Name
+import NameEnv
+import HscTypes
+import OccName
+import Var
+import Module
+import TcRnMonad
+import IfaceEnv
+import Class
+import TyCon
+import DataCon
+import Id
+import IdInfo
+import TysWiredIn
+import DsMeta
+import DsExpr
+import DsMonad hiding (Splice)
+import ErrUtils
+import SrcLoc
+import Outputable
+import Unique
+import PackageConfig
+import BasicTypes
+import Panic
+import FastString
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
 
-import HsSyn		( HsBracket(..), HsExpr(..), HsSplice(..), LHsExpr, LHsDecl, 
-		   	  HsType, LHsType )
-import Convert		( convertToHsExpr, convertToHsDecls, convertToHsType, thRdrName )
-import RnExpr		( rnLExpr )
-import RnEnv		( lookupFixityRn, lookupSrcOcc_maybe, lookupImportedName )
-import RdrName		( RdrName, lookupLocalRdrEnv, isSrcRdrName )
-import RnTypes		( rnLHsType )
-import TcExpr		( tcMonoExpr )
-import TcHsSyn		( mkHsDictLet, zonkTopLExpr )
-import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
-import TcUnify		( boxyUnify, unBox )
-import TcType		( TcType, TcKind, BoxyRhoType, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
-import TcEnv		( spliceOK, tcMetaTy, bracketOK )
-import TcMType		( newFlexiTyVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType )
-import TcHsType		( tcHsSigType, kcHsType )
-import TcIface		( tcImportDecl )
-import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
-import PrelNames	( thFAKE )
-import Name		( Name, NamedThing(..), nameOccName, nameModule, isExternalName, 
-			  nameIsLocalOrFrom )
-import NameEnv		( lookupNameEnv )
-import HscTypes		( lookupType, ExternalPackageState(..), emptyModDetails )
-import OccName
-import Var		( Id, TyVar, idType )
-import Module		( moduleName, moduleNameString, modulePackageId )
-import TcRnMonad
-import IfaceEnv		( lookupOrig )
-import Class		( Class, classExtraBigSig )
-import TyCon		( TyCon, tyConTyVars, synTyConDefn, 
-			  isSynTyCon, isNewTyCon, tyConDataCons, isPrimTyCon, isFunTyCon,
-			  tyConArity, tyConStupidTheta, isUnLiftedTyCon )
-import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
-			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix, 
-			  isVanillaDataCon )
-import Id		( idName, globalIdDetails )
-import IdInfo		( GlobalIdDetails(..) )
-import TysWiredIn	( mkListTy )
-import DsMeta		( expQTyConName, typeQTyConName, decTyConName, qTyConName, nameTyConName )
-import DsExpr		( dsLExpr )
-import DsMonad		( initDsTc )
-import ErrUtils		( Message )
-import SrcLoc		( SrcSpan, noLoc, unLoc, getLoc )
-import Outputable
-import Unique		( Unique, Uniquable(..), getKey, mkUniqueGrimily )
-import PackageConfig    ( packageIdString )
-import BasicTypes	( StrictnessMark(..), Fixity(..), FixityDirection(..) )
-import Panic		( showException )
-import FastString	( LitString )
-
-import GHC.Base		( unsafeCoerce#, Int#, Int(..) )	-- Should have a better home in the module hierarchy
-import Monad 		( liftM )
-
-#ifdef GHCI
-import FastString	( mkFastString )
-#endif
+import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
+import Control.Monad	( liftM )
 \end{code}
 
 

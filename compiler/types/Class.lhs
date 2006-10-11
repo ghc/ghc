@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[Class]{The @Class@ datatype}
+
+The @Class@ datatype
 
 \begin{code}
 module Class (
@@ -20,10 +22,10 @@ module Class (
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} TypeRep	( PredType )
 
-import Var		( Id, TyVar )
-import Name		( NamedThing(..), Name )
-import BasicTypes	( Arity )
-import Unique		( Unique, Uniquable(..) )
+import Var
+import Name
+import BasicTypes
+import Unique
 import Outputable
 \end{code}
 

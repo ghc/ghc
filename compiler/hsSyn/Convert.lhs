@@ -1,45 +1,42 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
 This module converts Template Haskell syntax into HsSyn
 
-
 \begin{code}
-module Convert( convertToHsExpr, convertToHsDecls, convertToHsType, thRdrName ) where
+module Convert( convertToHsExpr, convertToHsDecls, 
+                convertToHsType, thRdrName ) where
 
 #include "HsVersions.h"
+
+import HsSyn as Hs
+import qualified Class
+import RdrName
+import qualified Name
+import Module
+import RdrHsSyn
+import qualified OccName
+import PackageConfig
+import OccName
+import SrcLoc
+import Type
+import TysWiredIn
+import BasicTypes
+import ForeignCall
+import Char
+import List
+import Unique
+import ErrUtils
+import Bag
+import FastString
+import Outputable
 
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 
-import HsSyn as Hs
-import qualified Class (FunDep)
-import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, getRdrName, nameRdrName )
-import qualified Name	( Name, mkInternalName, getName )
-import Module   ( ModuleName, mkModuleName, mkModule )
-import RdrHsSyn	( mkClassDecl, mkTyData )
-import qualified OccName
-import PackageConfig    ( PackageId, stringToPackageId )
-import OccName	( startsVarId, startsVarSym, startsConId, startsConSym,
-		  pprNameSpace )
-import SrcLoc	( Located(..), SrcSpan )
-import Type	( Type )
-import TysWiredIn ( unitTyCon, tupleTyCon, tupleCon, trueDataCon, nilDataCon, consDataCon )
-import BasicTypes( Boxity(..) ) 
-import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
-                     CExportSpec(..)) 
-import Char 	( isAscii, isAlphaNum, isAlpha )
-import List	( partition )
-import Unique	( Unique, mkUniqueGrimily )
-import ErrUtils ( Message )
-import GLAEXTS	( Int(..), Int# )
-import SrcLoc	( noSrcLoc )
-import Bag	( listToBag )
-import FastString
-import Outputable
-
-
+import GHC.Exts
 
 -------------------------------------------------------------------
 --		The external interface
@@ -230,8 +227,8 @@ cvtForD (ExportF callconv as nm ty)
 	; let e = CExport (CExportStatic (mkFastString as) (cvt_conv callconv))
  	; return $ ForeignExport nm' ty' e }
 
-cvt_conv CCall   = CCallConv
-cvt_conv StdCall = StdCallConv
+cvt_conv TH.CCall   = CCallConv
+cvt_conv TH.StdCall = StdCallConv
 
 parse_ccall_impent :: String -> String -> Maybe (FastString, CImportSpec)
 parse_ccall_impent nm s

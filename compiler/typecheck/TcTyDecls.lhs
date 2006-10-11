@@ -8,7 +8,6 @@ Analysis functions over data types.  Specficially, detecting recursive types.
 This stuff is only used for source-code decls; it's recorded in interface
 files for imported data types.
 
-
 \begin{code}
 module TcTyDecls(
 	calcRecFlags, 

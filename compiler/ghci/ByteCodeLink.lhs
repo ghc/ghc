@@ -1,10 +1,9 @@
 %
-% (c) The University of Glasgow 2000
+% (c) The University of Glasgow 2000-2006
 %
-\section[ByteCodeLink]{Bytecode assembler and linker}
+ByteCodeLink: Bytecode assembler and linker
 
 \begin{code}
-
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeLink ( 
@@ -15,21 +14,20 @@ module ByteCodeLink (
 
 #include "HsVersions.h"
 
-import ByteCodeItbls	( ItblEnv, ItblPtr )
-import ByteCodeAsm	( UnlinkedBCO(..), BCOPtr(..), sizeSS, ssElts )
-import ObjLink		( lookupSymbol )
+import ByteCodeItbls
+import ByteCodeAsm
+import ObjLink
 
-import Name		( Name,  nameModule, nameOccName )
+import Name
 import NameEnv
-import OccName		( occNameFS )
-import PrimOp		( PrimOp, primOpOcc )
+import OccName
+import PrimOp
 import Module
-import PackageConfig    ( mainPackageId, packageIdFS )
-import FastString	( FastString(..), unpackFS, zEncodeFS )
-import Panic            ( GhcException(..) )
+import PackageConfig
+import FastString
+import Panic
 
 #ifdef DEBUG
-import Name             ( isExternalName )
 import Outputable
 #endif
 

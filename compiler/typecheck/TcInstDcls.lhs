@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcInstDecls]{Typechecking instance declarations}
+
+TcInstDecls: Typechecking instance declarations
 
 \begin{code}
 module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
@@ -9,56 +11,43 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 #include "HsVersions.h"
 
 import HsSyn
-import TcBinds		( mkPragFun, tcPrags, badBootDeclErr )
-import TcTyClsDecls     ( tcIdxTyInstDecl )
-import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, badATErr,
-			  omittedATWarn, tcClassDecl2, getGenericInstances )
+import TcBinds
+import TcTyClsDecls
+import TcClassDcl
 import TcRnMonad       
-import TcMType		( tcSkolSigType, checkValidInstance,
-			  checkValidInstHead )
-import TcType		( TcType, mkClassPred, tcSplitSigmaTy,
-			  tcSplitDFunHead,  SkolemInfo(InstSkol),
-			  tcSplitTyConApp, 
-			  tcSplitDFunTy, mkFunTy ) 
-import Inst		( newDictBndr, newDictBndrs, instToId, showLIE, 
-			  getOverlapFlag, tcExtendLocalInstEnv )
-import InstEnv		( mkLocalInstance, instanceDFunId )
-import FamInst		( tcExtendLocalFamInstEnv )
-import FamInstEnv	( mkLocalFamInst )
-import TcDeriv		( tcDeriving )
-import TcEnv		( InstInfo(..), InstBindings(..), 
-			  newDFunName, tcExtendIdEnv, tcExtendGlobalEnv
-			)
-import TcHsType		( kcHsSigType, tcHsKindedType )
-import TcUnify		( checkSigTyVars )
-import TcSimplify	( tcSimplifySuperClasses )
-import Type		( zipOpenTvSubst, substTheta, mkTyConApp, mkTyVarTy,
-                          TyThing(ATyCon), isTyVarTy, tcEqType,
-                          substTys, emptyTvSubst, extendTvSubst )
-import Coercion         ( mkSymCoercion )
-import TyCon            ( TyCon, tyConName, newTyConCo_maybe, tyConTyVars,
-			  isTyConAssoc, tyConFamInst_maybe, tyConDataCons,
-			  assocTyConArgPoss_maybe )
-import DataCon		( classDataCon, dataConInstArgTys )
-import Class		( Class, classTyCon, classBigSig, classATs )
-import Var		( TyVar, Id, idName, idType, tyVarName )
-import MkId		( mkDictFunId )
-import Name		( Name, getSrcLoc, nameOccName )
-import NameSet		( addListToNameSet, emptyNameSet, minusNameSet,
-			  nameSetToList ) 
-import Maybe		( fromJust, catMaybes )
-import Monad		( when )
-import List		( find )
-import DynFlags		( DynFlag(Opt_WarnMissingMethods) )
-import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart,
-			  getLoc)
-import ListSetOps	( minusList )
-import Util		( snocView, dropList )
+import TcMType
+import TcType
+import Inst
+import InstEnv
+import FamInst
+import FamInstEnv
+import TcDeriv
+import TcEnv
+import TcHsType
+import TcUnify
+import TcSimplify
+import Type
+import Coercion
+import TyCon
+import DataCon
+import Class
+import Var
+import MkId
+import Name
+import NameSet
+import DynFlags
+import SrcLoc
+import ListSetOps
+import Util
 import Outputable
 import Bag
-import BasicTypes	( Activation( AlwaysActive ), InlineSpec(..) )
-import HscTypes		( implicitTyThings )
+import BasicTypes
+import HscTypes
 import FastString
+
+import Data.Maybe
+import Control.Monad hiding (zipWithM_, mapAndUnzipM)
+import Data.List
 \end{code}
 
 Typechecking instance declarations is done in two passes. The first
