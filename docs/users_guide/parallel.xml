@@ -38,7 +38,7 @@
   </para><para>
   To the programmer, Concurrent Haskell introduces no new language constructs;
   rather, it appears simply as a library, <ulink
-  url="http://www.haskell.org/ghc/docs/latest/html/libraries/base/Control-Concurrent.html">
+  url="../libraries/base/Control-Concurrent.html">
 	      Control.Concurrent</ulink>.  The functions exported by this
 	      library include:
   <itemizedlist>
@@ -62,7 +62,7 @@ the FFI with concurrency</ulink>.</para></listitem>
     it.</para>
 
    <para>The main library you need to use STM is <ulink
-  url="http://www.haskell.org/ghc/docs/latest/html/libraries/stm/Control-Concurrent-STM.html">
+  url="../libraries/stm/Control-Concurrent-STM.html">
 	      Control.Concurrent.STM</ulink>. The main features supported are these:
 <itemizedlist>
 <listitem><para>Atomic blocks.</para></listitem>
