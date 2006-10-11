@@ -1,56 +1,45 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.62 2005/06/21 10:44:41 simonmar Exp $
-%
-%********************************************************
-%*							*
-\section[CgExpr]{Converting @StgExpr@s}
-%*							*
-%********************************************************
 
 \begin{code}
 module CgExpr ( cgExpr ) where
 
 #include "HsVersions.h"
 
-import Constants	( mAX_SPEC_SELECTEE_SIZE, mAX_SPEC_AP_SIZE )
+import Constants
 import StgSyn
 import CgMonad
 
-import SMRep		( fixedHdrSize, isFollowableArg, CgRep(..), argMachRep,
-			  nonVoidArg, idCgRep, typeCgRep, typeHint,
-			  primRepToCgRep )
-import CoreSyn		( AltCon(..) )
-import CgProf		( emitSetCCC )
-import CgHeapery	( layOutDynConstr )
-import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, 
-			  nukeDeadBindings, addBindC, addBindsC )
-import CgCase		( cgCase, saveVolatileVarsAndRegs )
-import CgClosure	( cgRhsClosure, cgStdRhsClosure )
-import CgCon		( buildDynCon, cgReturnDataCon )
-import CgLetNoEscape	( cgLetNoEscapeClosure )
-import CgCallConv	( dataReturnConvPrim )
+import SMRep
+import CoreSyn
+import CgProf
+import CgHeapery
+import CgBindery
+import CgCase
+import CgClosure
+import CgCon
+import CgLetNoEscape
+import CgCallConv
 import CgTailCall
-import CgInfoTbls	( emitDirectReturnInstr )
-import CgForeignCall	( emitForeignCall, shimForeignCallArg )
-import CgPrimOp		( cgPrimOp )
-import CgUtils		( addIdReps, newTemp, assignTemp, cgLit, tagToClosure )
-import ClosureInfo	( mkSelectorLFInfo, mkApLFInfo )
-import Cmm		( CmmExpr(..), CmmStmt(..), CmmReg, nodeReg )
-import MachOp		( wordRep, MachHint )
+import CgInfoTbls
+import CgForeignCall
+import CgPrimOp
+import CgUtils
+import ClosureInfo
+import Cmm
+import MachOp
 import VarSet
-import Literal		( literalType )
-import PrimOp		( primOpOutOfLine, getPrimOpResultInfo, 
-			  PrimOp(..), PrimOpResultInfo(..) )
-import Id		( Id )
-import TyCon		( isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, tyConAppArgs, tyConAppTyCon, repType,
-			  PrimRep(VoidRep) )
-import Maybes		( maybeToBool )
-import ListSetOps	( assocMaybe )
-import BasicTypes	( RecFlag(..) )
-import Util             ( lengthIs )
+import Literal
+import PrimOp
+import Id
+import TyCon
+import Type
+import Maybes
+import ListSetOps
+import BasicTypes
+import Util
 import Outputable
 \end{code}
 

@@ -2,7 +2,7 @@
 --
 -- Code generation for foreign calls.
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -19,24 +19,24 @@ module CgForeignCall (
 
 #include "HsVersions.h"
 
-import StgSyn		( StgLiveVars, StgArg, stgArgType )
-import CgProf		( curCCS, curCCSAddr )
-import CgBindery	( getVolatileRegs, getArgAmodes )
+import StgSyn
+import CgProf
+import CgBindery
 import CgMonad
-import CgUtils		( cmmOffsetW, cmmOffsetB, newTemp )
-import Type		( tyConAppTyCon, repType )
+import CgUtils
+import Type
 import TysPrim
-import CLabel		( mkForeignLabel, mkRtsCodeLabel )
+import CLabel
 import Cmm
 import CmmUtils
 import MachOp
 import SMRep
 import ForeignCall
 import Constants
-import StaticFlags	( opt_SccProfilingOn )
+import StaticFlags
 import Outputable
 
-import Monad		( when )
+import Control.Monad
 
 -- -----------------------------------------------------------------------------
 -- Code generation for Foreign Calls

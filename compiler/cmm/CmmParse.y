@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow, 2004
+-- (c) The University of Glasgow, 2004-2006
 --
 -- Parser for concrete Cmm.
 --
@@ -16,37 +16,37 @@ import CgProf
 import CgTicky
 import CgInfoTbls
 import CgForeignCall
-import CgTailCall	( pushUnboxedTuple )
-import CgStackery	( emitPushUpdateFrame )
-import ClosureInfo	( C_SRT(..) )
-import CgCallConv	( smallLiveness )
-import CgClosure	( emitBlackHoleCode )
-import CostCentre	( dontCareCCS )
+import CgTailCall
+import CgStackery
+import ClosureInfo
+import CgCallConv
+import CgClosure
+import CostCentre
 
 import Cmm
 import PprCmm
-import CmmUtils		( mkIntCLit )
+import CmmUtils
 import CmmLex
 import CLabel
 import MachOp
-import SMRep		( fixedHdrSize, CgRep(..) )
+import SMRep
 import Lexer
 
-import ForeignCall	( CCallConv(..), Safety(..) )
-import Literal		( mkMachInt )
+import ForeignCall
+import Literal
 import Unique
 import UniqFM
 import SrcLoc
-import DynFlags		( DynFlags, DynFlag(..) )
-import StaticFlags	( opt_SccProfilingOn )
-import ErrUtils		( printError, dumpIfSet_dyn, showPass )
-import StringBuffer	( hGetStringBuffer )
+import DynFlags
+import StaticFlags
+import ErrUtils
+import StringBuffer
 import FastString
-import Panic		( panic )
-import Constants	( wORD_SIZE )
+import Panic
+import Constants
 import Outputable
 
-import Monad		( when )
+import Control.Monad	( when )
 import Data.Char	( ord )
 
 #include "HsVersions.h"

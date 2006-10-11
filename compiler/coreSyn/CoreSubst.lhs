@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[CoreUtils]{Utility functions on @Core@ syntax}
+
+Utility functions on @Core@ syntax
 
 \begin{code}
 module CoreSubst (
@@ -24,29 +26,23 @@ module CoreSubst (
 
 #include "HsVersions.h"
 
-import CoreSyn		( Expr(..), Bind(..), CoreExpr, CoreBind,
-			  CoreRule(..), hasUnfolding, noUnfolding
-			)
-import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprIsTrivial )
+import CoreSyn
+import CoreFVs
+import CoreUtils
 
-import qualified Type	( substTy, substTyVarBndr )
-import Type		( Type, tyVarsOfType, TvSubstEnv, TvSubst(..), mkTyVarTy )
+import qualified Type
+import Type     ( Type, TvSubst(..), TvSubstEnv )
 import VarSet
 import VarEnv
-import Var		( setVarUnique, isId )
-import Id		( idType, idInfo, setIdType, maybeModifyIdInfo, isLocalId )
-import IdInfo		( IdInfo, SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo,
-			  unfoldingInfo, setUnfoldingInfo, seqSpecInfo,
-			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo
-			)
-import Unique		( Unique )
-import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply )
-import Var		( Var, Id, TyVar, isTyVar )
-import Maybes		( orElse )
+import Id
+import Var      ( Var, TyVar, setVarUnique )
+import IdInfo
+import Unique
+import UniqSupply
+import Maybes
 import Outputable
 import PprCore		()		-- Instances
-import Util		( mapAccumL )
+import Util
 import FastTypes
 \end{code}
 
@@ -148,7 +144,7 @@ lookupIdSubst (Subst in_scope ids tvs) v
 -}
 
 lookupTvSubst :: Subst -> TyVar -> Type
-lookupTvSubst (Subst _ ids tvs) v = lookupVarEnv tvs v `orElse` mkTyVarTy v
+lookupTvSubst (Subst _ ids tvs) v = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
 
 ------------------------------
 isInScope :: Var -> Subst -> Bool
@@ -279,7 +275,8 @@ substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
 	| otherwise	 = setIdType id1 (substTy subst old_ty)
 
     old_ty = idType old_id
-    no_type_change = isEmptyVarEnv tvs || isEmptyVarSet (tyVarsOfType old_ty)
+    no_type_change = isEmptyVarEnv tvs || 
+                     isEmptyVarSet (Type.tyVarsOfType old_ty)
 
 	-- new_id has the right IdInfo
 	-- The lazy-set is because we're in a loop here, with 
@@ -361,7 +358,7 @@ substTy (Subst in_scope id_env tv_env) ty
 \begin{code}
 substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst in_scope id_env tv_env) id
-  | isEmptyVarEnv tv_env || isEmptyVarSet (tyVarsOfType old_ty) = id
+  | isEmptyVarEnv tv_env || isEmptyVarSet (Type.tyVarsOfType old_ty) = id
   | otherwise	= setIdType id (substTy subst old_ty)
 		-- The tyVarsOfType is cheaper than it looks
 		-- because we cache the free tyvars of the type
@@ -425,5 +422,5 @@ substVarSet subst fvs
   where
     subst_fv subst fv 
 	| isId fv   = exprFreeVars (lookupIdSubst subst fv)
-	| otherwise = tyVarsOfType (lookupTvSubst subst fv)
+	| otherwise = Type.tyVarsOfType (lookupTvSubst subst fv)
 \end{code}

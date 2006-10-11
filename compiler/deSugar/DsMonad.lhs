@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsMonad]{@DsMonad@: monadery used in desugaring}
+
+@DsMonad@: monadery used in desugaring
 
 \begin{code}
 module DsMonad (
@@ -33,29 +35,28 @@ module DsMonad (
 #include "HsVersions.h"
 
 import TcRnMonad
-import CoreSyn		( CoreExpr )
-import HsSyn		( HsExpr, HsMatchContext, Pat )
-import TcIface		( tcIfaceGlobal )
-import RdrName		( GlobalRdrEnv )
-import HscTypes		( TyThing(..), TypeEnv, HscEnv(..), 
-			  tyThingId, tyThingTyCon, tyThingDataCon, mkPrintUnqualified )
-import Bag		( emptyBag, snocBag )
-import DataCon		( DataCon )
-import TyCon		( TyCon )
-import Id		( mkSysLocal, setIdUnique, Id )
-import Module		( Module )
-import Var		( TyVar, setTyVarUnique )
+import CoreSyn
+import HsSyn
+import TcIface
+import RdrName
+import HscTypes
+import Bag
+import DataCon
+import TyCon
+import Id
+import Module
+import Var
 import Outputable
-import SrcLoc		( noSrcSpan, SrcSpan )
-import Type             ( Type )
-import UniqSupply	( UniqSupply, uniqsFromSupply )
-import Name		( Name, nameOccName )
+import SrcLoc
+import Type
+import UniqSupply
+import Name
 import NameEnv
-import OccName          ( occNameFS )
-import DynFlags	( DynFlags )
-import ErrUtils		( Messages, mkWarnMsg, mkErrMsg, 
-			  printErrorsAndWarnings, errorsFound )
-import DATA_IOREF	( newIORef, readIORef )
+import OccName
+import DynFlags
+import ErrUtils
+
+import Data.IORef
 
 infixr 9 `thenDs`
 \end{code}

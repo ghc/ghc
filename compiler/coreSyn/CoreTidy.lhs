@@ -1,6 +1,10 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1996-1998
 %
+
+This module contains "tidying" code for *nested* expressions, bindings, rules.
+The code for *top-level* bindings is in TidyPgm.
 
 \begin{code}
 module CoreTidy (
@@ -10,26 +14,20 @@ module CoreTidy (
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( exprArity )
-import Id		( Id, mkUserLocal, idInfo, setIdInfo, idUnique, idType )
-import IdInfo		( setArityInfo, vanillaIdInfo,
-			  newStrictnessInfo, setAllStrictnessInfo,
-			  newDemandInfo, setNewDemandInfo )
-import Type		( tidyType, tidyTyVarBndr )
-import Var		( Var, varName )
+import CoreUtils
+import Id
+import IdInfo
+import Type
+import Var
 import VarEnv
-import UniqFM		( lookupUFM )
-import Name		( Name, getOccName )
-import OccName		( tidyOccName )
-import SrcLoc		( noSrcLoc )
-import Maybes		( orElse )
-import Outputable
-import Util		( mapAccumL )
+import UniqFM
+import Name hiding (tidyNameOcc)
+import OccName
+import SrcLoc
+import Maybes
+import Util
 \end{code}
 
-
-This module contains "tidying" code for *nested* expressions, bindings, rules.
-The code for *top-level* bindings is in TidyPgm.
 
 %************************************************************************
 %*									*
@@ -115,7 +113,7 @@ tidyNameOcc :: TidyEnv -> Name -> Name
 -- Fortunately, we can lookup in the VarEnv with a name
 tidyNameOcc (_, var_env) n = case lookupUFM var_env n of
 				Nothing -> n
-				Just v  -> varName v
+				Just v  -> idName v
 
 tidyVarOcc :: TidyEnv -> Var -> Var
 tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v

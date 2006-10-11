@@ -103,10 +103,11 @@ import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 
-import DATA_IOREF	( IORef, readIORef )
 import StringBuffer	( StringBuffer )
 import Maybes           ( catMaybes, seqMaybe )
-import Time		( ClockTime )
+
+import System.Time	( ClockTime )
+import Data.IORef	( IORef, readIORef )
 \end{code}
 
 

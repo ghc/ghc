@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcIfaceSig]{Type checking of type signatures in interface files}
+
+Type checking of type signatures in interface files
 
 \begin{code}
 module TcIface ( 
@@ -13,63 +15,45 @@ module TcIface (
 #include "HsVersions.h"
 
 import IfaceSyn
-import LoadIface	( loadInterface, loadWiredInHomeIface, findAndReadIface, loadDecls )
-import IfaceEnv		( lookupIfaceTop, newGlobalBinder, 
-			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
-			  tcIfaceTyVar, tcIfaceLclId,
-			  newIfaceName, newIfaceNames, ifaceExportNames )
-import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon,
-			  buildClass, 
-			  mkAbstractTyConRhs, mkOpenDataTyConRhs,
-			  mkOpenNewTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
+import LoadIface
+import IfaceEnv
+import BuildTyCl
 import TcRnMonad
-import Type		( liftedTypeKind, splitTyConApp, mkTyConApp,
-                          liftedTypeKindTyCon, unliftedTypeKindTyCon, 
-                          openTypeKindTyCon, argTypeKindTyCon, 
-                          ubxTupleKindTyCon, ThetaType )
-import TypeRep		( Type(..), PredType(..) )
-import TyCon		( TyCon, tyConName, SynTyConRhs(..), setTyConArgPoss )
-import HscTypes		( ExternalPackageState(..), 
-			  TyThing(..), tyThingClass, tyThingTyCon, 
-			  ModIface(..), ModDetails(..), HomeModInfo(..),
-			  emptyModDetails, lookupTypeEnv, lookupType,
-			  typeEnvIds )
-import InstEnv		( Instance(..), mkImportedInstance )
-import FamInstEnv	( FamInst(..), mkImportedFamInst )
+import Type
+import TypeRep
+import HscTypes
+import InstEnv
+import FamInstEnv
 import CoreSyn
-import CoreUtils	( exprType, dataConRepFSInstPat )
+import CoreUtils
 import CoreUnfold
-import CoreLint		( lintUnfolding )
-import WorkWrap		( mkWrapper )
-import Id		( Id, mkVanillaGlobal, mkLocalId )
-import MkId		( mkFCallId )
-import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
-			  setUnfoldingInfoLazily, setAllStrictnessInfo, setWorkerInfo,
-			  setArityInfo, setInlinePragInfo, setCafInfo, 
-			  vanillaIdInfo, newStrictnessInfo )
-import Class		( Class )
-import TyCon		( tyConDataCons, isTupleTyCon, mkForeignTyCon )
-import DataCon		( DataCon, dataConWorkId )
-import TysWiredIn	( tupleCon, tupleTyCon, listTyCon, intTyCon, boolTyCon, charTyCon, parrTyCon )
-import Var		( TyVar, mkTyVar )
-import Name		( Name, nameModule, nameIsLocalOrFrom, isWiredInName,
- 			  nameOccName, wiredInNameTyThing_maybe )
+import CoreLint
+import WorkWrap
+import Id
+import MkId
+import IdInfo
+import Class
+import TyCon
+import DataCon
+import TysWiredIn
+import Var              ( TyVar )
+import qualified Var
+import Name
 import NameEnv
-import OccName		( OccName, mkVarOccFS, mkTyVarOcc, occNameSpace, 
-			  pprNameSpace, occNameFS  )
-import Module		( Module, moduleName )
-import UniqFM		( lookupUFM )
-import UniqSupply	( initUs_, uniqsFromSupply )
+import OccName
+import Module
+import UniqFM
+import UniqSupply
 import Outputable	
-import ErrUtils		( Message )
-import Maybes		( MaybeErr(..) )
-import SrcLoc		( noSrcLoc )
-import Util		( zipWithEqual )
-import DynFlags		( DynFlag(..), isOneShot )
-import Control.Monad	( unless )
+import ErrUtils
+import Maybes
+import SrcLoc
+import Util
+import DynFlags
+import Control.Monad
 
-import List		( elemIndex)
-import Maybe		( catMaybes )
+import Data.List
+import Data.Maybe
 \end{code}
 
 This module takes
@@ -1020,14 +1004,14 @@ bindIfaceTyVar (occ,kind) thing_inside
 bindIfaceTyVars :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
 bindIfaceTyVars bndrs thing_inside
   = do	{ names <- newIfaceNames (map mkTyVarOcc occs)
-  	; tyvars <- zipWithM mk_iface_tyvar names kinds
+  	; tyvars <- TcRnMonad.zipWithM mk_iface_tyvar names kinds
 	; extendIfaceTyVarEnv tyvars (thing_inside tyvars) }
   where
     (occs,kinds) = unzip bndrs
 
 mk_iface_tyvar :: Name -> IfaceKind -> IfL TyVar
 mk_iface_tyvar name ifKind = do { kind <- tcIfaceType ifKind
-                                ; return (mkTyVar name kind)
+                                ; return (Var.mkTyVar name kind)
                                 }
 \end{code}
 

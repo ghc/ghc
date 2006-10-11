@@ -22,42 +22,6 @@ you will screw up the layout where they are used in case expressions!
  * settings for the target plat instead). */
 #include "../includes/ghcautoconf.h"
 
-#if __GLASGOW_HASKELL__ >= 504
-
-#define CONCURRENT  Control.Concurrent
-#define EXCEPTION   Control.Exception
-     /* If you want Control.Exception.try, get it as Panic.try, which
-        deals with the shift from 'tryAllIO' to 'try'.  */
-#define DYNAMIC     Data.Dynamic
-#define GLAEXTS     GHC.Exts
-#define DATA_BITS   Data.Bits
-#define DATA_INT    Data.Int
-#define DATA_WORD   Data.Word
-#define UNSAFE_IO   System.IO.Unsafe
-#define TRACE       Debug.Trace
-#define DATA_IOREF  Data.IORef
-#define FIX_IO      System.IO
-#define MONAD_ST    Control.Monad.ST
-#define ST_ARRAY    Data.Array.ST
-
-#else
-
-#define CONCURRENT  Concurrent
-#define EXCEPTION   Exception
-#define DYNAMIC     Dynamic
-#define GLAEXTS     GlaExts
-#define DATA_BITS   Bits
-#define DATA_INT    Int
-#define DATA_WORD   Word
-#define UNSAFE_IO   IOExts
-#define TRACE       IOExts
-#define DATA_IOREF  IOExts
-#define FIX_IO      IOExts
-#define MONAD_ST    ST
-#define ST_ARRAY    ST
-
-#endif
-
 #ifdef __GLASGOW_HASKELL__
 #define GLOBAL_VAR(name,value,ty)  \
 name = Util.global (value) :: IORef (ty); \

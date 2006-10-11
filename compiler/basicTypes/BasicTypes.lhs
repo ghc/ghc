@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 %
 \section[BasicTypes]{Miscellanous types}

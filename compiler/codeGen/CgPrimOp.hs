@@ -2,7 +2,7 @@
 --
 -- Code generation for PrimOps.
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -12,24 +12,23 @@ module CgPrimOp (
 
 #include "HsVersions.h"
 
-import ForeignCall	( CCallConv(CCallConv) )
-import StgSyn		( StgLiveVars, StgArg )
-import CgForeignCall	( emitForeignCall' )
-import CgBindery	( getVolatileRegs, getArgAmodes )
+import ForeignCall
+import StgSyn
+import CgForeignCall
+import CgBindery
 import CgMonad
-import CgInfoTbls	( getConstrTag )
-import CgUtils		( cmmOffsetW, cmmOffsetB, cmmLoadIndexW )
+import CgInfoTbls
+import CgUtils
 import ForeignCall
 import Cmm
-import CLabel		( mkMAP_FROZEN_infoLabel, mkMAP_DIRTY_infoLabel,
-			  mkDirty_MUT_VAR_Label, mkRtsCodeLabel )
+import CLabel
 import CmmUtils
 import MachOp
 import SMRep
-import PrimOp		( PrimOp(..) )
-import SMRep		( tablesNextToCode )
-import Constants 	( wORD_SIZE, wORD_SIZE_IN_BITS )
-import StaticFlags	( opt_Parallel )
+import PrimOp
+import SMRep
+import Constants
+import StaticFlags
 import Outputable
 
 -- ---------------------------------------------------------------------------

@@ -1,7 +1,8 @@
 %
-% (c) The University of Glasgow, 1994-2000
+% (c) The University of Glasgow, 1994-2006
 %
-\section{Core pass to saturate constructors and PrimOps}
+
+Core pass to saturate constructors and PrimOps
 
 \begin{code}
 module CorePrep (
@@ -10,33 +11,27 @@ module CorePrep (
 
 #include "HsVersions.h"
 
-import CoreUtils( exprType, exprIsHNF, etaExpand, exprArity, exprOkForSpeculation )
-import CoreFVs	( exprFreeVars )
-import CoreLint	( endPass )
+import CoreUtils hiding (exprIsTrivial)
+import CoreFVs
+import CoreLint
 import CoreSyn
-import Type	( Type, applyTy, 
-                  splitFunTy_maybe, isUnLiftedType, isUnboxedTupleType, seqType )
-import Coercion ( coercionKind )
-import TyCon	( TyCon, tyConDataCons )
-import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
-import Var 	( Var, Id, setVarUnique )
+import Type
+import Coercion
+import TyCon
+import NewDemand
+import Var
 import VarSet
 import VarEnv
-import Id	( mkSysLocal, idType, idNewDemandInfo, idArity, setIdUnfolding, 
-		  isFCallId, isGlobalId, isLocalId, hasNoBinding, idNewStrictness, 
-		  isPrimOpId_maybe
-		)
-import DataCon	  ( dataConWorkId )
-import PrimOp	  ( PrimOp( DataToTagOp ) )
-import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
-		    RecFlag(..), isNonRec
-		  )
+import Id
+import DataCon
+import PrimOp
+import BasicTypes
 import UniqSupply
 import Maybes
 import OrdList
 import ErrUtils
 import DynFlags
-import Util       ( listLengthCmp )
+import Util
 import Outputable
 \end{code}
 

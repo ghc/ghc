@@ -1,7 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcDeriv]{Deriving}
 
 Handles @deriving@ clauses on @data@ declarations.
 
@@ -11,49 +11,39 @@ module TcDeriv ( tcDeriving ) where
 #include "HsVersions.h"
 
 import HsSyn
-import DynFlags	( DynFlag(..) )
+import DynFlags
 
-import Generics		( mkTyConGenericBinds )
+import Generics
 import TcRnMonad
-import TcMType		( checkValidInstance )
-import TcEnv		( newDFunName, pprInstInfoDetails, 
-			  InstInfo(..), InstBindings(..), simpleInstInfoClsTy,
-			  tcLookupClass, tcLookupTyCon, tcLookupLocatedTyCon, tcExtendTyVarEnv
-			)
+import TcMType
+import TcEnv
 import TcGenDeriv	-- Deriv stuff
-import InstEnv		( Instance, OverlapFlag, mkLocalInstance, instanceHead, extendInstEnvList )
-import Inst		( getOverlapFlag )
-import TcHsType		( tcHsDeriv )
-import TcSimplify	( tcSimplifyDeriv )
-import TypeRep          ( PredType )
+import InstEnv
+import Inst
+import TcHsType
+import TcSimplify
 
-import RnBinds		( rnMethodBinds, rnTopBinds )
-import RnEnv		( bindLocalNames )
-import HscTypes		( FixityEnv )
+import RnBinds
+import RnEnv
+import HscTypes
 
-import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
-import Type		( zipOpenTvSubst, substTheta, pprThetaArrow, pprClassPred, mkTyVarTy )
-import ErrUtils		( dumpIfSet_dyn )
-import MkId		( mkDictFunId )
-import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConInstOrigArgTys )
-import Maybes		( catMaybes )
-import RdrName		( RdrName )
-import Name		( Name, getSrcLoc )
-import NameSet		( duDefs )
-import Type		( splitKindFunTys )
-import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
-			  tyConStupidTheta, isProductTyCon, isDataTyCon, isNewTyCon, newTyConRhs,
-			  isEnumerationTyCon, isRecursiveTyCon, TyCon
-			)
-import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
-			  isUnLiftedType, mkClassPred, tyVarsOfType, tyVarsOfTypes,
-			  isSubArgTypeKind, tcEqTypes, tcSplitAppTys, mkAppTys )
-import Var		( TyVar, tyVarKind, varName )
-import VarSet		( mkVarSet, disjointVarSet )
+import Class
+import Type
+import ErrUtils
+import MkId
+import DataCon
+import Maybes
+import RdrName
+import Name
+import NameSet
+import TyCon
+import TcType
+import Var
+import VarSet
 import PrelNames
-import SrcLoc		( SrcSpan, srcLocSpan, Located(..), unLoc )
-import Util		( zipWithEqual, sortLe, notNull )
-import ListSetOps	( removeDups,  assocMaybe )
+import SrcLoc
+import Util
+import ListSetOps
 import Outputable
 import Bag
 \end{code}
@@ -876,7 +866,7 @@ genInst spec
 	-- It's a bit yukky that we return *renamed* InstInfo, but
 	-- *non-renamed* auxiliary bindings
 	; (rn_meth_binds, _fvs) <- discardWarnings $ 
-				   bindLocalNames (map varName tyvars)	$
+				   bindLocalNames (map Var.varName tyvars) $
 			 	   rnMethodBinds clas_nm (\n -> []) [] meth_binds
 
 	-- Build the InstInfo

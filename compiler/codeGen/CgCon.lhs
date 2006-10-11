@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
 \section[CgCon]{Code generation for constructors}
@@ -20,40 +21,30 @@ module CgCon (
 import CgMonad
 import StgSyn
 
-import CgBindery	( getArgAmodes, bindNewToNode,
-			  bindArgsToRegs, idInfoToAmode, stableIdInfo,
-			  heapIdInfo, CgIdInfo, bindArgsToStack
-			)
-import CgStackery	( mkVirtStkOffsets, freeStackSlots,
-			  getRealSp, getVirtSp, setRealAndVirtualSp )
-import CgUtils		( addIdReps, cmmLabelOffW, emitRODataLits, emitDataLits )
-import CgCallConv	( assignReturnRegs )
-import CgHeapery	( allocDynClosure, layOutDynConstr, 
-			  layOutStaticConstr, mkStaticClosureFields )
-import CgTailCall	( performReturn, emitKnownConReturnCode, returnUnboxedTuple )
-import CgProf		( mkCCostCentreStack, ldvEnter, curCCS )
+import CgBindery
+import CgStackery
+import CgUtils
+import CgCallConv
+import CgHeapery
+import CgTailCall
+import CgProf
 import CgTicky
-import CgInfoTbls	( emitClosureCodeAndInfoTable, dataConTagZ )
+import CgInfoTbls
 import CLabel
-import ClosureInfo	( mkConLFInfo, mkLFArgument )
-import CmmUtils		( mkLblExpr )
+import ClosureInfo
+import CmmUtils
 import Cmm
-import SMRep		( WordOff, CgRep, separateByPtrFollowness,
-			  fixedHdrSize, typeCgRep )
-import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
-			  currentCCS )
-import Constants	( mIN_INTLIKE, mAX_INTLIKE, mIN_CHARLIKE, mAX_CHARLIKE )
-import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, tyConName )
-import DataCon		( DataCon, dataConRepArgTys, isNullaryRepDataCon,
-			  isUnboxedTupleCon, dataConWorkId, 
-			  dataConName, dataConRepArity
-			)
-import Id		( Id, idName, isDeadBinder )
-import Type		( Type )
-import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
+import SMRep
+import CostCentre
+import Constants
+import TyCon
+import DataCon
+import Id
+import Type
+import PrelInfo
 import Outputable
-import Util		( lengthIs )
-import ListSetOps	( assocMaybe )
+import Util
+import ListSetOps
 \end{code}
 
 

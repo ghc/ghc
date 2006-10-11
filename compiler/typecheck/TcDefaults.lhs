@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1993-1998
 %
 \section[TcDefaults]{Typechecking \tr{default} declarations}
@@ -8,15 +9,15 @@ module TcDefaults ( tcDefaults ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( DefaultDecl(..), LDefaultDecl )
-import Name		( Name )
+import HsSyn
+import Name
 import TcRnMonad
-import TcEnv		( tcLookupClass )
-import TcHsType		( tcHsSigType, UserTypeCtxt( DefaultDeclCtxt ) )
-import TcSimplify	( tcSimplifyDefault )
-import TcType           ( Type, mkClassPred, isTauTy )
-import PrelNames	( numClassName )
-import SrcLoc		( Located(..) )
+import TcEnv
+import TcHsType
+import TcSimplify
+import TcType
+import PrelNames
+import SrcLoc
 import Outputable
 \end{code}
 

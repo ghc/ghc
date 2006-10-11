@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
@@ -12,38 +13,24 @@ module BuildTyCl (
 
 #include "HsVersions.h"
 
-import IfaceEnv		( newImplicitBinder )
+import IfaceEnv
 import TcRnMonad
 
-import DataCon		( DataCon, isNullarySrcDataCon, 
-			  mkDataCon, dataConFieldLabels, dataConInstOrigArgTys )
-import Var		( tyVarKind, TyVar, Id )
-import VarSet		( isEmptyVarSet, intersectVarSet, elemVarSet )
-import TysWiredIn  	( unitTy )
-import BasicTypes	( RecFlag, StrictnessMark(..) )
-import Name		( Name )
-import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc,
-			  mkClassTyConOcc, mkClassDataConOcc,
-			  mkSuperDictSelOcc, mkNewTyCoOcc, 
-			  mkInstTyCoOcc ) 
-import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
-import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
-import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons,
-			  tyConStupidTheta, tyConDataCons, isNewTyCon,
-			  mkClassTyCon, TyCon( tyConTyVars ),
-			  isRecursiveTyCon, AlgTyConRhs(..),
-			  SynTyConRhs(..), newTyConRhs, AlgTyConParent(..) )
-import Type		( mkArrowKinds, liftedTypeKind, typeKind, 
-			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-			  splitTyConApp_maybe, splitAppTy_maybe,
-			  getTyVar_maybe, 
-			  mkPredTys, mkTyVarTys, ThetaType, Type, 
-			  TyThing(..), 
-			  substTyWith, zipTopTvSubst, substTheta )
-import Coercion         ( mkNewTypeCoercion, mkDataInstCoercion )
+import DataCon
+import Var
+import VarSet
+import TysWiredIn
+import BasicTypes
+import Name
+import OccName
+import MkId
+import Class
+import TyCon
+import Type
+import Coercion
 import Outputable
-import List		( nub )
 
+import Data.List
 \end{code}
 	
 

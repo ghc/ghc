@@ -1,40 +1,40 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[Main_match]{The @match@ function}
+
+The @match@ function
 
 \begin{code}
 module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat ) where
 
 #include "HsVersions.h"
 
-import DynFlags	( DynFlag(..), dopt )
+import DynFlags
 import HsSyn		
-import TcHsSyn		( mkVanillaTuplePat, hsPatType )
-import Check            ( check, ExhaustivePat )
+import TcHsSyn
+import Check
 import CoreSyn
-import Literal		( Literal )
-import CoreUtils	( bindNonRec, exprType )
+import Literal
+import CoreUtils
 import DsMonad
-import DsBinds		( dsLHsBinds, dsCoercion )
-import DsGRHSs		( dsGRHSs )
+import DsBinds
+import DsGRHSs
 import DsUtils
-import Id		( idName, idType, Id )
-import DataCon		( DataCon )
-import MatchCon		( matchConFamily )
-import MatchLit		( matchLiterals, matchNPlusKPats, matchNPats, 
-			  tidyLitPat, tidyNPat, hsLitKey, hsOverLitKey )
-import PrelInfo		( pAT_ERROR_ID )
-import TcType		( Type )
-import Type		( splitFunTysN, coreEqType )
-import TysWiredIn	( consDataCon, mkListTy, unitTy,
-			  tupleCon, parrFakeCon, mkPArrTy )
-import BasicTypes	( Boxity(..) )
-import ListSetOps	( equivClasses, runs )
-import SrcLoc		( unLoc, Located(..) )
-import Maybes		( isJust )
-import Util             ( lengthExceeds, notNull )
-import Name		( Name )
+import Id
+import DataCon
+import MatchCon
+import MatchLit
+import PrelInfo
+import TcType
+import Type
+import TysWiredIn
+import BasicTypes
+import ListSetOps
+import SrcLoc
+import Maybes
+import Util
+import Name
 import Outputable
 \end{code}
 

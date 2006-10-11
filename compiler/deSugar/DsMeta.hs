@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+--
+-- (c) The University of Glasgow 2006
+--
 -- The purpose of this module is to transform an HsExpr into a CoreExpr which
 -- when evaluated, returns a (Meta.Q Meta.Exp) computation analogous to the
 -- input HsExpr. We do this in the DsM monad, which supplies access to
@@ -21,47 +24,45 @@ module DsMeta( dsBracket,
 
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
-import MatchLit	  ( dsLit )
-import DsUtils    ( mkListExpr, mkStringExpr, mkCoreTup, mkIntExpr )
+import MatchLit
+import DsUtils
 import DsMonad
 
 import qualified Language.Haskell.TH as TH
 
 import HsSyn
-import Class (FunDep)
-import PrelNames  ( rationalTyConName, integerTyConName, negateName )
-import OccName	  ( isDataOcc, isTvOcc, occNameString )
--- To avoid clashes with DsMeta.varName we must make a local alias for OccName.varName
--- we do this by removing varName from the import of OccName above, making
--- a qualified instance of OccName and using OccNameAlias.varName where varName
--- ws previously used in this file.
+import Class
+import PrelNames
+import OccName
+-- To avoid clashes with DsMeta.varName we must make a local alias for
+-- OccName.varName we do this by removing varName from the import of
+-- OccName above, making a qualified instance of OccName and using
+-- OccNameAlias.varName where varName ws previously used in this file.
 import qualified OccName
 
-import Module	  ( Module, mkModule, moduleNameString, moduleName,
-                    modulePackageId, mkModuleNameFS )
-import Id         ( Id, mkLocalId )
-import OccName	  ( mkOccNameFS )
-import Name       ( Name, mkExternalName, localiseName, nameOccName, nameModule, 
-		    isExternalName, getSrcLoc )
+import Module
+import Id
+import OccName
+import Name
 import NameEnv
-import Type       ( Type, mkTyConApp )
-import TcType	  ( tcTyConAppArgs )
-import TyCon	  ( tyConName )
-import TysWiredIn ( parrTyCon )
+import Type
+import TcType
+import TyCon
+import TysWiredIn
 import CoreSyn
-import CoreUtils  ( exprType )
-import SrcLoc	  ( noSrcLoc, unLoc, Located(..), SrcSpan, srcLocSpan )
-import PackageConfig ( thPackageId, packageIdString )
-import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique, getKey, Uniquable(..) )
-import BasicTypes ( isBoxed ) 
+import CoreUtils
+import SrcLoc
+import PackageConfig
+import Unique
+import BasicTypes
 import Outputable
-import Bag	  ( bagToList, unionManyBags )
-import FastString ( unpackFS )
-import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..) )
+import Bag
+import FastString
+import ForeignCall
 
-import Maybe	  ( catMaybes )
-import Monad ( zipWithM )
-import List ( sortBy )
+import Data.Maybe
+import Control.Monad
+import Data.List
  
 -----------------------------------------------------------------------------
 dsBracket :: HsBracket Name -> [PendingSplice] -> DsM CoreExpr

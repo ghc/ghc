@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsGRHSs]{Matching guarded right-hand-sides (GRHSs)}
+
+Matching guarded right-hand-sides (GRHSs)
 
 \begin{code}
 module DsGRHSs ( dsGuarded, dsGRHSs ) where
@@ -11,20 +13,19 @@ module DsGRHSs ( dsGuarded, dsGRHSs ) where
 import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
-import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), 
-			  LHsExpr, HsMatchContext(..), Pat(..) )
-import CoreSyn		( CoreExpr )
-import Var		( Id )
-import Type		( Type )
+import HsSyn
+import CoreSyn
+import Var
+import Type
 
 import DsMonad
 import DsUtils
-import Unique		( Uniquable(..) )
-import PrelInfo		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
-import TysWiredIn	( trueDataConId )
-import PrelNames	( otherwiseIdKey, hasKey )
-import Name		( Name )
-import SrcLoc		( unLoc, Located(..) )
+import Unique
+import PrelInfo
+import TysWiredIn
+import PrelNames
+import Name
+import SrcLoc
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.

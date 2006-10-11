@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 Taken quite directly from the Peyton Jones/Lester paper.
@@ -25,16 +26,15 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idType, idSpecialisation, isLocalId )
-import IdInfo		( specInfoFreeVars )
+import Id
+import IdInfo
 import NameSet
-import UniqFM		( delFromUFM )
-import Name		( isExternalName )
+import UniqFM
+import Name
 import VarSet
-import Var		( Var, isId, isLocalVar, varName )
-import Type		( tyVarsOfType )
-import TcType		( tyClsNamesOfType )
-import Util		( mapAndUnzip )
+import Var
+import TcType
+import Util
 import Outputable
 \end{code}
 
@@ -213,11 +213,11 @@ exprFreeNames e
     go (Var v) 
       | isExternalName n    = unitNameSet n
       | otherwise	    = emptyNameSet
-      where n = varName v
+      where n = idName v
     go (Lit _) 	   	    = emptyNameSet
     go (Type ty)   	    = tyClsNamesOfType ty	-- Don't need free tyvars
     go (App e1 e2) 	    = go e1 `unionNameSets` go e2
-    go (Lam v e)   	    = go e `delFromNameSet` varName v
+    go (Lam v e)   	    = go e `delFromNameSet` idName v
     go (Note n e)  	    = go e  
     go (Cast e co)          = go e `unionNameSets` tyClsNamesOfType co
     go (Let (NonRec b r) e) = go e `unionNameSets` go r

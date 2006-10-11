@@ -7,7 +7,7 @@
 module TysPrim(
 	alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 	alphaTy, betaTy, gammaTy, deltaTy,
-	openAlphaTy, openAlphaTyVar, openAlphaTyVars,
+	openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar, openAlphaTyVars,
 
 	primTyCons,
 
@@ -167,9 +167,10 @@ alphaTys = mkTyVarTys alphaTyVars
 	-- to a lifted or unlifted type variable.  It's used for the 
 	-- result type for "error", so that we can have (error Int# "Help")
 openAlphaTyVars :: [TyVar]
-openAlphaTyVars@(openAlphaTyVar:_) = tyVarList openTypeKind
+openAlphaTyVars@(openAlphaTyVar:openBetaTyVar:_) = tyVarList openTypeKind
 
 openAlphaTy = mkTyVarTy openAlphaTyVar
+openBetaTy   = mkTyVarTy openBetaTyVar
 \end{code}
 
 

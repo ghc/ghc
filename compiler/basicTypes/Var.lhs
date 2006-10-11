@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{@Vars@: Variables}
@@ -37,11 +38,10 @@ module Var (
 
 import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
-import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, IdInfo, seqIdInfo )
-
-import Name		( Name, NamedThing(..), setNameUnique, nameUnique, mkSysTvName )
-import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey#,
-                          mkBuiltinUnique )
+import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, 
+                                IdInfo, seqIdInfo )
+import Name hiding (varName)
+import Unique
 import FastTypes
 import FastString
 import Outputable       

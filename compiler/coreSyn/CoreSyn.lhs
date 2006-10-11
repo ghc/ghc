@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[CoreSyn]{A data type for the Haskell compiler midsection}
+
+CoreSyn: A data type for the Haskell compiler midsection
 
 \begin{code}
 module CoreSyn (
@@ -46,16 +48,16 @@ module CoreSyn (
 
 #include "HsVersions.h"
 
-import StaticFlags	( opt_RuntimeTypes )
-import CostCentre	( CostCentre, noCostCentre )
-import Var		( Var, Id, TyVar, isTyVar, isId )
-import Type		( Type, mkTyVarTy, seqType )
-import Coercion         ( Coercion )
-import Name		( Name )
-import OccName		( OccName )
-import Literal	        ( Literal, mkMachInt )
-import DataCon		( DataCon, dataConWorkId, dataConTag )
-import BasicTypes	( Activation )
+import StaticFlags
+import CostCentre
+import Var
+import Type
+import Coercion
+import Name
+import OccName
+import Literal
+import DataCon
+import BasicTypes
 import FastString
 import Outputable
 

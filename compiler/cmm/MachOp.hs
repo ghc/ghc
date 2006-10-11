@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow 2002-2004
+-- (c) The University of Glasgow 2002-2006
 --
 -- Low-level machine operations, used in the Cmm datatype.
 --

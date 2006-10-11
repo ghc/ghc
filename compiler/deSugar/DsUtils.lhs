@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsUtils]{Utilities for desugaring}
+
+Utilities for desugaring
 
 This module exports some utility functions of no great interest.
 
@@ -40,44 +42,36 @@ import {-# SOURCE #-}	Match ( matchSimply )
 import {-# SOURCE #-}	DsExpr( dsExpr )
 
 import HsSyn
-import TcHsSyn		( hsLPatType, hsPatType )
+import TcHsSyn
 import CoreSyn
-import Constants	( mAX_TUPLE_SIZE )
+import Constants
 import DsMonad
 
-import CoreUtils	( exprType, mkIfThenElse, mkCoerce, bindNonRec )
-import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, unwrapNewTypeBody )
-import Id		( idType, Id, mkWildId, mkTemplateLocals, mkSysLocal )
-import Var		( Var )
-import Name		( Name )
-import Literal		( Literal(..), mkStringLit, inIntRange, tARGET_MAX_INT )
-import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon, dataConSourceArity, dataConTyCon, dataConTag )
-import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp, mkTyVarTy,
-                          splitNewTyConApp )
-import Coercion         ( mkUnsafeCoercion )
-import TysPrim		( intPrimTy )
-import TysWiredIn	( nilDataCon, consDataCon, 
-                          tupleCon, mkTupleTy,
-			  unitDataConId, unitTy,
-                          charTy, charDataCon, 
-                          intTy, intDataCon, 
-			  isPArrFakeCon )
-import BasicTypes	( Boxity(..) )
-import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet )
-import UniqSupply	( splitUniqSupply, uniqFromSupply, uniqsFromSupply )
-import PrelNames	( unpackCStringName, unpackCStringUtf8Name, 
-			  plusIntegerName, timesIntegerName, smallIntegerDataConName, 
-			  lengthPName, indexPName )
+import CoreUtils
+import MkId
+import Id
+import Var
+import Name
+import Literal
+import TyCon
+import DataCon
+import Type
+import Coercion
+import TysPrim
+import TysWiredIn
+import BasicTypes
+import UniqSet
+import UniqSupply
+import PrelNames
 import Outputable
-import SrcLoc		( Located(..), unLoc )
-import Util             ( isSingleton, zipEqual, sortWith )
-import ListSetOps	( assocDefault )
+import SrcLoc
+import Util
+import ListSetOps
 import FastString
-import Data.Char	( ord )
+import Data.Char
 
 #ifdef DEBUG
-import Util		( notNull )	-- Used in an assertion
+import Util
 #endif
 \end{code}
 

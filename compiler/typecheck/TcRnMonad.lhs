@@ -1,3 +1,7 @@
+%
+% (c) The University of Glasgow 2006
+%
+
 \begin{code}
 module TcRnMonad(
 	module TcRnMonad,
@@ -11,58 +15,48 @@ import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
 #if defined(GHCI) && defined(BREAKPOINT)
-import TypeRep          ( Type(..), liftedTypeKind )
-import Var              ( mkTyVar, mkGlobalId )
-import IdInfo           ( GlobalIdDetails(..), vanillaIdInfo )
-import OccName          ( mkOccName, tvName )
-import SrcLoc           ( noSrcLoc  )
-import TysWiredIn       ( intTy, stringTy, mkListTy, unitTy, boolTy )
-import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
-import NameEnv          ( mkNameEnv )
-import TcEnv            ( tcExtendIdEnv )
+import TypeRep
+import Var
+import IdInfo
+import OccName
+import SrcLoc
+import TysWiredIn
+import PrelNames
+import NameEnv
+import TcEnv
 #endif
 
-import HsSyn		( emptyLHsBinds, HaddockModInfo(..) )
-import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
-			  TypeEnv, emptyTypeEnv, HscSource(..), isHsBoot,
-			  ExternalPackageState(..), HomePackageTable,
-			  Deprecs(..), FixityEnv, FixItem, 
-			  mkPrintUnqualified )
-import Module		( Module, moduleName )
-import RdrName		( GlobalRdrEnv, LocalRdrEnv, emptyLocalRdrEnv )
-import Name		( Name, mkInternalName, tidyNameOcc, nameOccName, getSrcLoc )
-import Type		( Type )
-import TcType		( TcType, tcIsTyVarTy, tcGetTyVar )
-import NameEnv		( extendNameEnvList, nameEnvElts )
-import InstEnv		( emptyInstEnv )
-import FamInstEnv	( emptyFamInstEnv )
+import HsSyn hiding (LIE)
+import HscTypes
+import Module
+import RdrName
+import Name
+import TcType
+import InstEnv
+import FamInstEnv
 
-import Var		( setTyVarName )
-import Id		( mkSysLocal )
-import VarSet		( emptyVarSet )
-import VarEnv		( TidyEnv, emptyTidyEnv, extendVarEnv )
-import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
-			  mkWarnMsg, printErrorsAndWarnings,
-			  mkLocMessage, mkLongErrMsg )
-import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
-import NameEnv		( emptyNameEnv )
-import NameSet		( NameSet, emptyDUs, emptyNameSet, unionNameSets, addOneToNameSet )
-import OccName		( emptyOccEnv, tidyOccName )
-import Bag		( emptyBag )
+import Var
+import Id
+import VarSet
+import VarEnv
+import ErrUtils
+import SrcLoc
+import NameEnv
+import NameSet
+import OccName
+import Bag
 import Outputable
-import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply )
-import UniqFM		( unitUFM )
-import Unique		( Unique )
-import DynFlags		( DynFlags(..), DynFlag(..), dopt, dopt_set,
-			  dopt_unset, GhcMode ) 
-import StaticFlags	( opt_PprStyle_Debug )
-import FastString	( FastString )
-import Bag		( snocBag, unionBags )
-import Panic		( showException )
+import UniqSupply
+import UniqFM
+import Unique
+import DynFlags
+import StaticFlags
+import FastString
+import Panic
  
-import IO		( stderr )
-import DATA_IOREF	( newIORef, readIORef )
-import EXCEPTION	( Exception )
+import System.IO
+import Data.IORef
+import Control.Exception
 \end{code}
 
 

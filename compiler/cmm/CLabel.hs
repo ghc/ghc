@@ -2,7 +2,7 @@
 --
 -- Object-file symbols (called CLabel for histerical raisins).
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -103,16 +103,16 @@ module CLabel (
 
 #include "HsVersions.h"
 
-import StaticFlags	( opt_Static, opt_DoTickyProfiling )
-import Packages		( isDllName )
-import DataCon		( ConTag )
-import PackageConfig	( PackageId )
-import Module		( Module, modulePackageId )
-import Name		( Name, isExternalName )
-import Unique		( pprUnique, Unique )
-import PrimOp		( PrimOp )
-import Config		( cLeadingUnderscore )
-import CostCentre	( CostCentre, CostCentreStack )
+import StaticFlags
+import Packages
+import DataCon
+import PackageConfig
+import Module
+import Name
+import Unique
+import PrimOp
+import Config
+import CostCentre
 import Outputable
 import FastString
 

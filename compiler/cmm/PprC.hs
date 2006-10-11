@@ -2,7 +2,7 @@
 --
 -- Pretty-printing of Cmm as C, suitable for feeding gcc
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -30,23 +30,21 @@ import MachOp
 import ForeignCall
 
 -- Utils
-import DynFlags		( DynFlags, DynFlag(..), dopt )
-import Unique           ( getUnique )
+import DynFlags
+import Unique
 import UniqSet
 import FiniteMap
-import UniqFM		( eltsUFM )
+import UniqFM
 import FastString
 import Outputable
 import Constants
-import StaticFlags 	( opt_Unregisterised )
 
 -- The rest
-import Data.List        ( intersperse, groupBy )
-import Data.Bits        ( shiftR )
-import Char             ( ord, chr )
-import IO               ( Handle )
-import DATA_BITS
-import Data.Word	( Word8 )
+import Data.List
+import Data.Bits
+import Data.Char
+import System.IO
+import Data.Word
 
 #ifdef DEBUG
 import PprCmm		() -- instances only
@@ -56,7 +54,7 @@ import PprCmm		() -- instances only
 #if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
 #endif
-import MONAD_ST
+import Control.Monad.ST
 
 -- --------------------------------------------------------------------------
 -- Top level

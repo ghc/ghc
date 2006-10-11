@@ -1,8 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 
-	This module defines interface types and binders
+This module defines interface types and binders
 
 \begin{code}
 module IfaceType (
@@ -24,18 +25,14 @@ module IfaceType (
 
 #include "HsVersions.h"
 
-import TypeRep		( TyThing(..), Type(..), PredType(..), ThetaType,
-                          unliftedTypeKindTyConName, openTypeKindTyConName,
-                          ubxTupleKindTyConName, argTypeKindTyConName,
-                          liftedTypeKindTyConName )
-import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
-import Var		( isId, tyVarKind, idType )
-import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
-import OccName		( OccName, parenSymOcc, occNameFS )
-import Name		( Name, getName, getOccName, nameModule, nameOccName,
-			  wiredInNameTyThing_maybe )
-import Module		( Module, ModuleName )
-import BasicTypes	( IPName(..), Arity, Version, mapIPName, tupleParens, Boxity )
+import TypeRep
+import TyCon
+import Var
+import TysWiredIn
+import OccName
+import Name
+import Module
+import BasicTypes
 import Outputable
 import FastString
 \end{code}

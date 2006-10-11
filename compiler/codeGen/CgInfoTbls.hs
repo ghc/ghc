@@ -2,7 +2,7 @@
 --
 -- Building info tables.
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -28,42 +28,27 @@ module CgInfoTbls (
 
 #include "HsVersions.h"
 
-import ClosureInfo	( ClosureInfo, closureTypeDescr, closureName,
-			  infoTableLabelFromCI, Liveness,
-			  closureValDescr, closureSRT, closureSMRep,
-			  closurePtrsSize, closureNonHdrSize, closureFunInfo,
-			  C_SRT(..), needsSRT, isConstrClosure_maybe,
-			  ArgDescr(..) )
-import SMRep		( StgHalfWord, hALF_WORD_SIZE_IN_BITS, hALF_WORD_SIZE,
-			  WordOff, ByteOff,
-			  smRepClosureTypeInt, tablesNextToCode,
-			  rET_BIG, rET_SMALL, rET_VEC_BIG, rET_VEC_SMALL )
-import CgBindery	( getLiveStackSlots )
-import CgCallConv	( isBigLiveness, mkLivenessCLit, buildContLiveness,
-			  argDescrType, getSequelAmode,
-			  CtrlReturnConvention(..) )
-import CgUtils		( mkStringCLit, packHalfWordsCLit, mkWordCLit, 
-			  cmmOffsetB, cmmOffsetExprW, cmmLabelOffW, cmmOffsetW,
-			  emitDataLits, emitRODataLits, emitSwitch, cmmNegate,
-			  newTemp )
+import ClosureInfo
+import SMRep
+import CgBindery
+import CgCallConv
+import CgUtils
 import CgMonad
 
-import CmmUtils		( mkIntCLit, zeroCLit )
-import Cmm		( CmmStmt(..), CmmExpr(..), CmmLit(..), LocalReg,
-			  CmmBasicBlock, nodeReg )
+import CmmUtils
+import Cmm
 import MachOp
 import CLabel
-import StgSyn		( SRT(..) )
-import Name		( Name )
-import DataCon		( DataCon, dataConTag, fIRST_TAG )
-import Unique		( Uniquable(..) )
-import DynFlags		( DynFlags(..), HscTarget(..) )
-import StaticFlags	( opt_SccProfilingOn )
-import ListSetOps	( assocDefault )
-import Maybes		( isJust )
-import Constants	( wORD_SIZE, sIZEOF_StgFunInfoExtraRev )
-import Outputable
+import StgSyn
+import Name
+import DataCon
+import Unique
+import DynFlags
+import StaticFlags
 
+import ListSetOps
+import Maybes
+import Constants
 
 -------------------------------------------------------------------------
 --

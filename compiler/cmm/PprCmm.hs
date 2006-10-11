@@ -2,7 +2,7 @@
 --
 -- Pretty-printing of Cmm as (a superset of) C--
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -39,19 +39,19 @@ module PprCmm (
 #include "HsVersions.h"
 
 import Cmm
-import CmmUtils     ( isTrivialCmmExpr )
-import MachOp       ( MachOp(..), pprMachOp, MachRep(..), wordRep )
-import CLabel       ( pprCLabel, mkForeignLabel, entryLblToInfoLbl )
+import CmmUtils
+import MachOp
+import CLabel
 
-import ForeignCall  ( CCallConv(..) )
-import Unique       ( getUnique )
+import ForeignCall
+import Unique
 import Outputable
-import FastString   ( mkFastString )
+import FastString
 
-import Data.List    ( intersperse, groupBy )
-import IO           ( Handle )
-import Maybe	    ( isJust )
-import Data.Char    ( chr )
+import Data.List
+import System.IO
+import Data.Maybe
+import Data.Char
 
 pprCmms :: [Cmm] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))

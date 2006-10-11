@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[NameEnv]{@NameEnv@: name environments}
@@ -17,9 +18,9 @@ module NameEnv (
 
 #include "HsVersions.h"
 
-import Name	( Name )
+import Name
 import UniqFM
-import Maybes	( expectJust )
+import Maybes
 \end{code}
 
 %************************************************************************

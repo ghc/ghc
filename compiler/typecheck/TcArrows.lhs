@@ -1,7 +1,8 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section{Typecheck arrow notation}
+Typecheck arrow notation
 
 \begin{code}
 module TcArrows ( tcProc ) where
@@ -11,32 +12,28 @@ module TcArrows ( tcProc ) where
 import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho )
 
 import HsSyn
-import TcHsSyn	(  mkHsDictLet )
+import TcHsSyn
 
-import TcMatches ( matchCtxt, tcStmts, tcMDoStmt, tcGuardStmt,
-		   TcMatchCtxt(..), tcMatchesCase )
+import TcMatches
 
-import TcType	( TcType, TcTauType, BoxyRhoType, mkFunTys, mkTyConApp,
-		  mkTyVarTy, mkAppTys, tcSplitTyConApp_maybe, tcEqType, 
-		  SkolemInfo(..) )
-import TcMType	( newFlexiTyVarTy, tcInstSkolTyVars, zonkTcType )
-import TcBinds	( tcLocalBinds )
-import TcSimplify ( tcSimplifyCheck )
-import TcGadt	( Refinement, emptyRefinement, refineResType )
-import TcPat	( tcLamPat, tcLamPats )
-import TcUnify	( checkSigTyVarsWrt, boxySplitAppTy )
+import TcType
+import TcMType
+import TcBinds
+import TcSimplify
+import TcGadt
+import TcPat
+import TcUnify
 import TcRnMonad
-import Inst	( tcSyntaxName )
-import Name	( Name )
-import TysWiredIn ( boolTy, pairTyCon )
+import Inst
+import Name
+import TysWiredIn
 import VarSet 
-import TysPrim	( alphaTyVar )
-import Type	( Kind, mkArrowKinds, liftedTypeKind, openTypeKind, tyVarsOfTypes )
+import TysPrim
+import Type
 
-import SrcLoc	( Located(..), noLoc, unLoc )
+import SrcLoc
 import Outputable
-import Util	( lengthAtLeast )
-
+import Util
 \end{code}
 
 %************************************************************************

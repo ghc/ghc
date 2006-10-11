@@ -1,7 +1,6 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-% $Id: CgMonad.lhs,v 1.45 2005/06/21 10:44:41 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -42,7 +41,7 @@ module CgMonad (
 	getHpUsage,  setHpUsage,
 	heapHWM,
 
-	moduleName,
+	getModuleName,
 
 	Sequel(..), -- ToDo: unabstract?
 
@@ -61,23 +60,23 @@ module CgMonad (
 
 import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 
-import DynFlags		( DynFlags(..) )
-import PackageConfig	( PackageId )
+import DynFlags
+import PackageConfig
 import Cmm
-import CmmUtils		( CmmStmts, isNopStmt )
+import CmmUtils
 import CLabel
-import SMRep		( WordOff )
-import Module		( Module )
-import Id		( Id )
+import SMRep
+import Module
+import Id
 import VarEnv
 import OrdList
-import Unique		( Unique )
-import Util		( mapAccumL )
-import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply, uniqFromSupply )
+import Unique
+import Util
+import UniqSupply
 import FastString
 import Outputable
 
-import Control.Monad	( liftM )
+import Control.Monad
 
 infixr 9 `thenC`	-- Right-associative!
 infixr 9 `thenFC`
@@ -804,8 +803,8 @@ consCgStmt stmt stmts = CgStmt stmt `consOL` stmts
 -- ----------------------------------------------------------------------------
 -- Get the current module name
 
-moduleName :: FCode Module
-moduleName = do { info <- getInfoDown; return (cgd_mod info) }
+getModuleName :: FCode Module
+getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
 
 -- ----------------------------------------------------------------------------
 -- Get/set the end-of-block info

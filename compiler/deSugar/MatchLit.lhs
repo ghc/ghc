@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[MatchLit]{Pattern-matching literal patterns}
+
+Pattern-matching literal patterns
 
 \begin{code}
 module MatchLit ( dsLit, dsOverLit, hsLitKey, hsOverLitKey,
@@ -17,24 +19,23 @@ import DsMonad
 import DsUtils
 
 import HsSyn
-import Id		( Id, idType )
+import Id
 import CoreSyn
-import TyCon		( tyConDataCons )
-import DataCon		( DataCon )
-import TcType		( tcSplitTyConApp, isIntegerTy, isIntTy, 
-			  isFloatTy, isDoubleTy, isStringTy )
-import Type		( Type )
-import PrelNames	( ratioTyConKey )
-import TysWiredIn	( stringTy, consDataCon, intDataCon, floatDataCon, doubleDataCon )
-import PrelNames	( eqStringName )
-import Unique		( hasKey )
-import Literal		( mkMachInt, Literal(..) )
-import SrcLoc		( noLoc )
-import Ratio 		( numerator, denominator )
-import SrcLoc		( Located(..), unLoc )
+import TyCon
+import DataCon
+import TcType
+import Type
+import PrelNames
+import TysWiredIn
+import PrelNames
+import Unique
+import Literal
+import SrcLoc
+import Ratio
+import SrcLoc
 import Outputable
-import Util		( mapAndUnzip )
-import FastString	( lengthFS, unpackFS )
+import Util
+import FastString
 \end{code}
 
 %************************************************************************

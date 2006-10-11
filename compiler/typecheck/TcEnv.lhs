@@ -1,3 +1,7 @@
+%
+% (c) The University of Glasgow 2006
+%
+
 \begin{code}
 module TcEnv(
 	TyThing(..), TcTyThing(..), TcId,
@@ -43,36 +47,29 @@ module TcEnv(
 
 #include "HsVersions.h"
 
-import HsSyn		( LRuleDecl, LHsBinds, LSig, 
-			  LHsTyVarBndr, HsTyVarBndr(..), pprLHsBinds,
-		 	  idHsWrapper, (<.>) )
-import TcIface		( tcImportDecl )
-import IfaceEnv		( newGlobalBinder )
+import HsSyn
+import TcIface
+import IfaceEnv
 import TcRnMonad
-import TcMType		( zonkTcType, zonkTcTyVarsAndFV )
-import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, TcType, PredType,
-			  tyVarsOfType, tcTyVarsOfTypes, mkTyConApp,
-			  getDFunTyKey, tcTyConAppTyCon, tcGetTyVar, mkTyVarTy,
-			  tidyOpenType, isRefineableTy
-			)
-import TcGadt		( Refinement, refineType )
-import qualified Type	( getTyVar_maybe )
-import Id		( idName, isLocalId )
-import Var		( TyVar, Id, idType, tyVarName )
+import TcMType
+import TcType
+import TcGadt
+import qualified Type
+import Id
+import Var
 import VarSet
 import VarEnv
-import RdrName		( extendLocalRdrEnv )
-import InstEnv		( Instance, DFunId, instanceDFunId, instanceHead )
-import DataCon		( DataCon )
-import TyCon		( TyCon )
-import Class		( Class )
-import Name		( Name, NamedThing(..), getSrcLoc, nameModule_maybe, nameOccName )
-import PrelNames	( thFAKE )
+import RdrName
+import InstEnv
+import DataCon
+import TyCon
+import Class
+import Name
+import PrelNames
 import NameEnv
-import OccName		( mkDFunOcc, occNameString, mkInstTyTcOcc )
-import HscTypes		( extendTypeEnvList, lookupType, TyThing(..),
-			  ExternalPackageState(..) )
-import SrcLoc		( SrcLoc, Located(..) )
+import OccName
+import HscTypes
+import SrcLoc
 import Outputable
 \end{code}
 

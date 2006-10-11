@@ -1,5 +1,5 @@
 --
--- (c) The University of Glasgow 2003
+-- (c) The University of Glasgow 2003-2006
 -- 
 
 -- Functions for constructing bitmaps, which are used in various
@@ -17,7 +17,8 @@ module Bitmap (
 
 import SMRep
 import Constants
-import DATA_BITS
+
+import Data.Bits
 
 {-|
 A bitmap represented by a sequence of 'StgWord's on the /target/

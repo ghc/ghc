@@ -45,11 +45,11 @@ import Outputable
 import FastString
 import StaticFlags      ( opt_SimplExcessPrecision )
 
-import DATA_BITS	( Bits(..) )
+import Data.Bits	( Bits(..) )
 #if __GLASGOW_HASKELL__ >= 500
-import DATA_WORD	( Word )
+import Data.Word	( Word )
 #else
-import DATA_WORD	( Word64 )
+import Data.Word	( Word64 )
 #endif
 \end{code}
 

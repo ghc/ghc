@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsListComp]{Desugaring list comprehensions and array comprehensions}
+
+Desugaring list comprehensions and array comprehensions
 
 \begin{code}
 module DsListComp ( dsListComp, dsPArrComp ) where
@@ -10,30 +12,26 @@ module DsListComp ( dsListComp, dsPArrComp ) where
 
 import {-# SOURCE #-} DsExpr ( dsLExpr, dsLocalBinds )
 
-import BasicTypes	( Boxity(..) )
+import BasicTypes
 import HsSyn
-import TcHsSyn		( hsLPatType, mkVanillaTuplePat )
+import TcHsSyn
 import CoreSyn
 
 import DsMonad		-- the monadery used in the desugarer
 import DsUtils
 
-import DynFlags		( DynFlag(..), dopt )
-import StaticFlags	( opt_RulesOff )
-import CoreUtils	( exprType, mkIfThenElse )
-import Id		( idType )
-import Var              ( Id )
-import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type,
-			  splitTyConApp_maybe )
-import TysPrim		( alphaTyVar )
-import TysWiredIn	( nilDataCon, consDataCon, trueDataConId, falseDataConId, 
-			  unitDataConId, unitTy, mkListTy, parrTyCon )
-import Match		( matchSimply )
-import PrelNames	( foldrName, buildName, replicatePName, mapPName, 
-			  filterPName, zipPName, crossPName ) 
-import PrelInfo		( pAT_ERROR_ID )
-import SrcLoc		( noLoc, unLoc )
-import Panic		( panic )
+import DynFlags
+import StaticFlags
+import CoreUtils
+import Var
+import Type
+import TysPrim
+import TysWiredIn
+import Match
+import PrelNames
+import PrelInfo
+import SrcLoc
+import Panic
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''

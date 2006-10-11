@@ -1,5 +1,5 @@
 
-% (c) The University of Glasgow 2001
+% (c) The University of Glasgow 2001-2006
 %
 \begin{code}
 
@@ -18,19 +18,18 @@ import TyCon
 import TypeRep
 import Type
 import PprExternalCore	-- Instances
-import DataCon	( DataCon, dataConExTyVars, dataConRepArgTys, 
-		  dataConName, dataConTyCon )
+import DataCon
 import CoreSyn
 import Var
 import IdInfo
 import Literal
 import Name
-import NameSet ( NameSet, emptyNameSet )
-import UniqSet ( elementOfUniqSet )
+import NameSet
+import UniqSet
 import Outputable
 import ForeignCall
-import DynFlags	( DynFlags(..) )
-import StaticFlags	( opt_EmitExternalCore )
+import DynFlags
+import StaticFlags
 import IO
 import FastString
 

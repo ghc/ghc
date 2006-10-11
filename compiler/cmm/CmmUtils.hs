@@ -2,7 +2,7 @@
 --
 -- Cmm utilities.
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ module CmmUtils(
 
 #include "HsVersions.h"
 
-import CLabel		( CLabel )
+import CLabel
 import Cmm
 import MachOp
 import OrdList

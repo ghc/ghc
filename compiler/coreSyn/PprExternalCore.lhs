@@ -1,14 +1,14 @@
 %
-% (c) The University of Glasgow 2001
+% (c) The University of Glasgow 2001-2006
 %
-\begin{code}
 
+\begin{code}
 module PprExternalCore () where
 
 import Pretty
 import ExternalCore
 import Char
-import Encoding ( zEncodeString )
+import Encoding
 
 instance Show Module where
   showsPrec d m = shows (pmodule m)

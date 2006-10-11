@@ -1,5 +1,6 @@
 -----------------------------------------------------------------------------
--- (c) The University of Glasgow, 2004
+--
+-- (c) The University of Glasgow, 2004-2006
 --
 -- Lexer for concrete Cmm.  We try to stay close to the C-- spec, but there
 -- are a few minor differences:
@@ -24,7 +25,7 @@ import UniqFM
 import StringBuffer
 import FastString
 import Ctype
-import Util		( readRational )
+import Util
 --import TRACE
 }
 

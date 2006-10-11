@@ -1,18 +1,14 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[CodeGen]{@CodeGen@: main module of the code generator}
+
+The Code Generator
 
 This module says how things get going at the top level.
 
 @codeGen@ is the interface to the outside world.  The \tr{cgTop*}
 functions drive the mangling of top-level bindings.
-
-%************************************************************************
-%*									*
-\subsection[codeGen-outside-interface]{The code generator's offering to the world}
-%*									*
-%************************************************************************
 
 \begin{code}
 module CodeGen ( codeGen ) where
@@ -25,35 +21,34 @@ module CodeGen ( codeGen ) where
 import CgExpr           ( {-NOTHING!-} )	-- DO NOT DELETE THIS IMPORT
 import CgProf
 import CgMonad
-import CgBindery	( CgIdInfo, addBindC, addBindsC, getCgIdInfo,
-			  cgIdInfoId )
-import CgClosure	( cgTopRhsClosure )
-import CgCon		( cgTopRhsCon, cgTyCon )
-import CgUtils		( cmmRegOffW, emitRODataLits, cmmNeWord )
+import CgBindery
+import CgClosure
+import CgCon
+import CgUtils
 
 import CLabel
 import Cmm
-import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
-import PprCmm		( pprCmms )
-import MachOp		( wordRep )
+import CmmUtils
+import PprCmm
+import MachOp
 
 import StgSyn
-import PrelNames	( gHC_PRIM, rOOT_MAIN, gHC_TOP_HANDLER )
-import DynFlags		( DynFlags(..), DynFlag(..), dopt )
-import StaticFlags	( opt_SccProfilingOn )
+import PrelNames
+import DynFlags
+import StaticFlags
 
-import PackageConfig	( PackageId )
-import HscTypes		( ForeignStubs(..) )
-import CostCentre       ( CollectedCCs )
-import Id               ( Id, idName, setIdName )
-import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalName )
-import OccName		( mkLocalOcc )
-import TyCon            ( TyCon )
-import Module		( Module )
-import ErrUtils		( dumpIfSet_dyn, showPass )
+import PackageConfig
+import HscTypes
+import CostCentre
+import Id
+import Name
+import OccName
+import TyCon
+import Module
+import ErrUtils
 
 #ifdef DEBUG
-import Panic		( assertPanic )
+import Panic
 #endif
 \end{code}
 
@@ -326,7 +321,7 @@ which refers to this name).
 maybeExternaliseId :: DynFlags -> Id -> FCode Id
 maybeExternaliseId dflags id
   | dopt Opt_SplitObjs dflags, 	-- Externalise the name for -split-objs
-    isInternalName name = do { mod <- moduleName
+    isInternalName name = do { mod <- getModuleName
 			     ; returnFC (setIdName id (externalise mod)) }
   | otherwise		= returnFC id
   where

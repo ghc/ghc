@@ -90,9 +90,10 @@ import ParserCoreUtils
 import FastString
 import UniqFM		( emptyUFM )
 import Bag		( unitBag )
-import Monad		( unless )
-import IO
-import DATA_IOREF	( newIORef, readIORef )
+
+import Control.Monad
+import System.IO
+import Data.IORef
 \end{code}
 
 

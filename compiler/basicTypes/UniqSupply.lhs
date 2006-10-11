@@ -1,7 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[UniqSupply]{The @UniqueSupply@ data type and a (monadic) supply thereof}
 
 \begin{code}
 module UniqSupply (
@@ -25,8 +25,8 @@ module UniqSupply (
 
 import Unique
 
-import GLAEXTS
-import UNSAFE_IO	( unsafeInterleaveIO )
+import GHC.Exts
+import System.IO.Unsafe	( unsafeInterleaveIO )
 
 w2i x = word2Int# x
 i2w x = int2Word# x

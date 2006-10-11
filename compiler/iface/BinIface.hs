@@ -1,7 +1,5 @@
-{-% DrIFT (Automatic class derivations for Haskell) v1.1 %-}
-{-% DrIFT (Automatic class derivations for Haskell) v1.1 %-}
 -- 
---  (c) The University of Glasgow 2002
+--  (c) The University of Glasgow 2002-2006
 -- 
 -- Binary interface file support.
 
@@ -9,45 +7,38 @@ module BinIface ( writeBinIface, readBinIface, v_IgnoreHiWay ) where
 
 #include "HsVersions.h"
 
-import TcRnMonad        ( TcRnIf, ioToIOEnv )
+import TcRnMonad
 import IfaceEnv
 import HscTypes
 import BasicTypes
 import NewDemand
 import IfaceSyn
-import Module           ( ModuleName, mkModule, modulePackageId, moduleName )
+import Module
 import Name
-import OccName          ( OccName )
+import OccName
 import VarEnv
-import InstEnv		( OverlapFlag(..) )
-import Class		( DefMeth(..) )
-import DynFlags         ( DynFlags )
-import UniqFM           ( UniqFM, eltsUFM )
-import UniqSupply       ( uniqFromSupply, splitUniqSupply )
+import InstEnv
+import Class
+import DynFlags
+import UniqFM
+import UniqSupply
 import CostCentre
-import StaticFlags	( opt_HiVersion, v_Build_tag )
-import Type		( Kind,
-                          isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
-			  isArgTypeKind, isUbxTupleKind, liftedTypeKind,
-			  unliftedTypeKind, openTypeKind, argTypeKind,  
-			  ubxTupleKind, mkArrowKind, splitFunTy_maybe )
-import PackageConfig    ( PackageId )
+import StaticFlags
+import PackageConfig
 import Panic
 import Binary
-import SrcLoc           ( noSrcLoc )
+import SrcLoc
 import Util
-import ErrUtils         ( debugTraceMsg )
-import Config		( cGhcUnregisterised )
-import FastMutInt       ( readFastMutInt )
-
-import Data.Word        ( Word32 )
-import Data.Array       ( Array, array, elems, listArray, (!) )
-import DATA_IOREF
-import EXCEPTION	( throwDyn )
-import Monad		( when )
+import ErrUtils
+import Config
+import FastMutInt
 import Outputable
 
-#include "HsVersions.h"
+import Data.Word
+import Data.Array
+import Data.IORef
+import Control.Exception
+import Control.Monad
 
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files

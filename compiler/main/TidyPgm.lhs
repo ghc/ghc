@@ -48,11 +48,12 @@ import Maybes		( orElse, mapCatMaybes )
 import ErrUtils		( showPass, dumpIfSet_core )
 import PackageConfig	( PackageId )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
-import List		( partition )
-import Maybe		( isJust )
 import Outputable
-import DATA_IOREF	( IORef, readIORef, writeIORef )
 import FastTypes  hiding ( fastOr )
+
+import Data.List	( partition )
+import Data.Maybe	( isJust )
+import Data.IORef	( IORef, readIORef, writeIORef )
 \end{code}
 
 

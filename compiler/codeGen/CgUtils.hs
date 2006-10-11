@@ -2,7 +2,7 @@
 --
 -- Code generator utilities; mostly monadic
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -34,32 +34,29 @@ module CgUtils (
 #include "HsVersions.h"
 
 import CgMonad
-import TyCon		( TyCon, tyConName )
-import Id		( Id )
-import Constants	( wORD_SIZE )
-import SMRep		( CgRep, StgWord, hALF_WORD_SIZE_IN_BITS, ByteOff,
-			  WordOff, idCgRep )
+import TyCon
+import Id
+import Constants
+import SMRep
 import PprCmm		( {- instances -} )
 import Cmm
 import CLabel
 import CmmUtils
-import MachOp		( MachRep(..), wordRep, MachOp(..),  MachHint(..),
-			  mo_wordOr, mo_wordAnd, mo_wordNe, mo_wordEq,
-			  mo_wordULt, mo_wordUGt, mo_wordUGe, machRepByteWidth )
-import ForeignCall	( CCallConv(..) )
-import Literal		( Literal(..) )
-import Digraph		( SCC(..), stronglyConnComp )
-import ListSetOps	( assocDefault )
-import Util		( filterOut, sortLe )
-import DynFlags		( DynFlags(..), HscTarget(..) )
-import FastString	( LitString, bytesFS )
-import PackageConfig	( PackageId )
+import MachOp
+import ForeignCall
+import Literal
+import Digraph
+import ListSetOps
+import Util
+import DynFlags
+import FastString
+import PackageConfig
 import Outputable
 
-import Char		( ord )
-import DATA_BITS
-import DATA_WORD	( Word8 )
-import Maybe		( isNothing )
+import Data.Char
+import Data.Bits
+import Data.Word
+import Data.Maybe
 
 -------------------------------------------------------------------------
 --

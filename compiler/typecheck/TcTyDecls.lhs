@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
 %
 
@@ -16,25 +17,22 @@ module TcTyDecls(
 
 #include "HsVersions.h"
 
-import TypeRep          ( Type(..), TyNote(..), PredType(..) )  -- friend
-import HsSyn		( TyClDecl(..), HsPred(..), LTyClDecl, isClassDecl )
-import RnHsSyn		( extractHsTyNames )
-import Type		( predTypeRep, tcView )
-import HscTypes		( TyThing(..), ModDetails(..), availsToNameSet )
-import TyCon            ( TyCon, tyConArity, tyConDataCons, tyConTyVars,
-                          isSynTyCon, isAlgTyCon, 
-			  tyConName, isNewTyCon, isProductTyCon, newTyConRhs,
-			  isOpenTyCon )
-import Class		( classTyCon )
-import DataCon          ( dataConOrigArgTys )
-import Var              ( TyVar )
+import TypeRep
+import HsSyn
+import RnHsSyn
+import Type
+import HscTypes
+import TyCon
+import Class
+import DataCon
+import Var
 import VarSet
-import Name		( Name, isTyVarName )
+import Name
 import NameEnv
 import NameSet
-import Digraph 		( SCC(..), stronglyConnComp, stronglyConnCompR )
-import BasicTypes	( RecFlag(..) )
-import SrcLoc		( Located(..), unLoc )
+import Digraph
+import BasicTypes
+import SrcLoc
 import Outputable
 \end{code}
 

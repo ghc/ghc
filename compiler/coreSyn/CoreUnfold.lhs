@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
-\section[CoreUnfold]{Core-syntax unfoldings}
+
+Core-syntax unfoldings
 
 Unfoldings (which can travel across module boundaries) are in Core
 syntax (namely @CoreExpr@s).
@@ -30,31 +32,24 @@ module CoreUnfold (
 
 #include "HsVersions.h"
 
-import StaticFlags	( opt_UF_CreationThreshold, opt_UF_UseThreshold,
-			  opt_UF_FunAppDiscount, opt_UF_KeenessFactor,
-			  opt_UF_DearOp,
-			)
-import DynFlags		( DynFlags, DynFlag(..), dopt )
+import StaticFlags
+import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
-import OccurAnal	( occurAnalyseExpr )
-import CoreUtils	( exprIsHNF, exprIsCheap, exprIsTrivial )
-import Id		( Id, idType, isId,
-			  idUnfolding, globalIdDetails
-			)
-import DataCon		( isUnboxedTupleCon )
-import Literal		( litSize )
-import PrimOp		( primOpIsDupable, primOpOutOfLine )
-import IdInfo		( GlobalIdDetails(..) )
-import Type		( isUnLiftedType )
-import PrelNames	( hasKey, buildIdKey, augmentIdKey )
+import OccurAnal
+import CoreUtils
+import Id
+import DataCon
+import Literal
+import PrimOp
+import IdInfo
+import Type
+import PrelNames
 import Bag
 import FastTypes
 import Outputable
 
-#if __GLASGOW_HASKELL__ >= 404
-import GLAEXTS		( Int# )
-#endif
+import GHC.Exts		( Int# )
 \end{code}
 
 

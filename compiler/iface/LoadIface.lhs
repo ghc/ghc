@@ -1,7 +1,9 @@
-
+%
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section{Dealing with interface files}
+
+Loading interface files
 
 \begin{code}
 module LoadIface (
@@ -19,53 +21,39 @@ module LoadIface (
 import {-# SOURCE #-}	TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst, 
 				 tcIfaceFamInst )
 
-import DynFlags		( DynFlags(..), DynFlag( Opt_IgnoreInterfacePragmas ) )
+import DynFlags
 import IfaceSyn
-import IfaceEnv		( newGlobalBinder )
-import HscTypes		( ModIface(..), TyThing, IfaceExport, Usage(..), 
-			  Deprecs(..), Dependencies(..),
-			  emptyModIface, EpsStats(..), GenAvailInfo(..),
-			  addEpsInStats, ExternalPackageState(..),
-			  PackageTypeEnv, emptyTypeEnv,  HscEnv(..),
-			  lookupIfaceByModule, emptyPackageIfaceTable,
-			  IsBootInterface, mkIfaceFixCache, 
-			  implicitTyThings 
-			 )
+import IfaceEnv
+import HscTypes
 
-import BasicTypes	( Version, initialVersion,
-			  Fixity(..), FixityDirection(..), isMarkedStrict )
+import BasicTypes hiding (SuccessFlag(..))
 import TcRnMonad
-import Type             ( TyThing(..) )
+import Type
 
-import PrelNames	( gHC_PRIM )
-import PrelInfo		( ghcPrimExports )
-import PrelRules	( builtinRules )
-import Rules		( extendRuleBaseList, mkRuleBase )
-import InstEnv		( emptyInstEnv, extendInstEnvList )
-import FamInstEnv	( emptyFamInstEnv, extendFamInstEnvList )
-import Name		( Name {-instance NamedThing-}, getOccName,
-			  nameModule, nameIsLocalOrFrom, isWiredInName )
+import PrelNames
+import PrelInfo
+import PrelRules
+import Rules
+import InstEnv
+import FamInstEnv
+import Name
 import NameEnv
-import MkId		( seqId )
+import MkId
 import Module
-import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc,
-			  mkClassDataConOcc, mkSuperDictSelOcc,
-			  mkDataConWrapperOcc, mkDataConWorkerOcc,
-			  mkNewTyCoOcc, mkInstTyCoOcc ) 
-import SrcLoc		( importedSrcLoc )
-import Maybes		( MaybeErr(..) )
-import ErrUtils         ( Message )
-import Finder		( findImportedModule, findExactModule,  
-			  FindResult(..), cannotFindInterface )
+import OccName
+import SrcLoc
+import Maybes
+import ErrUtils
+import Finder
 import UniqFM
-import StaticFlags	( opt_HiVersion )
+import StaticFlags
 import Outputable
-import BinIface		( readBinIface, v_IgnoreHiWay )
-import Binary
-import Panic		( ghcError, showException, GhcException(..) )
-import List		( nub )
-import Maybe            ( isJust )
-import DATA_IOREF	( writeIORef )
+import BinIface
+import Panic
+
+import Data.List
+import Data.Maybe
+import Data.IORef
 \end{code}
 
 
@@ -341,9 +329,6 @@ loadDecl ignore_prags mod (_version, decl)
 	= newGlobalBinder mod occ 
 			  (importedSrcLoc (showSDoc (ppr (moduleName mod))))
 			-- ToDo: qualify with the package name if necessary
-
-    ifFamily (IfaceData {ifFamInst = Just (famTyCon, _)}) = Just famTyCon
-    ifFamily _						  = Nothing
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 

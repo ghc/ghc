@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[Inst]{The @Inst@ type: dictionaries or method instances}
+
+The @Inst@ type: dictionaries or method instances
 
 \begin{code}
 module Inst ( 
@@ -42,56 +44,35 @@ module Inst (
 import {-# SOURCE #-}	TcExpr( tcPolyExpr )
 import {-# SOURCE #-}	TcUnify( unifyType )
 
-import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, mkHsApp,
-		  HsWrapper(..), (<.>), mkWpTyApps, idHsWrapper,
-		  nlHsLit, nlHsVar )
-import TcHsSyn	( zonkId )
+import HsSyn
+import TcHsSyn
 import TcRnMonad
-import TcEnv	( tcLookupId, checkWellStaged, topIdLvl, tcMetaTy )
-import InstEnv	( DFunId, InstEnv, Instance(..), OverlapFlag(..),
-		  lookupInstEnv, extendInstEnv, pprInstances, 
-		  instanceHead, instanceDFunId, setInstanceDFunId )
-import FunDeps	( checkFunDeps )
-import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zonkTcThetaType, 
-		  tcInstTyVar, tcInstSkolType
-		)
-import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcPredType,
-		  BoxyRhoType,
-		  PredType(..), SkolemInfo(..), typeKind, mkSigmaTy,
-		  tcSplitForAllTys, applyTys, 
-		  tcSplitPhiTy, tcSplitDFunHead,
-		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
-		  mkPredTy, mkTyVarTys,
-		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
-		  isClassPred, isTyVarClassPred, 
-		  getClassPredTys, mkPredName,
-		  isInheritablePred, isIPPred, 
-		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
-		  pprPred, pprParendType, pprTheta 
-		)
-import Type	( TvSubst, substTy, substTyVar, substTyWith,
-		  notElemTvSubst, extendTvSubstList )
-import Unify	( tcMatchTys )
-import Module	( modulePackageId )
-import {- Kind parts of -} Type	( isSubKind )
-import Coercion ( isEqPred )
-import HscTypes	( ExternalPackageState(..), HscEnv(..) )
-import CoreFVs	( idFreeTyVars )
-import DataCon	( dataConWrapId )
-import Id	( Id, idName, idType, mkUserLocal, mkLocalId, isId )
-import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, nameModule,
-		  isInternalName, setNameUnique )
-import NameSet	( addOneToNameSet )
-import Literal	( inIntRange )
-import Var	( Var, TyVar, tyVarKind, setIdType, isId, mkTyVar )
-import VarEnv	( TidyEnv, emptyTidyEnv )
-import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
-import TysWiredIn ( floatDataCon, doubleDataCon )
-import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
-import BasicTypes( IPName(..), mapIPName, ipNameName )
-import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
-import DynFlags	( DynFlag(..), DynFlags(..), dopt )
-import Maybes	( isJust )
+import TcEnv
+import InstEnv
+import FunDeps
+import TcMType
+import TcType
+import Type
+import Unify
+import Module
+import Coercion
+import HscTypes
+import CoreFVs
+import DataCon
+import Id
+import Name
+import NameSet
+import Literal
+import Var      ( Var, TyVar )
+import qualified Var
+import VarEnv
+import VarSet
+import TysWiredIn
+import PrelNames
+import BasicTypes
+import SrcLoc
+import DynFlags
+import Maybes
 import Outputable
 \end{code}
 
@@ -111,7 +92,7 @@ instToVar :: Inst -> Var
 instToVar (LitInst nm _ ty _) = mkLocalId nm ty
 instToVar (Method id _ _ _ _) = id
 instToVar (Dict nm pred _)    
-  | isEqPred pred = mkTyVar nm (mkPredTy pred)
+  | isEqPred pred = Var.mkTyVar nm (mkPredTy pred)
   | otherwise	  = mkLocalId nm (mkPredTy pred)
 
 instLoc (Dict _ _       loc) = loc
@@ -337,12 +318,12 @@ checkKind :: TyVar -> TcType -> TcM ()
 checkKind tv ty
   = do	{ let ty1 = ty 
 		-- ty1 <- zonkTcType ty
-	; if typeKind ty1 `isSubKind` tyVarKind tv
+	; if typeKind ty1 `isSubKind` Var.tyVarKind tv
 	  then return ()
 	  else 
 
     pprPanic "checkKind: adding kind constraint" 
-	     (vcat [ppr tv <+> ppr (tyVarKind tv), 
+	     (vcat [ppr tv <+> ppr (Var.tyVarKind tv), 
 	            ppr ty <+> ppr ty1 <+> ppr (typeKind ty1)])
 	}
 --    do	{ tv1 <- tcInstTyVar tv

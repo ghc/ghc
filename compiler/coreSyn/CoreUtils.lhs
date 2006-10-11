@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[CoreUtils]{Utility functions on @Core@ syntax}
+
+Utility functions on @Core@ syntax
 
 \begin{code}
 module CoreUtils (
@@ -38,57 +40,41 @@ module CoreUtils (
 
 #include "HsVersions.h"
 
-
-import GLAEXTS		-- For `xori` 
-
 import CoreSyn
-import CoreFVs		( exprFreeVars )
-import PprCore		( pprCoreExpr )
-import Var		( Var, TyVar, CoVar, tyVarKind, mkCoVar, mkTyVar )
-import OccName          ( mkVarOccFS )
-import SrcLoc		( noSrcLoc )
-import VarSet		( unionVarSet )
+import CoreFVs
+import PprCore
+import Var
+import SrcLoc
+import VarSet
 import VarEnv
-import Name		( hashName, mkSysTvName )
+import Name
 #if mingw32_TARGET_OS
-import Packages		( isDllName )
+import Packages
 #endif
-import Literal		( hashLiteral, literalType, litIsDupable, 
-			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
-import DataCon		( DataCon, dataConRepArity, eqSpecPreds, 
-			  dataConTyCon, dataConRepArgTys,
-                          dataConUnivTyVars, dataConExTyVars, dataConEqSpec,
-                          dataConOrigArgTys, dataConTheta )
-import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
-import Id		( Id, idType, globalIdDetails, idNewStrictness, 
-			  mkWildId, idArity, idName, idUnfolding, idInfo,
-			  isOneShotBndr, isStateHackType, 
-			  isDataConWorkId_maybe, mkSysLocal, mkUserLocal,
-			  isDataConWorkId, isBottomingId, isDictId
-			)
-import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo )
-import NewDemand	( appIsBottom )
-import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
-			  splitFunTy, tcEqTypeX,
-			  applyTys, isUnLiftedType, seqType, mkTyVarTy,
-			  splitForAllTy_maybe, isForAllTy, 
-			  splitTyConApp_maybe, splitTyConApp, coreEqType, funResultTy, applyTy,
-                          substTyWith, mkPredTy, zipOpenTvSubst, substTy, substTyVar
-			)
-import Coercion         ( Coercion, mkTransCoercion, coercionKind,
-                          splitNewTypeRepCo_maybe, mkSymCoercion,
-                          decomposeCo, coercionKindPredTy )
-import TyCon		( tyConArity )
-import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
-import CostCentre	( CostCentre )
-import BasicTypes	( Arity )
-import PackageConfig	( PackageId )
-import Unique		( Unique )
+import Literal
+import DataCon
+import PrimOp
+import Id
+import IdInfo
+import NewDemand
+import Type
+import Coercion
+import TyCon
+import TysWiredIn
+import CostCentre
+import BasicTypes
+import PackageConfig
+import Unique
 import Outputable
-import DynFlags		( DynFlags, DynFlag(Opt_DictsCheap), dopt )
-import TysPrim		( alphaTy )	-- Debugging only
-import Util             ( equalLength, lengthAtLeast, foldl2 )
-import FastString       ( FastString )
+import DynFlags
+import TysPrim
+import FastString
+
+#ifdef DEBUG
+import Util
+#endif
+
+import GHC.Exts		-- For `xori` 
 \end{code}
 
 

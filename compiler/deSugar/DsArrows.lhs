@@ -1,23 +1,21 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsArrows]{Desugaring arrow commands}
+
+Desugaring arrow commands
 
 \begin{code}
 module DsArrows ( dsProcExpr ) where
 
 #include "HsVersions.h"
 
-import Match		( matchSimply )
-import DsUtils		( mkErrorAppDs,
-			  mkCoreTupTy, mkCoreTup, selectSimpleMatchVarL,
-			  mkTupleCase, mkBigCoreTup, mkTupleType,
-			  mkTupleExpr, mkTupleSelector,
-			  dsSyntaxTable, lookupEvidence )
+import Match
+import DsUtils
 import DsMonad
 
 import HsSyn
-import TcHsSyn		( hsLPatType )
+import TcHsSyn
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
@@ -26,29 +24,24 @@ import TcHsSyn		( hsLPatType )
 
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds )
 
-import TcType		( Type, tcSplitAppTy, mkFunTy )
-import Type		( mkTyConApp, funArgTy )
+import TcType
+import Type
 import CoreSyn
-import CoreFVs		( exprFreeVars )
-import CoreUtils	( mkIfThenElse, bindNonRec, exprType )
+import CoreFVs
+import CoreUtils
 
-import Id		( Id, idType )
-import Name		( Name )
-import PrelInfo		( pAT_ERROR_ID )
-import DataCon		( dataConWrapId )
-import TysWiredIn	( tupleCon )
-import BasicTypes	( Boxity(..) )
-import PrelNames	( eitherTyConName, leftDataConName, rightDataConName,
-			  arrAName, composeAName, firstAName,
-			  appAName, choiceAName, loopAName )
-import Util		( mapAccumL )
-import Outputable
+import Id
+import Name
+import PrelInfo
+import DataCon
+import TysWiredIn
+import BasicTypes
+import PrelNames
+import Util
 
-import HsUtils		( collectPatBinders, collectPatsBinders )
-import VarSet		( IdSet, mkVarSet, varSetElems,
-			  intersectVarSet, minusVarSet, extendVarSetList, 
-			  unionVarSet, unionVarSets, elemVarSet )
-import SrcLoc		( Located(..), unLoc, noLoc )
+import HsUtils
+import VarSet
+import SrcLoc
 \end{code}
 
 \begin{code}

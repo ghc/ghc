@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2001
+% (c) The University of Glasgow 2001-2006
 %
 \begin{code}
 

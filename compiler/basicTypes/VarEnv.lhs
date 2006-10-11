@@ -1,7 +1,7 @@
-
+%
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section{@VarEnvs@: Variable environments}
 
 \begin{code}
 module VarEnv (
@@ -36,14 +36,14 @@ module VarEnv (
 
 #include "HsVersions.h"
 
-import OccName	  ( TidyOccEnv, emptyTidyOccEnv )
-import Var	  ( Var, setVarUnique )
+import OccName
+import Var
 import VarSet
 import UniqFM  
-import Unique	  ( Unique, deriveUnique, getUnique )
-import Util	  ( zipEqual, foldl2 )
-import Maybes	  ( orElse )
-import StaticFlags( opt_PprStyle_Debug )
+import Unique
+import Util
+import Maybes
+import StaticFlags
 import Outputable
 import FastTypes
 \end{code}

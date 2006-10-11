@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------
 --
--- CmmLint: checking the correctness of Cmm statements and expressions
+-- (c) The University of Glasgow 2004-2006
 --
--- (c) The University of Glasgow 2004
+-- CmmLint: checking the correctness of Cmm statements and expressions
 --
 -----------------------------------------------------------------------------
 
@@ -13,14 +13,14 @@ module CmmLint (
 #include "HsVersions.h"
 
 import Cmm
-import CLabel		( pprCLabel )
+import CLabel
 import MachOp
 import Outputable
 import PprCmm
-import Unique		( getUnique )
-import Constants	( wORD_SIZE )
+import Unique
+import Constants
 
-import Monad		( when )
+import Control.Monad
 
 -- -----------------------------------------------------------------------------
 -- Exported entry points:

@@ -1,7 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
-\section[NameSet]{@NameSets@} 
 
 \begin{code}
 module NameSet (
@@ -27,7 +27,6 @@ module NameSet (
 import Name
 import UniqSet
 \end{code}
-
 
 %************************************************************************
 %*									*

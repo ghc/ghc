@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
@@ -37,21 +38,20 @@ module Name (
 
 import {-# SOURCE #-} TypeRep( TyThing )
 
-import OccName		-- All of it
-import Module		( Module )
-import SrcLoc		( noSrcLoc, wiredInSrcLoc, SrcLoc )
-import UniqFM           ( lookupUFM, addToUFM )
-import Unique		( Unique, Uniquable(..), getKey, pprUnique,
-                          mkUniqueGrimily, getKey# )
-import Maybes		( orElse, isJust )
+import OccName
+import Module
+import SrcLoc
+import UniqFM
+import Unique
+import Maybes
 import Binary
 import FastMutInt
-import FastString	( FastString, zEncodeFS )
+import FastString
 import Outputable
 
-import DATA_IOREF
-import GLAEXTS          ( Int#, Int(..) )
-import Data.Array       ( (!) )
+import Data.IORef
+import GHC.Exts
+import Data.Array
 \end{code}
 
 %************************************************************************

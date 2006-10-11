@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[SMRep]{Storage manager representations of closure}
+
+Storage manager representation of closures
 
 This is here, rather than in ClosureInfo, just to keep nhc happy.
 Other modules should access this info through ClosureInfo.
@@ -38,16 +40,15 @@ module SMRep (
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
-import Id		( Id, idType )
-import Type		( Type, typePrimRep, PrimRep(..) )
-import TyCon		( TyCon, tyConPrimRep )
-import MachOp--		( MachRep(..), MachHint(..), wordRep )
-import StaticFlags	( opt_SccProfilingOn, opt_GranMacros,
-			  opt_Unregisterised )
+import Id
+import Type
+import TyCon
+import MachOp
+import StaticFlags
 import Constants
 import Outputable
 
-import DATA_WORD
+import Data.Word
 \end{code}
 
 

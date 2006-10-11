@@ -1,14 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-%************************************************************************
-%*									*
-\section[HsCore]{Core-syntax unfoldings in Haskell interface files}
-%*									*
-%************************************************************************
-
-We could either use this, or parameterise @GenCoreExpr@ on @Types@ and
-@TyVars@ as well.  Currently trying the former... MEGA SIGH.
 
 \begin{code}
 module IfaceSyn (
@@ -35,25 +28,22 @@ module IfaceSyn (
 import CoreSyn
 import IfaceType
 
-import NewDemand	( StrictSig, pprIfaceStrictSig )
-import Class		( FunDep, DefMeth, pprFundeps )
-import OccName
-import UniqFM           ( UniqFM, emptyUFM, addToUFM, lookupUFM )
-import Unique           ( mkBuiltinUnique )
+import NewDemand
+import Class
+import UniqFM
+import Unique
 import NameSet 
-import Name		( Name, NamedThing(..), isExternalName,
-                          mkInternalName )
-import CostCentre	( CostCentre, pprCostCentreCore )
-import Literal		( Literal )
-import ForeignCall	( ForeignCall )
-import SrcLoc           ( noSrcLoc )
+import Name
+import CostCentre
+import Literal
+import ForeignCall
+import SrcLoc
 import BasicTypes
 import Outputable
 import FastString
-import Maybes		( catMaybes )
 
-import Data.List        ( nub )
-import Data.Maybe       ( isJust )
+import Data.List
+import Data.Maybe
 
 infixl 3 &&&
 infix  4 `eqIfExt`, `eqIfIdInfo`, `eqIfType`

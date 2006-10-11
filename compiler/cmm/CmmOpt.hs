@@ -15,22 +15,20 @@ module CmmOpt (
 #include "HsVersions.h"
 
 import Cmm
-import CmmUtils	( hasNoGlobalRegs )
-import CLabel	( entryLblToInfoLbl )
+import CmmUtils
+import CLabel
 import MachOp
-import SMRep	( tablesNextToCode )
+import SMRep
 
 import UniqFM
-import Unique	( Unique )
-import Panic	( panic )
+import Unique
 
 import Outputable
 
-import Bits
-import Word
-import Int
-import GLAEXTS
-
+import Data.Bits
+import Data.Word
+import Data.Int
+import GHC.Exts
 
 -- -----------------------------------------------------------------------------
 -- The mini-inliner

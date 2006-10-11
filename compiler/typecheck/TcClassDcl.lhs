@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcClassDcl]{Typechecking class declarations}
+
+Typechecking class declarations
 
 \begin{code}
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
@@ -13,58 +15,45 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 #include "HsVersions.h"
 
 import HsSyn
-import RnHsSyn		( maybeGenericMatch, extractHsTyVars )
-import RnExpr		( rnLExpr )
-import RnEnv		( lookupTopBndrRn, lookupImportedName )
-import Inst		( instToId, newDictBndr, newDictBndrs, newMethod, getOverlapFlag )
-import InstEnv		( mkLocalInstance )
-import TcEnv		( tcLookupLocatedClass, 
-			  tcExtendTyVarEnv, tcExtendIdEnv,
-			  InstInfo(..), pprInstInfoDetails,
-			  simpleInstInfoTyCon, simpleInstInfoTy,
-			  InstBindings(..), newDFunName
-			)
-import TcBinds		( TcPragFun, tcMonoBinds, tcPrags, mkPragFun, TcSigInfo(..), 
-			  TcSigFun, mkTcSigFun )
-import TcHsType		( tcHsKindedType, tcHsSigType )
-import TcSimplify	( tcSimplifyCheck )
-import TcUnify		( checkSigTyVars, sigCtxt )
-import TcMType		( tcSkolSigTyVars )
-import TcType		( Type, SkolemInfo(ClsSkol, InstSkol), UserTypeCtxt( GenPatCtxt ),
-			  TcType, TcThetaType, TcTyVar, mkTyVarTys,
-			  mkClassPred, tcSplitSigmaTy, tcSplitFunTys,
-			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitForAllTys, tcSplitPhiTy,
-			  getClassPredTys_maybe, mkPhiTy, mkTyVarTy
-			)
+import RnHsSyn
+import RnExpr
+import RnEnv
+import Inst
+import InstEnv
+import TcEnv
+import TcBinds
+import TcHsType
+import TcSimplify
+import TcUnify
+import TcMType
+import TcType
 import TcRnMonad
-import Generics		( mkGenericRhs, validGenericInstanceType )
-import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Class		( classTyVars, classBigSig, 
-			  Class, ClassOpItem, DefMeth (..) )
-import TyCon		( TyCon, tyConName, tyConHasGenerics )
-import Type		( substTyWith )
-import MkId		( mkDefaultMethodId, mkDictFunId )
-import Id		( Id, idType, idName, mkUserLocal )
-import Name		( Name, NamedThing(..) )
-import NameEnv		( NameEnv, lookupNameEnv, mkNameEnv )
-import NameSet		( nameSetToList )
-import OccName		( reportIfUnused, mkDefaultMethodOcc )
-import RdrName		( RdrName, mkDerivedRdrName )
+import Generics
+import PrelInfo
+import Class
+import TyCon
+import Type
+import MkId
+import Id
+import Name
+import NameEnv
+import NameSet
+import OccName
+import RdrName
 import Outputable
-import PrelNames	( genericTyConNames )
+import PrelNames
 import DynFlags
-import ErrUtils		( dumpIfSet_dyn )
-import Util		( count, lengthIs, isSingleton, lengthExceeds )
-import Unique		( Uniquable(..) )
-import ListSetOps	( equivClassesByUniq, minusList	)
-import SrcLoc		( Located(..), srcSpanStart, unLoc, noLoc )
-import Maybes		( seqMaybe, isJust, mapCatMaybes )
-import List		( partition )
-import BasicTypes	( RecFlag(..), Boxity(..) )
+import ErrUtils
+import Util
+import Unique
+import ListSetOps
+import SrcLoc
+import Maybes
+import List
+import BasicTypes
 import Bag
 import FastString
 \end{code}
-
 
 
 Dictionary handling

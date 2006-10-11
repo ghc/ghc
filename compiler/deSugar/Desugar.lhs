@@ -1,50 +1,49 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[Desugar]{@deSugar@: the main function}
+
+The Desugarer: turning HsSyn into Core.
 
 \begin{code}
 module Desugar ( deSugar, deSugarExpr ) where
 
 #include "HsVersions.h"
 
-import DynFlags		( DynFlag(..), DynFlags(..), dopt, GhcMode(..) )
-import StaticFlags	( opt_SccProfilingOn,
-			  opt_AutoSccsOnAllToplevs,
-			  opt_AutoSccsOnExportedToplevs )
-import DriverPhases	( isHsBoot )
-import HscTypes		( ModGuts(..), HscEnv(..), availsToNameSet,
-			  Dependencies(..), ForeignStubs(..), TypeEnv, IsBootInterface )
-import HsSyn		( RuleDecl(..), RuleBndr(..), LHsExpr, LRuleDecl )
-import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
-import MkIface		( mkUsageInfo )
-import Id		( Id, setIdExported, idName )
-import Name		( Name, isExternalName, nameIsLocalOrFrom, nameOccName )
+import DynFlags
+import StaticFlags
+import HscTypes
+import HsSyn
+import TcRnTypes
+import MkIface
+import Id
+import Name
 import CoreSyn
-import PprCore		( pprRules, pprCoreExpr )
+import PprCore
 import DsMonad
-import DsExpr		( dsLExpr )
-import DsBinds		( dsTopLHsBinds, decomposeRuleLhs, AutoScc(..) )
-import DsForeign	( dsForeigns )
+import DsExpr
+import DsBinds
+import DsForeign
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Module
-import UniqFM		( eltsUFM, delFromUFM )
-import PackageConfig	( thPackageId )
-import RdrName	 	( GlobalRdrEnv )
+import UniqFM
+import PackageConfig
+import RdrName
 import NameSet
 import VarSet
-import Rules		( roughTopNames )
-import CoreLint		( showPass, endPass )
-import CoreFVs		( ruleRhsFreeVars, exprsFreeNames )
-import ErrUtils		( doIfSet, dumpIfSet_dyn )
-import ListSetOps	( insertList )
+import Rules
+import CoreLint
+import CoreFVs
+import ErrUtils
+import ListSetOps
 import Outputable
-import SrcLoc		( Located(..) )
-import DATA_IOREF	( readIORef )
-import Maybes		( catMaybes )
+import SrcLoc
+import Maybes
 import FastString
-import Util		( sortLe )
+import Util
+
+import Data.IORef
 \end{code}
 
 %************************************************************************

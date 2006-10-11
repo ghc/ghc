@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
-\section[CoreLint]{A ``lint'' pass to check for Core correctness}
+
+A ``lint'' pass to check for Core correctness
 
 \begin{code}
 module CoreLint (
@@ -13,43 +15,32 @@ module CoreLint (
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreFVs		( idFreeVars )
-import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize )
+import CoreFVs
+import CoreUtils
 import Bag
-import Literal		( literalType )
-import DataCon		( dataConRepType, dataConTyCon, dataConWorkId )
-import TysWiredIn	( tupleCon )
-import Var		( Var, Id, TyVar, isCoVar, idType, tyVarKind, 
-			  mustHaveLocalBinding, setTyVarKind, setIdType  )
-import VarEnv           ( lookupInScope )
+import Literal
+import DataCon
+import TysWiredIn
+import Var
+import VarEnv
 import VarSet
-import Name		( getSrcLoc )
+import Name
 import PprCore
-import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
-			  mkLocMessage, debugTraceMsg )
-import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
-import Type		( Type, tyVarsOfType, coreEqType,
-			  splitFunTy_maybe, 
-			  splitForAllTy_maybe, splitTyConApp_maybe,
-			  isUnLiftedType, typeKind, mkForAllTy, mkFunTy,
-			  isUnboxedTupleType, isSubKind,
-			  substTyWith, emptyTvSubst, extendTvInScope, 
-			  TvSubst, substTy,
-			  extendTvSubst, substTyVarBndr, isInScope,
-			  getTvInScope )
-import Coercion         ( coercionKind, coercionKindPredTy )
-import TyCon		( isPrimTyCon, isNewTyCon )
-import BasicTypes	( RecFlag(..), Boxity(..), isNonRec )
-import StaticFlags	( opt_PprStyle_Debug )
-import DynFlags		( DynFlags, DynFlag(..), dopt )
+import ErrUtils
+import SrcLoc
+import Type
+import Coercion
+import TyCon
+import BasicTypes
+import StaticFlags
+import DynFlags
 import Outputable
 
 #ifdef DEBUG
 import Util             ( notNull )
 #endif
 
-import Maybe
-
+import Data.Maybe
 \end{code}
 
 %************************************************************************

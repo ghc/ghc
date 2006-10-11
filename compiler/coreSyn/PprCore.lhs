@@ -1,11 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1996-1998
 %
-%************************************************************************
-%*									*
-\section[PprCore]{Printing of Core syntax, including for interfaces}
-%*									*
-%************************************************************************
+
+Printing of Core syntax
 
 \begin{code}
 module PprCore (
@@ -17,34 +15,24 @@ module PprCore (
 #include "HsVersions.h"
 
 import CoreSyn
-import CostCentre	( pprCostCentreCore )
-import Var		( Var )
-import Id		( Id, idType, isDataConWorkId_maybe, idArity,
-			  idInfo, globalIdDetails, isGlobalId, isExportedId 
-			)
-import Var		( TyVar, isTyVar, tyVarKind )
-import IdInfo		( IdInfo, megaSeqIdInfo, 
-			  inlinePragInfo, occInfo, newDemandInfo, 
-			  lbvarInfo, hasNoLBVarInfo,
-			  arityInfo, ppArityInfo, 
-			  specInfo, pprNewStrictness,
-			  workerInfo, ppWorkerInfo,
-			  newStrictnessInfo, cafInfo, ppCafInfo, specInfoRules
-			)
-import NewDemand	( isTop )
+import CostCentre
+import Var
+import Id
+import IdInfo
+import NewDemand
 #ifdef OLD_STRICTNESS
-import Id		( idDemandInfo )
-import IdInfo		( cprInfo, ppCprInfo, strictnessInfo, ppStrictnessInfo ) 
+import Id
+import IdInfo
 #endif
 
-import DataCon		( dataConTyCon )
-import TyCon		( tupleTyConBoxity, isTupleTyCon )
-import Type		( pprParendType, pprType, pprParendKind )
-import Coercion         ( coercionKindPredTy )
-import BasicTypes	( tupleParens, isNoOcc, isAlwaysActive )
-import Util             ( lengthIs )
+import DataCon
+import TyCon
+import Type
+import Coercion
+import BasicTypes
+import Util
 import Outputable
-import FastString       ( mkFastString )
+import FastString
 \end{code}
 
 %************************************************************************

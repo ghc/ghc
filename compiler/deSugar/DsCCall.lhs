@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
-\section[DsCCall]{Desugaring C calls}
+
+Desugaring foreign calls
 
 \begin{code}
 module DsCCall 
@@ -19,48 +21,25 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType, coreAltType, mkCoerce )
-import Id		( Id, mkWildId )
-import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
-import Maybes		( maybeToBool )
-import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, 
-			  CCallConv(..), CLabelString )
-import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
+import CoreUtils
+import Id
+import MkId
+import Maybes
+import ForeignCall
+import DataCon
 
-import TcType		( tcSplitIOType_maybe )
-import Type		( Type, isUnLiftedType, mkFunTys, mkFunTy,
-			  tyVarsOfType, mkForAllTys, mkTyConApp, 
-			  isPrimitiveType, splitTyConApp_maybe, 
-			  splitRecNewType_maybe, splitForAllTy_maybe,
-			  isUnboxedTupleType
-			)
-import Coercion         ( Coercion, splitNewTypeRepCo_maybe, mkSymCoercion )
-import PrimOp		( PrimOp(..) )
-import TysPrim		( realWorldStatePrimTy, intPrimTy,
-			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
-			  addrPrimTy
-			)
-import TyCon		( TyCon, tyConDataCons, tyConName )
-import TysWiredIn	( unitDataConId,
-			  unboxedSingletonDataCon, unboxedPairDataCon,
-			  unboxedSingletonTyCon, unboxedPairTyCon,
-			  trueDataCon, falseDataCon, 
-			  trueDataConId, falseDataConId,
-			  listTyCon, charTyCon, boolTy, 
-			  tupleTyCon, tupleCon
-			)
-import BasicTypes       ( Boxity(..) )
-import Literal		( mkMachInt )
-import PrelNames	( Unique, hasKey, boolTyConKey, unitTyConKey,
-			  int8TyConKey, int16TyConKey, int32TyConKey,
-			  word8TyConKey, word16TyConKey, word32TyConKey
-			  -- dotnet interop
-			  , marshalStringName, unmarshalStringName
-			  , marshalObjectName, unmarshalObjectName
-			  , objectTyConName
-			)
-import VarSet		( varSetElems )
-import Constants	( wORD_SIZE)
+import TcType
+import Type
+import Coercion
+import PrimOp
+import TysPrim
+import TyCon
+import TysWiredIn
+import BasicTypes
+import Literal
+import PrelNames
+import VarSet
+import Constants
 import Outputable
 
 #ifdef DEBUG

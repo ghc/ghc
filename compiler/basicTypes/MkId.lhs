@@ -1,7 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1998
 %
-\section[StdIdInfo]{Standard unfoldings}
 
 This module contains definitions for the IdInfo for things that
 have a standard form, namely:
@@ -38,71 +38,40 @@ module MkId (
 
 #include "HsVersions.h"
 
-
-import BasicTypes	( Arity, StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
-import Rules		( mkSpecInfo )
-import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
-			  realWorldStatePrimTy, addrPrimTy
-			)
-import TysWiredIn	( charTy, mkListTy )
-import PrelRules	( primOpRules )
-import Type		( TyThing(..), mkForAllTy, tyVarsOfTypes, 
- 			  newTyConInstRhs, mkTopTvSubst, substTyVar, 
- 			  substTys, zipTopTvSubst )
-import TcGadt           ( gadtRefine, refineType, emptyRefinement )
-import HsBinds          ( HsWrapper(..), isIdHsWrapper )
-import Coercion         ( mkSymCoercion, mkUnsafeCoercion, isEqPred )
-import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkPredTy, 
-			  mkTyConApp, mkTyVarTys, mkClassPred, isPredTy,
-			  mkFunTys, mkFunTy, mkSigmaTy, tcSplitSigmaTy, tcEqType,
-			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
-			  tcSplitFunTys, tcSplitForAllTys, dataConsStupidTheta
-			)
-import CoreUtils	( exprType, dataConOrigInstPat, mkCoerce )
-import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
-import Literal		( nullAddrLit, mkStringLit )
-import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
-			  FieldLabel,
-                          tyConStupidTheta, isProductTyCon, isDataTyCon,
-                          isRecursiveTyCon, isFamInstTyCon,
-                          tyConFamInst_maybe, tyConFamilyCoercion_maybe,
-                          newTyConCo_maybe )
-import Class		( Class, classTyCon, classSelIds )
-import Var		( Id, TyVar, Var, setIdType )
-import VarSet		( isEmptyVarSet, subVarSet, varSetElems )
-import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..))
-import OccName		( mkOccNameFS, varName )
-import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
-import ForeignCall	( ForeignCall )
-import DataCon		( DataCon, DataConIds(..), dataConTyCon,
-			  dataConUnivTyVars, 
-			  dataConFieldLabels, dataConRepArity, dataConResTys,
-			  dataConRepArgTys, dataConRepType, dataConFullSig,
-			  dataConStrictMarks, dataConExStricts, 
-			  splitProductType, isVanillaDataCon, dataConFieldType,
-			  deepSplitProductType, 
-			)
-import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, 
-			  mkTemplateLocals, mkTemplateLocalsNum, mkExportedLocalId,
-			  mkTemplateLocal, idName
-			)
-import IdInfo		( IdInfo, noCafIdInfo,  setUnfoldingInfo, 
-			  setArityInfo, setSpecInfo, setCafInfo,
-			  setAllStrictnessInfo, vanillaIdInfo,
-			  GlobalIdDetails(..), CafInfo(..)
-			)
-import NewDemand	( mkStrictSig, DmdResult(..),
-			  mkTopDmdType, topDmd, evalDmd, lazyDmd, retCPR,
-			  Demand(..), Demands(..) )
-import DmdAnal		( dmdAnalTopRhs )
+import Rules
+import TysPrim
+import TysWiredIn
+import PrelRules
+import Type
+import TcGadt
+import HsBinds
+import Coercion
+import TcType
+import CoreUtils
+import CoreUnfold
+import Literal
+import TyCon
+import Class
+import VarSet
+import Name
+import OccName
+import PrimOp
+import ForeignCall
+import DataCon
+import Id
+import Var              ( Var, TyVar)
+import IdInfo
+import NewDemand
+import DmdAnal
 import CoreSyn
-import Unique		( mkBuiltinUnique, mkPrimOpIdUnique )
+import Unique
 import Maybes
 import PrelNames
-import Util             ( dropList, isSingleton )
+import BasicTypes       hiding ( SuccessFlag(..) )
+import Util
 import Outputable
 import FastString
-import ListSetOps	( assoc, minusList )
+import ListSetOps
 \end{code}		
 
 %************************************************************************
@@ -1226,9 +1195,5 @@ pc_bottoming_Id name ty
 
     strict_sig	   = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
 	-- These "bottom" out, no matter what their arguments
-
-(openAlphaTyVar:openBetaTyVar:_) = openAlphaTyVars
-openAlphaTy  = mkTyVarTy openAlphaTyVar
-openBetaTy   = mkTyVarTy openBetaTyVar
 \end{code}
 

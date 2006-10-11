@@ -2,7 +2,7 @@
 --
 -- Cmm data types
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -26,11 +26,12 @@ module Cmm (
 #include "HsVersions.h"
 
 import MachOp
-import CLabel		( CLabel )
-import ForeignCall	( CCallConv )
-import Unique		( Unique, Uniquable(..) )
-import FastString	( FastString )
-import DATA_WORD	( Word8 )
+import CLabel
+import ForeignCall
+import Unique
+import FastString
+
+import Data.Word
 
 -----------------------------------------------------------------------------
 --		Cmm, CmmTop, CmmBasicBlock

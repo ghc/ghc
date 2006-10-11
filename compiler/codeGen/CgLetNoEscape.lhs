@@ -1,7 +1,6 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-% $Id: CgLetNoEscape.lhs,v 1.26 2004/09/30 10:35:47 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -19,21 +18,21 @@ import {-# SOURCE #-} CgExpr ( cgExpr )
 import StgSyn
 import CgMonad
 
-import CgBindery	( CgIdInfo, letNoEscapeIdInfo, nukeDeadBindings	)
-import CgCase		( restoreCurrentCostCentre )
-import CgCon		( bindUnboxedTupleComponents )
-import CgHeapery	( unbxTupleHeapCheck )
-import CgInfoTbls	( emitDirectReturnTarget )
-import CgStackery	( allocStackTop, deAllocStackTop, getSpRelOffset )
-import Cmm		( CmmStmt(..) )
-import CmmUtils		( mkLblExpr, oneStmt )
-import CLabel		( mkReturnInfoLabel )
-import ClosureInfo	( mkLFLetNoEscape )
-import CostCentre       ( CostCentreStack )
-import Id		( Id, idName )
-import Var		( idUnique )
-import SMRep		( retAddrSizeW )
-import BasicTypes	( RecFlag(..) )
+import CgBindery
+import CgCase
+import CgCon
+import CgHeapery
+import CgInfoTbls
+import CgStackery
+import Cmm
+import CmmUtils
+import CLabel
+import ClosureInfo
+import CostCentre
+import Id
+import Var
+import SMRep
+import BasicTypes
 \end{code}
 
 %************************************************************************

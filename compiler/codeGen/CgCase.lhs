@@ -1,13 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.75 2005/06/21 10:44:41 simonmar Exp $
-%
-%********************************************************
-%*							*
-\section[CgCase]{Converting @StgCase@ expressions}
-%*							*
-%********************************************************
 
 \begin{code}
 module CgCase (	cgCase, saveVolatileVarsAndRegs, 
@@ -19,43 +13,33 @@ module CgCase (	cgCase, saveVolatileVarsAndRegs,
 import {-# SOURCE #-} CgExpr  ( cgExpr )
 
 import CgMonad
-import StgSyn
-import CgBindery	( getArgAmodes,
-			  bindNewToReg, bindNewToTemp,
-			  getCgIdInfo, getArgAmode,
-			  rebindToStack, getCAddrModeIfVolatile,
-			  nukeDeadBindings, idInfoToAmode
-			)
-import CgCon		( bindConArgs, bindUnboxedTupleComponents )
-import CgHeapery	( altHeapCheck, unbxTupleHeapCheck )
-import CgCallConv	( dataReturnConvPrim, ctrlReturnConvAlg,
-			  CtrlReturnConvention(..)
-			)
-import CgStackery	( allocPrimStack, allocStackTop, getSpRelOffset,
-			  deAllocStackTop, freeStackSlots
-			)
-import CgTailCall	( performTailCall )
-import CgPrimOp		( cgPrimOp )
-import CgForeignCall	( cgForeignCall )
-import CgUtils		( newTemp, cgLit, emitLitSwitch, emitSwitch,
-			  tagToClosure )
-import CgProf		( curCCS, curCCSAddr )
-import CgInfoTbls	( emitDirectReturnTarget, emitAlgReturnTarget, 
-			  dataConTagZ )
-import SMRep		( CgRep(..), retAddrSizeW, nonVoidArg, isVoidArg,
-			  idCgRep, tyConCgRep, typeHint )
-import CmmUtils		( CmmStmts, noStmts, oneStmt, plusStmts )
+import CgBindery
+import CgCon
+import CgHeapery
+import CgCallConv
+import CgStackery
+import CgTailCall
+import CgPrimOp
+import CgForeignCall
+import CgUtils
+import CgProf
+import CgInfoTbls
+
+import ClosureInfo
+import SMRep
+import CmmUtils
 import Cmm
-import MachOp		( wordRep )
-import ClosureInfo	( mkLFArgument )
-import StaticFlags	( opt_SccProfilingOn )
-import Id		( Id, idName, isDeadBinder, idType )
-import ForeignCall	( ForeignCall(..), CCallSpec(..), playSafe )
-import VarSet		( varSetElems )
-import CoreSyn		( AltCon(..) )
-import PrimOp		( PrimOp(..), primOpOutOfLine )
-import TyCon		( isEnumerationTyCon, tyConFamilySize )
-import Util		( isSingleton )
+import MachOp
+
+import StgSyn
+import StaticFlags
+import Id
+import ForeignCall
+import VarSet
+import CoreSyn
+import PrimOp
+import TyCon
+import Util
 import Outputable
 \end{code}
 

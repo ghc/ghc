@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
@@ -49,15 +50,14 @@ module Unique (
 
 #include "HsVersions.h"
 
-import BasicTypes	( Boxity(..) )
-import PackageConfig	( PackageId, packageIdFS )
-import FastString	( FastString, uniqueOfFS )
+import BasicTypes
+import PackageConfig
+import FastString
 import Outputable
 import FastTypes
 
-import GLAEXTS
-
-import Char		( chr, ord )
+import GHC.Exts
+import Data.Char	( chr, ord )
 \end{code}
 
 %************************************************************************

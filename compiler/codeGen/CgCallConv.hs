@@ -1,11 +1,11 @@
 -----------------------------------------------------------------------------
 --
---		CgCallConv
+-- (c) The University of Glasgow 2004-2006
+--
+-- CgCallConv
 --
 -- The datatypes and functions here encapsulate the 
 -- calling and return conventions used by the code generator.
---
--- (c) The University of Glasgow 2004
 --
 -----------------------------------------------------------------------------
 
@@ -33,36 +33,29 @@ module CgCallConv (
 
 #include "HsVersions.h"
 
-import CgUtils		( emitRODataLits, mkWordCLit )
+import CgUtils
 import CgMonad
-
-import Constants	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
-			  mAX_Vanilla_REG, mAX_Float_REG,
-			  mAX_Double_REG, mAX_Long_REG,
-			  mAX_Real_Vanilla_REG, mAX_Real_Float_REG,
-			  mAX_Real_Double_REG, mAX_Real_Long_REG,
-			  bITMAP_BITS_SHIFT
-			)
-
-import ClosureInfo	( ArgDescr(..), Liveness(..) )
-import CgStackery	( getSpRelOffset )
 import SMRep
-import MachOp		( wordRep )
-import Cmm		( CmmExpr(..), GlobalReg(..), CmmLit(..), CmmReg(..), node )
-import CmmUtils		( mkLblExpr )
-import CLabel
-import Maybes		( mapCatMaybes )
-import Id		( Id )
-import Name		( Name )
-import TyCon		( TyCon, tyConFamilySize )
-import Bitmap		( Bitmap, mAX_SMALL_BITMAP_SIZE, 
-			  mkBitmap, intsToReverseBitmap )
-import Util		( isn'tIn, sortLe )
-import StaticFlags	( opt_Unregisterised )
-import FastString	( LitString )
-import Outputable
-import DATA_BITS
 
+import MachOp
+import Cmm
+import CLabel
+
+import Constants
+import ClosureInfo
+import CgStackery
+import CmmUtils
+import Maybes
+import Id
+import Name
+import TyCon
+import Bitmap
+import Util
+import StaticFlags
+import FastString
+import Outputable
+
+import Data.Bits
 
 -------------------------------------------------------------------------
 --

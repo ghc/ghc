@@ -1,66 +1,59 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsExpr]{Matching expressions (Exprs)}
+
+Desugaring exporessions.
 
 \begin{code}
 module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
 #if defined(GHCI) && defined(BREAKPOINT)
-import Foreign.StablePtr ( newStablePtr, castStablePtrToPtr )
-import GHC.Exts         ( Ptr(..), Int(..), addr2Int# )
-import IOEnv            ( ioToIOEnv )
-import PrelNames        ( breakpointJumpName, breakpointCondJumpName )
-import TysWiredIn       ( unitTy )
-import TypeRep          ( Type(..) )
-import TyCon            ( isUnLiftedTyCon )
+import Foreign.StablePtr
+import GHC.Exts
+import IOEnv
+import PrelNames
+import TysWiredIn
+import TypeRep
+import TyCon
 #endif
 
-import Match		( matchWrapper, matchSinglePat, matchEquations )
-import MatchLit		( dsLit, dsOverLit )
-import DsBinds		( dsLHsBinds, dsCoercion )
-import DsGRHSs		( dsGuarded )
-import DsListComp	( dsListComp, dsPArrComp )
-import DsUtils		( mkErrorAppDs, mkStringExpr, mkConsExpr, mkNilExpr,
-			  extractMatchResult, cantFailMatchResult, matchCanFail,
-			  mkCoreTupTy, selectSimpleMatchVarL, lookupEvidence, selectMatchVar )
-import DsArrows		( dsProcExpr )
+import Match
+import MatchLit
+import DsBinds
+import DsGRHSs
+import DsListComp
+import DsUtils
+import DsArrows
 import DsMonad
 
 #ifdef GHCI
 	-- Template Haskell stuff iff bootstrapped
-import DsMeta		( dsBracket )
+import DsMeta
 #endif
 
 import HsSyn
-import TcHsSyn		( hsLPatType, mkVanillaTuplePat )
+import TcHsSyn
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
---     needs to see source types (newtypes etc), and sometimes not
---     So WATCH OUT; check each use of split*Ty functions.
--- Sigh.  This is a pain.
-
-import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppTyCon, 
-			  tcTyConAppArgs, isUnLiftedType, Type, mkAppTy )
-import Type		( splitFunTys, isUnboxedTupleType, mkFunTy )
+--     needs to see source types
+import TcType
+import Type
 import CoreSyn
-import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
+import CoreUtils
 
-import CostCentre	( mkUserCC )
-import Id		( Id, idType, idName, idDataCon )
-import PrelInfo		( rEC_CON_ERROR_ID )
-import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
-import DataCon		( isVanillaDataCon )
-import TyCon		( FieldLabel, tyConDataCons )
-import TysWiredIn	( tupleCon )
-import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
-import PrelNames	( toPName,
-			  returnMName, bindMName, thenMName, failMName,
-			  mfixName )
-import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
-import Util		( zipEqual, zipWithEqual )
-import Bag		( bagToList )
+import CostCentre
+import Id
+import PrelInfo
+import DataCon
+import TyCon
+import TysWiredIn
+import BasicTypes
+import PrelNames
+import SrcLoc
+import Util
+import Bag
 import Outputable
 import FastString
 \end{code}

@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The Univserity of Glasgow 1992-2004
 %
 
@@ -57,27 +58,25 @@ module ClosureInfo (
 #include "HsVersions.h"
 
 import StgSyn
-import SMRep		-- all of it
+import SMRep
 
 import CLabel
 
-import Packages		( isDllName )
-import PackageConfig	( PackageId )
-import StaticFlags	( opt_SccProfilingOn, opt_OmitBlackHoling,
-			  opt_Parallel, opt_DoTickyProfiling )
-import Id		( Id, idType, idArity, idName )
-import DataCon		( DataCon, dataConTyCon, isNullaryRepDataCon, dataConName )
-import Name		( Name, nameUnique, getOccName, getOccString )
-import OccName		( occNameString )
-import Type		( isUnLiftedType, Type, repType, splitTyConApp_maybe )
-import TcType		( tcSplitSigmaTy )
-import TyCon		( isFunTyCon, isAbstractTyCon )
-import BasicTypes	( TopLevelFlag(..), isNotTopLevel, isTopLevel, ipNameName )
+import Packages
+import PackageConfig
+import StaticFlags
+import Id
+import DataCon
+import Name
+import OccName
+import Type
+import TypeRep
+import TcType
+import TyCon
+import BasicTypes
 import FastString
 import Outputable
 import Constants
-
-import TypeRep	-- TEMP
 \end{code}
 
 

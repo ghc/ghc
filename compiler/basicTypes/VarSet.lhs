@@ -1,7 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section{@VarSet@: Variable sets}
 
 \begin{code}
 module VarSet (
@@ -19,10 +19,10 @@ module VarSet (
 
 #include "HsVersions.h"
 
-import Var		( Var, Id, TyVar )
-import Unique		( Unique )
+import Var
+import Unique
 import UniqSet
-import UniqFM		( delFromUFM_Directly, addToUFM_C )
+import UniqFM
 \end{code}
 
 %************************************************************************

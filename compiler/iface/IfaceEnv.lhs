@@ -1,4 +1,4 @@
-(c) The University of Glasgow 2002
+(c) The University of Glasgow 2002-2006
 
 \begin{code}
 module IfaceEnv (
@@ -19,29 +19,21 @@ module IfaceEnv (
 #include "HsVersions.h"
 
 import TcRnMonad
-import TysWiredIn	( tupleTyCon, tupleCon )
-import HscTypes		( NameCache(..), HscEnv(..), GenAvailInfo(..), 
-			  IfaceExport, OrigNameCache, AvailInfo )
-import Type		( mkOpenTvSubst, substTy )
-import TyCon		( TyCon, tyConName )
-import DataCon		( dataConWorkId, dataConName )
-import Var		( TyVar, Id, varName )
-import Name		( Name, nameUnique, nameModule,
-			  nameOccName, nameSrcLoc, getOccName,
-		  	  isWiredInName, mkIPName,
-			  mkExternalName, mkInternalName )
-import NameSet		( NameSet, emptyNameSet, addListToNameSet )
-import OccName		( OccName, isTupleOcc_maybe, tcName, dataName, occNameFS,
-			  lookupOccEnv, unitOccEnv, extendOccEnv )
-import PrelNames	( gHC_PRIM, dATA_TUP )
-import Module		( Module, emptyModuleEnv, ModuleName, modulePackageId,
-			  lookupModuleEnv, extendModuleEnv_C, mkModule )
-import UniqFM           ( lookupUFM, addListToUFM )
-import FastString       ( FastString )
-import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply, uniqsFromSupply )
-import FiniteMap	( emptyFM, lookupFM, addToFM )
-import BasicTypes	( IPName(..), mapIPName )
-import SrcLoc		( SrcLoc, noSrcLoc )
+import TysWiredIn
+import HscTypes
+import TyCon
+import DataCon
+import Var
+import Name
+import OccName
+import PrelNames
+import Module
+import UniqFM
+import FastString
+import UniqSupply
+import FiniteMap
+import BasicTypes
+import SrcLoc
 
 import Outputable
 \end{code}
@@ -205,7 +197,7 @@ lookupOrigNameCache nc mod occ
     mk_tup_name (ns, boxity, arity)
 	| ns == tcName   = tyConName (tupleTyCon boxity arity)
 	| ns == dataName = dataConName (tupleCon boxity arity)
-	| otherwise      = varName (dataConWorkId (tupleCon boxity arity))
+	| otherwise      = Var.varName (dataConWorkId (tupleCon boxity arity))
 
 lookupOrigNameCache nc mod occ	-- The normal case
   = case lookupModuleEnv nc mod of
@@ -296,12 +288,6 @@ lookupIfaceTop :: OccName -> IfL Name
 -- Look up a top-level name from the current Iface module
 lookupIfaceTop occ
   = do	{ env <- getLclEnv; lookupOrig (if_mod env) occ }
-
-lookupHomePackage :: ModuleName -> OccName -> IfL Name
-lookupHomePackage mod_name occ
-  = do	{ env <- getLclEnv; 
-        ; let this_pkg = modulePackageId (if_mod env)
-        ; lookupOrig (mkModule this_pkg mod_name) occ }
 
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ

@@ -41,7 +41,7 @@ import FastString	( FastString )
 import Outputable
 import FastTypes
 
-import GLAEXTS		( indexArray# )
+import GHC.Exts		( indexArray# )
 
 #if __GLASGOW_HASKELL__ < 503
 import PrelArr  ( Array(..) )

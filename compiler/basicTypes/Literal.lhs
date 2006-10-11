@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
 \section[Literal]{@Literal@: Machine literals (unboxed, of course)}
@@ -26,22 +27,19 @@ module Literal
 
 #include "HsVersions.h"
 
-import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
-			  intPrimTy, wordPrimTy, int64PrimTy, word64PrimTy
-			)
-import Type		( Type )
+import TysPrim
+import Type
 import Outputable
 import FastTypes
 import FastString
 import Binary
+import Ratio
+import FastString
 
-import Ratio 		( numerator )
-import FastString	( uniqueOfFS, lengthFS )
-import DATA_INT		( Int8,  Int16,  Int32 )
-import DATA_WORD	( Word8, Word16, Word32 )
-import Char		( ord, chr )
+import Data.Int
+import Data.Word
+import Data.Char
 \end{code}
-
 
 
 %************************************************************************

@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow, 2004
+% (c) The University of Glasgow, 2004-2006
 %
 
 Module
@@ -48,10 +48,10 @@ module Module
 
 #include "HsVersions.h"
 import Outputable
-import Unique		( Uniquable(..) )
+import Unique
 import FiniteMap
 import UniqFM
-import PackageConfig	( PackageId, packageIdFS, mainPackageId )
+import PackageConfig
 import FastString
 import Binary
 \end{code}

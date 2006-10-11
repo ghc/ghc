@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcBinds]{TcBinds}
@@ -15,56 +16,36 @@ module TcBinds ( tcLocalBinds, tcTopBinds,
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 
-import DynFlags		( dopt, DynFlags,
-			  DynFlag(Opt_MonomorphismRestriction, Opt_MonoPatBinds, Opt_GlasgowExts) )
-import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, LHsBind, Sig(..),
-			  HsLocalBinds(..), HsValBinds(..), HsIPBinds(..),
-			  LSig, Match(..), IPBind(..), Prag(..), LHsType,
-			  isVanillaLSig, sigName, placeHolderNames, isPragLSig,
-			  LPat, GRHSs, MatchGroup(..), pprLHsBinds, mkHsWrap, hsExplicitTvs,
-			  collectHsBindBinders, collectPatBinders, pprPatBind, isBangHsBind
-			)
-import TcHsSyn		( zonkId )
+import DynFlags
+import HsSyn
+import TcHsSyn
 
 import TcRnMonad
-import Inst		( newDictBndrs, newIPDict, instToId )
-import TcEnv		( tcExtendIdEnv, tcExtendIdEnv2, tcExtendTyVarEnv2, 
-			  pprBinders, tcLookupId,
-			  tcGetGlobalTyVars )
-import TcUnify		( tcInfer, tcSubExp, unifyTheta, 
-			  bleatEscapedTvs, sigCtxt )
-import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, 
-			  tcSimplifyRestricted, tcSimplifyIPs )
-import TcHsType		( tcHsSigType, UserTypeCtxt(..) )
-import TcPat		( tcLetPat )
-import TcSimplify	( bindInstsOfLocalFuns )
-import TcMType		( newFlexiTyVarTy, zonkQuantifiedTyVar, zonkSigTyVar,
-			  tcInstSigTyVars, tcInstSkolTyVars, tcInstType, 
-			  zonkTcType, zonkTcTypes, zonkTcTyVar )
-import TcType		( TcType, TcTyVar, TcThetaType, 
-			  SkolemInfo(SigSkol), UserTypeCtxt(FunSigCtxt), 
-			  TcTauType, TcSigmaType, isUnboxedTupleType,
-			  mkTyVarTy, mkForAllTys, mkFunTys, exactTyVarsOfType, 
-			  mkForAllTy, isUnLiftedType, tcGetTyVar, 
-			  mkTyVarTys, tidyOpenTyVar )
-import {- Kind parts of -} Type		( argTypeKind )
-import VarEnv		( TyVarEnv, emptyVarEnv, lookupVarEnv, extendVarEnv ) 
-import TysPrim		( alphaTyVar )
-import Id		( Id, mkLocalId, mkVanillaGlobal )
-import IdInfo		( vanillaIdInfo )
-import Var		( TyVar, idType, idName )
-import Name		( Name )
+import Inst
+import TcEnv
+import TcUnify
+import TcSimplify
+import TcHsType
+import TcPat
+import TcMType
+import TcType
+import {- Kind parts of -} Type
+import VarEnv
+import TysPrim
+import Id
+import IdInfo
+import Var ( TyVar )
+import Name
 import NameSet
 import NameEnv
 import VarSet
-import SrcLoc		( Located(..), unLoc, getLoc )
+import SrcLoc
 import Bag
-import ErrUtils		( Message )
-import Digraph		( SCC(..), stronglyConnComp )
-import Maybes		( expectJust, isJust, isNothing, orElse )
-import Util		( singleton )
-import BasicTypes	( TopLevelFlag(..), isTopLevel, isNotTopLevel,
-			  RecFlag(..), isNonRec, InlineSpec, defaultInlineSpec )
+import ErrUtils
+import Digraph
+import Maybes
+import Util
+import BasicTypes
 import Outputable
 \end{code}
 

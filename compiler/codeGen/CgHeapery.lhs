@@ -1,7 +1,6 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-% $Id: CgHeapery.lhs,v 1.47 2005/06/21 10:44:41 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -23,39 +22,29 @@ module CgHeapery (
 
 #include "HsVersions.h"
 
-import StgSyn		( AltType(..) )
-import CLabel		( CLabel, mkRtsCodeLabel )
-import CgUtils		( mkWordCLit, cmmRegOffW, cmmOffsetW,
-			  cmmOffsetExprB )
+import StgSyn
+import CLabel
+import CgUtils
 import CgMonad
-import CgProf		( staticProfHdr, profDynAlloc, dynProfHdr )
-import CgTicky		( staticTickyHdr, tickyDynAlloc, tickyAllocHeap )
-import CgParallel	( staticGranHdr, staticParHdr, doGranAllocate )
-import CgStackery	( getFinalStackHW, getRealSp )
-import CgCallConv	( mkRegLiveness )
-import ClosureInfo	( closureSize, staticClosureNeedsLink, 
-			  mkConInfo,  closureNeedsUpdSpace,
-			  infoTableLabelFromCI, closureLabelFromCI,
-			  nodeMustPointToIt, closureLFInfo, 			
-			  ClosureInfo )
-import SMRep		( CgRep(..), cgRepSizeW, separateByPtrFollowness,
-			  WordOff, fixedHdrSize, thunkHdrSize,
-			  isVoidArg, primRepToCgRep )
+import CgProf
+import CgTicky
+import CgParallel
+import CgStackery
+import CgCallConv
+import ClosureInfo
+import SMRep
 
-import Cmm		( CmmLit(..), CmmStmt(..), CmmExpr(..), GlobalReg(..),
-			  CmmReg(..), hpReg, nodeReg, spReg )
-import MachOp		( mo_wordULt, mo_wordUGt, mo_wordSub )
-import CmmUtils		( mkIntCLit, CmmStmts, noStmts, oneStmt, plusStmts,
-			  mkStmts )
-import Id		( Id )
-import DataCon		( DataCon )
-import TyCon		( tyConPrimRep )
-import CostCentre	( CostCentreStack )
-import Util		( mapAccumL, filterOut )
-import Constants	( wORD_SIZE )
-import PackageConfig	( PackageId )
+import Cmm
+import MachOp
+import CmmUtils
+import Id
+import DataCon
+import TyCon
+import CostCentre
+import Util
+import Constants
+import PackageConfig
 import Outputable
-
 \end{code}
 
 

@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Id]{@Ids@: Value and constructor identifiers}
@@ -79,42 +80,29 @@ module Id (
 
 #include "HsVersions.h"
 
-
-import CoreSyn		( Unfolding, CoreRule )
-import BasicTypes	( Arity )
-import Var		( Id, DictId,
-			  isId, isExportedId, isLocalId,
-			  idName, idType, idUnique, idInfo, isGlobalId,
-			  setIdName, setIdType, setIdUnique, 
-			  setIdExported, setIdNotExported,
-			  setIdInfo, lazySetIdInfo, modifyIdInfo, 
-			  maybeModifyIdInfo,
-			  globalIdDetails
-			)
-import qualified Var	( mkLocalId, mkGlobalId, mkExportedLocalId )
-import TyCon		( FieldLabel, TyCon )
-import Type		( Type, typePrimRep, addFreeTyVars, seqType, 
-			  splitTyConApp_maybe, PrimRep )
-import TcType		( isDictTy )
-import TysPrim		( statePrimTyCon )
+import CoreSyn
+import BasicTypes
+import qualified Var
+import Var hiding (mkLocalId, mkGlobalId, mkExportedLocalId)
+import TyCon
+import Type
+import TcType
+import TysPrim
 import IdInfo 
-
 #ifdef OLD_STRICTNESS
-import qualified Demand	( Demand )
+import qualified Demand
 #endif
-import DataCon		( DataCon, isUnboxedTupleCon )
-import NewDemand	( Demand, StrictSig, topDmd, topSig, isBottomingSig )
-import Name	 	( Name, OccName, nameIsLocalOrFrom, 
-			  mkSystemVarName, mkInternalName, getOccName,
-			  getSrcLoc ) 
-import Module		( Module )
-import OccName		( mkWorkerOcc )
-import Maybes		( orElse )
-import SrcLoc		( SrcLoc )
+import DataCon
+import NewDemand
+import Name
+import Module
+import OccName
+import Maybes
+import SrcLoc
 import Outputable
-import Unique		( Unique, mkBuiltinUnique )
-import FastString	( FastString )
-import StaticFlags	( opt_NoStateHack )
+import Unique
+import FastString
+import StaticFlags
 
 -- infixl so you can say (id `set` a `set` b)
 infixl 	1 `setIdUnfolding`,

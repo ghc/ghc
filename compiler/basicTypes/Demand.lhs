@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Demand]{@Demand@: the amount of demand on a value}
@@ -27,7 +28,7 @@ module Demand(
 #include "HsVersions.h"
 
 import Outputable
-import Util ( listLengthCmp )
+import Util
 \end{code}
 
 

@@ -2,7 +2,7 @@
 --
 -- Code generation for profiling
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -32,30 +32,28 @@ module CgProf (
 #include "../includes/DerivedConstants.h"
 	-- For REP_xxx constants, which are MachReps
 
-import ClosureInfo	( ClosureInfo, closureSize,
-			  closureName, isToplevClosure, closureReEntrant, )
+import ClosureInfo
 import CgUtils
 import CgMonad
-import SMRep		( StgWord, profHdrSize )
+import SMRep
 
 import Cmm
 import MachOp
-import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr )
-import CLabel		( mkCCLabel, mkCCSLabel, mkRtsDataLabel )
+import CmmUtils
+import CLabel
 
-import Module		( moduleNameString )
-import qualified Module ( moduleName ) -- clashes with CgMonad.moduleName
-import Id		( Id )
+import Id
+import qualified Module
 import CostCentre
-import StgSyn		( GenStgExpr(..), StgExpr )
-import StaticFlags	( opt_SccProfilingOn )
-import FastString	( FastString )
+import StgSyn
+import StaticFlags
+import FastString
 import Constants	-- Lots of field offsets
 import Outputable
 
-import Maybe
-import Char		( ord )
-import Monad		( when )
+import Data.Maybe
+import Data.Char
+import Control.Monad
 
 -----------------------------------------------------------------------------
 --
@@ -293,7 +291,8 @@ emitCostCentreDecl
    -> Code
 emitCostCentreDecl cc = do 
   { label <- mkStringCLit (costCentreUserName cc)
-  ; modl  <- mkStringCLit (moduleNameString (Module.moduleName (cc_mod cc)))
+  ; modl  <- mkStringCLit (Module.moduleNameString 
+                                (Module.moduleName (cc_mod cc)))
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.
                 -- Hence don't emit the package name in the module here.

@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[CgBindery]{Utility functions related to doing @CgBindings@}
@@ -31,26 +32,24 @@ module CgBindery (
 #include "HsVersions.h"
 
 import CgMonad
-import CgHeapery	( getHpRelOffset )
-import CgStackery	( freeStackSlots, getSpRelOffset )
-import CgUtils		( cgLit, cmmOffsetW )
-import CLabel		( mkClosureLabel, pprCLabel )
-import ClosureInfo	( mkLFImported, mkLFArgument, LambdaFormInfo )
+import CgHeapery
+import CgStackery
+import CgUtils
+import CLabel
+import ClosureInfo
 
 import Cmm
 import PprCmm		( {- instance Outputable -} )
-import SMRep		( CgRep(..), WordOff, isFollowableArg, 
-			  isVoidArg, cgRepSizeW, argMachRep, 
-			  idCgRep, typeCgRep )
-import Id		( Id, idName )
+import SMRep
+import Id
 import VarEnv
-import VarSet		( varSetElems )
-import Literal		( literalType )
-import Maybes		( catMaybes )
-import Name		( isExternalName )
-import StgSyn		( StgArg, StgLiveVars, GenStgArg(..), isStgTypeArg )
-import Unique           ( Uniquable(..) )
-import UniqSet		( elementOfUniqSet )
+import VarSet
+import Literal
+import Maybes
+import Name
+import StgSyn
+import Unique
+import UniqSet
 import Outputable
 \end{code}
 

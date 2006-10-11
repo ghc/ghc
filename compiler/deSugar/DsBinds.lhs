@@ -1,7 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[DsBinds]{Pattern-matching bindings (HsBinds and MonoBinds)}
+
+Pattern-matching bindings (HsBinds and MonoBinds)
 
 Handles @HsBinds@; those at the top level require different handling,
 in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
@@ -15,36 +17,36 @@ module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs,
 
 #include "HsVersions.h"
 
-
 import {-# SOURCE #-}	DsExpr( dsLExpr, dsExpr )
 import {-# SOURCE #-}	Match( matchWrapper )
 
 import DsMonad
-import DsGRHSs		( dsGuarded )
+import DsGRHSs
 import DsUtils
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
-import CoreUtils	( exprType, mkInlineMe, mkSCC )
+import CoreUtils
 
-import OccurAnal	( occurAnalyseExpr )
-import CostCentre	( mkAutoCC, IsCafCC(..) )
-import Id		( Id, DictId, idType, idName, mkLocalId, setInlinePragma )
-import Rules		( addIdSpecialisations, mkLocalRule )
-import Var		( TyVar, Var, isGlobalId, setIdNotExported )
+import OccurAnal
+import CostCentre
+import Module
+import Id
+import Rules
+import Var              ( TyVar, Var )
 import VarEnv
-import Type		( mkTyVarTy, substTyWith )
-import TysWiredIn	( voidTy )
-import Module		( Module )
+import Type
+import TysWiredIn
 import Outputable
-import SrcLoc		( Located(..) )
-import Maybes		( catMaybes, orElse )
-import Bag		( bagToList )
-import BasicTypes	( Activation(..), InlineSpec(..), isAlwaysActive )
-import Monad		( foldM )
-import FastString	( mkFastString )
-import List		( (\\) )
+import SrcLoc
+import Maybes
+import Bag
+import BasicTypes hiding ( TopLevel )
+import FastString
 import Util		( mapSnd )
+
+import Control.Monad
+import Data.List
 \end{code}
 
 %************************************************************************

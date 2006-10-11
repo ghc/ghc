@@ -1,11 +1,6 @@
 %
-% (c) The University of Glasgow, 1992-2003
+% (c) The University of Glasgow, 1992-2006
 %
-%************************************************************************
-%*									*
-\section[SrcLoc]{The @SrcLoc@ type}
-%*									*
-%************************************************************************
 
 \begin{code}
 module SrcLoc (
@@ -42,7 +37,7 @@ module SrcLoc (
 
 #include "HsVersions.h"
 
-import Util		( thenCmp )
+import Util
 import Outputable
 import FastString
 \end{code}

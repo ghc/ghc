@@ -1,6 +1,12 @@
+-----------------------------------------------------------------------------
+--
+-- (c) The University of Glasgow -2006
+--
 -- Code generation relaed to GpH
 -- 	(a) parallel
 --	(b) GranSim
+--
+-----------------------------------------------------------------------------
 
 module CgParallel(
 	staticGranHdr,staticParHdr,
@@ -9,10 +15,10 @@ module CgParallel(
   ) where
 
 import CgMonad
-import CgCallConv	( mkRegLiveness )
-import Id		( Id )
-import Cmm		( CmmLit, GlobalReg(..), node, CmmExpr )
-import StaticFlags	( opt_GranMacros )
+import CgCallConv
+import Id
+import Cmm
+import StaticFlags
 import Outputable
 
 staticParHdr :: [CmmLit]

@@ -1,9 +1,7 @@
-{-% DrIFT (Automatic class derivations for Haskell) v1.1 %-}
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-
-\section[OccName]{@OccName@}
 
 \begin{code}
 module OccName (
@@ -65,19 +63,18 @@ module OccName (
 
 #include "HsVersions.h"
 
-import Util		( thenCmp )
-import Unique		( Unique, mkUnique, Uniquable(..) )
-import BasicTypes 	( Boxity(..), Arity )
-import StaticFlags 	( opt_PprStyle_Debug )
+import Util
+import Unique
+import BasicTypes
+import StaticFlags
 import UniqFM
 import UniqSet
 import FastString
 import Outputable
 import Binary
 
-import GLAEXTS
-
-import Data.Char	( isUpper, isLower, ord )
+import GHC.Exts
+import Data.Char
 
 -- Unicode TODO: put isSymbol in libcompat
 #if __GLASGOW_HASKELL__ > 604

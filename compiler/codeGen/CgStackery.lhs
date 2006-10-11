@@ -1,7 +1,6 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-% $Id: CgStackery.lhs,v 1.27 2004/09/30 10:35:49 simonpj Exp $
 %
 \section[CgStackery]{Stack management functions}
 
@@ -24,16 +23,16 @@ module CgStackery (
 #include "HsVersions.h"
 
 import CgMonad
-import CgUtils		( cmmOffsetB, cmmRegOffW )
-import CgProf		( initUpdFrameProf )
+import CgUtils
+import CgProf
 import SMRep
 import Cmm
-import CmmUtils		( CmmStmts, mkLblExpr )
-import CLabel		( mkUpdInfoLabel )
+import CmmUtils
+import CLabel
 import Constants
-import Util		( sortLe )
-import FastString	( LitString )
-import OrdList		( toOL )
+import Util
+import FastString
+import OrdList
 import Outputable
 \end{code}
 

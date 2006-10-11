@@ -1,7 +1,9 @@
-
+%
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[MatchCon]{Pattern-matching constructors}
+
+Pattern-matching constructors
 
 \begin{code}
 module MatchCon ( matchConFamily ) where
@@ -10,19 +12,17 @@ module MatchCon ( matchConFamily ) where
 
 import {-# SOURCE #-} Match	( match )
 
-import HsSyn		( Pat(..), LPat, HsConDetails(..), HsRecField(..) )
-import DsBinds		( dsLHsBinds )
-import DataCon		( DataCon, dataConInstOrigArgTys, dataConEqSpec,
-			  dataConFieldLabels, dataConSourceArity )
-import TcType		( tcTyConAppArgs )
-import Type		( mkTyVarTys )
+import HsSyn
+import DsBinds
+import DataCon
+import TcType
+import Type
 import CoreSyn
 import DsMonad
 import DsUtils
 
-import Id		( Id, idName )
-import Type             ( Type )
-import SrcLoc		( unLoc, Located(..) )
+import Id
+import SrcLoc
 import Outputable
 \end{code}
 

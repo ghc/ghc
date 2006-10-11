@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 
@@ -175,80 +176,46 @@ compiled with -O.  I think this is the case.]
 \begin{code}
 #include "HsVersions.h"
 
-import IfaceSyn		-- All of it
+import IfaceSyn
 import IfaceType
-import LoadIface	( readIface, loadInterface, pprModIface )
-import Id		( Id, idName, idType, idInfo, idArity, isDataConWorkId_maybe, isFCallId_maybe )
-import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..), 
-			  arityInfo, cafInfo, newStrictnessInfo, 
-			  workerInfo, unfoldingInfo, inlinePragInfo )
-import NewDemand	( isTopSig )
+import LoadIface
+import Id
+import IdInfo
+import NewDemand
 import CoreSyn
-import Class		( classExtraBigSig, classTyCon )
-import TyCon		( TyCon, AlgTyConRhs(..), SynTyConRhs(..),
-			  isRecursiveTyCon, isForeignTyCon, 
-			  isSynTyCon, isAlgTyCon, isPrimTyCon, isFunTyCon,
-			  isTupleTyCon, tupleTyConBoxity, tyConStupidTheta,
-			  tyConHasGenerics, synTyConRhs, isGadtSyntaxTyCon,
-			  tyConArity, tyConTyVars, algTyConRhs, tyConExtName,
-			  tyConFamInst_maybe )
-import DataCon		( dataConName, dataConFieldLabels, dataConStrictMarks,
-			  dataConTyCon, dataConIsInfix, dataConUnivTyVars,
-			  dataConExTyVars, dataConEqSpec, dataConTheta,
-			  dataConOrigArgTys ) 
-import Type		( TyThing(..), splitForAllTys, funResultTy )
-import TcType		( deNoteType )
-import TysPrim		( alphaTyVars )
-import InstEnv		( Instance(..) )
-import FamInstEnv	( FamInst(..) )
+import Class
+import TyCon
+import DataCon
+import Type
+import TcType
+import TysPrim
+import InstEnv
+import FamInstEnv
 import TcRnMonad
-import HscTypes		( ModIface(..), ModDetails(..), 
-			  ModGuts(..), HscEnv(..), hscEPS, Dependencies(..),
-			  FixItem(..), 
-			  ModSummary(..), msHiFilePath, 
-			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
-			  typeEnvElts,
-			  GenAvailInfo(..), availName, AvailInfo,
-			  ExternalPackageState(..),
-			  Usage(..), IsBootInterface,
-			  Deprecs(..), IfaceDeprecs, Deprecations,
-			  lookupIfaceByModule, isImplicitTyThing
-			)
+import HscTypes
 
-
-import DynFlags		( GhcMode(..), DynFlags(..), DynFlag(..), dopt )
-import Name		( Name, nameModule, nameModule_maybe, nameOccName,
-			  isExternalName, isInternalName, isWiredInName,
-			  NamedThing(..) )
+import DynFlags
+import Name
 import NameEnv
 import NameSet
-import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
-			  extendOccEnv_C,
-			  OccSet, emptyOccSet, elemOccSet, occSetElts, 
-			  extendOccSet, extendOccSetList, mkOccSet,
-			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
-                          unionOccSets, unitOccSet,
-			  occNameFS, isTcOcc )
+import OccName
 import Module
-import BinIface		( readBinIface, writeBinIface, v_IgnoreHiWay )
-import Unique		( Unique, Uniquable(..) )
-import ErrUtils		( dumpIfSet_dyn, showPass )
-import Digraph		( stronglyConnComp, SCC(..) )
-import SrcLoc		( SrcSpan )
-import PackageConfig	( PackageId )
+import BinIface
+import Unique
+import ErrUtils
+import Digraph
+import SrcLoc
+import PackageConfig    hiding ( Version )
 import Outputable
 import BasicTypes       hiding ( SuccessFlag(..) )
 import UniqFM
 import Util             hiding ( eqListBy )
 import FiniteMap
 import FastString
+import Maybes
 
-import Data.List        ( partition )
-import DATA_IOREF	( writeIORef )
-import Monad		( when )
-import List		( insert )
-import Maybes		( orElse, mapCatMaybes, isNothing, isJust, 
-			  expectJust, catMaybes, MaybeErr(..) )
+import Control.Monad
+import Data.List
 \end{code}
 
 

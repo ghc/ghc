@@ -1,36 +1,31 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 %
 % Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
-\section{Module @Check@ in @deSugar@}
 
 \begin{code}
-
-
 module Check ( check , ExhaustivePat ) where
 
+#include "HsVersions.h"
 
 import HsSyn		
-import TcHsSyn		( hsLPatType, mkVanillaTuplePat )
-import TcType		( tcTyConAppTyCon )
-import DsUtils		( EquationInfo(..), MatchResult(..), 
-			  CanItFail(..), firstPat )
-import MatchLit		( tidyLitPat, tidyNPat )
-import Id		( Id, idType )
-import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConFieldLabels )
-import Name             ( Name, mkInternalName, getOccName, isDataSymOcc,
-			  getName, mkVarOccFS )
+import TcHsSyn
+import TcType
+import DsUtils
+import MatchLit
+import Id
+import DataCon
+import Name
 import TysWiredIn
-import PrelNames	( unboundKey )
-import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
-import BasicTypes	( Boxity(..) )
-import SrcLoc		( noSrcLoc, Located(..), unLoc, noLoc )
+import PrelNames
+import TyCon
+import BasicTypes
+import SrcLoc
 import UniqSet
-import Util             ( takeList, splitAtList, notNull )
+import Util
 import Outputable
 import FastString
-
-#include "HsVersions.h"
 \end{code}
 
 This module performs checks about if one list of equations are:

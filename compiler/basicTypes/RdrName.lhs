@@ -1,8 +1,7 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-
-\section[RdrName]{@RdrName@}
 
 \begin{code}
 module RdrName (
@@ -41,14 +40,13 @@ module RdrName (
 #include "HsVersions.h"
 
 import OccName
-import Module   ( ModuleName, mkModuleNameFS, Module, moduleName )
-import Name	( Name, NamedThing(getName), nameModule,
-		  nameOccName, isExternalName, nameSrcLoc )
-import Maybes	( mapCatMaybes )
-import SrcLoc	( isGoodSrcLoc, isGoodSrcSpan, srcLocSpan, SrcSpan )
-import FastString ( FastString )
+import Module
+import Name
+import Maybes
+import SrcLoc
+import FastString
 import Outputable
-import Util	( thenCmp )
+import Util
 \end{code}
 
 %************************************************************************

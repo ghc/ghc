@@ -1,4 +1,4 @@
-\section[FamInst]{The @FamInst@ type: family instance heads}
+The @FamInst@ type: family instance heads
 
 \begin{code}
 module FamInst ( 
@@ -7,17 +7,13 @@ module FamInst (
 
 #include "HsVersions.h"
 
-import HscTypes   ( ExternalPackageState(..) )
-import FamInstEnv ( FamInstEnv, FamInst(..), famInstTyCon, extendFamInstEnv,
-		    pprFamInst, pprFamInsts )
-import TcMType	  ( tcInstSkolType )
-import TcType	  ( SkolemInfo(..), tcSplitTyConApp )
-import TcRnMonad  ( TcM, TcGblEnv(..), setGblEnv, getGblEnv, foldlM,
-		    setSrcSpan, addErr, getEps )
-import TyCon      ( tyConFamInst_maybe )
-import Type	  ( mkTyConApp )
-import Name	  ( getSrcLoc )
-import SrcLoc	  ( mkSrcSpan )
+import HscTypes
+import FamInstEnv
+import TcMType
+import TcType
+import TcRnMonad
+import TyCon
+import Type
 import Outputable
 \end{code}
 
@@ -81,6 +77,7 @@ addLocalFamInst home_fie famInst
 		-- OK, now extend the envt
 	; return (extendFamInstEnv home_fie famInst) }
 
+{-  UNUSED??? --SDM
 overlapErr famInst dupFamInst
   = addFamInstLoc famInst $
     addErr (hang (ptext SLIT("Overlapping family instance declarations:"))
@@ -90,4 +87,5 @@ addFamInstLoc famInst thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
     loc = getSrcLoc famInst
+-}
 \end{code}

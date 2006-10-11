@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
 \section[DataCon]{@DataCon@: Data Constructors}
@@ -29,26 +30,18 @@ module DataCon (
 
 #include "HsVersions.h"
 
-import Type		( Type, ThetaType, 
-			  substTyWith, substTyVar, mkTopTvSubst, 
-			  mkForAllTys, mkFunTys, mkTyConApp, mkTyVarTy, mkTyVarTys, 
-			  splitTyConApp_maybe, newTyConInstRhs, 
-			  mkPredTys, isStrictPred, pprType
-			)
-import Coercion		( isEqPred, mkEqPred )
-import TyCon		( TyCon, FieldLabel, tyConDataCons, 
-			  isProductTyCon, isTupleTyCon, isUnboxedTupleTyCon,
-                          isNewTyCon, isClosedNewTyCon, isRecursiveTyCon,
-                          tyConFamInst_maybe )
-import Class		( Class, classTyCon )
-import Name		( Name, NamedThing(..), nameUnique )
-import Var		( TyVar, Id )
-import BasicTypes	( Arity, StrictnessMark(..) )
+import Type
+import Coercion
+import TyCon
+import Class
+import Name
+import Var
+import BasicTypes
 import Outputable
-import Unique		( Unique, Uniquable(..) )
-import ListSetOps	( assoc, minusList )
-import Util		( zipEqual, zipWithEqual )
-import Maybes           ( expectJust )
+import Unique
+import ListSetOps
+import Util
+import Maybes
 import FastString
 \end{code}
 

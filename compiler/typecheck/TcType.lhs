@@ -131,44 +131,7 @@ module TcType (
 -- friends:
 import TypeRep		( Type(..), funTyCon, Kind )  -- friend
 
-import Type		(	-- Re-exports
-			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-			  tyVarsOfTheta, Kind, PredType(..), KindVar,
-			  ThetaType, isUnliftedTypeKind, unliftedTypeKind, 
-			  argTypeKind,
-			  liftedTypeKind, openTypeKind, mkArrowKind,
-		  	  tySuperKind, isLiftedTypeKind,
-			  mkArrowKinds, mkForAllTy, mkForAllTys,
-			  defaultKind, isSubArgTypeKind, isSubOpenTypeKind,
-			  mkFunTy, mkFunTys, zipFunTys, 
-			  mkTyConApp, mkAppTy,
-			  mkAppTys, applyTy, applyTys,
-			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy,
-			  mkPredTys, isUnLiftedType, 
-			  isUnboxedTupleType, isPrimitiveType,
-			  splitTyConApp_maybe,
-			  tidyTopType, tidyType, tidyPred, tidyTypes,
-			  tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
-			  tidyTyVarBndr, tidyOpenTyVar,
-			  tidyOpenTyVars, tidyKind,
-			  isSubKind, tcView,
-
-			  tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
-			  tcEqPred, tcCmpPred, tcEqTypeX, eqKind,
-
-			  TvSubst(..),
-			  TvSubstEnv, emptyTvSubst, mkTvSubst, zipTyEnv,
-			  mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst,
-			  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
-			  extendTvSubst, extendTvSubstList, isInScope, notElemTvSubst,
-		  	  substTy, substTys, substTyWith, substTheta, 
-			  substTyVar, substTyVarBndr, substPred, lookupTyVar,
-
-			  typeKind, repType, coreView, repSplitAppTy_maybe,
-			  pprKind, pprParendKind,
-			  pprType, pprParendType, pprTyThingCategory,
-			  pprPred, pprTheta, pprThetaArrow, pprClassPred
-			)
+import Type
 import TyCon		( TyCon, isUnLiftedTyCon, isSynTyCon, isOpenTyCon,
 			  synTyConDefn, tyConUnique )	 
 import DataCon		( DataCon, dataConStupidTheta, dataConResTys )
@@ -193,7 +156,8 @@ import Maybes		( maybeToBool, expectJust, mapCatMaybes )
 import ListSetOps	( hasNoDups )
 import List		( nubBy )
 import Outputable
-import DATA_IOREF
+
+import Data.IORef
 \end{code}
 
 
@@ -863,10 +827,6 @@ getClassPredTys_maybe _		        = Nothing
 getClassPredTys :: PredType -> (Class, [Type])
 getClassPredTys (ClassP clas tys) = (clas, tys)
 getClassPredTys other = panic "getClassPredTys"
-
-isEqPred :: PredType -> Bool
-isEqPred (EqPred {}) = True
-isEqPred _	     = False
 
 mkDictTy :: Class -> [Type] -> Type
 mkDictTy clas tys = mkPredTy (ClassP clas tys)

@@ -2,7 +2,7 @@
 --
 -- Code generation for ticky-ticky profiling
 --
--- (c) The University of Glasgow 2004
+-- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
@@ -40,32 +40,30 @@ module CgTicky (
 #include "../includes/DerivedConstants.h"
 	-- For REP_xxx constants, which are MachReps
 
-import ClosureInfo	( ClosureInfo, closureSize, slopSize, closureSMRep,
-			  closureUpdReqd, closureName, isStaticClosure )
+import ClosureInfo
 import CgUtils
 import CgMonad
-import SMRep		( ClosureType(..), smRepClosureType, CgRep )
+import SMRep
 
 import Cmm
 import MachOp
-import CmmUtils		( zeroCLit, mkIntCLit, mkLblExpr, cmmIndexExpr )
-import CLabel		( CLabel, mkRtsDataLabel, mkRednCountsLabel )
+import CmmUtils
+import CLabel
 
-import Name		( isInternalName )
-import Id		( Id, idType )
-import StaticFlags	( opt_DoTickyProfiling )
-import BasicTypes	( Arity )
-import FastString	( FastString, mkFastString, LitString )	
-import Constants	-- Lots of field offsets
+import Name
+import Id
+import StaticFlags
+import BasicTypes
+import FastString
+import Constants
 import Outputable
 
 -- Turgid imports for showTypeCategory
 import PrelNames
-import TcType		( Type, isDictTy, tcSplitTyConApp_maybe,
-			  tcSplitFunTy_maybe )
-import TyCon		( isPrimTyCon, isTupleTyCon, isEnumerationTyCon,
-			  maybeTyConSingleCon )
-import Maybe
+import TcType
+import TyCon
+
+import Data.Maybe
 
 -----------------------------------------------------------------------------
 --
@@ -83,7 +81,7 @@ staticTickyHdr
 emitTickyCounter :: ClosureInfo -> [Id] -> Int -> Code
 emitTickyCounter cl_info args on_stk
   = ifTicky $
-    do	{ mod_name <- moduleName
+    do	{ mod_name <- getModuleName
 	; fun_descr_lit <- mkStringCLit (fun_descr mod_name)
 	; arg_descr_lit <- mkStringCLit arg_descr
 	; emitDataLits ticky_ctr_label 	-- Must match layout of StgEntCounter

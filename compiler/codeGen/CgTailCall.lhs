@@ -1,13 +1,8 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.43 2005/06/21 10:44:41 simonmar Exp $
-%
-%********************************************************
-%*							*
-\section[CgTailCall]{Tail calls: converting @StgApps@}
-%*							*
-%********************************************************
+% Code generation for tail calls.
 
 \begin{code}
 module CgTailCall (
@@ -24,31 +19,27 @@ module CgTailCall (
 #include "HsVersions.h"
 
 import CgMonad
-import CgBindery	( getArgAmodes, getCgIdInfo, CgIdInfo, maybeLetNoEscape,
-			  idInfoToAmode, cgIdInfoId, cgIdInfoLF,
-			  cgIdInfoArgRep )
-import CgInfoTbls	( entryCode, emitDirectReturnInstr, dataConTagZ,
-			  emitVectoredReturnInstr, closureInfoPtr )
+import CgBindery
+import CgInfoTbls
 import CgCallConv
-import CgStackery	( setRealSp, mkStkAmodes, adjustStackHW,
-			  getSpRelOffset )
-import CgHeapery	( setRealHp, getHpRelOffset )
-import CgUtils		( emitSimultaneously )
+import CgStackery
+import CgHeapery
+import CgUtils
 import CgTicky
 import ClosureInfo
-import SMRep		( CgRep, isVoidArg, separateByPtrFollowness )
+import SMRep
 import Cmm	
 import CmmUtils
-import CLabel		( CLabel, mkRtsPrimOpLabel, mkSeqInfoLabel )
-import Type		( isUnLiftedType )
-import Id		( Id, idName, idUnique, idType )
-import DataCon		( DataCon, dataConTyCon )
-import StgSyn		( StgArg )
-import TyCon            ( TyCon )
-import PrimOp		( PrimOp )
+import CLabel
+import Type
+import Id
+import DataCon
+import StgSyn
+import TyCon
+import PrimOp
 import Outputable
 
-import Monad		( when )
+import Control.Monad
 
 -----------------------------------------------------------------------------
 -- Tail Calls

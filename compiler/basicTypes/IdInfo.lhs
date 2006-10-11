@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 %
 \section[IdInfo]{@IdInfos@: Non-essential information about @Ids@}
@@ -75,31 +76,26 @@ module IdInfo (
 
 #include "HsVersions.h"
 
-
 import CoreSyn
-import Class		( Class )
-import PrimOp	 	( PrimOp )
-import Var              ( Id )
-import VarSet		( VarSet, emptyVarSet, seqVarSet )
-import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBreaker,
-			  InsideLam, insideLam, notInsideLam, 
-			  OneBranch, oneBranch, notOneBranch,
-			  Arity,
-			  Activation(..)
-			)
-import DataCon		( DataCon )
-import TyCon		( TyCon, FieldLabel )
-import ForeignCall	( ForeignCall )
+import Class
+import PrimOp
+import Var
+import VarSet
+import BasicTypes
+import DataCon
+import TyCon
+import ForeignCall
 import NewDemand
 import Outputable	
-import Maybe		( isJust )
+
+import Data.Maybe
 
 #ifdef OLD_STRICTNESS
-import Name		( Name )
-import Demand		hiding( Demand, seqDemand )
+import Name
+import Demand
 import qualified Demand
-import Util		( listLengthCmp )
-import List		( replicate )
+import Util
+import Data.List
 #endif
 
 -- infixl so you can say (id `set` a `set` b)

@@ -92,7 +92,7 @@ import FastString
 
 
 -- FIXME: fro debugging - remove this
-import TRACE    (trace)
+import Debug.Trace  (trace)
 
 -- standard
 import Monad        (liftM, foldM)

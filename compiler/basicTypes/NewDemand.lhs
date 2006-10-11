@@ -1,4 +1,5 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[Demand]{@Demand@: the amount of demand on a value}
@@ -24,11 +25,11 @@ module NewDemand(
 
 #include "HsVersions.h"
 
-import StaticFlags	( opt_CprOff )
-import BasicTypes	( Arity )
-import VarEnv		( VarEnv, emptyVarEnv, isEmptyVarEnv )
-import UniqFM		( ufmToList )
-import Util             ( listLengthCmp, zipWithEqual )
+import StaticFlags
+import BasicTypes
+import VarEnv
+import UniqFM
+import Util
 import Outputable
 \end{code}
 

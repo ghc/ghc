@@ -1,3 +1,5 @@
+% (c) The University of Glasgow 2006
+
 \section[CprAnalyse]{Identify functions that always return a
 constructed product result}
 
@@ -11,16 +13,15 @@ module CprAnalyse ( cprAnalyse ) where
 
 #include "HsVersions.h"
 
-import DynFlags	( DynFlags, DynFlag(..) )
-import CoreLint		( showPass, endPass )
+import DynFlags
+import CoreLint
 import CoreSyn
-import CoreUtils	( exprIsHNF )
-import Id               ( Id, setIdCprInfo, idCprInfo, idArity,
-			  isBottomingId, idDemandInfo, isImplicitId )
-import IdInfo           ( CprInfo(..) )
-import Demand		( isStrict )
+import CoreUtils
+import Id
+import IdInfo
+import Demand
 import VarEnv
-import Util		( nTimes, mapAccumL )
+import Util
 import Outputable
 
 import Maybe

@@ -1,9 +1,9 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1998
 %
-\section[DsCCall]{Desugaring \tr{foreign} declarations}
 
-Expanding out @foreign import@ and @foreign export@ declarations.
+Desugaring foreign declarations (see also DsCCall).
 
 \begin{code}
 module DsForeign ( dsForeigns ) where
@@ -13,48 +13,33 @@ import TcRnMonad	-- temp
 
 import CoreSyn
 
-import DsCCall		( dsCCall, mkFCall, boxResult, unboxArg, resultWrapper )
+import DsCCall
 import DsMonad
 
-import HsSyn		( ForeignDecl(..), ForeignExport(..), LForeignDecl,
-			  ForeignImport(..), CImportSpec(..) )
-import DataCon		( splitProductType_maybe )
-#ifdef DEBUG
-import DataCon		( dataConSourceArity )
-import Type		( isUnLiftedType )
-#endif
-import MachOp		( machRepByteWidth, MachRep(..) )
-import SMRep		( argMachRep, typeCgRep )
-import CoreUtils	( exprType, mkInlineMe )
-import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
-import Literal		( Literal(..), mkStringLit )
-import Module		( moduleNameFS, moduleName )
-import Name		( getOccString, NamedThing(..) )
-import Type		( repType, coreEqType )
-import Coercion         ( mkUnsafeCoercion )
-import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
-			  mkFunTy, tcSplitTyConApp_maybe, tcSplitIOType_maybe,
-			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
-			  isBoolTy
-			)
+import HsSyn
+import DataCon
+import MachOp
+import SMRep
+import CoreUtils
+import Id
+import Literal
+import Module
+import Name
+import Type
+import Coercion
+import TcType
 
-import BasicTypes       ( Boxity(..) )
-import HscTypes		( ForeignStubs(..) )
-import ForeignCall	( ForeignCall(..), CCallSpec(..), 
-			  Safety(..), 
-			  CExportSpec(..), CLabelString,
-			  CCallConv(..), ccallConvToInt,
-			  ccallConvAttribute
-			)
-import TysWiredIn	( unitTy, tupleTyCon )
-import TysPrim		( addrPrimTy, mkStablePtrPrimTy, alphaTy, intPrimTy )
-import PrelNames	( stablePtrTyConName, newStablePtrName, bindIOName,
-			  checkDotnetResName )
-import BasicTypes	( Activation( NeverActive ) )
-import SrcLoc		( Located(..), unLoc )
+import HscTypes
+import ForeignCall
+import TysWiredIn
+import TysPrim
+import PrelNames
+import BasicTypes
+import SrcLoc
 import Outputable
-import Maybe 		( fromJust, isNothing )
 import FastString
+
+import Data.Maybe
 \end{code}
 
 Desugaring of @foreign@ declarations is naturally split up into

@@ -1,7 +1,6 @@
 %
+% (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-% $Id: CgClosure.lhs,v 1.72 2005/05/18 12:06:51 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -23,34 +22,29 @@ import {-# SOURCE #-} CgExpr ( cgExpr )
 import CgMonad
 import CgBindery
 import CgHeapery
-import CgStackery	( mkVirtStkOffsets, pushUpdateFrame, getVirtSp,
-			  setRealAndVirtualSp )
-import CgProf		( chooseDynCostCentres, ldvEnter, enterCostCentre,
-			  costCentreFrom )
+import CgStackery
+import CgProf
 import CgTicky
-import CgParallel	( granYield, granFetchAndReschedule )
-import CgInfoTbls	( emitClosureCodeAndInfoTable, getSRTInfo )
-import CgCallConv	( assignCallRegs, mkArgDescr )
-import CgUtils		( emitDataLits, addIdReps, cmmRegOffW, 
-			  emitRtsCallWithVols )
-import ClosureInfo	-- lots and lots of stuff
-import SMRep		( CgRep, cgRepSizeW, argMachRep, fixedHdrSize, WordOff,
-			  idCgRep )
-import MachOp		( MachHint(..) )
+import CgParallel
+import CgInfoTbls
+import CgCallConv
+import CgUtils
+import ClosureInfo
+import SMRep
+import MachOp
 import Cmm
-import CmmUtils		( CmmStmts, mkStmts, oneStmt, plusStmts, noStmts,
-			  mkLblExpr )
+import CmmUtils
 import CLabel
 import StgSyn
-import StaticFlags	( opt_DoTickyProfiling )
+import StaticFlags
 import CostCentre	
-import Id		( Id, idName, idType )
-import Name		( Name, isExternalName )
-import Module		( Module, pprModule )
-import ListSetOps	( minusList )
-import Util		( isIn, mapAccumL, zipWithEqual )
-import BasicTypes	( TopLevelFlag(..) )
-import Constants	( oFFSET_StgInd_indirectee, wORD_SIZE )
+import Id
+import Name
+import Module
+import ListSetOps
+import Util
+import BasicTypes
+import Constants
 import Outputable
 import FastString
 \end{code}
@@ -79,7 +73,7 @@ cgTopRhsClosure id ccs binder_info srt upd_flag args body = do
     let name = idName id
   ; lf_info  <- mkClosureLFInfo id TopLevel [] upd_flag args
   ; srt_info <- getSRTInfo name srt
-  ; mod_name <- moduleName
+  ; mod_name <- getModuleName
   ; let descr         = closureDescription mod_name name
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name
@@ -118,7 +112,7 @@ cgStdRhsClosure bndr cc bndr_info fvs args body lf_info payload
   = do	-- AHA!  A STANDARD-FORM THUNK
   {	-- LAY OUT THE OBJECT
     amodes <- getArgAmodes payload
-  ; mod_name <- moduleName
+  ; mod_name <- getModuleName
   ; let (tot_wds, ptr_wds, amodes_w_offsets) 
 	    = mkVirtHeapOffsets (isLFThunk lf_info) amodes
 
@@ -169,7 +163,7 @@ cgRhsClosure bndr cc bndr_info srt fvs upd_flag args body = do
   ; lf_info <- mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
   ; fv_infos <- mapFCs getCgIdInfo reduced_fvs
   ; srt_info <- getSRTInfo name srt
-  ; mod_name <- moduleName
+  ; mod_name <- getModuleName
   ; let	bind_details :: [(CgIdInfo, VirtualHpOffset)]
 	(tot_wds, ptr_wds, bind_details) 
 	   = mkVirtHeapOffsets (isLFThunk lf_info) (map add_rep fv_infos)
