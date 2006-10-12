@@ -14,7 +14,11 @@ import TcType
 import TcRnMonad
 import TyCon
 import Type
+import Name
+import SrcLoc
 import Outputable
+
+import Monad
 \end{code}
 
 
@@ -51,41 +55,42 @@ addLocalFamInst home_fie famInst
 	      ty    = case tyConFamInst_maybe tycon of
 		        Nothing        -> panic "FamInst.addLocalFamInst"
 			Just (tc, tys) -> tc `mkTyConApp` tys
-	; (tvs', theta', tau') <- tcInstSkolType (FamInstSkol tycon) ty
+	; (tvs', _, tau') <- tcInstSkolType (FamInstSkol tycon) ty
 
-	; let	(fam, tys') = tcSplitTyConApp tau'
+	; let (fam, tys') = tcSplitTyConApp tau'
 
 		-- Load imported instances, so that we report
 		-- overlaps correctly
 	; eps <- getEps
 	; let inst_envs = (eps_fam_inst_env eps, home_fie)
 
-{- !!!TODO: Need to complete this:
-		-- Check for overlapping instance decls
-	; let { (matches, _) = lookupFamInstEnv inst_envs fam tys'
-	      ;	dup_ispecs = [ dup_ispec   --!!!adapt
-			     | (_, dup_ispec) <- matches
-			     , let (_,_,_,dup_tys) = instanceHead dup_ispec
-			     , isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)] }
-		-- Find memebers of the match list which ispec itself matches.
-		-- If the match is 2-way, it's a duplicate
-	; case dup_ispecs of
-	    dup_ispec : _ -> dupInstErr famInst dup_ispec
-	    []            -> return ()
- -}
+		-- Check for conflicting instance decls
+	; let { matches   = lookupFamInstEnvUnify inst_envs fam tys'
+	      ;	conflicts = [ conflictingFamInst
+			    | match@(_, conflictingFamInst) <- matches
+			    , conflicting fam tys' tycon match 
+			    ]
+              }
+	; unless (null conflicts) $
+	    conflictInstErr famInst (head conflicts)
 
 		-- OK, now extend the envt
-	; return (extendFamInstEnv home_fie famInst) }
+	; return (extendFamInstEnv home_fie famInst) 
+        }
+  where
+    -- In the case of data/newtype instances, any overlap is a conflicts (as
+    -- these instances imply injective type mappings).
+    conflicting _   _    tycon _                 | isAlgTyCon tycon = True
+    conflicting fam tys' tycon (subst, cFamInst) | otherwise	  =
+      panic "FamInst.addLocalFamInst: overlap check for indexed synonyms is still missing"
 
-{-  UNUSED??? --SDM
-overlapErr famInst dupFamInst
+conflictInstErr famInst conflictingFamInst
   = addFamInstLoc famInst $
-    addErr (hang (ptext SLIT("Overlapping family instance declarations:"))
-	       2 (pprFamInsts [famInst, dupFamInst]))
+    addErr (hang (ptext SLIT("Conflicting family instance declarations:"))
+	       2 (pprFamInsts [famInst, conflictingFamInst]))
 
 addFamInstLoc famInst thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
     loc = getSrcLoc famInst
--}
 \end{code}

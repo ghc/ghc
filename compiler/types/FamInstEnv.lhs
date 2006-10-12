@@ -11,13 +11,15 @@ module FamInstEnv (
 
 	FamInstEnv, emptyFamInstEnv, extendFamInstEnv, extendFamInstEnvList, 
 	famInstEnvElts, familyInstances,
-	lookupFamInstEnv
+
+	lookupFamInstEnv, lookupFamInstEnvUnify
     ) where
 
 #include "HsVersions.h"
 
 import InstEnv
 import Unify
+import TcGadt
 import TcType
 import Type
 import TyCon
@@ -210,6 +212,7 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
 		     | otherwise                   -> find insts
 
     --------------
+    find [] = []
     find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, 
 			  fi_tys = tpl_tys, fi_tycon = tycon }) : rest)
 	-- Fast check for no match, uses the "rough match" fields
@@ -223,4 +226,61 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
         -- No match => try next
       | otherwise
       = find rest
+\end{code}
+
+While @lookupFamInstEnv@ uses a one-way match, the next function
+@lookupFamInstEnvUnify@ uses two-way matching (ie, unification).  This is
+needed to check for overlapping instances.
+
+For class instances, these two variants of lookup are combined into one
+function (cf, @InstEnv@).  We don't do that for family instances as the
+results of matching and unification are used in two different contexts.
+Moreover, matching is the wildly more frequently used operation in the case of
+indexed synonyms and we don't want to slow that down by needless unification.
+
+\begin{code}
+lookupFamInstEnvUnify :: (FamInstEnv, FamInstEnv) -> TyCon -> [Type]
+	              -> [(TvSubst, FamInst)]
+lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
+  = home_matches ++ pkg_matches
+  where
+    rough_tcs    = roughMatchTcs tys
+    all_tvs      = all isNothing rough_tcs
+    home_matches = lookup home_ie 
+    pkg_matches  = lookup pkg_ie  
+
+    --------------
+    lookup env = case lookupUFM env fam of
+		   Nothing -> []	-- No instances for this class
+		   Just (FamIE insts has_tv_insts)
+		       -- Short cut for common case:
+		       --   The thing we are looking up is of form (C a
+		       --   b c), and the FamIE has no instances of
+		       --   that form, so don't bother to search 
+		     | all_tvs && not has_tv_insts -> []
+		     | otherwise                   -> find insts
+
+    --------------
+    find [] = []
+    find (item@(FamInst { fi_tcs = mb_tcs, fi_tvs = tpl_tvs, 
+			  fi_tys = tpl_tys, fi_tycon = tycon }) : rest)
+	-- Fast check for no match, uses the "rough match" fields
+      | instanceCantMatch rough_tcs mb_tcs
+      = find rest
+
+      | otherwise
+      = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
+		 (ppr fam <+> ppr tys <+> ppr all_tvs) $$
+		 (ppr tycon <+> ppr tpl_tvs <+> ppr tpl_tys)
+		)
+		-- Unification will break badly if the variables overlap
+		-- They shouldn't because we allocate separate uniques for them
+        case tcUnifyTys bind_fn tpl_tys tys of
+	    Just subst -> (subst, item) : find rest
+	    Nothing    -> find rest
+
+-- See explanation at @InstEnv.bind_fn@.
+--
+bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
+	   | otherwise	 		 	   = BindMe
 \end{code}
