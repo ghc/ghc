@@ -317,7 +317,7 @@ splitThunk transforms like this:
 Now simplifier will transform to
 
       case x-rhs of 
-	I# a ->	let x* = I# b 
+	I# a ->	let x* = I# a 
 	        in body
 
 which is what we want. Now suppose x-rhs is itself a case:

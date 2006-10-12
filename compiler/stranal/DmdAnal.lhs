@@ -474,7 +474,22 @@ The thunk_cpr_ok stuff [CPR-AND-STRICTNESS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the rhs is a thunk, we usually forget the CPR info, because
 it is presumably shared (else it would have been inlined, and 
-so we'd lose sharing if w/w'd it into a function.
+so we'd lose sharing if w/w'd it into a function).  E.g.
+
+	let r = case expensive of
+		  (a,b) -> (b,a)
+	in ...
+
+If we marked r as having the CPR property, then we'd w/w into
+
+	let $wr = \() -> case expensive of
+			    (a,b) -> (# b, a #)
+	    r = case $wr () of
+		  (# b,a #) -> (b,a)
+	in ...
+
+But now r is a thunk, which won't be inlined, so we are no further ahead.
+
 
 However, if the strictness analyser has figured out (in a previous 
 iteration) that it's strict, then we DON'T need to forget the CPR info.
