@@ -136,7 +136,7 @@ import Control.Parallel
 
 nfib :: Int -&#62; Int
 nfib n | n &#60;= 1 = 1
-       | otherwise = par n1 (seq n2 (n1 + n2))
+       | otherwise = par n1 (seq n2 (n1 + n2 + 1))
                      where n1 = nfib (n-1)
                            n2 = nfib (n-2)</programlisting>
 
@@ -149,8 +149,8 @@ nfib n | n &#60;= 1 = 1
       (leaving the parent to evaluate the other branch).  Also, we must use
       <function>seq</function> to ensure that the parent will evaluate
       <varname>n2</varname> <emphasis>before</emphasis> <varname>n1</varname>
-      in the expression <literal>(n1 + n2)</literal>.  It is not sufficient
-      to reorder the expression as <literal>(n2 + n1)</literal>, because
+      in the expression <literal>(n1 + n2 + 1)</literal>.  It is not sufficient
+      to reorder the expression as <literal>(n2 + n1 + 1)</literal>, because
       the compiler may not generate code to evaluate the addends from left to
       right.</para>
 
