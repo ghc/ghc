@@ -5,15 +5,17 @@ EXTRA_HBC_FLAGS = -H16M -A1M
 
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
-	Data/Either.hs Data/FiniteMap.hs Data/IORef.hs Data/Int.hs \
+	Data/Either.hs Data/IORef.hs Data/Int.hs \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
 	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
 	Data/HashTable.hs Data/Typeable.hs Data/Dynamic.hs \
 	Data/Monoid.hs Data/Queue.hs Data/Tree.hs \
 	Data/Map.hs Data/IntMap.hs Data/IntSet.hs Data/FunctorM.hs \
 	Data/Eq.hs Data/Ord.hs \
+	Data/Foldable.hs Data/Traversable.hs \
 	Control/Monad.hs Control/Monad/Fix.hs \
-	Control/Arrow.hs Debug/Trace.hs \
+	Control/Arrow.hs Control/Applicative.hs \
+	Debug/Trace.hs \
 	NHC/SizedTypes.hs \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
 	System/Environment.hs System/Exit.hs System/Locale.hs \
