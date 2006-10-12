@@ -17,7 +17,8 @@ Release:        %{release}
 License:        BSD-like
 Group:          Development/Languages/Haskell
 URL:            http://haskell.org/ghc/
-Source:         http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src.tar.bz2
+Source0:        http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src.tar.bz2
+Source1:        http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src-extralibs.tar.bz2
 Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Prefix:         %{_prefix}
@@ -78,7 +79,7 @@ Profiling libraries for Glorious Glasgow Haskell Compilation System
 needed.
 
 %prep
-%setup
+%setup -b1
 
 %build
 test -f configure || autoreconf
