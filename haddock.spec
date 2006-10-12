@@ -5,7 +5,7 @@
 # If this file is part of a tarball, you can build RPMs directly from
 # the tarball by using the following command:
 #
-#    rpm -ta haddock-(VERSION)-src.tar.gz
+#    rpm -ta haddock-(VERSION).tar.gz
 #
 # The resulting package will be placed in the RPMS/(arch) subdirectory
 # of your RPM build directory (usually /usr/src/redhat or ~/rpm), with
@@ -26,7 +26,7 @@ Release:        %{release}
 License:        BSD-like
 Group:          Development/Languages/Haskell
 URL:            http://haskell.org/haddock/
-Source:         http://haskell.org/haddock/haddock-%{version}-src.tar.gz
+Source:         http://haskell.org/haddock/haddock-%{version}.tar.gz
 Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 Prefix:         %{_prefix}
