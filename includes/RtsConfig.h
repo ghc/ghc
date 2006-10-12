@@ -46,15 +46,6 @@
 #  define LAZY_BLACKHOLING
 #endif
 
-/* TABLES_NEXT_TO_CODE says whether to assume that info tables are
- * assumed to reside just before the code for a function.
- *
- * UNDEFINING THIS WON'T WORK ON ITS OWN.  You have been warned.
- */
-#if !defined(USE_MINIINTERPRETER) && !defined(ia64_HOST_ARCH) && !defined (powerpc64_HOST_ARCH)
-#define TABLES_NEXT_TO_CODE
-#endif
-
 /* -----------------------------------------------------------------------------
    Labels - entry labels & info labels point to the same place in
    TABLES_NEXT_TO_CODE, so we only generate the _info label.  Jumps

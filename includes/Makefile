@@ -9,10 +9,18 @@ include $(TOP)/mk/boilerplate.mk
 H_FILES = $(filter-out gmp.h,$(wildcard *.h)) gmp.h
 
 #
-# Options -- if we're building unregisterised, add a couple of -D's
+# Options
 #
-ifeq "$(GhcUnregisterised)" "YES"
-SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
+ifeq "$(GhcWithNoRegs)" "YES"
+SRC_CC_OPTS += -DNO_REGS
+endif
+
+ifeq "$(GhcWithMiniInterpreter)" "YES"
+SRC_CC_OPTS += -DUSE_MINIINTERPRETER
+endif
+
+ifeq "$(GhcWithTablesNextToCode)" "YES"
+SRC_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
 SRC_CC_OPTS += -I. -I../rts

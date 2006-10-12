@@ -277,6 +277,23 @@ else
 GhcWithInterpreter=NO
 endif
 
+# GhcWithTablesNextToCode, which corresponds to the TABLES_NEXT_TO_CODE
+# CPP symbol, says whether to assume that info tables are assumed to
+# reside just before the code for a function.
+ifeq "$(GhcUnregisterised)" "YES"
+GhcWithTablesNextToCode=NO
+GhcWithNoRegs=YES
+GhcWithMiniInterpreter=YES
+else
+ifeq "$(findstring $(HostArch_CPP), ia64 powerpc64)" ""
+GhcWithTablesNextToCode=YES
+else
+GhcWithTablesNextToCode=NO
+endif
+GhcWithNoRegs=NO
+GhcWithMiniInterpreter=NO
+endif
+
 #
 # Building various ways?
 # (right now, empty if not).

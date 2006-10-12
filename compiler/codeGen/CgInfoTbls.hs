@@ -202,7 +202,7 @@ retVec :: CmmExpr -> CmmExpr -> CmmExpr
 -- Get a return vector from the info pointer
 retVec info_amode zero_indexed_tag
   = let slot = vectorSlot info_amode zero_indexed_tag
-#ifdef x86_64_TARGET_ARCH
+#if defined(x86_64_TARGET_ARCH) && defined(TABLES_NEXT_TO_CODE)
         tableEntry = CmmMachOp (MO_S_Conv I32 I64) [CmmLoad slot I32]
 	-- offsets are 32-bits on x86-64, due to the inability of
 	-- the tools to handle 64-bit PC-relative relocations.  See also

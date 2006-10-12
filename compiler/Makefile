@@ -346,6 +346,10 @@ endif
 	@echo "#define HOST_VENDOR \"$(TargetVendor_CPP)\"" >> $@
 	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\"" >> $@
 	@echo >> $@
+ifeq "$(GhcWithTablesNextToCode)" "YES"
+	@echo "#define TABLES_NEXT_TO_CODE 1" >> $@
+endif
+	@echo >> $@
 	@echo "#endif /* __PLATFORM_H__ */"          >> $@
 	@echo "Done."
 
