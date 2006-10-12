@@ -203,8 +203,8 @@ instance Bits Int where
         | i# >=# 0#        = I# (x# `iShiftL#` i#)
         | otherwise        = I# (x# `iShiftRA#` negateInt# i#)
     (I# x#) `rotate` (I# i#) =
-        I# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                       (x'# `shiftRL#` (wsib -# i'#))))
+        I# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+                       (x'# `uncheckedShiftRL#` (wsib -# i'#))))
         where
         x'# = int2Word# x#
         i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))

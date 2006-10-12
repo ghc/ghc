@@ -125,8 +125,8 @@ instance Bits Int8 where
         | i'# ==# 0# 
         = I8# x#
         | otherwise
-        = I8# (narrow8Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                                       (x'# `shiftRL#` (8# -# i'#)))))
+        = I8# (narrow8Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+                                       (x'# `uncheckedShiftRL#` (8# -# i'#)))))
         where
         x'# = narrow8Word# (int2Word# x#)
         i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
@@ -232,8 +232,8 @@ instance Bits Int16 where
         | i'# ==# 0# 
         = I16# x#
         | otherwise
-        = I16# (narrow16Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                                         (x'# `shiftRL#` (16# -# i'#)))))
+        = I16# (narrow16Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+                                         (x'# `uncheckedShiftRL#` (16# -# i'#)))))
         where
         x'# = narrow16Word# (int2Word# x#)
         i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
@@ -486,8 +486,8 @@ instance Bits Int32 where
         | i'# ==# 0# 
         = I32# x#
         | otherwise
-        = I32# (narrow32Int# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                                        (x'# `shiftRL#` (32# -# i'#)))))
+        = I32# (narrow32Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+                                         (x'# `uncheckedShiftRL#` (32# -# i'#)))))
         where
         x'# = narrow32Word# (int2Word# x#)
         i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
@@ -765,8 +765,8 @@ instance Bits Int64 where
         | i'# ==# 0# 
         = I64# x#
         | otherwise
-        = I64# (word2Int# ((x'# `shiftL#` i'#) `or#`
-                           (x'# `shiftRL#` (64# -# i'#))))
+        = I64# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
+                           (x'# `uncheckedShiftRL#` (64# -# i'#))))
         where
         x'# = int2Word# x#
         i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
