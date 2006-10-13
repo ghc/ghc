@@ -204,7 +204,7 @@ FILE *istream, *ostream; {
     }
 
     if (c==DEFNCHAR) {
-/*	myputc(' ',ostream);*/
+	myputc(' ',ostream);
         while (c=egetc(istream), !isLineTerm(c))
             myputc(c,ostream);
         myputc('\n',ostream);
