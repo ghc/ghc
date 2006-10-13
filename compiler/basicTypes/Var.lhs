@@ -40,6 +40,10 @@ import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, 
                                 IdInfo, seqIdInfo )
+#ifdef DEBUG
+import {-# SOURCE #-}	TypeRep( isCoercionKind )
+#endif
+
 import Name hiding (varName)
 import Unique
 import FastTypes
@@ -187,7 +191,8 @@ setTyVarKind tv k = tv {tyVarKind = k}
 
 \begin{code}
 mkTyVar :: Name -> Kind -> TyVar
-mkTyVar name kind = TyVar { varName    = name
+mkTyVar name kind = ASSERT( not (isCoercionKind kind ) )
+		    TyVar { varName    = name
 			  , realUnique = getKey# (nameUnique name)
 			  , tyVarKind  = kind
                           , isCoercionVar    = False
@@ -195,22 +200,12 @@ mkTyVar name kind = TyVar { varName    = name
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
-  = TcTyVar {	varName    = name,
+  = ASSERT( not (isCoercionKind kind) )
+    TcTyVar {	varName    = name,
 		realUnique = getKey# (nameUnique name),
 		tyVarKind  = kind,
 		tcTyVarDetails = details
 	}
-
-mkWildCoVar :: Kind -> TyVar
--- A type variable that is never referred to,
--- so its unique doesn't matter
-mkWildCoVar kind 
-  = TyVar { varName = mkSysTvName wild_uniq FSLIT("co_wild"),
-            realUnique = _ILIT(1),
-            tyVarKind = kind,
-            isCoercionVar = True }
-  where
-    wild_uniq = mkBuiltinUnique 1
 \end{code}
 
 %************************************************************************
@@ -228,12 +223,24 @@ setCoVarUnique = setVarUnique
 setCoVarName   = setVarName
 
 mkCoVar :: Name -> Kind -> CoVar
-mkCoVar name kind = TyVar { varName    = name
+mkCoVar name kind = ASSERT( isCoercionKind kind )
+		    TyVar { varName    = name
 			  , realUnique = getKey# (nameUnique name)
 			  , tyVarKind  = kind
                           , isCoercionVar    = True
 			}
 
+mkWildCoVar :: Kind -> TyVar
+-- A type variable that is never referred to,
+-- so its unique doesn't matter
+mkWildCoVar kind 
+  = ASSERT( isCoercionKind kind )
+    TyVar { varName = mkSysTvName wild_uniq FSLIT("co_wild"),
+            realUnique = _ILIT(1),
+            tyVarKind = kind,
+            isCoercionVar = True }
+  where
+    wild_uniq = mkBuiltinUnique 1
 \end{code}
 
 %************************************************************************

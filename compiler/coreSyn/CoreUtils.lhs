@@ -1120,7 +1120,8 @@ eta_expand n us expr ty
 
               Lam lam_tv (eta_expand n us2 (App expr (Type (mkTyVarTy lam_tv))) (substTyWith [tv] [mkTyVarTy lam_tv] ty'))
                   where 
-                    lam_tv = mkTyVar (mkSysTvName uniq FSLIT("etaT")) (tyVarKind tv)
+                    lam_tv = setVarName tv (mkSysTvName uniq FSLIT("etaT"))
+			-- Using tv as a base retains its tyvar/covar-ness
                     (uniq:us2) = us 
  	; Nothing ->
   

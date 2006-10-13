@@ -94,7 +94,7 @@ instToVar (LitInst {tci_name = nm, tci_ty = ty})
 instToVar (Method {tci_id = id}) 
   = id
 instToVar (Dict {tci_name = nm, tci_pred = pred})    
-  | isEqPred pred = Var.mkTyVar nm (mkPredTy pred)
+  | isEqPred pred = Var.mkCoVar nm (mkPredTy pred)
   | otherwise	  = mkLocalId nm (mkPredTy pred)
 
 instLoc inst = tci_loc inst

@@ -39,7 +39,7 @@ module Coercion (
 import TypeRep
 import Type
 import TyCon
-import Var hiding (isCoVar)
+import Var
 import Name
 import OccName
 import PrelNames
@@ -90,9 +90,6 @@ splitCoercionKind_maybe :: Kind -> Maybe (Type, Type)
 splitCoercionKind_maybe co | Just co' <- kindView co = splitCoercionKind_maybe co'
 splitCoercionKind_maybe (PredTy (EqPred ty1 ty2)) = Just (ty1, ty2)
 splitCoercionKind_maybe other = Nothing
-
-isCoVar :: Var -> Bool
-isCoVar tv = isTyVar tv && isCoercionKind (tyVarKind tv)
 
 type Coercion     = Type
 type CoercionKind = Kind	-- A CoercionKind is always of form (ty1 :=: ty2)

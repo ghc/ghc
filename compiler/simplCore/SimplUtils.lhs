@@ -44,7 +44,6 @@ import Id		( Id, idType, isDataConWorkId, idOccInfo, isDictId,
 			)
 import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
-import Var              ( tyVarKind, mkTyVar )
 import Name             ( mkSysTvName )
 import Type		( Type, splitFunTys, dropForAlls, isStrictType,
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys ) 

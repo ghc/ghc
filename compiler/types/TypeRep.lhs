@@ -22,7 +22,7 @@ module TypeRep (
 	liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind,
 	isLiftedTypeKindCon, isLiftedTypeKind,
-	mkArrowKind, mkArrowKinds,
+	mkArrowKind, mkArrowKinds, isCoercionKind,
 
         -- Kind constructors...
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
@@ -386,14 +386,21 @@ isCoSuperKind (TyConApp kc []) = kc `hasKey` coSuperKindTyConKey
 isCoSuperKind other            = False
 
 -------------------
--- lastly we need a few functions on Kinds
+-- Lastly we need a few functions on Kinds
 
 isLiftedTypeKindCon tc    = tc `hasKey` liftedTypeKindTyConKey
 
+isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind (TyConApp tc []) = isLiftedTypeKindCon tc
 isLiftedTypeKind other            = False
 
-
+isCoercionKind :: Kind -> Bool
+-- All coercions are of form (ty1 :=: ty2)
+-- This function is here rather than in Coercion, 
+-- because it's used in a knot-tied way to enforce invariants in Var
+isCoercionKind (NoteTy _ k)         = isCoercionKind k
+isCoercionKind (PredTy (EqPred {})) = True
+isCoercionKind other		    = False
 \end{code}
 
 

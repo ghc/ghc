@@ -1010,8 +1010,11 @@ bindIfaceTyVars bndrs thing_inside
     (occs,kinds) = unzip bndrs
 
 mk_iface_tyvar :: Name -> IfaceKind -> IfL TyVar
-mk_iface_tyvar name ifKind = do { kind <- tcIfaceType ifKind
-                                ; return (Var.mkTyVar name kind)
-                                }
+mk_iface_tyvar name ifKind
+   = do { kind <- tcIfaceType ifKind
+	; if isCoercionKind kind then 
+		return (Var.mkCoVar name kind)
+	  else
+		return (Var.mkTyVar name kind) }
 \end{code}
 

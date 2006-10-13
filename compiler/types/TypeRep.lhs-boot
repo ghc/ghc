@@ -12,6 +12,8 @@ type SuperKind = Type
 tySuperKind :: SuperKind
 coSuperKind :: SuperKind
 
+isCoercionKind :: Kind -> Bool
+
 isCoSuperKind :: SuperKind -> Bool
 \end{code}
 

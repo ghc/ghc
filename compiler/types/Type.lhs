@@ -1289,7 +1289,7 @@ substTyVarBndr subst@(TvSubst in_scope env) old_var
 	| is_co_var = setTyVarKind old_var (substTy subst kind)
 	| otherwise = old_var
     kind = tyVarKind old_var
-    is_co_var = isCoercionKind kind
+    is_co_var = isCoVar old_var
 \end{code}
 
 ----------------------------------------------------
@@ -1464,14 +1464,6 @@ defaultKind k
   | isSubOpenTypeKind k = liftedTypeKind
   | isSubArgTypeKind k  = liftedTypeKind
   | otherwise        = k
-
-isCoercionKind :: Kind -> Bool
--- All coercions are of form (ty1 :=: ty2)
--- This function is here rather than in Coercion, 
--- because it's used by substTy
-isCoercionKind k | Just k' <- kindView k = isCoercionKind k'
-isCoercionKind (PredTy (EqPred {})) 	 = True
-isCoercionKind other			 = False
 
 isEqPred :: PredType -> Bool
 isEqPred (EqPred _ _) = True
