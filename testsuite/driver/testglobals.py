@@ -143,6 +143,9 @@ class TestOptions:
        # any other threads
        self.alone = 0
 
+       # Does this test use a literate (.lhs) file?
+       self.literate = 0
+
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()

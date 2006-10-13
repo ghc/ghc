@@ -183,6 +183,10 @@ def _skip_if_platform( opts, plat ):
 def alone(opts):
     opts.alone = 1
 
+# ---
+def literate( opts ):
+    opts.literate = 1;
+
 # ----
 # Function for composing two opt-fns together
 
@@ -524,7 +528,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
     if top_mod != '':
         srcname = top_mod
     else:
-        srcname = add_suffix(name, 'hs')
+        srcname = add_hs_lhs_suffix(name)
 
     to_do = ''
     if top_mod != '':
@@ -626,7 +630,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail(name)
     
     if (top_mod == ''):
-        srcname = add_suffix(name, 'hs')
+        srcname = add_hs_lhs_suffix(name)
     else:
         srcname = top_mod
         
@@ -734,7 +738,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail( qualify(name, '') )
 
     if (top_mod == ''):
-        srcname = add_suffix(name, 'hs')
+        srcname = add_hs_lhs_suffix(name)
     else:
         srcname = top_mod
 
@@ -948,6 +952,12 @@ def add_suffix( name, suffix ):
         return name
     else:
         return name + '.' + suffix    
+
+def add_hs_lhs_suffix(name):
+    if getTestOpts().literate:
+        return add_suffix(name, 'lhs')
+    else:
+        return add_suffix(name, 'hs')
 
 def in_testdir( name ):
     return os.path.join(testdir, name)
