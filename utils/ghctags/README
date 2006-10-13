@@ -1,0 +1,13 @@
+This program should eventually replace the lexically-based
+tags program.  But before this can happen, several problems 
+must be addressed:
+
+  * Performance is disastrous: it takes much longer to run ghctags
+    than it does to compile GHC
+
+  * The program does not use the correct source-code locations
+
+The program accepts both its own arguments and options intended for GHC.
+As a quick self-test, you can run
+
+  ./ghctags -- -package ghc -- GhcTags.hs
