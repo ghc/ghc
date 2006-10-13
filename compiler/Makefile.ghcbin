@@ -9,9 +9,14 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-stage=2
-
+ifeq "$(stage)" "2"
 HC=$(GHC_STAGE1)
+endif
+
+ifeq "$(stage)" "3"
+HC=$(GHC_STAGE2)
+endif
+
 SRC_HC_OPTS += -package ghc
 SRC_HC_OPTS += -Istage$(stage)
 SRC_HC_OPTS += \
