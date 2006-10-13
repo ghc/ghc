@@ -1,4 +1,4 @@
--- See SourceForge bug 807249 
+-- See trac bug 179
 
 -- Gives a bogus type error
 --    No instance for (Show (t -> Bool))
