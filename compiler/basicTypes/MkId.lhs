@@ -592,14 +592,14 @@ mkRecordSelId tycon field_label
 	--		T1 b' (c : [b]=[b']) (x:Maybe b') 
 	--			-> x `cast` Maybe (sym (right c))
 
-        Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs
-        (co_fn, res_ty) = refineType refinement (idType the_arg_id)
+
 		-- Generate the refinement for b'=b, 
 		-- and apply to (Maybe b'), to get (Maybe b)
-
-        rhs = case co_fn of
-		WpCo co -> Cast (Var the_arg_id) co
-		id_co	    -> ASSERT(isIdHsWrapper id_co) Var the_arg_id
+        Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs
+	the_arg_id_ty = idType the_arg_id
+        (rhs, res_ty) = case refineType refinement the_arg_id_ty of
+			  Just (co, res_ty) -> (Cast (Var the_arg_id) co, res_ty)
+			  Nothing	    -> (Var the_arg_id, the_arg_id_ty)
 
 	field_vs    = filter (not . isPredTy . idType) arg_vs 
     	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` field_vs) field_label

@@ -405,11 +405,13 @@ refineEnvironment reft thing_inside
  	; setLclEnv (env {tcl_env = le'}) thing_inside }
   where
     refine elt@(ATcId { tct_co = Just co, tct_type = ty })
-			  = let (co', ty') = refineType reft ty
-			    in elt { tct_co = Just (co' <.> co), tct_type = ty' }
-    refine (ATyVar tv ty) = ATyVar tv (snd (refineType reft ty))
-				-- Ignore the coercion that refineType returns
-    refine elt		  = elt
+	| Just (co', ty') <- refineType reft ty
+	= elt { tct_co = Just (WpCo co' <.> co), tct_type = ty' }
+    refine (ATyVar tv ty) 
+	| Just (_, ty') <- refineType reft ty
+	= ATyVar tv ty'	-- Ignore the coercion that refineType returns
+
+    refine elt = elt	-- Common case
 \end{code}
 
 %************************************************************************

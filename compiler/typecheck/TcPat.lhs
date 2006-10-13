@@ -279,7 +279,9 @@ tc_lpat :: LPat Name
 tc_lpat (L span pat) pat_ty pstate thing_inside
   = setSrcSpan span		  $
     maybeAddErrCtxt (patCtxt pat) $
-    do	{ let (coercion, pat_ty') = refineType (pat_reft pstate) pat_ty
+    do	{ let mb_reft = refineType (pat_reft pstate) pat_ty
+	      pat_ty' = case mb_reft of { Just (_, ty') -> ty'; Nothing -> pat_ty }
+
 		-- Make sure the result type reflects the current refinement
 		-- We must do this here, so that it correctly ``sees'' all
 		-- the refinements to the left.  Example:
@@ -289,7 +291,10 @@ tc_lpat (L span pat) pat_ty pstate thing_inside
 		-- pattern had better see it.
 
 	; (pat', tvs, res) <- tc_pat pstate pat pat_ty' thing_inside
-	; return (mkCoPat coercion (L span pat') pat_ty, tvs, res) }
+	; let final_pat = case mb_reft of
+				Nothing     -> pat'
+				Just (co,_) -> CoPat (WpCo co) pat' pat_ty
+	; return (L span final_pat, tvs, res) }
 
 --------------------
 tc_pat	:: PatState
