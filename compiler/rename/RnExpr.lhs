@@ -581,7 +581,7 @@ rnBracket (DecBr group)
 	; let new_occs = map nameOccName names
 	      trimmed_rdr_env = hideSomeUnquals (tcg_rdr_env gbl_env) new_occs
 
-	; rdr_env' <- extendRdrEnvRn trimmed_rdr_env names
+	; rdr_env' <- extendRdrEnvRn trimmed_rdr_env avails
 	-- In this situation we want to *shadow* top-level bindings.
 	--	foo = 1
 	--	bar = [d| foo = 1|]

@@ -14,7 +14,7 @@ module RnEnv (
 	lookupFixityRn, lookupTyFixityRn, lookupLocatedSigOccRn, 
 	lookupLocatedInstDeclBndr,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
-	lookupGreRn,    
+	lookupGreRn, lookupGreRn_maybe,
 
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV,
@@ -42,18 +42,17 @@ import RdrName		( RdrName, isQual, isUnqual, isOrig_maybe,
 			  mkRdrUnqual, setRdrNameSpace, rdrNameOcc,
 			  pprGlobalRdrEnv, lookupGRE_RdrName, 
 			  isExact_maybe, isSrcRdrName,
+			  Parent(..),
 			  GlobalRdrElt(..), GlobalRdrEnv, lookupGlobalRdrEnv, 
 			  isLocalGRE, extendLocalRdrEnv, elemLocalRdrEnv, lookupLocalRdrEnv,
 			  Provenance(..), pprNameProvenance,
 			  importSpecLoc, importSpecModule
 			)
-import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity,
-                          AvailInfo, GenAvailInfo(..) )
+import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameOccName, nameModule, isExternalName )
 import NameSet
-import NameEnv          ( NameEnv, lookupNameEnv )
 import OccName		( tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
 			  reportIfUnused )
 import Module		( Module, ModuleName )
@@ -201,27 +200,27 @@ lookupLocatedSigOccRn = lookupLocatedBndrRn
 -- disambiguate.  
 
 lookupLocatedInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
-lookupLocatedInstDeclBndr cls rdr = do
-   imp_avails <- getImports
-   wrapLocM (lookupInstDeclBndr (imp_parent imp_avails) cls) rdr
+lookupLocatedInstDeclBndr cls rdr = wrapLocM (lookupInstDeclBndr cls) rdr
 
-lookupInstDeclBndr :: NameEnv AvailInfo -> Name -> RdrName -> RnM Name
+lookupInstDeclBndr :: Name -> RdrName -> RnM Name
 -- This is called on the method name on the left-hand side of an 
 -- instance declaration binding. eg.  instance Functor T where
 --                                       fmap = ...
 --                                       ^^^^ called on this
 -- Regardless of how many unqualified fmaps are in scope, we want
 -- the one that comes from the Functor class.
-lookupInstDeclBndr availenv cls_name rdr_name
+lookupInstDeclBndr cls_name rdr_name
   | isUnqual rdr_name	-- Find all the things the rdr-name maps to
   = do	{		-- and pick the one with the right parent name
-	  let { is_op gre     = cls_name == nameParent (gre_name gre)
+	  let { is_op gre@(GRE {gre_par = ParentIs n}) = cls_name == n
+	      ;	is_op other			       = False
 	      ; occ	      = rdrNameOcc rdr_name
 	      ; lookup_fn env = filter is_op (lookupGlobalRdrEnv env occ) }
 	; mb_gre <- lookupGreRn_help rdr_name lookup_fn
 	; case mb_gre of
 	    Just gre -> return (gre_name gre)
 	    Nothing  -> do { addErr (unknownInstBndrErr cls_name rdr_name)
+			   ; traceRn (text "lookupInstDeclBndr" <+> ppr rdr_name)
 			   ; return (mkUnboundName rdr_name) } }
 
   | otherwise	-- Occurs in derived instances, where we just
@@ -229,12 +228,6 @@ lookupInstDeclBndr availenv cls_name rdr_name
   = ASSERT2( not (isQual rdr_name), ppr rdr_name )
 	  -- NB: qualified names are rejected by the parser
     lookupImportedName rdr_name
-
-  where nameParent nm
-           | Just (AvailTC tc subs) <- lookupNameEnv availenv nm = tc
-           | otherwise = nm -- might be an Avail, if the Name is 
-                            -- in scope some other way
-                                   
 
 newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
 newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
@@ -256,7 +249,7 @@ lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
 
   | otherwise
   =	-- First look up the name in the normal environment.
-   lookupGreRn rdr_name			`thenM` \ mb_gre ->
+   lookupGreRn_maybe rdr_name		`thenM` \ mb_gre ->
    case mb_gre of {
 	Just gre -> returnM (gre_name gre) ;
 	Nothing  -> newTopSrcBinder mod lrdr_name }
@@ -291,7 +284,7 @@ lookupGlobalOccRn rdr_name
 
   | otherwise
   =	-- First look up the name in the normal environment.
-   lookupGreRn rdr_name			`thenM` \ mb_gre ->
+   lookupGreRn_maybe rdr_name		`thenM` \ mb_gre ->
    case mb_gre of {
 	Just gre -> returnM (gre_name gre) ;
 	Nothing   -> 
@@ -342,16 +335,27 @@ unboundName rdr_name
 lookupSrcOcc_maybe :: RdrName -> RnM (Maybe Name)
 -- No filter function; does not report an error on failure
 lookupSrcOcc_maybe rdr_name
-  = do	{ mb_gre <- lookupGreRn rdr_name
+  = do	{ mb_gre <- lookupGreRn_maybe rdr_name
 	; case mb_gre of
 		Nothing  -> returnM Nothing
 		Just gre -> returnM (Just (gre_name gre)) }
 	
 -------------------------
-lookupGreRn :: RdrName -> RnM (Maybe GlobalRdrElt)
+lookupGreRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Just look up the RdrName in the GlobalRdrEnv
-lookupGreRn rdr_name 
+lookupGreRn_maybe rdr_name 
   = lookupGreRn_help rdr_name (lookupGRE_RdrName rdr_name)
+
+lookupGreRn :: RdrName -> RnM GlobalRdrElt
+-- If not found, add error message, and return a fake GRE
+lookupGreRn rdr_name 
+  = do	{ mb_gre <- lookupGreRn_maybe rdr_name
+	; case mb_gre of {
+	    Just gre -> return gre ;
+	    Nothing  -> do
+	{ name <- unboundName rdr_name
+	; return (GRE { gre_name = name, gre_par = NoParent,
+		        gre_prov = LocalDef }) }}}
 
 lookupGreLocalRn :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Similar, but restricted to locally-defined things

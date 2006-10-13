@@ -47,7 +47,6 @@ import OccName
 import Bag
 import Outputable
 import UniqSupply
-import UniqFM
 import Unique
 import DynFlags
 import StaticFlags
@@ -103,7 +102,7 @@ initTc hsc_env hsc_src mod do_this
 		tcg_inst_uses = dfuns_var,
 		tcg_th_used   = th_var,
 		tcg_exports  = [],
-		tcg_imports  = init_imports,
+		tcg_imports  = emptyImportAvails,
 		tcg_dus      = emptyDUs,
                 tcg_rn_imports = Nothing,
                 tcg_rn_exports = Nothing,
@@ -149,12 +148,6 @@ initTc hsc_env hsc_src mod do_this
 
 	return (msgs, final_res)
     }
-  where
-    init_imports = emptyImportAvails {imp_env = unitUFM (moduleName mod) []}
-	-- Initialise tcg_imports with an empty set of bindings for
-	-- this module, so that if we see 'module M' in the export
-	-- list, and there are no bindings in M, we don't bleat 
-	-- "unknown module M".
 
 initTcPrintErrors	-- Used from the interactive loop only
        :: HscEnv

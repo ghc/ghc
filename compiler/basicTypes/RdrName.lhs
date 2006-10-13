@@ -31,15 +31,15 @@ module RdrName (
 	lookupGRE_RdrName, lookupGRE_Name, hideSomeUnquals,
 
 	-- GlobalRdrElt, Provenance, ImportSpec
-	GlobalRdrElt(..), isLocalGRE, unQualOK, 
+	GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
 	Provenance(..), pprNameProvenance,
+	Parent(..), 
 	ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..), 
 	importSpecLoc, importSpecModule
   ) where 
 
 #include "HsVersions.h"
 
-import OccName
 import Module
 import Name
 import Maybes
@@ -295,22 +295,32 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 	-- INVARIANT: All the members of the list have distinct 
 	--	      gre_name fields; that is, no duplicate Names
 
+data GlobalRdrElt 
+  = GRE { gre_name :: Name,
+	  gre_par  :: Parent,
+	  gre_prov :: Provenance	-- Why it's in scope
+    }
+
+data Parent = NoParent | ParentIs Name
+
+instance Outputable Parent where
+   ppr NoParent     = empty
+   ppr (ParentIs n) = ptext SLIT("parent:") <> ppr n
+   
+
+plusParent :: Parent -> Parent -> Parent
+plusParent NoParent     rel = ASSERT( case rel of { NoParent -> True; other -> False } )    NoParent
+plusParent (ParentIs n) rel = ASSERT( case rel of { ParentIs m -> n==m;  other -> False } ) ParentIs n
+
 emptyGlobalRdrEnv = emptyOccEnv
 
 globalRdrEnvElts :: GlobalRdrEnv -> [GlobalRdrElt]
 globalRdrEnvElts env = foldOccEnv (++) [] env
 
-data GlobalRdrElt 
-  = GRE { gre_name   :: Name,
-	  gre_prov   :: Provenance	-- Why it's in scope
-    }
-
 instance Outputable GlobalRdrElt where
-  ppr gre = ppr name <+> parens (pprNameProvenance gre)
+  ppr gre = ppr name <+> parens (ppr (gre_par gre) <+> pprNameProvenance gre)
 	  where
 	    name = gre_name gre
-	    pp_parent (Just p) = brackets (text "parent:" <+> ppr p)
-	    pp_parent Nothing  = empty
 
 pprGlobalRdrEnv :: GlobalRdrEnv -> SDoc
 pprGlobalRdrEnv env
@@ -396,7 +406,15 @@ isLocalGRE other    		       = False
 unQualOK :: GlobalRdrElt -> Bool
 -- An unqualifed version of this thing is in scope
 unQualOK (GRE {gre_prov = LocalDef})    = True
-unQualOK (GRE {gre_prov = Imported is}) = not (all (is_qual . is_decl) is)
+unQualOK (GRE {gre_prov = Imported is}) = any unQualSpecOK is
+
+unQualSpecOK :: ImportSpec -> Bool
+-- In scope unqualified
+unQualSpecOK is = not (is_qual (is_decl is))
+
+qualSpecOK :: ModuleName -> ImportSpec -> Bool
+-- In scope qualified with M
+qualSpecOK mod is = mod == is_as (is_decl is)
 
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
@@ -421,7 +439,8 @@ plusGRE :: GlobalRdrElt -> GlobalRdrElt -> GlobalRdrElt
 -- Used when the gre_name fields match
 plusGRE g1 g2
   = GRE { gre_name = gre_name g1,
-	  gre_prov = gre_prov g1 `plusProv` gre_prov g2 }
+	  gre_prov = gre_prov g1 `plusProv`   gre_prov g2,
+	  gre_par  = gre_par  g1 `plusParent` gre_par  g2 }
 
 hideSomeUnquals :: GlobalRdrEnv -> [OccName] -> GlobalRdrEnv
 -- Hide any unqualified bindings for the specified OccNames
@@ -438,7 +457,7 @@ hideSomeUnquals rdr_env occs
 	| Just gres <- lookupOccEnv env occ = extendOccEnv env occ (map qual_gre gres)
 	| otherwise			    = env
     qual_gre gre@(GRE { gre_name = name, gre_prov = LocalDef })
-	= GRE { gre_name = name, gre_prov = Imported [imp_spec] }
+	= gre { gre_prov = Imported [imp_spec] }
 	where	-- Local defs get transfomed to (fake) imported things
 	  mod = moduleName (nameModule name)
 	  imp_spec = ImpSpec { is_item = ImpAll, is_decl = decl_spec }

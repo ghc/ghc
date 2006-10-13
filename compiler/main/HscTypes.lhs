@@ -857,11 +857,8 @@ instance Outputable n => Outputable (GenAvailInfo n) where
    ppr = pprAvail
 
 pprAvail :: Outputable n => GenAvailInfo n -> SDoc
-pprAvail (AvailTC n ns) = ppr n <> case {- filter (/= n) -} ns of
-					[]  -> empty
-					ns' -> braces (hsep (punctuate comma (map ppr ns')))
-
-pprAvail (Avail n) = ppr n
+pprAvail (Avail n)      = ppr n
+pprAvail (AvailTC n ns) = ppr n <> braces (hsep (punctuate comma (map ppr ns)))
 \end{code}
 
 \begin{code}

@@ -1,7 +1,7 @@
 module RnHsDoc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc, rnMbHsDoc ) where
 
 import TcRnMonad   ( RnM )
-import RnEnv       ( dataTcOccs, lookupGreRn )
+import RnEnv       ( dataTcOccs, lookupGreRn_maybe )
 import HsDoc       ( HsDoc(..) )
 
 import RdrName     ( RdrName, isRdrDataCon, isRdrTc, gre_name )
@@ -49,7 +49,7 @@ rnHsDoc doc = case doc of
 
   DocIdentifier ids -> do
     let choices = concatMap dataTcOccs ids
-    mb_gres <- mapM lookupGreRn choices 
+    mb_gres <- mapM lookupGreRn_maybe choices 
     case [gre_name gre | Just gre <- mb_gres] of
       [] -> return (DocString (ids2string ids))
       ids' -> return (DocIdentifier ids')

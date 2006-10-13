@@ -15,9 +15,6 @@ module TcRnTypes(
 	-- Ranamer types
 	ErrCtxt,
 	ImportAvails(..), emptyImportAvails, plusImportAvails, 
-	plusAvail, pruneAvails,  
-	AvailEnv, emptyAvailEnv, unitAvailEnv, plusAvailEnv, 
-	mkAvailEnv, lookupAvailEnv, lookupAvailEnv_maybe, availEnvElts, addAvail,
 	WhereFrom(..), mkModDeps,
 
 	-- Typechecker types
@@ -478,22 +475,6 @@ It is used 	* when processing the export list
 \begin{code}
 data ImportAvails 
    = ImportAvails {
-	imp_env :: ModuleNameEnv [AvailInfo],
-		-- All the things imported *unqualified*, classified by 
-		-- the *module qualifier* for its import
-		--   e.g.	 import List as Foo
-		-- would add a binding Foo |-> ...stuff from List...
-		-- to imp_env.
-		-- 
-                -- This is exactly the list of things that will be exported
-                -- by a 'module M' specifier in the export list.
-		-- (see Haskell 98 Report Section 5.2).
-                --
-                -- Warning: there may be duplciates in this list,
-                -- duplicates are removed at the use site (rnExports).
-                -- We might consider turning this into a NameEnv at
-                -- some point.
-
 	imp_mods :: ModuleEnv (Module, Bool, SrcSpan),
 		-- Domain is all directly-imported modules
 		-- Bool means:
@@ -532,15 +513,9 @@ data ImportAvails
 		-- Orphan modules below us in the import tree (and maybe
 		-- including us for imported modules) 
 
- 	imp_finsts :: [Module],
+ 	imp_finsts :: [Module]
 		-- Family instance modules below us in the import tree  (and
 		-- maybe including us for imported modules)
-
-        imp_parent :: NameEnv AvailInfo
-                -- for the names in scope in this module, tells us
-                -- the relationship between parents and children
-                -- (eg. a TyCon is the parent of its DataCons, a
-                -- class is the parent of its methods, etc.).
       }
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
@@ -550,107 +525,30 @@ mkModDeps deps = foldl add emptyUFM deps
 		 add env elt@(m,_) = addToUFM env m elt
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_env 	= emptyUFM, 
-				   imp_mods   	= emptyModuleEnv,
+emptyImportAvails = ImportAvails { imp_mods   	= emptyModuleEnv,
 				   imp_dep_mods = emptyUFM,
 				   imp_dep_pkgs = [],
 				   imp_orphs    = [],
-				   imp_finsts   = [],
-                                   imp_parent   = emptyNameEnv }
+				   imp_finsts   = [] }
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
-  (ImportAvails { imp_env = env1, imp_mods = mods1,
+  (ImportAvails { imp_mods = mods1,
 		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, 
-                  imp_orphs = orphs1, imp_finsts = finsts1, 
-		  imp_parent = parent1 })
-  (ImportAvails { imp_env = env2, imp_mods = mods2,
+                  imp_orphs = orphs1, imp_finsts = finsts1 })
+  (ImportAvails { imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
-                  imp_orphs = orphs2, imp_finsts = finsts2, 
-		  imp_parent = parent2  })
-  = ImportAvails { imp_env      = plusUFM_C (++) env1 env2, 
-		   imp_mods     = mods1  `plusModuleEnv` mods2,	
+                  imp_orphs = orphs2, imp_finsts = finsts2 })
+  = ImportAvails { imp_mods     = mods1  `plusModuleEnv` mods2,	
 		   imp_dep_mods = plusUFM_C plus_mod_dep dmods1 dmods2,	
 		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
 		   imp_orphs    = orphs1 `unionLists` orphs2,
-		   imp_finsts   = finsts1 `unionLists` finsts2,
-                   imp_parent   = plusNameEnv_C plus_avails parent1 parent2 }
+		   imp_finsts   = finsts1 `unionLists` finsts2 }
   where
-    plus_avails (AvailTC tc subs1) (AvailTC _ subs2)
-                = AvailTC tc (nub (subs1 ++ subs2))
-    plus_avails avail _ = avail
-
     plus_mod_dep (m1, boot1) (m2, boot2) 
 	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
 		-- Check mod-names match
 	  (m1, boot1 && boot2)	-- If either side can "see" a non-hi-boot interface, use that
-\end{code}
-
-%************************************************************************
-%*									*
-	Avails, AvailEnv, etc
-%*									*
-v%************************************************************************
-
-\begin{code}
-plusAvail (Avail n1)	   (Avail n2)	    = Avail n1
-plusAvail (AvailTC n1 ns1) (AvailTC n2 ns2) = AvailTC n2 (ns1 `unionLists` ns2)
--- Added SOF 4/97
-#ifdef DEBUG
-plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
-#endif
-
--------------------------
-pruneAvails :: (Name -> Bool)	-- Keep if this is True
-	    -> [AvailInfo]
-	    -> [AvailInfo]
-pruneAvails keep avails
-  = mapMaybe del avails
-  where
-    del :: AvailInfo -> Maybe AvailInfo	-- Nothing => nothing left!
-    del (Avail n) | keep n    = Just (Avail n)
-    	          | otherwise = Nothing
-    del (AvailTC n ns) | null ns'  = Nothing
-		       | otherwise = Just (AvailTC n ns')
-		       where
-		         ns' = filter keep ns
-\end{code}
-
----------------------------------------
-	AvailEnv and friends
----------------------------------------
-
-\begin{code}
-type AvailEnv = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
-
-emptyAvailEnv :: AvailEnv
-emptyAvailEnv = emptyNameEnv
-
-unitAvailEnv :: AvailInfo -> AvailEnv
-unitAvailEnv a = unitNameEnv (availName a) a
-
-plusAvailEnv :: AvailEnv -> AvailEnv -> AvailEnv
-plusAvailEnv = plusNameEnv_C plusAvail
-
-lookupAvailEnv_maybe :: AvailEnv -> Name -> Maybe AvailInfo
-lookupAvailEnv_maybe = lookupNameEnv
-
-lookupAvailEnv :: AvailEnv -> Name -> AvailInfo
-lookupAvailEnv env n = case lookupNameEnv env n of
-			 Just avail -> avail
-			 Nothing    -> pprPanic "lookupAvailEnv" (ppr n)
-
-availEnvElts = nameEnvElts
-
-addAvail :: AvailEnv -> AvailInfo -> AvailEnv
-addAvail avails avail = extendNameEnv_C plusAvail avails (availName avail) avail
-
-mkAvailEnv :: [AvailInfo] -> AvailEnv
-	-- 'avails' may have several items with the same availName
-	-- E.g  import Ix( Ix(..), index )
-	-- will give Ix(Ix,index,range) and Ix(index)
-	-- We want to combine these; addAvail does that
-mkAvailEnv avails = foldl addAvail emptyAvailEnv avails
 \end{code}
 
 %************************************************************************

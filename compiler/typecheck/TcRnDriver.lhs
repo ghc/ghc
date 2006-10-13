@@ -482,7 +482,7 @@ checkHiBootIface :: TcGblEnv -> ModDetails -> TcM (LHsBinds Id)
 
 checkHiBootIface
 	(TcGblEnv { tcg_insts = local_insts, tcg_fam_insts = local_fam_insts,
-		    tcg_type_env = local_type_env, tcg_imports = imports })
+		    tcg_type_env = local_type_env })
 	(ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
 		      md_types = boot_type_env })
   = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts)) ;
@@ -497,8 +497,11 @@ checkHiBootIface
 	; return (unionManyBags dfun_binds) }
   where
     check_one boot_thing
-      | no_check name
-      = return ()	
+      | isImplicitTyThing boot_thing = return ()
+      | name `elem` dfun_names       = return ()	
+      | isWiredInName name	     = return ()	-- No checking for wired-in names.  In particular,
+							-- 'error' is handled by a rather gross hack
+							-- (see comments in GHC.Err.hs-boot)
       | Just real_thing <- lookupTypeEnv local_type_env name
       = do { let boot_decl = tyThingToIfaceDecl boot_thing
 	         real_decl = tyThingToIfaceDecl real_thing
@@ -510,17 +513,6 @@ checkHiBootIface
       = addErrTc (missingBootThing boot_thing)
       where
 	name = getName boot_thing
-
-    avail_env = imp_parent imports
-    is_implicit name = case lookupNameEnv avail_env name of
-                         Just (AvailTC tc _) | tc /= name -> True
-                         _otherwise -> False
-
-    no_check name = isWiredInName name	-- No checking for wired-in names.  In particular,
-					-- 'error' is handled by a rather gross hack
-					-- (see comments in GHC.Err.hs-boot)
-		  || name `elem` dfun_names
-		  || is_implicit name	-- Has a parent, which we'll check
 
     dfun_names = map getName boot_insts
 
