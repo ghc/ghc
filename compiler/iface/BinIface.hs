@@ -251,6 +251,7 @@ instance Binary ModIface where
 		 mi_boot      = is_boot,
 		 mi_mod_vers  = mod_vers,
 		 mi_orphan    = orphan,
+		 mi_finsts    = hasFamInsts,
 		 mi_deps      = deps,
 		 mi_usages    = usages,
 		 mi_exports   = exports,
@@ -269,6 +270,7 @@ instance Binary ModIface where
 	put_ bh is_boot
 	put_ bh mod_vers
 	put_ bh orphan
+	put_ bh hasFamInsts
 	lazyPut bh deps
 	lazyPut bh usages
 	put_ bh exports
@@ -305,6 +307,7 @@ instance Binary ModIface where
 	is_boot   <- get bh
 	mod_vers  <- get bh
 	orphan    <- get bh
+	hasFamInsts <- get bh
 	deps	  <- lazyGet bh
 	usages	  <- {-# SCC "bin_usages" #-} lazyGet bh
 	exports	  <- {-# SCC "bin_exports" #-} get bh
@@ -321,6 +324,7 @@ instance Binary ModIface where
 		 mi_boot      = is_boot,
 		 mi_mod_vers  = mod_vers,
 		 mi_orphan    = orphan,
+		 mi_finsts    = hasFamInsts,
 		 mi_deps      = deps,
 		 mi_usages    = usages,
 		 mi_exports   = exports,
@@ -355,11 +359,14 @@ instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_mods deps)
 		      put_ bh (dep_pkgs deps)
 		      put_ bh (dep_orphs deps)
+		      put_ bh (dep_finsts deps)
 
     get bh = do ms <- get bh 
 		ps <- get bh
 		os <- get bh
-		return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os })
+		fis <- get bh
+		return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
+			       dep_finsts = fis })
 
 instance (Binary name) => Binary (GenAvailInfo name) where
     put_ bh (Avail aa) = do

@@ -167,9 +167,11 @@ tcRnModule hsc_env hsc_src save_rn_syntax
         traceIf (text "rdr_env: " <+> ppr rdr_env) ;
 	failIfErrsM ;
 
-		-- Load any orphan-module interfaces, so that
-		-- their rules and instance decls will be found
-	loadOrphanModules (imp_orphs imports) ;
+		-- Load any orphan-module and family instance-module
+		-- interfaces, so that their rules and instance decls will be
+		-- found.
+	loadOrphanModules (imp_orphs  imports) False ;
+	loadOrphanModules (imp_finsts imports) True  ;
 
 	traceRn (text "rn1a") ;
 		-- Rename and type check the declarations
@@ -1098,9 +1100,12 @@ tcGetModuleExports :: Module -> TcM [AvailInfo]
 tcGetModuleExports mod = do
   let doc = ptext SLIT("context for compiling statements")
   iface <- initIfaceTcRn $ loadSysInterface doc mod
-  loadOrphanModules (dep_orphs (mi_deps iface))
+  loadOrphanModules (dep_orphs (mi_deps iface)) False 
   		-- Load any orphan-module interfaces,
   		-- so their instances are visible
+  loadOrphanModules (dep_finsts (mi_finsts iface)) True
+  		-- Load any family instance-module interfaces,
+  		-- so all family instances are visible
   ifaceExportNames (mi_exports iface)
 
 tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Maybe [Name])

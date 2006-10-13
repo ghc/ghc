@@ -88,8 +88,10 @@ loadSrcInterface doc mod want_boot  = do
 	failWithTc (cannotFindInterface dflags mod err)
 
 -- | Load interfaces for a collection of orphan modules.
-loadOrphanModules :: [Module] -> TcM ()
-loadOrphanModules mods
+loadOrphanModules :: [Module]	      -- the modules
+		  -> Bool	      -- these are family instance-modules
+		  -> TcM ()
+loadOrphanModules mods isFamInstMod
   | null mods = returnM ()
   | otherwise = initIfaceTcRn $
 		do { traceIf (text "Loading orphan modules:" <+> 
@@ -98,7 +100,9 @@ loadOrphanModules mods
 		   ; returnM () }
   where
     load mod   = loadSysInterface (mk_doc mod) mod
-    mk_doc mod = ppr mod <+> ptext SLIT("is a orphan-instance module")
+    mk_doc mod 
+      | isFamInstMod = ppr mod <+> ptext SLIT("is a family-instance module")
+      | otherwise    = ppr mod <+> ptext SLIT("is a orphan-instance module")
 
 -- | Loads the interface for a given Name.
 loadInterfaceForName :: SDoc -> Name -> TcRn ModIface
@@ -528,6 +532,7 @@ pprModIface iface
 		<+> ppr (mi_module iface) <+> pp_boot 
 		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
+		<+> (if mi_finsts iface then ptext SLIT("[family instance module]") else empty)
 		<+> int opt_HiVersion
 		<+> ptext SLIT("where")
 	, vcat (map pprExport (mi_exports iface))
@@ -583,10 +588,12 @@ pprUsage usage
     pp_export_version (Just v) = int v
 
 pprDeps :: Dependencies -> SDoc
-pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs})
+pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
+		dep_finsts = finsts })
   = vcat [ptext SLIT("module dependencies:") <+> fsep (map ppr_mod mods),
 	  ptext SLIT("package dependencies:") <+> fsep (map ppr pkgs), 
-	  ptext SLIT("orphans:") <+> fsep (map ppr orphs)
+	  ptext SLIT("orphans:") <+> fsep (map ppr orphs),
+	  ptext SLIT("family instance modules:") <+> fsep (map ppr finsts)
 	]
   where
     ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot

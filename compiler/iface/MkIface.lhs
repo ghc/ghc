@@ -289,6 +289,7 @@ mkIface hsc_env maybe_old_iface
  			mi_rule_vers = initialVersion,
 			mi_orphan    = False,	-- Always set by addVersionInfo, but
 						-- it's a strict field, so we can't omit it.
+                        mi_finsts    = False,   -- Ditto
 			mi_decls     = deliberatelyOmitted "decls",
 			mi_ver_fn    = deliberatelyOmitted "ver_fn",
 
@@ -371,9 +372,12 @@ addVersionInfo
 addVersionInfo ver_fn Nothing new_iface new_decls
 -- No old interface, so definitely write a new one!
   = (new_iface { mi_orphan = anyNothing ifInstOrph (mi_insts new_iface)
-                                || anyNothing ifRuleOrph (mi_rules new_iface),
-                mi_decls  = [(initialVersion, decl) | decl <- new_decls],
-                mi_ver_fn = mkIfaceVerCache (zip (repeat initialVersion) new_decls)},
+                                || anyNothing ifRuleOrph (mi_rules new_iface)
+               , mi_finsts = not . null $ mi_fam_insts new_iface
+               , mi_decls  = [(initialVersion, decl) | decl <- new_decls]
+               , mi_ver_fn = mkIfaceVerCache (zip (repeat initialVersion) 
+						  new_decls)
+	       },
      False, 
      ptext SLIT("No old interface file"),
      pprOrphans orph_insts orph_rules)
@@ -401,6 +405,7 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
                 mi_exp_vers  = bump_unless no_export_change old_exp_vers,
                 mi_rule_vers = bump_unless no_rule_change   old_rule_vers,
                 mi_orphan    = not (null new_orph_rules && null new_orph_insts),
+                mi_finsts    = not . null $ mi_fam_insts new_iface,
                 mi_decls     = decls_w_vers,
                 mi_ver_fn    = mkIfaceVerCache decls_w_vers }
 
@@ -411,6 +416,8 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
         mkOrphMap ifInstOrph (mi_insts old_iface)
     (new_non_orph_insts, new_orph_insts) = 
         mkOrphMap ifInstOrph (mi_insts new_iface)
+    old_fam_insts = mi_fam_insts old_iface
+    new_fam_insts = mi_fam_insts new_iface
     same_insts occ = eqMaybeBy	(eqListBy eqIfInst) 
 				(lookupOccEnv old_non_orph_insts occ)
 				(lookupOccEnv new_non_orph_insts occ)
@@ -430,7 +437,8 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
                                 -- Kept sorted
     no_decl_change   = isEmptyOccSet changed_occs
     no_rule_change   = not (changedWrtNames changed_occs (eqListBy eqIfRule old_orph_rules new_orph_rules)
-	    		 || changedWrtNames changed_occs (eqListBy eqIfInst old_orph_insts new_orph_insts))
+	    		 || changedWrtNames changed_occs (eqListBy eqIfInst old_orph_insts new_orph_insts)
+	    		 || changedWrtNames changed_occs (eqListBy eqIfFamInst old_fam_insts new_fam_insts))
     no_deprec_change = mi_deprecs new_iface == mi_deprecs old_iface
 
 	-- If the usages havn't changed either, we don't need to write the interface file
@@ -710,14 +718,15 @@ mk_usage_info pit hsc_env dir_imp_mods dep_mods used_names
     --	a) we used something from; has something in used_names
     --	b) we imported all of it, even if we used nothing from it
     --		(need to recompile if its export list changes: export_vers)
-    --	c) is a home-package orphan module (need to recompile if its
-    --	 	instance decls change: rules_vers)
+    --	c) is a home-package orphan or family-instance module (need to
+    --	        recompile if its instance decls change: rules_vers)
     mkUsage :: (ModuleName, IsBootInterface) -> Maybe Usage
     mkUsage (mod_name, _)
       |  isNothing maybe_iface		-- We can't depend on it if we didn't
       || (null used_occs		-- load its interface.
 	  && isNothing export_vers
-	  && not orphan_mod)
+	  && not orphan_mod
+	  && not finsts_mod)
       = Nothing			-- Record no usage info
     
       | otherwise	
@@ -735,6 +744,7 @@ mk_usage_info pit hsc_env dir_imp_mods dep_mods used_names
 
         Just iface   = maybe_iface
 	orphan_mod   = mi_orphan    iface
+	finsts_mod   = mi_finsts    iface
         version_env  = mi_ver_fn    iface
         mod_vers     = mi_mod_vers  iface
         rules_vers   = mi_rule_vers iface

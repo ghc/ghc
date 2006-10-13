@@ -139,9 +139,10 @@ deSugar hsc_env
 	     le_dep_mod :: (ModuleName, IsBootInterface) -> (ModuleName, IsBootInterface) -> Bool	 
 	     le_dep_mod (m1,_) (m2,_) = moduleNameFS m1 <= moduleNameFS m2
 
-	     deps = Deps { dep_mods  = sortLe le_dep_mod dep_mods,
-			   dep_pkgs  = sortLe (<=)   pkgs,	
-			   dep_orphs = sortLe le_mod (imp_orphs imports) }
+	     deps = Deps { dep_mods   = sortLe le_dep_mod dep_mods,
+			   dep_pkgs   = sortLe (<=)   pkgs,	
+			   dep_orphs  = sortLe le_mod (imp_orphs  imports),
+			   dep_finsts = sortLe le_mod (imp_finsts imports) }
 		-- sort to get into canonical order
 
 	     mod_guts = ModGuts {	

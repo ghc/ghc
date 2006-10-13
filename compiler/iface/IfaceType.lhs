@@ -81,6 +81,7 @@ data IfaceTyCon 	-- Abbreviations for common tycons with known names
   | IfaceTupTc Boxity Arity 
   | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
   | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
+  deriving( Eq )
 
 ifaceTyConName :: IfaceTyCon -> Name
 ifaceTyConName IfaceIntTc  	  = intTyConName

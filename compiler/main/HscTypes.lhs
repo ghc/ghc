@@ -367,6 +367,7 @@ data ModIface
         mi_mod_vers :: !Version,	    -- Module version: changes when anything changes
 
         mi_orphan   :: !WhetherHasOrphans,  -- Whether this module has orphans
+        mi_finsts   :: !WhetherHasFamInst,  -- Whether module has family insts
 	mi_boot	    :: !IsBootInterface,    -- Read from an hi-boot file?
 
 	mi_deps	    :: Dependencies,
@@ -420,7 +421,8 @@ data ModIface
 	mi_fam_insts :: [IfaceFamInst],			-- Sorted
 	mi_rules     :: [IfaceRule],			-- Sorted
 	mi_rule_vers :: !Version,	-- Version number for rules and 
-					-- instances combined
+					-- instances (for classes and families)
+					-- combined
 
 		-- Cached environments for easy lookup
 		-- These are computed (lazily) from other fields
@@ -550,6 +552,7 @@ emptyModIface mod
   = ModIface { mi_module   = mod,
 	       mi_mod_vers = initialVersion,
 	       mi_orphan   = False,
+	       mi_finsts   = False,
 	       mi_boot	   = False,
 	       mi_deps     = noDependencies,
 	       mi_usages   = [],
@@ -904,22 +907,32 @@ type WhetherHasOrphans   = Bool
 	--	* a transformation rule in a module other than the one defining
 	--		the function in the head of the rule.
 
+type WhetherHasFamInst = Bool	     -- This module defines family instances?
+
 type IsBootInterface = Bool
 
 -- Dependency info about modules and packages below this one
 -- in the import hierarchy.  See TcRnTypes.ImportAvails for details.
+-- The orphan modules in `dep_orphs' do *not* include family instance orphans,
+-- as they are anyway included in `dep_finsts'.
 --
 -- Invariant: the dependencies of a module M never includes M
 -- Invariant: the lists are unordered, with no duplicates
 data Dependencies
-  = Deps { dep_mods  :: [(ModuleName,IsBootInterface)],	-- Home-package module dependencies
-	   dep_pkgs  :: [PackageId], 			-- External package dependencies
-	   dep_orphs :: [Module] }			-- Orphan modules (whether home or external pkg)
+  = Deps { dep_mods   :: [(ModuleName,      -- Home-package module dependencies
+			   IsBootInterface)]
+	 , dep_pkgs   :: [PackageId] 	    -- External package dependencies
+	 , dep_orphs  :: [Module]	    -- Orphan modules (whether home or
+					    -- external pkg)
+         , dep_finsts :: [Module]	    -- Modules that contain family
+					    -- instances (whether home or
+					    -- external pkg)
+         }
   deriving( Eq )
 	-- Equality used only for old/new comparison in MkIface.addVersionInfo
 
 noDependencies :: Dependencies
-noDependencies = Deps [] [] []
+noDependencies = Deps [] [] [] []
  	  
 data Usage
   = Usage { usg_name     :: ModuleName,			-- Name of the module

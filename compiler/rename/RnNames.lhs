@@ -163,10 +163,11 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 	   (warnRedundantSourceImport imp_mod_name)
 
     let
-	imp_mod	= mi_module iface
-	deprecs	= mi_deprecs iface
-	is_orph	= mi_orphan iface 
-	deps 	= mi_deps iface
+	imp_mod	   = mi_module iface
+	deprecs	   = mi_deprecs iface
+	is_orph	   = mi_orphan iface 
+	has_finsts = mi_finsts iface 
+	deps 	   = mi_deps iface
 
 	filtered_exports = filter not_this_mod (mi_exports iface)
 	not_this_mod (mod,_) = mod /= this_mod
@@ -211,6 +212,10 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 			      imp_mod : dep_orphs deps
 		| otherwise = dep_orphs deps
 
+ 	finsts | has_finsts = ASSERT( not (imp_mod `elem` dep_finsts deps) )
+			      imp_mod : dep_finsts deps
+		| otherwise = dep_finsts deps
+
 	pkg = modulePackageId (mi_module iface)
 
 	(dependent_mods, dependent_pkgs) 
@@ -244,6 +249,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 			imp_env      = unitUFM qual_mod_name filtered_avails,
 			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all, loc),
 			imp_orphs    = orphans,
+			imp_finsts   = finsts,
 			imp_dep_mods = mkModDeps dependent_mods,
 			imp_dep_pkgs = dependent_pkgs,
                         imp_parent   = emptyNameEnv

@@ -17,7 +17,7 @@ module IfaceSyn (
 
 	-- Equality
 	GenIfaceEq(..), IfaceEq, (&&&), bool, eqListBy, eqMaybeBy,
-	eqIfDecl, eqIfInst, eqIfRule, checkBootDecl,
+	eqIfDecl, eqIfInst, eqIfFamInst, eqIfRule, checkBootDecl,
 	
 	-- Pretty printing
 	pprIfaceExpr, pprIfaceDeclHead 
@@ -648,6 +648,9 @@ eqWith = eq_ifTvBndrs emptyEqEnv
 -----------------------
 eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2 && ifOFlag d1 == ifOFlag d2)
 -- All other changes are handled via the version info on the dfun
+
+eqIfFamInst d1 d2 = bool (ifFamInstTyCon d1 == ifFamInstTyCon d2)
+-- All other changes are handled via the version info on the tycon
 
 eqIfRule (IfaceRule n1 a1 bs1 f1 es1 rhs1 o1)
 	 (IfaceRule n2 a2 bs2 f2 es2 rhs2 o2)

@@ -529,7 +529,12 @@ data ImportAvails
 		-- modules imported from other packages.
 
  	imp_orphs :: [Module],
-		-- Orphan modules below us in the import tree
+		-- Orphan modules below us in the import tree (and maybe
+		-- including us for imported modules) 
+
+ 	imp_finsts :: [Module],
+		-- Family instance modules below us in the import tree  (and
+		-- maybe including us for imported modules)
 
         imp_parent :: NameEnv AvailInfo
                 -- for the names in scope in this module, tells us
@@ -550,21 +555,25 @@ emptyImportAvails = ImportAvails { imp_env 	= emptyUFM,
 				   imp_dep_mods = emptyUFM,
 				   imp_dep_pkgs = [],
 				   imp_orphs    = [],
+				   imp_finsts   = [],
                                    imp_parent   = emptyNameEnv }
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_env = env1, imp_mods = mods1,
 		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, 
-                  imp_orphs = orphs1, imp_parent = parent1 })
+                  imp_orphs = orphs1, imp_finsts = finsts1, 
+		  imp_parent = parent1 })
   (ImportAvails { imp_env = env2, imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
-                  imp_orphs = orphs2, imp_parent = parent2  })
+                  imp_orphs = orphs2, imp_finsts = finsts2, 
+		  imp_parent = parent2  })
   = ImportAvails { imp_env      = plusUFM_C (++) env1 env2, 
 		   imp_mods     = mods1  `plusModuleEnv` mods2,	
 		   imp_dep_mods = plusUFM_C plus_mod_dep dmods1 dmods2,	
 		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
 		   imp_orphs    = orphs1 `unionLists` orphs2,
+		   imp_finsts   = finsts1 `unionLists` finsts2,
                    imp_parent   = plusNameEnv_C plus_avails parent1 parent2 }
   where
     plus_avails (AvailTC tc subs1) (AvailTC _ subs2)
