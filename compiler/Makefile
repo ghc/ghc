@@ -834,6 +834,7 @@ HIERARCHICAL_LIB = NO
 VERSION = $(ProjectVersion)
 PKG_DEPENDS += base haskell98
 PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(PKG_DEPENDS)'
+PACKAGE_CPP_OPTS += -DSTAGE='"$(stage)"'
 
 # Omit Main from the library, the client will want to plug their own Main in
 LIBOBJS = $(filter-out $(odir)/main/Main.o $(odir)/parser/hschooks.o, $(OBJS))
@@ -865,7 +866,16 @@ NO_HADDOCK_DOCS = YES
 
 all :: $(GHC_PROG)
 
+# The stage 2 and stage 3 package.conf.in files are different, because they
+# point to either the stage2/ or stage3/ dirs in import-dirs.  Hence before
+# linking the ghc binary we must install the correct version of the package
+# configuration.  Yeuch... maybe one day this will all be done more cleanly.
+STAMP_PKG_CONF = $(GHC_DRIVER_DIR)/stamp-pkg-conf-$(PACKAGE)
+
 $(GHC_PROG) : libHS$(PACKAGE)$(_way).a main/Main.hs
+	$(RM) package.conf.inplace
+	$(RM) $(STAMP_PKG_CONF)
+	$(MAKE) $(STAMP_PKG_CONF)
 	$(MAKE) -f Makefile.ghcbin $(MFLAGS) HS_PROG=$(GHC_PROG) $@
 
 # Propagate standard targets to Makefile.ghcbin
