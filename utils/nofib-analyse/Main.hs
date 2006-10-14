@@ -17,7 +17,7 @@ import Data.FiniteMap
 import System.Console.GetOpt
 import System.Exit	( exitWith, ExitCode(..) )
 
-import Numeric          ( showFloat, showEFloat, showSigned )
+import Numeric          ( showFloat, showFFloat, showSigned )
 import Data.Maybe	( isNothing )
 import Data.Char
 import System.IO
@@ -689,14 +689,14 @@ data BoxValue
 showBox :: BoxValue -> String
 showBox (RunFailed stat) = show_stat stat
 showBox (Percentage f)   = show_pcntage f
-showBox (BoxFloat f)     = show f
+showBox (BoxFloat f)     = showFFloat (Just 2) f ""
 showBox (BoxInt n)       = show (n `div` 1024) ++ "k"
 showBox (BoxInteger n)   = show (n `div` 1024) ++ "k"
 showBox (BoxString s)    = s
 
 instance Show BoxValue where { show = showBox }
 
-show_pcntage n = show (n-100) ++ "%"
+show_pcntage n = showFFloat (Just 1) (n-100) "%"
 --show_pcntage n = show_float_signed (n-100) ++ "%"
 
 --show_float_signed = showFloat False False True False False Nothing (Just 1)
