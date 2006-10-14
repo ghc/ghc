@@ -7,7 +7,7 @@
 module Main where
 
 import GenUtils
-import Printf
+import Text.Printf
 import Slurp
 import CmdLine
 
@@ -17,6 +17,7 @@ import Data.FiniteMap
 import System.Console.GetOpt
 import System.Exit	( exitWith, ExitCode(..) )
 
+import Numeric          ( showFloat, showEFloat, showSigned )
 import Data.Maybe	( isNothing )
 import Data.Char
 import System.IO
@@ -688,16 +689,17 @@ data BoxValue
 showBox :: BoxValue -> String
 showBox (RunFailed stat) = show_stat stat
 showBox (Percentage f)   = show_pcntage f
-showBox (BoxFloat f)     = showFloat' Nothing (Just 2) f
+showBox (BoxFloat f)     = show f
 showBox (BoxInt n)       = show (n `div` 1024) ++ "k"
 showBox (BoxInteger n)   = show (n `div` 1024) ++ "k"
 showBox (BoxString s)    = s
 
 instance Show BoxValue where { show = showBox }
 
-show_pcntage n = show_float_signed (n-100) ++ "%"
+show_pcntage n = show (n-100) ++ "%"
+--show_pcntage n = show_float_signed (n-100) ++ "%"
 
-show_float_signed = showFloat False False True False False Nothing (Just 1)
+--show_float_signed = showFloat False False True False False Nothing (Just 1)
 
 show_stat Success     = "(no result)"
 show_stat WrongStdout = "(stdout)"
