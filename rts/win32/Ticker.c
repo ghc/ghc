@@ -54,6 +54,7 @@ TimerProc(PVOID param)
       /* event has become signalled */
       tickProc = NULL;
       CloseHandle(hStopEvent);
+      hStopEvent = INVALID_HANDLE_VALUE;
       return 0;
     case WAIT_TIMEOUT:
       /* tick */
@@ -115,7 +116,10 @@ stopTicker(void)
 	    }
 	    if (exitCode != STILL_ACTIVE) {
 		tickThread = INVALID_HANDLE_VALUE;
-		CloseHandle(hStopEvent);
+		if ( hStopEvent != INVALID_HANDLE_VALUE ) {
+		    CloseHandle(hStopEvent);
+		    hStopEvent = INVALID_HANDLE_VALUE;
+		}
 		return 0;
 	    }
 	    TerminateThread(tickThread, 0);
