@@ -333,7 +333,7 @@ newSession :: GhcMode -> Maybe FilePath -> IO Session
 newSession mode mb_top_dir = do
   -- catch ^C
   main_thread <- myThreadId
-  putMVar interruptTargetThread [main_thread]
+  modifyMVar_ interruptTargetThread (return . (main_thread :))
   installSignalHandlers
 
   dflags0 <- initSysTools mb_top_dir defaultDynFlags

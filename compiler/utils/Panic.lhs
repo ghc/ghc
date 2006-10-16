@@ -40,7 +40,7 @@ import GHC.ConsoleHandler
 #endif
 
 import Control.Exception hiding (try)
-import Control.Concurrent ( myThreadId, MVar, ThreadId, withMVar, newEmptyMVar )
+import Control.Concurrent ( myThreadId, MVar, ThreadId, withMVar, newMVar )
 import Data.Dynamic
 import qualified Control.Exception as Exception
 import Debug.Trace	( trace )
@@ -237,5 +237,5 @@ installSignalHandlers = do
 
 {-# NOINLINE interruptTargetThread #-}
 interruptTargetThread :: MVar [ThreadId]
-interruptTargetThread = unsafePerformIO newEmptyMVar
+interruptTargetThread = unsafePerformIO (newMVar [])
 \end{code}
