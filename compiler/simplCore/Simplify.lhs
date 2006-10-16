@@ -1014,7 +1014,7 @@ completeCall env var cont
 		(if dopt Opt_D_dump_inlinings dflags then
 		   pprTrace "Inlining done" (vcat [
 			text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
-			text "Inlined fn: " <+> ppr unfolding,
+			text "Inlined fn: " $$ nest 2 (ppr unfolding),
 			text "Cont:  " <+> ppr call_cont])
 		 else
 			id)		$
