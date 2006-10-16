@@ -7,7 +7,9 @@
 module Slurp (Status(..), Results(..), ResultTable, parse_log) where
 
 import CmdLine
-import Data.FiniteMap
+
+import qualified Data.Map as Map
+import Data.Map (Map)
 import Text.Regex
 import Data.Maybe
 -- import Debug.Trace
@@ -15,7 +17,7 @@ import Data.Maybe
 -----------------------------------------------------------------------------
 -- This is the structure into which we collect our results:
 
-type ResultTable = FiniteMap String Results
+type ResultTable = Map String Results
 
 data Status
 	= NotDone
@@ -27,8 +29,8 @@ data Status
 	| WrongStderr 
 
 data Results = Results { 
-	compile_time   	:: FiniteMap String Float,
-	module_size	:: FiniteMap String Int,
+	compile_time   	:: Map String Float,
+	module_size	:: Map String Int,
 	binary_size    	:: Maybe Int,
 	link_time      	:: Maybe Float,
 	run_time       	:: [Float],
@@ -45,8 +47,8 @@ data Results = Results {
 	}
 
 emptyResults = Results { 
-	compile_time   	= emptyFM,
-	module_size    	= emptyFM,
+	compile_time   	= Map.empty,
+	module_size    	= Map.empty,
 	binary_size    	= Nothing,
 	link_time      	= Nothing,
 	run_time       	= [],
@@ -127,10 +129,10 @@ parse_log
 	. chunk_log [] []		-- break at banner lines
 	. lines
 
-combine_results :: [(String,Results)] -> FiniteMap String Results
-combine_results = foldr f emptyFM
+combine_results :: [(String,Results)] -> Map String Results
+combine_results = foldr f Map.empty
  where
-	f (prog,results) fm = addToFM_C combine2Results fm prog results
+	f (prog,results) fm = Map.insertWith (flip combine2Results) prog results fm
 
 
 combine2Results
@@ -150,8 +152,8 @@ combine2Results
 		      gc_time = gt2, gc_work = gw2,
 		      binary_size = bs2, allocs = al2, 
 		      run_status = rs2, compile_status = cs2 }
-	  =  Results{ compile_time   = plusFM_C const ct1 ct2,
-		      module_size    = plusFM_C const ms1 ms2,
+	  =  Results{ compile_time   = Map.unionWith (flip const) ct1 ct2,
+		      module_size    = Map.unionWith (flip const) ms1 ms2,
 		      link_time      = combMaybes lt1 lt2,
 		      run_time       = rt1 ++ rt2,
 		      mut_time       = mt1 ++ mt2,
@@ -194,14 +196,14 @@ parse_compile_time prog mod [] = []
 parse_compile_time prog mod (l:ls) =
 	case matchRegex time_re l of {
 	     Just (real:user:system:_) ->
-		let ct  = addToFM emptyFM mod (read user)
+		let ct  = Map.singleton mod (read user)
 		in 
 		[(prog,emptyResults{compile_time = ct})];
 	     Nothing -> 
 
 	case matchRegex time_gnu17_re l of {
 	     Just (user:system:elapsed:_) ->
-		let ct  = addToFM emptyFM mod (read user)
+		let ct  = Map.singleton mod (read user)
 		in 
 		[(prog,emptyResults{compile_time = ct})];
 	     Nothing -> 
@@ -212,7 +214,7 @@ parse_compile_time prog mod (l:ls) =
 		  read_mut = read mut
 		  read_gc  = read gc
 		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = addToFM emptyFM mod time
+		  ct  = Map.singleton mod time
 	      in
 		[(prog,emptyResults{compile_time = ct})];
 	    Nothing ->
@@ -223,7 +225,7 @@ parse_compile_time prog mod (l:ls) =
 		  read_mut = read mut
 		  read_gc  = read gc
 		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = addToFM emptyFM mod time
+		  ct  = Map.singleton mod time
 	      in
 		[(prog,emptyResults{compile_time = ct})];
 	    Nothing ->
@@ -234,7 +236,7 @@ parse_compile_time prog mod (l:ls) =
 		  read_mut = read mut
 		  read_gc  = read gc
 		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = addToFM emptyFM mod time
+		  ct  = Map.singleton mod time
 	      in
 		[(prog,emptyResults{compile_time = ct})];
 	    Nothing ->
@@ -245,7 +247,7 @@ parse_compile_time prog mod (l:ls) =
 		  read_mut = read mut
 		  read_gc  = read gc
 		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = addToFM emptyFM mod time
+		  ct  = Map.singleton mod time
 	      in
 		[(prog,emptyResults{compile_time = ct})];
 	    Nothing ->
@@ -368,7 +370,7 @@ parse_size prog mod (l:ls) =
 					      Just (read text + read datas),
 				    compile_status = Success})]
 		 | otherwise ->
-			let ms  = addToFM emptyFM mod (read text + read datas)
+			let ms  = Map.singleton mod (read text + read datas)
 			in
 			[(prog,emptyResults{module_size = ms})]
 

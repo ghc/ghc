@@ -7,13 +7,14 @@
 module Main where
 
 import GenUtils
-import Text.Printf
 import Slurp
 import CmdLine
 
+import Text.Printf
 import Text.Html hiding ((!))
 import qualified Text.Html as Html ((!))
-import Data.FiniteMap
+import qualified Data.Map as Map
+import Data.Map (Map)
 import System.Console.GetOpt
 import System.Exit	( exitWith, ExitCode(..) )
 
@@ -66,7 +67,7 @@ main = do
 
  -- sanity check
  sequence_ [ checkTimes prog res | table <- results, 
-				   (prog,res) <- fmToList table ]
+				   (prog,res) <- Map.toList table ]
 
  case () of
    _ | html      -> 
@@ -104,7 +105,7 @@ data PerModuleTableSpec =
 	   SpecM 
 		String			-- Name of the table
 		String			-- HTML tag for the table
-		(Results -> FiniteMap String a)	-- get the module map
+		(Results -> Map String a)	-- get the module map
 		(a -> Bool)		-- Result within reasonable limits?
 
 -- The various per-program aspects of execution that we can generate results for.
@@ -182,7 +183,7 @@ cachegrind_summary_specs =
 -- in instructions, mem reads and mem writes (and vice-versa).
 pickSummary :: [ResultTable] -> [PerProgTableSpec]
 pickSummary rs 
-  | isNothing (instrs (head (eltsFM (head rs)))) = normal_summary_specs
+  | isNothing (instrs (head (Map.elems (head rs)))) = normal_summary_specs
   | otherwise = cachegrind_summary_specs
 
 per_module_result_tab =
@@ -251,7 +252,7 @@ htmlShowResults (r:rs) ss f stat result_ok
                     ++ [tableRow (-1) ("Average", gms)])
  where
 	-- results_per_prog :: [ (String,[BoxValue a]) ]
-	results_per_prog = map (calc_result rs f stat result_ok) (fmToList r)
+	results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
 	
 	results_per_run  = transpose (map snd results_per_prog)
 	(lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
@@ -260,7 +261,7 @@ htmlShowMultiResults
     :: Result a
 	=> [ResultTable]
 	-> [String]
-	-> (Results -> FiniteMap String a)
+	-> (Results -> Map String a)
 	-> (a -> Bool)
 	-> HtmlTable
 
@@ -276,18 +277,18 @@ htmlShowMultiResults (r:rs) ss f result_ok =
                                <-> tableRow (-1) ("", gms)])
 
   where
-	base_results = fmToList r :: [(String,Results)]
+	base_results = Map.toList r :: [(String,Results)]
 
         -- results_per_prog_mod_run :: [(String,[(String,[BoxValue a])])]
         results_per_prog_mod_run = map get_results_for_prog base_results
 
         -- get_results_for_prog :: (String,Results) -> (String,[BoxValue a])
-        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (fmToList (f r)))
+        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (Map.toList (f r)))
 
            where fms = map get_run_results rs
 
-                 get_run_results fm = case lookupFM fm prog of
-                                        Nothing  -> emptyFM
+                 get_run_results fm = case Map.lookup prog fm of
+                                        Nothing  -> Map.empty
                                         Just res -> f res
 
                  get_results_for_mod (id,attr) = calc_result fms Just (const Success)
@@ -423,7 +424,7 @@ ascii_show_results (r:rs) ss f stat result_ok
 	. show_per_prog_results ("Average",gms)
  where
 	-- results_per_prog :: [ (String,[BoxValue a]) ]
-	results_per_prog = map (calc_result rs f stat result_ok) (fmToList r)
+	results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
 	
 	results_per_run  = transpose (map snd results_per_prog)
         (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
@@ -446,8 +447,8 @@ ascii_summary_table latex (r1:r2:_) specs mb_restrict
 
 	(headings, columns, av_cols) = unzip3 (map calc_col specs)
         av_heads = [BoxString "Min", BoxString "Max", BoxString "Geometric Mean"]
-	baseline = fmToList r1
-	progs   = map BoxString (keysFM r1)
+	baseline = Map.toList r1
+	progs   = map BoxString (Map.keys r1)
 	rows0   = map TableRow (zipWith (:) progs (transpose columns))
 
 	rows1 = restrictRows mb_restrict rows0
@@ -494,7 +495,7 @@ ascii_show_multi_results
    :: Result a
 	=> [ResultTable]
 	-> [String]
-	-> (Results -> FiniteMap String a)
+	-> (Results -> Map String a)
 	-> (a -> Bool)
 	-> ShowS
 
@@ -510,18 +511,18 @@ ascii_show_multi_results (r:rs) ss f result_ok
 	. str "\n"
 	. show_per_prog_results ("Average",gms)
   where
-	base_results = fmToList r :: [(String,Results)]
+	base_results = Map.toList r :: [(String,Results)]
 
         -- results_per_prog_mod_run :: [(String,[(String,[BoxValue a])])]
         results_per_prog_mod_run = map get_results_for_prog base_results
 
         -- get_results_for_prog :: (String,Results) -> (String,[BoxValue a])
-        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (fmToList (f r)))
+        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (Map.toList (f r)))
 
            where fms = map get_run_results rs
 
-                 get_run_results fm = case lookupFM fm prog of
-                                        Nothing  -> emptyFM
+                 get_run_results fm = case Map.lookup prog fm of
+                                        Nothing  -> Map.empty
                                         Just res -> f res
 
                  get_results_for_mod (id,attr) = calc_result fms Just (const Success)
@@ -553,7 +554,7 @@ show_per_prog_results_width width (prog,results)
 -- calc_result is a nice exercise in higher-order programming...
 calc_result 
   :: Result a
-	=> [FiniteMap String b]		-- accumulated results
+	=> [Map String b]		-- accumulated results
 	-> (b -> Maybe a)		-- get a result from the b
 	-> (b -> Status)		-- get a status from the b
 	-> (a -> Bool)			-- is this result ok?
@@ -564,7 +565,7 @@ calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
 	(prog, (just_result baseline base_stat :
 
 	  let
-		rts' = map (\rt -> get_stuff (lookupFM rt prog)) rts
+		rts' = map (\rt -> get_stuff (Map.lookup prog rt)) rts
 
 		get_stuff Nothing  = (Nothing, NotDone)
 		get_stuff (Just r) = (get_maybe_a r, get_stat r)
@@ -689,17 +690,18 @@ data BoxValue
 showBox :: BoxValue -> String
 showBox (RunFailed stat) = show_stat stat
 showBox (Percentage f)   = show_pcntage f
-showBox (BoxFloat f)     = showFFloat (Just 2) f ""
+showBox (BoxFloat f)     = printf "%.2f" f
 showBox (BoxInt n)       = show (n `div` 1024) ++ "k"
 showBox (BoxInteger n)   = show (n `div` 1024) ++ "k"
 showBox (BoxString s)    = s
 
 instance Show BoxValue where { show = showBox }
 
-show_pcntage n = showFFloat (Just 1) (n-100) "%"
---show_pcntage n = show_float_signed (n-100) ++ "%"
+show_pcntage n = show_float_signed (n-100) ++ "%"
 
---show_float_signed = showFloat False False True False False Nothing (Just 1)
+show_float_signed n
+  | n >= 0    = printf "+%.1f" n
+  | otherwise = printf "%.1f" n
 
 show_stat Success     = "(no result)"
 show_stat WrongStdout = "(stdout)"
