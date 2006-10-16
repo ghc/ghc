@@ -30,11 +30,11 @@ import ErrUtils
 import Maybes
 import Control.Monad
 import Outputable
+import TcType
 
 #ifdef DEBUG
 import Unique
 import UniqFM
-import TcType
 #endif
 \end{code}
 
