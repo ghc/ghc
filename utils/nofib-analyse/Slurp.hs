@@ -4,7 +4,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Slurp (Status(..), Results(..), ResultTable(..), parse_log) where
+module Slurp (Status(..), Results(..), ResultTable, parse_log) where
 
 import CmdLine
 import Data.FiniteMap
@@ -75,7 +75,8 @@ Various banner lines:
 ==nofib== boyer2: time to compile Checker follows...
 -}
 
-banner_re = mkRegex "^==nofib==[ \t]+([A-Za-z0-9\\-_]+):[ \t]+(size of|time to link|time to run|time to compile)[ \t]+([A-Za-z0-9\\-_]+)(\\.o)?[ \t]+follows"
+-- NB. the hyphen must come last (or first) inside [...] to stand for itself.
+banner_re = mkRegex "^==nofib==[ \t]+([A-Za-z0-9_-]+):[ \t]+(size of|time to link|time to run|time to compile)[ \t]+([A-Za-z0-9_-]+)(\\.o)?[ \t]+follows"
 
 {-
 This regexp for the output of "time" works on FreeBSD, other versions
