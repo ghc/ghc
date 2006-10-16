@@ -1095,7 +1095,7 @@ tcGetModuleExports mod = do
   loadOrphanModules (dep_orphs (mi_deps iface)) False 
   		-- Load any orphan-module interfaces,
   		-- so their instances are visible
-  loadOrphanModules (dep_finsts (mi_finsts iface)) True
+  loadOrphanModules (dep_finsts (mi_deps iface)) True
   		-- Load any family instance-module interfaces,
   		-- so all family instances are visible
   ifaceExportNames (mi_exports iface)
