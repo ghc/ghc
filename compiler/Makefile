@@ -192,7 +192,7 @@ else
 GHC_PROG=$(odir)/ghc-$(ProjectVersion)
 endif
 
-ifneq "$(stage)" "2"
+ifeq "$(stage)" "1"
 HS_PROG = $(GHC_PROG)
 endif
 
@@ -822,13 +822,11 @@ coreSyn/CorePrep_HC_OPTS += -auto-all
 #-----------------------------------------------------------------------------
 # Building the GHC package
 
-# The GHC package is made from the stage 2 build.  Fortunately the
-# package build system framework more or less does the right thing for
-# us here.
+# The GHC package is made from the stage 2 build and later.
+# Fortunately the package build system framework more or less does the
+# right thing for us here.
 
-# 		All this section is stage-2 only!
-ifeq "$(stage)" "2"
-
+ifneq "$(findstring $(stage), 2 3)" ""
 PACKAGE = ghc
 HIERARCHICAL_LIB = NO
 VERSION = $(ProjectVersion)
