@@ -56,6 +56,10 @@ import Data.Array.ST
 #endif
 import Control.Monad.ST
 
+#if x86_64_TARGET_ARCH
+import StaticFlags	( opt_Unregisterised )
+#endif
+
 -- --------------------------------------------------------------------------
 -- Top level
 
