@@ -244,7 +244,7 @@ boot ::
 	if [ -f gmp/config.status ]; then \
 	   cd gmp && CC=$(WhatGccIsCalled) ./config.status; \
         else \
-	   cd gmp && CC=$(WhatGccIsCalled) ./configure --enable-shared=no \
+	   cd gmp && CC=$(WhatGccIsCalled) $(SHELL) configure --enable-shared=no \
 		        --host=`echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g'`; \
 	fi
 
