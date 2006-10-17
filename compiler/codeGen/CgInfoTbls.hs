@@ -202,18 +202,19 @@ retVec :: CmmExpr -> CmmExpr -> CmmExpr
 -- Get a return vector from the info pointer
 retVec info_amode zero_indexed_tag
   = let slot = vectorSlot info_amode zero_indexed_tag
-#if defined(x86_64_TARGET_ARCH) && defined(TABLES_NEXT_TO_CODE)
-        tableEntry = CmmMachOp (MO_S_Conv I32 I64) [CmmLoad slot I32]
+        table_slot = CmmLoad slot wordRep
+#if defined(x86_64_TARGET_ARCH)
+        offset_slot = CmmMachOp (MO_S_Conv I32 I64) [CmmLoad slot I32]
 	-- offsets are 32-bits on x86-64, due to the inability of
 	-- the tools to handle 64-bit PC-relative relocations.  See also
 	-- PprMach.pprDataItem, and InfoTables.h:OFFSET_FIELD().
 #else
-        tableEntry = CmmLoad slot wordRep
+	offset_slot = table_slot
 #endif
     in if tablesNextToCode
-           then CmmMachOp (MO_Add wordRep) [tableEntry, info_amode]
-           else tableEntry
-           
+           then CmmMachOp (MO_Add wordRep) [offset_slot, info_amode]
+           else table_slot
+
 emitReturnTarget
    :: Name
    -> CgStmts			-- The direct-return code (if any)

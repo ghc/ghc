@@ -11,15 +11,11 @@ H_FILES = $(filter-out gmp.h,$(wildcard *.h)) gmp.h
 #
 # Options
 #
-ifeq "$(GhcWithNoRegs)" "YES"
-SRC_CC_OPTS += -DNO_REGS
+ifeq "$(GhcUnregisterised)" "YES"
+SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
 endif
 
-ifeq "$(GhcWithMiniInterpreter)" "YES"
-SRC_CC_OPTS += -DUSE_MINIINTERPRETER
-endif
-
-ifeq "$(GhcWithTablesNextToCode)" "YES"
+ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 SRC_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 

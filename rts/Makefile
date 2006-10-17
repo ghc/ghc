@@ -124,11 +124,6 @@ SRC_CC_OPTS += -DNOSMP
 SRC_HC_OPTS += -optc-DNOSMP
 endif
 
-ifeq "$(GhcWithTablesNextToCode)" "YES"
-SRC_CC_OPTS += -DTABLES_NEXT_TO_CODE
-SRC_HC_OPTS += -optc-DTABLES_NEXT_TO_CODE
-endif
-
 ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
 endif

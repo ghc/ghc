@@ -217,6 +217,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
+	@echo "cGhcEnableTablesNextToCode = \"$(GhcEnableTablesNextToCode)\"" >> $(CONFIG_HS)
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
 	@echo "cRAWCPP_FLAGS         = \"$(RAWCPP_FLAGS)\"" >> $(CONFIG_HS)
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
@@ -346,10 +347,6 @@ endif
 	@echo "#define HOST_VENDOR \"$(TargetVendor_CPP)\"" >> $@
 	@echo "#define TARGET_VENDOR \"$(TargetVendor_CPP)\"" >> $@
 	@echo >> $@
-ifeq "$(GhcWithTablesNextToCode)" "YES"
-	@echo "#define TABLES_NEXT_TO_CODE 1" >> $@
-endif
-	@echo >> $@
 	@echo "#endif /* __PLATFORM_H__ */"          >> $@
 	@echo "Done."
 
@@ -419,6 +416,12 @@ SRC_HC_OPTS += -DGHCI -package template-haskell
 # -DBREAKPOINT causes a loop in stage2
 # SRC_HC_OPTS += -DGHCI -DBREAKPOINT -package template-haskell
 PKG_DEPENDS += template-haskell
+
+# Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
+# or not?
+ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
+SRC_HC_OPTS += -DGHCI_TABLES_NEXT_TO_CODE
+endif
 
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
 SRC_HC_OPTS += -threaded

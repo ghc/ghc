@@ -31,7 +31,6 @@ module SMRep (
 	isStaticRep,
 	fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize,
 	profHdrSize, thunkHdrSize,
-	tablesNextToCode,
 	smRepClosureType, smRepClosureTypeInt,
 
 	rET_SMALL, rET_VEC_SMALL, rET_BIG, rET_VEC_BIG
@@ -292,16 +291,6 @@ arrPtrsHdrSize    = fixedHdrSize*wORD_SIZE + sIZEOF_StgMutArrPtrs_NoHdr
 thunkHdrSize :: WordOff
 thunkHdrSize = fixedHdrSize + smp_hdr
 	where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
-\end{code}
-
-\begin{code}
--- IA64 mangler doesn't place tables next to code
-tablesNextToCode :: Bool
-#if defined(ia64_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH)
-tablesNextToCode = False
-#else
-tablesNextToCode = not opt_Unregisterised
-#endif
 \end{code}
 
 \begin{code}

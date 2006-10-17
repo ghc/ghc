@@ -92,14 +92,14 @@ make_constr_itbls cons
                     | ptrs + nptrs >= mIN_PAYLOAD_SIZE = nptrs
                     | otherwise = mIN_PAYLOAD_SIZE - ptrs
                  itbl  = StgInfoTable {
-#ifndef TABLES_NEXT_TO_CODE
+#ifndef GHCI_TABLES_NEXT_TO_CODE
                            entry = entry_addr,
 #endif
                            ptrs  = fromIntegral ptrs, 
                            nptrs = fromIntegral nptrs_really,
                            tipe  = fromIntegral cONSTR,
                            srtlen = fromIntegral conNo
-#ifdef TABLES_NEXT_TO_CODE
+#ifdef GHCI_TABLES_NEXT_TO_CODE
                          , code  = code
 #endif
                         }
@@ -113,7 +113,7 @@ make_constr_itbls cons
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
                     poke addr itbl
                     return (getName dcon, addr
-#ifdef TABLES_NEXT_TO_CODE
+#ifdef GHCI_TABLES_NEXT_TO_CODE
                                                `plusPtr` (2 * wORD_SIZE)
 #endif
                            )
@@ -279,14 +279,14 @@ type HalfWord = Word16
 #endif
 
 data StgInfoTable = StgInfoTable {
-#ifndef TABLES_NEXT_TO_CODE
+#ifndef GHCI_TABLES_NEXT_TO_CODE
    entry  :: Ptr (),
 #endif
    ptrs   :: HalfWord,
    nptrs  :: HalfWord,
    tipe   :: HalfWord,
    srtlen :: HalfWord
-#ifdef TABLES_NEXT_TO_CODE
+#ifdef GHCI_TABLES_NEXT_TO_CODE
  , code   :: [ItblCode]
 #endif
   }
@@ -296,14 +296,14 @@ instance Storable StgInfoTable where
    sizeOf itbl 
       = sum
         [
-#ifndef TABLES_NEXT_TO_CODE
+#ifndef GHCI_TABLES_NEXT_TO_CODE
          fieldSz entry itbl,
 #endif
          fieldSz ptrs itbl,
          fieldSz nptrs itbl,
          fieldSz tipe itbl,
          fieldSz srtlen itbl
-#ifdef TABLES_NEXT_TO_CODE
+#ifdef GHCI_TABLES_NEXT_TO_CODE
         ,fieldSz (head.code) itbl * itblCodeLength
 #endif
         ]
@@ -314,40 +314,40 @@ instance Storable StgInfoTable where
    poke a0 itbl
       = runState (castPtr a0)
       $ do
-#ifndef TABLES_NEXT_TO_CODE
+#ifndef GHCI_TABLES_NEXT_TO_CODE
            store (entry  itbl)
 #endif
            store (ptrs   itbl)
            store (nptrs  itbl)
            store (tipe   itbl)
            store (srtlen itbl)
-#ifdef TABLES_NEXT_TO_CODE
+#ifdef GHCI_TABLES_NEXT_TO_CODE
            sequence_ (map store (code itbl))
 #endif
 
    peek a0
       = runState (castPtr a0)
       $ do
-#ifndef TABLES_NEXT_TO_CODE
+#ifndef GHCI_TABLES_NEXT_TO_CODE
            entry  <- load
 #endif
            ptrs   <- load
            nptrs  <- load
            tipe   <- load
            srtlen <- load
-#ifdef TABLES_NEXT_TO_CODE
+#ifdef GHCI_TABLES_NEXT_TO_CODE
            code   <- sequence (replicate itblCodeLength load)
 #endif
            return 
               StgInfoTable { 
-#ifndef TABLES_NEXT_TO_CODE
+#ifndef GHCI_TABLES_NEXT_TO_CODE
                  entry  = entry,
 #endif
                  ptrs   = ptrs,
                  nptrs  = nptrs, 
                  tipe   = tipe,
                  srtlen = srtlen
-#ifdef TABLES_NEXT_TO_CODE
+#ifdef GHCI_TABLES_NEXT_TO_CODE
                 ,code   = code
 #endif
               }

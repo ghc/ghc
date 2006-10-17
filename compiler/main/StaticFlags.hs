@@ -64,13 +64,13 @@ module StaticFlags (
 	opt_EmitExternalCore,
 	opt_PIC,
 	v_Ld_inputs,
+	tablesNextToCode
   ) where
 
 #include "HsVersions.h"
 
 import CmdLineParser
-import Config		( cProjectVersionInt, cProjectPatchLevel,
-			  cGhcUnregisterised )
+import Config
 import FastString	( FastString, mkFastString )
 import Util
 import Maybes		( firstJust )
@@ -99,7 +99,12 @@ parseStaticFlags args = do
   let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
 
-  (more_leftover, errs) <- processArgs static_flags (unreg_flags ++ way_flags)
+    -- TABLES_NEXT_TO_CODE affects the info table layout.
+  let cg_flags | tablesNextToCode = ["-optc-DTABLES_NEXT_TO_CODE"]
+	       | otherwise	  = []
+
+  (more_leftover, errs) <- processArgs static_flags 
+				(unreg_flags ++ cg_flags ++ way_flags)
   when (not (null errs)) $ ghcError (UsageError (unlines errs))
   return (more_leftover++leftover)
 
@@ -284,6 +289,14 @@ opt_UF_DearOp   = ( 4 :: Int)
 			
 opt_Static			= lookUp  FSLIT("-static")
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
+
+-- Derived, not a real option.  Determines whether we will be compiling
+-- info tables that reside just before the entry code, or with an
+-- indirection to the entry code.  See TABLES_NEXT_TO_CODE in 
+-- includes/InfoTables.h.
+tablesNextToCode 		= not opt_Unregisterised
+		 		  && cGhcEnableTablesNextToCode == "YES"
+
 opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
 
 -- Include full span info in error messages, instead of just the start position.

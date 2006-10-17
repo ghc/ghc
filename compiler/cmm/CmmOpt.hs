@@ -19,6 +19,7 @@ import CmmUtils
 import CLabel
 import MachOp
 import SMRep
+import StaticFlags
 
 import UniqFM
 import Unique
