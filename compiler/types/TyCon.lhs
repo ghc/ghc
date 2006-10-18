@@ -73,7 +73,6 @@ import Class
 import BasicTypes
 import Name
 import PrelNames
-import Maybe
 import Maybes
 import Outputable
 import FastString
@@ -546,8 +545,8 @@ isAlgTyCon (TupleTyCon {}) = True
 isAlgTyCon other 	   = False
 
 isDataTyCon :: TyCon -> Bool
--- isDataTyCon returns True for data types that are represented by
--- heap-allocated constructors.
+-- isDataTyCon returns True for data types that are definitely
+-- represented by heap-allocated constructors.
 -- These are srcutinised by Core-level @case@ expressions, and they
 -- get info tables allocated for them.
 --	True for all @data@ types
@@ -559,7 +558,7 @@ isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})
 	DataTyCon {}  -> True
 	OpenNewTyCon  -> False
 	NewTyCon {}   -> False
-	AbstractTyCon -> pprPanic "isDataTyCon" (ppr tc)
+	AbstractTyCon -> False	-- We don't know, so return False
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 

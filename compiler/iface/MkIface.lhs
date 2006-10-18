@@ -1076,17 +1076,6 @@ tyThingToIfaceDecl (ATyCon tycon)
   = IfaceForeign { ifName    = getOccName tycon,
 	    	   ifExtName = tyConExtName tycon }
 
-  | isPrimTyCon tycon || isFunTyCon tycon
-	-- Needed in GHCi for ':info Int#', for example
-  = IfaceData { ifName    = getOccName tycon,
-	  	ifTyVars  = toIfaceTvBndrs (take (tyConArity tycon) alphaTyVars),
-		ifCtxt	  = [],
-		ifCons    = IfAbstractTyCon,
-		ifGadtSyntax = False,
-		ifGeneric = False,
-		ifRec     = NonRecursive,
-		ifFamInst = Nothing }
-
   | otherwise = pprPanic "toIfaceDecl" (ppr tycon)
   where
     tyvars = tyConTyVars tycon

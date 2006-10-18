@@ -28,6 +28,7 @@ import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils
 
+import TcHsSyn		( mkArbitraryType )	-- Mis-placed?
 import OccurAnal
 import CostCentre
 import Module
@@ -178,7 +179,7 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 
 	      mk_bind ((tyvars, global, local, prags), n)	-- locals !! n == local
 	        = 	-- Need to make fresh locals to bind in the selector, because
-		      	-- some of the tyvars will be bound to voidTy
+		      	-- some of the tyvars will be bound to 'Any'
 		  do { locals' <- newSysLocalsDs (map substitute local_tys)
 		     ; tup_id  <- newSysLocalDs  (substitute tup_ty)
 		     ; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global local core_bind) 
@@ -191,7 +192,7 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 		     ; returnDs ((global', rhs) : spec_binds) }
 	        where
 	          mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
-	      			      | otherwise		= voidTy
+	      			      | otherwise		= mkArbitraryType all_tyvar
 	          ty_args    = map mk_ty_arg all_tyvars
 	          substitute = substTyWith all_tyvars ty_args
 
@@ -266,11 +267,11 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 				(mkVarApps (Var spec_id) bndrs)
 	}
   where
-	-- Bind to voidTy any of all_ptvs that aren't 
+	-- Bind to Any any of all_ptvs that aren't 
 	-- relevant for this particular function 
     fix_up body | null void_tvs = body
 		| otherwise	= mkTyApps (mkLams void_tvs body) 
-					   (map (const voidTy) void_tvs)
+					   (map mkArbitraryType void_tvs)
     void_tvs = all_tvs \\ tvs
 
     msg = hang (ptext SLIT("Specialisation too complicated to desugar; ignored"))

@@ -40,7 +40,6 @@ module TysWiredIn (
 	unboxedPairTyCon, unboxedPairDataCon,
 
 	unitTy,
-	voidTy,
 
         -- parallel arrays
 	mkPArrTy,
@@ -306,22 +305,6 @@ unboxedPairDataCon = tupleCon   Unboxed 2
 \subsection[TysWiredIn-boxed-prim]{The ``boxed primitive'' types (@Char@, @Int@, etc)}
 %*									*
 %************************************************************************
-
-\begin{code}
--- The Void type is represented as a data type with no constructors
--- It's a built in type (i.e. there's no way to define it in Haskell;
---	the nearest would be
---
---		data Void =		-- No constructors!
---
--- ) It's lifted; there is only one value of this
--- type, namely "void", whose semantics is just bottom.
---
--- Haskell 98 drops the definition of a Void type, so we just 'simulate'
--- voidTy using ().
-voidTy = unitTy
-\end{code}
-
 
 \begin{code}
 charTy = mkTyConTy charTyCon

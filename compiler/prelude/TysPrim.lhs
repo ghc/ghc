@@ -39,7 +39,9 @@ module TysPrim(
 	word32PrimTyCon,	word32PrimTy,
 
 	int64PrimTyCon,		int64PrimTy,
-	word64PrimTyCon,	word64PrimTy
+	word64PrimTyCon,	word64PrimTy,
+
+	anyPrimTyCon, anyPrimTy, anyPrimTyCon1, mkAnyPrimTyCon
   ) where
 
 #include "HsVersions.h"
@@ -52,11 +54,11 @@ import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon,
 import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  unliftedTypeKind, 
 			  liftedTypeKind, openTypeKind, 
-			  Kind, mkArrowKinds,
+			  Kind, mkArrowKinds, mkArrowKind,
 			  TyThing(..)
 			)
 import SrcLoc		( noSrcLoc )
-import Unique		( mkAlphaTyVarUnique )
+import Unique		( mkAlphaTyVarUnique, pprUnique )
 import PrelNames
 import FastString	( FastString, mkFastString )
 import Outputable
@@ -97,6 +99,7 @@ primTyCons
     , wordPrimTyCon
     , word32PrimTyCon
     , word64PrimTyCon
+    , anyPrimTyCon, anyPrimTyCon1
     ]
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
@@ -130,6 +133,8 @@ stableNamePrimTyConName       = mkPrimTc FSLIT("StableName#") stableNamePrimTyCo
 bcoPrimTyConName 	      = mkPrimTc FSLIT("BCO#") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName  	      = mkPrimTc FSLIT("Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName  	      = mkPrimTc FSLIT("ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
+anyPrimTyConName	      = mkPrimTc FSLIT("Any") anyPrimTyConKey anyPrimTyCon
+anyPrimTyCon1Name	      = mkPrimTc FSLIT("Any1") anyPrimTyCon1Key anyPrimTyCon
 \end{code}
 
 %************************************************************************
@@ -259,6 +264,52 @@ realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 
 Note: the ``state-pairing'' types are not truly primitive, so they are
 defined in \tr{TysWiredIn.lhs}, not here.
+
+
+%************************************************************************
+%*									*
+		Any
+%*									*
+%************************************************************************
+
+The type constructor Any is type to which you can unsafely coerce any
+lifted type, and back. 
+
+  * It is lifted, and hence represented by a pointer
+
+  * It does not claim to be a *data* type, and that's important for
+    the code generator, because the code gen may *enter* a data value
+    but never enters a function value.  
+
+It's also used to instantiate un-constrained type variables after type
+checking.  For example
+	lenth Any []
+Annoyingly, we sometimes need Anys of other kinds, such as (*->*) etc.
+This is a bit like tuples.   We define a couple of useful ones here,
+and make others up on the fly.  If any of these others end up being exported
+into interface files, we'll get a crash; at least until we add interface-file
+syntax to support them.
+
+\begin{code}
+anyPrimTy = mkTyConApp anyPrimTyCon []
+
+anyPrimTyCon :: TyCon 	-- Kind *
+anyPrimTyCon = mkLiftedPrimTyCon anyPrimTyConName liftedTypeKind 0 PtrRep
+
+anyPrimTyCon1 :: TyCon 	-- Kind *->*
+anyPrimTyCon1 = mkLiftedPrimTyCon anyPrimTyCon1Name kind 0 PtrRep
+  where
+    kind = mkArrowKind liftedTypeKind liftedTypeKind
+				  
+mkAnyPrimTyCon :: Unique -> Kind -> TyCon
+-- Grotesque hack alert: the client gives the unique; so equality won't work
+mkAnyPrimTyCon uniq kind 
+  = pprTrace "Urk! Inventing strangely-kinded Any TyCon:" (ppr uniq <+> ppr kind)
+    tycon
+  where
+     name  = mkPrimTc (mkFastString ("Any" ++ showSDoc (pprUnique uniq))) uniq tycon
+     tycon = mkLiftedPrimTyCon name kind 0 PtrRep
+\end{code}
 
 
 %************************************************************************

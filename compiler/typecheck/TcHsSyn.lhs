@@ -15,6 +15,7 @@ module TcHsSyn (
 	mkHsAppTy, mkSimpleHsAlt,
 	nlHsIntLit, mkVanillaTuplePat,
 	
+	mkArbitraryType,	-- Put this elsewhere?
 
 	-- re-exported from TcMonad
 	TcId, TcIdSet, TcDictBinds,
@@ -920,24 +921,22 @@ mkArbitraryType :: TcTyVar -> Type
 -- Make up an arbitrary type whose kind is the same as the tyvar.
 -- We'll use this to instantiate the (unbound) tyvar.
 mkArbitraryType tv 
-  | liftedTypeKind `isSubKind` kind = voidTy		-- The vastly common case
+  | liftedTypeKind `isSubKind` kind = anyPrimTy		-- The vastly common case
   | otherwise			    = mkTyConApp tycon []
   where
     kind       = tyVarKind tv
     (args,res) = splitKindFunTys kind
 
-    tycon | eqKind kind (tyConKind listTyCon) 	--  *->*
-	  = listTyCon				-- No tuples this size
+    tycon | eqKind kind (tyConKind anyPrimTyCon1) 	--  *->*
+	  = anyPrimTyCon1				-- No tuples this size
 
 	  | all isLiftedTypeKind args && isLiftedTypeKind res
 	  = tupleTyCon Boxed (length args)	--  *-> ... ->*->*
+		-- Horrible hack to make less use of mkAnyPrimTyCon
 
 	  | otherwise
-	  = pprTrace "Urk! Inventing strangely-kinded void TyCon:" (ppr tc_name $$ ppr kind) $
-	    mkPrimTyCon tc_name kind 0 VoidRep
+	  = mkAnyPrimTyCon (getUnique tv) kind
 		-- Same name as the tyvar, apart from making it start with a colon (sigh)
 		-- I dread to think what will happen if this gets out into an 
 		-- interface file.  Catastrophe likely.  Major sigh.
-
-    tc_name = mkInternalName (getUnique tv) (mkDerivedTyConOcc (getOccName tv)) noSrcLoc
 \end{code}

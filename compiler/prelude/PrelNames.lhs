@@ -60,7 +60,7 @@ import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkTupleTyConUnique
 		  ) 
 import BasicTypes ( Boxity(..), Arity )
-import Name	  ( Name, mkInternalName, mkExternalName, nameModule )
+import Name	  ( Name, mkInternalName, mkExternalName )
 import SrcLoc     ( noSrcLoc )
 import FastString
 \end{code}
@@ -758,6 +758,10 @@ rationalTyConKey			= mkPreludeTyConUnique 33
 realWorldTyConKey			= mkPreludeTyConUnique 34
 stablePtrPrimTyConKey			= mkPreludeTyConUnique 35
 stablePtrTyConKey			= mkPreludeTyConUnique 36
+
+anyPrimTyConKey				= mkPreludeTyConUnique 37
+anyPrimTyCon1Key			= mkPreludeTyConUnique 38
+
 statePrimTyConKey			= mkPreludeTyConUnique 50
 stableNamePrimTyConKey			= mkPreludeTyConUnique 51
 stableNameTyConKey		        = mkPreludeTyConUnique 52
@@ -798,7 +802,7 @@ eitherTyConKey				= mkPreludeTyConUnique 84
 
 -- Super Kinds constructors
 tySuperKindTyConKey                    = mkPreludeTyConUnique 85
-coSuperKindTyConKey                = mkPreludeTyConUnique 86
+coSuperKindTyConKey                    = mkPreludeTyConUnique 86
 
 -- Kind constructors
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
