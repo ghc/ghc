@@ -1,7 +1,11 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS    += -fglasgow-exts -package util -package data -package text -cpp -package lang
+SRC_HC_OPTS    += -fglasgow-exts -cpp
 HS_PROG		= nofib-analyse
+
+ifeq "$(ghc_ge_605)" "YES"
+SRC_HC_OPTS	+= -package regex-compat -package html
+endif
 
 include $(TOP)/mk/target.mk
