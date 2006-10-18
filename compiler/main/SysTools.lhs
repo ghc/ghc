@@ -51,7 +51,6 @@ import Data.IORef
 import Data.Int
 import Control.Monad
 import System.Exit
-import System.Cmd
 import System.Environment
 import System.IO
 import SYSTEM_IO_ERROR as IO
@@ -82,9 +81,11 @@ import Text.Regex
 
 #if __GLASGOW_HASKELL__ < 603
 -- rawSystem comes from libghccompat.a in stage1
-import Compat.RawSystem	( rawSystem )
+import Compat.RawSystem ( rawSystem )
+import System.Cmd       ( system )
 import GHC.IOBase       ( IOErrorType(..) ) 
 #else
+import System.Cmd       ( rawSystem, system )
 import System.Process	( runInteractiveProcess, getProcessExitCode )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
 import Data.Char        ( isSpace )
