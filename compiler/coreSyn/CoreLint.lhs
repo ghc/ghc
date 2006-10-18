@@ -369,8 +369,8 @@ The basic version of these functions checks that the argument is a
 subtype of the required type, as one would expect.
 
 \begin{code}
-lintCoreArgs :: Type -> [CoreArg] -> LintM Type
-lintCoreArg  :: Type -> CoreArg   -> LintM Type
+lintCoreArgs :: OutType -> [CoreArg] -> LintM OutType
+lintCoreArg  :: OutType -> CoreArg   -> LintM OutType
 -- First argument has already had substitution applied to it
 \end{code}
 
@@ -398,6 +398,7 @@ lintCoreArg fun_ty arg =
 
 \begin{code}
 -- Both args have had substitution applied
+lintTyApp :: OutType -> OutType -> LintM OutType
 lintTyApp ty arg_ty 
   = case splitForAllTy_maybe ty of
       Nothing -> addErrL (mkTyAppMsg ty arg_ty)
@@ -488,7 +489,9 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
   = addLoc (CaseAlt alt) $  do
     {   -- First instantiate the universally quantified 
 	-- type variables of the data constructor
-      con_payload_ty <- lintCoreArgs (dataConRepType con) (map Type tycon_arg_tys)
+	-- We've already check
+      checkL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
+    ; let con_payload_ty = applyTys (dataConRepType con) tycon_arg_tys
 
 	-- And now bring the new binders into scope
     ; lintBinders args $ \ args -> do
@@ -782,7 +785,6 @@ mkScrutMsg var var_ty scrut_ty subst
 	  text "Scrutinee type:" <+> ppr scrut_ty,
      hsep [ptext SLIT("Current TV subst"), ppr subst]]
 
-
 mkNonDefltMsg e
   = hang (text "Case expression with DEFAULT not at the beginnning") 4 (ppr e)
 mkNonIncreasingAltsMsg e
@@ -791,6 +793,14 @@ mkNonIncreasingAltsMsg e
 nonExhaustiveAltsMsg :: CoreExpr -> Message
 nonExhaustiveAltsMsg e
   = hang (text "Case expression with non-exhaustive alternatives") 4 (ppr e)
+
+mkBadConMsg :: TyCon -> DataCon -> Message
+mkBadConMsg tycon datacon
+  = vcat [
+	text "In a case alternative, data constructor isn't in scrutinee type:",
+	text "Scrutinee type constructor:" <+> ppr tycon,
+	text "Data con:" <+> ppr datacon
+    ]
 
 mkBadPatMsg :: Type -> Type -> Message
 mkBadPatMsg con_result_ty scrut_ty
