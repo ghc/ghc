@@ -583,17 +583,18 @@ getCallMethod this_pkg name (LFCon con) n_args
     ReturnCon con
 
 getCallMethod this_pkg name (LFThunk _ _ updatable std_form_info is_fun) n_args
-  | is_fun 	-- Must always "call" a function-typed 
-  = SlowCall	-- thing, cannot just enter it [in eval/apply, the entry code
+  | is_fun 	-- *Might* be a function, so we must "call" it (which is always safe)
+  = SlowCall	-- We cannot just enter it [in eval/apply, the entry code
 		-- is the fast-entry code]
 
+  -- Since is_fun is False, we are *definitely* looking at a data value
   | updatable || opt_DoTickyProfiling  -- to catch double entry
       {- OLD: || opt_SMP
 	 I decided to remove this, because in SMP mode it doesn't matter
 	 if we enter the same thunk multiple times, so the optimisation
 	 of jumping directly to the entry code is still valid.  --SDM
 	-}
-  = ASSERT( n_args == 0 ) EnterIt
+  = ASSERT2( n_args == 0, ppr name ) EnterIt
 
   | otherwise	-- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
