@@ -226,6 +226,7 @@ test('tc210', normal, compile, [''])
 test('tc211', normal, compile, [''])
 test('tc212', normal, compile, [''])
 test('tc213', normal, compile, [''])
+test('tc214', normal, compile, [''])
 
 # Omitting temporarily
 # test('syn-perf', normal, compile, ['-fcontext-stack=30'])
