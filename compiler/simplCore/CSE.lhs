@@ -157,7 +157,7 @@ bar will be inlined (when it should not be). Even if we remove INLINE foo,
 we'd still like foo to be inlined if rhs is small. This won't happen
 with foo = bar.
 
-Not CSE-ing inside INLLINE also solves an annoying bug in CSE. Consider
+Not CSE-ing inside INLINE also solves an annoying bug in CSE. Consider
 a worker/wrapper, in which the worker has turned into a single variable:
 	$wf = h
 	f = \x -> ...$wf...
