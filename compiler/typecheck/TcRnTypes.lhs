@@ -469,7 +469,8 @@ of whether the imported things are actually used or not
 It is used 	* when processing the export list
 		* when constructing usage info for the inteface file
 		* to identify the list of directly imported modules
-			for initialisation purposes
+			for initialisation purposes and
+			for optimsed overlap checking of family instances
 		* when figuring out what things are really unused
 
 \begin{code}

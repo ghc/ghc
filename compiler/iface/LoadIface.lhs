@@ -238,9 +238,12 @@ loadInterface doc_str mod from
 	; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
 	; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
 
-	; let {	final_iface = iface {	mi_decls = panic "No mi_decls in PIT",
-					mi_insts = panic "No mi_insts in PIT",
-					mi_rules = panic "No mi_rules in PIT" } }
+	; let {	final_iface = iface {	
+			        mi_decls     = panic "No mi_decls in PIT",
+				mi_insts     = panic "No mi_insts in PIT",
+				mi_fam_insts = panic "No mi_fam_insts in PIT",
+				mi_rules     = panic "No mi_rules in PIT"
+                              } }
 
 	; updateEps_  $ \ eps -> 
 	    eps { 
@@ -252,6 +255,15 @@ loadInterface doc_str mod from
 						   new_eps_insts,
 	      eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
 						      new_eps_fam_insts,
+              eps_mod_fam_inst_env
+			       = let
+				   fam_inst_env = 
+				     extendFamInstEnvList emptyFamInstEnv
+							  new_eps_fam_insts
+				 in
+				 extendModuleEnv (eps_mod_fam_inst_env eps)
+						 mod
+						 fam_inst_env,
 	      eps_stats        = addEpsInStats (eps_stats eps) 
 					       (length new_eps_decls)
 	      (length new_eps_insts) (length new_eps_rules) }
@@ -456,6 +468,8 @@ initExternalPackageState
       eps_fam_inst_env = emptyFamInstEnv,
       eps_rule_base    = mkRuleBase builtinRules,
 	-- Initialise the EPS rule pool with the built-in rules
+      eps_mod_fam_inst_env
+                       = emptyModuleEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
 			   , n_insts_in = 0, n_insts_out = 0
 			   , n_rules_in = length builtinRules, n_rules_out = 0 }

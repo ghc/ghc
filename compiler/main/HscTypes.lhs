@@ -440,12 +440,12 @@ data ModIface
 -- Should be able to construct ModDetails from mi_decls in ModIface
 data ModDetails
    = ModDetails {
-	-- The next three fields are created by the typechecker
-	md_exports  :: [AvailInfo],
-        md_types    :: !TypeEnv,
-        md_fam_insts :: ![FamInst],	-- Cached value extracted from md_types
-        md_insts    :: ![Instance],	-- Dfun-ids for the instances in this module
-        md_rules    :: ![CoreRule]	-- Domain may include Ids from other modules
+	-- The next two fields are created by the typechecker
+	md_exports   :: [AvailInfo],
+        md_types     :: !TypeEnv,
+        md_insts     :: ![Instance],	-- Dfun-ids for the instances in this module
+        md_fam_insts :: ![FamInst],
+        md_rules     :: ![CoreRule]	-- Domain may include Ids from other modules
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
@@ -1007,6 +1007,9 @@ data ExternalPackageState
 					       -- modules 
 	eps_fam_inst_env :: !PackageFamInstEnv,-- Ditto FamInstEnv
 	eps_rule_base    :: !PackageRuleBase,  -- Ditto RuleEnv
+
+        eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- identifies family
+						       -- instances of each mod
 
 	eps_stats :: !EpsStats
   }

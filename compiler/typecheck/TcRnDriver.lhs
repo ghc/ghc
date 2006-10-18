@@ -37,6 +37,7 @@ import TcExpr
 import TcRnMonad
 import TcType
 import Inst
+import FamInst
 import InstEnv
 import FamInstEnv
 import TcBinds
@@ -172,6 +173,12 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- found.
 	loadOrphanModules (imp_orphs  imports) False ;
 	loadOrphanModules (imp_finsts imports) True  ;
+
+	let { directlyImpMods =   map (\(mod, _, _) -> mod) 
+			        . moduleEnvElts 
+			        . imp_mods 
+			        $ imports } ;
+	checkFamInstConsistency (imp_finsts imports) directlyImpMods ;
 
 	traceRn (text "rn1a") ;
 		-- Rename and type check the declarations
