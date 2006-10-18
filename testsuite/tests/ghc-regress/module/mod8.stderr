@@ -1,2 +1,2 @@
 
-mod8.hs:2:9: Unknown module in export list: module `N'
+mod8.hs:2:9: Warning: The export item `module N' exports nothing

@@ -1,2 +1,3 @@
 
-mod135.hs:2:10: Unknown module in export list: module `List'
+mod135.hs:2:10:
+    Warning: The export item `module List' exports nothing
