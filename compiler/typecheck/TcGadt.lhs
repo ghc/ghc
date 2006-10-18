@@ -47,6 +47,8 @@ import UniqFM
 
 \begin{code}
 data Refinement = Reft InScopeSet InternalReft 
+
+type InternalReft = TyVarEnv (Coercion, Type)
 -- INVARIANT:   a->(co,ty)   then   co :: (a:=:ty)
 -- Not necessarily idemopotent
 
@@ -139,7 +141,7 @@ gadtRefine (Reft in_scope env1)
 	   ex_tvs co_vars
 -- Precondition: fvs( co_vars ) # env1
 -- That is, the kinds of the co_vars are a
--- fixed point of the  incoming refinement
+-- fixed point of the incoming refinement
 
   = ASSERT2( not $ any (`elemVarEnv` env1) (varSetElems $ tyVarsOfTypes $ map tyVarKind co_vars),
 	     ppr env1 $$ ppr co_vars $$ ppr (map tyVarKind co_vars) )
@@ -157,9 +159,11 @@ gadtRefine (Reft in_scope env1)
   where
     tv_set = mkVarSet ex_tvs
     in_scope' = foldr extend in_scope co_vars
+
+	-- For each co_var, add it *and* the tyvars it mentions, to in_scope
     extend co_var in_scope
-	= extendInScopeSetSet (extendInScopeSet in_scope co_var)
-			      (tyVarsOfType (tyVarKind co_var))
+	= extendInScopeSetSet in_scope $
+	  extendVarSet (tyVarsOfType (tyVarKind co_var)) co_var
 	
     do_one reft co_var = unify reft (TyVarTy co_var) ty1 ty2
 	where
@@ -252,11 +256,6 @@ tryToBind tv_set tv | tv `elemVarSet` tv_set = BindMe
 %************************************************************************
 
 \begin{code}
-type InternalReft = TyVarEnv (Coercion, Type)
-
--- INVARIANT:   a->(co,ty)   then   co :: (a:=:ty)
--- Not necessarily idemopotent
-
 #ifdef DEBUG
 badReftElts :: InternalReft -> [(Unique, (Coercion,Type))]
 -- Return the BAD elements of the refinement
