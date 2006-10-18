@@ -173,7 +173,8 @@ data TyCon
 	tyConUnique   :: Unique,
 	tyConName     :: Name,
 	tyConKind     :: Kind,
-	tyConArity    :: Arity,
+	tyConArity    :: Arity,		-- SLPJ Oct06: I'm not sure what the significance
+					--	       of the arity of a primtycon is!
 
 	primTyConRep  :: PrimRep,
 			-- Many primitive tycons are unboxed, but some are
