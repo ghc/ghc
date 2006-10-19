@@ -99,16 +99,14 @@ instance Show Dynamic where
 	  showString ">>"
 
 #ifdef __GLASGOW_HASKELL__
-type Obj = forall a . a
- -- Dummy type to hold the dynamically typed value.
+type Obj = Any
+ -- Use GHC's primitive 'Any' type to hold the dynamically typed value.
  --
- -- In GHC's new eval/apply execution model this type must
- -- be polymorphic.  It can't be a constructor, because then
- -- GHC will use the constructor convention when evaluating it,
- -- and this will go wrong if the object is really a function.  On
- -- the other hand, if we use a polymorphic type, GHC will use
+ -- In GHC's new eval/apply execution model this type must not look
+ -- like a data type.  If it did, GHC would use the constructor convention 
+ -- when evaluating it, and this will go wrong if the object is really a 
+ -- function.  Using Any forces GHC to use
  -- a fallback convention for evaluating it that works for all types.
- -- (using a function type here would also work).
 #elif !defined(__HUGS__)
 data Obj = Obj
 #endif
