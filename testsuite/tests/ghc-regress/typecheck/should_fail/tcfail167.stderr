@@ -1,0 +1,6 @@
+
+tcfail167.hs:14:13:
+    Inaccessible case alternative: Can't match types `Char' and `Float'
+    In the pattern: C2
+    In the definition of `inaccessible': inaccessible C2 = ' '
+
