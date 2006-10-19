@@ -555,6 +555,7 @@ pprModIface iface
 	, pprFixities (mi_fixities iface)
 	, vcat (map pprIfaceDecl (mi_decls iface))
 	, vcat (map ppr (mi_insts iface))
+	, vcat (map ppr (mi_fam_insts iface))
 	, vcat (map ppr (mi_rules iface))
 	, pprDeprecs (mi_deprecs iface)
 	]

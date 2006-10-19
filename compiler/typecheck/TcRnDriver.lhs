@@ -461,7 +461,7 @@ tcRnHsBootDecls decls
 	; gbl_env <- getGblEnv 
 	
 		-- Make the final type-env
-		-- Include the dfun_ids so that their type sigs get
+		-- Include the dfun_ids so that their type sigs
 		-- are written into the interface file
 	; let { type_env0 = tcg_type_env gbl_env
 	      ; type_env1 = extendTypeEnvWithIds type_env0 val_ids
@@ -1276,6 +1276,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
 		        tcg_rules     = rules,
 			tcg_imports   = imports })
   = vcat [ ppr_types insts type_env
+	 , ppr_tycons fam_insts type_env
 	 , ppr_insts insts
 	 , ppr_fam_insts fam_insts
 	 , vcat (map ppr rules)
@@ -1304,6 +1305,17 @@ ppr_types insts type_env
 	-- that the type checker has invented.  Top-level user-defined things 
 	-- have External names.
 
+ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
+ppr_tycons fam_insts type_env
+  = text "TYPE CONSTRUCTORS" $$ nest 4 (ppr_tydecls tycons)
+  where
+    fi_tycons = map famInstTyCon fam_insts
+    tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
+    want_tycon tycon | opt_PprStyle_Debug = True
+	             | otherwise	  = not (isImplicitTyCon tycon) &&
+					    isExternalName (tyConName tycon) &&
+				            not (tycon `elem` fi_tycons)
+
 ppr_insts :: [Instance] -> SDoc
 ppr_insts []     = empty
 ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
@@ -1320,6 +1332,16 @@ ppr_sigs ids
   where
     le_sig id1 id2 = getOccName id1 <= getOccName id2
     ppr_sig id = ppr id <+> dcolon <+> ppr (tidyTopType (idType id))
+
+ppr_tydecls :: [TyCon] -> SDoc
+ppr_tydecls tycons
+	-- Print type constructor info; sort by OccName 
+  = vcat (map ppr_tycon (sortLe le_sig tycons))
+  where
+    le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
+    ppr_tycon tycon 
+      | isCoercionTyCon tycon = ptext SLIT("coercion") <+> ppr tycon
+      | otherwise             = ppr (tyThingToIfaceDecl (ATyCon tycon))
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty
