@@ -13,7 +13,7 @@ module TyCon(
 	tyConPrimRep,
 
 	AlgTyConRhs(..), visibleDataCons, 
-        AlgTyConParent(..), hasParent,
+        AlgTyConParent(..), 
 	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
@@ -114,6 +114,8 @@ data TyCon
 					-- argument list (starting from 0).
 					-- NB: Length is less than tyConArity
 					--     if higher kind signature.
+					-- NB: Just _ <=> associated (not
+					--		  toplevel) family
 	
 	algTcSelIds :: [Id],  		-- Its record selectors (empty if none)
 
@@ -278,10 +280,6 @@ data AlgTyConParent = -- An ordinary type constructor has no parent.
 				    TyCon	-- a *coercion* identifying
 						-- the representation type
 						-- with the type instance
-
-hasParent :: AlgTyConParent -> Bool
-hasParent NoParentTyCon = False
-hasParent _other        = True
 
 data SynTyConRhs
   = OpenSynTyCon Kind	-- Type family: *result* kind given
@@ -674,11 +672,24 @@ isCoercionTyCon :: TyCon -> Bool
 isCoercionTyCon (CoercionTyCon {}) = True
 isCoercionTyCon other              = False
 
+-- Identifies implicit tycons that, in particular, do not go into interface
+-- files (because they are implicitly reconstructed when the interface is
+-- read).
+--
+-- Note that 
+--
+-- * associated families are implicit, as they are re-constructed from
+--   the class declaration in which they reside, and 
+-- * family instances are *not* implicit as they represent the instance body
+--   (similar to a dfun does that for a class instance).
+--
 isImplicitTyCon :: TyCon -> Bool
-isImplicitTyCon SynTyCon{}                     = False
-isImplicitTyCon AlgTyCon{algTcParent = parent} = hasParent parent
-isImplicitTyCon other                          = True
-        -- catches: FunTyCon, TupleTyCon, PrimTyCon, 
+isImplicitTyCon tycon | isTyConAssoc tycon           = True
+		      | isSynTyCon tycon	     = False
+		      | isAlgTyCon tycon	     = isClassTyCon tycon ||
+						       isTupleTyCon tycon
+isImplicitTyCon _other                               = True
+        -- catches: FunTyCon, PrimTyCon, 
         -- CoercionTyCon, SuperKindTyCon
 \end{code}
 
