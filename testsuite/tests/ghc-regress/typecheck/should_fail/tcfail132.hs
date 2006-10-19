@@ -1,15 +1,11 @@
 -- Fails with a kind error.
--- The current error message is rather horrible:
+-- The current error message was rather horrible (trac bug #312):
 --
 --    Kind error: Expecting kind `k_a1JA -> k_a1JE -> k_a1JI -> *',
 --	          but `DUnit t' has kind `k_a1JA -> k_a1JE -> *'
 --
--- but we can't tidy kinds at the moment, becuase they don't have OccNames.
+-- as we couldn't tidy kinds, becuase they didn't have OccNames.
 -- This test recalls the bad error message.
---
--- One way to improve matters would be to compile type defns in dependency order
--- I'm not sure when we stopped doing so; and stopping doing so at least means that
--- uses can influence kinds...
 
 module ShouldFail where
 
