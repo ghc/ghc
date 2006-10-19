@@ -207,8 +207,12 @@ cat /dev/null > $DefaultStdoutFile
 cat /dev/null > $DefaultStderrFile
 $PreScriptLines
 $SpixifyLine1
-echo $TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile | dos2unix 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
-$TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile | dos2unix 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
+set -x
+$TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1.raw 2> $TmpPrefix/runtest$$.2.raw 3> $TmpPrefix/runtest$$.3.raw\'
+set +x
+dos2unix < $TmpPrefix/runtest$$.1.raw > $TmpPrefix/runtest$$.1
+dos2unix < $TmpPrefix/runtest$$.2.raw > $TmpPrefix/runtest$$.2
+dos2unix < $TmpPrefix/runtest$$.3.raw > $TmpPrefix/runtest$$.3
 progexit=\$?
 if [ \$progexit -eq 0 ] && [ $PgmFail -ne 0 ]; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
