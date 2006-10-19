@@ -22,10 +22,40 @@
 #error Build options incompatible with THREADED_RTS.
 #endif
 
+/* ----------------------------------------------------------------------------
+   Atomic operations
+   ------------------------------------------------------------------------- */
+   
 /* 
- * XCHG - the atomic exchange instruction.  Used for locking closures
- * during updates (see lockClosure() below) and the MVar primops.
+ * The atomic exchange operation: xchg(p,w) exchanges the value
+ * pointed to by p with the value w, returning the old value.
  *
+ * Used for locking closures during updates (see lockClosure() below)
+ * and the MVar primops.
+ */
+INLINE_HEADER StgWord xchg(StgPtr p, StgWord w);
+
+/* 
+ * Compare-and-swap.  Atomically does this:
+ *
+ * cas(p,o,n) { 
+ *    r = *p; 
+ *    if (r == o) { *p = n }; 
+ *    return r;
+ * }
+ */
+INLINE_HEADER StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
+
+/*
+ * Prevents write operations from moving across this call in either
+ * direction.
+ */ 
+INLINE_HEADER void write_barrier(void);
+
+/* ----------------------------------------------------------------------------
+   Implementations
+   ------------------------------------------------------------------------- */
+/* 
  * NB: the xchg instruction is implicitly locked, so we do not need
  * a lock prefix here. 
  */
@@ -137,11 +167,12 @@ write_barrier(void) {
 #endif
 }
 
-/*
+/* -----------------------------------------------------------------------------
  * Locking/unlocking closures
  *
  * This is used primarily in the implementation of MVars.
- */
+ * -------------------------------------------------------------------------- */
+
 #define SPIN_COUNT 4000
 
 INLINE_HEADER StgInfoTable *
@@ -161,11 +192,100 @@ lockClosure(StgClosure *p)
 INLINE_HEADER void
 unlockClosure(StgClosure *p, StgInfoTable *info)
 {
-    // This is a strictly ordered write, so we need a wb():
+    // This is a strictly ordered write, so we need a write_barrier():
     write_barrier();
     p->header.info = info;
 }
 
+/* -----------------------------------------------------------------------------
+ * Spin locks
+ *
+ * These are simple spin-only locks as opposed to Mutexes which
+ * probably spin for a while before blocking in the kernel.  We use
+ * these when we are sure that all our threads are actively running on
+ * a CPU, eg. in the GC.
+ *
+ * TODO: measure whether we really need these, or whether Mutexes
+ * would do (and be a bit safer if a CPU becomes loaded).
+ * -------------------------------------------------------------------------- */
+
+#if defined(DEBUG)
+typedef struct StgSync_
+{
+    StgWord32 lock;
+    StgWord64 spin; // DEBUG version counts how much it spins
+} StgSync;
+#else
+typedef StgWord StgSync;
+#endif
+
+typedef lnat StgSyncCount;
+
+
+#if defined(DEBUG)
+
+// Debug versions of spin locks maintain a spin count
+
+// How to use: 
+//  To use the debug veriosn of the spin locks, a debug version of the program 
+//  can be run under a deugger with a break point on stat_exit. At exit time 
+//  of the program one can examine the state the spin count counts of various
+//  spin locks to check for contention. 
+
+// acquire spin lock
+INLINE_HEADER void acquireSpinLock(StgSync * p)
+{
+    StgWord32 r = 0;
+    do {
+        p->spin++;
+        r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+    } while(r == 0);
+    p->spin--;
+}
+
+// release spin lock
+INLINE_HEADER void releaseSpinLock(StgSync * p)
+{
+    write_barrier();
+    p->lock = 1;
+}
+
+// initialise spin lock
+INLINE_HEADER void initSpinLock(StgSync * p)
+{
+    write_barrier();
+    p->lock = 1;
+    p->spin = 0;
+}
+
+#else
+
+// acquire spin lock
+INLINE_HEADER void acquireSpinLock(StgSync * p)
+{
+    StgWord32 r = 0;
+    do {
+        r = cas((StgVolatilePtr)p, 1, 0);
+    } while(r == 0);
+}
+
+// release spin lock
+INLINE_HEADER void releaseSpinLock(StgSync * p)
+{
+    write_barrier();
+    (*p) = 1;
+}
+
+// init spin lock
+INLINE_HEADER void initSpinLock(StgSync * p)
+{
+    write_barrier();
+    (*p) = 1;
+}
+
+#endif /* DEBUG */
+
+/* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
 #define write_barrier() /* nothing */
@@ -184,6 +304,15 @@ lockClosure(StgClosure *p)
 
 INLINE_HEADER void
 unlockClosure(StgClosure *p STG_UNUSED, StgInfoTable *info STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void acquireSpinLock(void * p STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void releaseSpinLock(void * p STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void initSpinLock(void * p STG_UNUSED)
 { /* nothing */ }
 
 #endif /* !THREADED_RTS */
