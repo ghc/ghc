@@ -137,7 +137,7 @@ extern void freeStorage(void);
    rtsBool doYouWantToGC(void)  Returns True if the storage manager is
    				ready to perform a GC, False otherwise.
 
-   lnat  allocated_bytes(void)  Returns the number of bytes allocated
+   lnat  allocatedBytes(void)  Returns the number of bytes allocated
                                 via allocate() since the last GC.
 				Used in the reporting of statistics.
 
@@ -148,7 +148,7 @@ extern void freeStorage(void);
 extern StgPtr  allocate        ( nat n );
 extern StgPtr  allocateLocal   ( Capability *cap, nat n );
 extern StgPtr  allocatePinned  ( nat n );
-extern lnat    allocated_bytes ( void );
+extern lnat    allocatedBytes  ( void );
 
 extern bdescr * RTS_VAR(small_alloc_list);
 extern bdescr * RTS_VAR(large_alloc_list);

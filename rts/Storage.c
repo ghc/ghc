@@ -615,7 +615,7 @@ allocate( nat n )
 }
 
 lnat
-allocated_bytes( void )
+allocatedBytes( void )
 {
     lnat allocated;
 
@@ -874,7 +874,7 @@ calcAllocated( void )
   nat allocated;
   bdescr *bd;
 
-  allocated = allocated_bytes();
+  allocated = allocatedBytes();
   allocated += countNurseryBlocks() * BLOCK_SIZE_W;
   
   {
