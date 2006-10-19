@@ -118,6 +118,12 @@ extern void freeStorage(void);
    				n words long, returning a pointer to
 				the first word.  Always succeeds.
 				
+   StgPtr allocateLocal(Capability *cap, nat n)
+                                Allocates memory from the nursery in
+				the current Capability.  This can be
+				done without taking a global lock,
+                                unlike allocate().
+
    StgPtr allocatePinned(nat n) Allocates a chunk of contiguous store
    				n words long, which is at a fixed
 				address (won't be moved by GC).  
@@ -141,8 +147,6 @@ extern void freeStorage(void);
                                 via allocate() since the last GC.
 				Used in the reporting of statistics.
 
-   THREADED_RTS: allocate and doYouWantToGC can be used from STG code, they are
-   surrounded by a mutex.
    -------------------------------------------------------------------------- */
 
 extern StgPtr  allocate        ( nat n );
