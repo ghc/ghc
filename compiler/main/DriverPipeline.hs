@@ -416,9 +416,7 @@ runPipeline stop_phase dflags (input_fn, mb_phase) output maybe_loc
   let (basename, suffix) = splitFilename input_fn
 
 	-- If we were given a -x flag, then use that phase to start from
-      start_phase
-	| Just x_phase <- mb_phase = x_phase
-	| otherwise                = startPhase suffix
+      start_phase = fromMaybe (startPhase suffix) mb_phase
 
   -- We want to catch cases of "you can't get there from here" before
   -- we start the pipeline, because otherwise it will just run off the
