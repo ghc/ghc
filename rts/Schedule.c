@@ -2670,11 +2670,6 @@ GetRoots( evac_fn evac )
    This is the interface to the garbage collector from Haskell land.
    We provide this so that external C code can allocate and garbage
    collect when called from Haskell via _ccall_GC.
-
-   It might be useful to provide an interface whereby the programmer
-   can specify more roots (ToDo).
-   
-   This needs to be protected by the GC condition variable above.  KH.
    -------------------------------------------------------------------------- */
 
 static void (*extra_roots)(evac_fn);
@@ -2710,13 +2705,6 @@ AllRoots(evac_fn evac)
 {
     GetRoots(evac);		// the scheduler's roots
     extra_roots(evac);		// the user's roots
-}
-
-void
-performGCWithRoots(void (*get_roots)(evac_fn))
-{
-    extra_roots = get_roots;
-    performGC_(rtsFalse, AllRoots);
 }
 
 /* -----------------------------------------------------------------------------

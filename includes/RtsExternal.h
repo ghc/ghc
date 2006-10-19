@@ -88,7 +88,6 @@ typedef void (*evac_fn)(StgClosure **);
 
 extern void performGC(void);
 extern void performMajorGC(void);
-extern void performGCWithRoots(void (*get_roots)(evac_fn));
 extern HsInt64 getAllocations( void );
 extern void revertCAFs( void );
 extern void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
