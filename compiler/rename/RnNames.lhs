@@ -32,8 +32,8 @@ import NameEnv
 import NameSet
 import OccName		( srcDataName, pprNonVarNameSpace,
 			  occNameSpace,
-			  OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv,
-			  extendOccEnv )
+			  OccEnv, mkOccEnv, mkOccEnv_C, lookupOccEnv,
+			  emptyOccEnv, extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo, availNames, availName,
 			  HomePackageTable, PackageIfaceTable, 
 			  mkPrintUnqualified, availsToNameSet,
@@ -57,7 +57,7 @@ import BasicTypes	( DeprecTxt )
 import DriverPhases	( isHsBoot )
 import Util
 import ListSetOps
-import Data.List        ( partition, concatMap )
+import Data.List        ( partition, concatMap, (\\) )
 import IO		( openFile, IOMode(..) )
 import Monad		( when )
 \end{code}
@@ -191,7 +191,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 
         -- filter the imports according to the import declaration
     (new_imp_details, gbl_env) <- 
-        filterImports iface imp_spec imp_details total_avails
+        filterImports2 iface imp_spec imp_details total_avails
 
     dflags <- getDOpts
 
@@ -408,6 +408,175 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 	    gres | want_hiding = gresFromAvails hiding_prov pruned_avails
 		 | otherwise   = concatMap (gresFromIE decl_spec) items2
 
+        traceRn (ppr $ all_avails)
+        traceRn (ppr $ occ_env)
+        traceRn (ppr $ items2)
+        traceRn (ppr $ mkGlobalRdrEnv gres)
+
+        return (Just (want_hiding, map fst items2), mkGlobalRdrEnv gres)
+  where
+	-- This environment is how we map names mentioned in the import
+        -- list to the actual Name they correspond to, and the name family
+        -- that the Name belongs to (the AvailInfo).  The situation is
+        -- complicated by associated families, which introduce a three-level
+        -- hierachy, where class = grand parent, assoc family = parent, and
+        -- data constructors = children.  The occ_env entries for associated
+        -- families needs to capture all this information; hence, we have the
+        -- third component of the environment that gives the class name (=
+        -- grand parent) in case of associated families.
+        --
+	-- This env will have entries for data constructors too,
+	-- they won't make any difference because naked entities like T
+	-- in an import list map to TcOccs, not VarOccs.
+    occ_env :: OccEnv (Name,	    -- the name
+		       AvailInfo,   -- the export item providing the name
+		       Maybe Name)  -- the parent of associated types
+    occ_env = mkOccEnv_C combine [ (nameOccName n, (n, a, Nothing)) 
+			         | a <- all_avails, n <- availNames a]
+      where
+        -- we know that (1) there are at most entries for one name, (2) their
+        -- first component is identical, (3) they are for tys/cls, and (4) one
+        -- entry has the name in its parent position (the other doesn't)
+        combine (name, AvailTC p1 subs1, Nothing)
+		(_   , AvailTC p2 subs2, Nothing)
+          = let
+	      (parent, subs) = if p1 == name then (p2, subs1) else (p1, subs2)
+	    in
+	    (name, AvailTC name subs, Just parent)
+
+    lookup_lie :: Bool -> LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
+    lookup_lie opt_indexedtypes (L loc ieRdr)
+        = do 
+             stuff <- setSrcSpan loc $ 
+                      case lookup_ie opt_indexedtypes ieRdr of
+                            Failed err  -> addErr err >> return []
+                            Succeeded a -> return a
+             checkDodgyImport stuff
+             return [ (L loc ie, avail) | (ie,avail) <- stuff ]
+        where
+                -- Warn when importing T(..) if T was exported abstractly
+            checkDodgyImport stuff
+                | IEThingAll n <- ieRdr, (_, AvailTC _ [one]):_ <- stuff
+                = ifOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
+                -- NB. use the RdrName for reporting the warning
+            checkDodgyImport _
+                = return ()
+
+        -- For each import item, we convert its RdrNames to Names,
+        -- and at the same time construct an AvailInfo corresponding
+        -- to what is actually imported by this item.
+        -- Returns Nothing on error.
+        -- We return a list here, because in the case of an import
+        -- item like C, if we are hiding, then C refers to *both* a
+        -- type/class and a data constructor.  Moreover, when we import
+	-- data constructors of an associated family, we need separate
+	-- AvailInfos for the data constructors and the family (as they have
+	-- different parents).  See the discussion at occ_env.
+    lookup_ie :: Bool -> IE RdrName -> MaybeErr Message [(IE Name,AvailInfo)]
+    lookup_ie opt_indexedtypes ie 
+      = let bad_ie = Failed (badImportItemErr iface decl_spec ie)
+
+            lookup_name rdrName = 
+                case lookupOccEnv occ_env (rdrNameOcc rdrName) of
+                   Nothing -> bad_ie
+                   Just n  -> return n
+        in
+        case ie of
+         IEVar n -> do
+             (name, avail, _) <- lookup_name n
+             return [(IEVar name, trimAvail avail name)]
+
+         IEThingAll tc -> do
+             (name, avail@(AvailTC name2 subs), mb_parent) <- lookup_name tc
+             case mb_parent of
+	       -- non-associated ty/cls
+	       Nothing     -> return [(IEThingAll name, avail)]
+	       -- associated ty
+	       Just parent -> return [(IEThingAll name, 
+				       AvailTC name2 (subs \\ [name])),
+				      (IEThingAll name, AvailTC parent [name])]
+
+         IEThingAbs tc
+             | want_hiding   -- hiding ( C )
+                        -- Here the 'C' can be a data constructor 
+                        --  *or* a type/class, or even both
+             -> let tc_name = lookup_name tc
+                    dc_name = lookup_name (setRdrNameSpace tc srcDataName)
+                in
+                case catMaybeErr [ tc_name, dc_name ] of
+                  []    -> bad_ie
+                  names -> return [mkIEThingAbs name | name <- names]
+             | otherwise
+             -> do nameAvail <- lookup_name tc
+                   return [mkIEThingAbs nameAvail]
+
+         IEThingWith tc ns -> do
+            (name, AvailTC name2 subnames, mb_parent) <- lookup_name tc
+	    let 
+	      env         = mkOccEnv [(nameOccName s, s) | s <- subnames]
+	      mb_children = map (lookupOccEnv env . rdrNameOcc) ns
+	    children <- if any isNothing mb_children
+                        then bad_ie
+                        else return (catMaybes mb_children)
+              -- check for proper import of indexed types
+	    when (not opt_indexedtypes && any isTyConName children) $
+              Failed (typeItemErr (head . filter isTyConName $ children)
+				  (text "in import list"))
+            case mb_parent of
+	       -- non-associated ty/cls
+	      Nothing     -> return [(IEThingWith name children, 
+				      AvailTC name (name:children))]
+	       -- associated ty
+	      Just parent -> return [(IEThingWith name children, 
+				      AvailTC name children),
+				     (IEThingWith name children, 
+				      AvailTC parent [name])]
+
+         _other -> Failed illegalImportItemErr
+         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed
+         -- all errors.
+
+      where
+        mkIEThingAbs (n, av, Nothing    ) = (IEThingAbs n, trimAvail av n) 
+	mkIEThingAbs (n, av, Just parent) = (IEThingAbs n, AvailTC parent [n]) 
+
+
+catMaybeErr :: [MaybeErr err a] -> [a]
+catMaybeErr ms =  [ a | Succeeded a <- ms ]
+\end{code}
+
+\begin{code}
+filterImports2 :: ModIface
+	      -> ImpDeclSpec			-- The span for the entire import decl
+	      -> Maybe (Bool, [LIE RdrName])	-- Import spec; True => hiding
+	      -> [AvailInfo]    		-- What's available
+	      -> RnM (Maybe (Bool, [LIE Name]), -- Import spec w/ Names
+		      GlobalRdrEnv)		-- Same again, but in GRE form
+			
+filterImports2 iface decl_spec Nothing all_avails
+  = return (Nothing, mkGlobalRdrEnv (gresFromAvails prov all_avails))
+  where
+    prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
+
+
+filterImports2 iface decl_spec (Just (want_hiding, import_items)) all_avails
+  = do   -- check for errors, convert RdrNames to Names
+        opt_indexedtypes <- doptM Opt_IndexedTypes
+        items1 <- mapM (lookup_lie opt_indexedtypes) import_items
+
+        let items2 :: [(LIE Name, AvailInfo)]
+            items2 = concat items1
+		-- NB the AvailInfo may have duplicates, and several items
+		--    for the same parent; e.g N(x) and N(y)
+
+            names  = availsToNameSet (map snd items2)
+	    keep n = not (n `elemNameSet` names)
+	    pruned_avails = filterAvails keep all_avails
+	    hiding_prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
+
+	    gres | want_hiding = gresFromAvails hiding_prov pruned_avails
+		 | otherwise   = concatMap (gresFromIE decl_spec) items2
+
         return (Just (want_hiding, map fst items2), mkGlobalRdrEnv gres)
   where
 	-- This environment is how we map names mentioned in the import
@@ -502,9 +671,6 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
          _other -> Failed illegalImportItemErr
          -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed
          -- all errors.
-
-catMaybeErr :: [MaybeErr err a] -> [a]
-catMaybeErr ms =  [ a | Succeeded a <- ms ]
 \end{code}
 
 %************************************************************************

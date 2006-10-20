@@ -200,6 +200,8 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- Process the export list
 	(rn_exports, exports) <- rnExports (isJust maybe_mod) export_ies ;
                  
+	traceRn (text "rn4") ;
+
 		-- Rename the Haddock documentation header 
 	rn_module_doc <- rnMbHsDoc maybe_doc ;
 

@@ -302,6 +302,7 @@ data GlobalRdrElt
     }
 
 data Parent = NoParent | ParentIs Name
+	      deriving (Eq)
 
 instance Outputable Parent where
    ppr NoParent     = empty
@@ -309,8 +310,20 @@ instance Outputable Parent where
    
 
 plusParent :: Parent -> Parent -> Parent
-plusParent NoParent     rel = ASSERT( case rel of { NoParent -> True; other -> False } )    NoParent
-plusParent (ParentIs n) rel = ASSERT( case rel of { ParentIs m -> n==m;  other -> False } ) ParentIs n
+plusParent p1 p2 = ASSERT2( p1 == p2, parens (ppr p1) <+> parens (ppr p2) )
+                   p1
+
+{- Why so complicated? -=chak
+plusParent :: Parent -> Parent -> Parent
+plusParent NoParent     rel = 
+  ASSERT2( case rel of { NoParent -> True; other -> False }, 
+	   ptext SLIT("plusParent[NoParent]: ") <+> ppr rel )    
+  NoParent
+plusParent (ParentIs n) rel = 
+  ASSERT2( case rel of { ParentIs m -> n==m;  other -> False }, 
+	   ptext SLIT("plusParent[ParentIs]:") <+> ppr n <> comma <+> ppr rel )
+  ParentIs n
+ -}
 
 emptyGlobalRdrEnv = emptyOccEnv
 

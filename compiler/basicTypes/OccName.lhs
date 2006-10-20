@@ -43,7 +43,7 @@ module OccName (
 
 	-- The OccEnv type
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
-	lookupOccEnv, mkOccEnv, extendOccEnvList, elemOccEnv,
+	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
 
 	-- The OccSet type
@@ -259,6 +259,7 @@ extendOccEnv :: OccEnv a -> OccName -> a -> OccEnv a
 extendOccEnvList :: OccEnv a -> [(OccName, a)] -> OccEnv a
 lookupOccEnv :: OccEnv a -> OccName -> Maybe a
 mkOccEnv     :: [(OccName,a)] -> OccEnv a
+mkOccEnv_C   :: (a -> a -> a) -> [(OccName,a)] -> OccEnv a
 elemOccEnv   :: OccName -> OccEnv a -> Bool
 foldOccEnv   :: (a -> b -> b) -> b -> OccEnv a -> b
 occEnvElts   :: OccEnv a -> [a]
@@ -280,6 +281,8 @@ plusOccEnv	 = plusUFM
 plusOccEnv_C	 = plusUFM_C
 extendOccEnv_C   = addToUFM_C
 mapOccEnv	 = mapUFM
+
+mkOccEnv_C comb l = addListToUFM_C comb emptyOccEnv l
 
 type OccSet = UniqFM OccName
 
