@@ -16,3 +16,5 @@ if config.platform == 'i386-unknown-freebsd':
 
 test('queryfdoption01', compose(omit_ways(['ghci']), compose(only_compiler_types(['ghc']), conf)),
 	compile_and_run, ['-package unix'])
+test('getEnvironment01', conf, compile_and_run, ['-package unix'])
+
