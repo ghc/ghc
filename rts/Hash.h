@@ -36,5 +36,7 @@ HashTable * allocStrHashTable ( void );
  */
 void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
 
+void exitHashTable ( void );
+
 #endif /* HASH_H */
 
