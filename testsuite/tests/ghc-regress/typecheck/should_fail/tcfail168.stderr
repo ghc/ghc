@@ -1,0 +1,7 @@
+
+tcfail168.hs:8:10:
+    Couldn't match expected type `(->) Char' against inferred type `IO'
+    Probable cause: `putChar' is applied to too many arguments
+    In the expression: putChar 'a'
+    In a 'do' expression: putChar 'a'
+
