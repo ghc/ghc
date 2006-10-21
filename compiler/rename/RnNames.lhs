@@ -43,7 +43,8 @@ import HscTypes		( GenAvailInfo(..), AvailInfo, availNames, availName,
 import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, Parent(..),
 		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
 			  emptyGlobalRdrEnv, plusGlobalRdrEnv, globalRdrEnvElts,
-			  extendGlobalRdrEnv, lookupGlobalRdrEnv, lookupGRE_Name,
+			  extendGlobalRdrEnv, lookupGlobalRdrEnv,
+			  lookupGRE_RdrName, lookupGRE_Name, 
 			  Provenance(..), ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..), 
 			  importSpecLoc, importSpecModule, isLocalGRE, pprNameProvenance,
 			  unQualSpecOK, qualSpecOK )
@@ -407,11 +408,6 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 
 	    gres | want_hiding = gresFromAvails hiding_prov pruned_avails
 		 | otherwise   = concatMap (gresFromIE decl_spec) items2
-
-        traceRn (ppr $ all_avails)
-        traceRn (ppr $ occ_env)
-        traceRn (ppr $ items2)
-        traceRn (ppr $ mkGlobalRdrEnv gres)
 
         return (Just (want_hiding, map fst items2), mkGlobalRdrEnv gres)
   where
@@ -935,7 +931,13 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
     lookup_ie (IEThingAbs rdr) 
         = do name <- lookupGlobalOccRn rdr
-             return (IEThingAbs name, AvailTC name [name])
+	     case lookupGRE_RdrName rdr rdr_env of
+	       []    -> panic "RnNames.lookup_ie"
+	       elt:_ -> case gre_par elt of
+			  NoParent   -> return (IEThingAbs name, 
+						AvailTC name [name])
+			  ParentIs p -> return (IEThingAbs name, 
+						AvailTC p [name])
 
     lookup_ie ie@(IEThingAll rdr) 
         = do name <- lookupGlobalOccRn rdr
