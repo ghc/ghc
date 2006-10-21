@@ -58,7 +58,7 @@ import BasicTypes	( DeprecTxt )
 import DriverPhases	( isHsBoot )
 import Util
 import ListSetOps
-import Data.List        ( partition, concatMap, (\\) )
+import Data.List        ( partition, concatMap, (\\), delete )
 import IO		( openFile, IOMode(..) )
 import Monad		( when )
 \end{code}
@@ -780,9 +780,18 @@ mkAvailEnv :: [AvailInfo] -> AvailEnv
 	-- We want to combine these; addAvail does that
 mkAvailEnv avails = foldl addAvail emptyAvailEnv avails
 
+-- After combining the avails, we need to ensure that the parent name is the
+-- first entry in the list of subnames, if it is included at all.  (Subsequent
+-- functions rely on that.)
+normaliseAvail :: AvailInfo -> AvailInfo
+normaliseAvail avail@(Avail _)     = avail
+normaliseAvail (AvailTC name subs) = AvailTC name subs'
+  where
+    subs' = if name `elem` subs then name : (delete name subs) else subs
+
 -- | combines 'AvailInfo's from the same family
 nubAvails :: [AvailInfo] -> [AvailInfo]
-nubAvails avails = nameEnvElts (mkAvailEnv avails)
+nubAvails avails = map normaliseAvail . nameEnvElts . mkAvailEnv $ avails
 \end{code}
 
 
@@ -874,6 +883,7 @@ exports_from_avail Nothing rdr_env imports this_mod
 
 exports_from_avail (Just rdr_items) rdr_env imports this_mod
   = do (ie_names, _, exports) <- foldlM do_litem emptyExportAccum rdr_items
+
        return (Just ie_names, exports)
   where
     do_litem :: ExportAccum -> LIE RdrName -> RnM ExportAccum
