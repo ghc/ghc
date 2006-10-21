@@ -24,6 +24,7 @@ clean(['Gadt17_help.hi', 'Gadt17_help.o'])
 
 test('gadt18', normal, compile, [''])
 test('gadt19', normal, compile, [''])
+test('gadt20', normal, compile, [''])
 
 test('red-black', normal, compile, [''])
 test('type-rep', skip_if_fast, compile_and_run, [''])
