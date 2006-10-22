@@ -1150,7 +1150,7 @@ newtypeFieldErr con_name n_flds
 badSigTyDecl tc_name
   = vcat [ ptext SLIT("Illegal kind signature") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow indexed types")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -findexed-types to allow indexed types")) ]
 
 badKindSigCtxt tc_name
   = vcat [ ptext SLIT("Illegal context in kind signature") <+>
@@ -1160,7 +1160,7 @@ badKindSigCtxt tc_name
 badIdxTyDecl tc_name
   = vcat [ ptext SLIT("Illegal indexed type instance for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow indexed types")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -findexed-types to allow indexed types")) ]
 
 badGadtIdxTyDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+>
