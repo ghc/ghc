@@ -414,7 +414,7 @@ genApply regstatus args =
 --    if fast == 1:
 --        print "    goto *lbls[info->type];";
 --    else:
-        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (%INFO_TYPE(%STD_INFO(info))) {",
+        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (TO_W_(%INFO_TYPE(%STD_INFO(info)))) {",
 	nest 4 (vcat [
 
 --    if fast == 1:
@@ -540,7 +540,7 @@ genApplyFast regstatus args =
         text "W_ info;",
         text "W_ arity;",
         text  "info = %GET_STD_INFO(R1);",
-        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (%INFO_TYPE(info)) {",
+        text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (TO_W_(%INFO_TYPE(info))) {",
 	nest 4 (vcat [
           text "case FUN,",
           text "     FUN_1_0,",

@@ -119,7 +119,11 @@ lintCmmStmt (CmmStore l r) = do
   return ()
 lintCmmStmt (CmmCall _target _res args _vols) = mapM_ (lintCmmExpr.fst) args
 lintCmmStmt (CmmCondBranch e _id)   = lintCmmExpr e >> checkCond e >> return ()
-lintCmmStmt (CmmSwitch e _branches) = lintCmmExpr e >> return ()
+lintCmmStmt (CmmSwitch e _branches) = do
+  erep <- lintCmmExpr e
+  if (erep == wordRep)
+    then return ()
+    else cmmLintErr (text "switch scrutinee is not a word: " <> ppr e)
 lintCmmStmt (CmmJump e _args)       = lintCmmExpr e >> return ()
 lintCmmStmt _other 		    = return ()
 
