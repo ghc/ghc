@@ -101,8 +101,10 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		-- So we content ourselves with gathering uses only; that
 		-- means we'll only report a declaration as unused if it isn't
 		-- mentioned at all.  Ah well.
+	traceRn (text "Start rnTyClDecls") ;
 	(rn_tycl_decls,    src_fvs1)
 	   <- mapFvRn (wrapLocFstM rnTyClDecl) tycl_decls ;
+	traceRn (text "finish rnTyClDecls") ;
 	(rn_inst_decls,    src_fvs2)
 	   <- mapFvRn (wrapLocFstM rnSrcInstDecl) inst_decls ;
 	(rn_deriv_decls,    src_fvs_deriv)
@@ -118,7 +120,9 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	-- the rnDocEntity stuff reports the errors again.
 	failIfErrsM ;
 
+	traceRn (text "Start rnDocEntitys") ;
 	rn_docs <- mapM rnDocEntity docs ;
+	traceRn (text "finish rnDocEntitys") ;
 
 	let {
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,

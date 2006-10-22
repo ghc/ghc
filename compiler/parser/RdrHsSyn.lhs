@@ -309,6 +309,8 @@ add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs, hs_docs = docs})
 		addl (gp { hs_tyclds = L l d : ts, 
                            hs_fixds = fsigs ++ fs,
                            hs_docs = add_doc decl docs}) ds
+	| isIdxTyDecl d = 
+	        addl (gp { hs_tyclds = L l d : ts }) ds
 	| otherwise =
 		addl (gp { hs_tyclds = L l d : ts, 
                            hs_docs = add_doc decl docs }) ds

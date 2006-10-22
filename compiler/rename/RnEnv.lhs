@@ -179,7 +179,9 @@ lookupTopBndrRn rdr_name
   | otherwise
   = do	{ mb_gre <- lookupGreLocalRn rdr_name
 	; case mb_gre of
-		Nothing  -> unboundName rdr_name
+		Nothing  -> do
+			      traceRn $ text "lookupTopBndrRn"
+			      unboundName rdr_name
 		Just gre -> returnM (gre_name gre) }
 	      
 -- lookupLocatedSigOccRn is used for type signatures and pragmas
@@ -244,15 +246,10 @@ newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
 --
 lookupFamInstDeclBndr :: Module -> Located RdrName -> RnM Name
 lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
-  | not (isSrcRdrName rdr_name)
-  = lookupImportedName rdr_name	
-
-  | otherwise
-  =	-- First look up the name in the normal environment.
-   lookupGreRn_maybe rdr_name		`thenM` \ mb_gre ->
-   case mb_gre of {
-	Just gre -> returnM (gre_name gre) ;
-	Nothing  -> newTopSrcBinder mod lrdr_name }
+  = do { mb_gre <- lookupGreRn_maybe rdr_name
+       ; case mb_gre of
+           Just gre -> returnM (gre_name gre) ;
+	   Nothing  -> newTopSrcBinder mod lrdr_name }
 
 --------------------------------------------------
 --		Occurrences
@@ -297,7 +294,8 @@ lookupGlobalOccRn rdr_name
    if isQual rdr_name && mod == iNTERACTIVE then	
 					-- This test is not expensive,
 	lookupQualifiedName rdr_name	-- and only happens for failed lookups
-   else	
+   else	do
+        traceRn $ text "lookupGlobalOccRn"
 	unboundName rdr_name }
 
 lookupImportedName :: RdrName -> TcRnIf m n Name
@@ -353,7 +351,8 @@ lookupGreRn rdr_name
 	; case mb_gre of {
 	    Just gre -> return gre ;
 	    Nothing  -> do
-	{ name <- unboundName rdr_name
+	{ traceRn $ text "lookupGreRn"
+	; name <- unboundName rdr_name
 	; return (GRE { gre_name = name, gre_par = NoParent,
 		        gre_prov = LocalDef }) }}}
 
