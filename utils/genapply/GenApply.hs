@@ -732,7 +732,7 @@ genStackFns regstatus args
 
 genStackApplyArray types =
   vcat [
-    text "section \"rodata\" {",
+    text "section \"relrodata\" {",
     text "stg_ap_stack_entries:",
     text "W_ 0; W_ 0; W_ 0;", -- ARG_GEN, ARG_GEN_BIG, ARG_BCO
     vcat (map arr_ent types),
@@ -743,7 +743,7 @@ genStackApplyArray types =
 
 genStackSaveArray types =
   vcat [
-    text "section \"rodata\" {",
+    text "section \"relrodata\" {",
     text "stg_stack_save_entries:",
     text "W_ 0; W_ 0; W_ 0;", -- ARG_GEN, ARG_GEN_BIG, ARG_BCO
     vcat (map arr_ent types),

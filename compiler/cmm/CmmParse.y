@@ -424,6 +424,7 @@ section :: String -> Section
 section "text"	 = Text
 section "data" 	 = Data
 section "rodata" = ReadOnlyData
+section "relrodata" = RelocatableReadOnlyData
 section "bss"	 = UninitialisedData
 section s	 = OtherSection s
 
