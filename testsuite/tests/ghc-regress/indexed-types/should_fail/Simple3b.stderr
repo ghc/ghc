@@ -1,0 +1,3 @@
+
+Simple3b.hs:10:2:
+    Wrong category of type instance; declaration was for a newtype

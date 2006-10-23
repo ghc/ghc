@@ -1,0 +1,5 @@
+
+Simple11d.hs:8:14:
+    Conflicting family instance declarations:
+      data instance C9 [Int] [a] -- Defined at Simple11d.hs:8:14
+      data instance C9 [a] [Int] -- Defined at Simple11d.hs:10:14

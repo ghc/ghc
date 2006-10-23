@@ -1,0 +1,8 @@
+
+Simple5a.hs:31:10:
+    Couldn't match expected type `a' (a rigid variable)
+	   against inferred type `Int'
+      `a' is bound by the type signature for `bar3wrong'
+	at Simple5a.hs:30:16
+    In the pattern: D3Int
+    In the definition of `bar3wrong': bar3wrong D3Int = 1

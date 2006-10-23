@@ -1,0 +1,3 @@
+
+Simple4.hs:8:2:
+    Type declaration in a class must be a kind signature or synonym default

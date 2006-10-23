@@ -1,0 +1,4 @@
+
+Simple1b.hs:4:0:
+    Indexed type instance has too many parameters: `T1'
+    In the data type declaration for `T1'

@@ -1,0 +1,5 @@
+
+Simple5b.hs:31:11:
+    Couldn't match expected type `Int' against inferred type `Char'
+    In the pattern: D3Char
+    In the definition of `bar3wrong'': bar3wrong' D3Char = 'a'
