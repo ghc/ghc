@@ -99,14 +99,17 @@ parseStaticFlags args = do
   let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
 
+  (more_leftover, errs) <- processArgs static_flags (unreg_flags ++ way_flags)
+
     -- TABLES_NEXT_TO_CODE affects the info table layout.
+    -- Be careful to do this *after* all processArgs,
+    -- because evaluating tablesNextToCode involves looking at the global
+    -- static flags.  Those pesky global variables...
   let cg_flags | tablesNextToCode = ["-optc-DTABLES_NEXT_TO_CODE"]
 	       | otherwise	  = []
 
-  (more_leftover, errs) <- processArgs static_flags 
-				(unreg_flags ++ cg_flags ++ way_flags)
   when (not (null errs)) $ ghcError (UsageError (unlines errs))
-  return (more_leftover++leftover)
+  return (cg_flags++more_leftover++leftover)
 
 
 -- note that ordering is important in the following list: any flag which
