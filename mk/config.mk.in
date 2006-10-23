@@ -282,7 +282,7 @@ endif
 # (see TABLES_NEXT_TO_CODE in the RTS).  Whether we actually compile for
 # TABLES_NEXT_TO_CODE depends on whether we're building unregisterised
 # code or not, which may be decided by options to the compiler later.
-ifneq "$(findstring $(TargetArch_CPP), ia64 powerpc64)" ""
+ifneq "$(findstring $(TargetArch_CPP)X, ia64X powerpc64X)" ""
 GhcEnableTablesNextToCode=NO
 else
 GhcEnableTablesNextToCode=YES
