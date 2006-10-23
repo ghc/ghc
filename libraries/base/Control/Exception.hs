@@ -372,7 +372,7 @@ userErrors _ = Nothing
 -- The arguments to 'bracket' are in this order so that we can partially apply 
 -- it, e.g.:
 --
--- > withFile name = bracket (openFile name) hClose
+-- > withFile name mode = bracket (openFile name mode) hClose
 --
 bracket 
 	:: IO a		-- ^ computation to run first (\"acquire resource\")
