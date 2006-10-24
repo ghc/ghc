@@ -10,11 +10,11 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "MBlock.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "Stats.h"
 #include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
-#include "Storage.h"
 #include "GetTime.h"
 
 /* huh? */

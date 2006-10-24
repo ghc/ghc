@@ -1,5 +1,15 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1995-2005
+ *
+ * Data.Typeable support
+ *
+ * ---------------------------------------------------------------------------*/
+
 #include "RtsTypeable.h"
 #include "Rts.h"
+#include "Storage.h"
+#include "Stable.h"
 
 static StgPtr typeableStore = 0;
 #ifdef THREADED_RTS

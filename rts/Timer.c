@@ -17,6 +17,7 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Proftimer.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "Timer.h"
 #include "Ticker.h"

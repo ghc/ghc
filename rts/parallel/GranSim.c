@@ -1,5 +1,5 @@
 /* 
-   Time-stamp: <Tue Mar 06 2001 00:17:42 Stardate: [-30]6285.06 hwloidl>
+   Time-stamp: <2006-10-19 15:12:58 simonmar>
 
    Variables and functions specific to GranSim the parallelism simulator
    for GPH.
@@ -45,6 +45,7 @@
 #include "RtsUtils.h"
 #include "StgMiscClosures.h"
 #include "StgTypes.h"
+#include "Storage.h"       // for recordMutable
 #include "Schedule.h"
 #include "SchedAPI.h"       // for pushClosure
 #include "GranSimRts.h"
@@ -52,7 +53,6 @@
 #include "ParallelRts.h"
 #include "ParallelDebug.h"
 #include "Sparks.h"
-#include "Storage.h"       // for recordMutable
 
 
 //@node Prototypes and externs, Constants and Variables, Includes, GranSim specific code

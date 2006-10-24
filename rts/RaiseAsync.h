@@ -45,7 +45,7 @@ void awakenBlockedExceptionQueue  (Capability *cap, StgTSO *tso);
  * indefinitely).  Interruptible threads can be sent an exception with
  * killThread# even if they have async exceptions blocked.
  */
-STATIC_INLINE int
+INLINE_HEADER int
 interruptible(StgTSO *t)
 {
   switch (t->why_blocked) {

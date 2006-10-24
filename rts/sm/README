@@ -1,0 +1,11 @@
+The Storage Manager
+===================
+
+This directory contains the storage manager and garbage collector.
+The interfaces exported from here are:
+
+  Storage.h (in ../includes)
+  Block.h (in ../includes)
+  GC.h
+  Arena.h
+  BlockAlloc.h

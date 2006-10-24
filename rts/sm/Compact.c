@@ -12,9 +12,11 @@
 #include "RtsFlags.h"
 #include "OSThreads.h"
 #include "Storage.h"
+#include "Stable.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
-#include "GCCompact.h"
+#include "GC.h"
+#include "Compact.h"
 #include "Schedule.h"
 #include "Apply.h"
 #include "Trace.h"
@@ -476,7 +478,8 @@ update_fwd_large( bdescr *bd )
   }
 }
 
-STATIC_INLINE StgPtr
+// ToDo: too big to inline
+static /* STATIC_INLINE */ StgPtr
 thread_obj (StgInfoTable *info, StgPtr p)
 {
     switch (info->type) {
@@ -891,13 +894,13 @@ update_bkwd_compact( step *stp )
 }
 
 void
-compact( void (*get_roots)(evac_fn) )
+compact(void)
 {
     nat g, s, blocks;
     step *stp;
 
     // 1. thread the roots
-    get_roots((evac_fn)thread);
+    GetRoots((evac_fn)thread);
 
     // the weak pointer lists...
     if (weak_ptr_list != NULL) {

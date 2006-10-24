@@ -66,7 +66,9 @@
 #define BITS_IN(x) (BITS_PER_BYTE * sizeof(x))
 
 /*
- * 'Portable' inlining
+ * 'Portable' inlining:
+ * INLINE_HEADER is for inline functions in header files
+ * STATIC_INLINE is for inline functions in source files
  */
 #if defined(__GNUC__) || defined( __INTEL_COMPILER)
 # define INLINE_HEADER static inline

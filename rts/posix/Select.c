@@ -10,6 +10,7 @@
 /* #include "PosixSource.h" */
 
 #include "Rts.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"

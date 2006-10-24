@@ -11,7 +11,6 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
-#include "BlockAlloc.h"
 #include "Profiling.h"
 
 #ifdef HAVE_CTYPE_H

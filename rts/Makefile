@@ -44,7 +44,7 @@ endif
 NON_HS_PACKAGE = YES
 
 # grab sources from these subdirectories
-ALL_DIRS = hooks parallel
+ALL_DIRS = hooks parallel sm
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 ALL_DIRS += win32
@@ -88,7 +88,7 @@ H_FILES = $(wildcard ../includes/*.h) $(wildcard *.h)
 # gcc provides lots of useful warnings if you ask it.
 # This is a pretty good list to start with - use a # to comment out
 # any you don't like.
-WARNING_OPTS += -Wall 
+WARNING_OPTS += -Wall
 WARNING_OPTS += -W
 WARNING_OPTS += -Wstrict-prototypes 
 WARNING_OPTS += -Wmissing-prototypes 
@@ -105,7 +105,7 @@ WARNING_OPTS += -Wbad-function-cast
 #WARNING_OPTS += -Wredundant-decls 
 #WARNING_OPTS += -Wconversion
 
-STANDARD_OPTS += -I../includes -I. -Iparallel
+STANDARD_OPTS += -I../includes -I. -Iparallel -Ism
 # COMPILING_RTS is only used when building Win32 DLL support.
 STANDARD_OPTS += -DCOMPILING_RTS
 

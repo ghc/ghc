@@ -8,9 +8,9 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "SchedAPI.h"
-#include "Storage.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "ParTicky.h"

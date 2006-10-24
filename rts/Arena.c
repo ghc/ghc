@@ -20,7 +20,6 @@
 
 #include "Rts.h"
 #include "RtsUtils.h"
-#include "BlockAlloc.h"
 #include "Arena.h"
 
 #include <stdlib.h>

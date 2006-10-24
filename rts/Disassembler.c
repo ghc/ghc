@@ -16,6 +16,7 @@
 #include "RtsUtils.h"
 #include "Closures.h"
 #include "TSO.h"
+#include "Storage.h"
 #include "Schedule.h"
 
 #include "Bytecodes.h"

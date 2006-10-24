@@ -41,6 +41,7 @@ Haskell side.
 #include "RtsExternal.h"
 #include "RtsUtils.h"
 #include "Storage.h"
+#include "Stable.h"
 #include <stdlib.h>
 
 #if defined(_WIN32)

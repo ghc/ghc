@@ -19,6 +19,7 @@
 #include "RtsFlags.h"
 #include "OSThreads.h"
 #include "Trace.h"
+#include "Stable.h"
 
 /* Comment from ADR's implementation in old RTS:
 

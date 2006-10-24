@@ -185,7 +185,7 @@ extern void freeExec (void *p);
    MarkRoot(StgClosure *p)	Returns the new location of the root.
    -------------------------------------------------------------------------- */
 
-extern void GarbageCollect(void (*get_roots)(evac_fn),rtsBool force_major_gc);
+extern void GarbageCollect(rtsBool force_major_gc);
 
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
@@ -362,7 +362,7 @@ INLINE_HEADER StgWord tso_sizeW ( StgTSO *tso )
 INLINE_HEADER StgWord bco_sizeW ( StgBCO *bco )
 { return bco->size; }
 
-STATIC_INLINE nat
+INLINE_HEADER nat
 closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 {
     switch (info->type) {
@@ -428,7 +428,7 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 }
 
 // The definitive way to find the size, in words, of a heap-allocated closure
-STATIC_INLINE nat
+INLINE_HEADER nat
 closure_sizeW (StgClosure *p)
 {
     return closure_sizeW_(p, get_itbl(p));
@@ -482,6 +482,8 @@ extern lnat     countNurseryBlocks   ( void );
 /* -----------------------------------------------------------------------------
    Functions from GC.c 
    -------------------------------------------------------------------------- */
+
+typedef void (*evac_fn)(StgClosure **);
 
 extern void         threadPaused ( Capability *cap, StgTSO * );
 extern StgClosure * isAlive      ( StgClosure *p );

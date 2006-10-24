@@ -18,6 +18,12 @@ extern "C" {
 #endif
 #include "Stg.h"
 
+// Turn off inlining when debugging - it obfuscates things
+#ifdef DEBUG
+# undef  STATIC_INLINE
+# define STATIC_INLINE static
+#endif
+
 #include "RtsTypes.h"
 
 #if __GNUC__ >= 3
@@ -138,16 +144,13 @@ extern void _assertFail (const char *, unsigned int);
 #include "OSThreads.h"
 #include "SMP.h"
 
-/* STG/Optimised-C related stuff */
-#include "Block.h"
-
 /* GNU mp library */
 #include "gmp.h"
 
 /* Macros for STG/C code */
+#include "Block.h"
 #include "ClosureMacros.h"
 #include "StgTicky.h"
-#include "Stable.h"
 
 /* Runtime-system hooks */
 #include "Hooks.h"

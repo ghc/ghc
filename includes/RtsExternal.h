@@ -83,9 +83,6 @@ extern void* allocateExec(unsigned int len);
    Storage manager stuff exported
    -------------------------------------------------------------------------- */
 
-/* Prototype for an evacuate-like function */
-typedef void (*evac_fn)(StgClosure **);
-
 extern void performGC(void);
 extern void performMajorGC(void);
 extern HsInt64 getAllocations( void );

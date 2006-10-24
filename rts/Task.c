@@ -15,6 +15,7 @@
 #include "Capability.h"
 #include "Stats.h"
 #include "RtsFlags.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "Hash.h"
 #include "Trace.h"

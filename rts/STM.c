@@ -86,10 +86,10 @@
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "SMP.h"
 #include "STM.h"
-#include "Storage.h"
 #include "Trace.h"
 
 #include <stdlib.h>

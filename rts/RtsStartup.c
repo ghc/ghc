@@ -29,6 +29,7 @@
 #include "BlockAlloc.h"
 #include "Trace.h"
 #include "RtsTypeable.h"
+#include "Stable.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"

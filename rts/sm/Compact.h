@@ -9,7 +9,37 @@
 #ifndef GCCOMPACT_H
 #define GCCOMPACT_H
 
-STATIC_INLINE void 
+INLINE_HEADER rtsBool
+mark_stack_empty(void)
+{
+    return mark_sp == mark_stack;
+}
+
+INLINE_HEADER rtsBool
+mark_stack_full(void)
+{
+    return mark_sp >= mark_splim;
+}
+
+INLINE_HEADER void
+reset_mark_stack(void)
+{
+    mark_sp = mark_stack;
+}
+
+INLINE_HEADER void
+push_mark_stack(StgPtr p)
+{
+    *mark_sp++ = p;
+}
+
+INLINE_HEADER StgPtr
+pop_mark_stack(void)
+{
+    return *--mark_sp;
+}
+
+INLINE_HEADER void 
 mark(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -19,7 +49,7 @@ mark(StgPtr p, bdescr *bd)
     *bitmap_word |= bit_mask;
 }
 
-STATIC_INLINE void 
+INLINE_HEADER void 
 unmark(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -29,7 +59,7 @@ unmark(StgPtr p, bdescr *bd)
     *bitmap_word &= ~bit_mask;
 }
 
-STATIC_INLINE StgWord
+INLINE_HEADER StgWord
 is_marked(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -39,6 +69,6 @@ is_marked(StgPtr p, bdescr *bd)
     return (*bitmap_word & bit_mask);
 }
 
-void compact( void (*get_roots)(evac_fn) );
+void compact(void);
 
 #endif /* GCCOMPACT_H */

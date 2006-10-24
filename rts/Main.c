@@ -12,7 +12,6 @@
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "SchedAPI.h"
-#include "Schedule.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"

@@ -23,6 +23,7 @@
 #include "STM.h"
 #include "OSThreads.h"
 #include "Capability.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "Sparks.h"
 #include "Trace.h"

@@ -191,7 +191,7 @@ void print_bqe (StgBlockingQueueElement *bqe);
  * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.
  * ASSUMES: cap->running_task is the current task.
  */
-STATIC_INLINE void
+INLINE_HEADER void
 appendToRunQueue (Capability *cap, StgTSO *tso)
 {
     ASSERT(tso->link == END_TSO_QUEUE);
@@ -207,7 +207,7 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
  * newly awakened threads, so they get run as soon as possible.
  * ASSUMES: cap->running_task is the current task.
  */
-STATIC_INLINE void
+INLINE_HEADER void
 pushOnRunQueue (Capability *cap, StgTSO *tso)
 {
     tso->link = cap->run_queue_hd;
@@ -219,7 +219,7 @@ pushOnRunQueue (Capability *cap, StgTSO *tso)
 
 /* Pop the first thread off the runnable queue.
  */
-STATIC_INLINE StgTSO *
+INLINE_HEADER StgTSO *
 popRunQueue (Capability *cap)
 { 
     StgTSO *t = cap->run_queue_hd;
@@ -235,7 +235,7 @@ popRunQueue (Capability *cap)
 /* Add a thread to the end of the blocked queue.
  */
 #if !defined(THREADED_RTS)
-STATIC_INLINE void
+INLINE_HEADER void
 appendToBlockedQueue(StgTSO *tso)
 {
     ASSERT(tso->link == END_TSO_QUEUE);
@@ -249,7 +249,7 @@ appendToBlockedQueue(StgTSO *tso)
 #endif
 
 #if defined(THREADED_RTS)
-STATIC_INLINE void
+INLINE_HEADER void
 appendToWakeupQueue (Capability *cap, StgTSO *tso)
 {
     ASSERT(tso->link == END_TSO_QUEUE);
@@ -264,20 +264,20 @@ appendToWakeupQueue (Capability *cap, StgTSO *tso)
 
 /* Check whether various thread queues are empty
  */
-STATIC_INLINE rtsBool
+INLINE_HEADER rtsBool
 emptyQueue (StgTSO *q)
 {
     return (q == END_TSO_QUEUE);
 }
 
-STATIC_INLINE rtsBool
+INLINE_HEADER rtsBool
 emptyRunQueue(Capability *cap)
 {
     return emptyQueue(cap->run_queue_hd);
 }
 
 #if defined(THREADED_RTS)
-STATIC_INLINE rtsBool
+INLINE_HEADER rtsBool
 emptyWakeupQueue(Capability *cap)
 {
     return emptyQueue(cap->wakeup_queue_hd);
@@ -289,7 +289,7 @@ emptyWakeupQueue(Capability *cap)
 #define EMPTY_SLEEPING_QUEUE() (emptyQueue(sleeping_queue))
 #endif
 
-STATIC_INLINE rtsBool
+INLINE_HEADER rtsBool
 emptyThreadQueues(Capability *cap)
 {
     return emptyRunQueue(cap)
@@ -301,7 +301,7 @@ emptyThreadQueues(Capability *cap)
 
 #endif /* !IN_STG_CODE */
 
-STATIC_INLINE void
+INLINE_HEADER void
 dirtyTSO (StgTSO *tso)
 {
     tso->flags |= TSO_DIRTY;

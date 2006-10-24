@@ -22,6 +22,7 @@
 #include "Ticker.h"
 #include "posix/Itimer.h"
 #include "Proftimer.h"
+#include "Storage.h"
 #include "Schedule.h"
 #include "posix/Select.h"
 

@@ -11,7 +11,6 @@
 #include "SchedAPI.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-#include "BlockAlloc.h"
 #include "OSThreads.h"
 #include "Storage.h"
 #include "StgRun.h"
@@ -218,11 +217,9 @@ static rtsBool scheduleHandleThreadFinished( Capability *cap, Task *task,
 					     StgTSO *t );
 static rtsBool scheduleDoHeapProfile(rtsBool ready_to_gc);
 static Capability *scheduleDoGC(Capability *cap, Task *task,
-				rtsBool force_major, 
-				void (*get_roots)(evac_fn));
+				rtsBool force_major);
 
 static rtsBool checkBlackHoles(Capability *cap);
-static void AllRoots(evac_fn evac);
 
 static StgTSO *threadStackOverflow(Capability *cap, StgTSO *tso);
 
@@ -421,7 +418,7 @@ schedule (Capability *initialCapability, Task *task)
 	discardSparksCap(cap);
 #endif
 	/* scheduleDoGC() deletes all the threads */
-	cap = scheduleDoGC(cap,task,rtsFalse,GetRoots);
+	cap = scheduleDoGC(cap,task,rtsFalse);
 	break;
     case SCHED_SHUTTING_DOWN:
 	debugTrace(DEBUG_sched, "SCHED_SHUTTING_DOWN");
@@ -701,7 +698,7 @@ run_thread:
 
     if (scheduleDoHeapProfile(ready_to_gc)) { ready_to_gc = rtsFalse; }
     if (ready_to_gc) {
-      cap = scheduleDoGC(cap,task,rtsFalse,GetRoots);
+      cap = scheduleDoGC(cap,task,rtsFalse);
     }
   } /* end of while() */
 
@@ -968,7 +965,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	// they are unreachable and will therefore be sent an
 	// exception.  Any threads thus released will be immediately
 	// runnable.
-	cap = scheduleDoGC (cap, task, rtsTrue/*force  major GC*/, GetRoots);
+	cap = scheduleDoGC (cap, task, rtsTrue/*force  major GC*/);
 
 	recent_activity = ACTIVITY_DONE_GC;
 	
@@ -1929,7 +1926,7 @@ scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
 	scheduleCheckBlackHoles(&MainCapability);
 
 	debugTrace(DEBUG_sched, "garbage collecting before heap census");
-	GarbageCollect(GetRoots, rtsTrue);
+	GarbageCollect(rtsTrue);
 
 	debugTrace(DEBUG_sched, "performing heap census");
 	heapCensus();
@@ -1946,8 +1943,7 @@ scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
  * -------------------------------------------------------------------------- */
 
 static Capability *
-scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
-	      rtsBool force_major, void (*get_roots)(evac_fn))
+scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 {
     StgTSO *t;
 #ifdef THREADED_RTS
@@ -2066,7 +2062,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS,
 #if defined(THREADED_RTS)
     debugTrace(DEBUG_sched, "doing GC");
 #endif
-    GarbageCollect(get_roots, force_major);
+    GarbageCollect(force_major);
     
 #if defined(THREADED_RTS)
     // release our stash of capabilities.
@@ -2567,7 +2563,7 @@ exitScheduler( void )
     // If we haven't killed all the threads yet, do it now.
     if (sched_state < SCHED_SHUTTING_DOWN) {
 	sched_state = SCHED_INTERRUPTING;
-	scheduleDoGC(NULL,task,rtsFalse,GetRoots);    
+	scheduleDoGC(NULL,task,rtsFalse);    
     }
     sched_state = SCHED_SHUTTING_DOWN;
 
@@ -2672,10 +2668,8 @@ GetRoots( evac_fn evac )
    collect when called from Haskell via _ccall_GC.
    -------------------------------------------------------------------------- */
 
-static void (*extra_roots)(evac_fn);
-
 static void
-performGC_(rtsBool force_major, void (*get_roots)(evac_fn))
+performGC_(rtsBool force_major)
 {
     Task *task;
     // We must grab a new Task here, because the existing Task may be
@@ -2684,27 +2678,20 @@ performGC_(rtsBool force_major, void (*get_roots)(evac_fn))
     ACQUIRE_LOCK(&sched_mutex);
     task = newBoundTask();
     RELEASE_LOCK(&sched_mutex);
-    scheduleDoGC(NULL,task,force_major, get_roots);
+    scheduleDoGC(NULL,task,force_major);
     boundTaskExiting(task);
 }
 
 void
 performGC(void)
 {
-    performGC_(rtsFalse, GetRoots);
+    performGC_(rtsFalse);
 }
 
 void
 performMajorGC(void)
 {
-    performGC_(rtsTrue, GetRoots);
-}
-
-static void
-AllRoots(evac_fn evac)
-{
-    GetRoots(evac);		// the scheduler's roots
-    extra_roots(evac);		// the user's roots
+    performGC_(rtsTrue);
 }
 
 /* -----------------------------------------------------------------------------
