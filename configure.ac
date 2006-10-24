@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.5], [glasgow-haskell-bugs@haskell.org], [ghc])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.7], [glasgow-haskell-bugs@haskell.org], [ghc])
 
 if test ! -f mk/config.h.in; then
    echo "mk/config.h.in doesn't exist: perhaps you haven't run 'autoreconf'?"
