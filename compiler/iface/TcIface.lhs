@@ -447,8 +447,8 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 			 ifConOcc = occ, ifConCtxt = ctxt, ifConEqSpec = spec,
 			 ifConArgTys = args, ifConFields = field_lbls,
 			 ifConStricts = stricts})
-      = bindIfaceTyVars univ_tvs $ \ univ_tyvars -> do
-	bindIfaceTyVars ex_tvs	 $ \ ex_tyvars -> do
+     = bindIfaceTyVars univ_tvs $ \ univ_tyvars -> do
+       bindIfaceTyVars ex_tvs	 $ \ ex_tyvars -> do
 	{ name  <- lookupIfaceTop occ
         ; eq_spec <- tcIfaceEqSpec spec
 	; theta <- tcIfaceCtxt ctxt	-- Laziness seems not worth the bother here
