@@ -202,6 +202,18 @@ data HsExpr id
 					-- always has an empty stack
 
   ---------------------------------------
+  -- Hpc Support
+
+  | HsTick 
+     Int				-- module-local tick number
+     (LHsExpr id)			-- sub-expression
+
+  | HsBinTick
+     Int				-- module-local tick number for True
+     Int				-- module-local tick number for False
+     (LHsExpr id)			-- sub-expression
+
+  ---------------------------------------
   -- The following are commands, not expressions proper
 
   | HsArrApp	-- Arrow tail, or arrow application (f -< arg)
@@ -390,6 +402,16 @@ ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("pending") <+> ppr ps
 
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [ptext SLIT("proc"), ppr pat, ptext SLIT("->"), ppr cmd]
+
+ppr_expr (HsTick tickId exp)
+  = hcat [ptext SLIT("tick<"), ppr tickId,ptext SLIT(">("), ppr exp,ptext SLIT(")")]
+ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
+  = hcat [ptext SLIT("bintick<"), 
+	  ppr tickIdTrue,
+	  ptext SLIT(","),
+	  ppr tickIdFalse,
+	  ptext SLIT(">("), 
+	  ppr exp,ptext SLIT(")")]
 
 ppr_expr (HsArrApp arrow arg _ HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, ptext SLIT("-<"), ppr_lexpr arg]

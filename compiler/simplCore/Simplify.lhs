@@ -911,6 +911,14 @@ simplNote env InlineMe e cont
 simplNote env (CoreNote s) e cont
   = simplExpr env e    `thenSmpl` \ e' ->
     rebuild env (Note (CoreNote s) e') cont
+
+simplNote env note@(TickBox {}) e cont
+  = simplExpr env e    `thenSmpl` \ e' ->
+    rebuild env (Note note e') cont
+
+simplNote env note@(BinaryTickBox {}) e cont
+  = simplExpr env e    `thenSmpl` \ e' ->
+    rebuild env (Note note e') cont
 \end{code}
 
 

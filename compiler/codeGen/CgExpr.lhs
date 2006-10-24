@@ -26,6 +26,7 @@ import CgTailCall
 import CgInfoTbls
 import CgForeignCall
 import CgPrimOp
+import CgHpc
 import CgUtils
 import ClosureInfo
 import Cmm
@@ -249,6 +250,16 @@ centre.
 
 \begin{code}
 cgExpr (StgSCC cc expr) = do emitSetCCC cc; cgExpr expr
+\end{code}
+
+%********************************************************
+%*                                                     *
+%*             Hpc Tick Boxes                          *
+%*                                                     *
+%********************************************************
+
+\begin{code}
+cgExpr (StgTick m n expr) = do cgTickBox m n; cgExpr expr
 \end{code}
 
 %********************************************************

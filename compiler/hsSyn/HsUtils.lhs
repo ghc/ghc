@@ -225,7 +225,8 @@ nlHsFunTy a b		= noLoc (HsFunTy a b)
 mkFunBind :: Located id -> [LMatch id] -> HsBind id
 -- Not infix, with place holders for coercion and free vars
 mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False, fun_matches = mkMatchGroup ms,
-			    fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames }
+			    fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames,
+			    fun_tick = Nothing }
 
 
 mkVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName

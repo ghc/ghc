@@ -93,6 +93,9 @@ module CLabel (
         mkPicBaseLabel,
         mkDeadStripPreventer,
 
+        mkHpcTicksLabel,
+        mkHpcModuleNameLabel,
+
 	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, externallyVisibleCLabel,
 	CLabelType(..), labelType, labelDynamic,
@@ -204,6 +207,9 @@ data CLabel
 
   | DeadStripPreventer CLabel
     -- label before an info table to prevent excessive dead-stripping on darwin
+
+  | HpcTicksLabel Module       -- Per-module table of tick locations
+  | HpcModuleNameLabel         -- Per-module name of the module for Hpc
 
   deriving (Eq, Ord)
 
@@ -402,6 +408,11 @@ mkRtsApFastLabel str = RtsLabel (RtsApFast str)
 mkRtsSlowTickyCtrLabel :: String -> CLabel
 mkRtsSlowTickyCtrLabel pat = RtsLabel (RtsSlowTickyCtr pat)
 
+        -- Coverage
+
+mkHpcTicksLabel                = HpcTicksLabel
+mkHpcModuleNameLabel           = HpcModuleNameLabel
+
         -- Dynamic linking
         
 mkDynamicLinkerLabel :: DynamicLinkerLabelInfo -> CLabel -> CLabel
@@ -473,6 +484,8 @@ needsCDecl (RtsLabel _)			= False
 needsCDecl (ForeignLabel _ _ _)		= False
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
+needsCDecl (HpcTicksLabel _)            = True
+needsCDecl HpcModuleNameLabel           = False
 
 -- Whether the label is an assembler temporary:
 
@@ -501,6 +514,8 @@ externallyVisibleCLabel (DynIdLabel name _)  = isExternalName name
 externallyVisibleCLabel (CC_Label _)	   = True
 externallyVisibleCLabel (CCS_Label _)	   = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
+externallyVisibleCLabel (HpcTicksLabel _)   = True
+externallyVisibleCLabel HpcModuleNameLabel      = False
 
 -- -----------------------------------------------------------------------------
 -- Finding the "type" of a CLabel 
@@ -760,6 +775,12 @@ pprCLbl (ModuleInitLabel mod way _)
 	<> char '_' <> text way
 pprCLbl (PlainModuleInitLabel mod _)	
    = ptext SLIT("__stginit_") <> ppr mod
+
+pprCLbl (HpcTicksLabel mod)
+  = ptext SLIT("_tickboxes_")  <> ppr mod <> ptext SLIT("_hpc")
+
+pprCLbl HpcModuleNameLabel
+  = ptext SLIT("_hpc_module_name_str")
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <>

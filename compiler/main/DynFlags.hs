@@ -121,6 +121,7 @@ data DynFlag
    | Opt_D_dump_splices
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
+   | Opt_D_dump_hpc
    | Opt_D_source_stats
    | Opt_D_verbose_core2core
    | Opt_D_verbose_stg2stg
@@ -198,6 +199,8 @@ data DynFlag
    | Opt_HideAllPackages
    | Opt_PrintBindResult
    | Opt_Haddock
+   | Opt_Hpc
+   | Opt_Hpc_Trace
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -254,6 +257,8 @@ data DynFlags = DynFlags {
   
   ghcUsagePath          :: FilePath,    -- Filled in by SysTools
   ghciUsagePath         :: FilePath,    -- ditto
+
+  hpcDir		:: String,	-- ^ path to store the .mix files
 
   -- options for particular phases
   opt_L			:: [String],
@@ -392,6 +397,8 @@ defaultDynFlags =
 	cmdlineFrameworks	= [],
 	tmpDir			= cDEFAULT_TMPDIR,
 	
+        hpcDir		        = ".hpc",
+
 	opt_L			= [],
 	opt_P			= [],
 	opt_F			= [],
@@ -875,6 +882,7 @@ dynamic_flags = [
   ,  ( "no-hs-main"     , NoArg (setDynFlag Opt_NoHsMain))
   ,  ( "main-is"   	, SepArg setMainIs )
   ,  ( "haddock"	, NoArg (setDynFlag Opt_Haddock) )
+  ,  ( "hpcdir"		, SepArg setOptHpcDir )
 
 	------- recompilation checker (DEPRECATED, use -fforce-recomp) -----
   ,  ( "recomp"		, NoArg (unSetDynFlag Opt_ForceRecomp) )
@@ -938,6 +946,8 @@ dynamic_flags = [
   ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
   ,  ( "ddump-minimal-imports",  NoArg (setDynFlag Opt_D_dump_minimal_imports))
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
+  ,  ( "ddump-hpc",         	 setDumpFlag Opt_D_dump_hpc)
+  
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
   ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting))
@@ -1041,7 +1051,9 @@ fFlags = [
   ( "excess-precision",			Opt_ExcessPrecision ),
   ( "asm-mangling",			Opt_DoAsmMangling ),
   ( "print-bind-result",		Opt_PrintBindResult ),
-  ( "force-recomp",			Opt_ForceRecomp )
+  ( "force-recomp",			Opt_ForceRecomp ),
+  ( "hpc",				Opt_Hpc ),
+  ( "hpc-tracer",			Opt_Hpc )
   ]
 
 
@@ -1242,6 +1254,12 @@ setTmpDir dir dflags = dflags{ tmpDir = canonicalise dir }
          '\\' -> init path
          _    -> path
 #endif
+
+-----------------------------------------------------------------------------
+-- Hpc stuff
+
+setOptHpcDir :: String -> DynP ()
+setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 
 -----------------------------------------------------------------------------
 -- Via-C compilation stuff

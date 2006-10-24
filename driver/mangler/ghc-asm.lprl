@@ -699,6 +699,12 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
+        } elsif ( /^${T_US}([A-Za-z0-9_]+)_hpc?${T_POST_LBL}$/o ) {
+           # hpc shares tick boxes across modules
+           $chk[++$i]   = $_;
+           $chkcat[$i]  = 'data';
+           $chksymb[$i] = '';
+
 	} elsif ( /^${T_US}([A-Za-z0-9_]+)_(alt|dflt)${T_POST_LBL}$/o ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';

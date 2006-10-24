@@ -25,6 +25,7 @@ import CgBindery
 import CgClosure
 import CgCon
 import CgUtils
+import CgHpc
 
 import CLabel
 import Cmm
@@ -60,10 +61,11 @@ codeGen :: DynFlags
 	-> [Module]		-- directly-imported modules
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
 	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
+	-> HpcInfo
 	-> IO [Cmm]		-- Output
 
 codeGen dflags this_mod data_tycons foreign_stubs imported_mods 
-	cost_centre_info stg_binds
+	cost_centre_info stg_binds hpc_info
   = do	
   { showPass dflags "CodeGen"
   ; let way = buildTag dflags
@@ -77,7 +79,7 @@ codeGen dflags this_mod data_tycons foreign_stubs imported_mods
 		; cmm_tycons <- mapM cgTyCon data_tycons
 		; cmm_init   <- getCmm (mkModuleInit dflags way cost_centre_info 
 					     this_mod main_mod
-				  	     foreign_stubs imported_mods)
+				  	     foreign_stubs imported_mods hpc_info)
 		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
 		}
 		-- Put datatype_stuff after code_stuff, because the
@@ -142,17 +144,24 @@ mkModuleInit
 	-> Module		-- name of the Main module
 	-> ForeignStubs
 	-> [Module]
+	-> HpcInfo
 	-> Code
-mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs imported_mods
-  = do	{ 	
-        if opt_SccProfilingOn
-            then do { -- Allocate the static boolean that records if this
-                      -- module has been registered already
-	              emitData Data [CmmDataLabel moduleRegdLabel, 
-		                     CmmStaticLit zeroCLit]
+mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs imported_mods hpc_info
+  = do	{ -- Allocate the static boolean that records if this
+          -- module has been registered already
+	  emitData Data [CmmDataLabel moduleRegdLabel, 
+		         CmmStaticLit zeroCLit]
 
-                    ; emitSimpleProc real_init_lbl $ do
-                        { ret_blk <- forkLabelledCode ret_code
+        ; whenC (dopt Opt_Hpc dflags) $
+              hpcTable this_mod hpc_info
+
+          -- we emit a recursive descent module search for all modules
+	  -- and *choose* to chase it in :Main, below.
+          -- In this way, Hpc enabled modules can interact seamlessly with
+	  -- not Hpc enabled moduled, provided Main is compiled with Hpc.
+
+        ; emitSimpleProc real_init_lbl $ do
+                       { ret_blk <- forkLabelledCode ret_code
 
                         ; init_blk <- forkLabelledCode $ do
                                         { mod_init_code; stmtC (CmmBranch ret_blk) }
@@ -161,8 +170,6 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
                                     ret_blk)
                         ; stmtC (CmmBranch init_blk)	    
                         }
-                    }
-            else emitSimpleProc real_init_lbl ret_code
 
  	    -- Make the "plain" procedure jump to the "real" init procedure
 	; emitSimpleProc plain_init_lbl jump_to_init
@@ -172,8 +179,12 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
 	-- we inject an extra stg_init procedure for stg_init_ZCMain, for the 
 	-- RTS to invoke.  We must consult the -main-is flag in case the
 	-- user specified a different function to Main.main
+ 
+        -- Notice that the recursive descent is optional, depending on what options
+	-- are enabled.
+
 	; whenC (this_mod == main_mod)
-		(emitSimpleProc plain_main_init_lbl jump_to_init)
+		(emitSimpleProc plain_main_init_lbl rec_descent_init)
     }
   where
     this_pkg = thisPackage dflags
@@ -196,16 +207,26 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
 	{ 	-- Set mod_reg to 1 to record that we've been here
 	  stmtC (CmmStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1)))
 
-		-- Now do local stuff
-	; initCostCentres cost_centre_info
+        ; whenC (opt_SccProfilingOn) $ do 
+	    initCostCentres cost_centre_info
+
+        ; whenC (dopt Opt_Hpc dflags) $
+            initHpc this_mod hpc_info
+         
 	; mapCs (registerModuleImport this_pkg way) 
 		(imported_mods++extra_imported_mods)
+
 	} 
 
                     -- The return-code pops the work stack by 
                     -- incrementing Sp, and then jumpd to the popped item
     ret_code = stmtsC [ CmmAssign spReg (cmmRegOffW spReg 1)
                       , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
+
+
+    rec_descent_init = if opt_SccProfilingOn || dopt Opt_Hpc dflags
+		       then jump_to_init
+		       else ret_code
 
 -----------------------
 registerModuleImport :: PackageId -> String -> Module -> Code

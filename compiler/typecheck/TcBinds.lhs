@@ -526,7 +526,7 @@ tcMonoBinds [L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
 	; let mono_id = mkLocalId mono_name zonked_rhs_ty
 	; return (unitBag (L b_loc (FunBind { fun_id = L nm_loc mono_id, fun_infix = inf,
 					      fun_matches = matches', bind_fvs = fvs,
-					      fun_co_fn = co_fn })),
+					      fun_co_fn = co_fn, fun_tick = Nothing })),
 		  [(name, Nothing, mono_id)]) }
 
 tcMonoBinds [L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf, 
@@ -550,7 +550,8 @@ tcMonoBinds [L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
 
 	; let fun_bind' = FunBind { fun_id = L nm_loc mono_id, 
 				    fun_infix = inf, fun_matches = matches',
-			            bind_fvs = placeHolderNames, fun_co_fn = co_fn }
+			            bind_fvs = placeHolderNames, fun_co_fn = co_fn, 
+				    fun_tick = Nothing }
 	; return (unitBag (L b_loc fun_bind'),
 		  [(name, Just tc_sig, mono_id)]) }
 
@@ -655,7 +656,8 @@ tcRhs (TcFunBind info fun'@(L _ mono_id) inf matches)
   = do	{ (co_fn, matches') <- tcMatchesFun (idName mono_id) matches 
 				    	    (idType mono_id)
 	; return (FunBind { fun_id = fun', fun_infix = inf, fun_matches = matches',
-			    bind_fvs = placeHolderNames, fun_co_fn = co_fn }) }
+			    bind_fvs = placeHolderNames, fun_co_fn = co_fn,
+			    fun_tick = Nothing }) }
 
 tcRhs bind@(TcPatBind _ pat' grhss pat_ty)
   = do	{ grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $

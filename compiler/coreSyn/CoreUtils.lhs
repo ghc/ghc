@@ -800,6 +800,14 @@ exprIsConApp_maybe (Cast expr co)
     Just (dc, map Type to_tc_arg_tys ++ ex_args ++ new_co_args ++ new_val_args)
     }}
 
+-- We do not want to tell the world that we have a
+-- Cons, to *stop* Case of Known Cons, which removes
+-- the TickBox.
+exprIsConApp_maybe (Note (TickBox {}) expr)
+  = Nothing
+exprIsConApp_maybe (Note (BinaryTickBox {}) expr)
+  = Nothing
+
 exprIsConApp_maybe (Note _ expr)
   = exprIsConApp_maybe expr
     -- We ignore InlineMe notes in case we have
@@ -1184,6 +1192,9 @@ exprArity e = go e
 	      go (Var v) 	       	   = idArity v
 	      go (Lam x e) | isId x    	   = go e + 1
 			   | otherwise 	   = go e
+              go (Note (TickBox {}) _)     = 0
+              go (Note (BinaryTickBox {}) _) 
+		                           = 0
 	      go (Note n e) 		   = go e
               go (Cast e _)                = go e
 	      go (App e (Type t))      	   = go e
@@ -1301,6 +1312,8 @@ exprSize (Type t)        = seqType t `seq` 1
 noteSize (SCC cc)       = cc `seq` 1
 noteSize InlineMe       = 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
+noteSize (TickBox m n)    = m `seq` n `seq` 1 
+noteSize (BinaryTickBox m t e)  = m `seq` t `seq` e `seq` 1 
 
 varSize :: Var -> Int
 varSize b  | isTyVar b = 1
@@ -1446,6 +1459,8 @@ rhsIsStatic this_pkg rhs = is_static False rhs
   is_static False (Lam b e) = isRuntimeVar b || is_static False e
   
   is_static in_arg (Note (SCC _) e) = False
+  is_static in_arg (Note (TickBox {}) e) = False
+  is_static in_arg (Note (BinaryTickBox {}) e) = False
   is_static in_arg (Note _ e)       = is_static in_arg e
   is_static in_arg (Cast e co)      = is_static in_arg e
   

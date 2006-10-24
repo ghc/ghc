@@ -398,7 +398,7 @@ rnBind sig_fn trim (L loc (FunBind { fun_id = name, fun_infix = inf, fun_matches
 	; checkPrecMatch inf plain_name matches'
 
 	; return (L loc (FunBind { fun_id = new_name, fun_infix = inf, fun_matches = matches',
-				   bind_fvs = trim fvs, fun_co_fn = idHsWrapper }), 
+				   bind_fvs = trim fvs, fun_co_fn = idHsWrapper, fun_tick = Nothing }), 
 		  [plain_name], fvs)
       }
 \end{code}

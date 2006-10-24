@@ -1002,6 +1002,15 @@ instance Binary IfaceNote where
     put_ bh (IfaceCoreNote s) = do
             putByte bh 4
             put_ bh s
+    put_ bh (IfaceTickBox m n) = do
+            putByte bh 5
+            put_ bh m
+            put_ bh n
+    put_ bh (IfaceBinaryTickBox m t e) = do
+            putByte bh 6
+            put_ bh m
+            put_ bh t
+            put_ bh e
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -1010,7 +1019,13 @@ instance Binary IfaceNote where
 	      3 -> do return IfaceInlineMe
               4 -> do ac <- get bh
                       return (IfaceCoreNote ac)
-
+              5 -> do m <- get bh
+                      n <- get bh
+                      return (IfaceTickBox m n)
+              6 -> do m <- get bh
+                      t <- get bh
+                      e <- get bh
+                      return (IfaceBinaryTickBox m t e)
 
 -------------------------------------------------------------------------
 --		IfaceDecl and friends

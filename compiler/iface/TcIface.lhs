@@ -686,6 +686,8 @@ tcIfaceExpr (IfaceNote note expr)
 	IfaceInlineMe     -> returnM (Note InlineMe   expr')
 	IfaceSCC cc       -> returnM (Note (SCC cc)   expr')
 	IfaceCoreNote n   -> returnM (Note (CoreNote n) expr')
+        IfaceTickBox m n  -> returnM (Note (TickBox m n) expr')
+        IfaceBinaryTickBox m t e -> returnM (Note (BinaryTickBox m t e) expr')
 
 -------------------------
 tcIfaceAlt _ (IfaceDefault, names, rhs)

@@ -33,7 +33,8 @@ module DsUtils (
 	
 	dsSyntaxTable, lookupEvidence,
 
-	selectSimpleMatchVarL, selectMatchVars, selectMatchVar
+	selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
+	mkTickBox, mkOptTickBox, mkBinaryTickBox
     ) where
 
 #include "HsVersions.h"
@@ -880,4 +881,18 @@ mkFailurePair expr
     ty = exprType expr
 \end{code}
 
+\begin{code}
+mkOptTickBox :: Maybe Int -> CoreExpr -> DsM CoreExpr
+mkOptTickBox Nothing e   = return e
+mkOptTickBox (Just ix) e = mkTickBox ix e
 
+mkTickBox :: Int -> CoreExpr -> DsM CoreExpr
+mkTickBox ix e = do
+       mod <- getModuleDs
+       return $ Note (TickBox mod ix) e
+
+mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
+mkBinaryTickBox ixT ixF e = do
+       mod <- getModuleDs
+       return $ Note (BinaryTickBox mod ixT ixF) e
+\end{code}

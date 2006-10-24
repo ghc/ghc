@@ -158,6 +158,8 @@ extern void hs_perform_gc (void);
 extern void hs_free_stable_ptr (HsStablePtr sp);
 extern void hs_free_fun_ptr    (HsFunPtr fp);
 
+extern void hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr);
+
 /* -------------------------------------------------------------------------- */
 
 #ifdef __cplusplus

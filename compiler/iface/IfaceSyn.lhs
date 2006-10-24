@@ -41,6 +41,7 @@ import SrcLoc
 import BasicTypes
 import Outputable
 import FastString
+import Module
 
 import Data.List
 import Data.Maybe
@@ -209,6 +210,8 @@ data IfaceExpr
 data IfaceNote = IfaceSCC CostCentre
 	       | IfaceInlineMe
                | IfaceCoreNote String
+               | IfaceTickBox Module Int
+               | IfaceBinaryTickBox Module Int Int
 
 type IfaceAlt = (IfaceConAlt, [FastString], IfaceExpr)
 	-- Note: FastString, not IfaceBndr (and same with the case binder)
@@ -482,6 +485,13 @@ instance Outputable IfaceNote where
     ppr (IfaceSCC cc)     = pprCostCentreCore cc
     ppr IfaceInlineMe     = ptext SLIT("__inline_me")
     ppr (IfaceCoreNote s) = ptext SLIT("__core_note") <+> pprHsString (mkFastString s)
+    ppr (IfaceTickBox m n)  = ptext SLIT("__tick_box") <+> pprModule m <+>  text (show n)
+    ppr (IfaceBinaryTickBox m t e)
+                         = ptext SLIT("__binary_tick_box")
+                               <+> pprModule m
+                               <+> text (show t)
+                               <+> text (show e)
+
 
 instance Outputable IfaceConAlt where
     ppr IfaceDefault	  = text "DEFAULT"
@@ -749,6 +759,8 @@ eq_ifaceNote :: EqEnv -> IfaceNote -> IfaceNote -> IfaceEq
 eq_ifaceNote env (IfaceSCC c1)    (IfaceSCC c2)        = bool (c1==c2)
 eq_ifaceNote env IfaceInlineMe    IfaceInlineMe        = Equal
 eq_ifaceNote env (IfaceCoreNote s1) (IfaceCoreNote s2) = bool (s1==s2)
+eq_ifaceNote env (IfaceTickBox m1 n1) (IfaceTickBox m2 n2)   = bool (m1==m2 && n1==n2)
+eq_ifaceNote env (IfaceBinaryTickBox m1 t1 e1) (IfaceBinaryTickBox m2 t2 e2) = bool (m1==m2 && t1==t2 && e1 == e2)
 eq_ifaceNote env _ _ = NotEqual
 \end{code}
 

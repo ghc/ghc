@@ -1240,6 +1240,9 @@ toIfaceExpr (Note n e)    = IfaceNote (toIfaceNote n) (toIfaceExpr e)
 toIfaceNote (SCC cc)      = IfaceSCC cc
 toIfaceNote InlineMe      = IfaceInlineMe
 toIfaceNote (CoreNote s)  = IfaceCoreNote s
+toIfaceNote (TickBox m n) = IfaceTickBox m n
+toIfaceNote (BinaryTickBox m t e)
+                          = IfaceBinaryTickBox m t e
 
 ---------------------
 toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceIdBndr b) (toIfaceExpr r)

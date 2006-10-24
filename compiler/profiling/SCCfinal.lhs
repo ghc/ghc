@@ -195,6 +195,10 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
 	= do_let b e `thenMM` \ (b,e) ->
 	  returnMM (StgLetNoEscape lvs1 lvs2 b e)
 
+    do_expr (StgTick m n expr) 
+        = do_expr expr `thenMM` \ expr' ->
+          returnMM (StgTick m n expr')
+
 #ifdef DEBUG
     do_expr other = pprPanic "SCCfinal.do_expr" (ppr other)
 #endif

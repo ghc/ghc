@@ -89,9 +89,10 @@ dsHsBind auto_scc rest (VarBind var expr)
     addDictScc var core_expr	`thenDs` \ core_expr' ->
     returnDs ((var, core_expr') : rest)
 
-dsHsBind auto_scc rest (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn })
+dsHsBind auto_scc rest (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn, fun_tick = tick })
   = matchWrapper (FunRhs (idName fun)) matches		`thenDs` \ (args, body) ->
-    dsCoercion co_fn (return (mkLams args body))	`thenDs` \ rhs ->
+    mkOptTickBox tick body 				`thenDs` \ body' ->
+    dsCoercion co_fn (return (mkLams args body'))	`thenDs` \ rhs ->
     returnDs ((fun,rhs) : rest)
 
 dsHsBind auto_scc rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })

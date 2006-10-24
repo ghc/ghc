@@ -67,6 +67,7 @@ import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
 import Bitmap
 import StaticFlags	( opt_SccProfilingOn )
+import Module		( Module, pprModule )
 \end{code}
 
 %************************************************************************
@@ -349,6 +350,21 @@ Finally for @scc@ expressions we introduce a new STG construct.
   | StgSCC
 	CostCentre		-- label of SCC expression
 	(GenStgExpr bndr occ)	-- scc expression
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{@GenStgExpr@: @hpc@ expressions}
+%*									*
+%************************************************************************
+
+Finally for @scc@ expressions we introduce a new STG construct.
+
+\begin{code}
+  | StgTick
+    Module			-- the module of the source of this tick
+    Int				-- tick number
+    (GenStgExpr bndr occ)	-- sub expression
   -- end of GenStgExpr
 \end{code}
 
@@ -717,6 +733,10 @@ pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
 
 pprStgExpr (StgSCC cc expr)
   = sep [ hsep [ptext SLIT("_scc_"), ppr cc],
+	  pprStgExpr expr ]
+
+pprStgExpr (StgTick m n expr)
+  = sep [ hsep [ptext SLIT("_tick_"),  pprModule m,text (show n)],
 	  pprStgExpr expr ]
 
 pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alt_type alts)

@@ -239,7 +239,8 @@ tidyProgram hsc_env
 				mg_binds = binds, 
 				mg_rules = imp_rules,
 				mg_dir_imps = dir_imps, mg_deps = deps, 
-				mg_foreign = foreign_stubs })
+				mg_foreign = foreign_stubs,
+			        mg_hpc_info = hpc_info })
 
   = do	{ let dflags = hsc_dflags hsc_env
 	; showPass dflags "Tidy Core"
@@ -290,7 +291,8 @@ tidyProgram hsc_env
 			   cg_binds    = all_tidy_binds,
 			   cg_dir_imps = dir_imps,
 			   cg_foreign  = foreign_stubs,
-			   cg_dep_pkgs = dep_pkgs deps }, 
+			   cg_dep_pkgs = dep_pkgs deps,
+			   cg_hpc_info = hpc_info }, 
 
 		   ModDetails { md_types     = tidy_type_env,
 				md_rules     = tidy_rules,
@@ -789,11 +791,17 @@ CAF list to keep track of non-collectable CAFs.
 \begin{code}
 hasCafRefs  :: PackageId -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
 hasCafRefs this_pkg p arity expr 
-  | is_caf || mentions_cafs = MayHaveCafRefs
+  | is_caf || mentions_cafs || is_tick
+                            = MayHaveCafRefs
   | otherwise 		    = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefs p expr)
   is_caf = not (arity > 0 || rhsIsStatic this_pkg expr)
+  is_tick = case expr of
+	      Note (TickBox {}) _       -> True
+	      Note (BinaryTickBox {}) _ -> True
+	      _                         -> False
+        
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
   -- knows how much eta expansion is going to be done by 

@@ -303,7 +303,8 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_rdr_env   = emptyGlobalRdrEnv,
 				mg_fix_env   = emptyFixityEnv,
 				mg_deprecs   = NoDeprecs,
-				mg_foreign   = NoStubs
+				mg_foreign   = NoStubs,
+				mg_hpc_info = noHpcInfo
 		    } } ;
 
    tcCoreDump mod_guts ;

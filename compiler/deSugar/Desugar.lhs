@@ -42,6 +42,7 @@ import SrcLoc
 import Maybes
 import FastString
 import Util
+import Coverage
 
 import Data.IORef
 \end{code}
@@ -53,10 +54,11 @@ import Data.IORef
 %************************************************************************
 
 \begin{code}
-deSugar :: HscEnv -> TcGblEnv -> IO (Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env 
+        mod_loc
         tcg_env@(TcGblEnv { tcg_mod       = mod,
 			    tcg_src	  = hsc_src,
 		    	    tcg_type_env  = type_env,
@@ -81,18 +83,22 @@ deSugar hsc_env
 	; let auto_scc = mkAutoScc mod export_set
 
 	; mb_res <- case ghcMode dflags of
-	             JustTypecheck -> return (Just ([], [], NoStubs))
-	             _             -> initDs hsc_env mod rdr_env type_env $ do
-		                        { core_prs <- dsTopLHsBinds auto_scc binds
+	             JustTypecheck -> return (Just ([], [], NoStubs, noHpcInfo))
+                     _        -> do (binds_cvr,ds_hpc_info) 
+					      <- if dopt Opt_Hpc dflags
+                                                 then addCoverageTicksToBinds dflags mod mod_loc binds
+                                                 else return (binds, noHpcInfo)
+                                    initDs hsc_env mod rdr_env type_env $ do
+		                        { core_prs <- dsTopLHsBinds auto_scc binds_cvr
 		                        ; (ds_fords, foreign_prs) <- dsForeigns fords
 		                        ; let all_prs = foreign_prs ++ core_prs
 		                              local_bndrs = mkVarSet (map fst all_prs)
 		                        ; ds_rules <- mappM (dsRule mod local_bndrs) rules
-		                        ; return (all_prs, catMaybes ds_rules, ds_fords)
+		                        ; return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info)
 		                        }
 	; case mb_res of {
 	   Nothing -> return Nothing ;
-	   Just (all_prs, ds_rules, ds_fords) -> do
+	   Just (all_prs, ds_rules, ds_fords,ds_hpc_info) -> do
 
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
@@ -160,8 +166,8 @@ deSugar hsc_env
 		mg_fam_insts = fam_insts,
 	        mg_rules     = ds_rules,
 		mg_binds     = ds_binds,
-		mg_foreign   = ds_fords }
-	
+		mg_foreign   = ds_fords,
+		mg_hpc_info  = ds_hpc_info }
         ; return (Just mod_guts)
 	}}}
 

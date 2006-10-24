@@ -111,11 +111,12 @@ ds_val_bind (NonRecursive, hsbinds) body
 	--	 below.  Then pattern-match would fail.  Urk.)
     putSrcSpanDs loc	$
     case bind of
-      FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn }
+      FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn, fun_tick = tick }
 	-> matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
 	   ASSERT( isIdHsWrapper co_fn )
-	   returnDs (bindNonRec fun rhs body_w_exports)
+           mkOptTickBox tick rhs 				`thenDs` \ rhs' ->
+	   returnDs (bindNonRec fun rhs' body_w_exports)
 
       PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }
 	-> 	-- let C x# y# = rhs in body
@@ -570,6 +571,26 @@ dsExpr (HsSpliceE s)       = pprPanic "dsExpr:splice" (ppr s)
 dsExpr (HsProc pat cmd) = dsProcExpr pat cmd
 \end{code}
 
+Hpc Support 
+
+\begin{code}
+dsExpr (HsTick ix e) = do
+  e' <- dsLExpr e
+  mkTickBox ix e'
+
+-- There is a problem here. The then and else branches
+-- have no free variables, so they are open to lifting.
+-- We need someway of stopping this.
+-- This will make no difference to binary coverage
+-- (did you go here: YES or NO), but will effect accurate
+-- tick counting.
+
+dsExpr (HsBinTick ixT ixF e) = do
+  e2 <- dsLExpr e
+  do { ASSERT(exprType e2 `coreEqType` boolTy)
+       mkBinaryTickBox ixT ixF e2
+     }
+\end{code}
 
 \begin{code}
 

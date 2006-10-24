@@ -311,6 +311,8 @@ hs_add_root(void (*init_root)(void))
 
     freeGroup_lock(bd);
 
+    startupHpc();
+
 #if defined(PROFILING) || defined(DEBUG)
     // This must be done after module initialisation.
     // ToDo: make this work in the presence of multiple hs_add_root()s.
@@ -391,6 +393,9 @@ hs_exit(void)
     /* stop timing the shutdown, we're about to print stats */
     stat_endExit();
     
+    /* shutdown the hpc support (if needed) */
+    exitHpc();
+
     // clean up things from the storage manager's point of view.
     // also outputs the stats (+RTS -s) info.
     exitStorage();

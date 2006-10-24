@@ -757,7 +757,7 @@ makeFunBind :: Located id -> Bool -> [LMatch id] -> HsBind id
 -- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn is_infix ms 
   = FunBind { fun_id = fn, fun_infix = is_infix, fun_matches = mkMatchGroup ms,
-	      fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames }
+	      fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames, fun_tick = Nothing }
 
 checkPatBind lhs (L _ grhss)
   = do	{ lhs <- checkPattern lhs

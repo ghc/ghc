@@ -87,11 +87,13 @@ data HsBind id
 				-- type 	Int -> forall a'. a' -> a'
 				-- Notice that the coercion captures the free a'.
 
-	bind_fvs :: NameSet	-- After the renamer, this contains a superset of the 
+	bind_fvs :: NameSet,	-- After the renamer, this contains a superset of the 
 				-- Names of the other binders in this binding group that 
 				-- are free in the RHS of the defn
 				-- Before renaming, and after typechecking, 
 				-- the field is unused; it's just an error thunk
+
+        fun_tick :: Maybe Int   -- This is the (optional) module-local tick number. 
     }
 
   | PatBind {	-- The pattern is never a simple variable;
@@ -238,7 +240,13 @@ ppr_monobind :: OutputableBndr id => HsBind id -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })      = pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = ppr var <+> equals <+> pprExpr (unLoc rhs)
-ppr_monobind (FunBind { fun_id = fun, fun_matches = matches }) = pprFunBind (unLoc fun) matches
+ppr_monobind (FunBind { fun_id = fun, 
+			fun_matches = matches,
+		        fun_tick = tick }) = 
+		           (case tick of 
+			      Nothing -> empty
+			      Just t  -> text "-- tick id = " <> ppr t
+			   ) $$ pprFunBind (unLoc fun) matches
       -- ToDo: print infix if appropriate
 
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_dicts = dictvars, 

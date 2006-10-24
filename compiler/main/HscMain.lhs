@@ -466,7 +466,7 @@ hscFileFrontEnd =
                          -------------------
                          -- DESUGAR
                          -------------------
-                         -> {-# SCC "DeSugar" #-} deSugar hsc_env tc_result
+                         -> {-# SCC "DeSugar" #-} deSugar hsc_env (ms_location mod_summary) tc_result
 
 --------------------------------------------------------------
 -- Simplifiers
@@ -583,7 +583,8 @@ hscCompile cgguts
                      cg_tycons   = tycons,
                      cg_dir_imps = dir_imps,
                      cg_foreign  = foreign_stubs,
-                     cg_dep_pkgs = dependencies } = cgguts
+                     cg_dep_pkgs = dependencies,
+		     cg_hpc_info = hpc_info } = cgguts
              dflags = hsc_dflags hsc_env
              location = ms_location mod_summary
              data_tycons = filter isDataTyCon tycons
@@ -603,7 +604,7 @@ hscCompile cgguts
          abstractC <- {-# SCC "CodeGen" #-}
                       codeGen dflags this_mod data_tycons
                               foreign_stubs dir_imps cost_centre_info
-                              stg_binds
+                              stg_binds hpc_info
          ------------------  Code output -----------------------
          (stub_h_exists,stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 

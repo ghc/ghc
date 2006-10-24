@@ -60,6 +60,7 @@ import DataCon
 import BasicTypes
 import FastString
 import Outputable
+import Module
 
 infixl 4 `mkApps`, `mkValApps`, `mkTyApps`, `mkVarApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
@@ -131,6 +132,11 @@ data Note
 			-- as very small, and inline it at its call sites
 
   | CoreNote String     -- A generic core annotation, propagated but not used by GHC
+
+  | TickBox Module !Int -- ^Tick box for Hpc-style coverage
+  | BinaryTickBox Module !Int !Int
+    			-- ^Binary tick box, with a tick for result = True, result = False
+
 
 -- NOTE: we also treat expressions wrapped in InlineMe as
 -- 'cheap' and 'dupable' (in the sense of exprIsCheap, exprIsDupable)
@@ -615,6 +621,9 @@ seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
 
 seqNote (CoreNote s)   = s `seq` ()
+seqNote (TickBox m n)  = m `seq` ()  -- no need for seq on n, because n is strict
+seqNote (BinaryTickBox m t f)   
+	               = m `seq` ()  -- likewise on t and f.
 seqNote other	       = ()
 
 seqBndr b = b `seq` ()

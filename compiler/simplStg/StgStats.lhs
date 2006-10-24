@@ -151,6 +151,7 @@ statExpr (StgLit _)	  = countOne Literals
 statExpr (StgConApp _ _)  = countOne ConstructorApps
 statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
 statExpr (StgSCC l e) 	  = statExpr e
+statExpr (StgTick m n e)  = statExpr e
 
 statExpr (StgLetNoEscape lvs_whole lvs_rhss binds body)
   = statBinding False{-not top-level-} binds	`combineSE`

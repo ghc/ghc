@@ -33,6 +33,7 @@ import ErrUtils
 import DynFlags
 import Util
 import Outputable
+import TysWiredIn
 \end{code}
 
 -- ---------------------------------------------------------------------------
@@ -333,6 +334,8 @@ exprIsTrivial (Type _)	      	       = True
 exprIsTrivial (Lit lit)       	       = True
 exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
 exprIsTrivial (Note (SCC _) e) 	       = False
+exprIsTrivial (Note (TickBox {}) e)    = False
+exprIsTrivial (Note (BinaryTickBox {}) e) = False
 exprIsTrivial (Note _ e)      	       = exprIsTrivial e
 exprIsTrivial (Cast e co)              = exprIsTrivial e
 exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
@@ -380,6 +383,23 @@ corePrepExprFloat env (Note n@(SCC _) expr)
     deLamFloat expr1			`thenUs` \ (floats, expr2) ->
     returnUs (floats, Note n expr2)
 
+corePrepExprFloat env (Note note@(TickBox {}) expr)
+  = corePrepAnExpr env expr            `thenUs` \ expr1 ->
+    deLamFloat expr1                   `thenUs` \ (floats, expr2) ->
+    return (floats, Note note expr2)
+
+corePrepExprFloat env (Note note@(BinaryTickBox m t e) expr)
+  = corePrepAnExpr env expr            `thenUs` \ expr1 ->
+    deLamFloat expr1                   `thenUs` \ (floats, expr2) ->
+    getUniqueUs                        `thenUs` \ u ->
+    let bndr = mkSysLocal FSLIT("t") u boolTy in
+    return (floats, Case expr2
+                       bndr
+                       boolTy
+                       [ (DataAlt falseDataCon, [], Note (TickBox m e) (Var falseDataConId))
+                       , (DataAlt trueDataCon,  [], Note (TickBox m t) (Var trueDataConId))
+                       ])
+
 corePrepExprFloat env (Note other_note expr)
   = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
     returnUs (floats, Note other_note expr')
@@ -394,6 +414,21 @@ corePrepExprFloat env expr@(Lam _ _)
     returnUs (emptyFloats, mkLams bndrs' body')
   where
     (bndrs,body) = collectBinders expr
+
+corePrepExprFloat env (Case (Note note@(TickBox m n) expr) bndr ty alts)
+  = corePrepExprFloat env (Note note (Case expr bndr ty alts))
+
+corePrepExprFloat env (Case (Note note@(BinaryTickBox m t e) expr) bndr ty alts)
+  = do { ASSERT(exprType expr `coreEqType` boolTy)
+         corePrepExprFloat env $
+               Case expr bndr ty
+                       [ (DataAlt falseDataCon, [], Note (TickBox m e) falseBranch)
+                       , (DataAlt trueDataCon,  [], Note (TickBox m t) trueBranch)
+                       ]
+       }
+   where
+       (_,_,trueBranch)  = findAlt (DataAlt trueDataCon) alts
+       (_,_,falseBranch) = findAlt (DataAlt falseDataCon) alts
 
 corePrepExprFloat env (Case scrut bndr ty alts)
   = corePrepExprFloat env scrut		`thenUs` \ (floats1, scrut1) ->

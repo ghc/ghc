@@ -58,7 +58,8 @@ module HscTypes (
 	-- Linker stuff
 	Linkable(..), isObjectLinkable,
 	Unlinked(..), CompiledByteCode,
-	isObject, nameOfObject, isInterpretable, byteCodeOfObject
+	isObject, nameOfObject, isInterpretable, byteCodeOfObject,
+        HpcInfo, noHpcInfo
     ) where
 
 #include "HsVersions.h"
@@ -480,7 +481,8 @@ data ModGuts
 	mg_fam_insts :: ![FamInst],	 -- Instances 
         mg_rules     :: ![CoreRule],	 -- Rules from this module
 	mg_binds     :: ![CoreBind],	 -- Bindings for this module
-	mg_foreign   :: !ForeignStubs
+	mg_foreign   :: !ForeignStubs,
+	mg_hpc_info  :: !HpcInfo         -- info about coverage tick boxes
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -517,7 +519,8 @@ data CgGuts
 		-- initialisation code
 
 	cg_foreign  :: !ForeignStubs,	
-	cg_dep_pkgs :: ![PackageId]	-- Used to generate #includes for C code gen
+	cg_dep_pkgs :: ![PackageId],	-- Used to generate #includes for C code gen
+        cg_hpc_info :: !HpcInfo         -- info about coverage tick boxes
     }
 
 -----------------------------------
@@ -1136,6 +1139,19 @@ showModMsg target recomp mod_summary
     mod_str = showSDoc (ppr mod) ++ hscSourceString (ms_hsc_src mod_summary)
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Hpc Support}
+%*									*
+%************************************************************************
+
+\begin{code}
+type HpcInfo = Int             -- just the number of ticks in a module
+
+noHpcInfo :: HpcInfo
+noHpcInfo = 0                  -- default = 0
+\end{code}
 
 %************************************************************************
 %*									*
