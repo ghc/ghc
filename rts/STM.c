@@ -906,7 +906,7 @@ static volatile StgBool token_locked = FALSE;
 static void getTokenBatch(Capability *cap) {
   while (cas((void *)&token_locked, FALSE, TRUE) == TRUE) { /* nothing */ }
   max_commits += TOKEN_BATCH_SIZE;
-  TRACE("%p : cap got token batch, max_commits=%lld", cap, max_commits);
+  TRACE("%p : cap got token batch, max_commits=%" FMT_Int64, cap, max_commits);
   cap -> transaction_tokens = TOKEN_BATCH_SIZE;
   token_locked = FALSE;
 }
