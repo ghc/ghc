@@ -35,6 +35,7 @@ module Data.List
    , reverse           -- :: [a] -> [a]
 
    , intersperse       -- :: a -> [a] -> [a]
+   , intercalate       -- :: [a] -> [[a]] -> [a]
    , transpose         -- :: [[a]] -> [[a]]
 
    -- * Reducing lists (folds)
@@ -91,6 +92,8 @@ module Data.List
    , dropWhile         -- :: (a -> Bool) -> [a] -> [a]
    , span              -- :: (a -> Bool) -> [a] -> ([a], [a])
    , break             -- :: (a -> Bool) -> [a] -> ([a], [a])
+
+   , split             -- :: Eq a => a -> [a] -> [[a]]
 
    , group             -- :: Eq a => [a] -> [[a]]
 
@@ -396,6 +399,12 @@ intersperse _   []      = []
 intersperse _   [x]     = [x]
 intersperse sep (x:xs)  = x : sep : intersperse sep xs
 
+-- | 'intercalate' @xs xss@ is equivalent to @('concat' ('intersperse' xs xss))@.
+-- It inserts the list @xs@ in between the lists in @xss@ and concatenates the
+-- result.
+intercalate :: [a] -> [[a]] -> [a]
+intercalate xs xss = concat (intersperse xs xss)
+
 -- | The 'transpose' function transposes the rows and columns of its argument.
 -- For example,
 --
@@ -667,6 +676,19 @@ unzip7		=  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
 -- the second list removed.
 deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
+
+-- | 'split' @x xs@ divides the list @xs@ at every occurrence of @x@ and
+-- removes those occurrences.
+--
+-- Example:
+--
+-- > split 'i' "mississippi" -> ["m","ss","ss","pp",""]
+-- > split 'i' [] -> [""]
+split :: Eq a => a -> [a] -> [[a]]
+split x xs = let (f,r) = break (==x) xs
+             in f : case r of
+                      [] -> []
+                      (_:ys) -> split x ys
 
 -- | The 'group' function takes a list and returns a list of lists such
 -- that the concatenation of the result is equal to the argument.  Moreover,
