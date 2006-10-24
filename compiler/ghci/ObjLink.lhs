@@ -95,7 +95,6 @@ resolveObjs = do
 -- Foreign declaractions to RTS entry points which does the real work;
 -- ---------------------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 504
 foreign import ccall unsafe "addDLL"	   c_addDLL :: CString -> IO CString
 foreign import ccall unsafe "initLinker"   initObjLinker :: IO ()
 foreign import ccall unsafe "insertSymbol" c_insertSymbol :: CString -> CString -> Ptr a -> IO ()
@@ -105,16 +104,5 @@ foreign import ccall unsafe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr 
 foreign import ccall unsafe "loadObj"      c_loadObj :: CString -> IO Int
 foreign import ccall unsafe "unloadObj"    c_unloadObj :: CString -> IO Int
 foreign import ccall unsafe "resolveObjs"  c_resolveObjs :: IO Int
-#else
-foreign import "addDLL"       unsafe	c_addDLL :: CString -> IO CString
-foreign import "initLinker"   unsafe	initLinker :: IO ()
-foreign import "insertSymbol" unsafe	c_insertSymbol :: CString -> CString -> Ptr a -> IO ()
-foreign import "insertStableSymbol" unsafe c_insertStableSymbol
-    :: CString -> CString -> Ptr a -> IO ()
-foreign import "lookupSymbol" unsafe	c_lookupSymbol :: CString -> IO (Ptr a)
-foreign import "loadObj"      unsafe	c_loadObj :: CString -> IO Int
-foreign import "unloadObj"    unsafe	c_unloadObj :: CString -> IO Int
-foreign import "resolveObjs"  unsafe	c_resolveObjs :: IO Int
-#endif
 
 \end{code}
