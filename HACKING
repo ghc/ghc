@@ -28,6 +28,14 @@ The GHC Developer's Wiki
      This is part of the "Building GHC" section of the wiki, which
      has more detailed information on GHC's build system should you
      need it.
+
+
+  Coding conventions
+
+     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions
+
+     This wiki page explains the ground rules for code that is intended
+     to go into the mainline compiler source.
   
   
   The GHC Commentary
