@@ -10,6 +10,7 @@
 #include <string.h>
 #include <assert.h>
 #include "HsFFI.h"
+#include "Rts.h"
 #include "Hpc.h"
 
 /* This is the runtime support for the Haskell Program Coverage (hpc) toolkit,
@@ -38,7 +39,7 @@ int totalTixes = 0;		// total number of tix boxes.
 
 
 
-static char *tixFilename = "Main.tix";
+static char *tixFilename;
 
 static void failure(char *msg) {
   printf("Hpc failure: %s\n",msg);
@@ -104,6 +105,10 @@ static void hpc_init(void) {
   }
   hpc_inited = 1;
   
+
+  tixFilename = (char *) malloc(strlen(prog_name) + 6);
+  sprintf(tixFilename, "%s.tix", prog_name);
+
   if (init_open(tixFilename)) { 
     totalTixes = 0;
 
