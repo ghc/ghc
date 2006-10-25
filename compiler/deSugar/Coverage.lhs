@@ -266,19 +266,27 @@ addTickHsExpr (HsWrap w e) =
 	liftM2 HsWrap
 		(return w)
 		(addTickHsExpr e)	-- explicitly no tick on inside
-addTickHsExpr (HsArrApp	 {}) = error "addTickHsExpr:  HsArrApp	"
-addTickHsExpr (HsArrForm {}) = error "addTickHsExpr:  HsArrForm"
+addTickHsExpr (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
+        liftM5 HsArrApp
+	       (addTickLHsExpr e1)
+	       (addTickLHsExpr e2)
+	       (return ty1)
+	       (return arr_ty)
+	       (return lr)
+addTickHsExpr (HsArrForm e fix cmdtop) = 
+        liftM3 HsArrForm
+	       (addTickLHsExpr e)
+	       (return fix)
+	       (mapM (liftL addTickHsCmdTop) cmdtop)
+
+addTickHsExpr e@(HsType ty) = return e
+
+-- Should never happen in expression content.
 addTickHsExpr (EAsPat _ _) = error "addTickHsExpr: EAsPat _ _"
 addTickHsExpr (ELazyPat _) = error "addTickHsExpr: ELazyPat _"
 addTickHsExpr (EWildPat) = error "addTickHsExpr: EWildPat"
 addTickHsExpr (HsBinTick _ _ _) = error "addTickhsExpr: HsBinTick _ _ _"
 addTickHsExpr (HsTick _ _) = error "addTickhsExpr: HsTick _ _"
-
-addTickHsExpr e@(HsType ty) = return e
-
--- catch all, and give an error message.
---addTickHsExpr e = error ("addTickLhsExpr: " ++ showSDoc (ppr e))
-
 
 addTickMatchGroup (MatchGroup matches ty) = do
   let isOneOfMany = True -- AJG: for now

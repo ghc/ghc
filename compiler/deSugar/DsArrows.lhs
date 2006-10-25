@@ -586,6 +586,12 @@ dsCmd _ids local_vars env_ids _stack _res_ty (HsArrForm op _ args)
     returnDs (mkApps (App core_op (Type env_ty)) core_args,
 	      unionVarSets fv_sets)
 
+
+dsCmd ids local_vars env_ids stack res_ty (HsTick ix expr)
+  = dsLCmd ids local_vars env_ids stack res_ty expr `thenDs` \ (expr1,id_set) ->
+    mkTickBox ix expr1                     	    `thenDs` \ expr2 ->
+    return (expr2,id_set)
+
 --	A | ys |- c :: [ts] t	(ys <= xs)
 --	---------------------
 --	A | xs |- c :: [ts] t	---> arr_ts (\ (xs) -> (ys)) >>> c
