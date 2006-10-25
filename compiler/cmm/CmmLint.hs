@@ -63,7 +63,7 @@ lintCmmExpr expr@(CmmMachOp op args) = do
   mapM_ lintCmmExpr args
   if map cmmExprRep args == machOpArgReps op
   	then cmmCheckMachOp op args
-	else cmmLintMachOpErr expr
+	else cmmLintMachOpErr expr (map cmmExprRep args) (machOpArgReps op)
 lintCmmExpr (CmmRegOff reg offset)
   = lintCmmExpr (CmmMachOp (MO_Add rep) 
 		[CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
@@ -149,9 +149,12 @@ addLintInfo info thing = CmmLint $
 	Left err -> Left (hang info 2 err)
 	Right a  -> Right a
 
-cmmLintMachOpErr :: CmmExpr -> CmmLint a
-cmmLintMachOpErr expr = cmmLintErr (text "in MachOp application: " $$ 
-					nest 2 (pprExpr expr))
+cmmLintMachOpErr :: CmmExpr -> [MachRep] -> [MachRep] -> CmmLint a
+cmmLintMachOpErr expr argsRep opExpectsRep
+     = cmmLintErr (text "in MachOp application: " $$ 
+					nest 2 (pprExpr expr) $$
+				        (text "op is expecting: " <+> ppr opExpectsRep) $$
+					(text "arguments provide: " <+> ppr argsRep))
 
 cmmLintAssignErr :: CmmStmt -> CmmLint a
 cmmLintAssignErr stmt = cmmLintErr (text "in assignment: " $$ 
