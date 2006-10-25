@@ -988,6 +988,7 @@ def pretest_cleanup(name):
    rm_no_fail(qualify(name,'comp.stderr'))
    rm_no_fail(qualify(name,'run.stderr'))
    rm_no_fail(qualify(name,'run.stdout'))
+   rm_no_fail(qualify(name,'tix'))	# remove the old tix file
    # simple_build zaps the following:
    # rm_nofail(qualify("o"))
    # rm_nofail(qualify(""))
