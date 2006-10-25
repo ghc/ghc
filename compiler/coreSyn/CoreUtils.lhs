@@ -620,6 +620,10 @@ exprIsHNF (Lit l)	   = True
 exprIsHNF (Type ty)	   = True	-- Types are honorary Values; 
 			   		-- we don't mind copying them
 exprIsHNF (Lam b e)  	   = isRuntimeVar b || exprIsHNF e
+exprIsHNF (Note (TickBox {}) _)
+	                   = False
+exprIsHNF (Note (BinaryTickBox {}) _)
+	                   = False
 exprIsHNF (Note _ e) 	   = exprIsHNF e
 exprIsHNF (Cast e co)      = exprIsHNF e
 exprIsHNF (App e (Type _)) = exprIsHNF e
