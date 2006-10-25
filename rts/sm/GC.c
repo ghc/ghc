@@ -28,15 +28,6 @@
 #include "ParTicky.h"		// ToDo: move into Rts.h
 #include "RtsSignals.h"
 #include "STM.h"
-#if defined(GRAN) || defined(PAR)
-# include "GranSimRts.h"
-# include "ParallelRts.h"
-# include "FetchMe.h"
-# if defined(DEBUG)
-#  include "Printer.h"
-#  include "ParallelDebug.h"
-# endif
-#endif
 #include "HsFFI.h"
 #include "Linker.h"
 #if defined(RTS_GTK_FRONTPANEL)
@@ -235,9 +226,6 @@ GarbageCollect ( rtsBool force_major_gc )
   mutlist_OTHERS = 0;
 #endif
 
-  // Init stats and print par specific (timing) info 
-  PAR_TICKY_PAR_START();
-
   // attribute any costs to CCS_GC 
 #ifdef PROFILING
   prev_CCS = CCCS;
@@ -273,9 +261,6 @@ GarbageCollect ( rtsBool force_major_gc )
 #endif
 
   // check stack sanity *before* GC (ToDo: check all threads) 
-#if defined(GRAN)
-  // ToDo!: check sanity  IF_DEBUG(sanity, checkTSOsSanity());
-#endif
   IF_DEBUG(sanity, checkFreeListSanity());
 
   /* Initialise the static object lists
@@ -466,7 +451,6 @@ GarbageCollect ( rtsBool force_major_gc )
     }
 
     for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
-      IF_PAR_DEBUG(verbose, printMutableList(&generations[g]));
       scavenge_mutable_list(&generations[g]);
       evac_gen = g;
       for (st = generations[g].n_steps-1; st >= 0; st--) {
@@ -484,21 +468,6 @@ GarbageCollect ( rtsBool force_major_gc )
    */
   evac_gen = 0;
   GetRoots(mark_root);
-
-#if defined(PAR)
-  /* And don't forget to mark the TSO if we got here direct from
-   * Haskell! */
-  /* Not needed in a seq version?
-  if (CurrentTSO) {
-    CurrentTSO = (StgTSO *)MarkRoot((StgClosure *)CurrentTSO);
-  }
-  */
-
-  // Mark the entries in the GALA table of the parallel system 
-  markLocalGAs(major_gc);
-  // Mark all entries on the list of pending fetches 
-  markPendingFetches(major_gc);
-#endif
 
   /* Mark the weak pointer list, and prepare to detect dead weak
    * pointers.
@@ -613,12 +582,6 @@ GarbageCollect ( rtsBool force_major_gc )
 	  }
       }
   }
-
-#if defined(PAR)
-  // Reconstruct the Global Address tables used in GUM 
-  rebuildGAtables(major_gc);
-  IF_DEBUG(sanity, checkLAGAtable(rtsTrue/*check closures, too*/));
-#endif
 
   // Now see which stable names are still alive.
   gcStablePtrTable();
@@ -1057,8 +1020,6 @@ GarbageCollect ( rtsBool force_major_gc )
 #endif
 
   RELEASE_SM_LOCK;
-
-  //PAR_TICKY_TP();
 }
 
 /* -----------------------------------------------------------------------------

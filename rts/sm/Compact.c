@@ -398,10 +398,6 @@ thread_TSO (StgTSO *tso)
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnException
-#if defined(PAR)
-	|| tso->why_blocked == BlockedOnGA
-	|| tso->why_blocked == BlockedOnGA_NoSend
-#endif
 	) {
 	thread_(&tso->block_info.closure);
     }
@@ -703,10 +699,6 @@ update_fwd( bdescr *blocks )
 
     bd = blocks;
 
-#if defined(PAR)
-    barf("update_fwd: ToDo");
-#endif
-
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
 	p = bd->start;
@@ -734,10 +726,6 @@ update_fwd_compact( bdescr *blocks )
     bd = blocks;
     free_bd = blocks;
     free = free_bd->start;
-
-#if defined(PAR)
-    barf("update_fwd: ToDo");
-#endif
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {
@@ -817,10 +805,6 @@ update_bkwd_compact( step *stp )
     bd = free_bd = stp->old_blocks;
     free = free_bd->start;
     free_blocks = 1;
-
-#if defined(PAR)
-    barf("update_bkwd: ToDo");
-#endif
 
     // cycle through all the blocks in the step
     for (; bd != NULL; bd = bd->link) {

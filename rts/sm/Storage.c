@@ -361,15 +361,6 @@ newCAF(StgClosure* caf)
   }
   
   RELEASE_SM_LOCK;
-
-#ifdef PAR
-  /* If we are PAR or DIST then  we never forget a CAF */
-  { globalAddr *newGA;
-    //debugBelch("<##> Globalising CAF %08x %s",caf,info_type(caf));
-    newGA=makeGlobal(caf,rtsTrue); /*given full weight*/
-    ASSERT(newGA);
-  } 
-#endif /* PAR */
 }
 
 // An alternate version of newCaf which is used for dynamically loaded

@@ -287,9 +287,6 @@ evacuate_large(StgPtr p)
 REGPARM1 StgClosure *
 evacuate(StgClosure *q)
 {
-#if defined(PAR)
-  StgClosure *to;
-#endif
   bdescr *bd = NULL;
   step *stp;
   const StgInfoTable *info;
@@ -634,43 +631,6 @@ loop:
       }
     }
 
-#if defined(PAR)
-  case RBH:
-    {
-      //StgInfoTable *rip = get_closure_info(q, &size, &ptrs, &nonptrs, &vhs, str);
-      to = copy(q,BLACKHOLE_sizeW(),stp); 
-      //ToDo: derive size etc from reverted IP
-      //to = copy(q,size,stp);
-      debugTrace(DEBUG_gc, "evacuate: RBH %p (%s) to %p (%s)",
-		 q, info_type(q), to, info_type(to));
-      return to;
-    }
-  
-  case BLOCKED_FETCH:
-    ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOD_SIZE);
-    to = copy(q,sizeofW(StgBlockedFetch),stp);
-    debugTrace(DEBUG_gc, "evacuate: %p (%s) to %p (%s)",
-	       q, info_type(q), to, info_type(to));
-    return to;
-
-# ifdef DIST    
-  case REMOTE_REF:
-# endif
-  case FETCH_ME:
-    ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOAD_SIZE);
-    to = copy(q,sizeofW(StgFetchMe),stp);
-    debugTrace(DEBUG_gc, "evacuate: %p (%s) to %p (%s)",
-	       q, info_type(q), to, info_type(to)));
-    return to;
-
-  case FETCH_ME_BQ:
-    ASSERT(sizeofW(StgBlockedFetch) >= MIN_PAYLOAD_SIZE);
-    to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
-    debugTrace(DEBUG_gc, "evacuate: %p (%s) to %p (%s)",
-	       q, info_type(q), to, info_type(to)));
-    return to;
-#endif
-
   case TREC_HEADER: 
     return copy(q,sizeofW(StgTRecHeader),stp);
 
@@ -927,15 +887,6 @@ selector_loop:
       case SE_CAF_BLACKHOLE:
       case SE_BLACKHOLE:
       case BLACKHOLE:
-#if defined(PAR)
-      case RBH:
-      case BLOCKED_FETCH:
-# ifdef DIST    
-      case REMOTE_REF:
-# endif
-      case FETCH_ME:
-      case FETCH_ME_BQ:
-#endif
 	  // not evaluated yet 
 	  break;
     

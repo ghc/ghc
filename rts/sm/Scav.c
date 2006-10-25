@@ -128,10 +128,6 @@ scavengeTSO (StgTSO *tso)
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnException
-#if defined(PAR)
-	|| tso->why_blocked == BlockedOnGA
-	|| tso->why_blocked == BlockedOnGA_NoSend
-#endif
 	) {
 	tso->block_info.closure = evacuate(tso->block_info.closure);
     }
@@ -563,60 +559,6 @@ scavenge(step *stp)
 	break;
     }
 
-#if defined(PAR)
-    case RBH:
-    { 
-#if 0
-	nat size, ptrs, nonptrs, vhs;
-	char str[80];
-	StgInfoTable *rip = get_closure_info(p, &size, &ptrs, &nonptrs, &vhs, str);
-#endif
-	StgRBH *rbh = (StgRBH *)p;
-	(StgClosure *)rbh->blocking_queue = 
-	    evacuate((StgClosure *)rbh->blocking_queue);
-	failed_to_evac = rtsTrue;  // mutable anyhow.
-	debugTrace(DEBUG_gc, "scavenge: RBH %p (%s) (new blocking_queue link=%p)",
-		   p, info_type(p), (StgClosure *)rbh->blocking_queue);
-	// ToDo: use size of reverted closure here!
-	p += BLACKHOLE_sizeW(); 
-	break;
-    }
-
-    case BLOCKED_FETCH:
-    { 
-	StgBlockedFetch *bf = (StgBlockedFetch *)p;
-	// follow the pointer to the node which is being demanded 
-	(StgClosure *)bf->node = 
-	    evacuate((StgClosure *)bf->node);
-	// follow the link to the rest of the blocking queue 
-	(StgClosure *)bf->link = 
-	    evacuate((StgClosure *)bf->link);
-	debugTrace(DEBUG_gc, "scavenge: %p (%s); node is now %p; exciting, isn't it",
-		   bf, info_type((StgClosure *)bf), 
-		   bf->node, info_type(bf->node)));
-	p += sizeofW(StgBlockedFetch);
-	break;
-    }
-
-#ifdef DIST
-    case REMOTE_REF:
-#endif
-    case FETCH_ME:
-	p += sizeofW(StgFetchMe);
-	break; // nothing to do in this case
-
-    case FETCH_ME_BQ:
-    { 
-	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
-	(StgClosure *)fmbq->blocking_queue = 
-	    evacuate((StgClosure *)fmbq->blocking_queue);
-	debugTrace(DEBUG_gc, "scavenge: %p (%s) exciting, isn't it",
-		   p, info_type((StgClosure *)p)));
-	p += sizeofW(StgFetchMeBlockingQueue);
-	break;
-    }
-#endif
-
     case TVAR_WATCH_QUEUE:
       {
 	StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
@@ -978,55 +920,6 @@ linear_scan:
 	    break;
 	}
 
-#if defined(PAR)
-	case RBH:
-	{ 
-#if 0
-	    nat size, ptrs, nonptrs, vhs;
-	    char str[80];
-	    StgInfoTable *rip = get_closure_info(p, &size, &ptrs, &nonptrs, &vhs, str);
-#endif
-	    StgRBH *rbh = (StgRBH *)p;
-	    bh->blocking_queue = 
-		(StgTSO *)evacuate((StgClosure *)bh->blocking_queue);
-	    failed_to_evac = rtsTrue;  // mutable anyhow.
-	    debugTrace(DEBUG_gc, "scavenge: RBH %p (%s) (new blocking_queue link=%p)",
-		       p, info_type(p), (StgClosure *)rbh->blocking_queue));
-	    break;
-	}
-	
-	case BLOCKED_FETCH:
-	{ 
-	    StgBlockedFetch *bf = (StgBlockedFetch *)p;
-	    // follow the pointer to the node which is being demanded 
-	    (StgClosure *)bf->node = 
-		evacuate((StgClosure *)bf->node);
-	    // follow the link to the rest of the blocking queue 
-	    (StgClosure *)bf->link = 
-		evacuate((StgClosure *)bf->link);
-	    debugTrace(DEBUG_gc, "scavenge: %p (%s); node is now %p; exciting, isn't it",
-		       bf, info_type((StgClosure *)bf), 
-		       bf->node, info_type(bf->node)));
-	    break;
-	}
-
-#ifdef DIST
-	case REMOTE_REF:
-#endif
-	case FETCH_ME:
-	    break; // nothing to do in this case
-
-	case FETCH_ME_BQ:
-	{ 
-	    StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
-	    (StgClosure *)fmbq->blocking_queue = 
-		evacuate((StgClosure *)fmbq->blocking_queue);
-	    debugTrace(DEBUG_gc, "scavenge: %p (%s) exciting, isn't it",
-		       p, info_type((StgClosure *)p)));
-	    break;
-	}
-#endif /* PAR */
-
 	case TVAR_WATCH_QUEUE:
 	  {
 	    StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
@@ -1351,57 +1244,6 @@ scavenge_one(StgPtr p)
 	break;
     }
   
-#if defined(PAR)
-    case RBH:
-    { 
-#if 0
-	nat size, ptrs, nonptrs, vhs;
-	char str[80];
-	StgInfoTable *rip = get_closure_info(p, &size, &ptrs, &nonptrs, &vhs, str);
-#endif
-	StgRBH *rbh = (StgRBH *)p;
-	(StgClosure *)rbh->blocking_queue = 
-	    evacuate((StgClosure *)rbh->blocking_queue);
-	failed_to_evac = rtsTrue;  // mutable anyhow.
-	debugTrace(DEBUG_gc, "scavenge: RBH %p (%s) (new blocking_queue link=%p)",
-		   p, info_type(p), (StgClosure *)rbh->blocking_queue));
-	// ToDo: use size of reverted closure here!
-	break;
-    }
-
-    case BLOCKED_FETCH:
-    { 
-	StgBlockedFetch *bf = (StgBlockedFetch *)p;
-	// follow the pointer to the node which is being demanded 
-	(StgClosure *)bf->node = 
-	    evacuate((StgClosure *)bf->node);
-	// follow the link to the rest of the blocking queue 
-	(StgClosure *)bf->link = 
-	    evacuate((StgClosure *)bf->link);
-	debugTrace(DEBUG_gc,
-		   "scavenge: %p (%s); node is now %p; exciting, isn't it",
-		   bf, info_type((StgClosure *)bf), 
-		   bf->node, info_type(bf->node)));
-	break;
-    }
-
-#ifdef DIST
-    case REMOTE_REF:
-#endif
-    case FETCH_ME:
-	break; // nothing to do in this case
-
-    case FETCH_ME_BQ:
-    { 
-	StgFetchMeBlockingQueue *fmbq = (StgFetchMeBlockingQueue *)p;
-	(StgClosure *)fmbq->blocking_queue = 
-	    evacuate((StgClosure *)fmbq->blocking_queue);
-	debugTrace(DEBUG_gc, "scavenge: %p (%s) exciting, isn't it",
-		   p, info_type((StgClosure *)p)));
-	break;
-    }
-#endif
-
     case TVAR_WATCH_QUEUE:
       {
 	StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
