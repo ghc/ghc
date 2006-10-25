@@ -92,7 +92,7 @@ getImpMod (ImportDecl located_mod _ _ _ _) = located_mod
 getOptionsFromFile :: FilePath            -- input file
                    -> IO [Located String] -- options, if any
 getOptionsFromFile filename
-    = System.IO.bracket
+    = Control.Exception.bracket
 	      (openBinaryFile filename ReadMode)
               (hClose)
               (\handle ->
