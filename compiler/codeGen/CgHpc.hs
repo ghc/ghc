@@ -29,7 +29,7 @@ cgTickBox mod n = do
        stmtsC [ CmmStore tick_box
                          (CmmMachOp (MO_Add I64)
                                                [ CmmLoad tick_box I64
-                                               , CmmLit (mkIntCLit 1)
+                                               , CmmLit (CmmInt 1 I64)
                                                ])
               ]
 
