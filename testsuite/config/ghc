@@ -6,11 +6,11 @@ config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
 config.compiler_always_flags = ['-no-recomp', '-dcore-lint', '-dcmm-lint']
 
-# By default, we test the 'normal' and 'opt' ways.
+# By default, we test the 'normal', 'opt' and 'hpc' ways.
 # 'optasm' is added by mk/test.mk if the compiler has a native code gen,
 # 'prof'   is added by mk/test.mk if the profiling way is enabled.
-config.compile_ways	     = ['normal', 'opt']
-config.run_ways		     = ['normal', 'opt']
+config.compile_ways	     = ['normal', 'opt', 'hpc']
+config.run_ways		     = ['normal', 'opt', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways            = ['extcore','optextcore']
@@ -49,7 +49,8 @@ config.way_flags = {
 	'extcore'    : ['-fext-core'],
 	'optextcore' : ['-O -fext-core'],
 	'threaded1'  : ['-threaded', '-debug'],
-	'threaded2'  : ['-O', '-threaded']
+	'threaded2'  : ['-O', '-threaded'],
+	'hpc'	     : ['-O', '-fhpc' ]
 	}
 
 config.way_rts_flags = { 
@@ -63,6 +64,7 @@ config.way_rts_flags = {
 	'extcore'    : [],
 	'optextcore' : [],
 	'threaded1'  : [],
-	'threaded2'  : ['-N2']
+	'threaded2'  : ['-N2'],
+	'hpc'	     : []
     	}
 
