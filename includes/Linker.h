@@ -33,7 +33,6 @@ HsInt resolveObjs( void );
 /* load a dynamic library */
 char *addDLL( char* dll_name );
 
-extern void markRootPtrTable(evac_fn evac);
-
+extern void markRootPtrTable(void (*)(StgClosure **));
 
 #endif /* LINKER_H */
