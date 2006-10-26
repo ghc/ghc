@@ -4,6 +4,11 @@
  *
  * Weak pointers and weak-like things in the GC
  *
+ * Documentation on the architecture of the Garbage Collector can be
+ * found in the online commentary:
+ * 
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage/GC
+ *
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"

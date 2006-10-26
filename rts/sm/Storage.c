@@ -1,8 +1,13 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2006
  *
  * Storage manager front end
+ *
+ * Documentation on the architecture of the Storage Manager can be
+ * found in the online commentary:
+ * 
+ *   http://hackage.haskell.org/trac/ghc/wiki/Commentary/Rts/Storage
  *
  * ---------------------------------------------------------------------------*/
 
