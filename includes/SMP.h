@@ -233,7 +233,7 @@ typedef lnat StgSyncCount;
 //  spin locks to check for contention. 
 
 // acquire spin lock
-INLINE_HEADER void acquireSpinLock(StgSync * p)
+INLINE_HEADER void ACQUIRE_SPIN_LOCK(StgSync * p)
 {
     StgWord32 r = 0;
     do {
@@ -244,7 +244,7 @@ INLINE_HEADER void acquireSpinLock(StgSync * p)
 }
 
 // release spin lock
-INLINE_HEADER void releaseSpinLock(StgSync * p)
+INLINE_HEADER void RELEASE_SPIN_LOCK(StgSync * p)
 {
     write_barrier();
     p->lock = 1;
@@ -261,7 +261,7 @@ INLINE_HEADER void initSpinLock(StgSync * p)
 #else
 
 // acquire spin lock
-INLINE_HEADER void acquireSpinLock(StgSync * p)
+INLINE_HEADER void ACQUIRE_SPIN_LOCK(StgSync * p)
 {
     StgWord32 r = 0;
     do {
@@ -270,7 +270,7 @@ INLINE_HEADER void acquireSpinLock(StgSync * p)
 }
 
 // release spin lock
-INLINE_HEADER void releaseSpinLock(StgSync * p)
+INLINE_HEADER void RELEASE_SPIN_LOCK(StgSync * p)
 {
     write_barrier();
     (*p) = 1;
@@ -306,11 +306,9 @@ INLINE_HEADER void
 unlockClosure(StgClosure *p STG_UNUSED, StgInfoTable *info STG_UNUSED)
 { /* nothing */ }
 
-INLINE_HEADER void acquireSpinLock(void * p STG_UNUSED)
-{ /* nothing */ }
-
-INLINE_HEADER void releaseSpinLock(void * p STG_UNUSED)
-{ /* nothing */ }
+// Using macros here means we don't have to ensure the argument is in scope
+#define ACQUIRE_SPIN_LOCK(p) /* nothing */
+#define RELEASE_SPIN_LOCK(p) /* nothing */
 
 INLINE_HEADER void initSpinLock(void * p STG_UNUSED)
 { /* nothing */ }
