@@ -207,9 +207,7 @@ cat /dev/null > $DefaultStdoutFile
 cat /dev/null > $DefaultStderrFile
 $PreScriptLines
 $SpixifyLine1
-set -x
 $TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1.raw 2> $TmpPrefix/runtest$$.2.raw 3> $TmpPrefix/runtest$$.3.raw\'
-set +x
 dos2unix < $TmpPrefix/runtest$$.1.raw > $TmpPrefix/runtest$$.1
 dos2unix < $TmpPrefix/runtest$$.2.raw > $TmpPrefix/runtest$$.2
 dos2unix < $TmpPrefix/runtest$$.3.raw > $TmpPrefix/runtest$$.3
@@ -371,7 +369,12 @@ sub process_stats_file {
 	    }
 
 	    $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
-	    $GCWork += $1    if /^\s*([0-9,]+) bytes copied during GC/;
+	    
+	    if (/^\s*([0-9,]+) bytes copied during GC/) {
+	       $tmp = $1;
+	       $tmp =~ s/,//g;
+	       $GCWork += $tmp;
+            }
 
 #	    if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
 #		$MaxResidency = $1; $ResidencySamples = $2;
@@ -441,7 +444,6 @@ sub process_stats_file {
 
     # a bit of tidying
     $BytesAlloc =~ s/,//g;
-    $GCWork =~ s/,//g;
     $MaxResidency =~ s/,//g;
     $GCs =~ s/,//g;
     $InitTime =~ s/,//g;
