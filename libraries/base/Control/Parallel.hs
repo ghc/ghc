@@ -13,7 +13,8 @@
 -----------------------------------------------------------------------------
 
 module Control.Parallel (
-          par, seq -- re-exported
+          par, pseq,
+	  seq, -- for backwards compatibility, 6.6 exported this
 #if defined(__GRANSIM__)
 	, parGlobal, parLocal, parAt, parAtAbs, parAtRel, parAtForNow     
 #endif
@@ -22,7 +23,7 @@ module Control.Parallel (
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
-import qualified GHC.Conc	( par )
+import qualified GHC.Conc	( par, pseq )
 #endif
 
 #if defined(__GRANSIM__)
@@ -79,4 +80,25 @@ par = GHC.Conc.par
 #else
 -- For now, Hugs does not support par properly.
 par a b = b
+#endif
+
+-- | Semantically identical to 'seq', but with a subtle operational
+-- difference: 'seq' is strict in both its arguments, so the compiler
+-- may, for example, rearrange @a `seq` b@ into @b `seq` a `seq` b@.
+-- This is normally no problem when using 'seq' to express strictness,
+-- but it can be a problem when annotating code for parallelism,
+-- because we need more control over the order of evaluation; we may
+-- want to evaluate @a@ before @b@, because we know that @b@ has
+-- already been sparked in parallel with 'par'.
+--
+-- This is why we have 'pseq'.  In contrast to 'seq', 'pseq' is only
+-- strict in its first argument (as far as the compiler is concerned),
+-- which restricts the transformations that the compiler can do, and
+-- ensures that the user can retain control of the evaluation order.
+--
+pseq :: a -> b -> b
+#ifdef __GLASGOW_HASKELL__
+pseq = GHC.Conc.pseq
+#else
+pseq = seq
 #endif

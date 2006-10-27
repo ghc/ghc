@@ -19,15 +19,12 @@ module Control.Parallel.Strategies where
 --	Phil Trinder, Hans-Wolfgang Loidl, Kevin Hammond et al. 
 --
 
-#ifdef __HADDOCK__
-import Prelude
-#endif
-
-import Control.Parallel as Parallel
-import Data.Ix
+import Control.Parallel as Parallel (par, pseq)
 import Data.Array
 import Data.Complex
-import Data.Ratio
+
+import Prelude hiding (seq)
+import qualified Prelude (seq)
 
 -- not a terribly portable way of getting at Ratio rep.
 #ifdef __GLASGOW_HASKELL__
@@ -48,6 +45,10 @@ infixr 2 >||                -- another name for par
 infixr 3 >|                 -- another name for seq
 infixl 6 $||, $|            -- strategic function application (seq and par)
 infixl 9 .|, .||, -|, -||   -- strategic (inverse) function composition
+
+-- We need 'pseq', not the Prelude 'seq' here.  See the documentation
+-- with 'pseq' in Control.Parallel.
+seq = Parallel.pseq
 
 ------------------------------------------------------------------------------
 --			Strategy Type, Application and Semantics	      
@@ -102,7 +103,7 @@ with a singleton sequence as it is not necessarily excuted
 -}
 
 demanding, sparking :: a -> Done -> a
-demanding = flip Parallel.seq
+demanding = flip seq
 sparking  = flip Parallel.par
 
 {-
