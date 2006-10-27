@@ -274,7 +274,7 @@ if [ $SaveStderr = 1 ] &&
 	cp $TmpPrefix/runtest$$.2 $PgmStderrFile[0]
 fi
 
-${RM} core $ToRunOrig.spix $DefaultStdoutFile $DefaultStderrFile $TmpPrefix/runtest$$.1 $TmpPrefix/runtest$$.2 $TmpPrefix/runtest$$.3
+${RM} core $ToRunOrig.spix $DefaultStdoutFile $DefaultStderrFile $TmpPrefix/runtest$$.1 $TmpPrefix/runtest$$.2 $TmpPrefix/runtest$$.3 $TmpPrefix/runtest$$.1.raw $TmpPrefix/runtest$$.2.raw $TmpPrefix/runtest$$.3.raw
 exit \$myexit
 EOSCRIPT
 
