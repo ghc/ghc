@@ -557,13 +557,13 @@ statDescribeGens(void)
   step *step;
 
   debugBelch(
-"     Gen    Steps      Max   Mutable  Step   Blocks     Live    Large\n"
-"                     Blocks Closures                          Objects\n");
+"     Gen    Steps      Max  Mut-list  Step   Blocks     Live    Large\n"
+"                    Blocks     Bytes                          Objects\n");
 
   mut = 0;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
-	  mut += bd->free - bd->start;
+	  mut += (bd->free - bd->start) * sizeof(W_);
       }
 
     debugBelch("%8d %8d %8d %9d", g, generations[g].n_steps,
