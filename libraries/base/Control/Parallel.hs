@@ -30,6 +30,8 @@ import PrelBase
 import PrelErr   ( parError )
 import PrelGHC   ( parGlobal#, parLocal#, parAt#, parAtAbs#, parAtRel#, parAtForNow# )
 
+infixr 0 `par`
+
 {-# INLINE parGlobal #-}
 {-# INLINE parLocal #-}
 {-# INLINE parAt #-}
