@@ -455,7 +455,6 @@ allocNurseries( void )
 	nurseries[i].n_blocks    = RtsFlags.GcFlags.minAllocAreaSize;
 	nurseries[i].old_blocks   = NULL;
 	nurseries[i].n_old_blocks = 0;
-	/* hp, hpLim, hp_bd, to_space etc. aren't used in the nursery */
     }
     assignNurseriesToCapabilities();
 }
@@ -917,9 +916,7 @@ calcLive(void)
   step *stp;
 
   if (RtsFlags.GcFlags.generations == 1) {
-    live = (g0s0->n_blocks - 1) * BLOCK_SIZE_W + 
-      ((lnat)g0s0->hp_bd->free - (lnat)g0s0->hp_bd->start) / sizeof(W_);
-    return live;
+      return (g0s0->n_large_blocks + g0s0->n_blocks) * BLOCK_SIZE_W;
   }
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -931,14 +928,7 @@ calcLive(void)
 	  continue; 
       }
       stp = &generations[g].steps[s];
-      live += (stp->n_large_blocks + stp->n_blocks - 1) * BLOCK_SIZE_W;
-      if (stp->hp_bd != NULL) {
-	  live += ((lnat)stp->hp_bd->free - (lnat)stp->hp_bd->start) 
-	      / sizeof(W_);
-      }
-      if (stp->scavd_hp != NULL) {
-	  live -= (P_)(BLOCK_ROUND_UP(stp->scavd_hp)) - stp->scavd_hp;
-      }
+      live += (stp->n_large_blocks + stp->n_blocks) * BLOCK_SIZE_W;
     }
   }
   return live;
@@ -1106,64 +1096,87 @@ memInventory(void)
   nat g, s, i;
   step *stp;
   bdescr *bd;
-  lnat total_blocks = 0, free_blocks = 0;
+  lnat gen_blocks[RtsFlags.GcFlags.generations];
+  lnat nursery_blocks, allocate_blocks, retainer_blocks,
+       arena_blocks, exec_blocks;
+  lnat live_blocks = 0, free_blocks = 0;
 
-  /* count the blocks we current have */
+  // count the blocks we current have
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      gen_blocks[g] = 0;
       for (i = 0; i < n_capabilities; i++) {
 	  for (bd = capabilities[i].mut_lists[g]; bd != NULL; bd = bd->link) {
-	      total_blocks += bd->blocks;
+	      gen_blocks[g] += bd->blocks;
 	  }
       }	  
       for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
-	  total_blocks += bd->blocks;
+	  gen_blocks[g] += bd->blocks;
       }
       for (s = 0; s < generations[g].n_steps; s++) {
 	  if (g==0 && s==0) continue;
 	  stp = &generations[g].steps[s];
-	  total_blocks += stepBlocks(stp);
+	  gen_blocks[g] += stepBlocks(stp);
       }
   }
 
+  nursery_blocks = 0;
   for (i = 0; i < n_nurseries; i++) {
-      total_blocks += stepBlocks(&nurseries[i]);
+      nursery_blocks += stepBlocks(&nurseries[i]);
   }
 #ifdef THREADED_RTS
   // We put pinned object blocks in g0s0, so better count blocks there too.
-  total_blocks += stepBlocks(g0s0);
+  gen_blocks[0] += stepBlocks(g0s0);
 #endif
 
   /* any blocks held by allocate() */
+  allocate_blocks = 0;
   for (bd = small_alloc_list; bd; bd = bd->link) {
-    total_blocks += bd->blocks;
+      allocate_blocks += bd->blocks;
   }
 
+  retainer_blocks = 0;
 #ifdef PROFILING
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-      total_blocks += retainerStackBlocks();
+      retainer_blocks = retainerStackBlocks();
   }
 #endif
 
   // count the blocks allocated by the arena allocator
-  total_blocks += arenaBlocks();
+  arena_blocks = arenaBlocks();
 
   // count the blocks containing executable memory
+  exec_blocks = 0;
   for (bd = exec_block; bd; bd = bd->link) {
-    total_blocks += bd->blocks;
+      exec_blocks = bd->blocks;
   }
 
   /* count the blocks on the free list */
   free_blocks = countFreeList();
 
-  if (total_blocks + free_blocks != mblocks_allocated *
-      BLOCKS_PER_MBLOCK) {
-    debugBelch("Blocks: %ld live + %ld free  = %ld total (%ld around)\n",
-	    total_blocks, free_blocks, total_blocks + free_blocks,
-	    mblocks_allocated * BLOCKS_PER_MBLOCK);
+  live_blocks = 0;
+  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      live_blocks += gen_blocks[g];
   }
+  live_blocks += nursery_blocks + allocate_blocks
+               + retainer_blocks + arena_blocks + exec_blocks;
 
-  ASSERT(total_blocks + free_blocks == mblocks_allocated * BLOCKS_PER_MBLOCK);
+  if (live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK)
+  {
+      debugBelch("Memory leak detected\n");
+      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	  debugBelch("  gen %d blocks : %4lu\n", g, gen_blocks[g]);
+      }
+      debugBelch("  nursery      : %4lu\n", nursery_blocks);
+      debugBelch("  allocate()   : %4lu\n", allocate_blocks);
+      debugBelch("  retainer     : %4lu\n", retainer_blocks);
+      debugBelch("  arena blocks : %4lu\n", arena_blocks);
+      debugBelch("  exec         : %4lu\n", exec_blocks);
+      debugBelch("  free         : %4lu\n", free_blocks);
+      debugBelch("  total        : %4lu\n\n", live_blocks + free_blocks);
+      debugBelch("  in system    : %4lu\n", mblocks_allocated + BLOCKS_PER_MBLOCK);
+      ASSERT(0);
+  }
 }
 
 
