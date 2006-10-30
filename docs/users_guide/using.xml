@@ -225,8 +225,7 @@ module X where
     <variablelist>
       <varlistentry>
 	<term>
-	  <cmdsynopsis><command>ghc</command>
-	    <arg choice='plain'>&ndash;&ndash;interactive</arg>
+	  <cmdsynopsis><command>ghc --interactive</command>
 	  </cmdsynopsis>
           <indexterm><primary>interactive mode</primary></indexterm>
           <indexterm><primary>ghci</primary></indexterm>
@@ -240,8 +239,7 @@ module X where
       
       <varlistentry>
 	<term>
-	  <cmdsynopsis><command>ghc</command>
-	    <arg choice='plain'>&ndash;&ndash;make</arg>
+	  <cmdsynopsis><command>ghc --make</command>
 	  </cmdsynopsis>
           <indexterm><primary>make mode</primary></indexterm>
           <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
@@ -258,8 +256,8 @@ module X where
 
       <varlistentry>
 	<term>
-	  <cmdsynopsis><command>ghc</command>
-	    <arg choice='plain'>&ndash;e</arg> <arg choice='plain'><replaceable>expr</replaceable></arg>
+	  <cmdsynopsis><command>ghc -e</command>
+	     <arg choice='plain'><replaceable>expr</replaceable></arg>
           </cmdsynopsis>
           <indexterm><primary>eval mode</primary></indexterm>
 	</term>
@@ -275,13 +273,10 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
-	    <command>ghc</command>
-	    <group>
-	      <arg>-E</arg>
-	      <arg>-C</arg>
-	      <arg>-S</arg>
-	      <arg>-c</arg>
-	    </group>
+	    <command>ghc -E</command>
+	    <command>ghc -c</command>
+	    <command>ghc -S</command>
+	    <command>ghc -c</command>
 	  </cmdsynopsis>
 	  <indexterm><primary><option>-E</option></primary></indexterm>
 	  <indexterm><primary><option>-C</option></primary></indexterm>
@@ -302,8 +297,7 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
-            <command>ghc</command>
-	    <arg choice='plain'>&ndash;M</arg>
+            <command>ghc -M</command>
           </cmdsynopsis>
           <indexterm><primary>dependency-generation mode</primary></indexterm>
         </term>
@@ -318,16 +312,73 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
-            <command>ghc</command>
-	    <arg choice='plain'>&ndash;&ndash;mk-dll</arg>
+            <command>ghc --mk-dll</command>
           </cmdsynopsis>
-	  <indexterm><primary>dependency-generation mode</primary></indexterm>
+	  <indexterm><primary>DLL-creation mode</primary></indexterm>
         </term>
 	<listitem>
 	  <para>DLL-creation mode (Windows only).  See <xref
 	  linkend="win32-dlls-create"/>.</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <cmdsynopsis>
+          <command>ghc --help</command> <command>ghc -?</command>
+	    </cmdsynopsis>
+          <indexterm><primary><option>&ndash;&ndash;help</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Cause GHC to spew a long usage message to standard
+          output and then exit.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <cmdsynopsis>
+          <command>ghc --version</command> <command>ghc -V</command> 
+          <indexterm><primary><option>-V</option></primary></indexterm>
+          <indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
+	    </cmdsynopsis>
+        </term>
+	<listitem>
+	  <para>Print a one-line string including GHC's version number.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <cmdsynopsis>
+          <command>ghc --numeric-version</command>
+          <indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
+	    </cmdsynopsis>
+        </term>
+	<listitem>
+	  <para>Print GHC's numeric version number only.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <cmdsynopsis>
+          <command>ghc --print-libdir</command>
+          <indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
+	    </cmdsynopsis>
+        </term>
+	<listitem>
+	  <para>Print the path to GHC's library directory.  This is
+	  the top of the directory tree containing GHC's libraries,
+	  interfaces, and include files (usually something like
+	  <literal>/usr/local/lib/ghc-5.04</literal> on Unix).  This
+	  is the value of
+	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary>
+	  </indexterm>in the package configuration file (see <xref
+	  linkend="packages"/>).</para>
+	</listitem>
+      </varlistentry>
+
     </variablelist>
 
     <sect2 id="make-mode">
@@ -574,22 +625,9 @@ ghc -c Foo.hs</screen>
     <indexterm><primary>help options</primary></indexterm>
     <indexterm><primary>verbosity options</primary></indexterm>
 
+    See also the <option>--help</option>, <option>--version</option>, <option>--numeric-version</option>,
+    and <option>--print-libdir</option> modes in <xref linkend="modes"/>.
     <variablelist>
-      <varlistentry>
-	<term>
-          <option>&ndash;&ndash;help</option>
-          <indexterm><primary><option>&ndash;&ndash;help</option></primary></indexterm>
-        </term>
-	<term>
-          <option>-?</option>
-          <indexterm><primary><option>-?</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Cause GHC to spew a long usage message to standard
-          output and then exit.</para>
-	</listitem>
-      </varlistentry>
-
       <varlistentry>
 	<term>
           <option>-n</option>
@@ -684,47 +722,6 @@ ghc -c Foo.hs</screen>
 	</listitem>
       </varlistentry>
       
-      <varlistentry>
-	<term>
-          <option>-V</option>
-          <indexterm><primary><option>-V</option></primary></indexterm>
-        </term>
-	<term>
-          <option>&ndash;&ndash;version</option>
-          <indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Print a one-line string including GHC's version number.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>&ndash;&ndash;numeric-version</option>
-          <indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Print GHC's numeric version number only.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>&ndash;&ndash;print-libdir</option>
-          <indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Print the path to GHC's library directory.  This is
-	  the top of the directory tree containing GHC's libraries,
-	  interfaces, and include files (usually something like
-	  <literal>/usr/local/lib/ghc-5.04</literal> on Unix).  This
-	  is the value of
-	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary>
-	  </indexterm>in the package configuration file (see <xref
-	  linkend="packages"/>).</para>
-	</listitem>
-      </varlistentry>
-
       <varlistentry>
 	<term><option>-ferror-spans</option>
           <indexterm><primary><option>-ferror-spans</option></primary>
