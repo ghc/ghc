@@ -8,7 +8,28 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- Random numbers.
+-- This library deals with the common task of pseudo-random number
+-- generation. The library makes it possible to generate repeatable
+-- results, by starting with a specified initial random number generator,
+-- or to get different results on each run by using the system-initialised
+-- generator or by supplying a seed from some other source.
+--
+-- The library is split into two layers: 
+--
+-- * A core /random number generator/ provides a supply of bits.
+--   The class 'RandomGen' provides a common interface to such generators.
+--   The library provides one instance of 'RandomGen', the abstract
+--   data type 'StdGen'.  Programmers may, of course, supply their own
+--   instances of 'RandomGen'.
+--
+-- * The class 'Random' provides a way to extract values of a particular
+--   type from a random number generator.  For example, the 'Float'
+--   instance of 'Random' allows one to generate random values of type
+--   'Float'.
+--
+-- This implementation uses the Portable Combined Generator of L'Ecuyer
+-- ["System.Random\#LEcuyer"] for 32-bit computers, transliterated by
+-- Lennart Augustsson.  It has a period of roughly 2.30584e18.
 --
 -----------------------------------------------------------------------------
 
@@ -17,18 +38,15 @@ module System.Random
 
 	-- $intro
 
-	-- * The 'RandomGen' class, and the 'StdGen' generator
+	-- * Random number generators
 
 	  RandomGen(next, split, genRange)
+
+	-- ** Standard random number generators
 	, StdGen
 	, mkStdGen
 
-	-- * The 'Random' class
-	, Random ( random,   randomR,
-		   randoms,  randomRs,
-		   randomIO, randomRIO )
-
-	-- * The global random number generator
+	-- ** The global random number generator
 
 	-- $globalrng
 
@@ -36,6 +54,11 @@ module System.Random
 	, getStdGen
 	, setStdGen
 	, newStdGen
+
+	-- * Random values of various types
+	, Random ( random,   randomR,
+		   randoms,  randomRs,
+		   randomIO, randomRIO )
 
 	-- * References
 	-- $references
@@ -65,30 +88,6 @@ foreign import ccall "time.h time" readtime :: Ptr () -> IO Int
 getClockTime :: IO ClockTime
 getClockTime = do t <- readtime nullPtr;  return (TOD (toInteger t) ())
 #endif
-
-{- $intro
-
-This library deals with the common task of pseudo-random
-number generation. The library makes it possible to generate
-repeatable results, by starting with a specified initial random
-number generator; or to get different results on each run by using the 
-system-initialised generator, or by supplying a seed from some other
-source.
-
-The library is split into two layers: 
-
-* A core /random number generator/ provides a supply of bits. The class
-'RandomGen' provides a common interface to such generators.
-
-* The class 'Random' provides a way to extract particular values from
-a random number generator. For example, the 'Float' instance of 'Random'
-allows one to generate random values of type 'Float'.
-
-This implementation uses the Portable Combined Generator of L'Ecuyer
-["System.Random\#LEcuyer"] for 32-bit computers, transliterated by
-Lennart Augustsson.  It has a period of roughly 2.30584e18.
-
--}
 
 -- | The class 'RandomGen' provides a common interface to random number
 -- generators.
@@ -128,9 +127,7 @@ class RandomGen g where
    -- default method
    genRange g = (minBound,maxBound)
 
-{- |The "System.Random" library provides one instance of 'RandomGen', the
-abstract data type 'StdGen'.
-
+{- |
 The 'StdGen' instance of 'RandomGen' has a 'genRange' of at least 30 bits.
 
 The result of repeatedly using 'next' should be at least as statistically
@@ -195,8 +192,6 @@ stdFromString s        = (mkStdGen num, rest)
 The function 'mkStdGen' provides an alternative way of producing an initial
 generator, by mapping an 'Int' into a generator. Again, distinct arguments
 should be likely to produce distinct generators.
-
-Programmers may, of course, supply their own instances of 'RandomGen'.
 -}
 mkStdGen :: Int -> StdGen -- why not Integer ?
 mkStdGen s
