@@ -91,6 +91,8 @@ getClockTime = do t <- readtime nullPtr;  return (TOD (toInteger t) ())
 
 -- | The class 'RandomGen' provides a common interface to random number
 -- generators.
+--
+-- Minimal complete definition: 'next' and 'split'.
 
 class RandomGen g where
 
@@ -114,7 +116,7 @@ class RandomGen g where
    --
    -- * If @(a,b) = 'genRange' g@, then @a < b@.
    --
-   -- * 'genRange' is not strict.
+   -- * 'genRange' always returns a pair of defined 'Int's.
    --
    -- The second condition ensures that 'genRange' cannot examine its
    -- argument, and hence the value it returns can be determined only by the
@@ -122,6 +124,8 @@ class RandomGen g where
    -- a single call to 'genRange' to establish a generator's range, without
    -- being concerned that the generator returned by (say) 'next' might have
    -- a different range to the generator passed to 'next'.
+   --
+   -- The default definition spans the full range of 'Int'.
    genRange :: g -> (Int,Int)
 
    -- default method
