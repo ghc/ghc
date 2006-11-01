@@ -88,7 +88,7 @@ data Var
 	varName    :: !Name,	-- Always an External or WiredIn Name
 	realUnique :: FastInt,
    	idType     :: Type,
-	idInfo     :: IdInfo,
+	idInfo_    :: IdInfo,
 	gblDetails :: GlobalIdDetails }
 
   | LocalId { 			-- Used for locally-defined Ids 
@@ -96,7 +96,7 @@ data Var
 	varName    :: !Name,
 	realUnique :: FastInt,
    	idType     :: Type,
-	idInfo     :: IdInfo,
+	idInfo_    :: IdInfo,
 	lclDetails :: LocalIdDetails }
 
 data LocalIdDetails 
@@ -284,25 +284,30 @@ globaliseId :: GlobalIdDetails -> Id -> Id
 globaliseId details id = GlobalId { varName    = varName id,
 				    realUnique = realUnique id,
 			   	    idType     = idType id,
-				    idInfo     = idInfo id,
+				    idInfo_    = idInfo id,
 				    gblDetails = details }
 
+idInfo :: Id -> IdInfo
+idInfo (GlobalId {idInfo_ = info}) = info
+idInfo (LocalId  {idInfo_ = info}) = info
+idInfo other_var		   = pprPanic "idInfo" (ppr other_var)
+
 lazySetIdInfo :: Id -> IdInfo -> Id
-lazySetIdInfo id info = id {idInfo = info}
+lazySetIdInfo id info = id {idInfo_ = info}
 
 setIdInfo :: Id -> IdInfo -> Id
-setIdInfo id info = seqIdInfo info `seq` id {idInfo = info}
+setIdInfo id info = seqIdInfo info `seq` id {idInfo_ = info}
 	-- Try to avoid spack leaks by seq'ing
 
 modifyIdInfo :: (IdInfo -> IdInfo) -> Id -> Id
 modifyIdInfo fn id
-  = seqIdInfo new_info `seq` id {idInfo = new_info}
+  = seqIdInfo new_info `seq` id {idInfo_ = new_info}
   where
     new_info = fn (idInfo id)
 
 -- maybeModifyIdInfo tries to avoid unnecesary thrashing
 maybeModifyIdInfo :: Maybe IdInfo -> Id -> Id
-maybeModifyIdInfo (Just new_info) id = id {idInfo = new_info}
+maybeModifyIdInfo (Just new_info) id = id {idInfo_ = new_info}
 maybeModifyIdInfo Nothing	  id = id
 \end{code}
 
@@ -319,7 +324,7 @@ mkGlobalId details name ty info
 		realUnique = getKey# (nameUnique name), 	-- Cache the unique
 		idType     = ty,	
 		gblDetails = details,
-		idInfo     = info }
+		idInfo_    = info }
 
 mk_local_id :: Name -> Type -> LocalIdDetails -> IdInfo -> Id
 mk_local_id name ty details info
@@ -327,7 +332,7 @@ mk_local_id name ty details info
 		realUnique = getKey# (nameUnique name), 	-- Cache the unique
 		idType     = ty,	
 		lclDetails = details,
-		idInfo     = info }
+		idInfo_    = info }
 
 mkLocalId :: Name -> Type -> IdInfo -> Id
 mkLocalId name ty info = mk_local_id name ty NotExported info
