@@ -1,0 +1,6 @@
+
+tcfail170.hs:7:0:
+    Illegal instance declaration for `C [p] [q]'
+	(the Coverage Condition fails for one of the functional dependencies;
+	 Use -fallow-undecidable-instances to permit this)
+    In the instance declaration for `C [p] [q]'
