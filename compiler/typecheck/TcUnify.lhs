@@ -41,7 +41,6 @@ import TysPrim
 import Inst
 import TyCon
 import TysWiredIn
-import Id
 import Var
 import VarSet
 import VarEnv
