@@ -309,6 +309,7 @@ data DataCon
 					-- and *including* existential dictionaries
 
 	dcRepStrictness :: [StrictnessMark],	-- One for each *representation* argument	
+		-- See also Note [Data-con worker strictness] in MkId.lhs
 
 	dcRepType   :: Type,	-- Type of the constructor
 				-- 	forall a x y. (a:=:(x,y), Ord x) => x -> y -> MkT a

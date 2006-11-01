@@ -246,6 +246,7 @@ mkDataConIds wrap_name wkr_name data_con
 							-- even if arity = 0
 
     wkr_sig = mkStrictSig (mkTopDmdType (replicate wkr_arity topDmd) cpr_info)
+	--	Note [Data-con worker strictness]
 	-- Notice that we do *not* say the worker is strict
 	-- even if the data constructor is declared strict
 	--	e.g. 	data T = MkT !(Int,Int)
