@@ -97,7 +97,7 @@ import BasicTypes	( Version, initialVersion, IPName,
 import IfaceSyn
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
-import Maybes		( orElse, expectJust )
+import Maybes		( orElse, expectJust, catMaybes, seqMaybe )
 import Outputable
 import SrcLoc		( SrcSpan, Located )
 import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
@@ -105,7 +105,6 @@ import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 
 import StringBuffer	( StringBuffer )
-import Maybes           ( catMaybes, seqMaybe )
 
 import System.Time	( ClockTime )
 import Data.IORef	( IORef, readIORef )
