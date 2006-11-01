@@ -2150,35 +2150,62 @@ tcSimplifyDeriv orig tc tyvars theta
     doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
     doptM Opt_AllowUndecidableInstances		`thenM` \ undecidable_ok ->
     let
- 	tv_set      = mkVarSet tvs
+	inst_ty = mkTyConApp tc (mkTyVarTys tvs)
+ 	(ok_insts, bad_insts) = partition is_ok_inst irreds
+	is_ok_inst dict 
+	   = isTyVarClassPred pred || (gla_exts && ok_gla_pred pred)
+	   where
+	     pred = dictPred dict	-- reduceMe squashes all non-dicts
 
- 	(bad_insts, ok_insts) = partition is_bad_inst irreds
-	is_bad_inst dict 
-	   = let pred = dictPred dict	-- reduceMe squashes all non-dicts
-	     in isEmptyVarSet (tyVarsOfPred pred)
-		  -- Things like (Eq T) are bad
-	     || (not gla_exts && not (isTyVarClassPred pred))
-  
+	ok_gla_pred pred = null (checkInstTermination [inst_ty] [pred])
+	 	-- See Note [Deriving context]
+	   
+ 	tv_set = mkVarSet tvs
 	simpl_theta = map dictPred ok_insts
 	weird_preds = [pred | pred <- simpl_theta
 			    , not (tyVarsOfPred pred `subVarSet` tv_set)]  
+
 	  -- Check for a bizarre corner case, when the derived instance decl should
 	  -- have form 	instance C a b => D (T a) where ...
 	  -- Note that 'b' isn't a parameter of T.  This gives rise to all sorts
 	  -- of problems; in particular, it's hard to compare solutions for
 	  -- equality when finding the fixpoint.  So I just rule it out for now.
-  
+	
 	rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
 		-- This reverse-mapping is a Royal Pain, 
 		-- but the result should mention TyVars not TcTyVars
     in
-   
+	-- In effect, the bad and wierd insts cover all of the cases that
+	-- would make checkValidInstance fail; if it were called right after tcSimplifyDeriv
+	--   * wierd_preds ensures unambiguous instances (checkAmbiguity in checkValidInstance)
+	--   * ok_gla_pred ensures termination (checkInstTermination in checkValidInstance)
     addNoInstanceErrs Nothing [] bad_insts		`thenM_`
     mapM_ (addErrTc . badDerivedPred) weird_preds	`thenM_`
     returnM (substTheta rev_env simpl_theta)
   where
     doc    = ptext SLIT("deriving classes for a data type")
 \end{code}
+
+Note [Deriving context]
+~~~~~~~~~~~~~~~~~~~~~~~
+With -fglasgow-exts, we allow things like (C Int a) in the simplified
+context for a derived instance declaration, because at a use of this
+instance, we might know that a=Bool, and have an instance for (C Int
+Bool)
+
+We nevertheless insist that each predicate meets the termination
+conditions. If not, the deriving mechanism generates larger and larger
+constraints.  Example:
+  data Succ a = S a
+  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
+
+Note the lack of a Show instance for Succ.  First we'll generate
+  instance (Show (Succ a), Show a) => Show (Seq a)
+and then
+  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
+and so on.  Instead we want to complain of no instance for (Show (Succ a)).
+  
+
 
 @tcSimplifyDefault@ just checks class-type constraints, essentially;
 used with \tr{default} declarations.  We are only interested in

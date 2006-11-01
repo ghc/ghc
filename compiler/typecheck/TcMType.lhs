@@ -72,8 +72,10 @@ import TcRnMonad          -- TcType, amongst others
 import FunDeps
 import Name
 import VarSet
+import ErrUtils
 import DynFlags
 import Util
+import Maybes
 import ListSetOps
 import UniqSupply
 import Outputable
@@ -1102,7 +1104,7 @@ checkValidInstance tyvars theta clas inst_tys
 	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98, checkValidTheta has already done that
 	; when (gla_exts && not undecidable_ok) $
-	       checkInstTermination theta inst_tys
+	  mapM_ failWithTc (checkInstTermination inst_tys theta)
 	
 	-- The Coverage Condition
 	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)
@@ -1126,20 +1128,19 @@ The underlying idea is that
 
 
 \begin{code}
-checkInstTermination :: ThetaType -> [TcType] -> TcM ()
-checkInstTermination theta tys
-  = do	{ mappM_ (check_nomore (fvTypes tys))    theta
-	; mappM_ (check_smaller (sizeTypes tys)) theta }
-
-check_nomore :: [TyVar] -> PredType -> TcM ()
-check_nomore fvs pred
-  = checkTc (null (fvPred pred \\ fvs))
-	    (predUndecErr pred nomoreMsg $$ parens undecidableMsg)
-
-check_smaller :: Int -> PredType -> TcM ()
-check_smaller n pred
-  = checkTc (sizePred pred < n)
-	    (predUndecErr pred smallerMsg $$ parens undecidableMsg)
+checkInstTermination :: [TcType] -> ThetaType -> [Message]
+checkInstTermination tys theta
+  = mapCatMaybes check theta
+  where
+   fvs  = fvTypes tys
+   size = sizeTypes tys
+   check pred 
+      | not (null (fvPred pred \\ fvs)) 
+      = Just (predUndecErr pred nomoreMsg $$ parens undecidableMsg)
+      | sizePred pred >= size
+      = Just (predUndecErr pred smallerMsg $$ parens undecidableMsg)
+      | otherwise
+      = Nothing
 
 predUndecErr pred msg = sep [msg,
 			nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]

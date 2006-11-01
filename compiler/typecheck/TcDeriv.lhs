@@ -15,7 +15,6 @@ import DynFlags
 
 import Generics
 import TcRnMonad
-import TcMType
 import TcEnv
 import TcGenDeriv	-- Deriv stuff
 import InstEnv
@@ -763,9 +762,10 @@ solveDerivEqns overlap_flag orig_eqns
 	do { let inst_tys = [mkTyConApp tc (mkTyVarTys tyvars)]
 	   ; theta <- addErrCtxt (derivInstCtxt1 clas inst_tys) $
 		      tcSimplifyDeriv orig tc tyvars deriv_rhs
-	   ; addErrCtxt (derivInstCtxt2 theta clas inst_tys) $
-	     checkValidInstance tyvars theta clas inst_tys
-	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the soluction
+		-- Claim: the result instance declaration is guaranteed valid
+		-- Hence no need to call:
+		--   checkValidInstance tyvars theta clas inst_tys
+	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the solution
       where
 	
 
@@ -995,10 +995,5 @@ derivCtxt tycon
 
 derivInstCtxt1 clas inst_tys
   = ptext SLIT("When deriving the instance for") <+> quotes (pprClassPred clas inst_tys)
-
-derivInstCtxt2 theta clas inst_tys
-  = vcat [ptext SLIT("In the derived instance declaration"),
-          nest 2 (ptext SLIT("instance") <+> sep [pprThetaArrow theta, 
-						  pprClassPred clas inst_tys])]
 \end{code}
 
