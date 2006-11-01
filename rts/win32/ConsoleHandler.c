@@ -3,6 +3,7 @@
  *
  */
 #include "Rts.h"
+#include "Storage.h"
 #include <windows.h>
 #include "ConsoleHandler.h"
 #include "SchedAPI.h"
@@ -10,6 +11,7 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "AsyncIO.h"
+#include "Stable.h"
 #include "RtsSignals.h"
 
 extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
@@ -46,6 +48,7 @@ initUserSignals(void)
     return;
 }
 
+/* Seems to be a bit of an orphan...where used? */
 void
 finiUserSignals(void)
 {
@@ -186,7 +189,7 @@ void startSignalHandlers(Capability *cap)
  * Evacuate the handler stack. _Assumes_ that console event delivery
  * has already been blocked.
  */
-void markSignalHandlers (evac_fn evac)
+void markSignalHandlers (evac_fn evac STG_UNUSED)
 {
     // nothing to mark; the console handler is a StablePtr which is
     // already treated as a root by the GC.
