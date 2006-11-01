@@ -120,24 +120,26 @@ match :: MatchEnv	-- For the most part this is pushed downwards
 -- it respects NewTypes and PredType
 
 match menv subst ty1 ty2 | Just ty1' <- tcView ty1 = match menv subst ty1' ty2
-match menv subst ty1 ty2 | Just ty2' <- tcView ty2 = match menv subst ty1 ty2'
+			  | Just ty2' <- tcView ty2 = match menv subst ty1 ty2'
 
 match menv subst (TyVarTy tv1) ty2
   | tv1 `elemVarSet` me_tmpls menv
   = case lookupVarEnv subst tv1' of
-	Nothing | any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
-		-> Nothing	-- Occurs check
-		| not (typeKind ty2 `isSubKind` tyVarKind tv1)
-		-> Nothing	-- Kind mis-match
-		| otherwise
-		-> Just (extendVarEnv subst tv1 ty2)
+	Nothing 	-- No existing binding
+	    | any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
+	    -> Nothing	-- Occurs check
+	    | not (typeKind ty2 `isSubKind` tyVarKind tv1)
+	    -> Nothing	-- Kind mis-match
+	    | otherwise
+	    -> Just (extendVarEnv subst tv1 ty2)
 
-	Just ty1' | tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
+	Just ty1' 	-- There is an existing binding; check whether ty2 matches it
+	    | tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
 		-- ty1 has no locally-bound variables, hence nukeRnEnvL
 		-- Note tcEqType...we are doing source-type matching here
-		  -> Just subst
-
-	other -> Nothing
+	    -> Just subst
+	    | otherwise	-> Nothing	-- ty2 doesn't match
+	    
 
    | otherwise	-- tv1 is not a template tyvar
    = case ty2 of
@@ -161,6 +163,7 @@ match menv subst (FunTy ty1a ty1b) (FunTy ty2a ty2b)
        ; match menv subst' ty1b ty2b }
 match menv subst (AppTy ty1a ty1b) ty2
   | Just (ty2a, ty2b) <- repSplitAppTy_maybe ty2
+	-- 'repSplit' used because the tcView stuff is done above
   = do { subst' <- match menv subst ty1a ty2a
        ; match menv subst' ty1b ty2b }
 
