@@ -49,7 +49,7 @@ module TcMType (
   zonkType, zonkTcPredType, 
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkQuantifiedTyVar,
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
-  zonkTcKindToKind, zonkTcKind,
+  zonkTcKindToKind, zonkTcKind, zonkTopTyVar,
 
   readKindVar, writeKindVar
 
@@ -443,6 +443,30 @@ zonkTcPredType (EqPred t1 t2)
 		     are used at the end of type checking
 
 \begin{code}
+zonkTopTyVar :: TcTyVar -> TcM TcTyVar
+-- zonkTopTyVar is used, at the top level, on any un-instantiated meta type variables
+-- to default the kind of ? and ?? etc to *.  This is important to ensure that
+-- instance declarations match.  For example consider
+--	instance Show (a->b)
+--	foo x = show (\_ -> True)
+-- Then we'll get a constraint (Show (p ->q)) where p has argTypeKind (printed ??), 
+-- and that won't match the typeKind (*) in the instance decl.
+--
+-- Because we are at top level, no further constraints are going to affect these
+-- type variables, so it's time to do it by hand.  However we aren't ready
+-- to default them fully to () or whatever, because the type-class defaulting
+-- rules have yet to run.
+
+zonkTopTyVar tv
+  | k `eqKind` default_k = return tv
+  | otherwise
+  = do	{ tv' <- newFlexiTyVar default_k
+	; writeMetaTyVar tv (mkTyVarTy tv') 
+	; return tv' }
+  where
+    k = tyVarKind tv
+    default_k = defaultKind k
+
 zonkQuantifiedTyVar :: TcTyVar -> TcM TyVar
 -- zonkQuantifiedTyVar is applied to the a TcTyVar when quantifying over it.
 -- It might be a meta TyVar, in which case we freeze it into an ordinary TyVar.

@@ -1914,6 +1914,9 @@ tc_simplify_top doc use_extended_defaulting want_scs wanteds
   = do	{ lcl_env <- getLclEnv
 	; traceTc (text "tcSimplifyTop" <+> ppr (lclEnvElts lcl_env))
 
+	; wanteds <- mapM zonkInst wanteds
+	; mapM_ zonkTopTyVar (varSetElems (tyVarsOfInsts wanteds))
+
 	; let try_me inst = ReduceMe want_scs
 	; (frees, binds, irreds) <- simpleReduceLoop doc try_me wanteds
 
