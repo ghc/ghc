@@ -30,7 +30,7 @@ import Literal		( Literal(..), mkMachInt, mkMachWord
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 			, float2DoubleLit, double2FloatLit
 			)
-import PrimOp		( PrimOp(..), primOpOcc, tagToEnumKey )
+import PrimOp		( PrimOp(..), tagToEnumKey )
 import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
@@ -40,7 +40,7 @@ import OccName		( occNameFS )
 import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey,
 			  eqStringName, unpackCStringIdKey, inlineIdName )
 import Maybes		( orElse )
-import Name		( Name )
+import Name		( Name, nameOccName )
 import Outputable
 import FastString
 import StaticFlags      ( opt_SimplExcessPrecision )
@@ -77,122 +77,115 @@ example:
 primOpRules :: PrimOp -> Name -> [CoreRule]
 primOpRules op op_name = primop_rule op
   where
-    rule_name = occNameFS (primOpOcc op)
-    rule_name_case = rule_name `appendFS` FSLIT("->case")
-
 	-- A useful shorthand
-    one_rule rule_fn = [BuiltinRule { ru_name = rule_name, 
-				      ru_fn = op_name, 
-				      ru_try = rule_fn }]
-    case_rule rule_fn = [BuiltinRule { ru_name = rule_name_case, 
-				       ru_fn = op_name, 
-				       ru_try = rule_fn }]
+    one_lit   = oneLit  op_name
+    two_lits  = twoLits op_name
+    relop cmp = two_lits (cmpOp (\ord -> ord `cmp` EQ))
+	-- Cunning.  cmpOp compares the values to give an Ordering.
+	-- It applies its argument to that ordering value to turn
+	-- the ordering into a boolean value.  (`cmp` EQ) is just the job.
 
     -- ToDo:	something for integer-shift ops?
     --		NotOp
 
-    primop_rule TagToEnumOp = one_rule tagToEnumRule
-    primop_rule DataToTagOp = one_rule dataToTagRule
+    primop_rule TagToEnumOp = mkBasicRule op_name 2 tagToEnumRule
+    primop_rule DataToTagOp = mkBasicRule op_name 2 dataToTagRule
 
 	-- Int operations
-    primop_rule IntAddOp    = one_rule (twoLits (intOp2     (+)))
-    primop_rule IntSubOp    = one_rule (twoLits (intOp2     (-)))
-    primop_rule IntMulOp    = one_rule (twoLits (intOp2     (*)))
-    primop_rule IntQuotOp   = one_rule (twoLits (intOp2Z    quot))
-    primop_rule IntRemOp    = one_rule (twoLits (intOp2Z    rem))
-    primop_rule IntNegOp    = one_rule (oneLit  negOp)
+    primop_rule IntAddOp    = two_lits (intOp2     (+))
+    primop_rule IntSubOp    = two_lits (intOp2     (-))
+    primop_rule IntMulOp    = two_lits (intOp2     (*))
+    primop_rule IntQuotOp   = two_lits (intOp2Z    quot)
+    primop_rule IntRemOp    = two_lits (intOp2Z    rem)
+    primop_rule IntNegOp    = one_lit  negOp
 
 	-- Word operations
 #if __GLASGOW_HASKELL__ >= 500
-    primop_rule WordAddOp   = one_rule (twoLits (wordOp2    (+)))
-    primop_rule WordSubOp   = one_rule (twoLits (wordOp2    (-)))
-    primop_rule WordMulOp   = one_rule (twoLits (wordOp2    (*)))
+    primop_rule WordAddOp   = two_lits (wordOp2    (+))
+    primop_rule WordSubOp   = two_lits (wordOp2    (-))
+    primop_rule WordMulOp   = two_lits (wordOp2    (*))
 #endif
-    primop_rule WordQuotOp  = one_rule (twoLits (wordOp2Z   quot))
-    primop_rule WordRemOp   = one_rule (twoLits (wordOp2Z   rem))
+    primop_rule WordQuotOp  = two_lits (wordOp2Z   quot)
+    primop_rule WordRemOp   = two_lits (wordOp2Z   rem)
 #if __GLASGOW_HASKELL__ >= 407
-    primop_rule AndOp       = one_rule (twoLits (wordBitOp2 (.&.)))
-    primop_rule OrOp        = one_rule (twoLits (wordBitOp2 (.|.)))
-    primop_rule XorOp       = one_rule (twoLits (wordBitOp2 xor))
+    primop_rule AndOp       = two_lits (wordBitOp2 (.&.))
+    primop_rule OrOp        = two_lits (wordBitOp2 (.|.))
+    primop_rule XorOp       = two_lits (wordBitOp2 xor)
 #endif
 
 	-- coercions
-    primop_rule Word2IntOp 	= one_rule (oneLit (litCoerce word2IntLit))
-    primop_rule Int2WordOp 	= one_rule (oneLit (litCoerce int2WordLit))
-    primop_rule Narrow8IntOp 	= one_rule (oneLit (litCoerce narrow8IntLit))
-    primop_rule Narrow16IntOp 	= one_rule (oneLit (litCoerce narrow16IntLit))
-    primop_rule Narrow32IntOp 	= one_rule (oneLit (litCoerce narrow32IntLit))
-    primop_rule Narrow8WordOp 	= one_rule (oneLit (litCoerce narrow8WordLit))
-    primop_rule Narrow16WordOp 	= one_rule (oneLit (litCoerce narrow16WordLit))
-    primop_rule Narrow32WordOp 	= one_rule (oneLit (litCoerce narrow32WordLit))
-    primop_rule OrdOp   	= one_rule (oneLit (litCoerce char2IntLit))
-    primop_rule ChrOp    	= one_rule (oneLit (litCoerce int2CharLit))
-    primop_rule Float2IntOp	= one_rule (oneLit (litCoerce float2IntLit))
-    primop_rule Int2FloatOp	= one_rule (oneLit (litCoerce int2FloatLit))
-    primop_rule Double2IntOp	= one_rule (oneLit (litCoerce double2IntLit))
-    primop_rule Int2DoubleOp	= one_rule (oneLit (litCoerce int2DoubleLit))
+    primop_rule Word2IntOp 	= one_lit (litCoerce word2IntLit)
+    primop_rule Int2WordOp 	= one_lit (litCoerce int2WordLit)
+    primop_rule Narrow8IntOp 	= one_lit (litCoerce narrow8IntLit)
+    primop_rule Narrow16IntOp 	= one_lit (litCoerce narrow16IntLit)
+    primop_rule Narrow32IntOp 	= one_lit (litCoerce narrow32IntLit)
+    primop_rule Narrow8WordOp 	= one_lit (litCoerce narrow8WordLit)
+    primop_rule Narrow16WordOp 	= one_lit (litCoerce narrow16WordLit)
+    primop_rule Narrow32WordOp 	= one_lit (litCoerce narrow32WordLit)
+    primop_rule OrdOp   	= one_lit (litCoerce char2IntLit)
+    primop_rule ChrOp    	= one_lit (litCoerce int2CharLit)
+    primop_rule Float2IntOp	= one_lit (litCoerce float2IntLit)
+    primop_rule Int2FloatOp	= one_lit (litCoerce int2FloatLit)
+    primop_rule Double2IntOp	= one_lit (litCoerce double2IntLit)
+    primop_rule Int2DoubleOp	= one_lit (litCoerce int2DoubleLit)
 	-- SUP: Not sure what the standard says about precision in the following 2 cases
-    primop_rule Float2DoubleOp 	= one_rule (oneLit (litCoerce float2DoubleLit))
-    primop_rule Double2FloatOp 	= one_rule (oneLit (litCoerce double2FloatLit))
+    primop_rule Float2DoubleOp 	= one_lit (litCoerce float2DoubleLit)
+    primop_rule Double2FloatOp 	= one_lit (litCoerce double2FloatLit)
 
 	-- Float
-    primop_rule FloatAddOp   = one_rule (twoLits (floatOp2  (+)))
-    primop_rule FloatSubOp   = one_rule (twoLits (floatOp2  (-)))
-    primop_rule FloatMulOp   = one_rule (twoLits (floatOp2  (*)))
-    primop_rule FloatDivOp   = one_rule (twoLits (floatOp2Z (/)))
-    primop_rule FloatNegOp   = one_rule (oneLit  negOp)
+    primop_rule FloatAddOp   = two_lits (floatOp2  (+))
+    primop_rule FloatSubOp   = two_lits (floatOp2  (-))
+    primop_rule FloatMulOp   = two_lits (floatOp2  (*))
+    primop_rule FloatDivOp   = two_lits (floatOp2Z (/))
+    primop_rule FloatNegOp   = one_lit  negOp
 
 	-- Double
-    primop_rule DoubleAddOp   = one_rule (twoLits (doubleOp2  (+)))
-    primop_rule DoubleSubOp   = one_rule (twoLits (doubleOp2  (-)))
-    primop_rule DoubleMulOp   = one_rule (twoLits (doubleOp2  (*)))
-    primop_rule DoubleDivOp   = one_rule (twoLits (doubleOp2Z (/)))
-    primop_rule DoubleNegOp   = one_rule (oneLit  negOp)
+    primop_rule DoubleAddOp   = two_lits (doubleOp2  (+))
+    primop_rule DoubleSubOp   = two_lits (doubleOp2  (-))
+    primop_rule DoubleMulOp   = two_lits (doubleOp2  (*))
+    primop_rule DoubleDivOp   = two_lits (doubleOp2Z (/))
+    primop_rule DoubleNegOp   = one_lit  negOp
 
 	-- Relational operators
-    primop_rule IntEqOp  = one_rule (relop (==)) ++ case_rule (litEq True)
-    primop_rule IntNeOp  = one_rule (relop (/=)) ++ case_rule (litEq False)
-    primop_rule CharEqOp = one_rule (relop (==)) ++ case_rule (litEq True)
-    primop_rule CharNeOp = one_rule (relop (/=)) ++ case_rule (litEq False)
+    primop_rule IntEqOp  = relop (==) ++ litEq op_name True
+    primop_rule IntNeOp  = relop (/=) ++ litEq op_name False
+    primop_rule CharEqOp = relop (==) ++ litEq op_name True
+    primop_rule CharNeOp = relop (/=) ++ litEq op_name False
 
-    primop_rule IntGtOp		= one_rule (relop (>))
-    primop_rule IntGeOp		= one_rule (relop (>=))
-    primop_rule IntLeOp		= one_rule (relop (<=))
-    primop_rule IntLtOp		= one_rule (relop (<))
+    primop_rule IntGtOp		= relop (>)
+    primop_rule IntGeOp		= relop (>=)
+    primop_rule IntLeOp		= relop (<=)
+    primop_rule IntLtOp		= relop (<)
 
-    primop_rule CharGtOp	= one_rule (relop (>))
-    primop_rule CharGeOp	= one_rule (relop (>=))
-    primop_rule CharLeOp	= one_rule (relop (<=))
-    primop_rule CharLtOp	= one_rule (relop (<))
+    primop_rule CharGtOp	= relop (>)
+    primop_rule CharGeOp	= relop (>=)
+    primop_rule CharLeOp	= relop (<=)
+    primop_rule CharLtOp	= relop (<)
 
-    primop_rule FloatGtOp	= one_rule (relop (>))
-    primop_rule FloatGeOp	= one_rule (relop (>=))
-    primop_rule FloatLeOp	= one_rule (relop (<=))
-    primop_rule FloatLtOp	= one_rule (relop (<))
-    primop_rule FloatEqOp	= one_rule (relop (==))
-    primop_rule FloatNeOp	= one_rule (relop (/=))
+    primop_rule FloatGtOp	= relop (>)
+    primop_rule FloatGeOp	= relop (>=)
+    primop_rule FloatLeOp	= relop (<=)
+    primop_rule FloatLtOp	= relop (<)
+    primop_rule FloatEqOp	= relop (==)
+    primop_rule FloatNeOp	= relop (/=)
 
-    primop_rule DoubleGtOp	= one_rule (relop (>))
-    primop_rule DoubleGeOp	= one_rule (relop (>=))
-    primop_rule DoubleLeOp	= one_rule (relop (<=))
-    primop_rule DoubleLtOp	= one_rule (relop (<))
-    primop_rule DoubleEqOp	= one_rule (relop (==))
-    primop_rule DoubleNeOp	= one_rule (relop (/=))
+    primop_rule DoubleGtOp	= relop (>)
+    primop_rule DoubleGeOp	= relop (>=)
+    primop_rule DoubleLeOp	= relop (<=)
+    primop_rule DoubleLtOp	= relop (<)
+    primop_rule DoubleEqOp	= relop (==)
+    primop_rule DoubleNeOp	= relop (/=)
 
-    primop_rule WordGtOp	= one_rule (relop (>))
-    primop_rule WordGeOp	= one_rule (relop (>=))
-    primop_rule WordLeOp	= one_rule (relop (<=))
-    primop_rule WordLtOp	= one_rule (relop (<))
-    primop_rule WordEqOp	= one_rule (relop (==))
-    primop_rule WordNeOp	= one_rule (relop (/=))
+    primop_rule WordGtOp	= relop (>)
+    primop_rule WordGeOp	= relop (>=)
+    primop_rule WordLeOp	= relop (<=)
+    primop_rule WordLtOp	= relop (<)
+    primop_rule WordEqOp	= relop (==)
+    primop_rule WordNeOp	= relop (/=)
 
     primop_rule other		= []
 
 
-    relop cmp = twoLits (cmpOp (\ord -> ord `cmp` EQ))
-	-- Cunning.  cmpOp compares the values to give an Ordering.
-	-- It applies its argument to that ordering value to turn
-	-- the ordering into a boolean value.  (`cmp` EQ) is just the job.
 \end{code}
 
 %************************************************************************
@@ -305,19 +298,25 @@ doubleOp2Z op l1 l2 = Nothing
 	--	  m  -> e2
 	-- (modulo the usual precautions to avoid duplicating e1)
 
-litEq :: Bool		-- True <=> equality, False <=> inequality
-      -> RuleFun
-litEq is_eq [Lit lit, expr] = do_lit_eq is_eq lit expr
-litEq is_eq [expr, Lit lit] = do_lit_eq is_eq lit expr
-litEq is_eq other	    = Nothing
-
-do_lit_eq is_eq lit expr
-  = Just (Case expr (mkWildId (literalType lit)) boolTy
-		[(DEFAULT,    [], val_if_neq),
-		 (LitAlt lit, [], val_if_eq)])
+litEq :: Name 
+      -> Bool		-- True <=> equality, False <=> inequality
+      -> [CoreRule]
+litEq op_name is_eq
+  = [BuiltinRule { ru_name = occNameFS (nameOccName op_name) 
+				`appendFS` FSLIT("->case"),
+		   ru_fn = op_name, 
+		   ru_nargs = 2, ru_try = rule_fn }]
   where
+    rule_fn [Lit lit, expr] = do_lit_eq lit expr
+    rule_fn [expr, Lit lit] = do_lit_eq lit expr
+    rule_fn other	    = Nothing
+    
+    do_lit_eq lit expr
+      = Just (Case expr (mkWildId (literalType lit)) boolTy
+		    [(DEFAULT,    [], val_if_neq),
+		     (LitAlt lit, [], val_if_eq)])
     val_if_eq  | is_eq     = trueVal
-	       | otherwise = falseVal
+   	       | otherwise = falseVal
     val_if_neq | is_eq     = falseVal
 	       | otherwise = trueVal
 
@@ -345,15 +344,28 @@ wordResult result
 %************************************************************************
 
 \begin{code}
-type RuleFun = [CoreExpr] -> Maybe CoreExpr
+mkBasicRule :: Name -> Int -> ([CoreExpr] -> Maybe CoreExpr) -> [CoreRule]
+-- Gives the Rule the same name as the primop itself
+mkBasicRule op_name n_args rule_fn
+  = [BuiltinRule { ru_name = occNameFS (nameOccName op_name),
+		   ru_fn = op_name, 
+		   ru_nargs = n_args, ru_try = rule_fn }]
 
-twoLits :: (Literal -> Literal -> Maybe CoreExpr) -> RuleFun
-twoLits rule [Lit l1, Lit l2] = rule (convFloating l1) (convFloating l2)
-twoLits rule _                = Nothing
+oneLit :: Name -> (Literal -> Maybe CoreExpr)
+       -> [CoreRule]
+oneLit op_name test
+  = mkBasicRule op_name 1 rule_fn
+  where
+    rule_fn [Lit l1] = test (convFloating l1)
+    rule_fn _        = Nothing
 
-oneLit :: (Literal -> Maybe CoreExpr) -> RuleFun
-oneLit rule [Lit l1] = rule (convFloating l1)
-oneLit rule _        = Nothing
+twoLits :: Name -> (Literal -> Literal -> Maybe CoreExpr)
+	-> [CoreRule]
+twoLits op_name test 
+  = mkBasicRule op_name 2 rule_fn
+  where
+    rule_fn [Lit l1, Lit l2] = test (convFloating l1) (convFloating l2)
+    rule_fn _                = Nothing
 
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture
@@ -364,7 +376,6 @@ convFloating (MachFloat  f) | not opt_SimplExcessPrecision =
 convFloating (MachDouble d) | not opt_SimplExcessPrecision =
    MachDouble (toRational ((fromRational d) :: Double))
 convFloating l = l
-
 
 trueVal       = Var trueDataConId
 falseVal      = Var falseDataConId
@@ -427,9 +438,9 @@ dataToTagRule other = Nothing
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ BuiltinRule FSLIT("AppendLitString") unpackCStringFoldrName match_append_lit,
-      BuiltinRule FSLIT("EqString") eqStringName match_eq_string,
-      BuiltinRule FSLIT("Inline") inlineIdName match_inline
+  = [ BuiltinRule FSLIT("AppendLitString") unpackCStringFoldrName 4 match_append_lit,
+      BuiltinRule FSLIT("EqString") eqStringName 2 match_eq_string,
+      BuiltinRule FSLIT("Inline") inlineIdName 1 match_inline
     ]
 
 
@@ -472,10 +483,10 @@ match_eq_string other = Nothing
 -- The rule is this:
 --	inline (f a b c) = <f's unfolding> a b c
 -- (if f has an unfolding)
-match_inline (e:args2)
+match_inline (e:_)
   | (Var f, args1) <- collectArgs e,
     Just unf <- maybeUnfoldingTemplate (idUnfolding f)
-  = Just (mkApps (mkApps unf args1) args2)
+  = Just (mkApps unf args1)
 
 match_inline other = Nothing
 \end{code}		

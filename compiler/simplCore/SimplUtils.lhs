@@ -5,72 +5,79 @@
 
 \begin{code}
 module SimplUtils (
+	-- Rebuilding
 	mkLam, mkCase, 
 
 	-- Inlining,
-	preInlineUnconditionally, postInlineUnconditionally, activeInline, activeRule,
-	inlineMode,
+	preInlineUnconditionally, postInlineUnconditionally, 
+	activeInline, activeRule, inlineMode,
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
-	contIsDupable, contResultType,
-	countValArgs, countArgs, pushContArgs,
-	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhs, contIsRhsOrArg,
-	getContArgs, interestingCallContext, interestingArgContext,
-	interestingArg, isStrictType
+	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
+	countValArgs, countArgs,
+	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhsOrArg,
+	interestingCallContext, interestingArgContext,
 
+	interestingArg, isStrictBndr, mkArgInfo
     ) where
 
 #include "HsVersions.h"
 
 import SimplEnv
-import DynFlags		( SimplifierSwitch(..), SimplifierMode(..),
-			  DynFlags, DynFlag(..), dopt )
-import StaticFlags	( opt_UF_UpdateInPlace, opt_SimplNoPreInlining,
-			  opt_RulesOff )
+import DynFlags
+import StaticFlags
 import CoreSyn
-import CoreFVs		( exprFreeVars )
-import CoreUtils	( cheapEqExpr, exprType, exprIsTrivial, 
-			  etaExpand, exprEtaExpandArity, bindNonRec, mkCoerce,
-			  findDefault, exprOkForSpeculation, exprIsHNF, mergeAlts,
-                          applyTypeToArgs
-			)
-import Literal		( mkStringLit )
-import CoreUnfold	( smallEnoughToInline )
-import MkId		( eRROR_ID, wrapNewTypeBody )
-import Id		( Id, idType, isDataConWorkId, idOccInfo, isDictId, 
-			  isDeadBinder, idNewDemandInfo, isExportedId, mkSysLocal,
-			  idUnfolding, idNewStrictness, idInlinePragma, idHasRules
-			)
-import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
+import CoreFVs
+import CoreUtils
+import Literal	
+import CoreUnfold
+import MkId
+import Id
+import NewDemand
 import SimplMonad
-import Name             ( mkSysTvName )
-import Type		( Type, splitFunTys, dropForAlls, isStrictType,
-			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys ) 
-import Coercion         ( isEqPredTy
-			)
-import Coercion         ( Coercion, mkUnsafeCoercion, coercionKind )
-import TyCon		( tyConDataCons_maybe, isClosedNewTyCon )
-import DataCon		( DataCon, dataConRepArity, dataConInstArgTys, dataConTyCon )
+import Type
+import TyCon
+import DataCon
 import VarSet
-import BasicTypes	( TopLevelFlag(..), isNotTopLevel, OccInfo(..), isLoopBreaker, isOneOcc,
-			  Activation, isAlwaysActive, isActive )
-import Util		( lengthExceeds )
+import BasicTypes
+import Util
 import Outputable
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{The continuation data type}
+		The SimplCont type
 %*									*
 %************************************************************************
 
+A SimplCont allows the simplifier to traverse the expression in a 
+zipper-like fashion.  The SimplCont represents the rest of the expression,
+"above" the point of interest.
+
+You can also think of a SimplCont as an "evaluation context", using
+that term in the way it is used for operational semantics. This is the
+way I usually think of it, For example you'll often see a syntax for
+evaluation context looking like
+	C ::= []  |  C e   |  case C of alts  |  C `cast` co
+That's the kind of thing we are doing here, and I use that syntax in
+the comments.
+
+
+Key points:
+  * A SimplCont describes a *strict* context (just like 
+    evaluation contexts do).  E.g. Just [] is not a SimplCont
+
+  * A SimplCont describes a context that *does not* bind
+    any variables.  E.g. \x. [] is not a SimplCont
+
 \begin{code}
-data SimplCont		-- Strict contexts
-  = Stop     OutType	-- Type of the result
-	     LetRhsFlag
-	     Bool	-- True <=> There is something interesting about
+data SimplCont	
+  = Stop		-- An empty context, or hole, []     
+	OutType		-- Type of the result
+	LetRhsFlag
+	Bool		-- True <=> There is something interesting about
 			--          the context, and hence the inliner
 			--	    should be a bit keener (see interestingCallContext)
 			-- Two cases:
@@ -79,31 +86,30 @@ data SimplCont		-- Strict contexts
 			-- (b) This is an argument of a function that has RULES
 			--     Inlining the call might allow the rule to fire
 
-  | CoerceIt OutCoercion		-- The coercion simplified
-	     SimplCont
+  | CoerceIt 		-- C `cast` co
+	OutCoercion		-- The coercion simplified
+	SimplCont
 
-  | ApplyTo  DupFlag 
-	     CoreExpr		-- The argument
-	     (Maybe SimplEnv)   -- (Just se) => the arg is un-simplified and this is its subst-env
-				-- Nothing   => the arg is already simplified; don't repeatedly simplify it!
-	     SimplCont		-- and its environment
+  | ApplyTo  		-- C arg
+	DupFlag 
+	InExpr SimplEnv		-- The argument and its static env
+	SimplCont
 
-  | Select   DupFlag 
-	     InId [InAlt] SimplEnv	-- The case binder, alts, and subst-env
-	     SimplCont
+  | Select   		-- case C of alts
+	DupFlag 
+	InId [InAlt] SimplEnv	-- The case binder, alts, and subst-env
+	SimplCont
 
-  | ArgOf    LetRhsFlag		-- An arbitrary strict context: the argument 
-  	     			-- 	of a strict function, or a primitive-arg fn
-				-- 	or a PrimOp
-				-- No DupFlag, because we never duplicate it
-	     OutType		-- arg_ty: type of the argument itself
-	     OutType		-- cont_ty: the type of the expression being sought by the context
-				--	f (error "foo") ==> coerce t (error "foo")
-				-- when f is strict
-				-- We need to know the type t, to which to coerce.
+  -- The two strict forms have no DupFlag, because we never duplicate them
+  | StrictBind 		-- (\x* \xs. e) C
+	InId [InBndr]		-- let x* = [] in e 	
+	InExpr SimplEnv		--	is a special case 
+	SimplCont	
 
-	     (SimplEnv -> OutExpr -> SimplM FloatsWithExpr)	-- What to do with the result
-				-- The result expression in the OutExprStuff has type cont_ty
+  | StrictArg 		-- e C
+	OutExpr OutType		-- e and its type
+	(Bool,[Bool])		-- Whether the function at the head of e has rules,
+	SimplCont		--     plus strictness flags for further args
 
 data LetRhsFlag = AnArg		-- It's just an argument not a let RHS
 		| AnRhs 	-- It's the RHS of a let (so please float lets out of big lambdas)
@@ -115,9 +121,10 @@ instance Outputable LetRhsFlag where
 instance Outputable SimplCont where
   ppr (Stop ty is_rhs _)  	     = ptext SLIT("Stop") <> brackets (ppr is_rhs) <+> ppr ty
   ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
-  ppr (ArgOf _ _ _ _)   	     = ptext SLIT("ArgOf...")
+  ppr (StrictBind b _ _ _ cont)      = (ptext SLIT("StrictBind") <+> ppr b) $$ ppr cont
+  ppr (StrictArg f _ _ cont)         = (ptext SLIT("StrictArg") <+> ppr f) $$ ppr cont
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
-				       (nest 4 (ppr alts)) $$ ppr cont
+				       (nest 4 (ppr alts $$ ppr (seIdSubst se))) $$ ppr cont
   ppr (CoerceIt co cont)	     = (ptext SLIT("CoerceIt") <+> ppr co) $$ ppr cont
 
 data DupFlag = OkToDup | NoDup
@@ -138,13 +145,9 @@ mkLazyArgStop ty has_rules = Stop ty AnArg (canUpdateInPlace ty || has_rules)
 mkRhsStop :: OutType -> SimplCont
 mkRhsStop ty = Stop ty AnRhs (canUpdateInPlace ty)
 
-contIsRhs :: SimplCont -> Bool
-contIsRhs (Stop _ AnRhs _)    = True
-contIsRhs (ArgOf AnRhs _ _ _) = True
-contIsRhs other	              = False
-
 contIsRhsOrArg (Stop _ _ _)    = True
-contIsRhsOrArg (ArgOf _ _ _ _) = True
+contIsRhsOrArg (StrictBind {}) = True
+contIsRhsOrArg (StrictArg {})  = True
 contIsRhsOrArg other	       = False
 
 -------------------
@@ -156,28 +159,20 @@ contIsDupable (CoerceIt _ cont)          = contIsDupable cont
 contIsDupable other	  	         = False
 
 -------------------
-discardableCont :: SimplCont -> Bool
-discardableCont (Stop _ _ _)	    = False
-discardableCont (CoerceIt _ cont)   = discardableCont cont
-discardableCont other		    = True
-
-discardCont :: Type             -- The type expected
-            -> SimplCont	-- A continuation, expecting the previous type
-	    -> SimplCont	-- Replace the continuation with a suitable coerce
-discardCont from_ty cont = case cont of
-		     Stop to_ty is_rhs _ -> cont
-		     other               -> CoerceIt co (mkBoringStop to_ty)
-		 where
-                   co      = mkUnsafeCoercion from_ty to_ty
-		   to_ty   = contResultType cont
+contIsTrivial :: SimplCont -> Bool
+contIsTrivial (Stop _ _ _)		  = True
+contIsTrivial (ApplyTo _ (Type _) _ cont) = contIsTrivial cont
+contIsTrivial (CoerceIt _ cont) 	  = contIsTrivial cont
+contIsTrivial other			  = False
 
 -------------------
 contResultType :: SimplCont -> OutType
-contResultType (Stop to_ty _ _)	     = to_ty
-contResultType (ArgOf _ _ to_ty _)   = to_ty
-contResultType (ApplyTo _ _ _ cont)  = contResultType cont
-contResultType (CoerceIt _ cont)     = contResultType cont
-contResultType (Select _ _ _ _ cont) = contResultType cont
+contResultType (Stop to_ty _ _)	      	 = to_ty
+contResultType (StrictArg _ _ _ cont) 	 = contResultType cont
+contResultType (StrictBind _ _ _ _ cont) = contResultType cont
+contResultType (ApplyTo _ _ _ cont)   	 = contResultType cont
+contResultType (CoerceIt _ cont)      	 = contResultType cont
+contResultType (Select _ _ _ _ cont)  	 = contResultType cont
 
 -------------------
 countValArgs :: SimplCont -> Int
@@ -189,103 +184,21 @@ countArgs :: SimplCont -> Int
 countArgs (ApplyTo _ arg se cont) = 1 + countArgs cont
 countArgs other			  = 0
 
--------------------
-pushContArgs ::[OutArg] -> SimplCont -> SimplCont
--- Pushes args with the specified environment
-pushContArgs []           cont = cont
-pushContArgs (arg : args) cont = ApplyTo NoDup arg Nothing (pushContArgs args cont)
+contArgs :: SimplCont -> ([OutExpr], SimplCont)
+-- Uses substitution to turn each arg into an OutExpr
+contArgs cont = go [] cont
+  where
+    go args (ApplyTo _ arg se cont) = go (substExpr se arg : args) cont
+    go args cont		    = (reverse args, cont)
+
+dropArgs :: Int -> SimplCont -> SimplCont
+dropArgs 0 cont = cont
+dropArgs n (ApplyTo _ _ _ cont) = dropArgs (n-1) cont
+dropArgs n other		= pprPanic "dropArgs" (ppr n <+> ppr other)
 \end{code}
 
 
 \begin{code}
-getContArgs :: SwitchChecker
-	    -> OutId -> SimplCont 
-	    -> ([(InExpr, Maybe SimplEnv, Bool)],	-- Arguments; the Bool is true for strict args
-		SimplCont)				-- Remaining continuation
--- getContArgs id k = (args, k', inl)
--- 	args are the leading ApplyTo items in k
---	(i.e. outermost comes first)
---	augmented with demand info from the functionn
-getContArgs chkr fun orig_cont
-  = let
-		-- Ignore strictness info if the no-case-of-case
-		-- flag is on.  Strictness changes evaluation order
-		-- and that can change full laziness
-	stricts | switchIsOn chkr NoCaseOfCase = vanilla_stricts
-		| otherwise		       = computed_stricts
-    in
-    go [] stricts orig_cont
-  where
-    ----------------------------
-
-	-- Type argument
-    go acc ss (ApplyTo _ arg@(Type _) se cont)
-	= go ((arg,se,False) : acc) ss cont
-		-- NB: don't bother to instantiate the function type
-
-	-- Value argument
-    go acc (s:ss) (ApplyTo _ arg se cont)
-	= go ((arg,se,s) : acc) ss cont
-
-	-- We're run out of arguments, or else we've run out of demands
-	-- The latter only happens if the result is guaranteed bottom
-	-- This is the case for
-	--	* case (error "hello") of { ... }
-	--	* (error "Hello") arg
-	--	* f (error "Hello") where f is strict
-	--	etc
-	-- Then, especially in the first of these cases, we'd like to discard
-	-- the continuation, leaving just the bottoming expression.  But the
-	-- type might not be right, so we may have to add a coerce.
-
-    go acc ss cont 
-	| null ss && discardableCont cont = (args, discardCont hole_ty cont)
-	| otherwise			  = (args, cont)
-	where
-	  args = reverse acc
-	  hole_ty = applyTypeToArgs (Var fun) (idType fun)
-				    [substExpr_mb se arg | (arg,se,_) <- args]
-          substExpr_mb Nothing   arg = arg
-	  substExpr_mb (Just se) arg = substExpr se arg
-    
-    ----------------------------
-    vanilla_stricts, computed_stricts :: [Bool]
-    vanilla_stricts  = repeat False
-    computed_stricts = zipWith (||) fun_stricts arg_stricts
-
-    ----------------------------
-    (val_arg_tys, res_ty) = splitFunTys (dropForAlls (idType fun))
-    arg_stricts      = map isStrictType val_arg_tys ++ repeat False
-	-- These argument types are used as a cheap and cheerful way to find
-	-- unboxed arguments, which must be strict.  But it's an InType
-	-- and so there might be a type variable where we expect a function
-	-- type (the substitution hasn't happened yet).  And we don't bother
-	-- doing the type applications for a polymorphic function.
-	-- Hence the splitFunTys*IgnoringForAlls*
-
-    ----------------------------
-	-- If fun_stricts is finite, it means the function returns bottom
-	-- after that number of value args have been consumed
-	-- Otherwise it's infinite, extended with False
-    fun_stricts
-      = case splitStrictSig (idNewStrictness fun) of
-	  (demands, result_info)
-		| not (demands `lengthExceeds` countValArgs orig_cont)
-		-> 	-- Enough args, use the strictness given.
-			-- For bottoming functions we used to pretend that the arg
-			-- is lazy, so that we don't treat the arg as an
-			-- interesting context.  This avoids substituting
-			-- top-level bindings for (say) strings into 
-			-- calls to error.  But now we are more careful about
-			-- inlining lone variables, so its ok (see SimplUtils.analyseCont)
-		   if isBotRes result_info then
-			map isStrictDmd demands		-- Finite => result is bottom
-		   else
-			map isStrictDmd demands ++ vanilla_stricts
-
-	  other -> vanilla_stricts	-- Not enough args, or no strictness
-
--------------------
 interestingArg :: OutExpr -> Bool
 	-- An argument is interesting if it has *some* structure
 	-- We are here trying to avoid unfolding a function that
@@ -309,6 +222,7 @@ interestingArg other	         = True
 	-- The substitution will contain (x -> ContEx y), and we want to say
 	-- that x is not interesting (assuming y has no unfolding)
 \end{code}
+
 
 Comment about interestingCallContext
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -395,7 +309,8 @@ interestingCallContext some_args some_val_args cont
 						-- Perhaps True is a bit over-keen, but I've
 						-- seen (coerce f) x, where f has an INLINE prag,
 						-- So we have to give some motivaiton for inlining it
-    interesting (ArgOf {})	         = some_val_args
+    interesting (StrictArg {})	         = some_val_args
+    interesting (StrictBind {})	         = some_val_args	-- ??
     interesting (Stop ty _ interesting)  = some_val_args && interesting
     interesting (CoerceIt _ cont)        = interesting cont
 	-- If this call is the arg of a strict function, the context
@@ -415,6 +330,41 @@ interestingCallContext some_args some_val_args cont
 
 
 -------------------
+mkArgInfo :: Id
+	  -> Int	-- Number of value args
+	  -> SimplCont	-- Context of the cal
+	  -> (Bool, [Bool])	-- Arg info
+-- The arg info consists of
+--  * A Bool indicating if the function has rules (recursively)
+--  * A [Bool] indicating strictness for each arg
+-- The [Bool] is usually infinite, but if it is finite it 
+-- guarantees that the function diverges after being given
+-- that number of args
+
+mkArgInfo fun n_val_args call_cont
+  = (interestingArgContext fun call_cont, fun_stricts)
+  where
+    vanilla_stricts, fun_stricts :: [Bool]
+    vanilla_stricts  = repeat False
+
+    fun_stricts
+      = case splitStrictSig (idNewStrictness fun) of
+	  (demands, result_info)
+		| not (demands `lengthExceeds` n_val_args)
+		-> 	-- Enough args, use the strictness given.
+			-- For bottoming functions we used to pretend that the arg
+			-- is lazy, so that we don't treat the arg as an
+			-- interesting context.  This avoids substituting
+			-- top-level bindings for (say) strings into 
+			-- calls to error.  But now we are more careful about
+			-- inlining lone variables, so its ok (see SimplUtils.analyseCont)
+		   if isBotRes result_info then
+			map isStrictDmd demands		-- Finite => result is bottom
+		   else
+			map isStrictDmd demands ++ vanilla_stricts
+
+	  other -> vanilla_stricts	-- Not enough args, or no strictness
+
 interestingArgContext :: Id -> SimplCont -> Bool
 -- If the argument has form (f x y), where x,y are boring,
 -- and f is marked INLINE, then we don't want to inline f.
@@ -436,7 +386,8 @@ interestingArgContext fn cont
   where
     go (Select {})	      = False
     go (ApplyTo {})	      = False
-    go (ArgOf {})	      = True
+    go (StrictArg {})	      = True
+    go (StrictBind {})	      = False	-- ??
     go (CoerceIt _ c)	      = go c
     go (Stop _ _ interesting) = interesting
 
@@ -737,7 +688,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 	--	   True  -> case x of ...
 	--	   False -> case x of ...
 	-- I'm not sure how important this is in practice
-      OneOcc in_lam one_br int_cxt	-- OneOcc => no work-duplication issue
+      OneOcc in_lam one_br int_cxt	-- OneOcc => no code-duplication issue
 	->     smallEnoughToInline unfolding	-- Small enough to dup
 			-- ToDo: consider discount on smallEnoughToInline if int_cxt is true
 			--
@@ -829,36 +780,38 @@ activeRule env
 
 %************************************************************************
 %*									*
-\subsection{Rebuilding a lambda}
+	Rebuilding a lambda
 %*									*
 %************************************************************************
 
 \begin{code}
-mkLam :: SimplEnv -> [OutBinder] -> OutExpr -> SimplCont -> SimplM FloatsWithExpr
+mkLam :: [OutBndr] -> OutExpr -> SimplM OutExpr
+-- mkLam tries three things
+--	a) eta reduction, if that gives a trivial expression
+--	b) eta expansion [only if there are some value lambdas]
+
+mkLam bndrs body
+  = do	{ dflags <- getDOptsSmpl
+	; mkLam' dflags bndrs body }
+  where
+    mkLam' dflags bndrs body
+      | dopt Opt_DoEtaReduction dflags,
+        Just etad_lam <- tryEtaReduce bndrs body
+      = do { tick (EtaReduction (head bndrs))
+	   ; return etad_lam }
+
+      | dopt Opt_DoLambdaEtaExpansion dflags,
+   	any isRuntimeVar bndrs
+      = do { body' <- tryEtaExpansion dflags body
+ 	   ; return (mkLams bndrs body') }
+   
+      | otherwise 
+      = returnSmpl (mkLams bndrs body)
 \end{code}
 
-Try three things
-	a) eta reduction, if that gives a trivial expression
-	b) eta expansion [only if there are some value lambdas]
-	c) floating lets out through big lambdas 
-		[only if all tyvar lambdas, and only if this lambda
-		 is the RHS of a let]
-
-\begin{code}
-mkLam env bndrs body cont
- = getDOptsSmpl	 `thenSmpl` \dflags ->
-   mkLam' dflags env bndrs body cont
- where
- mkLam' dflags env bndrs body cont
-   | dopt Opt_DoEtaReduction dflags,
-     Just etad_lam <- tryEtaReduce bndrs body
-   = tick (EtaReduction (head bndrs)) 	`thenSmpl_`
-     returnSmpl (emptyFloats env, etad_lam)
-
-   | dopt Opt_DoLambdaEtaExpansion dflags,
-     any isRuntimeVar bndrs
-   = tryEtaExpansion dflags body	`thenSmpl` \ body' ->
-     returnSmpl (emptyFloats env, mkLams bndrs body')
+--	c) floating lets out through big lambdas 
+--		[only if all tyvar lambdas, and only if this lambda
+--		 is the RHS of a let]
 
 {-	Sept 01: I'm experimenting with getting the
 	full laziness pass to float out past big lambdsa
@@ -870,10 +823,6 @@ mkLam env bndrs body cont
  = tryRhsTyLam env bndrs body		`thenSmpl` \ (floats, body') ->
    returnSmpl (floats, mkLams bndrs body')
 -}
-
-   | otherwise 
-   = returnSmpl (emptyFloats env, mkLams bndrs body)
-\end{code}
 
 
 %************************************************************************
@@ -888,7 +837,7 @@ We don't want to remove extra lambdas unless we are going
 to avoid allocating this thing altogether
 
 \begin{code}
-tryEtaReduce :: [OutBinder] -> OutExpr -> Maybe OutExpr
+tryEtaReduce :: [OutBndr] -> OutExpr -> Maybe OutExpr
 tryEtaReduce bndrs body 
 	-- We don't use CoreUtils.etaReduce, because we can be more
 	-- efficient here:

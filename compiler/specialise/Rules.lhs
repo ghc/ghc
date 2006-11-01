@@ -203,7 +203,7 @@ pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs)
 \begin{code}
 lookupRule :: (Activation -> Bool) -> InScopeSet
 	   -> RuleBase	-- Imported rules
-	   -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
+	   -> Id -> [CoreExpr] -> Maybe (CoreRule, CoreExpr)
 lookupRule is_active in_scope rule_base fn args
   = matchRules is_active in_scope fn args rules
   where
@@ -217,13 +217,13 @@ lookupRule is_active in_scope rule_base fn args
 
 matchRules :: (Activation -> Bool) -> InScopeSet
 	   -> Id -> [CoreExpr]
-	   -> [CoreRule] -> Maybe (RuleName, CoreExpr)
+	   -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 -- See comments on matchRule
 matchRules is_active in_scope fn args rules
-  = case go [] rules of
+  = -- pprTrace "matchRules" (ppr fn <+> ppr rules) $
+    case go [] rules of
 	[]     -> Nothing
-	(m:ms) -> Just (case findBest (fn,args) m ms of
-			  (rule, ans) -> (ru_name rule, ans))
+	(m:ms) -> Just (findBest (fn,args) m ms)
   where
     rough_args = map roughTopName args
 
@@ -231,7 +231,8 @@ matchRules is_active in_scope fn args rules
     go ms []	       = ms
     go ms (r:rs) = case (matchRule is_active in_scope args rough_args r) of
 			Just e  -> go ((r,e):ms) rs
-			Nothing -> go ms         rs
+			Nothing -> -- pprTrace "Failed match" ((ppr r) $$ (ppr args)) $
+				   go ms         rs
 
 findBest :: (Id, [CoreExpr])
 	 -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
@@ -309,11 +310,9 @@ matchRule is_active in_scope args rough_args
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise
   = case matchN in_scope tpl_vars tpl_args args of
-	Nothing			   -> Nothing
-	Just (binds, tpl_vals, leftovers) -> Just (mkLets binds $
-						   rule_fn
-						    `mkApps` tpl_vals
-						    `mkApps` leftovers)
+	Nothing		       -> Nothing
+	Just (binds, tpl_vals) -> Just (mkLets binds $
+					rule_fn `mkApps` tpl_vals)
   where
     rule_fn = occurAnalyseExpr (mkLams tpl_vars rhs)
 	-- We could do this when putting things into the rulebase, I guess
@@ -325,20 +324,18 @@ matchN	:: InScopeSet
 	-> [CoreExpr]		-- Template
 	-> [CoreExpr]		-- Target; can have more elts than template
 	-> Maybe ([CoreBind],	-- Bindings to wrap around the entire result
-		  [CoreExpr], 	-- What is substituted for each template var
-		  [CoreExpr])	-- Leftover target exprs
+		  [CoreExpr]) 	-- What is substituted for each template var
 
 matchN in_scope tmpl_vars tmpl_es target_es
-  = do	{ ((tv_subst, id_subst, binds), leftover_es)
+  = do	{ (tv_subst, id_subst, binds)
 		<- go init_menv emptySubstEnv tmpl_es target_es
 	; return (fromOL binds, 
-		  map (lookup_tmpl tv_subst id_subst) tmpl_vars, 
-		  leftover_es) }
+		  map (lookup_tmpl tv_subst id_subst) tmpl_vars) }
   where
     init_menv = ME { me_tmpls = mkVarSet tmpl_vars, me_env = init_rn_env }
     init_rn_env = mkRnEnv2 (extendInScopeSetList in_scope tmpl_vars)
 		
-    go menv subst []     es 	= Just (subst, es)
+    go menv subst []     es 	= Just subst
     go menv subst ts     [] 	= Nothing	-- Fail if too few actual args
     go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e 
 				     ; go menv subst1 ts es }
@@ -538,7 +535,8 @@ match menv subst e1 (Let bind e2)
 -}
 
 -- Everything else fails
-match menv subst e1 e2 = Nothing
+match menv subst e1 e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr e1) $$ (text "e2:" <+> ppr e2)) $ 
+			 Nothing
 
 ------------------------------------------
 match_var :: MatchEnv

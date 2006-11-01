@@ -482,7 +482,10 @@ occAnal env (Note note body)
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
-    (usage, Cast expr' co)
+    (markRhsUds env True usage, Cast expr' co)
+	-- If we see let x = y `cast` co
+	-- then mark y as 'Many' so that we don't
+	-- immediately inline y again. 
     }
 \end{code}
 
@@ -581,23 +584,13 @@ the "build hack" to work.
 occAnalApp env (Var fun, args) is_rhs
   = case args_stuff of { (args_uds, args') ->
     let
-	-- We mark the free vars of the argument of a constructor or PAP 
-	-- as "many", if it is the RHS of a let(rec).
-	-- This means that nothing gets inlined into a constructor argument
-	-- position, which is what we want.  Typically those constructor
-	-- arguments are just variables, or trivial expressions.
-	--
-	-- This is the *whole point* of the isRhsEnv predicate
-        final_args_uds
-		| isRhsEnv env,
-		  isDataConWorkId fun || valArgCount args < idArity fun
-		= mapVarEnv markMany args_uds
-		| otherwise = args_uds
+        final_args_uds = markRhsUds env is_pap args_uds
     in
     (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
   where
     fun_uniq = idUnique fun
     fun_uds  = mkOneOcc env fun (valArgCount args > 0)
+    is_pap = isDataConWorkId fun || valArgCount args < idArity fun
 
 		-- Hack for build, fold, runST
     args_stuff	| fun_uniq == buildIdKey    = appSpecial env 2 [True,True]  args
@@ -628,6 +621,23 @@ occAnalApp env (fun, args) is_rhs
     in
     (final_uds, mkApps fun' args') }}
     
+
+markRhsUds :: OccEnv		-- Check if this is a RhsEnv
+	   -> Bool		-- and this is true
+	   -> UsageDetails	-- The do markMany on this
+	   -> UsageDetails
+-- We mark the free vars of the argument of a constructor or PAP 
+-- as "many", if it is the RHS of a let(rec).
+-- This means that nothing gets inlined into a constructor argument
+-- position, which is what we want.  Typically those constructor
+-- arguments are just variables, or trivial expressions.
+--
+-- This is the *whole point* of the isRhsEnv predicate
+markRhsUds env is_pap arg_uds
+  | isRhsEnv env && is_pap = mapVarEnv markMany arg_uds
+  | otherwise 		   = arg_uds
+
+
 appSpecial :: OccEnv 
 	   -> Int -> CtxtTy	-- Argument number, and context to use for it
 	   -> [CoreExpr]

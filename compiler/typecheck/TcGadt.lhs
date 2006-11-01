@@ -21,6 +21,7 @@ module TcGadt (
 
 import HsSyn
 import Coercion
+import Type
 import TypeRep
 import DataCon
 import Var
@@ -226,12 +227,15 @@ fixTvSubstEnv in_scope env
     fixpt = mapVarEnv (substTy (mkTvSubst in_scope fixpt)) env
 
 ----------------------------
-dataConCanMatch :: DataCon -> [Type] -> Bool
+dataConCanMatch :: [Type] -> DataCon -> Bool
 -- Returns True iff the data con can match a scrutinee of type (T tys)
 --		    where T is the type constructor for the data con
 --
 -- Instantiate the equations and try to unify them
-dataConCanMatch con tys
+dataConCanMatch tys con
+  | null eq_spec      = True	-- Common
+  | all isTyVarTy tys = True	-- Also common
+  | otherwise
   = isJust (tcUnifyTys (\tv -> BindMe) 
 	   	       (map (substTyVar subst . fst) eq_spec)
 		       (map snd eq_spec))

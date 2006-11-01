@@ -5,9 +5,11 @@
 
 \begin{code}
 module SimplEnv (
-	InId, InBind, InExpr, InAlt, InArg, InType, InBinder,
-	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBinder,
+	InId, InBind, InExpr, InAlt, InArg, InType, InBndr,
+	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr,
         InCoercion, OutCoercion,
+
+	isStrictBndr,
 
 	-- The simplifier mode
 	setMode, getMode, 
@@ -19,51 +21,47 @@ module SimplEnv (
 	setEnclosingCC, getEnclosingCC,
 
 	-- Environments
-	SimplEnv, mkSimplEnv, extendIdSubst, extendTvSubst, 
+	SimplEnv(..), 	-- Temp not abstract
+	mkSimplEnv, extendIdSubst, SimplEnv.extendTvSubst, 
 	zapSubstEnv, setSubstEnv, 
 	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
 	getRules, 
 
-	SimplSR(..), mkContEx, substId, 
+	SimplSR(..), mkContEx, substId, lookupRecBndr,
 
 	simplNonRecBndr, simplRecBndrs, simplLamBndr, simplLamBndrs, 
  	simplBinder, simplBinders, addLetIdInfo,
-	substExpr, substTy,
+	substExpr, substTy, 
 
 	-- Floats
-	FloatsWith, FloatsWithExpr,
-  	Floats, emptyFloats, isEmptyFloats, unitFloat, addFloats, flattenFloats,
-	allLifted, wrapFloats, floatBinds,
-	addAuxiliaryBind,
+  	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, 
+	wrapFloats, floatBinds, setFloats, canFloat, zapFloats, addRecFloats,
+	getFloats
     ) where
 
 #include "HsVersions.h"
 
 import SimplMonad	
-import Id		( Id, idType, idOccInfo, idUnfolding, setIdUnfolding )
-import IdInfo		( IdInfo, vanillaIdInfo, occInfo, setOccInfo, specInfo, setSpecInfo,
-			  arityInfo, workerInfo, setWorkerInfo, 
-			  unfoldingInfo, setUnfoldingInfo, isEmptySpecInfo,
-			  workerExists
-			    )
+import IdInfo
 import CoreSyn
-import Rules		( RuleBase )
-import CoreUtils	( needsCaseBinding )
-import CostCentre	( CostCentreStack, subsumedCCS )
-import Var	
+import Rules
+import CoreUtils
+import CoreFVs
+import CostCentre
+import Var
 import VarEnv
-import VarSet		( isEmptyVarSet )
+import VarSet
 import OrdList
-
+import Id
+import NewDemand
 import qualified CoreSubst	( Subst, mkSubst, substExpr, substSpec, substWorker )
 import qualified Type		( substTy, substTyVarBndr )
-
-import Type             ( Type, TvSubst(..), TvSubstEnv,
-			  isUnLiftedType, seqType, tyVarsOfType )
-import Coercion         ( Coercion )
-import BasicTypes	( OccInfo(..), isFragileOcc )
-import DynFlags		( SimplifierMode(..) )
-import Util		( mapAccumL )
+import Type hiding		( substTy, substTyVarBndr )
+import Coercion
+import BasicTypes	
+import DynFlags
+import Util
+import UniqFM
 import Outputable
 \end{code}
 
@@ -74,7 +72,7 @@ import Outputable
 %************************************************************************
 
 \begin{code}
-type InBinder   = CoreBndr
+type InBndr     = CoreBndr
 type InId       = Id			-- Not yet cloned
 type InType     = Type			-- Ditto
 type InBind     = CoreBind
@@ -83,7 +81,7 @@ type InAlt      = CoreAlt
 type InArg      = CoreArg
 type InCoercion = Coercion
 
-type OutBinder   = CoreBndr
+type OutBndr     = CoreBndr
 type OutId	 = Id			-- Cloned
 type OutTyVar	 = TyVar		-- Cloned
 type OutType	 = Type			-- Cloned
@@ -92,6 +90,13 @@ type OutBind	 = CoreBind
 type OutExpr	 = CoreExpr
 type OutAlt	 = CoreAlt
 type OutArg	 = CoreArg
+\end{code}
+
+\begin{code}
+isStrictBndr :: Id -> Bool
+isStrictBndr bndr
+  = ASSERT2( isId bndr, ppr bndr )
+    isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)
 \end{code}
 
 %************************************************************************
@@ -114,10 +119,14 @@ data SimplEnv
 	-- The current set of in-scope variables
 	-- They are all OutVars, and all bound in this module
 	seInScope   :: InScopeSet,	-- OutVars only
+		-- Includes all variables bound by seFloats
+	seFloats    :: Floats,
+		-- See Note [Simplifier floats]
 
 	-- The current substitution
 	seTvSubst   :: TvSubstEnv,	-- InTyVar |--> OutType
 	seIdSubst   :: SimplIdSubst	-- InId    |--> OutExpr
+
     }
 
 type SimplIdSubst = IdEnv SimplSR	-- IdId |--> OutExpr
@@ -128,6 +137,15 @@ data SimplSR
   | ContEx TvSubstEnv	 	-- A suspended substitution
 	   SimplIdSubst
 	   InExpr 	 
+instance Outputable SimplSR where
+  ppr (DoneEx e) = ptext SLIT("DoneEx") <+> ppr e
+  ppr (DoneId v) = ptext SLIT("DoneId") <+> ppr v
+  ppr (ContEx tv id e) = vcat [ptext SLIT("ContEx") <+> ppr e {-,
+				ppr (filter_env tv), ppr (filter_env id) -}]
+	where
+	  fvs = exprFreeVars e
+	  filter_env env = filterVarEnv_Directly keep env
+	  keep uniq _ = uniq `elemUFM_Directly` fvs
 \end{code}
 
 
@@ -197,7 +215,7 @@ mkSimplEnv :: SimplifierMode -> SwitchChecker -> RuleBase -> SimplEnv
 mkSimplEnv mode switches rules
   = SimplEnv { seChkr = switches, seCC = subsumedCCS, 
 	       seMode = mode, seInScope = emptyInScopeSet, 
-	       seExtRules = rules,
+	       seExtRules = rules, seFloats = emptyFloats,
 	       seTvSubst = emptyVarEnv, seIdSubst = emptyVarEnv }
 	-- The top level "enclosing CC" is "SUBSUMED".
 
@@ -236,7 +254,16 @@ setInScopeSet :: SimplEnv -> InScopeSet -> SimplEnv
 setInScopeSet env in_scope = env {seInScope = in_scope}
 
 setInScope :: SimplEnv -> SimplEnv -> SimplEnv
-setInScope env env_with_in_scope = setInScopeSet env (getInScope env_with_in_scope)
+-- Set the in-scope set, and *zap* the floats
+setInScope env env_with_scope
+  = env { seInScope = seInScope env_with_scope,
+	  seFloats = emptyFloats }
+
+setFloats :: SimplEnv -> SimplEnv -> SimplEnv
+-- Set the in-scope set *and* the floats
+setFloats env env_with_floats
+  = env { seInScope = seInScope env_with_floats,
+	  seFloats  = seFloats  env_with_floats }
 
 addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
 	-- The new Ids are guaranteed to be freshly allocated
@@ -273,6 +300,142 @@ getRules = seExtRules
 \end{code}
 
 
+
+%************************************************************************
+%*									*
+\subsection{Floats}
+%*									*
+%************************************************************************
+
+Note [Simplifier floats]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The Floats is a bunch of bindings, classified by a FloatFlag.
+
+  NonRec x (y:ys)	FltLifted
+  Rec [(x,rhs)]		FltLifted
+  NonRec x# (y +# 3)	FltOkSpec
+  NonRec x# (a /# b)	FltCareful
+  NonRec x* (f y)	FltCareful	-- Might fail or diverge
+  NonRec x# (f y)	FltCareful	-- Might fail or diverge
+			  (where f :: Int -> Int#)
+
+\begin{code}
+data Floats = Floats (OrdList OutBind) FloatFlag
+	-- See Note [Simplifier floats]
+
+data FloatFlag
+  = FltLifted 	-- All bindings are lifted and lazy
+		--  Hence ok to float to top level, or recursive
+
+  | FltOkSpec	-- All bindings are FltLifted *or* 
+		--	strict (perhaps because unlifted, 
+		--	perhaps because of a strict binder),
+		--	  *and* ok-for-speculation
+		--  Hence ok to float out of the RHS 
+		--  of a lazy non-recursive let binding
+		--  (but not to top level, or into a rec group)
+
+  | FltCareful	-- At least one binding is strict (or unlifted)
+		--	and not guaranteed cheap
+		--	Do not float these bindings out of a lazy let
+
+instance Outputable Floats where
+  ppr (Floats binds ff) = ppr ff $$ ppr (fromOL binds)
+
+instance Outputable FloatFlag where
+  ppr FltLifted = ptext SLIT("FltLifted")
+  ppr FltOkSpec = ptext SLIT("FltOkSpec")
+  ppr FltCareful = ptext SLIT("FltCareful")
+   
+andFF :: FloatFlag -> FloatFlag -> FloatFlag
+andFF FltCareful _ 	    = FltCareful
+andFF FltOkSpec  FltCareful = FltCareful
+andFF FltOkSpec  flt	    = FltOkSpec
+andFF FltLifted  flt	    = flt
+
+classifyFF :: CoreBind -> FloatFlag
+classifyFF (Rec _) = FltLifted
+classifyFF (NonRec bndr rhs) 
+  | not (isStrictBndr bndr)  = FltLifted
+  | exprOkForSpeculation rhs = FltOkSpec
+  | otherwise		     = FltCareful
+
+canFloat :: TopLevelFlag -> RecFlag -> Bool -> SimplEnv -> Bool
+canFloat lvl rec str (SimplEnv {seFloats = Floats _ ff}) 
+  = canFloatFlt lvl rec str ff
+
+canFloatFlt :: TopLevelFlag -> RecFlag -> Bool -> FloatFlag -> Bool
+canFloatFlt lvl rec str FltLifted  = True
+canFloatFlt lvl rec str FltOkSpec  = isNotTopLevel lvl && isNonRec rec
+canFloatFlt lvl rec str FltCareful = str && isNotTopLevel lvl && isNonRec rec
+\end{code}
+
+
+\begin{code}
+emptyFloats :: Floats
+emptyFloats = Floats nilOL FltLifted
+
+unitFloat :: OutBind -> Floats
+-- A single-binding float
+unitFloat bind = Floats (unitOL bind) (classifyFF bind)
+
+addNonRec :: SimplEnv -> OutId -> OutExpr -> SimplEnv
+-- Add a non-recursive binding and extend the in-scope set
+-- The latter is important; the binder may already be in the
+-- in-scope set (although it might also have been created with newId)
+-- but it may now have more IdInfo
+addNonRec env id rhs
+  = env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
+	  seInScope = extendInScopeSet (seInScope env) id }
+
+addFloats :: SimplEnv -> SimplEnv -> SimplEnv
+-- Add the floats for env2 to env1; 
+-- *plus* the in-scope set for env2, which is bigger 
+-- than that for env1
+addFloats env1 env2 
+  = env1 {seFloats = seFloats env1 `addFlts` seFloats env2,
+	  seInScope = seInScope env2 }
+
+addFlts :: Floats -> Floats -> Floats
+addFlts (Floats bs1 l1) (Floats bs2 l2)
+  = Floats (bs1 `appOL` bs2) (l1 `andFF` l2)
+
+zapFloats :: SimplEnv -> SimplEnv
+zapFloats env = env { seFloats = emptyFloats }
+
+addRecFloats :: SimplEnv -> SimplEnv -> SimplEnv
+-- Flattens the floats from env2 into a single Rec group,
+-- prepends the floats from env1, and puts the result back in env2
+-- This is all very specific to the way recursive bindings are
+-- handled; see Simplify.simplRecBind
+addRecFloats env1 env2@(SimplEnv {seFloats = Floats bs ff})
+  = ASSERT2( case ff of { FltLifted -> True; other -> False }, ppr (fromOL bs) )
+    env2 {seFloats = seFloats env1 `addFlts` unitFloat (Rec (flattenBinds (fromOL bs)))}
+
+wrapFloats :: SimplEnv -> OutExpr -> OutExpr
+wrapFloats env expr = wrapFlts (seFloats env) expr
+
+wrapFlts :: Floats -> OutExpr -> OutExpr
+-- Wrap the floats around the expression, using case-binding where necessary
+wrapFlts (Floats bs _) body = foldrOL wrap body bs
+  where
+    wrap (Rec prs)    body = Let (Rec prs) body
+    wrap (NonRec b r) body = bindNonRec b r body
+
+getFloats :: SimplEnv -> [CoreBind]
+getFloats (SimplEnv {seFloats = Floats bs _}) = fromOL bs
+
+isEmptyFloats :: SimplEnv -> Bool
+isEmptyFloats env = isEmptyFlts (seFloats env)
+
+isEmptyFlts :: Floats -> Bool
+isEmptyFlts (Floats bs _) = isNilOL bs 
+
+floatBinds :: Floats -> [OutBind]
+floatBinds (Floats bs _) = fromOL bs
+\end{code}
+
+
 %************************************************************************
 %*									*
 		Substitution of Vars
@@ -287,16 +450,26 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = DoneId v
   | otherwise	-- A local Id
   = case lookupVarEnv ids v of
-	Just (DoneId v) -> DoneId (refine v)
+	Just (DoneId v) -> DoneId (refine in_scope v)
 	Just res	-> res
-	Nothing		-> DoneId (refine v)
+	Nothing		-> DoneId (refine in_scope v)
   where
+
 	-- Get the most up-to-date thing from the in-scope set
 	-- Even though it isn't in the substitution, it may be in
 	-- the in-scope set with better IdInfo
-    refine v = case lookupInScope in_scope v of
-		 Just v' -> v'
-		 Nothing -> WARN( True, ppr v ) v	-- This is an error!
+refine in_scope v = case lookupInScope in_scope v of
+			 Just v' -> v'
+			 Nothing -> WARN( True, ppr v ) v	-- This is an error!
+
+lookupRecBndr :: SimplEnv -> Id -> Id
+-- Look up an Id which has been put into the envt by simplRecBndrs,
+-- but where we have not yet done its RHS
+lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
+  = case lookupVarEnv ids v of
+	Just (DoneId v) -> v
+	Just res	-> pprPanic "lookupRecBndr" (ppr v)
+	Nothing		-> refine in_scope v
 \end{code}
 
 
@@ -311,12 +484,12 @@ These functions are in the monad only so that they can be made strict via seq.
 
 \begin{code}
 simplBinders, simplLamBndrs
-	:: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
+	:: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplBinders  env bndrs = mapAccumLSmpl simplBinder  env bndrs
 simplLamBndrs env bndrs = mapAccumLSmpl simplLamBndr env bndrs
 
 -------------
-simplBinder :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
+simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Used for lambda and case-bound variables
 -- Clone Id if necessary, substitute type
 -- Return with IdInfo already substituted, but (fragile) occurrence info zapped
@@ -382,8 +555,8 @@ substIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst})
 	      = delVarEnv id_subst old_id
 \end{code}
 
-
 \begin{code}
+------------------------------------
 seqTyVar :: TyVar -> ()
 seqTyVar b = b `seq` ()
 
@@ -397,7 +570,6 @@ seqIds []       = ()
 seqIds (id:ids) = seqId id `seq` seqIds ids
 \end{code}
 
-
 %************************************************************************
 %*									*
 		Let bindings
@@ -409,21 +581,21 @@ Simplifying let binders
 Rename the binders if necessary, 
 
 \begin{code}
-simplNonRecBndr :: SimplEnv -> InBinder -> SimplM (SimplEnv, OutBinder)
+simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 simplNonRecBndr env id
   = do	{ let (env1, id1) = substLetIdBndr env id
 	; seqId id1 `seq` return (env1, id1) }
 
 ---------------
-simplRecBndrs :: SimplEnv -> [InBinder] -> SimplM (SimplEnv, [OutBinder])
+simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 simplRecBndrs env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) ids
   = do	{ let (env1, ids1) = mapAccumL substLetIdBndr env ids
-	; seqIds ids1 `seq` return (env1, ids1) }
+	; seqIds ids1 `seq` return env1 }
 
 ---------------
-substLetIdBndr :: SimplEnv -> InBinder 	-- Env and binder to transform
-	       -> (SimplEnv, OutBinder)
--- C.f. CoreSubst.substIdBndr
+substLetIdBndr :: SimplEnv -> InBndr 	-- Env and binder to transform
+	       -> (SimplEnv, OutBndr)
+-- C.f. substIdBndr above
 -- Clone Id if necessary, substitute its type
 -- Return an Id with completely zapped IdInfo
 -- 	[addLetIdInfo, below, will restore its IdInfo]
@@ -442,7 +614,6 @@ substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old
 	-- Extend the substitution if the unique has changed,
 	-- or there's some useful occurrence information
 	-- See the notes with substTyVarBndr for the delSubstEnv
-    occ_info = occInfo (idInfo old_id)
     new_subst | new_id /= old_id
 	      = extendVarEnv id_subst old_id (DoneId new_id)
 	      | otherwise 
@@ -505,7 +676,7 @@ Here, we'll do postInlineUnconditionally on f, and we must "see" that
 when substituting in h's RULE.  
 
 \begin{code}
-addLetIdInfo :: SimplEnv -> InBinder -> OutBinder -> (SimplEnv, OutBinder)
+addLetIdInfo :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
 addLetIdInfo env in_id out_id
   = (modifyInScope env out_id final_id, final_id)
   where
@@ -550,7 +721,7 @@ substIdInfo subst info
 substIdType :: SimplEnv -> Id -> Id
 substIdType env@(SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
   | isEmptyVarEnv tv_env || isEmptyVarSet (tyVarsOfType old_ty) = id
-  | otherwise	= setIdType id (Type.substTy (TvSubst in_scope tv_env) old_ty)
+  | otherwise	= Id.setIdType id (Type.substTy (TvSubst in_scope tv_env) old_ty)
 		-- The tyVarsOfType is cheaper than it looks
 		-- because we cache the free tyvars of the type
 		-- in a Note in the id's type itself
@@ -602,82 +773,4 @@ substExpr env expr
   | isEmptySimplSubst env = expr
   | otherwise	          = CoreSubst.substExpr (mkCoreSubst env) expr
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Floats}
-%*									*
-%************************************************************************
-
-\begin{code}
-type FloatsWithExpr = FloatsWith OutExpr
-type FloatsWith a   = (Floats, a)
-	-- We return something equivalent to (let b in e), but
-	-- in pieces to avoid the quadratic blowup when floating 
-	-- incrementally.  Comments just before simplExprB in Simplify.lhs
-
-data Floats = Floats (OrdList OutBind) 
-		     InScopeSet		-- Environment "inside" all the floats
-		     Bool		-- True <=> All bindings are lifted
-
-allLifted :: Floats -> Bool
-allLifted (Floats _ _ is_lifted) = is_lifted
-
-wrapFloats :: Floats -> OutExpr -> OutExpr
-wrapFloats (Floats bs _ _) body = foldrOL Let body bs
-
-isEmptyFloats :: Floats -> Bool
-isEmptyFloats (Floats bs _ _) = isNilOL bs 
-
-floatBinds :: Floats -> [OutBind]
-floatBinds (Floats bs _ _) = fromOL bs
-
-flattenFloats :: Floats -> Floats
--- Flattens into a single Rec group
-flattenFloats (Floats bs is is_lifted) 
-  = ASSERT2( is_lifted, ppr (fromOL bs) )
-    Floats (unitOL (Rec (flattenBinds (fromOL bs)))) is is_lifted
-\end{code}
-
-\begin{code}
-emptyFloats :: SimplEnv -> Floats
-emptyFloats env = Floats nilOL (getInScope env) True
-
-unitFloat :: SimplEnv -> OutId -> OutExpr -> Floats
--- A single non-rec float; extend the in-scope set
-unitFloat env var rhs = Floats (unitOL (NonRec var rhs))
-			       (extendInScopeSet (getInScope env) var)
-			       (not (isUnLiftedType (idType var)))
-
-addFloats :: SimplEnv -> Floats 
-	  -> (SimplEnv -> SimplM (FloatsWith a))
-	  -> SimplM (FloatsWith a)
-addFloats env (Floats b1 is1 l1) thing_inside
-  | isNilOL b1 
-  = thing_inside env
-  | otherwise
-  = thing_inside (setInScopeSet env is1)	`thenSmpl` \ (Floats b2 is2 l2, res) ->
-    returnSmpl (Floats (b1 `appOL` b2) is2 (l1 && l2), res)
-
-addLetBind :: OutBind -> Floats -> Floats
-addLetBind bind (Floats binds in_scope lifted) 
-  = Floats (bind `consOL` binds) in_scope (lifted && is_lifted_bind bind)
-
-is_lifted_bind (Rec _)      = True
-is_lifted_bind (NonRec b r) = not (isUnLiftedType (idType b))
-
--- addAuxiliaryBind 	* takes already-simplified things (bndr and rhs)
---			* extends the in-scope env
---			* assumes it's a let-bindable thing
-addAuxiliaryBind :: SimplEnv -> OutBind
-		 -> (SimplEnv -> SimplM (FloatsWith a))
-	 	 -> SimplM (FloatsWith a)
-	-- Extends the in-scope environment as well as wrapping the bindings
-addAuxiliaryBind env bind thing_inside
-  = ASSERT( case bind of { NonRec b r -> not (needsCaseBinding (idType b) r) ; Rec _ -> True } )
-    thing_inside (addNewInScopeIds env (bindersOf bind))	`thenSmpl` \ (floats, x) ->
-    returnSmpl (addLetBind bind floats, x)
-\end{code}
-
 

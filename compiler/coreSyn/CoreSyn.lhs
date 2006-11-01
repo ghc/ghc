@@ -42,7 +42,7 @@ module CoreSyn (
 
 	-- Core rules
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
-	RuleName, seqRules, 
+	RuleName, seqRules, ruleArity,
 	isBuiltinRule, ruleName, isLocalRule, ruleIdName
     ) where
 
@@ -216,10 +216,15 @@ data CoreRule
 	ru_name :: RuleName,	-- and suchlike.  It has no free variables.
 	ru_fn :: Name,		-- Name of the Id at 
 				-- the head of this rule
+	ru_nargs :: Int,	-- Number of args that ru_try expects
 	ru_try  :: [CoreExpr] -> Maybe CoreExpr }
 
 isBuiltinRule (BuiltinRule {}) = True
 isBuiltinRule _		       = False
+
+ruleArity :: CoreRule -> Int
+ruleArity (BuiltinRule {ru_nargs = n}) = n
+ruleArity (Rule {ru_args = args})      = length args
 
 ruleName :: CoreRule -> RuleName
 ruleName = ru_name

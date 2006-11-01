@@ -787,7 +787,8 @@ callToPats in_scope bndr_occs (con_env, args)
 		-- Quantify over variables that are not in sccpe
 		-- See Note [Shadowing] at the top
 		
-	; if or good_pats 
+	; -- pprTrace "callToPats"  (ppr args $$ ppr prs $$ ppr bndr_occs) $
+	  if or good_pats 
 	  then return (Just (qvars, pats))
 	  else return Nothing }
 
