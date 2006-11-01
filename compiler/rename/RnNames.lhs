@@ -81,29 +81,16 @@ rnImports imports
          -- warning for {- SOURCE -} ones that are unnecessary
     = do this_mod <- getModule
          implicit_prelude <- doptM Opt_ImplicitPrelude
-         let all_imports	       = mk_prel_imports this_mod implicit_prelude ++ imports
-             (source, ordinary) = partition is_source_import all_imports
+         let prel_imports	= mkPrelImports this_mod implicit_prelude imports
+             (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
 
-         stuff1 <- mapM (rnImportDecl this_mod) ordinary
+         stuff1 <- mapM (rnImportDecl this_mod) (prel_imports ++ ordinary)
          stuff2 <- mapM (rnImportDecl this_mod) source
          let (decls, rdr_env, imp_avails) = combine (stuff1 ++ stuff2)
          return (decls, rdr_env, imp_avails) 
 
     where
--- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
--- because the former doesn't even look at Prelude.hi for instance 
--- declarations, whereas the latter does.
-   mk_prel_imports this_mod implicit_prelude
-       |  this_mod == pRELUDE
-          || explicit_prelude_import
-          || not implicit_prelude
-           = []
-       | otherwise = [preludeImportDecl]
-   explicit_prelude_import
-       = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- imports, 
-	           unLoc mod == pRELUDE_NAME ]
-
    combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails)]
            -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails)
    combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails)
@@ -113,18 +100,34 @@ rnImports imports
                    gbl_env1 `plusGlobalRdrEnv` gbl_env2,
                    imp_avails1 `plusImportAvails` imp_avails2)
 
-preludeImportDecl :: LImportDecl RdrName
-preludeImportDecl
-  = L loc $
-	ImportDecl (L loc pRELUDE_NAME)
+mkPrelImports :: Module -> Bool -> [LImportDecl RdrName] -> [LImportDecl RdrName]
+-- Consruct the implicit declaration "import Prelude" (or not)
+--
+-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
+-- because the former doesn't even look at Prelude.hi for instance 
+-- declarations, whereas the latter does.
+mkPrelImports this_mod implicit_prelude import_decls
+  | this_mod == pRELUDE
+   || explicit_prelude_import
+   || not implicit_prelude
+  = []
+  | otherwise = [preludeImportDecl]
+  where
+      explicit_prelude_import
+       = notNull [ () | L _ (ImportDecl mod _ _ _ _) <- import_decls, 
+	           unLoc mod == pRELUDE_NAME ]
+
+      preludeImportDecl :: LImportDecl RdrName
+      preludeImportDecl
+        = L loc $
+	  ImportDecl (L loc pRELUDE_NAME)
 	       False {- Not a boot interface -}
 	       False	{- Not qualified -}
 	       Nothing	{- No "as" -}
 	       Nothing	{- No import list -}
-  where
-    loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")         
 
-	
+      loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")         
+
 
 rnImportDecl  :: Module
 	      -> LImportDecl RdrName
