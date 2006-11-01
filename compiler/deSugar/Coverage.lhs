@@ -122,7 +122,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  })))  = do
   let arg_count = matchGroupArity mg
   let (tys,res_ty) = splitFunTysN arg_count ty
 
-  return $ L pos $ funBind { fun_matches = MatchGroup ({-L pos fn_entry:-}matches') ty 
+  return $ L pos $ funBind { fun_matches = MatchGroup matches' ty 
 			   , fun_tick = tick_no
 			   }
 
@@ -289,7 +289,7 @@ addTickHsExpr (HsBinTick _ _ _) = error "addTickhsExpr: HsBinTick _ _ _"
 addTickHsExpr (HsTick _ _) = error "addTickhsExpr: HsTick _ _"
 
 addTickMatchGroup (MatchGroup matches ty) = do
-  let isOneOfMany = True -- AJG: for now
+  let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany)) matches
   return $ MatchGroup matches' ty
 
@@ -510,6 +510,14 @@ hpcSrcSpan = mkGeneralSrcSpan (FSLIT("Haskell Program Coverage internals"))
 -- all newly allocated locations have an HPC tag on them, to help debuging
 hpcLoc :: e -> Located e
 hpcLoc = L hpcSrcSpan
+\end{code}
+
+
+\begin{code}
+matchesOneOfMany :: [LMatch Id] -> Bool
+matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
+  where
+	matchCount (L _ (Match _pats _ty (GRHSs grhss _binds))) = length grhss
 \end{code}
 
 
