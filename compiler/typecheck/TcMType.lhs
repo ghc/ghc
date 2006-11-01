@@ -1111,7 +1111,8 @@ checkValidInstance tyvars theta clas inst_tys
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
 	}
   where
-    msg  = parens (ptext SLIT("the Coverage Condition fails for one of the functional dependencies"))
+    msg  = parens (vcat [ptext SLIT("the Coverage Condition fails for one of the functional dependencies;"),
+			 undecidableMsg])
 \end{code}
 
 Termination test: each assertion in the context satisfies
