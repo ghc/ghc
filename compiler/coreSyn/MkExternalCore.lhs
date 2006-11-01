@@ -105,10 +105,15 @@ make_exp (Var v) =
   case globalIdDetails v of
      -- a DataConId represents the Id of a worker, which is a varName. -- sof 4/02
 --    DataConId _ -> C.Dcon (make_con_qid (Var.varName v))
-    FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (unpackFS nm) (make_ty (idType v))
-    FCallId _ -> error "MkExternalCore died: can't handle non-static-C foreign call"
+    FCallId (CCall (CCallSpec (StaticTarget nm) callconv _)) 
+        -> C.External (unpackFS nm) (showSDoc (ppr callconv)) (make_ty (idType v))
+    FCallId (CCall (CCallSpec DynamicTarget     callconv _)) 
+        -> C.DynExternal            (showSDoc (ppr callconv)) (make_ty (idType v))
+    FCallId _ 
+        -> pprPanic "MkExternalCore died: can't handle non-{static,dynamic}-C foreign call"
+                    (ppr v)
     _ -> C.Var (make_var_qid (Var.varName v))
-make_exp (Lit (l@(MachLabel s _))) = error "MkExternalCore died: can't handle \"foreign label\" declarations"
+make_exp (Lit (l@(MachLabel s _))) = C.Label (unpackFS s)
 make_exp (Lit l) = C.Lit (make_lit l)
 make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)

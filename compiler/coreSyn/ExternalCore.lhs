@@ -34,7 +34,9 @@ data Exp
   | Case Exp Vbind Ty [Alt] {- non-empty list -}
   | Cast Exp Ty
   | Note String Exp
-  | External String Ty
+  | External String String Ty {- target name, convention, and type -} 
+  | DynExternal String Ty {- convention and type (incl. Addr# of target as first arg) -} 
+  | Label String
 
 data Bind 
   = Vb Vbind
@@ -78,10 +80,10 @@ type Qual t = (Mname,t)
 
 type Id = String
 
-primMname = "GHCziPrim"
+primMname = "base:GHC.Prim"
 
 tcArrow :: Qual Tcon
-tcArrow = (primMname, "ZLzmzgZR")
+tcArrow = (primMname, "(->)")
 
 \end{code}
 
