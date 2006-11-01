@@ -134,7 +134,7 @@ mkWwBodies fun_ty demands res_info one_shots
 	returnUs (id, id, res_ty)
     )					`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty) ->
 
-    returnUs ([idNewDemandInfo v | v <- work_args, isId v],
+    returnUs ([idNewDemandInfo v | v <- work_call_args, isId v],
 	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
 	      mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args)
 	-- We use an INLINE unconditionally, even if the wrapper turns out to be
