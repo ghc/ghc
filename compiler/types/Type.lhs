@@ -110,7 +110,6 @@ import Var
 import VarEnv
 import VarSet
 
-import OccName
 import Name
 import Class
 import PrelNames
