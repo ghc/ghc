@@ -44,6 +44,7 @@ module Data.Complex
 import Prelude
 
 import Data.Typeable
+import Data.Generics.Basics( Data )
 
 #ifdef __HUGS__
 import Hugs.Prelude(Num(fromInt), Fractional(fromDouble))
@@ -62,7 +63,11 @@ infix  6  :+
 data (RealFloat a) => Complex a
   = !a :+ !a	-- ^ forms a complex number from its real and imaginary
 		-- rectangular components.
-  deriving (Eq, Read, Show)
+# if __GLASGOW_HASKELL__
+	deriving (Eq, Show, Read, Data)
+# else
+	deriving (Eq, Show, Read)
+# endif
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex
