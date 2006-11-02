@@ -236,5 +236,9 @@ test('mod173', normal, multimod_compile, ['mod173', '-v0'])
 clean(['Mod173_Aux.hi', 'Mod173_Aux.o'])
 test('mod174', normal, compile_fail, [''])
 
+# mod175 is a sub-directory
+
+test('mod176', normal, compile, ['-fwarn-unused-imports'])
+
 
 # After here we have GHC-only tests (the ones above are copied from Hugs)

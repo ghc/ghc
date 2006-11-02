@@ -1,0 +1,7 @@
+
+mod176.hs:3:22:
+    Warning: Imported from `Control.Monad' but not used: `return'
+
+mod176.hs:3:22:
+    Warning: Imported from `Control.Monad' but not used:
+	       type constructor or class `Monad'
