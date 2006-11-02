@@ -35,6 +35,7 @@ module Data.List
    , reverse           -- :: [a] -> [a]
 
    , intersperse       -- :: a -> [a] -> [a]
+   , intercalate       -- :: [a] -> [[a]] -> [a]
    , transpose         -- :: [[a]] -> [[a]]
 
    -- * Reducing lists (folds)
@@ -395,6 +396,12 @@ intersperse		:: a -> [a] -> [a]
 intersperse _   []      = []
 intersperse _   [x]     = [x]
 intersperse sep (x:xs)  = x : sep : intersperse sep xs
+
+-- | 'intercalate' @xs xss@ is equivalent to @('concat' ('intersperse' xs xss))@.
+-- It inserts the list @xs@ in between the lists in @xss@ and concatenates the
+-- result.
+intercalate :: [a] -> [[a]] -> [a]
+intercalate xs xss = concat (intersperse xs xss)
 
 -- | The 'transpose' function transposes the rows and columns of its argument.
 -- For example,
