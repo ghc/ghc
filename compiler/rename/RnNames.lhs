@@ -1013,14 +1013,15 @@ reportUnusedNames export_decls gbl_env
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
     
-    unused_imports :: [GlobalRdrElt]
-    unused_imports = filter unused_imp defined_but_not_used
-    unused_imp (GRE {gre_prov = Imported imp_specs}) 
-	= not (all (module_unused . importSpecModule) imp_specs)
-	  && or [exp | ImpSpec { is_item = ImpSome { is_explicit = exp } } <- imp_specs]
-		-- Don't complain about unused imports if we've already said the
-		-- entire import is unused
-    unused_imp other = False
+    unused_imports :: [GlobalRdrElt]	
+    unused_imports = mapCatMaybes unused_imp defined_but_not_used
+    unused_imp :: GlobalRdrElt -> Maybe GlobalRdrElt	-- Result has trimmed Imported provenances
+    unused_imp gre@(GRE {gre_prov = LocalDef}) = Nothing
+    unused_imp gre@(GRE {gre_prov = Imported imp_specs}) 
+	| null trimmed_specs = Nothing
+	| otherwise	     = Just (gre {gre_prov = Imported trimmed_specs})
+	where
+	  trimmed_specs = filter report_if_unused imp_specs
     
     -- To figure out the minimal set of imports, start with the things
     -- that are in scope (i.e. in gbl_env).  Then just combine them
@@ -1096,6 +1097,7 @@ reportUnusedNames export_decls gbl_env
     --
     -- BUG WARNING: does not deal correctly with multiple imports of the same module
     --	 	    becuase direct_import_mods has only one entry per module
+    unused_imp_mods :: [(ModuleName, SrcSpan)]
     unused_imp_mods = [(mod_name,loc) | (mod,no_imp,loc) <- direct_import_mods,
 		       let mod_name = moduleName mod,
     		       not (mod_name `elemFM` minimal_imports1),
@@ -1108,6 +1110,12 @@ reportUnusedNames export_decls gbl_env
     module_unused :: ModuleName -> Bool
     module_unused mod = any (((==) mod) . fst) unused_imp_mods
 
+    report_if_unused :: ImportSpec -> Bool
+	-- Do we want to report this as an unused import?  
+    report_if_unused (ImpSpec {is_decl = d, is_item = i})
+	= not (module_unused (is_mod d)) -- Not if we've already said entire import is unused
+	  && isExplicitItem i		 -- Only if the import was explicit
+			
 ---------------------
 warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
 -- Given the GREs for names that are used, figure out which imports 

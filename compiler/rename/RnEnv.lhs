@@ -775,12 +775,12 @@ warnUnusedMatches    names = ifOptM Opt_WarnUnusedMatches (warnUnusedLocals name
 -------------------------
 --	Helpers
 warnUnusedGREs gres 
- = warnUnusedBinds [(n,Just p) | GRE {gre_name = n, gre_prov = p} <- gres]
+ = warnUnusedBinds [(n,p) | GRE {gre_name = n, gre_prov = p} <- gres]
 
 warnUnusedLocals names
- = warnUnusedBinds [(n,Nothing) | n<-names]
+ = warnUnusedBinds [(n,LocalDef) | n<-names]
 
-warnUnusedBinds :: [(Name,Maybe Provenance)] -> RnM ()
+warnUnusedBinds :: [(Name,Provenance)] -> RnM ()
 warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
  where reportable (name,_) 
 	| isWiredInName name = False	-- Don't report unused wired-in names
@@ -790,23 +790,25 @@ warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
 
 -------------------------
 
-warnUnusedName :: (Name, Maybe Provenance) -> RnM ()
-warnUnusedName (name, prov)
-  = addWarnAt loc $
+warnUnusedName :: (Name, Provenance) -> RnM ()
+warnUnusedName (name, LocalDef)
+  = addUnusedWarning name (srcLocSpan (nameSrcLoc name)) 
+		     (ptext SLIT("Defined but not used"))
+
+warnUnusedName (name, Imported is)
+  = mapM_ warn is
+  where
+    warn spec = addUnusedWarning name span msg
+	where
+	   span = importSpecLoc spec
+	   pp_mod = quotes (ppr (importSpecModule spec))
+	   msg = ptext SLIT("Imported from") <+> pp_mod <+> ptext SLIT("but not used")
+
+addUnusedWarning name span msg
+  = addWarnAt span $
     sep [msg <> colon, 
 	 nest 2 $ pprNonVarNameSpace (occNameSpace (nameOccName name))
 			<+> quotes (ppr name)]
-	-- TODO should be a proper span
-  where
-    (loc,msg) = case prov of
-		  Just (Imported is)
-		        -> (importSpecLoc imp_spec, imp_from (importSpecModule imp_spec))
-		        where
-			  imp_spec = head is
-		  other -> (srcLocSpan (nameSrcLoc name), unused_msg)
-
-    unused_msg   = text "Defined but not used"
-    imp_from mod = text "Imported from" <+> quotes (ppr mod) <+> text "but not used"
 \end{code}
 
 \begin{code}

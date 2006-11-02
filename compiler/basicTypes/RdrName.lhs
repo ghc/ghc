@@ -35,7 +35,7 @@ module RdrName (
 	Provenance(..), pprNameProvenance,
 	Parent(..), 
 	ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..), 
-	importSpecLoc, importSpecModule
+	importSpecLoc, importSpecModule, isExplicitItem
   ) where 
 
 #include "HsVersions.h"
@@ -539,6 +539,10 @@ importSpecLoc (ImpSpec _    item)   = is_iloc item
 
 importSpecModule :: ImportSpec -> ModuleName
 importSpecModule is = is_mod (is_decl is)
+
+isExplicitItem :: ImpItemSpec -> Bool
+isExplicitItem ImpAll 			     = False
+isExplicitItem (ImpSome {is_explicit = exp}) = exp
 
 -- Note [Comparing provenance]
 -- Comparison of provenance is just used for grouping 
