@@ -51,7 +51,7 @@ module HscTypes (
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	IfaceExport,
 
-	Deprecations, DeprecTxt, lookupDeprec, plusDeprecs,
+	Deprecations, DeprecTxt, plusDeprecs,
 
 	PackageInstEnv, PackageRuleBase,
 
@@ -805,13 +805,6 @@ mkIfaceDepCache (DeprecSome pairs) = lookupOccEnv (mkOccEnv pairs) . nameOccName
 
 emptyIfaceDepCache :: Name -> Maybe DeprecTxt
 emptyIfaceDepCache n = Nothing
-
-lookupDeprec :: Deprecations -> Name -> Maybe DeprecTxt
-lookupDeprec NoDeprecs        name = Nothing
-lookupDeprec (DeprecAll  txt) name = Just txt
-lookupDeprec (DeprecSome env) name = case lookupNameEnv env name of
-					    Just (_, txt) -> Just txt
-					    Nothing	  -> Nothing
 
 plusDeprecs :: Deprecations -> Deprecations -> Deprecations
 plusDeprecs d NoDeprecs = d

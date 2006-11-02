@@ -918,7 +918,7 @@ reportDeprecations dflags tcg_env
 
     check hpt pit gre@(GRE {gre_name = name, gre_prov = Imported (imp_spec:_)})
       | name `elemNameSet` used_names
-      ,	Just deprec_txt <- lookupDeprec dflags hpt pit gre
+      ,	Just deprec_txt <- lookupImpDeprec dflags hpt pit gre
       = addWarnAt (importSpecLoc imp_spec)
 		  (sep [ptext SLIT("Deprecated use of") <+> 
 			pprNonVarNameSpace (occNameSpace (nameOccName name)) <+> 
@@ -940,9 +940,10 @@ reportDeprecations dflags tcg_env
 	    -- the defn of a non-deprecated thing, when changing a module's 
 	    -- interface
 
-lookupDeprec :: DynFlags -> HomePackageTable -> PackageIfaceTable 
-	     -> GlobalRdrElt -> Maybe DeprecTxt
-lookupDeprec dflags hpt pit gre
+lookupImpDeprec :: DynFlags -> HomePackageTable -> PackageIfaceTable 
+	        -> GlobalRdrElt -> Maybe DeprecTxt
+-- The name is definitely imported, so look in HPT, PIT
+lookupImpDeprec dflags hpt pit gre
   = case lookupIfaceByModule dflags hpt pit (nameModule name) of
 	Just iface -> mi_dep_fn iface name `seqMaybe` 	-- Bleat if the thing, *or
 		      case gre_par gre of	
