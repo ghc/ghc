@@ -44,7 +44,7 @@ module Data.Complex
 import Prelude
 
 import Data.Typeable
-#ifndef __NHC__
+#ifdef __GLASGOW_HASKELL__
 import Data.Generics.Basics( Data )
 #endif
 
