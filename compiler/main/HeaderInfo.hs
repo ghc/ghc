@@ -23,7 +23,7 @@ import Module		( ModuleName, moduleName )
 import PrelNames        ( gHC_PRIM, mAIN_NAME )
 import StringBuffer	( StringBuffer(..), hGetStringBuffer, hGetStringBufferBlock
                         , appendStringBuffers )
-import SrcLoc		( Located(..), mkSrcLoc, unLoc, noSrcSpan )
+import SrcLoc
 import FastString	( mkFastString )
 import DynFlags	( DynFlags )
 import ErrUtils
@@ -31,6 +31,7 @@ import Util
 import Outputable
 import Pretty           ()
 import Panic
+import Maybes
 import Bag		( emptyBag, listToBag )
 
 import Distribution.Compiler
@@ -66,17 +67,16 @@ getImports dflags buf filename = do
 	PFailed span err -> parseError span err
 	POk _ rdr_module -> 
 	  case rdr_module of
-	    L _ (HsModule mod _ imps _ _ _ _ _) ->
+	    L _ (HsModule mb_mod _ imps _ _ _ _ _) ->
 	      let
-		mod_name | Just located_mod <- mod = located_mod
-			 | otherwise               = L noSrcSpan mAIN_NAME
+		mod = mb_mod `orElse` L (srcLocSpan loc) mAIN_NAME
 	        (src_idecls, ord_idecls) = partition isSourceIdecl (map unLoc imps)
 		source_imps   = map getImpMod src_idecls	
 		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc) 
 					(map getImpMod ord_idecls)
 		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
 	      in
-	      return (source_imps, ordinary_imps, mod_name)
+	      return (source_imps, ordinary_imps, mod)
   
 parseError span err = throwDyn $ mkPlainErrMsg span err
 
