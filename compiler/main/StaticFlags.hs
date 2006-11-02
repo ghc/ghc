@@ -52,6 +52,10 @@ module StaticFlags (
 	opt_UF_UpdateInPlace,
 	opt_UF_DearOp,
 
+	-- Related to linking
+	opt_PIC,
+	opt_Static,
+
 	-- misc opts
 	opt_IgnoreDotGhci,
 	opt_ErrorSpans,
@@ -59,10 +63,8 @@ module StaticFlags (
 	opt_HiVersion,
 	opt_HistorySize,
 	opt_OmitBlackHoling,
-	opt_Static,
 	opt_Unregisterised,
 	opt_EmitExternalCore,
-	opt_PIC,
 	v_Ld_inputs,
 	tablesNextToCode
   ) where
@@ -112,11 +114,20 @@ parseStaticFlags args = do
   return (cg_flags++more_leftover++leftover)
 
 
--- note that ordering is important in the following list: any flag which
+static_flags :: [(String, OptKind IO)]
+-- All the static flags should appear in this list.  It describes how each
+-- static flag should be processed.  Two main purposes:
+-- (a) if a command-line flag doesn't appear in the list, GHC can complain
+-- (b) a command-line flag may remove, or add, other flags; e.g. the "-fno-X" things
+--
+-- The common (PassFlag addOpt) action puts the static flag into the bunch of
+-- things that are searched up by the top-level definitions like
+--	opt_foo = lookUp FSLIT("-dfoo")
+
+-- Note that ordering is important in the following list: any flag which
 -- is a prefix flag (i.e. HasArg, Prefix, OptPrefix, AnySuffix) will override
 -- flags further down the list with the same prefix.
 
-static_flags :: [(String, OptKind IO)]
 static_flags = [
 	------- GHCi -------------------------------------------------------
      ( "ignore-dot-ghci", PassFlag addOpt )
@@ -135,7 +146,6 @@ static_flags = [
  	-- ToDo: user ways
 
 	------ Debugging ----------------------------------------------------
-  ,  ( "dppr-noprags",     PassFlag addOpt )
   ,  ( "dppr-debug",       PassFlag addOpt )
   ,  ( "dppr-user-length", AnySuffix addOpt )
       -- rest of the debugging flags are dynamic
@@ -290,6 +300,7 @@ opt_UF_UpdateInPlace		= lookUp  FSLIT("-funfolding-update-in-place")
 
 opt_UF_DearOp   = ( 4 :: Int)
 			
+opt_PIC                         = lookUp FSLIT("-fPIC")
 opt_Static			= lookUp  FSLIT("-static")
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
 
@@ -305,7 +316,6 @@ opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
 -- Include full span info in error messages, instead of just the start position.
 opt_ErrorSpans			= lookUp FSLIT("-ferror-spans")
 
-opt_PIC                         = lookUp FSLIT("-fPIC")
 
 -- object files and libraries to be linked in are collected here.
 -- ToDo: perhaps this could be done without a global, it wasn't obvious
