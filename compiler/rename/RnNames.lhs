@@ -30,28 +30,12 @@ import Module
 import Name
 import NameEnv
 import NameSet
-import OccName		( srcDataName, pprNonVarNameSpace,
-			  occNameSpace,
-			  OccEnv, mkOccEnv, mkOccEnv_C, lookupOccEnv,
-			  emptyOccEnv, extendOccEnv )
-import HscTypes		( GenAvailInfo(..), AvailInfo, availNames, availName,
-			  HomePackageTable, PackageIfaceTable, 
-			  mkPrintUnqualified, availsToNameSet,
-			  Deprecs(..), ModIface(..), Dependencies(..), 
-			  lookupIfaceByModule, ExternalPackageState(..)
-			)
-import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace, Parent(..),
-		  	  GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..), 
-			  emptyGlobalRdrEnv, plusGlobalRdrEnv, globalRdrEnvElts,
-			  extendGlobalRdrEnv, lookupGlobalRdrEnv,
-			  lookupGRE_RdrName, lookupGRE_Name, 
-			  Provenance(..), ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..), 
-			  importSpecLoc, importSpecModule, isLocalGRE, pprNameProvenance,
-			  unQualSpecOK, qualSpecOK )
+import OccName
+import HscTypes
+import RdrName
 import Outputable
 import Maybes
-import SrcLoc		( Located(..), mkGeneralSrcSpan, getLoc,
-			  unLoc, noLoc, srcLocSpan, SrcSpan )
+import SrcLoc
 import FiniteMap
 import ErrUtils
 import BasicTypes	( DeprecTxt )
@@ -815,14 +799,13 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
              return (IEVar (gre_name gre), greAvail gre)
 
     lookup_ie (IEThingAbs rdr) 
-        = do name <- lookupGlobalOccRn rdr
-	     case lookupGRE_RdrName rdr rdr_env of
-	       []    -> panic "RnNames.lookup_ie"
-	       elt:_ -> case gre_par elt of
-			  NoParent   -> return (IEThingAbs name, 
-						AvailTC name [name])
-			  ParentIs p -> return (IEThingAbs name, 
-						AvailTC p [name])
+        = do gre <- lookupGreRn rdr
+	     let name = gre_name gre
+	     case gre_par gre of
+		NoParent   -> return (IEThingAbs name, 
+				      AvailTC name [name])
+		ParentIs p -> return (IEThingAbs name, 
+				      AvailTC p [name])
 
     lookup_ie ie@(IEThingAll rdr) 
         = do name <- lookupGlobalOccRn rdr
