@@ -777,7 +777,7 @@ activeRule env
 			-- to work in Template Haskell when simplifying
 			-- splices, so we get simpler code for literal strings
 	SimplPhase n -> Just (isActive n)
-\end{code}	
+\end{code}
 
 
 %************************************************************************
@@ -1251,7 +1251,7 @@ match.  For example:
 	  other -> ...(case x of
 			 0#    -> ...
 			 other -> ...) ...
-\end{code}
+\end{verbatim}
 Here the inner case can be eliminated.  This really only shows up in
 eliminating error-checking code.
 
