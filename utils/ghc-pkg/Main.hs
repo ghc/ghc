@@ -135,7 +135,7 @@ flags = [
   Option ['V'] ["version"] (NoArg FlagVersion)
 	"output version information and exit",
   Option [] ["simple-output"] (NoArg FlagSimpleOutput)
-        "print output in easy-to-parse format when running command 'list'"
+        "print output in easy-to-parse format for some commands"
   ]
  where
   toDefined str = 
@@ -171,9 +171,14 @@ usageHeader prog = substProg prog $
   "    List registered packages in the global database, and also the\n" ++
   "    user database if --user is given. If a package name is given\n" ++
   "    all the registered versions will be listed in ascending order.\n" ++
+  "    Accepts the --simple-output flag.\n" ++
   "\n" ++
   "  $p latest pkg\n" ++
   "    Prints the highest registered version of a package.\n" ++
+  "\n" ++
+  "  $p check\n" ++
+  "    Check the consistency of package depenencies and list broken packages.\n" ++
+  "    Accepts the --simple-output flag.\n" ++
   "\n" ++
   "  $p describe {pkg-id}\n" ++
   "    Give the registered description for the specified package. The\n" ++
@@ -236,6 +241,8 @@ runit cli nonopts = do
     ["field", pkgid_str, field] -> do
 	pkgid <- readGlobPkgId pkgid_str
 	describeField cli pkgid field
+    ["check"] -> do
+	checkConsistency cli
     [] -> do
 	die ("missing command\n" ++ 
 		usageInfo (usageHeader prog) flags)
@@ -476,21 +483,23 @@ listPackages flags mPackageName = do
 			EQ -> pkgVersion p1 `compare` pkgVersion p2
 		   where (p1,p2) = (package pkg1, package pkg2)
 
-      show_func = if simple_output then show_easy else mapM_ show_regular
+      pkg_map = map (\p -> (package p, p)) $ concatMap snd db_stack
+      show_func = if simple_output then show_simple else mapM_ (show_normal pkg_map)
 
   show_func (reverse db_stack_sorted)
 
-  where show_regular (db_name,pkg_confs) =
+  where show_normal pkg_map (db_name,pkg_confs) =
 	  hPutStrLn stdout (render $
-		text (db_name ++ ":") $$ nest 4 packages
+		text db_name <> comma $$ nest 4 packages
 		)
 	   where packages = fsep (punctuate comma (map pp_pkg pkg_confs))
 		 pp_pkg p
+                   | isBrokenPackage p pkg_map = braces doc
 		   | exposed p = doc
 		   | otherwise = parens doc
 		   where doc = text (showPackageId (package p))
 
-        show_easy db_stack = do
+        show_simple db_stack = do
           let pkgs = map showPackageId $ sortBy compPkgIdVer $
                           map package (concatMap snd db_stack)
           when (null pkgs) $ die "no matches"
@@ -567,6 +576,41 @@ toField s 	 	  = showInstalledPackageInfoField s
 
 strList :: [String] -> String
 strList = show
+
+
+-- -----------------------------------------------------------------------------
+-- Check: Check consistency of installed packages
+
+checkConsistency :: [Flag] -> IO ()
+checkConsistency flags = do
+  db_stack <- getPkgDatabases False flags
+  let pkgs = map (\p -> (package p, p)) $ concatMap snd db_stack
+      broken_pkgs = do
+        (pid, p) <- pkgs
+        let broken_deps = missingPackageDeps p pkgs
+        guard (not . null $ broken_deps)
+        return (pid, broken_deps)
+  mapM_ (putStrLn . render . show_func) broken_pkgs
+  where
+  show_func | FlagSimpleOutput `elem` flags = show_simple
+            | otherwise = show_normal
+  show_simple (pid,deps) =
+    text (showPackageId pid) <> colon
+      <+> fsep (punctuate comma (map (text . showPackageId) deps))
+  show_normal (pid,deps) =
+    text "package" <+> text (showPackageId pid) <+> text "has missing dependencies:"
+      $$ nest 4 (fsep (punctuate comma (map (text . showPackageId) deps)))
+
+missingPackageDeps :: InstalledPackageInfo
+                   -> [(PackageIdentifier, InstalledPackageInfo)]
+                   -> [PackageIdentifier]
+missingPackageDeps pkg pkg_map =
+  [ d | d <- depends pkg, isNothing (lookup d pkg_map)] ++
+  [ d | d <- depends pkg, Just p <- return (lookup d pkg_map), isBrokenPackage p pkg_map]
+
+isBrokenPackage :: InstalledPackageInfo -> [(PackageIdentifier, InstalledPackageInfo)] -> Bool
+isBrokenPackage pkg pkg_map = not . null $ missingPackageDeps pkg pkg_map
+
 
 -- -----------------------------------------------------------------------------
 -- Manipulating package.conf files
