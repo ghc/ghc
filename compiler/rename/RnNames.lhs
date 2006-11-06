@@ -1134,8 +1134,6 @@ warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
 warnDuplicateImports gres
   = ifOptM Opt_WarnUnusedImports $ 
     sequenceM_	[ warn name pr
-			-- The 'head' picks the first offending group
-			-- for this particular name
 		| GRE { gre_name = name, gre_prov = Imported imps } <- gres
 		, pr <- redundants imps ]
   where
@@ -1154,7 +1152,12 @@ warnDuplicateImports gres
     redundants imps 
 	= [ (red_imp, cov_imp) 
 	  | red_imp <- imps
+	  , isExplicitItem (is_item red_imp)
+		-- Complain only about redundant imports
+		-- mentioned explicitly by the user				
 	  , cov_imp <- take 1 (filter (covers red_imp) imps) ]
+			-- The 'take 1' picks the first offending group
+			-- for this particular name
 
 	-- "red_imp" is a putative redundant import
 	-- "cov_imp" potentially covers it
@@ -1175,6 +1178,10 @@ warnDuplicateImports gres
 	= False		-- They bring into scope different qualified names
 	| not (is_qual red_decl) && is_qual cov_decl
 	= False		-- Covering one doesn't bring unqualified name into scope
+	| otherwise
+	= not (isExplicitItem cov_item) -- Redundant one is selective and covering one isn't
+	  || red_later			-- or both are explicit; tie-break using red_later
+{-
 	| red_selective
 	= not cov_selective 	-- Redundant one is selective and covering one isn't
 	  || red_later		-- Both are explicit; tie-break using red_later
@@ -1182,16 +1189,11 @@ warnDuplicateImports gres
 	= not cov_selective 	-- Neither import is selective
 	  && (is_mod red_decl == is_mod cov_decl)	-- They import the same module
 	  && red_later 		-- Tie-break
+-}
 	where
 	  red_loc   = importSpecLoc red_imp
 	  cov_loc   = importSpecLoc cov_imp
 	  red_later = red_loc > cov_loc
-	  cov_selective = selectiveImpItem cov_item
-	  red_selective = selectiveImpItem red_item
-
-selectiveImpItem :: ImpItemSpec -> Bool
-selectiveImpItem ImpAll       = False
-selectiveImpItem (ImpSome {}) = True
 
 -- ToDo: deal with original imports with 'qualified' and 'as M' clauses
 printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
