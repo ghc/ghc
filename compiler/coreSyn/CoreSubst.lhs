@@ -71,8 +71,51 @@ data Subst
 	--	- make it empty because all the free vars of the subst are fresh,
 	--		and hence can't possibly clash.a
 	--
-	-- INVARIANT 2: The substitution is apply-once; see notes with
+	-- INVARIANT 2: The substitution is apply-once; see Note [Apply once] with
 	--		Types.TvSubstEnv
+	--
+	-- INVARIANT 3: See Note [Extending the Subst]
+
+{-
+Note [Extending the Subst]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a core Subst, which binds Ids as well, we make a different choice for Ids
+than we do for TyVars.  
+
+For TyVars, see Note [Extending the TvSubst] with Type.TvSubstEnv
+
+For Ids, we have a different invariant
+	The IdSubstEnv is extended *only* when the Unique on an Id changes
+	Otherwise, we just extend the InScopeSet
+
+In consequence:
+
+* In substIdBndr, we extend the IdSubstEnv only when the unique changes
+
+* If the TvSubstEnv and IdSubstEnv are both empty, substExpr does nothing
+  (Note that the above rule for substIdBndr maintains this property.  If
+   the incoming envts are both empty, then substituting the type and
+   IdInfo can't change anything.)
+
+* In lookupIdSubst, we *must* look up the Id in the in-scope set, because
+  it may contain non-trivial changes.  Example:
+	(/\a. \x:a. ...x...) Int
+  We extend the TvSubstEnv with [a |-> Int]; but x's unique does not change
+  so we only extend the in-scope set.  Then we must look up in the in-scope
+  set when we find the occurrence of x.
+
+Why do we make a different choice for the IdSubstEnv than the TvSubstEnv?
+
+* For Ids, we change the IdInfo all the time (e.g. deleting the
+  unfolding), and adding it back later, so using the TyVar convention
+  would entail extending the substitution almost all the time
+
+* The simplifier wants to look up in the in-scope set anyway, in case it 
+  can see a better unfolding from an enclosing case expression
+
+* For TyVars, only coercion variables can possibly change, and they are 
+  easy to spot
+-}
 
 type IdSubstEnv = IdEnv CoreExpr
 
@@ -120,28 +163,11 @@ extendTvSubstList (Subst in_scope ids tvs) prs = Subst in_scope ids (extendVarEn
 lookupIdSubst :: Subst -> Id -> CoreExpr
 lookupIdSubst (Subst in_scope ids tvs) v 
   | not (isLocalId v) = Var v
-  | otherwise	      = case lookupVarEnv ids v of
-			  Just e  -> e
-			  Nothing -> Var v 
-
-{-	We used to have to look up in the in-scope set, 
-	because GADTs were implicit in the intermediate language
-	But with FC, the type of an Id does not change in its scope
-	The worst that can happen if we don't look up in the in-scope set
-	is that we don't propagate IdInfo as vigorously as we might.
-	But that'll happen (when it's useful) in SimplEnv.substId
-
-	If you put this back in, you should worry about the
-		Just e -> e
-	case above too!
-
-    case lookupInScope in_scope v of {
-	-- Watch out!  Must get the Id from the in-scope set,
-	-- because its type there may differ
-	Just v  -> Var v ;
-	Nothing -> WARN( True, ptext SLIT("CoreSubst.lookupIdSubst") <+> ppr v ) 
-		   Var v
--}
+  | Just e  <- lookupVarEnv ids       v = e
+  | Just v' <- lookupInScope in_scope v = Var v'
+	-- Vital! See Note [Extending the Subst]
+  | otherwise = WARN( True, ptext SLIT("CoreSubst.lookupIdSubst") <+> ppr v ) 
+		Var v
 
 lookupTvSubst :: Subst -> TyVar -> Type
 lookupTvSubst (Subst _ ids tvs) v = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
@@ -289,7 +315,9 @@ substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
     new_env | no_change = delVarEnv env old_id
 	    | otherwise = extendVarEnv env old_id (Var new_id)
 
-    no_change = False -- id1 == old_id && isNothing mb_new_info && no_type_change
+    no_change = id1 == old_id
+	-- See Note [Extending the Subst]
+	-- *not* necessary to check mb_new_info and no_type_change
 \end{code}
 
 Now a variant that unconditionally allocates a new unique.

@@ -130,6 +130,7 @@ data SimplEnv
     }
 
 type SimplIdSubst = IdEnv SimplSR	-- IdId |--> OutExpr
+	-- See Note [Extending the Subst] in CoreSubst
 
 data SimplSR
   = DoneEx OutExpr		-- Completed term
@@ -137,6 +138,7 @@ data SimplSR
   | ContEx TvSubstEnv	 	-- A suspended substitution
 	   SimplIdSubst
 	   InExpr 	 
+
 instance Outputable SimplSR where
   ppr (DoneEx e) = ptext SLIT("DoneEx") <+> ppr e
   ppr (DoneId v) = ptext SLIT("DoneId") <+> ppr v
@@ -531,6 +533,8 @@ substIdBndr :: SimplEnv -> Id 	-- Substitition and Id to transform
 --	* The substitution extended with a DoneId if unique changed
 --	  In this case, the var in the DoneId is the same as the
 --	  var returned
+--
+-- Exactly like CoreSubst.substIdBndr, except that the type of id_subst differs
 
 substIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst})
 	    old_id
@@ -549,6 +553,7 @@ substIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst})
 
 	-- Extend the substitution if the unique has changed
 	-- See the notes with substTyVarBndr for the delSubstEnv
+	-- Also see Note [Extending the Subst] in CoreSubst
     new_subst | new_id /= old_id
 	      = extendVarEnv id_subst old_id (DoneId new_id)
 	      | otherwise 

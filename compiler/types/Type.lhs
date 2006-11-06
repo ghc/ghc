@@ -1047,11 +1047,13 @@ instance Ord PredType where { compare = tcCmpPred }
 data TvSubst 		
   = TvSubst InScopeSet 	-- The in-scope type variables
 	    TvSubstEnv	-- The substitution itself
-			-- See Note [Apply Once]
+	-- See Note [Apply Once]
+	-- and Note [Extending the TvSubstEnv]
 
 {- ----------------------------------------------------------
-	 	Note [Apply Once]
 
+Note [Apply Once]
+~~~~~~~~~~~~~~~~~
 We use TvSubsts to instantiate things, and we might instantiate
 	forall a b. ty
 \with the types
@@ -1068,6 +1070,38 @@ variations happen to; for example [a -> (a, b)].
 
 A TvSubst is not idempotent, but, unlike the non-idempotent substitution
 we use during unifications, it must not be repeatedly applied.
+
+Note [Extending the TvSubst]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The following invariant should hold of a TvSubst
+
+	The in-scope set is needed *only* to
+	guide the generation of fresh uniques
+
+	In particular, the *kind* of the type variables in 
+	the in-scope set is not relevant
+
+This invariant allows a short-cut when the TvSubstEnv is empty:
+if the TvSubstEnv is empty --- i.e. (isEmptyTvSubt subst) holds ---
+then (substTy subst ty) does nothing.
+
+For example, consider:
+	(/\a. /\b:(a~Int). ...b..) Int
+We substitute Int for 'a'.  The Unique of 'b' does not change, but
+nevertheless we add 'b' to the TvSubstEnv, because b's type does change
+
+This invariant has several crucial consequences:
+
+* In substTyVarBndr, we need extend the TvSubstEnv 
+	- if the unique has changed
+	- or if the kind has changed
+
+* In substTyVar, we do not need to consult the in-scope set;
+  the TvSubstEnv is enough
+
+* In substTy, substTheta, we can short-circuit when the TvSubstEnv is empty
+  
+
 -------------------------------------------------------------- -}
 
 
@@ -1096,6 +1130,7 @@ composeTvSubst in_scope env1 env2
 emptyTvSubst = TvSubst emptyInScopeSet emptyVarEnv
 
 isEmptyTvSubst :: TvSubst -> Bool
+	 -- See Note [Extending the TvSubstEnv]
 isEmptyTvSubst (TvSubst _ env) = isEmptyVarEnv env
 
 mkTvSubst :: InScopeSet -> TvSubstEnv -> TvSubst
@@ -1254,17 +1289,19 @@ subst_ty subst ty
 substTyVar :: TvSubst -> TyVar  -> Type
 substTyVar subst@(TvSubst in_scope env) tv
   = case lookupTyVar subst tv of {
-	Nothing  -> TyVarTy tv;
+	Nothing -> TyVarTy tv;
        	Just ty -> ty	-- See Note [Apply Once]
     } 
 
 lookupTyVar :: TvSubst -> TyVar  -> Maybe Type
+	-- See Note [Extending the TvSubst]
 lookupTyVar (TvSubst in_scope env) tv = lookupVarEnv env tv
 
 substTyVarBndr :: TvSubst -> TyVar -> (TvSubst, TyVar)	
 substTyVarBndr subst@(TvSubst in_scope env) old_var
   = (TvSubst (in_scope `extendInScopeSet` new_var) new_env, new_var)
   where
+    is_co_var = isCoVar old_var
 
     new_env | no_change = delVarEnv env old_var
 	    | otherwise = extendVarEnv env old_var (TyVarTy new_var)
@@ -1272,6 +1309,7 @@ substTyVarBndr subst@(TvSubst in_scope env) old_var
     no_change = new_var == old_var && not is_co_var
 	-- no_change means that the new_var is identical in
 	-- all respects to the old_var (same unique, same kind)
+	-- See Note [Extending the TvSubst]
 	--
 	-- In that case we don't need to extend the substitution
 	-- to map old to new.  But instead we must zap any 
@@ -1283,12 +1321,10 @@ substTyVarBndr subst@(TvSubst in_scope env) old_var
 	-- The uniqAway part makes sure the new variable is not already in scope
 
     subst_old_var -- subst_old_var is old_var with the substitution applied to its kind
-		 -- It's only worth doing the substitution for coercions,
-		 -- becuase only they can have free type variables
-	| is_co_var = setTyVarKind old_var (substTy subst kind)
+		  -- It's only worth doing the substitution for coercions,
+		  -- becuase only they can have free type variables
+	| is_co_var = setTyVarKind old_var (substTy subst (tyVarKind old_var))
 	| otherwise = old_var
-    kind = tyVarKind old_var
-    is_co_var = isCoVar old_var
 \end{code}
 
 ----------------------------------------------------
