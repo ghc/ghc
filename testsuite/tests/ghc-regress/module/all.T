@@ -239,6 +239,7 @@ test('mod174', normal, compile_fail, [''])
 # mod175 is a sub-directory
 
 test('mod176', normal, compile, ['-fwarn-unused-imports'])
+test('mod177', normal, compile, ['-fwarn-unused-imports'])
 
 
 # After here we have GHC-only tests (the ones above are copied from Hugs)

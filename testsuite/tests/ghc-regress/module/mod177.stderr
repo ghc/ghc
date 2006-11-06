@@ -1,0 +1,8 @@
+
+mod177.hs:3:19:
+    Warning: Redundant import of: `Just'
+	     It is also imported from Data.Maybe at mod177.hs:4:0-16
+
+mod177.hs:3:19:
+    Warning: Redundant import of: `Maybe'
+	     It is also imported from Data.Maybe at mod177.hs:4:0-16
