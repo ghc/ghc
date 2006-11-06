@@ -1,13 +1,12 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts -fno-warn-orphans #-}
---
--- Module      : ByteString
+-- |
+-- Module      : Data.ByteString
 -- Copyright   : (c) The University of Glasgow 2001,
 --               (c) David Roundy 2003-2005,
 --               (c) Simon Marlow 2005
 --               (c) Don Stewart 2005-2006
 --               (c) Bjorn Bringert 2006
---
--- Array fusion code:
+--               Array fusion code:
 --               (c) 2001,2002 Manuel M T Chakravarty & Gabriele Keller
 --               (c) 2006      Manuel M T Chakravarty & Roman Leshchinskiy
 --
@@ -15,12 +14,9 @@
 --
 -- Maintainer  : dons@cse.unsw.edu.au
 -- Stability   : experimental
--- Portability : portable, requires ffi and cpp
--- Tested with : GHC 6.4.1 and Hugs March 2005
+-- Portability : portable
 -- 
-
---
--- | A time and space-efficient implementation of byte vectors using
+-- A time and space-efficient implementation of byte vectors using
 -- packed Word8 arrays, suitable for high performance use, both in terms
 -- of large data quantities, or high speed requirements. Byte vectors
 -- are encoded as strict 'Word8' arrays of bytes, held in a 'ForeignPtr',
@@ -31,9 +27,10 @@
 --
 -- > import qualified Data.ByteString as B
 --
--- Original GHC implementation by Bryan O\'Sullivan. Rewritten to use
--- UArray by Simon Marlow. Rewritten to support slices and use
--- ForeignPtr by David Roundy. Polished and extended by Don Stewart.
+-- Original GHC implementation by Bryan O\'Sullivan.
+-- Rewritten to use 'Data.Array.Unboxed.UArray' by Simon Marlow.
+-- Rewritten to support slices and use 'ForeignPtr' by David Roundy.
+-- Polished and extended by Don Stewart.
 --
 
 module Data.ByteString (

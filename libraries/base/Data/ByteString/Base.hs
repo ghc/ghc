@@ -1,16 +1,14 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
---
--- Module      : ByteString.Base
+-- |
+-- Module      : Data.ByteString.Base
 -- License     : BSD-style
 -- Maintainer  : dons@cse.unsw.edu.au
 -- Stability   : experimental
--- Portability : portable, requires ffi and cpp
--- Tested with : GHC 6.4.1 and Hugs March 2005
+-- Portability : portable
 -- 
-
--- | A module containing semi-public ByteString internals. This exposes
--- the ByteString representation and low level construction functions.
--- Modules which extend the ByteString system will need to use this module
+-- A module containing semi-public 'ByteString' internals. This exposes
+-- the 'ByteString' representation and low level construction functions.
+-- Modules which extend the 'ByteString' system will need to use this module
 -- while ideally most users will be able to make do with the public interface
 -- modules.
 --

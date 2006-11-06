@@ -1,16 +1,14 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts #-}
---
+-- |
 -- Module      : Data.ByteString.Char8
 -- Copyright   : (c) Don Stewart 2006
 -- License     : BSD-style
 --
 -- Maintainer  : dons@cse.unsw.edu.au
 -- Stability   : experimental
--- Portability : portable (tested with GHC>=6.4.1 and Hugs 2005)
--- 
-
+-- Portability : portable
 --
--- | Manipulate 'ByteString's using 'Char' operations. All Chars will be
+-- Manipulate 'ByteString's using 'Char' operations. All Chars will be
 -- truncated to 8 bits. It can be expected that these functions will run
 -- at identical speeds to their 'Word8' equivalents in "Data.ByteString".
 --

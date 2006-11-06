@@ -1,18 +1,16 @@
 {-# OPTIONS_GHC -cpp -fno-warn-orphans #-}
---
+-- |
 -- Module      : Data.ByteString.Lazy.Char8
 -- Copyright   : (c) Don Stewart 2006
 -- License     : BSD-style
 --
 -- Maintainer  : dons@cse.unsw.edu.au
 -- Stability   : experimental
--- Portability : portable (tested with GHC>=6.4.1 and Hugs 2005)
--- 
-
+-- Portability : non-portable (imports Data.ByteString.Lazy)
 --
--- | Manipulate /lazy/ 'ByteString's using 'Char' operations. All Chars will
+-- Manipulate /lazy/ 'ByteString's using 'Char' operations. All Chars will
 -- be truncated to 8 bits. It can be expected that these functions will
--- run at identical speeds to their Word8 equivalents in
+-- run at identical speeds to their 'Data.Word.Word8' equivalents in
 -- "Data.ByteString.Lazy".
 --
 -- This module is intended to be imported @qualified@, to avoid name

@@ -1,18 +1,15 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts -fno-warn-orphans -fno-warn-incomplete-patterns #-}
---
--- Module      : ByteString.Lazy
+-- |
+-- Module      : Data.ByteString.Lazy
 -- Copyright   : (c) Don Stewart 2006
 --               (c) Duncan Coutts 2006
 -- License     : BSD-style
 --
 -- Maintainer  : dons@cse.unsw.edu.au
 -- Stability   : experimental
--- Portability : portable, requires ffi and cpp
--- Tested with : GHC 6.4.1 and Hugs March 2005
+-- Portability : non-portable (instance of type synonym)
 -- 
-
---
--- | A time and space-efficient implementation of lazy byte vectors
+-- A time and space-efficient implementation of lazy byte vectors
 -- using lists of packed 'Word8' arrays, suitable for high performance
 -- use, both in terms of large data quantities, or high speed
 -- requirements. Byte vectors are encoded as lazy lists of strict 'Word8'
@@ -22,7 +19,7 @@
 -- Some operations, such as concat, append, reverse and cons, have
 -- better complexity than their "Data.ByteString" equivalents, due to
 -- optimisations resulting from the list spine structure. And for other
--- operations Lazy ByteStrings are usually within a few percent of
+-- operations lazy ByteStrings are usually within a few percent of
 -- strict ones, but with better heap usage. For data larger than the
 -- available memory, or if you have tight memory constraints, this
 -- module will be the only option. The default chunk size is 64k, which
@@ -34,9 +31,11 @@
 --
 -- > import qualified Data.ByteString.Lazy as B
 --
--- Original GHC implementation by Bryan O\'Sullivan. Rewritten to use
--- UArray by Simon Marlow. Rewritten to support slices and use
--- ForeignPtr by David Roundy. Polished and extended by Don Stewart.
+-- Original GHC implementation by Bryan O\'Sullivan.
+-- Rewritten to use 'Data.Array.Unboxed.UArray' by Simon Marlow.
+-- Rewritten to support slices and use 'Foreign.ForeignPtr.ForeignPtr'
+-- by David Roundy.
+-- Polished and extended by Don Stewart.
 -- Lazy variant by Duncan Coutts and Don Stewart.
 --
 

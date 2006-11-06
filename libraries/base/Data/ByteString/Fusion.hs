@@ -1,20 +1,18 @@
 {-# OPTIONS_GHC -cpp -fglasgow-exts -fno-warn-orphans #-}
---
+-- |
 -- Module      : Data.ByteString.Fusion
 -- License     : BSD-style
 -- Maintainer  : dons@cse.unsw.edu.au
 -- Stability   : experimental
--- Portability : portable, requires ffi and cpp
--- Tested with : GHC 6.4.1 and Hugs March 2005
--- 
-
--- #hide
-
--- | Functional array fusion for ByteStrings. 
+-- Portability : portable
+--
+-- Functional array fusion for ByteStrings.
 --
 -- Originally based on code from the Data Parallel Haskell project, 
 --      <http://www.cse.unsw.edu.au/~chak/project/dph>
 --
+
+-- #hide
 module Data.ByteString.Fusion (
 
     -- * Fusion utilities
