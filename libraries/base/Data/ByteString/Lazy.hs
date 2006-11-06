@@ -801,7 +801,7 @@ splitWith p (LPS (a:as)) = comb [] (P.splitWith p a) as
 -- argument, consuming the delimiter. I.e.
 --
 -- > split '\n' "a\nb\nd\ne" == ["a","b","d","e"]
--- > split 'a'  "aXaXaXa"    == ["","X","X","X"]
+-- > split 'a'  "aXaXaXa"    == ["","X","X","X",""]
 -- > split 'x'  "x"          == ["",""]
 -- 
 -- and
