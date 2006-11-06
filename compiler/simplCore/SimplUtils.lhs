@@ -28,6 +28,7 @@ import SimplEnv
 import DynFlags
 import StaticFlags
 import CoreSyn
+import PprCore
 import CoreFVs
 import CoreUtils
 import Literal	
@@ -120,11 +121,12 @@ instance Outputable LetRhsFlag where
 
 instance Outputable SimplCont where
   ppr (Stop ty is_rhs _)  	     = ptext SLIT("Stop") <> brackets (ppr is_rhs) <+> ppr ty
-  ppr (ApplyTo dup arg se cont)      = (ptext SLIT("ApplyTo") <+> ppr dup <+> ppr arg) $$ ppr cont
+  ppr (ApplyTo dup arg se cont)      = ((ptext SLIT("ApplyTo") <+> ppr dup <+> pprParendExpr arg) $$ 
+					  nest 2 (pprSimplEnv se)) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext SLIT("StrictBind") <+> ppr b) $$ ppr cont
   ppr (StrictArg f _ _ cont)         = (ptext SLIT("StrictArg") <+> ppr f) $$ ppr cont
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
-				       (nest 4 (ppr alts $$ ppr (seIdSubst se))) $$ ppr cont
+				       (nest 4 (ppr alts $$ pprSimplEnv se)) $$ ppr cont
   ppr (CoerceIt co cont)	     = (ptext SLIT("CoerceIt") <+> ppr co) $$ ppr cont
 
 data DupFlag = OkToDup | NoDup

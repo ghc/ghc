@@ -21,7 +21,7 @@ module SimplEnv (
 	setEnclosingCC, getEnclosingCC,
 
 	-- Environments
-	SimplEnv(..), 	-- Temp not abstract
+	SimplEnv(..), pprSimplEnv,	-- Temp not abstract
 	mkSimplEnv, extendIdSubst, SimplEnv.extendTvSubst, 
 	zapSubstEnv, setSubstEnv, 
 	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
@@ -129,6 +129,12 @@ data SimplEnv
 
     }
 
+pprSimplEnv :: SimplEnv -> SDoc
+-- Used for debugging; selective
+pprSimplEnv env
+  = vcat [ptext SLIT("TvSubst:") <+> ppr (seTvSubst env),
+ 	  ptext SLIT("IdSubst:") <+> ppr (seIdSubst env) ]
+
 type SimplIdSubst = IdEnv SimplSR	-- IdId |--> OutExpr
 	-- See Note [Extending the Subst] in CoreSubst
 
@@ -144,10 +150,10 @@ instance Outputable SimplSR where
   ppr (DoneId v) = ptext SLIT("DoneId") <+> ppr v
   ppr (ContEx tv id e) = vcat [ptext SLIT("ContEx") <+> ppr e {-,
 				ppr (filter_env tv), ppr (filter_env id) -}]
-	where
-	  fvs = exprFreeVars e
-	  filter_env env = filterVarEnv_Directly keep env
-	  keep uniq _ = uniq `elemUFM_Directly` fvs
+	-- where
+	-- fvs = exprFreeVars e
+	-- filter_env env = filterVarEnv_Directly keep env
+	-- keep uniq _ = uniq `elemUFM_Directly` fvs
 \end{code}
 
 

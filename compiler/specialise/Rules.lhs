@@ -231,7 +231,8 @@ matchRules is_active in_scope fn args rules
     go ms []	       = ms
     go ms (r:rs) = case (matchRule is_active in_scope args rough_args r) of
 			Just e  -> go ((r,e):ms) rs
-			Nothing -> -- pprTrace "Failed match" ((ppr r) $$ (ppr args)) $
+			Nothing -> -- pprTrace "match failed" (ppr r $$ ppr args $$ 
+				   --	ppr [(arg_id, unfoldingTemplate unf) | Var arg_id <- args, let unf = idUnfolding arg_id, isCheapUnfolding unf] )
 				   go ms         rs
 
 findBest :: (Id, [CoreExpr])

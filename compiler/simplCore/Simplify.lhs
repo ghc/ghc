@@ -626,8 +626,9 @@ simplExprC env expr cont
 simplExprF :: SimplEnv -> InExpr -> SimplCont
 	   -> SimplM (SimplEnv, OutExpr)
 
-simplExprF env e cont = -- pprTrace "simplExprF" (ppr e $$ ppr cont {- $$ ppr (seIdSubst env) -} $$ ppr (seFloats env) ) $
-			simplExprF' env e cont
+simplExprF env e cont 
+  = -- pprTrace "simplExprF" (ppr e $$ ppr cont $$ ppr (seTvSubst env) $$ ppr (seIdSubst env) {- $$ ppr (seFloats env) -} ) $
+    simplExprF' env e cont
     				     
 simplExprF' env (Var v)	      cont = simplVar env v cont
 simplExprF' env (Lit lit)      cont = rebuild env (Lit lit) cont
