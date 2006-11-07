@@ -299,8 +299,7 @@ readFile name	=  openFile name ReadMode >>= hGetContents
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.
 writeFile :: FilePath -> String -> IO ()
-writeFile f txt = bracket (openFile f WriteMode) hClose
-			  (\hdl -> hPutStr hdl txt) 
+writeFile f txt = withFile f WriteMode (\ hdl -> hPutStr hdl txt)
 
 -- | The computation 'appendFile' @file str@ function appends the string @str@,
 -- to the file @file@.
@@ -312,8 +311,7 @@ writeFile f txt = bracket (openFile f WriteMode) hClose
 -- > main = appendFile "squares" (show [(x,x*x) | x <- [0,0.1..2]])
 
 appendFile      :: FilePath -> String -> IO ()
-appendFile f txt = bracket (openFile f AppendMode) hClose
-			   (\hdl -> hPutStr hdl txt)
+appendFile f txt = withFile f AppendMode (\ hdl -> hPutStr hdl txt)
 
 -- | The 'readLn' function combines 'getLine' and 'readIO'.
 
