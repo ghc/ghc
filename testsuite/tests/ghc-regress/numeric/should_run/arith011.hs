@@ -161,7 +161,7 @@ testBits zero do_bitsize = do
   table1 "complement"       complement    xs
   table2 "`shiftL`"         shiftL        xs ([0..3] ++ [32,64])
   table2 "`shiftR`"         shiftR        xs ([0..3] ++ [32,64]) 
-  table2 "`rotate`"         rotate        xs ([-3..3])
+  table2 "`rotate`"         rotate        xs ([-3..3] ++ [-64,-32,32,64])
   table1 "bit"              (\ x -> (bit x) `asTypeOf` zero)   [(0::Int)..3]
   table2 "`setBit`"         setBit        xs ([0..3] ++ [32,64])
   table2 "`clearBit`"       clearBit      xs ([0..3] ++ [32,64])

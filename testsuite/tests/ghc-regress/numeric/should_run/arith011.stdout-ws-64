@@ -1243,6 +1243,10 @@ complement 3 = -4
 -3 `rotate` 1 = -5
 -3 `rotate` 2 = -9
 -3 `rotate` 3 = -17
+-3 `rotate` -64 = -3
+-3 `rotate` -32 = -8589934593
+-3 `rotate` 32 = -8589934593
+-3 `rotate` 64 = -3
  
 -2 `rotate` -3 = -2305843009213693953
 -2 `rotate` -2 = -4611686018427387905
@@ -1251,6 +1255,10 @@ complement 3 = -4
 -2 `rotate` 1 = -3
 -2 `rotate` 2 = -5
 -2 `rotate` 3 = -9
+-2 `rotate` -64 = -2
+-2 `rotate` -32 = -4294967297
+-2 `rotate` 32 = -4294967297
+-2 `rotate` 64 = -2
  
 -1 `rotate` -3 = -1
 -1 `rotate` -2 = -1
@@ -1259,6 +1267,10 @@ complement 3 = -4
 -1 `rotate` 1 = -1
 -1 `rotate` 2 = -1
 -1 `rotate` 3 = -1
+-1 `rotate` -64 = -1
+-1 `rotate` -32 = -1
+-1 `rotate` 32 = -1
+-1 `rotate` 64 = -1
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -1267,6 +1279,10 @@ complement 3 = -4
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 2305843009213693952
 1 `rotate` -2 = 4611686018427387904
@@ -1275,6 +1291,10 @@ complement 3 = -4
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 4294967296
+1 `rotate` 32 = 4294967296
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 4611686018427387904
 2 `rotate` -2 = -9223372036854775808
@@ -1283,6 +1303,10 @@ complement 3 = -4
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 8589934592
+2 `rotate` 32 = 8589934592
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 6917529027641081856
 3 `rotate` -2 = -4611686018427387904
@@ -1291,6 +1315,10 @@ complement 3 = -4
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 12884901888
+3 `rotate` 32 = 12884901888
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -2759,6 +2787,10 @@ complement 3 = -4
 -3 `rotate` 1 = -5
 -3 `rotate` 2 = -9
 -3 `rotate` 3 = -17
+-3 `rotate` -64 = -3
+-3 `rotate` -32 = -3
+-3 `rotate` 32 = -3
+-3 `rotate` 64 = -3
  
 -2 `rotate` -3 = -33
 -2 `rotate` -2 = -65
@@ -2767,6 +2799,10 @@ complement 3 = -4
 -2 `rotate` 1 = -3
 -2 `rotate` 2 = -5
 -2 `rotate` 3 = -9
+-2 `rotate` -64 = -2
+-2 `rotate` -32 = -2
+-2 `rotate` 32 = -2
+-2 `rotate` 64 = -2
  
 -1 `rotate` -3 = -1
 -1 `rotate` -2 = -1
@@ -2775,6 +2811,10 @@ complement 3 = -4
 -1 `rotate` 1 = -1
 -1 `rotate` 2 = -1
 -1 `rotate` 3 = -1
+-1 `rotate` -64 = -1
+-1 `rotate` -32 = -1
+-1 `rotate` 32 = -1
+-1 `rotate` 64 = -1
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -2783,6 +2823,10 @@ complement 3 = -4
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 32
 1 `rotate` -2 = 64
@@ -2791,6 +2835,10 @@ complement 3 = -4
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 1
+1 `rotate` 32 = 1
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 64
 2 `rotate` -2 = -128
@@ -2799,6 +2847,10 @@ complement 3 = -4
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 2
+2 `rotate` 32 = 2
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 96
 3 `rotate` -2 = -64
@@ -2807,6 +2859,10 @@ complement 3 = -4
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 3
+3 `rotate` 32 = 3
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -4275,6 +4331,10 @@ complement 3 = -4
 -3 `rotate` 1 = -5
 -3 `rotate` 2 = -9
 -3 `rotate` 3 = -17
+-3 `rotate` -64 = -3
+-3 `rotate` -32 = -3
+-3 `rotate` 32 = -3
+-3 `rotate` 64 = -3
  
 -2 `rotate` -3 = -8193
 -2 `rotate` -2 = -16385
@@ -4283,6 +4343,10 @@ complement 3 = -4
 -2 `rotate` 1 = -3
 -2 `rotate` 2 = -5
 -2 `rotate` 3 = -9
+-2 `rotate` -64 = -2
+-2 `rotate` -32 = -2
+-2 `rotate` 32 = -2
+-2 `rotate` 64 = -2
  
 -1 `rotate` -3 = -1
 -1 `rotate` -2 = -1
@@ -4291,6 +4355,10 @@ complement 3 = -4
 -1 `rotate` 1 = -1
 -1 `rotate` 2 = -1
 -1 `rotate` 3 = -1
+-1 `rotate` -64 = -1
+-1 `rotate` -32 = -1
+-1 `rotate` 32 = -1
+-1 `rotate` 64 = -1
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -4299,6 +4367,10 @@ complement 3 = -4
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 8192
 1 `rotate` -2 = 16384
@@ -4307,6 +4379,10 @@ complement 3 = -4
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 1
+1 `rotate` 32 = 1
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 16384
 2 `rotate` -2 = -32768
@@ -4315,6 +4391,10 @@ complement 3 = -4
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 2
+2 `rotate` 32 = 2
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 24576
 3 `rotate` -2 = -16384
@@ -4323,6 +4403,10 @@ complement 3 = -4
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 3
+3 `rotate` 32 = 3
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -5791,6 +5875,10 @@ complement 3 = -4
 -3 `rotate` 1 = -5
 -3 `rotate` 2 = -9
 -3 `rotate` 3 = -17
+-3 `rotate` -64 = -3
+-3 `rotate` -32 = -3
+-3 `rotate` 32 = -3
+-3 `rotate` 64 = -3
  
 -2 `rotate` -3 = -536870913
 -2 `rotate` -2 = -1073741825
@@ -5799,6 +5887,10 @@ complement 3 = -4
 -2 `rotate` 1 = -3
 -2 `rotate` 2 = -5
 -2 `rotate` 3 = -9
+-2 `rotate` -64 = -2
+-2 `rotate` -32 = -2
+-2 `rotate` 32 = -2
+-2 `rotate` 64 = -2
  
 -1 `rotate` -3 = -1
 -1 `rotate` -2 = -1
@@ -5807,6 +5899,10 @@ complement 3 = -4
 -1 `rotate` 1 = -1
 -1 `rotate` 2 = -1
 -1 `rotate` 3 = -1
+-1 `rotate` -64 = -1
+-1 `rotate` -32 = -1
+-1 `rotate` 32 = -1
+-1 `rotate` 64 = -1
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -5815,6 +5911,10 @@ complement 3 = -4
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 536870912
 1 `rotate` -2 = 1073741824
@@ -5823,6 +5923,10 @@ complement 3 = -4
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 1
+1 `rotate` 32 = 1
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 1073741824
 2 `rotate` -2 = -2147483648
@@ -5831,6 +5935,10 @@ complement 3 = -4
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 2
+2 `rotate` 32 = 2
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 1610612736
 3 `rotate` -2 = -1073741824
@@ -5839,6 +5947,10 @@ complement 3 = -4
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 3
+3 `rotate` 32 = 3
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -7307,6 +7419,10 @@ complement 3 = -4
 -3 `rotate` 1 = -5
 -3 `rotate` 2 = -9
 -3 `rotate` 3 = -17
+-3 `rotate` -64 = -3
+-3 `rotate` -32 = -8589934593
+-3 `rotate` 32 = -8589934593
+-3 `rotate` 64 = -3
  
 -2 `rotate` -3 = -2305843009213693953
 -2 `rotate` -2 = -4611686018427387905
@@ -7315,6 +7431,10 @@ complement 3 = -4
 -2 `rotate` 1 = -3
 -2 `rotate` 2 = -5
 -2 `rotate` 3 = -9
+-2 `rotate` -64 = -2
+-2 `rotate` -32 = -4294967297
+-2 `rotate` 32 = -4294967297
+-2 `rotate` 64 = -2
  
 -1 `rotate` -3 = -1
 -1 `rotate` -2 = -1
@@ -7323,6 +7443,10 @@ complement 3 = -4
 -1 `rotate` 1 = -1
 -1 `rotate` 2 = -1
 -1 `rotate` 3 = -1
+-1 `rotate` -64 = -1
+-1 `rotate` -32 = -1
+-1 `rotate` 32 = -1
+-1 `rotate` 64 = -1
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -7331,6 +7455,10 @@ complement 3 = -4
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 2305843009213693952
 1 `rotate` -2 = 4611686018427387904
@@ -7339,6 +7467,10 @@ complement 3 = -4
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 4294967296
+1 `rotate` 32 = 4294967296
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 4611686018427387904
 2 `rotate` -2 = -9223372036854775808
@@ -7347,6 +7479,10 @@ complement 3 = -4
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 8589934592
+2 `rotate` 32 = 8589934592
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 6917529027641081856
 3 `rotate` -2 = -4611686018427387904
@@ -7355,6 +7491,10 @@ complement 3 = -4
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 12884901888
+3 `rotate` 32 = 12884901888
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -8823,6 +8963,10 @@ complement 3 = 252
 253 `rotate` 1 = 251
 253 `rotate` 2 = 247
 253 `rotate` 3 = 239
+253 `rotate` -64 = 253
+253 `rotate` -32 = 253
+253 `rotate` 32 = 253
+253 `rotate` 64 = 253
  
 254 `rotate` -3 = 223
 254 `rotate` -2 = 191
@@ -8831,6 +8975,10 @@ complement 3 = 252
 254 `rotate` 1 = 253
 254 `rotate` 2 = 251
 254 `rotate` 3 = 247
+254 `rotate` -64 = 254
+254 `rotate` -32 = 254
+254 `rotate` 32 = 254
+254 `rotate` 64 = 254
  
 255 `rotate` -3 = 255
 255 `rotate` -2 = 255
@@ -8839,6 +8987,10 @@ complement 3 = 252
 255 `rotate` 1 = 255
 255 `rotate` 2 = 255
 255 `rotate` 3 = 255
+255 `rotate` -64 = 255
+255 `rotate` -32 = 255
+255 `rotate` 32 = 255
+255 `rotate` 64 = 255
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -8847,6 +8999,10 @@ complement 3 = 252
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 32
 1 `rotate` -2 = 64
@@ -8855,6 +9011,10 @@ complement 3 = 252
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 1
+1 `rotate` 32 = 1
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 64
 2 `rotate` -2 = 128
@@ -8863,6 +9023,10 @@ complement 3 = 252
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 2
+2 `rotate` 32 = 2
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 96
 3 `rotate` -2 = 192
@@ -8871,6 +9035,10 @@ complement 3 = 252
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 3
+3 `rotate` 32 = 3
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -10339,6 +10507,10 @@ complement 3 = 65532
 65533 `rotate` 1 = 65531
 65533 `rotate` 2 = 65527
 65533 `rotate` 3 = 65519
+65533 `rotate` -64 = 65533
+65533 `rotate` -32 = 65533
+65533 `rotate` 32 = 65533
+65533 `rotate` 64 = 65533
  
 65534 `rotate` -3 = 57343
 65534 `rotate` -2 = 49151
@@ -10347,6 +10519,10 @@ complement 3 = 65532
 65534 `rotate` 1 = 65533
 65534 `rotate` 2 = 65531
 65534 `rotate` 3 = 65527
+65534 `rotate` -64 = 65534
+65534 `rotate` -32 = 65534
+65534 `rotate` 32 = 65534
+65534 `rotate` 64 = 65534
  
 65535 `rotate` -3 = 65535
 65535 `rotate` -2 = 65535
@@ -10355,6 +10531,10 @@ complement 3 = 65532
 65535 `rotate` 1 = 65535
 65535 `rotate` 2 = 65535
 65535 `rotate` 3 = 65535
+65535 `rotate` -64 = 65535
+65535 `rotate` -32 = 65535
+65535 `rotate` 32 = 65535
+65535 `rotate` 64 = 65535
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -10363,6 +10543,10 @@ complement 3 = 65532
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 8192
 1 `rotate` -2 = 16384
@@ -10371,6 +10555,10 @@ complement 3 = 65532
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 1
+1 `rotate` 32 = 1
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 16384
 2 `rotate` -2 = 32768
@@ -10379,6 +10567,10 @@ complement 3 = 65532
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 2
+2 `rotate` 32 = 2
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 24576
 3 `rotate` -2 = 49152
@@ -10387,6 +10579,10 @@ complement 3 = 65532
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 3
+3 `rotate` 32 = 3
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -11855,6 +12051,10 @@ complement 3 = 4294967292
 4294967293 `rotate` 1 = 4294967291
 4294967293 `rotate` 2 = 4294967287
 4294967293 `rotate` 3 = 4294967279
+4294967293 `rotate` -64 = 4294967293
+4294967293 `rotate` -32 = 4294967293
+4294967293 `rotate` 32 = 4294967293
+4294967293 `rotate` 64 = 4294967293
  
 4294967294 `rotate` -3 = 3758096383
 4294967294 `rotate` -2 = 3221225471
@@ -11863,6 +12063,10 @@ complement 3 = 4294967292
 4294967294 `rotate` 1 = 4294967293
 4294967294 `rotate` 2 = 4294967291
 4294967294 `rotate` 3 = 4294967287
+4294967294 `rotate` -64 = 4294967294
+4294967294 `rotate` -32 = 4294967294
+4294967294 `rotate` 32 = 4294967294
+4294967294 `rotate` 64 = 4294967294
  
 4294967295 `rotate` -3 = 4294967295
 4294967295 `rotate` -2 = 4294967295
@@ -11871,6 +12075,10 @@ complement 3 = 4294967292
 4294967295 `rotate` 1 = 4294967295
 4294967295 `rotate` 2 = 4294967295
 4294967295 `rotate` 3 = 4294967295
+4294967295 `rotate` -64 = 4294967295
+4294967295 `rotate` -32 = 4294967295
+4294967295 `rotate` 32 = 4294967295
+4294967295 `rotate` 64 = 4294967295
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -11879,6 +12087,10 @@ complement 3 = 4294967292
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 536870912
 1 `rotate` -2 = 1073741824
@@ -11887,6 +12099,10 @@ complement 3 = 4294967292
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 1
+1 `rotate` 32 = 1
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 1073741824
 2 `rotate` -2 = 2147483648
@@ -11895,6 +12111,10 @@ complement 3 = 4294967292
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 2
+2 `rotate` 32 = 2
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 1610612736
 3 `rotate` -2 = 3221225472
@@ -11903,6 +12123,10 @@ complement 3 = 4294967292
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 3
+3 `rotate` 32 = 3
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -13371,6 +13595,10 @@ complement 3 = 18446744073709551612
 18446744073709551613 `rotate` 1 = 18446744073709551611
 18446744073709551613 `rotate` 2 = 18446744073709551607
 18446744073709551613 `rotate` 3 = 18446744073709551599
+18446744073709551613 `rotate` -64 = 18446744073709551613
+18446744073709551613 `rotate` -32 = 18446744065119617023
+18446744073709551613 `rotate` 32 = 18446744065119617023
+18446744073709551613 `rotate` 64 = 18446744073709551613
  
 18446744073709551614 `rotate` -3 = 16140901064495857663
 18446744073709551614 `rotate` -2 = 13835058055282163711
@@ -13379,6 +13607,10 @@ complement 3 = 18446744073709551612
 18446744073709551614 `rotate` 1 = 18446744073709551613
 18446744073709551614 `rotate` 2 = 18446744073709551611
 18446744073709551614 `rotate` 3 = 18446744073709551607
+18446744073709551614 `rotate` -64 = 18446744073709551614
+18446744073709551614 `rotate` -32 = 18446744069414584319
+18446744073709551614 `rotate` 32 = 18446744069414584319
+18446744073709551614 `rotate` 64 = 18446744073709551614
  
 18446744073709551615 `rotate` -3 = 18446744073709551615
 18446744073709551615 `rotate` -2 = 18446744073709551615
@@ -13387,6 +13619,10 @@ complement 3 = 18446744073709551612
 18446744073709551615 `rotate` 1 = 18446744073709551615
 18446744073709551615 `rotate` 2 = 18446744073709551615
 18446744073709551615 `rotate` 3 = 18446744073709551615
+18446744073709551615 `rotate` -64 = 18446744073709551615
+18446744073709551615 `rotate` -32 = 18446744073709551615
+18446744073709551615 `rotate` 32 = 18446744073709551615
+18446744073709551615 `rotate` 64 = 18446744073709551615
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -13395,6 +13631,10 @@ complement 3 = 18446744073709551612
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 2305843009213693952
 1 `rotate` -2 = 4611686018427387904
@@ -13403,6 +13643,10 @@ complement 3 = 18446744073709551612
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 1
+1 `rotate` -32 = 4294967296
+1 `rotate` 32 = 4294967296
+1 `rotate` 64 = 1
  
 2 `rotate` -3 = 4611686018427387904
 2 `rotate` -2 = 9223372036854775808
@@ -13411,6 +13655,10 @@ complement 3 = 18446744073709551612
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 2
+2 `rotate` -32 = 8589934592
+2 `rotate` 32 = 8589934592
+2 `rotate` 64 = 2
  
 3 `rotate` -3 = 6917529027641081856
 3 `rotate` -2 = 13835058055282163712
@@ -13419,6 +13667,10 @@ complement 3 = 18446744073709551612
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 3
+3 `rotate` -32 = 12884901888
+3 `rotate` 32 = 12884901888
+3 `rotate` 64 = 3
  
 #
 bit 0 = 1
@@ -14873,6 +15125,10 @@ complement 3 = -4
 -3 `rotate` 1 = -6
 -3 `rotate` 2 = -12
 -3 `rotate` 3 = -24
+-3 `rotate` -64 = -1
+-3 `rotate` -32 = -1
+-3 `rotate` 32 = -12884901888
+-3 `rotate` 64 = -55340232221128654848
  
 -2 `rotate` -3 = -1
 -2 `rotate` -2 = -1
@@ -14881,6 +15137,10 @@ complement 3 = -4
 -2 `rotate` 1 = -4
 -2 `rotate` 2 = -8
 -2 `rotate` 3 = -16
+-2 `rotate` -64 = -1
+-2 `rotate` -32 = -1
+-2 `rotate` 32 = -8589934592
+-2 `rotate` 64 = -36893488147419103232
  
 -1 `rotate` -3 = -1
 -1 `rotate` -2 = -1
@@ -14889,6 +15149,10 @@ complement 3 = -4
 -1 `rotate` 1 = -2
 -1 `rotate` 2 = -4
 -1 `rotate` 3 = -8
+-1 `rotate` -64 = -1
+-1 `rotate` -32 = -1
+-1 `rotate` 32 = -4294967296
+-1 `rotate` 64 = -18446744073709551616
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -14897,6 +15161,10 @@ complement 3 = -4
 0 `rotate` 1 = 0
 0 `rotate` 2 = 0
 0 `rotate` 3 = 0
+0 `rotate` -64 = 0
+0 `rotate` -32 = 0
+0 `rotate` 32 = 0
+0 `rotate` 64 = 0
  
 1 `rotate` -3 = 0
 1 `rotate` -2 = 0
@@ -14905,6 +15173,10 @@ complement 3 = -4
 1 `rotate` 1 = 2
 1 `rotate` 2 = 4
 1 `rotate` 3 = 8
+1 `rotate` -64 = 0
+1 `rotate` -32 = 0
+1 `rotate` 32 = 4294967296
+1 `rotate` 64 = 18446744073709551616
  
 2 `rotate` -3 = 0
 2 `rotate` -2 = 0
@@ -14913,6 +15185,10 @@ complement 3 = -4
 2 `rotate` 1 = 4
 2 `rotate` 2 = 8
 2 `rotate` 3 = 16
+2 `rotate` -64 = 0
+2 `rotate` -32 = 0
+2 `rotate` 32 = 8589934592
+2 `rotate` 64 = 36893488147419103232
  
 3 `rotate` -3 = 0
 3 `rotate` -2 = 0
@@ -14921,6 +15197,10 @@ complement 3 = -4
 3 `rotate` 1 = 6
 3 `rotate` 2 = 12
 3 `rotate` 3 = 24
+3 `rotate` -64 = 0
+3 `rotate` -32 = 0
+3 `rotate` 32 = 12884901888
+3 `rotate` 64 = 55340232221128654848
  
 #
 bit 0 = 1
