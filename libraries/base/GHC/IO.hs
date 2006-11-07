@@ -64,13 +64,15 @@ import GHC.Conc
 -- or 'False' if no input is available within @t@ milliseconds.
 --
 -- If @t@ is less than zero, then @hWaitForInput@ waits indefinitely.
--- NOTE: in the current implementation, this is the only case that works
--- correctly (if @t@ is non-zero, then all other concurrent threads are
--- blocked until data is available).
 --
 -- This operation may fail with:
 --
 --  * 'isEOFError' if the end of file has been reached.
+--
+-- NOTE for GHC users: unless you use the @-threaded@ flag,
+-- @hWaitForInput t@ where @t >= 0@ will block all other Haskell
+-- threads for the duration of the call.  It behaves like a
+-- @safe@ foreign call in this respect.
 
 hWaitForInput :: Handle -> Int -> IO Bool
 hWaitForInput h msecs = do
