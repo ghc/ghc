@@ -173,8 +173,9 @@ constructors, primitives, and literals.
 
   | StgOpApp	StgOp		-- Primitive op or foreign call
 		[GenStgArg occ]	-- Saturated
-		Type		-- Result type; we need to know the result type
-				-- so that we can assign result registers.
+		Type		-- Result type
+				-- We need to know this so that we can 
+				-- assign result registers
 \end{code}
 
 %************************************************************************

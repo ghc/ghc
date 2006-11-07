@@ -121,11 +121,8 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
 		    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
 		      nonVoidArg rep]
 
-    -- in
     arg_tmps <- mapM assignTemp arg_exprs
-    let
-	arg_hints = zip arg_tmps (map (typeHint.stgArgType) stg_args)
-    -- in
+    let	arg_hints = zip arg_tmps (map (typeHint.stgArgType) stg_args)
     {-
 	Now, allocate some result regs.
     -}

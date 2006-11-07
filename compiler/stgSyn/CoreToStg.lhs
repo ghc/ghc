@@ -16,7 +16,6 @@ import CoreUtils	( rhsIsStatic, manifestArity, exprType, findDefault )
 import StgSyn
 
 import Type
-import Coercion         ( mkUnsafeCoercion )
 import TyCon		( isAlgTyCon )
 import Id
 import Var		( Var, globalIdDetails, idType )
@@ -505,8 +504,8 @@ coreToStgApp maybe_thunk_body f args
 	res_ty = exprType (mkApps (Var f) args)
 	app = case globalIdDetails f of
       		DataConWorkId dc | saturated -> StgConApp dc args'
-	        PrimOpId op  		     -> ASSERT( saturated )
-					        StgOpApp (StgPrimOp op) args' res_ty
+	        PrimOpId op  	 -> ASSERT( saturated )
+				    StgOpApp (StgPrimOp op) args' res_ty
 		FCallId call	 -> ASSERT( saturated )
 				    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
 		_other      	 -> StgApp f args'
