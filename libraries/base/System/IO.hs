@@ -36,6 +36,7 @@ module System.IO (
 
     -- ** Opening files
 
+    withFile,
     openFile,		       -- :: FilePath -> IOMode -> IO Handle
     IOMode(ReadMode,WriteMode,AppendMode,ReadWriteMode),
 
@@ -144,6 +145,7 @@ module System.IO (
 
     -- * Binary input and output
 
+    withBinaryFile,
     openBinaryFile,	       -- :: FilePath -> IOMode -> IO Handle
     hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
 #if !defined(__NHC__)
@@ -179,6 +181,7 @@ import Hugs.IO
 import Hugs.IOExts
 import Hugs.IORef
 import Hugs.Prelude	( throw, Exception(NonTermination) )
+import Control.Exception ( bracket )
 import System.IO.Unsafe	( unsafeInterleaveIO )
 #endif
 
@@ -214,6 +217,7 @@ import IO
   , hIsOpen, hIsClosed        -- :: Handle -> IO Bool
   , hIsReadable, hIsWritable  -- :: Handle -> IO Bool
   , hIsSeekable               -- :: Handle -> IO Bool
+  , bracket
 
   , IO ()
   , FilePath                  -- :: String
@@ -361,6 +365,20 @@ hPutStrLn hndl str = do
 hPrint		:: Show a => Handle -> a -> IO ()
 hPrint hdl 	=  hPutStrLn hdl . show
 #endif /* !__NHC__ */
+
+-- | @'withFile' name mode act@ opens a file using 'openFile' and passes
+-- the resulting handle to the computation @act@.  The handle will be
+-- closed on exit from 'withFile', whether by normal termination or by
+-- raising an exception.
+withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFile name mode = bracket (openFile name mode) hClose
+
+-- | @'withBinaryFile' name mode act@ opens a file using 'openBinaryFile'
+-- and passes the resulting handle to the computation @act@.  The handle
+-- will be closed on exit from 'withBinaryFile', whether by normal
+-- termination or by raising an exception.
+withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 
 -- ---------------------------------------------------------------------------
 -- fixIO
