@@ -564,7 +564,6 @@ copyFile fromFPath toFPath =
 				copyContents hFrom hTo buffer
 #endif
 
-#ifdef __GLASGOW_HASKELL__
 -- | Given path referring to a file or directory, returns a
 -- canonicalized path, with the intent that two paths referring
 -- to the same file\/directory will map to the same canonicalized
@@ -597,11 +596,6 @@ foreign import ccall unsafe "realpath"
                               -> CString
                               -> IO CString
 #endif
-#else /* !__GLASGOW_HASKELL__ */
--- dummy implementation
-canonicalizePath :: FilePath -> IO FilePath
-canonicalizePath fpath = return fpath
-#endif /* !__GLASGOW_HASKELL__ */
 
 -- | Given an executable file name, searches for such file
 -- in the directories listed in system PATH. The returned value 
