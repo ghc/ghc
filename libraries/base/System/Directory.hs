@@ -79,10 +79,10 @@ import NHC.FFI
 import Hugs.Directory
 #endif /* __HUGS__ */
 
-#if defined(__GLASGOW_HASKELL__) || defined(mingw32_HOST_OS)
 import Foreign
 import Foreign.C
-#endif
+
+{-# CFILES cbits/PrelIOUtils.c #-}
 
 #ifdef __GLASGOW_HASKELL__
 import Prelude
@@ -623,10 +623,6 @@ foreign import stdcall unsafe "SearchPathA"
                          -> CString
                          -> Ptr CString
                          -> IO CInt
-# if !defined(__GLASGOW_HASKELL__)
-long_path_size :: Int
-long_path_size = 4096
-# endif
 #else
  do
   path <- getEnv "PATH"
@@ -867,9 +863,6 @@ fileNameEndClean name =
       i  = (length name) - 1
       ec = name !! i
 
-foreign import ccall unsafe "__hscore_long_path_size"
-  long_path_size :: Int
-
 foreign import ccall unsafe "__hscore_R_OK" r_OK :: CMode
 foreign import ccall unsafe "__hscore_W_OK" w_OK :: CMode
 foreign import ccall unsafe "__hscore_X_OK" x_OK :: CMode
@@ -879,6 +872,9 @@ foreign import ccall unsafe "__hscore_S_IWUSR" s_IWUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IXUSR" s_IXUSR :: CMode
 
 #endif /* __GLASGOW_HASKELL__ */
+
+foreign import ccall unsafe "__hscore_long_path_size"
+  long_path_size :: Int
 
 {- | Returns the current user's home directory.
 
@@ -903,7 +899,7 @@ cannot be found.
 -}
 getHomeDirectory :: IO FilePath
 getHomeDirectory =
-#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_PROFILE nullPtr 0 pPath
      if (r < 0)
@@ -945,7 +941,7 @@ cannot be found.
 -}
 getAppUserDataDirectory :: String -> IO FilePath
 getAppUserDataDirectory appName = do
-#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
      when (r<0) (raiseUnsupported "System.Directory.getAppUserDataDirectory")
@@ -979,7 +975,7 @@ cannot be found.
 -}
 getUserDocumentsDirectory :: IO FilePath
 getUserDocumentsDirectory = do
-#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_PERSONAL nullPtr 0 pPath
      when (r<0) (raiseUnsupported "System.Directory.getUserDocumentsDirectory")
@@ -1016,7 +1012,7 @@ The function doesn\'t verify whether the path exists.
 -}
 getTemporaryDirectory :: IO FilePath
 getTemporaryDirectory = do
-#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_GetTempPath (fromIntegral long_path_size) pPath
      peekCString pPath
@@ -1024,7 +1020,7 @@ getTemporaryDirectory = do
   catch (getEnv "TMPDIR") (\ex -> return "/tmp")
 #endif
 
-#if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "__hscore_getFolderPath"
             c_SHGetFolderPath :: Ptr () 
                               -> CInt 
