@@ -38,6 +38,7 @@ extern int rts_getThreadId(StgPtr tso);
 extern int forkOS_createThread ( HsStablePtr entry );
 extern StgInt forkProcess(HsStablePtr *entry);
 extern StgBool rtsSupportsBoundThreads(void);
+extern StgInt newSpark (StgRegTable *reg, StgClosure *p);
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
 extern StgDouble __encodeDouble (I_ size, StgByteArray arr, I_ e);

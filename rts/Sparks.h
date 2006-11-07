@@ -9,10 +9,6 @@
 #ifndef SPARKS_H
 #define SPARKS_H
 
-#if !defined(GRAN)
-StgInt newSpark (StgRegTable *reg, StgClosure *p);
-#endif
-
 #if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
 StgClosure * findSpark         (Capability *cap);
 void         initSparkPools    (void);
