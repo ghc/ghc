@@ -548,6 +548,21 @@ coreToStgArgs (arg : args)	-- Non-type argument
 		       StgLit lit       -> StgLitArg lit
 		       _ 		-> pprPanic "coreToStgArgs" (ppr arg)
     in
+	-- WARNING: what if we have an argument like (v `cast` co)
+	-- 	    where 'co' changes the representation type?
+	--	    (This really only happens if co is unsafe.)
+	-- Then all the getArgAmode stuff in CgBindery will set the
+	-- cg_rep of the CgIdInfo based on the type of v, rather
+	-- than the type of 'co'.
+	-- This matters particularly when the function is a primop
+	-- or foreign call.
+	-- Wanted: a better solution than this hacky warning
+    let
+	arg_ty = exprType arg
+	stg_arg_ty = stgArgType stg_arg
+    in
+    WARN( isUnLiftedType arg_ty /= isUnLiftedType stg_arg_ty, 
+	  ptext SLIT("Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg)
     returnLne (stg_arg : stg_args, fvs)
 
 
