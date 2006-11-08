@@ -29,7 +29,7 @@ module GHC.Exts
 	Splittable(..),
 
 	-- * Debugging
-	breakpoint, breakpointCond, Unknown,
+	breakpoint, breakpointCond, Unknown, Unknown2, Unknown3, Unknown4,
 
 	-- * Ids with special behaviour
 	lazy, inline,

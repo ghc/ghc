@@ -423,4 +423,21 @@ itos n# cs
 instance Show Unknown where
  show _ = "This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type"
  showList _ = ("This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type" ++)
+
+instance Show (Unknown1 a) where
+ show _ = "This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type"
+ showList _ = ("This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type" ++)
+
+instance Show (Unknown2 a b) where
+ show _ = "This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type"
+ showList _ = ("This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type" ++)
+
+instance Show (Unknown3 a b c) where
+ show _ = "This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type"
+ showList _ = ("This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type" ++)
+
+instance Show (Unknown4 a b c d) where
+ show _ = "This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type"
+ showList _ = ("This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type" ++)
+
 \end{code}
