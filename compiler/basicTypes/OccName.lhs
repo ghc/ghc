@@ -401,6 +401,7 @@ Here's our convention for splitting up the interface file name space:
 	$w...		workers
 	:T...		compiler-generated tycons for dictionaries
 	:D...		...ditto data cons
+        :Co...          ...ditto coercions
 	$sf..		specialised version of f
 
 	in encoded form these appear as Zdfxxx etc
