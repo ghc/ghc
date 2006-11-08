@@ -219,8 +219,8 @@ pprConArgs (PrefixCon pats) = interppSP pats
 pprConArgs (InfixCon p1 p2) = interppSP [p1,p2]
 pprConArgs (RecCon rpats)   = braces (hsep (punctuate comma (map (pp_rpat) rpats)))
 			    where
-			      pp_rpat (HsRecField v p d) = 
-                                hsep [ppr d, ppr v, char '=', ppr p]
+			      pp_rpat (HsRecField v p _d) = 
+                                hsep [ppr v, char '=', ppr p]
 
 -- add parallel array brackets around a document
 --
