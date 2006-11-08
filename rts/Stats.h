@@ -54,4 +54,9 @@ HsInt64   getAllocations( void );
 Ticks stat_getElapsedGCTime(void);
 Ticks stat_getElapsedTime(void);
 
+/* Only exported for Papi.c */
+void statsPrintf( char *s, ... ) 
+    GNUC3_ATTRIBUTE(format (printf, 1, 2));
+
+
 #endif /* STATS_H */

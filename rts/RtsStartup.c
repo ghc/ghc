@@ -6,7 +6,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include "PosixSource.h"
+// PAPI uses caddr_t, which is not POSIX
+// #include "PosixSource.h"
+
 #include "Rts.h"
 #include "RtsAPI.h"
 #include "RtsUtils.h"
@@ -65,6 +67,10 @@
 #endif
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
+#endif
+
+#if USE_PAPI
+#include "Papi.h"
 #endif
 
 // Count of how many outstanding hs_init()s there have been.
@@ -152,7 +158,23 @@ hs_init(int *argc, char **argv[])
     argv++; argc--;
 #endif
 
+    /* Initialise the performance tracking library */
+#ifdef USE_PAPI
+    /* Must fix to abort gracefully */
+    if(PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT)
+      exit(1);
+#ifdef THREADED_RTS
+    {
+	int err;
+	if ((err = PAPI_thread_init(osThreadId)) < 0) {
+	    barf("PAPI_thread_init: %d",err);
+	}
+    }
+#endif
+#endif
+
     /* Set the RTS flags to default values. */
+
     initRtsFlagsDefaults();
 
     /* Call the user hook to reset defaults, if present */

@@ -53,6 +53,9 @@ extra-libraries:		"m"		/* for ldexp() */
                               ,"mingwex"
 # endif
 #endif
+#if USE_PAPI
+			     , "papi"
+#endif
 
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR

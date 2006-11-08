@@ -32,6 +32,10 @@
 # include <sys/times.h>
 #endif
 
+#ifdef USE_PAPI
+# include <papi.h>
+#endif
+
 #if ! ((defined(HAVE_GETRUSAGE) && !irix_HOST_OS) || defined(HAVE_TIMES))
 #error No implementation for getProcessCPUTime() available.
 #endif
@@ -68,9 +72,17 @@ void getProcessTimes(Ticks *user, Ticks *elapsed)
 
 Ticks getProcessCPUTime(void)
 {
+#if !defined(THREADED_RTS) && USE_PAPI
+    long long usec;
+    if ((usec = PAPI_get_virt_usec()) < 0) {
+	barf("PAPI_get_virt_usec: %lld", usec);
+    }
+    return ((usec * TICKS_PER_SECOND) / 1000000);
+#else
     Ticks user, elapsed;
     getProcessTimes(&user,&elapsed);
     return user;
+#endif
 }
 
 Ticks getProcessElapsedTime(void)
@@ -115,7 +127,14 @@ void getProcessTimes(Ticks *user, Ticks *elapsed)
 
 Ticks getThreadCPUTime(void)
 {
-#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_THREAD_CPUTIME_ID)
+#if USE_PAPI
+    long long usec;
+    if ((usec = PAPI_get_virt_usec()) < 0) {
+	barf("PAPI_get_virt_usec: %lld", usec);
+    }
+    return ((usec * TICKS_PER_SECOND) / 1000000);
+
+#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_THREAD_CPUTIME_ID)
     // clock_gettime() gives us per-thread CPU time.  It isn't
     // reliable on Linux, but it's the best we have.
     struct timespec ts;

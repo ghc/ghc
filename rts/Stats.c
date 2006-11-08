@@ -17,6 +17,10 @@
 #include "Profiling.h"
 #include "GetTime.h"
 
+#if USE_PAPI
+#include "Papi.h"
+#endif
+
 /* huh? */
 #define BIG_STRING_LEN              512
 
@@ -63,9 +67,6 @@ static lnat ResidencySamples = 0; // for stats only
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
 static Ticks *GC_coll_times;
-
-static void statsPrintf( char *s, ... ) 
-    GNUC3_ATTRIBUTE(format (printf, 1, 2));
 
 static void statsFlush( void );
 static void statsClose( void );
@@ -170,6 +171,18 @@ stat_endInit(void)
     } else {
 	InitElapsedTime = elapsed - ElapsedTimeStart;
     }
+#if USE_PAPI
+    papi_init_eventsets();
+
+    /* We start counting events for the mutator
+     * when garbage collection starts
+     * we switch to the GC event set. */
+    papi_start_mutator_count();
+
+    /* This flag is needed to avoid counting the last GC */
+    papi_is_reporting = 1;
+
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -192,6 +205,16 @@ stat_startExit(void)
 
     MutUserTime = user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
     if (MutUserTime < 0) { MutUserTime = 0; }
+
+#if USE_PAPI
+    /* We stop counting mutator events
+     * GC events are not being counted at this point */
+    papi_stop_mutator_count();
+
+    /* This flag is needed, because GC is run once more after this function */
+    papi_is_reporting = 0;
+
+#endif
 }
 
 void
@@ -249,6 +272,15 @@ stat_startGC(void)
 	    GC_start_faults = getPageFaults();
 	}
     }
+
+#if USE_PAPI
+    if(papi_is_reporting) {
+      /* Switch to counting GC events */
+      papi_stop_mutator_count();
+      papi_start_gc_count();
+    }
+#endif
+
 }
 
 /* -----------------------------------------------------------------------------
@@ -316,6 +348,14 @@ stat_endGC (lnat alloc, lnat live, lnat copied,
 	debugBelch("\b\b\b  \b\b\b");
 	rub_bell = 0;
     }
+
+#if USE_PAPI
+    if(papi_is_reporting) {
+      /* Switch to counting mutator events */
+      papi_stop_gc_count();
+      papi_start_mutator_count();
+    }
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -517,6 +557,16 @@ stat_exit(int alloc)
 		    TICK_TO_DBL(time - GC_tot_time - 
 				PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime) * 100 
 		    / TICK_TO_DBL(etime));
+#if USE_PAPI
+	    /* PAPI reporting, should put somewhere else?
+	     * Note that the cycles are counted _after_ the initialization of the RTS -- AR */
+
+	    statsPrintf("  -- CPU Mutator counters --\n");
+	    papi_report(MutatorCounters);
+
+	    statsPrintf("\n  -- CPU GC counters --\n");
+	    papi_report(GCCounters);
+#endif
 	}
 
 	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
@@ -606,7 +656,7 @@ extern HsInt64 getAllocations( void )
    Dumping stuff in the stats file, or via the debug message interface
    -------------------------------------------------------------------------- */
 
-static void
+void
 statsPrintf( char *s, ... )
 {
     FILE *sf = RtsFlags.GcFlags.statsFile;
