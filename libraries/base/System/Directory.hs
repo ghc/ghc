@@ -72,7 +72,6 @@ import Control.Monad           ( when, unless )
 
 #ifdef __NHC__
 import Directory
-import NHC.FFI
 #endif /* __NHC__ */
 
 #ifdef __HUGS__
