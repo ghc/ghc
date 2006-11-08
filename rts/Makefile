@@ -320,10 +320,10 @@ SRC_HC_OPTS += -optc-fno-stack-protector
 endif
 
 # -O3 helps unroll some loops (especially in copy() with a constant argument).
-GC_HC_OPTS += -optc-O3
+sm/Evac_HC_OPTS += -optc-funroll-loops
 
 # Without this, thread_obj will not be inlined (at least on x86 with GCC 4.1.0)
-GCCompact_HC_OPTS += -optc-finline-limit=2500
+sm/Compact_HC_OPTS += -optc-finline-limit=2500
 
 # -fno-strict-aliasing is required for the runtime, because we often
 # use a variety of types to represent closure pointers (StgPtr,
