@@ -812,7 +812,7 @@ EOF
 # 'PATH'. Note that /usr/bin/fop is broken in SuSE 9.1 (unpatched), so try
 # /usr/share/fop/fop.sh in that case (or no 'fop'), too.
 AC_DEFUN([FP_PROG_FOP],
-[AC_PATH_PROGS([FopCmd1], [fop])
+[AC_PATH_PROGS([FopCmd1], [fop fop.sh])
 if test -n "$FopCmd1"; then
   AC_CACHE_CHECK([for $FopCmd1 usability], [fp_cv_fop_usability],
     [FP_GEN_FO
