@@ -858,6 +858,9 @@ HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 # Haddock can't handle recursive modules currently, so we disable it for now.
 NO_HADDOCK_DOCS = YES
 
+# Tell package.mk not to set $(HC)
+NO_SET_HC = YES
+
 # The stage 2 GHC binary itself is built by  compiling main/Main.hs 
 # (the same as used in stage 1) against the GHC package.
 #

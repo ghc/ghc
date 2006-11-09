@@ -141,7 +141,9 @@ endif # $(way) == ""
 
 SRC_HSC2HS_OPTS += -I.
 
+ifneq "$(NO_SET_HC)" "YES"
 HC = $(GHC_INPLACE)
+endif
 IGNORE_PACKAGE_FLAG = -package-name  $(PACKAGE)-$(VERSION)
 
 ifeq "$(NON_HS_PACKAGE)" ""
