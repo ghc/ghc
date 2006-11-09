@@ -1,9 +1,10 @@
-
+#ifdef USE_PAPI /* ugly */
 
 #include "Papi.h"
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "Stats.h"
+#include "RtsFlags.h"
 
 
 /* These constants specify which events to keep track of.
@@ -23,7 +24,13 @@ struct _papi_events {
   char * event_name;
 };
 
-#define PAPI_ADD_EVENT(EVENT) { EVENT, #EVENT }
+#define PAPI_ADD_EVENT(EVENT) \
+    {			      \
+	ASSERT(n_papi_events<MAX_PAPI_EVENTS);	   \
+	papi_events[n_papi_events].event_code = EVENT;	\
+	papi_events[n_papi_events].event_name = #EVENT; \
+	n_papi_events++;				\
+    }
 
 /* Beware, these counters are Opteron specific */
 #define FR_BR 0x40000040
@@ -47,7 +54,7 @@ struct _papi_events {
 	      papi_counter(EVENTSET,EVENT)*100.0/papi_counter(EVENTSET,EVENTTOT))
 
 /* Number of counted events, computed from size of papi_events */
-#define N_PAPI_EVENTS ((int)(sizeof(papi_events)/sizeof(struct _papi_events)))
+#define N_PAPI_EVENTS n_papi_events
 
 /* This is bad, it should be in a header */
 #define BIG_STRING_LEN 512
@@ -62,6 +69,10 @@ int GCEvents = PAPI_NULL;
 
 int papi_error;
 
+/* Arbitrary, to avoid using malloc */
+#define MAX_PAPI_EVENTS 10
+
+int n_papi_events = 0;
 
 /* If you want to add events to count, extend the
  * papi_events array and the papi_report function.
@@ -69,30 +80,34 @@ int papi_error;
 
 /* Events counted during GC and Mutator execution */
 /* There's a trailing comma, do all C compilers accept that? */
-static struct _papi_events papi_events[] = {
-  PAPI_ADD_EVENT(PAPI_TOT_CYC),
-#if PAPI_COUNT_BRANCHES
-  PAPI_ADD_EVENT(FR_BR),
-  PAPI_ADD_EVENT(FR_BR_MIS),
-  /* Docs are wrong? Opteron does not count indirect branch misses apparently */
-  PAPI_ADD_EVENT(FR_BR_MISCOMPARE),
-#endif
-#if PAPI_COUNT_STALLS
-  PAPI_ADD_EVENT(FR_DISPATCH_STALLS_BR),
-  PAPI_ADD_EVENT(FR_DISPATCH_STALLS_FULL_LS),
-#endif
-#if PAPI_COUNT_DCACHE1_MISSES
-  PAPI_ADD_EVENT(PAPI_L1_DCA),
-  PAPI_ADD_EVENT(PAPI_L1_DCM),
-#endif
-#if PAPI_COUNT_DCACHE2_MISSES
-  PAPI_ADD_EVENT(PAPI_L2_DCA),
-  PAPI_ADD_EVENT(PAPI_L2_DCM),
-#endif
+static struct _papi_events papi_events[MAX_PAPI_EVENTS];
+
+static void
+init_countable_events(void) 
+{
+    PAPI_ADD_EVENT(PAPI_TOT_CYC);
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
+	PAPI_ADD_EVENT(FR_BR);
+	PAPI_ADD_EVENT(FR_BR_MIS);
+	/* Docs are wrong? Opteron does not count indirect branch misses exclusively */
+	PAPI_ADD_EVENT(FR_BR_MISCOMPARE);
+    }
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_STALLS) {
+	PAPI_ADD_EVENT(FR_DISPATCH_STALLS_BR);
+	PAPI_ADD_EVENT(FR_DISPATCH_STALLS_FULL_LS);
+    }
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L1) {
+	PAPI_ADD_EVENT(PAPI_L1_DCA);
+	PAPI_ADD_EVENT(PAPI_L1_DCM);
+    }
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L2) {
+	PAPI_ADD_EVENT(PAPI_L2_DCA);
+	PAPI_ADD_EVENT(PAPI_L2_DCM);
+    }
 };
 
-long_long MutatorCounters[N_PAPI_EVENTS];
-long_long GCCounters[N_PAPI_EVENTS];
+long_long MutatorCounters[MAX_PAPI_EVENTS];
+long_long GCCounters[MAX_PAPI_EVENTS];
 
 
 /* Extract the value corresponding to an event */
@@ -118,28 +133,32 @@ papi_report(long_long PapiCounters[])
 
     /* I need to improve formatting aesthetics */
     PAPI_REPORT(PapiCounters,PAPI_TOT_CYC);
-#if PAPI_COUNT_BRANCHES
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
     PAPI_REPORT(PapiCounters,FR_BR);
     PAPI_REPORT(PapiCounters,FR_BR_MIS);
     PAPI_REPORT_PCT(PapiCounters,FR_BR_MIS,FR_BR);
     PAPI_REPORT_PCT(PapiCounters,FR_BR_MISCOMPARE,FR_BR);
-#endif
-#if PAPI_COUNT_STALLS
+    }
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_STALLS) {
     PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_BR);
     PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_BR,PAPI_TOT_CYC);
     PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS);
     PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS,PAPI_TOT_CYC);
-#endif
-#if PAPI_COUNT_DCACHE1_MISSES
+    }
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L1) {
     PAPI_REPORT(PapiCounters,PAPI_L1_DCA);
     PAPI_REPORT(PapiCounters,PAPI_L1_DCM);
     PAPI_REPORT_PCT(PapiCounters,PAPI_L1_DCM,PAPI_L1_DCA);
-#endif
-#if PAPI_COUNT_DCACHE2_MISSES
+    }
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L2) {
     PAPI_REPORT(PapiCounters,PAPI_L2_DCA);
     PAPI_REPORT(PapiCounters,PAPI_L2_DCM);
     PAPI_REPORT_PCT(PapiCounters,PAPI_L2_DCM,PAPI_L2_DCA);
-#endif
+    }
+
 }
 
 /* Add the events of papi_events into an event set */
@@ -159,6 +178,8 @@ papi_add_events(int EventSet)
 void
 papi_init_eventsets(void)
 {
+
+    init_countable_events();
 
     /* One event set for the mutator and another for the GC */
     PAPI_CHECK( PAPI_create_eventset(&MutatorEvents));
@@ -195,3 +216,6 @@ papi_stop_gc_count(void)
       PAPI_CHECK( PAPI_accum(GCEvents,GCCounters));
       PAPI_CHECK( PAPI_stop(GCEvents,NULL));
 }
+
+
+#endif /* USE_PAPI */

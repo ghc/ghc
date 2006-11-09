@@ -301,6 +301,10 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.TraceFlags.timestamp	= rtsFalse;
     RtsFlags.TraceFlags.sched 		= rtsFalse;
+
+#ifdef USE_PAPI
+    RtsFlags.PapiFlags.eventType        = PAPI_FLAG_BRANCH;
+#endif
 }
 
 static const char *
@@ -448,6 +452,16 @@ usage_text[] = {
 #endif /* PAR */
 #if defined(GRAN)  /* ToDo: fill in decent Docu here */
 "  -b...     All GranSim options start with -b; see GranSim User's Guide for details",
+#endif
+#if defined(USE_PAPI)
+"  -aX       Perform measurements using PAPI, it should be used with the -s<file> option.",
+"            Where X is one of:",
+"",
+/* "            y - cycles", */
+"            1 - level 1 cache misses",
+"            2 - level 2 cache misses",
+"            b - branch mispredictions",
+"            s - stalled cycles",
 #endif
 "",
 "RTS options may also be specified using the GHCRTS environment variable.",
@@ -646,6 +660,27 @@ error = rtsTrue;
 		  bad_option(rts_argv[arg]);
 		}
 		break;
+
+#ifdef USE_PAPI
+	      case 'a':
+		switch(rts_argv[arg][2]) {
+		case '1':
+		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CACHE_L1;
+		  break;
+		case '2':
+		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CACHE_L2;
+		  break;
+		case 'b':
+		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_BRANCH;
+		  break;
+		case 's':
+		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_STALLS;
+		  break;
+		default:
+		  bad_option( rts_argv[arg] );
+		}
+		break;
+#endif
 
 	      case 'B':
 		RtsFlags.GcFlags.ringBell = rtsTrue;

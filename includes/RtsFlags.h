@@ -302,6 +302,18 @@ struct TRACE_FLAGS {
 
 /* Put them together: */
 
+#ifdef USE_PAPI
+struct PAPI_FLAGS {
+    nat     eventType;          /* The type of events to count */
+};
+
+#define PAPI_FLAG_CACHE_L1 1
+#define PAPI_FLAG_CACHE_L2 2
+#define PAPI_FLAG_BRANCH 3
+#define PAPI_FLAG_STALLS 4
+
+#endif
+
 typedef struct _RTS_FLAGS {
     /* The first portion of RTS_FLAGS is invariant. */
     struct GC_FLAGS	     GcFlags;
@@ -318,6 +330,9 @@ typedef struct _RTS_FLAGS {
 #endif
 #ifdef GRAN
     struct GRAN_FLAGS	GranFlags;
+#endif
+#ifdef USE_PAPI
+    struct PAPI_FLAGS   PapiFlags;
 #endif
 } RTS_FLAGS;
 
