@@ -303,7 +303,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.sched 		= rtsFalse;
 
 #ifdef USE_PAPI
-    RtsFlags.PapiFlags.eventType        = PAPI_FLAG_BRANCH;
+    /* By default no special measurements taken */
+    RtsFlags.PapiFlags.eventType        = 0;
 #endif
 }
 
