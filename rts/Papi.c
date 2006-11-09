@@ -1,3 +1,18 @@
+
+/* -----------------------------------------------------------------------------
+ * (c) The GHC Team 2006
+ * 
+ * Initialization and use of the PAPI performance monitoring library
+ *
+ *
+ * For adding events or add your processor counters modify
+ *
+ *   init_countable_events
+ *   papi_report
+ *
+ * ---------------------------------------------------------------------------*/
+
+
 #ifdef USE_PAPI /* ugly */
 
 #include "Papi.h"
@@ -6,18 +21,6 @@
 #include "Stats.h"
 #include "RtsFlags.h"
 
-
-/* These constants specify which events to keep track of.
- * Probably it is better to count one set of events at a time.
- * The reason is that processors have limited counters and
- * multiplexing is not enabled (yet).
- */
-#define PAPI_COUNT_BRANCHES 0
-/* The one below is Opteron specific.
- */
-#define PAPI_COUNT_STALLS 0
-#define PAPI_COUNT_DCACHE1_MISSES 1
-#define PAPI_COUNT_DCACHE2_MISSES 0
 
 struct _papi_events {
   int event_code;
@@ -32,15 +35,6 @@ struct _papi_events {
 	n_papi_events++;				\
     }
 
-/* Beware, these counters are Opteron specific */
-#define FR_BR 0x40000040
-#define FR_BR_MIS 0x40000041
-#define FR_BR_MISCOMPARE 0x40000048
-#define DC_ACCESS 0x40000019
-#define DC_MISS 0x4000001a
-#define FR_DISPATCH_STALLS_BR 0x40000055
-#define FR_DISPATCH_STALLS_FULL_LS 0x4000005b
-
 /* Report the value of a counter */
 #define PAPI_REPORT(EVENTSET,EVENT) \
   { \
@@ -52,6 +46,20 @@ struct _papi_events {
 #define PAPI_REPORT_PCT(EVENTSET,EVENT,EVENTTOT) \
   statsPrintf("  (" #EVENT ") %% of (" #EVENTTOT ") : %.1f%%\n", \
 	      papi_counter(EVENTSET,EVENT)*100.0/papi_counter(EVENTSET,EVENTTOT))
+
+/* Beware, these counters are Opteron specific
+ * I obtained the numbers using the papi_avail
+ * and papi_native_avail utilities.
+ * This is certainly not the official PAPI way
+ * of doing things.
+ */
+#define FR_BR 0x40000040
+#define FR_BR_MIS 0x40000041
+#define FR_BR_MISCOMPARE 0x40000048
+#define DC_ACCESS 0x40000019
+#define DC_MISS 0x4000001a
+#define FR_DISPATCH_STALLS_BR 0x40000055
+#define FR_DISPATCH_STALLS_FULL_LS 0x4000005b
 
 /* Number of counted events, computed from size of papi_events */
 #define N_PAPI_EVENTS n_papi_events
@@ -74,14 +82,19 @@ int papi_error;
 
 int n_papi_events = 0;
 
-/* If you want to add events to count, extend the
- * papi_events array and the papi_report function.
- */
 
 /* Events counted during GC and Mutator execution */
 /* There's a trailing comma, do all C compilers accept that? */
 static struct _papi_events papi_events[MAX_PAPI_EVENTS];
+long_long MutatorCounters[MAX_PAPI_EVENTS];
+long_long GCCounters[MAX_PAPI_EVENTS];
 
+/* If you want to add events to count, extend the
+ * init_countable_events and the papi_report function.
+ * Be aware that your processor can count a limited number
+ * of events simultaneously, you can turn on multiplexing
+ * to increase that number, though.
+ */
 static void
 init_countable_events(void) 
 {
@@ -106,9 +119,60 @@ init_countable_events(void)
     }
 };
 
-long_long MutatorCounters[MAX_PAPI_EVENTS];
-long_long GCCounters[MAX_PAPI_EVENTS];
+/* This function reports counters for GC and mutator */
+void
+papi_report(long_long PapiCounters[])
+{
+    char temp[BIG_STRING_LEN];
 
+    /* I need to improve formatting aesthetics */
+    PAPI_REPORT(PapiCounters,PAPI_TOT_CYC);
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
+	PAPI_REPORT(PapiCounters,FR_BR);
+	PAPI_REPORT(PapiCounters,FR_BR_MIS);
+	PAPI_REPORT_PCT(PapiCounters,FR_BR_MIS,FR_BR);
+	PAPI_REPORT_PCT(PapiCounters,FR_BR_MISCOMPARE,FR_BR);
+    }
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_STALLS) {
+	PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_BR);
+	PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_BR,PAPI_TOT_CYC);
+	PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS);
+	PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS,PAPI_TOT_CYC);
+    }
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L1) {
+	PAPI_REPORT(PapiCounters,PAPI_L1_DCA);
+	PAPI_REPORT(PapiCounters,PAPI_L1_DCM);
+	PAPI_REPORT_PCT(PapiCounters,PAPI_L1_DCM,PAPI_L1_DCA);
+    }
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L2) {
+	PAPI_REPORT(PapiCounters,PAPI_L2_DCA);
+	PAPI_REPORT(PapiCounters,PAPI_L2_DCM);
+	PAPI_REPORT_PCT(PapiCounters,PAPI_L2_DCM,PAPI_L2_DCA);
+    }
+
+}
+
+
+
+void
+papi_init_eventsets(void)
+{
+
+    init_countable_events();
+
+    /* One event set for the mutator and another for the GC */
+    PAPI_CHECK( PAPI_create_eventset(&MutatorEvents));
+    PAPI_CHECK( PAPI_create_eventset(&GCEvents));
+
+    /* Both sets contain the same events */
+    papi_add_events(MutatorEvents);
+    papi_add_events(GCEvents);
+
+}
 
 /* Extract the value corresponding to an event */
 long_long
@@ -125,42 +189,6 @@ papi_counter(long_long values[],int event)
   return 0;
 }
 
-/* This function reports counters for GC and mutator */
-void
-papi_report(long_long PapiCounters[])
-{
-    char temp[BIG_STRING_LEN];
-
-    /* I need to improve formatting aesthetics */
-    PAPI_REPORT(PapiCounters,PAPI_TOT_CYC);
-    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
-    PAPI_REPORT(PapiCounters,FR_BR);
-    PAPI_REPORT(PapiCounters,FR_BR_MIS);
-    PAPI_REPORT_PCT(PapiCounters,FR_BR_MIS,FR_BR);
-    PAPI_REPORT_PCT(PapiCounters,FR_BR_MISCOMPARE,FR_BR);
-    }
-
-    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_STALLS) {
-    PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_BR);
-    PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_BR,PAPI_TOT_CYC);
-    PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS);
-    PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS,PAPI_TOT_CYC);
-    }
-
-    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L1) {
-    PAPI_REPORT(PapiCounters,PAPI_L1_DCA);
-    PAPI_REPORT(PapiCounters,PAPI_L1_DCM);
-    PAPI_REPORT_PCT(PapiCounters,PAPI_L1_DCM,PAPI_L1_DCA);
-    }
-
-    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L2) {
-    PAPI_REPORT(PapiCounters,PAPI_L2_DCA);
-    PAPI_REPORT(PapiCounters,PAPI_L2_DCM);
-    PAPI_REPORT_PCT(PapiCounters,PAPI_L2_DCM,PAPI_L2_DCA);
-    }
-
-}
-
 /* Add the events of papi_events into an event set */
 void
 papi_add_events(int EventSet)
@@ -173,22 +201,6 @@ papi_add_events(int EventSet)
       debugBelch("Failed adding %s to event set with error code %d\n",
 		 papi_events[i].event_name,papi_error);
   }
-}
-
-void
-papi_init_eventsets(void)
-{
-
-    init_countable_events();
-
-    /* One event set for the mutator and another for the GC */
-    PAPI_CHECK( PAPI_create_eventset(&MutatorEvents));
-    PAPI_CHECK( PAPI_create_eventset(&GCEvents));
-
-    /* Both sets contain the same events */
-    papi_add_events(MutatorEvents);
-    papi_add_events(GCEvents);
-
 }
 
 void
