@@ -3,9 +3,6 @@
 
 ifneq "$(PACKAGE)" ""
 
-# FIXME: does anyone do this any more?
-STANDALONE_PACKAGE = NO
-
 # -----------------------------------------------------------------------------
 # Directory layouts, installation etc.
 
@@ -61,11 +58,7 @@ HADDOCK_IFACE_INSTALLED = $(HTML_DIR_INSTALLED)/$(PACKAGE).haddock
 
 ifeq "$(way)" ""
 
-ifeq "$(STANDALONE_PACKAGE)" "NO"
 PACKAGE_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -Iinclude
-else
-PACKAGE_CPP_OPTS += -Iinclude
-endif
 
 PACKAGE_CPP_OPTS += -DPACKAGE=${PACKAGE}
 PACKAGE_CPP_OPTS += -DVERSION=${VERSION}
@@ -109,7 +102,6 @@ package.conf.installed : package.conf.in
 # to 'make clean' in ghc without cleaning in libraries too, the packages
 # will be correctly re-installed.
 #
-ifeq "$(STANDALONE_PACKAGE)" "NO"
 
 STAMP_PKG_CONF = $(GHC_DRIVER_DIR)/stamp-pkg-conf-$(PACKAGE)
 CLEAN_FILES += $(STAMP_PKG_CONF)
@@ -142,8 +134,6 @@ install :: package.conf.installed
 install-inplace-pkg : package.conf.inplace
 	$(GHC_PKG) --force --update-package <package.conf.inplace
 
-endif # $(STANDALONE_PACKAGE)
-
 endif # $(way) == ""
 
 # -----------------------------------------------------------------------------
@@ -151,19 +141,8 @@ endif # $(way) == ""
 
 SRC_HSC2HS_OPTS += -I.
 
-ifeq "$(STANDALONE_PACKAGE)" "NO"
 HC = $(GHC_INPLACE)
 IGNORE_PACKAGE_FLAG = -package-name  $(PACKAGE)-$(VERSION)
-else
-# Only use -ignore-package if supported by HC; i.e., ghc-6.3 and later.
-# (Don't like the use of slow $(shell ..) in Makefiles, but can't see a way around it here.)
-ifeq "$(strip $(GHC))" ""
-IGNORE_PACKAGE_FLAG = -ignore-package $(PACKAGE)
-else
-# Making the assumption here that standalone packages will be using mk/config.mk:GHC
-IGNORE_PACKAGE_FLAG = $(shell if (test $(GhcCanonVersion) -ge 603); then echo "-ignore-package"; else echo "-package-name"; fi) $(PACKAGE)
-endif 
-endif # STANDALONE_PACKAGE
 
 ifeq "$(NON_HS_PACKAGE)" ""
 SRC_HC_OPTS	+= $(IGNORE_PACKAGE_FLAG)
@@ -238,15 +217,10 @@ endif
 # -----------------------------------------------------------------------------
 # Dependencies
 
-ifeq "$(STANDALONE_PACKAGE)" "NO"
 MKDEPENDHS = $(GHC_INPLACE)
-endif
 
 SRC_MKDEPENDC_OPTS += $(addprefix -I,$(ALL_DIRS))
-
-ifeq "$(STANDALONE_PACKAGE)" "NO"
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
-endif
 
 endif # $(PACKAGE) != ""
 
