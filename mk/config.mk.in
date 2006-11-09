@@ -987,6 +987,9 @@ UNAME			= uname
 # GTK+
 GTK_CONFIG = @GTK_CONFIG@
 
+# PAPI
+USE_PAPI   = @USE_PAPI@
+
 #-----------------------------------------------------------------------------
 # DocBook XML stuff
 

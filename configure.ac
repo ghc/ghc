@@ -1200,6 +1200,17 @@ if test -n "$GTK_CONFIG"; then
 fi
 AC_SUBST([GTK_CONFIG])
 
+#Checking for PAPI
+AC_CHECK_LIB(papi, PAPI_library_init, HavePapiLib=YES, HavePapiLib=NO)
+AC_CHECK_HEADER([papi.h], [HavePapiHeader=YES], [HavePapiHeader=NO])
+AC_SUBST(HavePapiLib)
+AC_SUBST(HavePapiHeader)
+
+if test "$HavePapiLib" = "YES" -a "$HavePapiHeader" = "YES"; then
+   USE_PAPI=YES
+fi
+AC_SUBST(USE_PAPI)
+
 AC_CONFIG_FILES([mk/config.mk ghc.spec docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
