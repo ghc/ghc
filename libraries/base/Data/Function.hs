@@ -17,6 +17,8 @@ module Data.Function
   , on
   ) where
 
+import Prelude
+
 infixl 0 `on`
 
 -- | @(*) \`on\` f = \\x y -> f x * f y@.
