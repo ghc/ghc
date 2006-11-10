@@ -29,9 +29,7 @@ import TypeRep
 import TyCon
 import Var
 import TysWiredIn
-import OccName
 import Name
-import Module
 import BasicTypes
 import Outputable
 import FastString
