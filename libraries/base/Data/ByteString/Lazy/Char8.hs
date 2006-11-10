@@ -177,7 +177,7 @@ module Data.ByteString.Lazy.Char8 (
 -- Functions transparently exported
 import Data.ByteString.Lazy 
         (ByteString, fromChunks, toChunks
-        ,empty,null,length,tail,init,append,reverse,transpose
+        ,empty,null,length,tail,init,append,reverse,transpose,cycle
         ,concat,take,drop,splitAt,join,isPrefixOf,group,inits,tails,copy
         ,hGetContents, hGet, hPut, getContents
         ,hGetNonBlocking
@@ -200,7 +200,7 @@ import Prelude hiding
         ,concat,any,take,drop,splitAt,takeWhile,dropWhile,span,break,elem,filter
         ,unwords,words,maximum,minimum,all,concatMap,scanl,scanl1,foldl1,foldr1
         ,readFile,writeFile,appendFile,replicate,getContents,getLine,putStr,putStrLn
-        ,zip,zipWith,unzip,notElem,repeat,iterate,interact)
+        ,zip,zipWith,unzip,notElem,repeat,iterate,interact,cycle)
 
 import System.IO            (hClose,openFile,IOMode(..))
 import Control.Exception    (bracket)
