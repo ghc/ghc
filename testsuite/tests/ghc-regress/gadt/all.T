@@ -51,6 +51,9 @@ test('gadt-fd', expect_fail, compile, [''])
 
 test('karl1', normal, compile, [''])
 test('karl2', normal, compile, [''])
+test('data1', normal, compile, [''])
+test('data2', normal, compile, [''])
+
 
 # New ones from Dimitrios
 
