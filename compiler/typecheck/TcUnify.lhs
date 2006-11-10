@@ -65,7 +65,7 @@ tcInfer tc_infer
 	; res <- tc_infer (mkTyVarTy box)
 	; res_ty <- readFilledBox box	-- Guaranteed filled-in by now
 	; return (res, res_ty) }
-\end{code}		   
+\end{code}
 
 
 %************************************************************************

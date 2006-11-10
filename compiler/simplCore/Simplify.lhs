@@ -553,7 +553,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
     loop_breaker = isNonRuleLoopBreaker occ_info
     old_info     = idInfo old_bndr
     occ_info     = occInfo old_info
-\end{code}    
+\end{code}
 
 
 

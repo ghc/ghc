@@ -236,7 +236,7 @@ isBoxed Unboxed = False
 %*									*
 %************************************************************************
 
-\begin{code} 
+\begin{code}
 data RecFlag = Recursive 
 	     | NonRecursive
 	     deriving( Eq )

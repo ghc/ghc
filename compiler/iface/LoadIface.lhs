@@ -518,7 +518,7 @@ ifaceStats eps
     	 hsep [ int (n_rules_out stats), text "rule decls imported, out of",  
     	        int (n_rules_in stats), text "read"]
 	]
-\end{code}    
+\end{code}
 
 
 %************************************************************************

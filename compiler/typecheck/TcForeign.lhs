@@ -309,7 +309,7 @@ checkCg check
        case check target of
 	 Nothing  -> returnM ()
 	 Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
-\end{code} 
+\end{code}
 			   
 Calling conventions
 

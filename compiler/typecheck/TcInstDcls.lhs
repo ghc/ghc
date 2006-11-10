@@ -221,7 +221,7 @@ addFamInsts tycons thing_inside
     mkLocalFamInstTyThing (ATyCon tycon) = mkLocalFamInst tycon
     mkLocalFamInstTyThing tything	 = pprPanic "TcInstDcls.addFamInsts"
 						    (ppr tything)
-\end{code} 
+\end{code}
 
 \begin{code}
 tcLocalInstDecl1 :: LInstDecl Name 

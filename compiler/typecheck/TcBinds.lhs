@@ -827,7 +827,7 @@ checkDistinctTyVars sig_tvs
 		         <+> quotes (ppr tidy_tv2)
 	    ; failWithTcM (env2, msg) }
        where
-\end{code}    
+\end{code}
 
 
 @getTyVarsToGen@ decides what type variables to generalise over.

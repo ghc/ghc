@@ -184,7 +184,7 @@ gadtRefine (Reft in_scope env1)
     do_one reft co_var = unify reft (TyVarTy co_var) ty1 ty2
 	where
 	   (ty1,ty2) = splitCoercionKind (tyVarKind co_var)
-\end{code} 
+\end{code}
 
 %************************************************************************
 %*									*
