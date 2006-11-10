@@ -12,7 +12,7 @@ module Util (
         zipLazy, stretchZipWith,
 	mapFst, mapSnd,
 	mapAndUnzip, mapAndUnzip3,
-	nOfThem, filterOut,
+	nOfThem, filterOut, partitionWith,
 
 	lengthExceeds, lengthIs, lengthAtLeast, 
 	listLengthCmp, atLength, equalLength, compareLength,
@@ -168,6 +168,15 @@ filterOut :: (a->Bool) -> [a] -> [a]
 filterOut p [] = []
 filterOut p (x:xs) | p x       = filterOut p xs
 		   | otherwise = x : filterOut p xs
+
+partitionWith :: (a -> Either b c) -> [a] -> ([b], [c])
+partitionWith f [] = ([],[])
+partitionWith f (x:xs) = case f x of
+			   Left  b -> (b:bs, cs)
+			   Right c -> (bs, c:cs)
+		       where
+			 (bs,cs) = partitionWith f xs
+
 \end{code}
 
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
