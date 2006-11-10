@@ -8,6 +8,7 @@
 
 #include "Rts.h"
 #include "Storage.h"
+#include "LdvProfile.h"
 #include "Updates.h"
 #include "RaiseAsync.h"
 #include "Trace.h"

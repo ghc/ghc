@@ -30,6 +30,7 @@
 #include "Trace.h"
 #include "RtsTypeable.h"
 #include "Stable.h"
+#include "Hpc.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
