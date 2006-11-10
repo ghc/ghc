@@ -44,6 +44,10 @@ test('ubx-records', skip_if_fast, compile_and_run, [''])
 test('records-fail1', normal, compile_fail, [''])
 
 test('doaitse', normal, compile, [''])
+test('josef', normal, compile, [''])
+
+# Interaction of fundeps with GADTs doesn't work well 
+test('gadt-fd', expect_fail, compile, [''])
 
 # New ones from Dimitrios
 

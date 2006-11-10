@@ -1,6 +1,6 @@
 
 lazypat.hs:7:2:
     A lazy (~) pattern connot bind existential type variables
-      `a' is bound by the pattern for `T' at lazypat.hs:7:4-8
+      `a' is bound by the constructor `T' at lazypat.hs:7:4
     In the pattern: ~(T x f)
     In the definition of `f': f ~(T x f) = f x
