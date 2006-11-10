@@ -478,7 +478,7 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 mkTupleTy :: Boxity -> Int -> [Type] -> Type
 mkTupleTy boxity arity tys = mkTyConApp (tupleTyCon boxity arity) tys
 
-unitTy    = mkTupleTy Boxed 0 []
+unitTy = mkTupleTy Boxed 0 []
 \end{code}
 
 %************************************************************************
