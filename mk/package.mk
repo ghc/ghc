@@ -117,23 +117,6 @@ $(STAMP_PKG_CONF) : package.conf.inplace package.conf.installed
 
 CLEAN_FILES += package.conf.installed package.conf.inplace 
 
-else # $(STANDALONE_PACKAGE) == "YES"
-
-PACKAGE_CPP_OPTS += -DPACKAGE_DEPS='$(subst " ","$(comma) ",$(patsubst %,"%",$(PACKAGE_DEPS)))'
-PACKAGE_CPP_OPTS += -DLIBRARY=\"HS$(PACKAGE)\"
-PACKAGE_CPP_OPTS += -DLIBDIR=\"$(libdir)\"
-
-# Let the package configuration file refer to $(libdir) as
-# ${pkglibdir}.  Note we can't use ${libdir} because ghc-pkg already
-# redefines it to point to GHC's libdir (bug or feature?).
-#
-install :: package.conf.installed
-	$(GHC_PKG) --force --update-package <package.conf.installed
-
-# Invoke this rule by hand in order to use the package in-place
-install-inplace-pkg : package.conf.inplace
-	$(GHC_PKG) --force --update-package <package.conf.inplace
-
 endif # $(way) == ""
 
 # -----------------------------------------------------------------------------
