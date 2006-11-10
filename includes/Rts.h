@@ -156,6 +156,10 @@ extern void _assertFail (const char *, unsigned int);
 #include "Hooks.h"
 #include "RtsMessages.h"
 
+/* for StablePtr/getStablePtr/deRefStablePtr */
+#include "Storage.h"
+#include "Stable.h"
+
 #include "ieee-flpt.h"
 
 #include "Signals.h"
