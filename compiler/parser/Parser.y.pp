@@ -1186,8 +1186,8 @@ exp10 :: { LHsExpr RdrName }
 	: '\\' aexp aexps opt_asig '->' exp	
 			{% checkPatterns ($2 : reverse $3) >>= \ ps -> 
 			   return (LL $ HsLam (mkMatchGroup [LL $ Match ps $4
-					    (GRHSs (unguardedRHS $6) emptyLocalBinds
-							)])) }
+							    	  (unguardedGRHSs $6)
+							    ])) }
   	| 'let' binds 'in' exp			{ LL $ HsLet (unLoc $2) $4 }
 	| 'if' exp 'then' exp 'else' exp	{ LL $ HsIf $2 $4 $6 }
    	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }

@@ -28,7 +28,6 @@ import RdrName
 import Var
 import Type
 import DataCon
-import OccName
 import Name
 import BasicTypes
 import SrcLoc
@@ -53,15 +52,17 @@ just attach noSrcSpan to everything.
 mkHsPar :: LHsExpr id -> LHsExpr id
 mkHsPar e = L (getLoc e) (HsPar e)
 
--- gaw 2004
 mkSimpleMatch :: [LPat id] -> LHsExpr id -> LMatch id
 mkSimpleMatch pats rhs 
   = L loc $
-    Match pats Nothing (GRHSs (unguardedRHS rhs) emptyLocalBinds)
+    Match pats Nothing (unguardedGRHSs rhs)
   where
     loc = case pats of
 		[]      -> getLoc rhs
 		(pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
+
+unguardedGRHSs :: LHsExpr id -> GRHSs id
+unguardedGRHSs rhs = GRHSs (unguardedRHS rhs) emptyLocalBinds
 
 unguardedRHS :: LHsExpr id -> [LGRHS id]
 unguardedRHS rhs@(L loc _) = [L loc (GRHS [] rhs)]
