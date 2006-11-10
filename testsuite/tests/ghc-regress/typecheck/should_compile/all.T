@@ -231,6 +231,8 @@ test('tc215', normal, compile, [''])
 test('tc216', normal, compile, [''])
 test('tc217', normal, compile, [''])
 
+test('faxen', normal, compile, [''])
+
 # Omitting temporarily
 # test('syn-perf', normal, compile, ['-fcontext-stack=30'])
 # test('syn-perf2', normal, compile, ['-fcontext-stack=30'])
