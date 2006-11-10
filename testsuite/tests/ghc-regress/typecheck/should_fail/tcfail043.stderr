@@ -1,7 +1,7 @@
 
 tcfail043.hs:38:16:
     Ambiguous type variable `a' in the constraint:
-      `Ord_ a' arising from use of `gt' at tcfail043.hs:38:16-27
+      `Ord_ a' arising from a use of `gt' at tcfail043.hs:38:16-27
     Possible cause: the monomorphism restriction applied to the following:
       search :: a -> [a] -> Bool (bound at tcfail043.hs:37:0)
     Probable fix: give these definition(s) an explicit type signature

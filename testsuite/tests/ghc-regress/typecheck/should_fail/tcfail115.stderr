@@ -4,7 +4,7 @@ tcfail115.hs:9:23:
     When matching the kinds of `t :: ??' and `(# Int, Int #) :: (#)'
       Expected type: (# Int, Int #)
       Inferred type: t
-    In the expression: r
+    In the expression: (r :: (# Int, Int #))
 
 tcfail115.hs:12:24:
     The variable `r' cannot be bound to an unboxed tuple

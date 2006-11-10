@@ -3,11 +3,11 @@ tcfail076.hs:18:67:
     Couldn't match expected type `res' (a rigid variable)
 	   against inferred type `res1' (a rigid variable)
       `res' is bound by the polymorphic type
-	      `forall res. (b -> m res) -> m res'
-	      at tcfail076.hs:18:49-73
+			  `forall res. (b -> m res) -> m res'
+			  at tcfail076.hs:18:49
       `res1' is bound by the polymorphic type
-	       `forall res1. (a -> m res1) -> m res1'
-	       at tcfail076.hs:18:13-81
+			   `forall res1. (a -> m res1) -> m res1'
+			   at tcfail076.hs:18:13
       Expected type: m res
       Inferred type: m res1
     In the expression: cont a

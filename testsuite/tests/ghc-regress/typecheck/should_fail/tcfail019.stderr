@@ -1,8 +1,9 @@
 
 tcfail019.hs:18:0:
-    No instances for (B [a], C [a])
-      arising from the superclasses of an instance declaration at tcfail019.hs:18:0
+    Could not deduce (C [a], B [a]) from the context ()
+      arising from the superclasses of an instance declaration
+		   at tcfail019.hs:18:0
     Possible fix:
-      add (B [a], C [a]) to the instance declaration superclass context
-      or add an instance declaration for (B [a], C [a])
+      add (C [a], B [a]) to the context of the instance declaration
+      or add an instance declaration for (C [a], B [a])
     In the instance declaration for `D [a]'

@@ -1,5 +1,6 @@
 
-tcfail132.hs:21:35:
+tcfail132.hs:17:35:
     Kind mis-match
-    Expected kind `k -> k1 -> k2 -> *', but `Object f' f t' has kind `k -> k1 -> *'
+    Expected kind `k -> k1 -> k2 -> *',
+    but `Object f' f t' has kind `k -> k1 -> *'
     In the type synonym declaration for `LiftObject'

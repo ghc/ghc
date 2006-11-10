@@ -1,8 +1,9 @@
 
 tcfail034.hs:17:10:
     Could not deduce (Integral a) from the context (Num a, Eq a)
-      arising from use of `mod' at tcfail034.hs:17:10-18
-    Possible fix: add (Integral a) to the type signature(s) for `test'
+      arising from a use of `mod' at tcfail034.hs:17:10-18
+    Possible fix:
+      add (Integral a) to the context of the type signature for `test'
     In the first argument of `(==)', namely `(x `mod` 3)'
     In the expression: (x `mod` 3) == 0
     In the definition of `test': test x = (x `mod` 3) == 0

@@ -1,7 +1,7 @@
 
 tcfail029.hs:6:6:
     No instance for (Ord Foo)
-      arising from use of `>' at tcfail029.hs:6:6-12
+      arising from a use of `>' at tcfail029.hs:6:6-12
     Possible fix: add an instance declaration for (Ord Foo)
     In the expression: x > Bar
     In the definition of `f': f x = x > Bar

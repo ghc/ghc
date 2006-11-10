@@ -1,7 +1,7 @@
 
 tcfail121.hs:12:8:
     Overlapping instances for Foo [a]
-      arising from use of `op' at tcfail121.hs:12:8-11
+      arising from a use of `op' at tcfail121.hs:12:8-11
     Matching instances:
       instance [overlap ok] (Foo a) => Foo [a]
 	-- Defined at tcfail121.hs:8:0

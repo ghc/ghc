@@ -1,8 +1,9 @@
 
-tcfail143.hs:1:0:
+tcfail143.hs:27:0:
     Couldn't match expected type `Z' against inferred type `S Z'
     When using functional dependencies to combine
       MinMax a Z Z a,
 	arising from the instance declaration at tcfail143.hs:10:0
       MinMax (S Z) Z Z Z,
-	arising from use of `extend' at tcfail143.hs:27:5-18
+	arising from a use of `extend' at tcfail143.hs:27:5-18
+    When generalising the type(s) for `t2'

@@ -1,7 +1,8 @@
 
 tcfail125.hs:11:3:
-    No instance for (Show a)
-      arising from use of `LiftObs' at tcfail125.hs:11:3-13
-    Possible fix: add (Show a) to the type signature(s) for `f'
+    Could not deduce (Show a) from the context ()
+      arising from a use of `LiftObs' at tcfail125.hs:11:3-13
+    Possible fix:
+      add (Show a) to the context of the type signature for `f'
     In the pattern: LiftObs _ _
     In the definition of `f': f (LiftObs _ _) = "yes"

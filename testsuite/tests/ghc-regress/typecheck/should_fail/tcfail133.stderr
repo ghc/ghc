@@ -1,7 +1,7 @@
 
 tcfail133.hs:67:13:
     No instance for (AddDigit ((:@) Zero ((:@) One One)) One a)
-      arising from use of `add' at tcfail133.hs:67:13-38
+      arising from a use of `add' at tcfail133.hs:67:13-38
     Possible fix:
       add an instance declaration for
       (AddDigit ((:@) Zero ((:@) One One)) One a)

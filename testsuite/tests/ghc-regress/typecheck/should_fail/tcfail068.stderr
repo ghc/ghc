@@ -12,7 +12,7 @@ tcfail068.hs:19:13:
     Couldn't match expected type `s' (a rigid variable)
 	   against inferred type `s1' (a rigid variable)
       `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
-	    at tcfail068.hs:(18,1)-(21,11)
+	at tcfail068.hs:18:1
       `s1' is bound by the type signature for `itiap'
 	at tcfail068.hs:16:57
       Expected type: STArray s i a1
@@ -24,7 +24,7 @@ tcfail068.hs:24:34:
     Couldn't match expected type `s' (a rigid variable)
 	   against inferred type `s1' (a rigid variable)
       `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
-	    at tcfail068.hs:24:28-44
+	at tcfail068.hs:24:28
       `s1' is bound by the type signature for `itrap'
 	at tcfail068.hs:23:69
       Expected type: GHC.ST.ST s a
@@ -36,7 +36,7 @@ tcfail068.hs:36:45:
     Couldn't match expected type `s' (a rigid variable)
 	   against inferred type `s1' (a rigid variable)
       `s' is bound by the polymorphic type `forall s. GHC.ST.ST s a'
-	    at tcfail068.hs:36:39-62
+	at tcfail068.hs:36:39
       `s1' is bound by the type signature for `itrapstate'
 	at tcfail068.hs:35:25
       Expected type: GHC.ST.ST s a

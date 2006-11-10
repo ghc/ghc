@@ -1,7 +1,6 @@
 
 tcfail144.hs:9:2:
-    Couldn't match expected type `{Ord a}'
-	   against inferred type `{Eq a1}'
+    Couldn't match expected type `Ord a' against inferred type `Eq a1'
     When matching the contexts of the signatures for
       f1 :: forall a. (Eq a) => a -> Bool
       g1 :: forall a. (Ord a) => a -> Bool
