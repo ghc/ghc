@@ -32,6 +32,13 @@ typedef struct _Info {
   struct _Info *next;
 } Info;
 
+// This is a cruel hack, we should completely redesign the format specifier handling in the RTS.
+#if SIZEOF_LONG == 8
+#define PRIuWORD64 "lu"
+#else
+#define PRIuWORD64 "llu"
+#endif
+
 Info *modules = 0;
 Info *nextModule = 0;
 StgWord64 *tixBoxes = 0;	// local copy of tixBoxes array, from file.
@@ -314,7 +321,7 @@ exitHpc(void) {
       }
 
       if (tmpModule->tixArr) {
-	fprintf(f,"%lld",tmpModule->tixArr[i]);
+	fprintf(f,"%" PRIuWORD64,tmpModule->tixArr[i]);
       } else {
 	fprintf(f,"0");
       }
