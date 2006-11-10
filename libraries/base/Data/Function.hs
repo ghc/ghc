@@ -14,12 +14,18 @@ module Data.Function
   ( -- * "Prelude" re-exports
     id, const, (.), flip, ($)
     -- * Other combinators
+  , fix
   , on
   ) where
 
 import Prelude
 
 infixl 0 `on`
+
+-- | @'fix' f@ is the least fixed point of the function @f@,
+-- i.e. the least defined @x@ such that @f x = x@.
+fix :: (a -> a) -> a
+fix f = let x = f x in x
 
 -- | @(*) \`on\` f = \\x y -> f x * f y@.
 --

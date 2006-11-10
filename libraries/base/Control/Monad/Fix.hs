@@ -25,11 +25,7 @@ module Control.Monad.Fix (
 import Prelude
 import System.IO
 import Control.Monad.Instances ()
-
--- | @'fix' f@ is the least fixed point of the function @f@,
--- i.e. the least defined @x@ such that @f x = x@.
-fix :: (a -> a) -> a
-fix f = let x = f x in x
+import Data.Function (fix)
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:
