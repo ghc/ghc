@@ -870,10 +870,14 @@ foreign import ccall unsafe "__hscore_S_IRUSR" s_IRUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IWUSR" s_IWUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IXUSR" s_IXUSR :: CMode
 
-#endif /* __GLASGOW_HASKELL__ */
-
 foreign import ccall unsafe "__hscore_long_path_size"
   long_path_size :: Int
+
+#else
+long_path_size :: Int
+long_path_size = 2048	/* guess? */
+
+#endif /* __GLASGOW_HASKELL__ */
 
 {- | Returns the current user's home directory.
 
