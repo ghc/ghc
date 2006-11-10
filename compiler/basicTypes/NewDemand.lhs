@@ -80,7 +80,13 @@ zipWithDmds :: (Demand -> Demand -> Demand)
 zipWithDmds f (Poly d1)  (Poly d2)  = Poly (d1 `f` d2)
 zipWithDmds f (Prod ds1) (Poly d2)  = Prod [d1 `f` d2 | d1 <- ds1]
 zipWithDmds f (Poly d1)  (Prod ds2) = Prod [d1 `f` d2 | d2 <- ds2]
-zipWithDmds f (Prod ds1) (Prod ds2) = Prod (zipWithEqual "zipWithDmds" f ds1 ds2)
+zipWithDmds f (Prod ds1) (Prod ds2) 
+  | length ds1 == length ds2 = Prod (zipWithEqual "zipWithDmds" f ds1 ds2)
+  | otherwise		     = Poly topDmd
+	-- This really can happen with polymorphism
+	-- \f. case f x of (a,b) -> ...
+	--     case f y of (a,b,c) -> ...
+	-- Here the two demands on f are C(LL) and C(LLL)!
 
 topDmd, lazyDmd, seqDmd :: Demand
 topDmd  = Top			-- The most uninformative demand
