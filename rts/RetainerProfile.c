@@ -662,6 +662,12 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     // following statement by either a memcpy() call or a switch statement
     // on the type of the element. Currently, the size of stackElement is
     // small enough (5 words) that this direct assignment seems to be enough.
+
+    // ToDo: The line below leads to the warning:
+    //    warning: 'se.info.type' may be used uninitialized in this function
+    // This is caused by the fact that there are execution paths through the
+    // large switch statement above where some cases do not initialize this
+    // field. Is this really harmless? Can we avoid the warning?
     *stackTop = se;
 
 #ifdef DEBUG_RETAINER
