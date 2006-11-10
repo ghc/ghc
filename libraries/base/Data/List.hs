@@ -168,6 +168,10 @@ module Data.List
    -- ** The \"@By@\" operations
    -- | By convention, overloaded functions have a non-overloaded
    -- counterpart whose name is suffixed with \`@By@\'.
+   --
+   -- It is often convenient to use these functions together with
+   -- 'Data.Function.on', for instance @'sortBy' ('compare'
+   -- \`on\` 'fst')@.
 
    -- *** User-supplied equality (replacing an @Eq@ context)
    -- | The predicate is assumed to define an equivalence.
