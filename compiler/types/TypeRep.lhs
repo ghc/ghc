@@ -15,8 +15,8 @@ module TypeRep (
 	funTyCon,
 
 	-- Pretty-printing
-	pprType, pprParendType, pprTyThingCategory,
-	pprPred, pprTheta, pprThetaArrow, pprClassPred,
+	pprType, pprParendType, pprTyThingCategory, 
+	pprPred, pprTheta, pprForAll, pprThetaArrow, pprClassPred,
 
 	-- Kinds
 	liftedTypeKind, unliftedTypeKind, openTypeKind,
@@ -468,7 +468,7 @@ pprParendKind = pprParendType
 
 ppr_type :: Prec -> Type -> SDoc
 ppr_type p (TyVarTy tv)       = ppr tv
-ppr_type p (PredTy pred)      = braces (ppr pred)
+ppr_type p (PredTy pred)      = ifPprDebug (ptext SLIT("<pred>")) <> (ppr pred)
 ppr_type p (NoteTy other ty2) = ppr_type p ty2
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 

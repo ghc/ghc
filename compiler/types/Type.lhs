@@ -94,7 +94,7 @@ module Type (
 	substPred, substTyVar, substTyVarBndr, deShadowTy, lookupTyVar,
 
 	-- Pretty-printing
-	pprType, pprParendType, pprTyThingCategory,
+	pprType, pprParendType, pprTyThingCategory, pprForAll,
 	pprPred, pprTheta, pprThetaArrow, pprClassPred, pprKind, pprParendKind
     ) where
 
@@ -1015,10 +1015,12 @@ cmpTypesX env ty        []        = GT
 -------------
 cmpPredX :: RnEnv2 -> PredType -> PredType -> Ordering
 cmpPredX env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` cmpTypeX env ty1 ty2
-	-- Compare types as well as names for implicit parameters
-	-- This comparison is used exclusively (I think) for the
-	-- finite map built in TcSimplify
-cmpPredX env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` cmpTypesX env tys1 tys2
+	-- Compare names only for implicit parameters
+	-- This comparison is used exclusively (I believe) 
+	-- for the Avails finite map built in TcSimplify
+	-- If the types differ we keep them distinct so that we see 
+	-- a distinct pair to run improvement on 
+cmpPredX env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` (cmpTypesX env tys1 tys2)
 cmpPredX env (EqPred ty1 ty2) (EqPred ty1' ty2') = (cmpTypeX env ty1 ty1') `thenCmp` (cmpTypeX env ty2 ty2')
 
 -- Constructor order: IParam < ClassP < EqPred
