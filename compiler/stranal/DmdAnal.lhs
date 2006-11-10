@@ -262,8 +262,8 @@ dmdAnal sigs dmd (Case scrut case_bndr ty [alt@(DataAlt dc,bndrs,rhs)])
 	-- The insight is, of course, that a demand on y is a demand on the
 	-- scrutinee, so we need to `both` it with the scrut demand
 
-        scrut_dmd 	   = Eval (Prod [idNewDemandInfo b | b <- bndrs', isId b])
-				   `both`
+	alt_dmd 	   = Eval (Prod [idNewDemandInfo b | b <- bndrs', isId b])
+        scrut_dmd 	   = alt_dmd `both`
 			     idNewDemandInfo case_bndr'
 
 	(scrut_ty, scrut') = dmdAnal sigs scrut_dmd scrut
@@ -489,7 +489,12 @@ If we marked r as having the CPR property, then we'd w/w into
 	in ...
 
 But now r is a thunk, which won't be inlined, so we are no further ahead.
+But consider
 
+	f x = let r = case expensive of (a,b) -> (b,a)
+	      in if foo r then r else (x,x)
+
+Does f have the CPR property?  Well, no.
 
 However, if the strictness analyser has figured out (in a previous 
 iteration) that it's strict, then we DON'T need to forget the CPR info.
@@ -986,7 +991,7 @@ lub d1@(Eval _) d2	          = d2 `lub` d1	-- Bot,Abs,Top,Call,Defer
 lub (Box d1)   (Box d2) = box (d1 `lub` d2)
 lub d1@(Box _)  d2	= d2 `lub` d1
 
-lubs = zipWithDmds lub
+lubs ds1 ds2 = zipWithDmds lub ds1 ds2
 
 ---------------------
 -- box is the smart constructor for Box
@@ -1093,7 +1098,7 @@ both d1@(Eval ds1) d2	       = d2 `both` d1
 both (Defer ds1) (Defer ds2) = deferEval (ds1 `boths` ds2)
 both d1@(Defer ds1) d2	     = d2 `both` d1
  
-boths = zipWithDmds both
+boths ds1 ds2 = zipWithDmds both ds1 ds2
 \end{code}
 
 
