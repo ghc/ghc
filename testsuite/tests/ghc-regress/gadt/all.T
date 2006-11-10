@@ -49,6 +49,9 @@ test('josef', normal, compile, [''])
 # Interaction of fundeps with GADTs doesn't work well 
 test('gadt-fd', expect_fail, compile, [''])
 
+test('karl1', normal, compile, [''])
+test('karl2', normal, compile, [''])
+
 # New ones from Dimitrios
 
 # test('gadt-dim1', normal, compile, [''])
@@ -60,3 +63,4 @@ test('gadt-fd', expect_fail, compile, [''])
 # test('gadt-dim7', normal, compile, [''])
 # test('gadt-dim8', normal, compile, [''])
 # test('Arith', normal, compile, [''])
+
