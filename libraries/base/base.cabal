@@ -40,10 +40,10 @@ exposed-modules:
 	Data.Bool,
 	Data.ByteString,
 	Data.ByteString.Char8,
-    Data.ByteString.Lazy
-    Data.ByteString.Lazy.Char8
-    Data.ByteString.Base
-    Data.ByteString.Fusion
+	Data.ByteString.Lazy
+	Data.ByteString.Lazy.Char8
+	Data.ByteString.Base
+	Data.ByteString.Fusion
 	Data.Char,
 	Data.Complex,
 	Data.Dynamic,
