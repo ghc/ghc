@@ -410,8 +410,8 @@ length (LPS ss) = L.foldl' (\n ps -> n + fromIntegral (P.length ps)) 0 ss
 -- You can however use 'repeat' and 'cycle' to build infinite lazy ByteStrings.
 --
 cons :: Word8 -> ByteString -> ByteString
-cons c (LPS (s:ss)) | P.length s <= 16 = LPS (P.cons c s : ss)
-cons c (LPS ss)                        = LPS (P.singleton c : ss)
+cons c (LPS (s:ss)) | P.length s < 16 = LPS (P.cons c s : ss)
+cons c (LPS ss)                       = LPS (P.singleton c : ss)
 {-# INLINE cons #-}
 
 -- | /O(n\/c)/ Append a byte to the end of a 'ByteString'
