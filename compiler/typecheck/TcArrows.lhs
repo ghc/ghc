@@ -238,7 +238,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)	$
     do	{ cmds_w_tys <- zipWithM new_cmd_ty cmd_args [1..]
 	; span       <- getSrcSpanM
-	; [w_tv]     <- tcInstSkolTyVars (ArrowSkol span) [alphaTyVar]
+	; [w_tv]     <- tcInstSkolTyVars ArrowSkol [alphaTyVar]
 	; let w_ty = mkTyVarTy w_tv 	-- Just a convenient starting point
 
 		--  a ((w,t1) .. tn) t
@@ -251,7 +251,8 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 
 		-- Check expr
 	; (expr', lie) <- escapeArrowScope (getLIE (tcMonoExpr expr e_ty))
-	; inst_binds <- tcSimplifyCheck sig_msg [w_tv] [] lie
+	; loc <- getInstLoc (SigOrigin ArrowSkol)
+	; inst_binds <- tcSimplifyCheck loc [w_tv] [] lie
 
 		-- Check that the polymorphic variable hasn't been unified with anything
 		-- and is not free in res_ty or the cmd_stk  (i.e.  t, t1..tn)
@@ -302,8 +303,6 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		   in (w, s:ss)
 				    
 	    other -> (ty, [])
-
-    sig_msg  = ptext SLIT("expected type of a command form")
 
 -----------------------------------------------------------------
 --		Base case for illegal commands

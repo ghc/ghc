@@ -483,7 +483,7 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
   = do	{ let dfun_id      = instanceDFunId ispec 
-	      rigid_info   = InstSkol dfun_id
+	      rigid_info   = InstSkol
 	      origin	   = SigOrigin rigid_info
 	      inst_ty      = idType dfun_id
 	; (tvs, theta, inst_head_ty) <- tcSkolSigType rigid_info inst_ty
@@ -518,7 +518,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
     make_wrapper inst_loc tvs theta (Just preds)	-- Case (a)
       = ASSERT( null tvs && null theta )
 	do { dicts <- newDictBndrs inst_loc preds
-	   ; sc_binds <- addErrCtxt superClassCtxt (tcSimplifySuperClasses [] [] dicts)
+	   ; sc_binds <- addErrCtxt superClassCtxt $
+			 tcSimplifySuperClasses inst_loc [] dicts
 		-- Use tcSimplifySuperClasses to avoid creating loops, for the
 		-- same reason as Note [SUPERCLASS-LOOP 1] in TcSimplify
 	   ; return (map instToId dicts, idHsWrapper, sc_binds) }
@@ -584,7 +585,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
   = let 
 	dfun_id    = instanceDFunId ispec
-	rigid_info = InstSkol dfun_id
+	rigid_info = InstSkol
 	inst_ty    = idType dfun_id
     in
 	 -- Prime error recovery
@@ -626,9 +627,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	-- Don't include this_dict in the 'givens', else
 	-- sc_dicts get bound by just selecting  from this_dict!!
     addErrCtxt superClassCtxt
-	(tcSimplifySuperClasses inst_tyvars'
-			 dfun_arg_dicts
-			 sc_dicts)	`thenM` \ sc_binds ->
+	(tcSimplifySuperClasses inst_loc
+			 dfun_arg_dicts sc_dicts)	`thenM` \ sc_binds ->
 
 	-- It's possible that the superclass stuff might unified one
 	-- of the inst_tyavars' with something in the envt

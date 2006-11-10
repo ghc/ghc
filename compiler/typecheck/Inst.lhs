@@ -26,17 +26,17 @@ module Inst (
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
 	instLoc, getDictClassTys, dictPred,
 
-	lookupInst, LookupInstResult(..), lookupPred, 
+	lookupSimpleInst, LookupInstResult(..), lookupPred, 
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
 
-	isDict, isClassDict, isMethod, 
-	isIPDict, isInheritableInst,
-	isTyVarDict, isMethodFor, 
+	isDict, isClassDict, isMethod, isImplicInst,
+	isIPDict, isInheritableInst, isMethodOrLit,
+	isTyVarDict, isMethodFor, getDefaultableDicts,
 
 	zonkInst, zonkInsts,
 	instToId, instToVar, instName,
 
-	InstOrigin(..), InstLoc(..), pprInstLoc
+	InstOrigin(..), InstLoc, pprInstLoc
     ) where
 
 #include "HsVersions.h"
@@ -53,6 +53,7 @@ import FunDeps
 import TcMType
 import TcType
 import Type
+import Class
 import Unify
 import Module
 import Coercion
@@ -73,6 +74,7 @@ import BasicTypes
 import SrcLoc
 import DynFlags
 import Maybes
+import Util
 import Outputable
 \end{code}
 
@@ -96,6 +98,25 @@ instToVar (Method {tci_id = id})
 instToVar (Dict {tci_name = nm, tci_pred = pred})    
   | isEqPred pred = Var.mkCoVar nm (mkPredTy pred)
   | otherwise	  = mkLocalId nm (mkPredTy pred)
+instToVar (ImplicInst {tci_name = nm, tci_tyvars = tvs, tci_given = givens,
+		       tci_wanted = wanteds})
+  = mkLocalId nm (mkImplicTy tvs givens wanteds)
+
+instType :: Inst -> Type
+instType (LitInst {tci_ty = ty}) = ty
+instType (Method {tci_id = id}) = idType id
+instType (Dict {tci_pred = pred}) = mkPredTy pred
+instType imp@(ImplicInst {})      = mkImplicTy (tci_tyvars imp) (tci_given imp)	
+					       (tci_wanted imp)
+
+mkImplicTy tvs givens wanteds	-- The type of an implication constraint
+  = -- pprTrace "mkImplicTy" (ppr givens) $
+    mkForAllTys tvs $ 
+    mkPhiTy (map dictPred givens) $
+    if isSingleton wanteds then
+	instType (head wanteds) 
+    else
+	mkTupleTy Boxed (length wanteds) (map instType wanteds)
 
 instLoc inst = tci_loc inst
 
@@ -111,9 +132,11 @@ getDictClassTys inst		         = pprPanic "getDictClassTys" (ppr inst)
 -- Leaving these in is really important for the call to fdPredsOfInsts
 -- in TcSimplify.inferLoop, because the result is fed to 'grow',
 -- which is supposed to be conservative
-fdPredsOfInst (Dict {tci_pred = pred}) 	   = [pred]
-fdPredsOfInst (Method {tci_theta = theta}) = theta
-fdPredsOfInst other		           = []	-- LitInsts etc
+fdPredsOfInst (Dict {tci_pred = pred}) 	     = [pred]
+fdPredsOfInst (Method {tci_theta = theta})   = theta
+fdPredsOfInst (ImplicInst {tci_given = gs, 
+			   tci_wanted = ws}) = fdPredsOfInsts (gs ++ ws)
+fdPredsOfInst (LitInst {})		     = []
 
 fdPredsOfInsts :: [Inst] -> [PredType]
 fdPredsOfInsts insts = concatMap fdPredsOfInst insts
@@ -123,22 +146,27 @@ isInheritableInst (Method {tci_theta = theta}) = all isInheritablePred theta
 isInheritableInst other			       = True
 
 
+---------------------------------
+-- Get the implicit parameters mentioned by these Insts
+-- NB: the results of these functions are insensitive to zonking
+
 ipNamesOfInsts :: [Inst] -> [Name]
 ipNamesOfInst  :: Inst   -> [Name]
--- Get the implicit parameters mentioned by these Insts
--- NB: ?x and %x get different Names
 ipNamesOfInsts insts = [n | inst <- insts, n <- ipNamesOfInst inst]
 
 ipNamesOfInst (Dict {tci_pred = IParam n _}) = [ipNameName n]
 ipNamesOfInst (Method {tci_theta = theta})   = [ipNameName n | IParam n _ <- theta]
 ipNamesOfInst other		    	     = []
 
+---------------------------------
 tyVarsOfInst :: Inst -> TcTyVarSet
 tyVarsOfInst (LitInst {tci_ty = ty})  = tyVarsOfType  ty
 tyVarsOfInst (Dict {tci_pred = pred}) = tyVarsOfPred pred
 tyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) = tyVarsOfTypes tys `unionVarSet` idFreeTyVars id
 				 -- The id might have free type variables; in the case of
 				 -- locally-overloaded class methods, for example
+tyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, tci_wanted = wanteds})
+  = (tyVarsOfInsts givens `unionVarSet` tyVarsOfInsts wanteds) `minusVarSet` mkVarSet tvs
 
 
 tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
@@ -164,6 +192,9 @@ isIPDict :: Inst -> Bool
 isIPDict (Dict {tci_pred = pred}) = isIPPred pred
 isIPDict other		 	  = False
 
+isImplicInst (ImplicInst {}) = True
+isImplicInst other 	     = False
+
 isMethod :: Inst -> Bool
 isMethod (Method {}) = True
 isMethod other	     = False
@@ -171,9 +202,33 @@ isMethod other	     = False
 isMethodFor :: TcIdSet -> Inst -> Bool
 isMethodFor ids (Method {tci_oid = id}) = id `elemVarSet` ids
 isMethodFor ids inst			= False
+
+isMethodOrLit :: Inst -> Bool
+isMethodOrLit (Method {})  = True
+isMethodOrLit (LitInst {}) = True
+isMethodOrLit other        = False
 \end{code}
 
-
+\begin{code}
+getDefaultableDicts :: [Inst] -> ([(Inst, Class, TcTyVar)], TcTyVarSet)
+-- Look for free dicts of the form (C tv), even inside implications
+-- *and* the set of tyvars mentioned by all *other* constaints
+-- This disgustingly ad-hoc function is solely to support defaulting
+getDefaultableDicts insts
+  = (concat ps, unionVarSets tvs)
+  where
+    (ps, tvs) = mapAndUnzip get insts
+    get d@(Dict {tci_pred = ClassP cls [ty]})
+	| Just tv <- tcGetTyVar_maybe ty = ([(d,cls,tv)], emptyVarSet)
+	| otherwise		         = ([], tyVarsOfType ty)
+    get (ImplicInst {tci_tyvars = tvs, tci_wanted = wanteds})
+	= ([ up | up@(_,_,tv) <- ups, not (tv `elemVarSet` tv_set)],
+	   ftvs `minusVarSet` tv_set)
+	where
+	   tv_set = mkVarSet tvs
+	   (ups, ftvs) = getDefaultableDicts wanteds
+    get inst = ([], tyVarsOfInst inst)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -197,7 +252,7 @@ newDictBndrs inst_loc theta = mapM (newDictBndr inst_loc) theta
 newDictBndr :: InstLoc -> TcPredType -> TcM Inst
 newDictBndr inst_loc pred
   = do 	{ uniq <- newUnique 
-	; let name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
+	; let name = mkPredName uniq inst_loc pred 
 	; return (Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}) }
 
 ----------------
@@ -240,7 +295,7 @@ instCallDicts loc (EqPred ty1 ty2 : preds)
 
 instCallDicts loc (pred : preds)
   = do	{ uniq <- newUnique
-	; let name = mkPredName uniq (instLocSrcLoc loc) pred 
+	; let name = mkPredName uniq loc pred 
 	      dict = Dict {tci_name = name, tci_pred = pred, tci_loc = loc}
 	; (dicts, co_fn) <- instCallDicts loc preds
 	; return (dict:dicts, co_fn <.> WpApp (instToId dict)) }
@@ -262,13 +317,22 @@ newIPDict orig ip_name ty
     newUnique				`thenM` \ uniq ->
     let
 	pred = IParam ip_name ty
-        name = mkPredName uniq (instLocSrcLoc inst_loc) pred 
+        name = mkPredName uniq inst_loc pred 
 	dict = Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}
     in
     returnM (mapIPName (\n -> instToId dict) ip_name, dict)
 \end{code}
 
 
+\begin{code}
+mkPredName :: Unique -> InstLoc -> PredType -> Name
+mkPredName uniq loc pred_ty
+  = mkInternalName uniq occ (srcSpanStart (instLocSpan loc))
+  where
+    occ = case pred_ty of
+	    ClassP cls tys -> mkDictOcc (getOccName cls)
+	    IParam ip ty   -> getOccName (ipNameName ip)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -340,7 +404,7 @@ newMethod inst_loc id tys
 	meth_id	    = mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
 	inst        = Method {tci_id = meth_id, tci_oid = id, tci_tys = tys,
 			      tci_theta = theta, tci_loc = inst_loc}
-	loc         = instLocSrcLoc inst_loc
+	loc         = srcSpanStart (instLocSpan inst_loc)
     in
     returnM inst
 \end{code}
@@ -411,6 +475,12 @@ zonkInst lit@(LitInst {tci_ty = ty})
   = zonkTcType ty			`thenM` \ new_ty ->
     returnM (lit {tci_ty = new_ty})
 
+zonkInst implic@(ImplicInst {})
+  = ASSERT( all isImmutableTyVar (tci_tyvars implic) )
+    do 	{ givens'  <- zonkInsts (tci_given  implic)
+	; wanteds' <- zonkInsts (tci_wanted implic)
+	; return (implic {tci_given = givens',tci_wanted = wanteds'}) }
+
 zonkInsts insts = mappM zonkInst insts
 \end{code}
 
@@ -430,36 +500,41 @@ instance Outputable Inst where
 
 pprDictsTheta :: [Inst] -> SDoc
 -- Print in type-like fashion (Eq a, Show b)
-pprDictsTheta dicts = pprTheta (map dictPred dicts)
+-- The Inst can be an implication constraint, but not a Method or LitInst
+pprDictsTheta insts = parens (sep (punctuate comma (map (ppr . instType) insts)))
 
 pprDictsInFull :: [Inst] -> SDoc
 -- Print in type-like fashion, but with source location
 pprDictsInFull dicts 
   = vcat (map go dicts)
   where
-    go dict = sep [quotes (ppr (dictPred dict)), nest 2 (pprInstLoc (instLoc dict))]
+    go dict = sep [quotes (ppr (instType dict)), nest 2 (pprInstArising dict)]
 
 pprInsts :: [Inst] -> SDoc
 -- Debugging: print the evidence :: type
-pprInsts insts  = brackets (interpp'SP insts)
+pprInsts insts = brackets (interpp'SP insts)
 
 pprInst, pprInstInFull :: Inst -> SDoc
 -- Debugging: print the evidence :: type
-pprInst (LitInst {tci_name = nm, tci_ty = ty})   = ppr nm <+> dcolon <+> ppr ty
-pprInst (Dict {tci_name = nm, tci_pred =  pred}) = ppr nm <+> dcolon <+> pprPred pred
+pprInst inst = ppr (instName inst) <+> dcolon 
+		<+> (braces (ppr (instType inst)) $$
+		     ifPprDebug implic_stuff)
+  where
+    implic_stuff | isImplicInst inst = ppr (tci_reft inst)
+		 | otherwise	     = empty
 
-pprInst (Method {tci_id = inst_id, tci_oid = id, tci_tys = tys})
-  = ppr inst_id <+> dcolon <+> 
-	braces (sep [ppr id <+> ptext SLIT("at"),
-		     brackets (sep (map pprParendType tys))])
-
-pprInstInFull inst
-  = sep [quotes (pprInst inst), nest 2 (pprInstLoc (instLoc inst))]
+pprInstInFull inst = sep [quotes (pprInst inst), nest 2 (pprInstArising inst)]
 
 tidyInst :: TidyEnv -> Inst -> Inst
 tidyInst env lit@(LitInst {tci_ty = ty})   = lit {tci_ty = tidyType env ty}
 tidyInst env dict@(Dict {tci_pred = pred}) = dict {tci_pred = tidyPred env pred}
 tidyInst env meth@(Method {tci_tys = tys}) = meth {tci_tys = tidyTypes env tys}
+tidyInst env implic@(ImplicInst {})
+  = implic { tci_tyvars = tvs' 
+	   , tci_given  = map (tidyInst env') (tci_given  implic)
+	   , tci_wanted = map (tidyInst env') (tci_wanted implic) }
+  where
+    (env', tvs') = mapAccumL tidyTyVarBndr env (tci_tyvars implic)
 
 tidyMoreInsts :: TidyEnv -> [Inst] -> (TidyEnv, [Inst])
 -- This function doesn't assume that the tyvars are in scope
@@ -509,7 +584,7 @@ addLocalInst home_ie ispec
 		-- We use tcInstSkolType because we don't want to allocate fresh
 		--  *meta* type variables.  
 	  let dfun = instanceDFunId ispec
-	; (tvs', theta', tau') <- tcInstSkolType (InstSkol dfun) (idType dfun)
+	; (tvs', theta', tau') <- tcInstSkolType InstSkol (idType dfun)
 	; let	(cls, tys') = tcSplitDFunHead tau'
 		dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    
 	  	ispec'      = setInstanceDFunId ispec dfun'
@@ -581,46 +656,46 @@ addDictLoc ispec thing_inside
 \begin{code}
 data LookupInstResult
   = NoInstance
-  | SimpleInst (LHsExpr TcId)		-- Just a variable, type application, or literal
-  | GenInst    [Inst] (LHsExpr TcId)	-- The expression and its needed insts
+  | GenInst [Inst] (LHsExpr TcId)	-- The expression and its needed insts
 
-lookupInst :: Inst -> TcM LookupInstResult
+lookupSimpleInst :: Inst -> TcM LookupInstResult
+-- This is "simple" in tthat it returns NoInstance for implication constraints
+
 -- It's important that lookupInst does not put any new stuff into
 -- the LIE.  Instead, any Insts needed by the lookup are returned in
 -- the LookupInstResult, where they can be further processed by tcSimplify
 
+--------------------- Impliciations ------------------------
+lookupSimpleInst (ImplicInst {}) = return NoInstance
 
--- Methods
-
-lookupInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_loc = loc})
+--------------------- Methods ------------------------
+lookupSimpleInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_loc = loc})
   = do	{ (dicts, dict_app) <- instCallDicts loc theta
 	; let co_fn = dict_app <.> mkWpTyApps tys
 	; return (GenInst dicts (L span $ HsWrap co_fn (HsVar id))) }
   where
-    span = instLocSrcSpan loc
+    span = instLocSpan loc
 
--- Literals
-
+--------------------- Literals ------------------------
 -- Look for short cuts first: if the literal is *definitely* a 
 -- int, integer, float or a double, generate the real thing here.
 -- This is essential (see nofib/spectral/nucleic).
 -- [Same shortcut as in newOverloadedLit, but we
 --  may have done some unification by now] 		
 
-lookupInst (LitInst {tci_lit = HsIntegral i from_integer_name, tci_ty = ty, tci_loc = loc})
+lookupSimpleInst (LitInst {tci_lit = HsIntegral i from_integer_name, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutIntLit i ty
-  = returnM (GenInst [] (noLoc expr))	-- GenInst, not SimpleInst, because 
-					-- expr may be a constructor application
+  = returnM (GenInst [] (noLoc expr))
   | otherwise
   = ASSERT( from_integer_name `isHsVar` fromIntegerName )	-- A LitInst invariant
     tcLookupId fromIntegerName			`thenM` \ from_integer ->
     tcInstClassOp loc from_integer [ty]		`thenM` \ method_inst ->
     mkIntegerLit i				`thenM` \ integer_lit ->
     returnM (GenInst [method_inst]
-		     (mkHsApp (L (instLocSrcSpan loc)
+		     (mkHsApp (L (instLocSpan loc)
 			   	 (HsVar (instToId method_inst))) integer_lit))
 
-lookupInst (LitInst {tci_lit = HsFractional f from_rat_name, tci_ty = ty, tci_loc = loc})
+lookupSimpleInst (LitInst {tci_lit = HsFractional f from_rat_name, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutFracLit f ty
   = returnM (GenInst [] (noLoc expr))
 
@@ -629,11 +704,11 @@ lookupInst (LitInst {tci_lit = HsFractional f from_rat_name, tci_ty = ty, tci_lo
     tcLookupId fromRationalName			`thenM` \ from_rational ->
     tcInstClassOp loc from_rational [ty]	`thenM` \ method_inst ->
     mkRatLit f					`thenM` \ rat_lit ->
-    returnM (GenInst [method_inst] (mkHsApp (L (instLocSrcSpan loc) 
+    returnM (GenInst [method_inst] (mkHsApp (L (instLocSpan loc) 
 					       (HsVar (instToId method_inst))) rat_lit))
 
--- Dictionaries
-lookupInst (Dict {tci_pred = pred, tci_loc = loc})
+--------------------- Dictionaries ------------------------
+lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
   = do 	{ mb_result <- lookupPred pred
 	; case mb_result of {
 	    Nothing -> return NoInstance ;
@@ -668,11 +743,11 @@ lookupInst (Dict {tci_pred = pred, tci_loc = loc})
 		-- any nested for-alls in rho.  So the in-scope set is unchanged
     	dfun_rho   = substTy tenv' rho
     	(theta, _) = tcSplitPhiTy dfun_rho
-	src_loc	   = instLocSrcSpan loc
+	src_loc	   = instLocSpan loc
 	dfun	   = HsVar dfun_id
 	tys	   = map (substTyVar tenv') tyvars
     ; if null theta then
-    	returnM (SimpleInst (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
+    	returnM (GenInst [] (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
       else do
     { (dicts, dict_app) <- instCallDicts loc theta
     ; let co_fn = dict_app <.> mkWpTyApps tys
@@ -799,7 +874,7 @@ syntaxNameCtxt name orig ty tidy_env
 	msg = vcat [ptext SLIT("When checking that") <+> quotes (ppr name) <+> 
 				ptext SLIT("(needed by a syntactic construct)"),
 		    nest 2 (ptext SLIT("has the required type:") <+> ppr (tidyType tidy_env ty)),
-		    nest 2 (pprInstLoc inst_loc)]
+		    nest 2 (ptext SLIT("arising from") <+> pprInstLoc inst_loc)]
     in
     returnM (tidy_env, msg)
 \end{code}

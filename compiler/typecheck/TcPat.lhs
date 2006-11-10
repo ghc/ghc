@@ -531,14 +531,14 @@ tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon
 	 -> HsConDetails Name (LPat Name) -> (PatState -> TcM a)
 	 -> TcM (Pat TcId, [TcTyVar], a)
 tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
-  = do	{ span <- getSrcSpanM	-- Span for the whole pattern
-	; let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys) = dataConFullSig data_con
-	      skol_info = PatSkol data_con span
+  = do	{ let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys) = dataConFullSig data_con
+	      skol_info = PatSkol data_con
 	      origin    = SigOrigin skol_info
 
 	  -- Instantiate the constructor type variables [a->ty]
 	; ctxt_res_tys <- boxySplitTyConAppWithFamily tycon pat_ty
-	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs
+	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	-- Get location from monad,
+							-- not from ex_tvs
 	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
 				      (ctxt_res_tys ++ mkTyVarTys ex_tvs')
 	      eq_spec' = substEqSpec tenv eq_spec
@@ -553,7 +553,8 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 	; loc <- getInstLoc origin
 	; dicts <- newDictBndrs loc theta'
-	; dict_binds <- tcSimplifyCheck doc ex_tvs' dicts lie_req
+	; dict_binds <- tcSimplifyCheckPat loc co_vars (pat_reft pstate') 
+					   ex_tvs' dicts lie_req
 
 	; addDataConStupidTheta data_con ctxt_res_tys
 
@@ -567,8 +568,6 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	     ex_tvs' ++ inner_tvs, res)
 	}
   where
-    doc = ptext SLIT("existential context for") <+> quotes (ppr data_con)
-
     -- Split against the family tycon if the pattern constructor belongs to a
     -- representation tycon.
     --

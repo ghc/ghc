@@ -78,7 +78,8 @@ tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
 	--
 	-- NB: tcSimplifyInferCheck zonks the forall_tvs, and 
 	--     knocks out any that are constrained by the environment
-    tcSimplifyInferCheck (text "tcRule")
+    getInstLoc (SigOrigin (RuleSkol name))	`thenM` \ loc -> 
+    tcSimplifyInferCheck loc
 			 forall_tvs
 			 lhs_dicts rhs_lie	`thenM` \ (forall_tvs1, rhs_binds) ->
     mappM zonkQuantifiedTyVar forall_tvs1 	`thenM` \ forall_tvs2 ->
@@ -100,7 +101,7 @@ tcRuleBndrs (RuleBndrSig var rn_ty : vars) thing_inside
 --  e.g 	x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --		a::*, x :: a->a
-  = do	{ let ctxt = RuleSigCtxt (unLoc var)
+  = do	{ let ctxt = FunSigCtxt (unLoc var)
 	; (tyvars, ty) <- tcHsPatSigType ctxt rn_ty
 	; let skol_tvs = tcSkolSigTyVars (SigSkol ctxt) tyvars
 	      id_ty = substTyWith tyvars (mkTyVarTys skol_tvs) ty

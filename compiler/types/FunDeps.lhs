@@ -10,7 +10,7 @@ It's better to read it as: "if we know these, then we're going to know these"
 \begin{code}
 module FunDeps (
  	Equation, pprEquation,
-	oclose, grow, improve, 
+	oclose, grow, improve, improveOne,
 	checkInstCoverage, checkFunDeps,
 	pprFundeps
     ) where
@@ -228,6 +228,63 @@ improve inst_env preds
 	-- Equality predicates don't have uniques
 	-- In any case, improvement *generates*, rather than
 	-- *consumes*, equality constraints
+
+improveOne :: (Class -> [Instance])
+	   -> Pred_Loc
+	   -> [Pred_Loc]
+	   -> [(Equation,Pred_Loc,Pred_Loc)]
+
+-- Just do improvement triggered by a single, distinguised predicate
+
+improveOne inst_env pred@(IParam ip ty, _) preds
+  = [ ((emptyVarSet, [(ty,ty2)]), pred, p2) 
+    | p2@(IParam ip2 ty2, _) <- preds
+    , ip==ip2
+    , not (ty `tcEqType` ty2)]
+
+improveOne inst_env pred@(ClassP cls tys, _) preds
+  | tys `lengthAtLeast` 2
+  = instance_eqns ++ pairwise_eqns
+	-- NB: we put the instance equations first.   This biases the 
+	-- order so that we first improve individual constraints against the
+	-- instances (which are perhaps in a library and less likely to be
+	-- wrong; and THEN perform the pairwise checks.
+	-- The other way round, it's possible for the pairwise check to succeed
+	-- and cause a subsequent, misleading failure of one of the pair with an
+	-- instance declaration.  See tcfail143.hs for an example
+  where
+    (cls_tvs, cls_fds) = classTvsFds cls
+    instances	       = inst_env cls
+    rough_tcs 	       = roughMatchTcs tys
+
+	-- NOTE that we iterate over the fds first; they are typically
+	-- empty, which aborts the rest of the loop.
+    pairwise_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
+    pairwise_eqns	-- This group comes from pairwise comparison
+      = [ (eqn, pred, p2)
+	| fd <- cls_fds
+	, p2@(ClassP cls2 tys2, _) <- preds
+	, cls == cls2
+	, eqn <- checkClsFD emptyVarSet fd cls_tvs tys tys2
+	]
+
+    instance_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
+    instance_eqns	-- This group comes from comparing with instance decls
+      = [ (eqn, p_inst, pred)
+	| fd <- cls_fds		-- Iterate through the fundeps first, 
+				-- because there often are none!
+	, let rough_fd_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
+	, ispec@(Instance { is_tvs = qtvs, is_tys = tys_inst, 
+		 	    is_tcs = mb_tcs_inst }) <- instances
+	, not (instanceCantMatch mb_tcs_inst rough_tcs)
+	, eqn <- checkClsFD qtvs fd cls_tvs tys_inst tys
+	, let p_inst = (mkClassPred cls tys_inst, 
+		        ptext SLIT("arising from the instance declaration at")
+			<+> ppr (getSrcLoc ispec))
+	]
+
+improveOne inst_env eq_pred preds
+  = []
 
 ----------
 checkGroup :: (Class -> [Instance])

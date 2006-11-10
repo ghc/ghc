@@ -400,6 +400,9 @@ refineEnvironment :: Refinement -> TcM a -> TcM a
 -- I don't think I have to refine the set of global type variables in scope
 -- Reason: the refinement never increases that set
 refineEnvironment reft thing_inside
+  | isEmptyRefinement reft		-- Common case
+  = thing_inside
+  | otherwise
   = do	{ env <- getLclEnv
 	; let le' = mapNameEnv refine (tcl_env env)
  	; setLclEnv (env {tcl_env = le'}) thing_inside }

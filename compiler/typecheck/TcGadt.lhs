@@ -11,8 +11,9 @@
 
 \begin{code}
 module TcGadt (
-	Refinement, emptyRefinement, gadtRefine, 
-	refineType, refineResType,
+	Refinement, emptyRefinement, isEmptyRefinement, 
+	gadtRefine, 
+	refineType, refinePred, refineResType,
 	dataConCanMatch,
 	tcUnifyTys, BindFlag(..)
   ) where
@@ -22,6 +23,7 @@ module TcGadt (
 import HsSyn
 import Coercion
 import Type
+
 import TypeRep
 import DataCon
 import Var
@@ -61,6 +63,8 @@ instance Outputable Refinement where
 emptyRefinement :: Refinement
 emptyRefinement = (Reft emptyInScopeSet emptyVarEnv)
 
+isEmptyRefinement :: Refinement -> Bool
+isEmptyRefinement (Reft _ env) = isEmptyVarEnv env
 
 refineType :: Refinement -> Type -> Maybe (Coercion, Type)
 -- Apply the refinement to the type.
@@ -71,6 +75,17 @@ refineType (Reft in_scope env) ty
   | not (isEmptyVarEnv env),		-- Common case
     any (`elemVarEnv` env) (varSetElems (tyVarsOfType ty))
   = Just (substTy co_subst ty, substTy tv_subst ty)
+  | otherwise
+  = Nothing	-- The type doesn't mention any refined type variables
+  where
+    tv_subst = mkTvSubst in_scope (mapVarEnv snd env)
+    co_subst = mkTvSubst in_scope (mapVarEnv fst env)
+ 
+refinePred :: Refinement -> PredType -> Maybe (Coercion, PredType)
+refinePred (Reft in_scope env) pred
+  | not (isEmptyVarEnv env),		-- Common case
+    any (`elemVarEnv` env) (varSetElems (tyVarsOfPred pred))
+  = Just (mkPredTy (substPred co_subst pred), substPred tv_subst pred)
   | otherwise
   = Nothing	-- The type doesn't mention any refined type variables
   where

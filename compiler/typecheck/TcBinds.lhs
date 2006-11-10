@@ -710,16 +710,17 @@ generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
   = tcSimplifyInfer doc tau_tvs lie_req
 
   | otherwise	-- UNRESTRICTED CASE, WITH TYPE SIGS
-  = do	{ sig_lie <- unifyCtxts sigs	-- sigs is non-empty
+  = do	{ sig_lie <- unifyCtxts sigs	-- sigs is non-empty; sig_lie is zonked
 	; let	-- The "sig_avails" is the stuff available.  We get that from
 		-- the context of the type signature, BUT ALSO the lie_avail
 		-- so that polymorphic recursion works right (see Note [Polymorphic recursion])
 		local_meths = [mkMethInst sig mono_id | (_, Just sig, mono_id) <- mono_infos]
 		sig_avails = sig_lie ++ local_meths
+		loc = sig_loc (head sigs)
 
 	-- Check that the needed dicts can be
 	-- expressed in terms of the signature ones
-	; (forall_tvs, dict_binds) <- tcSimplifyInferCheck doc tau_tvs sig_avails lie_req
+	; (forall_tvs, dict_binds) <- tcSimplifyInferCheck loc tau_tvs sig_avails lie_req
 	
    	-- Check that signature type variables are OK
 	; final_qtvs <- checkSigsTyVars forall_tvs sigs
@@ -754,14 +755,16 @@ might not otherwise be related.  This is a rather subtle issue.
 
 \begin{code}
 unifyCtxts :: [TcSigInfo] -> TcM [Inst]
+-- Post-condition: the returned Insts are full zonked
 unifyCtxts (sig1 : sigs) 	-- Argument is always non-empty
   = do	{ mapM unify_ctxt sigs
-	; newDictBndrs (sig_loc sig1) (sig_theta sig1) }
+	; theta <- zonkTcThetaType (sig_theta sig1)
+	; newDictBndrs (sig_loc sig1) theta }
   where
     theta1 = sig_theta sig1
     unify_ctxt :: TcSigInfo -> TcM ()
     unify_ctxt sig@(TcSigInfo { sig_theta = theta })
-	= setSrcSpan (instLocSrcSpan (sig_loc sig)) 	$
+	= setSrcSpan (instLocSpan (sig_loc sig)) 	$
 	  addErrCtxt (sigContextsCtxt sig1 sig)		$
 	  unifyTheta theta1 theta
 
@@ -1060,8 +1063,7 @@ tcInstSig use_skols name scoped_names
   = do	{ poly_id <- tcLookupId name	-- Cannot fail; the poly ids are put into 
 					-- scope when starting the binding group
 	; let skol_info = SigSkol (FunSigCtxt name)
-	      inst_tyvars | use_skols = tcInstSkolTyVars skol_info
-			  | otherwise = tcInstSigTyVars  skol_info
+	      inst_tyvars = tcInstSigTyVars use_skols skol_info
 	; (tvs, theta, tau) <- tcInstType inst_tyvars (idType poly_id)
 	; loc <- getInstLoc (SigOrigin skol_info)
 	; return (TcSigInfo { sig_id = poly_id,

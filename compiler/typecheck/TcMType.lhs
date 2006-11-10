@@ -78,6 +78,7 @@ import Util
 import Maybes
 import ListSetOps
 import UniqSupply
+import SrcLoc
 import Outputable
 
 import Control.Monad	( when )
@@ -160,19 +161,30 @@ tcSkolSigTyVars :: SkolemInfo -> [TyVar] -> [TcTyVar]
 tcSkolSigTyVars info tyvars = [ mkSkolTyVar (tyVarName tv) (tyVarKind tv) info
 			      | tv <- tyvars ]
 
-tcInstSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
--- Instantiate a type with fresh skolem constants
-tcInstSkolType info ty = tcInstType (tcInstSkolTyVars info) ty
-
-tcInstSkolTyVar :: SkolemInfo -> TyVar -> TcM TcTyVar
-tcInstSkolTyVar info tyvar
+tcInstSkolTyVar :: SkolemInfo -> Maybe SrcLoc -> TyVar -> TcM TcTyVar
+-- Instantiate the tyvar, using 
+--	* the occ-name and kind of the supplied tyvar, 
+--	* the unique from the monad,
+--	* the location either from the tyvar (mb_loc = Nothing)
+--	  or from mb_loc (Just loc)
+tcInstSkolTyVar info mb_loc tyvar
   = do	{ uniq <- newUnique
-	; let name = setNameUnique (tyVarName tyvar) uniq
-	      kind = tyVarKind tyvar
-	; return (mkSkolTyVar name kind info) }
+	; let old_name = tyVarName tyvar
+	      kind     = tyVarKind tyvar
+	      loc      = mb_loc `orElse` getSrcLoc old_name
+	      new_name = mkInternalName uniq (nameOccName old_name) loc
+	; return (mkSkolTyVar new_name kind info) }
 
 tcInstSkolTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
-tcInstSkolTyVars info tyvars = mapM (tcInstSkolTyVar info) tyvars
+-- Get the location from the monad
+tcInstSkolTyVars info tyvars 
+  = do 	{ span <- getSrcSpanM
+	; mapM (tcInstSkolTyVar info (Just (srcSpanStart span))) tyvars }
+
+tcInstSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type with fresh skolem constants
+-- Binding location comes from the monad
+tcInstSkolType info ty = tcInstType (tcInstSkolTyVars info) ty
 \end{code}
 
 
@@ -275,9 +287,14 @@ tcInstTyVars tyvars
 %************************************************************************
 
 \begin{code}
-tcInstSigTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
--- Instantiate with meta SigTvs
-tcInstSigTyVars skol_info tyvars 
+tcInstSigTyVars :: Bool -> SkolemInfo -> [TyVar] -> TcM [TcTyVar]
+-- Instantiate with skolems or meta SigTvs; depending on use_skols
+-- Always take location info from the supplied tyvars
+tcInstSigTyVars use_skols skol_info tyvars 
+  | use_skols
+  = mapM (tcInstSkolTyVar skol_info Nothing) tyvars
+
+  | otherwise
   = mapM (instMetaTyVar (SigTv skol_info)) tyvars
 
 zonkSigTyVar :: TcTyVar -> TcM TcTyVar
@@ -686,7 +703,6 @@ checkValidType ctxt ty
 		 ConArgCtxt _   -> Rank 1	-- We are given the type of the entire
 						-- constructor, hence rank 1
 		 ForSigCtxt _	-> Rank 1
-		 RuleSigCtxt _	-> Rank 1
 		 SpecInstCtxt   -> Rank 1
 
 	actual_kind = typeKind ty
@@ -1012,7 +1028,9 @@ even in a scope where b is in scope.
 
 \begin{code}
 checkFreeness forall_tyvars theta
-  = mappM_ complain (filter is_free theta)
+  = do	{ gla_exts <- doptM Opt_GlasgowExts
+	; if gla_exts then return ()	-- New!  Oct06
+	  else mappM_ complain (filter is_free theta) }
   where    
     is_free pred     =  not (isIPPred pred)
 		     && not (any bound_var (varSetElems (tyVarsOfPred pred)))

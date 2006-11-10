@@ -756,8 +756,8 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 		-- Hence the tiresome but innocuous fixM
 	  ((tvs', theta', rho'), skol_info) <- fixM (\ ~(_, skol_info) ->
 		do { (forall_tvs, theta, rho_ty) <- tcInstSkolType skol_info expected_ty
-		   ; span <- getSrcSpanM
-		   ; let skol_info = GenSkol forall_tvs (mkPhiTy theta rho_ty) span
+			-- Get loation from monad, not from expected_ty
+		   ; let skol_info = GenSkol forall_tvs (mkPhiTy theta rho_ty)
 		   ; return ((forall_tvs, theta, rho_ty), skol_info) })
 
 #ifdef DEBUG
@@ -781,8 +781,9 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	-- Conclusion: include the free vars of the expected_ty in the
 	-- list of "free vars" for the signature check.
 
-	; dicts <- newDictBndrsO (SigOrigin skol_info) theta'
-	; inst_binds <- tcSimplifyCheck sig_msg tvs' dicts lie
+	; loc <- getInstLoc (SigOrigin skol_info)
+	; dicts <- newDictBndrs loc theta'
+	; inst_binds <- tcSimplifyCheck loc tvs' dicts lie
 
 	; checkSigTyVarsWrt free_tvs tvs'
 	; traceTc (text "tcGen:done")
@@ -794,7 +795,6 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	; returnM (co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
-    sig_msg  = ptext SLIT("expected type of an expression")
 \end{code}    
 
     
@@ -965,6 +965,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
     go _ ty1@(ForAllTy _ _) ty2@(ForAllTy _ _)
       | length tvs1 == length tvs2
       = do   { tvs <- tcInstSkolTyVars UnkSkol tvs1	-- Not a helpful SkolemInfo
+			-- Get location from monad, not from tvs1
 	     ; let tys      = mkTyVarTys tvs
 	           in_scope = mkInScopeSet (mkVarSet tvs)
  	           subst1   = mkTvSubst in_scope (zipTyEnv tvs1 tys)

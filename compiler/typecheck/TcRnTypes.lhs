@@ -28,8 +28,8 @@ module TcRnTypes(
 	ArrowCtxt(NoArrowCtxt), newArrowScope, escapeArrowScope,
 
 	-- Insts
-	Inst(..), InstOrigin(..), InstLoc(..), pprInstLoc, 
-	instLocSrcLoc, instLocSrcSpan,
+	Inst(..), InstOrigin(..), InstLoc(..), 
+	pprInstLoc, pprInstArising, instLocSpan, instLocOrigin,
 	LIE, emptyLIE, unitLIE, plusLIE, consLIE, 
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
@@ -44,6 +44,7 @@ import HscTypes
 import Packages
 import Type
 import TcType
+import TcGadt
 import InstEnv
 import FamInstEnv
 import IOEnv
@@ -594,6 +595,18 @@ data Inst
 	tci_loc  :: InstLoc 
     }
 
+  | ImplicInst {	-- An implication constraint
+			-- forall tvs. (reft, given) => wanted
+	tci_name   :: Name,
+	tci_reft   :: Refinement,
+	tci_tyvars :: [TcTyVar],
+	tci_given  :: [Inst],	    -- Only Dicts
+				    --   (no Methods, LitInsts, ImplicInsts)
+	tci_wanted :: [Inst],	    -- Only Dicts and ImplicInsts
+				    --   (no Methods or LitInsts)
+	tci_loc    :: InstLoc
+    }
+
   | Method {
 	tci_id :: TcId,		-- The Id for the Inst
 
@@ -638,7 +651,8 @@ data Inst
 
 @Insts@ are ordered by their class/type info, rather than by their
 unique.  This allows the context-reduction mechanism to use standard finite
-maps to do their stuff.
+maps to do their stuff.  It's horrible that this code is here, rather
+than with the Avails handling stuff in TcSimplify
 
 \begin{code}
 instance Ord Inst where
@@ -661,6 +675,14 @@ cmpInst (LitInst {})	(Dict {}) 	= GT
 cmpInst (LitInst {})	(Method {})	= GT
 cmpInst l1@(LitInst {})	l2@(LitInst {})	= (tci_lit l1 `compare` tci_lit l2) `thenCmp`
 					  (tci_ty l1 `tcCmpType` tci_ty l2)
+cmpInst (LitInst {})  	other		= LT
+
+	-- Implication constraints are compared by *name*
+	-- not by type; that is, we make no attempt to do CSE on them
+cmpInst (ImplicInst {})    (Dict {})	      = GT
+cmpInst (ImplicInst {})    (Method {})	      = GT
+cmpInst (ImplicInst {})    (LitInst {})	      = GT
+cmpInst i1@(ImplicInst {}) i2@(ImplicInst {}) = tci_name i1 `compare` tci_name i2
 \end{code}
 
 
@@ -700,14 +722,22 @@ It appears in TcMonad because there are a couple of error-message-generation
 functions that deal with it.
 
 \begin{code}
+-------------------------------------------
 data InstLoc = InstLoc InstOrigin SrcSpan ErrCtxt
 
-instLocSrcLoc :: InstLoc -> SrcLoc
-instLocSrcLoc (InstLoc _ src_span _) = srcSpanStart src_span
+instLocSpan :: InstLoc -> SrcSpan
+instLocSpan (InstLoc _ s _) = s
 
-instLocSrcSpan :: InstLoc -> SrcSpan
-instLocSrcSpan (InstLoc _ src_span _) = src_span
+instLocOrigin :: InstLoc -> InstOrigin
+instLocOrigin (InstLoc o _ _) = o
 
+pprInstArising :: Inst -> SDoc
+pprInstArising loc = ptext SLIT("arising from") <+> pprInstLoc (tci_loc loc)
+
+pprInstLoc :: InstLoc -> SDoc
+pprInstLoc (InstLoc orig span _) = sep [ppr orig, text "at" <+> ppr span]
+
+-------------------------------------------
 data InstOrigin
   = SigOrigin SkolemInfo	-- Pattern, class decl, inst decl etc;
 				-- Places that bind type variables and introduce
@@ -737,27 +767,23 @@ data InstOrigin
   | DefaultOrigin	-- Typechecking a default decl
   | DoOrigin		-- Arising from a do expression
   | ProcOrigin		-- Arising from a proc expression
-\end{code}
+  | ImplicOrigin SDoc	-- An implication constraint
 
-\begin{code}
-pprInstLoc :: InstLoc -> SDoc
-pprInstLoc (InstLoc orig locn _)
-  = sep [text "arising from" <+> pp_orig orig, 
-	 text "at" <+> ppr locn]
-  where
-    pp_orig (OccurrenceOf name)  = hsep [ptext SLIT("use of"), quotes (ppr name)]
-    pp_orig (IPOccOrigin name)   = hsep [ptext SLIT("use of implicit parameter"), quotes (ppr name)]
-    pp_orig (IPBindOrigin name)  = hsep [ptext SLIT("binding for implicit parameter"), quotes (ppr name)]
-    pp_orig RecordUpdOrigin 	 = ptext SLIT("a record update")
-    pp_orig (LiteralOrigin lit)	 = hsep [ptext SLIT("the literal"), quotes (ppr lit)]
-    pp_orig (ArithSeqOrigin seq) = hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
-    pp_orig (PArrSeqOrigin seq)	 = hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
-    pp_orig InstSigOrigin	 = ptext SLIT("instantiating a type signature")
-    pp_orig InstScOrigin	 = ptext SLIT("the superclasses of an instance declaration")
-    pp_orig DerivOrigin	 	 = ptext SLIT("the 'deriving' clause of a data type declaration")
-    pp_orig StandAloneDerivOrigin = ptext SLIT("a 'deriving' declaration")
-    pp_orig DefaultOrigin	 = ptext SLIT("a 'default' declaration")
-    pp_orig DoOrigin		 = ptext SLIT("a do statement")
-    pp_orig ProcOrigin		 = ptext SLIT("a proc expression")
-    pp_orig (SigOrigin info) 	 = pprSkolInfo info
+instance Outputable InstOrigin where
+    ppr (OccurrenceOf name)   = hsep [ptext SLIT("a use of"), quotes (ppr name)]
+    ppr (IPOccOrigin name)    = hsep [ptext SLIT("a use of implicit parameter"), quotes (ppr name)]
+    ppr (IPBindOrigin name)   = hsep [ptext SLIT("a binding for implicit parameter"), quotes (ppr name)]
+    ppr RecordUpdOrigin       = ptext SLIT("a record update")
+    ppr (LiteralOrigin lit)   = hsep [ptext SLIT("the literal"), quotes (ppr lit)]
+    ppr (ArithSeqOrigin seq)  = hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
+    ppr (PArrSeqOrigin seq)   = hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
+    ppr InstSigOrigin	      = ptext SLIT("instantiating a type signature")
+    ppr InstScOrigin	      = ptext SLIT("the superclasses of an instance declaration")
+    ppr DerivOrigin	      = ptext SLIT("the 'deriving' clause of a data type declaration")
+    ppr StandAloneDerivOrigin = ptext SLIT("a 'deriving' declaration")
+    ppr DefaultOrigin	      = ptext SLIT("a 'default' declaration")
+    ppr DoOrigin	      = ptext SLIT("a do statement")
+    ppr ProcOrigin	      = ptext SLIT("a proc expression")
+    ppr (ImplicOrigin doc)    = doc
+    ppr (SigOrigin info)      = pprSkolInfo info
 \end{code}

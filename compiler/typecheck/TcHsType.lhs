@@ -800,7 +800,6 @@ pprHsSigCtxt ctxt hs_ty = vcat [ ptext SLIT("In") <+> pprUserTypeCtxt ctxt <> co
     pp_sig (FunSigCtxt n)  = pp_n_colon n
     pp_sig (ConArgCtxt n)  = pp_n_colon n
     pp_sig (ForSigCtxt n)  = pp_n_colon n
-    pp_sig (RuleSigCtxt n) = pp_n_colon n
     pp_sig other	   = ppr (unLoc hs_ty)
 
     pp_n_colon n = ppr n <+> dcolon <+> ppr (unLoc hs_ty)

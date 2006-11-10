@@ -271,7 +271,7 @@ tcDefMeth origin clas tyvars binds_in sig_fn prag_fn sel_id
     
         -- Check the context
 	{ dict_binds <- tcSimplifyCheck
-			        (ptext SLIT("class") <+> ppr clas)
+			        loc
 				tyvars
 			        [this_dict]
 			        insts_needed
@@ -362,18 +362,18 @@ tcMethodBind inst_tyvars inst_theta avail_insts sig_fn prag_fn
 
     let
 	[(_, Just sig, local_meth_id)] = mono_bind_infos
+	loc = sig_loc sig
     in
 
     addErrCtxtM (sigCtxt sel_id inst_tyvars inst_theta (idType meth_id))	$
-    newDictBndrs (sig_loc sig) (sig_theta sig)		`thenM` \ meth_dicts ->
+    newDictBndrs loc (sig_theta sig)		`thenM` \ meth_dicts ->
     let
 	meth_tvs   = sig_tvs sig
 	all_tyvars = meth_tvs ++ inst_tyvars
 	all_insts  = avail_insts ++ meth_dicts
     in
     tcSimplifyCheck
-	 (ptext SLIT("class or instance method") <+> quotes (ppr sel_id))
-	 all_tyvars all_insts meth_lie		`thenM` \ lie_binds ->
+	 loc all_tyvars all_insts meth_lie	`thenM` \ lie_binds ->
 
     checkSigTyVars all_tyvars			`thenM_`
 
@@ -537,8 +537,8 @@ mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth
 				  other						  -> Nothing
 			other -> Nothing
 
-isInstDecl (SigOrigin (InstSkol _)) = True
-isInstDecl (SigOrigin (ClsSkol _))  = False
+isInstDecl (SigOrigin InstSkol)    = True
+isInstDecl (SigOrigin (ClsSkol _)) = False
 \end{code}
 
 

@@ -65,7 +65,6 @@ import Module
 import UniqFM
 import Name
 import NameSet
-import NameEnv
 import TyCon
 import SrcLoc
 import HscTypes
@@ -188,6 +187,8 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 			tcRnSrcDecls local_decls ;
 	setGblEnv tcg_env		$ do {
 
+	failIfErrsM ;	-- reportDeprecations crashes sometimes 
+			-- as a result of typechecker repairs (e.g. unboundNames)
 	traceRn (text "rn3") ;
 
 		-- Report the use of any deprecated things
@@ -336,29 +337,15 @@ tcRnSrcDecls decls
 	boot_iface <- tcHiBootIface mod ;
 
 	  	-- Do all the declarations
-	(tc_envs, lie) <- getLIE (tc_rn_src_decls boot_iface decls) ;
-
-	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
-	     -- How could there be ambiguous ones?  They can only arise if a
-	     -- top-level decl falls under the monomorphism
-	     -- restriction, and no subsequent decl instantiates its
-	     -- type.  (Usually, ambiguous type variables are resolved
-	     -- during the generalisation step.)
-        traceTc (text "Tc8") ;
-	inst_binds <- setEnvs tc_envs (tcSimplifyTop lie) ;
-		-- Setting the global env exposes the instances to tcSimplifyTop
-		-- Setting the local env exposes the local Ids to tcSimplifyTop, 
-		-- so that we get better error messages (monomorphism restriction)
+	tcg_env <- tc_rn_src_decls boot_iface decls ;
 
 	    -- Backsubstitution.  This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
         traceTc (text "Tc9") ;
-	let { (tcg_env, _) = tc_envs ;
-	      TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
+	let { TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
 		         tcg_rules = rules, tcg_fords = fords } = tcg_env } ;
 
-	(bind_ids, binds', fords', rules') <- zonkTopDecls (binds `unionBags` inst_binds)
-							   rules fords ;
+	(bind_ids, binds', fords', rules') <- zonkTopDecls binds rules fords ;
 
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
 	    ; tcg_env' = tcg_env { tcg_type_env = final_type_env,
@@ -375,32 +362,40 @@ tcRnSrcDecls decls
 	return (tcg_env' { tcg_binds = tcg_binds tcg_env' `unionBags` dfun_binds }) 
    }
 
-tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
+tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM TcGblEnv
 -- Loops around dealing with each top level inter-splice group 
 -- in turn, until it's dealt with the entire module
 tc_rn_src_decls boot_details ds
  = do { let { (first_group, group_tail) = findSplice ds } ;
 		-- If ds is [] we get ([], Nothing)
 
-	-- Type check the decls up to, but not including, the first splice
-	tc_envs@(tcg_env,tcl_env) <- tcRnGroup boot_details first_group ;
+	-- Deal with decls up to, but not including, the first splice
+	(tcg_env, rn_decls) <- rnTopSrcDecls first_group ;
+	((tcg_env, tcl_env), lie) <- getLIE $ setGblEnv tcg_env $ 
+				     tcTopSrcDecls boot_details rn_decls ;
 
-	-- Bale out if errors; for example, error recovery when checking
-	-- the RHS of 'main' can mean that 'main' is not in the envt for 
-	-- the subsequent checkMain test
-	failIfErrsM ;
+	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
+	     -- How could there be ambiguous ones?  They can only arise if a
+	     -- top-level decl falls under the monomorphism restriction
+	     -- and no subsequent decl instantiates its type.
+        traceTc (text "Tc8") ;
+	inst_binds <- setEnvs (tcg_env, tcl_env) (tcSimplifyTop lie) ;
+		-- Setting the global env exposes the instances to tcSimplifyTop
+		-- Setting the local env exposes the local Ids to tcSimplifyTop, 
+		-- so that we get better error messages (monomorphism restriction)
 
-	setEnvs tc_envs $
+	let { tcg_env' = tcg_env { tcg_binds = tcg_binds tcg_env `unionBags` inst_binds } } ;
+
+	setEnvs (tcg_env', tcl_env) $ 
 
 	-- If there is no splice, we're nearly done
 	case group_tail of {
-	   Nothing -> do { 	-- Last thing: check for `main'
-			   tcg_env <- checkMain ;
-			   return (tcg_env, tcl_env) 
-		      } ;
+	   Nothing -> 	-- Last thing: check for `main'
+		        checkMain ;
 
 	-- If there's a splice, we must carry on
-	   Just (SpliceDecl splice_expr, rest_ds) -> do {
+	   Just (SpliceDecl splice_expr, rest_ds) -> 
+   do {
 #ifndef GHCI
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
@@ -568,17 +563,6 @@ declarations.  It expects there to be an incoming TcGblEnv in the
 monad; it augments it and returns the new TcGblEnv.
 
 \begin{code}
-tcRnGroup :: ModDetails -> HsGroup RdrName -> TcM (TcGblEnv, TcLclEnv)
-	-- Returns the variables free in the decls, for unused-binding reporting
-tcRnGroup boot_details decls
- = do {		-- Rename the declarations
-	(tcg_env, rn_decls) <- rnTopSrcDecls decls ;
-	setGblEnv tcg_env $ do {
-
-		-- Typecheck the declarations
-	tcTopSrcDecls boot_details rn_decls 
-  }}
-
 ------------------------------------------------
 rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 rnTopSrcDecls group

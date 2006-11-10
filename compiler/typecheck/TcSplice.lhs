@@ -76,6 +76,7 @@ import Control.Monad	( liftM )
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 tcSpliceExpr  :: HsSplice Name -> BoxyRhoType -> TcM (HsExpr TcId)
 kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
+	-- None of these functions add constraints to the LIE
 
 #ifndef GHCI
 tcSpliceExpr n e ty = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)

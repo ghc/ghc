@@ -69,7 +69,7 @@ module TcType (
   isClassPred, isTyVarClassPred, isEqPred, 
   mkDictTy, tcSplitPredTy_maybe, 
   isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
-  mkClassPred, isInheritablePred, isIPPred, mkPredName, 
+  mkClassPred, isInheritablePred, isIPPred, 
   dataConsStupidTheta, isRefineableTy,
 
   ---------------------------------
@@ -142,6 +142,7 @@ import TyCon
 
 -- others:
 import DynFlags
+import CoreSyn
 import Name
 import NameSet
 import VarEnv
@@ -149,7 +150,6 @@ import OccName
 import PrelNames
 import TysWiredIn
 import BasicTypes
-import SrcLoc
 import Util
 import Maybes
 import ListSetOps
@@ -299,6 +299,8 @@ data MetaDetails
 		     --   For a BoxTv, this type must be non-boxy
                      --   For a TauTv, this type must be a tau-type
 
+-- Generally speaking, SkolemInfo should not contain location info
+-- that is contained in the Name of the tyvar with this SkolemInfo
 data SkolemInfo
   = SigSkol UserTypeCtxt	-- A skolem that is created by instantiating
 				-- a programmer-supplied type signature
@@ -306,25 +308,26 @@ data SkolemInfo
 
 	-- The rest are for non-scoped skolems
   | ClsSkol Class	-- Bound at a class decl
-  | InstSkol Id		-- Bound at an instance decl
-  | FamInstSkol TyCon	-- Bound at a family instance decl
+  | InstSkol 		-- Bound at an instance decl
+  | FamInstSkol 	-- Bound at a family instance decl
   | PatSkol DataCon	-- An existential type variable bound by a pattern for
-	    SrcSpan	-- a data constructor with an existential type. E.g.
+	    		-- a data constructor with an existential type. E.g.
 			--	data T = forall a. Eq a => MkT a
 			-- 	f (MkT x) = ...
 			-- The pattern MkT x will allocate an existential type
 			-- variable for 'a'.  
-  | ArrowSkol SrcSpan	-- An arrow form (see TcArrows)
+  | ArrowSkol 		-- An arrow form (see TcArrows)
 
+  | RuleSkol RuleName	-- The LHS of a RULE
   | GenSkol [TcTyVar]	-- Bound when doing a subsumption check for 
 	    TcType	-- 	(forall tvs. ty)
-	    SrcSpan
 
   | UnkSkol		-- Unhelpful info (until I improve it)
 
 -------------------------------------
 -- UserTypeCtxt describes the places where a 
 -- programmer-written type signature can occur
+-- Like SkolemInfo, no location info
 data UserTypeCtxt 
   = FunSigCtxt Name	-- Function type signature
 			-- Also used for types in SPECIALISE pragmas
@@ -340,7 +343,6 @@ data UserTypeCtxt
   | ResSigCtxt		-- Result type sig
 			-- 	f x :: t = ....
   | ForSigCtxt Name	-- Foreign inport or export signature
-  | RuleSigCtxt Name 	-- Signature on a forall'd variable in a RULE
   | DefaultDeclCtxt	-- Types in a default declaration
   | SpecInstCtxt	-- SPECIALISE instance pragma
 
@@ -405,7 +407,6 @@ pprUserTypeCtxt LamPatSigCtxt   = ptext SLIT("a pattern type signature")
 pprUserTypeCtxt BindPatSigCtxt  = ptext SLIT("a pattern type signature")
 pprUserTypeCtxt ResSigCtxt      = ptext SLIT("a result type signature")
 pprUserTypeCtxt (ForSigCtxt n)  = ptext SLIT("the foreign declaration for") <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n) = ptext SLIT("the type signature for") <+> quotes (ppr n)
 pprUserTypeCtxt DefaultDeclCtxt = ptext SLIT("a type in a `default' declaration")
 pprUserTypeCtxt SpecInstCtxt    = ptext SLIT("a SPECIALISE instance pragma")
 
@@ -426,7 +427,7 @@ tidySkolemTyVar env tv
 				  (env1, info') = tidy_skol_info env info
 			info -> (env, info)
 
-    tidy_skol_info env (GenSkol tvs ty loc) = (env2, GenSkol tvs1 ty1 loc)
+    tidy_skol_info env (GenSkol tvs ty) = (env2, GenSkol tvs1 ty1)
 			    where
 			      (env1, tvs1) = tidyOpenTyVars env tvs
 			      (env2, ty1)  = tidyOpenType env1 ty
@@ -444,27 +445,22 @@ pprSkolTvBinding tv
     ppr_details (MetaTv (SigTv info) _) = ppr_skol info
     ppr_details (SkolemTv info)		= ppr_skol info
 
-    ppr_skol UnkSkol 	     = empty	-- Unhelpful; omit
-    ppr_skol (SigSkol ctxt)  = sep [quotes (ppr tv) <+> ptext SLIT("is bound by") <+> pprUserTypeCtxt ctxt,
-				    nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]
-    ppr_skol info            = quotes (ppr tv) <+> pprSkolInfo info
+    ppr_skol UnkSkol = empty	-- Unhelpful; omit
+    ppr_skol info    = quotes (ppr tv) <+> ptext SLIT("is bound by") 
+			<+> sep [pprSkolInfo info, nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]
  
 pprSkolInfo :: SkolemInfo -> SDoc
-pprSkolInfo (SigSkol ctxt)   = ptext SLIT("is bound by") <+> pprUserTypeCtxt ctxt
-pprSkolInfo (ClsSkol cls)    = ptext SLIT("is bound by the class declaration for") <+> quotes (ppr cls)
-pprSkolInfo (InstSkol df)    = 
-  ptext SLIT("is bound by the instance declaration at") <+> ppr (getSrcLoc df)
-pprSkolInfo (FamInstSkol tc) = 
-  ptext SLIT("is bound by the family instance declaration at") <+> 
-  ppr (getSrcLoc tc)
-pprSkolInfo (ArrowSkol loc)  = 
-  ptext SLIT("is bound by the arrow form at") <+> ppr loc
-pprSkolInfo (PatSkol dc loc) = sep [ptext SLIT("is bound by the pattern for") <+> quotes (ppr dc),
-           		            nest 2 (ptext SLIT("at") <+> ppr loc)]
-pprSkolInfo (GenSkol tvs ty loc) = sep [sep [ptext SLIT("is bound by the polymorphic type"), 
-				   	     nest 2 (quotes (ppr (mkForAllTys tvs ty)))],
-				        nest 2 (ptext SLIT("at") <+> ppr loc)]
--- UnkSkol, SigSkol
+pprSkolInfo (SigSkol ctxt)   = pprUserTypeCtxt ctxt
+pprSkolInfo (ClsSkol cls)    = ptext SLIT("the class declaration for") <+> quotes (ppr cls)
+pprSkolInfo InstSkol         = ptext SLIT("the instance declaration")
+pprSkolInfo FamInstSkol      = ptext SLIT("the family instance declaration")
+pprSkolInfo (RuleSkol name)  = ptext SLIT("the RULE") <+> doubleQuotes (ftext name)
+pprSkolInfo ArrowSkol        = ptext SLIT("the arrow form")
+pprSkolInfo (PatSkol dc)     = sep [ptext SLIT("the constructor") <+> quotes (ppr dc)]
+pprSkolInfo (GenSkol tvs ty) = sep [ptext SLIT("the polymorphic type"), 
+				    nest 2 (quotes (ppr (mkForAllTys tvs ty)))]
+
+-- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.  
 -- For Insts, these cases should not happen
 pprSkolInfo UnkSkol = panic "UnkSkol"
@@ -496,8 +492,8 @@ isSkolemTyVar tv
 isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	SkolemTv (PatSkol _ _) -> True
-	other 		       -> False
+	SkolemTv (PatSkol {}) -> True
+	other 		      -> False
 
 isMetaTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
@@ -800,10 +796,6 @@ tcSplitPredTy_maybe other	  = Nothing
 predTyUnique :: PredType -> Unique
 predTyUnique (IParam n _)      = getUnique (ipNameName n)
 predTyUnique (ClassP clas tys) = getUnique clas
-
-mkPredName :: Unique -> SrcLoc -> PredType -> Name
-mkPredName uniq loc (ClassP cls tys) = mkInternalName uniq (mkDictOcc (getOccName cls)) loc
-mkPredName uniq loc (IParam ip ty)   = mkInternalName uniq (getOccName (ipNameName ip)) loc
 \end{code}
 
 

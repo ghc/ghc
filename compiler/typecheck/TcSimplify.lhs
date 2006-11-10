@@ -12,7 +12,7 @@ module TcSimplify (
 	tcSimplifyRuleLhs, tcSimplifyIPs, 
 	tcSimplifySuperClasses,
 	tcSimplifyTop, tcSimplifyInteractive,
-	tcSimplifyBracket,
+	tcSimplifyBracket, tcSimplifyCheckPat,
 
 	tcSimplifyDeriv, tcSimplifyDefault,
 	bindInstsOfLocalFuns
@@ -27,10 +27,10 @@ import TcRnMonad
 import Inst
 import TcEnv
 import InstEnv
+import TcGadt
 import TcMType
 import TcType
 import TcIface
-import Id
 import Var
 import TyCon
 import Name
@@ -668,16 +668,17 @@ inferLoop doc tau_tvs wanteds
 
 	try_me inst
 	  | isFreeWhenInferring qtvs inst = Free
-	  | isClassDict inst 		  = DontReduceUnlessConstant	-- Dicts
-	  | otherwise	    		  = ReduceMe NoSCs		-- Lits and Methods
+	  | isClassDict inst 		  = Irred		-- Dicts
+	  | otherwise	    		  = ReduceMe NoSCs	-- Lits and Methods
+	env = mkRedEnv doc try_me []
     in
     traceTc (text "infloop" <+> vcat [ppr tau_tvs', ppr wanteds', ppr preds, 
 				      ppr (grow preds tau_tvs'), ppr qtvs])	`thenM_`
 		-- Step 2
-    reduceContext doc try_me [] wanteds'    `thenM` \ (no_improvement, frees, binds, irreds) ->
+    reduceContext env wanteds'    `thenM` \ (improved, frees, binds, irreds) ->
 
 		-- Step 3
-    if no_improvement then
+    if not improved then
 	returnM (varSetElems qtvs, frees, binds, irreds)
     else
 	-- If improvement did some unification, we go round again.  There
@@ -746,12 +747,14 @@ isFreeWhenInferring qtvs inst
   && isInheritableInst inst		-- And no implicit parameter involved
 					-- (see "Notes on implicit parameters")
 
+{-	No longer used (with implication constraints)
 isFreeWhenChecking :: TyVarSet	-- Quantified tyvars
 	 	   -> NameSet	-- Quantified implicit parameters
 		   -> Inst -> Bool
 isFreeWhenChecking qtvs ips inst
   =  isFreeWrtTyVars qtvs inst
   && isFreeWrtIPs    ips inst
+-}
 
 isFreeWrtTyVars qtvs inst = tyVarsOfInst inst `disjointVarSet` qtvs
 isFreeWrtIPs     ips inst = not (any (`elemNameSet` ips) (ipNamesOfInst inst))
@@ -768,45 +771,190 @@ isFreeWrtIPs     ips inst = not (any (`elemNameSet` ips) (ipNamesOfInst inst))
 we are going to quantify over.  For example, a class or instance declaration.
 
 \begin{code}
-tcSimplifyCheck
-	 :: SDoc
-	 -> [TcTyVar]		-- Quantify over these
-	 -> [Inst]		-- Given
-	 -> [Inst]		-- Wanted
-	 -> TcM TcDictBinds	-- Bindings
-
+-----------------------------------------------------------
 -- tcSimplifyCheck is used when checking expression type signatures,
 -- class decls, instance decls etc.
---
--- NB: tcSimplifyCheck does not consult the
---	global type variables in the environment; so you don't
---	need to worry about setting them before calling tcSimplifyCheck
-tcSimplifyCheck doc qtvs givens wanted_lie
+tcSimplifyCheck	:: InstLoc
+	 	-> [TcTyVar]		-- Quantify over these
+	 	-> [Inst]		-- Given
+	 	-> [Inst]		-- Wanted
+	 	-> TcM TcDictBinds	-- Bindings
+tcSimplifyCheck loc qtvs givens wanteds 
   = ASSERT( all isSkolemTyVar qtvs )
-    do	{ (qtvs', frees, binds) <- tcSimplCheck doc get_qtvs AddSCs givens wanted_lie
-	; extendLIEs frees
-	; return binds }
+    do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
+	; implic_bind <- makeImplicationBind loc [] emptyRefinement 
+					     qtvs givens irreds
+	; return (binds `unionBags` implic_bind) }
+
+-----------------------------------------------------------
+-- tcSimplifyCheckPat is used for existential pattern match
+tcSimplifyCheckPat :: InstLoc
+	 	   -> [CoVar] -> Refinement
+	 	   -> [TcTyVar]		-- Quantify over these
+	 	   -> [Inst]		-- Given
+	 	   -> [Inst]		-- Wanted
+	 	   -> TcM TcDictBinds	-- Bindings
+tcSimplifyCheckPat loc co_vars reft qtvs givens wanteds
+  = ASSERT( all isSkolemTyVar qtvs )
+    do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
+	; implic_bind <- makeImplicationBind loc co_vars reft 
+					     qtvs givens irreds
+	; return (binds `unionBags` implic_bind) }
+
+-----------------------------------------------------------
+makeImplicationBind :: InstLoc -> [CoVar] -> Refinement
+		    -> [TcTyVar] -> [Inst] -> [Inst]
+		    -> TcM TcDictBinds	
+-- Make a binding that binds 'irreds', by generating an implication
+-- constraint for them, *and* throwing the constraint into the LIE
+makeImplicationBind loc co_vars reft qtvs givens irreds
+  = do	{ let givens' = filter isDict givens
+		-- The givens can include methods
+
+	   -- If there are no 'givens', then it's safe to 
+	   -- partition the 'wanteds' by their qtvs, thereby trimming irreds
+	   -- See Note [Freeness and implications]
+	; irreds <- if null givens'
+	     then do
+		{ let qtv_set = mkVarSet qtvs
+		      (frees, real_irreds) = partition (isFreeWrtTyVars qtv_set) irreds
+		; extendLIEs frees
+		; return real_irreds }
+	     else 
+		return irreds
+
+	-- If there are no irreds, we are done!
+	; if null irreds then 
+		return emptyBag
+	  else do
+
+	-- Otherwise we must generate a binding
+	-- The binding looks like
+	--	(ir1, .., irn) = f qtvs givens
+	-- where f is (evidence for) the new implication constraint
+	--
+	-- This binding must line up the 'rhs' in reduceImplication
+
+	{ uniq <- newUnique 
+	; span <- getSrcSpanM
+	; let all_tvs = qtvs ++ co_vars	-- Abstract over all these
+	      name = mkInternalName uniq (mkVarOcc "ic") (srcSpanStart span)
+	      implic_inst = ImplicInst { tci_name = name, tci_reft = reft,
+					 tci_tyvars = all_tvs, 
+					 tci_given = givens',
+					 tci_wanted = irreds, tci_loc = loc }
+
+	; let n_irreds = length irreds
+	      irred_ids = map instToId irreds
+	      tup_ty = mkTupleTy Boxed n_irreds (map idType irred_ids)
+	      pat = TuplePat (map nlVarPat irred_ids) Boxed tup_ty
+	      rhs = L span (mkHsWrap co (HsVar (instToId implic_inst)))
+	      co  = mkWpApps (map instToId givens') <.> mkWpTyApps (mkTyVarTys all_tvs)
+	      bind | n_irreds==1 = VarBind (head irred_ids) rhs
+		   | otherwise   = PatBind { pat_lhs = L span pat, 
+				      	     pat_rhs = unguardedGRHSs rhs, 
+				      	     pat_rhs_ty = tup_ty,
+				      	     bind_fvs = placeHolderNames }
+	; -- pprTrace "Make implic inst" (ppr implic_inst) $
+	  extendLIE implic_inst
+	; return (unitBag (L span bind)) }}
+
+
+-----------------------------------------------------------
+topCheckLoop :: SDoc
+	     -> [Inst]			-- Wanted
+	     -> TcM (TcDictBinds,
+		     [Inst])		-- Irreducible
+
+topCheckLoop doc wanteds
+  = checkLoop (mkRedEnv doc try_me []) wanteds
   where
---  get_qtvs = zonkTcTyVarsAndFV qtvs
-    get_qtvs = return (mkVarSet qtvs)	-- All skolems
+    try_me inst = ReduceMe AddSCs
+
+-----------------------------------------------------------
+innerCheckLoop :: InstLoc -> WantSCs
+	       -> [Inst]		-- Given
+	       -> [Inst]		-- Wanted
+	       -> TcM (TcDictBinds,
+		       [Inst])		-- Irreducible
+
+innerCheckLoop inst_loc want_scs givens wanteds
+  = checkLoop env wanteds
+  where
+    env = mkRedEnv (pprInstLoc inst_loc) try_me givens
+
+    try_me inst | isMethodOrLit inst = ReduceMe want_scs
+		| otherwise	     = Irred
+	-- When checking against a given signature 
+	-- we MUST be very gentle: Note [Check gently]
+\end{code}
+
+Note [Check gently]
+~~~~~~~~~~~~~~~~~~~~
+We have to very careful about not simplifying too vigorously
+Example:  
+  data T a where
+    MkT :: a -> T [a]
+
+  f :: Show b => T b -> b
+  f (MkT x) = show [x]
+
+Inside the pattern match, which binds (a:*, x:a), we know that
+	b ~ [a]
+Hence we have a dictionary for Show [a] available; and indeed we 
+need it.  We are going to build an implication contraint
+	forall a. (b~[a]) => Show [a]
+Later, we will solve this constraint using the knowledge (Show b)
+	
+But we MUST NOT reduce (Show [a]) to (Show a), else the whole
+thing becomes insoluble.  So we simplify gently (get rid of literals
+and methods only, plus common up equal things), deferring the real
+work until top level, when we solve the implication constraint
+with topCheckLooop.
 
 
+\begin{code}
+-----------------------------------------------------------
+checkLoop :: RedEnv
+	  -> [Inst]			-- Wanted
+	  -> TcM (TcDictBinds,
+		  [Inst])		-- Irreducible
+-- Precondition: the try_me never returns Free
+-- 		 givens are completely rigid
+
+checkLoop env wanteds
+  = do { -- Givens are skolems, so no need to zonk them
+	 wanteds' <- mappM zonkInst wanteds
+
+	; (improved, _frees, binds, irreds) <- reduceContext env wanteds'
+
+	; ASSERT( null _frees )
+
+	  if not improved then
+ 	     return (binds, irreds)
+	  else do
+
+	{ (binds1, irreds1) <- checkLoop env irreds
+	; return (binds `unionBags` binds1, irreds1) } }
+\end{code}
+
+
+\begin{code}
+-----------------------------------------------------------
 -- tcSimplifyInferCheck is used when we know the constraints we are to simplify
 -- against, but we don't know the type variables over which we are going to quantify.
 -- This happens when we have a type signature for a mutually recursive group
 tcSimplifyInferCheck
-	 :: SDoc
+	 :: InstLoc
 	 -> TcTyVarSet		-- fv(T)
 	 -> [Inst]		-- Given
 	 -> [Inst]		-- Wanted
 	 -> TcM ([TcTyVar],	-- Variables over which to quantify
 		 TcDictBinds)	-- Bindings
 
-tcSimplifyInferCheck doc tau_tvs givens wanted_lie
-  = do	{ (qtvs', frees, binds) <- tcSimplCheck doc get_qtvs AddSCs givens wanted_lie
-	; extendLIEs frees
-	; return (qtvs', binds) }
-  where
+tcSimplifyInferCheck loc tau_tvs givens wanteds
+  = do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
+
 	-- Figure out which type variables to quantify over
 	-- You might think it should just be the signature tyvars,
 	-- but in bizarre cases you can get extra ones
@@ -816,60 +964,18 @@ tcSimplifyInferCheck doc tau_tvs givens wanted_lie
 	-- Here we infer g :: forall a b. a -> b -> (b,a)
 	-- We don't want g to be monomorphic in b just because
 	-- f isn't quantified over b.
-    all_tvs = varSetElems (tau_tvs `unionVarSet` tyVarsOfInsts givens)
+	; let all_tvs = varSetElems (tau_tvs `unionVarSet` tyVarsOfInsts givens)
+	; all_tvs <- zonkTcTyVarsAndFV all_tvs
+	; gbl_tvs <- tcGetGlobalTyVars
+	; let qtvs = varSetElems (all_tvs `minusVarSet` gbl_tvs)
+		-- We could close gbl_tvs, but its not necessary for
+		-- soundness, and it'll only affect which tyvars, not which
+		-- dictionaries, we quantify over
 
-    get_qtvs = zonkTcTyVarsAndFV all_tvs	`thenM` \ all_tvs' ->
-	       tcGetGlobalTyVars		`thenM` \ gbl_tvs ->
-	       let
-	          qtvs = all_tvs' `minusVarSet` gbl_tvs
-			-- We could close gbl_tvs, but its not necessary for
-			-- soundness, and it'll only affect which tyvars, not which
-			-- dictionaries, we quantify over
-	       in
-	       returnM qtvs
-\end{code}
-
-Here is the workhorse function for all three wrappers.
-
-\begin{code}
-tcSimplCheck doc get_qtvs want_scs givens wanted_lie
-  = do	{ (qtvs, frees, binds, irreds) <- check_loop givens wanted_lie
-
-		-- Complain about any irreducible ones
-	; if not (null irreds)
-	  then do { givens' <- mappM zonkInst given_dicts_and_ips
-		  ; groupErrs (addNoInstanceErrs (Just doc) givens') irreds }
-	  else return ()
-
-	; returnM (qtvs, frees, binds) }
-  where
-    given_dicts_and_ips = filter (not . isMethod) givens
-	-- For error reporting, filter out methods, which are 
-	-- only added to the given set as an optimisation
-
-    ip_set = mkNameSet (ipNamesOfInsts givens)
-
-    check_loop givens wanteds
-      =		-- Step 1
-    	mappM zonkInst givens	`thenM` \ givens' ->
-    	mappM zonkInst wanteds	`thenM` \ wanteds' ->
-    	get_qtvs 		`thenM` \ qtvs' ->
-
- 		    -- Step 2
-    	let
- 	    -- When checking against a given signature we always reduce
- 	    -- until we find a match against something given, or can't reduce
- 	    try_me inst | isFreeWhenChecking qtvs' ip_set inst = Free
- 			| otherwise  			       = ReduceMe want_scs
-    	in
-    	reduceContext doc try_me givens' wanteds'	`thenM` \ (no_improvement, frees, binds, irreds) ->
-
- 		    -- Step 3
-    	if no_improvement then
- 	    returnM (varSetElems qtvs', frees, binds, irreds)
-    	else
- 	    check_loop givens' (irreds ++ frees) 	`thenM` \ (qtvs', frees1, binds1, irreds1) ->
- 	    returnM (qtvs', frees1, binds `unionBags` binds1, irreds1)
+		-- Now we are back to normal (c.f. tcSimplCheck)
+	; implic_bind <- makeImplicationBind loc [] emptyRefinement 
+					     qtvs givens irreds
+	; return (qtvs, binds `unionBags` implic_bind) }
 \end{code}
 
 
@@ -918,15 +1024,20 @@ Two more nasty cases are in
 	tcrun033
 
 \begin{code}
-tcSimplifySuperClasses qtvs givens sc_wanteds
-  = ASSERT( all isSkolemTyVar qtvs )
-    do	{ (_, frees, binds1) <- tcSimplCheck doc get_qtvs NoSCs givens sc_wanteds
-	; ext_default        <- doptM Opt_ExtendedDefaultRules
-	; binds2	     <- tc_simplify_top doc ext_default NoSCs frees
-	; return (binds1 `unionBags` binds2) }
+tcSimplifySuperClasses 
+	:: InstLoc 
+	-> [Inst]	-- Given 
+	-> [Inst]	-- Wanted
+	-> TcM TcDictBinds
+tcSimplifySuperClasses loc givens sc_wanteds
+  = do	{ (binds1, irreds) <- checkLoop env sc_wanteds
+	; let (tidy_env, tidy_irreds) = tidyInsts irreds
+	; reportNoInstances tidy_env (Just (loc, givens)) tidy_irreds
+	; return binds1 }
   where
-    get_qtvs = return (mkVarSet qtvs)
-    doc = ptext SLIT("instance declaration superclass context")
+    env = mkRedEnv (pprInstLoc loc) try_me givens
+    try_me inst = ReduceMe NoSCs
+	-- Like topCheckLoop, but with NoSCs
 \end{code}
 
 
@@ -1057,8 +1168,9 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- BUT do no improvement!  See Plan D above
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
-    reduceContextWithoutImprovement 
-	doc reduceMe wanteds' 		`thenM` \ (_frees, _binds, constrained_dicts) ->
+    let env = mkNoImproveRedEnv doc reduceMe
+    in
+    reduceContext env wanteds' 		`thenM` \ (_imp, _frees, _binds, constrained_dicts) ->
 
 	-- Next, figure out the tyvars we will quantify over
     zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
@@ -1095,9 +1207,9 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
         try_me inst | isFreeWrtTyVars qtvs' inst,
 		      (is_nested_group || isDict inst) = Free
 	            | otherwise  		       = ReduceMe AddSCs
-    in
-    reduceContextWithoutImprovement 
-	doc try_me wanteds' 		`thenM` \ (frees, binds, irreds) ->
+ 	env = mkNoImproveRedEnv doc try_me
+   in
+    reduceContext env wanteds'   `thenM` \ (_imp, frees, binds, irreds) ->
     ASSERT( null irreds )
 
 	-- See "Notes on implicit parameters, Question 4: top level"
@@ -1187,10 +1299,9 @@ tcSimplifyRuleLhs wanteds
 	| otherwise
 	= do { w' <- zonkInst w  -- So that (3::Int) does not generate a call
 				 -- to fromInteger; this looks fragile to me
-	     ; lookup_result <- lookupInst w'
+	     ; lookup_result <- lookupSimpleInst w'
 	     ; case lookup_result of
 		 GenInst ws' rhs -> go dicts (addBind binds w rhs) (ws' ++ ws)
-		 SimpleInst rhs  -> go dicts (addBind binds w rhs) ws
 		 NoInstance	 -> pprPanic "tcSimplifyRuleLhs" (ppr w)
 	  }
 \end{code}
@@ -1205,8 +1316,8 @@ this bracket again at its usage site.
 \begin{code}
 tcSimplifyBracket :: [Inst] -> TcM ()
 tcSimplifyBracket wanteds
-  = simpleReduceLoop doc reduceMe wanteds	`thenM_`
-    returnM ()
+  = do	{ topCheckLoop doc wanteds
+	; return () }
   where
     doc = text "tcSimplifyBracket"
 \end{code}
@@ -1236,30 +1347,34 @@ force the binding for ?x to be of type Int.
 tcSimplifyIPs :: [Inst]		-- The implicit parameters bound here
 	      -> [Inst]		-- Wanted
 	      -> TcM TcDictBinds
+	-- We need a loop so that we do improvement, and then
+	-- (next time round) generate a binding to connect the two
+	-- 	let ?x = e in ?x
+	-- Here the two ?x's have different types, and improvement 
+	-- makes them the same.
+
 tcSimplifyIPs given_ips wanteds
-  = simpl_loop given_ips wanteds	`thenM` \ (frees, binds) ->
-    extendLIEs frees			`thenM_`
-    returnM binds
+  = do	{ wanteds'   <- mappM zonkInst wanteds
+	; given_ips' <- mappM zonkInst given_ips
+		-- Unusually for checking, we *must* zonk the given_ips
+
+	; let env = mkRedEnv doc try_me given_ips'
+	; (improved, _frees, binds, irreds) <- reduceContext env wanteds'
+
+	; if not improved then 
+		ASSERT( all is_free irreds )
+		do { extendLIEs irreds
+		   ; return binds }
+	  else
+		tcSimplifyIPs given_ips wanteds }
   where
-    doc	     = text "tcSimplifyIPs" <+> ppr given_ips
-    ip_set   = mkNameSet (ipNamesOfInsts given_ips)
+    doc	   = text "tcSimplifyIPs" <+> ppr given_ips
+    ip_set = mkNameSet (ipNamesOfInsts given_ips)
+    is_free inst = isFreeWrtIPs ip_set inst
 
 	-- Simplify any methods that mention the implicit parameter
-    try_me inst | isFreeWrtIPs ip_set inst = Free
-		| otherwise		   = ReduceMe NoSCs
-
-    simpl_loop givens wanteds
-      = mappM zonkInst givens		`thenM` \ givens' ->
-        mappM zonkInst wanteds		`thenM` \ wanteds' ->
-
-        reduceContext doc try_me givens' wanteds'    `thenM` \ (no_improvement, frees, binds, irreds) ->
-
-        if no_improvement then
-	    ASSERT( null irreds )
-	    returnM (frees, binds)
-	else
-	    simpl_loop givens' (irreds ++ frees)	`thenM` \ (frees1, binds1) ->
-	    returnM (frees1, binds `unionBags` binds1)
+    try_me inst | is_free inst = Irred
+		| otherwise    = ReduceMe NoSCs
 \end{code}
 
 
@@ -1304,12 +1419,12 @@ bindInstsOfLocalFuns wanteds local_ids
     returnM emptyLHsBinds
 
   | otherwise
-  = simpleReduceLoop doc try_me for_me	`thenM` \ (frees, binds, irreds) ->
-    ASSERT( null irreds )
-    extendLIEs not_for_me	`thenM_`
-    extendLIEs frees		`thenM_`
-    returnM binds
+  = do	{ (binds, irreds) <- checkLoop env for_me
+	; extendLIEs not_for_me	
+	; extendLIEs irreds
+	; return binds }
   where
+    env = mkRedEnv doc try_me []
     doc		     = text "bindInsts" <+> ppr local_ids
     overloaded_ids   = filter is_overloaded local_ids
     is_overloaded id = isOverloadedTy (idType id)
@@ -1319,7 +1434,7 @@ bindInstsOfLocalFuns wanteds local_ids
 						-- so it's worth building a set, so that
 						-- lookup (in isMethodFor) is faster
     try_me inst | isMethod inst = ReduceMe NoSCs
-		| otherwise	= Free
+		| otherwise	= Irred
 \end{code}
 
 
@@ -1332,15 +1447,53 @@ bindInstsOfLocalFuns wanteds local_ids
 The main control over context reduction is here
 
 \begin{code}
+data RedEnv 
+  = RedEnv { red_doc	:: SDoc			-- The context
+	   , red_try_me :: Inst -> WhatToDo
+	   , red_improve :: Bool		-- True <=> do improvement
+	   , red_givens :: [Inst]		-- All guaranteed rigid
+						-- Always dicts
+						-- but see Note [Rigidity]
+	   , red_stack  :: (Int, [Inst])	-- Recursion stack (for err msg)
+						-- See Note [RedStack]
+  }
+
+-- Note [Rigidity]
+-- The red_givens are rigid so far as cmpInst is concerned.
+-- There is one case where they are not totally rigid, namely in tcSimplifyIPs
+--	let ?x = e in ...
+-- Here, the given is (?x::a), where 'a' is not necy a rigid type
+-- But that doesn't affect the comparison, which is based only on mame.
+
+-- Note [RedStack]
+-- The red_stack pair (n,insts) pair is just used for error reporting.
+-- 'n' is always the depth of the stack.
+-- The 'insts' is the stack of Insts being reduced: to produce X
+-- I had to produce Y, to produce Y I had to produce Z, and so on.
+
+
+mkRedEnv :: SDoc -> (Inst -> WhatToDo) -> [Inst] -> RedEnv
+mkRedEnv doc try_me givens
+  = RedEnv { red_doc = doc, red_try_me = try_me,
+	     red_givens = givens, red_stack = (0,[]),
+	     red_improve = True }	
+
+mkNoImproveRedEnv :: SDoc -> (Inst -> WhatToDo) -> RedEnv
+-- Do not do improvement; no givens
+mkNoImproveRedEnv doc try_me
+  = RedEnv { red_doc = doc, red_try_me = try_me,
+	     red_givens = [], red_stack = (0,[]),
+	     red_improve = True }	
+
 data WhatToDo
  = ReduceMe WantSCs	-- Try to reduce this
-			-- If there's no instance, behave exactly like
-			-- DontReduce: add the inst to the irreductible ones, 
-			-- but don't produce an error message of any kind.
+			-- If there's no instance, add the inst to the 
+			-- irreductible ones, but don't produce an error 
+			-- message of any kind.
 			-- It might be quite legitimate such as (Eq a)!
 
- | DontReduceUnlessConstant	-- Return as irreducible unless it can
-				-- be reduced to a constant in one step
+ | Irred		-- Return as irreducible unless it can
+			-- be reduced to a constant in one step
 
  | Free			  -- Return as free
 
@@ -1353,237 +1506,77 @@ data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 	-- Note [SUPER-CLASS LOOP 1]
 \end{code}
 
-
-
-\begin{code}
-type Avails = FiniteMap Inst Avail
-emptyAvails = emptyFM
-
-data Avail
-  = IsFree		-- Used for free Insts
-  | Irred		-- Used for irreducible dictionaries,
-			-- which are going to be lambda bound
-
-  | Given TcId 		-- Used for dictionaries for which we have a binding
-			-- e.g. those "given" in a signature
-
-  | Rhs 		-- Used when there is a RHS
-	(LHsExpr TcId) 	-- The RHS
-	[Inst]		-- Insts free in the RHS; we need these too
-
-pprAvails avails = vcat [sep [ppr inst, nest 2 (equals <+> pprAvail avail)]
-			| (inst,avail) <- fmToList avails ]
-
-instance Outputable Avail where
-    ppr = pprAvail
-
-pprAvail IsFree	       	= text "Free"
-pprAvail Irred	       	= text "Irred"
-pprAvail (Given x)   	= text "Given" <+> ppr x
-pprAvail (Rhs rhs bs)   = text "Rhs" <+> ppr rhs <+> braces (ppr bs)
-\end{code}
-
-Extracting the bindings from a bunch of Avails.
-The bindings do *not* come back sorted in dependency order.
-We assume that they'll be wrapped in a big Rec, so that the
-dependency analyser can sort them out later
-
-The loop startes
-\begin{code}
-extractResults :: Avails
-	       -> [Inst]		-- Wanted
-	       -> TcM (TcDictBinds, 	-- Bindings
-			[Inst],		-- Irreducible ones
-			[Inst])		-- Free ones
-
-extractResults avails wanteds
-  = go avails emptyBag [] [] wanteds
-  where
-    go avails binds irreds frees [] 
-      = returnM (binds, irreds, frees)
-
-    go avails binds irreds frees (w:ws)
-      = case lookupFM avails w of
-	  Nothing    -> pprTrace "Urk: extractResults" (ppr w) $
-			go avails binds irreds frees ws
-
-	  Just IsFree -> go (add_free avails w)  binds irreds     (w:frees) ws
-	  Just Irred  -> go (add_given avails w) binds (w:irreds) frees     ws
-
-	  Just (Given id) -> go avails new_binds irreds frees ws
-			  where
-			       new_binds | id == instToId w = binds
-					 | otherwise        = addBind binds w (L (instSpan w) (HsVar id))
-		-- The sought Id can be one of the givens, via a superclass chain
-		-- and then we definitely don't want to generate an x=x binding!
-
-	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds frees (ws' ++ ws)
-			     where
-				new_binds = addBind binds w rhs
-
-    add_given avails w = addToFM avails w (Given (instToId w))
-
-    add_free avails w | isMethod w = avails
-		      | otherwise  = add_given avails w
-	-- NB: Hack alert!  
-	-- Do *not* replace Free by Given if it's a method.
-	-- The following situation shows why this is bad:
-	--	truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
-	-- From an application (truncate f i) we get
-	--	t1 = truncate at f
-	--	t2 = t1 at i
-	-- If we have also have a second occurrence of truncate, we get
-	--	t3 = truncate at f
-	--	t4 = t3 at i
-	-- When simplifying with i,f free, we might still notice that
-	--   t1=t3; but alas, the binding for t2 (which mentions t1)
-	--   will continue to float out!
-
-addBind binds inst rhs = binds `unionBags` unitBag (L (instLocSrcSpan (instLoc inst)) 
-						      (VarBind (instToId inst) rhs))
-instSpan wanted = instLocSrcSpan (instLoc wanted)
-\end{code}
-
-
 %************************************************************************
 %*									*
 \subsection[reduce]{@reduce@}
 %*									*
 %************************************************************************
 
-When the "what to do" predicate doesn't depend on the quantified type variables,
-matters are easier.  We don't need to do any zonking, unless the improvement step
-does something, in which case we zonk before iterating.
-
-The "given" set is always empty.
 
 \begin{code}
-simpleReduceLoop :: SDoc
-	 	 -> (Inst -> WhatToDo)		-- What to do, *not* based on the quantified type variables
-		 -> [Inst]			-- Wanted
-		 -> TcM ([Inst],		-- Free
-			 TcDictBinds,
-			 [Inst])		-- Irreducible
-
-simpleReduceLoop doc try_me wanteds
-  = mappM zonkInst wanteds			`thenM` \ wanteds' ->
-    reduceContext doc try_me [] wanteds'	`thenM` \ (no_improvement, frees, binds, irreds) ->
-    if no_improvement then
-	returnM (frees, binds, irreds)
-    else
-	simpleReduceLoop doc try_me (irreds ++ frees)	`thenM` \ (frees1, binds1, irreds1) ->
-	returnM (frees1, binds `unionBags` binds1, irreds1)
-\end{code}
-
-
-
-\begin{code}
-reduceContext :: SDoc
-	      -> (Inst -> WhatToDo)
-	      -> [Inst]			-- Given
+reduceContext :: RedEnv
 	      -> [Inst]			-- Wanted
-	      -> TcM (Bool, 		-- True <=> improve step did no unification
-			 [Inst],	-- Free
-			 TcDictBinds,	-- Dictionary bindings
-			 [Inst])	-- Irreducible
+	      -> TcM (ImprovementDone,
+		      [Inst],		-- Free
+		      TcDictBinds,	-- Dictionary bindings
+		      [Inst])		-- Irreducible
 
-reduceContext doc try_me givens wanteds
-  =
-    traceTc (text "reduceContext" <+> (vcat [
+reduceContext env wanteds
+  = do	{ traceTc (text "reduceContext" <+> (vcat [
 	     text "----------------------",
-	     doc,
-	     text "given" <+> ppr givens,
+	     red_doc env,
+	     text "given" <+> ppr (red_givens env),
 	     text "wanted" <+> ppr wanteds,
 	     text "----------------------"
-	     ]))					`thenM_`
+	     ]))
 
         -- Build the Avail mapping from "givens"
-    foldlM addGiven emptyAvails givens			`thenM` \ init_state ->
+	; init_state <- foldlM addGiven emptyAvails (red_givens env)
 
         -- Do the real work
-    reduceList (0,[]) try_me wanteds init_state		`thenM` \ avails ->
+	; avails <- reduceList env wanteds init_state
 
-	-- Do improvement, using everything in avails
-	-- In particular, avails includes all superclasses of everything
-    tcImprove avails					`thenM` \ no_improvement ->
+	; let improved = availsImproved avails
+	; (binds, irreds, frees) <- extractResults avails wanteds
 
-    extractResults avails wanteds			`thenM` \ (binds, irreds, frees) ->
-
-    traceTc (text "reduceContext end" <+> (vcat [
+	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
-	     doc,
-	     text "given" <+> ppr givens,
+	     red_doc env,
+	     text "given" <+> ppr (red_givens env),
 	     text "wanted" <+> ppr wanteds,
 	     text "----",
 	     text "avails" <+> pprAvails avails,
 	     text "frees" <+> ppr frees,
-	     text "no_improvement =" <+> ppr no_improvement,
+	     text "improved =" <+> ppr improved,
 	     text "----------------------"
-	     ])) 					`thenM_`
+	     ]))
 
-    returnM (no_improvement, frees, binds, irreds)
+	; return (improved, frees, binds, irreds) }
 
--- reduceContextWithoutImprovement differs from reduceContext
---	(a) no improvement
---	(b) 'givens' is assumed empty
-reduceContextWithoutImprovement doc try_me wanteds
-  =
-    traceTc (text "reduceContextWithoutImprovement" <+> (vcat [
-	     text "----------------------",
-	     doc,
-	     text "wanted" <+> ppr wanteds,
-	     text "----------------------"
-	     ]))					`thenM_`
-
-        -- Do the real work
-    reduceList (0,[]) try_me wanteds emptyAvails	`thenM` \ avails ->
-    extractResults avails wanteds			`thenM` \ (binds, irreds, frees) ->
-
-    traceTc (text "reduceContextWithoutImprovement end" <+> (vcat [
-	     text "----------------------",
-	     doc,
-	     text "wanted" <+> ppr wanteds,
-	     text "----",
-	     text "avails" <+> pprAvails avails,
-	     text "frees" <+> ppr frees,
-	     text "----------------------"
-	     ])) 					`thenM_`
-
-    returnM (frees, binds, irreds)
-
-tcImprove :: Avails -> TcM Bool		-- False <=> no change
--- Perform improvement using all the predicates in Avails
-tcImprove avails
- =  tcGetInstEnvs 			`thenM` \ inst_envs -> 
-    let
-	preds = [ (pred, pp_loc)
-		| (inst, avail) <- fmToList avails,
-		  pred <- get_preds inst avail,
-		  let pp_loc = pprInstLoc (instLoc inst)
-		]
+tcImproveOne :: Avails -> Inst -> TcM ImprovementDone
+tcImproveOne avails inst
+  | not (isDict inst) = return False
+  | otherwise
+  = do	{ inst_envs <- tcGetInstEnvs
+	; let eqns = improveOne (classInstances inst_envs)
+				(dictPred inst, pprInstArising inst)
+				[ (dictPred p, pprInstArising p)
+				| p <- availsInsts avails, isDict p ]
 		-- Avails has all the superclasses etc (good)
 		-- It also has all the intermediates of the deduction (good)
 		-- It does not have duplicates (good)
 		-- NB that (?x::t1) and (?x::t2) will be held separately in avails
 		--    so that improve will see them separate
+	; traceTc (text "improveOne" <+> ppr inst)
+	; unifyEqns eqns }
 
-	-- For free Methods, we want to take predicates from their context,
-	-- but for Methods that have been squished their context will already
-	-- be in Avails, and we don't want duplicates.  Hence this rather
-	-- horrid get_preds function
-	get_preds inst IsFree = fdPredsOfInst inst
-	get_preds inst other | isDict inst = [dictPred inst]
-			     | otherwise   = []
-
-	eqns = improve get_insts preds
-	get_insts clas = classInstances inst_envs clas
-     in
-     if null eqns then
-	returnM True
-     else
-	traceTc (ptext SLIT("Improve:") <+> vcat (map pprEquationDoc eqns))	`thenM_`
-        mappM_ unify eqns	`thenM_`
-	returnM False
+unifyEqns :: [(Equation,(PredType,SDoc),(PredType,SDoc))] 
+	  -> TcM ImprovementDone
+unifyEqns [] = return False
+unifyEqns eqns
+  = do	{ traceTc (ptext SLIT("Improve:") <+> vcat (map pprEquationDoc eqns))
+        ; mappM_ unify eqns
+	; return True }
   where
     unify ((qtvs, pairs), what1, what2)
 	 = addErrCtxtM (mkEqnMsg what1 what2)	$
@@ -1605,73 +1598,48 @@ mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
 The main context-reduction function is @reduce@.  Here's its game plan.
 
 \begin{code}
-reduceList :: (Int,[Inst])		-- Stack (for err msgs)
-					-- along with its depth
-       	   -> (Inst -> WhatToDo)
-       	   -> [Inst]
-       	   -> Avails
-       	   -> TcM Avails
-\end{code}
-
-@reduce@ is passed
-     try_me:	given an inst, this function returns
-		  Reduce       reduce this
-		  DontReduce   return this in "irreds"
-		  Free	       return this in "frees"
-
-     wanteds:	The list of insts to reduce
-     state:	An accumulating parameter of type Avails
-		that contains the state of the algorithm
-
-  It returns a Avails.
-
-The (n,stack) pair is just used for error reporting.
-n is always the depth of the stack.
-The stack is the stack of Insts being reduced: to produce X
-I had to produce Y, to produce Y I had to produce Z, and so on.
-
-\begin{code}
-reduceList (n,stack) try_me wanteds state
+reduceList :: RedEnv -> [Inst] -> Avails -> TcM Avails
+reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
   = do 	{ dopts <- getDOpts
 #ifdef DEBUG
 	; if n > 8 then
-		dumpTcRn (text "Interesting! Context reduction stack deeper than 8:" 
-			  <+> (int n $$ ifPprDebug (nest 2 (pprStack stack))))
+		dumpTcRn (hang (ptext SLIT("Interesting! Context reduction stack depth") <+> int n) 
+			     2 (ifPprDebug (nest 2 (pprStack stk))))
 	  else return ()
 #endif
 	; if n >= ctxtStkDepth dopts then
-	    failWithTc (reduceDepthErr n stack)
+	    failWithTc (reduceDepthErr n stk)
 	  else
 	    go wanteds state }
   where
     go []     state = return state
-    go (w:ws) state = do { state' <- reduce (n+1, w:stack) try_me w state
+    go (w:ws) state = do { state' <- reduce (env {red_stack = (n+1, w:stk)}) w state
 			 ; go ws state' }
 
     -- Base case: we're done!
-reduce stack try_me wanted avails
+reduce env wanted avails
     -- It's the same as an existing inst, or a superclass thereof
-  | Just avail <- isAvailable avails wanted
+  | Just avail <- findAvail avails wanted
   = returnM avails	
 
   | otherwise
-  = case try_me wanted of {
-
-    ; DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
-  				     -- First, see if the inst can be reduced to a constant in one step
-	try_simple (addIrred AddSCs)	-- Assume want superclasses
-
-    ; Free ->	-- It's free so just chuck it upstairs
-  		-- First, see if the inst can be reduced to a constant in one step
-	try_simple addFree
+  = case red_try_me env wanted of {
+      Free  -> try_simple addFree		-- It's free so just chuck it upstairs
+    ; Irred -> try_simple (addIrred AddSCs)	-- Assume want superclasses
 
     ; ReduceMe want_scs ->	-- It should be reduced
-	lookupInst wanted	      `thenM` \ lookup_result ->
+	reduceInst env avails wanted      `thenM` \ (avails, lookup_result) ->
 	case lookup_result of
-	    GenInst wanteds' rhs -> addIrred NoSCs avails wanted		`thenM` \ avails1 ->
-				    reduceList stack try_me wanteds' avails1	`thenM` \ avails2 ->
-				    addWanted want_scs avails2 wanted rhs wanteds'
-		-- Experiment with temporarily doing addIrred *before* the reduceList, 
+	    NoInstance ->    -- No such instance!
+			     -- Add it and its superclasses
+		    	     addIrred want_scs avails wanted
+
+	    GenInst [] rhs -> addWanted want_scs avails wanted rhs []
+
+	    GenInst wanteds' rhs -> do	{ avails1 <- addIrred NoSCs avails wanted
+					; avails2 <- reduceList env wanteds' avails1
+					; addWanted want_scs avails2 wanted rhs wanteds' }
+		-- Temporarily do addIrred *before* the reduceList, 
 		-- which has the effect of adding the thing we are trying
 		-- to prove to the database before trying to prove the things it
 		-- needs.  See note [RECURSIVE DICTIONARIES]
@@ -1680,122 +1648,18 @@ reduce stack try_me wanted avails
 		--     the examples in [SUPERCLASS-LOOP]
 		-- So we do an addIrred before, and then overwrite it afterwards with addWanted
 
-	    SimpleInst rhs -> addWanted want_scs avails wanted rhs []
-
-	    NoInstance ->    -- No such instance!
-			     -- Add it and its superclasses
-		    	     addIrred want_scs avails wanted
     }
   where
+  	-- First, see if the inst can be reduced to a constant in one step
+	-- Works well for literals (1::Int) and constant dictionaries (d::Num Int)
+	-- Don't bother for implication constraints, which take real work
     try_simple do_this_otherwise
-      = lookupInst wanted	  `thenM` \ lookup_result ->
-	case lookup_result of
-	    SimpleInst rhs -> addWanted AddSCs avails wanted rhs []
-	    other	   -> do_this_otherwise avails wanted
+      = do { res <- lookupSimpleInst wanted
+	   ; case res of
+	        GenInst [] rhs -> addWanted AddSCs avails wanted rhs []
+	        other	       -> do_this_otherwise avails wanted }
 \end{code}
 
-
-\begin{code}
--------------------------
-isAvailable :: Avails -> Inst -> Maybe Avail
-isAvailable avails wanted = lookupFM avails wanted
-	-- NB 1: the Ord instance of Inst compares by the class/type info
-	--  *not* by unique.  So
-	--	d1::C Int ==  d2::C Int
-
--------------------------
-addFree :: Avails -> Inst -> TcM Avails
-	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
-	-- to avails, so that any other equal Insts will be commoned up right
-	-- here rather than also being tossed upstairs.  This is really just
-	-- an optimisation, and perhaps it is more trouble that it is worth,
-	-- as the following comments show!
-	--
-	-- NB: do *not* add superclasses.  If we have
-	--	df::Floating a
-	--	dn::Num a
-	-- but a is not bound here, then we *don't* want to derive
-	-- dn from df here lest we lose sharing.
-	--
-addFree avails free = returnM (addToFM avails free IsFree)
-
-addWanted :: WantSCs -> Avails -> Inst -> LHsExpr TcId -> [Inst] -> TcM Avails
-addWanted want_scs avails wanted rhs_expr wanteds
-  = addAvailAndSCs want_scs avails wanted avail
-  where
-    avail = Rhs rhs_expr wanteds
-
-addGiven :: Avails -> Inst -> TcM Avails
-addGiven avails given = addAvailAndSCs AddSCs avails given (Given (instToId given))
-	-- Always add superclasses for 'givens'
-	--
-	-- No ASSERT( not (given `elemFM` avails) ) because in an instance
-	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 
-	-- so the assert isn't true
-
-addIrred :: WantSCs -> Avails -> Inst -> TcM Avails
-addIrred want_scs avails irred = ASSERT2( not (irred `elemFM` avails), ppr irred $$ ppr avails )
-    	      		         addAvailAndSCs want_scs avails irred Irred
-
-addAvailAndSCs :: WantSCs -> Avails -> Inst -> Avail -> TcM Avails
-addAvailAndSCs want_scs avails inst avail
-  | not (isClassDict inst) = return avails_with_inst
-  | NoSCs <- want_scs	   = return avails_with_inst
-  | otherwise		   = do { traceTc (text "addAvailAndSCs" <+> vcat [ppr inst, ppr deps])
-				; addSCs is_loop avails_with_inst inst }
-  where
-    avails_with_inst = addToFM avails inst avail
-
-    is_loop pred = any (`tcEqType` mkPredTy pred) dep_tys
-			-- Note: this compares by *type*, not by Unique
-    deps         = findAllDeps (unitVarSet (instToId inst)) avail
-    dep_tys	 = map idType (varSetElems deps)
-
-    findAllDeps :: IdSet -> Avail -> IdSet
-    -- Find all the Insts that this one depends on
-    -- See Note [SUPERCLASS-LOOP 2]
-    -- Watch out, though.  Since the avails may contain loops 
-    -- (see Note [RECURSIVE DICTIONARIES]), so we need to track the ones we've seen so far
-    findAllDeps so_far (Rhs _ kids) = foldl find_all so_far kids
-    findAllDeps so_far other	    = so_far
-
-    find_all :: IdSet -> Inst -> IdSet
-    find_all so_far kid
-      | kid_id `elemVarSet` so_far	  = so_far
-      | Just avail <- lookupFM avails kid = findAllDeps so_far' avail
-      | otherwise			  = so_far'
-      where
-	so_far' = extendVarSet so_far kid_id	-- Add the new kid to so_far
-	kid_id = instToId kid
-
-addSCs :: (TcPredType -> Bool) -> Avails -> Inst -> TcM Avails
-	-- Add all the superclasses of the Inst to Avails
-	-- The first param says "dont do this because the original thing
-	--	depends on this one, so you'd build a loop"
-	-- Invariant: the Inst is already in Avails.
-
-addSCs is_loop avails dict
-  = do	{ sc_dicts <- newDictBndrs (instLoc dict) sc_theta'
-	; foldlM add_sc avails (zipEqual "add_scs" sc_dicts sc_sels) }
-  where
-    (clas, tys) = getDictClassTys dict
-    (tyvars, sc_theta, sc_sels, _) = classBigSig clas
-    sc_theta' = substTheta (zipTopTvSubst tyvars tys) sc_theta
-
-    add_sc avails (sc_dict, sc_sel)
-      | is_loop (dictPred sc_dict) = return avails 	-- See Note [SUPERCLASS-LOOP 2]
-      | is_given sc_dict 	   = return avails
-      | otherwise		   = addSCs is_loop avails' sc_dict
-      where
-	sc_sel_rhs = L (instSpan dict) (HsWrap co_fn (HsVar sc_sel))
-	co_fn	   = WpApp (instToId dict) <.> mkWpTyApps tys
-	avails'    = addToFM avails sc_dict (Rhs sc_sel_rhs [dict])
-
-    is_given :: Inst -> Bool
-    is_given sc_dict = case lookupFM avails sc_dict of
-			  Just (Given _) -> True	-- Given is cheaper than superclass selection
-			  other		 -> False	
-\end{code}
 
 Note [SUPERCLASS-LOOP 2]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1877,6 +1741,379 @@ contributing clauses.
 
 %************************************************************************
 %*									*
+		Reducing a single constraint
+%*									*
+%************************************************************************
+
+\begin{code}
+---------------------------------------------
+reduceInst :: RedEnv -> Avails -> Inst -> TcM (Avails, LookupInstResult)
+reduceInst env avails (ImplicInst { tci_tyvars = tvs, tci_reft = reft, tci_loc = loc,
+				    tci_given = extra_givens, tci_wanted = wanteds })
+  = reduceImplication env avails reft tvs extra_givens wanteds loc
+
+reduceInst env avails other_inst
+  = do	{ result <- lookupSimpleInst other_inst
+	; return (avails, result) }
+\end{code}
+
+\begin{code}
+---------------------------------------------
+reduceImplication :: RedEnv
+		 -> Avails
+		 -> Refinement	-- May refine the givens; often empty
+		 -> [TcTyVar]	-- Quantified type variables; all skolems
+		 -> [Inst]	-- Extra givens; all rigid
+		 -> [Inst]	-- Wanted
+		 -> InstLoc
+		 -> TcM (Avails, LookupInstResult)
+\end{code}
+
+Suppose we are simplifying the constraint
+	forall bs. extras => wanted
+in the context of an overall simplification problem with givens 'givens',
+and refinment 'reft'.
+
+Note that
+  * The refinement is often empty
+
+  * The 'extra givens' need not mention any of the quantified type variables
+	e.g. 	forall {}. Eq a => Eq [a]
+		forall {}. C Int => D (Tree Int)
+
+    This happens when you have something like
+	data T a where
+	  T1 :: Eq a => a -> T a
+
+	f :: T a -> Int
+	f x = ...(case x of { T1 v -> v==v })...
+
+\begin{code}
+	-- ToDo: should we instantiate tvs?  I think it's not necessary
+	--
+	-- ToDo: what about improvement?  There may be some improvement
+	--	 exposed as a result of the simplifications done by reduceList
+	--	 which are discarded if we back off.  
+	--	 This is almost certainly Wrong, but we'll fix it when dealing
+	--	 better with equality constraints
+reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
+  = do	{ 	-- Add refined givens, and the extra givens
+	  (refined_red_givens, avails) 
+		<- if isEmptyRefinement reft then return (red_givens env, orig_avails)
+		   else foldlM (addRefinedGiven reft) ([], orig_avails) (red_givens env)
+	; avails <- foldlM addGiven avails extra_givens
+
+		-- Solve the sub-problem
+	; let try_me inst = ReduceMe AddSCs	-- Note [Freeness and implications]
+	      env' = env { red_givens = refined_red_givens ++ extra_givens
+			 , red_try_me = try_me }
+
+	; traceTc (text "reduceImplication" <+> vcat
+			[ ppr (red_givens env), ppr extra_givens, ppr reft, ppr wanteds ])
+	; avails <- reduceList env' wanteds avails
+
+		-- Extract the binding
+	; (binds, irreds, _frees) <- extractResults avails wanteds
+			-- No frees, because try_me never says Free
+ 
+	; let	dict_ids = map instToId extra_givens
+		co  = mkWpTyLams tvs <.> mkWpLams dict_ids <.> WpLet binds
+		rhs = mkHsWrap co payload
+	        loc = instLocSpan inst_loc
+		payload | isSingleton wanteds = HsVar (instToId (head wanteds))
+			| otherwise = ExplicitTuple (map (L loc . HsVar . instToId) wanteds) Boxed
+
+		-- If there are any irreds, we back off and return NoInstance
+		-- Either way, we discard the extra avails we've generated;
+		-- but we remember if we have done any (global) improvement
+	; let ret_avails = updateImprovement orig_avails avails
+	; case irreds of
+		[]    -> return (ret_avails, GenInst [] (L loc rhs))
+		other -> return (ret_avails, NoInstance)
+  }
+\end{code}
+
+Note [Freeness and implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's hard to say when an implication constraint can be floated out.  Consider
+	forall {} Eq a => Foo [a]
+The (Foo [a]) doesn't mention any of the quantified variables, but it
+still might be partially satisfied by the (Eq a). 
+
+There is a useful special case when it *is* easy to partition the 
+constraints, namely when there are no 'givens'.  Consider
+	forall {a}. () => Bar b
+There are no 'givens', and so there is no reason to capture (Bar b).
+We can let it float out.  But if there is even one constraint we
+must be much more careful:
+	forall {a}. C a b => Bar (m b)
+because (C a b) might have a superclass (D b), from which we might 
+deduce (Bar [b]) when m later gets instantiated to [].  Ha!
+
+Here is an even more exotic example
+	class C a => D a b
+Now consider the constraint
+	forall b. D Int b => C Int
+We can satisfy the (C Int) from the superclass of D, so we don't want
+to float the (C Int) out, even though it mentions no type variable in
+the constraints!
+
+%************************************************************************
+%*									*
+		Avails and AvailHow: the pool of evidence
+%*									*
+%************************************************************************
+
+
+\begin{code}
+data Avails = Avails !ImprovementDone !AvailEnv
+
+type ImprovementDone = Bool	-- True <=> some unification has happened
+				-- so some Irreds might now be reducible
+				-- keys that are now 
+
+type AvailEnv = FiniteMap Inst AvailHow
+data AvailHow
+  = IsFree		-- Used for free Insts
+  | IsIrred		-- Used for irreducible dictionaries,
+			-- which are going to be lambda bound
+
+  | Given TcId 		-- Used for dictionaries for which we have a binding
+			-- e.g. those "given" in a signature
+
+  | Rhs 		-- Used when there is a RHS
+	(LHsExpr TcId) 	-- The RHS
+	[Inst]		-- Insts free in the RHS; we need these too
+
+instance Outputable Avails where
+  ppr = pprAvails
+
+pprAvails (Avails imp avails)
+  = vcat [ ptext SLIT("Avails") <> (if imp then ptext SLIT("[improved]") else empty)
+	 , nest 2 (vcat [sep [ppr inst, nest 2 (equals <+> ppr avail)]
+			| (inst,avail) <- fmToList avails ])]
+
+instance Outputable AvailHow where
+    ppr = pprAvail
+
+-------------------------
+pprAvail :: AvailHow -> SDoc
+pprAvail IsFree	       	= text "Free"
+pprAvail IsIrred	= text "Irred"
+pprAvail (Given x)   	= text "Given" <+> ppr x
+pprAvail (Rhs rhs bs)   = text "Rhs" <+> ppr rhs <+> braces (ppr bs)
+
+-------------------------
+extendAvailEnv :: AvailEnv -> Inst -> AvailHow -> AvailEnv
+extendAvailEnv env inst avail = addToFM env inst avail
+
+findAvailEnv :: AvailEnv -> Inst -> Maybe AvailHow
+findAvailEnv env wanted = lookupFM env wanted
+	-- NB 1: the Ord instance of Inst compares by the class/type info
+	--  *not* by unique.  So
+	--	d1::C Int ==  d2::C Int
+
+emptyAvails :: Avails
+emptyAvails = Avails False emptyFM
+
+findAvail :: Avails -> Inst -> Maybe AvailHow
+findAvail (Avails _ avails) wanted = findAvailEnv avails wanted
+
+elemAvails :: Inst -> Avails -> Bool
+elemAvails wanted (Avails _ avails) = wanted `elemFM` avails
+
+extendAvails :: Avails -> Inst -> AvailHow -> TcM Avails
+-- Does improvement
+extendAvails avails@(Avails imp env) inst avail 
+  = do	{ imp1 <- tcImproveOne avails inst	-- Do any improvement
+	; return (Avails (imp || imp1) (extendAvailEnv env inst avail)) }
+
+availsInsts :: Avails -> [Inst]
+availsInsts (Avails _ avails) = keysFM avails
+
+availsImproved (Avails imp _) = imp
+
+updateImprovement :: Avails -> Avails -> Avails
+-- (updateImprovement a1 a2) sets a1's improvement flag from a2
+updateImprovement (Avails _ avails1) (Avails imp2 _) = Avails imp2 avails1
+\end{code}
+
+Extracting the bindings from a bunch of Avails.
+The bindings do *not* come back sorted in dependency order.
+We assume that they'll be wrapped in a big Rec, so that the
+dependency analyser can sort them out later
+
+\begin{code}
+extractResults :: Avails
+	       -> [Inst]		-- Wanted
+	       -> TcM (	TcDictBinds, 	-- Bindings
+			[Inst],		-- Irreducible ones
+			[Inst])		-- Free ones
+
+extractResults (Avails _ avails) wanteds
+  = go avails emptyBag [] [] wanteds
+  where
+    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst] -> [Inst]
+	-> TcM (TcDictBinds, [Inst], [Inst])
+    go avails binds irreds frees [] 
+      = returnM (binds, irreds, frees)
+
+    go avails binds irreds frees (w:ws)
+      = case findAvailEnv avails w of
+	  Nothing    -> pprTrace "Urk: extractResults" (ppr w) $
+			go avails binds irreds frees ws
+
+	  Just IsFree  -> go (add_free avails w)  binds irreds     (w:frees) ws
+	  Just IsIrred -> go (add_given avails w) binds (w:irreds) frees     ws
+
+	  Just (Given id) -> go avails new_binds irreds frees ws
+			  where
+			       new_binds | id == instToId w = binds
+					 | otherwise        = addBind binds w (L (instSpan w) (HsVar id))
+		-- The sought Id can be one of the givens, via a superclass chain
+		-- and then we definitely don't want to generate an x=x binding!
+
+	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds frees (ws' ++ ws)
+			     where
+				new_binds = addBind binds w rhs
+
+    add_given avails w = extendAvailEnv avails w (Given (instToId w))
+
+    add_free avails w | isMethod w = avails
+		      | otherwise  = add_given avails w
+	-- NB: Hack alert!  
+	-- Do *not* replace Free by Given if it's a method.
+	-- The following situation shows why this is bad:
+	--	truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
+	-- From an application (truncate f i) we get
+	--	t1 = truncate at f
+	--	t2 = t1 at i
+	-- If we have also have a second occurrence of truncate, we get
+	--	t3 = truncate at f
+	--	t4 = t3 at i
+	-- When simplifying with i,f free, we might still notice that
+	--   t1=t3; but alas, the binding for t2 (which mentions t1)
+	--   will continue to float out!
+
+addBind binds inst rhs = binds `unionBags` unitBag (L (instSpan inst)
+						      (VarBind (instToId inst) rhs))
+instSpan wanted = instLocSpan (instLoc wanted)
+\end{code}
+
+
+\begin{code}
+-------------------------
+addFree :: Avails -> Inst -> TcM Avails
+	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
+	-- to avails, so that any other equal Insts will be commoned up right
+	-- here rather than also being tossed upstairs.  This is really just
+	-- an optimisation, and perhaps it is more trouble that it is worth,
+	-- as the following comments show!
+	--
+	-- NB: do *not* add superclasses.  If we have
+	--	df::Floating a
+	--	dn::Num a
+	-- but a is not bound here, then we *don't* want to derive
+	-- dn from df here lest we lose sharing.
+	--
+addFree avails free = extendAvails avails free IsFree
+
+addWanted :: WantSCs -> Avails -> Inst -> LHsExpr TcId -> [Inst] -> TcM Avails
+addWanted want_scs avails wanted rhs_expr wanteds
+  = addAvailAndSCs want_scs avails wanted avail
+  where
+    avail = Rhs rhs_expr wanteds
+
+addGiven :: Avails -> Inst -> TcM Avails
+addGiven avails given = addAvailAndSCs AddSCs avails given (Given (instToId given))
+	-- Always add superclasses for 'givens'
+	--
+	-- No ASSERT( not (given `elemAvails` avails) ) because in an instance
+	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 
+	-- so the assert isn't true
+
+addRefinedGiven :: Refinement -> ([Inst], Avails) -> Inst -> TcM ([Inst], Avails)
+addRefinedGiven reft (refined_givens, avails) given
+  | isDict given	-- We sometimes have 'given' methods, but they
+			-- are always optional, so we can drop them
+  , Just (co, pred) <- refinePred reft (dictPred given)
+  = do 	{ new_given <- newDictBndr (instLoc given) pred
+	; let rhs = L (instSpan given) $
+		    HsWrap (WpCo co) (HsVar (instToId given))
+	; avails <- addAvailAndSCs AddSCs avails new_given (Rhs rhs [given])
+	; return (new_given:refined_givens, avails) }
+	    -- ToDo: the superclasses of the original given all exist in Avails 
+	    -- so we could really just cast them, but it's more awkward to do,
+	    -- and hopefully the optimiser will spot the duplicated work
+  | otherwise
+  = return (refined_givens, avails)
+
+addIrred :: WantSCs -> Avails -> Inst -> TcM Avails
+addIrred want_scs avails irred = ASSERT2( not (irred `elemAvails` avails), ppr irred $$ ppr avails )
+    	      		         addAvailAndSCs want_scs avails irred IsIrred
+
+addAvailAndSCs :: WantSCs -> Avails -> Inst -> AvailHow -> TcM Avails
+addAvailAndSCs want_scs avails inst avail
+  | not (isClassDict inst) = extendAvails avails inst avail
+  | NoSCs <- want_scs	   = extendAvails avails inst avail
+  | otherwise		   = do { traceTc (text "addAvailAndSCs" <+> vcat [ppr inst, ppr deps])
+				; avails' <- extendAvails avails inst avail
+				; addSCs is_loop avails' inst }
+  where
+    is_loop pred = any (`tcEqType` mkPredTy pred) dep_tys
+			-- Note: this compares by *type*, not by Unique
+    deps         = findAllDeps (unitVarSet (instToId inst)) avail
+    dep_tys	 = map idType (varSetElems deps)
+
+    findAllDeps :: IdSet -> AvailHow -> IdSet
+    -- Find all the Insts that this one depends on
+    -- See Note [SUPERCLASS-LOOP 2]
+    -- Watch out, though.  Since the avails may contain loops 
+    -- (see Note [RECURSIVE DICTIONARIES]), so we need to track the ones we've seen so far
+    findAllDeps so_far (Rhs _ kids) = foldl find_all so_far kids
+    findAllDeps so_far other	    = so_far
+
+    find_all :: IdSet -> Inst -> IdSet
+    find_all so_far kid
+      | kid_id `elemVarSet` so_far	   = so_far
+      | Just avail <- findAvail avails kid = findAllDeps so_far' avail
+      | otherwise			   = so_far'
+      where
+	so_far' = extendVarSet so_far kid_id	-- Add the new kid to so_far
+	kid_id = instToId kid
+
+addSCs :: (TcPredType -> Bool) -> Avails -> Inst -> TcM Avails
+	-- Add all the superclasses of the Inst to Avails
+	-- The first param says "dont do this because the original thing
+	--	depends on this one, so you'd build a loop"
+	-- Invariant: the Inst is already in Avails.
+
+addSCs is_loop avails dict
+  = ASSERT( isDict dict )
+    do	{ sc_dicts <- newDictBndrs (instLoc dict) sc_theta'
+	; foldlM add_sc avails (zipEqual "add_scs" sc_dicts sc_sels) }
+  where
+    (clas, tys) = getDictClassTys dict
+    (tyvars, sc_theta, sc_sels, _) = classBigSig clas
+    sc_theta' = substTheta (zipTopTvSubst tyvars tys) sc_theta
+
+    add_sc avails (sc_dict, sc_sel)
+      | is_loop (dictPred sc_dict) = return avails 	-- See Note [SUPERCLASS-LOOP 2]
+      | is_given sc_dict 	   = return avails
+      | otherwise		   = do { avails' <- extendAvails avails sc_dict (Rhs sc_sel_rhs [dict])
+					; addSCs is_loop avails' sc_dict }
+      where
+	sc_sel_rhs = L (instSpan dict) (HsWrap co_fn (HsVar sc_sel))
+	co_fn	   = WpApp (instToId dict) <.> mkWpTyApps tys
+
+    is_given :: Inst -> Bool
+    is_given sc_dict = case findAvail avails sc_dict of
+			  Just (Given _) -> True	-- Given is cheaper than superclass selection
+			  other		 -> False	
+\end{code}
+
+%************************************************************************
+%*									*
 \section{tcSimplifyTop: defaulting}
 %*									*
 %************************************************************************
@@ -1898,107 +2135,44 @@ It's OK: the final zonking stage should zap y to (), which is fine.
 \begin{code}
 tcSimplifyTop, tcSimplifyInteractive :: [Inst] -> TcM TcDictBinds
 tcSimplifyTop wanteds
-  = do 	{ ext_default <- doptM Opt_ExtendedDefaultRules
-	; tc_simplify_top doc ext_default AddSCs wanteds }
+  = tc_simplify_top doc False wanteds
   where 
     doc = text "tcSimplifyTop"
 
 tcSimplifyInteractive wanteds
-  = tc_simplify_top doc True  {- Interactive loop -}     AddSCs wanteds
+  = tc_simplify_top doc True wanteds
   where 
-    doc = text "tcSimplifyTop"
+    doc = text "tcSimplifyInteractive"
 
 -- The TcLclEnv should be valid here, solely to improve
 -- error message generation for the monomorphism restriction
-tc_simplify_top doc use_extended_defaulting want_scs wanteds
-  = do	{ lcl_env <- getLclEnv
-	; traceTc (text "tcSimplifyTop" <+> ppr (lclEnvElts lcl_env))
-
-	; wanteds <- mapM zonkInst wanteds
+tc_simplify_top doc interactive wanteds
+  = do	{ wanteds <- mapM zonkInst wanteds
 	; mapM_ zonkTopTyVar (varSetElems (tyVarsOfInsts wanteds))
 
-	; let try_me inst = ReduceMe want_scs
-	; (frees, binds, irreds) <- simpleReduceLoop doc try_me wanteds
+	; (binds1, irreds1) <- topCheckLoop doc wanteds
 
-	; let
-		-- First get rid of implicit parameters
-    	    (non_ips, bad_ips) = partition isClassDict irreds
+	; if null irreds1 then 
+		return binds1
+	  else do
+	-- OK, so there are some errors
+	{	-- Use the defaulting rules to do extra unification
+		-- NB: irreds are already zonked
+	; extended_default <- if interactive then return True
+			      else doptM Opt_ExtendedDefaultRules
+	; disambiguate extended_default irreds1	-- Does unification
+	; (binds2, irreds2) <- topCheckLoop doc irreds1
 
-		-- All the non-tv or multi-param ones are definite errors
-	    (unary_tv_dicts, non_tvs) = partition is_unary_tyvar_dict non_ips
-	    bad_tyvars = unionVarSets (map tyVarsOfInst non_tvs)
+		-- Deal with implicit parameter
+	; let (bad_ips, non_ips) = partition isIPDict irreds2
+	      (ambigs, others)   = partition isTyVarDict non_ips
 
-		-- Group by type variable
-	    tv_groups = equivClasses cmp_by_tyvar unary_tv_dicts
+	; topIPErrs bad_ips	-- Can arise from   f :: Int -> Int
+				--		    f x = x + ?y
+	; addNoInstanceErrs others
+	; addTopAmbigErrs ambigs	
 
-		-- Pick the ones which its worth trying to disambiguate
-		-- namely, the ones whose type variable isn't bound
-		-- up with one of the non-tyvar classes
-	    (default_gps, non_default_gps) = partition defaultable_group tv_groups
-	    defaultable_group ds
-		=  (bad_tyvars `disjointVarSet` tyVarsOfInst (head ds))
-		&& defaultable_classes (map get_clas ds)
-	    defaultable_classes clss 
-		| use_extended_defaulting = any isInteractiveClass clss
-		| otherwise = all isStandardClass clss && any isNumericClass clss
-
-	    isInteractiveClass cls = isNumericClass cls
-				  || (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
-		 	-- In interactive mode, or with -fextended-default-rules,
-			-- we default Show a to Show () to avoid graututious errors on "show []"
-
-    
-		    -- Collect together all the bad guys
-	    bad_guys 	       = non_tvs ++ concat non_default_gps
-    	    (ambigs, no_insts) = partition isTyVarDict bad_guys
-	    -- If the dict has no type constructors involved, it must be ambiguous,
-	    -- except I suppose that another error with fundeps maybe should have
-	    -- constrained those type variables
-
-	-- Report definite errors
-	; ASSERT( null frees )
-	  groupErrs (addNoInstanceErrs Nothing []) no_insts
-	; strangeTopIPErrs bad_ips
-
-	-- Deal with ambiguity errors, but only if
-	-- if there has not been an error so far:
-	-- errors often give rise to spurious ambiguous Insts.
-	-- For example:
-	--   f = (*)	-- Monomorphic
-	--   g :: Num a => a -> a
-	--   g x = f x x
-	-- Here, we get a complaint when checking the type signature for g,
-	-- that g isn't polymorphic enough; but then we get another one when
-	-- dealing with the (Num a) context arising from f's definition;
-	-- we try to unify a with Int (to default it), but find that it's
-	-- already been unified with the rigid variable from g's type sig
-	; binds_ambig <- ifErrsM (returnM []) $
-	    do	{ -- Complain about the ones that don't fall under
-		  -- the Haskell rules for disambiguation
-		  -- This group includes both non-existent instances
-		  --	e.g. Num (IO a) and Eq (Int -> Int)
-		  -- and ambiguous dictionaries
-		  --	e.g. Num a
-		  addTopAmbigErrs ambigs
-
-		  -- Disambiguate the ones that look feasible
-		; mappM disambigGroup default_gps }
-
-	; return (binds `unionBags` unionManyBags binds_ambig) }
-
-----------------------------------
-d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
-
-is_unary_tyvar_dict :: Inst -> Bool	-- Dicts of form (C a)
-  -- Invariant: argument is a ClassDict, not IP or method
-is_unary_tyvar_dict d = case getDictClassTys d of
-			  (_, [ty]) -> tcIsTyVarTy ty
-			  other	    -> False
-
-get_tv d   = case getDictClassTys d of
-		   (clas, [ty]) -> tcGetTyVar "tcSimplify" ty
-get_clas d = case getDictClassTys d of
-		   (clas, _) -> clas
+	; return (binds1 `unionBags` binds2) }}
 \end{code}
 
 If a dictionary constrains a type variable which is
@@ -2034,88 +2208,88 @@ Since we're not using the result of @foo@, the result if (presumably)
 @void@.
 
 \begin{code}
-disambigGroup :: [Inst]	-- All standard classes of form (C a)
-	      -> TcM TcDictBinds
-
-disambigGroup dicts
-  = 	-- THE DICTS OBEY THE DEFAULTABLE CONSTRAINT
-	-- SO, TRY DEFAULT TYPES IN ORDER
-
-	-- Failure here is caused by there being no type in the
-	-- default list which can satisfy all the ambiguous classes.
-	-- For example, if Real a is reqd, but the only type in the
-	-- default list is Int.
-    get_default_tys			`thenM` \ default_tys ->
-    let
-      try_default [] 	-- No defaults work, so fail
-	= failM
-
-      try_default (default_ty : default_tys)
-	= tryTcLIE_ (try_default default_tys) $	-- If default_ty fails, we try
-						-- default_tys instead
-	  tcSimplifyDefault theta		`thenM` \ _ ->
-	  returnM default_ty
-        where
-	  theta = [mkClassPred clas [default_ty] | clas <- classes]
-    in
-	-- See if any default works
-    tryM (try_default default_tys)	`thenM` \ mb_ty ->
-    case mb_ty of
-	Left  _ 		-> bomb_out
-	Right chosen_default_ty -> choose_default chosen_default_ty
+disambiguate :: Bool -> [Inst] -> TcM ()
+	-- Just does unification to fix the default types
+	-- The Insts are assumed to be pre-zonked
+disambiguate extended_defaulting insts
+  | null defaultable_groups
+  = return ()
+  | otherwise
+  = do 	{  	-- Figure out what default types to use
+	  mb_defaults <- getDefaultTys
+	; default_tys <- case mb_defaults of
+			   Just tys -> return tys
+			   Nothing  -> 	-- No use-supplied default;
+					-- use [Integer, Double]
+				do { integer_ty <- tcMetaTy integerTyConName
+				   ; checkWiredInTyCon doubleTyCon
+				   ; return [integer_ty, doubleTy] }
+	; mapM_ (disambigGroup default_tys) defaultable_groups  }
   where
-    tyvar   = get_tv (head dicts)	-- Should be non-empty
-    classes = map get_clas dicts
+   unaries :: [(Inst,Class, TcTyVar)]  -- (C tv) constraints
+   bad_tvs :: TcTyVarSet	  -- Tyvars mentioned by *other* constraints
+   (unaries, bad_tvs) = getDefaultableDicts insts
 
-    choose_default default_ty	-- Commit to tyvar = default_ty
-      =	-- Bind the type variable 
-	unifyType default_ty (mkTyVarTy tyvar)	`thenM_`
-	-- and reduce the context, for real this time
-	simpleReduceLoop (text "disambig" <+> ppr dicts)
-		         reduceMe dicts			`thenM` \ (frees, binds, ambigs) ->
-	WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
-	warnDefault dicts default_ty			`thenM_`
-	returnM binds
+		-- Group by type variable
+   defaultable_groups :: [[(Inst,Class,TcTyVar)]]
+   defaultable_groups = filter defaultable_group (equivClasses cmp_tv unaries)
+   cmp_tv (_,_,tv1) (_,_,tv2) = tv1 `compare` tv2
 
-    bomb_out = addTopAmbigErrs dicts	`thenM_`
-	       returnM emptyBag
+   defaultable_group :: [(Inst,Class,TcTyVar)] -> Bool
+   defaultable_group ds@((_,_,tv):_)
+	=  not (isSkolemTyVar tv)	-- Note [Avoiding spurious errors]
+	&& not (tv `elemVarSet` bad_tvs)
+	&& defaultable_classes [c | (_,c,_) <- ds]
+   defaultable_group [] = panic "defaultable_group"
 
-get_default_tys
-  = do 	{ mb_defaults <- getDefaultTys
-	; case mb_defaults of
-		Just tys -> return tys
-		Nothing  -> 	-- No use-supplied default;
-				-- use [Integer, Double]
-			    do { integer_ty <- tcMetaTy integerTyConName
-			       ; checkWiredInTyCon doubleTyCon
-			       ; return [integer_ty, doubleTy] } }
+   defaultable_classes clss 
+	| extended_defaulting = any isInteractiveClass clss
+	| otherwise = all isStandardClass clss && any isNumericClass clss
+
+ 	-- In interactive mode, or with -fextended-default-rules,
+	-- we default Show a to Show () to avoid graututious errors on "show []"
+   isInteractiveClass cls 
+	= isNumericClass cls
+	|| (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
+
+
+disambigGroup :: [Type]			-- The default types
+	      -> [(Inst,Class,TcTyVar)]	-- All standard classes of form (C a)
+	      -> TcM ()	-- Just does unification, to fix the default types
+
+disambigGroup default_tys dicts
+  = try_default default_tys
+  where
+    (_,_,tyvar) = head dicts	-- Should be non-empty
+    classes = [c | (_,c,_) <- dicts]
+
+    try_default [] = return ()
+    try_default (default_ty : default_tys)
+      = tryTcLIE_ (try_default default_tys) $
+    	do { tcSimplifyDefault [mkClassPred clas [default_ty] | clas <- classes]
+		-- This may fail; then the tryTcLIE_ kicks in
+		-- Failure here is caused by there being no type in the
+		-- default list which can satisfy all the ambiguous classes.
+		-- For example, if Real a is reqd, but the only type in the
+		-- default list is Int.
+
+		-- After this we can't fail
+	   ; warnDefault dicts default_ty
+	   ; unifyType default_ty (mkTyVarTy tyvar) }
 \end{code}
 
-[Aside - why the defaulting mechanism is turned off when
- dealing with arguments and results to ccalls.
-
-When typechecking _ccall_s, TcExpr ensures that the external
-function is only passed arguments (and in the other direction,
-results) of a restricted set of 'native' types.
-
-The interaction between the defaulting mechanism for numeric
-values and CC & CR can be a bit puzzling to the user at times.
-For example,
-
-    x <- _ccall_ f
-    if (x /= 0) then
-       _ccall_ g x
-     else
-       return ()
-
-What type has 'x' got here? That depends on the default list
-in operation, if it is equal to Haskell 98's default-default
-of (Integer, Double), 'x' has type Double, since Integer
-is not an instance of CR. If the default list is equal to
-Haskell 1.4's default-default of (Int, Double), 'x' has type
-Int.
-
-End of aside]
+Note [Avoiding spurious errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When doing the unification for defaulting, we check for skolem
+type variables, and simply don't default them.  For example:
+   f = (*)	-- Monomorphic
+   g :: Num a => a -> a
+   g x = f x x
+Here, we get a complaint when checking the type signature for g,
+that g isn't polymorphic enough; but then we get another one when
+dealing with the (Num a) context arising from f's definition;
+we try to unify a with Int (to default it), but find that it's
+already been unified with the rigid variable from g's type sig
 
 
 %************************************************************************
@@ -2147,18 +2321,18 @@ tcSimplifyDeriv orig tc tyvars theta
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
     newDictBndrsO orig (substTheta tenv theta)	`thenM` \ wanteds ->
-    simpleReduceLoop doc reduceMe wanteds		`thenM` \ (frees, _, irreds) ->
-    ASSERT( null frees )			-- reduceMe never returns Free
+    topCheckLoop doc wanteds			`thenM` \ (_, irreds) ->
 
     doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
     doptM Opt_AllowUndecidableInstances		`thenM` \ undecidable_ok ->
     let
 	inst_ty = mkTyConApp tc (mkTyVarTys tvs)
  	(ok_insts, bad_insts) = partition is_ok_inst irreds
-	is_ok_inst dict 
-	   = isTyVarClassPred pred || (gla_exts && ok_gla_pred pred)
+	is_ok_inst inst
+	   = isDict inst 	-- Exclude implication consraints
+	   && (isTyVarClassPred pred || (gla_exts && ok_gla_pred pred))
 	   where
-	     pred = dictPred dict	-- reduceMe squashes all non-dicts
+	     pred = dictPred inst
 
 	ok_gla_pred pred = null (checkInstTermination [inst_ty] [pred])
 	 	-- See Note [Deriving context]
@@ -2182,11 +2356,11 @@ tcSimplifyDeriv orig tc tyvars theta
 	-- would make checkValidInstance fail; if it were called right after tcSimplifyDeriv
 	--   * wierd_preds ensures unambiguous instances (checkAmbiguity in checkValidInstance)
 	--   * ok_gla_pred ensures termination (checkInstTermination in checkValidInstance)
-    addNoInstanceErrs Nothing [] bad_insts		`thenM_`
+    addNoInstanceErrs bad_insts				`thenM_`
     mapM_ (addErrTc . badDerivedPred) weird_preds	`thenM_`
     returnM (substTheta rev_env simpl_theta)
   where
-    doc    = ptext SLIT("deriving classes for a data type")
+    doc = ptext SLIT("deriving classes for a data type")
 \end{code}
 
 Note [Deriving context]
@@ -2219,10 +2393,9 @@ tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 		  -> TcM ()
 
 tcSimplifyDefault theta
-  = newDictBndrsO DefaultOrigin theta		`thenM` \ wanteds ->
-    simpleReduceLoop doc reduceMe wanteds	`thenM` \ (frees, _, irreds) ->
-    ASSERT( null frees )	-- try_me never returns Free
-    addNoInstanceErrs Nothing []  irreds 	`thenM_`
+  = newDictBndrsO DefaultOrigin theta	`thenM` \ wanteds ->
+    topCheckLoop doc wanteds		`thenM` \ (_, irreds) ->
+    addNoInstanceErrs  irreds	 	`thenM_`
     if null irreds then
 	returnM ()
     else
@@ -2267,7 +2440,7 @@ groupErrs report_err (inst:insts)
 
 -- Add the "arising from..." part to a message about bunch of dicts
 addInstLoc :: [Inst] -> Message -> Message
-addInstLoc insts msg = msg $$ nest 2 (pprInstLoc (instLoc (head insts)))
+addInstLoc insts msg = msg $$ nest 2 (pprInstArising (head insts))
 
 addTopIPErrs :: [Name] -> [Inst] -> TcM ()
 addTopIPErrs bndrs [] 
@@ -2281,10 +2454,10 @@ addTopIPErrs bndrs ips
 					    <+> pprBinders bndrs <> colon)],
 		       nest 2 (vcat (map ppr_ip ips)),
 		       monomorphism_fix]
-    ppr_ip ip = pprPred (dictPred ip) <+> pprInstLoc (instLoc ip)
+    ppr_ip ip = pprPred (dictPred ip) <+> pprInstArising ip
 
-strangeTopIPErrs :: [Inst] -> TcM ()
-strangeTopIPErrs dicts	-- Strange, becuase addTopIPErrs should have caught them all
+topIPErrs :: [Inst] -> TcM ()
+topIPErrs dicts
   = groupErrs report tidy_dicts
   where
     (tidy_env, tidy_dicts) = tidyInsts dicts
@@ -2292,54 +2465,59 @@ strangeTopIPErrs dicts	-- Strange, becuase addTopIPErrs should have caught them 
     mk_msg dicts = addInstLoc dicts (ptext SLIT("Unbound implicit parameter") <> 
 				     plural tidy_dicts <+> pprDictsTheta tidy_dicts)
 
-addNoInstanceErrs :: Maybe SDoc	-- Nothing => top level
-				-- Just d => d describes the construct
-		  -> [Inst]	-- What is given by the context or type sig
-		  -> [Inst]	-- What is wanted
+addNoInstanceErrs :: [Inst]	-- Wanted (can include implications)
 		  -> TcM ()	
-addNoInstanceErrs mb_what givens [] 
-  = returnM ()
-addNoInstanceErrs mb_what givens dicts
-  =	-- Some of the dicts are here because there is no instances
-	-- and some because there are too many instances (overlap)
-    tcGetInstEnvs	`thenM` \ inst_envs ->
-    let
-    	(tidy_env1, tidy_givens) = tidyInsts givens
-	(tidy_env2, tidy_dicts)  = tidyMoreInsts tidy_env1 dicts
+addNoInstanceErrs insts
+  = do	{ let (tidy_env, tidy_insts) = tidyInsts insts
+	; reportNoInstances tidy_env Nothing tidy_insts }
 
-	-- Run through the dicts, generating a message for each
-	-- overlapping one, but simply accumulating all the 
-	-- no-instance ones so they can be reported as a group
-	(overlap_doc, no_inst_dicts) = foldl check_overlap (empty, []) tidy_dicts
-    	check_overlap (overlap_doc, no_inst_dicts) dict 
-	  | not (isClassDict dict) = (overlap_doc, dict : no_inst_dicts)
-	  | otherwise
-	  = case lookupInstEnv inst_envs clas tys of
+reportNoInstances 
+	:: TidyEnv
+	-> Maybe (InstLoc, [Inst])	-- Context
+			-- Nothing => top level
+			-- Just (d,g) => d describes the construct
+			--		 with givens g
+	-> [Inst]	-- What is wanted (can include implications)
+	-> TcM ()	
+
+reportNoInstances tidy_env mb_what insts 
+  = groupErrs (report_no_instances tidy_env mb_what) insts
+
+report_no_instances tidy_env mb_what insts
+  = do	{ inst_envs <- tcGetInstEnvs
+	; let (implics, insts1)  = partition isImplicInst insts
+	      (insts2, overlaps) = partitionWith (check_overlap inst_envs) insts1
+	; traceTc (text "reportNoInstnces" <+> vcat 
+			[ppr implics, ppr insts1, ppr insts2])
+	; mapM_ complain_implic implics
+	; mapM_ (\doc -> addErrTcM (tidy_env, doc)) overlaps
+	; groupErrs complain_no_inst insts2 }
+  where
+    complain_no_inst insts = addErrTcM (tidy_env, mk_no_inst_err insts)
+
+    complain_implic inst	-- Recurse!
+      = reportNoInstances tidy_env 
+			  (Just (tci_loc inst, tci_given inst)) 
+			  (tci_wanted inst)
+
+    check_overlap :: (InstEnv,InstEnv) -> Inst -> Either Inst SDoc
+	-- Right msg  => overlap message
+	-- Left  inst => no instance
+    check_overlap inst_envs wanted
+	| not (isClassDict wanted) = Left wanted
+	| otherwise
+	= case lookupInstEnv inst_envs clas tys of
 		-- The case of exactly one match and no unifiers means
 		-- a successful lookup.  That can't happen here, becuase
 		-- dicts only end up here if they didn't match in Inst.lookupInst
 #ifdef DEBUG
-		([m],[]) -> pprPanic "addNoInstanceErrs" (ppr dict)
+		([m],[]) -> pprPanic "reportNoInstance" (ppr wanted)
 #endif
-		([], _)  -> (overlap_doc, dict : no_inst_dicts) 	-- No match
-		res	 -> (mk_overlap_msg dict res $$ overlap_doc, no_inst_dicts)
+		([], _)  -> Left wanted		-- No match
+		res	 -> Right (mk_overlap_msg wanted res)
 	  where
-	    (clas,tys) = getDictClassTys dict
-    in
-	
-	-- Now generate a good message for the no-instance bunch
-    mk_probable_fix tidy_env2 no_inst_dicts	`thenM` \ (tidy_env3, probable_fix) ->
-    let
-    	no_inst_doc | null no_inst_dicts = empty
-		    | otherwise = vcat [addInstLoc no_inst_dicts heading, probable_fix]
-	heading | null givens = ptext SLIT("No instance") <> plural no_inst_dicts <+> 
-				ptext SLIT("for") <+> pprDictsTheta no_inst_dicts
-		| otherwise   = sep [ptext SLIT("Could not deduce") <+> pprDictsTheta no_inst_dicts,
-				     nest 2 $ ptext SLIT("from the context") <+> pprDictsTheta tidy_givens]
-    in
-	-- And emit both the non-instance and overlap messages
-    addErrTcM (tidy_env3, no_inst_doc $$ overlap_doc)
-  where
+	    (clas,tys) = getDictClassTys wanted
+
     mk_overlap_msg dict (matches, unifiers)
       = vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
 					<+> pprPred (dictPred dict))),
@@ -2357,31 +2535,46 @@ addNoInstanceErrs mb_what givens dicts
       where
     	ispecs = [ispec | (_, ispec) <- matches]
 
-    mk_probable_fix tidy_env dicts	
-      = returnM (tidy_env, sep [ptext SLIT("Possible fix:"), nest 2 (vcat fixes)])
+    mk_no_inst_err insts
+      | null insts = empty
+
+      | Just (loc, givens) <- mb_what,   -- Nested (type signatures, instance decls)
+	not (isEmptyVarSet (tyVarsOfInsts insts))
+      = vcat [ addInstLoc insts $
+	       sep [ ptext SLIT("Could not deduce") <+> pprDictsTheta insts
+	           , nest 2 $ ptext SLIT("from the context") <+> pprDictsTheta givens]
+	     , show_fixes (fix1 loc : fixes2) ]
+
+      | otherwise	-- Top level 
+      = vcat [ addInstLoc insts $
+	       ptext SLIT("No instance") <> plural insts
+		    <+> ptext SLIT("for") <+> pprDictsTheta insts
+	     , show_fixes fixes2 ]
+
       where
-	fixes = add_ors (fix1 ++ fix2)
+    	fix1 loc = sep [ ptext SLIT("add") <+> pprDictsTheta insts
+				 <+> ptext SLIT("to the context of"),
+			 nest 2 (ppr (instLocOrigin loc)) ]
+			 -- I'm not sure it helps to add the location
+			 -- nest 2 (ptext SLIT("at") <+> ppr (instLocSpan loc)) ]
 
-    	fix1 = case mb_what of
-		 Nothing   -> []	-- Top level
-		 Just what -> -- Nested (type signatures, instance decls)
-			      [ sep [ ptext SLIT("add") <+> pprDictsTheta dicts,
-			        ptext SLIT("to the") <+> what] ]
-
-    	fix2 | null instance_dicts = []
-	     | otherwise	   = [ sep [ptext SLIT("add an instance declaration for"),
-				            pprDictsTheta instance_dicts] ]
-	instance_dicts = [d | d <- dicts, isClassDict d, not (isTyVarDict d)]
+    	fixes2 | null instance_dicts = []
+	       | otherwise	     = [sep [ptext SLIT("add an instance declaration for"),
+				        pprDictsTheta instance_dicts]]
+	instance_dicts = [d | d <- insts, isClassDict d, not (isTyVarDict d)]
 		-- Insts for which it is worth suggesting an adding an instance declaration
 		-- Exclude implicit parameters, and tyvar dicts
 
-	add_ors :: [SDoc] -> [SDoc]	-- The empty case should not happen
-	add_ors []      = [ptext SLIT("[No suggested fixes]")]	-- Strange
-	add_ors (f1:fs) = f1 : map (ptext SLIT("or") <+>) fs
+	show_fixes :: [SDoc] -> SDoc
+	show_fixes []     = empty
+	show_fixes (f:fs) = sep [ptext SLIT("Possible fix:"), 
+				 nest 2 (vcat (f : map (ptext SLIT("or") <+>) fs))]
 
 addTopAmbigErrs dicts
 -- Divide into groups that share a common set of ambiguous tyvars
-  = mapM report (equivClasses cmp [(d, tvs_of d) | d <- tidy_dicts])
+  = ifErrsM (return ()) $	-- Only report ambiguity if no other errors happened
+				-- See Note [Avoiding spurious errors]
+    mapM_ report (equivClasses cmp [(d, tvs_of d) | d <- tidy_dicts])
   where
     (tidy_env, tidy_dicts) = tidyInsts dicts
 
@@ -2392,7 +2585,7 @@ addTopAmbigErrs dicts
     report :: [(Inst,[TcTyVar])] -> TcM ()
     report pairs@((inst,tvs) : _)	-- The pairs share a common set of ambiguous tyvars
 	= mkMonomorphismMsg tidy_env tvs	`thenM` \ (tidy_env, mono_msg) ->
-	  setSrcSpan (instLocSrcSpan (instLoc inst)) $
+	  setSrcSpan (instSpan inst) $
 		-- the location of the first one will do for the err message
 	  addErrTcM (tidy_env, msg $$ mono_msg)
 	where
@@ -2401,6 +2594,7 @@ addTopAmbigErrs dicts
 			  pprQuotedList tvs <+> in_msg,
 		     nest 2 (pprDictsInFull dicts)]
 	  in_msg = text "in the constraint" <> plural dicts <> colon
+    report [] = panic "addTopAmbigErrs"
 
 
 mkMonomorphismMsg :: TidyEnv -> [TcTyVar] -> TcM (TidyEnv, Message)
@@ -2415,7 +2609,7 @@ mkMonomorphismMsg tidy_env inst_tvs
     mk_msg []   = ptext SLIT("Probable fix: add a type signature that fixes these type variable(s)")
 			-- This happens in things like
 			--	f x = show (read "foo")
-			-- whre monomorphism doesn't play any role
+			-- where monomorphism doesn't play any role
     mk_msg docs = vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
 			nest 2 (vcat docs),
 			monomorphism_fix
@@ -2425,10 +2619,12 @@ monomorphism_fix = ptext SLIT("Probable fix:") <+>
 		   (ptext SLIT("give these definition(s) an explicit type signature")
 		    $$ ptext SLIT("or use -fno-monomorphism-restriction"))
     
-warnDefault dicts default_ty
+warnDefault ups default_ty
   = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
     addInstCtxt (instLoc (head (dicts))) (warnTc warn_flag warn_msg)
   where
+    dicts = [d | (d,_,_) <- ups]
+
 	-- Tidy them first
     (_, tidy_dicts) = tidyInsts dicts
     warn_msg  = vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+>

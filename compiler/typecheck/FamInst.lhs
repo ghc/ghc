@@ -163,7 +163,7 @@ checkForConflicts inst_envs famInst
 		         Nothing        -> panic "FamInst.checkForConflicts"
 		         Just (tc, tys) -> tc `mkTyConApp` tys
              }
-       ; (tvs', _, tau') <- tcInstSkolType (FamInstSkol tycon) ty
+       ; (tvs', _, tau') <- tcInstSkolType FamInstSkol ty
 
        ; let (fam, tys') = tcSplitTyConApp tau'
 
