@@ -51,6 +51,7 @@ exposed-modules:
 	Data.Eq,
 	Data.Foldable,
 	Data.Fixed,
+	Data.Function,
 	Data.FunctorM,
 	-- Data.Generics,
 	-- Data.Generics.Aliases,
