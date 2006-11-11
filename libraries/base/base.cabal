@@ -31,7 +31,6 @@ exposed-modules:
 	Data.Array.Diff,
 	Data.Array.IArray,
 	Data.Array.IO,
-	Data.Array.IO.Internals,
 	Data.Array.MArray,
 	Data.Array.ST,
 	Data.Array.Storable,
@@ -137,6 +136,8 @@ exposed-modules:
 	Text.Read.Lex,
 	Text.Show,
 	Text.Show.Functions
+other-modules:
+	Data.Array.IO.Internals
 include-dirs:	include, ../../ghc/includes
 includes:	HsBase.h
 extensions:	CPP

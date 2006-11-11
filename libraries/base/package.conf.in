@@ -29,7 +29,6 @@ exposed-modules:
 	Data.Array.Diff,
 	Data.Array.IArray,
 	Data.Array.IO,
-	Data.Array.IO.Internals,
 	Data.Array.MArray,
 	Data.Array.ST,
 	Data.Array.Storable,
@@ -171,6 +170,7 @@ exposed-modules:
 	GHC.Weak
 
 hidden-modules:
+	Data.Array.IO.Internals
 
 import-dirs:	IMPORT_DIR
 
