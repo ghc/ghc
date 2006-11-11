@@ -199,15 +199,15 @@ instance Ix () where
 instance (Ix a, Ix b) => Ix (a, b) where -- as derived
     {-# SPECIALISE instance Ix (Int,Int) #-}
 
-    {- INLINE range #-}
+    {-# INLINE range #-}
     range ((l1,l2),(u1,u2)) =
       [ (i1,i2) | i1 <- range (l1,u1), i2 <- range (l2,u2) ]
 
-    {- INLINE unsafeIndex #-}
+    {-# INLINE unsafeIndex #-}
     unsafeIndex ((l1,l2),(u1,u2)) (i1,i2) =
       unsafeIndex (l1,u1) i1 * unsafeRangeSize (l2,u2) + unsafeIndex (l2,u2) i2
 
-    {- INLINE inRange #-}
+    {-# INLINE inRange #-}
     inRange ((l1,l2),(u1,u2)) (i1,i2) =
       inRange (l1,u1) i1 && inRange (l2,u2) i2
 
