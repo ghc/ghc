@@ -9,8 +9,8 @@ SRCS	= \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
 	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
 	Data/HashTable.hs Data/Typeable.hs Data/Dynamic.hs \
-	Data/Monoid.hs Data/Queue.hs Data/Tree.hs \
-	Data/Map.hs Data/IntMap.hs Data/IntSet.hs Data/FunctorM.hs \
+	Data/Monoid.hs Data/Tree.hs \
+	Data/Map.hs Data/IntMap.hs Data/IntSet.hs \
 	Data/Eq.hs Data/Ord.hs \
 	Data/Foldable.hs Data/Traversable.hs Data/Sequence.hs \
 	Data/Function.hs \
