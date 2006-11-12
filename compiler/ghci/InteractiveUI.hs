@@ -168,7 +168,7 @@ helpText =
  "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
  "   :set prog <progname>        set the value returned by System.getProgName\n" ++
  "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
- "   :set editor <cmd>           set the comand used for :edit\n" ++
+ "   :set editor <cmd>           set the command used for :edit\n" ++
  "\n" ++
  "   :show modules               show the currently loaded modules\n" ++
  "   :show bindings              show the current bindings made at the prompt\n" ++
