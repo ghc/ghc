@@ -92,3 +92,5 @@ clean(['ffi015_cbits.o'])
 
 # GHCi can't handle foreign import "&"
 test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
+
+test('ffi017', normal, compile_and_run, [''])
