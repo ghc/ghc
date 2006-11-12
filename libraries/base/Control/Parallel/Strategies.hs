@@ -397,8 +397,10 @@ parListNth n strat xs
   where
     rest = drop n xs
 
--- | Sequentially applies a strategy to chunks
--- (sub-sequences) of a list in parallel. Useful to increase grain size.
+-- | Splits a list into chunks (sub-sequences) of length @n@,
+-- and applies a strategy sequentially to the elements in each
+-- chunk. The chunks are evaluated in parallel.
+-- This is useful for increasing the grain size.
 parListChunk :: Int -> Strategy a -> Strategy [a]
 parListChunk n strat [] = ()
 parListChunk n strat xs = seqListN n strat xs `par` 
