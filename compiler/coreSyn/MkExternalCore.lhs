@@ -20,6 +20,7 @@ import Type
 import PprExternalCore	-- Instances
 import DataCon
 import CoreSyn
+import Coercion
 import Var
 import IdInfo
 import Literal
@@ -179,7 +180,8 @@ make_ty (NoteTy _ t) 	= make_ty t
 
 
 make_kind :: Kind -> C.Kind
-make_kind (PredTy p) | isEqPred p = panic "coercion kinds in external core not implemented!"
+make_kind (PredTy p) | isEqPred p = C.Keq (make_ty t1) (make_ty t2)
+    where (t1, t2) = getEqPredTys p
 make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
 make_kind k
   | isLiftedTypeKind k   = C.Klifted

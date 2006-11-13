@@ -6,7 +6,7 @@ import Char
 import Numeric
 
 isNameChar c = isAlpha c || isDigit c || (c == '_') || (c == '\'')
-	       || (c == ':') || (c == '$')
+	       || (c == '$') || (c == '-') || (c == '.')
 isKeywordChar c = isAlpha c || (c == '_') 
 
 lexer :: (Token -> P a) -> P a 
@@ -29,6 +29,7 @@ lexer cont (')':cs) 	= cont TKcparen cs
 lexer cont ('{':cs) 	= cont TKobrace cs
 lexer cont ('}':cs) 	= cont TKcbrace cs
 lexer cont ('=':cs)     = cont TKeq cs
+lexer cont (':':'=':':':cs) = cont TKcoloneqcolon cs
 lexer cont (':':':':cs) = cont TKcoloncolon cs
 lexer cont ('*':cs) 	= cont TKstar cs
 lexer cont ('.':cs) 	= cont TKdot cs
@@ -37,7 +38,9 @@ lexer cont ('@':cs) 	= cont TKat cs
 lexer cont ('?':cs) 	= cont TKquestion cs
 lexer cont (';':cs) 	= cont TKsemicolon cs
 -- 20060420 GHC spits out constructors with colon in them nowadays. jds
-lexer cont (':':cs)     = lexName cont TKcname (':':cs)
+-- 20061103 but it's easier to parse if we split on the colon, and treat them
+-- as several tokens
+lexer cont (':':cs)     = cont TKcolon cs
 -- 20060420 Likewise does it create identifiers starting with dollar. jds
 lexer cont ('$':cs)     = lexName cont TKname ('$':cs)
 lexer cont (c:cs) 	= failP "invalid character" [c]
@@ -94,6 +97,7 @@ lexKeyword cont cs =
       ("cast",rest) -> cont TKcast rest	
       ("note",rest) -> cont TKnote rest	
       ("external",rest) -> cont TKexternal rest
+      ("local",rest) -> cont TKlocal rest
       ("_",rest) -> cont TKwild rest
       _ -> failP "invalid keyword" ('%':cs) 
 

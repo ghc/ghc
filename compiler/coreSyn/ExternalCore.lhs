@@ -62,6 +62,7 @@ data Kind
   | Kunboxed
   | Kopen
   | Karrow Kind Kind
+  | Keq Ty Ty
 
 data Lit 
   = Lint Integer Ty

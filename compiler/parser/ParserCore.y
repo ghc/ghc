@@ -11,9 +11,9 @@ import Type ( Kind,
               liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
               argTypeKindTyCon, ubxTupleKindTyCon, mkArrowKind, mkTyConApp
             )
-import Name( Name, nameOccName, nameModule )
+import Name( Name, nameOccName, nameModule, mkExternalName )
 import Module
-import PackageConfig	( mainPackageId )
+import PackageConfig	( mainPackageId, stringToPackageId )
 import ParserCoreUtils
 import LexCore
 import Literal
@@ -24,6 +24,7 @@ import TyCon ( TyCon, tyConName )
 import FastString
 import Outputable
 import Char
+import Unique
 
 #include "../HsVersions.h"
 
@@ -45,6 +46,7 @@ import Char
  '%cast'	{ TKcast }
  '%note'	{ TKnote }
  '%external'	{ TKexternal }
+ '%local'	{ TKlocal }
  '%_'		{ TKwild }
  '('		{ TKoparen }
  ')'		{ TKcparen }
@@ -52,7 +54,9 @@ import Char
  '}'		{ TKcbrace }
  '#' 		{ TKhash}
  '='		{ TKeq }
+ ':'		{ TKcolon }
  '::'		{ TKcoloncolon }
+ ':=:'		{ TKcoloneqcolon }
  '*'		{ TKstar }
  '->'		{ TKrarrow }
  '\\'		{ TKlambda}
@@ -73,27 +77,52 @@ import Char
 %%
 
 module	:: { HsExtCore RdrName }
-         : '%module' modid tdefs vdefgs { HsExtCore $2 $3 $4 }
+	-- : '%module' modid tdefs vdefgs	{ HsExtCore $2 $3 $4 }
+	: '%module' modid tdefs vdefgs	{ HsExtCore $2 [] [] }
 
+
+-------------------------------------------------------------
+--     Names: the trickiest bit in here
+
+-- A name of the form A.B.C could be:
+--   module A.B.C
+--   dcon C in module A.B
+--   tcon C in module A.B
 modid	:: { Module }
-        : CNAME	                 { mkModule mainPackageId  -- ToDo: wrong
-		  			(mkModuleNameFS (mkFastString $1)) }
+	: NAME ':' mparts		{ undefined }
+
+q_dc_name :: { Name }
+	  : NAME ':' mparts		{ undefined }
+
+q_tc_name :: { Name }
+ 	  : NAME ':' mparts		{ undefined }
+
+q_var_occ :: { Name }
+          : NAME ':' vparts             { undefined }
+
+mparts	:: { [String] }
+	: CNAME				{ [$1] }
+	| CNAME '.' mparts		{ $1:$3 }
+
+vparts  :: { [String] }
+        : var_occ                       { [$1] }
+        | CNAME '.' vparts              { $1:$3 }
 
 -------------------------------------------------------------
 --     Type and newtype declarations are in HsSyn syntax
 
 tdefs	:: { [TyClDecl RdrName] }
 	: {- empty -}	{[]}
-	| tdef ';' tdefs	{$1:$3}
+	| tdef tdefs	{$1:$2}
 
 tdef	:: { TyClDecl RdrName }
-	: '%data' q_tc_name tv_bndrs '=' '{' cons '}'
+	: '%data' q_tc_name tv_bndrs '=' '{' cons '}' ';'
                 { mkTyData DataType ( noLoc []
 				    , noLoc (ifaceExtRdrName $2)
 				    , map toHsTvBndr $3
 				    , Nothing
 				    ) Nothing $6 Nothing }
-	| '%newtype' q_tc_name tv_bndrs trep 
+	| '%newtype' q_tc_name tv_bndrs trep ';'
 		{ let tc_rdr = ifaceExtRdrName $2 in
                   mkTyData NewType ( noLoc []
 				   , noLoc tc_rdr
@@ -112,6 +141,7 @@ trep    :: { OccName -> [LConDecl RdrName] }
 
 cons	:: { [LConDecl RdrName] }
 	: {- empty -}	{ [] } -- 20060420 Empty data types allowed. jds
+        | con           { [$1] }
 	| con ';' cons	{ $1:$3 }
 
 con	:: { LConDecl RdrName }
@@ -143,12 +173,13 @@ atys	:: { [IfaceType] }
 	| aty atys      { $1:$2 }
 
 aty	:: { IfaceType }
-	: tv_occ    { IfaceTyVar $1 }
+	: fs_var_occ { IfaceTyVar $1 }
 	| q_tc_name  { IfaceTyConApp (IfaceTc $1) [] }
 	| '(' ty ')' { $2 }
 
 bty	:: { IfaceType }
-	: tv_occ atys    { foldl IfaceAppTy (IfaceTyVar $1) $2 }
+	: fs_var_occ atys { foldl IfaceAppTy (IfaceTyVar $1) $2 }
+        | q_var_occ atys  { undefined }
         | q_tc_name atys  { IfaceTyConApp (IfaceTc $1) $2 }
         | '(' ty ')' { $2 }
 
@@ -165,25 +196,23 @@ vdefgs	:: { [IfaceBinding] }
 	| let_bind ';' vdefgs	{ $1 : $3 }
 
 let_bind :: { IfaceBinding }
-	: '%rec' '{' vdefs1 '}' { IfaceRec $3 }
+	: '%rec' '{' vdefs1 '}' { IfaceRec $3 } -- Can be empty. Do we care?
 	|  vdef                 { let (b,r) = $1
 				  in IfaceNonRec b r }
 
 vdefs1	:: { [(IfaceIdBndr, IfaceExpr)] }
-	: vdef		        { [$1] }
+	: vdef  	        { [$1] }
 	| vdef ';' vdefs1       { $1:$3 }
 
 vdef	:: { (IfaceIdBndr, IfaceExpr) }
-	: qd_occ '::' ty '=' exp { (($1, $3), $5) }
+	: fs_var_occ '::' ty '=' exp { (($1, $3), $5) }
+        | '%local' vdef              { $2 }
+
   -- NB: qd_occ includes data constructors, because
   --     we allow data-constructor wrappers at top level
   -- But we discard the module name, because it must be the
   -- same as the module being compiled, and Iface syntax only
-  -- has OccNames in binding positions
-
-qd_occ :: { FastString }
-        : var_occ { $1 }
-        | d_occ   { $1 }
+  -- has OccNames in binding positions. Ah, but it has Names now!
 
 ---------------------------------------
 --  Binders
@@ -196,15 +225,11 @@ bndrs 	:: { [IfaceBndr] }
 	| bndr bndrs	{ $1:$2 }
 
 id_bndr	:: { IfaceIdBndr }
-	: '(' var_occ '::' ty ')'	{ ($2,$4) }
-
-id_bndrs :: { [IfaceIdBndr] }
-	: {-empty -}    	{ [] }
-	| id_bndr id_bndrs	{ $1:$2 }
+	: '(' fs_var_occ '::' ty ')'	{ ($2,$4) }
 
 tv_bndr	:: { IfaceTvBndr }
-	:  tv_occ                    { ($1, ifaceLiftedTypeKind) }
-	|  '(' tv_occ '::' akind ')' { ($2, $4) }
+	:  fs_var_occ                    { ($1, ifaceLiftedTypeKind) }
+	|  '(' fs_var_occ '::' akind ')' { ($2, $4) }
 
 tv_bndrs 	:: { [IfaceTvBndr] }
 	: {- empty -}	{ [] }
@@ -219,13 +244,15 @@ akind	:: { IfaceKind }
 kind 	:: { IfaceKind }
 	: akind 	   { $1 }
 	| akind '->' kind  { ifaceArrow $1 $3 }
+        | ty ':=:' ty      { ifaceEq $1 $3 }
 
 -----------------------------------------
 --             Expressions
 
 aexp    :: { IfaceExpr }
-	: var_occ	         { IfaceLcl $1 }
-        | modid '.' qd_occ	 { IfaceExt undefined {-ToDo!!! (ExtPkg $1 (mkVarOccFS $3))-} }
+	: fs_var_occ    { IfaceLcl $1 }
+        | q_var_occ    	{ IfaceExt $1 }
+	| q_dc_name	{ IfaceExt $1 }
 	| lit		{ IfaceLit $1 }
 	| '(' exp ')' 	{ $2 }
 
@@ -241,7 +268,7 @@ exp	:: { IfaceExpr }
 -- gaw 2004
 	| '%case' '(' ty ')' aexp '%of' id_bndr
 	  '{' alts1 '}'		      { IfaceCase $5 (fst $7) $3 $9 }
-        | '%cast' exp aty { IfaceCast $2 $3 }
+        | '%cast' aexp aty { IfaceCast $2 $3 }
 	| '%note' STRING exp 	   
 	    { case $2 of
 	       --"SCC"      -> IfaceNote (IfaceSCC "scc") $3
@@ -257,11 +284,13 @@ alts1	:: { [IfaceAlt] }
 	| alt ';' alts1	{ $1:$3 }
 
 alt	:: { IfaceAlt }
-	: modid '.' d_pat_occ bndrs '->' exp 
-		{ (IfaceDataAlt undefined {-ToDo!!! $3 -}, map ifaceBndrName $4, $6) } 
+	: q_dc_name bndrs '->' exp 
+		{ (IfaceDataAlt $1, map ifaceBndrName $2, $4) } 
                        -- The external syntax currently includes the types of the
 		       -- the args, but they aren't needed internally
                        -- Nor is the module qualifier
+	| q_dc_name '->' exp 
+		{ (IfaceDataAlt $1, [], $3) } 
 	| lit '->' exp
 		{ (IfaceLitAlt $1, [], $3) }
 	| '%_' '->' exp
@@ -273,26 +302,17 @@ lit	:: { Literal }
 	| '(' CHAR '::' aty ')'		{ MachChar $2 }
 	| '(' STRING '::' aty ')'	{ MachStr (mkFastString $2) }
 
-tv_occ	:: { FastString }
-	: NAME	{ mkFastString $1 }
+fs_var_occ	:: { FastString }
+		: NAME	{ mkFastString $1 }
 
-var_occ	:: { FastString }
-	: NAME	{ mkFastString $1 }
+var_occ	:: { String }
+	: NAME	{ $1 }
 
-
--- Type constructor
-q_tc_name	:: { Name }
-        : modid '.' CNAME	{ undefined {-ToDo!!! ExtPkg $1 (mkOccName tcName $3)-} }
 
 -- Data constructor in a pattern or data type declaration; use the dataName, 
 -- because that's what we expect in Core case patterns
 d_pat_occ :: { OccName }
         : CNAME      { mkOccName dataName $1 }
-
--- Data constructor occurrence in an expression;
--- use the varName because that's the worker Id
-d_occ :: { FastString }
-       : CNAME { mkFastString $1 }
 
 {
 
@@ -354,6 +374,8 @@ ifaceOpenTypeKind     = ifaceTcType IfaceOpenTypeKindTc
 ifaceUnliftedTypeKind = ifaceTcType IfaceUnliftedTypeKindTc
 
 ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
+
+ifaceEq ifT1 ifT2 = IfacePredTy (IfaceEqPred ifT1 ifT2)
 
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
 toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOcc tv)) (toKind k)

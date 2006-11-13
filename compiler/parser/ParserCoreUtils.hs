@@ -30,6 +30,7 @@ getCoreModuleName fpath =
     (\ _ -> return "Main")
  where
    findMod [] = "Main"
+   -- TODO: this should just return the module name, without the package name
    findMod ("%module":m:_) = m
    findMod (_:xs) = findMod xs
 
@@ -47,6 +48,7 @@ data Token =
  | TKcast
  | TKnote
  | TKexternal
+ | TKlocal
  | TKwild
  | TKoparen
  | TKcparen
@@ -54,7 +56,9 @@ data Token =
  | TKcbrace
  | TKhash
  | TKeq
+ | TKcolon
  | TKcoloncolon
+ | TKcoloneqcolon
  | TKstar
  | TKrarrow
  | TKlambda

@@ -76,6 +76,7 @@ pakind (Kopen) = char '?'
 pakind k = parens (pkind k)
 
 pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
+pkind (Keq t1 t2) = parens (pty t1 <> text ":=:" <> pty t2)
 pkind k = pakind k
 
 paty (Tvar n) = pname n
@@ -132,7 +133,7 @@ pexp (Let vd e) = (text "%let" <+> pvdefg vd) $$ (text "%in" <+> pexp e)
 pexp (Case e vb ty alts) = sep [text "%case" <+> parens (paty ty) <+> paexp e,
 			     text "%of" <+> pvbind vb]
 			$$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
-pexp (Cast e co) = (text "%cast" <+> pexp e) $$ paty co
+pexp (Cast e co) = (text "%cast" <+> parens (pexp e)) $$ paty co
 pexp (Note s e) = (text "%note" <+> pstring s) $$ pexp e
 pexp (External n cc t) = (text "%external" <+> text cc <+> pstring n) $$ paty t
 pexp (DynExternal cc t) = (text "%dynexternal" <+> text cc) $$ paty t
