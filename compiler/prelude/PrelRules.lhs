@@ -45,7 +45,7 @@ import Outputable
 import FastString
 import StaticFlags      ( opt_SimplExcessPrecision )
 
-import Data.Bits	( Bits(..) )
+import Data.Bits as Bits	( Bits(..) )
 #if __GLASGOW_HASKELL__ >= 500
 import Data.Word	( Word )
 #else
@@ -98,6 +98,9 @@ primOpRules op op_name = primop_rule op
     primop_rule IntQuotOp   = two_lits (intOp2Z    quot)
     primop_rule IntRemOp    = two_lits (intOp2Z    rem)
     primop_rule IntNegOp    = one_lit  negOp
+    primop_rule ISllOp      = two_lits (intShiftOp2 Bits.shiftL)
+    primop_rule ISraOp      = two_lits (intShiftOp2 Bits.shiftR)
+    primop_rule ISrlOp      = two_lits (intShiftOp2 shiftRightLogical)
 
 	-- Word operations
 #if __GLASGOW_HASKELL__ >= 500
@@ -112,6 +115,8 @@ primOpRules op op_name = primop_rule op
     primop_rule OrOp        = two_lits (wordBitOp2 (.|.))
     primop_rule XorOp       = two_lits (wordBitOp2 xor)
 #endif
+    primop_rule SllOp       = two_lits (wordShiftOp2 Bits.shiftL)
+    primop_rule SrlOp       = two_lits (wordShiftOp2 shiftRightLogical)
 
 	-- coercions
     primop_rule Word2IntOp 	= one_lit (litCoerce word2IntLit)
@@ -242,6 +247,18 @@ intOp2Z op (MachInt i1) (MachInt i2)
   | i2 /= 0 = intResult (i1 `op` i2)
 intOp2Z op l1 l2 = Nothing		-- LitLit or zero dividend
 
+intShiftOp2 :: (Integer->Int->Integer) -> Literal -> Literal -> Maybe CoreExpr
+	-- Shifts take an Int; hence second arg of op is Int
+intShiftOp2 op (MachInt i1) (MachInt i2) = intResult (i1 `op` fromInteger i2)
+intShiftOp2 op l1           l2           = Nothing 
+
+shiftRightLogical :: Integer -> Int -> Integer
+-- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
+-- Do this by converting to Word and back.  Obviously this won't work for big 
+-- values, but its ok as we use it here
+shiftRightLogical x n = fromIntegral (fromInteger x `shiftR` n :: Word)
+
+
 --------------------------
 #if __GLASGOW_HASKELL__ >= 500
 wordOp2 :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
@@ -264,6 +281,13 @@ wordBitOp2 op l1@(MachWord w1) l2@(MachWord w2)
   = wordResult ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2))
 #endif
 wordBitOp2 op l1 l2 = Nothing		-- Could find LitLit
+
+wordShiftOp2 :: (Integer->Int->Integer) -> Literal -> Literal -> Maybe CoreExpr
+	-- Shifts take an Int; hence second arg of op is Int
+wordShiftOp2 op (MachWord x) (MachInt n) 
+  = wordResult (x `op` fromInteger n)
+	-- Do the shift at type Integer
+wordShiftOp2 op l1 l2 = Nothing	
 
 --------------------------
 floatOp2  op (MachFloat f1) (MachFloat f2)
