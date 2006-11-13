@@ -223,39 +223,45 @@ cmpOp cmp l1 l2
 
 --------------------------
 
-negOp (MachFloat 0.0) = Nothing  -- can't represent -0.0 as a Rational
-negOp (MachFloat f)   = Just (mkFloatVal (-f))
+negOp :: Literal -> Maybe CoreExpr	-- Negate
+negOp (MachFloat 0.0)  = Nothing  -- can't represent -0.0 as a Rational
+negOp (MachFloat f)    = Just (mkFloatVal (-f))
 negOp (MachDouble 0.0) = Nothing
 negOp (MachDouble d)   = Just (mkDoubleVal (-d))
 negOp (MachInt i)      = intResult (-i)
 negOp l		       = Nothing
 
 --------------------------
+intOp2 :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 intOp2 op (MachInt i1) (MachInt i2) = intResult (i1 `op` i2)
 intOp2 op l1	       l2	    = Nothing		-- Could find LitLit
 
+intOp2Z :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
+-- Like intOp2, but Nothing if i2=0
 intOp2Z op (MachInt i1) (MachInt i2)
-  | i2 /= 0 = Just (mkIntVal (i1 `op` i2))
+  | i2 /= 0 = intResult (i1 `op` i2)
 intOp2Z op l1 l2 = Nothing		-- LitLit or zero dividend
 
 --------------------------
 #if __GLASGOW_HASKELL__ >= 500
+wordOp2 :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 wordOp2 op (MachWord w1) (MachWord w2)
   = wordResult (w1 `op` w2)
 wordOp2 op l1 l2 = Nothing		-- Could find LitLit
 #endif
 
+wordOp2Z :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 wordOp2Z op (MachWord w1) (MachWord w2)
-  | w2 /= 0 = Just (mkWordVal (w1 `op` w2))
+  | w2 /= 0 = wordResult (w1 `op` w2)
 wordOp2Z op l1 l2 = Nothing	-- LitLit or zero dividend
 
 #if __GLASGOW_HASKELL__ >= 500
 wordBitOp2 op l1@(MachWord w1) l2@(MachWord w2)
-  = Just (mkWordVal (w1 `op` w2))
+  = wordResult (w1 `op` w2)
 #else
 -- Integer is not an instance of Bits, so we operate on Word64
 wordBitOp2 op l1@(MachWord w1) l2@(MachWord w2)
-  = Just (mkWordVal ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2)))
+  = wordResult ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2))
 #endif
 wordBitOp2 op l1 l2 = Nothing		-- Could find LitLit
 
