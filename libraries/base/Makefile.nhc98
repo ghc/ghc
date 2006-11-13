@@ -14,7 +14,7 @@ SRCS	= \
 	Data/Eq.hs Data/Ord.hs \
 	Data/Foldable.hs Data/Traversable.hs Data/Sequence.hs \
 	Data/Function.hs \
-	Control/Monad.hs Control/Monad/Fix.hs \
+	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Instances.hs \
 	Control/Arrow.hs Control/Applicative.hs \
 	Debug/Trace.hs \
 	NHC/SizedTypes.hs \
