@@ -16,7 +16,32 @@
 --	Phil Trinder, Hans-Wolfgang Loidl, Kevin Hammond et al. 
 --
 -----------------------------------------------------------------------------
-module Control.Parallel.Strategies where
+module Control.Parallel.Strategies (
+   -- *	Strategy Type, Application and Semantics
+   Done, Strategy,
+   (>|), (>||),
+   using, demanding, sparking,
+   -- *	Basic Strategies				     
+   r0, rwhnf, NFData(..),
+   -- * Strategic Function Application
+   ($|), ($||),
+   (.|), (.||),
+   (-|), (-||),
+   -- * Tuples
+   seqPair, parPair,
+   seqTriple, parTriple,
+   -- * Lists: Parallel Strategies
+   parList, parListN, parListNth, parListChunk, 
+   parMap, parFlatMap, parZipWith,
+   -- * Lists: Sequential Strategies
+   seqList, seqListN, seqListNth, parBuffer,
+   -- *	Arrays
+   seqArr, parArr,
+   -- * Deprecated types and functions
+   sPar, sSeq,
+   Assoc(..),
+   fstPairFstList, force, sforce
+  ) where
 
 -- based on hslibs/concurrent/Strategies.lhs; see it for more detailed
 -- code comments. 
@@ -25,8 +50,8 @@ import Control.Parallel as Parallel (par, pseq)
 import Data.Array
 import Data.Complex
 import Data.Int
-import qualified Data.IntMap (IntMap, IntMap.toList)
-import qualified Data.IntSet (IntSet, IntSet.toList)
+import qualified Data.IntMap (IntMap, toList)
+import qualified Data.IntSet (IntSet, toList)
 import qualified Data.Map (Map, toList)
 import qualified Data.Set (Set, toList)
 import qualified Data.Tree (Tree(..))
@@ -543,7 +568,6 @@ seqArr s arr = seqList s (elems arr)
 parArr :: (Ix b) => Strategy a -> Strategy (Array b a)
 parArr s arr = parList s (elems arr)
 
--- | Associations maybe useful even without mentioning Arrays.
 {-# DEPRECATED Assoc "Does not belong in Control.Parallel.Strategies" #-}
 data  Assoc a b =  a := b  deriving ()
 
