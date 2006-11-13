@@ -37,6 +37,9 @@ module Control.Monad
     , sequence      -- :: (Monad m) => [m a] -> m [a]
     , sequence_     -- :: (Monad m) => [m a] -> m ()
     , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
+    , (>=>)         -- :: (Monad m) => (a -> m b) -> (b -> m c) -> (a -> m c)
+    , (<=<)         -- :: (Monad m) => (b -> m c) -> (a -> m b) -> (a -> m c)
+    , forever       -- :: (Monad m) => m a -> m ()
 
     -- ** Generalisations of list functions
 
@@ -173,6 +176,20 @@ msum        :: MonadPlus m => [m a] -> m a
 {-# INLINE msum #-}
 msum        =  foldr mplus mzero
 
+infixr 1 <=<, >=>
+
+-- | Left-to-right Kleisli composition of monads.
+(>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
+f >=> g     = \x -> f x >>= g
+
+-- | Right-to-left Kleisli composition of monads. '(>=>)', with the arguments flipped
+(<=<)       :: Monad m => (b -> m c) -> (a -> m b) -> (a -> m c)
+(<=<)       = flip (>=>)
+
+-- | @'forever' act@ repeats the action infinitely.
+forever     :: (Monad m) => m a -> m ()
+forever a   = a >> forever a
+
 -- -----------------------------------------------------------------------------
 -- Other monad functions
 
@@ -289,6 +306,7 @@ is equivalent to
 
 ap                :: (Monad m) => m (a -> b) -> m a -> m b
 ap                =  liftM2 id
+
 
 {- $naming
 
