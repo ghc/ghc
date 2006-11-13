@@ -24,6 +24,13 @@ module Control.Parallel.Strategies where
 import Control.Parallel as Parallel (par, pseq)
 import Data.Array
 import Data.Complex
+import Data.Int
+import qualified Data.IntMap (IntMap, IntMap.toList)
+import qualified Data.IntSet (IntSet, IntSet.toList)
+import qualified Data.Map (Map, toList)
+import qualified Data.Set (Set, toList)
+import qualified Data.Tree (Tree(..))
+import Data.Word
 
 import Prelude hiding (seq)
 import qualified Prelude (seq)
@@ -338,6 +345,10 @@ parTriple strata stratb stratc (x,y,z) =
   stratc z `par`
   ()
 
+-----------------------------------------------------------------------------
+-- 			Atomic types
+-----------------------------------------------------------------------------
+
 {-
 Weak head normal form and normal form are identical for integers, so the 
 default rnf is sufficient. 
@@ -346,6 +357,16 @@ instance NFData Int
 instance NFData Integer
 instance NFData Float
 instance NFData Double
+
+instance NFData Int8
+instance NFData Int16
+instance NFData Int32
+instance NFData Int64
+
+instance NFData Word8
+instance NFData Word16
+instance NFData Word32
+instance NFData Word64
 
 instance NFDataIntegral Int
 instance NFDataOrd Int
@@ -367,8 +388,35 @@ instance NFData Bool
 instance NFData ()
 
 -----------------------------------------------------------------------------
+-- 			Various library types						    
+-----------------------------------------------------------------------------
+
+instance NFData a => NFData (Maybe a) where
+    rnf Nothing  = ()
+    rnf (Just x) = rnf x
+
+instance (NFData a, NFData b) => NFData (Either a b) where
+    rnf (Left x)  = rnf x
+    rnf (Right y) = rnf y
+
+instance (NFData k, NFData a) => NFData (Data.Map.Map k a) where
+    rnf = rnf . Data.Map.toList
+
+instance NFData a => NFData (Data.Set.Set a) where
+    rnf = rnf . Data.Set.toList
+
+instance NFData a => NFData (Data.Tree.Tree a) where
+    rnf (Data.Tree.Node r f) = rnf r `seq` rnf f
+
+instance NFData a => NFData (Data.IntMap.IntMap a) where
+    rnf = rnf . Data.IntMap.toList
+
+instance NFData Data.IntSet.IntSet where
+    rnf = rnf . Data.IntSet.toList
+
+-----------------------------------------------------------------------------
 -- 			Lists						    
-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 
 instance NFData a => NFData [a] where
   rnf [] = ()
