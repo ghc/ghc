@@ -119,6 +119,7 @@ sparking  = flip Parallel.par
 --
 -- 'sPar' has been superceded by 'sparking'.
 -- Replace @e \`using\` sPar x@ with @e \`sparking\` rwhnf x@.
+{-# DEPRECATED sPar "Use sparking instead." #-}
 sPar :: a -> Strategy b
 sPar x y = x `par` ()
 
@@ -127,6 +128,7 @@ sPar x y = x `par` ()
 --
 -- 'sSeq' has been superceded by 'demanding'. 
 -- Replace @e \`using\` sSeq x@ with @e \`demanding\` rwhnf x@.
+{-# DEPRECATED sSeq "Use demanding instead." #-}
 sSeq :: a -> Strategy b
 sSeq x y = x `seq` ()
 
@@ -494,6 +496,7 @@ parArr :: (Ix b) => Strategy a -> Strategy (Array b a)
 parArr s arr = parList s (elems arr)
 
 -- | Associations maybe useful even without mentioning Arrays.
+{-# DEPRECATED Assoc "Does not belong in Control.Parallel.Strategies" #-}
 data  Assoc a b =  a := b  deriving ()
 
 instance (NFData a, NFData b) => NFData (Assoc a b) where
@@ -503,12 +506,14 @@ instance (NFData a, NFData b) => NFData (Assoc a b) where
 -- *	                Some strategies specific for Lolita	
 ------------------------------------------------------------------------------
 
+{-# DEPRECATED fstPairFstList "This was just an example. Write your own." #-}
 fstPairFstList :: (NFData a) => Strategy [(a,b)]
 fstPairFstList = seqListN 1 (seqPair rwhnf r0)
 
 -- Some HACKs for Lolita. AFAIK force is just another name for our rnf and
 -- sforce is a shortcut (definition here is identical to the one in Force.lhs)
 
+{-# DEPRECATED force, sforce "Lolita-specific hacks." #-}
 force :: (NFData a) => a -> a 
 sforce :: (NFData a) => a -> b -> b
 
