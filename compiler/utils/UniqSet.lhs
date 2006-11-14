@@ -22,8 +22,6 @@ module UniqSet (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Name ( Name )
-
 import Maybes		( maybeToBool )
 import UniqFM
 import Unique		( Unique, Uniquable(..) )
@@ -123,6 +121,10 @@ mapUniqSet f (MkUniqSet set) = MkUniqSet (mapUFM f set)
 {-# SPECIALIZE
     addOneToUniqSet :: UniqSet Unique -> Unique -> UniqSet Unique
     #-}
+
+-- These next three specialisations disabled as importing Name creates a
+-- loop, and getting the Uniquable Name instance in particular is tricky.
+
 {- SPECIALIZE
     elementOfUniqSet :: Name -> UniqSet Name -> Bool
 		      , Unique -> UniqSet Unique -> Bool
