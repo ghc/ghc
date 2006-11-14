@@ -33,6 +33,8 @@ static floatish KeyWidth PROTO((void)); /* forward */
 void
 Dimensions()
 {
+    boolish keyOnGraph;
+
     xrange = samplemap[nsamples - 1] - samplemap[0];
     xrange = max(xrange, auxxrange);
     if (xrange == 0.0) xrange = 1.0;            /* avoid division by 0.0 */
@@ -51,7 +53,7 @@ Dimensions()
 	titleheight = TITLE_HEIGHT;
     } 
 
-    boolish keyOnGraph = !multipageflag && TWENTY != 0;
+    keyOnGraph = !multipageflag && TWENTY != 0;
     graphwidth  = titlewidth - graphx0 - (keyOnGraph ? KeyWidth() : 0);
     graphheight = borderheight - titleheight - (2 * borderspace) - graphy0;
 }
