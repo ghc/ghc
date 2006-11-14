@@ -846,6 +846,14 @@ selector_loop:
 	  if (thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
 	      break;
 	  }
+
+	  // we don't update THUNK_SELECTORS in the compacted
+	  // generation, because compaction does not remove the INDs
+	  // that result, this causes confusion later.
+	  if (Bdescr((P_)selectee)->flags && BF_COMPACTED) {
+	      break;
+	  }
+
 	  thunk_selector_depth++;
 
 	  val = eval_thunk_selector(info->layout.selector_offset, 
