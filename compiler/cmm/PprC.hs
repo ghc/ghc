@@ -609,18 +609,15 @@ pprAssign :: CmmReg -> CmmExpr -> SDoc
 
 -- dest is a reg, rhs is a reg
 pprAssign r1 (CmmReg r2)
-   | not (isStrangeTypeReg r1) && not (isStrangeTypeReg r2)
-   || isPtrReg r1 && isPtrReg r2
+   | isPtrReg r1 && isPtrReg r2
    = hcat [ pprAsPtrReg r1, equals, pprAsPtrReg r2, semi ]
 
 -- dest is a reg, rhs is a CmmRegOff
 pprAssign r1 (CmmRegOff r2 off)
-   | not (isStrangeTypeReg r1) && not (isStrangeTypeReg r2)
-   || isPtrReg r1 && isPtrReg r2
+   | isPtrReg r1 && isPtrReg r2 && (off `rem` wORD_SIZE == 0)
    = hcat [ pprAsPtrReg r1, equals, pprAsPtrReg r2, op, int off', semi ]
   where
-	off1 | isPtrReg r2 = off `shiftR` wordShift
-	     | otherwise   = off
+	off1 = off `shiftR` wordShift
 
 	(op,off') | off >= 0  = (char '+', off1)
 		  | otherwise = (char '-', -off1)
@@ -629,8 +626,8 @@ pprAssign r1 (CmmRegOff r2 off)
 -- We can't cast the lvalue, so we have to cast the rhs if necessary.  Casting
 -- the lvalue elicits a warning from new GCC versions (3.4+).
 pprAssign r1 r2
-  | isPtrReg r1
-  = pprAsPtrReg r1 <> ptext SLIT(" = ") <> mkP_ <> pprExpr1 r2 <> semi
+  | isFixedPtrReg r1
+  = pprReg r1 <> ptext SLIT(" = ") <> mkP_ <> pprExpr1 r2 <> semi
   | Just ty <- strangeRegType r1
   = pprReg r1 <> ptext SLIT(" = ") <> parens ty <> pprExpr1 r2 <> semi
   | otherwise
@@ -643,20 +640,26 @@ pprCastReg reg
    | isStrangeTypeReg reg = mkW_ <> pprReg reg
    | otherwise            = pprReg reg
 
--- True if the register has type StgPtr in C, otherwise it has an
--- integer type.  We need to take care with pointer arithmetic on registers
--- with type StgPtr.
-isPtrReg :: CmmReg -> Bool
-isPtrReg (CmmLocal _) = False
-isPtrReg (CmmGlobal r) = isPtrGlobalReg r
+-- True if (pprReg reg) will give an expression with type StgPtr.  We
+-- need to take care with pointer arithmetic on registers with type
+-- StgPtr.
+isFixedPtrReg :: CmmReg -> Bool
+isFixedPtrReg (CmmLocal _) = False
+isFixedPtrReg (CmmGlobal r) = isFixedPtrGlobalReg r
 
-isPtrGlobalReg :: GlobalReg -> Bool
-isPtrGlobalReg (VanillaReg n) 	= True
-isPtrGlobalReg Sp 		= True
-isPtrGlobalReg Hp 		= True
-isPtrGlobalReg HpLim 		= True
-isPtrGlobalReg SpLim 		= True
-isPtrGlobalReg _ 		= False
+-- True if (pprAsPtrReg reg) will give an expression with type StgPtr
+isPtrReg :: CmmReg -> Bool
+isPtrReg (CmmLocal _) 		    = False
+isPtrReg (CmmGlobal (VanillaReg n)) = True -- if we print via pprAsPtrReg
+isPtrReg (CmmGlobal reg)	    = isFixedPtrGlobalReg reg
+
+-- True if this global reg has type StgPtr
+isFixedPtrGlobalReg :: GlobalReg -> Bool
+isFixedPtrGlobalReg Sp 		= True
+isFixedPtrGlobalReg Hp 		= True
+isFixedPtrGlobalReg HpLim	= True
+isFixedPtrGlobalReg SpLim	= True
+isFixedPtrGlobalReg _ 		= False
 
 -- True if in C this register doesn't have the type given by 
 -- (machRepCType (cmmRegRep reg)), so it has to be cast.
@@ -668,7 +671,7 @@ isStrangeTypeGlobal :: GlobalReg -> Bool
 isStrangeTypeGlobal CurrentTSO		= True
 isStrangeTypeGlobal CurrentNursery 	= True
 isStrangeTypeGlobal BaseReg	 	= True
-isStrangeTypeGlobal r 			= isPtrGlobalReg r
+isStrangeTypeGlobal r 			= isFixedPtrGlobalReg r
 
 strangeRegType :: CmmReg -> Maybe SDoc
 strangeRegType (CmmGlobal CurrentTSO) = Just (ptext SLIT("struct StgTSO_ *"))
