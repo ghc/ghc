@@ -356,6 +356,20 @@ pprMachOpApp op args
 	isMulMayOfloOp _ = False
 
 pprMachOpApp mop args
+  | Just ty <- machOpNeedsCast mop 
+  = ty <> parens (pprMachOpApp' mop args)
+  | otherwise
+  = pprMachOpApp' mop args
+
+-- Comparisons in C have type 'int', but we want type W_ (this is what
+-- resultRepOfMachOp says).  The other C operations inherit their type
+-- from their operands, so no casting is required.
+machOpNeedsCast :: MachOp -> Maybe SDoc
+machOpNeedsCast mop
+  | isComparisonMachOp mop = Just mkW_
+  | otherwise              = Nothing
+
+pprMachOpApp' mop args
  = case args of
     -- dyadic
     [x,y] -> pprArg x <+> pprMachOp_for_C mop <+> pprArg y
