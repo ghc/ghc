@@ -710,7 +710,7 @@ x = nfib 25
       currently support mixing the <option>-hr</option> and
       <option>-hb</option> options.</para>
 
-      <para>There are two more options which relate to heap
+      <para>There are three more options which relate to heap
       profiling:</para>
 
       <variablelist>
@@ -748,6 +748,19 @@ x = nfib 25
 	    <para>Memory occupied by threads and their stacks is
 	    labelled as &ldquo;TSO&rdquo; when displaying the profile
 	    by closure description or type description.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-L<replaceable>num</replaceable></option>
+            <indexterm><primary><option>-L</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
+	  <listitem>
+	    <para>
+          Sets the maximum length of a cost-centre stack name in a
+          heap profile. Defaults to 25.
+	    </para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
