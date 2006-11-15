@@ -16,8 +16,6 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "OSThreads.h"
-#include "Storage.h"
-#include "Stable.h"
 #include "BlockAlloc.h"
 #include "MBlock.h"
 #include "GC.h"

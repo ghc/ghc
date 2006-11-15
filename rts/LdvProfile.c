@@ -14,7 +14,6 @@
 #include "RtsFlags.h"
 #include "Profiling.h"
 #include "Stats.h"
-#include "Storage.h"
 #include "RtsUtils.h"
 #include "Schedule.h"
 

@@ -19,7 +19,6 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "Profiling.h"
-#include "Storage.h"
 #include "ProfHeap.h"
 #include "Stats.h"
 #include "Hash.h"

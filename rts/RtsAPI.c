@@ -9,7 +9,6 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "OSThreads.h"
-#include "Storage.h"
 #include "RtsAPI.h"
 #include "SchedAPI.h"
 #include "RtsFlags.h"

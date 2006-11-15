@@ -40,8 +40,6 @@ Haskell side.
 #include "Rts.h"
 #include "RtsExternal.h"
 #include "RtsUtils.h"
-#include "Storage.h"
-#include "Stable.h"
 #include <stdlib.h>
 
 #if defined(_WIN32)
@@ -115,7 +113,6 @@ extern void obscure_ccall_ret_code(void);
 #endif
 
 #if defined(ia64_HOST_ARCH)
-#include "Storage.h"
 
 /* Layout of a function descriptor */
 typedef struct _IA64FunDesc {

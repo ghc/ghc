@@ -3,7 +3,6 @@
  *
  */
 #include "Rts.h"
-#include "Storage.h"
 #include <windows.h>
 #include "ConsoleHandler.h"
 #include "SchedAPI.h"
@@ -11,7 +10,6 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "AsyncIO.h"
-#include "Stable.h"
 #include "RtsSignals.h"
 
 extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);

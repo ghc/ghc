@@ -13,7 +13,6 @@
 #include "SchedAPI.h"
 #include "RtsFlags.h"
 #include "Weak.h"
-#include "Storage.h"
 #include "Schedule.h"
 #include "Prelude.h"
 #include "RtsAPI.h"

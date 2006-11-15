@@ -21,8 +21,6 @@
 #include "RtsFlags.h"
 #include "HsFFI.h"
 #include "Hash.h"
-#include "Storage.h"
-#include "Stable.h"
 #include "Linker.h"
 #include "LinkerInternals.h"
 #include "RtsUtils.h"

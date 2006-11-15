@@ -17,8 +17,6 @@
 #include "RtsUtils.h"
 #include "Apply.h"
 #include "OSThreads.h"
-#include "Storage.h"
-#include "Stable.h"
 #include "LdvProfile.h"
 #include "Updates.h"
 #include "Stats.h"

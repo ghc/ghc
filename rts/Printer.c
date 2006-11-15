@@ -15,7 +15,6 @@
 
 #include "RtsFlags.h"
 #include "MBlock.h"
-#include "Storage.h"
 #include "Bytecodes.h"  /* for InstrPtr */
 #include "Disassembler.h"
 #include "Apply.h"

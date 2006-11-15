@@ -8,8 +8,6 @@
 
 #include "HsFFI.h"
 #include "Rts.h"
-#include "Storage.h"
-#include "Stable.h"
 
 // hs_init and hs_exit are defined in RtsStartup.c
 
