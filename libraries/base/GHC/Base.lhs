@@ -19,13 +19,15 @@ GHC.Prim		Has no implementation.  It defines built-in things, and
 GHC.Base	Classes: Eq, Ord, Functor, Monad
 		Types:   list, (), Int, Bool, Ordering, Char, String
 
-Data.Tup	Types: tuples, plus instances for GHC.Base classes
+Data.Tuple	Types: tuples, plus instances for GHC.Base classes
 
 GHC.Show	Class: Show, plus instances for GHC.Base/GHC.Tup types
 
 GHC.Enum	Class: Enum,  plus instances for GHC.Base/GHC.Tup types
 
 Data.Maybe	Type: Maybe, plus instances for GHC.Base classes
+
+GHC.List	List functions
 
 GHC.Num		Class: Num, plus instances for Int
 		Type:  Integer, plus instances for all classes so far (Eq, Ord, Num, Show)
@@ -41,11 +43,12 @@ GHC.Real	Classes: Real, Integral, Fractional, RealFrac
 		Rational is needed here because it is mentioned in the signature
 		of 'toRational' in class Real
 
+GHC.ST	The ST monad, instances and a few helper functions
+
 Ix		Classes: Ix, plus instances for Int, Bool, Char, Integer, Ordering, tuples
 
 GHC.Arr		Types: Array, MutableArray, MutableVar
 
-		Does *not* contain any ByteArray stuff (see GHC.ByteArr)
 		Arrays are used by a function in GHC.Float
 
 GHC.Float	Classes: Floating, RealFloat
@@ -54,11 +57,6 @@ GHC.Float	Classes: Floating, RealFloat
 		This module contains everything to do with floating point.
 		It is a big module (900 lines)
 		With a bit of luck, many modules can be compiled without ever reading GHC.Float.hi
-
-GHC.ByteArr	Types: ByteArray, MutableByteArray
-		
-		We want this one to be after GHC.Float, because it defines arrays
-		of unboxed floats.
 
 
 Other Prelude modules are much easier with fewer complex dependencies.
