@@ -45,7 +45,8 @@ import Outputable
 import FastString
 import StaticFlags      ( opt_SimplExcessPrecision )
 
-import Data.Bits as Bits	( Bits(..) )
+import Data.Bits as Bits	( Bits(..), shiftL, shiftR )
+	-- shiftL and shiftR were not always methods of Bits
 #if __GLASGOW_HASKELL__ >= 500
 import Data.Word	( Word )
 #else
