@@ -148,10 +148,8 @@ module System.IO (
     withBinaryFile,
     openBinaryFile,	       -- :: FilePath -> IOMode -> IO Handle
     hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
-#if !defined(__NHC__)
     hPutBuf,		       -- :: Handle -> Ptr a -> Int -> IO ()
     hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
-#endif
 #if !defined(__NHC__) && !defined(__HUGS__)
     hPutBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
@@ -222,7 +220,8 @@ import IO
   , IO ()
   , FilePath                  -- :: String
   )
-import NHC.IOExtras (fixIO)
+import NHC.IOExtras (fixIO, hPutBuf, hGetBuf)
+import NHC.FFI (Ptr)
 #endif
 
 -- -----------------------------------------------------------------------------
