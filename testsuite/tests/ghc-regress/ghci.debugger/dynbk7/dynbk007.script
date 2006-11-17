@@ -1,0 +1,7 @@
+-- Breakpoints in do statements
+
+:set -fdebugging
+:l A.hs
+-- :break add Main 3  This bkpt gets coalesced due to empty local bindings, which is fine
+:break add Main 4
+:break add Main 5

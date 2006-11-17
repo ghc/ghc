@@ -1,0 +1,7 @@
+-- Breakpoints on binding sites that start with a List Comprehension were being coalesced, as list comp. are desugared to Lets and we coalesce bkpts in binding sites that start with a Let (i.e. we postpone the breakpoint to the body of the Let)
+
+:set -fdebugging
+:l A.hs
+
+:break add Main 2
+

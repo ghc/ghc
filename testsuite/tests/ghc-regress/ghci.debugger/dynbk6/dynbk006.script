@@ -1,6 +1,2 @@
--- TH generated code does not get instrumented
+-- Higher order Test: ensure dictionaries, coercions and friends don't show up
 
-:set -fglasgow-exts
-:set -fdebugging
-:l A
-:show bkptTable

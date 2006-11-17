@@ -1,11 +1,11 @@
 Local bindings in scope:
-  a :: a, c :: (), b :: forall a. a -> a, i :: a,
-  d :: Integer -> Integer -> Integer
+  a :: a, c :: (), b :: forall a. a -> a, d :: Integer -> Integer -> Integer,
+  i :: a
 A.hs:8:9-18> a :: GHC.Base.Unknown
 A.hs:8:9-18> b :: a -> a
 A.hs:8:9-18> c :: ()
 A.hs:8:9-18> d :: Integer -> Integer -> Integer
-A.hs:8:9-18> a = (_t1::GHC.Base.Unknown)
+A.hs:8:9-18> a = (_t1::a)
 b = (_t2::forall a. a -> a)
 c = ()
 d = (_t3::Integer -> Integer -> Integer)

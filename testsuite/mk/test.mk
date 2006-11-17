@@ -136,7 +136,7 @@ $(TOP)/timeout/timeout$(exeext) :
 	cd $(TOP)/timeout && $(MAKE) $(MFLAGS) all
 
 test: timeout
-	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
+	python2.5 $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
 		$(patsubst %, --way=%, $(WAY)) \

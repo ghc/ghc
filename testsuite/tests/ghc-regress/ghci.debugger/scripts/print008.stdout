@@ -3,5 +3,5 @@ _t1 :: GHC.Base.Unknown
 ()
 t = O [(_t2::a) | (_t3::[a])]
 ()
-t = O [Just [(_t4::Maybe [a]),(_t5::Maybe [a])] | (_t6::[Maybe [a]])]
-_t4 :: Maybe [GHC.Base.Unknown]
+t = O [Just [(_t4::a),(_t5::a)] | (_t6::[Maybe [a]])]
+_t4 :: GHC.Base.Unknown
