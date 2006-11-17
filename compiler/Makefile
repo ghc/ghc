@@ -726,6 +726,10 @@ all :: $(odir)/ghc-inplace ghc-inplace
 #   (On other system, -W isn't a pwd flag at all.)
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+all :: $(odir)/ghc-inplace.bat ghc-inplace.bat
+endif
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 #	MSys (...and cygwin with a mingw toolchain)
 SCRIPT_SHELL = $(shell cd /bin; pwd -W 2>/dev/null || echo "/bin")/sh
 else
@@ -753,6 +757,13 @@ $(odir)/ghc-inplace : $(GHC_PROG)
 		'-B$(subst \,\\,$(FPTOOLS_TOP_ABS_PLATFORM))' '"$$@"' >>$@
 # Re exec, see note 2 above
 	chmod 755 $@
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ghc-inplace.bat $(odir)/ghc-inplace.bat: $(GHC_PROG)
+	@$(RM) $@
+	echo '@call $(subst /,\,$(GHC_COMPILER_DIR_ABS)/$(GHC_PROG)) -B$(FPTOOLS_TOP_ABS_PLATFORM) %*' >> $@
+	chmod 755 $@
+endif	
 
 ghc-inplace : stage1/ghc-inplace
 	$(RM) -f $@ && $(LN_S) $< $@
