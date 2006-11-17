@@ -84,8 +84,11 @@ class Num a => Bits a where
     {-| Reverse all the bits in the argument -}
     complement        :: a -> a
 
-    {-| Shift the argument left by the specified number of bits.
-	Right shifts (signed) are specified by giving a negative value.
+    {-| @'shift' x i@ shifts @x@ left by @i@ bits if @i@ is positive,
+	or right by @-i@ bits otherwise.
+	Right shifts perform sign extension on signed number types;
+	i.e. they fill the top bits with 1 if the @x@ is negative
+	and with 0 otherwise.
 
 	An instance can define either this unified 'shift' or 'shiftL' and
 	'shiftR', depending on which is more convenient for the type in
@@ -96,8 +99,8 @@ class Num a => Bits a where
                   | i==0 = x
                   | i>0  = x `shiftL` i
 
-    {-| Rotate the argument left by the specified number of bits.
-	Right rotates are specified by giving a negative value.
+    {-| @'rotate' x i@ rotates @x@ left by @i@ bits if @i@ is positive,
+	or right by @-i@ bits otherwise.
 
         For unbounded types like 'Integer', 'rotate' is equivalent to 'shift'.
 
@@ -164,8 +167,11 @@ class Num a => Bits a where
     shiftL            :: a -> Int -> a
     x `shiftL`  i = x `shift`  i
 
-    {-| Shift the argument right (signed) by the specified number of bits
+    {-| Shift the first argument right by the specified number of bits
 	(which must be non-negative).
+	Right shifts perform sign extension on signed number types;
+	i.e. they fill the top bits with 1 if the @x@ is negative
+	and with 0 otherwise.
 
 	An instance can define either this and 'shiftL' or the unified
 	'shift', depending on which is more convenient for the type in
