@@ -100,6 +100,14 @@ clean distclean maintainer-clean ::
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
 endif
 
+ifeq "$(INSTALLING)$(HOSTPLATFORM)" "0i386-unknown-mingw32"
+all :: $(INPLACE_SCRIPT_PROG).bat
+
+$(INPLACE_SCRIPT_PROG).bat :
+	echo '@call $(subst /,\\,$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/$(HS_PROG)) --global-conf $(PKGCONF) %*' >> $@
+	chmod 755 $@
+endif
+
 # ghc-pkg is needed to boot in rts/ and library dirs
 # Do a recursive 'make all' after generating dependencies, because this
 # will work with 'make -j'.
