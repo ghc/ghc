@@ -171,6 +171,8 @@ instance Outputable BCInstr where
    ppr (ALLOC_PAP arity sz)  = text "ALLOC_PAP   " <+> int arity <+> int sz
    ppr (MKAP offset sz)      = text "MKAP    " <+> int sz <+> text "words," 
                                                <+> int offset <+> text "stkoff"
+   ppr (MKPAP offset sz)     = text "MKPAP   " <+> int sz <+> text "words,"
+                                               <+> int offset <+> text "stkoff"
    ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
    ppr (PACK dcon sz)        = text "PACK    " <+> ppr dcon <+> ppr sz
    ppr (LABEL     lab)       = text "__"       <> int lab <> colon
@@ -182,16 +184,16 @@ instance Outputable BCInstr where
    ppr (TESTEQ_D  d lab)     = text "TESTEQ_D" <+> double d <+> text "__" <> int lab
    ppr (TESTLT_P  i lab)     = text "TESTLT_P" <+> int i <+> text "__" <> int lab
    ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> int i <+> text "__" <> int lab
-   ppr (JMP lab)             = text "JMP"      <+> int lab
    ppr CASEFAIL              = text "CASEFAIL"
-   ppr ENTER                 = text "ENTER"
-   ppr RETURN		     = text "RETURN"
-   ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
+   ppr (JMP lab)             = text "JMP"      <+> int lab
    ppr (CCALL off marshall_addr) = text "CCALL   " <+> int off 
 						<+> text "marshall code at" 
                                                <+> text (show marshall_addr)
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> int stkoff 
                                                <+> text "by" <+> int n 
+   ppr ENTER                 = text "ENTER"
+   ppr RETURN		     = text "RETURN"
+   ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
 
 -- -----------------------------------------------------------------------------
 -- The stack use, in words, of each bytecode insn.  These _must_ be
