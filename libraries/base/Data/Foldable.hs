@@ -185,7 +185,7 @@ for_ :: (Foldable t, Applicative f) => t a -> (a -> f b) -> f ()
 {-# INLINE for_ #-}
 for_ = flip traverse_
 
--- | Map each element of a structure to an monadic action, evaluate
+-- | Map each element of a structure to a monadic action, evaluate
 -- these actions from left to right, and ignore the results.
 mapM_ :: (Foldable t, Monad m) => (a -> m b) -> t a -> m ()
 mapM_ f = foldr ((>>) . f) (return ())

@@ -81,7 +81,7 @@ class (Functor t, Foldable t) => Traversable t where
 	sequenceA :: Applicative f => t (f a) -> f (t a)
 	sequenceA = traverse id
 
-	-- | Map each element of a structure to an monadic action, evaluate
+	-- | Map each element of a structure to a monadic action, evaluate
 	-- these actions from left to right, and collect the results.
 	mapM :: Monad m => (a -> m b) -> t a -> m (t b)
 	mapM f = unwrapMonad . traverse (WrapMonad . f)
