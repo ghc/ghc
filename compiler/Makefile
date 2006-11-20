@@ -423,8 +423,10 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 SRC_HC_OPTS += -DGHCI_TABLES_NEXT_TO_CODE
 endif
 
+ifneq "$(GhcNotThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
 SRC_HC_OPTS += -threaded
+endif
 
 ALL_DIRS += ghci
 

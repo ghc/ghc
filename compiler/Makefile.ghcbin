@@ -31,7 +31,9 @@ ifeq "$(GhcWithInterpreter)" "YES"
 SRC_HC_OPTS += -DGHCI -DBREAKPOINT
 endif
 
+ifneq "$(GhcNotThreaded)" "YES"
 SRC_HC_OPTS += -threaded
+endif
 
 odir=stage$(stage)
 
