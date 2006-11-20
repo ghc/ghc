@@ -298,7 +298,7 @@ sub init_TARGET_STUFF {
     $T_CONST_LBL    = '^\LC\d+:'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.align \d+|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*|\.lcomm.*)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s.*|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*|\.lcomm.*)\n)';
     $T_COPY_DIRVS   = '\.(globl|lcomm)';
 
     $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
@@ -326,7 +326,7 @@ sub init_TARGET_STUFF {
     $T_X86_PRE_LLBL	    = 'L';
     $T_X86_BADJMP   = '^\tjmp [^L\*]';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.align \d+|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*|\.lcomm.*)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s.*|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*|\.lcomm.*)\n)';
     $T_COPY_DIRVS   = '\.(globl|lcomm)';
 
     $T_DOT_WORD	    = '\.(long|short|byte|fill|space)';
@@ -929,8 +929,8 @@ sub mangle_asm {
  		    $p =~ s/^\tstw r0,\d+\(r1\)\n//g;
   		    $p =~ s/^\tstwu r1,-\d+\(r1\)\n//; 
   		    $p =~ s/^\tstw r\d+,-\d+\(r1\)\n//g; 
-  		    $p =~ s/^\tbcl 20,31,L\d+\$pb\n//;
-  		    $p =~ s/^L\d+\$pb:\n//;
+  		    $p =~ s/^\tbcl 20,31,\"?L\d+\$pb\"?\n//;
+  		    $p =~ s/^\"?L\d+\$pb\"?:\n//;
   		    $p =~ s/^\tmflr r31\n//;
 
 		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
