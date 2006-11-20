@@ -60,6 +60,10 @@ import Control.Monad.ST
 import StaticFlags	( opt_Unregisterised )
 #endif
 
+#if defined(alpha_TARGET_ARCH) || defined(mips_TARGET_ARCH) || defined(mipsel_TARGET_ARCH) || defined(arm_TARGET_ARCH)
+#define BEWARE_LOAD_STORE_ALIGNMENT
+#endif
+
 -- --------------------------------------------------------------------------
 -- Top level
 
@@ -325,7 +329,7 @@ pprExpr e = case e of
 
     CmmLoad expr rep ->
 	-- the general case:
-	char '*' <> parens (cCast (machRepPtrCType rep) expr)
+	cLoad expr rep
 
     CmmReg reg      -> pprCastReg reg
     CmmRegOff reg 0 -> pprCastReg reg
@@ -878,6 +882,18 @@ te_Reg _            = return ()
 
 cCast :: SDoc -> CmmExpr -> SDoc
 cCast ty expr = parens ty <> pprExpr1 expr
+
+cLoad :: CmmExpr -> MachRep -> SDoc
+#ifdef BEWARE_LOAD_STORE_ALIGNMENT
+cLoad expr rep =
+    let decl = machRepCType rep <+> ptext SLIT("x") <> semi
+        struct = ptext SLIT("struct") <+> braces (decl)
+        packed_attr = ptext SLIT("__attribute__((packed))")
+        cast = parens (struct <+> packed_attr <> char '*')
+    in parens (cast <+> pprExpr1 expr) <> ptext SLIT("->x")
+#else
+cLoad expr rep = char '*' <> parens (cCast (machRepPtrCType rep) expr)
+#endif
 
 -- This is for finding the types of foreign call arguments.  For a pointer
 -- argument, we always cast the argument to (void *), to avoid warnings from
