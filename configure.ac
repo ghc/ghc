@@ -1207,9 +1207,11 @@ AC_SUBST(HavePapiLib)
 AC_SUBST(HavePapiHeader)
 
 if test "$HavePapiLib" = "YES" -a "$HavePapiHeader" = "YES"; then
-   USE_PAPI=YES
+   HavePapi=YES
+else
+   HavePapi=NO
 fi
-AC_SUBST(USE_PAPI)
+AC_SUBST(HavePapi)
 
 AC_CONFIG_FILES([mk/config.mk ghc.spec docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])

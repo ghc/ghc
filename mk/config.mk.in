@@ -431,6 +431,11 @@ GhcRtsCcOpts=-fomit-frame-pointer
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO
 
+# Include support for CPU performance counters via the PAPI library in the RTS?
+# (PAPI: http://icl.cs.utk.edu/papi/)
+GhcRtsWithPapi = NO
+HavePapi = @HavePapi@
+
 ################################################################################
 #
 #		nofib
@@ -986,9 +991,6 @@ UNAME			= uname
 
 # GTK+
 GTK_CONFIG = @GTK_CONFIG@
-
-# PAPI
-USE_PAPI   = @USE_PAPI@
 
 #-----------------------------------------------------------------------------
 # DocBook XML stuff

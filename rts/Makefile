@@ -181,8 +181,8 @@ endif
 #-----------------------------------------------------------------------------
 # Add PAPI library if needed
 
-ifeq "$(USE_PAPI)" "YES"
-SRC_HC_OPTS		+= -lpapi -optc-DUSE_PAPI
+ifeq "$(GhcRtsWithPapi)" "YES"
+SRC_HC_OPTS		+= -optc-DUSE_PAPI
 PACKAGE_CPP_OPTS	+= -DUSE_PAPI
 endif
 
