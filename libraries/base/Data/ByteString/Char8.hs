@@ -265,7 +265,7 @@ import Control.Exception        (bracket)
 import Foreign
 
 #if defined(__GLASGOW_HASKELL__)
-import GHC.Base                 (Char(..),unpackCString#,unsafeCoerce#)
+import GHC.Base                 (Char(..),unpackCString#,ord#,int2Word#)
 import GHC.IOBase               (IO(..),stToIO)
 import GHC.Prim                 (Addr#,writeWord8OffAddr#,plusAddr#)
 import GHC.Ptr                  (Ptr(..))
@@ -301,7 +301,7 @@ pack str = B.unsafeCreate (P.length str) $ \(Ptr p) -> stToIO (go p str)
   where
     go :: Addr# -> [Char] -> ST a ()
     go _ []        = return ()
-    go p (C# c:cs) = writeByte p (unsafeCoerce# c) >> go (p `plusAddr#` 1#) cs
+    go p (C# c:cs) = writeByte p (int2Word# (ord# c)) >> go (p `plusAddr#` 1#) cs
 
     writeByte p c = ST $ \s# ->
         case writeWord8OffAddr# p 0# c s# of s2# -> (# s2#, () #)
