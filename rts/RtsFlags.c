@@ -454,8 +454,8 @@ usage_text[] = {
 "  -b...     All GranSim options start with -b; see GranSim User's Guide for details",
 #endif
 #if defined(USE_PAPI)
-"  -aX       Perform measurements using PAPI, it should be used with the -s<file> option.",
-"            Where X is one of:",
+"  -aX       CPU performance counter measurements using PAPI",
+"            (use with the -s<file> option).  X is one of:",
 "",
 /* "            y - cycles", */
 "            1 - level 1 cache misses",
