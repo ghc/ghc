@@ -175,6 +175,11 @@ howToAccessLabel _ lbl | labelDynamic lbl = AccessViaSymbolPtr
 -- It is always possible to access something indirectly,
 -- even when it's not necessary.
 
+#if powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH
+    -- on i386 and probably also on x86_64, dyld code stubs don't
+    -- work for tailcalls because the stack alignment is only right
+    -- for regular calls.
+
 howToAccessLabel True lbl
       -- jumps to a dynamic library go via a symbol stub
     | labelDynamic lbl = AccessViaStub
@@ -186,7 +191,8 @@ howToAccessLabel True lbl
       -- we'd need to pass the current Module all the way in to
       -- this function.
     | opt_PIC && externallyVisibleCLabel lbl = AccessViaStub
-howToAccessLabel False lbl
+#endif
+howToAccessLabel _ lbl
       -- data access to a dynamic library goes via a symbol pointer
     | labelDynamic lbl = AccessViaSymbolPtr
       -- cross-module PIC references: same as above
