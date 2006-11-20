@@ -160,9 +160,18 @@ hs_init(int *argc, char **argv[])
 
     /* Initialise the performance tracking library */
 #ifdef USE_PAPI
-    /* Must fix to abort gracefully */
-    if(PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT)
-      exit(1);
+    {
+	int ver;
+	if ((ver = PAPI_library_init(PAPI_VER_CURRENT)) != PAPI_VER_CURRENT) {
+	    if (ver > 0) {
+		errorBelch("PAPI_library_init: wrong version: %x", ver);
+		stg_exit(EXIT_FAILURE);
+	    } else {
+		sysErrorBelch("PAPI_library_init");
+		stg_exit(EXIT_FAILURE);
+	    }
+	}
+    }
 #ifdef THREADED_RTS
     {
 	int err;
