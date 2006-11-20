@@ -1351,9 +1351,6 @@ machdepCCOpts dflags
 			-- version.
 		] )
 
-#elif mips_TARGET_ARCH
-	= ( ["-static"], [] )
-
 #elif sparc_TARGET_ARCH
 	= ( [], ["-w"] )
 	-- For now, to suppress the gcc warning "call-clobbered
