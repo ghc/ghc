@@ -48,7 +48,7 @@
 #define FMSBIT   0x80000000
 #endif
 
-#ifdef WORDS_BIGENDIAN
+#if defined(WORDS_BIGENDIAN) || defined(FLOAT_WORDS_BIGENDIAN)
 #define L 1
 #define H 0
 #else
@@ -307,10 +307,17 @@ union stg_ieee754_dbl
 	unsigned int mantissa0:20;
 	unsigned int mantissa1:32;
 #else
+#if FLOAT_WORDS_BIGENDIAN
+	unsigned int mantissa0:20;
+	unsigned int exponent:11;
+	unsigned int negative:1;
+	unsigned int mantissa1:32;
+#else
 	unsigned int mantissa1:32;
 	unsigned int mantissa0:20;
 	unsigned int exponent:11;
 	unsigned int negative:1;
+#endif
 #endif
    } ieee;
     /* This format makes it easier to see if a NaN is a signalling NaN.  */
@@ -323,11 +330,19 @@ union stg_ieee754_dbl
 	unsigned int mantissa0:19;
 	unsigned int mantissa1:32;
 #else
+#if FLOAT_WORDS_BIGENDIAN
+	unsigned int mantissa0:19;
+	unsigned int quiet_nan:1;
+	unsigned int exponent:11;
+	unsigned int negative:1;
+	unsigned int mantissa1:32;
+#else
 	unsigned int mantissa1:32;
 	unsigned int mantissa0:19;
 	unsigned int quiet_nan:1;
 	unsigned int exponent:11;
 	unsigned int negative:1;
+#endif
 #endif
    } ieee_nan;
 };

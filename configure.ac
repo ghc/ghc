@@ -1136,6 +1136,7 @@ AC_C_CONST
 
 dnl ** are we big endian?
 AC_C_BIGENDIAN
+FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
