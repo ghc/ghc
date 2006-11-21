@@ -797,6 +797,7 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
       RTS_CYGWIN_ONLY_SYMBOLS
+      RTS_DARWIN_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
 #if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
       // dyld stub code contains references to this,

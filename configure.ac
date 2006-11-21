@@ -1175,8 +1175,8 @@ AC_CHECK_LIB(rt, clock_gettime)
 AC_CHECK_FUNCS(clock_gettime)
 
 dnl ** check for Apple's "interesting" long double compatibility scheme
-AC_MSG_CHECKING(for printf$LDBLStub)
-AC_TRY_LINK_FUNC(printf$LSBLStub,
+AC_MSG_CHECKING(for printf\$LDBLStub)
+AC_TRY_LINK_FUNC(printf\$LDBLStub,
     [
         AC_MSG_RESULT(yes)
         AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[1],
