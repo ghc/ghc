@@ -80,10 +80,7 @@ allocGroup(nat n)
   for (bd = free_list; bd != NULL; bd = bd->link) {
     if (bd->blocks == n) {	/* exactly the right size! */
       *last = bd->link;
-      /* no initialisation necessary - this is already a
-       * self-contained block group. */
-      bd->free = bd->start;	/* block isn't free now */
-      bd->link = NULL;
+      initGroup(n, bd);		/* initialise it */
       return bd;
     }
     if (bd->blocks >  n) {	/* block too big... */
@@ -219,20 +216,26 @@ allocMegaGroup(nat n)
 STATIC_INLINE bdescr *
 coalesce(bdescr *p)
 {
-  bdescr *bd, *q;
-  nat i, blocks;
+  bdescr *q;
 
   q = p->link;
   if (q != NULL && p->start + p->blocks * BLOCK_SIZE_W == q->start) {
     /* can coalesce */
     p->blocks += q->blocks;
     p->link    = q->link;
-    blocks = q->blocks;
-    for (i = 0, bd = q; i < blocks; bd++, i++) {
-	bd->free = 0;
-	bd->blocks = 0;
-	bd->link = p;
+#ifdef DEBUG
+    {
+	nat i, blocks;
+	bdescr *bd;
+	// not strictly necessary to do this, but helpful if we have a 
+	// random ptr and want to figure out what block it belongs to.
+	for (i = 0, bd = q; i < q->blocks; bd++, i++) {
+	    bd->free = 0;
+	    bd->blocks = 0;
+	    bd->link = p;
+	}
     }
+#endif
     return p;
   }
   return q;
