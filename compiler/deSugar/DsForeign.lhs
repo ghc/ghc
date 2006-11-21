@@ -388,8 +388,10 @@ dsFExportDynamic id cconv
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
      let ccall_adj_ty = exprType ccall_adj
          ccall_io_adj = mkLams [stbl_value]		     $
-			(pprTrace "DsForeign: why is there an unsafeCoerce here?" (text "") $
-			(Cast ccall_adj (mkUnsafeCoercion ccall_adj_ty io_res_ty )))
+#ifdef DEBUG
+			pprTrace "DsForeign: why is there an unsafeCoerce here?" (text "") $
+#endif
+			(Cast ccall_adj (mkUnsafeCoercion ccall_adj_ty io_res_ty ))
 
          io_app = mkLams tvs	 $
 		  mkLams [cback] $
