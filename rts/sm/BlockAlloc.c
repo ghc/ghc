@@ -227,9 +227,11 @@ coalesce(bdescr *p)
     {
 	nat i, blocks;
 	bdescr *bd;
+	blocks = q->blocks;
 	// not strictly necessary to do this, but helpful if we have a 
 	// random ptr and want to figure out what block it belongs to.
-	for (i = 0, bd = q; i < q->blocks; bd++, i++) {
+	// Also required for sanity checking (see checkFreeListSanity()).
+	for (i = 0, bd = q; i < blocks; bd++, i++) {
 	    bd->free = 0;
 	    bd->blocks = 0;
 	    bd->link = p;
