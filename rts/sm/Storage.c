@@ -1069,26 +1069,43 @@ void freeExec (void *addr)
 
 #ifdef DEBUG
 
-static lnat
-stepBlocks (step *stp)
+nat
+countBlocks(bdescr *bd)
 {
-    lnat total_blocks;
-    bdescr *bd;
+    nat n;
+    for (n=0; bd != NULL; bd=bd->link) {
+	n += bd->blocks;
+    }
+    return n;
+}
 
-    total_blocks = stp->n_blocks;    
-    total_blocks += stp->n_old_blocks;
-    for (bd = stp->large_objects; bd; bd = bd->link) {
-	total_blocks += bd->blocks;
-	/* hack for megablock groups: they have an extra block or two in
-	   the second and subsequent megablocks where the block
-	   descriptors would normally go.
-	*/
+// (*1) Just like countBlocks, except that we adjust the count for a
+// megablock group so that it doesn't include the extra few blocks
+// that would be taken up by block descriptors in the second and
+// subsequent megablock.  This is so we can tally the count with the
+// number of blocks allocated in the system, for memInventory().
+static nat
+countAllocdBlocks(bdescr *bd)
+{
+    nat n;
+    for (n=0; bd != NULL; bd=bd->link) {
+	n += bd->blocks;
+	// hack for megablock groups: see (*1) above
 	if (bd->blocks > BLOCKS_PER_MBLOCK) {
-	    total_blocks -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
+	    n -= (MBLOCK_SIZE / BLOCK_SIZE - BLOCKS_PER_MBLOCK)
 		* (bd->blocks/(MBLOCK_SIZE/BLOCK_SIZE));
 	}
     }
-    return total_blocks;
+    return n;
+}
+
+static lnat
+stepBlocks (step *stp)
+{
+    ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
+    ASSERT(countBlocks(stp->large_objects) == stp->n_large_blocks);
+    return stp->n_blocks + stp->n_old_blocks + 
+	    countAllocdBlocks(stp->large_objects);
 }
 
 void
@@ -1096,7 +1113,6 @@ memInventory(void)
 {
   nat g, s, i;
   step *stp;
-  bdescr *bd;
   lnat gen_blocks[RtsFlags.GcFlags.generations];
   lnat nursery_blocks, allocate_blocks, retainer_blocks,
        arena_blocks, exec_blocks;
@@ -1107,15 +1123,15 @@ memInventory(void)
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       gen_blocks[g] = 0;
       for (i = 0; i < n_capabilities; i++) {
-	  for (bd = capabilities[i].mut_lists[g]; bd != NULL; bd = bd->link) {
-	      gen_blocks[g] += bd->blocks;
-	  }
+	  gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
       }	  
-      for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
-	  gen_blocks[g] += bd->blocks;
-      }
+      gen_blocks[g] += countAllocdBlocks(generations[g].mut_list);
       for (s = 0; s < generations[g].n_steps; s++) {
+#if !defined(THREADED_RTS)
+	  // We put pinned object blocks in g0s0, so better count
+	  // blocks there too.
 	  if (g==0 && s==0) continue;
+#endif
 	  stp = &generations[g].steps[s];
 	  gen_blocks[g] += stepBlocks(stp);
       }
@@ -1125,16 +1141,9 @@ memInventory(void)
   for (i = 0; i < n_nurseries; i++) {
       nursery_blocks += stepBlocks(&nurseries[i]);
   }
-#ifdef THREADED_RTS
-  // We put pinned object blocks in g0s0, so better count blocks there too.
-  gen_blocks[0] += stepBlocks(g0s0);
-#endif
 
   /* any blocks held by allocate() */
-  allocate_blocks = 0;
-  for (bd = small_alloc_list; bd; bd = bd->link) {
-      allocate_blocks += bd->blocks;
-  }
+  allocate_blocks = countAllocdBlocks(small_alloc_list);
 
   retainer_blocks = 0;
 #ifdef PROFILING
@@ -1147,10 +1156,7 @@ memInventory(void)
   arena_blocks = arenaBlocks();
 
   // count the blocks containing executable memory
-  exec_blocks = 0;
-  for (bd = exec_block; bd; bd = bd->link) {
-      exec_blocks += bd->blocks;
-  }
+  exec_blocks = countAllocdBlocks(exec_block);
 
   /* count the blocks on the free list */
   free_blocks = countFreeList();
@@ -1180,16 +1186,6 @@ memInventory(void)
   }
 }
 
-
-nat
-countBlocks(bdescr *bd)
-{
-    nat n;
-    for (n=0; bd != NULL; bd=bd->link) {
-	n += bd->blocks;
-    }
-    return n;
-}
 
 /* Full heap sanity check. */
 void
