@@ -1148,7 +1148,7 @@ memInventory(void)
   // count the blocks containing executable memory
   exec_blocks = 0;
   for (bd = exec_block; bd; bd = bd->link) {
-      exec_blocks = bd->blocks;
+      exec_blocks += bd->blocks;
   }
 
   /* count the blocks on the free list */
