@@ -132,7 +132,7 @@ tcCheckExistentialPat pats [] pat_tys body_ty
   = return ()	-- Short cut for case when there are no existentials
 
 tcCheckExistentialPat pats ex_tvs pat_tys body_ty
-  = addErrCtxtM (sigPatCtxt (collectPatsBinders pats) ex_tvs pat_tys body_ty)	$
+  = addErrCtxtM (sigPatCtxt pats ex_tvs pat_tys body_ty)	$
     checkSigTyVarsWrt (tcTyVarsOfTypes (body_ty:pat_tys)) ex_tvs
 
 data PatState = PS {
@@ -894,7 +894,7 @@ existentialExplode pat
 		text "In the binding group for"])
 	4 (ppr pat)
 
-sigPatCtxt bound_ids bound_tvs pat_tys body_ty tidy_env 
+sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env 
   = do	{ pat_tys' <- mapM zonkTcType pat_tys
 	; body_ty' <- zonkTcType body_ty
 	; let (env1,  tidy_tys)    = tidyOpenTypes tidy_env (map idType show_ids)
@@ -904,9 +904,11 @@ sigPatCtxt bound_ids bound_tvs pat_tys body_ty tidy_env
 		 sep [ptext SLIT("When checking an existential match that binds"),
 		      nest 4 (vcat (zipWith ppr_id show_ids tidy_tys)),
 		      ptext SLIT("The pattern(s) have type(s):") <+> vcat (map ppr tidy_pat_tys),
-		      ptext SLIT("The body has type:") <+> ppr tidy_body_ty
+		      ptext SLIT("The body has type:") <+> ppr tidy_body_ty,
+		      ppr pats
 		]) }
   where
+    bound_ids = collectPatsBinders pats
     show_ids = filter is_interesting bound_ids
     is_interesting id = any (`elemVarSet` idFreeTyVars id) bound_tvs
 
