@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (uses Control.Monad.ST)
+-- Portability :  portable
 --
 -- A version of the graph algorithms described in:
 --
@@ -50,9 +50,18 @@ module Data.Graph(
 
     ) where
 
+#if __GLASGOW_HASKELL__
+# define USE_ST_MONAD 1
+#endif
+
 -- Extensions
+#if USE_ST_MONAD
 import Control.Monad.ST
 import Data.Array.ST (STArray, newArray, readArray, writeArray)
+#else
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as Set
+#endif
 import Data.Tree (Tree(Node), Forest)
 
 -- std interfaces
@@ -230,17 +239,6 @@ graphFromEdges edges0
 --									-
 -------------------------------------------------------------------------
 
-type Set s    = STArray s Vertex Bool
-
-mkEmpty      :: Bounds -> ST s (Set s)
-mkEmpty bnds  = newArray bnds False
-
-contains     :: Set s -> Vertex -> ST s Bool
-contains m v  = readArray m v
-
-include      :: Set s -> Vertex -> ST s ()
-include m v   = writeArray m v True
-
 -- | A spanning forest of the graph, obtained from a depth-first search of
 -- the graph starting from each vertex in an unspecified order.
 dff          :: Graph -> Forest Vertex
@@ -256,20 +254,61 @@ generate     :: Graph -> Vertex -> Tree Vertex
 generate g v  = Node v (map (generate g) (g!v))
 
 prune        :: Bounds -> Forest Vertex -> Forest Vertex
-prune bnds ts = runST (mkEmpty bnds  >>= \m ->
-                       chop m ts)
+prune bnds ts = run bnds (chop ts)
 
-chop         :: Set s -> Forest Vertex -> ST s (Forest Vertex)
-chop _ []     = return []
-chop m (Node v ts : us)
-              = contains m v >>= \visited ->
+chop         :: Forest Vertex -> SetM s (Forest Vertex)
+chop []       = return []
+chop (Node v ts : us)
+              = do
+                visited <- contains v
                 if visited then
-                  chop m us
-                else
-                  include m v >>= \_  ->
-                  chop m ts   >>= \as ->
-                  chop m us   >>= \bs ->
+                  chop us
+                 else do
+                  include v
+                  as <- chop ts
+                  bs <- chop us
                   return (Node v as : bs)
+
+-- A monad holding a set of vertices visited so far.
+#if USE_ST_MONAD
+
+-- Use the ST monad if available, for constant-time primitives.
+
+newtype SetM s a = SetM { runSetM :: STArray s Vertex Bool -> ST s a }
+
+instance Monad (SetM s) where
+    return x     = SetM $ const (return x)
+    SetM v >>= f = SetM $ \ s -> do { x <- v s; runSetM (f x) s }
+
+run          :: Bounds -> (forall s. SetM s a) -> a
+run bnds act  = runST (newArray bnds False >>= runSetM act)
+
+contains     :: Vertex -> SetM s Bool
+contains v    = SetM $ \ m -> readArray m v
+
+include      :: Vertex -> SetM s ()
+include v     = SetM $ \ m -> writeArray m v True
+
+#else /* !USE_ST_MONAD */
+
+-- Portable implementation using IntSet.
+
+newtype SetM s a = SetM { runSetM :: IntSet -> (a, IntSet) }
+
+instance Monad (SetM s) where
+    return x     = SetM $ \ s -> (x, s)
+    SetM v >>= f = SetM $ \ s -> case v s of (x, s') -> runSetM (f x) s'
+
+run          :: Bounds -> SetM s a -> a
+run _ act     = fst (runSetM act Set.empty)
+
+contains     :: Vertex -> SetM s Bool
+contains v    = SetM $ \ m -> (Set.member v m, m)
+
+include      :: Vertex -> SetM s ()
+include v     = SetM $ \ m -> ((), Set.insert v m)
+
+#endif /* !USE_ST_MONAD */
 
 -------------------------------------------------------------------------
 --									-
