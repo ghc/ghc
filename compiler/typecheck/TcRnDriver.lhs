@@ -337,15 +337,34 @@ tcRnSrcDecls decls
 	boot_iface <- tcHiBootIface mod ;
 
 	  	-- Do all the declarations
-	tcg_env <- tc_rn_src_decls boot_iface decls ;
+	(tc_envs, lie) <- getLIE $ tc_rn_src_decls boot_iface decls ;
+
+	     -- 	Finish simplifying class constraints
+	     -- 
+	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
+	     -- How could there be ambiguous ones?  They can only arise if a
+	     -- top-level decl falls under the monomorphism restriction
+	     -- and no subsequent decl instantiates its type.
+	     --
+	     -- We do this after checkMain, so that we use the type info 
+	     -- thaat checkMain adds
+	     -- 
+	     -- We do it with both global and local env in scope:
+	     --	 * the global env exposes the instances to tcSimplifyTop
+	     --  * the local env exposes the local Ids to tcSimplifyTop, 
+	     --    so that we get better error messages (monomorphism restriction)
+        traceTc (text "Tc8") ;
+	inst_binds <- setEnvs tc_envs (tcSimplifyTop lie) ;
 
 	    -- Backsubstitution.  This must be done last.
 	    -- Even tcSimplifyTop may do some unification.
         traceTc (text "Tc9") ;
-	let { TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
-		         tcg_rules = rules, tcg_fords = fords } = tcg_env } ;
+	let { (tcg_env, _) = tc_envs
+	    ; TcGblEnv { tcg_type_env = type_env, tcg_binds = binds, 
+		         tcg_rules = rules, tcg_fords = fords } = tcg_env
+	    ; all_binds = binds `unionBags` inst_binds } ;
 
-	(bind_ids, binds', fords', rules') <- zonkTopDecls binds rules fords ;
+	(bind_ids, binds', fords', rules') <- zonkTopDecls all_binds rules fords ;
 
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
 	    ; tcg_env' = tcg_env { tcg_type_env = final_type_env,
@@ -362,7 +381,7 @@ tcRnSrcDecls decls
 	return (tcg_env' { tcg_binds = tcg_binds tcg_env' `unionBags` dfun_binds }) 
    }
 
-tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM TcGblEnv
+tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
 -- Loops around dealing with each top level inter-splice group 
 -- in turn, until it's dealt with the entire module
 tc_rn_src_decls boot_details ds
@@ -370,39 +389,27 @@ tc_rn_src_decls boot_details ds
 		-- If ds is [] we get ([], Nothing)
 
 	-- Deal with decls up to, but not including, the first splice
-	(tcg_env, rn_decls) <- rnTopSrcDecls first_group ;
-	((tcg_env, tcl_env), lie) <- getLIE $ setGblEnv tcg_env $ 
-				     tcTopSrcDecls boot_details rn_decls ;
-
-	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
-	     -- How could there be ambiguous ones?  They can only arise if a
-	     -- top-level decl falls under the monomorphism restriction
-	     -- and no subsequent decl instantiates its type.
-        traceTc (text "Tc8") ;
-	inst_binds <- setEnvs (tcg_env, tcl_env) (tcSimplifyTop lie) ;
-		-- Setting the global env exposes the instances to tcSimplifyTop
-		-- Setting the local env exposes the local Ids to tcSimplifyTop, 
-		-- so that we get better error messages (monomorphism restriction)
-
-	let { tcg_env' = tcg_env { tcg_binds = tcg_binds tcg_env `unionBags` inst_binds } } ;
-
-	setEnvs (tcg_env', tcl_env) $ 
+	(tcg_env, rn_decls) <- checkNoErrs $ rnTopSrcDecls first_group ;
+		-- checkNoErrs: don't typecheck if renaming failed
+	tc_envs <- setGblEnv tcg_env $ 
+		   tcTopSrcDecls boot_details rn_decls ;
 
 	-- If there is no splice, we're nearly done
+	setEnvs tc_envs $ 
 	case group_tail of {
-	   Nothing -> 	-- Last thing: check for `main'
-		        checkMain ;
+	   Nothing -> do { tcg_env <- checkMain ;	-- Check for `main'
+			   return (tcg_env, snd tc_envs) 
+		      } ;
 
 	-- If there's a splice, we must carry on
-	   Just (SpliceDecl splice_expr, rest_ds) -> 
-   do {
+	   Just (SpliceDecl splice_expr, rest_ds) -> do {
 #ifndef GHCI
 	failWithTc (text "Can't do a top-level splice; need a bootstrapped compiler")
 #else
 
 	-- Rename the splice expression, and get its supporting decls
-	(rn_splice_expr, splice_fvs) <- rnLExpr splice_expr ;
-	failIfErrsM ;	-- Don't typecheck if renaming failed
+	(rn_splice_expr, splice_fvs) <- checkNoErrs (rnLExpr splice_expr) ;
+		-- checkNoErrs: don't typecheck if renaming failed
 	rnDump (ppr rn_splice_expr) ;
 
 	-- Execute the splice
@@ -412,7 +419,7 @@ tc_rn_src_decls boot_details ds
 	setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
 	tc_rn_src_decls boot_details (spliced_decls ++ rest_ds)
 #endif /* GHCI */
-    }}}
+    } } }
 \end{code}
 
 %************************************************************************
