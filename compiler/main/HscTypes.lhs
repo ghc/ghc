@@ -295,12 +295,15 @@ hptRules hsc_env deps
     , mod /= moduleName gHC_PRIM
 
 	-- Look it up in the HPT
-    , let mod_info = case lookupUFM hpt mod of
-		  	Nothing -> pprPanic "hptRules" (ppr mod <+> ppr deps)
-		  	Just x  -> x
+    , let rules = case lookupUFM hpt mod of
+		    Just info -> md_rules (hm_details info)
+		    Nothing -> pprTrace "WARNING in hptRules" msg [] 
+	  msg = vcat [ptext SLIT("missing module") <+> ppr mod,
+		      ptext SLIT("Probable cause: out-of-date interface files")]
+			-- This really shouldn't happen, but see Trac #962
 
 	-- And get its dfuns
-    , rule <- md_rules (hm_details mod_info) ]
+    , rule <- rules ]
 \end{code}
 
 %************************************************************************
