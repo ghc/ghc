@@ -598,8 +598,9 @@ data Inst
   | ImplicInst {	-- An implication constraint
 			-- forall tvs. (reft, given) => wanted
 	tci_name   :: Name,
+	tci_tyvars :: [TcTyVar],    -- Includes coercion variables
+				    --   mentioned in tci_reft
 	tci_reft   :: Refinement,
-	tci_tyvars :: [TcTyVar],
 	tci_given  :: [Inst],	    -- Only Dicts
 				    --   (no Methods, LitInsts, ImplicInsts)
 	tci_wanted :: [Inst],	    -- Only Dicts and ImplicInsts

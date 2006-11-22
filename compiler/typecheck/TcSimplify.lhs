@@ -782,7 +782,7 @@ tcSimplifyCheck	:: InstLoc
 tcSimplifyCheck loc qtvs givens wanteds 
   = ASSERT( all isSkolemTyVar qtvs )
     do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
-	; implic_bind <- makeImplicationBind loc [] emptyRefinement 
+	; implic_bind <- bindIrreds loc [] emptyRefinement 
 					     qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
 
@@ -797,51 +797,60 @@ tcSimplifyCheckPat :: InstLoc
 tcSimplifyCheckPat loc co_vars reft qtvs givens wanteds
   = ASSERT( all isSkolemTyVar qtvs )
     do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
-	; implic_bind <- makeImplicationBind loc co_vars reft 
-					     qtvs givens irreds
+	; implic_bind <- bindIrreds loc co_vars reft 
+				    qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
 
 -----------------------------------------------------------
-makeImplicationBind :: InstLoc -> [CoVar] -> Refinement
-		    -> [TcTyVar] -> [Inst] -> [Inst]
-		    -> TcM TcDictBinds	
+bindIrreds :: InstLoc -> [CoVar] -> Refinement
+	   -> [TcTyVar] -> [Inst] -> [Inst]
+	   -> TcM TcDictBinds	
 -- Make a binding that binds 'irreds', by generating an implication
 -- constraint for them, *and* throwing the constraint into the LIE
-makeImplicationBind loc co_vars reft qtvs givens irreds
+bindIrreds loc co_vars reft qtvs givens irreds
   = do	{ let givens' = filter isDict givens
 		-- The givens can include methods
 
 	   -- If there are no 'givens', then it's safe to 
 	   -- partition the 'wanteds' by their qtvs, thereby trimming irreds
 	   -- See Note [Freeness and implications]
-	; irreds <- if null givens'
-	     then do
-		{ let qtv_set = mkVarSet qtvs
-		      (frees, real_irreds) = partition (isFreeWrtTyVars qtv_set) irreds
-		; extendLIEs frees
-		; return real_irreds }
-	     else 
-		return irreds
-
-	-- If there are no irreds, we are done!
-	; if null irreds then 
-		return emptyBag
-	  else do
-
-	-- Otherwise we must generate a binding
-	-- The binding looks like
-	--	(ir1, .., irn) = f qtvs givens
-	-- where f is (evidence for) the new implication constraint
-	--
-	-- This binding must line up the 'rhs' in reduceImplication
-
-	{ uniq <- newUnique 
-	; span <- getSrcSpanM
+	; irreds' <- if null givens'
+	     	     then do
+	     	    	{ let qtv_set = mkVarSet qtvs
+	     	    	      (frees, real_irreds) = partition (isFreeWrtTyVars qtv_set) irreds
+	     	    	; extendLIEs frees
+	     	    	; return real_irreds }
+	     	     else return irreds
+	
 	; let all_tvs = qtvs ++ co_vars	-- Abstract over all these
-	      name = mkInternalName uniq (mkVarOcc "ic") (srcSpanStart span)
+	; (implics, bind) <- makeImplicationBind loc all_tvs reft givens' irreds'
+				-- This call does the real work
+	; extendLIEs implics
+	; return bind } 
+
+
+makeImplicationBind :: InstLoc -> [TcTyVar] -> Refinement
+		    -> [Inst] -> [Inst]
+		    -> TcM ([Inst], TcDictBinds)
+-- Make a binding that binds 'irreds', by generating an implication
+-- constraint for them, *and* throwing the constraint into the LIE
+-- The binding looks like
+--	(ir1, .., irn) = f qtvs givens
+-- where f is (evidence for) the new implication constraint
+--
+-- This binding must line up the 'rhs' in reduceImplication
+makeImplicationBind loc all_tvs reft
+		    givens 	-- Guaranteed all Dicts
+		    irreds
+ | null irreds			-- If there are no irreds, we are done
+ = return ([], emptyBag)
+ | otherwise			-- Otherwise we must generate a binding
+ = do	{ uniq <- newUnique 
+	; span <- getSrcSpanM
+	; let name = mkInternalName uniq (mkVarOcc "ic") (srcSpanStart span)
 	      implic_inst = ImplicInst { tci_name = name, tci_reft = reft,
 					 tci_tyvars = all_tvs, 
-					 tci_given = givens',
+					 tci_given = givens,
 					 tci_wanted = irreds, tci_loc = loc }
 
 	; let n_irreds = length irreds
@@ -849,16 +858,14 @@ makeImplicationBind loc co_vars reft qtvs givens irreds
 	      tup_ty = mkTupleTy Boxed n_irreds (map idType irred_ids)
 	      pat = TuplePat (map nlVarPat irred_ids) Boxed tup_ty
 	      rhs = L span (mkHsWrap co (HsVar (instToId implic_inst)))
-	      co  = mkWpApps (map instToId givens') <.> mkWpTyApps (mkTyVarTys all_tvs)
+	      co  = mkWpApps (map instToId givens) <.> mkWpTyApps (mkTyVarTys all_tvs)
 	      bind | n_irreds==1 = VarBind (head irred_ids) rhs
 		   | otherwise   = PatBind { pat_lhs = L span pat, 
 				      	     pat_rhs = unguardedGRHSs rhs, 
 				      	     pat_rhs_ty = tup_ty,
 				      	     bind_fvs = placeHolderNames }
 	; -- pprTrace "Make implic inst" (ppr implic_inst) $
-	  extendLIE implic_inst
-	; return (unitBag (L span bind)) }}
-
+	  return ([implic_inst], unitBag (L span bind)) }
 
 -----------------------------------------------------------
 topCheckLoop :: SDoc
@@ -973,8 +980,8 @@ tcSimplifyInferCheck loc tau_tvs givens wanteds
 		-- dictionaries, we quantify over
 
 		-- Now we are back to normal (c.f. tcSimplCheck)
-	; implic_bind <- makeImplicationBind loc [] emptyRefinement 
-					     qtvs givens irreds
+	; implic_bind <- bindIrreds loc [] emptyRefinement 
+					   qtvs givens irreds
 	; return (qtvs, binds `unionBags` implic_bind) }
 \end{code}
 
@@ -1159,7 +1166,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- Zonk everything in sight
   = mappM zonkInst wanteds			`thenM` \ wanteds' ->
 
-   	-- 'reduceMe': Reduce as far as we can.  Don't stop at
+   	-- 'ReduceMe': Reduce as far as we can.  Don't stop at
 	-- dicts; the idea is to get rid of as many type
 	-- variables as possible, and we don't want to stop
 	-- at (say) Monad (ST s), because that reduces
@@ -1168,7 +1175,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- BUT do no improvement!  See Plan D above
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
-    let env = mkNoImproveRedEnv doc reduceMe
+    let env = mkNoImproveRedEnv doc (\i -> ReduceMe AddSCs)
     in
     reduceContext env wanteds' 		`thenM` \ (_imp, _frees, _binds, constrained_dicts) ->
 
@@ -1497,9 +1504,6 @@ data WhatToDo
 
  | Free			  -- Return as free
 
-reduceMe :: Inst -> WhatToDo
-reduceMe inst = ReduceMe AddSCs
-
 data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 				-- of a predicate when adding it to the avails
 	-- The reason for this flag is entirely the super-class loop problem
@@ -1812,25 +1816,32 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 			[ ppr (red_givens env), ppr extra_givens, ppr reft, ppr wanteds ])
 	; avails <- reduceList env' wanteds avails
 
-		-- Extract the binding
+		-- Extract the binding (no frees, because try_me never says Free)
 	; (binds, irreds, _frees) <- extractResults avails wanteds
-			-- No frees, because try_me never says Free
  
+		-- We always discard the extra avails we've generated;
+		-- but we remember if we have done any (global) improvement
+	; let ret_avails = updateImprovement orig_avails avails
+
+	; if isEmptyLHsBinds binds then 	-- No progress
+		return (ret_avails, NoInstance)
+	  else do
+	{ (implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens irreds
+			-- This binding is useless if the recursive simplification
+			-- made no progress; but currently we don't try to optimise that
+			-- case.  After all, we only try hard to reduce at top level, or
+			-- when inferring types.
+
 	; let	dict_ids = map instToId extra_givens
-		co  = mkWpTyLams tvs <.> mkWpLams dict_ids <.> WpLet binds
+		co  = mkWpTyLams tvs <.> mkWpLams dict_ids <.> WpLet (binds `unionBags` bind)
 		rhs = mkHsWrap co payload
 	        loc = instLocSpan inst_loc
 		payload | isSingleton wanteds = HsVar (instToId (head wanteds))
 			| otherwise = ExplicitTuple (map (L loc . HsVar . instToId) wanteds) Boxed
 
 		-- If there are any irreds, we back off and return NoInstance
-		-- Either way, we discard the extra avails we've generated;
-		-- but we remember if we have done any (global) improvement
-	; let ret_avails = updateImprovement orig_avails avails
-	; case irreds of
-		[]    -> return (ret_avails, GenInst [] (L loc rhs))
-		other -> return (ret_avails, NoInstance)
-  }
+	; return (ret_avails, GenInst implic_insts (L loc rhs))
+  } }
 \end{code}
 
 Note [Freeness and implications]
