@@ -763,6 +763,7 @@ allocatePinned( nat n )
     if (bd == NULL || (bd->free + n) > (bd->start + BLOCK_SIZE_W)) {
 	pinned_object_block = bd = allocBlock();
 	dbl_link_onto(bd, &g0s0->large_objects);
+	g0s0->n_large_blocks++;
 	bd->gen_no = 0;
 	bd->step   = g0s0;
 	bd->flags  = BF_PINNED | BF_LARGE;
