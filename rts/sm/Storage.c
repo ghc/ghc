@@ -578,7 +578,7 @@ allocate( nat n )
 	nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
 	bd = allocGroup(req_blocks);
 	dbl_link_onto(bd, &g0s0->large_objects);
-	g0s0->n_large_blocks += req_blocks;
+	g0s0->n_large_blocks += bd->blocks; // might be larger than req_blocks
 	bd->gen_no  = 0;
 	bd->step = g0s0;
 	bd->flags = BF_LARGE;
@@ -662,7 +662,7 @@ allocateLocal (Capability *cap, nat n)
 	ACQUIRE_SM_LOCK;
 	bd = allocGroup(req_blocks);
 	dbl_link_onto(bd, &g0s0->large_objects);
-	g0s0->n_large_blocks += req_blocks;
+	g0s0->n_large_blocks += bd->blocks; // might be larger than req_blocks
 	bd->gen_no  = 0;
 	bd->step = g0s0;
 	bd->flags = BF_LARGE;
