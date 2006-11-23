@@ -651,74 +651,50 @@ tcSimplifyInfer
 
 \begin{code}
 tcSimplifyInfer doc tau_tvs wanted_lie
-  = inferLoop doc (varSetElems tau_tvs)
-	      wanted_lie		`thenM` \ (qtvs, frees, binds, irreds) ->
+  = do	{ let try_me inst | isDict inst = Stop			-- Dicts
+			  | otherwise	= ReduceMe NoSCs	-- Lits, Methods, 
+								-- and impliciation constraints
+		-- In an effort to make the inferred types simple, we try 
+		-- to squeeze out implication constraints if we can.
+		-- See Note [Squashing methods]
 
-    extendLIEs frees							`thenM_`
-    returnM (qtvs, binds, map instToId irreds)
+	; (binds1, irreds) <- checkLoop (mkRedEnv doc try_me []) wanted_lie
 
-inferLoop doc tau_tvs wanteds
-  =   	-- Step 1
-    zonkTcTyVarsAndFV tau_tvs		`thenM` \ tau_tvs' ->
-    mappM zonkInst wanteds		`thenM` \ wanteds' ->
-    tcGetGlobalTyVars			`thenM` \ gbl_tvs ->
-    let
- 	preds = fdPredsOfInsts wanteds'
-	qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
+	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
+	; gbl_tvs  <- tcGetGlobalTyVars
+	; let preds = fdPredsOfInsts irreds
+	      qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
+	      (free, bound) = partition (isFreeWhenInferring qtvs) irreds
 
-	try_me inst
-	  | isFreeWhenInferring qtvs inst = Free
-	  | isClassDict inst 		  = Irred		-- Dicts
-	  | otherwise	    		  = ReduceMe NoSCs	-- Lits and Methods
-	env = mkRedEnv doc try_me []
-    in
-    traceTc (text "infloop" <+> vcat [ppr tau_tvs', ppr wanteds', ppr preds, 
-				      ppr (grow preds tau_tvs'), ppr qtvs])	`thenM_`
-		-- Step 2
-    reduceContext env wanteds'    `thenM` \ (improved, frees, binds, irreds) ->
+		-- Remove redundant superclasses from 'bound'
+		-- The 'Stop' try_me result does not do so, 
+		-- see Note [No superclasses for Stop]
+	; let try_me inst = ReduceMe AddSCs
+	; (binds2, irreds) <- checkLoop (mkRedEnv doc try_me []) bound
 
-		-- Step 3
-    if not improved then
-	returnM (varSetElems qtvs, frees, binds, irreds)
-    else
-	-- If improvement did some unification, we go round again.  There
-	-- are two subtleties:
-	--   a) We start again with irreds, not wanteds
-	-- 	Using an instance decl might have introduced a fresh type variable
-	--	which might have been unified, so we'd get an infinite loop
-	--	if we started again with wanteds!  See example [LOOP]
-	--
-	--   b) It's also essential to re-process frees, because unification
-	--      might mean that a type variable that looked free isn't now.
-	--
-	-- Hence the (irreds ++ frees)
-
-	-- However, NOTICE that when we are done, we might have some bindings, but
-	-- the final qtvs might be empty.  See [NO TYVARS] below.
-				
-	inferLoop doc tau_tvs (irreds ++ frees)	`thenM` \ (qtvs1, frees1, binds1, irreds1) ->
-	returnM (qtvs1, frees1, binds `unionBags` binds1, irreds1)
+	; extendLIEs free
+	; return (varSetElems qtvs, binds1 `unionBags` binds2, map instToId irreds) }
+	-- NB: when we are done, we might have some bindings, but
+	-- the final qtvs might be empty.  See Note [NO TYVARS] below.
 \end{code}
 
-Example [LOOP]
+Note [Squashing methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Be careful if you want to float methods more:
+	truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
+From an application (truncate f i) we get
+	t1 = truncate at f
+	t2 = t1 at i
+If we have also have a second occurrence of truncate, we get
+	t3 = truncate at f
+	t4 = t3 at i
+When simplifying with i,f free, we might still notice that
+t1=t3; but alas, the binding for t2 (which mentions t1)
+may continue to float out!
 
-	class If b t e r | b t e -> r
-	instance If T t e t
-	instance If F t e e
-	class Lte a b c | a b -> c where lte :: a -> b -> c
-	instance Lte Z b T
-	instance (Lte a b l,If l b a c) => Max a b c
 
-Wanted:	Max Z (S x) y
-
-Then we'll reduce using the Max instance to:
-	(Lte Z (S x) l, If l (S x) Z y)
-and improve by binding l->T, after which we can do some reduction
-on both the Lte and If constraints.  What we *can't* do is start again
-with (Max Z (S x) y)!
-
-[NO TYVARS]
-
+Note [NO TYVARS]
+~~~~~~~~~~~~~~~~~
 	class Y a b | a -> b where
 	    y :: a -> X b
 	
@@ -781,7 +757,7 @@ tcSimplifyCheck	:: InstLoc
 	 	-> TcM TcDictBinds	-- Bindings
 tcSimplifyCheck loc qtvs givens wanteds 
   = ASSERT( all isSkolemTyVar qtvs )
-    do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
+    do	{ (binds, irreds) <- innerCheckLoop loc givens wanteds
 	; implic_bind <- bindIrreds loc [] emptyRefinement 
 					     qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
@@ -796,7 +772,7 @@ tcSimplifyCheckPat :: InstLoc
 	 	   -> TcM TcDictBinds	-- Bindings
 tcSimplifyCheckPat loc co_vars reft qtvs givens wanteds
   = ASSERT( all isSkolemTyVar qtvs )
-    do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
+    do	{ (binds, irreds) <- innerCheckLoop loc givens wanteds
 	; implic_bind <- bindIrreds loc co_vars reft 
 				    qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
@@ -879,19 +855,19 @@ topCheckLoop doc wanteds
     try_me inst = ReduceMe AddSCs
 
 -----------------------------------------------------------
-innerCheckLoop :: InstLoc -> WantSCs
+innerCheckLoop :: InstLoc
 	       -> [Inst]		-- Given
 	       -> [Inst]		-- Wanted
 	       -> TcM (TcDictBinds,
 		       [Inst])		-- Irreducible
 
-innerCheckLoop inst_loc want_scs givens wanteds
+innerCheckLoop inst_loc givens wanteds
   = checkLoop env wanteds
   where
     env = mkRedEnv (pprInstLoc inst_loc) try_me givens
 
-    try_me inst | isMethodOrLit inst = ReduceMe want_scs
-		| otherwise	     = Irred
+    try_me inst | isMethodOrLit inst = ReduceMe AddSCs
+		| otherwise	     = Stop
 	-- When checking against a given signature 
 	-- we MUST be very gentle: Note [Check gently]
 \end{code}
@@ -933,17 +909,37 @@ checkLoop env wanteds
   = do { -- Givens are skolems, so no need to zonk them
 	 wanteds' <- mappM zonkInst wanteds
 
-	; (improved, _frees, binds, irreds) <- reduceContext env wanteds'
+	; (improved, binds, irreds) <- reduceContext env wanteds'
 
-	; ASSERT( null _frees )
-
-	  if not improved then
+	; if not improved then
  	     return (binds, irreds)
 	  else do
 
+	-- If improvement did some unification, we go round again.
+	-- We start again with irreds, not wanteds
+	-- Using an instance decl might have introduced a fresh type variable
+	-- which might have been unified, so we'd get an infinite loop
+	-- if we started again with wanteds!  See Note [LOOP]
 	{ (binds1, irreds1) <- checkLoop env irreds
 	; return (binds `unionBags` binds1, irreds1) } }
 \end{code}
+
+Note [LOOP]
+~~~~~~~~~~~
+	class If b t e r | b t e -> r
+	instance If T t e t
+	instance If F t e e
+	class Lte a b c | a b -> c where lte :: a -> b -> c
+	instance Lte Z b T
+	instance (Lte a b l,If l b a c) => Max a b c
+
+Wanted:	Max Z (S x) y
+
+Then we'll reduce using the Max instance to:
+	(Lte Z (S x) l, If l (S x) Z y)
+and improve by binding l->T, after which we can do some reduction
+on both the Lte and If constraints.  What we *can't* do is start again
+with (Max Z (S x) y)!
 
 
 \begin{code}
@@ -960,7 +956,7 @@ tcSimplifyInferCheck
 		 TcDictBinds)	-- Bindings
 
 tcSimplifyInferCheck loc tau_tvs givens wanteds
-  = do	{ (binds, irreds) <- innerCheckLoop loc AddSCs givens wanteds
+  = do	{ (binds, irreds) <- innerCheckLoop loc givens wanteds
 
 	-- Figure out which type variables to quantify over
 	-- You might think it should just be the signature tyvars,
@@ -1177,7 +1173,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- 	    a method Inst with an equality constraint
     let env = mkNoImproveRedEnv doc (\i -> ReduceMe AddSCs)
     in
-    reduceContext env wanteds' 		`thenM` \ (_imp, _frees, _binds, constrained_dicts) ->
+    reduceContext env wanteds' 		`thenM` \ (_imp, _binds, constrained_dicts) ->
 
 	-- Next, figure out the tyvars we will quantify over
     zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
@@ -1185,19 +1181,19 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
     mappM zonkInst constrained_dicts		`thenM` \ constrained_dicts' ->
     let
 	constrained_tvs' = tyVarsOfInsts constrained_dicts'
-	qtvs' = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
+	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
 			 `minusVarSet` constrained_tvs'
     in
     traceTc (text "tcSimplifyRestricted" <+> vcat [
-		pprInsts wanteds, pprInsts _frees, pprInsts constrained_dicts',
+		pprInsts wanteds, pprInsts constrained_dicts',
 		ppr _binds,
-		ppr constrained_tvs', ppr tau_tvs', ppr qtvs' ])	`thenM_`
+		ppr constrained_tvs', ppr tau_tvs', ppr qtvs ])	`thenM_`
 
 	-- The first step may have squashed more methods than
 	-- necessary, so try again, this time more gently, knowing the exact
 	-- set of type variables to quantify over.
 	--
-	-- We quantify only over constraints that are captured by qtvs';
+	-- We quantify only over constraints that are captured by qtvs;
 	-- these will just be a subset of non-dicts.  This in contrast
 	-- to normal inference (using isFreeWhenInferring) in which we quantify over
 	-- all *non-inheritable* constraints too.  This implements choice
@@ -1211,25 +1207,25 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- expose implicit parameters to the test that follows
     let
 	is_nested_group = isNotTopLevel top_lvl
-        try_me inst | isFreeWrtTyVars qtvs' inst,
-		      (is_nested_group || isDict inst) = Free
+        try_me inst | isFreeWrtTyVars qtvs inst,
+		      (is_nested_group || isDict inst) = Stop
 	            | otherwise  		       = ReduceMe AddSCs
  	env = mkNoImproveRedEnv doc try_me
    in
-    reduceContext env wanteds'   `thenM` \ (_imp, frees, binds, irreds) ->
-    ASSERT( null irreds )
+    reduceContext env wanteds'   `thenM` \ (_imp, binds, irreds) ->
+    ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
 
 	-- See "Notes on implicit parameters, Question 4: top level"
     if is_nested_group then
-	extendLIEs frees	`thenM_`
-        returnM (varSetElems qtvs', binds)
+	extendLIEs irreds	`thenM_`
+        returnM (varSetElems qtvs, binds)
     else
 	let
-    	    (non_ips, bad_ips) = partition isClassDict frees
+    	    (non_ips, bad_ips) = partition isClassDict irreds
 	in    
 	addTopIPErrs bndrs bad_ips	`thenM_`
 	extendLIEs non_ips		`thenM_`
-        returnM (varSetElems qtvs', binds)
+        returnM (varSetElems qtvs, binds)
 \end{code}
 
 
@@ -1366,7 +1362,7 @@ tcSimplifyIPs given_ips wanteds
 		-- Unusually for checking, we *must* zonk the given_ips
 
 	; let env = mkRedEnv doc try_me given_ips'
-	; (improved, _frees, binds, irreds) <- reduceContext env wanteds'
+	; (improved, binds, irreds) <- reduceContext env wanteds'
 
 	; if not improved then 
 		ASSERT( all is_free irreds )
@@ -1380,7 +1376,7 @@ tcSimplifyIPs given_ips wanteds
     is_free inst = isFreeWrtIPs ip_set inst
 
 	-- Simplify any methods that mention the implicit parameter
-    try_me inst | is_free inst = Irred
+    try_me inst | is_free inst = Stop
 		| otherwise    = ReduceMe NoSCs
 \end{code}
 
@@ -1441,7 +1437,7 @@ bindInstsOfLocalFuns wanteds local_ids
 						-- so it's worth building a set, so that
 						-- lookup (in isMethodFor) is faster
     try_me inst | isMethod inst = ReduceMe NoSCs
-		| otherwise	= Irred
+		| otherwise	= Stop
 \end{code}
 
 
@@ -1499,10 +1495,9 @@ data WhatToDo
 			-- message of any kind.
 			-- It might be quite legitimate such as (Eq a)!
 
- | Irred		-- Return as irreducible unless it can
+ | Stop		-- Return as irreducible unless it can
 			-- be reduced to a constant in one step
-
- | Free			  -- Return as free
+			-- Do not add superclasses; see 
 
 data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 				-- of a predicate when adding it to the avails
@@ -1521,7 +1516,6 @@ data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 reduceContext :: RedEnv
 	      -> [Inst]			-- Wanted
 	      -> TcM (ImprovementDone,
-		      [Inst],		-- Free
 		      TcDictBinds,	-- Dictionary bindings
 		      [Inst])		-- Irreducible
 
@@ -1541,7 +1535,7 @@ reduceContext env wanteds
 	; avails <- reduceList env wanteds init_state
 
 	; let improved = availsImproved avails
-	; (binds, irreds, frees) <- extractResults avails wanteds
+	; (binds, irreds) <- extractResults avails wanteds
 
 	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
@@ -1550,12 +1544,11 @@ reduceContext env wanteds
 	     text "wanted" <+> ppr wanteds,
 	     text "----",
 	     text "avails" <+> pprAvails avails,
-	     text "frees" <+> ppr frees,
 	     text "improved =" <+> ppr improved,
 	     text "----------------------"
 	     ]))
 
-	; return (improved, frees, binds, irreds) }
+	; return (improved, binds, irreds) }
 
 tcImproveOne :: Avails -> Inst -> TcM ImprovementDone
 tcImproveOne avails inst
@@ -1628,8 +1621,7 @@ reduce env wanted avails
 
   | otherwise
   = case red_try_me env wanted of {
-      Free  -> try_simple addFree		-- It's free so just chuck it upstairs
-    ; Irred -> try_simple (addIrred AddSCs)	-- Assume want superclasses
+    ; Stop -> try_simple (addIrred NoSCs)	-- See Note [No superclasses for Stop]
 
     ; ReduceMe want_scs ->	-- It should be reduced
 	reduceInst env avails wanted      `thenM` \ (avails, lookup_result) ->
@@ -1699,7 +1691,7 @@ At first I had a gross hack, whereby I simply did not add superclass constraints
 in addWanted, though I did for addGiven and addIrred.  This was sub-optimal,
 becuase it lost legitimate superclass sharing, and it still didn't do the job:
 I found a very obscure program (now tcrun021) in which improvement meant the
-simplifier got two bites a the cherry... so something seemed to be an Irred
+simplifier got two bites a the cherry... so something seemed to be an Stop
 first time, but reducible next time.
 
 Now we implement the Right Solution, which is to check for loops directly 
@@ -1817,7 +1809,7 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 	; avails <- reduceList env' wanteds avails
 
 		-- Extract the binding (no frees, because try_me never says Free)
-	; (binds, irreds, _frees) <- extractResults avails wanteds
+	; (binds, irreds) <- extractResults avails wanteds
  
 		-- We always discard the extra avails we've generated;
 		-- but we remember if we have done any (global) improvement
@@ -1885,8 +1877,7 @@ type ImprovementDone = Bool	-- True <=> some unification has happened
 
 type AvailEnv = FiniteMap Inst AvailHow
 data AvailHow
-  = IsFree		-- Used for free Insts
-  | IsIrred		-- Used for irreducible dictionaries,
+  = IsIrred		-- Used for irreducible dictionaries,
 			-- which are going to be lambda bound
 
   | Given TcId 		-- Used for dictionaries for which we have a binding
@@ -1909,7 +1900,6 @@ instance Outputable AvailHow where
 
 -------------------------
 pprAvail :: AvailHow -> SDoc
-pprAvail IsFree	       	= text "Free"
 pprAvail IsIrred	= text "Irred"
 pprAvail (Given x)   	= text "Given" <+> ppr x
 pprAvail (Rhs rhs bs)   = text "Rhs" <+> ppr rhs <+> braces (ppr bs)
@@ -1958,77 +1948,60 @@ dependency analyser can sort them out later
 extractResults :: Avails
 	       -> [Inst]		-- Wanted
 	       -> TcM (	TcDictBinds, 	-- Bindings
-			[Inst],		-- Irreducible ones
-			[Inst])		-- Free ones
+			[Inst])		-- Irreducible ones
 
 extractResults (Avails _ avails) wanteds
-  = go avails emptyBag [] [] wanteds
+  = go avails emptyBag [] wanteds
   where
-    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst] -> [Inst]
-	-> TcM (TcDictBinds, [Inst], [Inst])
-    go avails binds irreds frees [] 
-      = returnM (binds, irreds, frees)
+    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst]
+	-> TcM (TcDictBinds, [Inst])
+    go avails binds irreds [] 
+      = returnM (binds, irreds)
 
-    go avails binds irreds frees (w:ws)
+    go avails binds irreds (w:ws)
       = case findAvailEnv avails w of
 	  Nothing    -> pprTrace "Urk: extractResults" (ppr w) $
-			go avails binds irreds frees ws
+			go avails binds irreds ws
 
-	  Just IsFree  -> go (add_free avails w)  binds irreds     (w:frees) ws
-	  Just IsIrred -> go (add_given avails w) binds (w:irreds) frees     ws
+	  Just IsIrred -> go (add_given avails w) binds (w:irreds) ws
 
-	  Just (Given id) -> go avails new_binds irreds frees ws
-			  where
-			       new_binds | id == instToId w = binds
-					 | otherwise        = addBind binds w (L (instSpan w) (HsVar id))
+	  Just (Given id) 
+		| id == instToId w
+		-> go avails binds irreds ws 
 		-- The sought Id can be one of the givens, via a superclass chain
 		-- and then we definitely don't want to generate an x=x binding!
 
-	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds frees (ws' ++ ws)
+--		| getSrcLoc id `precedesSrcLoc` srcSpanStart span
+--		-> go avails (addBind binds w_span id (nlHsVar w_id)) irreds ws
+
+		| otherwise
+		-> go avails (addBind binds w (nlHsVar id)) irreds ws
+
+	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds (ws' ++ ws)
 			     where
 				new_binds = addBind binds w rhs
+	where
+	  w_span = instSpan w
+	  w_id = instToId w
 
     add_given avails w = extendAvailEnv avails w (Given (instToId w))
 
-    add_free avails w | isMethod w = avails
-		      | otherwise  = add_given avails w
-	-- NB: Hack alert!  
-	-- Do *not* replace Free by Given if it's a method.
-	-- The following situation shows why this is bad:
-	--	truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
-	-- From an application (truncate f i) we get
-	--	t1 = truncate at f
-	--	t2 = t1 at i
-	-- If we have also have a second occurrence of truncate, we get
-	--	t3 = truncate at f
-	--	t4 = t3 at i
-	-- When simplifying with i,f free, we might still notice that
-	--   t1=t3; but alas, the binding for t2 (which mentions t1)
-	--   will continue to float out!
-
-addBind binds inst rhs = binds `unionBags` unitBag (L (instSpan inst)
+addBind binds inst rhs = binds `unionBags` unitBag (L (instSpan inst) 
 						      (VarBind (instToId inst) rhs))
-instSpan wanted = instLocSpan (instLoc wanted)
 \end{code}
 
 
-\begin{code}
--------------------------
-addFree :: Avails -> Inst -> TcM Avails
-	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
-	-- to avails, so that any other equal Insts will be commoned up right
-	-- here rather than also being tossed upstairs.  This is really just
-	-- an optimisation, and perhaps it is more trouble that it is worth,
-	-- as the following comments show!
-	--
-	-- NB: do *not* add superclasses.  If we have
-	--	df::Floating a
-	--	dn::Num a
-	-- but a is not bound here, then we *don't* want to derive
-	-- dn from df here lest we lose sharing.
-	--
-addFree avails free = extendAvails avails free IsFree
+Note [No superclasses for Stop]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we decide not to reduce an Inst -- the 'WhatToDo' --- we still
+add it to avails, so that any other equal Insts will be commoned up
+right here.  However, we do *not* add superclasses.  If we have
+	df::Floating a
+	dn::Num a
+but a is not bound here, then we *don't* want to derive dn from df
+here lest we lose sharing.
 
+\begin{code}
 addWanted :: WantSCs -> Avails -> Inst -> LHsExpr TcId -> [Inst] -> TcM Avails
 addWanted want_scs avails wanted rhs_expr wanteds
   = addAvailAndSCs want_scs avails wanted avail

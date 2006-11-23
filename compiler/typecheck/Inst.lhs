@@ -24,7 +24,7 @@ module Inst (
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
-	instLoc, getDictClassTys, dictPred,
+	getDictClassTys, dictPred,
 
 	lookupSimpleInst, LookupInstResult(..), lookupPred, 
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
@@ -117,8 +117,6 @@ mkImplicTy tvs givens wanteds	-- The type of an implication constraint
 	instType (head wanteds) 
     else
 	mkTupleTy Boxed (length wanteds) (map instType wanteds)
-
-instLoc inst = tci_loc inst
 
 dictPred (Dict {tci_pred = pred}) = pred
 dictPred inst		          = pprPanic "dictPred" (ppr inst)
@@ -665,7 +663,7 @@ lookupSimpleInst :: Inst -> TcM LookupInstResult
 -- the LIE.  Instead, any Insts needed by the lookup are returned in
 -- the LookupInstResult, where they can be further processed by tcSimplify
 
---------------------- Impliciations ------------------------
+--------------------- Implications ------------------------
 lookupSimpleInst (ImplicInst {}) = return NoInstance
 
 --------------------- Methods ------------------------
@@ -785,7 +783,7 @@ lookupPred pred@(ClassP clas tys)
 			; return Nothing }
 	}}
 
-lookupPred ip_pred = return Nothing
+lookupPred ip_pred = return Nothing	-- Implicit parameters
 
 record_dfun_usage dfun_id 
   = do	{ hsc_env <- getTopEnv

@@ -30,7 +30,7 @@ module TcRnTypes(
 	-- Insts
 	Inst(..), InstOrigin(..), InstLoc(..), 
 	pprInstLoc, pprInstArising, instLocSpan, instLocOrigin,
-	LIE, emptyLIE, unitLIE, plusLIE, consLIE, 
+	LIE, emptyLIE, unitLIE, plusLIE, consLIE, instLoc, instSpan,
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
 	-- Misc other types
@@ -725,6 +725,12 @@ functions that deal with it.
 \begin{code}
 -------------------------------------------
 data InstLoc = InstLoc InstOrigin SrcSpan ErrCtxt
+
+instLoc :: Inst -> InstLoc
+instLoc inst = tci_loc inst
+
+instSpan :: Inst -> SrcSpan
+instSpan wanted = instLocSpan (instLoc wanted)
 
 instLocSpan :: InstLoc -> SrcSpan
 instLocSpan (InstLoc _ s _) = s
