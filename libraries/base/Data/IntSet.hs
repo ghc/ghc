@@ -93,7 +93,6 @@ module Data.IntSet  (
 
 import Prelude hiding (lookup,filter,foldr,foldl,null,map)
 import Data.Bits 
-import Data.Int
 
 import qualified Data.List as List
 import Data.Monoid (Monoid(..))
@@ -108,12 +107,11 @@ import qualified List
 
 #if __GLASGOW_HASKELL__
 import Text.Read
-import Data.Generics.Basics
-import Data.Generics.Instances
+import Data.Generics.Basics (Data(..), mkNorepType)
+import Data.Generics.Instances ()
 #endif
 
 #if __GLASGOW_HASKELL__ >= 503
-import GHC.Word
 import GHC.Exts ( Word(..), Int(..), shiftRL# )
 #elif __GLASGOW_HASKELL__
 import Word
