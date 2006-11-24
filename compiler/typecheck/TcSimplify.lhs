@@ -398,8 +398,8 @@ When m is later unified with [], we can solve both constraints.
 		Notes on implicit parameters
 	--------------------------------------
 
-Question 1: can we "inherit" implicit parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Inheriting implicit parameters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
 
 	f x = (x::Int) + ?y
@@ -422,6 +422,21 @@ dynamic binding means) so we'd better infer the second.
 
 BOTTOM LINE: when *inferring types* you *must* quantify 
 over implicit parameters. See the predicate isFreeWhenInferring.
+
+
+Note [Implicit parameters and ambiguity] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What type should we infer for this?
+	f x = (show ?y, x::Int)
+Since we must quantify over the ?y, the most plausible type is
+	f :: (Show a, ?y::a) => Int -> (String, Int)
+But notice that the type of the RHS is (String,Int), with no type 
+varibables mentioned at all!  The type of f looks ambiguous.  But
+it isn't, because at a call site we might have
+	let ?y = 5::Int in f 7
+and all is well.  In effect, implicit parameters are, well, parameters,
+so we can take their type variables into account as part of the
+"tau-tvs" stuff.  This is done in the function 'FunDeps.grow'.
 
 
 Question 2: type signatures
@@ -719,9 +734,9 @@ The net effect of [NO TYVARS]
 \begin{code}
 isFreeWhenInferring :: TyVarSet -> Inst	-> Bool
 isFreeWhenInferring qtvs inst
-  =  isFreeWrtTyVars qtvs inst		-- Constrains no quantified vars
-  && isInheritableInst inst		-- And no implicit parameter involved
-					-- (see "Notes on implicit parameters")
+  =  isFreeWrtTyVars qtvs inst	-- Constrains no quantified vars
+  && isInheritableInst inst	-- and no implicit parameter involved
+				--   see Note [Inheriting implicit parameters]
 
 {-	No longer used (with implication constraints)
 isFreeWhenChecking :: TyVarSet	-- Quantified tyvars
@@ -2431,7 +2446,8 @@ addTopIPErrs bndrs ips
   where
     (tidy_env, tidy_ips) = tidyInsts ips
     mk_msg ips = vcat [sep [ptext SLIT("Implicit parameters escape from"),
-			    nest 2 (ptext SLIT("the monomorphic top-level binding(s) of")
+			    nest 2 (ptext SLIT("the monomorphic top-level binding") 
+					    <> plural bndrs <+> ptext SLIT("of")
 					    <+> pprBinders bndrs <> colon)],
 		       nest 2 (vcat (map ppr_ip ips)),
 		       monomorphism_fix]
