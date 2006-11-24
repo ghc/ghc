@@ -18,6 +18,12 @@
 module GHC.Ptr where
 
 import GHC.Base
+import GHC.Show
+import GHC.Num
+import GHC.List ( length, replicate )
+import Numeric		( showHex )
+
+#include "MachDeps.h"
 
 ------------------------------------------------------------------------
 -- Data pointers.
@@ -134,5 +140,25 @@ castFunPtrToPtr (FunPtr addr) = Ptr addr
 -- this assumption.
 castPtrToFunPtr :: Ptr a -> FunPtr b
 castPtrToFunPtr (Ptr addr) = FunPtr addr
+
+
+------------------------------------------------------------------------
+-- Show instances for Ptr and FunPtr
+-- I have absolutely no idea why the WORD_SIZE_IN_BITS stuff is here
+
+#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
+instance Show (Ptr a) where
+   showsPrec p (Ptr a) rs = pad_out (showHex (word2Integer(int2Word#(addr2Int# a))) "") rs
+     where
+        -- want 0s prefixed to pad it out to a fixed length.
+       pad_out ls rs = 
+	  '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
+       -- word2Integer :: Word# -> Integer (stolen from Word.lhs)
+       word2Integer w = case word2Integer# w of
+			(# s, d #) -> J# s d
+
+instance Show (FunPtr a) where
+   showsPrec p = showsPrec p . castFunPtrToPtr
+#endif
 \end{code}
 
