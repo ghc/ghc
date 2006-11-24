@@ -593,9 +593,15 @@ instance Outputable ArgOcc where
   ppr BothOcc 	    = ptext SLIT("both-occ")
   ppr NoOcc    	    = ptext SLIT("no-occ")
 
+-- Experimentally, this vresion of combineOcc makes ScrutOcc "win", so
+-- that if the thing is scrutinised anywhere then we get to see that
+-- in the overall result, even if it's also used in a boxed way
+-- This might be too agressive; see Note [Reboxing]
 combineOcc NoOcc	 occ 	       = occ
 combineOcc occ 		 NoOcc	       = occ
 combineOcc (ScrutOcc xs) (ScrutOcc ys) = ScrutOcc (plusUFM_C combineOccs xs ys)
+combineOcc occ           (ScrutOcc ys) = ScrutOcc ys
+combineOcc (ScrutOcc xs) occ	       = ScrutOcc xs
 combineOcc UnkOcc        UnkOcc        = UnkOcc
 combineOcc _	    _	     	       = BothOcc
 
@@ -753,22 +759,25 @@ specialise :: ScEnv
 
 specialise env fn bndrs body body_usg
   = do	{ let (_, bndr_occs) = lookupOccs body_usg bndrs
+	      all_calls = lookupVarEnv (calls body_usg) fn `orElse` []
 
-	; mb_calls <- -- pprTrace "specialise" (ppr fn <+> ppr bndrs <+> ppr bndr_occs) $
-		      mapM (callToPats (scope env) bndr_occs)
-		   	   (lookupVarEnv (calls body_usg) fn `orElse` [])
+	; mb_pats <- mapM (callToPats (scope env) bndr_occs) all_calls
 
-	; let good_calls :: [([Var], [CoreArg])]
-	      good_calls = catMaybes mb_calls
+	; let good_pats :: [([Var], [CoreArg])]
+	      good_pats = catMaybes mb_pats
 	      in_scope = mkInScopeSet $ unionVarSets $
 			 [ exprsFreeVars pats `delVarSetList` vs 
-			 | (vs,pats) <- good_calls ]
-	      uniq_calls = nubBy (same_call in_scope) good_calls
-	; mapAndUnzipUs (spec_one env fn (mkLams bndrs body)) 
-			(uniq_calls `zip` [1..]) }
+			 | (vs,pats) <- good_pats ]
+	      uniq_pats = nubBy (same_pat in_scope) good_pats
+	; -- pprTrace "specialise" (vcat [ppr fn <+> ppr bndrs <+> ppr bndr_occs,
+	  --				text "calls" <+> ppr all_calls,
+	  --				text "good pats" <+> ppr good_pats,
+	  --				text "uniq pats" <+> ppr uniq_pats])  $
+ 	  mapAndUnzipUs (spec_one env fn (mkLams bndrs body)) 
+			(uniq_pats `zip` [1..]) }
   where
-	-- Two calls are the same if they match both ways
-    same_call in_scope (vs1,as1)(vs2,as2)
+	-- Two pats are the same if they match both ways
+    same_pat in_scope (vs1,as1)(vs2,as2)
 	 =  isJust (matchN in_scope vs1 as1 as2)
  	 && isJust (matchN in_scope vs2 as2 as1)
 
@@ -932,8 +941,8 @@ argToPat in_scope con_env arg arg_occ
   | Just (CV dc args) <- is_con_app_maybe con_env arg
   , case arg_occ of
 	ScrutOcc _ -> True		-- Used only by case scrutinee
-	BothOcc    -> case arg of	-- Used by case scrut
-			App {} -> True	-- ...and elsewhere...
+	BothOcc    -> case arg of	-- Used elsewhere
+			App {} -> True	--     see Note [Reboxing]
 			other  -> False
 	other	   -> False	-- No point; the arg is not decomposed
   = do	{ args' <- argsToPats in_scope con_env (args `zip` conArgOccs arg_occ dc)
