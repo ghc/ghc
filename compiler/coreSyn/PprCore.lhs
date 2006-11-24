@@ -133,7 +133,7 @@ ppr_expr add_par expr@(App fun arg)
     let
 	pp_args     = sep (map pprArg args)
 	val_args    = dropWhile isTypeArg args	 -- Drop the type arguments for tuples
-	pp_tup_args = sep (punctuate comma (map pprArg val_args))
+	pp_tup_args = sep (punctuate comma (map pprCoreExpr val_args))
     in
     case fun of
 	Var f -> case isDataConWorkId_maybe f of
