@@ -649,7 +649,7 @@ GarbageCollect ( rtsBool force_major_gc )
 	if (g <= N) {
 	  copied -= stp->hp_bd->start + BLOCK_SIZE_W -
 	    stp->hp_bd->free;
-	  scavd_copied -= (P_)(BLOCK_ROUND_UP(stp->scavd_hp)) - stp->scavd_hp;
+	  scavd_copied -= stp->scavd_hpLim - stp->scavd_hp;
 	}
       }
 
