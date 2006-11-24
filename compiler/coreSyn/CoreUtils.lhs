@@ -69,6 +69,7 @@ import Outputable
 import DynFlags
 import TysPrim
 import FastString
+import Maybes
 import Util
 
 import GHC.Exts		-- For `xori` 
@@ -1351,32 +1352,48 @@ hashExpr :: CoreExpr -> Int
 -- expressions may hash to the different Ints
 --
 -- The emphasis is on a crude, fast hash, rather than on high precision
+--
+-- We must be careful that \x.x and \y.y map to the same hash code,
+-- (at least if we want the above invariant to be true)
 
 hashExpr e | hash < 0  = 77	-- Just in case we hit -maxInt
 	   | otherwise = hash
 	   where
-	     hash = abs (hash_expr e)	-- Negative numbers kill UniqFM
+	     hash = abs (hash_expr (1,emptyVarEnv) e)	-- Negative numbers kill UniqFM
 
-hash_expr (Note _ e)   		  = hash_expr e
-hash_expr (Cast e co)             = hash_expr e
-hash_expr (Let (NonRec b r) e)    = hashId b
-hash_expr (Let (Rec ((b,r):_)) e) = hashId b
-hash_expr (Case _ b _ _)	  = hashId b
-hash_expr (App f e)   		  = hash_expr f * fast_hash_expr e
-hash_expr (Var v)     		  = hashId v
-hash_expr (Lit lit)	   	  = hashLiteral lit
-hash_expr (Lam b _)	          = hashId b
-hash_expr (Type t)	          = trace "hash_expr: type" 1		-- Shouldn't happen
+type HashEnv = (Int, VarEnv Int)	-- Hash code for bound variables
 
-fast_hash_expr (Var v)     	= hashId v
-fast_hash_expr (Lit lit)	= hashLiteral lit
-fast_hash_expr (App f (Type _)) = fast_hash_expr f
-fast_hash_expr (App f a)        = fast_hash_expr a
-fast_hash_expr (Lam b _)        = hashId b
-fast_hash_expr other	        = 1
+hash_expr :: HashEnv -> CoreExpr -> Int
+hash_expr env (Note _ e)   	      = hash_expr env e
+hash_expr env (Cast e co)             = hash_expr env e
+hash_expr env (Var v)     	      = hashVar env v
+hash_expr env (Lit lit)		      = hashLiteral lit
+hash_expr env (App f e)   	      = hash_expr env f * fast_hash_expr env e
+hash_expr env (Let (NonRec b r) e)    = hash_expr (extend_env env b) e * fast_hash_expr env r
+hash_expr env (Let (Rec ((b,r):_)) e) = hash_expr (extend_env env b) e
+hash_expr env (Case e _ _ _)	      = hash_expr env e
+hash_expr env (Lam b e)	              = hash_expr (extend_env env b) e
+hash_expr env (Type t)	              = fast_hash_type env t
 
-hashId :: Id -> Int
-hashId id = hashName (idName id)
+fast_hash_expr env (Var v)     	= hashVar env v
+fast_hash_expr env (Type t)	= fast_hash_type env t
+fast_hash_expr env (Lit lit)	= hashLiteral lit
+fast_hash_expr env (Cast e co)  = fast_hash_expr env e
+fast_hash_expr env (Note n e)   = fast_hash_expr env e
+fast_hash_expr env (App f a)    = fast_hash_expr env a	-- A bit idiosyncratic ('a' not 'f')!
+fast_hash_expr env other        = 1
+
+fast_hash_type :: HashEnv -> Type -> Int
+fast_hash_type env ty 
+  | Just tv <- getTyVar_maybe ty          = hashVar env tv
+  | Just (tc,_) <- splitTyConApp_maybe ty = hashName (tyConName tc)
+  | otherwise				  = 1
+
+extend_env :: HashEnv -> Var -> (Int, VarEnv Int)
+extend_env (n,env) b = (n+1, extendVarEnv env b n)
+
+hashVar :: HashEnv -> Var -> Int
+hashVar (_,env) v = lookupVarEnv env v `orElse` hashName (idName v)
 \end{code}
 
 %************************************************************************
