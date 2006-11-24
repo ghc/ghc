@@ -230,6 +230,8 @@ test('tc214', normal, compile, [''])
 test('tc215', normal, compile, [''])
 test('tc216', normal, compile, [''])
 test('tc217', normal, compile, [''])
+test('tc218', normal, compile, [''])
+test('tc219', normal, compile, [''])
 
 test('faxen', normal, compile, [''])
 
