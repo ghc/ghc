@@ -222,41 +222,28 @@ allocateReg r f = f .&. complement (1 `shiftL` fromIntegral r)
 #endif
 
 -- -----------------------------------------------------------------------------
--- The free list of stack slots
+-- The assignment of virtual registers to stack slots
 
--- This doesn't need to be so efficient.  It also doesn't really need to be
--- maintained as a set, so we just use an ordinary list (lazy, because it
--- contains all the possible stack slots and there are lots :-).
--- We do one more thing here: We make sure that we always use the same stack
--- slot to spill the same temporary. That way, the stack slot assignments
--- will always match up and we never need to worry about memory-to-memory
--- moves when generating fixup code.
+-- We have lots of stack slots. Memory-to-memory moves are a pain on most
+-- architectures. Therefore, we avoid having to generate memory-to-memory moves
+-- by simply giving every virtual register its own stack slot.
+
+-- The StackMap stack map keeps track of virtual register - stack slot
+-- associations and of which stack slots are still free. Once it has been
+-- associated, a stack slot is never "freed" or removed from the StackMap again,
+-- it remains associated until we are done with the current CmmProc.
 
 type StackSlot = Int
-data FreeStack = FreeStack [StackSlot] (UniqFM StackSlot)
+data StackMap = StackMap [StackSlot] (UniqFM StackSlot)
 
-completelyFreeStack :: FreeStack
-completelyFreeStack = FreeStack [0..maxSpillSlots] emptyUFM
+emptyStackMap :: StackMap
+emptyStackMap = StackMap [0..maxSpillSlots] emptyUFM
 
-getFreeStackSlot :: FreeStack -> (FreeStack,Int)
-getFreeStackSlot (FreeStack (slot:stack) reserved)
-    = (FreeStack stack reserved,slot)
-
-freeStackSlot :: FreeStack -> Int -> FreeStack
-freeStackSlot (FreeStack stack reserved) slot
-    -- NOTE: This is probably terribly, unthinkably slow.
-    --       But on the other hand, it never gets called, because the allocator
-    --       currently does not free stack slots. So who cares if it's slow?
-    | slot `elem` eltsUFM reserved = FreeStack stack reserved
-    | otherwise = FreeStack (slot:stack) reserved
-
-
-getFreeStackSlotFor :: FreeStack -> Unique -> (FreeStack,Int)
-getFreeStackSlotFor fs@(FreeStack _ reserved) reg =
+getStackSlotFor :: StackMap -> Unique -> (StackMap,Int)
+getStackSlotFor fs@(StackMap (freeSlot:stack') reserved) reg =
     case lookupUFM reserved reg of
     	Just slot -> (fs,slot)
-    	Nothing -> let (FreeStack stack' _, slot) = getFreeStackSlot fs
-    	           in  (FreeStack stack' (addToUFM reserved reg slot), slot)
+    	Nothing -> (StackMap stack' (addToUFM reserved reg freeSlot), freeSlot)
 
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
@@ -424,56 +411,57 @@ linearRegAlloc
    :: BlockMap RegSet		-- live regs on entry to each basic block
    -> [SCC AnnBasicBlock]	-- instructions annotated with "deaths"
    -> UniqSM [NatBasicBlock]
-linearRegAlloc block_live sccs = linearRA_SCCs emptyBlockMap sccs
+linearRegAlloc block_live sccs = linearRA_SCCs emptyBlockMap emptyStackMap sccs
   where
   linearRA_SCCs
 	:: BlockAssignment
+	-> StackMap
 	-> [SCC AnnBasicBlock]
 	-> UniqSM [NatBasicBlock]
-  linearRA_SCCs block_assig [] = returnUs []
-  linearRA_SCCs block_assig 
+  linearRA_SCCs block_assig stack [] = returnUs []
+  linearRA_SCCs block_assig stack
 	(AcyclicSCC (BasicBlock id instrs) : sccs) 
 	= getUs `thenUs` \us ->
 	  let
-            (block_assig',(instrs',fixups)) =
+            (block_assig',stack',(instrs',fixups)) =
                case lookupUFM block_assig id of
                     -- no prior info about this block: assume everything is
                     -- free and the assignment is empty.
                     Nothing ->
                         runR block_assig initFreeRegs
-                                    emptyRegMap completelyFreeStack us $
+                                    emptyRegMap stack us $
                             linearRA [] [] instrs
-                    Just (freeregs,stack,assig) ->
+                    Just (freeregs,assig) ->
                        runR block_assig freeregs assig stack us $
                             linearRA [] [] instrs
 	  in
-	  linearRA_SCCs block_assig' sccs `thenUs` \moreBlocks ->
+	  linearRA_SCCs block_assig' stack' sccs `thenUs` \moreBlocks ->
 	  returnUs $ BasicBlock id instrs' : fixups ++ moreBlocks
 
-  linearRA_SCCs block_assig 
+  linearRA_SCCs block_assig stack
 	(CyclicSCC blocks : sccs) 
 	= getUs `thenUs` \us ->
 	  let
-            ((block_assig', us'), blocks') = mapAccumL processBlock
-                                                       (block_assig, us)
+            ((block_assig', stack', us'), blocks') = mapAccumL processBlock
+                                                       (block_assig, stack, us)
                                                        ({-reverse-} blocks)
           in
-	  linearRA_SCCs block_assig' sccs `thenUs` \moreBlocks ->
+	  linearRA_SCCs block_assig' stack' sccs `thenUs` \moreBlocks ->
 	  returnUs $ concat blocks' ++ moreBlocks
     where
-        processBlock (block_assig, us0) (BasicBlock id instrs)
-          = ((block_assig', us'), BasicBlock id instrs' : fixups)
+        processBlock (block_assig, stack, us0) (BasicBlock id instrs)
+          = ((block_assig', stack', us'), BasicBlock id instrs' : fixups)
           where
                 (us, us') = splitUniqSupply us0
-                (block_assig',(instrs',fixups)) = 
+                (block_assig',stack',(instrs',fixups)) = 
                    case lookupUFM block_assig id of
                         -- no prior info about this block: assume everything is
                         -- free and the assignment is empty.
                         Nothing -> 
                            runR block_assig initFreeRegs 
-                                        emptyRegMap completelyFreeStack us $
+                                        emptyRegMap stack us $
                                 linearRA [] [] instrs 
-                        Just (freeregs,stack,assig) -> 
+                        Just (freeregs,assig) -> 
                            runR block_assig freeregs assig stack us $
                                 linearRA [] [] instrs 
 
@@ -488,7 +476,7 @@ linearRegAlloc block_live sccs = linearRA_SCCs emptyBlockMap sccs
 -- -----------------------------------------------------------------------------
 -- Register allocation for a single instruction
 
-type BlockAssignment = BlockMap (FreeRegs, FreeStack, RegMap Loc)
+type BlockAssignment = BlockMap (FreeRegs, RegMap Loc)
 
 raInsn  :: BlockMap RegSet		-- Live temporaries at each basic block
 	-> [Instr]			-- new instructions (accum.)
@@ -507,12 +495,16 @@ raInsn block_live new_instrs (instr, r_dying, w_dying) = do
 
     -- If we have a reg->reg move between virtual registers, where the
     -- src register is not live after this instruction, and the dst
-    -- register does not already have an assignment, then we can
-    -- eliminate the instruction.
+    -- register does not already have an assignment,
+    -- and the source register is assigned to a register, not to a spill slot,
+    -- then we can eliminate the instruction.
+    -- (we can't eliminitate it if the source register is on the stack, because
+    --  we do not want to use one spill slot for different virtual registers)
     case isRegRegMove instr of
 	Just (src,dst)	| src `elem` r_dying, 
 		  	  isVirtualReg dst,
-		 	  not (dst `elemUFM` assig) -> do
+		 	  not (dst `elemUFM` assig),
+		 	  Just (InReg _) <- (lookupUFM assig src) -> do
 	   case src of
 	      RealReg i -> setAssigR (addToUFM assig dst (InReg i))
 		-- if src is a fixed reg, then we just map dest to this
@@ -836,12 +828,11 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	Nothing -> do
 	  freeregs <- getFreeRegsR
 	  let freeregs' = foldr releaseReg freeregs to_free 
- 	  stack <- getStackR
 	  setBlockAssigR (addToUFM block_assig dest 
-				(freeregs',stack,adjusted_assig))
+				(freeregs',adjusted_assig))
 	  joinToTargets block_live new_blocks instr dests
 
-	Just (freeregs,stack,dest_assig)
+	Just (freeregs,dest_assig)
 	   | ufmToList dest_assig == ufmToList adjusted_assig
 	   -> -- ok, the assignments match
 	     joinToTargets block_live new_blocks instr dests
@@ -867,7 +858,7 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	           sccs = stronglyConnCompR graph
 	           
 		   mkNodes src vreg = 
-			expandNode src (lookupWithDefaultUFM_Directly
+			expandNode vreg src (lookupWithDefaultUFM_Directly
                                     	  dest_assig
                                     	  (panic "RegisterAlloc.joinToTargets")
                                     	  vreg)
@@ -881,38 +872,38 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 		-- we only care about the register that the source value
 		-- is in, so that we can move it to the destinations.
 
-		   expandNode loc@(InReg src) (InBoth dst mem)
-			| src == dst = [(loc, loc, [InMem dst])]
-			| otherwise  = [(loc, loc, [InReg dst, InMem mem])]
-		   expandNode loc@(InMem src) (InBoth dst mem)
-			| src == mem = [(loc, loc, [InReg dst])]
-			| otherwise  = [(loc, loc, [InReg dst, InMem mem])]
-		   expandNode loc@(InBoth _ src) (InMem dst)
+		   expandNode vreg loc@(InReg src) (InBoth dst mem)
+			| src == dst = [(vreg, loc, [InMem mem])]
+			| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
+		   expandNode vreg loc@(InMem src) (InBoth dst mem)
+			| src == mem = [(vreg, loc, [InReg dst])]
+			| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
+		   expandNode vreg loc@(InBoth _ src) (InMem dst)
 			| src == dst = [] -- guaranteed to be true
-		   expandNode loc@(InBoth src _) (InReg dst)
+		   expandNode vreg loc@(InBoth src _) (InReg dst)
 			| src == dst = []
-		   expandNode loc@(InBoth src _) dst
-			= expandNode (InReg src) dst
-		   expandNode src dst
+		   expandNode vreg loc@(InBoth src _) dst
+			= expandNode vreg (InReg src) dst
+		   expandNode vreg src dst
 			| src == dst = []
-			| otherwise  = [(src, src, [dst])]
+			| otherwise  = [(vreg, src, [dst])]
 
 		-- we have eliminated any possibility of single-node cylces
 		-- in expandNode above.
-	           handleComponent (AcyclicSCC (src,_,dsts))
-	               = map (makeMove src) dsts
+	           handleComponent (AcyclicSCC (vreg,src,dsts))
+	               = map (makeMove vreg src) dsts
 	           handleComponent (CyclicSCC things)
 	               = panic $ "Register Allocator: handleComponent: cyclic"
 	                         ++ " (workaround: use -fviaC)"
 	           
-	           makeMove (InReg src) (InReg dst)
+	           makeMove vreg (InReg src) (InReg dst)
 	               = mkRegRegMoveInstr (RealReg src) (RealReg dst)
-	     	   makeMove (InMem src) (InReg dst)
+	     	   makeMove vreg (InMem src) (InReg dst)
 	     	       = mkLoadInstr (RealReg dst) delta src
-	     	   makeMove (InReg src) (InMem dst)
+	     	   makeMove vreg (InReg src) (InMem dst)
 	     	       = mkSpillInstr (RealReg src) delta dst
-	     	   makeMove src dst
-	     	       = panic $ "makeMove (" ++ show src ++ ") ("
+	     	   makeMove vreg src dst
+	     	       = panic $ "makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
 	     	                 ++ show dst ++ ")"
 	                         ++ " (workaround: use -fviaC)"
 	     
@@ -938,7 +929,7 @@ data RA_State
 	ra_freeregs   :: {-#UNPACK#-}!FreeRegs,	-- free machine registers
 	ra_assig      :: RegMap Loc,	-- assignment of temps to locations
 	ra_delta      :: Int,		-- current stack delta
-	ra_stack      :: FreeStack,	-- free stack slots for spilling
+	ra_stack      :: StackMap,	-- free stack slots for spilling
 	ra_us         :: UniqSupply     -- unique supply for generating names
 	                                -- for fixup blocks.
   }
@@ -949,18 +940,18 @@ instance Monad RegM where
   m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
   return a  =  RegM $ \s -> (# s, a #)
 
-runR :: BlockAssignment -> FreeRegs -> RegMap Loc -> FreeStack -> UniqSupply
-  -> RegM a -> (BlockAssignment, a)
+runR :: BlockAssignment -> FreeRegs -> RegMap Loc -> StackMap -> UniqSupply
+  -> RegM a -> (BlockAssignment, StackMap, a)
 runR block_assig freeregs assig stack us thing =
   case unReg thing (RA_State{ ra_blockassig=block_assig, ra_freeregs=freeregs,
 			ra_assig=assig, ra_delta=0{-???-}, ra_stack=stack,
 			ra_us = us }) of
-	(# RA_State{ ra_blockassig=block_assig }, returned_thing #)
-		-> (block_assig, returned_thing)
+	(# RA_State{ ra_blockassig=block_assig, ra_stack=stack' }, returned_thing #)
+		-> (block_assig, stack', returned_thing)
 
 spillR :: Reg -> Unique -> RegM (Instr, Int)
 spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
-  let (stack',slot) = getFreeStackSlotFor stack temp
+  let (stack',slot) = getStackSlotFor stack temp
       instr  = mkSpillInstr reg delta slot
   in
   (# s{ra_stack=stack'}, (instr,slot) #)
@@ -968,10 +959,6 @@ spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
 loadR :: Reg -> Int -> RegM Instr
 loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
   (# s, mkLoadInstr reg delta slot #)
-
-freeSlotR :: Int -> RegM ()
-freeSlotR slot = RegM $ \ s@RA_State{ra_stack=stack} ->
-  (# s{ra_stack=freeStackSlot stack slot}, () #)
 
 getFreeRegsR :: RegM FreeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->
@@ -989,11 +976,11 @@ setAssigR :: RegMap Loc -> RegM ()
 setAssigR assig = RegM $ \ s ->
   (# s{ra_assig=assig}, () #)
 
-getStackR :: RegM FreeStack
+getStackR :: RegM StackMap
 getStackR = RegM $ \ s@RA_State{ra_stack = stack} ->
   (# s, stack #)
 
-setStackR :: FreeStack -> RegM ()
+setStackR :: StackMap -> RegM ()
 setStackR stack = RegM $ \ s ->
   (# s{ra_stack=stack}, () #)
 
