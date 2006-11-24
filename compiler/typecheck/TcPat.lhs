@@ -332,11 +332,26 @@ tc_pat pstate (BangPat pat) pat_ty thing_inside
 --
 -- Nor should a lazy pattern bind any existential type variables
 -- because they won't be in scope when we do the desugaring
+--
+-- Note [Hopping the LIE in lazy patterns]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In a lazy pattern, we must *not* discharge constraints from the RHS
+-- from dictionaries bound in the pattern.  E.g.
+--	f ~(C x) = 3
+-- We can't discharge the Num constraint from dictionaries bound by
+-- the pattern C!  
+--
+-- So we have to make the constraints from thing_inside "hop around" 
+-- the pattern.  Hence the getLLE and extendLIEs later.
+
 tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
-  = do	{ (pat', pat_tvs, res) <- tc_lpat pat pat_ty pstate $ \ _ ->
-				  thing_inside pstate
-					-- Ignore refined pstate',
-					-- revert to pstate
+  = do	{ (pat', pat_tvs, (res,lie)) 
+		<- tc_lpat pat pat_ty pstate $ \ _ ->
+		   getLIE (thing_inside pstate)
+		-- Ignore refined pstate', revert to pstate
+	; extendLIEs lie
+	-- getLIE/extendLIEs: see Note [Hopping the LIE in lazy patterns]
+
 	-- Check no existentials
 	; if (null pat_tvs) then return ()
 	  else lazyPatErr lpat pat_tvs

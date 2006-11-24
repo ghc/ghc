@@ -380,15 +380,12 @@ collectl (L l pat) bndrs
     go (TuplePat pats _ _)  	  = foldr collectl bndrs pats
 				  
     go (ConPatIn c ps)   	  = foldr collectl bndrs (hsConArgs ps)
-    go (ConPatOut { pat_dicts = ds, 
-		    pat_binds = bs, pat_args = ps })
-				  = map noLoc ds
-				    ++ collectHsBindLocatedBinders bs
-				    ++ foldr collectl bndrs (hsConArgs ps)
+    go (ConPatOut {pat_args=ps})  = foldr collectl bndrs (hsConArgs ps)
+	-- See Note [Dictionary binders in ConPatOut]
     go (LitPat _)	      	  = bndrs
     go (NPat _ _ _ _)		  = bndrs
     go (NPlusKPat n _ _ _)        = n : bndrs
-
+ 				  
     go (SigPatIn pat _)	 	  = collectl pat bndrs
     go (SigPatOut pat _)	  = collectl pat bndrs
     go (TypePat ty)               = bndrs
@@ -396,6 +393,16 @@ collectl (L l pat) bndrs
 				    ++ bndrs
     go (CoPat _ pat ty)           = collectl (noLoc pat) bndrs
 \end{code}
+
+Note [Dictionary binders in ConPatOut]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do *not* gather (a) dictionary and (b) dictionary bindings as binders
+of a ConPatOut pattern.  For most calls it doesn't matter, because
+it's pre-typechecker and there are no ConPatOuts.  But it does matter
+more in the desugarer; for example, DsUtils.mkSelectorBinds uses
+collectPatBinders.  In a lazy pattern, for example f ~(C x y) = ...,
+we want to generate bindings for x,y but not for dictionaries bound by
+C.  (The type checker ensures they would not be used.)
 
 \begin{code}
 collectSigTysFromPats :: [InPat name] -> [LHsType name]
