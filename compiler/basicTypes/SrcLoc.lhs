@@ -133,11 +133,7 @@ cmpSrcLoc (ImportedLoc m1) (ImportedLoc m2)  = m1 `compare` m2
 cmpSrcLoc (ImportedLoc _)  other	     = LT
 
 cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)      
-  = (s1 `compare` s2) `thenCmp` (l1 `cmpline` l2) `thenCmp` (c1 `cmpline` c2)
-  where
-	l1 `cmpline` l2 | l1 <  l2 = LT
-			| l1 == l2 = EQ
-			| otherwise = GT 
+  = (s1 `compare` s2) `thenCmp` (l1 `compare` l2) `thenCmp` (c1 `compare` c2)
 cmpSrcLoc (SrcLoc _ _ _) other = GT
 
 instance Outputable SrcLoc where
