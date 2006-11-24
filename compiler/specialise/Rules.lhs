@@ -33,7 +33,7 @@ import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName,
 import IdInfo		( SpecInfo( SpecInfo ) )
 import Var		( Var )
 import VarEnv		( IdEnv, InScopeSet, emptyTidyEnv,
-			  emptyInScopeSet, mkInScopeSet, extendInScopeSetList, 
+			  emptyInScopeSet, mkInScopeSet, 
 			  emptyVarEnv, lookupVarEnv, extendVarEnv, 
 			  nukeRnEnvL, mkRnEnv2, rnOccR, rnOccL, inRnEnvR,
 			  rnBndrR, rnBndr2, rnBndrL, rnBndrs2,
@@ -45,11 +45,11 @@ import Unify 		( ruleMatchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )
 import Outputable
 import FastString
-import Maybes		( isJust, orElse )
+import Maybes
 import OrdList
 import Bag
-import Util		( singleton )
-import List		( isPrefixOf )
+import Util
+import List hiding( mapAccumL )	-- Also defined in Util
 \end{code}
 
 
@@ -331,10 +331,12 @@ matchN in_scope tmpl_vars tmpl_es target_es
   = do	{ (tv_subst, id_subst, binds)
 		<- go init_menv emptySubstEnv tmpl_es target_es
 	; return (fromOL binds, 
-		  map (lookup_tmpl tv_subst id_subst) tmpl_vars) }
+		  map (lookup_tmpl tv_subst id_subst) tmpl_vars') }
   where
-    init_menv = ME { me_tmpls = mkVarSet tmpl_vars, me_env = init_rn_env }
-    init_rn_env = mkRnEnv2 (extendInScopeSetList in_scope tmpl_vars)
+    (init_rn_env, tmpl_vars') = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
+	-- See Note [Template binders]
+
+    init_menv = ME { me_tmpls = mkVarSet tmpl_vars', me_env = init_rn_env }
 		
     go menv subst []     es 	= Just subst
     go menv subst ts     [] 	= Nothing	-- Fail if too few actual args
@@ -342,16 +344,27 @@ matchN in_scope tmpl_vars tmpl_es target_es
 				     ; go menv subst1 ts es }
 
     lookup_tmpl :: TvSubstEnv -> IdSubstEnv -> Var -> CoreExpr
-    lookup_tmpl tv_subst id_subst tmpl_var
-	| isTyVar tmpl_var = case lookupVarEnv tv_subst tmpl_var of
+    lookup_tmpl tv_subst id_subst tmpl_var'
+	| isTyVar tmpl_var' = case lookupVarEnv tv_subst tmpl_var' of
 				Just ty 	-> Type ty
-				Nothing 	-> unbound tmpl_var
-	| otherwise	   = case lookupVarEnv id_subst tmpl_var of
+				Nothing 	-> unbound tmpl_var'
+	| otherwise	    = case lookupVarEnv id_subst tmpl_var' of
 				Just e -> e
-				other  -> unbound tmpl_var
+				other  -> unbound tmpl_var'
  
     unbound var = pprPanic "Template variable unbound in rewrite rule" (ppr var)
 \end{code}
+
+Note [Template binders]
+~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following match:
+	Template:  forall x.  f x 
+	Taret:     f (x+1)
+This should succeed, because the template variable 'x' has nothing to do with
+the 'x' in the target.
+
+To achive this, we use rnBndrL to rename the template variables if necessary;
+the renamed ones are the tmpl_vars'
 
 
 	---------------------------------------------
@@ -415,18 +428,14 @@ match menv subst (Var v1) e2
 -- (Its occurrence information is not necessarily up to date,
 --  so we don't use it.)
 match menv subst e1 (Var v2)
-  | not (inRnEnvR rn_env v2),
-	-- If v2 is in the RnEnvR, then it's locally bound and can't
-	-- have an unfolding. We must make this check because if it
-	-- is locally bound we must not look it up in the in-scope set
-	-- E.g. 	(\x->x) where x is already in scope
-    isCheapUnfolding unfolding
+  | isCheapUnfolding unfolding
   = match menv subst e1 (unfoldingTemplate unfolding)
   where
     rn_env    = me_env menv
-    unfolding = idUnfolding (lookupRnInScope rn_env v2)
+    unfolding = idUnfolding (lookupRnInScope rn_env (rnOccR rn_env v2))
 	-- Notice that we look up v2 in the in-scope set
 	-- See Note [Lookup in-scope]
+	-- Remember to apply any renaming first (hence rnOccR)
 
 -- Matching a let-expression.  Consider
 --	RULE forall x.  f (g x) = <rhs>
@@ -553,7 +562,7 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 		-- e.g. match forall a. (\x-> a x) against (\y. y y)
 
 		| otherwise	-- No renaming to do on e2
-		-> Just (tv_subst, extendVarEnv id_subst v1 e2, binds)
+		-> Just (tv_subst, extendVarEnv id_subst v1' e2, binds)
 
 	Just e2' | tcEqExprX (nukeRnEnvL rn_env) e2' e2 
 		 -> Just subst
