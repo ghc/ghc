@@ -631,8 +631,10 @@ floatToDigits base x =
       (f*b*2, b^(-e+1)*2, b, 1)
     else
       (f*2, b^(-e)*2, 1, 1)
+  k :: Int
   k =
    let 
+    k0 :: Int
     k0 =
      if b == 2 && base == 10 then
         -- logBase 10 2 is slightly bigger than 3/10 so
