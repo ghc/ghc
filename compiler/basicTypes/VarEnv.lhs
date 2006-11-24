@@ -231,16 +231,14 @@ rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
 	 , envR     = envR
 	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
   where
-    new_b | not (bL `elemInScopeSet` in_scope) = bL
-      	  | otherwise			       = uniqAway' in_scope bL
+    new_b = uniqAway in_scope bL
 
 rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
   = (RV2 { envL     = envL
 	 , envR     = extendVarEnv envR bR new_b
 	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
   where
-    new_b | not (bR `elemInScopeSet` in_scope) = bR
-      	  | otherwise			       = uniqAway' in_scope bR
+    new_b = uniqAway in_scope bR
 
 rnOccL, rnOccR :: RnEnv2 -> Var -> Var
 -- Look up the renaming of an occurrence in the left or right term
