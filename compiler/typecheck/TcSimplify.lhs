@@ -1971,9 +1971,6 @@ extractResults (Avails _ avails) wanteds
 		-- The sought Id can be one of the givens, via a superclass chain
 		-- and then we definitely don't want to generate an x=x binding!
 
---		| getSrcLoc id `precedesSrcLoc` srcSpanStart span
---		-> go avails (addBind binds w_span id (nlHsVar w_id)) irreds ws
-
 		| otherwise
 		-> go avails (addBind binds w (nlHsVar id)) irreds ws
 

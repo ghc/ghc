@@ -702,10 +702,20 @@ emptyLIE          = emptyBag
 unitLIE inst 	  = unitBag inst
 mkLIE insts	  = listToBag insts
 plusLIE lie1 lie2 = lie1 `unionBags` lie2
-consLIE inst lie  = inst `consBag` lie
 plusLIEs lies	  = unionManyBags lies
 lieToList	  = bagToList
 listToLIE	  = listToBag
+
+consLIE inst lie  = lie `snocBag` inst
+-- Putting the new Inst at the *end* of the bag is a half-hearted attempt
+-- to ensure that we tend to report the *leftmost* type-constraint error
+-- E.g. 	f :: [a]
+--		f = [1,2,3]
+-- we'd like to complain about the '1', not the '3'.
+--
+-- "Half-hearted" because the rest of the type checker makes no great
+-- claims for retaining order in the constraint set.  Still, this 
+-- seems to improve matters slightly.  Exampes: mdofail001, tcfail015
 \end{code}
 
 
