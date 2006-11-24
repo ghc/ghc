@@ -418,12 +418,15 @@ int64ToIntegerzh_fast
    /* arguments: L1 = Int64# */
 
    L_ val;
-   W_ hi, s, neg, words_needed, p;
+   W_ hi, lo, s, neg, words_needed, p;
 
    val = L1;
    neg = 0;
 
-   if ( %ge(val,0x100000000::L_) || %le(val,-0x100000000::L_) )  { 
+   hi = TO_W_(val >> 32);
+   lo = TO_W_(val);
+
+   if ( hi != 0 && hi != 0xFFFFFFFF )  { 
        words_needed = 2;
    } else { 
        // minimum is one word
@@ -437,21 +440,24 @@ int64ToIntegerzh_fast
    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
    StgArrWords_words(p) = words_needed;
 
-   if ( %lt(val,0::L_) ) {
+   if ( %lt(hi,0) ) {
      neg = 1;
-     val = -val;
+     lo = -lo;
+     if(lo == 0) {
+       hi = -hi;
+     } else {
+       hi = -hi - 1;
+     }
    }
-
-   hi = TO_W_(val >> 32);
 
    if ( words_needed == 2 )  { 
       s = 2;
-      Hp(-1) = TO_W_(val);
+      Hp(-1) = lo;
       Hp(0) = hi;
    } else { 
-       if ( val != 0::L_ ) {
+       if ( lo != 0 ) {
 	   s = 1;
-	   Hp(0) = TO_W_(val);
+	   Hp(0) = lo;
        } else /* val==0 */  {
 	   s = 0;
        }
@@ -465,16 +471,18 @@ int64ToIntegerzh_fast
    */
    RET_NP(s,p);
 }
-
 word64ToIntegerzh_fast
 {
    /* arguments: L1 = Word64# */
 
    L_ val;
-   W_ hi, s, words_needed, p;
+   W_ hi, lo, s, words_needed, p;
 
    val = L1;
-   if ( val >= 0x100000000::L_ ) {
+   hi = TO_W_(val >> 32);
+   lo = TO_W_(val);
+
+   if ( hi != 0 ) {
       words_needed = 2;
    } else {
       words_needed = 1;
@@ -487,15 +495,14 @@ word64ToIntegerzh_fast
    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
    StgArrWords_words(p) = words_needed;
 
-   hi = TO_W_(val >> 32);
-   if ( val >= 0x100000000::L_ ) { 
+   if ( hi != 0 ) { 
      s = 2;
-     Hp(-1) = TO_W_(val);
+     Hp(-1) = lo;
      Hp(0)  = hi;
    } else {
-      if ( val != 0::L_ ) {
+      if ( lo != 0 ) {
         s = 1;
-        Hp(0) = TO_W_(val);
+        Hp(0) = lo;
      } else /* val==0 */  {
       s = 0;
      }
@@ -506,6 +513,7 @@ word64ToIntegerzh_fast
    */
    RET_NP(s,p);
 }
+
 
 
 #endif /* SUPPORT_LONG_LONGS */

@@ -497,6 +497,31 @@ getRegister (CmmReg reg)
 getRegister tree@(CmmRegOff _ _) 
   = getRegister (mangleIndexTree tree)
 
+
+#if WORD_SIZE_IN_BITS==32
+    -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
+    -- TO_W_(x), TO_W_(x >> 32)
+
+getRegister (CmmMachOp (MO_U_Conv I64 I32)
+             [CmmMachOp (MO_U_Shr I64) [x,CmmLit (CmmInt 32 _)]]) = do
+  ChildCode64 code rlo <- iselExpr64 x
+  return $ Fixed I32 (getHiVRegFromLo rlo) code
+
+getRegister (CmmMachOp (MO_S_Conv I64 I32)
+             [CmmMachOp (MO_U_Shr I64) [x,CmmLit (CmmInt 32 _)]]) = do
+  ChildCode64 code rlo <- iselExpr64 x
+  return $ Fixed I32 (getHiVRegFromLo rlo) code
+
+getRegister (CmmMachOp (MO_U_Conv I64 I32) [x]) = do
+  ChildCode64 code rlo <- iselExpr64 x
+  return $ Fixed I32 rlo code
+
+getRegister (CmmMachOp (MO_S_Conv I64 I32) [x]) = do
+  ChildCode64 code rlo <- iselExpr64 x
+  return $ Fixed I32 rlo code       
+
+#endif
+
 -- end of machine-"independent" bit; here we go on the rest...
 
 #if alpha_TARGET_ARCH
