@@ -291,6 +291,8 @@ class Typeable a => Data a where
 
 
   -- | A generic query that processes the immediate subterms and returns a list
+  -- of results.  The list is given in the same order as originally specified
+  -- in the declaratoin of the data constructors.
   gmapQ :: (forall a. Data a => a -> u) -> a -> [u]
   gmapQ f = gmapQr (:) [] f
 
@@ -569,7 +571,9 @@ dataTypeConstrs dt = case datarep dt of
 			_ -> error "dataTypeConstrs"
 
 
--- | Gets the field labels of a constructor
+-- | Gets the field labels of a constructor.  The list of labels
+-- is returned in the same order as they were given in the original 
+-- constructor declaration.
 constrFields :: Constr -> [String]
 constrFields = confields
 
