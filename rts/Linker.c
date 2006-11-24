@@ -95,8 +95,6 @@ static /*Str*/HashTable *symhash;
 /* Hash table mapping symbol names to StgStablePtr */
 static /*Str*/HashTable *stablehash;
 
-static unsigned int RPT_size = 0;
-
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;	/* initially empty */
 
