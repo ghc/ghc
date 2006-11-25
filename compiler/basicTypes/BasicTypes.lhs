@@ -491,6 +491,10 @@ instance Outputable StrictnessMark where
 \begin{code}
 data SuccessFlag = Succeeded | Failed
 
+instance Outputable SuccessFlag where
+    ppr Succeeded = ptext SLIT("Succeeded")
+    ppr Failed    = ptext SLIT("Failed")
+
 successIf :: Bool -> SuccessFlag
 successIf True  = Succeeded
 successIf False = Failed

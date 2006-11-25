@@ -209,8 +209,14 @@ data TargetId
 pprTarget :: Target -> SDoc
 pprTarget (Target id _) = pprTargetId id
 
+instance Outputable Target where
+    ppr = pprTarget
+
 pprTargetId (TargetModule m) = ppr m
 pprTargetId (TargetFile f _) = text f
+
+instance Outputable TargetId where
+    ppr = pprTargetId
 
 type HomePackageTable  = ModuleNameEnv HomeModInfo
 	-- Domain = modules in the home package
