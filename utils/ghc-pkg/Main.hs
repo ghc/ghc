@@ -490,7 +490,7 @@ listPackages flags mPackageName = do
 
   where show_normal pkg_map (db_name,pkg_confs) =
 	  hPutStrLn stdout (render $
-		text db_name <> comma $$ nest 4 packages
+		text db_name <> colon $$ nest 4 packages
 		)
 	   where packages = fsep (punctuate comma (map pp_pkg pkg_confs))
 		 pp_pkg p
