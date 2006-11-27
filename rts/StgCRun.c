@@ -107,6 +107,12 @@ StgFunPtr StgReturn(void)
 #else /* !USE_MINIINTERPRETER */
 
 #ifdef LEADING_UNDERSCORE
+#define STG_RUN "_StgRun"
+#else
+#define STG_RUN "StgRun"
+#endif
+
+#ifdef LEADING_UNDERSCORE
 #define STG_RETURN "_StgReturn"
 #else
 #define STG_RETURN "StgReturn"
@@ -207,8 +213,8 @@ StgRunIsImplementedInAssembler(void)
 	/*
 	 * save callee-saves registers on behalf of the STG code.
 	 */
-	".globl StgRun\n"
-	"StgRun:\n\t"
+	".globl " STG_RUN "\n"
+	STG_RUN ":\n\t"
 	"subq %0, %%rsp\n\t"
 	"movq %%rsp, %%rax\n\t"
 	"addq %0-48, %%rax\n\t"
@@ -228,7 +234,7 @@ StgRunIsImplementedInAssembler(void)
         "movq %%rdi,%%rax\n\t"
         "jmp *%%rax\n\t"
 
-	".global " STG_RETURN "\n"
+	".globl " STG_RETURN "\n"
        	STG_RETURN ":\n\t"
 
 	"movq %%rbx, %%rax\n\t"   /* Return value in R1  */

@@ -317,6 +317,15 @@ x86_64-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
+x86_64-apple-darwin*)
+        HostPlatform=x86_64-apple-darwin
+        TargetPlatform=x86_64-apple-darwin
+        BuildPlatform=x86_64-apple-darwin
+        HostPlatform_CPP='x86_64_apple_darwin'
+        HostArch_CPP='x86_64'
+        HostVendor_CPP='apple'
+        HostOS_CPP='darwin'
+        ;;
 m68k-*-linux*)
         HostPlatform=m68k-unknown-linux # hack again
         TargetPlatform=m68k-unknown-linux

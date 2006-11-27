@@ -96,6 +96,8 @@ x86_64-*-openbsd*)
 	TargetPlatform=x86_64-unknown-openbsd;;
 x86_64-*-netbsd*)
 	TargetPlatform=x86_64-unknown-netbsd;;
+x86_64-apple-darwin*)
+	TargetPlatform=x86_64-apple-darwin;;
 *)
         echo "Unrecognised platform: $TargetPlatform"
         exit 1

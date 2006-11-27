@@ -168,6 +168,10 @@ case $HostPlatform in
 alpha-dec-osf*) fptools_cv_leading_underscore=no;;
 *cygwin32) fptools_cv_leading_underscore=yes;;
 *mingw32) fptools_cv_leading_underscore=yes;;
+
+    # HACK: Apple doesn't seem to provide nlist in the 64-bit-libraries
+x86_64-apple-darwin*) fptools_cv_leading_underscore=yes;;
+
 *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#ifdef HAVE_NLIST_H
 #include <nlist.h>
 struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};

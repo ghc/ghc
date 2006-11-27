@@ -344,6 +344,32 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^x86_64-apple-darwin.*/ ) {
+				# Apple PowerPC Darwin/MacOS X.
+    $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US	    = '_'; # _ if symbols have an underscore on the front
+    $T_PRE_APP	    = 'DOESNT APPLY'; # regexp that says what comes before APP/NO_APP
+    $T_CONST_LBL    = '^\LC\d+:'; # regexp for what such a lbl looks like
+    $T_POST_LBL	    = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*(\.align \d+|\.text|\.data|\.const_data|\.cstring|\.non_lazy_symbol_pointer|\.const|\.static_const|\.literal4|\.literal8|\.static_data|\.globl \S+|\.section .*|\.lcomm.*)\n)';
+    $T_COPY_DIRVS   = '\.(globl|lcomm)';
+
+    $T_DOT_WORD	    = '\.(quad|long|short|byte|fill|space)';
+    $T_DOT_GLOBAL   = '\.globl';
+    $T_HDR_toc      = "\.toc\n";
+    $T_HDR_literal16= "\t\.literal8\n\t\.align 4\n";
+    $T_HDR_literal  = "\t\.const\n\t\.align 4\n";
+    $T_HDR_misc	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_data	    = "\t\.data\n\t\.align 2\n";
+    $T_HDR_rodata   = "\t\.const\n\t\.align 2\n";
+    $T_HDR_relrodata= "\t\.const_data\n\t\.align 2\n";
+    $T_HDR_closure  = "\t\.data\n\t\.align 2\n";
+    $T_HDR_info	    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_entry    = "\t\.text\n\t\.align 2\n";
+    $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
+
+    #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^powerpc-.*-linux/ ) {
 				# PowerPC Linux
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
@@ -1728,6 +1754,20 @@ sub rev_tbl {
 		}
 	    }
 	}
+    }
+
+    if ( $TargetPlatform =~ /x86_64-apple-darwin/ ) {
+        # Tack a label to the front of the info table, too.
+        # For now, this just serves to work around a crash in Apple's new
+        # 64-bit linker (it seems to assume that there is no data before the
+        # first label in a section).
+        
+        # The plan for the future is to do this on all Darwin platforms, and
+        # to add a reference to this label after the entry code, just as the
+        # NCG does, so we can enable dead-code-stripping in the linker without
+        # losing our info tables. (Hence the name _dsp, for dead-strip preventer)
+        
+        $before .= "\n${infoname}_dsp:\n";    
     }
 
     $tbl = $before
