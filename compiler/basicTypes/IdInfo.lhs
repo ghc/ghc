@@ -16,7 +16,7 @@ module IdInfo (
 	seqIdInfo, megaSeqIdInfo,
 
 	-- Zapping
-	zapLamInfo, zapDemandInfo,
+	zapLamInfo, zapDemandInfo, zapFragileInfo,
 
 	-- Arity
 	ArityInfo,
@@ -693,3 +693,8 @@ zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
   | otherwise  = Nothing
 \end{code}
 
+\begin{code}
+zapFragileInfo :: IdInfo -> Maybe IdInfo
+zapFragileInfo info = Just (info `setSpecInfo` emptySpecInfo
+                                 `setUnfoldingInfo` NoUnfolding)
+\end{code}

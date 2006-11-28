@@ -22,7 +22,7 @@ module Id (
 	-- Modifying an Id
 	setIdName, setIdUnique, Id.setIdType, setIdExported, setIdNotExported, 
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-	zapLamIdInfo, zapDemandIdInfo, 
+	zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo,
 
 	-- Predicates
 	isImplicitId, isDeadBinder, isDictId,
@@ -513,9 +513,15 @@ clearOneShotLambda id
 \end{code}
 
 \begin{code}
-zapLamIdInfo :: Id -> Id
-zapLamIdInfo id = maybeModifyIdInfo (zapLamInfo (idInfo id)) id
+zapInfo :: (IdInfo -> Maybe IdInfo) -> Id -> Id
+zapInfo zapper id = maybeModifyIdInfo (zapper (idInfo id)) id
 
-zapDemandIdInfo id = maybeModifyIdInfo (zapDemandInfo (idInfo id)) id
+zapLamIdInfo :: Id -> Id
+zapLamIdInfo = zapInfo zapLamInfo
+
+zapDemandIdInfo = zapInfo zapDemandInfo
+
+zapFragileIdInfo :: Id -> Id
+zapFragileIdInfo = zapInfo zapFragileInfo 
 \end{code}
 

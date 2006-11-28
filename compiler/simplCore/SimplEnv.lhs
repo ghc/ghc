@@ -620,7 +620,9 @@ substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old
   where
     id1	   = uniqAway in_scope old_id
     id2    = substIdType env id1
-    new_id = setIdInfo id2 vanillaIdInfo
+    -- we want to get rid of any info that's dependent on free variables,
+    -- but keep other info (like the arity).
+    new_id = zapFragileIdInfo id2
 
 	-- Extend the substitution if the unique has changed,
 	-- or there's some useful occurrence information
