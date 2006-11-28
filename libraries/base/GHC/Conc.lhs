@@ -874,8 +874,7 @@ atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
 waitForDelayEvent :: Int -> IO ()
 waitForDelayEvent usecs = do
   m <- newEmptyMVar
-  now <- getTicksOfDay
-  let target = now + usecs `quot` tick_usecs
+  target <- calculateTarget usecs
   atomicModifyIORef pendingDelays (\xs -> (Delay target m : xs, ()))
   prodServiceThread
   takeMVar m
@@ -884,12 +883,23 @@ waitForDelayEvent usecs = do
 waitForDelayEventSTM :: Int -> IO (TVar Bool)
 waitForDelayEventSTM usecs = do
    t <- atomically $ newTVar False
-   now <- getTicksOfDay
-   let target = now + usecs `quot` tick_usecs
+   target <- calculateTarget usecs
    atomicModifyIORef pendingDelays (\xs -> (DelaySTM target t : xs, ()))
    prodServiceThread
    return t  
     
+calculateTarget :: Int -> IO Int
+calculateTarget usecs = do
+    now <- getTicksOfDay
+    let -- Convert usecs to ticks, rounding up as we must wait /at least/
+        -- as long as we are told
+        usecs' = (usecs + tick_usecs - 1) `quot` tick_usecs
+        target = now + 1 -- getTicksOfDay will have rounded down, but
+                         -- again we need to wait for /at least/ as long
+                         -- as we are told, so add 1 to it
+               + usecs'
+    return target
+
 -- Walk the queue of pending delays, waking up any that have passed
 -- and return the smallest delay to wait for.  The queue of pending
 -- delays is kept ordered.
