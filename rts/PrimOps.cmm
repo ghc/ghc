@@ -2052,8 +2052,11 @@ delayzh_fast
 #else
 
     W_ time;
+    W_ divisor;
     time = foreign "C" getourtimeofday() [R1];
-    target = (R1 / (TO_W_(RtsFlags_MiscFlags_tickInterval(RtsFlags))*1000)) + time;
+    divisor = TO_W_(RtsFlags_MiscFlags_tickInterval(RtsFlags))*1000;
+    target = ((R1 + divisor - 1) / divisor) /* divide rounding up */
+           + time + 1; /* Add 1 as getourtimeofday rounds down */
     StgTSO_block_info(CurrentTSO) = target;
 
     /* Insert the new thread in the sleeping queue. */
