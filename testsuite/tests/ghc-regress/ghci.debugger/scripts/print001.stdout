@@ -1,13 +1,16 @@
 li = (_t1::[Maybe Integer])
 Just 0
-li = [Just 0 | (_t2::[Maybe Integer])]
+li = [Just 0
+       | (_t2::[Maybe Integer])]
 6
 li = [Just 0,
       (_t3::Maybe Integer),
       (_t4::Maybe Integer),
       (_t5::Maybe Integer),
-      (_t6::Maybe Integer),(_t7::Maybe Integer)]
-li = [Just 0,_,_,_,_,_]
+      (_t6::Maybe Integer)
+      ,(_t7::Maybe Integer)]
+li = [Just 0,_,_,_,_
+      ,_]
 [Just 0,Just 1,Just 2,Just 3,Just 4,Just 5]
 li = [Just 0,Just 1,Just 2,Just 3,Just 4,Just 5]
 li = [Just 0,Just 1,Just 2,Just 3,Just 4,Just 5]

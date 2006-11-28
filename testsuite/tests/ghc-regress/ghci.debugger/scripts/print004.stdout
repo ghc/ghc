@@ -2,17 +2,22 @@ a = False
 a = False
 b = (_t1::[Maybe Integer])
 Just 1
-b = [Just 1 | (_t2::[Maybe Integer])]
+b = [Just 1
+      | (_t2::[Maybe Integer])]
 4
-b = [Just 1,(_t3::Maybe Integer),(_t4::Maybe Integer),(_t5::Maybe Integer)]
-b = [Just 1,_,_,_]
+b = [Just 1,(_t3::Maybe Integer),(_t4::Maybe Integer)
+     ,(_t5::Maybe Integer)]
+b = [Just 1,_,_
+     ,_]
 [Just 1,Just 2,Just 3,Just 4]
 b = [Just 1,Just 2,Just 3,Just 4]
 c = ListT
 d = (_t6::[Type])
 TupleT 1
-d = [TupleT 1 | (_t7::[Type])]
+d = [TupleT 1
+      | (_t7::[Type])]
 4
-d = [TupleT 1,(_t8::Type),(_t9::Type),(_t10::Type)]
+d = [TupleT 1,(_t8::Type),(_t9::Type)
+     ,(_t10::Type)]
 [TupleT 1,TupleT 2,TupleT 3,TupleT 4]
 d = [TupleT 1,TupleT 2,TupleT 3,TupleT 4]
