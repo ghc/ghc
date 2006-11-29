@@ -23,14 +23,13 @@ import CoreUtils	( exprIsTrivial, isDefaultAlt )
 import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo, isLocalId,
 			  isExportedId, idArity, idHasRules,
-			  idType, idUnique, Id
+			  idUnique, Id
 			)
 import BasicTypes	( OccInfo(..), isOneOcc, InterestingCxt )
 
 import VarSet
 import VarEnv
 
-import Type		( isFunTy, dropForAlls )
 import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
@@ -301,7 +300,7 @@ reOrderCycle bndrs (bind : binds)
 		-- where df is the exported dictionary. Then df makes a really
 		-- bad choice for loop breaker
 	  
-	| not_fun_ty (idType bndr) = 3	-- Data types help with cases
+	| is_con_app rhs = 3	-- Data types help with cases
 		-- This used to have a lower score than inlineCandidate, but
 		-- it's *really* helpful if dictionaries get inlined fast,
 		-- so I'm experimenting with giving higher priority to data-typed things
@@ -328,7 +327,11 @@ reOrderCycle bndrs (bind : binds)
 	-- we didn't stupidly choose d as the loop breaker.
 	-- But we won't because constructor args are marked "Many".
 
-    not_fun_ty ty = not (isFunTy (dropForAlls ty))
+	-- Cheap and cheerful; the simplifer moves casts out of the way
+    is_con_app (Var v)    = isDataConWorkId v
+    is_con_app (App f _)  = is_con_app f
+    is_con_app (Note _ e) = is_con_app e
+    is_con_app other      = False
 
 makeLoopBreaker :: VarSet		-- Binders of this group
 		-> UsageDetails		-- Usage of this rhs (neglecting rules)
