@@ -18,7 +18,7 @@ module MkId (
 
 	mkDataConIds,
 	mkRecordSelId, 
-	mkPrimOpId, mkFCallId,
+	mkPrimOpId, mkFCallId, mkTickBoxOpId, mkBinaryTickBoxOpId,
 
 	mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
         mkUnpackCase, mkProductBox,
@@ -72,6 +72,7 @@ import Util
 import Outputable
 import FastString
 import ListSetOps
+import Module
 \end{code}		
 
 %************************************************************************
@@ -903,6 +904,38 @@ mkFCallId uniq fcall ty
     (arg_tys, _) = tcSplitFunTys tau
     arity	 = length arg_tys
     strict_sig   = mkStrictSig (mkTopDmdType (replicate arity evalDmd) TopRes)
+
+mkTickBoxOpId :: Unique 
+	      -> Module
+	      -> TickBoxId
+	      -> Id
+mkTickBoxOpId uniq mod ix =  mkGlobalId (TickBoxOpId tickbox) name ty info    
+  where
+    tickbox = TickBox mod ix
+    occ_str = showSDoc (braces (ppr tickbox))
+    name    = mkTickBoxOpName uniq occ_str
+    info    = noCafIdInfo
+    ty      = realWorldStatePrimTy 
+
+mkBinaryTickBoxOpId 
+              :: Unique 
+	      -> Module
+	      -> TickBoxId
+	      -> TickBoxId
+	      -> Id
+mkBinaryTickBoxOpId uniq mod ixT ixF =  mkGlobalId (TickBoxOpId tickbox) name ty info    
+  where
+    tickbox  = BinaryTickBox mod ixT ixF
+    occ_str = showSDoc (braces (ppr tickbox))
+    name    = mkTickBoxOpName uniq occ_str
+    info    = noCafIdInfo
+	        `setArityInfo` 		arity
+	        `setAllStrictnessInfo`	Just strict_sig
+    ty      = mkFunTy boolTy boolTy
+
+    arity	 = 1
+    strict_sig   = mkStrictSig (mkTopDmdType (replicate arity evalDmd) TopRes)
+		   --- ?? mkStrictSig (mkTopDmdType [seqDmd] TopRes)
 \end{code}
 
 

@@ -200,7 +200,7 @@ data DynFlag
    | Opt_PrintBindResult
    | Opt_Haddock
    | Opt_Hpc
-   | Opt_Hpc_Trace
+   | Opt_Hpc_Tracer
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -1053,7 +1053,7 @@ fFlags = [
   ( "print-bind-result",		Opt_PrintBindResult ),
   ( "force-recomp",			Opt_ForceRecomp ),
   ( "hpc",				Opt_Hpc ),
-  ( "hpc-tracer",			Opt_Hpc )
+  ( "hpc-tracer",			Opt_Hpc_Tracer )
   ]
 
 

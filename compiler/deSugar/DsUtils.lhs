@@ -70,6 +70,7 @@ import Util
 import ListSetOps
 import FastString
 import Data.Char
+import DynFlags
 
 #ifdef DEBUG
 import Util
@@ -888,11 +889,27 @@ mkOptTickBox (Just ix) e = mkTickBox ix e
 
 mkTickBox :: Int -> CoreExpr -> DsM CoreExpr
 mkTickBox ix e = do
+       dflags <- getDOptsDs
+       uq <- newUnique 	
        mod <- getModuleDs
-       return $ Note (TickBox mod ix) e
+       let tick = mkTickBoxOpId uq mod ix
+       uq2 <- newUnique 	
+       let occName = mkVarOcc "tick"
+       let name = mkInternalName uq2 occName noSrcLoc   -- use mkSysLocal?
+       let var  = Id.mkLocalId name realWorldStatePrimTy
+       return $ Case (Var tick) 
+	             var
+		     ty
+	             [(DEFAULT,[],e)]
+  where
+     ty = exprType e
 
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        mod <- getModuleDs
-       return $ Note (BinaryTickBox mod ixT ixF) e
+       dflags <- getDOptsDs
+       uq <- newUnique 	
+       mod <- getModuleDs
+       let tick = mkBinaryTickBoxOpId uq mod ixT ixF
+       return $ App (Var tick) e
 \end{code}

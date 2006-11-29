@@ -33,6 +33,7 @@ module Id (
 	isFCallId, isFCallId_maybe,
 	isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
 	isBottomingId, idIsFrom,
+        isTickBoxOp, isTickBoxOp_maybe,
 	hasNoBinding, 
 
 	-- Inline pragma stuff
@@ -313,6 +314,19 @@ isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 		  | otherwise = False	-- TyVars count as not dead
 \end{code}
 
+\begin{code}
+isTickBoxOp :: Id -> Bool
+isTickBoxOp id = 
+  case globalIdDetails id of
+    TickBoxOpId tick -> True
+    _                -> False
+
+isTickBoxOp_maybe :: Id -> Maybe TickBoxOp
+isTickBoxOp_maybe id = 
+  case globalIdDetails id of
+    TickBoxOpId tick -> Just tick
+    _                -> Nothing
+\end{code}
 
 %************************************************************************
 %*									*

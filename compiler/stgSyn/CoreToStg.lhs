@@ -317,14 +317,10 @@ coreToStgExpr (Note (SCC cc) expr)
   = coreToStgExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
     returnLne (StgSCC cc expr2, fvs, escs) )
 
-coreToStgExpr (Note (TickBox m n) expr)
+coreToStgExpr (Case (Var id) _bndr ty [(DEFAULT,[],expr)])
+  | Just (TickBox m n) <- isTickBoxOp_maybe id
   = coreToStgExpr expr         `thenLne` ( \ (expr2, fvs, escs) ->
     returnLne (StgTick m n expr2, fvs, escs) )
-
--- BinaryTickBox'es are are removed by the CorePrep pass.
-
-coreToStgExpr expr@(Note (BinaryTickBox m t e) _)	
-  = pprPanic "coreToStgExpr: " (ppr expr)
 
 coreToStgExpr (Note other_note expr)
   = coreToStgExpr expr
@@ -451,6 +447,7 @@ coreToStgApp
 	-> [CoreArg]			-- Arguments
 	-> LneM (StgExpr, FreeVarsInfo, EscVarsSet)
 
+
 coreToStgApp maybe_thunk_body f args
   = coreToStgArgs args		`thenLne` \ (args', args_fvs) ->
     lookupVarLne f		`thenLne` \ how_bound ->
@@ -508,6 +505,7 @@ coreToStgApp maybe_thunk_body f args
 				    StgOpApp (StgPrimOp op) args' res_ty
 		FCallId call	 -> ASSERT( saturated )
 				    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+                TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
 		_other      	 -> StgApp f args'
 
     in
@@ -1098,8 +1096,6 @@ myCollectBinders expr
   where
     go bs (Lam b e)          = go (b:bs) e
     go bs e@(Note (SCC _) _) = (reverse bs, e) 
-    go bs e@(Note (TickBox {}) _) = (reverse bs, e)
-    go bs e@(Note (BinaryTickBox {}) _)  = (reverse bs, e)
     go bs (Cast e co)        = go bs e
     go bs (Note _ e)         = go bs e
     go bs e	             = (reverse bs, e)
@@ -1113,8 +1109,6 @@ myCollectArgs expr
     go (Var v)          as = (v, as)
     go (App f a) as        = go f (a:as)
     go (Note (SCC _) e) as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
-    go (Note (TickBox {}) e) as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
-    go (Note (BinaryTickBox {}) e) as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
     go (Cast e co)      as = go e as
     go (Note n e)       as = go e as
     go _		as = pprPanic "CoreToStg.myCollectArgs" (ppr expr)

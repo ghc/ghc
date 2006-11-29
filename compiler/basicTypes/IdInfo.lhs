@@ -71,7 +71,10 @@ module IdInfo (
 	CafInfo(..), cafInfo, ppCafInfo, setCafInfo, mayHaveCafRefs,
 
         -- Lambda-bound variable info
-        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo, hasNoLBVarInfo
+        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo, hasNoLBVarInfo,
+
+        -- Tick-box info
+        TickBoxOp(..), TickBoxId,
     ) where
 
 #include "HsVersions.h"
@@ -87,6 +90,7 @@ import TyCon
 import ForeignCall
 import NewDemand
 import Outputable	
+import Module
 
 import Data.Maybe
 
@@ -215,7 +219,7 @@ seqNewDemandInfo (Just dmd) = seqDemand dmd
 
 %************************************************************************
 %*									*
-\subsection{GlobalIdDetails
+\subsection{GlobalIdDetails}
 %*									*
 %************************************************************************
 
@@ -246,6 +250,8 @@ data GlobalIdDetails
   | PrimOpId PrimOp		-- The Id for a primitive operator
   | FCallId ForeignCall		-- The Id for a foreign call
 
+  | TickBoxOpId TickBoxOp	-- The Id for a tick box (both traditional and binary)
+
   | NotGlobalId			-- Used as a convenient extra return value from globalIdDetails
     
 notGlobalId = NotGlobalId
@@ -258,6 +264,7 @@ instance Outputable GlobalIdDetails where
     ppr (ClassOpId _)     = ptext SLIT("[ClassOp]")
     ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
     ppr (FCallId _)       = ptext SLIT("[ForeignCall]")
+    ppr (TickBoxOpId _)   = ptext SLIT("[TickBoxOp]")
     ppr (RecordSelId {})  = ptext SLIT("[RecSel]")
 \end{code}
 
@@ -697,4 +704,24 @@ zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 zapFragileInfo info = Just (info `setSpecInfo` emptySpecInfo
                                  `setUnfoldingInfo` NoUnfolding)
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{TickBoxOp}
+%*									*
+%************************************************************************
+
+\begin{code}
+type TickBoxId = Int
+
+data TickBoxOp 
+   = TickBox Module !TickBoxId  -- ^Tick box for Hpc-style coverage,
+				-- type = State# Void#
+   | BinaryTickBox Module !TickBoxId !TickBoxId
+    			  -- ^Binary tick box, with a tick for result = True, result = False,
+			  -- type = Bool -> Bool
+instance Outputable TickBoxOp where
+    ppr (TickBox mod n)         = ptext SLIT("tick") <+> ppr (mod,n)
+    ppr (BinaryTickBox mod t f) = ptext SLIT("btick") <+> ppr (mod,t,f)
 \end{code}

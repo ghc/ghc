@@ -213,21 +213,6 @@ ppr_expr add_par (Note (SCC cc) expr)
 ppr_expr add_par (Note InlineMe expr)
   = add_par $ ptext SLIT("__inline_me") <+> pprParendExpr expr
 
-ppr_expr add_par (Note (TickBox mod n) expr)
-  = add_par $
-    sep [sep [ptext SLIT("__tick_box"),
-               pprModule mod,
-              text (show n)],
-         pprParendExpr expr]
-
-ppr_expr add_par (Note (BinaryTickBox mod t e) expr)
-  = add_par $
-    sep [sep [ptext SLIT("__binary_tick_box"),
-               pprModule mod,
-              text (show t),
-              text (show e)],
-         pprParendExpr expr]
-
 ppr_expr add_par (Note (CoreNote s) expr)
   = add_par $ 
     sep [sep [ptext SLIT("__core_note"), pprHsString (mkFastString s)],

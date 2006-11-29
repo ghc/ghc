@@ -21,7 +21,8 @@ import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, idCoreRules, isGlobalId,
 			  isExportedId, mkVanillaGlobal, isLocalId, isNaughtyRecordSelector,
-			  idArity, idCafInfo, idUnfolding, isImplicitId, setIdInfo
+			  idArity, idCafInfo, idUnfolding, isImplicitId, setIdInfo,
+			  isTickBoxOp
 			) 
 import IdInfo		{- loads of stuff -}
 import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
@@ -791,17 +792,13 @@ CAF list to keep track of non-collectable CAFs.
 \begin{code}
 hasCafRefs  :: PackageId -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
 hasCafRefs this_pkg p arity expr 
-  | is_caf || mentions_cafs || is_tick
+  | is_caf || mentions_cafs 
                             = MayHaveCafRefs
   | otherwise 		    = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefs p expr)
   is_caf = not (arity > 0 || rhsIsStatic this_pkg expr)
-  is_tick = case expr of
-	      Note (TickBox {}) _       -> True
-	      Note (BinaryTickBox {}) _ -> True
-	      _                         -> False
-        
+
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
   -- knows how much eta expansion is going to be done by 

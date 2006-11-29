@@ -58,10 +58,22 @@ import System.Directory ( createDirectoryIfMissing )
 
 \begin{code}
 addCoverageTicksToBinds dflags mod mod_loc binds = do 
+  { let orig_file = 
+             case ml_hs_file mod_loc of
+		    Just file -> file
+		    Nothing -> error "can not find the original file during hpc trans"
+
+  ; if "boot" `isSuffixOf` orig_file then return (binds, 0)  
+    else addCoverageTicksToBinds2 dflags mod orig_file binds 
+  }
+
+addCoverageTicksToBinds2 dflags mod orig_file binds = do 
   let main_mod = mainModIs dflags
       main_is  = case mainFunIs dflags of
 		  Nothing -> "main"
 		  Just main -> main 
+
+  modTime <- getModificationTime' orig_file
 
   let mod_name = moduleNameString (moduleName mod)
 
@@ -77,12 +89,6 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
 
   -- write the mix entries for this module
   let tabStop = 1 -- <tab> counts as a normal char in GHC's location ranges.
-
-  let orig_file = case ml_hs_file mod_loc of
-		    Just file -> file
-		    Nothing -> error "can not find the original file during hpc trans"
-
-  modTime <- getModificationTime' orig_file
 
   createDirectoryIfMissing True hpc_dir
 

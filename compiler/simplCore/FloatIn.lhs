@@ -214,13 +214,6 @@ fiExpr to_drop (_, AnnNote InlineMe expr)
   = 	-- Ditto... don't float anything into an INLINE expression
     mkCoLets' to_drop (Note InlineMe (fiExpr [] expr))
 
-fiExpr to_drop (_, AnnNote note@(TickBox {}) expr)
-  =    -- Wimp out for now
-    mkCoLets' to_drop (Note note (fiExpr [] expr))
-fiExpr to_drop (_, AnnNote note@(BinaryTickBox {}) expr)
-  =    -- Wimp out for now
-    mkCoLets' to_drop (Note note (fiExpr [] expr))
-
 fiExpr to_drop (_, AnnNote note@(CoreNote _) expr)
   = Note note (fiExpr to_drop expr)
 \end{code}

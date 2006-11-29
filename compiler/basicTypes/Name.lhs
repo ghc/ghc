@@ -15,6 +15,7 @@ module Name (
 	mkInternalName, mkSystemName,
 	mkSystemVarName, mkSysTvName, 
 	mkFCallName, mkIPName,
+        mkTickBoxOpName,
 	mkExternalName, mkWiredInName,
 
 	nameUnique, setNameUnique,
@@ -219,6 +220,11 @@ mkFCallName :: Unique -> String -> Name
 	-- The encoded string completely describes the ccall
 mkFCallName uniq str =  Name { n_uniq = getKey# uniq, n_sort = Internal, 
 			       n_occ = mkVarOcc str, n_loc = noSrcLoc }
+
+mkTickBoxOpName :: Unique -> String -> Name
+mkTickBoxOpName uniq str 
+   = Name { n_uniq = getKey# uniq, n_sort = Internal, 
+	    n_occ = mkVarOcc str, n_loc = noSrcLoc }
 
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
