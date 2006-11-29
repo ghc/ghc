@@ -344,11 +344,6 @@ Interface file code:
 
 
 \begin{code}
--- TyClDecls are precisely the kind of declarations that can 
--- appear in interface files; or (internally) in GHC's interface
--- for a module.  That's why (despite the misnomer) IfaceSig and ForeignType
--- are both in TyClDecl
-
 -- Representation of indexed types
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Kind signatures of indexed types come in two flavours:
