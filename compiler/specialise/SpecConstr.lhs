@@ -902,18 +902,6 @@ argToPat :: InScopeEnv			-- What's in scope at the fn defn site
 argToPat in_scope con_env arg@(Type ty) arg_occ
   = return (False, arg)
 
-argToPat in_scope con_env (Var v) arg_occ
-  | not (isLocalId v) || v `elemVarEnv` in_scope
-  = 	-- The recursive call passes a variable that 
-	-- is in scope at the function definition site
-	-- It's worth specialising on this if
-	--	(a) it's used in an interesting way in the body
-	--	(b) we know what its value is
-    if    (case arg_occ of { UnkOcc -> False; other -> True })	-- (a)
-       && isValueUnfolding (idUnfolding v)			-- (b)
-    then return (True, Var v)
-    else wildCardPat (idType v)
-
 argToPat in_scope con_env (Let _ arg) arg_occ
   = argToPat in_scope con_env arg arg_occ
 	-- Look through let expressions
@@ -937,6 +925,8 @@ argToPat in_scope con_env arg arg_occ
 	| otherwise = is_value_lam e
     is_value_lam other = False
 
+  -- Check for a constructor application
+  -- NB: this *precedes* the Var case, so that we catch nullary constrs
 argToPat in_scope con_env arg arg_occ
   | Just (CV dc args) <- is_con_app_maybe con_env arg
   , case arg_occ of
@@ -948,15 +938,27 @@ argToPat in_scope con_env arg arg_occ
   = do	{ args' <- argsToPats in_scope con_env (args `zip` conArgOccs arg_occ dc)
 	; return (True, mk_con_app dc (map snd args')) }
 
+  -- Check if the argument is a variable that 
+  -- is in scope at the function definition site
+  -- It's worth specialising on this if
+  --	(a) it's used in an interesting way in the body
+  --	(b) we know what its value is
 argToPat in_scope con_env (Var v) arg_occ
-  = 	-- A variable bound inside the function. 
-	-- Don't make a wild-card, because we may usefully share
-	--	e.g.  f a = let x = ... in f (x,x)
-	-- NB: this case follows the lambda and con-app cases!!
-    return (False, Var v)
+  | not (isLocalId v) || v `elemVarEnv` in_scope,
+    case arg_occ of { UnkOcc -> False; other -> True },	-- (a)
+    isValueUnfolding (idUnfolding v)			-- (b)
+  = return (True, Var v)
 
--- The default case: make a wild-card
-argToPat in_scope con_env arg arg_occ = wildCardPat (exprType arg)
+  -- Check for a variable bound inside the function. 
+  -- Don't make a wild-card, because we may usefully share
+  --	e.g.  f a = let x = ... in f (x,x)
+  -- NB: this case follows the lambda and con-app cases!!
+argToPat in_scope con_env (Var v) arg_occ
+  = return (False, Var v)
+
+  -- The default case: make a wild-card
+argToPat in_scope con_env arg arg_occ
+  = wildCardPat (exprType arg)
 
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
 wildCardPat ty = do { uniq <- getUniqueUs
@@ -975,33 +977,30 @@ argsToPats in_scope con_env args
 
 \begin{code}
 is_con_app_maybe :: ConstrEnv -> CoreExpr -> Maybe ConValue
-is_con_app_maybe env (Var v)
-  = case lookupVarEnv env v of
-	Just stuff -> Just stuff
-		-- You might think we could look in the idUnfolding here
-		-- but that doesn't take account of which branch of a 
-		-- case we are in, which is the whole point
-
-	Nothing | isCheapUnfolding unf
-		-> is_con_app_maybe env (unfoldingTemplate unf)
-		where
-		  unf = idUnfolding v
-		-- However we do want to consult the unfolding 
-		-- as well, for let-bound constructors!
-
-	other  -> Nothing
-
 is_con_app_maybe env (Lit lit)
   = Just (CV (LitAlt lit) [])
 
-is_con_app_maybe env expr
-  = case collectArgs expr of
-	(Var fun, args) | Just con <- isDataConWorkId_maybe fun,
-			  args `lengthAtLeast` dataConRepArity con
-		-- Might be > because the arity excludes type args
-		        -> Just (CV (DataAlt con) args)
+is_con_app_maybe env expr	-- Maybe it's a constructor application
+  | (Var fun, args) <- collectArgs expr,
+    Just con <- isDataConWorkId_maybe fun,
+    args `lengthAtLeast` dataConRepArity con
+	-- Might be > because the arity excludes type args
+  = Just (CV (DataAlt con) args)
 
-	other -> Nothing
+is_con_app_maybe env (Var v)
+  | Just stuff <- lookupVarEnv env v
+  = Just stuff	-- You might think we could look in the idUnfolding here
+		-- but that doesn't take account of which branch of a 
+		-- case we are in, which is the whole point
+
+  | isCheapUnfolding unf
+  = is_con_app_maybe env (unfoldingTemplate unf)
+  where
+    unf = idUnfolding v
+	-- However we do want to consult the unfolding 
+	-- as well, for let-bound constructors!
+
+is_con_app_maybe env expr = Nothing
 
 mk_con_app :: AltCon -> [CoreArg] -> CoreExpr
 mk_con_app (LitAlt lit)  []   = Lit lit
