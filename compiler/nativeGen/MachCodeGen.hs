@@ -3164,7 +3164,7 @@ genCCall target dest_regs args vols = do
     let
 	fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
 	int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
-	arg_regs = int_regs_used ++ fp_regs_used
+	arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
 		-- for annotating the call instruction with
 
 	sse_regs = length fp_regs_used

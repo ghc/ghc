@@ -224,12 +224,6 @@ regUsage instr = case instr of
     _other		-> panic "regUsage: unrecognised instr"
 
  where
-#if x86_64_TARGET_ARCH
-	-- call parameters: include %eax, because it is used
-	-- to pass the number of SSE reg arguments to varargs fns.
-    params = eax : allArgRegs ++ allFPArgRegs
-#endif
-
     -- 2 operand form; first operand Read; second Written
     usageRW :: Operand -> Operand -> RegUsage
     usageRW op (OpReg reg) = mkRU (use_R op) [reg]
