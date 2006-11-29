@@ -786,11 +786,11 @@ specialise env calls (fn, rhs, arg_occs)
 			 [ exprsFreeVars pats `delVarSetList` vs 
 			 | (vs,pats) <- good_pats ]
 	      uniq_pats = nubBy (same_pat in_scope) good_pats
-	; pprTrace "specialise" (vcat [ppr fn <+> ppr arg_occs,
-	  				text "calls" <+> ppr all_calls,
-	  				text "good pats" <+> ppr good_pats,
-	  			text "uniq pats" <+> ppr uniq_pats])  $
-	  return ()
+--	; pprTrace "specialise" (vcat [ppr fn <+> ppr arg_occs,
+--	  				text "calls" <+> ppr all_calls,
+--	  				text "good pats" <+> ppr good_pats,
+--	  			text "uniq pats" <+> ppr uniq_pats])  $
+--	  return ()
 
  	; (rules, spec_prs) <- mapAndUnzipUs (spec_one fn rhs) 
 					     (uniq_pats `zip` [1..])
