@@ -690,24 +690,23 @@ pop _span _buf _len = do popLexState; lexToken
 pop_and :: Action -> Action
 pop_and act span buf len = do popLexState; act span buf len
 
-notFollowedBy char _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf /= char
+{-# INLINE nextCharIs #-}
+nextCharIs buf p = not (atEnd buf) && p (currentChar buf)
+
+notFollowedBy char _ _ _ (AI _ _ buf) 
+  = nextCharIs buf (/=char)
 
 notFollowedBySymbol _ _ _ (AI _ _ buf)
-  = atEnd buf || currentChar buf `notElem` "!#$%&*+./<=>?@\\^|-~"
+  = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
 
 isNormalComment bits _ _ (AI _ _ buf)
-  = (if haddockEnabled bits then False else (followedBySpaceDoc buf))
-    || notFollowedByDocOrPragma
+  | haddockEnabled bits = notFollowedByDocOrPragma
+  | otherwise           = nextCharIs buf (/='#')
   where 
-    notFollowedByDocOrPragma = not $ spaceAndP buf
-      (\buf' -> currentChar buf' `elem` "|^*$#")
+    notFollowedByDocOrPragma 
+	= not $ spaceAndP buf (`nextCharIs` (`elem` "|^*$#"))
 
-spaceAndP buf p = p buf || currentChar buf == ' ' && p buf'
-  where buf' = snd (nextChar buf)
-
-followedBySpaceDoc buf = spaceAndP buf followedByDoc
-
-followedByDoc buf = currentChar buf `elem` "|^*$"
+spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
 
 haddockDisabledAnd p bits _ _ (AI _ _ buf)
   = if haddockEnabled bits then False else (p buf)
