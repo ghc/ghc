@@ -115,7 +115,7 @@ This happens if
 
 Hence the "OR" part of Note [Good arguments] below.
 
-ALTERNATIVE: pass both boxed and unboxed versions.  This no longer saves
+ALTERNATIVE 2: pass both boxed and unboxed versions.  This no longer saves
 allocation, but does perhaps save evals. In the RULE we'd have
 something like
 
@@ -124,6 +124,25 @@ something like
 If at the call site the (I# x) was an unfolding, then we'd have to
 rely on CSE to eliminate the duplicate allocation.... This alternative
 doesn't look attractive enough to pursue.
+
+ALTERNATIVE 3: ignore the reboxing problem.  The trouble is that 
+the conservative reboxing story prevents many useful functions from being
+specialised.  Example:
+	foo :: Maybe Int -> Int -> Int
+	foo   (Just m) 0 = 0
+	foo x@(Just m) n = foo x (n-m)
+Here the use of 'x' will clearly not require boxing in the specialised function.
+
+The strictness analyser has the same problem, in fact.  Example:
+	f p@(a,b) = ...
+If we pass just 'a' and 'b' to the worker, it might need to rebox the
+pair to create (a,b).  A more sophisticated analysis might figure out
+precisely the cases in which this could happen, but the strictness
+analyser does no such analysis; it just passes 'a' and 'b', and hopes
+for the best.
+
+So my current choice is to make SpecConstr similarly aggressive, and
+ignore the bad potential of reboxing.
 
 
 Note [Good arguments]
@@ -593,10 +612,10 @@ instance Outputable ArgOcc where
   ppr BothOcc 	    = ptext SLIT("both-occ")
   ppr NoOcc    	    = ptext SLIT("no-occ")
 
--- Experimentally, this vresion of combineOcc makes ScrutOcc "win", so
+-- Experimentally, this vesion of combineOcc makes ScrutOcc "win", so
 -- that if the thing is scrutinised anywhere then we get to see that
 -- in the overall result, even if it's also used in a boxed way
--- This might be too agressive; see Note [Reboxing]
+-- This might be too agressive; see Note [Reboxing] Alternative 3
 combineOcc NoOcc	 occ 	       = occ
 combineOcc occ 		 NoOcc	       = occ
 combineOcc (ScrutOcc xs) (ScrutOcc ys) = ScrutOcc (plusUFM_C combineOccs xs ys)
