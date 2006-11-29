@@ -60,6 +60,7 @@ test('tcrun038', normal, multimod_compile_and_run, ['tcrun038',''])
 clean(['TcRun038_B.hi', 'TcRun038_B.o'])
 
 test('tcrun039', only_compiler_types(['ghc']), compile_and_run, [''])
+test('tcrun040', normal, compile_and_run, [''])
 
 test('church', normal, compile_and_run, [''])
 test('testeq2', normal, compile_and_run, [''])
