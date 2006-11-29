@@ -14,6 +14,9 @@ fi
 if test -d X11; then
   AC_CONFIG_SUBDIRS(X11)
 fi
+if test -d Win32; then
+  AC_CONFIG_SUBDIRS(Win32)
+fi
 if test -d HGL; then
   AC_CONFIG_SUBDIRS(HGL)
 fi
