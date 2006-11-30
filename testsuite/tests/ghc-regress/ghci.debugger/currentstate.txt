@@ -5,3 +5,4 @@ print 4  - My TH is broken ?
 print 7  - the issue with unboxed fields
 dynbk4   - status on mdo ?
 dynbk5   - My TH is broken ?
+dynbk8   - Coalescing is not perfect :S

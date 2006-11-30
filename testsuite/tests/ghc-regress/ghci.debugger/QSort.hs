@@ -1,5 +1,5 @@
 module QSort where
-import GHC.Exts
+
 
 qsort [] = [] 
 qsort (a:as) = (qsort left) ++ [a] ++ (qsort right)
