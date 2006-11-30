@@ -10,6 +10,9 @@ data Opaque = forall a. O a
 data List1 a = Nil | a :^ (List1 a)
   deriving Show
 
+newtype MyInt = My Int
+  deriving (Eq,Show,Num, Enum)
+
 infixr 5 :^ 
 --test T{t=t1} = undefined
 

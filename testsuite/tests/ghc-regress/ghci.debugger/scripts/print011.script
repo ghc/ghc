@@ -1,0 +1,12 @@
+-- Type reconstruction with newtypes involved
+
+:set -fglasgow-exts
+:l ../Test
+
+let i = map Just [My 1 .. My 3]
+:p i
+seq _t1 ()
+:p i
+seq _t2 ()
+:p i
+

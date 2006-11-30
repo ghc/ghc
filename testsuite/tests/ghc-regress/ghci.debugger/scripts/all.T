@@ -9,4 +9,6 @@ test('print007', normal, ghci_script, ['print007.script'])
 test('print008', normal, ghci_script, ['print008.script'])
 test('print009', normal, ghci_script, ['print009.script'])
 test('print010', normal, ghci_script, ['print010.script'])
+test('print011', normal, ghci_script, ['print011.script'])
+
 
