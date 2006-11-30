@@ -20,9 +20,10 @@
 
 #define DEBUG_HPC 0
 
-static int hpc_inited = 0;	// Have you started this component?
-static FILE *tixFile;		// file being read/written
-static int tix_ch;		// current char
+static int hpc_inited = 0;		// Have you started this component?
+static FILE *tixFile;			// file being read/written
+static int tix_ch;			// current char
+static StgWord64 magicTixNumber;	// Magic/Hash number to mark .tix files
 
 typedef struct _Info {
   char *modName;		// name of module
@@ -124,7 +125,7 @@ static void hpc_init(void) {
     expect('i');
     expect('x');
     ws();
-    expectWord64();
+    magicTixNumber = expectWord64();
     ws();
     expect('[');
     ws();
@@ -156,7 +157,8 @@ static void hpc_init(void) {
       if (tix_ch == ',') {
 	expect(',');
 	ws();
-      }}
+      }
+    }
     expect(']');
     ws();
     tixBoxes = (StgWord64 *)calloc(totalTixes,sizeof(StgWord64));
@@ -173,6 +175,9 @@ static void hpc_init(void) {
     expect(']');
 
     fclose(tixFile);
+  } else {
+    // later, we will find a binary specific 
+    magicTixNumber = (StgWord64)0;
   }
 }
 
@@ -285,7 +290,7 @@ exitHpc(void) {
   
   comma = 0;
 
-  fprintf(f,"Tix 0 [");
+  fprintf(f,"Tix %" PRIuWORD64 " [", magicTixNumber);
   tmpModule = modules;
   for(;tmpModule != 0;tmpModule = tmpModule->next) {
     if (comma) {
@@ -293,11 +298,11 @@ exitHpc(void) {
     } else {
       comma = 1;
     }
-    fprintf(f,"(\"%s\",%d)",
+    fprintf(f,"(\"%s\",%u)",
 	   tmpModule->modName,
 	    tmpModule->tickCount);
 #if DEBUG_HPC
-    fprintf(stderr,"%s: %d (offset=%d)\n",
+    fprintf(stderr,"%s: %u (offset=%u)\n",
 	   tmpModule->modName,
 	   tmpModule->tickCount,
 	   tmpModule->tickOffset);
