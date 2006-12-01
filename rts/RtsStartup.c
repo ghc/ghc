@@ -56,7 +56,7 @@
 # include "LLC.h"
 #endif
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
 #include "win32/AsyncIO.h"
 #endif
 
@@ -254,7 +254,7 @@ hs_init(int *argc, char **argv[])
     initDefaultHandlers();
 #endif
  
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
     startupAsyncIO();
 #endif
 
@@ -465,7 +465,7 @@ hs_exit(void)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
     shutdownAsyncIO();
 #endif
 

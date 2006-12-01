@@ -4,6 +4,9 @@
  *
  * (c) sof, 2002-2003.
  */
+
+#if !defined(THREADED_RTS)
+
 #include "Rts.h"
 #include "RtsUtils.h"
 #include <windows.h>
@@ -354,3 +357,4 @@ resetAbandonRequestWait( void )
     ResetEvent(abandon_req_wait);
 }
 
+#endif /* !defined(THREADED_RTS) */

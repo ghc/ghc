@@ -4,6 +4,9 @@
  *
  * (c) sof, 2002-2003.
  */
+
+#if !defined(THREADED_RTS)
+
 #include "Rts.h"
 #include "IOManager.h"
 #include "WorkQueue.h"
@@ -526,3 +529,5 @@ abandonWorkRequest ( int reqID )
      */
     LeaveCriticalSection(&ioMan->active_work_lock);
 }
+
+#endif
