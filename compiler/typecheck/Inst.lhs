@@ -110,7 +110,8 @@ instType imp@(ImplicInst {})      = mkImplicTy (tci_tyvars imp) (tci_given imp)
 					       (tci_wanted imp)
 
 mkImplicTy tvs givens wanteds	-- The type of an implication constraint
-  = -- pprTrace "mkImplicTy" (ppr givens) $
+  = ASSERT( all isDict givens )
+    -- pprTrace "mkImplicTy" (ppr givens) $
     mkForAllTys tvs $ 
     mkPhiTy (map dictPred givens) $
     if isSingleton wanteds then
@@ -330,6 +331,7 @@ mkPredName uniq loc pred_ty
     occ = case pred_ty of
 	    ClassP cls tys -> mkDictOcc (getOccName cls)
 	    IParam ip ty   -> getOccName (ipNameName ip)
+	    EqPred _ _     -> pprPanic "mkPredName" (ppr pred_ty)
 \end{code}
 
 %************************************************************************

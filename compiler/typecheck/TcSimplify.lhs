@@ -1236,7 +1236,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
         returnM (varSetElems qtvs, binds)
     else
 	let
-    	    (non_ips, bad_ips) = partition isClassDict irreds
+    	    (bad_ips, non_ips) = partition isIPDict irreds
 	in    
 	addTopIPErrs bndrs bad_ips	`thenM_`
 	extendLIEs non_ips		`thenM_`
@@ -1992,9 +1992,6 @@ extractResults (Avails _ avails) wanteds
 	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds (ws' ++ ws)
 			     where
 				new_binds = addBind binds w rhs
-	where
-	  w_span = instSpan w
-	  w_id = instToId w
 
     add_given avails w = extendAvailEnv avails w (Given (instToId w))
 
