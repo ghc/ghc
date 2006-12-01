@@ -36,6 +36,7 @@ import Foreign
 import Foreign.C
 import GHC.IOBase
 import GHC.Handle
+import Data.Typeable
 
 data Handler
  = Default
@@ -49,6 +50,7 @@ data ConsoleEvent
     -- these are sent to Services only.
  | Logoff
  | Shutdown
+ deriving (Eq, Ord, Enum, Show, Read, Typeable)
 
 installHandler :: Handler -> IO Handler
 installHandler handler = 
