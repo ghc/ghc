@@ -10,5 +10,6 @@ test('print008', normal, ghci_script, ['print008.script'])
 test('print009', normal, ghci_script, ['print009.script'])
 test('print010', normal, ghci_script, ['print010.script'])
 test('print011', normal, ghci_script, ['print011.script'])
-
-
+test('print012', normal, ghci_script, ['print012.script'])
+test('print013', normal, ghci_script, ['print013.script'])
+test('print014', normal, ghci_script, ['print014.script'])

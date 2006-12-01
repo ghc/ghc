@@ -1,0 +1,9 @@
+-- Test handling of extra fields in the representation due to existentials.
+
+:set -fglasgow-exts
+:l ../GADT
+
+let e = Exist 1
+:p e
+seq _t1 ()
+:p e

@@ -1,0 +1,12 @@
+-- GADTs not being fully supported yet, this test is expected to fail
+
+:set -fglasgow-exts
+:l ../GADT
+:a ../Test
+:m +Main
+let o = O (id foo)
+:p o
+seq _t1 ()
+:p o
+seq _t3 ()
+:p o

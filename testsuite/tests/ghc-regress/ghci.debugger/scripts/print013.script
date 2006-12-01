@@ -1,0 +1,9 @@
+-- Test handling of extra fields in the representation due to dictionaries
+
+:set -fglasgow-exts
+:l ../GADT
+
+let d = Dict 1
+:p d
+seq _t1 ()
+:p d

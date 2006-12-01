@@ -1,0 +1,5 @@
+o = O (_t1::a)
+()
+o = O Cons (_t2::a) (_t3::SafeList a b)
+()
+o = O Cons (_t4::a) Cons (_t5::a) (_t6::SafeList b a)
