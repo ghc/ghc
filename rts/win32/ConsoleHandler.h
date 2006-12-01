@@ -9,9 +9,16 @@
  * Console control handlers lets an application handle Ctrl+C, Ctrl+Break etc.
  * in Haskell under Win32. Akin to the Unix signal SIGINT.
  *
- * The API offered by ConsoleHandler.h is identical to that of the signal handling
- * code (which isn't supported under win32.) Unsurprisingly, the underlying impl 
- * is derived from the signal handling code also.
+ * The API offered by ConsoleHandler.h is identical to that of the
+ * signal handling code (which isn't supported under win32.)
+ * Unsurprisingly, the underlying impl is derived from the signal
+ * handling code also.
+ */
+
+#if !defined(THREADED_RTS)
+/* 
+ * under THREADED_RTS, console events are passed to the IO manager
+ * thread, which starts up the handler.  See ThrIOManager.c.
  */
 
 /*
@@ -59,5 +66,7 @@ extern void handleSignalsInThisThread(void);
  * up as part Ctrl-C delivery.
  */
 extern int rts_waitConsoleHandlerCompletion(void);
+
+#endif /* THREADED_RTS */
 
 #endif /* __CONSOLEHANDLER_H__ */

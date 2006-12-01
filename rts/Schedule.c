@@ -51,6 +51,7 @@
 #include "Trace.h"
 #include "RaiseAsync.h"
 #include "Threads.h"
+#include "ThrIOManager.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -849,7 +850,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
  * Start any pending signal handlers
  * ------------------------------------------------------------------------- */
 
-#if defined(RTS_USER_SIGNALS) && (!defined(THREADED_RTS) || defined(mingw32_HOST_OS))
+#if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
 static void
 scheduleStartSignalHandlers(Capability *cap)
 {
@@ -971,7 +972,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	
 	if ( !emptyRunQueue(cap) ) return;
 
-#if defined(RTS_USER_SIGNALS) && (!defined(THREADED_RTS) || defined(mingw32_HOST_OS))
+#if defined(RTS_USER_SIGNALS) && !defined(THREADED_RTS)
 	/* If we have user-installed signal handlers, then wait
 	 * for signals to arrive rather then bombing out with a
 	 * deadlock.
@@ -2820,17 +2821,10 @@ void
 wakeUpRts(void)
 {
 #if defined(THREADED_RTS)
-#if !defined(mingw32_HOST_OS)
     // This forces the IO Manager thread to wakeup, which will
     // in turn ensure that some OS thread wakes up and runs the
     // scheduler loop, which will cause a GC and deadlock check.
     ioManagerWakeup();
-#else
-    // On Windows this might be safe enough, because we aren't
-    // in a signal handler.  Later we should use the IO Manager,
-    // though.
-    prodOneCapability();
-#endif
 #endif
 }
 

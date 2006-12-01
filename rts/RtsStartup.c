@@ -19,6 +19,7 @@
 #include "STM.h"        /* initSTM */
 #include "Signals.h"
 #include "RtsSignals.h"
+#include "ThrIOManager.h"
 #include "Timer.h"      /* startTimer, stopTimer */
 #include "Weak.h"
 #include "Ticky.h"
@@ -268,7 +269,7 @@ hs_init(int *argc, char **argv[])
     x86_init_fpu();
 #endif
 
-#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#if defined(THREADED_RTS)
     ioManagerStart();
 #endif
 
@@ -371,7 +372,7 @@ hs_exit(void)
     /* start timing the shutdown */
     stat_startExit();
     
-#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#if defined(THREADED_RTS)
     ioManagerDie();
 #endif
 

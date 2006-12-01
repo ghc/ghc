@@ -18,13 +18,17 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType);
 static BOOL WINAPI generic_handler(DWORD dwCtrlType);
 
 static rtsBool deliver_event = rtsTrue;
-static StgInt console_handler = STG_SIG_DFL;
+StgInt console_handler = STG_SIG_DFL;
+
+#if !defined(THREADED_RTS)
 
 static HANDLE hConsoleEvent = INVALID_HANDLE_VALUE;
 
 #define N_PENDING_EVENTS 16
 StgInt stg_pending_events = 0;           /* number of undelivered events */
 DWORD stg_pending_buf[N_PENDING_EVENTS]; /* their associated event numbers. */
+
+#endif
 
 /*
  * Function: initUserSignals()
@@ -34,8 +38,9 @@ DWORD stg_pending_buf[N_PENDING_EVENTS]; /* their associated event numbers. */
 void
 initUserSignals(void)
 {
-    stg_pending_events = 0;
     console_handler = STG_SIG_DFL;
+#if !defined (THREADED_RTS)
+    stg_pending_events = 0;
     if (hConsoleEvent == INVALID_HANDLE_VALUE) {
 	hConsoleEvent = 
 	    CreateEvent ( NULL,  /* default security attributes */
@@ -43,6 +48,7 @@ initUserSignals(void)
 			  FALSE, /* initially non-signalled */
 			  NULL); /* no name */
     }
+#endif
     return;
 }
 
@@ -50,9 +56,11 @@ initUserSignals(void)
 void
 finiUserSignals(void)
 {
+#if !defined (THREADED_RTS)
     if (hConsoleEvent != INVALID_HANDLE_VALUE) {
         CloseHandle(hConsoleEvent);
     }
+#endif
 }
 
 /*
@@ -83,9 +91,6 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 	    stg_exit(EXIT_INTERRUPTED);
 	} else {
 	    interruptStgRts();
-	    /* Cheesy pulsing of an event to wake up a waiting RTS thread, if any */
-	    abandonRequestWait();
-	    resetAbandonRequestWait();
 	}
 	return TRUE;
 
@@ -148,6 +153,7 @@ void awaitUserSignals(void)
 }
 
 
+#if !defined (THREADED_RTS)
 /*
  * Function: startSignalHandlers()
  *
@@ -180,6 +186,7 @@ void startSignalHandlers(Capability *cap)
     RELEASE_LOCK(&sched_mutex);
     unblockUserSignals();
 }
+#endif /* !THREADED_RTS */
 
 /*
  * Function: markSignalHandlers()
@@ -202,8 +209,6 @@ void markSignalHandlers (evac_fn evac STG_UNUSED)
  */
 static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 {
-    ACQUIRE_LOCK(&sched_mutex);
-
     /* Ultra-simple -- up the counter + signal a switch. */
     switch(dwCtrlType) {
     case CTRL_CLOSE_EVENT:
@@ -217,17 +222,16 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
     default:
 	if (!deliver_event) return TRUE;
 
+#if defined(THREADED_RTS)
+        sendIOManagerEvent((StgWord8) ((dwCtrlType<<1) | 1));
+#else
 	if ( stg_pending_events < N_PENDING_EVENTS ) {
 	    stg_pending_buf[stg_pending_events] = dwCtrlType;
 	    stg_pending_events++;
 	}
-	/* Cheesy pulsing of an event to wake up a waiting RTS thread, if any */
-	abandonRequestWait();
-	resetAbandonRequestWait();
+#endif
 	return TRUE;
     }
-
-    RELEASE_LOCK(&sched_mutex);
 }
 
 
@@ -293,17 +297,22 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
  *
  */
 void
-rts_ConsoleHandlerDone(int ev)
+rts_ConsoleHandlerDone (int ev USED_IF_NOT_THREADS)
 {
+#if !defined(THREADED_RTS)
     if ( (DWORD)ev == CTRL_BREAK_EVENT ||
 	 (DWORD)ev == CTRL_C_EVENT ) {
 	/* only these two cause stdin system calls to abort.. */
 	SetEvent(hConsoleEvent); /* event is manual-reset */
 	Sleep(0); /* yield */
 	ResetEvent(hConsoleEvent); /* turn it back off again */
+        // SDM: yeuch, this can't possibly work reliably.
+        // I'm not having it in THREADED_RTS.
     }
+#endif
 }
 
+#if !defined(THREADED_RTS)
 /*
  * Function: rts_waitConsoleHandlerCompletion()
  *
@@ -318,3 +327,4 @@ rts_waitConsoleHandlerCompletion()
      */
     return (WaitForSingleObject(hConsoleEvent, INFINITE) == WAIT_OBJECT_0);
 }
+#endif

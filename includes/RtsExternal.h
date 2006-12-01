@@ -73,10 +73,19 @@ extern void rts_ConsoleHandlerDone  ( int ev );
 extern int stg_sig_install (int, int, StgStablePtr *, void *);
 #endif
 
-#if !defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+extern StgInt console_handler;
+#else
 extern StgInt *signal_handlers;
 #endif
+
+#if defined(mingw32_HOST_OS)
+void *getIOManagerEvent (void);
+StgWord32 readIOManagerEvent (void);
+void sendIOManagerEvent (StgWord32 event);
+#else
 extern void setIOManagerPipe (int fd);
+#endif
 
 extern void* allocateExec(unsigned int len);
 

@@ -18,12 +18,6 @@ extern StgPtr *next_pending_handler;
 void startSignalHandlers(Capability *cap);
 #endif
 
-#if defined(THREADED_RTS)
-void ioManagerWakeup (void);
-void ioManagerDie (void);
-void ioManagerStart (void);
-#endif
-
 extern StgInt *signal_handlers;
 
 #endif /* POSIX_SIGNALS_H */

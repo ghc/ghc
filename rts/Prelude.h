@@ -42,9 +42,7 @@ PRELUDE_CLOSURE(base_GHCziIOBase_BlockedIndefinitely_closure);
 PRELUDE_CLOSURE(base_GHCziIOBase_NonTermination_closure);
 PRELUDE_CLOSURE(base_GHCziIOBase_NestedAtomically_closure);
 
-#if !defined(mingw32_HOST_OS)
 PRELUDE_CLOSURE(base_GHCziConc_ensureIOManagerIsRunning_closure);
-#endif
 
 PRELUDE_INFO(base_GHCziBase_Czh_static_info);
 PRELUDE_INFO(base_GHCziBase_Izh_static_info);
