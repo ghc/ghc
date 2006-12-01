@@ -42,7 +42,7 @@ infixr 8  **
 -- | Trigonometric and hyperbolic functions and related functions.
 --
 -- Minimal complete definition:
---      'pi', 'exp', 'log', 'sin', 'cos', 'sinh', 'cosh'
+--      'pi', 'exp', 'log', 'sin', 'cos', 'sinh', 'cosh',
 --      'asin', 'acos', 'atan', 'asinh', 'acosh' and 'atanh'
 class  (Fractional a) => Floating a  where
     pi			:: a
