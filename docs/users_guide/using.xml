@@ -1252,10 +1252,6 @@ f "2"    = 2
 	    <para>Means: &ldquo;Generate good-quality code without
             taking too long about it.&rdquo; Thus, for example:
             <command>ghc -c -O Main.lhs</command></para>
-
-	    <para><option>-O</option> currently also implies
-	    <option>-fvia-C</option>.  This may change in the
-	    future.</para>
 	  </listitem>
 	</varlistentry>
 

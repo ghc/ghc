@@ -200,9 +200,6 @@ should go here!</para>
           mind-bogglingly clever.  Better to let GCC have a go, as it
           tries much harder on register allocation, etc.</para>
 
-	  <para>At the moment, if you turn on <option>-O</option> you
-          get GCC instead.  This may change in the future.</para>
-
 	  <para>So, when we want very fast code, we use: <option>-O
 	  -fvia-C</option>.</para>
 	</listitem>

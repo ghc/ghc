@@ -540,9 +540,7 @@ data Option
 updOptLevel :: Int -> DynFlags -> DynFlags
 -- Set dynflags appropriate to the optimisation level
 updOptLevel n dfs
-  = if (n >= 1)
-     then dfs2{ hscTarget = HscC, optLevel = n } -- turn on -fvia-C with -O
-     else dfs2{ optLevel = n }
+  = dfs2{ optLevel = n }
   where
    dfs1 = foldr (flip dopt_unset) dfs  remove_dopts
    dfs2 = foldr (flip dopt_set)   dfs1 extra_dopts

@@ -567,9 +567,7 @@ $ cat foo.hspp</screen>
           <para>Use GHC's native code generator rather than
           compiling via C.  This will compile faster (up to twice as
           fast), but may produce code that is slightly slower than
-          compiling via C.  <option>-fasm</option> is the default
-          when optimisation is off (see <xref
-          linkend="options-optimise"/>).</para>
+          compiling via C.  <option>-fasm</option> is the default.</para>
         </listitem>
       </varlistentry>
 
@@ -580,9 +578,8 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Compile via C instead of using the native code
-          generator.  This is default for optimised compilations,
-          and on architectures for which GHC doesn't have a native
-          code generator.</para>
+          generator.  This is the default on architectures for which GHC
+          doesn't have a native code generator.</para>
         </listitem>
       </varlistentry>
 
