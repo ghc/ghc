@@ -132,6 +132,12 @@
 #include "runProcess.h"
 
 #if defined(__MINGW32__)
+/* in Win32Utils.c */
+extern void maperrno (void);
+extern HsInt getTicksOfDay(void);
+#endif
+
+#if defined(__MINGW32__)
 #include <io.h>
 #include <fcntl.h>
 #include "timeUtils.h"

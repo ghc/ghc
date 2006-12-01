@@ -79,13 +79,13 @@ module GHC.Conc
 	, asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
 #endif
 
-#ifndef mingw32_HOST_OS
 	, ensureIOManagerIsRunning
-#endif
         ) where
 
 import System.Posix.Types
+#ifndef mingw32_HOST_OS
 import System.Posix.Internals
+#endif
 import Foreign
 import Foreign.C
 
@@ -99,7 +99,9 @@ import GHC.Base
 import GHC.IOBase
 import GHC.Num		( Num(..) )
 import GHC.Real		( fromIntegral, quot )
+#ifndef mingw32_HOST_OS
 import GHC.Base		( Int(..) )
+#endif
 import GHC.Exception    ( catchException, Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
@@ -614,11 +616,7 @@ threadWaitWrite fd
 --
 threadDelay :: Int -> IO ()
 threadDelay time
-#ifndef mingw32_HOST_OS
   | threaded  = waitForDelayEvent time
-#else
-  | threaded  = c_Sleep (fromIntegral (time `quot` 1000))
-#endif
   | otherwise = IO $ \s -> 
 	case fromIntegral time of { I# time# ->
 	case delay# time# s of { s -> (# s, () #)
@@ -626,19 +624,41 @@ threadDelay time
 
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs 
-#ifndef mingw32_HOST_OS
   | threaded = waitForDelayEventSTM usecs
   | otherwise = error "registerDelay: requires -threaded"
-#else
-  = error "registerDelay: not currently supported on Windows"
-#endif
-
--- On Windows, we just make a safe call to 'Sleep' to implement threadDelay.
-#ifdef mingw32_HOST_OS
-foreign import stdcall safe "Sleep" c_Sleep :: CInt -> IO ()
-#endif
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
+
+waitForDelayEvent :: Int -> IO ()
+waitForDelayEvent usecs = do
+  m <- newEmptyMVar
+  now <- getTicksOfDay
+  let target = now + usecs `quot` tick_usecs
+  atomicModifyIORef pendingDelays (\xs -> (Delay target m : xs, ()))
+  prodServiceThread
+  takeMVar m
+
+-- Delays for use in STM
+waitForDelayEventSTM :: Int -> IO (TVar Bool)
+waitForDelayEventSTM usecs = do
+   t <- atomically $ newTVar False
+   now <- getTicksOfDay
+   let target = now + usecs `quot` tick_usecs
+   atomicModifyIORef pendingDelays (\xs -> (DelaySTM target t : xs, ()))
+   prodServiceThread
+   return t  
+    
+calculateTarget :: Int -> IO Int
+calculateTarget usecs = do
+    now <- getTicksOfDay
+    let -- Convert usecs to ticks, rounding up as we must wait /at least/
+        -- as long as we are told
+        usecs' = (usecs + tick_usecs - 1) `quot` tick_usecs
+        target = now + 1 -- getTicksOfDay will have rounded down, but
+                         -- again we need to wait for /at least/ as long
+                         -- as we are told, so add 1 to it
+               + usecs'
+    return target
 
 -- ----------------------------------------------------------------------------
 -- Threaded RTS implementation of threadWaitRead, threadWaitWrite, threadDelay
@@ -673,16 +693,18 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 --	  hope we don't need to do any blocking IO between fork & exec.
 
 #ifndef mingw32_HOST_OS
-
 data IOReq
   = Read   {-# UNPACK #-} !Fd {-# UNPACK #-} !(MVar ())
   | Write  {-# UNPACK #-} !Fd {-# UNPACK #-} !(MVar ())
+#endif
 
 data DelayReq
   = Delay    {-# UNPACK #-} !Int {-# UNPACK #-} !(MVar ())
   | DelaySTM {-# UNPACK #-} !Int {-# UNPACK #-} !(TVar Bool)
 
+#ifndef mingw32_HOST_OS
 pendingEvents :: IORef [IOReq]
+#endif
 pendingDelays :: IORef [DelayReq]
 	-- could use a strict list or array here
 {-# NOINLINE pendingEvents #-}
@@ -699,6 +721,146 @@ ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning 
   | threaded  = seq pendingEvents $ return ()
   | otherwise = return ()
+
+insertDelay :: DelayReq -> [DelayReq] -> [DelayReq]
+insertDelay d [] = [d]
+insertDelay d1 ds@(d2 : rest)
+  | delayTime d1 <= delayTime d2 = d1 : ds
+  | otherwise                    = d2 : insertDelay d1 rest
+
+delayTime (Delay t _) = t
+delayTime (DelaySTM t _) = t
+
+type Ticks = Int
+tick_freq  = 50 :: Ticks  -- accuracy of threadDelay (ticks per sec)
+tick_usecs = 1000000 `quot` tick_freq :: Int
+tick_msecs = 1000 `quot` tick_freq :: Int
+
+-- XXX: move into GHC.IOBase from Data.IORef?
+atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
+atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
+
+foreign import ccall unsafe "getTicksOfDay" 
+  getTicksOfDay :: IO Ticks
+
+#ifdef mingw32_HOST_OS
+-- ----------------------------------------------------------------------------
+-- Windows IO manager thread
+
+startIOManagerThread :: IO ()
+startIOManagerThread = do
+  wakeup <- c_getIOManagerEvent
+  forkIO $ service_loop wakeup []
+  return ()
+
+service_loop :: HANDLE          -- read end of pipe
+             -> [DelayReq]      -- current delay requests
+             -> IO ()
+
+service_loop wakeup old_delays = do
+  -- pick up new delay requests
+  new_delays <- atomicModifyIORef pendingDelays (\a -> ([],a))
+  let  delays = foldr insertDelay old_delays new_delays
+
+  now <- getTicksOfDay
+  (delays', timeout) <- getDelay now delays
+
+  r <- c_WaitForSingleObject wakeup timeout
+  case r of
+    0xffffffff -> do c_maperrno; throwErrno "service_loop"
+    0 -> do
+        r <- c_readIOManagerEvent
+        exit <- 
+	      case r of
+		_ | r == io_MANAGER_WAKEUP -> return False
+		_ | r == io_MANAGER_DIE    -> return True
+                0 -> return False -- spurious wakeup
+		r -> do start_console_handler (r `shiftR` 1); return False
+        if exit
+          then return ()
+          else service_cont wakeup delays'
+
+    _other -> service_cont wakeup delays' -- probably timeout        
+
+service_cont wakeup delays = do
+  takeMVar prodding
+  putMVar prodding False
+  service_loop wakeup delays
+
+-- must agree with rts/win32/ThrIOManager.c
+io_MANAGER_WAKEUP = 0xffffffff :: Word32
+io_MANAGER_DIE    = 0xfffffffe :: Word32
+
+start_console_handler :: Word32 -> IO ()
+start_console_handler r = do                   
+  stableptr <- peek console_handler
+  forkIO $ do io <- deRefStablePtr stableptr; io (fromIntegral r)
+  return ()
+
+foreign import ccall "&console_handler" 
+   console_handler :: Ptr (StablePtr (CInt -> IO ()))
+
+stick :: IORef HANDLE
+{-# NOINLINE stick #-}
+stick = unsafePerformIO (newIORef nullPtr)
+
+prodding :: MVar Bool
+{-# NOINLINE prodding #-}
+prodding = unsafePerformIO (newMVar False)
+
+prodServiceThread :: IO ()
+prodServiceThread = do
+  b <- takeMVar prodding
+  if (not b) 
+    then do hdl <- readIORef stick
+            c_sendIOManagerEvent io_MANAGER_WAKEUP
+    else return ()
+  putMVar prodding True
+
+-- Walk the queue of pending delays, waking up any that have passed
+-- and return the smallest delay to wait for.  The queue of pending
+-- delays is kept ordered.
+getDelay :: Ticks -> [DelayReq] -> IO ([DelayReq], DWORD)
+getDelay now [] = return ([], iNFINITE)
+getDelay now all@(d : rest) 
+  = case d of
+     Delay time m | now >= time -> do
+	putMVar m ()
+	getDelay now rest
+     DelaySTM time t | now >= time -> do
+	atomically $ writeTVar t True
+	getDelay now rest
+     _otherwise ->
+        return (all, (fromIntegral (delayTime d - now) * 
+                        fromIntegral tick_msecs))
+                        -- delay is in millisecs for WaitForSingleObject
+
+-- ToDo: this just duplicates part of System.Win32.Types, which isn't
+-- available yet.  We should move some Win32 functionality down here,
+-- maybe as part of the grand reorganisation of the base package...
+type HANDLE       = Ptr ()
+type DWORD        = Word32
+
+iNFINITE = 0xFFFFFFFF :: DWORD -- urgh
+
+foreign import ccall unsafe "getIOManagerEvent" -- in the RTS (ThrIOManager.c)
+  c_getIOManagerEvent :: IO HANDLE
+
+foreign import ccall unsafe "readIOManagerEvent" -- in the RTS (ThrIOManager.c)
+  c_readIOManagerEvent :: IO Word32
+
+foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
+  c_sendIOManagerEvent :: Word32 -> IO ()
+
+foreign import ccall unsafe "maperrno"             -- in runProcess.c
+   c_maperrno :: IO ()
+
+foreign import stdcall "WaitForSingleObject"
+   c_WaitForSingleObject :: HANDLE -> DWORD -> IO DWORD
+
+#else
+-- ----------------------------------------------------------------------------
+-- Unix IO manager thread, using select()
 
 startIOManagerThread :: IO ()
 startIOManagerThread = do
@@ -793,12 +955,12 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   service_loop wakeup readfds writefds ptimeval reqs' delays'
 
+io_MANAGER_WAKEUP = 0xff :: CChar
+io_MANAGER_DIE    = 0xfe :: CChar
+
 stick :: IORef Fd
 {-# NOINLINE stick #-}
 stick = unsafePerformIO (newIORef 0)
-
-io_MANAGER_WAKEUP = 0xff :: CChar
-io_MANAGER_DIE    = 0xfe :: CChar
 
 prodding :: MVar Bool
 {-# NOINLINE prodding #-}
@@ -864,41 +1026,8 @@ waitForWriteEvent fd = do
   prodServiceThread
   takeMVar m
 
--- XXX: move into GHC.IOBase from Data.IORef?
-atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
-
 -- -----------------------------------------------------------------------------
 -- Delays
-
-waitForDelayEvent :: Int -> IO ()
-waitForDelayEvent usecs = do
-  m <- newEmptyMVar
-  target <- calculateTarget usecs
-  atomicModifyIORef pendingDelays (\xs -> (Delay target m : xs, ()))
-  prodServiceThread
-  takeMVar m
-
--- Delays for use in STM
-waitForDelayEventSTM :: Int -> IO (TVar Bool)
-waitForDelayEventSTM usecs = do
-   t <- atomically $ newTVar False
-   target <- calculateTarget usecs
-   atomicModifyIORef pendingDelays (\xs -> (DelaySTM target t : xs, ()))
-   prodServiceThread
-   return t  
-    
-calculateTarget :: Int -> IO Int
-calculateTarget usecs = do
-    now <- getTicksOfDay
-    let -- Convert usecs to ticks, rounding up as we must wait /at least/
-        -- as long as we are told
-        usecs' = (usecs + tick_usecs - 1) `quot` tick_usecs
-        target = now + 1 -- getTicksOfDay will have rounded down, but
-                         -- again we need to wait for /at least/ as long
-                         -- as we are told, so add 1 to it
-               + usecs'
-    return target
 
 -- Walk the queue of pending delays, waking up any that have passed
 -- and return the smallest delay to wait for.  The queue of pending
@@ -917,29 +1046,19 @@ getDelay now ptimeval all@(d : rest)
 	setTimevalTicks ptimeval (delayTime d - now)
     	return (all,ptimeval)
 
-insertDelay :: DelayReq -> [DelayReq] -> [DelayReq]
-insertDelay d [] = [d]
-insertDelay d1 ds@(d2 : rest)
-  | delayTime d1 <= delayTime d2 = d1 : ds
-  | otherwise                    = d2 : insertDelay d1 rest
-
-delayTime (Delay t _) = t
-delayTime (DelaySTM t _) = t
-
-type Ticks = Int
-tick_freq  = 50 :: Ticks  -- accuracy of threadDelay (ticks per sec)
-tick_usecs = 1000000 `quot` tick_freq :: Int
-
 newtype CTimeVal = CTimeVal ()
 
 foreign import ccall unsafe "sizeofTimeVal"
   sizeofTimeVal :: Int
 
-foreign import ccall unsafe "getTicksOfDay" 
-  getTicksOfDay :: IO Ticks
-
 foreign import ccall unsafe "setTimevalTicks" 
   setTimevalTicks :: Ptr CTimeVal -> Ticks -> IO ()
+
+{- 
+  On Win32 we're going to have a single Pipe, and a
+  waitForSingleObject with the delay time.  For signals, we send a
+  byte down the pipe just like on Unix.
+-}
 
 -- ----------------------------------------------------------------------------
 -- select() interface
@@ -971,4 +1090,5 @@ foreign import ccall unsafe "sizeof_fd_set"
   sizeofFdSet :: Int
 
 #endif
+
 \end{code}
