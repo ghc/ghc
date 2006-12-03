@@ -71,6 +71,8 @@ import TysPrim
 import FastString
 import Maybes
 import Util
+import Data.Word
+import Data.Bits
 
 import GHC.Exts		-- For `xori` 
 \end{code}
@@ -1351,44 +1353,48 @@ hashExpr :: CoreExpr -> Int
 -- We must be careful that \x.x and \y.y map to the same hash code,
 -- (at least if we want the above invariant to be true)
 
-hashExpr e | hash < 0  = 77	-- Just in case we hit -maxInt
-	   | otherwise = hash
-	   where
-	     hash = abs (hash_expr (1,emptyVarEnv) e)	-- Negative numbers kill UniqFM
+hashExpr e = fromIntegral (hash_expr (1,emptyVarEnv) e .&. 0x7fffffff)
+             -- UniqFM doesn't like negative Ints
 
 type HashEnv = (Int, VarEnv Int)	-- Hash code for bound variables
 
-hash_expr :: HashEnv -> CoreExpr -> Int
+hash_expr :: HashEnv -> CoreExpr -> Word32
+-- Word32, because we're expecting overflows here, and overflowing
+-- signed types just isn't cool.  In C it's even undefined.
 hash_expr env (Note _ e)   	      = hash_expr env e
 hash_expr env (Cast e co)             = hash_expr env e
 hash_expr env (Var v)     	      = hashVar env v
-hash_expr env (Lit lit)		      = hashLiteral lit
+hash_expr env (Lit lit)		      = fromIntegral (hashLiteral lit)
 hash_expr env (App f e)   	      = hash_expr env f * fast_hash_expr env e
 hash_expr env (Let (NonRec b r) e)    = hash_expr (extend_env env b) e * fast_hash_expr env r
 hash_expr env (Let (Rec ((b,r):_)) e) = hash_expr (extend_env env b) e
 hash_expr env (Case e _ _ _)	      = hash_expr env e
 hash_expr env (Lam b e)	              = hash_expr (extend_env env b) e
-hash_expr env (Type t)	              = fast_hash_type env t
+hash_expr env (Type t)	              = WARN(True, text "hash_expr: type") 1
+-- Shouldn't happen.  Better to use WARN than trace, because trace
+-- prevents the CPR optimisation kicking in for hash_expr.
 
 fast_hash_expr env (Var v)     	= hashVar env v
 fast_hash_expr env (Type t)	= fast_hash_type env t
-fast_hash_expr env (Lit lit)	= hashLiteral lit
+fast_hash_expr env (Lit lit)	= fromIntegral (hashLiteral lit)
 fast_hash_expr env (Cast e co)  = fast_hash_expr env e
 fast_hash_expr env (Note n e)   = fast_hash_expr env e
 fast_hash_expr env (App f a)    = fast_hash_expr env a	-- A bit idiosyncratic ('a' not 'f')!
 fast_hash_expr env other        = 1
 
-fast_hash_type :: HashEnv -> Type -> Int
+fast_hash_type :: HashEnv -> Type -> Word32
 fast_hash_type env ty 
   | Just tv <- getTyVar_maybe ty          = hashVar env tv
-  | Just (tc,_) <- splitTyConApp_maybe ty = hashName (tyConName tc)
+  | Just (tc,_) <- splitTyConApp_maybe ty
+                              = fromIntegral (hashName (tyConName tc))
   | otherwise				  = 1
 
 extend_env :: HashEnv -> Var -> (Int, VarEnv Int)
 extend_env (n,env) b = (n+1, extendVarEnv env b n)
 
-hashVar :: HashEnv -> Var -> Int
-hashVar (_,env) v = lookupVarEnv env v `orElse` hashName (idName v)
+hashVar :: HashEnv -> Var -> Word32
+hashVar (_,env) v
+ = fromIntegral (lookupVarEnv env v `orElse` hashName (idName v))
 \end{code}
 
 %************************************************************************
