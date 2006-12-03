@@ -8,10 +8,10 @@ top_dirs="nofib testsuite"
 # based on where this GHC repo came from.
 defaultrepo=`cat _darcs/prefs/defaultrepo`
 case $defaultrepo in
-  http://*) default_repo_root=`echo $defaultrepo | sed 's!/ghc$!!'`
-            default_lib_repo_root=$default_repo_root/packages;;
-  /*)       default_repo_root=$defaultrepo
-            default_lib_repo_root=$default_repo_root/libraries;;
+  http://* | *@*:*)
+    defaultrepo_lib=`echo $defaultrepo | sed 's!/ghc$!!'`/packages;;
+  /*)
+    defaultrepo_lib=$defaultrepo/libraries;;
 esac
 
 quiet=NO
@@ -52,12 +52,6 @@ darcsget()
     *) echo "warning: adding --partial, to override use --complete"
   esac
 
-  repo_root=`cat _darcs/prefs/defaultrepo`
-  case $repo_root in
-    /*) lib_repos=$repo_root/libraries;;
-    *)  lib_repos=$default_lib_repo_root;;
-  esac
-
   cd libraries
 
   if test "$extra" = "YES"; then
@@ -70,7 +64,7 @@ darcsget()
     if test -d $pkg; then
 	echo "warning: $pkg already present; omitting"
     else
-	repo=$lib_repos/$pkg
+	repo=$defaultrepo_lib/$pkg
 	message "== running darcs get --partial $* $repo"
 	darcs get --partial $* $repo
     fi
