@@ -397,7 +397,11 @@ typedef struct _RtsSymbolVal {
 #define RTS_USER_SIGNALS_SYMBOLS \
    SymX(setIOManagerPipe)
 #else
-#define RTS_USER_SIGNALS_SYMBOLS /* nothing */
+#define RTS_USER_SIGNALS_SYMBOLS \
+   SymX(sendIOManagerEvent) \
+   SymX(readIOManagerEvent) \
+   SymX(getIOManagerEvent) \
+   SymX(console_handler)
 #endif
 
 #ifdef TABLES_NEXT_TO_CODE
