@@ -267,7 +267,12 @@ cycle []		= error "Prelude.cycle: empty list"
 cycle xs		= xs' where xs' = xs ++ xs'
 
 -- | 'takeWhile', applied to a predicate @p@ and a list @xs@, returns the
--- longest prefix (possibly empty) of @xs@ of elements that satisfy @p@.
+-- longest prefix (possibly empty) of @xs@ of elements that satisfy @p@:
+--
+-- > takeWhile (< 3) [1,2,3,4,1,2,3,4] == [1,2]
+-- > takeWhile (< 9) [1,2,3] == [1,2,3]
+-- > takeWhile (< 0) [1,2,3] == []
+--
 
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile _ []          =  []
@@ -275,7 +280,12 @@ takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
             | otherwise =  []
 
--- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@.
+-- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@:
+--
+-- > dropWhile (< 3) [1,2,3,4,5,1,2,3] == [3,4,5,1,2,3]
+-- > dropWhile (< 9) [1,2,3] == []
+-- > dropWhile (< 0) [1,2,3] == [1,2,3]
+--
 
 dropWhile               :: (a -> Bool) -> [a] -> [a]
 dropWhile _ []          =  []
@@ -284,19 +294,46 @@ dropWhile p xs@(x:xs')
             | otherwise =  xs
 
 -- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
--- of length @n@, or @xs@ itself if @n > 'length' xs@.
+-- of length @n@, or @xs@ itself if @n > 'length' xs@:
+--
+-- > take 5 "Hello World!" == "Hello"
+-- > take 3 [1,2,3,4,5] == [1,2,3]
+-- > take 3 [1,2] == [1,2]
+-- > take 3 [] == []
+-- > take (-1) [1,2] == []
+-- > take 0 [1,2] == []
+--
 -- It is an instance of the more general 'Data.List.genericTake',
 -- in which @n@ may be of any integral type.
 take                   :: Int -> [a] -> [a]
 
 -- | 'drop' @n xs@ returns the suffix of @xs@
--- after the first @n@ elements, or @[]@ if @n > 'length' xs@.
+-- after the first @n@ elements, or @[]@ if @n > 'length' xs@:
+--
+-- > drop 6 "Hello World!" == "World!"
+-- > drop 3 [1,2,3,4,5] == [4,5]
+-- > drop 3 [1,2] == []
+-- > drop 3 [] == []
+-- > drop (-1) [1,2] == [1,2]
+-- > drop 0 [1,2] == [1,2]
+--
 -- It is an instance of the more general 'Data.List.genericDrop',
 -- in which @n@ may be of any integral type.
 drop                   :: Int -> [a] -> [a]
 
--- | 'splitAt' @n xs@ is equivalent to @('take' n xs, 'drop' n xs)@.
--- It is an instance of the more general 'Data.List.genericSplitAt',
+-- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
+-- length @n@ and second element is the remainder of the list:
+--
+-- > splitAt 6 "Hello World!" == ("Hello ","World!")
+-- > splitAt 3 [1,2,3,4,5] == ([1,2,3],[4,5])
+-- > splitAt 1 [1,2,3] == ([1],[2,3])
+-- > splitAt 3 [1,2,3] == ([1,2,3],[])
+-- > splitAt 4 [1,2,3] == ([1,2,3],[])
+-- > splitAt 0 [1,2,3] == ([],[1,2,3])
+-- > splitAt (-1) [1,2,3] == ([],[1,2,3])
+--
+-- It is equivalent to @('take' n xs, 'drop' n xs)@.
+-- 'splitAt' is an instance of the more general 'Data.List.genericSplitAt',
 -- in which @n@ may be of any integral type.
 splitAt                :: Int -> [a] -> ([a],[a])
 
@@ -381,7 +418,15 @@ splitAt (I# n#) ls
 
 #endif /* USE_REPORT_PRELUDE */
 
--- | 'span' @p xs@ is equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
+-- | 'span', applied to a predicate @p@ and a list @xs@, returns a tuple where
+-- first element is longest prefix (possibly empty) of @xs@ of elements that
+-- satisfy @p@ and second element is the remainder of the list:
+-- 
+-- > span (< 3) [1,2,3,4,1,2,3,4] == ([1,2],[3,4,1,2,3,4])
+-- > span (< 9) [1,2,3] == ([1,2,3],[])
+-- > span (< 0) [1,2,3] == ([],[1,2,3])
+-- 
+-- 'span' @p xs@ is equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
 
 span                    :: (a -> Bool) -> [a] -> ([a],[a])
 span _ xs@[]            =  (xs, xs)
@@ -389,7 +434,15 @@ span p xs@(x:xs')
          | p x          =  let (ys,zs) = span p xs' in (x:ys,zs)
          | otherwise    =  ([],xs)
 
--- | 'break' @p@ is equivalent to @'span' ('not' . p)@.
+-- | 'break', applied to a predicate @p@ and a list @xs@, returns a tuple where
+-- first element is longest prefix (possibly empty) of @xs@ of elements that
+-- /do not satisfy/ @p@ and second element is the remainder of the list:
+-- 
+-- > break (> 3) [1,2,3,4,1,2,3,4] == ([1,2,3],[4,1,2,3,4])
+-- > break (< 9) [1,2,3] == ([],[1,2,3])
+-- > break (> 9) [1,2,3] == ([1,2,3],[])
+--
+-- 'break' @p@ is equivalent to @'span' ('not' . p)@.
 
 break                   :: (a -> Bool) -> [a] -> ([a],[a])
 #ifdef USE_REPORT_PRELUDE
