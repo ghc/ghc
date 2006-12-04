@@ -6130,6 +6130,22 @@ r) ->
 described in this section.  All are exported by
 <literal>GHC.Exts</literal>.</para>
 
+<sect2> <title>The <literal>seq</literal> function </title>
+<para>
+The function <literal>seq</literal> is as described in the Haskell98 Report.
+<programlisting>
+  seq :: a -> b -> b
+</programlisting>
+It evaluates its first argument to head normal form, and then returns its
+second argument as the result.  The reason that it is documented here is 
+that, despite <literal>seq</literal>'s polymorphism, its 
+second argument can have an unboxed type, or
+can be an unboxed tuple; for example <literal>(seq x 4#)</literal>
+or <literal>(seq x (# p,q #))</literal>.  This requires <literal>b</literal>
+to be instantiated to an unboxed type, which is not usually allowed.
+</para>
+</sect2>
+
 <sect2> <title>The <literal>inline</literal> function </title>
 <para>
 The <literal>inline</literal> function is somewhat experimental.
@@ -6188,6 +6204,11 @@ If <literal>lazy</literal> were not lazy, <literal>par</literal> would
 look strict in <literal>y</literal> which would defeat the whole 
 purpose of <literal>par</literal>.
 </para>
+<para>
+Like <literal>seq</literal>, the argument of <literal>lazy</literal> can have
+an unboxed type.
+</para>
+
 </sect2>
 
 <sect2> <title>The <literal>unsafeCoerce#</literal> function </title>
@@ -6203,7 +6224,14 @@ It is generally used when you want to write a program that you know is
 well-typed, but where Haskell's type system is not expressive enough to prove
 that it is well typed.
 </para>
+<para>
+The argument to <literal>unsafeCoerce#</literal> can have unboxed types,
+although extremely bad things will happen if you coerce a boxed type 
+to an unboxed type.
+</para>
+
 </sect2>
+
 </sect1>
 
 
