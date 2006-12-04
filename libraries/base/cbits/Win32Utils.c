@@ -4,6 +4,8 @@
    Useful Win32 bits
    ------------------------------------------------------------------------- */
 
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+
 #include "HsBase.h"
 
 /* This is the error table that defines the mapping between OS error
@@ -118,4 +120,6 @@ HsInt getTicksOfDay(void)
       /* FILETIMES are in units of 100ns */
     return (HsInt)t;
 }
+
+#endif
 
