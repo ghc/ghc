@@ -1070,8 +1070,7 @@ unsafeCoerceId
 		      (mkFunTy openAlphaTy openBetaTy)
     [x] = mkTemplateLocals [openAlphaTy]
     rhs = mkLams [openAlphaTyVar,openBetaTyVar,x] $
---       Note (Coerce openBetaTy openAlphaTy) (Var x)
-         Cast (Var x) (mkUnsafeCoercion openAlphaTy openBetaTy)
+          Cast (Var x) (mkUnsafeCoercion openAlphaTy openBetaTy)
 
 -- nullAddr# :: Addr#
 -- The reason is is here is because we don't provide 
