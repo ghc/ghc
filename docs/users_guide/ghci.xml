@@ -1556,10 +1556,9 @@ Prelude> :set -fno-glasgow-exts
 	<term>Concurrent threads don't carry on running when GHCi is
         waiting for input.</term>
 	<listitem>
-	  <para>No, they don't.  This is because the Haskell binding
-	  to the GNU readline library doesn't support reading from the
-	  terminal in a non-blocking way, which is required to work
-	  properly with GHC's concurrency model.</para>
+	  <para>This should work, as long as your GHCi was built with
+	  the <option>-threaded</option> switch, which is the default.
+	  Consult whoever supplied your GHCi installation.</para>
 	</listitem>
       </varlistentry>
 
