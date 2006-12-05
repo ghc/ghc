@@ -4,7 +4,7 @@
 
 <sect1>
 <title>
-Starting GHC on Win32 platforms</title>
+Starting GHC on Windows platforms</title>
 
 <para>
 The installer that installs GHC on Win32 also sets up the file-suffix associations
@@ -34,6 +34,45 @@ Notice how the "%1" argument is quoted (or not).
 </para>
 -->
 
+</sect1>
+
+<sect1 id="ghci-windows">
+<title>Running GHCi on Windows</title>
+
+  <para>We recommend running GHCi in a standard Windows console:
+  select the <literal>GHCi</literal> option from the start menu item
+  added by the GHC installer, or use
+  <literal>Start->Run->cmd</literal> to get a Windows console and
+  invoke <literal>ghci</literal> from there (as long as it's in your
+  <literal>PATH</literal>).</para>
+
+  <para>If you run GHCi in a Cygwin or MSYS shell, then the Control-C
+  behaviour is adversely affected.  In one of these environments you
+  should use the <literal>ghcii.sh</literal> script to start GHCi,
+  otherwise when you hit Control-C you'll be returned to the shell
+  prompt but the GHCi process will still be running.  However, even
+  using the <literal>ghcii.sh</literal> script, if you hit Control-C
+  then the GHCi process will be killed immediately, rather than
+  letting you interrupt a running program inside GHCi as it should.
+  This problem is caused by the fact that the Cygwin and MSYS shell
+  environments don't pass Control-C events to non-Cygwin child
+  processes, because in order to do that there needs to be a Windows
+  console.</para>
+
+  <para>There's an exception: you can use a Cygwin shell if the
+  <literal>CYGWIN</literal> environment variable does
+  <emphasis>not</emphasis> contain <literal>tty</literal>.  In this
+  mode, the Cygwin shell behaves like a Windows console shell and
+  console events are propagated to child processes.  Note that the
+  <literal>CYGWIN</literal> environment variable must be set
+  <emphasis>before</emphasis> starting the Cygwin shell; changing it
+  afterwards has no effect on the shell.</para>
+
+  <para>This problem doesn't just affect GHCi, it affects any
+  GHC-compiled program that wants to catch console events.  See the
+  <ulink
+  url="../libraries/base/GHC-ConsoleHandler.html">GHC.ConsoleHandler</ulink>
+  module.</para>
 </sect1>
 
 <sect1>

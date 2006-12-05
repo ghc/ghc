@@ -1511,7 +1511,7 @@ Prelude> :set -fno-glasgow-exts
 
   </sect1>
 
-  <sect1>
+  <sect1 id="ghci-faq">
     <title>FAQ and Things To Watch Out For</title>
     
     <variablelist>
@@ -1585,6 +1585,13 @@ Prelude> :set -fno-glasgow-exts
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term>I can't use Control-C to interrupt computations in
+          GHCi on Windows.</term>
+        <listitem>
+          <para>See <xref linkend="ghci-windows">.</xref></para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect1>
 
