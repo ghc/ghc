@@ -595,6 +595,7 @@ INSTALL_PROGRAM = $(INSTALL) -m 755
 INSTALL_SCRIPT  = $(INSTALL) -m 755
 INSTALL_SHLIB   = $(INSTALL) -m 755
 INSTALL_DATA    = $(INSTALL) -m 644
+INSTALL_MAN     = $(INSTALL) -m 644
 INSTALL_DIR     = $(MKDIRHIER)
 
 # -----------------------------------------------------------------------------
