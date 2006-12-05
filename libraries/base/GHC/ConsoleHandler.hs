@@ -52,6 +52,25 @@ data ConsoleEvent
  | Shutdown
  deriving (Eq, Ord, Enum, Show, Read, Typeable)
 
+-- | Allows Windows console events to be caught and handled.  To
+-- handle a console event, call 'installHandler' passing the
+-- appropriate 'Handler' value.  When the event is received, if the
+-- 'Handler' value is @Catch f@, then a new thread will be spawned by
+-- the system to execute @f e@, where @e@ is the 'ConsoleEvent' that
+-- was received.
+--
+-- Note that console events can only be received by an application
+-- running in a Windows console.  Certain environments that look like consoles
+-- do not support console events, these include:
+--
+--  * Cygwin shells with @CYGWIN=tty@ set (if you don't set @CYGWIN=tty@,
+--    then a Cygwin shell behaves like a Windows console).
+--  * Cygwin xterm and rxvt windows
+--  * MSYS rxvt windows
+--
+-- In order for your application to receive console events, avoid running
+-- it in one of these environments.
+--
 installHandler :: Handler -> IO Handler
 installHandler handler = 
   alloca $ \ p_sp -> do
