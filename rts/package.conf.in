@@ -142,12 +142,10 @@ ld-options:
          , "-u", "base_GHCziWeak_runFinalizzerBatch_closure"
 #endif
 
-#ifndef mingw32_HOST_OS
 #ifdef LEADING_UNDERSCORE
 	 , "-u", "_base_GHCziConc_ensureIOManagerIsRunning_closure"
 #else
 	 , "-u", "base_GHCziConc_ensureIOManagerIsRunning_closure"
-#endif
 #endif
 
 framework-dirs:
