@@ -6,7 +6,7 @@ class C a where
   type    St a :: *
 
 instance C Int where
-  data    Td a :: *   -- must fail: kind signature in instance
-  data    Sd Int = SdC Char
+  data    Sd Int = SdC1 Char	-- must fail: conflicting
+  data    Sd Int = SdC2 Char	--            declarations
   newtype Sn Int = SnC Char
   type    St Int = Char

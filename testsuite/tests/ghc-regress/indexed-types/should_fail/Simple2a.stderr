@@ -1,5 +1,2 @@
 
-Simple2a.hs:9:10:
-    Multiple declarations of `Main.Sd'
-    Declared at: Simple2a.hs:4:10
-		 Simple2a.hs:9:10
+Simple2a.hs:12:2: parse error (possibly incorrect indentation)
