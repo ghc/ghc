@@ -52,6 +52,17 @@ import Control.Monad    ( mplus )
 
 {-
 -----------------------------------------------------------------------------
+6 December 2006
+
+Conflicts: 32 shift/reduce
+           1 reduce/reduce
+
+The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
+would think the two should never occur in the same context.
+
+  -=chak
+
+-----------------------------------------------------------------------------
 26 July 2006
 
 Conflicts: 37 shift/reduce
@@ -491,9 +502,10 @@ topdecls :: { OrdList (LHsDecl RdrName) }
 topdecl :: { OrdList (LHsDecl RdrName) }
   	: cl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
   	| ty_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
-	  | 'instance' inst_type where
-		{ let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
-		  in unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs ats))) }
+	| 'instance' inst_type where_inst
+	    { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
+	      in 
+	      unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs ats)))}
         | stand_alone_deriving                  { unitOL (LL (DerivD (unLoc $1))) }
 	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
 	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
@@ -510,7 +522,7 @@ topdecl :: { OrdList (LHsDecl RdrName) }
 -- Type classes
 --
 cl_decl :: { LTyClDecl RdrName }
-	: 'class' tycl_hdr fds where
+	: 'class' tycl_hdr fds where_cls
 		{% do { let { (binds, sigs, ats, docs)           = 
 			        cvBindsAndSigs (unLoc $4)
 		            ; (ctxt, tc, tvs, tparms) = unLoc $2}
@@ -616,9 +628,16 @@ ty_decl :: { LTyClDecl RdrName }
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
 			       (unLoc $4) (reverse (unLoc $6)) (unLoc $7)) } }
 
--- Associate type declarations
+-- Associate type family declarations
 --
-at_decl :: { LTyClDecl RdrName }
+-- * They have a different syntax than on the toplevel (no family special
+--   identifier).
+--
+-- * They also need to be separate from instances; otherwise, data family
+--   declarations without a kind signature cause parsing conflicts with empty
+--   data declarations. 
+--
+at_decl_cls :: { LTyClDecl RdrName }
            -- type family declarations
         : 'type' type opt_kind_sig
 		-- Note the use of type for the head; this allows
@@ -632,7 +651,7 @@ at_decl :: { LTyClDecl RdrName }
 				  (TyFunction tc tvs False kind))
 		      } }
 
-           -- type instance declarations
+           -- default type instance
         | 'type' type '=' ctype
 		-- Note the use of type for the head; this allows
 		-- infix type constructors and type patterns
@@ -642,14 +661,30 @@ at_decl :: { LTyClDecl RdrName }
 				  (TySynonym tc tvs (Just typats) $4)) 
                       } }
 
-          -- data/newtype family
-        | data_or_newtype tycl_hdr '::' kind
+          -- data/newtype family declaration
+        | data_or_newtype tycl_hdr opt_kind_sig
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
                       ; checkTyVars tparms    -- no type pattern
+		      ; let kind = case unLoc $3 of
+				     Nothing -> liftedTypeKind
+				     Just ki -> ki
 		      ; return $
-			  L (comb3 $1 $2 $4)
+			  L (comb3 $1 $2 $3)
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
-			      (Just (unLoc $4)) [] Nothing) } }
+			      (Just kind) [] Nothing) } }
+
+-- Associate type instances
+--
+at_decl_inst :: { LTyClDecl RdrName }
+           -- type instance declarations
+        : 'type' type '=' ctype
+		-- Note the use of type for the head; this allows
+		-- infix type constructors and type patterns
+		--
+ 		{% do { (tc, tvs, typats) <- checkSynHdr $2 True
+		      ; return (L (comb2 $1 $4) 
+				  (TySynonym tc tvs (Just typats) $4)) 
+                      } }
 
         -- data/newtype instance declaration
 	| data_or_newtype tycl_hdr constrs deriving
@@ -712,32 +747,59 @@ stand_alone_deriving :: { LDerivDecl RdrName }
 -----------------------------------------------------------------------------
 -- Nested declarations
 
--- Type declaration or value declaration
+-- Declaration in class bodies
 --
-tydecl  :: { Located (OrdList (LHsDecl RdrName)) }
-tydecl  : at_decl		        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
-	| decl                          { $1 }
+decl_cls  :: { Located (OrdList (LHsDecl RdrName)) }
+decl_cls  : at_decl_cls		        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
+	  | decl                        { $1 }
 
-tydecls	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
-	: tydecls ';' tydecl		{ LL (unLoc $1 `appOL` unLoc $3) }
-	| tydecls ';'			{ LL (unLoc $1) }
-	| tydecl			{ $1 }
-	| {- empty -}			{ noLoc nilOL }
+decls_cls :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+	  : decls_cls ';' decl_cls	{ LL (unLoc $1 `appOL` unLoc $3) }
+	  | decls_cls ';'		{ LL (unLoc $1) }
+	  | decl_cls			{ $1 }
+	  | {- empty -}			{ noLoc nilOL }
 
 
-tydecllist 
+decllist_cls
         :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
-	: '{'            tydecls '}'	{ LL (unLoc $2) }
-	|     vocurly    tydecls close	{ $2 }
+	: '{'         decls_cls '}'	{ LL (unLoc $2) }
+	|     vocurly decls_cls close	{ $2 }
 
--- Form of the body of class and instance declarations
+-- Class body
 --
-where 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+where_cls :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 				-- No implicit parameters
 				-- May have type declarations
-	: 'where' tydecllist		{ LL (unLoc $2) }
+	: 'where' decllist_cls	        { LL (unLoc $2) }
+	| {- empty -}		        { noLoc nilOL }
+
+-- Declarations in instance bodies
+--
+decl_inst  :: { Located (OrdList (LHsDecl RdrName)) }
+decl_inst  : at_decl_inst	        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
+	   | decl                       { $1 }
+
+decls_inst :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+	   : decls_inst ';' decl_inst	{ LL (unLoc $1 `appOL` unLoc $3) }
+	   | decls_inst ';'		{ LL (unLoc $1) }
+	   | decl_inst			{ $1 }
+	   | {- empty -}		{ noLoc nilOL }
+
+decllist_inst 
+        :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+	: '{'         decls_inst '}'	{ LL (unLoc $2) }
+	|     vocurly decls_inst close	{ $2 }
+
+-- Instance body
+--
+where_inst :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+				-- No implicit parameters
+				-- May have type declarations
+	: 'where' decllist_inst		{ LL (unLoc $2) }
 	| {- empty -}			{ noLoc nilOL }
 
+-- Declarations in binding groups other than classes and instances
+--
 decls 	:: { Located (OrdList (LHsDecl RdrName)) }	
 	: decls ';' decl		{ LL (unLoc $1 `appOL` unLoc $3) }
 	| decls ';'			{ LL (unLoc $1) }
