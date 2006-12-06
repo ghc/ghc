@@ -1266,6 +1266,14 @@
             <literal>network</literal> package.
           </para>
         </listitem>
+        <listitem>
+          <para>
+            The <literal>Network.CGI.Compat</literal> module provides
+            a similar interface to the old <literal>Network.CGI</literal>
+            module, but it uses <literal>Text.XHtml</literal> rather than
+            <literal>Text.Html</literal>.
+          </para>
+        </listitem>
       </itemizedlist>
     </sect3>
 
