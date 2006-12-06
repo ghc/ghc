@@ -328,8 +328,13 @@ reOrderCycle bndrs (bind : binds)
 	-- But we won't because constructor args are marked "Many".
 
 	-- Cheap and cheerful; the simplifer moves casts out of the way
+	-- The lambda case is important to spot x = /\a. C (f a)
+	-- which comes up when C is a dictionary constructor and
+	-- f is a default method.  
+	-- Example: the instance for Show (ST s a) in GHC.ST
     is_con_app (Var v)    = isDataConWorkId v
     is_con_app (App f _)  = is_con_app f
+    is_con_app (Lam b e) | isTyVar b = is_con_app e
     is_con_app (Note _ e) = is_con_app e
     is_con_app other      = False
 
