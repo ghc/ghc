@@ -3,8 +3,8 @@
 module ShouldCompile where
 
 class C3 a where
-  data    S3  a :: *
-  newtype S3n a :: *
+  data    S3  a		-- kind is optional
+  newtype S3n a		-- kind is optional
   foo3  :: a -> S3 a
   foo3n :: a -> S3n a
   bar3  :: S3 a -> a
