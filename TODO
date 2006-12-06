@@ -1,6 +1,9 @@
 -- ---------------------------------------------------------------------------
 -- Before next release
 
+* There should be a --maintainer flag to allow Cabal to pass the maintainer
+  from the .cabal file to the generated docs.
+
 -----------------------------------------------------------------------------
 -- bugs
 
