@@ -444,33 +444,33 @@ cmmBlockConFold (BasicBlock id stmts) = do
 cmmStmtConFold stmt
    = case stmt of
         CmmAssign reg src
-           -> do src' <- cmmExprConFold False src
+           -> do src' <- cmmExprConFold DataReference src
                  return $ case src' of
 		   CmmReg reg' | reg == reg' -> CmmNop
 		   new_src -> CmmAssign reg new_src
 
         CmmStore addr src
-           -> do addr' <- cmmExprConFold False addr
-                 src'  <- cmmExprConFold False src
+           -> do addr' <- cmmExprConFold DataReference addr
+                 src'  <- cmmExprConFold DataReference src
                  return $ CmmStore addr' src'
 
         CmmJump addr regs
-           -> do addr' <- cmmExprConFold True addr
+           -> do addr' <- cmmExprConFold JumpReference addr
                  return $ CmmJump addr' regs
 
 	CmmCall target regs args vols
 	   -> do target' <- case target of
 			      CmmForeignCall e conv -> do
-			        e' <- cmmExprConFold True e
+			        e' <- cmmExprConFold CallReference e
 			        return $ CmmForeignCall e' conv
 			      other -> return other
                  args' <- mapM (\(arg, hint) -> do
-                                  arg' <- cmmExprConFold False arg
+                                  arg' <- cmmExprConFold DataReference arg
                                   return (arg', hint)) args
 	         return $ CmmCall target' regs args' vols
 
         CmmCondBranch test dest
-           -> do test' <- cmmExprConFold False test
+           -> do test' <- cmmExprConFold DataReference test
 	         return $ case test' of
 		   CmmLit (CmmInt 0 _) -> 
 		     CmmComment (mkFastString ("deleted: " ++ 
@@ -480,29 +480,29 @@ cmmStmtConFold stmt
 		   other -> CmmCondBranch test' dest
 
 	CmmSwitch expr ids
-	   -> do expr' <- cmmExprConFold False expr
+	   -> do expr' <- cmmExprConFold DataReference expr
 	         return $ CmmSwitch expr' ids
 
         other
            -> return other
 
 
-cmmExprConFold isJumpTarget expr
+cmmExprConFold referenceKind expr
    = case expr of
         CmmLoad addr rep
-           -> do addr' <- cmmExprConFold False addr
+           -> do addr' <- cmmExprConFold DataReference addr
                  return $ CmmLoad addr' rep
 
         CmmMachOp mop args
            -- For MachOps, we first optimize the children, and then we try 
            -- our hand at some constant-folding.
-           -> do args' <- mapM (cmmExprConFold False) args
+           -> do args' <- mapM (cmmExprConFold DataReference) args
                  return $ cmmMachOpFold mop args'
 
         CmmLit (CmmLabel lbl)
-           -> cmmMakeDynamicReference addImportCmmOpt isJumpTarget lbl
+           -> cmmMakeDynamicReference addImportCmmOpt referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
-           -> do dynRef <- cmmMakeDynamicReference addImportCmmOpt isJumpTarget lbl
+           -> do dynRef <- cmmMakeDynamicReference addImportCmmOpt referenceKind lbl
                  return $ cmmMachOpFold (MO_Add wordRep) [
                      dynRef,
                      (CmmLit $ CmmInt (fromIntegral off) wordRep)
@@ -514,11 +514,11 @@ cmmExprConFold isJumpTarget expr
            -- with the corresponding labels:
         CmmReg (CmmGlobal GCEnter1)
           | not opt_PIC
-          -> cmmExprConFold isJumpTarget $
+          -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_enter_1"))) 
         CmmReg (CmmGlobal GCFun)
           | not opt_PIC
-          -> cmmExprConFold isJumpTarget $
+          -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "__stg_gc_fun")))
 #endif
 
@@ -533,12 +533,12 @@ cmmExprConFold isJumpTarget expr
                  Left  realreg -> return expr
                  Right baseRegAddr 
                     -> case mid of 
-                          BaseReg -> cmmExprConFold False baseRegAddr
-                          other   -> cmmExprConFold False (CmmLoad baseRegAddr 
-							(globalRegRep mid))
+                          BaseReg -> cmmExprConFold DataReference baseRegAddr
+                          other   -> cmmExprConFold DataReference
+                                        (CmmLoad baseRegAddr (globalRegRep mid))
 	   -- eliminate zero offsets
 	CmmRegOff reg 0
-	   -> cmmExprConFold False (CmmReg reg)
+	   -> cmmExprConFold referenceKind (CmmReg reg)
 
         CmmRegOff (CmmGlobal mid) offset
            -- RegOf leaves are just a shorthand form. If the reg maps
@@ -547,7 +547,7 @@ cmmExprConFold isJumpTarget expr
            -> case get_GlobalReg_reg_or_addr mid of
                 Left  realreg -> return expr
                 Right baseRegAddr
-                   -> cmmExprConFold False (CmmMachOp (MO_Add wordRep) [
+                   -> cmmExprConFold DataReference (CmmMachOp (MO_Add wordRep) [
                                         CmmReg (CmmGlobal mid),
                                         CmmLit (CmmInt (fromIntegral offset)
                                                        wordRep)])

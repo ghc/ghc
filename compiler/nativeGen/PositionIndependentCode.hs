@@ -1,5 +1,6 @@
 module PositionIndependentCode (
         cmmMakeDynamicReference,
+        ReferenceKind(..),
         needImportedSymbols,
         pprImportedSymbol,
         pprGotDeclaration,
@@ -83,17 +84,22 @@ import Panic            ( panic )
 -- - addImportCmmOpt for the CmmOptM monad
 -- - addImportNat for the NatM monad.
 
+data ReferenceKind = DataReference
+                   | CallReference
+                   | JumpReference
+                   deriving(Eq)
+
 cmmMakeDynamicReference
   :: Monad m => (CLabel -> m ())  -- a monad & a function
                                   -- used for recording imported symbols
-             -> Bool              -- whether this is the target of a jump
+             -> ReferenceKind     -- whether this is the target of a jump
              -> CLabel            -- the label
              -> m CmmExpr
   
-cmmMakeDynamicReference addImport isJumpTarget lbl
+cmmMakeDynamicReference addImport referenceKind lbl
   | Just _ <- dynamicLinkerLabelInfo lbl
   = return $ CmmLit $ CmmLabel lbl   -- already processed it, pass through
-  | otherwise = case howToAccessLabel isJumpTarget lbl of
+  | otherwise = case howToAccessLabel referenceKind lbl of
         AccessViaStub -> do
               let stub = mkDynamicLinkerLabel CodeStub lbl
               addImport stub
@@ -102,12 +108,13 @@ cmmMakeDynamicReference addImport isJumpTarget lbl
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
               return $ CmmLoad (cmmMakePicReference symbolPtr) wordRep
-        AccessDirectly
-                -- all currently supported processors support
-                -- a PC-relative branch instruction, so just jump there
-          | isJumpTarget -> return $ CmmLit $ CmmLabel lbl
+        AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:
-          | otherwise    -> return $ cmmMakePicReference lbl  
+              DataReference -> return $ cmmMakePicReference lbl  
+                -- all currently supported processors support
+                -- PC-relative branch and call instructions,
+                -- so just jump there if it's a call or a jump
+              _ -> return $ CmmLit $ CmmLabel lbl
   
 -- -------------------------------------------------------------------
   
@@ -154,7 +161,7 @@ data LabelAccessStyle = AccessViaStub
                       | AccessViaSymbolPtr
                       | AccessDirectly
 
-howToAccessLabel :: Bool -> CLabel -> LabelAccessStyle
+howToAccessLabel :: ReferenceKind -> CLabel -> LabelAccessStyle
 
 #if mingw32_TARGET_OS
 -- Windows
@@ -165,45 +172,60 @@ howToAccessLabel :: Bool -> CLabel -> LabelAccessStyle
 
 howToAccessLabel _ lbl | labelDynamic lbl = AccessViaSymbolPtr
                        | otherwise        = AccessDirectly
-
 #elif darwin_TARGET_OS
 -- Mach-O (Darwin, Mac OS X)
 --
 -- Indirect access is required in the following cases:
 --  * things imported from a dynamic library
---  * things from a different module, if we're generating PIC code
+--  * (not on x86_64) data from a different module, if we're generating PIC code
 -- It is always possible to access something indirectly,
 -- even when it's not necessary.
 
-#if powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH
-    -- on i386 and probably also on x86_64, dyld code stubs don't
-    -- work for tailcalls because the stack alignment is only right
-    -- for regular calls.
-
-howToAccessLabel True lbl
-      -- jumps to a dynamic library go via a symbol stub
-    | labelDynamic lbl = AccessViaStub
-      -- when generating PIC code, all cross-module references must
-      -- must go via a symbol pointer, too.
+howToAccessLabel DataReference lbl
+      -- data access to a dynamic library goes via a symbol pointer
+    | labelDynamic lbl = AccessViaSymbolPtr
+    
+#if !x86_64_TARGET_ARCH
+      -- when generating PIC code, all cross-module data references must
+      -- must go via a symbol pointer, too, because the assembler
+      -- cannot generate code for a label difference where one
+      -- label is undefined. Doesn't apply t x86_64.
       -- Unfortunately, we don't know whether it's cross-module,
       -- so we do it for all externally visible labels.
       -- This is a slight waste of time and space, but otherwise
       -- we'd need to pass the current Module all the way in to
       -- this function.
-    | opt_PIC && externallyVisibleCLabel lbl = AccessViaStub
-#endif
-howToAccessLabel _ lbl
-      -- data access to a dynamic library goes via a symbol pointer
-    | labelDynamic lbl = AccessViaSymbolPtr
-      -- cross-module PIC references: same as above
     | opt_PIC && externallyVisibleCLabel lbl = AccessViaSymbolPtr
-howToAccessLabel _ _ = AccessDirectly
+#endif
+    | otherwise = AccessDirectly
+
+
+#if x86_TARGET_ARCH || x86_64_TARGET_ARCH
+    -- dyld code stubs don't work for tailcalls because the
+    -- stack alignment is only right for regular calls.
+    -- Therefore, we have to go via a symbol pointer:
+howToAccessLabel JumpReference lbl
+    | labelDynamic lbl
+    = AccessViaSymbolPtr
+#endif
+
+howToAccessLabel _ lbl
+#if !x86_64_TARGET_ARCH
+    -- Code stubs are the usual method of choice for imported code;
+    -- not needed on x86_64 because Apple's new linker, ld64, generates
+    -- them automatically.
+    | labelDynamic lbl
+    = AccessViaStub
+#endif
+    | otherwise
+    = AccessDirectly
+
 
 #elif linux_TARGET_OS && powerpc64_TARGET_ARCH
 -- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
 
-howToAccessLabel True lbl = AccessDirectly -- actually, .label instead of label
-howToAccessLabel _ lbl = AccessViaSymbolPtr
+howToAccessLabel DataReference lbl = AccessViaSymbolPtr
+howToAccessLabel _ lbl = AccessDirectly -- actually, .label instead of label
 
 #elif linux_TARGET_OS
 -- ELF (Linux)
@@ -217,49 +239,47 @@ howToAccessLabel _ lbl = AccessViaSymbolPtr
 -- from position independent code. It is also required from the main program
 -- when dynamic libraries containing Haskell code are used.
 
-howToAccessLabel isJump lbl
+howToAccessLabel _ lbl
 	-- no PIC -> the dynamic linker does everything for us;
 	--           if we don't dynamically link to Haskell code,
 	--           it actually manages to do so without messing thins up.
     | not opt_PIC && opt_Static = AccessDirectly
    
-#if !i386_TARGET_ARCH
--- for Intel, we temporarily disable the use of the
--- Procedure Linkage Table, because PLTs on intel require the
--- address of the GOT to be loaded into register %ebx before
--- a jump through the PLT is made.
--- TODO: make the i386 NCG ensure this before jumping to a
---       CodeStub label, so we can remove this special case.
-
-	-- As long as we're in a shared library ourselves,
-	-- we can use the plt.
-	-- NOTE: We might want to disable this, because this
-	--       prevents -fPIC code from being linked statically.
-    | isJump && labelDynamic lbl && opt_PIC = AccessViaStub
-
-    	-- TODO: it would be OK to access non-Haskell code via a stub
---  | isJump && labelDynamic lbl && not isHaskellCode lbl = AccessViaStub
-
-	-- Using code stubs for jumps from the main program to an entry
-	-- label in a dynamic library is deadly; this will cause the dynamic
-	-- linker to replace all references (even data references) to that
-	-- label by references to the stub, so we won't find our info tables
-	-- any more.
-#endif
-
+howToAccessLabel DataReference lbl
     	-- A dynamic label needs to be accessed via a symbol pointer.
-	-- NOTE: It would be OK to jump to foreign code via a PLT stub.
     | labelDynamic lbl = AccessViaSymbolPtr
-    
 #if powerpc_TARGET_ARCH
  	-- For PowerPC32 -fPIC, we have to access even static data
 	-- via a symbol pointer (see below for an explanation why
 	-- PowerPC32 Linux is especially broken).
-    | opt_PIC && not isJump = AccessViaSymbolPtr
+    | opt_PIC = AccessViaSymbolPtr
 #endif
-
     | otherwise = AccessDirectly
 
+
+-- In most cases, we have to avoid symbol stubs on ELF, for the following reasons:
+-- * on i386, the position-independent symbol stubs in the Procedure Linkage Table
+--   require the address of the GOT to be loaded into register %ebx on entry.
+-- * The linker will take any reference to the symbol stub as a hint that
+--   the label in question is a code label. When linking executables, this
+--   will cause the linker to replace even data references to the label with
+--   references to the symbol stub.
+
+-- This leaves calling a (foreign) function from non-PIC code
+-- (AccessDirectly, because we get an implicit symbol stub)
+-- and calling functions from PIC code on non-i386 platforms (via a symbol stub) 
+
+howToAccessLabel CallLabel lbl
+    | labelDynamic lbl && not opt_PIC
+    = AccessDirectly
+#if !i386_TARGET_ARCH
+    | labelDynamic lbl && opt_PIC
+    = AccessViaSymbolStub
+#endif
+
+howToAccessLabel _ lbl
+    | labelDynamic lbl = AccessViaSymbolPtr
+    | otherwise = AccessDirectly
 #else
 --
 -- all other platforms
@@ -275,8 +295,8 @@ howToAccessLabel _ _
 -- get the address of a label?
 
 picRelative :: CLabel -> CmmLit
-#if darwin_TARGET_OS
--- Darwin:
+#if darwin_TARGET_OS && !x86_64_TARGET_ARCH
+-- Darwin, but not x86_64:
 -- The PIC base register points to the PIC base label at the beginning
 -- of the current CmmTop. We just have to use a label difference to
 -- get the offset.
@@ -297,10 +317,14 @@ picRelative lbl
 picRelative lbl
   = CmmLabelDiffOff lbl gotLabel 0
 
-#elif linux_TARGET_OS
--- Other Linux versions:
+#elif linux_TARGET_OS || (darwin_TARGET_OS && x86_64_TARGET_ARCH)
+-- Most Linux versions:
 -- The PIC base register points to the GOT. Use foo@got for symbol
 -- pointers, and foo@gotoff for everything else.
+-- Linux and Darwin on x86_64:
+-- The PIC base register is %rip, we use foo@gotpcrel for symbol pointers,
+-- and a GotSymbolOffset label for other things.
+-- For reasons of tradition, the symbol offset label is written as a plain label.
 
 picRelative lbl
   | Just (SymbolPtr, lbl') <- dynamicLinkerLabelInfo lbl
@@ -323,7 +347,7 @@ asmSDoc d = Outputable.withPprStyleDoc (
 pprCLabel_asm l = asmSDoc (pprCLabel l)
 
 
-#if darwin_TARGET_OS
+#if darwin_TARGET_OS && !x86_64_TARGET_ARCH
 
 needImportedSymbols = True
 

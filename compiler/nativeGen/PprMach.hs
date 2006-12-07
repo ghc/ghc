@@ -37,8 +37,6 @@ import Pretty
 import FastString
 import qualified Outputable
 
-import StaticFlags      ( opt_PIC, opt_Static )
-
 import Data.Array.ST
 import Data.Word	( Word8 )
 import Control.Monad.ST
@@ -618,7 +616,8 @@ pprSectionHeader Text
        ,IF_ARCH_i386(IF_OS_darwin(SLIT(".text\n\t.align 2"),
                                   SLIT(".text\n\t.align 4,0x90"))
                                   {-needs per-OS variation!-}
-       ,IF_ARCH_x86_64(SLIT(".text\n\t.align 8") {-needs per-OS variation!-}
+       ,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".text\n.align 3"),
+                                    SLIT(".text\n\t.align 8"))
        ,IF_ARCH_powerpc(SLIT(".text\n.align 2")
        ,)))))
 pprSectionHeader Data
@@ -627,7 +626,8 @@ pprSectionHeader Data
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(IF_OS_darwin(SLIT(".data\n\t.align 2"),
                                    SLIT(".data\n\t.align 4"))
-	,IF_ARCH_x86_64(SLIT(".data\n\t.align 8")
+	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".data\n.align 3"),
+	                             SLIT(".data\n\t.align 8"))
         ,IF_ARCH_powerpc(SLIT(".data\n.align 2")
 	,)))))
 pprSectionHeader ReadOnlyData
@@ -636,7 +636,8 @@ pprSectionHeader ReadOnlyData
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const\n.align 2"),
                                    SLIT(".section .rodata\n\t.align 4"))
-	,IF_ARCH_x86_64(SLIT(".section .rodata\n\t.align 8")
+	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".const\n.align 3"),
+	                             SLIT(".section .rodata\n\t.align 8"))
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 2"),
                                       SLIT(".section .rodata\n\t.align 2"))
 	,)))))
@@ -646,7 +647,8 @@ pprSectionHeader RelocatableReadOnlyData
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                    SLIT(".section .rodata\n\t.align 4"))
-	,IF_ARCH_x86_64(SLIT(".section .rodata\n\t.align 8")
+	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".const_data\n.align 3"),
+                                     SLIT(".section .rodata\n\t.align 8"))
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".data\n\t.align 2"))
 	,)))))
@@ -654,9 +656,10 @@ pprSectionHeader UninitialisedData
     = ptext
 	 IF_ARCH_alpha(SLIT("\t.bss\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".bss\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const_data\n\t.align 2"),
+	,IF_ARCH_i386(IF_OS_darwin(SLIT(".data\n\t.align 2"),
                                    SLIT(".section .bss\n\t.align 4"))
-	,IF_ARCH_x86_64(SLIT(".section .bss\n\t.align 8")
+	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".data\n\t.align 3"),
+                                     SLIT(".section .bss\n\t.align 8"))
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".section .bss\n\t.align 2"))
 	,)))))
@@ -666,7 +669,8 @@ pprSectionHeader ReadOnlyData16
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 16")
 	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const\n.align 4"),
                                    SLIT(".section .rodata\n\t.align 16"))
-	,IF_ARCH_x86_64(SLIT(".section .rodata.cst16\n\t.align 16")
+	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".const\n.align 4"),
+	                             SLIT(".section .rodata.cst16\n\t.align 16"))
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 4"),
                                       SLIT(".section .rodata\n\t.align 4"))
 	,)))))
@@ -701,7 +705,7 @@ pprASCII str
 pprAlign bytes =
 	IF_ARCH_alpha(ptextSLIT(".align ") <> int pow2,
 	IF_ARCH_i386(ptext SLIT(".align ") <> int IF_OS_darwin(pow2,bytes),
-	IF_ARCH_x86_64(ptext SLIT(".align ") <> int bytes,
+	IF_ARCH_x86_64(ptext SLIT(".align ") <> int IF_OS_darwin(pow2,bytes),
 	IF_ARCH_sparc(ptext SLIT(".align ") <> int bytes,
 	IF_ARCH_powerpc(ptext SLIT(".align ") <> int pow2,)))))
   where
@@ -747,10 +751,10 @@ pprDataItem lit
                     <> int (fromIntegral
                         (fromIntegral (x `shiftR` 32) :: Word32))]
 #endif
-#if i386_TARGET_ARCH
+#if i386_TARGET_ARCH || (darwin_TARGET_OS && x86_64_TARGET_ARCH)
 	ppr_item I64  x = [ptext SLIT("\t.quad\t") <> pprImm imm]
 #endif
-#if x86_64_TARGET_ARCH
+#if x86_64_TARGET_ARCH && !darwin_TARGET_OS
 	-- x86_64: binutils can't handle the R_X86_64_PC64 relocation
 	-- type, which means we can't do pc-relative 64-bit addresses.
 	-- Fortunately we're assuming the small memory model, in which

@@ -825,7 +825,14 @@ asmTempLabelPrefix =
 
 pprDynamicLinkerAsmLabel :: DynamicLinkerLabelInfo -> CLabel -> SDoc
 
-#if darwin_TARGET_OS
+#if x86_64_TARGET_ARCH && darwin_TARGET_OS
+pprDynamicLinkerAsmLabel GotSymbolPtr lbl
+  = pprCLabel lbl <> text "@GOTPCREL"
+pprDynamicLinkerAsmLabel GotSymbolOffset lbl
+  = pprCLabel lbl
+pprDynamicLinkerAsmLabel _ _
+  = panic "pprDynamicLinkerAsmLabel"
+#elif darwin_TARGET_OS
 pprDynamicLinkerAsmLabel CodeStub lbl
   = char 'L' <> pprCLabel lbl <> text "$stub"
 pprDynamicLinkerAsmLabel SymbolPtr lbl
@@ -837,6 +844,15 @@ pprDynamicLinkerAsmLabel CodeStub lbl
   = pprCLabel lbl <> text "@plt"
 pprDynamicLinkerAsmLabel SymbolPtr lbl
   = text ".LC_" <> pprCLabel lbl
+pprDynamicLinkerAsmLabel _ _
+  = panic "pprDynamicLinkerAsmLabel"
+#elif x86_64_TARGET_ARCH && linux_TARGET_OS
+pprDynamicLinkerAsmLabel CodeStub lbl
+  = pprCLabel lbl <> text "@plt"
+pprDynamicLinkerAsmLabel GotSymbolPtr lbl
+  = pprCLabel lbl <> text "@gotpcrel"
+pprDynamicLinkerAsmLabel GotSymbolOffset lbl
+  = pprCLabel lbl
 pprDynamicLinkerAsmLabel _ _
   = panic "pprDynamicLinkerAsmLabel"
 #elif linux_TARGET_OS

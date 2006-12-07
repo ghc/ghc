@@ -300,7 +300,11 @@ opt_UF_UpdateInPlace		= lookUp  FSLIT("-funfolding-update-in-place")
 
 opt_UF_DearOp   = ( 4 :: Int)
 			
+#if darwin_TARGET_OS && x86_64_TARGET_ARCH
+opt_PIC                         = True
+#else
 opt_PIC                         = lookUp FSLIT("-fPIC")
+#endif
 opt_Static			= lookUp  FSLIT("-static")
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
 

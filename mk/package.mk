@@ -277,6 +277,9 @@ DYLD_LIBRARY = $(patsubst %.a,%_dyn.dylib,$(LIBRARY))
     #   Without these options, we'd have to specify the correct dependencies
     #   for each of the dylibs. Twolevel namespaces are in general a good thing
     #   (they make things more robust), so we should fix this sooner or later.
+    # -undefined dynamic_lookup:
+    #   Another way to avoid having to specify the correct dependencies, but
+    #   this time, we don't allow overriding symbols.
     # -install_name
     #   Causes the dynamic linker to ignore the DYLD_LIBRARY_PATH when loading
     #   this lib and instead look for it at its absolute path.
@@ -287,7 +290,7 @@ DYLD_LIBRARY = $(patsubst %.a,%_dyn.dylib,$(LIBRARY))
     #         library dir. -- Wolfgang
 
 $(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
-	$(CC) -dynamiclib -o $@ $(STUBOBJS) $(LIBOBJS) -flat_namespace -undefined suppress -install_name `pwd`/$@
+	$(CC) -dynamiclib -o $@ $(STUBOBJS) $(LIBOBJS) -undefined dynamic_lookup -install_name `pwd`/$@
 else
 DYLD_LIBRARY = $(patsubst %.a,%_dyn.so,$(LIBRARY))
 

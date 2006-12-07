@@ -21,7 +21,7 @@ module MachCodeGen ( cmmTopCodeGen, InstrBlock ) where
 import MachInstrs
 import MachRegs
 import NCGMonad
-import PositionIndependentCode ( cmmMakeDynamicReference, initializePicBase )
+import PositionIndependentCode
 import RegAllocInfo ( mkBranchInstr )
 
 -- Our intermediate code:
@@ -486,10 +486,14 @@ getRegisterReg (CmmGlobal mid)
 
 getRegister :: CmmExpr -> NatM Register
 
+#if !x86_64_TARGET_ARCH
+    -- on x86_64, we have %rip for PicBaseReg, but it's not a full-featured
+    -- register, it can only be used for rip-relative addressing.
 getRegister (CmmReg (CmmGlobal PicBaseReg))
   = do
       reg <- getPicBaseNat wordRep
       return (Fixed wordRep reg nilOL)
+#endif
 
 getRegister (CmmReg reg) 
   = return (Fixed (cmmRegRep reg) (getRegisterReg reg) nilOL)
@@ -761,7 +765,7 @@ getRegister leaf
 
 getRegister (CmmLit (CmmFloat f F32)) = do
     lbl <- getNewLabelNat
-    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let code dst =
 	    LDATA ReadOnlyData
@@ -784,7 +788,7 @@ getRegister (CmmLit (CmmFloat d F64))
 
   | otherwise = do
     lbl <- getNewLabelNat
-    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let code dst =
 	    LDATA ReadOnlyData
@@ -866,6 +870,13 @@ getRegister (CmmMachOp (MO_S_Conv I32 I64) [CmmLoad addr _]) = do
   code <- intLoadCode (MOVSxL I32) addr
   return (Any I64 code)
 
+#endif
+
+#if x86_64_TARGET_ARCH
+getRegister (CmmMachOp (MO_Add I64) [CmmReg (CmmGlobal PicBaseReg),
+                                     CmmLit displacement])
+    = return $ Any I64 (\dst -> unitOL $
+        LEA I64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 #endif
 
 #if x86_64_TARGET_ARCH
@@ -1683,7 +1694,7 @@ getRegister (CmmLit (CmmInt i rep))
 
 getRegister (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
-    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let code dst = 
 	    LDATA ReadOnlyData  [CmmDataLabel lbl,
@@ -1781,6 +1792,14 @@ getAmode other
 #endif /* alpha_TARGET_ARCH */
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+#if x86_64_TARGET_ARCH
+
+getAmode (CmmMachOp (MO_Add I64) [CmmReg (CmmGlobal PicBaseReg),
+                                     CmmLit displacement])
+    = return $ Amode (ripRel (litToImm displacement)) nilOL
+
+#endif
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
@@ -3092,7 +3111,7 @@ outOfLineFloatOp :: CallishMachOp -> CmmReg -> [(CmmExpr,MachHint)]
   -> Maybe [GlobalReg] -> NatM InstrBlock
 outOfLineFloatOp mop res args vols
   = do
-      targetExpr <- cmmMakeDynamicReference addImportNat True lbl
+      targetExpr <- cmmMakeDynamicReference addImportNat CallReference lbl
       let target = CmmForeignCall targetExpr CCallConv
         
       if cmmRegRep res == F64
@@ -3448,7 +3467,7 @@ genCCall target dest_regs argsAndHints vols = do
                          )
 outOfLineFloatOp mop =
     do
-      mopExpr <- cmmMakeDynamicReference addImportNat True $
+      mopExpr <- cmmMakeDynamicReference addImportNat CallReference $
 		  mkForeignLabel functionName Nothing True
       let mopLabelOrExpr = case mopExpr of
 			CmmLit (CmmLabel lbl) -> Left lbl
@@ -3699,7 +3718,7 @@ genCCall target dest_regs argsAndHints vols
                           
         outOfLineFloatOp mop =
             do
-                mopExpr <- cmmMakeDynamicReference addImportNat True $
+                mopExpr <- cmmMakeDynamicReference addImportNat CallReference $
                               mkForeignLabel functionName Nothing True
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
@@ -3759,7 +3778,7 @@ genSwitch expr ids
   = do
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
-        dynRef <- cmmMakeDynamicReference addImportNat False lbl
+        dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let
             jumpTable = map jumpTableEntryRel ids
@@ -3773,11 +3792,25 @@ genSwitch expr ids
             op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg wORD_SIZE) (ImmInt 0))
 
+#if x86_64_TARGET_ARCH && darwin_TARGET_OS
+    -- on Mac OS X/x86_64, put the jump table in the text section
+    -- to work around a limitation of the linker.
+    -- ld64 is unable to handle the relocations for
+    --     .quad L1 - L0
+    -- if L0 is not preceded by a non-anonymous label in its section.
+    
+            code = e_code `appOL` t_code `appOL` toOL [
+                            ADD wordRep op (OpReg tableReg),
+                            JMP_TBL (OpReg tableReg) [ id | Just id <- ids ],
+                            LDATA Text (CmmDataLabel lbl : jumpTable)
+                    ]
+#else
             code = e_code `appOL` t_code `appOL` toOL [
                             LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
                             ADD wordRep op (OpReg tableReg),
                             JMP_TBL (OpReg tableReg) [ id | Just id <- ids ]
                     ]
+#endif
         return code
   | otherwise
   = do
@@ -3799,7 +3832,7 @@ genSwitch expr ids
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat I32
         lbl <- getNewLabelNat
-        dynRef <- cmmMakeDynamicReference addImportNat False lbl
+        dynRef <- cmmMakeDynamicReference addImportNat DatReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let
             jumpTable = map jumpTableEntryRel ids
@@ -4638,7 +4671,7 @@ coerceInt2FP fromRep toRep x = do
     lbl <- getNewLabelNat
     itmp <- getNewRegNat I32
     ftmp <- getNewRegNat F64
-    dynRef <- cmmMakeDynamicReference addImportNat False lbl
+    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let
     	code' dst = code `appOL` maybe_exts `appOL` toOL [

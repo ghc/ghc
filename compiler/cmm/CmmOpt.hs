@@ -312,8 +312,12 @@ cmmMachOpFold op [x@(CmmLit _), y]
 -- put arg1 on the left of the rearranged expression, we'll get into a
 -- loop:  (x1+x2)+x3 => x1+(x2+x3)  => (x2+x3)+x1 => x2+(x3+x1) ...
 --
+-- Also don't do it if arg1 is PicBaseReg, so that we don't separate the
+-- PicBaseReg from the corresponding label (or label difference).
+--
 cmmMachOpFold mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
-   | mop1 == mop2 && isAssociativeMachOp mop1 && not (isLit arg1)
+   | mop1 == mop2 && isAssociativeMachOp mop1
+     && not (isLit arg1) && not (isPicReg arg1)
    = cmmMachOpFold mop1 [arg1, cmmMachOpFold mop2 [arg2,arg3]]
 
 -- Make a RegOff if we can
@@ -527,3 +531,6 @@ maybeInvertConditionalExpr :: CmmExpr -> Maybe CmmExpr
 maybeInvertConditionalExpr (CmmMachOp op args) 
   | Just op' <- maybeInvertComparison op = Just (CmmMachOp op' args)
 maybeInvertConditionalExpr _ = Nothing
+
+isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True
+isPicReg _ = False
