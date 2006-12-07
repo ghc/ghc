@@ -726,7 +726,16 @@ doCase d s p (_,scrut)
 	-- things that are pointers, whereas in CgBindery the code builds the
 	-- bitmap from the free slots and unboxed bindings.
 	-- (ToDo: merge?)
-	bitmap = intsToReverseBitmap d{-size-} (sortLe (<=) rel_slots)
+        --
+        -- NOTE [7/12/2006] bug #1013, testcase ghci/should_run/ghci002.
+        -- The bitmap must cover the portion of the stack up to the sequel only.
+        -- Previously we were building a bitmap for the whole depth (d), but we
+        -- really want a bitmap up to depth (d-s).  This affects compilation of
+        -- case-of-case expressions, which is the only time we can be compiling a
+        -- case expression with s /= 0.
+        bitmap_size = d-s
+	bitmap = intsToReverseBitmap bitmap_size{-size-} 
+                        (sortLe (<=) (filter (< bitmap_size) rel_slots))
 	  where
 	  binds = fmToList p
 	  rel_slots = concat (map spread binds)
@@ -741,7 +750,7 @@ doCase d s p (_,scrut)
      let 
          alt_bco_name = getName bndr
          alt_bco = mkProtoBCO alt_bco_name alt_final (Left alts)
-			0{-no arity-} d{-bitmap size-} bitmap True{-is alts-}
+			0{-no arity-} bitmap_size bitmap True{-is alts-}
      -- in
 --     trace ("case: bndr = " ++ showSDocDebug (ppr bndr) ++ "\ndepth = " ++ show d ++ "\nenv = \n" ++ showSDocDebug (ppBCEnv p) ++
 --	     "\n      bitmap = " ++ show bitmap) $ do
