@@ -18,6 +18,7 @@ import Name
 import Module
 import SrcLoc
 import Outputable
+import UniqFM
 import FiniteMap
 
 import Maybe
@@ -78,7 +79,14 @@ checkFamInstConsistency famInstMods directlyImpMods
                    Nothing    -> panic "FamInst.checkFamInstConsistency"
                    Just iface -> iface
 
-             ; modInstsEnv   = eps_mod_fam_inst_env eps
+             ; hmiModule     = mi_module . hm_iface
+	     ; hmiFamInstEnv = mkFamInstEnv . md_fam_insts . hm_details
+	     ; mkFamInstEnv  = extendFamInstEnvList emptyFamInstEnv
+             ; hptModInsts   = [ (hmiModule hmi, hmiFamInstEnv hmi) 
+			       | hmi <- eltsUFM hpt]
+             ; modInstsEnv   = eps_mod_fam_inst_env eps	-- external modules
+			       `extendModuleEnvList`	-- plus
+			       hptModInsts		-- home package modules
 	     ; groups        = map (dep_finsts . mi_deps . modIface) 
 				   directlyImpMods
 	     ; okPairs       = listToSet $ concatMap allPairs groups
@@ -95,7 +103,9 @@ checkFamInstConsistency famInstMods directlyImpMods
     allPairs []     = []
     allPairs (m:ms) = map (ModulePair m) ms ++ allPairs ms
 
-    -- Check the consistency of the family instances of the two modules.
+    -- The modules are guaranteed to be in the environment, as they are either
+    -- already loaded in the EPS or they are in the HPT.
+    --
     check modInstsEnv (ModulePair m1 m2)
       = let { instEnv1 = fromJust . lookupModuleEnv modInstsEnv $ m1
 	    ; instEnv2 = fromJust . lookupModuleEnv modInstsEnv $ m2

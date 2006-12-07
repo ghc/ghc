@@ -173,6 +173,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	loadOrphanModules (imp_orphs  imports) False ;
 	loadOrphanModules (imp_finsts imports) True  ;
 
+	traceRn (text "rn1: checking family instance consistency") ;
 	let { directlyImpMods =   map (\(mod, _, _) -> mod) 
 			        . moduleEnvElts 
 			        . imp_mods 
