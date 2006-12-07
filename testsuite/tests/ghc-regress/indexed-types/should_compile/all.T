@@ -6,6 +6,7 @@ test('Simple2', normal, compile, [''])
 test('Simple3', normal, compile, [''])
 test('Simple4', normal, compile, [''])
 test('Simple5', normal, compile, [''])
+test('Simple6', normal, compile, [''])
 
 test('ind1', normal, compile, [''])
 test('ind2', normal, multimod_compile, ['ind2', '-v0'])
