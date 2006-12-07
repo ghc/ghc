@@ -269,7 +269,7 @@ howToAccessLabel DataReference lbl
 -- (AccessDirectly, because we get an implicit symbol stub)
 -- and calling functions from PIC code on non-i386 platforms (via a symbol stub) 
 
-howToAccessLabel CallLabel lbl
+howToAccessLabel CallReference lbl
     | labelDynamic lbl && not opt_PIC
     = AccessDirectly
 #if !i386_TARGET_ARCH
