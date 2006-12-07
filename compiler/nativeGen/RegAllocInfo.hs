@@ -156,6 +156,8 @@ regUsage instr = case instr of
     IDIV   sz op	-> mkRU (eax:edx:use_R op) [eax,edx]
     AND    sz src dst	-> usageRM src dst
     OR     sz src dst	-> usageRM src dst
+    XOR    sz (OpReg src) (OpReg dst)
+        | src == dst    -> mkRU [] [dst]
     XOR    sz src dst	-> usageRM src dst
     NOT    sz op	-> usageM op
     NEGI   sz op	-> usageM op
