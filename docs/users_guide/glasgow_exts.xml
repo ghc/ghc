@@ -4807,7 +4807,7 @@ f !x = 3
 </programlisting>
 Is this a definition of the infix function "<literal>(!)</literal>",
 or of the "<literal>f</literal>" with a bang pattern? GHC resolves this
-ambiguity inf favour of the latter.  If you want to define
+ambiguity in favour of the latter.  If you want to define
 <literal>(!)</literal> with bang-patterns enabled, you have to do so using
 prefix notation:
 <programlisting>
