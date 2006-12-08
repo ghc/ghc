@@ -3,10 +3,11 @@
 :set -fglasgow-exts
 :l ../Test
 
-let i = map Just [My 1 .. My 3]
+let i = map (Just . Just) [My 1 .. My 3]
 :p i
 seq _t1 ()
 :p i
 seq _t2 ()
 :p i
-
+seq _t4 ()
+:p i
