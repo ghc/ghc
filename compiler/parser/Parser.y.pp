@@ -1190,7 +1190,7 @@ docdecld :: { LDocDecl RdrName }
 
 decl 	:: { Located (OrdList (LHsDecl RdrName)) }
 	: sigdecl			{ $1 }
-	| '!' infixexp rhs		{% do { pat <- checkPattern $2;
+	| '!' aexp rhs			{% do { pat <- checkPattern $2;
 					        return (LL $ unitOL $ LL $ ValD ( 
 							PatBind (LL $ BangPat pat) (unLoc $3)
 								placeHolderType placeHolderNames)) } }
@@ -1245,11 +1245,10 @@ infixexp :: { LHsExpr RdrName }
 	| infixexp qop exp10		{ LL (OpApp $1 $2 (panic "fixity") $3) }
 
 exp10 :: { LHsExpr RdrName }
-	: '\\' aexp aexps opt_asig '->' exp	
-			{% checkPatterns ($2 : reverse $3) >>= \ ps -> 
-			   return (LL $ HsLam (mkMatchGroup [LL $ Match ps $4
-							    	  (unguardedGRHSs $6)
-							    ])) }
+	: '\\' apat apats opt_asig '->' exp	
+			{ LL $ HsLam (mkMatchGroup [LL $ Match ($2:$3) $4
+							   	(unguardedGRHSs $6)
+							    ]) }
   	| 'let' binds 'in' exp			{ LL $ HsLet (unLoc $2) $4 }
 	| 'if' exp 'then' exp 'else' exp	{ LL $ HsIf $2 $4 $6 }
    	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
@@ -1283,14 +1282,9 @@ fexp 	:: { LHsExpr RdrName }
 	: fexp aexp				{ LL $ HsApp $1 $2 }
   	| aexp					{ $1 }
 
-aexps 	:: { [LHsExpr RdrName] }
-	: aexps aexp				{ $2 : $1 }
-  	| {- empty -}				{ [] }
-
 aexp	:: { LHsExpr RdrName }
 	: qvar '@' aexp			{ LL $ EAsPat $1 $3 }
 	| '~' aexp			{ LL $ ELazyPat $2 }
---	| '!' aexp			{ LL $ EBangPat $2 }
 	| aexp1				{ $1 }
 
 aexp1	:: { LHsExpr RdrName }
@@ -1443,10 +1437,7 @@ alts1 	:: { Located [LMatch RdrName] }
 	| alt				{ L1 [$1] }
 
 alt 	:: { LMatch RdrName }
-	: infixexp opt_sig alt_rhs	{%  checkPattern $1 >>= \p ->
-			    		    return (LL (Match [p] $2 (unLoc $3))) }
-	| '!' infixexp opt_sig alt_rhs	{%  checkPattern $2 >>= \p ->
-			    		    return (LL (Match [LL $ BangPat p] $3 (unLoc $4))) }
+	: pat opt_sig alt_rhs		{ LL (Match [$1] $2 (unLoc $3)) }
 
 alt_rhs :: { Located (GRHSs RdrName) }
 	: ralt wherebinds		{ LL (GRHSs (unLoc $1) (unLoc $2)) }
@@ -1461,6 +1452,22 @@ gdpats :: { Located [LGRHS RdrName] }
 
 gdpat	:: { LGRHS RdrName }
 	: '|' quals '->' exp	 	{ sL (comb2 $1 $>) $ GRHS (reverse (unLoc $2)) $4 }
+
+-- 'pat' recognises a pattern, including one with a bang at the top
+-- 	e.g.  "!x" or "!(x,y)" or "C a b" etc
+-- Bangs inside are parsed as infix operator applications, so that
+-- we parse them right when bang-patterns are off
+pat     :: { LPat RdrName }
+pat 	: infixexp		{% checkPattern $1 }
+	| '!' aexp		{% checkPattern (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
+
+apat   :: { LPat RdrName }	
+apat 	: aexp			{% checkPattern $1 }
+	| '!' aexp		{% checkPattern (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
+
+apats  :: { [LPat RdrName] }
+	: apat apats		{ $1 : $2 }
+  	| {- empty -}		{ [] }
 
 -----------------------------------------------------------------------------
 -- Statement sequences
@@ -1491,13 +1498,13 @@ maybe_stmt :: { Maybe (LStmt RdrName) }
 
 stmt  :: { LStmt RdrName }
 	: qual				{ $1 }
+-- What is this next production doing?  I have no clue!  SLPJ Dec06
 	| infixexp '->' exp		{% checkPattern $3 >>= \p ->
 					   return (LL $ mkBindStmt p $1) }
   	| 'rec' stmtlist		{ LL $ mkRecStmt (unLoc $2) }
 
 qual  :: { LStmt RdrName }
-	: exp '<-' exp			{% checkPattern $1 >>= \p ->
-					   return (LL $ mkBindStmt p $3) }
+	: pat '<-' exp			{ LL $ mkBindStmt $1 $3 }
 	| exp				{ L1 $ mkExprStmt $1 }
   	| 'let' binds			{ LL $ LetStmt (unLoc $2) }
 
@@ -1817,7 +1824,7 @@ moduleheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }
                      Left err -> parseError (getLoc $1) err;                    
                      Right doc -> return (info, Just doc);          
                    };                                             
-                 Left err -> parseError (getLoc $1) err                           
+                 Left err -> parseError (getLoc $1) err
             }  }                                                  
 
 maybe_docprev :: { Maybe (LHsDoc RdrName) }

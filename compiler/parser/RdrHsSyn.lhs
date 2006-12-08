@@ -42,6 +42,7 @@ module RdrHsSyn (
 	checkInstType,	      -- HsType -> P HsType
         checkDerivDecl,       -- LDerivDecl RdrName -> P (LDerivDecl RdrName)
 	checkPattern,	      -- HsExp -> P HsPat
+	bang_RDR,
 	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
 	checkDo,	      -- [Stmt] -> P [Stmt]
 	checkMDo,	      -- [Stmt] -> P [Stmt]
