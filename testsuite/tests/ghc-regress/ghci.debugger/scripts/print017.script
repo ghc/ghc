@@ -1,0 +1,12 @@
+-- More newtypes goodness
+
+:set -fglasgow-exts
+:l ../Test
+let a = map (MkT2 . MkT) [1..2]
+:p a
+seq _t1 ()
+:p a
+seq _t2 ()
+:p a
+seq _t4 ()
+:p a

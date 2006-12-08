@@ -1,0 +1,2 @@
+fromList [1,2,3]
+s = fromList [1,2,3]

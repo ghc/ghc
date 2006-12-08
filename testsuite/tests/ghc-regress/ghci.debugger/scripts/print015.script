@@ -1,0 +1,6 @@
+-- Data.Set makes for a wondeful test of unboxed fields
+
+:m +Data.Set
+let s = fromList [1,2,3]
+s
+:p s
