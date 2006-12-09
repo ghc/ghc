@@ -652,7 +652,7 @@ GLOBAL_VAR(turn_off_buffering, error "no flush_stdout", IO ())
 
 no_buf_cmd = "System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
 	     " Prelude.>> System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
-flush_cmd  = "System.IO.hFlush System.IO.stdout Prelude.>> System.IO.hFlush IO.stderr"
+flush_cmd  = "System.IO.hFlush System.IO.stdout Prelude.>> System.IO.hFlush System.IO.stderr"
 
 initInterpBuffering :: Session -> IO ()
 initInterpBuffering session
