@@ -48,8 +48,11 @@ darcsall()
 darcsget()
 {
   case $* in
-    *--partial*) ;;
-    *) echo "warning: adding --partial, to override use --complete"
+    *--complete*|*--partial*)
+      additional_flag="" ;;
+    *)
+      echo "warning: adding --partial, to override use --complete"
+      additional_flag="--partial" ;;
   esac
 
   cd libraries
@@ -65,8 +68,8 @@ darcsget()
 	echo "warning: $pkg already present; omitting"
     else
 	repo=$defaultrepo_lib/$pkg
-	message "== running darcs get --partial $* $repo"
-	darcs get --partial $* $repo
+	message "== running darcs get $additional_flag $* $repo"
+	darcs get $additional_flag $* $repo
     fi
   done
 }
