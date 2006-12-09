@@ -2,14 +2,13 @@
  * (c)2006 Galois Connections, Inc.
  */ 
 
-// #include "HsFFI.h"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include "HsFFI.h"
+
 #include "Rts.h"
 #include "Hpc.h"
 
@@ -24,6 +23,9 @@ static int hpc_inited = 0;		// Have you started this component?
 static FILE *tixFile;			// file being read/written
 static int tix_ch;			// current char
 static StgWord64 magicTixNumber;	// Magic/Hash number to mark .tix files
+
+static int hpc_ticks_inited = 0;	// Have you started the dynamic external ticking?
+static FILE *rixFile;			// The tracer file/pipe
 
 typedef struct _Info {
   char *modName;		// name of module
@@ -186,10 +188,11 @@ static void hpc_init(void) {
  * of the tix file, or all zeros.
  */
 
-void
+int
 hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
   Info *tmpModule, *lastModule;
   int i;
+  int offset = 0;
   
 #if DEBUG_HPC
   printf("hs_hpc_module(%s,%d)\n",modName,modCount);
@@ -211,7 +214,7 @@ hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
       for(i=0;i < modCount;i++) {
 	tixArr[i] = tixBoxes[i + tmpModule->tickOffset];
       }
-      return;
+      return tmpModule->tickOffset;
     }
     lastModule = tmpModule;
   }
@@ -239,6 +242,80 @@ hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
 #if DEBUG_HPC
   printf("end: hs_hpc_module\n");
 #endif
+  return offset;
+}
+
+
+/*
+ * Called on *every* exception thrown
+ */
+void
+hs_hpc_throw() {
+  // Assumes that we have had at least *one* tick first.
+  // All exceptions before the first tick are not reported.
+  // The only time this might be an issue is in bootstrapping code,
+  // so this is a feature.
+  if (hpc_inited != 0 && hpc_ticks_inited != 0) {
+    fprintf(rixFile,"Throw\n");
+  }
+}
+
+/* Called on every tick
+ */
+
+void
+hs_hpc_tick(int globIx) {
+  int threadId = 0;	 // for now, assume single thread
+			 // TODO: work out how to get the thread Id to here.
+
+  
+#if DEBUG_HPC && DEBUG
+  printf("hs_hpc_tick(%d)\n",globIx);
+#endif
+  if (!hpc_ticks_inited) {
+    char* trace_filename;
+    int comma;
+    Info *tmpModule;  
+
+    assert(hpc_inited);
+    hpc_ticks_inited = 1;
+
+    trace_filename = (char *) malloc(strlen(prog_name) + 6);
+    sprintf(trace_filename, "%s.rix", prog_name);
+    rixFile = fopen(trace_filename,"w+");
+
+    comma = 0;
+    
+    fprintf(rixFile,"START %s\n",prog_name);
+    fprintf(rixFile,"[");
+    tmpModule = modules;
+    for(;tmpModule != 0;tmpModule = tmpModule->next) {
+      if (comma) {
+	fprintf(rixFile,",");
+      } else {
+	comma = 1;
+      }
+      fprintf(rixFile,"(\"%s\",%u)",
+	      tmpModule->modName,
+	      tmpModule->tickCount);
+#if DEBUG_HPC
+      fprintf(stderr,"(tracer)%s: %u (offset=%u)\n",
+	      tmpModule->modName,
+	      tmpModule->tickCount,
+	      tmpModule->tickOffset);
+#endif
+    }
+    fprintf(rixFile,"]\n");
+    fflush(rixFile);
+  }
+  assert(rixFile != 0);
+
+  fprintf(rixFile,"%d\n",globIx);
+
+#if DEBUG_HPC
+  printf("end: hs_hpc_tick\n");
+#endif
+  
 }
 
 /* This is called after all the modules have registered their local tixboxes,
@@ -269,6 +346,7 @@ startupHpc(void) {
     }
   }
 }
+
 
 /* Called at the end of execution, to write out the Hpc *.tix file  
  * for this exection. Safe to call, even if coverage is not used.
@@ -336,6 +414,10 @@ exitHpc(void) {
       
   fprintf(f,"]\n");
   fclose(f);
+
+  if (hpc_ticks_inited && rixFile != 0) {
+    fclose(rixFile);
+  }
   
 }
 

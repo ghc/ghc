@@ -158,7 +158,9 @@ extern void hs_perform_gc (void);
 extern void hs_free_stable_ptr (HsStablePtr sp);
 extern void hs_free_fun_ptr    (HsFunPtr fp);
 
-extern void hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr);
+extern int hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr);
+extern void hs_hpc_tick(int globIx);
+extern void hs_hpc_throw(void);
 
 /* -------------------------------------------------------------------------- */
 

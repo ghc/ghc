@@ -152,7 +152,7 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
 	  emitData Data [CmmDataLabel moduleRegdLabel, 
 		         CmmStaticLit zeroCLit]
 
-        ; whenC (dopt Opt_Hpc dflags) $
+        ; whenC (opt_Hpc) $
               hpcTable this_mod hpc_info
 
           -- we emit a recursive descent module search for all modules
@@ -210,7 +210,7 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
         ; whenC (opt_SccProfilingOn) $ do 
 	    initCostCentres cost_centre_info
 
-        ; whenC (dopt Opt_Hpc dflags) $
+        ; whenC (opt_Hpc) $
             initHpc this_mod hpc_info
          
 	; mapCs (registerModuleImport this_pkg way) 
@@ -224,7 +224,7 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
                       , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
 
 
-    rec_descent_init = if opt_SccProfilingOn || dopt Opt_Hpc dflags
+    rec_descent_init = if opt_SccProfilingOn || opt_Hpc
 		       then jump_to_init
 		       else ret_code
 

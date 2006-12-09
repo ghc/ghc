@@ -27,6 +27,10 @@ module StaticFlags (
 	opt_SccProfilingOn,
 	opt_DoTickyProfiling,
 
+        -- Hpc opts
+	opt_Hpc,
+        opt_Hpc_Tracer,
+
 	-- language opts
 	opt_DictsStrict,
 	opt_IrrefutableTuples,
@@ -150,6 +154,11 @@ static_flags = [
   ,  ( "dppr-user-length", AnySuffix addOpt )
       -- rest of the debugging flags are dynamic
 
+	--------- Haskell Program Coverage -----------------------------------
+
+  ,  ( "fhpc"           , PassFlag addOpt )
+  ,  ( "fhpc-tracer"    , PassFlag addOpt )
+
 	--------- Profiling --------------------------------------------------
   ,  ( "auto-all"	, NoArg (addOpt "-fauto-sccs-on-all-toplevs") )
   ,  ( "auto"		, NoArg (addOpt "-fauto-sccs-on-exported-toplevs") )
@@ -263,6 +272,13 @@ opt_AutoSccsOnExportedToplevs	= lookUp  FSLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  FSLIT("-fauto-sccs-on-individual-cafs")
 opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
 opt_DoTickyProfiling		= lookUp  FSLIT("-fticky-ticky")
+
+
+-- Hpc opts
+
+opt_Hpc				= lookUp FSLIT("-fhpc")  
+				  || opt_Hpc_Tracer 
+opt_Hpc_Tracer			= lookUp FSLIT("-fhpc-tracer")
 
 -- language opts
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")

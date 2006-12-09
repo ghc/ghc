@@ -567,11 +567,6 @@ mixCreate :: String -> String -> Mix -> IO ()
 mixCreate dirName modName mix =
    writeFile (mixName dirName modName) (show mix)
 
-readMix :: FilePath -> String -> IO Mix
-readMix dirName modName = do
-   contents <- readFile (mixName dirName modName)
-   return (read contents)
-
 mixName :: FilePath -> String -> String
 mixName dirName name = dirName ++ "/" ++ name ++ ".mix"
 
@@ -586,21 +581,6 @@ data Tix = Tix [PixEntry]	-- The number of tickboxes in each module
 
 type TixEntry = Integer
 
--- always read and write Tix from the current working directory.
-
-readTix :: String -> IO (Maybe Tix)
-readTix pname = 
-  catch (do contents <- readFile $ tixName pname 
-	    return $ Just $ read contents)
-	(\ _ -> return $ Nothing)
-
-writeTix :: String -> Tix -> IO ()
-writeTix pname tix = 
-  writeFile (tixName pname) (show tix)
-
-tixName :: String -> String
-tixName name = name ++ ".tix"
-
 -- a program index records module names and numbers of tick-boxes
 -- introduced in each module that has been transformed for coverage 
 
@@ -609,40 +589,6 @@ data Pix = Pix [PixEntry] deriving (Read, Show)
 type PixEntry = ( String	-- module name
 		, Int		-- number of boxes
 		)
-
-pixUpdate :: FilePath -> String -> String -> Int -> IO ()
-pixUpdate dirName progName modName boxCount = do
-   fileUpdate (pixName dirName progName) pixAssign (Pix [])
-   where
-   pixAssign :: Pix -> Pix
-   pixAssign (Pix pes) =
-     Pix ((modName,boxCount) : filter ((/=) modName . fst) pes)
-
-readPix :: FilePath -> String -> IO Pix
-readPix dirName pname = do
-  contents <- readFile (pixName dirName pname)
-  return (read contents)
-
-tickCount :: Pix -> Int
-tickCount (Pix mp) = sum $ map snd mp
-
-pixName :: FilePath -> String -> String
-pixName dirName name = dirName ++ "/" ++ name ++ ".pix"
-
--- updating a value stored in a file via read and show
-fileUpdate :: (Read a, Show a) => String -> (a->a) -> a -> IO()
-fileUpdate fname update init =
-   catch
-     (do
-        valueText <- readFile fname
-        ( case finite valueText of
-          True ->
-            writeFile fname (show (update (read valueText))) ))
-     (const (writeFile fname (show (update init))))
-
-finite :: [a] -> Bool
-finite []     = True
-finite (x:xs) = finite xs
 
 data HpcPos = P !Int !Int !Int !Int deriving (Eq)
 

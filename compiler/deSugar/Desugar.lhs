@@ -85,7 +85,7 @@ deSugar hsc_env
 	; mb_res <- case ghcMode dflags of
 	             JustTypecheck -> return (Just ([], [], NoStubs, noHpcInfo))
                      _        -> do (binds_cvr,ds_hpc_info) 
-					      <- if dopt Opt_Hpc dflags
+					      <- if opt_Hpc
                                                  then addCoverageTicksToBinds dflags mod mod_loc binds
                                                  else return (binds, noHpcInfo)
                                     initDs hsc_env mod rdr_env type_env $ do

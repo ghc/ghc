@@ -199,8 +199,6 @@ data DynFlag
    | Opt_HideAllPackages
    | Opt_PrintBindResult
    | Opt_Haddock
-   | Opt_Hpc
-   | Opt_Hpc_Tracer
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -1049,9 +1047,7 @@ fFlags = [
   ( "excess-precision",			Opt_ExcessPrecision ),
   ( "asm-mangling",			Opt_DoAsmMangling ),
   ( "print-bind-result",		Opt_PrintBindResult ),
-  ( "force-recomp",			Opt_ForceRecomp ),
-  ( "hpc",				Opt_Hpc ),
-  ( "hpc-tracer",			Opt_Hpc_Tracer )
+  ( "force-recomp",			Opt_ForceRecomp )
   ]
 
 

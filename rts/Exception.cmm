@@ -336,6 +336,9 @@ raisezh_fast
       foreign "C" fprintCCS_stderr(W_[CCCS] "ptr");
     }
 #endif
+    
+    /* Inform the Hpc that an exception has been thrown */
+    foreign "C" hs_hpc_throw();
 
 retry_pop_stack:
     StgTSO_sp(CurrentTSO) = Sp;
