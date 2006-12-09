@@ -412,7 +412,7 @@ def ghci_script( name, way, script ):
           join(flags,' ')
 
     getTestOpts().stdin = script
-    return simple_run( name, way, cmd, '', 0 )
+    return simple_run( name, way, cmd, getTestOpts().extra_run_opts, 0 )
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
