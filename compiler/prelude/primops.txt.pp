@@ -1677,6 +1677,16 @@ primop  NewBCOOp "newBCO#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primop  InfoPtrOp "infoPtr#" GenPrimOp
+   a -> Addr#
+   with
+   out_of_line = True
+
+primop  ClosurePayloadOp "closurePayload#" GenPrimOp
+   a -> (# Array# b, ByteArr# #)
+   with
+   out_of_line = True
+
 ------------------------------------------------------------------------
 section "Coercion" 
 	{{\tt unsafeCoerce\# :: a -> b} is not a primop, but is defined in MkId.lhs.}

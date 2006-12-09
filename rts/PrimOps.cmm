@@ -1961,6 +1961,55 @@ mkApUpd0zh_fast
     RET_P(ap);
 }
 
+infoPtrzh_fast
+{
+/* args: R1 = closure to analyze */
+   
+  MAYBE_GC(R1_PTR, infoPtrzh_fast);
+
+  W_ info;
+  info = %GET_STD_INFO(R1);
+  RET_N(info);
+}
+
+closurePayloadzh_fast
+{
+/* args: R1 = closure to analyze */
+// TODO: Consider the absence of ptrs or nonptrs as a special case ?
+
+    MAYBE_GC(R1_PTR, closurePayloadzh_fast);
+
+    W_ info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
+    info  = %GET_STD_INFO(R1);
+    ptrs  = TO_W_(%INFO_PTRS(info)); 
+    nptrs = TO_W_(%INFO_NPTRS(info));
+    p = 0;
+
+    ALLOC_PRIM (SIZEOF_StgMutArrPtrs + WDS(ptrs), R1_PTR, closurePayloadzh_fast);
+    ptrs_arr = Hp - SIZEOF_StgMutArrPtrs - WDS(ptrs) + WDS(1);
+    SET_HDR(ptrs_arr, stg_MUT_ARR_PTRS_FROZEN_info, W_[CCCS]);
+    StgMutArrPtrs_ptrs(ptrs_arr) = ptrs;
+for:
+    if(p < ptrs) {
+    	 W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(R1,p);
+	 p = p + 1;
+	 goto for;
+    }
+    
+    ALLOC_PRIM (SIZEOF_StgArrWords + WDS(nptrs), R1_PTR, closurePayloadzh_fast);
+    nptrs_arr = Hp - SIZEOF_StgArrWords - WDS(nptrs) + WDS(1);
+    SET_HDR(nptrs_arr, stg_ARR_WORDS_info, W_[CCCS]);
+    StgArrWords_words(nptrs_arr) = nptrs;
+    p = 0;
+for2:
+    if(p < nptrs) {
+    	 W_[BYTE_ARR_CTS(nptrs_arr) + WDS(p)] = StgClosure_payload(R1, p+ptrs);
+    	 p = p + 1;
+	 goto for2;
+    }
+    RET_PP(ptrs_arr, nptrs_arr);
+}
+
 /* -----------------------------------------------------------------------------
    Thread I/O blocking primitives
    -------------------------------------------------------------------------- */

@@ -614,4 +614,7 @@ RTS_FUN(readTVarzh_fast);
 RTS_FUN(writeTVarzh_fast);
 RTS_FUN(checkzh_fast);
 
+RTS_FUN(infoPtrzh_fast);
+RTS_FUN(closurePayloadzh_fast);
+
 #endif /* STGMISCCLOSURES_H */
