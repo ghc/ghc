@@ -10,6 +10,7 @@ module ByteCodeLink (
 	HValue, 
 	ClosureEnv, emptyClosureEnv, extendClosureEnv,
 	linkBCO, lookupStaticPtr
+       ,lookupIE
   ) where
 
 #include "HsVersions.h"

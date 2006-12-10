@@ -38,6 +38,8 @@ module TysWiredIn (
 	unitTyCon, unitDataCon, unitDataConId, pairTyCon, 
 	unboxedSingletonTyCon, unboxedSingletonDataCon,
 	unboxedPairTyCon, unboxedPairDataCon,
+       
+        boxedTupleArr, unboxedTupleArr,
 
 	unitTy,
 

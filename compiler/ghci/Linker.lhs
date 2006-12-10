@@ -18,6 +18,7 @@ module Linker ( HValue, showLinkerState,
 		linkExpr, unload, extendLinkEnv, withExtendedLinkEnv,
                 extendLoadedPkgs,
 		linkPackages,initDynLinker
+               ,recoverDataCon
 	) where
 
 #include "HsVersions.h"
@@ -26,7 +27,14 @@ import ObjLink
 import ByteCodeLink
 import ByteCodeItbls
 import ByteCodeAsm
-
+import RtClosureInspect
+import Var
+import IfaceEnv
+import Config
+import OccName
+import TcRnMonad
+import Constants
+import Encoding
 import Packages
 import DriverPhases
 import Finder
@@ -50,9 +58,12 @@ import SrcLoc
 
 -- Standard libraries
 import Control.Monad
- 
+import Control.Arrow    ( second )
+
 import Data.IORef
 import Data.List
+import Foreign.Ptr
+import GHC.Exts
 
 import System.IO
 import System.Directory
@@ -108,6 +119,7 @@ data PersistentLinkerState
 	-- Held, as usual, in dependency order; though I am not sure if
 	-- that is really important
 	pkgs_loaded :: [PackageId]
+       ,dtacons_env :: DataConEnv
      }
 
 emptyPLS :: DynFlags -> PersistentLinkerState
@@ -116,7 +128,9 @@ emptyPLS dflags = PersistentLinkerState {
 			itbl_env    = emptyNameEnv,
 			pkgs_loaded = init_pkgs,
 			bcos_loaded = [],
-			objs_loaded = [] }
+			objs_loaded = []
+                      , dtacons_env = emptyAddressEnv
+                                        }
   -- Packages that don't need loading, because the compiler 
   -- shares them with the interpreted program.
   --
@@ -137,6 +151,56 @@ extendLinkEnv new_bindings
 	let new_closure_env = extendClosureEnv (closure_env pls) new_bindings
 	    new_pls = pls { closure_env = new_closure_env }
 	writeIORef v_PersistentLinkerState new_pls
+
+
+recoverDataCon :: a -> TcM Name
+recoverDataCon a = recoverDCInRTS a `recoverM` ioToTcRn (do 
+               mb_name <- recoverDCInDynEnv a
+               maybe (fail "Linker.recoverDatacon: Name not found in Dyn Env")
+                     return
+                     mb_name)
+
+-- | If a is a Constr closure, lookupDC returns either the Name of the DataCon or the
+--   symbol if it is a nullary constructor
+--   For instance, for a closure containing 'Just x' it would return the Name for Data.Maybe.Just
+--   For a closure containing 'Nothing' it would return the String "DataziMaybe_Nothing_static_info"
+recoverDCInDynEnv :: a -> IO (Maybe Name)
+recoverDCInDynEnv a = do 
+   pls <- readIORef v_PersistentLinkerState
+   let de = dtacons_env pls
+   ctype <- getClosureType a
+   if not (isConstr ctype) 
+         then putStrLn ("Not a Constr (" ++ show  ctype ++ ")") >> 
+              return Nothing
+         else do let infot = getInfoTablePtr a
+                     name  = lookupAddressEnv de (castPtr$ infot `plusPtr` (wORD_SIZE*2))
+                 return name
+
+
+recoverDCInRTS :: a -> TcM Name 
+recoverDCInRTS a = do
+  ctype <- ioToTcRn$ getClosureType a
+  if (not$ isConstr ctype)
+     then fail "not Constr"
+     else do
+       Just symbol <- ioToTcRn$ lookupDataCon (getInfoTablePtr a)
+       let (occ,mod) = (parse . lex) symbol
+       lookupOrig mod occ
+    where lex x = map zDecodeString . init . init . split '_' . removeLeadingUnderscore $ x
+          parse [pkg, modName, occ] = (mkOccName OccName.dataName occ,
+              mkModule (stringToPackageId pkg) (mkModuleName modName))
+          parse [modName, occ] = (mkOccName OccName.dataName occ,
+              mkModule mainPackageId (mkModuleName modName))
+          split delim = let 
+                 helper [] = Nothing
+                 helper x  = Just . second (drop 1) . break (==delim) $ x
+              in unfoldr helper
+
+removeLeadingUnderscore = if cLeadingUnderscore=="YES" 
+                                       then tail 
+                                       else id
+
+
 
 withExtendedLinkEnv :: [(Name,HValue)] -> IO a -> IO a
 withExtendedLinkEnv new_env action
@@ -173,7 +237,9 @@ showLinkerState
        printDump (vcat [text "----- Linker state -----",
 			text "Pkgs:" <+> ppr (pkgs_loaded pls),
 			text "Objs:" <+> ppr (objs_loaded pls),
-			text "BCOs:" <+> ppr (bcos_loaded pls)])
+			text "BCOs:" <+> ppr (bcos_loaded pls),
+                        text "DataCons:" <+> ppr (dtacons_env pls)
+                       ])
 \end{code}
 			
 	
@@ -324,6 +390,8 @@ linkExpr :: HscEnv -> SrcSpan -> UnlinkedBCO -> IO HValue
 --
 -- Raises an IO exception if it can't find a compiled version of the
 -- dependents to link.
+--
+-- Note: This function side-effects the linker state (Pepe)
 
 linkExpr hsc_env span root_ul_bco
   = do {  
@@ -353,9 +421,11 @@ linkExpr hsc_env span root_ul_bco
      pls <- readIORef v_PersistentLinkerState
    ; let ie = itbl_env pls
 	 ce = closure_env pls
+         de = dtacons_env pls
 
 	-- Link the necessary packages and linkables
-   ; (_, (root_hval:_)) <- linkSomeBCOs False ie ce [root_ul_bco]
+   ; (_,de_out, (root_hval:_)) <- linkSomeBCOs False ie ce de [root_ul_bco]
+   ; writeIORef v_PersistentLinkerState (pls{dtacons_env=de_out})
    ; return root_hval
    }}
    where
@@ -615,10 +685,11 @@ dynLinkBCOs bcos
 	    gce	      = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        (final_gce, linked_bcos) <- linkSomeBCOs True final_ie gce ul_bcos
+        (final_gce, final_de, linked_bcos) <- linkSomeBCOs True final_ie gce (dtacons_env pls) ul_bcos
 		-- What happens to these linked_bcos?
 
 	let pls2 = pls1 { closure_env = final_gce,
+                          dtacons_env = final_de, 
 			  itbl_env    = final_ie }
 
 	writeIORef v_PersistentLinkerState pls2
@@ -629,19 +700,18 @@ linkSomeBCOs :: Bool 	-- False <=> add _all_ BCOs to returned closure env
                         -- True  <=> add only toplevel BCOs to closure env
              -> ItblEnv 
              -> ClosureEnv 
+             -> DataConEnv
              -> [UnlinkedBCO]
-             -> IO (ClosureEnv, [HValue])
+             -> IO (ClosureEnv, DataConEnv, [HValue])
 			-- The returned HValues are associated 1-1 with
 			-- the incoming unlinked BCOs.  Each gives the
 			-- value of the corresponding unlinked BCO
 					
-
-linkSomeBCOs toplevs_only ie ce_in ul_bcos
+linkSomeBCOs toplevs_only ie ce_in de_in ul_bcos
    = do let nms = map unlinkedBCOName ul_bcos
         hvals <- fixIO 
                     ( \ hvs -> let ce_out = extendClosureEnv ce_in (zipLazy nms hvs)
                                in  mapM (linkBCO ie ce_out) ul_bcos )
-
         let ce_all_additions = zip nms hvals
             ce_top_additions = filter (isExternalName.fst) ce_all_additions
             ce_additions     = if toplevs_only then ce_top_additions 
@@ -650,8 +720,22 @@ linkSomeBCOs toplevs_only ie ce_in ul_bcos
 		     -- closure environment, which leads to trouble.
 		     ASSERT (all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
 		     extendClosureEnv ce_in ce_additions
-        return (ce_out, hvals)
-
+            refs  = goForRefs ul_bcos
+            names = nub$ concatMap (ssElts . unlinkedBCOItbls) (ul_bcos ++ refs)
+        addresses <- mapM (lookupIE ie) names
+        let de_additions = [(address, name) | (address, name) <- zip addresses names
+                                            , not(address `elemAddressEnv` de_in) 
+                           ]
+            de_out = extendAddressEnvList' de_in de_additions
+        return ( ce_out, de_out, hvals)
+    where 
+          goForRefs = getRefs []
+          getRefs acc []  = acc
+          getRefs acc new = getRefs (new++acc) 
+                 [bco | BCOPtrBCO bco <- concatMap (ssElts . unlinkedBCOPtrs) new
+                      , notElemBy bco (new ++ acc) nameEq]
+          ul1 `nameEq` ul2 = unlinkedBCOName ul1 == unlinkedBCOName ul2
+          (x1 `notElemBy` x2) eq = null$ intersectBy eq [x1] x2
 \end{code}
 
 

@@ -95,6 +95,11 @@ static /*Str*/HashTable *symhash;
 /* Hash table mapping symbol names to StgStablePtr */
 static /*Str*/HashTable *stablehash;
 
+#if defined(GHCI) && defined(BREAKPOINT)
+/* Hash table mapping info table ptrs to DataCon names */
+static HashTable *dchash;
+#endif 
+
 /* List of currently loaded objects */
 ObjectCode *objects = NULL;	/* initially empty */
 
@@ -521,6 +526,8 @@ typedef struct _RtsSymbolVal {
       SymX(hs_free_stable_ptr)			\
       SymX(hs_free_fun_ptr)			\
       SymX(initLinker)				\
+      SymX(infoPtrzh_fast)                      \
+      SymX(closurePayloadzh_fast)               \
       SymX(int2Integerzh_fast)			\
       SymX(integer2Intzh_fast)			\
       SymX(integer2Wordzh_fast)			\
@@ -539,6 +546,7 @@ typedef struct _RtsSymbolVal {
       SymX(insertStableSymbol) 			\
       SymX(insertSymbol)     			\
       SymX(lookupSymbol)     			\
+      SymX(lookupDataCon)     			\
       SymX(makeStablePtrzh_fast)		\
       SymX(minusIntegerzh_fast)			\
       SymX(mkApUpd0zh_fast)			\
@@ -806,10 +814,10 @@ static RtsSymbolVal rtsSyms[] = {
 
 
 
-
 /* -----------------------------------------------------------------------------
  * Insert symbols into hash tables, checking for duplicates.
  */
+
 static void ghciInsertStrHashTable ( char* obj_name,
                                      HashTable *table,
                                      char* key,
@@ -819,6 +827,15 @@ static void ghciInsertStrHashTable ( char* obj_name,
    if (lookupHashTable(table, (StgWord)key) == NULL)
    {
       insertStrHashTable(table, (StgWord)key, data);
+#if defined(GHCI) && defined(BREAKPOINT)    
+      // Insert the reverse pair in the datacon hash if it is a closure
+      {
+	if(isSuffixOf(key, "static_info") || isSuffixOf(key, "con_info")) {
+	     insertHashTable(dchash, (StgWord)data, key);
+	     //             debugBelch("DChash addSymbol: %s (%p)\n", key, data);
+	   }
+      }
+#endif
       return;
    }
    debugBelch(
@@ -840,7 +857,16 @@ static void ghciInsertStrHashTable ( char* obj_name,
    exit(1);
 }
 
+#if defined(GHCI) && defined(BREAKPOINT)
+static void ghciInsertDCTable ( char* obj_name,
+				StgWord key,
+				char* data
+			      )
+{
+    ghciInsertStrHashTable(obj_name, dchash, (char *)key, data);
 
+}
+#endif
 /* -----------------------------------------------------------------------------
  * initialize the object linker
  */
@@ -866,6 +892,9 @@ initLinker( void )
 
     stablehash = allocStrHashTable();
     symhash = allocStrHashTable();
+#if defined(GHCI) && defined(BREAKPOINT)
+    dchash  = allocHashTable();
+#endif
 
     /* populate the symbol table with stuff from the RTS */
     for (sym = rtsSyms; sym->lbl != NULL; sym++) {
@@ -1083,6 +1112,24 @@ lookupSymbol( char *lbl )
 	return val;
     }
 }
+
+#if defined(GHCI) && defined(BREAKPOINT)
+char * 
+lookupDataCon( StgWord addr ) 
+{
+  void *val;
+    initLinker() ;
+    ASSERT(dchash != NULL);
+    val = lookupHashTable(dchash, addr); 
+
+    return val;
+}
+#else
+char* lookupDataCon( StgWord addr )
+{
+  return NULL;
+}
+#endif
 
 static
 __attribute((unused))
@@ -4358,4 +4405,21 @@ static int machoGetMisalignment( FILE * f )
     return misalignment ? (16 - misalignment) : 0;
 }
 
+#endif
+
+#if defined(GHCI) && defined(BREAKPOINT)
+int isSuffixOf(char* x, char* suffix) {
+  int suffix_len = strlen (suffix);
+  int x_len = strlen (x);
+  
+  if (x_len == 0)
+    return 0;
+  if (suffix_len > x_len) 
+    return 0;
+  if (suffix_len == 0) 
+    return 1;
+  
+  char* x_suffix = &x[strlen(x)-strlen(suffix)];
+  return strcmp(x_suffix, suffix) == 0;
+  }
 #endif

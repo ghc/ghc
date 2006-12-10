@@ -18,9 +18,11 @@ module ObjLink (
    unloadObj,   	 -- :: String -> IO ()
    insertSymbol,         -- :: String -> String -> Ptr a -> IO ()
    lookupSymbol,	 -- :: String -> IO (Maybe (Ptr a))
-   resolveObjs  	 -- :: IO SuccessFlag
+   resolveObjs,  	 -- :: IO SuccessFlag
+   lookupDataCon         -- :: Ptr a  -> IO (Maybe String)
   )  where
 
+import ByteCodeItbls    ( StgInfoTable )
 import Panic		( panic )
 import BasicTypes	( SuccessFlag, successIf )
 import Config		( cLeadingUnderscore )
@@ -30,6 +32,10 @@ import Control.Monad    ( when )
 import Foreign.C
 import Foreign		( nullPtr )
 import GHC.Exts         ( Ptr(..), unsafeCoerce# )
+
+import Constants        ( wORD_SIZE )
+import Foreign          ( plusPtr )
+
 
 -- ---------------------------------------------------------------------------
 -- RTS Linker Interface
@@ -50,6 +56,14 @@ lookupSymbol str_in = do
      if addr == nullPtr
 	then return Nothing
 	else return (Just addr)
+
+-- | Expects a Ptr to an info table, not to a closure
+lookupDataCon :: Ptr StgInfoTable -> IO (Maybe String)
+lookupDataCon ptr = do
+    name <- c_lookupDataCon  (ptr `plusPtr` (wORD_SIZE*2))
+    if name == nullPtr
+       then return Nothing
+       else peekCString name >>= return . Just
 
 prefixUnderscore :: String -> String
 prefixUnderscore
@@ -94,5 +108,6 @@ foreign import ccall unsafe "lookupSymbol" c_lookupSymbol :: CString -> IO (Ptr 
 foreign import ccall unsafe "loadObj"      c_loadObj :: CString -> IO Int
 foreign import ccall unsafe "unloadObj"    c_unloadObj :: CString -> IO Int
 foreign import ccall unsafe "resolveObjs"  c_resolveObjs :: IO Int
+foreign import ccall unsafe "lookupDataCon"  c_lookupDataCon :: Ptr a -> IO CString
 
 \end{code}
