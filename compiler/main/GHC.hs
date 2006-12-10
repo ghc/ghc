@@ -82,6 +82,7 @@ module GHC (
 	compileExpr, HValue, dynCompileExpr,
 	lookupName,
 
+        getBreakpointHandler, setBreakpointHandler, 
         obtainTerm,  
 #endif
 
@@ -342,6 +343,12 @@ defaultCleanupHandler dflags inner =
           -- signals.
     inner
 
+
+#if defined(GHCI) 
+GLOBAL_VAR(v_bkptLinkEnv, [], [(Name, HValue)])
+        -- stores the current breakpoint handler to help setContext to
+        -- restore it after a context change
+#endif
 
 -- | Starts a new session.  A session consists of a set of loaded
 -- modules, a set of options (DynFlags), and an interactive context.
@@ -1924,7 +1931,7 @@ setContext :: Session
 	   -> [Module]	-- entire top level scope of these modules
 	   -> [Module]	-- exports only of these modules
 	   -> IO ()
-setContext (Session ref) toplev_mods export_mods = do 
+setContext sess@(Session ref) toplev_mods export_mods = do 
   hsc_env <- readIORef ref
   let old_ic  = hsc_IC     hsc_env
       hpt     = hsc_HPT    hsc_env
@@ -1935,7 +1942,7 @@ setContext (Session ref) toplev_mods export_mods = do
   writeIORef ref hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplev_mods,
 					    ic_exports      = export_mods,
 					    ic_rn_gbl_env   = all_env }}
-
+  reinstallBreakpointHandlers sess
 
 -- Make a GlobalRdrEnv based on the exports of the modules only.
 mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv
@@ -2193,6 +2200,73 @@ showModule s mod_summary = withSession s $ \hsc_env -> do
 	Just mod_info -> return (showModMsg (hscTarget (hsc_dflags hsc_env)) (not obj_linkable) mod_summary)
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
+
+getBreakpointHandler :: Session -> IO (Maybe (BkptHandler Module))
+getBreakpointHandler session = getSessionDynFlags session >>= return . bkptHandler
+ 
+setBreakpointHandler :: Session -> BkptHandler Module -> IO ()
+setBreakpointHandler session handler = do
+  dflags <- getSessionDynFlags session
+  setSessionDynFlags session dflags{ bkptHandler = Just handler }
+  let linkEnv =   [ ( breakpointJumpName
+                    , unsafeCoerce# (jumpFunction session handler))
+                  , ( breakpointCondJumpName
+                    , unsafeCoerce# (jumpCondFunction session handler))
+                  , ( breakpointAutoJumpName 
+                    , unsafeCoerce# (jumpAutoFunction session handler))
+                  ]
+  writeIORef v_bkptLinkEnv linkEnv
+  dflags <- getSessionDynFlags session
+  reinstallBreakpointHandlers session
+
+reinstallBreakpointHandlers :: Session -> IO ()
+reinstallBreakpointHandlers session = do
+  dflags <- getSessionDynFlags session
+  let mode = ghcMode dflags
+  when (mode == Interactive) $ do 
+    linkEnv <- readIORef v_bkptLinkEnv
+    initDynLinker dflags 
+    extendLinkEnv linkEnv
+
+type SiteInfo = (String, String, SiteNumber)
+jumpFunction, jumpAutoFunction  :: Session -> BkptHandler Module -> Int -> [Opaque] 
+                                -> SiteInfo -> String -> b -> b
+jumpCondFunction  :: Session -> BkptHandler Module -> Int -> [Opaque] 
+                  -> SiteInfo -> String -> Bool -> b -> b
+jumpFunctionM :: Session -> BkptHandler a -> Int -> [Opaque] -> BkptLocation a 
+              -> String -> b -> IO b
+
+jumpCondFunction _ _ _ _ _ _ False b = b
+jumpCondFunction session handler ptr hValues siteInfo locmsg True b
+    = jumpFunction session handler ptr hValues siteInfo locmsg b
+
+jumpFunction session handler ptr hValues siteInfo locmsg b 
+    | site <- mkSite siteInfo
+    = unsafePerformIO $ jumpFunctionM session handler ptr hValues site locmsg b
+
+jumpFunctionM session handler (I# idsPtr) wrapped_hValues site locmsg b = 
+      do 
+         ids <- deRefStablePtr (castPtrToStablePtr (Ptr (int2Addr# idsPtr)))
+         ASSERT (length ids == length wrapped_hValues) return ()
+         let hValues = [unsafeCoerce# hv | O hv <- wrapped_hValues]
+         handleBreakpoint handler session (zip ids hValues) site locmsg b
+
+jumpAutoFunction session handler ptr hValues siteInfo locmsg b 
+    | site <- mkSite siteInfo
+    = unsafePerformIO $ do
+         break <- isAutoBkptEnabled handler session site 
+         if break 
+            then jumpFunctionM session handler ptr hValues site locmsg b
+            else return b
+
+jumpStepByStepFunction session handler ptr hValues siteInfo locmsg b 
+    | site <- mkSite siteInfo
+    = unsafePerformIO $ do
+          jumpFunctionM session handler ptr hValues site locmsg b
+
+mkSite :: SiteInfo -> BkptLocation Module
+mkSite (pkgName, modName, sitenum) =
+  (mkModule (stringToPackageId pkgName) (mkModuleName modName), sitenum)
 
 obtainTerm :: Session -> Bool -> Id -> IO (Maybe Term)
 obtainTerm sess force id = withSession sess $ \hsc_env -> 

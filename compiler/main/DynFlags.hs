@@ -84,6 +84,9 @@ import Util		( split )
 import Data.Char	( isDigit, isUpper )
 import System.IO        ( hPutStrLn, stderr )
 
+import Breakpoints      ( BkptHandler )
+import Module           ( ModuleName )
+
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
@@ -303,6 +306,9 @@ data DynFlags = DynFlags {
   
   -- message output
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO ()
+
+  -- breakpoint handling
+ ,bkptHandler           :: Maybe (BkptHandler Module)
  }
 
 data HscTarget
@@ -411,7 +417,8 @@ defaultDynFlags =
 	packageFlags		= [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
-	
+
+        bkptHandler             = Nothing,
 	flags = [ 
     	    Opt_ReadUserPackageConf,
     
