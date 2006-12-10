@@ -52,6 +52,7 @@ import ErrUtils
 import SrcLoc
 import Outputable
 import Unique
+import DynFlags
 import PackageConfig
 import BasicTypes
 import Panic
@@ -363,7 +364,7 @@ runMeta :: (SrcSpan -> th_syn -> Either Message hs_syn)
 	-> TcM hs_syn		-- Of type t
 runMeta convert expr
   = do	{ 	-- Desugar
-	  ds_expr <- initDsTc (dsLExpr expr)
+	  ds_expr <- unsetOptM Opt_Debugging $ initDsTc (dsLExpr expr)
 
 	-- Compile and link it; might fail if linking fails
 	; hsc_env <- getTopEnv
