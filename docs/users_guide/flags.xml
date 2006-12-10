@@ -477,6 +477,18 @@
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-fdebugging</option></entry>
+	      <entry>Generate bytecode enabled for debugging</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-debugging</option></entry>
+	      <entry>Do not include debugging information in bytecodes</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
