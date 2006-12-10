@@ -132,6 +132,9 @@ builtin_commands = [
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
 #if defined(GHCI)
+  ("print",     keepGoing (pprintClosureCommand True False), False, completeIdentifier),
+  ("sprint",    keepGoing (pprintClosureCommand False False),False, completeIdentifier),
+  ("force",     keepGoing (pprintClosureCommand False True), False, completeIdentifier),
   ("breakpoint",keepGoing bkptOptions,          False, completeBkpt),
 #endif
   ("kind",	keepGoing kindOfType,		False, completeIdentifier),
@@ -170,6 +173,8 @@ helpText =
  "   :edit                       edit last module\n" ++
  "   :help, :?                   display this list of commands\n" ++
  "   :info [<name> ...]          display information about the given names\n" ++
+ "   :print [<name> ...]         prints a value without forcing its computation\n" ++
+ "   :sprint [<name> ...]        prints a value without forcing its computation(simpler)\n" ++
  "   :load <filename> ...        load module(s) and their dependents\n" ++
  "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++

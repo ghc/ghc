@@ -53,6 +53,248 @@ import GHC.Exts
 
 #include "HsVersions.h"
 
+-------------------------------------
+-- | The :print & friends commands
+-------------------------------------
+pprintClosureCommand :: Bool -> Bool -> String -> GHCi ()
+pprintClosureCommand bindThings force str = do
+  cms <- getSession 
+  let strs = words str
+  mbThings <- io$ ( mapM (GHC.lookupName cms) =<<) 
+                  . liftM concat 
+                  . mapM (GHC.parseName cms) 
+                   $ strs
+  newvarsNames <- io$ do 
+           uniques <- liftM uniqsFromSupply (mkSplitUniqSupply 'q')
+           return$ map (\u-> (mkSysTvName u (mkFastString "a"))) uniques
+  let ids_ = [id | Just (AnId id) <- mbThings]
+
+  -- Clean up 'Unknown' types artificially injected into tyvars 
+      ids = map (stripUnknowns newvarsNames) ids_
+ 
+ -- Obtain the terms 
+  mb_terms  <- io$ mapM (obtainTerm cms force) ids
+
+  -- Give names to suspensions and bind them in the local env
+  mb_terms' <- if bindThings
+               then io$ mapM (traverse (bindSuspensions cms)) mb_terms
+               else return mb_terms
+  ppr_terms <- io$ mapM (traverse (printTerm cms)) mb_terms' 
+  let docs = [ ppr id <+> char '=' <+> t | (Just t,id) <- zip ppr_terms ids]
+  unqual  <- io$ GHC.getPrintUnqual cms
+  io . putStrLn . showSDocForUser unqual $ Outputable.vcat docs
+
+  -- Type reconstruction may have obtained more defined types for some ids
+  -- So we refresh their types.
+  let new_ids0 = [ setIdType id ty | (id,Just t) <- zip ids mb_terms
+                                   , let Just ty = termType t
+                                   , ty `isMoreSpecificThan` idType id 
+                                   ]
+  new_ids <- io$ mapM (\x->liftM (setIdType x) . instantiateTyVarsToUnknown cms . idType $ x) 
+                      new_ids0   
+  let Session ref = cms
+  hsc_env <- io$ readIORef ref
+  let ictxt = hsc_IC hsc_env
+      type_env = ic_type_env ictxt
+      filtered_type_env = delListFromNameEnv type_env (map idName new_ids)
+      new_type_env =  extendTypeEnvWithIds filtered_type_env new_ids
+      new_ic = ictxt {ic_type_env = new_type_env }
+  io$ writeIORef ref (hsc_env {hsc_IC = new_ic })
+                                          
+  where
+    isMoreSpecificThan :: Type -> Type -> Bool
+    ty `isMoreSpecificThan   ` ty1 
+      | Just subst    <- tcUnifyTys bindOnlyTy1 [repType' ty] [repType' ty1] 
+      , substFiltered <- filter (not.isTyVarTy) . varEnvElts . getTvSubstEnv $ subst
+      , not . null $ substFiltered
+      , all (flip notElemTvSubst subst) ty_vars
+--      , pprTrace "subst" (ppr subst) True
+      = True
+      | otherwise = False
+      where bindOnlyTy1 tyv | tyv `elem` ty_vars = AvoidMe
+                            | otherwise = BindMe
+            ty_vars = varSetElems$ tyVarsOfType ty
+
+    bindSuspensions :: Session -> Term -> IO Term
+    bindSuspensions cms@(Session ref) t = do 
+      hsc_env <- readIORef ref
+      inScope <- GHC.getBindings cms
+      let ictxt        = hsc_IC hsc_env
+          rn_env       = ic_rn_local_env ictxt
+          type_env     = ic_type_env ictxt
+          prefix       = "_t"
+          alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
+          availNames   = [n | n <- map ((prefix++) . show) [1..]
+                            , n `notElem` alreadyUsedNames ]
+      availNames_var  <- newIORef availNames
+      (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
+      let (names, tys, hvals) = unzip3 stuff
+      concrete_tys    <- mapM (instantiateTyVarsToUnknown cms) tys
+      let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
+                  | (name,ty) <- zip names concrete_tys]
+          new_type_env = extendTypeEnvWithIds type_env ids 
+          new_rn_env   = extendLocalRdrEnv rn_env names
+          new_ic       = ictxt { ic_rn_local_env = new_rn_env, 
+                                 ic_type_env     = new_type_env }
+      extendLinkEnv (zip names hvals)
+      writeIORef ref (hsc_env {hsc_IC = new_ic })
+      return t'
+     where    
+
+--    Processing suspensions. Give names and recopilate info
+        nameSuspensionsAndGetInfos :: IORef [String] -> TermFold (IO (Term, [(Name,Type,HValue)]))
+        nameSuspensionsAndGetInfos freeNames = TermFold 
+                      {
+                        fSuspension = doSuspension freeNames
+                      , fTerm = \ty dc v tt -> do 
+                                    tt' <- sequence tt 
+                                    let (terms,names) = unzip tt' 
+                                    return (Term ty dc v terms, concat names)
+                      , fPrim    = \ty n ->return (Prim ty n,[])
+                      }
+        doSuspension freeNames ct mb_ty hval Nothing = do
+          name <- atomicModifyIORef freeNames (\x->(tail x, head x))
+          n <- newGrimName cms name
+          let ty' = fromMaybe (error "unexpected") mb_ty
+          return (Suspension ct mb_ty hval (Just n), [(n,ty',hval)])
+
+
+--  A custom Term printer to enable the use of Show instances
+    printTerm cms@(Session ref) = customPrintTerm customPrint
+      where
+        customPrint = \p-> customPrintShowable : customPrintTermBase p 
+        customPrintShowable t@Term{ty=ty, dc=dc, val=val} = do
+          let hasType = isEmptyVarSet (tyVarsOfType ty)  -- redundant
+              isEvaled = isFullyEvaluatedTerm t
+          if isEvaled -- && hasType
+           then do 
+              hsc_env <- readIORef ref
+              dflags  <- GHC.getSessionDynFlags cms
+              do
+                   (new_env, bname) <- bindToFreshName hsc_env ty "showme"
+                   writeIORef ref (new_env)
+                   let noop_log _ _ _ _ = return () 
+                       expr = "show " ++ showSDoc (ppr bname)
+                   GHC.setSessionDynFlags cms dflags{log_action=noop_log}
+                   mb_txt <- withExtendedLinkEnv [(bname, val)] 
+                               (GHC.compileExpr cms expr)
+                   case mb_txt of 
+                     Just txt -> return . Just . text . unsafeCoerce# $ txt
+                     Nothing  -> return Nothing
+               `finally` do 
+                   writeIORef ref hsc_env
+                   GHC.setSessionDynFlags cms dflags
+           else return Nothing
+
+        bindToFreshName hsc_env ty userName = do
+          name <- newGrimName cms userName 
+          let ictxt    = hsc_IC hsc_env
+              rn_env   = ic_rn_local_env ictxt
+              type_env = ic_type_env ictxt
+              id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
+              new_type_env = extendTypeEnv type_env (AnId id)
+              new_rn_env   = extendLocalRdrEnv rn_env [name]
+              new_ic       = ictxt { ic_rn_local_env = new_rn_env, 
+                                     ic_type_env     = new_type_env }
+          return (hsc_env {hsc_IC = new_ic }, name)
+--    Create new uniques and give them sequentially numbered names
+--    newGrimName :: Session -> String -> IO Name
+    newGrimName cms userName  = do
+      us <- mkSplitUniqSupply 'b'
+      let unique  = uniqFromSupply us
+          occname = mkOccName varName userName
+          name    = mkInternalName unique occname noSrcLoc
+      return name
+
+----------------------------------------------------------------------------
+-- | Replace all the tyvars in a Term with the opaque type GHC.Base.Unknown
+----------------------------------------------------------------------------
+instantiateTyVarsToUnknown :: Session -> Type -> IO Type
+instantiateTyVarsToUnknown cms ty
+-- We have a GADT, so just fix its tyvars
+    | Just (tycon, args) <- splitTyConApp_maybe ty
+    , tycon /= funTyCon
+    , isGADT tycon
+    = mapM fixTyVars args >>= return . mkTyConApp tycon
+-- We have a regular TyCon, so map recursively to its args
+    | Just (tycon, args) <- splitTyConApp_maybe ty
+    , tycon /= funTyCon
+    = do unknownTyVar <- unknownTV
+         args' <- mapM (instantiateTyVarsToUnknown cms) args
+         return$ mkTyConApp tycon args'
+-- we have a tyvar of kind *
+    | Just tyvar <- getTyVar_maybe ty
+    , ([],_) <- splitKindFunTys (tyVarKind tyvar) 
+    = unknownTV
+-- we have a higher kind tyvar, so insert an unknown of the appropriate kind
+    | Just tyvar <- getTyVar_maybe ty
+    , (args,_) <- splitKindFunTys (tyVarKind tyvar)
+    = liftM mkTyConTy $ unknownTC !! length args
+-- Base case
+    | otherwise    = return ty 
+
+ where unknownTV = do 
+         Just (ATyCon unknown_tc) <- lookupName cms unknownTyConName
+         return$ mkTyConTy unknown_tc
+       unknownTC = [undefined, unknownTC1, unknownTC2, unknownTC3]
+       unknownTC1 = do 
+         Just (ATyCon unknown_tc) <- lookupName cms unknown1TyConName
+         return unknown_tc
+       unknownTC2 = do 
+         Just (ATyCon unknown_tc) <- lookupName cms unknown2TyConName
+         return unknown_tc
+       unknownTC3 = do 
+         Just (ATyCon unknown_tc) <- lookupName cms unknown3TyConName
+         return unknown_tc
+--       isGADT ty | pprTrace' "isGADT" (ppr ty <> colon <> ppr(isGadtSyntaxTyCon ty)) False = undefined
+       isGADT tc | Just dcs <- tyConDataCons_maybe tc = any (not . null . dataConEqSpec) dcs
+                 | otherwise = False
+       fixTyVars ty 
+           | Just (tycon, args) <- splitTyConApp_maybe ty
+           = mapM fixTyVars args >>= return . mkTyConApp tycon
+-- Fix the tyvar so that the interactive environment doesn't choke on it TODO 
+           | Just tv <- getTyVar_maybe ty = return ty --TODO
+           | otherwise = return ty
+
+-- | The inverse function. Strip the GHC.Base.Unknowns in the type of the id, they correspond to tyvars. The caller must provide an infinite list of fresh names
+stripUnknowns :: [Name] -> Id -> Id
+stripUnknowns names id = setIdType id . sigmaType . fst . go names . idType 
+                           $ id
+ where 
+   sigmaType ty = mkForAllTys (varSetElems$ tyVarsOfType (dropForAlls ty)) ty
+   go tyvarsNames@(v:vv) ty 
+    | Just (ty1,ty2) <- splitFunTy_maybe ty = let
+               (ty1',vv') = go tyvarsNames ty1
+               (ty2',vv'')= go vv' ty2
+               in (mkFunTy ty1' ty2', vv'')
+    | Just (ty1,ty2) <- splitAppTy_maybe ty = let
+               (ty1',vv') = go tyvarsNames ty1
+               (ty2',vv'')= go vv' ty2
+               in (mkAppTy ty1' ty2', vv'')
+    | Just (tycon, args) <- splitTyConApp_maybe ty 
+    , Just (tycon', vv') <- (fixTycon tycon tyvarsNames)
+    , (args',vv'') <- foldr (\arg (aa,vv) -> let (arg',vv') = go vv' arg 
+                                             in (arg':aa,vv'))
+                            ([],vv') args
+    = (mkAppTys tycon' args',vv'')
+    | Just (tycon, args) <- splitTyConApp_maybe ty
+    , (args',vv') <- foldr (\arg (aa,vv) -> let (arg',vv') = go vv' arg 
+                                            in (arg':aa,vv'))
+                           ([],tyvarsNames) args
+    = (mkTyConApp tycon args',vv')
+    | otherwise = (ty, tyvarsNames)
+    where  fixTycon tycon (v:vv) = do
+               k <- lookup (tyConName tycon) kinds
+               return (mkTyVarTy$ mkTyVar v k, vv)
+           kinds = [ (unknownTyConName, liftedTypeKind)
+                   , (unknown1TyConName, kind1)
+                   , (unknown2TyConName, kind2)
+                   , (unknown3TyConName, kind3)]
+           kind1 = mkArrowKind liftedTypeKind liftedTypeKind
+           kind2 = mkArrowKind kind1 liftedTypeKind
+           kind3 = mkArrowKind kind2 liftedTypeKind
+stripUnknowns _ id = id
+
 -----------------------------
 -- | The :breakpoint command
 -----------------------------

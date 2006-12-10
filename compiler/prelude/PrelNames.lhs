@@ -186,7 +186,8 @@ basicKnownKeyNames
 	otherwiseIdName, 
 	plusIntegerName, timesIntegerName,
 	eqStringName, assertName, breakpointName, breakpointCondName,
-        breakpointAutoName, opaqueTyConName,
+        breakpointAutoName,  opaqueTyConName, unknownTyConName, 
+        unknown1TyConName, unknown2TyConName, unknown3TyConName,
         assertErrorName, runSTRepName,
 	printName, fstName, sndName,
 
@@ -492,6 +493,10 @@ assertName        = varQual gHC_BASE FSLIT("assert")     assertIdKey
 breakpointName    = varQual gHC_BASE FSLIT("breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE FSLIT("breakpointCond") breakpointCondIdKey
 breakpointAutoName= varQual gHC_BASE FSLIT("breakpointAuto") breakpointAutoIdKey
+unknownTyConName  = tcQual  gHC_BASE FSLIT("Unknown") unknownTyConKey
+unknown1TyConName = tcQual  gHC_BASE FSLIT("Unknown1") unknown1TyConKey
+unknown2TyConName = tcQual  gHC_BASE FSLIT("Unknown2") unknown2TyConKey
+unknown3TyConName = tcQual  gHC_BASE FSLIT("Unknown3") unknown3TyConKey
 opaqueTyConName   = tcQual  gHC_BASE FSLIT("Opaque")   opaqueTyConKey
 
 breakpointJumpName
@@ -828,6 +833,11 @@ rightCoercionTyConKey                   = mkPreludeTyConUnique 96
 instCoercionTyConKey                    = mkPreludeTyConUnique 97
 unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
 
+
+unknownTyConKey				= mkPreludeTyConUnique 99
+unknown1TyConKey			= mkPreludeTyConUnique 100
+unknown2TyConKey			= mkPreludeTyConUnique 101
+unknown3TyConKey			= mkPreludeTyConUnique 102
 opaqueTyConKey                          = mkPreludeTyConUnique 103
 
 ---------------- Template Haskell -------------------

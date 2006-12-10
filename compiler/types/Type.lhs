@@ -48,7 +48,7 @@ module Type (
 	splitTyConApp_maybe, splitTyConApp, 
         splitNewTyConApp_maybe, splitNewTyConApp,
 
-	repType, typePrimRep, coreView, tcView, kindView,
+	repType, repType', typePrimRep, coreView, tcView, kindView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
@@ -456,6 +456,16 @@ repType (TyConApp tc tys)
 			   ASSERT( {- isRecursiveTyCon tc && -} tys `lengthIs` tyConArity tc )
 			   repType (new_type_rep tc tys)
 repType ty = ty
+
+-- repType' aims to be a more thorough version of repType
+-- For now it simply looks through the TyConApp args too
+repType' ty -- | pprTrace "repType'" (ppr ty $$ ppr (go1 ty)) False = undefined
+            | otherwise = go1 ty 
+ where 
+        go1 = go . repType
+        go (TyConApp tc tys) = mkTyConApp tc (map repType' tys)
+        go ty = ty
+
 
 -- new_type_rep doesn't ask any questions: 
 -- it just expands newtype, whether recursive or not
