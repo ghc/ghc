@@ -76,6 +76,7 @@ import CodeGen		( codeGen )
 import CmmParse		( parseCmmFile )
 import CodeOutput	( codeOutput )
 import NameEnv          ( emptyNameEnv )
+import Breakpoints      ( noDbgSites )
 
 import DynFlags
 import ErrUtils
@@ -685,6 +686,7 @@ hscFileCheck hsc_env mod_summary = do {
 				md_exports   = tcg_exports   tc_result,
 				md_insts     = tcg_insts     tc_result,
 				md_fam_insts = tcg_fam_insts tc_result,
+                                md_dbg_sites = noDbgSites,
 				md_rules     = [panic "no rules"] }
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker

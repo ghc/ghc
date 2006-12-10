@@ -23,3 +23,9 @@ nullBkptHandler = BkptHandler {
 
 type BkptLocation a = (a, SiteNumber)
 type SiteNumber   = Int
+
+type SiteMap      = [(SiteNumber, Coord)]
+type Coord        = (Int, Int)
+
+noDbgSites :: SiteMap
+noDbgSites = []

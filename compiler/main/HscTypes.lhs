@@ -64,6 +64,7 @@ module HscTypes (
 
 #include "HsVersions.h"
 
+import Breakpoints      ( SiteNumber, Coord, noDbgSites )
 #ifdef GHCI
 import ByteCodeAsm	( CompiledByteCode )
 #endif
@@ -454,14 +455,16 @@ data ModDetails
         md_types     :: !TypeEnv,
         md_insts     :: ![Instance],	-- Dfun-ids for the instances in this module
         md_fam_insts :: ![FamInst],
-        md_rules     :: ![CoreRule]	-- Domain may include Ids from other modules
+        md_rules     :: ![CoreRule],	-- Domain may include Ids from other modules
+        md_dbg_sites     :: ![(SiteNumber, Coord)]     -- Breakpoint sites inserted by the renamer
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_exports = [],
 			       md_insts     = [],
 			       md_rules     = [],
-			       md_fam_insts = [] }
+			       md_fam_insts = [],
+                               md_dbg_sites = noDbgSites}
 
 -- A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
@@ -490,7 +493,8 @@ data ModGuts
         mg_rules     :: ![CoreRule],	 -- Rules from this module
 	mg_binds     :: ![CoreBind],	 -- Bindings for this module
 	mg_foreign   :: !ForeignStubs,
-	mg_hpc_info  :: !HpcInfo         -- info about coverage tick boxes
+	mg_hpc_info  :: !HpcInfo,        -- info about coverage tick boxes
+        mg_dbg_sites :: ![(SiteNumber, Coord)]     -- Bkpts inserted by the renamer
     }
 
 -- The ModGuts takes on several slightly different forms:

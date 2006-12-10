@@ -124,7 +124,8 @@ mkBootModDetails hsc_env (ModGuts { mg_module    = mod
 				  , mg_exports   = exports
 				  , mg_types     = type_env
 				  , mg_insts     = insts
-				  , mg_fam_insts = fam_insts })
+				  , mg_fam_insts = fam_insts,
+                                    mg_dbg_sites = sites })
   = do	{ let dflags = hsc_dflags hsc_env 
 	; showPass dflags "Tidy [hoot] type env"
 
@@ -138,7 +139,8 @@ mkBootModDetails hsc_env (ModGuts { mg_module    = mod
 			     , md_insts     = insts'
 			     , md_fam_insts = fam_insts
 			     , md_rules     = []
-			     , md_exports   = exports })
+			     , md_exports   = exports
+                             , md_dbg_sites = sites})
 	}
   where
 
@@ -241,7 +243,8 @@ tidyProgram hsc_env
 				mg_rules = imp_rules,
 				mg_dir_imps = dir_imps, mg_deps = deps, 
 				mg_foreign = foreign_stubs,
-			        mg_hpc_info = hpc_info })
+			        mg_hpc_info = hpc_info,
+                                mg_dbg_sites = sites })
 
   = do	{ let dflags = hsc_dflags hsc_env
 	; showPass dflags "Tidy Core"
@@ -299,7 +302,8 @@ tidyProgram hsc_env
 				md_rules     = tidy_rules,
 				md_insts     = tidy_insts,
 				md_fam_insts = fam_insts,
-				md_exports   = exports })
+				md_exports   = exports,
+                                md_dbg_sites = sites })
 	}
 
 lookup_dfun type_env dfun_id

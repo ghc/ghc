@@ -20,6 +20,7 @@ import Type
 
 import DsMonad
 import DsUtils
+import DsBreakpoint
 import Unique
 import PrelInfo
 import TysWiredIn

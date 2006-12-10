@@ -18,11 +18,12 @@ module DsMonad (
 	getModuleDs,
 	newUnique, 
 	UniqSupply, newUniqueSupply,
-	getDOptsDs,
+	getDOptsDs, getGhcModeDs, doptDs,
 	dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon, dsLookupDataCon,
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
+        getBkptSitesDs,
 	-- Warnings
 	DsWarning, warnDs, failWithDs,
 
@@ -55,6 +56,9 @@ import NameEnv
 import OccName
 import DynFlags
 import ErrUtils
+import Bag
+import Breakpoints
+import OccName
 
 import Data.IORef
 
@@ -132,8 +136,9 @@ data DsGblEnv = DsGblEnv {
 	ds_mod	   :: Module,       		-- For SCC profiling
 	ds_unqual  :: PrintUnqualified,
 	ds_msgs    :: IORef Messages,		-- Warning messages
-	ds_if_env  :: (IfGblEnv, IfLclEnv)	-- Used for looking up global, 
+	ds_if_env  :: (IfGblEnv, IfLclEnv),	-- Used for looking up global, 
 						-- possibly-imported things
+        ds_bkptSites :: IORef SiteMap  -- Inserted Breakpoints sites
     }
 
 data DsLclEnv = DsLclEnv {
@@ -256,6 +261,12 @@ the @SrcSpan@ being carried around.
 getDOptsDs :: DsM DynFlags
 getDOptsDs = getDOpts
 
+doptDs :: DynFlag -> TcRnIf gbl lcl Bool
+doptDs = doptM
+
+getGhcModeDs :: DsM GhcMode
+getGhcModeDs =  getDOptsDs >>= return . ghcMode
+
 getModuleDs :: DsM Module
 getModuleDs = do { env <- getGblEnv; return (ds_mod env) }
 
@@ -316,4 +327,10 @@ dsExtendMetaEnv menv thing_inside
   = updLclEnv (\env -> env { ds_meta = ds_meta env `plusNameEnv` menv }) thing_inside
 \end{code}
 
+\begin{code}
+
+getBkptSitesDs :: DsM (IORef SiteMap)
+getBkptSitesDs = do { env <- getGblEnv; return (ds_bkptSites env) }
+
+\end{code}
 

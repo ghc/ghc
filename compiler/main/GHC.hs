@@ -59,6 +59,9 @@ module GHC (
 	modInfoInstances,
 	modInfoIsExportedName,
 	modInfoLookupName,
+#if defined(GHCI)
+        modInfoBkptSites,
+#endif
 	lookupGlobalName,
 
 	-- * Printing
@@ -849,6 +852,9 @@ checkModule session@(Session ref) mod = do
                                                      md_exports details,
 				minf_rdr_env   = Just rdr_env,
 				minf_instances = md_insts details
+#ifdef GHCI
+                               ,minf_dbg_sites = noDbgSites
+#endif
 			      }
 		   return (Just (CheckedModule {
 					parsedSource = parsed,
@@ -1757,7 +1763,10 @@ data ModuleInfo = ModuleInfo {
 	minf_type_env  :: TypeEnv,
 	minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
 	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
-	minf_instances :: [Instance]
+	minf_instances :: [Instance],
+#ifdef GHCI
+        minf_dbg_sites :: [(SiteNumber,Coord)] 
+#endif
 	-- ToDo: this should really contain the ModIface too
   }
 	-- We don't want HomeModInfo here, because a ModuleInfo applies
@@ -1796,7 +1805,8 @@ getPackageModuleInfo hsc_env mdl = do
 			minf_type_env  = mkTypeEnv tys,
 			minf_exports   = names,
 			minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names (moduleName mdl),
-			minf_instances = error "getModuleInfo: instances for package module unimplemented"
+			minf_instances = error "getModuleInfo: instances for package module unimplemented",
+                        minf_dbg_sites = noDbgSites
 		}))
 #else
   -- bogusly different for non-GHCI (ToDo)
@@ -1813,6 +1823,9 @@ getHomeModuleInfo hsc_env mdl =
 			minf_exports   = availsToNameSet (md_exports details),
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
 			minf_instances = md_insts details
+#ifdef GHCI
+                       ,minf_dbg_sites = md_dbg_sites details
+#endif
 			}))
 
 -- | The list of top-level entities defined in a module
@@ -1845,6 +1858,10 @@ modInfoLookupName s minf name = withSession s $ \hsc_env -> do
        eps <- readIORef (hsc_EPS hsc_env)
        return $! lookupType (hsc_dflags hsc_env) 
 			    (hsc_HPT hsc_env) (eps_PTE eps) name
+
+#ifdef GHCI
+modInfoBkptSites = minf_dbg_sites
+#endif
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id

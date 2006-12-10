@@ -50,6 +50,7 @@ import Maybes
 import SrcLoc
 import Util
 import DynFlags
+import Breakpoints
 import Control.Monad
 
 import Data.List
@@ -209,7 +210,8 @@ typecheckIface iface
 			      , md_insts     = insts
 			      , md_fam_insts = fam_insts
 			      , md_rules     = rules
-			      , md_exports   = exports 
+			      , md_exports   = exports
+                              , md_dbg_sites = noDbgSites
 			      }
     }
 \end{code}

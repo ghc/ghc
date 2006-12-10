@@ -104,6 +104,79 @@ mkBreakpointExpr loc bkptFuncId = do
           srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
           instrumenting = idName bkptFuncId == breakpointAutoName
 
+debug_enabled :: DsM Bool
+debug_enabled = do
+    debugging      <- doptDs Opt_Debugging
+    b_enabled      <- breakpoints_enabled
+    return (debugging && b_enabled)
+
+breakpoints_enabled :: DsM Bool
+breakpoints_enabled = do
+    ghcMode            <- getGhcModeDs
+    currentModule      <- getModuleDs
+    ignore_breakpoints <- doptDs Opt_IgnoreBreakpoints
+    return ( not ignore_breakpoints 
+          && ghcMode == Interactive 
+          && currentModule /= iNTERACTIVE )
+
+maybeInsertBreakpoint :: LHsExpr Id -> Type ->  DsM (LHsExpr Id)
+--maybeInsertBreakpoint e | pprTrace("insertBreakpoint at" (ppr e) False = undefined
+maybeInsertBreakpoint lhsexpr@(L loc _) ty = do 
+  instrumenting <- isInstrumentationSpot lhsexpr
+  if instrumenting
+         then do L _ dynBkpt <- dynBreakpoint loc 
+--                 return (l (HsApp (l$ TyApp dynBkpt [ty]) lhsexpr))
+                 return$ l(HsApp (l$ HsWrap (WpTyApp ty) dynBkpt) lhsexpr)
+         else return lhsexpr
+  where l = L loc
+
+dsAndThenMaybeInsertBreakpoint :: LHsExpr Id -> DsM CoreExpr
+dsAndThenMaybeInsertBreakpoint expr@(L loc _) = do
+  coreExpr  <- dsLExpr expr
+  instrumenting <- isInstrumentationSpot expr
+  if instrumenting
+         then do L _ dynBkpt<- dynBreakpoint loc
+                 bkptCore   <- dsLExpr (l$ HsWrap (WpTyApp (exprType coreExpr)) dynBkpt)
+                 return (bkptCore `App` coreExpr)
+         else return coreExpr
+  where l = L loc
+
+isInstrumentationSpot (L loc e) = do
+  ghcmode   <- getGhcModeDs
+  instrumenting <- debug_enabled 
+  return$ instrumenting     
+          && isGoodSrcSpan loc          -- Avoids 'derived' code
+          && (not$ isRedundant e)
+
+isRedundant HsLet  {} = True
+isRedundant HsDo   {} = True
+isRedundant HsCase {} = True
+isRedundant     _     = False
+
+dynBreakpoint :: SrcSpan -> DsM (LHsExpr Id)
+dynBreakpoint loc | not (isGoodSrcSpan loc) = 
+                         pprPanic "dynBreakpoint" (ppr loc)
+dynBreakpoint loc = do 
+    let autoBreakpoint = mkGlobalId VanillaGlobal breakpointAutoName 
+                         breakpointAutoTy vanillaIdInfo
+    dflags <- getDOptsDs 
+    ioToIOEnv$ debugTraceMsg dflags 3 (text "Breakpoint inserted at " <> ppr loc)
+    return$ L loc (HsVar autoBreakpoint)
+  where breakpointAutoTy = (ForAllTy alphaTyVar
+                                (FunTy (TyVarTy  alphaTyVar)
+                                 (TyVarTy alphaTyVar)))
+
+-- Records a breakpoint site and returns the site number
+recordBkpt :: SrcLoc -> DsM (Int)
+--recordBkpt | trace "recordBkpt" False = undefined
+recordBkpt loc = do
+    sites_var <- getBkptSitesDs
+    sites     <- ioToIOEnv$ readIORef sites_var
+    let site   = length sites + 1
+    let coords = (srcLocLine loc, srcLocCol loc)
+    ioToIOEnv$ writeIORef sites_var ((site, coords) : sites) 
+    return site
+
 mkJumpFunc :: Id -> DsM Id  
 mkJumpFunc bkptFuncId
     | idName bkptFuncId == breakpointName 
@@ -129,5 +202,9 @@ mkJumpFunc bkptFuncId
                       (basicType extra (mkTyConApp opaqueTyCon [])) vanillaIdInfo
         mkTupleType tys = mkTupleTy Boxed (length tys) tys
 
+#else
+maybeInsertBreakpoint expr _ = return expr
+dsAndThenMaybeInsertBreakpoint coreExpr = dsLExpr coreExpr
+breakpoints_enabled = False
 #endif
 \end{code}

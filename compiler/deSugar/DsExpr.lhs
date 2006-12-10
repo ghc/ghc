@@ -291,7 +291,7 @@ dsExpr (HsCase discrim matches)
     returnDs (scrungleMatch discrim_var core_discrim matching_code)
 
 dsExpr (HsLet binds body)
-  = dsLExpr body		`thenDs` \ body' ->
+  = dsAndThenMaybeInsertBreakpoint body `thenDs` \ body' ->
     dsLocalBinds binds body'
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
@@ -593,10 +593,10 @@ dsDo	:: [LStmt Id]
 dsDo stmts body result_ty
   = go (map unLoc stmts)
   where
-    go [] = dsLExpr body
+    go [] = dsAndThenMaybeInsertBreakpoint body
     
     go (ExprStmt rhs then_expr _ : stmts)
-      = do { rhs2 <- dsLExpr rhs
+      = do { rhs2 <- dsAndThenMaybeInsertBreakpoint rhs
 	   ; then_expr2 <- dsExpr then_expr
 	   ; rest <- go stmts
 	   ; returnDs (mkApps then_expr2 [rhs2, rest]) }
@@ -611,7 +611,7 @@ dsDo stmts body result_ty
 	   ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
     				  result_ty (cantFailMatchResult body)
 	   ; match_code <- handle_failure pat match fail_op
-	   ; rhs'       <- dsLExpr rhs
+           ; rhs'       <- dsAndThenMaybeInsertBreakpoint rhs
 	   ; bind_op'   <- dsExpr bind_op
 	   ; returnDs (mkApps bind_op' [rhs', Lam var match_code]) }
     
@@ -661,7 +661,7 @@ dsMDo tbl stmts body result_ty
 	   ; dsLocalBinds binds rest }
 
     go (ExprStmt rhs _ rhs_ty : stmts)
-      = do { rhs2 <- dsLExpr rhs
+      = do { rhs2 <- dsAndThenMaybeInsertBreakpoint rhs
 	   ; rest <- go stmts
 	   ; returnDs (mkApps (Var then_id) [Type rhs_ty, Type b_ty, rhs2, rest]) }
     
@@ -674,7 +674,7 @@ dsMDo tbl stmts body result_ty
 	   ; let fail_expr = mkApps (Var fail_id) [Type b_ty, fail_msg]
 	   ; match_code <- extractMatchResult match fail_expr
 
-	   ; rhs'       <- dsLExpr rhs
+	   ; rhs'       <- dsAndThenMaybeInsertBreakpoint rhs
 	   ; returnDs (mkApps (Var bind_id) [Type (hsLPatType pat), Type b_ty, 
 					     rhs', Lam var match_code]) }
     

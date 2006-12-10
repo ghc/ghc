@@ -69,6 +69,7 @@ import NameSet
 import TyCon
 import SrcLoc
 import HscTypes
+import DsBreakpoint
 import Outputable
 
 #ifdef GHCI
@@ -309,7 +310,8 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_fix_env   = emptyFixityEnv,
 				mg_deprecs   = NoDeprecs,
 				mg_foreign   = NoStubs,
-				mg_hpc_info  = noHpcInfo
+				mg_hpc_info  = noHpcInfo,
+                                mg_dbg_sites = noDbgSites
 		    } } ;
 
    tcCoreDump mod_guts ;
