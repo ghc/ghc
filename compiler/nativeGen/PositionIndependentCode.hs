@@ -274,7 +274,7 @@ howToAccessLabel CallReference lbl
     = AccessDirectly
 #if !i386_TARGET_ARCH
     | labelDynamic lbl && opt_PIC
-    = AccessViaSymbolStub
+    = AccessViaStub
 #endif
 
 howToAccessLabel _ lbl
