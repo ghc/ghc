@@ -35,13 +35,7 @@ import SrcLoc           ( SrcSpan )
 import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
 			  negateName, thenMName, bindMName, failMName )
-#if defined(GHCI) && defined(BREAKPOINT)
-import PrelNames        ( breakpointJumpName, breakpointCondJumpName
-                        , undefined_RDR, breakpointIdKey, breakpointCondIdKey )
-import UniqFM           ( eltsUFM )
-import DynFlags         ( GhcMode(..) )
-import Name             ( isTyVarName )
-#endif
+
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
 import RdrName		( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
@@ -106,22 +100,6 @@ rnExpr (HsVar v)
                       && not ignore_asserts,
                       do (e, fvs) <- mkAssertErrorExpr
                          return (e, fvs `addOneFV` name))
-#if defined(GHCI) && defined(BREAKPOINT)
-                   , (name `hasKey` breakpointIdKey
-                      && not ignore_breakpoints
-                      && ghcMode == Interactive,
-                         do let isWantedName = not.isTyVarName
-                            (e, fvs) <- mkBreakpointExpr (filter isWantedName (eltsUFM localRdrEnv))
-                            return (e, fvs `addOneFV` name)
-                     )
-                   , (name `hasKey` breakpointCondIdKey
-                      && not ignore_breakpoints
-                      && ghcMode == Interactive,
-                         do let isWantedName = not.isTyVarName
-                            (e, fvs) <- mkBreakpointCondExpr (filter isWantedName (eltsUFM localRdrEnv))
-                            return (e, fvs `addOneFV` name)
-                     )
-#endif
                    ]
        case lookup True conds of
          Just action -> action
@@ -945,48 +923,14 @@ segsToStmts ((defs, uses, fwds, ss) : segs) fvs_later
 
 %************************************************************************
 %*									*
-\subsubsection{breakpoint utils}
-%*									*
-%************************************************************************
-
-\begin{code}
-#if defined(GHCI) && defined(BREAKPOINT)
-mkBreakpointExpr :: [Name] -> RnM (HsExpr Name, FreeVars)
-mkBreakpointExpr = mkBreakpointExpr' breakpointJumpName
-
-mkBreakpointCondExpr :: [Name] -> RnM (HsExpr Name, FreeVars)
-mkBreakpointCondExpr = mkBreakpointExpr' breakpointCondJumpName
-
-mkBreakpointExpr' :: Name -> [Name] -> RnM (HsExpr Name, FreeVars)
-mkBreakpointExpr' breakpointFunc scope
-    = do sloc <- getSrcSpanM
-         undef <- lookupOccRn undefined_RDR
-         let inLoc = L sloc
-             lHsApp x y = inLoc (HsApp x y)
-             mkExpr fnName args = mkExpr' fnName (reverse args)
-             mkExpr' fnName [] = inLoc (HsVar fnName)
-             mkExpr' fnName (arg:args)
-                 = lHsApp (mkExpr' fnName args) (inLoc arg)
-             expr = unLoc $ mkExpr breakpointFunc [mkScopeArg scope, HsVar undef, msg]
-             mkScopeArg args = unLoc $ mkExpr undef (map HsVar args)
-             msg = srcSpanLit sloc
-         return (expr, emptyFVs)
-
-srcSpanLit :: SrcSpan -> HsExpr Name
-srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
-#endif
-
-srcSpanPrimLit :: SrcSpan -> HsExpr Name
-srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDoc (ppr span))))
-\end{code}
-
-%************************************************************************
-%*									*
 \subsubsection{Assertion utils}
 %*									*
 %************************************************************************
 
 \begin{code}
+srcSpanPrimLit :: SrcSpan -> HsExpr Name
+srcSpanPrimLit span = HsLit (HsStringPrim (mkFastString (showSDoc (ppr span))))
+
 mkAssertErrorExpr :: RnM (HsExpr Name, FreeVars)
 -- Return an expression for (assertError "Foo.hs:27")
 mkAssertErrorExpr
@@ -1015,3 +959,5 @@ badIpBinds what binds
   = hang (ptext SLIT("Implicit-parameter bindings illegal in") <+> what)
 	 2 (ppr binds)
 \end{code}
+
+

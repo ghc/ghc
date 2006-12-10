@@ -186,6 +186,7 @@ basicKnownKeyNames
 	otherwiseIdName, 
 	plusIntegerName, timesIntegerName,
 	eqStringName, assertName, breakpointName, breakpointCondName,
+        breakpointAutoName, opaqueTyConName,
         assertErrorName, runSTRepName,
 	printName, fstName, sndName,
 
@@ -490,6 +491,9 @@ orName		  = varQual gHC_BASE FSLIT("||")	  orIdKey
 assertName        = varQual gHC_BASE FSLIT("assert")     assertIdKey
 breakpointName    = varQual gHC_BASE FSLIT("breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE FSLIT("breakpointCond") breakpointCondIdKey
+breakpointAutoName= varQual gHC_BASE FSLIT("breakpointAuto") breakpointAutoIdKey
+opaqueTyConName   = tcQual  gHC_BASE FSLIT("Opaque")   opaqueTyConKey
+
 breakpointJumpName
     = mkInternalName
         breakpointJumpIdKey
@@ -499,6 +503,11 @@ breakpointCondJumpName
     = mkInternalName
         breakpointCondJumpIdKey
         (mkOccNameFS varName FSLIT("breakpointCondJump"))
+        noSrcLoc
+breakpointAutoJumpName
+    = mkInternalName
+        breakpointAutoJumpIdKey
+        (mkOccNameFS varName FSLIT("breakpointAutoJump"))
         noSrcLoc
 
 -- PrelTup
@@ -819,6 +828,7 @@ rightCoercionTyConKey                   = mkPreludeTyConUnique 96
 instCoercionTyConKey                    = mkPreludeTyConUnique 97
 unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
 
+opaqueTyConKey                          = mkPreludeTyConUnique 103
 
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-129
@@ -931,10 +941,12 @@ assertErrorIdKey	      = mkPreludeMiscIdUnique 61
 
 breakpointIdKey               = mkPreludeMiscIdUnique 62
 breakpointCondIdKey           = mkPreludeMiscIdUnique 63
-breakpointJumpIdKey           = mkPreludeMiscIdUnique 64
-breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 65
+breakpointAutoIdKey           = mkPreludeMiscIdUnique 64
+breakpointJumpIdKey           = mkPreludeMiscIdUnique 65
+breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 66
+breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 67
 
-inlineIdKey		      = mkPreludeMiscIdUnique 66
+inlineIdKey		      = mkPreludeMiscIdUnique 68
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 80

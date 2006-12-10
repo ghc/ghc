@@ -9,15 +9,7 @@ Desugaring exporessions.
 module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
-#if defined(GHCI) && defined(BREAKPOINT)
-import Foreign.StablePtr
-import GHC.Exts
-import IOEnv
-import PrelNames
-import TysWiredIn
-import TypeRep
-import TyCon
-#endif
+
 
 import Match
 import MatchLit
@@ -29,8 +21,12 @@ import DsArrows
 import DsMonad
 
 #ifdef GHCI
+import PrelNames
+import DsBreakpoint
 	-- Template Haskell stuff iff bootstrapped
 import DsMeta
+#else
+import DsBreakpoint
 #endif
 
 import HsSyn
@@ -179,6 +175,7 @@ scrungleMatch var scrut body
 		    | x == var = Case scrut bndr ty alts
     scrungle (Let binds body)  = Let binds (scrungle body)
     scrungle other = panic ("scrungleMatch: tuple pattern:\n" ++ showSDoc (ppr other))
+
 \end{code}	
 
 %************************************************************************
@@ -189,10 +186,21 @@ scrungleMatch var scrut body
 
 \begin{code}
 dsLExpr :: LHsExpr Id -> DsM CoreExpr
+
+#if defined(GHCI)
+dsLExpr (L loc expr@(HsWrap w (HsVar v)))
+    | idName v `elem` [breakpointName, breakpointCondName, breakpointAutoName]
+    = do areBreakpointsEnabled <- breakpoints_enabled
+         if areBreakpointsEnabled
+           then do
+              L _ breakpointExpr <- mkBreakpointExpr loc v
+              dsLExpr (L loc $ HsWrap w breakpointExpr)
+           else putSrcSpanDs loc $ dsExpr expr
+#endif
+
 dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e
 
 dsExpr :: HsExpr Id -> DsM CoreExpr
-
 dsExpr (HsPar e) 	      = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar var)     	      = returnDs (Var var)
@@ -209,37 +217,6 @@ dsExpr (NegApp expr neg_expr)
 dsExpr expr@(HsLam a_Match)
   = matchWrapper LambdaExpr a_Match	`thenDs` \ (binders, matching_code) ->
     returnDs (mkLams binders matching_code)
-
-#if defined(GHCI) && defined(BREAKPOINT)
-dsExpr (HsApp (L _ (HsApp realFun@(L _ (HsWrap _ fun)) (L loc arg))) _)
-    | HsVar funId <- fun
-    , idName funId `elem` [breakpointJumpName, breakpointCondJumpName]
-    , ids <- filter (isValidType . idType) (extractIds arg)
-    = do warnDs (text "Extracted ids:" <+> ppr ids <+> ppr (map idType ids))
-         stablePtr <- ioToIOEnv $ newStablePtr ids
-         -- Yes, I know... I'm gonna burn in hell.
-         let Ptr addr# = castStablePtrToPtr stablePtr
-         funCore <- dsLExpr realFun
-         argCore <- dsLExpr (L loc (HsLit (HsInt (fromIntegral (I# (addr2Int# addr#))))))
-         hvalCore <- dsLExpr (L loc (extractHVals ids))
-         return ((funCore `App` argCore) `App` hvalCore)
-    where extractIds :: HsExpr Id -> [Id]
-          extractIds (HsApp fn arg)
-              | HsVar argId <- unLoc arg
-              = argId:extractIds (unLoc fn)
-              | HsWrap co_fn arg' <- unLoc arg
-              , HsVar argId <- arg'		-- SLPJ: not sure what is going on here
-              = error (showSDoc (ppr co_fn)) -- argId:extractIds (unLoc fn)
-          extractIds x = []
-          extractHVals ids = ExplicitList unitTy (map (L loc . HsVar) ids)
-          -- checks for tyvars and unlifted kinds.
-          isValidType (TyVarTy _) = False
-          isValidType (FunTy a b) = isValidType a && isValidType b
-          isValidType (NoteTy _ t) = isValidType t
-          isValidType (AppTy a b) = isValidType a && isValidType b
-          isValidType (TyConApp con ts) = not (isUnLiftedTyCon con) && all isValidType ts
-          isValidType _ = True
-#endif
 
 dsExpr expr@(HsApp fun arg)      
   = dsLExpr fun		`thenDs` \ core_fun ->

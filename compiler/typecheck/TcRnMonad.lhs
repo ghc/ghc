@@ -14,16 +14,12 @@ module TcRnMonad(
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
-#if defined(GHCI) && defined(BREAKPOINT)
+#if defined(GHCI)
 import TypeRep
-import Var
 import IdInfo
-import OccName
-import SrcLoc
 import TysWiredIn
 import PrelNames
-import NameEnv
-import TcEnv
+import {-#SOURCE#-} TcEnv
 #endif
 
 import HsSyn hiding (LIE)
@@ -72,6 +68,7 @@ ioToTcRn = ioToIOEnv
 \end{code}
 
 \begin{code}
+
 initTc :: HscEnv
        -> HscSource
        -> Module 
@@ -163,7 +160,7 @@ initTcPrintErrors env mod todo = do
 \begin{code}
 addBreakpointBindings :: TcM a -> TcM a
 addBreakpointBindings thing_inside
-#if defined(GHCI) && defined(BREAKPOINT)
+#if defined(GHCI)
   = do	{ unique <- newUnique
         ; let { var = mkInternalName unique (mkOccName tvName "a") noSrcLoc;
                 tyvar = mkTyVar var liftedTypeKind;
@@ -175,10 +172,10 @@ addBreakpointBindings thing_inside
                                        (FunTy (TyVarTy tyvar)
                                         (TyVarTy tyvar)))))));
                 breakpointJumpId
-                    = mkGlobalId VanillaGlobal breakpointJumpName
+                    = Id.mkGlobalId VanillaGlobal breakpointJumpName
                                  (basicType id) vanillaIdInfo;
                 breakpointCondJumpId
-                    = mkGlobalId VanillaGlobal breakpointCondJumpName
+                    = Id.mkGlobalId VanillaGlobal breakpointCondJumpName
                                  (basicType (FunTy boolTy)) vanillaIdInfo
 	  }
 	; tcExtendIdEnv [breakpointJumpId, breakpointCondJumpId] thing_inside}
