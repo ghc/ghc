@@ -9,7 +9,16 @@
 
 module Breakpoints where
 
+#ifdef GHCI
+import {-#SOURCE#-} ByteCodeLink ( HValue ) 
+#endif
+
 import {-#SOURCE#-} HscTypes     ( Session )
+import Name
+import Var                       ( Id )
+import PrelNames
+
+import GHC.Exts                  ( unsafeCoerce# )
 
 data BkptHandler a = BkptHandler {
      handleBreakpoint  :: forall b. Session -> [(Id,HValue)] -> BkptLocation a ->  String -> b -> IO b
@@ -29,3 +38,16 @@ type Coord        = (Int, Int)
 
 noDbgSites :: SiteMap
 noDbgSites = []
+
+-- | Returns the 'identity' jumps
+--   Used to deal with spliced code, where we don't want breakpoints
+#ifdef GHCI
+lookupBogusBreakpointVal :: Name -> Maybe HValue
+lookupBogusBreakpointVal name 
+  | name == breakpointJumpName     = Just$ unsafeCoerce# (\_ _ _ _ a->a)
+  | name == breakpointAutoJumpName = Just$ unsafeCoerce# (\_ _ _ _ a->a)
+  | name == breakpointCondJumpName = Just$ unsafeCoerce# (\_ _ _ _ _ a->a)
+  | otherwise = Nothing
+#else 
+lookupBogusBreakpointVal _ = Nothing
+#endif //GHCI

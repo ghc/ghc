@@ -27,6 +27,7 @@ import Module
 import PackageConfig
 import FastString
 import Panic
+import Breakpoints
 
 #ifdef DEBUG
 import Outputable
@@ -211,6 +212,8 @@ lookupName :: ClosureEnv -> Name -> IO HValue
 lookupName ce nm
    = case lookupNameEnv ce nm of
         Just (_,aa) -> return aa
+        Nothing | Just bk <- lookupBogusBreakpointVal nm
+           -> return bk
         Nothing 
            -> ASSERT2(isExternalName nm, ppr nm)
 	      do let sym_to_find = nameToCLabel nm "closure"
