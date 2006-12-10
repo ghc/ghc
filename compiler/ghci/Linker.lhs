@@ -14,11 +14,11 @@ necessary.
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
-module Linker ( HValue, showLinkerState,
+module Linker ( HValue, getHValue, showLinkerState,
 		linkExpr, unload, extendLinkEnv, withExtendedLinkEnv,
                 extendLoadedPkgs,
-		linkPackages,initDynLinker
-               ,recoverDataCon
+		linkPackages,initDynLinker,
+                recoverDataCon
 	) where
 
 #include "HsVersions.h"
@@ -195,12 +195,14 @@ recoverDCInRTS a = do
                  helper [] = Nothing
                  helper x  = Just . second (drop 1) . break (==delim) $ x
               in unfoldr helper
-
-removeLeadingUnderscore = if cLeadingUnderscore=="YES" 
+          removeLeadingUnderscore = if cLeadingUnderscore=="YES" 
                                        then tail 
                                        else id
 
-
+getHValue :: Name -> IO (Maybe HValue)
+getHValue name = do
+    pls <- readIORef v_PersistentLinkerState
+    return$ fmap snd (lookupNameEnv (closure_env pls) name)
 
 withExtendedLinkEnv :: [(Name,HValue)] -> IO a -> IO a
 withExtendedLinkEnv new_env action

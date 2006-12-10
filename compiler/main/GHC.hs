@@ -81,6 +81,8 @@ module GHC (
 	showModule,
 	compileExpr, HValue, dynCompileExpr,
 	lookupName,
+
+        obtainTerm,  
 #endif
 
 	-- * Abstract syntax elements
@@ -174,9 +176,6 @@ module GHC (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import qualified Linker
-import Data.Dynamic     ( Dynamic )
-import Linker		( HValue, extendLinkEnv )
 import TcRnDriver	( tcRnLookupRdrName, tcRnGetInfo,
 			  tcRnLookupName, getModuleExports )
 import RdrName		( plusGlobalRdrEnv, Provenance(..), 
@@ -186,7 +185,25 @@ import HscMain		( hscParseIdentifier, hscStmt, hscTcExpr, hscKcType )
 import Name		( nameOccName )
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
-import GHC.Exts		( unsafeCoerce# )
+import GHC.Exts         ( unsafeCoerce# )
+
+-- For breakpoints
+import Breakpoints      ( SiteNumber, Coord, nullBkptHandler, 
+                          BkptHandler(..), BkptLocation, noDbgSites )
+import Linker           ( initDynLinker )
+import PrelNames        ( breakpointJumpName, breakpointCondJumpName, 
+                          breakpointAutoJumpName )
+
+import GHC.Exts         ( Int(..), Ptr(..), int2Addr#, indexArray# )
+import GHC.Base         ( Opaque(..) )
+import Foreign.StablePtr( deRefStablePtr, castPtrToStablePtr )
+import Foreign          ( unsafePerformIO )
+import Data.Maybe       ( fromMaybe)
+import qualified Linker
+
+import Data.Dynamic     ( Dynamic )
+import RtClosureInspect ( cvObtainTerm, Term )
+import Linker		( HValue, getHValue, extendLinkEnv )
 #endif
 
 import Packages		( initPackages )
@@ -204,7 +221,7 @@ import Id		( Id, idType, isImplicitId, isDeadBinder,
                           isPrimOpId, isFCallId, isClassOpId_maybe,
                           isDataConWorkId, idDataCon,
                           isBottomingId )
-import Var		( TyVar )
+import Var		( TyVar, varName )
 import TysPrim		( alphaTyVars )
 import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon,
 			  isPrimTyCon, isFunTyCon, isOpenTyCon, tyConArity,
@@ -259,6 +276,7 @@ import System.Exit	( exitWith, ExitCode(..) )
 import System.Time	( ClockTime )
 import Control.Exception as Exception hiding (handle)
 import Data.IORef
+import Data.Traversable ( traverse )
 import System.IO
 import System.IO.Error	( isDoesNotExistError )
 import Prelude hiding (init)
@@ -2175,5 +2193,9 @@ showModule s mod_summary = withSession s $ \hsc_env -> do
 	Just mod_info -> return (showModMsg (hscTarget (hsc_dflags hsc_env)) (not obj_linkable) mod_summary)
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
+
+obtainTerm :: Session -> Bool -> Id -> IO (Maybe Term)
+obtainTerm sess force id = withSession sess $ \hsc_env -> 
+              getHValue (varName id) >>= traverse (cvObtainTerm hsc_env force Nothing)
 
 #endif /* GHCI */

@@ -12,6 +12,7 @@ module TcRnDriver (
 	tcRnLookupName,
 	tcRnGetInfo,
 	getModuleExports, 
+        tcRnRecoverDataCon,
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
@@ -71,6 +72,8 @@ import HscTypes
 import Outputable
 
 #ifdef GHCI
+import Linker
+import DataCon
 import TcHsType
 import TcMType
 import TcMatches
@@ -306,7 +309,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_fix_env   = emptyFixityEnv,
 				mg_deprecs   = NoDeprecs,
 				mg_foreign   = NoStubs,
-				mg_hpc_info = noHpcInfo
+				mg_hpc_info  = noHpcInfo
 		    } } ;
 
    tcCoreDump mod_guts ;
@@ -1136,6 +1139,12 @@ lookup_rdr_name rdr_name = do {
     return good_names
  }
 
+tcRnRecoverDataCon :: HscEnv -> a -> IO (Maybe DataCon) 
+tcRnRecoverDataCon hsc_env a
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext hsc_env (hsc_IC hsc_env) $
+     do name    <- recoverDataCon a
+        tcLookupDataCon name
 
 tcRnLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
 tcRnLookupName hsc_env name
@@ -1170,7 +1179,6 @@ tcRnGetInfo hsc_env name
     fixity <- lookupFixityRn name
     ispecs <- lookupInsts (icPrintUnqual ictxt) thing
     return (thing, fixity, ispecs)
-
 
 lookupInsts :: PrintUnqualified -> TyThing -> TcM [Instance]
 -- Filter the instances by the ones whose tycons (or clases resp) 
