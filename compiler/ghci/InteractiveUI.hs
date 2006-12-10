@@ -13,19 +13,7 @@ module InteractiveUI (
 
 #include "HsVersions.h"
 
-#if defined(GHCI) && defined(BREAKPOINT)
-import GHC.Exts         ( Int(..), Ptr(..), int2Addr# )
-import Foreign.StablePtr ( deRefStablePtr, castPtrToStablePtr )
-import System.IO.Unsafe ( unsafePerformIO )
-import Var
-import HscTypes
-import RdrName
-import NameEnv
-import TcType
-import qualified Id
-import IdInfo
-import PrelNames
-#endif
+import GhciMonad
 
 -- The GHC interface
 import qualified GHC
@@ -45,12 +33,25 @@ import SrcLoc
 
 -- Other random utilities
 import Digraph
-import BasicTypes
-import Panic hiding (showException)
+import BasicTypes hiding (isTopLevel)
+import Panic      hiding (showException)
 import Config
 import StaticFlags
 import Linker
 import Util
+
+-- The debugger
+import Breakpoints
+import Debugger hiding  ( addModule )
+import HscTypes
+import Id
+import Var       ( globaliseId )
+import IdInfo
+import NameEnv
+import RdrName
+import Module
+import Type
+import TcType
 
 #ifndef mingw32_HOST_OS
 import System.Posix
@@ -110,9 +111,9 @@ GLOBAL_VAR(commands, builtin_commands, [Command])
 
 builtin_commands :: [Command]
 builtin_commands = [
-  ("add",	keepGoingPaths addModule,	False, completeFilename),
+  ("add",	tlC$ keepGoingPaths addModule,	False, completeFilename),
   ("browse",    keepGoing browseCmd,		False, completeModule),
-  ("cd",    	keepGoing changeDirectory, 	False, completeFilename),
+  ("cd",    	keepGoing changeDirectory,	False, completeFilename),
   ("def",	keepGoing defineMacro,		False, completeIdentifier),
   ("e", 	keepGoing editFile,		False, completeFilename),
 	-- Hugs users are accustomed to :e, so make sure it doesn't overlap
@@ -120,16 +121,19 @@ builtin_commands = [
   ("help",	keepGoing help,			False, completeNone),
   ("?",		keepGoing help,			False, completeNone),
   ("info",      keepGoing info,			False, completeIdentifier),
-  ("load",	keepGoingPaths loadModule_,	False, completeHomeModuleOrFile),
+  ("load",	tlC$ keepGoingPaths loadModule_,False, completeHomeModuleOrFile),
   ("module",	keepGoing setContext,		False, completeModule),
-  ("main",	keepGoing runMain,		False, completeIdentifier),
-  ("reload",	keepGoing reloadModule,		False, completeNone),
+  ("main",	tlC$ keepGoing runMain,		False, completeIdentifier),
+  ("reload", 	tlC$ keepGoing reloadModule,  	False, completeNone),
   ("check",	keepGoing checkModule,		False, completeHomeModule),
   ("set",	keepGoing setCmd,		True,  completeSetOptions),
   ("show",	keepGoing showCmd,		False, completeNone),
   ("etags",	keepGoing createETagsFileCmd,	False, completeFilename),
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
+#if defined(GHCI)
+  ("breakpoint",keepGoing bkptOptions,          False, completeBkpt),
+#endif
   ("kind",	keepGoing kindOfType,		False, completeIdentifier),
   ("unset",	keepGoing unsetOptions,		True,  completeSetOptions),
   ("undef",     keepGoing undefineMacro,	False, completeMacro),
@@ -138,6 +142,14 @@ builtin_commands = [
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
 keepGoing a str = a str >> return False
+
+-- tlC: Top Level Command
+tlC ::  (String -> GHCi Bool) -> (String -> GHCi Bool)
+tlC a str = do 
+    top_level <- isTopLevel
+    if not top_level
+       then throwDyn (CmdLineError "Command only allowed at Top Level")
+       else a str
 
 keepGoingPaths :: ([FilePath] -> GHCi ()) -> (String -> GHCi Bool)
 keepGoingPaths a str = a (toArgs str) >> return False
@@ -150,6 +162,7 @@ helpText =
  "\n" ++
  "   <stmt>                      evaluate/run <stmt>\n" ++
  "   :add <filename> ...         add module(s) to the current target set\n" ++
+ "   :breakpoint <option>        commands for the GHCi debugger\n" ++
  "   :browse [*]<module>         display the names defined by <module>\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
@@ -186,73 +199,14 @@ helpText =
  "    +s            print timing/memory stats after each evaluation\n" ++
  "    +t            print type after evaluation\n" ++
  "    -<flags>      most GHC command line flags can also be set here\n" ++
- "                         (eg. -v2, -fglasgow-exts, etc.)\n"
-
-
-#if defined(GHCI) && defined(BREAKPOINT)
-globaliseAndTidy :: Id -> Id
-globaliseAndTidy id
--- Give the Id a Global Name, and tidy its type
-  = Id.setIdType (globaliseId VanillaGlobal id) tidy_type
-  where
-    tidy_type = tidyTopType (idType id)
-
-
-printScopeMsg :: Session -> String -> [Id] -> IO ()
-printScopeMsg session location ids
-    = GHC.getPrintUnqual session >>= \unqual ->
-      printForUser stdout unqual $
-        text "Local bindings in scope:" $$
-        nest 2 (pprWithCommas showId ids)
-    where showId id = ppr (idName id) <+> dcolon <+> ppr (idType id)
-
-jumpCondFunction :: Session -> Int -> [HValue] -> String -> Bool -> b -> b
-jumpCondFunction session ptr hValues location True b = b
-jumpCondFunction session ptr hValues location False b
-    = jumpFunction session ptr hValues location b
-
-jumpFunction :: Session -> Int -> [HValue] -> String -> b -> b
-jumpFunction session@(Session ref) (I# idsPtr) hValues location b
-    = unsafePerformIO $
-      do ids <- deRefStablePtr (castPtrToStablePtr (Ptr (int2Addr# idsPtr)))
-         let names = map idName ids
-         ASSERT (length names == length hValues) return ()
-         printScopeMsg session location ids
-         hsc_env <- readIORef ref
-
-         let ictxt = hsc_IC hsc_env
-             global_ids = map globaliseAndTidy ids
-             rn_env   = ic_rn_local_env ictxt
-             type_env = ic_type_env ictxt
-             bound_names = map idName global_ids
-             new_rn_env  = extendLocalRdrEnv rn_env bound_names
-		-- Remove any shadowed bindings from the type_env;
-		-- they are inaccessible but might, I suppose, cause 
-		-- a space leak if we leave them there
-             shadowed = [ n | name <- bound_names,
-                          let rdr_name = mkRdrUnqual (nameOccName name),
-                          Just n <- [lookupLocalRdrEnv rn_env rdr_name] ]
-             filtered_type_env = delListFromNameEnv type_env shadowed
-             new_type_env = extendTypeEnvWithIds filtered_type_env global_ids
-             new_ic = ictxt { ic_rn_local_env = new_rn_env, 
-		  	      ic_type_env     = new_type_env }
-         writeIORef ref (hsc_env { hsc_IC = new_ic })
-         is_tty <- hIsTerminalDevice stdin
-         prel_mod <- GHC.findModule session prel_name Nothing
-	 default_editor <- findEditor
-         withExtendedLinkEnv (zip names hValues) $
-           startGHCi (interactiveLoop is_tty True)
-                     GHCiState{ progname = "<interactive>",
-                                args = [],
-                                prompt = location++"> ",
-				editor = default_editor,
-                                session = session,
-                                options = [],
-                                prelude =  prel_mod }
-         writeIORef ref hsc_env
-         putStrLn $ "Returning to normal execution..."
-         return b
-#endif
+ "                         (eg. -v2, -fglasgow-exts, etc.)\n" ++
+ "\n" ++
+ " Options for ':breakpoint':\n" ++
+ "   list                                     list the current breakpoints\n" ++
+ "   add Module line [col]                    add a new breakpoint\n" ++
+ "   del (breakpoint# | Module line [col])    delete a breakpoint\n" ++
+ "   stop                   Stop a computation and return to the top level\n" ++
+ "   step [count]           Step by step execution (DISABLED)\n"
 
 findEditor = do
   getEnv "EDITOR" 
@@ -266,11 +220,6 @@ findEditor = do
 
 interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe String -> IO ()
 interactiveUI session srcs maybe_expr = do
-#if defined(GHCI) && defined(BREAKPOINT)
-   initDynLinker =<< GHC.getSessionDynFlags session
-   extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))
-                 ,(breakpointCondJumpName,unsafeCoerce# (jumpCondFunction session))]
-#endif
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -315,6 +264,8 @@ interactiveUI session srcs maybe_expr = do
    Readline.setCompleterWordBreakCharacters word_break_chars
 #endif
 
+   bkptTable <- newIORef emptyBkptTable
+   GHC.setBreakpointHandler session (instrumentationBkptHandler bkptTable)
    default_editor <- findEditor
 
    startGHCi (runGHCi srcs maybe_expr)
@@ -324,7 +275,10 @@ interactiveUI session srcs maybe_expr = do
 		   editor = default_editor,
 		   session = session,
 		   options = [],
-                   prelude = prel_mod }
+                   prelude = prel_mod,
+                   bkptTable = bkptTable,
+		   topLevel  = True
+                 }
 
 #ifdef USE_READLINE
    Readline.resetTerminal Nothing
@@ -812,11 +766,8 @@ afterLoad ok session = do
   graph <- io (GHC.getModuleGraph session)
   graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
   setContextAfterLoad session graph'
+  refreshBkptTable graph'
   modulesLoadedMsg ok (map GHC.ms_mod_name graph')
-#if defined(GHCI) && defined(BREAKPOINT)
-  io (extendLinkEnv [(breakpointJumpName,unsafeCoerce# (jumpFunction session))
-                    ,(breakpointCondJumpName,unsafeCoerce# (jumpCondFunction session))])
-#endif
 
 setContextAfterLoad session [] = do
   prel_mod <- getPrelude
@@ -1248,6 +1199,7 @@ showCmd str =
 	["modules" ] -> showModules
 	["bindings"] -> showBindings
 	["linker"]   -> io showLinkerState
+        ["breakpoints"] -> showBkptTable
 	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings]")
 
 showModules = do
@@ -1278,6 +1230,14 @@ cleanType ty = do
 	then return ty
 	else return $! GHC.dropForAlls ty
 
+showBkptTable :: GHCi ()
+showBkptTable = do
+  bt     <- getBkptTable
+  msg <- showForUser . vcat $ 
+             [ ppr mod <> colon <+> fcat 
+                       [ parens(int row <> comma <> int col) | (row,col) <- sites]
+               | (mod, sites) <-  sitesList bt ]
+  io (putStrLn msg)
 -- -----------------------------------------------------------------------------
 -- Completion
 
@@ -1349,6 +1309,12 @@ completeSetOptions w = do
   return (filter (w `isPrefixOf`) options)
     where options = "args":"prog":allFlags
 
+completeBkpt = unionComplete completeModule completeBkptCmds
+
+completeBkptCmds w = do
+  return (filter (w `isPrefixOf`) options)
+    where options = ["add","del","list","stop"]
+
 completeFilename = Readline.filenameCompletionFunction
 
 completeHomeModuleOrFile = unionComplete completeHomeModule completeFilename
@@ -1392,6 +1358,7 @@ completeHomeModule = completeNone
 completeSetOptions = completeNone
 completeFilename   = completeNone
 completeHomeModuleOrFile=completeNone
+completeBkpt       = completeNone
 #endif
 
 -- ----------------------------------------------------------------------------
@@ -1429,3 +1396,82 @@ setUpConsole = do
 	setConsoleOutputCP 28591 -- ISO Latin-1
 #endif
 	return ()
+
+
+instrumentationBkptHandler :: IORef (BkptTable Module) -> BkptHandler Module
+instrumentationBkptHandler ref_bkptTable = BkptHandler {
+    isAutoBkptEnabled = \sess bkptLoc -> do 
+      bktpTable <- readIORef ref_bkptTable
+      return$ isBkptEnabled bktpTable bkptLoc
+
+  , handleBreakpoint = doBreakpoint ref_bkptTable 
+  }
+
+doBreakpoint :: IORef (BkptTable Module)-> Session -> [(Id,HValue)] -> BkptLocation Module -> String -> b -> IO b
+doBreakpoint ref_bkptTable s@(Session ref) values _ locMsg b = do
+         let (ids, hValues) = unzip values
+             names = map idName ids
+         ASSERT (length names == length hValues) return ()
+         let global_ids = map globaliseAndTidy ids
+         printScopeMsg locMsg global_ids
+         typed_ids  <- mapM instantiateIdType global_ids
+         hsc_env <- readIORef ref
+         let ictxt = hsc_IC hsc_env
+             rn_env   = ic_rn_local_env ictxt
+             type_env = ic_type_env ictxt
+             bound_names = map idName typed_ids
+             new_rn_env  = extendLocalRdrEnv rn_env bound_names
+		-- Remove any shadowed bindings from the type_env;
+		-- they are inaccessible but might, I suppose, cause 
+		-- a space leak if we leave them there
+             shadowed = [ n | name <- bound_names,
+                          let rdr_name = mkRdrUnqual (nameOccName name),
+                          Just n <- [lookupLocalRdrEnv rn_env rdr_name] ]
+             filtered_type_env = delListFromNameEnv type_env shadowed
+             new_type_env = extendTypeEnvWithIds filtered_type_env (typed_ids)
+             new_ic = ictxt { ic_rn_local_env = new_rn_env, 
+		  	      ic_type_env     = new_type_env }
+         writeIORef ref (hsc_env { hsc_IC = new_ic })
+         is_tty <- hIsTerminalDevice stdin
+         prel_mod <- GHC.findModule s prel_name Nothing
+         withExtendedLinkEnv (zip names hValues) $ 
+           startGHCi (interactiveLoop is_tty True) GHCiState{ 
+                              progname = "<interactive>",
+                              args     = [],
+                              prompt   = locMsg ++ "> ",
+                              session  = s,
+                              options  = [],
+                              bkptTable= ref_bkptTable,
+                              prelude  = prel_mod,
+			      topLevel = False }
+             `catchDyn` (
+                 \StopChildSession -> evaluate$ 
+                     throwDyn (ChildSessionStopped "You may need to reload your modules")
+           ) `finally` do
+             writeIORef ref hsc_env
+             putStrLn $ "Returning to normal execution..."
+         return b
+  where 
+     printScopeMsg :: String -> [Id] -> IO ()
+     printScopeMsg location ids = do
+       unqual  <- GHC.getPrintUnqual s
+       printForUser stdout unqual $
+         text "Local bindings in scope:" $$
+         nest 2 (pprWithCommas showId ids)
+      where 
+           showId id = 
+                ppr (idName id) <+> dcolon <+> ppr (idType id) 
+
+-- | Give the Id a Global Name, and tidy its type
+     globaliseAndTidy :: Id -> Id
+     globaliseAndTidy id
+      = let tidied_type = tidyTopType$ idType id
+        in setIdType (globaliseId VanillaGlobal id) tidied_type
+
+-- | Instantiate the tyVars with GHC.Base.Unknown
+     instantiateIdType :: Id -> IO Id
+     instantiateIdType id = do
+       instantiatedType <- instantiateTyVarsToUnknown s (idType id)
+       return$ setIdType id instantiatedType
+
+
