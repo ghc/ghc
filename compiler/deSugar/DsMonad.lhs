@@ -23,7 +23,7 @@ module DsMonad (
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
-        getBkptSitesDs,
+        bindLocalsDs, getLocalBindsDs, getBkptSitesDs,
 	-- Warnings
 	DsWarning, warnDs, failWithDs,
 
@@ -143,7 +143,8 @@ data DsGblEnv = DsGblEnv {
 
 data DsLclEnv = DsLclEnv {
 	ds_meta	   :: DsMetaEnv,	-- Template Haskell bindings
-	ds_loc	   :: SrcSpan		-- to put in pattern-matching error msgs
+	ds_loc	   :: SrcSpan,		-- to put in pattern-matching error msgs
+        ds_locals  :: OccEnv Id         -- For locals in breakpoints
      }
 
 -- Inside [| |] brackets, the desugarer looks 
@@ -166,7 +167,7 @@ initDs  :: HscEnv
 
 initDs hsc_env mod rdr_env type_env thing_inside
   = do 	{ msg_var <- newIORef (emptyBag, emptyBag)
-	; let (ds_gbl_env, ds_lcl_env) = mkDsEnvs mod rdr_env type_env msg_var
+        ; (ds_gbl_env, ds_lcl_env) <- mkDsEnvs mod rdr_env type_env msg_var
 
 	; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
 		        tryM thing_inside	-- Catch exceptions (= errors during desugaring)
@@ -194,21 +195,26 @@ initDsTc thing_inside
 	; msg_var  <- getErrsVar
 	; let type_env = tcg_type_env tcg_env
 	      rdr_env  = tcg_rdr_env tcg_env
-	; setEnvs (mkDsEnvs this_mod rdr_env type_env msg_var) thing_inside }
+        ; ds_envs <- ioToIOEnv$ mkDsEnvs this_mod rdr_env type_env msg_var
+	; setEnvs ds_envs thing_inside }
 
-mkDsEnvs :: Module -> GlobalRdrEnv -> TypeEnv
-	 -> IORef Messages -> (DsGblEnv, DsLclEnv)
+mkDsEnvs :: Module -> GlobalRdrEnv -> TypeEnv -> IORef Messages -> IO (DsGblEnv, DsLclEnv)
 mkDsEnvs mod rdr_env type_env msg_var
-  = (gbl_env, lcl_env)
-  where
-    if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
-    if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
-    gbl_env = DsGblEnv { ds_mod = mod, 
-    			 ds_if_env = (if_genv, if_lenv),
-    			 ds_unqual = mkPrintUnqualified rdr_env,
-    			 ds_msgs = msg_var }
-    lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
-			 ds_loc = noSrcSpan }
+  = do 
+       sites_var <- newIORef []
+       let     if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
+               if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
+               gbl_env = DsGblEnv { ds_mod = mod, 
+    			            ds_if_env = (if_genv, if_lenv),
+    			            ds_unqual = mkPrintUnqualified rdr_env,
+    			            ds_msgs = msg_var,
+                                    ds_bkptSites = sites_var}
+               lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
+			            ds_loc = noSrcSpan,
+                                    ds_locals = emptyOccEnv }
+
+       return (gbl_env, lcl_env)
+
 \end{code}
 
 %************************************************************************
@@ -328,6 +334,14 @@ dsExtendMetaEnv menv thing_inside
 \end{code}
 
 \begin{code}
+getLocalBindsDs :: DsM [Id]
+getLocalBindsDs = do { env <- getLclEnv; return (occEnvElts$ ds_locals env) }
+
+bindLocalsDs :: [Id] -> DsM a -> DsM a
+bindLocalsDs new_ids enclosed_scope = 
+    updLclEnv (\env-> env {ds_locals = ds_locals env `extendOccEnvList` occnamed_ids})
+	      enclosed_scope
+  where occnamed_ids = [ (nameOccName (idName id),id) | id <- new_ids ] 
 
 getBkptSitesDs :: DsM (IORef SiteMap)
 getBkptSitesDs = do { env <- getGblEnv; return (ds_bkptSites env) }

@@ -14,6 +14,7 @@ import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
 import HsSyn
+import HsUtils
 import CoreSyn
 import Var
 import Type
@@ -27,6 +28,7 @@ import TysWiredIn
 import PrelNames
 import Name
 import SrcLoc
+
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
@@ -56,18 +58,23 @@ dsGRHSs :: HsMatchContext Name -> [Pat Id]	-- These are to build a MatchContext 
 	-> GRHSs Id				-- Guarded RHSs
 	-> Type					-- Type of RHS
 	-> DsM MatchResult
-
-dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty
-  = mappM (dsGRHS hs_ctx pats rhs_ty) grhss	`thenDs` \ match_results ->
+dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty =
+   bindLocalsDs (bindsBinders ++ patsBinders) $
+    mappM (dsGRHS hs_ctx pats rhs_ty) grhss	`thenDs` \ match_results ->
     let 
 	match_result1 = foldr1 combineMatchResults match_results
-	match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
+	match_result2 = adjustMatchResultDs 
+                                 (\e -> bindLocalsDs patsBinders $ dsLocalBinds binds e) 
+                                 match_result1
 		-- NB: nested dsLet inside matchResult
     in
     returnDs match_result2
+        where bindsBinders = map unLoc (collectLocalBinders binds)
+              patsBinders  = collectPatsBinders (map (L undefined) pats) 
 
 dsGRHS hs_ctx pats rhs_ty (L loc (GRHS guards rhs))
-  = matchGuards (map unLoc guards) hs_ctx rhs rhs_ty
+  = do rhs' <- maybeInsertBreakpoint rhs rhs_ty
+       matchGuards (map unLoc guards) hs_ctx rhs' rhs_ty
 \end{code}
 
 
@@ -110,7 +117,8 @@ matchGuards (ExprStmt expr _ _ : stmts) ctx rhs rhs_ty
     returnDs (mkGuardedMatchResult pred_expr match_result)
 
 matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty
-  = matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
+  = bindLocalsDs (map unLoc $ collectLocalBinders binds) $
+    matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
     returnDs (adjustMatchResultDs (dsLocalBinds binds) match_result)
 	-- NB the dsLet occurs inside the match_result
 	-- Reason: dsLet takes the body expression as its argument
@@ -118,7 +126,8 @@ matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty
 	--	   body expression in hand
 
 matchGuards (BindStmt pat bind_rhs _ _ : stmts) ctx rhs rhs_ty
-  = matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
+  = bindLocalsDs (collectPatBinders pat) $
+    matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
     dsLExpr bind_rhs			`thenDs` \ core_rhs ->
     matchSinglePat core_rhs ctx pat rhs_ty match_result
 \end{code}

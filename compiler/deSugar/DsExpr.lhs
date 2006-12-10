@@ -290,8 +290,11 @@ dsExpr (HsCase discrim matches)
     matchWrapper CaseAlt matches 	`thenDs` \ ([discrim_var], matching_code) ->
     returnDs (scrungleMatch discrim_var core_discrim matching_code)
 
+-- Pepe: The binds are in scope in the body but NOT in the binding group
+--       This is to avoid silliness in breakpoints
 dsExpr (HsLet binds body)
-  = dsAndThenMaybeInsertBreakpoint body `thenDs` \ body' ->
+  = (bindLocalsDs (map unLoc $ collectLocalBinders binds) $ 
+     dsAndThenMaybeInsertBreakpoint body) `thenDs` \ body' ->
     dsLocalBinds binds body'
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
@@ -602,11 +605,16 @@ dsDo stmts body result_ty
 	   ; returnDs (mkApps then_expr2 [rhs2, rest]) }
     
     go (LetStmt binds : stmts)
-      = do { rest <- go stmts
+      = do { rest <- bindLocalsDs (map unLoc$ collectLocalBinders binds) $ 
+                      go stmts
 	   ; dsLocalBinds binds rest }
-        
+
+    -- Notice how due to the placement of bindLocals, binders in this stmt
+    -- are available in posterior stmts but Not in this one rhs.
+    -- This is to avoid silliness in breakpoints
     go (BindStmt pat rhs bind_op fail_op : stmts)
-      = do { body  <- go stmts
+      = 
+       do { body  <- bindLocalsDs (collectPatBinders pat) $ go stmts
 	   ; var   <- selectSimpleMatchVarL pat
 	   ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
     				  result_ty (cantFailMatchResult body)
@@ -666,7 +674,7 @@ dsMDo tbl stmts body result_ty
 	   ; returnDs (mkApps (Var then_id) [Type rhs_ty, Type b_ty, rhs2, rest]) }
     
     go (BindStmt pat rhs _ _ : stmts)
-      = do { body  <- go stmts
+      = do { body  <- bindLocalsDs (collectPatBinders pat) $ go stmts
 	   ; var   <- selectSimpleMatchVarL pat
 	   ; match <- matchSinglePat (Var var) (StmtCtxt ctxt) pat
     				  result_ty (cantFailMatchResult body)
