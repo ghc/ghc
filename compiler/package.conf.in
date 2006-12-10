@@ -12,6 +12,7 @@ exposed-modules:
 	Binary
 	BitSet
 	Bitmap
+    	Breakpoints
 	BuildTyCl
 	ByteCodeAsm
 	ByteCodeFFI
@@ -66,6 +67,7 @@ exposed-modules:
 	CprAnalyse
 	Ctype
 	DataCon
+	Debugger
 	Demand
 	Desugar
 	Digraph
@@ -75,6 +77,7 @@ exposed-modules:
 	DriverPipeline
 	DsArrows
 	DsBinds
+	DsBreakpoint
 	DsCCall
 	DsExpr
 	DsForeign
@@ -189,6 +192,7 @@ exposed-modules:
 	RnNames
 	RnSource
 	RnTypes
+	RtClosureInspect
 	Rules
 	SAT
 	SATMonad
