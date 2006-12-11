@@ -608,8 +608,12 @@ substLetIdBndr :: SimplEnv -> InBndr 	-- Env and binder to transform
 	       -> (SimplEnv, OutBndr)
 -- C.f. substIdBndr above
 -- Clone Id if necessary, substitute its type
--- Return an Id with completely zapped IdInfo
+-- Return an Id with its fragile info zapped
+--	namely, any info that depends on free variables
 -- 	[addLetIdInfo, below, will restore its IdInfo]
+--	We want to retain robust info, especially arity and demand info,
+--	so that they are available to occurrences that occur in an
+--	earlier binding of a letrec
 -- Augment the subtitution 
 --	if the unique changed, *or* 
 --	if there's interesting occurrence info
@@ -620,7 +624,8 @@ substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old
   where
     id1	   = uniqAway in_scope old_id
     id2    = substIdType env id1
-    -- we want to get rid of any info that's dependent on free variables,
+
+    -- We want to get rid of any info that's dependent on free variables,
     -- but keep other info (like the arity).
     new_id = zapFragileIdInfo id2
 

@@ -702,7 +702,9 @@ zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
 
 \begin{code}
 zapFragileInfo :: IdInfo -> Maybe IdInfo
+-- Zap info that depends on free variables
 zapFragileInfo info = Just (info `setSpecInfo` emptySpecInfo
+				 `setWorkerInfo` NoWorker
                                  `setUnfoldingInfo` NoUnfolding)
 \end{code}
 
