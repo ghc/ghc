@@ -682,7 +682,13 @@ tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
 	; co_fn2 <- tc_sub sub_ctxt tau' tau' exp_ib exp_sty expected_ty
 
 		-- Deal with the dictionaries
-	; co_fn1 <- instCall InstSigOrigin inst_tys (substTheta subst' theta)
+		-- The origin gives a helpful origin when we have
+		-- a function with type f :: Int -> forall a. Num a => ...
+		-- This way the (Num a) dictionary gets an OccurrenceOf f origin
+	; let orig = case sub_ctxt of
+			SubFun n -> OccurrenceOf n
+			other    -> InstSigOrigin	-- Unhelpful
+	; co_fn1 <- instCall orig inst_tys (substTheta subst' theta)
  	; return (co_fn2 <.> co_fn1) }
 
 -----------------------------------
