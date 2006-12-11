@@ -3552,6 +3552,10 @@ outOfLineFloatOp mop =
     frame just before ccalling.
 -}
 
+
+genCCall (CmmPrim MO_WriteBarrier) _ _ _
+ = return $ unitOL LWSYNC
+
 genCCall target dest_regs argsAndHints vols
   = ASSERT (not $ any (`elem` [I8,I16]) argReps)
         -- we rely on argument promotion in the codeGen

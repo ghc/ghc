@@ -2322,6 +2322,8 @@ pprInstr (FETCHPC reg) = vcat [
         hcat [ ptext SLIT("1:\tmflr\t"), pprReg reg ]
     ]
 
+pprInstr LWSYNC = ptext SLIT("\tlwsync")
+
 pprInstr _ = panic "pprInstr (ppc)"
 
 pprLogic op reg1 reg2 ri = hcat [

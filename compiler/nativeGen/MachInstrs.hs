@@ -719,4 +719,5 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 	      | FETCHPC Reg            -- pseudo-instruction:
 	                               -- bcl to next insn, mflr reg
 	      
+	      | LWSYNC -- memory barrier
 #endif /* powerpc_TARGET_ARCH */
