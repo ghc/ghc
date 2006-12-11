@@ -841,7 +841,8 @@ unifyTheta :: TcThetaType -> TcThetaType -> TcM ()
 -- Acutal and expected types
 unifyTheta theta1 theta2
   = do	{ checkTc (equalLength theta1 theta2)
-		  (ptext SLIT("Contexts differ in length"))
+		  (vcat [ptext SLIT("Contexts differ in length"),
+			 nest 2 $ parens $ ptext SLIT("Use -fglasgow-exts to allow this")])
 	; uList unifyPred theta1 theta2 }
 
 ---------------
