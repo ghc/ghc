@@ -3836,7 +3836,7 @@ genSwitch expr ids
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat I32
         lbl <- getNewLabelNat
-        dynRef <- cmmMakeDynamicReference addImportNat DatReference lbl
+        dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let
             jumpTable = map jumpTableEntryRel ids
