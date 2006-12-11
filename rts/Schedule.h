@@ -19,6 +19,7 @@
  */
 void initScheduler (void);
 void exitScheduler (void);
+void freeScheduler (void);
 
 // Place a new thread on the run queue of the current Capability
 void scheduleThread (Capability *cap, StgTSO *tso);

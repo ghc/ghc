@@ -438,6 +438,9 @@ hs_exit(void)
     // also outputs the stats (+RTS -s) info.
     exitStorage();
     
+    /* free the tasks */
+    freeScheduler();
+
     /* free shared Typeable store */
     exitTypeableStore();
 

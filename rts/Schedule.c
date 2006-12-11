@@ -2582,6 +2582,12 @@ exitScheduler( void )
 #endif
 }
 
+void
+freeScheduler( void )
+{
+    freeTaskManager();
+}
+
 /* ---------------------------------------------------------------------------
    Where are the roots that we know about?
 

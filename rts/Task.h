@@ -170,6 +170,7 @@ extern Task *all_tasks;
 //
 void initTaskManager (void);
 void stopTaskManager (void);
+void freeTaskManager (void);
 
 // Create a new Task for a bound thread
 // Requires: sched_mutex.
