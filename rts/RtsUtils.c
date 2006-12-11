@@ -45,6 +45,96 @@
 #endif
 
 /* -----------------------------------------------------------------------------
+   Debugging allocator
+   -------------------------------------------------------------------------- */
+
+#if defined(DEBUG)
+
+typedef struct Allocated_ {
+    void *addr;
+    size_t len;
+    struct Allocated_ *next;
+} Allocated;
+
+static Allocated *allocs = NULL;
+
+#ifdef THREADED_RTS
+static Mutex allocator_mutex;
+#endif
+
+void
+initAllocator(void)
+{
+    Allocated *a;
+    size_t alloc_size;
+
+#ifdef THREADED_RTS
+    initMutex(&allocator_mutex);
+#endif
+    alloc_size = sizeof(Allocated);
+    if ((a = (Allocated *) malloc(alloc_size)) == NULL) {
+      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+      MallocFailHook((W_) alloc_size, "initialising debugging allocator");
+      stg_exit(EXIT_INTERNAL_ERROR);
+    }
+    a->addr = NULL;
+    a->len = 0;
+    a->next = NULL;
+    allocs = a;
+}
+
+void
+shutdownAllocator(void)
+{
+#ifdef THREADED_RTS
+    closeMutex(&allocator_mutex);
+#endif
+}
+
+static void allocate(void *addr, size_t len) {
+    Allocated *a;
+    size_t alloc_size;
+
+    alloc_size = sizeof(Allocated);
+    if ((a = (Allocated *) malloc(alloc_size)) == NULL) {
+      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+      MallocFailHook((W_) alloc_size, "creating info for debugging allocator");
+      stg_exit(EXIT_INTERNAL_ERROR);
+    }
+    a->addr = addr;
+    a->len = len;
+    ACQUIRE_LOCK(&allocator_mutex);
+    a->next = allocs->next;
+    allocs->next = a;
+    RELEASE_LOCK(&allocator_mutex);
+}
+
+static void deallocate(void *addr) {
+    Allocated *prev, *a;
+
+    if (addr == NULL) {
+        barf("Freeing NULL!");
+    }
+
+    ACQUIRE_LOCK(&allocator_mutex);
+    prev = allocs;
+    a = prev->next;
+    while (a != NULL) {
+        if (a->addr == addr) {
+            prev->next = a->next;
+            memset(addr, 0xaa, a->len);
+            free(a);
+            RELEASE_LOCK(&allocator_mutex);
+            return;
+        }
+        prev = a;
+        a = a->next;
+    }
+    barf("Freeing non-allocated memory at %p", addr);
+}
+#endif
+
+/* -----------------------------------------------------------------------------
    Result-checking malloc wrappers.
    -------------------------------------------------------------------------- */
 
@@ -52,12 +142,17 @@ void *
 stgMallocBytes (int n, char *msg)
 {
     char *space;
+    size_t n2;
 
-    if ((space = (char *) malloc((size_t) n)) == NULL) {
+    n2 = (size_t) n;
+    if ((space = (char *) malloc(n2)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
       MallocFailHook((W_) n, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
     }
+#if defined(DEBUG)
+    allocate(space, n2);
+#endif
     return space;
 }
 
@@ -65,12 +160,18 @@ void *
 stgReallocBytes (void *p, int n, char *msg)
 {
     char *space;
+    size_t n2;
 
-    if ((space = (char *) realloc(p, (size_t) n)) == NULL) {
+    n2 = (size_t) n;
+    if ((space = (char *) realloc(p, (size_t) n2)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
       MallocFailHook((W_) n, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
     }
+#if defined(DEBUG)
+    deallocate(p);
+    allocate(space, n2);
+#endif
     return space;
 }
 
@@ -84,6 +185,9 @@ stgCallocBytes (int n, int m, char *msg)
       MallocFailHook((W_) n*m, msg); /*msg*/
       stg_exit(EXIT_INTERNAL_ERROR);
     }
+#if defined(DEBUG)
+    allocate(space, (size_t) n * (size_t) m);
+#endif
     return space;
 }
 
@@ -93,6 +197,9 @@ stgCallocBytes (int n, int m, char *msg)
 void
 stgFree(void* p)
 {
+#if defined(DEBUG)
+  deallocate(p);
+#endif
   free(p);
 }
 

@@ -138,7 +138,13 @@ hs_init(int *argc, char **argv[])
 	return;
     }
 
-    /* The very first thing we do is grab the start time...just in case we're
+#if defined(DEBUG)
+    /* Start off by initialising the allocator debugging so we can
+     * use it anywhere */
+    initAllocator();
+#endif
+
+    /* Next we do is grab the start time...just in case we're
      * collecting timing statistics.
      */
     stat_startInit();
@@ -470,8 +476,14 @@ hs_exit(void)
     shutdownAsyncIO();
 #endif
 
-    // Finally, free all our storage.
+    // Finally, free all our storage
     freeStorage();
+
+#if defined(DEBUG)
+    /* and shut down the allocator debugging */
+    shutdownAllocator();
+#endif
+
 }
 
 // Compatibility interfaces

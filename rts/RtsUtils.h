@@ -13,6 +13,9 @@
  * (Checked) dynamic allocation
  * -------------------------------------------------------------------------- */
 
+extern void initAllocator(void);
+extern void shutdownAllocator(void);
+
 extern void *stgMallocBytes(int n, char *msg)
     GNUC3_ATTRIBUTE(__malloc__);
 
