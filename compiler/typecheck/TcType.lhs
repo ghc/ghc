@@ -70,7 +70,7 @@ module TcType (
   mkDictTy, tcSplitPredTy_maybe, 
   isPredTy, isDictTy, tcSplitDFunTy, tcSplitDFunHead, predTyUnique, 
   mkClassPred, isInheritablePred, isIPPred, 
-  dataConsStupidTheta, isRefineableTy,
+  dataConsStupidTheta, isRefineableTy, isRefineablePred,
 
   ---------------------------------
   -- Foreign import and export
@@ -569,14 +569,19 @@ isBoxyTy ty = any isBoxyTyVar (varSetElems (tcTyVarsOfType ty))
 
 isRigidTy :: TcType -> Bool
 -- A type is rigid if it has no meta type variables in it
-isRigidTy ty = all isSkolemTyVar (varSetElems (tcTyVarsOfType ty))
+isRigidTy ty = all isImmutableTyVar (varSetElems (tcTyVarsOfType ty))
 
 isRefineableTy :: TcType -> Bool
 -- A type should have type refinements applied to it if it has
 -- free type variables, and they are all rigid
-isRefineableTy ty = not (null tc_tvs) && all isSkolemTyVar tc_tvs
+isRefineableTy ty = not (null tc_tvs) && all isImmutableTyVar tc_tvs
 		    where
 		      tc_tvs = varSetElems (tcTyVarsOfType ty)
+
+isRefineablePred :: TcPredType -> Bool
+isRefineablePred pred = not (null tc_tvs) && all isImmutableTyVar tc_tvs
+		      where
+		        tc_tvs = varSetElems (tcTyVarsOfPred pred)
 
 ---------------
 getDFunTyKey :: Type -> OccName	-- Get some string from a type, to be used to 

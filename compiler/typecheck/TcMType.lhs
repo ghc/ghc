@@ -47,7 +47,8 @@ module TcMType (
   --------------------------------
   -- Zonking
   zonkType, zonkTcPredType, 
-  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkQuantifiedTyVar,
+  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, 
+  zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
   zonkTcKindToKind, zonkTcKind, zonkTopTyVar,
 
@@ -484,17 +485,24 @@ zonkTopTyVar tv
     k = tyVarKind tv
     default_k = defaultKind k
 
+zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TyVar]
+zonkQuantifiedTyVars = mappM zonkQuantifiedTyVar
+
 zonkQuantifiedTyVar :: TcTyVar -> TcM TyVar
 -- zonkQuantifiedTyVar is applied to the a TcTyVar when quantifying over it.
--- It might be a meta TyVar, in which case we freeze it into an ordinary TyVar.
--- When we do this, we also default the kind -- see notes with Kind.defaultKind
+--
+-- The quantified type variables often include meta type variables
+-- we want to freeze them into ordinary type variables, and
+-- default their kind (e.g. from OpenTypeKind to TypeKind)
+-- 			-- see notes with Kind.defaultKind
 -- The meta tyvar is updated to point to the new regular TyVar.  Now any 
 -- bound occurences of the original type variable will get zonked to 
 -- the immutable version.
 --
 -- We leave skolem TyVars alone; they are immutable.
 zonkQuantifiedTyVar tv
-  | isSkolemTyVar tv = return tv
+  | ASSERT( isTcTyVar tv ) 
+    isSkolemTyVar tv = return tv
 	-- It might be a skolem type variable, 
 	-- for example from a user type signature
 

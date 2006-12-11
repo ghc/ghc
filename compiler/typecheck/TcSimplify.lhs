@@ -15,7 +15,7 @@ module TcSimplify (
 	tcSimplifyBracket, tcSimplifyCheckPat,
 
 	tcSimplifyDeriv, tcSimplifyDefault,
-	bindInstsOfLocalFuns
+	bindInstsOfLocalFuns, bindIrreds,
     ) where
 
 #include "HsVersions.h"
@@ -658,39 +658,78 @@ tcSimplifyInfer
 	-> TcTyVarSet		-- fv(T); type vars
 	-> [Inst]		-- Wanted
 	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
-		TcDictBinds,	-- Bindings
-		[TcId])		-- Dict Ids that must be bound here (zonked)
+		[Inst],		-- Dict Ids that must be bound here (zonked)
+		TcDictBinds)	-- Bindings
 	-- Any free (escaping) Insts are tossed into the environment
 \end{code}
 
 
 \begin{code}
-tcSimplifyInfer doc tau_tvs wanted_lie
-  = do	{ let try_me inst | isDict inst = Stop			-- Dicts
-			  | otherwise	= ReduceMe NoSCs	-- Lits, Methods, 
-								-- and impliciation constraints
-		-- In an effort to make the inferred types simple, we try 
-		-- to squeeze out implication constraints if we can.
-		-- See Note [Squashing methods]
-
-	; (binds1, irreds) <- checkLoop (mkRedEnv doc try_me []) wanted_lie
-
-	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
+tcSimplifyInfer doc tau_tvs wanted
+  = do	{ tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
+	; wanted' <- mappM zonkInst wanted	-- Zonk before deciding quantified tyvars
 	; gbl_tvs  <- tcGetGlobalTyVars
-	; let preds = fdPredsOfInsts irreds
+	; let preds = fdPredsOfInsts wanted'
 	      qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
-	      (free, bound) = partition (isFreeWhenInferring qtvs) irreds
-
-		-- Remove redundant superclasses from 'bound'
-		-- The 'Stop' try_me result does not do so, 
-		-- see Note [No superclasses for Stop]
-	; let try_me inst = ReduceMe AddSCs
-	; (binds2, irreds) <- checkLoop (mkRedEnv doc try_me []) bound
-
+	      (free, bound) = partition (isFreeWhenInferring qtvs) wanted'
+	; traceTc (text "infer" <+> (ppr preds $$ ppr (grow preds tau_tvs') $$ ppr gbl_tvs $$ ppr (oclose preds gbl_tvs) $$ ppr free $$ ppr bound))
 	; extendLIEs free
-	; return (varSetElems qtvs, binds1 `unionBags` binds2, map instToId irreds) }
+
+		-- To make types simple, reduce as much as possible
+	; let try_me inst = ReduceMe AddSCs
+	; (irreds, binds) <- checkLoop (mkRedEnv doc try_me []) bound
+
+	; qtvs' <- zonkQuantifiedTyVars (varSetElems qtvs)
+
+	-- We can't abstract over implications
+	; let (dicts, implics) = partition isDict irreds
+	; loc <- getInstLoc (ImplicOrigin doc)
+	; implic_bind <- bindIrreds loc qtvs' dicts implics
+
+	; return (qtvs', dicts, binds `unionBags` implic_bind) }
 	-- NB: when we are done, we might have some bindings, but
 	-- the final qtvs might be empty.  See Note [NO TYVARS] below.
+\end{code}
+
+\begin{code}
+-----------------------------------------------------------
+-- tcSimplifyInferCheck is used when we know the constraints we are to simplify
+-- against, but we don't know the type variables over which we are going to quantify.
+-- This happens when we have a type signature for a mutually recursive group
+tcSimplifyInferCheck
+	 :: InstLoc
+	 -> TcTyVarSet		-- fv(T)
+	 -> [Inst]		-- Given
+	 -> [Inst]		-- Wanted
+	 -> TcM ([TyVar],	-- Fully zonked, and quantified
+		 TcDictBinds)	-- Bindings
+
+tcSimplifyInferCheck loc tau_tvs givens wanteds
+  = do	{ (irreds, binds) <- innerCheckLoop loc givens wanteds
+
+	-- Figure out which type variables to quantify over
+	-- You might think it should just be the signature tyvars,
+	-- but in bizarre cases you can get extra ones
+	-- 	f :: forall a. Num a => a -> a
+	--	f x = fst (g (x, head [])) + 1
+	--	g a b = (b,a)
+	-- Here we infer g :: forall a b. a -> b -> (b,a)
+	-- We don't want g to be monomorphic in b just because
+	-- f isn't quantified over b.
+	; let all_tvs = varSetElems (tau_tvs `unionVarSet` tyVarsOfInsts givens)
+	; all_tvs <- zonkTcTyVarsAndFV all_tvs
+	; gbl_tvs <- tcGetGlobalTyVars
+	; let qtvs = varSetElems (all_tvs `minusVarSet` gbl_tvs)
+		-- We could close gbl_tvs, but its not necessary for
+		-- soundness, and it'll only affect which tyvars, not which
+		-- dictionaries, we quantify over
+
+	; qtvs' <- zonkQuantifiedTyVars qtvs
+
+		-- Now we are back to normal (c.f. tcSimplCheck)
+	; implic_bind <- bindIrreds loc qtvs' givens irreds
+
+	; return (qtvs', binds `unionBags` implic_bind) }
 \end{code}
 
 Note [Squashing methods]
@@ -771,10 +810,9 @@ tcSimplifyCheck	:: InstLoc
 	 	-> [Inst]		-- Wanted
 	 	-> TcM TcDictBinds	-- Bindings
 tcSimplifyCheck loc qtvs givens wanteds 
-  = ASSERT( all isSkolemTyVar qtvs )
-    do	{ (binds, irreds) <- innerCheckLoop loc givens wanteds
-	; implic_bind <- bindIrreds loc [] emptyRefinement 
-					     qtvs givens irreds
+  = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
+    do	{ (irreds, binds) <- innerCheckLoop loc givens wanteds
+	; implic_bind <- bindIrreds loc qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
 
 -----------------------------------------------------------
@@ -786,19 +824,28 @@ tcSimplifyCheckPat :: InstLoc
 	 	   -> [Inst]		-- Wanted
 	 	   -> TcM TcDictBinds	-- Bindings
 tcSimplifyCheckPat loc co_vars reft qtvs givens wanteds
-  = ASSERT( all isSkolemTyVar qtvs )
-    do	{ (binds, irreds) <- innerCheckLoop loc givens wanteds
-	; implic_bind <- bindIrreds loc co_vars reft 
-				    qtvs givens irreds
+  = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
+    do	{ (irreds, binds) <- innerCheckLoop loc givens wanteds
+	; implic_bind <- bindIrredsR loc qtvs co_vars reft 
+				    givens irreds
 	; return (binds `unionBags` implic_bind) }
 
 -----------------------------------------------------------
-bindIrreds :: InstLoc -> [CoVar] -> Refinement
-	   -> [TcTyVar] -> [Inst] -> [Inst]
-	   -> TcM TcDictBinds	
+bindIrreds :: InstLoc -> [TcTyVar]
+	   -> [Inst] -> [Inst]
+	   -> TcM TcDictBinds
+bindIrreds loc qtvs givens irreds 
+  = bindIrredsR loc qtvs [] emptyRefinement givens irreds
+
+bindIrredsR :: InstLoc -> [TcTyVar] -> [CoVar]
+	    -> Refinement -> [Inst] -> [Inst]
+	    -> TcM TcDictBinds	
 -- Make a binding that binds 'irreds', by generating an implication
 -- constraint for them, *and* throwing the constraint into the LIE
-bindIrreds loc co_vars reft qtvs givens irreds
+bindIrredsR loc qtvs co_vars reft givens irreds
+  | null irreds
+  = return emptyBag
+  | otherwise
   = do	{ let givens' = filter isDict givens
 		-- The givens can include methods
 
@@ -861,8 +908,7 @@ makeImplicationBind loc all_tvs reft
 -----------------------------------------------------------
 topCheckLoop :: SDoc
 	     -> [Inst]			-- Wanted
-	     -> TcM (TcDictBinds,
-		     [Inst])		-- Irreducible
+	     -> TcM ([Inst], TcDictBinds)
 
 topCheckLoop doc wanteds
   = checkLoop (mkRedEnv doc try_me []) wanteds
@@ -873,8 +919,7 @@ topCheckLoop doc wanteds
 innerCheckLoop :: InstLoc
 	       -> [Inst]		-- Given
 	       -> [Inst]		-- Wanted
-	       -> TcM (TcDictBinds,
-		       [Inst])		-- Irreducible
+	       -> TcM ([Inst], TcDictBinds)
 
 innerCheckLoop inst_loc givens wanteds
   = checkLoop env wanteds
@@ -915,10 +960,8 @@ with topCheckLooop.
 -----------------------------------------------------------
 checkLoop :: RedEnv
 	  -> [Inst]			-- Wanted
-	  -> TcM (TcDictBinds,
-		  [Inst])		-- Irreducible
--- Precondition: the try_me never returns Free
--- 		 givens are completely rigid
+	  -> TcM ([Inst], TcDictBinds)
+-- Precondition: givens are completely rigid
 
 checkLoop env wanteds
   = do { -- Givens are skolems, so no need to zonk them
@@ -927,7 +970,7 @@ checkLoop env wanteds
 	; (improved, binds, irreds) <- reduceContext env wanteds'
 
 	; if not improved then
- 	     return (binds, irreds)
+ 	     return (irreds, binds)
 	  else do
 
 	-- If improvement did some unification, we go round again.
@@ -935,8 +978,8 @@ checkLoop env wanteds
 	-- Using an instance decl might have introduced a fresh type variable
 	-- which might have been unified, so we'd get an infinite loop
 	-- if we started again with wanteds!  See Note [LOOP]
-	{ (binds1, irreds1) <- checkLoop env irreds
-	; return (binds `unionBags` binds1, irreds1) } }
+	{ (irreds1, binds1) <- checkLoop env irreds
+	; return (irreds1, binds `unionBags` binds1) } }
 \end{code}
 
 Note [LOOP]
@@ -956,45 +999,6 @@ and improve by binding l->T, after which we can do some reduction
 on both the Lte and If constraints.  What we *can't* do is start again
 with (Max Z (S x) y)!
 
-
-\begin{code}
------------------------------------------------------------
--- tcSimplifyInferCheck is used when we know the constraints we are to simplify
--- against, but we don't know the type variables over which we are going to quantify.
--- This happens when we have a type signature for a mutually recursive group
-tcSimplifyInferCheck
-	 :: InstLoc
-	 -> TcTyVarSet		-- fv(T)
-	 -> [Inst]		-- Given
-	 -> [Inst]		-- Wanted
-	 -> TcM ([TcTyVar],	-- Variables over which to quantify
-		 TcDictBinds)	-- Bindings
-
-tcSimplifyInferCheck loc tau_tvs givens wanteds
-  = do	{ (binds, irreds) <- innerCheckLoop loc givens wanteds
-
-	-- Figure out which type variables to quantify over
-	-- You might think it should just be the signature tyvars,
-	-- but in bizarre cases you can get extra ones
-	-- 	f :: forall a. Num a => a -> a
-	--	f x = fst (g (x, head [])) + 1
-	--	g a b = (b,a)
-	-- Here we infer g :: forall a b. a -> b -> (b,a)
-	-- We don't want g to be monomorphic in b just because
-	-- f isn't quantified over b.
-	; let all_tvs = varSetElems (tau_tvs `unionVarSet` tyVarsOfInsts givens)
-	; all_tvs <- zonkTcTyVarsAndFV all_tvs
-	; gbl_tvs <- tcGetGlobalTyVars
-	; let qtvs = varSetElems (all_tvs `minusVarSet` gbl_tvs)
-		-- We could close gbl_tvs, but its not necessary for
-		-- soundness, and it'll only affect which tyvars, not which
-		-- dictionaries, we quantify over
-
-		-- Now we are back to normal (c.f. tcSimplCheck)
-	; implic_bind <- bindIrreds loc [] emptyRefinement 
-					   qtvs givens irreds
-	; return (qtvs, binds `unionBags` implic_bind) }
-\end{code}
 
 
 %************************************************************************
@@ -1048,7 +1052,7 @@ tcSimplifySuperClasses
 	-> [Inst]	-- Wanted
 	-> TcM TcDictBinds
 tcSimplifySuperClasses loc givens sc_wanteds
-  = do	{ (binds1, irreds) <- checkLoop env sc_wanteds
+  = do	{ (irreds, binds1) <- checkLoop env sc_wanteds
 	; let (tidy_env, tidy_irreds) = tidyInsts irreds
 	; reportNoInstances tidy_env (Just (loc, givens)) tidy_irreds
 	; return binds1 }
@@ -1167,7 +1171,7 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 	-> [Name]		-- Things bound in this group
 	-> TcTyVarSet		-- Free in the type of the RHSs
 	-> [Inst]		-- Free in the RHSs
-	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
+	-> TcM ([TyVar],	-- Tyvars to quantify (zonked)
 		TcDictBinds)	-- Bindings
 	-- tcSimpifyRestricted returns no constraints to
 	-- quantify over; by definition there are none.
@@ -1175,7 +1179,7 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 
 tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- Zonk everything in sight
-  = mappM zonkInst wanteds			`thenM` \ wanteds' ->
+  = do	{ wanteds' <- mappM zonkInst wanteds
 
    	-- 'ReduceMe': Reduce as far as we can.  Don't stop at
 	-- dicts; the idea is to get rid of as many type
@@ -1186,23 +1190,21 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- BUT do no improvement!  See Plan D above
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
-    let env = mkNoImproveRedEnv doc (\i -> ReduceMe AddSCs)
-    in
-    reduceContext env wanteds' 		`thenM` \ (_imp, _binds, constrained_dicts) ->
+	; let env = mkNoImproveRedEnv doc (\i -> ReduceMe AddSCs)
+	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds'
 
 	-- Next, figure out the tyvars we will quantify over
-    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
-    tcGetGlobalTyVars				`thenM` \ gbl_tvs' ->
-    mappM zonkInst constrained_dicts		`thenM` \ constrained_dicts' ->
-    let
-	constrained_tvs' = tyVarsOfInsts constrained_dicts'
-	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
+	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
+	; gbl_tvs' <- tcGetGlobalTyVars
+	; constrained_dicts' <- mappM zonkInst constrained_dicts
+
+	; let constrained_tvs' = tyVarsOfInsts constrained_dicts'
+	      qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
 			 `minusVarSet` constrained_tvs'
-    in
-    traceTc (text "tcSimplifyRestricted" <+> vcat [
+	; traceTc (text "tcSimplifyRestricted" <+> vcat [
 		pprInsts wanteds, pprInsts constrained_dicts',
 		ppr _binds,
-		ppr constrained_tvs', ppr tau_tvs', ppr qtvs ])	`thenM_`
+		ppr constrained_tvs', ppr tau_tvs', ppr qtvs ])
 
 	-- The first step may have squashed more methods than
 	-- necessary, so try again, this time more gently, knowing the exact
@@ -1220,27 +1222,23 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	--
 	-- At top level, we *do* squash methods becuase we want to 
 	-- expose implicit parameters to the test that follows
-    let
-	is_nested_group = isNotTopLevel top_lvl
-        try_me inst | isFreeWrtTyVars qtvs inst,
-		      (is_nested_group || isDict inst) = Stop
-	            | otherwise  		       = ReduceMe AddSCs
- 	env = mkNoImproveRedEnv doc try_me
-   in
-    reduceContext env wanteds'   `thenM` \ (_imp, binds, irreds) ->
-    ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
+	; let is_nested_group = isNotTopLevel top_lvl
+	      try_me inst | isFreeWrtTyVars qtvs inst,
+			   (is_nested_group || isDict inst) = Stop
+		          | otherwise  	         = ReduceMe AddSCs
+	      env = mkNoImproveRedEnv doc try_me
+	; (_imp, binds, irreds) <- reduceContext env wanteds'
 
 	-- See "Notes on implicit parameters, Question 4: top level"
-    if is_nested_group then
-	extendLIEs irreds	`thenM_`
-        returnM (varSetElems qtvs, binds)
-    else
-	let
-    	    (bad_ips, non_ips) = partition isIPDict irreds
-	in    
-	addTopIPErrs bndrs bad_ips	`thenM_`
-	extendLIEs non_ips		`thenM_`
-        returnM (varSetElems qtvs, binds)
+	; ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
+	  if is_nested_group then
+		extendLIEs irreds
+	  else do { let (bad_ips, non_ips) = partition isIPDict irreds
+		  ; addTopIPErrs bndrs bad_ips
+		  ; extendLIEs non_ips }
+
+	; qtvs' <- zonkQuantifiedTyVars (varSetElems qtvs)
+	; return (qtvs', binds) }
 \end{code}
 
 
@@ -1437,7 +1435,7 @@ bindInstsOfLocalFuns wanteds local_ids
     returnM emptyLHsBinds
 
   | otherwise
-  = do	{ (binds, irreds) <- checkLoop env for_me
+  = do	{ (irreds, binds) <- checkLoop env for_me
 	; extendLIEs not_for_me	
 	; extendLIEs irreds
 	; return binds }
@@ -1820,10 +1818,12 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 			 , red_try_me = try_me }
 
 	; traceTc (text "reduceImplication" <+> vcat
-			[ ppr (red_givens env), ppr extra_givens, ppr reft, ppr wanteds ])
+			[ ppr orig_avails,
+			  ppr (red_givens env), ppr extra_givens, 
+			  ppr reft, ppr wanteds, ppr avails ])
 	; avails <- reduceList env' wanteds avails
 
-		-- Extract the binding (no frees, because try_me never says Free)
+		-- Extract the binding
 	; (binds, irreds) <- extractResults avails wanteds
  
 		-- We always discard the extra avails we've generated;
@@ -2029,7 +2029,9 @@ addRefinedGiven :: Refinement -> ([Inst], Avails) -> Inst -> TcM ([Inst], Avails
 addRefinedGiven reft (refined_givens, avails) given
   | isDict given	-- We sometimes have 'given' methods, but they
 			-- are always optional, so we can drop them
-  , Just (co, pred) <- refinePred reft (dictPred given)
+  , let pred = dictPred given
+  , isRefineablePred pred	-- See Note [ImplicInst rigidity]
+  , Just (co, pred) <- refinePred reft pred
   = do 	{ new_given <- newDictBndr (instLoc given) pred
 	; let rhs = L (instSpan given) $
 		    HsWrap (WpCo co) (HsVar (instToId given))
@@ -2040,7 +2042,30 @@ addRefinedGiven reft (refined_givens, avails) given
 	    -- and hopefully the optimiser will spot the duplicated work
   | otherwise
   = return (refined_givens, avails)
+\end{code}
 
+Note [ImplicInst rigidity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	C :: forall ab. (Eq a, Ord b) => b -> T a
+	
+	...(case x of C v -> <body>)...
+
+From the case (where x::T ty) we'll get an implication constraint
+	forall b. (Eq ty, Ord b) => <body-constraints>
+Now suppose <body-constraints> itself has an implication constraint 
+of form
+	forall c. <reft> => <payload>
+Then, we can certainly apply the refinement <reft> to the Ord b, becuase it is
+existential, but we probably should not apply it to the (Eq ty) because it may
+be wobbly. Hence the isRigidInst
+
+@Insts@ are ordered by their class/type info, rather than by their
+unique.  This allows the context-reduction mechanism to use standard finite
+maps to do their stuff.  It's horrible that this code is here, rather
+than with the Avails handling stuff in TcSimplify
+
+\begin{code}
 addIrred :: WantSCs -> Avails -> Inst -> TcM Avails
 addIrred want_scs avails irred = ASSERT2( not (irred `elemAvails` avails), ppr irred $$ ppr avails )
     	      		         addAvailAndSCs want_scs avails irred IsIrred
@@ -2143,7 +2168,7 @@ tc_simplify_top doc interactive wanteds
   = do	{ wanteds <- mapM zonkInst wanteds
 	; mapM_ zonkTopTyVar (varSetElems (tyVarsOfInsts wanteds))
 
-	; (binds1, irreds1) <- topCheckLoop doc wanteds
+	; (irreds1, binds1) <- topCheckLoop doc wanteds
 
 	; if null irreds1 then 
 		return binds1
@@ -2154,7 +2179,7 @@ tc_simplify_top doc interactive wanteds
 	; extended_default <- if interactive then return True
 			      else doptM Opt_ExtendedDefaultRules
 	; disambiguate extended_default irreds1	-- Does unification
-	; (binds2, irreds2) <- topCheckLoop doc irreds1
+	; (irreds2, binds2) <- topCheckLoop doc irreds1
 
 		-- Deal with implicit parameter
 	; let (bad_ips, non_ips) = partition isIPDict irreds2
@@ -2206,7 +2231,8 @@ disambiguate :: Bool -> [Inst] -> TcM ()
 	-- The Insts are assumed to be pre-zonked
 disambiguate extended_defaulting insts
   | null defaultable_groups
-  = return ()
+  = do { traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
+	;     return () }
   | otherwise
   = do 	{  	-- Figure out what default types to use
 	  mb_defaults <- getDefaultTys
@@ -2217,6 +2243,7 @@ disambiguate extended_defaulting insts
 				do { integer_ty <- tcMetaTy integerTyConName
 				   ; checkWiredInTyCon doubleTyCon
 				   ; return [integer_ty, doubleTy] }
+	; traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
 	; mapM_ (disambigGroup default_tys) defaultable_groups  }
   where
    unaries :: [(Inst,Class, TcTyVar)]  -- (C tv) constraints
@@ -2230,7 +2257,7 @@ disambiguate extended_defaulting insts
 
    defaultable_group :: [(Inst,Class,TcTyVar)] -> Bool
    defaultable_group ds@((_,_,tv):_)
-	=  not (isSkolemTyVar tv)	-- Note [Avoiding spurious errors]
+	=  not (isImmutableTyVar tv)	-- Note [Avoiding spurious errors]
 	&& not (tv `elemVarSet` bad_tvs)
 	&& defaultable_classes [c | (_,c,_) <- ds]
    defaultable_group [] = panic "defaultable_group"
@@ -2314,7 +2341,7 @@ tcSimplifyDeriv orig tc tyvars theta
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
     newDictBndrsO orig (substTheta tenv theta)	`thenM` \ wanteds ->
-    topCheckLoop doc wanteds			`thenM` \ (_, irreds) ->
+    topCheckLoop doc wanteds			`thenM` \ (irreds, _) ->
 
     doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
     doptM Opt_AllowUndecidableInstances		`thenM` \ undecidable_ok ->
@@ -2387,7 +2414,7 @@ tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 
 tcSimplifyDefault theta
   = newDictBndrsO DefaultOrigin theta	`thenM` \ wanteds ->
-    topCheckLoop doc wanteds		`thenM` \ (_, irreds) ->
+    topCheckLoop doc wanteds		`thenM` \ (irreds, _) ->
     addNoInstanceErrs  irreds	 	`thenM_`
     if null irreds then
 	returnM ()

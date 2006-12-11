@@ -598,15 +598,20 @@ data Inst
   | ImplicInst {	-- An implication constraint
 			-- forall tvs. (reft, given) => wanted
 	tci_name   :: Name,
-	tci_tyvars :: [TcTyVar],    -- Includes coercion variables
+	tci_tyvars :: [TcTyVar],    -- Quantified type variables
+				    -- Includes coercion variables
 				    --   mentioned in tci_reft
 	tci_reft   :: Refinement,
 	tci_given  :: [Inst],	    -- Only Dicts
 				    --   (no Methods, LitInsts, ImplicInsts)
 	tci_wanted :: [Inst],	    -- Only Dicts and ImplicInsts
 				    --   (no Methods or LitInsts)
+
 	tci_loc    :: InstLoc
     }
+	-- NB: the tci_given are not necessarily rigid,
+	--     although they will be if the tci_reft is non-trivial
+	-- NB: the tci_reft is already applied to tci_given and tci_wanted
 
   | Method {
 	tci_id :: TcId,		-- The Id for the Inst

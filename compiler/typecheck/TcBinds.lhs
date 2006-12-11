@@ -44,6 +44,7 @@ import Bag
 import ErrUtils
 import Digraph
 import Maybes
+import List
 import Util
 import BasicTypes
 import Outputable
@@ -310,6 +311,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
    	-- TYPECHECK THE BINDINGS
   ; ((binds', mono_bind_infos), lie_req) 
 	<- getLIE (tcMonoBinds bind_list sig_fn rec_tc)
+  ; traceTc (text "temp" <+> (ppr binds' $$ ppr lie_req))
 
 	-- CHECK FOR UNLIFTED BINDINGS
 	-- These must be non-recursive etc, and are not generalised
@@ -329,24 +331,19 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
     else do	-- The normal lifted case: GENERALISE
   { dflags <- getDOpts 
-  ; (tyvars_to_gen, dict_binds, dict_ids)
+  ; (tyvars_to_gen, dicts, dict_binds)
 	<- addErrCtxt (genCtxt (bndrNames mono_bind_infos)) $
 	   generalise dflags top_lvl bind_list sig_fn mono_bind_infos lie_req
 
-	-- FINALISE THE QUANTIFIED TYPE VARIABLES
-	-- The quantified type variables often include meta type variables
-	-- we want to freeze them into ordinary type variables, and
-	-- default their kind (e.g. from OpenTypeKind to TypeKind)
-  ; tyvars_to_gen' <- mappM zonkQuantifiedTyVar tyvars_to_gen
-
 	-- BUILD THE POLYMORPHIC RESULT IDs
-  ; exports <- mapM (mkExport prag_fn tyvars_to_gen' (map idType dict_ids))
+  ; let dict_ids = map instToId dicts
+  ; exports <- mapM (mkExport prag_fn tyvars_to_gen (map idType dict_ids))
 		    mono_bind_infos
 
   ; let	poly_ids = [poly_id | (_, poly_id, _, _) <- exports]
   ; traceTc (text "binding:" <+> ppr (poly_ids `zip` map idType poly_ids))
 
-  ; let abs_bind = L loc $ AbsBinds tyvars_to_gen'
+  ; let abs_bind = L loc $ AbsBinds tyvars_to_gen
 	 		            dict_ids exports
 	 		    	    (dict_binds `unionBags` binds')
 
@@ -686,10 +683,13 @@ getMonoBindInfo tc_binds
 generalise :: DynFlags -> TopLevelFlag 
 	   -> [LHsBind Name] -> TcSigFun 
 	   -> [MonoBindInfo] -> [Inst]
-	   -> TcM ([TcTyVar], TcDictBinds, [TcId])
+	   -> TcM ([TyVar], [Inst], TcDictBinds)
+-- The returned [TyVar] are all ready to quantify
+
 generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
   | isMonoGroup dflags bind_list
-  = do { extendLIEs lie_req; return ([], emptyBag, []) }
+  = do	{ extendLIEs lie_req
+	; return ([], [], emptyBag) }
 
   | isRestrictedGroup dflags bind_list sig_fn 	-- RESTRICTED CASE
   = 	-- Check signature contexts are empty 
@@ -704,7 +704,7 @@ generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
    	-- Check that signature type variables are OK
 	; final_qtvs <- checkSigsTyVars qtvs sigs
 
-	; return (final_qtvs, binds, []) }
+	; return (final_qtvs, [], binds) }
 
   | null sigs	-- UNRESTRICTED CASE, NO TYPE SIGS
   = tcSimplifyInfer doc tau_tvs lie_req
@@ -720,12 +720,12 @@ generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
 
 	-- Check that the needed dicts can be
 	-- expressed in terms of the signature ones
-	; (forall_tvs, dict_binds) <- tcSimplifyInferCheck loc tau_tvs sig_avails lie_req
+	; (qtvs, binds) <- tcSimplifyInferCheck loc tau_tvs sig_avails lie_req
 	
    	-- Check that signature type variables are OK
-	; final_qtvs <- checkSigsTyVars forall_tvs sigs
+	; final_qtvs <- checkSigsTyVars qtvs sigs
 
-	; returnM (final_qtvs, dict_binds, map instToId sig_lie) }
+	; returnM (final_qtvs, sig_lie, binds) }
   where
     bndrs   = bndrNames mono_infos
     sigs    = [sig | (_, Just sig, _) <- mono_infos]
