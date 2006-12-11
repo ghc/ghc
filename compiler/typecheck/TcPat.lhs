@@ -919,8 +919,7 @@ sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env
 		 sep [ptext SLIT("When checking an existential match that binds"),
 		      nest 4 (vcat (zipWith ppr_id show_ids tidy_tys)),
 		      ptext SLIT("The pattern(s) have type(s):") <+> vcat (map ppr tidy_pat_tys),
-		      ptext SLIT("The body has type:") <+> ppr tidy_body_ty,
-		      ppr pats
+		      ptext SLIT("The body has type:") <+> ppr tidy_body_ty
 		]) }
   where
     bound_ids = collectPatsBinders pats
