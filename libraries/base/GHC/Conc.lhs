@@ -221,7 +221,8 @@ killThread tid = throwTo tid (AsyncException ThreadKilled)
 {- | 'throwTo' raises an arbitrary exception in the target thread (GHC only).
 
 'throwTo' does not return until the exception has been raised in the
-target thread.  The calling thread can thus be certain that the target
+target thread. 
+The calling thread can thus be certain that the target
 thread has received the exception.  This is a useful property to know
 when dealing with race conditions: eg. if there are two threads that
 can kill each other, it is guaranteed that only one of the threads
@@ -231,6 +232,16 @@ If the target thread is currently making a foreign call, then the
 exception will not be raised (and hence 'throwTo' will not return)
 until the call has completed.  This is the case regardless of whether
 the call is inside a 'block' or not.
+
+Important note: the behaviour of 'throwTo' differs from that described in
+the paper "Asynchronous exceptions in Haskell" 
+(<http://research.microsoft.com/~simonpj/Papers/asynch-exns.htm>).
+In the paper, 'throwTo' is non-blocking; but the library implementation adopts
+a more synchronous design in which 'throwTo' does not return until the exception
+is received by the target thread.  The trade-off is discussed in Section 8 of the paper.
+Like any blocking operation, 'throwTo' is therefore interruptible (see Section 4.3 of
+the paper).
+
  -}
 throwTo :: ThreadId -> Exception -> IO ()
 throwTo (ThreadId id) ex = IO $ \ s ->
