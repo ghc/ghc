@@ -180,6 +180,7 @@ module GHC (
 #include "HsVersions.h"
 
 #ifdef GHCI
+import RtClosureInspect ( cvObtainTerm, Term )
 import TcRnDriver	( tcRnLookupRdrName, tcRnGetInfo,
 			  tcRnLookupName, getModuleExports )
 import RdrName		( plusGlobalRdrEnv, Provenance(..), 
@@ -206,7 +207,6 @@ import Data.Maybe       ( fromMaybe)
 import qualified Linker
 
 import Data.Dynamic     ( Dynamic )
-import RtClosureInspect ( cvObtainTerm, Term )
 import Linker		( HValue, getHValue, extendLinkEnv )
 #endif
 
@@ -1763,9 +1763,9 @@ data ModuleInfo = ModuleInfo {
 	minf_type_env  :: TypeEnv,
 	minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
 	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
-	minf_instances :: [Instance],
+	minf_instances :: [Instance]
 #ifdef GHCI
-        minf_dbg_sites :: [(SiteNumber,Coord)] 
+        ,minf_dbg_sites :: [(SiteNumber,Coord)] 
 #endif
 	-- ToDo: this should really contain the ModIface too
   }

@@ -84,9 +84,10 @@ import Util		( split )
 import Data.Char	( isDigit, isUpper )
 import System.IO        ( hPutStrLn, stderr )
 
+#ifdef GHCI
 import Breakpoints      ( BkptHandler )
 import Module           ( ModuleName )
-
+#endif
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
@@ -308,8 +309,10 @@ data DynFlags = DynFlags {
   -- message output
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO ()
 
+#ifdef GHCI
   -- breakpoint handling
  ,bkptHandler           :: Maybe (BkptHandler Module)
+#endif
  }
 
 data HscTarget
@@ -418,8 +421,9 @@ defaultDynFlags =
 	packageFlags		= [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
-
+#ifdef GHCI
         bkptHandler             = Nothing,
+#endif
 	flags = [ 
     	    Opt_ReadUserPackageConf,
     

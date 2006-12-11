@@ -140,13 +140,14 @@ handler :: Exception -> GHCi Bool
 handler (DynException dyn)        
   | Just StopChildSession <- fromDynamic dyn 
  -- propagate to the parent session
-  = ASSERTM (liftM not isTopLevel) >> throwDyn StopChildSession
+  = do ASSERTM (liftM not isTopLevel) 
+       throwDyn StopChildSession
 
   | Just (ChildSessionStopped msg) <- fromDynamic dyn 
  -- Revert CAFs and display some message
-  = ASSERTM (isTopLevel) >>
-    io (revertCAFs >> putStrLn msg) >> 
-    return False
+  = do ASSERTM (isTopLevel) 
+       io (revertCAFs >> putStrLn msg)
+       return False
 
 handler exception = do
   flushInterpBuffers
@@ -231,7 +232,7 @@ no_buf_cmd = "System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
 	     " Prelude.>> System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
 flush_cmd  = "System.IO.hFlush System.IO.stdout Prelude.>> System.IO.hFlush System.IO.stderr"
 
-initInterpBuffering :: Session -> IO ()
+initInterpBuffering :: GHC.Session -> IO ()
 initInterpBuffering session
  = do maybe_hval <- GHC.compileExpr session no_buf_cmd
 	

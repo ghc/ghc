@@ -20,6 +20,7 @@ import PrelNames
 
 import GHC.Exts                  ( unsafeCoerce# )
 
+#ifdef GHCI
 data BkptHandler a = BkptHandler {
      handleBreakpoint  :: forall b. Session -> [(Id,HValue)] -> BkptLocation a ->  String -> b -> IO b
    , isAutoBkptEnabled :: Session -> BkptLocation a -> IO Bool
@@ -29,6 +30,7 @@ nullBkptHandler = BkptHandler {
     isAutoBkptEnabled = \ _ _     -> return False,
     handleBreakpoint  = \_ _ _ _ b -> putStrLn "null Bkpt Handler" >> return b
                               }
+#endif
 
 type BkptLocation a = (a, SiteNumber)
 type SiteNumber   = Int

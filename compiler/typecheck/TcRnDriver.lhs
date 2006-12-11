@@ -69,8 +69,8 @@ import NameSet
 import TyCon
 import SrcLoc
 import HscTypes
-import DsBreakpoint
 import Outputable
+import Breakpoints
 
 #ifdef GHCI
 import Linker

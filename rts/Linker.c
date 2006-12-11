@@ -817,6 +817,7 @@ static RtsSymbolVal rtsSyms[] = {
 /* -----------------------------------------------------------------------------
  * Insert symbols into hash tables, checking for duplicates.
  */
+int isSuffixOf(char* x, char* suffix);
 
 static void ghciInsertStrHashTable ( char* obj_name,
                                      HashTable *table,
@@ -856,17 +857,6 @@ static void ghciInsertStrHashTable ( char* obj_name,
    );
    exit(1);
 }
-
-#if defined(GHCI) && defined(BREAKPOINT)
-static void ghciInsertDCTable ( char* obj_name,
-				StgWord key,
-				char* data
-			      )
-{
-    ghciInsertStrHashTable(obj_name, dchash, (char *)key, data);
-
-}
-#endif
 /* -----------------------------------------------------------------------------
  * initialize the object linker
  */

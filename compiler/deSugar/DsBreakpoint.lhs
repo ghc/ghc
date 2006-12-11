@@ -54,7 +54,6 @@ import Data.IORef
 import Foreign.StablePtr ( newStablePtr, castStablePtrToPtr )
 import GHC.Exts         ( Ptr(..), Int(..), addr2Int#, unsafeCoerce# )
 
-#if defined(GHCI)
 mkBreakpointExpr :: SrcSpan -> Id -> DsM (LHsExpr Id)
 mkBreakpointExpr loc bkptFuncId = do
         scope' <- getLocalBindsDs
@@ -110,36 +109,8 @@ debug_enabled = do
     b_enabled      <- breakpoints_enabled
     return (debugging && b_enabled)
 
-breakpoints_enabled :: DsM Bool
-breakpoints_enabled = do
-    ghcMode            <- getGhcModeDs
-    currentModule      <- getModuleDs
-    ignore_breakpoints <- doptDs Opt_IgnoreBreakpoints
-    return ( not ignore_breakpoints 
-          && ghcMode == Interactive 
-          && currentModule /= iNTERACTIVE )
-
 maybeInsertBreakpoint :: LHsExpr Id -> Type ->  DsM (LHsExpr Id)
 --maybeInsertBreakpoint e | pprTrace("insertBreakpoint at" (ppr e) False = undefined
-maybeInsertBreakpoint lhsexpr@(L loc _) ty = do 
-  instrumenting <- isInstrumentationSpot lhsexpr
-  if instrumenting
-         then do L _ dynBkpt <- dynBreakpoint loc 
---                 return (l (HsApp (l$ TyApp dynBkpt [ty]) lhsexpr))
-                 return$ l(HsApp (l$ HsWrap (WpTyApp ty) dynBkpt) lhsexpr)
-         else return lhsexpr
-  where l = L loc
-
-dsAndThenMaybeInsertBreakpoint :: LHsExpr Id -> DsM CoreExpr
-dsAndThenMaybeInsertBreakpoint expr@(L loc _) = do
-  coreExpr  <- dsLExpr expr
-  instrumenting <- isInstrumentationSpot expr
-  if instrumenting
-         then do L _ dynBkpt<- dynBreakpoint loc
-                 bkptCore   <- dsLExpr (l$ HsWrap (WpTyApp (exprType coreExpr)) dynBkpt)
-                 return (bkptCore `App` coreExpr)
-         else return coreExpr
-  where l = L loc
 
 isInstrumentationSpot (L loc e) = do
   ghcmode   <- getGhcModeDs
@@ -202,9 +173,39 @@ mkJumpFunc bkptFuncId
                       (basicType extra (mkTyConApp opaqueTyCon [])) vanillaIdInfo
         mkTupleType tys = mkTupleTy Boxed (length tys) tys
 
+breakpoints_enabled :: DsM Bool
+dsAndThenMaybeInsertBreakpoint :: LHsExpr Id -> DsM CoreExpr
+
+#ifdef GHCI
+maybeInsertBreakpoint lhsexpr@(L loc _) ty = do 
+  instrumenting <- isInstrumentationSpot lhsexpr
+  if instrumenting
+         then do L _ dynBkpt <- dynBreakpoint loc 
+--                 return (l (HsApp (l$ TyApp dynBkpt [ty]) lhsexpr))
+                 return$ l(HsApp (l$ HsWrap (WpTyApp ty) dynBkpt) lhsexpr)
+         else return lhsexpr
+  where l = L loc
+
+dsAndThenMaybeInsertBreakpoint expr@(L loc _) = do
+  coreExpr  <- dsLExpr expr
+  instrumenting <- isInstrumentationSpot expr
+  if instrumenting
+         then do L _ dynBkpt<- dynBreakpoint loc
+                 bkptCore   <- dsLExpr (l$ HsWrap (WpTyApp (exprType coreExpr)) dynBkpt)
+                 return (bkptCore `App` coreExpr)
+         else return coreExpr
+  where l = L loc
+
+breakpoints_enabled = do
+    ghcMode            <- getGhcModeDs
+    currentModule      <- getModuleDs
+    ignore_breakpoints <- doptDs Opt_IgnoreBreakpoints
+    return ( not ignore_breakpoints 
+          && ghcMode == Interactive 
+          && currentModule /= iNTERACTIVE )
 #else
 maybeInsertBreakpoint expr _ = return expr
 dsAndThenMaybeInsertBreakpoint coreExpr = dsLExpr coreExpr
-breakpoints_enabled = False
+breakpoints_enabled = return False
 #endif
 \end{code}
