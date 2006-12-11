@@ -76,6 +76,7 @@ tcPolyExprNC expr res_ty
   = do	{ (gen_fn, expr') <- tcGen res_ty emptyVarSet (\_ -> tcPolyExprNC expr)
 		-- Note the recursive call to tcPolyExpr, because the
 		-- type may have multiple layers of for-alls
+		-- E.g. forall a. Eq a => forall b. Ord b => ....
 	; return (mkLHsWrap gen_fn expr') }
 
   | otherwise

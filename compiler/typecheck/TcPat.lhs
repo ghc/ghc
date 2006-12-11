@@ -555,7 +555,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	-- Get location from monad,
 							-- not from ex_tvs
 	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
-				      (ctxt_res_tys ++ mkTyVarTys ex_tvs')
+				       (ctxt_res_tys ++ mkTyVarTys ex_tvs')
 	      eq_spec' = substEqSpec tenv eq_spec
 	      theta'   = substTheta  tenv theta
 	      arg_tys' = substTys    tenv arg_tys
