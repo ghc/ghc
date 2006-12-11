@@ -201,7 +201,9 @@ data DynFlag
    | Opt_SplitObjs
    | Opt_StgStats
    | Opt_HideAllPackages
+#if defined(GHCI) && defined(DEBUGGER)
    | Opt_Debugging
+#endif
    | Opt_PrintBindResult
    | Opt_Haddock
 

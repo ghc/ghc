@@ -45,7 +45,7 @@ import CoreUtils        ( exprType )
 import Outputable
 import ErrUtils         ( debugTraceMsg )
 import FastString       ( mkFastString, unpackFS )
-import DynFlags         ( GhcMode(..), DynFlag(Opt_Debugging, Opt_IgnoreBreakpoints) )
+import DynFlags         ( GhcMode(..), DynFlag(..) )
  
 import DsMonad 
 import {-#SOURCE#-}DsExpr ( dsLExpr ) 
@@ -104,10 +104,14 @@ mkBreakpointExpr loc bkptFuncId = do
           instrumenting = idName bkptFuncId == breakpointAutoName
 
 debug_enabled :: DsM Bool
+#if defined(GHCI) && defined(DEBUGGER)
 debug_enabled = do
     debugging      <- doptDs Opt_Debugging
     b_enabled      <- breakpoints_enabled
     return (debugging && b_enabled)
+#else
+debug_enabled = return False
+#endif
 
 maybeInsertBreakpoint :: LHsExpr Id -> Type ->  DsM (LHsExpr Id)
 --maybeInsertBreakpoint e | pprTrace("insertBreakpoint at" (ppr e) False = undefined

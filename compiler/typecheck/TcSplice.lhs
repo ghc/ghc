@@ -364,8 +364,11 @@ runMeta :: (SrcSpan -> th_syn -> Either Message hs_syn)
 	-> TcM hs_syn		-- Of type t
 runMeta convert expr
   = do	{ 	-- Desugar
+#if defined(GHCI) && defined(DEBUGGER)
 	  ds_expr <- unsetOptM Opt_Debugging $ initDsTc (dsLExpr expr)
-
+#else 
+	  ds_expr <- initDsTc (dsLExpr expr)
+#endif
 	-- Compile and link it; might fail if linking fails
 	; hsc_env <- getTopEnv
 	; src_span <- getSrcSpanM

@@ -95,7 +95,7 @@ static /*Str*/HashTable *symhash;
 /* Hash table mapping symbol names to StgStablePtr */
 static /*Str*/HashTable *stablehash;
 
-#if defined(GHCI) && defined(BREAKPOINT)
+#if defined(DEBUGGER)
 /* Hash table mapping info table ptrs to DataCon names */
 static HashTable *dchash;
 #endif 
@@ -828,7 +828,7 @@ static void ghciInsertStrHashTable ( char* obj_name,
    if (lookupHashTable(table, (StgWord)key) == NULL)
    {
       insertStrHashTable(table, (StgWord)key, data);
-#if defined(GHCI) && defined(BREAKPOINT)    
+#if defined(DEBUGGER)    
       // Insert the reverse pair in the datacon hash if it is a closure
       {
 	if(isSuffixOf(key, "static_info") || isSuffixOf(key, "con_info")) {
@@ -882,7 +882,7 @@ initLinker( void )
 
     stablehash = allocStrHashTable();
     symhash = allocStrHashTable();
-#if defined(GHCI) && defined(BREAKPOINT)
+#if defined(DEBUGGER)
     dchash  = allocHashTable();
 #endif
 
@@ -1103,7 +1103,7 @@ lookupSymbol( char *lbl )
     }
 }
 
-#if defined(GHCI) && defined(BREAKPOINT)
+#if defined(DEBUGGER)
 char * 
 lookupDataCon( StgWord addr ) 
 {
@@ -4397,7 +4397,6 @@ static int machoGetMisalignment( FILE * f )
 
 #endif
 
-#if defined(GHCI) && defined(BREAKPOINT)
 int isSuffixOf(char* x, char* suffix) {
   int suffix_len = strlen (suffix);
   int x_len = strlen (x);
@@ -4412,4 +4411,3 @@ int isSuffixOf(char* x, char* suffix) {
   char* x_suffix = &x[strlen(x)-strlen(suffix)];
   return strcmp(x_suffix, suffix) == 0;
   }
-#endif

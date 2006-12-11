@@ -534,7 +534,7 @@ refreshBkptTable :: [ModSummary] -> GHCi ()
 refreshBkptTable [] = return ()
 refreshBkptTable (ms:mod_sums) = do
     sess   <- getSession
-    when (Opt_Debugging `elem` flags (GHC.ms_hspp_opts ms)) $ do
+    when isDebugging $ do
       old_table <- getBkptTable
       new_table <- addModuleGHC sess old_table (GHC.ms_mod ms)
       setBkptTable new_table
@@ -547,3 +547,8 @@ refreshBkptTable (ms:mod_sums) = do
                 (ppr mod <> text ": inserted " <> int (length sites) <>
                  text " breakpoints")
           return$ addModule mod sites bt
+#if defined(GHCI) && defined(DEBUGGER)
+        isDebugging = Opt_Debugging `elem` flags (GHC.ms_hspp_opts ms)
+#else
+        isDebugging = False
+#endif

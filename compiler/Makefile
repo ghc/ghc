@@ -413,10 +413,12 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
 # Yes, include the interepreter, readline, and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package template-haskell
-# -DBREAKPOINT causes a loop in stage2
-# SRC_HC_OPTS += -DGHCI -DBREAKPOINT -package template-haskell
 PKG_DEPENDS += template-haskell
 
+# Should the debugger commands be enabled?
+ifeq "$(GhciWithDebugger)" "YES"
+SRC_HC_OPTS += -DDEBUGGER
+endif
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
 # or not?
 ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"

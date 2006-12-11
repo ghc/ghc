@@ -315,6 +315,9 @@ BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 
 HscIfaceFileVersion=6
 
+# Building with debugger?
+GhciWithDebugger=YES
+
 #------------------------------------------------------------------------------
 # Options for Libraries
 

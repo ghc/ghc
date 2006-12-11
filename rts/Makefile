@@ -144,6 +144,10 @@ ifeq "$(HaveLibMingwEx)" "YES"
 PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
 endif
 
+ifeq "$(GhciWithDebugger)" "YES"
+STANDARD_OPTS += -DDEBUGGER
+endif
+
 ifeq "$(DotnetSupport)" "YES"
 
 # 

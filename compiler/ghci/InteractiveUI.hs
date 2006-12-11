@@ -131,7 +131,7 @@ builtin_commands = [
   ("etags",	keepGoing createETagsFileCmd,	False, completeFilename),
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
-#if defined(GHCI)
+#if defined(DEBUGGER)
   ("print",     keepGoing (pprintClosureCommand True False), False, completeIdentifier),
   ("sprint",    keepGoing (pprintClosureCommand False False),False, completeIdentifier),
   ("force",     keepGoing (pprintClosureCommand False True), False, completeIdentifier),
