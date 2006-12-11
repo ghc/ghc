@@ -2286,7 +2286,10 @@ mkSite (pkgName, modName, sitenum) =
   (mkModule (stringToPackageId pkgName) (mkModuleName modName), sitenum)
 
 obtainTerm :: Session -> Bool -> Id -> IO (Maybe Term)
-obtainTerm sess force id = withSession sess $ \hsc_env -> 
-              getHValue (varName id) >>= traverse (cvObtainTerm hsc_env force Nothing)
+obtainTerm sess force id = withSession sess $ \hsc_env -> do
+              mb_v <- getHValue (varName id) 
+              case mb_v of
+                Just v  -> fmap Just$ cvObtainTerm hsc_env force (Just$ idType id) v
+                Nothing -> return Nothing
 
 #endif /* GHCI */

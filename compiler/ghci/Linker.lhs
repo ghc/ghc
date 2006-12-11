@@ -202,7 +202,9 @@ recoverDCInRTS a = do
 getHValue :: Name -> IO (Maybe HValue)
 getHValue name = do
     pls <- readIORef v_PersistentLinkerState
-    return$ fmap snd (lookupNameEnv (closure_env pls) name)
+    case lookupNameEnv (closure_env pls) name of
+      Just (_,x) -> return$ Just x
+      _          -> return Nothing
 
 withExtendedLinkEnv :: [(Name,HValue)] -> IO a -> IO a
 withExtendedLinkEnv new_env action
