@@ -91,7 +91,7 @@ shutdownAllocator(void)
 #endif
 }
 
-static void allocate(void *addr, size_t len) {
+static void addAllocation(void *addr, size_t len) {
     Allocated *a;
     size_t alloc_size;
 
@@ -109,7 +109,7 @@ static void allocate(void *addr, size_t len) {
     RELEASE_LOCK(&allocator_mutex);
 }
 
-static void deallocate(void *addr) {
+static void removeAllocation(void *addr) {
     Allocated *prev, *a;
 
     if (addr == NULL) {
@@ -151,7 +151,7 @@ stgMallocBytes (int n, char *msg)
       stg_exit(EXIT_INTERNAL_ERROR);
     }
 #if defined(DEBUG)
-    allocate(space, n2);
+    addAllocation(space, n2);
 #endif
     return space;
 }
@@ -169,8 +169,8 @@ stgReallocBytes (void *p, int n, char *msg)
       stg_exit(EXIT_INTERNAL_ERROR);
     }
 #if defined(DEBUG)
-    deallocate(p);
-    allocate(space, n2);
+    removeAllocation(p);
+    addAllocation(space, n2);
 #endif
     return space;
 }
@@ -186,7 +186,7 @@ stgCallocBytes (int n, int m, char *msg)
       stg_exit(EXIT_INTERNAL_ERROR);
     }
 #if defined(DEBUG)
-    allocate(space, (size_t) n * (size_t) m);
+    addAllocation(space, (size_t) n * (size_t) m);
 #endif
     return space;
 }
@@ -198,7 +198,7 @@ void
 stgFree(void* p)
 {
 #if defined(DEBUG)
-  deallocate(p);
+  removeAllocation(p);
 #endif
   free(p);
 }
