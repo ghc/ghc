@@ -157,4 +157,5 @@ test('tcfail168', normal, compile_fail, [''])
 test('tcfail169', normal, compile_fail, [''])
 test('tcfail170', normal, compile_fail, [''])
 test('tcfail171', normal, compile_fail, [''])
+test('tcfail172', normal, compile_fail, [''])
 
