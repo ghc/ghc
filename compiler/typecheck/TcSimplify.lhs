@@ -848,6 +848,7 @@ bindIrredsR loc qtvs co_vars reft givens irreds
   | otherwise
   = do	{ let givens' = filter isDict givens
 		-- The givens can include methods
+		-- See Note [Pruning the givens in an implication constraint]
 
 	   -- If there are no 'givens', then it's safe to 
 	   -- partition the 'wanteds' by their qtvs, thereby trimming irreds
@@ -1875,6 +1876,20 @@ Now consider the constraint
 We can satisfy the (C Int) from the superclass of D, so we don't want
 to float the (C Int) out, even though it mentions no type variable in
 the constraints!
+
+Note [Pruning the givens in an implication constraint]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are about to form the implication constraint
+	forall tvs.  Eq a => Ord b
+The (Eq a) cannot contribute to the (Ord b), because it has no access to
+the type variable 'b'.  So we could filter out the (Eq a) from the givens.
+
+Doing so would be a bit tidier, but all the implication constraints get
+simplified away by the optimiser, so it's no great win.   So I don't take
+advantage of that at the moment.
+
+If you do, BE CAREFUL of wobbly type variables.
+
 
 %************************************************************************
 %*									*
