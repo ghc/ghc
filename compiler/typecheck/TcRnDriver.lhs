@@ -1036,11 +1036,11 @@ tcRnExpr hsc_env ictxt rdr_expr
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
     ((tc_expr, res_ty), lie)	   <- getLIE (tcInferRho rn_expr) ;
-    ((qtvs, _, dict_ids), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
+    ((qtvs, dict_insts, _), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
     tcSimplifyInteractive lie_top ;
 
     let { all_expr_ty = mkForAllTys qtvs $
-    		        mkFunTys (map idType dict_ids)	$
+    		        mkFunTys (map (idType . instToId) dict_insts)	$
     		        res_ty } ;
     zonkTcType all_expr_ty
     }
