@@ -19,6 +19,7 @@ import System.Console.GetOpt
 import System.Exit      ( exitWith, ExitCode(..) )
 
 import Numeric          ( showFloat, showFFloat, showSigned )
+import Control.Monad
 import Data.Maybe       ( isNothing )
 import Data.Char
 import System.IO
@@ -36,22 +37,16 @@ usageHeader = "usage: nofib-analyse [OPTION...] <logfile1> <logfile2> ..."
 
 main = do
 
- if not (null cmdline_errors) || OptHelp `elem` flags
-        then die (concat cmdline_errors ++ usageInfo usageHeader argInfo)
-        else do
+ when (not (null cmdline_errors) || OptHelp `elem` flags) $
+      die (concat cmdline_errors ++ usageInfo usageHeader argInfo)
 
  let { html  = OptHTMLOutput  `elem` flags;
        latex = OptLaTeXOutput `elem` flags;
        ascii = OptASCIIOutput `elem` flags
      }
 
- if ascii && html
-        then die "Can't produce both ASCII and HTML"
-        else do
-
- if devs && nodevs
-        then die "Can't both display and hide deviations"
-        else do
+ when (ascii && html)  $ die "Can't produce both ASCII and HTML"
+ when (devs && nodevs) $ die "Can't both display and hide deviations"
 
  results <- parse_logs other_args
 
