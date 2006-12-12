@@ -163,7 +163,7 @@ Gofer-like stuff:
 
 > fst3 (a,_,_) = a
 > snd3 (_,a,_) = a
-> thd3 (_,a,_) = a
+> thd3 (_,_,a) = a
 
 > cjustify, ljustify, rjustify :: Int -> String -> String
 > cjustify n s = space halfm ++ s ++ space (m - halfm)
