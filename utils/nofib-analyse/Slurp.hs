@@ -6,8 +6,7 @@
 
 module Slurp (Status(..), Results(..), ResultTable, parse_log) where
 
-import CmdLine
-
+import Control.Monad
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Text.Regex
@@ -46,6 +45,7 @@ data Results = Results {
 	compile_status 	:: Status
 	}
 
+emptyResults :: Results
 emptyResults = Results { 
 	compile_time   	= Map.empty,
 	module_size    	= Map.empty,
@@ -78,6 +78,7 @@ Various banner lines:
 -}
 
 -- NB. the hyphen must come last (or first) inside [...] to stand for itself.
+banner_re :: Regex
 banner_re = mkRegex "^==nofib==[ \t]+([A-Za-z0-9_-]+):[ \t]+(size of|time to link|time to run|time to compile)[ \t]+([A-Za-z0-9_-]+)(\\.o)?[ \t]+follows"
 
 {-
@@ -85,12 +86,15 @@ This regexp for the output of "time" works on FreeBSD, other versions
 of "time" will need different regexps.
 -}
 
+time_re :: Regex
 time_re = mkRegex "^[ \t]*([0-9.]+)[ \t]+real[ \t]+([0-9.]+)[ \t]+user[ \t]+([0-9.]+)[ \t]+sys[ \t]*$"
 
+time_gnu17_re :: Regex
 time_gnu17_re = mkRegex "^[ \t]*([0-9.]+)user[ \t]+([0-9.]+)system[ \t]+([0-9.:]+)elapsed"
                 -- /usr/bin/time --version reports: GNU time 1.7
                 -- notice the order is different, and the elapsed time is [hh:]mm:ss.s
 
+size_re :: Regex
 size_re = mkRegex "^[ \t]*([0-9]+)[ \t]+([0-9]+)[ \t]+([0-9]+)"
 
 {-
@@ -104,6 +108,7 @@ ghc2_re = GHC 4.02 (includes "xxM in use")
 ghc3_re = GHC 4.03 (includes "xxxx bytes GC work")
 -}
 
+ghc1_re, ghc2_re, ghc3_re, ghc4_re :: Regex
 ghc1_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
 
 ghc2_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
@@ -112,13 +117,11 @@ ghc3_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t
 
 ghc4_re = mkRegex "^<<ghc-instrs:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\), ([0-9]+) instructions, ([0-9]+) memory reads, ([0-9]+) memory writes, ([0-9]+) L2 cache misses :ghc-instrs>>"
 
+wrong_exit_status, wrong_output, out_of_heap, out_of_stack :: Regex
 wrong_exit_status = mkRegex "^\\**[ \t]*expected exit status ([0-9]+) not seen ; got ([0-9]+)"
-
-wrong_output = mkRegex "^expected (stdout|stderr) not matched by reality$"
-
-out_of_heap = mkRegex "^\\+ Heap exhausted;$"
-
-out_of_stack = mkRegex "^\\+ Stack space overflow:"
+wrong_output      = mkRegex "^expected (stdout|stderr) not matched by reality$"
+out_of_heap       = mkRegex "^\\+ Heap exhausted;$"
+out_of_stack      = mkRegex "^\\+ Stack space overflow:"
 
 parse_log :: String -> ResultTable
 parse_log
@@ -134,7 +137,7 @@ combine_results = foldr f Map.empty
  where
 	f (prog,results) fm = Map.insertWith (flip combine2Results) prog results fm
 
-
+combine2Results :: Results -> Results -> Results
 combine2Results
              Results{ compile_time = ct1, link_time = lt1, 
 		      module_size = ms1,
@@ -154,27 +157,24 @@ combine2Results
 		      run_status = rs2, compile_status = cs2 }
 	  =  Results{ compile_time   = Map.unionWith (flip const) ct1 ct2,
 		      module_size    = Map.unionWith (flip const) ms1 ms2,
-		      link_time      = combMaybes lt1 lt2,
+		      link_time      = lt1 `mplus` lt2,
 		      run_time       = rt1 ++ rt2,
 		      mut_time       = mt1 ++ mt2,
-		      instrs         = combMaybes is1 is2,
-		      mem_reads      = combMaybes mr1 mr2,
-		      mem_writes     = combMaybes mw1 mw2,
-		      cache_misses   = combMaybes cm1 cm2,
+		      instrs         = is1 `mplus` is2,
+		      mem_reads      = mr1 `mplus` mr2,
+		      mem_writes     = mw1 `mplus` mw2,
+		      cache_misses   = cm1 `mplus` cm2,
 		      gc_time        = gt1 ++ gt2,
-		      gc_work        = combMaybes gw1 gw2,
-		      binary_size    = combMaybes bs1 bs2,
-		      allocs         = combMaybes al1 al2,
+		      gc_work        = gw1 `mplus` gw2,
+		      binary_size    = bs1 `mplus` bs2,
+		      allocs         = al1 `mplus` al2,
 		      run_status     = combStatus rs1 rs2,
 		      compile_status = combStatus cs1 cs2 }
 
-combMaybes m1 m2 = case maybeToList m1 ++ maybeToList m2 of
-			[] -> Nothing
-			(x:_) -> Just x
-
-combStatus NotDone x = x
-combStatus x NotDone = x
-combStatus x y = x
+combStatus :: Status -> Status -> Status
+combStatus NotDone y       = y
+combStatus x       NotDone = x
+combStatus x       _       = x
 
 chunk_log :: [String] -> [String] -> [String] -> [([String],[String])]
 chunk_log header chunk [] = [(header,chunk)]
@@ -184,86 +184,89 @@ chunk_log header chunk (l:ls) =
 		Just stuff -> (header,chunk) : chunk_log stuff [] ls
 
 process_chunk :: ([String],[String]) -> [(String,Results)]
-process_chunk (prog : what : mod : _, chk) =
+process_chunk (progName : what : modName : _, chk) =
  case what of
-	"time to compile" -> parse_compile_time prog mod chk
-	"time to run"     -> parse_run_time prog (reverse chk) emptyResults NotDone
-	"time to link"    -> parse_link_time prog chk
-	"size of"	  -> parse_size prog mod chk
-	_		  -> error ("process_chunk: "++what)
+	"time to compile" -> parse_compile_time progName modName chk
+	"time to run"     -> parse_run_time progName (reverse chk) emptyResults NotDone
+	"time to link"    -> parse_link_time progName chk
+	"size of"	      -> parse_size progName modName chk
+	_		          -> error ("process_chunk: "++what)
+process_chunk _ = error "process_chunk: Can't happen"
 
-parse_compile_time prog mod [] = []
-parse_compile_time prog mod (l:ls) =
+parse_compile_time :: String -> String -> [String] -> [(String, Results)]
+parse_compile_time _    _   [] = []
+parse_compile_time progName modName (l:ls) =
 	case matchRegex time_re l of {
-	     Just (real:user:system:_) ->
-		let ct  = Map.singleton mod (read user)
+	     Just (_real:user:_system:_) ->
+		let ct  = Map.singleton modName (read user)
 		in 
-		[(prog,emptyResults{compile_time = ct})];
+		[(progName, emptyResults{compile_time = ct})];
 	     Nothing -> 
 
 	case matchRegex time_gnu17_re l of {
-	     Just (user:system:elapsed:_) ->
-		let ct  = Map.singleton mod (read user)
+	     Just (user:_system:_elapsed:_) ->
+		let ct  = Map.singleton modName (read user)
 		in 
-		[(prog,emptyResults{compile_time = ct})];
+		[(progName, emptyResults{compile_time = ct})];
 	     Nothing -> 
 
 	case matchRegex ghc1_re l of {
-	    Just (allocs:_:_:_:_:init:_:mut:_:gc:_) ->
+	    Just (_allocations:_:_:_:_:initialisation:_:mut:_:gc:_) ->
 	      let 
 		  read_mut = read mut
 		  read_gc  = read gc
-		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = Map.singleton mod time
+		  time = (read initialisation + read_mut + read_gc) :: Float 
+		  ct  = Map.singleton modName time
 	      in
-		[(prog,emptyResults{compile_time = ct})];
+		[(progName, emptyResults{compile_time = ct})];
 	    Nothing ->
 
 	case matchRegex ghc2_re l of {
-	   Just (allocs:_:_:_:_:_:init:_:mut:_:gc:_) ->
+	   Just (_allocations:_:_:_:_:_:initialisation:_:mut:_:gc:_) ->
 	      let 
 		  read_mut = read mut
 		  read_gc  = read gc
-		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = Map.singleton mod time
+		  time = (read initialisation + read_mut + read_gc) :: Float 
+		  ct  = Map.singleton modName time
 	      in
-		[(prog,emptyResults{compile_time = ct})];
+		[(progName, emptyResults{compile_time = ct})];
 	    Nothing ->
 
 	case matchRegex ghc3_re l of {
-	   Just (allocs:_:_:_:_:_:_:init:_:mut:_:gc:_) ->
+	   Just (_allocations:_:_:_:_:_:_:initialisation:_:mut:_:gc:_) ->
 	      let 
 		  read_mut = read mut
 		  read_gc  = read gc
-		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = Map.singleton mod time
+		  time = (read initialisation + read_mut + read_gc) :: Float 
+		  ct  = Map.singleton modName time
 	      in
-		[(prog,emptyResults{compile_time = ct})];
+		[(progName, emptyResults{compile_time = ct})];
 	    Nothing ->
 
 	case matchRegex ghc4_re l of {
-	   Just (allocs:_:_:_:_:_:_:init:_:mut:_:gc:_:_:_:_) ->
+	   Just (_allocations:_:_:_:_:_:_:initialisation:_:mut:_:gc:_:_:_:_) ->
 	      let 
 		  read_mut = read mut
 		  read_gc  = read gc
-		  time = (read init + read_mut + read_gc) :: Float 
-		  ct  = Map.singleton mod time
+		  time = (read initialisation + read_mut + read_gc) :: Float 
+		  ct  = Map.singleton modName time
 	      in
-		[(prog,emptyResults{compile_time = ct})];
+		[(progName, emptyResults{compile_time = ct})];
 	    Nothing ->
 
-		parse_compile_time prog mod ls
+		parse_compile_time progName modName ls
 	}}}}}}
 
-parse_link_time prog [] = []
+parse_link_time :: String -> [String] -> [(String, Results)]
+parse_link_time _ [] = []
 parse_link_time prog (l:ls) =
 	  case matchRegex time_re l of {
-	     Just (real:user:system:_) ->
+	     Just (_real:user:_system:_) ->
 		[(prog,emptyResults{link_time = Just (read user)})];
 	     Nothing ->
 
 	  case matchRegex time_gnu17_re l of {
-	     Just (user:system:elapsed:_) ->
+	     Just (user:_system:_elapsed:_) ->
 		[(prog,emptyResults{link_time = Just (read user)})];
 	     Nothing ->
 
@@ -274,34 +277,36 @@ parse_link_time prog (l:ls) =
 -- There might be multiple runs of the program, so we have to collect up
 -- all the results.  Variable results like runtimes are aggregated into
 -- a list, whereas the non-variable aspects are just kept singly.
-parse_run_time prog [] res NotDone = []
+parse_run_time :: String -> [String] -> Results -> Status
+               -> [(String, Results)]
+parse_run_time _ [] _ NotDone = []
 parse_run_time prog [] res ex = [(prog, res{run_status=ex})]
 parse_run_time prog (l:ls) res ex =
 	case matchRegex ghc1_re l of {
-	   Just (allocs:_:_:_:_:init:_:mut:_:gc:_) ->
-		got_run_result allocs init mut gc Nothing
+	   Just (allocations:_:_:_:_:initialisation:_:mut:_:gc:_) ->
+		got_run_result allocations initialisation mut gc Nothing
 			Nothing Nothing Nothing Nothing;
 	   Nothing -> 
 
 	case matchRegex ghc2_re l of {
-	   Just (allocs:_:_:_:_:_:init:_:mut:_:gc:_) ->
-		got_run_result allocs init mut gc Nothing
+	   Just (allocations:_:_:_:_:_:initialisation:_:mut:_:gc:_) ->
+		got_run_result allocations initialisation mut gc Nothing
 			Nothing Nothing Nothing Nothing;
 
 	    Nothing ->
 	
 	case matchRegex ghc3_re l of {
-	   Just (allocs:_:_:_:_:gc_work:_:init:_:mut:_:gc:_) ->
-		got_run_result allocs init mut gc (Just (read gc_work))
+	   Just (allocations:_:_:_:_:gc_work':_:initialisation:_:mut:_:gc:_) ->
+		got_run_result allocations initialisation mut gc (Just (read gc_work'))
 			Nothing Nothing Nothing Nothing;
 
 	    Nothing ->
 	
 	case matchRegex ghc4_re l of {
-	   Just (allocs:_:_:_:_:gc_work:_:init:_:mut:_:gc:_:is:mem_rs:mem_ws:cache_misses:_) ->
-		got_run_result allocs init mut gc (Just (read gc_work))
+	   Just (allocations:_:_:_:_:gc_work':_:initialisation:_:mut:_:gc:_:is:mem_rs:mem_ws:cache_misses':_) ->
+		got_run_result allocations initialisation mut gc (Just (read gc_work'))
 			(Just (read is)) (Just (read mem_rs))
-			(Just (read mem_ws)) (Just (read cache_misses));
+			(Just (read mem_ws)) (Just (read cache_misses'));
 
 	    Nothing ->
 	
@@ -313,7 +318,7 @@ parse_run_time prog (l:ls) res ex =
 	    Nothing ->
 			
 	case matchRegex wrong_exit_status l of {
-	    Just (wanted:got:_) -> 
+	    Just (_wanted:got:_) -> 
 		parse_run_time prog ls res (combineRunResult (Exit (read got)) ex);
 	    Nothing -> 
 
@@ -330,28 +335,28 @@ parse_run_time prog (l:ls) res ex =
 
 	}}}}}}}}
   where
-  got_run_result allocs init mut gc gc_work instrs mem_rs mem_ws cache_misses
-      = -- trace ("got_run_result: " ++ init ++ ", " ++ mut ++ ", " ++ gc) $
+  got_run_result allocations initialisation mut gc gc_work' instrs' mem_rs mem_ws cache_misses'
+      = -- trace ("got_run_result: " ++ initialisation ++ ", " ++ mut ++ ", " ++ gc) $
 	let 
 	  read_mut = read mut
 	  read_gc  = read gc
-	  time = (read init + read_mut + read_gc) :: Float 
+	  time = (read initialisation + read_mut + read_gc) :: Float 
 	  res' = combine2Results res
 	      		emptyResults{	run_time   = [time],
 					mut_time   = [read_mut],
 				  	gc_time    = [read_gc],
-				  	gc_work    = gc_work,
-				  	allocs     = Just (read allocs),
-					instrs     = instrs,
+				  	gc_work    = gc_work',
+				  	allocs     = Just (read allocations),
+					instrs     = instrs',
 				  	mem_reads  = mem_rs,
 				  	mem_writes = mem_ws,
-				  	cache_misses = cache_misses,
+				  	cache_misses = cache_misses',
 				  	run_status = Success 
 				}
 	in
 	parse_run_time prog ls res' Success
 
-
+combineRunResult :: Status -> Status -> Status
 combineRunResult OutOfHeap  _           = OutOfHeap
 combineRunResult _          OutOfHeap   = OutOfHeap
 combineRunResult OutOfStack _           = OutOfStack
@@ -360,17 +365,18 @@ combineRunResult (Exit e)   _           = Exit e
 combineRunResult _          (Exit e)    = Exit e
 combineRunResult exit       _		 = exit
 
-parse_size prog mod [] = []
-parse_size prog mod (l:ls) =
+parse_size :: String -> String -> [String] -> [(String, Results)]
+parse_size _ _ [] = []
+parse_size progName modName (l:ls) =
 	case matchRegex size_re l of
-	    Nothing -> parse_size prog mod ls
-	    Just (text:datas:bss:_) 
-		 | prog == mod ->
-			[(prog,emptyResults{binary_size = 
+	    Nothing -> parse_size progName modName ls
+	    Just (text:datas:_bss:_) 
+		 | progName == modName ->
+			[(progName,emptyResults{binary_size = 
 					      Just (read text + read datas),
 				    compile_status = Success})]
 		 | otherwise ->
-			let ms  = Map.singleton mod (read text + read datas)
+			let ms  = Map.singleton modName (read text + read datas)
 			in
-			[(prog,emptyResults{module_size = ms})]
+			[(progName,emptyResults{module_size = ms})]
 
