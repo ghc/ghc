@@ -333,15 +333,19 @@ findBest stuff@(Result base : rest)
         unPcnt (_ : rest)                = unPcnt rest
 -}
 
+logHeaders :: [String] -> HtmlTable
 logHeaders ss
   = besides (map (\s -> (td <! [align "right", width "100"] << bold << s)) ss)
 
+mkTable :: HtmlTable -> Html
 mkTable t = table <! [cellspacing 0, cellpadding 0, border 0] << t
 
+tabHeader :: [String] -> HtmlTable
 tabHeader ss
   =   (td <! [align "left", width "100"] << bold << "Program")
   <-> logHeaders ss
 
+multiTabHeader :: [String] -> HtmlTable
 multiTabHeader ss
   =   (td <! [align "left", width "100"] << bold << "Program")
   <-> (td <! [align "left", width "100"] << bold << "Module")
@@ -351,7 +355,7 @@ multiTabHeader ss
 
 calcColor :: Int -> String
 calcColor p | p >= 0    = "#"     ++ (showHex red 2 "0000")
-              | otherwise = "#0000" ++ (showHex blue 2 "")
+            | otherwise = "#0000" ++ (showHex blue 2 "")
         where red  = p * 255 `div` 100
               blue = (-p) * 255 `div` 100
 
