@@ -23,6 +23,7 @@ import Data.Char
 import System.IO
 import Data.List
 
+(<!) :: Text.Html.ADDATTRS a => a -> [HtmlAttr] -> a
 (<!) = (Html.!)
 
 -----------------------------------------------------------------------------
@@ -209,22 +210,30 @@ htmlPage results args
           +++ hr
           +++ body (gen_tables results args)
 
+gen_menu :: Html
 gen_menu = unordList (map (prog_menu_item) per_prog_result_tab
-                      ++ map (module_menu_item) per_module_result_tab)
+                   ++ map (module_menu_item) per_module_result_tab)
 
-prog_menu_item (SpecP name _ anc _ _ _) = anchor <! [href ('#':anc)] << name
-module_menu_item (SpecM name anc _ _) = anchor <! [href ('#':anc)] << name
+prog_menu_item :: PerProgTableSpec -> Html
+prog_menu_item (SpecP long_name _ anc _ _ _)
+    = anchor <! [href ('#':anc)] << long_name
+module_menu_item :: PerModuleTableSpec -> Html
+module_menu_item (SpecM long_name anc _ _)
+    = anchor <! [href ('#':anc)] << long_name
 
+gen_tables :: [ResultTable] -> [String] -> Html
 gen_tables results args =
-  foldr1 (+++) (map (htmlGenProgTable results args) per_prog_result_tab)
-  +++ foldr1 (+++) (map (htmlGenModTable results args) per_module_result_tab)
+      foldr1 (+++) (map (htmlGenProgTable results args) per_prog_result_tab)
+  +++ foldr1 (+++) (map (htmlGenModTable  results args) per_module_result_tab)
 
+htmlGenProgTable :: [ResultTable] -> [String] -> PerProgTableSpec -> Html
 htmlGenProgTable results args (SpecP title _ anc get_result get_status result_ok)
   =   sectHeading title anc
   +++ font <! [size "1"]
         << mkTable (htmlShowResults results args get_result get_status result_ok)
   +++ hr
 
+htmlGenModTable :: [ResultTable] -> [String] -> PerModuleTableSpec -> Html
 htmlGenModTable results args (SpecM title anc get_result result_ok)
   =   sectHeading title anc
   +++ font <![size "1"]
@@ -283,7 +292,8 @@ htmlShowMultiResults (r:rs) ss f result_ok =
         results_per_prog_mod_run = map get_results_for_prog base_results
 
         -- get_results_for_prog :: (String,Results) -> (String,[BoxValue a])
-        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (Map.toList (f r)))
+        get_results_for_prog (prog, results)
+            = (prog, map get_results_for_mod (Map.toList (f results)))
 
            where fms = map get_run_results rs
 
@@ -291,8 +301,8 @@ htmlShowMultiResults (r:rs) ss f result_ok =
                                         Nothing  -> Map.empty
                                         Just res -> f res
 
-                 get_results_for_mod (id,attr) = calc_result fms Just (const Success)
-                                                             result_ok (id,attr)
+                 get_results_for_mod id_attr
+                     = calc_result fms Just (const Success) result_ok id_attr
 
         show_results_for_prog (prog,mrs) =
             td <! [valign "top"] << bold << prog
@@ -352,12 +362,10 @@ multiTabHeader ss
   <-> logHeaders ss
 
 -- Calculate a color ranging from bright blue for -100% to bright red for +100%.
-
 calcColor :: Int -> String
-calcColor p | p >= 0    = "#"     ++ (showHex red 2 "0000")
-            | otherwise = "#0000" ++ (showHex blue 2 "")
-        where red  = p * 255 `div` 100
-              blue = (-p) * 255 `div` 100
+calcColor percentage | percentage >= 0 = "#"     ++ (showHex val 2 "0000")
+                     | otherwise       = "#0000" ++ (showHex val 2 "")
+        where val = abs percentage * 255 `div` 100
 
 showHex 0 f s = if f > 0 then take f (repeat '0') ++ s else s
 showHex i f s = showHex (i `div` 16) (f-1) (hexDig (i `mod` 16) : s)
@@ -464,12 +472,13 @@ ascii_summary_table latex (r1:r2:_) specs mb_restrict
         width   = 10
 
         calc_col (SpecP _ heading _ getr gets ok)
-          = (heading, column, [min,max,mean]) -- throw away the baseline result
+            -- throw away the baseline result
+          = (heading, column, [column_min, column_max, column_mean])
           where (_, boxes) = unzip (map calc_one_result baseline)
                 calc_one_result = calc_result [r2] getr gets ok
                 column = map (\(_:b:_) -> b) boxes
-                (_,mean,_) = calc_gmsd column
-                (min,max) = calc_minmax column
+                (_, column_mean, _) = calc_gmsd column
+                (column_min, column_max) = calc_minmax column
 
 restrictRows :: Maybe [String] -> [TableRow] -> [TableRow]
 restrictRows Nothing rows = rows
@@ -521,7 +530,8 @@ ascii_show_multi_results (r:rs) ss f result_ok
         results_per_prog_mod_run = map get_results_for_prog base_results
 
         -- get_results_for_prog :: (String,Results) -> (String,[BoxValue a])
-        get_results_for_prog (prog,r) = (prog, map get_results_for_mod (Map.toList (f r)))
+        get_results_for_prog (prog, results)
+            = (prog, map get_results_for_mod (Map.toList (f results)))
 
            where fms = map get_run_results rs
 
@@ -529,8 +539,8 @@ ascii_show_multi_results (r:rs) ss f result_ok
                                         Nothing  -> Map.empty
                                         Just res -> f res
 
-                 get_results_for_mod (id,attr) = calc_result fms Just (const Success)
-                                                             result_ok (id,attr)
+                 get_results_for_mod id_attr
+                     = calc_result fms Just (const Success) result_ok id_attr
 
         show_results_for_prog (prog,mrs) =
               str ("\n"++prog++"\n")
@@ -626,14 +636,14 @@ We therefore return a (low, mean, high) triple.
 calc_gmsd :: [BoxValue] -> (BoxValue, BoxValue, BoxValue)
 calc_gmsd xs
   | null percentages = (RunFailed NotDone, RunFailed NotDone, RunFailed NotDone)
-  | otherwise        = let sqr x = x * x
-                           len   = fromIntegral (length percentages)
-                           logs  = map log percentages
-                           lbar  = sum logs / len
-                           devs  = map (sqr . (lbar-)) logs
-                           dbar  = sum devs / len
-                           gm    = exp lbar
-                           sdf   = exp (sqrt dbar)
+  | otherwise        = let sqr x   = x * x
+                           len     = fromIntegral (length percentages)
+                           logs    = map log percentages
+                           lbar    = sum logs / len
+                           st_devs = map (sqr . (lbar-)) logs
+                           dbar    = sum st_devs / len
+                           gm      = exp lbar
+                           sdf     = exp (sqrt dbar)
                        in
                        (Percentage (gm/sdf),
                         Percentage gm,
@@ -722,8 +732,8 @@ data TableRow
 type Layout = [String -> ShowS]
 
 makeTable :: Layout -> [TableRow] -> ShowS
-makeTable p = interleave "\n" . map do_row
-  where do_row (TableRow boxes) = applyLayout p boxes
+makeTable layout = interleave "\n" . map do_row
+  where do_row (TableRow boxes) = applyLayout layout boxes
         do_row TableLine = str (take 80 (repeat '-'))
 
 makeLatexTable :: [TableRow] -> ShowS
@@ -753,10 +763,13 @@ split c s = case rest of
                 _:rest -> chunk : split c rest
   where (chunk, rest) = break (==c) s
 
+str :: String -> ShowS
 str = showString
 
+interleave :: String -> [ShowS] -> ShowS
 interleave s = foldr1 (\a b -> a . str s . b)
 
-fIELD_WIDTH = 16 :: Int
+fIELD_WIDTH :: Int
+fIELD_WIDTH = 16
 
 -----------------------------------------------------------------------------
