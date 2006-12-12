@@ -1038,9 +1038,8 @@ tcRnExpr hsc_env ictxt rdr_expr
     ((tc_expr, res_ty), lie)	   <- getLIE (tcInferRho rn_expr) ;
     ((qtvs, _, dict_ids), lie_top) <- getLIE (tcSimplifyInfer smpl_doc (tyVarsOfType res_ty) lie)  ;
     tcSimplifyInteractive lie_top ;
-    qtvs' <- mappM zonkQuantifiedTyVar qtvs ;
 
-    let { all_expr_ty = mkForAllTys qtvs' $
+    let { all_expr_ty = mkForAllTys qtvs $
     		        mkFunTys (map idType dict_ids)	$
     		        res_ty } ;
     zonkTcType all_expr_ty

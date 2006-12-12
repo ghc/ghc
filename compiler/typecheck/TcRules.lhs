@@ -82,11 +82,9 @@ tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
     tcSimplifyInferCheck loc
 			 forall_tvs
 			 lhs_dicts rhs_lie	`thenM` \ (forall_tvs1, rhs_binds) ->
-    zonkQuantifiedTyVars forall_tvs1 		`thenM` \ forall_tvs2 ->
-	-- This zonk is exactly the same as the one in TcBinds.generalise
 
     returnM (HsRule name act
-		    (map (RuleBndr . noLoc) (forall_tvs2 ++ tpl_ids))	-- yuk
+		    (map (RuleBndr . noLoc) (forall_tvs1 ++ tpl_ids))	-- yuk
 		    (mkHsDictLet lhs_binds lhs') fv_lhs
 		    (mkHsDictLet rhs_binds rhs') fv_rhs)
 

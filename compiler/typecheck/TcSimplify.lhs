@@ -657,7 +657,7 @@ tcSimplifyInfer
 	:: SDoc
 	-> TcTyVarSet		-- fv(T); type vars
 	-> [Inst]		-- Wanted
-	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked)
+	-> TcM ([TcTyVar],	-- Tyvars to quantify (zonked and quantified)
 		[Inst],		-- Dict Ids that must be bound here (zonked)
 		TcDictBinds)	-- Bindings
 	-- Any free (escaping) Insts are tossed into the environment
@@ -1172,7 +1172,7 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 	-> [Name]		-- Things bound in this group
 	-> TcTyVarSet		-- Free in the type of the RHSs
 	-> [Inst]		-- Free in the RHSs
-	-> TcM ([TyVar],	-- Tyvars to quantify (zonked)
+	-> TcM ([TyVar],	-- Tyvars to quantify (zonked and quantified)
 		TcDictBinds)	-- Bindings
 	-- tcSimpifyRestricted returns no constraints to
 	-- quantify over; by definition there are none.
