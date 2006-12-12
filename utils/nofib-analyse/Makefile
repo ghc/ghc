@@ -1,7 +1,7 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS    += -fglasgow-exts -cpp
+SRC_HC_OPTS    += -fglasgow-exts -cpp -Wall
 HS_PROG		= nofib-analyse
 
 ifeq "$(ghc_ge_605)" "YES"
