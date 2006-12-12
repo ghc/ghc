@@ -104,6 +104,7 @@ This will never terminate.
 >   where
 >       match (a:b:_) | a `eq` b = a
 >       match (_:c)              = match c
+>       match [] = error "GenUtils.mkClosure: Can't happen"
 
 > foldb :: (a -> a -> a) -> [a] -> a
 > foldb _ [] = error "can't reduce an empty list using foldb"
@@ -161,9 +162,12 @@ quickest sorting function I know of.
 
 Gofer-like stuff:
 
-> fst3 (a,_,_) = a
-> snd3 (_,a,_) = a
-> thd3 (_,_,a) = a
+> fst3 :: (a, b, c) -> a
+> fst3 (a, _, _) = a
+> snd3 :: (a, b, c) -> b
+> snd3 (_, a, _) = a
+> thd3 :: (a, b, c) -> c
+> thd3 (_, _, a) = a
 
 > cjustify, ljustify, rjustify :: Int -> String -> String
 > cjustify n s = space halfm ++ s ++ space (m - halfm)
@@ -180,13 +184,14 @@ Gofer-like stuff:
 > copy n x = take n xs where xs = x:xs
 
 > partition' :: (Eq b) => (a -> b) -> [a] -> [[a]]
-> partition' f [] = []
-> partition' f [x] = [[x]]
+> partition' _ [] = []
+> partition' _ [x] = [[x]]
 > partition' f (x:x':xs) | f x == f x'
 >    = tack x (partition' f (x':xs))
 >                       | otherwise
 >    = [x] : partition' f (x':xs)
 
+> tack :: a -> [[a]] -> [[a]]
 > tack x xss = (x : head xss) : tail xss
 
 > combinePairs :: (Ord a) => [(a,b)] -> [(a,[b])]
@@ -221,8 +226,7 @@ Gofer-like stuff:
 > assocMaybeErr :: (Eq a) => [(a,b)] -> a -> MaybeErr b String
 > assocMaybeErr env k = case [ val | (key,val) <- env, k == key] of
 >                        [] -> Failed "assoc: "
->                        (val:vs) -> Succeeded val
->
+>                        (val:_) -> Succeeded val
 
 Now some utilties involving arrays.
 Here is a version of @elem@ that uses partual application
@@ -251,47 +255,3 @@ will give a very efficent variation of the fib function.
 > memoise bds f = (!) arr
 >   where arr = array bds [ ASSOC(t, f t) | t <- range bds ]
 
-> mapAccumR :: (acc -> x -> (acc, y))         -- Function of elt of input list
->                                     -- and accumulator, returning new
->                                     -- accumulator and elt of result list
->         -> acc                      -- Initial accumulator
->         -> [x]                      -- Input list
->         -> (acc, [y])               -- Final accumulator and result list
->
-> mapAccumR f b []     = (b, [])
-> mapAccumR f b (x:xs) = (b'', x':xs') where
->                                       (b'', x') = f b' x
->                                       (b', xs') = mapAccumR f b xs
-
-> mapAccumL :: (acc -> x -> (acc, y))   -- Function of elt of input list
->                                       -- and accumulator, returning new
->                                       -- accumulator and elt of result list
->           -> acc                      -- Initial accumulator
->           -> [x]                      -- Input list
->           -> (acc, [y])               -- Final accumulator and result list
->
-> mapAccumL f b []     = (b, [])
-> mapAccumL f b (x:xs) = (b'', x':xs') where
->                                         (b', x') = f b x
->                                         (b'', xs') = mapAccumL f b' xs
-
-Here is the bi-directional version ...
-
-> mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
->                                       -- Function of elt of input list
->                                       -- and accumulator, returning new
->                                       -- accumulator and elt of result list
->           -> accl                     -- Initial accumulator from left
->           -> accr                     -- Initial accumulator from right
->           -> [x]                      -- Input list
->           -> (accl, accr, [y])        -- Final accumulator and result list
->
-> mapAccumB f a b []     = (a,b,[])
-> mapAccumB f a b (x:xs) = (a'',b'',y:ys)
->    where
->       (a',b'',y)    = f a b' x
->       (a'',b',ys) = mapAccumB f a' b xs
-
-
-> assert False x = error "assert Failed"
-> assert True  x = x
