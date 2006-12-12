@@ -11,14 +11,13 @@ import Slurp
 import CmdLine
 
 import Text.Printf
-import Text.Html hiding ((!))
+import Text.Html hiding (cols, rows, (!))
 import qualified Text.Html as Html ((!))
 import qualified Data.Map as Map
 import Data.Map (Map)
 import System.Console.GetOpt
 import System.Exit      ( exitWith, ExitCode(..) )
 
-import Numeric          ( showFloat, showFFloat, showSigned )
 import Control.Monad
 import Data.Maybe       ( isNothing )
 import Data.Char
@@ -33,8 +32,10 @@ import Data.List
 die :: String -> IO a
 die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 
+usageHeader :: String
 usageHeader = "usage: nofib-analyse [OPTION...] <logfile1> <logfile2> ..."
 
+main :: IO ()
 main = do
 
  when (not (null cmdline_errors) || OptHelp `elem` flags) $
@@ -61,8 +62,8 @@ main = do
  let column_headings = map (reverse . takeWhile (/= '/') . reverse) other_args
 
  -- sanity check
- sequence_ [ checkTimes prog res | table <- results,
-                                   (prog,res) <- Map.toList table ]
+ sequence_ [ checkTimes prog res | result_table <- results,
+                                   (prog,res) <- Map.toList result_table ]
 
  case () of
    _ | html      ->
@@ -104,6 +105,9 @@ data PerModuleTableSpec =
                 (a -> Bool)             -- Result within reasonable limits?
 
 -- The various per-program aspects of execution that we can generate results for.
+size_spec, alloc_spec, runtime_spec, muttime_spec, gctime_spec,
+    gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec
+        :: PerProgTableSpec
 size_spec    = SpecP "Binary Sizes" "Size" "binary-sizes" binary_size compile_status always_ok
 alloc_spec   = SpecP "Allocations" "Allocs" "allocations" allocs run_status always_ok
 runtime_spec = SpecP "Run Time" "Runtime" "run-times" (mean run_time) run_status time_ok
@@ -115,6 +119,7 @@ mreads_spec  = SpecP "Memory Reads" "Reads" "mem-reads" mem_reads run_status alw
 mwrite_spec  = SpecP "Memory Writes" "Writes" "mem-writes" mem_writes run_status always_ok
 cmiss_spec   = SpecP "Cache Misses" "Misses" "cache-misses" cache_misses run_status always_ok
 
+all_specs :: [PerProgTableSpec]
 all_specs = [
   size_spec,
   alloc_spec,
@@ -161,15 +166,18 @@ checkTimes prog results = do
 
 
 -- These are the per-prog tables we want to generate
+per_prog_result_tab :: [PerProgTableSpec]
 per_prog_result_tab =
         [ size_spec, alloc_spec, runtime_spec, muttime_spec, gctime_spec,
           gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec ]
 
 -- A single summary table, giving comparison figures for a number of
 -- aspects, each in its own column.  Only works when comparing two runs.
+normal_summary_specs :: [PerProgTableSpec]
 normal_summary_specs =
         [ size_spec, alloc_spec, runtime_spec ]
 
+cachegrind_summary_specs :: [PerProgTableSpec]
 cachegrind_summary_specs =
         [ size_spec, alloc_spec, instrs_spec, mreads_spec, mwrite_spec ]
 
@@ -181,6 +189,7 @@ pickSummary rs
   | isNothing (instrs (head (Map.elems (head rs)))) = normal_summary_specs
   | otherwise = cachegrind_summary_specs
 
+per_module_result_tab :: [PerModuleTableSpec]
 per_module_result_tab =
         [ SpecM "Module Sizes"  "mod-sizes"     module_size  always_ok
         , SpecM "Compile Times" "compile-time"  compile_time time_ok
@@ -195,7 +204,7 @@ time_ok t = t > tooquick_threshold
 -----------------------------------------------------------------------------
 -- HTML page generation
 
---htmlPage :: Results -> [String] -> Html
+htmlPage :: [ResultTable] -> [String] -> Html
 htmlPage results args
    =  header << thetitle << reportTitle
           +++ hr
