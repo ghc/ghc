@@ -4,7 +4,13 @@
 -- (c) Simon Marlow 2005
 -----------------------------------------------------------------------------
 
-module CmdLine where
+module CmdLine
+    (
+    flags, other_args, cmdline_errors,
+    devs, nodevs, tooquick_threshold, reportTitle,
+    CLIFlags(..), usage,
+    )
+    where
 
 import System.Console.GetOpt
 import System.Environment	( getArgs )
@@ -42,6 +48,12 @@ data CLIFlags
   | OptRows String
   | OptHelp
   deriving Eq
+
+usageHeader :: String
+usageHeader = "usage: nofib-analyse [OPTION...] <logfile1> <logfile2> ..."
+
+usage :: String
+usage = usageInfo usageHeader argInfo
 
 argInfo :: [ OptDescr CLIFlags ]
 argInfo = 

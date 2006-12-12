@@ -15,7 +15,6 @@ import Text.Html hiding (cols, rows, (!))
 import qualified Text.Html as Html ((!))
 import qualified Data.Map as Map
 import Data.Map (Map)
-import System.Console.GetOpt
 import System.Exit      ( exitWith, ExitCode(..) )
 
 import Control.Monad
@@ -32,14 +31,11 @@ import Data.List
 die :: String -> IO a
 die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 
-usageHeader :: String
-usageHeader = "usage: nofib-analyse [OPTION...] <logfile1> <logfile2> ..."
-
 main :: IO ()
 main = do
 
  when (not (null cmdline_errors) || OptHelp `elem` flags) $
-      die (concat cmdline_errors ++ usageInfo usageHeader argInfo)
+      die (concat cmdline_errors ++ usage)
 
  let { html  = OptHTMLOutput  `elem` flags;
        latex = OptLaTeXOutput `elem` flags;
