@@ -86,16 +86,32 @@ This regexp for the output of "time" works on FreeBSD, other versions
 of "time" will need different regexps.
 -}
 
-time_re :: Regex
-time_re = mkRegex "^[ \t]*([0-9.]+)[ \t]+real[ \t]+([0-9.]+)[ \t]+user[ \t]+([0-9.]+)[ \t]+sys[ \t]*$"
+time_re :: String -> Maybe (Float, Float, Float)
+time_re s = case matchRegex re s of
+                Just [real, user, system] ->
+                    Just (read real, read user, read system)
+                Just _ -> error "time_re: Can't happen"
+                Nothing -> Nothing
+    where re = mkRegex "^[ \t]*([0-9.]+)[ \t]+real[ \t]+([0-9.]+)[ \t]+user[ \t]+([0-9.]+)[ \t]+sys[ \t]*$"
 
-time_gnu17_re :: Regex
-time_gnu17_re = mkRegex "^[ \t]*([0-9.]+)user[ \t]+([0-9.]+)system[ \t]+([0-9.:]+)elapsed"
-                -- /usr/bin/time --version reports: GNU time 1.7
-                -- notice the order is different, and the elapsed time is [hh:]mm:ss.s
+time_gnu17_re :: String -> Maybe (Float, Float, String)
+time_gnu17_re s = case matchRegex re s of
+                      Just [user, system, elapsed] ->
+                          Just (read user, read system, elapsed)
+                      Just _ -> error "time_gnu17_re: Can't happen"
+                      Nothing -> Nothing
+    where re = mkRegex "^[ \t]*([0-9.]+)user[ \t]+([0-9.]+)system[ \t]+([0-9.:]+)elapsed"
+          -- /usr/bin/time --version reports: GNU time 1.7
+          -- notice the order is different, and the elapsed time
+          -- is [hh:]mm:ss.s
 
-size_re :: Regex
-size_re = mkRegex "^[ \t]*([0-9]+)[ \t]+([0-9]+)[ \t]+([0-9]+)"
+size_re :: String -> Maybe (Int, Int, Int)
+size_re s = case matchRegex re s of
+                Just [text, datas, bss] ->
+                    Just (read text, read datas, read bss)
+                Just _ -> error "size_re: Can't happen"
+                Nothing -> Nothing
+    where re = mkRegex "^[ \t]*([0-9]+)[ \t]+([0-9]+)[ \t]+([0-9]+)"
 
 {-
 <<ghc: 5820820 bytes, 0 GCs, 0/0 avg/max bytes residency (0 samples), 41087234 bytes GC work, 0.00 INIT (0.05 elapsed), 0.08 MUT (0.18 elapsed), 0.00 GC (0.00 elapsed) :ghc>>
@@ -108,14 +124,37 @@ ghc2_re = GHC 4.02 (includes "xxM in use")
 ghc3_re = GHC 4.03 (includes "xxxx bytes GC work")
 -}
 
-ghc1_re, ghc2_re, ghc3_re, ghc4_re :: Regex
-ghc1_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
+ghc1_re :: String -> Maybe (Integer, Integer, Integer, Integer, Integer, Integer, Float, Float, Float, Float, Float, Float)
+ghc1_re s = case matchRegex re s of
+                Just [allocations, gcs, avg_residency, max_residency, samples, gc_work', initialisation, initialisation_elapsed, mut, mut_elapsed, gc, gc_elapsed] ->
+                    Just (read allocations, read gcs, read avg_residency, read max_residency, read samples, read gc_work', read initialisation, read initialisation_elapsed, read mut, read mut_elapsed, read gc, read gc_elapsed)
+                Just _ -> error "ghc1_re: Can't happen"
+                Nothing -> Nothing
+    where re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
 
-ghc2_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
+ghc2_re :: String -> Maybe (Integer, Integer, Integer, Integer, Integer, Integer, Float, Float, Float, Float, Float, Float)
+ghc2_re s = case matchRegex re s of
+                Just [allocations, gcs, avg_residency, max_residency, samples, in_use, initialisation, initialisation_elapsed, mut, mut_elapsed, gc, gc_elapsed] ->
+                    Just (read allocations, read gcs, read avg_residency, read max_residency, read samples, read in_use, read initialisation, read initialisation_elapsed, read mut, read mut_elapsed, read gc, read gc_elapsed)
+                Just _ -> error "ghc2_re: Can't happen"
+                Nothing -> Nothing
+    where re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
 
-ghc3_re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
+ghc3_re :: String -> Maybe (Integer, Integer, Integer, Integer, Integer, Integer, Integer, Float, Float, Float, Float, Float, Float)
+ghc3_re s = case matchRegex re s of
+                Just [allocations, gcs, avg_residency, max_residency, samples, gc_work', in_use, initialisation, initialisation_elapsed, mut, mut_elapsed, gc, gc_elapsed] ->
+                    Just (read allocations, read gcs, read avg_residency, read max_residency, read samples, read gc_work', read in_use, read initialisation, read initialisation_elapsed, read mut, read mut_elapsed, read gc, read gc_elapsed)
+                Just _ -> error "ghc3_re: Can't happen"
+                Nothing -> Nothing
+    where re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\) :ghc>>"
 
-ghc4_re = mkRegex "^<<ghc-instrs:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\), ([0-9]+) instructions, ([0-9]+) memory reads, ([0-9]+) memory writes, ([0-9]+) L2 cache misses :ghc-instrs>>"
+ghc4_re :: String -> Maybe (Integer, Integer, Integer, Integer, Integer, Integer, Integer, Float, Float, Float, Float, Float, Float, Integer, Integer, Integer, Integer)
+ghc4_re s = case matchRegex re s of
+                Just [allocations, gcs, avg_residency, max_residency, samples, gc_work', in_use, initialisation, initialisation_elapsed, mut, mut_elapsed, gc, gc_elapsed, instructions, memory_reads, memory_writes, l2_cache_misses] ->
+                    Just (read allocations, read gcs, read avg_residency, read max_residency, read samples, read gc_work', read in_use, read initialisation, read initialisation_elapsed, read mut, read mut_elapsed, read gc, read gc_elapsed, read instructions, read memory_reads, read memory_writes, read l2_cache_misses)
+                Just _ -> error "ghc4_re: Can't happen"
+                Nothing -> Nothing
+    where re = mkRegex "^<<ghc-instrs:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\), ([0-9]+) instructions, ([0-9]+) memory reads, ([0-9]+) memory writes, ([0-9]+) L2 cache misses :ghc-instrs>>"
 
 wrong_exit_status, wrong_output, out_of_heap, out_of_stack :: Regex
 wrong_exit_status = mkRegex "^\\**[ \t]*expected exit status ([0-9]+) not seen ; got ([0-9]+)"
@@ -196,60 +235,46 @@ process_chunk _ = error "process_chunk: Can't happen"
 parse_compile_time :: String -> String -> [String] -> [(String, Results)]
 parse_compile_time _    _   [] = []
 parse_compile_time progName modName (l:ls) =
-        case matchRegex time_re l of {
-             Just (_real:user:_system:_) ->
-                let ct  = Map.singleton modName (read user)
+        case time_re l of {
+             Just (_real, user, _system) ->
+                let ct  = Map.singleton modName user
                 in
                 [(progName, emptyResults{compile_time = ct})];
              Nothing ->
 
-        case matchRegex time_gnu17_re l of {
-             Just (user:_system:_elapsed:_) ->
-                let ct  = Map.singleton modName (read user)
+        case time_gnu17_re l of {
+             Just (user, _system, _elapsed) ->
+                let ct  = Map.singleton modName user
                 in
                 [(progName, emptyResults{compile_time = ct})];
              Nothing ->
 
-        case matchRegex ghc1_re l of {
-            Just (_allocations:_:_:_:_:initialisation:_:mut:_:gc:_) ->
+        case ghc1_re l of {
+            Just (_, _, _, _, _, _, initialisation, _, mut, _, gc, _) ->
               let
-                  read_mut = read mut
-                  read_gc  = read gc
-                  time = (read initialisation + read_mut + read_gc) :: Float
+                  time = (initialisation + mut + gc) :: Float
                   ct  = Map.singleton modName time
               in
                 [(progName, emptyResults{compile_time = ct})];
             Nothing ->
 
-        case matchRegex ghc2_re l of {
-           Just (_allocations:_:_:_:_:_:initialisation:_:mut:_:gc:_) ->
-              let
-                  read_mut = read mut
-                  read_gc  = read gc
-                  time = (read initialisation + read_mut + read_gc) :: Float
-                  ct  = Map.singleton modName time
+        case ghc2_re l of {
+           Just (_, _, _, _, _, _, initialisation, _, mut, _, gc, _) ->
+              let ct = Map.singleton modName (initialisation + mut + gc)
               in
                 [(progName, emptyResults{compile_time = ct})];
             Nothing ->
 
-        case matchRegex ghc3_re l of {
-           Just (_allocations:_:_:_:_:_:_:initialisation:_:mut:_:gc:_) ->
-              let
-                  read_mut = read mut
-                  read_gc  = read gc
-                  time = (read initialisation + read_mut + read_gc) :: Float
-                  ct  = Map.singleton modName time
+        case ghc3_re l of {
+           Just (_, _, _, _, _, _, _, initialisation, _, mut, _, gc, _) ->
+              let ct = Map.singleton modName (initialisation + mut + gc)
               in
                 [(progName, emptyResults{compile_time = ct})];
             Nothing ->
 
-        case matchRegex ghc4_re l of {
-           Just (_allocations:_:_:_:_:_:_:initialisation:_:mut:_:gc:_:_:_:_) ->
-              let
-                  read_mut = read mut
-                  read_gc  = read gc
-                  time = (read initialisation + read_mut + read_gc) :: Float
-                  ct  = Map.singleton modName time
+        case ghc4_re l of {
+           Just (_, _, _, _, _, _, _, initialisation, _, mut, _, gc, _, _, _, _, _) ->
+              let ct = Map.singleton modName (initialisation + mut + gc)
               in
                 [(progName, emptyResults{compile_time = ct})];
             Nothing ->
@@ -260,14 +285,14 @@ parse_compile_time progName modName (l:ls) =
 parse_link_time :: String -> [String] -> [(String, Results)]
 parse_link_time _ [] = []
 parse_link_time prog (l:ls) =
-          case matchRegex time_re l of {
-             Just (_real:user:_system:_) ->
-                [(prog,emptyResults{link_time = Just (read user)})];
+          case time_re l of {
+             Just (_real, user, _system) ->
+                [(prog,emptyResults{link_time = Just user})];
              Nothing ->
 
-          case matchRegex time_gnu17_re l of {
-             Just (user:_system:_elapsed:_) ->
-                [(prog,emptyResults{link_time = Just (read user)})];
+          case time_gnu17_re l of {
+             Just (user, _system, _elapsed) ->
+                [(prog,emptyResults{link_time = Just user})];
              Nothing ->
 
           parse_link_time prog ls
@@ -282,44 +307,46 @@ parse_run_time :: String -> [String] -> Results -> Status
 parse_run_time _ [] _ NotDone = []
 parse_run_time prog [] res ex = [(prog, res{run_status=ex})]
 parse_run_time prog (l:ls) res ex =
-        case matchRegex ghc1_re l of {
-           Just (allocations:_:_:_:_:initialisation:_:mut:_:gc:_) ->
+        case ghc1_re l of {
+           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, _) ->
                 got_run_result allocations initialisation mut gc Nothing
                         Nothing Nothing Nothing Nothing;
            Nothing ->
 
-        case matchRegex ghc2_re l of {
-           Just (allocations:_:_:_:_:_:initialisation:_:mut:_:gc:_) ->
+        case ghc2_re l of {
+           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, _) ->
                 got_run_result allocations initialisation mut gc Nothing
                         Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
-        case matchRegex ghc3_re l of {
-           Just (allocations:_:_:_:_:gc_work':_:initialisation:_:mut:_:gc:_) ->
-                got_run_result allocations initialisation mut gc (Just (read gc_work'))
-                        Nothing Nothing Nothing Nothing;
+        case ghc3_re l of {
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, _) ->
+                got_run_result allocations initialisation mut gc
+                        (Just gc_work') Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
-        case matchRegex ghc4_re l of {
-           Just (allocations:_:_:_:_:gc_work':_:initialisation:_:mut:_:gc:_:is:mem_rs:mem_ws:cache_misses':_) ->
-                got_run_result allocations initialisation mut gc (Just (read gc_work'))
-                        (Just (read is)) (Just (read mem_rs))
-                        (Just (read mem_ws)) (Just (read cache_misses'));
+        case ghc4_re l of {
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, _, is, mem_rs, mem_ws, cache_misses') ->
+                got_run_result allocations initialisation mut gc
+                        (Just gc_work') (Just is) (Just mem_rs)
+                        (Just mem_ws) (Just cache_misses');
 
             Nothing ->
 
         case matchRegex wrong_output l of {
-            Just ("stdout":_) ->
+            Just ["stdout"] ->
                 parse_run_time prog ls res (combineRunResult WrongStdout ex);
-            Just ("stderr":_) ->
+            Just ["stderr"] ->
                 parse_run_time prog ls res (combineRunResult WrongStderr ex);
+            Just _ -> error "wrong_output: Can't happen";
             Nothing ->
 
         case matchRegex wrong_exit_status l of {
-            Just (_wanted:got:_) ->
+            Just [_wanted, got] ->
                 parse_run_time prog ls res (combineRunResult (Exit (read got)) ex);
+            Just _ -> error "wrong_exit_status: Can't happen";
             Nothing ->
 
         case matchRegex out_of_heap l of {
@@ -338,15 +365,13 @@ parse_run_time prog (l:ls) res ex =
   got_run_result allocations initialisation mut gc gc_work' instrs' mem_rs mem_ws cache_misses'
       = -- trace ("got_run_result: " ++ initialisation ++ ", " ++ mut ++ ", " ++ gc) $
         let
-          read_mut = read mut
-          read_gc  = read gc
-          time = (read initialisation + read_mut + read_gc) :: Float
+          time = initialisation + mut + gc
           res' = combine2Results res
                         emptyResults{   run_time   = [time],
-                                        mut_time   = [read_mut],
-                                        gc_time    = [read_gc],
+                                        mut_time   = [mut],
+                                        gc_time    = [gc],
                                         gc_work    = gc_work',
-                                        allocs     = Just (read allocations),
+                                        allocs     = Just allocations,
                                         instrs     = instrs',
                                         mem_reads  = mem_rs,
                                         mem_writes = mem_ws,
@@ -368,15 +393,15 @@ combineRunResult exit       _            = exit
 parse_size :: String -> String -> [String] -> [(String, Results)]
 parse_size _ _ [] = []
 parse_size progName modName (l:ls) =
-        case matchRegex size_re l of
+        case size_re l of
             Nothing -> parse_size progName modName ls
-            Just (text:datas:_bss:_)
+            Just (text, datas, _bss)
                  | progName == modName ->
                         [(progName,emptyResults{binary_size =
-                                              Just (read text + read datas),
+                                              Just (text + datas),
                                     compile_status = Success})]
                  | otherwise ->
-                        let ms  = Map.singleton modName (read text + read datas)
+                        let ms  = Map.singleton modName (text + datas)
                         in
                         [(progName,emptyResults{module_size = ms})]
 
