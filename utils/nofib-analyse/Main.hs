@@ -16,10 +16,10 @@ import qualified Text.Html as Html ((!))
 import qualified Data.Map as Map
 import Data.Map (Map)
 import System.Console.GetOpt
-import System.Exit	( exitWith, ExitCode(..) )
+import System.Exit      ( exitWith, ExitCode(..) )
 
 import Numeric          ( showFloat, showFFloat, showSigned )
-import Data.Maybe	( isNothing )
+import Data.Maybe       ( isNothing )
 import Data.Char
 import System.IO
 import Data.List
@@ -37,8 +37,8 @@ usageHeader = "usage: nofib-analyse [OPTION...] <logfile1> <logfile2> ..."
 main = do
 
  if not (null cmdline_errors) || OptHelp `elem` flags
-	then die (concat cmdline_errors ++ usageInfo usageHeader argInfo)
-	else do
+        then die (concat cmdline_errors ++ usageInfo usageHeader argInfo)
+        else do
 
  let { html  = OptHTMLOutput  `elem` flags; 
        latex = OptLaTeXOutput `elem` flags;
@@ -46,67 +46,67 @@ main = do
      }
 
  if ascii && html 
-	then die "Can't produce both ASCII and HTML"
-	else do
+        then die "Can't produce both ASCII and HTML"
+        else do
 
  if devs && nodevs
-	then die "Can't both display and hide deviations"
-	else do
+        then die "Can't both display and hide deviations"
+        else do
 
  results <- parse_logs other_args
 
  summary_spec <- case [ cols | OptColumns cols <- flags ] of
-			[]       -> return (pickSummary results)
-			(cols:_) -> namedColumns (split ',' cols)
+                        []       -> return (pickSummary results)
+                        (cols:_) -> namedColumns (split ',' cols)
 
  let summary_rows = case [ rows | OptRows rows <- flags ] of
-			[] -> Nothing
-			rows -> Just (split ',' (last rows))
+                        [] -> Nothing
+                        rows -> Just (split ',' (last rows))
 
  let column_headings = map (reverse . takeWhile (/= '/') . reverse) other_args
 
  -- sanity check
  sequence_ [ checkTimes prog res | table <- results, 
-				   (prog,res) <- Map.toList table ]
+                                   (prog,res) <- Map.toList table ]
 
  case () of
    _ | html      -> 
-	putStr (renderHtml (htmlPage results column_headings))
+        putStr (renderHtml (htmlPage results column_headings))
    _ | latex     -> 
-	putStr (latexOutput results column_headings summary_spec summary_rows)
+        putStr (latexOutput results column_headings summary_spec summary_rows)
    _ | otherwise -> 
-	putStr (asciiPage results column_headings summary_spec summary_rows)
+        putStr (asciiPage results column_headings summary_spec summary_rows)
 
 
 parse_logs :: [String] -> IO [ResultTable]
 parse_logs [] = do
-	f <- hGetContents stdin
-	return [parse_log f]
+        f <- hGetContents stdin
+        return [parse_log f]
 parse_logs log_files =
-	mapM (\f -> do h <- openFile f ReadMode
-		       c <- hGetContents h
-		       return (parse_log c)) log_files
+        mapM (\f -> do h <- openFile f ReadMode
+                       c <- hGetContents h
+                       return (parse_log c)) log_files
 
 -----------------------------------------------------------------------------
 -- List of tables we're going to generate
 
 data PerProgTableSpec =
-	forall a . Result a =>
-	   SpecP 
-		String			-- Name of the table
-		String			-- Short name (for column heading)
-		String			-- HTML tag for the table
-		(Results -> Maybe a)	-- How to get the result
-		(Results -> Status)	-- How to get the status of this result
-		(a -> Bool)		-- Result within reasonable limits?
+        forall a . Result a =>
+           SpecP 
+                String                  -- Name of the table
+                String                  -- Short name (for column heading)
+                String                  -- HTML tag for the table
+                (Results -> Maybe a)    -- How to get the result
+                (Results -> Status)     -- How to get the status of this result
+                (a -> Bool)             -- Result within reasonable limits?
 
 data PerModuleTableSpec =
-	forall a . Result a =>
-	   SpecM 
-		String			-- Name of the table
-		String			-- HTML tag for the table
-		(Results -> Map String a)	-- get the module map
-		(a -> Bool)		-- Result within reasonable limits?
+        forall a . Result a =>
+           SpecM 
+                String                  -- Name of the table
+                String                  -- HTML tag for the table
+                (Results -> Map String a)       -- get the module map
+                (a -> Bool)             -- Result within reasonable limits?
 
 -- The various per-program aspects of execution that we can generate results for.
 size_spec    = SpecP "Binary Sizes" "Size" "binary-sizes" binary_size compile_status always_ok
@@ -136,15 +136,15 @@ all_specs = [
 namedColumns :: [String] -> IO [PerProgTableSpec]
 namedColumns ss = mapM findSpec ss
   where findSpec s = 
-	   case [ spec | spec@(SpecP _ short_name _ _ _ _) <- all_specs,
-			 short_name == s ] of
-		[] -> die ("unknown column: " ++ s)
-		(spec:_) -> return spec
+           case [ spec | spec@(SpecP _ short_name _ _ _ _) <- all_specs,
+                         short_name == s ] of
+                [] -> die ("unknown column: " ++ s)
+                (spec:_) -> return spec
 
 mean :: (Results -> [Float]) -> Results -> Maybe Float
 mean f results = go (f results)
   where go [] = Nothing
-	go fs = Just (foldl' (+) 0 fs / fromIntegral (length fs))
+        go fs = Just (foldl' (+) 0 fs / fromIntegral (length fs))
 
 -- Look for bogus-looking times: On Linux we occasionally get timing results
 -- that are bizarrely low, and skew the average.
@@ -154,29 +154,29 @@ checkTimes prog results = do
   check "mut time" (mut_time results)
   check "GC time" (gc_time results)
   where
-	check kind ts
-	   | any strange ts = 
-		hPutStrLn stderr ("warning: dubious " ++ kind
-				   ++ " results for " ++ prog
-				   ++ ": " ++ show ts)
-	   | otherwise = return ()
-	   where strange t = any (\r -> time_ok r && r / t > 1.4) ts
-			-- looks for times that are >40% smaller than
-			-- any other.
+        check kind ts
+           | any strange ts = 
+                hPutStrLn stderr ("warning: dubious " ++ kind
+                                   ++ " results for " ++ prog
+                                   ++ ": " ++ show ts)
+           | otherwise = return ()
+           where strange t = any (\r -> time_ok r && r / t > 1.4) ts
+                        -- looks for times that are >40% smaller than
+                        -- any other.
 
 
 -- These are the per-prog tables we want to generate
 per_prog_result_tab =
-	[ size_spec, alloc_spec, runtime_spec, muttime_spec, gctime_spec,
-	  gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec ]
+        [ size_spec, alloc_spec, runtime_spec, muttime_spec, gctime_spec,
+          gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec ]
 
 -- A single summary table, giving comparison figures for a number of
 -- aspects, each in its own column.  Only works when comparing two runs.
 normal_summary_specs =
- 	[ size_spec, alloc_spec, runtime_spec ]
+        [ size_spec, alloc_spec, runtime_spec ]
   
 cachegrind_summary_specs =
- 	[ size_spec, alloc_spec, instrs_spec, mreads_spec, mwrite_spec ]
+        [ size_spec, alloc_spec, instrs_spec, mreads_spec, mwrite_spec ]
   
 -- Pick an appropriate summary table: if we're cachegrinding, then
 -- we're probably not interested in the runtime, but we are interested
@@ -187,9 +187,9 @@ pickSummary rs
   | otherwise = cachegrind_summary_specs
 
 per_module_result_tab =
-	[ SpecM "Module Sizes"  "mod-sizes"     module_size  always_ok
-	, SpecM "Compile Times" "compile-time"  compile_time time_ok
-	]
+        [ SpecM "Module Sizes"  "mod-sizes"     module_size  always_ok
+        , SpecM "Compile Times" "compile-time"  compile_time time_ok
+        ]
 
 always_ok :: a -> Bool
 always_ok = const True
@@ -203,14 +203,14 @@ time_ok t = t > tooquick_threshold
 --htmlPage :: Results -> [String] -> Html
 htmlPage results args
    =  header << thetitle << reportTitle
-	  +++ hr
+          +++ hr
           +++ h1 << reportTitle
-	  +++ gen_menu
-	  +++ hr
-	  +++ body (gen_tables results args)
+          +++ gen_menu
+          +++ hr
+          +++ body (gen_tables results args)
 
 gen_menu = unordList (map (prog_menu_item) per_prog_result_tab
-      	              ++ map (module_menu_item) per_module_result_tab)
+                      ++ map (module_menu_item) per_module_result_tab)
 
 prog_menu_item (SpecP name _ anc _ _ _) = anchor <! [href ('#':anc)] << name
 module_menu_item (SpecM name anc _ _) = anchor <! [href ('#':anc)] << name
@@ -222,7 +222,7 @@ gen_tables results args =
 htmlGenProgTable results args (SpecP title _ anc get_result get_status result_ok)
   =   sectHeading title anc
   +++ font <! [size "1"]
-	<< mkTable (htmlShowResults results args get_result get_status result_ok)
+        << mkTable (htmlShowResults results args get_result get_status result_ok)
   +++ hr
 
 htmlGenModTable results args (SpecM title anc get_result result_ok)
@@ -236,12 +236,12 @@ sectHeading s nm = h2 << anchor <! [name nm] << s
 
 htmlShowResults 
     :: Result a
-	=> [ResultTable]
-	-> [String]
-	-> (Results -> Maybe a)
-	-> (Results -> Status)
-	-> (a -> Bool)
-	-> HtmlTable
+        => [ResultTable]
+        -> [String]
+        -> (Results -> Maybe a)
+        -> (Results -> Status)
+        -> (a -> Bool)
+        -> HtmlTable
 
 htmlShowResults (r:rs) ss f stat result_ok
   =   tabHeader ss
@@ -251,23 +251,23 @@ htmlShowResults (r:rs) ss f stat result_ok
                                tableRow (-1) ("+1 s.d.", highs)])
                     ++ [tableRow (-1) ("Average", gms)])
  where
-	-- results_per_prog :: [ (String,[BoxValue a]) ]
-	results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
-	
-	results_per_run  = transpose (map snd results_per_prog)
-	(lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
+        -- results_per_prog :: [ (String,[BoxValue a]) ]
+        results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
+        
+        results_per_run  = transpose (map snd results_per_prog)
+        (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
 htmlShowMultiResults
     :: Result a
-	=> [ResultTable]
-	-> [String]
-	-> (Results -> Map String a)
-	-> (a -> Bool)
-	-> HtmlTable
+        => [ResultTable]
+        -> [String]
+        -> (Results -> Map String a)
+        -> (a -> Bool)
+        -> HtmlTable
 
 htmlShowMultiResults (r:rs) ss f result_ok =
-	multiTabHeader ss 
-	 </> aboves (map show_results_for_prog results_per_prog_mod_run)
+        multiTabHeader ss 
+         </> aboves (map show_results_for_prog results_per_prog_mod_run)
          </> aboves ((if nodevs then []
                                       else [td << bold << "-1 s.d."
                                             <-> tableRow (-1) ("", lows),
@@ -277,7 +277,7 @@ htmlShowMultiResults (r:rs) ss f result_ok =
                                <-> tableRow (-1) ("", gms)])
 
   where
-	base_results = Map.toList r :: [(String,Results)]
+        base_results = Map.toList r :: [(String,Results)]
 
         -- results_per_prog_mod_run :: [(String,[(String,[BoxValue a])])]
         results_per_prog_mod_run = map get_results_for_prog base_results
@@ -295,11 +295,11 @@ htmlShowMultiResults (r:rs) ss f result_ok =
                                                              result_ok (id,attr)
 
         show_results_for_prog (prog,mrs) =
-	    td <! [valign "top"] << bold << prog
-	    <-> (if null mrs then
-		   td << "(no modules compiled)"
-	         else
-		   toHtml (aboves (map (tableRow 0) mrs)))
+            td <! [valign "top"] << bold << prog
+            <-> (if null mrs then
+                   td << "(no modules compiled)"
+                 else
+                   toHtml (aboves (map (tableRow 0) mrs)))
 
         results_per_run  = transpose [xs | (_,mods) <- results_per_prog_mod_run,
                                            (_,xs) <- mods]
@@ -307,12 +307,12 @@ htmlShowMultiResults (r:rs) ss f result_ok =
 
 tableRow :: Int -> (String, [BoxValue]) -> HtmlTable
 tableRow row_no (prog, results)
-	=   td <! [bgcolor left_column_color] << prog
-	<-> besides (map (\s -> td <! [align "right", clr] << showBox s) 
-				results)
+        =   td <! [bgcolor left_column_color] << prog
+        <-> besides (map (\s -> td <! [align "right", clr] << showBox s) 
+                                results)
   where clr | row_no < 0  = bgcolor average_row_color
-	    | even row_no = bgcolor even_row_color
-	    | otherwise   = bgcolor odd_row_color
+            | even row_no = bgcolor even_row_color
+            | otherwise   = bgcolor odd_row_color
 
 left_column_color = "#d0d0ff"  -- light blue
 odd_row_color     = "#d0d0ff"  -- light blue
@@ -324,13 +324,13 @@ findBest :: Result a => [BoxValue a] -> [(Bool,BoxValue a)]
 findBest stuff@(Result base : rest)
   = map (\a -> (a==base, a))
   where
-	best = snd (minimumBy (\a b -> fst a < fst b) no_pcnt_stuff
+        best = snd (minimumBy (\a b -> fst a < fst b) no_pcnt_stuff
 
-	no_pcnt_stuff = map unPcnt stuff
+        no_pcnt_stuff = map unPcnt stuff
 
-	unPcnt (r@(Percentage f) : rest) = (base * f/100, r) : unPcnt rest
-	unPcnt (r@(Result a) : rest)     = (a, r) : unPcnt rest
-	unPcnt (_ : rest)                = unPcnt rest
+        unPcnt (r@(Percentage f) : rest) = (base * f/100, r) : unPcnt rest
+        unPcnt (r@(Result a) : rest)     = (a, r) : unPcnt rest
+        unPcnt (_ : rest)                = unPcnt rest
 -}
 
 logHeaders ss
@@ -351,24 +351,24 @@ multiTabHeader ss
 
 calcColor :: Int -> String
 calcColor p | p >= 0    = "#"     ++ (showHex red 2 "0000")
-	      | otherwise = "#0000" ++ (showHex blue 2 "")
-	where red  = p * 255 `div` 100
-	      blue = (-p) * 255 `div` 100
+              | otherwise = "#0000" ++ (showHex blue 2 "")
+        where red  = p * 255 `div` 100
+              blue = (-p) * 255 `div` 100
 
 showHex 0 f s = if f > 0 then take f (repeat '0') ++ s else s
 showHex i f s = showHex (i `div` 16) (f-1) (hexDig (i `mod` 16) : s)
 
 hexDig i | i > 10 = chr (i-10 + ord 'a')
-	 | otherwise = chr (i + ord '0')
+         | otherwise = chr (i + ord '0')
 
 -----------------------------------------------------------------------------
 -- LaTeX table generation (just the summary for now)
 
 latexOutput results args summary_spec summary_rows =
    (if (length results == 2)
-	then ascii_summary_table True results summary_spec summary_rows
-	    . str "\n\n"
-	else id) ""
+        then ascii_summary_table True results summary_spec summary_rows
+            . str "\n\n"
+        else id) ""
 
 
 -----------------------------------------------------------------------------
@@ -379,8 +379,8 @@ asciiPage results args summary_spec summary_rows =
   . str "\n\n"
      -- only show the summary table if we're comparing two runs
   . (if (length results == 2)
-	then ascii_summary_table False results summary_spec summary_rows . str "\n\n"
-	else id)
+        then ascii_summary_table False results summary_spec summary_rows . str "\n\n"
+        else id)
   . interleave "\n\n" (map (asciiGenProgTable results args) per_prog_result_tab)
   . str "\n"
   . interleave "\n\n" (map (asciiGenModTable results args)  per_module_result_tab)
@@ -397,94 +397,94 @@ asciiGenModTable results args (SpecM title anc get_result result_ok)
   . ascii_show_multi_results results args get_result result_ok
 
 ascii_header width ss
-	= str "\n-------------------------------------------------------------------------------\n"
-	. str (rjustify 15 "Program")
-	. str (space 5)
-	. foldr (.) id (map (str . rjustify width) ss)
-	. str "\n-------------------------------------------------------------------------------\n"
+        = str "\n-------------------------------------------------------------------------------\n"
+        . str (rjustify 15 "Program")
+        . str (space 5)
+        . foldr (.) id (map (str . rjustify width) ss)
+        . str "\n-------------------------------------------------------------------------------\n"
 
 ascii_show_results
    :: Result a
-	=> [ResultTable]
-	-> [String]
-	-> (Results -> Maybe a)
-	-> (Results -> Status)
-	-> (a -> Bool)
-	-> ShowS
+        => [ResultTable]
+        -> [String]
+        -> (Results -> Maybe a)
+        -> (Results -> Status)
+        -> (a -> Bool)
+        -> ShowS
 
 ascii_show_results (r:rs) ss f stat result_ok
-	= ascii_header fIELD_WIDTH ss
-	. interleave "\n" (map show_per_prog_results results_per_prog)
+        = ascii_header fIELD_WIDTH ss
+        . interleave "\n" (map show_per_prog_results results_per_prog)
         . if nodevs then id
                     else   str "\n"
-	                 . show_per_prog_results ("-1 s.d.",lows)
-	                 . str "\n"
-	                 . show_per_prog_results ("+1 s.d.",highs)
-	. str "\n"
-	. show_per_prog_results ("Average",gms)
+                         . show_per_prog_results ("-1 s.d.",lows)
+                         . str "\n"
+                         . show_per_prog_results ("+1 s.d.",highs)
+        . str "\n"
+        . show_per_prog_results ("Average",gms)
  where
-	-- results_per_prog :: [ (String,[BoxValue a]) ]
-	results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
-	
-	results_per_run  = transpose (map snd results_per_prog)
+        -- results_per_prog :: [ (String,[BoxValue a]) ]
+        results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
+        
+        results_per_run  = transpose (map snd results_per_prog)
         (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
 -- A summary table, useful only when we are comparing two runs.  This table
 -- shows a number of different result categories, one per column.
 ascii_summary_table 
-	:: Bool				-- generate a LaTeX table?
-	-> [ResultTable]
-	-> [PerProgTableSpec]
-	-> Maybe [String]
-	-> ShowS
+        :: Bool                         -- generate a LaTeX table?
+        -> [ResultTable]
+        -> [PerProgTableSpec]
+        -> Maybe [String]
+        -> ShowS
 ascii_summary_table latex (r1:r2:_) specs mb_restrict
   | latex     = makeLatexTable (rows ++ TableLine : av_rows)
   | otherwise = 
        makeTable (table_layout (length specs) width)
-	  (TableLine : TableRow header : TableLine : rows ++ TableLine : av_rows)
+          (TableLine : TableRow header : TableLine : rows ++ TableLine : av_rows)
   where
-	header = BoxString "Program" : map BoxString headings
+        header = BoxString "Program" : map BoxString headings
 
-	(headings, columns, av_cols) = unzip3 (map calc_col specs)
+        (headings, columns, av_cols) = unzip3 (map calc_col specs)
         av_heads = [BoxString "Min", BoxString "Max", BoxString "Geometric Mean"]
-	baseline = Map.toList r1
-	progs   = map BoxString (Map.keys r1)
-	rows0   = map TableRow (zipWith (:) progs (transpose columns))
+        baseline = Map.toList r1
+        progs   = map BoxString (Map.keys r1)
+        rows0   = map TableRow (zipWith (:) progs (transpose columns))
 
-	rows1 = restrictRows mb_restrict rows0
+        rows1 = restrictRows mb_restrict rows0
 
-	rows | latex     = mungeForLaTeX rows1
-	     | otherwise = rows1
+        rows | latex     = mungeForLaTeX rows1
+             | otherwise = rows1
 
-	av_rows = map TableRow (zipWith (:) av_heads (transpose av_cols))
-	width   = 10
+        av_rows = map TableRow (zipWith (:) av_heads (transpose av_cols))
+        width   = 10
 
-	calc_col (SpecP _ heading _ getr gets ok)
-	  = (heading, column, [min,max,mean]) -- throw away the baseline result
-	  where (_, boxes) = unzip (map calc_one_result baseline)
-		calc_one_result = calc_result [r2] getr gets ok
-		column = map (\(_:b:_) -> b) boxes
-		(_,mean,_) = calc_gmsd column
-		(min,max) = calc_minmax column
+        calc_col (SpecP _ heading _ getr gets ok)
+          = (heading, column, [min,max,mean]) -- throw away the baseline result
+          where (_, boxes) = unzip (map calc_one_result baseline)
+                calc_one_result = calc_result [r2] getr gets ok
+                column = map (\(_:b:_) -> b) boxes
+                (_,mean,_) = calc_gmsd column
+                (min,max) = calc_minmax column
 
 restrictRows :: Maybe [String] -> [TableRow] -> [TableRow]
 restrictRows Nothing rows = rows
 restrictRows (Just these) rows = filter keep_it rows
   where keep_it (TableRow (BoxString s: _)) = s `elem` these
-	keep_it TableLine = True
-	keep_it _ = False
+        keep_it TableLine = True
+        keep_it _ = False
 
 mungeForLaTeX :: [TableRow] -> [TableRow]
 mungeForLaTeX = map transrow
    where
-	transrow (TableRow boxes) = TableRow (map transbox boxes)
-	transrow row = row
+        transrow (TableRow boxes) = TableRow (map transbox boxes)
+        transrow row = row
 
-	transbox (BoxString s) = BoxString (foldr transchar "" s)
-	transbox box = box
+        transbox (BoxString s) = BoxString (foldr transchar "" s)
+        transbox box = box
 
-	transchar '_' s = '\\':'_':s
-	transchar c s = c:s
+        transchar '_' s = '\\':'_':s
+        transchar c s = c:s
 
 table_layout n width =
   (str . rjustify 15) : 
@@ -493,25 +493,25 @@ table_layout n width =
 
 ascii_show_multi_results
    :: Result a
-	=> [ResultTable]
-	-> [String]
-	-> (Results -> Map String a)
-	-> (a -> Bool)
-	-> ShowS
+        => [ResultTable]
+        -> [String]
+        -> (Results -> Map String a)
+        -> (a -> Bool)
+        -> ShowS
 
 ascii_show_multi_results (r:rs) ss f result_ok
-	= ascii_header fIELD_WIDTH ss 
-	. interleave "\n" (map show_results_for_prog results_per_prog_mod_run)
-	. str "\n"
+        = ascii_header fIELD_WIDTH ss 
+        . interleave "\n" (map show_results_for_prog results_per_prog_mod_run)
+        . str "\n"
         . if nodevs then id
                     else   str "\n"
-	                 . show_per_prog_results ("-1 s.d.",lows)
-	                 . str "\n"
-	                 . show_per_prog_results ("+1 s.d.",highs)
-	. str "\n"
-	. show_per_prog_results ("Average",gms)
+                         . show_per_prog_results ("-1 s.d.",lows)
+                         . str "\n"
+                         . show_per_prog_results ("+1 s.d.",highs)
+        . str "\n"
+        . show_per_prog_results ("Average",gms)
   where
-	base_results = Map.toList r :: [(String,Results)]
+        base_results = Map.toList r :: [(String,Results)]
 
         -- results_per_prog_mod_run :: [(String,[(String,[BoxValue a])])]
         results_per_prog_mod_run = map get_results_for_prog base_results
@@ -529,11 +529,11 @@ ascii_show_multi_results (r:rs) ss f result_ok
                                                              result_ok (id,attr)
 
         show_results_for_prog (prog,mrs) =
-	      str ("\n"++prog++"\n")
-	    . (if null mrs then
-		   str "(no modules compiled)\n"
-	         else
-		   interleave "\n" (map show_per_prog_results mrs))
+              str ("\n"++prog++"\n")
+            . (if null mrs then
+                   str "(no modules compiled)\n"
+                 else
+                   interleave "\n" (map show_per_prog_results mrs))
 
         results_per_run  = transpose [xs | (_,mods) <- results_per_prog_mod_run,
                                            (_,xs) <- mods]
@@ -544,9 +544,9 @@ show_per_prog_results :: (String, [BoxValue]) -> ShowS
 show_per_prog_results = show_per_prog_results_width fIELD_WIDTH
 
 show_per_prog_results_width width (prog,results)
-	= str (rjustify 15 prog)
-	. str (space 5)
-	. foldr (.) id (map (str . rjustify width . showBox) results)
+        = str (rjustify 15 prog)
+        . str (space 5)
+        . foldr (.) id (map (str . rjustify width . showBox) results)
 
 -- ---------------------------------------------------------------------------
 -- Generic stuff for results generation
@@ -554,39 +554,39 @@ show_per_prog_results_width width (prog,results)
 -- calc_result is a nice exercise in higher-order programming...
 calc_result 
   :: Result a
-	=> [Map String b]		-- accumulated results
-	-> (b -> Maybe a)		-- get a result from the b
-	-> (b -> Status)		-- get a status from the b
-	-> (a -> Bool)			-- is this result ok?
-	-> (String,b)			-- the baseline result
-	-> (String,[BoxValue])
+        => [Map String b]               -- accumulated results
+        -> (b -> Maybe a)               -- get a result from the b
+        -> (b -> Status)                -- get a status from the b
+        -> (a -> Bool)                  -- is this result ok?
+        -> (String,b)                   -- the baseline result
+        -> (String,[BoxValue])
 
 calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
-	(prog, (just_result baseline base_stat :
+        (prog, (just_result baseline base_stat :
 
-	  let
-		rts' = map (\rt -> get_stuff (Map.lookup prog rt)) rts
+          let
+                rts' = map (\rt -> get_stuff (Map.lookup prog rt)) rts
 
-		get_stuff Nothing  = (Nothing, NotDone)
-		get_stuff (Just r) = (get_maybe_a r, get_stat r)
-	  in
-	  (
-	  case baseline of
-	  	Just base | result_ok base
-		   -> map (\(r,s) -> percentage  r s base) rts'
-	  	_other
-		   -> map (\(r,s) -> just_result r s) rts'
-	   )))
+                get_stuff Nothing  = (Nothing, NotDone)
+                get_stuff (Just r) = (get_maybe_a r, get_stat r)
+          in
+          (
+          case baseline of
+                Just base | result_ok base
+                   -> map (\(r,s) -> percentage  r s base) rts'
+                _other
+                   -> map (\(r,s) -> just_result r s) rts'
+           )))
  where
-	baseline  = get_maybe_a base_r
-	base_stat = get_stat base_r
+        baseline  = get_maybe_a base_r
+        base_stat = get_stat base_r
 
-	just_result Nothing  s = RunFailed s
-	just_result (Just a) s = toBox a
+        just_result Nothing  s = RunFailed s
+        just_result (Just a) s = toBox a
 
-	percentage Nothing   s base = RunFailed s
-	percentage (Just a)  s base = Percentage 
-					 (convert_to_percentage base a)
+        percentage Nothing   s base = RunFailed s
+        percentage (Just a)  s base = Percentage 
+                                         (convert_to_percentage base a)
 -----------------------------------------------------------------------------
 -- Calculating geometric means and standard deviations
 
@@ -594,11 +594,11 @@ calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
 This is done using the log method, to avoid needing really large
 intermediate results.  The formula for a geometric mean is 
 
-	(a1 * .... * an) ^ 1/n
+        (a1 * .... * an) ^ 1/n
 
 which is equivalent to
 
-	e ^ ( (log a1 + ... + log an) / n )
+        e ^ ( (log a1 + ... + log an) / n )
 
 where log is the natural logarithm function.
 
@@ -636,14 +636,14 @@ calc_gmsd xs
                         Percentage (gm*sdf))
  where
   percentages = [ if f < 5 then 5 else f | Percentage f <- xs ]
-	-- can't do log(0.0), so exclude zeros
+        -- can't do log(0.0), so exclude zeros
         -- small values have inordinate effects so cap at -95%.
 
 calc_minmax :: [BoxValue] -> (BoxValue, BoxValue)
 calc_minmax xs
  | null percentages = (RunFailed NotDone, RunFailed NotDone)
  | otherwise = (Percentage (minimum percentages), 
-		Percentage (maximum percentages))
+                Percentage (maximum percentages))
  where
   percentages = [ if f < 5 then 5 else f | Percentage f <- xs ]
 
@@ -652,28 +652,28 @@ calc_minmax xs
 -- Show the Results
 
 class Num a => Result a where
-	toBox :: a -> BoxValue
-	convert_to_percentage :: a -> a -> Float
+        toBox :: a -> BoxValue
+        convert_to_percentage :: a -> a -> Float
 
 -- We assume an Int is a size, and print it in kilobytes.
 
 instance Result Int where
-	convert_to_percentage 0 size = 100
-	convert_to_percentage base size = (fromIntegral size / fromIntegral base) * 100
+        convert_to_percentage 0 size = 100
+        convert_to_percentage base size = (fromIntegral size / fromIntegral base) * 100
 
-	toBox = BoxInt
+        toBox = BoxInt
 
 instance Result Integer where
-	convert_to_percentage 0 size = 100
-	convert_to_percentage base size = (fromInteger size / fromInteger base) * 100
-	toBox = BoxInteger
+        convert_to_percentage 0 size = 100
+        convert_to_percentage base size = (fromInteger size / fromInteger base) * 100
+        toBox = BoxInteger
 
 
 instance Result Float where
-	convert_to_percentage 0.0 size = 100.0
-	convert_to_percentage base size = size / base * 100
+        convert_to_percentage 0.0 size = 100.0
+        convert_to_percentage base size = size / base * 100
 
-	toBox = BoxFloat
+        toBox = BoxFloat
 
 -- -----------------------------------------------------------------------------
 -- BoxValues
@@ -723,21 +723,21 @@ type Layout = [String -> ShowS]
 makeTable :: Layout -> [TableRow] -> ShowS
 makeTable p = interleave "\n" . map do_row
   where do_row (TableRow boxes) = applyLayout p boxes
-	do_row TableLine = str (take 80 (repeat '-'))
+        do_row TableLine = str (take 80 (repeat '-'))
 
 makeLatexTable :: [TableRow] -> ShowS
 makeLatexTable = foldr (.) id . map do_row
   where do_row (TableRow boxes)
-	   = applyLayout latexTableLayout boxes . str "\\\\\n"
-	do_row TableLine
-	   = str "\\hline\n"
+           = applyLayout latexTableLayout boxes . str "\\\\\n"
+        do_row TableLine
+           = str "\\hline\n"
 
 latexTableLayout :: Layout
 latexTableLayout = box : repeat (box . (" & "++))
   where box s = str (foldr transchar "" s)
 
-	transchar '%' s = s  -- leave out the percentage signs
-	transchar c   s = c : s
+        transchar '%' s = s  -- leave out the percentage signs
+        transchar c   s = c : s
 
 applyLayout :: Layout -> [BoxValue] -> ShowS
 applyLayout layout values = 
@@ -748,8 +748,8 @@ applyLayout layout values =
 
 split :: Char -> String -> [String]
 split c s = case rest of
-		[]     -> [chunk] 
-		_:rest -> chunk : split c rest
+                []     -> [chunk] 
+                _:rest -> chunk : split c rest
   where (chunk, rest) = break (==c) s
 
 str = showString
