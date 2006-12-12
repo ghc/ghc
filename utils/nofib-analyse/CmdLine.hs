@@ -19,18 +19,26 @@ import System.IO.Unsafe		( unsafePerformIO )
 -----------------------------------------------------------------------------
 -- Command line arguments
 
+args :: [String]
 args = unsafePerformIO getArgs
+
+flags :: [CLIFlags]
+other_args :: [String]
+cmdline_errors :: [String]
 (flags, other_args, cmdline_errors) = getOpt Permute argInfo args 
 
-default_tooquick_threshold = 0.2 {- secs -} :: Float
+default_tooquick_threshold, tooquick_threshold :: Float
+default_tooquick_threshold = 0.2 {- secs -}
 tooquick_threshold
  = case [ i | OptIgnoreSmallTimes i <- flags ] of
 	[] -> default_tooquick_threshold
 	(i:_) -> i
 
+devs, nodevs :: Bool
 devs   = OptDeviations   `elem` flags
 nodevs = OptNoDeviations `elem` flags
 
+default_title, reportTitle :: String
 default_title = "NoFib Results"
 reportTitle = case [ t | OptTitle t <- flags ] of
         []    -> default_title

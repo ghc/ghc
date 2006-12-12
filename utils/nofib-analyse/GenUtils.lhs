@@ -85,7 +85,7 @@ HBC has it in one of its builtin modules
 
 > maybeMap :: (a -> b) -> Maybe a -> Maybe b
 > maybeMap f (Just a) = Just (f a)
-> maybeMap f Nothing  = Nothing
+> maybeMap _ Nothing  = Nothing
 
 > joinMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a 
 > joinMaybe _ Nothing  Nothing  = Nothing
@@ -102,12 +102,12 @@ This will never terminate.
 > mkClosure :: (a -> a -> Bool) -> (a -> a) -> a -> a
 > mkClosure eq f = match . iterate f
 >   where
->       match (a:b:c) | a `eq` b = a
+>       match (a:b:_) | a `eq` b = a
 >       match (_:c)              = match c
 
 > foldb :: (a -> a -> a) -> [a] -> a
-> foldb f [] = error "can't reduce an empty list using foldb"
-> foldb f [x] = x
+> foldb _ [] = error "can't reduce an empty list using foldb"
+> foldb _ [x] = x
 > foldb f l  = foldb f (foldb' l)
 >    where 
 >       foldb' (x:y:x':y':xs) = f (f x y) (f x' y') : foldb' xs
@@ -133,7 +133,7 @@ Sorting is something almost every program needs, and this is the
 quickest sorting function I know of.
 
 > sortWith :: (a -> a -> Bool) -> [a] -> [a]
-> sortWith le [] = []
+> sortWith _ [] = []
 > sortWith le lst = foldb (mergeWith le) (splitList lst)
 >   where
 >       splitList (a1:a2:a3:a4:a5:xs) = 
