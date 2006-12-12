@@ -582,10 +582,10 @@ calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
         base_stat = get_stat base_r
 
         just_result Nothing  s = RunFailed s
-        just_result (Just a) s = toBox a
+        just_result (Just a) _ = toBox a
 
-        percentage Nothing   s base = RunFailed s
-        percentage (Just a)  s base = Percentage
+        percentage Nothing   s _    = RunFailed s
+        percentage (Just a)  _ base = Percentage
                                          (convert_to_percentage base a)
 -----------------------------------------------------------------------------
 -- Calculating geometric means and standard deviations
@@ -658,22 +658,23 @@ class Num a => Result a where
 -- We assume an Int is a size, and print it in kilobytes.
 
 instance Result Int where
-        convert_to_percentage 0 size = 100
-        convert_to_percentage base size = (fromIntegral size / fromIntegral base) * 100
+    convert_to_percentage 0    _    = 100
+    convert_to_percentage base size
+        = (fromIntegral size / fromIntegral base) * 100
 
-        toBox = BoxInt
+    toBox = BoxInt
 
 instance Result Integer where
-        convert_to_percentage 0 size = 100
-        convert_to_percentage base size = (fromInteger size / fromInteger base) * 100
-        toBox = BoxInteger
-
+    convert_to_percentage 0    _    = 100
+    convert_to_percentage base size
+        = (fromInteger size / fromInteger base) * 100
+    toBox = BoxInteger
 
 instance Result Float where
-        convert_to_percentage 0.0 size = 100.0
-        convert_to_percentage base size = size / base * 100
+    convert_to_percentage 0.0  _    = 100.0
+    convert_to_percentage base size = size / base * 100
 
-        toBox = BoxFloat
+    toBox = BoxFloat
 
 -- -----------------------------------------------------------------------------
 -- BoxValues
@@ -689,20 +690,16 @@ data BoxValue
 
 showBox :: BoxValue -> String
 showBox (RunFailed stat) = show_stat stat
-showBox (Percentage f)   = show_pcntage f
+showBox (Percentage f)   = printf "%+.1f%%" (f-100)
 showBox (BoxFloat f)     = printf "%.2f" f
 showBox (BoxInt n)       = show (n `div` 1024) ++ "k"
 showBox (BoxInteger n)   = show (n `div` 1024) ++ "k"
 showBox (BoxString s)    = s
 
-instance Show BoxValue where { show = showBox }
+instance Show BoxValue where
+    show = showBox
 
-show_pcntage n = show_float_signed (n-100) ++ "%"
-
-show_float_signed n
-  | n >= 0    = printf "+%.1f" n
-  | otherwise = printf "%.1f" n
-
+show_stat :: Status -> String
 show_stat Success     = "(no result)"
 show_stat WrongStdout = "(stdout)"
 show_stat WrongStderr = "(stderr)"
