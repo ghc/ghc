@@ -68,20 +68,10 @@ initTaskManager (void)
 void
 stopTaskManager (void)
 {
-    Task *task;
-
     debugTrace(DEBUG_sched, 
 	       "stopping task manager, %d tasks still running",
 	       tasksRunning);
-
-    ACQUIRE_LOCK(&sched_mutex);
-    for (task = task_free_list; task != NULL; task = task->next) {
-#if defined(THREADED_RTS)
-        closeCondition(&task->cond);
-        closeMutex(&task->lock);
-#endif
-    }
-    RELEASE_LOCK(&sched_mutex);
+    /* nothing to do */
 }
 
 
@@ -94,6 +84,10 @@ freeTaskManager (void)
 
     ACQUIRE_LOCK(&sched_mutex);
     for (task = task_free_list; task != NULL; task = next) {
+#if defined(THREADED_RTS)
+        closeCondition(&task->cond);
+        closeMutex(&task->lock);
+#endif
         next = task->next;
         stgFree(task);
     }

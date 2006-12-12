@@ -2578,7 +2578,6 @@ exitScheduler( void )
 	boundTaskExiting(task);
 	stopTaskManager();
     }
-    closeMutex(&sched_mutex);
 #endif
 }
 
@@ -2586,6 +2585,9 @@ void
 freeScheduler( void )
 {
     freeTaskManager();
+#if defined(THREADED_RTS)
+    closeMutex(&sched_mutex);
+#endif
 }
 
 /* ---------------------------------------------------------------------------
