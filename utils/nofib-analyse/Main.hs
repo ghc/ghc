@@ -40,12 +40,12 @@ main = do
         then die (concat cmdline_errors ++ usageInfo usageHeader argInfo)
         else do
 
- let { html  = OptHTMLOutput  `elem` flags; 
+ let { html  = OptHTMLOutput  `elem` flags;
        latex = OptLaTeXOutput `elem` flags;
        ascii = OptASCIIOutput `elem` flags
      }
 
- if ascii && html 
+ if ascii && html
         then die "Can't produce both ASCII and HTML"
         else do
 
@@ -66,15 +66,15 @@ main = do
  let column_headings = map (reverse . takeWhile (/= '/') . reverse) other_args
 
  -- sanity check
- sequence_ [ checkTimes prog res | table <- results, 
+ sequence_ [ checkTimes prog res | table <- results,
                                    (prog,res) <- Map.toList table ]
 
  case () of
-   _ | html      -> 
+   _ | html      ->
         putStr (renderHtml (htmlPage results column_headings))
-   _ | latex     -> 
+   _ | latex     ->
         putStr (latexOutput results column_headings summary_spec summary_rows)
-   _ | otherwise -> 
+   _ | otherwise ->
         putStr (asciiPage results column_headings summary_spec summary_rows)
 
 
@@ -92,7 +92,7 @@ parse_logs log_files =
 
 data PerProgTableSpec =
         forall a . Result a =>
-           SpecP 
+           SpecP
                 String                  -- Name of the table
                 String                  -- Short name (for column heading)
                 String                  -- HTML tag for the table
@@ -102,7 +102,7 @@ data PerProgTableSpec =
 
 data PerModuleTableSpec =
         forall a . Result a =>
-           SpecM 
+           SpecM
                 String                  -- Name of the table
                 String                  -- HTML tag for the table
                 (Results -> Map String a)       -- get the module map
@@ -135,7 +135,7 @@ all_specs = [
 
 namedColumns :: [String] -> IO [PerProgTableSpec]
 namedColumns ss = mapM findSpec ss
-  where findSpec s = 
+  where findSpec s =
            case [ spec | spec@(SpecP _ short_name _ _ _ _) <- all_specs,
                          short_name == s ] of
                 [] -> die ("unknown column: " ++ s)
@@ -155,7 +155,7 @@ checkTimes prog results = do
   check "GC time" (gc_time results)
   where
         check kind ts
-           | any strange ts = 
+           | any strange ts =
                 hPutStrLn stderr ("warning: dubious " ++ kind
                                    ++ " results for " ++ prog
                                    ++ ": " ++ show ts)
@@ -174,15 +174,15 @@ per_prog_result_tab =
 -- aspects, each in its own column.  Only works when comparing two runs.
 normal_summary_specs =
         [ size_spec, alloc_spec, runtime_spec ]
-  
+
 cachegrind_summary_specs =
         [ size_spec, alloc_spec, instrs_spec, mreads_spec, mwrite_spec ]
-  
+
 -- Pick an appropriate summary table: if we're cachegrinding, then
 -- we're probably not interested in the runtime, but we are interested
 -- in instructions, mem reads and mem writes (and vice-versa).
 pickSummary :: [ResultTable] -> [PerProgTableSpec]
-pickSummary rs 
+pickSummary rs
   | isNothing (instrs (head (Map.elems (head rs)))) = normal_summary_specs
   | otherwise = cachegrind_summary_specs
 
@@ -226,15 +226,15 @@ htmlGenProgTable results args (SpecP title _ anc get_result get_status result_ok
   +++ hr
 
 htmlGenModTable results args (SpecM title anc get_result result_ok)
-  =   sectHeading title anc 
-  +++ font <![size "1"] 
+  =   sectHeading title anc
+  +++ font <![size "1"]
         << mkTable (htmlShowMultiResults results args get_result result_ok)
   +++ hr
 
 sectHeading :: String -> String -> Html
 sectHeading s nm = h2 << anchor <! [name nm] << s
 
-htmlShowResults 
+htmlShowResults
     :: Result a
         => [ResultTable]
         -> [String]
@@ -253,7 +253,7 @@ htmlShowResults (r:rs) ss f stat result_ok
  where
         -- results_per_prog :: [ (String,[BoxValue a]) ]
         results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
-        
+
         results_per_run  = transpose (map snd results_per_prog)
         (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
@@ -266,7 +266,7 @@ htmlShowMultiResults
         -> HtmlTable
 
 htmlShowMultiResults (r:rs) ss f result_ok =
-        multiTabHeader ss 
+        multiTabHeader ss
          </> aboves (map show_results_for_prog results_per_prog_mod_run)
          </> aboves ((if nodevs then []
                                       else [td << bold << "-1 s.d."
@@ -308,7 +308,7 @@ htmlShowMultiResults (r:rs) ss f result_ok =
 tableRow :: Int -> (String, [BoxValue]) -> HtmlTable
 tableRow row_no (prog, results)
         =   td <! [bgcolor left_column_color] << prog
-        <-> besides (map (\s -> td <! [align "right", clr] << showBox s) 
+        <-> besides (map (\s -> td <! [align "right", clr] << showBox s)
                                 results)
   where clr | row_no < 0  = bgcolor average_row_color
             | even row_no = bgcolor even_row_color
@@ -339,7 +339,7 @@ logHeaders ss
 mkTable t = table <! [cellspacing 0, cellpadding 0, border 0] << t
 
 tabHeader ss
-  =   (td <! [align "left", width "100"] << bold << "Program") 
+  =   (td <! [align "left", width "100"] << bold << "Program")
   <-> logHeaders ss
 
 multiTabHeader ss
@@ -387,12 +387,12 @@ asciiPage results args summary_spec summary_rows =
   ) "\n"
 
 asciiGenProgTable results args (SpecP title _ anc get_result get_status result_ok)
-  = str title 
+  = str title
   . str "\n"
   . ascii_show_results results args get_result get_status result_ok
 
 asciiGenModTable results args (SpecM title anc get_result result_ok)
-  = str title 
+  = str title
   . str "\n"
   . ascii_show_multi_results results args get_result result_ok
 
@@ -425,13 +425,13 @@ ascii_show_results (r:rs) ss f stat result_ok
  where
         -- results_per_prog :: [ (String,[BoxValue a]) ]
         results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
-        
+
         results_per_run  = transpose (map snd results_per_prog)
         (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
 
 -- A summary table, useful only when we are comparing two runs.  This table
 -- shows a number of different result categories, one per column.
-ascii_summary_table 
+ascii_summary_table
         :: Bool                         -- generate a LaTeX table?
         -> [ResultTable]
         -> [PerProgTableSpec]
@@ -439,7 +439,7 @@ ascii_summary_table
         -> ShowS
 ascii_summary_table latex (r1:r2:_) specs mb_restrict
   | latex     = makeLatexTable (rows ++ TableLine : av_rows)
-  | otherwise = 
+  | otherwise =
        makeTable (table_layout (length specs) width)
           (TableLine : TableRow header : TableLine : rows ++ TableLine : av_rows)
   where
@@ -487,7 +487,7 @@ mungeForLaTeX = map transrow
         transchar c s = c:s
 
 table_layout n width =
-  (str . rjustify 15) : 
+  (str . rjustify 15) :
   (\s -> str (space 5) . str (rjustify width s)) :
   replicate (n-1) (str . rjustify width)
 
@@ -500,7 +500,7 @@ ascii_show_multi_results
         -> ShowS
 
 ascii_show_multi_results (r:rs) ss f result_ok
-        = ascii_header fIELD_WIDTH ss 
+        = ascii_header fIELD_WIDTH ss
         . interleave "\n" (map show_results_for_prog results_per_prog_mod_run)
         . str "\n"
         . if nodevs then id
@@ -552,7 +552,7 @@ show_per_prog_results_width width (prog,results)
 -- Generic stuff for results generation
 
 -- calc_result is a nice exercise in higher-order programming...
-calc_result 
+calc_result
   :: Result a
         => [Map String b]               -- accumulated results
         -> (b -> Maybe a)               -- get a result from the b
@@ -585,14 +585,14 @@ calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
         just_result (Just a) s = toBox a
 
         percentage Nothing   s base = RunFailed s
-        percentage (Just a)  s base = Percentage 
+        percentage (Just a)  s base = Percentage
                                          (convert_to_percentage base a)
 -----------------------------------------------------------------------------
 -- Calculating geometric means and standard deviations
 
 {-
 This is done using the log method, to avoid needing really large
-intermediate results.  The formula for a geometric mean is 
+intermediate results.  The formula for a geometric mean is
 
         (a1 * .... * an) ^ 1/n
 
@@ -620,7 +620,7 @@ We therefore return a (low, mean, high) triple.
 -}
 
 calc_gmsd :: [BoxValue] -> (BoxValue, BoxValue, BoxValue)
-calc_gmsd xs 
+calc_gmsd xs
   | null percentages = (RunFailed NotDone, RunFailed NotDone, RunFailed NotDone)
   | otherwise        = let sqr x = x * x
                            len   = fromIntegral (length percentages)
@@ -642,7 +642,7 @@ calc_gmsd xs
 calc_minmax :: [BoxValue] -> (BoxValue, BoxValue)
 calc_minmax xs
  | null percentages = (RunFailed NotDone, RunFailed NotDone)
- | otherwise = (Percentage (minimum percentages), 
+ | otherwise = (Percentage (minimum percentages),
                 Percentage (maximum percentages))
  where
   percentages = [ if f < 5 then 5 else f | Percentage f <- xs ]
@@ -740,7 +740,7 @@ latexTableLayout = box : repeat (box . (" & "++))
         transchar c   s = c : s
 
 applyLayout :: Layout -> [BoxValue] -> ShowS
-applyLayout layout values = 
+applyLayout layout values =
  foldr (.) id [ f (show val) | (val,f) <- zip values layout ]
 
 -- -----------------------------------------------------------------------------
@@ -748,13 +748,13 @@ applyLayout layout values =
 
 split :: Char -> String -> [String]
 split c s = case rest of
-                []     -> [chunk] 
+                []     -> [chunk]
                 _:rest -> chunk : split c rest
   where (chunk, rest) = break (==c) s
 
 str = showString
 
-interleave s = foldr1 (\a b -> a . str s . b) 
+interleave s = foldr1 (\a b -> a . str s . b)
 
 fIELD_WIDTH = 16 :: Int
 
