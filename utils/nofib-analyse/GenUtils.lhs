@@ -12,7 +12,7 @@
 >       assocMaybeErr,
 >       arrElem,
 >       memoise,
->	returnMaybe,handleMaybe, findJust,
+>       returnMaybe,handleMaybe, findJust,
 >       MaybeErr(..),
 >       maybeMap,
 >       joinMaybe,
@@ -25,15 +25,15 @@
 >       rjustify,
 >       space,
 >       copy,
->	combinePairs,
->	--trace,		-- re-export it 
->	fst3,
->	snd3,
->	thd3
+>       combinePairs,
+>       --trace,                -- re-export it 
+>       fst3,
+>       snd3,
+>       thd3
 
 #if __HASKELL1__ < 3 || ( defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 200 )
 
->	,Cmp(..), compare, lookup, isJust
+>       ,Cmp(..), compare, lookup, isJust
 
 #endif
 
@@ -174,7 +174,7 @@ Gofer-like stuff:
 
 > space       :: Int -> String
 > space n | n < 0 = ""
->	  | otherwise = copy n ' '
+>         | otherwise = copy n ' '
 
 > copy  :: Int -> a -> [a]      -- make list of n copies of x
 > copy n x = take n xs where xs = x:xs
@@ -191,11 +191,11 @@ Gofer-like stuff:
 
 > combinePairs :: (Ord a) => [(a,b)] -> [(a,[b])]
 > combinePairs xs = 
->	combine [ (a,[b]) | (a,b) <- sortWith (\ (a,_) (b,_) -> a <= b) xs]
+>       combine [ (a,[b]) | (a,b) <- sortWith (\ (a,_) (b,_) -> a <= b) xs]
 >  where
->	combine [] = []
->	combine ((a,b):(c,d):r) | a == c = combine ((a,b++d) : r)
->	combine (a:r) = a : combine r
+>       combine [] = []
+>       combine ((a,b):(c,d):r) | a == c = combine ((a,b++d) : r)
+>       combine (a:r) = a : combine r
 > 
 
 #if __HASKELL1__ < 3 || ( defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 200 )
@@ -209,12 +209,12 @@ Gofer-like stuff:
 > data Cmp = LT | EQ | GT
 
 > compare a b | a <  b    = LT
->	      | a == b    = EQ
->	      | otherwise = GT 
+>             | a == b    = EQ
+>             | otherwise = GT 
 
 > isJust :: Maybe a -> Bool
 > isJust (Just _) = True
-> isJust _	  = False
+> isJust _        = False
 
 #endif
 
@@ -263,34 +263,34 @@ will give a very efficent variation of the fib function.
 >                                       (b'', x') = f b' x
 >                                       (b', xs') = mapAccumR f b xs
 
-> mapAccumL :: (acc -> x -> (acc, y)) 	-- Function of elt of input list
->					-- and accumulator, returning new
->					-- accumulator and elt of result list
->	    -> acc 			-- Initial accumulator
->	    -> [x] 			-- Input list
->	    -> (acc, [y])		-- Final accumulator and result list
+> mapAccumL :: (acc -> x -> (acc, y))   -- Function of elt of input list
+>                                       -- and accumulator, returning new
+>                                       -- accumulator and elt of result list
+>           -> acc                      -- Initial accumulator
+>           -> [x]                      -- Input list
+>           -> (acc, [y])               -- Final accumulator and result list
 >
 > mapAccumL f b []     = (b, [])
 > mapAccumL f b (x:xs) = (b'', x':xs') where
->					  (b', x') = f b x
->					  (b'', xs') = mapAccumL f b' xs
+>                                         (b', x') = f b x
+>                                         (b'', xs') = mapAccumL f b' xs
 
 Here is the bi-directional version ...
 
 > mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
->					-- Function of elt of input list
->					-- and accumulator, returning new
->					-- accumulator and elt of result list
->	    -> accl 			-- Initial accumulator from left
->	    -> accr 			-- Initial accumulator from right
->	    -> [x] 			-- Input list
->	    -> (accl, accr, [y])	-- Final accumulator and result list
+>                                       -- Function of elt of input list
+>                                       -- and accumulator, returning new
+>                                       -- accumulator and elt of result list
+>           -> accl                     -- Initial accumulator from left
+>           -> accr                     -- Initial accumulator from right
+>           -> [x]                      -- Input list
+>           -> (accl, accr, [y])        -- Final accumulator and result list
 >
 > mapAccumB f a b []     = (a,b,[])
 > mapAccumB f a b (x:xs) = (a'',b'',y:ys)
 >    where
->	(a',b'',y)    = f a b' x
->	(a'',b',ys) = mapAccumB f a' b xs
+>       (a',b'',y)    = f a b' x
+>       (a'',b',ys) = mapAccumB f a' b xs
 
 
 > assert False x = error "assert Failed"
