@@ -227,15 +227,15 @@ gen_tables results args =
   +++ foldr1 (+++) (map (htmlGenModTable  results args) per_module_result_tab)
 
 htmlGenProgTable :: [ResultTable] -> [String] -> PerProgTableSpec -> Html
-htmlGenProgTable results args (SpecP title _ anc get_result get_status result_ok)
-  =   sectHeading title anc
+htmlGenProgTable results args (SpecP long_name _ anc get_result get_status result_ok)
+  =   sectHeading long_name anc
   +++ font <! [size "1"]
         << mkTable (htmlShowResults results args get_result get_status result_ok)
   +++ hr
 
 htmlGenModTable :: [ResultTable] -> [String] -> PerModuleTableSpec -> Html
-htmlGenModTable results args (SpecM title anc get_result result_ok)
-  =   sectHeading title anc
+htmlGenModTable results args (SpecM long_name anc get_result result_ok)
+  =   sectHeading long_name anc
   +++ font <![size "1"]
         << mkTable (htmlShowMultiResults results args get_result result_ok)
   +++ hr
@@ -252,6 +252,8 @@ htmlShowResults
         -> (a -> Bool)
         -> HtmlTable
 
+htmlShowResults []     _  _  _   _
+ = error "htmlShowResults: Can't happen?"
 htmlShowResults (r:rs) ss f stat result_ok
   =   tabHeader ss
   </> aboves (zipWith tableRow [1..] results_per_prog)
@@ -274,6 +276,8 @@ htmlShowMultiResults
         -> (a -> Bool)
         -> HtmlTable
 
+htmlShowMultiResults []     _  _ _
+ = error "htmlShowMultiResults: Can't happen?"
 htmlShowMultiResults (r:rs) ss f result_ok =
         multiTabHeader ss
          </> aboves (map show_results_for_prog results_per_prog_mod_run)
@@ -284,7 +288,6 @@ htmlShowMultiResults (r:rs) ss f result_ok =
                                             <-> tableRow (-1) ("", highs)])
                            ++ [td << bold << "Average"
                                <-> tableRow (-1) ("", gms)])
-
   where
         base_results = Map.toList r :: [(String,Results)]
 
@@ -324,6 +327,7 @@ tableRow row_no (prog, results)
             | even row_no = bgcolor even_row_color
             | otherwise   = bgcolor odd_row_color
 
+left_column_color, odd_row_color, even_row_color, average_row_color :: String
 left_column_color = "#d0d0ff"  -- light blue
 odd_row_color     = "#d0d0ff"  -- light blue
 even_row_color    = "#f0f0ff"  -- v. light blue
@@ -363,20 +367,16 @@ multiTabHeader ss
 
 -- Calculate a color ranging from bright blue for -100% to bright red for +100%.
 calcColor :: Int -> String
-calcColor percentage | percentage >= 0 = "#"     ++ (showHex val 2 "0000")
-                     | otherwise       = "#0000" ++ (showHex val 2 "")
+calcColor percentage | percentage >= 0 = printf "#%02x0000" val
+                     | otherwise       = printf "#0000%02x" val
         where val = abs percentage * 255 `div` 100
-
-showHex 0 f s = if f > 0 then take f (repeat '0') ++ s else s
-showHex i f s = showHex (i `div` 16) (f-1) (hexDig (i `mod` 16) : s)
-
-hexDig i | i > 10 = chr (i-10 + ord 'a')
-         | otherwise = chr (i + ord '0')
 
 -----------------------------------------------------------------------------
 -- LaTeX table generation (just the summary for now)
 
-latexOutput results args summary_spec summary_rows =
+latexOutput :: [ResultTable] -> [String] -> [PerProgTableSpec]
+            -> Maybe [String] -> String
+latexOutput results _ summary_spec summary_rows =
    (if (length results == 2)
         then ascii_summary_table True results summary_spec summary_rows
             . str "\n\n"
@@ -386,6 +386,8 @@ latexOutput results args summary_spec summary_rows =
 -----------------------------------------------------------------------------
 -- ASCII page generation
 
+asciiPage :: [ResultTable] -> [String] -> [PerProgTableSpec] -> Maybe [String]
+          -> String
 asciiPage results args summary_spec summary_rows =
   ( str reportTitle
   . str "\n\n"
@@ -398,21 +400,24 @@ asciiPage results args summary_spec summary_rows =
   . interleave "\n\n" (map (asciiGenModTable results args)  per_module_result_tab)
   ) "\n"
 
-asciiGenProgTable results args (SpecP title _ anc get_result get_status result_ok)
-  = str title
+asciiGenProgTable :: [ResultTable] -> [String] -> PerProgTableSpec -> ShowS
+asciiGenProgTable results args (SpecP long_name _ _ get_result get_status result_ok)
+  = str long_name
   . str "\n"
   . ascii_show_results results args get_result get_status result_ok
 
-asciiGenModTable results args (SpecM title anc get_result result_ok)
-  = str title
+asciiGenModTable :: [ResultTable] -> [String] -> PerModuleTableSpec -> ShowS
+asciiGenModTable results args (SpecM long_name _ get_result result_ok)
+  = str long_name
   . str "\n"
   . ascii_show_multi_results results args get_result result_ok
 
-ascii_header width ss
+ascii_header :: Int -> [String] -> ShowS
+ascii_header w ss
         = str "\n-------------------------------------------------------------------------------\n"
         . str (rjustify 15 "Program")
         . str (space 5)
-        . foldr (.) id (map (str . rjustify width) ss)
+        . foldr (.) id (map (str . rjustify w) ss)
         . str "\n-------------------------------------------------------------------------------\n"
 
 ascii_show_results
@@ -424,6 +429,8 @@ ascii_show_results
         -> (a -> Bool)
         -> ShowS
 
+ascii_show_results []     _  _ _    _
+ = error "ascii_show_results: Can't happen?"
 ascii_show_results (r:rs) ss f stat result_ok
         = ascii_header fIELD_WIDTH ss
         . interleave "\n" (map show_per_prog_results results_per_prog)
@@ -449,13 +456,19 @@ ascii_summary_table
         -> [PerProgTableSpec]
         -> Maybe [String]
         -> ShowS
+ascii_summary_table _     []        _     _
+ = error "ascii_summary_table: Can't happen?"
+ascii_summary_table _     [_]       _     _
+ = error "ascii_summary_table: Can't happen?"
 ascii_summary_table latex (r1:r2:_) specs mb_restrict
   | latex     = makeLatexTable (rows ++ TableLine : av_rows)
   | otherwise =
-       makeTable (table_layout (length specs) width)
-          (TableLine : TableRow header : TableLine : rows ++ TableLine : av_rows)
+       makeTable (table_layout (length specs) w)
+          (TableLine : TableRow header_row :
+           TableLine : rows ++
+           TableLine : av_rows)
   where
-        header = BoxString "Program" : map BoxString headings
+        header_row = BoxString "Program" : map BoxString headings
 
         (headings, columns, av_cols) = unzip3 (map calc_col specs)
         av_heads = [BoxString "Min", BoxString "Max", BoxString "Geometric Mean"]
@@ -469,7 +482,7 @@ ascii_summary_table latex (r1:r2:_) specs mb_restrict
              | otherwise = rows1
 
         av_rows = map TableRow (zipWith (:) av_heads (transpose av_cols))
-        width   = 10
+        w   = 10
 
         calc_col (SpecP _ heading _ getr gets ok)
             -- throw away the baseline result
@@ -499,10 +512,11 @@ mungeForLaTeX = map transrow
         transchar '_' s = '\\':'_':s
         transchar c s = c:s
 
-table_layout n width =
+table_layout :: Int -> Int -> Layout
+table_layout n w =
   (str . rjustify 15) :
-  (\s -> str (space 5) . str (rjustify width s)) :
-  replicate (n-1) (str . rjustify width)
+  (\s -> str (space 5) . str (rjustify w s)) :
+  replicate (n-1) (str . rjustify w)
 
 ascii_show_multi_results
    :: Result a
@@ -512,6 +526,8 @@ ascii_show_multi_results
         -> (a -> Bool)
         -> ShowS
 
+ascii_show_multi_results []     _  _ _
+ = error "ascii_show_multi_results: Can't happen?"
 ascii_show_multi_results (r:rs) ss f result_ok
         = ascii_header fIELD_WIDTH ss
         . interleave "\n" (map show_results_for_prog results_per_prog_mod_run)
@@ -557,10 +573,11 @@ ascii_show_multi_results (r:rs) ss f result_ok
 show_per_prog_results :: (String, [BoxValue]) -> ShowS
 show_per_prog_results = show_per_prog_results_width fIELD_WIDTH
 
-show_per_prog_results_width width (prog,results)
+show_per_prog_results_width :: Int -> (String, [BoxValue]) -> ShowS
+show_per_prog_results_width w (prog,results)
         = str (rjustify 15 prog)
         . str (space 5)
-        . foldr (.) id (map (str . rjustify width . showBox) results)
+        . foldr (.) id (map (str . rjustify w . showBox) results)
 
 -- ---------------------------------------------------------------------------
 -- Generic stuff for results generation
@@ -576,7 +593,7 @@ calc_result
         -> (String,[BoxValue])
 
 calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
-        (prog, (just_result baseline base_stat :
+        (prog, (just_result m_baseline base_stat :
 
           let
                 rts' = map (\rt -> get_stuff (Map.lookup prog rt)) rts
@@ -585,22 +602,22 @@ calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
                 get_stuff (Just r) = (get_maybe_a r, get_stat r)
           in
           (
-          case baseline of
-                Just base | result_ok base
-                   -> map (\(r,s) -> percentage  r s base) rts'
-                _other
-                   -> map (\(r,s) -> just_result r s) rts'
+          case m_baseline of
+                Just baseline
+                 | result_ok baseline
+                  -> map (\(r,s) -> percentage  r s baseline) rts'
+                _ -> map (\(r,s) -> just_result r s) rts'
            )))
  where
-        baseline  = get_maybe_a base_r
+        m_baseline  = get_maybe_a base_r
         base_stat = get_stat base_r
 
         just_result Nothing  s = RunFailed s
         just_result (Just a) _ = toBox a
 
         percentage Nothing   s _    = RunFailed s
-        percentage (Just a)  _ base = Percentage
-                                         (convert_to_percentage base a)
+        percentage (Just a)  _ baseline
+            = Percentage (convert_to_percentage baseline a)
 -----------------------------------------------------------------------------
 -- Calculating geometric means and standard deviations
 
@@ -672,21 +689,21 @@ class Num a => Result a where
 -- We assume an Int is a size, and print it in kilobytes.
 
 instance Result Int where
-    convert_to_percentage 0    _    = 100
-    convert_to_percentage base size
-        = (fromIntegral size / fromIntegral base) * 100
+    convert_to_percentage 0 _ = 100
+    convert_to_percentage baseline val
+        = (fromIntegral val / fromIntegral baseline) * 100
 
     toBox = BoxInt
 
 instance Result Integer where
-    convert_to_percentage 0    _    = 100
-    convert_to_percentage base size
-        = (fromInteger size / fromInteger base) * 100
+    convert_to_percentage 0 _ = 100
+    convert_to_percentage baseline val
+        = (fromInteger val / fromInteger baseline) * 100
     toBox = BoxInteger
 
 instance Result Float where
-    convert_to_percentage 0.0  _    = 100.0
-    convert_to_percentage base size = size / base * 100
+    convert_to_percentage 0.0 _ = 100.0
+    convert_to_percentage baseline val = val / baseline * 100
 
     toBox = BoxFloat
 
@@ -704,7 +721,9 @@ data BoxValue
 
 showBox :: BoxValue -> String
 showBox (RunFailed stat) = show_stat stat
-showBox (Percentage f)   = printf "%+.1f%%" (f-100)
+showBox (Percentage f)   = case printf "%.1f%%" (f-100) of
+                               xs@('-':_) -> xs
+                               xs -> '+':xs
 showBox (BoxFloat f)     = printf "%.2f" f
 showBox (BoxInt n)       = show (n `div` 1024) ++ "k"
 showBox (BoxInteger n)   = show (n `div` 1024) ++ "k"
@@ -758,10 +777,11 @@ applyLayout layout values =
 -- General Utils
 
 split :: Char -> String -> [String]
-split c s = case rest of
-                []     -> [chunk]
-                _:rest -> chunk : split c rest
-  where (chunk, rest) = break (==c) s
+split c s = case break (==c) s of
+                (chunk, rest) ->
+                    case rest of
+                        []      -> [chunk]
+                        _:rest' -> chunk : split c rest'
 
 str :: String -> ShowS
 str = showString
