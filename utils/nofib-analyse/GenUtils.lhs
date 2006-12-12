@@ -8,7 +8,7 @@
 
 > module GenUtils (
 
->       partition', tack, 
+>       partition', tack,
 >       assocMaybeErr,
 >       arrElem,
 >       memoise,
@@ -26,7 +26,7 @@
 >       space,
 >       copy,
 >       combinePairs,
->       --trace,                -- re-export it 
+>       --trace,                -- re-export it
 >       fst3,
 >       snd3,
 >       thd3
@@ -52,7 +52,7 @@
 
 %------------------------------------------------------------------------------
 
-Here are two defs that everyone seems to define ... 
+Here are two defs that everyone seems to define ...
 HBC has it in one of its builtin modules
 
 #ifdef __GOFER__
@@ -70,13 +70,13 @@ HBC has it in one of its builtin modules
            primGenericGe "primGenericGe",
            primGenericGt "primGenericGt"   :: a -> a -> Bool
 
- instance Text (Maybe a) where { showsPrec = primPrint } 
+ instance Text (Maybe a) where { showsPrec = primPrint }
  instance Eq (Maybe a) where
-       (==) = primGenericEq 
+       (==) = primGenericEq
        (/=) = primGenericNe
 
  instance (Ord a) => Ord (Maybe a)
-   where 
+   where
        Nothing  <=  _       = True
        _        <=  Nothing = True
        (Just a) <= (Just b) = a <= b
@@ -87,7 +87,7 @@ HBC has it in one of its builtin modules
 > maybeMap f (Just a) = Just (f a)
 > maybeMap _ Nothing  = Nothing
 
-> joinMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a 
+> joinMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
 > joinMaybe _ Nothing  Nothing  = Nothing
 > joinMaybe _ (Just g) Nothing  = Just g
 > joinMaybe _ Nothing  (Just g) = Just g
@@ -95,8 +95,8 @@ HBC has it in one of its builtin modules
 
 > data MaybeErr a err = Succeeded a | Failed err deriving (Eq,Text)
 
-@mkClosure@ makes a closure, when given a comparison and iteration loop. 
-Be careful, because if the functional always makes the object different, 
+@mkClosure@ makes a closure, when given a comparison and iteration loop.
+Be careful, because if the functional always makes the object different,
 This will never terminate.
 
 > mkClosure :: (a -> a -> Bool) -> (a -> a) -> a -> a
@@ -109,14 +109,14 @@ This will never terminate.
 > foldb _ [] = error "can't reduce an empty list using foldb"
 > foldb _ [x] = x
 > foldb f l  = foldb f (foldb' l)
->    where 
+>    where
 >       foldb' (x:y:x':y':xs) = f (f x y) (f x' y') : foldb' xs
 >       foldb' (x:y:xs) = f x y : foldb' xs
 >       foldb' xs = xs
 
-Merge two ordered lists into one ordered list. 
+Merge two ordered lists into one ordered list.
 
-> mergeWith               :: (a -> a -> Bool) -> [a] -> [a] -> [a] 
+> mergeWith               :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 > mergeWith _ []     ys      = ys
 > mergeWith _ xs     []      = xs
 > mergeWith le (x:xs) (y:ys)
@@ -136,9 +136,9 @@ quickest sorting function I know of.
 > sortWith _ [] = []
 > sortWith le lst = foldb (mergeWith le) (splitList lst)
 >   where
->       splitList (a1:a2:a3:a4:a5:xs) = 
->                insertWith le a1 
->               (insertWith le a2 
+>       splitList (a1:a2:a3:a4:a5:xs) =
+>                insertWith le a1
+>               (insertWith le a2
 >               (insertWith le a3
 >               (insertWith le a4 [a5]))) : splitList xs
 >       splitList [] = []
@@ -154,7 +154,7 @@ quickest sorting function I know of.
 > handleMaybe m k = case m of
 >                Nothing -> k
 >                _ -> m
- 
+
 > findJust :: (a -> Maybe b) -> [a] -> Maybe b
 > findJust f = foldr handleMaybe Nothing . map f
 
@@ -182,21 +182,21 @@ Gofer-like stuff:
 > partition' :: (Eq b) => (a -> b) -> [a] -> [[a]]
 > partition' f [] = []
 > partition' f [x] = [[x]]
-> partition' f (x:x':xs) | f x == f x' 
+> partition' f (x:x':xs) | f x == f x'
 >    = tack x (partition' f (x':xs))
->                       | otherwise 
+>                       | otherwise
 >    = [x] : partition' f (x':xs)
 
 > tack x xss = (x : head xss) : tail xss
 
 > combinePairs :: (Ord a) => [(a,b)] -> [(a,[b])]
-> combinePairs xs = 
+> combinePairs xs =
 >       combine [ (a,[b]) | (a,b) <- sortWith (\ (a,_) (b,_) -> a <= b) xs]
 >  where
 >       combine [] = []
 >       combine ((a,b):(c,d):r) | a == c = combine ((a,b++d) : r)
 >       combine (a:r) = a : combine r
-> 
+>
 
 #if __HASKELL1__ < 3 || ( defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 200 )
 
@@ -210,7 +210,7 @@ Gofer-like stuff:
 
 > compare a b | a <  b    = LT
 >             | a == b    = EQ
->             | otherwise = GT 
+>             | otherwise = GT
 
 > isJust :: Maybe a -> Bool
 > isJust (Just _) = True
@@ -222,14 +222,14 @@ Gofer-like stuff:
 > assocMaybeErr env k = case [ val | (key,val) <- env, k == key] of
 >                        [] -> Failed "assoc: "
 >                        (val:vs) -> Succeeded val
-> 
+>
 
 Now some utilties involving arrays.
 Here is a version of @elem@ that uses partual application
 to optimise lookup.
 
 > arrElem :: (Ix a) => [a] -> a -> Bool
-> arrElem obj = \x -> inRange size x && arr ! x 
+> arrElem obj = \x -> inRange size x && arr ! x
 >   where
 >       obj' = sort obj
 >       size = (head obj',last obj')
