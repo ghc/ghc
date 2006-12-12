@@ -216,6 +216,14 @@ interestingArg (Var v)	         = hasSomeUnfolding (idUnfolding v)
 interestingArg (Type _)	         = False
 interestingArg (App fn (Type _)) = interestingArg fn
 interestingArg (Note _ a)	 = interestingArg a
+
+-- Idea (from Sam B); I'm not sure if it's a good idea, so commented out for now
+-- interestingArg expr | isUnLiftedType (exprType expr)
+--        -- Unlifted args are only ever interesting if we know what they are
+--  =                  case expr of
+--                        Lit lit -> True
+--                        _       -> False
+
 interestingArg other	         = True
 	-- Consider 	let x = 3 in f x
 	-- The substitution will contain (x -> ContEx 3), and we want to
