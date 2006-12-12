@@ -11,6 +11,8 @@ module ByteCodeInstr (
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import ByteCodeItbls	( ItblPtr )
+
 import Outputable
 import Name
 import Id
@@ -38,7 +40,7 @@ data ProtoBCO a
 	-- what the BCO came from
 	protoBCOExpr       :: Either  [AnnAlt Id VarSet] (AnnExpr Id VarSet),
 	-- malloc'd pointers
-        protoBCOPtrs       :: [Ptr ()]
+        protoBCOPtrs       :: [Either ItblPtr (Ptr ())]
    }
 
 type LocalLabel = Int

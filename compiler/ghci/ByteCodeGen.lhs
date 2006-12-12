@@ -10,6 +10,7 @@ module ByteCodeGen ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 #include "HsVersions.h"
 
 import ByteCodeInstr
+import ByteCodeItbls
 import ByteCodeFFI
 import ByteCodeAsm
 import ByteCodeLink
@@ -48,7 +49,7 @@ import Constants
 
 import Data.List	( intersperse, sortBy, zip4, zip6, partition )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8,
-			  withForeignPtr )
+			  withForeignPtr, castFunPtrToPtr )
 import Foreign.C	( CInt )
 import Control.Exception	( throwDyn )
 
@@ -138,7 +139,7 @@ mkProtoBCO
    -> Int
    -> [StgWord]
    -> Bool   	-- True <=> is a return point, rather than a function
-   -> [Ptr ()]
+   -> [BcPtr]
    -> ProtoBCO name
 mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap
   is_ret mallocd_blocks
@@ -926,7 +927,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          ioToBc (mkMarshalCode cconv
                     (r_offW, r_rep) addr_offW
                     (zip args_offW a_reps))	`thenBc` \ addr_of_marshaller ->
-         recordMallocBc addr_of_marshaller	`thenBc_`
+         recordItblMallocBc (ItblPtr (castFunPtrToPtr addr_of_marshaller)) `thenBc_`
      let
 	 -- Offset of the next stack frame down the stack.  The CCALL
  	 -- instruction needs to describe the chunk of stack containing
@@ -935,7 +936,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
 	 stk_offset   = d_after_r - s
 
          -- do the call
-         do_call      = unitOL (CCALL stk_offset (castPtr addr_of_marshaller))
+         do_call      = unitOL (CCALL stk_offset (castFunPtrToPtr addr_of_marshaller))
          -- slide and return
          wrapup       = mkSLIDE r_sizeW (d_after_r - r_sizeW - s)
                         `snocOL` RETURN_UBX r_rep
@@ -1102,7 +1103,7 @@ pushAtom d p (AnnLit lit)
 			    -- to be on the safe side we copy the string into
 			    -- a malloc'd area of memory.
                                 ioToBc (mallocBytes (n+1)) `thenBc` \ ptr ->
-                                recordMallocBc ptr         `thenBc_`
+                                recordMallocBc ptr `thenBc_`
                                 ioToBc (
                                    withForeignPtr fp $ \p -> do
 				      memcpy ptr p (fromIntegral n)
@@ -1314,10 +1315,12 @@ mkStackOffsets original_depth szsw
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad
 
+type BcPtr = Either ItblPtr (Ptr ())
+
 data BcM_State 
    = BcM_State { 
 	nextlabel :: Int,		-- for generating local labels
-	malloced  :: [Ptr ()] }		-- ptrs malloced for current BCO
+	malloced  :: [BcPtr] }		-- thunks malloced for current BCO
 					-- Should be free()d when it is GCd
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r))
@@ -1351,13 +1354,17 @@ instance Monad BcM where
   (>>)  = thenBc_
   return = returnBc
 
-emitBc :: ([Ptr ()] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
+emitBc :: ([BcPtr] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco
   = BcM $ \st -> return (st{malloced=[]}, bco (malloced st))
 
 recordMallocBc :: Ptr a -> BcM ()
 recordMallocBc a
-  = BcM $ \st -> return (st{malloced = castPtr a : malloced st}, ())
+  = BcM $ \st -> return (st{malloced = Right (castPtr a) : malloced st}, ())
+
+recordItblMallocBc :: ItblPtr -> BcM ()
+recordItblMallocBc a
+  = BcM $ \st -> return (st{malloced = Left a : malloced st}, ())
 
 getLabelBc :: BcM Int
 getLabelBc

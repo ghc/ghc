@@ -979,6 +979,11 @@ calcNeeded(void)
    in the page, and when the page is emptied (all objects on the page
    are free) we free the page again, not forgetting to make it
    non-executable.
+
+   TODO: The inability to handle objects bigger than BLOCK_SIZE_W means that
+         the linker cannot use allocateExec for loading object code files
+         on Windows. Once allocateExec can handle larger objects, the linker
+         should be modified to use allocateExec instead of VirtualAlloc.
    ------------------------------------------------------------------------- */
 
 static bdescr *exec_block;

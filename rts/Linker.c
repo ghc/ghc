@@ -10,7 +10,7 @@
 #include "PosixSource.h"
 #endif
 
-/* Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h> and 
+/* Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h> and
    MREMAP_MAYMOVE from <sys/mman.h>.
  */
 #ifdef __linux__
@@ -1161,13 +1161,12 @@ loadObj( char *path )
    void *map_addr = NULL;
 #else
    FILE *f;
-   int misalignment;
 #endif
    initLinker();
 
    /* debugBelch("loadObj %s\n", path ); */
 
-   /* Check that we haven't already loaded this object. 
+   /* Check that we haven't already loaded this object.
       Ignore requests to load multiple times */
    {
        ObjectCode *o;
@@ -1257,7 +1256,7 @@ loadObj( char *path )
 #define EXTRA_MAP_FLAGS 0
 #endif
 
-   oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE, 
+   oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE,
 		    MAP_PRIVATE|EXTRA_MAP_FLAGS, fd, 0);
    if (oc->image == MAP_FAILED)
       barf("loadObj: can't map `%s'", path);
@@ -1271,7 +1270,12 @@ loadObj( char *path )
    if (!f)
        barf("loadObj: can't read `%s'", path);
 
-#ifdef darwin_HOST_OS
+#   if defined(mingw32_HOST_OS)
+	// TODO: We would like to use allocateExec here, but allocateExec
+	//       cannot currently allocate blocks large enough.
+    oc->image = VirtualAlloc(NULL, oc->fileSize, MEM_RESERVE | MEM_COMMIT,
+                             PAGE_EXECUTE_READWRITE);
+#   elif defined(darwin_HOST_OS)
     // In a Mach-O .o file, all sections can and will be misaligned
     // if the total size of the headers is not a multiple of the
     // desired alignment. This is fine for .o files that only serve
@@ -1281,15 +1285,12 @@ loadObj( char *path )
     // We calculate the correct alignment from the header before
     // reading the file, and then we misalign oc->image on purpose so
     // that the actual sections end up aligned again.
-   misalignment = machoGetMisalignment(f);
-   oc->misalignment = misalignment;
-#else
-   misalignment = 0;
-#endif
-
+   oc->misalignment = machoGetMisalignment(f);
    oc->image = stgMallocBytes(oc->fileSize + misalignment, "loadObj(image)");
-   oc->image += misalignment;
-   
+#  else
+   oc->image = stgMallocBytes(oc->fileSize, "loadObj(image)");
+#  endif
+
    n = fread ( oc->image, 1, oc->fileSize, f );
    if (n != oc->fileSize)
       barf("loadObj: error whilst reading `%s'", path);
@@ -1402,9 +1403,13 @@ unloadObj( char *path )
 		prev->next = oc->next;
 	    }
 
-	    /* We're going to leave this in place, in case there are
-	       any pointers from the heap into it: */
-	    /* stgFree(oc->image); */
+	    // We're going to leave this in place, in case there are
+	    // any pointers from the heap into it:
+		// #ifdef mingw32_HOST_OS
+		//  VirtualFree(oc->image);
+		// #else
+	    //  stgFree(oc->image);
+	    // #endif
 	    stgFree(oc->fileName);
 	    stgFree(oc->symbols);
 	    stgFree(oc->sections);
@@ -1479,7 +1484,7 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
 
 /*
   ocAllocateJumpIslands
-  
+
   Allocate additional space at the end of the object file image to make room
   for jump islands.
   

@@ -46,7 +46,7 @@ import GHC.Exts		( BCO#, newBCO#, unsafeCoerce#, Int#,
 
 import GHC.Arr		( Array(..) )
 import GHC.IOBase	( IO(..) )
-import GHC.Ptr		( Ptr(..) )
+import GHC.Ptr		( Ptr(..), castPtr )
 import GHC.Base		( writeArray#, RealWorld, Int(..) )
 \end{code}
 
@@ -124,7 +124,7 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS itblsSS
             ptrs_parr = case ptrs_arr of Array lo hi parr -> parr
 
             itbls_arr = listArray (0, n_itbls-1) linked_itbls
-                        :: UArray Int ItblPtr
+
             itbls_barr = case itbls_arr of UArray lo hi barr -> barr
 
             literals_arr = listArray (0, n_literals-1) linked_literals
@@ -222,7 +222,7 @@ lookupName ce nm
 lookupIE :: ItblEnv -> Name -> IO (Ptr a)
 lookupIE ie con_nm 
    = case lookupNameEnv ie con_nm of
-        Just (_, Ptr a) -> return (Ptr a)
+        Just (_, a) -> return (castPtr (itblCode a))
         Nothing
            -> do -- try looking up in the object files.
                  let sym_to_find1 = nameToCLabel con_nm "con_info"

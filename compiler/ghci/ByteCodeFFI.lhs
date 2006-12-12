@@ -5,7 +5,7 @@
 ByteCodeGen: Generate machine-code sequences for foreign import
 
 \begin{code}
-module ByteCodeFFI ( mkMarshalCode, moan64 ) where
+module ByteCodeFFI ( mkMarshalCode, moan64, newExec ) where
 
 #include "HsVersions.h"
 
@@ -18,10 +18,12 @@ import Panic
 -- there is ifdeffery below
 import Control.Exception ( throwDyn )
 import Data.Bits	( Bits(..), shiftR, shiftL )
-import Foreign		( newArray, Ptr )
 import Data.List        ( mapAccumL )
 
 import Data.Word	( Word8, Word32 )
+import Foreign		( Ptr, FunPtr, castPtrToFunPtr,
+			  Storable, sizeOf, pokeArray )
+import Foreign.C	( CUInt )
 import System.IO.Unsafe ( unsafePerformIO )
 import System.IO	( hPutStrLn, stderr )
 -- import Debug.Trace	( trace )
@@ -70,14 +72,23 @@ we don't clear our own (single) arg off the C stack.
 -}
 mkMarshalCode :: CCallConv
               -> (Int, CgRep) -> Int -> [(Int, CgRep)] 
-              -> IO (Ptr Word8)
+              -> IO (FunPtr ())
 mkMarshalCode cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    = let bytes = mkMarshalCode_wrk cconv (r_offW, r_rep) 
                                    addr_offW arg_offs_n_reps
-     in  Foreign.newArray bytes
+     in  newExec bytes
 
+newExec :: Storable a => [a] -> IO (FunPtr ())
+newExec code
+   = do ptr <- _allocateExec (fromIntegral $ codeSize undefined code)
+        pokeArray ptr code
+        return (castPtrToFunPtr ptr)
+   where
+   codeSize :: Storable a => a -> [a] -> Int
+   codeSize dummy array = sizeOf(dummy) * length array
 
-
+foreign import ccall unsafe "allocateExec"
+  _allocateExec :: CUInt -> IO (Ptr a)  
 
 mkMarshalCode_wrk :: CCallConv 
                   -> (Int, CgRep) -> Int -> [(Int, CgRep)] 

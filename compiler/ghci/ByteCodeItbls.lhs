@@ -6,10 +6,11 @@ ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
-module ByteCodeItbls ( ItblEnv, ItblPtr, mkITbls ) where
+module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls ) where
 
 #include "HsVersions.h"
 
+import ByteCodeFFI	( newExec )
 import Name		( Name, getName )
 import NameEnv
 import SMRep		( typeCgRep )
@@ -35,7 +36,15 @@ import GHC.Ptr		( Ptr(..) )
 %************************************************************************
 
 \begin{code}
-type ItblPtr = Ptr StgInfoTable
+newtype ItblPtr = ItblPtr (Ptr ()) deriving Show
+
+itblCode :: ItblPtr -> Ptr ()
+itblCode (ItblPtr ptr)
+   = (castPtr ptr)
+#ifdef GHCI_TABLES_NEXT_TO_CODE
+                 `plusPtr` (wORD_SIZE * 2)
+#endif
+
 type ItblEnv = NameEnv (Name, ItblPtr)
 	-- We need the Name in the range so we know which
 	-- elements to filter out when unloading a module
@@ -107,16 +116,11 @@ make_constr_itbls cons
                  -- This is the only arch-dependent bit.
                  code = mkJumpToAddr entry_addr
              in
-                 do addr <- malloc_exec (sizeOf itbl)
+                 do addr <- newExec [itbl]
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
-                    poke addr itbl
-                    return (getName dcon, addr
-#ifdef GHCI_TABLES_NEXT_TO_CODE
-                                               `plusPtr` (2 * wORD_SIZE)
-#endif
-                           )
+                    return (getName dcon, ItblPtr (castFunPtrToPtr addr))
 
 
 -- Make code which causes a jump to the given address.  This is the
@@ -389,11 +393,5 @@ store x = do addr <- advance
 load :: Storable a => PtrIO a
 load = do addr <- advance
           lift (peek addr)
-
-foreign import ccall unsafe "allocateExec"
-  _allocateExec :: CUInt -> IO (Ptr a)
-
-malloc_exec :: Int -> IO (Ptr a)
-malloc_exec bytes = _allocateExec (fromIntegral bytes)
 
 \end{code}
