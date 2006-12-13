@@ -228,10 +228,12 @@ tcExpr in_expr@(SectionR lop@(L loc op) arg2) res_ty
   where
     doc = ptext SLIT("The section") <+> quotes (ppr in_expr)
 		<+> ptext SLIT("takes one argument")
-    tc_args arg1_ty' [arg1_ty, arg2_ty] 
-	= do { boxyUnify arg1_ty' arg1_ty
-	     ; tcArg lop (arg2, arg2_ty, 2) }
-    tc_args arg1_ty' other = panic "tcExpr SectionR"
+    tc_args arg1_ty' qtvs qtys [arg1_ty, arg2_ty] 
+	= do { boxyUnify arg1_ty' (substTyWith qtvs qtys arg1_ty)
+	     ; arg2' <- tcArg lop 2 arg2 qtvs qtys arg2_ty 
+	     ; qtys' <- mapM refineBox qtys	-- c.f. tcArgs 
+	     ; return (qtys', arg2') }
+    tc_args arg1_ty' _ _ _ = panic "tcExpr SectionR"
 \end{code}
 
 \begin{code}
@@ -321,12 +323,15 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 	; checkMissingFields data_con rbinds
 
 	; let arity = dataConSourceArity data_con
-	      check_fields arg_tys 
-		  = do	{ rbinds' <- tcRecordBinds data_con arg_tys rbinds
-		 	; mapM unBox arg_tys 
-			; return rbinds' }
-		-- The unBox ensures that all the boxes in arg_tys are indeed
+	      check_fields qtvs qtys arg_tys 
+		  = do	{ let arg_tys' = substTys (zipOpenTvSubst qtvs qtys) arg_tys
+			; rbinds' <- tcRecordBinds data_con arg_tys' rbinds
+		 	; qtys' <- mapM refineBoxToTau qtys
+			; return (qtys', rbinds') }
+		-- The refineBoxToTau ensures that all the boxes in arg_tys are indeed
 		-- filled, which is the invariant expected by tcIdApp
+		-- How could this not be the case?  Consider a record construction
+		-- that does not mention all the fields.
 
 	; (con_expr, rbinds') <- tcIdApp con_name arity check_fields res_ty
 
@@ -571,9 +576,9 @@ tcExpr other _ = pprPanic "tcMonoExpr" (ppr other)
 ---------------------------
 tcApp :: HsExpr Name				-- Function
       -> Arity					-- Number of args reqd
-      -> ([BoxySigmaType] -> TcM arg_results)	-- Argument type-checker
+      -> ArgChecker results
       -> BoxyRhoType				-- Result type
-      -> TcM (HsExpr TcId, arg_results)		
+      -> TcM (HsExpr TcId, results)		
 
 -- (tcFun fun n_args arg_checker res_ty)
 -- The argument type checker, arg_checker, will be passed exactly n_args types
@@ -582,19 +587,18 @@ tcApp (HsVar fun_name) n_args arg_checker res_ty
   = tcIdApp fun_name n_args arg_checker res_ty
 
 tcApp fun n_args arg_checker res_ty	-- The vanilla case (rula APP)
-  = do	{ arg_boxes <- newBoxyTyVars (replicate n_args argTypeKind)
-	; fun'      <- tcExpr fun (mkFunTys (mkTyVarTys arg_boxes) res_ty)
-	; arg_tys'  <- mapM readFilledBox arg_boxes
-	; args'     <- arg_checker arg_tys'
+  = do	{ arg_boxes  <- newBoxyTyVars (replicate n_args argTypeKind)
+	; fun'       <- tcExpr fun (mkFunTys (mkTyVarTys arg_boxes) res_ty)
+	; arg_tys'   <- mapM readFilledBox arg_boxes
+	; (_, args') <- arg_checker [] [] arg_tys'	-- Yuk
 	; return (fun', args') }
 
 ---------------------------
 tcIdApp :: Name					-- Function
         -> Arity				-- Number of args reqd
-        -> ([BoxySigmaType] -> TcM arg_results)	-- Argument type-checker
-		-- The arg-checker guarantees to fill all boxes in the arg types
+        -> ArgChecker results	-- The arg-checker guarantees to fill all boxes in the arg types
         -> BoxyRhoType				-- Result type
-        -> TcM (HsExpr TcId, arg_results)		
+        -> TcM (HsExpr TcId, results)		
 
 -- Call 	(f e1 ... en) :: res_ty
 -- Type		f :: forall a b c. theta => fa_1 -> ... -> fa_k -> fres
@@ -627,23 +631,16 @@ tcIdApp fun_name n_args arg_checker res_ty
 	; let extra_arg_tys' = mkTyVarTys extra_arg_boxes
 	      res_ty' 	     = mkFunTys extra_arg_tys' res_ty
 	; qtys' <- preSubType qtvs tau_qtvs fun_res_ty res_ty'
-	; let arg_subst    = zipOpenTvSubst qtvs qtys'
-	      fun_arg_tys' = substTys arg_subst fun_arg_tys
 
 	-- Typecheck the arguments!
 	-- Doing so will fill arg_qtvs and extra_arg_tys'
-	; args' <- arg_checker (fun_arg_tys' ++ extra_arg_tys')
+	; (qtys'', args') <- arg_checker qtvs qtys' (fun_arg_tys ++ extra_arg_tys')
 
 	-- Strip boxes from the qtvs that have been filled in by the arg checking
-	-- AND any variables that are mentioned in neither arg nor result
-	-- the latter are mentioned only in constraints; stripBoxyType will 
-	-- fill them with a monotype
-	; let strip qtv qty' | qtv `elemVarSet` arg_qtvs = stripBoxyType qty'
-			     | otherwise		 = return qty'
-	; qtys'' <- zipWithM strip qtvs qtys'
 	; extra_arg_tys'' <- mapM readFilledBox extra_arg_boxes
 
 	-- Result subsumption
+	-- This fills in res_qtvs
 	; let res_subst = zipOpenTvSubst qtvs qtys''
 	      fun_res_ty'' = substTy res_subst fun_res_ty
 	      res_ty'' = mkFunTys extra_arg_tys'' res_ty
@@ -653,7 +650,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 	-- By applying the coercion just to the *function* we can make
 	-- tcFun work nicely for OpApp and Sections too
 	; fun' <- instFun orig fun res_subst tv_theta_prs
-	; co_fn' <- wrapFunResCoercion fun_arg_tys' co_fn
+	; co_fn' <- wrapFunResCoercion (substTys res_subst fun_arg_tys) co_fn
 	; return (mkHsWrap co_fn' fun', args') }
 \end{code}
 
@@ -818,19 +815,45 @@ This gets a bit less sharing, but
 	a) it's better for RULEs involving overloaded functions
 	b) perhaps fewer separated lambdas
 
+Note [Left to right]
+~~~~~~~~~~~~~~~~~~~~
+tcArgs implements a left-to-right order, which goes beyond what is described in the
+impredicative type inference paper.  In particular, it allows
+	runST $ foo
+where runST :: (forall s. ST s a) -> a
+When typechecking the application of ($)::(a->b) -> a -> b, we first check that
+runST has type (a->b), thereby filling in a=forall s. ST s a.  Then we un-box this type
+before checking foo.  The left-to-right order really helps here.
+
 \begin{code}
 tcArgs :: LHsExpr Name				-- The function (for error messages)
-       -> [LHsExpr Name] -> [TcSigmaType]	-- Actual arguments and expected arg types
-       -> TcM [LHsExpr TcId]			-- Resulting args
+       -> [LHsExpr Name] 			-- Actual args
+       -> ArgChecker [LHsExpr TcId]
 
-tcArgs fun args expected_arg_tys
-  = mapM (tcArg fun) (zip3 args expected_arg_tys [1..])
+type ArgChecker results
+   = [TyVar] -> [TcSigmaType] 		-- Current instantiation
+   -> [TcSigmaType]			-- Expected arg types (**before** applying the instantiation)
+   -> TcM ([TcSigmaType], results)	-- Resulting instaniation and args
 
-tcArg :: LHsExpr Name				-- The function (for error messages)
-       -> (LHsExpr Name, BoxySigmaType, Int)	-- Actual argument and expected arg type
-       -> TcM (LHsExpr TcId)			-- Resulting argument
-tcArg fun (arg, ty, arg_no) = addErrCtxt (funAppCtxt fun arg arg_no) $
-			      tcPolyExprNC arg ty
+tcArgs fun args qtvs qtys arg_tys
+  = go 1 qtys args arg_tys
+  where
+    go n qtys [] [] = return (qtys, [])
+    go n qtys (arg:args) (arg_ty:arg_tys)
+	= do { arg' <- tcArg fun n arg qtvs qtys arg_ty
+	     ; qtys' <- mapM refineBox qtys	-- Exploit new info
+	     ; (qtys'', args') <- go (n+1) qtys' args arg_tys
+	     ; return (qtys'', arg':args') }
+
+tcArg :: LHsExpr Name				-- The function
+      -> Int					--   and arg number (for error messages)
+      -> LHsExpr Name
+      -> [TyVar] -> [TcSigmaType] 		-- Instantiate the arg type like this
+      -> BoxySigmaType
+      -> TcM (LHsExpr TcId)			-- Resulting argument
+tcArg fun arg_no arg qtvs qtys ty
+  = addErrCtxt (funAppCtxt fun arg arg_no) $
+    tcPolyExprNC arg (substTyWith qtvs qtys ty)
 \end{code}
 
 

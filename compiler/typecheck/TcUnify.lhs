@@ -19,7 +19,7 @@ module TcUnify (
 
   --------------------------------
   -- Holes
-  tcInfer, subFunTys, unBox, stripBoxyType, withBox, 
+  tcInfer, subFunTys, unBox, refineBox, refineBoxToTau, withBox, 
   boxyUnify, boxyUnifyList, zapToMonotype,
   boxySplitListTy, boxySplitTyConApp, boxySplitAppTy,
   wrapFunResCoercion
@@ -607,7 +607,8 @@ tc_sub :: SubCtxt		-- How to add an error-context
 -- e.g. in the SPEC rule where we just use splitSigmaTy 
 	
 tc_sub sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
-  = tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+  = traceTc (text "tc_sub" <+> ppr act_ty $$ ppr exp_ty) >>
+    tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
 	-- This indirection is just here to make 
 	-- it easy to insert a debug trace!
 
@@ -637,9 +638,11 @@ tc_sub1 sub_ctxt act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
 -- Consider  f g !
 
 tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
-  | not exp_ib, 	-- SKOL does not apply if exp_ty is inside a box
-    isSigmaTy exp_ty	
-  = do	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ _ body_exp_ty ->
+  | isSigmaTy exp_ty	
+  = if exp_ib then  	-- SKOL does not apply if exp_ty is inside a box
+	defer_to_boxy_matching sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+    else do 
+	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ _ body_exp_ty ->
 			     tc_sub sub_ctxt act_sty act_ty False body_exp_ty body_exp_ty
 	; return (gen_fn <.> co_fn) }
   where
@@ -713,10 +716,13 @@ tc_sub1 sub_ctxt act_sty act_ty@(FunTy act_arg act_res) _ exp_sty (TyVarTy exp_t
 
 -- Everything else: defer to boxy matching
 tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
+  = defer_to_boxy_matching sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
+
+-----------------------------------
+defer_to_boxy_matching sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
   = do	{ addSubCtxt sub_ctxt act_sty exp_sty $
 	  u_tys True False act_sty actual_ty exp_ib exp_sty expected_ty
 	; return idHsWrapper }
-
 
 -----------------------------------
 tc_sub_funs act_arg act_res exp_ib exp_arg exp_res
@@ -942,8 +948,45 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
     go outer (TyVarTy tyvar1) ty2 = uVar outer False tyvar1 nb2 orig_ty2 ty2
     go outer ty1 (TyVarTy tyvar2) = uVar outer True  tyvar2 nb1 orig_ty1 ty1
 				-- "True" means args swapped
+
+	-- The case for sigma-types must *follow* the variable cases
+	-- because a boxy variable can be filed with a polytype;
+	-- but must precede FunTy, because ((?x::Int) => ty) look
+	-- like a FunTy; there isn't necy a forall at the top
+    go _ ty1 ty2
+      | isSigmaTy ty1 || isSigmaTy ty2
+      = do   { checkM (equalLength tvs1 tvs2)
+		      (unifyMisMatch outer False orig_ty1 orig_ty2)
+
+	     ; tvs <- tcInstSkolTyVars UnkSkol tvs1	-- Not a helpful SkolemInfo
+			-- Get location from monad, not from tvs1
+	     ; let tys      = mkTyVarTys tvs
+	           in_scope = mkInScopeSet (mkVarSet tvs)
+ 	           subst1   = mkTvSubst in_scope (zipTyEnv tvs1 tys)
+	           subst2   = mkTvSubst in_scope (zipTyEnv tvs2 tys)
+		   (theta1,tau1) = tcSplitPhiTy (substTy subst1 body1)
+		   (theta2,tau2) = tcSplitPhiTy (substTy subst2 body2)
+
+	     ; checkM (equalLength theta1 theta2)
+		      (unifyMisMatch outer False orig_ty1 orig_ty2)
+	     
+	     ; uPreds False nb1 theta1 nb2 theta2
+	     ; uTys nb1 tau1 nb2 tau2
+
+		-- If both sides are inside a box, we are in a "box-meets-box"
+		-- situation, and we should not have a polytype at all.  
+		-- If we get here we have two boxes, already filled with
+		-- the same polytype... but it should be a monotype.
+		-- This check comes last, because the error message is 
+		-- extremely unhelpful.  
+	     ; ifM (nb1 && nb2) (notMonoType ty1)
+	     }
+      where
+	(tvs1, body1) = tcSplitForAllTys ty1
+	(tvs2, body2) = tcSplitForAllTys ty2
+
 	-- Predicates
-    go outer (PredTy p1) (PredTy p2) = uPred outer nb1 p1 nb2 p2
+    go outer (PredTy p1) (PredTy p2) = uPred False nb1 p1 nb2 p2
 
 	-- Type constructors must match
     go _ (TyConApp con1 tys1) (TyConApp con2 tys2)
@@ -969,27 +1012,6 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
       | Just (s1,t1) <- tcSplitAppTy_maybe ty1
       = do { uTys nb1 s1 nb2 s2; uTys nb1 t1 nb2 t2 }
 
-    go _ ty1@(ForAllTy _ _) ty2@(ForAllTy _ _)
-      | length tvs1 == length tvs2
-      = do   { tvs <- tcInstSkolTyVars UnkSkol tvs1	-- Not a helpful SkolemInfo
-			-- Get location from monad, not from tvs1
-	     ; let tys      = mkTyVarTys tvs
-	           in_scope = mkInScopeSet (mkVarSet tvs)
- 	           subst1   = mkTvSubst in_scope (zipTyEnv tvs1 tys)
-	           subst2   = mkTvSubst in_scope (zipTyEnv tvs2 tys)
-	     ; uTys nb1 (substTy subst1 body1) nb2 (substTy subst2 body2)
-
-		-- If both sides are inside a box, we are in a "box-meets-box"
-		-- situation, and we should not have a polytype at all.  
-		-- If we get here we have two boxes, already filled with
-		-- the same polytype... but it should be a monotype.
-		-- This check comes last, because the error message is 
-		-- extremely unhelpful.  
-	     ; ifM (nb1 && nb2) (notMonoType ty1)
-	     }
-      where
-	(tvs1, body1) = tcSplitForAllTys ty1
-	(tvs2, body2) = tcSplitForAllTys ty2
 
 	-- Anything else fails
     go outer _ _ = unifyMisMatch outer False orig_ty1 orig_ty2
@@ -1000,6 +1022,10 @@ uPred outer nb1 (IParam n1 t1) nb2 (IParam n2 t2)
 uPred outer nb1 (ClassP c1 tys1) nb2 (ClassP c2 tys2)
   | c1 == c2 = uTys_s nb1 tys1 nb2 tys2		-- Guaranteed equal lengths because the kinds check
 uPred outer _ p1 _ p2 = unifyMisMatch outer False (mkPredTy p1) (mkPredTy p2)
+
+uPreds outer nb1 []       nb2 []       = return ()
+uPreds outer nb1 (p1:ps1) nb2 (p2:ps2) = uPred outer nb1 p1 nb2 p2 >> uPreds outer nb1 ps1 nb2 ps2
+uPreds outer nb1 ps1      nb2 ps2      = panic "uPreds"
 \end{code}
 
 Note [Tycon app]
@@ -1380,16 +1406,27 @@ But we should not reject the program, because A t = ().
 Rather, we should bind t to () (= non_var_ty2).
 
 \begin{code}
-stripBoxyType :: BoxyType -> TcM TcType
--- Strip all boxes from the input type, returning a non-boxy type.
--- It's fine for there to be a polytype inside a box (c.f. unBox)
--- All of the boxes should have been filled in by now; 
--- hence we return a TcType
-stripBoxyType ty = zonkType strip_tv ty
-  where
-    strip_tv tv = ASSERT( not (isBoxyTyVar tv) ) return (TyVarTy tv)
-	-- strip_tv will be called for *Flexi* meta-tyvars
-	-- There should not be any Boxy ones; hence the ASSERT
+refineBox :: TcType -> TcM TcType
+-- Unbox the outer box of a boxy type (if any)
+refineBox ty@(TyVarTy box_tv) 
+  | isMetaTyVar box_tv
+  = do	{ cts <- readMetaTyVar box_tv
+	; case cts of
+		Flexi 	    -> return ty
+		Indirect ty -> return ty } 
+refineBox other_ty = return other_ty
+
+refineBoxToTau :: TcType -> TcM TcType
+-- Unbox the outer box of a boxy type, filling with a monotype if it is empty
+-- Like refineBox except for the "fill with monotype" part.
+refineBoxToTau ty@(TyVarTy box_tv) 
+  | isMetaTyVar box_tv
+  , MetaTv BoxTv ref <- tcTyVarDetails box_tv
+  = do	{ cts <- readMutVar ref
+	; case cts of
+		Flexi 	    -> fillBoxWithTau box_tv ref
+		Indirect ty -> return ty } 
+refineBoxToTau other_ty = return other_ty
 
 zapToMonotype :: BoxySigmaType -> TcM TcTauType
 -- Subtle... we must zap the boxy res_ty

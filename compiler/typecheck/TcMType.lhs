@@ -62,7 +62,6 @@ module TcMType (
 import TypeRep
 import TcType
 import Type
-import Type
 import Coercion
 import Class
 import TyCon
@@ -360,7 +359,7 @@ data LookupTyVarResult	-- The result of a lookupTcTyVar call
 
 lookupTcTyVar :: TcTyVar -> TcM LookupTyVarResult
 lookupTcTyVar tyvar 
-  = ASSERT( isTcTyVar tyvar )
+  = ASSERT2( isTcTyVar tyvar, ppr tyvar )
     case details of
       SkolemTv _   -> return (DoneTv details)
       MetaTv _ ref -> do { meta_details <- readMutVar ref
