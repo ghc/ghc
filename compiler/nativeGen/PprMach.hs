@@ -2162,6 +2162,19 @@ pprInstr (BCC cond (BlockId id)) = hcat [
     ]
     where lbl = mkAsmTempLabel id
 
+pprInstr (BCCFAR cond (BlockId id)) = vcat [
+        hcat [
+            ptext SLIT("\tb"),
+            pprCond (condNegate cond),
+            ptext SLIT("\t$+8")
+        ],
+        hcat [
+            ptext SLIT("\tb\t"),
+            pprCLabel_asm lbl
+        ]
+    ]
+    where lbl = mkAsmTempLabel id
+
 pprInstr (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
 	char '\t',
 	ptext SLIT("b"),

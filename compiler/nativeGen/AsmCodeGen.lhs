@@ -245,7 +245,7 @@ cmmNativeGen dflags cmm
 sequenceTop :: NatCmmTop -> NatCmmTop
 sequenceTop top@(CmmData _ _) = top
 sequenceTop (CmmProc info lbl params blocks) = 
-  CmmProc info lbl params (sequenceBlocks blocks)
+  CmmProc info lbl params (makeFarBranches $ sequenceBlocks blocks)
 
 -- The algorithm is very simple (and stupid): we make a graph out of
 -- the blocks where there is an edge from one block to another iff the
@@ -288,6 +288,46 @@ reorder id accum [] = (False, reverse accum)
 reorder id accum (b@(block,id',out) : rest)
   | id == id'  = (True, (block,id,out) : reverse accum ++ rest)
   | otherwise  = reorder id (b:accum) rest
+
+
+-- -----------------------------------------------------------------------------
+-- Making far branches
+
+-- Conditional branches on PowerPC are limited to +-32KB; if our Procs get too
+-- big, we have to work around this limitation.
+
+makeFarBranches :: [NatBasicBlock] -> [NatBasicBlock]
+
+#if powerpc_TARGET_ARCH
+makeFarBranches blocks
+    | last blockAddresses < nearLimit = blocks
+    | otherwise = zipWith handleBlock blockAddresses blocks
+    where
+        blockAddresses = scanl (+) 0 $ map blockLen blocks
+        blockLen (BasicBlock _ instrs) = length instrs
+        
+        handleBlock addr (BasicBlock id instrs)
+                = BasicBlock id (zipWith makeFar [addr..] instrs)
+        
+        makeFar addr (BCC ALWAYS tgt) = BCC ALWAYS tgt
+        makeFar addr (BCC cond tgt)
+            | abs (addr - targetAddr) >= nearLimit
+            = BCCFAR cond tgt
+            | otherwise
+            = BCC cond tgt
+            where Just targetAddr = lookupUFM blockAddressMap tgt
+        makeFar addr other            = other
+        
+        nearLimit = 7000 -- 8192 instructions are allowed; let's keep some
+                         -- distance, as we have a few pseudo-insns that are
+                         -- pretty-printed as multiple instructions,
+                         -- and it's just not worth the effort to calculate
+                         -- things exactly
+        
+        blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddresses
+#else
+makeFarBranches = id
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Instruction selection

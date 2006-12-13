@@ -333,6 +333,7 @@ regUsage instr = case instr of
     CMP   sz reg ri	-> usage (reg : regRI ri,[])
     CMPL  sz reg ri	-> usage (reg : regRI ri,[])
     BCC	  cond lbl	-> noUsage
+    BCCFAR cond lbl	-> noUsage
     MTCTR reg		-> usage ([reg],[])
     BCTR  targets	-> noUsage
     BL    imm params	-> usage (params, callClobberedRegs)
@@ -397,6 +398,7 @@ jumpDests insn acc
 	JMP_TBL _ ids	-> ids ++ acc
 #elif powerpc_TARGET_ARCH
         BCC _ id        -> id : acc
+        BCCFAR _ id     -> id : acc
         BCTR targets    -> targets ++ acc
 #endif
 	_other		-> acc
@@ -410,6 +412,7 @@ patchJump insn old new
 	JMP_TBL op ids -> error "Cannot patch JMP_TBL"
 #elif powerpc_TARGET_ARCH
         BCC cc id | id == old -> BCC cc new
+        BCCFAR cc id | id == old -> BCCFAR cc new
         BCTR targets -> error "Cannot patch BCTR"
 #endif
 	_other		-> insn
@@ -640,6 +643,7 @@ patchRegs instr env = case instr of
     CMP	  sz reg ri	-> CMP sz (env reg) (fixRI ri)
     CMPL  sz reg ri	-> CMPL sz (env reg) (fixRI ri)
     BCC	  cond lbl	-> BCC cond lbl
+    BCCFAR cond lbl	-> BCCFAR cond lbl
     MTCTR reg		-> MTCTR (env reg)
     BCTR  targets	-> BCTR targets
     BL    imm argRegs	-> BL imm argRegs	-- argument regs

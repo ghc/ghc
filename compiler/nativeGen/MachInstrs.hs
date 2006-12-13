@@ -15,7 +15,9 @@ module MachInstrs (
 	-- * Machine instructions
 	Instr(..),
 	Cond(..), condUnsigned, condToSigned, condToUnsigned,
-
+#if powerpc_TARGET_ARCH
+        condNegate,
+#endif
 #if !powerpc_TARGET_ARCH && !i386_TARGET_ARCH && !x86_64_TARGET_ARCH
 	Size(..), machRepSize,
 #endif
@@ -139,6 +141,20 @@ condToUnsigned LTT = LU
 condToUnsigned GE  = GEU
 condToUnsigned LE  = LEU
 condToUnsigned x   = x
+
+#if powerpc_TARGET_ARCH
+condNegate ALWAYS  = panic "condNegate: ALWAYS"
+condNegate EQQ     = NE
+condNegate GE      = LTT
+condNegate GEU     = LU
+condNegate GTT     = LE
+condNegate GU      = LEU
+condNegate LE      = GTT
+condNegate LEU     = GU
+condNegate LTT     = GE
+condNegate LU      = GEU
+condNegate NE      = EQQ
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Sizes on this architecture
@@ -660,6 +676,7 @@ fPair other = pprPanic "fPair(sparc NCG)" (ppr other)
 	      | CMPL    MachRep Reg RI --- size, src1, src2
 	      
 	      | BCC     Cond BlockId
+	      | BCCFAR  Cond BlockId
               | JMP     CLabel          -- same as branch,
                                         -- but with CLabel instead of block ID
 	      | MTCTR	Reg
