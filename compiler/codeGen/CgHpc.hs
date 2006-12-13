@@ -48,7 +48,11 @@ cgTickBox mod n = do
                      [ CmmLoad ext_tick_box I32
                      , CmmLit (CmmInt (fromIntegral n) I32)
 		     ]
-		  ,  NoHint) ]
+		  ,  NoHint)
+	       ,  ( CmmReg (CmmGlobal CurrentTSO)
+		  , PtrHint 
+		  )
+	       ]
                (Just [])
    where
       visible_tick = mkFastString "hs_hpc_tick"

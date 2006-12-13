@@ -24,8 +24,7 @@ static FILE *tixFile;			// file being read/written
 static int tix_ch;			// current char
 static StgWord64 magicTixNumber;	// Magic/Hash number to mark .tix files
 
-static int hpc_ticks_inited = 0;	// Have you started the dynamic external ticking?
-static FILE *rixFile;			// The tracer file/pipe
+static FILE *rixFile = NULL;		// The tracer file/pipe
 
 typedef struct _Info {
   char *modName;		// name of module
@@ -245,48 +244,101 @@ hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
   return offset;
 }
 
+static StgThreadID previous_tid = 0;
+
+static void 
+send_ThreadId(StgTSO *current_tso) {
+  // This assumes that there is no real thread 0.
+  StgThreadID tid = (current_tso == 0) ? 0 : current_tso->id;
+  if (tid != previous_tid) {
+    previous_tid = current_tso->id;
+    // How do we print StgWord32's without a cast?
+    fprintf(rixFile,"Thread %d\n",(unsigned int)tid);
+  }
+}
 
 /*
  * Called on *every* exception thrown
  */
 void
-hs_hpc_throw() {
+hs_hpc_throw(StgTSO *current_tso) {
   // Assumes that we have had at least *one* tick first.
   // All exceptions before the first tick are not reported.
   // The only time this might be an issue is in bootstrapping code,
   // so this is a feature.
-  if (hpc_inited != 0 && hpc_ticks_inited != 0) {
+
+  // This is called on *every* exception, even when Hpc is not enabled.
+
+  if (rixFile != NULL) {
+    assert(hpc_inited != 0);
+    send_ThreadId(current_tso);
     fprintf(rixFile,"Throw\n");
   }
 }
 
-/* Called on every tick
+/* Called on every tick, dynamically to our file record of program execution
  */
 
 void
-hs_hpc_tick(int globIx) {
-  int threadId = 0;	 // for now, assume single thread
-			 // TODO: work out how to get the thread Id to here.
-
-  
+hs_hpc_tick(int globIx, StgTSO *current_tso) {
 #if DEBUG_HPC && DEBUG
   printf("hs_hpc_tick(%d)\n",globIx);
 #endif
-  if (!hpc_ticks_inited) {
-    char* trace_filename;
+  assert(hpc_inited != 0);
+  if (rixFile != NULL) {
+    send_ThreadId(current_tso);
+    fprintf(rixFile,"%d\n",globIx);
+  }
+
+#if DEBUG_HPC
+  printf("end: hs_hpc_tick\n");
+#endif
+  
+}
+
+/* This is called after all the modules have registered their local tixboxes,
+ * and does a sanity check: are we good to go?
+ */
+
+void
+startupHpc(void) {
+  Info *tmpModule;
+  char *hpcRix;
+#if DEBUG_HPC
+  printf("startupHpc\n");
+#endif
+ 
+ if (hpc_inited == 0) {
+    return;
+  }
+
+  tmpModule = modules;
+
+  if (tixBoxes) {
+    for(;tmpModule != 0;tmpModule = tmpModule->next) {
+      if (!tmpModule->tixArr) {
+	fprintf(stderr,"error: module %s did not register any hpc tick data\n",
+		tmpModule->modName);
+	fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
+	exit(-1);
+      }
+    }
+  }
+
+  // HPCRIX contains the name of the file to send our dynamic runtime output to.
+  // This might be a real file, or perhaps a named pipe.
+  hpcRix = getenv("HPCRIX");
+  if (hpcRix) {
     int comma;
     Info *tmpModule;  
 
     assert(hpc_inited);
-    hpc_ticks_inited = 1;
 
-    trace_filename = (char *) malloc(strlen(prog_name) + 6);
-    sprintf(trace_filename, "%s.rix", prog_name);
-    rixFile = fopen(trace_filename,"w+");
+    rixFile = fopen(hpcRix,"w");
 
     comma = 0;
     
-    fprintf(rixFile,"START %s\n",prog_name);
+    fprintf(rixFile,"Starting %s\n",prog_name);
     fprintf(rixFile,"[");
     tmpModule = modules;
     for(;tmpModule != 0;tmpModule = tmpModule->next) {
@@ -308,43 +360,7 @@ hs_hpc_tick(int globIx) {
     fprintf(rixFile,"]\n");
     fflush(rixFile);
   }
-  assert(rixFile != 0);
 
-  fprintf(rixFile,"%d\n",globIx);
-
-#if DEBUG_HPC
-  printf("end: hs_hpc_tick\n");
-#endif
-  
-}
-
-/* This is called after all the modules have registered their local tixboxes,
- * and does a sanity check: are we good to go?
- */
-
-void
-startupHpc(void) {
-  Info *tmpModule;
-#if DEBUG_HPC
-  printf("startupHpc\n");
-#endif
- 
- if (hpc_inited == 0) {
-    return;
-  }
-
-  tmpModule = modules;
-
-  if (tixBoxes) {
-    for(;tmpModule != 0;tmpModule = tmpModule->next) {
-      if (!tmpModule->tixArr) {
-	fprintf(stderr,"error: module %s did not register any hpc tick data\n",
-		tmpModule->modName);
-	fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
-	exit(-1);
-      }
-    }
-  }
 }
 
 
@@ -415,7 +431,8 @@ exitHpc(void) {
   fprintf(f,"]\n");
   fclose(f);
 
-  if (hpc_ticks_inited && rixFile != 0) {
+  if (rixFile != NULL) {
+    fprintf(rixFile,"Finished\n",prog_name);
     fclose(rixFile);
   }
   

@@ -338,7 +338,7 @@ raisezh_fast
 #endif
     
     /* Inform the Hpc that an exception has been thrown */
-    foreign "C" hs_hpc_throw();
+    foreign "C" hs_hpc_throw(CurrentTSO);
 
 retry_pop_stack:
     StgTSO_sp(CurrentTSO) = Sp;
