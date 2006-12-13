@@ -432,7 +432,7 @@ exitHpc(void) {
   fclose(f);
 
   if (rixFile != NULL) {
-    fprintf(rixFile,"Finished\n",prog_name);
+    fprintf(rixFile,"Finished\n");
     fclose(rixFile);
   }
   
