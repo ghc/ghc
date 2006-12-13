@@ -18,7 +18,7 @@ module MkId (
 
 	mkDataConIds,
 	mkRecordSelId, 
-	mkPrimOpId, mkFCallId, mkTickBoxOpId, mkBinaryTickBoxOpId,
+	mkPrimOpId, mkFCallId, mkTickBoxOpId, 
 
 	mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
         mkUnpackCase, mkProductBox,
@@ -916,26 +916,6 @@ mkTickBoxOpId uniq mod ix =  mkGlobalId (TickBoxOpId tickbox) name ty info
     name    = mkTickBoxOpName uniq occ_str
     info    = noCafIdInfo
     ty      = realWorldStatePrimTy 
-
-mkBinaryTickBoxOpId 
-              :: Unique 
-	      -> Module
-	      -> TickBoxId
-	      -> TickBoxId
-	      -> Id
-mkBinaryTickBoxOpId uniq mod ixT ixF =  mkGlobalId (TickBoxOpId tickbox) name ty info    
-  where
-    tickbox  = BinaryTickBox mod ixT ixF
-    occ_str = showSDoc (braces (ppr tickbox))
-    name    = mkTickBoxOpName uniq occ_str
-    info    = noCafIdInfo
-	        `setArityInfo` 		arity
-	        `setAllStrictnessInfo`	Just strict_sig
-    ty      = mkFunTy boolTy boolTy
-
-    arity	 = 1
-    strict_sig   = mkStrictSig (mkTopDmdType (replicate arity evalDmd) TopRes)
-		   --- ?? mkStrictSig (mkTopDmdType [seqDmd] TopRes)
 \end{code}
 
 

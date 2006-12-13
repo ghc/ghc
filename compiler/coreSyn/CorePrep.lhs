@@ -390,30 +390,6 @@ corePrepExprFloat env (Case (Var id) bndr ty [(DEFAULT,[],expr)])
     deLamFloat expr1                   `thenUs` \ (floats, expr2) ->
     return (floats, Case (Var id) bndr ty [(DEFAULT,[],expr2)])
 
--- Translate Binary tickBox into standard tickBox
-corePrepExprFloat env (App (Var id) expr)
-  | Just (BinaryTickBox m t e) <- isTickBoxOp_maybe id
-  = corePrepAnExpr env expr            `thenUs` \ expr1 ->
-    deLamFloat expr1                   `thenUs` \ (floats, expr2) ->
-    getUniqueUs                        `thenUs` \ u1 ->
-    getUniqueUs                        `thenUs` \ u2 ->
-    getUniqueUs                        `thenUs` \ u3 ->
-    getUniqueUs                        `thenUs` \ u4 ->
-    getUniqueUs                        `thenUs` \ u5 ->
-    let bndr1 = mkSysLocal FSLIT("t1") u1 boolTy in
-    let bndr2 = mkSysLocal FSLIT("t2") u2 realWorldStatePrimTy in
-    let bndr3 = mkSysLocal FSLIT("t3") u3 realWorldStatePrimTy in
-    let tick_e  = mkTickBoxOpId u4 m e in
-    let tick_t  = mkTickBoxOpId u5 m t in
-    return (floats, Case expr2
-                       bndr1
-                       boolTy
-                       [ (DataAlt falseDataCon, [], 
-			  Case (Var tick_e) bndr2 boolTy [(DEFAULT,[],Var falseDataConId)])
-                       , (DataAlt trueDataCon,  [], 
-			  Case (Var tick_t) bndr3 boolTy [(DEFAULT,[],Var trueDataConId)])
-                       ])
-
 corePrepExprFloat env (Note other_note expr)
   = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
     returnUs (floats, Note other_note expr')
@@ -428,38 +404,6 @@ corePrepExprFloat env expr@(Lam _ _)
     returnUs (emptyFloats, mkLams bndrs' body')
   where
     (bndrs,body) = collectBinders expr
-
--- This is an (important) optimization.
--- case <btick,A,B>  e of { T -> e1 ; F -> e2 }
---  ==> case e of { T -> <tick,A> e1 ; F -> <tick,B> e2 }
--- This could move into the simplifier.
-
-corePrepExprFloat env (Case (App (Var id) expr) bndr ty alts)
-  | Just (BinaryTickBox m t e) <- isTickBoxOp_maybe id
-  = getUniqueUs                        `thenUs` \ u1 ->
-    getUniqueUs                        `thenUs` \ u2 ->
-    getUniqueUs                        `thenUs` \ u3 ->
-    getUniqueUs                        `thenUs` \ u4 ->
-    getUniqueUs                        `thenUs` \ u5 ->
-    let bndr1 = mkSysLocal FSLIT("t1") u1 boolTy in
-    let bndr2 = mkSysLocal FSLIT("t2") u2 realWorldStatePrimTy in
-    let bndr3 = mkSysLocal FSLIT("t3") u3 realWorldStatePrimTy in
-    let tick_e  = mkTickBoxOpId u4 m e in
-    let tick_t  = mkTickBoxOpId u5 m t in
-    ASSERT (exprType expr `coreEqType` boolTy)
-    corePrepExprFloat env $
-		Case expr
-                       bndr1
-                       ty
-                       [ (DataAlt falseDataCon, [], 
-			  Case (Var tick_e) bndr2 ty [(DEFAULT,[],falseBranch)])
-                       , (DataAlt trueDataCon,  [], 
-			  Case (Var tick_t) bndr3 ty [(DEFAULT,[],trueBranch)])
-                       ]
-
-   where
-       (_,_,trueBranch)  = findAlt (DataAlt trueDataCon) alts
-       (_,_,falseBranch) = findAlt (DataAlt falseDataCon) alts
 
 corePrepExprFloat env (Case scrut bndr ty alts)
   = corePrepExprFloat env scrut		`thenUs` \ (floats1, scrut1) ->

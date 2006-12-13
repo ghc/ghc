@@ -889,7 +889,6 @@ mkOptTickBox (Just ix) e = mkTickBox ix e
 
 mkTickBox :: Int -> CoreExpr -> DsM CoreExpr
 mkTickBox ix e = do
-       dflags <- getDOptsDs
        uq <- newUnique 	
        mod <- getModuleDs
        let tick = mkTickBoxOpId uq mod ix
@@ -907,9 +906,13 @@ mkTickBox ix e = do
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        mod <- getModuleDs
-       dflags <- getDOptsDs
        uq <- newUnique 	
        mod <- getModuleDs
-       let tick = mkBinaryTickBoxOpId uq mod ixT ixF
-       return $ App (Var tick) e
+       let bndr1 = mkSysLocal FSLIT("t1") uq boolTy 
+       falseBox <- mkTickBox ixF $ Var falseDataConId
+       trueBox  <- mkTickBox ixT $ Var trueDataConId
+       return $ Case e bndr1 boolTy
+                       [ (DataAlt falseDataCon, [], falseBox)
+                       , (DataAlt trueDataCon,  [], trueBox)
+                       ]
 \end{code}

@@ -720,10 +720,7 @@ type TickBoxId = Int
 data TickBoxOp 
    = TickBox Module !TickBoxId  -- ^Tick box for Hpc-style coverage,
 				-- type = State# Void#
-   | BinaryTickBox Module !TickBoxId !TickBoxId
-    			  -- ^Binary tick box, with a tick for result = True, result = False,
-			  -- type = Bool -> Bool
+
 instance Outputable TickBoxOp where
     ppr (TickBox mod n)         = ptext SLIT("tick") <+> ppr (mod,n)
-    ppr (BinaryTickBox mod t f) = ptext SLIT("btick") <+> ppr (mod,t,f)
 \end{code}
