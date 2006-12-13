@@ -1,5 +1,5 @@
 
-tcfail040.hs:19:13:
+tcfail040.hs:19:4:
     Ambiguous type variable `a' in the constraint:
-      `ORD a' arising from a use of `<<' at tcfail040.hs:19:13-16
+      `ORD a' arising from a use of `<<' at tcfail040.hs:19:4-7
     Probable fix: add a type signature that fixes these type variable(s)

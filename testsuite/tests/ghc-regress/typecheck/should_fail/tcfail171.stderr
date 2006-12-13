@@ -1,1 +1,9 @@
- 
+
+tcfail171.hs:9:9:
+    Could not deduce (PrintfType b, PrintfArg a) from the context ()
+      arising from a use of `printf' at tcfail171.hs:9:9-23
+    Possible fix:
+      add (PrintfType b, PrintfArg a) to the context of
+	the type signature for `phex'
+    In the expression: printf "0x%x" x
+    In the definition of `phex': phex x = printf "0x%x" x

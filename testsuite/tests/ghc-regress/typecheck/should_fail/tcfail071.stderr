@@ -1,6 +1,7 @@
 
 tcfail071.hs:9:0:
     Contexts differ in length
+      (Use -fglasgow-exts to allow this)
     When matching the contexts of the signatures for
       f :: forall d. (Ord d) => d -> d
       g :: forall e. e -> e

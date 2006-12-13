@@ -1,7 +1,7 @@
 
 tcfail130.hs:10:0:
     Implicit parameters escape from
-      the monomorphic top-level binding(s) of `foo':
+      the monomorphic top-level binding of `foo':
       ?x::Int arising from a use of `woggle' at tcfail130.hs:10:6-13
     Probable fix: give these definition(s) an explicit type signature
 		  or use -fno-monomorphism-restriction

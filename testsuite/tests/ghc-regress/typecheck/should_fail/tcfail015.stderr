@@ -1,9 +1,10 @@
 
-tcfail015.hs:9:38:
+tcfail015.hs:8:32:
     No instance for (Num Bool)
-      arising from the literal `4' at tcfail015.hs:9:38
+      arising from the literal `1' at tcfail015.hs:8:32
     Possible fix: add an instance declaration for (Num Bool)
-    In the expression: 4
+    In the second argument of `(+)', namely `1'
+    In the expression: c + 1
     In the definition of `g':
 	g (ANode b (ANode c d))
 	    | b = c + 1
