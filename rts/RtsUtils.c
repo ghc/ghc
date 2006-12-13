@@ -86,57 +86,92 @@ initAllocator(void)
 void
 shutdownAllocator(void)
 {
+    Allocated *prev, *a;
+
+    if (allocs == NULL) {
+        barf("Allocator shutdown requested, but not initialised!");
+    }
+
 #ifdef THREADED_RTS
     closeMutex(&allocator_mutex);
 #endif
+
+    prev = allocs;
+    while (1) {
+        a = prev->next;
+        free(prev);
+        if (a == NULL) return;
+        IF_DEBUG(sanity,
+                 debugBelch("Warning: %p still allocated at shutdown\n",
+                            a->addr);)
+        prev = a;
+    }
 }
 
 static void addAllocation(void *addr, size_t len) {
     Allocated *a;
     size_t alloc_size;
 
-    if (allocs == NULL) {
-        barf("addAllocation: allocator debugger not initialised");
+    if (allocs != NULL) {
+        alloc_size = sizeof(Allocated);
+        if ((a = (Allocated *) malloc(alloc_size)) == NULL) {
+          /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+          MallocFailHook((W_) alloc_size,
+                         "creating info for debugging allocator");
+          stg_exit(EXIT_INTERNAL_ERROR);
+        }
+        a->addr = addr;
+        a->len = len;
+        ACQUIRE_LOCK(&allocator_mutex);
+        a->next = allocs->next;
+        allocs->next = a;
+        RELEASE_LOCK(&allocator_mutex);
     }
-    alloc_size = sizeof(Allocated);
-    if ((a = (Allocated *) malloc(alloc_size)) == NULL) {
-      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      MallocFailHook((W_) alloc_size, "creating info for debugging allocator");
-      stg_exit(EXIT_INTERNAL_ERROR);
+    else {
+        /* This doesn't actually help as we haven't looked at the flags
+         * at the time that it matters (while running constructors) */
+        IF_DEBUG(sanity,
+                 debugBelch("Ignoring allocation %p %zd as allocs is NULL\n",
+                            addr, len);)
     }
-    a->addr = addr;
-    a->len = len;
-    ACQUIRE_LOCK(&allocator_mutex);
-    a->next = allocs->next;
-    allocs->next = a;
-    RELEASE_LOCK(&allocator_mutex);
 }
 
 static void removeAllocation(void *addr) {
     Allocated *prev, *a;
 
-    if (allocs == NULL) {
-        barf("addAllocation: allocator debugger not initialised");
-    }
     if (addr == NULL) {
         barf("Freeing NULL!");
     }
 
-    ACQUIRE_LOCK(&allocator_mutex);
-    prev = allocs;
-    a = prev->next;
-    while (a != NULL) {
-        if (a->addr == addr) {
-            prev->next = a->next;
-            memset(addr, 0xaa, a->len);
-            free(a);
-            RELEASE_LOCK(&allocator_mutex);
-            return;
+    if (allocs != NULL) {
+        ACQUIRE_LOCK(&allocator_mutex);
+        prev = allocs;
+        a = prev->next;
+        while (a != NULL) {
+            if (a->addr == addr) {
+                prev->next = a->next;
+                memset(addr, 0xaa, a->len);
+                free(a);
+                RELEASE_LOCK(&allocator_mutex);
+                return;
+            }
+            prev = a;
+            a = a->next;
         }
-        prev = a;
-        a = a->next;
+        /* We would like to barf here, but we can't as conc021
+         * allocates some stuff in a constructor which then gets freed
+         * during hs_exit */
+        /* barf("Freeing non-allocated memory at %p", addr); */
+        IF_DEBUG(sanity,
+                 debugBelch("Warning: Freeing non-allocated memory at %p\n",
+                            addr);)
+        RELEASE_LOCK(&allocator_mutex);
     }
-    barf("Freeing non-allocated memory at %p", addr);
+    else {
+        IF_DEBUG(sanity,
+                 debugBelch("Ignoring free of %p as allocs is NULL\n",
+                            addr);)
+    }
 }
 #endif
 
