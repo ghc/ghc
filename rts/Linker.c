@@ -1286,7 +1286,7 @@ loadObj( char *path )
     // reading the file, and then we misalign oc->image on purpose so
     // that the actual sections end up aligned again.
    oc->misalignment = machoGetMisalignment(f);
-   oc->image = stgMallocBytes(oc->fileSize + misalignment, "loadObj(image)");
+   oc->image = stgMallocBytes(oc->fileSize + oc->misalignment, "loadObj(image)");
 #  else
    oc->image = stgMallocBytes(oc->fileSize, "loadObj(image)");
 #  endif
