@@ -95,6 +95,9 @@ static void addAllocation(void *addr, size_t len) {
     Allocated *a;
     size_t alloc_size;
 
+    if (allocs == NULL) {
+        barf("addAllocation: allocator debugger not initialised");
+    }
     alloc_size = sizeof(Allocated);
     if ((a = (Allocated *) malloc(alloc_size)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
@@ -112,6 +115,9 @@ static void addAllocation(void *addr, size_t len) {
 static void removeAllocation(void *addr) {
     Allocated *prev, *a;
 
+    if (allocs == NULL) {
+        barf("addAllocation: allocator debugger not initialised");
+    }
     if (addr == NULL) {
         barf("Freeing NULL!");
     }
