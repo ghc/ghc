@@ -1186,7 +1186,7 @@ memInventory(void)
       debugBelch("  exec         : %4lu\n", exec_blocks);
       debugBelch("  free         : %4lu\n", free_blocks);
       debugBelch("  total        : %4lu\n\n", live_blocks + free_blocks);
-      debugBelch("  in system    : %4lu\n", mblocks_allocated + BLOCKS_PER_MBLOCK);
+      debugBelch("  in system    : %4lu\n", mblocks_allocated * BLOCKS_PER_MBLOCK);
       ASSERT(0);
   }
 }
