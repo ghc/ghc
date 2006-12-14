@@ -71,6 +71,12 @@ def skip( opts ):
 def expect_fail( opts ):
     opts.expect = 'fail';
 
+def expect_broken( bug ):
+    return lambda opts, b=bug: _expect_broken (opts, b )
+
+def _expect_broken( opts, bug ):
+    opts.expect = 'fail';
+
 # -----
 
 def expect_fail_for( ways ):
