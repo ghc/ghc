@@ -7,27 +7,89 @@
 
 # Uncomment one of these to select a build profile below:
 
-#BuildFlavour = devel
+# Full build with max optimisation (slow build)
 #BuildFlavour = perf
+
+# Fastest build (libs unoptimised):
+#BuildFlavour = quickest
+
+# Fast build with optimised libraries:
+#BuildFlavour = quick
+
+# A development build, working on the stage 1 compiler:
+#BuildFlavour = devel1
+
+# A development build, working on the stage 2 compiler:
+#BuildFlavour = devel2
 
 # Which warnings we like to use
 MyWarningOpts   = -W -fno-warn-unused-matches -fwarn-unused-imports
 
-# -------- 1. A Development build --------------------------------------------
+# -------- 1. A Performance/Distribution build--------------------------------
 
-ifeq "$(BuildFlavour)" "devel"
+ifeq "$(BuildFlavour)" "perf"
 
-GhcCompilerWays =
+SRC_HC_OPTS   = -H32m -O2
+GhcHcOpts     = -Rghc-timing
+GhcLibHcOpts  =
+GhcLibWays    = p
 
-SRC_HC_OPTS     = -H32m -O -fasm $(MyWarningOpts)
+endif
+
+# -------- A Fast build ------------------------------------------------------
+
+ifeq "$(BuildFlavour)" "quickest"
+
+SRC_HC_OPTS     = -H64m -Onot -fasm
+GhcStage1HcOpts = -O -fasm
+GhcStage2HcOpts = -Onot -fasm
+GhcLibHcOpts    = -Onot -fasm
+GhcLibWays      =
+SplitObjs       = NO
+
+endif
+
+# -------- A Fast build with optimised libs ----------------------------------
+
+ifeq "$(BuildFlavour)" "quick"
+
+SRC_HC_OPTS     = -H64m -Onot -fasm
+GhcStage1HcOpts = -O -fasm
+GhcStage2HcOpts = -Onot -fasm
+GhcLibHcOpts    = -O -fasm
+GhcLibWays      =
+SplitObjs       = NO
+
+endif
+
+# -------- A Development build (stage 1) -------------------------------------
+
+ifeq "$(BuildFlavour)" "devel1"
+
+SRC_HC_OPTS     = -H64m -O -fasm $(MyWarningOpts)
 GhcLibHcOpts    = -O -dcore-lint $(MyWarningOpts)
 GhcLibWays      =
-
-# If you're working on the stage1 compiler, build stage1 with debugging:
 GhcStage1HcOpts = -Rghc-timing -O0 -DDEBUG
+GhcStage2HcOpts = -Rghc-timing O -fasm
+SplitObjs = NO
 
-# alternatively, to work on the stage 2 compiler:
-# GhcStage2HcOpts = -Rghc-timing -O0 -DDEBUG
+endif
+
+# -------- A Development build (stage 2) -------------------------------------
+
+ifeq "$(BuildFlavour)" "devel2"
+
+SRC_HC_OPTS     = -H64m -O -fasm $(MyWarningOpts)
+GhcLibHcOpts    = -O -dcore-lint $(MyWarningOpts)
+GhcLibWays      =
+GhcStage1HcOpts = -Rghc-timing -O -fasm
+GhcStage2HcOpts = -Rghc-timing -O0 -DDEBUG
+SplitObjs = NO
+
+endif
+
+# -----------------------------------------------------------------------------
+# Other settings that might be useful
 
 # profiled RTS
 #GhcRtsCcOpts =  -pg -g
@@ -38,23 +100,6 @@ GhcStage1HcOpts = -Rghc-timing -O0 -DDEBUG
 #GhcRtsWithFrontPanel = YES
 #SRC_HC_OPTS += `gtk-config --libs`
 
-SplitObjs = NO
-
+# NoFib settings
 NoFibWays =
-SRC_RUNTEST_OPTS += +RTS -H10m -RTS
 STRIP=:
-
-endif
-
-# -------- 1. A Performance/Distribution build--------------------------------
-
-ifeq "$(BuildFlavour)" "perf"
-
-SRC_HC_OPTS   = -H32m -O $(MyWarningOpts)
-GhcHcOpts     = -Rghc-timing
-GhcLibHcOpts  =
-
-GhcLibWays    = p
-
-#GhcRtsCcOpts = -O2 -fomit-frame-pointer -mpreferred-stack-boundary=2 -march=pentiumpro
-endif
