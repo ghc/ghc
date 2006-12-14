@@ -25,7 +25,7 @@ test('arith008', compose(skip_if_fast,ways), compile_and_run, [''])
 
 test('arith009', skip_if_fast, compile_and_run, [''])
 test('arith010', skip_if_fast, compile_and_run, [''])
-test('arith011', normal, compile_and_run, [''])
+test('arith011', expect_broken_if_platform(1052, 'x86_64-unknown-linux'), compile_and_run, [''])
 
 if config.platform.startswith('i386-'):
 	ways = expect_fail_for(['optasm'])
