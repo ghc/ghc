@@ -130,6 +130,11 @@ INLINE_HEADER bdescr *Bdescr(StgPtr p)
 #define FIRST_BDESCR(m) \
    ((bdescr *)((FIRST_BLOCK_OFF>>(BLOCK_SHIFT-BDESCR_SHIFT)) + (W_)(m)))
 
+/* Last real block descriptor in a megablock */
+
+#define LAST_BDESCR(m) \
+  ((bdescr *)(((MBLOCK_SIZE-BLOCK_SIZE)>>(BLOCK_SHIFT-BDESCR_SHIFT)) + (W_)(m)))
+
 /* Number of usable blocks in a megablock */
 
 #define BLOCKS_PER_MBLOCK ((MBLOCK_SIZE - FIRST_BLOCK_OFF) / BLOCK_SIZE)
@@ -159,6 +164,45 @@ dbl_link_onto(bdescr *bd, bdescr **list)
     (*list)->u.back = bd; /* double-link the list */
   }
   *list = bd;
+}
+
+INLINE_HEADER void
+dbl_link_remove(bdescr *bd, bdescr **list)
+{
+    if (bd->u.back) {
+        bd->u.back->link = bd->link;
+    } else {
+        *list = bd->link;
+    }
+    if (bd->link) {
+        bd->link->u.back = bd->u.back;
+    }
+}
+
+INLINE_HEADER void
+dbl_link_insert_after(bdescr *bd, bdescr *after)
+{
+    bd->link = after->link;
+    bd->u.back = after;
+    if (after->link) {
+        after->link->u.back = bd;
+    }
+    after->link = bd;
+}
+
+INLINE_HEADER void
+dbl_link_replace(bdescr *new, bdescr *old, bdescr **list)
+{
+    new->link = old->link;
+    new->u.back = old->u.back;
+    if (old->link) {
+        old->link->u.back = new;
+    }
+    if (old->u.back) {
+        old->u.back->link = new;
+    } else {
+        *list = new;
+    }
 }
 
 /* Initialisation ---------------------------------------------------------- */

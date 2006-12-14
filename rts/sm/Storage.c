@@ -1049,14 +1049,7 @@ void freeExec (void *addr)
     // the head of the queue.
     if (bd->gen_no == 0 && bd != exec_block) {
 	debugTrace(DEBUG_gc, "free exec block %p", bd->start);
-	if (bd->u.back) {
-	    bd->u.back->link = bd->link;
-	} else {
-	    exec_block = bd->link;
-	}
-	if (bd->link) {
-	    bd->link->u.back = bd->u.back;
-	}
+        dbl_link_remove(bd, &exec_block);
 	setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsFalse);
 	freeGroup(bd);
     }
