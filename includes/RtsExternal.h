@@ -69,7 +69,7 @@ extern void   freeHaskellFunctionPtr(void* ptr);
 /* Hpc stuff */
 extern int hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr);
 extern void hs_hpc_tick(int globIx,struct StgTSO_ *current_tso);
-extern void hs_hpc_throw(struct StgTSO_ *current_tso);
+extern void hs_hpc_event(char *msg,struct StgTSO_ *current_tso);
 
 
 #if defined(mingw32_HOST_OS)

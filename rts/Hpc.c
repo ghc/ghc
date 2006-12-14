@@ -251,9 +251,9 @@ send_ThreadId(StgTSO *current_tso) {
   // This assumes that there is no real thread 0.
   StgThreadID tid = (current_tso == 0) ? 0 : current_tso->id;
   if (tid != previous_tid) {
-    previous_tid = current_tso->id;
+    previous_tid = tid;
     // How do we print StgWord32's without a cast?
-    fprintf(rixFile,"Thread %d\n",(unsigned int)tid);
+    fprintf(rixFile,"Thread Switch %d\n",(unsigned int)tid);
   }
 }
 
@@ -261,7 +261,7 @@ send_ThreadId(StgTSO *current_tso) {
  * Called on *every* exception thrown
  */
 void
-hs_hpc_throw(StgTSO *current_tso) {
+hs_hpc_event(char *msg,StgTSO *current_tso) {
   // Assumes that we have had at least *one* tick first.
   // All exceptions before the first tick are not reported.
   // The only time this might be an issue is in bootstrapping code,
@@ -272,7 +272,7 @@ hs_hpc_throw(StgTSO *current_tso) {
   if (rixFile != NULL) {
     assert(hpc_inited != 0);
     send_ThreadId(current_tso);
-    fprintf(rixFile,"Throw\n");
+    fprintf(rixFile,"%s\n",msg);
   }
 }
 
