@@ -3,14 +3,13 @@ TH_exn.hs:1:0:
     Exception when trying to run compile-time code:
       Prelude.tail: empty list
       Code: let
-	      >>= = (>>=) Language.Haskell.TH.Syntax.Q $dMonad
-	      $dMonad = Language.Haskell.TH.Syntax.$f18
-	      return = return Language.Haskell.TH.Syntax.Q $dMonad
+	      >>= = (>>=) @ Language.Haskell.TH.Syntax.Q $dMonad
 	      $dMonad = $dMonad
+	      return = return @ Language.Haskell.TH.Syntax.Q $dMonad
+	      $dMonad = Language.Haskell.TH.Syntax.$f20
 	    in
-	      do
-		ds <- [d| |]
-		return [Language.Haskell.TH.Syntax.Dec] (tail
-							     Language.Haskell.TH.Syntax.Dec ds)
+	      do ds <- [d| |]
+		 return @ [Language.Haskell.TH.Syntax.Dec]
+		   (tail @ Language.Haskell.TH.Syntax.Dec ds)
 Loading package base ... linking ... done.
 Loading package template-haskell ... linking ... done.
