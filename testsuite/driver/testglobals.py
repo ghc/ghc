@@ -146,6 +146,9 @@ class TestOptions:
        # Does this test use a literate (.lhs) file?
        self.literate = 0
 
+       # Does this test use a .c file?
+       self.c_src = 0
+
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()

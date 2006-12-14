@@ -187,6 +187,9 @@ def alone(opts):
 def literate( opts ):
     opts.literate = 1;
 
+def c_src( opts ):
+    opts.c_src = 1;
+
 # ----
 # Function for composing two opt-fns together
 
@@ -1017,7 +1020,9 @@ def add_suffix( name, suffix ):
         return name + '.' + suffix    
 
 def add_hs_lhs_suffix(name):
-    if getTestOpts().literate:
+    if getTestOpts().c_src:
+        return add_suffix(name, 'c')
+    elif getTestOpts().literate:
         return add_suffix(name, 'lhs')
     else:
         return add_suffix(name, 'hs')
