@@ -127,6 +127,13 @@ def expect_fail_if_platform( plat ):
 def _expect_fail_if_platform( opts, plat ):
     if config.platform == plat:
 	opts.expect = 'fail'
+
+def expect_broken_if_platform( bug, plat ):
+   return lambda opts, b=bug, p=plat: _expect_broken_if_platform(opts, b, p)
+
+def _expect_broken_if_platform( opts, bug, plat ):
+    if config.platform == plat:
+	opts.expect = 'fail'
 	
 # -----
 
