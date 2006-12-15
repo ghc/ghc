@@ -545,4 +545,11 @@ initDefaultHandlers()
 #endif
 }
 
+void
+freeSignalHandlers(void) {
+    if (signal_handlers != NULL) {
+        stgFree(signal_handlers);
+    }
+}
+
 #endif /* RTS_USER_SIGNALS */

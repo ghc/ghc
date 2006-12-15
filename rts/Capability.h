@@ -232,6 +232,9 @@ extern void grabCapability (Capability **pCap);
 
 #endif /* !THREADED_RTS */
 
+// Free a capability on exit
+void freeCapability (Capability *cap);
+
 /* -----------------------------------------------------------------------------
  * INLINE functions... private below here
  * -------------------------------------------------------------------------- */

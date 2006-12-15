@@ -52,6 +52,11 @@ initUserSignals(void)
     return;
 }
 
+void
+freeSignalHandlers(void) {
+    /* Do nothing */
+}
+
 /* Seems to be a bit of an orphan...where used? */
 void
 finiUserSignals(void)

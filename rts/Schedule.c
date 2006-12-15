@@ -2581,6 +2581,8 @@ exitScheduler( void )
 	boundTaskExiting(task);
 	stopTaskManager();
     }
+#else
+    freeCapability(&MainCapability);
 #endif
 }
 
@@ -2588,6 +2590,9 @@ void
 freeScheduler( void )
 {
     freeTaskManager();
+    if (n_capabilities != 1) {
+        stgFree(capabilities);
+    }
 #if defined(THREADED_RTS)
     closeMutex(&sched_mutex);
 #endif

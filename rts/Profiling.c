@@ -186,6 +186,12 @@ initProfiling1 (void)
 }
 
 void
+freeProfiling1 (void)
+{
+    arenaFree(prof_arena);
+}
+
+void
 initProfiling2 (void)
 {
   CostCentreStack *ccs, *next;

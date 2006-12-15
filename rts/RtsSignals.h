@@ -41,6 +41,8 @@ extern void initUserSignals(void);
  */
 extern void initDefaultHandlers(void);
 
+extern void freeSignalHandlers(void);
+
 /*
  * Function: blockUserSignals()
  *

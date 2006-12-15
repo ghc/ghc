@@ -316,6 +316,13 @@ initEra(Census *census)
     census->drag_total = 0;
 }
 
+STATIC_INLINE void
+freeEra(Census *census)
+{
+    arenaFree(census->arena);
+    freeHashTable(census->hash, NULL);
+}
+
 /* --------------------------------------------------------------------------
  * Increases era by 1 and initialize census[era].
  * Reallocates gi[] and increases its size if needed.
@@ -352,6 +359,10 @@ FILE *hp_file;
 static char *hp_filename;
 
 void initProfiling1( void )
+{
+}
+
+void freeProfiling1( void )
 {
 }
 
@@ -492,6 +503,14 @@ endHeapProfiling(void)
 	}
     }
 #endif
+
+    {
+        nat t;
+        for (t = 0; t <= era; t++) {
+            freeEra( &censuses[t] );
+        }
+    }
+    stgFree(censuses);
 
     seconds = mut_user_time();
     printSample(rtsTrue, seconds);

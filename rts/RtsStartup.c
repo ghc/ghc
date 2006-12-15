@@ -378,6 +378,10 @@ hs_exit(void)
     /* start timing the shutdown */
     stat_startExit();
     
+#if defined(RTS_USER_SIGNALS)
+    freeSignalHandlers();
+#endif
+
 #if defined(THREADED_RTS)
     ioManagerDie();
 #endif
@@ -446,6 +450,10 @@ hs_exit(void)
 
     /* free the stable pointer table */
     exitStablePtrTable();
+
+#if defined(PROFILING) || defined(DEBUG)
+    freeProfiling1();
+#endif
 
 #if defined(DEBUG)
     /* free the thread label table */
