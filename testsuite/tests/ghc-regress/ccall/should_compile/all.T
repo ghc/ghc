@@ -28,6 +28,6 @@ test('cc009', expect_fail_for(['extcore','optextcore']), compile, [''])
 # Non-static C call
 test('cc010', expect_fail_for(['extcore','optextcore']), compile, [''])
 test('cc011', normal, compile, [''])
-test('cc012', normal, compile, [''])
+test('cc012', expect_broken(1054), compile, [''])
 test('ffi001', normal, compile, [''])
 test('ffi-deriv1', normal, compile, [''])

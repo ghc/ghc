@@ -5,7 +5,7 @@ test('arrowapply2', normal, compile, [''])
 test('arrowapply3', normal, compile, [''])
 test('arrowapply4', normal, compile, [''])
 test('arrowapply5', normal, compile, [''])
-test('arrowcase1', normal, compile, [''])
+test('arrowcase1', expect_broken(1054), compile, [''])
 test('arrowdo1', normal, compile, [''])
 test('arrowdo2', normal, compile, [''])
 # test('arrowdo3', normal, compile, [''])	# takes too long
