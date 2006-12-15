@@ -212,6 +212,9 @@ def c_src( opts ):
 # ----
 # Function for composing two opt-fns together
 
+def composes( fs ):
+    return reduce(lambda f, g: compose(f, g), fs)
+
 def compose( f, g ):
     return lambda opts, f=f, g=g: _compose(opts,f,g)
 
