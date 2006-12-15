@@ -30,7 +30,7 @@ class (RealFrac a, Floating a) => RealFloat a where
   isIEEE :: a -> Bool
   atan2 :: a -> a -> a
   	-- Defined in GHC.Float
-instance RealFloat Double -- Defined in GHC.Float
 instance RealFloat Float -- Defined in GHC.Float
+instance RealFloat Double -- Defined in GHC.Float
 Data.List.isPrefixOf :: (Eq a) => [a] -> [a] -> Bool
   	-- Defined in Data.List
