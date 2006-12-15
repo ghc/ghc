@@ -234,7 +234,7 @@ clean(['Mod172_B.hi', 'Mod172_B.o', 'Mod172_C.hi', 'Mod172_C.o'])
 
 test('mod173', normal, multimod_compile, ['mod173', '-v0'])
 clean(['Mod173_Aux.hi', 'Mod173_Aux.o'])
-test('mod174', normal, compile_fail, [''])
+test('mod174', expect_broken(414), compile_fail, [''])
 
 # mod175 is a sub-directory
 
