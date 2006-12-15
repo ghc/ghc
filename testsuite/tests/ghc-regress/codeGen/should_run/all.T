@@ -22,8 +22,8 @@ test('cg021', normal, compile_and_run, [''])
 test('cg022', normal, compile_and_run, [''])
 test('cg024', normal, compile_and_run, [''])
 
-test('cg025', compose(extra_run_opts('cg025.hs'),exit_code(1)), \
-	compile_and_run, ['-package regex-compat'])
+test('cg025', compose(extra_run_opts('cg025.hs'),exit_code(1)),
+                      compile_and_run, ['-package regex-compat'])
 
 test('cg026', compose(skip_if_fast,only_compiler_types(['ghc'])), compile_and_run, [''])
 test('cg027', normal, compile_and_run, [''])
@@ -54,8 +54,9 @@ test('cg054', normal, compile_and_run, [''])
 test('cg055', normal, compile_and_run, [''])
 test('cg056', normal, compile_and_run, [''])
 
-test('cg057', compose( only_ways(['prof','profasm']), 
-		       extra_run_opts('+RTS -xc') ),
-	 compile_and_run, [''])
+test('cg057', composes([expect_broken(948),
+                        only_ways(['prof','profasm']),
+                        extra_run_opts('+RTS -xc')]),
+     compile_and_run, [''])
 
 test('cg058', normal, compile_and_run, [''])
