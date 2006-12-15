@@ -85,6 +85,6 @@ test('hGetBuf001', compose(only_compiler_types(['ghc']),
 test('hDuplicateTo001', normal, compile_and_run, [''])
 clean(['tmp'])
 
-test('countReaders001', normal, compile_and_run, [''])
+test('countReaders001', expect_broken(629), compile_and_run, [''])
 clean(['countReaders001.txt'])
 
