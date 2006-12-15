@@ -85,6 +85,12 @@ def expect_fail_for( ways ):
 def _expect_fail_for( opts, ways ):
     opts.expect_fail_for = ways
 
+def expect_broken_for( bug, ways ):
+    return lambda opts, b=bug, w=ways: _expect_broken_for( opts, b, w )
+
+def _expect_broken_for( opts, bug, ways ):
+    opts.expect_broken_for = ways
+
 # -----
 
 def omit_ways( ways ):
