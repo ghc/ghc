@@ -83,14 +83,15 @@ freeTaskManager (void)
     debugTrace(DEBUG_sched, "freeing task manager");
 
     ACQUIRE_LOCK(&sched_mutex);
-    for (task = task_free_list; task != NULL; task = next) {
+    for (task = all_tasks; task != NULL; task = next) {
 #if defined(THREADED_RTS)
         closeCondition(&task->cond);
         closeMutex(&task->lock);
 #endif
-        next = task->next;
+        next = task->all_link;
         stgFree(task);
     }
+    all_tasks = NULL;
     task_free_list = NULL;
     RELEASE_LOCK(&sched_mutex);
 }
