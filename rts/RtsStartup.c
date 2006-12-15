@@ -444,8 +444,13 @@ hs_exit(void)
     /* free shared Typeable store */
     exitTypeableStore();
 
-    /* initialise the stable pointer table */
+    /* free the stable pointer table */
     exitStablePtrTable();
+
+#if defined(DEBUG)
+    /* free the thread label table */
+    freeThreadLabelTable();
+#endif
 
     /* free hash table storage */
     exitHashTable();

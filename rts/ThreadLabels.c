@@ -29,6 +29,15 @@ initThreadLabelTable(void)
 }
 
 void
+freeThreadLabelTable(void)
+{
+    if (threadLabels != NULL) {
+        freeHashTable(threadLabels, NULL);
+        threadLabels = NULL;
+    }
+}
+
+void
 updateThreadLabel(StgWord key, void *data)
 {
   removeThreadLabel(key);

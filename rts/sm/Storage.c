@@ -287,6 +287,7 @@ freeStorage (void)
 #if defined(THREADED_RTS)
     closeMutex(&sm_mutex);
     closeMutex(&atomic_modify_mutvar_mutex);
+    stgFree(nurseries);
 #endif
 }
 

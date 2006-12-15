@@ -63,6 +63,11 @@ initSparkPools( void )
 #endif
 }
 
+void
+freeSparkPool(StgSparkPool *pool) {
+    stgFree(pool->base);
+}
+
 /* -----------------------------------------------------------------------------
  * 
  * findSpark: find a spark on the current Capability that we can fork

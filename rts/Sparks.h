@@ -12,6 +12,7 @@
 #if defined(PARALLEL_HASKELL) || defined(THREADED_RTS)
 StgClosure * findSpark         (Capability *cap);
 void         initSparkPools    (void);
+void         freeSparkPool     (StgSparkPool *pool);
 void         markSparkQueue    (evac_fn evac);
 void         createSparkThread (Capability *cap, StgClosure *p);
 

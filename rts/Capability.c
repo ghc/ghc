@@ -673,6 +673,8 @@ shutdownCapability (Capability *cap, Task *task)
 	    continue;
 	}
 	debugTrace(DEBUG_sched, "capability %d is stopped.", cap->no);
+        stgFree(cap->mut_lists);
+        freeSparkPool(&cap->r.rSparks);
 	RELEASE_LOCK(&cap->lock);
 	break;
     }
