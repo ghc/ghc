@@ -251,6 +251,11 @@ workerTaskStop (Task *task)
     taskTimeStamp(task);
     task->stopped = rtsTrue;
     tasksRunning--;
+
+    ACQUIRE_LOCK(&sched_mutex);
+    task->next = task_free_list;
+    task_free_list = task;
+    RELEASE_LOCK(&sched_mutex);
 }
 
 void
