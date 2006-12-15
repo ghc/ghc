@@ -1,9 +1,6 @@
 TYPE SIGNATURES
-Tycons with generics:
-Dependent modules: []
-Dependent packages: [base]
-TYPE SIGNATURES
     f :: forall a a1 b. (C a (a1, b)) => a -> a1
+TYPE CONSTRUCTORS
 Tycons with generics:
 Dependent modules: []
 Dependent packages: [base]
