@@ -835,10 +835,10 @@ unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
 
 
 unknownTyConKey				= mkPreludeTyConUnique 99
-unknown1TyConKey			= mkPreludeTyConUnique 100
-unknown2TyConKey			= mkPreludeTyConUnique 101
-unknown3TyConKey			= mkPreludeTyConUnique 102
-opaqueTyConKey                          = mkPreludeTyConUnique 103
+unknown1TyConKey			= mkPreludeTyConUnique 130
+unknown2TyConKey			= mkPreludeTyConUnique 131
+unknown3TyConKey			= mkPreludeTyConUnique 132
+opaqueTyConKey                          = mkPreludeTyConUnique 133
 
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-129
