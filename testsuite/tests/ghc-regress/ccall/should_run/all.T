@@ -20,12 +20,7 @@ test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
 test('ffi002', omit_ways(['ghci']), compile_and_run, ['ffi002_c.c -no-hs-main'])
 clean(['ffi002_c.o'])
 
-if config.platform == 'alpha-dec-osf3':
-	f = skip
-else:
-	f = normal
-
-test('ffi003', f, compile_and_run, [''])
+test('ffi003', normal, compile_and_run, [''])
 
 test('ffi004', normal, compile_and_run, [''])
 
