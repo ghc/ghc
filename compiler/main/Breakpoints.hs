@@ -52,4 +52,5 @@ lookupBogusBreakpointVal name
   | otherwise = Nothing
 #else 
 lookupBogusBreakpointVal _ = Nothing
-#endif //GHCI
+#endif /* GHCI */
+
