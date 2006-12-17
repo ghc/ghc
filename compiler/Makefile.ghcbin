@@ -28,7 +28,13 @@ SRC_HC_OPTS += -optl-Xlinker -optl-E
 endif
 
 ifeq "$(GhcWithInterpreter)" "YES"
-SRC_HC_OPTS += -DGHCI -DBREAKPOINT
+SRC_HC_OPTS += -DGHCI
+
+# Should the debugger commands be enabled?
+ifeq "$(GhciWithDebugger)" "YES"
+SRC_HC_OPTS += -DDEBUGGER
+endif
+
 endif
 
 ifneq "$(GhcNotThreaded)" "YES"
