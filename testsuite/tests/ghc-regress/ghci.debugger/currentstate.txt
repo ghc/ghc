@@ -1,8 +1,4 @@
-break 10 - fails as coalescing is temporarily disabled
 break 4  - implicit params are not working yet
-break 7  - status on mdo ?
-print 4  - My TH is broken ?
-print 7  - the issue with unboxed fields
-dynbk4   - status on mdo ?
-dynbk5   - My TH is broken ?
+print 12 - GADTs
+print 16 - tricky newtypes
 dynbk8   - Coalescing is not perfect :S
