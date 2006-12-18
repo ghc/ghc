@@ -38,12 +38,12 @@ import ErrUtils
 import FastString
 import SrcLoc
 import Util
+import Maybes
 
 import Control.Exception
 import Control.Monad
 import qualified Data.Map as Map
 import Data.Array.Unboxed
-import Data.Traversable ( traverse )
 import Data.Typeable             ( Typeable )
 import Data.Maybe
 import Data.IORef
@@ -77,9 +77,9 @@ pprintClosureCommand bindThings force str = do
 
   -- Give names to suspensions and bind them in the local env
   mb_terms' <- if bindThings
-               then io$ mapM (traverse (bindSuspensions cms)) mb_terms
+               then io$ mapM (fmapMMaybe (bindSuspensions cms)) mb_terms
                else return mb_terms
-  ppr_terms <- io$ mapM (traverse (printTerm cms)) mb_terms' 
+  ppr_terms <- io$ mapM (fmapMMaybe (printTerm cms)) mb_terms' 
   let docs = [ ppr id <+> char '=' <+> t | (Just t,id) <- zip ppr_terms ids]
   unqual  <- io$ GHC.getPrintUnqual cms
   io . putStrLn . showSDocForUser unqual $ Outputable.vcat docs

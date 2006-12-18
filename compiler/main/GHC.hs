@@ -280,7 +280,6 @@ import System.Exit	( exitWith, ExitCode(..) )
 import System.Time	( ClockTime )
 import Control.Exception as Exception hiding (handle)
 import Data.IORef
-import Data.Traversable ( traverse )
 import System.IO
 import System.IO.Error	( isDoesNotExistError )
 import Prelude hiding (init)

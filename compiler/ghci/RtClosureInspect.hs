@@ -76,6 +76,7 @@ import TysWiredIn
 import Constants        ( wORD_SIZE )
 import FastString       ( mkFastString )
 import Outputable
+import Maybes
 import Panic
 
 import GHC.Arr          ( Array(..) )
@@ -87,12 +88,9 @@ import GHC.Word         ( Word32(..), Word64(..) )
 import Control.Monad    ( liftM, liftM2, msum )
 import Data.Maybe
 import Data.List
-import Data.Traversable ( mapM )
 import Data.Array.Base
 import Foreign.Storable
 import Foreign          ( unsafePerformIO )
-
-import Prelude hiding ( mapM )
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -546,7 +544,7 @@ zonkTerm = foldTerm idTermFoldM {
               fTerm = \ty dc v tt -> sequence tt      >>= \tt ->
                                      zonkTcType ty    >>= \ty' ->
                                      return (Term ty' dc v tt)
-             ,fSuspension = \ct ty v b -> mapM zonkTcType ty >>= \ty ->
+             ,fSuspension = \ct ty v b -> fmapMMaybe zonkTcType ty >>= \ty ->
                                           return (Suspension ct ty v b)}  
 
 {-

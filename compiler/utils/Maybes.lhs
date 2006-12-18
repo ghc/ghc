@@ -17,7 +17,7 @@ module Maybes (
 	expectJust,
 	maybeToBool,
 
-	thenMaybe, seqMaybe, returnMaybe, failMaybe
+	thenMaybe, seqMaybe, returnMaybe, failMaybe, fmapMMaybe
     ) where
 
 #include "HsVersions.h"
@@ -100,6 +100,11 @@ failMaybe = Nothing
 orElse :: Maybe a -> a -> a
 (Just x) `orElse` y = x
 Nothing  `orElse` y = y
+
+fmapMMaybe :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
+fmapMMaybe f Nothing  = return Nothing
+fmapMMaybe f (Just x) = f x >>= \x' -> return (Just x')
+
 \end{code}
 
 
