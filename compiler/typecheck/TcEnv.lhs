@@ -17,7 +17,7 @@ module TcEnv(
 	tcLookupLocatedGlobal,	tcLookupGlobal, 
 	tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
 	tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
-	tcLookupLocatedClass, 
+	tcLookupLocatedClass, tcLookupFamInst,
 	
 	-- Local environment
 	tcExtendKindEnv, tcExtendKindEnvTvs,
@@ -61,6 +61,7 @@ import VarSet
 import VarEnv
 import RdrName
 import InstEnv
+import FamInstEnv
 import DataCon
 import TyCon
 import Class
@@ -157,6 +158,18 @@ tcLookupLocatedClass = addLocM tcLookupClass
 
 tcLookupLocatedTyCon :: Located Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocM tcLookupTyCon
+
+-- Look up the representation tycon of a family instance.
+--
+tcLookupFamInst :: TyCon -> [Type] -> TcM TyCon
+tcLookupFamInst tycon tys
+  = do { env <- getGblEnv
+       ; eps <- getEps
+       ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
+       ; case lookupFamInstEnvExact instEnv tycon tys of
+	   Nothing      -> famInstNotFound tycon tys
+	   Just famInst -> return $ famInstTyCon famInst
+       }
 \end{code}
 
 %************************************************************************
@@ -656,4 +669,9 @@ notFound name
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
 		ptext SLIT("used as a") <+> text expected)
+
+famInstNotFound tycon tys
+  = failWithTc (quotes famInst <+> ptext SLIT("is not in scope"))
+  where
+    famInst = ppr tycon <+> hsep (map pprParendType tys)
 \end{code}
