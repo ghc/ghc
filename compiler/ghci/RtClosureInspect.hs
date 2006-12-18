@@ -13,7 +13,6 @@ module RtClosureInspect(
      AddressEnv(..), 
      DataConEnv,
      extendAddressEnvList, 
-     extendAddressEnvList', 
      elemAddressEnv, 
      delFromAddressEnv, 
      emptyAddressEnv, 
@@ -78,6 +77,7 @@ import FastString       ( mkFastString )
 import Outputable
 import Maybes
 import Panic
+import FiniteMap
 
 import GHC.Arr          ( Array(..) )
 import GHC.Ptr          ( Ptr(..), castPtr )
@@ -87,8 +87,8 @@ import GHC.Word         ( Word32(..), Word64(..) )
 
 import Control.Monad    ( liftM, liftM2, msum )
 import Data.Maybe
-import Data.List
 import Data.Array.Base
+import Data.List        ( partition )
 import Foreign.Storable
 import Foreign          ( unsafePerformIO )
 
@@ -606,28 +606,25 @@ NOTE: (Num t) contexts have been manually replaced by Integer for clarity
 type DataConEnv   = AddressEnv StgInfoTable
 
 -- Note that this AddressEnv and DataConEnv I wrote trying to follow 
--- conventions in ghc, but probably they make no sense. Should 
--- probably be replaced by a plain Data.Map
+-- conventions in ghc, but probably they make not much sense.
 
-newtype AddressEnv a = AE {outAE::[(Ptr a, Name)]}
+newtype AddressEnv a = AE {aenv:: FiniteMap (Ptr a) Name}
+  deriving (Outputable)
 
-emptyAddressEnv = AE []
+emptyAddressEnv = AE emptyFM
 
 extendAddressEnvList  :: AddressEnv a -> [(Ptr a, Name)] -> AddressEnv a
-extendAddressEnvList' :: AddressEnv a -> [(Ptr a, Name)] -> AddressEnv a
 elemAddressEnv        :: Ptr a -> AddressEnv a -> Bool
 delFromAddressEnv     :: AddressEnv a -> Ptr a -> AddressEnv a
 nullAddressEnv        :: AddressEnv a -> Bool
 lookupAddressEnv       :: AddressEnv a -> Ptr a -> Maybe Name
 
-extendAddressEnvList  (AE env) = AE . nub . (++ env) 
-extendAddressEnvList' (AE env) = AE . (++ env)
-elemAddressEnv ptr    (AE env) = ptr `elem` fst (unzip env) 
-delFromAddressEnv (AE env) ptr = AE [(ptr', n) | (ptr', n) <- env, ptr' /= ptr]
-nullAddressEnv                 = null . outAE
-lookupAddressEnv       (AE env) = flip lookup env
-
-instance Outputable (AddressEnv a) where
- ppr (AE ae) = vcat [text (show ptr) <> comma <> ppr a | (ptr,a) <- ae] 
+extendAddressEnvList  (AE env) = AE . addListToFM env 
+elemAddressEnv   ptr  (AE env) = ptr `elemFM` env
+delFromAddressEnv     (AE env) = AE . delFromFM env
+nullAddressEnv                 = isEmptyFM . aenv
+lookupAddressEnv      (AE env) = lookupFM env
 
 
+instance Outputable (Ptr a) where
+  ppr = text . show

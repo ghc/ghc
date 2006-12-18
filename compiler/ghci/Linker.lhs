@@ -730,7 +730,7 @@ linkSomeBCOs toplevs_only ie ce_in de_in ul_bcos
         let de_additions = [(address, name) | (address, name) <- zip addresses names
                                             , not(address `elemAddressEnv` de_in) 
                            ]
-            de_out = extendAddressEnvList' de_in de_additions
+            de_out = extendAddressEnvList de_in de_additions
         return ( ce_out, de_out, hvals)
     where 
           goForRefs = getRefs []
