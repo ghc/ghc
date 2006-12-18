@@ -136,7 +136,7 @@ static void addAllocation(void *addr, size_t len) {
     }
 }
 
-static void removeAllocation(void *addr) {
+static void removeAllocation(void *addr, int overwrite_with_aa) {
     Allocated *prev, *a;
 
     if (addr == NULL) {
@@ -150,7 +150,9 @@ static void removeAllocation(void *addr) {
         while (a != NULL) {
             if (a->addr == addr) {
                 prev->next = a->next;
-                memset(addr, 0xaa, a->len);
+                if (overwrite_with_aa) {
+                    memset(addr, 0xaa, a->len);
+                }
                 free(a);
                 RELEASE_LOCK(&allocator_mutex);
                 return;
@@ -210,7 +212,7 @@ stgReallocBytes (void *p, int n, char *msg)
       stg_exit(EXIT_INTERNAL_ERROR);
     }
 #if defined(DEBUG)
-    removeAllocation(p);
+    removeAllocation(p, 0);
     addAllocation(space, n2);
 #endif
     return space;
@@ -239,7 +241,7 @@ void
 stgFree(void* p)
 {
 #if defined(DEBUG)
-  removeAllocation(p);
+  removeAllocation(p, 1);
 #endif
   free(p);
 }
