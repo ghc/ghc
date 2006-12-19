@@ -47,7 +47,7 @@ test('doaitse', normal, compile, [''])
 test('josef', normal, compile, [''])
 
 # Interaction of fundeps with GADTs doesn't work well 
-test('gadt-fd', expect_fail, compile, [''])
+test('gadt-fd', expect_broken(345), compile, [''])
 
 test('karl1', normal, compile, [''])
 test('karl2', normal, compile, [''])
