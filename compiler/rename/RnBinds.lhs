@@ -445,8 +445,11 @@ rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = 
 	new_group = MatchGroup new_matches placeHolderType
     in
     checkPrecMatch inf plain_name new_group		`thenM_`
-    returnM (unitBag (L loc (FunBind { fun_id = sel_name, fun_infix = inf, fun_matches = new_group,
-				       bind_fvs = fvs, fun_co_fn = idHsWrapper })), 
+    returnM (unitBag (L loc (FunBind { 
+				fun_id = sel_name, fun_infix = inf, 
+				fun_matches = new_group,
+				bind_fvs = fvs, fun_co_fn = idHsWrapper,
+				fun_tick = Nothing })), 
 	     fvs `addOneFV` plain_name)
 	-- The 'fvs' field isn't used for method binds
   where
