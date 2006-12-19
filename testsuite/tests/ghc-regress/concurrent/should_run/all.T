@@ -61,8 +61,7 @@ test('conc030', compose(only_compiler_types(['ghc']),
 			extra_run_opts('+RTS -K2M -RTS')),
 		compile_and_run, [''])
 
-# Skip for now, hangs for ever (broken?)
-test('conc031', skip, compile_and_run, [''])
+test('conc031', normal, compile_and_run, [''])
 
 test('conc032', only_compiler_types(['ghc']), compile_and_run, [''])
 
@@ -114,10 +113,7 @@ test('conc047', compose(only_compiler_types(['ghc']),
 test('conc048', compose(only_compiler_types(['ghc']), 
                         omit_ways(['ghci'])), compile_and_run, [''])
 
-# skip this test right now - for some reason it goes on for ever in the 
-# 'opt' ways. (ToDo)
-# test('conc050', compose(only_compiler_types(['ghc']), extra_run_opts('10000')), compile_and_run, ['-package stm'])
-test('conc050', skip, compile_and_run, ['-package stm'])
+test('conc050', compose(only_compiler_types(['ghc']), extra_run_opts('10000')), compile_and_run, ['-package stm'])
 
 test('conc051', normal, compile_and_run, [''])
 
