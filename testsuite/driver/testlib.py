@@ -150,7 +150,7 @@ def _expect_fail_if_compiler_type( opts, compiler_type ):
     if config.compiler_type == compiler_type:
 	opts.expect = 'fail'
 
-def expect_broken_if_compiler_type( compiler_type ):
+def expect_broken_if_compiler_type( bug, compiler_type ):
    return lambda opts, b=bug, c=compiler_type: _expect_broken_if_compiler_type(opts, b, c)
 
 def _expect_broken_if_compiler_type( opts, bug, compiler_type ):
