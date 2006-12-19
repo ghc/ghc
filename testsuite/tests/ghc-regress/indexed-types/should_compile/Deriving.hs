@@ -16,9 +16,12 @@ instance Eq (T Char) where
   C == C = False
 
 
-{-
 newtype family S a
 
 newtype instance S Int = S Int
 		         deriving Eq
--}
+
+newtype family S2 a b
+
+newtype instance S2 Int b = S2 (IO b)
+		          deriving Monad
