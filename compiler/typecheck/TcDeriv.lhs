@@ -337,6 +337,7 @@ type DerivSpec = (SrcSpan,		-- location of the deriving clause
 		  InstOrigin,		-- deriving at data decl or standalone?
 		  NewOrData,		-- newtype or data type
 		  Name,			-- Type constructor for which we derive
+		  [LHsTyVarBndr Name],  -- Type variables
 		  Maybe [LHsType Name], -- Type indexes if indexed type
 		  LHsType Name)		-- Class instance to be generated
 
@@ -355,9 +356,9 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
     ------------------------------------------------------------------
     -- Deriving clauses at data declarations
     derive_data :: [DerivSpec]
-    derive_data = [ (loc, DerivOrigin, nd, tycon, tyPats, pred) 
+    derive_data = [ (loc, DerivOrigin, nd, tycon, tyVars, tyPats, pred) 
 		   | L loc (TyData { tcdND = nd, tcdLName = L _ tycon, 
-			             tcdTyPats = tyPats,
+			             tcdTyVars = tyVars, tcdTyPats = tyPats,
 				     tcdDerivs = Just preds }) <- tycl_decls,
 		     pred <- preds ]
 
@@ -367,37 +368,46 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
       recoverM (returnM Nothing) $ setSrcSpan loc $ 
         do tycon <- tcLookupLocatedTyCon ty_name
            let new_or_data = if isNewTyCon tycon then NewType else DataType
+	   let tyVars = [ noLoc $ KindedTyVar (tyVarName tv) (tyVarKind tv)
+			| tv <- tyConTyVars tycon]           -- Yuk!!!
            traceTc (text "Stand-alone deriving:" <+> 
 		    ppr (new_or_data, unLoc ty_name, inst))
            return $ Just (loc, StandAloneDerivOrigin, new_or_data, 
-			  unLoc ty_name, Nothing, inst)
+			  unLoc ty_name, tyVars, Nothing, inst)
 
     ------------------------------------------------------------------
     -- Derive equation/inst info for one deriving clause (data or standalone)
     mk_eqn :: DerivSpec -> TcM (Maybe DerivEqn, Maybe InstInfo)
-	-- We swizzle the tyvars and datacons out of the tycon
-	-- to make the rest of the equation
+	-- We swizzle the datacons out of the tycon to make the rest of the
+	-- equation.  We can't get the tyvars out of the constructor in case
+	-- of family instances, as we already need to them to lookup the
+	-- representation tycon (only that has the right set of type
+	-- variables, the type variables of the family constructor are
+	-- different).
 	--
 	-- The "deriv_ty" is a LHsType to take account of the fact that for
 	-- newtype deriving we allow deriving (forall a. C [a]).
 
-    mk_eqn (loc, orig, new_or_data, tycon_name, mb_tys, hs_deriv_ty)
+    mk_eqn (loc, orig, new_or_data, tycon_name, tyvars, mb_tys, hs_deriv_ty)
       = setSrcSpan loc                            $
         addErrCtxt (derivCtxt tycon_name mb_tys)  $
         do { named_tycon <- tcLookupTyCon tycon_name
 
+	     -- Enable deriving preds to mention the type variables in the
+	     -- instance type
+           ; tcTyVarBndrs tyvars $ \tvs -> do 
+           { traceTc (text "TcDeriv.mk_eqn: tyvars:" <+> ppr tvs)
+
              -- Lookup representation tycon in case of a family instance
+	     -- NB: We already need the type variables in scope here for the
+	     --	    call to `dsHsType'.
 	   ; tycon <- case mb_tys of
 		        Nothing    -> return named_tycon
 			Just hsTys -> do
 				        tys <- mapM dsHsType hsTys
 					tcLookupFamInst named_tycon tys
 
-	     -- Enable deriving preds to mention the type variables in the
-	     -- instance type
-	   ; tcExtendTyVarEnv (tyConTyVars tycon) $ do
-               -- 
-	   { (deriv_tvs, clas, tys) <- tcHsDeriv hs_deriv_ty
+	   ; (deriv_tvs, clas, tys) <- tcHsDeriv hs_deriv_ty
 	   ; gla_exts <- doptM Opt_GlasgowExts
            ; mk_eqn_help loc orig gla_exts new_or_data tycon deriv_tvs clas tys
 	   }}
@@ -481,7 +491,7 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
         (tc_tvs, rep_ty)      = newTyConRhs tycon
 	(rep_fn, rep_ty_args) = tcSplitAppTys rep_ty
 
-	n_tyvars_to_keep = tyConArity tycon  - n_args_to_drop
+	n_tyvars_to_keep = tyConArity tycon - n_args_to_drop
 	tyvars_to_drop   = drop n_tyvars_to_keep tc_tvs
 	tyvars_to_keep   = take n_tyvars_to_keep tc_tvs
 
@@ -493,12 +503,22 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
 	rep_tys  = tys ++ [rep_fn']
 	rep_pred = mkClassPred clas rep_tys
 		-- rep_pred is the representation dictionary, from where
-		-- we are gong to get all the methods for the newtype dictionary
+		-- we are gong to get all the methods for the newtype
+		-- dictionary 
+
+        -- To account for newtype family instance, we need to get the family
+        -- tycon and its index types when costructing the type at which we
+        -- construct the class instance.  The dropped class parameters must of
+        -- course all be variables (not more complex indexes).
+	--
+	origHead = let
+                     (origTyCon, tyArgs) = tyConOrigHead tycon
+                   in mkTyConApp origTyCon (take n_tyvars_to_keep tyArgs)
 
         -- Next we figure out what superclass dictionaries to use
         -- See Note [Newtype deriving superclasses] above
 
-	inst_tys = tys ++ [mkTyConApp tycon (mkTyVarTys tyvars_to_keep)]
+	inst_tys = tys ++ [origHead]
 	sc_theta = substTheta (zipOpenTvSubst clas_tyvars inst_tys)
 			      (classSCTheta clas)
 
@@ -551,12 +571,23 @@ makeDerivEqns overlap_flag tycl_decls deriv_decls
 
 	-- Check that eta reduction is OK
 	-- 	(a) the dropped-off args are identical
-	--	(b) the remaining type args do not mention any of teh dropped type variables
-	--	(c) the type class args do not mention any of teh dropped type variables
+	--	(b) the remaining type args do not mention any of teh dropped
+	--	    type variables 
+	--	(c) the type class args do not mention any of teh dropped type
+	--	    variables 
+	--      (d) in case of newtype family instances, the eta-dropped
+	--          arguments must be type variables (not more complex indexes)
 	dropped_tvs = mkVarSet tyvars_to_drop
 	eta_ok = (args_to_drop `tcEqTypes` mkTyVarTys tyvars_to_drop)
 	      && (tyVarsOfType rep_fn' `disjointVarSet` dropped_tvs)
 	      && (tyVarsOfTypes tys    `disjointVarSet` dropped_tvs)
+	      && droppedIndexesAreVariables
+
+        droppedIndexesAreVariables = 
+	  case tyConFamInst_maybe tycon of
+	    Nothing                 -> True
+	    Just (famTyCon, tyIdxs) -> 
+	      all isTyVarTy $ drop (tyConArity famTyCon - n_args_to_drop) tyIdxs
 
 	cant_derive_err = derivingThingErr clas tys tycon (mkTyVarTys tyvars_to_keep)
 				(vcat [ptext SLIT("even with cunning newtype deriving:"),
