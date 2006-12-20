@@ -79,7 +79,7 @@ Various banner lines:
 
 -- NB. the hyphen must come last (or first) inside [...] to stand for itself.
 banner_re :: Regex
-banner_re = mkRegex "^==nofib==[ \t]+([A-Za-z0-9_-]+):[ \t]+(size of|time to link|time to run|time to compile)[ \t]+([A-Za-z0-9_-]+)(\\.o)?[ \t]+follows"
+banner_re = mkRegex "^==nofib==[ \t]+([A-Za-z0-9_-]+):[ \t]+(size of|time to link|time to run|time to compile|time to compile & run)[ \t]+([A-Za-z0-9_-]+)(\\.o)?[ \t]+follows"
 
 {-
 This regexp for the output of "time" works on FreeBSD, other versions
@@ -227,6 +227,8 @@ process_chunk (progName : what : modName : _, chk) =
  case what of
         "time to compile" -> parse_compile_time progName modName chk
         "time to run"     -> parse_run_time progName (reverse chk) emptyResults NotDone
+        "time to compile & run" -> parse_compile_time progName modName chk
+                                ++ parse_run_time progName (reverse chk) emptyResults NotDone
         "time to link"    -> parse_link_time progName chk
         "size of"         -> parse_size progName modName chk
         _                 -> error ("process_chunk: "++what)
