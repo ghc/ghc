@@ -18,7 +18,7 @@ import Name
 import Var                       ( Id )
 import PrelNames
 
-import GHC.Exts                  ( unsafeCoerce# )
+import GHC.Exts
 
 #ifdef GHCI
 data BkptHandler a = BkptHandler {

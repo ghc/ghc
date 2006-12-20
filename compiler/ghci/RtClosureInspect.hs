@@ -50,22 +50,18 @@ import HscTypes         ( HscEnv )
 
 import DataCon          
 import Type             
-import TcRnMonad
+import TcRnMonad        ( TcM, initTcPrintErrors, ioToTcRn, recoverM, writeMutVar )
 import TcType
 import TcMType
 import TcUnify
 import TcGadt
-import DriverPhases
 import TyCon		
 import Var
 import Name 
+import VarEnv
+import OccName
+import VarSet
 import Unique
-import UniqSupply
-import Var              ( setVarUnique, mkTyVar, tyVarKind, setTyVarKind )
-import VarEnv           ( mkVarEnv )
-import OccName          ( emptyTidyOccEnv )
-import VarSet           ( VarSet, mkVarSet, varSetElems, unionVarSets )
-import Unique           ( getUnique, incrUnique )
 import {-#SOURCE#-} TcRnDriver ( tcRnRecoverDataCon )
 
 import TysPrim		
@@ -73,7 +69,6 @@ import PrelNames
 import TysWiredIn
 
 import Constants        ( wORD_SIZE )
-import FastString       ( mkFastString )
 import Outputable
 import Maybes
 import Panic
@@ -85,12 +80,11 @@ import GHC.Exts
 import GHC.Int          ( Int32(..),  Int64(..) )
 import GHC.Word         ( Word32(..), Word64(..) )
 
-import Control.Monad    ( liftM, liftM2, msum )
+import Control.Monad
 import Data.Maybe
 import Data.Array.Base
 import Data.List        ( partition )
 import Foreign.Storable
-import Foreign          ( unsafePerformIO )
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms

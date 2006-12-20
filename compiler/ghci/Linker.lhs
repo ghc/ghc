@@ -28,7 +28,6 @@ import ByteCodeLink
 import ByteCodeItbls
 import ByteCodeAsm
 import RtClosureInspect
-import Var
 import IfaceEnv
 import Config
 import OccName
@@ -63,7 +62,6 @@ import Control.Arrow    ( second )
 import Data.IORef
 import Data.List
 import Foreign.Ptr
-import GHC.Exts
 
 import System.IO
 import System.Directory

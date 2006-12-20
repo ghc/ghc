@@ -14,45 +14,42 @@ module DsBreakpoint(
                    , mkBreakpointExpr
                    ) where
 
-import IOEnv            ( ioToIOEnv )
-import TysPrim          ( alphaTyVar )
-import TysWiredIn       ( intTy, stringTy, mkTupleTy, mkListTy, boolTy )
+import IOEnv
+import TysPrim
+import TysWiredIn
 import PrelNames        
-import Module           ( moduleName, moduleNameFS, modulePackageId )
-import PackageConfig    ( packageIdFS)
-import SrcLoc           ( SrcLoc, Located(..), SrcSpan, srcSpanFile,
-                          noLoc, noSrcLoc, isGoodSrcSpan,
-                          srcLocLine, srcLocCol, srcSpanStart )
-
-import TyCon            ( isUnLiftedTyCon, tyConDataCons )
-import TypeRep          ( Type(..) )
+import Module
+import PackageConfig
+import SrcLoc
+import TyCon
+import TypeRep
 import DataCon          
 import Type             
-import MkId             ( unsafeCoerceId, lazyId )
-import Name             ( Name, mkInternalName )
-import Var              ( mkTyVar )
-import Id               ( Id, idType, mkGlobalId, idName )
+import MkId
+import Name
+import Var
+import Id 
 
-import IdInfo           ( vanillaIdInfo, GlobalIdDetails (VanillaGlobal) )
-import BasicTypes       ( Boxity(Boxed) )
-import OccName          ( mkOccName, tvName )
+import IdInfo
+import BasicTypes
+import OccName
 
 import TcRnMonad
 import HsSyn            
-import HsLit            ( HsLit(HsString, HsInt) )
-import CoreSyn          ( CoreExpr, Expr (App) )
-import CoreUtils        ( exprType )
+import HsLit
+import CoreSyn
+import CoreUtils
 import Outputable
-import ErrUtils         ( debugTraceMsg )
-import FastString       ( mkFastString, unpackFS )
-import DynFlags         ( GhcMode(..), DynFlag(..) )
+import ErrUtils
+import FastString
+import DynFlags
  
 import DsMonad 
 import {-#SOURCE#-}DsExpr ( dsLExpr ) 
 import Control.Monad
 import Data.IORef
-import Foreign.StablePtr ( newStablePtr, castStablePtrToPtr )
-import GHC.Exts         ( Ptr(..), Int(..), addr2Int#, unsafeCoerce# )
+import Foreign.StablePtr
+import GHC.Exts
 
 mkBreakpointExpr :: SrcSpan -> Id -> DsM (LHsExpr Id)
 mkBreakpointExpr loc bkptFuncId = do
@@ -132,7 +129,7 @@ dynBreakpoint :: SrcSpan -> DsM (LHsExpr Id)
 dynBreakpoint loc | not (isGoodSrcSpan loc) = 
                          pprPanic "dynBreakpoint" (ppr loc)
 dynBreakpoint loc = do 
-    let autoBreakpoint = mkGlobalId VanillaGlobal breakpointAutoName 
+    let autoBreakpoint = Id.mkGlobalId VanillaGlobal breakpointAutoName 
                          breakpointAutoTy vanillaIdInfo
     dflags <- getDOptsDs 
     ioToIOEnv$ debugTraceMsg dflags 3 (text "Breakpoint inserted at " <> ppr loc)
@@ -173,7 +170,7 @@ mkJumpFunc bkptFuncId
                                  (TyVarTy tyvar))))))))
         build name extra  = do 
             ATyCon opaqueTyCon <- dsLookupGlobal opaqueTyConName
-            return$ mkGlobalId VanillaGlobal name
+            return$ Id.mkGlobalId VanillaGlobal name
                       (basicType extra (mkTyConApp opaqueTyCon [])) vanillaIdInfo
         mkTupleType tys = mkTupleTy Boxed (length tys) tys
 

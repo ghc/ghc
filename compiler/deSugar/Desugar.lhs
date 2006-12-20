@@ -10,7 +10,6 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 #include "HsVersions.h"
 
-import Breakpoints
 import DynFlags
 import StaticFlags
 import HscTypes
