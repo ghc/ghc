@@ -463,6 +463,7 @@ usage_text[] = {
 "            2 - level 2 cache misses",
 "            b - branch mispredictions",
 "            s - stalled cycles",
+"            e - cache miss and branch misprediction events",
 #endif
 "",
 "RTS options may also be specified using the GHCRTS environment variable.",
@@ -676,6 +677,9 @@ error = rtsTrue;
 		  break;
 		case 's':
 		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_STALLS;
+		  break;
+		case 'e':
+		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CB_EVENTS;
 		  break;
 		default:
 		  bad_option( rts_argv[arg] );

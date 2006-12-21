@@ -59,6 +59,8 @@ struct _papi_events {
 #define DC_MISS 0x4000001a
 #define FR_DISPATCH_STALLS_BR 0x40000055
 #define FR_DISPATCH_STALLS_FULL_LS 0x4000005b
+#define DC_L2_REFILL_MOES 0x40001e1b
+#define DC_SYS_REFILL_MOES 0x40001e1c
 
 /* Number of counted events, computed from size of papi_events */
 #define N_PAPI_EVENTS n_papi_events
@@ -88,6 +90,13 @@ static struct _papi_events papi_events[MAX_PAPI_EVENTS];
 long_long MutatorCounters[MAX_PAPI_EVENTS];
 long_long GCCounters[MAX_PAPI_EVENTS];
 
+long_long start_mutator_cycles;
+long_long start_gc_cycles;
+long_long mutator_cycles;
+long_long gc_cycles;
+
+
+
 /* If you want to add events to count, extend the
  * init_countable_events and the papi_report function.
  * Be aware that your processor can count a limited number
@@ -97,7 +106,7 @@ long_long GCCounters[MAX_PAPI_EVENTS];
 static void
 init_countable_events(void) 
 {
-    PAPI_ADD_EVENT(PAPI_TOT_CYC);
+    PAPI_ADD_EVENT(PAPI_TOT_INS);
     if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
 	PAPI_ADD_EVENT(FR_BR);
 	PAPI_ADD_EVENT(FR_BR_MIS);
@@ -116,16 +125,37 @@ init_countable_events(void)
 	PAPI_ADD_EVENT(PAPI_L2_DCA);
 	PAPI_ADD_EVENT(PAPI_L2_DCM);
     }
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CB_EVENTS) {
+	PAPI_ADD_EVENT(DC_L2_REFILL_MOES);
+	PAPI_ADD_EVENT(DC_SYS_REFILL_MOES);
+	PAPI_ADD_EVENT(FR_BR_MIS);
+    }
 };
+
+
+static char temp[BIG_STRING_LEN];
+
+void
+papi_mut_cycles()
+{
+    ullong_format_string(mutator_cycles,temp,rtsTrue/*commas*/); 
+    statsPrintf("  (MUT_CYCLES)  : %s\n",temp);
+}
+
+void
+papi_gc_cycles()
+{
+    ullong_format_string(gc_cycles,temp,rtsTrue/*commas*/); 
+    statsPrintf("  (GC_CYCLES)  : %s\n",temp);
+}
 
 /* This function reports counters for GC and mutator */
 void
 papi_report(long_long PapiCounters[])
 {
-    char temp[BIG_STRING_LEN];
 
     /* I need to improve formatting aesthetics */
-    PAPI_REPORT(PapiCounters,PAPI_TOT_CYC);
+    PAPI_REPORT(PapiCounters,PAPI_TOT_INS);
 
     if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_BRANCH) {
 	PAPI_REPORT(PapiCounters,FR_BR);
@@ -136,9 +166,9 @@ papi_report(long_long PapiCounters[])
 
     if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_STALLS) {
 	PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_BR);
-	PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_BR,PAPI_TOT_CYC);
+	//PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_BR,PAPI_TOT_CYC);
 	PAPI_REPORT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS);
-	PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS,PAPI_TOT_CYC);
+	//PAPI_REPORT_PCT(PapiCounters,FR_DISPATCH_STALLS_FULL_LS,PAPI_TOT_CYC);
     }
 
     if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CACHE_L1) {
@@ -151,6 +181,12 @@ papi_report(long_long PapiCounters[])
 	PAPI_REPORT(PapiCounters,PAPI_L2_DCA);
 	PAPI_REPORT(PapiCounters,PAPI_L2_DCM);
 	PAPI_REPORT_PCT(PapiCounters,PAPI_L2_DCM,PAPI_L2_DCA);
+    }
+
+    if(RtsFlags.PapiFlags.eventType==PAPI_FLAG_CB_EVENTS) {
+	PAPI_REPORT(PapiCounters,DC_L2_REFILL_MOES);
+	PAPI_REPORT(PapiCounters,DC_SYS_REFILL_MOES);
+	PAPI_REPORT(PapiCounters,FR_BR_MIS);
     }
 
 }
@@ -202,15 +238,24 @@ papi_add_events(int EventSet)
   }
 }
 
+/* We should be using elapsed cycles
+ * to be consistent with time metric chosen in Stats.c (Elapsed time).
+ * This is an approximation to the cycles that the program spends.
+ * Note that the counters, in contrast, are virtual and user space.
+ */
+#define PAPI_cycles PAPI_get_virt_cyc
+
 void
 papi_start_mutator_count(void)
 {
     PAPI_CHECK( PAPI_start(MutatorEvents));
+    start_mutator_cycles = PAPI_cycles();
 }
 
 void
 papi_stop_mutator_count(void)
 {
+    mutator_cycles += PAPI_cycles() - start_mutator_cycles;
     PAPI_CHECK( PAPI_accum(MutatorEvents,MutatorCounters));
     PAPI_CHECK( PAPI_stop(MutatorEvents,NULL));
 }
@@ -219,11 +264,13 @@ void
 papi_start_gc_count(void)
 {
       PAPI_CHECK( PAPI_start(GCEvents));
+      start_gc_cycles = PAPI_cycles();
 }
 
 void
 papi_stop_gc_count(void)
 {
+      gc_cycles += PAPI_cycles() - start_gc_cycles;
       PAPI_CHECK( PAPI_accum(GCEvents,GCCounters));
       PAPI_CHECK( PAPI_stop(GCEvents,NULL));
 }

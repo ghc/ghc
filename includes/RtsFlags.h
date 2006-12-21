@@ -311,6 +311,7 @@ struct PAPI_FLAGS {
 #define PAPI_FLAG_CACHE_L2 2
 #define PAPI_FLAG_BRANCH 3
 #define PAPI_FLAG_STALLS 4
+#define PAPI_FLAG_CB_EVENTS 5
 
 #endif
 

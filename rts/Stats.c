@@ -562,9 +562,11 @@ stat_exit(int alloc)
 	     * Note that the cycles are counted _after_ the initialization of the RTS -- AR */
 
 	    statsPrintf("  -- CPU Mutator counters --\n");
+	    papi_mut_cycles();
 	    papi_report(MutatorCounters);
 
 	    statsPrintf("\n  -- CPU GC counters --\n");
+	    papi_gc_cycles();
 	    papi_report(GCCounters);
 #endif
 	}

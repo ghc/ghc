@@ -32,6 +32,8 @@ extern long_long GCCounters[];
 
 long_long papi_counter(long_long values[],int event);
 void papi_report(long_long PapiCounters[]);
+void papi_mut_cycles(void);
+void papi_gc_cycles(void);
 void papi_add_events(int EventSet);
 
 void papi_init_eventsets(void);
