@@ -564,6 +564,8 @@ zonkOverLit env (HsIntegral i e)
   = do	{ e' <- zonkExpr env e; return (HsIntegral i e') }
 zonkOverLit env (HsFractional r e)
   = do	{ e' <- zonkExpr env e; return (HsFractional r e') }
+zonkOverLit env (HsIsString s e)
+  = do	{ e' <- zonkExpr env e; return (HsIsString s e') }
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo TcId -> TcM (ArithSeqInfo Id)

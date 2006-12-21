@@ -109,6 +109,7 @@ basicKnownKeyNames
 	runMainIOName,
 	orderingTyConName,
 	rationalTyConName,
+	stringTyConName,
 	ratioDataConName,
 	ratioTyConName,
 	integerTyConName, smallIntegerDataConName, largeIntegerDataConName,
@@ -130,11 +131,15 @@ basicKnownKeyNames
 	realFracClassName,		-- numeric
 	realFloatClassName,		-- numeric
 	dataClassName, 
+	isStringClassName,
 
 	-- Numeric stuff
 	negateName, minusName, 
 	fromRationalName, fromIntegerName, 
 	geName, eqName, 
+
+        -- String stuff
+        fromStringName,
 	
 	-- Enum stuff
 	enumFromName, enumFromThenName,	
@@ -372,6 +377,8 @@ minus_RDR		= nameRdrName minusName
 times_RDR		= varQual_RDR  gHC_NUM FSLIT("*")
 plus_RDR                = varQual_RDR gHC_NUM FSLIT("+")
 
+fromString_RDR		= nameRdrName fromStringName
+
 compose_RDR		= varQual_RDR gHC_BASE FSLIT(".")
 
 not_RDR 		= varQual_RDR gHC_BASE FSLIT("not")
@@ -463,6 +470,7 @@ unpackCStringAppendName = varQual gHC_BASE FSLIT("unpackAppendCString#") unpackC
 unpackCStringFoldrName  = varQual gHC_BASE FSLIT("unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual gHC_BASE FSLIT("unpackCStringUtf8#") unpackCStringUtf8IdKey
 eqStringName	 	= varQual gHC_BASE FSLIT("eqString")  eqStringIdKey
+stringTyConName         = tcQual  gHC_BASE FSLIT("String") stringTyConKey
 
 -- The 'inline' function
 inlineIdName	 	= varQual gHC_BASE FSLIT("inline") inlineIdKey
@@ -482,13 +490,14 @@ returnMName	   = methName gHC_BASE FSLIT("return") returnMClassOpKey
 failMName	   = methName gHC_BASE FSLIT("fail")   failMClassOpKey
 
 -- Random PrelBase functions
+fromStringName    = methName gHC_BASE FSLIT("fromString") fromStringClassOpKey
 otherwiseIdName   = varQual gHC_BASE FSLIT("otherwise")  otherwiseIdKey
 foldrName	  = varQual gHC_BASE FSLIT("foldr")      foldrIdKey
 buildName	  = varQual gHC_BASE FSLIT("build")      buildIdKey
 augmentName	  = varQual gHC_BASE FSLIT("augment")    augmentIdKey
 appendName	  = varQual gHC_BASE FSLIT("++")         appendIdKey
-andName		  = varQual gHC_BASE FSLIT("&&")	  andIdKey
-orName		  = varQual gHC_BASE FSLIT("||")	  orIdKey
+andName		  = varQual gHC_BASE FSLIT("&&")	 andIdKey
+orName		  = varQual gHC_BASE FSLIT("||")	 orIdKey
 assertName        = varQual gHC_BASE FSLIT("assert")     assertIdKey
 breakpointName    = varQual gHC_BASE FSLIT("breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE FSLIT("breakpointCond") breakpointCondIdKey
@@ -654,6 +663,7 @@ loopAName	   = varQual aRROW FSLIT("loop")  loopAIdKey
 monadPlusClassName  = clsQual mONAD FSLIT("MonadPlus")  monadPlusClassKey
 randomClassName     = clsQual rANDOM FSLIT("Random")    randomClassKey
 randomGenClassName  = clsQual rANDOM FSLIT("RandomGen") randomGenClassKey
+isStringClassName   = clsQual gHC_BASE FSLIT("IsString") isStringClassKey
 
 -- dotnet interop
 objectTyConName	    = tcQual   dOTNET FSLIT("Object") objectTyConKey
@@ -731,6 +741,8 @@ monadFixClassKey	= mkPreludeClassUnique 28
 monadPlusClassKey	= mkPreludeClassUnique 30
 randomClassKey		= mkPreludeClassUnique 31
 randomGenClassKey	= mkPreludeClassUnique 32
+
+isStringClassKey	= mkPreludeClassUnique 33
 \end{code}
 
 %************************************************************************
@@ -833,12 +845,14 @@ rightCoercionTyConKey                   = mkPreludeTyConUnique 96
 instCoercionTyConKey                    = mkPreludeTyConUnique 97
 unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
 
-
 unknownTyConKey				= mkPreludeTyConUnique 99
 unknown1TyConKey			= mkPreludeTyConUnique 130
 unknown2TyConKey			= mkPreludeTyConUnique 131
 unknown3TyConKey			= mkPreludeTyConUnique 132
 opaqueTyConKey                          = mkPreludeTyConUnique 133
+
+stringTyConKey				= mkPreludeTyConUnique 134
+
 
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-129
@@ -1017,6 +1031,8 @@ appAIdKey	= mkPreludeMiscIdUnique 122
 choiceAIdKey	= mkPreludeMiscIdUnique 123 --  |||
 loopAIdKey	= mkPreludeMiscIdUnique 124
 
+fromStringClassOpKey	      = mkPreludeMiscIdUnique 125
+
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399
 -----------------------------------------------------
@@ -1076,7 +1092,9 @@ needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
 standardClassKeys = derivableClassKeys ++ numericClassKeys
 		  ++ [randomClassKey, randomGenClassKey,
 		      functorClassKey, 
-		      monadClassKey, monadPlusClassKey]
+		      monadClassKey, monadPlusClassKey,
+		      isStringClassKey
+		     ]
 \end{code}
 
 @derivableClassKeys@ is also used in checking \tr{deriving} constructs

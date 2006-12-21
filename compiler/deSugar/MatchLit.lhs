@@ -87,6 +87,7 @@ dsOverLit :: HsOverLit Id -> DsM CoreExpr
 -- (an expression for) the literal value itself
 dsOverLit (HsIntegral   _ lit) = dsExpr lit
 dsOverLit (HsFractional _ lit) = dsExpr lit
+dsOverLit (HsIsString   _ lit) = dsExpr lit
 \end{code}
 
 \begin{code}
@@ -109,6 +110,8 @@ hsOverLitKey (HsIntegral i _) False   = MachInt i
 hsOverLitKey (HsIntegral i _) True    = MachInt (-i)
 hsOverLitKey (HsFractional r _) False = MachFloat r
 hsOverLitKey (HsFractional r _) True  = MachFloat (-r)
+hsOverLitKey (HsIsString s _)  False  = MachStr s
+-- negated string should never happen
 \end{code}
 
 %************************************************************************
@@ -140,6 +143,7 @@ tidyNPat over_lit mb_neg eq lit_ty
   | isIntTy    lit_ty = mk_con_pat intDataCon    (HsIntPrim int_val)
   | isFloatTy  lit_ty = mk_con_pat floatDataCon  (HsFloatPrim  rat_val)
   | isDoubleTy lit_ty = mk_con_pat doubleDataCon (HsDoublePrim rat_val)
+--  | isStringTy lit_ty = mk_con_pat stringDataCon (HsStringPrim str_val)
   | otherwise	      = NPat over_lit mb_neg eq lit_ty
   where
     mk_con_pat :: DataCon -> HsLit -> Pat Id
@@ -158,6 +162,11 @@ tidyNPat over_lit mb_neg eq lit_ty
     rat_val = case neg_lit of
 		HsIntegral   i _ -> fromInteger i
 		HsFractional f _ -> f
+	
+    str_val :: FastString
+    str_val = case neg_lit of
+		HsIsString   s _ -> s
+		_                -> error "tidyNPat"
 \end{code}
 
 

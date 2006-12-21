@@ -1325,6 +1325,9 @@ aexp2	:: { LHsExpr RdrName }
 	: ipvar				{ L1 (HsIPVar $! unLoc $1) }
 	| qcname			{ L1 (HsVar   $! unLoc $1) }
 	| literal			{ L1 (HsLit   $! unLoc $1) }
+-- This will enable overloaded strings permanently.  Normally the renamer turns HsString
+-- into HsOverLit when -foverloaded-strings is on.
+--	| STRING			{ L1 (HsOverLit $! mkHsIsString (getSTRING $1)) }
 	| INTEGER			{ L1 (HsOverLit $! mkHsIntegral (getINTEGER $1)) }
 	| RATIONAL			{ L1 (HsOverLit $! mkHsFractional (getRATIONAL $1)) }
 	| '(' exp ')'			{ LL (HsPar $2) }
@@ -1776,7 +1779,7 @@ consym :: { Located RdrName }
 
 literal :: { Located HsLit }
 	: CHAR 			{ L1 $ HsChar       $ getCHAR $1 }
-	| STRING		{ L1 $ HsString     $ getSTRING $1 }
+	| STRING 		{ L1 $ HsString     $ getSTRING $1 }
 	| PRIMINTEGER		{ L1 $ HsIntPrim    $ getPRIMINTEGER $1 }
 	| PRIMCHAR		{ L1 $ HsCharPrim   $ getPRIMCHAR $1 }
 	| PRIMSTRING		{ L1 $ HsStringPrim $ getPRIMSTRING $1 }

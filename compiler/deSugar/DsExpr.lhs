@@ -207,7 +207,7 @@ dsExpr (HsVar var)     	      = returnDs (Var var)
 dsExpr (HsIPVar ip)    	      = returnDs (Var (ipNameName ip))
 dsExpr (HsLit lit)     	      = dsLit lit
 dsExpr (HsOverLit lit) 	      = dsOverLit lit
-dsExpr (HsWrap co_fn e)     = dsCoercion co_fn (dsExpr e)
+dsExpr (HsWrap co_fn e)       = dsCoercion co_fn (dsExpr e)
 
 dsExpr (NegApp expr neg_expr) 
   = do	{ core_expr <- dsLExpr expr

@@ -1269,10 +1269,13 @@ mk_integer  i = do integer_ty <- lookupType integerTyConName
                    return $ HsInteger i integer_ty
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
+mk_string s   = do string_ty <- lookupType stringTyConName
+                   return $ HsString s
 
 repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
 repOverloadedLiteral (HsIntegral i _)   = do { lit <- mk_integer  i; repLiteral lit }
 repOverloadedLiteral (HsFractional f _) = do { lit <- mk_rational f; repLiteral lit }
+repOverloadedLiteral (HsIsString s _)   = do { lit <- mk_string   s; repLiteral lit }
 	-- The type Rational will be in the environment, becuase 
 	-- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
 	-- and rationalL is sucked in when any TH stuff is used

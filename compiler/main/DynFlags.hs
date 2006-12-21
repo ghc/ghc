@@ -176,6 +176,7 @@ data DynFlag
    | Opt_ScopedTypeVariables
    | Opt_BangPatterns
    | Opt_IndexedTypes
+   | Opt_OverloadedStrings
 
    -- optimisation opts
    | Opt_Strictness
@@ -1042,6 +1043,7 @@ fFlags = [
   ( "implicit-prelude",  		Opt_ImplicitPrelude ),
   ( "scoped-type-variables",  		Opt_ScopedTypeVariables ),
   ( "bang-patterns",	  		Opt_BangPatterns ),
+  ( "overloaded-strings",		Opt_OverloadedStrings ),
   ( "indexed-types",	  		Opt_IndexedTypes ),
   ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
   ( "mono-pat-binds",			Opt_MonoPatBinds ),

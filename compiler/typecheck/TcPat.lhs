@@ -813,6 +813,19 @@ tcOverloadedLit orig lit@(HsFractional r fr) res_ty
   = do 	{ expr <- newLitInst orig lit res_ty
 	; return (HsFractional r expr) }
 
+tcOverloadedLit orig lit@(HsIsString s fr) res_ty
+  | not (fr `isHsVar` fromStringName)	-- c.f. HsIntegral case
+  = do	{ str_ty <- tcMetaTy stringTyConName
+	; fr' <- tcSyntaxOp orig fr (mkFunTy str_ty res_ty)
+	; return (HsIsString s (HsApp (noLoc fr') (nlHsLit (HsString s)))) }
+
+  | Just expr <- shortCutStringLit s res_ty 
+  = return (HsIsString s expr)
+
+  | otherwise
+  = do 	{ expr <- newLitInst orig lit res_ty
+	; return (HsIsString s expr) }
+
 newLitInst :: InstOrigin -> HsOverLit Name -> BoxyRhoType -> TcM (HsExpr TcId)
 newLitInst orig lit res_ty	-- Make a LitInst
   = do 	{ loc <- getInstLoc orig

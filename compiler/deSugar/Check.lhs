@@ -424,6 +424,7 @@ get_lit :: Pat id -> Maybe HsLit
 get_lit (LitPat lit)			 = Just lit
 get_lit (NPat (HsIntegral i   _) mb _ _) = Just (HsIntPrim   (mb_neg mb i))
 get_lit (NPat (HsFractional f _) mb _ _) = Just (HsFloatPrim (mb_neg mb f))
+get_lit (NPat (HsIsString s   _)  _ _ _) = Just (HsStringPrim s)
 get_lit other_pat			 = Nothing
 
 mb_neg :: Num a => Maybe b -> a -> a

@@ -2258,8 +2258,13 @@ disambiguate extended_defaulting insts
 				do { integer_ty <- tcMetaTy integerTyConName
 				   ; checkWiredInTyCon doubleTyCon
 				   ; return [integer_ty, doubleTy] }
+        ; string_ty <- tcMetaTy stringTyConName
+	; ovlStr <- doptM Opt_OverloadedStrings
+	-- XXX This should not be added unconditionally, but the default declaration stuff
+	-- is too wired to Num for me to understand.  /LA
+        ; let default_str_tys = default_tys ++ if ovlStr then [string_ty] else []
 	; traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
-	; mapM_ (disambigGroup default_tys) defaultable_groups  }
+	; mapM_ (disambigGroup default_str_tys) defaultable_groups  }
   where
    unaries :: [(Inst,Class, TcTyVar)]  -- (C tv) constraints
    bad_tvs :: TcTyVarSet	  -- Tyvars mentioned by *other* constraints
@@ -2279,13 +2284,13 @@ disambiguate extended_defaulting insts
 
    defaultable_classes clss 
 	| extended_defaulting = any isInteractiveClass clss
-	| otherwise = all isStandardClass clss && any isNumericClass clss
+	| otherwise = all isStandardClass clss && (any isNumericClass clss || any ((== isStringClassKey) . classKey) clss)
 
  	-- In interactive mode, or with -fextended-default-rules,
 	-- we default Show a to Show () to avoid graututious errors on "show []"
    isInteractiveClass cls 
 	= isNumericClass cls
-	|| (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
+	|| (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey, isStringClassKey])
 
 
 disambigGroup :: [Type]			-- The default types

@@ -118,6 +118,7 @@ mkSimpleHsAlt pat expr
 
 mkHsIntegral   i       = HsIntegral   i  noSyntaxExpr
 mkHsFractional f       = HsFractional f  noSyntaxExpr
+mkHsIsString   s       = HsIsString   s  noSyntaxExpr
 mkHsDo ctxt stmts body = HsDo ctxt stmts body placeHolderType
 
 mkNPat lit neg     = NPat lit neg noSyntaxExpr placeHolderType

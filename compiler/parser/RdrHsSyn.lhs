@@ -9,7 +9,7 @@ module RdrHsSyn (
 	extractHsRhoRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl,
-	mkHsNegApp, mkHsIntegral, mkHsFractional,
+	mkHsNegApp, mkHsIntegral, mkHsFractional, mkHsIsString,
 	mkHsDo, mkHsSplice,
         mkTyData, mkPrefixCon, mkRecCon, mkInlineSpec,	
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp

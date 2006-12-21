@@ -21,7 +21,7 @@ module RnTypes (
 	dupFieldErr, patSigErr, checkTupSize
   ) where
 
-import DynFlags		( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts, Opt_ScopedTypeVariables ) )
+import DynFlags		( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts, Opt_ScopedTypeVariables, Opt_OverloadedStrings ) )
 
 import HsSyn
 import RdrHsSyn		( extractHsRhoRdrTyVars )
@@ -40,7 +40,7 @@ import RdrName		( RdrName, elemLocalRdrEnv )
 import PrelNames	( eqClassName, integralClassName, geName, eqName,
 		  	  negateName, minusName, lengthPName, indexPName,
 			  plusIntegerName, fromIntegerName, timesIntegerName,
-			  ratioDataConName, fromRationalName )
+			  ratioDataConName, fromRationalName, fromStringName )
 import TypeRep		( funTyCon )
 import Constants	( mAX_TUPLE_SIZE )
 import Name		( Name )
@@ -586,6 +586,10 @@ rnPat (SigPatIn pat ty)
   where
     doc = text "In a pattern type-signature"
     
+rnPat (LitPat lit@(HsString s))
+  = do { ovlStr <- doptM Opt_OverloadedStrings
+       ; if ovlStr then rnPat (mkNPat (mkHsIsString s) Nothing)
+         else do { rnLit lit; return (LitPat lit, emptyFVs) } }  -- Same as below
 rnPat (LitPat lit) 
   = rnLit lit 	`thenM_` 
     returnM (LitPat lit, emptyFVs) 
@@ -741,6 +745,10 @@ rnOverLit (HsFractional i _)
 	-- and denominator (see DsUtils.mkIntegerLit)
     in
     returnM (HsFractional i from_rat_name, fvs `plusFV` extra_fvs)
+
+rnOverLit (HsIsString s _)
+  = lookupSyntaxName fromStringName	`thenM` \ (from_string_name, fvs) ->
+	returnM (HsIsString s from_string_name, fvs)
 \end{code}
 
 

@@ -546,7 +546,7 @@ At the moment this just happens for
   * "do" notation
 
 We store the relevant Name in the HsSyn tree, in 
-  * HsIntegral/HsFractional	
+  * HsIntegral/HsFractional/HsIsString
   * NegApp
   * NPlusKPat
   * HsDo

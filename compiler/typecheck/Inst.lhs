@@ -17,7 +17,7 @@ module Inst (
 	newDictBndr, newDictBndrs, newDictBndrsO,
 	instCall, instStupidTheta,
 	cloneDict, 
-	shortCutFracLit, shortCutIntLit, newIPDict, 
+	shortCutFracLit, shortCutIntLit, shortCutStringLit, newIPDict, 
 	newMethod, newMethodFromName, newMethodWithGivenTy, 
 	tcInstClassOp, 
 	tcSyntaxName, isHsVar,
@@ -44,6 +44,7 @@ module Inst (
 import {-# SOURCE #-}	TcExpr( tcPolyExpr )
 import {-# SOURCE #-}	TcUnify( unifyType )
 
+import FastString(FastString)
 import HsSyn
 import TcHsSyn
 import TcRnMonad
@@ -436,6 +437,12 @@ shortCutFracLit f ty
   where
     mk_lit con lit = HsApp (nlHsVar (dataConWrapId con)) (nlHsLit lit)
 
+shortCutStringLit :: FastString -> TcType -> Maybe (HsExpr TcId)
+shortCutStringLit s ty
+  | isStringTy ty 			-- Short cut for String
+  = Just (HsLit (HsString s))
+  | otherwise = Nothing
+
 mkIntegerLit :: Integer -> TcM (LHsExpr TcId)
 mkIntegerLit i
   = tcMetaTy integerTyConName 	`thenM` \ integer_ty ->
@@ -447,6 +454,12 @@ mkRatLit r
   = tcMetaTy rationalTyConName 	`thenM` \ rat_ty ->
     getSrcSpanM			`thenM` \ span -> 
     returnM (L span $ HsLit (HsRat r rat_ty))
+
+mkStrLit :: FastString -> TcM (LHsExpr TcId)
+mkStrLit s
+  = --tcMetaTy stringTyConName 	`thenM` \ string_ty ->
+    getSrcSpanM			`thenM` \ span -> 
+    returnM (L span $ HsLit (HsString s))
 
 isHsVar :: HsExpr Name -> Name -> Bool
 isHsVar (HsVar f) g = f==g
@@ -714,6 +727,18 @@ lookupSimpleInst (LitInst {tci_lit = HsFractional f from_rat_name, tci_ty = ty, 
     mkRatLit f					`thenM` \ rat_lit ->
     returnM (GenInst [method_inst] (mkHsApp (L (instLocSpan loc) 
 					       (HsVar (instToId method_inst))) rat_lit))
+
+lookupSimpleInst (LitInst {tci_lit = HsIsString s from_string_name, tci_ty = ty, tci_loc = loc})
+  | Just expr <- shortCutStringLit s ty
+  = returnM (GenInst [] (noLoc expr))
+  | otherwise
+  = ASSERT( from_string_name `isHsVar` fromStringName )	-- A LitInst invariant
+    tcLookupId fromStringName			`thenM` \ from_string ->
+    tcInstClassOp loc from_string [ty]		`thenM` \ method_inst ->
+    mkStrLit s					`thenM` \ string_lit ->
+    returnM (GenInst [method_inst]
+		     (mkHsApp (L (instLocSpan loc)
+			   	 (HsVar (instToId method_inst))) string_lit))
 
 --------------------- Dictionaries ------------------------
 lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})

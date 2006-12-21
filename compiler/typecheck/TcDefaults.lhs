@@ -46,6 +46,7 @@ tcDefaults [L locn (DefaultDecl mono_tys)]
   = setSrcSpan locn 			$
     addErrCtxt defaultDeclCtxt		$
     tcLookupClass numClassName		`thenM` \ num_class ->
+    tcLookupClass isStringClassName		`thenM` \ num_class ->
     mappM tc_default_ty mono_tys	`thenM` \ tau_tys ->
     
     	-- Check that all the types are instances of Num

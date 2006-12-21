@@ -56,6 +56,7 @@ instance Eq HsLit where
 data HsOverLit id 	-- An overloaded literal
   = HsIntegral	 Integer  (SyntaxExpr id)	-- Integer-looking literals;
   | HsFractional Rational (SyntaxExpr id)	-- Frac-looking literals
+  | HsIsString   FastString (SyntaxExpr id)	-- String-looking literals
   -- Before type checking, the SyntaxExpr is 'fromInteger' or 'fromRational'
   -- After type checking, it is (fromInteger 3) or lit_78; that is,
   -- the expression that should replace the literal.
@@ -68,13 +69,19 @@ data HsOverLit id 	-- An overloaded literal
 instance Eq (HsOverLit id) where
   (HsIntegral i1 _)   == (HsIntegral i2 _)   = i1 == i2
   (HsFractional f1 _) == (HsFractional f2 _) = f1 == f2
+  (HsIsString s1 _)   == (HsIsString s2 _)   = s1 == s2
   l1		      == l2		     = False
 
 instance Ord (HsOverLit id) where
   compare (HsIntegral i1 _)   (HsIntegral i2 _)   = i1 `compare` i2
   compare (HsIntegral _ _)    (HsFractional _ _)  = LT
+  compare (HsIntegral _ _)    (HsIsString _ _)    = LT
   compare (HsFractional f1 _) (HsFractional f2 _) = f1 `compare` f2
   compare (HsFractional f1 _) (HsIntegral _ _)    = GT
+  compare (HsFractional f1 _) (HsIsString _ _)    = LT
+  compare (HsIsString s1 _)   (HsIsString s2 _)   = s1 `compare` s2
+  compare (HsIsString s1 _)   (HsIntegral _ _)    = GT
+  compare (HsIsString s1 _)   (HsFractional _ _)  = GT
 \end{code}
 
 \begin{code}
@@ -94,4 +101,5 @@ instance Outputable HsLit where
 instance Outputable (HsOverLit id) where
   ppr (HsIntegral i _)   = integer i
   ppr (HsFractional f _) = rational f
+  ppr (HsIsString s _)   = pprHsString s
 \end{code}

@@ -109,6 +109,16 @@ rnExpr (HsIPVar v)
   = newIPNameRn v		`thenM` \ name ->
     returnM (HsIPVar name, emptyFVs)
 
+rnExpr (HsLit lit@(HsString s))
+  = do {
+         opt_OverloadedStrings <- doptM Opt_OverloadedStrings
+       ; if opt_OverloadedStrings then
+            rnExpr (HsOverLit (mkHsIsString s))
+	 else -- Same as below
+	    rnLit lit		`thenM_`
+            returnM (HsLit lit, emptyFVs)
+       }
+
 rnExpr (HsLit lit) 
   = rnLit lit		`thenM_`
     returnM (HsLit lit, emptyFVs)
