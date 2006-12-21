@@ -5,3 +5,4 @@ setTestOpts(f)
 
 test('ghci001', normal, compile_and_run, [''])
 test('ghci002', normal, compile_and_run, [''])
+test('ghci003', normal, compile_and_run, [''])
