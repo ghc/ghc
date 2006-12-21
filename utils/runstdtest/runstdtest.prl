@@ -74,7 +74,9 @@ $TimeCmd = 'time';
 $StatsFile = "$TmpPrefix/stats$$";
 $CachegrindStats = "cachegrind.out.summary";
 $SysSpecificTiming = '';
+$SysCPUCounting = 0; # Use CPU counters
 $Cachegrind = 'no';
+$Counters = "";
 
 die "$Pgm: program to run not given as first argument\n" if $#ARGV < 0;
 $ToRun = $ARGV[0]; shift(@ARGV);
@@ -122,6 +124,8 @@ arg: while ($_ = $ARGV[0]) {
 		    $Status++;
 		    next arg; };
     /^-(ghc|hbc)-timing$/ && do { $SysSpecificTiming = $1;
+				  next arg; };
+    /^-cpu-counting-(.)$/ && do { $SysCPUCounting = "$1";
 				  next arg; };
     /^-cachegrind$/ && do { $SysSpecificTiming = 'ghc-instrs';
 			    $Cachegrind = 'yes'; 
@@ -171,7 +175,13 @@ foreach $a ( @PgmArgs ) {
 # deal with system-specific timing options
 $TimingMagic = '';
 if ( $SysSpecificTiming =~ /^ghc/ ) {
-    $TimingMagic = "+RTS -S$StatsFile -RTS"
+    if ($SysCPUCounting) {
+        # Count specified CPU events
+        $cpu_counting_ghc = "-a$SysCPUCounting";
+    } else {
+        $cpu_counting_ghc = "";
+    }
+    $TimingMagic = "+RTS -S$StatsFile $cpu_counting_ghc -RTS"
 } elsif ( $SysSpecificTiming eq 'hbc' ) {
     $TimingMagic = "-S$StatsFile";
 }
@@ -313,7 +323,7 @@ if ( $SysSpecificTiming eq '' ) {
 # print out what we found
 print STDERR "<<$SysSpecificTiming: ";
 if ( $Cachegrind ne 'yes') {
-	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)";
+	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)$Counters";
 } else {
 	print STDERR "$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $GCWork bytes GC work, ${TotMem}M in use, $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed), $TotInstrs instructions, $TotReads memory reads, $TotWrites memory writes, $TotMisses L2 cache misses";
 };
@@ -372,6 +382,10 @@ sub process_stats_file {
 	local($max_live)    = 0; 
 	local($tot_live)    = 0; # for calculating residency stuff
 	local($tot_samples) = 0;
+	local($into_gc_counters) = 0; # once we reach into the GC counters part
+	local($counters) = "";
+	local($counter) = "";
+	local($count) = 0;
 
 	$GCWork = 0;
 	while (<STATS>) {
@@ -406,12 +420,50 @@ sub process_stats_file {
 	    } elsif ( /^\s*GC\s+time\s*(-*\d+\.\d\d)s\s*\(\s*(-*\d+\.\d\d)s elapsed\)/ ) {
 		$GcTime = $1; $GcElapsed = $2;
 	    }
+
+	    if ( /CPU GC counters/ ) {
+		# Counters that follow correspond to GC
+		$into_gc_counters = 1;
+	    }
+
+	    if ( /^\s+\(([A-Z_0-9]+)\)\s+:\s+([0-9,]+)/ ) {
+		$counter = $1;
+		$count   = $2;
+		$count =~ s/,//g; # Remove commas in numbers
+		# Pretty printing elements of a list with type [(String,[Float])]
+                # It's a bit lame for passing values but it works.
+		if($into_gc_counters) {
+		    $counters = "$counters(\"GC:$counter\",[$count]),";
+		} else {
+		    $counters = "$counters(\"$counter\",[$count]),";
+		}
+	    }
+
+	    if ( /^\s+\(([A-Z_0-9]+)\)\s+\%\s+of\s+\(([A-Z_0-9]+)\)\s+:\s+([0-9.]+)/ ) {
+		$counter = "$1/$2"; # Relative quantity
+		$count   = $3;
+		# Pretty printing elements of a list with type [(String,[Float])]
+                # It's a bit lame for passing values but it works.
+		if($into_gc_counters) {
+		    $counters = "$counters(\"GC:$counter\",[$count]),";
+		} else {
+		    $counters = "$counters(\"$counter\",[$count]),";
+		}
+	    }
+
 	}
 	close(STATS) || die "Failed when closing $StatsFile\n";
 	if ( $tot_samples > 0 ) {
 	    $ResidencySamples = $tot_samples;
 	    $MaxResidency = $max_live;
 	    $AvgResidency = int ($tot_live / $tot_samples) ;
+	}
+
+	if ( length($counters) == 0 ) {
+	    $Counters = "";
+	} else {
+	    chop($counters); # remove trailing comma from the last entry
+	    $Counters = " [$counters]";
 	}
 
     } elsif ( $SysSpecificTiming eq 'hbc' ) {
