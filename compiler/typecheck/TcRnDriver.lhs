@@ -1092,19 +1092,32 @@ tcRnType hsc_env ictxt rdr_type
 -- could not be found.
 getModuleExports :: HscEnv -> Module -> IO (Messages, Maybe [AvailInfo])
 getModuleExports hsc_env mod
-  = initTc hsc_env HsSrcFile iNTERACTIVE (tcGetModuleExports mod)
+  = let
+      ic        = hsc_IC hsc_env
+      checkMods = ic_toplev_scope ic ++ ic_exports ic
+    in
+    initTc hsc_env HsSrcFile iNTERACTIVE (tcGetModuleExports mod checkMods)
 
-tcGetModuleExports :: Module -> TcM [AvailInfo]
-tcGetModuleExports mod = do
-  let doc = ptext SLIT("context for compiling statements")
-  iface <- initIfaceTcRn $ loadSysInterface doc mod
-  loadOrphanModules (dep_orphs (mi_deps iface)) False 
-  		-- Load any orphan-module interfaces,
-  		-- so their instances are visible
-  loadOrphanModules (dep_finsts (mi_deps iface)) True
-  		-- Load any family instance-module interfaces,
-  		-- so all family instances are visible
-  ifaceExportNames (mi_exports iface)
+-- Get the export avail info and also load all orphan and family-instance
+-- modules.  Finally, check that the family instances of all modules in the
+-- interactive context are consistent (these modules are in the second
+-- argument).
+tcGetModuleExports :: Module -> [Module] -> TcM [AvailInfo]
+tcGetModuleExports mod directlyImpMods
+  = do { let doc = ptext SLIT("context for compiling statements")
+       ; iface <- initIfaceTcRn $ loadSysInterface doc mod
+
+  		-- Load any orphan-module and family instance-module
+  		-- interfaces, so their instances are visible.
+       ; loadOrphanModules (dep_orphs (mi_deps iface)) False 
+       ; loadOrphanModules (dep_finsts (mi_deps iface)) True
+
+                -- Check that the family instances of all directly loaded
+                -- modules are consistent.
+       ; checkFamInstConsistency (dep_finsts (mi_deps iface)) directlyImpMods
+
+       ; ifaceExportNames (mi_exports iface)
+       }
 
 tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Maybe [Name])
 tcRnLookupRdrName hsc_env rdr_name 
