@@ -75,6 +75,10 @@
 #define bci_RETURN_D 			50
 #define bci_RETURN_L 			51
 #define bci_RETURN_V 			52
+/* If you need to go past 255 then you will run into the flags */
+
+/* If you need to go below 0x0100 then you will run into the instructions */
+#define bci_FLAG_LARGE_ARGS     0x8000
 
 /* If a BCO definitely requires less than this many words of stack,
    don't include an explicit STKCHECK insn in it.  The interpreter

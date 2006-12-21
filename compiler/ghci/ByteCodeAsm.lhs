@@ -42,6 +42,7 @@ import Data.Array.Unboxed ( listArray )
 import Data.Array.Base	( UArray(..) )
 import Data.Array.ST	( castSTUArray )
 import Foreign		( Word16, free )
+import Data.Bits
 import Data.Int		( Int64 )
 import Data.Char	( ord )
 
@@ -202,6 +203,21 @@ sizeSS (SizedSeq n r_xs) = n
 -- Bring in all the bci_ bytecode constants.
 #include "Bytecodes.h"
 
+largeArgInstr :: Int -> Int
+largeArgInstr bci = bci_FLAG_LARGE_ARGS .|. bci
+
+largeArg :: Int -> [Int]
+largeArg i
+ | wORD_SIZE_IN_BITS == 64
+           = [(i .&. 0xFFFF000000000000) `shiftR` 48,
+              (i .&. 0x0000FFFF00000000) `shiftR` 32,
+              (i .&. 0x00000000FFFF0000) `shiftR` 16,
+              (i .&. 0x000000000000FFFF)]
+ | wORD_SIZE_IN_BITS == 32
+           = [(i .&. 0xFFFF0000) `shiftR` 16,
+              (i .&. 0x0000FFFF)]
+ | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
+
 -- This is where all the action is (pass 2 of the assembler)
 mkBits :: (Int -> Int) 			-- label finder
        -> AsmState
@@ -214,7 +230,10 @@ mkBits findLabel st proto_insns
        doInstr :: AsmState -> BCInstr -> IO AsmState
        doInstr st i
           = case i of
-               STKCHECK  n        -> instr2 st bci_STKCHECK n
+               STKCHECK  n
+                | n > 65535 ->
+                       instrn st (largeArgInstr bci_STKCHECK : largeArg n)
+                | otherwise -> instr2 st bci_STKCHECK n
                PUSH_L    o1       -> instr2 st bci_PUSH_L o1
                PUSH_LL   o1 o2    -> instr3 st bci_PUSH_LL o1 o2
                PUSH_LLL  o1 o2 o3 -> instr4 st bci_PUSH_LLL o1 o2 o3
@@ -285,6 +304,12 @@ mkBits findLabel st proto_insns
 
        i2s :: Int -> Word16
        i2s = fromIntegral
+
+       instrn :: AsmState -> [Int] -> IO AsmState
+       instrn st [] = return st
+       instrn (st_i, st_l, st_p, st_I) (i:is)
+          = do st_i' <- addToSS st_i (i2s i)
+               instrn (st_i', st_l, st_p, st_I) is
 
        instr1 (st_i0,st_l0,st_p0,st_I0) i1
           = do st_i1 <- addToSS st_i0 i1

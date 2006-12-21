@@ -165,14 +165,12 @@ mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap
 		-- don't do stack checks at return points;
 		-- everything is aggregated up to the top BCO
 		-- (which must be a function)
-           | stack_overest >= 65535
-           = pprPanic "mkProtoBCO: stack use won't fit in 16 bits" 
-                      (int stack_overest)
            | stack_overest >= iNTERP_STACK_CHECK_THRESH
            = STKCHECK stack_overest : peep_d
            | otherwise
            = peep_d	-- the supposedly common case
              
+        -- We assume that this sum doesn't wrap
         stack_overest = sum (map bciStackUse peep_d)
 
         -- Merge local pushes

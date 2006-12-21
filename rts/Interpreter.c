@@ -41,6 +41,17 @@
 /* Sp points to the lowest live word on the stack. */
 
 #define BCO_NEXT      instrs[bciPtr++]
+#define BCO_NEXT_32   (bciPtr += 2, (((StgWord) instrs[bciPtr-2]) << 16) + ((StgWord) instrs[bciPtr-1]))
+#define BCO_NEXT_64   (bciPtr += 4, (((StgWord) instrs[bciPtr-4]) << 48) + (((StgWord) instrs[bciPtr-3]) << 32) + (((StgWord) instrs[bciPtr-2]) << 16) + ((StgWord) instrs[bciPtr-1]))
+#if WORD_SIZE_IN_BITS == 32
+#define BCO_NEXT_WORD BCO_NEXT_32
+#elif WORD_SIZE_IN_BITS == 64
+#define BCO_NEXT_WORD BCO_NEXT_64
+#else
+#error Can't cope with WORD_SIZE_IN_BITS being nether 32 nor 64
+#endif
+#define BCO_GET_LARGE_ARG ((bci & bci_FLAG_LARGE_ARGS) ? BCO_NEXT_WORD : BCO_NEXT)
+
 #define BCO_PTR(n)    (W_)ptrs[n]
 #define BCO_LIT(n)    literals[n]
 #define BCO_ITBL(n)   itbls[n]
@@ -713,6 +724,7 @@ run_BCO:
     INTERP_TICK(it_BCO_entries);
     {
 	register int       bciPtr     = 1; /* instruction pointer */
+    register StgWord16 bci;
 	register StgBCO*   bco        = (StgBCO*)obj;
 	register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
 	register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
@@ -753,13 +765,18 @@ run_BCO:
 	it_lastopc = (int)instrs[bciPtr];
 #endif
 
-	switch (BCO_NEXT) {
+	bci = BCO_NEXT;
+    /* We use the high 8 bits for flags, only the highest of which is
+     * currently allocated */
+    ASSERT((bci & 0xFF00) == (bci & 0x8000));
+
+    switch (bci & 0xFF) {
 
 	case bci_STKCHECK: {
 	    // Explicit stack check at the beginning of a function
 	    // *only* (stack checks in case alternatives are
 	    // propagated to the enclosing function).
-	    int stk_words_reqd = BCO_NEXT + 1;
+	    StgWord stk_words_reqd = BCO_GET_LARGE_ARG + 1;
 	    if (Sp - stk_words_reqd < SpLim) {
 		Sp -= 2; 
 		Sp[1] = (W_)obj; 
