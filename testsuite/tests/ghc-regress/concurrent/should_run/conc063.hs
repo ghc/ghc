@@ -2,9 +2,14 @@ module Main where
 
 import GHC.Conc
 import Control.Exception
+import IO
+import Foreign.StablePtr
+import System.IO
 
 -- Test invariants using updates & blocking in invariants
 main = do
+  newStablePtr stdout
+
   putStr "\nStarting\n"
   (x1, x2, x3) <- atomically ( do x1 <- newTVar 0
                                   x2 <- newTVar 0 
@@ -34,6 +39,7 @@ main = do
   atomically ( writeTVar x1 20 ) 
 
   putStr "\nUpdate the TVar to cause the invariant to block again (expect thread blocked indef)\n"
-  atomically ( writeTVar x1 0 ) 
+  Control.Exception.catch (atomically ( writeTVar x1 0 ))
+                 (\e -> putStr ("Caught: " ++ (show e) ++ "\n"))
 
          

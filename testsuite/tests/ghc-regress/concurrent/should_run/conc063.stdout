@@ -13,3 +13,4 @@ Attaching an invariant that blocks
 Another update to the TVar with the blocking invariant
 
 Update the TVar to cause the invariant to block again (expect thread blocked indef)
+Caught: thread blocked indefinitely
