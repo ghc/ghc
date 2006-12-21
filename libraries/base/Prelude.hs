@@ -80,6 +80,9 @@ module Prelude (
     Functor(fmap),
     mapM, mapM_, sequence, sequence_, (=<<),
 
+    -- ** String class
+    IsString(fromString),
+
     -- ** Miscellaneous functions
     id, const, (.), flip, ($), until,
     asTypeOf, error, undefined,

@@ -496,6 +496,14 @@ otherwise		:: Bool
 otherwise 		=  True
 \end{code}
 
+\begin{code}
+class IsString a where
+    fromString :: String -> a
+
+instance IsString [Char] where
+    fromString xs = xs
+\end{code}
+
 
 %*********************************************************
 %*							*
