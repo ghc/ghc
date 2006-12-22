@@ -30,48 +30,14 @@ Packages
     <indexterm><primary>packages</primary>
       <secondary>using</secondary></indexterm>
     
-    <para>To see which packages are installed, use the
-      <literal>ghc-pkg</literal> command:</para>
+    <para>GHC only knows about packages that are <emphasis>installed</emphasis>.</para>
 
-<screen>
-$ ghc-pkg list
-/usr/lib/ghc-6.4/package.conf:
-    base-1.0, haskell98-1.0, template-haskell-1.0, mtl-1.0, unix-1.0,
-    Cabal-1.0, haskell-src-1.0, parsec-1.0, network-1.0,
-    QuickCheck-1.0, HUnit-1.1, fgl-1.0, X11-1.1, HGL-3.1, OpenGL-2.0,
-    GLUT-2.0, stm-1.0, readline-1.0, (lang-1.0), (concurrent-1.0),
-    (posix-1.0), (util-1.0), (data-1.0), (text-1.0), (net-1.0),
-    (hssource-1.0), rts-1.0
-      </screen>
-
-    <para>Packages are either exposed or hidden.  Only
-      modules from exposed packages may be imported by your Haskell code; if
+    <para>An installed package is either <emphasis>exposed</emphasis> or <emphasis>hidden</emphasis>
+      by default.  Command-line flags, described below, allow you to expose a hidden package
+      or hide an exposed one.
+      Only modules from exposed packages may be imported by your Haskell code; if
       you try to import a module from a hidden package, GHC will emit an error
       message.</para>
-
-    <para>Each package has an exposed flag, which says whether it is exposed by
-      default or not.  Packages hidden by default are listed in
-      parentheses (eg. <literal>(lang-1.0)</literal>) in the output from
-      <literal>ghc-pkg list</literal>.  To expose a package which is hidden by
-      default, use the <option>-package</option>
-      flag (see below).</para>
-    
-    <para>To see which modules are exposed by a package:</para>
-    
-<screen>
-$ ghc-pkg field network exposed-modules
-exposed-modules: Network.BSD,
-                 Network.CGI,
-                 Network.Socket,
-                 Network.URI,
-                 Network
-</screen>
-
-    <para>In general, packages containing hierarchical modules are usually
-      exposed by default.  However, it is possible for two packages to contain
-      the same module: in this case, only one of the packages should be
-      exposed.  It is an error to import a module that belongs to more than one
-      exposed package.</para>
 
     <para>The GHC command line options that control packages are:</para>
 
@@ -82,7 +48,7 @@ exposed-modules: Network.BSD,
 	  <indexterm><primary><option>-package</option></primary></indexterm>
 	</term>
 	<listitem>
-	  <para>This option causes package <replaceable>P</replaceable> to be
+	  <para>This option causes the installed package <replaceable>P</replaceable> to be
 	    exposed.  The package <replaceable>P</replaceable> can be specified
 	    in full with its version number
 	    (e.g. <literal>network-1.0</literal>) or the version number can be
@@ -180,7 +146,81 @@ exposed-modules: Network.BSD,
 	    useful.</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term><option>-package-name</option> <replaceable>foo</replaceable>
+	<indexterm><primary><option>-package-name</option></primary>
+	  </indexterm></term>
+	<listitem>
+	  <para>Tells GHC the the module being compiled forms part of
+	    package <replaceable>foo</replaceable>.
+	    If this flag is omitted (a very common case) then the
+	    default package <literal>main</literal> is assumed.</para>
+            <para>Note: the argument to <option>-package-name</option>
+            should be the full package identifier for the package,
+            that is it should include the version number.  For example:
+            <literal>-package mypkg-1.2</literal>.</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
+
+
+    <para>To see which packages are installed, use the
+      <literal>ghc-pkg</literal> command:</para>
+
+<screen>
+$ ghc-pkg list
+/usr/lib/ghc-6.4/package.conf:
+    base-1.0, haskell98-1.0, template-haskell-1.0, mtl-1.0, unix-1.0,
+    Cabal-1.0, haskell-src-1.0, parsec-1.0, network-1.0,
+    QuickCheck-1.0, HUnit-1.1, fgl-1.0, X11-1.1, HGL-3.1, OpenGL-2.0,
+    GLUT-2.0, stm-1.0, readline-1.0, (lang-1.0), (concurrent-1.0),
+    (posix-1.0), (util-1.0), (data-1.0), (text-1.0), (net-1.0),
+    (hssource-1.0), rts-1.0
+      </screen>
+
+    <para>Packages hidden by default are listed in
+      parentheses (eg. <literal>(lang-1.0)</literal>) in the output above.
+      To expose a package which is hidden by
+      default, use the <option>-package</option>
+      flag (see above).</para>
+    
+    <para>When a package is exposed, it makes available for import the <emphasis>exposed modules</emphasis>
+    of the package.  To see which modules are exposed by a package use the
+      <literal>ghc-pkg</literal> command (see <xref linkend="package-management"/>):</para>
+    
+<screen>
+$ ghc-pkg field network exposed-modules
+exposed-modules: Network.BSD,
+                 Network.CGI,
+                 Network.Socket,
+                 Network.URI,
+                 Network
+</screen>
+
+    <para>In general, packages containing hierarchical modules are usually
+      exposed by default.  However, it is possible for two packages to contain
+      the same module: in this case, only one of the packages should be
+      exposed.  It is an error to import a module that belongs to more than one
+      exposed package.</para>
+
+  </sect2>
+
+  <sect2 id="package-main">
+    <title>The main package</title>
+
+  <para>Every complete Haskell program must define <literal>main</literal> in 
+   module <literal>Main</literal> 
+   in package <literal>main</literal>.   (Omitting the <option>-package-name</option> flag compiles
+   code for package <literal>main</literal>.) Failure to do so leads to a somewhat obscure
+   link-time error of the form:
+<programlisting>
+/usr/bin/ld: Undefined symbols:
+_ZCMain_main_closure
+___stginit_ZCMain
+</programlisting>
+</para>
+
   </sect2>
 
   <sect2 id="package-overlaps">
@@ -243,7 +283,7 @@ exposed-modules: Network.BSD,
       database will override those of the same name in the global
       database.</para> 
 
-    <para>You can control the loading of package databses using the following
+    <para>You can control the loading of package databases using the following
       GHC options:</para> 
 
     <variablelist>
@@ -379,28 +419,8 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
     </itemizedlist>
     
       <para>To compile a module which is to be part of a new package,
-      use the <literal>-package-name</literal> option:</para>
-
-      <variablelist>
-	<varlistentry>
-	  <term><option>-package-name <replaceable>foo</replaceable></option>
-	  <indexterm><primary><literal>-package-name</literal></primary>
-	    <secondary>option</secondary></indexterm></term>
-	  <listitem>
-	    <para>This option is added to the command line when
-	    compiling a module that is destined to be part of package
-	    <literal>foo</literal>.  If this flag is omitted then the
-	    default package <literal>main</literal> is assumed.</para>
-
-            <para>Note: the argument to <option>-package-name</option>
-            should be the full package identifier for the package,
-            that is it should include the version number.  For example:
-            <literal>-package mypkg-1.2</literal>.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-
-      <para>Failure to use the <literal>-package-name</literal> option
+      use the <literal>-package-name</literal> option (<xref linkend="using-packages"/>).
+      Failure to use the <literal>-package-name</literal> option
       when compiling a package will probably result in disaster, but
       you will only discover later when you attempt to import modules
       from the package.  At this point GHC will complain that the
