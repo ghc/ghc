@@ -89,3 +89,9 @@ clean(['ffi015_cbits.o'])
 test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
 
 test('ffi017', normal, compile_and_run, [''])
+# There's a dependency between these next two lines as the ghci way needs
+# the .o file the other ways make
+test('ffi018', omit_ways(['ghci']), compile_and_run, ['ffi018_c.c'])
+test('ffi018', only_ways(['ghci']), compile_and_run, ['ffi018_c.o'])
+clean(['ffi018_c.o'])
+
