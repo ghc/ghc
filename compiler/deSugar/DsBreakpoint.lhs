@@ -51,6 +51,7 @@ import Data.IORef
 import Foreign.StablePtr
 import GHC.Exts
 
+#ifdef GHCI
 mkBreakpointExpr :: SrcSpan -> Id -> DsM (LHsExpr Id)
 mkBreakpointExpr loc bkptFuncId = do
         scope' <- getLocalBindsDs
@@ -99,6 +100,9 @@ mkBreakpointExpr loc bkptFuncId = do
           srcSpanLit :: SrcSpan -> HsExpr Id
           srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
           instrumenting = idName bkptFuncId == breakpointAutoName
+#else
+mkBreakpointExpr = undefined    -- A stage1 ghc doesn't care about breakpoints
+#endif
 
 debug_enabled :: DsM Bool
 #if defined(GHCI) && defined(DEBUGGER)
