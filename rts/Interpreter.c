@@ -48,7 +48,7 @@
 #elif WORD_SIZE_IN_BITS == 64
 #define BCO_NEXT_WORD BCO_NEXT_64
 #else
-#error Can't cope with WORD_SIZE_IN_BITS being nether 32 nor 64
+#error Cannot cope with WORD_SIZE_IN_BITS being nether 32 nor 64
 #endif
 #define BCO_GET_LARGE_ARG ((bci & bci_FLAG_LARGE_ARGS) ? BCO_NEXT_WORD : BCO_NEXT)
 
