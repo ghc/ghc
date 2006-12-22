@@ -954,6 +954,7 @@ mkDummyLiteral pr
         NonPtrArg -> MachWord 0
         DoubleArg -> MachDouble 0
         FloatArg  -> MachFloat 0
+        LongArg   -> MachWord64 0
         _         -> moan64 "mkDummyLiteral" (ppr pr)
 
 

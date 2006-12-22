@@ -263,7 +263,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
            NonPtrArg -> i32
            DoubleArg -> f64  
            FloatArg  -> f32
-           -- LongArg -> i64
+           LongArg   -> i64
            VoidArg   -> []
            other     -> moan64 "ByteCodeFFI.mkMarshalCode_wrk(x86)" 
                                (ppr r_rep)
