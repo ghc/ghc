@@ -440,8 +440,8 @@ type FullyCheckedMod = (ParsedSource,
 printEntity (DocEntity doc) = show doc
 printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
--- | This data structure collects all the information we need from the GHC API
--- about a home package module
+-- | This data structure collects all the information we need about a home 
+-- package module
 data ModuleDataGHC = ModuleDataGHC {
    ghcModule         :: Module,
    ghcFilename       :: FilePath,
@@ -994,7 +994,8 @@ buildGlobalDocEnv modules
 			 n (nameSetMod n modName) env
 	keep_new env n = Map.insert n (nameSetMod n modName) env 
 
-nameSetMod n newMod = mkExternalName (nameUnique n) newMod (nameOccName n) Nothing (nameSrcLoc n)
+nameSetMod n newMod = mkExternalName (nameUnique n) newMod (nameOccName n)
+                      (nameSrcLoc n)
 
 -- -----------------------------------------------------------------------------
 -- Named documentation
@@ -1094,7 +1095,6 @@ sortImage f xs = map snd $ sortBy cmp_fst [(f x, x) | x <- xs]
 funTyConName = mkWiredInName gHC_PRIM
                         (mkOccNameFS tcName FSLIT("(->)"))
                         funTyConKey
-                        Nothing                 -- No parent object
                         (ATyCon funTyCon)       -- Relevant TyCon
                         BuiltInSyntax
 

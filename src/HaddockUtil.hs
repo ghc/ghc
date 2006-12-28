@@ -320,7 +320,7 @@ instance Binary FormatVersion where
                ++ " is not allowed")
    get bh =
       do
-         w8 :: Word8 <- get bh   
+         (w8 :: Word8) <- get bh   
          if testBit w8 7
             then
                do

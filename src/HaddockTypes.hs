@@ -35,7 +35,7 @@ data ExportItem name
       Name                 -- ^ The original name
       (LHsDecl name)       -- ^ A declaration
       (Maybe (HsDoc name)) -- ^ Maybe a doc comment
-      [InstHead name]	   -- ^ Instances relevant to this declaration
+      [InstHead name]	     -- ^ Instances relevant to this declaration
 
   | ExportNoDecl           -- ^ An exported entity for which we have no 
                            -- documentation (perhaps because it resides in
