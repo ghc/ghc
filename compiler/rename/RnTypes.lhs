@@ -505,14 +505,20 @@ rnLPred :: SDoc -> LHsPred RdrName -> RnM (LHsPred Name)
 rnLPred doc  = wrapLocM (rnPred doc)
 
 rnPred doc (HsClassP clas tys)
-  = lookupOccRn clas		`thenM` \ clas_name ->
-    rnLHsTypes doc tys		`thenM` \ tys' ->
-    returnM (HsClassP clas_name tys')
-
+  = do { clas_name <- lookupOccRn clas
+       ; tys' <- rnLHsTypes doc tys
+       ; returnM (HsClassP clas_name tys')
+       }
+rnPred doc (HsEqualP ty1 ty2)
+  = do { ty1' <- rnLHsType doc ty1
+       ; ty2' <- rnLHsType doc ty2
+       ; returnM (HsEqualP ty1' ty2')
+       }
 rnPred doc (HsIParam n ty)
-  = newIPNameRn n		`thenM` \ name ->
-    rnLHsType doc ty		`thenM` \ ty' ->
-    returnM (HsIParam name ty')
+  = do { name <- newIPNameRn n
+       ; ty' <- rnLHsType doc ty
+       ; returnM (HsIParam name ty')
+       }
 \end{code}
 
 

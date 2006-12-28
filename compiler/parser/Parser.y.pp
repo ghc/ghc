@@ -981,7 +981,8 @@ gentype :: { LHsType RdrName }
         : btype                         { $1 }
         | btype qtyconop gentype        { LL $ HsOpTy $1 $2 $3 }
         | btype tyvarop  gentype  	{ LL $ HsOpTy $1 $2 $3 }
- 	| btype '->' ctype		{ LL $ HsFunTy $1 $3 }
+ 	| btype '->'     ctype		{ LL $ HsFunTy $1 $3 }
+        | btype '~'      gentype  	{ LL $ HsPredTy (HsEqualP $1 $3) }
 
 btype :: { LHsType RdrName }
 	: btype atype			{ LL $ HsAppTy $1 $2 }

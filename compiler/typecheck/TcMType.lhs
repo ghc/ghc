@@ -924,14 +924,14 @@ check_valid_theta ctxt theta
 
 -------------------------
 check_pred_ty dflags ctxt pred@(ClassP cls tys)
-  = 	-- Class predicates are valid in all contexts
-    checkTc (arity == n_tys) arity_err		`thenM_`
+  = do {	-- Class predicates are valid in all contexts
+       ; checkTc (arity == n_tys) arity_err
 
-	-- Check the form of the argument types
-    mappM_ check_arg_type tys				`thenM_`
-    checkTc (check_class_pred_tys dflags ctxt tys)
-	    (predTyVarErr pred $$ how_to_allow)
-
+		-- Check the form of the argument types
+       ; mappM_ check_arg_type tys
+       ; checkTc (check_class_pred_tys dflags ctxt tys)
+		 (predTyVarErr pred $$ how_to_allow)
+       }
   where
     class_name = className cls
     arity      = classArity cls
@@ -939,10 +939,23 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
     arity_err  = arityErr "Class" class_name arity n_tys
     how_to_allow = parens (ptext SLIT("Use -fglasgow-exts to permit this"))
 
+check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
+  = do {	-- Equational constraints are valid in all contexts if indexed
+		-- types are permitted
+       ; checkTc (dopt Opt_IndexedTypes dflags) (eqPredTyErr pred)
+
+		-- Check the form of the argument types
+       ; check_eq_arg_type ty1
+       ; check_eq_arg_type ty2
+       }
+  where 
+    check_eq_arg_type = check_poly_type (Rank 0) UT_NotOk
+
 check_pred_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
-	-- Implicit parameters only allows in type
+	-- Implicit parameters only allowed in type
 	-- signatures; not in instance decls, superclasses etc
-	-- The reason for not allowing implicit params in instances is a bit subtle
+	-- The reason for not allowing implicit params in instances is a bit
+	-- subtle.
 	-- If we allowed	instance (?x::Int, Eq a) => Foo [a] where ...
 	-- then when we saw (e :: (?x::Int) => t) it would be unclear how to 
 	-- discharge all the potential usas of the ?x in e.   For example, a
@@ -1057,6 +1070,9 @@ checkThetaCtxt ctxt theta
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
 
 badPredTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
+eqPredTyErr  sty = ptext SLIT("Illegal equational constraint") <+> pprPred sty
+		   $$
+		   parens (ptext SLIT("Use -findexed-types to permit this"))
 predTyVarErr pred  = sep [ptext SLIT("Non type-variable argument"),
 			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)

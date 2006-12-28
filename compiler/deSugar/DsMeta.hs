@@ -398,6 +398,7 @@ repPred (HsClassP cls tys) = do
 			       tcon <- repTy (HsTyVar cls)
 			       tys1 <- repLTys tys
 			       repTapps tcon tys1
+repPred p@(HsEqualP _ _) = notHandled "Equational constraint" (ppr p)
 repPred p@(HsIParam _ _) = notHandled "Implicit parameter constraint" (ppr p)
 
 -- yield the representation of a list of types

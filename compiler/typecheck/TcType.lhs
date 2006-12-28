@@ -59,7 +59,7 @@ module TcType (
 
   ---------------------------------
   -- Misc type manipulators
-  deNoteType, classesOfTheta,
+  deNoteType,
   tyClsNamesOfType, tyClsNamesOfDFunHead, 
   getDFunTyKey,
 
@@ -540,7 +540,7 @@ mkSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkSigmaTy tyvars theta tau = mkForAllTys tyvars (mkPhiTy theta tau)
 
 mkPhiTy :: [PredType] -> Type -> Type
-mkPhiTy theta ty = foldr (\p r -> FunTy (mkPredTy p) r) ty theta
+mkPhiTy theta ty = foldr (\p r -> mkFunTy (mkPredTy p) r) ty theta
 \end{code}
 
 @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
@@ -850,7 +850,8 @@ isInheritablePred :: PredType -> Bool
 -- but it doesn't need to be quantified over the Num a dictionary
 -- which can be free in g's rhs, and shared by both calls to g
 isInheritablePred (ClassP _ _) = True
-isInheritablePred other	     = False
+isInheritablePred (EqPred _ _) = True
+isInheritablePred other	       = False
 \end{code}
 
 --------------------- Equality predicates ---------------------------------
@@ -1043,10 +1044,6 @@ tyClsNamesOfDFunHead :: Type -> NameSet
 tyClsNamesOfDFunHead dfun_ty 
   = case tcSplitSigmaTy dfun_ty of
 	(tvs,_,head_ty) -> tyClsNamesOfType head_ty
-
-classesOfTheta :: ThetaType -> [Class]
--- Looks just for ClassP things; maybe it should check
-classesOfTheta preds = [ c | ClassP c _ <- preds ]
 \end{code}
 
 

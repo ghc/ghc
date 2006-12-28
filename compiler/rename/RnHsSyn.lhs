@@ -87,6 +87,8 @@ extractHsCtxtTyNames (L _ ctxt)
 -- so don't mention the IP names
 extractHsPredTyNames (HsClassP cls tys)
   = unitNameSet cls `unionNameSets` extractHsTyNames_s tys
+extractHsPredTyNames (HsEqualP ty1 ty2)
+  = extractHsTyNames ty1 `unionNameSets` extractHsTyNames ty2
 extractHsPredTyNames (HsIParam n ty)
   = extractHsTyNames ty
 \end{code}

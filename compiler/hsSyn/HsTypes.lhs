@@ -102,7 +102,8 @@ type HsContext name = [LHsPred name]
 
 type LHsPred name = Located (HsPred name)
 
-data HsPred name = HsClassP name [LHsType name]
+data HsPred name = HsClassP name [LHsType name]		 -- class constraint
+		 | HsEqualP (LHsType name) (LHsType name)-- equality constraint
 		 | HsIParam (IPName name) (LHsType name)
 
 type LHsType name = Located (HsType name)
@@ -268,9 +269,6 @@ splitHsFunType other 	   	   = ([], other)
 %*									*
 %************************************************************************
 
-NB: these types get printed into interface files, so 
-    don't change the printing format lightly
-
 \begin{code}
 instance (OutputableBndr name) => Outputable (HsType name) where
     ppr ty = pprHsType ty
@@ -280,8 +278,13 @@ instance (Outputable name) => Outputable (HsTyVarBndr name) where
     ppr (KindedTyVar name kind) = pprHsTyVarBndr name kind
 
 instance OutputableBndr name => Outputable (HsPred name) where
-    ppr (HsClassP clas tys) = ppr clas <+> hsep (map (pprParendHsType.unLoc) tys)
-    ppr (HsIParam n ty)    = hsep [ppr n, dcolon, ppr ty]
+    ppr (HsClassP clas tys) = ppr clas <+> hsep (map pprLHsType tys)
+    ppr (HsEqualP t1 t2)    = hsep [pprLHsType t1, ptext SLIT("~"), 
+				    pprLHsType t2]
+    ppr (HsIParam n ty)     = hsep [ppr n, dcolon, ppr ty]
+
+pprLHsType :: OutputableBndr name => LHsType name -> SDoc
+pprLHsType = pprParendHsType . unLoc
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
 pprHsTyVarBndr name kind | isLiftedTypeKind kind = ppr name

@@ -388,13 +388,21 @@ kc_pred :: HsPred Name -> TcM (HsPred Name, TcKind)
 	-- Does *not* check for a saturated
 	-- application (reason: used from TcDeriv)
 kc_pred pred@(HsIParam name ty)
-  = kcHsType ty		`thenM` \ (ty', kind) ->
-    returnM (HsIParam name ty', kind)
-
+  = do { (ty', kind) <- kcHsType ty
+       ; returnM (HsIParam name ty', kind)
+       }
 kc_pred pred@(HsClassP cls tys)
-  = kcClass cls			`thenM` \ kind ->
-    kcApps kind (ppr cls) tys	`thenM` \ (tys', res_kind) ->
-    returnM (HsClassP cls tys', res_kind)
+  = do { kind <- kcClass cls
+       ; (tys', res_kind) <- kcApps kind (ppr cls) tys
+       ; returnM (HsClassP cls tys', res_kind)
+       }
+kc_pred pred@(HsEqualP ty1 ty2)
+  = do { (ty1', kind1) <- kcHsType ty1
+       ; checkExpectedKind ty1 kind1 liftedTypeKind
+       ; (ty2', kind2) <- kcHsType ty2
+       ; checkExpectedKind ty2 kind2 liftedTypeKind
+       ; returnM (HsEqualP ty1 ty2, liftedTypeKind)
+       }
 
 ---------------------------
 kcTyVar :: Name -> TcM TcKind
@@ -534,13 +542,19 @@ dsHsLPred :: LHsPred Name -> TcM PredType
 dsHsLPred pred = dsHsPred (unLoc pred)
 
 dsHsPred pred@(HsClassP class_name tys)
-  = dsHsTypes tys			`thenM` \ arg_tys ->
-    tcLookupClass class_name		`thenM` \ clas ->
-    returnM (ClassP clas arg_tys)
-
+  = do { arg_tys <- dsHsTypes tys
+       ; clas <- tcLookupClass class_name
+       ; returnM (ClassP clas arg_tys)
+       }
+dsHsPred pred@(HsEqualP ty1 ty2)
+  = do { arg_ty1 <- dsHsType ty1
+       ; arg_ty2 <- dsHsType ty2
+       ; returnM (EqPred arg_ty1 arg_ty2)
+       }
 dsHsPred (HsIParam name ty)
-  = dsHsType ty					`thenM` \ arg_ty ->
-    returnM (IParam name arg_ty)
+  = do { arg_ty <- dsHsType ty
+       ; returnM (IParam name arg_ty)
+       }
 \end{code}
 
 GADT constructor signatures

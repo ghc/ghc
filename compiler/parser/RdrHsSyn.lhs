@@ -97,8 +97,9 @@ extractHsRhoRdrTyVars ctxt ty
 
 extract_lctxt ctxt acc = foldr (extract_pred . unLoc) acc (unLoc ctxt)
 
-extract_pred (HsClassP cls tys) acc	= foldr extract_lty acc tys
-extract_pred (HsIParam n ty) acc	= extract_lty ty acc
+extract_pred (HsClassP cls tys) acc = foldr extract_lty acc tys
+extract_pred (HsEqualP ty1 ty2) acc = extract_lty ty1 (extract_lty ty2 acc)
+extract_pred (HsIParam n ty   ) acc = extract_lty ty acc
 
 extract_lty (L loc ty) acc 
   = case ty of
@@ -406,6 +407,15 @@ checkInstType (L l t)
 	ty ->   do dict_ty <- checkDictTy (L l ty)
 	      	   return (L l (HsForAllTy Implicit [] (noLoc []) dict_ty))
 
+checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
+checkDictTy (L spn ty) = check ty []
+  where
+  check (HsTyVar t) args | not (isRdrTyVar t) 
+  	= return (L spn (HsPredTy (HsClassP t args)))
+  check (HsAppTy l r) args = check (unLoc l) (r:args)
+  check (HsParTy t)   args = check (unLoc t) args
+  check _ _ = parseError spn "Malformed instance header"
+
 -- Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).  If the second argument is `False',
 -- only type variables are allowed and we raise an error on encountering a
@@ -477,10 +487,12 @@ checkTyClHdr (L l cxt) ty
     go l other	         acc    = 
       parseError l "Malformed head of type or class declaration"
 
-	-- The predicates in a type or class decl must all
-	-- be HsClassPs.  They need not all be type variables,
-	-- even in Haskell 98.  E.g. class (Monad m, Monad (t m)) => MonadT t m
-    chk_pred (L l (HsClassP _ args)) = return ()
+	-- The predicates in a type or class decl must be class predicates or 
+	-- equational constraints.  They need not all have variable-only
+	-- arguments, even in Haskell 98.  
+	-- E.g. class (Monad m, Monad (t m)) => MonadT t m
+    chk_pred (L l (HsClassP _ _)) = return ()
+    chk_pred (L l (HsEqualP _ _)) = return ()
     chk_pred (L l _)
        = parseError l "Malformed context in type or class declaration"
 
@@ -571,22 +583,16 @@ checkPred (L spn ty)
   where
     checkl (L l ty) args = check l ty args
 
+    check _loc (HsPredTy pred@(HsEqualP _ _)) 
+                                       args | null args
+					    = return $ L spn pred
     check _loc (HsTyVar t)             args | not (isRdrTyVar t) 
 		 		  	    = return (L spn (HsClassP t args))
     check _loc (HsAppTy l r)           args = checkl l (r:args)
     check _loc (HsOpTy l (L loc tc) r) args = check loc (HsTyVar tc) (l:r:args)
     check _loc (HsParTy t)  	       args = checkl t args
-    check loc _                        _    = parseError loc  "malformed class assertion"
-
-checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
-checkDictTy (L spn ty) = check ty []
-  where
-  check (HsTyVar t) args | not (isRdrTyVar t) 
-  	= return (L spn (HsPredTy (HsClassP t args)))
-  check (HsAppTy l r) args = check (unLoc l) (r:args)
-  check (HsParTy t)   args = check (unLoc t) args
-  check _ _ = parseError spn "Malformed context in instance header"
-
+    check loc _                        _    = parseError loc  
+					        "malformed class assertion"
 
 ---------------------------------------------------------------------------
 -- Checking stand-alone deriving declarations
