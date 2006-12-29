@@ -39,6 +39,7 @@ import MkId
 import PrimOp
 import BasicTypes	( RecFlag(..), Activation(NeverActive), Boxity(..) )
 import Data.List        ( isSuffixOf )
+import FastString       ( unpackFS )
 
 import System.Time (ClockTime(..))
 import System.Directory (getModificationTime)
@@ -258,6 +259,11 @@ addTickHsExpr (ArithSeq	 ty arith_seq) =
 	liftM2 ArithSeq	
 		(return ty)
 		(addTickArithSeqInfo arith_seq)
+addTickHsExpr (HsTickPragma (file,(l1,c1),(l2,c2)) (L pos e0)) = do
+    e1 <- addTickHsExpr e0
+    fn <- allocTickBox (ExternalBox (unpackFS file) (P l1 c1 l2 c2)) pos
+    let (L _ e2) = fn $ L pos e1
+    return $ e2
 addTickHsExpr (PArrSeq	 {}) = error "addTickHsExpr: PArrSeq	"
 addTickHsExpr (HsSCC	 {}) = error "addTickHsExpr: HsSCC	"
 addTickHsExpr (HsCoreAnn   {}) = error "addTickHsExpr: HsCoreAnn  "
@@ -555,12 +561,13 @@ data BoxLabel = ExpBox
               | AltBox
               | TopLevelBox [String]
               | LocalBox [String]
-           -- | UserBox (Maybe String)
               | GuardBinBox Bool
               | CondBinBox Bool
               | QualBinBox Bool
-           -- | PreludeBinBox String Bool
-           -- | UserBinBox (Maybe String) Bool
+	      | ExternalBox String HpcPos
+	      	   -- ^The position was generated from the named file/module,
+		   -- with the stated position (inside the named file/module).
+		   -- The HpcPos inside this MixEntry refers to the generated Haskell location.
               deriving (Read, Show)
                          
 mixCreate :: String -> String -> Mix -> IO ()

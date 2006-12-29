@@ -179,6 +179,9 @@ rnExpr (HsCoreAnn ann expr)
 rnExpr (HsSCC lbl expr)
   = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->
     returnM (HsSCC lbl expr', fvs_expr)
+rnExpr (HsTickPragma info expr)
+  = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->
+    returnM (HsTickPragma info expr', fvs_expr)
 
 rnExpr (HsLam matches)
   = rnMatchGroup LambdaExpr matches	`thenM` \ (matches', fvMatch) ->

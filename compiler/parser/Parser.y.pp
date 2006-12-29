@@ -31,7 +31,7 @@ import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
 			  SrcSpan, combineLocs, srcLocFile, 
 			  mkSrcLoc, mkSrcSpan )
 import Module
-import StaticFlags	( opt_SccProfilingOn )
+import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
 import Type		( Kind, mkArrowKind, liftedTypeKind, unliftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..), defaultInlineSpec )
@@ -223,6 +223,7 @@ incorrect.
  '{-# RULES'	   { L _ ITrules_prag }
  '{-# CORE'        { L _ ITcore_prag }              -- hdaume: annotated core
  '{-# SCC'	   { L _ ITscc_prag }
+ '{-# GENERATED'   { L _ ITgenerated_prag }
  '{-# DEPRECATED'  { L _ ITdeprecated_prag }
  '{-# UNPACK'      { L _ ITunpack_prag }
  '#-}'		   { L _ ITclose_prag }
@@ -1264,6 +1265,9 @@ exp10 :: { LHsExpr RdrName }
         | scc_annot exp		    		{ LL $ if opt_SccProfilingOn
 							then HsSCC (unLoc $1) $2
 							else HsPar $2 }
+        | hpc_annot exp		    		{ LL $ if opt_Hpc
+							then HsTickPragma (unLoc $1) $2
+							else HsPar $2 }
 
 	| 'proc' aexp '->' exp	
 			{% checkPattern $2 >>= \ p -> 
@@ -1278,6 +1282,18 @@ exp10 :: { LHsExpr RdrName }
 scc_annot :: { Located FastString }
 	: '_scc_' STRING			{ LL $ getSTRING $2 }
 	| '{-# SCC' STRING '#-}'		{ LL $ getSTRING $2 }
+
+hpc_annot :: { Located (FastString,(Int,Int),(Int,Int)) }
+	: '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
+						{ LL $ (getSTRING $2
+						       ,( fromInteger $ getINTEGER $3
+ 							, fromInteger $ getINTEGER $5
+							)
+                         			       ,( fromInteger $ getINTEGER $7
+ 							, fromInteger $ getINTEGER $9
+							)
+						       )
+					         }
 
 fexp 	:: { LHsExpr RdrName }
 	: fexp aexp				{ LL $ HsApp $1 $2 }

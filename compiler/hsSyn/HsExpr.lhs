@@ -213,6 +213,10 @@ data HsExpr id
      Int				-- module-local tick number for False
      (LHsExpr id)			-- sub-expression
 
+  | HsTickPragma			-- A pragma introduced tick
+     (FastString,(Int,Int),(Int,Int))   -- external span for this tick    
+     (LHsExpr id)     
+
   ---------------------------------------
   -- The following are commands, not expressions proper
 
@@ -412,6 +416,8 @@ ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
 	  ppr tickIdFalse,
 	  ptext SLIT(">("), 
 	  ppr exp,ptext SLIT(")")]
+ppr_expr (HsTickPragma externalSrcLoc exp)
+  = hcat [ptext SLIT("tickpragma<"), ppr externalSrcLoc,ptext SLIT(">("), ppr exp,ptext SLIT(")")]
 
 ppr_expr (HsArrApp arrow arg _ HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, ptext SLIT("-<"), ppr_lexpr arg]

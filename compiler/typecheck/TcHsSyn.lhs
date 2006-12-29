@@ -489,6 +489,10 @@ zonkExpr env (HsSCC lbl expr)
   = zonkLExpr env expr	`thenM` \ new_expr ->
     returnM (HsSCC lbl new_expr)
 
+zonkExpr env (HsTickPragma info expr)
+  = zonkLExpr env expr	`thenM` \ new_expr ->
+    returnM (HsTickPragma info new_expr)
+
 -- hdaume: core annotations
 zonkExpr env (HsCoreAnn lbl expr)
   = zonkLExpr env expr   `thenM` \ new_expr ->

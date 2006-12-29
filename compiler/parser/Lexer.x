@@ -233,6 +233,8 @@ $white_no_nl+ 				;
   "{-#" $whitechar* (DEPRECATED|deprecated)
   					{ token ITdeprecated_prag }
   "{-#" $whitechar* (SCC|scc)		{ token ITscc_prag }
+  "{-#" $whitechar* (GENERATED|generated)
+  					{ token ITgenerated_prag }
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
   "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
 
@@ -432,6 +434,7 @@ data Token
   | ITdeprecated_prag
   | ITline_prag
   | ITscc_prag
+  | ITgenerated_prag
   | ITcore_prag                 -- hdaume: core annotations
   | ITunpack_prag
   | ITclose_prag

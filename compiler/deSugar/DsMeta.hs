@@ -567,6 +567,7 @@ repE (HsSpliceE (HsSplice n _))
 repE e@(PArrSeq {})      = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})    = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})        = notHandled "Cost centres" (ppr e)
+repE e@(HsTickPragma {}) = notHandled "Tick Pragma" (ppr e)
 repE e@(HsBracketOut {}) = notHandled "TH brackets" (ppr e)
 repE e 			 = notHandled "Expression form" (ppr e)
 

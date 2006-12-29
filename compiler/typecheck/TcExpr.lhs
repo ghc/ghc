@@ -129,6 +129,9 @@ tcExpr (HsPar expr)     res_ty = do { expr' <- tcMonoExpr expr res_ty
 
 tcExpr (HsSCC lbl expr) res_ty = do { expr' <- tcMonoExpr expr res_ty
 				    ; returnM (HsSCC lbl expr') }
+tcExpr (HsTickPragma info expr) res_ty 
+       		     	       = do { expr' <- tcMonoExpr expr res_ty
+				    ; returnM (HsTickPragma info expr') }
 
 tcExpr (HsCoreAnn lbl expr) res_ty 	 -- hdaume: core annotation
   = do	{ expr' <- tcMonoExpr expr res_ty
