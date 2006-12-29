@@ -831,8 +831,7 @@ rnTySig (tydecl@TyData {tcdCtxt = context, tcdLName = tycon,
       ASSERT( isNothing mb_typats ) -- won't have type patterns
       ASSERT( isNothing derivs )    -- won't have deriving
       ASSERT( isJust sig )          -- will have kind signature
-      do { checkM (not . null $ tyvars) $ addErr needOneIdx   -- #indexes >= 1
-	 ; bindIdxVars (ksig_doc tycon) tyvars $ \tyvars' -> do {
+      do { bindIdxVars (ksig_doc tycon) tyvars $ \tyvars' -> do {
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
 	 ; context' <- rnContext (ksig_doc tycon) context
 	 ; returnM (TyData {tcdND = tcdND tydecl, tcdCtxt = context', 
