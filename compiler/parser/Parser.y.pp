@@ -971,8 +971,13 @@ ctype	:: { LHsType RdrName }
 -- errors in ctype.  The basic problem is that
 --	(Eq a, Ord a)
 -- looks so much like a tuple type.  We can't tell until we find the =>
+--
+-- We have the t1 ~ t2 form here and in gentype, to permit an individual
+-- equational constraint without parenthesis.
 context :: { LHsContext RdrName }
-	: btype 			{% checkContext $1 }
+        : btype '~'      btype  	{% checkContext
+					     (LL $ HsPredTy (HsEqualP $1 $3)) }
+	| btype 			{% checkContext $1 }
 
 type :: { LHsType RdrName }
 	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
@@ -983,7 +988,7 @@ gentype :: { LHsType RdrName }
         | btype qtyconop gentype        { LL $ HsOpTy $1 $2 $3 }
         | btype tyvarop  gentype  	{ LL $ HsOpTy $1 $2 $3 }
  	| btype '->'     ctype		{ LL $ HsFunTy $1 $3 }
-        | btype '~'      gentype  	{ LL $ HsPredTy (HsEqualP $1 $3) }
+        | btype '~'      btype  	{ LL $ HsPredTy (HsEqualP $1 $3) }
 
 btype :: { LHsType RdrName }
 	: btype atype			{ LL $ HsAppTy $1 $2 }

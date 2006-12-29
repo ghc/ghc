@@ -232,7 +232,7 @@ Predicates are represented inside GHC by PredType:
 data PredType 
   = ClassP Class [Type]		-- Class predicate
   | IParam (IPName Name) Type	-- Implicit parameter
-  | EqPred Type Type		-- Equality predicate (ty1 :=: ty2)
+  | EqPred Type Type		-- Equality predicate (ty1 ~ ty2)
 
 type ThetaType = [PredType]
 \end{code}
@@ -251,7 +251,7 @@ represented by evidence (a dictionary, for example, of type (predRepTy p).
 
 Note [Equality predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-	forall a b. (a :=: S b) => a -> b
+	forall a b. (a ~ S b) => a -> b
 could be represented by
 	ForAllTy a (ForAllTy b (FunTy (PredTy (EqPred a (S b))) ...))
 OR
@@ -395,7 +395,7 @@ isLiftedTypeKind (TyConApp tc []) = isLiftedTypeKindCon tc
 isLiftedTypeKind other            = False
 
 isCoercionKind :: Kind -> Bool
--- All coercions are of form (ty1 :=: ty2)
+-- All coercions are of form (ty1 ~ ty2)
 -- This function is here rather than in Coercion, 
 -- because it's used in a knot-tied way to enforce invariants in Var
 isCoercionKind (NoteTy _ k)         = isCoercionKind k
@@ -436,7 +436,7 @@ pprParendType ty = ppr_type TyConPrec ty
 pprPred :: PredType -> SDoc
 pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
-pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext SLIT(":=:")), ppr ty2]
+pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext SLIT("~")), ppr ty2]
 
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = parenSymOcc (getOccName clas) (ppr clas) 
