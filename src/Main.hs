@@ -63,6 +63,8 @@ import StaticFlags           ( parseStaticFlags )
 -- Top-level stuff
 --------------------------------------------------------------------------------
 
+-- | Get the GHC lib dir by asking the GHC binary that this program was built
+-- with (or should've been built with if it hasn't moved).
 getGHCLibDir = do
   str <- systemCaptureStdout 0 (compilerPath ++ " --print-libdir")
   case lines str of 
@@ -82,8 +84,6 @@ systemCaptureStdout verbose cmd = do
         ExitSuccess   -> do str <- readFile tmp
                             let ev [] = ' '; ev xs = last xs
                             ev str `seq` return str
-
-type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
 main :: IO ()
 main = do
@@ -450,6 +450,9 @@ instance Show a => Show (DocDecl a) where
   show (DocCommentPrev doc) = "prev" ++ show doc
   show _ = "other" 
 -}
+
+type CheckedMod = (Module, FilePath, FullyCheckedMod)
+
 type FullyCheckedMod = (ParsedSource, 
                         RenamedSource, 
                         TypecheckedSource, 
