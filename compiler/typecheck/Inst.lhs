@@ -83,7 +83,7 @@ Selection
 ~~~~~~~~~
 \begin{code}
 instName :: Inst -> Name
-instName inst = idName (instToId inst)
+instName inst = Var.varName (instToVar inst)
 
 instToId :: Inst -> TcId
 instToId inst = ASSERT2( isId id, ppr inst ) id 
@@ -329,9 +329,16 @@ mkPredName uniq loc pred_ty
   = mkInternalName uniq occ (srcSpanStart (instLocSpan loc))
   where
     occ = case pred_ty of
-	    ClassP cls tys -> mkDictOcc (getOccName cls)
-	    IParam ip ty   -> getOccName (ipNameName ip)
-	    EqPred _ _     -> pprPanic "mkPredName" (ppr pred_ty)
+	    ClassP cls _ -> mkDictOcc (getOccName cls)
+	    IParam ip  _ -> getOccName (ipNameName ip)
+	    EqPred ty  _ -> mkEqPredCoOcc baseOcc
+	      where
+		-- we use the outermost tycon of the lhs, which must be a type
+		-- function, as the base name for an equality
+	        baseOcc = case splitTyConApp_maybe ty of
+			    Nothing      -> 
+			      pprPanic "Inst.mkPredName:" (ppr ty)
+                            Just (tc, _) -> getOccName tc
 \end{code}
 
 %************************************************************************

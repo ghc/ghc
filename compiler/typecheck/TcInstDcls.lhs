@@ -611,7 +611,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
     newDictBndrs sc_loc sc_theta'			`thenM` \ sc_dicts ->
     getInstLoc origin					`thenM` \ inst_loc -> 
     newDictBndrs inst_loc dfun_theta'			`thenM` \ dfun_arg_dicts ->
-    newDictBndr inst_loc (mkClassPred clas inst_tys') 	`thenM` \ this_dict ->
+    newDictBndr inst_loc (mkClassPred clas inst_tys')   `thenM` \ this_dict ->
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 

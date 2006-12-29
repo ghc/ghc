@@ -31,7 +31,7 @@ module OccName (
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
-	mkInstTyCoOcc, 
+	mkInstTyCoOcc, mkEqPredCoOcc,
 
 	-- ** Deconstruction
 	occNameFS, occNameString, occNameSpace, 
@@ -445,6 +445,7 @@ mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkNewTyCoOcc        = mk_simple_deriv tcName  ":Co"
 mkInstTyCoOcc       = mk_simple_deriv tcName  ":Co"      -- derived from rep ty
+mkEqPredCoOcc	    = mk_simple_deriv tcName  "$co"
 
 -- Generic derivable classes
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"
