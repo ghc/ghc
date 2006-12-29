@@ -9,7 +9,7 @@ maintainer: Simon Marlow <simonmar@microsoft.com>
 stability: stable
 homepage: http://www.haskell.org/haddock/
 synopsis: Haddock is a documentation-generation tool for Haskell libraries
-build-depends: base>=1.0, haskell98>=1.0, mtl>=1.0, ghc, network>=1.0, Cabal
+build-depends: base>=1.0, haskell98>=1.0, mtl>=1.0, ghc, network>=1.0, Cabal, FilePath>=0.11
 data-files:
 	html/haddock-DEBUG.css
 	html/haddock.css
@@ -53,7 +53,7 @@ extra-source-files:
 	haskell.vim
 	src/haddock.sh
 
-executable: haddock-ghc-nolib
+executable: haddock-ghc
 hs-source-dirs: src
 main-is: Main.hs
 extensions: CPP, PatternGuards

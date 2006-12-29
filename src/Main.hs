@@ -13,7 +13,7 @@ import HaddockRename
 import HaddockTypes
 import HaddockUtil
 import HaddockVersion
-import Paths_haddock         ( getDataDir )
+import Paths_haddock         ( getDataDir, compilerPath )
 
 import Prelude hiding ( catch )
 import Control.Exception     ( catch )
@@ -22,18 +22,22 @@ import Control.Monad.Writer  ( Writer, runWriter, tell )
 import Data.Char             ( isSpace )
 import Data.IORef            ( writeIORef )
 import Data.List             ( nub, nubBy, (\\), foldl', sortBy, foldl1, init, 
-                               mapAccumL, find, isPrefixOf )
+                               mapAccumL, find, isPrefixOf ))
 import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList, 
                                listToMaybe, fromJust, catMaybes )
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
                                ArgDescr(..) )
 import System.Environment    ( getArgs )
 import System.Directory      ( doesDirectoryExist )
+import System.FilePath
+import System.Cmd            ( system )
+import System.Exit           ( ExitCode(..) )
 
 import qualified Data.Map as Map
 import Data.Map              (Map)
 
 import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
+import Distribution.Simple.Utils         ( withTempFile )
 
 import GHC
 import Outputable
@@ -55,32 +59,51 @@ import DynFlags hiding ( Option )
 import Packages hiding ( package ) 
 import StaticFlags           ( parseStaticFlags )
 
------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Top-level stuff
+--------------------------------------------------------------------------------
+
+getGHCLibDir = do
+  str <- systemCaptureStdout 0 (compilerPath ++ " --print-libdir")
+  case lines str of 
+    (path:_) -> return path 
+    _ -> die ("Error: " ++ compilerPath ++ " did not respond well to " ++
+             "--print-libdir")  
+
+-- temporarily taken from Cabal. TODO: use a library
+systemCaptureStdout :: Int -> String -> IO String
+systemCaptureStdout verbose cmd = do
+   withTempFile "." "" $ \tmp -> do
+      let cmd_line  = cmd ++ " >" ++ tmp
+      when (verbose > 0) $ putStrLn cmd_line
+      res <- system cmd_line
+      case res of
+        ExitFailure _ -> die ("executing external program failed: "++cmd_line)
+        ExitSuccess   -> do str <- readFile tmp
+                            let ev [] = ' '; ev xs = last xs
+                            ev str `seq` return str
 
 type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
 main :: IO ()
 main = do
-
-  -- first, get the GHC library dir (-B option)
   args <- getArgs
-  (libDir, rest) <- getLibDir args 
+  libDir <- getGHCLibDir
 
   -- find out which flag mode we are in
-  let (isGHCMode, rest') = parseModeFlag rest
+  let (isGHCMode, rest) = parseModeFlag args
 
   -- initialize GHC 
   (session, dynflags) <- startGHC libDir
 
   -- parse GHC flags given to the program 
-  (dynflags', rest'') <- if isGHCMode 
-    then parseGHCFlags_GHCMode     dynflags rest'   
-    else parseGHCFlags_HaddockMode dynflags rest' 
+  (dynflags', rest') <- if isGHCMode 
+    then parseGHCFlags_GHCMode     dynflags rest  
+    else parseGHCFlags_HaddockMode dynflags rest 
   setSessionDynFlags session dynflags'
 
   -- parse Haddock specific flags
-  (flags, fileArgs) <- parseHaddockOpts rest''
+  (flags, fileArgs) <- parseHaddockOpts rest'
 
   -- try to sort and check the input files using the GHC API 
   modules <- sortAndCheckModules session dynflags' fileArgs
@@ -170,11 +193,6 @@ parseHaddockOpts words =
 
 usageHeader :: String -> String
 usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
-
-getLibDir :: [String] -> IO (String, [String])
-getLibDir ("-B":dir:rest) = return (dir, rest)
-getLibDir (('-':'B':dir):rest) | not (null dir) = return (dir, rest)
-getLibDir _ = die "Missing GHC lib dir option: -B <dir>\n"
 
 extractGHCFlags :: [Flag] -> [String]
 extractGHCFlags flags = [ flag | Flag_GHCFlag flag <- flags ]
