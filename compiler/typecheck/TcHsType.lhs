@@ -506,6 +506,9 @@ ds_type full_ty@(HsForAllTy exp tv_names ctxt ty)
 
 ds_type (HsSpliceTy {}) = panic "ds_type: HsSpliceTy"
 
+ds_type (HsDocTy ty _)  -- Remove the doc comment
+  = dsHsType ty
+
 dsHsTypes arg_tys = mappM dsHsType arg_tys
 \end{code}
 
