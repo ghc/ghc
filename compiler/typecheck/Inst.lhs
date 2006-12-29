@@ -333,11 +333,10 @@ mkPredName uniq loc pred_ty
 	    IParam ip  _ -> getOccName (ipNameName ip)
 	    EqPred ty  _ -> mkEqPredCoOcc baseOcc
 	      where
-		-- we use the outermost tycon of the lhs, which must be a type
-		-- function, as the base name for an equality
+		-- we use the outermost tycon of the lhs, if there is one, to
+		-- improve readability of Core code
 	        baseOcc = case splitTyConApp_maybe ty of
-			    Nothing      -> 
-			      pprPanic "Inst.mkPredName:" (ppr ty)
+			    Nothing      -> mkOccName tcName "$"
                             Just (tc, _) -> getOccName tc
 \end{code}
 
