@@ -116,13 +116,7 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	(rn_default_decls, src_fvs5)
 	   <- mapFvRn (wrapLocFstM rnDefaultDecl) default_decls ;
 
-	-- At this point, stop if we have found errors.  Otherwise
-	-- the rnDocEntity stuff reports the errors again.
-	failIfErrsM ;
-
-	traceRn (text "Start rnDocEntitys") ;
-	rn_docs <- mapM rnDocEntity docs ;
-	traceRn (text "finish rnDocEntitys") ;
+	rn_docs <- rnDocEntities docs ;
 
 	let {
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
@@ -151,6 +145,30 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	return (tcg_env `addTcgDUs` src_dus, rn_group)
     }}}
 
+rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
+rnTyClDecls tycl_decls = do 
+  (decls', fvs) <- mapFvRn (wrapLocFstM rnTyClDecl) tycl_decls
+  return decls'
+
+addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv 
+addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
+\end{code}
+
+
+%*********************************************************
+%*						 	 *
+	HsDoc stuff
+%*							 *
+%*********************************************************
+
+\begin{code}
+rnDocEntities :: [DocEntity RdrName] -> RnM [DocEntity Name]
+rnDocEntities ents
+  = ifErrsM (return []) $
+	-- Yuk: stop if we have found errors.  Otherwise
+	-- the rnDocEntity stuff reports the errors again.
+    mapM rnDocEntity ents 
+
 rnDocEntity :: DocEntity RdrName -> RnM (DocEntity Name)
 rnDocEntity (DocEntity docdecl) = do
   rn_docdecl <- rnDocDecl docdecl
@@ -172,14 +190,6 @@ rnDocDecl (DocCommentNamed str doc) = do
 rnDocDecl (DocGroup lev doc) = do
   rn_doc <- rnHsDoc doc
   return (DocGroup lev rn_doc)
-
-rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
-rnTyClDecls tycl_decls = do 
-  (decls', fvs) <- mapFvRn (wrapLocFstM rnTyClDecl) tycl_decls
-  return decls'
-
-addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv 
-addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 \end{code}
 
 
@@ -647,34 +657,29 @@ rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname, 
 		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
 		       tcdMeths = mbinds, tcdATs = ats, tcdDocs = docs})
-  = lookupLocatedTopBndrRn cname		`thenM` \ cname' ->
+  = do	{ cname' <- lookupLocatedTopBndrRn cname
 
 	-- Tyvars scope over superclass context and method signatures
-    bindTyVarsRn cls_doc tyvars			( \ tyvars' ->
-	rnContext cls_doc context	`thenM` \ context' ->
-	rnFds cls_doc fds		`thenM` \ fds' ->
-	rnATs ats			`thenM` \ (ats', ats_fvs) ->
-	renameSigs okClsDclSig sigs	`thenM` \ sigs' ->
-        mapM rnDocEntity docs           `thenM` \ docs' ->
-	returnM   (tyvars', context', fds', (ats', ats_fvs), sigs', docs')
-    )	`thenM` \ (tyvars', context', fds', (ats', ats_fvs), sigs', docs') ->
+	; (tyvars', context', fds', ats', ats_fvs, sigs')
+	    <- bindTyVarsRn cls_doc tyvars $ \ tyvars' -> do
+	     { context' <- rnContext cls_doc context
+	     ; fds' <- rnFds cls_doc fds
+	     ; (ats', ats_fvs) <- rnATs ats
+	     ; sigs' <- renameSigs okClsDclSig sigs
+	     ; return   (tyvars', context', fds', ats', ats_fvs, sigs') }
 
 	-- Check for duplicates among the associated types
-    let
-      at_rdr_names_w_locs      = [tcdLName ty | L _ ty <- ats]
-    in
-    checkDupNames at_doc at_rdr_names_w_locs   `thenM_`
+	; let at_rdr_names_w_locs = [tcdLName ty | L _ ty <- ats]
+	; checkDupNames at_doc at_rdr_names_w_locs
 
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
-    let
-	sig_rdr_names_w_locs   = [op | L _ (TypeSig op _) <- sigs]
-    in
-    checkDupNames sig_doc sig_rdr_names_w_locs	`thenM_` 
-	-- Typechecker is responsible for checking that we only
-	-- give default-method bindings for things in this class.
-	-- The renamer *could* check this for class decls, but can't
-	-- for instance decls.
+	; let sig_rdr_names_w_locs = [op | L _ (TypeSig op _) <- sigs]
+	; checkDupNames sig_doc sig_rdr_names_w_locs
+		-- Typechecker is responsible for checking that we only
+		-- give default-method bindings for things in this class.
+		-- The renamer *could* check this for class decls, but can't
+		-- for instance decls.
 
    	-- The newLocals call is tiresome: given a generic class decl
 	--	class C a where
@@ -684,28 +689,31 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	--	  op {| a*b |} (a*b)   = ...
 	-- we want to name both "x" tyvars with the same unique, so that they are
 	-- easy to group together in the typechecker.  
-    extendTyVarEnvForMethodBinds tyvars' (
-   	 getLocalRdrEnv					`thenM` \ name_env ->
-   	 let
- 	     meth_rdr_names_w_locs = collectHsBindLocatedBinders mbinds
- 	     gen_rdr_tyvars_w_locs = 
-		[ tv | tv <- extractGenericPatTyVars mbinds,
- 		      not (unLoc tv `elemLocalRdrEnv` name_env) ]
-   	 in
-   	 checkDupNames meth_doc meth_rdr_names_w_locs	`thenM_`
-   	 newLocalsRn gen_rdr_tyvars_w_locs	`thenM` \ gen_tyvars ->
-   	 rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds
-    ) `thenM` \ (mbinds', meth_fvs) ->
+	; (mbinds', meth_fvs) 
+	    <- extendTyVarEnvForMethodBinds tyvars' $ do
+	    { name_env <- getLocalRdrEnv
+	    ; let meth_rdr_names_w_locs = collectHsBindLocatedBinders mbinds
+	          gen_rdr_tyvars_w_locs = [ tv | tv <- extractGenericPatTyVars mbinds,
+	    		 		         not (unLoc tv `elemLocalRdrEnv` name_env) ]
+	    ; checkDupNames meth_doc meth_rdr_names_w_locs
+	    ; gen_tyvars <- newLocalsRn gen_rdr_tyvars_w_locs
+	    ; rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds }
 
-    returnM (ClassDecl { tcdCtxt = context', tcdLName = cname', 
-			 tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
-			 tcdMeths = mbinds', tcdATs = ats', tcdDocs = docs'},
-	     delFVs (map hsLTyVarName tyvars')	$
-	     extractHsCtxtTyNames context'	    `plusFV`
-	     plusFVs (map extractFunDepNames (map unLoc fds'))  `plusFV`
-	     hsSigsFVs sigs'		  	    `plusFV`
-	     meth_fvs				    `plusFV`
-	     ats_fvs)
+	-- Sigh.  Check the Haddock docs after the methods, to avoid duplicate errors
+	-- Example: class { op :: a->a;  op2 x = x }
+	--	Don't want a duplicate complait about op2
+	; docs' <- bindLocalNames (map hsLTyVarName tyvars') $ rnDocEntities docs
+
+	; return (ClassDecl { tcdCtxt = context', tcdLName = cname', 
+			      tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
+			      tcdMeths = mbinds', tcdATs = ats', tcdDocs = docs'},
+
+	     	  delFVs (map hsLTyVarName tyvars')	$
+	     	  extractHsCtxtTyNames context'	    	`plusFV`
+	     	  plusFVs (map extractFunDepNames (map unLoc fds'))  `plusFV`
+	     	  hsSigsFVs sigs'		  	`plusFV`
+	     	  meth_fvs				`plusFV`
+	     	  ats_fvs) }
   where
     meth_doc = text "In the default-methods for class"	<+> ppr cname
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
