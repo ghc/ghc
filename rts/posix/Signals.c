@@ -17,6 +17,7 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "Prelude.h"
+#include "ThrIOManager.h"
 
 #ifdef alpha_HOST_ARCH
 # if defined(linux_HOST_OS)
