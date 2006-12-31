@@ -1541,7 +1541,7 @@ Prelude> :set -fno-glasgow-exts
     <indexterm><primary>debugger</primary></indexterm>
     <para>GHCi embeds an utility debugger with a very basic set of operations. The debugger
           is always available in ghci, you do not need to do anything to activate it. </para>
-    <para>The following conditions must hold before the debugger can be used with a module:
+    <para>The following conditions must hold before a module can be debugged in GHCi:
       <itemizedlist>
          <listitem>
 	   <para>The module must have been loaded interpreted, i.e. not loaded from an <filename>.o</filename> file compiled by ghc </para>
@@ -1551,15 +1551,14 @@ Prelude> :set -fno-glasgow-exts
 	   </para></listitem>
        </itemizedlist></para>
     <sect2><title>Using the debugger</title>
-    <para>The debugger allows the insertion of breakpoints at specific locations in the source code. These locations are goberned by event type, and not by line as in traditional debuggers for imperative languages.
+    <para>The debugger allows the insertion of breakpoints at specific locations in the source code. These locations are goberned by event sites, and not by line as in traditional debuggers such as gdb. </para> <para>
       Once a breakpointed event is hit, the debugger stops the execution and you can examine the local variables in scope
-      in the context of the event, and evaluate arbitrary Haskell expressions in
-      a special interactive environment prompt.No matter what you do at the
-      breakpoint context, you cannot change the value assigned to the bindings of
-      your program. When you are done you issue the <literal>:quit</literal> 
-      command and the execution goes on. All the other GHCi commands are supported 
-      too, but the commands <literal>:load</literal> and <literal>:reload</literal>,
-      will cause a breakpoint session to stop. 
+      in the context of the event, as well as evaluate arbitrary Haskell expressions in
+      a special interactive prompt. </para><para>
+      
+     When you are done you issue the <literal>:quit</literal> 
+      command to leave the breakpoint and let the execution go on. 
+     Note that not all the GHCi commands are supported in a breakpoint. 
 
     </para>
     <sidebar><title>Events</title><?dbfo float-type="left"?>
@@ -1595,10 +1594,9 @@ main = <coref linkend="name-binding-co"/> do {
       <para>do notation statements</para>
     </callout>
     </calloutlist></para>
-    <para>In reality however, we eliminate some redundant event sites. 
+    <para>In reality however, ghci eliminates some redundant event sites. 
     For instance, sites with two co-located breakpoint events are coalesced into a single one,
-    and sites with no bindings in scope are assumed to be uninteresting and eliminated 
-    too.</para>
+    and sites with no bindings in scope are assumed to be uninteresting and no breakpoint can be set in them.</para>
     </sidebar>
 
 <para>
@@ -1608,9 +1606,11 @@ main = <coref linkend="name-binding-co"/> do {
 <programlisting>
 *main:Main> :break add Main 2
 Breakpoint set at (2,15)
+
 *main:Main> qsort [10,9..1]
 Local bindings in scope:
   x :: a, xs :: [a], left :: [a], right :: [a]
+
 qsort2.hs:2:15-46>   
 </programlisting>
       What is happening here is that GHCi has interrupted the evaluation of 
@@ -1622,7 +1622,7 @@ qsort2.hs:2:15-46>
       trigger a computation. </para><para>
       Second: look at the types of the things in scope.
       GHCi has left its types parameterised by a variable!
-      This is due to the type of the <code>qsort</code> function, which is 
+      Look at the type of <code>qsort</code>, which is 
       polymorphic on the type of its argument. It does not 
       tell us really what the types of <code>x</code> and <code>xs</code> can be. 
       In general, polymorphic programs deal with polymorphic values,
@@ -1633,12 +1633,12 @@ qsort2.hs:2:15-46>
       things. The <literal>:print</literal> command in ghci allows you to 
       explore its contents and see if it is evaluated or not. 
       This is useful because you cannot just type <literal>x</literal> in the 
-      prompt and expect GHCi to return you the value of a. Perhaps you know for 
+      prompt and expect GHCi to return you its value. Perhaps you know for 
       sure that 
-      <literal>x</literal> is of type <code>Int</code> which is an instance of 
+      <literal>x</literal> is of type <code>Int</code>, which is an instance of 
       <code>Show</code>, but GHCi does not have this information. 
       <code>:print</code> however is fine, because it does not need to know the 
-      type of <literal>x</literal> to do its work. </para>
+      type to do its work. </para>
       <para> Let's go on with the debugging session of the <code>qsort</code>
       example:
 <programlisting>
@@ -1650,10 +1650,13 @@ qsort2.hs:2:15-46> seq x ()  <co id="seq2"/>
 qsort2.hs:2:15-46> x <co id="seq3"/>
 This is an untyped, unevaluated computation. You can use seq to 
 force its evaluation and then :print to recover its type
+
 qsort2.hs:2:15-46> :t x
 x :: GHC.Base.Unknown
 qsort2.hs:2:15-46> :p x <co id="seq4"/>
 x - 10
+qsort2.hs:2:15-46> :t x <co id="seq5"/>
+x :: Int
 </programlisting>
 
       <calloutlist>
@@ -1665,20 +1668,21 @@ x - 10
 	</callout>
 	<callout arearefs="seq3">
 	  <para>Even though x has been evaluated, we cannot simply use its name to see its value! 
-	  This is a bit counterintuitive, but currently in GHCi the type of a binding is a 
-	  static property and cannot change during a session. 
-	  Thus, the binding <code>x</code> still has type Unknown, 
-	  even if in fact the value it is bound to already got a concrete type.</para>
+	  This is a bit counterintuitive, but currently in GHCi the type of a binding
+	  cannot be a type variable <code>a</code>. 
+	  Thus, the binding <code>x</code> gets assigned the concrete type Unknown.</para>
 	</callout>
 	<callout arearefs="seq4">
 	  <para>We can explore <code>x</code> using the <literal>:print</literal> 
 	  command, which does find out that <code>x</code> is of type Int and prints
 	  its value accordingly.</para>
 	</callout>
+	<callout arearefs="seq5">
+	   <literal>:print</literal> also updates the type of <code>x</code> with
+	   the most concrete type information available.
+	</callout>
       </calloutlist>
-      The example shows the standard way to proceeed with polymorphic values in a breakpoint. In the
-      future, the restriction of static types will be removed and <code>x</code> will get a proper
-      type after step (2) in the example.
+      The example shows the standard way to proceeed with polymorphic values in a breakpoint. 
       </para>
     </sect2>
     <sect2><title>Commands</title>
