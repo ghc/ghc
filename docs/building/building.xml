@@ -2556,7 +2556,7 @@ SplitObjs       = NO
 $ ./configure --enable-hc-boot --enable-hc-boot-unregisterised</screen>
 
 	      <para>You might need to update
-              <filename>configure.in</filename> to recognise the new
+              <filename>configure.ac</filename> to recognise the new
               platform, and re-generate
               <filename>configure</filename> with
               <literal>autoreconf</literal>.</para>
