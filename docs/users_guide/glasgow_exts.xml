@@ -939,14 +939,10 @@ definitions; you must define such a function in prefix form.</para>
 
 
 <!-- TYPE SYSTEM EXTENSIONS -->
-<sect1 id="type-extensions">
-<title>Type system extensions</title>
+<sect1 id="data-type-extensions">
+<title>Extensions to data types and type synonyms</title>
 
-
-<sect2>
-<title>Data types and type synonyms</title>
-
-<sect3 id="nullary-types">
+<sect2 id="nullary-types">
 <title>Data types with no constructors</title>
 
 <para>With the <option>-fglasgow-exts</option> flag, GHC lets you declare
@@ -964,9 +960,9 @@ not <literal>*</literal> then an explicit kind annotation must be used
 
 <para>Such data types have only one value, namely bottom.
 Nevertheless, they can be useful when defining "phantom types".</para>
-</sect3>
+</sect2>
 
-<sect3 id="infix-tycons">
+<sect2 id="infix-tycons">
 <title>Infix type constructors, classes, and type variables</title>
 
 <para>
@@ -1033,9 +1029,9 @@ to be written infix, very much like expressions.  More specifically:
 
 </itemizedlist>
 </para>
-</sect3>
+</sect2>
 
-<sect3 id="type-synonyms">
+<sect2 id="type-synonyms">
 <title>Liberalised type synonyms</title>
 
 <para>
@@ -1125,10 +1121,10 @@ this will be rejected:
 </programlisting>
 because GHC does not allow  unboxed tuples on the left of a function arrow.
 </para>
-</sect3>
+</sect2>
 
 
-<sect3 id="existential-quantification">
+<sect2 id="existential-quantification">
 <title>Existentially quantified data constructors
 </title>
 
@@ -1527,11 +1523,11 @@ declarations.  Define your own instances!
 </para>
 
 </sect4>
-</sect3>
+</sect2>
 
 <!-- ====================== Generalised algebraic data types =======================  -->
 
-<sect3 id="gadt-style">
+<sect2 id="gadt-style">
 <title>Declaring data types with explicit constructor signatures</title>
 
 <para>GHC allows you to declare an algebraic data type by 
@@ -1719,9 +1715,9 @@ As before, only one selector function is generated here, that for <literal>tag</
 Nevertheless, you can still use all the field names in pattern matching and record construction.
 </para></listitem>
 </itemizedlist></para>
-</sect3>
+</sect2>
 
-<sect3 id="gadt">
+<sect2 id="gadt">
 <title>Generalised Algebraic Data Types (GADTs)</title>
 
 <para>Generalised Algebraic Data Types generalise ordinary algebraic data types 
@@ -1833,14 +1829,274 @@ their selector functions actually have different types:
 </itemizedlist>
 </para>
 
-</sect3>
+</sect2>
 
 <!-- ====================== End of Generalised algebraic data types =======================  -->
 
 
+<sect2 id="deriving-typeable">
+<title>Deriving clause for classes <literal>Typeable</literal> and <literal>Data</literal></title>
+
+<para>
+Haskell 98 allows the programmer to add "<literal>deriving( Eq, Ord )</literal>" to a data type 
+declaration, to generate a standard instance declaration for classes specified in the <literal>deriving</literal> clause.  
+In Haskell 98, the only classes that may appear in the <literal>deriving</literal> clause are the standard
+classes <literal>Eq</literal>, <literal>Ord</literal>, 
+<literal>Enum</literal>, <literal>Ix</literal>, <literal>Bounded</literal>, <literal>Read</literal>, and <literal>Show</literal>.
+</para>
+<para>
+GHC extends this list with two more classes that may be automatically derived 
+(provided the <option>-fglasgow-exts</option> flag is specified):
+<literal>Typeable</literal>, and <literal>Data</literal>.  These classes are defined in the library
+modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively, and the
+appropriate class must be in scope before it can be mentioned in the <literal>deriving</literal> clause.
+</para>
+<para>An instance of <literal>Typeable</literal> can only be derived if the
+data type has seven or fewer type parameters, all of kind <literal>*</literal>.
+The reason for this is that the <literal>Typeable</literal> class is derived using the scheme
+described in
+<ulink url="http://research.microsoft.com/%7Esimonpj/papers/hmap/gmap2.ps">
+Scrap More Boilerplate: Reflection, Zips, and Generalised Casts
+</ulink>.
+(Section 7.4 of the paper describes the multiple <literal>Typeable</literal> classes that
+are used, and only <literal>Typeable1</literal> up to
+<literal>Typeable7</literal> are provided in the library.)
+In other cases, there is nothing to stop the programmer writing a <literal>TypableX</literal>
+class, whose kind suits that of the data type constructor, and
+then writing the data type instance by hand.
+</para>
 </sect2>
 
+<sect2 id="newtype-deriving">
+<title>Generalised derived instances for newtypes</title>
 
+<para>
+When you define an abstract type using <literal>newtype</literal>, you may want
+the new type to inherit some instances from its representation. In
+Haskell 98, you can inherit instances of <literal>Eq</literal>, <literal>Ord</literal>,
+<literal>Enum</literal> and <literal>Bounded</literal> by deriving them, but for any
+other classes you have to write an explicit instance declaration. For
+example, if you define
+
+<programlisting> 
+  newtype Dollars = Dollars Int 
+</programlisting> 
+
+and you want to use arithmetic on <literal>Dollars</literal>, you have to
+explicitly define an instance of <literal>Num</literal>:
+
+<programlisting> 
+  instance Num Dollars where
+    Dollars a + Dollars b = Dollars (a+b)
+    ...
+</programlisting>
+All the instance does is apply and remove the <literal>newtype</literal>
+constructor. It is particularly galling that, since the constructor
+doesn't appear at run-time, this instance declaration defines a
+dictionary which is <emphasis>wholly equivalent</emphasis> to the <literal>Int</literal>
+dictionary, only slower!
+</para>
+
+
+<sect3> <title> Generalising the deriving clause </title>
+<para>
+GHC now permits such instances to be derived instead, so one can write 
+<programlisting> 
+  newtype Dollars = Dollars Int deriving (Eq,Show,Num)
+</programlisting> 
+
+and the implementation uses the <emphasis>same</emphasis> <literal>Num</literal> dictionary
+for <literal>Dollars</literal> as for <literal>Int</literal>. Notionally, the compiler
+derives an instance declaration of the form
+
+<programlisting> 
+  instance Num Int => Num Dollars
+</programlisting> 
+
+which just adds or removes the <literal>newtype</literal> constructor according to the type.
+</para>
+<para>
+
+We can also derive instances of constructor classes in a similar
+way. For example, suppose we have implemented state and failure monad
+transformers, such that
+
+<programlisting> 
+  instance Monad m => Monad (State s m) 
+  instance Monad m => Monad (Failure m)
+</programlisting> 
+In Haskell 98, we can define a parsing monad by 
+<programlisting> 
+  type Parser tok m a = State [tok] (Failure m) a
+</programlisting> 
+
+which is automatically a monad thanks to the instance declarations
+above. With the extension, we can make the parser type abstract,
+without needing to write an instance of class <literal>Monad</literal>, via
+
+<programlisting> 
+  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
+                         deriving Monad
+</programlisting>
+In this case the derived instance declaration is of the form 
+<programlisting> 
+  instance Monad (State [tok] (Failure m)) => Monad (Parser tok m) 
+</programlisting> 
+
+Notice that, since <literal>Monad</literal> is a constructor class, the
+instance is a <emphasis>partial application</emphasis> of the new type, not the
+entire left hand side. We can imagine that the type declaration is
+``eta-converted'' to generate the context of the instance
+declaration.
+</para>
+<para>
+
+We can even derive instances of multi-parameter classes, provided the
+newtype is the last class parameter. In this case, a ``partial
+application'' of the class appears in the <literal>deriving</literal>
+clause. For example, given the class
+
+<programlisting> 
+  class StateMonad s m | m -> s where ... 
+  instance Monad m => StateMonad s (State s m) where ... 
+</programlisting> 
+then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by 
+<programlisting> 
+  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
+                         deriving (Monad, StateMonad [tok])
+</programlisting>
+
+The derived instance is obtained by completing the application of the
+class to the new type:
+
+<programlisting> 
+  instance StateMonad [tok] (State [tok] (Failure m)) =>
+           StateMonad [tok] (Parser tok m)
+</programlisting>
+</para>
+<para>
+
+As a result of this extension, all derived instances in newtype
+ declarations are treated uniformly (and implemented just by reusing
+the dictionary for the representation type), <emphasis>except</emphasis>
+<literal>Show</literal> and <literal>Read</literal>, which really behave differently for
+the newtype and its representation.
+</para>
+</sect3>
+
+<sect3> <title> A more precise specification </title>
+<para>
+Derived instance declarations are constructed as follows. Consider the
+declaration (after expansion of any type synonyms)
+
+<programlisting> 
+  newtype T v1...vn = T' (t vk+1...vn) deriving (c1...cm) 
+</programlisting> 
+
+where 
+ <itemizedlist>
+<listitem><para>
+  The <literal>ci</literal> are partial applications of
+  classes of the form <literal>C t1'...tj'</literal>, where the arity of <literal>C</literal>
+  is exactly <literal>j+1</literal>.  That is, <literal>C</literal> lacks exactly one type argument.
+</para></listitem>
+<listitem><para>
+  The <literal>k</literal> is chosen so that <literal>ci (T v1...vk)</literal> is well-kinded.
+</para></listitem>
+<listitem><para>
+  The type <literal>t</literal> is an arbitrary type.
+</para></listitem>
+<listitem><para>
+  The type variables <literal>vk+1...vn</literal> do not occur in <literal>t</literal>, 
+  nor in the <literal>ci</literal>, and
+</para></listitem>
+<listitem><para>
+  None of the <literal>ci</literal> is <literal>Read</literal>, <literal>Show</literal>, 
+		<literal>Typeable</literal>, or <literal>Data</literal>.  These classes
+		should not "look through" the type or its constructor.  You can still
+		derive these classes for a newtype, but it happens in the usual way, not 
+		via this new mechanism.  
+</para></listitem>
+</itemizedlist>
+Then, for each <literal>ci</literal>, the derived instance
+declaration is:
+<programlisting> 
+  instance ci t => ci (T v1...vk)
+</programlisting>
+As an example which does <emphasis>not</emphasis> work, consider 
+<programlisting> 
+  newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
+</programlisting> 
+Here we cannot derive the instance 
+<programlisting> 
+  instance Monad (State s m) => Monad (NonMonad m) 
+</programlisting> 
+
+because the type variable <literal>s</literal> occurs in <literal>State s m</literal>,
+and so cannot be "eta-converted" away. It is a good thing that this
+<literal>deriving</literal> clause is rejected, because <literal>NonMonad m</literal> is
+not, in fact, a monad --- for the same reason. Try defining
+<literal>>>=</literal> with the correct type: you won't be able to.
+</para>
+<para>
+
+Notice also that the <emphasis>order</emphasis> of class parameters becomes
+important, since we can only derive instances for the last one. If the
+<literal>StateMonad</literal> class above were instead defined as
+
+<programlisting> 
+  class StateMonad m s | m -> s where ... 
+</programlisting>
+
+then we would not have been able to derive an instance for the
+<literal>Parser</literal> type above. We hypothesise that multi-parameter
+classes usually have one "main" parameter for which deriving new
+instances is most interesting.
+</para>
+<para>Lastly, all of this applies only for classes other than
+<literal>Read</literal>, <literal>Show</literal>, <literal>Typeable</literal>, 
+and <literal>Data</literal>, for which the built-in derivation applies (section
+4.3.3. of the Haskell Report).
+(For the standard classes <literal>Eq</literal>, <literal>Ord</literal>,
+<literal>Ix</literal>, and <literal>Bounded</literal> it is immaterial whether
+the standard method is used or the one described here.)
+</para>
+</sect3>
+
+</sect2>
+
+<sect2 id="stand-alone-deriving">
+<title>Stand-alone deriving declarations</title>
+
+<para>
+GHC now allows stand-alone <literal>deriving</literal> declarations:
+<programlisting>
+  data Foo a = Bar a | Baz String
+
+  derive instance Eq (Foo a)
+</programlisting>
+The token "<literal>derive</literal>" is a keyword only when followed by "<literal>instance</literal>";
+you can use it as a variable name elsewhere.</para>
+<para>The stand-alone syntax is generalised for newtypes in exactly the same
+way that ordinary <literal>deriving</literal> clauses are generalised (<xref linkend="newtype-deriving"/>).
+For example:
+<programlisting>
+  newtype Foo a = MkFoo (State Int a)
+
+  derive instance MonadState Int Foo
+</programlisting>
+GHC always treats the <emphasis>last</emphasis> parameter of the instance
+(<literal>Foo</literal> in this exmample) as the type whose instance is being derived.
+</para>
+
+</sect2>
+
+</sect1>
+
+
+<!-- TYPE SYSTEM EXTENSIONS -->
+<sect1 id="other-type-extensions">
+<title>Other type system extensions</title>
 
 <sect2 id="multi-param-type-classes">
 <title>Class declarations</title>
@@ -2700,54 +2956,6 @@ territory free in case we need it later.
 </para>
 </sect3>
 
-<sect3 id="hoist">
-<title>For-all hoisting</title>
-<para>
-It is often convenient to use generalised type synonyms (see <xref linkend="type-synonyms"/>) at the right hand
-end of an arrow, thus:
-<programlisting>
-  type Discard a = forall b. a -> b -> a
-
-  g :: Int -> Discard Int
-  g x y z = x+y
-</programlisting>
-Simply expanding the type synonym would give
-<programlisting>
-  g :: Int -> (forall b. Int -> b -> Int)
-</programlisting>
-but GHC "hoists" the <literal>forall</literal> to give the isomorphic type
-<programlisting>
-  g :: forall b. Int -> Int -> b -> Int
-</programlisting>
-In general, the rule is this: <emphasis>to determine the type specified by any explicit
-user-written type (e.g. in a type signature), GHC expands type synonyms and then repeatedly
-performs the transformation:</emphasis>
-<programlisting>
-  <emphasis>type1</emphasis> -> forall a1..an. <emphasis>context2</emphasis> => <emphasis>type2</emphasis>
-==>
-  forall a1..an. <emphasis>context2</emphasis> => <emphasis>type1</emphasis> -> <emphasis>type2</emphasis>
-</programlisting>
-(In fact, GHC tries to retain as much synonym information as possible for use in
-error messages, but that is a usability issue.)  This rule applies, of course, whether
-or not the <literal>forall</literal> comes from a synonym. For example, here is another
-valid way to write <literal>g</literal>'s type signature:
-<programlisting>
-  g :: Int -> Int -> forall b. b -> Int
-</programlisting>
-</para>
-<para>
-When doing this hoisting operation, GHC eliminates duplicate constraints.  For
-example:
-<programlisting>
-  type Foo a = (?x::Int) => Bool -> a
-  g :: Foo (Foo Int)
-</programlisting>
-means
-<programlisting>
-  g :: (?x::Int) => Bool -> Bool -> Int
-</programlisting>
-</para>
-</sect3>
 
 
 </sect2>
@@ -3250,6 +3458,8 @@ For example, all the following types are legal:
     g2 :: (forall a. Eq a => [a] -> a -> Bool) -> Int -> Int
 
     f3 :: ((forall a. a->a) -> Int) -> Bool -> Bool
+
+    f4 :: Int -> (forall a. a -> a)
 </programlisting>
 Here, <literal>f1</literal> and <literal>g1</literal> are rank-1 types, and
 can be written in standard Haskell (e.g. <literal>f1 :: a->b->a</literal>).
@@ -3272,7 +3482,8 @@ that restriction has now been lifted.)
 In particular, a forall-type (also called a "type scheme"),
 including an operational type class context, is legal:
 <itemizedlist>
-<listitem> <para> On the left of a function arrow </para> </listitem>
+<listitem> <para> On the left or right (see <literal>f4</literal>, for example)
+of a function arrow </para> </listitem>
 <listitem> <para> On the right of a function arrow (see <xref linkend="hoist"/>) </para> </listitem>
 <listitem> <para> As the argument of a constructor, or type of a field, in a data type declaration. For
 example, any of the <literal>f1,f2,f3,g1,g2</literal> above would be valid
@@ -3280,14 +3491,6 @@ field type signatures.</para> </listitem>
 <listitem> <para> As the type of an implicit parameter </para> </listitem>
 <listitem> <para> In a pattern type signature (see <xref linkend="scoped-type-variables"/>) </para> </listitem>
 </itemizedlist>
-There is one place you cannot put a <literal>forall</literal>:
-you cannot instantiate a type variable with a forall-type.  So you cannot 
-make a forall-type the argument of a type constructor.  So these types are illegal:
-<programlisting>
-    x1 :: [forall a. a->a]
-    x2 :: (forall a. a->a, Int)
-    x3 :: Maybe (forall a. a->a)
-</programlisting>
 Of course <literal>forall</literal> becomes a keyword; you can't use <literal>forall</literal> as
 a type variable any more!
 </para>
@@ -3789,263 +3992,6 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 
 </sect2>
 
-<sect2 id="deriving-typeable">
-<title>Deriving clause for classes <literal>Typeable</literal> and <literal>Data</literal></title>
-
-<para>
-Haskell 98 allows the programmer to add "<literal>deriving( Eq, Ord )</literal>" to a data type 
-declaration, to generate a standard instance declaration for classes specified in the <literal>deriving</literal> clause.  
-In Haskell 98, the only classes that may appear in the <literal>deriving</literal> clause are the standard
-classes <literal>Eq</literal>, <literal>Ord</literal>, 
-<literal>Enum</literal>, <literal>Ix</literal>, <literal>Bounded</literal>, <literal>Read</literal>, and <literal>Show</literal>.
-</para>
-<para>
-GHC extends this list with two more classes that may be automatically derived 
-(provided the <option>-fglasgow-exts</option> flag is specified):
-<literal>Typeable</literal>, and <literal>Data</literal>.  These classes are defined in the library
-modules <literal>Data.Typeable</literal> and <literal>Data.Generics</literal> respectively, and the
-appropriate class must be in scope before it can be mentioned in the <literal>deriving</literal> clause.
-</para>
-<para>An instance of <literal>Typeable</literal> can only be derived if the
-data type has seven or fewer type parameters, all of kind <literal>*</literal>.
-The reason for this is that the <literal>Typeable</literal> class is derived using the scheme
-described in
-<ulink url="http://research.microsoft.com/%7Esimonpj/papers/hmap/gmap2.ps">
-Scrap More Boilerplate: Reflection, Zips, and Generalised Casts
-</ulink>.
-(Section 7.4 of the paper describes the multiple <literal>Typeable</literal> classes that
-are used, and only <literal>Typeable1</literal> up to
-<literal>Typeable7</literal> are provided in the library.)
-In other cases, there is nothing to stop the programmer writing a <literal>TypableX</literal>
-class, whose kind suits that of the data type constructor, and
-then writing the data type instance by hand.
-</para>
-</sect2>
-
-<sect2 id="newtype-deriving">
-<title>Generalised derived instances for newtypes</title>
-
-<para>
-When you define an abstract type using <literal>newtype</literal>, you may want
-the new type to inherit some instances from its representation. In
-Haskell 98, you can inherit instances of <literal>Eq</literal>, <literal>Ord</literal>,
-<literal>Enum</literal> and <literal>Bounded</literal> by deriving them, but for any
-other classes you have to write an explicit instance declaration. For
-example, if you define
-
-<programlisting> 
-  newtype Dollars = Dollars Int 
-</programlisting> 
-
-and you want to use arithmetic on <literal>Dollars</literal>, you have to
-explicitly define an instance of <literal>Num</literal>:
-
-<programlisting> 
-  instance Num Dollars where
-    Dollars a + Dollars b = Dollars (a+b)
-    ...
-</programlisting>
-All the instance does is apply and remove the <literal>newtype</literal>
-constructor. It is particularly galling that, since the constructor
-doesn't appear at run-time, this instance declaration defines a
-dictionary which is <emphasis>wholly equivalent</emphasis> to the <literal>Int</literal>
-dictionary, only slower!
-</para>
-
-
-<sect3> <title> Generalising the deriving clause </title>
-<para>
-GHC now permits such instances to be derived instead, so one can write 
-<programlisting> 
-  newtype Dollars = Dollars Int deriving (Eq,Show,Num)
-</programlisting> 
-
-and the implementation uses the <emphasis>same</emphasis> <literal>Num</literal> dictionary
-for <literal>Dollars</literal> as for <literal>Int</literal>. Notionally, the compiler
-derives an instance declaration of the form
-
-<programlisting> 
-  instance Num Int => Num Dollars
-</programlisting> 
-
-which just adds or removes the <literal>newtype</literal> constructor according to the type.
-</para>
-<para>
-
-We can also derive instances of constructor classes in a similar
-way. For example, suppose we have implemented state and failure monad
-transformers, such that
-
-<programlisting> 
-  instance Monad m => Monad (State s m) 
-  instance Monad m => Monad (Failure m)
-</programlisting> 
-In Haskell 98, we can define a parsing monad by 
-<programlisting> 
-  type Parser tok m a = State [tok] (Failure m) a
-</programlisting> 
-
-which is automatically a monad thanks to the instance declarations
-above. With the extension, we can make the parser type abstract,
-without needing to write an instance of class <literal>Monad</literal>, via
-
-<programlisting> 
-  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
-                         deriving Monad
-</programlisting>
-In this case the derived instance declaration is of the form 
-<programlisting> 
-  instance Monad (State [tok] (Failure m)) => Monad (Parser tok m) 
-</programlisting> 
-
-Notice that, since <literal>Monad</literal> is a constructor class, the
-instance is a <emphasis>partial application</emphasis> of the new type, not the
-entire left hand side. We can imagine that the type declaration is
-``eta-converted'' to generate the context of the instance
-declaration.
-</para>
-<para>
-
-We can even derive instances of multi-parameter classes, provided the
-newtype is the last class parameter. In this case, a ``partial
-application'' of the class appears in the <literal>deriving</literal>
-clause. For example, given the class
-
-<programlisting> 
-  class StateMonad s m | m -> s where ... 
-  instance Monad m => StateMonad s (State s m) where ... 
-</programlisting> 
-then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by 
-<programlisting> 
-  newtype Parser tok m a = Parser (State [tok] (Failure m) a)
-                         deriving (Monad, StateMonad [tok])
-</programlisting>
-
-The derived instance is obtained by completing the application of the
-class to the new type:
-
-<programlisting> 
-  instance StateMonad [tok] (State [tok] (Failure m)) =>
-           StateMonad [tok] (Parser tok m)
-</programlisting>
-</para>
-<para>
-
-As a result of this extension, all derived instances in newtype
- declarations are treated uniformly (and implemented just by reusing
-the dictionary for the representation type), <emphasis>except</emphasis>
-<literal>Show</literal> and <literal>Read</literal>, which really behave differently for
-the newtype and its representation.
-</para>
-</sect3>
-
-<sect3> <title> A more precise specification </title>
-<para>
-Derived instance declarations are constructed as follows. Consider the
-declaration (after expansion of any type synonyms)
-
-<programlisting> 
-  newtype T v1...vn = T' (t vk+1...vn) deriving (c1...cm) 
-</programlisting> 
-
-where 
- <itemizedlist>
-<listitem><para>
-  The <literal>ci</literal> are partial applications of
-  classes of the form <literal>C t1'...tj'</literal>, where the arity of <literal>C</literal>
-  is exactly <literal>j+1</literal>.  That is, <literal>C</literal> lacks exactly one type argument.
-</para></listitem>
-<listitem><para>
-  The <literal>k</literal> is chosen so that <literal>ci (T v1...vk)</literal> is well-kinded.
-</para></listitem>
-<listitem><para>
-  The type <literal>t</literal> is an arbitrary type.
-</para></listitem>
-<listitem><para>
-  The type variables <literal>vk+1...vn</literal> do not occur in <literal>t</literal>, 
-  nor in the <literal>ci</literal>, and
-</para></listitem>
-<listitem><para>
-  None of the <literal>ci</literal> is <literal>Read</literal>, <literal>Show</literal>, 
-		<literal>Typeable</literal>, or <literal>Data</literal>.  These classes
-		should not "look through" the type or its constructor.  You can still
-		derive these classes for a newtype, but it happens in the usual way, not 
-		via this new mechanism.  
-</para></listitem>
-</itemizedlist>
-Then, for each <literal>ci</literal>, the derived instance
-declaration is:
-<programlisting> 
-  instance ci t => ci (T v1...vk)
-</programlisting>
-As an example which does <emphasis>not</emphasis> work, consider 
-<programlisting> 
-  newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
-</programlisting> 
-Here we cannot derive the instance 
-<programlisting> 
-  instance Monad (State s m) => Monad (NonMonad m) 
-</programlisting> 
-
-because the type variable <literal>s</literal> occurs in <literal>State s m</literal>,
-and so cannot be "eta-converted" away. It is a good thing that this
-<literal>deriving</literal> clause is rejected, because <literal>NonMonad m</literal> is
-not, in fact, a monad --- for the same reason. Try defining
-<literal>>>=</literal> with the correct type: you won't be able to.
-</para>
-<para>
-
-Notice also that the <emphasis>order</emphasis> of class parameters becomes
-important, since we can only derive instances for the last one. If the
-<literal>StateMonad</literal> class above were instead defined as
-
-<programlisting> 
-  class StateMonad m s | m -> s where ... 
-</programlisting>
-
-then we would not have been able to derive an instance for the
-<literal>Parser</literal> type above. We hypothesise that multi-parameter
-classes usually have one "main" parameter for which deriving new
-instances is most interesting.
-</para>
-<para>Lastly, all of this applies only for classes other than
-<literal>Read</literal>, <literal>Show</literal>, <literal>Typeable</literal>, 
-and <literal>Data</literal>, for which the built-in derivation applies (section
-4.3.3. of the Haskell Report).
-(For the standard classes <literal>Eq</literal>, <literal>Ord</literal>,
-<literal>Ix</literal>, and <literal>Bounded</literal> it is immaterial whether
-the standard method is used or the one described here.)
-</para>
-</sect3>
-
-</sect2>
-
-<sect2 id="stand-alone-deriving">
-<title>Stand-alone deriving declarations</title>
-
-<para>
-GHC now allows stand-alone <literal>deriving</literal> declarations:
-</para>
-
-<programlisting>
-  data Foo = Bar Int | Baz String
-
-  deriving Eq for Foo
-</programlisting>
-
-<para>Deriving instances of multi-parameter type classes for newtypes is
-also allowed:</para>
-
-<programlisting>
-  newtype Foo a = MkFoo (State Int a)
-
-  deriving (MonadState Int) for Foo
-</programlisting>
-
-<para>
-</para>
-
-</sect2>
 
 <sect2 id="typing-binds">
 <title>Generalised typing of mutually recursive bindings</title>
