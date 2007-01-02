@@ -2,7 +2,7 @@
 #
 # Copyright [1998..2004] The GHC Team
 #
-# Thanks to Zoltan Vorosbaranyi <vbzoli@vbzo.li> for suggestions in 
+# Thanks to Zoltan Vorosbaranyi <vbzoli@vbzo.li> for suggestions in
 # earlier versions and Pixel <pixel@mandrakesoft.com> for coding tips.
 #
 # This file is subject to the same free software license as GHC.
@@ -88,7 +88,7 @@ make
 make html
 make -C docs/ext-core ps
 make -C docs/storage-mgt ps
- 
+
 %install
 make prefix=${RPM_BUILD_ROOT}%{prefix} install
 make datadir=`pwd` install-docs
@@ -99,7 +99,7 @@ make datadir=`pwd` install-docs
 # * generating file lists in a BUILD_ROOT spec is a bit tricky: the file list
 #   has to contain complete paths, _but_ without the BUILD_ROOT, we also do
 #   _not_ want have directory names in the list; furthermore, we have to make
-#   sure that any leading / is removed from %{prefix}/lib, as find has to 
+#   sure that any leading / is removed from %{prefix}/lib, as find has to
 #   interpret the argument as a relative path; however, we have to include the
 #   leading / again in the final file list (otherwise, rpm complains)
 # * isn't there an easier way to do all this?
