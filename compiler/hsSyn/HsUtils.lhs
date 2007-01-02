@@ -212,6 +212,8 @@ nlList exprs		= noLoc (ExplicitList placeHolderType exprs)
 nlHsAppTy f t		= noLoc (HsAppTy f t)
 nlHsTyVar x		= noLoc (HsTyVar x)
 nlHsFunTy a b		= noLoc (HsFunTy a b)
+
+nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
 \end{code}
 
 

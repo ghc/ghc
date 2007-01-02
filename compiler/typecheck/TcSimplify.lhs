@@ -28,11 +28,10 @@ import Inst
 import TcEnv
 import InstEnv
 import TcGadt
-import TcMType
 import TcType
+import TcMType
 import TcIface
 import Var
-import TyCon
 import Name
 import NameSet
 import Class
@@ -2345,55 +2344,31 @@ instance declarations.
 
 \begin{code}
 tcSimplifyDeriv :: InstOrigin
-                -> TyCon
 		-> [TyVar]	
 		-> ThetaType		-- Wanted
 	        -> TcM ThetaType	-- Needed
+-- Given  instance (wanted) => C inst_ty 
+-- Simplify 'wanted' as much as possible
+-- The inst_ty is needed only for the termination check
 
-tcSimplifyDeriv orig tc tyvars theta
-  = tcInstTyVars tyvars			`thenM` \ (tvs, _, tenv) ->
+tcSimplifyDeriv orig tyvars theta
+  = do	{ (tvs, _, tenv) <- tcInstTyVars tyvars
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
-    newDictBndrsO orig (substTheta tenv theta)	`thenM` \ wanteds ->
-    topCheckLoop doc wanteds			`thenM` \ (irreds, _) ->
+	; wanteds <- newDictBndrsO orig (substTheta tenv theta)
+	; (irreds, _) <- topCheckLoop doc wanteds
 
-    doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
-    doptM Opt_AllowUndecidableInstances		`thenM` \ undecidable_ok ->
-    let
-	inst_ty = mkTyConApp tc (mkTyVarTys tvs)
- 	(ok_insts, bad_insts) = partition is_ok_inst irreds
-	is_ok_inst inst
-	   = isDict inst 	-- Exclude implication consraints
-	   && (isTyVarClassPred pred || (gla_exts && ok_gla_pred pred))
-	   where
-	     pred = dictPred inst
+	; let (dicts, non_dicts) = partition isDict irreds
+				 	-- Exclude implication consraints
+	; addNoInstanceErrs non_dicts	-- I'm not sure if these can really happen
 
-	ok_gla_pred pred = null (checkInstTermination [inst_ty] [pred])
-	 	-- See Note [Deriving context]
-	   
- 	tv_set = mkVarSet tvs
-	simpl_theta = map dictPred ok_insts
-	weird_preds = [pred | pred <- simpl_theta
-			    , not (tyVarsOfPred pred `subVarSet` tv_set)]  
-
-	  -- Check for a bizarre corner case, when the derived instance decl should
-	  -- have form 	instance C a b => D (T a) where ...
-	  -- Note that 'b' isn't a parameter of T.  This gives rise to all sorts
-	  -- of problems; in particular, it's hard to compare solutions for
-	  -- equality when finding the fixpoint.  So I just rule it out for now.
-	
-	rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
+	; let rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
+	      simpl_theta = substTheta rev_env (map dictPred dicts)
 		-- This reverse-mapping is a Royal Pain, 
 		-- but the result should mention TyVars not TcTyVars
-    in
-	-- In effect, the bad and wierd insts cover all of the cases that
-	-- would make checkValidInstance fail; if it were called right after tcSimplifyDeriv
-	--   * wierd_preds ensures unambiguous instances (checkAmbiguity in checkValidInstance)
-	--   * ok_gla_pred ensures termination (checkInstTermination in checkValidInstance)
-    addNoInstanceErrs bad_insts				`thenM_`
-    mapM_ (addErrTc . badDerivedPred) weird_preds	`thenM_`
-    returnM (substTheta rev_env simpl_theta)
+
+	; return simpl_theta }
   where
     doc = ptext SLIT("deriving classes for a data type")
 \end{code}
@@ -2666,12 +2641,6 @@ warnDefault ups default_ty
     warn_msg  = vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+>
 				quotes (ppr default_ty),
 		      pprDictsInFull tidy_dicts]
-
--- Used for the ...Thetas variants; all top level
-badDerivedPred pred
-  = vcat [ptext SLIT("Can't derive instances where the instance context mentions"),
-	  ptext SLIT("type variables that are not data type parameters"),
-	  nest 2 (ptext SLIT("Offending constraint:") <+> ppr pred)]
 
 reduceDepthErr n stack
   = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,

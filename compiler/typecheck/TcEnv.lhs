@@ -160,15 +160,22 @@ tcLookupLocatedTyCon :: Located Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocM tcLookupTyCon
 
 -- Look up the representation tycon of a family instance.
---
-tcLookupFamInst :: TyCon -> [Type] -> TcM TyCon
+-- Return the rep tycon and the corresponding rep args
+tcLookupFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
 tcLookupFamInst tycon tys
+  | not (isOpenTyCon tycon)
+  = return (tycon, tys)
+  | otherwise
   = do { env <- getGblEnv
        ; eps <- getEps
        ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
-       ; case lookupFamInstEnvExact instEnv tycon tys of
-	   Nothing      -> famInstNotFound tycon tys
-	   Just famInst -> return $ famInstTyCon famInst
+       ; case lookupFamInstEnv instEnv tycon tys of
+	   [(subst,fam_inst)] -> return (rep_tc, substTyVars subst (tyConTyVars rep_tc))
+		where	-- NB: assumption is that (tyConTyVars rep_tc) is in 
+			--     the domain of the substitution
+		  rep_tc = famInstTyCon fam_inst 
+
+	   other -> famInstNotFound tycon tys other
        }
 \end{code}
 
@@ -670,8 +677,10 @@ wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
 		ptext SLIT("used as a") <+> text expected)
 
-famInstNotFound tycon tys
-  = failWithTc (quotes famInst <+> ptext SLIT("is not in scope"))
+famInstNotFound tycon tys what
+  = failWithTc (msg <+> quotes (ppr tycon <+> hsep (map pprParendType tys)))
   where
-    famInst = ppr tycon <+> hsep (map pprParendType tys)
+    msg = case what of
+		[] -> ptext SLIT("No instance for")
+		xs -> ptext SLIT("More than one instance for")
 \end{code}

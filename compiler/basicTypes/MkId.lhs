@@ -218,7 +218,7 @@ mkDataConIds wrap_name wkr_name data_con
 		     -- arguments to the universals of the data constructor
 		     -- (crucial when type checking interfaces)
     dict_tys       = mkPredTys theta
-    result_ty_args = map (substTyVar subst) univ_tvs
+    result_ty_args = substTyVars subst univ_tvs
     result_ty      = case tyConFamInst_maybe tycon of
 		         -- ordinary constructor
 		       Nothing            -> mkTyConApp tycon result_ty_args

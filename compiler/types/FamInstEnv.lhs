@@ -6,13 +6,14 @@ FamInstEnv: Type checked family instance declarations
 
 \begin{code}
 module FamInstEnv (
-	FamInst(..), famInstTyCon, pprFamInst, pprFamInstHdr, pprFamInsts, 
+	FamInst(..), famInstTyCon, famInstTyVars, 
+	pprFamInst, pprFamInstHdr, pprFamInsts, 
 	famInstHead, mkLocalFamInst, mkImportedFamInst,
 
 	FamInstEnv, emptyFamInstEnv, extendFamInstEnv, extendFamInstEnvList, 
 	famInstEnvElts, familyInstances,
 
-	lookupFamInstEnvExact, lookupFamInstEnv, lookupFamInstEnvUnify
+	lookupFamInstEnv, lookupFamInstEnvUnify
     ) where
 
 #include "HsVersions.h"
@@ -32,7 +33,6 @@ import UniqFM
 import Outputable
 
 import Maybe
-import Monad
 \end{code}
 
 
@@ -60,6 +60,8 @@ data FamInst
 --
 famInstTyCon :: FamInst -> TyCon
 famInstTyCon = fi_tycon
+
+famInstTyVars = fi_tvs
 \end{code}
 
 \begin{code}
@@ -187,6 +189,7 @@ This is used when we want the @TyCon@ of a particular family instance (e.g.,
 during deriving classes).
 
 \begin{code}
+{-		NOT NEEDED ANY MORE
 lookupFamInstEnvExact :: (FamInstEnv		-- External package inst-env
 		         ,FamInstEnv)		-- Home-package inst-env
 		      -> TyCon -> [Type]	-- What we are looking for
@@ -224,6 +227,7 @@ lookupFamInstEnvExact (pkg_ie, home_ie) fam tys
         -- No match => try next
       | otherwise
       = find rest
+-}
 \end{code}
 
 @lookupFamInstEnv@ looks up in a @FamInstEnv@, using a one-way match.

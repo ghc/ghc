@@ -12,7 +12,7 @@ module Util (
         zipLazy, stretchZipWith,
 	mapFst, mapSnd,
 	mapAndUnzip, mapAndUnzip3,
-	nOfThem, filterOut, partitionWith,
+	nOfThem, filterOut, partitionWith, splitEithers,
 
 	lengthExceeds, lengthIs, lengthAtLeast, 
 	listLengthCmp, atLength, equalLength, compareLength,
@@ -177,6 +177,13 @@ partitionWith f (x:xs) = case f x of
 		       where
 			 (bs,cs) = partitionWith f xs
 
+splitEithers :: [Either a b] -> ([a], [b])
+splitEithers [] = ([],[])
+splitEithers (e : es) = case e of
+			  Left x -> (x:xs, ys)
+			  Right y -> (xs, y:ys)
+		      where
+			(xs,ys) = splitEithers es
 \end{code}
 
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists

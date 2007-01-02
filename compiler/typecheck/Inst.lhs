@@ -751,7 +751,7 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
     	(theta, _) = tcSplitPhiTy dfun_rho
 	src_loc	   = instLocSpan loc
 	dfun	   = HsVar dfun_id
-	tys	   = map (substTyVar tenv') tyvars
+	tys	   = substTyVars tenv' tyvars
     ; if null theta then
     	returnM (GenInst [] (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
       else do

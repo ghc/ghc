@@ -1208,8 +1208,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
 					      (nlHsApp (nlHsVar getTag_RDR) a_Expr)))
 			(noLoc (mkExplicitHsForAllTy (map (noLoc.UserTyVar) tvs) (noLoc []) con2tag_ty))
 
-    con2tag_ty = foldl nlHsAppTy (nlHsTyVar (getRdrName tycon)) 
-		       (map nlHsTyVar tvs)
+    con2tag_ty = nlHsTyConApp (getRdrName tycon) (map nlHsTyVar tvs)
 		`nlHsFunTy` 
 		nlHsTyVar (getRdrName intPrimTyCon)
 

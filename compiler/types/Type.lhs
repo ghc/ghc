@@ -92,7 +92,7 @@ module Type (
 
 	-- Performing substitution on types
 	substTy, substTys, substTyWith, substTheta, 
-	substPred, substTyVar, substTyVarBndr, deShadowTy, lookupTyVar,
+	substPred, substTyVar, substTyVars, substTyVarBndr, deShadowTy, lookupTyVar,
 
 	-- Pretty-printing
 	pprType, pprParendType, pprTyThingCategory, pprForAll,
@@ -411,7 +411,6 @@ splitNewTyConApp_maybe other	      = Nothing
 newTyConInstRhs :: TyCon -> [Type] -> Type
 newTyConInstRhs tycon tys =
     let (tvs, ty) = newTyConRhs tycon in substTyWith tvs tys ty
-
 \end{code}
 
 
@@ -1312,6 +1311,9 @@ substTyVar subst@(TvSubst in_scope env) tv
 	Nothing -> TyVarTy tv;
        	Just ty -> ty	-- See Note [Apply Once]
     } 
+
+substTyVars :: TvSubst -> [TyVar] -> [Type]
+substTyVars subst tvs = map (substTyVar subst) tvs
 
 lookupTyVar :: TvSubst -> TyVar  -> Maybe Type
 	-- See Note [Extending the TvSubst]

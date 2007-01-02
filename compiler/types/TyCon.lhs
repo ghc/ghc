@@ -837,7 +837,7 @@ isClassTyCon other_tycon			     = False
 
 tyConClass_maybe :: TyCon -> Maybe Class
 tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas}) = Just clas
-tyConClass_maybe ther_tycon				    = Nothing
+tyConClass_maybe other_tycon				    = Nothing
 
 isFamInstTyCon :: TyCon -> Bool
 isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _ _ _ }) = True
@@ -846,13 +846,13 @@ isFamInstTyCon other_tycon			             = False
 tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
 tyConFamInst_maybe (AlgTyCon {algTcParent = FamilyTyCon fam instTys _}) = 
   Just (fam, instTys)
-tyConFamInst_maybe ther_tycon				                = 
+tyConFamInst_maybe other_tycon				                = 
   Nothing
 
 tyConFamilyCoercion_maybe :: TyCon -> Maybe TyCon
 tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = FamilyTyCon _ _ coe}) = 
   Just coe
-tyConFamilyCoercion_maybe ther_tycon 				         = 
+tyConFamilyCoercion_maybe other_tycon 				         = 
   Nothing
 \end{code}
 

@@ -6,7 +6,8 @@
 
 \begin{code}
 module TcHsType (
-	tcHsSigType, tcHsDeriv,
+	tcHsSigType, tcHsDeriv, 
+	tcHsInstHead, tcHsQuantifiedType,
 	UserTypeCtxt(..), 
 
 		-- Kind checking
@@ -142,6 +143,24 @@ tcHsSigType ctxt hs_ty
 	; ty <- tcHsKindedType kinded_ty
 	; checkValidType ctxt ty	
 	; returnM ty }
+
+tcHsInstHead :: LHsType Name -> TcM ([TyVar], ThetaType, Type)
+-- Typecheck an instance head.  We can't use 
+-- tcHsSigType, because it's not a valid user type.
+tcHsInstHead hs_ty
+  = do	{ kinded_ty <- kcHsSigType hs_ty
+	; poly_ty   <- tcHsKindedType kinded_ty
+	; return (tcSplitSigmaTy poly_ty) }
+
+tcHsQuantifiedType :: [LHsTyVarBndr Name] -> LHsType Name -> TcM ([TyVar], Type)
+-- Behave very like type-checking (HsForAllTy sig_tvs hs_ty),
+-- except that we want to keep the tvs separate
+tcHsQuantifiedType tv_names hs_ty
+  = kcHsTyVars tv_names $ \ tv_names' ->
+    do	{ kc_ty <- kcHsSigType hs_ty
+    	; tcTyVarBndrs tv_names' $ \ tvs ->
+    do	{ ty <- dsHsType kc_ty
+    	; return (tvs, ty) } }
 
 -- Used for the deriving(...) items
 tcHsDeriv :: LHsType Name -> TcM ([TyVar], Class, [Type])
@@ -629,7 +648,7 @@ tcTyVarBndrs bndrs thing_inside
   where
     zonk (KindedTyVar name kind) = do { kind' <- zonkTcKindToKind kind
 				      ; return (mkTyVar name kind') }
-    zonk (UserTyVar name) = pprTrace "Un-kinded tyvar" (ppr name) $
+    zonk (UserTyVar name) = WARN( True, ptext SLIT("Un-kinded tyvar") <+> ppr name )
 			    return (mkTyVar name liftedTypeKind)
 
 -----------------------------------
@@ -725,16 +744,10 @@ tcHsPatSigType ctxt hs_ty
 			| n <- nameSetToList (extractHsTyVars hs_ty),
 			  not (in_scope n) ]
 
-	-- Behave very like type-checking (HsForAllTy sig_tvs hs_ty),
-	-- except that we want to keep the tvs separate
-	; (kinded_tvs, kinded_ty) <- kcHsTyVars sig_tvs $ \ kinded_tvs -> do
-				    { kinded_ty <- kcTypeType hs_ty
-				    ; return (kinded_tvs, kinded_ty) }
-	; tcTyVarBndrs kinded_tvs $ \ tyvars -> do
-	{ sig_ty <- dsHsType kinded_ty
+	; (tyvars, sig_ty) <- tcHsQuantifiedType sig_tvs hs_ty
 	; checkValidType ctxt sig_ty 
 	; return (tyvars, sig_ty)
-      } }
+      }
 
 tcPatSig :: UserTypeCtxt
 	 -> LHsType Name

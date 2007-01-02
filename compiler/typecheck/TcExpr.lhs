@@ -749,7 +749,7 @@ instFun orig fun subst tv_theta_prs
 	; go True fun ty_theta_prs' }
   where
     subst_pr (tvs, theta) 
-	= (map (substTyVar subst) tvs, substTheta subst theta)
+	= (substTyVars subst tvs, substTheta subst theta)
 
     go _ fun [] = return fun
 

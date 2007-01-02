@@ -381,12 +381,20 @@ data TyClDecl name
   | TyData {	tcdND     :: NewOrData,
 		tcdCtxt   :: LHsContext name,	 	-- Context
 		tcdLName  :: Located name,	 	-- Type constructor
+
 		tcdTyVars :: [LHsTyVarBndr name], 	-- Type variables
+			
 		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
-		tcdKindSig:: Maybe Kind,		-- Optional kind sig; 
-							-- (only for the 
-							-- 'where' form and
-							-- indexed type sigs)
+			-- Just [t1..tn] for data instance T t1..tn = ...
+			--	in this case tcdTyVars = fv( tcdTyPats )
+			-- Nothing for everything else
+
+		tcdKindSig:: Maybe Kind,		-- Optional kind sig 
+			-- (Just k) for 
+			--	(a) GADT-style data type decls with user kind sig
+			--	(b) 'data instance' decls with user kind sig	
+			--	(c) 'data family' decls, whether or not there is a kind sig
+			--		(this is how we distinguish a data family decl)
 
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
 			-- For data T a = T1 | T2 a          the LConDecls all have ResTyH98
@@ -400,6 +408,9 @@ data TyClDecl name
 			-- Typically the foralls and ty args are empty, but they
 			-- are non-empty for the newtype-deriving case
     }
+	-- data family:   tcdPats = Nothing, tcdCons = [], tcdKindSig = Just k
+	-- data instance: tcdPats = Just tys
+	-- data:	  tcdPats = Nothing, tcdCons is non-empty
 
   | TyFunction {tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
@@ -410,8 +421,9 @@ data TyClDecl name
   | TySynonym {	tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
 		tcdTyPats :: Maybe [LHsType name],	-- Type patterns
-							-- 'Nothing' => vanilla
-							--   type synonym
+			-- See comments for tcdTyPats in TyData
+			-- 'Nothing' => vanilla type synonym
+
 		tcdSynRhs :: LHsType name	        -- synonym expansion
     }
 
@@ -740,12 +752,11 @@ instDeclATs (InstDecl _ _ _ ats) = ats
 \begin{code}
 type LDerivDecl name = Located (DerivDecl name)
 
-data DerivDecl name
-  = DerivDecl (LHsType name) (Located name)
+data DerivDecl name = DerivDecl (LHsType name)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
-    ppr (DerivDecl ty n) 
-        = hsep [ptext SLIT("deriving"), ppr ty, ptext SLIT("for"), ppr n]
+    ppr (DerivDecl ty) 
+        = hsep [ptext SLIT("derived instance"), ppr ty]
 \end{code}
 
 %************************************************************************

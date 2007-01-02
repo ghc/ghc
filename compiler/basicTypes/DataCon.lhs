@@ -619,7 +619,7 @@ dataConUserType  (MkData { dcUnivTyVars = univ_tvs,
     mkFunTys (mkPredTys theta) $
     mkFunTys arg_tys $
     case tyConFamInst_maybe tycon of
-      Nothing             -> mkTyConApp tycon (map (substTyVar subst) univ_tvs)
+      Nothing             -> mkTyConApp tycon (substTyVars subst univ_tvs)
       Just (ftc, insttys) -> mkTyConApp ftc insttys	    -- data instance
   where
     subst = mkTopTvSubst eq_spec

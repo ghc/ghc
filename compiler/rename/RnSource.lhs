@@ -422,11 +422,10 @@ extendTyVarEnvForMethodBinds tyvars thing_inside
 
 \begin{code}
 rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
-rnSrcDerivDecl (DerivDecl ty n)
+rnSrcDerivDecl (DerivDecl ty)
   = do ty' <- rnLHsType (text "a deriving decl") ty
-       n'  <- lookupLocatedOccRn n
-       let fvs = extractHsTyNames ty' `addOneFV` unLoc n'
-       return (DerivDecl ty' n', fvs)
+       let fvs = extractHsTyNames ty'
+       return (DerivDecl ty', fvs)
 \end{code}
 
 %*********************************************************

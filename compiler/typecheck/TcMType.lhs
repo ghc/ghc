@@ -1169,7 +1169,7 @@ checkValidInstance tyvars theta clas inst_tys
 	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98, checkValidTheta has already done that
 	; when (gla_exts && not undecidable_ok) $
-	  mapM_ failWithTc (checkInstTermination inst_tys theta)
+	  mapM_ addErrTc (checkInstTermination inst_tys theta)
 	
 	-- The Coverage Condition
 	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)

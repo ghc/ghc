@@ -240,11 +240,7 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
 		  badBootDeclErr
 
-	-- Typecheck the instance type itself.  We can't use 
-	-- tcHsSigType, because it's not a valid user type.
-	; kinded_ty <- kcHsSigType poly_ty
-	; poly_ty'  <- tcHsKindedType kinded_ty
-	; let (tyvars, theta, tau) = tcSplitSigmaTy poly_ty'
+	; (tyvars, theta, tau) <- tcHsInstHead poly_ty
 	
 	-- Next, process any associated types.
 	; idx_tycons <- mappM tcIdxTyInstDecl ats
