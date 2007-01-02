@@ -82,14 +82,14 @@ needed.
 
 %build
 test -f configure || autoreconf
-./configure --prefix=%{prefix}
+./configure --prefix=%{_prefix}
 make
 make html
 make -C docs/ext-core ps
 make -C docs/storage-mgt ps
 
 %install
-make prefix=${RPM_BUILD_ROOT}%{prefix} install
+make prefix=${RPM_BUILD_ROOT}%{_prefix} install
 make datadir=`pwd` install-docs
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
@@ -98,14 +98,14 @@ make datadir=`pwd` install-docs
 # * generating file lists in a BUILD_ROOT spec is a bit tricky: the file list
 #   has to contain complete paths, _but_ without the BUILD_ROOT, we also do
 #   _not_ want have directory names in the list; furthermore, we have to make
-#   sure that any leading / is removed from %{prefix}/lib, as find has to
+#   sure that any leading / is removed from %{_prefix}/lib, as find has to
 #   interpret the argument as a relative path; however, we have to include the
 #   leading / again in the final file list (otherwise, rpm complains)
 # * isn't there an easier way to do all this?
 #
 dir=`pwd`
 cd ${RPM_BUILD_ROOT}
-libdir=`echo %{prefix}/lib | sed 's|^/||'`
+libdir=`echo %{_prefix}/lib | sed 's|^/||'`
 find $libdir ! -type d !  -name '*.p_hi' !   -name '*_p.a'    -print | sed 's|^|/|' > $dir/rpm-noprof-lib-files
 find $libdir ! -type d \( -name '*.p_hi' -or -name '*_p.a' \) -print | sed 's|^|/|' > $dir/rpm-prof-lib-files
 cd $dir
@@ -127,18 +127,18 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc docs/users_guide/users_guide
 %doc html/*
 %doc libraries/Cabal/doc/Cabal
-%{prefix}/bin/ghc
-%{prefix}/bin/ghc-%{version}
-%{prefix}/bin/ghc-pkg
-%{prefix}/bin/ghc-pkg-%{version}
-%{prefix}/bin/ghci
-%{prefix}/bin/ghci-%{version}
-%{prefix}/bin/ghcprof
-%{prefix}/bin/hasktags
-%{prefix}/bin/hp2ps
-%{prefix}/bin/hsc2hs
-%{prefix}/bin/runghc
-%{prefix}/bin/runhaskell
+%{_prefix}/bin/ghc
+%{_prefix}/bin/ghc-%{version}
+%{_prefix}/bin/ghc-pkg
+%{_prefix}/bin/ghc-pkg-%{version}
+%{_prefix}/bin/ghci
+%{_prefix}/bin/ghci-%{version}
+%{_prefix}/bin/ghcprof
+%{_prefix}/bin/hasktags
+%{_prefix}/bin/hp2ps
+%{_prefix}/bin/hsc2hs
+%{_prefix}/bin/runghc
+%{_prefix}/bin/runhaskell
 
 %files prof -f rpm-prof-lib-files
 %defattr(-,root,root)
