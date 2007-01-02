@@ -2069,7 +2069,7 @@ the standard method is used or the one described here.)
 <title>Stand-alone deriving declarations</title>
 
 <para>
-GHC now allows stand-alone <literal>deriving</literal> declarations:
+GHC now allows stand-alone <literal>deriving</literal> declarations, enabled by <literal>-fglasgow-exts</literal>:
 <programlisting>
   data Foo a = Bar a | Baz String
 
