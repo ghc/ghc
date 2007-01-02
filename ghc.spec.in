@@ -21,7 +21,6 @@ Source0:        http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src.tar.bz
 Source1:        http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src-extralibs.tar.bz2
 Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-Prefix:         %{_prefix}
 Requires:       gmp, readline
 BuildRequires:  alex >= 2.0, happy >= 1.15, ghc >= 5, haddock, docbook-dtd, docbook-xsl-stylesheets, libxslt, libxml2, fop, xmltex, dvips, gmp, readline-devel, mesaglut-devel
 Provides:       haskell
