@@ -1,7 +1,6 @@
 
-drvfail003.hs:13:5:
+drvfail003.hs:13:0:
     Variable occurs more often in a constraint than in the instance head
       in the constraint: Show (v (v a))
     (Use -fallow-undecidable-instances to permit this)
-    In the derived instance declaration
-      instance (Show (v (v a))) => Show (Square_ v w a)
+    In the derived instance: (Show (v (v a))) => Show (Square_ v w a)

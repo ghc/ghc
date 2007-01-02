@@ -1,6 +1,7 @@
 
-drvfail007.hs:4:5:
-    No instance for (Eq (Int -> Int))
-      arising from the 'deriving' clause of a data type declaration at drvfail007.hs:4:5
-    Possible fix: add an instance declaration for (Eq (Int -> Int))
-    When deriving the instance for `Eq Foo'
+drvfail007.hs:4:0:
+    Non type-variable argument in the constraint: Eq (Int -> Int)
+    (Use -fglasgow-exts to permit this)
+    In the context: (Eq (Int -> Int))
+    While checking the context of an instance declaration
+    In the derived instance: (Eq (Int -> Int)) => Eq Foo

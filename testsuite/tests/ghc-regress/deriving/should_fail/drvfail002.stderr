@@ -5,8 +5,8 @@ drvfail002.hs:15:0:
 	must be reachable from the type after the '=>'
     In the instance declaration for `Show T'
 
-drvfail002.hs:18:5:
+drvfail002.hs:18:0:
     Can't derive instances where the instance context mentions
     type variables that are not data type parameters
       Offending constraint: X T c
-    When deriving the instance for `Show S'
+    In the derived instance: (X T c) => Show S

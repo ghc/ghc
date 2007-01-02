@@ -1,5 +1,5 @@
 
-drvfail005.hs:3:5:
+drvfail005.hs:3:0:
     Can't make a derived instance of `Show a (Test a)'
       (`Show a' is not a class)
-    When deriving instances for `Test'
+    In the data type declaration for `Test'

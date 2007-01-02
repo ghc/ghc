@@ -1,12 +1,7 @@
 
-drvfail001.hs:15:5:
-    No instance for (Show (f (f a)))
-      arising from the 'deriving' clause of a data type declaration at drvfail001.hs:15:5
-    Possible fix: add an instance declaration for (Show (f (f a)))
-    When deriving the instance for `Show (SM f a)'
-
-drvfail001.hs:21:5:
-    No instance for (Show (f a))
-      arising from the 'deriving' clause of a data type declaration at drvfail001.hs:21:5
-    Possible fix: add an instance declaration for (Show (f a))
-    When deriving the instance for `Show (Cons f a)'
+drvfail001.hs:21:0:
+    Non type-variable argument in the constraint: Show (f a)
+    (Use -fglasgow-exts to permit this)
+    In the context: (Show (f a), Show a)
+    While checking the context of an instance declaration
+    In the derived instance: (Show (f a), Show a) => Show (Cons f a)
