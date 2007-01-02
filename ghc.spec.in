@@ -82,7 +82,7 @@ needed.
 
 %build
 test -f configure || autoreconf
-./configure --prefix=%{_prefix}
+./configure --prefix=%{_prefix} --mandir=%{_mandir}
 make
 make html
 make -C docs/ext-core ps
@@ -90,7 +90,7 @@ make -C docs/storage-mgt ps
 
 %install
 make prefix=${RPM_BUILD_ROOT}%{_prefix} install
-make datadir=`pwd` install-docs
+make datadir=`pwd` mandir=${RPM_BUILD_ROOT}%{_mandir} install-docs
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
 # only
@@ -128,6 +128,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc docs/users_guide/users_guide
 %doc html/*
 %doc libraries/Cabal/doc/Cabal
+%{_mandir}/man1/ghc.1*
 %{_prefix}/bin/ghc
 %{_prefix}/bin/ghc-%{version}
 %{_prefix}/bin/ghc-pkg
