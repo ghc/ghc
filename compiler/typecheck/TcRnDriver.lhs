@@ -396,15 +396,16 @@ tc_rn_src_decls boot_details ds
 
 	-- Deal with decls up to, but not including, the first splice
 	(tcg_env, rn_decls) <- checkNoErrs $ rnTopSrcDecls first_group ;
-		-- checkNoErrs: don't typecheck if renaming failed
-	tc_envs <- setGblEnv tcg_env $ 
-		   tcTopSrcDecls boot_details rn_decls ;
+		-- checkNoErrs: stop if renaming fails
+
+	(tcg_env, tcl_env) <- setGblEnv tcg_env $ 
+			      tcTopSrcDecls boot_details rn_decls ;
 
 	-- If there is no splice, we're nearly done
-	setEnvs tc_envs $ 
+	setEnvs (tcg_env, tcl_env) $ 
 	case group_tail of {
 	   Nothing -> do { tcg_env <- checkMain ;	-- Check for `main'
-			   return (tcg_env, snd tc_envs) 
+			   return (tcg_env, tcl_env) 
 		      } ;
 
 	-- If there's a splice, we must carry on
