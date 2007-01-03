@@ -186,6 +186,7 @@ data HsExpr id
 		
   -----------------------------------------------------------
   -- MetaHaskell Extensions
+
   | HsBracket    (HsBracket id)
 
   | HsBracketOut (HsBracket Name)	-- Output of the type checker is the *original*
@@ -200,22 +201,6 @@ data HsExpr id
   | HsProc	(LPat id)		-- arrow abstraction, proc
 		(LHsCmdTop id)		-- body of the abstraction
 					-- always has an empty stack
-
-  ---------------------------------------
-  -- Hpc Support
-
-  | HsTick 
-     Int				-- module-local tick number
-     (LHsExpr id)			-- sub-expression
-
-  | HsBinTick
-     Int				-- module-local tick number for True
-     Int				-- module-local tick number for False
-     (LHsExpr id)			-- sub-expression
-
-  | HsTickPragma			-- A pragma introduced tick
-     (FastString,(Int,Int),(Int,Int))   -- external span for this tick    
-     (LHsExpr id)     
 
   ---------------------------------------
   -- The following are commands, not expressions proper
@@ -236,13 +221,28 @@ data HsExpr id
 	(Maybe Fixity)	-- fixity (filled in by the renamer), for forms that
 			-- were converted from OpApp's by the renamer
 	[LHsCmdTop id]	-- argument commands
-\end{code}
 
 
-These constructors only appear temporarily in the parser.
-The renamer translates them into the Right Thing.
+  ---------------------------------------
+  -- Haskell program coverage (Hpc) Support
 
-\begin{code}
+  | HsTick 
+     Int				-- module-local tick number
+     (LHsExpr id)			-- sub-expression
+
+  | HsBinTick
+     Int				-- module-local tick number for True
+     Int				-- module-local tick number for False
+     (LHsExpr id)			-- sub-expression
+
+  | HsTickPragma			-- A pragma introduced tick
+     (FastString,(Int,Int),(Int,Int))   -- external span for this tick    
+     (LHsExpr id)     
+
+  ---------------------------------------
+  -- These constructors only appear temporarily in the parser.
+  -- The renamer translates them into the Right Thing.
+
   | EWildPat			-- wildcard
 
   | EAsPat	(Located id)	-- as pattern
@@ -251,11 +251,10 @@ The renamer translates them into the Right Thing.
   | ELazyPat	(LHsExpr id) -- ~ pattern
 
   | HsType      (LHsType id)     -- Explicit type argument; e.g  f {| Int |} x y
-\end{code}
 
-Everything from here on appears only in typechecker output.
+  ---------------------------------------
+  -- Finally, HsWrap appears only in typechecker output
 
-\begin{code}
   |  HsWrap	HsWrapper 	-- TRANSLATION
 		(HsExpr id)
 
