@@ -274,11 +274,11 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
     checkValidAndMissingATs clas inst_tys ats
       = do { -- Issue a warning for each class AT that is not defined in this
 	     -- instance.
-	   ; let classDefATs = listToNameSet . map tyConName . classATs $ clas
-                 definedATs  = listToNameSet . map (tcdName.unLoc.fst)  $ ats
-		 omitted     = classDefATs `minusNameSet` definedATs
+	   ; let class_ats   = map tyConName (classATs clas)
+                 defined_ats = listToNameSet . map (tcdName.unLoc.fst)  $ ats
+		 omitted     = filterOut (`elemNameSet` defined_ats) class_ats
 	   ; warn <- doptM Opt_WarnMissingMethods
-	   ; mapM_ (warnTc warn . omittedATWarn) (nameSetToList omitted)
+	   ; mapM_ (warnTc warn . omittedATWarn) omitted
 	   
 	     -- Ensure that all AT indexes that correspond to class parameters
 	     -- coincide with the types in the instance head.  All remaining
