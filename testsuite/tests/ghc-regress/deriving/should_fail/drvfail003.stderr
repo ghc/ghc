@@ -1,6 +1,6 @@
 
 drvfail003.hs:13:0:
-    Variable occurs more often in a constraint than in the instance head
-      in the constraint: Show (v (v a))
-    (Use -fallow-undecidable-instances to permit this)
-    In the derived instance: (Show (v (v a))) => Show (Square_ v w a)
+    No instance for (Show (v (v a)))
+      arising from the 'deriving' clause of a data type declaration
+		   at drvfail003.hs:(13,0)-(16,58)
+    Possible fix: add an instance declaration for (Show (v (v a)))

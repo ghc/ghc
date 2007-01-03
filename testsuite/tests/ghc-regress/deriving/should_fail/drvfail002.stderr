@@ -6,7 +6,7 @@ drvfail002.hs:15:0:
     In the instance declaration for `Show T'
 
 drvfail002.hs:18:0:
-    Can't derive instances where the instance context mentions
-    type variables that are not data type parameters
-      Offending constraint: X T c
-    In the derived instance: (X T c) => Show S
+    No instance for (X T c)
+      arising from the 'deriving' clause of a data type declaration
+		   at drvfail002.hs:18:0-25
+    Possible fix: add an instance declaration for (X T c)

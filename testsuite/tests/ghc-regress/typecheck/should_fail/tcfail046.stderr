@@ -1,14 +1,12 @@
 
-tcfail046.hs:9:6:
+tcfail046.hs:9:0:
     No instance for (Eq (Process a))
       arising from the 'deriving' clause of a data type declaration
-      at tcfail046.hs:9:6
+		   at tcfail046.hs:9:0-48
     Possible fix: add an instance declaration for (Eq (Process a))
-    When deriving the instance for `Eq (Continuation a)'
 
-tcfail046.hs:17:5:
+tcfail046.hs:17:0:
     No instance for (Eq (Process a))
       arising from the 'deriving' clause of a data type declaration
-      at tcfail046.hs:17:5
+		   at tcfail046.hs:(17,0)-(21,13)
     Possible fix: add an instance declaration for (Eq (Process a))
-    When deriving the instance for `Eq (Message a)'

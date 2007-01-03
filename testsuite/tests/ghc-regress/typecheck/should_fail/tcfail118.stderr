@@ -1,9 +1,8 @@
 
-tcfail118.hs:10:5:
+tcfail118.hs:10:0:
     Overlapping instances for Eq Foo
       arising from the 'deriving' clause of a data type declaration
-      at tcfail118.hs:10:5
+		   at tcfail118.hs:10:0-29
     Matching instances:
       instance Eq Foo -- Defined at tcfail118.hs:11:5
       instance Eq Foo -- Defined at tcfail118.hs:13:0
-    When deriving the instance for `Eq Bar'
