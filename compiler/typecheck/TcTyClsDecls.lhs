@@ -24,6 +24,7 @@ import TcClassDcl
 import TcHsType
 import TcMType
 import TcType
+import FunDeps
 import Type
 import Generics
 import Class
@@ -1043,8 +1044,13 @@ checkValidClass cls
 	; checkValidType (FunSigCtxt op_name) tau
 
 		-- Check that the type mentions at least one of
-		-- the class type variables
-	; checkTc (any (`elemVarSet` tyVarsOfType tau) tyvars)
+		-- the class type variables...or at least one reachable
+		-- from one of the class variables.  Example: tc223
+		--   class Error e => Game b mv e | b -> mv e where
+		--      newBoard :: MonadState b m => m ()
+		-- Here, MonadState has a fundep m->b, so newBoard is fine
+	; let grown_tyvars = grow theta (mkVarSet tyvars)
+	; checkTc (tyVarsOfType tau `intersectsVarSet` grown_tyvars)
 	          (noClassTyVarErr cls sel_id)
 
 		-- Check that for a generic method, the type of 
