@@ -128,34 +128,43 @@ topLevel = 0
 
 \begin{code}
 data LibCaseEnv
-  = LibCaseEnv
-	Int			-- Bomb-out size for deciding if
+  = LibCaseEnv {
+	lc_size :: Int,		-- Bomb-out size for deciding if
 				-- potential liberatees are too big.
 				-- (passed in from cmd-line args)
 
-	LibCaseLevel		-- Current level
+	lc_lvl :: LibCaseLevel,	-- Current level
 
-	(IdEnv LibCaseLevel)	-- Binds all non-top-level in-scope Ids
-				-- (top-level and imported things have
-				-- a level of zero)
+	lc_lvl_env :: IdEnv LibCaseLevel,  
+			-- Binds all non-top-level in-scope Ids
+			-- (top-level and imported things have
+			-- a level of zero)
 
-	(IdEnv CoreBind)	-- Binds *only* recursively defined
-				-- Ids, to their own binding group,
-				-- and *only* in their own RHSs
+	lc_rec_env :: IdEnv CoreBind, 
+			-- Binds *only* recursively defined ids, 
+			-- to their own binding group,
+			-- and *only* in their own RHSs
 
-	[(Id,LibCaseLevel)]     -- Each of these Ids was scrutinised by an
-				-- enclosing case expression, with the
-				-- specified number of enclosing
-				-- recursive bindings; furthermore,
-				-- the Id is bound at a lower level
-				-- than the case expression.  The
-				-- order is insignificant; it's a bag
-				-- really
+	lc_scruts :: [(Id,LibCaseLevel)]
+     			-- Each of these Ids was scrutinised by an
+			-- enclosing case expression, with the
+			-- specified number of enclosing
+			-- recursive bindings; furthermore,
+			-- the Id is bound at a lower level
+			-- than the case expression.  The order is
+			-- insignificant; it's a bag really
+
+--	lc_fams :: FamInstEnvs
+			-- Instance env for indexed data types 
+	}
 
 initEnv :: Int -> LibCaseEnv
-initEnv bomb_size = LibCaseEnv bomb_size 0 emptyVarEnv emptyVarEnv []
+initEnv bomb_size
+  = LibCaseEnv { lc_size = bomb_size, lc_lvl = 0,
+		 lc_lvl_env = emptyVarEnv, lc_rec_env = emptyVarEnv,
+		 lc_scruts = [] }
 
-bombOutSize (LibCaseEnv bomb_size _ _ _ _) = bomb_size
+bombOutSize = lc_size
 \end{code}
 
 
@@ -278,14 +287,15 @@ Utility functions
 ~~~~~~~~~~~~~~~~~
 \begin{code}
 addBinders :: LibCaseEnv -> [CoreBndr] -> LibCaseEnv
-addBinders (LibCaseEnv bomb lvl lvl_env rec_env scruts) binders
-  = LibCaseEnv bomb lvl lvl_env' rec_env scruts
+addBinders env@(LibCaseEnv { lc_lvl = lvl, lc_lvl_env = lvl_env }) binders
+  = env { lc_lvl_env = lvl_env' }
   where
     lvl_env' = extendVarEnvList lvl_env (binders `zip` repeat lvl)
 
 addRecBinds :: LibCaseEnv -> [(Id,CoreExpr)] -> LibCaseEnv
-addRecBinds (LibCaseEnv bomb lvl lvl_env rec_env scruts) pairs
-  = LibCaseEnv bomb lvl' lvl_env' rec_env' scruts
+addRecBinds env@(LibCaseEnv {lc_lvl = lvl, lc_lvl_env = lvl_env, 
+			     lc_rec_env = rec_env}) pairs
+  = env { lc_lvl = lvl', lc_lvl_env = lvl_env', lc_rec_env = rec_env' }
   where
     lvl'     = lvl + 1
     lvl_env' = extendVarEnvList lvl_env [(binder,lvl) | (binder,_) <- pairs]
@@ -295,9 +305,10 @@ addScrutedVar :: LibCaseEnv
 	      -> Id		-- This Id is being scrutinised by a case expression
 	      -> LibCaseEnv
 
-addScrutedVar env@(LibCaseEnv bomb lvl lvl_env rec_env scruts) scrut_var
+addScrutedVar env@(LibCaseEnv { lc_lvl = lvl, lc_lvl_env = lvl_env, 
+				lc_scruts = scruts }) scrut_var
   | bind_lvl < lvl
-  = LibCaseEnv bomb lvl lvl_env rec_env scruts'
+  = env { lc_scruts = scruts' }
 	-- Add to scruts iff the scrut_var is being scrutinised at
 	-- a deeper level than its defn
 
@@ -309,19 +320,18 @@ addScrutedVar env@(LibCaseEnv bomb lvl lvl_env rec_env scruts) scrut_var
 		 Nothing  -> topLevel
 
 lookupRecId :: LibCaseEnv -> Id -> Maybe CoreBind
-lookupRecId (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
-  = lookupVarEnv rec_env id
+lookupRecId env id = lookupVarEnv (lc_rec_env env) id
 
 lookupLevel :: LibCaseEnv -> Id -> LibCaseLevel
-lookupLevel (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
-  = case lookupVarEnv lvl_env id of
-      Just lvl -> lvl
+lookupLevel env id
+  = case lookupVarEnv (lc_lvl_env env) id of
+      Just lvl -> lc_lvl env
       Nothing  -> topLevel
 
 freeScruts :: LibCaseEnv
 	   -> LibCaseLevel 	-- Level of the recursive Id
 	   -> [Id]		-- Ids that are scrutinised between the binding
 				-- of the recursive Id and here
-freeScruts (LibCaseEnv bomb lvl lvl_env rec_env scruts) rec_bind_lvl
-  = [v | (v,scrut_lvl) <- scruts, scrut_lvl > rec_bind_lvl]
+freeScruts env rec_bind_lvl
+  = [v | (v,scrut_lvl) <- lc_scruts env, scrut_lvl > rec_bind_lvl]
 \end{code}
