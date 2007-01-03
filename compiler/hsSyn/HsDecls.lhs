@@ -390,10 +390,11 @@ data TyClDecl name
 			-- Nothing for everything else
 
 		tcdKindSig:: Maybe Kind,		-- Optional kind sig 
-			-- (Just k) for 
-			--	(a) GADT-style data type decls with user kind sig
-			--	(b) 'data instance' decls with user kind sig	
-			--	(c) 'data family' decls, whether or not there is a kind sig
+			-- (Just k) for a
+			--	(a) GADT-style 'data', or 'data instance' decl 
+			--		with explicit kind sig
+			--	(b) 'data family' decl, whether or not 
+			--		there is an explicit kind sig
 			--		(this is how we distinguish a data family decl)
 
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
@@ -409,8 +410,11 @@ data TyClDecl name
 			-- are non-empty for the newtype-deriving case
     }
 	-- data family:   tcdPats = Nothing, tcdCons = [], tcdKindSig = Just k
+	--
 	-- data instance: tcdPats = Just tys
-	-- data:	  tcdPats = Nothing, tcdCons is non-empty
+	--
+	-- data:	  tcdPats = Nothing, 
+	--		  tcdCons is non-empty *or* tcdKindSig = Nothing
 
   | TyFunction {tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
