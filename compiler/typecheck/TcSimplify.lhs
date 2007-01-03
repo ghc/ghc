@@ -2359,14 +2359,18 @@ tcSimplifyDeriv orig tyvars theta
 	; wanteds <- newDictBndrsO orig (substTheta tenv theta)
 	; (irreds, _) <- topCheckLoop doc wanteds
 
-	; let (dicts, non_dicts) = partition isDict irreds
-				 	-- Exclude implication consraints
-	; addNoInstanceErrs non_dicts	-- I'm not sure if these can really happen
+	-- Insist that the context of a derived instance declaration
+	-- consists of constraints of form (C a b), where a,b are
+	-- type variables
+	-- NB: the caller will further check the tv_dicts for
+	--     legal instance-declaration form
+	; let (tv_dicts, non_tv_dicts) = partition isTyVarDict irreds
+	; addNoInstanceErrs non_tv_dicts
 
 	; let rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
-	      simpl_theta = substTheta rev_env (map dictPred dicts)
-		-- This reverse-mapping is a Royal Pain, 
-		-- but the result should mention TyVars not TcTyVars
+	      simpl_theta = substTheta rev_env (map dictPred tv_dicts)
+		-- This reverse-mapping is a pain, but the result
+		-- should mention the original TyVars not TcTyVars
 
 	; return simpl_theta }
   where
