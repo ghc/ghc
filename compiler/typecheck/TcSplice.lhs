@@ -91,6 +91,18 @@ tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
 %*									*
 %************************************************************************
 
+Note [Handling brackets]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Source:		f = [| Just $(g 3) |]
+  The [| |] part is a HsBracket
+
+Typechecked:	f = [| Just ${s7}(g 3) |]{s7 = g Int 3}
+  The [| |] part is a HsBracketOut, containing *renamed* (not typechecked) expression
+  The "s7" is the "splice point"; the (g Int 3) part is a typechecked expression
+
+Desugared:	f = do { s7 <- g Int 3
+		       ; return (ConE "Data.Maybe.Just" s7) }
+
 \begin{code}
 tcBracket :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr TcId)
 tcBracket brack res_ty
