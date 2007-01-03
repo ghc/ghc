@@ -267,19 +267,23 @@ visibleDataCons (NewTyCon{ data_con = c })    = [c]
 -- structure (ie, the class or family from which they derive) using a type of
 -- the following form.
 --
-data AlgTyConParent = -- An ordinary type constructor has no parent.
-		      NoParentTyCon
+data AlgTyConParent 
+  = NoParentTyCon	-- An ordinary type constructor has no parent.
 
-		      -- Type constructors representing a class dictionary.
-		    | ClassTyCon    Class	
+  | ClassTyCon      	-- Type constructors representing a class dictionary.
+	Class	
 
-		      -- Type constructors representing an instances of a type
-		      -- family.
-		    | FamilyTyCon   TyCon	-- the type family
-				    [Type]	-- instance types
-				    TyCon	-- a *coercion* identifying
-						-- the representation type
-						-- with the type instance
+  | FamilyTyCon		-- Type constructors representing an instance of a type
+	TyCon		--   The type family
+	[Type]		--   Instance types
+	TyCon		--   A CoercionTyCon identifying the representation 
+			--     type with the type instance family.  
+			--	c.f. Note [Newtype coercions]
+	-- E.g.  data intance T [a] = ...
+	-- gives a representation tycon:
+	--	data T77 a = ...
+	-- 	axiom co a :: T [a] ~ T77 a
+	-- with T77's algTcParent = FamilyTyCon T [a] co
 
 data SynTyConRhs
   = OpenSynTyCon Kind	-- Type family: *result* kind given
@@ -316,7 +320,7 @@ and then when we used CoT at a particular type, s, we'd say
 	CoT @ s
 which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
 
-But in GHC we instead make CoT into a new piece of type syntax
+But in GHC we instead make CoT into a new piece of type syntax, CoercionTyCon,
 (like instCoercionTyCon, symCoercionTyCon etc), which must always
 be saturated, but which encodes as
 	TyConApp CoT [s]
