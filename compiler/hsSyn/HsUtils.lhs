@@ -445,7 +445,6 @@ getMainDeclBinder (ValD d)
         (name:_) -> Just (unLoc name)
 getMainDeclBinder (SigD d) = sigNameNoLoc d
 getMainDeclBinder (ForD (ForeignImport name _ _)) = Just (unLoc name)
-getMainDeclBinder (ForD (ForeignExport name _ _)) = Just (unLoc name)
+getMainDeclBinder (ForD (ForeignExport name _ _)) = Nothing
 getMainDeclBinder _ = Nothing
-
 \end{code}
