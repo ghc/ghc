@@ -10,7 +10,8 @@ module FamInstEnv (
 	pprFamInst, pprFamInstHdr, pprFamInsts, 
 	famInstHead, mkLocalFamInst, mkImportedFamInst,
 
-	FamInstEnv, emptyFamInstEnv, extendFamInstEnv, extendFamInstEnvList, 
+	FamInstEnvs, FamInstEnv, emptyFamInstEnv, 
+	extendFamInstEnv, extendFamInstEnvList, 
 	famInstEnvElts, familyInstances,
 
 	lookupFamInstEnv, lookupFamInstEnvUnify
@@ -142,6 +143,9 @@ InstEnv maps a family name to the list of known instances for that family.
 \begin{code}
 type FamInstEnv = UniqFM FamilyInstEnv	-- Maps a family to its instances
 
+type FamInstEnvs = (FamInstEnv, FamInstEnv)
+ 	-- External package inst-env, Home-package inst-env
+
 data FamilyInstEnv
   = FamIE [FamInst]	-- The instances for a particular family, in any order
   	  Bool 		-- True <=> there is an instance of form T a b c
@@ -236,8 +240,7 @@ families), and then, it doesn't matter which match we choose (as the
 instances are guaranteed confluent).
 
 \begin{code}
-lookupFamInstEnv :: (FamInstEnv 	-- External package inst-env
-		    ,FamInstEnv) 	-- Home-package inst-env
+lookupFamInstEnv :: FamInstEnvs
 	         -> TyCon -> [Type]		-- What we are looking for
 	         -> [(TvSubst, FamInst)] 	-- Successful matches
 lookupFamInstEnv (pkg_ie, home_ie) fam tys
