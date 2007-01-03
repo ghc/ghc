@@ -4,3 +4,9 @@ tcfail157.hs:27:0:
       in the constraint: E m a b
     (Use -fallow-undecidable-instances to permit this)
     In the instance declaration for `Foo m (a -> ())'
+
+tcfail157.hs:27:0:
+    Variable occurs more often in a constraint than in the instance head
+      in the constraint: Foo m b
+    (Use -fallow-undecidable-instances to permit this)
+    In the instance declaration for `Foo m (a -> ())'

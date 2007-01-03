@@ -1,5 +1,5 @@
 
-tcfail086.hs:6:5:
+tcfail086.hs:6:0:
     Can't make a derived instance of `Eq Ex'
       (`Ex' has non-Haskell-98 constructor(s))
-    When deriving instances for `Ex'
+    In the data type declaration for `Ex'
