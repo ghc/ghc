@@ -771,8 +771,7 @@ absVarsOf dest_lvl (_, lvl_env, _, id_env) v
 			Just (abs_vars, _) -> abs_vars
 			Nothing	           -> [v]
 
-    add_tyvars v | isId v    = v : varSetElems (idFreeTyVars v)
-		 | otherwise = [v]
+    add_tyvars v = v : varSetElems (varTypeTyVars v)
 
 	-- We are going to lambda-abstract, so nuke any IdInfo,
 	-- and add the tyvars of the Id (if necessary)

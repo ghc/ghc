@@ -161,12 +161,14 @@ ipNamesOfInst other		    	     = []
 tyVarsOfInst :: Inst -> TcTyVarSet
 tyVarsOfInst (LitInst {tci_ty = ty})  = tyVarsOfType  ty
 tyVarsOfInst (Dict {tci_pred = pred}) = tyVarsOfPred pred
-tyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) = tyVarsOfTypes tys `unionVarSet` idFreeTyVars id
+tyVarsOfInst (Method {tci_oid = id, tci_tys = tys}) = tyVarsOfTypes tys `unionVarSet` varTypeTyVars id
 				 -- The id might have free type variables; in the case of
 				 -- locally-overloaded class methods, for example
 tyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, tci_wanted = wanteds})
-  = (tyVarsOfInsts givens `unionVarSet` tyVarsOfInsts wanteds) `minusVarSet` mkVarSet tvs
-
+  = (tyVarsOfInsts givens `unionVarSet` tyVarsOfInsts wanteds) 
+    `minusVarSet` mkVarSet tvs
+    `unionVarSet` unionVarSets (map varTypeTyVars tvs)
+		-- Remember the free tyvars of a coercion
 
 tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
 tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)

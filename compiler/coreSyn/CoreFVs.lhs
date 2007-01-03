@@ -13,7 +13,7 @@ module CoreFVs (
 	exprSomeFreeVars, exprsSomeFreeVars,
 	exprFreeNames, exprsFreeNames,
 
-	idRuleVars, idFreeVars, idFreeTyVars, 
+	idRuleVars, idFreeVars, varTypeTyVars, 
 	ruleRhsFreeVars, rulesRhsFreeVars,
 	ruleLhsFreeNames, ruleLhsFreeIds, 
 
@@ -138,10 +138,10 @@ keep_it fv_cand in_scope var
 
 addBndr :: CoreBndr -> FV -> FV
 addBndr bndr fv fv_cand in_scope
-  | isId bndr = inside_fvs `unionVarSet` someVars (idFreeTyVars bndr) fv_cand in_scope
-  | otherwise = inside_fvs
-  where
-    inside_fvs = fv fv_cand (in_scope `extendVarSet` bndr) 
+  = someVars (varTypeTyVars bndr) fv_cand in_scope
+	-- Include type varibles in the binder's type
+	-- 	(not just Ids; coercion variables too!)
+    `unionVarSet`  fv fv_cand (in_scope `extendVarSet` bndr) 
 
 addBndrs :: [CoreBndr] -> FV -> FV
 addBndrs bndrs fv = foldr addBndr fv bndrs
@@ -318,18 +318,18 @@ delBinderFV :: Var -> VarSet -> VarSet
 --			  where
 --			    bottom = bottom -- Never evaluated
 
-delBinderFV b s | isId b    = (s `delVarSet` b) `unionFVs` idFreeVars b
-	        | otherwise = s `delVarSet` b
+delBinderFV b s = (s `delVarSet` b) `unionFVs` varTypeTyVars b
+	-- Include coercion variables too!
+
+varTypeTyVars :: Var -> TyVarSet
+-- Find the type variables free in the type of the variable
+-- Remember, coercion variables can mention type variables...
+varTypeTyVars var
+  | isLocalId var || isCoVar var = tyVarsOfType (idType var)
+  | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
 
 idFreeVars :: Id -> VarSet
-idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` idFreeTyVars id
-
-idFreeTyVars :: Id -> TyVarSet
--- Only local Ids conjured up locally, can have free type variables.
--- (During type checking top-level Ids can have free tyvars)
-idFreeTyVars id = tyVarsOfType (idType id)
---  | isLocalId id = tyVarsOfType (idType id)
---  | otherwise    = emptyVarSet
+idFreeVars id = ASSERT( isId id) idRuleVars id `unionVarSet` varTypeTyVars id
 
 idRuleVars ::Id -> VarSet
 idRuleVars id = ASSERT( isId id) specInfoFreeVars (idSpecialisation id)
@@ -369,7 +369,6 @@ freeVars (App fun arg)
     arg2 = freeVars arg
 
 freeVars (Case scrut bndr ty alts)
--- gaw 2004
   = ((bndr `delBinderFV` alts_fvs) `unionFVs` freeVarsOf scrut2 `unionFVs` tyVarsOfType ty,
      AnnCase scrut2 bndr ty alts2)
   where
@@ -384,7 +383,8 @@ freeVars (Case scrut bndr ty alts)
 			     rhs2 = freeVars rhs
 
 freeVars (Let (NonRec binder rhs) body)
-  = (freeVarsOf rhs2 `unionFVs` body_fvs,
+  = (freeVarsOf rhs2 `unionFVs` body_fvs `unionFVs` idRuleVars binder,
+		-- Remember any rules; cf rhs_fvs above
      AnnLet (AnnNonRec binder rhs2) body2)
   where
     rhs2     = freeVars rhs
@@ -392,16 +392,16 @@ freeVars (Let (NonRec binder rhs) body)
     body_fvs = binder `delBinderFV` freeVarsOf body2
 
 freeVars (Let (Rec binds) body)
-  = (foldl delVarSet group_fvs binders,
-	-- The "delBinderFV" part may have added one of the binders
-	-- via the idSpecVars part, so we must delete it again
+  = (delBindersFV binders all_fvs,
      AnnLet (AnnRec (binders `zip` rhss2)) body2)
   where
     (binders, rhss) = unzip binds
 
     rhss2     = map freeVars rhss
-    all_fvs   = foldr (unionFVs . fst) body_fvs rhss2
-    group_fvs = delBindersFV binders all_fvs
+    rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
+    all_fvs      = foldr (unionFVs . idRuleVars) rhs_body_fvs binders
+	-- The "delBinderFV" happens after adding the idSpecVars,
+	-- since the latter may add some of the binders as fvs
 
     body2     = freeVars body
     body_fvs  = freeVarsOf body2

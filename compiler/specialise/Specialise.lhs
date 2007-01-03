@@ -23,7 +23,7 @@ import VarSet
 import VarEnv
 import CoreSyn
 import CoreUtils	( applyTypeToArgs, mkPiTypes )
-import CoreFVs		( exprFreeVars, exprsFreeVars, idRuleVars )
+import CoreFVs		( exprFreeVars, exprsFreeVars, idFreeVars )
 import CoreTidy		( tidyRules )
 import CoreLint		( showPass, endPass )
 import Rules		( addIdSpecialisations, mkLocalRule, lookupRule, emptyRuleBase, rulesOfBinds )
@@ -1072,10 +1072,12 @@ bind_fvs (Rec prs)	   = foldl delVarSet rhs_fvs bndrs
 			     bndrs = map fst prs
 			     rhs_fvs = unionVarSets (map pair_fvs prs)
 
-pair_fvs (bndr, rhs) = exprFreeVars rhs `unionVarSet` idRuleVars bndr
+pair_fvs (bndr, rhs) = exprFreeVars rhs `unionVarSet` idFreeVars bndr
 	-- Don't forget variables mentioned in the
 	-- rules of the bndr.  C.f. OccAnal.addRuleUsage
-
+	-- Also tyvars mentioned in its type; they may not appear in the RHS
+	--	type T a = Int
+	--	x :: T a = 3
 
 addDictBind (dict,rhs) uds = uds { dict_binds = mkDB (NonRec dict rhs) `consBag` dict_binds uds }
 

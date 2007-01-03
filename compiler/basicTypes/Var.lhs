@@ -7,7 +7,7 @@
 \begin{code}
 module Var (
 	Var, 
-	varName, varUnique, 
+	varName, varUnique, varType,
 	setVarName, setVarUnique, 
 
 	-- TyVars
@@ -71,7 +71,7 @@ data Var
 	realUnique :: FastInt,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
-	tyVarKind :: Kind,
+	varType       :: Kind,
         isCoercionVar :: Bool
  }
 
@@ -80,14 +80,14 @@ data Var
 					-- inference, as well
 	varName        :: !Name,
 	realUnique     :: FastInt,
-	tyVarKind      :: Kind,
+	varType        :: Kind,
 	tcTyVarDetails :: TcTyVarDetails }
 
   | GlobalId { 			-- Used for imported Ids, dict selectors etc
  				-- See Note [GlobalId/LocalId] below
 	varName    :: !Name,	-- Always an External or WiredIn Name
 	realUnique :: FastInt,
-   	idType     :: Type,
+   	varType    :: Type,
 	idInfo_    :: IdInfo,
 	gblDetails :: GlobalIdDetails }
 
@@ -95,7 +95,7 @@ data Var
 				-- See Note [GlobalId/LocalId] below
 	varName    :: !Name,
 	realUnique :: FastInt,
-   	idType     :: Type,
+   	varType    :: Type,
 	idInfo_    :: IdInfo,
 	lclDetails :: LocalIdDetails }
 
@@ -181,12 +181,13 @@ setVarName var new_name
 type TyVar = Var
 
 tyVarName = varName
+tyVarKind = varType
 
 setTyVarUnique = setVarUnique
 setTyVarName   = setVarName
 
 setTyVarKind :: TyVar -> Kind -> TyVar
-setTyVarKind tv k = tv {tyVarKind = k}
+setTyVarKind tv k = tv {varType = k}
 \end{code}
 
 \begin{code}
@@ -194,7 +195,7 @@ mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = ASSERT( not (isCoercionKind kind ) )
 		    TyVar { varName    = name
 			  , realUnique = getKey# (nameUnique name)
-			  , tyVarKind  = kind
+			  , varType  = kind
                           , isCoercionVar    = False
 			}
 
@@ -203,7 +204,7 @@ mkTcTyVar name kind details
   = ASSERT( not (isCoercionKind kind) )
     TcTyVar {	varName    = name,
 		realUnique = getKey# (nameUnique name),
-		tyVarKind  = kind,
+		varType  = kind,
 		tcTyVarDetails = details
 	}
 \end{code}
@@ -226,7 +227,7 @@ mkCoVar :: Name -> Kind -> CoVar
 mkCoVar name kind = ASSERT( isCoercionKind kind )
 		    TyVar { varName    = name
 			  , realUnique = getKey# (nameUnique name)
-			  , tyVarKind  = kind
+			  , varType  = kind
                           , isCoercionVar    = True
 			}
 
@@ -237,7 +238,7 @@ mkWildCoVar kind
   = ASSERT( isCoercionKind kind )
     TyVar { varName = mkSysTvName wild_uniq FSLIT("co_wild"),
             realUnique = _ILIT(1),
-            tyVarKind = kind,
+            varType = kind,
             isCoercionVar = True }
   where
     wild_uniq = mkBuiltinUnique 1
@@ -259,6 +260,7 @@ type DictId = Id
 \begin{code}
 idName    = varName
 idUnique  = varUnique
+idType    = varType
 
 setIdUnique :: Id -> Unique -> Id
 setIdUnique = setVarUnique
@@ -267,7 +269,7 @@ setIdName :: Id -> Name -> Id
 setIdName = setVarName
 
 setIdType :: Id -> Type -> Id
-setIdType id ty = id {idType = ty}
+setIdType id ty = id {varType = ty}
 
 setIdExported :: Id -> Id
 -- Can be called on GlobalIds, such as data cons and class ops,
@@ -283,7 +285,7 @@ globaliseId :: GlobalIdDetails -> Id -> Id
 -- If it's a local, make it global
 globaliseId details id = GlobalId { varName    = varName id,
 				    realUnique = realUnique id,
-			   	    idType     = idType id,
+			   	    varType    = varType id,
 				    idInfo_    = idInfo id,
 				    gblDetails = details }
 
@@ -322,7 +324,7 @@ mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId details name ty info 
   = GlobalId {	varName    = name, 
 		realUnique = getKey# (nameUnique name), 	-- Cache the unique
-		idType     = ty,	
+		varType     = ty,	
 		gblDetails = details,
 		idInfo_    = info }
 
@@ -330,7 +332,7 @@ mk_local_id :: Name -> Type -> LocalIdDetails -> IdInfo -> Id
 mk_local_id name ty details info
   = LocalId {	varName    = name, 
 		realUnique = getKey# (nameUnique name), 	-- Cache the unique
-		idType     = ty,	
+		varType     = ty,	
 		lclDetails = details,
 		idInfo_    = info }
 

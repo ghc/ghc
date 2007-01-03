@@ -924,7 +924,7 @@ sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env
   where
     bound_ids = collectPatsBinders pats
     show_ids = filter is_interesting bound_ids
-    is_interesting id = any (`elemVarSet` idFreeTyVars id) bound_tvs
+    is_interesting id = any (`elemVarSet` varTypeTyVars id) bound_tvs
 
     ppr_id id ty = ppr id <+> dcolon <+> ppr ty
 	-- Don't zonk the types so we get the separate, un-unified versions
