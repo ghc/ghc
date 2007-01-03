@@ -14,8 +14,8 @@ test('TH_repE2', normal, compile_and_run, [''])
 test('TH_repE3', normal, compile, [''])
 test('TH_repPrim', normal, compile, [''])
 test('TH_repPrimOutput', normal, compile_and_run, [''])
-test('TH_repGuard', expect_broken(1054), compile, [''])
-test('TH_repGuardOutput', expect_broken(1054), compile_and_run, [''])
+test('TH_repGuard', normal, compile, [''])
+test('TH_repGuardOutput', normal, compile_and_run, [''])
 test('TH_repPatSig', normal, compile_fail, [''])
 
 test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5', '-v0'])
@@ -57,12 +57,12 @@ test('TH_bracket3', normal, compile, [''])
 
 test('TH_class1', normal, compile, [''])
 test('TH_tuple1', normal, compile, [''])
-test('TH_genEx', expect_broken(1054), multimod_compile, ['TH_genEx', '-v0'])
+test('TH_genEx', normal, multimod_compile, ['TH_genEx', '-v0'])
 clean(['TH_genExLib.hi', 'TH_genExLib.o'])
 
 test('TH_where', normal, compile_and_run, [''])
 
-test('TH_spliceInst', expect_broken(1054), compile, [''])
+test('TH_spliceInst', normal, compile, [''])
 
 test('TH_fail', normal, compile_fail, [''])
 
