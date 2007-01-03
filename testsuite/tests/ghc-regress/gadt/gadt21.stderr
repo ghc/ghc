@@ -1,0 +1,10 @@
+
+gadt21.hs:21:59:
+    Could not deduce (Ord a2) from the context ()
+      arising from a use of `f' at gadt21.hs:21:59-61
+    Possible fix:
+      add (Ord a2) to the context of the constructor `TypeSet'
+    In the first argument of `Just', namely `(f e)'
+    In the expression: Just (f e)
+    In the definition of `withOrdDynExpr':
+	withOrdDynExpr (DynExpr (e@(Const (TypeSet _) _))) f = Just (f e)
