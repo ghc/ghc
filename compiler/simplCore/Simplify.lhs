@@ -630,12 +630,12 @@ simplExprF env e cont
   = -- pprTrace "simplExprF" (ppr e $$ ppr cont $$ ppr (seTvSubst env) $$ ppr (seIdSubst env) {- $$ ppr (seFloats env) -} ) $
     simplExprF' env e cont
     				     
-simplExprF' env (Var v)	      cont = simplVar env v cont
+simplExprF' env (Var v)	       cont = simplVar env v cont
 simplExprF' env (Lit lit)      cont = rebuild env (Lit lit) cont
 simplExprF' env (Note n expr)  cont = simplNote env n expr cont
 simplExprF' env (Cast body co) cont = simplCast env body co cont
 simplExprF' env (App fun arg)  cont = simplExprF env fun $
-				     ApplyTo NoDup arg env cont
+				      ApplyTo NoDup arg env cont
 
 simplExprF' env expr@(Lam _ _) cont 
   = simplLam env (map zap bndrs) body cont
@@ -733,12 +733,12 @@ simplCast env body co cont
   = do	{ co' <- simplType env co
 	; simplExprF env body (addCoerce co' cont) }
   where
-       addCoerce co cont 
-         | (s1, k1) <- coercionKind co
-         , s1 `coreEqType` k1 = cont
-       addCoerce co1 (CoerceIt co2 cont)
-         | (s1, k1) <- coercionKind co1
-         , (l1, t1) <- coercionKind co2
+       addCoerce co cont = add_coerce co (coercionKind co) cont
+
+       add_coerce co (s1, k1) cont 
+         | s1 `coreEqType` k1 = cont
+       add_coerce co1 (s1, k2) (CoerceIt co2 cont)
+         | (l1, t1) <- coercionKind co2
                 -- 	coerce T1 S1 (coerce S1 K1 e)
 		-- ==>
 		--	e, 			if T1=K1
@@ -751,11 +751,10 @@ simplCast env body co cont
          , s1 `coreEqType` t1  = cont		 -- The coerces cancel out  
          | otherwise           = CoerceIt (mkTransCoercion co1 co2) cont
     
-       addCoerce co (ApplyTo dup arg arg_se cont)
-         | not (isTypeArg arg)    -- This whole case only works for value args
+       add_coerce co (s1s2, t1t2) (ApplyTo dup arg arg_se cont)
+         | not (isTypeArg arg)  -- This whole case only works for value args
 	                        -- Could upgrade to have equiv thing for type apps too	
-         , Just (s1s2, t1t2) <- splitCoercionKind_maybe co
-         , isFunTy s1s2
+         , isFunTy s1s2	  -- t1t2 must be a function type, becuase it's applied
                 -- co : s1s2 :=: t1t2
 		--	(coerce (T1->T2) (S1->S2) F) E
 		-- ===> 
@@ -768,6 +767,8 @@ simplCast env body co cont
 		-- with the InExpr in the argument, so we simply substitute
 		-- to make it all consistent.  It's a bit messy.
 		-- But it isn't a common case.
+		--
+		-- Example of use: Trac #995
          = ApplyTo dup new_arg (zapSubstEnv env) (addCoerce co2 cont)
          where
            -- we split coercion t1->t2 :=: s1->s2 into t1 :=: s1 and 
@@ -777,7 +778,7 @@ simplCast env body co cont
            new_arg    = mkCoerce (mkSymCoercion co1) arg'
 	   arg'       = substExpr arg_se arg
 
-       addCoerce co cont = CoerceIt co cont
+       add_coerce co _ cont = CoerceIt co cont
 \end{code}
 
 
