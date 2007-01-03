@@ -1,5 +1,6 @@
 
-gadt13.hs:13:5:
-    Couldn't match expected type `Int' against inferred type `Bool'
-    In the pattern: B t
-    In the definition of `shw': shw (B t) = (("B " ++)) . (shows t)
+gadt13.hs:12:5:
+    GADT pattern match in non-rigid context for `I'
+      Tell GHC HQ if you'd like this to unify the context
+    In the pattern: I t
+    In the definition of `shw': shw (I t) = (("I " ++)) . (shows t)

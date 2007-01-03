@@ -1,10 +1,14 @@
 
-gadt7.hs:12:40:
-    Couldn't match expected type `Int'
-	   against inferred type `a' (a rigid variable)
-      `a' is bound by the type signature for `i1' at gadt7.hs:11:8
-      Expected type: T Int
-      Inferred type: T a
-    In the first argument of `(\ t1 y1 -> case t1 of K -> y1)', namely
-	`t'
-    In the expression: (\ t1 y1 -> case t1 of K -> y1) t y
+gadt7.hs:12:31:
+    GADT pattern match in non-rigid context for `K'
+      Tell GHC HQ if you'd like this to unify the context
+    In the pattern: K
+    In a case alternative: K -> y1
+    In the expression: case t1 of K -> y1
+
+gadt7.hs:15:32:
+    GADT pattern match in non-rigid context for `K'
+      Tell GHC HQ if you'd like this to unify the context
+    In the pattern: K
+    In a case alternative: K -> y1
+    In the expression: case t1 of K -> y1
