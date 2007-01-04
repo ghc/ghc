@@ -5899,12 +5899,6 @@ The following are good consumers:
 <listitem>
 
 <para>
- <function>length</function>
-</para>
-</listitem>
-<listitem>
-
-<para>
  <function>++</function> (on its first argument)
 </para>
 </listitem>
