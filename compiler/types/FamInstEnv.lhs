@@ -188,52 +188,6 @@ extendFamInstEnv inst_env ins_item@(FamInst {fi_fam = cls_nm, fi_tcs = mb_tcs})
 %*									*
 %************************************************************************
 
-@lookupFamInstEnvExact@ looks up in a @FamInstEnv@ using an exact match.
-This is used when we want the @TyCon@ of a particular family instance (e.g.,
-during deriving classes).
-
-\begin{code}
-{-		NOT NEEDED ANY MORE
-lookupFamInstEnvExact :: (FamInstEnv		-- External package inst-env
-		         ,FamInstEnv)		-- Home-package inst-env
-		      -> TyCon -> [Type]	-- What we are looking for
-	              -> Maybe FamInst
-lookupFamInstEnvExact (pkg_ie, home_ie) fam tys
-  = home_matches `mplus` pkg_matches
-  where
-    rough_tcs    = roughMatchTcs tys
-    all_tvs      = all isNothing rough_tcs
-    home_matches = lookup home_ie 
-    pkg_matches  = lookup pkg_ie  
-
-    --------------
-    lookup env = case lookupUFM env fam of
-		   Nothing -> Nothing		-- No instances for this class
-		   Just (FamIE insts has_tv_insts)
-		       -- Short cut for common case:
-		       --   The thing we are looking up is of form (C a
-		       --   b c), and the FamIE has no instances of
-		       --   that form, so don't bother to search 
-		     | all_tvs && not has_tv_insts -> Nothing
-		     | otherwise                   -> find insts
-
-    --------------
-    find [] = Nothing
-    find (item@(FamInst { fi_tcs = mb_tcs, fi_tys = tpl_tys }) : rest)
-	-- Fast check for no match, uses the "rough match" fields
-      | instanceCantMatch rough_tcs mb_tcs
-      = find rest
-
-        -- Proper check
-      | tcEqTypes tpl_tys tys
-      = Just item
-
-        -- No match => try next
-      | otherwise
-      = find rest
--}
-\end{code}
-
 @lookupFamInstEnv@ looks up in a @FamInstEnv@, using a one-way match.
 Multiple matches are only possible in case of type families (not data
 families), and then, it doesn't matter which match we choose (as the

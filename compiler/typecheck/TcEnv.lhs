@@ -170,10 +170,18 @@ tcLookupFamInst tycon tys
        ; eps <- getEps
        ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
        ; case lookupFamInstEnv instEnv tycon tys of
-	   [(subst,fam_inst)] -> return (rep_tc, substTyVars subst (tyConTyVars rep_tc))
+
+	   [(subst, fam_inst)] | variable_only_subst -> 
+	     return (rep_tc, substTyVars subst (tyConTyVars rep_tc))
 		where	-- NB: assumption is that (tyConTyVars rep_tc) is in 
 			--     the domain of the substitution
-		  rep_tc = famInstTyCon fam_inst 
+		  rep_tc              = famInstTyCon fam_inst
+		  subst_domain        = varEnvElts . getTvSubstEnv $ subst
+		  tvs		      = map (Type.getTyVar "tcLookupFamInst") 
+					    subst_domain
+		  variable_only_subst = all Type.isTyVarTy subst_domain &&
+					sizeVarSet (mkVarSet tvs) == length tvs
+					-- renaming may have no repetitions
 
 	   other -> famInstNotFound tycon tys other
        }
@@ -680,7 +688,7 @@ wrongThingErr expected thing name
 famInstNotFound tycon tys what
   = failWithTc (msg <+> quotes (ppr tycon <+> hsep (map pprParendType tys)))
   where
-    msg = case what of
-		[] -> ptext SLIT("No instance for")
-		xs -> ptext SLIT("More than one instance for")
+    msg = ptext $ if length what > 1 
+		  then SLIT("More than one family instance for")
+		  else SLIT("No family instance exactly matching")
 \end{code}

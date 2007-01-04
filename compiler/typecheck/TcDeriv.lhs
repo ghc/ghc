@@ -419,7 +419,7 @@ baleOut err = addErrTc err >> returnM (Nothing, Nothing)
 
 \begin{code}
 mkDataTypeEqn orig gla_exts tvs cls cls_tys tycon tc_args rep_tc rep_tc_args
-  | Just err <- checkSideConditions gla_exts cls cls_tys tycon tc_args
+  | Just err <- checkSideConditions gla_exts cls cls_tys rep_tc
   = baleOut (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) err)
 
   | otherwise 
@@ -464,15 +464,19 @@ mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args
 ------------------------------------------------------------------
 -- Check side conditions that dis-allow derivability for particular classes
 -- This is *apart* from the newtype-deriving mechanism
+--
+-- Here we get the representation tycon in case of family instances as it has
+-- the data constructors - but we need to be careful to fall back to the
+-- family tycon (with indexes) in error messages.
 
-checkSideConditions :: Bool -> Class -> [TcType] -> TyCon -> [TcType] -> Maybe SDoc
-checkSideConditions gla_exts cls cls_tys tycon tc_tys
+checkSideConditions :: Bool -> Class -> [TcType] -> TyCon -> Maybe SDoc
+checkSideConditions gla_exts cls cls_tys rep_tc
   | notNull cls_tys	
   = Just ty_args_why	-- e.g. deriving( Foo s )
   | otherwise
   = case [cond | (key,cond) <- sideConditions, key == getUnique cls] of
 	[]     -> Just (non_std_why cls)
-	[cond] -> cond (gla_exts, tycon)
+	[cond] -> cond (gla_exts, rep_tc)
 	other  -> pprPanic "checkSideConditions" (ppr cls)
   where
     ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext SLIT("is not a class")
@@ -508,48 +512,54 @@ andCond c1 c2 tc = case c1 tc of
 		     Just x  -> Just x	-- c1 fails
 
 cond_std :: Condition
-cond_std (gla_exts, tycon)
+cond_std (gla_exts, rep_tc)
   | any (not . isVanillaDataCon) data_cons = Just existential_why     
   | null data_cons		    	   = Just no_cons_why
   | otherwise      			   = Nothing
   where
-    data_cons       = tyConDataCons tycon
-    no_cons_why	    = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
-    existential_why = quotes (ppr tycon) <+> ptext SLIT("has non-Haskell-98 constructor(s)")
+    data_cons       = tyConDataCons rep_tc
+    no_cons_why	    = quotes (pprSourceTyCon rep_tc) <+> 
+		      ptext SLIT("has no data constructors")
+    existential_why = quotes (pprSourceTyCon rep_tc) <+> 
+		      ptext SLIT("has non-Haskell-98 constructor(s)")
   
 cond_isEnumeration :: Condition
-cond_isEnumeration (gla_exts, tycon)
-  | isEnumerationTyCon tycon = Nothing
-  | otherwise		     = Just why
+cond_isEnumeration (gla_exts, rep_tc)
+  | isEnumerationTyCon rep_tc = Nothing
+  | otherwise		      = Just why
   where
-    why = quotes (ppr tycon) <+> ptext SLIT("has non-nullary constructors")
+    why = quotes (pprSourceTyCon rep_tc) <+> 
+	  ptext SLIT("has non-nullary constructors")
 
 cond_isProduct :: Condition
-cond_isProduct (gla_exts, tycon)
-  | isProductTyCon tycon = Nothing
-  | otherwise	         = Just why
+cond_isProduct (gla_exts, rep_tc)
+  | isProductTyCon rep_tc = Nothing
+  | otherwise	          = Just why
   where
-    why = quotes (ppr tycon) <+> ptext SLIT("has more than one constructor")
+    why = (pprSourceTyCon rep_tc) <+> 
+	  ptext SLIT("has more than one constructor")
 
 cond_typeableOK :: Condition
 -- OK for Typeable class
 -- Currently: (a) args all of kind *
 --	      (b) 7 or fewer args
-cond_typeableOK (gla_exts, tycon)
-  | tyConArity tycon > 7	= Just too_many
-  | not (all (isSubArgTypeKind . tyVarKind) (tyConTyVars tycon)) 
+cond_typeableOK (gla_exts, rep_tc)
+  | tyConArity rep_tc > 7	= Just too_many
+  | not (all (isSubArgTypeKind . tyVarKind) (tyConTyVars rep_tc)) 
                                 = Just bad_kind
-  | isFamInstTyCon tycon	= Just fam_inst  -- no Typable for family insts
+  | isFamInstTyCon rep_tc	= Just fam_inst  -- no Typable for family insts
   | otherwise	  		= Nothing
   where
-    too_many = quotes (ppr tycon) <+> ptext SLIT("has too many arguments")
-    bad_kind = quotes (ppr tycon) <+> 
+    too_many = quotes (pprSourceTyCon rep_tc) <+> 
+	       ptext SLIT("has too many arguments")
+    bad_kind = quotes (pprSourceTyCon rep_tc) <+> 
 	       ptext SLIT("has arguments of kind other than `*'")
-    fam_inst = quotes (ppr tycon) <+> ptext SLIT("is a type family")
+    fam_inst = quotes (pprSourceTyCon rep_tc) <+> 
+	       ptext SLIT("is a type family")
 
 cond_glaExts :: Condition
-cond_glaExts (gla_exts, tycon) | gla_exts  = Nothing
-			       | otherwise = Just why
+cond_glaExts (gla_exts, _rep_tc) | gla_exts  = Nothing
+			         | otherwise = Just why
   where
     why  = ptext SLIT("You need -fglasgow-exts to derive an instance for this class")
 

@@ -55,7 +55,7 @@ module Type (
 
 	-- Source types
 	predTypeRep, mkPredTy, mkPredTys,
-	tyConOrigHead,
+	tyConOrigHead, pprSourceTyCon,
 
 	-- Newtypes
 	splitRecNewType_maybe, newTyConInstRhs,
@@ -609,6 +609,13 @@ tyConOrigHead :: TyCon -> (TyCon, [Type])
 tyConOrigHead tycon = case tyConFamInst_maybe tycon of
 		        Nothing      -> (tycon, mkTyVarTys (tyConTyVars tycon))
 			Just famInst -> famInst
+
+-- Pretty prints a tycon, using the family instance in case of a
+-- representation tycon.
+pprSourceTyCon tycon | Just (repTyCon, tys) <- tyConFamInst_maybe tycon =
+  ppr $ repTyCon `TyConApp` tys	       -- can't be FunTyCon
+                     | otherwise                                        =
+  ppr tycon
 \end{code}
 
 
