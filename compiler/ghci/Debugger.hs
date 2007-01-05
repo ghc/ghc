@@ -511,7 +511,7 @@ getSiteCoords bt a site
 
 -- addModule is dumb and inefficient, but it does the job
 --addModule fn siteCoords _ | trace ("addModule: " ++ moduleString (unsafeCoerce# fn) ++ " - " ++ show siteCoords) False = undefined
-addModule a [] bt = bt
+addModule a [] bt = bt {sites = Map.insert a [] (sites bt)}
 addModule a siteCoords bt 
    | nrows        <- maximum$ [i | (_,(i,j)) <- siteCoords ]
    , sitesByRow   <- [ [(s,c) | (s,(r,c)) <- siteCoords, r==i] 
