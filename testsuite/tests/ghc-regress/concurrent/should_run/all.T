@@ -145,3 +145,5 @@ test('conc060', normal, compile_and_run, ['-package stm'])
 test('conc061', normal, compile_and_run, ['-package stm'])
 test('conc062', normal, compile_and_run, ['-package stm'])
 test('conc063', exit_code(1), compile_and_run, ['-package stm'])
+
+test('conc064', normal, compile_and_run, [''])
