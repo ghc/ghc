@@ -115,7 +115,7 @@ parseGHCFlags :: DynFlags -> [String] -> IO (DynFlags, [String])
 parseGHCFlags dynflags args = case args of
   [] -> return (dynflags, args)
   ("-g":rest) -> worker rest 
-  ("--ghc-flag":rest) -> worker rest
+  (('-':'-':'g':'h':'c':'-':'f':'l':'a':'g':'=':str):rest) -> worker (str:rest)
   (x:xs) -> do 
     (flags, rest) <- parseGHCFlags dynflags xs
     return (flags, x:rest)
