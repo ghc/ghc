@@ -19,7 +19,7 @@ test('gadt14', normal, compile, [''])
 test('gadt15', normal, compile, [''])
 test('gadt16', normal, compile, [''])
 
-test('gadt17', normal, run_command_ignore_output, ['$MAKE gadt17'])
+test('gadt17', ignore_output, run_command, ['$MAKE gadt17'])
 clean(['Gadt17_help.hi', 'Gadt17_help.o'])
 
 test('gadt18', normal, compile, [''])

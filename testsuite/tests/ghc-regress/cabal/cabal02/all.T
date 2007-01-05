@@ -1,1 +1,1 @@
-test('cabal02', skip_if_fast, run_command_ignore_output, ['$MAKE cabal02'])
+test('cabal02', compose(ignore_output, skip_if_fast), run_command, ['$MAKE cabal02'])

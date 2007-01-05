@@ -124,6 +124,9 @@ class TestOptions:
        # the stdin file that this test will use (empty for <name>.stdin)
        self.stdin = ''
 
+       # don't compare output
+       self.ignore_output = 0
+
        # compile this test to .hc only
        self.compile_to_hc = 0
 

@@ -183,7 +183,7 @@ test('tc171', normal, compile, [''])
 test('tc172', normal, compile, [''])
 
 # The point about this test is that it compiles Tc173a and Tc173b *separately*
-test('tc173', normal, run_command_ignore_output, ['$MAKE tc173'])
+test('tc173', ignore_output, run_command, ['$MAKE tc173'])
 clean(['Tc173a.hi', 'Tc173a.o', 'Tc173b.hi', 'Tc173b.o'])
 
 test('tc174', only_compiler_types(['ghc']), compile, [''])

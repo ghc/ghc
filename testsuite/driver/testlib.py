@@ -77,6 +77,9 @@ def expect_broken( bug ):
 def _expect_broken( opts, bug ):
     opts.expect = 'fail';
 
+def ignore_output( opts ):
+    opts.ignore_output = 1
+
 # -----
 
 def expect_fail_for( ways ):
@@ -361,7 +364,7 @@ def do_test(name, way, func, args):
         
         if getTestOpts().expect != 'pass' and getTestOpts().expect != 'fail' or \
            result != 'pass' and result != 'fail':
-            framework_fail(full_name)
+            framework_fail(name, way)
 
         if result == 'pass':
             if getTestOpts().expect == 'pass' \
@@ -396,7 +399,7 @@ def do_test(name, way, func, args):
     except:
         print '*** framework failure for', full_name, ':'
         traceback.print_exc()
-        framework_fail(full_name)
+        framework_fail(name, way)
 
 def skiptest (name, way):
     # print 'Skipping test \"', name, '\"'
@@ -406,9 +409,12 @@ def skiptest (name, way):
     else:
         t.tests_skipped[name] = [way]
 
-def framework_fail( name ):
+def framework_fail( name, way ):
     t.n_framework_failures = t.n_framework_failures + 1
-    t.framework_failures.append(name)
+    if name in t.framework_failures:
+        t.framework_failures[name].append(way)
+    else:
+        t.framework_failures[name] = [way]
 
 # -----------------------------------------------------------------------------
 # Generic command tests
@@ -498,25 +504,8 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
-def compile_and_run( name, way, extra_hc_opts ):
+def compile_and_run__( name, way, extra_hc_opts, top_mod ):
     # print 'Compile and run, extra args = ', extra_hc_opts
-    pretest_cleanup(name)
-
-    if way == 'ghci': # interpreted...
-        return interpreter_run( name, way, extra_hc_opts, 0, '' )
-    elif way == 'extcore' or way == 'optextcore' :
-        return extcore_run( name, way, extra_hc_opts, 0, '' )
-    else: # compiled...
-        result = simple_build( name, way, extra_hc_opts, 0, '', 1 )
-
-        if result != 0:
-            return 'fail'
-
-        # we don't check the compiler's stderr for a compile-and-run test
-        return simple_run( name, way, './'+name, getTestOpts().extra_run_opts, 0 )
-
-
-def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     pretest_cleanup(name)
 
     if way == 'ghci': # interpreted...
@@ -525,29 +514,19 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
         return extcore_run( name, way, extra_hc_opts, 0, top_mod )
     else: # compiled...
         result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1 )
+        
+        if result != 0:
+            return 'fail'
 
-    if result != 0:
-        return 'fail'
+        # we don't check the compiler's stderr for a compile-and-run test
+        return simple_run( name, way, './'+name, getTestOpts().extra_run_opts,
+                           ignore_output )
 
-    # we don't check the compiler's stderr for a compile-and-run test
-    return simple_run( name, way, './'+name, getTestOpts().extra_run_opts, 0 )
+def compile_and_run( name, way, extra_hc_opts ):
+    return compile_and_run__( name, way, extra_hc_opts, '' )
 
-def multimod_compile_and_run_ignore_output( name, way, top_mod, extra_hc_opts ):
-    pretest_cleanup(name)
-
-    if way == 'ghci': # interpreted...
-        # not supported: exit code is too difficult to check.
-	return 'pass'
-    elif way == 'extcore' or way == 'optextcore' :
-        return extcore_run( name, way, extra_hc_opts, 0, top_mod )
-    else: # compiled...
-        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1 )
-
-    if result != 0:
-        return 'fail'
-
-    # we don't check the compiler's stderr for a compile-and-run test
-    return simple_run( name, way, './'+name, getTestOpts().extra_run_opts, 1 )
+def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
+    return compile_and_run__( name, way, extra_hc_opts, top_mod )
 
 # -----------------------------------------------------------------------------
 # Build a single-module program

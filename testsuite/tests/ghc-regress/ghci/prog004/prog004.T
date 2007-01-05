@@ -5,5 +5,5 @@ def f(opts):
 	opts.skip = 1
 setTestOpts(f)
 
-test('ghciprog004', normal, run_command_ignore_output, ['$MAKE ghciprog004'])
+test('ghciprog004', ignore_output, run_command, ['$MAKE ghciprog004'])
 clean(['ctest.c', 'ctest.o'])
