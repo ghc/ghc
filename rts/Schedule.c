@@ -1768,13 +1768,14 @@ scheduleHandleThreadBlocked( StgTSO *t
       // has tidied up its stack and placed itself on whatever queue
       // it needs to be on.
 
-#if !defined(THREADED_RTS)
-    ASSERT(t->why_blocked != NotBlocked);
-	     // This might not be true under THREADED_RTS: we don't have
-	     // exclusive access to this TSO, so someone might have
-	     // woken it up by now.  This actually happens: try
-	     // conc023 +RTS -N2.
-#endif
+    // ASSERT(t->why_blocked != NotBlocked);
+    // Not true: for example,
+    //    - in THREADED_RTS, the thread may already have been woken
+    //      up by another Capability.  This actually happens: try
+    //      conc023 +RTS -N2.
+    //    - the thread may have woken itself up already, because
+    //      threadPaused() might have raised a blocked throwTo
+    //      exception, see maybePerformBlockedException().
 
 #ifdef DEBUG
     if (traceClass(DEBUG_sched)) {
