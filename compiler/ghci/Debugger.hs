@@ -376,10 +376,11 @@ bkptOptions cmd = do
     bkptOptions' _ _ = throwDyn $ CmdLineError $ 
                          "syntax: :breakpoint (list|stop|add|del)"
 
+-- Error messages
     handleBkptEx :: Module -> Debugger.BkptException -> a
     handleBkptEx _ NoBkptFound = error "No suitable breakpoint site found"  --TODO Automatically add to the next suitable line
     handleBkptEx _ NotNeeded   = error "Nothing to do"
-    handleBkptEx m NotHandled  = error$ "Module " ++ showSDoc (ppr m) ++  " was not loaded under debugging mode. Enable debugging mode and reload it"
+    handleBkptEx m NotHandled  = error$ "Module " ++ showSDoc (ppr m) ++  " was not loaded under debugging mode. Enable debugging mode with -fdebugging (and reload your module)"
 
 -------------------------
 -- Breakpoint Tables
