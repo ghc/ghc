@@ -108,7 +108,6 @@ pprintClosureCommand bindThings force str = do
       , substFiltered <- filter (not.isTyVarTy) . varEnvElts . getTvSubstEnv $ subst
       , not . null $ substFiltered
       , all (flip notElemTvSubst subst) ty_vars
---      , pprTrace "subst" (ppr subst) True
       = True
       | otherwise = False
       where bindOnlyTy1 tyv | tyv `elem` ty_vars = AvoidMe
@@ -378,7 +377,8 @@ bkptOptions cmd = do
 
 -- Error messages
     handleBkptEx :: Module -> Debugger.BkptException -> a
-    handleBkptEx _ NoBkptFound = error "No suitable breakpoint site found"  --TODO Automatically add to the next suitable line
+    handleBkptEx _ NoBkptFound = error "No suitable breakpoint site found"  
+         -- ^ TODO Instead of complaining, set a bkpt in the next suitable line
     handleBkptEx _ NotNeeded   = error "Nothing to do"
     handleBkptEx m NotHandled  = error$ "Module " ++ showSDoc (ppr m) ++  " was not loaded under debugging mode. Enable debugging mode with -fdebugging (and reload your module)"
 
@@ -511,7 +511,6 @@ getSiteCoords bt a site
                   , s == site ]
 
 -- addModule is dumb and inefficient, but it does the job
---addModule fn siteCoords _ | trace ("addModule: " ++ moduleString (unsafeCoerce# fn) ++ " - " ++ show siteCoords) False = undefined
 addModule a [] bt = bt {sites = Map.insert a [] (sites bt)}
 addModule a siteCoords bt 
    | nrows        <- maximum$ [i | (_,(i,j)) <- siteCoords ]
@@ -526,7 +525,7 @@ isBkptEnabled bt (a,site)
    | Just bkpts <- bkptsOf bt a 
    , inRange (bounds bkpts) site
    = bkpts ! site 
-   | otherwise = throwDyn NotHandled            -- This is an error
+   | otherwise = panic "unexpected condition: I don't know that breakpoint site"
 
 -----------------
 -- Other stuff
