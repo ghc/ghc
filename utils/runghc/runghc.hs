@@ -53,7 +53,13 @@ doIt ghc args = do
 			"-ignore-dot-ghci" : ghc_args ++ 
 			[ "-e","System.Environment.withProgName "++show filename++" (System.Environment.withArgs ["
 			  ++ concat (intersperse "," (map show prog_args))
-			  ++ "] Main.main)", filename])
+			  ++ "] (GHC.TopHandler.runIOFastExit Main.main))", filename])
+               -- runIOFastExit: makes exceptions raised by Main.main
+               -- behave in the same way as for a compiled program.
+               -- The "fast exit" part just calls exit() directly
+               -- instead of doing an orderly runtime shutdown,
+               -- otherwise the main GHCi thread will complain about
+               -- being interrupted.
   	  exitWith res
 
 notArg ('-':_) = False
