@@ -45,9 +45,19 @@ module System.Console.GetOpt (
    OptDescr(..),
    ArgDescr(..),
 
-   -- * Example
+   -- * Examples
 
-   -- $example
+   -- |To hopefully illuminate the role of the different data structures,
+   -- here are the command-line options for a (very simple) compiler,
+   -- done in two different ways.
+   -- The difference arises because the type of 'getOpt' is
+   -- parameterized by the type of values derived from flags.
+
+   -- ** Interpreting flags as concrete values
+   -- $example1
+
+   -- ** Interpreting flags as transformations of an options record
+   -- $example2
 ) where
 
 import Prelude -- necessary to get dependencies right
@@ -278,13 +288,13 @@ test order cmdline = case getOpt order options cmdline of
 -----------------------------------------------------------------------------------------
 -}
 
-{- $example
+{- $example1
 
-To hopefully illuminate the role of the different data
-structures, here\'s the command-line options for a (very simple)
-compiler:
+A simple choice for the type associated with flags is to define a type
+@Flag@ as an algebraic type representing the possible flags and their
+arguments:
 
->    module Opts where
+>    module Opts1 where
 >    
 >    import System.Console.GetOpt
 >    import Data.Maybe ( fromMaybe )
@@ -313,5 +323,70 @@ compiler:
 >          (o,n,[]  ) -> return (o,n)
 >          (_,_,errs) -> ioError (userError (concat errs ++ usageInfo header options))
 >      where header = "Usage: ic [OPTION...] files..."
+
+Then the rest of the program will use the constructed list of flags
+to determine it\'s behaviour.
+
+-}
+
+{- $example2
+
+A different approach is to group the option values in a record of type
+@Options@, and have each flag yield a function of type
+@Options -> Options@ transforming this record.
+
+>    module Opts2 where
+>
+>    import System.Console.GetOpt
+>    import Data.Maybe ( fromMaybe )
+>
+>    data Options = Options
+>     { optVerbose     :: Bool
+>     , optShowVersion :: Bool
+>     , optOutput      :: Maybe FilePath
+>     , optInput       :: Maybe FilePath
+>     , optLibDirs     :: [FilePath]
+>     } deriving Show
+>
+>    defaultOptions    = Options
+>     { optVerbose     = False
+>     , optShowVersion = False
+>     , optOutput      = Nothing
+>     , optInput       = Nothing
+>     , optLibDirs     = []
+>     }
+>
+>    options :: [OptDescr (Options -> Options)]
+>    options =
+>     [ Option ['v']     ["verbose"]
+>         (NoArg (\ opts -> opts { optVerbose = True }))
+>         "chatty output on stderr"
+>     , Option ['V','?'] ["version"]
+>         (NoArg (\ opts -> opts { optShowVersion = True }))
+>         "show version number"
+>     , Option ['o']     ["output"]
+>         (OptArg ((\ f opts -> opts { optOutput = Just f }) . fromMaybe "output")
+>                 "FILE")
+>         "output FILE"
+>     , Option ['c']     []
+>         (OptArg ((\ f opts -> opts { optInput = Just f }) . fromMaybe "input")
+>                 "FILE")
+>         "input FILE"
+>     , Option ['L']     ["libdir"]
+>         (ReqArg (\ d opts -> opts { optLibDirs = optLibDirs opts ++ [d] }) "DIR")
+>         "library directory"
+>     ]
+>
+>    compilerOpts :: [String] -> IO (Options, [String])
+>    compilerOpts argv =
+>       case getOpt Permute options argv of
+>          (o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
+>          (_,_,errs) -> ioError (userError (concat errs ++ usageInfo header options))
+>      where header = "Usage: ic [OPTION...] files..."
+
+Similarly, each flag could yield a monadic function transforming a record,
+of type @Options -> IO Options@ (or any other monad), allowing option
+processing to perform actions of the chosen monad, e.g. printing help or
+version messages, checking that file arguments exist, etc.
 
 -}
