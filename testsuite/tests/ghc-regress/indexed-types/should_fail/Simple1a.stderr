@@ -1,4 +1,4 @@
 
 Simple1a.hs:4:0:
-    Indexed type instance has too few parameters: `T1'
-    In the data type declaration for `T1'
+    Family instance has too few parameters: `T1'
+    In the data type family declaration for `T1'

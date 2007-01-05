@@ -1,0 +1,9 @@
+[1 of 4] Compiling OverA            ( OverA.hs, OverA.o )
+[2 of 4] Compiling OverB            ( OverB.hs, OverB.o )
+[3 of 4] Compiling OverC            ( OverC.hs, OverC.o )
+[4 of 4] Compiling OverD            ( OverD.hs, OverD.o )
+
+OverB.hs:7:14:
+    Conflicting family instance declarations:
+      data instance OverA.C [Int] [a] -- Defined at OverB.hs:7:14
+      data instance OverA.C [a] [Int] -- Defined at OverC.hs:7:14

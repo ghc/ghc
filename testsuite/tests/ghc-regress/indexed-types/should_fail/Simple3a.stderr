@@ -1,3 +1,3 @@
 
 Simple3a.hs:10:2:
-    Wrong category of type instance; declaration was for a newtype
+    Wrong category of family instance; declaration was for a newtype
