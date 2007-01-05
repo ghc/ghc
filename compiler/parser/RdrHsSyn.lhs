@@ -215,21 +215,21 @@ cvBindGroup binding
         ValBindsIn mbs sigs
 
 cvBindsAndSigs :: OrdList (LHsDecl RdrName)
-  -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName], [DocEntity RdrName])
+  -> (Bag (LHsBind RdrName), [LSig RdrName], [LTyClDecl RdrName], [LDocDecl RdrName])
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
 cvBindsAndSigs  fb = go (fromOL fb)
   where
     go [] 		   = (emptyBag, [], [], [])
-    go (L l x@(SigD s) : ds) = (bs, L l s : ss, ts, add_doc x docs)
+    go (L l x@(SigD s) : ds) = (bs, L l s : ss, ts, docs)
 			    where (bs, ss, ts, docs) = go ds
-    go (L l x@(ValD b) : ds) = (b' `consBag` bs, ss, ts, add_doc x docs)
+    go (L l x@(ValD b) : ds) = (b' `consBag` bs, ss, ts, docs)
 			    where (b', ds')    = getMonoBind (L l b) ds
 				  (bs, ss, ts, docs) = go ds'
     go (L l (TyClD t): ds) = (bs, ss, L l t : ts, docs)
 			    where (bs, ss, ts, docs) = go ds
-    go (L _ (DocD d) : ds)     =  (bs, ss, ts, DocEntity d : docs)
+    go (L l (DocD d) : ds)     =  (bs, ss, ts, (L l d) : docs)
 			    where (bs, ss, ts, docs) = go ds
 
 -----------------------------------------------------------------------------
@@ -304,28 +304,25 @@ add :: HsGroup a -> SrcSpan -> HsDecl a -> [LHsDecl a]
 add gp l (SpliceD e) ds = (gp, Just (e, ds))
 
 -- Class declarations: pull out the fixity signatures to the top
-add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs, hs_docs = docs}) 
-    l decl@(TyClD d) ds
+add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) 
+    l (TyClD d) ds
 	| isClassDecl d = 	
 		let fsigs = [ L l f | L l (FixSig f) <- tcdSigs d ] in
-		addl (gp { hs_tyclds = L l d : ts, 
-                           hs_fixds = fsigs ++ fs,
-                           hs_docs = add_doc decl docs}) ds
+		addl (gp { hs_tyclds = L l d : ts, hs_fixds = fsigs ++ fs}) ds
 	| isFamInstDecl d = 
 	        addl (gp { hs_tyclds = L l d : ts }) ds
 	| otherwise =
-		addl (gp { hs_tyclds = L l d : ts, 
-                           hs_docs = add_doc decl docs }) ds
+		addl (gp { hs_tyclds = L l d : ts }) ds
 
 -- Signatures: fixity sigs go a different place than all others
 add gp@(HsGroup {hs_fixds = ts}) l (SigD (FixSig f)) ds
   = addl (gp {hs_fixds = L l f : ts}) ds
-add gp@(HsGroup {hs_valds = ts, hs_docs = docs}) l x@(SigD d) ds
-  = addl (gp {hs_valds = add_sig (L l d) ts, hs_docs = add_doc x docs}) ds
+add gp@(HsGroup {hs_valds = ts}) l (SigD d) ds
+  = addl (gp {hs_valds = add_sig (L l d) ts}) ds
 
 -- Value declarations: use add_bind
-add gp@(HsGroup {hs_valds  = ts, hs_docs = docs}) l x@(ValD d) ds
-  = addl (gp { hs_valds = add_bind (L l d) ts, hs_docs = add_doc x docs }) ds
+add gp@(HsGroup {hs_valds  = ts}) l (ValD d) ds
+  = addl (gp { hs_valds = add_bind (L l d) ts }) ds
 
 -- The rest are routine
 add gp@(HsGroup {hs_instds = ts})  l (InstD d) ds
@@ -334,20 +331,16 @@ add gp@(HsGroup {hs_derivds = ts})  l (DerivD d) ds
   = addl (gp { hs_derivds = L l d : ts }) ds
 add gp@(HsGroup {hs_defds  = ts})  l (DefD d) ds
   = addl (gp { hs_defds = L l d : ts }) ds
-add gp@(HsGroup {hs_fords  = ts, hs_docs = docs}) l x@(ForD d) ds
-  = addl (gp { hs_fords = L l d : ts, hs_docs = add_doc x docs }) ds
+add gp@(HsGroup {hs_fords  = ts}) l (ForD d) ds
+  = addl (gp { hs_fords = L l d : ts }) ds
 add gp@(HsGroup {hs_depds  = ts})  l (DeprecD d) ds
   = addl (gp { hs_depds = L l d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
 
 add gp l (DocD d) ds
-  = addl (gp { hs_docs = DocEntity d : (hs_docs gp) })  ds
+  = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
 
-add_doc decl docs = case getMainDeclBinder decl of 
-  Just name -> DeclEntity name : docs
-  Nothing   -> docs
- 
 add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs
 add_sig  s (ValBindsIn bs sigs) = ValBindsIn bs	              (s:sigs) 
 \end{code}

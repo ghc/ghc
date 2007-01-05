@@ -428,23 +428,3 @@ collect_pat (TuplePat pats _ _) acc = foldr collect_lpat acc pats
 collect_pat (ConPatIn c ps)     acc = foldr collect_lpat acc (hsConArgs ps)
 collect_pat other	        acc = acc 	-- Literals, vars, wildcard
 \end{code}
-
-%************************************************************************
-%*									*
-%* 	Getting the main binder name of a top declaration
-%*									*
-%************************************************************************
-
-\begin{code}
-
-getMainDeclBinder :: HsDecl name -> Maybe name
-getMainDeclBinder (TyClD d) = Just (tcdName d)
-getMainDeclBinder (ValD d)
-   = case collectAcc d [] of
-        []       -> Nothing   -- see rn003
-        (name:_) -> Just (unLoc name)
-getMainDeclBinder (SigD d) = sigNameNoLoc d
-getMainDeclBinder (ForD (ForeignImport name _ _)) = Just (unLoc name)
-getMainDeclBinder (ForD (ForeignExport name _ _)) = Nothing
-getMainDeclBinder _ = Nothing
-\end{code}

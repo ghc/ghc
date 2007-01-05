@@ -75,7 +75,7 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		      hs_fords  = foreign_decls,
 		      hs_defds  = default_decls,
 		      hs_ruleds = rule_decls,
-                      hs_docs   = docs })
+          hs_docs   = docs })
 
  = do {		-- Deal with deprecations (returns only the extra deprecations)
 	deprecs <- rnSrcDeprecDecls deprec_decls ;
@@ -116,7 +116,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 	(rn_default_decls, src_fvs5)
 	   <- mapFvRn (wrapLocFstM rnDefaultDecl) default_decls ;
 
-	rn_docs <- rnDocEntities docs ;
+  -- Haddock docs
+	rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
 	let {
 	   rn_group = HsGroup { hs_valds  = rn_val_decls,
@@ -128,7 +129,7 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 			    	hs_fords  = rn_foreign_decls,
 			    	hs_defds  = rn_default_decls,
 			    	hs_ruleds = rn_rule_decls,
-                                hs_docs   = rn_docs } ;
+            hs_docs   = rn_docs } ;
 
 	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs_deriv, src_fvs3, 
 				src_fvs4, src_fvs5] ;
@@ -162,21 +163,6 @@ addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 %*********************************************************
 
 \begin{code}
-rnDocEntities :: [DocEntity RdrName] -> RnM [DocEntity Name]
-rnDocEntities ents
-  = ifErrsM (return []) $
-	-- Yuk: stop if we have found errors.  Otherwise
-	-- the rnDocEntity stuff reports the errors again.
-    mapM rnDocEntity ents 
-
-rnDocEntity :: DocEntity RdrName -> RnM (DocEntity Name)
-rnDocEntity (DocEntity docdecl) = do
-  rn_docdecl <- rnDocDecl docdecl
-  return (DocEntity rn_docdecl)
-rnDocEntity (DeclEntity name) = do
-  rn_name <- lookupTopBndrRn name
-  return (DeclEntity rn_name)
-
 rnDocDecl :: DocDecl RdrName -> RnM (DocDecl Name)
 rnDocDecl (DocCommentNext doc) = do 
   rn_doc <- rnHsDoc doc
@@ -690,10 +676,8 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	    ; gen_tyvars <- newLocalsRn gen_rdr_tyvars_w_locs
 	    ; rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds }
 
-	-- Sigh.  Check the Haddock docs after the methods, to avoid duplicate errors
-	-- Example: class { op :: a->a;  op2 x = x }
-	--	Don't want a duplicate complait about op2
-	; docs' <- bindLocalNames (map hsLTyVarName tyvars') $ rnDocEntities docs
+  -- Haddock docs 
+	; docs' <- mapM (wrapLocM rnDocDecl) docs
 
 	; return (ClassDecl { tcdCtxt = context', tcdLName = cname', 
 			      tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',

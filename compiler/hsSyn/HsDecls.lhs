@@ -18,7 +18,7 @@ module HsDecls (
 	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
 	ConDecl(..), ResType(..), LConDecl,	
-	DocDecl(..), LDocDecl, docDeclDoc, DocEntity(..),
+	DocDecl(..), LDocDecl, docDeclDoc,
 	DeprecDecl(..),  LDeprecDecl,
 	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
@@ -111,9 +111,7 @@ data HsGroup id
 	hs_depds  :: [LDeprecDecl id],
 	hs_ruleds :: [LRuleDecl id],
 
-	hs_docs   :: [DocEntity id]
-                -- Used to remember the module structure,
-                -- which is needed to produce Haddock documentation
+	hs_docs   :: [LDocDecl id]
   }
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
@@ -431,7 +429,7 @@ data TyClDecl name
 							--   only 'TyData',
 							--   'TyFunction',
 							--   and 'TySynonym'
-		tcdDocs    :: [DocEntity name]		-- Haddock docs
+		tcdDocs    :: [LDocDecl name]		-- Haddock docs
     }
 
 data NewOrData
@@ -935,11 +933,6 @@ instance OutputableBndr name => Outputable (RuleBndr name) where
 
 \begin{code}
 
--- source code entities, for representing the module structure
-data DocEntity name
-  = DeclEntity name
-  | DocEntity (DocDecl name)
- 
 type LDocDecl name = Located (DocDecl name)
 
 data DocDecl name
