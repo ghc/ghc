@@ -496,9 +496,11 @@ throwToReleaseTarget (void *tso)
    queue, but not perform any throwTo() immediately.  This might be
    more appropriate when the target thread is the one actually running
    (see Exception.cmm).
+
+   Returns: non-zero if an exception was raised, zero otherwise.
    -------------------------------------------------------------------------- */
 
-void
+int
 maybePerformBlockedException (Capability *cap, StgTSO *tso)
 {
     StgTSO *source;
@@ -514,7 +516,7 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
 	// locked it.
 	if (tso->blocked_exceptions == END_TSO_QUEUE) {
 	    unlockTSO(tso);
-	    return;
+	    return 0;
 	}
 
 	// We unblock just the first thread on the queue, and perform
@@ -524,7 +526,9 @@ maybePerformBlockedException (Capability *cap, StgTSO *tso)
 	tso->blocked_exceptions = unblockOne_(cap, source, 
 					      rtsFalse/*no migrate*/);
 	unlockTSO(tso);
+        return 1;
     }
+    return 0;
 }
 
 void

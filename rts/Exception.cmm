@@ -53,14 +53,36 @@
 INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
  		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {
+    CInt r;
+
     // Not true: see comments above
     // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
 
-    foreign "C" awakenBlockedExceptionQueue(MyCapability() "ptr", 
-					    CurrentTSO "ptr") [R1];
-
     StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
 	~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
+
+    /* Eagerly raise a blocked exception, if there is one */
+    if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
+        /* 
+         * We have to be very careful here, as in killThread#, since
+         * we are about to raise an async exception in the current
+         * thread, which might result in the thread being killed.
+         */
+        SAVE_THREAD_STATE();
+        r = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
+    					              CurrentTSO "ptr") [R1];
+
+        if (r != 0::CInt) {
+            if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+                R1 = ThreadFinished;
+                jump StgReturn;
+            } else {
+                LOAD_THREAD_STATE();
+                ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+                jump %ENTRY_CODE(Sp(0));
+            }
+        }
+    }
 
 #ifdef REG_R1
     Sp_adj(1);
@@ -116,15 +138,38 @@ blockAsyncExceptionszh_fast
 
 unblockAsyncExceptionszh_fast
 {
+    CInt r;
+
     /* Args: R1 :: IO a */
     STK_CHK_GEN( WDS(2), R1_PTR, unblockAsyncExceptionszh_fast);
 
     if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
-	foreign "C" awakenBlockedExceptionQueue(MyCapability() "ptr", 
-						CurrentTSO "ptr") [R1];
 
 	StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
 	   ~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
+
+        /* Eagerly raise a blocked exception, if there is one */
+        if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
+            /* 
+             * We have to be very careful here, as in killThread#, since
+             * we are about to raise an async exception in the current
+             * thread, which might result in the thread being killed.
+             */
+            SAVE_THREAD_STATE();
+            r = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
+						      CurrentTSO "ptr") [R1];
+
+            if (r != 0::CInt) {
+                if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+	            R1 = ThreadFinished;
+	            jump StgReturn;
+	        } else {
+	            LOAD_THREAD_STATE();
+	            ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+	            jump %ENTRY_CODE(Sp(0));
+	        }
+            }
+        }
 
 	/* avoid growing the stack unnecessarily */
 	if (Sp(0) == stg_unblockAsyncExceptionszh_ret_info) {

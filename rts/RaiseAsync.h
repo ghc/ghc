@@ -38,7 +38,7 @@ nat throwTo (Capability *cap,	         // the Capability we hold
 void throwToReleaseTarget (void *tso);
 #endif
 
-void maybePerformBlockedException (Capability *cap, StgTSO *tso);
+int  maybePerformBlockedException (Capability *cap, StgTSO *tso);
 void awakenBlockedExceptionQueue  (Capability *cap, StgTSO *tso);
 
 /* Determine whether a thread is interruptible (ie. blocked
