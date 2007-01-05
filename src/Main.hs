@@ -13,6 +13,7 @@ import HaddockRename
 import HaddockTypes
 import HaddockUtil
 import HaddockVersion
+import GHCUtils
 import Paths_haddock         ( getDataDir, compilerPath )
 
 import Prelude hiding ( catch )
@@ -21,8 +22,9 @@ import Control.Monad         ( when, liftM, foldM )
 import Control.Monad.Writer  ( Writer, runWriter, tell )
 import Data.Char             ( isSpace )
 import Data.IORef            ( writeIORef )
+import Data.Ord
 import Data.List             ( nub, nubBy, (\\), foldl', sortBy, foldl1, init, 
-                               mapAccumL, find, isPrefixOf ))
+                               mapAccumL, find, isPrefixOf )
 import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList, 
                                listToMaybe, fromJust, catMaybes )
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
@@ -51,6 +53,7 @@ import TypeRep
 import Var hiding ( varName )
 import TyCon
 import PrelNames
+import Bag
 
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
@@ -225,7 +228,7 @@ sortAndCheckModules session flags files = defaultErrorHandler flags $ do
     mbMod <- checkModule session (moduleName mod)
     checkedMod <- case mbMod of 
       Just m  -> return m
-      Nothing -> die ("Failed to load module: " ++ moduleString mod)
+      Nothing -> die ("Failed to load module: " ++ moduleString mod ++ "\n")
     return (mod, file, checkedMod)) modsAndFiles 
   ensureFullyChecked checkedMods
   where
@@ -458,8 +461,8 @@ type FullyCheckedMod = (ParsedSource,
                         TypecheckedSource, 
                         ModuleInfo)
 
-printEntity (DocEntity doc) = show doc
-printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
+--printEntity (DocEntity doc) = show doc
+--printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
 -- | This data structure collects all the information we need about a home 
 -- package module
@@ -507,8 +510,8 @@ pass1data modData flags modMap = do
   opts <- mkDocOpts (ghcMbDocOpts modData) mod
 
   let group        = ghcGroup modData
-      entities     = (reverse . nubBy sameName . hs_docs) group 
-      exports      = fmap (map unLoc) (ghcMbExports modData)
+      entities     = (nubBy sameName . collectEntities) group
+      exports      = fmap (reverse . map unLoc) (ghcMbExports modData)
       entityNames_ = entityNames entities
       subNames     = allSubNames group
       localNames   = entityNames_ ++ subNames
@@ -577,7 +580,7 @@ sameName (DeclEntity a) (DeclEntity b) = a == b
 -- This map includes everything that can be exported separately,
 -- that means: top declarations, class methods and record selectors
 -- TODO: merge this with mkDeclMap and the extractXXX functions 
-mkDocMap :: HsGroup Name ->  Map Name (HsDoc Name)
+mkDocMap :: HsGroup Name -> Map Name (HsDoc Name)
 mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
   where
     tyclds    = map unLoc (hs_tyclds group)
@@ -586,16 +589,59 @@ mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
     constrs   = [ con | d <- datadecls, L _ con <- tcdCons d ]
     fields    = concat [ fields | RecCon fields <- map con_details constrs]
 
-    topDeclDocs     = collectDocs (reverse (hs_docs group))
-    classMethDocs   = concatMap (collectDocs . tcdDocs) classes
+    topDeclDocs   = collectDocs (collectEntities group)
+    classMethDocs = concatMap (collectDocs . collectClassEntities) classes
+
     recordFieldDocs = [ (unLoc lname, doc) | 
                         HsRecField lname _ (Just (L _ doc)) <- fields ]
 
-collectDocs :: [DocEntity Name] -> [(Name, HsDoc Name)]
+--------------------------------------------------------------------------------
+-- Source code entities
+--------------------------------------------------------------------------------
+
+data Entity = DocEntity (DocDecl Name) | DeclEntity Name
+data LEntity = Located Entity
+
+sortByLoc = map unLoc . sortBy (comparing getLoc)
+
+-- | Collect all the entities in a class that can be documented. 
+-- The entities are sorted by their SrcLoc.
+collectClassEntities tcd = sortByLoc (docs ++ meths ++ sigs)
+  where
+    docs = [ L l (DocEntity d) | L l d <- tcdDocs tcd ]
+    meths = 
+      let bindings = bagToList (tcdMeths tcd)
+          bindingName = unLoc . fun_id
+      in [ L l (DeclEntity (bindingName b)) | L l b <- bindings ] 
+    sigs = 
+      let sigName = fromJust . sigNameNoLoc 
+      in [ L l (DeclEntity (sigName sig)) | L l sig <- tcdSigs tcd ]  
+
+-- | Collect all the entities in the source file that can be documented. 
+-- The entities are sorted by their SrcLoc.
+collectEntities :: HsGroup Name -> [Entity]
+collectEntities group = sortByLoc (docs ++ declarations)
+  where
+    docs = [ L l (DocEntity d) | L l d <- hs_docs group ]
+
+    declarations = [ L l (DeclEntity n) | (l, n) <- valds ++ tyclds ++ fords ]
+      where
+        valds = let ValBindsOut _ sigs = hs_valds group 
+             -- we just use the sigs here for now.
+             -- TODO: collect from the bindings as well 
+             -- (needed for docs to work for inferred entities)
+                in [ (l, fromJust (sigNameNoLoc s)) | L l s <- sigs ] 
+        tyclds = [ (l, tcdName t) | L l t <- hs_tyclds group ]
+        fords  = [ (l, forName f) | L l f <- hs_fords group ]  
+          where
+            forName (ForeignImport name _ _) = unLoc name
+            forName (ForeignExport name _ _) = unLoc name
+
+-- | Collect the docs and attach them to the right name
+collectDocs :: [Entity] -> [(Name, HsDoc Name)]
 collectDocs entities = collect Nothing DocEmpty entities
 
-collect :: Maybe (DocEntity Name) -> HsDoc Name -> [DocEntity Name] -> 
-           [(Name, HsDoc Name)]
+collect :: Maybe Entity -> HsDoc Name -> [Entity] -> [(Name, HsDoc Name)]
 collect d doc_so_far [] =
    case d of
         Nothing -> []
@@ -616,11 +662,16 @@ collect d doc_so_far (e:es) =
         | sameName d0 e -> collect d doc_so_far es  
         | otherwise -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
 
-finishedDoc :: DocEntity Name -> HsDoc Name -> [(Name, HsDoc Name)] -> [(Name, HsDoc Name)]
+finishedDoc :: Entity -> HsDoc Name -> [(Name, HsDoc Name)] -> 
+               [(Name, HsDoc Name)]
 finishedDoc d DocEmpty rest = rest
 finishedDoc (DeclEntity name) doc rest = (name, doc) : rest
 finishedDoc _ _ rest = rest
-        
+
+--------------------------------------------------------------------------------
+-- 
+--------------------------------------------------------------------------------
+       
 allSubNames :: HsGroup Name -> [Name]
 allSubNames group = 
   concat [ tail (map unLoc (tyClDeclNames tycld)) | L _ tycld <- hs_tyclds group ]
@@ -634,7 +685,7 @@ mkDeclMap names group = Map.fromList [ (n,d)  | (n,Just d) <- maybeDecls ]
   where 
   maybeDecls = [ (name, getDeclFromGroup group name) | name <- names ]
 
-entityNames :: [DocEntity Name] -> [Name]
+entityNames :: [Entity] -> [Name]
 entityNames entities = [ name | DeclEntity name <- entities ] 
 {-
 getValSig :: Name -> HsValBinds Name -> TypeEnv -> Maybe (LSig Name)
@@ -779,7 +830,7 @@ mkExportItems
         -> Map Name (LHsDecl Name) -- maps exported names to declarations
 	-> Map Name (LHsDecl Name) -- maps local names to declarations
 	-> Map Name [Name]	-- sub-map for this module
-	-> [DocEntity Name]	-- entities in the current module
+	-> [Entity]	-- entities in the current module
 	-> [DocOption]
 	-> Maybe [IE Name]
 	-> Bool				-- --ignore-all-exports flag
@@ -852,7 +903,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
       where
         m = nameModule n
 
-fullContentsOfThisModule :: Module -> [DocEntity Name] -> Map Name (LHsDecl Name) ->
+fullContentsOfThisModule :: Module -> [Entity] -> Map Name (LHsDecl Name) ->
                             Map Name (HsDoc Name) -> [ExportItem Name]
 fullContentsOfThisModule module_ entities declMap docMap 
   = catMaybes (map mkExportItem entities)
@@ -1021,7 +1072,7 @@ nameSetMod n newMod = mkExternalName (nameUnique n) newMod (nameOccName n)
 -- -----------------------------------------------------------------------------
 -- Named documentation
 
-findNamedDoc :: String -> [DocEntity Name] -> ErrMsgM (Maybe (HsDoc Name))
+findNamedDoc :: String -> [Entity] -> ErrMsgM (Maybe (HsDoc Name))
 findNamedDoc name entities = search entities 
 	where search [] = do
 		tell ["Cannot find documentation for: $" ++ name]

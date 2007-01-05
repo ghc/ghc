@@ -72,4 +72,6 @@ other-modules:
 	HaddockUtil
 	HaddockVersion
 	Html
+  GHCUtils
 	Main
+ 
