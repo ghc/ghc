@@ -44,13 +44,24 @@ import FastString
 import Maybes		( orElse )
 import Outputable
 
-import Control.Monad    ( when )
+import Control.Monad    ( unless )
 import GHC.Exts
 import Data.Char
 import Control.Monad    ( mplus )
 }
 
 {-
+-----------------------------------------------------------------------------
+31 December 2006
+
+Conflicts: 34 shift/reduce
+           1 reduce/reduce
+
+The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
+would think the two should never occur in the same context.
+
+  -=chak
+
 -----------------------------------------------------------------------------
 6 December 2006
 
@@ -208,7 +219,6 @@ incorrect.
  'threadsafe'	{ L _ ITthreadsafe }
  'unsafe'	{ L _ ITunsafe }
  'mdo'		{ L _ ITmdo }
- 'iso'		{ L _ ITiso }
  'family'	{ L _ ITfamily }
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
@@ -547,7 +557,7 @@ ty_decl :: { LTyClDecl RdrName }
 		-- infix type constructors to be declared 
  		{% do { (tc, tvs, _) <- checkSynHdr $2 False
 		      ; return (L (comb2 $1 $4) 
-				  (TySynonym tc tvs Nothing $4)) 
+				  (TySynonym tc tvs Nothing $4))
                       } }
 
            -- type family declarations
@@ -556,11 +566,8 @@ ty_decl :: { LTyClDecl RdrName }
 		-- infix type constructors to be declared
 		--
  		{% do { (tc, tvs, _) <- checkSynHdr $3 False
-		      ; let kind = case unLoc $4 of
-				     Nothing -> liftedTypeKind
-				     Just ki -> ki
 		      ; return (L (comb3 $1 $3 $4) 
-				  (TyFunction tc tvs False kind))
+				  (TyFamily TypeFamily tc tvs (unLoc $4)))
 		      } }
 
            -- type instance declarations
@@ -598,14 +605,14 @@ ty_decl :: { LTyClDecl RdrName }
           -- data/newtype family
         | data_or_newtype 'family' tycl_hdr opt_kind_sig
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
-                      ; checkTyVars tparms    -- no type pattern
-		      ; let kind = case unLoc $4 of
-				     Nothing -> liftedTypeKind
-				     Just ki -> ki
+                      ; checkTyVars tparms            -- no type pattern
+		      ; unless (null (unLoc ctxt)) $  -- and no context
+			  parseError (getLoc ctxt) 
+			    "A family declaration cannot have a context"
 		      ; return $
 			  L (comb3 $1 $2 $4)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
-			      (Just kind) [] Nothing) } }
+			    (TyFamily (DataFamily (unLoc $1)) tc tvs 
+				      (unLoc $4)) } }
 
           -- data/newtype instance declaration
 	| data_or_newtype 'instance' tycl_hdr constrs deriving
@@ -645,11 +652,8 @@ at_decl_cls :: { LTyClDecl RdrName }
 		-- infix type constructors to be declared
 		--
  		{% do { (tc, tvs, _) <- checkSynHdr $2 False
-		      ; let kind = case unLoc $3 of
-				     Nothing -> liftedTypeKind
-				     Just ki -> ki
 		      ; return (L (comb3 $1 $2 $3) 
-				  (TyFunction tc tvs False kind))
+				  (TyFamily TypeFamily tc tvs (unLoc $3)))
 		      } }
 
            -- default type instance
@@ -665,14 +669,15 @@ at_decl_cls :: { LTyClDecl RdrName }
           -- data/newtype family declaration
         | data_or_newtype tycl_hdr opt_kind_sig
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
-                      ; checkTyVars tparms    -- no type pattern
-		      ; let kind = case unLoc $3 of
-				     Nothing -> liftedTypeKind
-				     Just ki -> ki
+                      ; checkTyVars tparms            -- no type pattern
+		      ; unless (null (unLoc ctxt)) $  -- and no context
+			  parseError (getLoc ctxt) 
+			    "A family declaration cannot have a context"
 		      ; return $
 			  L (comb3 $1 $2 $3)
-			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Nothing) 
-			      (Just kind) [] Nothing) } }
+			    (TyFamily (DataFamily (unLoc $1)) tc tvs
+				      (unLoc $3)) 
+                      } }
 
 -- Associate type instances
 --
@@ -708,10 +713,6 @@ at_decl_inst :: { LTyClDecl RdrName }
 			  L (comb4 $1 $2 $5 $6)
 			    (mkTyData (unLoc $1) (ctxt, tc, tvs, Just tparms) 
 			     (unLoc $3) (reverse (unLoc $5)) (unLoc $6)) } }
-
-opt_iso :: { Bool }
-	:       { False }
-	| 'iso'	{ True  }
 
 data_or_newtype :: { Located NewOrData }
 	: 'data'	{ L1 DataType }
@@ -1706,7 +1707,6 @@ varid_no_unsafe :: { Located RdrName }
 	: VARID			{ L1 $! mkUnqual varName (getVARID $1) }
 	| special_id		{ L1 $! mkUnqual varName (unLoc $1) }
 	| 'forall'		{ L1 $! mkUnqual varName FSLIT("forall") }
-	| 'iso'                 { L1 $! mkUnqual varName FSLIT("iso") }
 	| 'family'              { L1 $! mkUnqual varName FSLIT("family") }
 
 qvarsym :: { Located RdrName }
@@ -1731,7 +1731,7 @@ varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 
 -- These special_ids are treated as keywords in various places, 
 -- but as ordinary ids elsewhere.   'special_id' collects all these
--- except 'unsafe', 'forall', 'family', and 'iso' whose treatment differs
+-- except 'unsafe', 'forall', and 'family' whose treatment differs
 -- depending on context 
 special_id :: { Located FastString }
 special_id

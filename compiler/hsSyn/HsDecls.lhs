@@ -12,6 +12,7 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 module HsDecls (
 	HsDecl(..), LHsDecl, TyClDecl(..), LTyClDecl, 
 	InstDecl(..), LInstDecl, DerivDecl(..), LDerivDecl, NewOrData(..),
+	FamilyFlavour(..),
 	RuleDecl(..), LRuleDecl, RuleBndr(..),
 	DefaultDecl(..), LDefaultDecl, SpliceDecl(..),
 	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
@@ -21,8 +22,8 @@ module HsDecls (
 	DeprecDecl(..),  LDeprecDecl,
 	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
 	tcdName, tyClDeclNames, tyClDeclTyVars,
-	isClassDecl, isTFunDecl, isSynDecl, isDataDecl, isKindSigDecl,
-	isIdxTyDecl,
+	isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
+	isFamInstDecl, 
 	countTyClDecls,
 	conDetailsTys,
 	instDeclATs,
@@ -346,13 +347,9 @@ Interface file code:
 \begin{code}
 -- Representation of indexed types
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Kind signatures of indexed types come in two flavours:
---
--- * kind signatures for type functions: variant `TyFunction' and
---
--- * kind signatures for indexed data types and newtypes : variant `TyData'
---   iff a kind is present in `tcdKindSig' and there are no constructors in
---   `tcdCons'.
+-- Family kind signatures are represented by the variant `TyFamily'.  It
+-- covers "type family", "newtype family", and "data family" declarations,
+-- distinguished by the value of the field `tcdFlavour'.
 --
 -- Indexed types are represented by 'TyData' and 'TySynonym' using the field
 -- 'tcdTyPats::Maybe [LHsType name]', with the following meaning:
@@ -361,7 +358,7 @@ Interface file code:
 --     synonym declaration and 'tcdVars' contains the type parameters of the
 --     type constructor.
 --
---   * If it is 'Just pats', we have the definition of an indexed type Then,
+--   * If it is 'Just pats', we have the definition of an indexed type.  Then,
 --     'pats' are type patterns for the type-indexes of the type constructor
 --     and 'tcdVars' are the variables in those patterns.  Hence, the arity of
 --     the indexed type (ie, the number of indexes) is 'length tcdTyPats' and
@@ -376,7 +373,13 @@ data TyClDecl name
 		tcdLName    :: Located name,
 		tcdExtName  :: Maybe FastString,
 		tcdFoType   :: FoType
-  }
+    }
+
+  | TyFamily {  tcdFlavour:: FamilyFlavour,	        -- type, new, or data
+		tcdLName  :: Located name,	        -- type constructor
+		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
+		tcdKind   :: Maybe Kind			-- result kind
+    }
 
   | TyData {	tcdND     :: NewOrData,
 		tcdCtxt   :: LHsContext name,	 	-- Context
@@ -390,12 +393,8 @@ data TyClDecl name
 			-- Nothing for everything else
 
 		tcdKindSig:: Maybe Kind,		-- Optional kind sig 
-			-- (Just k) for a
-			--	(a) GADT-style 'data', or 'data instance' decl 
-			--		with explicit kind sig
-			--	(b) 'data family' decl, whether or not 
-			--		there is an explicit kind sig
-			--		(this is how we distinguish a data family decl)
+			-- (Just k) for a GADT-style 'data', or 'data
+			-- instance' decl with explicit kind sig
 
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
 			-- For data T a = T1 | T2 a          the LConDecls all have ResTyH98
@@ -409,18 +408,9 @@ data TyClDecl name
 			-- Typically the foralls and ty args are empty, but they
 			-- are non-empty for the newtype-deriving case
     }
-	-- data family:   tcdPats = Nothing, tcdCons = [], tcdKindSig = Just k
-	--
 	-- data instance: tcdPats = Just tys
 	--
 	-- data:	  tcdPats = Nothing, 
-	--		  tcdCons is non-empty *or* tcdKindSig = Nothing
-
-  | TyFunction {tcdLName  :: Located name,	        -- type constructor
-		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
-		tcdIso    :: Bool,	                -- injective type?
-		tcdKind   :: Kind			-- result kind
-    }
 
   | TySynonym {	tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
@@ -445,46 +435,46 @@ data TyClDecl name
     }
 
 data NewOrData
-  = NewType  	-- "newtype Blah ..."
-  | DataType 	-- "data Blah ..."
-  deriving( Eq )	-- Needed because Demand derives Eq
+  = NewType			-- "newtype Blah ..."
+  | DataType			-- "data Blah ..."
+  deriving( Eq )		-- Needed because Demand derives Eq
+
+data FamilyFlavour
+  = TypeFamily			-- "type family ..."
+  | DataFamily NewOrData	-- "newtype family ..." or "data family ..."
 \end{code}
 
 Simple classifiers
 
 \begin{code}
-isTFunDecl, isDataDecl, isSynDecl, isClassDecl, isKindSigDecl, isIdxTyDecl ::
+isDataDecl, isTypeDecl, isSynDecl, isClassDecl, isFamilyDecl, isFamInstDecl :: 
   TyClDecl name -> Bool
 
--- type function kind signature
-isTFunDecl (TyFunction {}) = True
-isTFunDecl other	   = False
-
--- vanilla Haskell type synonym
-isSynDecl (TySynonym {tcdTyPats = Nothing}) = True
-isSynDecl other		                    = False
-
--- type equation (of a type function)
-isTEqnDecl (TySynonym {tcdTyPats = Just _}) = True
-isTEqnDecl other		            = False
-
+-- data/newtype or data/newtype instance declaration
 isDataDecl (TyData {}) = True
-isDataDecl other       = False
+isDataDecl _other      = False
 
+-- type or type instance declaration
+isTypeDecl (TySynonym {}) = True
+isTypeDecl _other	  = False
+
+-- vanilla Haskell type synonym (ie, not a type instance)
+isSynDecl (TySynonym {tcdTyPats = Nothing}) = True
+isSynDecl _other	                    = False
+
+-- type class
 isClassDecl (ClassDecl {}) = True
 isClassDecl other	   = False
 
--- kind signature (for an indexed type)
-isKindSigDecl (TyFunction {}                   ) = True
-isKindSigDecl (TyData     {tcdKindSig = Just _,
-			   tcdCons    = []    }) = True
-isKindSigDecl other                              = False
+-- type family declaration
+isFamilyDecl (TyFamily {}) = True
+isFamilyDecl _other        = False
 
--- definition of an instance of an indexed type
-isIdxTyDecl tydecl
-   | isTEqnDecl tydecl = True
-   | isDataDecl tydecl = isJust (tcdTyPats tydecl)
-   | otherwise	       = False
+-- family instance (types, newtypes, and data types)
+isFamInstDecl tydecl
+   | isTypeDecl tydecl
+     || isDataDecl tydecl = isJust (tcdTyPats tydecl)
+   | otherwise	          = False
 \end{code}
 
 Dealing with names
@@ -499,7 +489,7 @@ tyClDeclNames :: Eq name => TyClDecl name -> [Located name]
 -- For record fields, the first one counts as the SrcLoc
 -- We use the equality to filter out duplicate field names
 
-tyClDeclNames (TyFunction  {tcdLName = name})    = [name]
+tyClDeclNames (TyFamily    {tcdLName = name})    = [name]
 tyClDeclNames (TySynonym   {tcdLName = name})    = [name]
 tyClDeclNames (ForeignType {tcdLName = name})    = [name]
 
@@ -510,7 +500,7 @@ tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
 tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
   = tc_name : conDeclsNames (map unLoc cons)
 
-tyClDeclTyVars (TyFunction  {tcdTyVars = tvs}) = tvs
+tyClDeclTyVars (TyFamily    {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TySynonym   {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TyData      {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (ClassDecl   {tcdTyVars = tvs}) = tvs
@@ -519,21 +509,20 @@ tyClDeclTyVars (ForeignType {})		       = []
 
 \begin{code}
 countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int, Int)
-	-- class, synonym decls, type function signatures,
-	-- type function equations, data, newtype
+	-- class, synonym decls, data, newtype, family decls, family instances
 countTyClDecls decls 
- = (count isClassDecl     decls,
-    count isSynDecl       decls,
-    count isTFunDecl      decls,
-    count isTEqnDecl      decls,
-    count isDataTy        decls,
-    count isNewTy         decls) 
+ = (count isClassDecl    decls,
+    count isSynDecl      decls,  -- excluding...
+    count isDataTy       decls,  -- ...family...
+    count isNewTy        decls,  -- ...instances
+    count isFamilyDecl   decls,
+    count isFamInstDecl  decls)
  where
-   isDataTy TyData{tcdND=DataType} = True
-   isDataTy _                      = False
+   isDataTy TyData{tcdND = DataType, tcdTyPats = Nothing} = True
+   isDataTy _                                             = False
    
-   isNewTy TyData{tcdND=NewType} = True
-   isNewTy _                     = False
+   isNewTy TyData{tcdND = NewType, tcdTyPats = Nothing} = True
+   isNewTy _                                            = False
 \end{code}
 
 \begin{code}
@@ -543,14 +532,18 @@ instance OutputableBndr name
     ppr (ForeignType {tcdLName = ltycon})
 	= hsep [ptext SLIT("foreign import type dotnet"), ppr ltycon]
 
-    ppr (TyFunction {tcdLName = ltycon, tcdTyVars = tyvars, tcdIso = iso, 
-		     tcdKind = kind})
-      = typeMaybeIso <+> pp_decl_head [] ltycon tyvars Nothing <+> 
-	dcolon <+> pprKind kind
+    ppr (TyFamily {tcdFlavour = flavour, tcdLName = ltycon, 
+		   tcdTyVars = tyvars, tcdKind = mb_kind})
+      = pp_flavour <+> pp_decl_head [] ltycon tyvars Nothing <+> pp_kind
         where
-	  typeMaybeIso = if iso 
-			 then ptext SLIT("type family iso") 
-			 else ptext SLIT("type family")
+	  pp_flavour = case flavour of
+		         TypeFamily          -> ptext SLIT("type family")
+			 DataFamily NewType  -> ptext SLIT("newtype family")
+			 DataFamily DataType -> ptext SLIT("data family")
+
+          pp_kind = case mb_kind of
+		      Nothing   -> empty
+		      Just kind -> dcolon <+> pprKind kind
 
     ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdTyPats = typats,
 		    tcdSynRhs = mono_ty})

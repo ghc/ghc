@@ -7,7 +7,7 @@ TcTyClsDecls: Typecheck type and class declarations
 
 \begin{code}
 module TcTyClsDecls (
-	tcTyAndClassDecls, tcIdxTyInstDecl
+	tcTyAndClassDecls, tcFamInstDecl
     ) where
 
 #include "HsVersions.h"
@@ -45,6 +45,7 @@ import Digraph
 import DynFlags
 
 import Data.List        ( partition, elemIndex )
+import Control.Monad    ( mplus )
 \end{code}
 
 
@@ -134,7 +135,7 @@ tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
 tcTyAndClassDecls boot_details allDecls
   = do	{       -- Omit instances of indexed types; they are handled together
 		-- with the *heads* of class instances
-        ; let decls = filter (not . isIdxTyDecl . unLoc) allDecls
+        ; let decls = filter (not . isFamInstDecl . unLoc) allDecls
 
         	-- First check for cyclic type synonysm or classes
 		-- See notes with checkCycleErrs
@@ -222,36 +223,36 @@ mkGlobalThings decls things
 
 %************************************************************************
 %*									*
-\subsection{Type checking instances of indexed types}
+\subsection{Type checking family instances}
 %*									*
 %************************************************************************
 
-Instances of indexed types are somewhat of a hybrid.  They are processed
-together with class instance heads, but can contain data constructors and hence
-they share a lot of kinding and type checking code with ordinary algebraic
-data types (and GADTs).
+Family instances are somewhat of a hybrid.  They are processed together with
+class instance heads, but can contain data constructors and hence they share a
+lot of kinding and type checking code with ordinary algebraic data types (and
+GADTs).
 
 \begin{code}
-tcIdxTyInstDecl :: LTyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
-tcIdxTyInstDecl (L loc decl)
+tcFamInstDecl :: LTyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
+tcFamInstDecl (L loc decl)
   =	-- Prime error recovery, set source location
     recoverM (returnM Nothing)		        $
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
-    do { -- indexed data types require -findexed-types and can't be in an
+    do { -- type families require -findexed-types and can't be in an
 	 -- hs-boot file
        ; gla_exts <- doptM Opt_IndexedTypes
        ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
-       ; checkTc gla_exts      $ badIdxTyDecl (tcdLName decl)
-       ; checkTc (not is_boot) $ badBootTyIdxDeclErr
+       ; checkTc gla_exts      $ badFamInstDecl (tcdLName decl)
+       ; checkTc (not is_boot) $ badBootFamInstDeclErr
 
 	 -- perform kind and type checking
-       ; tcIdxTyInstDecl1 decl
+       ; tcFamInstDecl1 decl
        }
 
-tcIdxTyInstDecl1 :: TyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
+tcFamInstDecl1 :: TyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
 
-tcIdxTyInstDecl1 (decl@TySynonym {})
+tcFamInstDecl1 (decl@TySynonym {})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
     do { -- check that the family declaration is for a synonym
 	 unless (isSynTyCon family) $
@@ -269,8 +270,8 @@ tcIdxTyInstDecl1 (decl@TySynonym {})
        ; return Nothing     -- !!!TODO: need TyThing for indexed synonym
        }}
       
-tcIdxTyInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
-			       tcdCons = cons})
+tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
+			     tcdCons = cons})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
     do { -- check that the family declaration is for the right kind
 	 unless (new_or_data == NewType  && isNewTyCon  family ||
@@ -391,11 +392,11 @@ Indexed Types
 This treatment of type synonyms only applies to Haskell 98-style synonyms.
 General type functions can be recursive, and hence, appear in `alg_decls'.
 
-The kind of an indexed type is solely determinded by its kind signature;
+The kind of a type family is solely determinded by its kind signature;
 hence, only kind signatures participate in the construction of the initial
 kind environment (as constructed by `getInitialKind').  In fact, we ignore
-instances of indexed types altogether in the following.  However, we need to
-include the kind signatures of associated types into the construction of the
+instances of families altogether in the following.  However, we need to
+include the kinds of associated families into the construction of the
 initial kind environment.  (This is handled by `allDecls').
 
 \begin{code}
@@ -420,7 +421,7 @@ kcTyClDecls syn_decls alg_decls
 		-- instances of indexed types yet, but leave this to
 		-- `tcInstDecls1'
 	{ kc_alg_decls <- mappM (wrapLocM kcTyClDecl) 
-			    (filter (not . isIdxTyDecl . unLoc) alg_decls)
+			    (filter (not . isFamInstDecl . unLoc) alg_decls)
 
 	; return (kc_syn_decls, kc_alg_decls) }}}
   where
@@ -428,9 +429,9 @@ kcTyClDecls syn_decls alg_decls
     -- environment
     allDecls (decl@ClassDecl {tcdATs = ats}) = decl : [ at 
 						      | L _ at <- ats
-						      , isKindSigDecl at]
-    allDecls decl | isIdxTyDecl decl         = []
-		  | otherwise		     = [decl]
+						      , isFamilyDecl at]
+    allDecls decl | isFamInstDecl decl = []
+		  | otherwise	       = [decl]
 
 ------------------------------------------------------------------------
 getInitialKind :: TyClDecl Name -> TcM (Name, TcKind)
@@ -445,10 +446,9 @@ getInitialKind decl
     mk_arg_kind (UserTyVar _)        = newKindVar
     mk_arg_kind (KindedTyVar _ kind) = return kind
 
-    mk_res_kind (TyFunction { tcdKind    = kind      }) = return kind
-    mk_res_kind (TyData     { tcdKindSig = Just kind }) = return kind
-	-- On GADT-style and data signature declarations we allow a kind 
-	-- signature
+    mk_res_kind (TyFamily { tcdKind    = Just kind }) = return kind
+    mk_res_kind (TyData   { tcdKindSig = Just kind }) = return kind
+	-- On GADT-style declarations we allow a kind signature
 	--	data T :: *->* where { ... }
     mk_res_kind other = return liftedTypeKind
 
@@ -490,13 +490,15 @@ kcTyClDecl :: TyClDecl Name -> TcM (TyClDecl Name)
 	-- Not used for type synonyms (see kcSynDecl)
 
 kcTyClDecl decl@(TyData {})
-  = ASSERT( not . isJust $ tcdTyPats decl )   -- must not be instance of idx ty
+  = ASSERT( not . isFamInstDecl $ decl )   -- must not be a family instance
     kcTyClDeclBody decl	$
       kcDataDecl decl
 
-kcTyClDecl decl@(TyFunction {})
+kcTyClDecl decl@(TyFamily {tcdKind = kind})
   = kcTyClDeclBody decl $ \ tvs' ->
-      return (decl {tcdTyVars = tvs'})
+      return (decl {tcdTyVars = tvs', 
+		    tcdKind = kind `mplus` Just liftedTypeKind})
+		    -- default result kind is '*'
 
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
   = kcTyClDeclBody decl	$ \ tvs' ->
@@ -599,33 +601,36 @@ tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
 tcTyClDecl calc_isrec decl
   = tcAddDeclCtxt decl (tcTyClDecl1 calc_isrec decl)
 
-  -- kind signature for a type function
+  -- "type family" declarations
 tcTyClDecl1 _calc_isrec 
-  (TyFunction {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = kind})
+  (TyFamily {tcdFlavour = TypeFamily, 
+	     tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = Just kind})
+						      -- NB: kind at latest
+						      --     added during
+						      --     kind checking
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
   { traceTc (text "type family: " <+> ppr tc_name) 
-  ; gla_exts <- doptM Opt_IndexedTypes
+  ; idx_tys <- doptM Opt_IndexedTypes
 
-	-- Check that we don't use kind signatures without Glasgow extensions
-  ; checkTc gla_exts $ badSigTyDecl tc_name
+	-- Check that we don't use families without -findexed-types
+  ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; return [ATyCon $ buildSynTyCon tc_name tvs' (OpenSynTyCon kind)]
   }
 
-  -- kind signature for an indexed data type
+  -- "newtype family" or "data family" declaration
 tcTyClDecl1 _calc_isrec 
-  (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
-	   tcdLName = L _ tc_name, tcdKindSig = Just ksig, tcdCons = []})
+  (TyFamily {tcdFlavour = DataFamily new_or_data, 
+	     tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = mb_kind})
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
   { traceTc (text "data/newtype family: " <+> ppr tc_name) 
-  ; extra_tvs <- tcDataKindSig (Just ksig)
+  ; extra_tvs <- tcDataKindSig mb_kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
 
-  ; checkTc (null . unLoc $ ctxt) $ badKindSigCtxt tc_name
-  ; gla_exts <- doptM Opt_IndexedTypes
+  ; idx_tys <- doptM Opt_IndexedTypes
 
-	-- Check that we don't use kind signatures without Glasgow extensions
-  ; checkTc gla_exts $ badSigTyDecl tc_name
+	-- Check that we don't use families without -findexed-types
+  ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
 	       (case new_or_data of
@@ -635,6 +640,7 @@ tcTyClDecl1 _calc_isrec
   ; return [ATyCon tycon]
   }
 
+  -- "newtype", "data", "newtype instance", "data instance"
 tcTyClDecl1 calc_isrec
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
 	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = cons})
@@ -1156,36 +1162,31 @@ newtypeFieldErr con_name n_flds
 badSigTyDecl tc_name
   = vcat [ ptext SLIT("Illegal kind signature") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -findexed-types to allow indexed types")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow kind signatures")) ]
 
-badKindSigCtxt tc_name
-  = vcat [ ptext SLIT("Illegal context in kind signature") <+>
+badFamInstDecl tc_name
+  = vcat [ ptext SLIT("Illegal family instance for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Currently, kind signatures cannot have a context")) ]
-
-badIdxTyDecl tc_name
-  = vcat [ ptext SLIT("Illegal indexed type instance for") <+>
-	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -findexed-types to allow indexed types")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -findexed-types to allow indexed type families")) ]
 
 badGadtIdxTyDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Indexed types cannot use GADT declarations")) ]
+	 , nest 2 (parens $ ptext SLIT("Family instances can not yet use GADT declarations")) ]
 
 tooManyParmsErr tc_name
-  = ptext SLIT("Indexed type instance has too many parameters:") <+> 
+  = ptext SLIT("Family instance has too many parameters:") <+> 
     quotes (ppr tc_name)
 
 tooFewParmsErr tc_name
-  = ptext SLIT("Indexed type instance has too few parameters:") <+> 
+  = ptext SLIT("Family instance has too few parameters:") <+> 
     quotes (ppr tc_name)
 
-badBootTyIdxDeclErr = 
-  ptext SLIT("Illegal indexed type instance in hs-boot file")
+badBootFamInstDeclErr = 
+  ptext SLIT("Illegal family instance in hs-boot file")
 
 wrongKindOfFamily family =
-  ptext SLIT("Wrong category of type instance; declaration was for a") <+>
+  ptext SLIT("Wrong category of family instance; declaration was for a") <+>
   kindOfFamily
   where
     kindOfFamily | isSynTyCon  family = ptext SLIT("type synonym")

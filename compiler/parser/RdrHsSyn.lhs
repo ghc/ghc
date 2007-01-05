@@ -311,7 +311,7 @@ add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs, hs_docs = docs})
 		addl (gp { hs_tyclds = L l d : ts, 
                            hs_fixds = fsigs ++ fs,
                            hs_docs = add_doc decl docs}) ds
-	| isIdxTyDecl d = 
+	| isFamInstDecl d = 
 	        addl (gp { hs_tyclds = L l d : ts }) ds
 	| otherwise =
 		addl (gp { hs_tyclds = L l d : ts, 
@@ -548,7 +548,7 @@ checkKindSigs :: [LTyClDecl RdrName] -> P ()
 checkKindSigs = mapM_ check
   where
     check (L l tydecl) 
-      | isKindSigDecl tydecl
+      | isFamilyDecl tydecl
         || isSynDecl tydecl  = return ()
       | otherwise	     = 
 	parseError l "Type declaration in a class must be a kind signature or synonym default"

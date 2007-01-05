@@ -147,9 +147,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 		-- (they recover, so that we get more than one error each
 		-- round) 
 
-		-- (1) Do class instance declarations and instances of indexed
-		--     types 
-       ; let { idxty_decls = filter (isIdxTyDecl . unLoc) tycl_decls }
+		-- (1) Do class and family instance declarations
+       ; let { idxty_decls = filter (isFamInstDecl . unLoc) tycl_decls }
        ; local_info_tycons <- mappM tcLocalInstDecl1  inst_decls
        ; idx_tycons        <- mappM tcIdxTyInstDeclTL idxty_decls
 
@@ -193,7 +192,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     -- !!!TODO: Need to perform this check for the TyThing of type functions,
     --		too.
     tcIdxTyInstDeclTL ldecl@(L loc decl) =
-      do { tything <- tcIdxTyInstDecl ldecl
+      do { tything <- tcFamInstDecl ldecl
 	 ; setSrcSpan loc $
 	     when (isAssocFamily tything) $
 	       addErr $ assocInClassErr (tcdName decl)
@@ -243,7 +242,7 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; (tyvars, theta, tau) <- tcHsInstHead poly_ty
 	
 	-- Next, process any associated types.
-	; idx_tycons <- mappM tcIdxTyInstDecl ats
+	; idx_tycons <- mappM tcFamInstDecl ats
 
 	-- Now, check the validity of the instance.
 	; (clas, inst_tys) <- checkValidInstHead tau

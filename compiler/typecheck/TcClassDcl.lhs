@@ -727,15 +727,15 @@ mkGenericInstance clas (hs_ty, binds)
 tcAddDeclCtxt decl thing_inside
   = addErrCtxt ctxt thing_inside
   where
-     thing = case decl of
-	   	ClassDecl {}		  -> "class"
-		TySynonym {}		  -> "type synonym"
-		TyFunction {}		  -> "type function signature"
-		TyData {tcdND = NewType}  -> "newtype" ++ maybeSig
-		TyData {tcdND = DataType} -> "data type" ++ maybeSig
+     thing | isClassDecl decl  = "class"
+	   | isTypeDecl decl   = "type synonym" ++ maybeInst
+	   | isDataDecl decl   = if tcdND decl == NewType 
+				 then "newtype" ++ maybeInst
+				 else "data type" ++ maybeInst
+	   | isFamilyDecl decl = "family"
 
-     maybeSig | isKindSigDecl decl = " signature"
-	      | otherwise	   = ""
+     maybeInst | isFamInstDecl decl = " family"
+	       | otherwise          = ""
 
      ctxt = hsep [ptext SLIT("In the"), text thing, 
 		  ptext SLIT("declaration for"), quotes (ppr (tcdName decl))]

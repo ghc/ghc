@@ -422,7 +422,6 @@ data Token
   | ITccallconv
   | ITdotnet
   | ITmdo
-  | ITiso
   | ITfamily
 
 	-- Pragmas
@@ -556,7 +555,6 @@ isSpecial ITunsafe    	= True
 isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
 isSpecial ITmdo		= True
-isSpecial ITiso		= True
 isSpecial ITfamily	= True
 isSpecial _             = False
 
@@ -649,7 +647,7 @@ reservedSymsFM = listToUFM $
        ,("∀",	ITforall,	bit glaExtsBit)
        ,("→",   ITrarrow,	bit glaExtsBit)
        ,("←",   ITlarrow,	bit glaExtsBit)
-       ,("⋯", 	ITdotdot,	bit glaExtsBit)
+       ,("?", 	ITdotdot,	bit glaExtsBit)
         -- ToDo: ideally, → and ∷ should be "specials", so that they cannot
         -- form part of a large operator.  This would let us have a better
         -- syntax for kinds: ɑ∷*→* would be a legal kind signature. (maybe).

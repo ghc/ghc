@@ -380,26 +380,16 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 
 Renaming of the associated types in instances.  
 
-* We raise an error if we encounter a kind signature in an instance.
-
 \begin{code}
 rnATInsts :: [LTyClDecl RdrName] -> RnM ([LTyClDecl Name], FreeVars)
 rnATInsts atDecls = 
   mapFvRn (wrapLocFstM rnATInst) atDecls
   where
-    rnATInst tydecl@TyFunction {} = 
-      do
-        addErr noKindSig
-	rnTyClDecl tydecl
+    rnATInst tydecl@TyData     {} = rnTyClDecl tydecl
     rnATInst tydecl@TySynonym  {} = rnTyClDecl tydecl
-    rnATInst tydecl@TyData     {} = 
-      do
-        checkM (not . isKindSigDecl $ tydecl) $ addErr noKindSig
-        rnTyClDecl tydecl
-    rnATInst _                    =
-      panic "RnSource.rnATInsts: not a type declaration"
-
-noKindSig = text "Instances cannot have kind signatures"
+    rnATInst tydecl               =
+      pprPanic "RnSource.rnATInsts: invalid AT instance" 
+	       (ppr (tcdName tydecl))
 \end{code}
 
 For the method bindings in class and instance decls, we extend the 
@@ -557,17 +547,21 @@ rnTyClDecl (ForeignType {tcdLName = name, tcdFoType = fo_type, tcdExtName = ext_
     returnM (ForeignType {tcdLName = name', tcdFoType = fo_type, tcdExtName = ext_name},
 	     emptyFVs)
 
+-- all flavours of type family declarations ("type family", "newtype fanily",
+-- and "data family")
+rnTyClDecl (tydecl@TyFamily {}) =
+  rnFamily tydecl bindTyVarsRn
+
+-- "data", "newtype", "data instance, and "newtype instance" declarations
 rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context, 
 			   tcdLName = tycon, tcdTyVars = tyvars, 
 			   tcdTyPats = typatsMaybe, tcdCons = condecls, 
 			   tcdKindSig = sig, tcdDerivs = derivs})
-  | isKindSigDecl tydecl  -- kind signature of indexed type
-  = rnTySig tydecl bindTyVarsRn
   | is_vanilla	          -- Normal Haskell data type decl
   = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
 				-- data type is syntactically illegal
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
-    do	{ tycon' <- if isIdxTyDecl tydecl
+    do	{ tycon' <- if isFamInstDecl tydecl
 		    then lookupLocatedOccRn     tycon -- may be imported family
 		    else lookupLocatedTopBndrRn tycon
 	; context' <- rnContext data_doc context
@@ -583,14 +577,14 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 	     	   extractHsCtxtTyNames context'	`plusFV`
 	     	   plusFVs (map conDeclFVs condecls')   `plusFV`
 	     	   deriv_fvs				`plusFV`
-		   (if isIdxTyDecl tydecl
+		   (if isFamInstDecl tydecl
 		   then unitFV (unLoc tycon')	-- type instance => use
 		   else emptyFVs)) 
         }
 
   | otherwise	          -- GADT
   = ASSERT( none typatsMaybe )    -- GADTs cannot have type patterns for now
-    do	{ tycon' <- if isIdxTyDecl tydecl
+    do	{ tycon' <- if isFamInstDecl tydecl
 		    then lookupLocatedOccRn     tycon -- may be imported family
 		    else lookupLocatedTopBndrRn tycon
 	; checkTc (null (unLoc context)) (badGadtStupidTheta tycon)
@@ -608,7 +602,7 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
 	     	   plusFVs (map conDeclFVs condecls') `plusFV` 
 		   deriv_fvs			      `plusFV`
-		   (if isIdxTyDecl tydecl
+		   (if isFamInstDecl tydecl
 		   then unitFV (unLoc tycon')	-- type instance => use
 		   else emptyFVs))
         }
@@ -631,13 +625,11 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
     rn_derivs (Just ds) = rnLHsTypes data_doc ds	`thenM` \ ds' -> 
 			  returnM (Just ds', extractHsTyNames_s ds')
 
-rnTyClDecl (tydecl@TyFunction {}) =
-  rnTySig tydecl bindTyVarsRn
-
+-- "type" and "type instance" declarations
 rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 			      tcdTyPats = typatsMaybe, tcdSynRhs = ty})
   = bindTyVarsRn syn_doc tyvars		        $ \ tyvars' ->
-    do { name' <- if isIdxTyDecl tydecl
+    do { name' <- if isFamInstDecl tydecl
 		  then lookupLocatedOccRn     name -- may be imported family
 		  else lookupLocatedTopBndrRn name
        ; typats' <- rnTyPats syn_doc typatsMaybe
@@ -646,7 +638,7 @@ rnTyClDecl tydecl@(TySynonym {tcdLName = name, tcdTyVars = tyvars,
 			     tcdTyPats = typats', tcdSynRhs = ty'},
 	          delFVs (map hsLTyVarName tyvars') $
 		  fvs			      `plusFV`
-		   (if isIdxTyDecl tydecl
+		   (if isFamInstDecl tydecl
 		   then unitFV (unLoc name')	-- type instance => use
 		   else emptyFVs))
        }
@@ -808,64 +800,45 @@ rnField doc (HsRecField name ty haddock_doc)
     rnMbLHsDoc haddock_doc      `thenM` \ new_haddock_doc ->
     returnM (HsRecField new_name new_ty new_haddock_doc) 
 
--- Rename kind signatures (signatures of indexed data types/newtypes and
--- signatures of type functions)
+-- Rename family declarations
 --
 -- * This function is parametrised by the routine handling the index
 --   variables.  On the toplevel, these are defining occurences, whereas they
 --   are usage occurences for associated types.
 --
-rnTySig :: TyClDecl RdrName 
-        -> (SDoc -> [LHsTyVarBndr RdrName] -> 
-	    ([LHsTyVarBndr Name] -> RnM (TyClDecl Name, FreeVars)) ->
-	    RnM (TyClDecl Name, FreeVars))
-        -> RnM (TyClDecl Name, FreeVars)
+rnFamily :: TyClDecl RdrName 
+         -> (SDoc -> [LHsTyVarBndr RdrName] -> 
+	     ([LHsTyVarBndr Name] -> RnM (TyClDecl Name, FreeVars)) ->
+	     RnM (TyClDecl Name, FreeVars))
+         -> RnM (TyClDecl Name, FreeVars)
 
-rnTySig (tydecl@TyData {tcdCtxt = context, tcdLName = tycon, 
-			tcdTyVars = tyvars, tcdTyPats = mb_typats,
-			tcdCons = condecls, tcdKindSig = sig, 
-			tcdDerivs = derivs}) 
+rnFamily (tydecl@TyFamily {tcdFlavour = flavour, 
+			   tcdLName = tycon, tcdTyVars = tyvars}) 
         bindIdxVars =
-      ASSERT( null condecls )	    -- won't have constructors
-      ASSERT( isNothing mb_typats ) -- won't have type patterns
-      ASSERT( isNothing derivs )    -- won't have deriving
-      ASSERT( isJust sig )          -- will have kind signature
-      do { bindIdxVars (ksig_doc tycon) tyvars $ \tyvars' -> do {
+      do { checkM (isDataFlavour flavour                      -- for synonyms,
+		   || not (null tyvars)) $ addErr needOneIdx  -- #indexes >= 1
+	 ; bindIdxVars (family_doc tycon) tyvars $ \tyvars' -> do {
 	 ; tycon' <- lookupLocatedTopBndrRn tycon
-	 ; context' <- rnContext (ksig_doc tycon) context
-	 ; returnM (TyData {tcdND = tcdND tydecl, tcdCtxt = context', 
-			    tcdLName = tycon', tcdTyVars = tyvars',
-			    tcdTyPats = Nothing, tcdKindSig = sig, 
-			    tcdCons = [], tcdDerivs = Nothing}, 
-		    delFVs (map hsLTyVarName tyvars') $
-	     	    extractHsCtxtTyNames context') 
-         } }
-      where
-
-rnTySig (tydecl@TyFunction {tcdLName = tycon, tcdTyVars = tyvars, 
-			    tcdKind = sig}) 
-        bindIdxVars =
-      do { checkM (not . null $ tyvars) $ addErr needOneIdx   -- #indexes >= 1
-	 ; bindIdxVars (ksig_doc tycon) tyvars $ \tyvars' -> do {
-	 ; tycon' <- lookupLocatedTopBndrRn tycon
-	 ; returnM (TyFunction {tcdLName = tycon', tcdTyVars = tyvars',
-			        tcdIso = tcdIso tydecl, tcdKind = sig}, 
+	 ; returnM (TyFamily {tcdFlavour = flavour, tcdLName = tycon', 
+			      tcdTyVars = tyvars', tcdKind = tcdKind tydecl}, 
 		    emptyFVs) 
          } }
+      where
+        isDataFlavour (DataFamily _) = True
+	isDataFlavour _		     = False
 
-ksig_doc tycon = text "In the kind signature for" <+> quotes (ppr tycon)
-needOneIdx = text "Kind signature requires at least one type index"
+family_doc tycon = text "In the family declaration for" <+> quotes (ppr tycon)
+needOneIdx = text "Type family declarations requires at least one type index"
 
 -- Rename associated type declarations (in classes)
 --
--- * This can be kind signatures and (default) type function equations.
+-- * This can be family declarations and (default) type instances
 --
 rnATs :: [LTyClDecl RdrName] -> RnM ([LTyClDecl Name], FreeVars)
 rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
   where
-    rn_at (tydecl@TyData     {}) = rnTySig tydecl lookupIdxVars
-    rn_at (tydecl@TyFunction {}) = rnTySig tydecl lookupIdxVars
-    rn_at (tydecl@TySynonym  {}) = 
+    rn_at (tydecl@TyFamily  {}) = rnFamily tydecl lookupIdxVars
+    rn_at (tydecl@TySynonym {}) = 
       do
         checkM (isNothing (tcdTyPats tydecl)) $ addErr noPatterns
         rnTyClDecl tydecl

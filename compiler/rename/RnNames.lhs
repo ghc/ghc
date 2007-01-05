@@ -17,7 +17,7 @@ import DynFlags		( DynFlag(..), GhcMode(..), DynFlags(..) )
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
 			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
-			  instDeclATs, isIdxTyDecl,
+			  instDeclATs, isFamInstDecl,
 			  LIE )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
@@ -336,7 +336,7 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
     for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
 
     new_tc tc_decl 
-      | isIdxTyDecl (unLoc tc_decl)
+      | isFamInstDecl (unLoc tc_decl)
 	= do { main_name <- lookupFamInstDeclBndr mod main_rdr
 	     ; sub_names <- mappM (newTopSrcBinder mod) sub_rdrs
 	     ; return (AvailTC main_name sub_names) }
