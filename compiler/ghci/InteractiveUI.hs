@@ -1517,11 +1517,13 @@ doBreakpoint ref_bkptTable s@(Session ref) values _ locMsg b = do
      printScopeMsg location ids = do
        unqual  <- GHC.getPrintUnqual s
        printForUser stdout unqual $
-         text "Local bindings in scope:" $$
+         text "Stopped at a breakpoint in " <> text (stripColumn location) <>
+         char '.' <+> text "Local bindings in scope:" $$
          nest 2 (pprWithCommas showId ids)
       where 
            showId id = 
                 ppr (idName id) <+> dcolon <+> ppr (idType id) 
+           stripColumn = reverse . tail . dropWhile (/= ':') . reverse
 
 -- | Give the Id a Global Name, and tidy its type
      globaliseAndTidy :: Id -> Id
