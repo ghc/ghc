@@ -343,7 +343,7 @@ customPrintTerm custom = let
 customPrintTermBase :: Monad m => (Int->Term-> m SDoc)->[Term->m (Maybe SDoc)]
 customPrintTermBase showP =
   [ 
-    test isTupleDC (liftM (parens . cat . punctuate comma) . mapM (showP 0) . subTerms)
+    test isTupleDC (liftM (parens . hcat . punctuate comma) . mapM (showP 0) . subTerms)
   , test (isDC consDataCon) (\Term{subTerms=[h,t]} -> doList h t)
   , test (isDC intDataCon)  (coerceShow$ \(a::Int)->a)
   , test (isDC charDataCon) (coerceShow$ \(a::Char)->a)
@@ -370,7 +370,7 @@ customPrintTermBase showP =
                             1 -> last0 
                             _ | isConsLast -> text " | " <> last0
                             _ -> comma <> last0
-               return$ brackets (cat (punctuate comma init ++ [last]))
+               return$ brackets (hcat (punctuate comma init ++ [last]))
 
                 where Just a /= Just b = not (a `coreEqType` b)
                       _      /=   _    = True
