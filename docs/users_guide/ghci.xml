@@ -1641,6 +1641,7 @@ qsort2.hs:2:15-46>
       type to do its work. </para>
       <para> Let's go on with the debugging session of the <code>qsort</code>
       example:
+<example id="debuggingEx"><title>A short debugging session</title>
 <programlisting>
 qsort2.hs:2:15-46> x
 This is an untyped, unevaluated computation. You can use seq to 
@@ -1658,7 +1659,7 @@ x - 10
 qsort2.hs:2:15-46> :t x <co id="seq5"/>
 x :: Int
 </programlisting>
-
+</example>
       <calloutlist>
 	<callout arearefs="seq1">
 	  <para>GHCi reminds us that this value is untyped, and instructs us to force its evaluation </para>
@@ -1767,7 +1768,44 @@ x :: Int
       </itemizedlist>      
      </para>
     </sect2>
-    </sect1>
+    <sect2><title>Tips</title>
+      <variablelist>
+	<varlistentry><term>* Use PRAGMAs to fine tune which modules are loaded under debugging mode</term>
+	  <listitem>
+	    <programlisting>{-# OPTIONS_GHC -fdebugging #-}</programlisting>
+	  </listitem>
+	</varlistentry>
+	<varlistentry> <term>* Repeated use of <code>seq</code> and 
+	    <literal>:print</literal> may be necessary to observe unevaluated
+	    untyped bindings</term> 
+	  <listitem><para>see <xref linkend="debuggingEx"/> 
+	  </para></listitem>
+	</varlistentry>
+	<varlistentry> <term> * <code>GHC.Exts.unsafeCoerce</code> can help if you are positive about the type of a binding</term> 
+	  <listitem><para><programlisting>
+type MyLongType a = [Maybe [Maybe a]]
+
+main:Main> :m +GHC.Exts
+main:Main> main
+Local bindings in scope:
+  x :: a
+Main.hs:15> let x' = unsafeCoerce x :: MyLongType Bool
+Main.hs:15> x'
+[Just [Just False, Just True]]
+	  </programlisting>
+	   Note that a wrong coercion will likely result in your debugging session being interrupted by a segmentation fault 
+	  </para></listitem>
+	</varlistentry>
+	<varlistentry> <term> * The undocumented (and unsupported) &colon;force command </term>
+	  <listitem><para> 
+	      equivalent to <literal> :print</literal> with automatic 
+	      <code>seq</code> forcing, 
+	      may prove useful to replace sequences of <code>seq</code> and 
+	      <literal>&colon;print</literal> in some situations. 
+	  </para></listitem>
+	</varlistentry> 
+    </variablelist>
+    </sect2></sect1>
   <sect1 id="ghci-dot-files">
     <title>The <filename>.ghci</filename> file</title>
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
