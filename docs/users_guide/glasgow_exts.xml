@@ -620,7 +620,7 @@ to write clunky would be to use case expressions:
 </para>
 
 <programlisting>
-clunky env var1 var1 = case lookup env var1 of
+clunky env var1 var2 = case lookup env var1 of
   Nothing -&gt; fail
   Just val1 -&gt; case lookup env var2 of
     Nothing -&gt; fail
@@ -645,7 +645,7 @@ Here is how I would write clunky:
 </para>
 
 <programlisting>
-clunky env var1 var1
+clunky env var1 var2
   | Just val1 &lt;- lookup env var1
   , Just val2 &lt;- lookup env var2
   = val1 + val2
