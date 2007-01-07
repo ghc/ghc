@@ -61,7 +61,6 @@ import Name
 import VarEnv
 import OccName
 import VarSet
-import Unique
 import {-#SOURCE#-} TcRnDriver ( tcRnRecoverDataCon )
 
 import TysPrim		
@@ -124,6 +123,11 @@ isPrim   _    = False
 
 termType t@(Suspension {}) = mb_ty t
 termType t = Just$ ty t
+
+isFullyEvaluatedTerm :: Term -> Bool
+isFullyEvaluatedTerm Term {subTerms=tt} = all isFullyEvaluatedTerm tt
+isFullyEvaluatedTerm Suspension {}      = False
+isFullyEvaluatedTerm Prim {}            = True
 
 instance Outputable (Term) where
  ppr = head . customPrintTerm customPrintTermBase
@@ -358,7 +362,7 @@ customPrintTermBase showP =
                                     , largeIntegerDataConName] 
            isTupleDC Term{dc=dc}   = dc `elem` snd (unzip (elems boxedTupleArr))
            isDC a_dc Term{dc=dc}   = a_dc == dc
-           coerceShow f Term{val=val} = return . text . show . f . unsafeCoerce# $ val
+           coerceShow f = return . text . show . f . unsafeCoerce# . val
            --TODO pprinting of list terms is not lazy
            doList h t = do
                let elems = h : getListTerms t
@@ -378,12 +382,6 @@ customPrintTermBase showP =
                       getListTerms t@Term{subTerms=[]}  = []
                       getListTerms t@Suspension{}       = [t]
                       getListTerms t = pprPanic "getListTerms" (ppr t)
-
-isFullyEvaluatedTerm :: Term -> Bool
-isFullyEvaluatedTerm Term {subTerms=tt} = all isFullyEvaluatedTerm tt
-isFullyEvaluatedTerm Suspension {}      = False
-isFullyEvaluatedTerm Prim {}            = True
-
 
 -----------------------------------
 -- Type Reconstruction

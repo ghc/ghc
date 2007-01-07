@@ -114,9 +114,6 @@ debug_enabled = do
 debug_enabled = return False
 #endif
 
-maybeInsertBreakpoint :: LHsExpr Id -> Type ->  DsM (LHsExpr Id)
---maybeInsertBreakpoint e | pprTrace("insertBreakpoint at" (ppr e) False = undefined
-
 isInstrumentationSpot (L loc e) = do
   ghcmode   <- getGhcModeDs
   instrumenting <- debug_enabled 
@@ -144,7 +141,6 @@ dynBreakpoint loc = do
 
 -- Records a breakpoint site and returns the site number
 recordBkpt :: SrcLoc -> DsM (Int)
---recordBkpt | trace "recordBkpt" False = undefined
 recordBkpt loc = do
     sites_var <- getBkptSitesDs
     sites     <- ioToIOEnv$ readIORef sites_var
@@ -180,13 +176,14 @@ mkJumpFunc bkptFuncId
 
 breakpoints_enabled :: DsM Bool
 dsAndThenMaybeInsertBreakpoint :: LHsExpr Id -> DsM CoreExpr
+-- | Takes an expression and its type
+maybeInsertBreakpoint :: LHsExpr Id -> Type ->  DsM (LHsExpr Id)
 
 #ifdef GHCI
 maybeInsertBreakpoint lhsexpr@(L loc _) ty = do 
   instrumenting <- isInstrumentationSpot lhsexpr
   if instrumenting
          then do L _ dynBkpt <- dynBreakpoint loc 
---                 return (l (HsApp (l$ TyApp dynBkpt [ty]) lhsexpr))
                  return$ l(HsApp (l$ HsWrap (WpTyApp ty) dynBkpt) lhsexpr)
          else return lhsexpr
   where l = L loc
