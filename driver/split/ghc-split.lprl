@@ -25,6 +25,7 @@ exit(0);
 \begin{code}
 sub split_asm_file {
     local($asm_file) = @_;
+    my @pieces = ();
 
     open(TMPI, "< $asm_file") || &tidy_up_and_die(1,"$Pgm: failed to open `$asm_file' (to read)\n");
 
@@ -54,33 +55,36 @@ sub split_asm_file {
 
 	# grab and de-mangle a section of the .s file...
 	$s_stuff = &ReadTMPIUpToAMarker ( $_, $octr );
-	$this_piece = &process_asm_block ( $s_stuff );
+	$pieces[$octr] = &process_asm_block ( $s_stuff );
+    }
 
+    # Make sure that we still have some output when the input file is empty
+    if ($octr == 0) {
+        $octr = 1;
+        $pieces[$octr] = '';
+    }
+
+    $NoOfSplitFiles = $octr;
+
+    if ($pieces[$NoOfSplitFiles] =~ /(\n[ \t]*\.section[ \t]+\.note\.GNU-stack,[^\n]*\n)/) {
+        $note_gnu_stack = $1;
+        for $octr (1..($NoOfSplitFiles - 1)) {
+            $pieces[$octr] .= $note_gnu_stack;
+        }
+    }
+
+    for $octr (1..$NoOfSplitFiles) {
 	# output to a file of its own
 	# open a new output file...
 	$ofname = "${Tmp_prefix}__${octr}.s";
 	open(OUTF, "> $ofname") || die "$Pgm: can't open output file: $ofname\n";
 
 	print OUTF $prologue_stuff;
-	print OUTF $this_piece;
+	print OUTF $pieces[$octr];
 
 	close(OUTF)
 	  || &tidy_up_and_die(1,"$Pgm:Failed writing ${Tmp_prefix}__${octr}.s\n");
     }
-
-    # Make sure that we still have some output when the input file is empty
-    if ( $octr == 0 ) {
-        $octr = 1;
-	$ofname = "${Tmp_prefix}__${octr}.s";
-	open(OUTF, "> $ofname") || die "$Pgm: can't open output file: $ofname\n";
-
-	print OUTF $prologue_stuff;
-
-	close(OUTF)
-	  || &tidy_up_and_die(1,"$Pgm:Failed writing ${Tmp_prefix}__${octr}.s\n");
-    }
-
-    $NoOfSplitFiles = $octr;
 
     close(TMPI) || &tidy_up_and_die(1,"Failed reading $asm_file\n");
 }
