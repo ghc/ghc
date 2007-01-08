@@ -62,10 +62,36 @@ readBinIface_ hi_path nc = do
 	throwDyn (ProgramError (
 	   "magic number mismatch: old/corrupt interface file?"))
 
+        -- Get the dictionary pointer.  We won't attempt to actually
+        -- read the dictionary until we've done the version checks below,
+        -- just in case this isn't a valid interface.  In retrospect the
+        -- version should have come before the dictionary pointer, but this
+        -- is the way it was done originally, and we can't change it now.
+  dict_p <- Binary.get bh	-- Get the dictionary ptr
+
+        -- Check the interface file version and ways.
+  check_ver  <- get bh
+  let our_ver = show opt_HiVersion
+  when (check_ver /= our_ver) $
+        -- This will be caught by readIface which will emit an error
+        -- msg containing the iface module name.
+    throwDyn (ProgramError (
+        "mismatched interface file versions: expected "
+        ++ our_ver ++ ", found " ++ check_ver))
+
+  check_way <- get bh
+  ignore_way <- readIORef v_IgnoreHiWay
+  way_descr <- getWayDescr
+  when (not ignore_way && check_way /= way_descr) $
+        -- This will be caught by readIface
+        -- which will emit an error msg containing the iface module name.
+     throwDyn (ProgramError (
+  	"mismatched interface file ways: expected "
+  	++ way_descr ++ ", found " ++ check_way))
+
 	-- Read the dictionary
 	-- The next word in the file is a pointer to where the dictionary is
 	-- (probably at the end of the file)
-  dict_p <- Binary.get bh	-- Get the dictionary ptr
   data_p <- tellBin bh		-- Remember where we are now
   seekBin bh dict_p
   dict <- getDictionary bh
@@ -94,6 +120,11 @@ writeBinIface dflags hi_path mod_iface = do
 	-- Remember where the dictionary pointer will go
   dict_p_p <- tellBin bh
   put_ bh dict_p_p	-- Placeholder for ptr to dictionary
+
+        -- The version and way descriptor go next
+  put_ bh (show opt_HiVersion)
+  way_descr <- getWayDescr
+  put  bh way_descr
 
         -- Remember where the symbol table pointer will go
   symtab_p_p <- tellBin bh
@@ -263,9 +294,6 @@ instance Binary ModIface where
 		 mi_fam_insts = fam_insts,
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers }) = do
-	put_ bh (show opt_HiVersion)
-	way_descr <- getWayDescr
-	put  bh way_descr
 	put_ bh mod
 	put_ bh is_boot
 	put_ bh mod_vers
@@ -284,25 +312,6 @@ instance Binary ModIface where
 	put_ bh rule_vers
 
    get bh = do
-	check_ver  <- get bh
-	let our_ver = show opt_HiVersion
-        when (check_ver /= our_ver) $
-	   -- use userError because this will be caught by readIface
-	   -- which will emit an error msg containing the iface module name.
-	   throwDyn (ProgramError (
-		"mismatched interface file versions: expected "
-		++ our_ver ++ ", found " ++ check_ver))
-
-	check_way <- get bh
-        ignore_way <- readIORef v_IgnoreHiWay
-	way_descr <- getWayDescr
-        when (not ignore_way && check_way /= way_descr) $
-	   -- use userError because this will be caught by readIface
-	   -- which will emit an error msg containing the iface module name.
-	   throwDyn (ProgramError (
-		"mismatched interface file ways: expected "
-		++ way_descr ++ ", found " ++ check_way))
-
 	mod_name  <- get bh
 	is_boot   <- get bh
 	mod_vers  <- get bh
