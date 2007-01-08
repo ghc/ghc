@@ -520,7 +520,7 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod ):
 
         # we don't check the compiler's stderr for a compile-and-run test
         return simple_run( name, way, './'+name, getTestOpts().extra_run_opts,
-                           ignore_output )
+                           getTestOpts().ignore_output )
 
 def compile_and_run( name, way, extra_hc_opts ):
     return compile_and_run__( name, way, extra_hc_opts, '' )
