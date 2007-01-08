@@ -814,6 +814,8 @@ sub mangle_asm {
 	}
     }
     $numchks = $#chk + 1;
+    $chk[$numchks] = ''; # We might push .note.GNU-stack into this
+    $chkcat[$numchks] = 'verbatim'; # If we do, write it straight back out
 
     # open CHUNKS, ">/tmp/chunks1" or die "Cannot open /tmp/chunks1: $!\n";
     # for (my $i = 0; $i < @chk; ++$i) { print CHUNKS "======= $i =======\n", $chk[$i] }
@@ -1174,12 +1176,18 @@ sub mangle_asm {
 	        }
 	    }
 
-	    elsif ( $i < ($numchks - 1)
-	      && ( $to_move =~ /${T_COPY_DIRVS}/
-	        || ($TargetPlatform =~ /^hppa/ && $to_move =~ /align/ && $chkcat[$i+1] eq 'literal') )) {
-		$chk[$i + 1] = $to_move . $chk[$i + 1];
-		# otherwise they're tossed
-	    }
+            elsif (   (    $i < ($numchks - 1)
+                       && ( $to_move =~ /${T_COPY_DIRVS}/
+                           || (   $TargetPlatform =~ /^hppa/
+                               && $to_move =~ /align/
+                               && $chkcat[$i+1] eq 'literal')
+                          )
+                      )
+                   || ($to_move =~ /^[ \t]*\.section[ \t]+\.note\.GNU-stack,/)
+                  ) {
+                $chk[$i + 1] = $to_move . $chk[$i + 1];
+                # otherwise they're tossed
+            }
 
 	    $c =~ s/${T_MOVE_DIRVS}FUNNY#END#THING/FUNNY#END#THING/o;
 	}
@@ -1281,7 +1289,8 @@ sub mangle_asm {
 	}
     }
 
-    for ($i = $FIRST_MANGLABLE; $i < $numchks; $i++) {
+    # $numchks + 1 as we have the extra one for .note.GNU-stack
+    for ($i = $FIRST_MANGLABLE; $i < $numchks + 1; $i++) {
 #	print STDERR "$i: cat $chkcat[$i], symb $chksymb[$i]\n";
 
 	next if $chkcat[$i] eq 'DONE ALREADY';
@@ -1291,6 +1300,9 @@ sub mangle_asm {
 		print OUTASM $T_HDR_misc;
  		&print_doctored($chk[$i], 0);
 	    }
+
+	} elsif ( $chkcat[$i] eq 'verbatim' ) {
+	    print OUTASM $chk[$i];
 
 	} elsif ( $chkcat[$i] eq 'toss' ) {
 	    print STDERR "*** NB: TOSSING code for $chksymb[$i] !!! ***\n";
