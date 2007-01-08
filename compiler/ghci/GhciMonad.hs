@@ -15,6 +15,7 @@ import Data.Char
 import Data.Dynamic
 import Data.Int         ( Int64 )
 import Data.IORef
+import Data.List
 import Data.Typeable
 import System.CPUTime
 import System.IO
@@ -175,9 +176,22 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 GLOBAL_VAR(flush_interp,       error "no flush_interp", IO ())
 GLOBAL_VAR(turn_off_buffering, error "no flush_stdout", IO ())
 
-no_buf_cmd = "System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
-	     " Prelude.>> System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
-flush_cmd  = "System.IO.hFlush System.IO.stdout Prelude.>> System.IO.hFlush System.IO.stderr"
+command_sequence :: [String] -> String
+command_sequence = unwords . intersperse "Prelude.>>"
+
+no_buffer :: String -> String
+no_buffer h = unwords ["System.IO.hSetBuffering",
+                       "System.IO." ++ h,
+                       "System.IO.NoBuffering"]
+
+no_buf_cmd :: String
+no_buf_cmd = command_sequence $ map no_buffer ["stdout", "stderr", "stdin"]
+
+flush_buffer :: String -> String
+flush_buffer h = unwords ["System.IO.hFlush", "System.IO." ++ h]
+
+flush_cmd :: String
+flush_cmd = command_sequence [flush_buffer "stdout", flush_buffer "stderr"]
 
 initInterpBuffering :: GHC.Session -> IO ()
 initInterpBuffering session
