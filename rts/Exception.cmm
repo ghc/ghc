@@ -383,7 +383,7 @@ raisezh_fast
 #endif
     
     /* Inform the Hpc that an exception has been thrown */
-    foreign "C" hs_hpc_event("Raise",CurrentTSO);
+    foreign "C" hs_hpc_raise_event(CurrentTSO "ptr");
 
 retry_pop_stack:
     StgTSO_sp(CurrentTSO) = Sp;

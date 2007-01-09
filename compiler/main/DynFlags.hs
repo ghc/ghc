@@ -206,6 +206,7 @@ data DynFlag
 #endif
    | Opt_PrintBindResult
    | Opt_Haddock
+   | Opt_Hpc_No_Auto
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -1064,7 +1065,8 @@ fFlags = [
 #if defined(GHCI) && defined(DEBUGGER)
   ( "debugging",                        Opt_Debugging),
 #endif
-  ( "force-recomp",			Opt_ForceRecomp )
+  ( "force-recomp",			Opt_ForceRecomp ),
+  ( "hpc-no-auto",			Opt_Hpc_No_Auto )
   ]
 
 

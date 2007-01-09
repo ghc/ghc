@@ -1810,7 +1810,7 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 	       (unsigned long)t->id, whatNext_strs[t->what_next]);
 
     /* Inform the Hpc that a thread has finished */
-    hs_hpc_event("Thread Finished",t);
+    hs_hpc_thread_finished_event(t);
 
 #if defined(GRAN)
       endThread(t, CurrentProc); // clean-up the thread
