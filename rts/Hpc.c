@@ -260,7 +260,7 @@ static void breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid);
 // Breakpointing
 static StgThreadID previousTid = 0;
 static StgWord64 rixBPCounter = 0;	// The global event breakpoint counter
-static int tixBoxBP[10000];
+static int *tixBoxBP;
 static int specialOpBP = 0;
 static HpcRixOp rixOpBack[WOP_SIZE];	// The actual op
 static HpcRixOp rixTidBack[WOP_SIZE];	// Tid's before the op
@@ -507,6 +507,10 @@ startupHpc(void) {
     rixCmdFile = fopen(hpcRixCmd,"r");
     assert(rixCmdFile != NULL);
 
+    // Allocate the tixBox breakpoint array
+    // These are set to 1 if you want to 
+    // stop at a specific breakpoint
+    tixBoxBP = (int *)calloc(1,sizeof(int));
   }
 
 }
