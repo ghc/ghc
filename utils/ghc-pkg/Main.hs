@@ -556,7 +556,34 @@ describeField flags pkgid field = do
     Nothing -> die ("unknown field: " ++ field)
     Just fn -> do
 	ps <- findPackages db_stack pkgid 
-	mapM_ (putStrLn.fn) ps
+        let top_dir = getFilenameDir (fst (last db_stack))
+	mapM_ (putStrLn . fn) (mungePackagePaths top_dir ps)
+
+mungePackagePaths :: String -> [InstalledPackageInfo] -> [InstalledPackageInfo]
+-- Replace the string "$topdir" at the beginning of a path
+-- with the current topdir (obtained from the -B option).
+mungePackagePaths top_dir ps = map munge_pkg ps
+  where
+  munge_pkg p = p{ importDirs        = munge_paths (importDirs p),
+		   includeDirs       = munge_paths (includeDirs p),
+    		   libraryDirs       = munge_paths (libraryDirs p),
+		   frameworkDirs     = munge_paths (frameworkDirs p),
+        	   haddockInterfaces = munge_paths (haddockInterfaces p),
+        	   haddockHTMLs      = munge_paths (haddockHTMLs p)
+                 }
+
+  munge_paths = map munge_path
+
+  munge_path p 
+	  | Just p' <- maybePrefixMatch "$topdir" p = top_dir ++ p'
+	  | otherwise				    = p
+
+maybePrefixMatch :: String -> String -> Maybe String
+maybePrefixMatch []    rest = Just rest
+maybePrefixMatch (_:_) []   = Nothing
+maybePrefixMatch (p:pat) (r:rest)
+  | p == r    = maybePrefixMatch pat rest
+  | otherwise = Nothing
 
 toField :: String -> Maybe (InstalledPackageInfo -> String)
 -- backwards compatibility:
