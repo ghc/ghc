@@ -294,10 +294,19 @@ tcExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
+-- For tuples, take care to preserve rigidity
+-- E.g. 	case (x,y) of ....
+-- 	   The scrutinee should have a rigid type if x,y do
+-- The general scheme is the same as in tcIdApp
 tcExpr (ExplicitTuple exprs boxity) res_ty
-  = do	{ arg_tys <- boxySplitTyConApp (tupleTyCon boxity (length exprs)) res_ty
-	; exprs' <-  tcPolyExprs exprs arg_tys
-	; return (ExplicitTuple exprs' boxity) }
+  = do	{ tvs <- newBoxyTyVars [argTypeKind | e <- exprs]
+	; let tup_tc     = tupleTyCon boxity (length exprs)
+	      tup_res_ty = mkTyConApp tup_tc (mkTyVarTys tvs)
+	; arg_tys   <- preSubType tvs (mkVarSet tvs) tup_res_ty res_ty
+	; exprs'    <-  tcPolyExprs exprs arg_tys
+	; arg_tys' <- mapM refineBox arg_tys
+	; co_fn <- tcFunResTy (tyConName tup_tc) (mkTyConApp tup_tc arg_tys') res_ty
+	; return (mkHsWrap co_fn (ExplicitTuple exprs' boxity)) }
 
 tcExpr (HsProc pat cmd) res_ty
   = do	{ (pat', cmd') <- tcProc pat cmd res_ty
