@@ -33,6 +33,22 @@ bring.
     url = "citeseer.ist.psu.edu/pierce95foundational.html"
    }
 
+> So it sounds to me like the (terminating) type checker solves the
+> halting problem.  Can you please explain which part of this I have
+> misunderstood?
+
+The Terminating datatype takes three parameters:
+1. A term in the untyped lambda calculus
+2. A sequence of beta reductions
+3. A proof that the result of the beta reductions is normalized.
+
+Number 2 is the hard part. For a term that calculated the factorial of
+5, the list in part 2 would be at least 120 items long, and each one
+is kind of a pain.
+
+GHC's type checker ends up doing exactly what it was doing before:
+checking proofs.
+
 -}
 
 

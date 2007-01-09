@@ -57,6 +57,7 @@ test('data1', normal, compile, [''])
 test('data2', normal, compile, [''])
 
 test('termination', normal, compile, [''])
+test('set', normal, compile, [''])
 
 
 # New ones from Dimitrios
