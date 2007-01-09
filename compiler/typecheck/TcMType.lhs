@@ -81,7 +81,7 @@ import UniqSupply
 import SrcLoc
 import Outputable
 
-import Control.Monad	( when )
+import Control.Monad	( when, unless )
 import Data.List	( (\\) )
 \end{code}
 
@@ -826,12 +826,15 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
 		--	type Foo a = Tree [a]
 		--	f :: Foo a b -> ...
 	; case tcView ty of
-	     Just ty' -> check_tau_type rank ubx_tup ty'	-- Check expansion
-	     Nothing  -> failWithTc arity_msg
+	     Just ty' -> check_tau_type rank ubx_tup ty' -- Check expansion
+	     Nothing -> unless (isOpenTyCon tc           -- No expansion if open
+			        && tyConArity tc <= length tys) $
+		          failWithTc arity_msg
 
 	; gla_exts <- doptM Opt_GlasgowExts
-	; if gla_exts then
-	-- If -fglasgow-exts then don't check the type arguments
+	; if gla_exts && not (isOpenTyCon tc) then
+	-- If -fglasgow-exts then don't check the type arguments of 
+	-- *closed* synonyms.
 	-- This allows us to instantiate a synonym defn with a 
 	-- for-all type, or with a partially-applied type synonym.
 	-- 	e.g.   type T a b = a
