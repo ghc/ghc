@@ -1384,11 +1384,13 @@ handler :: Exception -> GHCi Bool
 handler (DynException dyn) 
   | Just StopChildSession <- fromDynamic dyn 
      -- propagate to the parent session
-  = ASSERTM (liftM not isTopLevel) >> throwDyn StopChildSession
+  = do ASSERTM (liftM not isTopLevel) 
+       throwDyn StopChildSession
 
   | Just (ChildSessionStopped msg) <- fromDynamic dyn 
      -- Reload modules and display some message
-  = ASSERTM (isTopLevel) >> io(putStrLn msg) >> return False
+  = do ASSERTM (isTopLevel) 
+       io(putStrLn msg) >> return False
 
 handler exception = do
   flushInterpBuffers
