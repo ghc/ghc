@@ -849,10 +849,11 @@ bindIrredsR loc qtvs co_vars reft givens irreds
 		-- The givens can include methods
 		-- See Note [Pruning the givens in an implication constraint]
 
-	   -- If there are no 'givens', then it's safe to 
+	   -- If there are no 'givens' *and* the refinement is empty
+	   -- (the refinement is like more givens), then it's safe to 
 	   -- partition the 'wanteds' by their qtvs, thereby trimming irreds
 	   -- See Note [Freeness and implications]
-	; irreds' <- if null givens'
+	; irreds' <- if null givens' && isEmptyRefinement reft
 	     	     then do
 	     	    	{ let qtv_set = mkVarSet qtvs
 	     	    	      (frees, real_irreds) = partition (isFreeWrtTyVars qtv_set) irreds
