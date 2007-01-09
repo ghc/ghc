@@ -30,14 +30,40 @@ Packages
     <indexterm><primary>packages</primary>
       <secondary>using</secondary></indexterm>
     
-    <para>GHC only knows about packages that are <emphasis>installed</emphasis>.</para>
+    <para>GHC only knows about packages that are
+      <emphasis>installed</emphasis>. To see which packages are installed, use
+      the <literal>ghc-pkg</literal> command:</para>
+
+<screen>
+$ ghc-pkg list
+/usr/lib/ghc-6.4/package.conf:
+    base-1.0, haskell98-1.0, template-haskell-1.0, mtl-1.0, unix-1.0,
+    Cabal-1.0, haskell-src-1.0, parsec-1.0, network-1.0,
+    QuickCheck-1.0, HUnit-1.1, fgl-1.0, X11-1.1, HGL-3.1, OpenGL-2.0,
+    GLUT-2.0, stm-1.0, readline-1.0, (lang-1.0), (concurrent-1.0),
+    (posix-1.0), (util-1.0), (data-1.0), (text-1.0), (net-1.0),
+    (hssource-1.0), rts-1.0
+      </screen>
 
     <para>An installed package is either <emphasis>exposed</emphasis> or <emphasis>hidden</emphasis>
-      by default.  Command-line flags, described below, allow you to expose a hidden package
+      by default.      Packages hidden by default are listed in
+      parentheses (eg. <literal>(lang-1.0)</literal>) in the output above.  Command-line flags, described below, allow you to expose a hidden package
       or hide an exposed one.
       Only modules from exposed packages may be imported by your Haskell code; if
       you try to import a module from a hidden package, GHC will emit an error
       message.</para>
+
+    <para>To see which modules are provided by a package use the
+      <literal>ghc-pkg</literal> command (see <xref linkend="package-management"/>):</para>
+    
+<screen>
+$ ghc-pkg field network exposed-modules
+exposed-modules: Network.BSD,
+                 Network.CGI,
+                 Network.Socket,
+                 Network.URI,
+                 Network
+</screen>
 
     <para>The GHC command line options that control packages are:</para>
 
@@ -163,47 +189,6 @@ Packages
 	</listitem>
       </varlistentry>
     </variablelist>
-
-
-    <para>To see which packages are installed, use the
-      <literal>ghc-pkg</literal> command:</para>
-
-<screen>
-$ ghc-pkg list
-/usr/lib/ghc-6.4/package.conf:
-    base-1.0, haskell98-1.0, template-haskell-1.0, mtl-1.0, unix-1.0,
-    Cabal-1.0, haskell-src-1.0, parsec-1.0, network-1.0,
-    QuickCheck-1.0, HUnit-1.1, fgl-1.0, X11-1.1, HGL-3.1, OpenGL-2.0,
-    GLUT-2.0, stm-1.0, readline-1.0, (lang-1.0), (concurrent-1.0),
-    (posix-1.0), (util-1.0), (data-1.0), (text-1.0), (net-1.0),
-    (hssource-1.0), rts-1.0
-      </screen>
-
-    <para>Packages hidden by default are listed in
-      parentheses (eg. <literal>(lang-1.0)</literal>) in the output above.
-      To expose a package which is hidden by
-      default, use the <option>-package</option>
-      flag (see above).</para>
-    
-    <para>When a package is exposed, it makes available for import the <emphasis>exposed modules</emphasis>
-    of the package.  To see which modules are exposed by a package use the
-      <literal>ghc-pkg</literal> command (see <xref linkend="package-management"/>):</para>
-    
-<screen>
-$ ghc-pkg field network exposed-modules
-exposed-modules: Network.BSD,
-                 Network.CGI,
-                 Network.Socket,
-                 Network.URI,
-                 Network
-</screen>
-
-    <para>In general, packages containing hierarchical modules are usually
-      exposed by default.  However, it is possible for two packages to contain
-      the same module: in this case, only one of the packages should be
-      exposed.  It is an error to import a module that belongs to more than one
-      exposed package.</para>
-
   </sect2>
 
   <sect2 id="package-main">
