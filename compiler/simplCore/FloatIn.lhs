@@ -20,7 +20,7 @@ import DynFlags	( DynFlags, DynFlag(..) )
 import CoreSyn
 import CoreUtils	( exprIsHNF, exprIsDupable )
 import CoreLint		( showPass, endPass )
-import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
+import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf, idRuleVars )
 import Id		( isOneShotBndr )
 import Var		( Id, idType )
 import Type		( isUnLiftedType )
@@ -124,7 +124,7 @@ the closure for a is not built.
 type FreeVarsSet   = IdSet
 
 type FloatingBinds = [(CoreBind, FreeVarsSet)]
-	-- In reverse dependency order (innermost bindiner first)
+	-- In reverse dependency order (innermost binder first)
 
 	-- The FreeVarsSet is the free variables of the binding.  In the case
 	-- of recursive bindings, the set doesn't include the bound
@@ -240,23 +240,52 @@ So: rather than drop \tr{w}'s binding here, we add it onto the list of
 things to drop in the outer let's body, and let nature take its
 course.
 
+Note [extra_fvs (1): avoid floating into RHS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consdider let x=\y....t... in body.  We do not necessarily want to float 
+a binding for t into the RHS, because it'll immediately be floated out
+again.  (It won't go inside the lambda else we risk losing work.)
+In letrec, we need to be more careful still. We don't want to transform
+	let x# = y# +# 1#
+	in
+	letrec f = \z. ...x#...f...
+	in ...
+into
+	letrec f = let x# = y# +# 1# in \z. ...x#...f... in ...
+because now we can't float the let out again, because a letrec
+can't have unboxed bindings.
+
+So we make "extra_fvs" which is the rhs_fvs of such bindings, and
+arrange to dump bindings that bind extra_fvs before the entire let.
+
+Note [extra_fvs (s): free variables of rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider let x{rule mentioning y} = rhs in body
+Here y is not free in rhs or body; but we still want to dump bindings
+that bind y outside the let.  So we augment extra_fvs with the
+idRuleVars of x.
+
+
 \begin{code}
 fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
   = fiExpr new_to_drop body
   where
     body_fvs = freeVarsOf body
 
-    final_body_fvs | noFloatIntoRhs ann_rhs
-		   || isUnLiftedType (idType id) = body_fvs `unionVarSet` rhs_fvs
-		   | otherwise		         = body_fvs
-	-- See commments with letrec below
+    rule_fvs = idRuleVars id	-- See Note [extra_fvs (2): free variables of rules]
+    extra_fvs | noFloatIntoRhs ann_rhs
+	      || isUnLiftedType (idType id) = rule_fvs `unionVarSet` rhs_fvs
+	      | otherwise		    = rule_fvs
+	-- See Note [extra_fvs (2): avoid floating into RHS]
 	-- No point in floating in only to float straight out again
 	-- Ditto ok-for-speculation unlifted RHSs
 
-    [shared_binds, rhs_binds, body_binds] = sepBindsByDropPoint False [rhs_fvs, final_body_fvs] to_drop
+    [shared_binds, extra_binds, rhs_binds, body_binds] 
+	= sepBindsByDropPoint False [extra_fvs, rhs_fvs, body_fvs] to_drop
 
     new_to_drop = body_binds ++				-- the bindings used only in the body
 		  [(NonRec id rhs', rhs_fvs')] ++ 	-- the new binding itself
+		  extra_binds ++			-- bindings from extra_fvs
 		  shared_binds  			-- the bindings used both in rhs and body
 
 	-- Push rhs_binds into the right hand side of the binding
@@ -271,32 +300,20 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
     rhss_fvs = map freeVarsOf rhss
     body_fvs = freeVarsOf body
 
-	-- Add to body_fvs the free vars of any RHS that has
-	-- a lambda at the top.  This has the effect of making it seem
-	-- that such things are used in the body as well, and hence prevents
-	-- them getting floated in.  The big idea is to avoid turning:
-	--	let x# = y# +# 1#
-	--	in
-	--	letrec f = \z. ...x#...f...
-	--	in ...
-	-- into
-	--	letrec f = let x# = y# +# 1# in \z. ...x#...f... in ...
-	-- 
-	-- Because now we can't float the let out again, because a letrec
-	-- can't have unboxed bindings.
+	-- See Note [extra_fvs (1,2)]
+    extra_fvs = foldr (unionVarSet . get_extras) emptyVarSet bindings
+    get_extras (id, (rhs_fvs, rhs)) 
+	| noFloatIntoRhs rhs = idRuleVars id `unionVarSet` rhs_fvs
+	| otherwise	     = idRuleVars id
 
-    final_body_fvs = foldr (unionVarSet . get_extras) body_fvs rhss
-    get_extras (rhs_fvs, rhs) | noFloatIntoRhs rhs = rhs_fvs
-			      | otherwise	   = emptyVarSet
+    (shared_binds:extra_binds:body_binds:rhss_binds) 
+	= sepBindsByDropPoint False (extra_fvs:body_fvs:rhss_fvs) to_drop
 
-    (shared_binds:body_binds:rhss_binds) = sepBindsByDropPoint False (final_body_fvs:rhss_fvs) to_drop
-
-    new_to_drop = -- the bindings used only in the body
-		  body_binds ++
-		  -- the new binding itself
+    new_to_drop = body_binds ++		-- the bindings used only in the body
 		  [(Rec (fi_bind rhss_binds bindings), rhs_fvs')] ++
-		  -- the bindings used both in rhs and body or in more than one rhs
-		  shared_binds
+					-- The new binding itself
+		  extra_binds ++	-- Note [extra_fvs (1,2)]
+		  shared_binds		-- Used in more than one place
 
     rhs_fvs' = unionVarSet (unionVarSets rhss_fvs)
 			   (unionVarSets (map floatedBindsFVs rhss_binds))
