@@ -560,8 +560,8 @@ isTauTy other		  = False
 isTauTyCon :: TyCon -> Bool
 -- Returns False for type synonyms whose expansion is a polytype
 isTauTyCon tc 
-  | isSynTyCon tc && not (isOpenTyCon tc) = isTauTy (snd (synTyConDefn tc))
-  | otherwise                             = True
+  | isClosedSynTyCon tc = isTauTy (snd (synTyConDefn tc))
+  | otherwise           = True
 
 ---------------
 isBoxyTy :: TcType -> Bool

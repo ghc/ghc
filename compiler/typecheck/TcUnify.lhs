@@ -1366,7 +1366,11 @@ checkTauTvUpdate orig_tv orig_ty
 	     ; case mb_tys' of
 		Just tys' -> return (TyConApp tc tys')
 				-- Retain the synonym (the common case)
-		Nothing   -> go (expectJust "checkTauTvUpdate" 
+		Nothing | isOpenTyCon tc
+			  -> notMonoArgs (TyConApp tc tys)
+				-- Synonym families must have monotype args
+			| otherwise
+			  -> go (expectJust "checkTauTvUpdate" 
 					(tcView (TyConApp tc tys)))
 				-- Try again, expanding the synonym
 	     }
@@ -1586,6 +1590,13 @@ notMonoType ty
 	; env0 <- tcInitTidyEnv
 	; let (env1, tidy_ty) = tidyOpenType env0 ty'
 	      msg = ptext SLIT("Cannot match a monotype with") <+> quotes (ppr tidy_ty)
+	; failWithTcM (env1, msg) }
+
+notMonoArgs ty
+  = do	{ ty' <- zonkTcType ty
+	; env0 <- tcInitTidyEnv
+	; let (env1, tidy_ty) = tidyOpenType env0 ty'
+	      msg = ptext SLIT("Arguments of synonym family must be monotypes") <+> quotes (ppr tidy_ty)
 	; failWithTcM (env1, msg) }
 
 occurCheck tyvar ty

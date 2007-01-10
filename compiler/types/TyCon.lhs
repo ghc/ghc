@@ -17,8 +17,8 @@ module TyCon(
 	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
-	isAlgTyCon, isDataTyCon, isSynTyCon, isNewTyCon, isClosedNewTyCon,
-	isPrimTyCon, 
+	isAlgTyCon, isDataTyCon, isNewTyCon, isClosedNewTyCon, isSynTyCon,
+	isClosedSynTyCon, isPrimTyCon, 
 	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
 	assocTyConArgPoss_maybe, isTyConAssoc, setTyConArgPoss,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
@@ -599,6 +599,13 @@ isProductTyCon other		= False
 isSynTyCon :: TyCon -> Bool
 isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
+
+-- As for newtypes, it is in some contexts important to distinguish between
+-- closed synonyms and synonym families, as synonym families have no unique
+-- right hand side to which a synonym family application can expand.
+--
+isClosedSynTyCon :: TyCon -> Bool
+isClosedSynTyCon tycon = isSynTyCon tycon && not (isOpenTyCon tycon)
 
 isGadtSyntaxTyCon :: TyCon -> Bool
 isGadtSyntaxTyCon (AlgTyCon { algTcGadtSyntax = res }) = res
