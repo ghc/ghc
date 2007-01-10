@@ -410,7 +410,7 @@ becomes
 prepareRhs :: SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
 
-prepareRhs env (Cast rhs co)	-- Note [Float coersions]
+prepareRhs env (Cast rhs co)	-- Note [Float coercions]
   = do	{ (env', rhs') <- makeTrivial env rhs
 	; return (env', Cast rhs' co) }
 
