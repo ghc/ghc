@@ -7,10 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "HsFFI.h"
 
 #include "Rts.h"
 #include "Hpc.h"
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 
 /* This is the runtime support for the Haskell Program Coverage (hpc) toolkit,
  * inside GHC.
@@ -29,7 +33,7 @@ static StgWord64 magicTixNumber;	// Magic/Hash number to mark .tix files
 static FILE *rixFile = NULL;		// The tracer file/pipe (to debugger)
 static FILE *rixCmdFile = NULL;		// The tracer file/pipe (from debugger)
 static StgWord64 rixCounter = 0;	// The global event counter
-
+static int debuggee_pid;
 
 typedef enum {
   RixThreadFinishedOp   = -1,
@@ -261,7 +265,6 @@ static void breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid);
 static StgThreadID previousTid = 0;
 static StgWord64 rixBPCounter = 0;	// The global event breakpoint counter
 static int *tixBoxBP;
-static int specialOpBP = 0;
 static HpcRixOp rixOpBack[WOP_SIZE];	// The actual op
 static HpcRixOp rixTidBack[WOP_SIZE];	// Tid's before the op
 
@@ -291,7 +294,8 @@ hs_hpc_tick(int rixOp, StgTSO *current_tso) {
   StgThreadID tid = (current_tso == 0) ? 0 : current_tso->id;
 
   // now check to see if we have met a breakpoint condition
-  if (rixCounter == rixBPCounter || (specialOpBP && tid != previousTid)) {
+  if (rixCounter == rixBPCounter 
+      || tid != previousTid) {
     breakPointCommand(rixOp,tid);
   } else {
     if (rixOp >= 0) {
@@ -300,10 +304,8 @@ hs_hpc_tick(int rixOp, StgTSO *current_tso) {
 	  breakPointCommand(rixOp,tid);
       }
     } else {
-      // Special op
-      if (specialOpBP) {
-	breakPointCommand(rixOp,tid);
-      }
+      // record the special operation
+      breakPointCommand(rixOp,tid);
     }
   }
   // update the history information.
@@ -324,14 +326,17 @@ printEvent(FILE *out,StgWord64 rixCounter,StgThreadID rixTid,HpcRixOp rixOp) {
     printEvent(stderr,rixCounter,rixTid,rixOp);
   }
 #endif
-  fprintf(out,"%" PRIuWORD64 " %u ",rixCounter,(unsigned int)rixTid);
+  fprintf(out,"Event %" PRIuWORD64 " %u ",rixCounter,(unsigned int)rixTid);
   switch(rixOp) {
   case RixThreadFinishedOp:
     fprintf(out,"ThreadFinished\n");
+    break;
   case RixRaiseOp:
     fprintf(out,"Raise\n");
+    break;
   case RixFinishedOp:
     fprintf(out,"Finished\n");
+    break;
   default:
     fprintf(out,"%u\n",rixOp);
   }
@@ -341,6 +346,13 @@ static void
 breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
   StgWord64 tmp64 = 0;
   unsigned int tmp = 0;
+
+  if (getpid() != debuggee_pid) {
+    // We are not the original process, to do not issue 
+    // any events, and do not try to talk to the debugger.
+    return;
+  }
+
   printEvent(rixFile,rixCounter,rixTid,rixOp);
   fflush(rixFile);
   /* From here, you can ask some basic questions.
@@ -348,12 +360,10 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
    *  c<nat>		set the (one) counter breakpoint
    *  s<nat>		set the (many) tickbox breakpoint
    *  u<nat>		unset the (many) tickbox breakpoint
-   *  x			set special bp 
-   *  o			unset special bp
    *  h			history
 
    * Note that you aways end up here on the first tick
-   * because the specialOpBP is equal 0.
+   * because the rixBPCounter starts equal to 0.
    */
   int c = getc(rixCmdFile);
   while(c != 10 && c != -1) {
@@ -394,20 +404,6 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
 #endif
       tixBoxBP[tmp] = 0;
       break;
-    case 'x': // x -- set special bp flag
-#if DEBUG_HPC
-      fprintf(stderr,"seting specialOpBP = 1\n");
-#endif
-      specialOpBP = 1;
-      c = getc(rixCmdFile);
-      break;
-    case 'o': // o -- clear special bp flag
-#if DEBUG_HPC
-      fprintf(stderr,"seting specialOpBP = 0\n");
-#endif
-      specialOpBP = 0;
-      c = getc(rixCmdFile);
-      break;
     case 'h': // h -- history of the last few (WOP_SIZE) steps 
       if (rixCounter > WOP_SIZE) {
 	tmp64 = rixCounter - WOP_SIZE;
@@ -444,7 +440,7 @@ void
 startupHpc(void) {
   Info *tmpModule;
   char *hpcRix;
-  char *hpcRixCmd;
+
 #if DEBUG_HPC
   fprintf(stderr,"startupHpc\n");
 #endif
@@ -473,10 +469,34 @@ startupHpc(void) {
   if (hpcRix) {
     int comma;
     Info *tmpModule;  
+    int rixFD, rixCmdFD;
 
     assert(hpc_inited);
 
-    rixFile = fopen(hpcRix,"w");
+    if (sscanf(hpcRix,"%d:%d",&rixFD,&rixCmdFD) != 2) {
+      /* Bad format for HPCRIX.
+       */
+      fprintf(stderr,"Bad HPCRIX (%s)\n",hpcRix);
+      exit(0);
+    }
+
+#if DEBUG_HPC    
+    fprintf(stderr,"found HPCRIX pipes: %d:%d\n",rixFD,rixCmdFD);
+#endif
+
+    rixFile = fdopen(rixFD,"w");
+    assert(rixFile != NULL);
+
+    rixCmdFile = fdopen(rixCmdFD,"r");
+    assert(rixCmdFile != NULL);
+
+    // If we fork a process, then we do not want ticks inside
+    // the sub-process to talk to the debugger. So we remember
+    // our pid at startup time, so we can check if we are still
+    // the original process.
+
+    debuggee_pid = getpid();
+
     comma = 0;
     
     fprintf(rixFile,"Starting %s\n",prog_name);
@@ -500,12 +520,6 @@ startupHpc(void) {
     }
     fprintf(rixFile,"]\n");
     fflush(rixFile);
-
-    // Now we open the command channel.
-    hpcRixCmd = getenv("HPCRIXCMD");
-    assert(hpcRixCmd != NULL);
-    rixCmdFile = fopen(hpcRixCmd,"r");
-    assert(rixCmdFile != NULL);
 
     // Allocate the tixBox breakpoint array
     // These are set to 1 if you want to 
