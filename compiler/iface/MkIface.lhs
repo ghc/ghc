@@ -188,7 +188,6 @@ import TyCon
 import DataCon
 import Type
 import TcType
-import TysPrim
 import InstEnv
 import FamInstEnv
 import TcRnMonad
@@ -276,9 +275,13 @@ mkIface hsc_env maybe_old_iface
 			mi_deps     = deps,
 			mi_usages   = usages,
 			mi_exports  = mkIfaceExports exports,
+	
+			-- Sort these lexicographically, so that
+			-- the result is stable across compilations
 			mi_insts    = sortLe le_inst iface_insts,
 			mi_fam_insts= sortLe le_fam_inst iface_fam_insts,
 			mi_rules    = sortLe le_rule iface_rules,
+
 			mi_fixities = fixities,
 			mi_deprecs  = deprecs,
 			mi_globals  = Just rdr_env,
@@ -314,13 +317,18 @@ mkIface hsc_env maybe_old_iface
 
 	; return (new_iface, no_change_at_all) }
   where
-     r1 `le_rule`     r2      = ifRuleName        r1 <= ifRuleName        r2
-     i1 `le_inst`     i2      = ifDFun            i1 <= ifDFun            i2
-     i1 `le_fam_inst` i2      = ifFamInstTyConOcc i1 <= ifFamInstTyConOcc i2
+     r1 `le_rule`     r2 = ifRuleName      r1    <=    ifRuleName      r2
+     i1 `le_inst`     i2 = ifDFun          i1 `le_occ` ifDFun          i2  
+     i1 `le_fam_inst` i2 = ifFamInstTcName i1 `le_occ` ifFamInstTcName i2
+
+     le_occ :: Name -> Name -> Bool
+	-- Compare lexicographically by OccName, *not* by unique, because 
+	-- the latter is not stable across compilations
+     le_occ n1 n2 = nameOccName n1 <= nameOccName n2
 
      dflags = hsc_dflags hsc_env
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
-     ifFamInstTyConOcc = nameOccName . ifaceTyConName . ifFamInstTyCon
+     ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
 
 					      
 -----------------------------

@@ -176,8 +176,9 @@ instance Eq OccName where
     (OccName sp1 s1) == (OccName sp2 s2) = s1 == s2 && sp1 == sp2
 
 instance Ord OccName where
-    compare (OccName sp1 s1) (OccName sp2 s2) = (s1  `compare` s2) `thenCmp`
-						(sp1 `compare` sp2)
+	-- Compares lexicographically, *not* by Unique of the string
+    compare (OccName sp1 s1) (OccName sp2 s2) 
+	= (s1  `compare` s2) `thenCmp` (sp1 `compare` sp2)
 \end{code}
 
 
