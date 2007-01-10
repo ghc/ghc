@@ -89,7 +89,7 @@ difficulty.  The builder's guide on the web site gives a complete
 run-down of what ports work and how to go about porting to a new
 platform; it can be found at
 
-   http://www.haskell.org/ghc/docs/latest/html/building/
+   http://hackage.haskell.org/trac/ghc/wiki/Building
 
 
 Mailing lists

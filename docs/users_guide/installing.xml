@@ -92,7 +92,7 @@ having a Haskell compiler.)
 
 <para>
 Binary distributions come in &ldquo;bundles,&rdquo; one bundle per file called
-<literal><replaceable>bundle</replaceable>-<replaceable>platform</replaceable>.tar.gz</literal>.  (See the building guide for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
+<literal><replaceable>bundle</replaceable>-<replaceable>platform</replaceable>.tar.gz</literal>.  (See the <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building">building guide</ulink> for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
 </para>
 
 <para>
@@ -378,7 +378,7 @@ stuff in your bin directory.
 option, so you can see exactly what pathnames it's using.
 
 If things don't work as expected, check the list of known pitfalls in
-the building guide.
+the <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building">building guide</ulink>.
 </para>
 </listitem>
 
