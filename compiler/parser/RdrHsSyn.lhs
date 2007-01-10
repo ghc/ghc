@@ -797,7 +797,7 @@ mk_gadt_con name qvars cxt ty
 	-- The parser left-associates, so there should 
 	-- not be any OpApps inside the e's
 splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
--- Splits (f ! g a b) into (f, [(! g), a, g])
+-- Splits (f ! g a b) into (f, [(! g), a, b])
 splitBang (L loc (OpApp l_arg bang@(L loc' (HsVar op)) _ r_arg))
   | op == bang_RDR = Just (l_arg, L loc (SectionR bang arg1) : argns)
   where
@@ -809,6 +809,16 @@ splitBang other = Nothing
 isFunLhs :: LHsExpr RdrName 
 	 -> P (Maybe (Located RdrName, Bool, [LHsExpr RdrName]))
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
+--
+-- The whole LHS is parsed as a single expression.  
+-- Any infix operators on the LHS will parse left-associatively
+-- E.g. 	f !x y !z
+-- 	will parse (rather strangely) as 
+--		(f ! x y) ! z
+-- 	It's up to isFunLhs to sort out the mess
+--
+-- a .!. !b 
+
 isFunLhs e = go e []
  where
    go (L loc (HsVar f)) es 
