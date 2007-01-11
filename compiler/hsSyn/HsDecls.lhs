@@ -373,12 +373,16 @@ data TyClDecl name
 		tcdFoType   :: FoType
     }
 
+	-- type/data/newtype family T :: *->*
   | TyFamily {  tcdFlavour:: FamilyFlavour,	        -- type, new, or data
 		tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
 		tcdKind   :: Maybe Kind			-- result kind
     }
 
+	-- Declares a data type or newtype, giving its construcors
+	-- 	data/newtype T a = <constrs>
+	--	data/newtype instance T [a] = <constrs>
   | TyData {	tcdND     :: NewOrData,
 		tcdCtxt   :: LHsContext name,	 	-- Context
 		tcdLName  :: Located name,	 	-- Type constructor
@@ -406,9 +410,6 @@ data TyClDecl name
 			-- Typically the foralls and ty args are empty, but they
 			-- are non-empty for the newtype-deriving case
     }
-	-- data instance: tcdPats = Just tys
-	--
-	-- data:	  tcdPats = Nothing, 
 
   | TySynonym {	tcdLName  :: Located name,	        -- type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
