@@ -208,7 +208,8 @@ simplTopBinds env binds
 		-- It's rather as if the top-level binders were imported.
 	; env <- simplRecBndrs env (bindersOfBinds binds)
 	; dflags <- getDOptsSmpl
-	; let dump_flag = dopt Opt_D_dump_inlinings dflags
+	; let dump_flag = dopt Opt_D_dump_inlinings dflags || 
+			  dopt Opt_D_dump_rule_firings dflags
 	; env' <- simpl_binds dump_flag env binds
 	; freeTick SimplifierDone
 	; return (getFloats env') }
@@ -216,6 +217,9 @@ simplTopBinds env binds
 	-- We need to track the zapped top-level binders, because
 	-- they should have their fragile IdInfo zapped (notably occurrence info)
 	-- That's why we run down binds and bndrs' simultaneously.
+	--
+	-- The dump-flag emits a trace for each top-level binding, which
+	-- helps to locate the tracing for inlining and rule firing
     simpl_binds :: Bool -> SimplEnv -> [InBind] -> SimplM SimplEnv
     simpl_binds dump env []	      = return env
     simpl_binds dump env (bind:binds) = do { env' <- trace dump bind $
@@ -946,7 +950,7 @@ completeCall env var cont
 	; case maybe_rule of {
 	    Just (rule, rule_rhs) -> 
 		tick (RuleFired (ru_name rule))			`thenSmpl_`
-		(if dopt Opt_D_dump_inlinings dflags then
+		(if dopt Opt_D_dump_rule_firings dflags then
 		   pprTrace "Rule fired" (vcat [
 			text "Rule:" <+> ftext (ru_name rule),
 			text "Before:" <+> ppr var <+> sep (map pprParendExpr args),

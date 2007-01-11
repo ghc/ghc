@@ -102,6 +102,7 @@ data DynFlag
    | Opt_D_dump_flatC
    | Opt_D_dump_foreign
    | Opt_D_dump_inlinings
+   | Opt_D_dump_rule_firings
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
    | Opt_D_dump_rn
@@ -932,6 +933,7 @@ dynamic_flags = [
   ,  ( "ddump-flatC",        	 setDumpFlag Opt_D_dump_flatC)
   ,  ( "ddump-foreign",      	 setDumpFlag Opt_D_dump_foreign)
   ,  ( "ddump-inlinings",    	 setDumpFlag Opt_D_dump_inlinings)
+  ,  ( "ddump-rule-firings",   	 setDumpFlag Opt_D_dump_rule_firings)
   ,  ( "ddump-occur-anal",   	 setDumpFlag Opt_D_dump_occur_anal)
   ,  ( "ddump-parsed",       	 setDumpFlag Opt_D_dump_parsed)
   ,  ( "ddump-rn",           	 setDumpFlag Opt_D_dump_rn)
