@@ -423,15 +423,15 @@ ppHtmlIndex :: FilePath
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   maybe_contents_url maybe_source_url maybe_wiki_url modules = do
   let html = 
-	header (documentCharacterEncoding +++
-		thetitle (toHtml (doctitle ++ " (Index)")) +++
+        header (documentCharacterEncoding +++
+                thetitle (toHtml (doctitle ++ " (Index)")) +++
         styleSheet +++
         (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
-	    simpleHeader doctitle maybe_contents_url Nothing
+            simpleHeader doctitle maybe_contents_url Nothing
                          maybe_source_url maybe_wiki_url </>
         search_box </> index_html
-	   )
+           )
 
   writeFile (pathJoin [odir, indexHtmlFile]) (renderHtml html)
   
@@ -451,7 +451,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
       search = "Search: " +++ input ! [identifier "searchbox", strAttr "onkeyup" "quick_search()"] +++ " " +++ input ! [value "Search", thetype "button", onclick "full_search()"]
  
   index_html = td << table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
-	  aboves (map indexElt index) 
+          aboves (map indexElt index) 
 
   index :: [(String, Map GHC.Name [(Module,Bool)])]
   index = sortBy cmp (Map.toAscList full_index)
@@ -463,41 +463,47 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   -- in a visible or invisible way (hence the Bool).
   full_index :: Map String (Map GHC.Name [(Module,Bool)])
   full_index = Map.fromListWith (flip (Map.unionWith (++)))
-		(concat (map getHModIndex modules))
+		(concat (map getIfaceIndex ifaces))
 
-  getHModIndex iface = 
-    [ (getOccString name, 
-	Map.fromList [(name, [(mdl, name `elem` instVisibleExports iface)])])
-    | name <- instExports iface ]
-    where mdl = instMod iface
+  getIfaceIndex iface = 
+    [ (hsNameStr nm, 
+	Map.fromList [(orig, [(mdl, not (nm `elem` iface_reexported iface))])])
+    | (nm, orig) <- Map.toAscList (iface_env iface) ]
+    where mdl = iface_module iface
 
   indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
   indexElt (str, entities) = 
      case Map.toAscList entities of
 	[(nm,entries)] ->  
 	    tda [ theclass "indexentry" ] << toHtml str <-> 
-			indexLinks nm entries
+			indexLinks (unQual nm) entries
 	many_entities ->
 	    tda [ theclass "indexentry" ] << toHtml str </> 
 		aboves (map doAnnotatedEntity (zip [1..] many_entities))
 
   doAnnotatedEntity (j,(nm,entries))
 	= tda [ theclass "indexannot" ] << 
-		toHtml (show j) <+> parens (ppAnnot (nameOccName nm)) <->
+		toHtml (show j) <+> parens (ppAnnot nm) <->
 		 indexLinks nm entries
+	where nm = unQual qnm
 
-  ppAnnot n | not (isValOcc n) = toHtml "Type/Class"
-            | isDataOcc n      = toHtml "Data Constructor"
-            | otherwise        = toHtml "Function"
+  ppAnnot (HsTyClsName n)
+       = toHtml "Type/Class"
+  ppAnnot (HsVarName n)
+       | isUpper c || c == ':'  = toHtml "Data Constructor"
+       | otherwise		= toHtml "Function"
+      where c = head (hsIdentifierStr n)
 
   indexLinks nm entries = 
      tda [ theclass "indexlinks" ] << 
 	hsep (punctuate comma 
 	[ if visible then
-	     linkId mod (Just nm) << toHtml (moduleString mod)
+	     linkId (Module mdl) (Just nm) << toHtml mdl
 	  else
-	     toHtml (moduleString mod)
-	| (mod, visible) <- entries ])
+	     toHtml mdl
+	| (Module mdl, visible) <- entries ])
+
+  initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
 
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
