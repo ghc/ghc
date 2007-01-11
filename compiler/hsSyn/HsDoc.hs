@@ -8,7 +8,6 @@ module HsDoc (
 
 #include "HsVersions.h"
 
-import RdrName
 import Outputable
 import SrcLoc
 
