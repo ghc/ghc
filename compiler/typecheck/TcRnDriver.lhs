@@ -302,6 +302,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_types     = final_type_env,
 				mg_insts     = tcg_insts tcg_env,
 				mg_fam_insts = tcg_fam_insts tcg_env,
+				mg_fam_inst_env = tcg_fam_inst_env tcg_env,
 				mg_rules     = [],
 				mg_binds     = core_binds,
 

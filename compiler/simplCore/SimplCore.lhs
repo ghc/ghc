@@ -134,7 +134,7 @@ doCorePasses hsc_env rb us stats guts (to_do : to_dos)
 
 doCorePass (CoreDoSimplify mode sws)   = _scc_ "Simplify"      simplifyPgm mode sws
 doCorePass CoreCSE		       = _scc_ "CommonSubExpr" trBinds  cseProgram
-doCorePass CoreLiberateCase	       = _scc_ "LiberateCase"  trBinds  liberateCase
+doCorePass CoreLiberateCase	       = _scc_ "LiberateCase"  liberateCase
 doCorePass CoreDoFloatInwards          = _scc_ "FloatInwards"  trBinds  floatInwards
 doCorePass (CoreDoFloatOutwards f)     = _scc_ "FloatOutwards" trBindsU (floatOutwards f)
 doCorePass CoreDoStaticArgs	       = _scc_ "StaticArgs"    trBinds  doStaticArgs
@@ -148,6 +148,8 @@ doCorePass (CoreDoRuleCheck phase pat) = observe (ruleCheck phase pat)
 doCorePass CoreDoNothing	       = observe (\ _ _ -> return ())
 #ifdef OLD_STRICTNESS		       
 doCorePass CoreDoOldStrictness	       = _scc_ "OldStrictness" trBinds doOldStrictness
+#else
+doCorePass CoreDoOldStrictness	       = panic "CoreDoOldStrictness"
 #endif
 
 #ifdef OLD_STRICTNESS

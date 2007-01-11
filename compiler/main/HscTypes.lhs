@@ -485,7 +485,10 @@ data ModGuts
         mg_rdr_env   :: !GlobalRdrEnv,	 -- Top-level lexical environment
 	mg_fix_env   :: !FixityEnv,	 -- Fixity env, for things declared in
 					 --   this module 
-	mg_deprecs   :: !Deprecations,	 -- Deprecations declared in the module
+
+	mg_fam_inst_env :: FamInstEnv,	 -- Type-family instance enviroment
+					 -- for *home-package* modules (including
+					 -- this one).  c.f. tcg_fam_inst_env
 
 	mg_types     :: !TypeEnv,
 	mg_insts     :: ![Instance],	 -- Instances 
@@ -493,6 +496,7 @@ data ModGuts
         mg_rules     :: ![CoreRule],	 -- Rules from this module
 	mg_binds     :: ![CoreBind],	 -- Bindings for this module
 	mg_foreign   :: !ForeignStubs,
+	mg_deprecs   :: !Deprecations,	 -- Deprecations declared in the module
 	mg_hpc_info  :: !HpcInfo,        -- info about coverage tick boxes
         mg_dbg_sites :: ![(SiteNumber, Coord)]     -- Bkpts inserted by the renamer
     }

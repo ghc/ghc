@@ -60,23 +60,24 @@ deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Maybe ModGuts)
 
 deSugar hsc_env 
         mod_loc
-        tcg_env@(TcGblEnv { tcg_mod       = mod,
-			    tcg_src	  = hsc_src,
-		    	    tcg_type_env  = type_env,
-		    	    tcg_imports   = imports,
-		    	    tcg_exports   = exports,
-		    	    tcg_dus	  = dus, 
-		    	    tcg_inst_uses = dfun_uses_var,
-			    tcg_th_used   = th_var,
-			    tcg_keep	  = keep_var,
-		    	    tcg_rdr_env   = rdr_env,
-		    	    tcg_fix_env   = fix_env,
-	    	    	    tcg_deprecs   = deprecs,
-			    tcg_binds     = binds,
-			    tcg_fords     = fords,
-			    tcg_rules     = rules,
-		    	    tcg_insts     = insts,
-		    	    tcg_fam_insts = fam_insts })
+        tcg_env@(TcGblEnv { tcg_mod          = mod,
+			    tcg_src	     = hsc_src,
+		    	    tcg_type_env     = type_env,
+		    	    tcg_imports      = imports,
+		    	    tcg_exports      = exports,
+		    	    tcg_dus	     = dus, 
+		    	    tcg_inst_uses    = dfun_uses_var,
+			    tcg_th_used      = th_var,
+			    tcg_keep	     = keep_var,
+		    	    tcg_rdr_env      = rdr_env,
+		    	    tcg_fix_env      = fix_env,
+		    	    tcg_fam_inst_env = fam_inst_env,
+	    	    	    tcg_deprecs      = deprecs,
+			    tcg_binds        = binds,
+			    tcg_fords        = fords,
+			    tcg_rules        = rules,
+		    	    tcg_insts        = insts,
+		    	    tcg_fam_insts    = fam_insts })
   = do	{ showPass dflags "Desugar"
 
 	-- Desugar the program
@@ -156,23 +157,24 @@ deSugar hsc_env
 		-- sort to get into canonical order
 
 	     mod_guts = ModGuts {	
-		mg_module    = mod,
-		mg_boot	     = isHsBoot hsc_src,
-		mg_exports   = exports,
-		mg_deps	     = deps,
-		mg_usages    = usages,
-		mg_dir_imps  = [m | (m,_,_) <- moduleEnvElts dir_imp_mods],
-	        mg_rdr_env   = rdr_env,
-		mg_fix_env   = fix_env,
-		mg_deprecs   = deprecs,
-		mg_types     = type_env,
-		mg_insts     = insts,
-		mg_fam_insts = fam_insts,
-	        mg_rules     = ds_rules,
-		mg_binds     = ds_binds,
-		mg_foreign   = ds_fords,
-		mg_hpc_info  = ds_hpc_info,
-                mg_dbg_sites = dbgSites }
+		mg_module    	= mod,
+		mg_boot	     	= isHsBoot hsc_src,
+		mg_exports   	= exports,
+		mg_deps	     	= deps,
+		mg_usages    	= usages,
+		mg_dir_imps  	= [m | (m,_,_) <- moduleEnvElts dir_imp_mods],
+	        mg_rdr_env   	= rdr_env,
+		mg_fix_env   	= fix_env,
+		mg_deprecs   	= deprecs,
+		mg_types     	= type_env,
+		mg_insts     	= insts,
+		mg_fam_insts 	= fam_insts,
+		mg_fam_inst_env = fam_inst_env,
+	        mg_rules     	= ds_rules,
+		mg_binds     	= ds_binds,
+		mg_foreign   	= ds_fords,
+		mg_hpc_info  	= ds_hpc_info,
+                mg_dbg_sites 	= dbgSites }
         ; return (Just mod_guts)
 	}}}
 
