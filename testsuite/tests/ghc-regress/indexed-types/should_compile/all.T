@@ -14,4 +14,7 @@ test('impexp', normal, multimod_compile,
      ['Imp', '-Wnot -no-hs-main -no-link'])
 clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o'])
 
+test('ATLoop', normal, multimod_compile, ['ATLoop','-v0'])
+clean(['ATLoop_Help.o','ATLoop_Help.hi'])
+
 test('Deriving', expect_fail, compile, [''])
