@@ -46,13 +46,19 @@ import Maybe
 \begin{code}
 data FamInst 
   = FamInst { fi_fam   :: Name		-- Family name
+		-- INVARIANT: fi_fam = case tyConFamInst_maybe fi_tycon of
+		--			   Just (tc, tys) -> tc
 
 		-- Used for "rough matching"; same idea as for class instances
 	    , fi_tcs   :: [Maybe Name]	-- Top of type args
+		-- INVARIANT: fi_tcs = roughMatchTcs is_tys
 
 		-- Used for "proper matching"; ditto
 	    , fi_tvs   :: TyVarSet	-- Template tyvars for full match
 	    , fi_tys   :: [Type]	-- Full arg types
+		-- INVARIANT: fi_tvs = tyConTyVars fi_tycon
+		--	      fi_tys = case tyConFamInst_maybe fi_tycon of
+		--			   Just (_, tys) -> tys
 
 	    , fi_tycon :: TyCon		-- Representation tycon
 	    }
@@ -82,8 +88,7 @@ pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr (FamInst {fi_fam = fam, fi_tys = tys, fi_tycon = tycon})
   = pprTyConSort <+> pprHead
   where
-    pprHead = parenSymOcc (getOccName fam) (ppr fam) <+> 
-	      sep (map pprParendType tys)
+    pprHead = pprTypeApp (parenSymOcc (getOccName fam) (ppr fam)) tys
     pprTyConSort | isDataTyCon tycon = ptext SLIT("data instance")
 		 | isNewTyCon  tycon = ptext SLIT("newtype instance")
 		 | isSynTyCon  tycon = ptext SLIT("type instance")

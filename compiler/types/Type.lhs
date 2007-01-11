@@ -95,7 +95,7 @@ module Type (
 	substPred, substTyVar, substTyVars, substTyVarBndr, deShadowTy, lookupTyVar,
 
 	-- Pretty-printing
-	pprType, pprParendType, pprTyThingCategory, pprForAll,
+	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprForAll,
 	pprPred, pprTheta, pprThetaArrow, pprClassPred, pprKind, pprParendKind
     ) where
 
@@ -611,11 +611,14 @@ tyConOrigHead tycon = case tyConFamInst_maybe tycon of
 			Just famInst -> famInst
 
 -- Pretty prints a tycon, using the family instance in case of a
--- representation tycon.
-pprSourceTyCon tycon | Just (repTyCon, tys) <- tyConFamInst_maybe tycon =
-  ppr $ repTyCon `TyConApp` tys	       -- can't be FunTyCon
-                     | otherwise                                        =
-  ppr tycon
+-- representation tycon.  For example
+--  	e.g.  data T [a] = ...
+-- In that case we want to print `T [a]', where T is the family TyCon
+pprSourceTyCon tycon 
+  | Just (repTyCon, tys) <- tyConFamInst_maybe tycon
+  = ppr $ repTyCon `TyConApp` tys	       -- can't be FunTyCon
+  | otherwise
+  = ppr tycon
 \end{code}
 
 

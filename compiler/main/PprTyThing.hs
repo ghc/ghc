@@ -158,7 +158,7 @@ pprDataConDecl exts gadt_style show_label dataCon
 
 	-- printing out the dataCon as a type signature, in GADT style
     pp_tau = foldr add pp_res_ty tys_w_strs
-    pp_res_ty = ppr_bndr tyCon <+> hsep (map GHC.pprParendType res_tys)
+    pp_res_ty = GHC.pprTypeApp (ppr_bndr tyCon) res_tys
     add (str,ty) pp_ty = pprBangTy str ty <+> arrow <+> pp_ty
 
     pprParendBangTy (strict,ty)

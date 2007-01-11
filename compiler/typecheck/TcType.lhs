@@ -122,7 +122,7 @@ module TcType (
   tcTyVarsOfType, tcTyVarsOfTypes, exactTyVarsOfType, exactTyVarsOfTypes,
 
   pprKind, pprParendKind,
-  pprType, pprParendType, pprTyThingCategory,
+  pprType, pprParendType, pprTypeApp, pprTyThingCategory,
   pprPred, pprTheta, pprThetaArrow, pprClassPred
 
   ) where

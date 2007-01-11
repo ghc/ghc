@@ -142,7 +142,8 @@ module GHC (
 	instanceDFunId, pprInstance, pprInstanceHdr,
 
 	-- ** Types and Kinds
-	Type, dropForAlls, splitForAllTys, funResultTy, pprParendType,
+	Type, dropForAlls, splitForAllTys, funResultTy, 
+	pprParendType, pprTypeApp,
 	Kind,
 	PredType,
 	ThetaType, pprThetaArrow,
@@ -189,6 +190,7 @@ import RdrName		( plusGlobalRdrEnv, Provenance(..),
 import HscMain		( hscParseIdentifier, hscStmt, hscTcExpr, hscKcType )
 import Name		( nameOccName )
 import Type		( tidyType )
+import Var		( varName )
 import VarEnv		( emptyTidyEnv )
 import GHC.Exts         ( unsafeCoerce# )
 
@@ -218,14 +220,14 @@ import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName(..),
 import HsSyn 
 import Type		( Kind, Type, dropForAlls, PredType, ThetaType,
 			  pprThetaArrow, pprParendType, splitForAllTys,
-			  funResultTy )
+			  pprTypeApp, funResultTy )
 import Id		( Id, idType, isImplicitId, isDeadBinder,
                           isExportedId, isLocalId, isGlobalId,
                           isRecordSelector, recordSelectorFieldLabel,
                           isPrimOpId, isFCallId, isClassOpId_maybe,
                           isDataConWorkId, idDataCon,
                           isBottomingId )
-import Var		( TyVar, varName )
+import Var		( TyVar )
 import TysPrim		( alphaTyVars )
 import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon,
 			  isPrimTyCon, isFunTyCon, isOpenTyCon, tyConArity,
