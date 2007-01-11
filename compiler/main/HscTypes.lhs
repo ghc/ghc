@@ -91,7 +91,7 @@ import TyCon
 import DataCon		( DataCon, dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
 import Packages		( PackageId )
-import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
+import DynFlags		( DynFlags(..), DynFlag(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
@@ -1140,7 +1140,12 @@ showModMsg target recomp mod_summary
   = showSDoc (hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
 	            char '(', text (msHsFilePath mod_summary) <> comma,
 		    case target of
-                      HscInterpreted | recomp
+#if defined(GHCI) && defined(DEBUGGER)
+                      HscInterpreted | recomp && 
+                                       Opt_Debugging `elem` modflags
+                                 -> text "interpreted(debugging)"
+#endif
+                      HscInterpreted | recomp 
                                  -> text "interpreted"
                       HscNothing -> text "nothing"
                       _other     -> text (msObjFilePath mod_summary),
@@ -1148,6 +1153,7 @@ showModMsg target recomp mod_summary
  where 
     mod     = moduleName (ms_mod mod_summary)
     mod_str = showSDoc (ppr mod) ++ hscSourceString (ms_hsc_src mod_summary)
+    modflags= flags(ms_hspp_opts mod_summary)
 \end{code}
 
 
