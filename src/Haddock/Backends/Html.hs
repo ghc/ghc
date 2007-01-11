@@ -440,32 +440,6 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
  
   index_html = td << table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
 	  aboves (map indexElt index) 
- 	
-  indexInitialLetterLinks = 
-	td << table ! [cellpadding 0, cellspacing 5] <<
-	    besides [ td << anchor ! [href (subIndexHtmlFile c)] <<
-			 toHtml [c]
-		    | c <- initialChars
-                    , any ((==c) . toUpper . head . fst) index ]
-
-  do_sub_index this_ix c
-    = unless (null index_part) $
-        writeFile (pathJoin [odir, subIndexHtmlFile c]) (renderHtml html)
-    where 
-      html = header (documentCharacterEncoding +++
-		thetitle (toHtml (doctitle ++ " (Index)")) +++
-		styleSheet) +++
-             body << vanillaTable << (
-	        simpleHeader doctitle maybe_contents_url Nothing
-                             maybe_source_url maybe_wiki_url </>
-		indexInitialLetterLinks </>
-	        tda [theclass "section1"] << 
-	      	toHtml ("Index (" ++ c:")") </>
-	        td << table ! [cellpadding 0, cellspacing 5] <<
-	      	  aboves (map indexElt index_part) 
-	       )
-
-      index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
 
   index :: [(String, Map GHC.Name [(Module,Bool)])]
   index = sortBy cmp (Map.toAscList full_index)
