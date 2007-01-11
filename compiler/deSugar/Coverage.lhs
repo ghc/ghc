@@ -9,37 +9,17 @@ module Coverage (addCoverageTicksToBinds) where
 #include "HsVersions.h"
 
 import HsSyn
-import Id		( Id )
-import DynFlags		( DynFlags, mainModIs, mainFunIs )
 import Module
-import HscTypes		( HpcInfo, noHpcInfo )
-
-import IdInfo
 import Outputable
-import DynFlags		( DynFlag(Opt_D_dump_hpc), hpcDir )
+import DynFlags
 import Monad		
-
 import SrcLoc
-import ErrUtils 	(doIfSet_dyn)
-import HsUtils		( mkHsApp )
-import Unique
-import UniqSupply
-import Id
+import ErrUtils
 import Name
-import TcType		
-import TysPrim		
-import CoreUtils
-import TyCon
-import Type
-import TysWiredIn	( intTy , stringTy, unitTy, intDataCon, falseDataConId, mkListTy, pairTyCon, tupleCon, mkTupleTy, unboxedSingletonDataCon )
 import Bag
-import Var		( TyVar, mkTyVar )
-import DataCon		( dataConWrapId )
-import MkId
-import PrimOp
-import BasicTypes	( RecFlag(..), Activation(NeverActive), Boxity(..) )
-import Data.List        ( isSuffixOf )
-import FastString       ( unpackFS )
+import Var
+import Data.List
+import FastString
 
 import System.Time (ClockTime(..))
 import System.Directory (getModificationTime)
@@ -59,20 +39,12 @@ import System.Directory ( createDirectoryIfMissing )
 
 \begin{code}
 addCoverageTicksToBinds dflags mod mod_loc binds = do 
-  { let orig_file = 
+  let orig_file = 
              case ml_hs_file mod_loc of
 		    Just file -> file
-		    Nothing -> error "can not find the original file during hpc trans"
+		    Nothing -> panic "can not find the original file during hpc trans"
 
-  ; if "boot" `isSuffixOf` orig_file then return (binds, 0)  
-    else addCoverageTicksToBinds2 dflags mod orig_file binds 
-  }
-
-addCoverageTicksToBinds2 dflags mod orig_file binds = do 
-  let main_mod = mainModIs dflags
-      main_is  = case mainFunIs dflags of
-		  Nothing -> "main"
-		  Just main -> main 
+  if "boot" `isSuffixOf` orig_file then return (binds, 0) else do
 
   modTime <- getModificationTime' orig_file
 
@@ -126,9 +98,6 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  })))  = do
 
   mg@(MatchGroup matches' ty) <- addPathEntry (getOccString id)  
 				 $ addTickMatchGroup (fun_matches funBind)
-  let arg_count = matchGroupArity mg
-  let (tys,res_ty) = splitFunTysN arg_count ty
-
   return $ L pos $ funBind { fun_matches = MatchGroup matches' ty 
 			   , fun_tick = tick_no
 			   }
@@ -437,8 +406,6 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
 \end{code}
 
 \begin{code}
-data TixFlags = TixFlags
-
 data TickTransState = TT { modName     :: String
                          , declPath    :: [String]
                          , tickBoxCount:: Int
@@ -518,10 +485,6 @@ mkHpcPos pos
 		     )
 
 hpcSrcSpan = mkGeneralSrcSpan (FSLIT("Haskell Program Coverage internals"))
-
--- all newly allocated locations have an HPC tag on them, to help debuging
-hpcLoc :: e -> Located e
-hpcLoc = L hpcSrcSpan
 \end{code}
 
 
@@ -582,25 +545,10 @@ getModificationTime' file = do
   (TOD sec _) <- System.Directory.getModificationTime file
   return $ sec
 
-data Tix = Tix [PixEntry]	-- The number of tickboxes in each module
-	       [TixEntry] 	-- The tick boxes
-	deriving (Read, Show,Eq)
-
-type TixEntry = Integer
-
 -- a program index records module names and numbers of tick-boxes
 -- introduced in each module that has been transformed for coverage 
 
-data Pix = Pix [PixEntry] deriving (Read, Show)
-
-type PixEntry = ( String	-- module name
-		, Int		-- number of boxes
-		)
-
 data HpcPos = P !Int !Int !Int !Int deriving (Eq)
-
-fromHpcPos :: HpcPos -> (Int,Int,Int,Int)
-fromHpcPos (P l1 c1 l2 c2) = (l1,c1,l2,c2)
 
 toHpcPos :: (Int,Int,Int,Int) -> HpcPos
 toHpcPos (l1,c1,l2,c2) = P l1 c1 l2 c2
