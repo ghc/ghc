@@ -119,11 +119,7 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc ANNOUNCE
 %doc LICENSE
 %doc README
-v v v v v v v
-*************
-%doc docs/building/building
 %doc docs/comm
-^ ^ ^ ^ ^ ^ ^
 %doc docs/ext-core/core.ps
 %doc docs/storage-mgt/ldv.ps
 %doc docs/storage-mgt/rp.ps
