@@ -674,12 +674,14 @@ implicitTyThings (ATyCon tc) = implicitCoTyCon tc ++
 			       concatMap (extras_plus . ADataCon) 
 					 (tyConDataCons tc)
 		     
-	-- For classes, add the class TyCon too (and its extras)
-	-- and the class selector Ids and the associated types (they don't
-	-- have extras as these are only the family decls)
-implicitTyThings (AClass cl) = map AnId (classSelIds cl) ++
-			       map ATyCon (classATs cl) ++
-			       extras_plus (ATyCon (classTyCon cl))
+	-- For classes, add the class selector Ids, and assoicated TyCons
+	-- and the class TyCon too (and its extras)
+implicitTyThings (AClass cl) 
+  = map AnId (classSelIds cl) ++
+    map ATyCon (classATs cl) ++
+	-- No extras_plus for the classATs, because they
+	-- are only the family decls; they have no implicit things
+    extras_plus (ATyCon (classTyCon cl))
 
 	-- For data cons add the worker and wrapper (if any)
 implicitTyThings (ADataCon dc) = map AnId (dataConImplicitIds dc)
