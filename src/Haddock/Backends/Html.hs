@@ -420,9 +420,6 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 	    index_html
 	   )
 
-  when split_indices $
-    mapM_ (do_sub_index index) initialChars
-
   writeFile (pathJoin [odir, indexHtmlFile]) (renderHtml html)
   
     -- Generate index and contents page for Html Help if requested
@@ -433,15 +430,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
  where
-  split_indices = length index > 50
-
-  index_html
-    | split_indices = 
-	tda [theclass "section1"] << 
-	      	toHtml ("Index") </>
-	indexInitialLetterLinks
-   | otherwise =
-	td << table ! [cellpadding 0, cellspacing 5] <<
+  index_html = td << table ! [cellpadding 0, cellspacing 5] <<
 	  aboves (map indexElt index) 
  	
   indexInitialLetterLinks = 
