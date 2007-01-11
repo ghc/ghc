@@ -735,8 +735,9 @@ simplCast env body co cont
   where
        addCoerce co cont = add_coerce co (coercionKind co) cont
 
-       add_coerce co (s1, k1) cont 
-         | s1 `coreEqType` k1 = cont
+       add_coerce co (s1, k1) cont 	-- co :: ty~ty
+         | s1 `coreEqType` k1 = cont	-- is a no-op
+
        add_coerce co1 (s1, k2) (CoerceIt co2 cont)
          | (l1, t1) <- coercionKind co2
                 -- 	coerce T1 S1 (coerce S1 K1 e)
