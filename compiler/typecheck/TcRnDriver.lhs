@@ -726,18 +726,7 @@ check_main ghc_mode tcg_env main_mod main_fn
 	; (main_expr, ty) <- setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
 			     tcInferRho rhs
 
-	-- The function that the RTS invokes is always :Main.main,
-	-- which we call root_main_id.  
-	-- (Because GHC allows the user to have a module not called 
-	-- Main as the main module, we can't rely on the main function
-	-- being called "Main.main".  That's why root_main_id has a fixed
-	-- module ":Main".)
-	-- We also make root_main_id an implicit Id, by making main_name
-	-- its parent (hence (Just main_name)).  That has the effect
-	-- of preventing its type and unfolding from getting out into
-	-- the interface file. Otherwise we can end up with two defns
-	-- for 'main' in the interface file!
-
+		-- See Note [Root-main Id]
 	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
 				   (mkVarOccFS FSLIT("main")) 
 				   (getSrcLoc main_name)
@@ -765,6 +754,19 @@ check_main ghc_mode tcg_env main_mod main_fn
     noMainMsg = ptext SLIT("The main function") <+> quotes (ppr main_fn) 
 		<+> ptext SLIT("is not defined in module") <+> quotes (ppr main_mod)
 \end{code}
+
+Note [Root-main Id]
+~~~~~~~~~~~~~~~~~~~
+The function that the RTS invokes is always :Main.main, which we call
+root_main_id.  (Because GHC allows the user to have a module not
+called Main as the main module, we can't rely on the main function
+being called "Main.main".  That's why root_main_id has a fixed module
+":Main".)  
+
+This is unusual: it's a LocalId whose Name has a Module from another
+module.  Tiresomely, we must filter it out again in MkIface, les we
+get two defns for 'main' in the interface file!
+
 
 %*********************************************************
 %*						 	 *

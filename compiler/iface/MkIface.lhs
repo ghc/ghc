@@ -257,11 +257,13 @@ mkIface hsc_env maybe_old_iface
 	; let	{ entities = typeEnvElts type_env ;
                   decls  = [ tyThingToIfaceDecl entity
 			   | entity <- entities,
-                             not (isImplicitTyThing entity
-                                  || isWiredInName (getName entity)) ]
-                        -- Don't put implicit Ids and class tycons in
-                        -- the interface file, Nor wired-in things; the
-                        -- compiler knows about them anyhow
+			     let name = getName entity,
+                             not (isImplicitTyThing entity),
+	                        -- No implicit Ids and class tycons in the interface file
+			     not (isWiredInName name),
+	                        -- Nor wired-in things; the compiler knows about them anyhow
+			     nameIsLocalOrFrom this_mod name  ]
+				-- Sigh: see Note [Root-main Id] in TcRnDriver
 
 		; fixities    = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
 		; deprecs     = mkIfaceDeprec src_deprecs
