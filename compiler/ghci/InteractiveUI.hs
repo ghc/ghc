@@ -114,7 +114,7 @@ builtin_commands :: [Command]
 builtin_commands = [
   ("add",	tlC$ keepGoingPaths addModule,	False, completeFilename),
   ("browse",    keepGoing browseCmd,		False, completeModule),
-  ("cd",    	keepGoing changeDirectory,	False, completeFilename),
+  ("cd",    	tlC$ keepGoing changeDirectory,	False, completeFilename),
   ("def",	keepGoing defineMacro,		False, completeIdentifier),
   ("e", 	keepGoing editFile,		False, completeFilename),
 	-- Hugs users are accustomed to :e, so make sure it doesn't overlap
