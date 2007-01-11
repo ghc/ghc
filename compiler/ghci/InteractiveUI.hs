@@ -175,7 +175,7 @@ helpText =
  "   :help, :?                   display this list of commands\n" ++
  "   :info [<name> ...]          display information about the given names\n" ++
  "   :print [<name> ...]         prints a value without forcing its computation\n" ++
- "   :sprint [<name> ...]        prints a value without forcing its computation(simpler)\n" ++
+ "   :sprint [<name> ...]        simplified version of :print\n" ++
  "   :load <filename> ...        load module(s) and their dependents\n" ++
  "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
