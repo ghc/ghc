@@ -152,7 +152,7 @@ builtin_commands = [
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
 keepGoing a str = a str >> return False
 
--- tlC: Top Level Command
+-- tlC: Top Level Command, not allowed in inferior sessions
 tlC ::  (String -> GHCi Bool) -> (String -> GHCi Bool)
 tlC a str = do 
     top_level <- isTopLevel
