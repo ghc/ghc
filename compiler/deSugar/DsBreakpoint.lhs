@@ -126,7 +126,7 @@ isInstrumentationSpot (L loc e) = do
 
 isRedundant HsLet  {} = True
 isRedundant HsDo   {} = True
-isRedundant HsCase {} = True
+isRedundant HsCase {} = False
 isRedundant     _     = False
 
 dynBreakpoint :: SrcSpan -> DsM (LHsExpr Id)
