@@ -54,11 +54,14 @@ data Instance
   = Instance { is_cls  :: Name		-- Class name
 	
 		-- Used for "rough matching"; see note below
+		-- INVARIANT: is_tcs = roughMatchTcs is_tys
 	     , is_tcs  :: [Maybe Name]	-- Top of type args
 
 		-- Used for "proper matching"; see note
 	     , is_tvs  :: TyVarSet	-- Template tyvars for full match
 	     , is_tys  :: [Type]	-- Full arg types
+		-- INVARIANT: is_dfun Id has type 
+		--	forall is_tvs. (...) => is_cls is_tys
 
 	     , is_dfun :: DFunId
 	     , is_flag :: OverlapFlag	-- See detailed comments with
@@ -88,7 +91,7 @@ In is_tcs,
 
 The "proper-match" fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-The is_tvs, is_tys fields are simply cahced values, pulled
+The is_tvs, is_tys fields are simply cached values, pulled
 out (lazily) from the dfun id. They are cached here simply so 
 that we don't need to decompose the DFunId each time we want 
 to match it.  The hope is that the fast-match fields mean
