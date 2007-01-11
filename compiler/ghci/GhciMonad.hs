@@ -124,6 +124,8 @@ showForUser doc = do
 
 data InfSessionException = 
              StopChildSession -- A child session requests to be stopped
+           | StopParentSession -- A child session requests to be stopped 
+                               -- AND that the parent session quits after that
            | ChildSessionStopped String  -- A child session has stopped
   deriving Typeable
 

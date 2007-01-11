@@ -114,6 +114,11 @@ builtin_commands :: [Command]
 builtin_commands = [
   ("add",	tlC$ keepGoingPaths addModule,	False, completeFilename),
   ("browse",    keepGoing browseCmd,		False, completeModule),
+#ifdef DEBUGGER
+        -- I think that :c should mean :continue rather than :cd, makes more sense
+        --  (pepe 01.11.07)
+  ("continue",  const(bkptOptions "continue"),  False, completeNone),
+#endif
   ("cd",    	tlC$ keepGoing changeDirectory,	False, completeFilename),
   ("def",	keepGoing defineMacro,		False, completeIdentifier),
   ("e", 	keepGoing editFile,		False, completeFilename),
@@ -136,7 +141,7 @@ builtin_commands = [
   ("print",     keepGoing (pprintClosureCommand True False), False, completeIdentifier),
   ("sprint",    keepGoing (pprintClosureCommand False False),False, completeIdentifier),
   ("force",     keepGoing (pprintClosureCommand False True), False, completeIdentifier),
-  ("breakpoint",keepGoing bkptOptions,          False, completeBkpt),
+  ("breakpoint",bkptOptions,                    False, completeBkpt),
 #endif
   ("kind",	keepGoing kindOfType,		False, completeIdentifier),
   ("unset",	keepGoing unsetOptions,		True,  completeSetOptions),
@@ -169,6 +174,7 @@ helpText =
  "   :breakpoint <option>        commands for the GHCi debugger\n" ++
  "   :browse [*]<module>         display the names defined by <module>\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
+ "   :continue                   equivalent to ':breakpoint continue'\n"  ++
  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
  "   :edit <file>                edit file\n" ++
  "   :edit                       edit last module\n" ++
@@ -211,6 +217,7 @@ helpText =
  "   list                                     list the current breakpoints\n" ++
  "   add Module line [col]                    add a new breakpoint\n" ++
  "   del (breakpoint# | Module line [col])    delete a breakpoint\n" ++
+ "   continue                                 continue execution\n"  ++
  "   stop                   Stop a computation and return to the top level\n" ++
  "   step [count]           Step by step execution (DISABLED)\n"
 
@@ -843,7 +850,11 @@ kindOfType str
 		           io (putStrLn (str ++ " :: " ++ tystr))
 
 quit :: String -> GHCi Bool
-quit _ = return True
+quit _ =  do in_inferior_session <- liftM not isTopLevel 
+             if in_inferior_session 
+               then throwDyn StopParentSession
+               else return True
+          
 
 shellEscape :: String -> GHCi Bool
 shellEscape str = io (system str >> return False)
@@ -1387,6 +1398,10 @@ handler (DynException dyn)
   = do ASSERTM (liftM not isTopLevel) 
        throwDyn StopChildSession
 
+  | Just StopParentSession <- fromDynamic dyn 
+  = do at_topLevel <-  isTopLevel
+       if at_topLevel then return True else throwDyn StopParentSession
+  
   | Just (ChildSessionStopped msg) <- fromDynamic dyn 
      -- Reload modules and display some message
   = do ASSERTM (isTopLevel) 
@@ -1507,9 +1522,10 @@ doBreakpoint ref_bkptTable s@(Session ref) values _ locMsg b = do
                               bkptTable= ref_bkptTable,
                               prelude  = prel_mod,
 			      topLevel = False }
-             `catchDyn` (
-                 \StopChildSession -> evaluate$
-                        throwDyn (ChildSessionStopped "")
+             `catchDyn` (\e -> case e of 
+                           StopChildSession -> evaluate$
+                                               throwDyn (ChildSessionStopped "")
+                           StopParentSession -> throwDyn StopParentSession
            ) `finally` do
              writeIORef ref hsc_env
              putStrLn $ "Returning to normal execution..."

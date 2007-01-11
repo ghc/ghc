@@ -82,6 +82,7 @@ module GHC (
 	RunResult(..),
 	runStmt,
 	showModule,
+        isModuleInterpreted,
 	compileExpr, HValue, dynCompileExpr,
 	lookupName,
 
@@ -2212,10 +2213,15 @@ foreign import "rts_evalStableIO"  {- safe -}
 -- show a module and it's source/object filenames
 
 showModule :: Session -> ModSummary -> IO String
-showModule s mod_summary = withSession s $ \hsc_env -> do
+showModule s mod_summary = withSession s $                        \hsc_env -> 
+                           isModuleInterpreted s mod_summary >>=  \interpreted -> 
+                           return (showModMsg (hscTarget(hsc_dflags hsc_env)) interpreted mod_summary)
+
+isModuleInterpreted :: Session -> ModSummary -> IO Bool
+isModuleInterpreted s mod_summary = withSession s $ \hsc_env -> 
   case lookupUFM (hsc_HPT hsc_env) (ms_mod_name mod_summary) of
 	Nothing	      -> panic "missing linkable"
-	Just mod_info -> return (showModMsg (hscTarget (hsc_dflags hsc_env)) (not obj_linkable) mod_summary)
+	Just mod_info -> return (not obj_linkable)
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
 

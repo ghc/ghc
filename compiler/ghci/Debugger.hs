@@ -297,11 +297,19 @@ stripUnknowns _ id = id
 -----------------------------
 -- | The :breakpoint command
 -----------------------------
-bkptOptions :: String -> GHCi ()
+bkptOptions :: String -> GHCi Bool
+bkptOptions "continue" = -- We want to quit if in an inferior session
+                         liftM not isTopLevel 
+bkptOptions "stop" = do
+  inside_break <- liftM not isTopLevel
+  when inside_break $ throwDyn StopChildSession 
+  return False
+
 bkptOptions cmd = do 
   dflags <- getDynFlags
   bt     <- getBkptTable
   bkptOptions' (words cmd) bt
+  return False
    where
     bkptOptions' ["list"] bt = do 
       let msgs = [ ppr mod <+> colon <+> ppr coords 
@@ -312,10 +320,6 @@ bkptOptions cmd = do
                             then text "There are no enabled breakpoints"
                             else vcat num_msgs
       io$ putStrLn msg
-
-    bkptOptions' ["stop"] bt = do
-        inside_break <- liftM not isTopLevel
-        when inside_break $ throwDyn StopChildSession
 
     bkptOptions' ("add":cmds) bt 
       | [mod_name,line]<- cmds
@@ -373,7 +377,7 @@ bkptOptions cmd = do
                io$ putStrLn delMsg
 
     bkptOptions' _ _ = throwDyn $ CmdLineError $ 
-                         "syntax: :breakpoint (list|stop|add|del)"
+                         "syntax: :breakpoint (list|continue|stop|add|del)"
 
 -- Error messages
     handleBkptEx :: Module -> Debugger.BkptException -> a
