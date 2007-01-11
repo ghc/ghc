@@ -308,10 +308,11 @@ bkptOptions "stop" = do
 bkptOptions cmd = do 
   dflags <- getDynFlags
   bt     <- getBkptTable
-  bkptOptions' (words cmd) bt
+  sess   <- getSession
+  bkptOptions' sess (words cmd) bt
   return False
    where
-    bkptOptions' ["list"] bt = do 
+    bkptOptions' _ ["list"] bt = do 
       let msgs = [ ppr mod <+> colon <+> ppr coords 
                    | (mod,site) <- btList bt
                    , let coords = getSiteCoords bt mod site]
@@ -321,7 +322,7 @@ bkptOptions cmd = do
                             else vcat num_msgs
       io$ putStrLn msg
 
-    bkptOptions' ("add":cmds) bt 
+    bkptOptions' s ("add":cmds) bt 
       | [mod_name,line]<- cmds
       , [(lineNum,[])] <- reads line
       =  handleAdd mod_name $ (\mod->addBkptByLine mod lineNum)
@@ -333,17 +334,15 @@ bkptOptions cmd = do
                        "syntax: :breakpoint add Module line [col]"
        where 
          handleAdd mod_name f = do
-           sess        <- getSession
-           dflags      <- getDynFlags
-           mod         <- io$ GHC.findModule sess (GHC.mkModuleName mod_name) Nothing
-           ghciHandleDyn (handleBkptEx mod) $
+           mod         <- io$ GHC.findModule s (GHC.mkModuleName mod_name) Nothing
+           ghciHandleDyn (handleBkptEx s mod) $
             case f mod bt of
              (newTable, site)  -> do
                setBkptTable newTable 
                io (putStrLn ("Breakpoint set at " ++ 
                               show (getSiteCoords newTable mod site)))
 
-    bkptOptions' ("del":cmds) bt 
+    bkptOptions' s ("del":cmds) bt 
       | [i']     <- cmds 
       , [(i,[])] <- reads i'
       , bkpts    <- btList bt
@@ -369,22 +368,29 @@ bkptOptions cmd = do
              "syntax: :breakpoint del (breakpoint # | Module line [col])"
 
        where delMsg = "Breakpoint deleted"
-             handleDel mod f = ghciHandleDyn (handleBkptEx mod) $ do
-               modifyBkptTable f
-               newTable <- getBkptTable
-               sess <- getSession
-               dflags <- getDynFlags
-               io$ putStrLn delMsg
+             handleDel mod f = ghciHandleDyn (handleBkptEx s mod) 
+                                             (modifyBkptTable f >> io (putStrLn delMsg))
 
-    bkptOptions' _ _ = throwDyn $ CmdLineError $ 
+    bkptOptions' _ _ _ = throwDyn $ CmdLineError $ 
                          "syntax: :breakpoint (list|continue|stop|add|del)"
 
 -- Error messages
-    handleBkptEx :: Module -> Debugger.BkptException -> a
-    handleBkptEx _ NoBkptFound = error "No suitable breakpoint site found"  
+--    handleBkptEx :: Session -> Module -> Debugger.BkptException -> a
+    handleBkptEx _ _ NoBkptFound = error "No suitable breakpoint site found"  
          -- ^ TODO Instead of complaining, set a bkpt in the next suitable line
-    handleBkptEx _ NotNeeded   = error "Nothing to do"
-    handleBkptEx m NotHandled  = error$ "Module " ++ showSDoc (ppr m) ++  " was not loaded under debugging mode. Enable debugging mode with -fdebugging (and reload your module)"
+    handleBkptEx _ _ NotNeeded   = error "Nothing to do"
+    handleBkptEx s m NotHandled  = io$
+                                   findModSummary m                  >>= \mod_summary ->
+                                   isModuleInterpreted s mod_summary >>= \it -> 
+       if it
+        then error$ "Module " ++ showSDoc (ppr m) ++  " was not loaded under debugging mode.\n" 
+                 ++ "Enable debugging mode with -fdebugging (and reload your module)"
+        else error$ "Module " ++ showSDoc (ppr m) ++  " was loaded in compiled (.o) mode.\n" 
+                 ++ "You must load a module in interpreted mode and with -fdebugging on to debug it."
+                     where findModSummary m = getModuleGraph s >>= \mod_graph ->  
+                               case [ modsum | modsum <- mod_graph
+                                             , ms_mod modsum == m ] of
+                                 [modsum] -> return modsum
 
 -------------------------
 -- Breakpoint Tables
@@ -537,7 +543,8 @@ isBkptEnabled bt (a,site)
 refreshBkptTable :: [ModSummary] -> GHCi ()
 refreshBkptTable [] = return ()
 refreshBkptTable (ms:mod_sums) = do
-    sess   <- getSession
+    sess        <- getSession
+    isDebugging <- io(isDebuggingM sess)
     when isDebugging $ do
       old_table <- getBkptTable
       new_table <- addModuleGHC sess old_table (GHC.ms_mod ms)
@@ -552,7 +559,10 @@ refreshBkptTable (ms:mod_sums) = do
                  text " breakpoints")
           return$ addModule mod sites bt
 #if defined(GHCI) && defined(DEBUGGER)
-        isDebugging = Opt_Debugging `elem` flags (GHC.ms_hspp_opts ms)
+        isDebuggingM sess = isModuleInterpreted sess ms >>= \isInterpreted -> 
+                            return (Opt_Debugging `elem` dflags && target == HscInterpreted && isInterpreted)
+        dflags = flags     (GHC.ms_hspp_opts ms)
+        target = hscTarget (GHC.ms_hspp_opts ms)
 #else
-        isDebugging = False
+        isDebuggingM _ = return False
 #endif
