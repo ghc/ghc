@@ -19,12 +19,12 @@ module RtClosureInspect(
      lookupAddressEnv, 
 
      ClosureType(..), 
-     getClosureData, 
+     getClosureData,     -- :: a -> IO Closure
      Closure ( tipe, infoTable, ptrs, nonPtrs ), 
-     getClosureType, 
-     isConstr, 
-     isIndirection,
-     getInfoTablePtr, 
+     getClosureType,     -- :: a -> IO ClosureType
+     isConstr,           -- :: ClosureType -> Bool
+     isIndirection,      -- :: ClosureType -> Bool
+     getInfoTablePtr,    -- :: a -> Ptr StgInfoTable
 
      Term(..), 
      printTerm, 
