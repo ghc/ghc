@@ -406,8 +406,8 @@ tcIfaceDecl ignore_prags
      = do { op_name <- lookupIfaceTop occ
 	  ; op_ty   <- forkM (mk_doc op_name rdr_ty) (tcIfaceType rdr_ty)
 		-- Must be done lazily for just the same reason as the 
-		-- context of a data decl: the type sig might mention the
-		-- class being defined
+		-- type of a data con; to avoid sucking in types that
+		-- it mentions unless it's necessray to do so
 	  ; return (op_name, dm, op_ty) }
 
    mk_doc op_name op_ty = ptext SLIT("Class op") <+> sep [ppr op_name, ppr op_ty]
