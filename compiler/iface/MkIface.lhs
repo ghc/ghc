@@ -332,7 +332,6 @@ mkIface hsc_env maybe_old_iface
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
      ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
 
-					      
 -----------------------------
 writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()
 writeIfaceFile dflags location new_iface
@@ -539,7 +538,7 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
 	where
 	  occ = ifName new_decl
 	  why = case lookupOccEnv eq_env occ of
-		    Just (EqBut names) -> sep [ppr occ <> colon, ptext SLIT("Free vars (only) changed:"),
+		    Just (EqBut names) -> sep [ppr occ <> colon, ptext SLIT("Free vars (only) changed:") <> ppr names,
 					      nest 2 (braces (fsep (map ppr (occSetElts 
 						(occs `intersectOccSet` changed_occs)))))]
                            where occs = mkOccSet (map nameOccName (nameSetToList names))
