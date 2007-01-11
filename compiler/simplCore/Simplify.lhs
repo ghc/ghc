@@ -1123,18 +1123,10 @@ in action in spectral/cichelli/Prog.hs:
 	 [(m,n) | m <- [1..max], n <- [1..max]]
 Hence the check for NoCaseOfCase.
 
-Note [Case of cast]
-~~~~~~~~~~~~~~~~~~~
-Consider 	case (v `cast` co) of x { I# ->
-		... (case (v `cast` co) of {...}) ...
-We'd like to eliminate the inner case.  We can get this neatly by 
-arranging that inside the outer case we add the unfolding
-	v |-> x `cast` (sym co)
-to v.  Then we should inline v at the inner case, cancel the casts, and away we go
-	
-Note 2
-~~~~~~
-There is another situation when we don't want to do it.  If we have
+Note [Suppressing the case binder-swap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is another situation when it might make sense to suppress the
+case-expression binde-swap. If we have
 
     case x of w1 { DEFAULT -> case x of w2 { A -> e1; B -> e2 }
 	           ...other cases .... }
@@ -1196,6 +1188,15 @@ The point is that we bring into the envt a binding
 after the outer case, and that makes (a,b) alive.  At least we do unless
 the case binder is guaranteed dead.
 
+Note [Case of cast]
+~~~~~~~~~~~~~~~~~~~
+Consider 	case (v `cast` co) of x { I# ->
+		... (case (v `cast` co) of {...}) ...
+We'd like to eliminate the inner case.  We can get this neatly by 
+arranging that inside the outer case we add the unfolding
+	v |-> x `cast` (sym co)
+to v.  Then we should inline v at the inner case, cancel the casts, and away we go
+	
 \begin{code}
 simplCaseBinder :: SimplEnv -> OutExpr -> InId -> SimplM (SimplEnv, OutId)
 simplCaseBinder env scrut case_bndr
