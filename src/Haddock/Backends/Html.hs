@@ -443,7 +443,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 
   index :: [(String, Map GHC.Name [(Module,Bool)])]
   index = sortBy cmp (Map.toAscList full_index)
-    where cmp (n1,_) (n2,_) = n1 `compare` n2
+    where cmp (n1,_) (n2,_) = map toUpper n1 `compare` map toUpper n2
 
   -- for each name (a plain string), we have a number of original HsNames that
   -- it can refer to, and for each of those we have a list of modules
