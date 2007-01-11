@@ -33,7 +33,7 @@ data OptKind m		-- Suppose the flag is -f
 	| AnySuffix (String -> m ())    -- -f or -farg; pass entire "-farg" to fn
 	| PrefixPred    (String -> Bool) (String -> m ())
 	| AnySuffixPred (String -> Bool) (String -> m ())
-
+ 
 processArgs :: Monad m
 	    => [(String, OptKind m)]	-- cmdline parser spec
 	    -> [String]			-- args
