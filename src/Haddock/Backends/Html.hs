@@ -413,11 +413,12 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   let html = 
 	header (documentCharacterEncoding +++
 		thetitle (toHtml (doctitle ++ " (Index)")) +++
-		styleSheet) +++
+        styleSheet +++
+        (script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
 	    simpleHeader doctitle maybe_contents_url Nothing
                          maybe_source_url maybe_wiki_url </>
-	    index_html
+        search_box </> index_html
 	   )
 
   writeFile (pathJoin [odir, indexHtmlFile]) (renderHtml html)
@@ -430,7 +431,14 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
  where
-  index_html = td << table ! [cellpadding 0, cellspacing 5] <<
+  -- colspan 2, marginheight 5
+  search_box :: HtmlTable
+  search_box = tda [colspan 2, thestyle "padding-top:5px;"] << search
+    where
+      search :: Html
+      search = "Search: " +++ input ! [identifier "searchbox", strAttr "onkeyup" "quick_search()"] +++ " " +++ input ! [value "Search", thetype "button", onclick "full_search()"]
+ 
+  index_html = td << table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
 	  aboves (map indexElt index) 
  	
   indexInitialLetterLinks = 
