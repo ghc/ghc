@@ -115,15 +115,15 @@ mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 -- because the latter is part of a knot, whereas the former is not.
 mkNewTyConRhs tycon_name tycon con 
   = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
-	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon etad_rhs
+	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon etad_tvs etad_rhs
               cocon_maybe | all_coercions || isRecursiveTyCon tycon 
 		          = Just co_tycon
                 	  | otherwise              
                 	  = Nothing
 	; return (NewTyCon { data_con    = con, 
 		       	     nt_rhs      = rhs_ty,
-		       	     nt_etad_rhs = etad_rhs,
- 		       	     nt_co = cocon_maybe, 
+		       	     nt_etad_rhs = (etad_tvs, etad_rhs),
+ 		       	     nt_co 	 = cocon_maybe, 
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
 		       	     nt_rep = mkNewTyConRep tycon rhs_ty }) }
@@ -137,8 +137,10 @@ mkNewTyConRhs tycon_name tycon con
 	-- Instantiate the data con with the 
 	-- type variables from the tycon
 
-    etad_rhs :: ([TyVar], Type)
-    etad_rhs = eta_reduce (reverse tvs) rhs_ty
+    etad_tvs :: [TyVar]	-- Matched lazily, so that mkNewTypeCoercion can
+    etad_rhs :: Type	-- return a TyCon without pulling on rhs_ty
+			-- See Note [Tricky iface loop] in LoadIface
+    (etad_tvs, etad_rhs) = eta_reduce (reverse tvs) rhs_ty
 
     eta_reduce :: [TyVar]		-- Reversed
 	       -> Type			-- Rhs type
@@ -300,7 +302,7 @@ buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	; let {	clas_kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 
  	      ; tycon = mkClassTyCon tycon_name clas_kind tvs
-                             rhs rec_clas tc_isrec
+ 	                             rhs rec_clas tc_isrec
 		-- A class can be recursive, and in the case of newtypes 
 		-- this matters.  For example
 		-- 	class C a where { op :: C b => a -> b -> Int }

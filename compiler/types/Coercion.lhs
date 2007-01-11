@@ -275,8 +275,8 @@ mkUnsafeCoercion ty1 ty2
 
 
 -- See note [Newtype coercions] in TyCon
-mkNewTypeCoercion :: Name -> TyCon -> ([TyVar], Type) -> TyCon
-mkNewTypeCoercion name tycon (tvs, rhs_ty)
+mkNewTypeCoercion :: Name -> TyCon -> [TyVar] -> Type -> TyCon
+mkNewTypeCoercion name tycon tvs rhs_ty
   = mkCoercionTyCon name co_con_arity rule
   where
     co_con_arity = length tvs

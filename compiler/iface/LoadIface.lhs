@@ -323,7 +323,27 @@ loadDecl ignore_prags mod (_version, decl)
 	; thing <- forkM doc $ do { bumpDeclStats main_name
 				  ; tcIfaceDecl ignore_prags decl }
 
-	-- Populate the type environment with the implicitTyThings too
+	-- Populate the type environment with the implicitTyThings too.
+	-- 
+	-- Note [Tricky iface loop]
+	-- ~~~~~~~~~~~~~~~~~~~~~~~~
+	-- The delicate point here is that 'mini-env' should be
+	-- buildable from 'thing' without demanding any of the things 'forkM'd 
+	-- by tcIfaceDecl.  For example
+	--	class C a where { data T a; op :: T a -> Int }
+	-- We return the bindings
+	--	[("C", <cls>), ("T", lookup env "T"), ("op", lookup env "op")]
+	-- The call (lookup env "T") must return the tycon T without first demanding
+	-- op; because getting the latter will look up T, hence loop.
+	--
+	-- Of course, there is no reason in principle why (lookup env "T") should demand
+	-- anything do to with op, but take care: 
+	--	(a) implicitTyThings, and 
+	--	(b) getOccName of all the things returned by implicitThings, 
+	-- must not depend on any of the nested type-checks
+	-- 
+	-- All a bit too finely-balanced for my liking.
+
 	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
 	      lookup n = case lookupOccEnv mini_env (getOccName n) of
 			   Just thing -> thing
