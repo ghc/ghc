@@ -8,9 +8,7 @@ module Simplify ( simplTopBinds, simplExpr ) where
 
 #include "HsVersions.h"
 
-import DynFlags	( dopt, DynFlag(Opt_D_dump_inlinings),
-			  SimplifierSwitch(..)
-			)
+import DynFlags
 import SimplMonad
 import Type hiding	( substTy, extendTvSubst )
 import SimplEnv	
