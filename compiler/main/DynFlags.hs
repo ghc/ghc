@@ -81,7 +81,7 @@ import Data.List	( isPrefixOf )
 import Util		( split )
 #endif
 
-import Data.Char	( isDigit, isUpper )
+import Data.Char	( isUpper )
 import System.IO        ( hPutStrLn, stderr )
 
 #ifdef GHCI
@@ -229,6 +229,8 @@ data DynFlags = DynFlags {
   optLevel		:: Int,		-- optimisation level
   maxSimplIterations    :: Int,		-- max simplifier iterations
   ruleCheck		:: Maybe String,
+  libCaseThreshold	:: Int,		-- Threshold for liberate-case
+
   stolen_x86_regs	:: Int,		
   cmdlineHcIncludes	:: [String],	-- -#includes
   importPaths		:: [FilePath],
@@ -383,6 +385,7 @@ defaultDynFlags =
 	optLevel		= 0,
 	maxSimplIterations	= 4,
 	ruleCheck		= Nothing,
+	libCaseThreshold	= 20,
 	stolen_x86_regs		= 4,
 	cmdlineHcIncludes	= [],
 	importPaths		= ["."],
@@ -832,6 +835,7 @@ dynamic_flags = [
   ,  ( "F"		, NoArg  (setDynFlag Opt_Pp))
   ,  ( "#include"	, HasArg (addCmdlineHCInclude) )
   ,  ( "v"		, OptIntSuffix setVerbosity )
+
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg (upd . setPgmL) )  
   ,  ( "pgmP"           , HasArg (upd . setPgmP) )  
@@ -980,18 +984,16 @@ dynamic_flags = [
   ,  ( "w"		, NoArg (mapM_ unSetDynFlag minusWallOpts) )
 
 	------ Optimisation flags ------------------------------------------
-  ,  ( "O"		   , NoArg (upd (setOptLevel 1)))
-  ,  ( "Onot"		   , NoArg (upd (setOptLevel 0)))
-  ,  ( "O"		   , PrefixPred (all isDigit) 
-				(\f -> upd (setOptLevel (read f))))
+  ,  ( "O"	, NoArg (upd (setOptLevel 1)))
+  ,  ( "Onot"	, NoArg (upd (setOptLevel 0)))
+  ,  ( "O"	, OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
+		-- If the number is missing, use 1
 
-  ,  ( "fmax-simplifier-iterations", 
-		PrefixPred (all isDigit) 
-		  (\n -> upd (\dfs -> 
-			dfs{ maxSimplIterations = read n })) )
-
-  ,  ( "frule-check", 
-		SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
+  ,  ( "fmax-simplifier-iterations", IntSuffix (\n -> 
+		upd (\dfs -> dfs{ maxSimplIterations = n })) )
+  ,  ( "fliberate-case-threshold", IntSuffix (\n -> upd (\dfs -> dfs{ libCaseThreshold = n })))
+  ,  ( "frule-check", SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
+  ,  ( "fcontext-stack"	, IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
 
         ------ Compiler flags -----------------------------------------------
 
@@ -1003,8 +1005,6 @@ dynamic_flags = [
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
 
-  ,  ( "fcontext-stack"	, OptIntSuffix $ \mb_n -> upd $ \dfs -> 
-			  dfs{ ctxtStkDepth = mb_n `orElse` 3 })
 
 	-- the rest of the -f* and -fno-* flags
   ,  ( "fno-", 		PrefixPred (\f -> isFFlag f) (\f -> unSetDynFlag (getFFlag f)) )

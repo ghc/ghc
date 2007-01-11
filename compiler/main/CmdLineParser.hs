@@ -28,6 +28,7 @@ data OptKind m		-- Suppose the flag is -f
 	| Prefix    (String -> m ())    -- -farg 
 	| OptPrefix (String -> m ())    -- -f or -farg (i.e. the arg is optional)
 	| OptIntSuffix (Maybe Int -> m ())	-- -f or -f=n; pass n to fn
+	| IntSuffix (Int -> m ())		-- -f or -f=n; pass n to fn
 	| PassFlag  (String -> m ())    -- -f; pass "-f" fn
 	| AnySuffix (String -> m ())    -- -f or -farg; pass entire "-farg" to fn
 	| PrefixPred    (String -> Bool) (String -> m ())
@@ -82,13 +83,16 @@ processOneArg action rest arg args
 	PassFlag f  | notNull rest -> unknownFlagErr dash_arg
 		    | otherwise    -> Right (f dash_arg, args)
 
-	OptIntSuffix f | Just n <- parseInt rest -> Right (f n, args)
+	OptIntSuffix f | null rest 		 -> Right (f Nothing,  args)
+		       | Just n <- parseInt rest -> Right (f (Just n), args)
 		       | otherwise -> Left ("malformed integer argument in " ++ dash_arg)
+
+	IntSuffix f | Just n <- parseInt rest -> Right (f n, args)
+		    | otherwise -> Left ("malformed integer argument in " ++ dash_arg)
 
 	OptPrefix f       -> Right (f rest, args)
 	AnySuffix f       -> Right (f dash_arg, args)
 	AnySuffixPred p f -> Right (f dash_arg, args)
-
 
 
 findArg :: [(String,OptKind a)] -> String -> Maybe (String,OptKind a)
@@ -107,21 +111,19 @@ arg_ok (SepArg _)           rest arg = null rest
 arg_ok (Prefix _)	    rest arg = notNull rest
 arg_ok (PrefixPred p _)     rest arg = notNull rest && p rest
 arg_ok (OptIntSuffix _)	    rest arg = True
+arg_ok (IntSuffix _)	    rest arg = True
 arg_ok (OptPrefix _)	    rest arg = True
 arg_ok (PassFlag _)         rest arg = null rest 
 arg_ok (AnySuffix _)        rest arg = True
 arg_ok (AnySuffixPred p _)  rest arg = p arg
 
-parseInt :: String -> Maybe (Maybe Int)
+parseInt :: String -> Maybe Int
 -- Looks for "433" or "=342", with no trailing gubbins
---   empty string => Just Nothing
---   n or =n	  => Just (Just n)
+--   n or =n	  => Just n
 --   gibberish    => Nothing
-parseInt s 
-  | null s    = Just Nothing
-  | otherwise = case reads (dropEq s) of
-		  ((n,""):_) -> Just (Just n)
-		  other	     -> Nothing
+parseInt s = case reads (dropEq s) of
+		((n,""):_) -> Just n
+		other	   -> Nothing
 
 dropEq :: String -> String
 -- Discards a leading equals sign

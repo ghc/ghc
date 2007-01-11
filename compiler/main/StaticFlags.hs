@@ -41,7 +41,6 @@ module StaticFlags (
 	-- optimisation opts
 	opt_NoMethodSharing, 
 	opt_NoStateHack,
-	opt_LiberateCaseThreshold,
 	opt_CprOff,
 	opt_RulesOff,
 	opt_SimplNoPreInlining,
@@ -292,7 +291,6 @@ opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
 opt_CprOff			= lookUp  FSLIT("-fcpr-off")
 opt_RulesOff			= lookUp  FSLIT("-frules-off")
 	-- Switch off CPR analysis in the new demand analyser
-opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 opt_GranMacros			= lookUp  FSLIT("-fgransim")
