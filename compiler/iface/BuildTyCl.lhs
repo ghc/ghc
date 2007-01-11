@@ -141,7 +141,7 @@ mkNewTyConRhs tycon_name tycon con
     etad_rhs :: Type	-- return a TyCon without pulling on rhs_ty
 			-- See Note [Tricky iface loop] in LoadIface
     (etad_tvs, etad_rhs) = eta_reduce (reverse tvs) rhs_ty
-
+ 
     eta_reduce :: [TyVar]		-- Reversed
 	       -> Type			-- Rhs type
 	       -> ([TyVar], Type)	-- Eta-reduced version (tyvars in normal order)
