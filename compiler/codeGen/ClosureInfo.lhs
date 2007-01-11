@@ -594,7 +594,13 @@ getCallMethod this_pkg name (LFThunk _ _ updatable std_form_info is_fun) n_args
 	 if we enter the same thunk multiple times, so the optimisation
 	 of jumping directly to the entry code is still valid.  --SDM
 	-}
-  = ASSERT2( n_args == 0, ppr name ) EnterIt
+  = EnterIt
+    -- We used to have ASSERT( n_args == 0 ), but actually it is
+    -- possible for the optimiser to generate
+    --   let bot :: Int = error Int "urk"
+    --   in (bot `cast` unsafeCoerce Int (Int -> Int)) 3
+    -- This happens as a result of the case-of-error transformation
+    -- So the right thing to do is just to enter the thing
 
   | otherwise	-- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
