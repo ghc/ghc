@@ -420,6 +420,7 @@ baleOut err = addErrTc err >> returnM (Nothing, Nothing)
 \begin{code}
 mkDataTypeEqn orig gla_exts tvs cls cls_tys tycon tc_args rep_tc rep_tc_args
   | Just err <- checkSideConditions gla_exts cls cls_tys rep_tc
+	-- NB: pass the *representation* tycon to checkSideConditions
   = baleOut (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) err)
 
   | otherwise 
@@ -496,7 +497,11 @@ sideConditions
 	(dataClassKey,	   cond_glaExts `andCond` cond_std)
     ]
 
-type Condition = (Bool, TyCon) -> Maybe SDoc	-- Nothing => OK
+type Condition = (Bool, TyCon) -> Maybe SDoc
+	-- Bool is gla-exts flag
+	-- TyCon is the *representation* tycon if the 
+	--	data type is an indexed one
+	-- Nothing => OK
 
 orCond :: Condition -> Condition -> Condition
 orCond c1 c2 tc 
