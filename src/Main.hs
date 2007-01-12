@@ -1247,9 +1247,7 @@ getIface pkgInfo = case haddockInterfaces pkgInfo of
 -- | Try to create a PackageData structure for a package
 getPackage :: Session -> InstalledPackageInfo -> IO PackageData 
 getPackage session pkgInfo = do
-
-  -- try to get the html path to the documentation
-  eHtml <- getHtml pkgInfo
+  html <- getHtml pkgInfo
 
   -- get a sorted list of the exposed modules  
   let modules = packageModules pkgInfo
@@ -1257,19 +1255,15 @@ getPackage session pkgInfo = do
 
   -- try to get a ModuleInfo struct for each module
   mbModInfo <- moduleInfo session modules'
-  let toEither err = maybe (Left err) Right
-  let eModInfo = toEither "Could not get ModuleInfo for all exposed modules." 
-                 mbModInfo
+  modInfo <- case mbModInfo of 
+    Just x -> return x
+    Nothing -> throwE "Could not get ModuleInfo for all exposed modules." 
 
-  -- build the PackageData structure in the Either monad
-  return $ do 
-    html <- eHtml
-    modInfo <- eModInfo
-    return $ PackageData {
-      pdModules  = modules',
-      pdDocEnv   = packageDocEnv modules' modInfo,
-      pdHtmlPath = html
-    } 
+  return $ PackageData {
+    pdModules  = modules',
+    pdDocEnv   = packageDocEnv modules' modInfo,
+    pdHtmlPath = html
+  } 
 
 -- | Build a package doc env out of a topologically sorted list of modules
 packageDocEnv :: [Module] -> [ModuleInfo] -> [(Name, Name)]
