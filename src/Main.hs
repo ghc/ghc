@@ -17,7 +17,7 @@ import GHCUtils
 import Paths_haddock_ghc     ( getDataDir, compilerPath )
 
 import Prelude hiding ( catch )
-import Control.Exception     ( catch )
+import Control.Exception     
 import Control.Monad         ( when, liftM, foldM )
 import Control.Monad.Writer  ( Writer, runWriter, tell )
 import Data.Char             ( isSpace )
@@ -27,6 +27,8 @@ import Data.List             ( nub, nubBy, (\\), foldl', sortBy, foldl1, init,
                                mapAccumL, find, isPrefixOf )
 import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList, 
                                listToMaybe, fromJust, catMaybes )
+import Data.Word
+import Data.Typeable
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
                                ArgDescr(..) )
 import System.Environment    ( getArgs )
@@ -34,6 +36,7 @@ import System.Directory      ( doesDirectoryExist )
 import System.FilePath
 import System.Cmd            ( system )
 import System.Exit           ( ExitCode(..) )
+import System.IO
 
 import qualified Data.Map as Map
 import Data.Map              (Map)
@@ -54,6 +57,7 @@ import Var hiding ( varName )
 import TyCon
 import PrelNames
 import Bag
+import Binary
 
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
@@ -99,31 +103,33 @@ main = do
   -- initialize GHC 
   (session, dynflags) <- startGHC libDir
 
-  -- parse GHC flags given to the program 
-  (dynflags', rest') <- if isGHCMode 
-    then parseGHCFlags_GHCMode     dynflags rest  
-    else parseGHCFlags_HaddockMode dynflags rest 
-  setSessionDynFlags session dynflags'
+  defaultErrorHandler dynflags $ do
 
-  -- parse Haddock specific flags
-  (flags, fileArgs) <- parseHaddockOpts rest'
+    -- parse GHC flags given to the program 
+    (dynflags', rest') <- if isGHCMode 
+      then parseGHCFlags_GHCMode     dynflags rest  
+      else parseGHCFlags_HaddockMode dynflags rest 
+    setSessionDynFlags session dynflags'
 
-  -- try to sort and check the input files using the GHC API 
-  modules <- sortAndCheckModules session dynflags' fileArgs
+    -- parse Haddock specific flags
+    (flags, fileArgs) <- parseHaddockOpts rest'
 
-  -- create a PackageData for each external package in the session
-  -- using the GHC API. The PackageData contains an html path,
-  -- a doc env and a list of module names.
-  packages <- getPackages session dynflags'
+    -- try to sort and check the input files using the GHC API 
+    modules <- sortAndCheckModules session dynflags' fileArgs
 
-  -- update the html references (module -> html file mapping)
-  updateHTMLXRefs packages
+    -- create a PackageData for each external package in the session
+    -- using the GHC API. The PackageData contains an html path,
+    -- a doc env and a list of module names.
+    packages <- getPackages session dynflags' flags
 
-  -- combine the doc envs of the external packages into one
-  let env = packagesDocEnv packages
+    -- update the html references (module -> html file mapping)
+    updateHTMLXRefs packages
 
-  -- TODO: continue to break up the run function into parts
-  run flags modules env
+    -- combine the doc envs of the external packages into one
+    let env = packagesDocEnv packages
+
+    -- TODO: continue to break up the run function into parts
+    run flags modules env
 
 parseModeFlag :: [String] -> (Bool, [String])
 parseModeFlag ("--ghc-flags":rest) = (True, rest)
@@ -146,12 +152,18 @@ parseGHCFlags dynflags args = case args of
     (flags, rest) <- parseGHCFlags dynflags xs
     return (flags, x:rest)
   where 
+{-    worker strs = do
+      let (inside, _:outside) = break (=='"') (unwords strs) 
+      (dynflags', rest) <- parseDynamicFlags dynflags (words inside)    
+      when (rest == words inside) $ parseStaticFlags (words inside) >> return ()
+      parseGHCFlags dynflags' (words outside)  
+-}
     worker rest = do
       (mbFlags, rest') <- parseGHCFlag dynflags rest
       case mbFlags of 
         Just flags -> parseGHCFlags flags rest'
         Nothing -> parseGHCFlags dynflags rest'
- 
+
 parseGHCFlag :: DynFlags -> [String] -> IO (Maybe DynFlags, [String])
 parseGHCFlag _ [] = die "No GHC flag supplied\n"
 parseGHCFlag dynflags args = do
@@ -210,7 +222,7 @@ startGHC libDir = do
   return (session, flags'')
 
 sortAndCheckModules :: Session -> DynFlags -> [FilePath] -> IO [CheckedMod]
-sortAndCheckModules session flags files = defaultErrorHandler flags $ do 
+sortAndCheckModules session flags files = do --defaultErrorHandler flags $ do 
   targets <- mapM (\s -> guessTarget s Nothing) files
   setTargets session targets 
   mbModGraph <- depanal session [] True
@@ -245,6 +257,8 @@ data Flag
 --  | Flag_DocBook
   | Flag_Heading String
   | Flag_Package String
+  | Flag_ReadInterface String
+  | Flag_DumpInterface String
   | Flag_Html
   | Flag_Hoogle
   | Flag_HtmlHelp String
@@ -276,6 +290,10 @@ options backwardsCompat =
   [
     Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
+    Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
+  "read an interface from FILE",
+    Option ['D']  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
+  "dump an interface for these modules in FILE",
     Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
 	"location of Haddock's auxiliary files",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
@@ -440,6 +458,12 @@ run flags modules extEnv = do
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
+
+  case [str | Flag_DumpInterface str <- flags] of
+        [] -> return ()
+        fs -> let filename = (last fs) in 
+              savePackageFile filename homeEnv
+
 {- 
 instance Outputable (DocEntity Name) where
   ppr (DocEntity d) = ppr d
@@ -1212,6 +1236,17 @@ type ErrMsgM a = Writer [ErrMsg] a
 -- Packages 
 --------------------------------------------------------------------------------
 
+type PackageEnv = Map Name Name
+
+data PackageData = PackageData {
+  pdModules  :: [Module],
+  pdDocEnv   :: PackageEnv,
+  pdHtmlPath :: FilePath
+}
+
+data HaddockException = HaddockException String deriving Typeable
+throwE str = throwDyn (HaddockException str)  
+
 -- | Recreate exposed modules from an InstalledPackageInfo
 packageModules :: InstalledPackageInfo -> [Module]
 packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
@@ -1233,22 +1268,25 @@ moduleInfo session modules = do
   return (sequence mbModInfo)
 
 -- | Get the Haddock HTML directory path for a package
-getHtml :: InstalledPackageInfo -> IO (Either String FilePath)
+getHtml :: InstalledPackageInfo -> IO FilePath
 getHtml pkgInfo = case haddockHTMLs pkgInfo of 
   (path:_) | not (null path) -> do
     dirExists <- doesDirectoryExist path
-    if dirExists then return (Right path) else return $
-       Left ("HTML directory " ++ path ++ " does not exist.")
-  _ -> return (Left "No Haddock documentation installed.")
+    if dirExists then return path else throwE $
+       "HTML directory " ++ path ++ " does not exist."
+  _ -> throwE "No Haddock documentation installed."
 
-data PackageData = PackageData {
-  pdModules  :: [Module],
-  pdDocEnv   :: [(Name, Name)],
-  pdHtmlPath :: FilePath
-}
+-- | Get the Haddock interface path for a package
+getIface :: InstalledPackageInfo -> IO FilePath
+getIface pkgInfo = case haddockInterfaces pkgInfo of
+  (path:_) | not (null path) -> do
+    dirExists <- doesDirectoryExist path
+    if dirExists then return path else throwE $
+       "Interface directory " ++ path ++ " does not exist."
+  _ -> throwE "No Haddock interface installed."
 
 -- | Try to create a PackageData structure for a package
-getPackage :: Session -> InstalledPackageInfo -> IO (Either String PackageData) 
+getPackage :: Session -> InstalledPackageInfo -> IO PackageData 
 getPackage session pkgInfo = do
 
   -- try to get the html path to the documentation
@@ -1284,31 +1322,64 @@ packageDocEnv mods infos = concatMap moduleDocEnv (zip mods infos)
 
 -- | Try to create a PackageData for each package in the session except for 
 -- rts. Print a warning on stdout if a PackageData could not be created.
-getPackages :: Session -> DynFlags -> IO [PackageData]
-getPackages session dynflags = do
+getPackages :: Session -> DynFlags -> [Flag] -> IO [PackageData]
+getPackages session dynflags flags = do
 
   -- get InstalledPackageInfos for every package in the session
   pkgInfos <- getPreloadPackagesAnd dynflags []
 
   -- return a list of those packages that we could create PackageDatas for 
   let pkgInfos' = filter notRTS pkgInfos
-  liftM catMaybes (mapM tryGetPackage pkgInfos')
+  liftM catMaybes $ mapM tryGetPackage pkgInfos'
 
   where
     -- no better way to do this?
     notRTS p = pkgName (package p) /= packageIdString rtsPackageId  
 
     -- try to get a PackageData, warn if we can't
-    tryGetPackage pkgInfo = do
-      result <- getPackage session pkgInfo
-      case result of
-        Left err -> do
+    tryGetPackage pkgInfo = 
+        (getPackage session pkgInfo >>= return . Just)
+      `catchDyn`
+        (\(HaddockException e) -> do 
           let pkgName = showPackageId (package pkgInfo)
           putStrLn ("Warning: Cannot use package " ++ pkgName ++ ":")
-          putStrLn ("   " ++ show err)
+          putStrLn ("   " ++ e)
           return Nothing
-        Right pkgInfo -> return (Just pkgInfo)
+        )
 
 -- | Build one big doc env out of a list of packages
-packagesDocEnv :: [PackageData] -> Map Name Name
-packagesDocEnv packages = Map.fromList (concatMap pdDocEnv packages)
+packagesDocEnv :: [PackageData] -> PackageEnv
+packagesDocEnv packages = Map.unions (map pdDocEnv packages)
+
+--------------------------------------------------------------------------------
+-- Package/Interface files 
+--------------------------------------------------------------------------------
+
+packageFileMagic = 0xDA303001 :: Word32
+
+savePackageFile :: FilePath -> PackageEnv -> IO ()
+savePackageFile filename pkgEnv = do
+  h <- openBinaryFile filename WriteMode   
+  bh <- openBinIO h 
+
+  ud <- newWriteState
+  bh <- return $ setUserData bh ud
+
+  put_ bh packageFileMagic
+  put_ bh (Map.toList pkgEnv)
+  hClose h
+
+loadPackageFile :: FilePath -> IO PackageEnv
+loadPackageFile filename = do
+  h <- openBinaryFile filename ReadMode
+  bh <- openBinIO h
+
+  ud <- newReadState undefined
+  bh <- return (setUserData bh ud)
+
+  magic <- get bh
+  when (magic /= packageFileMagic) $ throwE $
+    "Magic number mismatch: couldn't load interface file: " ++ filename
+  
+  envList <- get bh
+  return (Map.fromList envList)
