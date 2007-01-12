@@ -25,6 +25,7 @@ module Lexer (
    Token(..), lexer, pragState, mkPState, PState(..),
    P(..), ParseResult(..), getSrcLoc, 
    failLocMsgP, failSpanMsgP, srcParseFail,
+   getMessages,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
    extension, glaExtsEnabled, bangPatEnabled
@@ -32,7 +33,8 @@ module Lexer (
 
 #include "HsVersions.h"
 
-import ErrUtils		( Message )
+import Bag
+import ErrUtils
 import Outputable
 import StringBuffer
 import FastString
@@ -43,6 +45,7 @@ import DynFlags
 import Ctype
 import Util		( maybePrefixMatch, readRational )
 
+import Control.Monad
 import Data.Bits
 import Data.Char 	( chr, isSpace )
 import Data.Ratio
@@ -56,8 +59,9 @@ import Compat.Unicode	( GeneralCategory(..), generalCategory, isPrint, isUpper )
 }
 
 $unispace    = \x05
-$whitechar   = [\ \t\n\r\f\v\xa0 $unispace]
+$whitechar   = [\ \n\r\f\v\xa0 $unispace]
 $white_no_nl = $whitechar # \n
+$tab         = \t
 
 $ascdigit  = 0-9
 $unidigit  = \x03
@@ -108,6 +112,7 @@ haskell :-
 
 -- everywhere: skip whitespace and comments
 $white_no_nl+ 				;
+$tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 -- Everywhere: deal with nested comments.  We explicitly rule out
 -- pragmas, "{-#", so that we don't accidentally treat them as comments.
@@ -1299,6 +1304,14 @@ getCharOrFail =  do
 	Just (c,i)  -> do setInput i; return c
 
 -- -----------------------------------------------------------------------------
+-- Warnings
+
+warn :: DynFlag -> SDoc -> Action
+warn option warning span _buf _len = do
+    addWarning option (mkWarnMsg span alwaysQualify warning)
+    lexToken
+
+-- -----------------------------------------------------------------------------
 -- The Parse Monad
 
 data LayoutContext
@@ -1316,6 +1329,8 @@ data ParseResult a
 
 data PState = PState { 
 	buffer	   :: StringBuffer,
+    dflags     :: DynFlags,
+    messages   :: Messages,
         last_loc   :: SrcSpan,	-- pos of previous token
         last_offs  :: !Int, 	-- offset of the previous token from the
 				-- beginning of  the current line.
@@ -1500,6 +1515,10 @@ pragState :: StringBuffer -> SrcLoc -> PState
 pragState buf loc  = 
   PState {
       buffer	      = buf,
+      messages      = emptyMessages,
+      -- XXX defaultDynFlags is not right, but we don't have a real
+      -- dflags handy
+      dflags        = defaultDynFlags,
       last_loc      = mkSrcSpan loc loc,
       last_offs     = 0,
       last_len      = 0,
@@ -1517,6 +1536,8 @@ mkPState :: StringBuffer -> SrcLoc -> DynFlags -> PState
 mkPState buf loc flags  = 
   PState {
       buffer	      = buf,
+      dflags        = flags,
+      messages      = emptyMessages,
       last_loc      = mkSrcSpan loc loc,
       last_offs     = 0,
       last_len      = 0,
@@ -1542,6 +1563,15 @@ mkPState buf loc flags  =
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
 			| otherwise = 0
+
+addWarning :: DynFlag -> WarnMsg -> P ()
+addWarning option w
+ = P $ \s@PState{messages=(ws,es), dflags=d} ->
+       let ws' = if dopt option d then ws `snocBag` w else ws
+       in POk s{messages=(ws', es)} ()
+
+getMessages :: PState -> Messages
+getMessages PState{messages=ms} = ms
 
 getContext :: P [LayoutContext]
 getContext = P $ \s@PState{context=ctx} -> POk s ctx

@@ -54,7 +54,7 @@ import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl, HsDoc,
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
 import Parser
-import Lexer		( P(..), ParseResult(..), mkPState )
+import Lexer
 import SrcLoc		( mkSrcLoc )
 import TcRnDriver	( tcRnModule, tcRnExtCore )
 import TcIface		( typecheckIface )
@@ -93,6 +93,7 @@ import UniqFM		( emptyUFM )
 import Bag		( unitBag )
 
 import Control.Monad
+import System.Exit
 import System.IO
 import Data.IORef
 \end{code}
@@ -737,8 +738,12 @@ myParseModule dflags src_filename maybe_src_buf
 
 	PFailed span err -> return (Left (mkPlainErrMsg span err));
 
-	POk _ rdr_module -> do {
+	POk pst rdr_module -> do {
 
+      let {ms = getMessages pst};
+      printErrorsAndWarnings dflags ms;
+      when (errorsFound dflags ms) $ exitWith (ExitFailure 1);
+      
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_module) ;
       
       dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
@@ -893,7 +898,11 @@ hscParseThing parser dflags str
 	PFailed span err -> do { printError span err;
                                  return Nothing };
 
-	POk _ thing -> do {
+	POk pst thing -> do {
+
+      let {ms = getMessages pst};
+      printErrorsAndWarnings dflags ms;
+      when (errorsFound dflags ms) $ exitWith (ExitFailure 1);
 
       --ToDo: can't free the string buffer until we've finished this
       -- compilation sweep and all the identifiers have gone away.

@@ -1097,6 +1097,18 @@ f "2"    = 2
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fwarn-tabs</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-tabs</option></primary></indexterm>
+	  <indexterm><primary>tabs, warning</primary></indexterm>
+	  <para>Have the compiler warn if there are tabs in your source
+          file.</para>
+
+	  <para>This warning is off by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-type-defaults</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-type-defaults</option></primary></indexterm>

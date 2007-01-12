@@ -156,6 +156,7 @@ data DynFlag
    | Opt_WarnDeprecations
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
+   | Opt_WarnTabs
 
    -- language opts
    | Opt_AllowOverlappingInstances
@@ -1032,6 +1033,7 @@ fFlags = [
   ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
   ( "warn-orphans",	         	Opt_WarnOrphans ),
+  ( "warn-tabs",	         	Opt_WarnTabs ),
   ( "fi",				Opt_FFI ),  -- support `-ffi'...
   ( "ffi",				Opt_FFI ),  -- ...and also `-fffi'
   ( "arrows",				Opt_Arrows ), -- arrow syntax

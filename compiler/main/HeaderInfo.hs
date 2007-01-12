@@ -15,8 +15,7 @@ module HeaderInfo ( getImportsFromFile, getImports
 #include "HsVersions.h"
 
 import Parser		( parseHeader )
-import Lexer		( P(..), ParseResult(..), mkPState, pragState
-                        , lexer, Token(..), PState(..) )
+import Lexer
 import FastString
 import HsSyn		( ImportDecl(..), HsModule(..) )
 import Module		( ModuleName, moduleName )
@@ -25,7 +24,7 @@ import StringBuffer	( StringBuffer(..), hGetStringBuffer, hGetStringBufferBlock
                         , appendStringBuffers )
 import SrcLoc
 import FastString	( mkFastString )
-import DynFlags	( DynFlags )
+import DynFlags
 import ErrUtils
 import Util
 import Outputable
@@ -37,6 +36,8 @@ import Bag		( emptyBag, listToBag )
 import Distribution.Compiler
 
 import Control.Exception
+import Control.Monad
+import System.Exit
 import System.IO
 import Data.List
 
@@ -65,7 +66,10 @@ getImports dflags buf filename = do
   let loc  = mkSrcLoc (mkFastString filename) 1 0
   case unP parseHeader (mkPState buf loc dflags) of
 	PFailed span err -> parseError span err
-	POk _ rdr_module -> 
+	POk pst rdr_module -> do
+          let ms = getMessages pst
+          printErrorsAndWarnings dflags ms
+          when (errorsFound dflags ms) $ exitWith (ExitFailure 1)
 	  case rdr_module of
 	    L _ (HsModule mb_mod _ imps _ _ _ _ _) ->
 	      let

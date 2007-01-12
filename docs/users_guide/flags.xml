@@ -814,6 +814,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-tabs</option></entry>
+	    <entry>warn if there are tabs in the source file</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-tabs</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-type-defaults</option></entry>
 	    <entry>warn when defaulting happens</entry>
 	    <entry>dynamic</entry>

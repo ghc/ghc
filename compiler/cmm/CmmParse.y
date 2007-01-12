@@ -46,8 +46,9 @@ import Panic
 import Constants
 import Outputable
 
-import Control.Monad	( when )
+import Control.Monad
 import Data.Char	( ord )
+import System.Exit
 
 #include "HsVersions.h"
 }
@@ -918,9 +919,12 @@ parseCmmFile dflags filename = do
 		-- in there we don't want.
   case unP cmmParse init_state of
     PFailed span err -> do printError span err; return Nothing
-    POk _ code -> do
+    POk pst code -> do
 	cmm <- initC dflags no_module (getCmm (unEC code initEnv [] >> return ()))
-	dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms [cmm])
+	let ms = getMessages pst
+	printErrorsAndWarnings dflags ms
+        when (errorsFound dflags ms) $ exitWith (ExitFailure 1)
+        dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms [cmm])
 	return (Just cmm)
   where
 	no_module = panic "parseCmmFile: no module"
