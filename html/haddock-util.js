@@ -15,7 +15,7 @@ function toggle(button,id)
 }
 
 
-var max_results = 50;
+var max_results = 75; // 50 is not enough to search for map in the base libraries
 var shown_range = null;
 var last_search = null;
 
