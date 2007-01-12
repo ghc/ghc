@@ -1266,8 +1266,8 @@ getPackage session pkgInfo = do
   } 
 
 -- | Build a package doc env out of a topologically sorted list of modules
-packageDocEnv :: [Module] -> [ModuleInfo] -> [(Name, Name)]
-packageDocEnv mods infos = concatMap moduleDocEnv (zip mods infos)
+packageDocEnv :: [Module] -> [ModuleInfo] -> PackageEnv
+packageDocEnv mods infos = Map.fromList $ concatMap moduleDocEnv (zip mods infos)
   where
     moduleDocEnv (mod, modInfo) 
       | "GHC" `isPrefixOf` moduleString mod = []
