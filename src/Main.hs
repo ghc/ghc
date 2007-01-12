@@ -257,8 +257,6 @@ data Flag
 --  | Flag_DocBook
   | Flag_Heading String
   | Flag_Package String
-  | Flag_ReadInterface String
-  | Flag_DumpInterface String
   | Flag_Html
   | Flag_Hoogle
   | Flag_HtmlHelp String
@@ -290,11 +288,7 @@ options backwardsCompat =
   [
     Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
-    Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
-  "read an interface from FILE",
-    Option ['D']  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
-  "dump an interface for these modules in FILE",
-    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
+   Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
 	"location of Haddock's auxiliary files",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
 --	"output in DocBook XML",
@@ -458,11 +452,6 @@ run flags modules extEnv = do
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
-
-  case [str | Flag_DumpInterface str <- flags] of
-        [] -> return ()
-        fs -> let filename = (last fs) in 
-              savePackageFile filename homeEnv
 
 {- 
 instance Outputable (DocEntity Name) where
