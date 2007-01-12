@@ -448,10 +448,20 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   search_box = tda [colspan 2, thestyle "padding-top:5px;"] << search
     where
       search :: Html
-      search = "Search: " +++ input ! [identifier "searchbox", strAttr "onkeyup" "quick_search()"] +++ " " +++ input ! [value "Search", thetype "button", onclick "full_search()"]
+      search = "Search: " +++ input ! [identifier "searchbox", strAttr "onkeyup" "quick_search()"]
+                          +++ " " +++ input ! [value "Search", thetype "button", onclick "full_search()"]
+                          +++ " " +++ thespan ! [identifier "searchmsg"] << " "
  
-  index_html = td << table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
-          aboves (map indexElt index) 
+  index_html = td << setTrClass (table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
+          aboves (map indexElt index))
+
+  setTrClass :: Html -> Html
+  setTrClass (Html xs) = Html $ map f xs
+      where
+          f (HtmlTag name attrs inner)
+               | map toUpper name == "TR" = HtmlTag name (theclass "indexrow":attrs) inner
+               | otherwise = HtmlTag name attrs (setTrClass inner)
+          f x = x
 
   index :: [(String, Map GHC.Name [(Module,Bool)])]
   index = sortBy cmp (Map.toAscList full_index)

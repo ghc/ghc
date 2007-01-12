@@ -141,6 +141,13 @@ TD.pkg {
   padding-left: 10px
 }
 
+TABLE.indexsearch TR.indexrow {
+  display: none;
+}
+TABLE.indexsearch TR.indexshow {
+  display: table-row;
+}
+
 TD.indexentry {
   vertical-align: top;
   padding-right: 10px
