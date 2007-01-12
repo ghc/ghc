@@ -1402,10 +1402,8 @@ handler (DynException dyn)
   = do at_topLevel <-  isTopLevel
        if at_topLevel then return True else throwDyn StopParentSession
   
-  | Just (ChildSessionStopped msg) <- fromDynamic dyn 
-     -- Reload modules and display some message
-  = do ASSERTM (isTopLevel) 
-       io(putStrLn msg) >> return False
+  | Just (ChildSessionStopped msg) <- fromDynamic dyn     
+  = io(putStrLn msg) >> return False
 
 handler exception = do
   flushInterpBuffers
