@@ -68,7 +68,7 @@ ppHtml doctitle maybe_package hmods odir prologue maybe_html_help_format
 	maybe_contents_url maybe_index_url =  do
   let
 	visible_hmods = filter visible hmods
-	visible i = OptHide `notElem` hmod_options i
+	visible i = DocOptHide `notElem` hmod_options i
 
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package
@@ -99,7 +99,7 @@ ppHtmlHelpFiles
 ppHtmlHelpFiles doctitle maybe_package hmods odir maybe_html_help_format pkg_paths =  do
   let
 	visible_hmods = filter visible hmods
-	visible i = OptHide `notElem` hmod_options i
+	visible i = DocOptHide `notElem` hmod_options i
 
   -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of

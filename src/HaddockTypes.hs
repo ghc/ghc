@@ -22,14 +22,6 @@ import Outputable
 
 import Data.Map
 
-data DocOption
-  = OptHide           -- ^ This module should not appear in the docs
-  | OptPrune
-  | OptIgnoreExports  -- ^ Pretend everything is exported
-  | OptNotHome        -- ^ Not the best place to get docs for things
-                      -- exported by this module.
-  deriving (Eq, Show)
-
 data ExportItem name
   = ExportDecl
       Name                 -- ^ The original name
