@@ -448,10 +448,12 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   search_box = tda [colspan 2, thestyle "padding-top:5px;"] << search
     where
       search :: Html
-      search = "Search: " +++ input ! [identifier "searchbox", strAttr "onkeyup" "quick_search()"]
-                          +++ " " +++ input ! [value "Search", thetype "button", onclick "full_search()"]
-                          +++ " " +++ thespan ! [identifier "searchmsg"] << " "
- 
+      search = form ! [strAttr "onsubmit" "full_search(); return false;", action ""] << (
+                    "Search: "
+                    +++ input ! [identifier "searchbox", strAttr "onkeyup" "quick_search()"]
+                    +++ " " +++ input ! [value "Search", thetype "submit"]
+                    +++ " " +++ thespan ! [identifier "searchmsg"] << " ")
+
   index_html = td << setTrClass (table ! [identifier "indexlist", cellpadding 0, cellspacing 5] <<
           aboves (map indexElt index))
 
