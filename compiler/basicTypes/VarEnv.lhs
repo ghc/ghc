@@ -226,19 +226,33 @@ rnBndr2 (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
 rnBndrL, rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
 -- Used when there's a binder on one side or the other only
 -- Useful when eta-expanding
+-- 
 rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
   = (RV2 { envL     = extendVarEnv envL bL new_b
-	 , envR     = envR
+	 , envR     = extendVarEnv envR new_b new_b 	-- Note [rnBndrLR]
 	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
   where
     new_b = uniqAway in_scope bL
 
 rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
-  = (RV2 { envL     = envL
+  = (RV2 { envL     = extendVarEnv envL new_b new_b	-- Note [rnBndrLR]
 	 , envR     = extendVarEnv envR bR new_b
 	 , in_scope = extendInScopeSet in_scope new_b }, new_b)
   where
     new_b = uniqAway in_scope bR
+
+-- Note [rnBndrLR] 
+-- ~~~~~~~~~~~~~~~
+-- Notice that in rnBndrL, rnBndrR, we extend envR, envL respectively
+-- with a binding [new_b -> new_b], where new_b is the new binder.
+-- This is important when doing eta expansion; e.g. matching (\x.M) ~ N
+-- In effect we switch to (\x'.M) ~ (\x'.N x'), where x' is new_b
+-- So we must add x' to the env of both L and R.  (x' is fresh, so it
+-- can't capture anything in N.)  
+--
+-- If we don't do this, we can get silly matches like
+--	forall a.  \y.a  ~   v
+-- succeeding with [x -> v y], which is bogus of course 
 
 rnOccL, rnOccR :: RnEnv2 -> Var -> Var
 -- Look up the renaming of an occurrence in the left or right term
