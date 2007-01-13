@@ -20,5 +20,7 @@ test('simpl015', only_ways(['opt']), compile, [''])
 test('spec001', skip_if_fast, compile, [''])
 test('spec002', normal, compile, [''])
 
+test('rule1', normal, compile, [''])
+
 test('strict-float', normal, compile, [''])
 
