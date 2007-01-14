@@ -226,6 +226,7 @@ exposed-modules:
 	TcEnv
 	TcExpr
 	TcForeign
+	TcGadt
 	TcGenDeriv
 	TcHsSyn
 	TcHsType
