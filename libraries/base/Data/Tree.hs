@@ -66,6 +66,16 @@ INSTANCE_TYPEABLE1(Tree,treeTc,"Tree")
 instance Functor Tree where
   fmap f (Node x ts) = Node (f x) (map (fmap f) ts)
 
+instance Applicative Tree where
+  pure x = Node x []
+  Node f tfs <*> tx@(Node x txs) =
+    Node (f x) (map (f <$>) txs ++ map (<*> tx) tfs)
+
+instance Monad Tree where
+  return x = Node x []
+  Node x ts >>= f = Node x' (ts' ++ map (>>= f) ts)
+    where Node x' ts' = f x
+
 instance Traversable Tree where
   traverse f (Node x ts) = Node <$> f x <*> traverse (traverse f) ts
 
