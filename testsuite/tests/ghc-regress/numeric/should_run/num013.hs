@@ -3,7 +3,6 @@
 
 import Control.Exception
 import Data.Int
-import Data.Word
 import Prelude hiding (catch)
 
 main :: IO ()
