@@ -906,7 +906,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term>
-          <literal>:breakpoint</literal> <replaceable>list|add|del|stop|step</replaceable> ...
+          <literal>:breakpoint</literal> <replaceable>list|add|continue|del|stop|step</replaceable> ...
           <indexterm><primary><literal>:breakpoint</literal></primary></indexterm>
         </term>
 	<listitem>
@@ -958,6 +958,15 @@ $ ghci -lm
 	  usually expressed using relative directories, and changing
 	  the search path in the middle of a session is not
 	  supported.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:continue</literal> 
+          <indexterm><primary><literal>:continue</literal></primary></indexterm>
+        </term>
+	<listitem> Shortcut to <literal>:breakpoint continue </literal>
 	</listitem>
       </varlistentry>
 
@@ -1556,7 +1565,7 @@ Prelude> :set -fno-glasgow-exts
       in the context of the event, as well as evaluate arbitrary Haskell expressions in
       a special interactive prompt. </para><para>
       
-     When you are done you issue the <literal>:quit</literal> 
+     When you are done you issue the <literal>:continue</literal> 
       command to leave the breakpoint and let the execution go on. 
      Note that not all the GHCi commands are supported in a breakpoint. 
 
@@ -1706,6 +1715,26 @@ x :: Int
     at line <literal>line</literal> in <literal>module</literal>, if any.
   </para></listitem>
 </varlistentry>
+
+<varlistentry>
+  <term>
+    <literal>:breakpoint continue</literal>
+  </term>
+  <listitem><para>
+   When at a breakpoint, continue execution up to the next breakpoint
+   or end of evaluation.
+  </para></listitem>
+</varlistentry>
+
+<varlistentry>
+  <term>
+    <literal>:continue</literal>
+  </term>
+  <listitem><para>
+      Shortcut for <literal>:breakpoint continue</literal>
+  </para></listitem>
+</varlistentry>
+
 <varlistentry>
   <term>
     <literal>:breakpoint list</literal>
