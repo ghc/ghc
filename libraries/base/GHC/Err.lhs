@@ -32,6 +32,7 @@ module GHC.Err
 
        , absentErr	           -- :: a
        , divZeroError		   -- :: a
+       , overflowError		   -- :: a
 
        , error		           -- :: String -> a
        , assertError		   -- :: String -> Bool -> a -> a
@@ -130,12 +131,17 @@ untangle coded message
     not_bar c = c /= '|'
 \end{code}
 
-Divide by zero.  We put it here because it is needed relatively early
+Divide by zero and arithmetic overflow.
+We put them here because they are needed relatively early
 in the libraries before the Exception type has been defined yet.
 
 \begin{code}
 {-# NOINLINE divZeroError #-}
 divZeroError :: a
 divZeroError = throw (ArithException DivideByZero)
+
+{-# NOINLINE overflowError #-}
+overflowError :: a
+overflowError = throw (ArithException Overflow)
 \end{code}
 

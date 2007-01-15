@@ -231,23 +231,35 @@ instance  Real Int  where
 instance  Integral Int	where
     toInteger i = int2Integer i  -- give back a full-blown Integer
 
-    a `quot` 0   = divZeroError
-    a `quot` b	=  a `quotInt` b
+    a `quot` b
+     | b == 0                     = divZeroError
+     | a == minBound && b == (-1) = overflowError
+     | otherwise                  =  a `quotInt` b
 
-    a `rem` 0   = divZeroError
-    a `rem` b	= a `remInt` b
+    a `rem` b
+     | b == 0                     = divZeroError
+     | a == minBound && b == (-1) = overflowError
+     | otherwise                  =  a `remInt` b
 
-    a `div` 0   = divZeroError
-    a `div` b   = a `divInt` b
+    a `div` b
+     | b == 0                     = divZeroError
+     | a == minBound && b == (-1) = overflowError
+     | otherwise                  =  a `divInt` b
 
-    a `mod` 0   = divZeroError
-    a `mod` b   = a `modInt` b
+    a `mod` b
+     | b == 0                     = divZeroError
+     | a == minBound && b == (-1) = overflowError
+     | otherwise                  =  a `modInt` b
 
-    a `quotRem` 0 = divZeroError
-    a `quotRem` b = a `quotRemInt` b
+    a `quotRem` b
+     | b == 0                     = divZeroError
+     | a == minBound && b == (-1) = overflowError
+     | otherwise                  =  a `quotRemInt` b
 
-    a `divMod`  0 = divZeroError
-    a `divMod`  b = a `divModInt`  b
+    a `divMod` b
+     | b == 0                     = divZeroError
+     | a == minBound && b == (-1) = overflowError
+     | otherwise                  =  a `divModInt` b
 \end{code}
 
 

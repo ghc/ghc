@@ -4,7 +4,7 @@
 --                  Ghc.Err.hs-boot
 ---------------------------------------------------------------------------
 
-module GHC.Err( error, divZeroError ) where
+module GHC.Err( error, divZeroError, overflowError ) where
 
 -- The type signature for 'error' is a gross hack.
 -- First, we can't give an accurate type for error, because it mentions 
@@ -20,4 +20,7 @@ error    :: a
 
 -- divide by zero is needed quite early
 divZeroError :: a
+
+-- overflow is needed quite early
+overflowError :: a
 \end{code}

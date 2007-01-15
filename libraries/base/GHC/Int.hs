@@ -78,26 +78,32 @@ instance Enum Int8 where
 
 instance Integral Int8 where
     quot    x@(I8# x#) y@(I8# y#)
-        | y /= 0                  = I8# (narrow8Int# (x# `quotInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I8# (narrow8Int# (x# `quotInt#` y#))
     rem     x@(I8# x#) y@(I8# y#)
-        | y /= 0                  = I8# (narrow8Int# (x# `remInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I8# (narrow8Int# (x# `remInt#` y#))
     div     x@(I8# x#) y@(I8# y#)
-        | y /= 0                  = I8# (narrow8Int# (x# `divInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I8# (narrow8Int# (x# `divInt#` y#))
     mod     x@(I8# x#) y@(I8# y#)
-        | y /= 0                  = I8# (narrow8Int# (x# `modInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I8# (narrow8Int# (x# `modInt#` y#))
     quotRem x@(I8# x#) y@(I8# y#)
-        | y /= 0                  = (I8# (narrow8Int# (x# `quotInt#` y#)),
-                                    I8# (narrow8Int# (x# `remInt#` y#)))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I8# (narrow8Int# (x# `quotInt#` y#)),
+                                       I8# (narrow8Int# (x# `remInt#` y#)))
     divMod  x@(I8# x#) y@(I8# y#)
-        | y /= 0                  = (I8# (narrow8Int# (x# `divInt#` y#)),
-                                    I8# (narrow8Int# (x# `modInt#` y#)))
-        | otherwise               = divZeroError
-    toInteger (I8# x#)            = S# x#
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I8# (narrow8Int# (x# `divInt#` y#)),
+                                       I8# (narrow8Int# (x# `modInt#` y#)))
+    toInteger (I8# x#)               = S# x#
 
 instance Bounded Int8 where
     minBound = -0x80
@@ -185,26 +191,32 @@ instance Enum Int16 where
 
 instance Integral Int16 where
     quot    x@(I16# x#) y@(I16# y#)
-        | y /= 0                  = I16# (narrow16Int# (x# `quotInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I16# (narrow16Int# (x# `quotInt#` y#))
     rem     x@(I16# x#) y@(I16# y#)
-        | y /= 0                  = I16# (narrow16Int# (x# `remInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I16# (narrow16Int# (x# `remInt#` y#))
     div     x@(I16# x#) y@(I16# y#)
-        | y /= 0                  = I16# (narrow16Int# (x# `divInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I16# (narrow16Int# (x# `divInt#` y#))
     mod     x@(I16# x#) y@(I16# y#)
-        | y /= 0                  = I16# (narrow16Int# (x# `modInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I16# (narrow16Int# (x# `modInt#` y#))
     quotRem x@(I16# x#) y@(I16# y#)
-        | y /= 0                  = (I16# (narrow16Int# (x# `quotInt#` y#)),
-                                    I16# (narrow16Int# (x# `remInt#` y#)))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I16# (narrow16Int# (x# `quotInt#` y#)),
+                                        I16# (narrow16Int# (x# `remInt#` y#)))
     divMod  x@(I16# x#) y@(I16# y#)
-        | y /= 0                  = (I16# (narrow16Int# (x# `divInt#` y#)),
-                                    I16# (narrow16Int# (x# `modInt#` y#)))
-        | otherwise               = divZeroError
-    toInteger (I16# x#)           = S# x#
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I16# (narrow16Int# (x# `divInt#` y#)),
+                                        I16# (narrow16Int# (x# `modInt#` y#)))
+    toInteger (I16# x#)              = S# x#
 
 instance Bounded Int16 where
     minBound = -0x8000
@@ -302,23 +314,31 @@ instance Enum Int32 where
 
 instance Integral Int32 where
     quot    x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (x# `quotInt32#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I32# (x# `quotInt32#` y#)
     rem     x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (x# `remInt32#` y#)
-        | otherwise               = divZeroError
+        | y == 0                  = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise               = I32# (x# `remInt32#` y#)
     div     x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (x# `divInt32#` y#)
-        | otherwise               = divZeroError
+        | y == 0                  = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise               = I32# (x# `divInt32#` y#)
     mod     x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (x# `modInt32#` y#)
-        | otherwise               = divZeroError
+        | y == 0                  = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise               = I32# (x# `modInt32#` y#)
     quotRem x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = (I32# (x# `quotInt32#` y#), I32# (x# `remInt32#` y#))
-        | otherwise               = divZeroError
+        | y == 0                  = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise               = (I32# (x# `quotInt32#` y#),
+                                     I32# (x# `remInt32#` y#))
     divMod  x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = (I32# (x# `divInt32#` y#), I32# (x# `modInt32#` y#))
-        | otherwise               = divZeroError
+        | y == 0                  = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise               = (I32# (x# `divInt32#` y#),
+                                     I32# (x# `modInt32#` y#))
     toInteger x@(I32# x#)
 	| x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
                                   = S# (int32ToInt# x#)
@@ -448,26 +468,32 @@ instance Enum Int32 where
 
 instance Integral Int32 where
     quot    x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (narrow32Int# (x# `quotInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I32# (narrow32Int# (x# `quotInt#` y#))
     rem     x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (narrow32Int# (x# `remInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I32# (narrow32Int# (x# `remInt#` y#))
     div     x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (narrow32Int# (x# `divInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I32# (narrow32Int# (x# `divInt#` y#))
     mod     x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = I32# (narrow32Int# (x# `modInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I32# (narrow32Int# (x# `modInt#` y#))
     quotRem x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = (I32# (narrow32Int# (x# `quotInt#` y#)),
-                                    I32# (narrow32Int# (x# `remInt#` y#)))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I32# (narrow32Int# (x# `quotInt#` y#)),
+                                     I32# (narrow32Int# (x# `remInt#` y#)))
     divMod  x@(I32# x#) y@(I32# y#)
-        | y /= 0                  = (I32# (narrow32Int# (x# `divInt#` y#)),
-                                    I32# (narrow32Int# (x# `modInt#` y#)))
-        | otherwise               = divZeroError
-    toInteger (I32# x#)           = S# x#
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I32# (narrow32Int# (x# `divInt#` y#)),
+                                     I32# (narrow32Int# (x# `modInt#` y#)))
+    toInteger (I32# x#)              = S# x#
 
 instance Read Int32 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -572,27 +598,37 @@ instance Enum Int64 where
 
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `quotInt64#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `quotInt64#` y#)
     rem     x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `remInt64#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `remInt64#` y#)
     div     x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `divInt64#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `divInt64#` y#)
     mod     x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `modInt64#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `modInt64#` y#)
     quotRem x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = (I64# (x# `quotInt64#` y#), I64# (x# `remInt64#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I64# (x# `quotInt64#` y#),
+                                        I64# (x# `remInt64#` y#))
     divMod  x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = (I64# (x# `divInt64#` y#), I64# (x# `modInt64#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I64# (x# `divInt64#` y#),
+                                        I64# (x# `modInt64#` y#))
     toInteger x@(I64# x#)
-	| x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
-                                  = S# (int64ToInt# x#)
-        | otherwise               = case int64ToInteger# x# of (# s, d #) -> J# s d
+	| x >= fromIntegral (minBound::Int) &&
+          x <= fromIntegral (maxBound::Int)
+                                     = S# (int64ToInt# x#)
+        | otherwise                  = case int64ToInteger# x# of
+                                           (# s, d #) -> J# s d
 
 
 divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
@@ -729,24 +765,30 @@ instance Enum Int64 where
 
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `quotInt#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `quotInt#` y#)
     rem     x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `remInt#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `remInt#` y#)
     div     x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `divInt#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `divInt#` y#)
     mod     x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = I64# (x# `modInt#` y#)
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = I64# (x# `modInt#` y#)
     quotRem x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = (I64# (x# `quotInt#` y#), I64# (x# `remInt#` y#))
-        | otherwise               = divZeroError
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I64# (x# `quotInt#` y#), I64# (x# `remInt#` y#))
     divMod  x@(I64# x#) y@(I64# y#)
-        | y /= 0                  = (I64# (x# `divInt#` y#), I64# (x# `modInt#` y#))
-        | otherwise               = divZeroError
-    toInteger (I64# x#)           = S# x#
+        | y == 0                     = divZeroError
+        | x == minBound && y == (-1) = overflowError
+        | otherwise                  = (I64# (x# `divInt#` y#), I64# (x# `modInt#` y#))
+    toInteger (I64# x#)              = S# x#
 
 instance Read Int64 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
