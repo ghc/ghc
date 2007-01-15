@@ -954,6 +954,18 @@ if test "$fp_cv_gcc_has_no_unit_at_a_time" = "yes"; then
    AC_DEFINE([HAVE_GCC_HAS_NO_UNIT_AT_A_TIME], [1], [Define to 1 if gcc supports -fno-unit-at-a-time.])
 fi])
 
+# FP_GCC_HAS_WRAPV
+# --------------------------
+AC_DEFUN([FP_GCC_HAS_WRAPV],
+[AC_REQUIRE([FP_HAVE_GCC])
+AC_CACHE_CHECK([whether gcc has -fwrapv], [fp_cv_gcc_has_wrapv],
+[FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.4],
+  [fp_cv_gcc_has_wrapv=yes],
+  [fp_cv_gcc_has_wrapv=no])])
+if test "$fp_cv_gcc_has_wrapv" = "yes"; then
+   AC_DEFINE([HAVE_GCC_HAS_WRAPV], [1], [Define to 1 if gcc supports -fwrapv.])
+fi])
+
 # FP_SETUP_PROJECT_VERSION
 # ---------------------
 AC_DEFUN([FP_SETUP_PROJECT_VERSION],

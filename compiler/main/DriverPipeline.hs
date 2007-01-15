@@ -880,6 +880,10 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		       ++ split_opt
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
+#ifdef HAVE_GCC_HAS_WRAPV
+                  -- We need consistent integer overflow (trac #952)
+               ++ ["-fwrapv"]
+#endif
 		       ))
 
 	return (next_phase, dflags, maybe_loc, output_fn)

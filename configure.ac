@@ -878,6 +878,7 @@ FP_HAVE_GCC
 FP_MINGW_GCC
 FP_GCC_NEEDS_NO_OMIT_LFPTR
 FP_GCC_HAS_NO_UNIT_AT_A_TIME
+FP_GCC_HAS_WRAPV
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
