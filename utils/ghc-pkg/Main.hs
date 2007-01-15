@@ -18,7 +18,7 @@ module Main (main) where
 import Version	( version, targetOS, targetARCH )
 import Distribution.InstalledPackageInfo
 import Distribution.Compat.ReadP
-import Distribution.ParseUtils	( showError )
+import Distribution.ParseUtils
 import Distribution.Package
 import Distribution.Version
 import Compat.Directory 	( getAppUserDataDirectory, createDirectoryIfMissing )
@@ -429,7 +429,9 @@ parsePackageInfo
 parsePackageInfo str defines =
   case parseInstalledPackageInfo str of
     ParseOk _warns ok -> return ok
-    ParseFailed err -> die (showError err)
+    ParseFailed err -> case locatedErrorMsg err of
+                           (Nothing, s) -> die s
+                           (Just l, s) -> die (show l ++ ": " ++ s)
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Unregistering are all similar
