@@ -165,12 +165,16 @@ In GHC, threads may also communicate via exceptions.
 -}
 
 {- $blocking
-Calling a foreign C procedure (such as @getchar@) that blocks waiting
-for input will block /all/ threads, unless the @threadsafe@ attribute
-is used on the foreign call (and your compiler \/ operating system
-supports it).  GHC's I\/O system uses non-blocking I\/O internally to
-implement thread-friendly I\/O, so calling standard Haskell I\/O
-functions blocks only the thread making the call.
+Different Haskell implementations have different characteristics with
+regard to which operations block /all/ threads.
+
+Using GHC without the @-threaded@ option, all foreign calls will block
+all other Haskell threads in the system, although I\/O operations will
+not.  With the @-threaded@ option, only foreign calls with the @unsafe@
+attribute will block all other threads.
+
+Using Hugs, all I\/O operations and foreign calls will block all other
+Haskell threads.
 -}
 
 #ifndef __HUGS__
