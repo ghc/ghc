@@ -31,7 +31,7 @@ import Config		( cProjectVersion, cBooterVersion, cProjectName )
 import Packages		( dumpPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
-import StaticFlags	( staticFlags, v_Ld_inputs, parseStaticFlags )
+import StaticFlags
 import DynFlags         ( defaultDynFlags )
 import BasicTypes	( failed )
 import ErrUtils		( putMsg )
@@ -213,9 +213,10 @@ checkOptions cli_mode dflags srcs objs = do
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
 	-- -prof and --interactive are not a good combination
-   when (notNull (wayNames dflags)  && isInterpretiveMode cli_mode) $
+   when (notNull (filter (/= WayThreaded) (wayNames dflags))
+         && isInterpretiveMode cli_mode) $
       do throwDyn (UsageError 
-                   "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
+                   "--interactive can't be used with -prof, -ticky, or -unreg.")
 	-- -ohi sanity check
    if (isJust (outputHi dflags) && 
       (isCompManagerMode cli_mode || srcs `lengthExceeds` 1))
