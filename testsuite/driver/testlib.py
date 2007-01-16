@@ -428,10 +428,7 @@ def framework_fail( name, way ):
 # run_command.
 
 def run_command( name, way, cmd ):
-    return simple_run( name, '', cmd, '', 0 )
-
-def run_command_ignore_output( name, way, cmd ):
-    return simple_run( name, '', cmd, '', 1 )
+    return simple_run( name, '', cmd, '' )
 
 # -----------------------------------------------------------------------------
 # GHCi tests
@@ -450,7 +447,7 @@ def ghci_script( name, way, script ):
           join(flags,' ')
 
     getTestOpts().stdin = script
-    return simple_run( name, way, cmd, getTestOpts().extra_run_opts, 0 )
+    return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
@@ -519,8 +516,7 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod ):
             return 'fail'
 
         # we don't check the compiler's stderr for a compile-and-run test
-        return simple_run( name, way, './'+name, getTestOpts().extra_run_opts,
-                           getTestOpts().ignore_output )
+        return simple_run( name, way, './'+name, getTestOpts().extra_run_opts )
 
 def compile_and_run( name, way, extra_hc_opts ):
     return compile_and_run__( name, way, extra_hc_opts, '' )
@@ -579,7 +575,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
 # from /dev/null.  Route output to testname.run.stdout and 
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run( name, way, prog, args, ignore_output_files ):
+def simple_run( name, way, prog, args ):
    # figure out what to use for stdin
    if getTestOpts().stdin != '':
        use_stdin = getTestOpts().stdin
@@ -620,9 +616,9 @@ def simple_run( name, way, prog, args, ignore_output_files ):
 
    check_hp = my_rts_flags.find("-h") != -1
 
-   if ignore_output_files or (check_stdout_ok(name) and 
-                              check_stderr_ok(name) and
-                              (not check_hp or check_hp_ok(name))):
+   if getTestOpts().ignore_output or (check_stdout_ok(name) and 
+                                      check_stderr_ok(name) and
+                                      (not check_hp or check_hp_ok(name))):
        return 'pass'
    else:
        return 'fail'
@@ -826,7 +822,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail ( qcorefilename )
     rm_no_fail ( depsfilename )
     
-    return simple_run ( name, way, './'+name, getTestOpts().extra_run_opts, 0 )
+    return simple_run ( name, way, './'+name, getTestOpts().extra_run_opts )
 
 # -----------------------------------------------------------------------------
 # Utils
