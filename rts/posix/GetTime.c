@@ -134,15 +134,17 @@ Ticks getThreadCPUTime(void)
     }
     return ((usec * TICKS_PER_SECOND) / 1000000);
 
-#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_THREAD_CPUTIME_ID)
-    // clock_gettime() gives us per-thread CPU time.  It isn't
-    // reliable on Linux, but it's the best we have.
-    struct timespec ts;
-    int res;
-    res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-    if (res == 0) {
-        return ((Ticks)ts.tv_sec * TICKS_PER_SECOND +
-                ((Ticks)ts.tv_nsec * TICKS_PER_SECOND) / 1000000000);
+#elif defined(HAVE_CLOCK_GETTIME) && defined (_POSIX_THREAD_CPUTIME) && defined(CLOCK_THREAD_CPUTIME_ID) && defined(HAVE_SYSCONF)
+    if (sysconf(_POSIX_THREAD_CPUTIME) != -1) {
+        // clock_gettime() gives us per-thread CPU time.  It isn't
+        // reliable on Linux, but it's the best we have.
+        struct timespec ts;
+        int res;
+        res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+        if (res == 0) {
+            return ((Ticks)ts.tv_sec * TICKS_PER_SECOND +
+                    ((Ticks)ts.tv_nsec * TICKS_PER_SECOND) / 1000000000);
+        }
     }
 #endif
     return getProcessCPUTime();
