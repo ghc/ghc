@@ -649,7 +649,7 @@ waitForDelayEvent :: Int -> IO ()
 waitForDelayEvent usecs = do
   m <- newEmptyMVar
   now <- getTicksOfDay
-  let target = now + usecs `quot` tick_usecs
+  target <- calculateTarget usecs
   atomicModifyIORef pendingDelays (\xs -> (Delay target m : xs, ()))
   prodServiceThread
   takeMVar m
@@ -659,7 +659,7 @@ waitForDelayEventSTM :: Int -> IO (TVar Bool)
 waitForDelayEventSTM usecs = do
    t <- atomically $ newTVar False
    now <- getTicksOfDay
-   let target = now + usecs `quot` tick_usecs
+   target <- calculateTarget usecs
    atomicModifyIORef pendingDelays (\xs -> (DelaySTM target t : xs, ()))
    prodServiceThread
    return t  
