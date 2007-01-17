@@ -292,6 +292,8 @@ infixMachOp1 (MO_U_Lt   _) = Just (char '<')
 infixMachOp1 _             = Nothing
 
 -- %left '-' '+'
+pprExpr7 (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
+   = pprExpr7 (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
 pprExpr7 (CmmMachOp op [x,y]) | Just doc <- infixMachOp7 op
    = pprExpr7 x <+> doc <+> pprExpr8 y
 pprExpr7 e = pprExpr8 e
