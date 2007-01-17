@@ -68,6 +68,16 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
          * we are about to raise an async exception in the current
          * thread, which might result in the thread being killed.
          */
+
+#ifndef REG_R1
+        /*
+         * raiseAsync assumes that the stack is in ThreadRunGHC state,
+         * i.e. with a return address on the top.  In unreg mode, the
+         * return value for IO is on top of the return address, so we
+         * need to make a small adjustment here.
+         */
+        Sp_adj(1);
+#endif
         SAVE_THREAD_STATE();
         r = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
     					              CurrentTSO "ptr") [R1];
@@ -82,6 +92,15 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
                 jump %ENTRY_CODE(Sp(0));
             }
         }
+#ifndef REG_R1
+        /* 
+         * Readjust stack in unregisterised mode if we didn't raise an
+         * exception, see above
+         */
+        else {
+            Sp_adj(-1);
+        }
+#endif
     }
 
 #ifdef REG_R1
