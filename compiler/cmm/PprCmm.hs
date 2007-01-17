@@ -339,7 +339,10 @@ genMachOp mop args
    || isJust (infixMachOp7 mop)
    || isJust (infixMachOp8 mop)	 = parens (pprExpr (CmmMachOp mop args))
 
-   | otherwise = char '%' <> pprMachOp mop <> parens (commafy (map pprExpr args))
+   | otherwise = char '%' <> ppr_op <> parens (commafy (map pprExpr args))
+        where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
+                                 (show mop))
+                -- replace spaces in (show mop) with underscores,
 
 --
 -- Unsigned ops on the word size of the machine get nice symbols.
