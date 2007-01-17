@@ -29,6 +29,7 @@ import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList,
                                listToMaybe, fromJust, catMaybes )
 import Data.Word
 import Data.Typeable
+import Data.Graph hiding ( flattenSCC )
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
                                ArgDescr(..) )
 import System.Environment    ( getArgs )
@@ -58,6 +59,7 @@ import TyCon
 import PrelNames
 import Bag
 import Binary
+import HscTypes
 
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
@@ -1195,11 +1197,9 @@ type ErrMsgM a = Writer [ErrMsg] a
 -- Packages 
 --------------------------------------------------------------------------------
 
-type PackageEnv = Map Name Name
-
 data PackageData = PackageData {
   pdModules  :: [Module],
-  pdDocEnv   :: PackageEnv,
+  pdDocEnv   :: Map Name Name,
   pdHtmlPath :: FilePath
 }
 
@@ -1217,8 +1217,15 @@ pkgId = mkPackageId . package
 -- | Topologically sort a list of modules that belong to an external package,
 -- using the dependency information available in the ModIface structure for 
 -- each module. 
-sortPackageModules :: [Module] -> IO [Module]
-sortPackageModules mods = return mods
+sortPackageModules :: [ModuleInfo] -> [ModuleInfo]
+sortPackageModules modinfos = flattenSCCs $ stronglyConnComp nodes
+  where 
+    nodes = map mkNode modinfos
+      where
+       mkNode modinfo = let iface = minf_iface modinfo
+                            modNames = (map fst . dep_mods . mi_deps) iface
+                            modName  = moduleName (mi_module iface)
+                        in (modinfo, modName, modNames)
 
 -- | For each module in the list, try to retrieve a ModuleInfo structure  
 moduleInfo :: Session -> [Module] -> IO (Maybe [ModuleInfo])
@@ -1248,31 +1255,40 @@ getIface pkgInfo = case haddockInterfaces pkgInfo of
 getPackage :: Session -> InstalledPackageInfo -> IO PackageData 
 getPackage session pkgInfo = do
   html <- getHtml pkgInfo
-
-  -- get a sorted list of the exposed modules  
   let modules = packageModules pkgInfo
-  modules' <- sortPackageModules modules
 
   -- try to get a ModuleInfo struct for each module
-  mbModInfo <- moduleInfo session modules'
-  modInfo <- case mbModInfo of 
+  mbModInfos <- moduleInfo session modules
+  modInfos <- case mbModInfos of 
     Just x -> return x
     Nothing -> throwE "Could not get ModuleInfo for all exposed modules." 
 
+  let modInfos' = sortPackageModules modInfos
+
   return $ PackageData {
-    pdModules  = modules',
-    pdDocEnv   = packageDocEnv modules' modInfo,
+    pdModules  = map modInfoMod modInfos',
+    pdDocEnv   = packageDocEnv modInfos',
     pdHtmlPath = html
   } 
 
 -- | Build a package doc env out of a topologically sorted list of modules
-packageDocEnv :: [Module] -> [ModuleInfo] -> PackageEnv
-packageDocEnv mods infos = Map.fromList $ concatMap moduleDocEnv (zip mods infos)
+packageDocEnv :: [ModuleInfo] -> Map Name Name
+packageDocEnv modInfos = foldl addModuleEnv Map.empty (reverse modInfos)
   where
-    moduleDocEnv (mod, modInfo) 
-      | "GHC" `isPrefixOf` moduleString mod = []
-      | otherwise = [ (n, nameSetMod n mod) | n <- (modInfoExports modInfo) ]
-
+    addModuleEnv oldEnv thisMod 
+      | "GHC" `isPrefixOf` modStr = oldEnv 
+      | DocOptHide `elem` options = oldEnv
+      | DocOptNotHome `elem` options = foldl' keepOld oldEnv visibleNames
+      | otherwise = foldl' keepNew oldEnv visibleNames
+      where 
+        modStr = moduleNameString (modInfoName thisMod)
+        options = mi_docopts $ minf_iface thisMod
+        visibleNames = modInfoExports thisMod
+        modName = modInfoMod thisMod
+        keepOld env n = Map.insertWith (\new old -> old) n 
+                        (nameSetMod n modName) env
+        keepNew env n = Map.insert n (nameSetMod n modName) env
+        
 -- | Try to create a PackageData for each package in the session except for 
 -- rts. Print a warning on stdout if a PackageData could not be created.
 getPackages :: Session -> DynFlags -> [Flag] -> IO [PackageData]
@@ -1300,6 +1316,8 @@ getPackages session dynflags flags = do
           return Nothing
         )
 
--- | Build one big doc env out of a list of packages
-packagesDocEnv :: [PackageData] -> PackageEnv
+-- | Build one big doc env out of a list of packages. If multiple packages 
+-- export the same (original) name, we just pick one of the packages as the 
+-- documentation site.
+packagesDocEnv :: [PackageData] -> Map Name Name
 packagesDocEnv packages = Map.unions (map pdDocEnv packages)
