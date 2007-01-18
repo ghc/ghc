@@ -104,33 +104,31 @@ main = do
   -- initialize GHC 
   (session, dynflags) <- startGHC libDir
 
-  defaultErrorHandler dynflags $ do
+  -- parse GHC flags given to the program 
+  (dynflags', rest') <- if isGHCMode 
+    then parseGHCFlags_GHCMode     dynflags rest  
+    else parseGHCFlags_HaddockMode dynflags rest 
+  setSessionDynFlags session dynflags'
 
-    -- parse GHC flags given to the program 
-    (dynflags', rest') <- if isGHCMode 
-      then parseGHCFlags_GHCMode     dynflags rest  
-      else parseGHCFlags_HaddockMode dynflags rest 
-    setSessionDynFlags session dynflags'
+  -- parse Haddock specific flags
+  (flags, fileArgs) <- parseHaddockOpts rest'
 
-    -- parse Haddock specific flags
-    (flags, fileArgs) <- parseHaddockOpts rest'
+  -- try to sort and check the input files using the GHC API 
+  modules <- sortAndCheckModules session dynflags' fileArgs
 
-    -- try to sort and check the input files using the GHC API 
-    modules <- sortAndCheckModules session dynflags' fileArgs
+  -- create a PackageData for each external package in the session
+  -- using the GHC API. The PackageData contains an html path,
+  -- a doc env and a list of module names.
+  packages <- getPackages session dynflags' flags
 
-    -- create a PackageData for each external package in the session
-    -- using the GHC API. The PackageData contains an html path,
-    -- a doc env and a list of module names.
-    packages <- getPackages session dynflags' flags
+  -- update the html references (module -> html file mapping)
+  updateHTMLXRefs packages
 
-    -- update the html references (module -> html file mapping)
-    updateHTMLXRefs packages
+  -- combine the doc envs of the external packages into one
+  let env = packagesDocEnv packages
 
-    -- combine the doc envs of the external packages into one
-    let env = packagesDocEnv packages
-
-    -- TODO: continue to break up the run function into parts
-    run flags modules env
+	-- TODO: continue to break up the run function into parts
+  run flags modules env
 
 parseModeFlag :: [String] -> (Bool, [String])
 parseModeFlag ("--ghc-flags":rest) = (True, rest)
@@ -223,7 +221,7 @@ startGHC libDir = do
   return (session, flags'')
 
 sortAndCheckModules :: Session -> DynFlags -> [FilePath] -> IO [CheckedMod]
-sortAndCheckModules session flags files = do --defaultErrorHandler flags $ do 
+sortAndCheckModules session flags files = defaultErrorHandler flags $ do 
   targets <- mapM (\s -> guessTarget s Nothing) files
   setTargets session targets 
   mbModGraph <- depanal session [] True
