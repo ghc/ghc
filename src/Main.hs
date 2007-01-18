@@ -832,18 +832,18 @@ renameModule renamingEnv mod =
 -- original names.
 
 mkExportItems
-        :: ModuleMap
-	-> Module			-- this module
-	-> [Name]			-- exported names (orig)
-        -> Map Name (LHsDecl Name) -- maps exported names to declarations
-	-> Map Name (LHsDecl Name) -- maps local names to declarations
-	-> Map Name [Name]	-- sub-map for this module
-	-> [Entity]	-- entities in the current module
-	-> [DocOption]
-	-> Maybe [IE Name]
-	-> Bool				-- --ignore-all-exports flag
-        -> Map Name (HsDoc Name)
-	-> ErrMsgM [ExportItem Name]
+  :: ModuleMap
+  -> Module			-- this module
+  -> [Name]			-- exported names (orig)
+  -> Map Name (LHsDecl Name) -- maps exported names to declarations
+  -> Map Name (LHsDecl Name) -- maps local names to declarations
+  -> Map Name [Name]	-- sub-map for this module
+  -> [Entity]	-- entities in the current module
+  -> [DocOption]
+  -> Maybe [IE Name]
+  -> Bool				-- --ignore-all-exports flag
+  -> Map Name (HsDoc Name)
+  -> ErrMsgM [ExportItem Name]
 
 mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_map entities
               opts maybe_exps ignore_all_exports docMap
