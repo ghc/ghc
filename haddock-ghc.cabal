@@ -1,0 +1,78 @@
+name: haddock-ghc
+cabal-version: >=1.1.4
+version: 0.1
+license: BSD3
+license-file: LICENSE
+copyright: (c) Simon Marlow
+author: Simon Marlow
+maintainer: Simon Marlow <simonmar@microsoft.com>
+stability: stable
+homepage: http://www.haskell.org/haddock/
+synopsis: Haddock is a documentation-generation tool for Haskell libraries
+build-depends: base>=1.0, haskell98>=1.0, mtl>=1.0, ghc, network>=1.0, Cabal, FilePath>=0.11
+data-files:
+	html/haddock-DEBUG.css
+	html/haddock.css
+	html/haddock.js
+	html/haskell_icon.gif
+	html/minus.gif
+	html/plus.gif
+extra-source-files:
+	CHANGES
+	README
+	TODO
+	doc/Makefile
+	doc/README
+	doc/aclocal.m4
+	doc/config.mk.in
+	doc/configure.ac
+	doc/docbook-xml.mk
+	doc/fptools.css
+	doc/haddock.xml
+	examples/A.hs
+	examples/B.hs
+	examples/Bug1.hs
+	examples/Bug2.hs
+	examples/Bug3.hs
+	examples/Bug4.hs
+	examples/Bug6.hs
+	examples/Bug7.hs
+	examples/Bug8.hs
+	examples/Bug9.hs
+	examples/Hash.hs
+	examples/Hidden.hs
+	examples/Makefile
+	examples/NoLayout.hs
+	examples/Test.hs
+	examples/Visible.hs
+	examples/hide-bug/A.hs
+	examples/hide-bug/B.hs
+	examples/hide-bug/C.hs
+	examples/hide-bug/D.hs
+	haddock.spec
+	haskell.vim
+	src/haddock.sh
+
+executable: haddock-ghc
+hs-source-dirs: src
+main-is: Main.hs
+extensions: CPP, PatternGuards
+ghc-options: -fglasgow-exts
+other-modules:
+	FastMutInt2
+	BlockTable
+	HaddockDB
+	HaddockDevHelp
+	HaddockHH
+	HaddockHH2
+	HaddockHoogle
+	HaddockHtml
+	HaddockModuleTree
+	HaddockRename
+	HaddockTypes
+	HaddockUtil
+	HaddockVersion
+	Html
+	GHCUtils
+	Main
+ 

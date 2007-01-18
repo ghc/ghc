@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
 --
 -- Haddock - A Haskell Documentation Tool
 --
