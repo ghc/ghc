@@ -1,4 +1,4 @@
-Local bindings in scope:
+Stopped at a breakpoint in A.hs:8. Local bindings in scope:
   a :: a, c :: (), b :: forall a. a -> a, d :: Integer -> Integer -> Integer,
   i :: a
 A.hs:8:9-18> a :: GHC.Base.Unknown

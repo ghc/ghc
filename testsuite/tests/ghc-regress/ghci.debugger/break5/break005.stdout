@@ -1,8 +1,8 @@
-Local bindings in scope:
+Stopped at a breakpoint in A.hs:3. Local bindings in scope:
   i :: a
 A.hs:3:6-19> Returning to normal execution...
 ()
-Local bindings in scope:
+Stopped at a breakpoint in A.hs:6. Local bindings in scope:
   i :: Int
 A.hs:6:6-15> Returning to normal execution...
 ()

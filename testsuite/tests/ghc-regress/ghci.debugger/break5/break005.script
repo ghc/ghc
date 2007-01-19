@@ -3,6 +3,6 @@
 :set -fno-debugging
 :l A
 f 4
-:q
+:c
 g 1
-:q
+:c

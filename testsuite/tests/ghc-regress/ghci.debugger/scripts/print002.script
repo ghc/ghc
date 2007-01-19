@@ -1,5 +1,6 @@
 -- printing of Showables
 
+:set -fglasgow-exts
 let f = Just (1.2::Float)
 f
 :p f
@@ -7,7 +8,6 @@ f
 let i = Just (10::Integer)
 :p i
 
-:set -fglasgow-exts
 :l ../Test.hs
 
 let s = S1 'a' 'b' 'c'

@@ -1,5 +1,5 @@
 Breakpoint set at (5,15)
-Local bindings in scope:
+Stopped at a breakpoint in ../QSort.hs:5. Local bindings in scope:
   as :: [a], a :: a, left :: [a], right :: [a]
 ../QSort.hs:5:15-50> ../QSort.hs:5:15-50> right = (_t1::[a])
 ../QSort.hs:5:15-50> ()
@@ -10,4 +10,4 @@ Local bindings in scope:
 ../QSort.hs:5:15-50> 1
 ../QSort.hs:5:15-50> left = [4]
 ../QSort.hs:5:15-50> Returning to normal execution...
-You may need to reload your modules
+
