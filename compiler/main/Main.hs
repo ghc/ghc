@@ -78,6 +78,18 @@ main =
   -- 2. Parse the "mode" flags (--make, --interactive etc.)
   (cli_mode, argv3) <- parseModeFlags argv2
 
+  -- If all we want to do is to show the version number then do it
+  -- now, before we start a GHC session etc.
+  -- If we do it later then bootstrapping gets confused as it tries
+  -- to find out what version of GHC it's using before package.conf
+  -- exists, so starting the session fails.
+  case cli_mode of
+    ShowVersion     -> do showVersion
+                          exitWith ExitSuccess
+    ShowNumVersion  -> do putStrLn cProjectVersion
+                          exitWith ExitSuccess
+    _               -> return ()
+
   let mode = case cli_mode of
 		DoInteractive	-> Interactive
 		DoEval _	-> Interactive
@@ -145,16 +157,16 @@ main =
 
 	---------------- Do the business -----------
   case cli_mode of
-	ShowUsage       -> showGhcUsage dflags cli_mode
-	PrintLibdir     -> putStrLn (topDir dflags)
-	ShowVersion     -> showVersion
-        ShowNumVersion  -> putStrLn cProjectVersion
-        ShowInterface f -> doShowIface dflags f
-	DoMake 	        -> doMake session srcs
-	DoMkDependHS    -> doMkDependHS session (map fst srcs)
-	StopBefore p    -> oneShot dflags p srcs
-	DoInteractive   -> interactiveUI session srcs Nothing
-	DoEval expr     -> interactiveUI session srcs (Just expr)
+    ShowUsage       -> showGhcUsage dflags cli_mode
+    PrintLibdir     -> putStrLn (topDir dflags)
+    ShowVersion     -> panic "ShowVersion should already have been handled"
+    ShowNumVersion  -> panic "ShowNumVersion should already have been handled"
+    ShowInterface f -> doShowIface dflags f
+    DoMake          -> doMake session srcs
+    DoMkDependHS    -> doMkDependHS session (map fst srcs)
+    StopBefore p    -> oneShot dflags p srcs
+    DoInteractive   -> interactiveUI session srcs Nothing
+    DoEval expr     -> interactiveUI session srcs (Just expr)
 
   dumpFinalStats dflags
   exitWith ExitSuccess
