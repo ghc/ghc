@@ -2060,7 +2060,7 @@ getCondCode = panic "MachCode.getCondCode: not on Alphas"
 -- yes, they really do seem to want exactly the same!
 
 getCondCode (CmmMachOp mop [x, y])
-  = ASSERT (cmmExprRep x /= I8) -- tmp, not set up to handle 8-bit comparisons
+  = 
     case mop of
       MO_Eq F32 -> condFltCode EQQ x y
       MO_Ne F32 -> condFltCode NE  x y
