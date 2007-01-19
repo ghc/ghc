@@ -339,6 +339,38 @@ cmmMachOpFold (MO_Add _) [CmmLit (CmmInt i rep), CmmLit (CmmLabel lbl)]
 cmmMachOpFold (MO_Sub _) [CmmLit (CmmLabel lbl), CmmLit (CmmInt i rep)]
   = CmmLit (CmmLabelOff lbl (fromIntegral (negate (narrowU rep i))))
 
+
+-- Comparison of literal with narrowed/widened operand: perform
+-- the comparison at a different width, as long as the literal is
+-- within range.
+
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+-- powerPC NCG has a TODO for I8/I16 comparisons, so don't try
+
+cmmMachOpFold cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
+  | Just (rep, narrow) <- maybe_conversion conv,
+    Just narrow_cmp <- maybe_comparison cmp rep,
+    let narrow_i = narrow rep i,
+    narrow_i == i
+  = cmmMachOpFold narrow_cmp [x, CmmLit (CmmInt narrow_i rep)]
+ where
+    maybe_conversion (MO_U_Conv from _) = Just (from, narrowU)
+    maybe_conversion (MO_S_Conv from _) = Just (from, narrowS)
+    maybe_conversion _ = Nothing
+    
+    maybe_comparison (MO_U_Gt _) rep = Just (MO_U_Gt rep)
+    maybe_comparison (MO_U_Ge _) rep = Just (MO_U_Ge rep)
+    maybe_comparison (MO_U_Lt _) rep = Just (MO_U_Lt rep)
+    maybe_comparison (MO_U_Le _) rep = Just (MO_U_Le rep)
+    maybe_comparison (MO_S_Gt _) rep = Just (MO_S_Gt rep)
+    maybe_comparison (MO_S_Ge _) rep = Just (MO_S_Ge rep)
+    maybe_comparison (MO_S_Lt _) rep = Just (MO_S_Lt rep)
+    maybe_comparison (MO_S_Le _) rep = Just (MO_S_Le rep)
+    maybe_comparison (MO_Eq   _) rep = Just (MO_Eq   rep)
+    maybe_comparison _ _ = Nothing
+
+#endif
+
 -- We can often do something with constants of 0 and 1 ...
 
 cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt 0 _))]
