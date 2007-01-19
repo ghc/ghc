@@ -480,9 +480,11 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 			text "real_lo_tag: " <+> int real_lo_tag <+>
 			text "real_hi_tag: " <+> int real_hi_tag) $ -}
 		   ASSERT( n_branches > 1 && n_tags > 1 ) 
-		   n_tags > 2 && (small || dense || via_C)
-		 -- a 2-branch switch always turns into an if.
-    small      	 = n_tags <= 4
+		   n_tags > 2 && (via_C || (dense && big_enough))
+		 -- up to 4 branches we use a decision tree, otherwise
+                 -- a switch (== jump table in the NCG).  This seems to be
+                 -- optimal, and corresponds with what gcc does.
+    big_enough 	 = n_branches > 4
     dense      	 = n_branches > (n_tags `div` 2)
     n_branches   = length branches
     
