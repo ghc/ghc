@@ -474,11 +474,12 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
   where
     use_switch 	 = {- pprTrace "mk_switch" (
 			ppr tag_expr <+> text "n_tags:" <+> int n_tags <+>
+                        text "branches:" <+> ppr (map fst branches) <+>
 			text "n_branches:" <+> int n_branches <+>
-			text "lo_tag: " <+> int lo_tag <+>
-			text "hi_tag: " <+> int hi_tag <+>
-			text "real_lo_tag: " <+> int real_lo_tag <+>
-			text "real_hi_tag: " <+> int real_hi_tag) $ -}
+			text "lo_tag:" <+> int lo_tag <+>
+			text "hi_tag:" <+> int hi_tag <+>
+			text "real_lo_tag:" <+> int real_lo_tag <+>
+			text "real_hi_tag:" <+> int real_hi_tag) $ -}
 		   ASSERT( n_branches > 1 && n_tags > 1 ) 
 		   n_tags > 2 && (via_C || (dense && big_enough))
 		 -- up to 4 branches we use a decision tree, otherwise
