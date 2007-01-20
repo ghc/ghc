@@ -260,7 +260,6 @@ stripUnknowns :: [Name] -> Id -> Id
 stripUnknowns names id = setIdType id . sigmaType . fst . go names . idType 
                            $ id
  where 
-   sigmaType ty = mkForAllTys (varSetElems$ tyVarsOfType (dropForAlls ty)) ty
    go tyvarsNames@(v:vv) ty 
     | Just (ty1,ty2) <- splitFunTy_maybe ty = let
                (ty1',vv') = go tyvarsNames ty1

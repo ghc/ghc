@@ -39,6 +39,8 @@ module RtClosureInspect(
      isPointed,
      isFullyEvaluatedTerm,
 --     unsafeDeepSeq, 
+     
+     sigmaType
  ) where 
 
 #include "HsVersions.h"
@@ -472,7 +474,7 @@ cvObtainTerm1 hsc_env force mb_ty hval
   | Nothing <- mb_ty = runTR hsc_env . go argTypeKind $ hval
   | Just ty <- mb_ty = runTR hsc_env $ do
                  term <- go argTypeKind hval
-                 ty'  <- instScheme ty
+                 ty'  <- instScheme (sigmaType ty)
                  addConstraint ty' (fromMaybe (error "by definition") 
                                               (termType term)) 
                  return term
@@ -538,6 +540,11 @@ zonkTerm = foldTerm idTermFoldM {
                                      return (Term ty' dc v tt)
              ,fSuspension = \ct ty v b -> fmapMMaybe zonkTcType ty >>= \ty ->
                                           return (Suspension ct ty v b)}  
+
+
+-- Is this defined elsewhere?
+-- Find all free tyvars and insert the appropiate ForAll.
+sigmaType ty = mkForAllTys (varSetElems$ tyVarsOfType (dropForAlls ty)) ty
 
 {-
 Example of Type Reconstruction
