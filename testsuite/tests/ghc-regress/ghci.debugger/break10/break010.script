@@ -1,9 +1,0 @@
--- Check that coalescing of 'auto' breakpoints does work as expected
-
-:set -fdebugging
-:l A
-
-:breakpoint add Main 3
-:breakpoint add Main 6
-:breakpoint add Main 10
-:breakpoint add Main 14
