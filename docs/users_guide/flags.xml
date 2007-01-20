@@ -662,6 +662,13 @@
 	      <entry><option>-fno-extended-default-rules</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-foverloaded-strings</option></entry>
+	      <entry>Enable <link linkend="overloaded-strings">overloaded string literals</link>.
+	      </entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-overloaded-strings</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-fscoped-type-variables</option></entry>
 	      <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
 	      Implied by <option>-fglasgow-exts</option>.</entry>

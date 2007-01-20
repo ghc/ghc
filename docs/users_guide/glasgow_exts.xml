@@ -241,6 +241,14 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
+	<term><option>-foverloaded-strings</option></term>
+	<listitem>
+	  <para>Enables overloaded string literals (see <xref
+	  linkend="overloaded-strings"/>).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fscoped-type-variables</option></term>
 	<listitem>
 	  <para>Enables lexically-scoped type variables (see <xref
@@ -4053,6 +4061,57 @@ pattern binding must have the same context.  For example, this is fine:
   g :: Ord a =&gt; a -> Bool
   g y = (y &lt;= y) || f True
 </programlisting>
+</para>
+</sect2>
+
+<sect2 id="overloaded-strings">
+<title>Overloaded string literals
+</title>
+
+<para>
+GHC supports <emphasis>overloaded string literals</emphasis>.  Normally a
+string literal has type <literal>String</literal>, but with overloaded string
+literals enabled (with <literal>-foverloaded-strings</literal>)
+ a string literal has type <literal>(IsString a) => a</literal>.
+</para>
+<para>
+This means that the usual string syntax can be used, e.g., for packed strings
+and other variations of string like types.  String literals behave very much
+like integer literals, i.e., they can be used in both expressions and patterns.
+If used in a pattern the literal with be replaced by an equality test, in the same
+way as an integer literal is.
+</para>
+<para>
+The class <literal>IsString</literal> is defined as:
+<programlisting>
+class IsString a where
+    fromString :: String -> a
+</programlisting>
+And the only predefined instance is the obvious one to make strings work as usual:
+<programlisting>
+instance IsString [Char] where
+    fromString cs = cs
+</programlisting>
+</para>
+<para>
+A small example:
+<programlisting>
+newtype MyString = MyString String deriving (Eq, Show)
+instance IsString MyString where
+    fromString = MyString
+
+greet :: MyString -> MyString
+greet "hello" = "world"
+greet other = other
+
+main = do
+    print $ greet "hello"
+    print $ greet "fool"
+</programlisting>
+</para>
+<para>
+Note that deriving <literal>Eq</literal> is necessary for the pattern matching
+to work since it gets translated into an equality comparison.
 </para>
 </sect2>
 
