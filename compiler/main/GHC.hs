@@ -87,7 +87,7 @@ module GHC (
 	lookupName,
 
         getBreakpointHandler, setBreakpointHandler, 
-        obtainTerm,  
+        obtainTerm, obtainTerm1,
 #endif
 
 	-- * Abstract syntax elements
@@ -2291,6 +2291,9 @@ jumpStepByStepFunction session handler ptr hValues siteInfo locmsg b
 mkSite :: SiteInfo -> BkptLocation Module
 mkSite (pkgName, modName, sitenum) =
   (mkModule (stringToPackageId pkgName) (mkModuleName modName), sitenum)
+
+obtainTerm1 :: Session -> Bool -> Maybe Type -> a -> IO Term
+obtainTerm1 sess force mb_ty x = withSession sess $ \hsc_env -> cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)
 
 obtainTerm :: Session -> Bool -> Id -> IO (Maybe Term)
 obtainTerm sess force id = withSession sess $ \hsc_env -> do
