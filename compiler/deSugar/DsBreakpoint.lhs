@@ -59,7 +59,8 @@ mkBreakpointExpr loc bkptFuncId = do
         let scope = filter (isValidType .idType ) scope'
             mod_name = moduleNameFS$ moduleName mod
         if null scope && instrumenting
-         then return (l$ HsVar lazyId) 
+           -- need to return some expresion, hence lazy is used here as a noop (hopefully)
+         then return (l$ HsVar lazyId)  
          else do
           when (not instrumenting) $
               warnDs (text "Extracted ids:" <+> (ppr scope $$ 

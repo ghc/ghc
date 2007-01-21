@@ -276,7 +276,7 @@ extractUnboxed tt ba = helper tt (byteArrayContents# ba)
            -- TODO: Improve the offset handling in decode (make it machine dependant)
 
 -----------------------------------
--- Boilerplate Fold code for Term
+-- * Traversals for Terms
 -----------------------------------
 
 data TermFold a = TermFold { fTerm :: Type -> DataCon -> HValue -> [a] -> a
@@ -409,6 +409,8 @@ addConstraint t1 t2  = congruenceNewtypes t1 t2 >> unifyType t1 t2
 -- in the right side reptypes for newtypes as found in the lhs
 -- Sadly it doesn't cover all the possibilities. It does not always manage
 -- to recover the highest level type. See test print016 for an example
+-- This is used for approximating a unification over types modulo newtypes that recovers
+-- the most concrete, with-newtypes type
 congruenceNewtypes ::  TcType -> TcType -> TcM TcType
 congruenceNewtypes lhs rhs
 --    | pprTrace "Congruence" (ppr lhs $$ ppr rhs) False = undefined
@@ -465,6 +467,7 @@ cvObtainTerm hsc_env force mb_ty a =
             }
          tidy ty = tidyType (emptyTidyOccEnv, tidyVarEnv ty) ty  
          tidyVarEnv ty = 
+
              mkVarEnv$ [ (v, setTyVarName v (tyVarName tv))
                          | (tv,v) <- zip alphaTyVars vars]
              where vars = varSetElems$ tyVarsOfType ty
@@ -510,7 +513,7 @@ cvObtainTerm1 hsc_env force mb_ty hval
                 subTerms   = reOrderTerms subTermsP subTermsNP subTtypes
             resType       <- liftM mkTyVarTy (newVar k)
             baseType      <- instScheme (dataConRepType dc)
-            let myType     = mkFunTys (map (fromMaybe undefined . termType) 
+            let myType     = mkFunTys (map (fromMaybe (error "cvObtainTerm1") . termType) 
                                        subTerms) 
                                   resType
             addConstraint baseType myType
