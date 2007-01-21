@@ -779,7 +779,10 @@ afterLoad ok session = do
   graph <- io (GHC.getModuleGraph session)
   graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
   setContextAfterLoad session graph'
-  refreshBkptTable graph'
+  do 
+     bt  <- getBkptTable
+     bt' <- io$ refreshBkptTable session bt graph'
+     setBkptTable bt'
   modulesLoadedMsg ok (map GHC.ms_mod_name graph')
 
 setContextAfterLoad session [] = do

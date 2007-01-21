@@ -44,6 +44,7 @@ import Control.Exception
 import Control.Monad
 import qualified Data.Map as Map
 import Data.Array.Unboxed
+import Data.List
 import Data.Typeable             ( Typeable )
 import Data.Maybe
 import Data.IORef
@@ -57,53 +58,51 @@ import GHC.Exts
 -- | The :print & friends commands
 -------------------------------------
 pprintClosureCommand :: Bool -> Bool -> String -> GHCi ()
-pprintClosureCommand bindThings force str = do
-  cms <- getSession 
-  let strs = words str
-  mbThings <- io$ ( mapM (GHC.lookupName cms) =<<) 
-                  . liftM concat 
-                  . mapM (GHC.parseName cms) 
-                   $ strs
+pprintClosureCommand bindThings force str = do 
+  cms <- getSession
   newvarsNames <- io$ do 
            uniques <- liftM uniqsFromSupply (mkSplitUniqSupply 'q')
            return$ map (\u-> (mkSysTvName u (mkFastString "a"))) uniques
-  let ids_ = [id | Just (AnId id) <- mbThings]
+  mb_ids  <- io$ mapM (cleanUp cms newvarsNames) (words str)
+  new_ids <- mapM (io . go cms) (catMaybes mb_ids)
+  io$ updateIds cms new_ids
+ where 
+   -- Find the Id, clean up 'Unknowns'
+   cleanUp :: Session -> [Name] -> String -> IO (Maybe Id)
+   cleanUp cms newNames str = do
+     tythings <- GHC.parseName cms str >>= mapM (GHC.lookupName cms)
+     return$ listToMaybe (map (stripUnknowns newNames) 
+                              [ i | Just (AnId i) <- tythings]) 
 
-  -- Clean up 'Unknown' types artificially injected into tyvars 
-      ids = map (stripUnknowns newvarsNames) ids_
- 
- -- Obtain the terms 
-  mb_terms  <- io$ mapM (obtainTerm cms force) ids
+   -- Do the obtainTerm--bindSuspensions-refineIdType dance
+   -- Warning! This function got a good deal of side-effects
+   go :: Session -> Id -> IO Id
+   go cms id = do
+     Just term <- obtainTerm cms force id
+     term'     <- if not bindThings then return term 
+                   else bindSuspensions cms term                         
+     showterm  <- pprTerm cms term'
+     unqual    <- GHC.getPrintUnqual cms
+     (putStrLn . showSDocForUser unqual) (ppr id <+> char '=' <+> showterm)
+     -- Before leaving, we compare the type obtained to see if it's more specific
+     -- Note how we need the Unknown-clear type returned by obtainTerm
+     let Just reconstructedType = termType term  
+     new_type  <- instantiateTyVarsToUnknown cms 
+                  (mostSpecificType (idType id) reconstructedType)
+     return (setIdType id new_type)
 
-  -- Give names to suspensions and bind them in the local env
-  mb_terms' <- if bindThings
-               then io$ mapM (fmapMMaybe (bindSuspensions cms)) mb_terms
-               else return mb_terms
-  ppr_terms <- io$ mapM (fmapMMaybe (printTerm cms)) mb_terms' 
-  let docs = [ ppr id <+> char '=' <+> t | (Just t,id) <- zip ppr_terms ids]
-  unqual  <- io$ GHC.getPrintUnqual cms
-  io . putStrLn . showSDocForUser unqual $ Outputable.vcat docs
+   updateIds :: Session -> [Id] -> IO ()
+   updateIds (Session ref) new_ids = do
+     hsc_env <- readIORef ref
+     let ictxt = hsc_IC hsc_env
+         type_env = ic_type_env ictxt
+         filtered_type_env = delListFromNameEnv type_env (map idName new_ids)
+         new_type_env =  extendTypeEnvWithIds filtered_type_env new_ids
+         new_ic = ictxt {ic_type_env = new_type_env }
+     writeIORef ref (hsc_env {hsc_IC = new_ic })
 
-  -- Type reconstruction may have obtained more defined types for some ids
-  -- So we refresh their types.
-  let new_ids0 = [ setIdType id ty | (id,Just t) <- zip ids mb_terms
-                                   , let Just ty = termType t
-                                   , ty `isMoreSpecificThan` idType id 
-                                   ]
-  new_ids <- io$ mapM (\x->liftM (setIdType x) . instantiateTyVarsToUnknown cms . idType $ x) 
-                      new_ids0   
-  let Session ref = cms
-  hsc_env <- io$ readIORef ref
-  let ictxt = hsc_IC hsc_env
-      type_env = ic_type_env ictxt
-      filtered_type_env = delListFromNameEnv type_env (map idName new_ids)
-      new_type_env =  extendTypeEnvWithIds filtered_type_env new_ids
-      new_ic = ictxt {ic_type_env = new_type_env }
-  io$ writeIORef ref (hsc_env {hsc_IC = new_ic })
-                                          
-  where
-    isMoreSpecificThan :: Type -> Type -> Bool
-    ty `isMoreSpecificThan   ` ty1 
+isMoreSpecificThan :: Type -> Type -> Bool
+ty `isMoreSpecificThan` ty1 
       | Just subst    <- tcUnifyTys bindOnlyTy1 [repType' ty] [repType' ty1] 
       , substFiltered <- filter (not.isTyVarTy) . varEnvElts . getTvSubstEnv $ subst
       , not . null $ substFiltered
@@ -114,8 +113,13 @@ pprintClosureCommand bindThings force str = do
                             | otherwise = BindMe
             ty_vars = varSetElems$ tyVarsOfType ty
 
-    bindSuspensions :: Session -> Term -> IO Term
-    bindSuspensions cms@(Session ref) t = do 
+mostSpecificType ty1 ty2 | ty1 `isMoreSpecificThan` ty2 = ty1
+                         | otherwise = ty2
+
+-- | Give names, and bind in the interactive environment, to all the suspensions
+--   included (inductively) in a term
+bindSuspensions :: Session -> Term -> IO Term
+bindSuspensions cms@(Session ref) t = do 
       hsc_env <- readIORef ref
       inScope <- GHC.getBindings cms
       let ictxt        = hsc_IC hsc_env
@@ -123,8 +127,7 @@ pprintClosureCommand bindThings force str = do
           type_env     = ic_type_env ictxt
           prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
-          availNames   = [n | n <- map ((prefix++) . show) [1..]
-                            , n `notElem` alreadyUsedNames ]
+          availNames   = map ((prefix++) . show) [1..] \\ alreadyUsedNames 
       availNames_var  <- newIORef availNames
       (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
@@ -159,51 +162,52 @@ pprintClosureCommand bindThings force str = do
 
 
 --  A custom Term printer to enable the use of Show instances
-    printTerm cms@(Session ref) = customPrintTerm customPrint
-      where
-        customPrint = \p-> customPrintShowable : customPrintTermBase p 
-        customPrintShowable t@Term{ty=ty, dc=dc, val=val} = do
-          let hasType = isEmptyVarSet (tyVarsOfType ty)  -- redundant
-              isEvaled = isFullyEvaluatedTerm t
-          if isEvaled -- && hasType
-           then do 
-              hsc_env <- readIORef ref
-              dflags  <- GHC.getSessionDynFlags cms
-              do
-                   (new_env, bname) <- bindToFreshName hsc_env ty "showme"
-                   writeIORef ref (new_env)
-                   let noop_log _ _ _ _ = return () 
-                       expr = "show " ++ showSDoc (ppr bname)
-                   GHC.setSessionDynFlags cms dflags{log_action=noop_log}
-                   mb_txt <- withExtendedLinkEnv [(bname, val)] 
-                               (GHC.compileExpr cms expr)
-                   case mb_txt of 
-                     Just txt -> return . Just . text . unsafeCoerce# $ txt
-                     Nothing  -> return Nothing
-               `finally` do 
-                   writeIORef ref hsc_env
-                   GHC.setSessionDynFlags cms dflags
-           else return Nothing
+pprTerm cms@(Session ref) = customPrintTerm customPrint
+ where
+  customPrint = \p-> customPrintShowable : customPrintTermBase p 
+  customPrintShowable t@Term{ty=ty, dc=dc, val=val} = do
+    let hasType = isEmptyVarSet (tyVarsOfType ty)  -- redundant
+        isEvaled = isFullyEvaluatedTerm t
+    if not isEvaled -- || not hasType
+     then return Nothing
+     else do 
+        hsc_env <- readIORef ref
+        dflags  <- GHC.getSessionDynFlags cms
+        do
+           (new_env, bname) <- bindToFreshName hsc_env ty "showme"
+           writeIORef ref (new_env)
+           let noop_log _ _ _ _ = return () 
+               expr = "show " ++ showSDoc (ppr bname)
+           GHC.setSessionDynFlags cms dflags{log_action=noop_log}
+           mb_txt <- withExtendedLinkEnv [(bname, val)] 
+                                         (GHC.compileExpr cms expr)
+           case mb_txt of 
+             Just txt -> return . Just . text . unsafeCoerce# $ txt
+             Nothing  -> return Nothing
+         `finally` do 
+           writeIORef ref hsc_env
+           GHC.setSessionDynFlags cms dflags
+     
+  bindToFreshName hsc_env ty userName = do
+    name <- newGrimName cms userName 
+    let ictxt    = hsc_IC hsc_env
+        rn_env   = ic_rn_local_env ictxt
+        type_env = ic_type_env ictxt
+        id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
+        new_type_env = extendTypeEnv type_env (AnId id)
+        new_rn_env   = extendLocalRdrEnv rn_env [name]
+        new_ic       = ictxt { ic_rn_local_env = new_rn_env, 
+                               ic_type_env     = new_type_env }
+    return (hsc_env {hsc_IC = new_ic }, name)
 
-        bindToFreshName hsc_env ty userName = do
-          name <- newGrimName cms userName 
-          let ictxt    = hsc_IC hsc_env
-              rn_env   = ic_rn_local_env ictxt
-              type_env = ic_type_env ictxt
-              id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
-              new_type_env = extendTypeEnv type_env (AnId id)
-              new_rn_env   = extendLocalRdrEnv rn_env [name]
-              new_ic       = ictxt { ic_rn_local_env = new_rn_env, 
-                                     ic_type_env     = new_type_env }
-          return (hsc_env {hsc_IC = new_ic }, name)
 --    Create new uniques and give them sequentially numbered names
 --    newGrimName :: Session -> String -> IO Name
-    newGrimName cms userName  = do
-      us <- mkSplitUniqSupply 'b'
-      let unique  = uniqFromSupply us
-          occname = mkOccName varName userName
-          name    = mkInternalName unique occname noSrcLoc
-      return name
+newGrimName cms userName  = do
+    us <- mkSplitUniqSupply 'b'
+    let unique  = uniqFromSupply us
+        occname = mkOccName varName userName
+        name    = mkInternalName unique occname noSrcLoc
+    return name
 
 ----------------------------------------------------------------------------
 -- | Replace all the tyvars in a Term with the opaque type GHC.Base.Unknown
@@ -334,12 +338,13 @@ bkptOptions cmd = do
        where 
          handleAdd mod_name f = do
            mod         <- io$ GHC.findModule s (GHC.mkModuleName mod_name) Nothing
-           ghciHandleDyn (handleBkptEx s mod) $
-            case f mod bt of
-             (newTable, site)  -> do
+           either 
+             (handleBkptEx s mod)
+             (\(newTable, site) -> do
                setBkptTable newTable 
                io (putStrLn ("Breakpoint set at " ++ 
-                              show (getSiteCoords newTable mod site)))
+                              show (getSiteCoords newTable mod site))))
+             (f mod bt) 
 
     bkptOptions' s ("del":cmds) bt 
       | [i']     <- cmds 
@@ -367,17 +372,16 @@ bkptOptions cmd = do
              "syntax: :breakpoint del (breakpoint # | Module line [col])"
 
        where delMsg = "Breakpoint deleted"
-             handleDel mod f = ghciHandleDyn (handleBkptEx s mod) 
-                                             (modifyBkptTable f >> io (putStrLn delMsg))
+             handleDel mod f = either (handleBkptEx s mod)
+                                      (\newtable-> setBkptTable newtable >> io (putStrLn delMsg))
+                                      (f bt)
+                                      
 
     bkptOptions' _ _ _ = throwDyn $ CmdLineError $ 
                          "syntax: :breakpoint (list|continue|stop|add|del)"
 
 -- Error messages
 --    handleBkptEx :: Session -> Module -> Debugger.BkptException -> a
-    handleBkptEx _ _ NoBkptFound = error "No suitable breakpoint site found"  
-         -- ^ TODO Instead of complaining, set a bkpt in the next suitable line
-    handleBkptEx _ _ NotNeeded   = error "Nothing to do"
     handleBkptEx s m NotHandled  = io$
                                    findModSummary m                  >>= \mod_summary ->
                                    isModuleInterpreted s mod_summary >>= \it -> 
@@ -390,6 +394,7 @@ bkptOptions cmd = do
                                case [ modsum | modsum <- mod_graph
                                              , ms_mod modsum == m ] of
                                  [modsum] -> return modsum
+    handleBkptEx _ _ e = error (show e)
 
 -------------------------
 -- Breakpoint Tables
@@ -401,27 +406,32 @@ data BkptTable a  = BkptTable {
                            -- | A list of lines, each line can have zero or more sites, which are annotated with a column number
    , sites       :: Map.Map a [[(SiteNumber, Int)]] 
    }
+                  deriving Show
 
 sitesOf :: Ord a => BkptTable a -> a -> Maybe [[(SiteNumber, Int)]] 
 sitesOf bt fn = Map.lookup fn (sites bt)
 bkptsOf bt fn = Map.lookup fn (breakpoints bt)
 
 
--- The functions for manipulating BkptTables do throw exceptions
-data BkptException =
-                    NotHandled
+data BkptError =
+                    NotHandled  -- Trying to manipulate a element not handled by this BkptTable 
                   | NoBkptFound
                   | NotNeeded   -- Used when a breakpoint was already enabled
   deriving Typeable
 
+instance Show BkptError where
+  show NoBkptFound = "No suitable breakpoint site found"
+  show NotNeeded  = "Nothing to do"
+  show NotHandled  = "BkptTable: Element not controlled by this table"
+
 emptyBkptTable :: Ord a => BkptTable a
 addModule      :: Ord a => a -> [(SiteNumber,Coord)] -> BkptTable a -> BkptTable a
 -- | Lines start at index 1
-addBkptByLine  :: Ord a => a -> Int        -> BkptTable a -> (BkptTable a, SiteNumber)
-addBkptByCoord :: Ord a => a -> Coord      -> BkptTable a -> (BkptTable a, SiteNumber)
-delBkptByLine  :: Ord a => a -> Int        -> BkptTable a -> BkptTable a
-delBkptBySite  :: Ord a => a -> SiteNumber -> BkptTable a -> BkptTable a
-delBkptByCoord :: Ord a => a -> Coord      -> BkptTable a -> BkptTable a
+addBkptByLine  :: Ord a => a -> Int        -> BkptTable a -> Either BkptError (BkptTable a, SiteNumber)
+addBkptByCoord :: Ord a => a -> Coord      -> BkptTable a -> Either BkptError (BkptTable a, SiteNumber)
+delBkptByLine  :: Ord a => a -> Int        -> BkptTable a -> Either BkptError (BkptTable a)
+delBkptBySite  :: Ord a => a -> SiteNumber -> BkptTable a -> Either BkptError (BkptTable a)
+delBkptByCoord :: Ord a => a -> Coord      -> BkptTable a -> Either BkptError (BkptTable a)
 
 isBkptEnabled  :: Ord a => BkptTable a -> BkptLocation a -> Bool
 btElems        :: Ord a => BkptTable a -> [(a, [SiteNumber])]
@@ -435,53 +445,53 @@ addBkptByLine a i bt
    | Just lines    <- sitesOf bt a
    , Just bkptsArr <- bkptsOf bt a
    , i < length lines
-   = case lines!!i of 
-       []    -> throwDyn NoBkptFound
-       (x:_) -> let (siteNum,col) = x
-                    wasAlreadyOn  = bkptsArr ! siteNum
-                    newArr        = bkptsArr // [(siteNum, True)]
-                    newTable      = Map.insert a newArr (breakpoints bt)
+   = case [line | line <- drop i lines, not (null line)] of 
+       ((x:_):_) -> let (siteNum,col) = x
+                        wasAlreadyOn  = bkptsArr ! siteNum
+                        newArr        = bkptsArr // [(siteNum, True)]
+                        newTable      = Map.insert a newArr (breakpoints bt)
         in if wasAlreadyOn 
-           then throwDyn NotNeeded
-           else (bt{breakpoints=newTable}, siteNum)
+            then Left NotNeeded
+            else Right (bt{breakpoints=newTable}, siteNum)
+       otherwise -> Left NoBkptFound
 
    | Just sites    <- sitesOf bt a
-   = throwDyn NoBkptFound
-   | otherwise     = throwDyn NotHandled  
+   = Left NoBkptFound
+   | otherwise     = Left NotHandled  
 
 addBkptByCoord a (r,c) bt 
    | Just lines    <- sitesOf bt a
    , Just bkptsArr <- bkptsOf bt a
    , r < length lines
        = case [ (sn,col) | (sn,col)<-lines!!r, col>=c] of 
-       []    -> throwDyn NoBkptFound
+       []    -> Left NoBkptFound
        (x:_) -> let (siteNum, col) = x
                     wasAlreadyOn  = bkptsArr ! siteNum
                     newArr        = bkptsArr // [(siteNum, True)]
                     newTable      = Map.insert a newArr (breakpoints bt)
         in if wasAlreadyOn 
-           then throwDyn NotNeeded
-           else (bt{breakpoints=newTable}, siteNum)
+           then Left NotNeeded
+           else Right (bt{breakpoints=newTable}, siteNum)
 
    | Just sites    <- sitesOf bt a
-   = throwDyn NoBkptFound
-   | otherwise     = throwDyn NotHandled  
+   = Left NoBkptFound
+   | otherwise     = Left NotHandled  
 
 delBkptBySite a i bt 
    | Just bkptsArr <- bkptsOf bt a
    , not (inRange (bounds bkptsArr) i)
-   = throwDyn NoBkptFound
+   = Left NoBkptFound
 
    | Just bkptsArr <- bkptsOf bt a
    , bkptsArr ! i     -- Check that there was a enabled bkpt here 
    , newArr        <- bkptsArr // [(i,False)] 
    , newTable      <- Map.insert a newArr (breakpoints bt)
-   = bt {breakpoints=newTable}
+   = Right bt {breakpoints=newTable}
 
    | Just sites    <- sitesOf bt a
-   = throwDyn NotNeeded
+   = Left NotNeeded
 
-   | otherwise = throwDyn NotHandled
+   | otherwise = Left NotHandled
 
 delBkptByLine a l bt 
    | Just sites    <- sitesOf bt a
@@ -489,9 +499,9 @@ delBkptByLine a l bt
    = delBkptBySite a site bt
 
    | Just sites    <- sitesOf bt a
-   = throwDyn NoBkptFound
+   = Left NoBkptFound
 
-   | otherwise = throwDyn NotHandled
+   | otherwise = Left NotHandled
 
 delBkptByCoord a (r,c) bt 
    | Just sites    <- sitesOf bt a
@@ -499,9 +509,9 @@ delBkptByCoord a (r,c) bt
    = delBkptBySite a site bt
 
    | Just sites    <- sitesOf bt a
-   = throwDyn NoBkptFound
+   = Left NoBkptFound
 
-   | otherwise = throwDyn NotHandled
+   | otherwise = Left NotHandled
 
 btElems bt = [ (a, [i | (i,True) <- assocs siteArr])
              | (a, siteArr) <- Map.assocs (breakpoints bt) ]
@@ -539,29 +549,28 @@ isBkptEnabled bt (a,site)
 -----------------
 -- Other stuff
 -----------------
-refreshBkptTable :: [ModSummary] -> GHCi ()
-refreshBkptTable [] = return ()
-refreshBkptTable (ms:mod_sums) = do
-    sess        <- getSession
-    isDebugging <- io(isDebuggingM sess)
-    when isDebugging $ do
-      old_table <- getBkptTable
-      new_table <- addModuleGHC sess old_table (GHC.ms_mod ms)
-      setBkptTable new_table
-    refreshBkptTable mod_sums
-  where addModuleGHC sess bt mod = do
-          Just mod_info <- io$ GHC.getModuleInfo sess mod
-          dflags <- getDynFlags
-          let sites = GHC.modInfoBkptSites mod_info
-          io$ debugTraceMsg dflags 2 
+refreshBkptTable :: Session -> BkptTable Module -> [ModSummary] -> IO (BkptTable Module)
+refreshBkptTable sess = foldM updIfDebugging
+  where 
+   updIfDebugging bt ms = do
+      isDebugging <- isDebuggingM ms
+      if isDebugging 
+           then addModuleGHC sess bt (GHC.ms_mod ms)
+           else return bt
+   addModuleGHC sess bt mod = do
+      Just mod_info <- GHC.getModuleInfo sess mod
+      dflags <- GHC.getSessionDynFlags sess
+      let sites = GHC.modInfoBkptSites mod_info
+      debugTraceMsg dflags 2 
                 (ppr mod <> text ": inserted " <> int (length sites) <>
                  text " breakpoints")
-          return$ addModule mod sites bt
+      return$ addModule mod sites bt
 #if defined(GHCI) && defined(DEBUGGER)
-        isDebuggingM sess = isModuleInterpreted sess ms >>= \isInterpreted -> 
-                            return (Opt_Debugging `elem` dflags && target == HscInterpreted && isInterpreted)
-        dflags = flags     (GHC.ms_hspp_opts ms)
-        target = hscTarget (GHC.ms_hspp_opts ms)
+   isDebuggingM ms = isModuleInterpreted sess ms >>= \isInterpreted -> 
+                     return (Opt_Debugging `elem` dflags && 
+                             target == HscInterpreted && isInterpreted)
+       where dflags = flags     (GHC.ms_hspp_opts ms)
+             target = hscTarget (GHC.ms_hspp_opts ms)
 #else
-        isDebuggingM _ = return False
+   isDebuggingM _ = return False
 #endif
