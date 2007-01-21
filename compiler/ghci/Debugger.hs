@@ -34,6 +34,7 @@ import GhciMonad
 import PackageConfig
 
 import Outputable
+import Pretty                    ( Mode(..), showDocWith )
 import ErrUtils
 import FastString
 import SrcLoc
@@ -83,7 +84,9 @@ pprintClosureCommand bindThings force str = do
                    else bindSuspensions cms term                         
      showterm  <- pprTerm cms term'
      unqual    <- GHC.getPrintUnqual cms
-     (putStrLn . showSDocForUser unqual) (ppr id <+> char '=' <+> showterm)
+     let showSDocForUserOneLine unqual doc = 
+             showDocWith LeftMode (doc (mkErrStyle unqual))
+     (putStrLn . showSDocForUserOneLine unqual) (ppr id <+> char '=' <+> showterm)
      -- Before leaving, we compare the type obtained to see if it's more specific
      -- Note how we need the Unknown-clear type returned by obtainTerm
      let Just reconstructedType = termType term  
