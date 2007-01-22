@@ -520,6 +520,7 @@ bit or 64 bit precision.
 -- Jumping around.
 	| JMP	      Operand
 	| JXX	      Cond BlockId  -- includes unconditional branches
+	| JXX_GBL     Cond Imm      -- non-local version of JXX
 	| JMP_TBL     Operand [BlockId]  -- table jump
 	| CALL	      (Either Imm Reg) [Reg]
 

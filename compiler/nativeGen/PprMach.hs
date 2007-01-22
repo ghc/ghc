@@ -1291,6 +1291,8 @@ pprInstr (JXX cond (BlockId id))
   = pprCondInstr SLIT("j") cond (pprCLabel_asm lab)
   where lab = mkAsmTempLabel id
 
+pprInstr (JXX_GBL cond imm) = pprCondInstr SLIT("j") cond (pprImm imm)
+
 pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand wordRep op)
 pprInstr (JMP_TBL op ids)  = pprInstr (JMP op)

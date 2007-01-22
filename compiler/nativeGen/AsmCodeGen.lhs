@@ -17,7 +17,7 @@ import MachRegs
 import MachCodeGen
 import PprMach
 import RegisterAlloc
-import RegAllocInfo	( jumpDests )
+import RegAllocInfo
 import NCGMonad
 import PositionIndependentCode
 
@@ -25,7 +25,7 @@ import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
 import PprCmm		( pprStmt, pprCmms )
 import MachOp
-import CLabel           ( CLabel, mkSplitMarkerLabel, mkAsmTempLabel )
+import CLabel
 #if powerpc_TARGET_ARCH
 import CLabel           ( mkRtsCodeLabel )
 #endif
@@ -37,8 +37,9 @@ import FastTypes
 import List		( groupBy, sortBy )
 import CLabel           ( pprCLabel )
 import ErrUtils		( dumpIfSet_dyn )
-import DynFlags		( DynFlags, DynFlag(..), dopt )
+import DynFlags
 import StaticFlags	( opt_Static, opt_PIC )
+import Util
 import Config           ( cProjectVersion )
 
 import Digraph
@@ -212,8 +213,10 @@ cmmNativeGen dflags cmm
 	genMachCode cmm              `thenUs` \ (pre_regalloc, lastMinuteImports) ->
      {-# SCC "regAlloc"         #-}
 	mapUs regAlloc pre_regalloc `thenUs`   \ with_regs ->
+     {-# SCC "shortcutBranches"   #-}
+        shortcutBranches dflags with_regs `bind` \ shorted -> 
      {-# SCC "sequenceBlocks"   #-}
-	map sequenceTop with_regs    `bind`   \ sequenced ->
+	map sequenceTop shorted        `bind`   \ sequenced ->
      {-# SCC "x86fp_kludge"     #-}
 	map x86fp_kludge sequenced   `bind`   \ final_mach_code ->
      {-# SCC "vcat"             #-}
@@ -328,6 +331,48 @@ makeFarBranches blocks
 #else
 makeFarBranches = id
 #endif
+
+-- -----------------------------------------------------------------------------
+-- Shortcut branches
+
+shortcutBranches :: DynFlags -> [NatCmmTop] -> [NatCmmTop]
+shortcutBranches dflags tops
+  | optLevel dflags < 1 = tops    -- only with -O or higher
+  | otherwise           = map (apply_mapping mapping) tops'
+  where
+    (tops', mappings) = mapAndUnzip build_mapping tops
+    mapping = foldr plusUFM emptyUFM mappings
+
+build_mapping top@(CmmData _ _) = (top, emptyUFM)
+build_mapping (CmmProc info lbl params []) $
+  = (CmmProc info lbl params [], emptyUFM)
+build_mapping (CmmProc info lbl params (head:blocks))
+  = (CmmProc info lbl params (head:others), mapping)
+        -- drop the shorted blocks, but don't ever drop the first one,
+        -- because it is pointed to by a global label.
+  where
+    -- find all the blocks that just consist of a jump that can be
+    -- shorted.
+    (shortcut_blocks, others) = partitionWith split blocks
+    split (BasicBlock id [insn]) | Just dest <- canShortcut insn 
+                                 = Left (id,dest)
+    split other = Right other
+
+    -- build a mapping from BlockId to JumpDest for shorting branches
+    mapping = foldl add emptyUFM shortcut_blocks
+    add ufm (id,dest) = addToUFM ufm id dest
+    
+apply_mapping ufm (CmmData sec statics) 
+  = CmmData sec (map (shortcutStatic (lookupUFM ufm)) statics)
+  -- we need to get the jump tables, so apply the mapping to the entries
+  -- of a CmmData too.
+apply_mapping ufm (CmmProc info lbl params blocks)
+  = CmmProc info lbl params (map short_bb blocks)
+  where
+    short_bb (BasicBlock id insns) = BasicBlock id $! map short_insn insns
+    short_insn i = shortcutJump (lookupUFM ufm) i
+                 -- shortcutJump should apply the mapping repeatedly,
+                 -- just in case we can short multiple branches.
 
 -- -----------------------------------------------------------------------------
 -- Instruction selection

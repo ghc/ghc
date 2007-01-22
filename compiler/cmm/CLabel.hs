@@ -98,7 +98,7 @@ module CLabel (
         mkHpcModuleOffsetLabel,
 
 	infoLblToEntryLbl, entryLblToInfoLbl,
-	needsCDecl, isAsmTemp, externallyVisibleCLabel,
+	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
 	CLabelType(..), labelType, labelDynamic,
 
 	pprCLabel
@@ -496,6 +496,10 @@ needsCDecl HpcModuleNameLabel           = False
 isAsmTemp  :: CLabel -> Bool    -- is a local temporary for native code generation
 isAsmTemp (AsmTempLabel _) = True
 isAsmTemp _ 	    	   = False
+
+maybeAsmTemp :: CLabel -> Maybe Unique
+maybeAsmTemp (AsmTempLabel uq) = Just uq
+maybeAsmTemp _ 	    	       = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Is a CLabel visible outside this object file or not?

@@ -17,6 +17,8 @@ module RegAllocInfo (
 	patchJump,
 	isRegRegMove,
 
+        JumpDest, canShortcut, shortcutJump, shortcutStatic,
+
 	maxSpillSlots,
 	mkSpillInstr,
 	mkLoadInstr,
@@ -26,7 +28,8 @@ module RegAllocInfo (
 
 #include "HsVersions.h"
 
-import Cmm		( BlockId )
+import Cmm
+import CLabel
 import MachOp           ( MachRep(..), wordRep )
 import MachInstrs
 import MachRegs
@@ -172,6 +175,7 @@ regUsage instr = case instr of
     CMP    sz src dst	-> mkRUR (use_R src ++ use_R dst)
     SETCC  cond op	-> mkRU [] (def_W op)
     JXX    cond lbl	-> mkRU [] []
+    JXX_GBL cond lbl	-> mkRU [] []
     JMP    op		-> mkRUR (use_R op)
     JMP_TBL op ids      -> mkRUR (use_R op)
     CALL (Left imm)  params -> mkRU params callClobberedRegs
@@ -417,6 +421,45 @@ patchJump insn old new
 #endif
 	_other		-> insn
 
+data JumpDest = DestBlockId BlockId | DestImm Imm
+
+canShortcut :: Instr -> Maybe JumpDest
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+canShortcut (JXX ALWAYS id) = Just (DestBlockId id)
+canShortcut (JMP (OpImm imm)) = Just (DestImm imm)
+#endif
+canShortcut _ = Nothing
+
+shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
+shortcutJump fn insn@(JXX cc id) = 
+  case fn id of
+    Nothing                -> insn
+    Just (DestBlockId id') -> shortcutJump fn (JXX cc id')
+    Just (DestImm imm)     -> shortcutJump fn (JXX_GBL cc imm)
+#endif
+shortcutJump fn other = other
+
+-- Here because it knows about JumpDest
+shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
+shortcutStatic fn (CmmStaticLit (CmmLabel lab))
+  | Just uq <- maybeAsmTemp lab 
+  = CmmStaticLit (CmmLabel (shortBlockId fn (BlockId uq)))
+shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
+  | Just uq <- maybeAsmTemp lbl1
+  = CmmStaticLit (CmmLabelDiffOff (shortBlockId fn (BlockId uq)) lbl2 off)
+        -- slightly dodgy, we're ignoring the second label, but this
+        -- works with the way we use CmmLabelDiffOff for jump tables now.
+shortcutStatic fn other_static
+        = other_static
+
+shortBlockId fn blockid@(BlockId uq) =
+   case fn blockid of
+      Nothing -> mkAsmTempLabel uq
+      Just (DestBlockId blockid')  -> shortBlockId fn blockid'
+      Just (DestImm (ImmCLbl lbl)) -> lbl
+      _other -> panic "shortBlockId"
+
 -- -----------------------------------------------------------------------------
 -- 'patchRegs' function
 
@@ -562,6 +605,7 @@ patchRegs instr env = case instr of
     COMMENT _		-> instr
     DELTA _ 		-> instr
     JXX _ _		-> instr
+    JXX_GBL _ _		-> instr
     CLTD _		-> instr
 
     _other		-> panic "patchRegs: unrecognised instr"

@@ -133,6 +133,42 @@ data CmmStmt
   | CmmJump CmmExpr [LocalReg]    -- Jump to another function, with these 
 				  -- parameters.
 
+{-
+Discussion
+~~~~~~~~~~
+
+One possible problem with the above type is that the only way to do a
+non-local conditional jump is to encode it as a branch to a block that
+contains a single jump.  This leads to inefficient code in the back end.
+
+One possible way to fix this would be:
+
+data CmmStat = 
+  ...
+  | CmmJump CmmBranchDest
+  | CmmCondJump CmmExpr CmmBranchDest
+  ...
+
+data CmmBranchDest
+  = Local BlockId
+  | NonLocal CmmExpr [LocalReg]
+
+In favour:
+
++ one fewer constructors in CmmStmt
++ allows both cond branch and switch to jump to non-local destinations
+
+Against:
+
+- not strictly necessary: can already encode as branch+jump
+- not always possible to implement any better in the back end
+- could do the optimisation in the back end (but then plat-specific?)
+- C-- doesn't have it
+- back-end optimisation might be more general (jump shortcutting)
+
+So we'll stick with the way it is, and add the optimisation to the NCG.
+-}
+
 -----------------------------------------------------------------------------
 --		CmmCallTarget
 --
