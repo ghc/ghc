@@ -17,6 +17,8 @@ module CgUtils (
 	tagToClosure,
 
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
+        cmmULtWord, cmmUGtWord,
+        cmmULeWord, cmmUGeWord,
 	cmmOffsetExprW, cmmOffsetExprB,
 	cmmRegOffW, cmmRegOffB,
 	cmmLabelOffW, cmmLabelOffB,
@@ -151,6 +153,7 @@ cmmOrWord  e1 e2 = CmmMachOp mo_wordOr  [e1, e2]
 cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
 cmmNeWord  e1 e2 = CmmMachOp mo_wordNe  [e1, e2]
 cmmEqWord  e1 e2 = CmmMachOp mo_wordEq  [e1, e2]
+cmmULeWord e1 e2 = CmmMachOp mo_wordULe [e1, e2]
 cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
 cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
 cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]

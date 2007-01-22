@@ -6,7 +6,7 @@
 
 \begin{code}
 module CgTailCall (
-	cgTailCall, performTailCall,
+	cgTailCall, performTailCall, doFinalJump,
 	performReturn, performPrimReturn,
 	emitKnownConReturnCode, emitAlgReturnCode,
 	returnUnboxedTuple, ccallReturnUnboxedTuple,

@@ -19,7 +19,7 @@ module CgInfoTbls (
 	mkFunGenInfoExtraBits,
 	entryCode, closureInfoPtr,
 	getConstrTag,
-	infoTable, infoTableClosureType,
+	infoTable, infoTableClosureType, infoTableConstrTag,
 	infoTablePtrs, infoTableNonPtrs,
 	funInfoTable,
 	retVec
