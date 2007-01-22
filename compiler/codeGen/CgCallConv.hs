@@ -267,10 +267,9 @@ ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
 ctrlReturnConvAlg tycon
   = case (tyConFamilySize tycon) of
       size -> -- we're supposed to know...
-      -- Disable vectored returns
---	if (size > (1::Int) && size <= mAX_FAMILY_SIZE_FOR_VEC_RETURNS) then
---	    VectoredReturn size
---	else
+	if (size > (1::Int) && size <= mAX_FAMILY_SIZE_FOR_VEC_RETURNS) then
+	    VectoredReturn size
+	else
 	    UnvectoredReturn size	
   -- NB: unvectored returns Include size 0 (no constructors), so that
   --     the following perverse code compiles (it crashed GHC in 5.02)

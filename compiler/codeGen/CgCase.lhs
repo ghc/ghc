@@ -9,7 +9,6 @@ module CgCase (	cgCase, saveVolatileVarsAndRegs,
 	) where
 
 #include "HsVersions.h"
-#include "../includes/ClosureTypes.h"
 
 import {-# SOURCE #-} CgExpr  ( cgExpr )
 
@@ -42,7 +41,6 @@ import PrimOp
 import TyCon
 import Util
 import Outputable
-import Constants
 \end{code}
 
 \begin{code}
@@ -173,54 +171,9 @@ cgCase (StgOpApp op@(StgFCallOp fcall _) args _)
 		_other			-> False				
 \end{code}
 
-Special case: scrutinising a non-primitive variable.  This is where we
-want to do semi-tagging.  The code generated will be something like this:
-
-  save volatile vars
-  R1 = fun
-  jump c99_ret
-
-  <info table goes here>
-c99_ret:
-  infoptr = R1[0]
-  type = infoptr[-4] // or something
-  if (type > 8) goto no_cons
-  tag = infoptr[-6]
-  if (tag == 1) ... etc.
-no_cons
-  jump infoptr
-
-\begin{code}
-cgCase (StgApp fun [])
-	live_in_whole_case live_in_alts bndr srt (AlgAlt tycon) alts
-  = do	{ fun_info <- getCgIdInfo fun
-        ; fun_amode <- idInfoToAmode fun_info
-
-	; nukeDeadBindings live_in_alts	
-	; (save_assts, alts_eob_info, maybe_cc_slot)
-		<- saveVolatileVarsAndRegs live_in_alts
-
-	; scrut_eob_info
-	    <- forkEval alts_eob_info 
-			(allocStackTop retAddrSizeW >> nopC)
-			(do { deAllocStackTop retAddrSizeW
-			    ; cgEvalAltsSemiTag maybe_cc_slot bndr srt 
-                                                tycon alts })
-
-        -- jump to the continuation immediately
-        ; case scrut_eob_info of
-             EndOfBlockInfo sp (CaseAlts lbl _ _ _) -> do
-                let node_asst = oneStmt (CmmAssign nodeReg fun_amode)
-                emitSimultaneously (node_asst `plusStmts` save_assts)
-                let jmp = stmtC (CmmJump (CmmLit (CmmLabel lbl)) [])
-                setEndOfBlockInfo scrut_eob_info $
-                    doFinalJump sp False jmp
-        }
-\end{code}
-
-Special case: scrutinising a non-primitive application.  This can be
-done a little better than the general case, because we can reuse/trim
-the stack slot holding the variables involved in the application.
+Special case: scrutinising a non-primitive variable.
+This can be done a little better than the general case, because
+we can reuse/trim the stack slot holding the variable (if it is in one).
 
 \begin{code}
 cgCase (StgApp fun args)
@@ -457,6 +410,15 @@ cgEvalAlts cc_slot bndr srt alt_type alts
     do	{	-- Bind the default binder
 	  bindNewToReg bndr nodeReg (mkLFArgument bndr)
 
+	-- Generate sequel info for use downstream
+	-- At the moment, we only do it if the type is vector-returnable.
+	-- Reason: if not, then it costs extra to label the
+	-- alternatives, because we'd get return code like:
+	--
+	--	switch TagReg { 0 : JMP(alt_1); 1 : JMP(alt_2) ..etc }
+	--
+	-- which is worse than having the alt code in the switch statement
+
 	; (alts, mb_deflt) <- cgAlgAlts GCMayHappen cc_slot alt_type alts
 
 	; (lbl, branches) <- emitAlgReturnTarget (idName bndr) 
@@ -467,43 +429,6 @@ cgEvalAlts cc_slot bndr srt alt_type alts
     ret_conv = case alt_type of
     		AlgAlt tc -> ctrlReturnConvAlg tc
     		PolyAlt   -> UnvectoredReturn 0
-
-
--- Alternatives for a semi-tagging case expression
-cgEvalAltsSemiTag cc_slot bndr srt tycon alts
-  = do	-- Bind the default binder
-    bindNewToReg bndr nodeReg (mkLFArgument bndr)
-
-    blks <- getCgStmts $ cgEvalAltsSemiTag' cc_slot tycon alts
-    lbl <- emitDirectReturnTarget (idName bndr) blks srt
-    return (CaseAlts lbl Nothing bndr False)
-
-cgEvalAltsSemiTag' cc_slot tycon alts
-  = do
-    (alts, mb_deflt) <- cgAlgAlts GCMayHappen cc_slot (AlgAlt tycon) alts
-
-    iptr <- newTemp wordRep
-    stmtC (CmmAssign iptr (closureInfoPtr (CmmReg nodeReg)))
-        -- share the iptr between ctype and tag, below
-
-    -- we don't have a 1-indexed tag field, we have to use the type
-    -- field first to find out whether the closure is a constructor
-    not_constr <- newLabelC
-
-    let highCons = CmmLit (CmmInt CONSTR_NOCAF_STATIC halfWordRep)
-    stmtC (CmmCondBranch (CmmMachOp (MO_U_Gt halfWordRep)
-                            [infoTableClosureType (infoTable (CmmReg iptr)),
-                             highCons])
-                         not_constr)
-    
-    let tag_expr = CmmMachOp (MO_U_Conv halfWordRep wordRep) 
-                        [infoTableConstrTag (infoTable (CmmReg iptr))]
-
-    let family_size = tyConFamilySize tycon
-    emitSwitch tag_expr alts mb_deflt 0 (family_size - 1)
-    
-    labelC not_constr
-    stmtC (CmmJump (entryCode (CmmReg iptr)) [])
 \end{code}
 
 
