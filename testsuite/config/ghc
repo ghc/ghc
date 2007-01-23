@@ -44,9 +44,9 @@ if (ghc_with_threaded_rts == 1):
 
 config.way_flags = {
 	'normal'     : [],
-	'opt'        : ['-O'],
+	'optc'       : ['-O -fvia-C'],
 	'optasm'     : ['-O -fasm'],
-	'prof'       : ['-O -prof -auto-all'],
+	'profc'      : ['-O -prof -auto-all -fvia-C'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
 	'unreg'      : ['-unreg'],
 	'ghci'       : ['--interactive', '-v0'],
@@ -59,9 +59,9 @@ config.way_flags = {
 
 config.way_rts_flags = { 
 	'normal'     : [],
-	'opt'        : [],
+	'optc'       : [],
 	'optasm'     : [],
-	'prof'       : ['-p'],
+	'profc'      : ['-p'],
 	'profasm'    : ['-hc'], # test heap profiling too
 	'unreg'      : [],
 	'ghci'       : [],
