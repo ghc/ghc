@@ -353,7 +353,10 @@ computeLiveness sccs
 
   liveness liveregs blockmap done []  = (liveregs, done)
   liveness liveregs blockmap done (instr:instrs) 
- 	= liveness liveregs2 blockmap ((instr,r_dying,w_dying):done) instrs
+        | not_a_branch = liveness liveregs1 blockmap 
+                                ((instr,r_dying,w_dying):done) instrs
+        | otherwise = liveness liveregs_br blockmap
+                                ((instr,r_dying_br,w_dying):done) instrs
 	where 
 	      RU read written = regUsage instr
 
@@ -361,16 +364,6 @@ computeLiveness sccs
 	      -- registers that were read here are live going backwards.
 	      liveregs1 = (liveregs `delListFromUniqSet` written)
 				    `addListToUniqSet` read
-
-	      -- union in the live regs from all the jump destinations of this
-	      -- instruction.
-	      targets = jumpDests instr [] -- where we go from here
-	      liveregs2 = unionManyUniqSets
-			    (liveregs1 : map targetLiveRegs targets)
-
-              targetLiveRegs target = case lookupUFM blockmap target of
-                                        Just ra -> ra
-                                        Nothing -> emptyBlockMap
 
 	      -- registers that are not live beyond this point, are recorded
 	      --  as dying here.
@@ -380,6 +373,24 @@ computeLiveness sccs
 	      w_dying = [ reg | reg <- written,
 			        not (elementOfUniqSet reg liveregs) ]
 
+	      -- union in the live regs from all the jump destinations of this
+	      -- instruction.
+	      targets = jumpDests instr [] -- where we go from here
+              not_a_branch = null targets
+
+              targetLiveRegs target = case lookupUFM blockmap target of
+                                        Just ra -> ra
+                                        Nothing -> emptyBlockMap
+
+              live_from_branch = unionManyUniqSets (map targetLiveRegs targets)
+
+	      liveregs_br = liveregs1 `unionUniqSets` live_from_branch
+
+              -- registers that are live only in the branch targets should
+              -- be listed as dying here.
+              live_branch_only = live_from_branch `minusUniqSet` liveregs
+              r_dying_br = uniqSetToList (mkUniqSet r_dying `unionUniqSets`
+                                          live_branch_only)
 
 -- -----------------------------------------------------------------------------
 -- Linear sweep to allocate registers
