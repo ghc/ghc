@@ -80,8 +80,10 @@ module Prelude (
     Functor(fmap),
     mapM, mapM_, sequence, sequence_, (=<<),
 
+#ifdef __GLASGOW_HASKELL__
     -- ** String class
     IsString(fromString),
+#endif
 
     -- ** Miscellaneous functions
     id, const, (.), flip, ($), until,
