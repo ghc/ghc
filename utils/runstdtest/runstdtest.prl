@@ -43,6 +43,8 @@
 $Verbose = 0;
 $SaveStderr = 0;
 $SaveStdout = 0;
+$StdoutBinary = 0;
+$StderrBinary = 0;
 $Status = 0;
 @PgmArgs = ();
 $PgmFail=0;
@@ -90,6 +92,9 @@ arg: while ($_ = $ARGV[0]) {
     /^-accept-output-stderr$/ && do { $SaveStderr = 1; next arg; };
     /^-accept-output-stdout$/ && do { $SaveStdout = 1; next arg; };
     /^-accept-output$/        && do { $SaveStdout = 1; $SaveStderr = 1; next arg; };
+
+    /^-stdout-binary/ && do { $StdoutBinary=1; next arg; };
+    /^-stdout-binary/ && do { $StderrBinary=1; next arg; };
 
     /^-O(.*)/	&& do { push(@PgmArgs, &grab_arg_arg('-O',$1)); next arg; };
     /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
@@ -208,8 +213,16 @@ cat /dev/null > $DefaultStderrFile
 $PreScriptLines
 $SpixifyLine1
 $TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1.raw 2> $TmpPrefix/runtest$$.2.raw 3> $TmpPrefix/runtest$$.3.raw\'
-dos2unix < $TmpPrefix/runtest$$.1.raw > $TmpPrefix/runtest$$.1
-dos2unix < $TmpPrefix/runtest$$.2.raw > $TmpPrefix/runtest$$.2
+if [ "$StdoutBinary" = "0" ]; then
+    dos2unix < $TmpPrefix/runtest$$.1.raw > $TmpPrefix/runtest$$.1
+else
+    cp $TmpPrefix/runtest$$.1.raw $TmpPrefix/runtest$$.1
+fi
+if [ "$StderrBinary" = "0" ]; then
+    dos2unix < $TmpPrefix/runtest$$.2.raw > $TmpPrefix/runtest$$.2
+else
+    cp $TmpPrefix/runtest$$.2.raw $TmpPrefix/runtest$$.2
+fi
 dos2unix < $TmpPrefix/runtest$$.3.raw > $TmpPrefix/runtest$$.3
 progexit=\$?
 if [ \$progexit -eq 0 ] && [ $PgmFail -ne 0 ]; then
