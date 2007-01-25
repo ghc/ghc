@@ -383,21 +383,32 @@ serves for both.
 \begin{code}
 type LSig name = Located (Sig name)
 
-data Sig name
-  = TypeSig	(Located name)	-- A bog-std type signature
+data Sig name	-- Signatures and pragmas
+  = 	-- An ordinary type signature
+	-- f :: Num a => a -> a
+    TypeSig	(Located name)	-- A bog-std type signature
 		(LHsType name)
 
+	-- An ordinary fixity declaration
+	--	infixl *** 8
+  | FixSig	(FixitySig name)	-- Fixity declaration
+
+	-- An inline pragma
+	-- {#- INLINE f #-}
+  | InlineSig	(Located name)	-- Function name
+		InlineSpec
+
+	-- A specialisation pragma
+	-- {-# SPECIALISE f :: Int -> Int #-}
   | SpecSig 	(Located name)	-- Specialise a function or datatype ...
 		(LHsType name)	-- ... to these types
 		InlineSpec
 
-  | InlineSig	(Located name)	-- Function name
-		InlineSpec
-
+	-- A specialisation pragma for instance declarations only
+	-- {-# SPECIALISE instance Eq [Int] #-}
   | SpecInstSig (LHsType name)	-- (Class tys); should be a specialisation of the 
 				-- current instance decl
 
-  | FixSig	(FixitySig name)	-- Fixity declaration
 
 type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig (Located name) Fixity 
