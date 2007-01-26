@@ -159,6 +159,9 @@ typedef struct StgTSO_ {
 #ifdef DIST
     StgTSODistInfo dist;
 #endif
+#ifdef mingw32_HOST_OS
+    StgWord32 saved_winerror;
+#endif
 
     /* The thread stack... */
     StgWord32	       stack_size;     /* stack size in *words* */

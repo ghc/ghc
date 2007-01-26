@@ -588,6 +588,10 @@ run_thread:
     prev_what_next = t->what_next;
 
     errno = t->saved_errno;
+#if mingw32_HOST_OS
+    SetLastError(t->saved_winerror);
+#endif
+
     cap->in_haskell = rtsTrue;
 
     dirtyTSO(t);
@@ -637,6 +641,10 @@ run_thread:
     // XXX: possibly bogus for SMP because this thread might already
     // be running again, see code below.
     t->saved_errno = errno;
+#if mingw32_HOST_OS
+    // Similarly for Windows error code
+    SetLastError(t->saved_winerror);
+#endif
 
 #if defined(THREADED_RTS)
     // If ret is ThreadBlocked, and this Task is bound to the TSO that
@@ -2283,9 +2291,17 @@ void *
 suspendThread (StgRegTable *reg)
 {
   Capability *cap;
-  int saved_errno = errno;
+  int saved_errno;
   StgTSO *tso;
   Task *task;
+#if mingw32_HOST_OS
+  StgWord32 saved_winerror;
+#endif
+
+  saved_errno = errno;
+#if mingw32_HOST_OS
+  saved_winerror = GetLastError();
+#endif
 
   /* assume that *reg is a pointer to the StgRegTable part of a Capability.
    */
@@ -2330,6 +2346,9 @@ suspendThread (StgRegTable *reg)
 #endif
 
   errno = saved_errno;
+#if mingw32_HOST_OS
+  SetLastError(saved_winerror);
+#endif
   return task;
 }
 
@@ -2338,8 +2357,16 @@ resumeThread (void *task_)
 {
     StgTSO *tso;
     Capability *cap;
-    int saved_errno = errno;
     Task *task = task_;
+    int saved_errno;
+#if mingw32_HOST_OS
+    StgWord32 saved_winerror;
+#endif
+
+    saved_errno = errno;
+#if mingw32_HOST_OS
+    saved_winerror = GetLastError();
+#endif
 
     cap = task->cap;
     // Wait for permission to re-enter the RTS with the result.
@@ -2367,6 +2394,9 @@ resumeThread (void *task_)
     cap->r.rCurrentTSO = tso;
     cap->in_haskell = rtsTrue;
     errno = saved_errno;
+#if mingw32_HOST_OS
+    SetLastError(saved_winerror);
+#endif
 
     /* We might have GC'd, mark the TSO dirty again */
     dirtyTSO(tso);
