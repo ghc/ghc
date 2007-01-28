@@ -242,6 +242,7 @@ test('mod176', normal, compile, ['-fwarn-unused-imports'])
 test('mod177', normal, compile, ['-fwarn-unused-imports'])
 test('mod178', normal, multimod_compile_fail, ['mod178', '-v0'])
 clean(['Mod178_2.hi', 'Mod178_2.o'])
-
+test('mod179', normal, multimod_compile, ['mod179', '-v0'])
+clean(['Mod179_A.hi', 'Mod179_A.o'])
 
 # After here we have GHC-only tests (the ones above are copied from Hugs)
