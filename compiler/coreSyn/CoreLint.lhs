@@ -14,6 +14,7 @@ module CoreLint (
 
 #include "HsVersions.h"
 
+import NewDemand
 import CoreSyn
 import CoreFVs
 import CoreUtils
@@ -25,6 +26,7 @@ import Var
 import VarEnv
 import VarSet
 import Name
+import Id
 import PprCore
 import ErrUtils
 import SrcLoc
@@ -175,8 +177,8 @@ lintCoreBindings dflags whoDunnit binds
     lint_binds binds = addInScopeVars (bindersOfBinds binds) $
 		       mapM lint_bind binds 
 
-    lint_bind (Rec prs)		= mapM_ (lintSingleBinding Recursive) prs
-    lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
+    lint_bind (Rec prs)		= mapM_ (lintSingleBinding TopLevel Recursive) prs
+    lint_bind (NonRec bndr rhs) = lintSingleBinding TopLevel NonRecursive (bndr,rhs)
 
     display bad_news
       = vcat [  text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
@@ -217,7 +219,7 @@ lintUnfolding locn vars expr
 Check a core binding, returning the list of variables bound.
 
 \begin{code}
-lintSingleBinding rec_flag (binder,rhs)
+lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
   = addLoc (RhsOf binder) $
          -- Check the rhs 
     do { ty <- lintCoreExpr rhs	
@@ -228,14 +230,26 @@ lintSingleBinding rec_flag (binder,rhs)
        ; checkL (not (isUnLiftedType binder_ty)
             || (isNonRec rec_flag && exprOkForSpeculation rhs))
  	   (mkRhsPrimMsg binder rhs)
+        -- Check that if the binder is top-level or recursive, it's not demanded
+       ; checkL (not (isStrictId binder)
+            || (isNonRec rec_flag && not (isTopLevel top_lvl_flag)))
+           (mkStrictMsg binder)
         -- Check whether binder's specialisations contain any out-of-scope variables
-       ; mapM_ (checkBndrIdInScope binder) bndr_vars }
+       ; mapM_ (checkBndrIdInScope binder) bndr_vars 
+
+      -- Check whether arity and demand type are consistent (only if demand analysis
+      -- already happened)
+       ; checkL (case maybeDmdTy of
+                  Just (StrictSig dmd_ty) -> idArity binder >= dmdTypeDepth dmd_ty || exprIsTrivial rhs
+                  Nothing -> True)
+           (mkArityMsg binder) }
 	  
 	-- We should check the unfolding, if any, but this is tricky because
-	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
-  where
-    binder_ty = idType binder
-    bndr_vars = varSetElems (idFreeVars binder)
+ 	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
+   where
+    binder_ty                  = idType binder
+    maybeDmdTy                 = idNewStrictness_maybe binder
+    bndr_vars                  = varSetElems (idFreeVars binder)
     lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
 	           | otherwise = return ()
 \end{code}
@@ -283,13 +297,13 @@ lintCoreExpr (Note other_note expr)
   = lintCoreExpr expr
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
-  = do	{ lintSingleBinding NonRecursive (bndr,rhs)
+  = do	{ lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
 	; addLoc (BodyOfLetRec [bndr])
 		 (lintAndScopeId bndr $ \_ -> (lintCoreExpr body)) }
 
 lintCoreExpr (Let (Rec pairs) body) 
   = lintAndScopeIds bndrs	$ \_ ->
-    do	{ mapM (lintSingleBinding Recursive) pairs	
+    do	{ mapM (lintSingleBinding NotTopLevel Recursive) pairs	
 	; addLoc (BodyOfLetRec bndrs) (lintCoreExpr body) }
   where
     bndrs = map fst pairs
@@ -562,7 +576,7 @@ lintAndScopeIds ids linterF
 lintAndScopeId :: Var -> (Var -> LintM a) -> LintM a
 lintAndScopeId id linterF 
   = do { ty <- lintTy (idType id)
-       ; let id' = setIdType id ty
+       ; let id' = Var.setIdType id ty
        ; addInScopeVars [id'] $ (linterF id')
        }
 
@@ -870,6 +884,26 @@ mkRhsPrimMsg binder rhs
 		     ppr binder],
 	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]
 	     ]
+
+mkStrictMsg :: Id -> Message
+mkStrictMsg binder
+  = vcat [hsep [ptext SLIT("Recursive or top-level binder has strict demand info:"),
+		     ppr binder],
+	      hsep [ptext SLIT("Binder's demand info:"), ppr (idNewDemandInfo binder)]
+	     ]
+
+mkArityMsg :: Id -> Message
+mkArityMsg binder
+  = vcat [hsep [ptext SLIT("Demand type has "),
+                     ppr (dmdTypeDepth dmd_ty),
+                     ptext SLIT(" arguments, rhs has "),
+                     ppr (idArity binder),
+                     ptext SLIT("arguments, "),
+		     ppr binder],
+	      hsep [ptext SLIT("Binder's strictness signature:"), ppr dmd_ty]
+
+         ]
+           where (StrictSig dmd_ty) = idNewStrictness binder
 
 mkUnboxedTupleMsg :: Id -> Message
 mkUnboxedTupleMsg binder

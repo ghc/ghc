@@ -25,7 +25,7 @@ module Id (
 	zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo,
 
 	-- Predicates
-	isImplicitId, isDeadBinder, isDictId,
+	isImplicitId, isDeadBinder, isDictId, isStrictId,
 	isExportedId, isLocalId, isGlobalId,
 	isRecordSelector, isNaughtyRecordSelector,
 	isClassOpId_maybe,
@@ -368,6 +368,20 @@ setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` Just sig) id
 
 zapIdNewStrictness :: Id -> Id
 zapIdNewStrictness id = modifyIdInfo (`setNewStrictnessInfo` Nothing) id
+\end{code}
+
+This predicate says whether the id has a strict demand placed on it or
+has a type such that it can always be evaluated strictly (e.g., an
+unlifted type, but see the comment for isStrictType).  We need to
+check separately whether <id> has a so-called "strict type" because if
+the demand for <id> hasn't been computed yet but <id> has a strict
+type, we still want (isStrictId <id>) to be True.
+\begin{code}
+isStrictId :: Id -> Bool
+isStrictId id
+  = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
+           (isStrictDmd (idNewDemandInfo id)) || 
+           (isStrictType (idType id))
 
 	---------------------------------
 	-- WORKER ID
