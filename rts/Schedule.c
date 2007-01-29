@@ -643,7 +643,7 @@ run_thread:
     t->saved_errno = errno;
 #if mingw32_HOST_OS
     // Similarly for Windows error code
-    SetLastError(t->saved_winerror);
+    t->saved_winerror = GetLastError();
 #endif
 
 #if defined(THREADED_RTS)
