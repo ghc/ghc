@@ -622,10 +622,6 @@ threadWaitWrite fd
 -- | Suspends the current thread for a given number of microseconds
 -- (GHC only).
 --
--- Note that the resolution used by the Haskell runtime system's
--- internal timer is 1\/50 second, and 'threadDelay' will round its
--- argument up to the nearest multiple of this resolution.
---
 -- There is no guarantee that the thread will be rescheduled promptly
 -- when the delay has expired, but the thread will never continue to
 -- run /earlier/ than specified.
@@ -638,6 +634,10 @@ threadDelay time
 	case delay# time# s of { s -> (# s, () #)
 	}}
 
+
+-- | Set the value of returned TVar to True after a given number of
+-- microseconds. The caveats associated with threadDelay also apply.
+--
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs 
   | threaded = waitForDelayEventSTM usecs
@@ -648,7 +648,6 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 waitForDelayEvent :: Int -> IO ()
 waitForDelayEvent usecs = do
   m <- newEmptyMVar
-  now <- getTicksOfDay
   target <- calculateTarget usecs
   atomicModifyIORef pendingDelays (\xs -> (Delay target m : xs, ()))
   prodServiceThread
@@ -658,23 +657,16 @@ waitForDelayEvent usecs = do
 waitForDelayEventSTM :: Int -> IO (TVar Bool)
 waitForDelayEventSTM usecs = do
    t <- atomically $ newTVar False
-   now <- getTicksOfDay
    target <- calculateTarget usecs
    atomicModifyIORef pendingDelays (\xs -> (DelaySTM target t : xs, ()))
    prodServiceThread
    return t  
     
-calculateTarget :: Int -> IO Int
+calculateTarget :: Int -> IO USecs
 calculateTarget usecs = do
-    now <- getTicksOfDay
-    let -- Convert usecs to ticks, rounding up as we must wait /at least/
-        -- as long as we are told
-        usecs' = (usecs + tick_usecs - 1) `quot` tick_usecs
-        target = now + 1 -- getTicksOfDay will have rounded down, but
-                         -- again we need to wait for /at least/ as long
-                         -- as we are told, so add 1 to it
-               + usecs'
-    return target
+    now <- getUSecOfDay
+    return $ now + (fromIntegral usecs)
+
 
 -- ----------------------------------------------------------------------------
 -- Threaded RTS implementation of threadWaitRead, threadWaitWrite, threadDelay
@@ -715,8 +707,8 @@ data IOReq
 #endif
 
 data DelayReq
-  = Delay    {-# UNPACK #-} !Int {-# UNPACK #-} !(MVar ())
-  | DelaySTM {-# UNPACK #-} !Int {-# UNPACK #-} !(TVar Bool)
+  = Delay    {-# UNPACK #-} !Word64 {-# UNPACK #-} !(MVar ())
+  | DelaySTM {-# UNPACK #-} !Word64 {-# UNPACK #-} !(TVar Bool)
 
 #ifndef mingw32_HOST_OS
 pendingEvents :: IORef [IOReq]
@@ -747,17 +739,14 @@ insertDelay d1 ds@(d2 : rest)
 delayTime (Delay t _) = t
 delayTime (DelaySTM t _) = t
 
-type Ticks = Int
-tick_freq  = 50 :: Ticks  -- accuracy of threadDelay (ticks per sec)
-tick_usecs = 1000000 `quot` tick_freq :: Int
-tick_msecs = 1000 `quot` tick_freq :: Int
+type USecs = Word64
 
 -- XXX: move into GHC.IOBase from Data.IORef?
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
 
-foreign import ccall unsafe "getTicksOfDay" 
-  getTicksOfDay :: IO Ticks
+foreign import ccall unsafe "getUSecOfDay" 
+  getUSecOfDay :: IO USecs
 
 #ifdef mingw32_HOST_OS
 -- ----------------------------------------------------------------------------
@@ -778,7 +767,7 @@ service_loop wakeup old_delays = do
   new_delays <- atomicModifyIORef pendingDelays (\a -> ([],a))
   let  delays = foldr insertDelay old_delays new_delays
 
-  now <- getTicksOfDay
+  now <- getUSecOfDay
   (delays', timeout) <- getDelay now delays
 
   r <- c_WaitForSingleObject wakeup timeout
@@ -836,7 +825,7 @@ prodServiceThread = do
 -- Walk the queue of pending delays, waking up any that have passed
 -- and return the smallest delay to wait for.  The queue of pending
 -- delays is kept ordered.
-getDelay :: Ticks -> [DelayReq] -> IO ([DelayReq], DWORD)
+getDelay :: USecs -> [DelayReq] -> IO ([DelayReq], DWORD)
 getDelay now [] = return ([], iNFINITE)
 getDelay now all@(d : rest) 
   = case d of
@@ -922,7 +911,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 	  -- check the current time and wake up any thread in
 	  -- threadDelay whose timeout has expired.  Also find the
 	  -- timeout value for the select() call.
-	  now <- getTicksOfDay
+	  now <- getUSecOfDay
 	  (delays', timeout) <- getDelay now ptimeval delays
 
 	  res <- c_select ((max wakeup maxfd)+1) readfds writefds 
@@ -1048,7 +1037,7 @@ waitForWriteEvent fd = do
 -- Walk the queue of pending delays, waking up any that have passed
 -- and return the smallest delay to wait for.  The queue of pending
 -- delays is kept ordered.
-getDelay :: Ticks -> Ptr CTimeVal -> [DelayReq] -> IO ([DelayReq], Ptr CTimeVal)
+getDelay :: USecs -> Ptr CTimeVal -> [DelayReq] -> IO ([DelayReq], Ptr CTimeVal)
 getDelay now ptimeval [] = return ([],nullPtr)
 getDelay now ptimeval all@(d : rest) 
   = case d of
@@ -1068,7 +1057,7 @@ foreign import ccall unsafe "sizeofTimeVal"
   sizeofTimeVal :: Int
 
 foreign import ccall unsafe "setTimevalTicks" 
-  setTimevalTicks :: Ptr CTimeVal -> Ticks -> IO ()
+  setTimevalTicks :: Ptr CTimeVal -> USecs -> IO ()
 
 {- 
   On Win32 we're going to have a single Pipe, and a

@@ -134,7 +134,7 @@
 #if defined(__MINGW32__)
 /* in Win32Utils.c */
 extern void maperrno (void);
-extern HsInt getTicksOfDay(void);
+extern HsInt getUSecOfDay(void);
 #endif
 
 #if defined(__MINGW32__)
@@ -717,22 +717,20 @@ extern void hsFD_ZERO(fd_set *fds);
 // gettimeofday()-related
 
 #if !defined(__MINGW32__)
-#define TICK_FREQ  50
 
 INLINE HsInt sizeofTimeVal(void) { return sizeof(struct timeval); }
 
-INLINE HsInt getTicksOfDay(void)
+INLINE HsWord64 getUSecOfDay(void)
 {
     struct timeval tv;
     gettimeofday(&tv, (struct timezone *) NULL);
-    return (tv.tv_sec * TICK_FREQ +
-	    tv.tv_usec * TICK_FREQ / 1000000);
+    return (tv.tv_sec * 1000000 + tv.tv_usec);
 }
 
-INLINE void setTimevalTicks(struct timeval *p, HsInt ticks)
+INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
 {
-    p->tv_sec  = ticks / TICK_FREQ;
-    p->tv_usec = (ticks % TICK_FREQ) * (1000000 / TICK_FREQ);
+    p->tv_sec  = usecs / 1000000;
+    p->tv_usec = usecs % 1000000;
 }
 #endif /* !defined(__MINGW32__) */
 
