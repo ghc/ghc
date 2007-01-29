@@ -10,3 +10,4 @@ def set_opts( opts ):
 #	  opts.skip = 1
 
 test('win32001', set_opts, compile_and_run, [''])
+test('win32002', normal, compile_and_run, ['-package Win32'])
