@@ -77,6 +77,7 @@ exposed-modules:
 	Data.STRef.Strict,
 	Data.Sequence,
 	Data.Set,
+	Data.String,
 	Data.Tree,
 	Data.Traversable,
 	Data.Tuple,
