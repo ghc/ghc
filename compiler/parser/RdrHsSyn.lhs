@@ -54,7 +54,7 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn		-- Lots of it
-import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
+import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
 import BasicTypes	( maxPrecedence, Activation, InlineSpec(..), alwaysInlineSpec, neverInlineSpec )
@@ -468,13 +468,12 @@ checkTyClHdr (L l cxt) ty
   where
     gol (L l ty) acc = go l ty acc
 
-    go l (HsTyVar tc)    acc 
-	| not (isRdrTyVar tc)   = do
-				    tvs <- extractTyVars acc
-				    return (L l tc, tvs, acc)
-    go l (HsOpTy t1 tc t2) acc  = do
-				    tvs <- extractTyVars (t1:t2:acc)
-				    return (tc, tvs, acc)
+    go l (HsTyVar tc) acc 
+	| isRdrTc tc 		= do tvs <- extractTyVars acc
+				     return (L l tc, tvs, acc)
+    go l (HsOpTy t1 ltc@(L _ tc) t2) acc
+	| isRdrTc tc		= do tvs <- extractTyVars (t1:t2:acc)
+				     return (ltc, tvs, acc)
     go l (HsParTy ty)    acc    = gol ty acc
     go l (HsAppTy t1 t2) acc    = gol t1 (t2:acc)
     go l other	         acc    = 
