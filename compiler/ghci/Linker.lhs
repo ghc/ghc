@@ -54,6 +54,7 @@ import StaticFlags
 import ErrUtils
 import DriverPhases
 import SrcLoc
+import UniqSet
 
 -- Standard libraries
 import Control.Monad
@@ -474,17 +475,18 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
  = do {	pls <- readIORef v_PersistentLinkerState ;
 	let {
 	-- 1.  Find the dependent home-pkg-modules/packages from each iface
-	    (mods_s, pkgs_s) = unzip (map get_deps mods) ;
+	    (mods_s, pkgs_s) = follow_deps mods emptyUniqSet emptyUniqSet;
 
 	-- 2.  Exclude ones already linked
 	--	Main reason: avoid findModule calls in get_linkable
-	    mods_needed = nub (concat mods_s) `minusList` linked_mods     ;
-	    pkgs_needed = nub (concat pkgs_s) `minusList` pkgs_loaded pls ;
+	    mods_needed = mods_s `minusList` linked_mods     ;
+	    pkgs_needed = pkgs_s `minusList` pkgs_loaded pls ;
 
 	    linked_mods = map (moduleName.linkableModule) 
                                 (objs_loaded pls ++ bcos_loaded pls)
 	} ;
 	
+--        putStrLn (showSDoc (ppr mods_s)) ;
 	-- 3.  For each dependent module, find its linkable
 	--     This will either be in the HPT or (in the case of one-shot
 	--     compilation) we may need to use maybe_getFileLinkable
@@ -495,17 +497,43 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
 
-    get_deps :: Module -> ([ModuleName],[PackageId])
-	-- Get the things needed for the specified module
-	-- This is rather similar to the code in RnNames.importsFromImportDecl
-    get_deps mod
+        -- The ModIface contains the transitive closure of the module dependencies
+        -- within the current package, *except* for boot modules: if we encounter
+        -- a boot module, we have to find its real interface and discover the
+        -- dependencies of that.  Hence we need to traverse the dependency
+        -- tree recursively.  See bug #936, testcase ghci/prog007.
+    follow_deps :: [Module]             -- modules to follow
+                -> UniqSet ModuleName         -- accum. module dependencies
+                -> UniqSet PackageId          -- accum. package dependencies
+                -> ([ModuleName], [PackageId]) -- result
+    follow_deps []     acc_mods acc_pkgs
+        = (uniqSetToList acc_mods, uniqSetToList acc_pkgs)
+    follow_deps (mod:mods) acc_mods acc_pkgs
         | pkg /= this_pkg
-        = ([], pkg : dep_pkgs deps)
+        = follow_deps mods acc_mods (addOneToUniqSet acc_pkgs' pkg)
+        | mi_boot iface
+        = link_boot_mod_error mod
 	| otherwise
-	= (moduleName mod : [m | (m,_) <- dep_mods deps], dep_pkgs deps)
-	where
-          pkg   = modulePackageId mod
-	  deps  = mi_deps (get_iface mod)
+        = follow_deps (map (mkModule this_pkg) boot_deps ++ mods) acc_mods' acc_pkgs'
+      where
+        pkg   = modulePackageId mod
+        iface = get_iface mod
+	deps  = mi_deps iface
+
+	pkg_deps = dep_pkgs deps
+        (boot_deps, mod_deps) = partitionWith is_boot (dep_mods deps)
+                where is_boot (m,True)  = Left m
+                      is_boot (m,False) = Right m
+
+        boot_deps' = filter (not . (`elementOfUniqSet` acc_mods)) boot_deps
+        acc_mods'  = addListToUniqSet acc_mods (moduleName mod : mod_deps)
+        acc_pkgs'  = addListToUniqSet acc_pkgs pkg_deps
+
+
+    link_boot_mod_error mod = 
+        throwDyn (ProgramError (showSDoc (
+            text "module" <+> ppr mod <+> 
+            text "cannot be linked; it is only available as a boot module")))
 
     get_iface mod = case lookupIfaceByModule dflags hpt pit mod of
 			    Just iface -> iface
