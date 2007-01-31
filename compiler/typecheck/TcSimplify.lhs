@@ -2257,14 +2257,14 @@ disambiguate extended_defaulting insts
 					-- use [Integer, Double]
 				do { integer_ty <- tcMetaTy integerTyConName
 				   ; checkWiredInTyCon doubleTyCon
-				   ; return [integer_ty, doubleTy] }
-        ; string_ty <- tcMetaTy stringTyConName
-	; ovlStr <- doptM Opt_OverloadedStrings
-	-- XXX This should not be added unconditionally, but the default declaration stuff
-	-- is too wired to Num for me to understand.  /LA
-        ; let default_str_tys = default_tys ++ if ovlStr then [string_ty] else []
+				   ; string_ty <- tcMetaTy stringTyConName
+				   ; ovl_str <- doptM Opt_OverloadedStrings
+				   ; if ovl_str 	-- Add String if -foverloaded-strings
+					then return [integer_ty,doubleTy,string_ty] 
+					else return [integer_ty,doubleTy] }
+
 	; traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
-	; mapM_ (disambigGroup default_str_tys) defaultable_groups  }
+	; mapM_ (disambigGroup default_tys) defaultable_groups  }
   where
    unaries :: [(Inst,Class, TcTyVar)]  -- (C tv) constraints
    bad_tvs :: TcTyVarSet	  -- Tyvars mentioned by *other* constraints
