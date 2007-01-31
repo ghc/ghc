@@ -359,7 +359,7 @@ simplNonRecX :: SimplEnv
 simplNonRecX env bndr new_rhs
   = do	{ (env, bndr') <- simplBinder env bndr
 	; completeNonRecX env NotTopLevel NonRecursive
-			  (isStrictBndr bndr) bndr bndr' new_rhs }
+			  (isStrictId bndr) bndr bndr' new_rhs }
 
 completeNonRecX :: SimplEnv
 		-> TopLevelFlag -> RecFlag -> Bool
@@ -842,7 +842,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   = do	{ tick (PreInlineUnconditionally bndr)
 	; simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
 
-  | isStrictBndr bndr
+  | isStrictId bndr
   = do	{ simplExprF (rhs_se `setFloats` env) rhs 
 		     (StrictBind bndr bndrs body env cont) }
 

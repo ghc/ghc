@@ -9,8 +9,6 @@ module SimplEnv (
 	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr,
         InCoercion, OutCoercion,
 
-	isStrictBndr,
-
 	-- The simplifier mode
 	setMode, getMode, 
 
@@ -90,13 +88,6 @@ type OutBind	 = CoreBind
 type OutExpr	 = CoreExpr
 type OutAlt	 = CoreAlt
 type OutArg	 = CoreArg
-\end{code}
-
-\begin{code}
-isStrictBndr :: Id -> Bool
-isStrictBndr bndr
-  = ASSERT2( isId bndr, ppr bndr )
-    isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)
 \end{code}
 
 %************************************************************************
@@ -364,7 +355,7 @@ andFF FltLifted  flt	    = flt
 classifyFF :: CoreBind -> FloatFlag
 classifyFF (Rec _) = FltLifted
 classifyFF (NonRec bndr rhs) 
-  | not (isStrictBndr bndr)  = FltLifted
+  | not (isStrictId bndr)    = FltLifted
   | exprOkForSpeculation rhs = FltOkSpec
   | otherwise		     = FltCareful
 

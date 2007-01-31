@@ -90,7 +90,7 @@ Consider this:
     f = \ t -> case (v `cast` co) of
 	         V a b -> a : f t
 
-Exactly the same optimistaion (unrolling one call to f) will work here, 
+Exactly the same optimisation (unrolling one call to f) will work here, 
 despite the cast.  See mk_alt_env in the Case branch of libCase.
 
 
@@ -108,7 +108,6 @@ big.
 
 Data types
 ~~~~~~~~~~
-
 The ``level'' of a binder tells how many
 recursive defns lexically enclose the binding
 A recursive defn "encloses" its RHS, not its

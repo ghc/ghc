@@ -19,7 +19,7 @@ module SimplUtils (
 	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhsOrArg,
 	interestingCallContext, interestingArgContext,
 
-	interestingArg, isStrictBndr, mkArgInfo
+	interestingArg, mkArgInfo
     ) where
 
 #include "HsVersions.h"
