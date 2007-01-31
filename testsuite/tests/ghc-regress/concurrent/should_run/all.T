@@ -150,3 +150,4 @@ test('conc064', normal, compile_and_run, [''])
 
 test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
+test('conc067', ignore_output, compile_and_run, [''])
