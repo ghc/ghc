@@ -1,0 +1,7 @@
+-- Instrumentation should not set breakpoints around unlifted values
+
+:set -fdebugging
+:l A.hs
+
+:show breakpoints
+test
