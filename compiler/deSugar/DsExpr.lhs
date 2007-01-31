@@ -52,6 +52,8 @@ import Util
 import Bag
 import Outputable
 import FastString
+
+import Data.Maybe
 \end{code}
 
 

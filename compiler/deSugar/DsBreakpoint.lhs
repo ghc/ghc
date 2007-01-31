@@ -54,56 +54,55 @@ import GHC.Exts
 #ifdef GHCI
 mkBreakpointExpr :: SrcSpan -> Id -> DsM (LHsExpr Id)
 mkBreakpointExpr loc bkptFuncId = do
-        scope' <- getLocalBindsDs
-        mod  <- getModuleDs
-        let scope = filter (isValidType .idType ) scope'
-            mod_name = moduleNameFS$ moduleName mod
-        if null scope && instrumenting
-           -- need to return some expresion, hence lazy is used here as a noop (hopefully)
-         then return (l$ HsVar lazyId)  
-         else do
-          when (not instrumenting) $
+        scope <- getScope
+        mod   <- getModuleDs
+        let mod_name = moduleNameFS$ moduleName mod
+        when (not instrumenting) $
               warnDs (text "Extracted ids:" <+> (ppr scope $$ 
                                                    ppr (map idType scope)))
-          stablePtr <- ioToIOEnv $ newStablePtr scope
-          site <- if instrumenting
+        stablePtr <- ioToIOEnv $ newStablePtr scope
+        site <- if instrumenting
                    then recordBkpt (srcSpanStart loc)
                    else return 0
-          ATyCon opaqueTyCon <- dsLookupGlobal opaqueTyConName
-          jumpFuncId <- mkJumpFunc bkptFuncId
-          let [opaqueDataCon] = tyConDataCons opaqueTyCon
-              opaqueId = dataConWrapId opaqueDataCon
-              opaqueTy = mkTyConApp opaqueTyCon []
-              wrapInOpaque id = 
+        ATyCon opaqueTyCon <- dsLookupGlobal opaqueTyConName
+        jumpFuncId <- mkJumpFunc bkptFuncId
+        let [opaqueDataCon] = tyConDataCons opaqueTyCon
+            opaqueId = dataConWrapId opaqueDataCon
+            opaqueTy = mkTyConApp opaqueTyCon []
+            wrapInOpaque id = 
                   l(HsApp (l(HsWrap (WpTyApp (idType id)) (HsVar opaqueId)))
                           (l(HsVar id)))
            -- Yes, I know... I'm gonna burn in hell.
-              Ptr addr# = castStablePtrToPtr stablePtr
-              hvals = ExplicitList opaqueTy (map wrapInOpaque scope)
-              locInfo = nlTuple [ HsLit (HsString (packageIdFS$ modulePackageId mod))
-                                , HsLit (HsString mod_name)
-                                , HsLit (HsInt (fromIntegral site))]
-              
-              funE  = l$ HsVar jumpFuncId
-              ptrE  = l (HsLit (HsInt (fromIntegral (I# (addr2Int# addr#)))))
-              hvalE = l hvals
-              locE  = l locInfo
-              msgE  = l (srcSpanLit loc)
-          return$  l(l(l(l(funE `HsApp` ptrE) `HsApp` hvalE) `HsApp` locE) `HsApp` msgE)
+            Ptr addr# = castStablePtrToPtr stablePtr
+            hvals = ExplicitList opaqueTy (map wrapInOpaque scope)
+            locInfo = nlTuple [ HsLit (HsString (packageIdFS$ modulePackageId mod))
+                              , HsLit (HsString mod_name)
+                              , HsLit (HsInt (fromIntegral site))]
+            funE  = l$ HsVar jumpFuncId
+            ptrE  = l (HsLit (HsInt (fromIntegral (I# (addr2Int# addr#)))))
+            hvalE = l hvals
+            locE  = l locInfo
+            msgE  = l (srcSpanLit loc)
+        return $  
+            l(l(l(l(funE `HsApp` ptrE) `HsApp` hvalE) `HsApp` locE) `HsApp` msgE)
     where l = L loc
           nlTuple exps = ExplicitTuple (map noLoc exps) Boxed
 --          isValidType (PredTy p `FunTy` ty ) = False -- TODO: Too restrictive ? 
-          isValidType (FunTy a b) = isValidType a && isValidType b
-          isValidType (NoteTy _ t) = isValidType t
-          isValidType (AppTy a b) = isValidType a && isValidType b
-          isValidType (TyConApp con ts) = not (isUnLiftedTyCon con) && all isValidType ts
-          isValidType _ = True
           srcSpanLit :: SrcSpan -> HsExpr Id
           srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
           instrumenting = idName bkptFuncId == breakpointAutoName
 #else
 mkBreakpointExpr = undefined    -- A stage1 ghc doesn't care about breakpoints
 #endif
+
+getScope :: DsM [Id]
+getScope = getLocalBindsDs >>= return . filter(isValidType .idType )
+    where isValidType (FunTy a b)  = isValidType a && isValidType b
+          isValidType (NoteTy _ t) = isValidType t
+          isValidType (AppTy a b)  = isValidType a && isValidType b
+          isValidType (TyConApp con ts) = not (isUnLiftedTyCon con) && 
+                                          all isValidType ts
+          isValidType _ = True
 
 debug_enabled :: DsM Bool
 #if defined(GHCI) && defined(DEBUGGER)
@@ -122,14 +121,17 @@ isInstrumentationSpot (L loc e) = do
           && isGoodSrcSpan loc          -- Avoids 'derived' code
           && (not$ isRedundant e)
 
+isEnabledNullScopeCoalescing = True
 isRedundant HsLet  {} = True
 isRedundant HsDo   {} = True
 isRedundant HsCase {} = False
 isRedundant     _     = False
 
 dynBreakpoint :: SrcSpan -> DsM (LHsExpr Id)
+#ifdef DEBUG
 dynBreakpoint loc | not (isGoodSrcSpan loc) = 
-                         pprPanic "dynBreakpoint" (ppr loc)
+                         pprPanic "dynBreakpoint: bad SrcSpan" (ppr loc)
+#endif
 dynBreakpoint loc = do 
     let autoBreakpoint = Id.mkGlobalId VanillaGlobal breakpointAutoName 
                          breakpointAutoTy vanillaIdInfo
@@ -177,24 +179,27 @@ mkJumpFunc bkptFuncId
 
 breakpoints_enabled :: DsM Bool
 dsAndThenMaybeInsertBreakpoint :: LHsExpr Id -> DsM CoreExpr
--- | Takes an expression and its type
 maybeInsertBreakpoint :: LHsExpr Id -> Type ->  DsM (LHsExpr Id)
 
 #ifdef GHCI
 maybeInsertBreakpoint lhsexpr@(L loc _) ty = do 
   instrumenting <- isInstrumentationSpot lhsexpr
-  if instrumenting
+  scope         <- getScope
+  if instrumenting && not(isUnLiftedType ty) && 
+     not(isEnabledNullScopeCoalescing && null scope)
          then do L _ dynBkpt <- dynBreakpoint loc 
                  return$ l(HsApp (l$ HsWrap (WpTyApp ty) dynBkpt) lhsexpr)
          else return lhsexpr
   where l = L loc
-
 dsAndThenMaybeInsertBreakpoint expr@(L loc _) = do
-  coreExpr  <- dsLExpr expr
+  coreExpr      <- dsLExpr expr
   instrumenting <- isInstrumentationSpot expr
-  if instrumenting
+  scope         <- getScope
+  let ty = exprType coreExpr
+  if instrumenting && not (isUnLiftedType (exprType coreExpr)) &&
+     not(isEnabledNullScopeCoalescing && null scope)
          then do L _ dynBkpt<- dynBreakpoint loc
-                 bkptCore   <- dsLExpr (l$ HsWrap (WpTyApp (exprType coreExpr)) dynBkpt)
+                 bkptCore   <- dsLExpr (l$ HsWrap (WpTyApp ty) dynBkpt)
                  return (bkptCore `App` coreExpr)
          else return coreExpr
   where l = L loc
