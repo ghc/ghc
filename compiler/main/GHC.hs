@@ -339,9 +339,8 @@ defaultErrorHandler dflags inner =
 defaultCleanupHandler :: DynFlags -> IO a -> IO a
 defaultCleanupHandler dflags inner = 
     -- make sure we clean up after ourselves
-    later (unless (dopt Opt_KeepTmpFiles dflags) $
-               do cleanTempFiles dflags
-                  cleanTempDirs dflags
+    later (do cleanTempFiles dflags
+              cleanTempDirs dflags
           )
           -- exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further

@@ -494,22 +494,25 @@ GLOBAL_VAR(v_DirsToClean, emptyFM, FiniteMap FilePath FilePath )
 \begin{code}
 cleanTempDirs :: DynFlags -> IO ()
 cleanTempDirs dflags
-   = do ds <- readIORef v_DirsToClean
+   = unless (dopt Opt_KeepTmpFiles dflags)
+   $ do ds <- readIORef v_DirsToClean
         removeTmpDirs dflags (eltsFM ds)
         writeIORef v_DirsToClean emptyFM
 
 cleanTempFiles :: DynFlags -> IO ()
 cleanTempFiles dflags
-   = do fs <- readIORef v_FilesToClean
-	removeTmpFiles dflags fs
-	writeIORef v_FilesToClean []
+   = unless (dopt Opt_KeepTmpFiles dflags)
+   $ do fs <- readIORef v_FilesToClean
+        removeTmpFiles dflags fs
+        writeIORef v_FilesToClean []
 
 cleanTempFilesExcept :: DynFlags -> [FilePath] -> IO ()
 cleanTempFilesExcept dflags dont_delete
-   = do files <- readIORef v_FilesToClean
-	let (to_keep, to_delete) = partition (`elem` dont_delete) files
-	removeTmpFiles dflags to_delete
-	writeIORef v_FilesToClean to_keep
+   = unless (dopt Opt_KeepTmpFiles dflags)
+   $ do files <- readIORef v_FilesToClean
+        let (to_keep, to_delete) = partition (`elem` dont_delete) files
+        removeTmpFiles dflags to_delete
+        writeIORef v_FilesToClean to_keep
 
 
 -- find a temporary name that doesn't already exist.
