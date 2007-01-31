@@ -4226,6 +4226,14 @@ Tim Sheard is going to expand it.)
 	    (It would make sense to do so, but it's hard to implement.)
    </para></listitem>
 
+   <listitem><para>
+   Furthermore, the you can only run a function at compile time if it is imported
+   from another module <emphasis> that is not part of a mutually-recursive group of modules
+   that includes the module currently being compiled</emphasis>.  For example, when compiling module A,
+   you can only run Template Haskell functions imported from B if B does not import A (directly or indirectly).
+   The reason should be clear: to run B we must compile and run A, but we are currently type-checking A.
+   </para></listitem>
+
     <listitem><para>
 	    The flag <literal>-ddump-splices</literal> shows the expansion of all top-level splices as they happen.
    </para></listitem>
