@@ -713,7 +713,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if check_stdout_ok(name) and check_stderr_ok(name):
+    if getTestOpts().ignore_output or (check_stdout_ok(name) and
+                                       check_stderr_ok(name)):
         return 'pass'
     else:
         return 'fail'
