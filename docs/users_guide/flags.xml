@@ -1330,7 +1330,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-main-is</option></entry>
-	      <entry>Set main function</entry>
+	      <entry>Set main module and function</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
