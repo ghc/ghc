@@ -508,6 +508,7 @@ FPTOOLS_TOP_ABS_PLATFORM = @hardtop_plat@
 # passing through, we might as well set them.
 
 prefix			= @prefix@
+datarootdir		= @datarootdir@
 exec_prefix		= @exec_prefix@
 bindir			= @bindir@
 datadir0		= @datadir@
