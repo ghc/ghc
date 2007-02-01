@@ -73,6 +73,8 @@ typedef pthread_key_t   ThreadLocalKey;
 
 typedef HANDLE Condition;
 typedef DWORD OSThreadId;
+// don't be tempted to use HANDLE as the OSThreadId: there can be 
+// many HANDLES to a given thread, so comparison would not work.
 typedef DWORD ThreadLocalKey;
 
 #define OSThreadProcAttr __stdcall
@@ -146,6 +148,7 @@ typedef void OSThreadProcAttr OSThreadProc(void *);
 
 extern int  createOSThread        ( OSThreadId* tid, 
 				    OSThreadProc *startProc, void *param);
+extern rtsBool osThreadIsAlive    ( OSThreadId id );
 
 //
 // Condition Variables

@@ -7,6 +7,8 @@
  *
  * --------------------------------------------------------------------------*/
 
+#define _WIN32_WINNT 0x0500
+
 #include "Rts.h"
 #if defined(THREADED_RTS)
 #include "OSThreads.h"
@@ -112,6 +114,22 @@ osThreadId()
   return GetCurrentThreadId();
 }
 
+rtsBool
+osThreadIsAlive(OSThreadId id)
+{
+    DWORD exit_code;
+    HANDLE hdl;
+    if (!(hdl = OpenThread(THREAD_QUERY_INFORMATION,FALSE,id))) {
+        sysErrorBelch("osThreadIsAlive: OpenThread");
+        stg_exit(EXIT_FAILURE);
+    }
+    if (!GetExitCodeThread(hdl, &exit_code)) {
+        sysErrorBelch("osThreadIsAlive: GetExitCodeThread");
+        stg_exit(EXIT_FAILURE);
+    }
+    return (exit_code == STILL_ACTIVE);
+}
+
 #ifdef USE_CRITICAL_SECTIONS
 void
 initMutex (Mutex* pMut)
@@ -161,7 +179,8 @@ getThreadLocalVar (ThreadLocalKey *key)
     // r is allowed to be NULL - it can mean that either there was an
     // error or the stored value is in fact NULL.
     if (GetLastError() != NO_ERROR) {
-	barf("getThreadLocalVar: key not found");
+	sysErrorBelch("getThreadLocalVar");
+        stg_exit(EXIT_FAILURE);
     }
 #endif
     return r;
@@ -173,7 +192,8 @@ setThreadLocalVar (ThreadLocalKey *key, void *value)
     BOOL b;
     b = TlsSetValue(*key, value);
     if (!b) {
-	barf("setThreadLocalVar: %d", GetLastError());
+	sysErrorBelch("setThreadLocalVar");
+        stg_exit(EXIT_FAILURE);
     }
 }
 

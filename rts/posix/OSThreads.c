@@ -93,6 +93,14 @@ osThreadId()
   return pthread_self();
 }
 
+rtsBool
+osThreadIsAlive(OSThreadId id)
+{
+    // no good way to implement this on POSIX, AFAICT.  Returning true
+    // is safe.
+    return rtsTrue;
+}
+
 void
 initMutex(Mutex* pMut)
 {

@@ -664,6 +664,30 @@ shutdownCapability (Capability *cap, Task *task)
 	    continue;
 	}
 	cap->running_task = task;
+
+        if (cap->spare_workers) {
+            // Look for workers that have died without removing
+            // themselves from the list; this could happen if the OS
+            // summarily killed the thread, for example.  This
+            // actually happens on Windows when the system is
+            // terminating the program, and the RTS is running in a
+            // DLL.
+            Task *t, *prev;
+            prev = NULL;
+            for (t = cap->spare_workers; t != NULL; t = t->next) {
+                if (!osThreadIsAlive(t->id)) {
+                    debugTrace(DEBUG_sched, 
+                               "worker thread %p has died unexpectedly", t->id);
+                        if (!prev) {
+                            cap->spare_workers = t->next;
+                        } else {
+                            prev->next = t->next;
+                        }
+                        prev = t;
+                }
+            }
+        }
+
 	if (!emptyRunQueue(cap) || cap->spare_workers) {
 	    debugTrace(DEBUG_sched, 
 		       "runnable threads or workers still alive, yielding");
