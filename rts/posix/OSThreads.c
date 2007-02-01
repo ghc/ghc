@@ -94,7 +94,7 @@ osThreadId()
 }
 
 rtsBool
-osThreadIsAlive(OSThreadId id)
+osThreadIsAlive(OSThreadId id STG_UNUSED)
 {
     // no good way to implement this on POSIX, AFAICT.  Returning true
     // is safe.
