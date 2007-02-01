@@ -358,13 +358,13 @@
 	      <entry><option>-i</option><replaceable>dir1</replaceable>:<replaceable>dir2</replaceable>:...</entry>
 	      <entry>add <replaceable>dir</replaceable>,
 	          <replaceable>dir2</replaceable>, etc. to import path</entry>
-	      <entry>dynamic</entry>
+	      <entry>static/<literal>:set</literal></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-i</option></entry>
 	      <entry>Empty the import directory list</entry>
-	      <entry>dynamic</entry>
+	      <entry>static/<literal>:set</literal></entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>
@@ -519,7 +519,7 @@
 	    <row>
 	      <entry><option>-package</option> <replaceable>P</replaceable></entry>
 	      <entry>Expose package <replaceable>P</replaceable></entry>
-	      <entry>dynamic</entry>
+	      <entry>static/<literal>:set</literal></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
@@ -531,25 +531,25 @@
 	    <row>
 	      <entry><option>-hide-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Hide package <replaceable>P</replaceable></entry>
-	      <entry>dynamic</entry>
+	      <entry>static/<literal>:set</literal></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-ignore-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Ignore package <replaceable>P</replaceable></entry>
-	      <entry>dynamic</entry>
+	      <entry>static/<literal>:set</literal></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-package-conf</option> <replaceable>file</replaceable></entry>
 	      <entry>Load more packages from <replaceable>file</replaceable></entry>
-	      <entry>dynamic</entry>
+	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-no-user-package-conf</option></entry>
 	      <entry>Don't load the user's package config file.</entry>
-	      <entry>dynamic</entry>
+	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>

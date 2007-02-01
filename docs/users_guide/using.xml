@@ -138,6 +138,11 @@ module X where
     
     <para>The flag reference tables (<xref
     linkend="flag-reference"/>) lists the status of each flag.</para>
+
+    <para>There are a few flags that are static except that they can
+    also be used with GHCi's <literal>:set</literal> command; these
+    are listed as &ldquo;static/<literal>:set</literal>&rdquo; in the
+    table.</para> 
   </sect1>
 
   <sect1 id="file-suffixes">
