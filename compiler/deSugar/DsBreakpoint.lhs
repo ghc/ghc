@@ -47,15 +47,17 @@ import Data.IORef
 import Foreign.StablePtr
 import GHC.Exts
 #ifdef GHCI
-mkBreakpointExpr :: SrcSpan -> Id -> DsM (LHsExpr Id)
-mkBreakpointExpr loc bkptFuncId = do
+mkBreakpointExpr :: SrcSpan -> Id -> Type -> DsM (LHsExpr Id)
+mkBreakpointExpr loc bkptFuncId ty = do
         scope <- getScope
         mod   <- getModuleDs
+        u     <- newUnique
         let mod_name = moduleNameFS$ moduleName mod
+            valId = mkUserLocal (mkVarOcc "_result") u ty noSrcLoc 
         when (not instrumenting) $
               warnDs (text "Extracted ids:" <+> (ppr scope $$ 
                                                    ppr (map idType scope)))
-        stablePtr <- ioToIOEnv $ newStablePtr scope
+        stablePtr <- ioToIOEnv $ newStablePtr (valId:scope)
         site      <- if instrumenting
                         then recordBkpt (srcSpanStart loc)
                         else return 0

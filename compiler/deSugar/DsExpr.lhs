@@ -192,12 +192,16 @@ dsLExpr :: LHsExpr Id -> DsM CoreExpr
 #if defined(GHCI)
 dsLExpr (L loc expr@(HsWrap w (HsVar v)))
     | idName v `elem` [breakpointName, breakpointCondName, breakpointAutoName]
+    , WpTyApp ty <- simpWrapper w
     = do areBreakpointsEnabled <- breakpoints_enabled
          if areBreakpointsEnabled
            then do
-              L _ breakpointExpr <- mkBreakpointExpr loc v
+              L _ breakpointExpr <- mkBreakpointExpr loc v ty
               dsLExpr (L loc $ HsWrap w breakpointExpr)
            else putSrcSpanDs loc $ dsExpr expr
+       where simpWrapper (WpCompose w1 WpHole) = w1
+             simpWrapper (WpCompose WpHole w1) = w1
+             simpWrapper w = w
 #endif
 
 dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e

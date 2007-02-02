@@ -2208,6 +2208,7 @@ foreign import "rts_evalStableIO"  {- safe -}
   -- more informative than the C type!
 -}
 
+
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames
 
@@ -2223,6 +2224,9 @@ isModuleInterpreted s mod_summary = withSession s $ \hsc_env ->
 	Just mod_info -> return (not obj_linkable)
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
+
+-----------------------------------------------------------------------------
+-- Breakpoint handlers
 
 getBreakpointHandler :: Session -> IO (Maybe (BkptHandler Module))
 getBreakpointHandler session = getSessionDynFlags session >>= return . bkptHandler
@@ -2251,6 +2255,9 @@ reinstallBreakpointHandlers session = do
     initDynLinker dflags 
     extendLinkEnv linkEnv
 
+-----------------------------------------------------------------------
+-- Jump functions
+
 type SiteInfo = (String, String, SiteNumber)
 jumpFunction, jumpAutoFunction  :: Session -> BkptHandler Module -> Int -> [Opaque] 
                                 -> SiteInfo -> String -> b -> b
@@ -2270,8 +2277,7 @@ jumpFunction session handler ptr hValues siteInfo locmsg b
 jumpFunctionM session handler (I# idsPtr) wrapped_hValues site locmsg b = 
       do 
          ids <- deRefStablePtr (castPtrToStablePtr (Ptr (int2Addr# idsPtr)))
-         ASSERT (length ids == length wrapped_hValues) return ()
-         let hValues = [unsafeCoerce# hv | O hv <- wrapped_hValues]
+         let hValues = unsafeCoerce# b : [unsafeCoerce# hv | O hv <- wrapped_hValues]
          handleBreakpoint handler session (zip ids hValues) site locmsg b
 
 jumpAutoFunction session handler ptr hValues siteInfo locmsg b 
