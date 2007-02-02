@@ -41,6 +41,9 @@ module Data.Sequence (
 	(><),		-- :: Seq a -> Seq a -> Seq a
 	fromList,	-- :: [a] -> Seq a
 	-- * Deconstruction
+	-- | Additional functions for deconstructing sequences are available
+	-- via the 'Foldable' instance of 'Seq'.
+
 	-- ** Queries
 	null,		-- :: Seq a -> Bool
 	length,		-- :: Seq a -> Int
@@ -1008,6 +1011,8 @@ splitDigit i (Four a b c d)
 ------------------------------------------------------------------------
 
 -- | /O(n)/. Create a sequence from a finite list of elements.
+-- There is a function 'toList' in the opposite direction for all
+-- instances of the 'Foldable' class, including 'Seq'.
 fromList  	:: [a] -> Seq a
 fromList  	=  Data.List.foldl' (|>) empty
 
