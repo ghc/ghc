@@ -14,7 +14,6 @@ module DsBreakpoint(
                    , mkBreakpointExpr
                    ) where
 
-import IOEnv
 import TysPrim
 import TysWiredIn
 import PrelNames        
@@ -25,9 +24,6 @@ import TyCon
 import TypeRep
 import DataCon          
 import Type             
-import MkId
-import Name
-import Var
 import Id 
 
 import IdInfo
@@ -50,7 +46,6 @@ import Control.Monad
 import Data.IORef
 import Foreign.StablePtr
 import GHC.Exts
-
 #ifdef GHCI
 mkBreakpointExpr :: SrcSpan -> Id -> DsM (LHsExpr Id)
 mkBreakpointExpr loc bkptFuncId = do
