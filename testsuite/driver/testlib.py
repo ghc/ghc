@@ -971,10 +971,8 @@ def runCmd( cmd ):
     if config.platform == 'i386-unknown-mingw32':
 	# On MinGW, we will always have timeout
         assert config.timeout_prog!=''
-        # We need to add " around the command, because
-        # (like Windows programs usually) timeout parses the commandline.
         r = os.spawnl(os.P_WAIT, config.timeout_prog,
-		      config.timeout_prog,`config.timeout`,'"%s"'%cmd )
+		      config.timeout_prog,`config.timeout`,cmd )
     elif config.timeout_prog!='':
     	r = os.spawnv(os.P_WAIT, config.timeout_prog,
 		      [config.timeout_prog,`config.timeout`,cmd] )
