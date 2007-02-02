@@ -123,7 +123,7 @@ match menv subst ty1 ty2 | Just ty1' <- tcView ty1 = match menv subst ty1' ty2
 			  | Just ty2' <- tcView ty2 = match menv subst ty1 ty2'
 
 match menv subst (TyVarTy tv1) ty2
-  | tv1 `elemVarSet` me_tmpls menv
+  | tv1' `elemVarSet` me_tmpls menv
   = case lookupVarEnv subst tv1' of
 	Nothing 	-- No existing binding
 	    | any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
@@ -131,7 +131,7 @@ match menv subst (TyVarTy tv1) ty2
 	    | not (typeKind ty2 `isSubKind` tyVarKind tv1)
 	    -> Nothing	-- Kind mis-match
 	    | otherwise
-	    -> Just (extendVarEnv subst tv1 ty2)
+	    -> Just (extendVarEnv subst tv1' ty2)
 
 	Just ty1' 	-- There is an existing binding; check whether ty2 matches it
 	    | tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
