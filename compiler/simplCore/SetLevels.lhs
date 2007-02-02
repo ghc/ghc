@@ -842,9 +842,11 @@ cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
     returnUs (env', vs2)
 
 	-- VERY IMPORTANT: we must zap the demand info 
-	-- if the thing is going to float out past a lambda
+	-- if the thing is going to float out past a lambda,
+	-- or if it's going to top level (where things can't be strict)
 zap_demand dest_lvl ctxt_lvl id
-  | ctxt_lvl == dest_lvl = id			-- Stays put
-  | otherwise		 = zapDemandIdInfo id	-- Floats out
+  | ctxt_lvl == dest_lvl,
+    not (isTopLvl dest_lvl) = id	-- Stays, and not going to top level
+  | otherwise		    = zapDemandIdInfo id	-- Floats out
 \end{code}
 	
