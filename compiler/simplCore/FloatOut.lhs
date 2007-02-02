@@ -323,8 +323,9 @@ floatExpr lvl (Cast expr co)
 
 floatExpr lvl (Let (NonRec (TB bndr bndr_lvl) rhs) body)
   | isUnLiftedType (idType bndr)	-- Treat unlifted lets just like a case
-  = case floatExpr lvl rhs	of { (fs, rhs_floats, rhs') ->
-    case floatRhs bndr_lvl body of { (fs, body_floats, body') ->
+				-- I.e. floatExpr for rhs, floatCaseAlt for body
+  = case floatExpr lvl rhs	    of { (fs, rhs_floats, rhs') ->
+    case floatCaseAlt bndr_lvl body of { (fs, body_floats, body') ->
     (fs, rhs_floats ++ body_floats, Let (NonRec bndr rhs') body') }}
 
 floatExpr lvl (Let bind body)
