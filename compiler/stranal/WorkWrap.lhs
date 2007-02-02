@@ -11,11 +11,11 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 import CoreSyn
 import CoreUnfold	( certainlyWillInline )
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType, exprIsHNF )
+import CoreUtils	( exprType, exprIsHNF, exprArity )
 import Id		( Id, idType, isOneShotLambda, 
 			  setIdNewStrictness, mkWorkerId,
 			  setIdWorkerInfo, setInlinePragma,
-			  idInfo )
+			  setIdArity, idInfo )
 import MkId		( lazyIdKey, lazyIdUnfolding )
 import Type		( Type )
 import IdInfo		( WorkerInfo(..), arityInfo,
@@ -269,6 +269,9 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
 			`setIdNewStrictness` StrictSig (mkTopDmdType work_demands work_res_info)
 				-- Even though we may not be at top level, 
 				-- it's ok to give it an empty DmdEnv
+                        `setIdArity` (exprArity work_rhs)
+                                -- Set the arity so that the Core Lint check that the 
+                                -- arity is consistent with the demand type goes through
 
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdWorkerInfo` HasWorker work_id arity
