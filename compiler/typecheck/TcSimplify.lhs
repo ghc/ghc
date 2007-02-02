@@ -863,7 +863,8 @@ bindIrredsR loc qtvs co_vars reft givens irreds
 	
 	; let all_tvs = qtvs ++ co_vars	-- Abstract over all these
 	; (implics, bind) <- makeImplicationBind loc all_tvs reft givens' irreds'
-				-- This call does the real work
+			-- This call does the real work
+			-- If irreds' is empty, it does something sensible
 	; extendLIEs implics
 	; return bind } 
 
@@ -876,6 +877,8 @@ makeImplicationBind :: InstLoc -> [TcTyVar] -> Refinement
 -- The binding looks like
 --	(ir1, .., irn) = f qtvs givens
 -- where f is (evidence for) the new implication constraint
+--	f :: forall qtvs. {reft} givens => (ir1, .., irn)
+-- qtvs includes coercion variables
 --
 -- This binding must line up the 'rhs' in reduceImplication
 makeImplicationBind loc all_tvs reft
