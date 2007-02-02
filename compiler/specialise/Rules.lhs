@@ -423,6 +423,16 @@ match menv subst (Var v1) e2
   | Just subst <- match_var menv subst v1 e2
   = Just subst
 
+match menv subst e1 (Note n e2)
+  = match menv subst e1 e2
+	-- Note [Notes in RULE matching]
+	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	-- Look through Notes.  In particular, we don't want to
+	-- be confused by InlineMe notes.  Maybe we should be more
+	-- careful about profiling notes, but for now I'm just
+	-- riding roughshod over them.  
+	--- See Note [Notes in call patterns] in SpecConstr
+
 -- Here is another important rule: if the term being matched is a
 -- variable, we expand it so long as its unfolding is a WHNF
 -- (Its occurrence information is not necessarily up to date,

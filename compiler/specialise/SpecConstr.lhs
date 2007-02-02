@@ -925,6 +925,15 @@ argToPat :: InScopeEnv			-- What's in scope at the fn defn site
 argToPat in_scope con_env arg@(Type ty) arg_occ
   = return (False, arg)
 
+argToPat in_scope con_env (Note n arg) arg_occ
+  = argToPat in_scope con_env arg arg_occ
+	-- Note [Notes in call patterns]
+	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	-- Ignore Notes.  In particular, we want to ignore any InlineMe notes
+	-- Perhaps we should not ignore profiling notes, but I'm going to
+	-- ride roughshod over them all for now.
+	--- See Note [Notes in RULE matching] in Rules
+
 argToPat in_scope con_env (Let _ arg) arg_occ
   = argToPat in_scope con_env arg arg_occ
 	-- Look through let expressions
