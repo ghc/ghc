@@ -97,6 +97,7 @@ instance Monoid Ordering where
 
 -- | The dual of a monoid, obtained by swapping the arguments of 'mappend'.
 newtype Dual a = Dual { getDual :: a }
+	deriving (Eq, Ord, Read, Show, Bounded)
 
 instance Monoid a => Monoid (Dual a) where
 	mempty = Dual mempty
