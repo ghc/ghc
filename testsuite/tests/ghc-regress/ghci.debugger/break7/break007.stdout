@@ -1,3 +1,3 @@
 Stopped at a breakpoint in ../mdo.hs:30. Local bindings in scope:
-  x :: a, f :: N a, xs :: [a], l :: N a
+  _result :: IO (N a), x :: a, f :: N a, xs :: [a], l :: N a
 ../mdo.hs:30:29-38> Returning to normal execution...

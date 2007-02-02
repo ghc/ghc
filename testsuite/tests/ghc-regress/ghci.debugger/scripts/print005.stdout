@@ -1,6 +1,6 @@
 Breakpoint set at (5,15)
 Stopped at a breakpoint in ../QSort.hs:5. Local bindings in scope:
-  as :: [a], a :: a, left :: [a], right :: [a]
+  _result :: [a], as :: [a], a :: a, left :: [a], right :: [a]
 ../QSort.hs:5:15-50> ../QSort.hs:5:15-50> right = (_t1::[a])
 ../QSort.hs:5:15-50> ()
 ../QSort.hs:5:15-50> right = [42 | (_t2::[Integer])]
