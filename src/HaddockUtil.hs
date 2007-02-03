@@ -81,21 +81,24 @@ restrictTo names (L loc decl) = L loc $ case decl of
   _ -> decl
    
 restrictCons :: [Name] -> [LConDecl Name] -> [LConDecl Name]
-restrictCons names decls = [ L p (fromJust (keep d)) | L p d <- decls, isJust (keep d) ]  
-  where keep d | unLoc (con_name d) `elem` names = 
-          case con_details d of
-            PrefixCon _ -> Just d
-            RecCon fields  
-              | all field_avail fields -> Just d
-              | otherwise -> Just (d { con_details = PrefixCon (field_types fields) })
-       		-- if we have *all* the field names available, then
-		-- keep the record declaration.  Otherwise degrade to
-		-- a constructor declaration.  This isn't quite right, but
-		-- it's the best we can do.
-	   where
-            field_avail (HsRecField n _ _) = (unLoc n) `elem` names
-            field_types flds = [ ty | HsRecField n ty _ <- flds] 
-        keep d | otherwise = Nothing
+restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]  
+  where 
+    keep d | unLoc (con_name d) `elem` names = 
+      case con_details d of
+        PrefixCon _ -> Just d
+        RecCon fields  
+          | all field_avail fields -> Just d
+          | otherwise -> Just (d { con_details = PrefixCon (field_types fields) })
+          -- if we have *all* the field names available, then
+          -- keep the record declaration.  Otherwise degrade to
+          -- a constructor declaration.  This isn't quite right, but
+          -- it's the best we can do.
+        InfixCon _ _ -> Just d
+      where
+        field_avail (HsRecField n _ _) = (unLoc n) `elem` names
+        field_types flds = [ ty | HsRecField n ty _ <- flds] 
+      
+    keep d | otherwise = Nothing
 
 restrictDecls :: [Name] -> [LSig Name] -> [LSig Name]
 restrictDecls names decls = filter keep decls

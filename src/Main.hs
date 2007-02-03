@@ -869,9 +869,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
 		Nothing -> return []
 		Just found -> return [ ExportDoc found ]
  
-    -- NOTE: I'm unsure about this. Currently only "External" names are considered.	
     declWith :: Name -> ErrMsgM [ ExportItem Name ]
-    declWith t | not (isExternalName t) = return []
     declWith t
 	| (Just decl, maybeDoc) <- findDecl t
         = return [ ExportDecl t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
