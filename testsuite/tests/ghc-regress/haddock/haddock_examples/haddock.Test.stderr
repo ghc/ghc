@@ -1,0 +1,159 @@
+[1 of 3] Compiling Visible          ( Visible.hs, Visible.o )
+
+==================== Parser ====================
+module Visible where
+visible :: Int -> Int
+visible a = a
+
+
+[2 of 3] Compiling Hidden           ( Hidden.hs, Hidden.o )
+
+==================== Parser ====================
+module Hidden where
+hidden :: Int -> Int
+hidden a = a
+
+
+[3 of 3] Compiling Test             ( Test.hs, Test.o )
+
+==================== Parser ====================
+<document comment>
+module Test (
+	<IEGroup: 1>, <IEGroup: 2>, T(..), T2, T3(..), T4(..), T5(..), T6(..), N1(..),
+	N2(..), N3(..), N4, N5(..), N6(..), N7(..), <IEGroup: 2>, R(..), R1(..),
+	<document comment>, p, q, u, <IEGroup: 1>, C(a, b), D(..), E, F(..),
+	<document comment>, a, <IEGroup: 1>, f, g, <IEGroup: 1>, <IEDocNamed: aux1>,
+	<IEDocNamed: aux2>, <IEDocNamed: aux3>, <IEDocNamed: aux4>, <IEDocNamed: aux5>,
+	<IEDocNamed: aux6>, <IEDocNamed: aux7>, <IEDocNamed: aux8>, <IEDocNamed: aux9>,
+	<IEDocNamed: aux10>, <IEDocNamed: aux11>, <IEDocNamed: aux12>,
+	<document comment>, <IEGroup: 1>, module Hidden, <IEGroup: 1>, module Visible,
+	<document comment>, <IEGroup: 1>, Ex(..), <IEGroup: 1>, k, l, m, o,
+	<IEGroup: 1>, <IEGroup: 2>, <document comment>, f'
+    ) where
+import Hidden
+import Visible
+<document comment>
+data T a b
+    = <document comment> A Int Maybe Float |
+      <document comment> B (T a b, T Int Float)
+<document comment>
+data T2 a b = T2 a b
+<document comment>
+data T3 a b = A1 a | B1 b
+data T4 a b = A2 a | B2 b
+data T5 a b = <document comment> A3 a | <document comment> B3 b
+<document comment>
+data T6 = <document comment> A4 | <document comment> B4 | <document comment> C4
+<document comment>
+newtype N1 a = N1 a
+<document comment>
+newtype N2 a b = N2 {n :: a b}
+<document comment>
+newtype N3 a b = N3 {n3 :: a b <document comment>}
+<document comment>
+newtype N4 a b = N4 a
+newtype N5 a b = N5 {n5 :: a b <document comment>}
+newtype N6 a b = <document comment> N6 {n6 :: a b}
+<document comment>
+newtype N7 a b = <document comment> N7 {n7 :: a b}
+class (D a) => C a where { a :: IO a; b :: [a]; c :: a; }
+<document comment>
+class D a where { d :: T a b; e :: (a, a); }
+<document comment>
+instance D Int where
+    []
+    []
+    { d = undefined
+      e = undefined }
+instance Test.D Float where
+    []
+    []
+    { d = undefined
+      e = undefined }
+class E a where { ee :: a; }
+<document comment>
+class F a where { ff :: a; }
+<document comment>
+data R
+    = <document comment>
+      C1 {p :: Int <document comment>,
+	  q :: forall a. a -> a <document comment>,
+	  r :: Int <document comment>,
+	  s :: Int <document comment>} |
+      <document comment>
+      C2 {t :: T1 -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
+	  u :: Int,
+	  v :: Int}
+<document comment>
+data R1
+    = <document comment>
+      C3 {s1 :: Int <document comment>,
+	  s2 :: Int <document comment>,
+	  s3 :: Int <document comment>}
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+f :: (C a) => a -> Int
+<document comment>
+foreign import ccall safe "static  &g" g :: Int -> IO CInt
+<document comment>
+h :: Int
+h = 42
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+<document comment>
+data Ex a
+    = forall b. (C b) => Ex1 b |
+      forall b. Ex2 b |
+      forall b. (C a) => Ex3 b |
+      Ex4 forall a. a -> a
+<document comment>
+k ::
+  T () () <document comment>
+  -> T2 Int Int <document comment>
+     -> T3 Bool Bool -> T4 Float Float <document comment>
+	-> T5 () () <document comment> -> IO () <document comment>
+l :: (Int, Int, Float) <document comment> -> Int <document comment>
+<document comment>
+m :: R -> N1 () <document comment> -> IO Int <document comment>
+<document comment>
+newn :: R <document comment> -> N1 () <document comment> -> IO Int
+newn = undefined
+<document comment>
+foreign import ccall unsafe "static  &o" o :: Float <document comment>
+					      -> IO Float <document comment>
+<document comment>
+newp :: Int
+newp = undefined
+<document comment>
+f' :: Int
+data T1 =
+f = undefined
+f' = undefined
+type CInt = Int
+k = undefined
+l = undefined
+m = undefined
+
+
+
+Test.hs:32:1: Warning: `p' is exported by `p' and `R(..)'
+
+Test.hs:32:4: Warning: `q' is exported by `q' and `R(..)'
+
+Test.hs:32:7: Warning: `u' is exported by `u' and `R(..)'
+
+Test.hs:38:1: Warning: `a' is exported by `a' and `C(a, b)'
+Warning: output was redirected with -o, but no output will be generated
+because there is no Main module.

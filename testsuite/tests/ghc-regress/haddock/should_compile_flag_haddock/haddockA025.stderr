@@ -1,0 +1,7 @@
+
+==================== Parser ====================
+module ShouldCompile where
+test2 :: a <document comment> -> a
+test2 x = x
+
+

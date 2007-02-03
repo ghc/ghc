@@ -1,0 +1,14 @@
+
+==================== Parser ====================
+<document comment>
+module HeaderTest where
+<document comment>
+x = 0
+<document comment>
+y = 1
+<document comment>
+main = print x
+<document comment>
+z = 0
+
+
