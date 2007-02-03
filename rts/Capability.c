@@ -677,7 +677,7 @@ shutdownCapability (Capability *cap, Task *task)
             for (t = cap->spare_workers; t != NULL; t = t->next) {
                 if (!osThreadIsAlive(t->id)) {
                     debugTrace(DEBUG_sched, 
-                               "worker thread %p has died unexpectedly", t->id);
+                               "worker thread %p has died unexpectedly", (void *)t->id);
                         if (!prev) {
                             cap->spare_workers = t->next;
                         } else {
