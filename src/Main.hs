@@ -1212,6 +1212,7 @@ packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
 pkgId :: InstalledPackageInfo -> PackageId
 pkgId = mkPackageId . package 
 
+{-
 -- | Topologically sort a list of modules that belong to an external package,
 -- using the dependency information available in the ModIface structure for 
 -- each module. 
@@ -1224,6 +1225,7 @@ sortPackageModules modinfos = flattenSCCs $ stronglyConnComp nodes
                             modNames = (map fst . dep_mods . mi_deps) iface
                             modName  = moduleName (mi_module iface)
                         in (modinfo, modName, modNames)
+-}
 
 -- | For each module in the list, try to retrieve a ModuleInfo structure  
 moduleInfo :: Session -> [Module] -> IO (Maybe [ModuleInfo])
@@ -1264,7 +1266,7 @@ getPackage session pkgInfo = do
     Just x -> return x
     Nothing -> throwE "Could not get ModuleInfo for all exposed modules." 
 
-  let modInfos' = sortPackageModules modInfos
+  --let modInfos' = sortPackageModules modInfos
 
   return $ PackageData {
     pdModules  = modules,
@@ -1273,7 +1275,7 @@ getPackage session pkgInfo = do
   } 
 
 -- | Build a package doc env out of a topologically sorted list of modules
-packageDocEnv :: [ModuleInfo] -> Map Name Name
+{-packageDocEnv :: [ModuleInfo] -> Map Name Name
 packageDocEnv modInfos = foldl addModuleEnv Map.empty (reverse modInfos)
   where
     addModuleEnv oldEnv thisMod 
@@ -1289,6 +1291,7 @@ packageDocEnv modInfos = foldl addModuleEnv Map.empty (reverse modInfos)
         keepOld env n = Map.insertWith (\new old -> old) n 
                         (nameSetMod n modName) env
         keepNew env n = Map.insert n (nameSetMod n modName) env
+-}
         
 -- | Try to create a PackageData for each package in the session except for 
 -- rts. Print a warning on stdout if a PackageData could not be created.
