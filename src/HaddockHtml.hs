@@ -1078,7 +1078,11 @@ expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 ppDataHeader :: Bool -> NewOrData -> Name -> [Name] -> Html
 ppDataHeader summary newOrData name tyvars = 
   (if newOrData == NewType then keyword "newtype" else keyword "data") <+> 
-  ppBinder summary name <+> hsep (map ppName tyvars)
+  (if infixConstr then ppName (tyvars!!0) <+> ppBinder summary name <+> ppName (tyvars!!1)
+                  else ppBinder summary name <+> hsep (map ppName tyvars))
+  where 
+    -- there should be a better way to check this using the GHC API
+    infixConstr = (head (nameOccString name) == ':') && (length tyvars == 2)
 
 -- ----------------------------------------------------------------------------
 -- Types and contexts

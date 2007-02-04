@@ -20,7 +20,7 @@ module HaddockUtil (
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
-  moduleString, mkModuleNoPkg,
+  nameOccString, moduleString, mkModuleNoPkg,
 
   -- * HTML cross reference mapping
   html_xrefs_ref,
@@ -230,6 +230,8 @@ escapeStr = flip escapeString unreserved
 #else
 escapeStr = escapeURIString isUnreserved
 #endif
+
+nameOccString = occNameString . nameOccName 
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName 
