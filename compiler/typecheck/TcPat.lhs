@@ -228,7 +228,7 @@ unBoxArgType ty pp_this
 
 Note [Nesting]
 ~~~~~~~~~~~~~~
-tcPat takes a "thing inside" over which the patter scopes.  This is partly
+tcPat takes a "thing inside" over which the pattern scopes.  This is partly
 so that tcPat can extend the environment for the thing_inside, but also 
 so that constraints arising in the thing_inside can be discharged by the
 pattern.
