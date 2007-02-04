@@ -874,11 +874,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
 	| (Just decl, maybeDoc) <- findDecl t
         = return [ ExportDecl t (restrictTo subs (extractDecl t mdl decl)) maybeDoc [] ]
 	| otherwise
-	= return [ ExportNoDecl t t subs ]
-	-- can't find the decl (it might be from another package), but let's
-	-- list the entity anyway.  Later on, the renamer will change the
-	-- orig name into the import name, so we get a proper link to
-	-- the doc for this entity.
+	= return []
 	where 
               mdl = nameModule t
 	      subs = filter (`elem` exported_names) all_subs
