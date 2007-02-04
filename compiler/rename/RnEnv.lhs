@@ -15,6 +15,7 @@ module RnEnv (
 	lookupLocatedInstDeclBndr,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
 	lookupGreRn, lookupGreRn_maybe,
+	getLookupOccRn,
 
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV,
@@ -254,6 +255,11 @@ lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
 --------------------------------------------------
 --		Occurrences
 --------------------------------------------------
+
+getLookupOccRn :: RnM (Name -> Maybe Name)
+getLookupOccRn
+  = getLocalRdrEnv			`thenM` \ local_env ->
+    return (lookupLocalRdrEnv local_env . mkRdrUnqual . nameOccName)
 
 lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedOccRn = wrapLocM lookupOccRn
