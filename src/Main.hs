@@ -452,6 +452,11 @@ run flags modules extEnv = do
                 maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 
+  case [str | Flag_DumpInterface str <- flags] of
+        [] -> return ()
+        fs -> let filename = (last fs) in 
+              savePackageFile filename homeEnv
+
 {- 
 instance Outputable (DocEntity Name) where
   ppr (DocEntity d) = ppr d
@@ -1188,9 +1193,11 @@ type ErrMsgM a = Writer [ErrMsg] a
 -- Packages 
 --------------------------------------------------------------------------------
 
+type DocEnv = Map Name Name
+
 data PackageData = PackageData {
   pdModules  :: [Module],
-  pdDocEnv   :: Map Name Name,
+  pdDocEnv   :: DocEnv,
   pdHtmlPath :: FilePath
 }
 
@@ -1246,6 +1253,9 @@ getIface pkgInfo = case haddockInterfaces pkgInfo of
 getPackage :: Session -> InstalledPackageInfo -> IO PackageData 
 getPackage session pkgInfo = do
   html <- getHtml pkgInfo
+  iface <- getIface pkgInfo
+  docEnv <- readPackageFile iface
+
   let modules = packageModules pkgInfo
 
   -- try to get a ModuleInfo struct for each module
@@ -1257,8 +1267,8 @@ getPackage session pkgInfo = do
   let modInfos' = sortPackageModules modInfos
 
   return $ PackageData {
-    pdModules  = map modInfoMod modInfos',
-    pdDocEnv   = packageDocEnv modInfos',
+    pdModules  = modules,
+    pdDocEnv   = docEnv,
     pdHtmlPath = html
   } 
 
@@ -1310,5 +1320,38 @@ getPackages session dynflags flags = do
 -- | Build one big doc env out of a list of packages. If multiple packages 
 -- export the same (original) name, we just pick one of the packages as the 
 -- documentation site.
-packagesDocEnv :: [PackageData] -> Map Name Name
+packagesDocEnv :: [PackageData] -> DocEnv
 packagesDocEnv packages = Map.unions (map pdDocEnv packages)
+
+--------------------------------------------------------------------------------
+-- Package/Interface files 
+--------------------------------------------------------------------------------
+
+packageFileMagic = 0xDA303001 :: Word32
+
+savePackageFile :: FilePath -> PackageEnv -> IO ()
+savePackageFile filename pkgEnv = do
+  h <- openBinaryFile filename WriteMode   
+  bh <- openBinIO h 
+
+  ud <- newWriteState
+  bh <- return $ setUserData bh ud
+
+  put_ bh packageFileMagic
+  put_ bh (Map.toList pkgEnv)
+  hClose h
+
+loadPackageFile :: FilePath -> IO PackageEnv
+loadPackageFile filename = do
+  h <- openBinaryFile filename ReadMode
+  bh <- openBinIO h
+
+  ud <- newReadState undefined
+  bh <- return (setUserData bh ud)
+
+  magic <- get bh
+  when (magic /= packageFileMagic) $ throwE $
+    "Magic number mismatch: couldn't load interface file: " ++ filename
+  
+  envList <- get bh
+  return (Map.fromList envList)
