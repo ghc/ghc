@@ -4,7 +4,7 @@
 #
 # Targets: 
 #
-# 	bootsrap (DEFAULT)
+# 	bootstrap (DEFAULT)
 #		Builds GHC, then builds the libraries,
 #		then uses this GHC ("stage 1") to build itself
 #		("stage 2").
