@@ -921,7 +921,7 @@ tagToEnumError tys
 
 %************************************************************************
 %*									*
-\subsection{@tcId@ typchecks an identifier occurrence}
+\subsection{@tcId@ typechecks an identifier occurrence}
 %*									*
 %************************************************************************
 
