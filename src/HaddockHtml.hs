@@ -970,6 +970,8 @@ ppShortConstr summary con = case con_res con of
     PrefixCon args -> header +++ hsep (ppBinder summary name : map ppLType args)
     RecCon fields -> header +++ ppBinder summary name <+>
       braces (vanillaTable << aboves (map (ppShortField summary) fields))
+    InfixCon arg1 arg2 -> header +++ 
+      hsep [ppLType arg1, ppBinder summary name, ppLType arg2]    
 
   ResTyGADT resTy -> case con_details con of 
     PrefixCon args -> ppName name <+> dcolon <+> hsep [
@@ -1000,12 +1002,16 @@ ppSideBySideConstr (L _ con) = case con_res con of
  
   ResTyH98 -> case con_details con of 
     PrefixCon args -> argBox (hsep ((header +++ 
-		      ppBinder False name) : map ppLType args)) <->
+		                  ppBinder False name) : map ppLType args)) <->
                       maybeRDocBox mbLDoc  
     RecCon fields -> argBox (header +++ ppBinder False name) <->
                      maybeRDocBox mbLDoc </>
                      (tda [theclass "body"] << spacedTable1 <<
                      aboves (map ppSideBySideField fields))
+    InfixCon arg1 arg2 -> argBox (hsep 
+                          [header +++ ppLType arg1, ppBinder False name, 
+                           ppLType arg2])
+                          <-> maybeRDocBox mbLDoc
  
   ResTyGADT ltype -> emptyTable --error "GADTs not supported yet"
  
