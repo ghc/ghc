@@ -12,7 +12,7 @@ import Paths_haddock_ghc ( version )
 import Data.Version      ( showVersion )
 
 projectName, projectUrl :: String
-projectName = "Haddock"
+projectName = "Haddock-GHC"
 projectUrl = "http://www.haskell.org/haddock/"
 
 projectVersion = showVersion version
