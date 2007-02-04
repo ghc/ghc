@@ -382,7 +382,7 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 -- don't know how to do the update otherwise.
 
 
-tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
+tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _) res_ty
   = 	-- STEP 0
 	-- Check that the field names are really field names
     ASSERT( notNull rbinds )
@@ -404,7 +404,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 		-- It's OK to use the non-tc splitters here (for a selector)
-	upd_field_lbls  = recBindFields rbinds
+	upd_field_lbls  = recBindFields hrbinds
 	sel_id : _   	= sel_ids
 	(tycon, _)   	= recordSelectorFieldLabel sel_id	-- We've failed already if
 	data_cons    	= tyConDataCons tycon		-- it's not a field label
@@ -416,7 +416,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
     checkTc (not (null relevant_cons))
-	    (badFieldsUpd rbinds)	`thenM_`
+	    (badFieldsUpd hrbinds)	`thenM_`
 
 	-- Check that all relevant data cons are vanilla.  Doing record updates on 
 	-- GADTs and/or existentials is more than my tiny brain can cope with today
@@ -457,7 +457,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _) res_ty
 	con1_arg_tys'    = map (substTy inst_env) con1_arg_tys
     in
     tcSubExp result_record_ty res_ty		`thenM` \ co_fn ->
-    tcRecordBinds con1 con1_arg_tys' rbinds	`thenM` \ rbinds' ->
+    tcRecordBinds con1 con1_arg_tys' hrbinds	`thenM` \ rbinds' ->
 
 	-- STEP 5
 	-- Typecheck the expression to be updated
@@ -1049,9 +1049,9 @@ tcRecordBinds
 	-> HsRecordBinds Name
 	-> TcM (HsRecordBinds TcId)
 
-tcRecordBinds data_con arg_tys rbinds
+tcRecordBinds data_con arg_tys (HsRecordBinds rbinds)
   = do	{ mb_binds <- mappM do_bind rbinds
-	; return (catMaybes mb_binds) }
+	; return (HsRecordBinds (catMaybes mb_binds)) }
   where
     flds_w_tys = zipEqual "tcRecordBinds" (dataConFieldLabels data_con) arg_tys
     do_bind (L loc field_lbl, rhs)

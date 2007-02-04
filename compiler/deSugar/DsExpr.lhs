@@ -429,7 +429,7 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 
 \begin{code}
-dsExpr (RecordCon (L _ data_con_id) con_expr rbinds)
+dsExpr (RecordCon (L _ data_con_id) con_expr (HsRecordBinds rbinds))
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
 	(arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -477,10 +477,10 @@ might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
-dsExpr (RecordUpd record_expr [] record_in_ty record_out_ty)
+dsExpr (RecordUpd record_expr (HsRecordBinds []) record_in_ty record_out_ty)
   = dsLExpr record_expr
 
-dsExpr expr@(RecordUpd record_expr rbinds record_in_ty record_out_ty)
+dsExpr expr@(RecordUpd record_expr (HsRecordBinds rbinds) record_in_ty record_out_ty)
   = dsLExpr record_expr	 	`thenDs` \ record_expr' ->
 
 	-- Desugar the rbinds, and generate let-bindings if

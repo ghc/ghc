@@ -704,8 +704,8 @@ checkAPat loc e = case e of
    ExplicitTuple es b -> mapM (\e -> checkLPat e) es >>= \ps ->
    			 return (TuplePat ps b placeHolderType)
    
-   RecordCon c _ fs   -> mapM checkPatField fs >>= \fs ->
-			 return (ConPatIn c (RecCon (map (uncurry mkRecField) fs))) 
+   RecordCon c _ (HsRecordBinds fs)   -> mapM checkPatField fs >>= \fs ->
+			 return (ConPatIn c (RecCon (map (uncurry mkRecField) fs)))
 -- Generics 
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc
@@ -872,9 +872,9 @@ mkRecConstrOrUpdate
 
 mkRecConstrOrUpdate (L l (HsVar c)) loc fs | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr fs)
-mkRecConstrOrUpdate exp loc fs@(_:_)
+mkRecConstrOrUpdate exp loc fs@(HsRecordBinds (_:_))
   = return (RecordUpd exp fs placeHolderType placeHolderType)
-mkRecConstrOrUpdate _ loc []
+mkRecConstrOrUpdate _ loc (HsRecordBinds [])
   = parseError loc "Empty record update"
 
 mkInlineSpec :: Maybe Activation -> Bool -> InlineSpec

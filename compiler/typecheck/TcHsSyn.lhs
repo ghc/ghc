@@ -647,8 +647,8 @@ zonkStmt env (BindStmt pat expr bind_op fail_op)
 -------------------------------------------------------------------------
 zonkRbinds :: ZonkEnv -> HsRecordBinds TcId -> TcM (HsRecordBinds Id)
 
-zonkRbinds env rbinds
-  = mappM zonk_rbind rbinds
+zonkRbinds env (HsRecordBinds rbinds)
+  = mappM zonk_rbind rbinds >>= return . HsRecordBinds
   where
     zonk_rbind (field, expr)
       = zonkLExpr env expr	`thenM` \ new_expr ->

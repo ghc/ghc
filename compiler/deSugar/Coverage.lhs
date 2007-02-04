@@ -410,7 +410,7 @@ addTickDictBinds :: DictBinds Id -> TM (DictBinds Id)
 addTickDictBinds x = addTickLHsBinds x
 
 addTickHsRecordBinds :: HsRecordBinds Id -> TM (HsRecordBinds Id)
-addTickHsRecordBinds pairs = mapM process pairs
+addTickHsRecordBinds (HsRecordBinds pairs) = liftM HsRecordBinds (mapM process pairs)
     where
 	process (ids,expr) = 
 		liftM2 (,) 

@@ -364,10 +364,10 @@ cvtl e = wrapL (cvt e)
 			      ; return $ ExprWithTySig e' t' }
     cvt (RecConE c flds) = do { c' <- cNameL c
 			      ; flds' <- mapM cvtFld flds
-			      ; return $ RecordCon c' noPostTcExpr flds' }
+			      ; return $ RecordCon c' noPostTcExpr (HsRecordBinds flds') }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
 			      ; flds' <- mapM cvtFld flds
-			      ; return $ RecordUpd e' flds' placeHolderType placeHolderType }
+			      ; return $ RecordUpd e' (HsRecordBinds flds') placeHolderType placeHolderType }
 
 cvtFld (v,e) = do { v' <- vNameL v; e' <- cvtl e; return (v',e') }
 

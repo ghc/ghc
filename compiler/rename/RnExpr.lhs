@@ -228,16 +228,16 @@ rnExpr e@(ExplicitTuple exps boxity)
     tup_size   = length exps
     tycon_name = tupleTyCon_name boxity tup_size
 
-rnExpr (RecordCon con_id _ rbinds)
+rnExpr (RecordCon con_id _ (HsRecordBinds rbinds))
   = lookupLocatedOccRn con_id		`thenM` \ conname ->
     rnRbinds "construction" rbinds	`thenM` \ (rbinds', fvRbinds) ->
-    returnM (RecordCon conname noPostTcExpr rbinds', 
+    returnM (RecordCon conname noPostTcExpr (HsRecordBinds rbinds'), 
 	     fvRbinds `addOneFV` unLoc conname)
 
-rnExpr (RecordUpd expr rbinds _ _)
+rnExpr (RecordUpd expr (HsRecordBinds rbinds) _ _)
   = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
     rnRbinds "update" rbinds	`thenM` \ (rbinds', fvRbinds) ->
-    returnM (RecordUpd expr' rbinds' placeHolderType placeHolderType, 
+    returnM (RecordUpd expr' (HsRecordBinds rbinds') placeHolderType placeHolderType, 
 	     fvExpr `plusFV` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)

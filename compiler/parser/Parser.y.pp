@@ -1309,7 +1309,7 @@ aexp	:: { LHsExpr RdrName }
 
 aexp1	:: { LHsExpr RdrName }
         : aexp1 '{' fbinds '}' 	{% do { r <- mkRecConstrOrUpdate $1 (comb2 $2 $4) 
-							(reverse $3);
+							$3;
 				        return (LL r) }}
   	| aexp2			{ $1 }
 
@@ -1535,10 +1535,10 @@ qual  :: { LStmt RdrName }
 -- Record Field Update/Construction
 
 fbinds 	:: { HsRecordBinds RdrName }
-	: fbinds1			{ $1 }
-  	| {- empty -}			{ [] }
+	: fbinds1			{ HsRecordBinds (reverse $1) }
+  	| {- empty -}			{ HsRecordBinds [] }
 
-fbinds1	:: { HsRecordBinds RdrName }
+fbinds1	:: { [(Located id, LHsExpr id)] }
 	: fbinds1 ',' fbind		{ $3 : $1 }
 	| fbind				{ [$1] }
   

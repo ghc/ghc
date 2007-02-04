@@ -554,13 +554,13 @@ data HsCmdTop id
 %************************************************************************
 
 \begin{code}
-type HsRecordBinds id = [(Located id, LHsExpr id)]
+data HsRecordBinds id = HsRecordBinds [(Located id, LHsExpr id)]
 
 recBindFields :: HsRecordBinds id -> [id]
-recBindFields rbinds = [unLoc field | (field,_) <- rbinds]
+recBindFields (HsRecordBinds rbinds) = [unLoc field | (field,_) <- rbinds]
 
 pp_rbinds :: OutputableBndr id => SDoc -> HsRecordBinds id -> SDoc
-pp_rbinds thing rbinds
+pp_rbinds thing (HsRecordBinds rbinds)
   = hang thing 
 	 4 (braces (sep (punctuate comma (map (pp_rbind) rbinds))))
   where

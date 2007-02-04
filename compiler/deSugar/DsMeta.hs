@@ -530,11 +530,11 @@ repE e@(ExplicitPArr ty es) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple es boxed) 
   | isBoxed boxed         = do { xs <- repLEs es; repTup xs }
   | otherwise		  = notHandled "Unboxed tuples" (ppr e)
-repE (RecordCon c _ flds)
+repE (RecordCon c _ (HsRecordBinds flds))
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
-repE (RecordUpd e flds _ _)
+repE (RecordUpd e (HsRecordBinds flds) _ _)
  = do { x <- repLE e;
         fs <- repFields flds;
         repRecUpd x fs }
