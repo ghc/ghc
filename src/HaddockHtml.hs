@@ -863,7 +863,7 @@ ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan ->
                    Maybe (HsDoc DocName) -> TyClDecl DocName -> Html
 ppShortDataDecl summary links loc mbDoc dataDecl 
 
-  | [lcon] <- cons = 
+  | [lcon] <- cons, ResTyH98 <- resTy = 
     ppDataHeader summary NewType name tyVars
     <+> equals <+> ppShortConstr summary (unLoc lcon)
 
@@ -877,7 +877,7 @@ ppShortDataDecl summary links loc mbDoc dataDecl
           )
         ResTyGADT _ -> dataHeader </> 
           tda [theclass "body"] << vanillaTable << (
-            aboves (zipWith doConstr (repeat "::") cons)
+            aboves (map doGADTConstr cons)
           )
     )
   
@@ -888,6 +888,7 @@ ppShortDataDecl summary links loc mbDoc dataDecl
       case resTy of ResTyGADT _ -> keyword "where"; _ -> empty)
 
     doConstr c con = declBox (toHtml [c] <+> ppShortConstr summary (unLoc con))
+    doGADTConstr con = declBox (ppShortConstr summary (unLoc con))
 
     name      = orig (tcdLName dataDecl)
     context   = unLoc (tcdCtxt dataDecl)
@@ -897,7 +898,6 @@ ppShortDataDecl summary links loc mbDoc dataDecl
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons 
 
--- The rest of the cases:
 ppDataDecl :: Ord key => Bool -> LinksInfo -> [InstHead DocName] -> key -> 
               SrcSpan -> Maybe (HsDoc DocName) -> TyClDecl DocName -> HtmlTable
 ppDataDecl summary links instances x loc mbDoc dataDecl
@@ -974,10 +974,15 @@ ppShortConstr summary con = case con_res con of
       hsep [ppLType arg1, ppBinder summary name, ppLType arg2]    
 
   ResTyGADT resTy -> case con_details con of 
-    PrefixCon args -> ppName name <+> dcolon <+> hsep [
-                        ppForAll forall ltvs lcontext,
-                        ppLType (foldr mkFunTy resTy args) ]
-  where 
+    PrefixCon args -> doGADTCon args resTy
+    RecCon _ -> error "GADT records not suported"
+    InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
+    
+  where
+    doGADTCon args resTy = ppBinder summary name <+> dcolon <+> hsep [
+                             ppForAll forall ltvs lcontext,
+                             ppLType (foldr mkFunTy resTy args) ]
+
     header   = ppConstrHdr forall tyVars context
     name     = orig (con_name con)
     ltvs     = con_qvars con
@@ -1001,27 +1006,41 @@ ppSideBySideConstr :: LConDecl DocName -> HtmlTable
 ppSideBySideConstr (L _ con) = case con_res con of 
  
   ResTyH98 -> case con_details con of 
-    PrefixCon args -> argBox (hsep ((header +++ 
-		                  ppBinder False name) : map ppLType args)) <->
-                      maybeRDocBox mbLDoc  
-    RecCon fields -> argBox (header +++ ppBinder False name) <->
-                     maybeRDocBox mbLDoc </>
-                     (tda [theclass "body"] << spacedTable1 <<
-                     aboves (map ppSideBySideField fields))
-    InfixCon arg1 arg2 -> argBox (hsep 
-                          [header +++ ppLType arg1, ppBinder False name, 
-                           ppLType arg2])
-                          <-> maybeRDocBox mbLDoc
+
+    PrefixCon args -> 
+      argBox (hsep ((header +++ ppBinder False name) : map ppLType args)) 
+      <-> maybeRDocBox mbLDoc  
+
+    RecCon fields -> 
+      argBox (header +++ ppBinder False name) <->
+      maybeRDocBox mbLDoc </>
+      (tda [theclass "body"] << spacedTable1 <<
+      aboves (map ppSideBySideField fields))
+
+    InfixCon arg1 arg2 -> 
+      argBox (hsep [header+++ppLType arg1, ppBinder False name, ppLType arg2])
+      <-> maybeRDocBox mbLDoc
  
-  ResTyGADT ltype -> emptyTable --error "GADTs not supported yet"
- 
+  ResTyGADT resTy -> case con_details con of
+    PrefixCon args -> doGADTCon args resTy
+    RecCon _ -> error "GADT records not supported"
+    InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
+
  where 
+    doGADTCon args resTy = argBox (ppBinder False name <+> dcolon <+> hsep [
+                               ppForAll forall ltvs (con_cxt con),
+                               ppLType (foldr mkFunTy resTy args) ]
+                            ) <-> maybeRDocBox mbLDoc
+
+
     header  = ppConstrHdr forall tyVars context
     name    = orig (con_name con)
+    ltvs    = con_qvars con
     tyVars  = tyvarNames (con_qvars con)
     context = unLoc (con_cxt con)
     forall  = con_explicit con
     mbLDoc  = con_doc con
+    mkFunTy a b = noLoc (HsFunTy a b)
 
 ppSideBySideField :: HsRecField DocName (LHsType DocName) -> HtmlTable
 ppSideBySideField (HsRecField lname ltype mbLDoc) =
