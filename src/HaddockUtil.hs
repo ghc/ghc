@@ -20,7 +20,7 @@ module HaddockUtil (
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
-  nameOccString, moduleString, mkModuleNoPkg,
+  isConSym, isVarSym, nameOccString, moduleString, mkModuleNoPkg,
 
   -- * HTML cross reference mapping
   html_xrefs_ref,
@@ -46,7 +46,7 @@ import Module
 import PackageConfig ( stringToPackageId )
 
 import Control.Monad ( liftM, MonadPlus(..) )
-import Data.Char ( isAlpha, isSpace, toUpper, ord )
+import Data.Char
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( intersect, isSuffixOf, intersperse )
 import Data.Maybe ( maybeToList, fromMaybe, isJust, fromJust )
@@ -230,6 +230,11 @@ escapeStr = flip escapeString unreserved
 #else
 escapeStr = escapeURIString isUnreserved
 #endif
+
+-- there should be a better way to check this using the GHC API
+isConSym n = head (nameOccString n) == ':'
+isVarSym n = fstChar /= '_' && not (isConSym n) && (not . isLetter) fstChar
+  where fstChar = head (nameOccString n)
 
 nameOccString = occNameString . nameOccName 
 

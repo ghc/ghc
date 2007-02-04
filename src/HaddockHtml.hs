@@ -1077,12 +1077,11 @@ expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 
 ppDataHeader :: Bool -> NewOrData -> Name -> [Name] -> Html
 ppDataHeader summary newOrData name tyvars = 
-  (if newOrData == NewType then keyword "newtype" else keyword "data") <+> 
-  (if infixConstr then ppName (tyvars!!0) <+> ppBinder summary name <+> ppName (tyvars!!1)
-                  else ppBinder summary name <+> hsep (map ppName tyvars))
-  where 
-    -- there should be a better way to check this using the GHC API
-    infixConstr = (head (nameOccString name) == ':') && (length tyvars == 2)
+  (if newOrData == NewType then keyword "newtype" else keyword "data") 
+  <+> 
+  (if isConSym name 
+    then ppName (tyvars!!0) <+> ppBinder summary name <+> ppName (tyvars!!1)
+    else ppBinder summary name <+> hsep (map ppName tyvars))
 
 -- ----------------------------------------------------------------------------
 -- Types and contexts
@@ -1224,7 +1223,9 @@ ppBinder True nm = linkedAnchor (anchorNameStr nm) << ppBinder' nm
 ppBinder False nm = linkTarget nm +++ bold << ppBinder' nm
 
 ppBinder' :: Name -> Html
-ppBinder' name = toHtml (getOccString name)
+ppBinder' name 
+  | isVarSym name = parens $ toHtml (getOccString name)
+  | otherwise = toHtml (getOccString name)             
 
 linkId :: Module -> Maybe Name -> Html -> Html
 linkId mod mbName = anchor ! [href hr]
