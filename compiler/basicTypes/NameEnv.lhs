@@ -7,7 +7,7 @@
 \begin{code}
 module NameEnv (
 	NameEnv, mkNameEnv,
-	emptyNameEnv, unitNameEnv, nameEnvElts, 
+	emptyNameEnv, unitNameEnv, nameEnvElts, nameEnvUniqueElts,
 	extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
 	foldNameEnv, filterNameEnv,
@@ -19,6 +19,7 @@ module NameEnv (
 #include "HsVersions.h"
 
 import Name
+import Unique(Unique)
 import UniqFM
 import Maybes
 \end{code}
@@ -35,6 +36,7 @@ type NameEnv a = UniqFM a	-- Domain is Name
 emptyNameEnv   	   :: NameEnv a
 mkNameEnv	   :: [(Name,a)] -> NameEnv a
 nameEnvElts    	   :: NameEnv a -> [a]
+nameEnvUniqueElts  :: NameEnv a -> [(Unique, a)]
 extendNameEnv_C    :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
 extendNameEnv_Acc  :: (a->b->b) -> (a->b) -> NameEnv b -> Name -> a -> NameEnv b
 extendNameEnv  	   :: NameEnv a -> Name -> a -> NameEnv a
@@ -56,6 +58,7 @@ emptyNameEnv   	    = emptyUFM
 foldNameEnv	    = foldUFM
 mkNameEnv	    = listToUFM
 nameEnvElts    	    = eltsUFM
+nameEnvUniqueElts   = ufmToList
 extendNameEnv_C     = addToUFM_C
 extendNameEnv_Acc   = addToUFM_Acc
 extendNameEnv  	    = addToUFM
