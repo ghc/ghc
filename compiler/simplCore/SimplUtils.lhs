@@ -804,6 +804,14 @@ mkLam bndrs body
   = do	{ dflags <- getDOptsSmpl
 	; mkLam' dflags bndrs body }
   where
+    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
+    mkLam' dflags bndrs (Cast body@(Lam _ _) co)
+	-- Note [Casts and lambdas]
+      = do { lam <- mkLam' dflags (bndrs ++ bndrs') body'
+	   ; return (mkCoerce (mkPiTypes bndrs co) lam) }
+      where	
+	(bndrs',body') = collectBinders body
+
     mkLam' dflags bndrs body
       | dopt Opt_DoEtaReduction dflags,
         Just etad_lam <- tryEtaReduce bndrs body
@@ -818,6 +826,21 @@ mkLam bndrs body
       | otherwise 
       = returnSmpl (mkLams bndrs body)
 \end{code}
+
+Note [Casts and lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+	(\x. (\y. e) `cast` g1) `cast` g2
+There is a danger here that the two lambdas look separated, and the 
+full laziness pass might float an expression to between the two.
+
+So this equation in mkLam' floats the g1 out, thus:
+	(\x. e `cast` g1)  -->  (\x.e) `cast` (tx -> g1)
+where x:tx.
+
+In general, this floats casts outside lambdas, where (I hope) they might meet
+and cancel with some other cast.
+
 
 --	c) floating lets out through big lambdas 
 --		[only if all tyvar lambdas, and only if this lambda
