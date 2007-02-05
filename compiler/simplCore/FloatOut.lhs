@@ -11,7 +11,7 @@ module FloatOut ( floatOutwards ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( mkSCC, exprIsHNF, exprIsTrivial )
+import CoreUtils
 
 import DynFlags	( DynFlags, DynFlag(..), FloatOutSwitches(..) )
 import ErrUtils		( dumpIfSet_dyn )
@@ -224,7 +224,7 @@ floatCaseAlt lvl arg	-- Used rec rhss, and case-alternative rhss
 floatRhs lvl arg	-- Used for nested non-rec rhss, and fn args
 			-- See Note [Floating out of RHS]
   = case (floatExpr lvl arg) of { (fsa, floats, arg') ->
-    if exprIsHNF arg' || exprIsTrivial arg' then
+    if exprIsCheap arg' then	
 	(fsa, floats, arg')
     else
     case (partitionByMajorLevel lvl floats) of { (floats', heres) ->
@@ -250,6 +250,9 @@ floatRhs lvl arg	-- Used for nested non-rec rhss, and fn args
 --	bindings just after the '='.  And some of them might (correctly)
 --	be strict even though the 'let f' is lazy, because f, being a value,
 --	gets its demand-info zapped by the simplifier.
+--
+-- We use exprIsCheap because that is also what's used by the simplifier
+-- to decide whether to float a let out of a let
 
 floatExpr _ (Var v)   = (zeroStats, [], Var v)
 floatExpr _ (Type ty) = (zeroStats, [], Type ty)
