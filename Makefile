@@ -222,6 +222,8 @@ BinDistDirs = includes compiler docs driver libraries rts utils
 BIN_DIST_NAME=ghc-$(ProjectVersion)
 BIN_DIST_TMPDIR=$(FPTOOLS_TOP_ABS)
 
+BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
+
 BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      distrib/configure-bin.ac \
 	      distrib/INSTALL \
@@ -372,22 +374,18 @@ binary-dist::
 	done
 endif
 
-#
-# Do this separately for now
-# 
-binary-pack::
-	( cd $(BIN_DIST_TMPDIR); $(TAR) chzf $(BIN_DIST_NAME).tar.gz $(BIN_DIST_NAME) )
+# Tar up the distribution and build a manifest
+binary-dist ::
+	( cd $(BIN_DIST_TMPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
+	( cd $(BIN_DIST_TMPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
 
-ifneq "$(way)" ""
-.PHONY: package-way-dist
-package-way-dist::
-	( cd $(BIN_DIST_TMPDIR); $(FIND) $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print | xargs tar cvf $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar )
-	gzip $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar
-endif
-
-ifneq "$(way)" ""
-remove-way-dist::
-	( cd $(BIN_DIST_TMPDIR); $(FIND) $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print -exec $(RM) {} \; )
+# Upload the distribution
+ifneq "$(PublishLocation)" ""
+binary-dist ::
+	@for i in 0 1 2 3 4 5 6 7 8 9; do \
+		echo "Try $$i: $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)"; \
+		if $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation); then break; fi\
+	done
 endif
 
 binary-dist::
@@ -436,6 +434,9 @@ SRC_DIST_FILES += \
 
 EXTRA_LIBS=$(patsubst %, $(SRC_DIST_NAME)/libraries/%, $(shell cat libraries/extra-packages))
 
+SRC_DIST_TARBALL = ghc-$(ProjectVersion)-src.tar.bz2
+SRC_DIST_EXTRALIBS_TARBALL = ghc-$(ProjectVersion)-src-extralibs.tar.bz2
+
 dist ::
 	$(RM) -rf $(SRC_DIST_DIR)
 	$(RM) $(SRC_DIST_NAME).tar.gz
@@ -447,9 +448,24 @@ dist ::
 	  && $(RM) -rf compiler/stage[123] mk/build.mk \
 	  && $(FIND) $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | xargs $(RM) -rf \
 	)
-	tar chf - $(EXTRA_LIBS) | bzip2 >$(FPTOOLS_TOP_ABS)/ghc-$(ProjectVersion)-src-extralibs.tar.bz2
+	tar chf - $(EXTRA_LIBS) | bzip2 >$(FPTOOLS_TOP_ABS)/$(SRC_DIST_EXTRALIBS_TARBALL)
 	$(RM) -rf $(EXTRA_LIBS)
-	tar chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(FPTOOLS_TOP_ABS)/ghc-$(ProjectVersion)-src.tar.bz2
+	tar chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(FPTOOLS_TOP_ABS)/$(SRC_DIST_TARBALL)
+
+# Upload the distribution(s)
+# Retrying is to work around buggy firewalls that corrupt large file transfers
+# over SSH.
+ifneq "$(PublishLocation)" ""
+dist ::
+	@for i in 0 1 2 3 4 5 6 7 8 9; do \
+		echo "Try $$i: $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation)"; \
+		if $(PublishCp) $(SRC_DIST_EXTRALIBS_TARBALL) $(PublishLocation); then break; fi\
+	done
+	@for i in 0 1 2 3 4 5 6 7 8 9; do \
+		echo "Try $$i: $(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)"; \
+		if $(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation); then break; fi\
+	done
+endif
 
 # -----------------------------------------------------------------------------
 # HC file bundles
