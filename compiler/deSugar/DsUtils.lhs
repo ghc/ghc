@@ -12,7 +12,7 @@ module DsUtils (
 	EquationInfo(..), 
 	firstPat, shiftEqns,
 	
-	mkDsLet, mkDsLets,
+	mkDsLet, mkDsLets, mkDsApp, mkDsApps,
 
 	MatchResult(..), CanItFail(..), 
 	cantFailMatchResult, alwaysFailMatchResult,
@@ -75,6 +75,8 @@ import DynFlags
 #ifdef DEBUG
 import Util
 #endif
+
+infixl 4 `mkDsApp`, `mkDsApps`
 \end{code}
 
 
@@ -122,13 +124,43 @@ back again.
 \begin{code}
 mkDsLet :: CoreBind -> CoreExpr -> CoreExpr
 mkDsLet (NonRec bndr rhs) body
-  | isUnLiftedType (idType bndr) 
+  | isUnLiftedType (idType bndr) && not (exprOkForSpeculation rhs)
   = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
 mkDsLet bind body
   = Let bind body
 
 mkDsLets :: [CoreBind] -> CoreExpr -> CoreExpr
 mkDsLets binds body = foldr mkDsLet body binds
+
+-----------
+mkDsApp :: CoreExpr -> CoreExpr -> CoreExpr
+-- Check the invariant that the arg of an App is ok-for-speculation if unlifted
+-- See CoreSyn Note [CoreSyn let/app invariant]
+mkDsApp fun (Type ty) = App fun (Type ty)
+mkDsApp fun arg       = mk_val_app fun arg arg_ty res_ty
+		      where
+			(arg_ty, res_ty) = splitFunTy (exprType fun)
+
+-----------
+mkDsApps :: CoreExpr -> [CoreExpr] -> CoreExpr
+-- Slightly more efficient version of (foldl mkDsApp)
+mkDsApps fun args
+  = go fun (exprType fun) args
+  where
+    go fun fun_ty []               = fun
+    go fun fun_ty (Type ty : args) = go (App fun (Type ty)) (applyTy fun_ty ty) args
+    go fun fun_ty (arg     : args) = go (mk_val_app fun arg arg_ty res_ty) res_ty args
+				   where
+				     (arg_ty, res_ty) = splitFunTy fun_ty
+-----------
+mk_val_app fun arg arg_ty res_ty
+  | isUnLiftedType arg_ty && not (exprOkForSpeculation arg)
+  = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
+  | otherwise		-- The common case
+  = App fun arg
+  where
+    arg_id = mkWildId arg_ty	-- Lots of shadowing, but it doesn't matter,
+				-- because 'fun ' should not have a free wild-id
 \end{code}
 
 
@@ -806,7 +838,6 @@ mkCoreSel vars the_var scrut_var scrut
     Case scrut scrut_var (idType the_var)
 	 [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
 \end{code}
-
 
 %************************************************************************
 %*									*

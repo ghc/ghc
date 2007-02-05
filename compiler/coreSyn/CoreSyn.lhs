@@ -79,36 +79,16 @@ infixl 8 `App`	-- App brackets to the left
 data Expr b	-- "b" for the type of binders, 
   = Var	  Id
   | Lit   Literal
-  | App   (Expr b) (Arg b)
+  | App   (Expr b) (Arg b)		-- See Note [CoreSyn let/app invariant]
   | Lam   b (Expr b)
-  | Let   (Bind b) (Expr b)
+  | Let   (Bind b) (Expr b)		-- See [CoreSyn let/app invariant],
+					-- and [CoreSyn letrec invariant]
   | Case  (Expr b) b Type [Alt b]  	-- Binder gets bound to value of scrutinee
-	-- Invariant: The list of alternatives is ALWAYS EXHAUSTIVE,
-	--	      meaning that it covers all cases that can occur
-	--	      See the example below
-	--
-	-- Invariant: The DEFAULT case must be *first*, if it occurs at all
-	-- Invariant: The remaining cases are in order of increasing 
-	--		tag	(for DataAlts)
-	--		lit	(for LitAlts)
-	--	      This makes finding the relevant constructor easy,
-	--	      and makes comparison easier too
+					-- See Note [CoreSyn case invariants]
   | Cast  (Expr b) Coercion
   | Note  Note (Expr b)
   | Type  Type			-- This should only show up at the top
 				-- level of an Arg
-
--- An "exhausive" case does not necessarily mention all constructors:
---	data Foo = Red | Green | Blue
---
---	...case x of 
---		Red   -> True
---		other -> f (case x of 
---				Green -> ...
---				Blue  -> ... )
--- The inner case does not need a Red alternative, because x can't be Red at
--- that program point.
-
 
 type Arg b = Expr b		-- Can be a Type
 
@@ -123,7 +103,61 @@ data AltCon = DataAlt DataCon	-- Invariant: the DataCon is always from
 
 data Bind b = NonRec b (Expr b)
 	      | Rec [(b, (Expr b))]
+\end{code}
 
+-------------------------- CoreSyn INVARIANTS ---------------------------
+
+Note [CoreSyn top-level invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* The RHSs of all top-level lets must be of LIFTED type.
+
+Note [CoreSyn letrec invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* The RHS of a letrec must be of LIFTED type.
+
+Note [CoreSyn let/app invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* The RHS of a non-recursive let, *and* the argument of an App,
+  may be of UNLIFTED type, but only if the expression 
+  is ok-for-speculation.  This means that the let can be floated around 
+  without difficulty.  e.g.
+	y::Int# = x +# 1#	ok
+	y::Int# = fac 4#	not ok [use case instead]
+This is intially enforced by DsUtils.mkDsLet and mkDsApp
+
+Note [CoreSyn case invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant: The DEFAULT case must be *first*, if it occurs at all
+
+Invariant: The remaining cases are in order of increasing 
+		tag	(for DataAlts)
+		lit	(for LitAlts)
+	    This makes finding the relevant constructor easy,
+	    and makes comparison easier too
+
+Invariant: The list of alternatives is ALWAYS EXHAUSTIVE,
+	   meaning that it covers all cases that can occur
+
+    An "exhausive" case does not necessarily mention all constructors:
+	data Foo = Red | Green | Blue
+
+	...case x of 
+		Red   -> True
+		other -> f (case x of 
+				Green -> ...
+				Blue  -> ... )
+    The inner case does not need a Red alternative, because x can't be Red at
+    that program point.
+
+
+Note [CoreSyn let goal]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* The simplifier tries to ensure that if the RHS of a let is a constructor
+  application, its arguments are trivial, so that the constructor can be
+  inlined vigorously.
+
+
+\begin{code}
 data Note
   = SCC CostCentre
 
@@ -142,23 +176,6 @@ data Note
 -- inside an INLINE, so it'll stay looking like a redex.  Nevertheless, we 
 -- should inline f even inside lambdas.  In effect, we should trust the programmer.
 \end{code}
-
-INVARIANTS:
-
-* The RHS of a letrec, and the RHSs of all top-level lets,
-  must be of LIFTED type.
-
-* The RHS of a let, may be of UNLIFTED type, but only if the expression 
-  is ok-for-speculation.  This means that the let can be floated around 
-  without difficulty.  e.g.
-	y::Int# = x +# 1#	ok
-	y::Int# = fac 4#	not ok [use case instead]
-
-* The argument of an App can be of any type.
-
-* The simplifier tries to ensure that if the RHS of a let is a constructor
-  application, its arguments are trivial, so that the constructor can be
-  inlined vigorously.
 
 
 %************************************************************************

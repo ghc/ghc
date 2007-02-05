@@ -606,8 +606,8 @@ Because `seq` on such things completes immediately
 
 For unlifted argument types, we have to be careful:
 		C (f x :: Int#)
-Suppose (f x) diverges; then C (f x) is not a value.  True, but
-this form is illegal (see the invariants in CoreSyn).  Args of unboxed
+Suppose (f x) diverges; then C (f x) is not a value.  However this can't 
+happen: see CoreSyn Note [CoreSyn let/app invariant].  Args of unboxed
 type must be ok-for-speculation (or trivial).
 
 \begin{code}
@@ -633,22 +633,12 @@ exprIsHNF other	           = False
 
 -- There is at least one value argument
 app_is_value (Var fun) args
-  |  isDataConWorkId fun 		-- Constructor apps are values
-  || idArity fun > valArgCount args	-- Under-applied function
-  = check_args (idType fun) args
-app_is_value (App f a) as = app_is_value f (a:as)
-app_is_value other     as = False
-
-	-- 'check_args' checks that unlifted-type args
-	-- are in fact guaranteed non-divergent
-check_args fun_ty []	          = True
-check_args fun_ty (Type _ : args) = case splitForAllTy_maybe fun_ty of
-				      Just (_, ty) -> check_args ty args
-check_args fun_ty (arg : args)
-  | isUnLiftedType arg_ty = exprOkForSpeculation arg
-  | otherwise		  = check_args res_ty args
-  where
-    (arg_ty, res_ty) = splitFunTy fun_ty
+  = idArity fun > valArgCount args	-- Under-applied function
+    ||  isDataConWorkId fun 		--  or data constructor
+app_is_value (Note n f) as = app_is_value f as
+app_is_value (Cast f _) as = app_is_value f as
+app_is_value (App f a)  as = app_is_value f (a:as)
+app_is_value other      as = False
 \end{code}
 
 \begin{code}

@@ -227,7 +227,7 @@ dsExpr expr@(HsLam a_Match)
 dsExpr expr@(HsApp fun arg)      
   = dsLExpr fun		`thenDs` \ core_fun ->
     dsLExpr arg		`thenDs` \ core_arg ->
-    returnDs (core_fun `App` core_arg)
+    returnDs (core_fun `mkDsApp` core_arg)
 \end{code}
 
 Operator sections.  At first it looks as if we can convert
@@ -257,12 +257,12 @@ dsExpr (OpApp e1 op _ e2)
     -- for the type of y, we need the type of op's 2nd argument
     dsLExpr e1				`thenDs` \ x_core ->
     dsLExpr e2				`thenDs` \ y_core ->
-    returnDs (mkApps core_op [x_core, y_core])
+    returnDs (mkDsApps core_op [x_core, y_core])
     
 dsExpr (SectionL expr op)	-- Desugar (e !) to ((!) e)
   = dsLExpr op				`thenDs` \ core_op ->
     dsLExpr expr			`thenDs` \ x_core ->
-    returnDs (App core_op x_core)
+    returnDs (mkDsApp core_op x_core)
 
 -- dsLExpr (SectionR op expr)	-- \ x -> op x expr
 dsExpr (SectionR op expr)
@@ -277,7 +277,7 @@ dsExpr (SectionR op expr)
     newSysLocalDs y_ty			`thenDs` \ y_id ->
 
     returnDs (bindNonRec y_id y_core $
-	      Lam x_id (mkApps core_op [Var x_id, Var y_id]))
+	      Lam x_id (mkDsApps core_op [Var x_id, Var y_id]))
 
 dsExpr (HsSCC cc expr)
   = dsLExpr expr			`thenDs` \ core_expr ->
