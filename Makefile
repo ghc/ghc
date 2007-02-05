@@ -415,44 +415,41 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS += docs distrib $(filter-out docs distrib,$(SUBDIRS))
+SRC_DIST_DIRS += mk docs distrib $(filter-out docs distrib,$(SUBDIRS))
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in mk/bootstrap.mk \
-	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \
-	mk/paths.mk mk/package.mk mk/suffix.mk mk/target.mk \
-	mk/fptools.css mk/fix_install_names.sh
+	ghc.spec.in
 
-# clean the tree first, leaving certain extra files in place (eg. configure)
-dist :: distclean
+# -----------------------------------------------------------------------------
+# Source distributions
+
+# A source dist is built from a complete build tree, because we
+# require some extra files not contained in a darcs checkout: the
+# output from Happy and Alex, for example.
+# 
+# The steps performed by 'make dist' are as follows:
+#   - create a complete link-tree of the current build tree in /tmp
+#   - run 'make distclean' on that tree
+#   - remove a bunch of other files that we know shouldn't be in the dist
+#   - tar up first the extralibs package, then the main source package
+
+EXTRA_LIBS=$(patsubst %, $(SRC_DIST_NAME)/libraries/%, $(shell cat libraries/extra-packages))
 
 dist ::
-	-rm -rf $(SRC_DIST_DIR)
-	-$(RM) $(SRC_DIST_NAME).tar.gz
+	$(RM) -rf $(SRC_DIST_DIR)
+	$(RM) $(SRC_DIST_NAME).tar.gz
 	mkdir $(SRC_DIST_DIR)
-	mkdir $(SRC_DIST_DIR)/mk
-	$(FIND) $(SRC_DIST_DIRS) -type d \( -name _darcs -prune -o -name SRC -prune -o -name "autom4te*" -prune -o -print \) | sed -e 's!.*!mkdir "$(SRC_DIST_DIR)/&"!' | sh
-	$(FIND) $(SRC_DIST_DIRS) $(SRC_DIST_FILES) -name _darcs -prune -o -name SRC -prune -o -name "autom4te*" -prune -o -name "*~" -prune -o -name ".cvsignore" -prune -o -name "\#*" -prune -o -name ".\#*" -prune -o -name "log" -prune -o -name "*-SAVE" -prune -o -name "*.orig" -prune -o -name "*.rej" -prune -o ! -type d -print | sed -e 's!.*!$(LN_S) "$(FPTOOLS_TOP_ABS)/&" "$(SRC_DIST_DIR)/&"!' | sh
-
-# Automatic generation of a MANIFEST file for a source distribution
-# tree that is ready to go.
-dist-manifest ::
-	cd $(SRC_DIST_DIR); $(FIND) . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > MANIFEST
-
-dist-package :: dist-package-tar-gz
-
-SRC_DIST_PATHS = $(patsubst %, $(SRC_DIST_NAME)/%, $(SRC_DIST_FILES) $(SRC_DIST_DIRS))
-
-dist-package-tar-bz2 ::
-	BZIP2=-9 $(TAR) chjf $(SRC_DIST_NAME)-src.tar.bz2 $(SRC_DIST_NAME) || $(RM) $(SRC_DIST_NAME)-src.tar.bz2
-
-dist-package-tar-gz ::
-	$(TAR) chzf $(SRC_DIST_NAME)-src.tar.gz $(SRC_DIST_NAME) || $(RM) $(SRC_DIST_NAME)-src.tar.gz
-
-dist-package-zip ::
-	cd ..; $(LN_S) $(FPTOOLS_TOP_ABS) $(SRC_DIST_NAME) && \
-	       $(ZIP) $(ZIP_OPTS) -r $(SRC_DIST_NAME)-src.zip $(SRC_DIST_PATHS)
+	( cd $(SRC_DIST_DIR) \
+	  && for i in $(SRC_DIST_DIRS); do mkdir $$i; (cd $$i && lndir $(FPTOOLS_TOP_ABS)/$$i ); done \
+	  && for i in $(SRC_DIST_FILES); do $(LN_S) $(FPTOOLS_TOP_ABS)/$$i .; done \
+	  && $(MAKE) distclean \
+	  && $(RM) -rf compiler/stage[123] mk/build.mk \
+	  && $(FIND) $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | xargs $(RM) -rf \
+	)
+	tar chf - $(EXTRA_LIBS) | bzip2 >$(FPTOOLS_TOP_ABS)/ghc-$(ProjectVersion)-src-extralibs.tar.bz2
+	$(RM) -rf $(EXTRA_LIBS)
+	tar chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(FPTOOLS_TOP_ABS)/ghc-$(ProjectVersion)-src.tar.bz2
 
 # -----------------------------------------------------------------------------
 # HC file bundles
