@@ -61,6 +61,9 @@ ifneq "$(NO_HADDOCK_DOCS)" "YES"
 
 HTML_DIR = html-docs
 
+extraclean ::
+	$(RM) -rf $(HTML_DIR)
+
 # ATTENTION, incomprehensible shell stuff ahead: Automagically create the
 # prologue for the combined index via a header, the package prologues (in
 # alphabetical order of the packages) and a footer. Not very nice, but much
