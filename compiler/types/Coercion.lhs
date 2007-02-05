@@ -156,61 +156,71 @@ mkForAllCoercion tv  co  = ASSERT ( isTyVar tv ) mkForAllTy tv co
 mkFunCoercion    co1 co2 = mkFunTy co1 co2
 
 
+-------------------------------
 -- This smart constructor creates a sym'ed version its argument,
 -- but tries to push the sym's down to the leaves.  If we come to
 -- sym tv or sym tycon then we can drop the sym because tv and tycon
 -- are reflexive coercions
 mkSymCoercion co      
-  | Just co2 <- splitSymCoercion_maybe co = co2
-     -- sym (sym co) --> co
-  | Just (co1, arg_tys) <- splitTyConApp_maybe co
-  , not (isCoercionTyCon co1) = mkTyConApp co1 (map mkSymCoercion arg_tys)
-     -- we can drop the sym for a TyCon 
-     -- sym (ty [t1, ..., tn]) --> ty [sym t1, ..., sym tn] 
-  | (co1, arg_tys) <- splitAppTys co
-  , isTyVarTy co1 = mkAppTys (maybe_drop co1) (map mkSymCoercion arg_tys)
-     -- sym (tv [t1, ..., tn]) --> tv [sym t1, ..., sym tn]
-     --   if tv type variable
-     -- sym (cv [t1, ..., tn]) --> (sym cv) [sym t1, ..., sym tn]
-     --   if cv is a coercion variable
-     -- fall through if head is a CoercionTyCon
-  | Just (co1, co2) <- splitTransCoercion_maybe co
+  | Just co' <- coreView co = mkSymCoercion co'
+
+mkSymCoercion (ForAllTy tv ty)  = ForAllTy tv (mkSymCoercion ty)
+mkSymCoercion (AppTy co1 co2) 	= AppTy (mkSymCoercion co1) (mkSymCoercion co2)
+mkSymCoercion (FunTy co1 co2) 	= FunTy (mkSymCoercion co1) (mkSymCoercion co2)
+
+mkSymCoercion (TyConApp tc cos) 
+  | not (isCoercionTyCon tc) = mkTyConApp tc (map mkSymCoercion cos)
+
+mkSymCoercion (TyConApp tc [co]) 
+  | tc `hasKey` symCoercionTyConKey   = co    -- sym (sym co) --> co
+  | tc `hasKey` leftCoercionTyConKey  = mkLeftCoercion (mkSymCoercion co)
+  | tc `hasKey` rightCoercionTyConKey = mkRightCoercion (mkSymCoercion co)
+
+mkSymCoercion (TyConApp tc [co1,co2]) 
+  | tc `hasKey` transCoercionTyConKey
      -- sym (co1 `trans` co2) --> (sym co2) `trans (sym co2)
+     -- Note reversal of arguments!
   = mkTransCoercion (mkSymCoercion co2) (mkSymCoercion co1)
-  | Just (co, ty) <- splitInstCoercion_maybe co
+
+  | tc `hasKey` instCoercionTyConKey
      -- sym (co @ ty) --> (sym co) @ ty
-  = mkInstCoercion (mkSymCoercion co) ty
-  | Just co <- splitLeftCoercion_maybe co
-     -- sym (left co) --> left (sym co)
-  = mkLeftCoercion (mkSymCoercion co)
-  | Just co <- splitRightCoercion_maybe co
-     -- sym (right co) --> right (sym co)
-  = mkRightCoercion (mkSymCoercion co)
-  where
-    maybe_drop (TyVarTy tv) 
-        | isCoVar tv = mkCoercion symCoercionTyCon [TyVarTy tv]
-        | otherwise  = TyVarTy tv
-    maybe_drop other = other
-mkSymCoercion (ForAllTy tv ty) = ForAllTy tv (mkSymCoercion ty)
--- for atomic types and constructors, we can just ignore sym since these
--- are reflexive coercions
+     -- Note: sym is not applied to 'ty'
+  = mkInstCoercion (mkSymCoercion co1) co2
+
+mkSymCoercion (TyConApp tc cos) 	-- Other coercion tycons, such as those
+  = mkCoercion symCoercionTyCon [TyConApp tc cos]  -- arising from newtypes
+
 mkSymCoercion (TyVarTy tv) 
   | isCoVar tv = mkCoercion symCoercionTyCon [TyVarTy tv]
-  | otherwise  = TyVarTy tv
-mkSymCoercion co = mkCoercion symCoercionTyCon [co] 
+  | otherwise  = TyVarTy tv	-- Reflexive
 
+-------------------------------
+-- ToDo: we should be cleverer about transitivity
+mkTransCoercion g1 g2	-- sym g `trans` g = id
+  | (t1,_) <- coercionKind g1
+  , (_,t2) <- coercionKind g2
+  , t1 `coreEqType` t2 
+  = t1	
+
+  | otherwise
+  = mkCoercion transCoercionTyCon [g1, g2]
+
+
+-------------------------------
 -- Smart constructors for left and right
 mkLeftCoercion co 
   | Just (co', _) <- splitAppCoercion_maybe co = co'
-  | otherwise				 = mkCoercion leftCoercionTyCon [co]
+  | otherwise = mkCoercion leftCoercionTyCon [co]
 
 mkRightCoercion  co      
   | Just (co1, co2) <- splitAppCoercion_maybe co = co2
   | otherwise = mkCoercion rightCoercionTyCon [co]
 
-mkTransCoercion co1 co2 = mkCoercion transCoercionTyCon [co1, co2]
-
-mkInstCoercion  co ty = mkCoercion instCoercionTyCon  [co, ty]
+mkInstCoercion co ty
+  | Just (tv,co') <- splitForAllTy_maybe co
+  = substTyWith [tv] [ty] co'	-- (forall a.co) @ ty  -->  co[ty/a]
+  | otherwise
+  = mkCoercion instCoercionTyCon  [co, ty]
 
 mkInstsCoercion co tys = foldl mkInstCoercion co tys
 
