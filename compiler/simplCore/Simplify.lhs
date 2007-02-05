@@ -772,9 +772,19 @@ simplCast env body co cont
          , s1 `coreEqType` t1  = cont		 -- The coerces cancel out  
          | otherwise           = CoerceIt (mkTransCoercion co1 co2) cont
     
+       add_coerce co (s1s2, t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
+		-- (f `cast` g) ty  --->   (f ty) `cast` (g @ ty)
+		-- This implements the PushT rule from the paper
+	 | Just (tyvar,_) <- splitForAllTy_maybe s1s2
+	 , not (isCoVar tyvar)
+	 = ApplyTo dup (Type ty') (zapSubstEnv env) (addCoerce (mkInstCoercion co ty') cont)
+	 where
+	   ty' = substTy arg_se arg_ty
+
+	-- ToDo: the PushC rule is not implemented at all
+
        add_coerce co (s1s2, t1t2) (ApplyTo dup arg arg_se cont)
-         | not (isTypeArg arg)  -- This whole case only works for value args
-	                        -- Could upgrade to have equiv thing for type apps too	
+         | not (isTypeArg arg)  -- This implements the Push rule from the paper
          , isFunTy s1s2	  -- t1t2 must be a function type, becuase it's applied
                 -- co : s1s2 :=: t1t2
 		--	(coerce (T1->T2) (S1->S2) F) E
