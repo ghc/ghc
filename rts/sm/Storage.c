@@ -1046,13 +1046,17 @@ void freeExec (void *addr)
     bd->gen_no -= *(StgPtr)p;
     *(StgPtr)p = 0;
 
-    // Free the block if it is empty, but not if it is the block at
-    // the head of the queue.
-    if (bd->gen_no == 0 && bd != exec_block) {
-	debugTrace(DEBUG_gc, "free exec block %p", bd->start);
-        dbl_link_remove(bd, &exec_block);
-	setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsFalse);
-	freeGroup(bd);
+    if (bd->gen_no == 0) {
+        // Free the block if it is empty, but not if it is the block at
+        // the head of the queue.
+        if (bd != exec_block) {
+            debugTrace(DEBUG_gc, "free exec block %p", bd->start);
+            dbl_link_remove(bd, &exec_block);
+            setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsFalse);
+            freeGroup(bd);
+        } else {
+            bd->free = bd->start;
+        }
     }
 
     RELEASE_SM_LOCK
