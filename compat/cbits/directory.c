@@ -27,6 +27,7 @@ INLINE int __compat_long_path_size() { return 4096; }
 #endif
 
 #if defined(mingw32_HOST_OS)
+#if __GLASGOW_HASKELL__ < 604
 
 /* Make sure we've got the reqd CSIDL_ constants in scope;
  * w32api header files are lagging a bit in defining the full set.
@@ -49,7 +50,6 @@ INLINE int __hscore_CSIDL_APPDATA()  { return CSIDL_APPDATA;  }
 INLINE int __hscore_CSIDL_WINDOWS()  { return CSIDL_WINDOWS;  }
 INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
 
-#if __GLASGOW_HASKELL__ < 604
 /*
  * Function: __hscore_getFolderPath()
  *
@@ -93,4 +93,4 @@ __hscore_getFolderPath(HWND hwndOwner,
     /* ToDo: unload the DLL on shutdown? */
 }
 #endif /* __GLASGOW_HASKELL__ < 604 */
-#endif
+#endif /* mingw32_HOST_OS */
