@@ -344,7 +344,7 @@ shortcutBranches dflags tops
     mapping = foldr plusUFM emptyUFM mappings
 
 build_mapping top@(CmmData _ _) = (top, emptyUFM)
-build_mapping (CmmProc info lbl params []) $
+build_mapping (CmmProc info lbl params [])
   = (CmmProc info lbl params [], emptyUFM)
 build_mapping (CmmProc info lbl params (head:blocks))
   = (CmmProc info lbl params (head:others), mapping)
