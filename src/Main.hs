@@ -455,8 +455,7 @@ run flags modules extEnv = do
   case [str | Flag_DumpInterface str <- flags] of
         [] -> return ()
         fs -> let filename = (last fs) in 
-              savePackageFile filename homeEnv
-
+              writePackageFile filename homeEnv
 {- 
 instance Outputable (DocEntity Name) where
   ppr (DocEntity d) = ppr d
@@ -1331,9 +1330,10 @@ packagesDocEnv packages = Map.unions (map pdDocEnv packages)
 --------------------------------------------------------------------------------
 
 packageFileMagic = 0xDA303001 :: Word32
+packageFileVersion = 0 :: Word16
 
-savePackageFile :: FilePath -> PackageEnv -> IO ()
-savePackageFile filename pkgEnv = do
+writePackageFile :: FilePath -> DocEnv -> IO ()
+writePackageFile filename pkgEnv = do
   h <- openBinaryFile filename WriteMode   
   bh <- openBinIO h 
 
@@ -1341,11 +1341,12 @@ savePackageFile filename pkgEnv = do
   bh <- return $ setUserData bh ud
 
   put_ bh packageFileMagic
+  put_ bh packageFileVersion
   put_ bh (Map.toList pkgEnv)
   hClose h
 
-loadPackageFile :: FilePath -> IO PackageEnv
-loadPackageFile filename = do
+readPackageFile :: FilePath -> IO DocEnv
+readPackageFile filename = do
   h <- openBinaryFile filename ReadMode
   bh <- openBinIO h
 
@@ -1355,6 +1356,7 @@ loadPackageFile filename = do
   magic <- get bh
   when (magic /= packageFileMagic) $ throwE $
     "Magic number mismatch: couldn't load interface file: " ++ filename
-  
+ 
+  (version :: Word16) <- get bh
   envList <- get bh
   return (Map.fromList envList)
