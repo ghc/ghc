@@ -14,6 +14,7 @@ import Type hiding	( substTy, extendTvSubst )
 import SimplEnv	
 import SimplUtils
 import Id
+import Var
 import IdInfo
 import Coercion
 import TcGadt		( dataConCanMatch )
@@ -399,6 +400,7 @@ completeNonRecX env top_lvl is_rec is_strict old_bndr new_bndr new_rhs
   = thing_inside (extendIdSubst env bndr (DoneEx new_rhs))
 -}
 
+----------------------------------
 prepareRhs takes a putative RHS, checks whether it's a PAP or
 constructor application and, if so, converts it to ANF, so that the 
 resulting thing can be inlined more easily.  Thus
@@ -408,27 +410,43 @@ becomes
 	t2 = g b
 	x = (t1,t2)
 
+We also want to deal well cases like this
+	v = (f e1 `cast` co) e2
+Here we want to make e1,e2 trivial and get
+	x1 = e1; x2 = e2; v = (f x1 `cast` co) v2
+That's what the 'go' loop in prepareRhs does
+
 \begin{code}
 prepareRhs :: SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
-
 prepareRhs env (Cast rhs co)	-- Note [Float coercions]
   = do	{ (env', rhs') <- makeTrivial env rhs
 	; return (env', Cast rhs' co) }
 
 prepareRhs env rhs
-  | (Var fun, args) <- collectArgs rhs		-- It's an application
-  , let n_args = valArgCount args	
-  , n_args > 0					-- ...but not a trivial one	
-  , isDataConWorkId fun || n_args < idArity fun	-- ...and it's a constructor or PAP
-  = go env (Var fun) args
+  = do	{ (is_val, env', rhs') <- go 0 env rhs 
+	; return (env', rhs') }
   where
-    go env fun [] 	    = return (env, fun)
-    go env fun (arg : args) = do { (env', arg') <- makeTrivial env arg
-				 ; go env' (App fun arg') args }
-
-prepareRhs env rhs 		-- The default case
-  = return (env, rhs)
+    go n_val_args env (Cast rhs co)
+	= do { (is_val, env', rhs') <- go n_val_args env rhs
+	     ; return (is_val, env', Cast rhs' co) }
+    go n_val_args env (App fun (Type ty))
+	= do { (is_val, env', rhs') <- go n_val_args env fun
+	     ; return (is_val, env', App rhs' (Type ty)) }
+    go n_val_args env (App fun arg)
+	= do { (is_val, env', fun') <- go (n_val_args+1) env fun
+	     ; case is_val of
+		True -> do { (env'', arg') <- makeTrivial env' arg
+			   ; return (True, env'', App fun' arg') }
+		False -> return (False, env, App fun arg) }
+    go n_val_args env (Var fun)
+	= return (is_val, env, Var fun)
+	where
+	  is_val = n_val_args > 0	-- There is at least one arg
+					-- ...and the fun a constructor or PAP
+		 && (isDataConWorkId fun || n_val_args < idArity fun)
+    go n_val_args env other
+	= return (False, env, other)
 \end{code}
 
 Note [Float coercions]
