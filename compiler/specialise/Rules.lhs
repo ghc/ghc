@@ -19,6 +19,7 @@ module Rules (
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
+import CoreSubst	( substExpr, mkSubst )
 import OccurAnal	( occurAnalyseExpr )
 import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
@@ -32,12 +33,7 @@ import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName,
 			  idSpecialisation, idCoreRules, setIdSpecialisation ) 
 import IdInfo		( SpecInfo( SpecInfo ) )
 import Var		( Var )
-import VarEnv		( IdEnv, InScopeSet, emptyTidyEnv,
-			  emptyInScopeSet, mkInScopeSet, 
-			  emptyVarEnv, lookupVarEnv, extendVarEnv, 
-			  nukeRnEnvL, mkRnEnv2, rnOccR, rnOccL, inRnEnvR,
-			  rnBndrR, rnBndr2, rnBndrL, rnBndrs2,
-			  rnInScope, extendRnInScopeList, lookupRnInScope )
+import VarEnv
 import VarSet
 import Name		( Name, NamedThing(..), nameOccName )
 import NameEnv
@@ -447,6 +443,8 @@ match menv subst e1 (Var v2)
 	-- See Note [Lookup in-scope]
 	-- Remember to apply any renaming first (hence rnOccR)
 
+-- Note [Matching lets]
+-- ~~~~~~~~~~~~~~~~~~~~
 -- Matching a let-expression.  Consider
 --	RULE forall x.  f (g x) = <rhs>
 -- and target expression
@@ -460,24 +458,43 @@ match menv subst e1 (Var v2)
 -- We can only do this if
 --	(a) Widening the scope of w does not capture any variables
 --	    We use a conservative test: w is not already in scope
+--	    If not, we clone the binders, and substitute
 --	(b) The free variables of R are not bound by the part of the
 --	    target expression outside the let binding; e.g.
 --		f (\v. let w = v+1 in g E)
 --	    Here we obviously cannot float the let-binding for w.
+--
+-- You may think rule (a) would never apply, because rule matching is
+-- mostly invoked from the simplifier, when we have just run substExpr 
+-- over the argument, so there will be no shadowing anyway.
+-- The fly in the ointment is that the forall'd variables of the
+-- RULE itself are considered in scope.
+--
+-- I though of various cheapo ways to solve this tiresome problem,
+-- but ended up doing the straightforward thing, which is to 
+-- clone the binders if they are in scope.  It's tiresome, and
+-- potentially inefficient, because of the calls to substExpr,
+-- but I don't think it'll happen much in pracice.
 
 match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
-  | all freshly_bound bndrs,
-    not (any locally_bound bind_fvs)
+  | not (any locally_bound bind_fvs)
   = match (menv { me_env = rn_env' }) 
-	  (tv_subst, id_subst, binds `snocOL` bind)
-	  e1 e2
+	  (tv_subst, id_subst, binds `snocOL` bind')
+	  e1 e2'
   where
     rn_env   = me_env menv
-    bndrs    = bindersOf bind
+    bndrs    = bindersOf  bind
+    rhss     = rhssOfBind bind
     bind_fvs = varSetElems (bindFreeVars bind)
-    freshly_bound x = not (x `rnInScope` rn_env)
-    locally_bound x = inRnEnvR rn_env x
-    rn_env' = extendRnInScopeList rn_env bndrs
+    locally_bound x   = inRnEnvR rn_env x
+    (rn_env', bndrs') = mapAccumL rnBndrR rn_env bndrs
+    s_prs = [(bndr, Var bndr') | (bndr,bndr') <- zip bndrs bndrs', bndr /= bndr']
+    subst = mkSubst (rnInScopeSet rn_env) emptyVarEnv (mkVarEnv s_prs)
+    (bind', e2') | null s_prs = (bind,   e2)
+		 | otherwise  = (s_bind, substExpr subst e2)
+    s_bind = case bind of
+		NonRec {} -> NonRec (head bndrs') (head rhss)
+		Rec {}    -> Rec (bndrs' `zip` map (substExpr subst) rhss)
 
 match menv subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
