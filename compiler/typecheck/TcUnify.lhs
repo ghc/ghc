@@ -962,16 +962,22 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 			-- Get location from monad, not from tvs1
 	     ; let tys      = mkTyVarTys tvs
 	           in_scope = mkInScopeSet (mkVarSet tvs)
- 	           subst1   = mkTvSubst in_scope (zipTyEnv tvs1 tys)
-	           subst2   = mkTvSubst in_scope (zipTyEnv tvs2 tys)
-		   (theta1,tau1) = tcSplitPhiTy (substTy subst1 body1)
-		   (theta2,tau2) = tcSplitPhiTy (substTy subst2 body2)
+ 	           phi1   = substTy (mkTvSubst in_scope (zipTyEnv tvs1 tys)) body1
+ 	           phi2   = substTy (mkTvSubst in_scope (zipTyEnv tvs2 tys)) body2
+		   (theta1,tau1) = tcSplitPhiTy phi1
+		   (theta2,tau2) = tcSplitPhiTy phi2
 
-	     ; checkM (equalLength theta1 theta2)
+	     ; addErrCtxtM (unifyForAllCtxt tvs phi1 phi2) $ do
+	     { checkM (equalLength theta1 theta2)
 		      (unifyMisMatch outer False orig_ty1 orig_ty2)
 	     
 	     ; uPreds False nb1 theta1 nb2 theta2
 	     ; uTys nb1 tau1 nb2 tau2
+
+		-- Check for escape; e.g. (forall a. a->b) ~ (forall a. a->a)
+	     ; free_tvs <- zonkTcTyVarsAndFV (varSetElems (tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2))
+	     ; ifM (any (`elemVarSet` free_tvs) tvs)
+		   (bleatEscapedTvs free_tvs tvs tvs)
 
 		-- If both sides are inside a box, we are in a "box-meets-box"
 		-- situation, and we should not have a polytype at all.  
@@ -980,7 +986,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 		-- This check comes last, because the error message is 
 		-- extremely unhelpful.  
 	     ; ifM (nb1 && nb2) (notMonoType ty1)
-	     }
+	     }}
       where
 	(tvs1, body1) = tcSplitForAllTys ty1
 	(tvs2, body2) = tcSplitForAllTys ty2
@@ -1535,6 +1541,16 @@ addSubCtxt sub_ctxt actual_res_ty expected_res_ty thing_inside
       = ptext SLIT("Probable cause:") <+> quotes (ppr fun)
 	<+> ptext SLIT("is applied to") <+> text too_many_or_few 
 	<+> ptext SLIT("arguments")
+
+------------------
+unifyForAllCtxt tvs phi1 phi2 env
+  = returnM (env2, msg)
+  where
+    (env', tvs') = tidyOpenTyVars env tvs	-- NB: not tidyTyVarBndrs
+    (env1, phi1') = tidyOpenType env' phi1
+    (env2, phi2') = tidyOpenType env1 phi2
+    msg = vcat [ptext SLIT("When matching") <+> quotes (ppr (mkForAllTys tvs' phi1')),
+	        ptext SLIT("          and") <+> quotes (ppr (mkForAllTys tvs' phi2'))]
 
 ------------------
 unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
