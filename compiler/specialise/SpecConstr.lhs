@@ -986,12 +986,18 @@ argToPat in_scope con_env (Var v) arg_occ
     isValueUnfolding (idUnfolding v)			-- (b)
   = return (True, Var v)
 
+{-	I'm really not sure what this comment means
+	And by not wild-carding we tend to get forall'd 
+	variables that are in soope, which in turn can
+	expose the weakness in let-matching
+	See Note [Matching lets] in Rules
   -- Check for a variable bound inside the function. 
   -- Don't make a wild-card, because we may usefully share
   --	e.g.  f a = let x = ... in f (x,x)
   -- NB: this case follows the lambda and con-app cases!!
 argToPat in_scope con_env (Var v) arg_occ
   = return (False, Var v)
+-}
 
   -- The default case: make a wild-card
 argToPat in_scope con_env arg arg_occ
