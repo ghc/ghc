@@ -186,17 +186,17 @@ hGetLineBuffered handle_ = do
 
 hGetLineBufferedLoop :: Handle__ -> IORef Buffer -> Buffer -> [String]
                      -> IO String
-hGetLineBufferedLoop handle_ ref 
-	buf@Buffer{ bufRPtr=r, bufWPtr=w, bufBuf=raw } xss =
-  let 
-	-- find the end-of-line character, if there is one
-	loop raw r
-	   | r == w = return (False, w)
-	   | otherwise =  do
-		(c,r') <- readCharFromBuffer raw r
-		if c == '\n' 
-		   then return (True, r) -- NB. not r': don't include the '\n'
-		   else loop raw r'
+hGetLineBufferedLoop handle_ ref
+        buf@Buffer{ bufRPtr=r, bufWPtr=w, bufBuf=raw } xss =
+  let
+        -- find the end-of-line character, if there is one
+        loop raw r
+           | r == w = return (False, w)
+           | otherwise =  do
+                (c,r') <- readCharFromBuffer raw r
+                if c == '\n'
+                   then return (True, r) -- NB. not r': don't include the '\n'
+                   else loop raw r'
   in do
   (eol, off) <- loop raw r
 
@@ -209,24 +209,24 @@ hGetLineBufferedLoop handle_ ref
   -- if eol == True, then off is the offset of the '\n'
   -- otherwise off == w and the buffer is now empty.
   if eol
-	then do if (w == off + 1)
-	    		then writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
-		   	else writeIORef ref buf{ bufRPtr = off + 1 }
-	        return (concat (reverse (xs:xss)))
-	else do
-	     maybe_buf <- maybeFillReadBuffer (haFD handle_) True (haIsStream handle_)
-				buf{ bufWPtr=0, bufRPtr=0 }
-	     case maybe_buf of
-		-- Nothing indicates we caught an EOF, and we may have a
-		-- partial line to return.
-		Nothing -> do
-		     writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
-		     let str = concat (reverse (xs:xss))
-		     if not (null str)
-		        then return str
-		        else ioe_EOF
-		Just new_buf -> 
-		     hGetLineBufferedLoop handle_ ref new_buf (xs:xss)
+        then do if (w == off + 1)
+                        then writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
+                        else writeIORef ref buf{ bufRPtr = off + 1 }
+                return (concat (reverse (xs:xss)))
+        else do
+             maybe_buf <- maybeFillReadBuffer (haFD handle_) True (haIsStream handle_)
+                                buf{ bufWPtr=0, bufRPtr=0 }
+             case maybe_buf of
+                -- Nothing indicates we caught an EOF, and we may have a
+                -- partial line to return.
+                Nothing -> do
+                     writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
+                     let str = concat (reverse (xs:xss))
+                     if not (null str)
+                        then return str
+                        else ioe_EOF
+                Just new_buf ->
+                     hGetLineBufferedLoop handle_ ref new_buf (xs:xss)
 
 
 maybeFillReadBuffer fd is_line is_stream buf
