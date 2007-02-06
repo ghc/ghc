@@ -178,13 +178,14 @@ hGetLine h = do
 	Nothing -> hGetLineUnBuffered h
 	Just l  -> return l
 
-
+hGetLineBuffered :: Handle__ -> IO String
 hGetLineBuffered handle_ = do
   let ref = haBuffer handle_
   buf <- readIORef ref
   hGetLineBufferedLoop handle_ ref buf []
 
-
+hGetLineBufferedLoop :: Handle__ -> IORef Buffer -> Buffer -> [String]
+                     -> IO String
 hGetLineBufferedLoop handle_ ref 
 	buf@Buffer{ bufRPtr=r, bufWPtr=w, bufBuf=raw } xss =
   let 
