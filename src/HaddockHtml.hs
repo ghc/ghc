@@ -765,7 +765,6 @@ ppPred (HsIParam (IPName n) t)
 -- -----------------------------------------------------------------------------
 -- Class declarations
 
---ppClassHdr :: Bool -> HsContext -> HsName -> [HsName] -> [HsFunDep] -> Html
 ppClassHdr summ (L _ []) n tvs fds = 
   keyword "class"
 	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
@@ -775,7 +774,6 @@ ppClassHdr summ lctxt n tvs fds =
 	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
 	<+> ppFds fds
 
---ppFds :: [HsFunDep] -> Html
 ppFds fds =
   if null fds then noHtml else 
 	char '|' <+> hsep (punctuate comma (map (fundep . unLoc) fds))
@@ -783,21 +781,25 @@ ppFds fds =
 	fundep (vars1,vars2) = hsep (map ppDocName vars1) <+> toHtml "->" <+>
 			       hsep (map ppDocName vars2)
 
--- we skip ATs for now
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan -> DocMap -> HtmlTable
-ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ _ _) loc docMap = 
-  if null sigs
+ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc docMap = 
+  if null sigs && null ats
     then (if summary then declBox else topDeclBox links loc nm) hdr
     else (if summary then declBox else topDeclBox links loc nm) (hdr <+> keyword "where")
 	    </> 
            (tda [theclass "body"] << 
 	     vanillaTable << 
-	       aboves [ ppSig summary links loc mbDoc sig  
-		      | L _ sig@(TypeSig (L _ (NoLink n)) ty) <- sigs, let mbDoc = Map.lookup n docMap ]
+         aboves ([ ppAT summary at | L _ at <- ats ] ++
+	        [ ppSig summary links loc mbDoc sig  
+		      | L _ sig@(TypeSig (L _ (NoLink n)) ty) <- sigs, let mbDoc = Map.lookup n docMap ])
           )
   where
     hdr = ppClassHdr summary lctxt nm tvs fds
     NoLink nm = unLoc lname
+    
+    ppAT summary at = case at of
+      TyData {} -> topDeclBox links loc nm (ppDataHeader summary at)
+      _ -> error "associated type synonyms or type families not supported yet"
 
 -- we skip ATs for now
 ppClassDecl :: Ord key => Bool -> LinksInfo -> [InstHead DocName] -> key -> SrcSpan ->
@@ -864,10 +866,10 @@ ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan ->
 ppShortDataDecl summary links loc mbDoc dataDecl 
 
   | [lcon] <- cons, ResTyH98 <- resTy = 
-    ppDataHeader summary NewType name tyVars
+    ppDataHeader summary dataDecl 
     <+> equals <+> ppShortConstr summary (unLoc lcon)
 
-  | [] <- cons = ppDataHeader summary NewType name tyVars
+  | [] <- cons = ppDataHeader summary dataDecl
 
   | otherwise = vanillaTable << (
       case resTy of 
@@ -884,7 +886,7 @@ ppShortDataDecl summary links loc mbDoc dataDecl
   where
     dataHeader = 
       (if summary then declBox else topDeclBox links loc name)
-      ((ppDataHeader summary newOrData name tyVars) <+> 
+      ((ppDataHeader summary dataDecl) <+> 
       case resTy of ResTyGADT _ -> keyword "where"; _ -> empty)
 
     doConstr c con = declBox (toHtml [c] <+> ppShortConstr summary (unLoc con))
@@ -923,7 +925,7 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
       
     dataHeader = 
       (if summary then declBox else topDeclBox links loc name)
-      ((ppDataHeader summary newOrData name tyVars) <+> whereBit)
+      ((ppDataHeader summary dataDecl) <+> whereBit)
 
     whereBit 
       | null cons = empty 
@@ -1094,13 +1096,23 @@ expandField :: HsFieldDecl -> [HsFieldDecl]
 expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 -}
 
-ppDataHeader :: Bool -> NewOrData -> Name -> [Name] -> Html
-ppDataHeader summary newOrData name tyvars = 
-  (if newOrData == NewType then keyword "newtype" else keyword "data") 
-  <+> 
-  (if isConSym name 
-    then ppName (tyvars!!0) <+> ppBinder summary name <+> ppName (tyvars!!1)
-    else ppBinder summary name <+> hsep (map ppName tyvars))
+-- | Print the LHS of a data/newtype declaration.
+-- Currently doesn't handle 'data instance' decls or kind signatures
+ppDataHeader :: Bool -> TyClDecl DocName -> Html
+ppDataHeader summary decl 
+  | not (isDataDecl decl) = error "ppDataHeader: illegal argument"
+  | otherwise = 
+    -- newtype or data
+    (if tcdND decl == NewType then keyword "newtype" else keyword "data") <+> 
+    -- context
+    ppLContext (tcdCtxt decl) <+>
+    -- T a b c ..., or a :+: b  
+    (if isConSym name 
+      then ppName (tyvars!!0) <+> ppBinder summary name <+> ppName (tyvars!!1)
+      else ppBinder summary name <+> hsep (map ppName tyvars))
+  where 
+    tyvars = tyvarNames $ tcdTyVars decl
+    name = orig $ tcdLName decl
 
 -- ----------------------------------------------------------------------------
 -- Types and contexts
