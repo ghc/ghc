@@ -28,7 +28,7 @@ module VarEnv (
 	-- RnEnv2 and its operations
 	RnEnv2, mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
 		rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, extendRnInScopeList,
-		rnInScope, lookupRnInScope,
+		rnInScope, rnInScopeSet, lookupRnInScope,
 
 	-- TidyEnvs
 	TidyEnv, emptyTidyEnv
@@ -195,6 +195,9 @@ extendRnInScopeList env vs
 
 rnInScope :: Var -> RnEnv2 -> Bool
 rnInScope x env = x `elemInScopeSet` in_scope env
+
+rnInScopeSet :: RnEnv2 -> InScopeSet
+rnInScopeSet = in_scope
 
 rnBndrs2 :: RnEnv2 -> [Var] -> [Var] -> RnEnv2
 -- Arg lists must be of equal length
