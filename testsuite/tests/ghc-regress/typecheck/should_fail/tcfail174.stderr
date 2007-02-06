@@ -1,0 +1,19 @@
+
+tcfail174.hs:13:13:
+    Inferred type is less polymorphic than expected
+      Quantified type variable `a' escapes
+    When matching `forall a. a -> a'
+              and `forall a. a -> a1'
+      Expected type: Capture (forall x. x -> a)
+      Inferred type: Capture (forall a2. a2 -> a2)
+    In the first argument of `Capture', namely `g'
+
+tcfail174.hs:16:13:
+    Couldn't match expected type `b' (a rigid variable)
+	   against inferred type `a' (a rigid variable)
+      `b' is bound by the type signature for `h2' at tcfail174.hs:15:14
+    When matching `forall a. a -> a'
+              and `forall a. a -> b'
+      Expected type: Capture (forall x. x -> b)
+      Inferred type: Capture (forall a1. a1 -> a1)
+    In the first argument of `Capture', namely `g'
