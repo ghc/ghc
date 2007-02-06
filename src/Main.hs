@@ -255,7 +255,6 @@ data Flag
   | Flag_Debug
 --  | Flag_DocBook
   | Flag_Heading String
-  | Flag_Package String
   | Flag_Html
   | Flag_Hoogle
   | Flag_HtmlHelp String
@@ -316,8 +315,6 @@ options backwardsCompat =
 	"file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
 	"page heading",
-    Option ['k']  ["package"]  (ReqArg Flag_Package "NAME")
-	"package name (optional)",
     Option ['n']  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
  	"do not assume Prelude is imported",
     Option ['d']  ["debug"]  (NoArg Flag_Debug)
@@ -358,8 +355,6 @@ handleEagerFlags flags = do
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
     die ("-h cannot be used with --gen-index or --gen-contents")
-
-  return (listToMaybe [str | Flag_Package str <- flags])
   where 
     whenFlag flag action = when (flag `elem` flags) action 
 
