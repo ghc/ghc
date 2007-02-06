@@ -6,6 +6,10 @@
 # have to deal with variations in the package support of different
 # versions of GHC.
 
+ifneq "$(UseStage1)" "YES"
+
+SRC_HC_OPTS += -DUSING_COMPAT
+
 # Use libghccompat.a:
 SRC_HC_OPTS += -i$(GHC_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_COMPAT_DIR) -lghccompat
@@ -42,3 +46,12 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Distribution.Compiler \
 	-optdep--exclude-module=Distribution.Version \
 	-optdep--exclude-module=System.Directory.Internals
+
+PACKAGE_CABAL =
+
+else
+
+PACKAGE_CABAL = -package Cabal
+
+endif
+

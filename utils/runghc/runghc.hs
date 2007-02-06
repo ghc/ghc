@@ -28,8 +28,13 @@ import Data.List
 import System.Exit
 import Data.Char
 
-import Compat.RawSystem 	( rawSystem )
-import Compat.Directory 	( findExecutable )
+#ifdef USING_COMPAT
+import Compat.RawSystem ( rawSystem )
+import Compat.Directory ( findExecutable )
+#else
+import System.Cmd       ( rawSystem )
+import System.Directory ( findExecutable )
+#endif
 
 main = do 
   args <- getArgs

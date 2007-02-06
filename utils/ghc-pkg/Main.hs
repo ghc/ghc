@@ -21,8 +21,14 @@ import Distribution.Compat.ReadP
 import Distribution.ParseUtils
 import Distribution.Package
 import Distribution.Version
-import Compat.Directory 	( getAppUserDataDirectory, createDirectoryIfMissing )
-import Compat.RawSystem 	( rawSystem )
+
+#ifdef USING_COMPAT
+import Compat.Directory ( getAppUserDataDirectory, createDirectoryIfMissing )
+import Compat.RawSystem ( rawSystem )
+#else
+import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing )
+import System.Cmd       ( rawSystem )
+#endif
 
 import Prelude
 

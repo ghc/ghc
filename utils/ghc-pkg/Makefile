@@ -12,6 +12,8 @@ SRC_HC_OPTS += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
 # This causes libghccompat.a to be used:
 include $(GHC_COMPAT_DIR)/compat.mk
 
+SRC_HC_OPTS += $(PACKAGE_CABAL)
+
 # This is required because libghccompat.a must be built with
 # $(GhcHcOpts) because it is linked to the compiler, and hence
 # we must also build with $(GhcHcOpts) here:

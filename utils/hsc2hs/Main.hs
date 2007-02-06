@@ -42,7 +42,11 @@ import System.IO                ( openFile, IOMode(..), hClose )
 #endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(BUILD_NHC)
-import Compat.RawSystem 	( rawSystem )
+#ifdef USING_COMPAT
+import Compat.RawSystem ( rawSystem )
+#else
+import System.Cmd       ( rawSystem )
+#endif
 #define HAVE_rawSystem
 #elif __NHC__ >= 117
 import System.Cmd	 	( rawSystem )
