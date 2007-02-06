@@ -783,8 +783,13 @@ specialise env calls (fn, rhs, arg_occs)
 	; let good_pats :: [([Var], [CoreArg])]
 	      good_pats = catMaybes mb_pats
 	      in_scope = mkInScopeSet $ unionVarSets $
-			 [ exprsFreeVars pats `delVarSetList` vs 
+			 [ exprsFreeVars pats
 			 | (vs,pats) <- good_pats ]
+		-- This in-scope set is used when matching to see if
+		-- we have identical patterns.  We want to treat the
+		-- forall'd variables of each pattern as "in scope",
+		-- because each in turn serves as the match target for
+		-- a matchN call.  So don't remove the 'vs' from the free vars!
 	      uniq_pats = nubBy (same_pat in_scope) good_pats
 --	; pprTrace "specialise" (vcat [ppr fn <+> ppr arg_occs,
 --	  				text "calls" <+> ppr all_calls,
@@ -802,8 +807,8 @@ specialise env calls (fn, rhs, arg_occs)
   where
 	-- Two pats are the same if they match both ways
     same_pat in_scope (vs1,as1)(vs2,as2)
-	 =  isJust (matchN in_scope vs1 as1 as2)
- 	 && isJust (matchN in_scope vs2 as2 as1)
+	=  isJust (matchN in_scope vs1 as1 as2)
+	&& isJust (matchN in_scope vs2 as2 as1)
 
 callToPats :: InScopeEnv -> [ArgOcc] -> Call
 	   -> UniqSM (Maybe ([Var], [CoreExpr]))
