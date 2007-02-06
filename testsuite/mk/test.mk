@@ -33,6 +33,7 @@ export MAKE
 GHC_STAGE1_ABS	= $(GHC_COMPILER_DIR_ABS)/stage1/ghc-inplace
 GHC_STAGE2_ABS	= $(GHC_COMPILER_DIR_ABS)/stage2/ghc-inplace
 GHC_STAGE3_ABS	= $(GHC_COMPILER_DIR_ABS)/stage3/ghc-inplace
+GHC_PKG_ABS     = $(GHC_PKG_DIR_ABS)/ghc-pkg-inplace
 HP2PS_ABS	= $(GHC_HP2PS_DIR_ABS)/hp2ps
 GS = gs
 
@@ -47,6 +48,8 @@ TEST_HC = $(GHC_STAGE$(stage)_ABS)
 else
 TEST_HC = $(GHC_STAGE1_ABS)
 endif
+
+GHC_PKG = $(GHC_PKG_ABS)
 
 RUNTEST_OPTS =
 
@@ -98,6 +101,7 @@ RUNTEST_OPTS +=  \
 	-e config.compiler=\"$(TEST_HC)\" \
 	-e config.compiler_always_flags.append"(\"-D$(HostPlatform_CPP)\")" \
 	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
+	-e config.ghc_pkg=\"$(GHC_PKG)\" \
 	-e config.hp2ps=\"$(HP2PS_ABS)\" \
 	-e config.gs=\"$(GS)\" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \

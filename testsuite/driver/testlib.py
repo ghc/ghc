@@ -71,6 +71,15 @@ def skip( opts ):
 def expect_fail( opts ):
     opts.expect = 'fail';
 
+def reqlib( lib ):
+    return lambda opts, l=lib: _reqlib (opts, l )
+
+def _reqlib( opts, lib ):
+    # opts.reqlibs.append(lib)
+    r = os.system(config.ghc_pkg + ' describe ' + lib + ' > /dev/null 2> /dev/null')
+    if r != 0:
+        opts.expect = 'fail'
+
 def expect_broken( bug ):
     return lambda opts, b=bug: _expect_broken (opts, b )
 

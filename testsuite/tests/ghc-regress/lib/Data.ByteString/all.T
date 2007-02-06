@@ -1,5 +1,5 @@
-test('bytestring001', normal, compile_and_run, ['-package QuickCheck'])
+test('bytestring001', reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
 test('bytestring002', normal, compile_and_run, [''])
 test('bytestring003', normal, compile_and_run, [''])
-test('bytestring004', normal, compile_and_run, ['-package QuickCheck'])
-test('bytestring005', normal, compile_and_run, ['-package QuickCheck'])
+test('bytestring004', reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
+test('bytestring005', reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])

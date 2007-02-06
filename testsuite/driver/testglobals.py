@@ -45,6 +45,8 @@ class TestConfig:
 
         # Path to the compiler
         self.compiler = ''
+        # and ghc-pkg
+        self.ghc_pkg = ''
 
         # Flags we always give to this compiler
         self.compiler_always_flags = []

@@ -124,7 +124,9 @@ test('conc053', compose(only_ways(['threaded1','threaded2']),
 		 compile_and_run, ['-package stm'])
 test('conc054', normal, compile_and_run, ['-package stm'])
 test('conc055', exit_code(1), compile_and_run, ['-package stm'])
-test('conc056', only_ways(['threaded1','threaded2']), compile_and_run, ['-package stm -package network'])
+test('conc056', compose(only_ways(['threaded1','threaded2']),
+                        reqlib('network')),
+                compile_and_run, ['-package stm -package network'])
 
 test('conc057', only_ways(['threaded2']), compile_and_run, ['-O0'])
 
