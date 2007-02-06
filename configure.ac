@@ -3,9 +3,9 @@ dnl (run "grep '^dnl \*' configure.ac | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
 dnl  (or some such) to see the outline of this file)
 dnl
 #
-# (c) The AQUA Project, Glasgow University, 1994-2004
+# (c) The University of Glasgow 1994-2004
 #
-# Configure script template for the Glasgow functional programming tools
+# Configure script template for GHC
 #
 # Process with 'autoreconf' to get a working configure script.
 #
@@ -14,6 +14,17 @@ dnl
 #
 
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.7], [glasgow-haskell-bugs@haskell.org], [ghc])
+
+# Set this to YES for a released version, otherwise NO
+RELEASE=NO
+
+# The primary version (e.g. 6.7, 6.6.1) is set in the AC_INIT line
+# above.  If this is not a released version, then we will append the
+# date to the version number (e.g. 6.7.20070204).  The date is
+# constructed by finding the date of the most recent patch in the
+# darcs repository.  If this is a source distribution (not a darcs
+# checkout), then we ship a file 'VERSION' containing the full version
+# when the source distribution was created.
 
 if test ! -f mk/config.h.in; then
    echo "mk/config.h.in doesn't exist: perhaps you haven't run 'autoreconf'?"

@@ -66,6 +66,11 @@ endif
 
 SUBDIRS = $(SUBDIRS_NOLIB) libraries
 
+VERSION :
+	echo $(ProjectVersion) >VERSION
+
+all :: VERSION
+
 # Sanity check that all the core libraries are in the tree, to catch
 # failure to run darcs-all.
 check-packages :
@@ -417,7 +422,7 @@ SRC_DIST_DIRS += mk docs distrib $(filter-out docs distrib,$(SUBDIRS))
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in
+	ghc.spec.in VERSION
 
 # -----------------------------------------------------------------------------
 # Source distributions
@@ -505,6 +510,9 @@ DIST_CLEAN_FILES += config.cache config.status mk/config.h mk/stamp-h \
 
 # don't clean config.mk: it's needed when cleaning stuff later on
 LATE_DIST_CLEAN_FILES += mk/config.mk 
+
+# VERSION is shipped in a source dist
+MAINTAINER_CLEAN_FILES += VERSION
 
 extraclean::
 	$(RM) -rf autom4te.cache

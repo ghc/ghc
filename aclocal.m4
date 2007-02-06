@@ -969,7 +969,24 @@ fi])
 # FP_SETUP_PROJECT_VERSION
 # ---------------------
 AC_DEFUN([FP_SETUP_PROJECT_VERSION],
-[# Some renamings
+[
+if test "$RELEASE" = "NO"; then
+    AC_MSG_CHECKING([for GHC version date])
+    if test -d _darcs; then
+        changequote(, )dnl
+        ver_date=`darcs changes --last=100 --xml | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | sort -n | tail -1`
+        changequote([, ])dnl
+        PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
+        AC_MSG_RESULT($PACKAGE_VERSION)
+    elif test -f VERSION; then
+        PACKAGE_VERSION=`cat VERSION`        
+        AC_MSG_RESULT($PACKAGE_VERSION)
+    else
+        AC_MSG_ERROR([no version found])                
+    fi
+fi
+
+# Some renamings
 AC_SUBST([ProjectName], [$PACKAGE_NAME])
 AC_SUBST([ProjectVersion], [$PACKAGE_VERSION])
 
