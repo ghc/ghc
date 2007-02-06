@@ -140,6 +140,7 @@ test: timeout
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
 		$(patsubst %, --way=%, $(WAY)) \
+		$(patsubst %, --skipway=%, $(SKIPWAY)) \
 		$(setfast) \
 		$(setaccept)
 

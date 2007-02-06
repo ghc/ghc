@@ -26,6 +26,7 @@ long_options = [
   "output-summary=", 	# file in which to save the (human-readable) summary
   "only=",		# just this test (can be give multiple --only= flags)
   "way=",		# just this way
+  "skipway=",		# skip this way
   "threads=",           # threads to run simultaneously
   ]
 
@@ -56,6 +57,15 @@ for opt,arg in opts:
             sys.exit(1)
         config.run_ways = filter(eq(arg), config.run_ways + config.other_ways)
         config.compile_ways = filter(eq(arg), config.compile_ways + config.other_ways)
+
+    if opt == '--skipway':
+        if (arg not in config.run_ways and arg not in config.compile_ways and arg not in config.other_ways):
+            sys.stderr.write("ERROR: requested way \'" +
+                             arg + "\' does not exist\n")
+            sys.exit(1)
+        config.other_ways = filter(neq(arg), config.other_ways)
+        config.run_ways = filter(neq(arg), config.run_ways)
+        config.compile_ways = filter(neq(arg), config.compile_ways)
 
     if opt == '--threads':
         config.threads = int(arg)
