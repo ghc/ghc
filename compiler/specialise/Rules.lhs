@@ -597,7 +597,7 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 		| otherwise	-- No renaming to do on e2
 		-> Just (tv_subst, extendVarEnv id_subst v1' e2, binds)
 
-	Just e2' | tcEqExprX (nukeRnEnvL rn_env) e2' e2 
+	Just e1' | tcEqExprX (nukeRnEnvL rn_env) e1' e2 
 		 -> Just subst
 
 		 | otherwise
