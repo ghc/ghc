@@ -348,19 +348,25 @@ matchN in_scope tmpl_vars tmpl_es target_es
 				Just e -> e
 				other  -> unbound tmpl_var'
  
-    unbound var = pprPanic "Template variable unbound in rewrite rule" (ppr var)
+    unbound var = pprPanic "Template variable unbound in rewrite rule" 
+			(ppr var $$ ppr tmpl_vars $$ ppr tmpl_vars' $$ ppr tmpl_es $$ ppr target_es)
 \end{code}
 
 Note [Template binders]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following match:
 	Template:  forall x.  f x 
-	Taret:     f (x+1)
-This should succeed, because the template variable 'x' has nothing to do with
-the 'x' in the target.
+	Target:     f (x+1)
+This should succeed, because the template variable 'x' has 
+nothing to do with the 'x' in the target. 
 
-To achive this, we use rnBndrL to rename the template variables if necessary;
-the renamed ones are the tmpl_vars'
+On reflection, this case probably does just work, but this might not
+	Template:  forall x. f (\x.x) 
+	Target:    f (\y.y)
+Here we want to clone when we find the \x, but to know that x must be in scope
+
+To achive this, we use rnBndrL to rename the template variables if
+necessary; the renamed ones are the tmpl_vars'
 
 
 	---------------------------------------------
