@@ -112,14 +112,17 @@ main = do
 
   -- parse Haddock specific flags
   (flags, fileArgs) <- parseHaddockOpts rest'
-
-  -- try to sort and check the input files using the GHC API 
-  modules <- sortAndCheckModules session dynflags' fileArgs
+  
+  -- react to some flags before doing anything
+  handleEagerFlags flags
 
   -- create a PackageData for each external package in the session
   -- using the GHC API. The PackageData contains an html path,
   -- a doc env and a list of module names.
   packages <- getPackages session dynflags' flags
+
+  -- try to sort and check the input files using the GHC API 
+  modules <- sortAndCheckModules session dynflags' fileArgs
 
   -- update the html references (module -> html file mapping)
   updateHTMLXRefs packages
@@ -254,6 +257,7 @@ data Flag
   = Flag_CSS String
   | Flag_Debug
 --  | Flag_DocBook
+  | Flag_DumpInterface String
   | Flag_Heading String
   | Flag_Html
   | Flag_Hoogle
@@ -284,10 +288,12 @@ data Flag
 options :: Bool -> [OptDescr Flag]
 options backwardsCompat =
   [
-    Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
+   Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
 	"location of Haddock's auxiliary files",
+   Option ['D']  ["dump-interface"] (ReqArg Flag_DumpInterface "FILE") 
+  "interface file name",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
 --	"output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
@@ -344,12 +350,12 @@ options backwardsCompat =
   ]
 
 handleEagerFlags flags = do
-  whenFlag Flag_Help $ do
+  when ((Flag_Help `elem` flags) || null flags) $ do
     prog <- getProgramName
     bye (usageInfo (usageHeader prog) (options False))
-
+ 
   whenFlag Flag_Version $
-    bye ("Haddock version " ++ projectVersion ++ 
+    bye ("Haddock-GHC version " ++ projectVersion ++ 
          ", (c) Simon Marlow 2003; port to GHC-api by David Waern 2006\n")
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
