@@ -403,47 +403,81 @@ trIO :: IO a -> TR a
 trIO = liftTcM . ioToTcRn
 
 addConstraint :: TcType -> TcType -> TR ()
-addConstraint t1 t2  = congruenceNewtypes t1 t2 >> unifyType t1 t2
+addConstraint t1 t2  = congruenceNewtypes t1 t2 >>= uncurry unifyType 
 
--- A parallel fold over a Type value, replacing
--- in the right side reptypes for newtypes as found in the lhs
--- Sadly it doesn't cover all the possibilities. It does not always manage
--- to recover the highest level type. See test print016 for an example
--- This is used for approximating a unification over types modulo newtypes that recovers
--- the most concrete, with-newtypes type
-congruenceNewtypes ::  TcType -> TcType -> TcM TcType
-congruenceNewtypes lhs rhs
---    | pprTrace "Congruence" (ppr lhs $$ ppr rhs) False = undefined
- -- We have a tctyvar at the other side
-    | Just tv <- getTyVar_maybe rhs 
---    , trace "congruence, entering tyvar" True
-    = recoverM (return rhs) $ do  
+{-
+   A parallel fold over two Type values, 
+ compensating for missing newtypes on both sides. 
+ This is necessary because newtypes are not present 
+ in runtime, but since sometimes there is evidence 
+ available we do our best to reconstruct them. 
+   Evidence can come from DataCon signatures or 
+ from compile-time type inference.
+   I am using the words congruence and rewriting 
+ because what we are doing here is an approximation 
+ of unification modulo a set of equations, which would 
+ come from newtype definitions. These should be the 
+ equality coercions seen in System Fc. Rewriting 
+ is performed, taking those equations as rules, 
+ before launching unification.
+
+   It doesn't make sense to rewrite everywhere, 
+ or we would end up with all newtypes. So we rewrite 
+ only in presence of evidence.
+   The lhs comes from the heap structure of ptrs,nptrs. 
+   The rhs comes from a DataCon type signature. 
+ Rewriting in the rhs is restricted to the result type.
+
+   Note that it is very tricky to make this 'rewriting'
+ work with the unification implemented by TcM, where
+ substitutions are 'inlined'. The order in which 
+ constraints are unified is vital for this (or I am 
+ using TcM wrongly).
+-}
+congruenceNewtypes ::  TcType -> TcType -> TcM (TcType,TcType)
+congruenceNewtypes = go True
+  where 
+   go rewriteRHS lhs rhs  
+ -- TyVar lhs inductive case
+    | Just tv <- getTyVar_maybe lhs 
+    = recoverM (return (lhs,rhs)) $ do  
          Indirect ty_v <- readMetaTyVar tv
-         newtyped_tytv <- congruenceNewtypes lhs ty_v
-         writeMutVar (metaTvRef tv) (Indirect newtyped_tytv)
-         return newtyped_tytv
--- We have a function type: go on inductively
-    | Just (r1,r2) <- splitFunTy_maybe rhs
-    , Just (l1,l2) <- splitFunTy_maybe lhs
-    = liftM2 mkFunTy ( congruenceNewtypes l1 r1)
-                      (congruenceNewtypes l2 r2)
--- There is a newtype at the top level tycon and we can manage it
-    | Just (tycon, args)    <- splitNewTyConApp_maybe lhs
-    , isNewTyCon tycon
-    , (tvs, realtipe)       <- newTyConRep tycon
-    =   case tcUnifyTys (const BindMe) [realtipe] [rhs] of
-          Just subst -> 
-                let tvs' = substTys subst (map mkTyVarTy tvs) in
-                liftM (mkTyConApp tycon) (zipWithM congruenceNewtypes args tvs')
-          otherwise -> panic "congruenceNewtypes: Can't unify a newtype"
-                                             
--- We have a TyconApp: go on inductively
-    | Just (tycon, args)     <- splitNewTyConApp_maybe lhs
-    , Just (tycon_v, args_v) <- splitNewTyConApp_maybe rhs
-    = liftM (mkTyConApp tycon_v) (zipWithM congruenceNewtypes args args_v)
+         (lhs', rhs') <- go rewriteRHS ty_v rhs
+         writeMutVar (metaTvRef tv) (Indirect lhs')
+         return (lhs, rhs')
+ -- TyVar rhs inductive case
+    | Just tv <- getTyVar_maybe rhs 
+    = recoverM (return (lhs,rhs)) $ do  
+         Indirect ty_v <- readMetaTyVar tv
+         (lhs', rhs') <- go rewriteRHS lhs ty_v
+         writeMutVar (metaTvRef tv) (Indirect rhs')
+         return (lhs', rhs)
+-- FunTy inductive case
+    | Just (l1,l2) <- splitFunTy_maybe lhs
+    , Just (r1,r2) <- splitFunTy_maybe rhs
+    = do (l2',r2') <- go True l2 r2
+         (l1',r1') <- go False l1 r1
+         return (mkFunTy l1' l2', mkFunTy r1' r2')
+-- TyconApp Inductive case; this is the interesting bit.
+    | Just (tycon_l, args_l) <- splitNewTyConApp_maybe lhs
+    , Just (tycon_r, args_r) <- splitNewTyConApp_maybe rhs = do
 
-    | otherwise = return rhs
+      let (tycon_l',args_l') = if isNewTyCon tycon_r && not(isNewTyCon tycon_l)
+                                then (tycon_r, rewrite tycon_r lhs)
+                                else (tycon_l, args_l)
+          (tycon_r',args_r') = if rewriteRHS && isNewTyCon tycon_l && not(isNewTyCon tycon_r)
+                                then (tycon_l, rewrite tycon_l rhs)
+                                else (tycon_r, args_r)
+      (args_l'', args_r'') <- unzip `liftM` zipWithM (go rewriteRHS) args_l' args_r'
+      return (mkTyConApp tycon_l' args_l'', mkTyConApp tycon_r' args_r'') 
 
+    | otherwise = return (lhs,rhs)
+
+    where rewrite newtyped_tc lame_tipe
+           | (tvs, tipe) <- newTyConRep newtyped_tc 
+           = case tcUnifyTys (const BindMe) [tipe] [lame_tipe] of
+               Just subst -> substTys subst (map mkTyVarTy tvs)
+               otherwise  -> panic "congruenceNewtypes: Can't unify a newtype"
 
 newVar :: Kind -> TR TcTyVar
 newVar = liftTcM . newFlexiTyVar
@@ -473,27 +507,21 @@ cvObtainTerm hsc_env force mb_ty a =
              where vars = varSetElems$ tyVarsOfType ty
 
 cvObtainTerm1 :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
-cvObtainTerm1 hsc_env force mb_ty hval
-  | Nothing <- mb_ty = runTR hsc_env . go argTypeKind $ hval
-  | Just ty <- mb_ty = runTR hsc_env $ do
-                 term <- go argTypeKind hval
-                 ty'  <- instScheme (sigmaType ty)
-                 addConstraint ty' (fromMaybe (error "by definition") 
-                                              (termType term)) 
-                 return term
+cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
+   tv   <- liftM mkTyVarTy (newVar argTypeKind)
+   when (isJust mb_ty) $ 
+        instScheme (sigmaType$ fromJust mb_ty) >>= addConstraint tv
+   go tv hval
     where 
-  go k a = do 
+  go tv a = do 
     ctype <- trIO$ getClosureType a
     case ctype of
 -- Thunks we may want to force
-      Thunk _ | force -> seq a $ go k a
+      Thunk _ | force -> seq a $ go tv a
 -- We always follow indirections 
-      _       | isIndirection ctype 
-                      -> do
+      _       | isIndirection ctype -> do
         clos   <- trIO$ getClosureData a
---      dflags <- getSessionDynFlags session
---      debugTraceMsg dflags 2 (text "Following an indirection")
-        go k $! (ptrs clos ! 0)
+        (go tv $! (ptrs clos ! 0))
  -- The interesting case
       Constr -> do
         m_dc <- trIO$ tcRnRecoverDataCon hsc_env a
@@ -504,30 +532,27 @@ cvObtainTerm1 hsc_env force mb_ty hval
             let extra_args = length(dataConRepArgTys dc) - length(dataConOrigArgTys dc)
                 subTtypes  = drop extra_args (dataConRepArgTys dc)
                 (subTtypesP, subTtypesNP) = partition isPointed subTtypes
-                
-            subTermsP <- mapM (\i->extractSubterm i (ptrs clos)
-                                                    (subTtypesP!!(i-extra_args)))
-                              [extra_args..extra_args + length subTtypesP - 1]
+                n_subtermsP= length subTtypesP
+            subTermTvs    <- mapM (liftM mkTyVarTy . newVar ) (map typeKind subTtypesP)
+            baseType      <- instScheme (dataConRepType dc)
+            let myType     = mkFunTys (reOrderTerms subTermTvs subTtypesNP subTtypes) tv
+            addConstraint myType baseType
+            subTermsP <- sequence [ extractSubterm i tv (ptrs clos) 
+                                   | (i,tv) <- zip [extra_args..extra_args + n_subtermsP - 1]
+                                                   subTermTvs ]
             let unboxeds   = extractUnboxed subTtypesNP (nonPtrs clos)
                 subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)      
                 subTerms   = reOrderTerms subTermsP subTermsNP subTtypes
-            resType       <- liftM mkTyVarTy (newVar k)
-            baseType      <- instScheme (dataConRepType dc)
-            let myType     = mkFunTys (map (fromMaybe (error "cvObtainTerm1") . termType) 
-                                       subTerms) 
-                                  resType
-            addConstraint baseType myType
-            return (Term resType dc a subTerms)
+            return (Term tv dc a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       otherwise -> do
-         x <- liftM mkTyVarTy (newVar k)
-         return (Suspension ctype (Just x) a Nothing)
+         return (Suspension ctype (Just tv) a Nothing)
 
 -- Access the array of pointers and recurse down. Needs to be done with
 -- care of no introducing a thunk! or go will fail to do its job 
-  extractSubterm (I# i#) ptrs ty = case ptrs of 
+  extractSubterm (I# i#) tv ptrs = case ptrs of 
                  (Array _ _ ptrs#) -> case indexArray# ptrs# i# of 
-                       (# e #) -> go (typeKind ty) e
+                       (# e #) -> go tv e
 
 -- This is used to put together pointed and nonpointed subterms in the 
 --  correct order.
