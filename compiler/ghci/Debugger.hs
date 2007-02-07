@@ -45,6 +45,7 @@ import Control.Exception
 import Control.Monad
 import qualified Data.Map as Map
 import Data.Array.Unboxed
+import Data.Array.Base
 import Data.List
 import Data.Typeable             ( Typeable )
 import Data.Maybe
@@ -539,15 +540,16 @@ addModule a siteCoords bt
    , sitesByRow   <- [ [(s,c) | (s,(r,c)) <- siteCoords, r==i] 
                        | i <- [0..nrows] ]
    , nsites       <- length siteCoords
-   , initialBkpts <- listArray (1, nsites) (repeat False) 
+   , initialBkpts <- listArray (0, nsites+1) (repeat False) 
    = bt{ sites       = Map.insert a sitesByRow (sites bt) 
        , breakpoints = Map.insert a initialBkpts (breakpoints bt) }
 
+-- This MUST be fast
+isBkptEnabled bt site | bt `seq` site `seq` False = undefined
 isBkptEnabled bt (a,site) 
    | Just bkpts <- bkptsOf bt a 
-   , inRange (bounds bkpts) site
-   = bkpts ! site 
-   | otherwise = panic "unexpected condition: I don't know that breakpoint site"
+   = ASSERT (inRange (bounds bkpts) site) 
+     unsafeAt bkpts site
 
 -----------------
 -- Other stuff
