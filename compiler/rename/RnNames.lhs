@@ -22,7 +22,7 @@ import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
 import IfaceEnv		( ifaceExportNames )
-import LoadIface	( loadSrcInterface )
+import LoadIface	( loadSrcInterface, loadSysInterface )
 import TcRnMonad hiding (LIE)
 
 import PrelNames
@@ -1201,7 +1201,7 @@ printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
 printMinimalImports imps
  = ifOptM Opt_D_dump_minimal_imports $ do {
 
-   mod_ies  <-  mappM to_ies (fmToList imps) ;
+   mod_ies  <-  initIfaceTcRn $ mappM to_ies (fmToList imps) ;
    this_mod <- getModule ;
    rdr_env  <- getGlobalRdrEnv ;
    ioToTcRn (do { h <- openFile (mkFilename this_mod) WriteMode ;
@@ -1222,7 +1222,7 @@ printMinimalImports imps
     to_ies (mod, avail_env) = do ies <- mapM to_ie (availEnvElts avail_env)
                                  returnM (mod, ies)
 
-    to_ie :: AvailInfo -> RnM (IE Name)
+    to_ie :: AvailInfo -> IfG (IE Name)
 	-- The main trick here is that if we're importing all the constructors
 	-- we want to say "T(..)", but if we're importing only a subset we want
 	-- to say "T(A,B,C)".  So we have to find out what the module exports.
@@ -1230,9 +1230,9 @@ printMinimalImports imps
     to_ie (AvailTC n [m]) = ASSERT( n==m ) 
 			    returnM (IEThingAbs n)
     to_ie (AvailTC n ns)  
-	= loadSrcInterface doc n_mod False			`thenM` \ iface ->
+	= loadSysInterface doc n_mod			`thenM` \ iface ->
 	  case [xs | (m,as) <- mi_exports iface,
-		     moduleName m == n_mod,
+		     m == n_mod,
 		     AvailTC x xs <- as, 
 		     x == nameOccName n] of
 	      [xs] | all_used xs -> returnM (IEThingAll n)
@@ -1242,7 +1242,7 @@ printMinimalImports imps
 	where
 	  all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
 	  doc = text "Compute minimal imports from" <+> ppr n
-	  n_mod = moduleName (nameModule n)
+	  n_mod = nameModule n
 \end{code}
 
 
