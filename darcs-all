@@ -9,9 +9,11 @@ top_dirs="nofib testsuite"
 defaultrepo=`cat _darcs/prefs/defaultrepo`
 case $defaultrepo in
   http://* | *@*:*)
-    defaultrepo_lib=`echo $defaultrepo | sed 's!/ghc$!!'`/packages;;
+    defaultrepo_base="`echo $defaultrepo | sed 's!/ghc$!!'`"
+    defaultrepo_lib="$defaultrepo_base"/packages;;
   /*)
-    defaultrepo_lib=$defaultrepo/libraries;;
+    defaultrepo_base="$defaultrepo"
+    defaultrepo_lib="$defaultrepo"/libraries;;
 esac
 
 quiet=NO
@@ -55,6 +57,26 @@ darcsget()
       additional_flag="--partial" ;;
   esac
 
+  if test "$nofib" = "YES"; then
+    if test -d nofib; then
+      echo "warning: nofib already present; omitting"
+    else
+      repo="$defaultrepo_base"/nofib
+      message "== running darcs get $additional_flag $* $repo"
+      darcs get $additional_flag $* $repo
+    fi
+  fi
+
+  if test "$testsuite" = "YES"; then
+    if test -d testsuite; then
+      echo "warning: testsuite already present; omitting"
+    else
+      repo="$defaultrepo_base"/testsuite
+      message "== running darcs get $additional_flag $* $repo"
+      darcs get $additional_flag $* $repo
+    fi
+  fi
+
   cd libraries
 
   if test "$extra" = "YES"; then
@@ -85,10 +107,23 @@ esac
 
 # --extra says we grab the extra libs with 'get'.  It has no effect on
 # the other commands.
-extra=NO;
-case $1 in
-  --extra) shift; extra=YES;
-esac
+extra=NO
+# --nofib/--testsuite tell get to also grab the respective repos.
+# They have no effect on the other commands.
+nofib=NO
+testsuite=NO
+
+args_done=NO
+
+while [ "$args_done" == NO ]
+do
+    case $1 in
+      --extra) shift; extra=YES;;
+      --nofib) shift; nofib=YES;;
+      --testsuite) shift; testsuite=YES;;
+      *) args_done=YES;;
+    esac
+done
 
 case $1 in
   get)  shift; darcsget $*;;
