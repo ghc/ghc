@@ -974,12 +974,15 @@ if test "$RELEASE" = "NO"; then
     AC_MSG_CHECKING([for GHC version date])
     if test -d _darcs; then
         changequote(, )dnl
-        ver_date=`darcs changes --last=100 --xml | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | sort -n | tail -1`
+        ver_date=`darcs changes --quiet --no-summary --xml | head -500 | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | sort -n | tail -1`
+        if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
         changequote([, ])dnl
+                AC_MSG_ERROR([failed to detect version date: check that darcs is in your path])
+        fi
         PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
         AC_MSG_RESULT($PACKAGE_VERSION)
     elif test -f VERSION; then
-        PACKAGE_VERSION=`cat VERSION`        
+        PACKAGE_VERSION=`cat VERSION`
         AC_MSG_RESULT($PACKAGE_VERSION)
     else
         AC_MSG_ERROR([no version found])                
