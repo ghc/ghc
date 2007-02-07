@@ -70,7 +70,7 @@ SRC_HC_OPTS     = -H64m -O -fasm $(MyWarningOpts)
 GhcLibHcOpts    = -O -dcore-lint $(MyWarningOpts)
 GhcLibWays      =
 GhcStage1HcOpts = -Rghc-timing -O0 -DDEBUG
-GhcStage2HcOpts = -Rghc-timing O -fasm
+GhcStage2HcOpts = -Rghc-timing -O -fasm
 SplitObjs = NO
 
 endif
