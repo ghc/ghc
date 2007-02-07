@@ -44,7 +44,7 @@
       <listitem>
 	<para>Explicit kind annotations can now be given on any
         binding occurrence of a type variable.  See <xref
-        linkend="sec-kinding">.</para>
+        linkend="kinding">.</para>
       </listitem>
       <listitem>
 	<para>The handling of type synonyms has been rationalised.

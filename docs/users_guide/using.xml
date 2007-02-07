@@ -310,7 +310,7 @@ module X where
 	  <para>Dependency-generation mode.  In this mode, GHC can be
 	  used to generate dependency information suitable for use in
 	  a <literal>Makefile</literal>.  See <xref
-	  linkend="sec-makefile-dependencies"/>.</para>
+	  linkend="makefile-dependencies"/>.</para>
 	</listitem>
       </varlistentry>
 
@@ -1368,7 +1368,7 @@ f "2"    = 2
 	    <literal>Exception.assert</literal> in source code (in
 	    other words, rewriting <literal>Exception.assert p
 	    e</literal> to <literal>e</literal> (see <xref
-	    linkend="sec-assertions"/>).  This flag is turned on by
+	    linkend="assertions"/>).  This flag is turned on by
 	    <option>-O</option>.
 	    </para>
 	  </listitem>
@@ -1523,7 +1523,7 @@ f "2"    = 2
   
   &phases;  
   
-  <sect1 id="sec-using-concurrent">
+  <sect1 id="using-concurrent">
     <title>Using Concurrent Haskell</title>
     <indexterm><primary>Concurrent Haskell</primary><secondary>using</secondary></indexterm>
 
@@ -1553,7 +1553,7 @@ f "2"    = 2
     </variablelist>
   </sect1>
 
-  <sect1 id="sec-using-smp">
+  <sect1 id="using-smp">
     <title>Using SMP parallelism</title>
     <indexterm><primary>parallelism</primary>
     </indexterm>

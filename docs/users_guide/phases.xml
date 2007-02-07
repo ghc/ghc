@@ -896,7 +896,7 @@ $ cat foo.hspp</screen>
           <itemizedlist> 
             <listitem>
               <para>Parallelism<indexterm><primary>parallelism</primary></indexterm> on a multiprocessor<indexterm><primary>multiprocessor</primary></indexterm><indexterm><primary>SMP</primary></indexterm> or multicore<indexterm><primary>multicore</primary></indexterm>
-              machine.  See <xref linkend="sec-using-smp" />.</para>
+              machine.  See <xref linkend="using-smp" />.</para>
 
               <para>The ability to make a foreign call that does not
               block all other Haskell threads.</para>

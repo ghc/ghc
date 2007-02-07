@@ -964,7 +964,7 @@ a data type with no constructors.  For example:</para>
 <para>Syntactically, the declaration lacks the "= constrs" part.  The 
 type can be parameterised over types of any kind, but if the kind is
 not <literal>*</literal> then an explicit kind annotation must be used
-(see <xref linkend="sec-kinding"/>).</para>
+(see <xref linkend="kinding"/>).</para>
 
 <para>Such data types have only one value, namely bottom.
 Nevertheless, they can be useful when defining "phantom types".</para>
@@ -3372,7 +3372,7 @@ and you'd be right.  That is why they are an experimental feature.
 
 ================ END OF Linear Implicit Parameters commented out -->
 
-<sect2 id="sec-kinding">
+<sect2 id="kinding">
 <title>Explicitly-kinded quantification</title>
 
 <para>
@@ -4852,7 +4852,7 @@ Because the preprocessor targets Haskell (rather than Core),
 
 <!-- ==================== BANG PATTERNS =================  -->
 
-<sect1 id="sec-bang-patterns">
+<sect1 id="bang-patterns">
 <title>Bang patterns
 <indexterm><primary>Bang patterns</primary></indexterm>
 </title>
@@ -4867,7 +4867,7 @@ than the material below.
 Bang patterns are enabled by the flag <option>-fbang-patterns</option>.
 </para>
 
-<sect2 id="sec-bang-patterns-informal">
+<sect2 id="bang-patterns-informal">
 <title>Informal description of bang patterns
 </title>
 <para>
@@ -4922,7 +4922,7 @@ is part of the syntax of <literal>let</literal> bindings.
 </sect2>
 
 
-<sect2 id="sec-bang-patterns-sem">
+<sect2 id="bang-patterns-sem">
 <title>Syntax and semantics
 </title>
 <para>
@@ -4996,7 +4996,7 @@ a module.
 
 <!-- ==================== ASSERTIONS =================  -->
 
-<sect1 id="sec-assertions">
+<sect1 id="assertions">
 <title>Assertions
 <indexterm><primary>Assertions</primary></indexterm>
 </title>

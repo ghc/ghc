@@ -11,7 +11,7 @@
           when you compile with <option>-threaded</option>, you now get
           an RTS flag <option>-N</option> that allows you to specify the
           number of OS threads that GHC should use. Defaults to 1.
-          See <xref linkend="sec-using-smp" /> and <xref
+          See <xref linkend="using-smp" /> and <xref
           linkend="lang-parallel" />.
         </para>
       </listitem>
@@ -41,7 +41,7 @@
           <programlisting>
     f (x, y) | x `seq` False = undefined
              | otherwise = [x,y]</programlisting>
-          See <xref linkend="sec-bang-patterns" /> for more details.
+          See <xref linkend="bang-patterns" /> for more details.
         </para>
       </listitem>
       <listitem>

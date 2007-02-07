@@ -97,7 +97,7 @@
          <para>Sets the interval that the RTS clock ticks at.  The
          runtime uses a single timer signal to count ticks; this timer
          signal is used to control the context switch timer (<xref
-         linkend="sec-using-concurrent" />) and the heap profiling
+         linkend="using-concurrent" />) and the heap profiling
          timer <xref linkend="rts-options-heap-prof" />.  Also, the
          time profiler uses the RTS timer signal directly to record
          time profiling samples.</para>
@@ -430,7 +430,7 @@
 
     <para>The RTS options related to profiling are described in <xref
     linkend="rts-options-heap-prof"/>, those for concurrency in
-      <xref linkend="sec-using-concurrent" />, and those for parallelism in
+      <xref linkend="using-concurrent" />, and those for parallelism in
       <xref linkend="parallel-options"/>.</para>
   </sect2>
 

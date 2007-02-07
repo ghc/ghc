@@ -18,7 +18,7 @@
   <indexterm><primary>FFI</primary><secondary>GHCi support</secondary></indexterm>
   <indexterm><primary>Foreign Function Interface</primary><secondary>GHCi support</secondary></indexterm>
 
-  <sect1>
+  <sect1 id="ghci-introduction">
     <title>Introduction to GHCi</title>
 
     <para>Let's start with an example GHCi session.  You can fire up
@@ -106,7 +106,7 @@ Prelude>
     enter, GHCi will attempt to evaluate it.</para>
   </sect1>
 
-  <sect1>
+  <sect1 id="loading-source-files">
     <title>Loading source files</title>
 
     <para>Suppose we have the following Haskell source code, which we
@@ -363,7 +363,7 @@ Ok, modules loaded: A, B, C, D.
 
   </sect1>
 
-  <sect1>
+  <sect1 id="interactive-evaluation">
     <title>Interactive evaluation at the prompt</title>
 
     <para>When you type an expression at the prompt, GHCi immediately

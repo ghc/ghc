@@ -25,7 +25,7 @@ the <option>-fglasgow-exts</option><indexterm><primary><option>-fglasgow-exts</o
 
     <listitem>
       <para>GHC implements a number of GHC-specific extensions to the FFI
-      Addendum.  These extensions are described in <xref linkend="sec-ffi-ghcexts" />, but please note that programs using
+      Addendum.  These extensions are described in <xref linkend="ffi-ghcexts" />, but please note that programs using
       these features are not portable.  Hence, these features should be
       avoided where possible.</para>
     </listitem>
@@ -35,7 +35,7 @@ the <option>-fglasgow-exts</option><indexterm><primary><option>-fglasgow-exts</o
   documentation; see for example the <literal>Foreign</literal>
   module.</para>
 
-  <sect1 id="sec-ffi-ghcexts">
+  <sect1 id="ffi-ghcexts">
     <title>GHC extensions to the FFI Addendum</title>
 
     <para>The FFI features that are described in this section are specific to
@@ -81,7 +81,7 @@ OK:
 
   </sect1>
 
-  <sect1 id="sec-ffi-ghc">
+  <sect1 id="ffi-ghc">
     <title>Using the FFI with GHC</title>
 
     <para>The following sections also give some hints and tips on the

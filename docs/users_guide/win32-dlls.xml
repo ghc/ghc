@@ -2,7 +2,7 @@
 <chapter id="win32">
 <title>Running GHC on Win32 systems</title>
 
-<sect1>
+<sect1 id="ghc-windows">
 <title>
 Starting GHC on Windows platforms</title>
 
@@ -75,7 +75,7 @@ Notice how the "%1" argument is quoted (or not).
   module.</para>
 </sect1>
 
-<sect1>
+<sect1 id="terminal-interaction">
 <title>
 Interacting with the terminal</title>
 
@@ -102,7 +102,7 @@ You can get a close simulation by using an emacs shell buffer!
 
 </sect1>
 
-<sect1>
+<sect1 id="library-differences">
 <title>
 Differences in library behaviour </title>
 
@@ -125,7 +125,7 @@ binary mode using <literal>IOExts.hSetBinaryMode</literal>. The
 </para>
 </sect1>
 
-<sect1>
+<sect1 id="ghci-cygwin">
 <title>
 Using GHC (and other GHC-compiled executables) with cygwin</title>
 

@@ -812,7 +812,7 @@ can be given abstractly, by omitting the '=' sign and everything that follows.  
 	  it out precisely as in its real definition.</para>
 	  <para>
 	    If you do not write out the constructors, you may need to give a kind 
-	    annotation (<xref linkend="sec-kinding"/>), to tell
+	    annotation (<xref linkend="kinding"/>), to tell
 	    GHC the kind of the type variable, if it is not "*".  (In source files, this is worked out
 	    from the way the type variable is used in the constructors.)  For example:
 <programlisting>
@@ -915,11 +915,11 @@ Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
       <literal>make</literal> looks for a rule to do so; one of the
       preceding suffix rules does the job nicely.  These dependencies
       can be generated automatically by <command>ghc</command>; see 
-      <xref linkend="sec-makefile-dependencies"/></para>
+      <xref linkend="makefile-dependencies"/></para>
 
  </sect2>
 
-      <sect2 id="sec-makefile-dependencies">
+      <sect2 id="makefile-dependencies">
 	<title>Dependency generation</title>
 	<indexterm><primary>dependencies in Makefiles</primary></indexterm>
 	<indexterm><primary>Makefile dependencies</primary></indexterm>

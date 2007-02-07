@@ -107,7 +107,7 @@
       <listitem>
 	<para>FFI libraries have been updated to the latest proposal
 	from the FFI task force.  Too many changes to list here, see
-	the docs: <xref linkend="sec-Foreign">.</para>
+	the docs: <xref linkend="Foreign">.</para>
       </listitem>
     </itemizedlist>
   </sect2>
@@ -121,12 +121,12 @@
 	<literal>PutFullMVar</literal> exception no longer exists.
 	A non-blocking version of <function>putMVar</function>,
 	<function>tryPutMVar</function>, has been added (<xref
-	linkend="sec-MVars">).</para>
+	linkend="MVars">).</para>
       </listitem>
       <listitem>
 	<para>The <literal>Int</literal> and
         <literal>Integer</literal> types now have instances of
-        <literal>Bits</literal> (<xref linkend="sec-Bits">).</para>
+        <literal>Bits</literal> (<xref linkend="Bits">).</para>
       </listitem>
       <listitem>
 	<para>Package <literal>hssource</literal> has been added.  It
@@ -147,8 +147,8 @@
 	integral types.</para>
       </listitem>
       <listitem>
-	<para>New modules: DiffArray (<xref linkend="sec-DiffArray">),
-	StorableArray (<xref linkend="sec-StorableArray">),
+	<para>New modules: DiffArray (<xref linkend="DiffArray">),
+	StorableArray (<xref linkend="StorableArray">),
 	MonadList, MonadCont (no documentation yet).</para>
       </listitem>
     </itemizedlist>

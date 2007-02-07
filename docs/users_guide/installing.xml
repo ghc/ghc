@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<chapter id="sec-installing-bin-distrib">
+<chapter id="installing-bin-distrib">
   <title>Installing GHC</title>
 <indexterm><primary>binary installations</primary></indexterm>
 <indexterm><primary>installation, of binaries</primary></indexterm>
@@ -21,21 +21,21 @@ having a Haskell compiler.)
   <itemizedlist>
     <listitem>
       <para> Installing on Unix-a-likes (<xref
-      linkend="sec-unix-a-likes"/>). </para>
+      linkend="unix-a-likes"/>). </para>
     </listitem>
     <listitem>
       <para> Installing on Windows (<xref
-      linkend="sec-install-windows"/>).  </para>
+      linkend="install-windows"/>).  </para>
     </listitem>
     <listitem>
       <para> The layout of installed files (<xref
-      linkend="sec-install-files"/>).  You don't need to know this to
+      linkend="install-files"/>).  You don't need to know this to
       install GHC, but it's useful if you are changing the
       implementation.</para>
     </listitem>
   </itemizedlist>
   
-  <sect1 id="sec-unix-a-likes"><title>Installing on Unix-a-likes</title>
+  <sect1 id="unix-a-likes"><title>Installing on Unix-a-likes</title>
 
     <sect2>
       <title>When a platform-specific package is available</title>
@@ -119,14 +119,14 @@ following structure:
 <listitem>
 <para>
 the raw material from which the <literal>Makefile</literal>
-will be made (<xref linkend="sec-install"/>).
+will be made (<xref linkend="install"/>).
 </para>
 </listitem></varlistentry>
 <varlistentry>
 <term><literal>configure</literal></term>
 <listitem>
 <para>
-the configuration script (<xref linkend="sec-install"/>).
+the configuration script (<xref linkend="install"/>).
 </para>
 </listitem></varlistentry>
 <varlistentry>
@@ -238,7 +238,7 @@ sub-directory per project).
 </variablelist>
 </para>
 
-<sect3 id="sec-install">
+<sect3 id="install">
 <title>Installing</title>
 
 <para>
@@ -374,7 +374,7 @@ stuff in your bin directory.
 
 <para>
  Once done, test your &ldquo;installation&rdquo; as suggested in 
-<xref linkend="sec-GHC-test"/>.  Be sure to use a <literal>-v</literal>
+<xref linkend="GHC-test"/>.  Be sure to use a <literal>-v</literal>
 option, so you can see exactly what pathnames it's using.
 
 If things don't work as expected, check the list of known pitfalls in
@@ -472,7 +472,7 @@ bundles won't install on their own.</para>
 
 </sect3>
 
-<sect3 id="sec-GHC-test">
+<sect3 id="GHC-test">
 <title>Testing that GHC seems to be working
 </title>
 
@@ -529,7 +529,7 @@ on...</para>
 </sect1>
 
 
-<sect1 id="sec-install-windows"><title>Installing on Windows</title>
+<sect1 id="install-windows"><title>Installing on Windows</title>
 
 <para>
 Getting the Glasgow Haskell Compiler (post 5.02) to run on Windows platforms is
@@ -647,7 +647,7 @@ put GHC in a place with a space-free path.
 	<varlistentry>
 	  <term>I'm having trouble with symlinks.</term>
 	  <listitem>
-	    <para>Symlinks only work under Cygwin (<xref linkend="sec-install" />), so binaries not linked to the Cygwin
+	    <para>Symlinks only work under Cygwin (<xref linkend="install" />), so binaries not linked to the Cygwin
 	      DLL, in particular those built for Mingwin, will not work with
 	      symlinks.</para>
 	  </listitem>
@@ -681,7 +681,7 @@ manual.
 </sect1>
 
 
-<sect1 id="sec-install-files"><title>The layout of installed files</title>
+<sect1 id="install-files"><title>The layout of installed files</title>
 
 <para>
 This section describes what files get installed where.  You don't need to know it

@@ -83,7 +83,7 @@ All these features are described in the papers mentioned earlier.
   By default GHC runs your program on one processor; if you
      want it to run in parallel you must link your program
       with the <option>-threaded</option>, and run it with the RTS
-      <option>-N</option> option; see  <xref linkend="sec-using-smp" />).
+      <option>-N</option> option; see  <xref linkend="using-smp" />).
       The runtime will
       schedule the running Haskell threads among the available OS
       threads, running as many in parallel as you specified with the

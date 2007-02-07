@@ -684,7 +684,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-fbang-patterns</option></entry>
-	      <entry>Enable <link linkend="sec-bang-patterns">bang patterns</link>.</entry>
+	      <entry>Enable <link linkend="bang-patterns">bang patterns</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-bang-patterns</option></entry>
 	    </row>

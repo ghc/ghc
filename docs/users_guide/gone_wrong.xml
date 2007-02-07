@@ -155,7 +155,7 @@
           automatically generate the dependencies required in order to
           make sure that every module <emphasis>is</emphasis>
           up-to-date with respect to its imported interfaces.  Please
-          see <xref linkend="sec-makefile-dependencies"/>.</para>
+          see <xref linkend="makefile-dependencies"/>.</para>
 
 	  <para>If you are down to your
           last-compile-before-a-bug-report, we would recommend that
