@@ -343,10 +343,11 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
-          <command>ghc --version</command> <command>ghc -V</command> 
+            <command>ghc --version</command>
+            <command>ghc -V</command>
+          </cmdsynopsis>
           <indexterm><primary><option>-V</option></primary></indexterm>
           <indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
-	    </cmdsynopsis>
         </term>
 	<listitem>
 	  <para>Print a one-line string including GHC's version number.</para>
@@ -356,9 +357,9 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
-          <command>ghc --numeric-version</command>
+            <command>ghc --numeric-version</command>
+          </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
-	    </cmdsynopsis>
         </term>
 	<listitem>
 	  <para>Print GHC's numeric version number only.</para>
@@ -368,9 +369,9 @@ module X where
       <varlistentry>
 	<term>
 	  <cmdsynopsis>
-          <command>ghc --print-libdir</command>
+            <command>ghc --print-libdir</command>
+          </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
-	    </cmdsynopsis>
         </term>
 	<listitem>
 	  <para>Print the path to GHC's library directory.  This is
@@ -630,8 +631,8 @@ ghc -c Foo.hs</screen>
     <indexterm><primary>help options</primary></indexterm>
     <indexterm><primary>verbosity options</primary></indexterm>
 
-    See also the <option>--help</option>, <option>--version</option>, <option>--numeric-version</option>,
-    and <option>--print-libdir</option> modes in <xref linkend="modes"/>.
+    <para>See also the <option>--help</option>, <option>--version</option>, <option>--numeric-version</option>,
+    and <option>--print-libdir</option> modes in <xref linkend="modes"/>.</para>
     <variablelist>
       <varlistentry>
 	<term>

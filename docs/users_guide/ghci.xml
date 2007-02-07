@@ -966,7 +966,7 @@ $ ghci -lm
           <literal>:continue</literal> 
           <indexterm><primary><literal>:continue</literal></primary></indexterm>
         </term>
-	<listitem> Shortcut to <literal>:breakpoint continue </literal>
+	<listitem><para>Shortcut to <literal>:breakpoint continue</literal></para>
 	</listitem>
       </varlistentry>
 
@@ -1623,7 +1623,7 @@ Local bindings in scope:
 qsort2.hs:2:15-46>   
 </programlisting>
       What is happening here is that GHCi has interrupted the evaluation of 
-      <code>qsort</code> at the breakpoint set in line 2, as the prompt indicates.
+      <literal>qsort</literal> at the breakpoint set in line 2, as the prompt indicates.
       At this point you can freely explore the contents of the bindings in scope,
       but with two catches. </para><para>
       First, take into account that due to the lazy nature of Haskell, some of
@@ -1631,9 +1631,9 @@ qsort2.hs:2:15-46>
       trigger a computation. </para><para>
       Second: look at the types of the things in scope.
       GHCi has left its types parameterised by a variable!
-      Look at the type of <code>qsort</code>, which is 
+      Look at the type of <literal>qsort</literal>, which is 
       polymorphic on the type of its argument. It does not 
-      tell us really what the types of <code>x</code> and <code>xs</code> can be. 
+      tell us really what the types of <literal>x</literal> and <literal>xs</literal> can be. 
       In general, polymorphic programs deal with polymorphic values,
       and this means that some of the bindings available in a breakpoint site
       will be parametrically typed.
@@ -1644,11 +1644,11 @@ qsort2.hs:2:15-46>
       This is useful because you cannot just type <literal>x</literal> in the 
       prompt and expect GHCi to return you its value. Perhaps you know for 
       sure that 
-      <literal>x</literal> is of type <code>Int</code>, which is an instance of 
-      <code>Show</code>, but GHCi does not have this information. 
-      <code>:print</code> however is fine, because it does not need to know the 
+      <literal>x</literal> is of type <literal>Int</literal>, which is an instance of 
+      <literal>Show</literal>, but GHCi does not have this information. 
+      <literal>:print</literal> however is fine, because it does not need to know the 
       type to do its work. </para>
-      <para> Let's go on with the debugging session of the <code>qsort</code>
+      <para> Let's go on with the debugging session of the <literal>qsort</literal>
       example:
 <example id="debuggingEx"><title>A short debugging session</title>
 <programlisting>
@@ -1674,22 +1674,22 @@ x :: Int
 	  <para>GHCi reminds us that this value is untyped, and instructs us to force its evaluation </para>
 	</callout>
 	<callout arearefs="seq2">
-	  <para>This line forces the evaluation of <code>x</code> </para>
+	  <para>This line forces the evaluation of <literal>x</literal> </para>
 	</callout>
 	<callout arearefs="seq3">
 	  <para>Even though x has been evaluated, we cannot simply use its name to see its value! 
 	  This is a bit counterintuitive, but currently in GHCi the type of a binding
-	  cannot be a type variable <code>a</code>. 
-	  Thus, the binding <code>x</code> gets assigned the concrete type Unknown.</para>
+	  cannot be a type variable <literal>a</literal>. 
+	  Thus, the binding <literal>x</literal> gets assigned the concrete type Unknown.</para>
 	</callout>
 	<callout arearefs="seq4">
-	  <para>We can explore <code>x</code> using the <literal>:print</literal> 
-	  command, which does find out that <code>x</code> is of type Int and prints
+	  <para>We can explore <literal>x</literal> using the <literal>:print</literal> 
+	  command, which does find out that <literal>x</literal> is of type Int and prints
 	  its value accordingly.</para>
 	</callout>
 	<callout arearefs="seq5">
-	   <literal>:print</literal> also updates the type of <code>x</code> with
-	   the most concrete type information available.
+	   <para><literal>:print</literal> also updates the type of <literal>x</literal> with
+	   the most concrete type information available.</para>
 	</callout>
       </calloutlist>
       The example shows the standard way to proceeed with polymorphic values in a breakpoint. 
@@ -1784,7 +1784,7 @@ x :: Int
      <para>
       <itemizedlist>
 	<listitem><para>
-	  <xref linkend="implicit-parameters" xrefstyle="select: title"/> are only available 
+	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
 	  at the scope of a breakpoint if there is a explicit type signature.
 	</para></listitem>
       </itemizedlist>
@@ -1804,13 +1804,13 @@ x :: Int
 	    <programlisting>{-# OPTIONS_GHC -fdebugging #-}</programlisting>
 	  </listitem>
 	</varlistentry>
-	<varlistentry> <term>* Repeated use of <code>seq</code> and 
+	<varlistentry> <term>* Repeated use of <literal>seq</literal> and 
 	    <literal>:print</literal> may be necessary to observe unevaluated
 	    untyped bindings</term> 
 	  <listitem><para>see <xref linkend="debuggingEx"/> 
 	  </para></listitem>
 	</varlistentry>
-	<varlistentry> <term> * <code>GHC.Exts.unsafeCoerce</code> can help if you are positive about the type of a binding</term> 
+	<varlistentry> <term> * <literal>GHC.Exts.unsafeCoerce</literal> can help if you are positive about the type of a binding</term> 
 	  <listitem><para><programlisting>
 type MyLongType a = [Maybe [Maybe a]]
 
@@ -1828,8 +1828,8 @@ Main.hs:15> x'
 	<varlistentry> <term> * The undocumented (and unsupported) &colon;force command </term>
 	  <listitem><para> 
 	      equivalent to <literal> :print</literal> with automatic 
-	      <code>seq</code> forcing, 
-	      may prove useful to replace sequences of <code>seq</code> and 
+	      <literal>seq</literal> forcing, 
+	      may prove useful to replace sequences of <literal>seq</literal> and 
 	      <literal>&colon;print</literal> in some situations. 
 	  </para></listitem>
 	</varlistentry> 
@@ -1975,7 +1975,7 @@ Main.hs:15> x'
 	<term>I can't use Control-C to interrupt computations in
           GHCi on Windows.</term>
         <listitem>
-          <para>See <xref linkend="ghci-windows">.</xref></para>
+          <para>See <xref linkend="ghci-windows"/></para>
         </listitem>
       </varlistentry>
     </variablelist>

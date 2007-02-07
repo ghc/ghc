@@ -1226,7 +1226,7 @@ that collection of packages in a uniform manner.  You can express
 quite a bit of object-oriented-like programming this way.
 </para>
 
-<sect4 id="existential">
+<sect3 id="existential">
 <title>Why existential?
 </title>
 
@@ -1249,9 +1249,9 @@ But Haskell programmers can safely think of the ordinary
 adding a new existential quantification construct.
 </para>
 
-</sect4>
+</sect3>
 
-<sect4>
+<sect3>
 <title>Type classes</title>
 
 <para>
@@ -1311,9 +1311,9 @@ Notice the way that the syntax fits smoothly with that used for
 universal quantification earlier.
 </para>
 
-</sect4>
+</sect3>
 
-<sect4 id="existential-records">
+<sect3 id="existential-records">
 <title>Record Constructors</title>
 
 <para>
@@ -1376,10 +1376,10 @@ setTag obj t = obj{ tag = t }
 
 </para>
 
-</sect4>
+</sect3>
 
 
-<sect4>
+<sect3>
 <title>Restrictions</title>
 
 <para>
@@ -1530,7 +1530,7 @@ declarations.  Define your own instances!
 
 </para>
 
-</sect4>
+</sect3>
 </sect2>
 
 <!-- ====================== Generalised algebraic data types =======================  -->
@@ -3492,7 +3492,6 @@ including an operational type class context, is legal:
 <itemizedlist>
 <listitem> <para> On the left or right (see <literal>f4</literal>, for example)
 of a function arrow </para> </listitem>
-<listitem> <para> On the right of a function arrow (see <xref linkend="hoist"/>) </para> </listitem>
 <listitem> <para> As the argument of a constructor, or type of a field, in a data type declaration. For
 example, any of the <literal>f1,f2,f3,g1,g2</literal> above would be valid
 field type signatures.</para> </listitem>
