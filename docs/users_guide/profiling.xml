@@ -1327,9 +1327,9 @@ to re-read its input file:
     profiling system, intended for all users everywhere.</para>
 
     <para>To be able to use ticky-ticky profiling, you will need to
-    have built appropriate libraries and things when you made the
-    system.  See &ldquo;Customising what libraries to build,&rdquo; in
-    the installation guide.</para>
+    have built the ticky RTS. (This should be described in 
+    the building guide, but amounts to building the RTS with way
+    "t" enabled.)</para>
 
     <para>To get your compiled program to spit out the ticky-ticky
     numbers, use a <option>-r</option> RTS
