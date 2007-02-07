@@ -963,7 +963,7 @@ dynamic_flags = [
   ,  ( "dverbose-stg2stg",       setDumpFlag Opt_D_verbose_stg2stg)
   ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs))
   ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
-  ,  ( "ddump-minimal-imports",  NoArg (setDynFlag Opt_D_dump_minimal_imports))
+  ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
   ,  ( "ddump-hpc",         	 setDumpFlag Opt_D_dump_hpc)
   
