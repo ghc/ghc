@@ -578,7 +578,7 @@ std_class_via_iso clas	-- These standard classes can be derived for a newtype
 			-- using the isomorphism trick *even if no -fglasgow-exts*
   = classKey clas `elem`  [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
 	-- Not Read/Show because they respect the type
-	-- Not Enum, becuase newtypes are never in Enum
+	-- Not Enum, because newtypes are never in Enum
 
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
