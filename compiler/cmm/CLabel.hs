@@ -568,6 +568,8 @@ idInfoLabelType info =
     ConInfoTable  -> DataLabel
     StaticInfoTable -> DataLabel
     ClosureTable  -> DataLabel
+-- krc: aie! a ticky counter label is data
+    RednCounts    -> DataLabel
     _	          -> CodeLabel
 
 

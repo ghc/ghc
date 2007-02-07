@@ -463,18 +463,13 @@
 #define TICK_SLOW_CALL_ppppp()  	TICK_BUMP(SLOW_CALL_ppppp_ctr)
 #define TICK_SLOW_CALL_pppppp()  	TICK_BUMP(SLOW_CALL_pppppp_ctr)
 
-#ifdef TICKY_TICKY
-#define TICK_HISTO_BY(histo,n,i)			\
-	 W_ __idx;					\
-	 __idx = (n);					\
-	 if (__idx > 8) {				\
-	    __idx = 8;					\
-         }						\
-	 CLong[histo##_hst + _idx*SIZEOF_LONG]		\
-	   = histo##_hst + __idx*SIZEOF_LONG] + i;
-#else
+/* NOTE: TICK_HISTO_BY and TICK_HISTO 
+   currently have no effect.
+   The old code for it didn't typecheck and I 
+   just commented it out to get ticky to work.
+   - krc 1/2007 */
+
 #define TICK_HISTO_BY(histo,n,i) /* nothing */
-#endif
 
 #define TICK_HISTO(histo,n) TICK_HISTO_BY(histo,n,1)
 

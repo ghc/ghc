@@ -29,6 +29,9 @@ import FastString	( unpackFS )
 import Cmm		( Cmm )
 import HscTypes
 import DynFlags
+
+import StaticFlags      ( opt_DoTickyProfiling )
+
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )
@@ -131,7 +134,7 @@ outputC dflags filenm mod location flat_absC
            all_headers =  c_includes
 		       ++ reverse cmdline_includes
 		       ++ ffi_decl_headers
-
+                       
        let cc_injects = unlines (map mk_include all_headers)
        	   mk_include h_file = 
        	    case h_file of 

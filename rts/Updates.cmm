@@ -10,6 +10,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
+
 #include "Cmm.h"
 #include "Updates.h"
 #include "StgLdvProf.h"
@@ -52,8 +53,8 @@
 	  /* remove the update frame from the stack */			\
 	  Sp = Sp + SIZEOF_StgUpdateFrame;				\
 									\
-	  /* ToDo: it might be a PAP, so we should check... */		\
-	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));	\
+	  /* ToDo: it might be a PAP, so we should check... */  	\
+	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));  \
 									\
 	  UPD_SPEC_IND(updatee, ind_info, R1, jump (ret));		\
 	}

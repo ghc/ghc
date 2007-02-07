@@ -397,7 +397,7 @@ hs_exit(void)
     
     /* stop the ticker */
     stopTimer();
-    
+
     /* reset the standard file descriptors to blocking mode */
     resetNonBlockingFd(0);
     resetNonBlockingFd(1);

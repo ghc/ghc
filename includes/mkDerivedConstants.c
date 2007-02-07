@@ -261,7 +261,8 @@ main(int argc, char *argv[])
     struct_field(StgEntCounter, allocs);
     struct_field(StgEntCounter, registeredp);
     struct_field(StgEntCounter, link);
-    
+    struct_field(StgEntCounter, entry_count);
+
     closure_size(StgUpdateFrame);
     closure_size(StgCatchFrame);
     closure_size(StgStopFrame);

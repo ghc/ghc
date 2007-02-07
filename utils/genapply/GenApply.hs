@@ -202,7 +202,7 @@ genMkPAP regstatus macro jump ticker disamb
     smaller_arity arity
         =  text "if (arity == " <> int arity <> text ") {" $$
            nest 4 (vcat [
-	     text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_MANY();",
+	   --  text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_MANY();",
 
 		-- load up regs for the call, if necessary
 	     load_regs,
@@ -300,7 +300,7 @@ genMkPAP regstatus macro jump ticker disamb
 		| otherwise    = loadRegArgs regstatus stk_args_offset args
 	  in
 	  nest 4 (vcat [
-	    text "TICK_SLOW_CALL_" <> text ticker <> text "_CORRECT();",
+--	    text "TICK_SLOW_CALL_" <> text ticker <> text "_CORRECT();",
 	    reg_doc,
 	    text "Sp_adj(" <> int sp' <> text ");",
 	    if is_pap 
@@ -326,7 +326,7 @@ genMkPAP regstatus macro jump ticker disamb
 			empty
 	   in
 	   nest 4 (vcat [
-	  	text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_FEW();",
+--	  	text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_FEW();",
 		save_regs,
 		text macro <> char '(' <> int n_args <> comma <> 
 					int all_args_size <>  
@@ -396,7 +396,7 @@ genApply regstatus args =
 --       text "IF_DEBUG(sanity,checkStackChunk(Sp+" <> int (1 + all_args_size) <>
 --	  text ", CurrentTSO->stack + CurrentTSO->stack_size));",
     
-       text "TICK_SLOW_CALL(" <> int (length args) <> text ");",
+--       text "TICK_SLOW_CALL(" <> int (length args) <> text ");",
 
        let do_assert [] _ = []
 	   do_assert (arg:args) offset
@@ -483,7 +483,7 @@ genApply regstatus args =
         text "     THUNK_STATIC,",
         text "     THUNK_SELECTOR: {",
 	nest 4 (vcat [
-          text "TICK_SLOW_CALL_UNEVALD(" <> int (length args) <> text ");",
+--          text "TICK_SLOW_CALL_UNEVALD(" <> int (length args) <> text ");",
 	  text "Sp(0) = " <> fun_info_label <> text ";",
 	  -- CAREFUL! in SMP mode, the info table may already have been
 	  -- overwritten by an indirection, so we must enter the original

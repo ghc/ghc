@@ -150,7 +150,9 @@ extern void _assertFail (const char *, unsigned int);
 /* Macros for STG/C code */
 #include "Block.h"
 #include "ClosureMacros.h"
-#include "StgTicky.h"
+
+  /* Ticky-ticky counters */
+#include "TickyCounters.h"
 
 /* Runtime-system hooks */
 #include "Hooks.h"
@@ -256,5 +258,30 @@ extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 #ifdef __cplusplus
 }
 #endif
+
+
+/* krc: I put this here because I don't think
+   it needs to be visible externally.
+   It used to be in StgTicky.h, but I got rid
+   of that. */
+
+/* -----------------------------------------------------------------------------
+   The StgEntCounter type - needed regardless of TICKY_TICKY
+   -------------------------------------------------------------------------- */
+
+typedef struct _StgEntCounter {
+  /* krc: StgWord32, not StgWord16, in order to match the code
+     generator, which doesn't generate anything of that type. */
+    StgWord32	registeredp;	/* 0 == no, 1 == yes */
+    StgWord32	arity;		/* arity (static info) */
+    StgWord32	stk_args;	/* # of args off stack */
+				/* (rest of args are in registers) */
+    char   	*str;		/* name of the thing */
+    char   	*arg_kinds;	/* info about the args types */
+    StgInt	entry_count;	/* Trips to fast entry code */
+    StgInt      allocs;         /* number of allocations by this fun */
+    struct _StgEntCounter *link;/* link to chain them all together */
+} StgEntCounter;
+
 
 #endif /* RTS_H */

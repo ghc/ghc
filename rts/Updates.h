@@ -23,21 +23,14 @@
 
    -------------------------------------------------------------------------- */
 
-#ifdef TICKY_TICKY
-# define UPD_IND(updclosure, heapptr) \
-   UPD_PERM_IND(updclosure,heapptr)
-# define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
-   UPD_PERM_IND(updclosure,heapptr); and_then
-#else
 #  define SEMI ;
 # define UPD_IND(updclosure, heapptr) \
    UPD_REAL_IND(updclosure,INFO_PTR(stg_IND_info),heapptr,SEMI)
 # define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
    UPD_REAL_IND(updclosure,ind_info,heapptr,and_then)
-#endif
 
 /* These macros have to work in both C and C--, so here's the
- * impedence matching:
+ * impedance matching:
  */
 #ifdef CMINUSMINUS
 #define BLOCK_BEGIN
@@ -57,9 +50,10 @@
 #define ARG_PTR             /* nothing */
 #endif
 
-/* UPD_IND actually does a PERM_IND if TICKY_TICKY is on;
-   if you *really* need an IND use UPD_REAL_IND
- */
+/* krc: there used to be an UPD_REAL_IND and an
+   UPD_PERM_IND, the latter of which was used for
+   ticky and cost-centre profiling.
+   for now, we just have UPD_REAL_IND. */
 #define UPD_REAL_IND(updclosure, ind_info, heapptr, and_then)	\
         BLOCK_BEGIN						\
 	DECLARE_IPTR(info);					\
@@ -70,34 +64,18 @@
 			      and_then);			\
 	BLOCK_END
 
-#if defined(PROFILING) || defined(TICKY_TICKY)
-#define UPD_PERM_IND(updclosure, heapptr)	\
-        BLOCK_BEGIN				\
-	updateWithPermIndirection(updclosure,	\
-				  heapptr);	\
-	BLOCK_END
-#endif
-
 #if defined(RTS_SUPPORTS_THREADS)
 
-# ifdef TICKY_TICKY
-#  define UPD_IND_NOLOCK(updclosure, heapptr)	\
-        BLOCK_BEGIN				\
-	updateWithPermIndirection(updclosure,	\
-				  heapptr);	\
-	BLOCK_END
-# else
 #  define UPD_IND_NOLOCK(updclosure, heapptr)			\
         BLOCK_BEGIN						\
 	updateWithIndirection(INFO_PTR(stg_IND_info),		\
 			      updclosure,			\
 			      heapptr,); 			\
 	BLOCK_END
-# endif
 
 #else
 #define UPD_IND_NOLOCK(updclosure,heapptr) UPD_IND(updclosure,heapptr)
-#endif
+#endif /* RTS_SUPPORTS_THREADS */
 
 /* -----------------------------------------------------------------------------
    Awaken any threads waiting on a blocking queue (BLACKHOLE_BQ).
@@ -321,49 +299,5 @@ no_slop:
       and_then;							\
     }								\
   }
-#endif
-
-/* The permanent indirection version isn't performance critical.  We
- * therefore use an inline C function instead of the C-- macro.
- */
-#ifndef CMINUSMINUS
-INLINE_HEADER void
-updateWithPermIndirection(StgClosure *p1,
-	                  StgClosure *p2) 
-{
-  bdescr *bd;
-
-  ASSERT( p1 != p2 && !closure_IND(p1) );
-
-  /*
-   * @LDV profiling
-   * Destroy the old closure.
-   * Nb: LDV_* stuff cannot mix with ticky-ticky
-   */
-  LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);
-
-  bd = Bdescr((P_)p1);
-  if (bd->gen_no != 0) {
-    recordMutableGenLock(p1, &generations[bd->gen_no]);
-    ((StgInd *)p1)->indirectee = p2;
-    SET_INFO(p1, &stg_IND_OLDGEN_PERM_info);
-    /*
-     * @LDV profiling
-     * We have just created a new closure.
-     */
-    LDV_RECORD_CREATE(p1);
-    TICK_UPD_OLD_PERM_IND();
-  } else {
-    ((StgInd *)p1)->indirectee = p2;
-    SET_INFO(p1, &stg_IND_PERM_info);
-    /*
-     * @LDV profiling
-     * We have just created a new closure.
-     */
-    LDV_RECORD_CREATE(p1);
-    TICK_UPD_NEW_PERM_IND(p1);
-  }
-}
-#endif
-
+#endif /* CMINUSMINUS */
 #endif /* UPDATES_H */

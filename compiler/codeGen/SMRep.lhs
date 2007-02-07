@@ -303,10 +303,11 @@ isStaticRep BlackHoleRep	         = False
 #include "../includes/ClosureTypes.h"
 -- Defines CONSTR, CONSTR_1_0 etc
 
-
-smRepClosureType :: SMRep -> ClosureType
-smRepClosureType (GenericRep _ _ _ ty) = ty
-smRepClosureType BlackHoleRep	       = panic "smRepClosureType: black hole"
+-- krc: only called by tickyDynAlloc in CgTicky; return
+-- Nothing for a black hole so we can at least make something work.
+smRepClosureType :: SMRep -> Maybe ClosureType
+smRepClosureType (GenericRep _ _ _ ty) = Just ty
+smRepClosureType BlackHoleRep	       = Nothing
 
 smRepClosureTypeInt :: SMRep -> Int
 smRepClosureTypeInt (GenericRep False 1 0 Constr) = CONSTR_1_0

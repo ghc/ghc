@@ -33,7 +33,7 @@ module CgTicky (
 	tickyKnownCallTooFewArgs, tickyKnownCallExact, tickyKnownCallExtraArgs,
 	tickyUnknownCall, tickySlowCallPat,
 
-	staticTickyHdr,
+       staticTickyHdr,
   ) where
 
 #include "HsVersions.h"
@@ -72,11 +72,12 @@ import Data.Maybe
 -----------------------------------------------------------------------------
 
 staticTickyHdr :: [CmmLit]
--- The ticky header words in a static closure
--- Was SET_STATIC_TICKY_HDR
-staticTickyHdr 
-  | not opt_DoTickyProfiling = []
-  | otherwise		     = [zeroCLit]
+-- krc: not using this right now --
+-- in the new version of ticky-ticky, we
+-- don't change the closure layout.
+-- leave it defined, though, to avoid breaking
+-- other things.
+staticTickyHdr = []
 
 emitTickyCounter :: ClosureInfo -> [Id] -> Int -> Code
 emitTickyCounter cl_info args on_stk
@@ -85,10 +86,12 @@ emitTickyCounter cl_info args on_stk
 	; fun_descr_lit <- mkStringCLit (fun_descr mod_name)
 	; arg_descr_lit <- mkStringCLit arg_descr
 	; emitDataLits ticky_ctr_label 	-- Must match layout of StgEntCounter
-	    [ CmmInt 0 I16,
-	      CmmInt (fromIntegral (length args)) I16, 	-- Arity
-	      CmmInt (fromIntegral on_stk) I16,		-- Words passed on stack
-	      CmmInt 0 I16,				-- 2-byte gap
+-- krc: note that all the fields are I32 now; some were I16 before, 
+-- but the code generator wasn't handling that properly and it led to chaos, 
+-- panic and disorder.
+	    [ CmmInt 0 I32,
+	      CmmInt (fromIntegral (length args)) I32, 	-- Arity
+	      CmmInt (fromIntegral on_stk) I32,		-- Words passed on stack
 	      fun_descr_lit,
 	      arg_descr_lit,
 	      zeroCLit, 		-- Entry count
@@ -147,10 +150,11 @@ tickyEnterFun cl_info
     do 	{ bumpTickyCounter ctr
 	; fun_ctr_lbl <- getTickyCtrLabel
 	; registerTickyCtr fun_ctr_lbl
-	; bumpTickyCounter' fun_ctr_lbl }
+	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl oFFSET_StgEntCounter_entry_count)
+        }
   where
-    ctr | isStaticClosure cl_info = SLIT("TICK_ENT_STATIC_FUN_DIRECT")
-	| otherwise		  = SLIT("TICK_ENT_DYN_FUN_DIRECT")
+    ctr | isStaticClosure cl_info = SLIT("ENT_STATIC_FUN_DIRECT_ctr")
+	| otherwise		  = SLIT("ENT_DYN_FUN_DIRECT_ctr")
 
 registerTickyCtr :: CLabel -> Code
 -- Register a ticky counter
@@ -161,9 +165,11 @@ registerTickyCtr :: CLabel -> Code
 registerTickyCtr ctr_lbl
   = emitIf test (stmtsC register_stmts)
   where
-    test = CmmMachOp (MO_Not I16) 
-	    [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp)) I16]
+    -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
+    test = CmmMachOp (MO_Eq I32)
+              [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
+				oFFSET_StgEntCounter_registeredp)) I32,
+               CmmLit (mkIntCLit 0)]
     register_stmts
       =	[ CmmStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
 		   (CmmLoad ticky_entry_ctrs wordRep)
@@ -199,7 +205,7 @@ tickyVectoredReturn family_size
 -- Ticks at a *call site*:
 tickyKnownCallTooFewArgs = ifTicky $ bumpTickyCounter SLIT("KNOWN_CALL_TOO_FEW_ARGS_ctr")
 tickyKnownCallExact = ifTicky $ bumpTickyCounter SLIT("KNOWN_CALL_ctr")
-tickyKnownCallExtraArgs = ifTicky $ bumpTickyCounter SLIT("KNOWN_CALL_EXTRA_ctr")
+tickyKnownCallExtraArgs = ifTicky $ bumpTickyCounter SLIT("KNOWN_CALL_EXTRA_ARGS_ctr")
 tickyUnknownCall = ifTicky $ bumpTickyCounter SLIT("UNKNOWN_CALL_ctr")
 
 -- Tick for the call pattern at slow call site (i.e. in addition to
@@ -234,11 +240,13 @@ tickyDynAlloc :: ClosureInfo -> Code
 tickyDynAlloc cl_info
   = ifTicky $
     case smRepClosureType (closureSMRep cl_info) of
-	Constr        -> tick_alloc_con
-	ConstrNoCaf   -> tick_alloc_con
-	Fun	      -> tick_alloc_fun
-	Thunk 	      -> tick_alloc_thk
-	ThunkSelector -> tick_alloc_thk
+	Just Constr           -> tick_alloc_con
+	Just ConstrNoCaf      -> tick_alloc_con
+	Just Fun	      -> tick_alloc_fun
+	Just Thunk 	      -> tick_alloc_thk
+	Just ThunkSelector    -> tick_alloc_thk
+        -- black hole
+        Nothing               -> return ()
   where
 	-- will be needed when we fill in stubs
     cl_size   =	closureSize cl_info
@@ -248,10 +256,13 @@ tickyDynAlloc cl_info
 	| closureUpdReqd cl_info = tick_alloc_up_thk
 	| otherwise	         = tick_alloc_se_thk
 
-    tick_alloc_con = panic "ToDo: tick_alloc"
-    tick_alloc_fun = panic "ToDo: tick_alloc"
-    tick_alloc_up_thk = panic "ToDo: tick_alloc"
-    tick_alloc_se_thk = panic "ToDo: tick_alloc"
+    -- krc: changed from panic to return () 
+    -- just to get something working
+    tick_alloc_con = return ()
+    tick_alloc_fun = return ()
+    tick_alloc_up_thk = return ()
+    tick_alloc_se_thk = return ()
+
 
 tickyAllocPrim :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 tickyAllocPrim hdr goods slop = ifTicky $ panic "ToDo: tickyAllocPrim"
@@ -292,10 +303,11 @@ addToMemLbl rep lbl n = addToMem rep (CmmLit (CmmLabel lbl)) n
 
 -- All the ticky-ticky counters are declared "unsigned long" in C
 bumpTickyCounter :: LitString -> Code
-bumpTickyCounter lbl = bumpTickyCounter' (mkRtsDataLabel lbl)
+bumpTickyCounter lbl = bumpTickyCounter' (cmmLabelOffB (mkRtsDataLabel lbl) 0)
 
-bumpTickyCounter' :: CLabel -> Code
-bumpTickyCounter' lbl = stmtC (addToMemLbl cLongRep lbl 1)
+bumpTickyCounter' :: CmmLit -> Code
+-- krc: note that we're incrementing the _entry_count_ field of the ticky counter
+bumpTickyCounter' lhs = stmtC (addToMem cLongRep (CmmLit lhs) 1)
 
 addToMemLong = addToMem cLongRep
 

@@ -97,7 +97,7 @@ parseStaticFlags args = do
   when (not (null errs)) $ throwDyn (UsageError (unlines errs))
 
     -- deal with the way flags: the way (eg. prof) gives rise to
-    -- futher flags, some of which might be static.
+    -- further flags, some of which might be static.
   way_flags <- findBuildTag
 
     -- if we're unregisterised, add some more flags
@@ -489,7 +489,8 @@ findBuildTag :: IO [String]  -- new options
 findBuildTag = do
   way_names <- readIORef v_Ways
   let ws = sort (nub way_names)
-  if not (allowed_combination ws)
+  res <-
+    if not (allowed_combination ws)
       then throwDyn (CmdLineError $
       		    "combination not supported: "  ++
       		    foldr1 (\a b -> a ++ '/':b) 
@@ -502,6 +503,15 @@ findBuildTag = do
       	   writeIORef v_Build_tag tag
       	   writeIORef v_RTS_Build_tag rts_tag
       	   return (concat flags)
+
+  -- krc: horrible, I know.
+  (if opt_DoTickyProfiling then do
+                  writeIORef v_RTS_Build_tag (mkBuildTag [(lkupWay WayTicky)])
+                  return (res ++ (wayOpts (lkupWay WayTicky)))
+   else
+                  return res)
+
+
 
 mkBuildTag :: [Way] -> String
 mkBuildTag ways = concat (intersperse "_" (map wayTag ways))

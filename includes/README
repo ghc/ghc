@@ -86,7 +86,6 @@ Rts.h
   Parallel.h
   SMP.h
   Block.h
-  StgTicky.h
   Stable.h
   Hooks.h
   Signals.h

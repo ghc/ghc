@@ -11,6 +11,7 @@
 #define TICKY_C			/* define those variables */
 #include "PosixSource.h"
 #include "Rts.h"
+#include "TickyCounters.h"
 #include "RtsFlags.h"
 #include "Ticky.h"
 
@@ -30,6 +31,7 @@ void
 PrintTickyInfo(void)
 {
   unsigned long i;
+
   unsigned long tot_allocs = /* total number of things allocated */
 	ALLOC_FUN_ctr + ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr + ALLOC_CON_ctr + ALLOC_TUP_ctr +
     	+ ALLOC_TSO_ctr + ALLOC_BH_ctr  + ALLOC_PAP_ctr + ALLOC_PRIM_ctr
@@ -67,6 +69,7 @@ PrintTickyInfo(void)
 
   unsigned long tot_thk_enters = ENT_STATIC_THK_ctr + ENT_DYN_THK_ctr;
   unsigned long tot_con_enters = ENT_STATIC_CON_ctr + ENT_DYN_CON_ctr;
+
   unsigned long tot_fun_direct_enters = ENT_STATIC_FUN_DIRECT_ctr + ENT_DYN_FUN_DIRECT_ctr;
   unsigned long tot_ind_enters = ENT_STATIC_IND_ctr + ENT_DYN_IND_ctr;
   
@@ -84,11 +87,12 @@ PrintTickyInfo(void)
   unsigned long tot_tail_calls =
       UNKNOWN_CALL_ctr + tot_known_calls;
 
-  unsigned long tot_enters =
-	tot_con_enters + tot_fun_direct_enters +
+  unsigned long tot_enters = 
+      tot_con_enters + tot_fun_direct_enters +
 	tot_ind_enters + ENT_PERM_IND_ctr + ENT_PAP_ctr + tot_thk_enters;
   unsigned long jump_direct_enters =
 	tot_enters - ENT_VIA_NODE_ctr;
+
 
   unsigned long tot_returns =
       RET_NEW_ctr + RET_OLD_ctr + RET_UNBOXED_TUP_ctr;
@@ -106,6 +110,8 @@ PrintTickyInfo(void)
 
   FILE *tf = RtsFlags.TickyFlags.tickyFile;
 
+  /* krc: avoid dealing with this just now */
+#if FALSE
   fprintf(tf,"\n\nALLOCATIONS: %ld (%ld words total: %ld admin, %ld goods, %ld slop)\n",
 	  tot_allocs, tot_wds, tot_adm_wds, tot_gds_wds, tot_slp_wds);
   fprintf(tf,"\t\t\t\ttotal words:\t    2     3     4     5    6+\n");
@@ -122,6 +128,7 @@ PrintTickyInfo(void)
 	PC(INTAVG(ALLOC_FUN_ctr, tot_allocs)));
   if (ALLOC_FUN_ctr != 0)
       fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FUN));
+ 
 
   fprintf(tf,"\n%7ld (%5.1f%%) thunks",
 	ALLOC_SE_THK_ctr + ALLOC_UP_THK_ctr,
@@ -185,11 +192,15 @@ PrintTickyInfo(void)
   if (ALLOC_BF_ctr != 0)
       fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(BF));
 #endif
+
   fprintf(tf,"\n");
 
   fprintf(tf,"\nTotal storage-manager allocations: %ld (%ld words)\n\t[%ld words lost to speculative heap-checks]\n", ALLOC_HEAP_ctr, ALLOC_HEAP_tot, ALLOC_HEAP_tot - tot_wds);
+#endif /* FALSE */
+
 
   fprintf(tf,"\nSTACK USAGE:\n"); /* NB: some bits are direction sensitive */
+
 
   fprintf(tf,"\nENTERS: %ld  of which %ld (%.1f%%) direct to the entry code\n\t\t  [the rest indirected via Node's info ptr]\n",
 	tot_enters,
@@ -207,6 +218,7 @@ PrintTickyInfo(void)
   fprintf(tf,"%7ld (%5.1f%%) permanent indirections\n",
 	ENT_PERM_IND_ctr,
 	PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
+
 
   fprintf(tf,"\nFUNCTION ENTRIES: %ld\n", tot_fun_direct_enters);
 
@@ -232,6 +244,9 @@ PrintTickyInfo(void)
 	VEC_RETURN_ctr,
 	PC(INTAVG(VEC_RETURN_ctr,tot_returns)));
 
+  /* krc: comment out some of this stuff temporarily */
+
+  /*
   fprintf(tf, "\nRET_NEW:         %7ld: ", RET_NEW_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
 				PC(INTAVG(RET_NEW_hst[i],RET_NEW_ctr))); }
@@ -249,6 +264,7 @@ PrintTickyInfo(void)
   for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
 				PC(INTAVG(RET_VEC_RETURN_hst[i],VEC_RETURN_ctr))); }
   fprintf(tf, "\n");
+  */
 
   fprintf(tf,"\nUPDATE FRAMES: %ld (%ld omitted from thunks)",
 	UPDF_PUSHED_ctr,
@@ -274,6 +290,8 @@ PrintTickyInfo(void)
 	UPD_SQUEEZED_ctr,
 	PC(INTAVG(UPD_SQUEEZED_ctr, tot_updates)));
 
+  /* krc: also avoid dealing with this for now */
+#if FALSE
   fprintf(tf, "\nUPD_CON_IN_NEW:   %7ld: ", UPD_CON_IN_NEW_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_CON_IN_NEW_hst[i]); }
   fprintf(tf, "\n");
@@ -283,6 +301,7 @@ PrintTickyInfo(void)
   fprintf(tf, "UPD_PAP_IN_NEW:   %7ld: ", UPD_PAP_IN_NEW_ctr);
   for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_PAP_IN_NEW_hst[i]); }
   fprintf(tf, "\n");
+#endif
 
   if (tot_gengc_updates != 0) {
       fprintf(tf,"\nNEW GEN UPDATES: %9ld (%5.1f%%)\n",
@@ -320,6 +339,8 @@ PrintTickyInfo(void)
   PR_CTR(ALLOC_FUN_adm);
   PR_CTR(ALLOC_FUN_gds);
   PR_CTR(ALLOC_FUN_slp);
+
+  /* krc: comment out some of this stuff temporarily
   PR_HST(ALLOC_FUN_hst,0);
   PR_HST(ALLOC_FUN_hst,1);
   PR_HST(ALLOC_FUN_hst,2);
@@ -420,6 +441,7 @@ PrintTickyInfo(void)
   PR_HST(ALLOC_BF_hst,3);
   PR_HST(ALLOC_BF_hst,4);
 #endif
+  */
 
   PR_CTR(ENT_VIA_NODE_ctr);
   PR_CTR(ENT_STATIC_CON_ctr);
@@ -481,6 +503,9 @@ PrintTickyInfo(void)
   PR_CTR(SLOW_CALL_PAP_CORRECT_ctr);
   PR_CTR(SLOW_CALL_PAP_TOO_MANY_ctr);
   PR_CTR(SLOW_CALL_UNEVALD_ctr);
+
+  /* krc: put off till later... */
+#if FALSE
   PR_HST(SLOW_CALL_hst,0);
   PR_HST(SLOW_CALL_hst,1);
   PR_HST(SLOW_CALL_hst,2);
@@ -489,12 +514,15 @@ PrintTickyInfo(void)
   PR_HST(SLOW_CALL_hst,5);
   PR_HST(SLOW_CALL_hst,6);
   PR_HST(SLOW_CALL_hst,7);
+#endif
 
   PR_CTR(RET_NEW_ctr);
   PR_CTR(RET_OLD_ctr);
   PR_CTR(RET_UNBOXED_TUP_ctr);
   PR_CTR(VEC_RETURN_ctr);
 
+  /* krc: put off till later... */
+#if FALSE
   PR_HST(RET_NEW_hst,0);
   PR_HST(RET_NEW_hst,1);
   PR_HST(RET_NEW_hst,2);
@@ -531,6 +559,7 @@ PrintTickyInfo(void)
   PR_HST(RET_VEC_RETURN_hst,6);
   PR_HST(RET_VEC_RETURN_hst,7);
   PR_HST(RET_VEC_RETURN_hst,8);
+#endif /* FALSE */
 
   PR_CTR(UPDF_OMITTED_ctr);
   PR_CTR(UPDF_PUSHED_ctr);
@@ -550,6 +579,8 @@ PrintTickyInfo(void)
   PR_CTR(UPD_CAF_BH_UPDATABLE_ctr);
   PR_CTR(UPD_CAF_BH_SINGLE_ENTRY_ctr);
 
+  /* krc: put off till later...*/
+#if FALSE
   PR_HST(UPD_CON_IN_NEW_hst,0);
   PR_HST(UPD_CON_IN_NEW_hst,1);
   PR_HST(UPD_CON_IN_NEW_hst,2);
@@ -568,6 +599,7 @@ PrintTickyInfo(void)
   PR_HST(UPD_PAP_IN_NEW_hst,6);
   PR_HST(UPD_PAP_IN_NEW_hst,7);
   PR_HST(UPD_PAP_IN_NEW_hst,8);
+#endif /* FALSE */
 
   PR_CTR(UPD_NEW_IND_ctr);
   /* see comment on ENT_PERM_IND_ctr */

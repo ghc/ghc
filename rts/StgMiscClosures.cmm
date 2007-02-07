@@ -294,7 +294,7 @@ INFO_TABLE(stg_IND_OLDGEN_PERM,1,0,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN
 #if defined(TICKY_TICKY) && !defined(PROFILING)
     /* TICKY_TICKY && !PROFILING means PERM_IND *replaces* an IND, 
        rather than being extra  */
-    TICK_ENT_PERM_IND(R1); /* tick */
+    TICK_ENT_PERM_IND(); /* tick */
 #endif
 
     LDV_ENTER(R1);

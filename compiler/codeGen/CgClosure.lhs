@@ -447,12 +447,12 @@ emitBlackHoleCode is_single_entry
 	-- Profiling needs slop filling (to support LDV profiling), so
 	-- currently eager blackholing doesn't work with profiling.
 	--
-	-- TICKY_TICKY needs EAGER_BLACKHOLING to verify no double-entries of
-	-- single-entry thunks.
-    eager_blackholing 
-	| opt_DoTickyProfiling = True
-	| otherwise            = False
+        -- Previously, eager blackholing was enabled when ticky-ticky
+        -- was on. But it didn't work, and it wasn't strictly necessary 
+        -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING 
+        -- is unconditionally disabled. -- krc 1/2007
 
+    eager_blackholing = False 
 \end{code}
 
 \begin{code}
@@ -475,17 +475,9 @@ setupUpdate closure_info code
 	; if closureUpdReqd closure_info
 	  then do	-- Blackhole the (updatable) CAF:
 		{ upd_closure <- link_caf closure_info True
-	 	; pushUpdateFrame upd_closure code }
+		; pushUpdateFrame upd_closure code }
 	  else do
-		{ 	-- No update reqd, you'd think we don't need to 
-			-- black-hole it. But when ticky-ticky is on, we 
-			-- black-hole it regardless, to catch errors in which
-			-- an allegedly single-entry closure is entered twice
-			--
-			-- We discard the pointer returned by link_caf, because
-			-- we don't push an update frame
-		  whenC opt_DoTickyProfiling -- Blackhole even a SE CAF
-			(link_caf closure_info False >> nopC)
+		{ -- krc: removed some ticky-related code here.
 		; tickyUpdateFrameOmitted
 		; code }
     }
