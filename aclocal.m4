@@ -985,7 +985,7 @@ if test "$RELEASE" = "NO"; then
         PACKAGE_VERSION=`cat VERSION`
         AC_MSG_RESULT($PACKAGE_VERSION)
     else
-        AC_MSG_ERROR([no version found])                
+        AC_MSG_WARN([cannot determine snapshot version: no _darcs directory and no VERSION file])
     fi
 fi
 
