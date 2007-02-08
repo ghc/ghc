@@ -66,11 +66,6 @@ endif
 
 SUBDIRS = $(SUBDIRS_NOLIB) libraries
 
-VERSION :
-	echo $(ProjectVersion) >VERSION
-
-all :: VERSION
-
 # Sanity check that all the core libraries are in the tree, to catch
 # failure to run darcs-all.
 check-packages :
@@ -441,6 +436,11 @@ EXTRA_LIBS=$(patsubst %, $(SRC_DIST_NAME)/libraries/%, $(shell cat libraries/ext
 
 SRC_DIST_TARBALL = ghc-$(ProjectVersion)-src.tar.bz2
 SRC_DIST_EXTRALIBS_TARBALL = ghc-$(ProjectVersion)-src-extralibs.tar.bz2
+
+VERSION :
+	echo $(ProjectVersion) >VERSION
+
+dist :: VERSION
 
 dist ::
 	$(RM) -rf $(SRC_DIST_DIR)
