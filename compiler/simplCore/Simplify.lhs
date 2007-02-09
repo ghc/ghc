@@ -17,10 +17,10 @@ import Id
 import Var
 import IdInfo
 import Coercion
-import TcGadt		( dataConCanMatch )
-import DataCon		( dataConTyCon, dataConRepStrictness )
-import TyCon		( tyConArity, isAlgTyCon, isNewTyCon, tyConDataCons_maybe )
+import DataCon		( dataConTyCon, dataConRepStrictness, dataConUnivTyVars )
+import TyCon		( tyConArity )
 import CoreSyn
+import NewDemand	( isStrictDmd )
 import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreUnfold	( mkUnfolding, callSiteInline )
 import CoreUtils
@@ -31,7 +31,6 @@ import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
 			  RecFlag(..), isNonRuleLoopBreaker )
-import List		( nub )
 import Maybes		( orElse )
 import Outputable
 import Util
@@ -1112,6 +1111,10 @@ rebuildCase :: SimplEnv
 	    -> SimplCont
 	    -> SimplM (SimplEnv, OutExpr)
 
+--------------------------------------------------
+--	1. Eliminate the case if there's a known constructor
+--------------------------------------------------
+
 rebuildCase env scrut case_bndr alts cont
   | Just (con,args) <- exprIsConApp_maybe scrut	
 	-- Works when the scrutinee is a variable with a known unfolding
@@ -1122,7 +1125,54 @@ rebuildCase env scrut case_bndr alts cont
 			-- because literals are inlined more vigorously
   = knownCon env scrut (LitAlt lit) [] case_bndr alts cont
 
-  | otherwise
+
+--------------------------------------------------
+--	2. Eliminate the case if scrutinee is evaluated
+--------------------------------------------------
+
+rebuildCase env scrut case_bndr [(con,bndrs,rhs)] cont
+  -- See if we can get rid of the case altogether
+  -- See the extensive notes on case-elimination above
+  -- mkCase made sure that if all the alternatives are equal, 
+  -- then there is now only one (DEFAULT) rhs
+ | all isDeadBinder bndrs	-- bndrs are [InId]
+
+	-- Check that the scrutinee can be let-bound instead of case-bound
+ , exprOkForSpeculation scrut
+		-- OK not to evaluate it
+		-- This includes things like (==# a# b#)::Bool
+		-- so that we simplify 
+		-- 	case ==# a# b# of { True -> x; False -> x }
+		-- to just
+		--	x
+		-- This particular example shows up in default methods for
+		-- comparision operations (e.g. in (>=) for Int.Int32)
+	|| exprIsHNF scrut			-- It's already evaluated
+	|| var_demanded_later scrut		-- It'll be demanded later
+
+--      || not opt_SimplPedanticBottoms)	-- Or we don't care!
+--	We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
+-- 	but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
+-- 	its argument:  case x of { y -> dataToTag# y }
+--	Here we must *not* discard the case, because dataToTag# just fetches the tag from
+--	the info pointer.  So we'll be pedantic all the time, and see if that gives any
+-- 	other problems
+--	Also we don't want to discard 'seq's
+  = do	{ tick (CaseElim case_bndr)
+	; env <- simplNonRecX env case_bndr scrut
+	; simplExprF env rhs cont }
+  where
+	-- The case binder is going to be evaluated later, 
+	-- and the scrutinee is a simple variable
+    var_demanded_later (Var v) = isStrictDmd (idNewDemandInfo case_bndr)
+    var_demanded_later other   = False
+
+
+--------------------------------------------------
+--	3. Catch-all case
+--------------------------------------------------
+
+rebuildCase env scrut case_bndr alts cont
   = do	{ 	-- Prepare the continuation;
 		-- The new subst_env is in place
 	  (env, dup_cont, nodup_cont) <- prepareCaseCont env alts cont
@@ -1228,6 +1278,94 @@ arranging that inside the outer case we add the unfolding
 	v |-> x `cast` (sym co)
 to v.  Then we should inline v at the inner case, cancel the casts, and away we go
 	
+
+Note [Case elimination]
+~~~~~~~~~~~~~~~~~~~~~~~
+The case-elimination transformation discards redundant case expressions.
+Start with a simple situation:
+
+	case x# of	===>   e[x#/y#]
+	  y# -> e
+
+(when x#, y# are of primitive type, of course).  We can't (in general)
+do this for algebraic cases, because we might turn bottom into
+non-bottom!
+
+The code in SimplUtils.prepareAlts has the effect of generalise this
+idea to look for a case where we're scrutinising a variable, and we
+know that only the default case can match.  For example:
+
+	case x of
+	  0#      -> ...
+	  DEFAULT -> ...(case x of
+			 0#      -> ...
+			 DEFAULT -> ...) ...
+
+Here the inner case is first trimmed to have only one alternative, the
+DEFAULT, after which it's an instance of the previous case.  This
+really only shows up in eliminating error-checking code.
+
+We also make sure that we deal with this very common case:
+
+ 	case e of 
+	  x -> ...x...
+
+Here we are using the case as a strict let; if x is used only once
+then we want to inline it.  We have to be careful that this doesn't 
+make the program terminate when it would have diverged before, so we
+check that 
+	- e is already evaluated (it may so if e is a variable)
+	- x is used strictly, or
+
+Lastly, the code in SimplUtils.mkCase combines identical RHSs.  So
+
+	case e of	===> case e of DEFAULT -> r
+	   True  -> r
+	   False -> r
+
+Now again the case may be elminated by the CaseElim transformation.
+
+
+Further notes about case elimination
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:	test :: Integer -> IO ()
+		test = print
+
+Turns out that this compiles to:
+    Print.test
+      = \ eta :: Integer
+	  eta1 :: State# RealWorld ->
+	  case PrelNum.< eta PrelNum.zeroInteger of wild { __DEFAULT ->
+	  case hPutStr stdout
+		 (PrelNum.jtos eta ($w[] @ Char))
+		 eta1
+	  of wild1 { (# new_s, a4 #) -> PrelIO.lvl23 new_s  }}
+
+Notice the strange '<' which has no effect at all. This is a funny one.  
+It started like this:
+
+f x y = if x < 0 then jtos x
+          else if y==0 then "" else jtos x
+
+At a particular call site we have (f v 1).  So we inline to get
+
+	if v < 0 then jtos x 
+	else if 1==0 then "" else jtos x
+
+Now simplify the 1==0 conditional:
+
+	if v<0 then jtos v else jtos v
+
+Now common-up the two branches of the case:
+
+	case (v<0) of DEFAULT -> jtos v
+
+Why don't we drop the case?  Because it's strict in v.  It's technically
+wrong to drop even unnecessary evaluations, and in practice they
+may be a result of 'seq' so we *definitely* don't want to drop those.
+I don't really know how to improve this situation.
+
+
 \begin{code}
 simplCaseBinder :: SimplEnv -> OutExpr -> InId -> SimplM (SimplEnv, OutId)
 simplCaseBinder env scrut case_bndr
@@ -1313,125 +1451,48 @@ simplAlts env scrut case_bndr alts cont'
     do	{ let alt_env = zapFloats env
 	; (alt_env, case_bndr') <- simplCaseBinder alt_env scrut case_bndr
 
-	; default_alts <- prepareDefault alt_env case_bndr' imposs_deflt_cons cont' maybe_deflt
+	; (imposs_deflt_cons, in_alts) <- prepareAlts scrut case_bndr' alts
 
-	; let inst_tys = tyConAppArgs (idType case_bndr')
-	      trimmed_alts = filter (is_possible inst_tys) alts_wo_default
-	      in_alts      = mergeAlts default_alts trimmed_alts
-		-- We need the mergeAlts in case the new default_alt 
-		-- has turned into a constructor alternative.
-
-	; alts' <- mapM (simplAlt alt_env imposs_cons case_bndr' cont') in_alts
+	; alts' <- mapM (simplAlt alt_env imposs_deflt_cons case_bndr' cont') in_alts
 	; return (case_bndr', alts') }
-  where
-    (alts_wo_default, maybe_deflt) = findDefault alts
-    imposs_cons = case scrut of
-		    Var v -> otherCons (idUnfolding v)
-		    other -> []
-
-	-- "imposs_deflt_cons" are handled either by the context, 
-	-- OR by a branch in this case expression. (Don't include DEFAULT!!)
-    imposs_deflt_cons = nub (imposs_cons ++ [con | (con,_,_) <- alts_wo_default])
-
-    is_possible :: [Type] -> CoreAlt -> Bool
-    is_possible tys (con, _, _) | con `elem` imposs_cons = False
-    is_possible tys (DataAlt con, _, _) = dataConCanMatch tys con
-    is_possible tys alt		        = True
-
-------------------------------------
-prepareDefault :: SimplEnv
-	       -> OutId		-- Case binder; need just for its type. Note that as an
-				--   OutId, it has maximum information; this is important.
-				--   Test simpl013 is an example
-	     -> [AltCon]	-- These cons can't happen when matching the default
-	     -> SimplCont
-	     -> Maybe InExpr
-	     -> SimplM [InAlt]	-- One branch or none; still unsimplified
-				-- We use a list because it's what mergeAlts expects
-
-prepareDefault env case_bndr' imposs_cons cont Nothing
-  = return []	-- No default branch
-
-prepareDefault env case_bndr' imposs_cons cont (Just rhs)
-  | 	-- This branch handles the case where we are 
-	-- scrutinisng an algebraic data type
-    Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr'),
-    isAlgTyCon tycon,		-- It's a data type, tuple, or unboxed tuples.  
-    not (isNewTyCon tycon),	-- We can have a newtype, if we are just doing an eval:
-				-- 	case x of { DEFAULT -> e }
-				-- and we don't want to fill in a default for them!
-    Just all_cons <- tyConDataCons_maybe tycon,
-    not (null all_cons),	-- This is a tricky corner case.  If the data type has no constructors,
-				-- which GHC allows, then the case expression will have at most a default
-				-- alternative.  We don't want to eliminate that alternative, because the
-				-- invariant is that there's always one alternative.  It's more convenient
-				-- to leave	
-				--	case x of { DEFAULT -> e }     
-				-- as it is, rather than transform it to
-				--	error "case cant match"
-				-- which would be quite legitmate.  But it's a really obscure corner, and
-				-- not worth wasting code on.
-
-    let imposs_data_cons = [con | DataAlt con <- imposs_cons]	-- We now know it's a data type 
-	is_possible con  = not (con `elem` imposs_data_cons)
-			   && dataConCanMatch inst_tys con
-  = case filter is_possible all_cons of
-	[]    -> return []	-- Eliminate the default alternative
-				-- altogether if it can't match
-
-	[con] -> 	-- It matches exactly one constructor, so fill it in
-		 do { tick (FillInCaseDefault case_bndr')
-                    ; us <- getUniquesSmpl
-                    ; let (ex_tvs, co_tvs, arg_ids) =
-                              dataConRepInstPat us con inst_tys
-                    ; return [(DataAlt con, ex_tvs ++ co_tvs ++ arg_ids, rhs)] }
-
-	two_or_more -> return [(DEFAULT, [], rhs)]
-
-  | otherwise 
-  = return [(DEFAULT, [], rhs)]
 
 ------------------------------------
 simplAlt :: SimplEnv
 	 -> [AltCon]	-- These constructors can't be present when
-			-- matching this alternative
+			-- matching the DEFAULT alternative
 	 -> OutId	-- The case binder
 	 -> SimplCont
 	 -> InAlt
-	 -> SimplM (OutAlt)
+	 -> SimplM OutAlt
 
--- Simplify an alternative, returning the type refinement for the 
--- alternative, if the alternative does any refinement at all
-
-simplAlt env handled_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
+simplAlt env imposs_deflt_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
   = ASSERT( null bndrs )
-    do	{ let env' = addBinderOtherCon env case_bndr' handled_cons
+    do	{ let env' = addBinderOtherCon env case_bndr' imposs_deflt_cons
 		-- Record the constructors that the case-binder *can't* be.
 	; rhs' <- simplExprC env' rhs cont'
 	; return (DEFAULT, [], rhs') }
 
-simplAlt env handled_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
+simplAlt env imposs_deflt_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
   = ASSERT( null bndrs )
     do	{ let env' = addBinderUnfolding env case_bndr' (Lit lit)
 	; rhs' <- simplExprC env' rhs cont'
 	; return (LitAlt lit, [], rhs') }
 
-simplAlt env handled_cons case_bndr' cont' (DataAlt con, vs, rhs)
+simplAlt env imposs_deflt_cons case_bndr' cont' (DataAlt con, vs, rhs)
   = do	{	-- Deal with the pattern-bound variables
-		-- Mark the ones that are in ! positions in the data constructor
-		-- as certainly-evaluated.
-		-- NB: it happens that simplBinders does *not* erase the OtherCon
-		--     form of unfolding, so it's ok to add this info before 
-		--     doing simplBinders
 	  (env, vs') <- simplBinders env (add_evals con vs)
+
+		-- Mark the ones that are in ! positions in the
+		-- data constructor as certainly-evaluated.
+	; let vs'' = add_evals con vs'
 
 		-- Bind the case-binder to (con args)
 	; let inst_tys' = tyConAppArgs (idType case_bndr')
-	      con_args  = map Type inst_tys' ++ varsToCoreExprs vs' 
+	      con_args  = map Type inst_tys' ++ varsToCoreExprs vs'' 
 	      env'      = addBinderUnfolding env case_bndr' (mkConApp con con_args)
 
 	; rhs' <- simplExprC env' rhs cont'
-	; return (DataAlt con, vs', rhs') }
+	; return (DataAlt con, vs'', rhs') }
   where
 	-- add_evals records the evaluated-ness of the bound variables of
 	-- a case pattern.  This is *important*.  Consider
@@ -1516,8 +1577,8 @@ knownAlt env scrut args bndr (LitAlt lit, bs, rhs) cont
 	; simplExprF env rhs cont }
 
 knownAlt env scrut args bndr (DataAlt dc, bs, rhs) cont
-  = do	{ let dead_bndr  = isDeadBinder bndr
-	      n_drop_tys = tyConArity (dataConTyCon dc)
+  = do	{ let dead_bndr  = isDeadBinder bndr	-- bndr is an InId
+	      n_drop_tys = length (dataConUnivTyVars dc)
 	; env <- bind_args env dead_bndr bs (drop n_drop_tys args)
 	; let
 		-- It's useful to bind bndr to scrut, rather than to a fresh
@@ -1615,7 +1676,7 @@ mkDupableCont env cont@(Select _ case_bndr [(_,bs,rhs)] se case_cont)
 --  See Note [Single-alternative case]
 --  | not (exprIsDupable rhs && contIsDupable case_cont)
 --  | not (isDeadBinder case_bndr)
-  | all isDeadBinder bs
+  | all isDeadBinder bs		-- InIds
   = return (env, mkBoringStop scrut_ty, cont)
   where
     scrut_ty = substTy se (idType case_bndr)
@@ -1638,8 +1699,8 @@ mkDupableCont env (Select _ case_bndr alts se cont)
 		-- NB: simplBinder does not zap deadness occ-info, so
 		-- a dead case_bndr' will still advertise its deadness
 		-- This is really important because in
-		--	case e of b { (# a,b #) -> ... }
-		-- b is always dead, and indeed we are not allowed to bind b to (# a,b #),
+		--	case e of b { (# p,q #) -> ... }
+		-- b is always dead, and indeed we are not allowed to bind b to (# p,q #),
 		-- which might happen if e was an explicit unboxed pair and b wasn't marked dead.
 		-- In the new alts we build, we have the new case binder, so it must retain
 		-- its deadness.
