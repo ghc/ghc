@@ -134,7 +134,7 @@
 #if defined(__MINGW32__)
 /* in Win32Utils.c */
 extern void maperrno (void);
-extern HsInt getUSecOfDay(void);
+extern HsWord64 getUSecOfDay(void);
 #endif
 
 #if defined(__MINGW32__)

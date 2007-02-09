@@ -107,18 +107,16 @@ void maperrno (void)
 			errno = EINVAL;
 }
 
-#define TICKS_PER_SECOND 50
-// must match GHC.Conc.tick_freq
-
-HsInt getTicksOfDay(void)
+HsWord64 getUSecOfDay(void)
 {
-    HsInt64 t;
+    HsWord64 t;
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
-    t = ((HsInt64)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-    t = (t * TICKS_PER_SECOND) / 10000000LL;
-      /* FILETIMES are in units of 100ns */
-    return (HsInt)t;
+    t = ((HsWord64)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    t = t / 10LL;
+    /* FILETIMES are in units of 100ns,
+       so we divide by 10 to get microseconds */
+    return t;
 }
 
 #endif

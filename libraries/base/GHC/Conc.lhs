@@ -98,7 +98,7 @@ import Data.Maybe
 import GHC.Base
 import GHC.IOBase
 import GHC.Num		( Num(..) )
-import GHC.Real		( fromIntegral, quot )
+import GHC.Real		( fromIntegral, div )
 #ifndef mingw32_HOST_OS
 import GHC.Base		( Int(..) )
 #endif
@@ -707,8 +707,8 @@ data IOReq
 #endif
 
 data DelayReq
-  = Delay    {-# UNPACK #-} !Word64 {-# UNPACK #-} !(MVar ())
-  | DelaySTM {-# UNPACK #-} !Word64 {-# UNPACK #-} !(TVar Bool)
+  = Delay    {-# UNPACK #-} !USecs {-# UNPACK #-} !(MVar ())
+  | DelaySTM {-# UNPACK #-} !USecs {-# UNPACK #-} !(TVar Bool)
 
 #ifndef mingw32_HOST_OS
 pendingEvents :: IORef [IOReq]
@@ -736,6 +736,7 @@ insertDelay d1 ds@(d2 : rest)
   | delayTime d1 <= delayTime d2 = d1 : ds
   | otherwise                    = d2 : insertDelay d1 rest
 
+delayTime :: DelayReq -> USecs
 delayTime (Delay t _) = t
 delayTime (DelaySTM t _) = t
 
@@ -836,9 +837,10 @@ getDelay now all@(d : rest)
 	atomically $ writeTVar t True
 	getDelay now rest
      _otherwise ->
-        return (all, (fromIntegral (delayTime d - now) * 
-                        fromIntegral tick_msecs))
-                        -- delay is in millisecs for WaitForSingleObject
+        -- delay is in millisecs for WaitForSingleObject
+        let micro_seconds = delayTime d - now
+            milli_seconds = (micro_seconds + 999) `div` 1000
+        in return (all, fromIntegral milli_seconds)
 
 -- ToDo: this just duplicates part of System.Win32.Types, which isn't
 -- available yet.  We should move some Win32 functionality down here,
