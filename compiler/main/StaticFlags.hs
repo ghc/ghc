@@ -79,7 +79,7 @@ import Config
 import FastString	( FastString, mkFastString )
 import Util
 import Maybes		( firstJust )
-import Panic		( GhcException(..), ghcError )
+import Panic
 
 import Control.Exception ( throwDyn )
 import Data.IORef
@@ -105,6 +105,9 @@ parseStaticFlags args = do
 		  | otherwise = []
 
   (more_leftover, errs) <- processArgs static_flags (unreg_flags ++ way_flags)
+
+    -- see sanity code in staticOpts
+  writeIORef v_opt_C_ready True
 
     -- TABLES_NEXT_TO_CODE affects the info table layout.
     -- Be careful to do this *after* all processArgs,
@@ -205,7 +208,12 @@ lookup_str       :: String -> Maybe String
 -- holds the static opts while they're being collected, before
 -- being unsafely read by unpacked_static_opts below.
 GLOBAL_VAR(v_opt_C, defaultStaticOpts, [String])
-staticFlags = unsafePerformIO (readIORef v_opt_C)
+GLOBAL_VAR(v_opt_C_ready, False, Bool)
+staticFlags = unsafePerformIO $ do
+  ready <- readIORef v_opt_C_ready
+  if (not ready)
+        then panic "a static opt was looked at too early!"
+        else readIORef v_opt_C
 
 -- -static is the default
 defaultStaticOpts = ["-static"]
@@ -489,8 +497,8 @@ findBuildTag :: IO [String]  -- new options
 findBuildTag = do
   way_names <- readIORef v_Ways
   let ws = sort (nub way_names)
-  res <-
-    if not (allowed_combination ws)
+
+  if not (allowed_combination ws)
       then throwDyn (CmdLineError $
       		    "combination not supported: "  ++
       		    foldr1 (\a b -> a ++ '/':b) 
@@ -503,13 +511,6 @@ findBuildTag = do
       	   writeIORef v_Build_tag tag
       	   writeIORef v_RTS_Build_tag rts_tag
       	   return (concat flags)
-
-  -- krc: horrible, I know.
-  (if opt_DoTickyProfiling then do
-                  writeIORef v_RTS_Build_tag (mkBuildTag [(lkupWay WayTicky)])
-                  return (res ++ (wayOpts (lkupWay WayTicky)))
-   else
-                  return res)
 
 
 
@@ -551,7 +552,7 @@ way_details =
 	, "-DPROFILING"
 	, "-optc-DPROFILING" ]),
 
-    (WayTicky, Way  "t" False "Ticky-ticky Profiling"  
+    (WayTicky, Way  "t" True "Ticky-ticky Profiling"  
 	[ "-fticky-ticky"
 	, "-DTICKY_TICKY"
 	, "-optc-DTICKY_TICKY" ]),
