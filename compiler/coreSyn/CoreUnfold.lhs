@@ -268,7 +268,6 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 			-- The 1+ is a little discount for reduced allocation in the caller
 	  alts_size tot_size _ = tot_size
 
--- gaw 2004
     size_up (Case e _ _ alts) = nukeScrutDiscount (size_up e) `addSize` 
 			         foldr (addSize . size_up_alt) sizeZero alts
 	  	-- We don't charge for the case itself

@@ -13,7 +13,7 @@ module CoreUtils (
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
 	-- Taking expressions apart
-	findDefault, findAlt, isDefaultAlt, mergeAlts,
+	findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
 
 	-- Properties of expressions
 	exprType, coreAltType,
@@ -314,6 +314,18 @@ mergeAlts (a1:as1) (a2:as2)
 	LT -> a1 : mergeAlts as1      (a2:as2)
 	EQ -> a1 : mergeAlts as1      as2	-- Discard a2
 	GT -> a2 : mergeAlts (a1:as1) as2
+
+
+---------------------------------
+trimConArgs :: AltCon -> [CoreArg] -> [CoreArg]
+-- Given 	case (C a b x y) of
+--		   C b x y -> ...
+-- we want to drop the leading type argument of the scrutinee
+-- leaving the arguments to match agains the pattern
+
+trimConArgs DEFAULT      args = ASSERT( null args ) []
+trimConArgs (LitAlt lit) args = ASSERT( null args ) []
+trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 \end{code}
 
 

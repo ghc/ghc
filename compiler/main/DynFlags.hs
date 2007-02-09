@@ -182,6 +182,8 @@ data DynFlag
    | Opt_Strictness
    | Opt_FullLaziness
    | Opt_CSE
+   | Opt_LiberateCase
+   | Opt_SpecConstr
    | Opt_IgnoreInterfacePragmas
    | Opt_OmitInterfacePragmas
    | Opt_DoLambdaEtaExpansion
@@ -232,7 +234,8 @@ data DynFlags = DynFlags {
   optLevel		:: Int,		-- optimisation level
   maxSimplIterations    :: Int,		-- max simplifier iterations
   ruleCheck		:: Maybe String,
-  libCaseThreshold	:: Int,		-- Threshold for liberate-case
+
+  specThreshold		:: Int,		-- Threshold for function specialisation
 
   stolen_x86_regs	:: Int,		
   cmdlineHcIncludes	:: [String],	-- -#includes
@@ -388,7 +391,7 @@ defaultDynFlags =
 	optLevel		= 0,
 	maxSimplIterations	= 4,
 	ruleCheck		= Nothing,
-	libCaseThreshold	= 20,
+	specThreshold		= 200,
 	stolen_x86_regs		= 4,
 	cmdlineHcIncludes	= [],
 	importPaths		= ["."],
@@ -442,27 +445,14 @@ defaultDynFlags =
 
     	    Opt_ImplicitPrelude,
     	    Opt_MonomorphismRestriction,
-    	    Opt_Strictness,
-    			-- strictness is on by default, but this only
-    			-- applies to -O.
-    	    Opt_CSE,		-- similarly for CSE.
-    	    Opt_FullLaziness,	-- ...and for full laziness
-    
-    	    Opt_DoLambdaEtaExpansion,
-    			-- This one is important for a tiresome reason:
-    			-- we want to make sure that the bindings for data 
-    			-- constructors are eta-expanded.  This is probably
-    			-- a good thing anyway, but it seems fragile.
-    
+
     	    Opt_DoAsmMangling,
     
-    	    -- and the default no-optimisation options:
-    	    Opt_IgnoreInterfacePragmas,
-    	    Opt_OmitInterfacePragmas,
-    
 	    -- on by default:
-	    Opt_PrintBindResult
-               ] ++ standardWarnings,
+	    Opt_PrintBindResult ]
+	    ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
+	    	    -- The default -O0 options
+	    ++ standardWarnings,
                
         log_action = \severity srcSpan style msg -> 
                         case severity of
@@ -564,24 +554,28 @@ updOptLevel n dfs
    dfs1 = foldr (flip dopt_unset) dfs  remove_dopts
    dfs2 = foldr (flip dopt_set)   dfs1 extra_dopts
 
-   extra_dopts
-	| n == 0    = opt_0_dopts
-	| otherwise = opt_1_dopts
-
-   remove_dopts
-	| n == 0    = opt_1_dopts
-	| otherwise = opt_0_dopts
+   extra_dopts  = [ f | (ns,f) <- optLevelFlags, n `elem` ns ]
+   remove_dopts = [ f | (ns,f) <- optLevelFlags, n `notElem` ns ]
 	
-opt_0_dopts =  [ 
-	Opt_IgnoreInterfacePragmas,
-	Opt_OmitInterfacePragmas
-    ]
+optLevelFlags :: [([Int], DynFlag)]
+optLevelFlags
+  = [ ([0],	Opt_IgnoreInterfacePragmas)
+    , ([0],     Opt_OmitInterfacePragmas)
+    , ([1,2],	Opt_IgnoreAsserts)
+    , ([1,2],	Opt_DoEtaReduction)
+    , ([1,2],	Opt_CaseMerge)
+    , ([1,2],	Opt_Strictness)
+    , ([1,2],	Opt_CSE)
+    , ([1,2],	Opt_FullLaziness)
+    , ([2],	Opt_LiberateCase)
+    , ([2],	Opt_SpecConstr)
 
-opt_1_dopts = [
-	Opt_IgnoreAsserts,
-	Opt_DoEtaReduction,
-	Opt_CaseMerge
-     ]
+    , ([0,1,2], Opt_DoLambdaEtaExpansion)
+		-- This one is important for a tiresome reason:
+		-- we want to make sure that the bindings for data 
+		-- constructors are eta-expanded.  This is probably
+		-- a good thing anyway, but it seems fragile.
+    ]
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -638,8 +632,8 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck Int{-CompilerPhase-} String	-- Check for non-application of rules 
 						-- matching this string
-
-  | CoreDoNothing 	 -- useful when building up lists of these things
+  | CoreDoNothing 		 -- Useful when building up 
+  | CoreDoPasses [CoreToDo] 	 -- lists of these things
 
 data SimplifierMode 		-- See comments in SimplMonad
   = SimplGently
@@ -656,6 +650,9 @@ data FloatOutSwitches
 
 
 -- The core-to-core pass ordering is derived from the DynFlags:
+runWhen :: Bool -> CoreToDo -> CoreToDo
+runWhen True  do_this = do_this
+runWhen False do_this = CoreDoNothing
 
 getCoreToDo :: DynFlags -> [CoreToDo]
 getCoreToDo dflags
@@ -667,6 +664,8 @@ getCoreToDo dflags
     strictness    = dopt Opt_Strictness dflags
     full_laziness = dopt Opt_FullLaziness dflags
     cse           = dopt Opt_CSE dflags
+    spec_constr   = dopt Opt_SpecConstr dflags
+    liberate_case = dopt Opt_LiberateCase dflags
     rule_check    = ruleCheck dflags
 
     core_todo = 
@@ -699,8 +698,7 @@ getCoreToDo dflags
 	-- so that overloaded functions have all their dictionary lambdas manifest
 	CoreDoSpecialising,
 
-	if full_laziness then CoreDoFloatOutwards (FloatOutSw False False)
-			 else CoreDoNothing,
+	runWhen full_laziness (CoreDoFloatOutwards (FloatOutSw False False)),
 
 	CoreDoFloatInwards,
 
@@ -739,20 +737,19 @@ getCoreToDo dflags
 	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
 #ifdef OLD_STRICTNESS
-	CoreDoOldStrictness
+	CoreDoOldStrictness,
 #endif
-	if strictness then CoreDoStrictness else CoreDoNothing,
-	CoreDoWorkerWrapper,
-	CoreDoGlomBinds,
+	runWhen strictness (CoreDoPasses [
+		CoreDoStrictness,
+		CoreDoWorkerWrapper,
+		CoreDoGlomBinds,
+		CoreDoSimplify (SimplPhase 0) [
+		   MaxSimplifierIterations max_iter
+		]]),
 
-	CoreDoSimplify (SimplPhase 0) [
-	   MaxSimplifierIterations max_iter
-	],
-
-	if full_laziness then
-	  CoreDoFloatOutwards (FloatOutSw False	  -- Not lambdas
-					  True)   -- Float constants
-	else CoreDoNothing,
+	runWhen full_laziness 
+	  (CoreDoFloatOutwards (FloatOutSw False    -- Not lambdas
+					   True)),  -- Float constants
 		-- nofib/spectral/hartel/wang doubles in speed if you
 		-- do full laziness late in the day.  It only happens
 		-- after fusion and other stuff, so the early pass doesn't
@@ -760,38 +757,29 @@ getCoreToDo dflags
 		--	  f_el22 (f_el21 r_midblock)
 
 
-	-- We want CSE to follow the final full-laziness pass, because it may
-	-- succeed in commoning up things floated out by full laziness.
-	-- CSE used to rely on the no-shadowing invariant, but it doesn't any more
-
-	if cse then CoreCSE else CoreDoNothing,
+	runWhen cse CoreCSE,
+		-- We want CSE to follow the final full-laziness pass, because it may
+		-- succeed in commoning up things floated out by full laziness.
+		-- CSE used to rely on the no-shadowing invariant, but it doesn't any more
 
 	CoreDoFloatInwards,
 
--- Case-liberation for -O2.  This should be after
--- strictness analysis and the simplification which follows it.
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
-	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing }
-     ]
-
-	++ 
-
-     (if opt_level >= 2 then
-	   [  CoreLiberateCase,
-	      CoreDoSimplify (SimplPhase 0) [
+		-- Case-liberation for -O2.  This should be after
+		-- strictness analysis and the simplification which follows it.
+	runWhen liberate_case (CoreDoPasses [
+	    CoreLiberateCase,
+	    CoreDoSimplify (SimplPhase 0) [
 		  MaxSimplifierIterations max_iter
-	      ],	-- Run the simplifier after LiberateCase to vastly 
+	    ] ]),	-- Run the simplifier after LiberateCase to vastly 
 			-- reduce the possiblility of shadowing
 			-- Reason: see Note [Shadowing] in SpecConstr.lhs
-	     CoreDoSpecConstr
-	   ]
-      else
-	   [])
 
-	++
+	runWhen spec_constr CoreDoSpecConstr,
 
 	-- Final clean-up simplification:
-     [	CoreDoSimplify (SimplPhase 0) [
+     	CoreDoSimplify (SimplPhase 0) [
 	  MaxSimplifierIterations max_iter
 	]
      ]
@@ -995,7 +983,11 @@ dynamic_flags = [
 
   ,  ( "fmax-simplifier-iterations", IntSuffix (\n -> 
 		upd (\dfs -> dfs{ maxSimplIterations = n })) )
-  ,  ( "fliberate-case-threshold", IntSuffix (\n -> upd (\dfs -> dfs{ libCaseThreshold = n })))
+
+	-- liberate-case-threshold is an old flag for '-fspec-threshold'
+  ,  ( "fspec-threshold",          IntSuffix (\n -> upd (\dfs -> dfs{ specThreshold = n })))
+  ,  ( "fliberate-case-threshold", IntSuffix (\n -> upd (\dfs -> dfs{ specThreshold = n })))
+
   ,  ( "frule-check", SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
   ,  ( "fcontext-stack"	, IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
 
@@ -1055,6 +1047,8 @@ fFlags = [
   ( "generics",  			Opt_Generics ),
   ( "strictness",			Opt_Strictness ),
   ( "full-laziness",			Opt_FullLaziness ),
+  ( "liberate-case",			Opt_LiberateCase ),
+  ( "spec-constr",			Opt_SpecConstr ),
   ( "cse",				Opt_CSE ),
   ( "ignore-interface-pragmas",		Opt_IgnoreInterfacePragmas ),
   ( "omit-interface-pragmas",		Opt_OmitInterfacePragmas ),

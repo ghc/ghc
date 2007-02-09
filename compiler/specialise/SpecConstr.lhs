@@ -11,8 +11,10 @@ module SpecConstr(
 #include "HsVersions.h"
 
 import CoreSyn
+import CoreSubst
+import CoreUtils
+import CoreUnfold	( couldBeSmallEnoughToInline )
 import CoreLint		( showPass, endPass )
-import CoreUtils	( exprType, mkPiTypes )
 import CoreFVs 		( exprsFreeVars )
 import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
@@ -20,7 +22,6 @@ import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, dataConUnivTyVars )
 import Type		( Type, tyConAppArgs )
 import Coercion		( coercionKind )
-import Rules		( matchN )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, 
 			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
 import Var		( Var )
@@ -30,10 +31,10 @@ import Name		( nameOccName, nameSrcLoc )
 import Rules		( addIdSpecialisations, mkLocalRule, rulesOfBinds )
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
-import DynFlags		( DynFlags, DynFlag(..) )
+import DynFlags		( DynFlags(..), DynFlag(..) )
 import BasicTypes	( Activation(..) )
-import Maybes		( orElse, catMaybes, isJust )
-import Util		( zipWithEqual, lengthAtLeast, notNull )
+import Maybes		( orElse, catMaybes )
+import Util
 import List		( nubBy, partition )
 import UniqSupply
 import Outputable
@@ -425,7 +426,7 @@ specConstrProgram dflags us binds
   = do
 	showPass dflags "SpecConstr"
 
-	let (binds', _) = initUs us (go emptyScEnv binds)
+	let (binds', _) = initUs us (go (initScEnv dflags) binds)
 
 	endPass dflags "SpecConstr" Opt_D_dump_spec binds'
 
@@ -448,13 +449,19 @@ specConstrProgram dflags us binds
 %************************************************************************
 
 \begin{code}
-data ScEnv = SCE { scope :: InScopeEnv,
-			-- Binds all non-top-level variables in scope
+data ScEnv = SCE { sc_size :: Int,	-- Size threshold
 
-		   cons  :: ConstrEnv
+		   sc_subst :: Subst,	-- Current subsitution
+
+		   sc_how_bound :: HowBoundEnv,
+			-- Binds interesting non-top-level variables
+			-- Look up in here *after* applying the substitution
+
+		   sc_cons  :: ConstrEnv
+			-- Look up in here *after* applying the substitution
 	     }
 
-type InScopeEnv = VarEnv HowBound
+type HowBoundEnv = VarEnv HowBound
 
 type ConstrEnv = IdEnv ConValue
 data ConValue  = CV AltCon [CoreArg]
@@ -465,7 +472,11 @@ data ConValue  = CV AltCon [CoreArg]
 instance Outputable ConValue where
    ppr (CV con args) = ppr con <+> interpp'SP args
 
-emptyScEnv = SCE { scope = emptyVarEnv, cons = emptyVarEnv }
+initScEnv dflags
+  = SCE { sc_size = specThreshold dflags,
+	  sc_subst = emptySubst, 
+	  sc_how_bound = emptyVarEnv, 
+	  sc_cons = emptyVarEnv }
 
 data HowBound = RecFun	-- These are the recursive functions for which 
 			-- we seek interesting call patterns
@@ -473,63 +484,83 @@ data HowBound = RecFun	-- These are the recursive functions for which
 	      | RecArg	-- These are those functions' arguments, or their sub-components; 
 			-- we gather occurrence information for these
 
-	      | Other	-- We track all others so we know what's in scope
-			-- This is used in spec_one to check what needs to be
-			-- passed as a parameter and what is in scope at the 
-			-- function definition site
-
 instance Outputable HowBound where
   ppr RecFun = text "RecFun"
   ppr RecArg = text "RecArg"
-  ppr Other = text "Other"
 
-lookupScopeEnv env v = lookupVarEnv (scope env) v
+lookupHowBound :: ScEnv -> Id -> Maybe HowBound
+lookupHowBound env id = lookupVarEnv (sc_how_bound env) id
 
+scSubstId :: ScEnv -> Id -> CoreExpr
+scSubstId env v = lookupIdSubst (sc_subst env) v
 
-extendBndrsWith :: HowBound -> ScEnv -> [Var] -> ScEnv
+scSubstTy :: ScEnv -> Type -> Type
+scSubstTy env ty = substTy (sc_subst env) ty
+
+zapScSubst :: ScEnv -> ScEnv
+zapScSubst env = env { sc_subst = zapSubstEnv (sc_subst env) }
+
+extendScInScope :: ScEnv -> [Var] -> ScEnv
+	-- Bring the quantified variables into scope
+extendScInScope env qvars = env { sc_subst = extendInScopeList (sc_subst env) qvars }
+
+extendScSubst :: ScEnv -> [(Var,CoreArg)] -> ScEnv
+	-- Extend the substitution
+extendScSubst env prs = env { sc_subst = extendSubstList (sc_subst env) prs }
+
+extendHowBound :: ScEnv -> [Var] -> HowBound -> ScEnv
+extendHowBound env bndrs how_bound
+  = env { sc_how_bound = extendVarEnvList (sc_how_bound env)
+			    [(bndr,how_bound) | bndr <- bndrs] }
+
+extendBndrsWith :: HowBound -> ScEnv -> [Var] -> (ScEnv, [Var])
 extendBndrsWith how_bound env bndrs 
-  =  env { scope = scope env `extendVarEnvList` 
-			[(bndr,how_bound) | bndr <- bndrs] }
-
-extendBndrs env bndrs = extendBndrsWith Other env bndrs
-extendBndr  env bndr  = env { scope = extendVarEnv (scope env) bndr Other }
-
-    -- When we encounter
-    --	case scrut of b
-    --	    C x y -> ...
-    -- we want to bind b, and perhaps scrut too, to (C x y)
-extendCaseBndrs :: ScEnv -> Id -> CoreExpr -> AltCon -> [Var] -> ScEnv
-extendCaseBndrs env case_bndr scrut con alt_bndrs
-  = case con of
-	DEFAULT    -> env1
-	LitAlt lit -> extendCons env1 scrut case_bndr (CV con [])
-	DataAlt dc -> extendCons env1 scrut case_bndr (CV con vanilla_args)
-	      where
-        	vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
-			       varsToCoreExprs alt_bndrs
+  = (env { sc_subst = subst', sc_how_bound = hb_env' }, bndrs')
   where
-    env1 = extendBndrsWith (get_how scrut) env (case_bndr:alt_bndrs)
+    (subst', bndrs') = substBndrs (sc_subst env) bndrs
+    hb_env' = sc_how_bound env `extendVarEnvList` 
+		    [(bndr,how_bound) | bndr <- bndrs']
 
-	-- Record RecArg for the components iff the scrutinee is RecArg
-	-- I think the only reason for this is to keep the usage envt small
-	-- so is it worth it at all?
-	--	[This comment looks plain wrong to me, so I'm ignoring it
-	-- 	     "Also forget if the scrutinee is a RecArg, because we're
-	-- 	     now in the branch of a case, and we don't want to
-	-- 	     record a non-scrutinee use of v if we have
-	-- 	     	case v of { (a,b) -> ...(f v)... }" ]
-    get_how (Var v)    = lookupVarEnv (scope env) v `orElse` Other
-    get_how (Cast e _) = get_how e
-    get_how (Note _ e) = get_how e
-    get_how other      = Other
+extendBndrWith :: HowBound -> ScEnv -> Var -> (ScEnv, Var)
+extendBndrWith how_bound env bndr 
+  = (env { sc_subst = subst', sc_how_bound = hb_env' }, bndr')
+  where
+    (subst', bndr') = substBndr (sc_subst env) bndr
+    hb_env' = extendVarEnv (sc_how_bound env) bndr' how_bound
 
-extendCons :: ScEnv -> CoreExpr -> Id -> ConValue -> ScEnv
-extendCons env scrut case_bndr val
+extendRecBndrs :: ScEnv -> [Var] -> (ScEnv, [Var])
+extendRecBndrs env bndrs  = (env { sc_subst = subst' }, bndrs')
+		      where
+			(subst', bndrs') = substRecBndrs (sc_subst env) bndrs
+
+extendBndr :: ScEnv -> Var -> (ScEnv, Var)
+extendBndr  env bndr  = (env { sc_subst = subst' }, bndr')
+		      where
+			(subst', bndr') = substBndr (sc_subst env) bndr
+
+extendConEnv :: ScEnv -> Id -> Maybe ConValue -> ScEnv
+extendConEnv env id Nothing   = env
+extendConEnv env id (Just cv) = env { sc_cons = extendVarEnv (sc_cons env) id cv }
+
+extendCaseBndrs :: ScEnv -> CoreExpr -> Id -> AltCon -> [Var] -> ScEnv
+-- When we encounter
+--	case scrut of b
+--	    C x y -> ...
+-- we want to bind b, and perhaps scrut too, to (C x y)
+-- NB: Extends only the sc_cons part of the envt
+extendCaseBndrs env scrut case_bndr con alt_bndrs
   = case scrut of
-	Var v -> env { cons = extendVarEnv cons1 v val }
-	other -> env { cons = cons1 }
-  where
-    cons1 = extendVarEnv (cons env) case_bndr val
+	Var v -> extendConEnv env1 v cval
+	other -> env1
+ where
+   env1 = extendConEnv env case_bndr cval
+   cval = case con of
+		DEFAULT    -> Nothing
+		LitAlt lit -> Just (CV con [])
+		DataAlt dc -> Just (CV con vanilla_args)
+		      where
+		       	vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
+				       varsToCoreExprs alt_bndrs
 \end{code}
 
 
@@ -542,7 +573,7 @@ extendCons env scrut case_bndr val
 \begin{code}
 data ScUsage
    = SCU {
-	calls :: !(IdEnv [Call]),	-- Calls
+	calls :: CallEnv,		-- Calls
 					-- The functions are a subset of the 
 					-- 	RecFuns in the ScEnv
 
@@ -550,13 +581,17 @@ data ScUsage
      }					-- The variables are a subset of the 
 					--	RecArg in the ScEnv
 
+type CallEnv = IdEnv [Call]
 type Call = (ConstrEnv, [CoreArg])
 	-- The arguments of the call, together with the
 	-- env giving the constructor bindings at the call site
 
 nullUsage = SCU { calls = emptyVarEnv, occs = emptyVarEnv }
 
-combineUsage u1 u2 = SCU { calls = plusVarEnv_C (++) (calls u1) (calls u2),
+combineCalls :: CallEnv -> CallEnv -> CallEnv
+combineCalls = plusVarEnv_C (++)
+
+combineUsage u1 u2 = SCU { calls = combineCalls (calls u1) (calls u2),
 			   occs  = plusVarEnv_C combineOcc (occs u1) (occs u2) }
 
 combineUsages [] = nullUsage
@@ -618,6 +653,17 @@ combineOcc _	    _	     	       = BothOcc
 combineOccs :: [ArgOcc] -> [ArgOcc] -> [ArgOcc]
 combineOccs xs ys = zipWithEqual "combineOccs" combineOcc xs ys
 
+setScrutOcc :: ScEnv -> ScUsage -> CoreExpr -> ArgOcc -> ScUsage
+-- *Overwrite* the occurrence info for the scrutinee, if the scrutinee 
+-- is a variable, and an interesting variable
+setScrutOcc env usg (Cast e _) occ = setScrutOcc env usg e occ
+setScrutOcc env usg (Note _ e) occ = setScrutOcc env usg e occ
+setScrutOcc env usg (Var v)    occ
+  | Just RecArg <- lookupHowBound env v = usg { occs = extendVarEnv (occs usg) v occ }
+  | otherwise				= usg
+setScrutOcc env usg other occ	-- Catch-all
+  = usg	
+
 conArgOccs :: ArgOcc -> AltCon -> [ArgOcc]
 -- Find usage of components of data con; returns [UnkOcc...] if unknown
 -- See Note [ScrutOcc] for the extra UnkOccs in the vanilla datacon case
@@ -628,7 +674,6 @@ conArgOccs (ScrutOcc fm) (DataAlt dc)
 
 conArgOccs other con = repeat UnkOcc
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -644,113 +689,192 @@ scExpr :: ScEnv -> CoreExpr -> UniqSM (ScUsage, CoreExpr)
 	-- The unique supply is needed when we invent
 	-- a new name for the specialised function and its args
 
-scExpr env e@(Type t) = returnUs (nullUsage, e)
-scExpr env e@(Lit l)  = returnUs (nullUsage, e)
-scExpr env e@(Var v)  = returnUs (varUsage env v UnkOcc, e)
-scExpr env (Note n e) = scExpr env e	`thenUs` \ (usg,e') ->
-			returnUs (usg, Note n e')
-scExpr env (Cast e co)= scExpr env e	`thenUs` \ (usg,e') ->
-                        returnUs (usg, Cast e' co)
-scExpr env (Lam b e)  = scExpr (extendBndr env b) e	`thenUs` \ (usg,e') ->
-			returnUs (usg, Lam b e')
+scExpr env e = scExpr' env e
 
-scExpr env (Case scrut b ty alts) 
-  = do	{ (alt_usgs, alt_occs, alts') <- mapAndUnzip3Us sc_alt alts
-	; let (alt_usg, b_occ) = lookupOcc (combineUsages alt_usgs) b
-	      scrut_occ = foldr combineOcc b_occ alt_occs
-		-- The combined usage of the scrutinee is given
-		-- by scrut_occ, which is passed to scScrut, which
-		-- in turn treats a bare-variable scrutinee specially
-	; (scrut_usg, scrut') <- scScrut env scrut scrut_occ
-	; return (alt_usg `combineUsage` scrut_usg,
-		  Case scrut' b ty alts') }
+
+scExpr' env (Var v)     = case scSubstId env v of
+		       	    Var v' -> returnUs (varUsage env v UnkOcc, Var v')
+		            e'     -> scExpr (zapScSubst env) e'
+
+scExpr' env e@(Type t)  = returnUs (nullUsage, Type (scSubstTy env t))
+scExpr' env e@(Lit l)   = returnUs (nullUsage, e)
+scExpr' env (Note n e)  = do { (usg,e') <- scExpr env e
+			    ; return (usg, Note n e') }
+scExpr' env (Cast e co) = do { (usg, e') <- scExpr env e
+		            ; return (usg, Cast e' (scSubstTy env co)) }
+scExpr' env (Lam b e)   = do { let (env', b') = extendBndr env b
+			    ; (usg, e') <- scExpr env' e
+			    ; return (usg, Lam b' e') }
+
+scExpr' env (Case scrut b ty alts) 
+  = do	{ (scrut_usg, scrut') <- scExpr env scrut
+	; case isConApp (sc_cons env) scrut' of
+		Nothing   -> sc_vanilla scrut_usg scrut'
+		Just cval -> sc_con_app cval scrut'
+	}
   where
-    sc_alt (con,bs,rhs)
-      = do { let env1 = extendCaseBndrs env b scrut con bs
-	   ; (usg,rhs') <- scExpr env1 rhs
+    sc_con_app cval@(CV con args) scrut' 	-- Known constructor; simplify
+	= do { let (_, bs, rhs) = findAlt con alts
+		   alt_env' = extendScSubst env ((b,scrut') : bs `zip` trimConArgs con args)
+	     ; scExpr alt_env' rhs }
+
+				
+    sc_vanilla scrut_usg scrut'	-- Normal case
+     = do { let (alt_env,b') = extendBndrWith RecArg env b
+			-- Record RecArg for the components
+
+	  ; (alt_usgs, alt_occs, alts')
+		<- mapAndUnzip3Us (sc_alt alt_env scrut' b') alts
+
+	  ; let (alt_usg, b_occ) = lookupOcc (combineUsages alt_usgs) b
+		scrut_occ        = foldr combineOcc b_occ alt_occs
+		scrut_usg'       = setScrutOcc env scrut_usg scrut' scrut_occ
+	  	-- The combined usage of the scrutinee is given
+	  	-- by scrut_occ, which is passed to scScrut, which
+	  	-- in turn treats a bare-variable scrutinee specially
+
+	  ; return (alt_usg `combineUsage` scrut_usg',
+	  	    Case scrut' b' (scSubstTy env ty) alts') }
+
+    sc_alt env scrut' b' (con,bs,rhs)
+      = do { let (env1, bs') = extendBndrsWith RecArg env bs
+		 env2        = extendCaseBndrs env1 scrut' b' con bs'
+	   ; (usg,rhs') <- scExpr env2 rhs
 	   ; let (usg', arg_occs) = lookupOccs usg bs
 		 scrut_occ = case con of
 				DataAlt dc -> ScrutOcc (unitUFM dc arg_occs)
 				other	   -> ScrutOcc emptyUFM
-	   ; return (usg', scrut_occ, (con,bs,rhs')) }
+	   ; return (usg', scrut_occ, (con,bs',rhs')) }
 
-scExpr env (Let bind body)
-  = scBind env bind	`thenUs` \ (env', bind_usg, bind') ->
-    scExpr env' body	`thenUs` \ (body_usg, body') ->
-    returnUs (bind_usg `combineUsage` body_usg, Let bind' body')
+scExpr' env (Let (NonRec bndr rhs) body)
+  = do	{ (rhs_usg, rhs_info@(_, args', rhs_body', _)) <- scRecRhs env (bndr,rhs)
+	; if null args' || isEmptyVarEnv (calls rhs_usg) then do
+	    do	{ 	-- Vanilla case
+		  let rhs' = mkLams args' rhs_body'
+		      (body_env, bndr') = extendBndr env bndr
+		      body_env2 = extendConEnv body_env bndr' (isConApp (sc_cons env) rhs')
+			-- Record if the RHS is a constructor
+		; (body_usg, body') <- scExpr body_env2 body
+		; return (body_usg `combineUsage` rhs_usg, Let (NonRec bndr' rhs') body') }
+	  else 
+	    do	{ 	-- Join-point case
+		  let (body_env, bndr') = extendBndrWith RecFun env bndr
+			-- If the RHS of this 'let' contains calls
+			-- to recursive functions that we're trying
+			-- to specialise, then treat this let too
+			-- as one to specialise
+		; (body_usg, body') <- scExpr body_env body
 
-scExpr env e@(App _ _) 
+		; (spec_usg, _, specs) <- specialise env (calls body_usg) ([], rhs_info)
+
+		; return (body_usg { calls = calls body_usg `delVarEnv` bndr' } 
+			  `combineUsage` rhs_usg `combineUsage` spec_usg,
+			  mkLets [NonRec b r | (b,r) <- addRules rhs_info specs] body')
+	}	}
+
+scExpr' env (Let (Rec prs) body)
+  = do	{ (env', bind_usg, bind') <- scBind env (Rec prs)
+	; (body_usg, body') <- scExpr env' body
+	; return (bind_usg `combineUsage` body_usg, Let bind' body') }
+
+scExpr' env e@(App _ _) 
   = do	{ let (fn, args) = collectArgs e
-	; (fn_usg, fn') <- scScrut env fn (ScrutOcc emptyUFM)
+	; (fn_usg, fn') <- scExpr env fn
 	-- Process the function too.   It's almost always a variable,
 	-- but not always.  In particular, if this pass follows float-in,
 	-- which it may, we can get 
 	--	(let f = ...f... in f) arg1 arg2
-	-- We use scScrut to record the fact that the function is called
-	-- Perhpas we should check that it has at least one value arg, 
+	-- Also the substitution may replace a variable by a non-variable
+
+	; let fn_usg' = setScrutOcc env fn_usg fn' (ScrutOcc emptyUFM)
+	-- We use setScrutOcc to record the fact that the function is called
+	-- Perhaps we should check that it has at least one value arg, 
 	-- but currently we don't bother
 
 	; (arg_usgs, args') <- mapAndUnzipUs (scExpr env) args
-	; let call_usg = case fn of
-		 	   Var f | Just RecFun <- lookupScopeEnv env f
+	; let call_usg = case fn' of
+		 	   Var f | Just RecFun <- lookupHowBound env f
 				 , not (null args)	-- Not a proper call!
-			         -> SCU { calls = unitVarEnv f [(cons env, args)], 
+			         -> SCU { calls = unitVarEnv f [(sc_cons env, args')], 
 				          occs  = emptyVarEnv }
 			   other -> nullUsage
-	; return (combineUsages arg_usgs `combineUsage` fn_usg 
+	; return (combineUsages arg_usgs `combineUsage` fn_usg' 
 				         `combineUsage` call_usg,
 	          mkApps fn' args') }
 
 
 ----------------------
-scScrut :: ScEnv -> CoreExpr -> ArgOcc -> UniqSM (ScUsage, CoreExpr)
--- Used for the scrutinee of a case, 
--- or the function of an application.
--- Remember to look through casts
-scScrut env e@(Var v)   occ = returnUs (varUsage env v occ, e)
-scScrut env (Cast e co) occ = do { (usg, e') <- scScrut env e occ
-				 ; returnUs (usg, Cast e' co) }
-scScrut env e	        occ = scExpr env e
-
-
-----------------------
 scBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, ScUsage, CoreBind)
 scBind env (Rec prs)
-  = do	{ let bndrs = map fst prs
-	      rhs_env = extendBndrsWith RecFun env bndrs
+  | not (all (couldBeSmallEnoughToInline (sc_size env)) rhss)
+		-- No specialisation
+  = do	{ let (rhs_env,bndrs') = extendRecBndrs env bndrs
+	; (rhs_usgs, rhss') <- mapAndUnzipUs (scExpr rhs_env) rhss
+	; return (rhs_env, combineUsages rhs_usgs, Rec (bndrs' `zip` rhss')) }
+  | otherwise	-- Do specialisation
+  = do	{ let (rhs_env1,bndrs') = extendRecBndrs env bndrs
+	      rhs_env2 = extendHowBound rhs_env1 bndrs RecFun
 
-	; (rhs_usgs, prs_w_occs) <- mapAndUnzipUs (scRecRhs rhs_env) prs
-	; let rhs_usg   = combineUsages rhs_usgs
-	      rhs_calls = calls rhs_usg
+	; (rhs_usgs, rhs_infos) <- mapAndUnzipUs (scRecRhs rhs_env2) (bndrs' `zip` rhss)
+	; let rhs_usg = combineUsages rhs_usgs
 
-	; prs_s <- mapUs (specialise env rhs_calls) prs_w_occs
-	; return (extendBndrs env bndrs, 
-				-- For the body of the letrec, just
-				-- extend the env with Other to record 
-				-- that it's in scope; no funny RecFun business
-		    rhs_usg { calls = calls rhs_usg `delVarEnvList` bndrs },
-		    Rec (concat prs_s)) }
+	; (spec_usg, specs) <- spec_loop rhs_env2 (calls rhs_usg)
+					 (repeat [] `zip` rhs_infos)
+
+	; let all_usg = rhs_usg `combineUsage` spec_usg
+
+	; return (rhs_env1,  -- For the body of the letrec, delete the RecFun business
+		  all_usg { calls = calls rhs_usg `delVarEnvList` bndrs' },
+		  Rec (concat (zipWith addRules rhs_infos specs))) }
+  where
+    (bndrs,rhss) = unzip prs
+
+    spec_loop :: ScEnv
+	      -> CallEnv
+	      -> [([CallPat], RhsInfo)]			-- One per binder
+	      -> UniqSM (ScUsage, [[SpecInfo]])		-- One list per binder
+    spec_loop env all_calls rhs_stuff
+	= do { (spec_usg_s, new_pats_s, specs) <- mapAndUnzip3Us (specialise env all_calls) rhs_stuff
+	     ; let spec_usg = combineUsages spec_usg_s
+	     ; if all null new_pats_s then
+		return (spec_usg, specs) else do
+	     { (spec_usg1, specs1) <- spec_loop env (calls spec_usg) 
+						(zipWith add_pats new_pats_s rhs_stuff)
+	     ; return (spec_usg `combineUsage` spec_usg1, zipWith (++) specs specs1) } }
+
+    add_pats :: [CallPat] -> ([CallPat], RhsInfo) -> ([CallPat], RhsInfo)
+    add_pats new_pats (done_pats, rhs_info) = (done_pats ++ new_pats, rhs_info)
 
 scBind env (NonRec bndr rhs)
   = do	{ (usg, rhs') <- scExpr env rhs
-	; return (extendBndr env bndr, usg, NonRec bndr rhs') }
+	; let (env', bndr') = extendBndr env bndr
+	; return (env', usg, NonRec bndr' rhs') }
 
 ----------------------
-scRecRhs :: ScEnv -> (Id,CoreExpr)
-	 -> UniqSM (ScUsage, (Id, CoreExpr, [ArgOcc]))
--- The returned [ArgOcc] says how the visible,
--- lambda-bound binders of the RHS are used
--- (including the TyVar binders)
+scRecRhs :: ScEnv -> (Id,CoreExpr) -> UniqSM (ScUsage, RhsInfo)
 scRecRhs env (bndr,rhs)
   = do	{ let (arg_bndrs,body) = collectBinders rhs
-	      body_env = extendBndrsWith RecArg env arg_bndrs
+	      (body_env, arg_bndrs') = extendBndrsWith RecArg env arg_bndrs
 	; (body_usg, body') <- scExpr body_env body
-	; let (rhs_usg, arg_occs) = lookupOccs body_usg arg_bndrs
-	; return (rhs_usg, (bndr, mkLams arg_bndrs body', arg_occs)) }
+	; let (rhs_usg, arg_occs) = lookupOccs body_usg arg_bndrs'
+	; return (rhs_usg, (bndr, arg_bndrs', body', arg_occs)) }
+
+		-- The arg_occs says how the visible,
+		-- lambda-bound binders of the RHS are used
+		-- (including the TyVar binders)
+	 	-- Two pats are the same if they match both ways
+
+----------------------
+addRules :: RhsInfo -> [SpecInfo] -> [(Id,CoreExpr)]
+addRules (fn, args, body, _) specs
+  = [(id,rhs) | (_,id,rhs) <- specs] ++ 
+    [(fn `addIdSpecialisations` rules, mkLams args body)]
+  where
+    rules = [r | (r,_,_) <- specs]
 
 ----------------------
 varUsage env v use 
-  | Just RecArg <- lookupScopeEnv env v = SCU { calls = emptyVarEnv, 
+  | Just RecArg <- lookupHowBound env v = SCU { calls = emptyVarEnv, 
 						occs = unitVarEnv v use }
   | otherwise		   	        = nullUsage
 \end{code}
@@ -758,83 +882,54 @@ varUsage env v use
 
 %************************************************************************
 %*									*
-\subsection{The specialiser}
+		The specialiser itself
 %*									*
 %************************************************************************
 
 \begin{code}
+type RhsInfo = (Id, [Var], CoreExpr, [ArgOcc])
+	-- Info about the *original* RHS of a binding we are specialising
+ 	-- Original binding f = \xs.body
+	-- Plus info about usage of arguments
+
+type SpecInfo = (CoreRule, Var, CoreExpr)
+	-- One specialisation: Rule plus definition
+
+
 specialise 
    :: ScEnv
-   -> IdEnv [Call]		-- Info on usage
-   -> (Id, CoreExpr, [ArgOcc])	-- Original binding, plus info on how the rhs's
-				-- lambda-binders are used (includes TyVar bndrs)
-   -> UniqSM [(Id,CoreExpr)]	-- Original binding (decorated with rules)
-				-- plus specialised bindings
+   -> CallEnv				-- Info on calls
+   -> ([CallPat], RhsInfo)		-- Original RHS plus patterns dealt with
+   -> UniqSM (ScUsage, [CallPat], [SpecInfo])	-- Specialised calls
 
 -- Note: the rhs here is the optimised version of the original rhs
 -- So when we make a specialised copy of the RHS, we're starting
 -- from an RHS whose nested functions have been optimised already.
 
-specialise env calls (fn, rhs, arg_occs)
-  | notNull arg_occs,	-- Only specialise functions
-    Just all_calls <- lookupVarEnv calls fn
-  = do	{ mb_pats <- mapM (callToPats (scope env) arg_occs) all_calls
-
-	; let good_pats :: [([Var], [CoreArg])]
-	      good_pats = catMaybes mb_pats
-	      in_scope = mkInScopeSet $ unionVarSets $
-			 [ exprsFreeVars pats
-			 | (vs,pats) <- good_pats ]
-		-- This in-scope set is used when matching to see if
-		-- we have identical patterns.  We want to treat the
-		-- forall'd variables of each pattern as "in scope",
-		-- because each in turn serves as the match target for
-		-- a matchN call.  So don't remove the 'vs' from the free vars!
-	      uniq_pats = nubBy (same_pat in_scope) good_pats
+specialise env bind_calls (done_pats, (fn, arg_bndrs, body, arg_occs))
+  | notNull arg_bndrs,	-- Only specialise functions
+    Just all_calls <- lookupVarEnv bind_calls fn
+  = do	{ pats <- callsToPats env done_pats arg_occs all_calls
 --	; pprTrace "specialise" (vcat [ppr fn <+> ppr arg_occs,
 --	  				text "calls" <+> ppr all_calls,
---	  				text "good pats" <+> ppr good_pats,
---	  			text "uniq pats" <+> ppr uniq_pats])  $
+--	  				text "good pats" <+> ppr pats])  $
 --	  return ()
 
- 	; (rules, spec_prs) <- mapAndUnzipUs (spec_one fn rhs) 
-					     (uniq_pats `zip` [1..])
+	; (spec_usgs, specs) <- mapAndUnzipUs (spec_one env fn arg_bndrs body)
+					      (pats `zip` [length done_pats..])
 
-	; return ((fn `addIdSpecialisations` rules, rhs) : spec_prs) }
-
+	; return (combineUsages spec_usgs, pats, specs) }
   | otherwise
-  = return [(fn,rhs)]	-- The boring case
-  where
-	-- Two pats are the same if they match both ways
-    same_pat in_scope (vs1,as1)(vs2,as2)
-	=  isJust (matchN in_scope vs1 as1 as2)
-	&& isJust (matchN in_scope vs2 as2 as1)
+  = return (nullUsage, [], [])		-- The boring case
 
-callToPats :: InScopeEnv -> [ArgOcc] -> Call
-	   -> UniqSM (Maybe ([Var], [CoreExpr]))
-	-- The VarSet is the variables to quantify over in the rule
-	-- The [CoreExpr] are the argument patterns for the rule
-callToPats in_scope bndr_occs (con_env, args)
-  | length args < length bndr_occs	-- Check saturated
-  = return Nothing
-  | otherwise
-  = do	{ prs <- argsToPats in_scope con_env (args `zip` bndr_occs)
-	; let (good_pats, pats) = unzip prs
-	      pat_fvs = varSetElems (exprsFreeVars pats)
-	      qvars   = filter (not . (`elemVarEnv` in_scope)) pat_fvs
-		-- Quantify over variables that are not in sccpe
-		-- See Note [Shadowing] at the top
-		
-	; -- pprTrace "callToPats"  (ppr args $$ ppr prs $$ ppr bndr_occs) $
-	  if or good_pats 
-	  then return (Just (qvars, pats))
-	  else return Nothing }
 
 ---------------------
-spec_one :: Id					-- Function
-	 -> CoreExpr				-- Rhs of the original function
+spec_one :: ScEnv
+	 -> Id		-- Function
+	 -> [Var]	-- Lambda-binders of RHS; should match patterns
+	 -> CoreExpr	-- Body of the original function
 	 -> (([Var], [CoreArg]), Int)
-	 -> UniqSM (CoreRule, (Id,CoreExpr))	-- Rule and binding
+	 -> UniqSM (ScUsage, SpecInfo)	-- Rule and binding
 
 -- spec_one creates a specialised copy of the function, together
 -- with a rule for using it.  I'm very proud of how short this
@@ -848,7 +943,8 @@ spec_one :: Id					-- Function
 	  [c::*, v::(b,c) are presumably bound by the (...) part]
   ==>
      f_spec = /\ b c \ v::(b,c) hw::[(a,(b,c))] ->
-		  (...entire RHS of f...) (b,c) ((:) (a,(b,c)) (x,v) hw)
+		  (...entire body of f...) [b -> (b,c), 
+  					    y -> ((:) (a,(b,c)) (x,v) hw)]
   
      RULE:  forall b::* c::*,		-- Note, *not* forall a, x
 		   v::(b,c),
@@ -857,31 +953,32 @@ spec_one :: Id					-- Function
 	    f (b,c) ((:) (a,(b,c)) (x,v) hw) = f_spec b c v hw
 -}
 
-spec_one fn rhs ((vars_to_bind, pats), rule_number)
-  = getUniqueUs 		`thenUs` \ spec_uniq ->
-    let 
-	fn_name      = idName fn
-	fn_loc       = nameSrcLoc fn_name
-	spec_occ     = mkSpecOcc (nameOccName fn_name)
+spec_one env fn arg_bndrs body ((qvars, pats), rule_number)
+  = do	{ 	-- Specialise the body
+	  let spec_env = extendScSubst (extendScInScope env qvars)
+				       (arg_bndrs `zip` pats)
+	; (spec_usg, spec_body) <- scExpr spec_env body
 
-		-- Put the type variables first; the type of a term
-		-- variable may mention a type variable
-	(tvs, ids)   = partition isTyVar vars_to_bind
-	bndrs  	     = tvs ++ ids
-	spec_body    = mkApps rhs pats
-	body_ty	     = exprType spec_body
+--	; pprTrace "spec_one" (ppr fn <+> vcat [text "pats" <+> ppr pats,
+--			text "calls" <+> (ppr (calls spec_usg))])
+--	  (return ())
+
+		-- And build the results
+	; spec_uniq <- getUniqueUs
+	; let (spec_lam_args, spec_call_args) = mkWorkerArgs qvars body_ty
+	      	-- Usual w/w hack to avoid generating 
+	      	-- a spec_rhs of unlifted type and no args
 	
-	(spec_lam_args, spec_call_args) = mkWorkerArgs bndrs body_ty
-		-- Usual w/w hack to avoid generating 
-		-- a spec_rhs of unlifted type and no args
-	
-	rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
-	spec_rhs  = mkLams spec_lam_args spec_body
-	spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
-	rule_rhs  = mkVarApps (Var spec_id) spec_call_args
-	rule      = mkLocalRule rule_name specConstrActivation fn_name bndrs pats rule_rhs
-    in
-    returnUs (rule, (spec_id, spec_rhs))
+	      fn_name   = idName fn
+	      fn_loc    = nameSrcLoc fn_name
+	      spec_occ  = mkSpecOcc (nameOccName fn_name)
+	      rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
+	      spec_rhs  = mkLams spec_lam_args spec_body
+	      spec_id   = mkUserLocal spec_occ spec_uniq (mkPiTypes spec_lam_args body_ty) fn_loc
+	      body_ty   = exprType spec_body
+	      rule_rhs  = mkVarApps (Var spec_id) spec_call_args
+	      rule      = mkLocalRule rule_name specConstrActivation fn_name qvars pats rule_rhs
+	; return (spec_usg, (rule, spec_id, spec_rhs)) }
 
 -- In which phase should the specialise-constructor rules be active?
 -- Originally I made them always-active, but Manuel found that
@@ -906,13 +1003,56 @@ they are constructor applications.
 
 
 \begin{code}
+type CallPat = ([Var], [CoreExpr])	-- Quantified variables and arguments
+
+
+callsToPats :: ScEnv -> [CallPat] -> [ArgOcc] -> [Call] -> UniqSM [CallPat]
+	-- Result has no duplicate patterns, 
+	-- nor ones mentioned in done_pats
+callsToPats env done_pats bndr_occs calls
+  = do	{ mb_pats <- mapM (callToPats env bndr_occs) calls
+
+	; let good_pats :: [([Var], [CoreArg])]
+	      good_pats = catMaybes mb_pats
+	      is_done p = any (samePat p) done_pats
+
+	; return (filterOut is_done (nubBy samePat good_pats)) }
+
+callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
+	-- The [Var] is the variables to quantify over in the rule
+	--	Type variables come first, since they may scope 
+	--	over the following term variables
+	-- The [CoreExpr] are the argument patterns for the rule
+callToPats env bndr_occs (con_env, args)
+  | length args < length bndr_occs	-- Check saturated
+  = return Nothing
+  | otherwise
+  = do	{ let in_scope = substInScope (sc_subst env)
+	; prs <- argsToPats in_scope con_env (args `zip` bndr_occs)
+	; let (good_pats, pats) = unzip prs
+	      pat_fvs = varSetElems (exprsFreeVars pats)
+	      qvars   = filterOut (`elemInScopeSet` in_scope) pat_fvs
+		-- Quantify over variables that are not in sccpe
+		-- at the call site
+		-- See Note [Shadowing] at the top
+		
+	      (tvs, ids) = partition isTyVar qvars
+	      qvars'     = tvs ++ ids
+		-- Put the type variables first; the type of a term
+		-- variable may mention a type variable
+
+	; -- pprTrace "callToPats"  (ppr args $$ ppr prs $$ ppr bndr_occs) $
+	  if or good_pats 
+	  then return (Just (qvars', pats))
+	  else return Nothing }
+
     -- argToPat takes an actual argument, and returns an abstracted
     -- version, consisting of just the "constructor skeleton" of the
     -- argument, with non-constructor sub-expression replaced by new
     -- placeholder variables.  For example:
     --    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
 
-argToPat :: InScopeEnv			-- What's in scope at the fn defn site
+argToPat :: InScopeSet			-- What's in scope at the fn defn site
 	 -> ConstrEnv			-- ConstrEnv at the call site
 	 -> CoreArg			-- A call arg (or component thereof)
 	 -> ArgOcc
@@ -953,6 +1093,8 @@ argToPat in_scope con_env (Cast arg co) arg_occ
 	  else 
 		wildCardPat (snd (coercionKind co)) }
 
+{-	Disabling lambda specialisation for now
+	It's fragile, and the spec_loop can be infinite
 argToPat in_scope con_env arg arg_occ
   | is_value_lam arg
   = return (True, arg)
@@ -961,11 +1103,12 @@ argToPat in_scope con_env arg arg_occ
 	| isId v = True		-- it is inside a type lambda
 	| otherwise = is_value_lam e
     is_value_lam other = False
+-}
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
 argToPat in_scope con_env arg arg_occ
-  | Just (CV dc args) <- is_con_app_maybe con_env arg
+  | Just (CV dc args) <- isConApp con_env arg
   , case arg_occ of
 	ScrutOcc _ -> True		-- Used only by case scrutinee
 	BothOcc    -> case arg of	-- Used elsewhere
@@ -981,23 +1124,22 @@ argToPat in_scope con_env arg arg_occ
   --	(a) it's used in an interesting way in the body
   --	(b) we know what its value is
 argToPat in_scope con_env (Var v) arg_occ
-  | not (isLocalId v) || v `elemVarEnv` in_scope,
+  | not (isLocalId v) || v `elemInScopeSet` in_scope,
     case arg_occ of { UnkOcc -> False; other -> True },	-- (a)
     isValueUnfolding (idUnfolding v)			-- (b)
   = return (True, Var v)
 
-{-	I'm really not sure what this comment means
-	And by not wild-carding we tend to get forall'd 
-	variables that are in soope, which in turn can
-	expose the weakness in let-matching
-	See Note [Matching lets] in Rules
+--	I'm really not sure what this comment means
+--	And by not wild-carding we tend to get forall'd 
+--	variables that are in soope, which in turn can
+--	expose the weakness in let-matching
+--	See Note [Matching lets] in Rules
   -- Check for a variable bound inside the function. 
   -- Don't make a wild-card, because we may usefully share
   --	e.g.  f a = let x = ... in f (x,x)
   -- NB: this case follows the lambda and con-app cases!!
 argToPat in_scope con_env (Var v) arg_occ
   = return (False, Var v)
--}
 
   -- The default case: make a wild-card
 argToPat in_scope con_env arg arg_occ
@@ -1008,7 +1150,7 @@ wildCardPat ty = do { uniq <- getUniqueUs
 		    ; let id = mkSysLocal FSLIT("sc") uniq ty
 		    ; return (False, Var id) }
 
-argsToPats :: InScopeEnv -> ConstrEnv
+argsToPats :: InScopeSet -> ConstrEnv
 	   -> [(CoreArg, ArgOcc)]
 	   -> UniqSM [(Bool, CoreArg)]
 argsToPats in_scope con_env args
@@ -1019,34 +1161,70 @@ argsToPats in_scope con_env args
 
 
 \begin{code}
-is_con_app_maybe :: ConstrEnv -> CoreExpr -> Maybe ConValue
-is_con_app_maybe env (Lit lit)
+isConApp :: ConstrEnv -> CoreExpr -> Maybe ConValue
+isConApp env (Lit lit)
   = Just (CV (LitAlt lit) [])
 
-is_con_app_maybe env expr	-- Maybe it's a constructor application
+isConApp env expr	-- Maybe it's a constructor application
   | (Var fun, args) <- collectArgs expr,
     Just con <- isDataConWorkId_maybe fun,
     args `lengthAtLeast` dataConRepArity con
 	-- Might be > because the arity excludes type args
   = Just (CV (DataAlt con) args)
 
-is_con_app_maybe env (Var v)
+isConApp env (Var v)
   | Just stuff <- lookupVarEnv env v
   = Just stuff	-- You might think we could look in the idUnfolding here
 		-- but that doesn't take account of which branch of a 
 		-- case we are in, which is the whole point
 
-  | isCheapUnfolding unf
-  = is_con_app_maybe env (unfoldingTemplate unf)
+  | not (isLocalId v) && isCheapUnfolding unf
+  = isConApp env (unfoldingTemplate unf)
   where
     unf = idUnfolding v
 	-- However we do want to consult the unfolding 
 	-- as well, for let-bound constructors!
 
-is_con_app_maybe env expr = Nothing
+isConApp env expr = Nothing
 
 mk_con_app :: AltCon -> [CoreArg] -> CoreExpr
 mk_con_app (LitAlt lit)  []   = Lit lit
 mk_con_app (DataAlt con) args = mkConApp con args
 mk_con_app other args = panic "SpecConstr.mk_con_app"
+
+samePat :: CallPat -> CallPat -> Bool
+samePat (vs1, as1) (vs2, as2)
+  = all2 same as1 as2
+  where
+    same (Var v1) (Var v2) 
+	| v1 `elem` vs1 = v2 `elem` vs2
+	| v2 `elem` vs2 = False
+	| otherwise     = v1 == v2
+
+    same (Lit l1)    (Lit l2)    = l1==l2
+    same (App f1 a1) (App f2 a2) = same f1 f2 && same a1 a2
+
+    same (Type t1) (Type t2) = True	-- Note [Ignore type differences]
+    same (Note _ e1) e2	= same e1 e2	-- Ignore casts and notes
+    same (Cast e1 _) e2	= same e1 e2
+    same e1 (Note _ e2) = same e1 e2
+    same e1 (Cast e2 _) = same e1 e2
+
+    same e1 e2 = WARN( bad e1 || bad e2, ppr e1 $$ ppr e2) 
+		 False 	-- Let, lambda, case should not occur
+#ifdef DEBUG
+    bad (Case {}) = True
+    bad (Let {})  = True
+    bad (Lam {})  = True
+    bad other	  = False
+#endif
 \end{code}
+
+Note [Ignore type differences]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not want to generate specialisations where the call patterns
+differ only in their type arguments!  Not only is it utterly useless,
+but it also means that (with polymorphic recursion) we can generate
+an infinite number of specialisations. Example is Data.Sequence.adjustTree, 
+I think.
+

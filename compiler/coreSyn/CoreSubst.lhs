@@ -16,7 +16,8 @@ module CoreSubst (
 
 	emptySubst, mkEmptySubst, mkSubst, substInScope, isEmptySubst, 
  	extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList,
-	extendInScope, extendInScopeIds,
+	extendSubstList, zapSubstEnv,
+	extendInScope, extendInScopeList, extendInScopeIds, 
 	isInScope,
 
 	-- Binders
@@ -56,6 +57,7 @@ import FastTypes
 \begin{code}
 data Subst 
   = Subst InScopeSet	-- Variables in in scope (both Ids and TyVars)
+			-- *after* applying the substitution
 	  IdSubstEnv	-- Substitution for Ids
 	  TvSubstEnv	-- Substitution for TyVars
 
@@ -144,8 +146,8 @@ mkSubst in_scope tvs ids = Subst in_scope ids tvs
 substInScope :: Subst -> InScopeSet
 substInScope (Subst in_scope _ _) = in_scope
 
--- zapSubstEnv :: Subst -> Subst
--- zapSubstEnv (Subst in_scope _ _) = Subst in_scope emptyVarEnv emptyVarEnv
+zapSubstEnv :: Subst -> Subst
+zapSubstEnv (Subst in_scope _ _) = Subst in_scope emptyVarEnv emptyVarEnv
 
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
@@ -159,6 +161,14 @@ extendTvSubst (Subst in_scope ids tvs) v r = Subst in_scope ids (extendVarEnv tv
 
 extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst
 extendTvSubstList (Subst in_scope ids tvs) prs = Subst in_scope ids (extendVarEnvList tvs prs)
+
+extendSubstList :: Subst -> [(Var,CoreArg)] -> Subst
+extendSubstList subst [] 
+  = subst
+extendSubstList (Subst in_scope ids tvs) ((tv,Type ty):prs)
+  = ASSERT( isTyVar tv ) extendSubstList (Subst in_scope ids (extendVarEnv tvs tv ty)) prs
+extendSubstList (Subst in_scope ids tvs) ((id,expr):prs)
+  = ASSERT( isId id ) extendSubstList (Subst in_scope (extendVarEnv ids id expr) tvs) prs
 
 lookupIdSubst :: Subst -> Id -> CoreExpr
 lookupIdSubst (Subst in_scope ids tvs) v 
@@ -180,6 +190,11 @@ extendInScope :: Subst -> Var -> Subst
 extendInScope (Subst in_scope ids tvs) v
   = Subst (in_scope `extendInScopeSet` v) 
 	  (ids `delVarEnv` v) (tvs `delVarEnv` v)
+
+extendInScopeList :: Subst -> [Var] -> Subst
+extendInScopeList (Subst in_scope ids tvs) vs
+  = Subst (in_scope `extendInScopeSetList` vs) 
+	  (ids `delVarEnvList` vs) (tvs `delVarEnvList` vs)
 
 extendInScopeIds :: Subst -> [Id] -> Subst
 extendInScopeIds (Subst in_scope ids tvs) vs 

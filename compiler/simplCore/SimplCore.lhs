@@ -126,12 +126,17 @@ doCorePasses :: HscEnv
 doCorePasses hsc_env rb us stats guts []
   = return (stats, guts)
 
+doCorePasses hsc_env rb us stats guts (CoreDoPasses to_dos1 : to_dos2) 
+  = doCorePasses hsc_env rb us stats guts (to_dos1 ++ to_dos2) 
+
 doCorePasses hsc_env rb us stats guts (to_do : to_dos) 
   = do
 	let (us1, us2) = splitUniqSupply us
 	(stats1, guts1) <- doCorePass to_do hsc_env us1 rb guts
 	doCorePasses hsc_env rb us2 (stats `plusSimplCount` stats1) guts1 to_dos
 
+doCorePass :: CoreToDo -> HscEnv -> UniqSupply -> RuleBase
+	   -> ModGuts -> IO (SimplCount, ModGuts)
 doCorePass (CoreDoSimplify mode sws)   = _scc_ "Simplify"      simplifyPgm mode sws
 doCorePass CoreCSE		       = _scc_ "CommonSubExpr" trBinds  cseProgram
 doCorePass CoreLiberateCase	       = _scc_ "LiberateCase"  liberateCase
@@ -151,6 +156,7 @@ doCorePass CoreDoOldStrictness	       = _scc_ "OldStrictness" trBinds doOldStric
 #else
 doCorePass CoreDoOldStrictness	       = panic "CoreDoOldStrictness"
 #endif
+doCorePass (CoreDoPasses _) = panic "CoreDoPasses"
 
 #ifdef OLD_STRICTNESS
 doOldStrictness dfs binds

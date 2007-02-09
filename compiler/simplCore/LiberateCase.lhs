@@ -410,7 +410,7 @@ data LibCaseEnv
 
 initEnv :: DynFlags -> FamInstEnvs -> LibCaseEnv
 initEnv dflags fams
-  = LibCaseEnv { lc_size = libCaseThreshold dflags,
+  = LibCaseEnv { lc_size = specThreshold dflags,
 		 lc_lvl = 0,
 		 lc_lvl_env = emptyVarEnv, 
 		 lc_rec_env = emptyVarEnv,
