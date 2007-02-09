@@ -13,8 +13,8 @@ config.confdir               = '.'
 # By default, we test the 'normal', 'opt' and 'hpc' ways.
 # 'optasm' is added by mk/test.mk if the compiler has a native code gen,
 # 'prof'   is added by mk/test.mk if the profiling way is enabled.
-config.compile_ways	     = ['normal', 'opt', 'hpc']
-config.run_ways		     = ['normal', 'opt', 'hpc']
+config.compile_ways	     = ['normal', 'optc', 'hpc']
+config.run_ways		     = ['normal', 'optc', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways            = ['extcore','optextcore']
@@ -24,8 +24,8 @@ if (ghc_with_native_codegen == 1):
 	config.run_ways.append('optasm')
 
 if (ghc_with_profiling == 1):
-	config.compile_ways.append('prof')
-	config.run_ways.append('prof')
+	config.compile_ways.append('profc')
+	config.run_ways.append('profc')
 	if (ghc_with_native_codegen == 1):
 		config.compile_ways.append('profasm')
 		config.run_ways.append('profasm')
