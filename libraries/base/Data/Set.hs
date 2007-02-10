@@ -746,18 +746,15 @@ deleteFindMax t
 
 -- | /O(log n)/. Retrieves the minimal key of the set, and the set stripped from that element
 -- @fail@s (in the monad) when passed an empty set.
-minView :: Monad m => Set a -> m (Set a, a)
+minView :: Monad m => Set a -> m (a, Set a)
 minView Tip = fail "Set.minView: empty set"
-minView x = return (swap $ deleteFindMin x)
+minView x = return (deleteFindMin x)
 
 -- | /O(log n)/. Retrieves the maximal key of the set, and the set stripped from that element
 -- @fail@s (in the monad) when passed an empty set.
-maxView :: Monad m => Set a -> m (Set a, a)
+maxView :: Monad m => Set a -> m (a, Set a)
 maxView Tip = fail "Set.maxView: empty set"
-maxView x = return (swap $ deleteFindMax x)
-
-swap (a,b) = (b,a)
-
+maxView x = return (deleteFindMax x)
 
 
 {--------------------------------------------------------------------

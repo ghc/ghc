@@ -594,19 +594,33 @@ updateMaxWithKey f t
       Bin sx kx x l r    -> balance kx x l (updateMaxWithKey f r)
       Tip                -> Tip
 
--- | /O(log n)/. Retrieves the minimal key of the map, and the map stripped from that element
+-- | /O(log n)/. Retrieves the minimal (key,value) pair of the map, and the map stripped from that element
 -- @fail@s (in the monad) when passed an empty map.
-minView :: Monad m => Map k a -> m (Map k a, (k,a))
+minViewWithKey :: Monad m => Map k a -> m ((k,a), Map k a)
+minViewWithKey Tip = fail "Map.minView: empty map"
+minViewWithKey x = return (deleteFindMin x)
+
+-- | /O(log n)/. Retrieves the maximal (key,value) pair of the map, and the map stripped from that element
+-- @fail@s (in the monad) when passed an empty map.
+maxViewWithKey :: Monad m => Map k a -> m ((k,a), Map k a)
+maxViewWithKey Tip = fail "Map.maxView: empty map"
+maxViewWithKey x = return (deleteFindMax x)
+
+-- | /O(log n)/. Retrieves the minimal key\'s value of the map, and the map stripped from that element
+-- @fail@s (in the monad) when passed an empty map.
+minView :: Monad m => Map k a -> m (a, Map k a)
 minView Tip = fail "Map.minView: empty map"
-minView x = return (swap $ deleteFindMin x)
+minView x = return (first snd $ deleteFindMin x)
 
--- | /O(log n)/. Retrieves the maximal key of the map, and the map stripped from that element
+-- | /O(log n)/. Retrieves the maximal key\'s value of the map, and the map stripped from that element
 -- @fail@s (in the monad) when passed an empty map.
-maxView :: Monad m => Map k a -> m (Map k a, (k,a))
+maxView :: Monad m => Map k a -> m (a, Map k a)
 maxView Tip = fail "Map.maxView: empty map"
-maxView x = return (swap $ deleteFindMax x)
+maxView x = return (first snd $ deleteFindMax x)
 
-swap (a,b) = (b,a)
+-- Update the 1st component of a tuple (special case of Control.Arrow.first)
+first :: (a -> b) -> (a,c) -> (b,c)
+first f (x,y) = (f x, y)
 
 {--------------------------------------------------------------------
   Union. 
