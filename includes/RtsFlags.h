@@ -62,6 +62,7 @@ struct DEBUG_FLAGS {
     rtsBool apply;          /* 'a' */
     rtsBool stm;            /* 'm' */
     rtsBool squeeze;        /* 'z'  stack squeezing & lazy blackholing */
+    rtsBool hpc; 	    /* 'c' coverage */
 };
 
 struct COST_CENTRE_FLAGS {

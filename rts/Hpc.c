@@ -10,6 +10,7 @@
 
 #include "Rts.h"
 #include "Hpc.h"
+#include "Trace.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -21,7 +22,6 @@
  *
  */
 
-#define DEBUG_HPC 0
 #define WOP_SIZE 1024	
 
 static int hpc_inited = 0;		// Have you started this component?
@@ -64,13 +64,12 @@ int totalTixes = 0;		// total number of tix boxes.
 
 static char *tixFilename;
 
-
 static void failure(char *msg) {
+  debugTrace(DEBUG_hpc,"hpc failure: %s\n",msg);
   fprintf(stderr,"Hpc failure: %s\n",msg);
   fprintf(stderr,"(perhaps remove .tix file?)\n");
   exit(-1);
 }
-
 
 static int init_open(char *filename) 
 {
@@ -84,8 +83,7 @@ static int init_open(char *filename)
 
 static void expect(char c) {
   if (tix_ch != c) {
-    fprintf(stderr,"Hpc: parse failed (%c,%c)\n",tix_ch,c);
-    exit(-1);
+    failure("parse error when reading .tix file");
   }
   tix_ch = getc(tixFile);
 }
@@ -208,9 +206,7 @@ hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
   int i;
   int offset = 0;
   
-#if DEBUG_HPC
-  fprintf(stderr,"hs_hpc_module(%s,%d)\n",modName,modCount);
-#endif
+  debugTrace(DEBUG_hpc,"hs_hpc_module(%s,%d)",modName,modCount);
 
   hpc_init();
 
@@ -253,9 +249,8 @@ hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
     lastModule->next=tmpModule;
   }
 
-#if DEBUG_HPC
-  fprintf(stderr,"end: hs_hpc_module\n");
-#endif
+  debugTrace(DEBUG_hpc,"end: hs_hpc_module");
+
   return offset;
 }
 
@@ -284,9 +279,9 @@ hs_hpc_thread_finished_event(StgTSO *current_tso) {
 
 void
 hs_hpc_tick(int rixOp, StgTSO *current_tso) {
-#if DEBUG_HPC
-  fprintf(stderr,"hs_hpc_tick(%x)\n",rixOp);
-#endif
+
+  debugTrace(DEBUG_hpc,"hs_hpc_tick(%x)",rixOp);
+
   if (rixFile == NULL) {
     return;
   }
@@ -314,32 +309,35 @@ hs_hpc_tick(int rixOp, StgTSO *current_tso) {
   rixTidBack[rixCounter % WOP_SIZE] = tid;
   rixCounter++;
 
-#if DEBUG_HPC
-  fprintf(stderr,"end: hs_hpc_tick\n");
-#endif
+  debugTrace(DEBUG_hpc, "end: hs_hpc_tick");
 }
 
 static void 
 printEvent(FILE *out,StgWord64 rixCounter,StgThreadID rixTid,HpcRixOp rixOp) {
-#if DEBUG_HPC
-  if (out != stderr) {
-    printEvent(stderr,rixCounter,rixTid,rixOp);
-  }
-#endif
-  fprintf(out,"Event %" PRIuWORD64 " %u ",rixCounter,(unsigned int)rixTid);
+  char prefixMsg[128];
+  char suffixMsg[128];
+
+  sprintf(prefixMsg,
+	  "Event %" PRIuWORD64 " %u ",
+	  rixCounter,
+	  (unsigned int)rixTid);
+
   switch(rixOp) {
   case RixThreadFinishedOp:
-    fprintf(out,"ThreadFinished\n");
+    sprintf(suffixMsg,"ThreadFinished");
     break;
   case RixRaiseOp:
-    fprintf(out,"Raise\n");
+    sprintf(suffixMsg,"Raise");
     break;
   case RixFinishedOp:
-    fprintf(out,"Finished\n");
+    sprintf(suffixMsg,"Finished");
     break;
   default:
-    fprintf(out,"%u\n",rixOp);
+    sprintf(suffixMsg,"%u",rixOp);
   }
+
+  fprintf(out,"%s%s\n",prefixMsg,suffixMsg);
+  debugTrace(DEBUG_hpc,"sending %s%s",prefixMsg,suffixMsg);
 }
 
 static void
@@ -353,8 +351,11 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
     return;
   }
 
+  debugTrace(DEBUG_hpc,"breakPointCommand %d %x",rixOp,(unsigned int)rixTid);
+
   printEvent(rixFile,rixCounter,rixTid,rixOp);
   fflush(rixFile);
+
   /* From here, you can ask some basic questions.
    * 
    *  c<nat>		set the (one) counter breakpoint
@@ -375,9 +376,8 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
 	tmp64 = tmp64 * 10 + (c - '0');
 	c = getc(rixCmdFile);
       }
-#if DEBUG_HPC
-      fprintf(stderr,"setting countBP = %" PRIuWORD64 "\n",tmp64);
-#endif
+      debugTrace(DEBUG_hpc,"setting countBP = %" PRIuWORD64,tmp64);
+
       rixBPCounter = tmp64;
       break;
     case 's': // s2323  -- set tick box breakpoint at 2323
@@ -387,9 +387,9 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
 	tmp = tmp * 10 + (c - '0');
 	c = getc(rixCmdFile);
       }
-#if DEBUG_HPC
-      fprintf(stderr,"seting bp for tix %d\n",tmp);
-#endif
+
+      debugTrace(DEBUG_hpc,"seting bp for tix %d",tmp);
+
       tixBoxBP[tmp] = 1;
       break;
     case 'u': // u2323  -- unset tick box breakpoint at 2323
@@ -399,9 +399,9 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
 	tmp = tmp * 10 + (c - '0');
 	c = getc(rixCmdFile);
       }
-#if DEBUG_HPC
-      fprintf(stderr,"unseting bp for tix %d\n",tmp);
-#endif
+
+      debugTrace(DEBUG_hpc,"unseting bp for tix %d",tmp);
+
       tixBoxBP[tmp] = 0;
       break;
     case 'h': // h -- history of the last few (WOP_SIZE) steps 
@@ -411,15 +411,18 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
 	tmp64 = 0;
       }
       for(;tmp64 < rixCounter;tmp64++) {
-	printEvent(rixFile,tmp64,rixTidBack[tmp64 % WOP_SIZE],rixOpBack[tmp64 % WOP_SIZE]);
+	printEvent(rixFile,
+		   tmp64,
+		   rixTidBack[tmp64 % WOP_SIZE],
+		   rixOpBack[tmp64 % WOP_SIZE]);
       }
       fflush(rixFile);
       c = getc(rixCmdFile);
       break;
     default:
-#if DEBUG_HPC
-      fprintf(stderr,"strange command from HPCRIX (%d)\n",c);
-#endif
+
+      debugTrace(DEBUG_hpc,"strange command from HPCRIX (%d)",c);
+
       c = getc(rixCmdFile);
     }
     while (c != 10) {          // the end of the line
@@ -427,9 +430,9 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
     }
     c = getc(rixCmdFile); // the first char on the next command
   }
-#if DEBUG_HPC
-  fprintf(stderr,"re entering program\n");
-#endif
+
+  debugTrace(DEBUG_hpc,"leaving breakPointCommand");
+
 }
 
 /* This is called after all the modules have registered their local tixboxes,
@@ -441,9 +444,7 @@ startupHpc(void) {
   Info *tmpModule;
   char *hpcRix;
 
-#if DEBUG_HPC
-  fprintf(stderr,"startupHpc\n");
-#endif
+  debugTrace(DEBUG_hpc,"startupHpc");
  
  if (hpc_inited == 0) {
     return;
@@ -476,13 +477,11 @@ startupHpc(void) {
     if (sscanf(hpcRix,"%d:%d",&rixFD,&rixCmdFD) != 2) {
       /* Bad format for HPCRIX.
        */
-      fprintf(stderr,"Bad HPCRIX (%s)\n",hpcRix);
+      debugTrace(DEBUG_hpc,"Bad HPCRIX (%s)",hpcRix);
       exit(0);
     }
 
-#if DEBUG_HPC    
-    fprintf(stderr,"found HPCRIX pipes: %d:%d\n",rixFD,rixCmdFD);
-#endif
+    debugTrace(DEBUG_hpc,"found HPCRIX pipes: %d:%d",rixFD,rixCmdFD);
 
     rixFile = fdopen(rixFD,"w");
     assert(rixFile != NULL);
@@ -511,12 +510,12 @@ startupHpc(void) {
       fprintf(rixFile,"(\"%s\",%u)",
 	      tmpModule->modName,
 	      tmpModule->tickCount);
-#if DEBUG_HPC
-      fprintf(stderr,"(tracer)%s: %u (offset=%u)\n",
+
+      debugTrace(DEBUG_hpc,"(tracer)%s: %u (offset=%u)\n",
 	      tmpModule->modName,
 	      tmpModule->tickCount,
 	      tmpModule->tickOffset);
-#endif
+
     }
     fprintf(rixFile,"]\n");
     fflush(rixFile);
@@ -538,9 +537,7 @@ exitHpc(void) {
   Info *tmpModule;  
   int i, comma;
 
-#if DEBUG_HPC
-  fprintf(stderr,"exitHpc\n");
-#endif
+  debugTrace(DEBUG_hpc,"exitHpc");
 
   if (hpc_inited == 0) {
     return;
@@ -561,12 +558,10 @@ exitHpc(void) {
     fprintf(f,"(\"%s\",%u)",
 	   tmpModule->modName,
 	    tmpModule->tickCount);
-#if DEBUG_HPC
-    fprintf(stderr,"%s: %u (offset=%u)\n",
+    debugTrace(DEBUG_hpc,"%s: %u (offset=%u)\n",
 	   tmpModule->modName,
 	   tmpModule->tickCount,
 	   tmpModule->tickOffset);
-#endif
   }
   fprintf(f,"] [");
   
@@ -574,8 +569,9 @@ exitHpc(void) {
   tmpModule = modules;
   for(;tmpModule != 0;tmpModule = tmpModule->next) {
       if (!tmpModule->tixArr) {
-	fprintf(stderr,"warning: module %s did not register any hpc tick data\n",
-		tmpModule->modName);
+	debugTrace(DEBUG_hpc,
+		   "warning: module %s did not register any hpc tick data\n",
+		   tmpModule->modName);
       }
 
     for(i = 0;i < tmpModule->tickCount;i++) {

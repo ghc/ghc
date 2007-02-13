@@ -76,6 +76,7 @@ void initTracing (void)
     DEBUG_FLAG(par,          DEBUG_par);
     DEBUG_FLAG(linker,       DEBUG_linker);
     DEBUG_FLAG(squeeze,      DEBUG_squeeze);
+    DEBUG_FLAG(hpc,          DEBUG_hpc);
 
     PAR_FLAG(verbose,        PAR_DEBUG_verbose);
     PAR_FLAG(bq,             PAR_DEBUG_bq);

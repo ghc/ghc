@@ -165,6 +165,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.par		= rtsFalse;
     RtsFlags.DebugFlags.linker		= rtsFalse;
     RtsFlags.DebugFlags.squeeze		= rtsFalse;
+    RtsFlags.DebugFlags.hpc		= rtsFalse;
 #endif
 
 #if defined(PROFILING) || defined(PAR)
@@ -427,6 +428,7 @@ usage_text[] = {
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
 "  -Dz  DEBUG: stack squezing",
+"  -Dc  DEBUG: program coverage",
 "",
 #endif /* DEBUG */
 #if defined(THREADED_RTS) && !defined(NOSMP)
@@ -758,6 +760,9 @@ error = rtsTrue;
 			  break;
 		      case 'z':
 			  RtsFlags.DebugFlags.squeeze = rtsTrue;
+			  break;
+		      case 'c':
+			  RtsFlags.DebugFlags.hpc = rtsTrue;
 			  break;
 		      default:
 			  bad_option( rts_argv[arg] );

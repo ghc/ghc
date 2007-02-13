@@ -108,6 +108,8 @@ void traceEnd (void);
 // Profiling flags
 #define TRACE_sched                (1<<29)
 
+// Coverge flags
+#define DEBUG_hpc                  (1<<30)
 
 // -----------------------------------------------------------------------------
 // PRIVATE below here
