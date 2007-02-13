@@ -39,6 +39,7 @@ import Outputable
 import ErrUtils
 import FastString
 import DynFlags
+import MkId
  
 import DsMonad 
 import {-#SOURCE#-}DsExpr ( dsLExpr ) 
@@ -77,7 +78,8 @@ mkBreakpointExpr loc bkptFuncId ty = do
                               , HsLit (HsInt (fromIntegral site))]
             funE  = l$ HsVar jumpFuncId
             ptrE  = l (HsLit (HsInt (fromIntegral (I# (addr2Int# addr#)))))
-            locsE = l locals
+            locsE = l (HsApp (l(HsWrap (WpTyApp (mkListTy opaqueTy)) (HsVar lazyId))) 
+                             (l locals))
             locE  = l locInfo
             msgE  = l (srcSpanLit loc)
         return $  
