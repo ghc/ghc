@@ -471,6 +471,7 @@ startupHpc(void) {
     int comma;
     Info *tmpModule;  
     int rixFD, rixCmdFD;
+    int tixCount = 0;
 
     assert(hpc_inited);
 
@@ -511,6 +512,8 @@ startupHpc(void) {
 	      tmpModule->modName,
 	      tmpModule->tickCount);
 
+      tixCount += tmpModule->tickCount;
+
       debugTrace(DEBUG_hpc,"(tracer)%s: %u (offset=%u)\n",
 	      tmpModule->modName,
 	      tmpModule->tickCount,
@@ -523,7 +526,7 @@ startupHpc(void) {
     // Allocate the tixBox breakpoint array
     // These are set to 1 if you want to 
     // stop at a specific breakpoint
-    tixBoxBP = (int *)calloc(1,sizeof(int));
+    tixBoxBP = (int *)calloc(tixCount,sizeof(int));
   }
 
 }
