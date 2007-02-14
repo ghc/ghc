@@ -532,6 +532,13 @@
 	  replace it with a character <replaceable>c</replaceable> use
 	  <literal>%{MODULE/./<replaceable>c</replaceable>}</literal>.</para>
 
+	  <para>Similarly, for the <literal>%{FILE}</literal> substitution
+          you may want to replace the '<literal>/</literal>' character in
+          the file names with some other character (especially for links
+          to colourised entity source code with a shared css file).  To replace
+          it with a character <replaceable>c</replaceable> use
+          <literal>%{FILE///<replaceable>c</replaceable>}</literal>/</para>
+
           <para>One example of a tool that can generate syntax-highlighted
           HTML from your source code, complete with anchors suitable for use
           from haddock, is
@@ -591,13 +598,14 @@
 	  <literal>haddock --comments-base=<replaceable>url</replaceable>
 	  --comments-module=<replaceable>url</replaceable>/%M</literal></para>
 	  
-	  <para>If your Wiki system doesn't like the '<literal>.</literal>'
-	  character in Haskell module names, you can replace it with a
-	  different character. For example to replace the
-	  '<literal>.</literal>' characters with '<literal>_</literal>' use
-	  <literal>haddock --comments-base=<replaceable>url</replaceable>
+	  <para>If your Wiki system doesn't like the '<literal>.</literal>' character
+	  in Haskell module names, you can replace it with a different character. For
+	  example to replace the '<literal>.</literal>' characters with
+	  '<literal>_</literal>' use <literal>haddock
+	  --comments-base=<replaceable>url</replaceable>
 	  --comments-module=<replaceable>url</replaceable>/%{MODULE/./_}</literal>
-	  </para>
+	  Similarly, you can replace the '<literal>/</literal>' in a file name (may
+	  be useful for entity comments, but probably not.) </para>
 
 	</listitem>
       </varlistentry>

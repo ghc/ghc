@@ -191,6 +191,9 @@ spliceURL maybe_file maybe_mod maybe_name url = run url
   run ('%':'{':'M':'O':'D':'U':'L':'E':'/':'.':'/':c:'}':rest) =
     map (\x -> if x == '.' then c else x) mod ++ run rest
 
+  run ('%':'{':'F':'I':'L':'E':'/':'/':'/':c:'}':rest) =
+    map (\x -> if x == '/' then c else x) file ++ run rest
+
   run (c:rest) = c : run rest
   
 wikiButton :: WikiURLs -> Maybe Module -> HtmlTable
