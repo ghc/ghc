@@ -766,6 +766,10 @@ update_fwd_compact( bdescr *blocks )
 	    // know the destination without the size, because we may
 	    // spill into the next block.  So we have to run down the 
 	    // threaded list and get the info ptr first.
+            //
+            // ToDo: one possible avenue of attack is to use the fact
+            // that if (p&BLOCK_MASK) >= (free&BLOCK_MASK), then we
+            // definitely have enough room.  Also see bug #1147.
 	    info = get_threaded_info(p);
 
 	    q = p;
