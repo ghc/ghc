@@ -724,7 +724,10 @@ INLINE HsWord64 getUSecOfDay(void)
 {
     struct timeval tv;
     gettimeofday(&tv, (struct timezone *) NULL);
-    return (tv.tv_sec * 1000000 + tv.tv_usec);
+    // Don't forget to cast *before* doing the arithmetic, otherwise
+    // the arithmetic happens at the type of tv_sec, which is probably
+    // only 'int'.
+    return ((HsWord64)tv.tv_sec * 1000000 + (HsWord64)tv.tv_usec);
 }
 
 INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
