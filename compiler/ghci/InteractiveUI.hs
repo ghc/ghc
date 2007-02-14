@@ -1358,7 +1358,7 @@ wrapCompleter fun w =  do
 getCommonPrefix :: [String] -> String
 getCommonPrefix [] = ""
 getCommonPrefix (s:ss) = foldl common s ss
-  where common s "" = s
+  where common s "" = ""
 	common "" s = ""
 	common (c:cs) (d:ds)
 	   | c == d = c : common cs ds
