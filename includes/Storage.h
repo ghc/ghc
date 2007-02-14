@@ -392,6 +392,7 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     case AP_STACK:
 	return ap_stack_sizeW((StgAP_STACK *)p);
     case AP:
+	return ap_sizeW((StgAP *)p);
     case PAP:
 	return pap_sizeW((StgPAP *)p);
     case IND:
