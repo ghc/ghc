@@ -29,7 +29,7 @@ module DriverPipeline (
 import Packages
 import HeaderInfo
 import DriverPhases
-import SysTools		( newTempName, addFilesToClean, copy )
+import SysTools
 import qualified SysTools	
 import HscMain
 import Finder
@@ -442,17 +442,19 @@ runPipeline stop_phase dflags (input_fn, mb_phase) output maybe_loc
   -- Sometimes, a compilation phase doesn't actually generate any output
   -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
   -- stage, but we wanted to keep the output, then we have to explicitly
-  -- copy the file.
+  -- copy the file, remembering to prepend a {-# LINE #-} pragma so that
+  -- further compilation stages can tell what the original filename was.
   case output of
     Temporary -> 
 	return (dflags', output_fn)
     _other ->
 	do final_fn <- get_output_fn dflags' stop_phase maybe_loc
-	   when (final_fn /= output_fn) $
-		  copy dflags ("Copying `" ++ output_fn ++ "' to `" ++ final_fn
-			++ "'") output_fn final_fn
+	   when (final_fn /= output_fn) $ do
+              let msg = ("Copying `" ++ output_fn ++"' to `" ++ final_fn ++ "'")
+                  line_prag = Just ("{-# LINE 1 \"" ++ input_fn ++ "\" #-}\n")
+	      copyWithHeader dflags msg line_prag output_fn final_fn
 	   return (dflags', final_fn)
-	        
+
 
 
 pipeLoop :: DynFlags -> Phase -> Phase 

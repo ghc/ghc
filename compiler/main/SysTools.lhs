@@ -19,7 +19,8 @@ module SysTools (
 	runMkDLL,
 
 	touch,			-- String -> String -> IO ()
-	copy,			-- String -> String -> String -> IO ()
+	copy,
+        copyWithHeader,
 	normalisePath,          -- FilePath -> FilePath
 	
 	-- Temporary-file management
@@ -469,15 +470,21 @@ touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =
   runSomething dflags purpose (pgm_T dflags) [FileOption "" arg]
 
-copy :: DynFlags -> String -> String -> String -> IO ()
-copy dflags purpose from to = do
+copy :: DynFlags -> String -> FilePath -> FilePath -> IO ()
+copy dflags purpose from to = copyWithHeader dflags purpose Nothing from to
+
+copyWithHeader :: DynFlags -> String -> Maybe String -> FilePath -> FilePath
+               -> IO ()
+copyWithHeader dflags purpose maybe_header from to = do
   showPass dflags purpose
 
   h <- openFile to WriteMode
   ls <- readFile from -- inefficient, but it'll do for now.
 	    	      -- ToDo: speed up via slurping.
+  maybe (return ()) (hPutStr h) maybe_header
   hPutStr h ls
   hClose h
+
 \end{code}
 
 %************************************************************************
