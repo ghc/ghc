@@ -750,22 +750,14 @@ linkSomeBCOs toplevs_only ie ce_in de_in ul_bcos
 		     -- closure environment, which leads to trouble.
 		     ASSERT (all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
 		     extendClosureEnv ce_in ce_additions
-            refs  = goForRefs ul_bcos
-            names = nub$ concatMap (ssElts . unlinkedBCOItbls) (ul_bcos ++ refs)
+            names = concatMap (ssElts . unlinkedBCOItbls) ul_bcos
         addresses <- mapM (lookupIE ie) names
         let de_additions = [(address, name) | (address, name) <- zip addresses names
                                             , not(address `elemAddressEnv` de_in) 
                            ]
             de_out = extendAddressEnvList de_in de_additions
         return ( ce_out, de_out, hvals)
-    where 
-          goForRefs = getRefs []
-          getRefs acc []  = acc
-          getRefs acc new = getRefs (new++acc) 
-                 [bco | BCOPtrBCO bco <- concatMap (ssElts . unlinkedBCOPtrs) new
-                      , notElemBy bco (new ++ acc) nameEq]
-          ul1 `nameEq` ul2 = unlinkedBCOName ul1 == unlinkedBCOName ul2
-          (x1 `notElemBy` x2) eq = null$ intersectBy eq [x1] x2
+
 \end{code}
 
 
