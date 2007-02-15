@@ -207,14 +207,14 @@ mulHi a b = fromIntegral (r `shiftR` 32)
 -- golden ratio and adding.  The implementation is:
 --
 -- > hashString = foldl' f 0
--- >   where f m c = fromIntegral (ord c) + mulHi m golden
---
+-- >   where f m c = fromIntegral (fromEnum c + 1) * golden + mulHi m golden
+-- 
 -- Note that this has not been extensively tested for reasonability,
 -- but Knuth argues that repeated multiplication by the golden ratio
 -- will minimize gaps in the hash space.
 hashString :: String -> Int32
 hashString = foldl' f 0
-  where f m c = fromIntegral (ord c) + mulHi m golden
+  where f m c = fromIntegral (ord c + 1) * golden + mulHi m golden
 
 -- | A prime larger than the maximum hash table size
 prime :: Int32
