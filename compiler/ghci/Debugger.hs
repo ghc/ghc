@@ -330,18 +330,26 @@ bkptOptions cmd = do
       io$ putStrLn msg
 
     bkptOptions' s ("add":cmds) bt 
+      | [line]         <- cmds
+      , [(lineNum,[])] <- reads line
+      = do (toplevel,_) <- io$ GHC.getContext s
+           case toplevel of
+             (m:_) -> handleAdd (\mod->addBkptByLine mod lineNum) m
+             [] -> throwDyn $ CmdLineError $ "No module loaded in debugging mode"
+
       | [mod_name,line]<- cmds
       , [(lineNum,[])] <- reads line
-      =  handleAdd mod_name $ (\mod->addBkptByLine mod lineNum)
+      = io(GHC.findModule s (GHC.mkModuleName mod_name) Nothing) >>=
+         handleAdd (\mod->addBkptByLine mod lineNum)
 
       | [mod_name,line,col] <- cmds
-      = handleAdd mod_name $ (\mod->addBkptByCoord mod (read line, read col))
+      = io(GHC.findModule s (GHC.mkModuleName mod_name) Nothing) >>=
+         handleAdd (\mod->addBkptByCoord mod (read line, read col))
 
       | otherwise = throwDyn $ CmdLineError $ 
                        "syntax: :breakpoint add Module line [col]"
        where 
-         handleAdd mod_name f = do
-           mod         <- io$ GHC.findModule s (GHC.mkModuleName mod_name) Nothing
+         handleAdd f mod = 
            either 
              (handleBkptEx s mod)
              (\(newTable, site) -> do
@@ -373,31 +381,28 @@ bkptOptions cmd = do
       = handleDel mod $ delBkptByCoord mod (lineNum, colNum)
         
       | otherwise = throwDyn $ CmdLineError $ 
-             "syntax: :breakpoint del (breakpoint # | Module line [col])"
+             "syntax: :breakpoint del (breakpoint # | [Module] line [col])"
 
        where delMsg = "Breakpoint deleted"
              handleDel mod f = either (handleBkptEx s mod)
                                       (\newtable-> setBkptTable newtable >> io (putStrLn delMsg))
                                       (f bt)
                                       
-
     bkptOptions' _ _ _ = throwDyn $ CmdLineError $ 
                          "syntax: :breakpoint (list|continue|stop|add|del)"
 
 -- Error messages
 --    handleBkptEx :: Session -> Module -> Debugger.BkptException -> a
-    handleBkptEx s m NotHandled  = io$
-                                   findModSummary m                  >>= \mod_summary ->
-                                   isModuleInterpreted s mod_summary >>= \it -> 
-       if it
+    handleBkptEx s m NotHandled  = io$ do
+       isInterpreted <- findModSummary m >>= isModuleInterpreted s
+       if isInterpreted
         then error$ "Module " ++ showSDoc (ppr m) ++  " was not loaded under debugging mode.\n" 
                  ++ "Enable debugging mode with -fdebugging (and reload your module)"
         else error$ "Module " ++ showSDoc (ppr m) ++  " was loaded in compiled (.o) mode.\n" 
                  ++ "You must load a module in interpreted mode and with -fdebugging on to debug it."
-                     where findModSummary m = getModuleGraph s >>= \mod_graph ->  
-                               case [ modsum | modsum <- mod_graph
-                                             , ms_mod modsum == m ] of
-                                 [modsum] -> return modsum
+         where findModSummary m = do 
+                 mod_graph <- getModuleGraph s 
+                 return$ head [ modsum | modsum <- mod_graph, ms_mod modsum == m]
     handleBkptEx _ _ e = error (show e)
 
 -------------------------

@@ -215,7 +215,7 @@ helpText =
  "\n" ++
  " Options for ':breakpoint':\n" ++
  "   list                                     list the current breakpoints\n" ++
- "   add Module line [col]                    add a new breakpoint\n" ++
+ "   add [Module] line [col]                    add a new breakpoint\n" ++
  "   del (breakpoint# | Module line [col])    delete a breakpoint\n" ++
  "   continue                                 continue execution\n"  ++
  "   stop                   Stop a computation and return to the top level\n" ++
