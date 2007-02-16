@@ -265,7 +265,7 @@ instantiateTyVarsToUnknown cms ty
 
 -- | The inverse function. Strip the GHC.Base.Unknowns in the type of the id, they correspond to tyvars. The caller must provide an infinite list of fresh names
 stripUnknowns :: [Name] -> Id -> Id
-stripUnknowns names id = setIdType id . sigmaType . fst . go names . idType 
+stripUnknowns names id = setIdType id . fst . go names . idType 
                            $ id
  where 
    go tyvarsNames@(v:vv) ty 

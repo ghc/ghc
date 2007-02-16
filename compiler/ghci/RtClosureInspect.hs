@@ -39,8 +39,6 @@ module RtClosureInspect(
      isPointed,
      isFullyEvaluatedTerm,
 --     unsafeDeepSeq, 
-     
-     sigmaType
  ) where 
 
 #include "HsVersions.h"
@@ -571,7 +569,7 @@ zonkTerm = foldTerm idTermFoldM {
 
 
 -- Is this defined elsewhere?
--- Find all free tyvars and insert the appropiate ForAll.
+-- Generalize the type: find all free tyvars and wrap in the appropiate ForAll.
 sigmaType ty = mkForAllTys (varSetElems$ tyVarsOfType (dropForAlls ty)) ty
 
 {-
