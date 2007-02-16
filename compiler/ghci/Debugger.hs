@@ -353,9 +353,10 @@ bkptOptions cmd = do
            either 
              (handleBkptEx s mod)
              (\(newTable, site) -> do
-               setBkptTable newTable 
-               io (putStrLn ("Breakpoint set at " ++ 
-                              show (getSiteCoords newTable mod site))))
+               setBkptTable newTable
+               let (x,y) = getSiteCoords newTable mod site
+               io (putStrLn ("Breakpoint set at " ++ showSDoc (ppr mod) 
+                    ++ ':' : show x  ++ ':' : show y)))
              (f mod bt) 
 
     bkptOptions' s ("del":cmds) bt 
