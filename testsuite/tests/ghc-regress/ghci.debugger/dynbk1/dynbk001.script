@@ -1,5 +1,10 @@
+
 :set -fglasgow-exts
 :l ../Test
+
+:break add 1
+-- Illegal, no module loaded under debugging mode
+
 :set -fdebugging
 :l ../QSort
 
@@ -11,9 +16,6 @@
 
 :break del QSort 1 1 
 -- Illegal: no breakpoint at (1,1) in Main
-
-:break add 1       
- -- Illegal syntax
 
 :break add NonModule 1
 -- Illegal: I don't know this module
