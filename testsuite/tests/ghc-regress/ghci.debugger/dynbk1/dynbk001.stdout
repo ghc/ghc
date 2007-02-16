@@ -1,7 +1,7 @@
 Not a valid breakpoint #. Use :breakpoint list to see the current breakpoints.
 *** Exception: No suitable breakpoint site found
 *** Exception: No suitable breakpoint site found
-syntax: :breakpoint add Module line [col]
+Breakpoint set at main:QSort:5:15
 Could not find module `NonModule':
   Use -v to see a list of the files searched for.
 Could not find module `Test':
