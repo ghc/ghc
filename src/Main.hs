@@ -427,7 +427,7 @@ run flags modules extEnv = do
   mapM_ putStrLn messages'
 
   let 
-    visibleMods = [ m | m <- haddockMods'', DocOptHide `notElem` (hmod_options m) ]
+    visibleMods = [ m | m <- haddockMods'', OptHide `notElem` (hmod_options m) ]
     packageName = (Just . packageIdString . modulePackageId . 
                    hmod_mod . head) visibleMods
  
@@ -486,7 +486,7 @@ type FullyCheckedMod = (ParsedSource,
 data ModuleDataGHC = ModuleDataGHC {
    ghcModule         :: Module,
    ghcFilename       :: FilePath,
-   ghcDocOpts        :: [DocOption],
+   ghcMbDocOpts      :: Maybe String,
    ghcHaddockModInfo :: HaddockModInfo Name,
    ghcMbDoc          :: Maybe (HsDoc Name),
    ghcGroup          :: HsGroup Name,
@@ -501,7 +501,7 @@ moduleDataGHC :: CheckedMod -> ModuleDataGHC
 moduleDataGHC (mod, file, checkedMod) = ModuleDataGHC {
   ghcModule         = mod,
   ghcFilename       = file,
-  ghcDocOpts        = opts,
+  ghcMbDocOpts      = mbOpts,
   ghcHaddockModInfo = info,
   ghcMbDoc          = mbDoc,
   ghcGroup          = group,
@@ -511,8 +511,8 @@ moduleDataGHC (mod, file, checkedMod) = ModuleDataGHC {
   ghcInstances      = modInfoInstances modInfo
 }
   where
-    HsModule _ _ _ _ _ opts _ _      = unLoc parsed
-    (group, _, mbExports, (mbDoc, info, nodocs)) = renamed
+    HsModule _ _ _ _ _ mbOpts _ _      = unLoc parsed
+    (group, _, mbExports, mbDoc, info) = renamed
     (parsed, renamed, _, modInfo)      = checkedMod 
 
 -- | Massage the data in ModuleDataGHC to produce something closer to what
@@ -522,9 +522,11 @@ moduleDataGHC (mod, file, checkedMod) = ModuleDataGHC {
 pass1data :: ModuleDataGHC -> [Flag] -> ModuleMap -> ErrMsgM HaddockModule
 pass1data modData flags modMap = do
 
-  let mod          = ghcModule modData
-      opts         = docOpts (ghcDocOpts modData) mod
-      group        = ghcGroup modData
+  let mod = ghcModule modData
+
+  opts <- mkDocOpts (ghcMbDocOpts modData) mod
+
+  let group        = ghcGroup modData
       entities     = (nubBy sameName . collectEntities) group
       exports      = fmap (reverse . map unLoc) (ghcMbExports modData)
       entityNames_ = entityNames entities
@@ -547,7 +549,7 @@ pass1data modData flags modMap = do
   -- documentation, if the 'prune' option is on.
   let 
     prunedExportItems
-      | DocOptPrune `elem` opts = pruneExportItems exportItems
+      | OptPrune `elem` opts = pruneExportItems exportItems
       | otherwise = exportItems
  
   return HM {
@@ -569,10 +571,14 @@ pass1data modData flags modMap = do
     hmod_instances          = ghcInstances modData
   }
   where
-    docOpts opts mod =  
-      if Flag_HideModule (moduleString mod) `elem` flags 
-        then DocOptHide : opts
-        else opts      
+    mkDocOpts mbOpts mod = do
+      opts <- case mbOpts of 
+        Just opts -> processOptions opts
+        Nothing -> return []
+      let opts' = if Flag_HideModule (moduleString mod) `elem` flags 
+            then OptHide : opts
+            else opts      
+      return opts'
 
 -- | Produce a map of HaddockModules with information that is close to 
 -- renderable.  What is lacking after this pass are the renamed export items.
@@ -820,7 +826,7 @@ renameModule renamingEnv mod =
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
     -- modules.
-    when (DocOptHide `notElem` hmod_options mod && not (null strings)) $
+    when (OptHide `notElem` hmod_options mod && not (null strings)) $
 	  tell ["Warning: " ++ show (ppr (hmod_mod mod) defaultUserStyle) ++ 
 		": could not find link destinations for:\n"++
 		"   " ++ concat (map (' ':) strings) ]
@@ -850,7 +856,7 @@ mkExportItems
 
 mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_map entities
               opts maybe_exps ignore_all_exports docMap
-  | isNothing maybe_exps || ignore_all_exports || DocOptIgnoreExports `elem` opts
+  | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
   | Just specs <- maybe_exps = do 
       exps <- mapM lookupExport specs
@@ -891,7 +897,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
 	| otherwise = 
 	   case Map.lookup m mod_map of
 	     Just hmod
-		| DocOptHide `elem` hmod_options hmod
+		| OptHide `elem` hmod_options hmod
 			-> return (hmod_export_items hmod)
 		| otherwise -> return [ ExportModule m ]
 	     Nothing -> return [] -- already emitted a warning in visibleNames
@@ -996,7 +1002,7 @@ mkVisibleNames :: Module
 mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap 
   -- if no export list, just return all local names 
   | Nothing <- maybeExps         = return (filter hasDecl localNames)
-  | DocOptIgnoreExports `elem` opts = return localNames
+  | OptIgnoreExports `elem` opts = return localNames
   | Just expspecs <- maybeExps = do
       visibleNames <- mapM extract expspecs
       return $ filter isNotPackageName (concat visibleNames)
@@ -1021,7 +1027,7 @@ mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap
 	| otherwise -> let m' = mkModule (modulePackageId mdl) m in
 	  case Map.lookup m' modMap of
 	    Just mod
-		| DocOptHide `elem` hmod_options mod ->
+		| OptHide `elem` hmod_options mod ->
 		    return (filter (`elem` scope) (hmod_exports mod))
 		| otherwise -> return []
 	    Nothing
@@ -1057,9 +1063,9 @@ buildGlobalDocEnv modules
  = foldl upd Map.empty (reverse modules)
  where
   upd old_env mod
-     | DocOptHide `elem` hmod_options mod
+     | OptHide `elem` hmod_options mod
      = old_env
-     | DocOptNotHome `elem` hmod_options mod
+     | OptNotHome `elem` hmod_options mod
      = foldl' keep_old old_env exported_names
      | otherwise
      = foldl' keep_new old_env exported_names
@@ -1086,6 +1092,30 @@ findNamedDoc name entities = search entities
 			| name == name' = return (Just doc)
 		   	| otherwise = search rest
 	      search (_other_decl : rest) = search rest
+
+-- -----------------------------------------------------------------------------
+-- Haddock options embedded in the source file
+
+processOptions_ str = let (opts, msg) = runWriter (processOptions str) 
+                      in print msg >> return opts 
+
+processOptions :: String -> ErrMsgM [DocOption]
+processOptions str = do
+  case break (== ',') str of
+    (this, ',':rest) -> do
+	opt <- parseOption this
+	opts <- processOptions rest
+	return (maybeToList opt ++ opts)
+    (this, _)
+	| all isSpace this -> return []
+	| otherwise -> do opt <- parseOption this; return (maybeToList opt)
+
+parseOption :: String -> ErrMsgM (Maybe DocOption)
+parseOption "hide" = return (Just OptHide)
+parseOption "prune" = return (Just OptPrune)
+parseOption "ignore-exports" = return (Just OptIgnoreExports)
+parseOption "not-home" = return (Just OptNotHome)
+parseOption other = do tell ["Unrecognised option: " ++ other]; return Nothing
 
 -- simplified type for sorting types, ignoring qualification (not visible
 -- in Haddock output) and unifying special tycons with normal ones.
