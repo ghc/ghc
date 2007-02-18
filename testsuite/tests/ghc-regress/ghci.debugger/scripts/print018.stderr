@@ -1,0 +1,7 @@
+
+<interactive>:1:0:
+    No instance for (Show Unary)
+      arising from a use of `print' at <interactive>:1:0
+    Possible fix: add an instance declaration for (Show Unary)
+    In the expression: print it
+    In a 'do' expression: print it

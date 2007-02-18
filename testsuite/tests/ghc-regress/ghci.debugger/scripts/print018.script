@@ -1,0 +1,15 @@
+-- Test type reconstruction of Constants
+-- Found by Bernie Pope
+
+:set -fglasgow-exts
+:set -fdebugging
+:l ../Test
+
+:break add Test.Test2 40
+poly Unary
+:p x
+:t x
+seq x ()
+:p x
+:t x
+x

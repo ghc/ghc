@@ -33,3 +33,8 @@ instance Show Show1 where
 
 type Just1 = Maybe
 
+
+data Unary = Unary
+
+poly :: a -> ()
+poly x = seq x ()
