@@ -1,0 +1,4 @@
+
+tcfail175.hs:11:0:
+    The equation(s) for `evalRHS' have three arguments,
+    but its type `Int -> a' has only one
