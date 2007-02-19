@@ -160,28 +160,8 @@ initTcPrintErrors env mod todo = do
 \begin{code}
 addBreakpointBindings :: TcM a -> TcM a
 addBreakpointBindings thing_inside
-#if defined(GHCI)
-  = do	{ unique <- newUnique
-        ; let { var = mkInternalName unique (mkOccName tvName "a") noSrcLoc;
-                tyvar = mkTyVar var liftedTypeKind;
-                basicType extra = (FunTy intTy
-                                   (FunTy (mkListTy unitTy)
-                                    (FunTy stringTy
-                                     (ForAllTy tyvar
-                                      (extra
-                                       (FunTy (TyVarTy tyvar)
-                                        (TyVarTy tyvar)))))));
-                breakpointJumpId
-                    = Id.mkGlobalId VanillaGlobal breakpointJumpName
-                                 (basicType id) vanillaIdInfo;
-                breakpointCondJumpId
-                    = Id.mkGlobalId VanillaGlobal breakpointCondJumpName
-                                 (basicType (FunTy boolTy)) vanillaIdInfo
-	  }
-	; tcExtendIdEnv [breakpointJumpId, breakpointCondJumpId] thing_inside}
-#else
    = thing_inside
-#endif
+
 \end{code}
 
 %************************************************************************
