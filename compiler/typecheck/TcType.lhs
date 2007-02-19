@@ -28,7 +28,8 @@ module TcType (
   UserTypeCtxt(..), pprUserTypeCtxt,
   TcTyVarDetails(..), BoxInfo(..), pprTcTyVarDetails,
   MetaDetails(Flexi, Indirect), SkolemInfo(..), pprSkolTvBinding, pprSkolInfo,
-  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isBoxyTyVar, isSigTyVar, isExistentialTyVar, 
+  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isBoxyTyVar, 
+  isSigTyVar, isExistentialTyVar,  isTyConableTyVar,
   metaTvRef, 
   isFlexi, isIndirect, 
 
@@ -478,11 +479,26 @@ instance Outputable MetaDetails where
 %************************************************************************
 
 \begin{code}
-isImmutableTyVar, isSkolemTyVar, isExistentialTyVar, isBoxyTyVar, isMetaTyVar :: TyVar -> Bool
+isImmutableTyVar :: TyVar -> Bool
+
 isImmutableTyVar tv
   | isTcTyVar tv = isSkolemTyVar tv
   | otherwise    = True
 
+isTyConableTyVar, isSkolemTyVar, isExistentialTyVar, 
+  isBoxyTyVar, isMetaTyVar :: TcTyVar -> Bool 
+
+isTyConableTyVar tv	
+	-- True of a meta-type variable tha can be filled in 
+	-- with a type constructor application; in particular,
+	-- not a SigTv
+  = ASSERT( isTcTyVar tv) 
+    case tcTyVarDetails tv of
+	MetaTv BoxTv      _ -> True
+	MetaTv TauTv      _ -> True
+	MetaTv (SigTv {}) _ -> False
+	SkolemTv {}	    -> False
+	
 isSkolemTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of

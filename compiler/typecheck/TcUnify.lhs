@@ -142,7 +142,7 @@ subFunTys error_herald n_pats res_ty thing_inside
 	       else loop n args_so_far (FunTy arg_ty' res_ty') }
 
     loop n args_so_far (TyVarTy tv)
-        | not (isImmutableTyVar tv)
+        | isTyConableTyVar tv
 	= do { cts <- readMetaTyVar tv 
 	     ; case cts of
 		 Indirect ty -> loop n args_so_far ty
@@ -196,7 +196,7 @@ boxySplitTyConApp tc orig_ty
       = loop (n_req - 1) (arg:args_so_far) fun
 
     loop n_req args_so_far (TyVarTy tv)
-      | not (isImmutableTyVar tv)
+      | isTyConableTyVar tv
       = do { cts <- readMetaTyVar tv
 	   ; case cts of
 	       Indirect ty -> loop n_req args_so_far ty
@@ -232,7 +232,7 @@ boxySplitAppTy orig_ty
       = return (fun_ty, arg_ty)
 
     loop (TyVarTy tv)
-      | not (isImmutableTyVar tv)
+      | isTyConableTyVar tv
       = do { cts <- readMetaTyVar tv
 	   ; case cts of
 	       Indirect ty -> loop ty

@@ -2280,7 +2280,7 @@ disambiguate extended_defaulting insts
 
    defaultable_group :: [(Inst,Class,TcTyVar)] -> Bool
    defaultable_group ds@((_,_,tv):_)
-	=  not (isImmutableTyVar tv)	-- Note [Avoiding spurious errors]
+	=  isTyConableTyVar tv	-- Note [Avoiding spurious errors]
 	&& not (tv `elemVarSet` bad_tvs)
 	&& defaultable_classes [c | (_,c,_) <- ds]
    defaultable_group [] = panic "defaultable_group"
