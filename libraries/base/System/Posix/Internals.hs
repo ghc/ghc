@@ -72,11 +72,11 @@ type FD = Int
 -- ---------------------------------------------------------------------------
 -- stat()-related stuff
 
-fdFileSize :: Int -> IO Integer
+fdFileSize :: FD -> IO Integer
 fdFileSize fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fileSize" $
-	c_fstat (fromIntegral fd) p_stat
+	c_fstat fd p_stat
     c_mode <- st_mode p_stat :: IO CMode 
     if not (s_isreg c_mode)
 	then return (-1)
@@ -97,11 +97,11 @@ fileType file =
 
 -- NOTE: On Win32 platforms, this will only work with file descriptors
 -- referring to file handles. i.e., it'll fail for socket FDs.
-fdType :: Int -> IO FDType
+fdType :: FD -> IO FDType
 fdType fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fdType" $
-	c_fstat (fromIntegral fd) p_stat
+	c_fstat fd p_stat
     statGetType p_stat
 
 statGetType p_stat = do
@@ -129,17 +129,17 @@ foreign import stdcall unsafe "HsBase.h closesocket"
    c_closesocket :: CInt -> IO CInt
 #endif
 
-fdGetMode :: Int -> IO IOMode
+fdGetMode :: FD -> IO IOMode
 fdGetMode fd = do
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__)
     -- XXX: this code is *BROKEN*, _setmode only deals with O_TEXT/O_BINARY
     flags1 <- throwErrnoIfMinus1Retry "fdGetMode" 
-                (c__setmode (fromIntegral fd) (fromIntegral o_WRONLY))
+                (c__setmode fd (fromIntegral o_WRONLY))
     flags  <- throwErrnoIfMinus1Retry "fdGetMode" 
-                (c__setmode (fromIntegral fd) (fromIntegral flags1))
+                (c__setmode fd (fromIntegral flags1))
 #else
     flags <- throwErrnoIfMinus1Retry "fdGetMode" 
-		(c_fcntl_read (fromIntegral fd) const_f_getfl)
+		(c_fcntl_read fd const_f_getfl)
 #endif
     let
        wH  = (flags .&. o_WRONLY) /= 0
@@ -157,12 +157,12 @@ fdGetMode fd = do
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
 
-fdIsTTY :: Int -> IO Bool
-fdIsTTY fd = c_isatty (fromIntegral fd) >>= return.toBool
+fdIsTTY :: FD -> IO Bool
+fdIsTTY fd = c_isatty fd >>= return.toBool
 
 #if defined(HTYPE_TCFLAG_T)
 
-setEcho :: Int -> Bool -> IO ()
+setEcho :: FD -> Bool -> IO ()
 setEcho fd on = do
   tcSetAttr fd $ \ p_tios -> do
     c_lflag <- c_lflag p_tios :: IO CTcflag
@@ -171,13 +171,13 @@ setEcho fd on = do
 	 | otherwise = c_lflag .&. complement (fromIntegral const_echo)
     poke_c_lflag p_tios (new_c_lflag :: CTcflag)
 
-getEcho :: Int -> IO Bool
+getEcho :: FD -> IO Bool
 getEcho fd = do
   tcSetAttr fd $ \ p_tios -> do
     c_lflag <- c_lflag p_tios :: IO CTcflag
     return ((c_lflag .&. fromIntegral const_echo) /= 0)
 
-setCooked :: Int -> Bool -> IO ()
+setCooked :: FD -> Bool -> IO ()
 setCooked fd cooked = 
   tcSetAttr fd $ \ p_tios -> do
 
@@ -199,7 +199,7 @@ tcSetAttr :: FD -> (Ptr CTermios -> IO a) -> IO a
 tcSetAttr fd fun = do
      allocaBytes sizeof_termios  $ \p_tios -> do
 	throwErrnoIfMinus1Retry "tcSetAttr"
-	   (c_tcgetattr (fromIntegral fd) p_tios)
+	   (c_tcgetattr fd p_tios)
 
 #ifdef __GLASGOW_HASKELL__
 	-- Save a copy of termios, if this is a standard file descriptor.
@@ -224,16 +224,16 @@ tcSetAttr fd fun = do
 	     c_sigprocmask const_sig_block p_sigset p_old_sigset
 	     r <- fun p_tios  -- do the business
 	     throwErrnoIfMinus1Retry_ "tcSetAttr" $
-		 c_tcsetattr (fromIntegral fd) const_tcsanow p_tios
+		 c_tcsetattr fd const_tcsanow p_tios
 	     c_sigprocmask const_sig_setmask p_old_sigset nullPtr
 	     return r
 
 #ifdef __GLASGOW_HASKELL__
 foreign import ccall unsafe "HsBase.h __hscore_get_saved_termios"
-   get_saved_termios :: Int -> IO (Ptr CTermios)
+   get_saved_termios :: CInt -> IO (Ptr CTermios)
 
 foreign import ccall unsafe "HsBase.h __hscore_set_saved_termios"
-   set_saved_termios :: Int -> (Ptr CTermios) -> IO ()
+   set_saved_termios :: CInt -> (Ptr CTermios) -> IO ()
 #endif
 
 #else
@@ -246,9 +246,9 @@ foreign import ccall unsafe "HsBase.h __hscore_set_saved_termios"
 -- report that character until another character is input..odd.) This
 -- latter feature doesn't sit too well with IO actions like IO.hGetLine..
 -- consider yourself warned.
-setCooked :: Int -> Bool -> IO ()
+setCooked :: FD -> Bool -> IO ()
 setCooked fd cooked = do
-  x <- set_console_buffering (fromIntegral fd) (if cooked then 1 else 0)
+  x <- set_console_buffering fd (if cooked then 1 else 0)
   if (x /= 0)
    then ioError (ioe_unk_error "setCooked" "failed to set buffering")
    else return ()
@@ -258,16 +258,16 @@ ioe_unk_error loc msg
 
 -- Note: echoing goes hand in hand with enabling 'line input' / raw-ness
 -- for Win32 consoles, hence setEcho ends up being the inverse of setCooked.
-setEcho :: Int -> Bool -> IO ()
+setEcho :: FD -> Bool -> IO ()
 setEcho fd on = do
-  x <- set_console_echo (fromIntegral fd) (if on then 1 else 0)
+  x <- set_console_echo fd (if on then 1 else 0)
   if (x /= 0)
    then ioError (ioe_unk_error "setEcho" "failed to set echoing")
    else return ()
 
-getEcho :: Int -> IO Bool
+getEcho :: FD -> IO Bool
 getEcho fd = do
-  r <- get_console_echo (fromIntegral fd)
+  r <- get_console_echo fd
   if (r == (-1))
    then ioError (ioe_unk_error "getEcho" "failed to get echoing")
    else return (r == 1)
@@ -290,12 +290,12 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
-		 (c_fcntl_read (fromIntegral fd) const_f_getfl)
+		 (c_fcntl_read fd const_f_getfl)
   -- An error when setting O_NONBLOCK isn't fatal: on some systems 
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
   unless (testBit flags (fromIntegral o_NONBLOCK)) $ do
-    c_fcntl_write (fromIntegral fd) const_f_setfl (flags .|. o_NONBLOCK)
+    c_fcntl_write fd const_f_setfl (flags .|. o_NONBLOCK)
     return ()
 #else
 

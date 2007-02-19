@@ -53,6 +53,7 @@ import Data.Maybe  ( Maybe(..) )
 import GHC.Show
 import GHC.List
 import GHC.Read
+import Foreign.C.Types (CInt)
 
 #ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Dynamic
@@ -342,7 +343,7 @@ instance Eq Handle where
  (DuplexHandle _ h1 _) == (DuplexHandle _ h2 _) = h1 == h2
  _ == _ = False 
 
-type FD = Int -- XXX ToDo: should be CInt
+type FD = CInt
 
 data Handle__
   = Handle__ {

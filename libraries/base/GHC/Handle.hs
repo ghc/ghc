@@ -453,7 +453,7 @@ flushReadBuffer fd buf
      puts ("flushReadBuffer: new file offset = " ++ show off ++ "\n")
 #    endif
      throwErrnoIfMinus1Retry "flushReadBuffer"
-   	 (c_lseek (fromIntegral fd) (fromIntegral off) sEEK_CUR)
+   	 (c_lseek fd (fromIntegral off) sEEK_CUR)
      return buf{ bufWPtr=0, bufRPtr=0 }
 
 flushWriteBuffer :: FD -> Bool -> Buffer -> IO Buffer
@@ -466,7 +466,7 @@ flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  =
   if bytes == 0
      then return (buf{ bufRPtr=0, bufWPtr=0 })
      else do
-  res <- writeRawBuffer "flushWriteBuffer" (fromIntegral fd) is_stream b 
+  res <- writeRawBuffer "flushWriteBuffer" fd is_stream b 
   			(fromIntegral r) (fromIntegral bytes)
   let res' = fromIntegral res
   if res' < bytes 
@@ -549,13 +549,13 @@ readRawBufferPtr loc fd is_stream buf off len =
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 writeRawBuffer loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
-		(write_rawBuffer (fromIntegral fd) buf off len)
+		(write_rawBuffer fd buf off len)
 		(threadWaitWrite (fromIntegral fd))
 
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 writeRawBufferPtr loc fd is_stream buf off len = 
   throwErrnoIfMinus1RetryMayBlock loc
-		(write_off (fromIntegral fd) buf off len)
+		(write_off fd buf off len)
 		(threadWaitWrite (fromIntegral fd))
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
@@ -648,17 +648,17 @@ blockingReadRawBufferPtr loc fd False buf off len =
 
 blockingWriteRawBuffer loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
-    send_rawBuffer (fromIntegral fd) buf off len
+    send_rawBuffer fd buf off len
 blockingWriteRawBuffer loc fd False buf off len = 
   throwErrnoIfMinus1Retry loc $
-    write_rawBuffer (fromIntegral fd) buf off len
+    write_rawBuffer fd buf off len
 
 blockingWriteRawBufferPtr loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
-    send_off (fromIntegral fd) buf off len
+    send_off fd buf off len
 blockingWriteRawBufferPtr loc fd False buf off len = 
   throwErrnoIfMinus1Retry loc $
-    write_off (fromIntegral fd) buf off len
+    write_off fd buf off len
 
 -- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
 -- These calls may block, but that's ok.
@@ -809,14 +809,13 @@ openFile' filepath mode binary =
     -- directories.  However, the man pages I've read say that open()
     -- always returns EISDIR if the file is a directory and was opened
     -- for writing, so I think we're ok with a single open() here...
-    fd <- fromIntegral `liftM`
-	      throwErrnoIfMinus1Retry "openFile"
+    fd <- throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
     fd_type <- fdType fd
 
     h <- openFd fd (Just fd_type) False filepath mode binary
-            `catchException` \e -> do c_close (fromIntegral fd); throw e
+            `catchException` \e -> do c_close fd; throw e
 	-- NB. don't forget to close the FD if openFd fails, otherwise
 	-- this FD leaks.
 	-- ASSERT: if we just created the file, then openFd won't fail
@@ -829,7 +828,7 @@ openFile' filepath mode binary =
 	-- like /dev/null.
     if mode == WriteMode && fd_type == RegularFile
       then throwErrnoIf (/=0) "openFile" 
-              (c_ftruncate (fromIntegral fd) 0)
+              (c_ftruncate fd 0)
       else return 0
 #endif
     return h
@@ -873,8 +872,8 @@ openTempFile' loc tmp_dir template binary = do
            then findTempName (x+1)
            else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
        else do
-         h <- openFd (fromIntegral fd) Nothing False filepath ReadWriteMode True
-	        `catchException` \e -> do c_close (fromIntegral fd); throw e
+         h <- openFd fd Nothing False filepath ReadWriteMode True
+	        `catchException` \e -> do c_close fd; throw e
 	 return (filepath, h)
       where
         filename        = prefix ++ show x ++ suffix
@@ -918,7 +917,7 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
 	-- regular files need to be locked
 	RegularFile -> do
 #ifndef mingw32_HOST_OS
-	   r <- lockFile (fromIntegral fd) (fromBool write) 1{-exclusive-}
+	   r <- lockFile fd (fromBool write) 1{-exclusive-}
 	   when (r == -1)  $
 		ioException (IOError Nothing ResourceBusy "openFile"
 				   "file is locked" Nothing)
@@ -1061,7 +1060,6 @@ hClose_help handle_ =
 
 hClose_handle_ handle_ = do
     let fd = haFD handle_
-        c_fd = fromIntegral fd
 
     -- close the file descriptor, but not when this is the read
     -- side of a duplex handle.
@@ -1069,9 +1067,9 @@ hClose_handle_ handle_ = do
       Nothing -> 
   		  throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_HOST_OS
-	    			(closeFd (haIsStream handle_) c_fd)
+	    			(closeFd (haIsStream handle_) fd)
 #else
-	    			(c_close c_fd)
+	    			(c_close fd)
 #endif
       Just _  -> return ()
 
@@ -1080,7 +1078,7 @@ hClose_handle_ handle_ = do
   
 #ifndef mingw32_HOST_OS
     -- unlock it
-    unlockFile c_fd
+    unlockFile fd
 #endif
 
     -- we must set the fd to -1, because the finalizer is going
@@ -1119,7 +1117,7 @@ hSetFileSize handle size =
       SemiClosedHandle 		-> ioe_closedHandle
       _ -> do flushWriteBufferOnly handle_
 	      throwErrnoIf (/=0) "hSetFileSize" 
-	         (c_ftruncate (fromIntegral (haFD handle_)) (fromIntegral size))
+	         (c_ftruncate (haFD handle_) (fromIntegral size))
 	      return ()
 
 -- ---------------------------------------------------------------------------
@@ -1358,7 +1356,7 @@ hSeek handle mode offset =
 
     let do_seek =
 	  throwErrnoIfMinus1Retry_ "hSeek"
-	    (c_lseek (fromIntegral (haFD handle_)) (fromIntegral offset) whence)
+	    (c_lseek (haFD handle_) (fromIntegral offset) whence)
 
         whence :: CInt
         whence = case mode of
@@ -1391,7 +1389,7 @@ hTell handle =
 	-- current buffer size.  Just flush instead.
       flushBuffer handle_
 #endif
-      let fd = fromIntegral (haFD handle_)
+      let fd = haFD handle_
       posn <- fromIntegral `liftM`
 	        throwErrnoIfMinus1Retry "hGetPosn"
 		   (c_lseek fd 0 sEEK_CUR)
@@ -1530,7 +1528,7 @@ hSetBinaryMode :: Handle -> Bool -> IO ()
 hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
     do throwErrnoIfMinus1_ "hSetBinaryMode"
-          (setmode (fromIntegral (haFD handle_)) bin)
+          (setmode (haFD handle_) bin)
        return handle_{haIsBin=bin}
   
 foreign import ccall unsafe "__hscore_setmode"
@@ -1560,22 +1558,24 @@ dupHandle other_side h_ = do
   -- flush the buffer first, so we don't have to copy its contents
   flushBuffer h_
   new_fd <- throwErrnoIfMinus1 "dupHandle" $ 
-		c_dup (fromIntegral (haFD h_))
+		c_dup (haFD h_)
   dupHandle_ other_side h_ new_fd
 
 dupHandleTo other_side hto_ h_ = do
   flushBuffer h_
   -- Windows' dup2 does not return the new descriptor, unlike Unix
   throwErrnoIfMinus1 "dupHandleTo" $ 
-	c_dup2 (fromIntegral (haFD h_)) (fromIntegral (haFD hto_))
+	c_dup2 (haFD h_) (haFD hto_)
   dupHandle_ other_side h_ (haFD hto_)
 
+dupHandle_ :: Maybe (MVar Handle__) -> Handle__ -> FD
+           -> IO (Handle__, Handle__)
 dupHandle_ other_side h_ new_fd = do
   buffer <- allocateBuffer dEFAULT_BUFFER_SIZE (initBufferState (haType h_))
   ioref <- newIORef buffer
   ioref_buffers <- newIORef BufferListNil
 
-  let new_handle_ = h_{ haFD = fromIntegral new_fd, 
+  let new_handle_ = h_{ haFD = new_fd, 
 	         	haBuffer = ioref, 
 	          	haBuffers = ioref_buffers,
 	          	haOtherSide = other_side }
