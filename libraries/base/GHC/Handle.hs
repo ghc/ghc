@@ -157,6 +157,7 @@ withHandle_ :: String -> Handle -> (Handle__ -> IO a) -> IO a
 withHandle_ fun h@(FileHandle _ m)     act = withHandle_' fun h m act
 withHandle_ fun h@(DuplexHandle _ m _) act = withHandle_' fun h m act
 
+withHandle_' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO a) -> IO a
 withHandle_' fun h m act = 
    block $ do
    h_ <- takeMVar m
@@ -1064,7 +1065,7 @@ hClose_handle_ handle_ = do
     -- close the file descriptor, but not when this is the read
     -- side of a duplex handle.
     case haOtherSide handle_ of
-      Nothing -> 
+      Nothing ->
   		  throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_HOST_OS
 	    			(closeFd (haIsStream handle_) fd)
@@ -1544,21 +1545,24 @@ foreign import ccall unsafe "__hscore_setmode"
 
 hDuplicate :: Handle -> IO Handle
 hDuplicate h@(FileHandle path m) = do
-  new_h_ <- withHandle' "hDuplicate" h m (dupHandle Nothing)
+  new_h_ <- withHandle' "hDuplicate" h m (dupHandle h Nothing)
   newFileHandle path (handleFinalizer path) new_h_
 hDuplicate h@(DuplexHandle path r w) = do
-  new_w_ <- withHandle' "hDuplicate" h w (dupHandle Nothing)
+  new_w_ <- withHandle' "hDuplicate" h w (dupHandle h Nothing)
   new_w <- newMVar new_w_
-  new_r_ <- withHandle' "hDuplicate" h r (dupHandle (Just new_w))
+  new_r_ <- withHandle' "hDuplicate" h r (dupHandle h (Just new_w))
   new_r <- newMVar new_r_
   addMVarFinalizer new_w (handleFinalizer path new_w)
   return (DuplexHandle path new_r new_w)
 
-dupHandle other_side h_ = do
+dupHandle :: Handle -> Maybe (MVar Handle__) -> Handle__
+          -> IO (Handle__, Handle__)
+dupHandle h other_side h_ = do
   -- flush the buffer first, so we don't have to copy its contents
   flushBuffer h_
-  new_fd <- throwErrnoIfMinus1 "dupHandle" $ 
-		c_dup (haFD h_)
+  new_fd <- case other_side of
+                Nothing -> throwErrnoIfMinus1 "dupHandle" $ c_dup (haFD h_)
+                Just r -> withHandle_' "dupHandle" h r (return . haFD)
   dupHandle_ other_side h_ new_fd
 
 dupHandleTo other_side hto_ h_ = do
