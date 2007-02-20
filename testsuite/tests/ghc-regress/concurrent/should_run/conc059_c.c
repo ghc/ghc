@@ -23,4 +23,5 @@ int main(int argc, char *argv[])
 #else
     usleep(1000000);
 #endif
+    exit(0);
 }
