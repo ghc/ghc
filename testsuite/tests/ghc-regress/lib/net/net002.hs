@@ -19,7 +19,9 @@ module Main where
 
 import Network.Socket
 
-import System.IO
+import Prelude hiding (putStr)
+import System.IO hiding (putStr)
+import qualified System.IO
 import System.IO.Error
 import Control.Concurrent
 import System.Environment 	( getArgs )
@@ -39,6 +41,11 @@ eofAsEmptyHandler :: IOError -> IO String
 eofAsEmptyHandler e
  | isEOFError e = return ""
  | otherwise    = ioError e
+
+-- For debugging, enable the putStr below.  Turn it off to get deterministic
+-- results: on a multiprocessor we can't predict the order of the messages.
+putStr = const (return ())
+-- putStr = System.IO.putStr 
 
 echo_server s = do
     (s', clientAddr) <- accept s
@@ -110,9 +117,9 @@ main = {- withSocketsDo $ -} do
     c <- myForkIO (echo_client (read n::Int))
     -- let 'em run until they've signaled they're done
     join s
-    putStr("join s")
+    System.IO.putStr "join s\n"
     join c
-    putStr("join c")
+    System.IO.putStr "join c\n"
 
 -- these are used to make the main thread wait until
 -- the child threads have exited

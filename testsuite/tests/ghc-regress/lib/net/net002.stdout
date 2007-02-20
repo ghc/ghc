@@ -1,15 +1,3 @@
-Client wrote: Hello there sailor
-Server recv: Hello there sailor
-Server read: Hello there sailor
-Server wrote: Hello there sailor
-Client read successClient wrote: Hello there sailor
-Server recv: Hello there sailor
-Server read: Hello there sailor
-Server wrote: Hello there sailor
-Client read successClient wrote: Hello there sailor
-Server recv: Hello there sailor
-Server read: Hello there sailor
-Server wrote: Hello there sailor
-Client read successClient read nil
-Server recv: server read: server processed 57 bytes
-join sjoin c
+server processed 57 bytes
+join s
+join c
