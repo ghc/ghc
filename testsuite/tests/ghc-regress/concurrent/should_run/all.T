@@ -130,13 +130,7 @@ test('conc056', compose(only_ways(['threaded1','threaded2']),
 
 test('conc057', only_ways(['threaded2']), compile_and_run, ['-O0'])
 
-if config.platform == "i386-unknown-mingw32":
-    config058 = expect_fail_for(['ghci','threaded1','threaded2'])
-else:
-    config058 = normal
-
-test('conc058', compose(only_compiler_types(['ghc']), config058),
-	 compile_and_run, [''])
+test('conc058', only_compiler_types(['ghc']), compile_and_run, [''])
 
 test('conc059', compose(only_compiler_types(['ghc']),
 			only_ways(['threaded1','threaded2'])),
