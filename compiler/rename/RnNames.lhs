@@ -949,17 +949,33 @@ lookupImpDeprec dflags hpt pit gre
 		      case gre_par gre of	
 			ParentIs p -> mi_dep_fn iface p	-- its parent*, is deprec'd
 			NoParent   -> Nothing
-	Nothing    
-	  | isWiredInName name -> Nothing
-		-- We have not necessarily loaded the .hi file for a 
-		-- wired-in name (yet), although we *could*.
-		-- And we never deprecate them
 
-	 | otherwise -> pprPanic "lookupDeprec" (ppr name)	
-		-- By now all the interfaces should have been loaded
+	Nothing -> Nothing	-- See Note [Used names with interface not loaded]
   where
 	name = gre_name gre
 \end{code}
+
+Note [Used names with interface not loaded]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+By now all the interfaces should have been loaded,
+because reportDeprecations happens after typechecking.
+However, it's still (just) possible to to find a used 
+Name whose interface hasn't been loaded:
+
+a) It might be a WiredInName; in that case we may not load 
+   its interface (although we could).
+
+b) It might be GHC.Real.fromRational, or GHC.Num.fromInteger
+   These are seen as "used" by the renamer (if -fno-implicit-prelude) 
+   is on), but the typechecker may discard their uses 
+   if in fact the in-scope fromRational is GHC.Read.fromRational,
+   (see tcPat.tcOverloadedLit), and the typechecker sees that the type 
+   is fixed, say, to GHC.Base.Float (see Inst.lookupSimpleInst).
+   In that obscure case it won't force the interface in.
+
+In both cases we simply don't permit deprecations; 
+this is, after all, wired-in stuff.
+
 
 %*********************************************************
 %*						 	 *
