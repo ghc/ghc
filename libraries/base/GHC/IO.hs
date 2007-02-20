@@ -90,7 +90,7 @@ hWaitForInput h msecs = do
 	        writeIORef ref buf'
 		return True
 	else do r <- throwErrnoIfMinus1Retry "hWaitForInput" $
-	  		inputReady (fromIntegral (haFD handle_)) 
+	  		inputReady (haFD handle_)
 			   (fromIntegral msecs) (haIsStream handle_)
 		return (r /= 0)
 
@@ -132,7 +132,7 @@ hGetChar handle =
     NoBuffering -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
-	r <- readRawBuffer "hGetChar" (fromIntegral fd) (haIsStream handle_) raw 0 1
+	r <- readRawBuffer "hGetChar" fd (haIsStream handle_) raw 0 1
 	if r == 0
 	   then ioe_EOF
 	   else do (c,_) <- readCharFromBuffer raw 0
@@ -350,7 +350,7 @@ lazyRead' h handle_ = do
      NoBuffering      -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
-	r <- readRawBuffer "lazyRead" (fromIntegral fd) (haIsStream handle_) raw 0 1
+	r <- readRawBuffer "lazyRead" fd (haIsStream handle_) raw 0 1
 	if r == 0
 	   then do handle_ <- hClose_help handle_ 
 		   return (handle_, "")
@@ -413,7 +413,7 @@ hPutChar handle c = do
 	BlockBuffering _ -> hPutcBuffered handle_ False c
 	NoBuffering      ->
 		with (castCharToCChar c) $ \buf -> do
-  		  writeRawBufferPtr "hPutChar" (fromIntegral fd) (haIsStream handle_) buf 0 1
+  		  writeRawBufferPtr "hPutChar" fd (haIsStream handle_) buf 0 1
 		  return ()
 
 hPutcBuffered handle_ is_line c = do
@@ -718,7 +718,7 @@ writeChunk fd is_stream ptr bytes = loop 0 bytes
   loop _   bytes | bytes <= 0 = return ()
   loop off bytes = do
     r <- fromIntegral `liftM`
-    	   writeRawBufferPtr "writeChunk" (fromIntegral fd) is_stream ptr
+    	   writeRawBufferPtr "writeChunk" fd is_stream ptr
 	   		     off (fromIntegral bytes)
     -- write can't return 0
     loop (off + r) (bytes - r)
@@ -824,7 +824,7 @@ readChunk fd is_stream ptr bytes = loop 0 bytes
   loop off bytes | bytes <= 0 = return off
   loop off bytes = do
     r <- fromIntegral `liftM`
-           readRawBufferPtr "readChunk" (fromIntegral fd) is_stream 
+           readRawBufferPtr "readChunk" fd is_stream 
 	   		    (castPtr ptr) off (fromIntegral bytes)
     if r == 0
 	then return off
@@ -905,7 +905,7 @@ bufReadNonBlocking fd ref is_stream ptr so_far count =
 readChunkNonBlocking :: FD -> Bool -> Ptr a -> Int -> IO Int
 readChunkNonBlocking fd is_stream ptr bytes = do
 #ifndef mingw32_HOST_OS
-    ssize <- c_read (fromIntegral fd) (castPtr ptr) (fromIntegral bytes)
+    ssize <- c_read fd (castPtr ptr) (fromIntegral bytes)
     let r = fromIntegral ssize :: Int
     if (r == -1)
       then do errno <- getErrno
@@ -915,7 +915,7 @@ readChunkNonBlocking fd is_stream ptr bytes = do
       else return r
 #else
     fromIntegral `liftM`
-        readRawBufferPtr "readChunkNonBlocking" (fromIntegral fd) is_stream 
+        readRawBufferPtr "readChunkNonBlocking" fd is_stream 
 	   		    (castPtr ptr) 0 (fromIntegral bytes)
 
     -- we don't have non-blocking read support on Windows, so just invoke
