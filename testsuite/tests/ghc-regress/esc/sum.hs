@@ -5,7 +5,7 @@ module Sum where
 -- {-# CONTRACT f :: x:{y | y > 0} -> {y | y > 0} -> {r | r == x + 1} #-}
 -- {-# CONTRACT f :: any -> {y | y > 0}  #-}
 -- {-# CONTRACT f :: {y | y > 0} -> any #-}
-{-# CONTRACT f :: x:{y | y > 0} -> {r | r > 0} #-}
+{-# CONTRACT f :: {y | y > 0} -> {r | r > 0} #-}
 f :: Int -> Int
 f x = x + 1
 
