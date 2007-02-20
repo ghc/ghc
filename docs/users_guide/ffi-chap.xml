@@ -214,7 +214,41 @@ int main(int argc, char *argv[])
 	<replaceable>M</replaceable> is
 	<literal>__stginit_<replaceable>M</replaceable></literal>, and
 	it may be declared as an external function symbol as in the
-	code above.</para>
+	code above.  Note that the symbol name should be transformed
+	according to the Z-encoding:</para>
+
+      <informaltable>
+	<tgroup cols="2" align="left" colsep="1" rowsep="1">
+	  <thead>
+	    <row>
+	      <entry>Character</entry>
+	      <entry>Replacement</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><literal>.</literal></entry>
+	      <entry><literal>zd</literal></entry>
+	    </row>
+	    <row>
+	      <entry><literal>_</literal></entry>
+	      <entry><literal>zu</literal></entry>
+	    </row>
+	    <row>
+	      <entry><literal>`</literal></entry>
+	      <entry><literal>zq</literal></entry>
+	    </row>
+	    <row>
+	      <entry><literal>Z</literal></entry>
+	      <entry><literal>ZZ</literal></entry>
+	    </row>
+	    <row>
+	      <entry><literal>z</literal></entry>
+	      <entry><literal>zz</literal></entry>
+	    </row>
+          </tbody>
+        </tgroup>
+      </informaltable>
 
 	<para>After we've finished invoking our Haskell functions, we
 	can call <literal>hs_exit()</literal>, which
