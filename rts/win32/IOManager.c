@@ -190,7 +190,7 @@ IOWorkerProc(PVOID param)
 		     * 
 		     * Note: Sleep() is in milliseconds, not micros.
 		     */
-		    Sleep(work->workData.delayData.msecs / 1000);
+		    Sleep((work->workData.delayData.msecs + 999) / 1000);
 		    len = work->workData.delayData.msecs;
 		    complData = NULL;
 		    fd = 0;
