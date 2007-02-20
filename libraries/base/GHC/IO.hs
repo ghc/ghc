@@ -730,7 +730,7 @@ writeChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes
   loop off bytes | bytes <= 0 = return off
   loop off bytes = do
 #ifndef mingw32_HOST_OS
-    ssize <- c_write (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes)
+    ssize <- c_write fd (ptr `plusPtr` off) (fromIntegral bytes)
     let r = fromIntegral ssize :: Int
     if (r == -1)
       then do errno <- getErrno
@@ -739,7 +739,8 @@ writeChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes
 		 else throwErrno "writeChunk"
       else loop (off + r) (bytes - r)
 #else
-    (ssize, rc) <- asyncWrite fd (fromIntegral $ fromEnum is_stream)
+    (ssize, rc) <- asyncWrite (fromIntegral fd)
+                              (fromIntegral $ fromEnum is_stream)
     				 (fromIntegral bytes)
 				 (ptr `plusPtr` off)
     let r = fromIntegral ssize :: Int

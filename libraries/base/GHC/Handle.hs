@@ -599,7 +599,7 @@ readRawBufferNoBlock = readRawBuffer
 -- Async versions of the read/write primitives, for the non-threaded RTS
 
 asyncReadRawBuffer loc fd is_stream buf off len = do
-    (l, rc) <- asyncReadBA fd (if is_stream then 1 else 0) 
+    (l, rc) <- asyncReadBA (fromIntegral fd) (if is_stream then 1 else 0) 
 		 (fromIntegral len) off buf
     if l == (-1)
       then 
@@ -607,7 +607,7 @@ asyncReadRawBuffer loc fd is_stream buf off len = do
       else return (fromIntegral l)
 
 asyncReadRawBufferPtr loc fd is_stream buf off len = do
-    (l, rc) <- asyncRead fd (if is_stream then 1 else 0) 
+    (l, rc) <- asyncRead (fromIntegral fd) (if is_stream then 1 else 0) 
 			(fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
       then 
@@ -615,7 +615,7 @@ asyncReadRawBufferPtr loc fd is_stream buf off len = do
       else return (fromIntegral l)
 
 asyncWriteRawBuffer loc fd is_stream buf off len = do
-    (l, rc) <- asyncWriteBA fd (if is_stream then 1 else 0) 
+    (l, rc) <- asyncWriteBA (fromIntegral fd) (if is_stream then 1 else 0) 
 			(fromIntegral len) off buf
     if l == (-1)
       then 
@@ -623,7 +623,7 @@ asyncWriteRawBuffer loc fd is_stream buf off len = do
       else return (fromIntegral l)
 
 asyncWriteRawBufferPtr loc fd is_stream buf off len = do
-    (l, rc) <- asyncWrite fd (if is_stream then 1 else 0) 
+    (l, rc) <- asyncWrite (fromIntegral fd) (if is_stream then 1 else 0) 
 		  (fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
       then 
