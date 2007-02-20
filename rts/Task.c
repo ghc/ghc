@@ -84,12 +84,18 @@ freeTaskManager (void)
 
     ACQUIRE_LOCK(&sched_mutex);
     for (task = all_tasks; task != NULL; task = next) {
-#if defined(THREADED_RTS)
-        closeCondition(&task->cond);
-        closeMutex(&task->lock);
-#endif
         next = task->all_link;
-        stgFree(task);
+        if (task->stopped) {
+            // We only free resources if the Task is not in use.  A
+            // Task may still be in use if we have a Haskell thread in
+            // a foreign call while we are attempting to shut down the
+            // RTS (see conc059).
+#if defined(THREADED_RTS)
+            closeCondition(&task->cond);
+            closeMutex(&task->lock);
+#endif
+            stgFree(task);
+        }
     }
     all_tasks = NULL;
     task_free_list = NULL;
