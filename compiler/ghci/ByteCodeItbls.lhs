@@ -16,7 +16,7 @@ import ByteCodeFFI	( newExec )
 import Name		( Name, getName )
 import NameEnv
 import SMRep		( typeCgRep )
-import DataCon		( DataCon, dataConRepArgTys )
+import DataCon		( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Constants	( mIN_PAYLOAD_SIZE, wORD_SIZE )
 import CgHeapery	( mkVirtHeapOffsets )
@@ -25,10 +25,14 @@ import Util             ( lengthIs, listLengthCmp )
 
 import Foreign
 import Foreign.C
+import Foreign.C.String
 import Data.Bits	( Bits(..), shiftR )
 
 import GHC.Exts		( Int(I#), addr2Int# )
 import GHC.Ptr		( Ptr(..) )
+import GHC.Prim
+
+import Outputable
 \end{code}
 
 %************************************************************************
@@ -92,17 +96,17 @@ make_constr_itbls cons
            = mk_itbl dcon conNo stg_interp_constr_entry
 
         mk_itbl :: DataCon -> Int -> Ptr () -> IO (Name,ItblPtr)
-        mk_itbl dcon conNo entry_addr
-           = let rep_args = [ (typeCgRep arg,arg) 
-			    | arg <- dataConRepArgTys dcon ]
-		 (tot_wds, ptr_wds, _) = mkVirtHeapOffsets False{-not a THUNK-} rep_args
+        mk_itbl dcon conNo entry_addr = do
+           let rep_args = [ (typeCgRep arg,arg) | arg <- dataConRepArgTys dcon ]
+               (tot_wds, ptr_wds, _) = mkVirtHeapOffsets False{-not a THUNK-} rep_args
 
-                 ptrs  = ptr_wds
-                 nptrs = tot_wds - ptr_wds
-                 nptrs_really
-                    | ptrs + nptrs >= mIN_PAYLOAD_SIZE = nptrs
-                    | otherwise = mIN_PAYLOAD_SIZE - ptrs
-                 itbl  = StgInfoTable {
+               ptrs  = ptr_wds
+               nptrs = tot_wds - ptr_wds
+               nptrs_really
+                  | ptrs + nptrs >= mIN_PAYLOAD_SIZE = nptrs
+                  | otherwise = mIN_PAYLOAD_SIZE - ptrs
+               code = mkJumpToAddr entry_addr
+               itbl  = StgInfoTable {
 #ifndef GHCI_TABLES_NEXT_TO_CODE
                            entry = entry_addr,
 #endif
@@ -114,15 +118,21 @@ make_constr_itbls cons
                          , code  = code
 #endif
                         }
-                 -- Make a piece of code to jump to "entry_label".
-                 -- This is the only arch-dependent bit.
-                 code = mkJumpToAddr entry_addr
-             in
-                 do addr <- newExec [itbl]
+           qNameCString <- newCString $ dataConIdentity dcon 
+           let conInfoTbl = StgConInfoTable {
+                                 conDesc = qNameCString,
+                                 infoTable = itbl
+                            }
+               -- Make a piece of code to jump to "entry_label".
+               -- This is the only arch-dependent bit.
+           -- addr <- newExec [itbl]
+           addrCon <- newExec [conInfoTbl]
+           let addr = (castFunPtrToPtr addrCon) `plusPtr` 4 -- ToDo: remove magic number
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
-                    return (getName dcon, ItblPtr (castFunPtrToPtr addr))
+           -- return (getName dcon, ItblPtr (castFunPtrToPtr addr))
+           return (getName dcon, ItblPtr addr)
 
 
 -- Make code which causes a jump to the given address.  This is the
@@ -283,6 +293,30 @@ type HalfWord = Word32
 #else
 type HalfWord = Word16
 #endif
+
+data StgConInfoTable = StgConInfoTable {
+   conDesc   :: CString,
+   infoTable :: StgInfoTable
+}
+
+instance Storable StgConInfoTable where
+   sizeOf conInfoTable    
+      = sum [ sizeOf (conDesc conInfoTable)
+            , sizeOf (infoTable conInfoTable) ]
+   alignment conInfoTable = SIZEOF_VOID_P
+   peek ptr 
+      = runState (castPtr ptr) $ do
+           desc <- load
+           itbl <- load
+           return  
+              StgConInfoTable 
+              { conDesc   = desc
+              , infoTable = itbl
+              }
+   poke ptr itbl 
+      = runState (castPtr ptr) $ do
+           store (conDesc itbl)
+           store (infoTable itbl)
 
 data StgInfoTable = StgInfoTable {
 #ifndef GHCI_TABLES_NEXT_TO_CODE

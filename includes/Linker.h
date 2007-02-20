@@ -33,9 +33,6 @@ HsInt resolveObjs( void );
 /* load a dynamic library */
 char *addDLL( char* dll_name );
 
-/* lookup an address in the datacon tbl */
-char *lookupDataCon( StgWord addr);
-
 extern void markRootPtrTable(void (*)(StgClosure **));
 
 #endif /* LINKER_H */

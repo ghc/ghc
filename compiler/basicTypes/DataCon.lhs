@@ -10,7 +10,7 @@ module DataCon (
 	ConTag, fIRST_TAG,
 	mkDataCon,
 	dataConRepType, dataConSig, dataConFullSig,
-	dataConName, dataConTag, dataConTyCon, dataConUserType,
+	dataConName, dataConIdentity, dataConTag, dataConTyCon, dataConUserType,
 	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, dataConResTys,
 	dataConEqSpec, eqSpecPreds, dataConTheta, dataConStupidTheta, 
 	dataConInstArgTys, dataConOrigArgTys, 
@@ -500,6 +500,19 @@ mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
 \begin{code}
 dataConName :: DataCon -> Name
 dataConName = dcName
+
+-- generate a name in the format: package:Module.OccName
+-- and the unique identity of the name
+dataConIdentity :: DataCon -> String
+dataConIdentity dataCon
+   = prettyName
+   where
+   prettyName = pretty packageModule ++ "." ++ pretty occ
+   nm = getName dataCon
+   packageModule = nameModule nm
+   occ = getOccName dataCon
+   pretty :: Outputable a => a -> String 
+   pretty = showSDoc . ppr
 
 dataConTag :: DataCon -> ConTag
 dataConTag  = dcTag

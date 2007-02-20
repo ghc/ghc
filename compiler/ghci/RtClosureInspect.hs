@@ -10,14 +10,6 @@ module RtClosureInspect(
   
      cvObtainTerm,       -- :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
 
-     AddressEnv(..), 
-     DataConEnv,
-     extendAddressEnvList, 
-     elemAddressEnv, 
-     delFromAddressEnv, 
-     emptyAddressEnv, 
-     lookupAddressEnv, 
-
      ClosureType(..), 
      getClosureData,     -- :: a -> IO Closure
      Closure ( tipe, infoTable, ptrs, nonPtrs ), 
@@ -623,34 +615,3 @@ map Just [[1,1],[2,2]] :: [Maybe [Integer]]
 
 NOTE: (Num t) contexts have been manually replaced by Integer for clarity
 -}
-
---------------------------------------------------------------------
--- The DataConEnv is used to store the addresses of datacons loaded
--- via the dynamic linker
---------------------------------------------------------------------
-
-type DataConEnv   = AddressEnv StgInfoTable
-
--- Note that this AddressEnv and DataConEnv I wrote trying to follow 
--- conventions in ghc, but probably they make not much sense.
-
-newtype AddressEnv a = AE {aenv:: FiniteMap (Ptr a) Name}
-  deriving (Outputable)
-
-emptyAddressEnv = AE emptyFM
-
-extendAddressEnvList  :: AddressEnv a -> [(Ptr a, Name)] -> AddressEnv a
-elemAddressEnv        :: Ptr a -> AddressEnv a -> Bool
-delFromAddressEnv     :: AddressEnv a -> Ptr a -> AddressEnv a
-nullAddressEnv        :: AddressEnv a -> Bool
-lookupAddressEnv       :: AddressEnv a -> Ptr a -> Maybe Name
-
-extendAddressEnvList  (AE env) = AE . addListToFM env 
-elemAddressEnv   ptr  (AE env) = ptr `elemFM` env
-delFromAddressEnv     (AE env) = AE . delFromFM env
-nullAddressEnv                 = isEmptyFM . aenv
-lookupAddressEnv      (AE env) = lookupFM env
-
-
-instance Outputable (Ptr a) where
-  ppr = text . show

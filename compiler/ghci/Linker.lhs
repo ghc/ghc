@@ -29,11 +29,8 @@ import ByteCodeItbls
 import ByteCodeAsm
 import RtClosureInspect
 import IfaceEnv
-import Config
 import OccName
 import TcRnMonad
-import Constants
-import Encoding
 import Packages
 import DriverPhases
 import Finder
@@ -58,11 +55,13 @@ import UniqSet
 
 -- Standard libraries
 import Control.Monad
-import Control.Arrow    ( second )
 
 import Data.IORef
 import Data.List
 import Foreign.Ptr
+import Foreign.C.Types
+import Foreign.C.String
+import Foreign.Storable
 
 import System.IO
 import System.Directory
@@ -75,6 +74,7 @@ import GHC.IOBase	( IO(..) )
 #else
 import PrelIOBase	( IO(..) )
 #endif
+
 \end{code}
 
 
@@ -118,7 +118,6 @@ data PersistentLinkerState
 	-- Held, as usual, in dependency order; though I am not sure if
 	-- that is really important
 	pkgs_loaded :: [PackageId]
-       ,dtacons_env :: DataConEnv
      }
 
 emptyPLS :: DynFlags -> PersistentLinkerState
@@ -127,9 +126,8 @@ emptyPLS dflags = PersistentLinkerState {
 			itbl_env    = emptyNameEnv,
 			pkgs_loaded = init_pkgs,
 			bcos_loaded = [],
-			objs_loaded = []
-                      , dtacons_env = emptyAddressEnv
-                                        }
+			objs_loaded = [] }
+                    
   -- Packages that don't need loading, because the compiler 
   -- shares them with the interpreted program.
   --
@@ -151,52 +149,105 @@ extendLinkEnv new_bindings
 	    new_pls = pls { closure_env = new_closure_env }
 	writeIORef v_PersistentLinkerState new_pls
 
+-- | Given a data constructor, find its internal name.
+--   The info tables for data constructors have a field which records the source name
+--   of the constructor as a CString. The format is:
+--
+--    Package:Module.Name
+--
+--   We use this string to lookup the interpreter's internal representation of the name
+--   using the lookupOrig.    
 
 recoverDataCon :: a -> TcM Name
-recoverDataCon a = recoverDCInRTS a `recoverM` ioToTcRn (do 
-               mb_name <- recoverDCInDynEnv a
-               maybe (fail "Linker.recoverDatacon: Name not found in Dyn Env")
-                     return
-                     mb_name)
+recoverDataCon x = do 
+   theString <- ioToTcRn $ do
+      let ptr = getInfoTablePtr x 
+      conDescAddress <- getConDescAddress ptr 
+      peekCString conDescAddress  
+   let (pkg, mod, occ) = parse theString 
+       occName = mkOccName OccName.dataName occ
+       modName = mkModule (stringToPackageId pkg) (mkModuleName mod) 
+   lookupOrig modName occName
 
--- | If a is a Constr closure, lookupDC returns either the Name of the DataCon or the
---   symbol if it is a nullary constructor
---   For instance, for a closure containing 'Just x' it would return the Name for Data.Maybe.Just
---   For a closure containing 'Nothing' it would return the String "DataziMaybe_Nothing_static_info"
-recoverDCInDynEnv :: a -> IO (Maybe Name)
-recoverDCInDynEnv a = do 
-   pls <- readIORef v_PersistentLinkerState
-   let de = dtacons_env pls
-   ctype <- getClosureType a
-   if not (isConstr ctype) 
-         then putStrLn ("Not a Constr (" ++ show  ctype ++ ")") >> 
-              return Nothing
-         else do let infot = getInfoTablePtr a
-                     name  = lookupAddressEnv de (castPtr$ infot `plusPtr` (wORD_SIZE*2))
-                 return name
+   where
 
+   {- To find the string in the constructor's info table we need to consider 
+      the layout of info tables relative to the entry code for a closure.
 
-recoverDCInRTS :: a -> TcM Name 
-recoverDCInRTS a = do
-  ctype <- ioToTcRn$ getClosureType a
-  if (not$ isConstr ctype)
-     then fail "not Constr"
-     else do
-       Just symbol <- ioToTcRn$ lookupDataCon (getInfoTablePtr a)
-       let (occ,mod) = (parse . lex) symbol
-       lookupOrig mod occ
-    where lex x = map zDecodeString . init . init . split '_' . removeLeadingUnderscore $ x
-          parse [pkg, modName, occ] = (mkOccName OccName.dataName occ,
-              mkModule (stringToPackageId pkg) (mkModuleName modName))
-          parse [modName, occ] = (mkOccName OccName.dataName occ,
-              mkModule mainPackageId (mkModuleName modName))
-          split delim = let 
-                 helper [] = Nothing
-                 helper x  = Just . second (drop 1) . break (==delim) $ x
-              in unfoldr helper
-          removeLeadingUnderscore = if cLeadingUnderscore=="YES" 
-                                       then tail 
-                                       else id
+      An info table can be next to the entry code for the closure, or it can
+      be separate. The former (faster) is used in registerised versions of ghc, 
+      and the latter (portable) is for non-registerised versions. 
+
+      The diagrams below show where the string is to be found relative to 
+      the normal info table of the closure.
+
+      1) Code next to table:
+
+         --------------
+         |            |   <- pointer to the start of the string
+         --------------
+         |            |   <- the (start of the) info table structure
+         |            |
+         |            |
+         --------------
+         | entry code | 
+         |    ....    |
+
+         In this case the pointer to the start of the string can be found in
+         the memory location _one word before_ the first entry in the normal info 
+         table.
+
+      2) Code NOT next to table:
+
+                                 --------------
+         info table structure -> |     *------------------> --------------
+                                 |            |             | entry code |
+                                 |            |             |    ....    | 
+                                 --------------
+         ptr to start of str ->  |            |   
+                                 --------------
+
+         In this case the pointer to the start of the string can be found
+         in the memory location: info_table_ptr + info_table_size
+   -}
+
+   getConDescAddress :: Ptr StgInfoTable -> IO (Ptr CChar)
+   getConDescAddress ptr = do
+       peek $ intPtrToPtr $ (ptrToIntPtr ptr) + offset
+#ifdef GHCI_TABLES_NEXT_TO_CODE
+       where
+       -- subtract a word number of bytes 
+       offset = negate (fromIntegral SIZEOF_VOID_P)
+#endif
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+      where 
+      -- add the standard info table size in bytes 
+      infoTableSizeBytes = sTD_ITBL_SIZE * wORD_SIZE
+      offset = infoTableSizeBytes 
+#endif
+
+   -- parsing names is a little bit fiddly because we have a string in the form: 
+   -- pkg:A.B.C.foo, and we want to split it into three parts: ("pkg", "A.B.C", "foo").
+   -- Thus we split at the leftmost colon and the rightmost occurrence of the dot.
+   -- It would be easier if the string was in the form pkg:A.B.C:foo, but alas
+   -- this is not the conventional way of writing Haskell names. We stick with
+   -- convention, even though it makes the parsing code more troublesome.
+   -- Warning: this code assumes that the string is well formed.
+   parse :: String -> (String, String, String)
+   parse input 
+      = ASSERT (all (>0) (map length [pkg, mod, occ])) (pkg, mod, occ)
+      where
+      (pkg, rest1) = break (==':') input 
+      (mod, occ) 
+         = (concat $ intersperse "." $ reverse modWords, occWord)
+         where
+         (modWords, occWord) = ASSERT (length rest1 > 0) (parseModOcc [] (tail rest1))
+      parseModOcc :: [String] -> String -> ([String], String)
+      parseModOcc acc str
+         = case break (== '.') str of
+              (top, []) -> (acc, top)
+              (top, '.':bot) -> parseModOcc (top : acc) bot
+       
 
 getHValue :: Name -> IO (Maybe HValue)
 getHValue name = do
@@ -240,9 +291,7 @@ showLinkerState
        printDump (vcat [text "----- Linker state -----",
 			text "Pkgs:" <+> ppr (pkgs_loaded pls),
 			text "Objs:" <+> ppr (objs_loaded pls),
-			text "BCOs:" <+> ppr (bcos_loaded pls),
-                        text "DataCons:" <+> ppr (dtacons_env pls)
-                       ])
+			text "BCOs:" <+> ppr (bcos_loaded pls)])
 \end{code}
 			
 	
@@ -424,11 +473,9 @@ linkExpr hsc_env span root_ul_bco
      pls <- readIORef v_PersistentLinkerState
    ; let ie = itbl_env pls
 	 ce = closure_env pls
-         de = dtacons_env pls
 
 	-- Link the necessary packages and linkables
-   ; (_,de_out, (root_hval:_)) <- linkSomeBCOs False ie ce de [root_ul_bco]
-   ; writeIORef v_PersistentLinkerState (pls{dtacons_env=de_out})
+   ; (_, (root_hval:_)) <- linkSomeBCOs False ie ce [root_ul_bco]
    ; return root_hval
    }}
    where
@@ -715,11 +762,10 @@ dynLinkBCOs bcos
 	    gce	      = closure_env pls
             final_ie  = foldr plusNameEnv (itbl_env pls) ies
 
-        (final_gce, final_de, linked_bcos) <- linkSomeBCOs True final_ie gce (dtacons_env pls) ul_bcos
+        (final_gce, linked_bcos) <- linkSomeBCOs True final_ie gce ul_bcos
 		-- What happens to these linked_bcos?
 
 	let pls2 = pls1 { closure_env = final_gce,
-                          dtacons_env = final_de, 
 			  itbl_env    = final_ie }
 
 	writeIORef v_PersistentLinkerState pls2
@@ -730,14 +776,13 @@ linkSomeBCOs :: Bool 	-- False <=> add _all_ BCOs to returned closure env
                         -- True  <=> add only toplevel BCOs to closure env
              -> ItblEnv 
              -> ClosureEnv 
-             -> DataConEnv
              -> [UnlinkedBCO]
-             -> IO (ClosureEnv, DataConEnv, [HValue])
+             -> IO (ClosureEnv, [HValue])
 			-- The returned HValues are associated 1-1 with
 			-- the incoming unlinked BCOs.  Each gives the
 			-- value of the corresponding unlinked BCO
 					
-linkSomeBCOs toplevs_only ie ce_in de_in ul_bcos
+linkSomeBCOs toplevs_only ie ce_in ul_bcos
    = do let nms = map unlinkedBCOName ul_bcos
         hvals <- fixIO 
                     ( \ hvs -> let ce_out = extendClosureEnv ce_in (zipLazy nms hvs)
@@ -750,13 +795,7 @@ linkSomeBCOs toplevs_only ie ce_in de_in ul_bcos
 		     -- closure environment, which leads to trouble.
 		     ASSERT (all (not . (`elemNameEnv` ce_in)) (map fst ce_additions))
 		     extendClosureEnv ce_in ce_additions
-            names = concatMap (ssElts . unlinkedBCOItbls) ul_bcos
-        addresses <- mapM (lookupIE ie) names
-        let de_additions = [(address, name) | (address, name) <- zip addresses names
-                                            , not(address `elemAddressEnv` de_in) 
-                           ]
-            de_out = extendAddressEnvList de_in de_additions
-        return ( ce_out, de_out, hvals)
+        return (ce_out, hvals)
 
 \end{code}
 

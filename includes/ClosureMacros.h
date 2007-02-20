@@ -59,6 +59,7 @@
 #define get_ret_itbl(c) (RET_INFO_PTR_TO_STRUCT((c)->header.info))
 #define get_fun_itbl(c) (FUN_INFO_PTR_TO_STRUCT((c)->header.info))
 #define get_thunk_itbl(c) (THUNK_INFO_PTR_TO_STRUCT((c)->header.info))
+#define get_con_itbl(c) (CON_INFO_PTR_TO_STRUCT((c)->header.info))
 
 #define GET_TAG(con) (get_itbl(con)->srt_bitmap)
 
@@ -67,17 +68,21 @@
 #define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)(info) - 1)
 #define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)(info) - 1)
 #define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)(info) - 1)
+#define CON_INFO_PTR_TO_STRUCT(info) ((StgConInfoTable *)(info) - 1)
 #define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
 #define itbl_to_ret_itbl(i) ((StgRetInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
 #define itbl_to_thunk_itbl(i) ((StgThunkInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
+#define itbl_to_con_itbl(i) ((StgConInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
 #else
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
 #define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)info)
 #define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)info)
 #define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)info)
+#define CON_INFO_PTR_TO_STRUCT(info) ((StgConInfoTable *)info)
 #define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(i))
 #define itbl_to_ret_itbl(i) ((StgRetInfoTable *)(i))
 #define itbl_to_thunk_itbl(i) ((StgThunkInfoTable *)(i))
+#define itbl_to_con_itbl(i) ((StgConInfoTable *)(i))
 #endif
 
 /* -----------------------------------------------------------------------------

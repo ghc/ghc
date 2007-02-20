@@ -380,6 +380,22 @@ typedef struct _StgThunkInfoTable {
 #endif
 } StgThunkInfoTable;
 
+/* -----------------------------------------------------------------------------
+   Constructor info tables
+   -------------------------------------------------------------------------- */
+
+typedef struct _StgConInfoTable {
+#if !defined(TABLES_NEXT_TO_CODE)
+    StgInfoTable i;
+#endif
+
+char *con_desc;  /* the name of the data constructor as: Package:Module.Name */
+
+#if defined(TABLES_NEXT_TO_CODE)
+    StgInfoTable i;
+#endif
+} StgConInfoTable;
+
 
 /* -----------------------------------------------------------------------------
    Accessor macros for fields that might be offsets (C version)

@@ -50,6 +50,8 @@ import ListSetOps
 import Maybes
 import Constants
 
+import Outputable 
+
 -------------------------------------------------------------------------
 --
 --	Generating the info table and code for a closure
@@ -87,7 +89,13 @@ emitClosureCodeAndInfoTable cl_info args body
 					cl_type srt_len layout_lit
 
 	; blks <- cgStmtsToBlocks body
-	; emitInfoTableAndCode info_lbl std_info extra_bits args blks }
+
+        ; conName <-  
+             if is_con
+                then mkStringCLit $ fromJust conIdentity
+                else return (mkIntCLit 0)
+
+	; emitInfoTableAndCode info_lbl std_info (extra_bits conName) args blks }
   where
     info_lbl  = infoTableLabelFromCI cl_info
 
@@ -100,24 +108,25 @@ emitClosureCodeAndInfoTable cl_info args body
     mb_con = isConstrClosure_maybe  cl_info
     is_con = isJust mb_con
 
-    (srt_label,srt_len)
+    (srt_label,srt_len,conIdentity)
 	= case mb_con of
 	    Just con -> -- Constructors don't have an SRT
 			-- We keep the *zero-indexed* tag in the srt_len
 			-- field of the info table. 
-			(mkIntCLit 0, fromIntegral (dataConTagZ con)) 
+			(mkIntCLit 0, fromIntegral (dataConTagZ con), Just $ dataConIdentity con) 
 
 	    Nothing  -> -- Not a constructor
-			srtLabelAndLength srt info_lbl
+                        let (label, len) = srtLabelAndLength srt info_lbl
+                        in (label, len, Nothing)
 
     ptrs       = closurePtrsSize cl_info
     nptrs      = size - ptrs
     size       = closureNonHdrSize cl_info
     layout_lit = packHalfWordsCLit ptrs nptrs
 
-    extra_bits
+    extra_bits conName 
 	| is_fun    = fun_extra_bits
-	| is_con    = []
+	| is_con    = [conName]
 	| needs_srt = [srt_label]
  	| otherwise = []
 
