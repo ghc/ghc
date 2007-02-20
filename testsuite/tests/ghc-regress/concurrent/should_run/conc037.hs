@@ -18,7 +18,7 @@ main = do
      sleepBlock 1
      putStrLn "newThread back again"
      putMVar th "1 sec later"
-  yield -- make sure the newly created thread is run.
+  threadDelay 200000  -- make sure the newly created thread is run.
   putStrLn "mainThread"
   x <- takeMVar th
   putStrLn x
