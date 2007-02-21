@@ -28,6 +28,9 @@ module GHC.Exts
 	-- * Linear implicit parameter support
 	Splittable(..),
 
+	-- * Overloaded string literals
+	IsString(..),
+
 	-- * Debugging
 	breakpoint, breakpointCond, Unknown, Unknown2, Unknown3, Unknown4,
 
