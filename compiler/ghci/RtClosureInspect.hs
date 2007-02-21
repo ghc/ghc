@@ -313,8 +313,9 @@ printTerm :: Term -> SDoc
 printTerm Prim{value=value} = text value 
 printTerm t@Term{} = printTerm1 0 t 
 printTerm Suspension{bound_to=Nothing} =  char '_' -- <> ppr ct <> char '_'
-printTerm Suspension{mb_ty=Just ty, bound_to=Just n} =
-  parens$ ppr n <> text "::" <> ppr ty 
+printTerm Suspension{mb_ty=Just ty, bound_to=Just n}
+  | Just _ <- splitFunTy_maybe ty = text "<function>"
+  | otherwise = parens$ ppr n <> text "::" <> ppr ty 
 
 printTerm1 p Term{dc=dc, subTerms=tt} 
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt 
