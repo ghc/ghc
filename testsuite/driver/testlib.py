@@ -1077,10 +1077,13 @@ def pretest_cleanup(name):
 # -----------------------------------------------------------------------------
 # Return a list of all the files ending in '.T' below the directory dir.
 
-def findTFiles(path):
+def findTFiles(roots):
+    return concat(map(findTFiles_,roots))
+
+def findTFiles_(path):    
     if os.path.isdir(path):
         paths = map(lambda x, p=path: p + '/' + x, os.listdir(path))
-        return concat(map(findTFiles, paths))
+        return findTFiles(paths)
     elif path[-2:] == '.T':
         return [path]
     else:

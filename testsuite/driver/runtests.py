@@ -42,7 +42,7 @@ for opt,arg in opts:
         exec arg
 
     if opt == '--rootdir':
-        config.rootdir = arg
+        config.rootdirs.append(arg)
 
     if opt == '--output-summary':
         config.output_summary = arg
@@ -88,7 +88,10 @@ if config.use_threads:
 # -----------------------------------------------------------------------------
 # The main dude
 
-t_files = findTFiles(config.rootdir)
+if config.rootdirs == []:
+    config.rootdirs = ['.']
+
+t_files = findTFiles(config.rootdirs)
 
 print 'Found', len(t_files), '.T files...'
 

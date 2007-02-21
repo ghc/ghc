@@ -16,8 +16,8 @@
 class TestConfig:
     def __init__(self):
 
-        # Directory below which to look for test description files (foo.T)
-        self.rootdir = '.'
+        # Directories below which to look for test description files (foo.T)
+        self.rootdirs = []
 
         # Run these tests only (run all tests if empty)
         self.only = []

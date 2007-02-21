@@ -96,6 +96,7 @@ USETHREADS=0
 endif
 
 RUNTEST_OPTS +=  \
+	--rootdir=. \
 	--config=$(CONFIG) \
 	-e config.confdir=\"$(CONFIGDIR)\" \
 	-e config.compiler=\"$(TEST_HC)\" \
