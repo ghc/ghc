@@ -1192,20 +1192,19 @@ prepareAlts scrut case_bndr' alts
 	; let (alts_wo_default, maybe_deflt) = findDefault alts
 	      alt_cons = [con | (con,_,_) <- alts_wo_default]
 	      imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
-		-- "imposs_deflt_cons" are handled either by the context, 
-		-- OR by a branch in this case expression.
-		-- Don't include DEFAULT!!
+		-- "imposs_deflt_cons" are handled 
+		--   EITHER by the context, 
+		--   OR by a non-DEFAULT branch in this case expression.
 
 	; default_alts <- prepareDefault dflags scrut case_bndr' mb_tc_app 
 					 imposs_deflt_cons maybe_deflt
 
 	; let trimmed_alts = filter possible_alt alts_wo_default
-	      merged_alts = mergeAlts default_alts trimmed_alts
+	      merged_alts = mergeAlts trimmed_alts default_alts
 		-- We need the mergeAlts in case the new default_alt 
 		-- has turned into a constructor alternative.
 		-- The merge keeps the inner DEFAULT at the front, if there is one
-		-- and eliminates any inner_alts that are shadowed by the outer_alts
-
+		-- and interleaves the alternatives in the right order
 
 	; return (imposs_deflt_cons, merged_alts) }
   where
@@ -1262,7 +1261,17 @@ prepareDefault dflags scrut outer_bndr bndr_ty imposs_cons (Just deflt_rhs)
   = do	{ tick (CaseMerge outer_bndr)
 
 	; let munge_rhs rhs = bindCaseBndr inner_bndr (Var outer_bndr) rhs
-	; return [(con, args, munge_rhs rhs) | (con, args, rhs) <- inner_alts] }
+	; return [(con, args, munge_rhs rhs) | (con, args, rhs) <- inner_alts,
+					       not (con `elem` imposs_cons) ]
+		-- NB: filter out any imposs_cons.  Example:
+		--	case x of 
+		--	  A -> e1
+		--	  DEFAULT -> case x of 
+		--			A -> e2
+		--			B -> e3
+		-- When we merge, we must ensure that e1 takes 
+		-- precedence over e2 as the value for A!  
+	}
     	-- Warning: don't call prepareAlts recursively!
     	-- Firstly, there's no point, because inner alts have already had
     	-- mkCase applied to them, so they won't have a case in their default
