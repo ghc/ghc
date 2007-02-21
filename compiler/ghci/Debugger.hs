@@ -66,8 +66,8 @@ pprintClosureCommand bindThings force str = do
            uniques <- liftM uniqsFromSupply (mkSplitUniqSupply 'q')
            return$ map (\u-> (mkSysTvName u (mkFastString "a"))) uniques
   mb_ids  <- io$ mapM (cleanUp cms newvarsNames) (words str)
-  new_ids <- mapM (io . go cms) (catMaybes mb_ids)
-  io$ updateIds cms new_ids
+  mb_new_ids <- mapM (io . go cms) (catMaybes mb_ids)
+  io$ updateIds cms (catMaybes mb_new_ids)
  where 
    -- Find the Id, clean up 'Unknowns'
    cleanUp :: Session -> [Name] -> String -> IO (Maybe Id)
@@ -78,22 +78,23 @@ pprintClosureCommand bindThings force str = do
 
    -- Do the obtainTerm--bindSuspensions-refineIdType dance
    -- Warning! This function got a good deal of side-effects
-   go :: Session -> Id -> IO Id
+   go :: Session -> Id -> IO (Maybe Id)
    go cms id = do
-     Just term <- obtainTerm cms force id
-     term'     <- if not bindThings then return term 
-                   else bindSuspensions cms term                         
-     showterm  <- pprTerm cms term'
-     unqual    <- GHC.getPrintUnqual cms
-     let showSDocForUserOneLine unqual doc = 
-             showDocWith LeftMode (doc (mkErrStyle unqual))
-     (putStrLn . showSDocForUserOneLine unqual) (ppr id <+> char '=' <+> showterm)
+     mb_term <- obtainTerm cms force id
+     maybe (return Nothing) `flip` mb_term $ \term -> do
+       term'     <- if not bindThings then return term 
+                     else bindSuspensions cms term                         
+       showterm  <- pprTerm cms term'
+       unqual    <- GHC.getPrintUnqual cms
+       let showSDocForUserOneLine unqual doc = 
+               showDocWith LeftMode (doc (mkErrStyle unqual))
+       (putStrLn . showSDocForUserOneLine unqual) (ppr id <+> char '=' <+> showterm)
      -- Before leaving, we compare the type obtained to see if it's more specific
      -- Note how we need the Unknown-clear type returned by obtainTerm
-     let Just reconstructedType = termType term  
-     new_type  <- instantiateTyVarsToUnknown cms 
-                  (mostSpecificType (idType id) reconstructedType)
-     return (setIdType id new_type)
+       let Just reconstructedType = termType term  
+       new_type  <- instantiateTyVarsToUnknown cms 
+                    (mostSpecificType (idType id) reconstructedType)
+       return . Just $ setIdType id new_type
 
    updateIds :: Session -> [Id] -> IO ()
    updateIds (Session ref) new_ids = do
