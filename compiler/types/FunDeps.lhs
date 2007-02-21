@@ -271,10 +271,14 @@ improveOne inst_env pred@(ClassP cls tys, _) preds
       = [ (eqn, p_inst, pred)
 	| fd <- cls_fds		-- Iterate through the fundeps first, 
 				-- because there often are none!
-	, let rough_fd_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
+	, let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
+		-- Trim the rough_tcs based on the head of the fundep.
+		-- Remember that instanceCantMatch treats both argumnents
+		-- symmetrically, so it's ok to trim the rough_tcs,
+		-- rather than trimming each inst_tcs in turn
 	, ispec@(Instance { is_tvs = qtvs, is_tys = tys_inst, 
-		 	    is_tcs = mb_tcs_inst }) <- instances
-	, not (instanceCantMatch mb_tcs_inst rough_fd_tcs)
+		 	    is_tcs = inst_tcs }) <- instances
+	, not (instanceCantMatch inst_tcs trimmed_tcs)
 	, eqn <- checkClsFD qtvs fd cls_tvs tys_inst tys
 	, let p_inst = (mkClassPred cls tys_inst, 
 		        ptext SLIT("arising from the instance declaration at")
@@ -455,11 +459,11 @@ badFunDeps :: [Instance] -> Class
 badFunDeps cls_insts clas ins_tv_set ins_tys 
   = [ ispec | fd <- fds,	-- fds is often empty
 	      let trimmed_tcs = trimRoughMatchTcs clas_tvs fd rough_tcs,
-	      ispec@(Instance { is_tcs = mb_tcs, is_tvs = tvs, 
+	      ispec@(Instance { is_tcs = inst_tcs, is_tvs = tvs, 
 				is_tys = tys }) <- cls_insts,
 		-- Filter out ones that can't possibly match, 
 		-- based on the head of the fundep
-	      not (instanceCantMatch trimmed_tcs mb_tcs),	
+	      not (instanceCantMatch inst_tcs trimmed_tcs),	
 	      notNull (checkClsFD (tvs `unionVarSet` ins_tv_set) 
 				   fd clas_tvs tys ins_tys)
     ]
@@ -469,16 +473,16 @@ badFunDeps cls_insts clas ins_tv_set ins_tys
 
 trimRoughMatchTcs :: [TyVar] -> FunDep TyVar -> [Maybe Name] -> [Maybe Name]
 -- Computing rough_tcs for a particular fundep
---	class C a b c | a c -> b where ... 
+--	class C a b c | a -> b where ... 
 -- For each instance .... => C ta tb tc
--- we want to match only on the types ta, tb; so our
+-- we want to match only on the types ta, tc; so our
 -- rough-match thing must similarly be filtered.  
 -- Hence, we Nothing-ise the tb type right here
-trimRoughMatchTcs clas_tvs (ltvs,_) mb_tcs
+trimRoughMatchTcs clas_tvs (_,rtvs) mb_tcs
   = zipWith select clas_tvs mb_tcs
   where
-    select clas_tv mb_tc | clas_tv `elem` ltvs = mb_tc
-			 | otherwise	       = Nothing
+    select clas_tv mb_tc | clas_tv `elem` rtvs = Nothing
+			 | otherwise	       = mb_tc
 \end{code}
 
 

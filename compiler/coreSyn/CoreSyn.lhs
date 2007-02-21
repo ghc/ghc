@@ -217,11 +217,9 @@ data CoreRule
 	ru_rhs   :: CoreExpr,
 
 	-- Locality
-	ru_local :: Bool,	-- The fn at the head of the rule is
+	ru_local :: Bool	-- The fn at the head of the rule is
 				-- defined in the same module as the rule
-
-	-- Orphan-hood; see Note [Orphans] in InstEnv
-	ru_orph  :: Maybe OccName }
+    }
 
   | BuiltinRule {		-- Built-in rules are used for constant folding
 	ru_name :: RuleName,	-- and suchlike.  It has no free variables.

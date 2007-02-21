@@ -499,7 +499,7 @@ tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
   = do	{ dfun    <- forkM (ptext SLIT("Dict fun") <+> ppr dfun_occ) $
 		     tcIfaceExtId dfun_occ
         ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-	; return (mkImportedInstance cls mb_tcs' orph dfun oflag) }
+	; return (mkImportedInstance cls mb_tcs' dfun oflag) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 
@@ -547,7 +547,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
         ; let this_module = if_mod lcl
 	; returnM (Rule { ru_name = name, ru_fn = fn, ru_act = act, 
 			  ru_bndrs = bndrs', ru_args = args', 
-			  ru_rhs = rhs', ru_orph = orph,
+			  ru_rhs = rhs', 
 			  ru_rough = mb_tcs,
 			  ru_local = nameModule fn == this_module }) }
   where

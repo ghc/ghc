@@ -41,7 +41,6 @@ import SrcLoc
 import BasicTypes
 import Outputable
 import FastString
-import Module
 
 import Data.List
 import Data.Maybe
@@ -140,7 +139,7 @@ data IfaceInst
 		ifInstTys  :: [Maybe IfaceTyCon],	-- the defn of Instance
 		ifDFun     :: Name,     		-- The dfun
 		ifOFlag    :: OverlapFlag,		-- Overlap flag
-		ifInstOrph :: Maybe OccName }		-- See is_orph in defn of Instance
+		ifInstOrph :: Maybe OccName }		-- See Note [Orphans]
 	-- There's always a separate IfaceDecl for the DFun, which gives 
 	-- its IdInfo with its full type and version number.
 	-- The instance declarations taken together have a version number,
@@ -224,7 +223,84 @@ data IfaceConAlt = IfaceDefault
 data IfaceBinding
   = IfaceNonRec	IfaceIdBndr IfaceExpr
   | IfaceRec 	[(IfaceIdBndr, IfaceExpr)]
+\end{code}
 
+Note [Orphans]: the ifInstOrph and ifRuleOrph fields
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a module contains any "orphans", then its interface file is read
+regardless, so that its instances are not missed.
+
+Roughly speaking, an instance is an orphan if its head (after the =>)
+mentions nothing defined in this module.  Functional dependencies
+complicate the situation though. Consider
+
+  module M where { class C a b | a -> b }
+
+and suppose we are compiling module X:
+
+  module X where
+	import M
+	data T = ...
+	instance C Int T where ...
+
+This instance is an orphan, because when compiling a third module Y we
+might get a constraint (C Int v), and we'd want to improve v to T.  So
+we must make sure X's instances are loaded, even if we do not directly
+use anything from X.
+
+More precisely, an instance is an orphan iff
+
+  If there are no fundeps, then at least of the names in
+  the instance head is locally defined.
+
+  If there are fundeps, then for every fundep, at least one of the
+  names free in a *non-determined* part of the instance head is
+  defined in this module.  
+
+(Note that these conditions hold trivially if the class is locally
+defined.)
+
+Note [Versioning of instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Now consider versioning.  If we *use* an instance decl in one compilation,
+we'll depend on the dfun id for that instance, so we'll recompile if it changes.
+But suppose we *don't* (currently) use an instance!  We must recompile if
+the instance is changed in such a way that it becomes important.  (This would
+only matter with overlapping instances, else the importing module wouldn't have
+compiled before and the recompilation check is irrelevant.)
+
+The is_orph field is set to (Just n) if the instance is not an orphan.
+The 'n' is *any* of the locally-defined names mentioned anywhere in the
+instance head.  This name is used for versioning; the instance decl is
+considered part of the defn of this 'n'.
+
+I'm worried about whether this works right if we pick a name from
+a functionally-dependent part of the instance decl.  E.g.
+
+  module M where { class C a b | a -> b }
+
+and suppose we are compiling module X:
+
+  module X where
+	import M
+	data S  = ...
+	data T = ...
+	instance C S T where ...
+
+If we base the instance verion on T, I'm worried that changing S to S'
+would change T's version, but not S or S'.  But an importing module might
+not depend on T, and so might not be recompiled even though the new instance
+(C S' T) might be relevant.  I have not been able to make a concrete example,
+and it seems deeply obscure, so I'm going to leave it for now.
+
+
+Note [Versioning of rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+A rule that is not an orphan has an ifRuleOrph field of (Just n), where
+n appears on the LHS of the rule; any change in the rule changes the version of n.
+
+
+\begin{code}
 -- -----------------------------------------------------------------------------
 -- Utils on IfaceSyn
 

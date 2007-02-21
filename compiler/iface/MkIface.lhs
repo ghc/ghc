@@ -183,6 +183,7 @@ import Id
 import IdInfo
 import NewDemand
 import CoreSyn
+import CoreFVs
 import Class
 import TyCon
 import DataCon
@@ -267,7 +268,7 @@ mkIface hsc_env maybe_old_iface
 
 		; fixities    = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
 		; deprecs     = mkIfaceDeprec src_deprecs
-		; iface_rules = map coreRuleToIfaceRule rules
+		; iface_rules = map (coreRuleToIfaceRule this_mod) rules
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
 
@@ -380,8 +381,7 @@ addVersionInfo
 
 addVersionInfo ver_fn Nothing new_iface new_decls
 -- No old interface, so definitely write a new one!
-  = (new_iface { mi_orphan = anyNothing ifInstOrph (mi_insts new_iface)
-                                || anyNothing ifRuleOrph (mi_rules new_iface)
+  = (new_iface { mi_orphan = not (null orph_insts && null orph_rules)
                , mi_finsts = not . null $ mi_fam_insts new_iface
                , mi_decls  = [(initialVersion, decl) | decl <- new_decls]
                , mi_ver_fn = mkIfaceVerCache (zip (repeat initialVersion) 
@@ -659,10 +659,6 @@ mkOrphMap get_key decls
 	| Just occ <- get_key d
 	= (extendOccEnv_C (\ ds _ -> d:ds) non_orphs occ [d], orphs)
 	| otherwise = (non_orphs, d:orphs)
-
-anyNothing :: (a -> Maybe b) -> [a] -> Bool
-anyNothing p []     = False
-anyNothing p (x:xs) = isNothing (p x) || anyNothing p xs
 
 ----------------------
 mkIfaceDeprec :: Deprecations -> IfaceDeprecs
@@ -1131,16 +1127,41 @@ getFS x = occNameFS (getOccName x)
 --------------------------
 instanceToIfaceInst :: Instance -> IfaceInst
 instanceToIfaceInst ispec@(Instance { is_dfun = dfun_id, is_flag = oflag,
-				      is_cls = cls, is_tcs = mb_tcs, 
-				      is_orph = orph })
-  = IfaceInst { ifDFun    = getName dfun_id,
+				      is_cls = cls_name, is_tcs = mb_tcs })
+  = ASSERT( cls_name == className cls )
+    IfaceInst { ifDFun    = dfun_name,
 		ifOFlag   = oflag,
-		ifInstCls = cls,
+		ifInstCls = cls_name,
 		ifInstTys = map do_rough mb_tcs,
 		ifInstOrph = orph }
   where
     do_rough Nothing  = Nothing
     do_rough (Just n) = Just (toIfaceTyCon_name n)
+
+    dfun_name = idName dfun_id
+    mod       = nameModule dfun_name
+    is_local name = nameIsLocalOrFrom mod name
+
+	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn
+    (_, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
+		-- Slightly awkward: we need the Class to get the fundeps
+    (tvs, fds) = classTvsFds cls
+    arg_names = [filterNameSet is_local (tyClsNamesOfType ty) | ty <- tys]
+    orph | is_local cls_name = Just (nameOccName cls_name)
+	 | all isJust mb_ns  = head mb_ns
+	 | otherwise	     = Nothing
+    
+    mb_ns :: [Maybe OccName]	-- One for each fundep; a locally-defined name
+				-- that is not in the "determined" arguments
+    mb_ns | null fds   = [choose_one arg_names]
+	  | otherwise  = map do_one fds
+    do_one (ltvs,rtvs) = choose_one [ns | (tv,ns) <- tvs `zip` arg_names
+					, not (tv `elem` rtvs)]
+
+    choose_one :: [NameSet] -> Maybe OccName
+    choose_one nss = case nameSetToList (unionManyNameSets nss) of
+			[]     -> Nothing
+			(n:ns) -> Just (nameOccName n)
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst
@@ -1205,14 +1226,14 @@ toIfaceIdInfo id_info
 		  | otherwise			   = Just (HsInline inline_prag)
 
 --------------------------
-coreRuleToIfaceRule :: CoreRule -> IfaceRule
-coreRuleToIfaceRule (BuiltinRule { ru_fn = fn})
+coreRuleToIfaceRule :: Module -> CoreRule -> IfaceRule
+coreRuleToIfaceRule mod (BuiltinRule { ru_fn = fn})
   = pprTrace "toHsRule: builtin" (ppr fn) $
     bogusIfaceRule fn
 
-coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn, 
-                            ru_act = act, ru_bndrs = bndrs,
-	                    ru_args = args, ru_rhs = rhs, ru_orph = orph })
+coreRuleToIfaceRule mod (Rule { ru_name = name, ru_fn = fn, 
+                                ru_act = act, ru_bndrs = bndrs,
+	                        ru_args = args, ru_rhs = rhs })
   = IfaceRule { ifRuleName  = name, ifActivation = act, 
 		ifRuleBndrs = map toIfaceBndr bndrs,
 		ifRuleHead  = fn, 
@@ -1226,6 +1247,17 @@ coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
 	-- see tcIfaceRule
     do_arg (Type ty) = IfaceType (toIfaceType (deNoteType ty))
     do_arg arg       = toIfaceExpr arg
+
+	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn
+	-- A rule is an orphan only if none of the variables
+	-- mentioned on its left-hand side are locally defined
+    lhs_names = fn : nameSetToList (exprsFreeNames args)
+		-- No need to delete bndrs, because
+		-- exprsFreeNames finds only External names
+
+    orph = case filter (nameIsLocalOrFrom mod) lhs_names of
+			(n:ns) -> Just (nameOccName n)
+			[]     -> Nothing
 
 bogusIfaceRule :: Name -> IfaceRule
 bogusIfaceRule id_name

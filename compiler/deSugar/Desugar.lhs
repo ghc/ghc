@@ -297,20 +297,11 @@ dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
 		-- NB we can't use isLocalId in the orphan test, 
 		-- because isLocalId isn't true of class methods
 	      fn_name   = idName fn_id
-	      lhs_names = fn_name : nameSetToList (exprsFreeNames args)
-		-- No need to delete bndrs, because
-		-- exprsFreeNames finds only External names
-
-		-- A rule is an orphan only if none of the variables
-		-- mentioned on its left-hand side are locally defined
-	      orph = case filter (nameIsLocalOrFrom mod) lhs_names of
-			(n:ns) -> Just (nameOccName n)
-			[]     -> Nothing
 
 	      rule = Rule { ru_name = name, ru_fn = fn_name, ru_act = act,
 			    ru_bndrs = bndrs', ru_args = args, ru_rhs = rhs', 
 			    ru_rough = roughTopNames args, 
-			    ru_local = local_rule, ru_orph = orph }
+			    ru_local = local_rule }
 	; return (Just rule)
 	} } }
   where

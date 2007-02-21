@@ -143,7 +143,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
     let
 	imp_mod	   = mi_module iface
 	deprecs	   = mi_deprecs iface
-	is_orph	   = mi_orphan iface 
+	orph_iface = mi_orphan iface 
 	has_finsts = mi_finsts iface 
 	deps 	   = mi_deps iface
 
@@ -186,9 +186,9 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
     let
 	-- Compute new transitive dependencies
 
- 	orphans | is_orph   = ASSERT( not (imp_mod `elem` dep_orphs deps) )
-			      imp_mod : dep_orphs deps
-		| otherwise = dep_orphs deps
+ 	orphans | orph_iface = ASSERT( not (imp_mod `elem` dep_orphs deps) )
+			       imp_mod : dep_orphs deps
+		| otherwise  = dep_orphs deps
 
  	finsts | has_finsts = ASSERT( not (imp_mod `elem` dep_finsts deps) )
 			      imp_mod : dep_finsts deps

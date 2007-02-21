@@ -91,7 +91,7 @@ mkLocalRule name act fn bndrs args rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
 	   ru_bndrs = bndrs, ru_args = args,
 	   ru_rhs = rhs, ru_rough = roughTopNames args,
-	   ru_orph = Just (nameOccName fn), ru_local = True }
+	   ru_local = True }
 
 --------------
 roughTopNames :: [CoreExpr] -> [Maybe Name]
