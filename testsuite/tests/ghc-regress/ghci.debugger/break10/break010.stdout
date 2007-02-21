@@ -1,0 +1,3 @@
+Stopped at a breakpoint in A.hs:5. Local bindings in scope:
+  _result :: IO Bool
+A.hs:5:31-40> Returning to normal execution...

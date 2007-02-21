@@ -1,0 +1,8 @@
+-- Check that coalescing of 'auto' breakpoints does not interfere with user breakpoints
+
+:set -fno-debugging
+:l A
+f
+:q
+-- are we out of ghci yet ?
+it
