@@ -25,9 +25,6 @@ module GHC.Exts
 	-- * Fusion
 	build, augment,
 
-	-- * Linear implicit parameter support
-	Splittable(..),
-
 	-- * Overloaded string literals
 	IsString(..),
 
@@ -48,5 +45,3 @@ import GHC.Num
 import GHC.Float
 import GHC.Ptr
 
-class Splittable t where
-  split :: t -> (t,t)
