@@ -35,7 +35,7 @@ import IdInfo		( SpecInfo( SpecInfo ) )
 import Var		( Var )
 import VarEnv
 import VarSet
-import Name		( Name, NamedThing(..), nameOccName )
+import Name		( Name, NamedThing(..) )
 import NameEnv
 import Unify 		( ruleMatchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )

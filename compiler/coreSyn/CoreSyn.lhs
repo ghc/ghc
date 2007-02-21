@@ -54,7 +54,6 @@ import Var
 import Type
 import Coercion
 import Name
-import OccName
 import Literal
 import DataCon
 import BasicTypes

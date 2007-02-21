@@ -34,9 +34,6 @@ import ErrUtils
 import DynFlags
 import Util
 import Outputable
-import TysWiredIn
-import MkId
-import TysPrim
 \end{code}
 
 -- ---------------------------------------------------------------------------
