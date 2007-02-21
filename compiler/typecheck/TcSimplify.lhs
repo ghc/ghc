@@ -2374,43 +2374,19 @@ tcSimplifyDeriv orig tyvars theta
 	; wanteds <- newDictBndrsO orig (substTheta tenv theta)
 	; (irreds, _) <- topCheckLoop doc wanteds
 
-	-- Insist that the context of a derived instance declaration
-	-- consists of constraints of form (C a b), where a,b are
-	-- type variables
-	-- NB: the caller will further check the tv_dicts for
-	--     legal instance-declaration form
-	; let (tv_dicts, non_tv_dicts) = partition isTyVarDict irreds
-	; addNoInstanceErrs non_tv_dicts
-
 	; let rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
-	      simpl_theta = substTheta rev_env (map dictPred tv_dicts)
+	      simpl_theta = substTheta rev_env (map dictPred irreds)
 		-- This reverse-mapping is a pain, but the result
 		-- should mention the original TyVars not TcTyVars
+
+	-- NB: the caller will further check the tv_dicts for
+	--     legal instance-declaration form
 
 	; return simpl_theta }
   where
     doc = ptext SLIT("deriving classes for a data type")
 \end{code}
 
-Note [Deriving context]
-~~~~~~~~~~~~~~~~~~~~~~~
-With -fglasgow-exts, we allow things like (C Int a) in the simplified
-context for a derived instance declaration, because at a use of this
-instance, we might know that a=Bool, and have an instance for (C Int
-Bool)
-
-We nevertheless insist that each predicate meets the termination
-conditions. If not, the deriving mechanism generates larger and larger
-constraints.  Example:
-  data Succ a = S a
-  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
-
-Note the lack of a Show instance for Succ.  First we'll generate
-  instance (Show (Succ a), Show a) => Show (Seq a)
-and then
-  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
-and so on.  Instead we want to complain of no instance for (Show (Succ a)).
-  
 
 
 @tcSimplifyDefault@ just checks class-type constraints, essentially;
