@@ -23,7 +23,7 @@ module DsMonad (
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
-        bindLocalsDs, getLocalBindsDs, getBkptSitesDs,
+        bindLocalsDs, getLocalBindsDs, getBkptSitesDs, getModNameRefDs, withModNameRefDs,
 	-- Warnings
 	DsWarning, warnDs, failWithDs,
 
@@ -144,7 +144,9 @@ data DsGblEnv = DsGblEnv {
 data DsLclEnv = DsLclEnv {
 	ds_meta	   :: DsMetaEnv,	-- Template Haskell bindings
 	ds_loc	   :: SrcSpan,		-- to put in pattern-matching error msgs
-        ds_locals  :: OccEnv Id         -- For locals in breakpoints
+        ds_locals  :: OccEnv Id,        -- For locals in breakpoints
+        ds_mod_name_ref :: Maybe Id     -- The Id used to store the Module name 
+                                        --  used by the breakpoint desugaring 
      }
 
 -- Inside [| |] brackets, the desugarer looks 
@@ -211,7 +213,8 @@ mkDsEnvs mod rdr_env type_env msg_var
                                     ds_bkptSites = sites_var}
                lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
 			            ds_loc = noSrcSpan,
-                                    ds_locals = emptyOccEnv }
+                                    ds_locals = emptyOccEnv,
+                                    ds_mod_name_ref = Nothing }
 
        return (gbl_env, lcl_env)
 
@@ -336,6 +339,13 @@ dsExtendMetaEnv menv thing_inside
 \begin{code}
 getLocalBindsDs :: DsM [Id]
 getLocalBindsDs = do { env <- getLclEnv; return (occEnvElts$ ds_locals env) }
+
+getModNameRefDs :: DsM (Maybe Id)
+getModNameRefDs = do { env <- getLclEnv; return (ds_mod_name_ref env) }
+
+withModNameRefDs :: Id -> DsM a -> DsM a
+withModNameRefDs id thing_inside =
+    updLclEnv (\env -> env {ds_mod_name_ref = Just id}) thing_inside
 
 bindLocalsDs :: [Id] -> DsM a -> DsM a
 bindLocalsDs new_ids enclosed_scope = 

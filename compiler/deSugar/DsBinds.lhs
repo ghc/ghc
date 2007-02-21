@@ -23,6 +23,7 @@ import {-# SOURCE #-}	Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
+import DsBreakpoint
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
@@ -46,6 +47,10 @@ import BasicTypes hiding ( TopLevel )
 import FastString
 import Util		( mapSnd )
 
+import Name
+import OccName
+import Literal
+
 import Control.Monad
 import Data.List
 \end{code}
@@ -58,7 +63,21 @@ import Data.List
 
 \begin{code}
 dsTopLHsBinds :: AutoScc -> LHsBinds Id -> DsM [(Id,CoreExpr)]
-dsTopLHsBinds auto_scc binds = ds_lhs_binds auto_scc binds
+dsTopLHsBinds auto_scc binds = do
+  mb_mod_name_ref <- getModNameRefDs
+  case mb_mod_name_ref of 
+    Just _  -> ds_lhs_binds auto_scc binds
+    Nothing -> do  -- Inject a CAF with the module name as literal
+      mod <- getModuleDs
+      mod_name_ref <- do
+                 u <- newUnique 
+                 let n = mkSystemName u (mkVarOcc "_module")
+                 return (mkLocalId n stringTy)
+      let mod_name = moduleNameFS$ moduleName mod
+      mod_lit <- dsExpr (HsLit (HsString mod_name))
+      withModNameRefDs mod_name_ref $ do
+                 res <- ds_lhs_binds auto_scc binds
+                 return$ (mod_name_ref, mod_lit) : res
 
 dsLHsBinds :: LHsBinds Id -> DsM [(Id,CoreExpr)]
 dsLHsBinds binds = ds_lhs_binds NoSccs binds

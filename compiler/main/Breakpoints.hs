@@ -46,9 +46,9 @@ noDbgSites = []
 #ifdef GHCI
 lookupBogusBreakpointVal :: Name -> Maybe HValue
 lookupBogusBreakpointVal name 
-  | name == breakpointJumpName     = Just$ unsafeCoerce# (\_ _ _ _ a->a)
-  | name == breakpointAutoJumpName = Just$ unsafeCoerce# (\_ _ _ _ a->a)
-  | name == breakpointCondJumpName = Just$ unsafeCoerce# (\_ _ _ _ _ a->a)
+  | name == breakpointJumpName     = Just$ unsafeCoerce# (\_ _ a->a)
+  | name == breakpointAutoJumpName = Just$ unsafeCoerce# (\_ _ a->a)
+  | name == breakpointCondJumpName = Just$ unsafeCoerce# (\_ _ _ a->a)
   | otherwise = Nothing
 #else 
 lookupBogusBreakpointVal _ = Nothing

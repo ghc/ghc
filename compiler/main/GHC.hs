@@ -255,7 +255,7 @@ import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
 import Module
 import UniqFM
-import PackageConfig    ( PackageId, stringToPackageId )
+import PackageConfig    ( PackageId, stringToPackageId, mainPackageId )
 import FiniteMap
 import Panic
 import Digraph
@@ -2258,44 +2258,41 @@ reinstallBreakpointHandlers session = do
 -----------------------------------------------------------------------
 -- Jump functions
 
-type SiteInfo = (String, String, SiteNumber)
-jumpFunction, jumpAutoFunction  :: Session -> BkptHandler Module -> Int -> [Opaque] 
-                                -> SiteInfo -> String -> b -> b
-jumpCondFunction  :: Session -> BkptHandler Module -> Int -> [Opaque] 
-                  -> SiteInfo -> String -> Bool -> b -> b
-jumpFunctionM :: Session -> BkptHandler a -> Int -> [Opaque] -> BkptLocation a 
-              -> String -> b -> IO b
+type SiteInfo = (String, SiteNumber)
+jumpFunction, jumpAutoFunction  :: Session -> BkptHandler Module -> SiteInfo -> (Int, [Opaque], String) -> b -> b
+jumpCondFunction  :: Session -> BkptHandler Module -> SiteInfo -> (Int, [Opaque], String) -> Bool -> b -> b
+jumpFunctionM :: Session -> BkptHandler a ->  BkptLocation a -> (Int, [Opaque], String) -> b -> IO b
 
-jumpCondFunction _ _ _ _ _ _ False b = b
-jumpCondFunction session handler ptr hValues siteInfo locmsg True b
-    = jumpFunction session handler ptr hValues siteInfo locmsg b
+jumpCondFunction _ _ _ _ False b = b
+jumpCondFunction session handler site args True b
+    = jumpFunction session handler site args b
 
-jumpFunction session handler ptr hValues siteInfo locmsg b 
+jumpFunction session handler siteInfo args b 
     | site <- mkSite siteInfo
-    = unsafePerformIO $ jumpFunctionM session handler ptr hValues site locmsg b
+    = unsafePerformIO $ jumpFunctionM session handler site args b
 
-jumpFunctionM session handler (I# idsPtr) wrapped_hValues site locmsg b = 
+jumpFunctionM session handler site (I# idsPtr, wrapped_hValues, locmsg) b = 
       do 
          ids <- deRefStablePtr (castPtrToStablePtr (Ptr (int2Addr# idsPtr)))
          let hValues = unsafeCoerce# b : [unsafeCoerce# hv | O hv <- wrapped_hValues]
          handleBreakpoint handler session (zip ids hValues) site locmsg b
 
-jumpAutoFunction session handler ptr hValues siteInfo locmsg b 
+jumpAutoFunction session handler siteInfo args b 
     | site <- mkSite siteInfo
     = unsafePerformIO $ do
          break <- isAutoBkptEnabled handler session site 
          if break 
-            then jumpFunctionM session handler ptr hValues site locmsg b
+            then jumpFunctionM session handler site args b
             else return b
 
-jumpStepByStepFunction session handler ptr hValues siteInfo locmsg b 
+jumpStepByStepFunction session handler siteInfo args b 
     | site <- mkSite siteInfo
     = unsafePerformIO $ do
-          jumpFunctionM session handler ptr hValues site locmsg b
+          jumpFunctionM session handler site args b
 
 mkSite :: SiteInfo -> BkptLocation Module
-mkSite (pkgName, modName, sitenum) =
-  (mkModule (stringToPackageId pkgName) (mkModuleName modName), sitenum)
+mkSite ( modName, sitenum) =
+  (mkModule mainPackageId (mkModuleName modName), sitenum)
 
 obtainTerm1 :: Session -> Bool -> Maybe Type -> a -> IO Term
 obtainTerm1 sess force mb_ty x = withSession sess $ \hsc_env -> cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)

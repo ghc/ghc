@@ -7,8 +7,8 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
-module DsBreakpoint( 
-                     dsAndThenMaybeInsertBreakpoint
+module DsBreakpoint( debug_enabled
+                   , dsAndThenMaybeInsertBreakpoint
                    , maybeInsertBreakpoint
                    , breakpoints_enabled
                    , mkBreakpointExpr
@@ -18,7 +18,6 @@ import TysPrim
 import TysWiredIn
 import PrelNames        
 import Module
-import PackageConfig
 import SrcLoc
 import TyCon
 import TypeRep
@@ -47,14 +46,14 @@ import Control.Monad
 import Data.IORef
 import Foreign.StablePtr
 import GHC.Exts
+
 #ifdef GHCI
 mkBreakpointExpr :: SrcSpan -> Id -> Type -> DsM (LHsExpr Id)
 mkBreakpointExpr loc bkptFuncId ty = do
         scope <- getScope
         mod   <- getModuleDs
         u     <- newUnique
-        let mod_name = moduleNameFS$ moduleName mod
-            valId = mkUserLocal (mkVarOcc "_result") u ty noSrcLoc 
+        let valId = mkUserLocal (mkVarOcc "_result") u ty noSrcLoc 
         when (not instrumenting) $
               warnDs (text "Extracted ids:" <+> (ppr scope $$ 
                                                    ppr (map idType scope)))
@@ -64,6 +63,7 @@ mkBreakpointExpr loc bkptFuncId ty = do
                         else return 0
         ATyCon opaqueTyCon <- dsLookupGlobal opaqueTyConName
         jumpFuncId         <- mkJumpFunc bkptFuncId
+        Just mod_name_ref  <- getModNameRefDs 
         let [opaqueDataCon] = tyConDataCons opaqueTyCon
             opaqueId = dataConWrapId opaqueDataCon
             opaqueTy = mkTyConApp opaqueTyCon []
@@ -73,22 +73,24 @@ mkBreakpointExpr loc bkptFuncId ty = do
            -- Yes, I know... I'm gonna burn in hell.
             Ptr addr# = castStablePtrToPtr stablePtr
             locals    = ExplicitList opaqueTy (map wrapInOpaque scope)
-            locInfo = nlTuple [ HsLit (HsString (packageIdFS$ modulePackageId mod))
-                              , HsLit (HsString mod_name)
+            locInfo = nlTuple [ HsVar mod_name_ref
                               , HsLit (HsInt (fromIntegral site))]
             funE  = l$ HsVar jumpFuncId
-            ptrE  = l (HsLit (HsInt (fromIntegral (I# (addr2Int# addr#)))))
-            locsE = l (HsApp (l(HsWrap (WpTyApp (mkListTy opaqueTy)) (HsVar lazyId))) 
-                             (l locals))
-            locE  = l locInfo
-            msgE  = l (srcSpanLit loc)
-        return $  
-            l(l(l(l(funE `HsApp` ptrE) `HsApp` locsE) `HsApp` locE) `HsApp` msgE)        
+            ptrE  = (HsLit (HsInt (fromIntegral (I# (addr2Int# addr#)))))
+            locE  = locInfo
+            msgE  = srcSpanLit loc
+            argsE = nlTuple [ptrE, locals, msgE]
+            lazy_argsE = HsApp (l$ HsWrap (WpTyApp argsT) (HsVar lazyId)) (l argsE)
+            argsT = mkTupleType [intTy, mkListTy opaqueTy, stringTy]
+        return $ 
+            l(l(funE `HsApp` l locE) `HsApp` l lazy_argsE)
+
     where l = L loc
           nlTuple exps = ExplicitTuple (map noLoc exps) Boxed
           srcSpanLit :: SrcSpan -> HsExpr Id
           srcSpanLit span = HsLit (HsString (mkFastString (showSDoc (ppr span))))
           instrumenting = idName bkptFuncId == breakpointAutoName
+          mkTupleType tys = mkTupleTy Boxed (length tys) tys
 #else
 mkBreakpointExpr = undefined    -- A stage1 ghc doesn't care about breakpoints
 #endif
@@ -139,14 +141,12 @@ mkJumpFunc bkptFuncId
   where 
         tyvar = alphaTyVar
         basicType extra opaqueTy = 
-                           (FunTy intTy
-                            (FunTy (mkListTy opaqueTy)
-                             (FunTy (mkTupleType [stringTy, stringTy, intTy])
-                              (FunTy stringTy
+               (FunTy (mkTupleType [stringTy, intTy])
+                 (FunTy (mkTupleType [intTy, mkListTy opaqueTy, stringTy])
                           (ForAllTy tyvar
                                (extra
                                 (FunTy (TyVarTy tyvar)
-                                 (TyVarTy tyvar))))))))
+                                 (TyVarTy tyvar))))))
         build name extra  = do 
             ATyCon opaqueTyCon <- dsLookupGlobal opaqueTyConName
             return$ Id.mkGlobalId VanillaGlobal name
