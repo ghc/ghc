@@ -10,7 +10,7 @@ It's better to read it as: "if we know these, then we're going to know these"
 \begin{code}
 module FunDeps (
  	Equation, pprEquation,
-	oclose, grow, improve, improveOne,
+	oclose, grow, improveOne,
 	checkInstCoverage, checkFunDeps,
 	pprFundeps
     ) where
@@ -27,9 +27,6 @@ import VarSet
 import VarEnv
 import Outputable
 import Util
-import ListSetOps
-
-import Data.List	( tails )
 import Data.Maybe	( isJust )
 \end{code}
 
@@ -170,7 +167,6 @@ grow preds fixed_tvs
 
 
 \begin{code}
-----------
 type Equation = (TyVarSet, [(Type, Type)])
 -- These pairs of types should be equal, for some
 -- substitution of the tyvars in the tyvar set
@@ -195,16 +191,6 @@ type Equation = (TyVarSet, [(Type, Type)])
 pprEquation (qtvs, pairs) 
   = vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
 	  nest 2 (vcat [ ppr t1 <+> ptext SLIT(":=:") <+> ppr t2 | (t1,t2) <- pairs])]
-
-----------
-type Pred_Loc = (PredType, SDoc)	-- SDoc says where the Pred comes from
-
-improve :: (Class -> [Instance])		-- Gives instances for given class
-	-> [Pred_Loc]				-- Current constraints; 
-	-> [(Equation,Pred_Loc,Pred_Loc)]	-- Derived equalities that must also hold
-						-- (NB the above INVARIANT for type Equation)
-						-- The Pred_Locs explain which two predicates were
-						-- combined (for error messages)
 \end{code}
 
 Given a bunch of predicates that must hold, such as
@@ -237,20 +223,15 @@ NOTA BENE:
 
 
 \begin{code}
-improve inst_env preds
-  = [ eqn | group <- equivClassesByUniq (predTyUnique . fst) (filterEqPreds preds),
-	    eqn   <- checkGroup inst_env group ]
-  where 
-    filterEqPreds = filter (not . isEqPred . fst)
-	-- Equality predicates don't have uniques
-	-- In any case, improvement *generates*, rather than
-	-- *consumes*, equality constraints
+type Pred_Loc = (PredType, SDoc)	-- SDoc says where the Pred comes from
 
-improveOne :: (Class -> [Instance])
-	   -> Pred_Loc
-	   -> [Pred_Loc]
-	   -> [(Equation,Pred_Loc,Pred_Loc)]
-
+improveOne :: (Class -> [Instance])		-- Gives instances for given class
+	   -> Pred_Loc				-- Do improvement triggered by this
+	   -> [Pred_Loc]			-- Current constraints 
+	   -> [(Equation,Pred_Loc,Pred_Loc)]	-- Derived equalities that must also hold
+						-- (NB the above INVARIANT for type Equation)
+						-- The Pred_Locs explain which two predicates were
+						-- combined (for error messages)
 -- Just do improvement triggered by a single, distinguised predicate
 
 improveOne inst_env pred@(IParam ip ty, _) preds
@@ -303,72 +284,7 @@ improveOne inst_env pred@(ClassP cls tys, _) preds
 improveOne inst_env eq_pred preds
   = []
 
-----------
-checkGroup :: (Class -> [Instance])
-	   -> [Pred_Loc]
-	   -> [(Equation, Pred_Loc, Pred_Loc)]
-  -- The preds are all for the same class or implicit param
 
-checkGroup inst_env (p1@(IParam _ ty, _) : ips)
-  = 	-- For implicit parameters, all the types must match
-    [ ((emptyVarSet, [(ty,ty')]), p1, p2) 
-    | p2@(IParam _ ty', _) <- ips, not (ty `tcEqType` ty')]
-
-checkGroup inst_env clss@((ClassP cls _, _) : _)
-  = 	-- For classes life is more complicated  
-   	-- Suppose the class is like
-	--	classs C as | (l1 -> r1), (l2 -> r2), ... where ...
-	-- Then FOR EACH PAIR (ClassP c tys1, ClassP c tys2) in the list clss
-	-- we check whether
-	--	U l1[tys1/as] = U l2[tys2/as]
-	--  (where U is a unifier)
-	-- 
-	-- If so, we return the pair
-	--	U r1[tys1/as] = U l2[tys2/as]
-	--
-	-- We need to do something very similar comparing each predicate
-	-- with relevant instance decls
-
-    instance_eqns ++ pairwise_eqns
-	-- NB: we put the instance equations first.   This biases the 
-	-- order so that we first improve individual constraints against the
-	-- instances (which are perhaps in a library and less likely to be
-	-- wrong; and THEN perform the pairwise checks.
-	-- The other way round, it's possible for the pairwise check to succeed
-	-- and cause a subsequent, misleading failure of one of the pair with an
-	-- instance declaration.  See tcfail143.hs for an exmample
-
-  where
-    (cls_tvs, cls_fds) = classTvsFds cls
-    instances	       = inst_env cls
-
-	-- NOTE that we iterate over the fds first; they are typically
-	-- empty, which aborts the rest of the loop.
-    pairwise_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
-    pairwise_eqns	-- This group comes from pairwise comparison
-      = [ (eqn, p1, p2)
-	| fd <- cls_fds,
-	  p1@(ClassP _ tys1, _) : rest <- tails clss,
-	  p2@(ClassP _ tys2, _)	<- rest,
-	  eqn <- checkClsFD emptyVarSet fd cls_tvs tys1 tys2
-	]
-
-    instance_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
-    instance_eqns	-- This group comes from comparing with instance decls
-      = [ (eqn, p1, p2)
-	| fd <- cls_fds,	-- Iterate through the fundeps first, 
-				-- because there often are none!
-	  p2@(ClassP _ tys2, _) <- clss,
-	  let rough_tcs2 = trimRoughMatchTcs cls_tvs fd (roughMatchTcs tys2),
-	  ispec@(Instance { is_tvs = qtvs, is_tys = tys1, 
-		 	    is_tcs = mb_tcs1 }) <- instances,
-	  not (instanceCantMatch mb_tcs1 rough_tcs2),
-	  eqn <- checkClsFD qtvs fd cls_tvs tys1 tys2,
-	  let p1 = (mkClassPred cls tys1, 
-		    ptext SLIT("arising from the instance declaration at") <+> 
-			ppr (getSrcLoc ispec))
-	]
-----------
 checkClsFD :: TyVarSet 			-- Quantified type variables; see note below
 	   -> FunDep TyVar -> [TyVar] 	-- One functional dependency from the class
 	   -> [Type] -> [Type]
