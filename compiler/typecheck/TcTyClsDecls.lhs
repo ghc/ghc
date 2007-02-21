@@ -748,19 +748,22 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> TcM DataCon
 
 tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
-	  (ConDecl name _ ex_tvs ex_ctxt details ResTyH98 _)
-  = do	{ let tc_datacon field_lbls arg_ty
+	  (ConDecl name _ tvs ex_ctxt details res_ty _)
+  = tcTyVarBndrs tvs		$ \ tvs' -> do 
+    do	{ (univ_tvs, ex_tvs, eq_preds, data_tc) <- tcResultType tycon tc_tvs tvs' res_ty
+
+		-- Check that a newtype has no existential stuff
+	; checkTc (null ex_tvs && null (unLoc ex_ctxt)) (newtypeExError name)
+
+	; let tc_datacon field_lbls arg_ty
 		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
 		     ; buildDataCon (unLoc name) False {- Prefix -} 
 				    [NotMarkedStrict]
 		    		    (map unLoc field_lbls)
-			   	    tc_tvs []  -- No existentials
-				    [] []      -- No equalities, predicates
+			   	    univ_tvs []  -- No existentials
+				    [] []        -- No equalities, predicates
 				    [arg_ty']
-				    tycon }
-
-		-- Check that a newtype has no existential stuff
-	; checkTc (null ex_tvs && null (unLoc ex_ctxt)) (newtypeExError name)
+				    data_tc }
 
 	; case details of
 	    PrefixCon [arg_ty]           -> tc_datacon [] arg_ty
