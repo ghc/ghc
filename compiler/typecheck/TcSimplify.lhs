@@ -2194,9 +2194,8 @@ tc_simplify_top doc interactive wanteds
 	-- OK, so there are some errors
 	{	-- Use the defaulting rules to do extra unification
 		-- NB: irreds are already zonked
-	; extended_default <- if interactive then return True
-			      else doptM Opt_ExtendedDefaultRules
-	; disambiguate extended_default irreds1	-- Does unification
+	; dflags <- getDOpts
+	; disambiguate interactive dflags irreds1	-- Does unification
 	; (irreds2, binds2) <- topCheckLoop doc irreds1
 
 		-- Deal with implicit parameter
@@ -2244,10 +2243,10 @@ Since we're not using the result of @foo@, the result if (presumably)
 @void@.
 
 \begin{code}
-disambiguate :: Bool -> [Inst] -> TcM ()
+disambiguate :: Bool -> DynFlags -> [Inst] -> TcM ()
 	-- Just does unification to fix the default types
 	-- The Insts are assumed to be pre-zonked
-disambiguate extended_defaulting insts
+disambiguate interactive dflags insts
   | null defaultable_groups
   = do { traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
 	;     return () }
@@ -2261,14 +2260,16 @@ disambiguate extended_defaulting insts
 				do { integer_ty <- tcMetaTy integerTyConName
 				   ; checkWiredInTyCon doubleTyCon
 				   ; string_ty <- tcMetaTy stringTyConName
-				   ; ovl_str <- doptM Opt_OverloadedStrings
-				   ; if ovl_str 	-- Add String if -foverloaded-strings
+				   ; if ovl_strings 	-- Add String if -foverloaded-strings
 					then return [integer_ty,doubleTy,string_ty] 
 					else return [integer_ty,doubleTy] }
 
 	; traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
 	; mapM_ (disambigGroup default_tys) defaultable_groups  }
   where
+   extended_defaulting = interactive || dopt Opt_ExtendedDefaultRules dflags
+   ovl_strings = dopt Opt_OverloadedStrings dflags
+
    unaries :: [(Inst,Class, TcTyVar)]  -- (C tv) constraints
    bad_tvs :: TcTyVarSet	  -- Tyvars mentioned by *other* constraints
    (unaries, bad_tvs) = getDefaultableDicts insts
@@ -2287,14 +2288,19 @@ disambiguate extended_defaulting insts
 
    defaultable_classes clss 
 	| extended_defaulting = any isInteractiveClass clss
-	| otherwise = all isStandardClass clss && (any isNumericClass clss || any ((== isStringClassKey) . classKey) clss)
+	| otherwise 	      = all is_std_class clss && (any is_num_class clss)
 
  	-- In interactive mode, or with -fextended-default-rules,
 	-- we default Show a to Show () to avoid graututious errors on "show []"
    isInteractiveClass cls 
-	= isNumericClass cls
-	|| (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey, isStringClassKey])
+	= is_num_class cls || (classKey cls `elem` [showClassKey, eqClassKey, ordClassKey])
 
+   is_num_class cls = isNumericClass cls || (ovl_strings && (cls `hasKey` isStringClassKey))
+	-- is_num_class adds IsString to the standard numeric classes, 
+	-- when -foverloaded-strings is enabled
+
+   is_std_class cls = isStandardClass cls || (ovl_strings && (cls `hasKey` isStringClassKey))
+	-- Similarly is_std_class
 
 disambigGroup :: [Type]			-- The default types
 	      -> [(Inst,Class,TcTyVar)]	-- All standard classes of form (C a)

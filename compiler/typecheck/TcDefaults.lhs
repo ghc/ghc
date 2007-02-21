@@ -11,13 +11,16 @@ module TcDefaults ( tcDefaults ) where
 
 import HsSyn
 import Name
+import Class
 import TcRnMonad
 import TcEnv
 import TcHsType
 import TcSimplify
 import TcType
 import PrelNames
+import DynFlags
 import SrcLoc
+import Maybe
 import Outputable
 \end{code}
 
@@ -45,29 +48,38 @@ tcDefaults [L locn (DefaultDecl [])]
 tcDefaults [L locn (DefaultDecl mono_tys)]
   = setSrcSpan locn 			$
     addErrCtxt defaultDeclCtxt		$
-    tcLookupClass numClassName		`thenM` \ num_class ->
-    tcLookupClass isStringClassName		`thenM` \ num_class ->
-    mappM tc_default_ty mono_tys	`thenM` \ tau_tys ->
-    
-    	-- Check that all the types are instances of Num
-    	-- We only care about whether it worked or not
-    tcSimplifyDefault [mkClassPred num_class [ty] | ty <- tau_tys]	`thenM_`
-    
-    returnM (Just tau_tys)
+    do	{ ovl_str <- doptM Opt_OverloadedStrings
+	; num_class    <- tcLookupClass numClassName
+	; is_str_class <- tcLookupClass isStringClassName
+	; let deflt_clss | ovl_str   = [num_class, is_str_class]
+			 | otherwise = [num_class]
 
-tcDefaults decls@(L locn (DefaultDecl _) : _) =
-    setSrcSpan locn $
+	; tau_tys <- mappM (tc_default_ty deflt_clss) mono_tys
+    
+	; return (Just tau_tys) }
+
+tcDefaults decls@(L locn (DefaultDecl _) : _)
+  = setSrcSpan locn $
     failWithTc (dupDefaultDeclErr decls)
 
 
-tc_default_ty hs_ty 
- = tcHsSigType DefaultDeclCtxt hs_ty		`thenM` \ ty ->
-   checkTc (isTauTy ty) (polyDefErr hs_ty)	`thenM_`
-   returnM ty
+tc_default_ty deflt_clss hs_ty 
+ = do	{ ty <- tcHsSigType DefaultDeclCtxt hs_ty
+	; checkTc (isTauTy ty) (polyDefErr hs_ty)
 
-defaultDeclCtxt =  ptext SLIT("when checking that each type in a default declaration")
-		    $$ ptext SLIT("is an instance of class Num")
+	-- Check that the type is an instance of at least one of the deflt_clss
+	; oks <- mapM (check_instance ty) deflt_clss
+	; checkTc (or oks) (badDefaultTy ty deflt_clss)
+	; return ty }
 
+check_instance :: Type -> Class -> TcM Bool
+  -- Check that ty is an instance of cls
+  -- We only care about whether it worked or not; return a boolean
+check_instance ty cls
+  = do	{ (_, mb_res) <- tryTc (tcSimplifyDefault [mkClassPred cls [ty]])
+	; return (isJust mb_res) }
+    
+defaultDeclCtxt = ptext SLIT("When checking the types in a default declaration")
 
 dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
   = hang (ptext SLIT("Multiple default declarations"))
@@ -77,5 +89,9 @@ dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
 
 polyDefErr ty 
   = hang (ptext SLIT("Illegal polymorphic type in default declaration") <> colon) 4 (ppr ty) 
+
+badDefaultTy ty deflt_clss
+  = hang (ptext SLIT("The default type") <+> quotes (ppr ty) <+> ptext SLIT("is not an instance of"))
+       2 (foldr1 (\a b -> a <+> ptext SLIT("or") <+> b) (map (quotes. ppr) deflt_clss))
 \end{code}
 
