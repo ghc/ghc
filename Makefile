@@ -220,7 +220,8 @@ BinDistLibSplicedFiles = package.conf
 BinDistDirs = includes compiler docs driver libraries rts utils
 
 BIN_DIST_NAME=ghc-$(ProjectVersion)
-BIN_DIST_TMPDIR=$(FPTOOLS_TOP_ABS)
+BIN_DIST_TOPDIR=$(FPTOOLS_TOP_ABS)
+BIN_DIST_DIR=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)
 
 BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
 
@@ -248,55 +249,55 @@ binary-dist-pre::
 ifeq "$(BIN_DIST)" ""
 	@echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in mk/build.mk" && exit 1
 endif
-	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
-	-$(RM) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
+	-rm -rf $(BIN_DIST_DIR)
+	-$(RM) $(BIN_DIST_DIR).tar.gz
 	@for i in $(BinDistDirs); do 		 	 \
 	  if test -d "$$i"; then 			 \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM); \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM); \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
+	   echo $(MKDIRHIER) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM); \
+	   $(MKDIRHIER) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM); \
+	   echo $(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM); \
+	   $(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM); \
+	   echo $(MKDIRHIER) $(BIN_DIST_DIR)/share; \
+	   $(MKDIRHIER) $(BIN_DIST_DIR)/share; \
 	   echo $(MAKE) -C $$i $(MFLAGS) $(INSTALL_STAGE) install \
-		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
+		prefix=$(BIN_DIST_DIR) \
+		exec_prefix=$(BIN_DIST_DIR) \
+		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
+		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		datadir=$(BIN_DIST_DIR)/share; \
 	   $(MAKE) -C $$i $(MFLAGS) $(INSTALL_STAGE) install \
-		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
+		prefix=$(BIN_DIST_DIR) \
+		exec_prefix=$(BIN_DIST_DIR) \
+		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
+		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		datadir=$(BIN_DIST_DIR)/share; \
 	  fi; \
 	done
 
 binary-dist::
 	@for i in $(BIN_DIST_TOP); do \
 	  if test -f "$$i"; then \
-	     echo cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
-	     cp $$i $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); \
+	     echo cp $$i $(BIN_DIST_DIR); \
+	     cp $$i $(BIN_DIST_DIR); \
 	  fi; \
 	done;
 	@echo "Configuring the Makefile for this project..."
-	touch $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "package = ghc" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "version = $(ProjectVersion)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_SH_SCRIPTS = $(BinDistShScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_PRL_SCRIPTS = $(BinDistPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_LIB_PRL_SCRIPTS = $(BinDistLibPrlScripts)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_LIB_SPLICED_FILES = $(BinDistLibSplicedFiles)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_BINS = $(BinDistBins)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_OPT_BINS = $(BinDistOptBins)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	echo "PACKAGE_LINKS = $(BinDistLinks)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
-	cat $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile-bin.in >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
+	touch $(BIN_DIST_DIR)/Makefile.in
+	echo "package = ghc" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "version = $(ProjectVersion)" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "PACKAGE_SH_SCRIPTS = $(BinDistShScripts)" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "PACKAGE_PRL_SCRIPTS = $(BinDistPrlScripts)" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "PACKAGE_LIB_PRL_SCRIPTS = $(BinDistLibPrlScripts)" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "PACKAGE_LIB_SPLICED_FILES = $(BinDistLibSplicedFiles)" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "PACKAGE_BINS = $(BinDistBins)" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "PACKAGE_OPT_BINS = $(BinDistOptBins)" >> $(BIN_DIST_DIR)/Makefile.in
+	echo "PACKAGE_LINKS = $(BinDistLinks)" >> $(BIN_DIST_DIR)/Makefile.in
+	cat $(BIN_DIST_DIR)/Makefile-bin.in >> $(BIN_DIST_DIR)/Makefile.in
 	@echo "Generating a shippable configure script.."
-	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.ac $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.ac
-	( cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
+	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
+	( cd $(BIN_DIST_DIR); autoconf )
 #
 # binary dist'ing the documentation.  
 # The default documentation to build/install is given below; overrideable
@@ -328,19 +329,19 @@ ifneq "$(DIR_DOCBOOK_XSL)" ""
 	  if test -d "$$i"; then 			 	\
 	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
 	    echo $(MAKE) -C $$i $(MFLAGS) install-docs XMLDocWays="$(BINDIST_DOC_WAYS)" \
-		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
-		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
+		prefix=$(BIN_DIST_DIR) 	\
+		exec_prefix=$(BIN_DIST_DIR) \
+		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
+		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		datadir=$(BIN_DIST_DIR)/share; \
 	    $(MAKE) -C $$i $(MFLAGS) install-docs XMLDocWays="$(BINDIST_DOC_WAYS)" \
-		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
-		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
-		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
+		prefix=$(BIN_DIST_DIR) 	\
+		exec_prefix=$(BIN_DIST_DIR) \
+		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
+		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+		datadir=$(BIN_DIST_DIR)/share; \
 	  fi \
 	done
 endif
@@ -352,7 +353,7 @@ ifneq "$(BinDistPrlScripts)" ""
 binary-dist::
 	@for i in $(BinDistPrlScripts); do \
 	     echo "Renaming $$i to $$i.prl"; \
-	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i.prl; \
+	    $(MV) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i.prl; \
 	done
 endif
 
@@ -360,24 +361,24 @@ ifneq "$(BinDistLibPrlScripts)" ""
 binary-dist::
 	@for i in $(BinDistLibPrlScripts); do \
 	     echo "Renaming $$i to $$i.prl"; \
-	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i.prl; \
+	    $(MV) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)/$$i  $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)/$$i.prl; \
 	done
 endif
 
 ifneq "$(BinDistShScripts)" ""
 binary-dist::
 	@for i in $(BinDistShScripts); do \
-	    if test -x $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i ; then \
+	    if test -x $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i ; then \
 	    	echo "Renaming $$i to $$i.sh"; \
-	    	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i.sh; \
+	    	$(MV) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i.sh; \
 	    fi \
 	done
 endif
 
 # Tar up the distribution and build a manifest
 binary-dist ::
-	( cd $(BIN_DIST_TMPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
-	( cd $(BIN_DIST_TMPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
+	( cd $(BIN_DIST_TOPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
+	( cd $(BIN_DIST_TOPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
 
 # Upload the distribution
 ifneq "$(PublishLocation)" ""
@@ -387,6 +388,7 @@ binary-dist ::
 		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation); then break; fi\
 	done
 endif
+
 
 binary-dist::
 	@echo "Mechanical and super-natty! Inspect the result and *if* happy; freeze, sell and get some sleep!"
