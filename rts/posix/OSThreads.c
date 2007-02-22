@@ -148,6 +148,15 @@ setThreadLocalVar (ThreadLocalKey *key, void *value)
     }
 }
 
+void
+freeThreadLocalKey (ThreadLocalKey *key)
+{
+    int r;
+    if ((r = pthread_key_delete(key)) != 0) {
+	barf("freeThreadLocalKey: %s", strerror(r));
+    }
+}
+
 static void *
 forkOS_createThreadWrapper ( void * entry )
 {

@@ -99,6 +99,9 @@ freeTaskManager (void)
     }
     all_tasks = NULL;
     task_free_list = NULL;
+#if defined(THREADED_RTS)
+    freeThreadLocalKey(&currentTaskKey);
+#endif
     RELEASE_LOCK(&sched_mutex);
 }
 

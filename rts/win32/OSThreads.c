@@ -197,6 +197,17 @@ setThreadLocalVar (ThreadLocalKey *key, void *value)
     }
 }
 
+void
+freeThreadLocalKey (ThreadLocalKey *key)
+{
+    BOOL r;
+    r = TlsFree(*key);
+    if (r == 0) {
+        DWORD dw = GetLastError();
+	barf("freeThreadLocalKey failed: %lu", dw);
+    }
+}
+
 
 static unsigned __stdcall
 forkOS_createThreadWrapper ( void * entry )

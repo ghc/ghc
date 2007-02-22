@@ -172,6 +172,7 @@ extern void closeMutex            ( Mutex* pMut );
 void  newThreadLocalKey (ThreadLocalKey *key);
 void *getThreadLocalVar (ThreadLocalKey *key);
 void  setThreadLocalVar (ThreadLocalKey *key, void *value);
+void  freeThreadLocalKey (ThreadLocalKey *key);
 
 #else
 
