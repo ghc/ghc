@@ -65,9 +65,9 @@ import Data.List
 dsTopLHsBinds :: AutoScc -> LHsBinds Id -> DsM [(Id,CoreExpr)]
 dsTopLHsBinds auto_scc binds = do
   mb_mod_name_ref <- getModNameRefDs
+  debugging <- debug_enabled
   case mb_mod_name_ref of 
-    Just _  -> ds_lhs_binds auto_scc binds
-    Nothing -> do  -- Inject a CAF with the module name as literal
+    Nothing | debugging -> do  -- Inject a CAF with the module name as literal
       mod <- getModuleDs
       mod_name_ref <- do
                  u <- newUnique 
@@ -78,6 +78,8 @@ dsTopLHsBinds auto_scc binds = do
       withModNameRefDs mod_name_ref $ do
                  res <- ds_lhs_binds auto_scc binds
                  return$ (mod_name_ref, mod_lit) : res
+    _  -> ds_lhs_binds auto_scc binds
+
 
 dsLHsBinds :: LHsBinds Id -> DsM [(Id,CoreExpr)]
 dsLHsBinds binds = ds_lhs_binds NoSccs binds
