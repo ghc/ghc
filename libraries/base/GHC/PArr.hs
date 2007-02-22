@@ -245,7 +245,7 @@ takeP   :: Int -> [:a:] -> [:a:]
 takeP n  = sliceP 0 (n - 1)
 
 dropP     :: Int -> [:a:] -> [:a:]
-dropP n a  = sliceP (n - 1) (lengthP a - 1) a
+dropP n a  = sliceP n (lengthP a - 1) a
 
 splitAtP      :: Int -> [:a:] -> ([:a:],[:a:])
 splitAtP n xs  = (takeP n xs, dropP n xs)
