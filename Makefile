@@ -380,13 +380,14 @@ binary-dist ::
 	( cd $(BIN_DIST_TOPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
 	( cd $(BIN_DIST_TOPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
 
-# Upload the distribution
+# Upload the distribution and documentation
 ifneq "$(PublishLocation)" ""
 binary-dist ::
 	@for i in 0 1 2 3 4 5 6 7 8 9; do \
 		echo "Try $$i: $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)"; \
 		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation); then break; fi\
 	done
+	$(PublishCp) -r $(BIN_DIST_DIR)/share/html/* $(PublishLocation)/docs
 endif
 
 
