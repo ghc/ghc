@@ -302,8 +302,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 
        ; rep_tc_name <- newFamInstTyConName tc_name (srcSpanStart loc)
        ; tycon <- fixM (\ tycon -> do 
-	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
-					      tycon t_tvs))
+	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict tycon t_tvs))
 				  k_cons
 	     ; tc_rhs <-
 		 case new_or_data of
@@ -672,8 +671,7 @@ tcTyClDecl1 calc_isrec
 	    (newtypeConError tc_name (length cons))
 
   ; tycon <- fixM (\ tycon -> do 
-	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data 
-						 tycon final_tvs)) 
+	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict tycon final_tvs)) 
 			     cons
 	; tc_rhs <-
 	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
@@ -742,38 +740,11 @@ tcTyClDecl1 calc_isrec
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
-	  -> NewOrData 
 	  -> TyCon -> [TyVar] 
 	  -> ConDecl Name 
 	  -> TcM DataCon
 
-tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
-	  (ConDecl name _ tvs ex_ctxt details res_ty _)
-  = tcTyVarBndrs tvs		$ \ tvs' -> do 
-    do	{ (univ_tvs, ex_tvs, eq_preds, data_tc) <- tcResultType tycon tc_tvs tvs' res_ty
-
-		-- Check that a newtype has no existential stuff
-	; checkTc (null ex_tvs && null (unLoc ex_ctxt)) (newtypeExError name)
-
-	; let tc_datacon field_lbls arg_ty
-		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
-		     ; buildDataCon (unLoc name) False {- Prefix -} 
-				    [NotMarkedStrict]
-		    		    (map unLoc field_lbls)
-			   	    univ_tvs []  -- No existentials
-				    [] []        -- No equalities, predicates
-				    [arg_ty']
-				    data_tc }
-
-	; case details of
-	    PrefixCon [arg_ty]           -> tc_datacon [] arg_ty
-	    RecCon [HsRecField field_lbl arg_ty _] -> tc_datacon [field_lbl] arg_ty
-	    other                        -> 
-	      failWithTc (newtypeFieldErr name (length (hsConArgs details)))
-			-- Check that the constructor has exactly one field
-	}
-
-tcConDecl unbox_strict DataType tycon tc_tvs	-- Data types
+tcConDecl unbox_strict tycon tc_tvs	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty _)
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
@@ -1014,9 +985,25 @@ checkValidDataCon tc con
   = setSrcSpan (srcLocSpan (getSrcLoc con))	$
     addErrCtxt (dataConCtxt con)		$ 
     do	{ checkTc (dataConTyCon con == tc) (badDataConTyCon con)
-	; checkValidType ctxt (dataConUserType con) }
+	; checkValidType ctxt (dataConUserType con)
+	; ifM (isNewTyCon tc) (checkNewDataCon con)
+    }
   where
     ctxt = ConArgCtxt (dataConName con) 
+
+-------------------------------
+checkNewDataCon :: DataCon -> TcM ()
+-- Checks for the data constructor of a newtype
+checkNewDataCon con
+  = do	{ checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
+		-- One argument
+	; checkTc (null eq_spec) (newtypePredError con)
+		-- Return type is (T a b c)
+	; checkTc (null ex_tvs && null theta) (newtypeExError con)
+		-- No existentials
+    }
+  where
+    (univ_tvs, ex_tvs, eq_spec, theta, arg_tys) = dataConFullSig con
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -1157,6 +1144,10 @@ newtypeConError tycon n
 newtypeExError con
   = sep [ptext SLIT("A newtype constructor cannot have an existential context,"),
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does")]
+
+newtypePredError con
+  = sep [ptext SLIT("A newtype constructor must have a return type of form T a b c"),
+	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does not")]
 
 newtypeFieldErr con_name n_flds
   = sep [ptext SLIT("The constructor of a newtype must have exactly one field"), 
