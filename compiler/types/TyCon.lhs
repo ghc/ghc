@@ -108,15 +108,6 @@ data TyCon
 					--		   types if present
 					-- But not over the data constructors
 
-        tyConArgPoss :: Maybe [Int],    -- for associated families: for each
-					-- tyvar in the AT decl, gives the
-					-- position of that tyvar in the class
-					-- argument list (starting from 0).
-					-- NB: Length is less than tyConArity
-					--     if higher kind signature.
-					-- NB: Just _ <=> associated (not
-					--		  toplevel) family
-	
 	algTcSelIds :: [Id],  		-- Its record selectors (empty if none)
 
 	algTcGadtSyntax  :: Bool,	-- True <=> the data type was declared using GADT syntax
@@ -158,13 +149,6 @@ data TyCon
 
 	tyConTyVars  :: [TyVar],	-- Bound tyvars
 
-        tyConArgPoss :: Maybe [Int],    -- for associated families: for each
-					-- tyvar in the AT decl, gives the
-					-- position of that tyvar in the class
-					-- argument list (starting from 0).
-					-- NB: Length is less than tyConArity
-					--     if higher kind signature.
-	
 	synTcRhs     :: SynTyConRhs	-- Expanded type in here
     }
 
@@ -204,21 +188,37 @@ data TyCon
 
 type FieldLabel = Name
 
+-- Right hand sides of type constructors for algebraic types
+--
 data AlgTyConRhs
-  = AbstractTyCon	-- We know nothing about this data type, except 
-			-- that it's represented by a pointer
-			-- Used when we export a data type abstractly into
-			-- an hi file
 
-  | OpenDataTyCon       -- data family        (further instances can appear
-  | OpenNewTyCon        -- newtype family      at any time)
+  -- We know nothing about this data type, except that it's represented by a
+  -- pointer.  Used when we export a data type abstractly into an hi file.
+  --
+  = AbstractTyCon
+
+  -- The constructor represents an open family without a fixed right hand
+  -- side.  Additional instances can appear at any time.
+  --
+  | OpenTyCon {
+
+      otArgPoss   :: Maybe [Int],  
+	-- for associated families: for each tyvar in the AT decl, gives the
+	-- position of that tyvar in the class argument list (starting from 0).
+	-- NB: Length is less than tyConArity iff higher kind signature.
+	-- NB: Just _ <=> associated (not toplevel) family
+	
+      otIsNewtype :: Bool	     
+        -- is a newtype (rather than data type)?
+
+    }
 
   | DataTyCon {
 	data_cons :: [DataCon],
 			-- The constructors; can be empty if the user declares
 			--   the type to have no constructors
 			-- INVARIANT: Kept in order of increasing tag
-			--	      (see the tag assignment in DataCon.mkDataCon)
+			--	  (see the tag assignment in DataCon.mkDataCon)
 	is_enum :: Bool 	-- Cached: True <=> an enumeration type
     }			--	   Includes data types with no constructors.
 
@@ -257,8 +257,7 @@ data AlgTyConRhs
 
 visibleDataCons :: AlgTyConRhs -> [DataCon]
 visibleDataCons AbstractTyCon      	      = []
-visibleDataCons OpenDataTyCon		      = []
-visibleDataCons OpenNewTyCon		      = []
+visibleDataCons OpenTyCon {}		      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 
@@ -286,7 +285,14 @@ data AlgTyConParent
 	-- with T77's algTcParent = FamilyTyCon T [a] co
 
 data SynTyConRhs
-  = OpenSynTyCon Kind	-- Type family: *result* kind given
+  = OpenSynTyCon Kind	        -- Type family: *result* kind given
+		 (Maybe [Int])  -- for associated families: for each tyvars in
+				-- the AT decl, gives the position of that
+				-- tyvar in the class argument list (starting
+				-- from 0). 
+				-- NB: Length is less than tyConArity
+				--     if higher kind signature.
+
   | SynonymTyCon Type   -- Mentioning head type vars.  Acts as a template for
 			--  the expansion when the tycon is applied to some
 			--  types.  
@@ -428,7 +434,6 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
 	tyConKind	 = kind,
 	tyConArity	 = length tyvars,
 	tyConTyVars	 = tyvars,
-	tyConArgPoss	 = Nothing,
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
 	algTcSelIds	 = sel_ids,
@@ -498,7 +503,6 @@ mkSynTyCon name kind tyvars rhs
 	tyConKind = kind,
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
-	tyConArgPoss = Nothing,
 	synTcRhs = rhs
     }
 
@@ -556,20 +560,20 @@ isDataTyCon :: TyCon -> Bool
 --		  unboxed tuples
 isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})  
   = case rhs of
-        OpenDataTyCon -> True
+        OpenTyCon {}  -> not (otIsNewtype rhs)
 	DataTyCon {}  -> True
-	OpenNewTyCon  -> False
 	NewTyCon {}   -> False
-	AbstractTyCon -> False	-- We don't know, so return False
+	AbstractTyCon -> False	 -- We don't know, so return False
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
 isNewTyCon :: TyCon -> Bool
-isNewTyCon (AlgTyCon {algTcRhs = rhs}) = case rhs of
-					   OpenNewTyCon -> True
-					   NewTyCon {}  -> True
-					   _	        -> False
-isNewTyCon other			= False
+isNewTyCon (AlgTyCon {algTcRhs = rhs}) = 
+  case rhs of
+    OpenTyCon {} -> otIsNewtype rhs
+    NewTyCon {}  -> True
+    _	         -> False
+isNewTyCon other		       = False
 
 -- This is an important refinement as typical newtype optimisations do *not*
 -- hold for newtype families.  Why?  Given a type `T a', if T is a newtype
@@ -616,22 +620,24 @@ isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon { is_enum = res }}) = res
 isEnumerationTyCon other				       	       = False
 
 isOpenTyCon :: TyCon -> Bool
-isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon _}) = True
-isOpenTyCon (AlgTyCon {algTcRhs = OpenDataTyCon }) = True
-isOpenTyCon (AlgTyCon {algTcRhs = OpenNewTyCon  }) = True
-isOpenTyCon _					   = False
+isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon _ _}) = True
+isOpenTyCon (AlgTyCon {algTcRhs = OpenTyCon {}    }) = True
+isOpenTyCon _					     = False
 
 assocTyConArgPoss_maybe :: TyCon -> Maybe [Int]
-assocTyConArgPoss_maybe (AlgTyCon { tyConArgPoss = poss }) = poss
-assocTyConArgPoss_maybe (SynTyCon { tyConArgPoss = poss }) = poss
-assocTyConArgPoss_maybe _                                  = Nothing
+assocTyConArgPoss_maybe (AlgTyCon { 
+			   algTcRhs = OpenTyCon {otArgPoss = poss}})  = poss
+assocTyConArgPoss_maybe (SynTyCon { synTcRhs = OpenSynTyCon _ poss }) = poss
+assocTyConArgPoss_maybe _ = Nothing
 
 isTyConAssoc :: TyCon -> Bool
 isTyConAssoc = isJust . assocTyConArgPoss_maybe
 
 setTyConArgPoss :: TyCon -> [Int] -> TyCon
-setTyConArgPoss tc@(AlgTyCon {}) poss = tc { tyConArgPoss = Just poss }
-setTyConArgPoss tc@(SynTyCon {}) poss = tc { tyConArgPoss = Just poss }
+setTyConArgPoss tc@(AlgTyCon { algTcRhs = rhs })               poss = 
+  tc { algTcRhs = rhs {otArgPoss = Just poss} }
+setTyConArgPoss tc@(SynTyCon { synTcRhs = OpenSynTyCon ki _ }) poss = 
+  tc { synTcRhs = OpenSynTyCon ki (Just poss) }
 setTyConArgPoss tc _ = pprPanic "setTyConArgPoss" (ppr tc)
 
 isTupleTyCon :: TyCon -> Bool
@@ -769,7 +775,7 @@ tyConFamilySize  :: TyCon -> Int
 tyConFamilySize (AlgTyCon   {algTcRhs = DataTyCon {data_cons = cons}}) = 
   length cons
 tyConFamilySize (AlgTyCon   {algTcRhs = NewTyCon {}})                  = 1
-tyConFamilySize (AlgTyCon   {algTcRhs = OpenDataTyCon})                = 0
+tyConFamilySize (AlgTyCon   {algTcRhs = OpenTyCon {}})                 = 0
 tyConFamilySize (TupleTyCon {})	 		                       = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
@@ -826,7 +832,7 @@ synTyConType tc = case synTcRhs tc of
 		    _		   -> pprPanic "synTyConType" (ppr tc)
 
 synTyConResKind :: TyCon -> Kind
-synTyConResKind (SynTyCon {synTcRhs = OpenSynTyCon kind}) = kind
+synTyConResKind (SynTyCon {synTcRhs = OpenSynTyCon kind _}) = kind
 synTyConResKind tycon  = pprPanic "synTyConResKind" (ppr tycon)
 \end{code}
 

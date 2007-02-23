@@ -37,7 +37,7 @@ import Data.List
 \begin{code}
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] -> SynTyConRhs -> TyCon
-buildSynTyCon name tvs rhs@(OpenSynTyCon rhs_ki)
+buildSynTyCon name tvs rhs@(OpenSynTyCon rhs_ki _)
   = mkSynTyCon name kind tvs rhs
   where
     kind = mkArrowKinds (map tyVarKind tvs) rhs_ki
@@ -100,10 +100,10 @@ mkAbstractTyConRhs :: AlgTyConRhs
 mkAbstractTyConRhs = AbstractTyCon
 
 mkOpenDataTyConRhs :: AlgTyConRhs
-mkOpenDataTyConRhs = OpenDataTyCon
+mkOpenDataTyConRhs = OpenTyCon Nothing False
 
 mkOpenNewTyConRhs :: AlgTyConRhs
-mkOpenNewTyConRhs = OpenNewTyCon
+mkOpenNewTyConRhs = OpenTyCon Nothing True
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons

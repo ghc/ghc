@@ -380,7 +380,7 @@ tcIfaceDecl ignore_prags
    = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
      { tc_name <- lookupIfaceTop occ_name
      ; rhs_tyki <- tcIfaceType rdr_rhs_ty
-     ; let rhs = if isOpen then OpenSynTyCon rhs_tyki 
+     ; let rhs = if isOpen then OpenSynTyCon rhs_tyki Nothing
 			   else SynonymTyCon rhs_tyki
      ; return (ATyCon (buildSynTyCon tc_name tyvars rhs))
      }

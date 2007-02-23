@@ -615,7 +615,7 @@ tcTyClDecl1 _calc_isrec
 	-- Check that we don't use families without -findexed-types
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
-  ; return [ATyCon $ buildSynTyCon tc_name tvs' (OpenSynTyCon kind)]
+  ; return [ATyCon $ buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing)]
   }
 
   -- "newtype family" or "data family" declaration
@@ -634,8 +634,8 @@ tcTyClDecl1 _calc_isrec
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
 	       (case new_or_data of
-		  DataType -> OpenDataTyCon
-		  NewType  -> OpenNewTyCon)
+		  DataType -> mkOpenDataTyConRhs
+		  NewType  -> mkOpenNewTyConRhs)
 	       Recursive False True Nothing
   ; return [ATyCon tycon]
   }
@@ -945,8 +945,8 @@ checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc 
   | isSynTyCon tc 
   = case synTyConRhs tc of
-      OpenSynTyCon _  -> return ()
-      SynonymTyCon ty -> checkValidType syn_ctxt ty
+      OpenSynTyCon _ _ -> return ()
+      SynonymTyCon ty  -> checkValidType syn_ctxt ty
   | otherwise
   = 	-- Check the context on the data decl
     checkValidTheta (DataTyCtxt name) (tyConStupidTheta tc)	`thenM_` 

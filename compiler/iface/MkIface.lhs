@@ -1085,16 +1085,16 @@ tyThingToIfaceDecl (ATyCon tycon)
   where
     tyvars = tyConTyVars tycon
     (syn_isOpen, syn_tyki) = case synTyConRhs tycon of
-			       OpenSynTyCon ki -> (True , ki)
-			       SynonymTyCon ty -> (False, ty)
+			       OpenSynTyCon ki _ -> (True , ki)
+			       SynonymTyCon ty   -> (False, ty)
 
-    ifaceConDecls (NewTyCon { data_con = con })    = 
+    ifaceConDecls (NewTyCon { data_con = con })     = 
       IfNewTyCon  (ifaceConDecl con)
-    ifaceConDecls (DataTyCon { data_cons = cons }) = 
+    ifaceConDecls (DataTyCon { data_cons = cons })  = 
       IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls OpenDataTyCon                    = IfOpenDataTyCon
-    ifaceConDecls OpenNewTyCon                     = IfOpenNewTyCon
-    ifaceConDecls AbstractTyCon			   = IfAbstractTyCon
+    ifaceConDecls OpenTyCon { otIsNewtype = False } = IfOpenDataTyCon
+    ifaceConDecls OpenTyCon { otIsNewtype = True  } = IfOpenNewTyCon
+    ifaceConDecls AbstractTyCon			    = IfAbstractTyCon
 	-- The last case happens when a TyCon has been trimmed during tidying
 	-- Furthermore, tyThingToIfaceDecl is also used
 	-- in TcRnDriver for GHCi, when browsing a module, in which case the
