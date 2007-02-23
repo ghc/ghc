@@ -65,7 +65,7 @@ import Data.List
 dsTopLHsBinds :: AutoScc -> LHsBinds Id -> DsM [(Id,CoreExpr)]
 dsTopLHsBinds auto_scc binds = do
   mb_mod_name_ref <- getModNameRefDs
-  debugging <- debug_enabled
+  debugging <- breakpoints_enabled
   case mb_mod_name_ref of 
     Nothing | debugging -> do  -- Inject a CAF with the module name as literal
       mod <- getModuleDs
