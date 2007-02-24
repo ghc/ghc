@@ -16,7 +16,7 @@ dnl
 AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.7], [glasgow-haskell-bugs@haskell.org], [ghc])
 
 # Set this to YES for a released version, otherwise NO
-RELEASE=NO
+: ${RELEASE=NO}
 
 # The primary version (e.g. 6.7, 6.6.1) is set in the AC_INIT line
 # above.  If this is not a released version, then we will append the
