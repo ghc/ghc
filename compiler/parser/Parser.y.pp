@@ -52,6 +52,17 @@ import Control.Monad    ( mplus )
 
 {-
 -----------------------------------------------------------------------------
+24 Februar 2006
+
+Conflicts: 33 shift/reduce
+           1 reduce/reduce
+
+The reduce/reduce conflict is weird.  It's between tyconsym and consym, and I
+would think the two should never occur in the same context.
+
+  -=chak
+
+-----------------------------------------------------------------------------
 31 December 2006
 
 Conflicts: 34 shift/reduce
@@ -1434,12 +1445,12 @@ quals :: { Located [LStmt RdrName] }
 
 parr :: { LHsExpr RdrName }
 	: 				{ noLoc (ExplicitPArr placeHolderType []) }
-	| exp				{ L1 $ ExplicitPArr placeHolderType [$1] }
+	| texp				{ L1 $ ExplicitPArr placeHolderType [$1] }
 	| lexps 			{ L1 $ ExplicitPArr placeHolderType 
 						       (reverse (unLoc $1)) }
-	| exp '..' exp	 		{ LL $ PArrSeq noPostTcExpr (FromTo $1 $3) }
-	| exp ',' exp '..' exp		{ LL $ PArrSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| exp pquals			{ sL (comb2 $1 $>) $ mkHsDo PArrComp (reverse (unLoc $2)) $1 }
+	| texp '..' exp	 		{ LL $ PArrSeq noPostTcExpr (FromTo $1 $3) }
+	| texp ',' exp '..' exp		{ LL $ PArrSeq noPostTcExpr (FromThenTo $1 $3 $5) }
+	| texp pquals			{ sL (comb2 $1 $>) $ mkHsDo PArrComp (reverse (unLoc $2)) $1 }
 
 -- We are reusing `lexps' and `pquals' from the list case.
 
