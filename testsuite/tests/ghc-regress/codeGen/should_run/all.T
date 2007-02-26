@@ -60,3 +60,4 @@ test('cg057', composes([expect_broken(948),
      compile_and_run, [''])
 
 test('cg058', normal, compile_and_run, [''])
+test('cg059', exit_code(1), compile_and_run, [''])
