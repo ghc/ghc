@@ -1330,7 +1330,7 @@ data Counter a = forall self. NewCounter
 Here <literal>tag</literal> is a public field, with a well-typed selector
 function <literal>tag :: Counter a -> a</literal>.  The <literal>self</literal>
 type is hidden from the outside; any attempt to apply <literal>_this</literal>,
-<literal>_inc</literal> or <literal>_output</literal> as functions will raise a
+<literal>_inc</literal> or <literal>_display</literal> as functions will raise a
 compile-time error.  In other words, <emphasis>GHC defines a record selector function
 only for fields whose type does not mention the existentially-quantified variables</emphasis>.
 (This example used an underscore in the fields for which record selectors
