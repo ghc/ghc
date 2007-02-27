@@ -48,7 +48,7 @@ itblCode :: ItblPtr -> Ptr ()
 itblCode (ItblPtr ptr)
    = (castPtr ptr)
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-                 `plusPtr` (wORD_SIZE * 2)
+                 `plusPtr` (3 * wORD_SIZE)
 #endif
 
 type ItblEnv = NameEnv (Name, ItblPtr)
@@ -125,14 +125,11 @@ make_constr_itbls cons
                             }
                -- Make a piece of code to jump to "entry_label".
                -- This is the only arch-dependent bit.
-           -- addr <- newExec [itbl]
            addrCon <- newExec [conInfoTbl]
-           let addr = (castFunPtrToPtr addrCon) `plusPtr` 4 -- ToDo: remove magic number
                     --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
                     --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
                     --putStrLn ("# nptrs of itbl is " ++ show nptrs_really)
-           -- return (getName dcon, ItblPtr (castFunPtrToPtr addr))
-           return (getName dcon, ItblPtr addr)
+           return (getName dcon, ItblPtr (castFunPtrToPtr addrCon))
 
 
 -- Make code which causes a jump to the given address.  This is the
