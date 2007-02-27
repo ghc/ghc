@@ -43,9 +43,7 @@ import Control.Exception ( throwDyn )
 import Control.Monad	( zipWithM )
 import Control.Monad.ST ( stToIO )
 
-import GHC.Exts		( BCO#, newBCO#, unsafeCoerce#, Int#,
-			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
-
+import GHC.Exts
 import GHC.Arr		( Array(..) )
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..), castPtr )
@@ -107,27 +105,20 @@ linkBCO ie ce ul_bco
 
 
 linkBCO' :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO BCO
-linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS itblsSS)
+linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
    -- Raises an IO exception on failure
    = do let literals = ssElts literalsSS
 	    ptrs     = ssElts ptrsSS
-	    itbls    = ssElts itblsSS
 
-        linked_itbls    <- mapM (lookupIE ie) itbls
-        linked_literals <- mapM lookupLiteral literals
+        linked_literals <- mapM (lookupLiteral ie) literals
 
         let n_literals = sizeSS literalsSS
             n_ptrs     = sizeSS ptrsSS
-            n_itbls    = sizeSS itblsSS
 
 	ptrs_arr <- mkPtrsArray ie ce n_ptrs ptrs
 
         let 
             ptrs_parr = case ptrs_arr of Array lo hi parr -> parr
-
-            itbls_arr = listArray (0, n_itbls-1) linked_itbls
-
-            itbls_barr = case itbls_arr of UArray lo hi barr -> barr
 
             literals_arr = listArray (0, n_literals-1) linked_literals
                            :: UArray Int Word
@@ -135,7 +126,7 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS itblsSS
 
 	    (I# arity#)  = arity
 
-        newBCO insns_barr literals_barr ptrs_parr itbls_barr arity# bitmap
+        newBCO insns_barr literals_barr ptrs_parr arity# bitmap
 
 
 -- we recursively link any sub-BCOs while making the ptrs array
@@ -175,20 +166,18 @@ writeArrayBCO (IOArray (STArray _ _ marr#)) (I# i#) bco# = IO $ \s# ->
 data BCO = BCO BCO#
 
 newBCO :: ByteArray# -> ByteArray# -> Array# a
-	 -> ByteArray# -> Int# -> ByteArray# -> IO BCO
-newBCO instrs lits ptrs itbls arity bitmap
-   = IO $ \s -> case newBCO# instrs lits ptrs itbls arity bitmap s of 
+	 -> Int# -> ByteArray# -> IO BCO
+newBCO instrs lits ptrs arity bitmap
+   = IO $ \s -> case newBCO# instrs lits ptrs arity bitmap s of 
 		  (# s1, bco #) -> (# s1, BCO bco #)
 
 
-lookupLiteral :: Either Word FastString -> IO Word
-lookupLiteral (Left lit)  = return lit
-lookupLiteral (Right sym) = do Ptr addr <- lookupStaticPtr sym
-			       return (W# (unsafeCoerce# addr)) 
-     -- Can't be bothered to find the official way to convert Addr# to Word#;
-     -- the FFI/Foreign designers make it too damn difficult
-     -- Hence we apply the Blunt Instrument, which works correctly
-     -- on all reasonable architectures anyway
+lookupLiteral :: ItblEnv -> BCONPtr -> IO Word
+lookupLiteral ie (BCONPtrWord lit) = return lit
+lookupLiteral ie (BCONPtrLbl  sym) = do Ptr a# <- lookupStaticPtr sym
+			                return (W# (int2Word# (addr2Int# a#)))
+lookupLiteral ie (BCONPtrItbl nm)  = do Ptr a# <- lookupIE ie nm
+			                return (W# (int2Word# (addr2Int# a#)))
 
 lookupStaticPtr :: FastString -> IO (Ptr ())
 lookupStaticPtr addr_of_label_string 

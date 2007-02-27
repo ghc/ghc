@@ -41,9 +41,6 @@ disInstr ( StgBCO *bco, int pc )
    StgMutArrPtrs* ptrs_arr    = bco->ptrs;
    StgPtr*        ptrs        = (StgPtr*)(&ptrs_arr->payload[0]);
 
-   StgArrWords*   itbls_arr   = bco->itbls;
-   StgInfoTable** itbls       = (StgInfoTable**)(&itbls_arr->payload[0]);
-
    instr = instrs[pc++];
    switch (instr) {
       case bci_SWIZZLE:
@@ -163,7 +160,7 @@ disInstr ( StgBCO *bco, int pc )
          pc += 1; break;
       case bci_PACK:
          debugBelch("PACK      %d words with itbl ", instrs[pc+1] );
-         printPtr( (StgPtr)itbls[instrs[pc]] );
+         printPtr( (StgPtr)literals[instrs[pc]] );
          debugBelch("\n");
          pc += 2; break;
 

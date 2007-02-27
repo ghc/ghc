@@ -11,7 +11,7 @@ module ByteCodeAsm (
 	assembleBCOs, assembleBCO,
 
 	CompiledByteCode(..), 
-	UnlinkedBCO(..), BCOPtr(..), bcoFreeNames,
+	UnlinkedBCO(..), BCOPtr(..), BCONPtr(..), bcoFreeNames,
 	SizedSeq, sizeSS, ssElts,
 	iNTERP_STACK_CHECK_THRESH
   ) where
@@ -68,14 +68,10 @@ data UnlinkedBCO
    = UnlinkedBCO {
 	unlinkedBCOName   :: Name,
 	unlinkedBCOArity  :: Int,
-	unlinkedBCOInstrs :: ByteArray#,			 -- insns
-	unlinkedBCOBitmap :: ByteArray#,			 -- bitmap
-        unlinkedBCOLits   :: (SizedSeq (Either Word FastString)), -- literals
-			-- Either literal words or a pointer to a asciiz
-			-- string, denoting a label whose *address* should
-			-- be determined at link time
-        unlinkedBCOPtrs   :: (SizedSeq BCOPtr), 	-- ptrs
- 	unlinkedBCOItbls  :: (SizedSeq Name)	 	-- itbl refs
+	unlinkedBCOInstrs :: ByteArray#,		 -- insns
+	unlinkedBCOBitmap :: ByteArray#,		 -- bitmap
+        unlinkedBCOLits   :: (SizedSeq BCONPtr),        -- non-ptrs
+        unlinkedBCOPtrs   :: (SizedSeq BCOPtr) 	        -- ptrs
    }
 
 data BCOPtr
@@ -83,25 +79,29 @@ data BCOPtr
   | BCOPtrPrimOp PrimOp
   | BCOPtrBCO    UnlinkedBCO
 
+data BCONPtr
+  = BCONPtrWord  Word
+  | BCONPtrLbl   FastString
+  | BCONPtrItbl  Name
+
 -- | Finds external references.  Remember to remove the names
 -- defined by this group of BCOs themselves
 bcoFreeNames :: UnlinkedBCO -> NameSet
 bcoFreeNames bco
   = bco_refs bco `minusNameSet` mkNameSet [unlinkedBCOName bco]
   where
-    bco_refs (UnlinkedBCO _ _ _ _ _ ptrs itbls)
+    bco_refs (UnlinkedBCO _ _ _ _ nonptrs ptrs)
 	= unionManyNameSets (
 	     mkNameSet [ n | BCOPtrName n <- ssElts ptrs ] :
-	     mkNameSet (ssElts itbls) :
+	     mkNameSet [ n | BCONPtrItbl n <- ssElts nonptrs ] :
 	     map bco_refs [ bco | BCOPtrBCO bco <- ssElts ptrs ]
 	  )
 
 instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm arity insns bitmap lits ptrs itbls)
+   ppr (UnlinkedBCO nm arity insns bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with", 
              int (sizeSS lits), text "lits",
-             int (sizeSS ptrs), text "ptrs",
-             int (sizeSS itbls), text "itbls"]
+             int (sizeSS ptrs), text "ptrs" ]
 
 -- -----------------------------------------------------------------------------
 -- The bytecode assembler
@@ -141,11 +141,10 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
      in
      do  -- pass 2: generate the instruction, ptr and nonptr bits
          insns <- return emptySS :: IO (SizedSeq Word16)
-         lits  <- return emptySS :: IO (SizedSeq (Either Word FastString))
+         lits  <- return emptySS :: IO (SizedSeq BCONPtr)
          ptrs  <- return emptySS :: IO (SizedSeq BCOPtr)
-         itbls <- return emptySS :: IO (SizedSeq Name)
-         let init_asm_state = (insns,lits,ptrs,itbls)
-         (final_insns, final_lits, final_ptrs, final_itbls) 
+         let init_asm_state = (insns,lits,ptrs)
+         (final_insns, final_lits, final_ptrs) 
             <- mkBits findLabel init_asm_state instrs
 
 	 let asm_insns = ssElts final_insns
@@ -160,7 +159,7 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
              bitmap_barr = case bitmap_arr of UArray _lo _hi barr -> barr
 
          let ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits 
-					final_ptrs final_itbls
+					final_ptrs
 
          -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
          -- objects, since they might get run too early.  Disable this until
@@ -180,11 +179,10 @@ mkInstrArray :: Int -> [Word16]	-> UArray Int Word16
 mkInstrArray n_insns asm_insns
   = listArray (0, n_insns) (fromIntegral n_insns : asm_insns)
 
--- instrs nonptrs ptrs itbls
+-- instrs nonptrs ptrs
 type AsmState = (SizedSeq Word16, 
-                 SizedSeq (Either Word FastString),
-                 SizedSeq BCOPtr, 
-                 SizedSeq Name)
+                 SizedSeq BCONPtr,
+                 SizedSeq BCOPtr)
 
 data SizedSeq a = SizedSeq !Int [a]
 emptySS = SizedSeq 0 []
@@ -307,68 +305,68 @@ mkBits findLabel st proto_insns
 
        instrn :: AsmState -> [Int] -> IO AsmState
        instrn st [] = return st
-       instrn (st_i, st_l, st_p, st_I) (i:is)
+       instrn (st_i, st_l, st_p) (i:is)
           = do st_i' <- addToSS st_i (i2s i)
-               instrn (st_i', st_l, st_p, st_I) is
+               instrn (st_i', st_l, st_p) is
 
-       instr1 (st_i0,st_l0,st_p0,st_I0) i1
+       instr1 (st_i0,st_l0,st_p0) i1
           = do st_i1 <- addToSS st_i0 i1
-               return (st_i1,st_l0,st_p0,st_I0)
+               return (st_i1,st_l0,st_p0)
 
-       instr2 (st_i0,st_l0,st_p0,st_I0) i1 i2
+       instr2 (st_i0,st_l0,st_p0) i1 i2
           = do st_i1 <- addToSS st_i0 (i2s i1)
                st_i2 <- addToSS st_i1 (i2s i2)
-               return (st_i2,st_l0,st_p0,st_I0)
+               return (st_i2,st_l0,st_p0)
 
-       instr3 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3
+       instr3 (st_i0,st_l0,st_p0) i1 i2 i3
           = do st_i1 <- addToSS st_i0 (i2s i1)
                st_i2 <- addToSS st_i1 (i2s i2)
                st_i3 <- addToSS st_i2 (i2s i3)
-               return (st_i3,st_l0,st_p0,st_I0)
+               return (st_i3,st_l0,st_p0)
 
-       instr4 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3 i4
+       instr4 (st_i0,st_l0,st_p0) i1 i2 i3 i4
           = do st_i1 <- addToSS st_i0 (i2s i1)
                st_i2 <- addToSS st_i1 (i2s i2)
                st_i3 <- addToSS st_i2 (i2s i3)
                st_i4 <- addToSS st_i3 (i2s i4)
-               return (st_i4,st_l0,st_p0,st_I0)
+               return (st_i4,st_l0,st_p0)
 
-       float (st_i0,st_l0,st_p0,st_I0) f
+       float (st_i0,st_l0,st_p0) f
           = do let ws = mkLitF f
-               st_l1 <- addListToSS st_l0 (map Left ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+               st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
-       double (st_i0,st_l0,st_p0,st_I0) d
+       double (st_i0,st_l0,st_p0) d
           = do let ws = mkLitD d
-               st_l1 <- addListToSS st_l0 (map Left ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+               st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
-       int (st_i0,st_l0,st_p0,st_I0) i
+       int (st_i0,st_l0,st_p0) i
           = do let ws = mkLitI i
-               st_l1 <- addListToSS st_l0 (map Left ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+               st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
-       int64 (st_i0,st_l0,st_p0,st_I0) i
+       int64 (st_i0,st_l0,st_p0) i
           = do let ws = mkLitI64 i
-               st_l1 <- addListToSS st_l0 (map Left ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+               st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
-       addr (st_i0,st_l0,st_p0,st_I0) a
+       addr (st_i0,st_l0,st_p0) a
           = do let ws = mkLitPtr a
-               st_l1 <- addListToSS st_l0 (map Left ws)
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+               st_l1 <- addListToSS st_l0 (map BCONPtrWord ws)
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
-       litlabel (st_i0,st_l0,st_p0,st_I0) fs
-          = do st_l1 <- addListToSS st_l0 [Right fs]
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
+       litlabel (st_i0,st_l0,st_p0) fs
+          = do st_l1 <- addListToSS st_l0 [BCONPtrLbl fs]
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
-       ptr (st_i0,st_l0,st_p0,st_I0) p
+       ptr (st_i0,st_l0,st_p0) p
           = do st_p1 <- addToSS st_p0 p
-               return (sizeSS st_p0, (st_i0,st_l0,st_p1,st_I0))
+               return (sizeSS st_p0, (st_i0,st_l0,st_p1))
 
-       itbl (st_i0,st_l0,st_p0,st_I0) dcon
-          = do st_I1 <- addToSS st_I0 (getName dcon)
-               return (sizeSS st_I0, (st_i0,st_l0,st_p0,st_I1))
+       itbl (st_i0,st_l0,st_p0) dcon
+          = do st_l1 <- addToSS st_l0 (BCONPtrItbl (getName dcon))
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0))
 
 #ifdef mingw32_TARGET_OS
        literal st (MachLabel fs (Just sz)) 

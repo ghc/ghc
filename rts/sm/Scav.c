@@ -411,7 +411,6 @@ scavenge(step *stp)
 	bco->instrs = (StgArrWords *)evacuate((StgClosure *)bco->instrs);
 	bco->literals = (StgArrWords *)evacuate((StgClosure *)bco->literals);
 	bco->ptrs = (StgMutArrPtrs *)evacuate((StgClosure *)bco->ptrs);
-	bco->itbls = (StgArrWords *)evacuate((StgClosure *)bco->itbls);
 	p += bco_sizeW(bco);
 	break;
     }
@@ -792,7 +791,6 @@ linear_scan:
 	    bco->instrs = (StgArrWords *)evacuate((StgClosure *)bco->instrs);
 	    bco->literals = (StgArrWords *)evacuate((StgClosure *)bco->literals);
 	    bco->ptrs = (StgMutArrPtrs *)evacuate((StgClosure *)bco->ptrs);
-	    bco->itbls = (StgArrWords *)evacuate((StgClosure *)bco->itbls);
 	    break;
 	}
 

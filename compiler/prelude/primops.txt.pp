@@ -1672,7 +1672,7 @@ primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArr# -> ByteArr# -> Array# a -> ByteArr# -> Int# -> ByteArr# -> State# s -> (# State# s, BCO# #)
+   ByteArr# -> ByteArr# -> Array# a -> Int# -> ByteArr# -> State# s -> (# State# s, BCO# #)
    with
    has_side_effects = True
    out_of_line      = True

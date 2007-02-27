@@ -369,7 +369,6 @@ main(int argc, char *argv[])
     closure_field(StgBCO, instrs);
     closure_field(StgBCO, literals);
     closure_field(StgBCO, ptrs);
-    closure_field(StgBCO, itbls);
     closure_field(StgBCO, arity);
     closure_field(StgBCO, size);
     closure_payload(StgBCO, bitmap);

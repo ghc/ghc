@@ -1900,17 +1900,16 @@ newBCOzh_fast
     /* R1 = instrs
        R2 = literals
        R3 = ptrs
-       R4 = itbls
-       R5 = arity
-       R6 = bitmap array
+       R4 = arity
+       R5 = bitmap array
     */
     W_ bco, bitmap_arr, bytes, words;
     
-    bitmap_arr = R6;
+    bitmap_arr = R5;
     words = BYTES_TO_WDS(SIZEOF_StgBCO) + StgArrWords_words(bitmap_arr);
     bytes = WDS(words);
 
-    ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R4_PTR&R6_PTR, newBCOzh_fast );
+    ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R5_PTR, newBCOzh_fast );
 
     bco = Hp - bytes + WDS(1);
     SET_HDR(bco, stg_BCO_info, W_[CCCS]);
@@ -1918,8 +1917,7 @@ newBCOzh_fast
     StgBCO_instrs(bco)     = R1;
     StgBCO_literals(bco)   = R2;
     StgBCO_ptrs(bco)       = R3;
-    StgBCO_itbls(bco)      = R4;
-    StgBCO_arity(bco)      = HALF_W_(R5);
+    StgBCO_arity(bco)      = HALF_W_(R4);
     StgBCO_size(bco)       = HALF_W_(words);
     
     // Copy the arity/bitmap info into the BCO

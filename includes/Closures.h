@@ -232,7 +232,6 @@ typedef struct {
     StgArrWords   *instrs;	/* a pointer to an ArrWords */
     StgArrWords   *literals;	/* a pointer to an ArrWords */
     StgMutArrPtrs *ptrs;	/* a pointer to a  MutArrPtrs */
-    StgArrWords   *itbls;	/* a pointer to an ArrWords */
     StgHalfWord   arity;        /* arity of this BCO */
     StgHalfWord   size;         /* size of this BCO (in words) */
     StgWord       bitmap[FLEXIBLE_ARRAY];  /* an StgLargeBitmap */

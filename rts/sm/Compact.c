@@ -530,7 +530,6 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	thread_(&bco->instrs);
 	thread_(&bco->literals);
 	thread_(&bco->ptrs);
-	thread_(&bco->itbls);
 	return p + bco_sizeW(bco);
     }
 

@@ -324,7 +324,6 @@ checkClosure( StgClosure* p )
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->instrs));
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->literals));
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->ptrs));
-	ASSERT(LOOKS_LIKE_CLOSURE_PTR(bco->itbls));
 	return bco_sizeW(bco);
     }
 

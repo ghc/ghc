@@ -54,7 +54,6 @@
 
 #define BCO_PTR(n)    (W_)ptrs[n]
 #define BCO_LIT(n)    literals[n]
-#define BCO_ITBL(n)   itbls[n]
 
 #define LOAD_STACK_POINTERS					\
     Sp = cap->r.rCurrentTSO->sp;				\
@@ -729,8 +728,6 @@ run_BCO:
 	register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
 	register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
 	register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
-	register StgInfoTable** itbls = (StgInfoTable**)
-	    (&bco->itbls->payload[0]);
 
 #ifdef INTERP_STATS
 	it_lastopc = 0; /* no opcode */
@@ -1018,12 +1015,12 @@ run_BCO:
 	    int i;
 	    int o_itbl         = BCO_NEXT;
 	    int n_words        = BCO_NEXT;
-	    StgInfoTable* itbl = INFO_PTR_TO_STRUCT(BCO_ITBL(o_itbl));
+	    StgInfoTable* itbl = INFO_PTR_TO_STRUCT(BCO_LIT(o_itbl));
 	    int request        = CONSTR_sizeW( itbl->layout.payload.ptrs, 
 					       itbl->layout.payload.nptrs );
 	    StgClosure* con = (StgClosure*)allocate_NONUPD(request);
 	    ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
-	    SET_HDR(con, BCO_ITBL(o_itbl), CCS_SYSTEM/*ToDo*/);
+	    SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), CCS_SYSTEM/*ToDo*/);
 	    for (i = 0; i < n_words; i++) {
 		con->payload[i] = (StgClosure*)Sp[i];
 	    }
