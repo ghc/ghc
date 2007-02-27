@@ -482,8 +482,24 @@ match menv subst e1 (Var v2)
 -- potentially inefficient, because of the calls to substExpr,
 -- but I don't think it'll happen much in pracice.
 
+{-  Cases to think about
+	(let x=y+1 in \x. (x,x))
+		--> let x=y+1 in (\x1. (x1,x1))
+	(\x. let x = y+1 in (x,x))
+		--> let x1 = y+1 in (\x. (x1,x1)
+	(let x=y+1 in (x,x), let x=y-1 in (x,x))
+		--> let x=y+1 in let x1=y-1 in ((x,x),(x1,x1))
+
+Watch out!
+	(let x=y+1 in let z=x+1 in (z,z)
+		--> matches (p,p) but watch out that the use of 
+			x on z's rhs is OK!
+I'm removing the cloning because that makes the above case
+fail, because the inner let looks as if it has locally-bound vars -}
+
 match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
-  | not (any locally_bound bind_fvs)
+  | all freshly_bound bndrs,
+    not (any locally_bound bind_fvs)
   = match (menv { me_env = rn_env' }) 
 	  (tv_subst, id_subst, binds `snocOL` bind')
 	  e1 e2'
@@ -493,6 +509,11 @@ match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
     rhss     = rhssOfBind bind
     bind_fvs = varSetElems (bindFreeVars bind)
     locally_bound x   = inRnEnvR rn_env x
+    freshly_bound x = not (x `rnInScope` rn_env)
+    bind' = bind
+    e2'   = e2
+    rn_env' = extendRnInScopeList rn_env bndrs
+{-
     (rn_env', bndrs') = mapAccumL rnBndrR rn_env bndrs
     s_prs = [(bndr, Var bndr') | (bndr,bndr') <- zip bndrs bndrs', bndr /= bndr']
     subst = mkSubst (rnInScopeSet rn_env) emptyVarEnv (mkVarEnv s_prs)
@@ -501,6 +522,7 @@ match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
     s_bind = case bind of
 		NonRec {} -> NonRec (head bndrs') (head rhss)
 		Rec {}    -> Rec (bndrs' `zip` map (substExpr subst) rhss)
+-}
 
 match menv subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
