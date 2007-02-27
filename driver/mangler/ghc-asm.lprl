@@ -201,7 +201,7 @@ sub init_TARGET_STUFF {
     $T_DOT_WORD     = '\.(long|value|byte|zero)';
     $T_DOT_GLOBAL   = '\.global';
     $T_HDR_literal  = "\.section\t\.rodata\n";
-    $T_HDR_misc     = "\.text\n\t\.align 8\n";
+    $T_HDR_misc     = "\.text\n\t\.align 16\n"; # May contain code; align like 'entry'
     $T_HDR_data     = "\.data\n\t\.align 8\n";
     $T_HDR_rodata   = "\.section\t\.rodata\n\t\.align 8\n";
     $T_HDR_closure  = "\.data\n\t\.align 8\n";
@@ -912,15 +912,42 @@ sub mangle_asm {
 		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, 3[12], \d+, 0\n//;
 		    $p =~ s/^\t\.fframe \d+\n\tadds r12 = -\d+, r12\n//;
 		    $p =~ s/^\t\.save rp, r\d+\n\tmov r\d+ = b0\n//;
-		    $p =~ s/^\t\.(mii|mmi)\n//g;	# bundling is no longer sensible
+
+            # Remove .proc and .body directives
+            $p =~ s/^\t\.proc [a-zA-Z0-9_#.]+\n//;
+            $p =~ s/^\t\.body\n//;
+            # If there's a label, move it to the body
+            if ($p =~ /^[a-zA-Z0-9#.]+:\n/) {
+                $p = $` . $';
+            $r = $& . $r;
+              }
+            # Remove floating-point spill instructions.  This is actually a bad
+            # thing to remove, because we will be putting junk into the floating-point
+            # registers and this will be visible to the caller.
+            # Only fp registers 2-5 and 16-31 may be spilled.
+            if ($p =~ s/^\tstf\.spill \[r1[4-9]\] = f([2-5]|1[6-9]|2[0-9]|30|31)(, [0-9]+)?\n//g) {
+                # Being paranoid, only try to remove these if we saw a spill
+                # operation.
+                $p =~ s/^\tmov r1[4-9] = r12\n//;
+            $p =~ s/^\tadds r1[4-9] = -[0-9]+, r12\n//g;
+                $p =~ s/^\t\.save\.f 0x[0-9a-fA-F]\n//g;
+            }
+
+            $p =~ s/^\tnop\.[mifb]\s+0\n//g; # remove nop instructions
+            $p =~ s/^\t\.(mii|mmi|mfi)\n//g;    # bundling is no longer sensible
 		    $p =~ s/^\t;;\n//g;		# discard stops
 		    $p =~ s/^\t\/\/.*\n//g;	# gcc inserts timings in // comments
 
-		    # GCC 3.3 saves r1 in the prologue, move this to the body
-		    if ($p =~ /^\tmov r\d+ = r1\n/) {
-			  $p = $` . $';
-			  $r = $& . $r;
-		    }
+            # GCC 3.3 saves r1 in the prologue, move this to the body
+            if ($p =~ /^\tmov r\d+ = r1\n/) {
+              $p = $` . $';
+              $r = $& . $r;
+            }
+            # GCC 3.2 saves pr in the prologue, move this to the body
+            if ($p =~ /^\tmov r\d+ = pr\n/) {
+              $p = $` . $';
+              $r = $& . $r;
+            }
 		} elsif ($TargetPlatform =~ /^m68k-/) {
 		    $p =~ s/^\tlink a6,#-?\d.*\n//;
  		    $p =~ s/^\tpea a6@\n\tmovel sp,a6\n//;    
@@ -1042,6 +1069,9 @@ sub mangle_asm {
 	# toss all epilogue stuff; again, paranoidly
 	if ( $c =~ /--- END ---/ ) {
 	    if (($r, $e) = split(/--- END ---/, $c)) {
+        # rtail holds code that is after the epilogue in the assembly-code
+        # layout and should not be filtered as part of the epilogue.
+        $rtail = "";
 		if ($TargetPlatform =~ /^i386-/) {
 		    $e =~ s/^\tret\n//;
 		    $e =~ s/^\tpopl\s+\%edi\n//;
@@ -1051,13 +1081,56 @@ sub mangle_asm {
 		    $e =~ s/^\taddl\s+\$\d+,\s*\%esp\n//;
 		    $e =~ s/^\tsubl\s+\$-\d+,\s*\%esp\n//;
 		} elsif ($TargetPlatform =~ /^ia64-/) {
+            # GCC may have put the function's epilogue code in the _middle_
+            # of the function. We try to detect that here and extract the
+            # code that belongs to the body of the function.  We'll put that
+            # code back after cleaning up the epilogue.
+            # The epilogue is first split into:
+            #     $e,    the epilogue code (up to the return instruction)
+            #     $rtail, the rest of the function body
+            #     $edir,  the directives following the function
+            #             (everything starting with .endp)
+            # The return instruction and endp directive are stripped in the
+            # process.
+            if (!(($e, $rtail) = split(/^\tbr\.ret\.sptk\.many b0\n/, $e))) {
+                die "Epilogue doesn't seem to have one return instruction: $e\n";
+            }
+            if (!(($rtail, $edir) = split(/^\t\.endp [a-zA-Z0-9_#.]+\n/, $rtail))) {
+                die "Epilogue doesn't seem to have one endp directive: $e\n";
+            }
+            # print STDERR "Epilogue: $e\n";
+            # print STDERR "Code tail: $rtail\n";
+            # print STDERR "Directives: $edir\n";
+
+            # If a return value is saved here, move it to the function body
+            if ($e =~ /^\tmov r8 = r14\n/) {
+                $e = $` . $';
+            $r = $r . $&;
+              }
+
+            # Remove floating-point fill instructions.  This is actually a bad
+            # thing to remove, because we will be putting junk into the
+            # floating-point registers and this will be visible to the caller.
+            # Only fp registers 2-5 and 16-31 may be restored.
+            if ($e =~ s/^\tldf\.fill f([2-5]|1[6-9]|2[0-9]|30|31) = \[r1[4-9]\](, [0-9]+)?\n//g) {
+                # Being paranoid, only try to remove this if we saw a fill
+                # operation.
+                $e =~ s/^\tadds r1[4-9] = [0-9]+, r12//g;
+            }
+
+            $e =~ s/^\tnop\.[mifb]\s+0\n//g; # remove nop instructions
+
 		    $e =~ s/^\tmov ar\.pfs = r\d+\n//;
 		    $e =~ s/^\tmov b0 = r\d+\n//;
 		    $e =~ s/^\t\.restore sp\n\tadds r12 = \d+, r12\n//;
-		    $e =~ s/^\tbr\.ret\.sptk\.many b0\n//;
-		    $e =~ s/^\t\.(mii|mmi|mib)\n//g;	# bundling is no longer sensible
-		    $e =~ s/^\t;;\n//g;			# discard stops - stop at end of body is sufficient
-		    $e =~ s/^\t\/\/.*\n//g;		# gcc inserts timings in // comments
+		    #$e =~ s/^\tbr\.ret\.sptk\.many b0\n//; # already removed
+		    $e =~ s/^\t\.(mii|mmi|mfi|mib)\n//g; # bundling is no longer sensible
+		    $e =~ s/^\t;;\n//g; # discard stops - stop at end of body is sufficient
+		    $e =~ s/^\t\/\/.*\n//g; # gcc inserts timings in // comments
+
+            # Tack edir onto the end of rtail.  Some of the directives in
+            # edir are relevant to the next chunk.
+            $rtail .= $edir;
 		} elsif ($TargetPlatform =~ /^m68k-/) {
 		    $e =~ s/^\tunlk a6\n//;
 		    $e =~ s/^\trts\n//;
@@ -1095,7 +1168,7 @@ sub mangle_asm {
 		print STDERR "WARNING: Epilogue junk?: $e\n" if $e =~ /^\t\s*[^\.\s\n]/;
 
 		# glue together what's left
-		$c = $r . $e;
+		$c = $r . $e . $rtail;
 		$c =~ s/\n\t\n/\n/; # junk blank line
 	    }
 	}
@@ -1124,11 +1197,29 @@ sub mangle_asm {
 
 	# IA64: mangle tailcalls into jumps here
 	if ($TargetPlatform =~ /^ia64-/) {
-	    while ($c =~ s/^\tbr\.call\.sptk\.many b0 = (.*)\n(?:^\.L([0-9]*):\n)?(?:\t;;\n)?(?:\tmov r1 = r\d+\n)?(?:\t;;\n)?\t--- TAILCALL ---\n(?:\t;;\n\tbr \.L\d+\n)?/\tbr\.few $1\n/) {
+        # Example of what is mangled:
+        #   br.call.sptk.many b0 = b6
+        #.L211
+        #   ;;
+        #   .mmi
+        #   mov r1 = r32
+        #   ;;
+        #   nop.m 0
+        #   nop.i 0
+        #   ;;
+        #   --- TAILCALL --
+        #   ;;
+        #.L123
+	    while ($c =~ s/^\tbr\.call\.sptk\.many b0 = (.*)\n(?:^\.L([0-9]*):\n)?(?:\t;;\n)?(?:\t\.(?:mii|mmi|mfi|mfb)\n)?(?:\tmov r1 = r\d+\n)?(?:\t;;\n)?(?:\tnop\.[mifb] \d+\n)*\t--- TAILCALL ---\n(?:\t;;\n\tbr \.L\d+\n)?/\tbr\.few $1\n/) {
 		# Eek, the gcc optimiser is getting smarter... if we see a jump to the --- TAILCALL ---
 		# marker then we reapply the substitution at the source sites
 		$c =~ s/^\tbr \.L$2\n/\t--- TAILCALL ---\n/g if ($2);
 	    }
+
+        # Verify that all instances of TAILCALL were processed
+        if ($c =~ /^\t--- TAILCALL ---\n/) {
+          die "Unmangled TAILCALL tokens remain after mangling"
+        }
 	}
 
 	# MIPS: that may leave some gratuitous asm macros around
