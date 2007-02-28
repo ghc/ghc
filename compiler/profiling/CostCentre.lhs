@@ -32,7 +32,7 @@ module CostCentre (
 #include "HsVersions.h"
 
 import Var		( Id )
-import Name		( getOccName, occNameFS )
+import Name
 import Module		( Module )
 import Outputable	
 import FastTypes
@@ -206,9 +206,16 @@ mkUserCC cc_name mod
 
 mkAutoCC :: Id -> Module -> IsCafCC -> CostCentre
 mkAutoCC id mod is_caf
-  = NormalCC { cc_name = occNameFS (getOccName id), cc_mod =  mod,
+  = NormalCC { cc_name = str, cc_mod =  mod,
 	       cc_is_dupd = OriginalCC, cc_is_caf = is_caf
     }
+  where 
+        name = getName id
+        -- beware: we might be making an auto CC for a compiler-generated
+        -- thing (like a CAF when -caf-all is on), so include the uniq.
+        -- See bug #249, tests prof001, prof002
+        str | isSystemName name = mkFastString (showSDoc (ppr name))
+            | otherwise         = occNameFS (getOccName id)
 
 mkAllCafsCC m = AllCafsCC  { cc_mod = m }
 
@@ -359,7 +366,7 @@ pp_caf other   = empty
 ppCostCentreLbl (NoCostCentre)		  = text "NONE_cc"
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
-  = ppr m <> ftext (zEncodeFS n) <> 
+  = ppr m <> char '_' <> ftext (zEncodeFS n) <> 
 	text (case is_caf of { CafCC -> "_CAF"; _ -> "" }) <> text "_cc"
 
 -- This is the name to go in the user-displayed string, 

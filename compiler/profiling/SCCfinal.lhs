@@ -32,7 +32,8 @@ import StgSyn
 import PackageConfig	( PackageId )
 import StaticFlags	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
-import Id		( Id )
+import Id
+import Name
 import Module		( Module )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 #ifdef PROF_DO_BOXING
@@ -128,8 +129,13 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
 	-- Top level CAF without a cost centre attached
 	-- Attach CAF cc (collect if individual CAF ccs)
       = (if opt_AutoSccsOnIndividualCafs 
-		then let cc = mkAutoCC binder mod_name CafCC
+		then let cc = mkAutoCC binder modl CafCC
 			 ccs = mkSingletonCCS cc
+                                -- careful: the binder might be :Main.main,
+                                -- which doesn't belong to module mod_name.
+                                -- bug #249, tests prof001, prof002
+                         modl | Just m <- nameModule_maybe (idName binder) = m
+                              | otherwise = mod_name
 		     in
 		     collectCC  cc  `thenMM_`
 		     collectCCS ccs `thenMM_`
