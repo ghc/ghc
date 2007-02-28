@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------
 -- $Id: primops.txt.pp,v 1.37 2005/11/25 09:46:19 simonmar Exp $
 --
--- Primitive Operations
+-- Primitive Operations and Types
 --
 -----------------------------------------------------------------------
 
@@ -150,6 +150,7 @@ section "Char#"
 	{Operations on 31-bit characters.}
 ------------------------------------------------------------------------
 
+primtype Char#
 
 primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> Bool
 primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> Bool
@@ -171,6 +172,8 @@ primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
 section "Int#"
 	{Operations on native-size integers (30+ bits).}
 ------------------------------------------------------------------------
+
+primtype Int#
 
 primop   IntAddOp    "+#"    Dyadic
    Int# -> Int# -> Int#
@@ -203,7 +206,7 @@ primop   IntMulMayOfloOp  "mulIntMayOflo#"
 
     If in doubt, return non-zero, but do make an effort to create the
     correct answer for small args, since otherwise the performance of
-    (*) :: Integer -> Integer -> Integer will be poor.
+    \texttt{(*) :: Integer -> Integer -> Integer} will be poor.
    }
    with commutable = True
 
@@ -267,6 +270,8 @@ section "Word#"
 	{Operations on native-sized unsigned words (30+ bits).}
 ------------------------------------------------------------------------
 
+primtype Word#
+
 primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
@@ -328,10 +333,12 @@ primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
 #if WORD_SIZE_IN_BITS < 32
 ------------------------------------------------------------------------
 section "Int32#"
-	{Operations on 32-bit integers (Int32\#).  This type is only used
-         if plain Int\# has less than 32 bits.  In any case, the operations
+	{Operations on 32-bit integers ({\tt Int32\#}).  This type is only used
+         if plain {\tt Int\#} has less than 32 bits.  In any case, the operations
 	 are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
+
+primtype Int32#
 
 primop   Int32ToIntegerOp   "int32ToInteger#" GenPrimOp 
    Int32# -> (# Int#, ByteArr# #)
@@ -341,9 +348,11 @@ primop   Int32ToIntegerOp   "int32ToInteger#" GenPrimOp
 ------------------------------------------------------------------------
 section "Word32#"
 	{Operations on 32-bit unsigned words. This type is only used 
-	 if plain Word\# has less than 32 bits. In any case, the operations
+	 if plain {\tt Word\#} has less than 32 bits. In any case, the operations
 	 are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
+
+primtype Word32#
 
 primop   Word32ToIntegerOp   "word32ToInteger#" GenPrimOp
    Word32# -> (# Int#, ByteArr# #)
@@ -357,9 +366,11 @@ primop   Word32ToIntegerOp   "word32ToInteger#" GenPrimOp
 ------------------------------------------------------------------------
 section "Int64#"
 	{Operations on 64-bit unsigned words. This type is only used 
-	 if plain Int\# has less than 64 bits. In any case, the operations
+	 if plain {\tt Int\#} has less than 64 bits. In any case, the operations
 	 are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
+
+primtype Int64#
 
 primop   Int64ToIntegerOp   "int64ToInteger#" GenPrimOp 
    Int64# -> (# Int#, ByteArr# #)
@@ -368,9 +379,11 @@ primop   Int64ToIntegerOp   "int64ToInteger#" GenPrimOp
 ------------------------------------------------------------------------
 section "Word64#"
 	{Operations on 64-bit unsigned words. This type is only used 
-	 if plain Word\# has less than 64 bits. In any case, the operations
+	 if plain {\tt Word\#} has less than 64 bits. In any case, the operations
 	 are not primops; they are implemented (if needed) as ccalls instead.}
 ------------------------------------------------------------------------
+
+primtype Word64#
 
 primop   Word64ToIntegerOp   "word64ToInteger#" GenPrimOp
    Word64# -> (# Int#, ByteArr# #)
@@ -382,8 +395,8 @@ primop   Word64ToIntegerOp   "word64ToInteger#" GenPrimOp
 section "Integer#"
 	{Operations on arbitrary-precision integers. These operations are 
 implemented via the GMP package. An integer is represented as a pair
-consisting of an Int\# representing the number of 'limbs' in use and
-the sign, and a ByteArr\# containing the 'limbs' themselves.  Such pairs
+consisting of an {\tt Int\#} representing the number of 'limbs' in use and
+the sign, and a {\tt ByteArr\#} containing the 'limbs' themselves.  Such pairs
 are returned as unboxed pairs, but must be passed as separate
 components.
 
@@ -415,7 +428,7 @@ primop   IntegerGcdOp   "gcdInteger#" GenPrimOp
 
 primop   IntegerIntGcdOp   "gcdIntegerInt#" GenPrimOp
    Int# -> ByteArr# -> Int# -> Int#
-   {Greatest common divisor, where second argument is an ordinary Int\#.}
+   {Greatest common divisor, where second argument is an ordinary {\tt Int\#}.}
    with out_of_line = True
 
 primop   IntegerDivExactOp   "divExactInteger#" GenPrimOp
@@ -499,6 +512,8 @@ primop   IntegerComplementOp  "complementInteger#" GenPrimOp
 section "Double#"
 	{Operations on double-precision (64 bit) floating-point numbers.}
 ------------------------------------------------------------------------
+
+primtype Double#
 
 primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Bool
 primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Bool
@@ -596,14 +611,16 @@ primop   DoublePowerOp   "**##" Dyadic
 primop   DoubleDecodeOp   "decodeDouble#" GenPrimOp    
    Double# -> (# Int#, Int#, ByteArr# #)
    {Convert to arbitrary-precision integer.
-    First Int\# in result is the exponent; second Int\# and ByteArr\# represent an Integer\# 
-    holding the mantissa.}
+    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArr\#}
+    represent an {\tt Integer\#} holding the mantissa.}
    with out_of_line = True
 
 ------------------------------------------------------------------------
 section "Float#" 
 	{Operations on single-precision (32-bit) floating-point numbers.}
 ------------------------------------------------------------------------
+
+primtype Float#
 
 primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> Bool
 primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> Bool
@@ -697,14 +714,18 @@ primop   Float2DoubleOp   "float2Double#" GenPrimOp  Float# -> Double#
 primop   FloatDecodeOp   "decodeFloat#" GenPrimOp
    Float# -> (# Int#, Int#, ByteArr# #)
    {Convert to arbitrary-precision integer.
-    First Int\# in result is the exponent; second Int\# and ByteArr\# represent an Integer\# 
-    holding the mantissa.}
+    First {\tt Int\#} in result is the exponent; second {\tt Int\#} and {\tt ByteArr\#}
+    represent an {\tt Integer\#} holding the mantissa.}
    with out_of_line = True
 
 ------------------------------------------------------------------------
 section "Arrays"
-	{Operations on Array\#.}
+	{Operations on {\tt Array\#}.}
 ------------------------------------------------------------------------
+
+primtype Array# a
+
+primtype MutArr# s a
 
 primop  NewArrayOp "newArray#" GenPrimOp
    Int# -> a -> State# s -> (# State# s, MutArr# s a #)
@@ -756,7 +777,7 @@ primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Byte Arrays"
-	{Operations on ByteArray\#. A ByteArray\# is a just a region of
+	{Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
          raw memory in the garbage-collected heap, which is not scanned
          for pointers. It carries its own size (in bytes). There are
 	 three sets of operations for accessing byte array contents:
@@ -767,6 +788,10 @@ section "Byte Arrays"
 	 being read or written.}
 
 ------------------------------------------------------------------------
+
+primtype ByteArr#
+
+primtype MutByteArr# s
 
 primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutByteArr# s #)
@@ -967,20 +992,22 @@ primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Addr#"
-	{Addr\# is an arbitrary machine address assumed to point outside
-	 the garbage-collected heap.  
-
-	 NB: {\tt nullAddr\#::Addr\#} is not a primop, but is defined in MkId.lhs.
-	 It is the null address.}
 ------------------------------------------------------------------------
+
+primtype Addr#
+	{ An arbitrary machine address assumed to point outside
+	 the garbage-collected heap. }
+
+pseudoop "nullAddr#" Addr#
+	{ The null address. }
 
 primop	 AddrAddOp "plusAddr#" GenPrimOp Addr# -> Int# -> Addr#
 primop	 AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
-	 {Result is meaningless if two Addr\#s are so far apart that their
-	 difference doesn't fit in an Int\#.}
+	 {Result is meaningless if two {\tt Addr\#}s are so far apart that their
+	 difference doesn't fit in an {\tt Int\#}.}
 primop	 AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
-	 {Return the remainder when the Addr\# arg, treated like an Int\#,
-	  is divided by the Int\# arg.}
+	 {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
+	  is divided by the {\tt Int\#} arg.}
 #if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
 primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
 	{Coerce directly from address to int. Strongly deprecated.}
@@ -1162,25 +1189,28 @@ primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Mutable variables"
-	{Operations on MutVar\#s, which behave like single-element mutable arrays.}
+	{Operations on MutVar\#s.}
 ------------------------------------------------------------------------
+
+primtype MutVar# s a
+	{A {\tt MutVar\#} behaves like a single-element mutable array.}
 
 primop  NewMutVarOp "newMutVar#" GenPrimOp
    a -> State# s -> (# State# s, MutVar# s a #)
-   {Create MutVar\# with specified initial value in specified state thread.}
+   {Create {\tt MutVar\#} with specified initial value in specified state thread.}
    with
    usage       = { mangle NewMutVarOp [mkM, mkP] mkM }
    out_of_line = True
 
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
    MutVar# s a -> State# s -> (# State# s, a #)
-   {Read contents of MutVar\#. Result is not yet evaluated.}
+   {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
    with
    usage = { mangle ReadMutVarOp [mkM, mkP] mkM }
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a -> a -> State# s -> State# s
-   {Write contents of MutVar\#.}
+   {Write contents of {\tt MutVar\#}.}
    with
    usage            = { mangle WriteMutVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
@@ -1253,6 +1283,8 @@ primop  UnblockAsyncExceptionsOp "unblockAsyncExceptions#" GenPrimOp
 section "STM-accessible Mutable Variables"
 ------------------------------------------------------------------------
 
+primtype TVar# s a
+
 primop	AtomicallyOp "atomically#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
    -> State# RealWorld -> (# State# RealWorld, a #)
@@ -1292,14 +1324,14 @@ primop  Check "check#" GenPrimOp
 primop	NewTVarOp "newTVar#" GenPrimOp
        a
     -> State# s -> (# State# s, TVar# s a #)
-   {Create a new Tar\# holding a specified initial value.}
+   {Create a new {\tt TVar\#} holding a specified initial value.}
    with
    out_of_line  = True
 
 primop	ReadTVarOp "readTVar#" GenPrimOp
        TVar# s a
     -> State# s -> (# State# s, a #)
-   {Read contents of TVar\#.  Result is not yet evaluated.}
+   {Read contents of {\tt TVar\#}.  Result is not yet evaluated.}
    with
    out_of_line	= True
 
@@ -1307,7 +1339,7 @@ primop	WriteTVarOp "writeTVar#" GenPrimOp
        TVar# s a
     -> a
     -> State# s -> State# s
-   {Write contents of TVar\#.}
+   {Write contents of {\tt TVar\#}.}
    with
    out_of_line	    = True
    has_side_effects = True
@@ -1318,22 +1350,24 @@ primop  SameTVarOp "sameTVar#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Synchronized Mutable Variables"
-	{Operations on MVar\#s, which are shared mutable variables
-	({\it not} the same as MutVar\#s!). (Note: in a non-concurrent implementation,
-	(MVar\# a) can be represented by (MutVar\# (Maybe a)).)}
+	{Operations on {\tt MVar\#}s. }
 ------------------------------------------------------------------------
 
+primtype MVar# s a
+	{ A shared mutable variable ({\it not} the same as a {\tt MutVar\#}!).
+	(Note: in a non-concurrent implementation, {\tt (MVar\# a)} can be
+	represented by {\tt (MutVar\# (Maybe a))}.) }
 
 primop  NewMVarOp "newMVar#"  GenPrimOp
    State# s -> (# State# s, MVar# s a #)
-   {Create new mvar; initially empty.}
+   {Create new {\tt MVar\#}; initially empty.}
    with
    usage       = { mangle NewMVarOp [mkP] mkR }
    out_of_line = True
 
 primop  TakeMVarOp "takeMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, a #)
-   {If mvar is empty, block until it becomes full.
+   {If {\tt MVar\#} is empty, block until it becomes full.
    Then remove and return its contents, and set it empty.}
    with
    usage            = { mangle TakeMVarOp [mkM, mkP] mkM }
@@ -1342,8 +1376,8 @@ primop  TakeMVarOp "takeMVar#" GenPrimOp
 
 primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int#, a #)
-   {If mvar is empty, immediately return with integer 0 and value undefined.
-   Otherwise, return with integer 1 and contents of mvar, and set mvar empty.}
+   {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
+   Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
    with
    usage            = { mangle TryTakeMVarOp [mkM, mkP] mkM }
    has_side_effects = True
@@ -1351,7 +1385,7 @@ primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
 
 primop  PutMVarOp "putMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> State# s
-   {If mvar is full, block until it becomes empty.
+   {If {\tt MVar\#} is full, block until it becomes empty.
    Then store value arg as its new contents.}
    with
    usage            = { mangle PutMVarOp [mkM, mkM, mkP] mkR }
@@ -1360,8 +1394,8 @@ primop  PutMVarOp "putMVar#" GenPrimOp
 
 primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> (# State# s, Int# #)
-   {If mvar is full, immediately return with integer 0.
-    Otherwise, store value arg as mvar's new contents, and return with integer 1.}
+   {If {\tt MVar\#} is full, immediately return with integer 0.
+    Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
    with
    usage            = { mangle TryPutMVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
@@ -1374,7 +1408,7 @@ primop  SameMVarOp "sameMVar#" GenPrimOp
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int# #)
-   {Return 1 if mvar is empty; 0 otherwise.}
+   {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
    with
    usage = { mangle IsEmptyMVarOp [mkP, mkP] mkM }
    out_of_line = True
@@ -1436,10 +1470,24 @@ primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Concurrency primitives"
-	{(In a non-concurrent implementation, ThreadId\# can be as singleton
-	type, whose (unique) value is returned by myThreadId\#.  The 
-	other operations can be omitted.)}
 ------------------------------------------------------------------------
+
+primtype State# s
+	{ {\tt State#} is the primitive, unlifted type of states.  It has
+	one type parameter, thus {\tt State\# RealWorld}, or {\tt State\# s},
+	where s is a type variable. The only purpose of the type parameter
+	is to keep different state threads separate.  It is represented by
+	nothing at all. }
+
+primtype RealWorld
+	{ {\tt RealWorld} is deeply magical.  It is {\it primitive}, but it is not
+	{\it unlifted} (hence {\tt ptrArg}).  We never manipulate values of type
+	{\tt RealWorld}; it's only used in the type system, to parameterise {\tt State#}. }
+
+primtype ThreadId#
+	{(In a non-concurrent implementation, this can be a singleton
+	type, whose (unique) value is returned by {\tt myThreadId\#}.  The 
+	other operations can be omitted.)}
 
 primop  ForkOp "fork#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
@@ -1488,6 +1536,8 @@ primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
 section "Weak pointers"
 ------------------------------------------------------------------------
 
+primtype Weak# b
+
 -- note that tyvar "o" denotes openAlphaTyVar
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
@@ -1522,6 +1572,10 @@ primop TouchOp "touch#" GenPrimOp
 ------------------------------------------------------------------------
 section "Stable pointers and names"
 ------------------------------------------------------------------------
+
+primtype StablePtr# a
+
+primtype StableName# a
 
 primop  MakeStablePtrOp "makeStablePtr#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
@@ -1661,10 +1715,12 @@ section "Bytecode operations"
 	{Support for the bytecode interpreter and linker.}
 ------------------------------------------------------------------------
 
+primtype BCO#
+   {Primitive bytecode type.}
 
 primop   AddrToHValueOp "addrToHValue#" GenPrimOp
    Addr# -> (# a #)
-   {Convert an Addr\# to a followable type.}
+   {Convert an {\tt Addr\#} to a followable type.}
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    BCO# -> (# a #)
@@ -1687,11 +1743,89 @@ primop  ClosurePayloadOp "closurePayload#" GenPrimOp
    with
    out_of_line = True
 
-------------------------------------------------------------------------
-section "Coercion" 
-	{{\tt unsafeCoerce\# :: a -> b} is not a primop, but is defined in MkId.lhs.}
 
 ------------------------------------------------------------------------
+section "Etc" 
+	{Miscellaneous built-ins}
+------------------------------------------------------------------------
+
+pseudoop   "seq"
+   a -> b -> b
+   { Evaluates its first argument to head normal form, and then returns its second
+	argument as the result. }
+
+pseudoop   "inline"
+   a -> a
+   { The call {\tt(inline f)} arranges that f is inlined, regardless of its size.
+	More precisely, the call {\tt(inline f)} rewrites to the right-hand side of
+	{\tt f}'s definition. This allows the programmer to control inlining from a
+	particular call site rather than the definition site of the function (c.f.
+	{\ttINLINE} pragmas in User's Guide, Section 7.10.3, "INLINE and NOINLINE
+	pragmas").
+
+	This inlining occurs regardless of the argument to the call or the size of
+	{\tt f}'s definition; it is unconditional. The main caveat is that {\tt f}'s
+	definition must be visible to the compiler. That is, {\tt f} must be
+	{\tt let}-bound in the current scope. If no inlining takes place, the
+	{\tt inline} function expands to the identity function in Phase zero; so its
+	use imposes no overhead.
+
+	If the function is defined in another module, GHC only exposes its inlining
+	in the interface file if the function is sufficiently small that it might be
+	inlined by the automatic mechanism. There is currently no way to tell GHC to
+	expose arbitrarily-large functions in the interface file. (This shortcoming
+	is something that could be fixed, with some kind of pragma.) }
+
+pseudoop   "lazy"
+   a -> a
+   { The {\tt lazy} function restrains strictness analysis a little. The call
+	{\tt (lazy e)} means the same as {\tt e}, but {\tt lazy} has a magical
+	property so far as strictness analysis is concerned: it is lazy in its first
+	argument, even though its semantics is strict. After strictness analysis has
+	run, calls to {\tt lazy} are inlined to be the identity function.
+
+	This behaviour is occasionally useful when controlling evaluation order.
+	Notably, {\tt lazy} is used in the library definition of {\tt Control.Parallel.par}:
+
+	>    par :: a -> b -> b
+	>    par x y = case (par# x) of { _ -> lazy y }
+
+	If {\tt lazy} were not lazy, {\tt par} would look strict in {\tt y} which
+	would defeat the whole purpose of {\tt par}.
+
+	Like {\tt seq}, the argument of {\tt lazy} can have an unboxed type. }
+
+primtype Any a
+	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
+	lifted type, and back. 
+
+	  * It is lifted, and hence represented by a pointer
+
+	  * It does not claim to be a {\it data} type, and that's important for
+	    the code generator, because the code gen may {\it enter} a data value
+	    but never enters a function value.  
+
+	It's also used to instantiate un-constrained type variables after type
+	checking.  For example
+
+	>	length Any []
+
+	Annoyingly, we sometimes need {\tt Any}s of other kinds, such as {\tt (* -> *)} etc.
+	This is a bit like tuples.   We define a couple of useful ones here,
+	and make others up on the fly.  If any of these others end up being exported
+	into interface files, we'll get a crash; at least until we add interface-file
+	syntax to support them. }
+
+pseudoop   "unsafeCoerce#"
+   a -> b
+   { The function {\tt unsafeCoerce\#} allows you to side-step the typechecker entirely. That
+	is, it allows you to coerce any type into any other type. If you use this function,
+	you had better get it right, otherwise segmentation faults await. It is generally
+	used when you want to write a program that you know is well-typed, but where Haskell's
+	type system is not expressive enough to prove that it is well typed.
+
+	The argument to {\tt unsafeCoerce\#} can have unboxed types, although extremely bad
+	things will happen if you coerce a boxed type to an unboxed type.  }
 
 
 ------------------------------------------------------------------------

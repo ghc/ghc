@@ -111,53 +111,75 @@ known_args
 -- Code generators -----------------------------------------------
 ------------------------------------------------------------------
 
-gen_hs_source (Info defaults entries)
-   = "module GHC.Prim (\n"
-	    ++ unlines (map (("\t" ++) . hdr) entries)
-            ++ ") where\n\n{-\n"
-	    ++ unlines (map opt defaults) ++ "-}\n"
-            ++ unlines (map ent entries) ++ "\n\n\n"
-     where opt (OptionFalse n) = n ++ " = False"
-           opt (OptionTrue n) = n ++ " = True"
+gen_hs_source (Info defaults entries) =
+	   "-----------------------------------------------------------------------------\n"
+	++ "-- |\n"
+	++ "-- Module      :  GHC.Arr\n"
+	++ "-- \n"
+	++ "-- Maintainer  :  cvs-ghc@haskell.org\n"
+	++ "-- Stability   :  internal\n"
+	++ "-- Portability :  non-portable (GHC extensions)\n"
+	++ "--\n"
+	++ "-- GHC\'s primitive types and operations.\n"
+	++ "--\n" 
+	++ "-----------------------------------------------------------------------------\n"
+	++ "module GHC.Prim (\n"
+	++ unlines (map (("\t" ++) . hdr) entries)
+	++ ") where\n\n{-\n"
+	++ unlines (map opt defaults) ++ "-}\n"
+	++ unlines (map ent entries) ++ "\n\n\n"
+     where opt (OptionFalse n)	  = n ++ " = False"
+           opt (OptionTrue n)	  = n ++ " = True"
 	   opt (OptionString n v) = n ++ " = { " ++ v ++ "}"
 
-	   hdr s@(Section {}) = sec s
-	   hdr o@(PrimOpSpec {}) = wrap (name o) ++ ","
+	   hdr s@(Section {})			 = sec s
+	   hdr (PrimOpSpec { name = n })	 = wrapOp n ++ ","
+	   hdr (PseudoOpSpec { name = n })	 = wrapOp n ++ ","
+	   hdr (PrimTypeSpec { ty = TyApp n _ }) = wrapTy n ++ ","
 
-	   ent s@(Section {}) = ""
-	   ent o@(PrimOpSpec {}) = spec o
+	   ent s@(Section {})	   = ""
+	   ent o@(PrimOpSpec {})   = spec o
+	   ent o@(PrimTypeSpec {}) = spec o
+	   ent o@(PseudoOpSpec {}) = spec o
 
 	   sec s = "\n-- * " ++ escape (title s) ++ "\n"
 			++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s) ++ "\n"
 
 	   spec o = comm ++ decl
-	     where decl = wrap (name o) ++ " :: " ++ pty (ty o)
+	     where decl = case o of
+			PrimOpSpec { name = n, ty = t }	  -> wrapOp n ++ " :: " ++ pty t
+			PseudoOpSpec { name = n, ty = t } -> wrapOp n ++ " :: " ++ pty t
+			PrimTypeSpec { ty = t }	  -> "data " ++ pty t
+
 		   comm = case (desc o) of
 		   	[] -> ""
 			d -> "\n" ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ d)
 
 		   pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
-		   pty t = pbty t
+		   pty t	   = pbty t
 
 		   pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
-		   pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
-		   pbty t = paty t
+		   pbty (TyUTup ts)   = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
+		   pbty t	      = paty t
 
-		   paty (TyVar tv) = tv
-		   paty t = "(" ++ pty t ++ ")"
+		   paty (TyVar tv)	= tv
+		   paty t		= "(" ++ pty t ++ ")"
 
-	   wrap nm | isLower (head nm) = nm
-		   | otherwise = "(" ++ nm ++ ")"
+	   wrapOp nm | isAlpha (head nm) = nm
+		     | otherwise	 = "(" ++ nm ++ ")"
+	   wrapTy nm | isAlpha (head nm) = nm
+		     | otherwise	 = "(" ++ nm ++ ")"
 	   unlatex s = case s of
 	   	'\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
 		'{':'\\':'t':'t':cs -> markup "@" "@" cs
+		'{':'\\':'i':'t':cs -> markup "/" "/" cs
 		c : cs -> c : unlatex cs
 		[] -> []
 	   markup s t cs = s ++ mk (dropWhile isSpace cs)
-	   	where mk "" = t
+	   	where mk ""	   = t
 	              mk ('\n':cs) = ' ' : mk cs
-	              mk ('}':cs) = t ++ unlatex cs
-	              mk (c:cs) = c : mk cs
+	              mk ('}':cs)  = t ++ unlatex cs
+	              mk (c:cs)	   = c : mk cs
 	   escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
 	   	where special = "/'`\"@<"
 
@@ -507,6 +529,13 @@ data Entry
                    cat   :: Category,    -- category
 		   desc  :: String,      -- description
                    opts  :: [Option] }   -- default overrides
+    | PseudoOpSpec { name  :: String,      -- name in prog text
+                     ty    :: Ty,          -- type
+		     desc  :: String,      -- description
+                     opts  :: [Option] }   -- default overrides
+    | PrimTypeSpec { ty    :: Ty,      -- name in prog text
+		     desc  :: String,      -- description
+                     opts  :: [Option] }   -- default overrides
     | Section { title :: String,	 -- section title
 		desc  :: String }        -- description
     deriving Show
@@ -605,6 +634,8 @@ lookup_attrib nm (a:as)
 -- The parser ----------------------------------------------------
 ------------------------------------------------------------------
 
+keywords = [ "section", "primop", "pseudoop", "primtype", "with"]
+
 -- Due to lack of proper lexing facilities, a hack to zap any
 -- leading comments
 pTop :: Parser Info
@@ -614,7 +645,7 @@ pTop = then4 (\_ ds es _ -> Info ds es)
 
 pEntry :: Parser Entry
 pEntry 
-  = alts [pPrimOpSpec, pSection]
+  = alts [pPrimOpSpec, pPrimTypeSpec, pPseudoOpSpec, pSection]
 
 pSection :: Parser Entry
 pSection = then3 (\_ n d -> Section {title = n, desc = d}) 
@@ -638,6 +669,17 @@ pPrimOpSpec
                                            cat = k, desc = d, opts = o } )
            (lit "primop") pConstructor stringLiteral 
            pCategory pType pDesc pOptions
+
+pPrimTypeSpec :: Parser Entry
+pPrimTypeSpec
+   = then4 (\_ t d o -> PrimTypeSpec { ty = t, desc = d, opts = o } )
+           (lit "primtype") pType pDesc pOptions
+
+pPseudoOpSpec :: Parser Entry
+pPseudoOpSpec
+   = then5 (\_ n t d o -> PseudoOpSpec { name = n, ty = t, desc = d,
+					     opts = o } )
+           (lit "pseudoop") stringLiteral pType pDesc pOptions
 
 pOptions :: Parser [Option]
 pOptions = optdef [] (then2 sel22 (lit "with") (many pOption))
@@ -704,7 +746,7 @@ ppT = alts [apply TyVar pTyvar,
             apply (\tc -> TyApp tc []) pTycon
            ]
 
-pTyvar       = sat (`notElem` ["section","primop","with"]) pName
+pTyvar       = sat (`notElem` keywords) pName
 pTycon       = alts [pConstructor, lexeme (string "()")]
 pName        = lexeme (then2 (:) lower (many isIdChar))
 pConstructor = lexeme (then2 (:) upper (many isIdChar))
