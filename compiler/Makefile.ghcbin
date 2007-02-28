@@ -46,5 +46,8 @@ odir=stage$(stage)
 HS_SRCS = main/Main.hs
 HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS))))
 $(odir)/main/Main.o : libHSghc$(_way).a
+SRC_HC_OPTS += -fforce-recomp
+# can't rely on GHC's recompilation checking here, because it won't spot 
+# changes in the ghc package.
 
 include $(TOP)/mk/target.mk
