@@ -261,9 +261,7 @@ printClosure( StgClosure *obj )
     /* Cannot happen -- use default case.
     case RET_BCO:
     case RET_SMALL:
-    case RET_VEC_SMALL:
     case RET_BIG:
-    case RET_VEC_BIG:
     case RET_DYN:
     case RET_FUN:
     */
@@ -576,7 +574,6 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	}
 
 	case RET_SMALL:
-	case RET_VEC_SMALL:
 	    debugBelch("RET_SMALL (%p)\n", info);
 	    bitmap = info->layout.bitmap;
 	    printSmallBitmap(spBottom, sp+1, 
@@ -595,7 +592,6 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	}
 
 	case RET_BIG:
-	case RET_VEC_BIG:
 	    barf("todo");
 
 	case RET_FUN:
@@ -682,9 +678,7 @@ static char *closure_type_names[] = {
     "IND_STATIC",
     "RET_BCO",
     "RET_SMALL",
-    "RET_VEC_SMALL",
     "RET_BIG",
-    "RET_VEC_BIG",
     "RET_DYN",
     "RET_FUN",
     "UPDATE_FRAME",

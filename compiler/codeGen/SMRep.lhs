@@ -33,7 +33,7 @@ module SMRep (
 	profHdrSize, thunkHdrSize,
 	smRepClosureType, smRepClosureTypeInt,
 
-	rET_SMALL, rET_VEC_SMALL, rET_BIG, rET_VEC_BIG
+	rET_SMALL, rET_BIG
     ) where
 
 #include "HsVersions.h"
@@ -345,8 +345,6 @@ smRepClosureTypeInt rep = panic "smRepClosuretypeint"
 
 -- We export these ones
 rET_SMALL     = (RET_SMALL     :: Int)
-rET_VEC_SMALL = (RET_VEC_SMALL :: Int)
 rET_BIG       = (RET_BIG       :: Int)
-rET_VEC_BIG   = (RET_VEC_BIG   :: Int)
 \end{code}
 

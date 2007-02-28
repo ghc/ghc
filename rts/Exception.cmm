@@ -267,41 +267,9 @@ killThreadzh_fast
    -------------------------------------------------------------------------- */
 
 #ifdef REG_R1
-#define CATCH_FRAME_ENTRY_TEMPLATE(label,ret) 	\
-   label					\
-   {						\
-      Sp = Sp + SIZEOF_StgCatchFrame; 		\
-      jump ret;					\
-   }
-#else
-#define CATCH_FRAME_ENTRY_TEMPLATE(label,ret) 	\
-   label					\
-   {						\
-      W_ rval;					\
-      rval = Sp(0);				\
-      Sp = Sp + SIZEOF_StgCatchFrame;		\
-      Sp(0) = rval;				\
-      jump ret;					\
-   }
-#endif
-
-#ifdef REG_R1
 #define SP_OFF 0
 #else
 #define SP_OFF 1
-#endif
-
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_0_ret,%RET_VEC(Sp(SP_OFF),0))
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_1_ret,%RET_VEC(Sp(SP_OFF),1))
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_2_ret,%RET_VEC(Sp(SP_OFF),2))
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_3_ret,%RET_VEC(Sp(SP_OFF),3))
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_4_ret,%RET_VEC(Sp(SP_OFF),4))
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_5_ret,%RET_VEC(Sp(SP_OFF),5))
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_6_ret,%RET_VEC(Sp(SP_OFF),6))
-CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
-
-#if MAX_VECTORED_RTN > 8
-#error MAX_VECTORED_RTN has changed: please modify stg_catch_frame too.
 #endif
 
 #if defined(PROFILING)
@@ -319,16 +287,21 @@ CATCH_FRAME_ENTRY_TEMPLATE(stg_catch_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
 
 INFO_TABLE_RET(stg_catch_frame,
 	       CATCH_FRAME_WORDS, CATCH_FRAME_BITMAP,
-	       CATCH_FRAME,
-	       stg_catch_frame_0_ret,
-	       stg_catch_frame_1_ret,
-	       stg_catch_frame_2_ret,
-	       stg_catch_frame_3_ret,
-	       stg_catch_frame_4_ret,
-	       stg_catch_frame_5_ret,
-	       stg_catch_frame_6_ret,
-	       stg_catch_frame_7_ret)
-CATCH_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
+	       CATCH_FRAME)
+#ifdef REG_R1
+   {
+      Sp = Sp + SIZEOF_StgCatchFrame;
+      jump Sp(SP_OFF);
+   }
+#else
+   {
+      W_ rval;
+      rval = Sp(0);
+      Sp = Sp + SIZEOF_StgCatchFrame;
+      Sp(0) = rval;
+      jump Sp(SP_OFF);
+   }
+#endif
 
 /* -----------------------------------------------------------------------------
  * The catch infotable

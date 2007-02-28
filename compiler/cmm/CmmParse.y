@@ -230,12 +230,8 @@ info	:: { ExtFCode (CLabel, [CmmLit],[CmmLit]) }
 		-- selector, closure type, description, type
 		{ basicInfo $3 (mkIntCLit (fromIntegral $5)) 0 $7 $9 $11 }
 
-	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' INT ',' INT maybe_vec ')'
-		{ retInfo $3 $5 $7 $9 $10 }
-
-maybe_vec :: { [CmmLit] }
-	: {- empty -}			{ [] }
-	| ',' NAME maybe_vec		{ CmmLabel (mkRtsCodeLabelFS $2) : $3 }
+	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' INT ',' INT ')'
+		{ retInfo $3 $5 $7 $9 }
 
 body	:: { ExtCode }
 	: {- empty -}			{ return () }
@@ -473,8 +469,7 @@ exprMacros = listToUFM [
   ( FSLIT("GET_FUN_INFO"), \ [x] -> funInfoTable (closureInfoPtr x) ),
   ( FSLIT("INFO_TYPE"),    \ [x] -> infoTableClosureType x ),
   ( FSLIT("INFO_PTRS"),    \ [x] -> infoTablePtrs x ),
-  ( FSLIT("INFO_NPTRS"),   \ [x] -> infoTableNonPtrs x ),
-  ( FSLIT("RET_VEC"),      \ [info, conZ] -> retVec info conZ )
+  ( FSLIT("INFO_NPTRS"),   \ [x] -> infoTableNonPtrs x )
   ]
 
 -- we understand a subset of C-- primitives:
@@ -709,11 +704,11 @@ forkLabelledCodeEC ec = do
   stmts <- getCgStmtsEC ec
   code (forkCgStmts stmts)
 
-retInfo name size live_bits cl_type vector = do
+retInfo name size live_bits cl_type = do
   let liveness = smallLiveness (fromIntegral size) (fromIntegral live_bits)
       info_lbl = mkRtsRetInfoLabelFS name
       (info1,info2) = mkRetInfoTable info_lbl liveness NoC_SRT 
-				(fromIntegral cl_type) vector
+				(fromIntegral cl_type)
   return (info_lbl, info1, info2)
 
 stdInfo name ptrs nptrs srt_bitmap cl_type desc_str ty_str =

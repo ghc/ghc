@@ -47,7 +47,6 @@ import TcType
 import TysPrim
 import TysWiredIn
 import Util
-import Constants
 import Outputable
 import FastString
 import OccName
@@ -1212,7 +1211,9 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
 		`nlHsFunTy` 
 		nlHsTyVar (getRdrName intPrimTyCon)
 
-    lots_of_constructors = tyConFamilySize tycon > mAX_FAMILY_SIZE_FOR_VEC_RETURNS
+    lots_of_constructors = tyConFamilySize tycon > 8
+                                -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
+                                -- but we don't do vectored returns any more.
 
     mk_stuff :: DataCon -> ([LPat RdrName], LHsExpr RdrName)
     mk_stuff con = ([nlWildConPat con], 

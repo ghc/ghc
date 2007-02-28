@@ -240,9 +240,6 @@ PrintTickyInfo(void)
   fprintf(tf,"%7ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
 	tot_returns_of_new,
 	PC(INTAVG(tot_returns_of_new,tot_returns)));
-  fprintf(tf,"%7ld (%5.1f%%) vectored [the rest unvectored]\n",
-	VEC_RETURN_ctr,
-	PC(INTAVG(VEC_RETURN_ctr,tot_returns)));
 
   /* krc: comment out some of this stuff temporarily */
 
@@ -259,10 +256,6 @@ PrintTickyInfo(void)
   for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
 				    PC(INTAVG(RET_UNBOXED_TUP_hst[i],
 					      RET_UNBOXED_TUP_ctr))); }
-  fprintf(tf, "\n");
-  fprintf(tf, "\nRET_VEC_RETURN : %7ld: ", VEC_RETURN_ctr);
-  for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
-				PC(INTAVG(RET_VEC_RETURN_hst[i],VEC_RETURN_ctr))); }
   fprintf(tf, "\n");
   */
 
@@ -519,7 +512,6 @@ PrintTickyInfo(void)
   PR_CTR(RET_NEW_ctr);
   PR_CTR(RET_OLD_ctr);
   PR_CTR(RET_UNBOXED_TUP_ctr);
-  PR_CTR(VEC_RETURN_ctr);
 
   /* krc: put off till later... */
 #if FALSE
@@ -550,15 +542,6 @@ PrintTickyInfo(void)
   PR_HST(RET_UNBOXED_TUP_hst,6);
   PR_HST(RET_UNBOXED_TUP_hst,7);
   PR_HST(RET_UNBOXED_TUP_hst,8);
-  PR_HST(RET_VEC_RETURN_hst,0);
-  PR_HST(RET_VEC_RETURN_hst,1);
-  PR_HST(RET_VEC_RETURN_hst,2);
-  PR_HST(RET_VEC_RETURN_hst,3);
-  PR_HST(RET_VEC_RETURN_hst,4);
-  PR_HST(RET_VEC_RETURN_hst,5);
-  PR_HST(RET_VEC_RETURN_hst,6);
-  PR_HST(RET_VEC_RETURN_hst,7);
-  PR_HST(RET_VEC_RETURN_hst,8);
 #endif /* FALSE */
 
   PR_CTR(UPDF_OMITTED_ctr);

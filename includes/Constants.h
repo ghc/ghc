@@ -76,16 +76,6 @@
 #define MAX_LONG_REG    1
 
 /* -----------------------------------------------------------------------------
- *  Maximum number of constructors in a data type for direct-returns. 
- *
- *   NB. There are various places that assume the value of this
- *   constant, such as the polymorphic return frames for updates
- *   (stg_upd_frame_info) and catch frames (stg_catch_frame_info).
- * -------------------------------------------------------------------------- */
-
-#define MAX_VECTORED_RTN 8
-
-/* -----------------------------------------------------------------------------
    Semi-Tagging constants
 
    Old Comments about this stuff:

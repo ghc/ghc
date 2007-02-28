@@ -295,7 +295,7 @@ cgReturnDataCon con amodes
   = ASSERT( amodes `lengthIs` dataConRepArity con )
     do	{ EndOfBlockInfo _ sequel <- getEndOfBlockInfo
 	; case sequel of
-	    CaseAlts _ (Just (alts, deflt_lbl)) bndr _ 
+	    CaseAlts _ (Just (alts, deflt_lbl)) bndr
 	      ->    -- Ho! We know the constructor so we can
 		    -- go straight to the right alternative
 		 case assocMaybe alts (dataConTagZ con) of {
@@ -317,7 +317,7 @@ cgReturnDataCon con amodes
     
 	    other_sequel	-- The usual case
 	      | isUnboxedTupleCon con -> returnUnboxedTuple amodes
-              | otherwise -> build_it_then (emitKnownConReturnCode con)
+              | otherwise -> build_it_then emitReturnInstr
 	}
   where
     jump_to lbl = stmtC (CmmJump (CmmLit lbl) [])
@@ -434,7 +434,7 @@ cgDataCon data_con
 	    body_code = do { 	
 			-- NB: We don't set CC when entering data (WDP 94/06)
 			     tickyReturnOldCon (length arg_things)
-			   ; performReturn (emitKnownConReturnCode data_con) }
+			   ; performReturn emitReturnInstr }
 				-- noStmts: Ptr to thing already in Node
 
 	; whenC (not (isNullaryRepDataCon data_con))
@@ -442,6 +442,4 @@ cgDataCon data_con
 
 		-- Dynamic-Closure first, to reduce forward references
 	; emit_info static_cl_info tickyEnterStaticCon }
-
-  where
 \end{code}

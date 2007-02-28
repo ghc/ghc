@@ -266,7 +266,6 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	case STOP_FRAME:
 	case CATCH_FRAME:
 	case RET_SMALL:
-	case RET_VEC_SMALL:
 	    bitmap = BITMAP_BITS(info->i.layout.bitmap);
 	    size   = BITMAP_SIZE(info->i.layout.bitmap);
 	    p++;
@@ -298,7 +297,6 @@ thread_stack(StgPtr p, StgPtr stack_end)
 
 	    // large bitmap (> 32 entries, or 64 on a 64-bit machine) 
 	case RET_BIG:
-	case RET_VEC_BIG:
 	    p++;
 	    size = GET_LARGE_BITMAP(&info->i)->size;
 	    thread_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size);

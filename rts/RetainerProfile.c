@@ -618,9 +618,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case RET_DYN:
     case RET_BCO:
     case RET_SMALL:
-    case RET_VEC_SMALL:
     case RET_BIG:
-    case RET_VEC_BIG:
 	// invalid objects
     case IND:
     case BLOCKED_FETCH:
@@ -984,9 +982,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case STOP_FRAME:
 	case RET_BCO:
 	case RET_SMALL:
-	case RET_VEC_SMALL:
 	case RET_BIG:
-	case RET_VEC_BIG:
 	    // invalid objects
 	case IND:
 	case BLOCKED_FETCH:
@@ -1150,9 +1146,7 @@ isRetainer( StgClosure *c )
     case RET_DYN:
     case RET_BCO:
     case RET_SMALL:
-    case RET_VEC_SMALL:
     case RET_BIG:
-    case RET_VEC_BIG:
 	// other cases
     case IND:
     case BLOCKED_FETCH:
@@ -1387,7 +1381,6 @@ retainStack( StgClosure *c, retainer c_child_r,
 	case CATCH_RETRY_FRAME:
 	case ATOMICALLY_FRAME:
 	case RET_SMALL:
-	case RET_VEC_SMALL:
 	    bitmap = BITMAP_BITS(info->i.layout.bitmap);
 	    size   = BITMAP_SIZE(info->i.layout.bitmap);
 	    p++;
@@ -1412,7 +1405,6 @@ retainStack( StgClosure *c, retainer c_child_r,
 
 	    // large bitmap (> 32 entries, or > 64 on a 64-bit machine) 
 	case RET_BIG:
-	case RET_VEC_BIG:
 	    size = GET_LARGE_BITMAP(&info->i)->size;
 	    p++;
 	    retain_large_bitmap(p, GET_LARGE_BITMAP(&info->i),

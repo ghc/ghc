@@ -137,9 +137,7 @@ static char *type_names[] = {
 
     , "RET_BCO"
     , "RET_SMALL"
-    , "RET_VEC_SMALL"
     , "RET_BIG"
-    , "RET_VEC_BIG"
     , "RET_DYN"
     , "UPDATE_FRAME"
     , "CATCH_FRAME"

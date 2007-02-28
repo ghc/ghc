@@ -29,7 +29,6 @@ import CmmUtils
 import CLabel
 import ClosureInfo
 import CostCentre
-import Id
 import Var
 import SMRep
 import BasicTypes
@@ -169,7 +168,7 @@ cgLetNoEscapeClosure
 
 			-- Ignore the label that comes back from
 			-- mkRetDirectTarget.  It must be conjured up elswhere
-		    ; emitDirectReturnTarget (idName bndr) abs_c srt
+		    ; emitReturnTarget (idName bndr) abs_c srt
 		    ; return () })
 
 	; returnFC (bndr, letNoEscapeIdInfo bndr vSp lf_info) }

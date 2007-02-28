@@ -141,7 +141,7 @@ cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty)
 					-- so save in a temp if non-trivial
 	; this_pkg <- getThisPackage
 	; stmtC (CmmAssign nodeReg (tagToClosure this_pkg tycon amode'))
-	; performReturn (emitAlgReturnCode tycon amode') }
+	; performReturn emitReturnInstr }
    where
 	  -- If you're reading this code in the attempt to figure
 	  -- out why the compiler panic'ed here, it is probably because
@@ -157,12 +157,12 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
 
   | ReturnsPrim VoidRep <- result_info
 	= do cgPrimOp [] primop args emptyVarSet
-	     performReturn emitDirectReturnInstr
+	     performReturn emitReturnInstr
 
   | ReturnsPrim rep <- result_info
 	= do cgPrimOp [dataReturnConvPrim (primRepToCgRep rep)] 
 			primop args emptyVarSet
-	     performReturn emitDirectReturnInstr
+	     performReturn emitReturnInstr
 
   | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
 	= do (reps, regs, _hints) <- newUnboxedTupleRegs res_ty
@@ -175,7 +175,7 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
 	     this_pkg <- getThisPackage
 	     cgPrimOp [tag_reg] primop args emptyVarSet
 	     stmtC (CmmAssign nodeReg (tagToClosure this_pkg tycon (CmmReg tag_reg)))
-	     performReturn (emitAlgReturnCode tycon (CmmReg tag_reg))
+	     performReturn emitReturnInstr
   where
 	result_info = getPrimOpResultInfo primop
 \end{code}

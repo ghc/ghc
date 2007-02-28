@@ -23,15 +23,6 @@ stg_interp_constr_entry
     jump %ENTRY_CODE(Sp(0));
 }
 
-stg_interp_constr1_entry { jump %RET_VEC(Sp(0),0); }
-stg_interp_constr2_entry { jump %RET_VEC(Sp(0),1); }
-stg_interp_constr3_entry { jump %RET_VEC(Sp(0),2); }
-stg_interp_constr4_entry { jump %RET_VEC(Sp(0),3); }
-stg_interp_constr5_entry { jump %RET_VEC(Sp(0),4); }
-stg_interp_constr6_entry { jump %RET_VEC(Sp(0),5); }
-stg_interp_constr7_entry { jump %RET_VEC(Sp(0),6); }
-stg_interp_constr8_entry { jump %RET_VEC(Sp(0),7); }
-
 /* Some info tables to be used when compiled code returns a value to
    the interpreter, i.e. the interpreter pushes one of these onto the
    stack before entering a value.  What the code does is to
@@ -68,25 +59,13 @@ stg_interp_constr8_entry { jump %RET_VEC(Sp(0),7); }
 
 INFO_TABLE_RET( stg_ctoi_R1p, 
 		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO,
-		RET_LBL(stg_ctoi_R1p),
-		RET_LBL(stg_ctoi_R1p),
-		RET_LBL(stg_ctoi_R1p),
-		RET_LBL(stg_ctoi_R1p),
-		RET_LBL(stg_ctoi_R1p),
-		RET_LBL(stg_ctoi_R1p),
-		RET_LBL(stg_ctoi_R1p),
-		RET_LBL(stg_ctoi_R1p))
+		RET_BCO)
 {
     Sp_adj(-2);
     Sp(1) = R1;
     Sp(0) = stg_enter_info;
     jump stg_yield_to_interpreter;
 }
-
-#if MAX_VECTORED_RTN != 8
-#error MAX_VECTORED_RTN has changed: please modify stg_ctoi_R1p too.
-#endif
 
 /*
  * When the returned value is a pointer, but unlifted, in R1 ... 
@@ -194,10 +173,10 @@ INFO_TABLE_FUN( stg_BCO, 4, 0, BCO, "BCO", "BCO", ARG_BCO )
 /* ----------------------------------------------------------------------------
    Info tables for indirections.
 
-   SPECIALISED INDIRECTIONS: we have a specialised indirection for each
-   kind of return (direct, vectored 0-7), so that we can avoid entering
-   the object when we know what kind of return it will do.  The update
-   code (Updates.hc) updates objects with the appropriate kind of
+   SPECIALISED INDIRECTIONS: we have a specialised indirection for direct returns,
+   so that we can avoid entering
+   the object when we know it points directly to a value.  The update
+   code (Updates.cmm) updates objects with the appropriate kind of
    indirection.  We only do this for young-gen indirections.
    ------------------------------------------------------------------------- */
 
@@ -209,24 +188,13 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     jump %GET_ENTRY(R1);
 }
 
-#define IND_SPEC(label,ret) \
-INFO_TABLE(label,1,0,IND,"IND","IND") \
-{						\
-    TICK_ENT_DYN_IND();	/* tick */		\
-    R1 = StgInd_indirectee(R1);			\
-    TICK_ENT_VIA_NODE();			\
-    jump ret;					\
+INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
+{
+    TICK_ENT_DYN_IND();	/* tick */
+    R1 = StgInd_indirectee(R1);
+    TICK_ENT_VIA_NODE();
+    jump %ENTRY_CODE(Sp(0));
 }
-
-IND_SPEC(stg_IND_direct, %ENTRY_CODE(Sp(0)))
-IND_SPEC(stg_IND_0, %RET_VEC(Sp(0),0))
-IND_SPEC(stg_IND_1, %RET_VEC(Sp(0),1))
-IND_SPEC(stg_IND_2, %RET_VEC(Sp(0),2))
-IND_SPEC(stg_IND_3, %RET_VEC(Sp(0),3))
-IND_SPEC(stg_IND_4, %RET_VEC(Sp(0),4))
-IND_SPEC(stg_IND_5, %RET_VEC(Sp(0),5))
-IND_SPEC(stg_IND_6, %RET_VEC(Sp(0),6))
-IND_SPEC(stg_IND_7, %RET_VEC(Sp(0),7))
 
 INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
 {

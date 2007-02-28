@@ -56,11 +56,6 @@ mAX_CHARLIKE = MAX_CHARLIKE
 A section of code-generator-related MAGIC CONSTANTS.
 
 \begin{code}
-mAX_FAMILY_SIZE_FOR_VEC_RETURNS = (MAX_VECTORED_RTN::Int)  -- pretty arbitrary
--- If you change this, you may need to change runtimes/standard/Update.lhc
-\end{code}
-
-\begin{code}
 mAX_Vanilla_REG	= (MAX_VANILLA_REG :: Int)
 mAX_Float_REG	= (MAX_FLOAT_REG :: Int)
 mAX_Double_REG	= (MAX_DOUBLE_REG :: Int)

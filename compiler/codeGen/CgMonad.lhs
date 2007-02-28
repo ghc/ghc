@@ -170,7 +170,6 @@ data Sequel
 		     -- case this might be the label of a return vector
 	  SemiTaggingStuff
 	  Id	      -- The case binder, only used to see if it's dead
-	  Bool	      -- True <=> polymorphic, push a SEQ frame too
 
 type SemiTaggingStuff
   = Maybe			-- Maybe[1] we don't have any semi-tagging stuff...

@@ -970,22 +970,6 @@ isCurrentThreadBoundzh_fast
 
 // Catch retry frame ------------------------------------------------------------
 
-#define CATCH_RETRY_FRAME_ERROR(label) \
-  label { foreign "C" barf("catch_retry_frame incorrectly entered!"); }
-
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_0_ret)
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_1_ret)
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_2_ret)
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_3_ret)
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_4_ret)
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_5_ret)
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_6_ret)
-CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_7_ret)
-
-#if MAX_VECTORED_RTN > 8
-#error MAX_VECTORED_RTN has changed: please modify stg_catch_retry_frame too.
-#endif
-
 #if defined(PROFILING)
 #define CATCH_RETRY_FRAME_BITMAP 7
 #define CATCH_RETRY_FRAME_WORDS  5
@@ -996,15 +980,7 @@ CATCH_RETRY_FRAME_ERROR(stg_catch_retry_frame_7_ret)
 
 INFO_TABLE_RET(stg_catch_retry_frame,
 	       CATCH_RETRY_FRAME_WORDS, CATCH_RETRY_FRAME_BITMAP,
-	       CATCH_RETRY_FRAME,
-	       stg_catch_retry_frame_0_ret,
-	       stg_catch_retry_frame_1_ret,
-	       stg_catch_retry_frame_2_ret,
-	       stg_catch_retry_frame_3_ret,
-	       stg_catch_retry_frame_4_ret,
-	       stg_catch_retry_frame_5_ret,
-	       stg_catch_retry_frame_6_ret,
-	       stg_catch_retry_frame_7_ret)
+	       CATCH_RETRY_FRAME)
 {
    W_ r, frame, trec, outer;
    IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
@@ -1034,24 +1010,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
 }
 
 
-// Atomically frame -------------------------------------------------------------
-
-
-#define ATOMICALLY_FRAME_ERROR(label) \
-  label { foreign "C" barf("atomically_frame incorrectly entered!"); }
-
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_0_ret)
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_1_ret)
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_2_ret)
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_3_ret)
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_4_ret)
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_5_ret)
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_6_ret)
-ATOMICALLY_FRAME_ERROR(stg_atomically_frame_7_ret)
-
-#if MAX_VECTORED_RTN > 8
-#error MAX_VECTORED_RTN has changed: please modify stg_atomically_frame too.
-#endif
+// Atomically frame ------------------------------------------------------------
 
 #if defined(PROFILING)
 #define ATOMICALLY_FRAME_BITMAP 3
@@ -1061,18 +1020,9 @@ ATOMICALLY_FRAME_ERROR(stg_atomically_frame_7_ret)
 #define ATOMICALLY_FRAME_WORDS  2
 #endif
 
-
 INFO_TABLE_RET(stg_atomically_frame,
 	       ATOMICALLY_FRAME_WORDS, ATOMICALLY_FRAME_BITMAP,
-	       ATOMICALLY_FRAME,
-	       stg_atomically_frame_0_ret,
-	       stg_atomically_frame_1_ret,
-	       stg_atomically_frame_2_ret,
-	       stg_atomically_frame_3_ret,
-	       stg_atomically_frame_4_ret,
-	       stg_atomically_frame_5_ret,
-	       stg_atomically_frame_6_ret,
-	       stg_atomically_frame_7_ret)
+	       ATOMICALLY_FRAME)
 {
   W_ frame, trec, valid, next_invariant, q, outer;
   IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
@@ -1134,15 +1084,7 @@ INFO_TABLE_RET(stg_atomically_frame,
 
 INFO_TABLE_RET(stg_atomically_waiting_frame,
 	       ATOMICALLY_FRAME_WORDS, ATOMICALLY_FRAME_BITMAP,
-	       ATOMICALLY_FRAME,
-	       stg_atomically_frame_0_ret,
-	       stg_atomically_frame_1_ret,
-	       stg_atomically_frame_2_ret,
-	       stg_atomically_frame_3_ret,
-	       stg_atomically_frame_4_ret,
-	       stg_atomically_frame_5_ret,
-	       stg_atomically_frame_6_ret,
-	       stg_atomically_frame_7_ret)
+	       ATOMICALLY_FRAME)
 {
   W_ frame, trec, valid;
   IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
@@ -1169,48 +1111,10 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
 
 // STM catch frame --------------------------------------------------------------
 
-#define CATCH_STM_FRAME_ENTRY_TEMPLATE(label,ret)          					\
-   label                                                   					\
-   {                                                       					\
-      IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )  					\
-      W_ r, frame, trec, outer; 								\
-      frame = Sp; 										\
-      trec = StgTSO_trec(CurrentTSO);								\
-      "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];				\
-      r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];		\
-      if (r != 0) {										\
-        /* Commit succeeded */									\
-        StgTSO_trec(CurrentTSO) = outer;							\
-        Sp = Sp + SIZEOF_StgCatchSTMFrame;                   					\
-        IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)             					\
-        jump ret;                                            					\
-      } else {											\
-        /* Commit failed */									\
-        W_ new_trec;										\
-        "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];	\
-        StgTSO_trec(CurrentTSO) = new_trec;							\
-        R1 = StgCatchSTMFrame_code(frame);							\
-        jump stg_ap_v_fast;									\
-      }												\
-   }
-
 #ifdef REG_R1
 #define SP_OFF 0
 #else
 #define SP_OFF 1
-#endif
-
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_0_ret,%RET_VEC(Sp(SP_OFF),0))
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_1_ret,%RET_VEC(Sp(SP_OFF),1))
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_2_ret,%RET_VEC(Sp(SP_OFF),2))
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_3_ret,%RET_VEC(Sp(SP_OFF),3))
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_4_ret,%RET_VEC(Sp(SP_OFF),4))
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_5_ret,%RET_VEC(Sp(SP_OFF),5))
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_6_ret,%RET_VEC(Sp(SP_OFF),6))
-CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
-
-#if MAX_VECTORED_RTN > 8
-#error MAX_VECTORED_RTN has changed: please modify stg_catch_stm_frame too.
 #endif
 
 #if defined(PROFILING)
@@ -1228,16 +1132,29 @@ CATCH_STM_FRAME_ENTRY_TEMPLATE(stg_catch_stm_frame_7_ret,%RET_VEC(Sp(SP_OFF),7))
 
 INFO_TABLE_RET(stg_catch_stm_frame,
 	       CATCH_STM_FRAME_WORDS, CATCH_STM_FRAME_BITMAP,
-	       CATCH_STM_FRAME,
-	       stg_catch_stm_frame_0_ret,
-	       stg_catch_stm_frame_1_ret,
-	       stg_catch_stm_frame_2_ret,
-	       stg_catch_stm_frame_3_ret,
-	       stg_catch_stm_frame_4_ret,
-	       stg_catch_stm_frame_5_ret,
-	       stg_catch_stm_frame_6_ret,
-	       stg_catch_stm_frame_7_ret)
-CATCH_STM_FRAME_ENTRY_TEMPLATE(,%ENTRY_CODE(Sp(SP_OFF)))
+	       CATCH_STM_FRAME)
+   {
+      IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
+      W_ r, frame, trec, outer;
+      frame = Sp;
+      trec = StgTSO_trec(CurrentTSO);
+      "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+      r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
+      if (r != 0) {
+        /* Commit succeeded */
+        StgTSO_trec(CurrentTSO) = outer;
+        Sp = Sp + SIZEOF_StgCatchSTMFrame;
+        IF_NOT_REG_R1(Sp_adj(-1); Sp(0) = rval;)
+        jump Sp(SP_OFF);
+      } else {
+        /* Commit failed */
+        W_ new_trec;
+        "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
+        StgTSO_trec(CurrentTSO) = new_trec;
+        R1 = StgCatchSTMFrame_code(frame);
+        jump stg_ap_v_fast;
+      }
+   }
 
 
 // Primop definition ------------------------------------------------------------

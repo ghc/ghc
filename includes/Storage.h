@@ -458,7 +458,6 @@ INLINE_HEADER StgWord stack_frame_sizeW( StgClosure *frame )
 	return sizeofW(StgRetFun) + ((StgRetFun *)frame)->size;
 
     case RET_BIG:
-    case RET_VEC_BIG:
 	return 1 + GET_LARGE_BITMAP(&info->i)->size;
 
     case RET_BCO:

@@ -8,7 +8,6 @@
 module CgTailCall (
 	cgTailCall, performTailCall,
 	performReturn, performPrimReturn,
-	emitKnownConReturnCode, emitAlgReturnCode,
 	returnUnboxedTuple, ccallReturnUnboxedTuple,
 	pushUnboxedTuple,
 	tailCallPrimOp,
@@ -33,9 +32,7 @@ import CmmUtils
 import CLabel
 import Type
 import Id
-import DataCon
 import StgSyn
-import TyCon
 import PrimOp
 import Outputable
 
@@ -124,14 +121,14 @@ performTailCall fun_info arg_amodes pending_assts
 	    -- As with any return, Node must point to it.
 	    ReturnIt -> do
 		{ emitSimultaneously (node_asst `plusStmts` pending_assts)
-		; doFinalJump sp False emitDirectReturnInstr }
+		; doFinalJump sp False emitReturnInstr }
     
 	    -- A real constructor.  Don't bother entering it, 
 	    -- just do the right sort of return instead.
 	    -- As with any return, Node must point to it.
 	    ReturnCon con -> do
 		{ emitSimultaneously (node_asst `plusStmts` pending_assts)
-		; doFinalJump sp False (emitKnownConReturnCode con) }
+		; doFinalJump sp False emitReturnInstr }
 
 	    JumpToIt lbl -> do
 		{ emitSimultaneously (opt_node_asst `plusStmts` pending_assts)
@@ -218,17 +215,17 @@ doFinalJump final_sp is_let_no_escape jump_code
 	    -- and do the jump
 	; jump_code }
 
--- -----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
 -- A general return (just a special case of doFinalJump, above)
 
-performReturn :: Code		-- The code to execute to actually do the return
+performReturn :: Code	-- The code to execute to actually do the return
 	      -> Code
 
 performReturn finish_code
   = do  { EndOfBlockInfo args_sp sequel <- getEndOfBlockInfo
 	; doFinalJump args_sp False{-not a LNE-} finish_code }
 
--- -----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
 -- Primitive Returns
 -- Just load the return value into the right register, and return.
 
@@ -237,33 +234,9 @@ performPrimReturn :: CgRep -> CmmExpr	-- The thing to return
 performPrimReturn rep amode
   =  do { whenC (not (isVoidArg rep))
 		(stmtC (CmmAssign ret_reg amode))
-	; performReturn emitDirectReturnInstr }
+	; performReturn emitReturnInstr }
   where
     ret_reg = dataReturnConvPrim rep
-
--- -----------------------------------------------------------------------------
--- Algebraic constructor returns
-
--- Constructor is built on the heap; Node is set.
--- All that remains is to do the right sort of jump.
-
-emitKnownConReturnCode :: DataCon -> Code
-emitKnownConReturnCode con
-  = emitAlgReturnCode (dataConTyCon con)
-		      (CmmLit (mkIntCLit (dataConTagZ con)))
-			-- emitAlgReturnCode requires zero-indexed tag
-
-emitAlgReturnCode :: TyCon -> CmmExpr -> Code
--- emitAlgReturnCode is used both by emitKnownConReturnCode,
--- and by by PrimOps that return enumerated types (i.e.
--- all the comparison operators).
-emitAlgReturnCode tycon tag
- =  do	{ case ctrlReturnConvAlg tycon of
-	    VectoredReturn fam_sz -> do { tickyVectoredReturn fam_sz
-	 			     	; emitVectoredReturnInstr tag }
-	    UnvectoredReturn _    -> emitDirectReturnInstr 
-	}
-
 
 -- ---------------------------------------------------------------------------
 -- Unboxed tuple returns
@@ -285,7 +258,7 @@ returnUnboxedTuple amodes
 	; tickyUnboxedTupleReturn (length amodes)
 	; (final_sp, assts) <- pushUnboxedTuple args_sp amodes
 	; emitSimultaneously assts
-	; doFinalJump final_sp False{-not a LNE-} emitDirectReturnInstr }
+	; doFinalJump final_sp False{-not a LNE-} emitReturnInstr }
 
 pushUnboxedTuple :: VirtualSpOffset		-- Sp at which to start pushing
 		 -> [(CgRep, CmmExpr)]		-- amodes of the components
@@ -375,18 +348,9 @@ tailCallPrimOp op args
 
 pushReturnAddress :: EndOfBlockInfo -> Code
 
-pushReturnAddress (EndOfBlockInfo args_sp sequel@(CaseAlts lbl _ _ False))
+pushReturnAddress (EndOfBlockInfo args_sp sequel@(CaseAlts lbl _ _))
   = do	{ sp_rel <- getSpRelOffset args_sp
 	; stmtC (CmmStore sp_rel (mkLblExpr lbl)) }
-
--- For a polymorphic case, we have two return addresses to push: the case
--- return, and stg_seq_frame_info which turns a possible vectored return
--- into a direct one.
-pushReturnAddress (EndOfBlockInfo args_sp sequel@(CaseAlts lbl _ _ True))
-  = do	{ sp_rel <- getSpRelOffset (args_sp-1)
-	; stmtC (CmmStore sp_rel (mkLblExpr lbl))
-	; sp_rel <- getSpRelOffset args_sp
-	; stmtC (CmmStore sp_rel (CmmLit (CmmLabel mkSeqInfoLabel))) }
 
 pushReturnAddress _ = nopC
 

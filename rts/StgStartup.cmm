@@ -34,11 +34,6 @@
 
 /* -----------------------------------------------------------------------------
    Returning from the STG world.
-
-   This is a polymorphic return address, meaning that any old constructor
-   can be returned, we don't care (actually, it's probably going to be
-   an IOok constructor, which will indirect through the vector table
-   slot 0).
    -------------------------------------------------------------------------- */
 
 #if defined(PROFILING)
@@ -49,18 +44,8 @@
 #define STOP_THREAD_WORDS  0
 #endif
 
-/* A polymorhpic return address, where all the vector slots point to the
-   direct entry point. */
 INFO_TABLE_RET( stg_stop_thread, STOP_THREAD_WORDS, STOP_THREAD_BITMAP,
-		STOP_FRAME, 
-		RET_LBL(stg_stop_thread),
-		RET_LBL(stg_stop_thread),
-		RET_LBL(stg_stop_thread),
-		RET_LBL(stg_stop_thread),
-		RET_LBL(stg_stop_thread),
-		RET_LBL(stg_stop_thread),
-		RET_LBL(stg_stop_thread),
-		RET_LBL(stg_stop_thread) )
+		STOP_FRAME)
 {
     /* 
        The final exit.

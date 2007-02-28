@@ -197,7 +197,7 @@ cgCase (StgApp fun args)
 			(do { deAllocStackTop retAddrSizeW
 			    ; cgEvalAlts maybe_cc_slot bndr srt alt_type alts })
 
-	; setEndOfBlockInfo (maybeReserveSeqFrame alt_type scrut_eob_info)
+	; setEndOfBlockInfo scrut_eob_info
 			    (performTailCall fun_info arg_amodes save_assts) }
 \end{code}
 
@@ -234,8 +234,7 @@ cgCase expr live_in_whole_case live_in_alts bndr srt alt_type alts
 			   (do	{ deAllocStackTop retAddrSizeW
 				; cgEvalAlts maybe_cc_slot bndr srt alt_type alts })
 
-	; setEndOfBlockInfo (maybeReserveSeqFrame alt_type scrut_eob_info)
-			    (cgExpr expr)
+	; setEndOfBlockInfo scrut_eob_info (cgExpr expr)
     }
 \end{code}
 
@@ -264,13 +263,6 @@ different.  So we pick a free stack slot and save CCCS in it.  One
 consequence of this is that activation records on the stack don't
 follow the layout of closures when we're profiling.  The CCS could be
 anywhere within the record).
-
-\begin{code}
-maybeReserveSeqFrame PolyAlt (EndOfBlockInfo args_sp (CaseAlts amode stuff bndr _))
-   = EndOfBlockInfo (args_sp + retAddrSizeW) (CaseAlts amode stuff bndr True)
-maybeReserveSeqFrame other scrut_eob_info = scrut_eob_info
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -380,8 +372,8 @@ cgEvalAlts cc_slot bndr srt alt_type@(PrimAlt tycon) alts
 		; restoreCurrentCostCentre cc_slot True
 		; cgPrimAlts GCMayHappen alt_type reg alts }
 
-	; lbl <- emitDirectReturnTarget (idName bndr) abs_c srt
-	; returnFC (CaseAlts lbl Nothing bndr False) }
+	; lbl <- emitReturnTarget (idName bndr) abs_c srt
+	; returnFC (CaseAlts lbl Nothing bndr) }
 
 cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
   =	-- Unboxed tuple case
@@ -392,7 +384,7 @@ cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
     ASSERT2( case con of { DataAlt _ -> True; other -> False },
 	     text "cgEvalAlts: dodgy case of unboxed tuple type" )
     do	{ 	-- forkAbsC for the RHS, so that the envt is
-		-- not changed for the emitDirectReturn call
+		-- not changed for the emitReturn call
 	  abs_c <- forkProc $ do 
 		{ (live_regs, ptrs, nptrs, _) <- bindUnboxedTupleComponents args
 			-- Restore the CC *after* binding the tuple components, 
@@ -402,8 +394,8 @@ cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
 			-- and finally the code for the alternative
 		; unbxTupleHeapCheck live_regs ptrs nptrs noStmts
 				     (cgExpr rhs) }
-	; lbl <- emitDirectReturnTarget (idName bndr) abs_c srt
-	; returnFC (CaseAlts lbl Nothing bndr False) }
+	; lbl <- emitReturnTarget (idName bndr) abs_c srt
+	; returnFC (CaseAlts lbl Nothing bndr) }
 
 cgEvalAlts cc_slot bndr srt alt_type alts
   = 	-- Algebraic and polymorphic case
@@ -422,13 +414,13 @@ cgEvalAlts cc_slot bndr srt alt_type alts
 	; (alts, mb_deflt) <- cgAlgAlts GCMayHappen cc_slot alt_type alts
 
 	; (lbl, branches) <- emitAlgReturnTarget (idName bndr) 
-				alts mb_deflt srt ret_conv
+				alts mb_deflt srt fam_sz
 
-	; returnFC (CaseAlts lbl branches bndr False) }
+	; returnFC (CaseAlts lbl branches bndr) }
   where
-    ret_conv = case alt_type of
-    		AlgAlt tc -> ctrlReturnConvAlg tc
-    		PolyAlt   -> UnvectoredReturn 0
+    fam_sz = case alt_type of
+    		AlgAlt tc -> tyConFamilySize tc
+    		PolyAlt   -> 0
 \end{code}
 
 

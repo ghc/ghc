@@ -11,8 +11,8 @@ module CgInfoTbls (
 	emitInfoTableAndCode,
 	dataConTagZ,
 	getSRTInfo,
-	emitDirectReturnTarget, emitAlgReturnTarget,
-	emitDirectReturnInstr, emitVectoredReturnInstr,
+	emitReturnTarget, emitAlgReturnTarget,
+	emitReturnInstr,
 	mkRetInfoTable,
 	mkStdInfoTable,
 	stdInfoTableSizeB,
@@ -21,8 +21,7 @@ module CgInfoTbls (
 	getConstrTag,
 	infoTable, infoTableClosureType,
 	infoTablePtrs, infoTableNonPtrs,
-	funInfoTable,
-	retVec
+	funInfoTable
   ) where
 
 
@@ -43,10 +42,8 @@ import StgSyn
 import Name
 import DataCon
 import Unique
-import DynFlags
 import StaticFlags
 
-import ListSetOps
 import Maybes
 import Constants
 
@@ -173,7 +170,6 @@ mkFunGenInfoExtraBits fun_type arity srt_label liveness slow_entry
 --
 -- Tables next to code:
 --
---			<reversed vector table>
 --			<srt slot>
 --			<standard info table>
 --  	ret-addr -->	<entry code (if any)>
@@ -183,69 +179,25 @@ mkFunGenInfoExtraBits fun_type arity srt_label liveness slow_entry
 --	ret-addr -->	<ptr to entry code>
 --			<standard info table>
 --			<srt slot>
---			<forward vector table>
 --
---  * The vector table is only present for vectored returns
---
---  * The SRT slot is only there if either
---	(a) there is SRT info to record, OR
---	(b) if the return is vectored
---   The latter (b) is necessary so that the vector is in a
---   predictable place
-
-vectorSlot :: CmmExpr -> CmmExpr -> CmmExpr
--- Get the vector slot from the info pointer
-vectorSlot info_amode zero_indexed_tag
-  | tablesNextToCode 
-  = cmmOffsetExprW (cmmOffsetW info_amode (- (stdInfoTableSizeW + 2)))
-		   (cmmNegate zero_indexed_tag)
-	-- The "2" is one for the SRT slot, and one more 
-	-- to get to the first word of the vector
-
-  | otherwise 
-  = cmmOffsetExprW (cmmOffsetW info_amode (stdInfoTableSizeW + 2))
-		   zero_indexed_tag
-	-- The "2" is one for the entry-code slot and one for the SRT slot
-
-retVec :: CmmExpr -> CmmExpr -> CmmExpr
--- Get a return vector from the info pointer
-retVec info_amode zero_indexed_tag
-  = let slot = vectorSlot info_amode zero_indexed_tag
-        table_slot = CmmLoad slot wordRep
-#if defined(x86_64_TARGET_ARCH)
-        offset_slot = CmmMachOp (MO_S_Conv I32 I64) [CmmLoad slot I32]
-	-- offsets are 32-bits on x86-64, due to the inability of
-	-- the tools to handle 64-bit PC-relative relocations.  See also
-	-- PprMach.pprDataItem, and InfoTables.h:OFFSET_FIELD().
-#else
-	offset_slot = table_slot
-#endif
-    in if tablesNextToCode
-           then CmmMachOp (MO_Add wordRep) [offset_slot, info_amode]
-           else table_slot
+--  * The SRT slot is only there is SRT info to record
 
 emitReturnTarget
    :: Name
    -> CgStmts			-- The direct-return code (if any)
-				--    	(empty for vectored returns)
-   -> [CmmLit]			-- Vector of return points 
-				-- 	(empty for non-vectored returns)
    -> SRT
    -> FCode CLabel
-emitReturnTarget name stmts vector srt
+emitReturnTarget name stmts srt
   = do	{ live_slots <- getLiveStackSlots
 	; liveness   <- buildContLiveness name live_slots
 	; srt_info   <- getSRTInfo name srt
 
 	; let
-	      cl_type = case (null vector, isBigLiveness liveness) of
-	 		 (True,  True)  -> rET_BIG
- 			 (True,  False) -> rET_SMALL
- 			 (False, True)  -> rET_VEC_BIG
-	 		 (False, False) -> rET_VEC_SMALL
+	      cl_type | isBigLiveness liveness = rET_BIG
+                      | otherwise              = rET_SMALL
  
 	      (std_info, extra_bits) = 
-		   mkRetInfoTable info_lbl liveness srt_info cl_type vector
+		   mkRetInfoTable info_lbl liveness srt_info cl_type
 
 	; blks <- cgStmtsToBlocks stmts
 	; emitInfoTableAndCode info_lbl std_info extra_bits args blks
@@ -261,111 +213,42 @@ mkRetInfoTable
   -> Liveness		-- liveness
   -> C_SRT		-- SRT Info
   -> Int		-- type (eg. rET_SMALL)
-  -> [CmmLit]		-- vector
   -> ([CmmLit],[CmmLit])
-mkRetInfoTable info_lbl liveness srt_info cl_type vector
-  =  (std_info, extra_bits)
+mkRetInfoTable info_lbl liveness srt_info cl_type
+  =  (std_info, srt_slot)
   where
 	(srt_label, srt_len) = srtLabelAndLength srt_info info_lbl
  
-	srt_slot | need_srt  = [srt_label]
-	         | otherwise = []
-
-	need_srt = needsSRT srt_info || not (null vector)
-		-- If there's a vector table then we must allocate
-		-- an SRT slot, so that the vector table is at a 
-		-- known offset from the info pointer
+	srt_slot | needsSRT srt_info = [srt_label]
+	         | otherwise         = []
  
 	liveness_lit = makeRelativeRefTo info_lbl $ mkLivenessCLit liveness
 	std_info = mkStdInfoTable zeroCLit zeroCLit cl_type srt_len liveness_lit
-        extra_bits = srt_slot ++ map (makeRelativeRefTo info_lbl) vector
-
-
-emitDirectReturnTarget
-   :: Name
-   -> CgStmts		-- The direct-return code
-   -> SRT
-   -> FCode CLabel
-emitDirectReturnTarget name code srt
-  = emitReturnTarget name code [] srt
 
 emitAlgReturnTarget
 	:: Name				-- Just for its unique
 	-> [(ConTagZ, CgStmts)]		-- Tagged branches
 	-> Maybe CgStmts		-- Default branch (if any)
 	-> SRT				-- Continuation's SRT
-	-> CtrlReturnConvention
+	-> Int                          -- family size
 	-> FCode (CLabel, SemiTaggingStuff)
 
-emitAlgReturnTarget name branches mb_deflt srt ret_conv
-  = case ret_conv of
-      UnvectoredReturn fam_sz -> do	
-	{ blks <- getCgStmts $
+emitAlgReturnTarget name branches mb_deflt srt fam_sz
+  = do  { blks <- getCgStmts $
 		    emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
 		-- NB: tag_expr is zero-based
-	; lbl <- emitDirectReturnTarget name blks srt 
+	; lbl <- emitReturnTarget name blks srt 
 	; return (lbl, Nothing) }
 		-- Nothing: the internal branches in the switch don't have
 		-- global labels, so we can't use them at the 'call site'
-
-      VectoredReturn fam_sz -> do
-	{ let tagged_lbls = zip (map fst branches) $
-	                    map (CmmLabel . mkAltLabel uniq . fst) branches
-	      deflt_lbl | isJust mb_deflt = CmmLabel $ mkDefaultLabel uniq
-	                | otherwise       = mkIntCLit 0
-	; let vector = [ assocDefault deflt_lbl tagged_lbls i 
-		       | i <- [0..fam_sz-1]]
-	; lbl <- emitReturnTarget name noCgStmts vector srt 
-	; mapFCs emit_alt branches
-	; emit_deflt mb_deflt
-	; return (lbl, Just (tagged_lbls, deflt_lbl)) }
   where
-    uniq = getUnique name 
     tag_expr = getConstrTag (CmmReg nodeReg)
 
-    emit_alt :: (Int, CgStmts) -> FCode (Int, CmmLit)
-	-- Emit the code for the alternative as a top-level
-	-- code block returning a label for it
-    emit_alt (tag, stmts) = do	 { let lbl = mkAltLabel uniq tag
-				 ; blks <- cgStmtsToBlocks stmts
-				 ; emitProc [] lbl [] blks
-				 ; return (tag, CmmLabel lbl) }
-
-    emit_deflt (Just stmts) = do { let lbl = mkDefaultLabel uniq
-				 ; blks <- cgStmtsToBlocks stmts
-				 ; emitProc [] lbl [] blks
-				 ; return (CmmLabel lbl) }
-    emit_deflt Nothing = return (mkIntCLit 0)
-		-- Nothing case: the simplifier might have eliminated a case
-		-- 		 so we may have e.g. case xs of 
-		--					 [] -> e
-		-- In that situation the default should never be taken, 
-		-- so we just use a NULL pointer
-
 --------------------------------
-emitDirectReturnInstr :: Code
-emitDirectReturnInstr 
+emitReturnInstr :: Code
+emitReturnInstr 
   = do 	{ info_amode <- getSequelAmode
 	; stmtC (CmmJump (entryCode info_amode) []) }
-
-emitVectoredReturnInstr :: CmmExpr	-- _Zero-indexed_ constructor tag
-			-> Code
-emitVectoredReturnInstr zero_indexed_tag
-  = do	{ info_amode <- getSequelAmode
-		-- HACK! assign info_amode to a temp, because retVec
-		-- uses it twice and the NCG doesn't have any CSE yet.
-		-- Only do this for the NCG, because gcc is too stupid
-		-- to optimise away the extra tmp (grrr).
-	; dflags <- getDynFlags
-	; x <- if hscTarget dflags == HscAsm
-		   then do z <- newTemp wordRep
-			   stmtC (CmmAssign z info_amode)
-			   return (CmmReg z)
-		   else
-			return info_amode
-	; let target = retVec x zero_indexed_tag
-	; stmtC (CmmJump target []) }
-
 
 -------------------------------------------------------------------------
 --

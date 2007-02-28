@@ -39,7 +39,6 @@
 RTS_RET_INFO(stg_upd_frame_info);
 RTS_RET_INFO(stg_marked_upd_frame_info);
 RTS_RET_INFO(stg_noupd_frame_info);
-RTS_RET_INFO(stg_seq_frame_info);
 RTS_RET_INFO(stg_catch_frame_info);
 RTS_RET_INFO(stg_catch_retry_frame_info);
 RTS_RET_INFO(stg_atomically_frame_info);
@@ -48,18 +47,9 @@ RTS_RET_INFO(stg_catch_stm_frame_info);
 
 RTS_ENTRY(stg_upd_frame_ret);
 RTS_ENTRY(stg_marked_upd_frame_ret);
-RTS_ENTRY(stg_seq_frame_ret);
 
 /* Entry code for constructors created by the bytecode interpreter */
 RTS_FUN(stg_interp_constr_entry);
-RTS_FUN(stg_interp_constr1_entry);
-RTS_FUN(stg_interp_constr2_entry);
-RTS_FUN(stg_interp_constr3_entry);
-RTS_FUN(stg_interp_constr4_entry);
-RTS_FUN(stg_interp_constr5_entry);
-RTS_FUN(stg_interp_constr6_entry);
-RTS_FUN(stg_interp_constr7_entry);
-RTS_FUN(stg_interp_constr8_entry);
 
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
    or a VoidRep to the interpreter. */
@@ -84,14 +74,6 @@ RTS_ENTRY(stg_apply_interp_ret);
 
 RTS_INFO(stg_IND_info);
 RTS_INFO(stg_IND_direct_info);
-RTS_INFO(stg_IND_0_info);
-RTS_INFO(stg_IND_1_info);
-RTS_INFO(stg_IND_2_info);
-RTS_INFO(stg_IND_3_info);
-RTS_INFO(stg_IND_4_info);
-RTS_INFO(stg_IND_5_info);
-RTS_INFO(stg_IND_6_info);
-RTS_INFO(stg_IND_7_info);
 RTS_INFO(stg_IND_STATIC_info);
 RTS_INFO(stg_IND_PERM_info);
 RTS_INFO(stg_IND_OLDGEN_info);
@@ -149,14 +131,6 @@ RTS_INFO(stg_NO_TREC_info);
 
 RTS_ENTRY(stg_IND_entry);
 RTS_ENTRY(stg_IND_direct_entry);
-RTS_ENTRY(stg_IND_0_entry);
-RTS_ENTRY(stg_IND_1_entry);
-RTS_ENTRY(stg_IND_2_entry);
-RTS_ENTRY(stg_IND_3_entry);
-RTS_ENTRY(stg_IND_4_entry);
-RTS_ENTRY(stg_IND_5_entry);
-RTS_ENTRY(stg_IND_6_entry);
-RTS_ENTRY(stg_IND_7_entry);
 RTS_ENTRY(stg_IND_STATIC_entry);
 RTS_ENTRY(stg_IND_PERM_entry);
 RTS_ENTRY(stg_IND_OLDGEN_entry);

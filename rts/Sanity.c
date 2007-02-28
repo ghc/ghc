@@ -137,7 +137,6 @@ checkStackFrame( StgPtr c )
       // small bitmap cases (<= 32 entries)
     case STOP_FRAME:
     case RET_SMALL:
-    case RET_VEC_SMALL:
 	size = BITMAP_SIZE(info->i.layout.bitmap);
 	checkSmallBitmap((StgPtr)c + 1, 
 			 BITMAP_BITS(info->i.layout.bitmap), size);
@@ -153,7 +152,6 @@ checkStackFrame( StgPtr c )
     }
 
     case RET_BIG: // large bitmap (> 32 entries)
-    case RET_VEC_BIG:
 	size = GET_LARGE_BITMAP(&info->i)->size;
 	checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
 	return 1 + size;
@@ -361,9 +359,7 @@ checkClosure( StgClosure* p )
 
     case RET_BCO:
     case RET_SMALL:
-    case RET_VEC_SMALL:
     case RET_BIG:
-    case RET_VEC_BIG:
     case RET_DYN:
     case UPDATE_FRAME:
     case STOP_FRAME:

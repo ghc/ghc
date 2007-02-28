@@ -15,20 +15,6 @@
 #include "Updates.h"
 #include "StgLdvProf.h"
 
-/*
-  The update frame return address must be *polymorphic*, that means
-  we have to cope with both vectored and non-vectored returns.  This
-  is done by putting the return vector right before the info table, and
-  having a standard direct return address after the info table (pointed
-  to by the return address itself, as usual).
-
-  Each entry in the vector table points to a specialised entry code fragment
-  that knows how to return after doing the update.  It would be possible to
-  use a single generic piece of code that simply entered the return value
-  to return, but it's quicker this way.  The direct return code of course
-  just does another direct return when it's finished.
-*/
-
 /* on entry to the update code
    (1) R1 points to the closure being returned
    (2) Sp points to the update frame
@@ -43,8 +29,7 @@
    code), since we don't mind duplicating this jump.
 */
 
-#define UPD_FRAME_ENTRY_TEMPLATE(label,ind_info,ret)			\
-        label								\
+#define UPD_FRAME_ENTRY_TEMPLATE					\
 	{								\
           W_ updatee;							\
 									\
@@ -56,26 +41,8 @@
 	  /* ToDo: it might be a PAP, so we should check... */  	\
 	  TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));  \
 									\
-	  UPD_SPEC_IND(updatee, ind_info, R1, jump (ret));		\
+	  UPD_SPEC_IND(updatee, stg_IND_direct_info, R1, jump %ENTRY_CODE(Sp(0))); \
 	}
-
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_0_ret,stg_IND_0_info,%RET_VEC(Sp(0),0))
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_1_ret,stg_IND_1_info,%RET_VEC(Sp(0),1))
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_2_ret,stg_IND_2_info,%RET_VEC(Sp(0),2))
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_3_ret,stg_IND_3_info,%RET_VEC(Sp(0),3))
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_4_ret,stg_IND_4_info,%RET_VEC(Sp(0),4))
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_5_ret,stg_IND_5_info,%RET_VEC(Sp(0),5))
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_6_ret,stg_IND_6_info,%RET_VEC(Sp(0),6))
-UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_7_ret,stg_IND_7_info,%RET_VEC(Sp(0),7))
-
-#if MAX_VECTORED_RTN > 8
-#error MAX_VECTORED_RTN has changed: please modify stg_upd_frame too.
-#endif
-
-/*
-  Make sure this table is big enough to handle the maximum vectored
-  return size!
-  */
 
 #if defined(PROFILING)
 #define UPD_FRAME_BITMAP 3
@@ -91,64 +58,10 @@ UPD_FRAME_ENTRY_TEMPLATE(stg_upd_frame_7_ret,stg_IND_7_info,%RET_VEC(Sp(0),7))
  */
 
 INFO_TABLE_RET( stg_upd_frame, 
-	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME,
-	    stg_upd_frame_0_ret,
-	    stg_upd_frame_1_ret,
-	    stg_upd_frame_2_ret,
-	    stg_upd_frame_3_ret,
-	    stg_upd_frame_4_ret,
-	    stg_upd_frame_5_ret,
-	    stg_upd_frame_6_ret,
-	    stg_upd_frame_7_ret
-	    )
-UPD_FRAME_ENTRY_TEMPLATE(,stg_IND_direct_info,%ENTRY_CODE(Sp(0)))
+	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME)
+UPD_FRAME_ENTRY_TEMPLATE
 
 
 INFO_TABLE_RET( stg_marked_upd_frame, 
-	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME,
-	    stg_upd_frame_0_ret,
-	    stg_upd_frame_1_ret,
-	    stg_upd_frame_2_ret,
-	    stg_upd_frame_3_ret,
-	    stg_upd_frame_4_ret,
-	    stg_upd_frame_5_ret,
-	    stg_upd_frame_6_ret,
-	    stg_upd_frame_7_ret
-	    )
-UPD_FRAME_ENTRY_TEMPLATE(,stg_IND_direct_info,%ENTRY_CODE(Sp(0)))
-
-/*-----------------------------------------------------------------------------
-  Seq frames 
-
-  We don't have a primitive seq# operator: it is just a 'case'
-  expression whose scrutinee has either a polymorphic or function type
-  (constructor types can be handled by normal 'case' expressions).
-
-  To handle a polymorphic/function typed seq, we push a SEQ frame on
-  the stack.  This is a polymorphic activation record that just pops
-  itself and returns (in a non-vectored way) when entered.  The
-  purpose of the SEQ frame is to avoid having to make a polymorphic return
-  point for each polymorphic case expression.  
-
-  Another way of looking at it: the SEQ frame turns a vectored return
-  into a direct one.
-  -------------------------------------------------------------------------- */
-
-#if MAX_VECTORED_RTN > 8
-#error MAX_VECTORED_RTN has changed: please modify stg_seq_frame too.
-#endif
-
-INFO_TABLE_RET( stg_seq_frame, 0/* words */, 0/* bitmap */, RET_SMALL,
-	RET_LBL(stg_seq_frame), /* 0 */
-	RET_LBL(stg_seq_frame), /* 1 */
-	RET_LBL(stg_seq_frame), /* 2 */
-	RET_LBL(stg_seq_frame), /* 3 */
-	RET_LBL(stg_seq_frame), /* 4 */
-	RET_LBL(stg_seq_frame), /* 5 */
-	RET_LBL(stg_seq_frame), /* 6 */
-	RET_LBL(stg_seq_frame)  /* 7 */
-	)
-{
-   Sp_adj(1);
-   jump %ENTRY_CODE(Sp(0));
-}
+	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME)
+UPD_FRAME_ENTRY_TEMPLATE

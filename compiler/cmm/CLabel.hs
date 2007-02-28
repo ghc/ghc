@@ -48,7 +48,6 @@ module CLabel (
 	mkSplitMarkerLabel,
 	mkDirty_MUT_VAR_Label,
 	mkUpdInfoLabel,
-	mkSeqInfoLabel,
 	mkIndStaticInfoLabel,
         mkMainCapabilityLabel,
 	mkMAP_FROZEN_infoLabel,
@@ -358,7 +357,6 @@ mkPlainModuleInitLabel this_pkg mod
 mkSplitMarkerLabel		= RtsLabel (RtsCode SLIT("__stg_split_marker"))
 mkDirty_MUT_VAR_Label		= RtsLabel (RtsCode SLIT("dirty_MUT_VAR"))
 mkUpdInfoLabel			= RtsLabel (RtsInfo SLIT("stg_upd_frame"))
-mkSeqInfoLabel			= RtsLabel (RtsInfo SLIT("stg_seq_frame"))
 mkIndStaticInfoLabel		= RtsLabel (RtsInfo SLIT("stg_IND_STATIC"))
 mkMainCapabilityLabel		= RtsLabel (RtsData SLIT("MainCapability"))
 mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo SLIT("stg_MUT_ARR_PTRS_FROZEN0"))

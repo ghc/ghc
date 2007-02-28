@@ -61,9 +61,7 @@ StgWord16 closure_flags[] = {
 /* IND_STATIC	   	= */ (          _NS|_STA|                   _IND ),
 /* RET_BCO		= */ (     _BTM                                  ),
 /* RET_SMALL		= */ (     _BTM|                       _SRT      ),
-/* RET_VEC_SMALL	= */ (     _BTM|                       _SRT      ),
 /* RET_BIG		= */ (                                 _SRT      ),
-/* RET_VEC_BIG	   	= */ (                                 _SRT      ),
 /* RET_DYN		= */ (                                 _SRT      ),
 /* RET_FUN		= */ ( 0                                         ),
 /* UPDATE_FRAME        	= */ (     _BTM                                  ),
@@ -101,6 +99,6 @@ StgWord16 closure_flags[] = {
 /* CATCH_STM_FRAME      = */ (     _BTM                                  )
 };
 
-#if N_CLOSURE_TYPES != 73
+#if N_CLOSURE_TYPES != 71
 #error Closure types changed: update ClosureFlags.c!
 #endif

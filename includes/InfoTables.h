@@ -353,7 +353,6 @@ typedef struct {
 #else
     StgInfoTable i;
     StgSRT      *srt;	/* pointer to the SRT table */
-    StgFunPtr vector[FLEXIBLE_ARRAY];
 #endif
 } StgRetInfoTable;
 

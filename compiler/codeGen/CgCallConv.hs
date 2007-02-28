@@ -25,8 +25,6 @@ module CgCallConv (
 	constructSlowCall, slowArgs, slowCallPattern,
 
 	-- Returns
-	CtrlReturnConvention(..),
-	ctrlReturnConvAlg,
 	dataReturnConvPrim,
 	getSequelAmode
     ) where
@@ -48,7 +46,6 @@ import CmmUtils
 import Maybes
 import Id
 import Name
-import TyCon
 import Bitmap
 import Util
 import StaticFlags
@@ -215,10 +212,6 @@ constructSlowCall amodes
     stg_ap_pat = mkRtsApFastLabel arg_pat
     (arg_pat, these, rest) = matchSlowPattern amodes
 
-enterRtsRetLabel arg_pat
-  | tablesNextToCode = mkRtsRetInfoLabel arg_pat
-  | otherwise        = mkRtsRetLabel arg_pat
-
 -- | 'slowArgs' takes a list of function arguments and prepares them for
 -- pushing on the stack for "extra" arguments to a function which requires
 -- fewer arguments than we currently have.
@@ -257,26 +250,6 @@ slowCallPattern _  = panic "CgStackery.slowCallPattern"
 --
 -------------------------------------------------------------------------
 
--- A @CtrlReturnConvention@ says how {\em control} is returned.
-
-data CtrlReturnConvention
-  = VectoredReturn	Int	-- size of the vector table (family size)
-  | UnvectoredReturn    Int 	-- family size
-
-ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
-ctrlReturnConvAlg tycon
-  = case (tyConFamilySize tycon) of
-      size -> -- we're supposed to know...
-	if (size > (1::Int) && size <= mAX_FAMILY_SIZE_FOR_VEC_RETURNS) then
-	    VectoredReturn size
-	else
-	    UnvectoredReturn size	
-  -- NB: unvectored returns Include size 0 (no constructors), so that
-  --     the following perverse code compiles (it crashed GHC in 5.02)
-  -- 	    data T1
-  --	    data T2 = T2 !T1 Int
-  --     The only value of type T1 is bottom, which never returns anyway.
-
 dataReturnConvPrim :: CgRep -> CmmReg
 dataReturnConvPrim PtrArg    = CmmGlobal (VanillaReg 1)
 dataReturnConvPrim NonPtrArg = CmmGlobal (VanillaReg 1)
@@ -287,7 +260,7 @@ dataReturnConvPrim VoidArg   = panic "dataReturnConvPrim: void"
 
 
 -- getSequelAmode returns an amode which refers to an info table.  The info
--- table will always be of the RET(_VEC)?_(BIG|SMALL) kind.  We're careful
+-- table will always be of the RET_(BIG|SMALL) kind.  We're careful
 -- not to handle real code pointers, just in case we're compiling for 
 -- an unregisterised/untailcallish architecture, where info pointers and
 -- code pointers aren't the same.
@@ -304,9 +277,8 @@ getSequelAmode
 	    OnStack -> do { sp_rel <- getSpRelOffset virt_sp
 			  ; returnFC (CmmLoad sp_rel wordRep) }
 
-	    UpdateCode 	           -> returnFC (CmmLit (CmmLabel mkUpdInfoLabel))
-	    CaseAlts lbl _ _ True  -> returnFC (CmmLit (CmmLabel mkSeqInfoLabel))
-	    CaseAlts lbl _ _ False -> returnFC (CmmLit (CmmLabel lbl))
+	    UpdateCode 	      -> returnFC (CmmLit (CmmLabel mkUpdInfoLabel))
+	    CaseAlts lbl _ _  -> returnFC (CmmLit (CmmLabel lbl))
 	}
 
 -------------------------------------------------------------------------

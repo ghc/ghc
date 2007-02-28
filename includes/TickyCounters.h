@@ -155,8 +155,6 @@ EXTERN StgInt RET_NEW_ctr INIT(0);
 EXTERN StgInt RET_OLD_ctr INIT(0);
 EXTERN StgInt RET_UNBOXED_TUP_ctr INIT(0);
 
-EXTERN StgInt VEC_RETURN_ctr INIT(0);
-
 EXTERN StgInt RET_SEMI_loads_avoided INIT(0);
 
 /* End of counter declarations. */
