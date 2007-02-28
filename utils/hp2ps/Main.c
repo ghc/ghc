@@ -145,8 +145,12 @@ nextarg: ;
     if (!filter) {
 	pathName = copystring(argv[0]);
 	DropSuffix(pathName, ".hp");
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
+	DropSuffix(pathName, ".exe");
+        pathName = copystring2(pathName,".exe");
+#endif
 	baseName = copystring(Basename(pathName));
-
+        
         hpfp  = Fp(pathName, &hpfile, ".hp", "r"); 
 	psfp  = Fp(baseName, &psfile, ".ps", "w"); 
 
