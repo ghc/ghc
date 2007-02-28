@@ -891,7 +891,10 @@ def check_hp_ok(name):
 
     hp2psResult = runCmdExitCode(hp2psCmd)
 
-    actual_ps_file = qualify(name, 'ps')
+    if config.platform == 'i386-unknown-mingw32':
+        actual_ps_file = qualify(name, 'exe.ps')
+    else:   
+        actual_ps_file = qualify(name, 'ps')
     
     if(hp2psResult == 0):
         if (os.path.exists(actual_ps_file)):
@@ -903,7 +906,7 @@ def check_hp_ok(name):
                     print "hp2ps output for " + name + "is not valid PostScript"
             else: return (True) # assume postscript is valid without ghostscript
         else: 
-            print "hp2ps did not generate PostScript for" + name
+            print "hp2ps did not generate PostScript for " + name
             return (False) 
     else:
         print "hp2ps error when processing heap profile for " + name
