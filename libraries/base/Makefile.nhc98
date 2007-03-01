@@ -1,6 +1,6 @@
 THISPKG	= base
 SEARCH	= -I$(TOPDIR)/targets/$(MACHINE) -Iinclude
-EXTRA_H_FLAGS   = -H4M -K2M
+EXTRA_H_FLAGS   = -H4M -K3M
 EXTRA_HBC_FLAGS = -H16M -A1M
 
 SRCS	= \
