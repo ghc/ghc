@@ -225,6 +225,7 @@ allow you to use either GHC or Hugs.  To get GHC, just set the CPP variable
 #define GR      >#
 #define GREQ    >=#
 #define LT      <#
+#define LTEQ    <=#
 #define DIV     `quotInt#`
 
 
@@ -994,11 +995,11 @@ cant_fail = error "easy_display: NoDoc"
 indent n | n GREQ ILIT(8) = '\t' : indent (n MINUS ILIT(8))
          | otherwise      = spaces n
 
-multi_ch ILIT(0) ch = ""
-multi_ch n       ch = ch : multi_ch (n MINUS ILIT(1)) ch
+multi_ch n ch | n LTEQ ILIT(0) = ""
+	      | otherwise      = ch : multi_ch (n MINUS ILIT(1)) ch
 
-spaces ILIT(0) = ""
-spaces n       = ' ' : spaces (n MINUS ILIT(1))
+spaces n | n LTEQ ILIT(0) = ""
+         | otherwise      = ' ' : spaces (n MINUS ILIT(1))
 \end{code}
 
 \begin{code}
