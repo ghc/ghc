@@ -83,15 +83,9 @@ cONSTR = CONSTR
 -- Assumes constructors are numbered from zero, not one
 make_constr_itbls :: [DataCon] -> IO ItblEnv
 make_constr_itbls cons
-   | listLengthCmp cons 8 /= GT -- <= 8 elements in the list
-   = do is <- mapM mk_vecret_itbl (zip cons [0..])
-	return (mkItblEnv is)
-   | otherwise
    = do is <- mapM mk_dirret_itbl (zip cons [0..])
 	return (mkItblEnv is)
      where
-        mk_vecret_itbl (dcon, conNo)
-           = mk_itbl dcon conNo (vecret_entry conNo)
         mk_dirret_itbl (dcon, conNo)
            = mk_itbl dcon conNo stg_interp_constr_entry
 
@@ -258,27 +252,9 @@ byte6 w = fromIntegral (w `shiftR` 48)
 byte7 w = fromIntegral (w `shiftR` 56)
 
 
-vecret_entry 0 = stg_interp_constr1_entry
-vecret_entry 1 = stg_interp_constr2_entry
-vecret_entry 2 = stg_interp_constr3_entry
-vecret_entry 3 = stg_interp_constr4_entry
-vecret_entry 4 = stg_interp_constr5_entry
-vecret_entry 5 = stg_interp_constr6_entry
-vecret_entry 6 = stg_interp_constr7_entry
-vecret_entry 7 = stg_interp_constr8_entry
-
 #ifndef __HADDOCK__
 -- entry point for direct returns for created constr itbls
 foreign import ccall "&stg_interp_constr_entry" stg_interp_constr_entry :: Ptr ()
--- and the 8 vectored ones
-foreign import ccall "&stg_interp_constr1_entry" stg_interp_constr1_entry :: Ptr ()
-foreign import ccall "&stg_interp_constr2_entry" stg_interp_constr2_entry :: Ptr ()
-foreign import ccall "&stg_interp_constr3_entry" stg_interp_constr3_entry :: Ptr ()
-foreign import ccall "&stg_interp_constr4_entry" stg_interp_constr4_entry :: Ptr ()
-foreign import ccall "&stg_interp_constr5_entry" stg_interp_constr5_entry :: Ptr ()
-foreign import ccall "&stg_interp_constr6_entry" stg_interp_constr6_entry :: Ptr ()
-foreign import ccall "&stg_interp_constr7_entry" stg_interp_constr7_entry :: Ptr ()
-foreign import ccall "&stg_interp_constr8_entry" stg_interp_constr8_entry :: Ptr ()
 #endif
 
 
