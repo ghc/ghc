@@ -284,6 +284,18 @@ test061:
 	$(TEST_HC) --make -keep-hc-files -fvia-C A.hs
 	test -f A.hc
 
+# Test that -keep-s-files works with --make and -fvia-C
+test061a.1:
+	@$(RM) A.hi A$(OBJSUFFIX) A.s
+	$(TEST_HC) --make -keep-s-files -fvia-C A.hs
+	test -f A.s
+
+# Test that -keep-s-files works without --make
+test061a.2:
+	@$(RM) A.hi A$(OBJSUFFIX) A.s
+	$(TEST_HC) -c -keep-s-files -fvia-C A.hs
+	test -f A.s
+
 # Test that -main-is works with --make
 test062.1:
 	@$(RM) Hello.hs Hello.hi Hello$(OBJSUFFIX) Hello.hc hello
