@@ -1839,6 +1839,9 @@ getAmode (CmmMachOp (MO_Add rep)
   && not (is64BitInteger offset)
   = x86_complex_amode x y shift offset
 
+getAmode (CmmMachOp (MO_Add rep) [x,y])
+  = x86_complex_amode x y 0 0
+
 getAmode (CmmLit lit) | not (is64BitLit lit)
   = return (Amode (ImmAddr (litToImm lit) 0) nilOL)
 
@@ -2378,6 +2381,25 @@ assignIntCode pk dst src
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 -- integer assignment to memory
+
+-- specific case of adding/subtracting an integer to a particular address.
+-- ToDo: catch other cases where we can use an operation directly on a memory 
+-- address.
+assignMem_IntCode pk addr (CmmMachOp op [CmmLoad addr2 _,
+                                                 CmmLit (CmmInt i _)])
+   | addr == addr2, pk /= I64 || not (is64BitInteger i),
+     Just instr <- check op
+   = do Amode amode code_addr <- getAmode addr
+        let code = code_addr `snocOL`
+                   instr pk (OpImm (ImmInt (fromIntegral i))) (OpAddr amode)
+        return code
+   where
+        check (MO_Add _) = Just ADD
+        check (MO_Sub _) = Just SUB
+        check _ = Nothing
+        -- ToDo: more?
+
+-- general case
 assignMem_IntCode pk addr src = do
     Amode addr code_addr <- getAmode addr
     (code_src, op_src)   <- get_op_RI src

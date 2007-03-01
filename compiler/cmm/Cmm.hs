@@ -200,6 +200,7 @@ data CmmExpr
 	--        ** is shorthand only, meaning **
 	-- CmmMachOp (MO_S_Add rep (CmmReg reg) (CmmLit (CmmInt i rep)))
 	--	where rep = cmmRegRep reg
+  deriving Eq
 
 cmmExprRep :: CmmExpr -> MachRep
 cmmExprRep (CmmLit lit)      = cmmLitRep lit
@@ -248,6 +249,7 @@ data CmmLit
         -- It is also used inside the NCG during when generating
         -- position-independent code. 
   | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
+  deriving Eq
 
 cmmLitRep :: CmmLit -> MachRep
 cmmLitRep (CmmInt _ rep)    = rep
