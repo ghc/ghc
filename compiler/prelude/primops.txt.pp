@@ -1756,11 +1756,11 @@ pseudoop   "seq"
 
 pseudoop   "inline"
    a -> a
-   { The call {\tt(inline f)} arranges that f is inlined, regardless of its size.
-	More precisely, the call {\tt(inline f)} rewrites to the right-hand side of
+   { The call {\tt (inline f)} arranges that f is inlined, regardless of its size.
+	More precisely, the call {\tt (inline f)} rewrites to the right-hand side of
 	{\tt f}'s definition. This allows the programmer to control inlining from a
 	particular call site rather than the definition site of the function (c.f.
-	{\ttINLINE} pragmas in User's Guide, Section 7.10.3, "INLINE and NOINLINE
+	{\tt INLINE} pragmas in User's Guide, Section 7.10.3, "INLINE and NOINLINE
 	pragmas").
 
 	This inlining occurs regardless of the argument to the call or the size of
