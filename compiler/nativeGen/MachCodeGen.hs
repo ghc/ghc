@@ -49,6 +49,7 @@ import Control.Monad	( mapAndUnzipM )
 import Data.Maybe	( fromJust )
 import Data.Bits
 import Data.Word
+import Data.Int
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
@@ -2037,7 +2038,12 @@ is64BitLit x = False
 #endif
 
 is64BitInteger :: Integer -> Bool
-is64BitInteger i = i > 0x7fffffff || i < -0x80000000
+is64BitInteger i = i64 > 0x7fffffff || i64 < -0x80000000
+  where i64 = fromIntegral i :: Int64
+  -- a CmmInt is intended to be truncated to the appropriate 
+  -- number of bits, so here we truncate it to Int64.  This is
+  -- important because e.g. -1 as a CmmInt might be either
+  -- -1 or 18446744073709551615.
 
 -- -----------------------------------------------------------------------------
 --  The 'CondCode' type:  Condition codes passed up the tree.
