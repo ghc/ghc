@@ -75,7 +75,8 @@ import System.Environment
 preprocess :: DynFlags -> (FilePath, Maybe Phase) -> IO (DynFlags, FilePath)
 preprocess dflags (filename, mb_phase) =
   ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename) 
-  runPipeline anyHsc dflags (filename, mb_phase) Temporary Nothing{-no ModLocation-}
+  runPipeline anyHsc dflags (filename, mb_phase) 
+        Nothing Temporary Nothing{-no ModLocation-}
 
 -- ---------------------------------------------------------------------------
 -- Compile
@@ -169,7 +170,9 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
                             -> return ([], ms_hs_date mod_summary)
                           -- We're in --make mode: finish the compilation pipeline.
                           _other
-                            -> do runPipeline StopLn dflags (output_fn,Nothing) Persistent
+                            -> do runPipeline StopLn dflags (output_fn,Nothing)
+                                              (Just basename)
+                                              Persistent
                                               (Just location)
                                   -- The object filename comes from the ModLocation
                                   o_time <- getModificationTime object_filename
@@ -238,7 +241,7 @@ compileStub dflags mod location = do
 
 	-- compile the _stub.c file w/ gcc
 	let (stub_c,_) = mkStubPaths dflags (moduleName mod) location
-	runPipeline StopLn dflags (stub_c,Nothing) 
+	runPipeline StopLn dflags (stub_c,Nothing)  Nothing
 		(SpecificFile stub_o) Nothing{-no ModLocation-}
 
 	return stub_o
@@ -361,7 +364,8 @@ compileFile dflags stop_phase (src, mb_phase) = do
 			other      -> stop_phase
 
    (_, out_file) <- runPipeline stop_phase' dflags
-			  (src, mb_phase) output Nothing{-no ModLocation-}
+			  (src, mb_phase) Nothing output 
+                          Nothing{-no ModLocation-}
    return out_file
 
 
@@ -407,13 +411,16 @@ runPipeline
   :: Phase		        -- When to stop
   -> DynFlags		        -- Dynamic flags
   -> (FilePath,Maybe Phase)     -- Input filename (and maybe -x suffix)
+  -> Maybe FilePath             -- original basename (if different from ^^^)
   -> PipelineOutput	        -- Output filename
   -> Maybe ModLocation          -- A ModLocation, if this is a Haskell module
   -> IO (DynFlags, FilePath)	-- (final flags, output filename)
 
-runPipeline stop_phase dflags (input_fn, mb_phase) output maybe_loc
+runPipeline stop_phase dflags (input_fn, mb_phase) mb_basename output maybe_loc
   = do
-  let (basename, suffix) = splitFilename input_fn
+  let (input_basename, suffix) = splitFilename input_fn
+      basename | Just b <- mb_basename = b
+               | otherwise             = input_basename
 
 	-- If we were given a -x flag, then use that phase to start from
       start_phase = fromMaybe (startPhase suffix) mb_phase
