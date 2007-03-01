@@ -1,0 +1,20 @@
+*** Buggy output has incorrect indentation, but test harness discards
+*** white space, so doesn't show it up.  Hence this message, to force
+*** it to fail until we fix the bug.   
+
+tcfail177.hs:17:12:
+    Couldn't match expected type `Bool' against inferred type `[Char]'
+    In the expression: "Two"
+    In the first argument of `foo', namely
+	`[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5",
+          "Five" ~?= "5", "Five" ~?= "5", "Five" ~?= "5", 
+	  "Five" ~?= "5", "Five" ~?= "5", "Two", "Two", "Two", 
+          "Two", "Two", "Two", "Two", "Two", "Two", "Two", "Two", 
+ 	  "Two", "Two", "Two", "Two", "Two", "Two", "Two"]'
+    In the expression:
+	foo
+	  [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5",
+           "Five" ~?= "5", "Five" ~?= "5", "Five" ~?= "5", 
+	   "Five" ~?= "5", "Five" ~?= "5", "Two", "Two", "Two", 
+	   "Two", "Two", "Two", "Two", "Two", "Two", "Two", "Two", 
+	   "Two", "Two", "Two", "Two", "Two", "Two", "Two"]
