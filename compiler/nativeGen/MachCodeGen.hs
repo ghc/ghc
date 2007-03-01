@@ -1829,15 +1829,15 @@ getAmode (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
 getAmode (CmmMachOp (MO_Add rep) [x, CmmMachOp (MO_Shl _) 
 					[y, CmmLit (CmmInt shift _)]])
   | shift == 0 || shift == 1 || shift == 2 || shift == 3
-  = do (x_reg, x_code) <- getNonClobberedReg x
-	-- x must be in a temp, because it has to stay live over y_code
-	-- we could compre x_reg and y_reg and do something better here...
-       (y_reg, y_code) <- getSomeReg y
-       let
-    	   code = x_code `appOL` y_code
-           base = case shift of 0 -> 1; 1 -> 2; 2 -> 4; 3 -> 8
-       return (Amode (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg base) (ImmInt 0))
-               code)
+  = x86_complex_amode x y shift 0
+
+getAmode (CmmMachOp (MO_Add rep) 
+                [x, CmmMachOp (MO_Add _)
+                        [CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)],
+                         CmmLit (CmmInt offset _)]])
+  | shift == 0 || shift == 1 || shift == 2 || shift == 3
+  && not (is64BitInteger offset)
+  = x86_complex_amode x y shift offset
 
 getAmode (CmmLit lit) | not (is64BitLit lit)
   = return (Amode (ImmAddr (litToImm lit) 0) nilOL)
@@ -1845,6 +1845,19 @@ getAmode (CmmLit lit) | not (is64BitLit lit)
 getAmode expr = do
   (reg,code) <- getSomeReg expr
   return (Amode (AddrBaseIndex (EABaseReg reg) EAIndexNone (ImmInt 0)) code)
+
+
+x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> Integer -> NatM Amode
+x86_complex_amode base index shift offset
+  = do (x_reg, x_code) <- getNonClobberedReg base
+	-- x must be in a temp, because it has to stay live over y_code
+	-- we could compre x_reg and y_reg and do something better here...
+       (y_reg, y_code) <- getSomeReg index
+       let
+    	   code = x_code `appOL` y_code
+           base = case shift of 0 -> 1; 1 -> 2; 2 -> 4; 3 -> 8
+       return (Amode (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg base) (ImmInt (fromIntegral offset)))
+               code)
 
 #endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
 
