@@ -83,18 +83,18 @@ handle_tick(int unused STG_UNUSED)
 #endif
 }
 
-int
+void
 startTimer(void)
 {
 #ifdef PROFILING
   initProfTimer();
 #endif
 
-  return startTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
+  startTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
 }
 
-int
+void
 stopTimer(void)
 {
-  return stopTicker();
+  stopTicker();
 }

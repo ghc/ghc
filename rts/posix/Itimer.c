@@ -52,9 +52,7 @@
  *
  * (1) tick in realtime.  Not very good, because this ticker is used for
  *     profiling, and this will give us unreliable time profiling
- *     results.  Furthermore, this requires picking a single OS thread
- *     to be the timekeeper, which is a bad idea because the thread in
- *     question might just be making a temporary call into Haskell land.
+ *     results.
  *
  * (2) save/restore the virtual timer around excursions into STG land.
  *     Sounds great, but I tried it and the resolution of the virtual timer
@@ -68,16 +66,42 @@
  *
  * For now, we're using (1), but this needs a better solution. --SDM
  */
-#ifdef THREADED_RTS
-#define ITIMER_FLAVOUR  ITIMER_REAL
-#define ITIMER_SIGNAL   SIGALRM
+
+#if defined(HAVE_TIMER_CREATE) && defined(HAVE_TIMER_SETTIME)
+
+#  define USE_TIMER_CREATE
+#  define ITIMER_SIGNAL SIGVTALRM
+#  ifdef THREADED_RTS
+#    define TIMER_FLAVOUR CLOCK_REALTIME
+#  else
+#    define TIMER_FLAVOUR CLOCK_PROCESS_CPUTIME_ID
+#  endif
+
+#elif defined(HAVE_SETITIMER)
+
+#  define USE_ITIMER
+#  ifdef THREADED_RTS
+//   Oh dear, we have to use SIGALRM if there's no timer_create and
+//   we're using the THREADED_RTS.  This leads to problems, see bug #850.
+#    define ITIMER_SIGNAL  SIGALRM
+#    define ITIMER_FLAVOUR ITIMER_REAL
+#  else
+#    define ITIMER_SIGNAL  SIGVTALRM
+#    define ITIMER_FLAVOUR ITIMER_VIRTUAL
+#  endif
+
 #else
-#define ITIMER_FLAVOUR  ITIMER_VIRTUAL
-#define ITIMER_SIGNAL   SIGVTALRM
+
+#  error No way to set an interval timer.
+
+#endif
+
+#if defined(USE_TIMER_CREATE)
+timer_t timer;
 #endif
 
 static
-int
+void
 install_vtalrm_handler(TickProc handle_tick)
 {
     struct sigaction action;
@@ -98,95 +122,86 @@ install_vtalrm_handler(TickProc handle_tick)
     action.sa_flags = 0;
 #endif
 
-    return sigaction(ITIMER_SIGNAL, &action, NULL);
+    if (sigaction(ITIMER_SIGNAL, &action, NULL) == -1) {
+        sysErrorBelch("sigaction");
+        stg_exit(EXIT_FAILURE);
+    }
 }
 
-int
+void
 startTicker(nat ms, TickProc handle_tick)
 {
-# ifndef HAVE_SETITIMER
-  /*    debugBelch("No virtual timer on this system\n"); */
-    return -1;
-# else
-    struct itimerval it;
-
     install_vtalrm_handler(handle_tick);
 
 #if !defined(THREADED_RTS)
     timestamp = getourtimeofday();
 #endif
 
-    it.it_value.tv_sec = ms / 1000;
-    it.it_value.tv_usec = 1000 * (ms - (1000 * it.it_value.tv_sec));
-    it.it_interval = it.it_value;
-    return (setitimer(ITIMER_FLAVOUR, &it, NULL));
-# endif
-}
+#if defined(USE_TIMER_CREATE)
+    {
+        struct itimerspec it;
+        struct sigevent ev;
 
-int
-stopTicker()
-{
-# ifndef HAVE_SETITIMER
-  /*    debugBelch("No virtual timer on this system\n"); */
-    return -1;
-# else
-    struct itimerval it;
-  
-    it.it_value.tv_sec = 0;
-    it.it_value.tv_usec = 0;
-    it.it_interval = it.it_value;
-    return (setitimer(ITIMER_FLAVOUR, &it, NULL));
-# endif
-}
+        ev.sigev_notify = SIGEV_SIGNAL;
+        ev.sigev_signo  = ITIMER_SIGNAL;
+        
+        it.it_value.tv_sec = ms / 1000;
+        it.it_value.tv_nsec = (ms % 1000) * 1000000;
+        it.it_interval = it.it_value;
+        
+        if (timer_create(TIMER_FLAVOUR, &ev, &timer) != 0) {
+            sysErrorBelch("timer_create");
+            stg_exit(EXIT_FAILURE);
+        }
 
-# if 0
-/* This is a potential POSIX version */
-int
-startTicker(nat ms)
-{
-    struct sigevent se;
-    struct itimerspec it;
-    timer_t tid;
-
-#if !defined(THREADED_RTS)
-    timestamp = getourtimeofday();
-#endif
-
-    se.sigev_notify = SIGEV_SIGNAL;
-    se.sigev_signo = ITIMER_SIGNAL;
-    se.sigev_value.sival_int = ITIMER_SIGNAL;
-    if (timer_create(CLOCK_VIRTUAL, &se, &tid)) {
-	barf("can't create virtual timer");
+        if (timer_settime(timer, 0, &it, NULL) != 0) {
+            sysErrorBelch("timer_settime");
+            stg_exit(EXIT_FAILURE);
+        }
     }
-    it.it_value.tv_sec = ms / 1000;
-    it.it_value.tv_nsec = 1000000 * (ms - 1000 * it.it_value.tv_sec);
-    it.it_interval = it.it_value;
-    return timer_settime(tid, TIMER_RELTIME, &it, NULL);
+#else
+    {
+        struct itimerval it;
+
+        it.it_value.tv_sec = ms / 1000;
+        it.it_value.tv_usec = (ms % 1000) * 1000;
+        it.it_interval = it.it_value;
+        
+        if (setitimer(ITIMER_FLAVOUR, &it, NULL) != 0) {
+            sysErrorBelch("setitimer");
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+#endif
 }
 
-int
-stopTicker()
+void
+stopTicker(void)
 {
-    struct sigevent se;
+#if defined(USE_TIMER_CREATE)
     struct itimerspec it;
-    timer_t tid;
 
-#if !defined(THREADED_RTS)
-    timestamp = getourtimeofday();
-#endif
-
-    se.sigev_notify = SIGEV_SIGNAL;
-    se.sigev_signo = ITIMER_SIGNAL;
-    se.sigev_value.sival_int = ITIMER_SIGNAL;
-    if (timer_create(CLOCK_VIRTUAL, &se, &tid)) {
-	barf("can't create virtual timer");
-    }
     it.it_value.tv_sec = 0;
     it.it_value.tv_nsec = 0;
     it.it_interval = it.it_value;
-    return timer_settime(tid, TIMER_RELTIME, &it, NULL);
+
+    if (timer_settime(timer, 0, &it, NULL) != 0) {
+        sysErrorBelch("timer_settime");
+        stg_exit(EXIT_FAILURE);
+    }
+#else
+    struct itimerval it;
+
+    it.it_value.tv_sec = 0;
+    it.it_value.tv_usec = 0;
+    it.it_interval = it.it_value;
+
+    if (setitimer(ITIMER_FLAVOUR, &it, NULL) != 0) {
+        sysErrorBelch("setitimer");
+        stg_exit(EXIT_FAILURE);
+    }
+#endif
 }
-# endif
 
 #if 0
 /* Currently unused */

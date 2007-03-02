@@ -74,7 +74,7 @@ TimerProc(PVOID param)
 }
 
 
-int
+void
 startTicker(nat ms, TickProc handle_tick)
 {
   unsigned threadId;
@@ -95,10 +95,14 @@ startTicker(nat ms, TickProc handle_tick)
 			       (LPVOID)ms,
 			       0,
 			       &threadId);
-  return (tickThread != 0);
+
+  if (tickThread == 0) {
+      sysErrorBelch("_beginthreadex");
+      stg_exit(EXIT_FAILURE);
+  }
 }
 
-int
+void
 stopTicker(void)
 {
     // We must wait for the ticker thread to terminate, since if we
@@ -125,5 +129,4 @@ stopTicker(void)
 	    TerminateThread(tickThread, 0);
 	}
     }
-    return 0;
 }

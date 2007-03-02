@@ -11,7 +11,7 @@
 
 typedef void (*TickProc)(int);
 
-extern int startTimer(void);
-extern int stopTimer(void);
+extern void startTimer(void);
+extern void stopTimer(void);
 
 #endif /* TIMER_H */

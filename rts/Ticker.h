@@ -9,7 +9,7 @@
 #ifndef TICKER_H
 #define TICKER_H
 
-extern int  startTicker( nat ms, TickProc handle_tick );
-extern int  stopTicker ( void );
+extern void startTicker( nat ms, TickProc handle_tick );
+extern void stopTicker ( void );
 
 #endif /* TICKER_H */
