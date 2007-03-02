@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fparr #-}
+{-# OPTIONS_GHC -fparr -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -144,7 +144,7 @@ import Prelude
 
 import GHC.ST   ( ST(..), STRep, runST )
 import GHC.Exts	( Int#, Array#, Int(I#), MutableArray#, newArray#,
-		  unsafeFreezeArray#, indexArray#, writeArray# )
+		  unsafeFreezeArray#, indexArray#, writeArray#, (<#), (>=#) )
 
 infixl 9  !:
 infixr 5  +:+
@@ -637,12 +637,21 @@ scanEFL f  = \e a -> (Just a, f e a)
 --
 indexPArr                       :: [:e:] -> Int -> e
 {-# INLINE indexPArr #-}
-indexPArr (PArr _ arr#) (I# i#)  = 
-  case indexArray# arr# i# of (# e #) -> e
+indexPArr (PArr n# arr#) (I# i#) 
+  | i# >=# 0# && i# <# n# =
+    case indexArray# arr# i# of (# e #) -> e
+  | otherwise = error $ "indexPArr: out of bounds parallel array index; " ++
+			"idx = " ++ show (I# i#) ++ ", arr len = "
+			++ show (I# n#)
 
 -- encapsulate writing into a mutable array into the `ST' monad
 --
 writeMPArr                           :: MPArr s e -> Int -> e -> ST s ()
 {-# INLINE writeMPArr #-}
-writeMPArr (MPArr _ marr#) (I# i#) e  = ST $ \s# ->
-  case writeArray# marr# i# e s# of s'# -> (# s'#, () #)
+writeMPArr (MPArr n# marr#) (I# i#) e 
+  | i# >=# 0# && i# <# n# =
+    ST $ \s# ->
+    case writeArray# marr# i# e s# of s'# -> (# s'#, () #)
+  | otherwise = error $ "writeMPArr: out of bounds parallel array index; " ++
+			"idx = " ++ show (I# i#) ++ ", arr len = "
+			++ show (I# n#)
