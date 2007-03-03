@@ -238,6 +238,7 @@ gHC_LIST	= mkBaseModule FSLIT("GHC.List")
 gHC_PARR	= mkBaseModule FSLIT("GHC.PArr")
 dATA_TUP	= mkBaseModule FSLIT("Data.Tuple")
 dATA_EITHER	= mkBaseModule FSLIT("Data.Either")
+dATA_STRING	= mkBaseModule FSLIT("Data.String")
 gHC_PACK	= mkBaseModule FSLIT("GHC.Pack")
 gHC_CONC	= mkBaseModule FSLIT("GHC.Conc")
 gHC_IO_BASE	= mkBaseModule FSLIT("GHC.IOBase")
@@ -490,7 +491,7 @@ returnMName	   = methName gHC_BASE FSLIT("return") returnMClassOpKey
 failMName	   = methName gHC_BASE FSLIT("fail")   failMClassOpKey
 
 -- Random PrelBase functions
-fromStringName    = methName gHC_BASE FSLIT("fromString") fromStringClassOpKey
+fromStringName = methName dATA_STRING FSLIT("fromString") fromStringClassOpKey
 otherwiseIdName   = varQual gHC_BASE FSLIT("otherwise")  otherwiseIdKey
 foldrName	  = varQual gHC_BASE FSLIT("foldr")      foldrIdKey
 buildName	  = varQual gHC_BASE FSLIT("build")      buildIdKey
