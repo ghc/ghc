@@ -58,7 +58,7 @@ test('conc026', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc028', normal, compile_and_run, [''])
 test('conc029', normal, compile_and_run, [''])
 test('conc030', compose(only_compiler_types(['ghc']),
-			extra_run_opts('+RTS -K2M -RTS')),
+			extra_run_opts('+RTS -K4M -RTS')),
 		compile_and_run, [''])
 
 test('conc031', normal, compile_and_run, [''])
