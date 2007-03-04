@@ -42,6 +42,7 @@ module System.IO.Error (
     -- ** Attributes of I\/O errors
 #ifndef __NHC__
     ioeGetErrorType,		-- :: IOError -> IOErrorType
+    ioeGetLocation,		-- :: IOError -> String
 #endif
     ioeGetErrorString,		-- :: IOError -> String
     ioeGetHandle,		-- :: IOError -> Maybe Handle
@@ -50,6 +51,7 @@ module System.IO.Error (
 #ifndef __NHC__
     ioeSetErrorType,		-- :: IOError -> IOErrorType -> IOError
     ioeSetErrorString,		-- :: IOError -> String -> IOError
+    ioeSetLocation,		-- :: IOError -> String -> IOError
     ioeSetHandle,		-- :: IOError -> Handle -> IOError
     ioeSetFileName,		-- :: IOError -> FilePath -> IOError
 #endif
@@ -321,6 +323,7 @@ isUserErrorType _ = False
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 ioeGetErrorType	      :: IOError -> IOErrorType
 ioeGetErrorString     :: IOError -> String
+ioeGetLocation        :: IOError -> String
 ioeGetHandle          :: IOError -> Maybe Handle
 ioeGetFileName        :: IOError -> Maybe FilePath
 
@@ -330,17 +333,21 @@ ioeGetErrorString ioe
    | isUserErrorType (ioe_type ioe) = ioe_description ioe
    | otherwise                      = show (ioe_type ioe)
 
+ioeGetLocation ioe = ioe_location ioe
+
 ioeGetHandle ioe = ioe_handle ioe
 
 ioeGetFileName ioe = ioe_filename ioe
 
-ioeSetErrorType		:: IOError -> IOErrorType -> IOError
-ioeSetErrorString	:: IOError -> String      -> IOError
-ioeSetHandle		:: IOError -> Handle      -> IOError
-ioeSetFileName		:: IOError -> FilePath    -> IOError
+ioeSetErrorType   :: IOError -> IOErrorType -> IOError
+ioeSetErrorString :: IOError -> String      -> IOError
+ioeSetLocation    :: IOError -> String      -> IOError
+ioeSetHandle      :: IOError -> Handle      -> IOError
+ioeSetFileName    :: IOError -> FilePath    -> IOError
 
 ioeSetErrorType   ioe errtype  = ioe{ ioe_type = errtype }
 ioeSetErrorString ioe str      = ioe{ ioe_description = str }
+ioeSetLocation    ioe str      = ioe{ ioe_location = str }
 ioeSetHandle      ioe hdl      = ioe{ ioe_handle = Just hdl }
 ioeSetFileName    ioe filename = ioe{ ioe_filename = Just filename }
 
