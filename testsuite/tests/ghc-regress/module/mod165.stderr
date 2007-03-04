@@ -3,3 +3,4 @@ mod165.hs:9:4:
     Ambiguous occurrence `A.D1'
     It could refer to either `D1', imported from Mod164_A at mod165.hs:4:0-19
 		          or `D1', imported from Mod164_B at mod165.hs:5:0-19
+make[1]: *** [mod165] Error 1
