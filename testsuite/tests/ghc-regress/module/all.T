@@ -206,7 +206,9 @@ test('mod156', normal, compile, [''])
 test('mod157', normal, multimod_compile, ['mod157', '-v0'])
 clean(['Mod157_A.hi', 'Mod157_A.o', 'Mod157_B.hi', 'Mod157_B.o',
        'Mod157_C.hi', 'Mod157_C.o', 'Mod157_D.hi', 'Mod157_D.o'])
-test('mod158', normal, compile_fail, [''])
+test('mod158', compose(normal, exit_code(2)), run_command, ['$MAKE -s --no-print-directory mod158'])
+clean(['Mod157_A.hi', 'Mod157_A.o', 'Mod157_B.hi', 'Mod157_B.o',
+       'Mod157_C.hi', 'Mod157_C.o', 'Mod157_D.hi', 'Mod157_D.o'])
 test('mod159', normal, multimod_compile, ['mod159', '-v0'])
 clean(['Mod159_A.hi', 'Mod159_A.o', 'Mod159_B.hi', 'Mod159_B.o',
        'Mod159_C.hi', 'Mod159_C.o', 'Mod159_D.hi', 'Mod159_D.o'])

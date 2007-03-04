@@ -12,3 +12,13 @@ mod146::
 	@$(TEST_HC) -c Mod145_A.hs
 	@$(TEST_HC) mod146.hs
 
+mod158::
+	rm -f Mod157_*.o
+	rm -f Mod157_*.hi
+	rm -f mod158.o mod158.hi mod158
+	$(TEST_HC) -c Mod157_A.hs
+	$(TEST_HC) -c Mod157_B.hs
+	$(TEST_HC) -c Mod157_C.hs
+	$(TEST_HC) -c Mod157_D.hs
+	$(TEST_HC) mod158.hs -o mod158
+
