@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test( 'reify',
-      skip_if_fast,
+      compose(skip_if_fast, reqlib('mtl')),
       multimod_compile_and_run,
       ['Main','']
     )
