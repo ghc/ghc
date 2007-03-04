@@ -15,4 +15,4 @@ hidden-modules:
 import-dirs:
 library-dirs:
 hs-libraries: 
-depends: base-2.0, haskell-src, Cabal, testpkg-2.0
+depends: base-2.0, Cabal, testpkg-2.0
