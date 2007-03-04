@@ -3,3 +3,4 @@ mod144.hs:2:26:
     Conflicting exports for `Bar':
       `module Mod143_A' exports `Bar' imported from Mod143_A at mod144.hs:4:0-14
       `module M' exports `Bar' defined at mod144.hs:6:12
+make[1]: *** [mod144] Error 1
