@@ -16,6 +16,7 @@ if pid == 0:
 else:
     # parent
     def handler(signum, frame):
+        sys.stderr.write('Timeout happened...killing process...\n')
         os.killpg(pid, signal.SIGKILL) # XXX Kill better like .hs
         sys.exit(99)
     old = signal.signal(signal.SIGALRM, handler)

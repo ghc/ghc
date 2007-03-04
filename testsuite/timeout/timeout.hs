@@ -22,7 +22,7 @@ import System.Posix.Signals (installHandler, Handler(Catch),
 #if !defined(mingw32_HOST_OS)
 main = do
   args <- getArgs
-  case args of 
+  case args of
     [secs,cmd] -> do
         m <- newEmptyMVar
         mp <- newEmptyMVar
@@ -31,7 +31,7 @@ main = do
                    putMVar m Nothing
                )
         forkIO (do try (do pid <- systemSession cmd
-			   ph <- mkProcessHandle pid
+                           ph <- mkProcessHandle pid
                            putMVar mp (pid,ph)
                            r <- waitForProcess ph
                            putMVar m (Just r))
@@ -41,6 +41,7 @@ main = do
         r <- takeMVar m
         case r of
           Nothing -> do
+                hPutStrLn stderr "Timeout happened...killing process..."
                 killProcess pid ph
                 exitWith (ExitFailure 99)
           Just r -> do
@@ -48,7 +49,7 @@ main = do
     _other -> do hPutStrLn stderr "timeout: bad arguments"
                  exitWith (ExitFailure 1)
 
-systemSession cmd =  
+systemSession cmd =
  forkProcess $ do
    createSession
    executeFile "/bin/sh" False ["-c", cmd] Nothing
@@ -74,24 +75,25 @@ killProcess pid ph = do
 
 main = do
   args <- getArgs
-  case args of 
+  case args of
     [secs,cmd] -> do
         m <- newEmptyMVar
         mp <- newEmptyMVar
         forkIO (do threadDelay (read secs * 1000000)
                    putMVar m Nothing
                )
-	-- Assume sh.exe is in the path
+        -- Assume sh.exe is in the path
         forkIO (do p <- runProcess
                             "sh" ["-c",cmd]
                             Nothing Nothing Nothing Nothing Nothing
-		   putMVar mp p
-		   r <- waitForProcess p
-		   putMVar m (Just r))
-	p <- takeMVar mp
+                   putMVar mp p
+                   r <- waitForProcess p
+                   putMVar m (Just r))
+        p <- takeMVar mp
         r <- takeMVar m
         case r of
           Nothing -> do
+                hPutStrLn stderr "Timeout happened...killing process..."
                 killProcess p
                 exitWith (ExitFailure 99)
           Just r -> do
