@@ -310,7 +310,11 @@ This means that you can use all kinds of foreign libraries from this thread
 
 Just to clarify, 'forkOS' is /only/ necessary if you need to associate
 a Haskell thread with a particular OS thread.  It is not necessary if
-you only need to make non-blocking foreign calls (see "Control.Concurrent#osthreads").
+you only need to make non-blocking foreign calls (see
+"Control.Concurrent#osthreads").  Neither is it necessary if you want
+to run threads in parallel on a multiprocessor: threads created with
+'forkIO' will be shared out amongst the running CPUs (using GHC,
+@-threaded@, and the @+RTS -N@ runtime option).
 
 -}
 forkOS :: IO () -> IO ThreadId
