@@ -24,7 +24,7 @@ test('TH_spliceE5', normal, multimod_compile_and_run, ['TH_spliceE5', '-v0'])
 # profiling (-osuf p_o) because this is necessary when mixing
 # profiling w/ TH.  Furthermore we must have built the program the
 # normal way first, so this is a bit of a hack.
-test('TH_spliceE5_prof', normal, multimod_compile_and_run, ['TH_spliceE5', '-v0 -prof -auto-all -osuf p_o'])
+test('TH_spliceE5_prof', req_profiling, multimod_compile_and_run, ['TH_spliceE5', '-v0 -prof -auto-all -osuf p_o'])
 clean(['TH_spliceE5_Lib.p_o', 'TH_spliceE5_Lib.hi', 'TH_spliceE5_Lib.o',
        'TH_spliceE5.hi', 'TH_spliceE5.p_o'])
 
