@@ -24,6 +24,7 @@ if (ghc_with_native_codegen == 1):
 	config.run_ways.append('optasm')
 
 if (ghc_with_profiling == 1):
+	config.have_profiling = True
 	config.compile_ways.append('profc')
 	config.run_ways.append('profc')
 	if (ghc_with_native_codegen == 1):

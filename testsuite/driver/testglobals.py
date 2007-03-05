@@ -61,6 +61,9 @@ class TestConfig:
         self.way_flags = {}
         self.way_rts_flags = {}
 
+        # Do we have profiling support?
+        self.have_profiling = False
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
