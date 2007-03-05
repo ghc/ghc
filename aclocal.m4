@@ -1016,4 +1016,42 @@ ProjectPatchLevel=`echo $ProjectPatchLevel | sed 's/\.//'`
 AC_SUBST([ProjectPatchLevel])
 ])# FP_SETUP_PROJECT_VERSION
 
+AC_DEFUN([FP_CHECK_TIMER_CREATE],
+  [AC_CACHE_CHECK([for a working timer_create(CLOCK_REALTIME)], 
+    [fptools_cv_timer_create_works],
+    [AC_TRY_RUN([
+#ifdef HAVE_TIME_H
+#include <time.h>
+#endif
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+int main(int argc, char *argv[])
+{
+#if HAVE_TIMER_CREATE && HAVE_TIMER_SETTIME
+    struct sigevent ev;
+    timer_t timer;
+    ev.sigev_notify = SIGEV_SIGNAL;
+    ev.sigev_signo  = SIGVTALRM;
+    if (timer_create(CLOCK_REALTIME, &ev, &timer) != 0) {
+       exit(1);
+    }
+#else
+    exit(1)
+#endif
+    exit(0);
+}
+     ],
+     [fptools_cv_timer_create_works=yes],
+     [fptools_cv_timer_create_works=no])
+  ])
+case $fptools_cv_timer_create_works in
+    yes) AC_DEFINE([USE_TIMER_CREATE], 1, 
+                   [Define to 1 if we can use timer_create(CLOCK_REALTIMER,...)]);;
+esac
+])
+
 # LocalWords:  fi

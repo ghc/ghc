@@ -67,9 +67,8 @@
  * For now, we're using (1), but this needs a better solution. --SDM
  */
 
-#if defined(HAVE_TIMER_CREATE) && defined(HAVE_TIMER_SETTIME)
+#if defined(USE_TIMER_CREATE)
 
-#  define USE_TIMER_CREATE
 #  define ITIMER_SIGNAL SIGVTALRM
 #  ifdef THREADED_RTS
 #    define TIMER_FLAVOUR CLOCK_REALTIME
@@ -79,7 +78,6 @@
 
 #elif defined(HAVE_SETITIMER)
 
-#  define USE_ITIMER
 #  ifdef THREADED_RTS
 //   Oh dear, we have to use SIGALRM if there's no timer_create and
 //   we're using the THREADED_RTS.  This leads to problems, see bug #850.
