@@ -135,7 +135,7 @@ module GHC.PArr (
   fold1P,		-- :: (e -> e -> e) ->      [:e:] -> e
   permuteP,		-- :: [:Int:] -> [:e:] ->          [:e:]
   bpermuteP,		-- :: [:Int:] -> [:e:] ->          [:e:]
-  bpermuteDftP,		-- :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
+  dpermuteP,		-- :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
   crossP,		-- :: [:a:] -> [:b:] -> [:(a, b):]
   indexOfP		-- :: (a -> Bool) -> [:a:] -> [:Int:]
 ) where
@@ -457,7 +457,18 @@ fold1P  = foldl1P
 -- (EXPORTED)
 --
 permuteP       :: [:Int:] -> [:e:] -> [:e:]
-permuteP is es  = fst $ loop (mapEFL (es!:)) noAL is
+permuteP is es 
+  | isLen /= esLen = error "GHC.PArr: arguments must be of the same length"
+  | otherwise      = runST (do
+		       marr <- newArray isLen noElem
+		       permute marr is es
+		       mkPArr isLen marr)
+  where
+    noElem = error "GHC.PArr.permuteP: I do not exist!"
+	     -- unlike standard Haskell arrays, this value represents an
+	     -- internal error
+    isLen = lengthP is
+    esLen = lengthP es
 
 -- permute an array according to the back-permutation vector in the first
 -- argument (EXPORTED)
@@ -466,17 +477,32 @@ permuteP is es  = fst $ loop (mapEFL (es!:)) noAL is
 --   the result is undefined
 --
 bpermuteP       :: [:Int:] -> [:e:] -> [:e:]
-bpermuteP is es  = error "Prelude.bpermuteP: not implemented yet" -- FIXME
+bpermuteP is es  = fst $ loop (mapEFL (es!:)) noAL is
 
--- permute an array according to the back-permutation vector in the first
+-- permute an array according to the permutation vector in the first
 -- argument, which need not be surjective (EXPORTED)
 --
--- * any elements in the result that are not covered by the back-permutation
+-- * any elements in the result that are not covered by the permutation
 --   vector assume the value of the corresponding position of the third
 --   argument 
 --
-bpermuteDftP       :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
-bpermuteDftP is es  = error "Prelude.bpermuteDftP: not implemented yet"-- FIXME
+dpermuteP :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
+dpermuteP is es dft
+  | isLen /= esLen = error "GHC.PArr: arguments must be of the same length"
+  | otherwise      = runST (do
+		       marr <- newArray dftLen noElem
+		       trans 0 (isLen - 1) marr dft copyOne noAL
+		       permute marr is es
+		       mkPArr dftLen marr)
+  where
+    noElem = error "GHC.PArr.permuteP: I do not exist!"
+	     -- unlike standard Haskell arrays, this value represents an
+	     -- internal error
+    isLen  = lengthP is
+    esLen  = lengthP es
+    dftLen = lengthP dft
+
+    copyOne e _ = (Just e, noAL)
 
 -- computes the cross combination of two arrays (EXPORTED)
 --
@@ -566,7 +592,7 @@ loopFromTo from to mf start arr = runST (do
   arr       <- mkPArr n' marr
   return (arr, acc))
   where
-    noElem = error "PrelPArr.loopFromTo: I do not exist!"
+    noElem = error "GHC.PArr.loopFromTo: I do not exist!"
 	     -- unlike standard Haskell arrays, this value represents an
 	     -- internal error
 
@@ -596,6 +622,17 @@ trans from to marr arr mf start = trans' from 0 start
 					writeMPArr marr marrOff e'
 					return $ marrOff + 1
                         trans' (arrOff + 1) marrOff' acc'
+
+-- Permute the given elements into the mutable array.
+--
+permute :: MPArr s e -> [:Int:] -> [:e:] -> ST s ()
+permute marr is es = perm 0
+  where
+    perm i
+      | i == n = return ()
+      | otherwise  = writeMPArr marr (is!:i) (es!:i) >> perm (i + 1)
+      where
+        n = lengthP is
 
 
 -- common patterns for using `loop'
