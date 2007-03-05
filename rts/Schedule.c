@@ -2195,6 +2195,10 @@ forkProcess(HsStablePtr *entry
 	cap->returning_tasks_tl = NULL;
 #endif
 
+        // On Unix, all timers are reset in the child, so we need to start
+        // the timer again.
+        startTimer();
+
 	cap = rts_evalStableIO(cap, entry, NULL);  // run the action
 	rts_checkSchedStatus("forkProcess",cap);
 	
