@@ -2130,3 +2130,23 @@ asyncDoProczh_fast
 #endif
 }
 #endif
+
+// noDuplicate# tries to ensure that none of the thunks under
+// evaluation by the current thread are also under evaluation by
+// another thread.  It relies on *both* threads doing noDuplicate#;
+// the second one will get blocked if they are duplicating some work.
+noDuplicatezh_fast
+{
+    SAVE_THREAD_STATE();
+    ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+    foreign "C" threadPaused (MyCapability() "ptr", CurrentTSO "ptr") [];
+    
+    if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+        R1 = ThreadFinished;
+        jump StgReturn;
+    } else {
+        LOAD_THREAD_STATE();
+        ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+        jump %ENTRY_CODE(Sp(0));
+    }
+}

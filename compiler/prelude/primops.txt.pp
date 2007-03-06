@@ -1532,6 +1532,11 @@ primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
    with
    out_of_line = True
 
+primop  NoDuplicateOp "noDuplicate#" GenPrimOp
+   State# RealWorld -> State# RealWorld
+   with
+   out_of_line = True
+
 ------------------------------------------------------------------------
 section "Weak pointers"
 ------------------------------------------------------------------------
