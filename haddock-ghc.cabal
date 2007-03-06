@@ -1,11 +1,10 @@
 name: haddock-ghc
-cabal-version: >=1.1.4
-version: 0.1
+version: 2.0
 license: BSD3
 license-file: LICENSE
-copyright: (c) Simon Marlow
-author: Simon Marlow
-maintainer: Simon Marlow <simonmar@microsoft.com>
+copyright: (c) Simon Marlow, David Waern
+author: Simon Marlow, David Waern
+maintainer: David Waern <davve@dtek.chalmers.se>
 stability: stable
 homepage: http://www.haskell.org/haddock/
 synopsis: Haddock is a documentation-generation tool for Haskell libraries
@@ -53,7 +52,7 @@ extra-source-files:
 	haskell.vim
 	src/haddock.sh
 
-executable: haddock-ghc
+executable: haddock
 hs-source-dirs: src
 main-is: Main.hs
 extensions: CPP, PatternGuards
