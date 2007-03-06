@@ -258,6 +258,7 @@ workerTaskStop (Task *task)
     ASSERT(myTask() == task);
 #endif
 
+    task->cap = NULL;
     taskTimeStamp(task);
     task->stopped = rtsTrue;
     tasksRunning--;
