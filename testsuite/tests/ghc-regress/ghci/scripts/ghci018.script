@@ -1,0 +1,4 @@
+:set -fth
+:m + Language.Haskell.TH
+$( do runIO $ putStrLn "Q"; [| 'x' |] )
+
