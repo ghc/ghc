@@ -156,3 +156,5 @@ test('conc064', exit_code(1), compile_and_run, [''])
 test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
 test('conc067', ignore_output, compile_and_run, [''])
+
+test('conc068', normal, run_command, ['$MAKE -s --no-print-directory test068'])
