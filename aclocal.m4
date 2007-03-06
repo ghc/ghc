@@ -1036,7 +1036,7 @@ int main(int argc, char *argv[])
     timer_t timer;
     ev.sigev_notify = SIGEV_SIGNAL;
     ev.sigev_signo  = SIGVTALRM;
-    if (timer_create(CLOCK_REALTIME, &ev, &timer) != 0) {
+    if (timer_create(CLOCK_PROCESS_CPUTIME_ID, &ev, &timer) != 0) {
        exit(1);
     }
 #else
@@ -1050,7 +1050,7 @@ int main(int argc, char *argv[])
   ])
 case $fptools_cv_timer_create_works in
     yes) AC_DEFINE([USE_TIMER_CREATE], 1, 
-                   [Define to 1 if we can use timer_create(CLOCK_REALTIMER,...)]);;
+                   [Define to 1 if we can use timer_create(CLOCK_PROCESS_CPUTIME_ID,...)]);;
 esac
 ])
 
