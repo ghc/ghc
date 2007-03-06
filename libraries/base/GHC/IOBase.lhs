@@ -18,6 +18,8 @@
 module GHC.IOBase(
     IO(..), unIO, failIO, liftIO, bindIO, thenIO, returnIO, 
     unsafePerformIO, unsafeInterleaveIO,
+    unsafeDupablePerformIO, unsafeDupableInterleaveIO,
+    noDuplicate,
   
 	-- To and from from ST
     stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
@@ -214,21 +216,32 @@ once you use 'unsafePerformIO'.  Indeed, it is
 possible to write @coerce :: a -> b@ with the
 help of 'unsafePerformIO'.  So be careful!
 -}
-{-# NOINLINE unsafePerformIO #-}
 unsafePerformIO	:: IO a -> a
-unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
+unsafePerformIO m = unsafeDupablePerformIO (noDuplicate >> m)
 
--- Why do we NOINLINE unsafePerformIO?  See the comment with
+{-| 
+This version of 'unsafePerformIO' is slightly more efficient,
+because it omits the check that the IO is only being performed by a
+single thread.  Hence, when you write 'unsafeDupablePerformIO',
+there is a possibility that the IO action may be performed multiple
+times (on a multiprocessor), and you should therefore ensure that
+it gives the same results each time.
+-}
+{-# NOINLINE unsafeDupablePerformIO #-}
+unsafeDupablePerformIO	:: IO a -> a
+unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
+
+-- Why do we NOINLINE unsafeDupablePerformIO?  See the comment with
 -- GHC.ST.runST.  Essentially the issue is that the IO computation
 -- inside unsafePerformIO must be atomic: it must either all run, or
 -- not at all.  If we let the compiler see the application of the IO
 -- to realWorld#, it might float out part of the IO.
 
--- Why is there a call to 'lazy' in unsafePerformIO?
+-- Why is there a call to 'lazy' in unsafeDupablePerformIO?
 -- If we don't have it, the demand analyser discovers the following strictness
--- for unsafePerformIO:  C(U(AV))
+-- for unsafeDupablePerformIO:  C(U(AV))
 -- But then consider
---	unsafePerformIO (\s -> let r = f x in 
+--	unsafeDupablePerformIO (\s -> let r = f x in 
 --			       case writeIORef v r s of (# s1, _ #) ->
 --			       (# s1, r #)
 -- The strictness analyser will find that the binding for r is strict,
@@ -236,9 +249,8 @@ unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
 -- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
 -- get a deadlock!  
 --
--- Solution: don't expose the strictness of unsafePerformIO,
+-- Solution: don't expose the strictness of unsafeDupablePerformIO,
 --	     by hiding it with 'lazy'
-
 
 {-|
 'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
@@ -248,15 +260,32 @@ file reading, see 'System.IO.hGetContents'.
 -}
 {-# INLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO (IO m)
+unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
+
+-- We believe that INLINE on unsafeInterleaveIO is safe, because the
+-- state from this IO thread is passed explicitly to the interleaved
+-- IO, so it cannot be floated out and shared.
+
+{-# INLINE unsafeDupableInterleaveIO #-}
+unsafeDupableInterleaveIO :: IO a -> IO a
+unsafeDupableInterleaveIO (IO m)
   = IO ( \ s -> let
 		   r = case m s of (# _, res #) -> res
 		in
 		(# s, r #))
 
--- We believe that INLINE on unsafeInterleaveIO is safe, because the
--- state from this IO thread is passed explicitly to the interleaved
--- IO, so it cannot be floated out and shared.
+{-| 
+Ensures that the suspensions under evaluation by the current thread
+are unique; that is, the current thread is not evaluating anything
+that is also under evaluation by another thread that has also executed
+'noDuplicate'.
+
+This operation is used in the definition of 'unsafePerformIO' to
+prevent the IO action from being executed multiple times, which is usually
+undesirable.
+-}
+noDuplicate :: IO ()
+noDuplicate = IO $ \s -> case noDuplicate# s of s' -> (# s', () #)
 
 -- ---------------------------------------------------------------------------
 -- Handle type
