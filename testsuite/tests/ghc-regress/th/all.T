@@ -35,6 +35,7 @@ test('TH_spliceD2', normal, multimod_compile, ['TH_spliceD2', '-v0'])
 clean(['TH_spliceD2_Lib.hi', 'TH_spliceD2_Lib.o'])
 
 test('TH_reifyDecl1', normal, compile, [''])
+test('TH_reifyDecl2', normal, compile, ['-v0'])
 
 test('TH_reifyType1', normal, compile, [''])
 test('TH_reifyType2', normal, compile, [''])
