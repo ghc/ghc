@@ -178,6 +178,8 @@ threadPaused(Capability *cap, StgTSO *tso)
 {
     StgClosure *frame;
     StgRetInfoTable *info;
+    const StgInfoTable *bh_info;
+    const StgInfoTable *cur_bh_info USED_IF_THREADS;
     StgClosure *bh;
     StgPtr stack_end;
     nat words_to_squeeze = 0;
@@ -212,8 +214,13 @@ threadPaused(Capability *cap, StgTSO *tso)
 	    SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
 	    bh = ((StgUpdateFrame *)frame)->updatee;
+            bh_info = bh->header.info;
 
-	    if (closure_IND(bh) || bh->header.info == &stg_BLACKHOLE_info) {
+#ifdef THREADED_RTS
+        retry:
+#endif
+	    if (closure_flags[INFO_PTR_TO_STRUCT(bh_info)->type] & _IND
+                || bh_info == &stg_BLACKHOLE_info) {
 		debugTrace(DEBUG_squeeze,
 			   "suspending duplicate work: %ld words of stack",
 			   (long)((StgPtr)frame - tso->sp));
@@ -246,7 +253,20 @@ threadPaused(Capability *cap, StgTSO *tso)
 		// We pretend that bh is now dead.
 		LDV_recordDead_FILL_SLOP_DYNAMIC((StgClosure *)bh);
 #endif
+
+#ifdef THREADED_RTS
+                cur_bh_info = (const StgInfoTable *)
+                    cas((StgVolatilePtr)&bh->header.info, 
+                        (StgWord)bh_info, 
+                        (StgWord)&stg_BLACKHOLE_info);
+
+                if (cur_bh_info != bh_info) {
+                    bh_info = cur_bh_info;
+                    goto retry;
+                }
+#else
 		SET_INFO(bh,&stg_BLACKHOLE_info);
+#endif
 
 		// We pretend that bh has just been created.
 		LDV_RECORD_CREATE(bh);
