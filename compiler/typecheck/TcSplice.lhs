@@ -600,18 +600,19 @@ reifyTyCon tc
 
 reifyTyCon tc
   = do 	{ cxt <- reifyCxt (tyConStupidTheta tc)
-	; cons <- mapM reifyDataCon (tyConDataCons tc)
+	; let tvs = tyConTyVars tc
+	; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons tc)
 	; let name = reifyName tc
-	      tvs  = reifyTyVars (tyConTyVars tc)
+	      r_tvs  = reifyTyVars tvs
 	      deriv = []	-- Don't know about deriving
-	      decl | isNewTyCon tc = TH.NewtypeD cxt name tvs (head cons) deriv
-		   | otherwise	   = TH.DataD    cxt name tvs cons 	  deriv
+	      decl | isNewTyCon tc = TH.NewtypeD cxt name r_tvs (head cons) deriv
+		   | otherwise	   = TH.DataD    cxt name r_tvs cons 	  deriv
 	; return (TH.TyConI decl) }
 
-reifyDataCon :: DataCon -> TcM TH.Con
-reifyDataCon dc
+reifyDataCon :: [Type] -> DataCon -> TcM TH.Con
+reifyDataCon tys dc
   | isVanillaDataCon dc
-  = do 	{ arg_tys <- reifyTypes (dataConOrigArgTys dc)
+  = do 	{ arg_tys <- reifyTypes (dataConInstOrigArgTys dc tys)
 	; let stricts = map reifyStrict (dataConStrictMarks dc)
 	      fields  = dataConFieldLabels dc
 	      name    = reifyName dc
