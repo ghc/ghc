@@ -115,7 +115,7 @@ testsuite=NO
 
 args_done=NO
 
-while [ "$args_done" == NO ]
+while [ "$args_done" = NO ]
 do
     case $1 in
       --extra) shift; extra=YES;;
