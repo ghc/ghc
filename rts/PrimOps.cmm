@@ -2130,21 +2130,3 @@ asyncDoProczh_fast
 #endif
 }
 #endif
-
-/* -----------------------------------------------------------------------------
-  ** temporary **
-
-   classes CCallable and CReturnable don't really exist, but the
-   compiler insists on generating dictionaries containing references
-   to GHC_ZcCCallable_static_info etc., so we provide dummy symbols
-   for these.  Some C compilers can't cope with zero-length static arrays,
-   so we have to make these one element long.
-  --------------------------------------------------------------------------- */
-
-section "rodata" {
-  GHC_ZCCCallable_static_info:   W_ 0;
-}
-
-section "rodata" {
-  GHC_ZCCReturnable_static_info: W_ 0;
-}
