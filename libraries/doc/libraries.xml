@@ -30,9 +30,9 @@
 
     <para>The most up to date version of this document can be found in
     the <ulink
-    url="http://www.haskell.org/ghc/docs/latest/html/building/sec-cvs.html">GHC
-    CVS repository</ulink> in the directory
-    <literal>fptools/libraries/doc</literal>.</para>
+    url="http://hackage.haskell.org/trac/ghc/wiki/Building/GettingTheSources">GHC
+    darcs repository</ulink> in the directory
+    <literal>libraries/doc</literal>.</para>
 
     <para>The proposal has several parts: </para>
 

@@ -89,21 +89,18 @@ optimised and built in various ways (eg. profiling libs are built).
 It can take a long time.  To customise the build, see the file
 HACKING.
 
-For full information on building GHC, see the GHC Building Guide [3],
-which is also available in source form (DocBook XML) in docs/building.
+For full information on building GHC, see the GHC Building Guide [3].
 
 
 References
 ==========
 
- [1] http://www.haskell.org/ghc/		GHC Home Page
- [2] http://hackage.haskell.org/trac/ghc	GHC Developer's Wiki
- [3] http://hackage.haskell.org/trac/ghc/wiki/Building
-						Building Guide
-
- [4] http://www.haskell.org/happy/		Happy
- [5] http://www.haskell.org/alex/		Alex
- [6] http://www.haskell.org/haddock/		Haddock
+ [1] http://www.haskell.org/ghc/                        GHC Home Page
+ [2] http://hackage.haskell.org/trac/ghc                GHC Developer's Wiki
+ [3] http://hackage.haskell.org/trac/ghc/wiki/Building  Building Guide
+ [4] http://www.haskell.org/happy/                      Happy
+ [5] http://www.haskell.org/alex/                       Alex
+ [6] http://www.haskell.org/haddock/                    Haddock
 
 
 Contributors
