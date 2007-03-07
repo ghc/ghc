@@ -749,6 +749,15 @@ atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
 foreign import ccall unsafe "getUSecOfDay" 
   getUSecOfDay :: IO USecs
 
+prodding :: IORef Bool
+{-# NOINLINE prodding #-}
+prodding = unsafePerformIO (newIORef False)
+
+prodServiceThread :: IO ()
+prodServiceThread = do
+  was_set <- atomicModifyIORef prodding (\a -> (True,a))
+  if (not (was_set)) then wakeupIOManager else return ()
+
 #ifdef mingw32_HOST_OS
 -- ----------------------------------------------------------------------------
 -- Windows IO manager thread
@@ -789,8 +798,7 @@ service_loop wakeup old_delays = do
     _other -> service_cont wakeup delays' -- probably timeout        
 
 service_cont wakeup delays = do
-  takeMVar prodding
-  putMVar prodding False
+  atomicModifyIORef prodding (\_ -> (False,False))
   service_loop wakeup delays
 
 -- must agree with rts/win32/ThrIOManager.c
@@ -810,18 +818,9 @@ stick :: IORef HANDLE
 {-# NOINLINE stick #-}
 stick = unsafePerformIO (newIORef nullPtr)
 
-prodding :: MVar Bool
-{-# NOINLINE prodding #-}
-prodding = unsafePerformIO (newMVar False)
-
-prodServiceThread :: IO ()
-prodServiceThread = do
-  b <- takeMVar prodding
-  if (not b) 
-    then do hdl <- readIORef stick
-            c_sendIOManagerEvent io_MANAGER_WAKEUP
-    else return ()
-  putMVar prodding True
+wakeupIOManager = do 
+  hdl <- readIORef stick
+  c_sendIOManagerEvent io_MANAGER_WAKEUP
 
 -- Walk the queue of pending delays, waking up any that have passed
 -- and return the smallest delay to wait for.  The queue of pending
@@ -954,8 +953,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   if exit then return () else do
 
-  takeMVar prodding
-  putMVar prodding False
+  atomicModifyIORef prodding (\_ -> (False,False))
 
   reqs' <- if wakeup_all then do wakeupAll reqs; return []
 			 else completeRequests reqs readfds writefds []
@@ -969,19 +967,11 @@ stick :: IORef Fd
 {-# NOINLINE stick #-}
 stick = unsafePerformIO (newIORef 0)
 
-prodding :: MVar Bool
-{-# NOINLINE prodding #-}
-prodding = unsafePerformIO (newMVar False)
-
-prodServiceThread :: IO ()
-prodServiceThread = do
-  b <- takeMVar prodding
-  if (not b) 
-    then do fd <- readIORef stick
-	    with io_MANAGER_WAKEUP $ \pbuf -> do 
-		c_write (fromIntegral fd) pbuf 1; return ()
-    else return ()
-  putMVar prodding True
+wakeupIOManager :: IO ()
+wakeupIOManager = do
+  fd <- readIORef stick
+  with io_MANAGER_WAKEUP $ \pbuf -> do 
+    c_write (fromIntegral fd) pbuf 1; return ()
 
 foreign import ccall "&signal_handlers" handlers :: Ptr (Ptr (StablePtr (IO ())))
 
