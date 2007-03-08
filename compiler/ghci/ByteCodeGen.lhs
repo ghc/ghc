@@ -266,8 +266,8 @@ schemeR_wrk fvs nm original_body (args, body)
 	 bits = argBits (reverse (map idCgRep all_args))
 	 bitmap_size = length bits
 	 bitmap = mkBitmap bits
-     in
-     schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
+     in do
+     body_code <- schemeE szw_args 0 p_init body
      emitBc (mkProtoBCO (getName nm) body_code (Right original_body)
 		arity bitmap_size bitmap False{-not alts-})
 
@@ -302,34 +302,33 @@ schemeE d s p e@(AnnVar v)
      schemeT d s p e
 
    | otherwise
-   = -- Returning an unlifted value.  
-     -- Heave it on the stack, SLIDE, and RETURN.
-     pushAtom d p (AnnVar v)	`thenBc` \ (push, szw) ->
-     returnBc (push 			-- value onto stack
-               `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
-               `snocOL` RETURN_UBX v_rep)	-- go
+   = do -- Returning an unlifted value.  
+        -- Heave it on the stack, SLIDE, and RETURN.
+        (push, szw) <- pushAtom d p (AnnVar v)
+        return (push 			-- value onto stack
+                  `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
+                  `snocOL` RETURN_UBX v_rep)	-- go
    where
       v_type = idType v
       v_rep = typeCgRep v_type
 
 schemeE d s p (AnnLit literal)
-   = pushAtom d p (AnnLit literal)	`thenBc` \ (push, szw) ->
-     let l_rep = typeCgRep (literalType literal)
-     in  returnBc (push 			-- value onto stack
-                   `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
-                   `snocOL` RETURN_UBX l_rep)	-- go
-
+   = do (push, szw) <- pushAtom d p (AnnLit literal)
+        let l_rep = typeCgRep (literalType literal)
+        return (push 			-- value onto stack
+               `appOL`  mkSLIDE szw (d-s) 	-- clear to sequel
+               `snocOL` RETURN_UBX l_rep)	-- go
 
 schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
    | (AnnVar v, args_r_to_l) <- splitApp rhs,
      Just data_con <- isDataConWorkId_maybe v,
      dataConRepArity data_con == length args_r_to_l
-   = 	-- Special case for a non-recursive let whose RHS is a 
+   = do	-- Special case for a non-recursive let whose RHS is a 
 	-- saturatred constructor application.
 	-- Just allocate the constructor and carry on
-     mkConAppCode d s p data_con args_r_to_l	`thenBc` \ alloc_code ->
-     schemeE (d+1) s (addToFM p x d) body	`thenBc` \ body_code ->
-     returnBc (alloc_code `appOL` body_code)
+        alloc_code <- mkConAppCode d s p data_con args_r_to_l
+        body_code <- schemeE (d+1) s (addToFM p x d) body
+        return (alloc_code `appOL` body_code)
 
 -- General case for let.  Generates correct, if inefficient, code in
 -- all situations.
@@ -356,14 +355,14 @@ schemeE d s p (AnnLet binds (_,body))
 
          -- ToDo: don't build thunks for things with no free variables
          build_thunk dd [] size bco off arity
-            = returnBc (PUSH_BCO bco `consOL` unitOL (mkap (off+size) size))
+            = return (PUSH_BCO bco `consOL` unitOL (mkap (off+size) size))
 	   where 
 		mkap | arity == 0 = MKAP
 		     | otherwise  = MKPAP
          build_thunk dd (fv:fvs) size bco off arity = do
               (push_code, pushed_szw) <- pushAtom dd p' (AnnVar fv) 
               more_push_code <- build_thunk (dd+pushed_szw) fvs size bco off arity
-              returnBc (push_code `appOL` more_push_code)
+              return (push_code `appOL` more_push_code)
 
          alloc_code = toOL (zipWith mkAlloc sizes arities)
 	   where mkAlloc sz 0     = ALLOC_AP sz
@@ -381,7 +380,7 @@ schemeE d s p (AnnLet binds (_,body))
      in do
      body_code <- schemeE d' s p' body
      thunk_codes <- sequence compile_binds
-     returnBc (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
+     return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
 
 
@@ -465,11 +464,11 @@ schemeT d s p app
 
    -- Case 0
    | Just (arg, constr_names) <- maybe_is_tagToEnum_call
-   = pushAtom d p arg	 		`thenBc` \ (push, arg_words) ->
-     implement_tagToId constr_names	`thenBc` \ tagToId_sequence ->
-     returnBc (push `appOL`  tagToId_sequence            
-                    `appOL`  mkSLIDE 1 (d+arg_words-s)
-                    `snocOL` ENTER)
+   = do (push, arg_words) <- pushAtom d p arg
+        tagToId_sequence <- implement_tagToId constr_names
+        return (push `appOL`  tagToId_sequence            
+                       `appOL`  mkSLIDE 1 (d+arg_words-s)
+                       `snocOL` ENTER)
 
    -- Case 1
    | Just (CCall ccall_spec) <- isFCallId_maybe fn
@@ -487,10 +486,10 @@ schemeT d s p app
 
    -- Case 3: Ordinary data constructor
    | Just con <- maybe_saturated_dcon
-   = mkConAppCode d s p con args_r_to_l	`thenBc` \ alloc_con ->
-     returnBc (alloc_con	 `appOL` 
-               mkSLIDE 1 (d - s) `snocOL`
-               ENTER)
+   = do alloc_con <- mkConAppCode d s p con args_r_to_l
+        return (alloc_con	 `appOL` 
+                  mkSLIDE 1 (d - s) `snocOL`
+                  ENTER)
 
    -- Case 4: Tail call of function 
    | otherwise
@@ -539,7 +538,7 @@ mkConAppCode :: Int -> Sequel -> BCEnv
 
 mkConAppCode orig_d s p con []	-- Nullary constructor
   = ASSERT( isNullaryRepDataCon con )
-    returnBc (unitOL (PUSH_G (getName (dataConWorkId con))))
+    return (unitOL (PUSH_G (getName (dataConWorkId con))))
 	-- Instead of doing a PACK, which would allocate a fresh
 	-- copy of this constructor, use the single shared version.
 
@@ -552,11 +551,11 @@ mkConAppCode orig_d s p con args_r_to_l
       (ptr_args, non_ptr_args) = partition isPtrAtom args_r_to_l
 
       do_pushery d (arg:args)
-         = pushAtom d p arg			`thenBc` \ (push, arg_words) ->
-           do_pushery (d+arg_words) args	`thenBc` \ more_push_code ->
-           returnBc (push `appOL` more_push_code)
+         = do (push, arg_words) <- pushAtom d p arg
+              more_push_code <- do_pushery (d+arg_words) args
+              return (push `appOL` more_push_code)
       do_pushery d []
-         = returnBc (unitOL (PACK con n_arg_words))
+         = return (unitOL (PACK con n_arg_words))
 	 where
 	   n_arg_words = d - orig_d
 
@@ -573,7 +572,7 @@ unboxedTupleReturn
 	-> AnnExpr' Id VarSet -> BcM BCInstrList
 unboxedTupleReturn d s p arg = do
   (push, sz) <- pushAtom d p arg
-  returnBc (push `appOL`
+  return (push `appOL`
 	    mkSLIDE sz (d-s) `snocOL`
 	    RETURN_UBX (atomRep arg))
 
@@ -591,7 +590,7 @@ doTailCall init_d s p fn args
 	ASSERT( null reps ) return ()
         (push_fn, sz) <- pushAtom d p (AnnVar fn)
 	ASSERT( sz == 1 ) return ()
-	returnBc (push_fn `appOL` (
+	return (push_fn `appOL` (
 		  mkSLIDE ((d-init_d) + 1) (init_d - s) `appOL`
 		  unitOL ENTER))
   do_pushes d args reps = do
@@ -600,7 +599,7 @@ doTailCall init_d s p fn args
       (next_d, push_code) <- push_seq d these_args
       instrs <- do_pushes (next_d + 1) rest_of_args rest_of_reps 
 		--                ^^^ for the PUSH_APPLY_ instruction
-      returnBc (push_code `appOL` (push_apply `consOL` instrs))
+      return (push_code `appOL` (push_apply `consOL` instrs))
 
   push_seq d [] = return (d, nilOL)
   push_seq d (arg:args) = do
@@ -672,13 +671,13 @@ doCase d s p (_,scrut)
 
         -- given an alt, return a discr and code for it.
 	codeALt alt@(DEFAULT, _, (_,rhs))
-	   = schemeE d_alts s p_alts rhs	`thenBc` \ rhs_code ->
-	     returnBc (NoDiscr, rhs_code)
+	   = do rhs_code <- schemeE d_alts s p_alts rhs
+	        return (NoDiscr, rhs_code)
         codeAlt alt@(discr, bndrs, (_,rhs))
 	   -- primitive or nullary constructor alt: no need to UNPACK
 	   | null real_bndrs = do
 		rhs_code <- schemeE d_alts s p_alts rhs
-                returnBc (my_discr alt, rhs_code)
+                return (my_discr alt, rhs_code)
 	   -- algebraic alt with some binders
            | ASSERT(isAlgCase) otherwise =
              let
@@ -758,7 +757,7 @@ doCase d s p (_,scrut)
      let push_alts
 	    | isAlgCase = PUSH_ALTS alt_bco'
 	    | otherwise = PUSH_ALTS_UNLIFTED alt_bco' (typeCgRep bndr_ty)
-     returnBc (push_alts `consOL` scrut_code)
+     return (push_alts `consOL` scrut_code)
 
 
 -- -----------------------------------------------------------------------------
@@ -787,7 +786,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          -- depth to the first word of the bits for that arg, and the
          -- CgRep of what was actually pushed.
 
-         pargs d [] = returnBc []
+         pargs d [] = return []
          pargs d (a:az) 
             = let arg_ty = repType (exprType (deAnnotate' a))
 
@@ -796,34 +795,32 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
                     -- contains.
 		    Just (t, _)
 		     | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
-                       -> pargs (d + addr_sizeW) az	`thenBc` \ rest ->
-                          parg_ArrayishRep arrPtrsHdrSize d p a
-							`thenBc` \ code ->
-                          returnBc ((code,NonPtrArg):rest)
+                       -> do rest <- pargs (d + addr_sizeW) az
+                             code <- parg_ArrayishRep arrPtrsHdrSize d p a
+                             return ((code,NonPtrArg):rest)
 
 		     | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
-                       -> pargs (d + addr_sizeW) az	`thenBc` \ rest ->
-                          parg_ArrayishRep arrWordsHdrSize d p a
-							`thenBc` \ code ->
-                          returnBc ((code,NonPtrArg):rest)
+                       -> do rest <- pargs (d + addr_sizeW) az
+                             code <- parg_ArrayishRep arrWordsHdrSize d p a
+                             return ((code,NonPtrArg):rest)
 
                     -- Default case: push taggedly, but otherwise intact.
                     other
-                       -> pushAtom d p a		`thenBc` \ (code_a, sz_a) ->
-                          pargs (d+sz_a) az		`thenBc` \ rest ->
-                          returnBc ((code_a, atomRep a) : rest)
+                       -> do (code_a, sz_a) <- pushAtom d p a
+                             rest <- pargs (d+sz_a) az
+                             return ((code_a, atomRep a) : rest)
 
          -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
          -- the stack but then advance it over the headers, so as to
          -- point to the payload.
          parg_ArrayishRep hdrSize d p a
-            = pushAtom d p a `thenBc` \ (push_fo, _) ->
-              -- The ptr points at the header.  Advance it over the
-              -- header and then pretend this is an Addr#.
-              returnBc (push_fo `snocOL` SWIZZLE 0 hdrSize)
+            = do (push_fo, _) <- pushAtom d p a
+                 -- The ptr points at the header.  Advance it over the
+                 -- header and then pretend this is an Addr#.
+                 return (push_fo `snocOL` SWIZZLE 0 hdrSize)
 
-     in
-         pargs d0 args_r_to_l			`thenBc` \ code_n_reps ->
+     in do
+     code_n_reps <- pargs d0 args_r_to_l
      let
          (pushs_arg, a_reps_pushed_r_to_l) = unzip code_n_reps
 
@@ -883,12 +880,12 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          get_target_info
             = case target of
                  DynamicTarget
-                    -> returnBc (False, panic "ByteCodeGen.generateCCall(dyn)")
+                    -> return (False, panic "ByteCodeGen.generateCCall(dyn)")
                  StaticTarget target
-                    -> ioToBc (lookupStaticPtr target) `thenBc` \res ->
-                       returnBc (True, res)
-     in
-         get_target_info	`thenBc` \ (is_static, static_target_addr) ->
+                    -> do res <- ioToBc (lookupStaticPtr target)
+                          return (True, res)
+     -- in
+     (is_static, static_target_addr) <- get_target_info
      let
 
          -- Get the arg reps, zapping the leading Addr# in the dynamic case
@@ -921,11 +918,11 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          arg1_offW    = r_sizeW + addr_sizeW
          args_offW    = map (arg1_offW +) 
                             (init (scanl (+) 0 (map cgRepSizeW a_reps)))
-     in
-         ioToBc (mkMarshalCode cconv
-                    (r_offW, r_rep) addr_offW
-                    (zip args_offW a_reps))	`thenBc` \ addr_of_marshaller ->
-         recordItblMallocBc (ItblPtr (castFunPtrToPtr addr_of_marshaller)) `thenBc_`
+     -- in
+     addr_of_marshaller <- ioToBc (mkMarshalCode cconv
+                                (r_offW, r_rep) addr_offW
+                                (zip args_offW a_reps))
+     recordItblMallocBc (ItblPtr (castFunPtrToPtr addr_of_marshaller))
      let
 	 -- Offset of the next stack frame down the stack.  The CCALL
  	 -- instruction needs to describe the chunk of stack containing
@@ -938,9 +935,9 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          -- slide and return
          wrapup       = mkSLIDE r_sizeW (d_after_r - r_sizeW - s)
                         `snocOL` RETURN_UBX r_rep
-     in
+     --in
          --trace (show (arg1_offW, args_offW  ,  (map cgRepSizeW a_reps) )) $
-         returnBc (
+     return (
          push_args `appOL`
          push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup
          )
@@ -1002,15 +999,15 @@ maybe_getCCallReturnRep fn_ty
 implement_tagToId :: [Name] -> BcM BCInstrList
 implement_tagToId names
    = ASSERT( notNull names )
-     getLabelsBc (length names)			`thenBc` \ labels ->
-     getLabelBc					`thenBc` \ label_fail ->
-     getLabelBc 				`thenBc` \ label_exit ->
-     zip4 labels (tail labels ++ [label_fail])
-                 [0 ..] names			`bind`   \ infos ->
-     map (mkStep label_exit) infos		`bind`   \ steps ->
-     returnBc (concatOL steps
-               `appOL` 
-               toOL [LABEL label_fail, CASEFAIL, LABEL label_exit])
+     do labels <- getLabelsBc (length names)
+        label_fail <- getLabelBc
+        label_exit <- getLabelBc
+        let infos = zip4 labels (tail labels ++ [label_fail])
+                                [0 ..] names
+            steps = map (mkStep label_exit) infos
+        return (concatOL steps
+                  `appOL` 
+                  toOL [LABEL label_fail, CASEFAIL, LABEL label_exit])
      where
         mkStep l_exit (my_label, next_label, n, name_for_n)
            = toOL [LABEL my_label, 
@@ -1047,16 +1044,16 @@ pushAtom d p (AnnLam x e)
 pushAtom d p (AnnVar v)
 
    | idCgRep v == VoidArg
-   = returnBc (nilOL, 0)
+   = return (nilOL, 0)
 
    | isFCallId v
    = pprPanic "pushAtom: shouldn't get an FCallId here" (ppr v)
 
    | Just primop <- isPrimOpId_maybe v
-   = returnBc (unitOL (PUSH_PRIMOP primop), 1)
+   = return (unitOL (PUSH_PRIMOP primop), 1)
 
    | Just d_v <- lookupBCEnv_maybe p v  -- v is a local variable
-   = returnBc (toOL (nOfThem sz (PUSH_L (d-d_v+sz-2))), sz)
+   = return (toOL (nOfThem sz (PUSH_L (d-d_v+sz-2))), sz)
 	 -- d - d_v 		    the number of words between the TOS 
 	 --			    and the 1st slot of the object
 	 --
@@ -1070,7 +1067,7 @@ pushAtom d p (AnnVar v)
 
     | otherwise  -- v must be a global variable
     = ASSERT(sz == 1) 
-      returnBc (unitOL (PUSH_G (getName v)), sz)
+      return (unitOL (PUSH_G (getName v)), sz)
 
     where
          sz = idSizeW v
@@ -1088,7 +1085,7 @@ pushAtom d p (AnnLit lit)
      where
         code rep
            = let size_host_words = cgRepSizeW rep
-             in  returnBc (unitOL (PUSH_UBX (Left lit) size_host_words), 
+             in  return (unitOL (PUSH_UBX (Left lit) size_host_words), 
                            size_host_words)
 
         pushStr s 
@@ -1101,18 +1098,18 @@ pushAtom d p (AnnLit lit)
 			    -- by virtue of the global FastString table, but
 			    -- to be on the safe side we copy the string into
 			    -- a malloc'd area of memory.
-                                ioToBc (mallocBytes (n+1)) `thenBc` \ ptr ->
-                                recordMallocBc ptr `thenBc_`
-                                ioToBc (
-                                   withForeignPtr fp $ \p -> do
-				      memcpy ptr p (fromIntegral n)
-				      pokeByteOff ptr n (fromIntegral (ord '\0') :: Word8)
-                                      return ptr
-                                   )
-             in
-                getMallocvilleAddr `thenBc` \ addr ->
+                                do ptr <- ioToBc (mallocBytes (n+1))
+                                   recordMallocBc ptr
+                                   ioToBc (
+                                      withForeignPtr fp $ \p -> do
+				         memcpy ptr p (fromIntegral n)
+				         pokeByteOff ptr n (fromIntegral (ord '\0') :: Word8)
+                                         return ptr
+                                      )
+             in do
+                addr <- getMallocvilleAddr
                 -- Get the addr on the stack, untaggedly
-                   returnBc (unitOL (PUSH_UBX (Right addr) 1), 1)
+                return (unitOL (PUSH_UBX (Right addr) 1), 1)
 
 pushAtom d p (AnnCast e _)
    = pushAtom d p (snd e)
@@ -1142,28 +1139,28 @@ mkMultiBranch maybe_ncons raw_ways
                         (filter (not.isNoDiscr.fst) raw_ways)
 
          mkTree :: [(Discr, BCInstrList)] -> Discr -> Discr -> BcM BCInstrList
-         mkTree [] range_lo range_hi = returnBc the_default
+         mkTree [] range_lo range_hi = return the_default
 
          mkTree [val] range_lo range_hi
             | range_lo `eqAlt` range_hi 
-            = returnBc (snd val)
+            = return (snd val)
             | otherwise
-            = getLabelBc 				`thenBc` \ label_neq ->
-              returnBc (mkTestEQ (fst val) label_neq 
-			`consOL` (snd val
-			`appOL`   unitOL (LABEL label_neq)
-			`appOL`   the_default))
+            = do label_neq <- getLabelBc
+                 return (mkTestEQ (fst val) label_neq 
+   			  `consOL` (snd val
+   			  `appOL`   unitOL (LABEL label_neq)
+                          `appOL`   the_default))
 
          mkTree vals range_lo range_hi
             = let n = length vals `div` 2
                   vals_lo = take n vals
                   vals_hi = drop n vals
                   v_mid = fst (head vals_hi)
-              in
-              getLabelBc 				`thenBc` \ label_geq ->
-              mkTree vals_lo range_lo (dec v_mid) 	`thenBc` \ code_lo ->
-              mkTree vals_hi v_mid range_hi 		`thenBc` \ code_hi ->
-              returnBc (mkTestLT v_mid label_geq
+              in do
+              label_geq <- getLabelBc
+              code_lo <- mkTree vals_lo range_lo (dec v_mid)
+              code_hi <- mkTree vals_hi v_mid range_hi
+              return (mkTestLT v_mid label_geq
                         `consOL` (code_lo
 			`appOL`   unitOL (LABEL label_geq)
 			`appOL`   code_hi))
