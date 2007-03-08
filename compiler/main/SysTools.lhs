@@ -412,7 +412,8 @@ runPp dflags args =   do
 runCc :: DynFlags -> [Option] -> IO ()
 runCc dflags args =   do 
   let (p,args0) = pgm_c dflags
-  runSomethingFiltered dflags cc_filter "C Compiler" p (args0++args)
+  (args1,mb_env) <- getGccEnv (args0++args)
+  runSomethingFiltered dflags cc_filter "C Compiler" p args1 mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
   cc_filter str = unlines (do_filter (lines str))
@@ -427,6 +428,24 @@ runCc dflags args =   do
 
   r_from = mkRegex "from.*:[0-9]+"
   r_warn = mkRegex "warning: call-clobbered register used"
+
+-- Turn the -B<dir> option to gcc into the GCC_EXEC_PREFIX env var, to
+-- workaround a bug in MinGW gcc on Windows Vista, see bug #1110.
+getGccEnv :: [Option] -> IO ([Option], Maybe [(String,String)])
+getGccEnv opts = 
+#if __GLASGOW_HASKELL__ < 603
+  return (opts,Nothing)
+#else
+  if null b_dirs
+     then return (opts,Nothing)
+     else do env <- getEnvironment
+             return (rest, Just (("GCC_EXEC_PREFIX", head b_dirs) : env))
+ where
+  (b_dirs, rest) = partitionWith get_b_opt opts
+
+  get_b_opt (Option ('-':'B':dir)) = Left dir
+  get_b_opt other = Right other  
+#endif
 
 runMangle :: DynFlags -> [Option] -> IO ()
 runMangle dflags args = do 
@@ -451,7 +470,8 @@ runLink dflags args = do
 runMkDLL :: DynFlags -> [Option] -> IO ()
 runMkDLL dflags args = do
   let (p,args0) = pgm_dll dflags
-  runSomething dflags "Make DLL" p (args0++args)
+  (args1,mb_env) <- getGccEnv (args0++args)
+  runSomethingFiltered dflags id "Make DLL" p args1 mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =
@@ -600,17 +620,18 @@ runSomething :: DynFlags
 	     -> IO ()
 
 runSomething dflags phase_name pgm args = 
-  runSomethingFiltered dflags id phase_name pgm args
+  runSomethingFiltered dflags id phase_name pgm args Nothing
 
 runSomethingFiltered
-  :: DynFlags -> (String->String) -> String -> String -> [Option] -> IO ()
+  :: DynFlags -> (String->String) -> String -> String -> [Option]
+  -> Maybe [(String,String)] -> IO ()
 
-runSomethingFiltered dflags filter_fn phase_name pgm args = do
+runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
   let real_args = filter notNull (map showOpt args)
   traceCmd dflags phase_name (unwords (pgm:real_args)) $ do
   (exit_code, doesn'tExist) <- 
      IO.catch (do
-         rc <- builderMainLoop dflags filter_fn pgm real_args
+         rc <- builderMainLoop dflags filter_fn pgm real_args mb_env
 	 case rc of
 	   ExitSuccess{} -> return (rc, False)
 	   ExitFailure n 
@@ -642,12 +663,12 @@ runSomethingFiltered dflags filter_fn phase_name pgm args = do
 
 
 #if __GLASGOW_HASKELL__ < 603
-builderMainLoop dflags filter_fn pgm real_args = do
+builderMainLoop dflags filter_fn pgm real_args mb_env = do
   rawSystem pgm real_args
 #else
-builderMainLoop dflags filter_fn pgm real_args = do
+builderMainLoop dflags filter_fn pgm real_args mb_env = do
   chan <- newChan
-  (hStdIn, hStdOut, hStdErr, hProcess) <- runInteractiveProcess pgm real_args Nothing Nothing
+  (hStdIn, hStdOut, hStdErr, hProcess) <- runInteractiveProcess pgm real_args Nothing mb_env
 
   -- and run a loop piping the output from the compiler to the log_action in DynFlags
   hSetBuffering hStdOut LineBuffering
