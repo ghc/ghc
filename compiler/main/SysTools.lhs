@@ -29,9 +29,6 @@ module SysTools (
 	cleanTempDirs, cleanTempFiles, cleanTempFilesExcept,
 	addFilesToClean,
 
-	-- System interface
-	system, 		-- String -> IO ExitCode
-
 	Option(..)
 
  ) where
@@ -49,7 +46,6 @@ import FiniteMap
 
 import Control.Exception
 import Data.IORef
-import Data.Int
 import Control.Monad
 import System.Exit
 import System.Environment
@@ -59,12 +55,6 @@ import System.Directory
 import Data.Maybe
 import Data.List
 
--- GHC <= 4.08 didn't have rawSystem, and runs into problems with long command
--- lines on mingw32, so we disallow it now.
-#if __GLASGOW_HASKELL__ < 500
-#error GHC >= 5.00 is required for bootstrapping GHC
-#endif
-
 #ifndef mingw32_HOST_OS
 #if __GLASGOW_HASKELL__ > 504
 import qualified System.Posix.Internals
@@ -72,8 +62,6 @@ import qualified System.Posix.Internals
 import qualified Posix
 #endif
 #else /* Must be Win32 */
-import List		( isPrefixOf )
-import Util		( dropList )
 import Foreign
 import CString		( CString, peekCString )
 #endif
@@ -86,7 +74,6 @@ import Compat.RawSystem ( rawSystem )
 import System.Cmd       ( system )
 import GHC.IOBase       ( IOErrorType(..) ) 
 #else
-import System.Cmd       ( rawSystem, system )
 import System.Process	( runInteractiveProcess, getProcessExitCode )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
 import Data.Char        ( isSpace )
