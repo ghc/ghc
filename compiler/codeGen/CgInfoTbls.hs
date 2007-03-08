@@ -89,7 +89,8 @@ emitClosureCodeAndInfoTable cl_info args body
 
         ; conName <-  
              if is_con
-                then mkStringCLit $ fromJust conIdentity
+                then do cstr <- mkStringCLit $ fromJust conIdentity
+                        return (makeRelativeRefTo info_lbl cstr)
                 else return (mkIntCLit 0)
 
 	; emitInfoTableAndCode info_lbl std_info (extra_bits conName) args blks }

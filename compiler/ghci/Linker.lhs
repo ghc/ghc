@@ -213,13 +213,15 @@ recoverDataCon x = do
 
    getConDescAddress :: Ptr StgInfoTable -> IO (Ptr CChar)
    getConDescAddress ptr = do
-       peek $ intPtrToPtr $ (ptrToIntPtr ptr) + offset
 #ifdef GHCI_TABLES_NEXT_TO_CODE
+       offsetToString <- peek $ intPtrToPtr $ (ptrToIntPtr ptr) + offset
+       return $ ptr `plusPtr` offsetToString
        where
        -- subtract a word number of bytes 
        offset = negate (fromIntegral SIZEOF_VOID_P)
 #endif
 #ifndef GHCI_TABLES_NEXT_TO_CODE
+        peek $ intPtrToPtr $ (ptrToIntPtr ptr) + offset
       where 
       -- add the standard info table size in bytes 
       infoTableSizeBytes = sTD_ITBL_SIZE * wORD_SIZE

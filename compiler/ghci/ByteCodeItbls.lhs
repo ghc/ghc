@@ -279,17 +279,32 @@ instance Storable StgConInfoTable where
    alignment conInfoTable = SIZEOF_VOID_P
    peek ptr 
       = runState (castPtr ptr) $ do
+#ifdef GHCI_TABLES_NEXT_TO_CODE
            desc <- load
+#endif
            itbl <- load
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+           desc <- load
+#endif
            return  
               StgConInfoTable 
-              { conDesc   = desc
+              { 
+#ifdef GHCI_TABLES_NEXT_TO_CODE
+                conDesc   = castPtr $ ptr `plusPtr` wORD_SIZE `plusPtr` desc
+#else
+                conDesc   = desc
+#endif
               , infoTable = itbl
               }
    poke ptr itbl 
       = runState (castPtr ptr) $ do
-           store (conDesc itbl)
+#ifdef GHCI_TABLES_NEXT_TO_CODE
+           store (conDesc itbl `minusPtr` (ptr `plusPtr` wORD_SIZE))
+#endif
            store (infoTable itbl)
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+           store (conDesc itbl)
+#endif
 
 data StgInfoTable = StgInfoTable {
 #ifndef GHCI_TABLES_NEXT_TO_CODE

@@ -1779,6 +1779,7 @@ sub rev_tbl {
             $line =~ s/$infoname/0/
             || $line =~ s/([A-Za-z0-9_]+_srtd)$/\1 - $infoname/
             || $line =~ s/([A-Za-z0-9_]+_srt(\+\d+)?)$/\1 - $infoname/
+            || $line =~ s/([A-Za-z0-9_]+_str)$/\1 - $infoname/
 	    || $line =~ s/([A-Za-z0-9_]+_slow)$/\1 - $infoname/
 	    || $line =~ s/([A-Za-z0-9_]+_btm)$/\1 - $infoname/
             || $line =~ s/([A-Za-z0-9_]+_alt)$/\1 - $infoname/
