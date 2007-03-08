@@ -291,7 +291,7 @@ INFO_TABLE_RET(stg_catch_frame,
 #ifdef REG_R1
    {
       Sp = Sp + SIZEOF_StgCatchFrame;
-      jump Sp(SP_OFF);
+      jump %ENTRY_CODE(Sp(SP_OFF));
    }
 #else
    {
@@ -299,7 +299,7 @@ INFO_TABLE_RET(stg_catch_frame,
       rval = Sp(0);
       Sp = Sp + SIZEOF_StgCatchFrame;
       Sp(0) = rval;
-      jump Sp(SP_OFF);
+      jump %ENTRY_CODE(Sp(SP_OFF));
    }
 #endif
 
