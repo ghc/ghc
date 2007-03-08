@@ -552,6 +552,7 @@ typedef struct _RtsSymbolVal {
       SymX(newMVarzh_fast)			\
       SymX(newMutVarzh_fast)			\
       SymX(newTVarzh_fast)			\
+      SymX(noDuplicatezh_fast)			\
       SymX(atomicModifyMutVarzh_fast)		\
       SymX(newPinnedByteArrayzh_fast)		\
       SymX(newSpark)				\
