@@ -1,13 +1,10 @@
-# -----------------------------------------------------------------------------
+
+.PHONY: default_target
+
+default_target: build
 
 TOP=.
 include $(TOP)/mk/boilerplate.mk
-
-# -----------------------------------------------------------------------------
-
-# The Cabal package has a GNUmakefile for standalone building, but we
-# want the Makefile.
-MFLAGS += -f Makefile
 
 SUBDIRS = base filepath haskell98 template-haskell readline \
 	  regex-base regex-posix regex-compat parsec Cabal
@@ -50,96 +47,133 @@ endif
 
 # -----------------------------------------------------------------------------
 
-DIST_CLEAN_FILES += config.cache config.status
+empty=
+space=$(empty) $(empty)
 
-include $(TOP)/mk/target.mk
+CONFIGURE_OPTS =
+CONFIGURE_STAMP_EXTRAS :=
 
-# -----------------------------------------------------------------------------
-# Generating the combined contents/index pages for the library docs
+ifneq "$(findstring $(space)p$(space), $(space)$(GhcLibWays)$(space))" ""
+CONFIGURE_OPTS += --enable-library-profiling
+CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-profiling
+endif
+
+BOOTSTRAPPING_CABAL = bootstrapping.cabal
+
+.PHONY: boot
+
+boot: $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup)
+	# XXX Hideous hacks:
+	$(GENPRIMOP) --make-haskell-source < ../compiler/prelude/primops.txt > base/GHC/Prim.hs
+	$(GENPRIMOP) --make-haskell-wrappers < ../compiler/prelude/primops.txt > base/GHC/PrimopWrappers.hs
+
+# We build the Setup program in a setup subdirectory to stop it trying
+# to use bits of base and Cabal when we build those packages.
+# This also makes it slightly easier to clean.
+
+# We ought to be depending on %/Setup.*hs, but make makes that difficult.
+
+$(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
+%/setup/Setup: stamp/$(BOOTSTRAPPING_CABAL)
+	-$(RM) -rf $*/setup
+	mkdir $*/setup
+	$(CP) $*/Setup.*hs $*/setup
+	cd $*/setup && $(GHC) --make -i../../$(BOOTSTRAPPING_CABAL) Setup.*hs -o Setup
+
+stamp/$(BOOTSTRAPPING_CABAL):
+	$(RM) -rf $(BOOTSTRAPPING_CABAL)
+	$(CP) -a Cabal $(BOOTSTRAPPING_CABAL)
+	$(FIND) $(BOOTSTRAPPING_CABAL) \( -name "*.o" -o -name "*.hi" \) -exec $(RM) -f {} \;
+	touch $@
+
+.PHONY: all build configure
+
+all: build
 
 ifneq "$(NO_HADDOCK_DOCS)" "YES"
+all: doc
+endif
 
-HTML_DIR = html-docs
+build: $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR))
 
-extraclean ::
-	$(RM) -rf $(HTML_DIR)
+configure: $(foreach SUBDIR,$(SUBDIRS), \
+             stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR))
 
-# ATTENTION, incomprehensible shell stuff ahead: Automagically create the
-# prologue for the combined index via a header, the package prologues (in
-# alphabetical order of the packages) and a footer. Not very nice, but much
-# better than redundancy or a strong coupling with the packages.
-libraries.txt: libraries-header.txt libraries-footer.txt $(foreach f,package.conf.in prologue.txt,$(addsuffix /$(f),$(SUBDIRS)))
-	$(RM) $@
-	( cat libraries-header.txt ; echo ; \
-	for i in `for j in $(SUBDIRS) ; do echo $$j ; done | $(SORT) -f` ; do \
-	   if test -f $$i/$$i.haddock; then \
-	      echo "[@$$i@]"; \
-	      grep -v '^ *$$' $$i/prologue.txt; \
-	      echo; \
-	   fi; \
-	done ; \
-	cat libraries-footer.txt ; echo ) > $@
+.PHONY: build.library.%
 
-CLEAN_FILES += libraries.txt
+# We should depend on %/%.cabal here (and in other rules), but make
+# makes that difficult.
 
-$(HTML_DIR)/index.html : libraries.txt
-	@$(INSTALL_DIR) $(HTML_DIR)
-	$(HADDOCK) --gen-index --gen-contents -o $(HTML_DIR) \
-		$(HADDOCK_OPTS) \
-		-t "Haskell Hierarchical Libraries" \
-		-p libraries.txt \
-		$(foreach pkg, $(filter-out haskell98,$(SUBDIRS)), \
-		   $(foreach p, $(wildcard $(pkg)/$(pkg).haddock), \
-		      --read-interface=$(pkg),$(pkg)/$(pkg).haddock))
+$(foreach SUBDIR,$(SUBDIRS), \
+		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
+stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
+	-$(RM) -f stamp/configure.library.*.$*
+	cd $* && setup/Setup configure \
+	                     $(CONFIGURE_OPTS) \
+	                     --prefix=$(prefix) \
+	                     --with-compiler=../../compiler/ghc-inplace \
+	                     --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
+	                     --datasubdir=ghc \
+						 --haddock-args="--use-contents=../index.html --use-index=../doc-index.html"
+	touch $@
 
-html :: $(HTML_DIR)/index.html
+$(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
+build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
+                 %/setup/Setup
+	cd $* && setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts))
+	cd $* && setup/Setup register --inplace
 
-libraries.HxS : libraries.txt
-	@$(INSTALL_DIR) $(HTML_DIR)
-	$(HADDOCK) --gen-index --gen-contents -o $(HTML_DIR) \
-		$(HADDOCK_OPTS) \
-		-t "Haskell Hierarchical Libraries" \
-		-p libraries.txt \
-		-k libraries \
-		--html-help=mshelp2 \
-		$(foreach pkg, $(filter-out haskell98,$(SUBDIRS)), \
-		   $(foreach p, $(wildcard $(pkg)/$(pkg).haddock), \
-		      --read-interface=$(pkg),$(pkg)/$(pkg).haddock))
-	( cd $(HTML_DIR) && if Hxcomp -p libraries.HxC -o ../$@ ; then false ; else true ; fi ) || true
+.PHONY: doc
 
-libraries.chm : libraries.txt
-	@$(INSTALL_DIR) $(HTML_DIR)
-	$(HADDOCK) --gen-index --gen-contents -o $(HTML_DIR) \
-		$(HADDOCK_OPTS) \
-		-t "Haskell Hierarchical Libraries" \
-		-p libraries.txt \
-		-k libraries \
-		--html-help=mshelp \
-		$(foreach pkg, $(filter-out haskell98,$(SUBDIRS)), \
-		   $(foreach p, $(wildcard $(pkg)/$(pkg).haddock), \
-		      --read-interface=$(pkg),$(pkg)/$(pkg).haddock))
-	( cd $(HTML_DIR) && if hhc libraries.hhp ; then false ; else true ; fi && mv libraries.chm .. ) || true
+DOC_SUBDIRS = $(filter-out haskell98,$(SUBDIRS))
 
-HxS :: libraries.HxS
-chm :: libraries.chm
+doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
+	sh gen_contents_index
 
-install-docs :: $(HTML_DIR)/index.html
-	$(INSTALL_DIR) $(datadir)/html/libraries; \
-	for i in $(HTML_DIR)/*; do \
-		if test -f $$i; then \
-		  echo $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/libraries; \
-		  $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir)/html/libraries; \
-		fi; \
-	done
-	@for i in $(filter html chm HxS,$(XMLDocWays)); do \
-		if [ $$i != "html" ]; then \
-			$(INSTALL_DIR) $(datadir)/doc; \
-			echo $(INSTALL_DATA) $(INSTALL_OPTS) libraries`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir)/doc; \
-			$(INSTALL_DATA) $(INSTALL_OPTS) libraries`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir)/doc; \
-		fi; \
-		if [ $$i = "html-no-chunks" ]; then \
-			echo $(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
-			$(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
-		fi \
-	done
-endif # NO_HADDOCK_DOCS
+$(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
+doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
+               %/setup/Setup
+	cd $* && setup/Setup haddock
+
+.PHONY: install.library.%
+
+INSTALL_DIR=$(prefix)/share/ghc/doc/html/
+
+install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
+	$(INSTALL_DATA)   index.html doc-index.html 			  $(INSTALL_DIR)
+	$(INSTALL_SCRIPT) gen_contents_index 					  $(INSTALL_DIR)
+	# Hacks:
+	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.css $(INSTALL_DIR)
+	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.js  $(INSTALL_DIR)
+	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.gif $(INSTALL_DIR)
+
+# Ideally this would depend on a stamp/build.library.%, but if it does
+# then we can't change the libraries and then just rerun make.
+# Thus if you install without building then it will just break.
+$(foreach SUBDIR,$(SUBDIRS),stamp/configure.library.install.$(SUBDIR)): \
+stamp/configure.library.install.%: %/setup/Setup
+	-$(RM) -f stamp/configure.library.*.$*
+	cd $* && setup/Setup configure $(CONFIGURE_OPTS) \
+	                               --prefix=$(prefix) \
+	                               --with-compiler=$(bindir)/ghc \
+	                               --datasubdir=ghc
+	touch $@
+
+# We need to reconfigure as we now need to register with the normal ghc-pkg
+$(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
+install.library.%: stamp/configure.library.install.% %/setup/Setup
+	cd $* && setup/Setup install
+
+.PHONY: clean clean.library.%
+
+clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
+	$(RM) -f stamp/$(BOOTSTRAPPING_CABAL)
+	$(RM) -rf $(BOOTSTRAPPING_CABAL)
+	$(RM) -f libraries.txt index.html doc-index.html
+
+$(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
+clean.library.%:
+	$(RM) -f stamp/configure.library.*.$*
+	-cd $* && setup/Setup clean
+	$(RM) -rf $*/setup
+

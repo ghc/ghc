@@ -1,0 +1,53 @@
+#!/bin/sh
+
+set -e
+
+if [ -e base/dist ]
+then
+    HADDOCK_FILES=`ls -1 */dist/doc/html/*/*.haddock | sort`
+else
+    HADDOCK_FILES=`ls -1 */*.haddock | sort`
+fi
+
+# Automagically create the prologue for the combined index via a
+# header, the package prologues (in alphabetical order of the
+# packages) and a footer.
+{
+    cat libraries-header.txt
+    echo
+    # Hack to find out if we're in a build tree or installed docs
+    for HADDOCK_FILE in $HADDOCK_FILES
+    do
+        NAME=`echo "$HADDOCK_FILE" | sed "s#/.*##"`
+        if [ "$NAME" != haskell98 ]
+        then
+            echo "[@${NAME}@]"
+            grep -v '^ *$$' "$NAME"/prologue.txt
+            echo
+            HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
+        fi
+    done
+    cat libraries-footer.txt
+    echo
+} > libraries.txt
+
+# Now create the combined contents and index pages
+haddock --gen-index --gen-contents -o . \
+        -t "Haskell Hierarchical Libraries" \
+        -p libraries.txt \
+        $HADDOCK_ARGS
+
+# Unhandled Windows help stuff?:
+
+#libraries.HxS : libraries.txt
+#	 haddock ...
+#		-k libraries
+#		--html-help=mshelp2
+#	( cd $(HTML_DIR) && if Hxcomp -p libraries.HxC -o ../$@ ; then false ; else true ; fi ) || true
+#
+#libraries.chm : libraries.txt
+#	haddock ...
+#		-k libraries \
+#		--html-help=mshelp \
+#	( cd $(HTML_DIR) && if hhc libraries.hhp ; then false ; else true ; fi && mv libraries.chm .. ) || true
+

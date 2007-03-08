@@ -96,8 +96,8 @@ stage1 : check-packages
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) all; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done
-	@$(MAKE) -C libraries boot
-	@$(MAKE) -C libraries all
+	$(MAKE) -C libraries boot
+	$(MAKE) -C libraries all
 
 stage2 : check-packages
 	$(MAKE) -C compiler boot stage=2
