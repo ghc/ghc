@@ -30,10 +30,17 @@ endif
 export MAKE
 
 # ghastly hack, because the driver requires that $tool be an absolute path name.
+ifeq "$(Windows)" "YES"
+GHC_STAGE1_ABS	= $(GHC_COMPILER_DIR_ABS)/stage1/ghc-inplace.bat
+GHC_STAGE2_ABS	= $(GHC_COMPILER_DIR_ABS)/stage2/ghc-inplace.bat
+GHC_STAGE3_ABS	= $(GHC_COMPILER_DIR_ABS)/stage3/ghc-inplace.bat
+GHC_PKG_ABS     = $(GHC_PKG_DIR_ABS)/ghc-pkg-inplace.bat
+else
 GHC_STAGE1_ABS	= $(GHC_COMPILER_DIR_ABS)/stage1/ghc-inplace
 GHC_STAGE2_ABS	= $(GHC_COMPILER_DIR_ABS)/stage2/ghc-inplace
 GHC_STAGE3_ABS	= $(GHC_COMPILER_DIR_ABS)/stage3/ghc-inplace
 GHC_PKG_ABS     = $(GHC_PKG_DIR_ABS)/ghc-pkg-inplace
+endif
 HP2PS_ABS	= $(GHC_HP2PS_DIR_ABS)/hp2ps
 GS = gs
 
