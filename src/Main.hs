@@ -73,35 +73,16 @@ import StaticFlags           ( parseStaticFlags )
 -- Top-level stuff
 --------------------------------------------------------------------------------
 
--- | Get the GHC lib dir by asking the GHC binary that this program was built
--- with (or should've been built with if it hasn't moved).
-getGHCLibDir = do
-  str <- systemCaptureStdout 0 (compilerPath ++ " --print-libdir")
-  case lines str of 
-    (path:_) -> return path 
-    _ -> die ("Error: " ++ compilerPath ++ " did not respond well to " ++
-             "--print-libdir")  
-
--- temporarily taken from Cabal. TODO: use a library
-systemCaptureStdout :: Int -> String -> IO String
-systemCaptureStdout verbose cmd = do
-   withTempFile "." "" $ \tmp -> do
-      let cmd_line  = cmd ++ " >" ++ tmp
-      when (verbose > 0) $ putStrLn cmd_line
-      res <- system cmd_line
-      case res of
-        ExitFailure _ -> die ("executing external program failed: "++cmd_line)
-        ExitSuccess   -> do str <- readFile tmp
-                            let ev [] = ' '; ev xs = last xs
-                            ev str `seq` return str
+parseLibDir (('-':'B':libdir):rest) = (libdir,rest)  
+parseLibDir _ = die "Error: no -B<ghc_lib_dir> argument\n"
 
 main :: IO ()
 main = do
   args <- getArgs
-  libDir <- getGHCLibDir
+  let (libDir, args') = parseLibDir args 
 
   -- find out which flag mode we are in
-  let (isGHCMode, rest) = parseModeFlag args
+  let (isGHCMode, rest) = parseModeFlag args'
 
   -- initialize GHC 
   (session, dynflags) <- startGHC libDir
