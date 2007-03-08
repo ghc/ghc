@@ -141,6 +141,8 @@ module GHC.PArr (
   indexOfP		-- :: (a -> Bool) -> [:a:] -> [:Int:]
 ) where
 
+#ifndef __HADDOCK__
+
 import Prelude
 
 import GHC.ST   ( ST(..), STRep, runST )
@@ -712,3 +714,6 @@ writeMPArr (MPArr n# marr#) (I# i#) e
   | otherwise = error $ "writeMPArr: out of bounds parallel array index; " ++
 			"idx = " ++ show (I# i#) ++ ", arr len = "
 			++ show (I# n#)
+
+#endif /* __HADDOCK__ */
+

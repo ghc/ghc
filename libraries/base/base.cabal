@@ -51,13 +51,13 @@ exposed-modules:
 	Data.Foldable,
 	Data.Fixed,
 	Data.Function,
-	-- Data.Generics,
-	-- Data.Generics.Aliases,
-	-- Data.Generics.Basics,
-	-- Data.Generics.Instances,
-	-- Data.Generics.Schemes,
-	-- Data.Generics.Text,
-	-- Data.Generics.Twins,
+	Data.Generics,
+	Data.Generics.Aliases,
+	Data.Generics.Basics,
+	Data.Generics.Instances,
+	Data.Generics.Schemes,
+	Data.Generics.Text,
+	Data.Generics.Twins,
 	Data.Graph,
 	Data.HashTable,
 	Data.IORef,
@@ -91,7 +91,7 @@ exposed-modules:
 	Foreign.C.Error,
 	Foreign.C.String,
 	Foreign.C.Types,
-	-- Foreign.Concurrent,
+	Foreign.Concurrent,
 	Foreign.ForeignPtr,
 	Foreign.Marshal,
 	Foreign.Marshal.Alloc,
@@ -102,6 +102,40 @@ exposed-modules:
 	Foreign.Ptr,
 	Foreign.StablePtr,
 	Foreign.Storable,
+	GHC.Arr,
+	GHC.Base,
+	GHC.Conc,
+	GHC.ConsoleHandler,
+	GHC.Dotnet,
+	GHC.Dynamic,
+	GHC.Enum,
+	GHC.Err,
+	GHC.Exception,
+	GHC.Exts,
+	GHC.Float,
+	GHC.ForeignPtr,
+	GHC.Handle,
+	GHC.IO,
+	GHC.IOBase,
+	GHC.Int,
+	GHC.List,
+	GHC.Num,
+	GHC.PArr,
+	GHC.Pack,
+	GHC.Prim,
+	GHC.PrimopWrappers,
+	GHC.Ptr,
+	GHC.Read,
+	GHC.Real,
+	GHC.ST,
+	GHC.STRef,
+	GHC.Show,
+	GHC.Stable,
+	GHC.Storable,
+	GHC.TopHandler,
+	GHC.Unicode,
+	GHC.Weak,
+	GHC.Word,
 	Numeric,
 	Prelude,
 	System.Cmd,
@@ -122,7 +156,7 @@ exposed-modules:
 	System.Posix.Internals,
 	System.Posix.Signals,
 	System.Posix.Types,
-	-- System.Process,
+	System.Process,
 	System.Process.Internals,
 	System.Random,
 	System.Time,
@@ -138,6 +172,25 @@ exposed-modules:
 	Unsafe.Coerce
 other-modules:
 	Data.Array.IO.Internals
-include-dirs:	include, ../../ghc/includes
+c-sources:
+	cbits/PrelIOUtils.c
+	cbits/WCsubst.c
+	cbits/Win32Utils.c
+	cbits/consUtils.c
+	cbits/dirUtils.c
+	cbits/execvpe.c
+	cbits/fpstring.c
+	cbits/inputReady.c
+	cbits/lockFile.c
+	cbits/longlong.c
+	cbits/runProcess.c
+	cbits/selectUtils.c
+	cbits/timeUtils.c
+include-dirs: include, ../../includes, ../../rts
 includes:	HsBase.h
 extensions:	CPP
+-- XXX is there an extension for using # in varids?
+-- We need to set the package name to base (without a version number)
+-- as it's magic.
+ghc-options: -fglasgow-exts -package-name base -v0
+
