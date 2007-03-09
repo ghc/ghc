@@ -19,16 +19,29 @@
 -----------------------------------------------------------------------------
 
 module Data.Monoid (
+        -- * Monoid typeclass
  	Monoid(..),
 	Dual(..),
 	Endo(..),
+        -- * Bool wrappers
 	All(..),
 	Any(..),
+        -- * Num wrappers
 	Sum(..),
-	Product(..)
+	Product(..),
+        -- * Maybe wrappers
+        -- $MaybeExamples
+	First(..),
+	Last(..)
   ) where
 
 import Prelude
+
+{-
+-- just for testing
+import Data.Maybe
+import Test.QuickCheck
+-- -}
 
 -- ---------------------------------------------------------------------------
 -- | The monoid class.
@@ -141,3 +154,100 @@ newtype Product a = Product { getProduct :: a }
 instance Num a => Monoid (Product a) where
 	mempty = Product 1
 	Product x `mappend` Product y = Product (x * y)
+
+-- $MaybeExamples
+-- To implement @find@ or @findLast@ on any 'Foldable':
+--
+-- @
+-- findLast :: Foldable t => (a -> Bool) -> t a -> Maybe a
+-- findLast pred = getLast . foldMap (\x -> if pred x
+--                                            then Last (Just x)
+--                                            else Last Nothing)
+-- @
+--
+-- Much of "Data.Map"'s interface can be implemented with
+-- 'Data.Map.alter'. Some of the rest can be implemented with a new
+-- @alterA@ function and either 'First' or 'Last':
+--
+-- > alterA :: (Applicative f, Ord k) =>
+-- >           (Maybe a -> f (Maybe a)) -> k -> Map k a -> f (Map k a)
+-- >
+-- > instance Monoid a => Applicative ((,) a)  -- from Control.Applicative
+--
+-- @
+-- insertLookupWithKey :: Ord k => (k -> v -> v -> v) -> k -> v
+--                     -> Map k v -> (Maybe v, Map k v)
+-- insertLookupWithKey combine key value =
+--   Arrow.first getFirst . alterA doChange key
+--   where
+--   doChange Nothing = (First Nothing, Just value)
+--   doChange (Just oldValue) =
+--     (First (Just oldValue),
+--      Just (combine key value oldValue))
+-- @
+
+-- | Lift a semigroup into 'Maybe' forming a 'Monoid' according to
+-- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
+-- turned into a monoid simply by adjoining an element @e@ not in @S@
+-- and defining @e*e = e@ and @e*s = s = s*e@ for all @s ∈ S@.\" Since
+-- there is no \"Semigroup\" typeclass providing just 'mappend', we
+-- use 'Monoid' instead.
+instance Monoid a => Monoid (Maybe a) where
+  mempty = Nothing
+  Nothing `mappend` m = m
+  m `mappend` Nothing = m
+  Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
+
+
+-- | Maybe monoid returning the leftmost non-Nothing value.
+newtype First a = First { getFirst :: Maybe a }
+#ifndef __HADDOCK__
+	deriving (Eq, Ord, Read, Show)
+#else  /* __HADDOCK__ */
+instance Eq a => Eq (First a)
+instance Ord a => Ord (First a)
+instance Read a => Read (First a)
+instance Show a => Show (First a)
+#endif
+
+instance Monoid (First a) where
+	mempty = First Nothing
+	r@(First (Just _)) `mappend` _ = r
+	First Nothing `mappend` r = r
+
+-- | Maybe monoid returning the rightmost non-Nothing value.
+newtype Last a = Last { getLast :: Maybe a }
+#ifndef __HADDOCK__
+	deriving (Eq, Ord, Read, Show)
+#else  /* __HADDOCK__ */
+instance Eq a => Eq (Last a)
+instance Ord a => Ord (Last a)
+instance Read a => Read (Last a)
+instance Show a => Show (Last a)
+#endif
+
+instance Monoid (Last a) where
+	mempty = Last Nothing
+	_ `mappend` r@(Last (Just _)) = r
+	r `mappend` Last Nothing = r
+
+{-
+{--------------------------------------------------------------------
+  Testing
+--------------------------------------------------------------------}
+instance Arbitrary a => Arbitrary (Maybe a) where
+  arbitrary = oneof [return Nothing, Just `fmap` arbitrary]
+
+prop_mconcatMaybe :: [Maybe [Int]] -> Bool
+prop_mconcatMaybe x =
+  fromMaybe [] (mconcat x) == mconcat (catMaybes x)
+
+prop_mconcatFirst :: [Maybe Int] -> Bool
+prop_mconcatFirst x =
+  getFirst (mconcat (map First x)) == listToMaybe (catMaybes x)
+prop_mconcatLast :: [Maybe Int] -> Bool
+prop_mconcatLast x =
+  getLast (mconcat (map Last x)) == listLastToMaybe (catMaybes x)
+	where listLastToMaybe [] = Nothing
+              listLastToMaybe lst = Just (last lst)
+-- -}
