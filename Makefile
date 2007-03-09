@@ -314,27 +314,23 @@ endif # XSLTPROC
 
 endif # BINDIST_DOC_WAYS
 
-binary-dist ::
 ifneq "$(DIR_DOCBOOK_XSL)" ""
-	@for i in $(BinDistDirs); do 		 	 	\
-	  if test -d "$$i"; then 			 	\
-	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
-	    echo $(MAKE) -C $$i $(MFLAGS) install-docs XMLDocWays="$(BINDIST_DOC_WAYS)" \
-		prefix=$(BIN_DIST_DIR) 	\
-		exec_prefix=$(BIN_DIST_DIR) \
-		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_DIR)/share; \
-	    $(MAKE) -C $$i $(MFLAGS) install-docs XMLDocWays="$(BINDIST_DOC_WAYS)" \
-		prefix=$(BIN_DIST_DIR) 	\
-		exec_prefix=$(BIN_DIST_DIR) \
-		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_DIR)/share; \
-	  fi \
-	done
+.PHONY: binary-dist-doc-%
+
+BINARY_DIST_DOC_RULES=$(foreach d,$(BinDistDirs),binary-dist-doc-$d)
+
+binary-dist :: $(BINARY_DIST_DOC_RULES)
+
+$(BINARY_DIST_DOC_RULES): binary-dist-doc-%:
+	$(MAKE) -C $* $(MFLAGS) $(BINDIST_DOC_WAYS)
+	$(MAKE) -C $* $(MFLAGS) install-docs \
+	        XMLDocWays="$(BINDIST_DOC_WAYS)" \
+	        prefix=$(BIN_DIST_DIR) \
+	        exec_prefix=$(BIN_DIST_DIR) \
+	        bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
+	        libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+	        libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+	        datadir=$(BIN_DIST_DIR)/share
 endif
 
 # Rename scripts to $i.prl and $i.sh where necessary.
