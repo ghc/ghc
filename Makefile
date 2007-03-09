@@ -241,40 +241,31 @@ ifeq "$(darwin_TARGET_OS)" "1"
 BIN_DIST_TOP+=mk/fix_install_names.sh
 endif
 
-.PHONY: binary-dist-pre binary-dist binary-pack
+.PHONY: binary-dist-pre% binary-dist binary-pack
 
-binary-dist:: binary-dist-pre
+BINARY_DIST_PRE_RULES=$(foreach d,$(BinDistDirs),binary-dist-pre-$d)
+
+binary-dist:: binary-dist-pre $(BINARY_DIST_PRE_RULES)
 
 binary-dist-pre::
 ifeq "$(BIN_DIST)" ""
-	@echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in mk/build.mk" && exit 1
+	@echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in mk/build.mk"
+	@false
 endif
 	-rm -rf $(BIN_DIST_DIR)
 	-$(RM) $(BIN_DIST_DIR).tar.gz
-	@for i in $(BinDistDirs); do 		 	 \
-	  if test -d "$$i"; then 			 \
-	   echo $(MKDIRHIER) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM); \
-	   $(MKDIRHIER) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM); \
-	   echo $(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM); \
-	   $(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM); \
-	   echo $(MKDIRHIER) $(BIN_DIST_DIR)/share; \
-	   $(MKDIRHIER) $(BIN_DIST_DIR)/share; \
-	   echo $(MAKE) -C $$i $(MFLAGS) $(INSTALL_STAGE) install \
-		prefix=$(BIN_DIST_DIR) \
-		exec_prefix=$(BIN_DIST_DIR) \
-		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_DIR)/share; \
-	   $(MAKE) -C $$i $(MFLAGS) $(INSTALL_STAGE) install \
-		prefix=$(BIN_DIST_DIR) \
-		exec_prefix=$(BIN_DIST_DIR) \
-		bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
-		libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-		datadir=$(BIN_DIST_DIR)/share; \
-	  fi; \
-	done
+	$(MKDIRHIER) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)
+	$(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)
+	$(MKDIRHIER) $(BIN_DIST_DIR)/share
+
+$(BINARY_DIST_PRE_RULES): binary-dist-pre-%:
+	$(MAKE) -C $* $(MFLAGS) $(INSTALL_STAGE) install \
+	        prefix=$(BIN_DIST_DIR) \
+	        exec_prefix=$(BIN_DIST_DIR) \
+	        bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
+	        libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+	        libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
+	        datadir=$(BIN_DIST_DIR)/share
 
 binary-dist::
 	@for i in $(BIN_DIST_TOP); do \
