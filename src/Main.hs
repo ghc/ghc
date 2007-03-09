@@ -434,19 +434,6 @@ run flags modules extEnv = do
         [] -> return ()
         fs -> let filename = (last fs) in 
               writePackageFile filename homeEnv
-{- 
-instance Outputable (DocEntity Name) where
-  ppr (DocEntity d) = ppr d
-  ppr (DeclEntity name) = ppr name
-
-instance Show Name where
-  show name = show (ppr name defaultUserStyle)
-
-instance Show a => Show (DocDecl a) where
-  show (DocCommentNext doc) = "next" ++ show doc
-  show (DocCommentPrev doc) = "prev" ++ show doc
-  show _ = "other" 
--}
 
 type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
@@ -454,9 +441,6 @@ type FullyCheckedMod = (ParsedSource,
                         RenamedSource, 
                         TypecheckedSource, 
                         ModuleInfo)
-
---printEntity (DocEntity doc) = show doc
---printEntity (DeclEntity name) = show $ ppr name defaultUserStyle
 
 -- | This data structure collects all the information we need about a home 
 -- package module
