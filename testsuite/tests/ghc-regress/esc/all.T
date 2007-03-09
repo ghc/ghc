@@ -1,3 +1,5 @@
 test('head', normal, compile, ['-fesc -ddump-esc'])
 test('sum', normal, compile, ['-fesc -ddump-esc'])
+test('f', normal, compile, ['-fesc -ddump-esc'])
+test('synonym', normal, compile, ['-fesc -ddump-esc'])
 test('dataA', normal, compile, ['-fesc -ddump-esc'])
