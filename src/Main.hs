@@ -31,13 +31,15 @@ import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList,
 import Data.Word
 import Data.Typeable
 import Data.Graph hiding ( flattenSCC )
+import Data.Dynamic
+import Data.Foldable         ( foldlM )
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
                                ArgDescr(..) )
 import System.Environment    ( getArgs )
 import System.Directory      ( doesDirectoryExist )
 import System.FilePath
 import System.Cmd            ( system )
-import System.Exit           ( ExitCode(..) )
+import System.Exit           
 import System.IO
 
 import qualified Data.Map as Map
@@ -61,6 +63,8 @@ import PrelNames
 import Bag
 import Binary
 import HscTypes
+import Util                  ( handleDyn )
+import ErrUtils              ( printBagOfErrors )
 
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
@@ -70,171 +74,129 @@ import Packages hiding ( package )
 import StaticFlags           ( parseStaticFlags )
 
 --------------------------------------------------------------------------------
--- Top-level stuff
+-- Exception handling
 --------------------------------------------------------------------------------
 
-parseLibDir (('-':'B':libdir):rest) = (libdir,rest)  
-parseLibDir _ = die "Error: no -B<ghc_lib_dir> argument\n"
+data HaddockException = HaddockException String deriving Typeable
+throwE str = throwDyn (HaddockException str)  
+
+handleTopExceptions = 
+  handleNormalExceptions . handleHaddockExceptions . handleGhcExceptions
+
+handleNormalExceptions inner =
+  handle (\exception -> do
+    hFlush stdout    
+    case exception of
+      AsyncException StackOverflow -> do
+        putStrLn "stack overflow: use -g +RTS -K<size> to increase it"
+        exitFailure
+      ExitException code -> exitWith code
+      _other -> do
+        putStrLn ("haddock: internal Haddock or GHC error: " ++ show exception)
+        exitFailure
+  ) inner
+
+handleHaddockExceptions inner = 
+  handleDyn (\(HaddockException str) -> do
+    putStrLn $ "haddock: " ++ str
+    exitFailure
+  ) inner
+
+handleGhcExceptions inner = 
+  -- compilation errors: messages with locations attached
+  handleDyn (\dyn -> do
+    putStrLn "haddock: Compilation error(s):"
+    printBagOfErrors defaultDynFlags (unitBag dyn)
+    exitFailure
+  ) $
+
+  -- error messages propagated as exceptions
+  handleDyn (\dyn -> do
+    hFlush stdout
+    case dyn of
+      PhaseFailed _ code -> exitWith code
+      Interrupted -> exitFailure
+      _ -> do 
+        print (dyn :: GhcException)
+        exitFailure
+  ) inner
+
+--------------------------------------------------------------------------------
+-- Top-level
+--------------------------------------------------------------------------------
 
 main :: IO ()
-main = do
+main = handleTopExceptions $ do
   args <- getArgs
-  let (libDir, args') = parseLibDir args 
+  prog <- getProgramName
 
-  -- find out which flag mode we are in
-  let (isGHCMode, rest) = parseModeFlag args'
-
+  -- parse flags and handle some of them initially
+  (flags, fileArgs) <- parseHaddockOpts args
+  libDir <- handleFlags flags fileArgs
+  
   -- initialize GHC 
   (session, dynflags) <- startGHC libDir
-
-  -- parse GHC flags given to the program 
-  (dynflags', rest') <- if isGHCMode 
-    then parseGHCFlags_GHCMode     dynflags rest  
-    else parseGHCFlags_HaddockMode dynflags rest 
+  dynflags' <- parseGhcFlags dynflags flags
   setSessionDynFlags session dynflags'
 
-  -- parse Haddock specific flags
-  (flags, fileArgs) <- parseHaddockOpts rest'
-  
-  -- react to some flags before doing anything
-  handleEagerFlags flags
-
-  -- create a PackageData for each external package in the session
-  -- using the GHC API. The PackageData contains an html path,
-  -- a doc env and a list of module names.
+  -- load package data (from .haddock-files), typecheck input files and create 
+  -- the module -> html mapping
   packages <- getPackages session dynflags' flags
-
-  -- try to sort and check the input files using the GHC API 
-  modules <- sortAndCheckModules session dynflags' fileArgs
-
-  -- update the html references (module -> html file mapping)
+  modules <- sortAndCheckModules session fileArgs
   updateHTMLXRefs packages
 
   -- combine the doc envs of the external packages into one
   let env = packagesDocEnv packages
 
-	-- TODO: continue to break up the run function into parts
+  -- TODO: continue to break up the run function into parts
   run flags modules env
 
-parseModeFlag :: [String] -> (Bool, [String])
-parseModeFlag ("--ghc-flags":rest) = (True, rest)
-parseModeFlag rest = (False, rest)
+handleFlags flags fileArgs = do
+  prog <- getProgramName
+  let byeUsage = bye (usageInfo (usageHeader prog) (options False))
 
-parseGHCFlags_GHCMode :: DynFlags -> [String] -> IO (DynFlags, [String])
-parseGHCFlags_GHCMode dynflags args = do
-  (dynflags', rest) <- parseDynamicFlags dynflags args
-  rest' <- parseStaticFlags rest
-  return (dynflags', rest')
+  when (Flag_Help    `elem` flags) byeUsage
+  when (Flag_Version `elem` flags) byeVersion
+  when (null fileArgs) byeUsage
 
-parseGHCFlags_HaddockMode = parseGHCFlags
+  let ghcLibDir = case [ dir | Flag_GhcLibDir dir <- flags ] of
+                    [] -> throwE "no GHC lib dir specified"
+                    xs -> last xs
 
-parseGHCFlags :: DynFlags -> [String] -> IO (DynFlags, [String])
-parseGHCFlags dynflags args = case args of
-  [] -> return (dynflags, args)
-  ("-g":rest) -> worker rest 
-  (('-':'-':'g':'h':'c':'-':'f':'l':'a':'g':'=':str):rest) -> worker (str:rest)
-  (x:xs) -> do 
-    (flags, rest) <- parseGHCFlags dynflags xs
-    return (flags, x:rest)
+  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
+        && Flag_Html `elem` flags) $
+    throwE ("-h cannot be used with --gen-index or --gen-contents")
+
+  return ghcLibDir
+
+--------------------------------------------------------------------------------
+-- Flags 
+--------------------------------------------------------------------------------
+
+parseGhcFlags dflags flags = foldlM parseFlag dflags ghcFlags
   where 
-{-    worker strs = do
-      let (inside, _:outside) = break (=='"') (unwords strs) 
-      (dynflags', rest) <- parseDynamicFlags dynflags (words inside)    
-      when (rest == words inside) $ parseStaticFlags (words inside) >> return ()
-      parseGHCFlags dynflags' (words outside)  
--}
-    worker rest = do
-      (mbFlags, rest') <- parseGHCFlag dynflags rest
-      case mbFlags of 
-        Just flags -> parseGHCFlags flags rest'
-        Nothing -> parseGHCFlags dynflags rest'
+    -- a list of ghc flags with arguments, e.g. [[-o, odir],[-O]]
+    ghcFlags = [ words str | Flag_GhcFlag str <- flags ]
 
-parseGHCFlag :: DynFlags -> [String] -> IO (Maybe DynFlags, [String])
-parseGHCFlag _ [] = die "No GHC flag supplied\n"
-parseGHCFlag dynflags args = do
-  mbDyn <- findDynamic
-  case mbDyn of 
-    Just (dynflags', rest) -> return (Just dynflags', rest)   
-    Nothing -> do
-      mbStat <- findStatic
-      case mbStat of
-        Just (_, rest) -> return (Nothing, rest)
-        Nothing -> die ("Not a GHC flag: " ++ (head args) ++ "\n")
-  where
-    findDynamic = findFlag (\xs -> (do 
-          (fs, xs') <- parseDynamicFlags dynflags xs
-          if xs' /= xs then return (Just fs) else return Nothing
-        ) `catch` (\_ -> return Nothing) 
-      ) 
-
-    findStatic = findFlag (\xs -> do 
-        xs' <- parseStaticFlags xs
-        if xs /= xs' then return (Just ()) else return Nothing
-      )
-
-    findFlag p = do 
-      xs <- (sequence . snd) (mapAccumL (f p) [] args)
-      case [ (x, index) | Just x <- xs | index <- [1..] ] of
-        ((x, index):_) -> return (Just (x, drop index args))
-        _ -> return Nothing
-
-    f :: ([String] -> IO a) -> [String] -> String -> ([String], IO a)
-    f parser previousArgs arg = 
-      let args' = previousArgs ++ [arg]
-      in (args', parser args')
-
+    -- try to parse a flag as either a dynamic or static GHC flag
+    parseFlag dynflags ghcFlag = do
+      (dynflags', rest) <- parseDynamicFlags dynflags ghcFlag
+      when (rest == ghcFlag) $ do 
+        rest' <- parseStaticFlags ghcFlag
+        when (rest' == ghcFlag) $
+          throwE ("Couldn't parse GHC flag: " ++ (unwords ghcFlag))           
+      return dynflags'
+ 
 parseHaddockOpts :: [String] -> IO ([Flag], [String])
 parseHaddockOpts words =
   case getOpt Permute (options True) words of
     (flags, args, []) -> return (flags, args)
     (_, _, errors)    -> do 
       prog <- getProgramName
-      die (concat errors ++ usageInfo (usageHeader prog) (options False))
+      throwE (concat errors ++ usageInfo (usageHeader prog) (options False))
 
 usageHeader :: String -> String
 usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
-
-extractGHCFlags :: [Flag] -> [String]
-extractGHCFlags flags = [ flag | Flag_GHCFlag flag <- flags ]
-
-startGHC :: String -> IO (Session, DynFlags)
-startGHC libDir = do
-  let ghcMode = BatchCompile
-  session <- newSession ghcMode (Just libDir)
-  flags   <- getSessionDynFlags session
-  flags'  <- liftM fst (initPackages flags)
-  let flags'' = dopt_set flags' Opt_Haddock 
-  return (session, flags'')
-
-sortAndCheckModules :: Session -> DynFlags -> [FilePath] -> IO [CheckedMod]
-sortAndCheckModules session flags files = defaultErrorHandler flags $ do 
-  targets <- mapM (\s -> guessTarget s Nothing) files
-  setTargets session targets 
-  mbModGraph <- depanal session [] True
-  moduleGraph <- case mbModGraph of 
-    Just mg -> return mg 
-    Nothing -> die "Failed to load all modules\n" 
-  let 
-    modSumFile    = fromJust . ml_hs_file . ms_location
-    sortedGraph   = topSortModuleGraph False moduleGraph Nothing
-    sortedModules = concatMap flattenSCC sortedGraph 
-    modsAndFiles  = [ (ms_mod modsum, modSumFile modsum) | 
-                      modsum <- sortedModules, 
-                      modSumFile modsum `elem` files ] 
-  checkedMods <- mapM (\(mod, file) -> do
-    mbMod <- checkModule session (moduleName mod)
-    checkedMod <- case mbMod of 
-      Just m  -> return m
-      Nothing -> die ("Failed to load module: " ++ moduleString mod ++ "\n")
-    return (mod, file, checkedMod)) modsAndFiles 
-  ensureFullyChecked checkedMods
-  where
-    ensureFullyChecked modules 
-      | length modules' == length modules = return modules'
-      | otherwise = die "Failed to check all modules properly\n" 
-      where modules' = [ (mod, f, (a,b,c,d)) | 
-                         (mod, f, CheckedModule a (Just b) (Just c) (Just d)) 
-                         <- modules ] 
 
 data Flag
   = Flag_CSS String
@@ -265,12 +227,15 @@ data Flag
   | Flag_IgnoreAllExports
   | Flag_HideModule String
   | Flag_UsePackage String
-  | Flag_GHCFlag String
+  | Flag_GhcFlag String
+  | Flag_GhcLibDir String
   deriving (Eq)
 
 options :: Bool -> [OptDescr Flag]
 options backwardsCompat =
   [
+   Option ['B']  []     (ReqArg Flag_GhcLibDir "DIR")
+	"path to the GHC lib dir, e.g /usr/lib/ghc",
    Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
 	"directory in which to put the output files",
    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
@@ -328,24 +293,53 @@ options backwardsCompat =
 	"behave as if MODULE has the hide attribute",
     Option [] ["use-package"] (ReqArg Flag_UsePackage "PACKAGE")
 	"the modules being processed depend on PACKAGE",
-    Option ['g'] ["ghc-flag"] (ReqArg Flag_GHCFlag "FLAG")
- 	"send a flag to the Glasgow Haskell Compiler"       
-  ]
+    Option ['g'] [] (ReqArg Flag_GhcFlag "FLAGS + ARGS")
+ 	("send a flag to the Glasgow Haskell Compiler (use quotation to "
+  ++ "pass arguments to the flag)")      
+   ]
 
-handleEagerFlags flags = do
-  when ((Flag_Help `elem` flags) || null flags) $ do
-    prog <- getProgramName
-    bye (usageInfo (usageHeader prog) (options False))
- 
-  whenFlag Flag_Version $
-    bye ("Haddock-GHC version " ++ projectVersion ++ 
-         ", (c) Simon Marlow 2003; port to GHC-api by David Waern 2006\n")
+byeVersion = 
+  bye ("Haddock version " ++ projectVersion ++ 
+       ", (c) Simon Marlow 2003; ported to the GHC-API by David Waern 2006\n")
 
-  when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
-        && Flag_Html `elem` flags) $
-    die ("-h cannot be used with --gen-index or --gen-contents")
-  where 
-    whenFlag flag action = when (flag `elem` flags) action 
+startGHC :: String -> IO (Session, DynFlags)
+startGHC libDir = do
+  let ghcMode = BatchCompile
+  session <- newSession ghcMode (Just libDir)
+  flags   <- getSessionDynFlags session
+  flags'  <- liftM fst (initPackages flags)
+  let flags'' = dopt_set flags' Opt_Haddock 
+  return (session, flags'')
+
+sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
+sortAndCheckModules session files = do 
+  targets <- mapM (\s -> guessTarget s Nothing) files
+  setTargets session targets 
+  mbModGraph <- depanal session [] True
+  moduleGraph <- case mbModGraph of 
+    Just mg -> return mg 
+    Nothing -> throwE "Failed to load all modules" 
+  let 
+    modSumFile    = fromJust . ml_hs_file . ms_location
+    sortedGraph   = topSortModuleGraph False moduleGraph Nothing
+    sortedModules = concatMap flattenSCC sortedGraph 
+    modsAndFiles  = [ (ms_mod modsum, modSumFile modsum) | 
+                      modsum <- sortedModules, 
+                      modSumFile modsum `elem` files ] 
+  checkedMods <- mapM (\(mod, file) -> do
+    mbMod <- checkModule session (moduleName mod)
+    checkedMod <- case mbMod of 
+      Just m  -> return m
+      Nothing -> throwE ("Failed to load module: " ++ moduleString mod)
+    return (mod, file, checkedMod)) modsAndFiles 
+  ensureFullyChecked checkedMods
+  where
+    ensureFullyChecked modules 
+      | length modules' == length modules = return modules'
+      | otherwise = throwE "Failed to check all modules properly" 
+      where modules' = [ (mod, f, (a,b,c,d)) | 
+                         (mod, f, CheckedModule a (Just b) (Just c) (Just d)) 
+                         <- modules ] 
 
 run :: [Flag] -> [CheckedMod] -> Map Name Name -> IO ()
 run flags modules extEnv = do
@@ -766,9 +760,9 @@ getPrologue flags
 	[filename] -> do
 	   str <- readFile filename
 	   case parseHaddockComment str of
-		Left err -> die err
+		Left err -> throwE err
 		Right doc -> return (Just doc)
-	_otherwise -> die "multiple -p/--prologue options"
+	_otherwise -> throwE "multiple -p/--prologue options"
 
 -- -----------------------------------------------------------------------------
 -- Phase 2
@@ -1213,9 +1207,6 @@ data PackageData = PackageData {
   pdDocEnv   :: DocEnv,
   pdHtmlPath :: FilePath
 }
-
-data HaddockException = HaddockException String deriving Typeable
-throwE str = throwDyn (HaddockException str)  
 
 -- | Recreate exposed modules from an InstalledPackageInfo
 packageModules :: InstalledPackageInfo -> [Module]
