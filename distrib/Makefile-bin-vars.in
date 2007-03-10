@@ -1,0 +1,62 @@
+
+# Where the different pieces of the bundle should go:
+bindir      = @bindir@
+libdir      = @libdir@/$(package)-$(version)
+datadir     = @datadir@/$(package)-$(version)
+
+platform    = @TargetPlatform@
+prefix      = @prefix@
+exec_prefix = @exec_prefix@
+
+# default
+htmldir     = $(datadir)/html
+psdir       = $(datadir)
+pdfdir      = $(datadir)
+
+
+PERL        = @PerlCmd@
+SH	    = /bin/sh
+RM          = rm -f
+MV          = mv
+CP          = cp
+LN_S        = @LN_S@
+CHMOD       = chmod
+INSTALL	    = @INSTALL@
+exeext      = @exeext@
+SED	    = @SedCmd@
+DEFAULT_TMPDIR = /tmp
+
+# sigh
+INSTALL_DIR  = ./mkdirhier
+
+#
+# Set of package scripts for which you'd like a name-<version> symlink
+# to be created, i.e., create a symlink, ghc-$(version), pointing to ghc to
+# avoid version vertigo.
+#
+VERSION_SYMLINKS_FOR=$(PACKAGE_LINKS)
+
+# Binaries to install
+PACKAGE_BIN_INSTALL=$(PACKAGE_PRL_SCRIPTS) $(PACKAGE_SH_SCRIPTS)
+
+#----------end of user-serviceable parts------------
+#
+#
+# How to install the different pieces
+# 
+INSTALL_BIN    = $(INSTALL) $(INSTALL_BIN_OPTS)
+INSTALL_LIB    = $(INSTALL) $(INSTALL_LIB_OPTS)
+INSTALL_DATA   = $(INSTALL) $(INSTALL_DATA_OPTS)
+INSTALL_SCRIPT = $(INSTALL) $(INSTALL_SCRIPT_OPTS)
+
+# What's common to all installs
+INSTALL_OPTS= $(EXTRA_INSTALL_OPTS)
+
+BIN_PERMS = 755
+LIB_PERMS = 644
+
+INSTALL_BIN_OPTS    = -m $(BIN_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_BIN_OPTS)
+INSTALL_LIB_OPTS    = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_LIB_OPTS)
+INSTALL_DATA_OPTS   = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_DATA_OPTS)
+INSTALL_SCRIPT_OPTS = -m $(BIN_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_SCRIPT_OPTS)
+

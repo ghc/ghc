@@ -3,8 +3,12 @@
 
 default_target: build
 
+ifeq "$(IN_BIN_DIST)" "1"
+include ../Makefile-vars
+else
 TOP=.
 include $(TOP)/mk/boilerplate.mk
+endif
 
 SUBDIRS = base filepath haskell98 template-haskell readline \
 	  regex-base regex-posix regex-compat parsec Cabal
@@ -59,6 +63,11 @@ CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-profiling
 endif
 
 BOOTSTRAPPING_CABAL = bootstrapping.cabal
+
+.PHONY: subdirs
+
+subdirs:
+	@echo $(SUBDIRS)
 
 .PHONY: boot
 

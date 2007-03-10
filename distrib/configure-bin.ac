@@ -5,7 +5,7 @@ dnl
 #
 
 # Is it there?
-AC_INIT(Makefile.in)
+AC_INIT(Makefile-vars.in)
 
 exeext=''
 
@@ -141,7 +141,7 @@ FP_HAVE_GCC
 AC_PROG_CPP
 
 #
-AC_OUTPUT(Makefile)
+AC_OUTPUT(Makefile-vars)
 
 echo "****************************************************"
 echo "Configuration done, ready to either 'make install'"

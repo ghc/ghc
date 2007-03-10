@@ -216,7 +216,7 @@ BinDistLibPrlScripts = ghc-asm ghc-split
 BinDistBins = hp2ps runghc
 BinDistLinks = ghc ghci ghc-pkg
 BinDistLibSplicedFiles = package.conf
-BinDistDirs = includes compiler docs driver libraries rts utils
+BinDistDirs = includes compiler docs driver rts utils
 
 BIN_DIST_NAME=ghc-$(ProjectVersion)
 BIN_DIST_TOPDIR=$(FPTOOLS_TOP_ABS)
@@ -224,17 +224,17 @@ BIN_DIST_DIR=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)
 
 BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
 
-BIN_DIST_TOP= distrib/Makefile-bin.in \
-	      distrib/configure-bin.ac \
-	      distrib/INSTALL \
-	      distrib/README \
-	      ANNOUNCE \
-	      LICENSE \
-	      utils/mkdirhier/mkdirhier \
-	      install-sh \
-	      config.guess \
-	      config.sub   \
-	      aclocal.m4
+BIN_DIST_TOP= distrib/Makefile \
+              distrib/configure-bin.ac \
+              distrib/INSTALL \
+              distrib/README \
+              ANNOUNCE \
+              LICENSE \
+              utils/mkdirhier/mkdirhier \
+              install-sh \
+              config.guess \
+              config.sub   \
+              aclocal.m4
 
 ifeq "$(darwin_TARGET_OS)" "1"
 BIN_DIST_TOP+=mk/fix_install_names.sh
@@ -266,6 +266,8 @@ $(BINARY_DIST_PRE_RULES): binary-dist-pre-%:
 	        libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
 	        datadir=$(BIN_DIST_DIR)/share
 
+VARFILE=$(BIN_DIST_DIR)/Makefile-vars.in
+
 binary-dist::
 	@for i in $(BIN_DIST_TOP); do \
 	  if test -f "$$i"; then \
@@ -274,17 +276,17 @@ binary-dist::
 	  fi; \
 	done;
 	@echo "Configuring the Makefile for this project..."
-	touch $(BIN_DIST_DIR)/Makefile.in
-	echo "package = ghc" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "version = $(ProjectVersion)" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "PACKAGE_SH_SCRIPTS = $(BinDistShScripts)" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "PACKAGE_PRL_SCRIPTS = $(BinDistPrlScripts)" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "PACKAGE_LIB_PRL_SCRIPTS = $(BinDistLibPrlScripts)" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "PACKAGE_LIB_SPLICED_FILES = $(BinDistLibSplicedFiles)" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "PACKAGE_BINS = $(BinDistBins)" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "PACKAGE_OPT_BINS = $(BinDistOptBins)" >> $(BIN_DIST_DIR)/Makefile.in
-	echo "PACKAGE_LINKS = $(BinDistLinks)" >> $(BIN_DIST_DIR)/Makefile.in
-	cat $(BIN_DIST_DIR)/Makefile-bin.in >> $(BIN_DIST_DIR)/Makefile.in
+	echo                                                         >  $(VARFILE)
+	echo "package = ghc"                                         >> $(VARFILE)
+	echo "version = $(ProjectVersion)"                           >> $(VARFILE)
+	echo "PACKAGE_SH_SCRIPTS = $(BinDistShScripts)"              >> $(VARFILE)
+	echo "PACKAGE_PRL_SCRIPTS = $(BinDistPrlScripts)"            >> $(VARFILE)
+	echo "PACKAGE_LIB_PRL_SCRIPTS = $(BinDistLibPrlScripts)"     >> $(VARFILE)
+	echo "PACKAGE_LIB_SPLICED_FILES = $(BinDistLibSplicedFiles)" >> $(VARFILE)
+	echo "PACKAGE_BINS = $(BinDistBins)"                         >> $(VARFILE)
+	echo "PACKAGE_OPT_BINS = $(BinDistOptBins)"                  >> $(VARFILE)
+	echo "PACKAGE_LINKS = $(BinDistLinks)"                       >> $(VARFILE)
+	cat distrib/Makefile-bin-vars.in                             >> $(VARFILE)
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
 	( cd $(BIN_DIST_DIR); autoconf )
@@ -295,21 +297,23 @@ binary-dist::
 
 ifndef BINDIST_DOC_WAYS
 
-ifneq "$(XSLTPROC)" ""
-BINDIST_DOC_WAYS = html
-ifneq "$(FOP)" ""
-BINDIST_DOC_WAYS += ps pdf
-else
-ifneq "$(PDFXMLTEX)" ""
-BINDIST_DOC_WAYS += pdf
-endif
-ifneq "$(XMLTEX)" ""
-ifneq "$(DVIPS)" ""
-BINDIST_DOC_WAYS += ps
-endif # DVIPS
-endif # XMLTEX
-endif # FOP
-endif # XSLTPROC
+BINDIST_DOC_WAYS = $(XMLDocWays)
+
+# ifneq "$(XSLTPROC)" ""
+# BINDIST_DOC_WAYS = html
+# ifneq "$(FOP)" ""
+# BINDIST_DOC_WAYS += ps pdf
+# else
+# ifneq "$(PDFXMLTEX)" ""
+# BINDIST_DOC_WAYS += pdf
+# endif
+# ifneq "$(XMLTEX)" ""
+# ifneq "$(DVIPS)" ""
+# BINDIST_DOC_WAYS += ps
+# endif # DVIPS
+# endif # XMLTEX
+# endif # FOP
+# endif # XSLTPROC
 
 endif # BINDIST_DOC_WAYS
 
@@ -360,6 +364,30 @@ binary-dist::
 	    fi \
 	done
 endif
+
+.PHONY: binary-dist-doc-%
+
+BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
+
+LIBRARY_SUBDIRS=$(shell $(MAKE) -s -C libraries subdirs)
+
+BINARY_DIST_LIBRARY_RULES=$(foreach d,$(LIBRARY_SUBDIRS),binary-dist-lib-$d)
+
+binary-dist:: $(BINARY_DIST_LIBRARY_RULES)
+	cp    libraries/Makefile           $(BIN_DIST_LIBDIR)
+	cp    libraries/gen_contents_index $(BIN_DIST_LIBDIR)
+	cp    libraries/index.html         $(BIN_DIST_LIBDIR)
+	cp    libraries/doc-index.html     $(BIN_DIST_LIBDIR)
+	cp -a libraries/stamp              $(BIN_DIST_LIBDIR)
+
+$(BINARY_DIST_LIBRARY_RULES): binary-dist-lib-%:
+	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*/setup
+	cp    libraries/$*/setup/Setup   $(BIN_DIST_LIBDIR)/$*/setup
+	cp    libraries/$*/*.cabal       $(BIN_DIST_LIBDIR)/$*
+	cp -a libraries/$*/dist          $(BIN_DIST_LIBDIR)/$*
+	find $(BIN_DIST_LIBDIR)/$*/dist \
+	     \( \( -name "*.o" -o -name "*.p_o" \) -a \! -name "HS*" \) \
+	     -exec rm {} \;
 
 # Tar up the distribution and build a manifest
 binary-dist ::

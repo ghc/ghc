@@ -1,115 +1,5 @@
-#
-# @configure_input@
-#
-# Instructions for configuring an fptools package.
-#
-# There are two ways you can get started with an fptools package, either
-# by using the unpacked distribution tree in-situ or by installing the
-# package.
-#
-# Using the package directly is easy, just do `make in-place'. (The
-# distribution will *not* work straight out of the box, you'll have to do
-# this first)
-#
-# To install the package, you'll have to set one or more of the
-# following variables:
-#
-#  * bindir 
-#     path to directory of where you want the executables
-#     to be installed.
-#  * libdir
-#     where you want the library archives to go.
-#     Note, if you specify /usr/foo/lib for libdir,
-#     the library files for your fptools package will be
-#     installed in  /usr/foo/lib/<package>-<version>, e.g.,
-#     /usr/foo/lib/ghc-3.00. If you don't want the package/version
-#     directory appended, you'll have to modify $(real_libdir)
-#     below.
-#
-#  * datadir
-#     path to where the platform-independent files will go.
-#     As for libdir, the effective path for the platform-indep
-#     stuff is $(datadir)/<package>-<version>. If you want
-#     complete control, see $(real_datadir)
-#
-#  * platform 
-#     the platform you're installing for. The configure script
-#     makes an educated guess, so you'll only have to set this
-#     if it clashes with your reality, I guess.
-#
-#  * htmldir
-#     where to install the HTML documentation files.
-#  * pdfdir
-#     where to install the PDF documentation files.
-#  * psdir
-#     where to install the Postscript documentation files.
-#
-# For more complete instructions, consult the INSTALL file
-# that came with the bundle, and/or consult the installation
-# documentation in one of the document directories.
-#
-# Please report any bugs, problems etc. with installing and using this bundle
-# Makefile setup to glasgow-haskell-bugs@dcs.gla.ac.uk
-# 
 
-# Where the different pieces of the bundle should go:
-bindir      = @bindir@
-libdir      = @libdir@/$(package)-$(version)
-datadir     = @datadir@/$(package)-$(version)
-
-platform    = @TargetPlatform@
-prefix      = @prefix@
-exec_prefix = @exec_prefix@
-
-# default
-htmldir     = $(datadir)/html
-psdir       = $(datadir)
-pdfdir      = $(datadir)
-
-
-PERL        = @PerlCmd@
-SH	    = /bin/sh
-RM          = rm -f
-MV          = mv
-CP          = cp
-LN_S        = @LN_S@
-CHMOD       = chmod
-INSTALL	    = @INSTALL@
-exeext      = @exeext@
-SED	    = @SedCmd@
-DEFAULT_TMPDIR = /tmp
-
-# sigh
-INSTALL_DIR  = ./mkdirhier
-
-#
-# Set of package scripts for which you'd like a name-<version> symlink
-# to be created, i.e., create a symlink, ghc-$(version), pointing to ghc to
-# avoid version vertigo.
-#
-VERSION_SYMLINKS_FOR=$(PACKAGE_LINKS)
-
-# Binaries to install
-PACKAGE_BIN_INSTALL=$(PACKAGE_PRL_SCRIPTS) $(PACKAGE_SH_SCRIPTS)
-
-#----------end of user-serviceable parts------------
-#
-#
-# How to install the different pieces
-# 
-INSTALL_BIN  = $(INSTALL) $(INSTALL_BIN_OPTS)
-INSTALL_LIB  = $(INSTALL) $(INSTALL_LIB_OPTS)
-INSTALL_DATA = $(INSTALL) $(INSTALL_DATA_OPTS)
-
-# What's common to all installs
-INSTALL_OPTS= $(EXTRA_INSTALL_OPTS)
-
-BIN_PERMS = 755
-LIB_PERMS = 644
-
-INSTALL_BIN_OPTS  = -m $(BIN_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_BIN_OPTS)
-INSTALL_LIB_OPTS  = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_LIB_OPTS)
-INSTALL_DATA_OPTS = -m $(LIB_PERMS) $(INSTALL_OPTS) $(EXTRA_INSTALL_DATA_OPTS)
+include Makefile-vars
 
 .PHONY: in-place config-pkgs mk-version-symlinks install-dirs install
 
@@ -248,9 +138,9 @@ install-bin:
 	   fi; 					\
 	done
 
-
 install-libs:
 	(cd lib/$(platform); find . -type f -exec sh -c '$(CP) $$0 $(libdir)/$$0' {} \; )
+	$(MAKE) -C libraries install IN_BIN_DIST=1
 
 install-datas:
 	for i in `(cd share; find . -type f )`; do \
