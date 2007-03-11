@@ -27,6 +27,8 @@ test('gadt19', normal, compile, [''])
 test('gadt20', normal, compile, [''])
 test('gadt21', normal, compile_fail, [''])
 test('gadt22', normal, compile, [''])
+test('gadt23', normal, run_command, ['$MAKE -s gadt23'])
+clean(['Gadt23_AST.hi', 'Gadt23_AST.o'])
 
 test('red-black', normal, compile, [''])
 test('type-rep', skip_if_fast, compile_and_run, [''])
