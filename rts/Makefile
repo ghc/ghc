@@ -292,6 +292,24 @@ endif
 
 CLEAN_FILES += gmp/libgmp.a
 
+# Need to get the GMP vars in through CPP to package.conf.in, and put
+# quotes around each element.
+
+empty =
+space = $(empty) $(empty)
+comma = ,
+PACKAGE_CPP_OPTS += -DGMP_INCLUDE_DIRS='$(subst $(space),$(comma),$(patsubst %,"%",$(strip $(GMP_INCLUDE_DIRS))))'
+PACKAGE_CPP_OPTS += -DGMP_LIB_DIRS='$(subst $(space),$(comma),$(patsubst %,"%",$(strip $(GMP_LIB_DIRS))))'
+
+ifneq "$(GMP_INCLUDE_DIRS)" ""
+SRC_HC_OPTS += -I$(GMP_INCLUDE_DIRS)
+SRC_CC_OPTS += -I$(GMP_INCLUDE_DIRS)
+SRC_HSC2HS_OPTS += -I$(GMP_INCLUDE_DIRS)
+endif
+ifneq "$(GMP_LIB_DIRS)" ""
+SRC_LD_OPTS += -L$(GMP_LIB_DIRS)
+endif
+
 #-----------------------------------------------------------------------------
 #
 # Building the GUM SysMan

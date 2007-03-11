@@ -882,6 +882,9 @@ endif
 HaveLibGmp	= @HaveLibGmp@
 LibGmp		= @LibGmp@
 
+GMP_INCLUDE_DIRS=@GMP_INCLUDE_DIRS@
+GMP_LIB_DIRS=@GMP_LIB_DIRS@
+
 #-----------------------------------------------------------------------------
 # GMP framework (Mac OS X)
 #

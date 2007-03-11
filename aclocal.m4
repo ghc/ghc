@@ -1054,4 +1054,26 @@ case $fptools_cv_timer_create_works in
 esac
 ])
 
+# FP_ARG_GMP
+# -------------
+AC_DEFUN([FP_ARG_GMP],
+[
+AC_ARG_WITH([gmp-includes],
+  [AC_HELP_STRING([--with-gmp-includes],
+    [directory containing gmp.h])],
+    [gmp_includes=$withval],
+    [gmp_includes=NONE])
+
+AC_ARG_WITH([gmp-libraries],
+  [AC_HELP_STRING([--with-gmp-libraries],
+    [directory containing gmp library])],
+    [gmp_libraries=$withval],
+    [gmp_libraries=NONE])
+])# FP_ARG_GMP
+
+AC_DEFUN([CHECK_GMP],
+[AC_REQUIRE([AC_PROG_CPP])
+AC_REQUIRE([AC_PROG_CC])
+])
+
 # LocalWords:  fi

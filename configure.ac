@@ -64,6 +64,25 @@ if test x"$srcdir" != 'x.' ; then
 fi
 
 dnl--------------------------------------------------------------------
+dnl * Deal with arguments telling us gmp is somewhere odd
+dnl--------------------------------------------------------------------
+
+FP_ARG_GMP
+
+GMP_INCLUDE_DIRS=
+GMP_LIB_DIRS=
+if test "x$gmp_libraries" != "xNONE"; then
+  LDFLAGS="-L$gmp_libraries $LDFLAGS"
+  GMP_LIB_DIRS=$gmp_libraries
+fi
+if test "x$gmp_includes" != "xNONE"; then
+  CPPFLAGS="-I$gmp_includes $CPPFLAGS"
+  GMP_INCLUDE_DIRS=$gmp_includes
+fi
+AC_SUBST(GMP_INCLUDE_DIRS)
+AC_SUBST(GMP_LIB_DIRS)
+
+dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
 
