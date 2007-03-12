@@ -1176,13 +1176,19 @@ $(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean main
 	@echo "------------------------------------------------------------------------"
 # Don't rely on -e working, instead we check exit return codes from sub-makes.
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	if [ $$x_on_err -eq 0 ]; \
+	    then echo "Won't exit on error due to MFLAGS: ${MFLAGS}"; \
+	fi; \
 	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
 	  echo "------------------------------------------------------------------------"; \
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
-	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ]; \
+	      then echo "Finished making $@ in $$i": $$?; \
+	      else echo "Failed making $@ in $$i": $$?; exit 1; \
+	  fi; \
 	done
 	@echo "------------------------------------------------------------------------"
 	@echo "== Finished making \`$@' in $(SUBDIRS) ..."
