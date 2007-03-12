@@ -161,7 +161,7 @@ withMany withFoo (x:xs) f = withFoo x $ \x' ->
 copyBytes               :: Ptr a -> Ptr a -> Int -> IO ()
 copyBytes dest src size  = memcpy dest src (fromIntegral size)
 
--- |Copies the given number of elements from the second area (source) into the
+-- |Copies the given number of bytes from the second area (source) into the
 -- first (destination); the copied areas /may/ overlap
 --
 moveBytes               :: Ptr a -> Ptr a -> Int -> IO ()
