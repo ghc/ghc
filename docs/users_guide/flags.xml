@@ -169,25 +169,29 @@
 	  <tbody>
 	    <row>
 	      <entry><option>--interactive</option></entry>
-	      <entry>Interactive mode - normally used by just running <command>ghci</command></entry>
+	      <entry>Interactive mode - normally used by just running <command>ghci</command>;
+	      see <xref linkend="ghci"/> for details.</entry>
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>--make</option></entry>
-	      <entry>Build a multi-module Haskell program, automatically figuring out dependencies. Likely to be much easier, and faster, than using <command>make</command>.</entry>
+	      <entry>Build a multi-module Haskell program, automatically figuring out dependencies. Likely to be much easier, and faster, than using <command>make</command>;
+	      see <xref linkend="make-mode"/> for details..</entry>
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-e <replaceable>expr</replaceable></option></entry>
-	      <entry>Evaluate <replaceable>expr</replaceable></entry>
+	      <entry>Evaluate <replaceable>expr</replaceable>;
+	      see <xref linkend="eval-mode"/> for details.</entry>
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-M</option></entry>
-	      <entry>Generate dependency information suitable for use in a <filename>Makefile</filename>.</entry>
+	      <entry>Generate dependency information suitable for use in a <filename>Makefile</filename>;
+	      see <xref linkend="makefile-dependencies"/> for details.</entry>
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
