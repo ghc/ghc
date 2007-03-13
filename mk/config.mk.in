@@ -833,11 +833,11 @@ GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 
 # Some useful GHC version predicates:
-ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
-ghc_ge_601 = $(shell if (test $(GhcCanonVersion) -ge 601); then echo YES; else echo NO; fi)
-ghc_ge_602 = $(shell if (test $(GhcCanonVersion) -ge 602); then echo YES; else echo NO; fi)
-ghc_ge_603 = $(shell if (test $(GhcCanonVersion) -ge 603); then echo YES; else echo NO; fi)
-ghc_ge_605 = $(shell if (test $(GhcCanonVersion) -ge 605); then echo YES; else echo NO; fi)
+ghc_ge_504 = @ghc_ge_504@
+ghc_ge_601 = @ghc_ge_601@
+ghc_ge_602 = @ghc_ge_602@
+ghc_ge_603 = @ghc_ge_603@
+ghc_ge_605 = @ghc_ge_605@
 endif
 
 # Canonicalised ghc version number, used for easy (integer) version
