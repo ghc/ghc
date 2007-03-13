@@ -58,13 +58,17 @@ doIt ghc args = do
 			"-ignore-dot-ghci" : ghc_args ++ 
 			[ "-e","System.Environment.withProgName "++show filename++" (System.Environment.withArgs ["
 			  ++ concat (intersperse "," (map show prog_args))
-			  ++ "] (GHC.TopHandler.runIOFastExit Main.main))", filename])
+			  ++ "] (GHC.TopHandler.runIOFastExit (Main.main Prelude.>> (Prelude.return ()))))", filename])
                -- runIOFastExit: makes exceptions raised by Main.main
                -- behave in the same way as for a compiled program.
                -- The "fast exit" part just calls exit() directly
                -- instead of doing an orderly runtime shutdown,
                -- otherwise the main GHCi thread will complain about
                -- being interrupted.
+               --
+               -- Why (main >> return ()) rather than just main?  Because
+               -- otherwise GHCi by default tries to evaluate the result
+               -- of the IO in order to show it (see #1200).
   	  exitWith res
 
 notArg ('-':_) = False
