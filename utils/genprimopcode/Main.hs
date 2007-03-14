@@ -181,7 +181,7 @@ gen_hs_source (Info defaults entries) =
 		'{':'\\':'i':'t':cs -> markup "/" "/" cs
 		c : cs -> c : unlatex cs
 		[] -> []
-	   markup s t cs = s ++ mk (dropWhile isSpace cs)
+	   markup s t xs = s ++ mk (dropWhile isSpace xs)
 	   	where mk ""	   = t
 	              mk ('\n':cs) = ' ' : mk cs
 	              mk ('}':cs)  = t ++ unlatex cs
@@ -195,37 +195,37 @@ gen_latex_doc (Info defaults entries)
 	 ++ mk_options defaults
 	 ++ "}\n"
      ++ (concat (map mk_entry entries))
-     where mk_entry (PrimOpSpec {cons=cons,name=name,ty=ty,cat=cat,desc=desc,opts=opts}) =
+     where mk_entry (PrimOpSpec {cons=constr,name=n,ty=t,cat=c,desc=d,opts=o}) =
    		 "\\primopdesc{" 
-		 ++ latex_encode cons ++ "}{"
-		 ++ latex_encode name ++ "}{"
-		 ++ latex_encode (zencode name) ++ "}{"
-		 ++ latex_encode (show cat) ++ "}{"
-		 ++ latex_encode (mk_source_ty ty) ++ "}{"
-		 ++ latex_encode (mk_core_ty ty) ++ "}{"
-		 ++ desc ++ "}{"
-		 ++ mk_options opts
+		 ++ latex_encode constr ++ "}{"
+		 ++ latex_encode n ++ "}{"
+		 ++ latex_encode (zencode n) ++ "}{"
+		 ++ latex_encode (show c) ++ "}{"
+		 ++ latex_encode (mk_source_ty t) ++ "}{"
+		 ++ latex_encode (mk_core_ty t) ++ "}{"
+		 ++ d ++ "}{"
+		 ++ mk_options o
 		 ++ "}\n"
-           mk_entry (Section {title=title,desc=desc}) =
+           mk_entry (Section {title=ti,desc=d}) =
 		 "\\primopsection{" 
-		 ++ latex_encode title ++ "}{" 
-		 ++ desc ++ "}\n"
-           mk_entry (PrimTypeSpec {ty=ty,desc=desc,opts=opts}) =
+		 ++ latex_encode ti ++ "}{"
+		 ++ d ++ "}\n"
+           mk_entry (PrimTypeSpec {ty=t,desc=d,opts=o}) =
    		 "\\primtypespec{"
-		 ++ latex_encode (mk_source_ty ty) ++ "}{"
-		 ++ latex_encode (mk_core_ty ty) ++ "}{"
-		 ++ desc ++ "}{"
-		 ++ mk_options opts
+		 ++ latex_encode (mk_source_ty t) ++ "}{"
+		 ++ latex_encode (mk_core_ty t) ++ "}{"
+		 ++ d ++ "}{"
+		 ++ mk_options o
 		 ++ "}\n"
-           mk_entry (PseudoOpSpec {name=name,ty=ty,desc=desc,opts=opts}) =
+           mk_entry (PseudoOpSpec {name=n,ty=t,desc=d,opts=o}) =
 		 "\\pseudoopspec{"
-		 ++ latex_encode (zencode name) ++ "}{"
-		 ++ latex_encode (mk_source_ty ty) ++ "}{"
-		 ++ latex_encode (mk_core_ty ty) ++ "}{"
-		 ++ desc ++ "}{"
-		 ++ mk_options opts
+		 ++ latex_encode (zencode n) ++ "}{"
+		 ++ latex_encode (mk_source_ty t) ++ "}{"
+		 ++ latex_encode (mk_core_ty t) ++ "}{"
+		 ++ d ++ "}{"
+		 ++ mk_options o
 		 ++ "}\n"
-	   mk_source_ty t = pty t
+	   mk_source_ty typ = pty typ
 	     where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
 		   pty t = pbty t
 		   pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
@@ -234,7 +234,7 @@ gen_latex_doc (Info defaults entries)
 		   paty (TyVar tv) = tv
 		   paty t = "(" ++ pty t ++ ")"
 	   
-	   mk_core_ty t = foralls ++ (pty t)
+	   mk_core_ty typ = foralls ++ (pty typ)
 	     where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
 		   pty t = pbty t
 		   pbty (TyApp tc ts) = (zencode tc) ++ (concat (map (' ':) (map paty ts)))
@@ -246,7 +246,7 @@ gen_latex_doc (Info defaults entries)
 		   utuplenm 1 = "(# #)"
 		   utuplenm n = "(#" ++ (replicate (n-1) ',') ++ "#)"
 		   foralls = if tvars == [] then "" else "%forall " ++ (tbinds tvars)
-		   tvars = tvars_of t
+		   tvars = tvars_of typ
 		   tbinds [] = ". " 
 		   tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
 		   tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
@@ -255,46 +255,46 @@ gen_latex_doc (Info defaults entries)
 	   tvars_of (TyUTup ts) = foldr union [] (map tvars_of ts)
 	   tvars_of (TyVar tv) = [tv]
 	   
-           mk_options opts = 
+           mk_options o =
 	     "\\primoptions{"
-	      ++ mk_has_side_effects opts ++ "}{"
-	      ++ mk_out_of_line opts ++ "}{"
-	      ++ mk_commutable opts ++ "}{"
- 	      ++ mk_needs_wrapper opts ++ "}{"
-	      ++ mk_can_fail opts ++ "}{"
-	      ++ latex_encode (mk_strictness opts) ++ "}{"
- 	      ++ latex_encode (mk_usage opts)
+	      ++ mk_has_side_effects o ++ "}{"
+	      ++ mk_out_of_line o ++ "}{"
+	      ++ mk_commutable o ++ "}{"
+ 	      ++ mk_needs_wrapper o ++ "}{"
+	      ++ mk_can_fail o ++ "}{"
+	      ++ latex_encode (mk_strictness o) ++ "}{"
+ 	      ++ latex_encode (mk_usage o)
 	      ++ "}"
 
-  	   mk_has_side_effects opts = mk_bool_opt opts "has_side_effects" "Has side effects." "Has no side effects."
-	   mk_out_of_line opts = mk_bool_opt opts "out_of_line" "Implemented out of line." "Implemented in line."
-  	   mk_commutable opts = mk_bool_opt opts "commutable" "Commutable." "Not commutable."
-  	   mk_needs_wrapper opts = mk_bool_opt opts "needs_wrapper" "Needs wrapper." "Needs no wrapper."
-	   mk_can_fail opts = mk_bool_opt opts "can_fail" "Can fail." "Cannot fail."
+  	   mk_has_side_effects o = mk_bool_opt o "has_side_effects" "Has side effects." "Has no side effects."
+	   mk_out_of_line o = mk_bool_opt o "out_of_line" "Implemented out of line." "Implemented in line."
+  	   mk_commutable o = mk_bool_opt o "commutable" "Commutable." "Not commutable."
+  	   mk_needs_wrapper o = mk_bool_opt o "needs_wrapper" "Needs wrapper." "Needs no wrapper."
+	   mk_can_fail o = mk_bool_opt o "can_fail" "Can fail." "Cannot fail."
 
-	   mk_bool_opt opts opt_name if_true if_false =
-	     case lookup_attrib opt_name opts of
+	   mk_bool_opt o opt_name if_true if_false =
+	     case lookup_attrib opt_name o of
 	       Just (OptionTrue _) -> if_true
 	       Just (OptionFalse _) -> if_false
 	       Just (OptionString _ _) -> error "String value for boolean option"
 	       Nothing -> ""
 	   
-	   mk_strictness opts = 
-	     case lookup_attrib "strictness" opts of
+	   mk_strictness o = 
+	     case lookup_attrib "strictness" o of
 	       Just (OptionString _ s) -> s  -- for now
 	       Just _ -> error "Boolean value for strictness"
 	       Nothing -> "" 
 
-	   mk_usage opts = 
-	     case lookup_attrib "usage" opts of
+	   mk_usage o =
+	     case lookup_attrib "usage" o of
 	       Just (OptionString _ s) -> s  -- for now
 	       Just _ -> error "Boolean value for usage"
 	       Nothing -> "" 
 
-	   zencode cs = 
-	     case maybe_tuple cs of
+	   zencode xs =
+	     case maybe_tuple xs of
 		Just n  -> n		-- Tuples go to Z2T etc
-		Nothing -> concat (map encode_ch cs)
+		Nothing -> concat (map encode_ch xs)
 	     where
 	       maybe_tuple "(# #)" = Just("Z1H")
 	       maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
@@ -386,7 +386,7 @@ gen_primop_list (Info _ entries)
    = unlines (
         [      "   [" ++ cons first       ]
         ++
-        map (\pi -> "   , " ++ cons pi) rest
+        map (\p -> "   , " ++ cons p) rest
         ++ 
         [     "   ]"     ]
      ) where (first:rest) = filter is_primop entries
@@ -409,7 +409,7 @@ gen_data_decl (Info _ entries)
 gen_switch_from_attribs :: String -> String -> Info -> String
 gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
    = let defv = lookup_attrib attrib_name defaults
-         alts = catMaybes (map mkAlt (filter is_primop entries))
+         alternatives = catMaybes (map mkAlt (filter is_primop entries))
 
          getAltRhs (OptionFalse _)    = "False"
          getAltRhs (OptionTrue _)     = "True"
@@ -424,7 +424,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
          case defv of
             Nothing -> error ("gen_switch_from: " ++ attrib_name)
             Just xx 
-               -> unlines alts 
+               -> unlines alternatives
                   ++ fn_name ++ " other = " ++ getAltRhs xx ++ "\n"
 
 ------------------------------------------------------------------
@@ -729,7 +729,7 @@ pPseudoOpSpec
            (lit "pseudoop") stringLiteral pType pDesc pOptions
 
 pOptions :: Parser [Option]
-pOptions = optdef [] (then2 sel22 (lit "with") (many pOption))
+pOptions = pOptDef [] (then2 sel22 (lit "with") (many pOption))
 
 pCategory :: Parser Category
 pCategory 
@@ -741,7 +741,7 @@ pCategory
      ]
 
 pDesc :: Parser String
-pDesc = optdef "" pStuffBetweenBraces
+pDesc = pOptDef "" pStuffBetweenBraces
 
 pStuffBetweenBraces :: Parser String
 pStuffBetweenBraces
@@ -770,7 +770,7 @@ pType = then2 (\t maybe_tt -> case maybe_tt of
                                  Just tt -> TyF t tt
                                  Nothing -> t)
               paT 
-              (opt (then2 sel22 (lit "->") pType))
+              (pOpt (then2 sel22 (lit "->") pType))
 
 -- Atomic types
 paT :: Parser Ty
@@ -813,9 +813,9 @@ idChars :: [Char]
 idChars  = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] ++ "#_"
 
 sat :: (a -> Bool) -> Parser a -> Parser a
-sat pred p
+sat predicate p
    = do x <- try p
-        if pred x
+        if predicate x
          then return x
          else pzero
 
@@ -855,12 +855,12 @@ then7 f p1 p2 p3 p4 p5 p6 p7
    = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; x4 <- p4 ; x5 <- p5 ; x6 <- p6 ; x7 <- p7
         return (f x1 x2 x3 x4 x5 x6 x7)
 
-opt :: Parser a -> Parser (Maybe a)
-opt p
+pOpt :: Parser a -> Parser (Maybe a)
+pOpt p
    = (do x <- p; return (Just x)) <|> return Nothing
 
-optdef :: a -> Parser a -> Parser a
-optdef d p
+pOptDef :: a -> Parser a -> Parser a
+pOptDef d p
    = (do x <- p; return x) <|> return d
 
 sel12 :: a -> b -> a
