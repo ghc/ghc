@@ -664,7 +664,7 @@ loopAName	   = varQual aRROW FSLIT("loop")  loopAIdKey
 monadPlusClassName  = clsQual mONAD FSLIT("MonadPlus")  monadPlusClassKey
 randomClassName     = clsQual rANDOM FSLIT("Random")    randomClassKey
 randomGenClassName  = clsQual rANDOM FSLIT("RandomGen") randomGenClassKey
-isStringClassName   = clsQual gHC_BASE FSLIT("IsString") isStringClassKey
+isStringClassName   = clsQual dATA_STRING FSLIT("IsString") isStringClassKey
 
 -- dotnet interop
 objectTyConName	    = tcQual   dOTNET FSLIT("Object") objectTyConKey
