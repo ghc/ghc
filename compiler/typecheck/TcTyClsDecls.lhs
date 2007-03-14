@@ -1146,7 +1146,7 @@ newtypeExError con
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does")]
 
 newtypePredError con
-  = sep [ptext SLIT("A newtype constructor must have a return type of form T a b c"),
+  = sep [ptext SLIT("A newtype constructor must have a return type of form T a1 ... an"),
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does not")]
 
 newtypeFieldErr con_name n_flds

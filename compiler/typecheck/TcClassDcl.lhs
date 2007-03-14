@@ -767,7 +767,7 @@ badGenericInstance sel_id because
 notSimple inst_tys
   = vcat [ptext SLIT("because the instance type(s)"), 
 	  nest 2 (ppr inst_tys),
-	  ptext SLIT("is not a simple type of form (T a b c)")]
+	  ptext SLIT("is not a simple type of form (T a1 ... an)")]
 
 notGeneric tycon
   = vcat [ptext SLIT("because the instance type constructor") <+> quotes (ppr tycon) <+> 
