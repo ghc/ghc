@@ -1794,7 +1794,7 @@ pseudoop   "lazy"
 
 	{\tt par :: a -> b -> b}
 
-	{\tt par x y = case (par\# x) of \{ \_ -> lazy y \}}
+	{\tt par x y = case (par\# x) of \_ -> lazy y x}
 
 	If {\tt lazy} were not lazy, {\tt par} would look strict in {\tt y} which
 	would defeat the whole purpose of {\tt par}.
