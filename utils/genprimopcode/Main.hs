@@ -210,6 +210,21 @@ gen_latex_doc (Info defaults entries)
 		 "\\primopsection{" 
 		 ++ latex_encode title ++ "}{" 
 		 ++ desc ++ "}\n"
+           mk_entry (PrimTypeSpec {ty=ty,desc=desc,opts=opts}) =
+   		 "\\primtypespec{"
+		 ++ latex_encode (mk_source_ty ty) ++ "}{"
+		 ++ latex_encode (mk_core_ty ty) ++ "}{"
+		 ++ desc ++ "}{"
+		 ++ mk_options opts
+		 ++ "}\n"
+           mk_entry (PseudoOpSpec {name=name,ty=ty,desc=desc,opts=opts}) =
+		 "\\pseudoopspec{"
+		 ++ latex_encode (zencode name) ++ "}{"
+		 ++ latex_encode (mk_source_ty ty) ++ "}{"
+		 ++ latex_encode (mk_core_ty ty) ++ "}{"
+		 ++ desc ++ "}{"
+		 ++ mk_options opts
+		 ++ "}\n"
 	   mk_source_ty t = pty t
 	     where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
 		   pty t = pbty t
