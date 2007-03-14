@@ -721,8 +721,12 @@ tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
 -----------------------------------
 defer_to_boxy_matching sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
   = do	{ addSubCtxt sub_ctxt act_sty exp_sty $
-	  u_tys True False act_sty actual_ty exp_ib exp_sty expected_ty
+	  u_tys outer False act_sty actual_ty exp_ib exp_sty expected_ty
 	; return idHsWrapper }
+  where
+    outer = case sub_ctxt of		-- Ugh
+		SubDone -> False
+		other	-> True
 
 -----------------------------------
 tc_sub_funs act_arg act_res exp_ib exp_arg exp_res
