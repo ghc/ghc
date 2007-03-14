@@ -55,6 +55,9 @@ clean(['Rn050_A.hi', 'Rn050_A.o'])
 
 test('rn051', normal, compile, [''])
 
+test('rn052', normal, multimod_compile, ['rn052', '-v0'])
+clean(['Rn052Aux.hi', 'Rn052Aux.o'])
+
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
 test('timing003', normal, compile, [''])
