@@ -371,7 +371,7 @@ gen_primop_list (Info _ entries)
 
 gen_primop_tag :: Info -> String
 gen_primop_tag (Info _ entries)
-   = unlines (max_def : zipWith f primop_entries [1..])
+   = unlines (max_def : zipWith f primop_entries [1 :: Int ..])
      where
 	primop_entries = filter is_primop entries
         f i n = "tagOf_PrimOp " ++ cons i 
