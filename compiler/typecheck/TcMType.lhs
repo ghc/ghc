@@ -1137,7 +1137,7 @@ check_inst_head dflags clas tys
     (first_ty : _) = tys
 
     head_shape_msg = parens (text "The instance type must be of form (T a1 ... an)" $$
-			     text "where T is not a synonym, and a1 ... an are distinct type variables")
+			     text "where T is not a synonym, and a1 ... an are distinct type *variables*")
 
 	-- For now, I only allow tau-types (not polytypes) in 
 	-- the head of an instance decl.  
