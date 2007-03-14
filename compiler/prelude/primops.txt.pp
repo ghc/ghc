@@ -1473,7 +1473,7 @@ section "Concurrency primitives"
 ------------------------------------------------------------------------
 
 primtype State# s
-	{ {\tt State#} is the primitive, unlifted type of states.  It has
+	{ {\tt State\#} is the primitive, unlifted type of states.  It has
 	one type parameter, thus {\tt State\# RealWorld}, or {\tt State\# s},
 	where s is a type variable. The only purpose of the type parameter
 	is to keep different state threads separate.  It is represented by
@@ -1482,7 +1482,7 @@ primtype State# s
 primtype RealWorld
 	{ {\tt RealWorld} is deeply magical.  It is {\it primitive}, but it is not
 	{\it unlifted} (hence {\tt ptrArg}).  We never manipulate values of type
-	{\tt RealWorld}; it's only used in the type system, to parameterise {\tt State#}. }
+	{\tt RealWorld}; it's only used in the type system, to parameterise {\tt State\#}. }
 
 primtype ThreadId#
 	{(In a non-concurrent implementation, this can be a singleton
@@ -1792,8 +1792,9 @@ pseudoop   "lazy"
 	This behaviour is occasionally useful when controlling evaluation order.
 	Notably, {\tt lazy} is used in the library definition of {\tt Control.Parallel.par}:
 
-	>    par :: a -> b -> b
-	>    par x y = case (par# x) of { _ -> lazy y }
+	{\tt par :: a -> b -> b}
+
+	{\tt par x y = case (par\# x) of \{ \_ -> lazy y \}}
 
 	If {\tt lazy} were not lazy, {\tt par} would look strict in {\tt y} which
 	would defeat the whole purpose of {\tt par}.
@@ -1813,7 +1814,7 @@ primtype Any a
 	It's also used to instantiate un-constrained type variables after type
 	checking.  For example
 
-	>	length Any []
+	{\tt length Any []}
 
 	Annoyingly, we sometimes need {\tt Any}s of other kinds, such as {\tt (* -> *)} etc.
 	This is a bit like tuples.   We define a couple of useful ones here,
