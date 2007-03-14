@@ -88,6 +88,8 @@ main = getArgs >>= \args ->
 
 		      "--make-latex-doc"
 			 -> putStr (gen_latex_doc p_o_specs)
+
+                      _ -> error "Should not happen, known_args out of sync?"
                    )
 
 known_args :: [String]
@@ -138,6 +140,7 @@ gen_hs_source (Info defaults entries) =
 	   hdr (PrimOpSpec { name = n })	 = wrapOp n ++ ","
 	   hdr (PseudoOpSpec { name = n })	 = wrapOp n ++ ","
 	   hdr (PrimTypeSpec { ty = TyApp n _ }) = wrapTy n ++ ","
+	   hdr (PrimTypeSpec {})                 = error "Illegal type spec"
 
 	   ent   (Section {})	   = ""
 	   ent o@(PrimOpSpec {})   = spec o
@@ -152,6 +155,7 @@ gen_hs_source (Info defaults entries) =
 			PrimOpSpec { name = n, ty = t }	  -> wrapOp n ++ " :: " ++ pty t
 			PseudoOpSpec { name = n, ty = t } -> wrapOp n ++ " :: " ++ pty t
 			PrimTypeSpec { ty = t }	  -> "data " ++ pty t
+			Section { } -> ""
 
 		   comm = case (desc o) of
 		   	[] -> ""
@@ -257,16 +261,19 @@ gen_latex_doc (Info defaults entries)
 	     case lookup_attrib opt_name opts of
 	       Just (OptionTrue _) -> if_true
 	       Just (OptionFalse _) -> if_false
+	       Just (OptionString _ _) -> error "String value for boolean option"
 	       Nothing -> ""
 	   
 	   mk_strictness opts = 
 	     case lookup_attrib "strictness" opts of
 	       Just (OptionString _ s) -> s  -- for now
+	       Just _ -> error "Boolean value for strictness"
 	       Nothing -> "" 
 
 	   mk_usage opts = 
 	     case lookup_attrib "usage" opts of
 	       Just (OptionString _ s) -> s  -- for now
+	       Just _ -> error "Boolean value for usage"
 	       Nothing -> "" 
 
 	   zencode cs = 
@@ -427,14 +434,17 @@ mkPOI_RHS_text i
            -> case ty i of
                  TyF t1 (TyF _ _) 
                     -> "mkCompare " ++ sl_name i ++ ppType t1
+                 _ -> error "Type error in comparison op"
         Monadic
            -> case ty i of
                  TyF t1 _
                     -> "mkMonadic " ++ sl_name i ++ ppType t1
+                 _ -> error "Type error in monadic op"
         Dyadic
            -> case ty i of
                  TyF t1 (TyF _ _)
                     -> "mkDyadic " ++ sl_name i ++ ppType t1
+                 _ -> error "Type error in dyadic op"
         GenPrimOp
            -> let (argTys, resTy) = flatTys (ty i)
                   tvs = nub (tvsIn (ty i))
@@ -443,7 +453,7 @@ mkPOI_RHS_text i
                       ++ listify (map ppTyVar tvs) ++ " "
                       ++ listify (map ppType argTys) ++ " "
                       ++ "(" ++ ppType resTy ++ ")"
-            
+
 sl_name :: Entry -> String
 sl_name i = "FSLIT(\"" ++ name i ++ "\") "
 
@@ -453,6 +463,7 @@ ppTyVar "b" = "betaTyVar"
 ppTyVar "c" = "gammaTyVar"
 ppTyVar "s" = "deltaTyVar"
 ppTyVar "o" = "openAlphaTyVar"
+ppTyVar _   = error "Unknown type var"
 
 ppType :: Ty -> String
 ppType (TyApp "Bool"        []) = "boolTy"
@@ -798,6 +809,7 @@ sat pred p
 ------------------------------------------------------------------
 
 alts :: [Parser a] -> Parser a
+alts []         = pzero
 alts [p1]       = try p1
 alts (p1:p2:ps) = (try p1) <|> alts (p2:ps)
 
