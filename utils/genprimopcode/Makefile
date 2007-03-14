@@ -3,6 +3,8 @@ include $(TOP)/mk/boilerplate.mk
 
 HS_PROG = genprimopcode
 
+SRC_HC_OPTS += -Wall
+
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS += -package text
 endif
