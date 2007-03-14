@@ -139,7 +139,7 @@ gen_hs_source (Info defaults entries) =
 	   hdr (PseudoOpSpec { name = n })	 = wrapOp n ++ ","
 	   hdr (PrimTypeSpec { ty = TyApp n _ }) = wrapTy n ++ ","
 
-	   ent s@(Section {})	   = ""
+	   ent   (Section {})	   = ""
 	   ent o@(PrimOpSpec {})   = spec o
 	   ent o@(PrimTypeSpec {}) = spec o
 	   ent o@(PseudoOpSpec {}) = spec o
@@ -232,7 +232,7 @@ gen_latex_doc (Info defaults entries)
 		   tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
 		   tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
 	   tvars_of (TyF t1 t2) = tvars_of t1 `union` tvars_of t2
-	   tvars_of (TyApp tc ts) = foldl union [] (map tvars_of ts)
+	   tvars_of (TyApp _ ts) = foldl union [] (map tvars_of ts)
 	   tvars_of (TyUTup ts) = foldr union [] (map tvars_of ts)
 	   tvars_of (TyVar tv) = [tv]
 	   
@@ -276,13 +276,13 @@ gen_latex_doc (Info defaults entries)
 	     where
 	       maybe_tuple "(# #)" = Just("Z1H")
 	       maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-						(n, '#' : ')' : cs) -> Just ('Z' : shows (n+1) "H")
-						other		     -> Nothing
+						(n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
+						_		   -> Nothing
 	       maybe_tuple "()" = Just("Z0T")
 	       maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-						(n, ')' : cs) -> Just ('Z' : shows (n+1) "T")
-						other	       -> Nothing
-	       maybe_tuple other    	     = Nothing
+						(n, ')' : _) -> Just ('Z' : shows (n+1) "T")
+						_	     -> Nothing
+	       maybe_tuple _    	     = Nothing
 	       
 	       count_commas :: Int -> String -> (Int, String)
 	       count_commas n (',' : cs) = count_commas (n+1) cs
@@ -333,7 +333,7 @@ gen_latex_doc (Info defaults entries)
 	   latex_encode (c:cs) = c:(latex_encode cs)
 
 gen_wrappers :: Info -> String
-gen_wrappers (Info defaults entries)
+gen_wrappers (Info _ entries)
    = "{-# OPTIONS -fno-implicit-prelude #-}\n" 
 	-- Dependencies on Prelude must be explicit in libraries/base, but we
 	-- don't need the Prelude here so we add -fno-implicit-prelude.
@@ -360,7 +360,7 @@ gen_wrappers (Info defaults entries)
              ]
 
 gen_primop_list :: Info -> String
-gen_primop_list (Info defaults entries)
+gen_primop_list (Info _ entries)
    = unlines (
         [      "   [" ++ cons first       ]
         ++
@@ -370,7 +370,7 @@ gen_primop_list (Info defaults entries)
      ) where (first:rest) = filter is_primop entries
 
 gen_primop_tag :: Info -> String
-gen_primop_tag (Info defaults entries)
+gen_primop_tag (Info _ entries)
    = unlines (max_def : zipWith f primop_entries [1..])
      where
 	primop_entries = filter is_primop entries
@@ -379,7 +379,7 @@ gen_primop_tag (Info defaults entries)
 	max_def = "maxPrimOpTag = " ++ show (length primop_entries) ++ " :: Int"
 
 gen_data_decl :: Info -> String
-gen_data_decl (Info defaults entries)
+gen_data_decl (Info _ entries)
    = let conss = map cons (filter is_primop entries)
      in  "data PrimOp\n   = " ++ head conss ++ "\n"
          ++ unlines (map ("   | "++) (tail conss))
@@ -410,7 +410,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
 ------------------------------------------------------------------
 
 gen_primop_info :: Info -> String
-gen_primop_info (Info defaults entries)
+gen_primop_info (Info _ entries)
    = unlines (map mkPOItext (filter is_primop entries))
 
 mkPOItext :: Entry -> String
@@ -425,15 +425,15 @@ mkPOI_RHS_text i
    = case cat i of
         Compare 
            -> case ty i of
-                 TyF t1 (TyF t2 td) 
+                 TyF t1 (TyF _ _) 
                     -> "mkCompare " ++ sl_name i ++ ppType t1
         Monadic
            -> case ty i of
-                 TyF t1 td
+                 TyF t1 _
                     -> "mkMonadic " ++ sl_name i ++ ppType t1
         Dyadic
            -> case ty i of
-                 TyF t1 (TyF t2 td)
+                 TyF t1 (TyF _ _)
                     -> "mkDyadic " ++ sl_name i ++ ppType t1
         GenPrimOp
            -> let (argTys, resTy) = flatTys (ty i)
@@ -517,7 +517,7 @@ flatTys other       = ([],other)
 
 tvsIn :: Ty -> [TyVar]
 tvsIn (TyF t1 t2)    = tvsIn t1 ++ tvsIn t2
-tvsIn (TyApp tc tys) = concatMap tvsIn tys
+tvsIn (TyApp _ tys)  = concatMap tvsIn tys
 tvsIn (TyVar tv)     = [tv]
 tvsIn (TyUTup tys)   = concatMap tvsIn tys
 
@@ -633,9 +633,9 @@ sane_ty Compare (TyF t1 (TyF t2 td))
    | t1 == t2 && td == TyApp "Bool" []  = True
 sane_ty Monadic (TyF t1 td) 
    | t1 == td  = True
-sane_ty Dyadic (TyF t1 (TyF t2 td))
+sane_ty Dyadic (TyF t1 (TyF t2 _))
    | t1 == t2 && t2 == t2  = True
-sane_ty GenPrimOp any_old_thing
+sane_ty GenPrimOp _
    = True
 sane_ty _ _
    = False
@@ -646,7 +646,7 @@ get_attrib_name (OptionTrue nm)  = nm
 get_attrib_name (OptionString nm _) = nm
 
 lookup_attrib :: String -> [Option] -> Maybe Option
-lookup_attrib nm [] = Nothing
+lookup_attrib _ [] = Nothing
 lookup_attrib nm (a:as) 
     = if get_attrib_name a == nm then Just a else lookup_attrib nm as
 
@@ -678,9 +678,9 @@ pDefaults = then2 sel22 (lit "defaults") (many pOption)
 pOption :: Parser Option
 pOption 
    = alts [
-        then3 (\nm eq ff -> OptionFalse nm)  pName (lit "=") (lit "False"),
-        then3 (\nm eq tt -> OptionTrue nm)   pName (lit "=") (lit "True"),
-        then3 (\nm eq zz -> OptionString nm zz)
+        then3 (\nm _ _  -> OptionFalse nm)  pName (lit "=") (lit "False"),
+        then3 (\nm _ _  -> OptionTrue nm)   pName (lit "=") (lit "True"),
+        then3 (\nm _ zz -> OptionString nm zz)
               pName (lit "=") pStuffBetweenBraces
      ]
 
@@ -837,13 +837,13 @@ optdef d p
    = (do x <- p; return x) <|> return d
 
 sel12 :: a -> b -> a
-sel12 a b = a
+sel12 a _ = a
 
 sel22 :: a -> b -> b
-sel22 a b = b
+sel22 _ b = b
 
 sel23 :: a -> b -> c -> b
-sel23 a b c = b
+sel23 _ b _ = b
 
 apply :: (a -> b) -> Parser a -> Parser b
 apply f p = liftM f p
