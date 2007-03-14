@@ -146,20 +146,34 @@ spacedwords xs = (blanks ++ wordchars):(spacedwords rest2)
 	
 findthings :: FileName -> IO FileData
 findthings filename = do
-	text <- readFile filename
-        evaluate text -- forces evaluation of text
-                      -- too many files were being opened otherwise since
-                      -- readFile is lazy
-	let aslines = lines text
-	let wordlines = map words aslines
-	let noslcoms = map stripslcomments wordlines
-	let tokens = concat $ zipWith3 (withline filename) noslcoms 
-					aslines [0 ..]
-	let nocoms = stripblockcomments tokens
-	return $ FileData filename $ findstuff nocoms
+    text <- readFile filename
+    evaluate text -- forces evaluation of text
+                  -- too many files were being opened otherwise since
+                  -- readFile is lazy
+    let aslines = lines text
+    let wordlines = map mywords aslines
+    let noslcoms = map stripslcomments wordlines
+    let tokens = concat $ zipWith3 (withline filename) noslcoms aslines [0 ..]
+    let nocoms = stripblockcomments tokens
+    return $ FileData filename $ findstuff nocoms
   where evaluate [] = return ()
         evaluate (c:cs) = c `seq` evaluate cs
-	
+        -- my words is mainly copied from Data.List.
+        -- difference abc::def is split into three words instead of one.
+        -- We should really be lexing Haskell properly here rather
+        -- than using hacks like this. In the future we expect hasktags
+        -- to be replaced by something using the GHC API.
+        mywords :: String -> [String]
+        mywords (':':':':xs) = "::" : mywords xs
+        mywords s =  case dropWhile isSpace s of
+                         "" -> []
+                         s' -> w : mywords s''
+                             where (w, s'') = myBreak s'
+                                   myBreak [] = ([],[])
+                                   myBreak (':':':':xs) = ([], "::"++xs)
+                                   myBreak (' ':xs) = ([],xs);
+                                   myBreak (x:xs) = let (a,b) = myBreak xs
+                                                    in  (x:a,b)
 -- Create tokens from words, by recording their line number
 -- and which token they are through that line
 
