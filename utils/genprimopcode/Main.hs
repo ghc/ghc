@@ -17,6 +17,7 @@ import List
 import System ( getArgs )
 import Maybe ( catMaybes )
 
+main :: IO ()
 main = getArgs >>= \args ->
        if length args /= 1 || head args `notElem` known_args
        then error ("usage: genprimopcode command < primops.txt > ...\n"
@@ -89,7 +90,7 @@ main = getArgs >>= \args ->
 			 -> putStr (gen_latex_doc p_o_specs)
                    )
 
-
+known_args :: [String]
 known_args 
    = [ "--data-decl",
        "--has-side-effects",
@@ -111,6 +112,7 @@ known_args
 -- Code generators -----------------------------------------------
 ------------------------------------------------------------------
 
+gen_hs_source :: Info -> String
 gen_hs_source (Info defaults entries) =
 	   "-----------------------------------------------------------------------------\n"
 	++ "-- |\n"
@@ -183,6 +185,7 @@ gen_hs_source (Info defaults entries) =
 	   escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
 	   	where special = "/'`\"@<"
 
+gen_latex_doc :: Info -> String
 gen_latex_doc (Info defaults entries)
    = "\\primopdefaults{" 
 	 ++ mk_options defaults
@@ -329,6 +332,7 @@ gen_latex_doc (Info defaults entries)
 	   latex_encode ('\\':cs) = "$\\backslash$" ++ (latex_encode cs)
 	   latex_encode (c:cs) = c:(latex_encode cs)
 
+gen_wrappers :: Info -> String
 gen_wrappers (Info defaults entries)
    = "{-# OPTIONS -fno-implicit-prelude #-}\n" 
 	-- Dependencies on Prelude must be explicit in libraries/base, but we
@@ -355,7 +359,7 @@ gen_wrappers (Info defaults entries)
               "parAtAbs#", "parAtRel#", "parAtForNow#" 
              ]
 
-
+gen_primop_list :: Info -> String
 gen_primop_list (Info defaults entries)
    = unlines (
         [      "   [" ++ cons first       ]
@@ -365,6 +369,7 @@ gen_primop_list (Info defaults entries)
         [     "   ]"     ]
      ) where (first:rest) = filter is_primop entries
 
+gen_primop_tag :: Info -> String
 gen_primop_tag (Info defaults entries)
    = unlines (max_def : zipWith f primop_entries [1..])
      where
@@ -373,6 +378,7 @@ gen_primop_tag (Info defaults entries)
                 ++ " = _ILIT(" ++ show n ++ ") :: FastInt"
 	max_def = "maxPrimOpTag = " ++ show (length primop_entries) ++ " :: Int"
 
+gen_data_decl :: Info -> String
 gen_data_decl (Info defaults entries)
    = let conss = map cons (filter is_primop entries)
      in  "data PrimOp\n   = " ++ head conss ++ "\n"
@@ -403,15 +409,18 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------
 ------------------------------------------------------------------
 
-
+gen_primop_info :: Info -> String
 gen_primop_info (Info defaults entries)
    = unlines (map mkPOItext (filter is_primop entries))
 
+mkPOItext :: Entry -> String
 mkPOItext i = mkPOI_LHS_text i ++ mkPOI_RHS_text i
 
+mkPOI_LHS_text :: Entry -> String
 mkPOI_LHS_text i
    = "primOpInfo " ++ cons i ++ " = "
 
+mkPOI_RHS_text :: Entry -> String
 mkPOI_RHS_text i
    = case cat i of
         Compare 
@@ -435,15 +444,17 @@ mkPOI_RHS_text i
                       ++ listify (map ppType argTys) ++ " "
                       ++ "(" ++ ppType resTy ++ ")"
             
+sl_name :: Entry -> String
 sl_name i = "FSLIT(\"" ++ name i ++ "\") "
 
+ppTyVar :: String -> String
 ppTyVar "a" = "alphaTyVar"
 ppTyVar "b" = "betaTyVar"
 ppTyVar "c" = "gammaTyVar"
 ppTyVar "s" = "deltaTyVar"
 ppTyVar "o" = "openAlphaTyVar"
 
-
+ppType :: Ty -> String
 ppType (TyApp "Bool"        []) = "boolTy"
 
 ppType (TyApp "Int#"        []) = "intPrimTy"
@@ -462,7 +473,6 @@ ppType (TyApp "ThreadId#"   []) = "threadIdPrimTy"
 ppType (TyApp "ForeignObj#" []) = "foreignObjPrimTy"
 ppType (TyApp "BCO#"        []) = "bcoPrimTy"
 ppType (TyApp "()"          []) = "unitTy" 	-- unitTy is TysWiredIn's name for ()
-
 
 ppType (TyVar "a")               = "alphaTy"
 ppType (TyVar "b")               = "betaTy"
@@ -501,16 +511,18 @@ ppType other
 listify :: [String] -> String
 listify ss = "[" ++ concat (intersperse ", " ss) ++ "]"
 
+flatTys :: Ty -> ([Ty],Ty)
 flatTys (TyF t1 t2) = case flatTys t2 of (ts,t) -> (t1:ts,t)
 flatTys other       = ([],other)
 
+tvsIn :: Ty -> [TyVar]
 tvsIn (TyF t1 t2)    = tvsIn t1 ++ tvsIn t2
 tvsIn (TyApp tc tys) = concatMap tvsIn tys
 tvsIn (TyVar tv)     = [tv]
 tvsIn (TyUTup tys)   = concatMap tvsIn tys
 
+arity :: Ty -> Int
 arity = length . fst . flatTys
-
 
 ------------------------------------------------------------------
 -- Abstract syntax -----------------------------------------------
@@ -540,6 +552,7 @@ data Entry
 		desc  :: String }        -- description
     deriving Show
 
+is_primop :: Entry -> Bool
 is_primop (PrimOpSpec _ _ _ _ _ _) = True
 is_primop _ = False
 
@@ -582,7 +595,10 @@ type TyCon = String
          T -> T -> Bool.
    Dies with "error" if there's a problem, else returns ().
 -}
+myseq :: () -> a -> a
 myseq () x = x
+
+myseqAll :: [()] -> a -> a
 myseqAll (():ys) x = myseqAll ys x
 myseqAll []      x = x
 
@@ -595,6 +611,7 @@ sanityTop (Info defs entries)
      then error ("non-unique default attribute names: " ++ show opt_names ++ "\n")
      else myseqAll (map (sanityPrimOp opt_names) primops) ()
 
+sanityPrimOp :: [String] -> Entry -> ()
 sanityPrimOp def_names p
    = let p_names = map get_attrib_name (opts p)
          p_names_ok
@@ -611,6 +628,7 @@ sanityPrimOp def_names p
                      " category " ++ show (cat p) ++ "\n")
          else ()
 
+sane_ty :: Category -> Ty -> Bool
 sane_ty Compare (TyF t1 (TyF t2 td)) 
    | t1 == t2 && td == TyApp "Bool" []  = True
 sane_ty Monadic (TyF t1 td) 
@@ -622,10 +640,12 @@ sane_ty GenPrimOp any_old_thing
 sane_ty _ _
    = False
 
+get_attrib_name :: Option -> String
 get_attrib_name (OptionFalse nm) = nm
 get_attrib_name (OptionTrue nm)  = nm
 get_attrib_name (OptionString nm _) = nm
 
+lookup_attrib :: String -> [Option] -> Maybe Option
 lookup_attrib nm [] = Nothing
 lookup_attrib nm (a:as) 
     = if get_attrib_name a == nm then Just a else lookup_attrib nm as
@@ -634,6 +654,7 @@ lookup_attrib nm (a:as)
 -- The parser ----------------------------------------------------
 ------------------------------------------------------------------
 
+keywords :: [String]
 keywords = [ "section", "primop", "pseudoop", "primtype", "with"]
 
 -- Due to lack of proper lexing facilities, a hack to zap any
@@ -714,8 +735,6 @@ pInsides
       (do c <- satisfy (/= '}')
           return [c])
 
-
-
 -------------------
 -- Parsing types --
 -------------------
@@ -728,6 +747,7 @@ pType = then2 (\t maybe_tt -> case maybe_tt of
               (opt (then2 sel22 (lit "->") pType))
 
 -- Atomic types
+paT :: Parser Ty
 paT = alts [ then2 TyApp pTycon (many ppT),
              pUnboxedTupleTy,
              then3 sel23 (lit "(") pType (lit ")"),
@@ -735,6 +755,7 @@ paT = alts [ then2 TyApp pTycon (many ppT),
       ]
 
 -- the magic bit in the middle is:  T (,T)*  so to speak
+pUnboxedTupleTy :: Parser Ty
 pUnboxedTupleTy
    = then3 (\ _ ts _ -> TyUTup ts)
            (lit "(#")
@@ -742,18 +763,30 @@ pUnboxedTupleTy
            (lit "#)")
 
 -- Primitive types
+ppT :: Parser Ty
 ppT = alts [apply TyVar pTyvar,
             apply (\tc -> TyApp tc []) pTycon
            ]
 
+pTyvar :: Parser String
 pTyvar       = sat (`notElem` keywords) pName
+
+pTycon :: Parser String
 pTycon       = alts [pConstructor, lexeme (string "()")]
+
+pName :: Parser String
 pName        = lexeme (then2 (:) lower (many isIdChar))
+
+pConstructor :: Parser String
 pConstructor = lexeme (then2 (:) upper (many isIdChar))
 
+isIdChar :: Parser Char
 isIdChar = satisfy (`elem` idChars)
+
+idChars :: [Char]
 idChars  = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] ++ "#_"
 
+sat :: (a -> Bool) -> Parser a -> Parser a
 sat pred p
    = do x <- try p
         if pred x
@@ -764,32 +797,55 @@ sat pred p
 -- Helpful additions to Daan's parser stuff ----------------------
 ------------------------------------------------------------------
 
+alts :: [Parser a] -> Parser a
 alts [p1]       = try p1
 alts (p1:p2:ps) = (try p1) <|> alts (p2:ps)
 
+then2 :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
 then2 f p1 p2 
    = do x1 <- p1 ; x2 <- p2 ; return (f x1 x2)
+
+then3 :: (a -> b -> c -> d) -> Parser a -> Parser b -> Parser c -> Parser d
 then3 f p1 p2 p3
    = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; return (f x1 x2 x3)
+
+then4 :: (a -> b -> c -> d -> e) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e
 then4 f p1 p2 p3 p4
    = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; x4 <- p4 ; return (f x1 x2 x3 x4)
+
+then5 :: (a -> b -> c -> d -> e -> f) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f
 then5 f p1 p2 p3 p4 p5
    = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; x4 <- p4 ; x5 <- p5
         return (f x1 x2 x3 x4 x5)
+
+then6 :: (a -> b -> c -> d -> e -> f -> g) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g
 then6 f p1 p2 p3 p4 p5 p6
    = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; x4 <- p4 ; x5 <- p5 ; x6 <- p6
         return (f x1 x2 x3 x4 x5 x6)
+
+then7 :: (a -> b -> c -> d -> e -> f -> g -> h) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g -> Parser h
 then7 f p1 p2 p3 p4 p5 p6 p7
    = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; x4 <- p4 ; x5 <- p5 ; x6 <- p6 ; x7 <- p7
         return (f x1 x2 x3 x4 x5 x6 x7)
+
+opt :: Parser a -> Parser (Maybe a)
 opt p
    = (do x <- p; return (Just x)) <|> return Nothing
+
+optdef :: a -> Parser a -> Parser a
 optdef d p
    = (do x <- p; return x) <|> return d
 
+sel12 :: a -> b -> a
 sel12 a b = a
+
+sel22 :: a -> b -> b
 sel22 a b = b
+
+sel23 :: a -> b -> c -> b
 sel23 a b c = b
+
+apply :: (a -> b) -> Parser a -> Parser b
 apply f p = liftM f p
 
 -- Hacks for zapping whitespace and comments, unfortunately needed
@@ -819,11 +875,6 @@ stringLiteral   = lexeme (
                          }
                       <?> "literal string")
 
-
-
 ------------------------------------------------------------------
 -- end                                                          --
 ------------------------------------------------------------------
-
-
-
