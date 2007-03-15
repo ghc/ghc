@@ -405,8 +405,8 @@ extendFixityEnv new_bit
   = updGblEnv (\env@(TcGblEnv { tcg_fix_env = old_fix_env }) -> 
 		env {tcg_fix_env = extendNameEnvList old_fix_env new_bit})	     
 
-getDefaultTys :: TcRn (Maybe [Type])
-getDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
+getDeclaredDefaultTys :: TcRn (Maybe [Type])
+getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
 \end{code}
 
 %************************************************************************

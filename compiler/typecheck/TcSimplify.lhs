@@ -2252,17 +2252,7 @@ disambiguate interactive dflags insts
 	;     return () }
   | otherwise
   = do 	{  	-- Figure out what default types to use
-	  mb_defaults <- getDefaultTys
-	; default_tys <- case mb_defaults of
-			   Just tys -> return tys
-			   Nothing  -> 	-- No use-supplied default;
-					-- use [Integer, Double]
-				do { integer_ty <- tcMetaTy integerTyConName
-				   ; checkWiredInTyCon doubleTyCon
-				   ; string_ty <- tcMetaTy stringTyConName
-				   ; if ovl_strings 	-- Add String if -foverloaded-strings
-					then return [integer_ty,doubleTy,string_ty] 
-					else return [integer_ty,doubleTy] }
+	; default_tys <- getDefaultTys extended_defaulting ovl_strings
 
 	; traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
 	; mapM_ (disambigGroup default_tys) defaultable_groups  }
@@ -2325,7 +2315,42 @@ disambigGroup default_tys dicts
 		-- After this we can't fail
 	   ; warnDefault dicts default_ty
 	   ; unifyType default_ty (mkTyVarTy tyvar) }
+
+
+getDefaultTys :: Bool -> Bool -> TcM [Type]
+getDefaultTys extended_deflts ovl_strings
+  = do	{ mb_defaults <- getDeclaredDefaultTys
+	; case mb_defaults of
+	   Just tys -> return tys	-- User-supplied defaults
+	   Nothing  -> do
+
+	-- No use-supplied default
+	-- Use [Integer, Double], plus modifications
+	{ integer_ty <- tcMetaTy integerTyConName
+	; checkWiredInTyCon doubleTyCon
+	; string_ty <- tcMetaTy stringTyConName
+	; return (opt_deflt extended_deflts unitTy
+			-- Note [Default unitTy]
+			++
+		  [integer_ty,doubleTy]
+			++
+		  opt_deflt ovl_strings string_ty) }}
+  where
+    opt_deflt True  ty = [ty]
+    opt_deflt False ty = []
 \end{code}
+
+Note [Default unitTy]
+~~~~~~~~~~~~~~~~~~~~~
+In interative mode (or with -fextended-default-rules) we add () as the first type we
+try when defaulting.  This has very little real impact, except in the following case.
+Consider: 
+	Text.Printf.printf "hello"
+This has type (forall a. IO a); it prints "hello", and returns 'undefined'.  We don't
+want the GHCi repl loop to try to print that 'undefined'.  The neatest thing is to
+default the 'a' to (), rather than to Integer (which is what would otherwise happen;
+and then GHCi doesn't attempt to print the ().  So in interactive mode, we add
+() to the list of defaulting types.  See Trac #1200.
 
 Note [Avoiding spurious errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

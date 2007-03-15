@@ -31,7 +31,7 @@ tcDefaults :: [LDefaultDecl Name]
 				    -- in Disambig.
 
 tcDefaults [] 
-  = getDefaultTys		-- No default declaration, so get the
+  = getDeclaredDefaultTys	-- No default declaration, so get the
 				-- default types from the envt; 
 				-- i.e. use the curent ones
 				-- (the caller will put them back there)
