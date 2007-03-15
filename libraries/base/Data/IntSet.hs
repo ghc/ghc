@@ -68,6 +68,16 @@ module Data.IntSet  (
             , split
             , splitMember
 
+            -- * Min\/Max
+            , findMin   
+            , findMax
+            , deleteMin
+            , deleteMax
+            , deleteFindMin
+            , deleteFindMax
+            , maxView
+            , minView
+
             -- * Map
 	    , map
 
@@ -156,6 +166,8 @@ m1 \\ m2 = difference m1 m2
 data IntSet = Nil
             | Tip {-# UNPACK #-} !Int
             | Bin {-# UNPACK #-} !Prefix {-# UNPACK #-} !Mask !IntSet !IntSet
+-- Invariant: Nil is never found as a child of Bin.
+
 
 type Prefix = Int
 type Mask   = Int
@@ -209,7 +221,7 @@ member x t
       Tip y -> (x==y)
       Nil   -> False
     
--- | /O(log n)/. Is the element not in the set?
+-- | /O(min(n,W))/. Is the element not in the set?
 notMember :: Int -> IntSet -> Bool
 notMember k = not . member k
 
@@ -456,7 +468,7 @@ partition pred t
       Nil -> (Nil,Nil)
 
 
--- | /O(log n)/. The expression (@'split' x set@) is a pair @(set1,set2)@
+-- | /O(min(n,W))/. The expression (@'split' x set@) is a pair @(set1,set2)@
 -- where all elements in @set1@ are lower than @x@ and all elements in
 -- @set2@ larger than @x@.
 --
@@ -489,7 +501,7 @@ split' x t
         | otherwise -> (Nil,Nil)
       Nil -> (Nil,Nil)
 
--- | /O(log n)/. Performs a 'split' but also returns whether the pivot
+-- | /O(min(n,W))/. Performs a 'split' but also returns whether the pivot
 -- element was found in the original set.
 splitMember :: Int -> IntSet -> (IntSet,Bool,IntSet)
 splitMember x t
@@ -518,6 +530,80 @@ splitMember' x t
         | x<y       -> (Nil,False,t)
         | otherwise -> (Nil,True,Nil)
       Nil -> (Nil,False,Nil)
+
+{----------------------------------------------------------------------
+  Min/Max
+----------------------------------------------------------------------}
+
+-- | /O(min(n,W))/. Retrieves the maximal key of the set, and the set stripped from that element
+-- @fail@s (in the monad) when passed an empty set.
+maxView :: (Monad m) => IntSet -> m (Int, IntSet)
+maxView t
+    = case t of
+        Bin p m l r | m < 0 -> let (result,t') = maxViewUnsigned l in return (result, bin p m t' r)
+        Bin p m l r         -> let (result,t') = maxViewUnsigned r in return (result, bin p m l t')            
+        Tip y -> return (y,Nil)
+        Nil -> fail "maxView: empty set has no maximal element"
+
+maxViewUnsigned :: IntSet -> (Int, IntSet)
+maxViewUnsigned t 
+    = case t of
+        Bin p m l r -> let (result,t') = maxViewUnsigned r in (result, bin p m l t')
+        Tip y -> (y, Nil)
+
+-- | /O(min(n,W))/. Retrieves the minimal key of the set, and the set stripped from that element
+-- @fail@s (in the monad) when passed an empty set.
+minView :: (Monad m) => IntSet -> m (Int, IntSet)
+minView t
+    = case t of
+        Bin p m l r | m < 0 -> let (result,t') = minViewUnsigned r in return (result, bin p m l t')            
+        Bin p m l r         -> let (result,t') = minViewUnsigned l in return (result, bin p m t' r)
+        Tip y -> return (y, Nil)
+        Nil -> fail "minView: empty set has no minimal element"
+
+minViewUnsigned :: IntSet -> (Int, IntSet)
+minViewUnsigned t 
+    = case t of
+        Bin p m l r -> let (result,t') = minViewUnsigned l in (result, bin p m t' r)
+        Tip y -> (y, Nil)
+
+
+-- Duplicate the Identity monad here because base < mtl.
+newtype Identity a = Identity { runIdentity :: a }
+instance Monad Identity where
+	return a = Identity a
+	m >>= k  = k (runIdentity m)
+
+
+-- | /O(min(n,W))/. Delete and find the minimal element.
+-- 
+-- > deleteFindMin set = (findMin set, deleteMin set)
+deleteFindMin :: IntSet -> (Int, IntSet)
+deleteFindMin = runIdentity . minView
+
+-- | /O(min(n,W))/. Delete and find the maximal element.
+-- 
+-- > deleteFindMax set = (findMax set, deleteMax set)
+deleteFindMax :: IntSet -> (Int, IntSet)
+deleteFindMax = runIdentity . maxView
+
+-- | /O(min(n,W))/. The minimal element of a set.
+findMin :: IntSet -> Int
+findMin = fst . runIdentity . minView
+
+-- | /O(min(n,W))/. The maximal element of a set.
+findMax :: IntSet -> Int
+findMax = fst . runIdentity . maxView
+
+-- | /O(min(n,W))/. Delete the minimal element.
+deleteMin :: IntSet -> IntSet
+deleteMin = snd . runIdentity . minView
+
+-- | /O(min(n,W))/. Delete the maximal element.
+deleteMax :: IntSet -> IntSet
+deleteMax = snd . runIdentity . maxView
+
+
 
 {----------------------------------------------------------------------
   Map

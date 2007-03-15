@@ -157,6 +157,8 @@ module Data.Map  (
             , updateMaxWithKey
             , minView
             , maxView
+            , minViewWithKey
+            , maxViewWithKey
             
             -- * Debugging
             , showTree

@@ -135,6 +135,23 @@ module Data.IntMap  (
             , isSubmapOf, isSubmapOfBy
             , isProperSubmapOf, isProperSubmapOfBy
             
+            -- * Min\/Max
+
+            , maxView
+            , minView
+            , findMin   
+            , findMax
+            , deleteMin
+            , deleteMax
+            , deleteFindMin
+            , deleteFindMax
+            , updateMin
+            , updateMax
+            , updateMinWithKey
+            , updateMaxWithKey 
+            , minViewWithKey
+            , maxViewWithKey
+
             -- * Debugging
             , showTree
             , showTreeWith
@@ -147,7 +164,7 @@ import qualified Data.IntSet as IntSet
 import Data.Monoid (Monoid(..))
 import Data.Typeable
 import Data.Foldable (Foldable(foldMap))
-
+import Control.Monad ( liftM )
 {-
 -- just for testing
 import qualified Prelude
@@ -666,6 +683,115 @@ intersectionWithKey f t1 (Tip k y)
       Nothing -> Nil
 intersectionWithKey f Nil t = Nil
 intersectionWithKey f t Nil = Nil
+
+
+{--------------------------------------------------------------------
+  Min\/Max
+--------------------------------------------------------------------}
+
+-- | /O(log n)/. Update the value at the minimal key.
+updateMinWithKey :: (Key -> a -> a) -> IntMap a -> IntMap a
+updateMinWithKey f t
+    = case t of
+        Bin p m l r | m < 0 -> let t' = updateMinWithKeyUnsigned f l in Bin p m t' r
+        Bin p m l r         -> let t' = updateMinWithKeyUnsigned f r in Bin p m l t'
+        Tip k y -> Tip k (f k y)
+        Nil -> error "maxView: empty map has no maximal element"
+
+updateMinWithKeyUnsigned f t
+    = case t of
+        Bin p m l r -> let t' = updateMinWithKeyUnsigned f r in Bin p m l t'
+        Tip k y -> Tip k (f k y)
+
+-- | /O(log n)/. Update the value at the maximal key.
+updateMaxWithKey :: (Key -> a -> a) -> IntMap a -> IntMap a
+updateMaxWithKey f t
+    = case t of
+        Bin p m l r | m < 0 -> let t' = updateMaxWithKeyUnsigned f r in Bin p m r t'
+        Bin p m l r         -> let t' = updateMaxWithKeyUnsigned f l in Bin p m t' l
+        Tip k y -> Tip k (f k y)
+        Nil -> error "maxView: empty map has no maximal element"
+
+updateMaxWithKeyUnsigned f t
+    = case t of
+        Bin p m l r -> let t' = updateMaxWithKeyUnsigned f r in Bin p m l t'
+        Tip k y -> Tip k (f k y)
+
+
+-- | /O(log n)/. Retrieves the maximal (key,value) couple of the map, and the map stripped from that element.
+-- @fail@s (in the monad) when passed an empty map.
+maxViewWithKey :: (Monad m) => IntMap a -> m ((Key, a), IntMap a)
+maxViewWithKey t
+    = case t of
+        Bin p m l r | m < 0 -> let (result, t') = maxViewUnsigned l in return (result, bin p m t' r)
+        Bin p m l r         -> let (result, t') = maxViewUnsigned r in return (result, bin p m l t')
+        Tip k y -> return ((k,y), Nil)
+        Nil -> fail "maxView: empty map has no maximal element"
+
+maxViewUnsigned t 
+    = case t of
+        Bin p m l r -> let (result,t') = maxViewUnsigned r in (result,bin p m l t')
+        Tip k y -> ((k,y), Nil)
+
+-- | /O(log n)/. Retrieves the minimal (key,value) couple of the map, and the map stripped from that element.
+-- @fail@s (in the monad) when passed an empty map.
+minViewWithKey :: (Monad m) => IntMap a -> m ((Key, a), IntMap a)
+minViewWithKey t
+    = case t of
+        Bin p m l r | m < 0 -> let (result, t') = minViewUnsigned r in return (result, bin p m l t')
+        Bin p m l r         -> let (result, t') = minViewUnsigned l in return (result, bin p m t' r)
+        Tip k y -> return ((k,y),Nil)
+        Nil -> fail "minView: empty map has no minimal element"
+
+minViewUnsigned t 
+    = case t of
+        Bin p m l r -> let (result,t') = minViewUnsigned l in (result,bin p m t' r)
+        Tip k y -> ((k,y),Nil)
+
+
+-- | /O(log n)/. Update the value at the maximal key.
+updateMax :: (a -> a) -> IntMap a -> IntMap a
+updateMax f = updateMaxWithKey (const f)
+
+-- | /O(log n)/. Update the value at the minimal key.
+updateMin :: (a -> a) -> IntMap a -> IntMap a
+updateMin f = updateMinWithKey (const f)
+
+
+-- Duplicate the Identity monad here because base < mtl.
+newtype Identity a = Identity { runIdentity :: a }
+instance Monad Identity where
+	return a = Identity a
+	m >>= k  = k (runIdentity m)
+-- Similar to the Arrow instance.
+first f (x,y) = (f x,y)
+
+
+-- | /O(log n)/. Retrieves the maximal key of the map, and the map stripped from that element.
+-- @fail@s (in the monad) when passed an empty map.
+maxView t = liftM (first snd) (maxViewWithKey t)
+
+-- | /O(log n)/. Retrieves the minimal key of the map, and the map stripped from that element.
+-- @fail@s (in the monad) when passed an empty map.
+minView t = liftM (first snd) (minViewWithKey t)
+
+-- | /O(log n)/. Delete and find the maximal element.
+deleteFindMax = runIdentity . maxView
+
+-- | /O(log n)/. Delete and find the minimal element.
+deleteFindMin = runIdentity . minView
+
+-- | /O(log n)/. The minimal key of the map.
+findMin = fst . runIdentity . minView
+
+-- | /O(log n)/. The maximal key of the map.
+findMax = fst . runIdentity . maxView
+
+-- | /O(log n)/. Delete the minimal key.
+deleteMin = snd . runIdentity . minView
+
+-- | /O(log n)/. Delete the maximal key.
+deleteMax = snd . runIdentity . maxView
 
 
 {--------------------------------------------------------------------
