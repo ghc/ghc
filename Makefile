@@ -206,7 +206,7 @@ install-docs ::
 # 
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-BinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion) hsc2hs
+BinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion) hsc2hs-ghc
 else
 BinDistShScripts =
 endif
@@ -214,7 +214,6 @@ endif
 BinDistPrlScripts = ghcprof
 BinDistLibPrlScripts = ghc-asm ghc-split
 BinDistBins = hp2ps runghc
-BinDistOptBins = runhaskell
 BinDistLinks = ghc ghci ghc-pkg
 BinDistLibSplicedFiles = package.conf
 BinDistDirs = includes compiler docs driver libraries rts utils

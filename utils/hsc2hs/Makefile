@@ -33,7 +33,7 @@ endif
 SRC_HC_OPTS      += -Wall
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-INSTALLED_SCRIPT_PROG  = hsc2hs
+INSTALLED_SCRIPT_PROG  = hsc2hs-ghc
 endif
 INPLACE_SCRIPT_PROG    = hsc2hs-inplace
 

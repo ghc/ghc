@@ -15,18 +15,4 @@ include $(GHC_COMPAT_DIR)/compat.mk
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 
-all :: runhaskell
-
-runhaskell : $(HS_PROG)
-	$(CP) $< runhaskell$(exeext)
-
-CLEAN_FILES += runhaskell
-
-# Only install runhaskell if there isn't already one installed
-ifneq "$(findstring install, $(MAKECMDGOALS))" ""
-ifeq "$(wildcard $(bindir)/runhaskell)" ""
-INSTALL_PROGS += runhaskell$(exeext)
-endif
-endif
-
 include $(TOP)/mk/target.mk

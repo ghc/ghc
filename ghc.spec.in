@@ -1,6 +1,6 @@
 # RPM spec file for GHC					         -*-rpm-spec-*-
 #
-# Copyright [1998..2004] The GHC Team
+# Copyright [1998..2007] The GHC Team
 #
 # Thanks to Zoltan Vorosbaranyi <vbzoli@vbzo.li> for suggestions in
 # earlier versions and Pixel <pixel@mandrakesoft.com> for coding tips.
@@ -21,8 +21,9 @@ Source0:        http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src.tar.bz
 Source1:        http://haskell.org/ghc/dist/%{version}/ghc-%{version}-src-extralibs.tar.bz2
 Packager:       Sven Panne <sven.panne@aedion.de>
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
+PreReq:         update-alternatives
 Requires:       gmp, readline
-BuildRequires:  alex >= 2.0, happy >= 1.15, ghc >= 5, haddock, docbook-dtd, docbook-xsl-stylesheets, libxslt, libxml2, fop, xmltex, dvips, gmp, readline-devel, mesaglut-devel
+BuildRequires:  update-alternatives, alex >= 2.0, happy >= 1.15, ghc >= 5, haddock, docbook-dtd, docbook-xsl-stylesheets, libxslt, libxml2, fop, xmltex, dvips, gmp, readline-devel, mesaglut-devel
 Provides:       haskell
 Summary:        The Glasgow Haskell Compiler
 
@@ -113,6 +114,27 @@ cd $dir
 %clean
 rm -rf ${RPM_BUILD_ROOT}
 
+%post
+# Alas, GHC, Hugs and nhc all come with different set of tools in addition to
+# a runFOO:
+#
+#   * GHC:  hsc2hs
+#   * Hugs: hsc2hs, cpphs
+#   * nhc:  cpphs
+#
+# Therefore it is currently not possible to use --slave below to form link
+# groups under a single name 'runhaskell'. Either these tools should be
+# disentangled from the Haskell implementations or all implementations should
+# have the same set of tools. *sigh*
+update-alternatives --install %{_bindir}/runhaskell runhaskell %{_bindir}/runghc     500
+update-alternatives --install %{_bindir}/hsc2hs     hsc2hs     %{_bindir}/hsc2hs-ghc 500
+
+%preun
+if test "$1" = 0; then
+  update-alternatives --remove runhaskell %{_bindir}/runghc
+  update-alternatives --remove hsc2hs     %{_bindir}/hsc2hs-ghc
+fi
+
 %files -f rpm-noprof-lib-files
 %defattr(-,root,root)
 %doc docs/docbook-cheat-sheet/docbook-cheat-sheet
@@ -137,9 +159,8 @@ rm -rf ${RPM_BUILD_ROOT}
 %{_prefix}/bin/ghcprof
 %{_prefix}/bin/hasktags
 %{_prefix}/bin/hp2ps
-%{_prefix}/bin/hsc2hs
+%{_prefix}/bin/hsc2hs-ghc
 %{_prefix}/bin/runghc
-%{_prefix}/bin/runhaskell
 
 %files prof -f rpm-prof-lib-files
 %defattr(-,root,root)
