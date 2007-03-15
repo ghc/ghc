@@ -83,7 +83,7 @@ needed.
 %build
 test -f configure || autoreconf
 ./configure --prefix=%{_prefix} --mandir=%{_mandir}
-make HTML_DIR_INSTALLED=%{_defaultdocdir}/%{name}/libraries/'$(PACKAGE)'
+make %{?jobs:-j%jobs} HTML_DIR_INSTALLED=%{_defaultdocdir}/%{name}/libraries/'$(PACKAGE)'
 make html
 make -C docs/ext-core ps
 make -C docs/storage-mgt ps
