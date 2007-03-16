@@ -70,11 +70,6 @@ import Util
 import ListSetOps
 import FastString
 import Data.Char
-import DynFlags
-
-#ifdef DEBUG
-import Util
-#endif
 
 infixl 4 `mkDsApp`, `mkDsApps`
 \end{code}
@@ -123,7 +118,7 @@ back again.
 
 \begin{code}
 mkDsLet :: CoreBind -> CoreExpr -> CoreExpr
-mkDsLet (NonRec bndr rhs) body
+mkDsLet (NonRec bndr rhs) body	-- See Note [CoreSyn let/app invariant]
   | isUnLiftedType (idType bndr) && not (exprOkForSpeculation rhs)
   = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
 mkDsLet bind body
@@ -153,15 +148,40 @@ mkDsApps fun args
 				   where
 				     (arg_ty, res_ty) = splitFunTy fun_ty
 -----------
+mk_val_app fun arg arg_ty res_ty	-- See Note [CoreSyn let/app invariant]
+  | not (isUnLiftedType arg_ty) || exprOkForSpeculation arg
+  = App fun arg		-- The vastly common case
+
+mk_val_app (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2 _ res_ty
+  | f == seqId		-- Note [Desugaring seq]
+  = Case arg1 (mkWildId ty1) res_ty [(DEFAULT,[],arg2)]
+
 mk_val_app fun arg arg_ty res_ty
-  | isUnLiftedType arg_ty && not (exprOkForSpeculation arg)
-  = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
-  | otherwise		-- The common case
-  = App fun arg
+  = Case arg (mkWildId arg_ty) res_ty [(DEFAULT,[],App fun (Var arg_id))]
   where
     arg_id = mkWildId arg_ty	-- Lots of shadowing, but it doesn't matter,
 				-- because 'fun ' should not have a free wild-id
 \end{code}
+
+Note [Desugaring seq]  cf Trac #1031
+~~~~~~~~~~~~~~~~~~~~~
+   f x y = x `seq` (y `seq` (# x,y #))
+
+The [CoreSyn let/app invariant] means that, other things being equal, because 
+the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
+
+   f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
+
+But that is bad for two reasons: 
+  (a) we now evaluate y before x, and 
+  (b) we can't bind v to an unboxed pair
+
+Seq is very, very special!  So we recognise it right here, and desugar to
+	case x of _ -> case y of _ -> (# x,y #)
+
+The special case would be valid for all calls to 'seq', but it's only *necessary*
+for ones whose second argument has an unlifted type. So we only catch the latter
+case here, to avoid unnecessary tests.
 
 
 %************************************************************************
