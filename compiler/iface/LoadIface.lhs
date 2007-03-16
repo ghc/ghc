@@ -310,7 +310,7 @@ loadDecl ignore_prags mod (_version, decl)
   = do 	{ 	-- Populate the name cache with final versions of all 
 		-- the names associated with the decl
 	  main_name      <- mk_new_bndr mod (ifName decl)
-        ; traceIf (text "Loading decl for " <> ppr main_name)
+--        ; traceIf (text "Loading decl for " <> ppr main_name)
 	; implicit_names <- mapM (mk_new_bndr mod) (ifaceDeclSubBndrs decl)
 
 	-- Typecheck the thing, lazily

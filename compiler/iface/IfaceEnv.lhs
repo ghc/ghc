@@ -56,7 +56,7 @@ newGlobalBinder :: Module -> OccName -> SrcLoc -> TcRnIf a b Name
 
 newGlobalBinder mod occ loc
   = do	{ mod `seq` occ `seq` return ()	-- See notes with lookupOrig_help
-	; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
+--	; traceIf (text "newGlobalBinder" <+> ppr mod <+> ppr occ <+> ppr loc)
     	; name_supply <- getNameCache
 	; let (name_supply', name) = allocateGlobalBinder 
 					name_supply mod occ
@@ -146,7 +146,7 @@ lookupOrig mod occ
 		--	which does some stuff that modifies the name cache
 		-- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
 	  mod `seq` occ `seq` return ()	
-	; traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
+--	; traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
     
 	; name_cache <- getNameCache
     	; case lookupOrigNameCache (nsNames name_cache) mod occ of {
