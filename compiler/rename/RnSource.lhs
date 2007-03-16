@@ -6,7 +6,7 @@
 \begin{code}
 module RnSource ( 
 	rnSrcDecls, addTcgDUs, 
-	rnTyClDecls, checkModDeprec,
+	rnTyClDecls, 
 	rnSplice, checkTH
     ) where
 
@@ -23,7 +23,7 @@ import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, mkSigTvFn )
 import RnEnv		( lookupLocalDataTcNames,
 			  lookupLocatedTopBndrRn, lookupLocatedOccRn,
-			  lookupOccRn, lookupTopBndrRn, newLocalsRn, 
+			  lookupOccRn, newLocalsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindLocalNames, checkDupNames, mapFvRn
@@ -31,8 +31,7 @@ import RnEnv		( lookupLocalDataTcNames,
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 
-import HscTypes		( FixityEnv, FixItem(..),
-			  Deprecations, Deprecs(..), DeprecTxt, plusDeprecs )
+import HscTypes		( FixityEnv, FixItem(..), Deprecations, Deprecs(..), plusDeprecs )
 import Class		( FunDep )
 import Name		( Name, nameOccName )
 import NameSet
@@ -42,7 +41,7 @@ import Outputable
 import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybes		( seqMaybe )
-import Maybe            ( isNothing, isJust )
+import Maybe            ( isNothing )
 import Monad		( liftM, when )
 import BasicTypes       ( Boxity(..) )
 \end{code}
@@ -254,11 +253,6 @@ rnSrcDeprecDecls decls
    rn_deprec (Deprecation rdr_name txt)
      = lookupLocalDataTcNames rdr_name	`thenM` \ names ->
        returnM [(name, (nameOccName name, txt)) | name <- names]
-
-checkModDeprec :: Maybe DeprecTxt -> Deprecations
--- Check for a module deprecation; done once at top level
-checkModDeprec Nothing    = NoDeprecs
-checkModDeprec (Just txt) = DeprecAll txt
 \end{code}
 
 %*********************************************************

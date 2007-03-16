@@ -224,11 +224,14 @@ typecheckIface iface
 %************************************************************************
 
 \begin{code}
-tcHiBootIface :: Module -> TcRn ModDetails
+tcHiBootIface :: HscSource -> Module -> TcRn ModDetails
 -- Load the hi-boot iface for the module being compiled,
 -- if it indeed exists in the transitive closure of imports
 -- Return the ModDetails, empty if no hi-boot iface
-tcHiBootIface mod
+tcHiBootIface hsc_src mod
+  | isHsBoot hsc_src		-- Already compiling a hs-boot file
+  = return emptyModDetails
+  | otherwise
   = do 	{ traceIf (text "loadHiBootInterface" <+> ppr mod)
 
 	; mode <- getGhcMode

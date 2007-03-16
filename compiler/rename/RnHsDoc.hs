@@ -1,17 +1,29 @@
-module RnHsDoc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc, rnMbHsDoc ) where
+module RnHsDoc ( rnHaddock, rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
+import TcRnTypes
 import TcRnMonad   ( RnM )
 import RnEnv       ( dataTcOccs, lookupGreRn_maybe )
-import HsDoc       ( HsDoc(..) )
+import HsSyn
 
-import RdrName     ( RdrName, isRdrDataCon, isRdrTc, gre_name )
+import RdrName     ( RdrName, gre_name )
 import Name        ( Name )
 import SrcLoc      ( Located(..) )
 import Outputable  ( ppr, defaultUserStyle )
 
-import Data.List   ( (\\) )
-import Debug.Trace ( trace )
 
+rnHaddock :: HaddockModInfo RdrName -> Maybe (HsDoc RdrName)
+	  -> TcGblEnv -> RnM TcGblEnv
+rnHaddock module_info maybe_doc tcg_env
+  = do	{ rn_module_doc <- rnMbHsDoc maybe_doc ;
+
+		-- Rename the Haddock module info 
+	; rn_description <- rnMbHsDoc (hmi_description module_info)
+	; let { rn_module_info = module_info { hmi_description = rn_description } }
+
+	; return (tcg_env { tcg_doc = rn_module_doc, 
+			    tcg_hmi = rn_module_info }) }
+
+rnMbHsDoc :: Maybe (HsDoc RdrName) -> RnM (Maybe (HsDoc Name))
 rnMbHsDoc mb_doc = case mb_doc of
   Just doc -> do
     doc' <- rnHsDoc doc

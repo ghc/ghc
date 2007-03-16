@@ -71,13 +71,14 @@ ioToTcRn = ioToIOEnv
 
 initTc :: HscEnv
        -> HscSource
+       -> Bool		-- True <=> retain renamed syntax trees
        -> Module 
        -> TcM r
        -> IO (Messages, Maybe r)
 		-- Nothing => error thrown by the thing inside
 		-- (error messages should have been printed already)
 
-initTc hsc_env hsc_src mod do_this
+initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
       	tvs_var      <- newIORef emptyVarSet ;
 	type_env_var <- newIORef emptyNameEnv ;
@@ -86,6 +87,10 @@ initTc hsc_env hsc_src mod do_this
 	th_var	     <- newIORef False ;
 	dfun_n_var   <- newIORef 1 ;
       	let {
+	     maybe_rn_syntax empty_val
+		| keep_rn_syntax = Just empty_val
+		| otherwise	 = Nothing ;
+			
 	     gbl_env = TcGblEnv {
 		tcg_mod      = mod,
 		tcg_src	     = hsc_src,
@@ -101,9 +106,11 @@ initTc hsc_env hsc_src mod do_this
 		tcg_exports  = [],
 		tcg_imports  = emptyImportAvails,
 		tcg_dus      = emptyDUs,
-                tcg_rn_imports = Nothing,
-                tcg_rn_exports = Nothing,
-		tcg_rn_decls = Nothing,
+
+                tcg_rn_imports = maybe_rn_syntax [],
+                tcg_rn_exports = maybe_rn_syntax [],
+		tcg_rn_decls   = maybe_rn_syntax emptyRnGroup,
+
 		tcg_binds    = emptyLHsBinds,
 		tcg_deprecs  = NoDeprecs,
 		tcg_insts    = [],
@@ -152,7 +159,7 @@ initTcPrintErrors	-- Used from the interactive loop only
        -> TcM r
        -> IO (Maybe r)
 initTcPrintErrors env mod todo = do
-  (msgs, res) <- initTc env HsSrcFile mod todo
+  (msgs, res) <- initTc env HsSrcFile False mod todo
   printErrorsAndWarnings (hsc_dflags env) msgs
   return res
 \end{code}
@@ -161,7 +168,6 @@ initTcPrintErrors env mod todo = do
 addBreakpointBindings :: TcM a -> TcM a
 addBreakpointBindings thing_inside
    = thing_inside
-
 \end{code}
 
 %************************************************************************

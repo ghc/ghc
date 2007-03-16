@@ -8,7 +8,7 @@ module RnNames (
 	rnImports, importsFromLocalDecls,
 	rnExports,
 	getLocalDeclBinders, extendRdrEnvRn,
-	reportUnusedNames, reportDeprecations
+	reportUnusedNames, finishDeprecations
     ) where
 
 #include "HsVersions.h"
@@ -688,41 +688,44 @@ type ExportOccMap = OccEnv (Name, IE RdrName)
 	--   it came from.  It's illegal to export two distinct things
 	--   that have the same occurrence name
 
-rnExports :: Bool    -- False => no 'module M(..) where' header at all
+rnExports :: Bool	-- False => no 'module M(..) where' header at all
           -> Maybe [LIE RdrName]        -- Nothing => no explicit export list
-          -> RnM (Maybe [LIE Name], [AvailInfo])
+	  -> TcGblEnv
+          -> RnM TcGblEnv
 
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
 
-rnExports explicit_mod exports
- = do TcGblEnv { tcg_mod     = this_mod,
-                 tcg_rdr_env = rdr_env, 
-                 tcg_imports = imports } <- getGblEnv
-
+rnExports explicit_mod exports 
+	  tcg_env@(TcGblEnv { tcg_mod     = this_mod,
+          	      	      tcg_rdr_env = rdr_env, 
+                     	      tcg_imports = imports })
+ = do 	{  
 	-- If the module header is omitted altogether, then behave
 	-- as if the user had written "module Main(main) where..."
 	-- EXCEPT in interactive mode, when we behave as if he had
 	-- written "module Main where ..."
 	-- Reason: don't want to complain about 'main' not in scope
 	--	   in interactive mode
-      ghc_mode <- getGhcMode
-      real_exports <- 
-          case () of
-            () | explicit_mod
-                   -> return exports
-               | ghc_mode == Interactive
-                   -> return Nothing
-               | otherwise
-                   -> do mainName <- lookupGlobalOccRn main_RDR_Unqual
-                         return (Just ([noLoc (IEVar main_RDR_Unqual)]))
-		-- ToDo: the 'noLoc' here is unhelpful if 'main' turns
-		-- out to be out of scope
+	; ghc_mode <- getGhcMode
+	; let real_exports 
+          	 | explicit_mod 	   = exports
+          	 | ghc_mode == Interactive = Nothing
+          	 | otherwise = Just ([noLoc (IEVar main_RDR_Unqual)])
+	  		-- ToDo: the 'noLoc' here is unhelpful if 'main' 
+	  		--       turns out to be out of scope
 
-      (exp_spec, avails) <- exports_from_avail real_exports rdr_env imports this_mod
+	; (rn_exports, avails) <- exports_from_avail real_exports rdr_env imports this_mod
+	; let final_avails = nubAvails avails	     -- Combine families
+	
+	; return (tcg_env { tcg_exports    = final_avails,
+                            tcg_rn_exports = case tcg_rn_exports tcg_env of
+						Nothing -> Nothing
+						Just _  -> rn_exports,
+			    tcg_dus = tcg_dus tcg_env `plusDU` 
+				      usesOnly (availsToNameSet final_avails) }) }
 
-      return (exp_spec, nubAvails avails)     -- Combine families
 
 exports_from_avail :: Maybe [LIE RdrName]
                          -- Nothing => no explicit export list
@@ -904,13 +907,23 @@ check_occs ie occs names
 %*********************************************************
 
 \begin{code}
-reportDeprecations :: DynFlags -> TcGblEnv -> RnM ()
-reportDeprecations dflags tcg_env
-  = ifOptM Opt_WarnDeprecations	$
-    do	{ (eps,hpt) <- getEpsAndHpt
+finishDeprecations :: DynFlags -> Maybe DeprecTxt 
+		   -> TcGblEnv -> RnM TcGblEnv
+-- (a) Report usasge of deprecated imports
+-- (b) If the whole module is deprecated, update tcg_deprecs
+-- 		All this happens only once per module
+finishDeprecations dflags mod_deprec tcg_env
+  = do	{ (eps,hpt) <- getEpsAndHpt
+	; ifOptM Opt_WarnDeprecations	$
+	  mapM_ (check hpt (eps_PIT eps)) all_gres
 		-- By this time, typechecking is complete, 
 		-- so the PIT is fully populated
-	; mapM_ (check hpt (eps_PIT eps)) all_gres }
+
+	-- Deal with a module deprecation; it overrides all existing deprecs
+	; let new_deprecs = case mod_deprec of
+				Just txt -> DeprecAll txt
+				Nothing  -> tcg_deprecs tcg_env
+	; return (tcg_env { tcg_deprecs = new_deprecs }) }
   where
     used_names = allUses (tcg_dus tcg_env) 
 	-- Report on all deprecated uses; hence allUses

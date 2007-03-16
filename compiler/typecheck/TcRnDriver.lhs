@@ -91,6 +91,7 @@ import Data.Maybe
 #endif
 
 import FastString
+import Maybes
 import Util
 import Bag
 
@@ -116,7 +117,8 @@ tcRnModule :: HscEnv
 
 tcRnModule hsc_env hsc_src save_rn_syntax
 	 (L loc (HsModule maybe_mod export_ies 
-			  import_decls local_decls mod_deprec _ module_info maybe_doc))
+			  import_decls local_decls mod_deprec _ 
+			  module_info maybe_doc))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_pkg = thisPackage (hsc_dflags hsc_env) ;
@@ -125,121 +127,120 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 			Just (L _ mod) -> mkModule this_pkg mod } ;
 						-- The normal case
 		
-   initTc hsc_env hsc_src this_mod $ 
+   initTc hsc_env hsc_src save_rn_syntax this_mod $ 
    setSrcSpan loc $
-   do {
-		-- Deal with imports;
-	(rn_imports, rdr_env, imports) <- rnImports import_decls ;
+   do {		-- Deal with imports;
+	tcg_env <- tcRnImports hsc_env this_mod import_decls ;
+	setGblEnv tcg_env		$ do {
 
-	let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
-	    ; dep_mods = imp_dep_mods imports
+		-- Load the hi-boot interface for this module, if any
+		-- We do this now so that the boot_names can be passed
+		-- to tcTyAndClassDecls, because the boot_names are 
+		-- automatically considered to be loop breakers
+		--
+		-- Do this *after* tcRnImports, so that we know whether
+		-- a module that we import imports us; and hence whether to
+		-- look for a hi-boot file
+	boot_iface <- tcHiBootIface hsc_src this_mod ;
+
+		-- Rename and type check the declarations
+	traceRn (text "rn1a") ;
+	tcg_env <- if isHsBoot hsc_src then
+			tcRnHsBootDecls local_decls
+		   else	
+			tcRnSrcDecls boot_iface local_decls ;
+	setGblEnv tcg_env		$ do {
+
+		-- Report the use of any deprecated things
+		-- We do this *before* processsing the export list so
+		-- that we don't bleat about re-exporting a deprecated
+		-- thing (especially via 'module Foo' export item)
+		-- That is, only uses in the *body* of the module are complained about
+	traceRn (text "rn3") ;
+	failIfErrsM ;	-- finishDeprecations crashes sometimes 
+			-- as a result of typechecker repairs (e.g. unboundNames)
+	tcg_env <- finishDeprecations (hsc_dflags hsc_env) mod_deprec tcg_env ;
+
+		-- Process the export list
+	tcg_env <- rnExports (isJust maybe_mod) export_ies tcg_env ;
+	traceRn (text "rn4") ;
+
+	-- Compare the hi-boot iface (if any) with the real thing
+	-- Must be done after processing the exports
+ 	tcg_env <- checkHiBootIface tcg_env boot_iface ;
+
+		-- Rename the Haddock documentation 
+	tcg_env <- rnHaddock module_info maybe_doc tcg_env ;
+
+		-- Report unused names
+ 	reportUnusedNames export_ies tcg_env ;
+
+		-- Dump output and return
+	tcDump tcg_env ;
+	return tcg_env
+    }}}}
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Import declarations
+%*									*
+%************************************************************************
+
+\begin{code}
+tcRnImports :: HscEnv -> Module -> [LImportDecl RdrName] -> TcM TcGblEnv
+tcRnImports hsc_env this_mod import_decls
+  = do	{ (rn_imports, rdr_env, imports) <- rnImports import_decls ;
+
+	; let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
+	      ; dep_mods = imp_dep_mods imports
 
 		-- We want instance declarations from all home-package
 		-- modules below this one, including boot modules, except
 		-- ourselves.  The 'except ourselves' is so that we don't
 		-- get the instances from this module's hs-boot file
-	    ; want_instances :: ModuleName -> Bool
-	    ; want_instances mod = mod `elemUFM` dep_mods
+	      ; want_instances :: ModuleName -> Bool
+	      ; want_instances mod = mod `elemUFM` dep_mods
 				   && mod /= moduleName this_mod
-	    ; home_insts = hptInstances hsc_env want_instances
-	    } ;
+	      ; home_insts = hptInstances hsc_env want_instances
+	      } ;
 
 		-- Record boot-file info in the EPS, so that it's 
 		-- visible to loadHiBootInterface in tcRnSrcDecls,
 		-- and any other incrementally-performed imports
-	updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
+	; updateEps_ (\eps -> eps { eps_is_boot = dep_mods }) ;
 
 		-- Update the gbl env
-	updGblEnv ( \ gbl -> 
-		gbl { tcg_rdr_env  = plusOccEnv (tcg_rdr_env gbl) rdr_env,
-		      tcg_inst_env = extendInstEnvList (tcg_inst_env gbl) home_insts,
-		      tcg_imports  = tcg_imports gbl `plusImportAvails` imports,
-                      tcg_rn_imports = if save_rn_syntax then
-                                         Just rn_imports
-                                       else
-                                         Nothing,
-		      tcg_rn_decls = if save_rn_syntax then
-					Just emptyRnGroup
-				     else
-					Nothing })
-		$ do {
+	; updGblEnv ( \ gbl -> 
+		gbl { tcg_rdr_env    = plusOccEnv (tcg_rdr_env gbl) rdr_env,
+		      tcg_imports    = tcg_imports gbl `plusImportAvails` imports,
+                      tcg_rn_imports = fmap (const rn_imports) (tcg_rn_imports gbl),
+		      tcg_inst_env   = extendInstEnvList (tcg_inst_env gbl) home_insts
+		}) $ do {
 
-	traceRn (text "rn1" <+> ppr (imp_dep_mods imports)) ;
+	; traceRn (text "rn1" <+> ppr (imp_dep_mods imports))
 		-- Fail if there are any errors so far
 		-- The error printing (if needed) takes advantage 
 		-- of the tcg_env we have now set
-        traceIf (text "rdr_env: " <+> ppr rdr_env) ;
-	failIfErrsM ;
+-- 	; traceIf (text "rdr_env: " <+> ppr rdr_env)
+	; failIfErrsM
 
 		-- Load any orphan-module and family instance-module
 		-- interfaces, so that their rules and instance decls will be
 		-- found.
-	loadOrphanModules (imp_orphs  imports) False ;
-	loadOrphanModules (imp_finsts imports) True  ;
+	; loadOrphanModules (imp_orphs  imports) False
+	; loadOrphanModules (imp_finsts imports) True 
 
-	traceRn (text "rn1: checking family instance consistency") ;
-	let { directlyImpMods =   map (\(mod, _, _) -> mod) 
-			        . moduleEnvElts 
-			        . imp_mods 
-			        $ imports } ;
-	checkFamInstConsistency (imp_finsts imports) directlyImpMods ;
+		-- Check type-familily consistency
+	; traceRn (text "rn1: checking family instance consistency")
+	; let { dir_imp_mods = map (\ (mod, _, _) -> mod) 
+			     . moduleEnvElts 
+			     . imp_mods 
+			     $ imports }
+	; checkFamInstConsistency (imp_finsts imports) dir_imp_mods ;
 
-	traceRn (text "rn1a") ;
-		-- Rename and type check the declarations
-	tcg_env <- if isHsBoot hsc_src then
-			tcRnHsBootDecls local_decls
-		   else	
-			tcRnSrcDecls local_decls ;
-	setGblEnv tcg_env		$ do {
-
-	failIfErrsM ;	-- reportDeprecations crashes sometimes 
-			-- as a result of typechecker repairs (e.g. unboundNames)
-	traceRn (text "rn3") ;
-
-		-- Report the use of any deprecated things
-		-- We do this before processsing the export list so
-		-- that we don't bleat about re-exporting a deprecated
-		-- thing (especially via 'module Foo' export item)
-		-- Only uses in the body of the module are complained about
-	reportDeprecations (hsc_dflags hsc_env) tcg_env ;
-
-		-- Process the export list
-	(rn_exports, exports) <- rnExports (isJust maybe_mod) export_ies ;
-                 
-	traceRn (text "rn4") ;
-
-		-- Rename the Haddock documentation header 
-	rn_module_doc <- rnMbHsDoc maybe_doc ;
-
-		-- Rename the Haddock module info 
-	rn_description <- rnMbHsDoc (hmi_description module_info) ;
-	let { rn_module_info = module_info { hmi_description = rn_description } } ;
-
-		-- Check whether the entire module is deprecated
-		-- This happens only once per module
-	let { mod_deprecs = checkModDeprec mod_deprec } ;
-
-		-- Add exports and deprecations to envt
-	let { final_env  = tcg_env { tcg_exports = exports,
-                                     tcg_rn_exports = if save_rn_syntax then
-                                                         rn_exports
-                                                      else Nothing,
-				     tcg_dus = tcg_dus tcg_env `plusDU` usesOnly (availsToNameSet exports),
-				     tcg_deprecs = tcg_deprecs tcg_env `plusDeprecs` 
-						   mod_deprecs,
-				     tcg_doc = rn_module_doc, 
-				     tcg_hmi = rn_module_info
-				  }
-		-- A module deprecation over-rides the earlier ones
-	     } ;
-
-		-- Report unused names
- 	reportUnusedNames export_ies final_env ;
-
-		-- Dump output and return
-	tcDump final_env ;
-	return final_env
-    }}}}
+	; getGblEnv } }
 \end{code}
 
 
@@ -259,7 +260,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	-- The decls are IfaceDecls; all names are original names
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
-   initTc hsc_env ExtCoreFile this_mod $ do {
+   initTc hsc_env ExtCoreFile False this_mod $ do {
 
    let { ldecls  = map noLoc decls } ;
 
@@ -332,18 +333,11 @@ mkFakeGroup decls -- Rather clumsy; lots of unused fields
 %************************************************************************
 
 \begin{code}
-tcRnSrcDecls :: [LHsDecl RdrName] -> TcM TcGblEnv
+tcRnSrcDecls :: ModDetails -> [LHsDecl RdrName] -> TcM TcGblEnv
 	-- Returns the variables free in the decls
 	-- Reason: solely to report unused imports and bindings
-tcRnSrcDecls decls
- = do { 	-- Load the hi-boot interface for this module, if any
-		-- We do this now so that the boot_names can be passed
-		-- to tcTyAndClassDecls, because the boot_names are 
-		-- automatically considered to be loop breakers
-	mod <- getModule ;
-	boot_iface <- tcHiBootIface mod ;
-
-	  	-- Do all the declarations
+tcRnSrcDecls boot_iface decls
+ = do {   	-- Do all the declarations
 	(tc_envs, lie) <- getLIE $ tc_rn_src_decls boot_iface decls ;
 
 	     -- 	Finish simplifying class constraints
@@ -382,10 +376,7 @@ tcRnSrcDecls decls
 	-- Make the new type env available to stuff slurped from interface files
 	writeMutVar (tcg_type_env_var tcg_env) final_type_env ;
 
-	-- Compare the hi-boot iface (if any) with the real thing
- 	dfun_binds <- checkHiBootIface tcg_env' boot_iface ;
-
-	return (tcg_env' { tcg_binds = tcg_binds tcg_env' `unionBags` dfun_binds }) 
+	return (tcg_env' { tcg_binds = tcg_binds tcg_env' }) 
    }
 
 tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
@@ -460,7 +451,7 @@ tcRnHsBootDecls decls
 
 		-- Typecheck instance decls
 	; traceTc (text "Tc3")
-	; (tcg_env, inst_infos, _binds) 
+	; (tcg_env, inst_infos, _deriv_binds) 
             <- tcInstDecls1 tycl_decls (hs_instds rn_group) (hs_derivds rn_group)
 	; setGblEnv tcg_env	$ do {
 
@@ -491,7 +482,7 @@ Once we've typechecked the body of the module, we want to compare what
 we've found (gathered in a TypeEnv) with the hi-boot details (if any).
 
 \begin{code}
-checkHiBootIface :: TcGblEnv -> ModDetails -> TcM (LHsBinds Id)
+checkHiBootIface :: TcGblEnv -> ModDetails -> TcM TcGblEnv
 -- Compare the hi-boot file for this module (if there is one)
 -- with the type environment we've just come up with
 -- In the common case where there is no hi-boot file, the list
@@ -501,12 +492,18 @@ checkHiBootIface :: TcGblEnv -> ModDetails -> TcM (LHsBinds Id)
 -- hs-boot file, such as 	$fbEqT = $fEqT
 
 checkHiBootIface
-	(TcGblEnv { tcg_insts = local_insts, tcg_fam_insts = local_fam_insts,
-		    tcg_type_env = local_type_env })
+	tcg_env@(TcGblEnv { tcg_src = hs_src, tcg_binds = binds,
+			    tcg_insts = local_insts, tcg_fam_insts = local_fam_insts,
+			    tcg_type_env = local_type_env, tcg_exports = local_exports })
 	(ModDetails { md_insts = boot_insts, md_fam_insts = boot_fam_insts,
-		      md_types = boot_type_env })
-  = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts)) ;
-	; mapM_ check_one (typeEnvElts boot_type_env)
+		      md_types = boot_type_env, md_exports = boot_exports })
+  | isHsBoot hs_src	-- Current module is already a hs-boot file!
+  = return tcg_env	
+
+  | otherwise
+  = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts $$ 
+				ppr local_export_set $$ ppr boot_exports)) ;
+	; mapM_ check_export (concatMap availNames boot_exports)
 	; dfun_binds <- mapM check_inst boot_insts
 	; unless (null boot_fam_insts) $
 	    panic ("TcRnDriver.checkHiBootIface: Cannot handle family " ++
@@ -514,27 +511,35 @@ checkHiBootIface
             -- FIXME: Why?  The actual comparison is not hard, but what would
             --	      be the equivalent to the dfun bindings returned for class
             --	      instances?  We can't easily equate tycons...
-	; return (unionManyBags dfun_binds) }
+	; return (tcg_env { tcg_binds = binds `unionBags` unionManyBags dfun_binds }) }
   where
-    check_one boot_thing
-      | isImplicitTyThing boot_thing = return ()
+    check_export name	-- Name is exported by the boot iface
       | name `elem` dfun_names       = return ()	
       | isWiredInName name	     = return ()	-- No checking for wired-in names.  In particular,
 							-- 'error' is handled by a rather gross hack
 							-- (see comments in GHC.Err.hs-boot)
+      | isImplicitTyThing boot_thing = return ()
       | Just real_thing <- lookupTypeEnv local_type_env name
-      = do { let boot_decl = tyThingToIfaceDecl boot_thing
+      = do { checkTc (name `elemNameSet` local_export_set)
+		     (missingBootThing boot_thing "exported by")
+
+	   ; let boot_decl = tyThingToIfaceDecl boot_thing
 	         real_decl = tyThingToIfaceDecl real_thing
 	   ; checkTc (checkBootDecl boot_decl real_decl)
 		     (bootMisMatch boot_thing boot_decl real_decl) }
 		-- The easiest way to check compatibility is to convert to
 		-- iface syntax, where we already have good comparison functions
+
       | otherwise
-      = addErrTc (missingBootThing boot_thing)
+      = addErrTc (missingBootThing boot_thing "defined in")
       where
-	name = getName boot_thing
+	boot_thing = lookupTypeEnv boot_type_env name
+		     `orElse` pprPanic "checkHiBootIface" (ppr name)
 
     dfun_names = map getName boot_insts
+
+    local_export_set :: NameSet
+    local_export_set = availsToNameSet local_exports
 
     check_inst boot_inst
 	= case [dfun | inst <- local_insts, 
@@ -547,16 +552,20 @@ checkHiBootIface
 	  boot_inst_ty = idType boot_dfun
 	  local_boot_dfun = Id.mkExportedLocalId (idName boot_dfun) boot_inst_ty
 
+
 ----------------
-missingBootThing thing
-  = ppr thing <+> ptext SLIT("is defined in the hs-boot file, but not in the module")
+missingBootThing thing what
+  = ppr thing <+> ptext SLIT("is exported by the hs-boot file, but not") 
+	      <+> text what <+> ptext SLIT("the module")
+
 bootMisMatch thing boot_decl real_decl
   = vcat [ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file"),
-	  ptext SLIT("Decl") <+> ppr real_decl,
-	  ptext SLIT("Boot file:") <+> ppr boot_decl]
+	  ptext SLIT("Main module:") <+> ppr real_decl,
+	  ptext SLIT("Boot file:  ") <+> ppr boot_decl]
+
 instMisMatch inst
   = hang (ppr inst)
-       2 (ptext SLIT("is defined in the hs-boot file, but not in the module"))
+       2 (ptext SLIT("is defined in the hs-boot file, but not in the module itself"))
 \end{code}
 
 
