@@ -146,7 +146,7 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup
 	cd $* && setup/Setup haddock
 
-.PHONY: install.library.%
+.PHONY: install install-docs install.library.%
 
 INSTALL_DIR=$(prefix)/share/ghc/doc/html/
 
@@ -157,6 +157,10 @@ install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.css $(INSTALL_DIR)
 	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.js  $(INSTALL_DIR)
 	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.gif $(INSTALL_DIR)
+
+# Cabal doesn't let us ask to install docs only, so do nothing here
+install-docs:
+	@:
 
 # Ideally this would depend on a stamp/build.library.%, but if it does
 # then we can't change the libraries and then just rerun make.
