@@ -568,12 +568,6 @@ cond_glaExts (gla_exts, _rep_tc) | gla_exts  = Nothing
   where
     why  = ptext SLIT("You need -fglasgow-exts to derive an instance for this class")
 
-std_class gla_exts clas 
-  =  key `elem` derivableClassKeys
-  || (gla_exts && (key == typeableClassKey || key == dataClassKey))
-  where
-     key = classKey clas
-    
 std_class_via_iso clas	-- These standard classes can be derived for a newtype
 			-- using the isomorphism trick *even if no -fglasgow-exts*
   = classKey clas `elem`  [eqClassKey, ordClassKey, ixClassKey, boundedClassKey]
@@ -599,18 +593,26 @@ mkNewTypeEqn orig gla_exts overlap_flag tvs cls cls_tys
 	     tycon tc_args 
 	     rep_tycon rep_tc_args
   | can_derive_via_isomorphism && (gla_exts || std_class_via_iso cls)
-  =	do { traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)
-	   ; 	-- Go ahead and use the isomorphism
-	     dfun_name <- new_dfun_name cls tycon
-	   ; return (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
-					       iBinds = NewTypeDerived ntd_info })) }
-  | std_class gla_exts cls
-  = mkDataTypeEqn orig gla_exts tvs cls cls_tys tycon tc_args rep_tycon rep_tc_args	-- Go via bale-out route
+  = do	{ traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)
+	; 	-- Go ahead and use the isomorphism
+	   dfun_name <- new_dfun_name cls tycon
+	; return (Nothing, Just (InstInfo { iSpec  = mk_inst_spec dfun_name,
+					    iBinds = NewTypeDerived ntd_info })) }
 
-  	-- Otherwise its a non-standard instance
+  | isNothing mb_std_err	-- Use the standard H98 method
+  = do	{ loc <- getSrcSpanM
+	; eqn <- mk_data_eqn loc orig tvs cls tycon tc_args rep_tycon rep_tc_args
+	; return (Just eqn, Nothing) }
+
+  	-- Otherwise we can't derive
   | gla_exts  = baleOut cant_derive_err	-- Too hard
-  | otherwise = baleOut non_std_err	-- Just complain about being a non-std instance
+  | otherwise = baleOut std_err		-- Just complain about being a non-std instance
   where
+	mb_std_err = checkSideConditions gla_exts cls cls_tys rep_tycon
+	std_err = derivingThingErr cls cls_tys tc_app $
+		  vcat [fromJust mb_std_err,
+			ptext SLIT("Try -fglasgow-exts for GHC's newtype-deriving extension")]
+
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
 	-- where t is a type,
@@ -752,7 +754,7 @@ mkNewTypeEqn orig gla_exts overlap_flag tvs cls cls_tys
 	cant_derive_err = derivingThingErr cls cls_tys tc_app
 				(vcat [ptext SLIT("even with cunning newtype deriving:"),
 					if isRecursiveTyCon tycon then
-					  ptext SLIT("the newtype is recursive")
+					  ptext SLIT("the newtype may be recursive")
 					else empty,
 					if not right_arity then 
 					  quotes (ppr (mkClassPred cls cls_tys)) <+> ptext SLIT("does not have arity 1")
@@ -765,10 +767,6 @@ mkNewTypeEqn orig gla_exts overlap_flag tvs cls cls_tys
 					  ptext SLIT("the eta-reduction property does not hold")
 					else empty
 				      ])
-
-	non_std_err = derivingThingErr cls cls_tys tc_app
-				(vcat [non_std_why cls,
-				       ptext SLIT("Try -fglasgow-exts for GHC's newtype-deriving extension")])
 \end{code}
 
 
@@ -1122,3 +1120,4 @@ badDerivedPred pred
 	  nest 2 (ptext SLIT("Offending constraint:") <+> ppr pred)]
 \end{code}
 
+ 
