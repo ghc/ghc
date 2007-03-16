@@ -6,6 +6,8 @@ default_target: build
 ifeq "$(IN_BIN_DIST)" "1"
 include ../Makefile-vars
 else
+# Ideally we'd just include something to give us variables
+# for paths and arguments to tools etc, and those set in mk/build.mk.
 TOP=.
 include $(TOP)/mk/boilerplate.mk
 endif
