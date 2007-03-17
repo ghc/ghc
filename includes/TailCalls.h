@@ -233,8 +233,17 @@ but uses $$dyncall if necessary to cope, just in case you aren't.
 #ifdef ia64_HOST_ARCH
 
 /* The compiler can more intelligently decide how to do this.  We therefore
- * implement it as a call and optimise to a jump at mangle time. */
-#define JMP_(cont)	((F_) (cont))(); __asm__ volatile ("--- TAILCALL ---");
+ * implement it as a call and optimise to a jump at mangle time.
+ *
+ * Sometimes GCC likes to move instructions between the function call and
+ * the "--- TAILCALL ---".  To stop it from finding instructions to put
+ * there, we insert a jump to the end of the function after the TAILCALL. */
+#define JMP_(cont)				\
+	((F_) (cont))();			\
+	__asm__ volatile ("--- TAILCALL ---");	\
+	goto _function_end;
+
+#define FE_    _function_end: __asm__ volatile ("--- END ---");
 
 /* Don't emit calls to __DISCARD__ as this causes hassles */
 #define __DISCARD__()
