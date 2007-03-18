@@ -851,6 +851,10 @@ StgRunIsImplementedInAssembler(void)
            loc29: saved ar.pfs
            loc30: saved b0
            loc31: saved gp (gcc 3.3 uses this slot)
+           loc32: saved ar.lc
+           loc33: saved pr
+       f2  -  f5: preserved floating-point registers
+       f16 - f21: preserved floating-point registers
    -------------------------------------------------------------------------- */
 
 #ifdef ia64_HOST_ARCH
@@ -859,12 +863,13 @@ StgRunIsImplementedInAssembler(void)
 #undef RESERVED_C_STACK_BYTES
 #define RESERVED_C_STACK_BYTES 1024
 
-#if ((__GNUC__ == 3) && (__GNUC_MINOR__ >= 3)) || (__GNUC__ > 3)
-/* gcc 3.3+: leave an extra slot for gp saves */
-#define LOCALS 32
-#else
-#define LOCALS 31
-#endif
+/* We don't spill all the callee-save FP registers, only the ones that
+ * gcc has been observed to use */
+#define PRESERVED_FP_REGISTERS 10
+
+/* We always allocate 34 local and 8 output registers.  As long as gcc used
+ * fewer than 32 locals, the mangler will adjust the stack frame accordingly. */
+#define LOCALS 34
 
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
@@ -876,8 +881,8 @@ StgRunIsImplementedInAssembler(void)
 		"\tld8 r18 = [r32],8\n"			/* get procedure address */
 		"\tadds sp = -%0, sp ;;\n"		/* setup stack */
 		"\tld8 gp = [r32]\n"			/* get procedure GP */
-		"\tadds r16 = %0-(6*16), sp\n"
-		"\tadds r17 = %0-(5*16), sp ;;\n"
+		"\tadds r16 = %0-(%2*16), sp\n"
+		"\tadds r17 = %0-((%2-1)*16), sp ;;\n"
 		"\tstf.spill [r16] = f16,32\n"		/* spill callee-saved fp regs */
 		"\tstf.spill [r17] = f17,32\n"
 		"\tmov b6 = r18 ;;\n"			/* set target address */
@@ -886,12 +891,18 @@ StgRunIsImplementedInAssembler(void)
 		"\tmov loc30 = b0 ;;\n"			/* save return address */
 		"\tstf.spill [r16] = f20,32\n"
 		"\tstf.spill [r17] = f21,32\n"
+                "\tmov loc32 = ar.lc ;;\n"		/* save loop counter */
+		"\tstf.spill [r16] = f2,32\n"
+		"\tstf.spill [r17] = f3,32\n"
+                "\tmov loc33 = pr ;;\n"			/* save predicate registers */
+		"\tstf.spill [r16] = f4,32\n"
+		"\tstf.spill [r17] = f5,32\n"
 		"\tbr.few b6 ;;\n"			/* branch to function */
 		".global StgReturn\n"
 		"StgReturn:\n"
 		"\tmov r8 = loc16\n"		/* return value in r8 */
-		"\tadds r16 = %0-(6*16), sp\n"
-	    	"\tadds r17 = %0-(5*16), sp ;;\n"
+		"\tadds r16 = %0-(%2*16), sp\n"
+	    	"\tadds r17 = %0-((%2-1)*16), sp ;;\n"
 		"\tldf.fill f16 = [r16],32\n"	/* start restoring fp regs */
 		"\tldf.fill f17 = [r17],32\n"
 		"\tmov ar.pfs = loc29 ;;\n"	/* restore register frame */
@@ -900,9 +911,17 @@ StgRunIsImplementedInAssembler(void)
 		"\tmov b0 = loc30 ;;\n"		/* restore return address */
 		"\tldf.fill f20 = [r16],32\n"
 		"\tldf.fill f21 = [r17],32\n"
-		"\tadds sp = %0, sp\n"		/* restore stack */
+                "\tmov ar.lc = loc32 ;;\n"	/* restore loop counter */
+		"\tldf.fill f2 = [r16],32\n"
+		"\tldf.fill f3 = [r17],32\n"
+		"\tmov pr = loc33\n"		/* restore predicate registers */
+		"\tadds sp = %0, sp ;;\n"	/* restore stack */
+		"\tldf.fill f4 = [r16],32\n"
+		"\tldf.fill f5 = [r17],32\n"
 		"\tbr.ret.sptk.many b0 ;;\n"	/* return */
-	: : "i"(RESERVED_C_STACK_BYTES + 6*16), "i"(LOCALS));
+	: : "i"(RESERVED_C_STACK_BYTES + PRESERVED_FP_REGISTERS*16),
+            "i"(LOCALS),
+            "i"(PRESERVED_FP_REGISTERS));
 }
 
 #endif

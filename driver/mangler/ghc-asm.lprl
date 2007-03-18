@@ -539,6 +539,9 @@ sub mangle_asm {
     local($*) = 1;
     local($i, $c);
 
+    # ia64-specific information for code chunks
+    my $ia64_locnum;
+    my $ia64_outnum;
 
     &init_TARGET_STUFF();
     &init_FUNNY_THINGS();
@@ -851,6 +854,9 @@ sub mangle_asm {
 	# (see elsewhere)
 	$c = &hppa_mash_prologue($c) if $TargetPlatform =~ /^hppa-/;
 
+	undef $ia64_locnum;
+	undef $ia64_outnum;
+
 	# be slightly paranoid to make sure there's
 	# nothing surprising in there
 	if ( $c =~ /--- BEGIN ---/ ) {
@@ -909,45 +915,53 @@ sub mangle_asm {
 
 		} elsif ($TargetPlatform =~ /^ia64-/) {
 		    $p =~ s/^\t\.prologue .*\n//;
-		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, 3[12], \d+, 0\n//;
+
+		    # Record the number of local and out registers for register relocation later
+		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, (\d+), (\d+), 0\n//;
+		    $ia64_locnum = $1;
+		    $ia64_outnum = $2;
+
 		    $p =~ s/^\t\.fframe \d+\n\tadds r12 = -\d+, r12\n//;
 		    $p =~ s/^\t\.save rp, r\d+\n\tmov r\d+ = b0\n//;
 
-            # Remove .proc and .body directives
-            $p =~ s/^\t\.proc [a-zA-Z0-9_#.]+\n//;
-            $p =~ s/^\t\.body\n//;
-            # If there's a label, move it to the body
-            if ($p =~ /^[a-zA-Z0-9#.]+:\n/) {
-                $p = $` . $';
-            $r = $& . $r;
-              }
-            # Remove floating-point spill instructions.  This is actually a bad
-            # thing to remove, because we will be putting junk into the floating-point
-            # registers and this will be visible to the caller.
-            # Only fp registers 2-5 and 16-31 may be spilled.
-            if ($p =~ s/^\tstf\.spill \[r1[4-9]\] = f([2-5]|1[6-9]|2[0-9]|30|31)(, [0-9]+)?\n//g) {
-                # Being paranoid, only try to remove these if we saw a spill
-                # operation.
-                $p =~ s/^\tmov r1[4-9] = r12\n//;
-            $p =~ s/^\tadds r1[4-9] = -[0-9]+, r12\n//g;
-                $p =~ s/^\t\.save\.f 0x[0-9a-fA-F]\n//g;
-            }
+		    # Ignore save/restore of these registers; they're taken
+		    # care of in StgRun()
+		    $p =~ s/^\t\.save ar\.lc, r\d+\n//;
+		    $p =~ s/^\t\.save pr, r\d+\n//;
+		    $p =~ s/^\tmov r\d+ = ar\.lc\n//;
+		    $p =~ s/^\tmov r\d+ = pr\n//;
 
-            $p =~ s/^\tnop\.[mifb]\s+0\n//g; # remove nop instructions
-            $p =~ s/^\t\.(mii|mmi|mfi)\n//g;    # bundling is no longer sensible
+		    # Remove .proc and .body directives
+		    $p =~ s/^\t\.proc [a-zA-Z0-9_.]+#\n//;
+            	    $p =~ s/^\t\.body\n//;
+
+            	    # If there's a label, move it to the body
+            	    if ($p =~ /^[a-zA-Z0-9.]+:\n/) {
+            	        $p = $` . $';
+            	        $r = $& . $r;
+            	      }
+
+            	    # Remove floating-point spill instructions.
+            	    # Only fp registers 2-5 and 16-21 are saved by the runtime.
+            	    if ($p =~ s/^\tstf\.spill \[r1[4-9]\] = f([2-5]|1[6-9]|20|21)(, [0-9]+)?\n//g) {
+            	        # Being paranoid, only try to remove these if we saw a
+			# spill operation.
+                        $p =~ s/^\tmov r1[4-9] = r12\n//;
+                        $p =~ s/^\tadds r1[4-9] = -[0-9]+, r12\n//g;
+                        $p =~ s/^\t\.save\.f 0x[0-9a-fA-F]\n//g;
+            	    }
+
+            	    $p =~ s/^\tnop(?:\.[mifb])?\s+\d+\n//g; # remove nop instructions
+            	    $p =~ s/^\t\.(mii|mmi|mfi)\n//g;    # bundling is no longer sensible
 		    $p =~ s/^\t;;\n//g;		# discard stops
 		    $p =~ s/^\t\/\/.*\n//g;	# gcc inserts timings in // comments
 
-            # GCC 3.3 saves r1 in the prologue, move this to the body
-            if ($p =~ /^\tmov r\d+ = r1\n/) {
-              $p = $` . $';
-              $r = $& . $r;
-            }
-            # GCC 3.2 saves pr in the prologue, move this to the body
-            if ($p =~ /^\tmov r\d+ = pr\n/) {
-              $p = $` . $';
-              $r = $& . $r;
-            }
+               	    # GCC 3.3 saves r1 in the prologue, move this to the body
+		    # (Does this register get restored anywhere?)
+               	    if ($p =~ /^\tmov r\d+ = r1\n/) {
+               	      $p = $` . $';
+               	      $r = $& . $r;
+               	    }
 		} elsif ($TargetPlatform =~ /^m68k-/) {
 		    $p =~ s/^\tlink a6,#-?\d.*\n//;
  		    $p =~ s/^\tpea a6@\n\tmovel sp,a6\n//;    
@@ -1068,10 +1082,19 @@ sub mangle_asm {
 
 	# toss all epilogue stuff; again, paranoidly
 	if ( $c =~ /--- END ---/ ) {
-	    if (($r, $e) = split(/--- END ---/, $c)) {
-        # rtail holds code that is after the epilogue in the assembly-code
-        # layout and should not be filtered as part of the epilogue.
-        $rtail = "";
+	    # Gcc may decide to replicate the function epilogue.  We want
+	    # to process all epilogues, so we split the function and then
+	    # loop here.
+	    @fragments = split(/--- END ---/, $c);
+	    $r = shift(@fragments);
+
+	    # Rebuild `c'; processed fragments will be appended to `c'
+	    $c = $r;
+
+	    foreach $e (@fragments) {
+                # etail holds code that is after the epilogue in the assembly-code
+                # layout and should not be filtered as part of the epilogue.
+                $etail = "";
 		if ($TargetPlatform =~ /^i386-/) {
 		    $e =~ s/^\tret\n//;
 		    $e =~ s/^\tpopl\s+\%edi\n//;
@@ -1081,56 +1104,37 @@ sub mangle_asm {
 		    $e =~ s/^\taddl\s+\$\d+,\s*\%esp\n//;
 		    $e =~ s/^\tsubl\s+\$-\d+,\s*\%esp\n//;
 		} elsif ($TargetPlatform =~ /^ia64-/) {
-            # GCC may have put the function's epilogue code in the _middle_
-            # of the function. We try to detect that here and extract the
-            # code that belongs to the body of the function.  We'll put that
-            # code back after cleaning up the epilogue.
-            # The epilogue is first split into:
-            #     $e,    the epilogue code (up to the return instruction)
-            #     $rtail, the rest of the function body
-            #     $edir,  the directives following the function
-            #             (everything starting with .endp)
-            # The return instruction and endp directive are stripped in the
-            # process.
-            if (!(($e, $rtail) = split(/^\tbr\.ret\.sptk\.many b0\n/, $e))) {
-                die "Epilogue doesn't seem to have one return instruction: $e\n";
-            }
-            if (!(($rtail, $edir) = split(/^\t\.endp [a-zA-Z0-9_#.]+\n/, $rtail))) {
-                die "Epilogue doesn't seem to have one endp directive: $e\n";
-            }
-            # print STDERR "Epilogue: $e\n";
-            # print STDERR "Code tail: $rtail\n";
-            # print STDERR "Directives: $edir\n";
+            	    # The epilogue is first split into:
+            	    #     $e,    the epilogue code (up to the return instruction)
+            	    #     $etail, non-epilogue code (after the return instruction)
+            	    # The return instruction is stripped in the process.
+            	    if (!(($e, $etail) = split(/^\tbr\.ret\.sptk\.many b0\n/, $e))) {
+            	        die "Epilogue doesn't seem to have one return instruction: $e\n";
+            	    }
+		    # Remove 'endp' directive from the tail
+            	    $etail =~ s/^\t\.endp [a-zA-Z0-9_.]+#\n//;
 
-            # If a return value is saved here, move it to the function body
-            if ($e =~ /^\tmov r8 = r14\n/) {
-                $e = $` . $';
-            $r = $r . $&;
-              }
+            	    # If a return value is saved here, discard it
+ 		    $e =~ s/^\tmov r8 = r14\n//;
 
-            # Remove floating-point fill instructions.  This is actually a bad
-            # thing to remove, because we will be putting junk into the
-            # floating-point registers and this will be visible to the caller.
-            # Only fp registers 2-5 and 16-31 may be restored.
-            if ($e =~ s/^\tldf\.fill f([2-5]|1[6-9]|2[0-9]|30|31) = \[r1[4-9]\](, [0-9]+)?\n//g) {
-                # Being paranoid, only try to remove this if we saw a fill
-                # operation.
-                $e =~ s/^\tadds r1[4-9] = [0-9]+, r12//g;
-            }
+            	    # Remove floating-point fill instructions.
+            	    # Only fp registers 2-5 and 16-21 are saved by the runtime.
+            	    if ($e =~ s/^\tldf\.fill f([2-5]|1[6-9]|20|21) = \[r1[4-9]\](, [0-9]+)?\n//g) {
+            	        # Being paranoid, only try to remove this if we saw a fill
+            	        # operation.
+            	        $e =~ s/^\tadds r1[4-9] = [0-9]+, r12//g;
+            	    }
 
-            $e =~ s/^\tnop\.[mifb]\s+0\n//g; # remove nop instructions
-
-		    $e =~ s/^\tmov ar\.pfs = r\d+\n//;
-		    $e =~ s/^\tmov b0 = r\d+\n//;
-		    $e =~ s/^\t\.restore sp\n\tadds r12 = \d+, r12\n//;
-		    #$e =~ s/^\tbr\.ret\.sptk\.many b0\n//; # already removed
-		    $e =~ s/^\t\.(mii|mmi|mfi|mib)\n//g; # bundling is no longer sensible
-		    $e =~ s/^\t;;\n//g; # discard stops - stop at end of body is sufficient
-		    $e =~ s/^\t\/\/.*\n//g; # gcc inserts timings in // comments
-
-            # Tack edir onto the end of rtail.  Some of the directives in
-            # edir are relevant to the next chunk.
-            $rtail .= $edir;
+            	    $e =~ s/^\tnop(?:\.[mifb])?\s+\d+\n//g; # remove nop instructions
+	    	    $e =~ s/^\tmov ar\.pfs = r\d+\n//;
+	    	    $e =~ s/^\tmov ar\.lc = r\d+\n//;
+		    $e =~ s/^\tmov pr = r\d+, -1\n//;
+	    	    $e =~ s/^\tmov b0 = r\d+\n//;
+	    	    $e =~ s/^\t\.restore sp\n\tadds r12 = \d+, r12\n//;
+	    	    #$e =~ s/^\tbr\.ret\.sptk\.many b0\n//; # already removed
+	    	    $e =~ s/^\t\.(mii|mmi|mfi|mib)\n//g; # bundling is no longer sensible
+	    	    $e =~ s/^\t;;\n//g; # discard stops - stop at end of body is sufficient
+	    	    $e =~ s/^\t\/\/.*\n//g; # gcc inserts timings in // comments
 		} elsif ($TargetPlatform =~ /^m68k-/) {
 		    $e =~ s/^\tunlk a6\n//;
 		    $e =~ s/^\trts\n//;
@@ -1168,10 +1172,17 @@ sub mangle_asm {
 		print STDERR "WARNING: Epilogue junk?: $e\n" if $e =~ /^\t\s*[^\.\s\n]/;
 
 		# glue together what's left
-		$c = $r . $e . $rtail;
-		$c =~ s/\n\t\n/\n/; # junk blank line
+		$c .= $e . $etail;
 	    }
+	    $c =~ s/\n\t\n/\n/; # junk blank line
 	}
+ 	else {
+ 	    if ($TargetPlatform =~ /^ia64-/) {
+ 	        # On IA64, remove an .endp directive even if no epilogue was found.
+ 	        # Code optimizations may have removed the "--- END ---" token.
+ 	        $c =~ s/^\t\.endp [a-zA-Z0-9_.]+#\n//;
+ 	    }
+ 	}
 
 	# On SPARCs, we don't do --- BEGIN/END ---, we just
 	# toss the register-windowing save/restore/ret* instructions
@@ -1195,31 +1206,10 @@ sub mangle_asm {
 	$c =~ s/^\tbl\s+\.__DISCARD__\n\s+nop\n//go if $TargetPlatform =~ /^powerpc64-.*-linux/;
 	$c =~ s/^\tcall\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /i386-apple-darwin.*/;
 
-	# IA64: mangle tailcalls into jumps here
-	if ($TargetPlatform =~ /^ia64-/) {
-        # Example of what is mangled:
-        #   br.call.sptk.many b0 = b6
-        #.L211
-        #   ;;
-        #   .mmi
-        #   mov r1 = r32
-        #   ;;
-        #   nop.m 0
-        #   nop.i 0
-        #   ;;
-        #   --- TAILCALL --
-        #   ;;
-        #.L123
-	    while ($c =~ s/^\tbr\.call\.sptk\.many b0 = (.*)\n(?:^\.L([0-9]*):\n)?(?:\t;;\n)?(?:\t\.(?:mii|mmi|mfi|mfb)\n)?(?:\tmov r1 = r\d+\n)?(?:\t;;\n)?(?:\tnop\.[mifb] \d+\n)*\t--- TAILCALL ---\n(?:\t;;\n\tbr \.L\d+\n)?/\tbr\.few $1\n/) {
-		# Eek, the gcc optimiser is getting smarter... if we see a jump to the --- TAILCALL ---
-		# marker then we reapply the substitution at the source sites
-		$c =~ s/^\tbr \.L$2\n/\t--- TAILCALL ---\n/g if ($2);
-	    }
-
-        # Verify that all instances of TAILCALL were processed
-        if ($c =~ /^\t--- TAILCALL ---\n/) {
-          die "Unmangled TAILCALL tokens remain after mangling"
-        }
+	# IA64: fix register allocation; mangle tailcalls into jumps
+ 	if ($TargetPlatform =~ /^ia64-/) {
+	    ia64_rename_registers($ia64_locnum, $ia64_outnum) if (defined($ia64_locnum));
+	    ia64_mangle_tailcalls();
 	}
 
 	# MIPS: that may leave some gratuitous asm macros around
@@ -1539,6 +1529,141 @@ sub mangle_asm {
     close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
     close(INASM)  || &tidy_up_and_die(1,"Failed reading from $in_asmf\n");
 }
+\end{code}
+
+On IA64, tail calls are converted to branches at this point.  The mangler
+searches for function calls immediately followed by a '--- TAILCALL ---'
+token.  Since the compiler can put various combinations of labels, bundling
+directives, nop instructions, stops, and a move of the return value
+between the branch and the tail call, proper matching of the tail call
+gets a little hairy.  This subroutine does the mangling.
+
+Here is an example of a tail call before mangling:
+
+\begin{verbatim}
+	br.call.sptk.many b0 = b6
+.L211
+	;;
+	.mmi
+	mov r1 = r32
+	;;
+	nop.m 0
+	nop.i 0
+	;;
+	--- TAILCALL --
+	;;
+.L123
+\end{verbatim}
+
+\begin{code}
+sub ia64_mangle_tailcalls {
+    # Function input and output are in $c
+
+    # Construct the tailcall-mangling expression the first time this function
+    # is called.
+    if (!defined($IA64_MATCH_TAILCALL)) {
+        # One-line pattern matching constructs.  None of these
+        # should bind references; all parenthesized terms
+        # should be (?:) terms.
+	my $stop       = q/(?:\t;;\n)/;
+	my $bundle     = q/(?:\t\.(?:mii|mib|mmi|mmb|mfi|mfb|mbb|bbb)\n)/;
+	my $nop        = q/(?:\tnop(?:\.[mifb])?\s+\d+\n)/;
+	my $movgp      = q/(?:\tmov r1 = r\d+\n)/;
+	my $postbr     = q/(?:\tbr \.L\d+\n)/;
+
+	my $noeffect   = "(?:$stop$bundle?|$nop)*";
+	my $postbundle = "(?:$bundle?$nop?$nop?$postbr)?";
+
+	# Important parts of the pattern match.  The branch target
+	# and subsequent jump label are bound to $1 and $2
+	# respectively.  Sometimes there is no label.
+	my $callbr    = q/^\tbr\.call\.sptk\.many b0 = (.*)\n/;
+	my $label     = q/(?:^\.L([0-9]*):\n)/;
+	my $tailcall  = q/\t--- TAILCALL ---\n/;
+
+	$IA64_MATCH_TAILCALL =
+	  $callbr . $label . '?' . $noeffect . $movgp . '?' . $noeffect .
+	  $tailcall . $stop . '?' . '(?:' . $postbundle . ')?';
+    }
+
+    # Find and mangle tailcalls
+    while ($c =~ s/$IA64_MATCH_TAILCALL/\tbr\.few $1\n/o) {
+        # Eek, the gcc optimiser is getting smarter... if we see a jump to the
+        # --- TAILCALL --- marker then we reapply the substitution at the source sites
+        $c =~ s/^\tbr \.L$2\n/\t--- TAILCALL ---\n/g if ($2);
+    }
+
+    # Verify that all instances of TAILCALL were processed
+    if ($c =~ /^\t--- TAILCALL ---\n/) {
+        die "Unmangled TAILCALL tokens remain after mangling"
+    }
+}
+\end{code}
+
+The number of registers allocated on the IA64 register stack is set
+upon entry to the runtime with an `alloc' instruction at the entry
+point of \verb+StgRun()+.  Gcc uses its own `alloc' to allocate
+however many registers it likes in each function.  When we discard
+gcc's alloc, we have to reconcile its register assignment with what
+the STG uses.
+
+There are three stack areas: fixed registers, input/local registers,
+and output registers.  We move the output registers to the output
+register space and leave the other registers where they are.
+
+\begin{code}
+sub ia64_rename_registers() {
+    # The text to be mangled is in $c
+    # Find number of registers in each stack area
+    my ($loc, $out) = @_;
+    my $cout;
+    my $first_out_reg;
+    my $regnum;
+    my $fragment;
+
+    # These are the register numbers used in the STG runtime
+    my $STG_FIRST_OUT_REG = 32 + 34;
+    my $STG_LAST_OUT_REG = $STG_FIRST_OUT_REG + 7;
+
+    $first_out_reg = 32 + $loc;
+
+    if ($first_out_reg > $STG_FIRST_OUT_REG) {
+        die "Too many local registers allocated by gcc";
+    }
+
+    # Split the string into fragments containing one register name each.
+    # Rename the register in each fragment and concatenate.
+    $cout = "";
+    foreach $fragment (split(/(?=r\d+[^a-zA-Z0-9_.])/s, $c)) {
+        if ($fragment =~ /^r(\d+)((?:[^a-zA-Z0-9_.].*)?)$/s) {
+	    $regnum = $1;
+
+	    if ($regnum < $first_out_reg) {
+	        # This is a local or fixed register
+
+		# Local registers 32 and 33 (r64 and r65) are
+	        # used to hold saved state; they shouldn't be touched
+		if ($regnum == 64 || $regnum == 65) {
+		   die "Reserved register $regnum is in use";
+		}
+	    }
+	    else {
+	        # This is an output register
+	        $regnum = $regnum - $first_out_reg + $STG_FIRST_OUT_REG;
+		if ($regnum > $STG_LAST_OUT_REG) {
+		    die "Register number ($regnum) is out of expected range";
+		}
+	    }
+
+	    # Update this fragment
+	    $fragment = "r" . $regnum . $2;
+	}
+	$cout .= $fragment;
+    }
+
+    $c = $cout;
+}
+
 \end{code}
 
 \begin{code}
