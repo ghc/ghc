@@ -2320,8 +2320,8 @@ disambigGroup default_tys dicts
 getDefaultTys :: Bool -> Bool -> TcM [Type]
 getDefaultTys extended_deflts ovl_strings
   = do	{ mb_defaults <- getDeclaredDefaultTys
-	; case mb_defaults of
-	   Just tys -> return tys	-- User-supplied defaults
+	; case mb_defaults of {
+	   Just tys -> return tys ;	-- User-supplied defaults
 	   Nothing  -> do
 
 	-- No use-supplied default
@@ -2334,7 +2334,7 @@ getDefaultTys extended_deflts ovl_strings
 			++
 		  [integer_ty,doubleTy]
 			++
-		  opt_deflt ovl_strings string_ty) }}
+		  opt_deflt ovl_strings string_ty) } } }
   where
     opt_deflt True  ty = [ty]
     opt_deflt False ty = []
