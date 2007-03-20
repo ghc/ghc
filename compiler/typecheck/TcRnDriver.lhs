@@ -514,28 +514,34 @@ checkHiBootIface
 	; return (tcg_env { tcg_binds = binds `unionBags` unionManyBags dfun_binds }) }
   where
     check_export name	-- Name is exported by the boot iface
-      | name `elem` dfun_names       = return ()	
-      | isWiredInName name	     = return ()	-- No checking for wired-in names.  In particular,
-							-- 'error' is handled by a rather gross hack
-							-- (see comments in GHC.Err.hs-boot)
-      | isImplicitTyThing boot_thing = return ()
-      | Just real_thing <- lookupTypeEnv local_type_env name
-      = do { checkTc (name `elemNameSet` local_export_set)
-		     (missingBootThing boot_thing "exported by")
+      | name `elem` dfun_names = return ()	
+      | isWiredInName name     = return ()	-- No checking for wired-in names.  In particular,
+						-- 'error' is handled by a rather gross hack
+						-- (see comments in GHC.Err.hs-boot)
 
-	   ; let boot_decl = tyThingToIfaceDecl boot_thing
+	-- Check that the actual module exports the same thing
+      | not (name `elemNameSet` local_export_set)
+      = addErrTc (missingBootThing name "exported by")
+
+	-- If the boot module does not *define* the thing, we are done
+	-- (it simply re-exports it, and names match, so nothing further to do)
+      | isNothing mb_boot_thing = return ()
+
+	-- Check that the actual module also defines the thing, and 
+	-- then compare the definitions
+      | Just real_thing <- lookupTypeEnv local_type_env name
+      = do { let boot_decl = tyThingToIfaceDecl (fromJust mb_boot_thing)
 	         real_decl = tyThingToIfaceDecl real_thing
 	   ; checkTc (checkBootDecl boot_decl real_decl)
-		     (bootMisMatch boot_thing boot_decl real_decl) }
+		     (bootMisMatch real_thing boot_decl real_decl) }
 		-- The easiest way to check compatibility is to convert to
 		-- iface syntax, where we already have good comparison functions
 
       | otherwise
-      = addErrTc (missingBootThing boot_thing "defined in")
+      = addErrTc (missingBootThing name "defined in")
       where
-	boot_thing = lookupTypeEnv boot_type_env name
-		     `orElse` pprPanic "checkHiBootIface" (ppr name)
-
+	mb_boot_thing = lookupTypeEnv boot_type_env name
+		 
     dfun_names = map getName boot_insts
 
     local_export_set :: NameSet
