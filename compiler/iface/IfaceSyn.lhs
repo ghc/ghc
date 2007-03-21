@@ -31,13 +31,11 @@ import IfaceType
 import NewDemand
 import Class
 import UniqFM
-import Unique
 import NameSet 
 import Name
 import CostCentre
 import Literal
 import ForeignCall
-import SrcLoc
 import BasicTypes
 import Outputable
 import FastString
@@ -431,6 +429,7 @@ pp_condecls tc IfOpenDataTyCon  = empty
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |"))
 							     (map (pprIfaceConDecl tc) cs))
 
+pprIfaceConDecl :: OccName -> IfaceConDecl -> SDoc
 pprIfaceConDecl tc
 	(IfCon { ifConOcc = name, ifConInfix = is_infix, 
 		 ifConUnivTvs = univ_tvs, ifConExTvs = ex_tvs, 
@@ -444,15 +443,18 @@ pprIfaceConDecl tc
 	      else nest 4 (ptext SLIT("Fields:") <+> hsep (map ppr fields))]
   where
     main_payload = ppr name <+> dcolon <+> 
-		   pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) (ppr con_tau)
+		   pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) pp_tau
 
     eq_ctxt = [(IfaceEqPred (IfaceTyVar (occNameFS tv)) ty) 
 	      | (tv,ty) <- eq_spec] 
-    con_tau = foldr1 IfaceFunTy (arg_tys ++ [tc_app])
-    tc_app  = IfaceTyConApp (IfaceTc tc_name)
-			    [IfaceTyVar tv | (tv,_) <- univ_tvs]
-    tc_name = mkInternalName (mkBuiltinUnique 1) tc noSrcLoc
-	-- Really Gruesome, but just for debug print
+
+	-- A bit gruesome this, but we can't form the full con_tau, and ppr it,
+	-- because we don't have a Name for the tycon, only an OccName
+    pp_tau = case map pprParendIfaceType arg_tys ++ [pp_res_ty] of
+		(t:ts) -> fsep (t : map (arrow <+>) ts)
+		[]     -> panic "pp_con_taus"
+
+    pp_res_ty = ppr tc <+> fsep [ppr tv | (tv,_) <- univ_tvs]
 
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
