@@ -1,16 +1,14 @@
 \begin{code}
 module TcSplice where
-import HsSyn	( HsSplice, HsBracket, HsExpr, LHsExpr, HsType, LHsDecl )
+import HsSyn	( HsSplice, HsBracket, HsExpr, LHsExpr, LHsDecl )
 import Name	( Name )
 import RdrName	( RdrName )
 import TcRnTypes( TcM, TcId )
-import TcType	( TcKind, BoxyRhoType )
+import TcType	( BoxyRhoType )
 
 tcSpliceExpr :: HsSplice Name
 	     -> BoxyRhoType
 	     -> TcM (HsExpr TcId)
-
-kcSpliceType :: HsSplice Name -> TcM (HsType Name, TcKind)
 
 tcBracket :: HsBracket Name 
 	  -> BoxyRhoType
