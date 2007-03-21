@@ -89,7 +89,6 @@ import TysWiredIn
 import IdInfo
 import {- Kind parts of -} Type
 import BasicTypes
-import Data.Maybe
 #endif
 
 import FastString
@@ -98,7 +97,6 @@ import Util
 import Bag
 
 import Control.Monad    ( unless )
-import Data.Maybe	( isJust )
 \end{code}
 
 
@@ -1128,7 +1126,7 @@ getModuleExports hsc_env mod
       ic        = hsc_IC hsc_env
       checkMods = ic_toplev_scope ic ++ ic_exports ic
     in
-    initTc hsc_env HsSrcFile iNTERACTIVE (tcGetModuleExports mod checkMods)
+    initTc hsc_env HsSrcFile False iNTERACTIVE (tcGetModuleExports mod checkMods)
 
 -- Get the export avail info and also load all orphan and family-instance
 -- modules.  Finally, check that the family instances of all modules in the
