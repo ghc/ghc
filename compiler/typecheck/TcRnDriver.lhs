@@ -65,10 +65,12 @@ import Var
 import Module
 import UniqFM
 import Name
+import NameEnv
 import NameSet
 import TyCon
 import SrcLoc
 import HscTypes
+import ListSetOps
 import Outputable
 import Breakpoints
 
@@ -502,26 +504,33 @@ checkHiBootIface
 
   | otherwise
   = do	{ traceTc (text "checkHiBootIface" <+> (ppr boot_type_env $$ ppr boot_insts $$ 
-				ppr local_export_set $$ ppr boot_exports)) ;
-	; mapM_ check_export (concatMap availNames boot_exports)
+				ppr boot_exports)) ;
+
+		-- Check the exports of the boot module, one by one
+	; mapM_ check_export boot_exports
+
+		-- Check instance declarations
 	; dfun_binds <- mapM check_inst boot_insts
+
+		-- Check for no family instances
 	; unless (null boot_fam_insts) $
 	    panic ("TcRnDriver.checkHiBootIface: Cannot handle family " ++
 		   "instances in boot files yet...")
             -- FIXME: Why?  The actual comparison is not hard, but what would
             --	      be the equivalent to the dfun bindings returned for class
             --	      instances?  We can't easily equate tycons...
+
 	; return (tcg_env { tcg_binds = binds `unionBags` unionManyBags dfun_binds }) }
   where
-    check_export name	-- Name is exported by the boot iface
+    check_export boot_avail	-- boot_avail is exported by the boot iface
       | name `elem` dfun_names = return ()	
       | isWiredInName name     = return ()	-- No checking for wired-in names.  In particular,
 						-- 'error' is handled by a rather gross hack
 						-- (see comments in GHC.Err.hs-boot)
 
 	-- Check that the actual module exports the same thing
-      | not (name `elemNameSet` local_export_set)
-      = addErrTc (missingBootThing name "exported by")
+      | not (null missing_names)
+      = addErrTc (missingBootThing (head missing_names) "exported by")
 
 	-- If the boot module does not *define* the thing, we are done
 	-- (it simply re-exports it, and names match, so nothing further to do)
@@ -540,12 +549,16 @@ checkHiBootIface
       | otherwise
       = addErrTc (missingBootThing name "defined in")
       where
+	name          = availName boot_avail
 	mb_boot_thing = lookupTypeEnv boot_type_env name
+	missing_names = case lookupNameEnv local_export_env name of
+			  Nothing    -> [name]
+			  Just avail -> availNames boot_avail `minusList` availNames avail
 		 
     dfun_names = map getName boot_insts
 
-    local_export_set :: NameSet
-    local_export_set = availsToNameSet local_exports
+    local_export_env :: NameEnv AvailInfo
+    local_export_env = availsToNameEnv local_exports
 
     check_inst boot_inst
 	= case [dfun | inst <- local_insts, 
