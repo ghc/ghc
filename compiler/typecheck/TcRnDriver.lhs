@@ -169,6 +169,11 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	-- Must be done after processing the exports
  	tcg_env <- checkHiBootIface tcg_env boot_iface ;
 
+	-- Make the new type env available to stuff slurped from interface files
+	-- Must do this after checkHiBootIface, because the latter might add new
+	-- bindings for boot_dfuns, which may be mentioned in imported unfoldings
+	writeMutVar (tcg_type_env_var tcg_env) (tcg_type_env tcg_env) ;
+
 		-- Rename the Haddock documentation 
 	tcg_env <- rnHaddock module_info maybe_doc tcg_env ;
 
@@ -373,9 +378,6 @@ tcRnSrcDecls boot_iface decls
 				   tcg_rules = rules', 
 				   tcg_fords = fords' } } ;
 
-	-- Make the new type env available to stuff slurped from interface files
-	writeMutVar (tcg_type_env_var tcg_env) final_type_env ;
-
 	return (tcg_env' { tcg_binds = tcg_binds tcg_env' }) 
    }
 
@@ -508,7 +510,13 @@ checkHiBootIface
 	; mapM_ check_export boot_exports
 
 		-- Check instance declarations
-	; dfun_binds <- mapM check_inst boot_insts
+	; mb_dfun_prs <- mapM check_inst boot_insts
+	; let tcg_env' = tcg_env { tcg_binds    = binds `unionBags` dfun_binds,
+				   tcg_type_env = extendTypeEnvWithIds local_type_env boot_dfuns }
+	      dfun_prs   = catMaybes mb_dfun_prs
+	      boot_dfuns = map fst dfun_prs
+	      dfun_binds = listToBag [ noLoc $ VarBind boot_dfun (nlHsVar dfun)
+				     | (boot_dfun, dfun) <- dfun_prs ]
 
 		-- Check for no family instances
 	; unless (null boot_fam_insts) $
@@ -518,7 +526,7 @@ checkHiBootIface
             --	      be the equivalent to the dfun bindings returned for class
             --	      instances?  We can't easily equate tycons...
 
-	; return (tcg_env { tcg_binds = binds `unionBags` unionManyBags dfun_binds }) }
+	; return tcg_env' }
   where
     check_export boot_avail	-- boot_avail is exported by the boot iface
       | name `elem` dfun_names = return ()	
@@ -558,12 +566,14 @@ checkHiBootIface
     local_export_env :: NameEnv AvailInfo
     local_export_env = availsToNameEnv local_exports
 
+    check_inst :: Instance -> TcM (Maybe (Id, Id))
+	-- Returns a pair of the boot dfun in terms of the equivalent real dfun
     check_inst boot_inst
 	= case [dfun | inst <- local_insts, 
 		       let dfun = instanceDFunId inst,
 		       idType dfun `tcEqType` boot_inst_ty ] of
-	    [] -> do { addErrTc (instMisMatch boot_inst); return emptyBag }
-	    (dfun:_) -> return (unitBag $ noLoc $ VarBind local_boot_dfun (nlHsVar dfun))
+	    [] -> do { addErrTc (instMisMatch boot_inst); return Nothing }
+	    (dfun:_) -> return (Just (local_boot_dfun, dfun))
 	where
 	  boot_dfun = instanceDFunId boot_inst
 	  boot_inst_ty = idType boot_dfun
