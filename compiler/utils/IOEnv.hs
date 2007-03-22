@@ -47,6 +47,9 @@ instance Monad (IOEnv m) where
   return = returnM
   fail s = failM	-- Ignore the string
 
+instance Functor (IOEnv m) where
+  fmap f (IOEnv m) = IOEnv (\ env -> fmap f (m env))
+
 returnM :: a -> IOEnv env a
 returnM a = IOEnv (\ env -> return a)
 
