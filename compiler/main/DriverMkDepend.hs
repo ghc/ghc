@@ -14,25 +14,25 @@ module DriverMkDepend (
 
 import qualified GHC
 import GHC		( Session, ModSummary(..) )
-import DynFlags		( DynFlags( verbosity, opt_dep ), getOpts )
+import DynFlags
 import Util		( escapeSpaces, splitFilename, joinFileExt )
 import HscTypes		( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( ModuleName, ModLocation(..), mkModuleName,
-			  addBootSuffix_maybe )
+import Module
 import Digraph		( SCC(..) )
 import Finder		( findImportedModule, FindResult(..) )
 import Util             ( global, consIORef )
 import Outputable
 import Panic
-import SrcLoc		( unLoc )
+import SrcLoc
+import Data.List
 import CmdLineParser
 
 #if __GLASGOW_HASKELL__ <= 408
 import Panic		( catchJust, ioErrors )
 #endif
-import ErrUtils         ( debugTraceMsg, printErrorsAndWarnings )
+import ErrUtils         ( debugTraceMsg, putMsg )
 
 import Data.IORef	( IORef, readIORef, writeIORef )
 import Control.Exception
@@ -74,6 +74,9 @@ doMkDependHS session srcs
 		-- Prcess them one by one, dumping results into makefile
 		-- and complaining about cycles
 	; mapM (processDeps session excl_mods (mkd_tmp_hdl files)) sorted
+
+		-- If -ddump-mod-cycles, show cycles in the module graph
+	; dumpModCycles dflags mod_summaries
 
 		-- Tidy up
 	; endMkDependHS dflags files }}
@@ -311,6 +314,67 @@ endMkDependHS dflags
   	-- Copy the new makefile in place
   SysTools.copy dflags "Installing new makefile" tmp_file makefile
 
+
+-----------------------------------------------------------------
+--		Module cycles
+-----------------------------------------------------------------
+
+dumpModCycles :: DynFlags -> [ModSummary] -> IO ()
+dumpModCycles dflags mod_summaries
+  | not (dopt Opt_D_dump_mod_cycles dflags) 
+  = return ()
+
+  | null cycles
+  = putMsg dflags (ptext SLIT("No module cycles"))
+
+  | otherwise
+  = putMsg dflags (hang (ptext SLIT("Module cycles found:")) 2 pp_cycles)
+  where
+
+    cycles :: [[ModSummary]]
+    cycles = [ c | CyclicSCC c <- GHC.topSortModuleGraph True mod_summaries Nothing ]
+
+    pp_cycles = vcat [ (ptext SLIT("---------- Cycle") <+> int n <+> ptext SLIT("----------")) 
+			$$ pprCycle c $$ text ""
+		     | (n,c) <- [1..] `zip` cycles ]
+
+pprCycle :: [ModSummary] -> SDoc
+-- Print a cycle, but show only the imports within the cycle
+pprCycle summaries = pp_group (CyclicSCC summaries)
+  where
+    cycle_mods :: [ModuleName]	-- The modules in this cycle
+    cycle_mods = map (moduleName . ms_mod) summaries
+
+    pp_group (AcyclicSCC ms) = pp_ms ms
+    pp_group (CyclicSCC mss) 
+	= ASSERT( not (null boot_only) )
+		-- The boot-only list must be non-empty, else there would
+		-- be an infinite chain of non-boot imoprts, and we've
+		-- already checked for that in processModDeps
+	  pp_ms loop_breaker $$ vcat (map pp_group groups)
+	where
+	  (boot_only, others) = partition is_boot_only mss
+	  is_boot_only ms = not (any in_group (ms_imps ms))
+	  in_group (L _ m) = m `elem` group_mods
+	  group_mods = map (moduleName . ms_mod) mss
+	  
+	  loop_breaker = head boot_only
+	  all_others   = tail boot_only ++ others
+	  groups = GHC.topSortModuleGraph True all_others Nothing
+
+    pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
+		       <+> (pp_imps empty (ms_imps summary) $$
+			    pp_imps (ptext SLIT("{-# SOURCE #-}")) (ms_srcimps summary))
+	where
+	  mod_str = moduleNameString (moduleName (ms_mod summary))
+
+    pp_imps :: SDoc -> [Located ModuleName] -> SDoc
+    pp_imps what [] = empty
+    pp_imps what lms 
+	= case [m | L _ m <- lms, m `elem` cycle_mods] of
+	    [] -> empty
+	    ms -> what <+> ptext SLIT("imports") <+> 
+				pprWithCommas ppr ms
 
 -----------------------------------------------------------------
 --

@@ -133,6 +133,7 @@ data DynFlag
    | Opt_D_dump_hi
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_minimal_imports
+   | Opt_D_dump_mod_cycles
    | Opt_D_faststring_stats
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
@@ -954,6 +955,7 @@ dynamic_flags = [
   ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
   ,  ( "ddump-hpc",         	 setDumpFlag Opt_D_dump_hpc)
+  ,  ( "ddump-mod-cycles",     	 setDumpFlag Opt_D_dump_mod_cycles)
   
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
