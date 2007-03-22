@@ -110,6 +110,18 @@
          increase the resolution of the time profiler.</para>
        </listitem>
      </varlistentry>
+
+     <varlistentry>
+       <term><option>--install-signal-handlers=<replaceable>yes|no</replaceable></option>
+       <indexterm><primary><option>--install-signal-handlers</option></primary><secondary>RTS
+       option</secondary></indexterm></term>
+       <listitem>
+         <para>If yes (the default), the RTS installs signal handlers to catch
+         things like ctrl-C. This option is primarily useful for when
+         you are using the Haskell code as a DLL, and want to set your
+         own signal handlers.</para>
+       </listitem>
+     </varlistentry>
     </variablelist>
   </sect2>
 
