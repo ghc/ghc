@@ -300,7 +300,6 @@ stripUnknowns names id = setIdType id . fst . go names . idType
            kind1 = mkArrowKind liftedTypeKind liftedTypeKind
            kind2 = mkArrowKind kind1 liftedTypeKind
            kind3 = mkArrowKind kind2 liftedTypeKind
-stripUnknowns _ id = id
 
 -----------------------------
 -- | The :breakpoint command
