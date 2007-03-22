@@ -57,7 +57,7 @@ import System.IO	( hPutStrLn, stderr )
 --
 -----------------------------------------------------
 
-class Monad m => Quasi m where
+class (Monad m, Functor m) => Quasi m where
 	-- Fresh names
   qNewName :: String -> m Name
 
@@ -126,6 +126,9 @@ instance Monad Q where
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
   Q m >> Q n = Q (m >> n)
   fail s     = Q (fail s)
+
+instance Functor Q where
+  fmap f (Q x) = Q (fmap f x)
 
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
