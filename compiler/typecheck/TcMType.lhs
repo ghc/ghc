@@ -1183,7 +1183,11 @@ checkValidInstance tyvars theta clas inst_tys
 			 undecidableMsg])
 \end{code}
 
-Termination test: each assertion in the context satisfies
+Termination test: the so-called "Paterson conditions" (see Section 5 of
+"Understanding functionsl dependencies via Constraint Handling Rules, 
+JFP Jan 2007).
+
+We check that each assertion in the context satisfies:
  (1) no variable has more occurrences in the assertion than in the head, and
  (2) the assertion has fewer constructors and variables (taken together
      and counting repetitions) than the head.

@@ -2546,7 +2546,7 @@ the context and head of the instance declaration can each consist of arbitrary
 following rules:
 <orderedlist>
 <listitem><para>
-For each assertion in the context:
+The Paterson Conditions: for each assertion in the context
 <orderedlist>
 <listitem><para>No type variable has more occurrences in the assertion than in the head</para></listitem>
 <listitem><para>The assertion has fewer constructors and variables (taken together
@@ -2554,7 +2554,7 @@ For each assertion in the context:
 </orderedlist>
 </para></listitem>
 
-<listitem><para>The coverage condition.  For each functional dependency,
+<listitem><para>The Coverage Condition.  For each functional dependency,
 <replaceable>tvs</replaceable><subscript>left</subscript> <literal>-&gt;</literal>
 <replaceable>tvs</replaceable><subscript>right</subscript>,  of the class,
 every type variable in
@@ -2566,11 +2566,15 @@ corresponding type in the instance declaration.
 </orderedlist>
 These restrictions ensure that context reduction terminates: each reduction
 step makes the problem smaller by at least one
-constructor.  For example, the following would make the type checker
-loop if it wasn't excluded:
-<programlisting>
-  instance C a => C a where ...
-</programlisting>
+constructor.  Both the Paterson Conditions and the Coverage Condition are lifted 
+if you give the <option>-fallow-undecidable-instances</option> 
+flag (<xref linkend="undecidable-instances"/>).
+You can find lots of background material about the reason for these
+restrictions in the paper <ulink
+url="http://research.microsoft.com/%7Esimonpj/papers/fd%2Dchr/">
+Understanding functional dependencies via Constraint Handling Rules</ulink>.
+</para>
+<para>
 For example, these are OK:
 <programlisting>
   instance C Int [a]          -- Multiple parameters
@@ -2621,11 +2625,6 @@ something more specific does not:
   instance C a where
     op = ... -- Default
 </programlisting>
-</para>
-<para>You can find lots of background material about the reason for these
-restrictions in the paper <ulink
-url="http://research.microsoft.com/%7Esimonpj/papers/fd%2Dchr/">
-Understanding functional dependencies via Constraint Handling Rules</ulink>.
 </para>
 </sect3>
 
@@ -2691,8 +2690,8 @@ makes instance inference go into a loop, because it requires the constraint
 Nevertheless, GHC allows you to experiment with more liberal rules.  If you use
 the experimental flag <option>-fallow-undecidable-instances</option>
 <indexterm><primary>-fallow-undecidable-instances
-option</primary></indexterm>, you can use arbitrary
-types in both an instance context and instance head.  Termination is ensured by having a
+option</primary></indexterm>, both the Paterson Conditions and the Coverage Condition
+(described in <xref linkend="instance-rules"/>) are lifted.  Termination is ensured by having a
 fixed-depth recursion stack.  If you exceed the stack depth you get a
 sort of backtrace, and the opportunity to increase the stack depth
 with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
