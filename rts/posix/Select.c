@@ -208,7 +208,7 @@ awaitEvent(rtsBool wait)
 	   * serviced.
 	   */
 #if defined(RTS_USER_SIGNALS)
-	  if (signals_pending()) {
+	  if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
 	      startSignalHandlers(&MainCapability);
 	      return; /* still hold the lock */
 	  }

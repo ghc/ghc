@@ -117,6 +117,7 @@ struct CONCURRENT_FLAGS {
 
 struct MISC_FLAGS {
     int tickInterval;     /* in milliseconds */
+    rtsBool install_signal_handlers;
 };
 
 #ifdef PAR

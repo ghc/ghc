@@ -862,7 +862,8 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 static void
 scheduleStartSignalHandlers(Capability *cap)
 {
-    if (signals_pending()) { // safe outside the lock
+    if (RtsFlags.MiscFlags.install_signal_handlers && signals_pending()) {
+        // safe outside the lock
 	startSignalHandlers(cap);
     }
 }
@@ -985,7 +986,7 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	 * for signals to arrive rather then bombing out with a
 	 * deadlock.
 	 */
-	if ( anyUserHandlers() ) {
+	if ( RtsFlags.MiscFlags.install_signal_handlers && anyUserHandlers() ) {
 	    debugTrace(DEBUG_sched,
 		       "still deadlocked, waiting for signals...");
 
@@ -2708,7 +2709,9 @@ GetRoots( evac_fn evac )
     
 #if defined(RTS_USER_SIGNALS)
     // mark the signal handlers (signals should be already blocked)
-    markSignalHandlers(evac);
+    if (RtsFlags.MiscFlags.install_signal_handlers) {
+        markSignalHandlers(evac);
+    }
 #endif
 }
 

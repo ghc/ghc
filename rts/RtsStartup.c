@@ -255,10 +255,12 @@ hs_init(int *argc, char **argv[])
     initStats();
 
 #if defined(RTS_USER_SIGNALS)
-    /* Initialise the user signal handler set */
-    initUserSignals();
-    /* Set up handler to run on SIGINT, etc. */
-    initDefaultHandlers();
+    if (RtsFlags.MiscFlags.install_signal_handlers) {
+        /* Initialise the user signal handler set */
+        initUserSignals();
+        /* Set up handler to run on SIGINT, etc. */
+        initDefaultHandlers();
+    }
 #endif
  
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
@@ -379,7 +381,9 @@ hs_exit(void)
     stat_startExit();
     
 #if defined(RTS_USER_SIGNALS)
-    freeSignalHandlers();
+    if (RtsFlags.MiscFlags.install_signal_handlers) {
+        freeSignalHandlers();
+    }
 #endif
 
 #if defined(THREADED_RTS)

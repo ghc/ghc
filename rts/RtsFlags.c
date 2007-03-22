@@ -194,6 +194,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.tickInterval	= 50;  /* In milliseconds */
     RtsFlags.ConcFlags.ctxtSwitchTime	= 50;  /* In milliseconds */
 
+    RtsFlags.MiscFlags.install_signal_handlers = rtsTrue;
+
 #ifdef THREADED_RTS
     RtsFlags.ParFlags.nNodes	        = 1;
     RtsFlags.ParFlags.migrate           = rtsTrue;
@@ -436,6 +438,8 @@ usage_text[] = {
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qw       Migrate a thread to the current CPU when it is woken up",
 #endif
+"  --install-signal-handlers=<yes|no>",
+"            Install signal handlers (default: yes)",
 #if defined(THREADED_RTS) || defined(PAR)
 "  -e<size>  Size of spark pools (default 100)",
 #endif
@@ -657,6 +661,23 @@ error = rtsTrue;
 		error = rtsTrue;
 		break;
 
+              /* This isn't going to allow us to keep related options
+                 together as we add more --* flags. We really need a
+                 proper options parser. */
+	      case '-':
+                  if (strequal("install-signal-handlers=yes",
+                               &rts_argv[arg][2])) {
+                      RtsFlags.MiscFlags.install_signal_handlers = rtsTrue;
+                  }
+                  else if (strequal("install-signal-handlers=no",
+                               &rts_argv[arg][2])) {
+                      RtsFlags.MiscFlags.install_signal_handlers = rtsFalse;
+                  }
+                  else {
+		      errorBelch("unknown RTS option: %s",rts_argv[arg]);
+		      error = rtsTrue;
+                  }
+		  break;
 	      case 'A':
 		RtsFlags.GcFlags.minAllocAreaSize
 		  = decode(rts_argv[arg]+2) / BLOCK_SIZE;

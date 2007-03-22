@@ -208,8 +208,10 @@ GarbageCollect ( rtsBool force_major_gc )
   debugTrace(DEBUG_gc, "starting GC");
 
 #if defined(RTS_USER_SIGNALS)
-  // block signals
-  blockUserSignals();
+  if (RtsFlags.MiscFlags.install_signal_handlers) {
+    // block signals
+    blockUserSignals();
+  }
 #endif
 
   // tell the STM to discard any cached closures its hoping to re-use
@@ -1014,8 +1016,10 @@ GarbageCollect ( rtsBool force_major_gc )
   stat_endGC(allocated, live, copied, scavd_copied, N);
 
 #if defined(RTS_USER_SIGNALS)
-  // unblock signals again
-  unblockUserSignals();
+  if (RtsFlags.MiscFlags.install_signal_handlers) {
+    // unblock signals again
+    unblockUserSignals();
+  }
 #endif
 
   RELEASE_SM_LOCK;
