@@ -101,21 +101,14 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		-- means we'll only report a declaration as unused if it isn't
 		-- mentioned at all.  Ah well.
 	traceRn (text "Start rnTyClDecls") ;
-	(rn_tycl_decls,    src_fvs1)
-	   <- mapFvRn (wrapLocFstM rnTyClDecl) tycl_decls ;
-	traceRn (text "finish rnTyClDecls") ;
-	(rn_inst_decls,    src_fvs2)
-	   <- mapFvRn (wrapLocFstM rnSrcInstDecl) inst_decls ;
-	(rn_deriv_decls,    src_fvs_deriv)
-	   <- mapFvRn (wrapLocFstM rnSrcDerivDecl) deriv_decls ;
-	(rn_rule_decls,    src_fvs3)
-	   <- mapFvRn (wrapLocFstM rnHsRuleDecl) rule_decls ;
-	(rn_foreign_decls, src_fvs4)
-	   <- mapFvRn (wrapLocFstM rnHsForeignDecl) foreign_decls ;
-	(rn_default_decls, src_fvs5)
-	   <- mapFvRn (wrapLocFstM rnDefaultDecl) default_decls ;
+	(rn_tycl_decls,    src_fvs1) <- rnList rnTyClDecl      tycl_decls ;
+	(rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
+	(rn_rule_decls,    src_fvs3) <- rnList rnHsRuleDecl    rule_decls ;
+	(rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
+	(rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
+	(rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
 
-  -- Haddock docs
+  -- Haddock docs; no free vars
 	rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
 	let {
@@ -130,7 +123,7 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 			    	hs_ruleds = rn_rule_decls,
             hs_docs   = rn_docs } ;
 
-	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs_deriv, src_fvs3, 
+	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs6, src_fvs3, 
 				src_fvs4, src_fvs5] ;
 	   src_dus = bind_dus `plusDU` usesOnly other_fvs 
 		-- Note: src_dus will contain *uses* for locally-defined types
@@ -146,12 +139,15 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
     }}}
 
 rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
-rnTyClDecls tycl_decls = do 
-  (decls', fvs) <- mapFvRn (wrapLocFstM rnTyClDecl) tycl_decls
-  return decls'
+-- Used for external core
+rnTyClDecls tycl_decls = do  (decls', fvs) <- rnList rnTyClDecl tycl_decls
+			     return decls'
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv 
 addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
+
+rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
+rnList f xs = mapFvRn (wrapLocFstM f) xs
 \end{code}
 
 
@@ -362,8 +358,7 @@ Renaming of the associated types in instances.
 
 \begin{code}
 rnATInsts :: [LTyClDecl RdrName] -> RnM ([LTyClDecl Name], FreeVars)
-rnATInsts atDecls = 
-  mapFvRn (wrapLocFstM rnATInst) atDecls
+rnATInsts atDecls = rnList rnATInst atDecls
   where
     rnATInst tydecl@TyData     {} = rnTyClDecl tydecl
     rnATInst tydecl@TySynonym  {} = rnTyClDecl tydecl
