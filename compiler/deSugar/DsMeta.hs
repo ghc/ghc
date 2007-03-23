@@ -704,8 +704,8 @@ rep_val_binds (ValBindsOut binds sigs)
  = do { core1 <- rep_binds' (unionManyBags (map snd binds))
       ;	core2 <- rep_sigs' sigs
       ;	return (core1 ++ core2) }
-rep_val_binds (ValBindsOut binds sigs)
- = panic "rep_val_binds: ValBindsOut"
+rep_val_binds (ValBindsIn binds sigs)
+ = panic "rep_val_binds: ValBindsIn"
 
 rep_binds :: LHsBinds Name -> DsM [Core TH.DecQ]
 rep_binds binds = do { binds_w_locs <- rep_binds' binds
