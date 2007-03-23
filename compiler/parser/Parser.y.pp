@@ -1363,8 +1363,9 @@ aexp2	:: { LHsExpr RdrName }
 	| '[|' exp '|]'         { LL $ HsBracket (ExpBr $2) }                       
 	| '[t|' ctype '|]'      { LL $ HsBracket (TypBr $2) }                       
 	| '[p|' infixexp '|]'   {% checkPattern $2 >>= \p ->
-					   return (LL $ HsBracket (PatBr p)) }
-	| '[d|' cvtopbody '|]'	{ LL $ HsBracket (DecBr (mkGroup $2)) }
+					return (LL $ HsBracket (PatBr p)) }
+	| '[d|' cvtopbody '|]'	{% checkDecBrGroup $2 >>= \g -> 
+					return (LL $ HsBracket (DecBr g)) }
 
 	-- arrow notation extension
 	| '(|' aexp2 cmdargs '|)'	{ LL $ HsArrForm $2 Nothing (reverse $3) }

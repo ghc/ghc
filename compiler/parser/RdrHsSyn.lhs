@@ -17,7 +17,7 @@ module RdrHsSyn (
 	cvBindGroup,
         cvBindsAndSigs,
 	cvTopDecls,
-	findSplice, mkGroup,
+	findSplice, checkDecBrGroup,
 
 	-- Stuff to do with Foreign declarations
 	CallConv(..),
@@ -281,14 +281,15 @@ has_args ((L _ (Match args _ _)) : _) = not (null args)
 findSplice :: [LHsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]))
 findSplice ds = addl emptyRdrGroup ds
 
-mkGroup :: [LHsDecl a] -> HsGroup a
-mkGroup ds = addImpDecls emptyRdrGroup ds
-
-addImpDecls :: HsGroup a -> [LHsDecl a] -> HsGroup a
--- The decls are imported, and should not have a splice
-addImpDecls group decls = case addl group decls of
-				(group', Nothing) -> group'
-				other		  -> panic "addImpDecls"
+checkDecBrGroup :: [LHsDecl a] -> P (HsGroup a)
+-- Turn the body of a [d| ... |] into a HsGroup
+-- There should be no splices in the "..."
+checkDecBrGroup decls 
+  = case addl emptyRdrGroup decls of
+	(group, Nothing) -> return group
+	(_, Just (SpliceDecl (L loc _), _)) -> 
+		parseError loc "Declaration splices are not permitted inside declaration brackets"
+		-- Why not?  See Section 7.3 of the TH paper.  
 
 addl :: HsGroup a -> [LHsDecl a] -> (HsGroup a, Maybe (SpliceDecl a, [LHsDecl a]))
 	-- This stuff reverses the declarations (again) but it doesn't matter
@@ -309,8 +310,6 @@ add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs})
 	| isClassDecl d = 	
 		let fsigs = [ L l f | L l (FixSig f) <- tcdSigs d ] in
 		addl (gp { hs_tyclds = L l d : ts, hs_fixds = fsigs ++ fs}) ds
-	| isFamInstDecl d = 
-	        addl (gp { hs_tyclds = L l d : ts }) ds
 	| otherwise =
 		addl (gp { hs_tyclds = L l d : ts }) ds
 
