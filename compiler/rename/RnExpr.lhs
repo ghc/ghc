@@ -24,7 +24,6 @@ import RnHsSyn
 import TcRnMonad
 import RnEnv
 import HscTypes         ( availNames )
-import OccName		( plusOccEnv )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, 
@@ -91,19 +90,15 @@ rnExpr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 
 rnExpr (HsVar v)
   = do name           <- lookupOccRn v
-       localRdrEnv    <- getLocalRdrEnv
-       lclEnv         <- getLclEnv
        ignore_asserts <- doptM Opt_IgnoreAsserts
-       ignore_breakpoints <- doptM Opt_IgnoreBreakpoints
-       ghcMode        <- getGhcMode
-       let conds = [ (name `hasKey` assertIdKey
-                      && not ignore_asserts,
-                      do (e, fvs) <- mkAssertErrorExpr
-                         return (e, fvs `addOneFV` name))
-                   ]
-       case lookup True conds of
-         Just action -> action
-         Nothing     -> return (HsVar name, unitFV name)
+       finish_var ignore_asserts name
+  where
+    finish_var ignore_asserts name
+	| ignore_asserts || not (name `hasKey` assertIdKey)
+	= return (HsVar name, unitFV name)
+  	| otherwise
+	= do { (e, fvs) <- mkAssertErrorExpr
+             ; return (e, fvs `addOneFV` name) }
 
 rnExpr (HsIPVar v)
   = newIPNameRn v		`thenM` \ name ->
