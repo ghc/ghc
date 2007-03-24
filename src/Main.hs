@@ -15,7 +15,7 @@ import HaddockTypes
 import HaddockUtil
 import HaddockVersion
 import GHCUtils
-import Paths_haddock_ghc     ( getDataDir, compilerPath )
+import Paths_haddock_ghc     ( getDataDir )
 
 import Prelude hiding ( catch )
 import Control.Exception     
