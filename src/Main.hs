@@ -139,7 +139,7 @@ main = handleTopExceptions $ do
   -- load package data (from .haddock-files), typecheck input files and create 
   -- the module -> html mapping
   packages <- getPackages session dynflags' flags
-  modules <- sortAndCheckModules session fileArgs
+  modules  <- sortAndCheckModules session fileArgs
   updateHTMLXRefs packages
 
   -- combine the doc envs of the external packages into one
