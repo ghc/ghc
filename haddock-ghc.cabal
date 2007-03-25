@@ -62,21 +62,21 @@ main-is: Main.hs
 extensions: CPP, PatternGuards
 ghc-options: -fglasgow-exts
 other-modules:
-	FastMutInt2
-	BlockTable
-	HaddockDB
-	HaddockDevHelp
-	HaddockHH
-	HaddockHH2
-	HaddockHoogle
-	HaddockHtml
-	HaddockModuleTree
-	HaddockRename
-	HaddockTypes
-	HaddockUtil
-	HaddockVersion
-	Html
-	GHCUtils
+	Haddock.Utils.FastMutInt2
+	Haddock.Utils.BlockTable
+	Haddock.HaddockDB
+	Haddock.DevHelp
+	Haddock.HH
+	Haddock.HH2
+	Haddock.Hoogle
+	Haddock.Utils.Html
+	Haddock.ModuleTree
+	Haddock.Rename
+	Haddock.Types
+	Haddock.Utils
+	Haddock.Version
+	Haddock.Utils.Html
+	Haddock.Utils.GHC
 	Haddock.InterfaceFile        
 	Haddock.Exception
 	Main

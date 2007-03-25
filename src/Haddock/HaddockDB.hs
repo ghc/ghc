@@ -4,7 +4,7 @@
 -- (c) Simon Marlow 2003
 --
 
-module HaddockDB (ppDocBook) where
+module Haddock.HaddockDB (ppDocBook) where
 
 {-
 import HaddockTypes

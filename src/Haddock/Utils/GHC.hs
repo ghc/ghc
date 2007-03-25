@@ -1,4 +1,4 @@
-module GHCUtils where
+module Haddock.Utils.GHC where
 
 import Debug.Trace
 

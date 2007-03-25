@@ -5,7 +5,7 @@
 -- (c) Simon Marlow 2003
 --
 
-module HaddockUtil (
+module Haddock.Utils (
 
   -- * Misc utilities
   restrictTo, 
@@ -33,9 +33,7 @@ module HaddockUtil (
 --  FormatVersion, mkFormatVersion  
  ) where
 
-import HaddockTypes
-import Data.Map ( Map )
-import qualified Data.Map as Map hiding ( Map )
+import Haddock.Types
 
 import GHC
 import SrcLoc
@@ -46,6 +44,8 @@ import Module
 import PackageConfig ( stringToPackageId )
 
 import Control.Monad ( liftM, MonadPlus(..) )
+import Data.Map ( Map )
+import qualified Data.Map as Map hiding ( Map )
 import Data.Char
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( intersect, isSuffixOf, intersperse )

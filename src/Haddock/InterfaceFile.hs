@@ -4,7 +4,7 @@ module Haddock.InterfaceFile (
   readInterfaceFile
 ) where
 
-import HaddockTypes
+import Haddock.Types
 import Haddock.Exception
 
 import Binary

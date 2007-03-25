@@ -6,7 +6,7 @@
 -- Ported to use the GHC API by David Waern 2006
 -- 
 
-module HaddockTypes where
+module Haddock.Types where
 
 import GHC
 import Outputable

@@ -4,7 +4,7 @@
 -- (c) Simon Marlow 2003
 --
 
-module HaddockHtml ( 
+module Haddock.Html ( 
 	ppHtml, copyHtmlBits, 
 	ppHtmlIndex, ppHtmlContents,
 	ppHtmlHelpFiles
@@ -12,15 +12,15 @@ module HaddockHtml (
 
 import Prelude hiding (div)
 
-import HaddockDevHelp
-import HaddockHH
-import HaddockHH2
-import HaddockModuleTree
-import HaddockTypes
-import HaddockUtil
-import HaddockVersion
-import Html
-import qualified Html
+import Haddock.DevHelp
+import Haddock.HH
+import Haddock.HH2
+import Haddock.ModuleTree
+import Haddock.Types
+import Haddock.Utils
+import Haddock.Version
+import Haddock.Utils.Html
+import qualified Haddock.Utils.Html as Html
 
 import Control.Exception     ( bracket )
 import Control.Monad         ( when, unless )

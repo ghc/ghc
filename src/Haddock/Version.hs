@@ -4,7 +4,7 @@
 -- (c) Simon Marlow 2003
 --
 
-module HaddockVersion ( 
+module Haddock.Version ( 
 	projectName, projectVersion, projectUrl
    ) where
 

@@ -15,7 +15,7 @@
 --
 -----------------------------------------------------------------------------
 
-module BlockTable (
+module Haddock.Utils.BlockTable (
 
 -- Datatypes:
 

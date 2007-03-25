@@ -1,8 +1,8 @@
-module HaddockDevHelp(ppDevHelpFile) where
+module Haddock.DevHelp(ppDevHelpFile) where
 
-import HaddockModuleTree
-import HaddockTypes
-import HaddockUtil
+import Haddock.ModuleTree
+import Haddock.Types
+import Haddock.Utils
 
 import Module        ( moduleName, moduleNameString, Module, mkModule, mkModuleName )
 import PackageConfig ( stringToPackageId )

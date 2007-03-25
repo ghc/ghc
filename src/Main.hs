@@ -8,15 +8,15 @@
 
 module Main (main) where
 
-import HaddockHtml
-import HaddockHoogle
-import HaddockRename
-import HaddockTypes
-import HaddockUtil
-import HaddockVersion
+import Haddock.Html
+import Haddock.Hoogle
+import Haddock.Rename
+import Haddock.Types
+import Haddock.Utils
+import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Exception
-import GHCUtils
+import Haddock.Utils.GHC
 import Paths_haddock_ghc     ( getDataDir )
 
 import Prelude hiding ( catch )

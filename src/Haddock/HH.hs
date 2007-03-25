@@ -1,4 +1,4 @@
-module HaddockHH(ppHHContents, ppHHIndex, ppHHProject) where
+module Haddock.HH(ppHHContents, ppHHIndex, ppHHProject) where
 
 ppHHContents = error "not yet"
 ppHHIndex = error "not yet"

@@ -4,12 +4,12 @@
 -- (c) Simon Marlow 2003
 --
 
-module HaddockRename (
+module Haddock.Rename (
   runRnFM, -- the monad (instance of Monad)
   renameDoc, renameMaybeDoc, renameExportItems,
 ) where
 
-import HaddockTypes
+import Haddock.Types
 
 import GHC
 import BasicTypes

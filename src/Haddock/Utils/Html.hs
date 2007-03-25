@@ -13,11 +13,11 @@
 --
 -----------------------------------------------------------------------------
 
-module Html (
-      module Html,
+module Haddock.Utils.Html (
+      module Haddock.Utils.Html,
       ) where
 
-import qualified BlockTable as BT
+import qualified Haddock.Utils.BlockTable as BT
 
 import Data.Char (isAscii, ord)
 import Numeric (showHex)

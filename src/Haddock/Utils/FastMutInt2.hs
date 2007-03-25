@@ -4,7 +4,7 @@
 --
 -- Unboxed mutable Ints
 
-module FastMutInt2(
+module Haddock.Utils.FastMutInt2(
 	FastMutInt, newFastMutInt,
 	readFastMutInt, writeFastMutInt,
 	incFastMutInt, incFastMutIntBy
