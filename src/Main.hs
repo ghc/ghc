@@ -310,6 +310,7 @@ startGHC libDir = do
 
 sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
 sortAndCheckModules session files = do 
+  parseStaticFlags [] -- to avoid a GHC bug
   targets <- mapM (\s -> guessTarget s Nothing) files
   setTargets session targets 
   mbModGraph <- depanal session [] True
