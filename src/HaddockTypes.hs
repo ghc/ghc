@@ -121,13 +121,3 @@ data DocMarkup id a = Markup {
   markupURL           :: String -> a,
   markupAName         :: String -> a
 }
-
-instance (Outputable a, OutputableBndr a) => Outputable (ExportItem a) where
-  ppr (ExportDecl n decl doc instns) = text "ExportDecl" <+> ppr n <+> ppr decl <+> ppr doc <+> ppr instns
-  ppr (ExportNoDecl n1 n2 ns) = text "ExportNoDecl (org name, link name, sub names)" <+> ppr n1 <+> ppr n2 <+> ppr ns
-  ppr (ExportGroup lev id doc) = text "ExportGroup (lev, id, doc)" <+> ppr lev <+> ppr doc
-  ppr (ExportDoc doc) = text "ExportDoc" <+> ppr doc
-  ppr (ExportModule mod) = text "ExportModule" <+> ppr mod 	
-
-instance OutputableBndr DocName where
-  pprBndr _ d = ppr d
