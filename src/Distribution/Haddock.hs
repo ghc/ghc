@@ -1,7 +1,6 @@
 module Distribution.Haddock (
   readInterfaceFile,
-  H.writeInterfaceFile,
-  H.InterfaceFile
+  H.InterfaceFile(..)
 ) where
 
 import Haddock.Exception
