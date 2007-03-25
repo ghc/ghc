@@ -1195,21 +1195,6 @@ packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
 pkgId :: InstalledPackageInfo -> PackageId
 pkgId = mkPackageId . package 
 
-{-
--- | Topologically sort a list of modules that belong to an external package,
--- using the dependency information available in the ModIface structure for 
--- each module. 
-sortPackageModules :: [ModuleInfo] -> [ModuleInfo]
-sortPackageModules modinfos = flattenSCCs $ stronglyConnComp nodes
-  where 
-    nodes = map mkNode modinfos
-      where
-       mkNode modinfo = let iface = minf_iface modinfo
-                            modNames = (map fst . dep_mods . mi_deps) iface
-                            modName  = moduleName (mi_module iface)
-                        in (modinfo, modName, modNames)
--}
-
 -- | For each module in the list, try to retrieve a ModuleInfo structure  
 moduleInfo :: Session -> [Module] -> IO (Maybe [ModuleInfo])
 moduleInfo session modules = do
@@ -1256,26 +1241,7 @@ getPackage session pkgInfo = do
     pdDocEnv   = docEnv,
     pdHtmlPath = html
   } 
-
--- | Build a package doc env out of a topologically sorted list of modules
-{-packageDocEnv :: [ModuleInfo] -> Map Name Name
-packageDocEnv modInfos = foldl addModuleEnv Map.empty (reverse modInfos)
-  where
-    addModuleEnv oldEnv thisMod 
-      | "GHC" `isPrefixOf` modStr = oldEnv 
-      | DocOptHide `elem` options = oldEnv
-      | DocOptNotHome `elem` options = foldl' keepOld oldEnv visibleNames
-      | otherwise = foldl' keepNew oldEnv visibleNames
-      where 
-        modStr = moduleNameString (modInfoName thisMod)
-        options = mi_docopts $ minf_iface thisMod
-        visibleNames = modInfoExports thisMod
-        modName = modInfoMod thisMod
-        keepOld env n = Map.insertWith (\new old -> old) n 
-                        (nameSetMod n modName) env
-        keepNew env n = Map.insert n (nameSetMod n modName) env
--}
-        
+       
 -- | Try to create a PackageData for each package in the session except for 
 -- rts. Print a warning on stdout if a PackageData could not be created.
 getPackages :: Session -> DynFlags -> [Flag] -> IO [PackageData]
