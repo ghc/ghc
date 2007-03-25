@@ -59,22 +59,22 @@ instance Outputable DocName where
 
 data HaddockModule = HM {
 
--- | A value to identify the module
+  -- | A value to identify the module
   hmod_mod                :: Module,
 
--- | The original filename for this module
+  -- | The original filename for this module
   hmod_orig_filename      :: FilePath,
 
--- | Textual information about the module 
+  -- | Textual information about the module 
   hmod_info               :: HaddockModInfo Name,
 
--- | The documentation header for this module
+  -- | The documentation header for this module
   hmod_doc                :: Maybe (HsDoc Name),
 
--- | The renamed documentation header for this module
+  -- | The renamed documentation header for this module
   hmod_rn_doc             :: Maybe (HsDoc DocName),
 
--- | The Haddock options for this module (prune, ignore-exports, etc)
+  -- | The Haddock options for this module (prune, ignore-exports, etc)
   hmod_options            :: [DocOption],
 
   hmod_exported_decl_map  :: Map Name (LHsDecl Name),
@@ -84,24 +84,24 @@ data HaddockModule = HM {
   hmod_export_items       :: [ExportItem Name],
   hmod_rn_export_items    :: [ExportItem DocName],
 
--- | All the names that are defined in this module
+  -- | All the names that are defined in this module
   hmod_locals             :: [Name],
 
--- | All the names that are exported by this module
+  -- | All the names that are exported by this module
   hmod_exports            :: [Name],
 
--- | All the visible names exported by this module
--- For a name to be visible, it has to:
--- - be exported normally, and not via a full module re-exportation.
--- - have a declaration in this module or any of it's imports, with the exception
---   that it can't be from another package.
--- Basically, a visible name is a name that will show up in the documentation
--- for this module.
+  -- | All the visible names exported by this module
+  -- For a name to be visible, it has to:
+  -- - be exported normally, and not via a full module re-exportation.
+  -- - have a declaration in this module or any of it's imports, with the    
+  --   exception that it can't be from another package.
+  -- Basically, a visible name is a name that will show up in the documentation
+  -- for this module.
   hmod_visible_exports    :: [Name],
 
   hmod_sub_map            :: Map Name [Name],
 
--- | The instances exported by this module
+  -- | The instances exported by this module
   hmod_instances          :: [Instance]
 }
 
