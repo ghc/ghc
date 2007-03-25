@@ -6,16 +6,7 @@
 -- Ported to use the GHC API by David Waern 2006
 -- 
 
-module HaddockTypes (
-  ExportItem(..), 
-  ModuleMap, 
-  DocMap,
-  HaddockModule(..), 
-  DocOption(..), 
-  InstHead,
-  DocName(..),
-  DocMarkup(..)
- ) where
+module HaddockTypes where
 
 import GHC
 import Outputable
@@ -58,6 +49,7 @@ data ExportItem name
 type InstHead name = ([HsPred name], name, [HsType name])
 type ModuleMap     = Map Module HaddockModule
 type DocMap        = Map Name (HsDoc DocName)
+type DocEnv        = Map Name Name
 
 data DocName = Link Name | NoLink Name
 

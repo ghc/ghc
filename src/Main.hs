@@ -14,6 +14,8 @@ import HaddockRename
 import HaddockTypes
 import HaddockUtil
 import HaddockVersion
+import Haddock.InterfaceFile
+import Haddock.Exception
 import GHCUtils
 import Paths_haddock_ghc     ( getDataDir )
 
@@ -28,7 +30,6 @@ import Data.List             ( nub, nubBy, (\\), foldl', sortBy, foldl1, init,
                                mapAccumL, find, isPrefixOf )
 import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList, 
                                listToMaybe, fromJust, catMaybes )
-import Data.Word
 import Data.Typeable
 import Data.Graph hiding ( flattenSCC )
 import Data.Dynamic
@@ -61,7 +62,6 @@ import Var hiding ( varName )
 import TyCon
 import PrelNames
 import Bag
-import Binary
 import HscTypes
 import Util                  ( handleDyn )
 import ErrUtils              ( printBagOfErrors )
@@ -76,9 +76,6 @@ import StaticFlags           ( parseStaticFlags )
 --------------------------------------------------------------------------------
 -- Exception handling
 --------------------------------------------------------------------------------
-
-data HaddockException = HaddockException String deriving Typeable
-throwE str = throwDyn (HaddockException str)  
 
 handleTopExceptions = 
   handleNormalExceptions . handleHaddockExceptions . handleGhcExceptions
@@ -97,8 +94,8 @@ handleNormalExceptions inner =
   ) inner
 
 handleHaddockExceptions inner = 
-  handleDyn (\(HaddockException str) -> do
-    putStrLn $ "haddock: " ++ str
+  handleDyn (\(e::HaddockException) -> do
+    putStrLn $ "haddock: " ++ (show e)
     exitFailure
   ) inner
 
@@ -433,7 +430,7 @@ run flags modules extEnv = do
   case [str | Flag_DumpInterface str <- flags] of
         [] -> return ()
         fs -> let filename = (last fs) in 
-              writePackageFile filename homeEnv
+              writeInterfaceFile filename (InterfaceFile homeEnv)
 
 type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
@@ -1184,8 +1181,6 @@ type ErrMsgM a = Writer [ErrMsg] a
 -- Packages 
 --------------------------------------------------------------------------------
 
-type DocEnv = Map Name Name
-
 data PackageData = PackageData {
   pdModules  :: [Module],
   pdDocEnv   :: DocEnv,
@@ -1244,7 +1239,7 @@ getPackage :: Session -> InstalledPackageInfo -> IO PackageData
 getPackage session pkgInfo = do
   html <- getHtml pkgInfo
   iface <- getIface pkgInfo
-  docEnv <- readPackageFile iface
+  InterfaceFile docEnv <- readInterfaceFile iface
 
   let modules = packageModules pkgInfo
 
@@ -1301,10 +1296,10 @@ getPackages session dynflags flags = do
     tryGetPackage pkgInfo = 
         (getPackage session pkgInfo >>= return . Just)
       `catchDyn`
-        (\(HaddockException e) -> do 
+        (\(e::HaddockException) -> do 
           let pkgName = showPackageId (package pkgInfo)
           putStrLn ("Warning: Cannot use package " ++ pkgName ++ ":")
-          putStrLn ("   " ++ e)
+          putStrLn ("   " ++ show e)
           return Nothing
         )
 
@@ -1313,39 +1308,3 @@ getPackages session dynflags flags = do
 -- documentation site.
 packagesDocEnv :: [PackageData] -> DocEnv
 packagesDocEnv packages = Map.unions (map pdDocEnv packages)
-
---------------------------------------------------------------------------------
--- Package/Interface files 
---------------------------------------------------------------------------------
-
-packageFileMagic = 0xDA303001 :: Word32
-packageFileVersion = 0 :: Word16
-
-writePackageFile :: FilePath -> DocEnv -> IO ()
-writePackageFile filename pkgEnv = do
-  h <- openBinaryFile filename WriteMode   
-  bh <- openBinIO h 
-
-  ud <- newWriteState
-  bh <- return $ setUserData bh ud
-
-  put_ bh packageFileMagic
-  put_ bh packageFileVersion
-  put_ bh (Map.toList pkgEnv)
-  hClose h
-
-readPackageFile :: FilePath -> IO DocEnv
-readPackageFile filename = do
-  h <- openBinaryFile filename ReadMode
-  bh <- openBinIO h
-
-  ud <- newReadState undefined
-  bh <- return (setUserData bh ud)
-
-  magic <- get bh
-  when (magic /= packageFileMagic) $ throwE $
-    "Magic number mismatch: couldn't load interface file: " ++ filename
- 
-  (version :: Word16) <- get bh
-  envList <- get bh
-  return (Map.fromList envList)
