@@ -880,8 +880,8 @@ fullContentsOfThisModule module_ entities declMap docMap
   where 
     mkExportItem (DocEntity (DocGroup lev doc)) = Just (ExportGroup lev "" doc)
     mkExportItem (DeclEntity name) = fmap mkExport (Map.lookup name declMap) 
-    mkExportItem _ = Nothing
       where mkExport decl = ExportDecl name decl (Map.lookup name docMap) []
+    mkExportItem _ = Nothing
 
 -- Sometimes the declaration we want to export is not the "main" declaration:
 -- it might be an individual record selector or a class method.  In these
