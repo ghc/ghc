@@ -163,10 +163,6 @@ CLEAN_FILES += mkGHCConstants$(exeext) GHCConstants.h
 # ---------------------------------------------------------------------------
 # boot setup:
 #
-# Need config.h to make dependencies in the runtime system source.
-#
-boot :: all
-
 #
 # Install all header files
 #
@@ -188,3 +184,14 @@ CLEAN_FILES += $(H_CONFIG) $(H_PLATFORM)
 # Finally, slurp in the standard targets.
 #
 include $(TOP)/mk/target.mk
+
+# We need DerivedConstants.h in order to make dependencies in the RTS
+# sources, so 'make boot' here should behave like 'make all'.
+#
+# However, note that we should do this only *after* 'make boot' has
+# created .depend in here; otherwise an out-of-date .depend file can
+# prevent 'make boot' from working, requiring manual removal of
+# .depend (see #1095).  This is why the following target comes *after*
+# target.mk is included above (target.mk contains "boot :: depend").
+#
+boot :: all
