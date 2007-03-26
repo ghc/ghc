@@ -55,6 +55,7 @@ else
 $(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h $(FPTOOLS_TOP)/mk/config.mk
 
 $(H_CONFIG) : Makefile
+	@echo "Creating $@..."
 	@echo "#ifndef __GHCAUTOCONF_H__"  >$@
 	@echo "#define __GHCAUTOCONF_H__" >>$@
 #	Turn '#define PACKAGE_FOO "blah"' into '/* #undef PACKAGE_FOO */'.
