@@ -1100,6 +1100,7 @@ ghc -M -optdep-f -optdep.depend ...
 	    </listitem>
 	  </varlistentry>
 
+<!-- Not currently implemented:
 	  <varlistentry>
 	    <term><option>&ndash;&ndash;exclude-directory=&lt;dirs&gt;</option></term>
 	    <listitem>
@@ -1119,6 +1120,7 @@ ghc -M -optdep-f -optdep.depend ...
               the <option>&ndash;&ndash;exclude-directory</option> option.</para>
 	    </listitem>
 	  </varlistentry>
+-->
 
 	  <varlistentry>
 	    <term><option>&ndash;&ndash;include-pkg-deps</option></term>
