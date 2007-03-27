@@ -891,7 +891,17 @@ all :: $(GHC_PROG)
 # configuration.  Yeuch... maybe one day this will all be done more cleanly.
 STAMP_PKG_CONF = $(GHC_DRIVER_DIR)/stamp-pkg-conf-$(PACKAGE)
 
-$(GHC_PROG) : libHS$(PACKAGE)$(_way).a main/Main.hs
+ifeq "$(GhcBuildDylibs)" "YES"
+ifeq "$(darwin_TARGET_OS)" "1"
+GhcLibraryName=libHS$(PACKAGE)$(_way)_dyn.dylib
+else
+GhcLibraryName=libHS$(PACKAGE)$(_way)_dyn.so
+endif
+else
+GhcLibraryName=libHS$(PACKAGE)$(_way).a
+endif
+
+$(GHC_PROG) : $(GhcLibraryName) main/Main.hs
 	$(RM) package.conf.inplace
 	$(RM) $(STAMP_PKG_CONF)
 	$(MAKE) $(STAMP_PKG_CONF)
