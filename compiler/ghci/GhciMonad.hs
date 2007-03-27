@@ -16,6 +16,7 @@ import Breakpoints
 import Outputable
 import Panic hiding (showException)
 import Util
+import DynFlags
 
 import Numeric
 import Control.Exception as Exception
@@ -205,8 +206,14 @@ flush_cmd = command_sequence [flush_buffer "stdout", flush_buffer "stderr"]
 
 initInterpBuffering :: GHC.Session -> IO ()
 initInterpBuffering session
- = do maybe_hval <- GHC.compileExpr session no_buf_cmd
-	
+ = do -- we don't want to be fooled by any modules lying around in the current
+      -- directory when we compile these code fragments, so set the import
+      -- path to be empty while we compile them.
+      dflags <- GHC.getSessionDynFlags session
+      GHC.setSessionDynFlags session dflags{importPaths=[]}
+
+      maybe_hval <- GHC.compileExpr session no_buf_cmd
+
       case maybe_hval of
 	Just hval -> writeIORef turn_off_buffering (unsafeCoerce# hval :: IO ())
 	other	  -> panic "interactiveUI:setBuffering"
@@ -216,6 +223,8 @@ initInterpBuffering session
 	Just hval -> writeIORef flush_interp (unsafeCoerce# hval :: IO ())
 	_         -> panic "interactiveUI:flush"
 
+      GHC.setSessionDynFlags session dflags
+      GHC.workingDirectoryChanged session
       return ()
 
 
