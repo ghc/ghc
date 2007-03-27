@@ -398,7 +398,11 @@ dep_opts =
    [ (  "s", 			SepArg (consIORef v_Dep_suffixes) )
    , (  "f", 			SepArg (writeIORef v_Dep_makefile) )
    , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
+
    , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
+	-- -include-prelude is the old name for -include-pkg-deps, kept around
+	-- for backward compatibility, but undocumented
+
    , (  "-include-pkg-deps",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
    , (  "-exclude-module=",     Prefix (consIORef v_Dep_exclude_mods . mkModuleName) )
    , (  "x",                    Prefix (consIORef v_Dep_exclude_mods . mkModuleName) )
