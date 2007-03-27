@@ -350,9 +350,15 @@ splitAt n xs           =  (take n xs, drop n xs)
 
 #else /* hack away */
 {-# RULES
-"take"	   [~1] forall n xs . take n xs = case n of I# n# -> build (\c nil -> foldr (takeFB c nil) (takeConst nil) xs n#)
+"take"	   [~1] forall n xs . take n xs = takeFoldr n xs 
 "takeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n = takeUInt n xs
  #-}
+
+{-# INLINE takeFoldr #-}
+takeFoldr :: Int -> [a] -> [a]
+takeFoldr (I# n#) xs
+  = build (\c nil -> if n# <=# 0# then nil else
+                     foldr (takeFB c nil) (takeConst nil) xs n#)
 
 {-# NOINLINE [0] takeConst #-}
 -- just a version of const that doesn't get inlined too early, so we
@@ -361,8 +367,8 @@ takeConst :: a -> Int# -> a
 takeConst x _ = x
 
 {-# NOINLINE [0] takeFB #-}
-takeFB :: (a -> b -> c) -> c -> a -> (Int# -> b) -> Int# -> c
-takeFB c n x xs m | m <=# 0#  = n
+takeFB :: (a -> b -> b) -> b -> a -> (Int# -> b) -> Int# -> b
+takeFB c n x xs m | m <=# 1#  = x `c` n
 		  | otherwise = x `c` xs (m -# 1#)
 
 {-# INLINE [0] take #-}
