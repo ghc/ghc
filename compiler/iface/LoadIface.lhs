@@ -51,6 +51,7 @@ import Outputable
 import BinIface
 import Panic
 
+import Control.Monad (when)
 import Data.List
 import Data.Maybe
 import Data.IORef
@@ -175,9 +176,9 @@ loadInterface doc_str mod from
 			-- The (src_imp == mi_boot iface) test checks that the already-loaded
 			-- interface isn't a boot iface.  This can conceivably happen,
 			-- if an earlier import had a before we got to real imports.   I think.
-	    other -> do
+	    other -> do {
 
-	{ let { hi_boot_file = case from of
+          let { hi_boot_file = case from of
 				ImportByUser usr_boot -> usr_boot
 				ImportBySystem        -> sys_boot
 
@@ -412,18 +413,25 @@ findAndReadIface doc_str mod hi_boot_file
 
 	-- Look for the file
 	; hsc_env <- getTopEnv
-	; mb_found <- ioToIOEnv (findHiFile hsc_env mod hi_boot_file)
+	; mb_found <- ioToIOEnv (findExactModule hsc_env mod)
 	; case mb_found of {
-	      Failed err -> do
+              
+	      err | notFound err -> do
 		{ traceIf (ptext SLIT("...not found"))
 		; dflags <- getDOpts
 		; returnM (Failed (cannotFindInterface dflags 
 					(moduleName mod) err)) } ;
-
-	      Succeeded file_path -> do 
+	      Found loc mod -> do 
 
 	-- Found file, so read it
-	{ traceIf (ptext SLIT("readIFace") <+> text file_path)
+	{ let { file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc) }
+
+        ; if thisPackage dflags == modulePackageId mod
+                && not (isOneShot (ghcMode dflags))
+            then returnM (Failed (homeModError mod loc))
+            else do {
+
+        ; traceIf (ptext SLIT("readIFace") <+> text file_path)
 	; read_result <- readIface mod file_path hi_boot_file
 	; case read_result of
 	    Failed err -> returnM (Failed (badIfaceFile file_path err))
@@ -433,18 +441,10 @@ findAndReadIface doc_str mod hi_boot_file
 		| otherwise ->
 		  returnM (Succeeded (iface, file_path))
 			-- Don't forget to fill in the package name...
-	}}}
+	}}}}
 
-findHiFile :: HscEnv -> Module -> IsBootInterface
-	   -> IO (MaybeErr FindResult FilePath)
-findHiFile hsc_env mod hi_boot_file
-  = do
-      maybe_found <- findExactModule hsc_env mod
-      case maybe_found of
-	Found loc mod -> return (Succeeded path)
-		where
-		   path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc)
-	err -> return (Failed err)
+notFound (Found _ _) = False
+notFound _ = True
 \end{code}
 
 @readIface@ tries just the one file.
@@ -689,5 +689,12 @@ wrongIfaceModErr iface mod_name file_path
 	    ]
 	]
   where iface_file = doubleQuotes (text file_path)
+
+homeModError mod location
+  = ptext SLIT("attempting to use module ") <> quotes (ppr mod)
+    <> (case ml_hs_file location of
+           Just file -> space <> parens (text file)
+           Nothing   -> empty)
+    <+> ptext SLIT("which is not loaded")
 \end{code}
 
