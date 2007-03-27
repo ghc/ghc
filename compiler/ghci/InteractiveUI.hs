@@ -260,7 +260,7 @@ interactiveUI session srcs maybe_expr = do
 	hSetBuffering stdin NoBuffering
 
 	-- initial context is just the Prelude
-   prel_mod <- GHC.findModule session prel_name Nothing
+   prel_mod <- GHC.findModule session prel_name (Just basePackageId)
    GHC.setContext session [] [prel_mod]
 
 #ifdef USE_READLINE

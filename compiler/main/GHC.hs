@@ -1929,7 +1929,7 @@ findModule' hsc_env mod_name maybe_pkg =
   case lookupUFM hpt mod_name of
     Just mod_info -> return (mi_module (hm_iface mod_info))
     _not_a_home_module -> do
-	  res <- findImportedModule hsc_env mod_name Nothing
+	  res <- findImportedModule hsc_env mod_name maybe_pkg
 	  case res of
 	    Found _ m | modulePackageId m /= this_pkg -> return m
 		      | otherwise -> throwDyn (CmdLineError (showSDoc $
