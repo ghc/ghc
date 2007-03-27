@@ -942,13 +942,14 @@ sub mangle_asm {
             	      }
 
             	    # Remove floating-point spill instructions.
-            	    # Only fp registers 2-5 and 16-21 are saved by the runtime.
-            	    if ($p =~ s/^\tstf\.spill \[r1[4-9]\] = f([2-5]|1[6-9]|20|21)(, [0-9]+)?\n//g) {
+            	    # Only fp registers 2-5 and 16-23 are saved by the runtime.
+            	    if ($p =~ s/^\tstf\.spill \[r1[4-9]\] = f([2-5]|1[6-9]|2[0-3])(, [0-9]+)?\n//g) {
             	        # Being paranoid, only try to remove these if we saw a
 			# spill operation.
                         $p =~ s/^\tmov r1[4-9] = r12\n//;
                         $p =~ s/^\tadds r1[4-9] = -[0-9]+, r12\n//g;
                         $p =~ s/^\t\.save\.f 0x[0-9a-fA-F]\n//g;
+                        $p =~ s/^\t\.save\.gf 0x0, 0x[0-9a-fA-F]+\n//g;
             	    }
 
             	    $p =~ s/^\tnop(?:\.[mifb])?\s+\d+\n//g; # remove nop instructions
@@ -1118,8 +1119,8 @@ sub mangle_asm {
  		    $e =~ s/^\tmov r8 = r14\n//;
 
             	    # Remove floating-point fill instructions.
-            	    # Only fp registers 2-5 and 16-21 are saved by the runtime.
-            	    if ($e =~ s/^\tldf\.fill f([2-5]|1[6-9]|20|21) = \[r1[4-9]\](, [0-9]+)?\n//g) {
+            	    # Only fp registers 2-5 and 16-23 are saved by the runtime.
+            	    if ($e =~ s/^\tldf\.fill f([2-5]|1[6-9]|2[0-3]) = \[r1[4-9]\](, [0-9]+)?\n//g) {
             	        # Being paranoid, only try to remove this if we saw a fill
             	        # operation.
             	        $e =~ s/^\tadds r1[4-9] = [0-9]+, r12//g;

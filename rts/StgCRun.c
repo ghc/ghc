@@ -854,7 +854,7 @@ StgRunIsImplementedInAssembler(void)
            loc32: saved ar.lc
            loc33: saved pr
        f2  -  f5: preserved floating-point registers
-       f16 - f21: preserved floating-point registers
+       f16 - f23: preserved floating-point registers
    -------------------------------------------------------------------------- */
 
 #ifdef ia64_HOST_ARCH
@@ -865,7 +865,7 @@ StgRunIsImplementedInAssembler(void)
 
 /* We don't spill all the callee-save FP registers, only the ones that
  * gcc has been observed to use */
-#define PRESERVED_FP_REGISTERS 10
+#define PRESERVED_FP_REGISTERS 12
 
 /* We always allocate 34 local and 8 output registers.  As long as gcc used
  * fewer than 32 locals, the mangler will adjust the stack frame accordingly. */
@@ -890,7 +890,9 @@ StgRunIsImplementedInAssembler(void)
 		"\tstf.spill [r17] = f19,32\n"
 		"\tmov loc30 = b0 ;;\n"			/* save return address */
 		"\tstf.spill [r16] = f20,32\n"
-		"\tstf.spill [r17] = f21,32\n"
+		"\tstf.spill [r17] = f21,32 ;;\n"
+		"\tstf.spill [r16] = f22,32\n"
+		"\tstf.spill [r17] = f23,32\n"
                 "\tmov loc32 = ar.lc ;;\n"		/* save loop counter */
 		"\tstf.spill [r16] = f2,32\n"
 		"\tstf.spill [r17] = f3,32\n"
@@ -912,9 +914,11 @@ StgRunIsImplementedInAssembler(void)
 		"\tldf.fill f20 = [r16],32\n"
 		"\tldf.fill f21 = [r17],32\n"
                 "\tmov ar.lc = loc32 ;;\n"	/* restore loop counter */
+		"\tldf.fill f22 = [r16],32\n"
+		"\tldf.fill f23 = [r17],32\n"
+		"\tmov pr = loc33 ;;\n"		/* restore predicate registers */
 		"\tldf.fill f2 = [r16],32\n"
 		"\tldf.fill f3 = [r17],32\n"
-		"\tmov pr = loc33\n"		/* restore predicate registers */
 		"\tadds sp = %0, sp ;;\n"	/* restore stack */
 		"\tldf.fill f4 = [r16],32\n"
 		"\tldf.fill f5 = [r17],32\n"
