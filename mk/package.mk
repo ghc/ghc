@@ -273,24 +273,35 @@ DYLD_LIBRARY = $(patsubst %.a,%_dyn.dylib,$(LIBRARY))
     # About the options used for Darwin:
     # -dynamiclib
     #   Apple's way of saying -shared
-    # -flat_namespace -undefined suppress:
-    #   Without these options, we'd have to specify the correct dependencies
-    #   for each of the dylibs. Twolevel namespaces are in general a good thing
-    #   (they make things more robust), so we should fix this sooner or later.
     # -undefined dynamic_lookup:
-    #   Another way to avoid having to specify the correct dependencies, but
-    #   this time, we don't allow overriding symbols.
+    #   Without these options, we'd have to specify the correct dependencies
+    #   for each of the dylibs. Note that we could (and should) do without this
+    #	for all libraries except the RTS; all we need to do is to pass the
+    #	correct HSfoo_dyn.dylib files to the link command.
+    #	This feature requires Mac OS X 10.3 or later; there is a similar feature,
+    #	-flat_namespace -undefined suppress, which works on earlier versions,
+    #	but it has other disadvantages.
+    # -single_module
+    #	Build the dynamic library as a single "module", i.e. no dynamic binding
+    #	nonsense when referring to symbols from within the library. The NCG
+    #	assumes that this option is specified (on i386, at least).
+    # -Wl,-macosx_version_min -Wl,10.3
+    #	Tell the linker its safe to assume that the library will run on 10.3 or
+    #	later, so that it will not complain about the use of the option
+    #	-undefined dynamic_lookup above.
     # -install_name
     #   Causes the dynamic linker to ignore the DYLD_LIBRARY_PATH when loading
     #   this lib and instead look for it at its absolute path.
     #   When installing the .dylibs (see target.mk), we'll change that path to
-    #   point to the place they are installed.
-    #   Note: I'm not yet sure about this, but I think it will be convenient for
-    #         users not to have to set up DYLD_LIBRARY_PATH to point to the GHC
-    #         library dir. -- Wolfgang
+    #   point to the place they are installed. Therefore, we won't have to set
+    #	up DYLD_LIBRARY_PATH specifically for ghc.
 
 $(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
-	$(CC) -dynamiclib -o $@ $(STUBOBJS) $(LIBOBJS) -undefined dynamic_lookup -install_name `pwd`/$@
+	$(CC) -dynamiclib -o $@ $(STUBOBJS) $(LIBOBJS) \
+		-undefined dynamic_lookup -single_module \
+		 -Wl,-macosx_version_min -Wl,10.3 \
+		-install_name `pwd`/$@
+
 else
 DYLD_LIBRARY = $(patsubst %.a,%_dyn.so,$(LIBRARY))
 
