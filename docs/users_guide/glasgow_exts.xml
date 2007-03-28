@@ -552,14 +552,11 @@ import qualified Control.Monad.ST.Strict as ST
       linkend="search-path"/>.</para>
 
       <para>GHC comes with a large collection of libraries arranged
-      hierarchically; see the accompanying library documentation.
-      There is an ongoing project to create and maintain a stable set
-      of <quote>core</quote> libraries used by several Haskell
-      compilers, and the libraries that GHC comes with represent the
-      current status of that project.  For more details, see <ulink
-      url="http://www.haskell.org/~simonmar/libraries/libraries.html">Haskell
-      Libraries</ulink>.</para>
-
+      hierarchically; see the accompanying <ulink
+      url="../libraries/index.html">library
+      documentation</ulink>.  More libraries to install are available
+      from <ulink
+      url="http://hackage.haskell.org/packages/hackage.html">HackageDB</ulink>.</para>
     </sect2>
 
     <!-- ====================== PATTERN GUARDS =======================  -->

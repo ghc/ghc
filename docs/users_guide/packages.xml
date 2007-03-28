@@ -5,9 +5,12 @@ Packages
  </title>
   <indexterm><primary>packages</primary></indexterm>
   
-  <para>A package is a library of Haskell modules known to the compiler.  GHC
-    comes with several packages: see the accompanying 
-    <ulink url="../libraries/index.html">library documentation</ulink>.</para>
+  <para>A package is a library of Haskell modules known to the
+    compiler.  GHC comes with several packages: see the accompanying
+    <ulink url="../libraries/index.html">library
+    documentation</ulink>.  More packages to install can be obtained
+    from <ulink
+    url="http://hackage.haskell.org/packages/hackage.html">HackageDB</ulink>.</para>
 
   <para>Using a package couldn't be simpler: if you're using
     <option>--make</option> or GHCi, then most of the installed packages will be
