@@ -1,5 +1,6 @@
 base
 Cabal
+filepath
 haskell98
 readline
 regex-base

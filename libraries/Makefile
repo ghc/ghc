@@ -9,7 +9,7 @@ include $(TOP)/mk/boilerplate.mk
 # want the Makefile.
 MFLAGS += -f Makefile
 
-SUBDIRS = base haskell98 template-haskell readline \
+SUBDIRS = base filepath haskell98 template-haskell readline \
 	  regex-base regex-posix regex-compat parsec Cabal
 
 ifeq "$(GhcLibsWithUnix)" "YES"
