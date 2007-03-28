@@ -193,7 +193,7 @@ data HscStatus
                       -- This is a hack. We can't compile C files here
                       -- since it's done in DriverPipeline. For now we
                       -- just return True if we want the caller to compile
-                      -- it for us.
+                      -- them for us.
 
 -- Status of a compilation to byte-code.
 data InteractiveStatus
