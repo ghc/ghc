@@ -289,31 +289,26 @@ hscMkCompiler norecomp messenger frontend backend
 --        1         2         3         4         5         6         7         8          9
 -- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: Compiler HscStatus
-hscCompileOneShot hsc_env mod_summary =
-    compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecompOneShot oneShotMsg
-          -- How to compile nonBoot files.
-          nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
-                            hscWriteIface >>= hscOneShot
-          -- How to compile boot files.
-          bootComp inp = hscSimpleIface inp >>= hscWriteIface >>= hscConst (HscRecomp False)
-          compiler
-              = case ms_hsc_src mod_summary of
-                ExtCoreFile
-                    -> mkComp hscCoreFrontEnd nonBootComp
-                HsSrcFile
-                    -> mkComp hscFileFrontEnd nonBootComp
-                HsBootFile
-                    -> mkComp hscFileFrontEnd bootComp
+hscCompileOneShot = hscCompileHardCode norecompOneShot oneShotMsg hscOneShot (hscConst (HscRecomp False))
 
 -- Compile Haskell, boot and extCore in batch mode.
 hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileBatch hsc_env mod_summary
-    = compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecompBatch batchMsg
+hscCompileBatch = hscCompileHardCode norecompBatch batchMsg hscBatch hscNothing
+
+-- Compile to hardcode (C,asm,...). This general structure is shared by OneShot and Batch.
+hscCompileHardCode :: NoRecomp result                                  -- No recomp necessary
+                   -> (Maybe (Int,Int) -> Bool -> Comp ())             -- Message callback
+                   -> ((ModIface, ModDetails, CgGuts) -> Comp result)  -- Compile normal file
+                   -> ((ModIface, ModDetails, ModGuts) -> Comp result) -- Compile boot file
+                   -> Compiler result
+hscCompileHardCode norecomp msg compNormal compBoot hsc_env mod_summary =
+    compiler hsc_env mod_summary
+    where mkComp = hscMkCompiler norecomp msg
+          -- How to compile nonBoot files.
           nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
-                            hscWriteIface >>= hscBatch
-          bootComp inp = hscSimpleIface inp >>= hscWriteIface >>= hscNothing
+                            hscWriteIface >>= compNormal
+          -- How to compile boot files.
+          bootComp inp = hscSimpleIface inp >>= hscWriteIface >>= compBoot
           compiler
               = case ms_hsc_src mod_summary of
                 ExtCoreFile
