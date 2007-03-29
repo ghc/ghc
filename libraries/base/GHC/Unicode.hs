@@ -182,7 +182,7 @@ foreign import ccall unsafe "u_towtitle"
   towtitle :: CInt -> CInt
 
 foreign import ccall unsafe "u_gencat"
-  wgencat :: CInt -> Int
+  wgencat :: CInt -> CInt
 
 -- -----------------------------------------------------------------------------
 -- No libunicode, so fall back to the ASCII-only implementation (never used, indeed)

@@ -76,7 +76,7 @@ import Prelude(Char,String)
 import Char
 import Ix
 import NHC.FFI (CInt)
-foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> Int
+foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> CInt
 #endif
 
 -- | Convert a single digit 'Char' to the corresponding 'Int'.  
@@ -135,7 +135,7 @@ data GeneralCategory
 -- | The Unicode general category of the character.
 generalCategory :: Char -> GeneralCategory
 #if defined(__GLASGOW_HASKELL__) || defined(__NHC__)
-generalCategory c = toEnum (wgencat (fromIntegral (ord c)))
+generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
 #endif
 #ifdef __HUGS__
 generalCategory c = toEnum (primUniGenCat c)
