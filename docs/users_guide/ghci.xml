@@ -747,24 +747,79 @@ it &lt;- <replaceable>e</replaceable>
     standard rules take each group of constraints <literal>(C1 a, C2 a, ..., Cn
     a)</literal> for each type variable <literal>a</literal>, and defaults the
     type variable if 
-	<itemizedlist>
-	    <listitem><para> The type variable <literal>a</literal>
-	appears in no other constraints </para></listitem>
-	    <listitem><para> All the classes <literal>Ci</literal> are standard.</para></listitem>
-	    <listitem><para> At least one of the classes <literal>Ci</literal> is
-	    numeric.</para></listitem>
-      </itemizedlist>
-   At the GHCi prompt, the second and third rules are relaxed as follows
-   (differences italicised):
-	<itemizedlist>
-	    <listitem><para> <emphasis>All</emphasis> of the classes
-	    <literal>Ci</literal> are single-parameter type classes.</para></listitem>
-	    <listitem><para> At least one of the classes <literal>Ci</literal> is
-	    numeric, <emphasis>or is <literal>Show</literal>, 
-		<literal>Eq</literal>, or <literal>Ord</literal></emphasis>.</para></listitem>
-      </itemizedlist>
-   The same type-default behaviour can be enabled in an ordinary Haskell
-   module, using the flag <literal>-fextended-default-rules</literal>. 
+    <orderedlist>
+        <listitem>
+            <para>
+                The type variable <literal>a</literal> appears in no
+                other constraints
+            </para>
+        </listitem>
+        <listitem>
+            <para>
+                All the classes <literal>Ci</literal> are standard.
+            </para>
+        </listitem>
+        <listitem>
+            <para>
+                At least one of the classes <literal>Ci</literal> is
+                numeric.
+            </para>
+        </listitem>
+    </orderedlist>
+    At the GHCi prompt, or with GHC if the
+    <literal>-fextended-default-rules</literal> flag is given,
+    the following additional differences apply:
+    <itemizedlist>
+        <listitem>
+            <para>
+                Rule 2 above is relaxed thus:
+                <emphasis>All</emphasis> of the classes
+                <literal>Ci</literal> are single-parameter type classes.
+            </para>
+        </listitem>
+        <listitem>
+            <para>
+                Rule 3 above is relaxed this:
+                At least one of the classes <literal>Ci</literal> is
+                numeric, <emphasis>or is <literal>Show</literal>,
+                <literal>Eq</literal>, or
+                <literal>Ord</literal></emphasis>.
+            </para>
+        </listitem>
+        <listitem>
+            <para>
+                The unit type <literal>()</literal> is added to the
+                start of the standard list of types which are tried when
+                doing type defaulting.
+            </para>
+        </listitem>
+    </itemizedlist>
+    The last point means that, for example, this program:
+<programlisting>
+main :: IO ()
+main = print def
+
+instance Num ()
+
+def :: (Num a, Enum a) => a
+def = toEnum 0
+</programlisting>
+    prints <literal>()</literal> rather than <literal>0</literal> as the
+    type is defaulted to <literal>()</literal> rather than
+    <literal>Integer</literal>.
+   </para>
+   <para>
+    The motivation for the change is that it means <literal>IO a</literal>
+    actions default to <literal>IO ()</literal>, which in turn means that
+    ghci won't try to print a result when running them. This is
+    particularly important for <literal>printf</literal>, which has an
+    instance that returns <literal>IO a</literal>.
+    However, it is only able to return
+    <literal>undefined</literal>
+    (the reason for the instance having this type is to not require
+    extensions to the class system), so if the type defaults to
+    <literal>Integer</literal> then ghci gives an error when running a
+    printf.
    </para>
     </sect2>
   </sect1>
