@@ -50,10 +50,10 @@ data GeneralCategory
 
 -- | Retrieves the general Unicode category of the character.
 generalCategory :: Char -> GeneralCategory
-generalCategory c = toEnum (wgencat (fromIntegral (ord c)))
+generalCategory c = toEnum $ fromIntegral $ wgencat $ fromIntegral $ ord c
 
 foreign import ccall unsafe "u_gencat"
-  wgencat :: CInt -> Int
+  wgencat :: CInt -> CInt
 
 isPrint c = iswprint (fromIntegral (ord c)) /= 0
 isUpper c = iswupper (fromIntegral (ord c)) /= 0
