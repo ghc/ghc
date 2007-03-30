@@ -936,7 +936,7 @@ def outputs_differ( kind, expected, actual ):
     else:
         actual1 = actual
         
-    os.system( 'diff -c ' + expected1 + ' ' + actual1 )
+    os.system( 'diff -u ' + expected1 + ' ' + actual1 )
 
     if config.accept:
         if expected == '':
