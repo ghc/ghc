@@ -218,6 +218,10 @@ data CoreRule
 	-- Locality
 	ru_local :: Bool	-- The fn at the head of the rule is
 				-- defined in the same module as the rule
+				-- and is not an implicit Id (like a record sel
+				-- class op, or data con)
+		-- NB: ru_local is *not* used to decide orphan-hood
+		--	c.g. MkIface.coreRuleToIfaceRule
     }
 
   | BuiltinRule {		-- Built-in rules are used for constant folding

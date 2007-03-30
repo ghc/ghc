@@ -547,12 +547,13 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 		   ; return (bndrs', args', rhs') }
 	; let mb_tcs = map ifTopFreeName args
         ; lcl <- getLclEnv
-        ; let this_module = if_mod lcl
 	; returnM (Rule { ru_name = name, ru_fn = fn, ru_act = act, 
 			  ru_bndrs = bndrs', ru_args = args', 
 			  ru_rhs = rhs', 
 			  ru_rough = mb_tcs,
-			  ru_local = nameModule fn == this_module }) }
+			  ru_local = False }) }	-- An imported RULE is never for a local Id
+						-- or, even if it is (module loop, perhaps)
+						-- we'll just leave it in the non-local set
   where
 	-- This function *must* mirror exactly what Rules.topFreeName does
 	-- We could have stored the ru_rough field in the iface file

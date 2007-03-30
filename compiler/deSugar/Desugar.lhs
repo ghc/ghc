@@ -293,9 +293,10 @@ dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
 	
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
-	{ let local_rule = nameIsLocalOrFrom mod fn_name
-		-- NB we can't use isLocalId in the orphan test, 
-		-- because isLocalId isn't true of class methods
+	{ let local_rule = isLocalId fn_id
+		-- NB: isLocalId is False of implicit Ids.  This is good becuase
+		-- we don't want to attach rules to the bindings of implicit Ids, 
+		-- because they don't show up in the bindings until just before code gen
 	      fn_name   = idName fn_id
 
 	      rule = Rule { ru_name = name, ru_fn = fn_name, ru_act = act,
