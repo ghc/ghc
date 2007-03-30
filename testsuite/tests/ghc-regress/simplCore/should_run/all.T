@@ -5,7 +5,7 @@
 
 # Only compile with optimisation
 def f( opts ):
-  opts.only_ways = ['opt']
+  opts.only_ways = ['optc','optasm']
 
 setTestOpts(f)
 
