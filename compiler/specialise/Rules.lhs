@@ -19,17 +19,16 @@ module Rules (
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
-import CoreSubst	( substExpr, mkSubst )
 import OccurAnal	( occurAnalyseExpr )
 import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
-import CoreUtils	( tcEqExprX )
+import CoreUtils	( tcEqExprX, exprType )
 import PprCore		( pprRules )
-import Type		( TvSubstEnv )
+import Type		( Type, TvSubstEnv )
 import Coercion         ( coercionKind )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
-import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName,
+import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName, idType,
 			  idSpecialisation, idCoreRules, setIdSpecialisation ) 
 import IdInfo		( SpecInfo( SpecInfo ) )
 import Var		( Var )
@@ -506,7 +505,6 @@ match menv subst@(tv_subst, id_subst, binds) e1 (Let bind e2)
   where
     rn_env   = me_env menv
     bndrs    = bindersOf  bind
-    rhss     = rhssOfBind bind
     bind_fvs = varSetElems (bindFreeVars bind)
     locally_bound x   = inRnEnvR rn_env x
     freshly_bound x = not (x `rnInScope` rn_env)
@@ -616,8 +614,19 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 		-> Nothing	-- Occurs check failure
 		-- e.g. match forall a. (\x-> a x) against (\y. y y)
 
-		| otherwise	-- No renaming to do on e2
-		-> Just (tv_subst, extendVarEnv id_subst v1' e2, binds)
+		| otherwise	-- No renaming to do on e2, because no free var
+				-- of e2 is in the rnEnvR of the envt
+		-- However, we must match the *types*; e.g.
+		--   forall (c::Char->Int) (x::Char). 
+		--	f (c x) = "RULE FIRED"
+		-- We must only match on args that have the right type
+		-- It's actually quite difficult to come up with an example that shows
+		-- you need type matching, esp since matching is left-to-right, so type
+		-- args get matched first.  But it's possible (e.g. simplrun008) and
+		-- this is the Right Thing to do
+		-> do	{ tv_subst' <- Unify.ruleMatchTyX menv tv_subst (idType v1') (exprType e2)
+						-- c.f. match_ty below
+			; return (tv_subst', extendVarEnv id_subst v1' e2, binds) }
 
 	Just e1' | tcEqExprX (nukeRnEnvL rn_env) e1' e2 
 		 -> Just subst
@@ -667,6 +676,11 @@ We only want to replace (f T) with f', not (f Int).
 
 \begin{code}
 ------------------------------------------
+match_ty :: MatchEnv
+      	 -> SubstEnv
+      	 -> Type		-- Template
+      	 -> Type		-- Target
+      	 -> Maybe SubstEnv
 match_ty menv (tv_subst, id_subst, binds) ty1 ty2
   = do	{ tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
 	; return (tv_subst', id_subst, binds) }
