@@ -104,6 +104,7 @@ exposed-modules:
 	FunDeps
 	GHC
 	Generics
+	GhciMonad
         HeaderInfo
 	HsBinds
 	HsDecls
