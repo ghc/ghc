@@ -28,6 +28,9 @@ class TestConfig:
         # File in which to save the summary
         self.output_summary = ''
 
+        # File in which to save the times
+        self.times_file = ''
+
         # What platform are we running on?
         self.platform = ''
 

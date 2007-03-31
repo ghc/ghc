@@ -10,6 +10,7 @@ import sys
 import os
 import string
 import getopt
+import time
 
 from testutil import *
 from testglobals import *
@@ -46,6 +47,9 @@ for opt,arg in opts:
 
     if opt == '--output-summary':
         config.output_summary = arg
+
+    if opt == '--times-file':
+        config.times_file = arg
 
     if opt == '--only':
         config.only.append(arg)
@@ -104,13 +108,18 @@ print 'Beginning test run at', t.start_time
 sys.stdout.flush()
 sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
 
+times = {}
+
 for file in t_files:
     print '====> Running', file
     newTestDir(os.path.dirname(file))
     try:
         if config.use_threads:
             t.running_threads=0
+        start = time.time()
         execfile(file)
+        end = time.time()
+        times[file] = end - start
         if config.use_threads:
             t.thread_pool.acquire()
             while t.running_threads>0:
@@ -124,6 +133,12 @@ summary(t, sys.stdout)
 
 if config.output_summary != '':
     summary(t, open(config.output_summary, 'w'))
+
+if config.times_file != '':
+    h = open(config.times_file, 'w')
+    for (k, v) in times.items():
+        h.write(k + ',' + str(v) + '\n')
+    h.close()
 
 sys.exit(0)
 
