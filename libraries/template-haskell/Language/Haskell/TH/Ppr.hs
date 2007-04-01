@@ -39,7 +39,7 @@ instance Ppr a => Ppr [a] where
 
 ------------------------------
 instance Ppr Name where
-    ppr v = pprName v -- text (show v)
+    ppr v = pprName True v -- text (show v)
 
 ------------------------------
 instance Ppr Info where
@@ -76,6 +76,11 @@ pprFixity v (Fixity i d) = ppr_fix d <+> int i <+> ppr v
 instance Ppr Exp where
     ppr = pprExp noPrec
 
+pprInfixExp :: Exp -> Doc
+pprInfixExp (VarE v) = pprName False v
+pprInfixExp (ConE v) = pprName False v
+pprInfixExp _        = error "Attempt to pretty-print non-variable or constructor in infix context!"
+
 pprExp :: Precedence -> Exp -> Doc
 pprExp _ (VarE v)     = ppr v
 pprExp _ (ConE c)     = ppr c
@@ -84,10 +89,10 @@ pprExp i (AppE e1 e2) = parensIf (i >= appPrec) $ pprExp opPrec e1
                                               <+> pprExp appPrec e2
 pprExp i (InfixE (Just e1) op (Just e2))
  = parensIf (i >= opPrec) $ pprExp opPrec e1
-                        <+> ppr op
+                        <+> pprInfixExp op
                         <+> pprExp opPrec e2
 pprExp _ (InfixE me1 op me2) = parens $ pprMaybeExp noPrec me1
-                                    <+> ppr op
+                                    <+> pprInfixExp op
                                     <+> pprMaybeExp noPrec me2
 pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map ppr ps)
                                            <+> text "->" <+> ppr e
@@ -171,7 +176,7 @@ pprPat i (ConP s ps)  = parensIf (i > noPrec) $ ppr s
                                             <+> sep (map (pprPat appPrec) ps)
 pprPat i (InfixP p1 n p2)
                       = parensIf (i > noPrec)
-                      $ pprPat opPrec p1 <+> ppr n <+> pprPat opPrec p2
+                      $ pprPat opPrec p1 <+> pprName False n <+> pprPat opPrec p2
 pprPat i (TildeP p)   = parensIf (i > noPrec) $ pprPat appPrec p
 pprPat i (AsP v p)    = parensIf (i > noPrec) $ ppr v <> text "@"
                                                       <> pprPat appPrec p
@@ -252,7 +257,7 @@ instance Ppr Con where
     ppr (NormalC c sts) = ppr c <+> sep (map pprStrictType sts)
     ppr (RecC c vsts)
         = ppr c <+> braces (sep (punctuate comma $ map pprVarStrictType vsts))
-    ppr (InfixC st1 c st2) = pprStrictType st1 <+> ppr c <+> pprStrictType st2
+    ppr (InfixC st1 c st2) = pprStrictType st1 <+> pprName False c <+> pprStrictType st2
     ppr (ForallC ns ctxt con) = text "forall" <+> hsep (map ppr ns)
                             <+> char '.' <+> pprCxt ctxt <+> ppr con
 
