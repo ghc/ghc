@@ -1,6 +1,6 @@
 
 mod42.hs:3:0:
     Illegal instance declaration for `Eq a'
-	(The instance type must be of form (T a b c)
-	 where T is not a synonym, and a,b,c are distinct type variables)
+	(The instance type must be of form (T a1 ... an)
+	 where T is not a synonym, and a1 ... an are distinct type *variables*)
     In the instance declaration for `Eq a'
