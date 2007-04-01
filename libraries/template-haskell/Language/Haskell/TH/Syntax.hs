@@ -431,20 +431,36 @@ instance Ord NameFlavour where
 					    (m1 `compare` m2) 
   (NameG _ _ _)    `compare` other	  = GT
 
-instance Show Name where
-  show (Name occ NameS) = occString occ
-
+showName :: Bool -> Name -> String
+showName pflg nm | pf && pnam = nms
+                 | pf         = "(" ++ nms ++ ")"
+                 | pnam       = "`" ++ nms ++ "`"
+                 | otherwise  = nms
+    where
 	-- For now, we make the NameQ and NameG print the same, even though
 	-- NameQ is a qualified name (so what it means depends on what the
 	-- current scope is), and NameG is an original name (so its meaning
 	-- should be independent of what's in scope.
 	-- We may well want to distinguish them in the end.
-  show (Name occ (NameQ m))      = modString m ++ "." ++ occString occ
-  show (Name occ (NameG ns p m)) = modString m ++ "." ++ occString occ
+	-- Ditto NameU and NameL
+        nms = case nm of
+                    Name occ NameS          -> occString occ
+                    Name occ (NameQ m)      -> modString m ++ "." ++ occString occ
+                    Name occ (NameG ns p m) -> modString m ++ "." ++ occString occ
+                    Name occ (NameU u)      -> occString occ ++ "_" ++ show (I# u)
+                    Name occ (NameL u)      -> occString occ ++ "_" ++ show (I# u)
 
-	-- Ditto NameU and NameL  
-  show (Name occ (NameU u)) = occString occ ++ "_" ++ show (I# u)
-  show (Name occ (NameL u)) = occString occ ++ "_" ++ show (I# u)
+        pnam = classify nms
+
+        classify "" = False -- shouldn't happen; . operator is handled below
+        classify (x:xs) | isAlpha x || x == '_' =
+                            case dropWhile (/='.') xs of
+                                  (_:xs') -> classify xs'
+                                  []      -> True
+                        | otherwise = False
+
+instance Show Name where
+  show = showName True
 
 
 -- 	Tuple data and type constructors
