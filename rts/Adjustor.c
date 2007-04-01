@@ -957,8 +957,12 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 /* These macros distribute a long constant into the two words of an MLX bundle */
 #define BITS(val,start,count)	(((val) >> (start)) & ((1 << (count))-1))
 #define MOVL_LOWORD(val)	(BITS(val,22,18) << 46)
-#define MOVL_HIWORD(val)	(BITS(val,40,23) | (BITS(val,0,7) << 36) | (BITS(val,7,9) << 50) \
-				| (BITS(val,16,5) << 55) | (BITS(val,21,1) << 44) | BITS(val,63,1) << 59)
+#define MOVL_HIWORD(val)	( (BITS(val,0,7)    << 36)	\
+				| (BITS(val,7,9)    << 50)	\
+				| (BITS(val,16,5)   << 45)	\
+				| (BITS(val,21,1)   << 44)	\
+				| (BITS(val,40,23))		\
+				| (BITS(val,63,1)    << 59))
 
     {
 	StgStablePtr stable;
@@ -967,11 +971,17 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 	IA64FunDesc *fdesc;
 	StgWord64 *code;
 
-	/* we allocate on the Haskell heap since malloc'd memory isn't executable - argh */
-	adjustor = stgAllocStable(sizeof(IA64FunDesc)+18*8, &stable);
+	/* we allocate on the Haskell heap since malloc'd memory isn't
+	 * executable - argh */
+	/* Allocated memory is word-aligned (8 bytes) but functions on ia64
+	 * must be aligned to 16 bytes.  We allocate an extra 8 bytes of
+	 * wiggle room so that we can put the code on a 16 byte boundary. */
+	adjustor = stgAllocStable(sizeof(IA64FunDesc)+18*8+8, &stable);
 
 	fdesc = (IA64FunDesc *)adjustor;
 	code = (StgWord64 *)(fdesc + 1);
+	/* add 8 bytes to code if needed to align to a 16-byte boundary */
+	if ((StgWord64)code & 15) code++;
 	fdesc->ip = (StgWord64)code;
 	fdesc->gp = wdesc->gp;
 
