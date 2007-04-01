@@ -1307,10 +1307,12 @@ typeItemErr name wherestr
   = sep [ ptext SLIT("Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
 	  ptext SLIT("Use -findexed-types to enable this extension") ]
 
+exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
+               -> Message
 exportClashErr global_env name1 name2 ie1 ie2
   = vcat [ ptext SLIT("Conflicting exports for") <+> quotes (ppr occ) <> colon
-	 , ppr_export ie1 name1 
-	 , ppr_export ie2 name2  ]
+	 , ppr_export ie1' name1'
+	 , ppr_export ie2' name2' ]
   where
     occ = nameOccName name1
     ppr_export ie name = nest 2 (quotes (ppr ie) <+> ptext SLIT("exports") <+> 
@@ -1321,6 +1323,10 @@ exportClashErr global_env name1 name2 ie1 ie2
 	= case lookupGRE_Name global_env name of
 	     (gre:_) -> gre
 	     []	     -> pprPanic "exportClashErr" (ppr name)
+    get_loc name = nameSrcLoc $ gre_name $ get_gre name
+    (name1', ie1', name2', ie2') = if get_loc name1 < get_loc name2
+                                   then (name1, ie1, name2, ie2)
+                                   else (name2, ie2, name1, ie1)
 
 addDupDeclErr :: Name -> Name -> TcRn ()
 addDupDeclErr name_a name_b
