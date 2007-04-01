@@ -6,7 +6,7 @@ TH_exn.hs:1:0:
 	      >>= = (>>=) @ Language.Haskell.TH.Syntax.Q $dMonad
 	      $dMonad = $dMonad
 	      return = return @ Language.Haskell.TH.Syntax.Q $dMonad
-	      $dMonad = Language.Haskell.TH.Syntax.$f20
+	      $dMonad = Language.Haskell.TH.Syntax.$f21
 	    in
 	      do ds <- [d| |]
 		 return @ [Language.Haskell.TH.Syntax.Dec]
