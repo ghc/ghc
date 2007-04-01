@@ -20,13 +20,13 @@ cabal01: setup
 	  $(GHC_PKG_INPLACE) --user unregister test; \
 	fi
 
-	./setup configure --prefix=`pwd`/install --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG_INPLACE) --enable-library-profiling
-	./setup build
-	./setup copy --copy-prefix=`pwd`/install-tmp
+	./setup configure -v0 --prefix=`pwd`/install --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG_INPLACE) --enable-library-profiling
+	./setup build -v0
+	./setup copy -v0 --copy-prefix=`pwd`/install-tmp
 	ls install-tmp
 #	install w/ register!
-	./setup install --user
+	./setup install --user -v0
 	ls install
-	./setup sdist
+	./setup sdist -v0
 	ls dist
 	$(GHC_PKG_INPLACE) unregister --user test
