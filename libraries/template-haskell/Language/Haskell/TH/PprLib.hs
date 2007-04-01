@@ -117,14 +117,14 @@ punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<
 type State = (Map Name HPJ.Doc, Int)
 data PprM a = PprM { runPprM :: State -> (a, State) }
 
-pprName :: Name -> Doc
-pprName n@(Name o (NameU _))
+pprName :: Bool -> Name -> Doc
+pprName pfx n@(Name o (NameU _))
  = PprM $ \s@(fm, i@(I# i'))
         -> case Map.lookup n fm of
                Just d -> (d, s)
-               Nothing -> let d = HPJ.text $ show $ Name o (NameU i')
+               Nothing -> let d = HPJ.text $ showName pfx $ Name o (NameU i')
                           in (d, (Map.insert n d fm, i + 1))
-pprName n = text $ show n
+pprName pfx n = text $ showName pfx n
 
 {-
 instance Show Name where
