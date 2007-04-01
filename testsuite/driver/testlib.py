@@ -341,9 +341,13 @@ def test_common_work (name, opts, func, args):
             skiptest (name,way)
 
     clean(map (lambda suff: name + suff,
-              ['', '.exe', '.genscript', '.run.stderr', '.run.stdout',
-               '.comp.stderr', '.comp.stdout',
-               '.interp.stderr', '.interp.stdout',
+              ['', '.exe', '.genscript',
+               '.run.stderr',            '.run.stdout',
+               '.run.stderr.normalised', '.run.stdout.normalised',
+               '.comp.stderr',            '.comp.stdout',
+               '.comp.stderr.normalised', '.comp.stdout.normalised',
+               '.interp.stderr',            '.interp.stdout',
+               '.interp.stderr.normalised', '.interp.stdout.normalised',
                '.hi', '.o', '.prof', '.exe.prof', '.hc', '_stub.h', '_stub.c',
                '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr']))
 
@@ -495,18 +499,10 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
 
     (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
-    actual_stderr = normalise_errmsg(open(actual_stderr_file).read())
 
-    if os.path.exists(expected_stderr_file):
-        expected_stderr = normalise_errmsg(open(expected_stderr_file).read())
-    else:
-        expected_stderr = ''
-        expected_stderr_file = ''
-
-    if different_outputs(expected_stderr, actual_stderr):
-        print actual_stderr, '\n', expected_stderr
-        if not outputs_differ('stderr', expected_stderr_file, actual_stderr_file):
-            return 'fail'
+    if not compare_outputs('stderr', normalise_errmsg, normalise_whitespace, \
+                           expected_stderr_file, actual_stderr_file):
+        return 'fail'
 
     # no problems found, this test passed
     return 'pass'
@@ -845,48 +841,38 @@ def check_stdout_ok( name ):
    actual_stdout_file   = qualify(name, 'run.stdout')
    (platform_specific, expected_stdout_file) = platform_wordsize_qualify(name, 'stdout')
 
-   if os.path.exists(expected_stdout_file):
-       expected_stdout = open(expected_stdout_file).read()
-   else:
-       expected_stdout = ''
-       expected_stdout_file = ''
+   def norm(str):
+      if platform_specific:
+         return str
+      else:
+         return normalise_output(str)
 
-   if os.path.exists(actual_stdout_file):
-       actual_stdout = open(actual_stdout_file).read()
-       if not platform_specific:
-           actual_stdout = normalise_output(actual_stdout)
-   else:
-       actual_stdout = ''
-       actual_stdout_file = ''
-
-   if different_outputs(actual_stdout, expected_stdout):
-       return outputs_differ( 'stdout', expected_stdout_file, actual_stdout_file )
-   else:
-       return 1
+   return compare_outputs('stdout', norm, id, \
+                          expected_stdout_file, actual_stdout_file)
 
 def check_stderr_ok( name ):
    actual_stderr_file   = qualify(name, 'run.stderr')
    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
 
-   if os.path.exists(expected_stderr_file):
-       expected_stderr = open(expected_stderr_file).read()
-   else:
-       expected_stderr = ''
-       expected_stderr_file = ''
+   def norm(str):
+      if platform_specific:
+         return str
+      else:
+         return normalise_output(str)
 
-   if os.path.exists(actual_stderr_file):
-       actual_stderr = open(actual_stderr_file).read()
-       if not platform_specific:
-           actual_stderr = normalise_output(actual_stderr)
-   else:
-       actual_stderr = ''
-       actual_stderr_file = ''
+   return compare_outputs('stderr', norm, id, \
+                          expected_stderr_file, actual_stderr_file)
 
-   if different_outputs( actual_stderr,expected_stderr ):
-       return outputs_differ( 'stderr', expected_stderr_file, actual_stderr_file )
-   else:
-       return 1
+def read_no_crs(file):
+    h = open(file)
+    str = h.read()
+    h.close
+    return re.sub('\r', '', str)
 
+def write_file(file, str):
+    h = open(file, 'w')
+    h.write(str)
+    h.close
 
 def check_hp_ok(name):
 
@@ -916,42 +902,57 @@ def check_hp_ok(name):
         print "hp2ps error when processing heap profile for " + name
         return(False)
 
-def different_outputs( str1, str2 ):
-   # On Windows, remove '\r' characters from the output
-   return re.sub('\r', '', str1) != re.sub('\r', '', str2)
-
-# Output a message indicating that an expected output differed from the
-# actual output, and optionally accept the new output.  Returns true
-# if the output was accepted, or false otherwise.
-def outputs_differ( kind, expected, actual ):
-    print 'Actual ' + kind + ' output differs from expected:'
-
-    if expected == '':
-        expected1 = '/dev/null'
+# Compare expected output to # actual output, and optionally accept the
+# new output. Returns true if output matched or was accepted, false
+# otherwise.
+def compare_outputs( kind, normaliser, extra_normaliser,
+                     expected_file, actual_file ):
+    if os.path.exists(expected_file):
+        expected_raw = read_no_crs(expected_file)
+        expected_str = normaliser(expected_raw)
     else:
-        expected1 = expected
-        
-    if actual == '':
-        actual1 = '/dev/null'
-    else:
-        actual1 = actual
-        
-    os.system( 'diff -u ' + expected1 + ' ' + actual1 )
+        expected_str = ''
+        expected_file = ''
 
-    if config.accept:
-        if expected == '':
-            print '*** cannot accept new output: ' + kind + \
-                  ' file does not exist.'
-            return 0
+    actual_raw = read_no_crs(actual_file)
+    actual_str = normaliser(actual_raw)
+
+    if extra_normaliser(expected_str) != extra_normaliser(actual_str):
+        print 'Actual ' + kind + ' output differs from expected:'
+
+        if expected_file == '':
+            expected_normalised_file = '/dev/null'
+
         else:
-            print 'Accepting new output.'
-            os.system( 'cp ' + actual + ' ' + expected )
-            return 1
+            expected_normalised_file = expected_file + ".normalised"
+            write_file(expected_normalised_file, expected_str)
+        actual_normalised_file = actual_file + ".normalised"
+        write_file(actual_normalised_file, actual_str)
 
+        os.system( 'diff -u ' + expected_normalised_file + \
+                          ' ' + actual_normalised_file )
+
+        if config.accept:
+            if expected_file == '':
+                print '*** cannot accept new output: ' + kind + \
+                      ' file does not exist.'
+                return 0
+            else:
+                print 'Accepting new output.'
+                write_file(expected_file, actual_raw)
+                return 1
+        return 0
+    return 1
+
+def id(str):
+    return str
+
+def normalise_whitespace( str ):
+    # Merge contiguous whitespace characters into a single space.
+    str = re.sub('[ \t\n]+', ' ', str)
+    return str
 
 def normalise_errmsg( str ):
-    # Merge contiguous whitespace characters into a single space.
-    str = re.sub('[ \r\t\n]+', ' ', str)
     # Look for file names and zap the directory part:
     #    foo/var/xyzzy/somefile  -->  somefile
     str = re.sub('([^\\s/]+/)*([^\\s/])', '\\2', str)
