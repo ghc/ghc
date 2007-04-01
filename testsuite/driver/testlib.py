@@ -625,8 +625,8 @@ def simple_run( name, way, prog, args ):
 
    check_hp = my_rts_flags.find("-h") != -1
 
-   if getTestOpts().ignore_output or (check_stdout_ok(name) and 
-                                      check_stderr_ok(name) and
+   if getTestOpts().ignore_output or (check_stderr_ok(name) and
+                                      check_stdout_ok(name) and
                                       (not check_hp or check_hp_ok(name))):
        return 'pass'
    else:
@@ -722,8 +722,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if getTestOpts().ignore_output or (check_stdout_ok(name) and
-                                       check_stderr_ok(name)):
+    if getTestOpts().ignore_output or (check_stderr_ok(name) and
+                                       check_stdout_ok(name)):
         return 'pass'
     else:
         return 'fail'
