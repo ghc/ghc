@@ -35,7 +35,7 @@ module Language.Haskell.TH.PprLib (
   ) where
 
 
-import Language.Haskell.TH.Syntax (Name(..), NameFlavour(..))
+import Language.Haskell.TH.Syntax (Name(..), showName, NameFlavour(..))
 import qualified Text.PrettyPrint.HughesPJ as HPJ
 import Control.Monad (liftM, liftM2)
 import Data.Map ( Map )

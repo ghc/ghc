@@ -22,7 +22,7 @@ module Language.Haskell.TH.Syntax(
 	currentModule, runIO,
 
 	-- Names
-	Name(..), mkName, newName, nameBase, nameModule,
+	Name(..), mkName, newName, nameBase, nameModule, showName,
 
 	-- The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
@@ -50,6 +50,7 @@ import Data.IORef
 import GHC.IOBase	( unsafePerformIO )
 import Control.Monad (liftM)
 import System.IO	( hPutStrLn, stderr )
+import Data.Char        ( isAlpha )
 
 -----------------------------------------------------
 --
@@ -432,10 +433,10 @@ instance Ord NameFlavour where
   (NameG _ _ _)    `compare` other	  = GT
 
 showName :: Bool -> Name -> String
-showName pflg nm | pf && pnam = nms
-                 | pf         = "(" ++ nms ++ ")"
-                 | pnam       = "`" ++ nms ++ "`"
-                 | otherwise  = nms
+showName pflg nm | pflg && pnam = nms
+                 | pflg         = "(" ++ nms ++ ")"
+                 | pnam         = "`" ++ nms ++ "`"
+                 | otherwise    = nms
     where
 	-- For now, we make the NameQ and NameG print the same, even though
 	-- NameQ is a qualified name (so what it means depends on what the
