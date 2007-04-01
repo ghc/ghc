@@ -1,6 +1,8 @@
 {-# OPTIONS -foverloaded-strings #-}
 module T where
 
+import Data.String
+
 newtype MyString = MyString String deriving (Eq, Show)
 instance IsString MyString where
     fromString = MyString
