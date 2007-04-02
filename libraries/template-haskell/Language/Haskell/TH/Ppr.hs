@@ -229,6 +229,7 @@ instance Ppr Dec where
 ------------------------------
 instance Ppr FunDep where
     ppr (FunDep xs ys) = hsep (map ppr xs) <+> text "->" <+> hsep (map ppr ys)
+    ppr_list [] = empty
     ppr_list xs = char '|' <+> sep (punctuate (text ", ") (map ppr xs))
 
 ------------------------------
