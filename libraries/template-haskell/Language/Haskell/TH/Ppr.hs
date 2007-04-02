@@ -94,7 +94,7 @@ pprExp i (InfixE (Just e1) op (Just e2))
 pprExp _ (InfixE me1 op me2) = parens $ pprMaybeExp noPrec me1
                                     <+> pprInfixExp op
                                     <+> pprMaybeExp noPrec me2
-pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map ppr ps)
+pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat appPrec) ps)
                                            <+> text "->" <+> ppr e
 pprExp _ (TupE es) = parens $ sep $ punctuate comma $ map ppr es
 -- Nesting in Cond is to avoid potential problems in do statments
