@@ -733,13 +733,17 @@ It doesn't change the uniques at all, just the print names.
 
 \begin{code}
 tidyTyVarBndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
-tidyTyVarBndr (tidy_env, subst) tyvar
+tidyTyVarBndr env@(tidy_env, subst) tyvar
   = case tidyOccName tidy_env (getOccName name) of
-      (tidy', occ') -> 	((tidy', subst'), tyvar')
-		    where
-			subst' = extendVarEnv subst tyvar tyvar'
-			tyvar' = setTyVarName tyvar name'
-			name'  = tidyNameOcc name occ'
+      (tidy', occ') -> ((tidy', subst'), tyvar'')
+	where
+	  subst' = extendVarEnv subst tyvar tyvar''
+	  tyvar' = setTyVarName tyvar name'
+	  name'  = tidyNameOcc name occ'
+		-- Don't forget to tidy the kind for coercions!
+	  tyvar'' | isCoVar tyvar = setTyVarKind tyvar' kind'
+		  | otherwise	  = tyvar'
+	  kind'  = tidyType env (tyVarKind tyvar)
   where
     name = tyVarName tyvar
 
