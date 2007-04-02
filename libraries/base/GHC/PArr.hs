@@ -137,6 +137,7 @@ module GHC.PArr (
   bpermuteP,		-- :: [:Int:] -> [:e:] ->          [:e:]
   dpermuteP,		-- :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
   crossP,		-- :: [:a:] -> [:b:] -> [:(a, b):]
+  crossMapP,		-- :: [:a:] -> (a -> [:b:]) -> [:(a, b):]
   indexOfP		-- :: (a -> Bool) -> [:a:] -> [:Int:]
 ) where
 
@@ -530,6 +531,25 @@ crossP a1 a2  = let
 		  x2   = concatP $ replicateP len1 a2
 		in
 		zipP x1 x2
+ -}
+
+-- |Compute a cross of an array and the arrays produced by the given function
+-- for the elements of the first array.
+--
+crossMapP :: [:a:] -> (a -> [:b:]) -> [:(a, b):]
+crossMapP a f = let
+		  bs   = mapP f a
+		  segd = mapP lengthP bs
+		  as   = zipWithP replicateP segd a
+	        in
+		zipP (concatP as) (concatP bs)
+
+{- The following may seem more straight forward, but the above is very cheap
+   with segmented arrays, as `mapP lengthP', `zipP', and `concatP' are
+   constant time, and `map f' uses the lifted version of `f'.
+
+crossMapP a f = concatP $ mapP (\x -> mapP ((,) x) (f x)) a
+
  -}
 
 -- computes an index array for all elements of the second argument for which
