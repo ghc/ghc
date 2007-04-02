@@ -165,6 +165,7 @@ import Data.Monoid (Monoid(..))
 import Data.Typeable
 import Data.Foldable (Foldable(foldMap))
 import Control.Monad ( liftM )
+import Control.Arrow (ArrowZero)
 {-
 -- just for testing
 import qualified Prelude
