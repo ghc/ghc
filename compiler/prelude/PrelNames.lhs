@@ -179,7 +179,7 @@ basicKnownKeyNames
 
         -- Parallel array operations
 	nullPName, lengthPName, replicatePName,	mapPName,
-	filterPName, zipPName, crossPName, indexPName,
+	filterPName, zipPName, crossMapPName, indexPName,
 	toPName, bpermutePName, bpermuteDftPName, indexOfPName,
 
 	-- FFI primitive types that are not wired-in.
@@ -605,7 +605,7 @@ replicatePName	  = varQual gHC_PARR FSLIT("replicateP") 	 replicatePIdKey
 mapPName	  = varQual gHC_PARR FSLIT("mapP")       	 mapPIdKey
 filterPName	  = varQual gHC_PARR FSLIT("filterP")    	 filterPIdKey
 zipPName	  = varQual gHC_PARR FSLIT("zipP")       	 zipPIdKey
-crossPName	  = varQual gHC_PARR FSLIT("crossP")     	 crossPIdKey
+crossMapPName	  = varQual gHC_PARR FSLIT("crossMapP")     	 crossMapPIdKey
 indexPName	  = varQual gHC_PARR FSLIT("!:")	       	 indexPIdKey
 toPName	          = varQual gHC_PARR FSLIT("toP")	       	 toPIdKey
 bpermutePName     = varQual gHC_PARR FSLIT("bpermuteP")    bpermutePIdKey
@@ -980,7 +980,7 @@ replicatePIdKey		      = mkPreludeMiscIdUnique 82
 mapPIdKey		      = mkPreludeMiscIdUnique 83
 filterPIdKey		      = mkPreludeMiscIdUnique 84
 zipPIdKey		      = mkPreludeMiscIdUnique 85
-crossPIdKey		      = mkPreludeMiscIdUnique 86
+crossMapPIdKey		      = mkPreludeMiscIdUnique 86
 indexPIdKey		      = mkPreludeMiscIdUnique 87
 toPIdKey		      = mkPreludeMiscIdUnique 88
 enumFromToPIdKey              = mkPreludeMiscIdUnique 89

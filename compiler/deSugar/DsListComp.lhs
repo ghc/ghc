@@ -352,13 +352,17 @@ dsPArrComp      :: [Stmt Id]
 		-> LHsExpr Id
 	        -> Type		    -- Don't use; called with `undefined' below
 	        -> DsM CoreExpr
-dsPArrComp qs body _  =
+dsPArrComp [ParStmt qss] body _  =  -- parallel comprehension
+  dePArrParComp qss body
+dsPArrComp qs            body _  =  -- no ParStmt in `qs'
   dsLookupGlobalId replicatePName			  `thenDs` \repP ->
   let unitArray = mkApps (Var repP) [Type unitTy, 
 				     mkIntExpr 1, 
 				     mkCoreTup []]
   in
   dePArrComp qs body (mkTuplePat []) unitArray
+
+
 
 -- the work horse
 --
@@ -388,30 +392,34 @@ dePArrComp (ExprStmt b _ _ : qs) body pa cea =
   dePArrComp qs body pa (mkApps (Var filterP) [Type ty, clam, cea])
 --
 --  <<[:e' | p <- e, qs:]>> pa ea = 
---    let ef = filterP (\x -> case x of {p -> True; _ -> False}) e
+--    let ef = \pa -> filterP (\x -> case x of {p -> True; _ -> False}) e
 --    in
---    <<[:e' | qs:]>> (pa, p) (crossP ea ef)
+--    <<[:e' | qs:]>> (pa, p) (crossMapP ea ef)
 --
 dePArrComp (BindStmt p e _ _ : qs) body pa cea =
-  dsLookupGlobalId filterPName			  `thenDs` \filterP ->
-  dsLookupGlobalId crossPName			  `thenDs` \crossP  ->
-  dsLExpr e					  `thenDs` \ce      ->
-  let ty'cea = parrElemType cea
-      ty'ce  = parrElemType ce
-      false  = Var falseDataConId
-      true   = Var trueDataConId
+  dsLookupGlobalId filterPName			  `thenDs` \filterP    ->
+  dsLookupGlobalId crossMapPName		  `thenDs` \crossMapP  ->
+  dsLExpr e					  `thenDs` \ce         ->
+  let ety'cea = parrElemType cea
+      ety'ce  = parrElemType ce
+      false   = Var falseDataConId
+      true    = Var trueDataConId
   in
-  newSysLocalDs ty'ce					  `thenDs` \v       ->
+  newSysLocalDs ety'ce					  `thenDs` \v       ->
   matchSimply (Var v) (StmtCtxt PArrComp) p true false    `thenDs` \pred    ->
-  let cef    = mkApps (Var filterP) [Type ty'ce, mkLams [v] pred, ce]
-      ty'cef = ty'ce				-- filterP preserves the type
-      pa'    = mkTuplePat [pa, p]
+  let cef = mkApps (Var filterP) [Type ety'ce, mkLams [v] pred, ce]
   in
-  dePArrComp qs body pa' (mkApps (Var crossP) [Type ty'cea, Type ty'cef, cea, cef])
+  mkLambda ety'cea pa cef				  `thenDs` \(clam, 
+								     _    ) ->
+  let ety'cef = ety'ce		    -- filter doesn't change the element type
+      pa'     = mkTuplePat [pa, p]
+  in
+  dePArrComp qs body pa' (mkApps (Var crossMapP) 
+				 [Type ety'cea, Type ety'cef, cea, clam])
 --
 --  <<[:e' | let ds, qs:]>> pa ea = 
 --    <<[:e' | qs:]>> (pa, (x_1, ..., x_n)) 
---		      (mapP (\v@pa -> (v, let ds in (x_1, ..., x_n))) ea)
+--		      (mapP (\v@pa -> let ds in (v, (x_1, ..., x_n))) ea)
 --  where
 --    {x_1, ..., x_n} = DV (ds)		-- Defined Variables
 --
@@ -433,27 +441,29 @@ dePArrComp (LetStmt ds : qs) body pa cea =
   let pa'    = mkTuplePat [pa, mkTuplePat (map nlVarPat xs)]
       proj   = mkLams [v] ccase
   in
-  dePArrComp qs body pa' (mkApps (Var mapP) [Type ty'cea, proj, cea])
+  dePArrComp qs body pa' (mkApps (Var mapP) 
+				 [Type ty'cea, Type errTy, proj, cea])
 --
+-- The parser guarantees that parallel comprehensions can only appear as
+-- singeltons qualifier lists, which we already special case in the caller.
+-- So, encountering one here is a bug.
+--
+dePArrComp (ParStmt _ : _) _ _ _ = 
+  panic "DsListComp.dePArrComp: malformed comprehension AST"
+
 --  <<[:e' | qs | qss:]>> pa ea = 
 --    <<[:e' | qss:]>> (pa, (x_1, ..., x_n)) 
 --		       (zipP ea <<[:(x_1, ..., x_n) | qs:]>>)
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrComp (ParStmt qss : qs) body pa cea = 
-  dsLookupGlobalId crossPName				`thenDs` \crossP  ->
+dePArrParComp qss body = 
   deParStmt qss						`thenDs` \(pQss, 
 								   ceQss) ->
-  let ty'cea   = parrElemType cea
-      ty'ceQss = parrElemType ceQss
-      pa'      = mkTuplePat [pa, pQss]
-  in
-  dePArrComp qs body pa' (mkApps (Var crossP) [Type ty'cea, Type ty'ceQss, 
-					       cea, ceQss])
+  dePArrComp [] body pQss ceQss
   where
     deParStmt []             =
-      -- empty parallel statement lists have not source representation
+      -- empty parallel statement lists have no source representation
       panic "DsListComp.dePArrComp: Empty parallel list comprehension"
     deParStmt ((qs, xs):qss) =          -- first statement
       let res_expr = mkExplicitTuple (map nlHsVar xs)
@@ -476,19 +486,28 @@ dePArrComp (ParStmt qss : qs) body pa cea =
 
 -- generate Core corresponding to `\p -> e'
 --
-deLambda        :: Type			-- type of the argument
-		-> LPat Id		-- argument pattern
-		-> LHsExpr Id		-- body
-		-> DsM (CoreExpr, Type)
-deLambda ty p e  =
-  newSysLocalDs ty					  `thenDs` \v       ->
+deLambda :: Type			-- type of the argument
+	  -> LPat Id			-- argument pattern
+	  -> LHsExpr Id			-- body
+	  -> DsM (CoreExpr, Type)
+deLambda ty p e =
   dsLExpr e						  `thenDs` \ce      ->
-  let errTy    = exprType ce
-      errMsg   = "DsListComp.deLambda: internal error!"
+  mkLambda ty p ce
+
+-- generate Core for a lambda pattern match, where the body is already in Core
+--
+mkLambda :: Type			-- type of the argument
+	 -> LPat Id			-- argument pattern
+	 -> CoreExpr			-- desugared body
+	 -> DsM (CoreExpr, Type)
+mkLambda ty p ce =
+  newSysLocalDs ty					  `thenDs` \v       ->
+  let errMsg = "DsListComp.deLambda: internal error!"
+      ce'ty  = exprType ce
   in
-  mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    -> 
+  mkErrorAppDs pAT_ERROR_ID ce'ty errMsg                  `thenDs` \cerr    -> 
   matchSimply (Var v) (StmtCtxt PArrComp) p ce cerr	  `thenDs` \res	    ->
-  returnDs (mkLams [v] res, errTy)
+  returnDs (mkLams [v] res, ce'ty)
 
 -- obtain the element type of the parallel array produced by the given Core
 -- expression
