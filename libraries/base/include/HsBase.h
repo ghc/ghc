@@ -167,19 +167,19 @@ extern void pPrPr_disableITimers (void);
 
 #ifdef SUPPORT_LONG_LONGS
 
-StgInt stg_gtWord64 (StgWord64, StgWord64);
-StgInt stg_geWord64 (StgWord64, StgWord64);
-StgInt stg_eqWord64 (StgWord64, StgWord64);
-StgInt stg_neWord64 (StgWord64, StgWord64);
-StgInt stg_ltWord64 (StgWord64, StgWord64);
-StgInt stg_leWord64 (StgWord64, StgWord64);
+StgBool stg_gtWord64 (StgWord64, StgWord64);
+StgBool stg_geWord64 (StgWord64, StgWord64);
+StgBool stg_eqWord64 (StgWord64, StgWord64);
+StgBool stg_neWord64 (StgWord64, StgWord64);
+StgBool stg_ltWord64 (StgWord64, StgWord64);
+StgBool stg_leWord64 (StgWord64, StgWord64);
 
-StgInt stg_gtInt64 (StgInt64, StgInt64);
-StgInt stg_geInt64 (StgInt64, StgInt64);
-StgInt stg_eqInt64 (StgInt64, StgInt64);
-StgInt stg_neInt64 (StgInt64, StgInt64);
-StgInt stg_ltInt64 (StgInt64, StgInt64);
-StgInt stg_leInt64 (StgInt64, StgInt64);
+StgBool stg_gtInt64 (StgInt64, StgInt64);
+StgBool stg_geInt64 (StgInt64, StgInt64);
+StgBool stg_eqInt64 (StgInt64, StgInt64);
+StgBool stg_neInt64 (StgInt64, StgInt64);
+StgBool stg_ltInt64 (StgInt64, StgInt64);
+StgBool stg_leInt64 (StgInt64, StgInt64);
 
 StgWord64 stg_remWord64  (StgWord64, StgWord64);
 StgWord64 stg_quotWord64 (StgWord64, StgWord64);
@@ -199,19 +199,18 @@ StgWord64 stg_not64  (StgWord64);
 StgWord64 stg_uncheckedShiftL64   (StgWord64, StgInt);
 StgWord64 stg_uncheckedShiftRL64  (StgWord64, StgInt);
 StgInt64  stg_uncheckedIShiftL64  (StgInt64, StgInt);
-StgInt64  stg_uncheckedIShiftRL64 (StgInt64, StgInt);
 StgInt64  stg_uncheckedIShiftRA64 (StgInt64, StgInt);
+StgInt64  stg_uncheckedIShiftRL64 (StgInt64, StgInt);
 
 StgInt64  stg_intToInt64    (StgInt);
 StgInt    stg_int64ToInt    (StgInt64);
 StgWord64 stg_int64ToWord64 (StgInt64);
-
 StgWord64 stg_wordToWord64  (StgWord);
 StgWord   stg_word64ToWord  (StgWord64);
 StgInt64  stg_word64ToInt64 (StgWord64);
 
-StgInt64  stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da);
 StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da);
+StgInt64  stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da);
 
 #endif /* SUPPORT_LONG_LONGS */
 
@@ -235,13 +234,13 @@ INLINE int __hscore_get_errno(void) { return errno; }
 INLINE void __hscore_set_errno(int e) { errno = e; }
 
 #if !defined(_MSC_VER)
-INLINE int __hscore_s_isreg(m)  { return S_ISREG(m);  }
-INLINE int __hscore_s_isdir(m)  { return S_ISDIR(m);  }
-INLINE int __hscore_s_isfifo(m) { return S_ISFIFO(m); }
-INLINE int __hscore_s_isblk(m)  { return S_ISBLK(m);  }
-INLINE int __hscore_s_ischr(m)  { return S_ISCHR(m);  }
+INLINE int __hscore_s_isreg(mode_t m)  { return S_ISREG(m);  }
+INLINE int __hscore_s_isdir(mode_t m)  { return S_ISDIR(m);  }
+INLINE int __hscore_s_isfifo(mode_t m) { return S_ISFIFO(m); }
+INLINE int __hscore_s_isblk(mode_t m)  { return S_ISBLK(m);  }
+INLINE int __hscore_s_ischr(mode_t m)  { return S_ISCHR(m);  }
 #ifdef S_ISSOCK
-INLINE int __hscore_s_issock(m) { return S_ISSOCK(m); }
+INLINE int __hscore_s_issock(mode_t m) { return S_ISSOCK(m); }
 #endif
 #endif
 
@@ -291,13 +290,13 @@ __hscore_bufsiz()
   return BUFSIZ;
 }
 
-INLINE HsInt
+INLINE int
 __hscore_seek_cur()
 {
   return SEEK_CUR;
 }
 
-INLINE HsInt
+INLINE int
 __hscore_o_binary()
 {
 #if defined(_MSC_VER)
@@ -397,13 +396,13 @@ __hscore_o_nonblock( void )
 #endif
 }
 
-INLINE HsInt
+INLINE int
 __hscore_seek_set( void )
 {
   return SEEK_SET;
 }
 
-INLINE HsInt
+INLINE int
 __hscore_seek_end( void )
 {
   return SEEK_END;
@@ -421,8 +420,8 @@ __hscore_ftruncate( int fd, off_t where )
 #endif
 }
 
-INLINE HsInt
-__hscore_setmode( HsInt fd, HsBool toBin )
+INLINE int
+__hscore_setmode( int fd, HsBool toBin )
 {
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
@@ -433,28 +432,28 @@ __hscore_setmode( HsInt fd, HsBool toBin )
 
 #if __GLASGOW_HASKELL__
 
-INLINE HsInt
-__hscore_PrelHandle_write( HsInt fd, HsAddr ptr, HsInt off, int sz )
+INLINE int
+__hscore_PrelHandle_write( int fd, void *ptr, HsInt off, int sz )
 {
   return write(fd,(char *)ptr + off, sz);
 }
 
-INLINE HsInt
-__hscore_PrelHandle_read( HsInt fd, HsAddr ptr, HsInt off, int sz )
+INLINE int
+__hscore_PrelHandle_read( int fd, void *ptr, HsInt off, int sz )
 {
   return read(fd,(char *)ptr + off, sz);
 
 }
 
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
-INLINE HsInt
-__hscore_PrelHandle_send( HsInt fd, HsAddr ptr, HsInt off, int sz )
+INLINE int
+__hscore_PrelHandle_send( int fd, void *ptr, HsInt off, int sz )
 {
     return send(fd,(char *)ptr + off, sz, 0);
 }
 
-INLINE HsInt
-__hscore_PrelHandle_recv( HsInt fd, HsAddr ptr, HsInt off, int sz )
+INLINE int
+__hscore_PrelHandle_recv( int fd, void *ptr, HsInt off, int sz )
 {
     return recv(fd,(char *)ptr + off, sz, 0);
 }
@@ -462,8 +461,8 @@ __hscore_PrelHandle_recv( HsInt fd, HsAddr ptr, HsInt off, int sz )
 
 #endif /* __GLASGOW_HASKELL__ */
 
-INLINE HsInt
-__hscore_mkdir( HsAddr pathName, HsInt mode )
+INLINE int
+__hscore_mkdir( char *pathName, int mode )
 {
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
   return mkdir(pathName);
@@ -472,13 +471,13 @@ __hscore_mkdir( HsAddr pathName, HsInt mode )
 #endif
 }
 
-INLINE HsInt
-__hscore_lstat( HsAddr fname, HsAddr st )
+INLINE int
+__hscore_lstat( const char *fname, struct stat *st )
 {
 #if HAVE_LSTAT
-  return lstat((const char*)fname, (struct stat*)st);
+  return lstat(fname, st);
 #else
-  return stat((const char*)fname, (struct stat*)st);
+  return stat(fname, st);
 #endif
 }
 
@@ -512,20 +511,20 @@ INLINE mode_t __hscore_S_IWUSR() { return S_IWUSR; }
 INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
 #endif
 
-INLINE HsAddr
+INLINE char *
 __hscore_d_name( struct dirent* d )
 {
-  return (HsAddr)(d->d_name);
+  return (d->d_name);
 }
 
-INLINE HsInt
+INLINE int
 __hscore_end_of_dir( void )
 {
   return READDIR_ERRNO_EOF;
 }
 
 INLINE void
-__hscore_free_dirent(HsAddr dEnt)
+__hscore_free_dirent(struct dirent *dEnt)
 {
 #if HAVE_READDIR_R
   free(dEnt);
@@ -710,7 +709,7 @@ INLINE int  hsFD_SETSIZE(void) { return FD_SETSIZE; }
 INLINE void hsFD_CLR(int fd, fd_set *fds) { FD_CLR(fd, fds); }
 INLINE int  hsFD_ISSET(int fd, fd_set *fds) { return FD_ISSET(fd, fds); }
 INLINE void hsFD_SET(int fd, fd_set *fds) { FD_SET(fd, fds); }
-INLINE int  sizeof_fd_set(void) { return sizeof(fd_set); }
+INLINE HsInt sizeof_fd_set(void) { return sizeof(fd_set); }
 extern void hsFD_ZERO(fd_set *fds);
 #endif
 

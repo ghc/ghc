@@ -50,6 +50,7 @@ StgBool stg_leInt64 (StgInt64 a, StgInt64 b) {return a <= b;}
 
 StgWord64 stg_remWord64  (StgWord64 a, StgWord64 b) {return a % b;}
 StgWord64 stg_quotWord64 (StgWord64 a, StgWord64 b) {return a / b;}
+
 StgInt64 stg_remInt64    (StgInt64 a, StgInt64 b)   {return a % b;}
 StgInt64 stg_quotInt64   (StgInt64 a, StgInt64 b)   {return a / b;}
 StgInt64 stg_negateInt64 (StgInt64 a)               {return -a;}
@@ -63,6 +64,7 @@ StgWord64 stg_and64      (StgWord64 a, StgWord64 b) {return a & b;}
 StgWord64 stg_or64       (StgWord64 a, StgWord64 b) {return a | b;}
 StgWord64 stg_xor64      (StgWord64 a, StgWord64 b) {return a ^ b;}
 StgWord64 stg_not64      (StgWord64 a)              {return ~a;}
+
 StgWord64 stg_uncheckedShiftL64   (StgWord64 a, StgInt b)    {return a << b;}
 StgWord64 stg_uncheckedShiftRL64  (StgWord64 a, StgInt b)    {return a >> b;}
 /* Right shifting of signed quantities is not portable in C, so
@@ -72,7 +74,7 @@ StgWord64 stg_uncheckedShiftRL64  (StgWord64 a, StgInt b)    {return a >> b;}
 StgInt64  stg_uncheckedIShiftL64  (StgInt64 a,  StgInt b)    {return a << b;}
 StgInt64  stg_uncheckedIShiftRA64 (StgInt64 a,  StgInt b)    {return a >> b;}
 StgInt64  stg_uncheckedIShiftRL64 (StgInt64 a,  StgInt b)
-{return (StgInt64) ((StgWord64) a >> b);}
+                                    {return (StgInt64) ((StgWord64) a >> b);}
 
 /* Casting between longs and longer longs.
    (the primops that cast from long longs to Integers
@@ -86,10 +88,10 @@ StgWord64 stg_wordToWord64  (StgWord   w) {return (StgWord64) w;}
 StgWord   stg_word64ToWord  (StgWord64 w) {return (StgWord)   w;}
 StgInt64  stg_word64ToInt64 (StgWord64 w) {return (StgInt64)  w;}
 
-StgWord64 stg_integerToWord64 (I_ sa, StgByteArray /* Really: mp_limb_t* */ da)
+StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da)
 { 
   mp_limb_t* d;
-  I_ s;
+  StgInt s;
   StgWord64 res;
   d = (mp_limb_t *)da;
   s = sa;
@@ -107,7 +109,7 @@ StgWord64 stg_integerToWord64 (I_ sa, StgByteArray /* Really: mp_limb_t* */ da)
 StgInt64 stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da)
 { 
   mp_limb_t* d;
-  I_ s;
+  StgInt s;
   StgInt64 res;
   d = (mp_limb_t *)da;
   s = (sa);

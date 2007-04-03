@@ -466,11 +466,22 @@ foreign import ccall unsafe "HsBase.h __hscore_o_noctty"   o_NOCTTY   :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_nonblock" o_NONBLOCK :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_binary"   o_BINARY   :: CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_s_isreg"  s_isreg  :: CMode -> Bool
-foreign import ccall unsafe "HsBase.h __hscore_s_ischr"  s_ischr  :: CMode -> Bool
-foreign import ccall unsafe "HsBase.h __hscore_s_isblk"  s_isblk  :: CMode -> Bool
-foreign import ccall unsafe "HsBase.h __hscore_s_isdir"  s_isdir  :: CMode -> Bool
-foreign import ccall unsafe "HsBase.h __hscore_s_isfifo" s_isfifo :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_isreg"  c_s_isreg  :: CMode -> CInt
+foreign import ccall unsafe "HsBase.h __hscore_s_ischr"  c_s_ischr  :: CMode -> CInt
+foreign import ccall unsafe "HsBase.h __hscore_s_isblk"  c_s_isblk  :: CMode -> CInt
+foreign import ccall unsafe "HsBase.h __hscore_s_isdir"  c_s_isdir  :: CMode -> CInt
+foreign import ccall unsafe "HsBase.h __hscore_s_isfifo" c_s_isfifo :: CMode -> CInt
+
+s_isreg  :: CMode -> Bool
+s_isreg cm = c_s_isreg cm /= 0
+s_ischr  :: CMode -> Bool
+s_ischr cm = c_s_ischr cm /= 0
+s_isblk  :: CMode -> Bool
+s_isblk cm = c_s_isblk cm /= 0
+s_isdir  :: CMode -> Bool
+s_isdir cm = c_s_isdir cm /= 0
+s_isfifo :: CMode -> Bool
+s_isfifo cm = c_s_isfifo cm /= 0
 
 foreign import ccall unsafe "HsBase.h __hscore_sizeof_stat" sizeof_stat :: Int
 foreign import ccall unsafe "HsBase.h __hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTime
@@ -498,7 +509,9 @@ foreign import ccall unsafe "HsBase.h __hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermi
 #endif
 
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-foreign import ccall unsafe "HsBase.h __hscore_s_issock" s_issock :: CMode -> Bool
+foreign import ccall unsafe "HsBase.h __hscore_s_issock" c_s_issock :: CMode -> CInt
+s_issock :: CMode -> Bool
+s_issock cmode = c_s_issock cmode /= 0
 #else
 s_issock :: CMode -> Bool
 s_issock cmode = False

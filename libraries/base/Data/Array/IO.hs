@@ -143,11 +143,11 @@ hGetArray handle (IOUArray (STUArray l u ptr)) count
 		let avail = w - r
 		copied <- if (count >= avail)
 		       	    then do 
-				memcpy_ba_baoff ptr raw r (fromIntegral avail)
+				memcpy_ba_baoff ptr raw (fromIntegral r) (fromIntegral avail)
 				writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
 				return avail
 		     	    else do 
-				memcpy_ba_baoff ptr raw r (fromIntegral count)
+				memcpy_ba_baoff ptr raw (fromIntegral r) (fromIntegral count)
 				writeIORef ref buf{ bufRPtr = r + count }
 				return count
 
@@ -196,7 +196,7 @@ hPutArray handle (IOUArray (STUArray l u raw)) count
           if (size - w > count)
 		-- There's enough room in the buffer:
 		-- just copy the data in and update bufWPtr.
-	    then do memcpy_baoff_ba old_raw w raw (fromIntegral count)
+	    then do memcpy_baoff_ba old_raw (fromIntegral w) raw (fromIntegral count)
 		    writeIORef ref old_buf{ bufWPtr = w + count }
 		    return ()
 
@@ -213,9 +213,9 @@ hPutArray handle (IOUArray (STUArray l u raw)) count
 -- Internal Utils
 
 foreign import ccall unsafe "__hscore_memcpy_dst_off"
-   memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
+   memcpy_baoff_ba :: RawBuffer -> CInt -> RawBuffer -> CSize -> IO (Ptr ())
 foreign import ccall unsafe "__hscore_memcpy_src_off"
-   memcpy_ba_baoff :: RawBuffer -> RawBuffer -> Int -> CSize -> IO (Ptr ())
+   memcpy_ba_baoff :: RawBuffer -> RawBuffer -> CInt -> CSize -> IO (Ptr ())
 
 illegalBufferSize :: Handle -> String -> Int -> IO a
 illegalBufferSize handle fn sz = 

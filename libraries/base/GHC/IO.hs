@@ -90,12 +90,13 @@ hWaitForInput h msecs = do
 	        writeIORef ref buf'
 		return True
 	else do r <- throwErrnoIfMinus1Retry "hWaitForInput" $
-	  		inputReady (haFD handle_)
-			   (fromIntegral msecs) (haIsStream handle_)
+	             inputReady (haFD handle_)
+	                        (fromIntegral msecs)
+                                (fromIntegral $ fromEnum $ haIsStream handle_)
 		return (r /= 0)
 
 foreign import ccall safe "inputReady"
-  inputReady :: CInt -> CInt -> Bool -> IO CInt
+  inputReady :: CInt -> CInt -> CInt -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- hGetChar
@@ -601,7 +602,7 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release
 
 		-- not flushing, and there's enough room in the buffer:
 		-- just copy the data in and update bufWPtr.
-	    then do memcpy_baoff_ba old_raw w raw (fromIntegral count)
+	    then do memcpy_baoff_ba old_raw (fromIntegral w) raw (fromIntegral count)
 		    writeIORef ref old_buf{ bufWPtr = w + count }
 		    return (newEmptyBuffer raw WriteBuffer sz)
 
@@ -695,7 +696,7 @@ bufWrite fd ref is_stream ptr count can_block =
   if (size - w > count)
 	-- There's enough room in the buffer:
 	-- just copy the data in and update bufWPtr.
-	then do memcpy_baoff_ptr old_raw w ptr (fromIntegral count)
+	then do memcpy_baoff_ptr old_raw (fromIntegral w) ptr (fromIntegral count)
 	        writeIORef ref old_buf{ bufWPtr = w + count }
 		return count
 
@@ -793,18 +794,18 @@ bufRead fd ref is_stream ptr so_far count =
   	let avail = w - r
 	if (count == avail)
 	   then do 
-		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		memcpy_ptr_baoff ptr raw (fromIntegral r) (fromIntegral count)
 		writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
 		return (so_far + count)
 	   else do
 	if (count < avail)
 	   then do 
-		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		memcpy_ptr_baoff ptr raw (fromIntegral r) (fromIntegral count)
 		writeIORef ref buf{ bufRPtr = r + count }
 		return (so_far + count)
 	   else do
   
-	memcpy_ptr_baoff ptr raw r (fromIntegral avail)
+	memcpy_ptr_baoff ptr raw (fromIntegral r) (fromIntegral avail)
 	writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
 	let remaining = count - avail
 	    so_far' = so_far + avail
@@ -876,18 +877,18 @@ bufReadNonBlocking fd ref is_stream ptr so_far count =
   	let avail = w - r
 	if (count == avail)
 	   then do 
-		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		memcpy_ptr_baoff ptr raw (fromIntegral r) (fromIntegral count)
 		writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
 		return (so_far + count)
 	   else do
 	if (count < avail)
 	   then do 
-		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		memcpy_ptr_baoff ptr raw (fromIntegral r) (fromIntegral count)
 		writeIORef ref buf{ bufRPtr = r + count }
 		return (so_far + count)
 	   else do
 
-	memcpy_ptr_baoff ptr raw r (fromIntegral avail)
+	memcpy_ptr_baoff ptr raw (fromIntegral r) (fromIntegral avail)
 	writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
 	let remaining = count - avail
 	    so_far' = so_far + avail
@@ -941,13 +942,13 @@ slurpFile fname = do
 -- memcpy wrappers
 
 foreign import ccall unsafe "__hscore_memcpy_src_off"
-   memcpy_ba_baoff :: RawBuffer -> RawBuffer -> Int -> CSize -> IO (Ptr ())
+   memcpy_ba_baoff :: RawBuffer -> RawBuffer -> CInt -> CSize -> IO (Ptr ())
 foreign import ccall unsafe "__hscore_memcpy_src_off"
-   memcpy_ptr_baoff :: Ptr a -> RawBuffer -> Int -> CSize -> IO (Ptr ())
+   memcpy_ptr_baoff :: Ptr a -> RawBuffer -> CInt -> CSize -> IO (Ptr ())
 foreign import ccall unsafe "__hscore_memcpy_dst_off"
-   memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
+   memcpy_baoff_ba :: RawBuffer -> CInt -> RawBuffer -> CSize -> IO (Ptr ())
 foreign import ccall unsafe "__hscore_memcpy_dst_off"
-   memcpy_baoff_ptr :: RawBuffer -> Int -> Ptr a -> CSize -> IO (Ptr ())
+   memcpy_baoff_ptr :: RawBuffer -> CInt -> Ptr a -> CSize -> IO (Ptr ())
 
 -----------------------------------------------------------------------------
 -- Internal Utils
