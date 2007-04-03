@@ -745,31 +745,31 @@ a `shiftRL64#` b | b >=# 64#  = wordToWord64# (int2Word# 0#)
 		 | otherwise  = a `uncheckedShiftRL64#` b
 
 
-foreign import ccall unsafe "stg_eqWord64"      eqWord64#      :: Word64# -> Word64# -> Bool
-foreign import ccall unsafe "stg_neWord64"      neWord64#      :: Word64# -> Word64# -> Bool
-foreign import ccall unsafe "stg_ltWord64"      ltWord64#      :: Word64# -> Word64# -> Bool
-foreign import ccall unsafe "stg_leWord64"      leWord64#      :: Word64# -> Word64# -> Bool
-foreign import ccall unsafe "stg_gtWord64"      gtWord64#      :: Word64# -> Word64# -> Bool
-foreign import ccall unsafe "stg_geWord64"      geWord64#      :: Word64# -> Word64# -> Bool
-foreign import ccall unsafe "stg_int64ToWord64" int64ToWord64# :: Int64# -> Word64#
-foreign import ccall unsafe "stg_word64ToInt64" word64ToInt64# :: Word64# -> Int64#
-foreign import ccall unsafe "stg_intToInt64"    intToInt64#    :: Int# -> Int64#
-foreign import ccall unsafe "stg_wordToWord64"  wordToWord64#  :: Word# -> Word64#
-foreign import ccall unsafe "stg_word64ToWord"  word64ToWord#  :: Word64# -> Word#
-foreign import ccall unsafe "stg_plusInt64"     plusInt64#     :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "stg_minusInt64"    minusInt64#    :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "stg_timesInt64"    timesInt64#    :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "stg_negateInt64"   negateInt64#   :: Int64# -> Int64#
-foreign import ccall unsafe "stg_quotWord64"    quotWord64#    :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "stg_remWord64"     remWord64#     :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "stg_and64"         and64#         :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "stg_or64"          or64#          :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "stg_xor64"         xor64#         :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "stg_not64"         not64#         :: Word64# -> Word64#
-foreign import ccall unsafe "stg_uncheckedShiftL64"      uncheckedShiftL64#      :: Word64# -> Int# -> Word64#
-foreign import ccall unsafe "stg_uncheckedShiftRL64"     uncheckedShiftRL64#     :: Word64# -> Int# -> Word64#
+foreign import ccall unsafe "hs_eqWord64"      eqWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "hs_neWord64"      neWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "hs_ltWord64"      ltWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "hs_leWord64"      leWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "hs_gtWord64"      gtWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "hs_geWord64"      geWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "hs_int64ToWord64" int64ToWord64# :: Int64# -> Word64#
+foreign import ccall unsafe "hs_word64ToInt64" word64ToInt64# :: Word64# -> Int64#
+foreign import ccall unsafe "hs_intToInt64"    intToInt64#    :: Int# -> Int64#
+foreign import ccall unsafe "hs_wordToWord64"  wordToWord64#  :: Word# -> Word64#
+foreign import ccall unsafe "hs_word64ToWord"  word64ToWord#  :: Word64# -> Word#
+foreign import ccall unsafe "hs_plusInt64"     plusInt64#     :: Int64# -> Int64# -> Int64#
+foreign import ccall unsafe "hs_minusInt64"    minusInt64#    :: Int64# -> Int64# -> Int64#
+foreign import ccall unsafe "hs_timesInt64"    timesInt64#    :: Int64# -> Int64# -> Int64#
+foreign import ccall unsafe "hs_negateInt64"   negateInt64#   :: Int64# -> Int64#
+foreign import ccall unsafe "hs_quotWord64"    quotWord64#    :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "hs_remWord64"     remWord64#     :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "hs_and64"         and64#         :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "hs_or64"          or64#          :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "hs_xor64"         xor64#         :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "hs_not64"         not64#         :: Word64# -> Word64#
+foreign import ccall unsafe "hs_uncheckedShiftL64"      uncheckedShiftL64#      :: Word64# -> Int# -> Word64#
+foreign import ccall unsafe "hs_uncheckedShiftRL64"     uncheckedShiftRL64#     :: Word64# -> Int# -> Word64#
 
-foreign import ccall unsafe "stg_integerToWord64" integerToWord64# :: Int# -> ByteArray# -> Word64#
+foreign import ccall unsafe "hs_integerToWord64" integerToWord64# :: Int# -> ByteArray# -> Word64#
 
 
 {-# RULES

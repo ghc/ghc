@@ -10,7 +10,7 @@
 
 
 /*
-Miscellaneous primitive operations on StgInt64 and StgWord64s.
+Miscellaneous primitive operations on HsInt64 and HsWord64s.
 N.B. These are not primops!
 
 Instead of going the normal (boring) route of making the list
@@ -32,93 +32,95 @@ The exceptions to the rule are primops that cast to and from
 
 /* Relational operators */
 
-StgBool stg_gtWord64 (StgWord64 a, StgWord64 b) {return a >  b;}
-StgBool stg_geWord64 (StgWord64 a, StgWord64 b) {return a >= b;}
-StgBool stg_eqWord64 (StgWord64 a, StgWord64 b) {return a == b;}
-StgBool stg_neWord64 (StgWord64 a, StgWord64 b) {return a != b;}
-StgBool stg_ltWord64 (StgWord64 a, StgWord64 b) {return a <  b;}
-StgBool stg_leWord64 (StgWord64 a, StgWord64 b) {return a <= b;}
+static inline HsBool mkBool(int b) { return b ? HS_BOOL_TRUE : HS_BOOL_FALSE; }
 
-StgBool stg_gtInt64 (StgInt64 a, StgInt64 b) {return a >  b;}
-StgBool stg_geInt64 (StgInt64 a, StgInt64 b) {return a >= b;}
-StgBool stg_eqInt64 (StgInt64 a, StgInt64 b) {return a == b;}
-StgBool stg_neInt64 (StgInt64 a, StgInt64 b) {return a != b;}
-StgBool stg_ltInt64 (StgInt64 a, StgInt64 b) {return a <  b;}
-StgBool stg_leInt64 (StgInt64 a, StgInt64 b) {return a <= b;}
+HsBool hs_gtWord64 (HsWord64 a, HsWord64 b) {return mkBool(a >  b);}
+HsBool hs_geWord64 (HsWord64 a, HsWord64 b) {return mkBool(a >= b);}
+HsBool hs_eqWord64 (HsWord64 a, HsWord64 b) {return mkBool(a == b);}
+HsBool hs_neWord64 (HsWord64 a, HsWord64 b) {return mkBool(a != b);}
+HsBool hs_ltWord64 (HsWord64 a, HsWord64 b) {return mkBool(a <  b);}
+HsBool hs_leWord64 (HsWord64 a, HsWord64 b) {return mkBool(a <= b);}
+
+HsBool hs_gtInt64 (HsInt64 a, HsInt64 b) {return mkBool(a >  b);}
+HsBool hs_geInt64 (HsInt64 a, HsInt64 b) {return mkBool(a >= b);}
+HsBool hs_eqInt64 (HsInt64 a, HsInt64 b) {return mkBool(a == b);}
+HsBool hs_neInt64 (HsInt64 a, HsInt64 b) {return mkBool(a != b);}
+HsBool hs_ltInt64 (HsInt64 a, HsInt64 b) {return mkBool(a <  b);}
+HsBool hs_leInt64 (HsInt64 a, HsInt64 b) {return mkBool(a <= b);}
 
 /* Arithmetic operators */
 
-StgWord64 stg_remWord64  (StgWord64 a, StgWord64 b) {return a % b;}
-StgWord64 stg_quotWord64 (StgWord64 a, StgWord64 b) {return a / b;}
+HsWord64 hs_remWord64  (HsWord64 a, HsWord64 b) {return a % b;}
+HsWord64 hs_quotWord64 (HsWord64 a, HsWord64 b) {return a / b;}
 
-StgInt64 stg_remInt64    (StgInt64 a, StgInt64 b)   {return a % b;}
-StgInt64 stg_quotInt64   (StgInt64 a, StgInt64 b)   {return a / b;}
-StgInt64 stg_negateInt64 (StgInt64 a)               {return -a;}
-StgInt64 stg_plusInt64   (StgInt64 a, StgInt64 b)   {return a + b;}
-StgInt64 stg_minusInt64  (StgInt64 a, StgInt64 b)   {return a - b;}
-StgInt64 stg_timesInt64  (StgInt64 a, StgInt64 b)   {return a * b;}
+HsInt64 hs_remInt64    (HsInt64 a, HsInt64 b)   {return a % b;}
+HsInt64 hs_quotInt64   (HsInt64 a, HsInt64 b)   {return a / b;}
+HsInt64 hs_negateInt64 (HsInt64 a)              {return -a;}
+HsInt64 hs_plusInt64   (HsInt64 a, HsInt64 b)   {return a + b;}
+HsInt64 hs_minusInt64  (HsInt64 a, HsInt64 b)   {return a - b;}
+HsInt64 hs_timesInt64  (HsInt64 a, HsInt64 b)   {return a * b;}
 
 /* Logical operators: */
 
-StgWord64 stg_and64      (StgWord64 a, StgWord64 b) {return a & b;}
-StgWord64 stg_or64       (StgWord64 a, StgWord64 b) {return a | b;}
-StgWord64 stg_xor64      (StgWord64 a, StgWord64 b) {return a ^ b;}
-StgWord64 stg_not64      (StgWord64 a)              {return ~a;}
+HsWord64 hs_and64      (HsWord64 a, HsWord64 b) {return a & b;}
+HsWord64 hs_or64       (HsWord64 a, HsWord64 b) {return a | b;}
+HsWord64 hs_xor64      (HsWord64 a, HsWord64 b) {return a ^ b;}
+HsWord64 hs_not64      (HsWord64 a)             {return ~a;}
 
-StgWord64 stg_uncheckedShiftL64   (StgWord64 a, StgInt b)    {return a << b;}
-StgWord64 stg_uncheckedShiftRL64  (StgWord64 a, StgInt b)    {return a >> b;}
+HsWord64 hs_uncheckedShiftL64   (HsWord64 a, HsInt b)    {return a << b;}
+HsWord64 hs_uncheckedShiftRL64  (HsWord64 a, HsInt b)    {return a >> b;}
 /* Right shifting of signed quantities is not portable in C, so
    the behaviour you'll get from using these primops depends
    on the whatever your C compiler is doing. ToDo: fix. -- sof 8/98
 */
-StgInt64  stg_uncheckedIShiftL64  (StgInt64 a,  StgInt b)    {return a << b;}
-StgInt64  stg_uncheckedIShiftRA64 (StgInt64 a,  StgInt b)    {return a >> b;}
-StgInt64  stg_uncheckedIShiftRL64 (StgInt64 a,  StgInt b)
-                                    {return (StgInt64) ((StgWord64) a >> b);}
+HsInt64  hs_uncheckedIShiftL64  (HsInt64 a,  HsInt b)    {return a << b;}
+HsInt64  hs_uncheckedIShiftRA64 (HsInt64 a,  HsInt b)    {return a >> b;}
+HsInt64  hs_uncheckedIShiftRL64 (HsInt64 a,  HsInt b)
+                                    {return (HsInt64) ((HsWord64) a >> b);}
 
 /* Casting between longs and longer longs.
    (the primops that cast from long longs to Integers
    expressed as macros, since these may cause some heap allocation).
 */
 
-StgInt64  stg_intToInt64    (StgInt    i) {return (StgInt64)  i;}
-StgInt    stg_int64ToInt    (StgInt64  i) {return (StgInt)    i;}
-StgWord64 stg_int64ToWord64 (StgInt64  i) {return (StgWord64) i;}
-StgWord64 stg_wordToWord64  (StgWord   w) {return (StgWord64) w;}
-StgWord   stg_word64ToWord  (StgWord64 w) {return (StgWord)   w;}
-StgInt64  stg_word64ToInt64 (StgWord64 w) {return (StgInt64)  w;}
+HsInt64  hs_intToInt64    (HsInt    i) {return (HsInt64)  i;}
+HsInt    hs_int64ToInt    (HsInt64  i) {return (HsInt)    i;}
+HsWord64 hs_int64ToWord64 (HsInt64  i) {return (HsWord64) i;}
+HsWord64 hs_wordToWord64  (HsWord   w) {return (HsWord64) w;}
+HsWord   hs_word64ToWord  (HsWord64 w) {return (HsWord)   w;}
+HsInt64  hs_word64ToInt64 (HsWord64 w) {return (HsInt64)  w;}
 
-StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da)
+HsWord64 hs_integerToWord64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da)
 { 
   mp_limb_t* d;
-  StgInt s;
-  StgWord64 res;
+  HsInt s;
+  HsWord64 res;
   d = (mp_limb_t *)da;
   s = sa;
   switch (s) {
     case  0: res = 0;     break;
     case  1: res = d[0];  break;
-    case -1: res = -(StgWord64)d[0]; break;
+    case -1: res = -(HsWord64)d[0]; break;
     default:
-      res = (StgWord64)d[0] + ((StgWord64)d[1] << (BITS_IN (mp_limb_t)));
+      res = (HsWord64)d[0] + ((HsWord64)d[1] << (BITS_IN (mp_limb_t)));
       if (s < 0) res = -res;
   }
   return res;
 }
 
-StgInt64 stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da)
+HsInt64 hs_integerToInt64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da)
 { 
   mp_limb_t* d;
-  StgInt s;
-  StgInt64 res;
+  HsInt s;
+  HsInt64 res;
   d = (mp_limb_t *)da;
   s = (sa);
   switch (s) {
     case  0: res = 0;     break;
     case  1: res = d[0];  break;
-    case -1: res = -(StgInt64)d[0]; break;
+    case -1: res = -(HsInt64)d[0]; break;
     default:
-      res = (StgInt64)d[0] + ((StgWord64)d[1] << (BITS_IN (mp_limb_t)));
+      res = (HsInt64)d[0] + ((HsWord64)d[1] << (BITS_IN (mp_limb_t)));
       if (s < 0) res = -res;
   }
   return res;

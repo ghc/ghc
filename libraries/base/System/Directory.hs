@@ -862,9 +862,9 @@ fileNameEndClean name =
       i  = (length name) - 1
       ec = name !! i
 
-foreign import ccall unsafe "__hscore_R_OK" r_OK :: CMode
-foreign import ccall unsafe "__hscore_W_OK" w_OK :: CMode
-foreign import ccall unsafe "__hscore_X_OK" x_OK :: CMode
+foreign import ccall unsafe "__hscore_R_OK" r_OK :: CInt
+foreign import ccall unsafe "__hscore_W_OK" w_OK :: CInt
+foreign import ccall unsafe "__hscore_X_OK" x_OK :: CInt
 
 foreign import ccall unsafe "__hscore_S_IRUSR" s_IRUSR :: CMode
 foreign import ccall unsafe "__hscore_S_IWUSR" s_IWUSR :: CMode

@@ -123,12 +123,12 @@ cleanUpAndExit r = do cleanUp; safeExit r
 -- we have to use unsafeCoerce# to get the 'IO a' result type, since the
 -- compiler doesn't let us declare that as the result type of a foreign export.
 safeExit :: Int -> IO a
-safeExit r = unsafeCoerce# (shutdownHaskellAndExit r)
+safeExit r = unsafeCoerce# (shutdownHaskellAndExit $ fromIntegral r)
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
 -- re-enter Haskell land through finalizers.
 foreign import ccall "Rts.h shutdownHaskellAndExit"
-  shutdownHaskellAndExit :: Int -> IO ()
+  shutdownHaskellAndExit :: CInt -> IO ()
 
 fastExit :: Int -> IO a
 fastExit r = unsafeCoerce# (stg_exit (fromIntegral r))

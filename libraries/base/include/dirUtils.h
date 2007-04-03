@@ -6,8 +6,8 @@
 #ifndef __DIRUTILS_H__
 #define __DIRUTILS_H__
 
-extern HsInt __hscore_readdir(HsAddr dirPtr, HsAddr pDirEnt);
-extern HsInt __hscore_renameFile(HsAddr src, HsAddr dest);
+extern int __hscore_readdir(DIR *dirPtr, struct dirent **pDirEnt);
+extern int __hscore_renameFile(char *src, char *dest);
 
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
 extern int __hscore_getFolderPath(HWND hwndOwner,

@@ -29,6 +29,7 @@ module System.Environment
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
+import Data.List
 import Foreign
 import Foreign.C
 import Control.Exception 	( bracket )
@@ -165,11 +166,11 @@ freeArgv argv = do
 setArgs :: [String] -> IO (Ptr CString)
 setArgs argv = do
   vs <- mapM newCString argv >>= newArray0 nullPtr
-  setArgsPrim (length argv) vs
+  setArgsPrim (genericLength argv) vs
   return vs
 
 foreign import ccall unsafe "setProgArgv" 
-  setArgsPrim  :: Int -> Ptr CString -> IO ()
+  setArgsPrim  :: CInt -> Ptr CString -> IO ()
 
 -- |'getEnvironment' retrieves the entire environment as a
 -- list of @(key,value)@ pairs.

@@ -25,6 +25,7 @@ import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import Data.Ix		( Ix, range, index, rangeSize )
 import Data.Int
 import Data.Word
+import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.StablePtr
 
@@ -1593,7 +1594,8 @@ thawSTUArray (UArray l u arr#) = ST $ \s1# ->
     (# s3#, STUArray l u marr# #) }}}
 
 foreign import ccall unsafe "memcpy"
-    memcpy :: MutableByteArray# RealWorld -> ByteArray# -> Int# -> IO ()
+    memcpy :: MutableByteArray# RealWorld -> ByteArray# -> CSize
+           -> IO (Ptr a)
 
 {-# RULES
 "thaw/STArray"  thaw = ArrST.thawSTArray

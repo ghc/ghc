@@ -167,50 +167,50 @@ extern void pPrPr_disableITimers (void);
 
 #ifdef SUPPORT_LONG_LONGS
 
-StgBool stg_gtWord64 (StgWord64, StgWord64);
-StgBool stg_geWord64 (StgWord64, StgWord64);
-StgBool stg_eqWord64 (StgWord64, StgWord64);
-StgBool stg_neWord64 (StgWord64, StgWord64);
-StgBool stg_ltWord64 (StgWord64, StgWord64);
-StgBool stg_leWord64 (StgWord64, StgWord64);
+HsBool hs_gtWord64 (HsWord64, HsWord64);
+HsBool hs_geWord64 (HsWord64, HsWord64);
+HsBool hs_eqWord64 (HsWord64, HsWord64);
+HsBool hs_neWord64 (HsWord64, HsWord64);
+HsBool hs_ltWord64 (HsWord64, HsWord64);
+HsBool hs_leWord64 (HsWord64, HsWord64);
 
-StgBool stg_gtInt64 (StgInt64, StgInt64);
-StgBool stg_geInt64 (StgInt64, StgInt64);
-StgBool stg_eqInt64 (StgInt64, StgInt64);
-StgBool stg_neInt64 (StgInt64, StgInt64);
-StgBool stg_ltInt64 (StgInt64, StgInt64);
-StgBool stg_leInt64 (StgInt64, StgInt64);
+HsBool hs_gtInt64 (HsInt64, HsInt64);
+HsBool hs_geInt64 (HsInt64, HsInt64);
+HsBool hs_eqInt64 (HsInt64, HsInt64);
+HsBool hs_neInt64 (HsInt64, HsInt64);
+HsBool hs_ltInt64 (HsInt64, HsInt64);
+HsBool hs_leInt64 (HsInt64, HsInt64);
 
-StgWord64 stg_remWord64  (StgWord64, StgWord64);
-StgWord64 stg_quotWord64 (StgWord64, StgWord64);
+HsWord64 hs_remWord64  (HsWord64, HsWord64);
+HsWord64 hs_quotWord64 (HsWord64, HsWord64);
 
-StgInt64 stg_remInt64    (StgInt64, StgInt64);
-StgInt64 stg_quotInt64   (StgInt64, StgInt64);
-StgInt64 stg_negateInt64 (StgInt64);
-StgInt64 stg_plusInt64   (StgInt64, StgInt64);
-StgInt64 stg_minusInt64  (StgInt64, StgInt64);
-StgInt64 stg_timesInt64  (StgInt64, StgInt64);
+HsInt64 hs_remInt64    (HsInt64, HsInt64);
+HsInt64 hs_quotInt64   (HsInt64, HsInt64);
+HsInt64 hs_negateInt64 (HsInt64);
+HsInt64 hs_plusInt64   (HsInt64, HsInt64);
+HsInt64 hs_minusInt64  (HsInt64, HsInt64);
+HsInt64 hs_timesInt64  (HsInt64, HsInt64);
 
-StgWord64 stg_and64  (StgWord64, StgWord64);
-StgWord64 stg_or64   (StgWord64, StgWord64);
-StgWord64 stg_xor64  (StgWord64, StgWord64);
-StgWord64 stg_not64  (StgWord64);
+HsWord64 hs_and64  (HsWord64, HsWord64);
+HsWord64 hs_or64   (HsWord64, HsWord64);
+HsWord64 hs_xor64  (HsWord64, HsWord64);
+HsWord64 hs_not64  (HsWord64);
 
-StgWord64 stg_uncheckedShiftL64   (StgWord64, StgInt);
-StgWord64 stg_uncheckedShiftRL64  (StgWord64, StgInt);
-StgInt64  stg_uncheckedIShiftL64  (StgInt64, StgInt);
-StgInt64  stg_uncheckedIShiftRA64 (StgInt64, StgInt);
-StgInt64  stg_uncheckedIShiftRL64 (StgInt64, StgInt);
+HsWord64 hs_uncheckedShiftL64   (HsWord64, HsInt);
+HsWord64 hs_uncheckedShiftRL64  (HsWord64, HsInt);
+HsInt64  hs_uncheckedIShiftL64  (HsInt64, HsInt);
+HsInt64  hs_uncheckedIShiftRA64 (HsInt64, HsInt);
+HsInt64  hs_uncheckedIShiftRL64 (HsInt64, HsInt);
 
-StgInt64  stg_intToInt64    (StgInt);
-StgInt    stg_int64ToInt    (StgInt64);
-StgWord64 stg_int64ToWord64 (StgInt64);
-StgWord64 stg_wordToWord64  (StgWord);
-StgWord   stg_word64ToWord  (StgWord64);
-StgInt64  stg_word64ToInt64 (StgWord64);
+HsInt64  hs_intToInt64    (HsInt);
+HsInt    hs_int64ToInt    (HsInt64);
+HsWord64 hs_int64ToWord64 (HsInt64);
+HsWord64 hs_wordToWord64  (HsWord);
+HsWord   hs_word64ToWord  (HsWord64);
+HsInt64  hs_word64ToInt64 (HsWord64);
 
-StgWord64 stg_integerToWord64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da);
-StgInt64  stg_integerToInt64 (StgInt sa, StgByteArray /* Really: mp_limb_t* */ da);
+HsWord64 hs_integerToWord64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da);
+HsInt64  hs_integerToInt64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da);
 
 #endif /* SUPPORT_LONG_LONGS */
 
@@ -492,13 +492,13 @@ INLINE HsInt __hscore_long_path_size() { return 4096; }
 #endif
 
 #ifdef R_OK
-INLINE mode_t __hscore_R_OK() { return R_OK; }
+INLINE int __hscore_R_OK() { return R_OK; }
 #endif
 #ifdef W_OK
-INLINE mode_t __hscore_W_OK() { return W_OK; }
+INLINE int __hscore_W_OK() { return W_OK; }
 #endif
 #ifdef X_OK
-INLINE mode_t __hscore_X_OK() { return X_OK; }
+INLINE int __hscore_X_OK() { return X_OK; }
 #endif
 
 #ifdef S_IRUSR

@@ -159,13 +159,15 @@ withMany withFoo (x:xs) f = withFoo x $ \x' ->
 -- first (destination); the copied areas may /not/ overlap
 --
 copyBytes               :: Ptr a -> Ptr a -> Int -> IO ()
-copyBytes dest src size  = memcpy dest src (fromIntegral size)
+copyBytes dest src size  = do memcpy dest src (fromIntegral size)
+                              return ()
 
 -- |Copies the given number of bytes from the second area (source) into the
 -- first (destination); the copied areas /may/ overlap
 --
 moveBytes               :: Ptr a -> Ptr a -> Int -> IO ()
-moveBytes dest src size  = memmove dest src (fromIntegral size)
+moveBytes dest src size  = do memmove dest src (fromIntegral size)
+                              return ()
 
 
 -- auxilliary routines
@@ -173,5 +175,5 @@ moveBytes dest src size  = memmove dest src (fromIntegral size)
 
 -- |Basic C routines needed for memory copying
 --
-foreign import ccall unsafe "string.h" memcpy  :: Ptr a -> Ptr a -> CSize -> IO ()
-foreign import ccall unsafe "string.h" memmove :: Ptr a -> Ptr a -> CSize -> IO ()
+foreign import ccall unsafe "string.h" memcpy  :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
+foreign import ccall unsafe "string.h" memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)

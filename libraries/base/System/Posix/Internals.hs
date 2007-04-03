@@ -295,7 +295,7 @@ setNonBlockingFD fd = do
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
   unless (testBit flags (fromIntegral o_NONBLOCK)) $ do
-    c_fcntl_write fd const_f_setfl (flags .|. o_NONBLOCK)
+    c_fcntl_write fd const_f_setfl (fromIntegral (flags .|. o_NONBLOCK))
     return ()
 #else
 
@@ -308,7 +308,7 @@ setNonBlockingFD fd = return ()
 -- foreign imports
 
 foreign import ccall unsafe "HsBase.h access"
-   c_access :: CString -> CMode -> IO CInt
+   c_access :: CString -> CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h chmod"
    c_chmod :: CString -> CMode -> IO CInt
@@ -335,7 +335,7 @@ foreign import ccall unsafe "HsBase.h __hscore_fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
 
 foreign import ccall unsafe "HsBase.h getcwd"
-   c_getcwd   :: Ptr CChar -> CInt -> IO (Ptr CChar)
+   c_getcwd   :: Ptr CChar -> CSize -> IO (Ptr CChar)
 
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
@@ -390,7 +390,7 @@ foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h fcntl"
-   c_fcntl_write :: CInt -> CInt -> CInt -> IO CInt
+   c_fcntl_write :: CInt -> CInt -> CLong -> IO CInt
 
 foreign import ccall unsafe "HsBase.h fcntl"
    c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
@@ -423,7 +423,7 @@ foreign import ccall unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
 foreign import ccall unsafe "HsBase.h utime"
-   c_utime :: CString -> Ptr CUtimbuf -> IO CMode
+   c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
 foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid

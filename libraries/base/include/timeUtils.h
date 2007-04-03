@@ -6,7 +6,7 @@
 #ifndef __TIMEUTILS_H__
 #define __TIMEUTILS_H__
 
-extern HsAddr __hscore_timezone( void );
-extern HsAddr __hscore_tzname( void );
+extern long *__hscore_timezone( void );
+extern char **__hscore_tzname( void );
 
 #endif /* __DIRUTILS_H__ */

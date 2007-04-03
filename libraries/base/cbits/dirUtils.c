@@ -57,16 +57,15 @@ toErrno(DWORD rc)
  * read an entry from the directory stream; opt for the
  * re-entrant friendly way of doing this, if available.
  */
-HsInt
-__hscore_readdir( HsAddr dirPtr, HsAddr pDirEnt )
+int
+__hscore_readdir( DIR *dirPtr, struct dirent **pDirEnt )
 {
-  struct dirent **pDirE = (struct dirent**)pDirEnt;
 #if HAVE_READDIR_R
   struct dirent* p;
   int res;
   static unsigned int nm_max = (unsigned int)-1;
   
-  if (pDirE == NULL) {
+  if (pDirEnt == NULL) {
     return -1;
   }
   if (nm_max == (unsigned int)-1) {
@@ -80,24 +79,24 @@ __hscore_readdir( HsAddr dirPtr, HsAddr pDirEnt )
   }
   p = (struct dirent*)malloc(sizeof(struct dirent) + nm_max);
   if (p == NULL) return -1;
-  res = readdir_r((DIR*)dirPtr, p, pDirE);
+  res = readdir_r(dirPtr, p, pDirEnt);
   if (res != 0) {
-      *pDirE = NULL;
+      *pDirEnt = NULL;
       free(p);
   }
-  else if (*pDirE == NULL) {
+  else if (*pDirEnt == NULL) {
     // end of stream
     free(p);
   }
   return res;
 #else
 
-  if (pDirE == NULL) {
+  if (pDirEnt == NULL) {
     return -1;
   }
 
-  *pDirE = readdir((DIR*)dirPtr);
-  if (*pDirE == NULL) {
+  *pDirEnt = readdir(dirPtr);
+  if (*pDirEnt == NULL) {
     return -1;
   } else {
     return 0;
@@ -114,9 +113,8 @@ __hscore_readdir( HsAddr dirPtr, HsAddr pDirEnt )
  * an error
  *
  */
-HsInt
-__hscore_renameFile( HsAddr src,
-		     HsAddr dest)
+int
+__hscore_renameFile( char *src, char *dest)
 {
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
     static int forNT = -1;

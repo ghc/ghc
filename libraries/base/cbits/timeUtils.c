@@ -7,9 +7,9 @@
 
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32) /* to the end */
 
-HsAddr __hscore_timezone( void )
-{ return (HsAddr)&_timezone; }
+long *__hscore_timezone( void )
+{ return &_timezone; }
 
-HsAddr __hscore_tzname( void )
-{ return (HsAddr)_tzname; }
+char **__hscore_tzname( void )
+{ return _tzname; }
 #endif

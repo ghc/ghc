@@ -146,7 +146,7 @@ instance Show ThreadId where
    	showString "ThreadId " . 
         showsPrec d (getThreadId (id2TSO t))
 
-foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> Int
+foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> CInt
 
 id2TSO :: ThreadId -> ThreadId#
 id2TSO (ThreadId t) = t
@@ -915,7 +915,7 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 	  now <- getUSecOfDay
 	  (delays', timeout) <- getDelay now ptimeval delays
 
-	  res <- c_select ((max wakeup maxfd)+1) readfds writefds 
+	  res <- c_select (fromIntegral ((max wakeup maxfd)+1)) readfds writefds 
 			nullPtr timeout
 	  if (res == -1)
 	     then do
@@ -1065,7 +1065,7 @@ foreign import ccall unsafe "setTimevalTicks"
 newtype CFdSet = CFdSet ()
 
 foreign import ccall safe "select"
-  c_select :: Fd -> Ptr CFdSet -> Ptr CFdSet -> Ptr CFdSet -> Ptr CTimeVal
+  c_select :: CInt -> Ptr CFdSet -> Ptr CFdSet -> Ptr CFdSet -> Ptr CTimeVal
            -> IO CInt
 
 foreign import ccall unsafe "hsFD_SETSIZE"

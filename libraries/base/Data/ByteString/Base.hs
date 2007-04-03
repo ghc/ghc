@@ -456,21 +456,34 @@ foreign import ccall unsafe "static stdlib.h free" c_free
 foreign import ccall unsafe "static stdlib.h &free" c_free_finalizer
     :: FunPtr (Ptr Word8 -> IO ())
 
-foreign import ccall unsafe "string.h memchr" memchr
-    :: Ptr Word8 -> Word8 -> CSize -> IO (Ptr Word8)
+foreign import ccall unsafe "string.h memchr" c_memchr
+    :: Ptr Word8 -> CInt -> CSize -> IO (Ptr Word8)
+
+memchr :: Ptr Word8 -> Word8 -> CSize -> IO (Ptr Word8)
+memchr p w s = c_memchr p (fromIntegral w) s
 
 foreign import ccall unsafe "string.h memcmp" memcmp
     :: Ptr Word8 -> Ptr Word8 -> CSize -> IO CInt
 
-foreign import ccall unsafe "string.h memcpy" memcpy
-    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO ()
+foreign import ccall unsafe "string.h memcpy" c_memcpy
+    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO (Ptr Word8)
 
-foreign import ccall unsafe "string.h memmove" memmove
-    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO ()
+memcpy :: Ptr Word8 -> Ptr Word8 -> CSize -> IO ()
+memcpy p q s = do c_memcpy p q s
+                  return ()
 
-foreign import ccall unsafe "string.h memset" memset
-    :: Ptr Word8 -> Word8 -> CSize -> IO (Ptr Word8)
+foreign import ccall unsafe "string.h memmove" c_memmove
+    :: Ptr Word8 -> Ptr Word8 -> CSize -> IO (Ptr Word8)
 
+memmove :: Ptr Word8 -> Ptr Word8 -> CSize -> IO ()
+memmove p q s = do c_memmove p q s
+                   return ()
+
+foreign import ccall unsafe "string.h memset" c_memset
+    :: Ptr Word8 -> CInt -> CSize -> IO (Ptr Word8)
+
+memset :: Ptr Word8 -> Word8 -> CSize -> IO (Ptr Word8)
+memset p w s = c_memset p (fromIntegral w) s
 
 -- ---------------------------------------------------------------------
 --
@@ -491,22 +504,6 @@ foreign import ccall unsafe "static fpstring.h fps_minimum" c_minimum
 
 foreign import ccall unsafe "static fpstring.h fps_count" c_count
     :: Ptr Word8 -> CULong -> Word8 -> IO CULong
-
--- ---------------------------------------------------------------------
--- MMap
-
-{-
-foreign import ccall unsafe "static fpstring.h my_mmap" my_mmap
-    :: Int -> Int -> IO (Ptr Word8)
-
-foreign import ccall unsafe "static unistd.h close" c_close
-    :: Int -> IO Int
-
-#  if !defined(__OpenBSD__)
-foreign import ccall unsafe "static sys/mman.h munmap" c_munmap
-    :: Ptr Word8 -> Int -> IO Int
-#  endif
--}
 
 -- ---------------------------------------------------------------------
 -- Internal GHC Haskell magic

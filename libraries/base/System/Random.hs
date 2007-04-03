@@ -84,7 +84,7 @@ import Numeric		( readDec )
 -- replacement here.
 #ifdef __NHC__
 data ClockTime = TOD Integer ()
-foreign import ccall "time.h time" readtime :: Ptr () -> IO Int
+foreign import ccall "time.h time" readtime :: Ptr CTime -> IO CTime
 getClockTime :: IO ClockTime
 getClockTime = do t <- readtime nullPtr;  return (TOD (toInteger t) ())
 #endif
