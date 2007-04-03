@@ -17,7 +17,12 @@ test('ghci011', normal, ghci_script, ['ghci011.script'])
 test('ghci012', normal, ghci_script, ['ghci012.script'])
 test('ghci013', normal, ghci_script, ['ghci013.script'])
 test('ghci014', reqlib('QuickCheck'), ghci_script, ['ghci014.script'])
-test('ghci015', normal, ghci_script, ['ghci015.script'])
+
+# Ignore output from ghci015, the output is non-deterministic
+# (has occasional "thread blocked indefinitely" exceptions), and this
+# is part of the test.
+test('ghci015', ignore_output, ghci_script, ['ghci015.script'])
+
 test('ghci016', expect_broken(552), ghci_script, ['ghci016.script'])
 test('ghci017', extra_run_opts('-hide-package haskell98'), ghci_script, ['ghci017.script'])
 test('ghci018', expect_broken(1201), ghci_script, ['ghci018.script'])
