@@ -145,6 +145,7 @@ exposed-modules:
 	Text.Read.Lex,
 	Text.Show,
 	Text.Show.Functions,
+	Unsafe.Coerce,
 	GHC.Arr,
 	GHC.Base,
 	GHC.Conc,

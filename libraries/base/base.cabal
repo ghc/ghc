@@ -135,6 +135,7 @@ exposed-modules:
 	Text.Read.Lex,
 	Text.Show,
 	Text.Show.Functions
+	Unsafe.Coerce
 other-modules:
 	Data.Array.IO.Internals
 include-dirs:	include, ../../ghc/includes

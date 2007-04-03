@@ -34,6 +34,7 @@ SRCS	= \
 	Text/Printf.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
+	Unsafe/Coerce.hs \
 	WCsubst.c
 
 

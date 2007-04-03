@@ -34,7 +34,8 @@ ALL_DIRS = \
 	Text/PrettyPrint \
 	Text/ParserCombinators \
 	Text/Show \
-	Text/Read
+	Text/Read \
+	Unsafe
 
 PACKAGE = base
 VERSION = 2.0
