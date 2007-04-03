@@ -26,8 +26,8 @@ extern void newCAF(StgClosure*);
 #endif
 
 /* ToDo: remove? */
-extern I_ genSymZh(void);
-extern I_ resetGenSymZh(void);
+extern HsInt genSymZh(void);
+extern HsInt resetGenSymZh(void);
 
 /* Alternate to raise(3) for threaded rts, for OpenBSD */
 extern int genericRaise(int sig);
@@ -37,7 +37,7 @@ extern int cmp_thread(StgPtr tso1, StgPtr tso2);
 extern int rts_getThreadId(StgPtr tso);
 extern int forkOS_createThread ( HsStablePtr entry );
 extern StgInt forkProcess(HsStablePtr *entry);
-extern StgBool rtsSupportsBoundThreads(void);
+extern HsBool rtsSupportsBoundThreads(void);
 extern StgInt newSpark (StgRegTable *reg, StgClosure *p);
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
@@ -86,9 +86,9 @@ extern StgInt *signal_handlers;
 #endif
 
 #if defined(mingw32_HOST_OS)
-void *getIOManagerEvent (void);
-StgWord32 readIOManagerEvent (void);
-void sendIOManagerEvent (StgWord32 event);
+HANDLE getIOManagerEvent (void);
+HsWord32 readIOManagerEvent (void);
+void sendIOManagerEvent (HsWord32 event);
 #else
 extern void setIOManagerPipe (int fd);
 #endif

@@ -657,13 +657,13 @@ awakenBlockedQueue(Capability *cap, StgTSO *tso)
  * used by Control.Concurrent for error checking.
  * ------------------------------------------------------------------------- */
  
-StgBool
+HsBool
 rtsSupportsBoundThreads(void)
 {
 #if defined(THREADED_RTS)
-  return rtsTrue;
+  return HS_BOOL_TRUE;
 #else
-  return rtsFalse;
+  return HS_BOOL_FALSE;
 #endif
 }
 

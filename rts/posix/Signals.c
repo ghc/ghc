@@ -41,7 +41,7 @@
  * to POSIX.1 to control whether or not to include SA_NOCLDSTOP when
  * installing a SIGCHLD handler. 
  */
-StgInt nocldstop = 0;
+HsInt nocldstop = 0;
 
 /* -----------------------------------------------------------------------------
  * The table of signal handlers

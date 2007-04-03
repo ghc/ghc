@@ -59,20 +59,20 @@ nat next_event;
 
 #endif
 
-StgWord32
+HsWord32
 readIOManagerEvent (void)
 {
     // This function must exist even in non-THREADED_RTS, 
     // see getIOManagerEvent() above.
 #if defined(THREADED_RTS)
-    StgWord32 res;
+    HsWord32 res;
 
     ACQUIRE_LOCK(&event_buf_mutex);
     if (io_manager_event != INVALID_HANDLE_VALUE) {
         if (next_event == 0) {
             res = 0; // no event to return
         } else {
-            res = event_buf[--next_event];
+            res = (HsWord32)(event_buf[--next_event]);
             if (next_event == 0) {
                 if (!ResetEvent(io_manager_event)) {
                     sysErrorBelch("readIOManagerEvent");
@@ -92,7 +92,7 @@ readIOManagerEvent (void)
 }
 
 void
-sendIOManagerEvent (StgWord32 event)
+sendIOManagerEvent (HsWord32 event)
 {
 #if defined(THREADED_RTS)
     // debugBelch("sendIOManagerEvent: %d\n", event);
@@ -105,7 +105,7 @@ sendIOManagerEvent (StgWord32 event)
                 sysErrorBelch("sendIOManagerEvent");
                 stg_exit(EXIT_FAILURE);
             }        
-            event_buf[next_event++] = event;
+            event_buf[next_event++] = (StgWord32)event;
         }
     }
     RELEASE_LOCK(&event_buf_mutex);

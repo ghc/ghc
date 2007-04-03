@@ -298,14 +298,14 @@ nat stg_strlen(char *s)
    ToDo: put this somewhere sensible.
    -------------------------------------------------------------------------  */
 
-static I_ __GenSymCounter = 0;
+static HsInt __GenSymCounter = 0;
 
-I_
+HsInt
 genSymZh(void)
 {
     return(__GenSymCounter++);
 }
-I_
+HsInt
 resetGenSymZh(void) /* it's your funeral */
 {
     __GenSymCounter=0;

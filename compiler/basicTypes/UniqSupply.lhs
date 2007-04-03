@@ -73,15 +73,15 @@ mkSplitUniqSupply (C# c#)
 	-- This is one of the most hammered bits in the whole compiler
 	mk_supply#
 	  = unsafeInterleaveIO (
-		genSymZh    >>= \ (W# u#) ->
+		genSymZh    >>= \ (I# u#) ->
 		mk_supply#  >>= \ s1 ->
 		mk_supply#  >>= \ s2 ->
-		return (MkSplitUniqSupply (w2i (mask# `or#` u#)) s1 s2)
+		return (MkSplitUniqSupply (w2i (mask# `or#` (i2w u#))) s1 s2)
 	    )
     in
     mk_supply#
 
-foreign import ccall unsafe "genSymZh" genSymZh :: IO Word
+foreign import ccall unsafe "genSymZh" genSymZh :: IO Int
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
 \end{code}
