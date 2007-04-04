@@ -90,7 +90,7 @@ HsWord64 hs_wordToWord64  (HsWord   w) {return (HsWord64) w;}
 HsWord   hs_word64ToWord  (HsWord64 w) {return (HsWord)   w;}
 HsInt64  hs_word64ToInt64 (HsWord64 w) {return (HsInt64)  w;}
 
-HsWord64 hs_integerToWord64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da)
+HsWord64 hs_integerToWord64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da)
 { 
   mp_limb_t* d;
   HsInt s;
@@ -108,7 +108,7 @@ HsWord64 hs_integerToWord64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da)
   return res;
 }
 
-HsInt64 hs_integerToInt64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da)
+HsInt64 hs_integerToInt64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da)
 { 
   mp_limb_t* d;
   HsInt s;
