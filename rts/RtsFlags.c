@@ -398,7 +398,7 @@ usage_text[] = {
 #endif
 "",
 #if defined(TICKY_TICKY)
-"  -r<file>  Produce reduction profiling statistics (with -rstderr for stderr)",
+"  -r<file>  Produce ticky-ticky statistics (with -rstderr for stderr)",
 "",
 #endif
 #if defined(PAR)
