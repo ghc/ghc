@@ -90,7 +90,7 @@ extern StgInt *signal_handlers;
 #endif
 
 #if defined(mingw32_HOST_OS)
-HANDLE getIOManagerEvent (void);
+void *getIOManagerEvent (void);
 HsWord32 readIOManagerEvent (void);
 void sendIOManagerEvent (HsWord32 event);
 #else
