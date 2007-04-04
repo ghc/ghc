@@ -1,3 +1,3 @@
 
 mod158.hs:12:4: Not in scope: data constructor `C'
-make: *** [mod158] Error 1
+exit(1)
