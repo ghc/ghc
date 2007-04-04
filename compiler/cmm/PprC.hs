@@ -433,6 +433,9 @@ pprStatics (CmmStaticLit (CmmInt i I64) : rest)
 #endif
   where r = i .&. 0xffffffff
 	q = i `shiftR` 32
+pprStatics (CmmStaticLit (CmmInt i rep) : rest)
+  | machRepByteWidth rep /= wORD_SIZE
+  = panic "pprStatics: cannot emit a non-word-sized static literal"
 pprStatics (CmmStaticLit lit : rest)
   = pprLit1 lit : pprStatics rest
 pprStatics (other : rest)
