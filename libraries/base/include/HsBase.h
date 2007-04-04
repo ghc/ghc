@@ -209,8 +209,8 @@ HsWord64 hs_wordToWord64  (HsWord);
 HsWord   hs_word64ToWord  (HsWord64);
 HsInt64  hs_word64ToInt64 (HsWord64);
 
-HsWord64 hs_integerToWord64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da);
-HsInt64  hs_integerToInt64 (HsInt sa, HsByteArray /* Really: mp_limb_t* */ da);
+HsWord64 hs_integerToWord64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da);
+HsInt64  hs_integerToInt64 (HsInt sa, StgByteArray /* Really: mp_limb_t* */ da);
 
 #endif /* SUPPORT_LONG_LONGS */
 
