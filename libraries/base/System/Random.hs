@@ -70,6 +70,7 @@ import Prelude
 #ifdef __NHC__
 import CPUTime		( getCPUTime )
 import Foreign.Ptr      ( Ptr, nullPtr )
+import Foreign.C	( CTime, CUInt )
 #else
 import System.CPUTime	( getCPUTime )
 import System.Time	( getClockTime, ClockTime(..) )
@@ -86,7 +87,7 @@ import Numeric		( readDec )
 data ClockTime = TOD Integer ()
 foreign import ccall "time.h time" readtime :: Ptr CTime -> IO CTime
 getClockTime :: IO ClockTime
-getClockTime = do t <- readtime nullPtr;  return (TOD (toInteger t) ())
+getClockTime = do CTime t <- readtime nullPtr;  return (TOD (toInteger t) ())
 #endif
 
 -- | The class 'RandomGen' provides a common interface to random number
