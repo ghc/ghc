@@ -281,7 +281,7 @@ signalProcessGroup sig pgid
   = throwErrnoIfMinus1_ "signalProcessGroup" (c_killpg (fromIntegral pgid) sig)
 
 foreign import ccall unsafe "killpg"
-  c_killpg :: CInt -> CInt -> IO CInt
+  c_killpg :: CPid -> CInt -> IO CInt
 
 -- | @raiseSignal int@ calls @kill@ to signal the current process
 --   with interrupt signal @int@. 
