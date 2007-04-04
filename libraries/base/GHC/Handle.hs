@@ -560,10 +560,10 @@ writeRawBufferPtr loc fd is_stream buf off len =
 		(threadWaitWrite (fromIntegral fd))
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
-   read_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+   read_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
-   read_off :: FD -> Ptr CChar -> Int -> CInt -> IO CInt
+   read_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
 foreign import ccall unsafe "__hscore_PrelHandle_write"
    write_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
@@ -665,10 +665,10 @@ blockingWriteRawBufferPtr loc fd False buf off len =
 -- These calls may block, but that's ok.
 
 foreign import ccall safe "__hscore_PrelHandle_read"
-   read_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+   read_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_read"
-   read_off :: FD -> Ptr CChar -> Int -> CInt -> IO CInt
+   read_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_write"
    write_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
@@ -677,10 +677,10 @@ foreign import ccall safe "__hscore_PrelHandle_write"
    write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_recv"
-   recv_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+   recv_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_recv"
-   recv_off :: FD -> Ptr CChar -> Int -> CInt -> IO CInt
+   recv_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_send"
    send_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt

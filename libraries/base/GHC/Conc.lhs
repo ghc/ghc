@@ -1069,16 +1069,28 @@ foreign import ccall safe "select"
            -> IO CInt
 
 foreign import ccall unsafe "hsFD_SETSIZE"
-  fD_SETSIZE :: Fd
+  c_fD_SETSIZE :: CInt
+
+fD_SETSIZE :: Fd
+fD_SETSIZE = fromIntegral c_fD_SETSIZE
 
 foreign import ccall unsafe "hsFD_CLR"
-  fdClr :: Fd -> Ptr CFdSet -> IO ()
+  c_fdClr :: CInt -> Ptr CFdSet -> IO ()
+
+fdClr :: Fd -> Ptr CFdSet -> IO ()
+fdClr (Fd fd) fdset = c_fdClr fd fdset
 
 foreign import ccall unsafe "hsFD_ISSET"
-  fdIsSet :: Fd -> Ptr CFdSet -> IO CInt
+  c_fdIsSet :: CInt -> Ptr CFdSet -> IO CInt
+
+fdIsSet :: Fd -> Ptr CFdSet -> IO CInt
+fdIsSet (Fd fd) fdset = c_fdIsSet fd fdset
 
 foreign import ccall unsafe "hsFD_SET"
-  fdSet :: Fd -> Ptr CFdSet -> IO ()
+  c_fdSet :: CInt -> Ptr CFdSet -> IO ()
+
+fdSet :: Fd -> Ptr CFdSet -> IO ()
+fdSet (Fd fd) fdset = c_fdSet fd fdset
 
 foreign import ccall unsafe "hsFD_ZERO"
   fdZero :: Ptr CFdSet -> IO ()
