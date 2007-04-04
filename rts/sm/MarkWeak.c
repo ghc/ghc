@@ -284,17 +284,26 @@ traverseBlackholeQueue (void)
 {
     StgTSO *prev, *t, *tmp;
     rtsBool flag;
+    nat type;
 
     flag = rtsFalse;
     prev = NULL;
 
     for (t = blackhole_queue; t != END_TSO_QUEUE; prev=t, t = t->link) {
+        // if the thread is not yet alive...
 	if (! (tmp = (StgTSO *)isAlive((StgClosure*)t))) {
-	    if (isAlive(t->block_info.closure)) {
-		t = (StgTSO *)evacuate((StgClosure *)t);
-		if (prev) prev->link = t;
-		flag = rtsTrue;
-	    }
+            // if the closure it is blocked on is either (a) a
+            // reachable BLAKCHOLE or (b) not a BLACKHOLE, then we
+            // make the thread alive.
+	    if (!isAlive(t->block_info.closure)) {
+                type = get_itbl(t->block_info.closure)->type;
+                if (type == BLACKHOLE || type == CAF_BLACKHOLE) {
+                    continue;
+                }
+            }
+            t = (StgTSO *)evacuate((StgClosure *)t);
+            if (prev) prev->link = t;
+            flag = rtsTrue;
 	}
     }
     return flag;
