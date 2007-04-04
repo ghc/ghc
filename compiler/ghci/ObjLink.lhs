@@ -86,7 +86,7 @@ resolveObjs = do
    return (successIf (r /= 0))
 
 -- ---------------------------------------------------------------------------
--- Foreign declaractions to RTS entry points which does the real work;
+-- Foreign declarations to RTS entry points which does the real work;
 -- ---------------------------------------------------------------------------
 
 foreign import ccall unsafe "addDLL"	   c_addDLL :: CString -> IO CString
