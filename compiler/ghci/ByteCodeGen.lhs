@@ -50,7 +50,7 @@ import Constants
 import Data.List	( intersperse, sortBy, zip4, zip6, partition )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8,
 			  withForeignPtr, castFunPtrToPtr )
-import Foreign.C	( CInt )
+import Foreign.C
 import Control.Exception	( throwDyn )
 
 import GHC.Exts		( Int(..), ByteArray# )
@@ -1119,7 +1119,7 @@ pushAtom d p other
               (pprCoreExpr (deAnnotate (undefined, other)))
 
 foreign import ccall unsafe "memcpy"
- memcpy :: Ptr a -> Ptr b -> CInt -> IO ()
+ memcpy :: Ptr a -> Ptr b -> CSize -> IO ()
 
 
 -- -----------------------------------------------------------------------------

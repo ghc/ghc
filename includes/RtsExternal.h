@@ -15,6 +15,10 @@
 /* The standard FFI interface */
 #include "HsFFI.h"
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
 /* -----------------------------------------------------------------------------
    Functions exported by the RTS for use in Stg code
    -------------------------------------------------------------------------- */
@@ -36,7 +40,7 @@ extern int genericRaise(int sig);
 extern int cmp_thread(StgPtr tso1, StgPtr tso2);
 extern int rts_getThreadId(StgPtr tso);
 extern int forkOS_createThread ( HsStablePtr entry );
-extern StgInt forkProcess(HsStablePtr *entry);
+extern pid_t forkProcess(HsStablePtr *entry);
 extern HsBool rtsSupportsBoundThreads(void);
 extern StgInt newSpark (StgRegTable *reg, StgClosure *p);
 

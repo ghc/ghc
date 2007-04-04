@@ -2111,7 +2111,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
-StgInt
+pid_t
 forkProcess(HsStablePtr *entry
 #ifndef FORKPROCESS_PRIMOP_SUPPORTED
 	    STG_UNUSED

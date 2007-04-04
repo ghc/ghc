@@ -56,7 +56,7 @@
 /* -------------------- WINDOWS VERSION --------------------- */
 
 HsInt
-rawSystem(HsAddr cmd)
+rawSystem(char *cmd)
 {
   STARTUPINFO sInfo;
   PROCESS_INFORMATION pInfo;
@@ -90,7 +90,7 @@ rawSystem(HsAddr cmd)
 /* -------------------- UNIX VERSION --------------------- */
 
 HsInt
-rawSystem(HsAddr cmd, HsAddr args)
+rawSystem(char *cmd, char **args)
 {
     int pid;
     int wstat;

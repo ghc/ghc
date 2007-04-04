@@ -2206,6 +2206,9 @@ sandboxIO thing = do
 foreign import "rts_evalStableIO"  {- safe -}
   rts_evalStableIO :: StablePtr (IO a) -> Ptr (StablePtr a) -> IO CInt
   -- more informative than the C type!
+
+XXX the type of rts_evalStableIO no longer matches the above
+
 -}
 
 
