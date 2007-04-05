@@ -1,0 +1,10 @@
+Main.f Main.u1 Main.u2
+Main.u1 `Main.f` Main.u2
+(Main..+.) Main.u1 Main.u2
+Main.u1 Main..+. Main.u2
+(GHC.Base.:) Main.u1 Main.u2
+Main.u1 GHC.Base.: Main.u2
+\((GHC.Base.:) x_0 xs_1) -> x_0
+\(x_0 GHC.Base.: xs_1) -> x_0
+class Foo a_0 b_1
+    where foo :: a_0 -> b_1

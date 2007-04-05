@@ -73,3 +73,5 @@ test('TH_exn', normal, compile_fail, [''])
 test('TH_recover', normal, compile_and_run, [''])
 test('TH_dataD1', normal, compile_fail, ['-v0'])
 
+test('TH_ppr1', normal, compile_and_run, ['-fglasgow-exts'])
+
