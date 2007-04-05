@@ -118,6 +118,7 @@ RUNTEST_OPTS +=  \
 	-e "if '$(USETHREADS)': config.use_threads=int($(USETHREADS))" \
 	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
 	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
+	-e config.top=\"$(TOP)\" \
 	$(EXTRA_RUNTEST_OPTS)
 
 # HostPlatform_CPP should ideally be TargetPlatform_CPP, but that

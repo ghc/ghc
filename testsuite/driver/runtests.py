@@ -89,6 +89,12 @@ if config.use_threads:
     t.thread_pool = threading.Condition(t.lock)
     t.running_threads = 0
 
+# if timeout == -1 then we try to calculate a sensible value
+if config.timeout == -1:
+    config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
+
+print 'Timeout is ' + str(config.timeout)
+
 # -----------------------------------------------------------------------------
 # The main dude
 

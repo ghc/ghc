@@ -16,6 +16,9 @@
 class TestConfig:
     def __init__(self):
 
+        # Where the testsuite root is
+        self.top = ''
+
         # Directories below which to look for test description files (foo.T)
         self.rootdirs = []
 
