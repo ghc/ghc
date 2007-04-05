@@ -21,9 +21,8 @@ boot :: python-timeout
 endif
 
 calibrate.out:
-	chmod +x calibrate
 	rm -f Calibrate.o Calibrate.hi Calibrate
-	./calibrate "$(HC)" > $@
+	$(PYTHON) calibrate "$(HC)" > $@
 
 python-timeout:
 	cp timeout.py timeout
