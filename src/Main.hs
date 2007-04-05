@@ -308,6 +308,7 @@ startGHC libDir = do
   let flags'' = dopt_set flags' Opt_Haddock 
   return (session, flags'')
 
+-- TODO: clean up, restructure and make sure it handles cleanup
 sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
 sortAndCheckModules session files = do 
   parseStaticFlags [] -- to avoid a GHC bug
@@ -428,10 +429,15 @@ run flags modules extEnv = do
                 maybe_contents_url maybe_index_url
     copyHtmlBits odir libdir css_file
 
+  let iface = InterfaceFile {
+        ifDocEnv  = homeEnv
+--        ifModules = map hmod2interface visibleMods
+      }
+
   case [str | Flag_DumpInterface str <- flags] of
         [] -> return ()
         fs -> let filename = (last fs) in 
-              writeInterfaceFile filename (InterfaceFile homeEnv)
+              writeInterfaceFile filename iface
 
 type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
@@ -1226,8 +1232,8 @@ getPackage :: Session -> InstalledPackageInfo -> IO PackageData
 getPackage session pkgInfo = do
   html <- getHtml pkgInfo
   iface <- getIface pkgInfo
-  InterfaceFile docEnv <- readInterfaceFile iface
-
+  iface <- readInterfaceFile iface
+  
   let modules = packageModules pkgInfo
 
   -- try to get a ModuleInfo struct for each module
@@ -1240,7 +1246,7 @@ getPackage session pkgInfo = do
 
   return $ PackageData {
     pdModules  = modules,
-    pdDocEnv   = docEnv,
+    pdDocEnv   = ifDocEnv iface,
     pdHtmlPath = html
   } 
        
