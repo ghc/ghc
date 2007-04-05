@@ -94,5 +94,16 @@ rosenbrock = ScgInput
 
 
 \begin{code}
-main = print (w ((scgIter rosenbrock)!!1))
+main = case vectorList (w ((scgIter rosenbrock)!!1)) of
+       [v1, v2] -> if (e1 `isSame` v1) && (e2 `isSame` v2)
+                   then print (e1, e2)
+                   else putStrLn ("Mismatch: " ++ show (e1, e2, v1, v2))
+       vs -> putStrLn ("Wrong list length: " ++ show vs)
+
+e1, e2 :: Floating a => a
+e1 = -0.5105811455265337
+e2 = -0.7565080326002654
+
+isSame :: (Fractional a, Ord a) => a -> a -> Bool
+x `isSame` y = abs (x - y) < 0.000000000000001
 \end{code}
