@@ -12,8 +12,8 @@ reals) and convert it into something that plotExam can take in the
 Plot module.
 
 > plotExample:: (Signal s, Physical a, Physical b) =>
->               String -> s a b -> Float -> Float -> String
-> plotExample fl sig s e = plotExam fl s e f
+>               String -> [(Float, Float)] -> s a b -> Float -> Float -> String
+> plotExample fl expected sig s e = plotExam fl expected s e f
 >                    where f  = toFloatFunc f'
 >                          f' = mapSignal sig
 

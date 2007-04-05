@@ -13,18 +13,37 @@ anticipate using any modules (although this may change).
 Now we give the type of the function.  This consists of a file name, a
 list of values, and a function that goes from the appropriate types.
 
-> plot2d:: (Show a, Show b) => String -> [a] -> (a -> b) -> String
-> plot2d fl inp f = plot2d' inp f  
+> plot2d:: (Fractional a, Fractional b, Ord a, Ord b, Show a, Show b)
+>       => String -> [(a, b)] -> [a] -> (a -> b) -> String
+> plot2d fl expected inp f = plot2d' expected inp f  
 
-> plot2d':: (Show a, Show b) => [a] -> (a -> b) -> String
-> plot2d' [] f     = []
-> plot2d' (x:xs) f = (show x)        ++
+> plot2d':: (Fractional a, Fractional b, Ord a, Ord b, Show a, Show b)
+>        => [(a, b)] -> [a] -> (a -> b) -> String
+> plot2d' [] [] f     = []
+> plot2d' ((e1, e2):es) (x:xs) f
+>  | (e1 `isSame` x) && (e2 `isSame` x')
+>                  = (show e1)       ++
 >                    "  "            ++
->                    (show (f x))    ++
+>                    (show e2)       ++
 >                    "\n"            ++
->                    plot2d' xs f
+>                    plot2d' es xs f
+>  | otherwise
+>                  = "Mismatch: "    ++
+>                    (show e1)       ++
+>                    "  "            ++
+>                    (show e2)       ++
+>                    "  "            ++
+>                    (show x)        ++
+>                    "  "            ++
+>                    (show x')       ++
+>                    "\n"            ++
+>                    plot2d' es xs f
+>   where x' = f x
+> plot2d' es [] _ = "Extra expected: " ++ show es
+> plot2d' [] xs _ = "Extra results: " ++ show xs
 
-
+> isSame :: (Fractional a, Ord a) => a -> a -> Bool
+> x `isSame` y = abs (x - y) < 0.000001
 
 And now, let's create a function to make a range out of a triple of a
 start point, an end point, and an increment.
@@ -54,7 +73,8 @@ creates the appropriate gnuplot command file.
 And now we create a fairly specific plotExam function that takes a
 string, a function, and two floats and produces the correct files
 
-> plotExam:: String -> Float -> Float -> (Float -> Float) -> String
-> plotExam fl s e f = plot2d (fl++".plt") r f ++
->                     createGnuPlot fl s e
+> plotExam:: String -> [(Float, Float)] -> Float -> Float -> (Float -> Float)
+>         -> String
+> plotExam fl expected s e f = plot2d (fl++".plt") expected r f ++
+>                              createGnuPlot fl s e
 >               where r = createRange s e ((e - s) / 2500)
