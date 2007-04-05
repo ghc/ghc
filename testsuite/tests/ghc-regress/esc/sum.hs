@@ -4,13 +4,13 @@ module Sum where
 -- {-# CONTRACT f :: x:{y | y > 0} -> {r | r == x + 1} #-}
 -- {-# CONTRACT f :: x:{y | y > 0} -> {y | y > 0} -> {r | r == x + 1} #-}
 -- {-# CONTRACT f :: any -> {y | y > 0}  #-}
--- {-# CONTRACT f :: {y | y > 0} -> any #-}
+-- {-# CONTRACT f :: {y | y > 0} -> _ #-}
 {-# CONTRACT f :: {y | y > 0} -> {r | r > 1} #-}
 f :: Int -> Int
 f x = x + 1
 
 -- {-# CONTRACT f2 :: x:{y | y > 0} -> {y | y > x} -> {r | r > 0} #-}
-{-# CONTRACT f2 :: x:{y | y > 0} -> {y | y > x} -> any #-}
+{-# CONTRACT f2 :: x:{y | y > 0} -> {y | y > x} -> _ #-}
 f2 :: Int -> Int -> Int
 f2 x y = x + y
 

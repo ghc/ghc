@@ -1,5 +1,5 @@
-contract nat = {x | x > 0}
-contract notNull = {xs | not (null xs)}
+{-# TYPE nat = {x | x > 0} #-}
+{-# TYPE notNull = {xs | not (null xs)} #-}
 
 {-# CONTRACT f :: nat -> nat #-}
 f :: Int -> Int
