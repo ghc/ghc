@@ -319,24 +319,30 @@ AC_SUBST(AlexVersion)
 # Sets the output variable LdCmd to the (non-Cygwin version of the) full path
 # of ld. Exits if no ld can be found
 AC_DEFUN([FP_PROG_LD],
-[AC_PATH_PROG([fp_prog_ld_raw], [ld])
-if test -z "$fp_prog_ld_raw"; then
-  AC_MSG_ERROR([cannot find ld in your PATH, no idea how to link])
+[
+if test -z "$1"
+then
+  AC_PATH_PROG([fp_prog_ld_raw], [ld])
+  if test -z "$fp_prog_ld_raw"; then
+    AC_MSG_ERROR([cannot find ld in your PATH, no idea how to link])
+  fi
+  LdCmd=$fp_prog_ld_raw
+  case $HostPlatform in
+    *mingw32) if test x${OSTYPE} != xmsys; then
+   	      LdCmd="`cygpath -w ${fp_prog_ld_raw} | sed -e 's@\\\\@/@g'`"
+                AC_MSG_NOTICE([normalized ld command to $LdCmd])
+              fi
+  	    # Insist on >= ld-2.15.x, since earlier versions doesn't handle
+  	    # the generation of relocatable object files with large amounts
+  	    # of relocations correctly. (cf. HSbase.o splittage-hack)
+  	    fp_prog_ld_version=`${LdCmd} --version | sed -n '/GNU ld/p' | tr -cd 0-9 | cut -b1-3`
+  	    FP_COMPARE_VERSIONS([$fp_prog_ld_version],[-lt],[214],
+                                  [AC_MSG_ERROR([GNU ld version later than 2.14 required to compile GHC on Windows.])])[]dnl
+              ;;
+  esac
+else
+  LdCmd="$1"
 fi
-LdCmd=$fp_prog_ld_raw
-case $HostPlatform in
-  *mingw32) if test x${OSTYPE} != xmsys; then
- 	      LdCmd="`cygpath -w ${fp_prog_ld_raw} | sed -e 's@\\\\@/@g'`"
-              AC_MSG_NOTICE([normalized ld command to $LdCmd])
-            fi
-	    # Insist on >= ld-2.15.x, since earlier versions doesn't handle
-	    # the generation of relocatable object files with large amounts
-	    # of relocations correctly. (cf. HSbase.o splittage-hack)
-	    fp_prog_ld_version=`${LdCmd} --version | sed -n '/GNU ld/p' | tr -cd 0-9 | cut -b1-3`
-	    FP_COMPARE_VERSIONS([$fp_prog_ld_version],[-lt],[214],
-                                [AC_MSG_ERROR([GNU ld version later than 2.14 required to compile GHC on Windows.])])[]dnl
-            ;;
-esac
 AC_SUBST([LdCmd])
 ])# FP_PROG_LD
 

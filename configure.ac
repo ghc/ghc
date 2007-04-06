@@ -756,6 +756,25 @@ AC_ARG_WITH(gcc,
 )
 AC_SUBST(WhatGccIsCalled)
 
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+AC_ARG_WITH(ld,
+[AC_HELP_STRING([--with-ld=ARG],
+        [Use ARG as the path to LD  [default=autodetect]])],
+[if test "x$HostPlatform" = "xi386-unknown-mingw32"
+    then
+       if test "${OSTYPE}" != "msys"
+         then
+         # Canonicalise to <drive>:/path/to/ld
+         withval=`cygpath -w ${withval} | sed -e 's@\\\\@/@g' `
+       fi
+ fi;
+ LD=$withval
+ FP_PROG_LD([$LD])
+ ],
+ [FP_PROG_LD()]
+)
+
 dnl ** Booting from .hc files?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot,

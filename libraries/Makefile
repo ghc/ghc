@@ -56,6 +56,12 @@ endif
 empty=
 space=$(empty) $(empty)
 
+ifeq "$(Windows)" "YES"
+dot_bat=.bat
+else
+dot_bat=
+endif
+
 CONFIGURE_OPTS =
 CONFIGURE_STAMP_EXTRAS :=
 
@@ -122,10 +128,13 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	cd $* && setup/Setup configure \
 	                     $(CONFIGURE_OPTS) \
 	                     --prefix=$(prefix) \
-	                     --with-compiler=../../compiler/ghc-inplace \
-	                     --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
+	                     --with-compiler=../../compiler/ghc-inplace$(dot_bat) \
+	                     --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$(dot_bat) \
+	                     --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace$(dot_bat) \
+	                     --with-ld=$(LD) \
 	                     --datasubdir=ghc \
-						 --haddock-args="--use-contents=../index.html --use-index=../doc-index.html"
+	                     --haddock-args="--use-contents=../index.html --use-index=../doc-index.html" \
+	                     --configure-option=--with-cc=$(CC)
 	touch $@
 
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\

@@ -63,7 +63,7 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 endif
 
-HSC2HS_EXTRA="--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)"
+HSC2HS_EXTRA=--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)
 endif
 
 $(SCRIPT_PROG) : Makefile
@@ -93,6 +93,15 @@ all :: $(HS_PROG)
 
 clean distclean maintainer-clean :: 
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+endif
+
+ifeq "$(INSTALLING)$(HOSTPLATFORM)" "0i386-unknown-mingw32"
+all :: $(INPLACE_SCRIPT_PROG).bat
+
+FULL_INPLACE_PATH=$(subst /,\\,$(FPTOOLS_TOP_ABS)/utils/hsc2hs/)
+$(INPLACE_SCRIPT_PROG).bat :
+	echo '@call $(FULL_INPLACE_PATH)$(HS_PROG) --template=$(FULL_INPLACE_PATH)template-hsc.h $(HSC2HS_EXTRA) %*' >> $@
+	chmod 755 $@
 endif
 
 include $(TOP)/mk/target.mk
