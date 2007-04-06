@@ -20,26 +20,35 @@ import System.Exit
 main :: IO ()
 main = do args <- getArgs
           let (ghcArgs, args') = extractGhcArgs args
-          let hooks = defaultUserHooks {
+              (configureArgs, args'') = extractConfigureArgs args'
+              hooks = defaultUserHooks {
                   confHook = add_extra_deps
                            $ confHook defaultUserHooks,
+                  postConf = add_configure_options configureArgs
+                           $ postConf defaultUserHooks,
                   buildHook = add_ghc_options ghcArgs
                             $ filter_modules_hook
                             $ buildHook defaultUserHooks,
                   instHook = filter_modules_hook
                            $ instHook defaultUserHooks }
-          withArgs args' $ defaultMainWithHooks hooks
+          withArgs args'' $ defaultMainWithHooks hooks
 
 extractGhcArgs :: [String] -> ([String], [String])
-extractGhcArgs args
+extractGhcArgs = extractPrefixArgs "--ghc-option="
+
+extractConfigureArgs :: [String] -> ([String], [String])
+extractConfigureArgs = extractPrefixArgs "--configure-option="
+
+extractPrefixArgs :: String -> [String] -> ([String], [String])
+extractPrefixArgs prefix args
  = let f [] = ([], [])
        f (x:xs) = case f xs of
-                      (ghcArgs, otherArgs) ->
-                          case removePrefix "--ghc-option=" x of
-                              Just ghcArg ->
-                                  (ghcArg:ghcArgs, otherArgs)
+                      (wantedArgs, otherArgs) ->
+                          case removePrefix prefix x of
+                              Just wantedArg ->
+                                  (wantedArg:wantedArgs, otherArgs)
                               Nothing ->
-                                  (ghcArgs, x:otherArgs)
+                                  (wantedArgs, x:otherArgs)
    in f args
 
 removePrefix :: String -> String -> Maybe String
@@ -51,6 +60,8 @@ removePrefix (x:xs) (y:ys)
 type Hook a = PackageDescription -> LocalBuildInfo -> Maybe UserHooks -> a
            -> IO ()
 type ConfHook = PackageDescription -> ConfigFlags -> IO LocalBuildInfo
+type PostConfHook = Args -> ConfigFlags -> PackageDescription -> LocalBuildInfo
+                 -> IO ExitCode
 
 -- type PDHook = PackageDescription -> ConfigFlags -> IO ()
 
@@ -65,6 +76,10 @@ add_ghc_options args f pd lbi muhs x
                      Nothing -> error "Expected a library"
           pd' = pd { library = Just lib' }
       f pd' lbi muhs x
+
+add_configure_options :: [String] -> PostConfHook -> PostConfHook
+add_configure_options args f as cfs pd lbi
+ = f (as ++ args) cfs pd lbi
 
 filter_modules_hook :: Hook a -> Hook a
 filter_modules_hook f pd lbi muhs x
