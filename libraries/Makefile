@@ -99,7 +99,7 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 
 stamp/$(BOOTSTRAPPING_CABAL):
 	$(RM) -rf $(BOOTSTRAPPING_CABAL)
-	$(CP) -a Cabal $(BOOTSTRAPPING_CABAL)
+	$(CP) -R Cabal $(BOOTSTRAPPING_CABAL)
 	$(FIND) $(BOOTSTRAPPING_CABAL) \( -name "*.o" -o -name "*.hi" \) -exec $(RM) -f {} \;
 	touch $@
 
