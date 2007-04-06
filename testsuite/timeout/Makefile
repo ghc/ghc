@@ -4,7 +4,7 @@ include $(TOP)/mk/boilerplate.mk
 HC = $(GHC_INPLACE)
 MKDEPENDHS = $(GHC_INPLACE)
 SRC_HC_OPTS += -threaded
-EXCLUDED_SRCS += Calibrate.hs
+EXCLUDED_SRCS += TimeMe.hs
 
 ifeq "$(Windows)" "NO"
 SRC_HC_OPTS += -package unix
@@ -21,7 +21,7 @@ boot :: python-timeout
 endif
 
 calibrate.out:
-	rm -f Calibrate.o Calibrate.hi Calibrate
+	rm -f TimeMe.o TimeMe.hi TimeMe
 	$(PYTHON) calibrate "$(HC)" > $@
 
 python-timeout:

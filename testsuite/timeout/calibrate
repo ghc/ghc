@@ -10,8 +10,8 @@ compiler = argv[1]
 compiler_name = os.path.basename(compiler)
 
 spawnl(os.P_WAIT, compiler,
-                  compiler_name, 'Calibrate.hs', '-o', 'Calibrate', '-O2')
-spawnl(os.P_WAIT, './Calibrate', 'Calibrate')
+                  compiler_name, 'TimeMe.hs', '-o', 'TimeMe', '-O2')
+spawnl(os.P_WAIT, './TimeMe', 'TimeMe')
 
 xs = getrusage(RUSAGE_CHILDREN);
 print (300*int(math.ceil(xs[0] + xs[1])))
