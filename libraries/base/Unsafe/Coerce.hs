@@ -27,5 +27,5 @@ import NonStdUnsafeCoerce (unsafeCoerce)
 #endif
 
 #if defined(__HUGS__)
-import Hugs.Base (unsafeCoerce)
+import Hugs.IOExts (unsafeCoerce)
 #endif
