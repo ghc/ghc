@@ -63,11 +63,7 @@ uniqsFromSupply :: UniqSupply -> [Unique]	-- Infinite
 \begin{code}
 mkSplitUniqSupply (C# c#)
   = let
-#if __GLASGOW_HASKELL__ >= 503
 	mask# = (i2w (ord# c#)) `uncheckedShiftL#` (i2w_s 24#)
-#else
-	mask# = (i2w (ord# c#)) `shiftL#` (i2w_s 24#)
-#endif
 	-- here comes THE MAGIC:
 
 	-- This is one of the most hammered bits in the whole compiler

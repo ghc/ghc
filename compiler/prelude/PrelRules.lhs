@@ -47,11 +47,7 @@ import StaticFlags      ( opt_SimplExcessPrecision )
 
 import Data.Bits as Bits	( Bits(..), shiftL, shiftR )
 	-- shiftL and shiftR were not always methods of Bits
-#if __GLASGOW_HASKELL__ >= 500
 import Data.Word	( Word )
-#else
-import Data.Word	( Word64 )
-#endif
 \end{code}
 
 
@@ -104,18 +100,14 @@ primOpRules op op_name = primop_rule op
     primop_rule ISrlOp      = two_lits (intShiftOp2 shiftRightLogical)
 
 	-- Word operations
-#if __GLASGOW_HASKELL__ >= 500
     primop_rule WordAddOp   = two_lits (wordOp2    (+))
     primop_rule WordSubOp   = two_lits (wordOp2    (-))
     primop_rule WordMulOp   = two_lits (wordOp2    (*))
-#endif
     primop_rule WordQuotOp  = two_lits (wordOp2Z   quot)
     primop_rule WordRemOp   = two_lits (wordOp2Z   rem)
-#if __GLASGOW_HASKELL__ >= 407
     primop_rule AndOp       = two_lits (wordBitOp2 (.&.))
     primop_rule OrOp        = two_lits (wordBitOp2 (.|.))
     primop_rule XorOp       = two_lits (wordBitOp2 xor)
-#endif
     primop_rule SllOp       = two_lits (wordShiftOp2 Bits.shiftL)
     primop_rule SrlOp       = two_lits (wordShiftOp2 shiftRightLogical)
 
@@ -261,26 +253,18 @@ shiftRightLogical x n = fromIntegral (fromInteger x `shiftR` n :: Word)
 
 
 --------------------------
-#if __GLASGOW_HASKELL__ >= 500
 wordOp2 :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 wordOp2 op (MachWord w1) (MachWord w2)
   = wordResult (w1 `op` w2)
 wordOp2 op l1 l2 = Nothing		-- Could find LitLit
-#endif
 
 wordOp2Z :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 wordOp2Z op (MachWord w1) (MachWord w2)
   | w2 /= 0 = wordResult (w1 `op` w2)
 wordOp2Z op l1 l2 = Nothing	-- LitLit or zero dividend
 
-#if __GLASGOW_HASKELL__ >= 500
 wordBitOp2 op l1@(MachWord w1) l2@(MachWord w2)
   = wordResult (w1 `op` w2)
-#else
--- Integer is not an instance of Bits, so we operate on Word64
-wordBitOp2 op l1@(MachWord w1) l2@(MachWord w2)
-  = wordResult ((fromIntegral::Word64->Integer) (fromIntegral w1 `op` fromIntegral w2))
-#endif
 wordBitOp2 op l1 l2 = Nothing		-- Could find LitLit
 
 wordShiftOp2 :: (Integer->Int->Integer) -> Literal -> Literal -> Maybe CoreExpr
@@ -360,11 +344,9 @@ intResult :: Integer -> Maybe CoreExpr
 intResult result
   = Just (mkIntVal (toInteger (fromInteger result :: Int)))
 
-#if __GLASGOW_HASKELL__ >= 500
 wordResult :: Integer -> Maybe CoreExpr
 wordResult result
   = Just (mkWordVal (toInteger (fromInteger result :: Word)))
-#endif
 \end{code}
 
 

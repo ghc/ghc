@@ -202,12 +202,6 @@ writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
   hPutArray h arr ix
-#if __GLASGOW_HASKELL__ <= 500
-  -- workaround a bug in old implementation of hPutBuf (it doesn't
-  -- set the FILEOBJ_RW_WRITTEN flag on the file object, so the file doens't
-  -- get flushed properly).  Adding an extra '\0' doens't do any harm.
-  hPutChar h '\0'
-#endif
   hClose h
 
 readBinMem :: FilePath -> IO BinHandle
@@ -272,11 +266,7 @@ getWord8 (BinMem _ ix_r sz_r arr_r) = do
     ix <- readFastMutInt ix_r
     sz <- readFastMutInt sz_r
     when (ix >= sz)  $
-#if __GLASGOW_HASKELL__ <= 408
-	throw (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
-#else
 	ioError (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
-#endif
     arr <- readIORef arr_r
     w <- unsafeRead arr ix
     writeFastMutInt ix_r (ix+1)
@@ -516,23 +506,12 @@ freezeByteArray arr = IO $ \s ->
   (# s, BA arr #) }
 
 writeByteArray :: MutableByteArray# RealWorld -> Int# -> Word8 -> IO ()
-
-#if __GLASGOW_HASKELL__ < 503
-writeByteArray arr i w8 = IO $ \s ->
-  case word8ToWord w8 of { W# w# -> 
-  case writeCharArray# arr i (chr# (word2Int# w#)) s  of { s ->
-  (# s , () #) }}
-#else
 writeByteArray arr i (W8# w) = IO $ \s ->
   case writeWord8Array# arr i w s of { s ->
   (# s, () #) }
-#endif
 
-#if __GLASGOW_HASKELL__ < 503
-indexByteArray a# n# = fromIntegral (I# (ord# (indexCharArray# a# n#)))
-#else
+indexByteArray :: ByteArray# -> Int# -> Word8
 indexByteArray a# n# = W8# (indexWord8Array# a# n#)
-#endif
 
 instance (Integral a, Binary a) => Binary (Ratio a) where
     put_ bh (a :% b) = do put_ bh a; put_ bh b

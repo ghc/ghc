@@ -252,27 +252,16 @@ draw (Node x ts) = grp this (space (length this)) (stLoop ts)
 %************************************************************************
 
 \begin{code}
-#if __GLASGOW_HASKELL__ >= 504
-newSTArray :: Ix i => (i,i) -> e -> ST s (STArray s i e)
-newSTArray = newArray
-
-readSTArray :: Ix i => STArray s i e -> i -> ST s e
-readSTArray = readArray
-
-writeSTArray :: Ix i => STArray s i e -> i -> e -> ST s ()
-writeSTArray = writeArray
-#endif
-
 type Set s    = STArray s Vertex Bool
 
 mkEmpty      :: Bounds -> ST s (Set s)
-mkEmpty bnds  = newSTArray bnds False
+mkEmpty bnds  = newArray bnds False
 
 contains     :: Set s -> Vertex -> ST s Bool
-contains m v  = readSTArray m v
+contains m v  = readArray m v
 
 include      :: Set s -> Vertex -> ST s ()
-include m v   = writeSTArray m v True
+include m v   = writeArray m v True
 \end{code}
 
 \begin{code}

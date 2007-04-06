@@ -29,9 +29,6 @@ import SrcLoc
 import Data.List
 import CmdLineParser
 
-#if __GLASGOW_HASKELL__ <= 408
-import Panic		( catchJust, ioErrors )
-#endif
 import ErrUtils         ( debugTraceMsg, putMsg )
 
 import Data.IORef	( IORef, readIORef, writeIORef )

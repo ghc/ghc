@@ -19,10 +19,6 @@ module FastMutInt(
 
 import GHC.Base
 import GHC.IOBase
-
-#if __GLASGOW_HASKELL__ < 411
-newByteArray# = newCharArray#
-#endif
 \end{code}
 
 \begin{code}

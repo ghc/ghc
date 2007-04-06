@@ -51,9 +51,7 @@ import PprCmm		() -- instances only
 -- import Debug.Trace
 #endif
 
-#if __GLASGOW_HASKELL__ >= 504
 import Data.Array.ST
-#endif
 import Control.Monad.ST
 
 #if x86_64_TARGET_ARCH
@@ -965,46 +963,20 @@ big_doubles
   | machRepByteWidth F64 == wORD_SIZE      = False
   | otherwise = panic "big_doubles"
 
-#if __GLASGOW_HASKELL__ >= 504
-newFloatArray :: (Int,Int) -> ST s (STUArray s Int Float)
-newFloatArray = newArray_
-
-newDoubleArray :: (Int,Int) -> ST s (STUArray s Int Double)
-newDoubleArray = newArray_
-
 castFloatToIntArray :: STUArray s Int Float -> ST s (STUArray s Int Int)
 castFloatToIntArray = castSTUArray
 
 castDoubleToIntArray :: STUArray s Int Double -> ST s (STUArray s Int Int)
 castDoubleToIntArray = castSTUArray
 
-writeFloatArray :: STUArray s Int Float -> Int -> Float -> ST s ()
-writeFloatArray = writeArray
-
-writeDoubleArray :: STUArray s Int Double -> Int -> Double -> ST s ()
-writeDoubleArray = writeArray
-
-readIntArray :: STUArray s Int Int -> Int -> ST s Int
-readIntArray = readArray
-
-#else
-
-castFloatToIntArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
-castFloatToIntArray = return
-
-castDoubleToIntArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
-castDoubleToIntArray = return
-
-#endif
-
 -- floats are always 1 word
 floatToWord :: Rational -> CmmLit
 floatToWord r
   = runST (do
-	arr <- newFloatArray ((0::Int),0)
-	writeFloatArray arr 0 (fromRational r)
+	arr <- newArray_ ((0::Int),0)
+	writeArray arr 0 (fromRational r)
 	arr' <- castFloatToIntArray arr
-	i <- readIntArray arr' 0
+	i <- readArray arr' 0
 	return (CmmInt (toInteger i) wordRep)
     )
 
@@ -1012,21 +984,21 @@ doubleToWords :: Rational -> [CmmLit]
 doubleToWords r
   | big_doubles				-- doubles are 2 words
   = runST (do
-	arr <- newDoubleArray ((0::Int),1)
-	writeDoubleArray arr 0 (fromRational r)
+	arr <- newArray_ ((0::Int),1)
+	writeArray arr 0 (fromRational r)
 	arr' <- castDoubleToIntArray arr
-	i1 <- readIntArray arr' 0
-	i2 <- readIntArray arr' 1
+	i1 <- readArray arr' 0
+	i2 <- readArray arr' 1
 	return [ CmmInt (toInteger i1) wordRep
 	       , CmmInt (toInteger i2) wordRep
 	       ]
     )
   | otherwise				-- doubles are 1 word
   = runST (do
-	arr <- newDoubleArray ((0::Int),0)
-	writeDoubleArray arr 0 (fromRational r)
+	arr <- newArray_ ((0::Int),0)
+	writeArray arr 0 (fromRational r)
 	arr' <- castDoubleToIntArray arr
-	i <- readIntArray arr' 0
+	i <- readArray arr' 0
 	return [ CmmInt (toInteger i) wordRep ]
     )
 

@@ -120,25 +120,15 @@ i2w_s x = (x::Int#)
 mkUnique (C# c) (I# i)
   = MkUnique (w2i (tag `or#` bits))
   where
-#if __GLASGOW_HASKELL__ >= 503
     tag  = i2w (ord# c) `uncheckedShiftL#` i2w_s 24#
-#else
-    tag  = i2w (ord# c) `shiftL#` i2w_s 24#
-#endif
     bits = i2w i `and#` (i2w 16777215#){-``0x00ffffff''-}
 
 unpkUnique (MkUnique u)
   = let
-	tag = C# (chr# (w2i ((i2w u) `shiftr` (i2w_s 24#))))
+	tag = C# (chr# (w2i ((i2w u) `uncheckedShiftRL#` (i2w_s 24#))))
 	i   = I# (w2i ((i2w u) `and#` (i2w 16777215#){-``0x00ffffff''-}))
     in
     (tag, i)
-  where
-#if __GLASGOW_HASKELL__ >= 503
-    shiftr x y = uncheckedShiftRL# x y
-#else
-    shiftr x y = shiftRL# x y
-#endif
 \end{code}
 
 

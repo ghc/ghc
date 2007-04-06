@@ -39,7 +39,7 @@ import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
 import GHC.ConsoleHandler
 #endif
 
-import Control.Exception hiding (try)
+import Control.Exception
 import Control.Concurrent ( myThreadId, MVar, ThreadId, withMVar, newMVar )
 import Data.Dynamic
 import qualified Control.Exception as Exception
@@ -171,32 +171,13 @@ tryMost action = do r <- try action; filter r
 tryUser :: IO a -> IO (Either Exception.Exception a)
 tryUser action = tryJust tc_errors action
   where 
-#if __GLASGOW_HASKELL__ > 504 || __GLASGOW_HASKELL__ < 500
+#if __GLASGOW_HASKELL__ > 504
 	tc_errors e@(Exception.IOException ioe) | isUserError ioe = Just e
-#elif __GLASGOW_HASKELL__ == 502
-	tc_errors e@(UserError _) = Just e
 #else 
 	tc_errors e@(Exception.IOException ioe) | isUserError e = Just e
 #endif
 	tc_errors _other = Nothing
 \end{code}	
-
-Compatibility stuff:
-
-\begin{code}
-#if __GLASGOW_HASKELL__ <= 408
-try = Exception.tryAllIO
-#else
-try = Exception.try
-#endif
-
-#if __GLASGOW_HASKELL__ <= 408
-catchJust = Exception.catchIO
-tryJust   = Exception.tryIO
-ioErrors  = Exception.justIoErrors
-throwTo   = Exception.raiseInThread
-#endif
-\end{code}
 
 Standard signal handlers for catching ^C, which just throw an
 exception in the target thread.  The current target thread is

@@ -2395,41 +2395,11 @@ limitShiftRI x = x
 -- -----------------------------------------------------------------------------
 -- Converting floating-point literals to integrals for printing
 
-#if __GLASGOW_HASKELL__ >= 504
-newFloatArray :: (Int,Int) -> ST s (STUArray s Int Float)
-newFloatArray = newArray_
+castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
+castFloatToWord8Array = castSTUArray
 
-newDoubleArray :: (Int,Int) -> ST s (STUArray s Int Double)
-newDoubleArray = newArray_
-
-castFloatToCharArray :: STUArray s Int Float -> ST s (STUArray s Int Word8)
-castFloatToCharArray = castSTUArray
-
-castDoubleToCharArray :: STUArray s Int Double -> ST s (STUArray s Int Word8)
-castDoubleToCharArray = castSTUArray
-
-writeFloatArray :: STUArray s Int Float -> Int -> Float -> ST s ()
-writeFloatArray = writeArray
-
-writeDoubleArray :: STUArray s Int Double -> Int -> Double -> ST s ()
-writeDoubleArray = writeArray
-
-readCharArray :: STUArray s Int Word8 -> Int -> ST s Char
-readCharArray arr i = do 
-  w <- readArray arr i
-  return $! (chr (fromIntegral w))
-
-#else
-
-castFloatToCharArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
-castFloatToCharArray = return
-
-castDoubleToCharArray :: MutableByteArray s t -> ST s (MutableByteArray s t)
-
-
-castDoubleToCharArray = return
-
-#endif
+castDoubleToWord8Array :: STUArray s Int Double -> ST s (STUArray s Int Word8)
+castDoubleToWord8Array = castSTUArray
 
 -- floatToBytes and doubleToBytes convert to the host's byte
 -- order.  Providing that we're not cross-compiling for a 
@@ -2442,29 +2412,29 @@ castDoubleToCharArray = return
 floatToBytes :: Float -> [Int]
 floatToBytes f
    = runST (do
-        arr <- newFloatArray ((0::Int),3)
-        writeFloatArray arr 0 f
-	arr <- castFloatToCharArray arr
-        i0 <- readCharArray arr 0
-        i1 <- readCharArray arr 1
-        i2 <- readCharArray arr 2
-        i3 <- readCharArray arr 3
-        return (map ord [i0,i1,i2,i3])
+        arr <- newArray_ ((0::Int),3)
+        writeArray arr 0 f
+        arr <- castFloatToWord8Array arr
+        i0 <- readArray arr 0
+        i1 <- readArray arr 1
+        i2 <- readArray arr 2
+        i3 <- readArray arr 3
+        return (map fromIntegral [i0,i1,i2,i3])
      )
 
 doubleToBytes :: Double -> [Int]
 doubleToBytes d
    = runST (do
-        arr <- newDoubleArray ((0::Int),7)
-        writeDoubleArray arr 0 d
-	arr <- castDoubleToCharArray arr
-        i0 <- readCharArray arr 0
-        i1 <- readCharArray arr 1
-        i2 <- readCharArray arr 2
-        i3 <- readCharArray arr 3
-        i4 <- readCharArray arr 4
-        i5 <- readCharArray arr 5
-        i6 <- readCharArray arr 6
-        i7 <- readCharArray arr 7
-        return (map ord [i0,i1,i2,i3,i4,i5,i6,i7])
+        arr <- newArray_ ((0::Int),7)
+        writeArray arr 0 d
+        arr <- castDoubleToWord8Array arr
+        i0 <- readArray arr 0
+        i1 <- readArray arr 1
+        i2 <- readArray arr 2
+        i3 <- readArray arr 3
+        i4 <- readArray arr 4
+        i5 <- readArray arr 5
+        i6 <- readArray arr 6
+        i7 <- readArray arr 7
+        return (map fromIntegral [i0,i1,i2,i3,i4,i5,i6,i7])
      )

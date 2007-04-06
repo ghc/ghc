@@ -68,13 +68,6 @@ import System.Directory
 
 import Control.Exception
 import Data.Maybe
-
-#if __GLASGOW_HASKELL__ >= 503
-import GHC.IOBase	( IO(..) )
-#else
-import PrelIOBase	( IO(..) )
-#endif
-
 \end{code}
 
 

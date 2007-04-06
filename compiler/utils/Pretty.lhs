@@ -1022,11 +1022,7 @@ printDoc mode hdl doc
   -- some versions of hPutBuf will barf if the length is zero
 hPutLitString handle a# 0# = return ()
 hPutLitString handle a# l#
-#if __GLASGOW_HASKELL__ < 411
-  = hPutBuf handle (A# a#) (I# l#)
-#else
   = hPutBuf handle (Ptr a#) (I# l#)
-#endif
 
 -- Printing output in LeftMode is performance critical: it's used when
 -- dumping C and assembly output, so we allow ourselves a few dirty
@@ -1066,9 +1062,4 @@ layLeft b (TextBeside s sl p) 	= put b s >> layLeft b p
     put b (Str s)    = bPutStr  b s
     put b (PStr s)   = bPutFS   b s
     put b (LStr s l) = bPutLitString b s l
-
-#if __GLASGOW_HASKELL__ < 503
-hPutBuf = hPutBufFull
-#endif
-
 \end{code}

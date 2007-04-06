@@ -43,11 +43,7 @@ import FastTypes
 
 import GHC.Exts		( indexArray# )
 
-#if __GLASGOW_HASKELL__ < 503
-import PrelArr  ( Array(..) )
-#else
 import GHC.Arr  ( Array(..) )
-#endif
 
 import Array		( array, (//) )
 

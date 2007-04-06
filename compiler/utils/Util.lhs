@@ -890,13 +890,9 @@ handleDyn :: Typeable ex => (ex -> IO a) -> IO a -> IO a
 handleDyn = flip catchDyn
 
 handle :: (Exception -> IO a) -> IO a -> IO a
-#if __GLASGOW_HASKELL__ < 501
-handle = flip Exception.catchAllIO
-#else
 handle h f = f `Exception.catch` \e -> case e of
     ExitException _ -> throw e
     _               -> h e
-#endif
 
 -- --------------------------------------------------------------
 -- check existence & modification time at the same time

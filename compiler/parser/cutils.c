@@ -3,19 +3,8 @@ These utility routines are used various
 places in the GHC library.
 */
 
-/* For GHC 4.08, we are relying on the fact that RtsFlags has
- * compatible layout with the current version, because we're
- * #including the current version of RtsFlags.h below.  4.08 didn't
- * ship with its own RtsFlags.h, unfortunately.   For later GHC
- * versions, we #include the correct RtsFlags.h.
- */
-#if __GLASGOW_HASKELL__ < 502
-#include "../includes/Rts.h"
-#include "../includes/RtsFlags.h"
-#else
 #include "Rts.h"
 #include "RtsFlags.h"
-#endif
 
 #include "HsFFI.h"
 
@@ -51,10 +40,7 @@ ghc_memcmp_off( HsAddr a1, HsInt i, HsAddr a2, HsInt len )
 void
 enableTimingStats( void )	/* called from the driver */
 {
-#if __GLASGOW_HASKELL__ >= 411
     RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
-#endif
-    /* ignored when bootstrapping with an older GHC */
 }
 
 void

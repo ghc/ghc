@@ -379,11 +379,6 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 {
--- work around bug in Alex 2.0
-#if __GLASGOW_HASKELL__ < 503
-unsafeAt arr i = arr ! i
-#endif
-
 -- -----------------------------------------------------------------------------
 -- The token type
 

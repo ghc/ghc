@@ -3,7 +3,7 @@ module LexCore where
 import ParserCoreUtils
 import Ratio
 import Char
-import qualified Numeric( readFloat, readDec )
+import Numeric
 
 isNameChar c = isAlpha c || isDigit c || (c == '_') || (c == '\'')
 	       || (c == ':') || (c == '$')
@@ -97,39 +97,3 @@ lexKeyword cont cs =
       ("_",rest) -> cont TKwild rest
       _ -> failP "invalid keyword" ('%':cs) 
 
-
-#if __GLASGOW_HASKELL__ >= 504
--- The readFloat in the Numeric library will do the job
-
-readFloat :: (RealFrac a) => ReadS a
-readFloat = Numeric.readFloat
-
-#else
--- Haskell 98's Numeric.readFloat used to have a bogusly restricted signature
--- so it was incapable of reading a rational.  
--- So for GHCs that have that old bogus library, here is the code, written out longhand.
-
-readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
-                                                       (k,t)   <- readExp s] ++
-                 [ (0/0, t) | ("NaN",t)      <- lex r] ++
-                 [ (1/0, t) | ("Infinity",t) <- lex r]
-               where 
-                 readFix r = [(read (ds++ds'), length ds', t)
-                             | (ds,d) <- lexDigits r,
-                               (ds',t) <- lexFrac d ]
-               
-                 lexFrac ('.':ds) = lexDigits ds
-                 lexFrac s        = [("",s)]        
-                 
-                 readExp (e:s) | e `elem` "eE" = readExp' s
-                 readExp s                     = [(0,s)]
-                 
-                 readExp' ('-':s) = [(-k,t) | (k,t) <- Numeric.readDec s]
-                 readExp' ('+':s) = Numeric.readDec s
-                 readExp' s       = Numeric.readDec s
-
-lexDigits :: ReadS String 
-lexDigits s =  case span isDigit s of
-		 (cs,s') | not (null cs) -> [(cs,s')]
-		 otherwise		 -> []
-#endif

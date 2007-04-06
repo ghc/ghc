@@ -827,18 +827,8 @@ shiftR_ :: FastInt -> FastInt -> FastInt
 #if __GLASGOW_HASKELL__
 {-# INLINE shiftL_ #-}
 {-# INLINE shiftR_ #-}
-#if __GLASGOW_HASKELL__ >= 503
 shiftL_ n p = word2Int#((int2Word# n) `uncheckedShiftL#` p)
-#else
-shiftL_ n p = word2Int#((int2Word# n) `shiftL#` p)
-#endif
-shiftR_ n p = word2Int#((int2Word# n) `shiftr` p)
-  where
-#if __GLASGOW_HASKELL__ >= 503
-    shiftr x y = uncheckedShiftRL# x y
-#else
-    shiftr x y = shiftRL# x y
-#endif
+shiftR_ n p = word2Int#((int2Word# n) `uncheckedShiftRL#` p)
 
 #else /* not GHC */
 shiftL_ n p = n * (2 ^ p)

@@ -96,13 +96,8 @@ import Constants
 import FastTypes
 
 #if powerpc_TARGET_ARCH
-#if __GLASGOW_HASKELL__ >= 504
 import Data.Word	( Word8, Word16, Word32 )
 import Data.Int 	( Int8, Int16, Int32 )
-#else
-import Word     	( Word8, Word16, Word32 )
-import Int 	        ( Int8, Int16, Int32 )
-#endif
 #endif
 
 -- -----------------------------------------------------------------------------

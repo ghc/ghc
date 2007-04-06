@@ -417,13 +417,8 @@ decodeSize str
 -----------------------------------------------------------------------------
 -- RTS Hooks
 
-#if __GLASGOW_HASKELL__ >= 504
 foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
 foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
-#else
-foreign import "setHeapSize"       unsafe setHeapSize       :: Int -> IO ()
-foreign import "enableTimingStats" unsafe enableTimingStats :: IO ()
-#endif
 
 -----------------------------------------------------------------------------
 -- Ways
