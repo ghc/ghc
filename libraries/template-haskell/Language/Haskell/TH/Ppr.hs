@@ -170,9 +170,9 @@ instance Ppr Pat where
 
 pprPat :: Precedence -> Pat -> Doc
 pprPat i (LitP l)     = pprLit i l
-pprPat _ (VarP v)     = ppr v
+pprPat _ (VarP v)     = pprName' Applied v
 pprPat _ (TupP ps)    = parens $ sep $ punctuate comma $ map ppr ps
-pprPat i (ConP s ps)  = parensIf (i > noPrec) $ ppr s
+pprPat i (ConP s ps)  = parensIf (i > noPrec) $ pprName' Applied s
                                             <+> sep (map (pprPat appPrec) ps)
 pprPat i (InfixP p1 n p2)
                       = parensIf (i > noPrec) (pprPat opPrec p1 <+>
