@@ -26,6 +26,10 @@ main = do runQ [| f u1 u2 |] >>= p
           runQ [| \(x : xs) -> x |] >>= p
           runQ [d| class Foo a b where
                        foo :: a -> b   |] >>= p
+          runQ [| \x -> (x, 1 `x` 2) |] >>= p
+          runQ [| \(+) -> ((+), 1 + 2) |] >>= p
+          runQ [| (f, 1 `f` 2) |] >>= p
+          runQ [| ((.+.), 1 .+. 2) |] >>= p
 
 p :: Ppr a => a -> IO ()
 p = putStrLn . pprint

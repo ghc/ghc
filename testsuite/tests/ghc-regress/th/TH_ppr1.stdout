@@ -8,3 +8,7 @@ Main.u1 GHC.Base.: Main.u2
 \(x_0 GHC.Base.: xs_1) -> x_0
 class Foo a_0 b_1
     where foo :: a_0 -> b_1
+\x_0 -> (x_0, 1 `x_0` 2)
+\(+_0) -> ((+_0), 1 +_0 2)
+(Main.f, 1 `Main.f` 2)
+((Main..+.), 1 Main..+. 2)
