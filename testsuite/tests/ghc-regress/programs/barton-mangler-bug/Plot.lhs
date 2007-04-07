@@ -43,7 +43,7 @@ list of values, and a function that goes from the appropriate types.
 > plot2d' [] xs _ = "Extra results: " ++ show xs
 
 > isSame :: (Fractional a, Ord a) => a -> a -> Bool
-> x `isSame` y = abs (x - y) < 0.000001
+> x `isSame` y = abs (x - y) < 0.00001
 
 And now, let's create a function to make a range out of a triple of a
 start point, an end point, and an increment.
