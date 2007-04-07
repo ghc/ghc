@@ -31,11 +31,12 @@ module Language.Haskell.TH.PprLib (
 	-- * Predicates on documents
 	isEmpty,
 
-    to_HPJ_Doc, pprName
+    to_HPJ_Doc, pprName, pprName'
   ) where
 
 
-import Language.Haskell.TH.Syntax (Name(..), showName, NameFlavour(..))
+import Language.Haskell.TH.Syntax
+    (Name(..), showName', NameFlavour(..), NameIs(..))
 import qualified Text.PrettyPrint.HughesPJ as HPJ
 import Control.Monad (liftM, liftM2)
 import Data.Map ( Map )
@@ -114,17 +115,21 @@ punctuate :: Doc -> [Doc] -> [Doc];      -- ^ @punctuate p [d1, ... dn] = [d1 \<
 -- ---------------------------------------------------------------------------
 -- The "implementation"
 
-type State = (Map Name HPJ.Doc, Int)
+type State = (Map Name Name, Int)
 data PprM a = PprM { runPprM :: State -> (a, State) }
 
-pprName :: Bool -> Name -> Doc
-pprName pfx n@(Name o (NameU _))
+pprName :: Name -> Doc
+pprName = pprName' Alone
+
+pprName' :: NameIs -> Name -> Doc
+pprName' ni n@(Name o (NameU _))
  = PprM $ \s@(fm, i@(I# i'))
-        -> case Map.lookup n fm of
-               Just d -> (d, s)
-               Nothing -> let d = HPJ.text $ showName pfx $ Name o (NameU i')
-                          in (d, (Map.insert n d fm, i + 1))
-pprName pfx n = text $ showName pfx n
+        -> let (n', s') = case Map.lookup n fm of
+                         Just d -> (d, s)
+                         Nothing -> let n' = Name o (NameU i')
+                                    in (n', (Map.insert n n' fm, i + 1))
+           in (HPJ.text $ showName' ni n', s')
+pprName' ni n = text $ showName' ni n
 
 {-
 instance Show Name where

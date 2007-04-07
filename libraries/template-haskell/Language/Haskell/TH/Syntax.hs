@@ -22,7 +22,8 @@ module Language.Haskell.TH.Syntax(
 	currentModule, runIO,
 
 	-- Names
-	Name(..), mkName, newName, nameBase, nameModule, showName,
+	Name(..), mkName, newName, nameBase, nameModule,
+    showName, showName', NameIs(..),
 
 	-- The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
@@ -432,11 +433,21 @@ instance Ord NameFlavour where
 					    (m1 `compare` m2) 
   (NameG _ _ _)    `compare` other	  = GT
 
-showName :: Bool -> Name -> String
-showName pflg nm | pflg && pnam = nms
-                 | pflg         = "(" ++ nms ++ ")"
-                 | pnam         = "`" ++ nms ++ "`"
-                 | otherwise    = nms
+data NameIs = Alone | Applied | Infix
+
+showName :: Name -> String
+showName = showName' Alone
+
+showName' :: NameIs -> Name -> String
+showName' ni nm
+ = case ni of
+       Alone        -> nms
+       Applied
+        | pnam      -> nms
+        | otherwise -> "(" ++ nms ++ ")"
+       Infix
+        | pnam      -> "`" ++ nms ++ "`"
+        | otherwise -> nms
     where
 	-- For now, we make the NameQ and NameG print the same, even though
 	-- NameQ is a qualified name (so what it means depends on what the
@@ -453,16 +464,17 @@ showName pflg nm | pflg && pnam = nms
 
         pnam = classify nms
 
+        -- True if we are function style, e.g. f, [], (,)
+        -- False if we are operator style, e.g. +, :+
         classify "" = False -- shouldn't happen; . operator is handled below
-        classify (x:xs) | isAlpha x || x == '_' =
+        classify (x:xs) | isAlpha x || (x `elem` "_[]()") =
                             case dropWhile (/='.') xs of
                                   (_:xs') -> classify xs'
                                   []      -> True
                         | otherwise = False
 
 instance Show Name where
-  show = showName True
-
+  show = showName
 
 -- 	Tuple data and type constructors
 tupleDataName  :: Int -> Name	-- Data constructor
