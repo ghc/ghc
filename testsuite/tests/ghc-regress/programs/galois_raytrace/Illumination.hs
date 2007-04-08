@@ -30,7 +30,7 @@ render :: (Matrix,Matrix) -> Color -> [Light] -> Object -> Int ->
           Radian -> Int -> Int -> String -> IO ()
 render (m,m') amb ls obj dep fov wid ht file
   = do { debugging
-       ; putStrLn (showBitmap wid ht pixels)
+       ; putStrLn (showBitmap' wid ht pixels)
        }
   where
     debugging = return ()
@@ -130,6 +130,19 @@ showBitmap _ _ _ = error "incorrect length of bitmap string"
 scalePixel :: Double -> Char
 scalePixel p = chr (floor (clampf p * 255))
 
+showBitmap' :: Int -> Int ->[[Color]] -> String
+showBitmap' wid ht pss
+-- type of assert  | length pss == ht && all (\ ps -> length ps == wid) pss
+  = header
+ ++ unlines [ unwords [unwords [scalePixel' r,scalePixel' g,scalePixel' b]
+                      | (r,g,b) <- map uncolor ps]
+            | ps <- pss ]
+  where
+    header = "P3\n#Galois\n" ++ show wid ++ " " ++ show ht ++ "\n255\n"
+showBitmap' _ _ _ = error "incorrect length of bitmap string"
+
+scalePixel' :: Double -> String
+scalePixel' p = show (floor (clampf p * 255))
 
 -- Lights
 
