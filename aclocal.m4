@@ -978,7 +978,9 @@ AC_DEFUN([FP_SETUP_PROJECT_VERSION],
 [
 if test "$RELEASE" = "NO"; then
     AC_MSG_CHECKING([for GHC version date])
-    if test -d _darcs; then
+    if test -f VERSION_DATE; then
+        PACKAGE_VERSION=${PACKAGE_VERSION}.`cat VERSION_DATE`
+    elif test -d _darcs; then
         changequote(, )dnl
         ver_date=`darcs changes --quiet --no-summary --xml | head -500 | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | sort -n | tail -1`
         if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
