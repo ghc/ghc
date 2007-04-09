@@ -980,6 +980,7 @@ if test "$RELEASE" = "NO"; then
     AC_MSG_CHECKING([for GHC version date])
     if test -f VERSION_DATE; then
         PACKAGE_VERSION=${PACKAGE_VERSION}.`cat VERSION_DATE`
+        AC_MSG_RESULT(given $PACKAGE_VERSION)
     elif test -d _darcs; then
         changequote(, )dnl
         ver_date=`darcs changes --quiet --no-summary --xml | head -500 | grep 'date=' | sed "s/^.*date='\([0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]\).*$/\1/g" | sort -n | tail -1`
@@ -988,10 +989,10 @@ if test "$RELEASE" = "NO"; then
                 AC_MSG_ERROR([failed to detect version date: check that darcs is in your path])
         fi
         PACKAGE_VERSION=${PACKAGE_VERSION}.$ver_date
-        AC_MSG_RESULT($PACKAGE_VERSION)
+        AC_MSG_RESULT(inferred $PACKAGE_VERSION)
     elif test -f VERSION; then
         PACKAGE_VERSION=`cat VERSION`
-        AC_MSG_RESULT($PACKAGE_VERSION)
+        AC_MSG_RESULT(given $PACKAGE_VERSION)
     else
         AC_MSG_WARN([cannot determine snapshot version: no _darcs directory and no VERSION file])
     fi
