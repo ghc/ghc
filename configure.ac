@@ -44,13 +44,6 @@ dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
 dnl We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
 AC_PREREQ([2.52])
 
-dnl * Declare subdirectories that have a private configure script
-dnl
-dnl After the toplevel configuration is complete, the script will recurse into
-dnl these subdirectories if they exist. The use of a cache file makes repeated
-dnl checks cheap.
-AC_CONFIG_SUBDIRS([libraries])
-
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
 #
