@@ -529,16 +529,6 @@ SRC_HC_OPTS += -package Cabal
 PKG_DEPENDS += Cabal
 endif
 
-# We use Text.Regex which is in regex-compat with GHC 6.6+
-ifeq "$(bootstrapped)" "YES"
-SRC_HC_OPTS += -package regex-compat
-PKG_DEPENDS += regex-compat
-else
-ifeq "$(ghc_ge_605)" "YES"
-SRC_HC_OPTS += -package regex-compat
-endif
-endif
-
 ifeq "$(ghc_ge_603)" "YES"
 # Ignore lang, to avoid potential clash with the Generics module if
 # lang happens to be a dependency of some exposed package in the local

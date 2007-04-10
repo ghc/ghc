@@ -52,6 +52,7 @@ import System.Environment
 import System.IO
 import SYSTEM_IO_ERROR as IO
 import System.Directory
+import Data.Char
 import Data.Maybe
 import Data.List
 
@@ -65,8 +66,6 @@ import qualified Posix
 import Foreign
 import CString		( CString, peekCString )
 #endif
-
-import Text.Regex
 
 #if __GLASGOW_HASKELL__ < 603
 -- rawSystem comes from libghccompat.a in stage1
@@ -416,18 +415,57 @@ runCc dflags args =   do
   runSomethingFiltered dflags cc_filter "C Compiler" p args1 mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
-  cc_filter str = unlines (do_filter (lines str))
+  cc_filter = unlines . doFilter . lines
 
-  do_filter [] = []
-  do_filter ls@(l:ls')
-      | (w:rest) <- dropWhile (isJust .matchRegex r_from) ls, 
-        isJust (matchRegex r_warn w)
-      = do_filter rest
-      | otherwise
-      = l : do_filter ls'
+  {-
+  gcc gives warnings in chunks like so:
+      In file included from /foo/bar/baz.h:11,
+                       from /foo/bar/baz2.h:22,
+                       from wibble.c:33:
+      /foo/flibble:14: global register variable ...
+      /foo/flibble:15: warning: call-clobbered r...
+  We break it up into its chunks, remove any call-clobbered register
+  warnings from each chunk, and then delete any chunks that we have
+  emptied of warnings.
+  -}
+  doFilter = unChunkWarnings . filterWarnings . chunkWarnings []
+  -- We can't assume that the output will start with an "In file inc..."
+  -- line, so we start off expecting a list of warnings rather than a
+  -- location stack.
+  chunkWarnings :: [String] -- The location stack to use for the next
+                            -- list of warnings
+                -> [String] -- The remaining lines to look at
+                -> [([String], [String])]
+  chunkWarnings loc_stack [] = [(loc_stack, [])]
+  chunkWarnings loc_stack xs
+      = case break loc_stack_start xs of
+        (warnings, lss:xs') ->
+            case span loc_start_continuation xs' of
+            (lsc, xs'') ->
+                (loc_stack, warnings) : chunkWarnings (lss : lsc) xs''
+        _ -> [(loc_stack, xs)]
 
-  r_from = mkRegex "from.*:[0-9]+"
-  r_warn = mkRegex "warning: call-clobbered register used"
+  filterWarnings :: [([String], [String])] -> [([String], [String])]
+  filterWarnings [] = []
+  -- If the warnings are already empty then we are probably doing
+  -- something wrong, so don't delete anything
+  filterWarnings ((xs, []) : zs) = (xs, []) : filterWarnings zs
+  filterWarnings ((xs, ys) : zs) = case filter wantedWarning ys of
+                                       [] -> filterWarnings zs
+                                       ys' -> (xs, ys') : filterWarnings zs
+
+  unChunkWarnings :: [([String], [String])] -> [String]
+  unChunkWarnings [] = []
+  unChunkWarnings ((xs, ys) : zs) = xs ++ ys ++ unChunkWarnings zs
+
+  loc_stack_start        s = "In file included from " `isPrefixOf` s
+  loc_start_continuation s = "                 from " `isPrefixOf` s
+  wantedWarning w
+   | "warning: call-clobbered register used" `isContainedIn` w = False
+   | otherwise = True
+
+isContainedIn :: String -> String -> Bool
+xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 
 -- Turn the -B<dir> option to gcc into the GCC_EXEC_PREFIX env var, to
 -- workaround a bug in MinGW gcc on Windows Vista, see bug #1110.
@@ -730,23 +768,41 @@ readerProc chan hdl filter_fn =
 			checkError l ls
 
 	checkError l ls
-	   = case matchRegex errRegex l of
+	   = case parseError l of
 		Nothing -> do
 		    writeChan chan (BuildMsg (text l))
 		    loop ls Nothing
-		Just (file':lineno':colno':msg:_) -> do
-		    let file   = mkFastString file'
-		        lineno = read lineno'::Int
-		        colno  = case colno' of
-		                   "" -> 0
-		                   _  -> read (init colno') :: Int
-		        srcLoc = mkSrcLoc file lineno colno
+		Just (file, lineNum, colNum, msg) -> do
+		    let srcLoc = mkSrcLoc (mkFastString file) lineNum colNum
 		    loop ls (Just (BuildError srcLoc (text msg)))
 
 	leading_whitespace []    = False
 	leading_whitespace (x:_) = isSpace x
 
-errRegex = mkRegex "^([^:]*):([0-9]+):([0-9]+:)?(.*)"
+parseError :: String -> Maybe (String, Int, Int, String)
+parseError s0 = case breakColon s0 of
+                Just (filename, s1) ->
+                    case breakIntColon s1 of
+                    Just (lineNum, s2) ->
+                        case breakIntColon s2 of
+                        Just (columnNum, s3) ->
+                            Just (filename, lineNum, columnNum, s3)
+                        Nothing ->
+                            Just (filename, lineNum, 0, s2)
+                    Nothing -> Nothing
+                Nothing -> Nothing
+
+breakColon :: String -> Maybe (String, String)
+breakColon xs = case break (':' ==) xs of
+                    (ys, _:zs) -> Just (ys, zs)
+                    _ -> Nothing
+
+breakIntColon :: String -> Maybe (Int, String)
+breakIntColon xs = case break (':' ==) xs of
+                       (ys, _:zs)
+                        | not (null ys) && all isAscii ys && all isDigit ys ->
+                           Just (read ys, zs)
+                       _ -> Nothing
 
 data BuildMessage
   = BuildMsg   !SDoc
