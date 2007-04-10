@@ -22,7 +22,6 @@ ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SUBDIRS += lndir
 endif
 
-
 # Utils that we don't build by default:
 #	nofib-analyse
 
@@ -43,3 +42,10 @@ endif
 #  a Haskell compiler and if you want it.
 
 include $(TOP)/mk/target.mk
+
+# genprimopcode is needed to boot in ghc/compiler...
+ifneq "$(BootingFromHc)" "YES"
+boot ::
+	$(MAKE) -C genprimopcode
+endif
+
