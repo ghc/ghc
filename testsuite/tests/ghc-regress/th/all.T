@@ -65,10 +65,10 @@ test('TH_where', normal, compile_and_run, [''])
 
 test('TH_spliceInst', normal, compile, [''])
 
-test('TH_fail', normal, compile_fail, [''])
+test('TH_exn1', normal, compile_fail, [''])
 
 test('TH_dupdecl', normal, compile_fail, [''])
-test('TH_exn', normal, compile_fail, [''])
+test('TH_exn2', normal, compile_fail, [''])
 
 test('TH_recover', normal, compile_and_run, [''])
 test('TH_dataD1', normal, compile_fail, ['-v0'])
