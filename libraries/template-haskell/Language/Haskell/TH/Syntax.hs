@@ -127,7 +127,7 @@ instance Monad Q where
   return x   = Q (return x)
   Q m >>= k  = Q (m >>= \x -> unQ (k x))
   Q m >> Q n = Q (m >> n)
-  fail s     = Q (fail s)
+  fail s     = report True s >> Q (fail "Q monad failure")
 
 instance Functor Q where
   fmap f (Q x) = Q (fmap f x)
