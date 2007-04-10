@@ -75,3 +75,4 @@ test('TH_dataD1', normal, compile_fail, ['-v0'])
 
 test('TH_ppr1', normal, compile_and_run, ['-fglasgow-exts'])
 
+test('TH_fail', normal, compile_fail, [''])
