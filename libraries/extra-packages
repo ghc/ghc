@@ -14,5 +14,9 @@ haskell-src
 html
 mtl
 network
+parsec
+regex-base
+regex-compat
+regex-posix
 time
 xhtml

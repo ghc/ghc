@@ -12,8 +12,7 @@ TOP=.
 include $(TOP)/mk/boilerplate.mk
 endif
 
-SUBDIRS = base filepath haskell98 template-haskell readline \
-	  regex-base regex-posix regex-compat parsec Cabal
+SUBDIRS = base filepath haskell98 template-haskell readline Cabal
 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -25,6 +24,10 @@ endif
 # Set GhcBootLibs=YES from the command line to work with just the libraries
 # needed to bootstrap GHC.
 ifneq "$(GhcBootLibs)" "YES"
+SUBDIRS += $(wildcard regex-base)
+SUBDIRS += $(wildcard regex-posix)
+SUBDIRS += $(wildcard regex-compat)
+SUBDIRS += $(wildcard parsec)
 SUBDIRS += $(wildcard haskell-src)
 SUBDIRS += $(wildcard html)
 SUBDIRS += $(wildcard network)

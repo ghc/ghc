@@ -3,10 +3,6 @@ Cabal
 filepath
 haskell98
 readline
-regex-base
-regex-compat
-regex-posix
-parsec
 stm
 template-haskell
 unix
