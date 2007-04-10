@@ -394,17 +394,17 @@ runMeta convert expr
 		-- exception-cacthing thing so that if there are any lurking 
 		-- exceptions in the data structure returned by hval, we'll
 		-- encounter them inside the try
-	  either_tval <- tryAllM $ do
-		{ th_syn <- TH.runQ (unsafeCoerce# hval)
-		; case convert (getLoc expr) th_syn of
-		    Left err     -> do { addErrTc err; return Nothing }
-		    Right hs_syn -> return (Just hs_syn) }
-
-	; case either_tval of
-	      Right (Just v) -> return v
-	      Right Nothing  -> failM	-- Error already in Tc monad
-	      Left exn       -> failWithTc (mk_msg "run" exn)	-- Exception
-	}}}
+          either_th_syn <- tryAllM $ tryM $ TH.runQ $ unsafeCoerce# hval
+        ; case either_th_syn of
+            Left exn             -> failWithTc (mk_msg "run" exn)
+            Right (Left exn)     -> failM  -- Error already in Tc monad
+            Right (Right th_syn) -> do
+        { either_hs_syn <- tryAllM $ return $! convert (getLoc expr) th_syn
+        ; case either_hs_syn of
+            Left exn             -> failWithTc (mk_msg "interpret result of" exn)
+            Right (Left err)     -> do { addErrTc err; failM }
+            Right (Right hs_syn) -> return hs_syn
+        }}}}
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",
 			 nest 2 (text (Panic.showException exn)),
