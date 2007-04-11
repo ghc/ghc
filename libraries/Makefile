@@ -98,7 +98,7 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 	-$(RM) -rf $*/setup
 	mkdir $*/setup
 	$(CP) $*/Setup.*hs $*/setup
-	cd $*/setup && $(GHC) --make -i../../$(BOOTSTRAPPING_CABAL) Setup.*hs -o Setup
+	cd $*/setup && $(GHC) -Wall --make -i../../$(BOOTSTRAPPING_CABAL) Setup.*hs -o Setup
 
 stamp/$(BOOTSTRAPPING_CABAL):
 	$(RM) -rf $(BOOTSTRAPPING_CABAL)
