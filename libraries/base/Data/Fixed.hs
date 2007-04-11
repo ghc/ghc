@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -Werror -fno-warn-unused-binds #-}
+{-# OPTIONS -Wall -fno-warn-unused-binds #-}
 
 -----------------------------------------------------------------------------
 -- |
