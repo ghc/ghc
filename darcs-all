@@ -21,26 +21,26 @@ quiet=NO
 message()
 {
   if [ "$quiet" = "NO" ]; then
-     echo $*
+     echo "$@"
   fi
 }
 
 darcsall()
 {
-  message "== running darcs $* at the top level"
-  darcs $*
+  message "== running darcs $@ at the top level"
+  darcs "$@"
   for dir in $top_dirs; do
     if test -d $dir -a -d $dir/_darcs; then
-	message "== running darcs $* in $dir"
-	darcs $* --repodir $dir
+	message "== running darcs $@ in $dir"
+	darcs "$@" --repodir $dir
     else
 	message "== $dir not present or not a repository; skipping"
     fi
   done
   for pkg in `cat libraries/core-packages libraries/extra-packages`; do
     if test -d libraries/$pkg; then
-	message "== running darcs $* in libraries/$pkg"
-	darcs $* --repodir libraries/$pkg
+	message "== running darcs $@ in libraries/$pkg"
+	darcs "$@" --repodir libraries/$pkg
     else
 	echo "warning: $pkg doesn't seem to exist, use 'darcs-all get' to get it"
     fi
@@ -62,8 +62,8 @@ darcsget()
       echo "warning: nofib already present; omitting"
     else
       repo="$defaultrepo_base"/nofib
-      message "== running darcs get $additional_flag $* $repo"
-      darcs get $additional_flag $* $repo
+      message "== running darcs get $additional_flag $@ $repo"
+      darcs get $additional_flag "$@" $repo
     fi
   fi
 
@@ -72,8 +72,8 @@ darcsget()
       echo "warning: testsuite already present; omitting"
     else
       repo="$defaultrepo_base"/testsuite
-      message "== running darcs get $additional_flag $* $repo"
-      darcs get $additional_flag $* $repo
+      message "== running darcs get $additional_flag $@ $repo"
+      darcs get $additional_flag "$@" $repo
     fi
   fi
 
@@ -90,8 +90,8 @@ darcsget()
 	echo "warning: $pkg already present; omitting"
     else
 	repo=$defaultrepo_lib/$pkg
-	message "== running darcs get $additional_flag $* $repo"
-	darcs get $additional_flag $* $repo
+	message "== running darcs get $additional_flag $@ $repo"
+	darcs get $additional_flag "$@" $repo
     fi
   done
 }
@@ -126,8 +126,8 @@ do
 done
 
 case $1 in
-  get)  shift; darcsget $*;;
+  get)  shift; darcsget "$@";;
   # Hack around whatsnew failing if there are no changes
-  w|wh|wha|what|whats|whatsn|whatsne|whatsnew) set +e; darcsall $*;;
-  *) darcsall $*;;
+  w|wh|wha|what|whats|whatsn|whatsne|whatsnew) set +e; darcsall "$@";;
+  *) darcsall "$@";;
 esac
