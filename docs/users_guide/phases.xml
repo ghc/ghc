@@ -597,6 +597,32 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <option>-fobject-code</option>
+          <indexterm><primary><option>-fobject-code</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Generate object code.  This is the default outside of
+          GHCi, and can be used with GHCi to cause object code to be
+          generated in preference to bytecode.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-fbyte-code</option>
+          <indexterm><primary><option>-fbyte-code</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Generate byte-code instead of object-code.  This is
+          the default in GHCi.  Byte-code can currently only be used
+          in the interactive interpreter, not saved to disk.  This
+          option is only useful for reversing the effect of
+          <option>-fobject-code</option>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <option>-fPIC</option>
           <indexterm><primary><option>-fPIC</option></primary></indexterm>
         </term>

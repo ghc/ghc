@@ -13,7 +13,8 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC		( Session, DynFlags(..), GhcMode(..), HscTarget(..),
+import GHC		( Session, DynFlags(..), HscTarget(..), 
+                          GhcMode(..), GhcLink(..),
 			  LoadHowMuch(..), dopt, DynFlag(..) )
 import CmdLineParser
 
@@ -90,29 +91,27 @@ main =
                           exitWith ExitSuccess
     _               -> return ()
 
-  let mode = case cli_mode of
-		DoInteractive	-> Interactive
-		DoEval _	-> Interactive
-		DoMake		-> BatchCompile
-		DoMkDependHS	-> MkDepend
-		_		-> OneShot
-
   -- start our GHC session
-  session <- GHC.newSession mode mbMinusB
+  session <- GHC.newSession mbMinusB
 
   dflags0 <- GHC.getSessionDynFlags session
 
-  -- set the default HscTarget.  The HscTarget can be further
-  -- adjusted on a module by module basis, using only the -fvia-C and
-  -- -fasm flags.  If the default HscTarget is not HscC or HscAsm,
-  -- -fvia-C and -fasm have no effect.
-  let lang = case cli_mode of 
-		 DoInteractive  -> HscInterpreted
-		 DoEval _	-> HscInterpreted
-		 _other		-> hscTarget dflags0
+  -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
+  -- can be further adjusted on a module by module basis, using only
+  -- the -fvia-C and -fasm flags.  If the default HscTarget is not
+  -- HscC or HscAsm, -fvia-C and -fasm have no effect.
+  let dflt_target = hscTarget dflags0
+      (mode, lang, link)
+         = case cli_mode of
+		DoInteractive	-> (CompManager, HscInterpreted, LinkInMemory)
+		DoEval _	-> (CompManager, HscInterpreted, LinkInMemory)
+		DoMake		-> (CompManager, dflt_target,    LinkBinary)
+		DoMkDependHS	-> (MkDepend,    dflt_target,    LinkBinary)
+		_		-> (OneShot,     dflt_target,    LinkBinary)
 
-  let dflags1 = dflags0{ ghcMode = mode,
-                  	 hscTarget  = lang,
+  let dflags1 = dflags0{ ghcMode   = mode,
+                  	 hscTarget = lang,
+                         ghcLink   = link,
 			 -- leave out hscOutName for now
 	                 hscOutName = panic "Main.main:hscOutName not set",
 		  	 verbosity = case cli_mode of

@@ -78,14 +78,17 @@ deSugar hsc_env
 			    tcg_rules        = rules,
 		    	    tcg_insts        = insts,
 		    	    tcg_fam_insts    = fam_insts })
-  = do	{ showPass dflags "Desugar"
+
+  = do	{ let dflags = hsc_dflags hsc_env
+        ; showPass dflags "Desugar"
 
 	-- Desugar the program
         ; let export_set = availsToNameSet exports
 	; let auto_scc = mkAutoScc mod export_set
         ; let noDbgSites = []
-	; mb_res <- case ghcMode dflags of
-	             JustTypecheck -> return (Just ([], [], NoStubs, noHpcInfo, noDbgSites))
+        ; let target = hscTarget dflags
+	; mb_res <- case target of
+	             HscNothing -> return (Just ([], [], NoStubs, noHpcInfo, noDbgSites))
                      _        -> do (binds_cvr,ds_hpc_info) 
 					      <- if opt_Hpc
                                                  then addCoverageTicksToBinds dflags mod mod_loc binds
@@ -107,7 +110,7 @@ deSugar hsc_env
 
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
-	; let final_prs = addExportFlags ghci_mode export_set
+	; let final_prs = addExportFlags target export_set
                                  keep_alive all_prs ds_rules
 	      ds_binds  = [Rec final_prs]
 	-- Notice that we put the whole lot in a big Rec, even the foreign binds
@@ -178,10 +181,6 @@ deSugar hsc_env
         ; return (Just mod_guts)
 	}}}
 
-  where
-    dflags    = hsc_dflags hsc_env
-    ghci_mode = ghcMode (hsc_dflags hsc_env)
-
 mkAutoScc :: Module -> NameSet -> AutoScc
 mkAutoScc mod exports
   | not opt_SccProfilingOn 	-- No profiling
@@ -233,7 +232,7 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 -- it's just because the type checker is rather busy already and
 -- I didn't want to pass in yet another mapping.
 
-addExportFlags ghci_mode exports keep_alive prs rules
+addExportFlags target exports keep_alive prs rules
   = [(add_export bndr, rhs) | (bndr,rhs) <- prs]
   where
     add_export bndr
@@ -262,7 +261,7 @@ addExportFlags ghci_mode exports keep_alive prs rules
 	-- isExternalName separates the user-defined top-level names from those
 	-- introduced by the type checker.
     is_exported :: Name -> Bool
-    is_exported | ghci_mode == Interactive = isExternalName
+    is_exported | target == HscInterpreted = isExternalName
 		| otherwise 		   = (`elemNameSet` exports)
 
 ppr_ds_rules [] = empty

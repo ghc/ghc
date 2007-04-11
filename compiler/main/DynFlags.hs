@@ -1,3 +1,4 @@
+
 {-# OPTIONS -fno-warn-missing-fields #-}
 -----------------------------------------------------------------------------
 --
@@ -16,7 +17,7 @@ module DynFlags (
 	-- Dynamic flags
 	DynFlag(..),
 	DynFlags(..),
-	HscTarget(..),
+	HscTarget(..), isObjectTarget,
 	GhcMode(..), isOneShot,
 	GhcLink(..), isNoLink,
 	PackageFlag(..),
@@ -335,24 +336,35 @@ data HscTarget
   | HscNothing
   deriving (Eq, Show)
 
+-- | will this target result in an object file on the disk?
+isObjectTarget :: HscTarget -> Bool
+isObjectTarget HscC     = True
+isObjectTarget HscAsm   = True
+isObjectTarget _        = False
+
+-- | The 'GhcMode' tells us whether we're doing multi-module
+-- compilation (controlled via the "GHC" API) or one-shot
+-- (single-module) compilation.  This makes a difference primarily to
+-- the "Finder": in one-shot mode we look for interface files for
+-- imported modules, but in multi-module mode we look for source files
+-- in order to check whether they need to be recompiled.
 data GhcMode
-  = BatchCompile	-- | @ghc --make Main@
-  | Interactive		-- | @ghc --interactive@
-  | OneShot		-- | @ghc -c Foo.hs@
-  | JustTypecheck	-- | Development environemnts, refactorer, etc.
-  | MkDepend
+  = CompManager         -- ^ --make, GHCi, etc.
+  | OneShot		-- ^ ghc -c Foo.hs
+  | MkDepend            -- ^ ghc -M, see Finder for why we need this
   deriving Eq
 
 isOneShot :: GhcMode -> Bool
 isOneShot OneShot = True
 isOneShot _other  = False
 
+-- | What kind of linking to do.
 data GhcLink	-- What to do in the link step, if there is one
-  =		-- Only relevant for modes
-		-- 	DoMake and StopBefore StopLn
-    NoLink		-- Don't link at all
-  | StaticLink		-- Ordinary linker [the default]
+  = NoLink		-- Don't link at all
+  | LinkBinary		-- Link object code into a binary
+  | LinkInMemory        -- Use the in-memory dynamic linker
   | MkDLL		-- Make a DLL
+  deriving Eq
 
 isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
@@ -381,8 +393,8 @@ initDynFlags dflags = do
 
 defaultDynFlags =
      DynFlags {
-	ghcMode			= OneShot,
-	ghcLink			= StaticLink,
+	ghcMode			= CompManager,
+	ghcLink			= LinkBinary,
 	coreToDo 		= Nothing,
 	stgToDo			= Nothing, 
 	hscTarget		= defaultHscTarget, 
@@ -995,10 +1007,13 @@ dynamic_flags = [
 
         ------ Compiler flags -----------------------------------------------
 
+  ,  ( "fasm",		AnySuffix (\_ -> setObjTarget HscAsm) )
+  ,  ( "fvia-c",	NoArg (setObjTarget HscC) )
+  ,  ( "fvia-C",	NoArg (setObjTarget HscC) )
+
   ,  ( "fno-code",	NoArg (setTarget HscNothing))
-  ,  ( "fasm",		AnySuffix (\_ -> setTarget HscAsm) )
-  ,  ( "fvia-c",	NoArg (setTarget HscC) )
-  ,  ( "fvia-C",	NoArg (setTarget HscC) )
+  ,  ( "fbyte-code",    NoArg (setTarget HscInterpreted) )
+  ,  ( "fobject-code",  NoArg (setTarget defaultHscTarget) )
 
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
@@ -1133,12 +1148,23 @@ setPackageName p
   where
         pid = stringToPackageId p
 
--- we can only switch between HscC, and HscAsmm with dynamic flags 
--- (-fvia-C, -fasm, -filx respectively).
-setTarget l = upd (\dfs -> case hscTarget dfs of
-					HscC   -> dfs{ hscTarget = l }
-					HscAsm -> dfs{ hscTarget = l }
-					_      -> dfs)
+-- If we're linking a binary, then only targets that produce object
+-- code are allowed (requests for other target types are ignored).
+setTarget l = upd set
+  where 
+   set dfs 
+     | ghcLink dfs /= LinkBinary || isObjectTarget l  = dfs{ hscTarget = l }
+     | otherwise = dfs
+
+-- Changes the target only if we're compiling object code.  This is
+-- used by -fasm and -fvia-C, which switch from one to the other, but
+-- not from bytecode to object-code.  The idea is that -fasm/-fvia-C
+-- can be safely used in an OPTIONS_GHC pragma.
+setObjTarget l = upd set
+  where 
+   set dfs 
+     | isObjectTarget (hscTarget dfs) = dfs { hscTarget = l }
+     | otherwise = dfs
 
 setOptLevel :: Int -> DynFlags -> DynFlags
 setOptLevel n dflags

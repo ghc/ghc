@@ -1268,7 +1268,19 @@
 	    <row>
 	      <entry><option>-fno-code</option></entry>
 	      <entry>Omit code generation</entry>
-	      <entry>mode</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fbyte-code</option></entry>
+	      <entry>Generate byte-code</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fobject-code</option></entry>
+	      <entry>Generate object code</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	  </tbody>

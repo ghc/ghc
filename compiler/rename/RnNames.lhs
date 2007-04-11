@@ -13,7 +13,7 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import DynFlags		( DynFlag(..), GhcMode(..), DynFlags(..) )
+import DynFlags
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
 			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
@@ -708,10 +708,10 @@ rnExports explicit_mod exports
 	-- written "module Main where ..."
 	-- Reason: don't want to complain about 'main' not in scope
 	--	   in interactive mode
-	; ghc_mode <- getGhcMode
+        ; dflags <- getDOpts
 	; let real_exports 
-          	 | explicit_mod 	   = exports
-          	 | ghc_mode == Interactive = Nothing
+          	 | explicit_mod = exports
+          	 | ghcLink dflags == LinkInMemory = Nothing
           	 | otherwise = Just ([noLoc (IEVar main_RDR_Unqual)])
 	  		-- ToDo: the 'noLoc' here is unhelpful if 'main' 
 	  		--       turns out to be out of scope

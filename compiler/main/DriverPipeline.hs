@@ -250,7 +250,7 @@ compileStub dflags mod location = do
 -- ---------------------------------------------------------------------------
 -- Link
 
-link :: GhcMode			-- interactive or batch
+link :: GhcLink			-- interactive or batch
      -> DynFlags		-- dynamic flags
      -> Bool			-- attempt linking in batch mode?
      -> HomePackageTable	-- what to link
@@ -264,15 +264,15 @@ link :: GhcMode			-- interactive or batch
 -- will succeed.
 
 #ifdef GHCI
-link Interactive dflags batch_attempt_linking hpt
+link LinkInMemory dflags batch_attempt_linking hpt
     = do -- Not Linking...(demand linker will do the job)
 	 return Succeeded
 #endif
 
-link JustTypecheck dflags batch_attempt_linking hpt
+link NoLink dflags batch_attempt_linking hpt
    = return Succeeded
 
-link BatchCompile dflags batch_attempt_linking hpt
+link LinkBinary dflags batch_attempt_linking hpt
    | batch_attempt_linking
    = do 
 	let 
@@ -317,7 +317,7 @@ link BatchCompile dflags batch_attempt_linking hpt
 	-- Don't showPass in Batch mode; doLink will do that for us.
 	let link = case ghcLink dflags of
 	        MkDLL       -> doMkDLL
-	        StaticLink  -> staticLink
+	        LinkBinary  -> staticLink
 	link dflags obj_files pkg_deps
 
         debugTraceMsg dflags 3 (text "link: done")
@@ -377,7 +377,7 @@ doLink dflags stop_phase o_files
   | otherwise
   = case ghcLink dflags of
 	NoLink     -> return ()
-	StaticLink -> staticLink dflags o_files link_pkgs
+	LinkBinary -> staticLink dflags o_files link_pkgs
 	MkDLL      -> doMkDLL dflags o_files link_pkgs
   where
    -- Always link in the haskell98 package for static linking.  Other

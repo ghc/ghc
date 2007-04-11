@@ -728,19 +728,18 @@ tcTopSrcDecls boot_details
 checkMain :: TcM TcGblEnv
 -- If we are in module Main, check that 'main' is defined.
 checkMain 
-  = do { ghc_mode <- getGhcMode ;
-	 tcg_env   <- getGblEnv ;
+  = do { tcg_env   <- getGblEnv ;
 	 dflags    <- getDOpts ;
 	 let { main_mod = mainModIs dflags ;
 	       main_fn  = case mainFunIs dflags of {
 				Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn)) ;
 				Nothing -> main_RDR_Unqual } } ;
 	
-	 check_main ghc_mode tcg_env main_mod main_fn
+	 check_main dflags tcg_env main_mod main_fn
     }
 
 
-check_main ghc_mode tcg_env main_mod main_fn
+check_main dflags tcg_env main_mod main_fn
  | mod /= main_mod
  = traceTc (text "checkMain not" <+> ppr main_mod <+> ppr mod) >>
    return tcg_env
@@ -780,8 +779,8 @@ check_main ghc_mode tcg_env main_mod main_fn
   where
     mod = tcg_mod tcg_env
  
-    complain_no_main | ghc_mode == Interactive = return ()
-		     | otherwise 		= failWithTc noMainMsg
+    complain_no_main | ghcLink dflags == LinkInMemory = return ()
+		     | otherwise = failWithTc noMainMsg
 	-- In interactive mode, don't worry about the absence of 'main'
 	-- In other modes, fail altogether, so that we don't go on
 	-- and complain a second time when processing the export list.

@@ -14,7 +14,8 @@ module GHC (
 	newSession,
 
 	-- * Flags and settings
-	DynFlags(..), DynFlag(..), Severity(..), GhcMode(..), HscTarget(..), dopt,
+	DynFlags(..), DynFlag(..), Severity(..), HscTarget(..), dopt,
+        GhcMode(..), GhcLink(..),
 	parseDynamicFlags,
 	getSessionDynFlags,
 	setSessionDynFlags,
@@ -356,10 +357,8 @@ GLOBAL_VAR(v_bkptLinkEnv, [], [(Name, HValue)])
 
 -- | Starts a new session.  A session consists of a set of loaded
 -- modules, a set of options (DynFlags), and an interactive context.
--- ToDo: GhcMode should say "keep typechecked code" and\/or "keep renamed
--- code".
-newSession :: GhcMode -> Maybe FilePath -> IO Session
-newSession mode mb_top_dir = do
+newSession :: Maybe FilePath -> IO Session
+newSession mb_top_dir = do
   -- catch ^C
   main_thread <- myThreadId
   modifyMVar_ interruptTargetThread (return . (main_thread :))
@@ -367,7 +366,7 @@ newSession mode mb_top_dir = do
 
   dflags0 <- initSysTools mb_top_dir defaultDynFlags
   dflags  <- initDynFlags dflags0
-  env <- newHscEnv dflags{ ghcMode=mode }
+  env <- newHscEnv dflags
   ref <- newIORef env
   return (Session ref)
 
@@ -528,10 +527,9 @@ depanal (Session ref) excluded_mods allow_dup_roots = do
 	 old_graph = hsc_mod_graph hsc_env
 	
   showPass dflags "Chasing dependencies"
-  when (gmode == BatchCompile) $
-	debugTraceMsg dflags 2 (hcat [
-		     text "Chasing modules from: ",
-	     		hcat (punctuate comma (map pprTarget targets))])
+  debugTraceMsg dflags 2 (hcat [
+	     text "Chasing modules from: ",
+	     hcat (punctuate comma (map pprTarget targets))])
 
   r <- downsweep hsc_env old_graph excluded_mods allow_dup_roots
   case r of
@@ -610,8 +608,7 @@ load2 s@(Session ref) how_much mod_graph = do
  	let
 	    -- check the stability property for each module.
 	    stable_mods@(stable_obj,stable_bco)
-		| BatchCompile <- ghci_mode = ([],[])
-	        | otherwise = checkStability hpt1 mg2_with_srcimps all_home_mods
+	        = checkStability hpt1 mg2_with_srcimps all_home_mods
 
 	    -- prune bits of the HPT which are definitely redundant now,
 	    -- to save space.
@@ -719,13 +716,16 @@ load2 s@(Session ref) how_much mod_graph = do
 		a_root_is_Main = any ((==main_mod).ms_mod) mod_graph
 		do_linking = a_root_is_Main || no_hs_main
 
-	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking) $
-	        debugTraceMsg dflags 1 (text ("Warning: output was redirected with -o, " ++
-				              "but no output will be generated\n" ++
-				              "because there is no " ++ moduleNameString (moduleName main_mod) ++ " module."))
+	      when (ghcLink dflags == LinkBinary 
+                    && isJust ofile && not do_linking) $
+	        debugTraceMsg dflags 1 $
+                    text ("Warning: output was redirected with -o, " ++
+                          "but no output will be generated\n" ++
+			  "because there is no " ++ 
+                          moduleNameString (moduleName main_mod) ++ " module.")
 
 	      -- link everything together
-              linkresult <- link ghci_mode dflags do_linking (hsc_HPT hsc_env1)
+              linkresult <- link (ghcLink dflags) dflags do_linking (hsc_HPT hsc_env1)
 
 	      loadFinish Succeeded linkresult ref hsc_env1
 
@@ -755,7 +755,7 @@ load2 s@(Session ref) how_much mod_graph = do
 			(eltsUFM (hsc_HPT hsc_env))) do
 	
 	      -- Link everything together
-              linkresult <- link ghci_mode dflags False hpt4
+              linkresult <- link (ghcLink dflags) dflags False hpt4
 
 	      let hsc_env4 = hsc_env1{ hsc_HPT = hpt4 }
 	      loadFinish Failed linkresult ref hsc_env4
@@ -868,15 +868,13 @@ checkModule session@(Session ref) mod = do
 
 unload :: HscEnv -> [Linkable] -> IO ()
 unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkables'
-  = case ghcMode (hsc_dflags hsc_env) of
-	BatchCompile  -> return ()
-	JustTypecheck -> return ()
+  = case ghcLink (hsc_dflags hsc_env) of
 #ifdef GHCI
-	Interactive -> Linker.unload (hsc_dflags hsc_env) stable_linkables
+	LinkInMemory -> Linker.unload (hsc_dflags hsc_env) stable_linkables
 #else
-	Interactive -> panic "unload: no interpreter"
+	LinkInMemory -> panic "unload: no interpreter"
 #endif
-	other -> panic "unload: strange mode"
+	other -> return ()
 
 -- -----------------------------------------------------------------------------
 -- checkStability
@@ -892,9 +890,6 @@ unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkables'
      for a module when we also load object code fo  all of the imports of the
      module.  So we need to know that we will definitely not be recompiling
      any of these modules, and we can use the object code.
-
-  NB. stability is of no importance to BatchCompile at all, only Interactive.
-  (ToDo: what about JustTypecheck?)
 
   The stability check is as follows.  Both stableObject and
   stableBCO are used during the upsweep phase later.
@@ -914,7 +909,7 @@ unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkables'
 
   These properties embody the following ideas:
 
-    - if a module is stable:
+    - if a module is stable, then:
 	- if it has been compiled in a previous pass (present in HPT)
 	  then it does not need to be compiled or re-linked.
         - if it has not been compiled in a previous pass,
@@ -1125,95 +1120,133 @@ upsweep_mod :: HscEnv
             -> IO (Maybe HomeModInfo)	-- Nothing => Failed
 
 upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
-   = do 
-        let 
-	    this_mod_name = ms_mod_name summary
+   =    let 
+       	    this_mod_name = ms_mod_name summary
 	    this_mod    = ms_mod summary
 	    mb_obj_date = ms_obj_date summary
 	    obj_fn	= ml_obj_file (ms_location summary)
 	    hs_date     = ms_hs_date summary
 
+	    is_stable_obj = this_mod_name `elem` stable_obj
+	    is_stable_bco = this_mod_name `elem` stable_bco
+
+	    old_hmi = lookupUFM old_hpt this_mod_name
+
+            -- We're using the dflags for this module now, obtained by
+            -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
+            dflags = ms_hspp_opts summary
+            prevailing_target = hscTarget (hsc_dflags hsc_env)
+            local_target      = hscTarget dflags
+
+            -- If OPTIONS_GHC contains -fasm or -fvia-C, be careful that
+            -- we don't do anything dodgy: these should only work to change
+            -- from -fvia-C to -fasm and vice-versa, otherwise we could 
+            -- end up trying to link object code to byte code.
+            target = if prevailing_target /= local_target
+                        && (not (isObjectTarget prevailing_target)
+                            || not (isObjectTarget local_target))
+                        then prevailing_target
+                        else local_target 
+
+            -- store the corrected hscTarget into the summary
+            summary' = summary{ ms_hspp_opts = dflags { hscTarget = target } }
+
+	    -- The old interface is ok if
+	    --	a) we're compiling a source file, and the old HPT
+	    --	   entry is for a source file
+	    --	b) we're compiling a hs-boot file
+	    -- Case (b) allows an hs-boot file to get the interface of its
+	    -- real source file on the second iteration of the compilation
+	    -- manager, but that does no harm.  Otherwise the hs-boot file
+	    -- will always be recompiled
+            
+            mb_old_iface 
+	    	= case old_hmi of
+	    	     Nothing	 			  -> Nothing
+	    	     Just hm_info | isBootSummary summary -> Just iface
+	    			  | not (mi_boot iface)   -> Just iface
+	    			  | otherwise		  -> Nothing
+	    			   where 
+	    			     iface = hm_iface hm_info
+
 	    compile_it :: Maybe Linkable -> IO (Maybe HomeModInfo)
 	    compile_it  = upsweep_compile hsc_env old_hpt this_mod_name 
-				summary mod_index nmods
+				summary' mod_index nmods mb_old_iface
 
-	case ghcMode (hsc_dflags hsc_env) of
-	    BatchCompile ->
-		case () of
-		   -- Batch-compilating is easy: just check whether we have
-		   -- an up-to-date object file.  If we do, then the compiler
-		   -- needs to do a recompilation check.
-		   _ | Just obj_date <- mb_obj_date, obj_date >= hs_date -> do
-		           linkable <- 
-				findObjectLinkable this_mod obj_fn obj_date
-			   compile_it (Just linkable)
+            compile_it_discard_iface 
+                        = upsweep_compile hsc_env old_hpt this_mod_name 
+				summary' mod_index nmods Nothing
 
-		     | otherwise ->
-		           compile_it Nothing
+        in
+	case target of
 
-	    interactive ->
-		case () of
-		    _ | is_stable_obj, isJust old_hmi ->
-			   return old_hmi
+            _any
+                -- Regardless of whether we're generating object code or
+                -- byte code, we can always use an existing object file
+                -- if it is *stable* (see checkStability).
+		| is_stable_obj, isJust old_hmi ->
+		        return old_hmi
 			-- object is stable, and we have an entry in the
 			-- old HPT: nothing to do
 
-		      | is_stable_obj, isNothing old_hmi -> do
-		           linkable <-
-				findObjectLinkable this_mod obj_fn 
+		| is_stable_obj, isNothing old_hmi -> do
+		        linkable <- findObjectLinkable this_mod obj_fn 
 					(expectJust "upseep1" mb_obj_date)
-			   compile_it (Just linkable)
+		        compile_it (Just linkable)
 			-- object is stable, but we need to load the interface
 			-- off disk to make a HMI.
 
-		      | is_stable_bco -> 
-			   ASSERT(isJust old_hmi) -- must be in the old_hpt
-			   return old_hmi
+            HscInterpreted
+		| is_stable_bco -> 
+		        ASSERT(isJust old_hmi) -- must be in the old_hpt
+			return old_hmi
 			-- BCO is stable: nothing to do
 
-		      | Just hmi <- old_hmi,
-			Just l <- hm_linkable hmi, not (isObjectLinkable l),
-			linkableTime l >= ms_hs_date summary ->
-			   compile_it (Just l)
+		| Just hmi <- old_hmi,
+		  Just l <- hm_linkable hmi, not (isObjectLinkable l),
+		  linkableTime l >= ms_hs_date summary ->
+			compile_it (Just l)
 			-- we have an old BCO that is up to date with respect
 			-- to the source: do a recompilation check as normal.
 
-		      | otherwise ->
-			  compile_it Nothing
+		| otherwise -> 
+                        compile_it Nothing
 			-- no existing code at all: we must recompile.
-		   where
-		    is_stable_obj = this_mod_name `elem` stable_obj
-		    is_stable_bco = this_mod_name `elem` stable_bco
 
-		    old_hmi = lookupUFM old_hpt this_mod_name
+              -- When generating object code, if there's an up-to-date
+              -- object file on the disk, then we can use it.
+              -- However, if the object file is new (compared to any
+              -- linkable we had from a previous compilation), then we
+              -- must discard any in-memory interface, because this
+              -- means the user has compiled the source file
+              -- separately and generated a new interface, that we must
+              -- read from the disk.
+              --
+            obj | isObjectTarget obj,
+		  Just obj_date <- mb_obj_date, obj_date >= hs_date -> do
+                     case old_hmi of
+                        Just hmi 
+                          | Just l <- hm_linkable hmi,
+                            isObjectLinkable l && linkableTime l == obj_date
+                            -> compile_it (Just l)
+                        _otherwise -> do
+		          linkable <- findObjectLinkable this_mod obj_fn obj_date
+                          compile_it_discard_iface (Just linkable)
+
+	    _otherwise ->
+		  compile_it Nothing
+
 
 -- Run hsc to compile a module
 upsweep_compile hsc_env old_hpt this_mod summary
                 mod_index nmods
-                mb_old_linkable = do
-  let
-	-- The old interface is ok if it's in the old HPT 
-	--	a) we're compiling a source file, and the old HPT
-	--	   entry is for a source file
-	--	b) we're compiling a hs-boot file
-	-- Case (b) allows an hs-boot file to get the interface of its
-	-- real source file on the second iteration of the compilation
-	-- manager, but that does no harm.  Otherwise the hs-boot file
-	-- will always be recompiled
-
-        mb_old_iface 
-		= case lookupUFM old_hpt this_mod of
-		     Nothing	 			  -> Nothing
-		     Just hm_info | isBootSummary summary -> Just iface
-				  | not (mi_boot iface)   -> Just iface
-				  | otherwise		  -> Nothing
-				   where 
-				     iface = hm_iface hm_info
-
-  compresult <- compile hsc_env summary mb_old_linkable mb_old_iface
+                mb_old_iface
+                mb_old_linkable
+ = do
+   compresult <- compile hsc_env summary mb_old_linkable mb_old_iface
                         mod_index nmods
 
-  case compresult of
+   case compresult of
         -- Compilation failed.  Compile may still have updated the PCS, tho.
         CompErrs -> return Nothing
 
@@ -2253,7 +2286,7 @@ reinstallBreakpointHandlers :: Session -> IO ()
 reinstallBreakpointHandlers session = do
   dflags <- getSessionDynFlags session
   let mode = ghcMode dflags
-  when (mode == Interactive) $ do 
+  when (ghcLink dflags == LinkInMemory) $ do
     linkEnv <- readIORef v_bkptLinkEnv
     initDynLinker dflags 
     extendLinkEnv linkEnv

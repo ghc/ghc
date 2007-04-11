@@ -832,9 +832,8 @@ check_old_iface hsc_env mod_summary source_unchanged maybe_iface
 
      -- If the source has changed and we're in interactive mode, avoid reading
      -- an interface; just return the one we might have been supplied with.
-    ; ghc_mode <- getGhcMode
-    ; if (ghc_mode == Interactive || ghc_mode == JustTypecheck) 
-	 && not source_unchanged then
+    ; let dflags = hsc_dflags hsc_env
+    ; if not (isObjectTarget (hscTarget dflags)) && not source_unchanged then
          return (outOfDate, maybe_iface)
       else
       case maybe_iface of {

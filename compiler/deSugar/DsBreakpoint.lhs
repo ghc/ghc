@@ -166,9 +166,10 @@ debug_enabled = do
 breakpoints_enabled = do
     ghcMode            <- getGhcModeDs
     currentModule      <- getModuleDs
+    dflags             <- getDOptsDs
     ignore_breakpoints <- doptDs Opt_IgnoreBreakpoints
     return ( not ignore_breakpoints 
-          && ghcMode == Interactive 
+          && hscTarget dflags == HscInterpreted
           && currentModule /= iNTERACTIVE )
 
 maybeInsertBreakpoint lhsexpr@(L loc _) ty = do 
