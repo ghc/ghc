@@ -1,26 +1,25 @@
 #!/bin/sh
 #
-# Running 'binary-dist' gives us a tree which isn't quite right
-# for the purposes of creating a mingw/win32 install tree.  
-# This script rejigs that tree. The resulting tree is ready for
-# packaging up in whatever form convenient (MSI installer / tar bundle/ ..)
+# Modify a GHC binary distribution for the purposes of creating a
+# mingw/win32 install tree.  The resulting tree is ready for packaging
+# up in whatever form is convenient (MSI installer / tar bundle/ ..)
 #
 # To use:
 #
-#   foo$ cd <top of fptools build tree>
-#   foo$ make binary-dist (*)
-#   foo$ cd ghc-<version>
-#   foo$ ../distrib/prep-bin-dist-mingw
+#   - make sure you set BIN_DIST=1 in your mk/build.mk before you built GHC.
+#   $ cd <top of GHC build tree>
+#   $ make binary-dist
 #
-#  * - making sure you've initially set BIN_DIST=1 in 
-#      your build.mk ...
+# This script is called at the appropriate point during 'make binary-dist'.
+# The result is a tarball at the top of your GHC build tree, named something
+# like ghc-6.6.1-i386-unknown-mingw32.tar.bz2.
 # 
 # User tweakables 
 #    Note: you normally don't need to set any of these, the script
 #    will try to figure them out for itself.  If the heuristics don't
 #    work for whatever reason, you can override them using environment
 #    variables, e.g.
-#      mingw_top=<whatever> ../distrib/prep-bin-dist-mingw
+#      mingw_top=<whatever> make binary-dist
 #
 #    - mingw_top   -- location of mingw distribution tree (usually c:/mingw)
 #    - perl_dir    -- location of non-cygwin perl.exe
