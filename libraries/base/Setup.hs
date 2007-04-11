@@ -10,9 +10,7 @@ import Control.Monad
 import Data.List
 import Distribution.Simple
 import Distribution.PackageDescription
-import Distribution.PreProcess
 import Distribution.Setup
-import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import System.Environment
 import System.Exit
@@ -20,11 +18,11 @@ import System.Exit
 main :: IO ()
 main = do args <- getArgs
           let (ghcArgs, args') = extractGhcArgs args
-              (configureArgs, args'') = extractConfigureArgs args'
+              (confArgs, args'') = extractConfigureArgs args'
               hooks = defaultUserHooks {
                   confHook = add_extra_deps
                            $ confHook defaultUserHooks,
-                  postConf = add_configure_options configureArgs
+                  postConf = add_configure_options confArgs
                            $ postConf defaultUserHooks,
                   buildHook = add_ghc_options ghcArgs
                             $ filter_modules_hook
@@ -40,11 +38,11 @@ extractConfigureArgs :: [String] -> ([String], [String])
 extractConfigureArgs = extractPrefixArgs "--configure-option="
 
 extractPrefixArgs :: String -> [String] -> ([String], [String])
-extractPrefixArgs prefix args
+extractPrefixArgs the_prefix args
  = let f [] = ([], [])
        f (x:xs) = case f xs of
                       (wantedArgs, otherArgs) ->
-                          case removePrefix prefix x of
+                          case removePrefix the_prefix x of
                               Just wantedArg ->
                                   (wantedArg:wantedArgs, otherArgs)
                               Nothing ->
