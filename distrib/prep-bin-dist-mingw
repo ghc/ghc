@@ -8,7 +8,7 @@
 # To use:
 #
 #   foo$ cd <top of fptools build tree>
-#   foo$ make binary-dist Project=Ghc  (*)
+#   foo$ make binary-dist (*)
 #   foo$ cd ghc-<version>
 #   foo$ ../distrib/prep-bin-dist-mingw
 #
