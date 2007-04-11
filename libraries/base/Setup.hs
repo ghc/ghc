@@ -53,6 +53,7 @@ extractPrefixArgs prefix args
 
 removePrefix :: String -> String -> Maybe String
 removePrefix "" ys = Just ys
+removePrefix _  "" = Nothing
 removePrefix (x:xs) (y:ys)
  | x == y = removePrefix xs ys
  | otherwise = Nothing
