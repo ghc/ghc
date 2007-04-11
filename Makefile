@@ -365,6 +365,12 @@ binary-dist::
 	done
 endif
 
+# Jiggle the files around to make a valid Windows distribution if necessary
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+binary-dist::
+	cd $(BIN_DIST_TMPDIR) && ../distrib/prep-bin-dist-mingw
+endif
+
 .PHONY: binary-dist-doc-%
 
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
