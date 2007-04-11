@@ -16,55 +16,85 @@
 #      your build.mk ...
 # 
 # User tweakables 
-#   (settable via environment variables, e.g.,
+#    Note: you normally don't need to set any of these, the script
+#    will try to figure them out for itself.  If the heuristics don't
+#    work for whatever reason, you can override them using environment
+#    variables, e.g.
 #      mingw_top=<whatever> ../distrib/prep-bin-dist-mingw
-#   )
 #
-#    - mingw_top   -- location of mingw distribution tree
-#    - old_ghc_top -- top of existing GHC binary diste tree
-#                     (needed just to copy along perl binary.)
+#    - mingw_top   -- location of mingw distribution tree (usually c:/mingw)
+#    - perl_dir    -- location of non-cygwin perl.exe
+#    - gcc_lib     -- c:/mingw/lib/gcc/mingw32/3.4.2, or equivalent
+#    - gcc_libexec -- c:/mingw/libexec/gcc/mingw32/3.4.2, or equivalent
 #
-#    - gcc_version -- what gcc version your mingw tree uses.
-#
-#
-if [ "x${old_ghc_top}" == "x" ]; then
-    export old_ghc_top=c:/ghc/ghc-6.2.1
+
+#Directory where a (cygwin-free) perl binary resides.
+if [ "${perl_dir}" == "" ]; then
+    for i in c:/ghc/*; do
+       if [ -e $i/perl.exe ]; then
+           perl_dir=$i
+           echo "Found perl.exe in $i"
+           break
+       fi
+    done
+    if [ "${perl_dir}" == "" ]; then
+        echo "Can't find perl.exe; please set \$perl_dir"
+        exit 1
+    fi
 fi
-if [ "x${mingw_top}" == "x" ]; then
- export mingw_top=c:/mingw3
+
+if [ "${mingw_top}" == "" ]; then
+    if [ -d c:/mingw ]; then
+        mingw_top=c:/mingw
+        echo "Found mingw in $mingw_top"
+    else
+        echo "Can't find mingw; please set \$mingw_top"
+        exit 1
+    fi
 fi
 
 # The gcc-lib directory of the mingw tree you want to
 # include with the binary dist.
 if [ "x${gcc_lib}" == "x" ]; then
- if [ "x${gcc_version}" == "x" ]; then
-   # The default (with mingw3)
-   export gcc_lib=$mingw_top/lib/gcc-lib/mingw32/3.2.3
- else
-   export gcc_lib=$mingw_top/lib/gcc-lib/mingw32/${gcc_version}
- fi
+    if [ -d "${mingw_top}/lib/gcc-lib/mingw32" ]; then
+        mingw_gcc_lib=${mingw_top}/lib/gcc-lib/mingw32
+    else
+        mingw_gcc_lib=${mingw_top}/lib/gcc/mingw32
+    fi
+    for i in `ls -r ${mingw_gcc_lib}`; do
+        if [ -d "${mingw_gcc_lib}/$i" ]; then
+            gcc_lib=${mingw_gcc_lib}/$i
+            echo "Found gcc lib in $gcc_lib"
+            break
+        fi
+    done
+    if [ "${gcc_lib}" == "" ]; then
+        echo "Can't find gcc lib files; please set \$gcc_lib"
+        exit 1
+    fi
 fi
+    
+# The gcc-lib directory of the mingw tree you want to
+# include with the binary dist.
 if [ "x${gcc_libexec}" == "x" ]; then
- if [ "x${gcc_version}" == "x" ]; then
-   # The default (with mingw3)
-   export gcc_libexec=$mingw_top/lib/gcc-lib/mingw32/3.2.3
- else
-   if [ -d $mingw_top/lib/gcc-lib/mingw32/${gcc_version} ]; then
-     export gcc_libexec=$mingw_top/lib/gcc-lib/mingw32/${gcc_version}
-   elif [ -d $mingw_top/libexec/gcc/mingw32/${gcc_version} ]; then
-     export gcc_libexec=$mingw_top/libexec/gcc/mingw32/${gcc_version}
-   else
-     echo "WARNING: Unable to determine location of your gcc 'libexec' directory"
-     export gcc_libexec=$mingw_top/lib/gcc-lib/mingw32/${gcc_version}
-   fi
- fi
+    if [ -d "${mingw_top}/libexec/gcc-lib/mingw32" ]; then
+        mingw_gcc_libexec=${mingw_top}/libexec/gcc-lib/mingw32
+    else
+        mingw_gcc_libexec=${mingw_top}/libexec/gcc/mingw32
+    fi
+    for i in `ls -r ${mingw_gcc_libexec}`; do
+        if [ -d "${mingw_gcc_libexec}/$i" ]; then
+            gcc_libexec=${mingw_gcc_libexec}/$i
+            echo "Found gcc libexec in $gcc_libexec"
+            break
+        fi
+    done
+    if [ "${gcc_libexec}" == "" ]; then
+        echo "Can't find gcc libexec files; please set \$gcc_libexec"
+        exit 1
+    fi
 fi
-
-#Directory where a (cygwin-free) perl binary resides.
-if [ "x${perl_dir}" == "x" ]; then
-  export perl_dir=$old_ghc_top
-fi
-
+    
 #
 # The mingw include, lib, and bin directories; all derived
 # from ${mingw_top}.
