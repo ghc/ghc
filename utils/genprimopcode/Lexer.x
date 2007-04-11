@@ -2,7 +2,6 @@
 {
 module Lexer (lex_tok) where
 
-import Control.Monad.State (StateT, get)
 import ParserM (ParserM (..), mkT, mkTv, Token(..), St, start_code,
                 StartCode, Action, set_start_code,
                 inc_brace_depth, dec_brace_depth,
