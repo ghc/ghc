@@ -87,6 +87,9 @@
 #if defined(powerpc_HOST_ARCH)
 #  include <mach-o/ppc/reloc.h>
 #endif
+#if defined(x86_64_HOST_ARCH)
+#  include <mach-o/x86_64/reloc.h>
+#endif
 #endif
 
 /* Hash table mapping symbol names to Symbol */
@@ -103,7 +106,7 @@ static int ocVerifyImage_ELF    ( ObjectCode* oc );
 static int ocGetNames_ELF       ( ObjectCode* oc );
 static int ocResolve_ELF        ( ObjectCode* oc );
 #if defined(powerpc_HOST_ARCH)
-static int ocAllocateJumpIslands_ELF ( ObjectCode* oc );
+static int ocAllocateSymbolExtras_ELF ( ObjectCode* oc );
 #endif
 #elif defined(OBJFORMAT_PEi386)
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
@@ -115,13 +118,15 @@ static int ocGetNames_MachO       ( ObjectCode* oc );
 static int ocResolve_MachO        ( ObjectCode* oc );
 
 static int machoGetMisalignment( FILE * );
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+static int ocAllocateSymbolExtras_MachO ( ObjectCode* oc );
+#endif
 #ifdef powerpc_HOST_ARCH
-static int ocAllocateJumpIslands_MachO ( ObjectCode* oc );
 static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 #endif
 
-#if defined(x86_64_HOST_ARCH)
+#if defined(x86_64_HOST_ARCH) && defined(OBJFORMAT_ELF)
 static void*x86_64_high_symbol( char *lbl, void *addr );
 #endif
 
@@ -1289,14 +1294,13 @@ loadObj( char *path )
       barf("loadObj: error whilst reading `%s'", path);
 
    fclose(f);
-
 #endif /* USE_MMAP */
 
-#  if defined(OBJFORMAT_MACHO) && defined(powerpc_HOST_ARCH)
-   r = ocAllocateJumpIslands_MachO ( oc );
+#  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
+   r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) { return r; }
 #  elif defined(OBJFORMAT_ELF) && defined(powerpc_HOST_ARCH)
-   r = ocAllocateJumpIslands_ELF ( oc );
+   r = ocAllocateSymbolExtras_ELF ( oc );
    if (!r) { return r; }
 #endif
 
@@ -1470,28 +1474,36 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
 
 
 /* --------------------------------------------------------------------------
- * PowerPC specifics (jump islands)
- * ------------------------------------------------------------------------*/
+ * Symbol Extras.
+ * This is about allocating a small chunk of memory for every symbol in the
+ * object file. We make sure that the SymboLExtras are always "in range" of
+ * limited-range PC-relative instructions on various platforms by allocating
+ * them right next to the object code itself.
+ */
 
-#if defined(powerpc_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || (defined(x86_64_HOST_ARCH) \
+                                    && defined(darwin_TARGET_OS))
 
 /*
-  ocAllocateJumpIslands
+  ocAllocateSymbolExtras
 
   Allocate additional space at the end of the object file image to make room
-  for jump islands.
+  for jump islands (powerpc, x86_64) and GOT entries (x86_64).
   
   PowerPC relative branch instructions have a 24 bit displacement field.
   As PPC code is always 4-byte-aligned, this yields a +-32MB range.
   If a particular imported symbol is outside this range, we have to redirect
   the jump to a short piece of new code that just loads the 32bit absolute
   address and jumps there.
-  This function just allocates space for one 16 byte ppcJumpIsland for every
-  undefined symbol in the object file. The code for the islands is filled in by
-  makeJumpIsland below.
+  On x86_64, PC-relative jumps and PC-relative accesses to the GOT are limited
+  to 32 bits (+-2GB).
+  
+  This function just allocates space for one SymbolExtra for every
+  undefined symbol in the object file. The code for the jump islands is
+  filled in by makeSymbolExtra below.
 */
 
-static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
+static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
 #ifdef USE_MMAP
   int pagesize, n, m;
@@ -1509,12 +1521,12 @@ static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
 
 #ifdef USE_MMAP
     #ifndef linux_HOST_OS /* mremap is a linux extension */
-        #error ocAllocateJumpIslands doesnt want USE_MMAP to be defined
+        #error ocAllocateSymbolExtras doesnt want USE_MMAP to be defined
     #endif
 
     pagesize = getpagesize();
     n = ROUND_UP( oc->fileSize, pagesize );
-    m = ROUND_UP( aligned + sizeof (ppcJumpIsland) * count, pagesize );
+    m = ROUND_UP( aligned + sizeof (SymbolExtra) * count, pagesize );
 
     /* If we have a half-page-size file and map one page of it then
      * the part of the page after the size of the file remains accessible.
@@ -1553,52 +1565,66 @@ static int ocAllocateJumpIslands( ObjectCode* oc, int count, int first )
     oc->image -= misalignment;
     oc->image = stgReallocBytes( oc->image,
                                  misalignment + 
-                                 aligned + sizeof (ppcJumpIsland) * count,
-                                 "ocAllocateJumpIslands" );
+                                 aligned + sizeof (SymbolExtra) * count,
+                                 "ocAllocateSymbolExtras" );
     oc->image += misalignment;
 #endif /* USE_MMAP */
 
-    oc->jump_islands = (ppcJumpIsland *) (oc->image + aligned);
-    memset( oc->jump_islands, 0, sizeof (ppcJumpIsland) * count );
+    oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
+    memset( oc->symbol_extras, 0, sizeof (SymbolExtra) * count );
   }
   else
-    oc->jump_islands = NULL;
+    oc->symbol_extras = NULL;
 
-  oc->island_start_symbol = first;
-  oc->n_islands = count;
+  oc->first_symbol_extra = first;
+  oc->n_symbol_extras = count;
 
   return 1;
 }
 
-static unsigned long makeJumpIsland( ObjectCode* oc,
+static SymbolExtra* makeSymbolExtra( ObjectCode* oc,
                                      unsigned long symbolNumber,
                                      unsigned long target )
 {
-  ppcJumpIsland *island;
+  SymbolExtra *extra;
 
-  if( symbolNumber < oc->island_start_symbol ||
-      symbolNumber - oc->island_start_symbol > oc->n_islands)
-    return 0;
+  ASSERT( symbolNumber >= oc->first_symbol_extra
+        && symbolNumber - oc->first_symbol_extra < oc->n_symbol_extras);
 
-  island = &oc->jump_islands[symbolNumber - oc->island_start_symbol];
+  extra = &oc->symbol_extras[symbolNumber - oc->first_symbol_extra];
 
+#ifdef powerpc_HOST_ARCH
   // lis r12, hi16(target)
-  island->lis_r12     = 0x3d80;
-  island->hi_addr     = target >> 16;
+  extra->jumpIsland.lis_r12     = 0x3d80;
+  extra->jumpIsland.hi_addr     = target >> 16;
 
   // ori r12, r12, lo16(target)
-  island->ori_r12_r12 = 0x618c;
-  island->lo_addr     = target & 0xffff;
+  extra->jumpIsland.ori_r12_r12 = 0x618c;
+  extra->jumpIsland.lo_addr     = target & 0xffff;
 
   // mtctr r12
-  island->mtctr_r12   = 0x7d8903a6;
+  extra->jumpIsland.mtctr_r12   = 0x7d8903a6;
 
   // bctr
-  island->bctr        = 0x4e800420;
+  extra->jumpIsland.bctr        = 0x4e800420;
+#endif
+#ifdef x86_64_HOST_ARCH
+        // jmp *-14(%rip)
+  static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
+  extra->addr = target;
+  memcpy(extra->jumpIsland, jmp, 6);
+#endif
     
-  return (unsigned long) island;
+  return extra;
 }
 
+#endif
+
+/* --------------------------------------------------------------------------
+ * PowerPC specifics (instruction cache flushing)
+ * ------------------------------------------------------------------------*/
+
+#ifdef powerpc_TARGET_ARCH
 /*
    ocFlushInstructionCache
 
@@ -1609,7 +1635,7 @@ static unsigned long makeJumpIsland( ObjectCode* oc,
 
 static void ocFlushInstructionCache( ObjectCode *oc )
 {
-    int n = (oc->fileSize + sizeof( ppcJumpIsland ) * oc->n_islands + 3) / 4;
+    int n = (oc->fileSize + sizeof( SymbolExtra ) * oc->n_symbol_extras + 3) / 4;
     unsigned long *p = (unsigned long *) oc->image;
 
     while( n-- )
@@ -3406,12 +3432,13 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
             if( delta << 6 >> 6 != delta )
             {
-               value = makeJumpIsland( oc, ELF_R_SYM(info), value );
+               value = (Elf_Addr) (&makeSymbolExtra( oc, ELF_R_SYM(info), value )
+                                        ->jumpIsland);
                delta = value - P;
 
                if( value == 0 || delta << 6 >> 6 != delta )
                {
-                  barf( "Unable to make ppcJumpIsland for #%d",
+                  barf( "Unable to make SymbolExtra for #%d",
                         ELF_R_SYM(info) );
                   return 0;
                }
@@ -3610,7 +3637,7 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
 
 #ifdef powerpc_HOST_ARCH
 
-static int ocAllocateJumpIslands_ELF( ObjectCode *oc )
+static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 {
   Elf_Ehdr *ehdr;
   Elf_Shdr* shdr;
@@ -3637,7 +3664,7 @@ static int ocAllocateJumpIslands_ELF( ObjectCode *oc )
     return 0;
   }
 
-  return ocAllocateJumpIslands( oc, shdr[i].sh_size / sizeof( Elf_Sym ), 0 );
+  return ocAllocateSymbolExtras( oc, shdr[i].sh_size / sizeof( Elf_Sym ), 0 );
 }
 
 #endif /* powerpc */
@@ -3660,8 +3687,15 @@ static int ocAllocateJumpIslands_ELF( ObjectCode *oc )
   *) add still more sanity checks.
 */
 
+#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
+#define mach_header mach_header_64
+#define segment_command segment_command_64
+#define section section_64
+#define nlist nlist_64
+#endif
+
 #ifdef powerpc_HOST_ARCH
-static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
+static int ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 {
     struct mach_header *header = (struct mach_header *) oc->image;
     struct load_command *lc = (struct load_command *) (header + 1);
@@ -3696,20 +3730,52 @@ static int ocAllocateJumpIslands_MachO(ObjectCode* oc)
                 }
             }
             if(max >= min)
-                return ocAllocateJumpIslands(oc, max - min + 1, min);
+                return ocAllocateSymbolExtras(oc, max - min + 1, min);
 
             break;
         }
         
         lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
     }
-    return ocAllocateJumpIslands(oc,0,0);
+    return ocAllocateSymbolExtras(oc,0,0);
+}
+#endif
+#ifdef x86_64_HOST_ARCH
+static int ocAllocateSymbolExtras_MachO(ObjectCode* oc)
+{
+    struct mach_header *header = (struct mach_header *) oc->image;
+    struct load_command *lc = (struct load_command *) (header + 1);
+    unsigned i;
+
+    for( i = 0; i < header->ncmds; i++ )
+    {   
+        if( lc->cmd == LC_SYMTAB )
+        {
+                // Just allocate one entry for every symbol
+            struct symtab_command *symLC = (struct symtab_command *) lc;
+            
+            return ocAllocateSymbolExtras(oc, symLC->nsyms, 0);
+        }
+        
+        lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
+    }
+    return ocAllocateSymbolExtras(oc,0,0);
 }
 #endif
 
-static int ocVerifyImage_MachO(ObjectCode* oc STG_UNUSED)
+static int ocVerifyImage_MachO(ObjectCode* oc)
 {
-    // FIXME: do some verifying here
+    char *image = (char*) oc->image;
+    struct mach_header *header = (struct mach_header*) image;
+
+#if x86_64_TARGET_ARCH || powerpc64_TARGET_ARCH
+    if(header->magic != MH_MAGIC_64)
+        return 0;
+#else
+    if(header->magic != MH_MAGIC)
+        return 0;
+#endif
+    // FIXME: do some more verifying here
     return 1;
 }
 
@@ -3818,6 +3884,109 @@ static int relocateSection(
 
     for(i=0;i<n;i++)
     {
+#ifdef x86_64_HOST_ARCH
+        struct relocation_info *reloc = &relocs[i];
+        
+        char    *thingPtr = image + sect->offset + reloc->r_address;
+        uint64_t thing;
+        uint64_t value;
+        uint64_t baseValue;
+        int type = reloc->r_type;
+        
+        checkProddableBlock(oc,thingPtr);
+        switch(reloc->r_length)
+        {
+            case 0:
+                thing = *(uint8_t*)thingPtr;
+                baseValue = (uint64_t)thingPtr + 1;
+                break;
+            case 1:
+                thing = *(uint16_t*)thingPtr;
+                baseValue = (uint64_t)thingPtr + 2;
+                break;
+            case 2:
+                thing = *(uint32_t*)thingPtr;
+                baseValue = (uint64_t)thingPtr + 4;
+                break;
+            case 3:
+                thing = *(uint64_t*)thingPtr;
+                baseValue = (uint64_t)thingPtr + 8;
+                break;
+            default:
+                barf("Unknown size.");
+        }
+        
+        if(type == X86_64_RELOC_GOT
+           || type == X86_64_RELOC_GOT_LOAD)
+        {
+            ASSERT(reloc->r_extern);
+            value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, value)->addr;
+            
+            type = X86_64_RELOC_SIGNED;
+        }
+        else if(reloc->r_extern)
+        {
+            struct nlist *symbol = &nlist[reloc->r_symbolnum];
+            char *nm = image + symLC->stroff + symbol->n_un.n_strx;
+            if(symbol->n_value == 0)
+                value = (uint64_t) lookupSymbol(nm);
+            else
+                value = relocateAddress(oc, nSections, sections,
+                                        symbol->n_value);
+        }
+        else
+        {
+            value = sections[reloc->r_symbolnum-1].offset
+                  - sections[reloc->r_symbolnum-1].addr
+		  + (uint64_t) image;
+        }
+        
+        if(type == X86_64_RELOC_BRANCH)
+        {
+            if((int32_t)(value - baseValue) != (int64_t)(value - baseValue))
+            {
+                ASSERT(reloc->r_extern);
+                value = (uint64_t) &makeSymbolExtra(oc, reloc->r_symbolnum, value)
+                                        -> jumpIsland;
+            }
+            ASSERT((int32_t)(value - baseValue) == (int64_t)(value - baseValue));
+            type = X86_64_RELOC_SIGNED;
+        }
+        
+        switch(type)
+        {
+            case X86_64_RELOC_UNSIGNED:
+                ASSERT(!reloc->r_pcrel);
+                thing += value;
+                break;
+            case X86_64_RELOC_SIGNED:
+                ASSERT(reloc->r_pcrel);
+                thing += value - baseValue;
+                break;
+            case X86_64_RELOC_SUBTRACTOR:
+                ASSERT(!reloc->r_pcrel);
+                thing -= value;
+                break;
+            default:
+                barf("unkown relocation");
+        }
+                
+        switch(reloc->r_length)
+        {
+            case 0:
+                *(uint8_t*)thingPtr = thing;
+                break;
+            case 1:
+                *(uint16_t*)thingPtr = thing;
+                break;
+            case 2:
+                *(uint32_t*)thingPtr = thing;
+                break;
+            case 3:
+                *(uint64_t*)thingPtr = thing;
+                break;
+        }
+#else
 	if(relocs[i].r_address & R_SCATTERED)
 	{
 	    struct scattered_relocation_info *scat =
@@ -4016,7 +4185,11 @@ static int relocateSection(
                             // In the .o file, this should be a relative jump to NULL
                             // and we'll change it to a relative jump to the symbol
                         ASSERT(-word == reloc->r_address);
-                        jumpIsland = makeJumpIsland(oc,reloc->r_symbolnum,(unsigned long) symbolAddress);
+                        jumpIsland = (unsigned long)
+                                        &makeSymbolExtra(oc,
+                                                         reloc->r_symbolnum,
+                                                         (unsigned long) symbolAddress)
+                                         -> jumpIsland;
                         if(jumpIsland != 0)
                         {
                             offsetToJumpIsland = word + jumpIsland
@@ -4079,6 +4252,7 @@ static int relocateSection(
 	    barf("\nunknown relocation %d",reloc->r_type);
 	    return 0;
 	}
+#endif
     }
     return 1;
 }
@@ -4099,7 +4273,7 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
     for(i=0;i<header->ncmds;i++)
     {
-	if(lc->cmd == LC_SEGMENT)
+	if(lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64)
 	    segLC = (struct segment_command*) lc;
 	else if(lc->cmd == LC_SYMTAB)
 	    symLC = (struct symtab_command*) lc;
@@ -4109,6 +4283,9 @@ static int ocGetNames_MachO(ObjectCode* oc)
     sections = (struct section*) (segLC+1);
     nlist = symLC ? (struct nlist*) (image + symLC->symoff)
                   : NULL;
+    
+    if(!segLC)
+        barf("ocGetNames_MachO: no segment load command");
 
     for(i=0;i<segLC->nsects;i++)
     {
@@ -4234,7 +4411,7 @@ static int ocResolve_MachO(ObjectCode* oc)
 
     for(i=0;i<header->ncmds;i++)
     {
-	if(lc->cmd == LC_SEGMENT)
+	if(lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64)
 	    segLC = (struct segment_command*) lc;
 	else if(lc->cmd == LC_SYMTAB)
 	    symLC = (struct symtab_command*) lc;
@@ -4338,9 +4515,14 @@ static int machoGetMisalignment( FILE * f )
     fread(&header, sizeof(header), 1, f);
     rewind(f);
 
+#if x86_64_TARGET_ARCH || powerpc64_TARGET_ARCH
+    if(header.magic != MH_MAGIC_64)
+        return 0;
+#else
     if(header.magic != MH_MAGIC)
         return 0;
-    
+#endif
+
     misalignment = (header.sizeofcmds + sizeof(header))
                     & 0xF;
 

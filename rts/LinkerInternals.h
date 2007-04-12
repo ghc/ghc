@@ -42,14 +42,19 @@ typedef
 /* Jump Islands are sniplets of machine code required for relative
  * address relocations on the PowerPC.
  */
-#ifdef powerpc_HOST_ARCH
 typedef struct {
-    short lis_r12, hi_addr;
-    short ori_r12_r12, lo_addr;
-    long mtctr_r12;
-    long bctr;
-} ppcJumpIsland;
+#ifdef powerpc_HOST_ARCH
+    struct {
+        short lis_r12, hi_addr;
+        short ori_r12_r12, lo_addr;
+        long mtctr_r12;
+        long bctr;
+    } jumpIsland;
+#elif x86_64_TARGET_ARCH
+    uint64_t    addr;
+    uint8_t     jumpIsland[6];
 #endif
+} SymbolExtra;
 
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
@@ -97,10 +102,10 @@ typedef struct _ObjectCode {
     unsigned int pltIndex;
 #endif
 
-#ifdef powerpc_HOST_ARCH
-    ppcJumpIsland   *jump_islands;
-    unsigned long   island_start_symbol;
-    unsigned long   n_islands;
+#if powerpc_HOST_ARCH || x86_64_HOST_ARCH
+    SymbolExtra    *symbol_extras;
+    unsigned long   first_symbol_extra;
+    unsigned long   n_symbol_extras;
 #endif
 
 } ObjectCode;
