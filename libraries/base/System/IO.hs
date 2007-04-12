@@ -155,7 +155,7 @@ module System.IO (
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
-    -- * Temporary files
+    -- * Temporary files (not portable: GHC only)
 
 #ifdef __GLASGOW_HASKELL__
     openTempFile,
