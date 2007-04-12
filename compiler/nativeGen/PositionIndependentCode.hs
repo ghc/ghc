@@ -200,7 +200,7 @@ howToAccessLabel DataReference lbl
     | otherwise = AccessDirectly
 
 
-#if x86_TARGET_ARCH || x86_64_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
     -- dyld code stubs don't work for tailcalls because the
     -- stack alignment is only right for regular calls.
     -- Therefore, we have to go via a symbol pointer:
