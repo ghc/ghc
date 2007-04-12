@@ -442,7 +442,7 @@ pprImportedSymbol importedLbl
                 ptext SLIT("1:"),
                     ptext SLIT("\tmovl L") <> pprCLabel_asm lbl
                         <> ptext SLIT("$lazy_ptr-1b(%eax),%edx"),
-                    ptext SLIT("\tjmp %edx"),
+                    ptext SLIT("\tjmp *%edx"),
                 ptext SLIT("L") <> pprCLabel_asm lbl
                     <> ptext SLIT("$stub_binder:"),
                     ptext SLIT("\tlea L") <> pprCLabel_asm lbl
