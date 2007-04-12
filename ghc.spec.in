@@ -82,7 +82,7 @@ needed.
 %setup -b1
 
 %build
-test -f configure || autoreconf
+test -f configure || sh boot
 ./configure --prefix=%{_prefix} --mandir=%{_mandir}
 make %{?jobs:-j%jobs} HTML_DIR_INSTALLED=%{_defaultdocdir}/%{name}/libraries/'$(PACKAGE)'
 make html

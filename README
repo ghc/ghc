@@ -75,12 +75,12 @@ XML toolchain if you want to build the compiler documentation.
 
 Quick start:  the following gives you a default build:
 
-	$ autoreconf
+	$ sh boot
 	$ ./configure
 	$ make
 	$ make install
 
-The autoreconf step is only necessary if this is a tree checked out
+The "sh boot" step is only necessary if this is a tree checked out
 from darcs.  For source distributions downloaded from GHC's web site,
 this step has already been performed.
 
