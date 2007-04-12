@@ -365,13 +365,6 @@ binary-dist::
 	done
 endif
 
-# Jiggle the files around to make a valid Windows distribution if necessary
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-binary-dist :: fiddle-binary-dist
-endif
-
-fiddle-binary-dist:
-	cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) && ../distrib/prep-bin-dist-mingw
 .PHONY: binary-dist-doc-%
 
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
@@ -396,26 +389,34 @@ $(BINARY_DIST_LIBRARY_RULES): binary-dist-lib-%:
 	     \( \( -name "*.o" -o -name "*.p_o" \) -a \! -name "HS*" \) \
 	     -exec rm {} \;
 
+# Jiggle the files around to make a valid Windows distribution if necessary
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+binary-dist :: fiddle-binary-dist
+endif
+
+.PHONY: fiddle-binary-dist
+fiddle-binary-dist:
+	cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) && ../distrib/prep-bin-dist-mingw
 # Tar up the distribution and build a manifest
 binary-dist :: tar-binary-dist
 
+.PHONY: tar-binary-dist
 tar-binary-dist:
 	( cd $(BIN_DIST_TOPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
 	( cd $(BIN_DIST_TOPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
 
 # Upload the distribution and documentation
 ifneq "$(PublishLocation)" ""
-binary-dist ::
-	$(MAKE) publish-binary-dist
+binary-dist :: publish-binary-dist
 endif
 
+.PHONY: publish-binary-dist
 publish-binary-dist :
 	@for i in 0 1 2 3 4 5 6 7 8 9; do \
 		echo "Try $$i: $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)"; \
 		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation); then break; fi\
 	done
 	$(PublishCp) -r $(BIN_DIST_DIR)/share/html/* $(PublishLocation)/docs
-endif
 
 
 binary-dist::
