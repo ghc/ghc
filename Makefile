@@ -396,7 +396,7 @@ endif
 
 .PHONY: fiddle-binary-dist
 fiddle-binary-dist:
-	cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) && ../distrib/prep-bin-dist-mingw
+	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
 # Tar up the distribution and build a manifest
 binary-dist :: tar-binary-dist
 
