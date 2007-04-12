@@ -76,6 +76,11 @@ check-packages :
 	     exit 1; \
 	  fi \
 	done
+	if test ! -e libraries/base/configure; then \
+	    echo "Looks like you're missing base's configure script."; \
+	    echo "Did you run 'sh boot' at the top level?"; \
+	    exit 1; \
+	fi
 
 stage1 : check-packages
 	$(MAKE) -C utils/mkdependC boot
