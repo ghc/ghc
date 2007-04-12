@@ -35,7 +35,8 @@ SRCS	= \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
 	Unsafe/Coerce.hs \
-	WCsubst.c
+	WCsubst.c \
+	System/Posix/Types.hsc \
 
 
 #	Text/Regex/Posix.hsc Text/Regex.hs \
