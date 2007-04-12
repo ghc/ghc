@@ -4179,12 +4179,17 @@ static int ocGetNames_MachO(ObjectCode* oc)
                 if(nlist[i].n_type & N_EXT)
                 {
                     char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-                    ghciInsertStrHashTable(oc->fileName, symhash, nm,
-                                            image
-                                            + sections[nlist[i].n_sect-1].offset
-                                            - sections[nlist[i].n_sect-1].addr
-                                            + nlist[i].n_value);
-                    oc->symbols[curSymbol++] = nm;
+                    if((nlist[i].n_desc & N_WEAK_DEF) && lookupSymbol(nm))
+                        ; // weak definition, and we already have a definition
+                    else
+                    {
+                            ghciInsertStrHashTable(oc->fileName, symhash, nm,
+                                                    image
+                                                    + sections[nlist[i].n_sect-1].offset
+                                                    - sections[nlist[i].n_sect-1].addr
+                                                    + nlist[i].n_value);
+                            oc->symbols[curSymbol++] = nm;
+                    }
                 }
                 else
                 {
