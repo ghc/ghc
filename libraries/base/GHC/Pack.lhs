@@ -34,7 +34,7 @@ module GHC.Pack
 	where
 
 import GHC.Base
-import {-# SOURCE #-} GHC.Err ( error )
+import GHC.Err ( error )
 import GHC.List ( length )
 import GHC.ST
 import GHC.Num
