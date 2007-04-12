@@ -367,10 +367,11 @@ endif
 
 # Jiggle the files around to make a valid Windows distribution if necessary
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-binary-dist::
-	cd $(BIN_DIST_TMPDIR) && ../distrib/prep-bin-dist-mingw
+binary-dist :: fiddle-binary-dist
 endif
 
+fiddle-binary-dist:
+	cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) && ../distrib/prep-bin-dist-mingw
 .PHONY: binary-dist-doc-%
 
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
@@ -396,7 +397,9 @@ $(BINARY_DIST_LIBRARY_RULES): binary-dist-lib-%:
 	     -exec rm {} \;
 
 # Tar up the distribution and build a manifest
-binary-dist ::
+binary-dist :: tar-binary-dist
+
+tar-binary-dist:
 	( cd $(BIN_DIST_TOPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
 	( cd $(BIN_DIST_TOPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
 
