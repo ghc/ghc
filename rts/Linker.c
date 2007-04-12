@@ -4191,15 +4191,6 @@ static int ocGetNames_MachO(ObjectCode* oc)
                             oc->symbols[curSymbol++] = nm;
                     }
                 }
-                else
-                {
-                    char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
-                    ghciInsertStrHashTable(oc->fileName, oc->lochash, nm,
-                                            image
-                                            + sections[nlist[i].n_sect-1].offset
-                                            - sections[nlist[i].n_sect-1].addr
-                                            + nlist[i].n_value);
-                }
             }
         }
     }
