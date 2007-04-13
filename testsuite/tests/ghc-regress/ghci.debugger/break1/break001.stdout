@@ -1,5 +1,5 @@
 Stopped at a breakpoint in A.hs:8. Local bindings in scope:
-  _result :: (), a :: a, c :: (), b :: forall a. a -> a,
+  _result :: (), a :: a, b :: forall a. a -> a, c :: (),
   d :: Integer -> Integer -> Integer, i :: a
 A.hs:8:9-18> a :: GHC.Base.Unknown
 A.hs:8:9-18> b :: a -> a
