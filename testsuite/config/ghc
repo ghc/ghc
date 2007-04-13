@@ -1,3 +1,7 @@
+
+import os
+import re
+
 # Testsuite configuration setup for GHC
 #
 # This file is Python source
@@ -72,4 +76,13 @@ config.way_rts_flags = {
 	'threaded2'  : ['-N2'],
 	'hpc'	     : []
     	}
+
+def get_compiler_info():
+    h = os.popen(config.compiler + ' --numeric-version', 'r')
+    v = h.read()
+    h.close()
+    v = re.sub('[\r\n]', '', v)
+    v = v.split('-')
+    config.compiler_version = v[0]
+    config.compiler_tags = v[1:]
 

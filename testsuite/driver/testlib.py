@@ -222,6 +222,22 @@ def _skip_if_platform( opts, plat ):
 	opts.skip = 1
 	
 # ---
+
+def skip_if_tag( tag ):
+   return lambda opts, t=tag: _skip_if_tag(opts, t)
+
+def _skip_if_tag( opts, tag ):
+    if tag in config.compiler_tags:
+	opts.skip = 1
+	
+def skip_unless_tag( tag ):
+   return lambda opts, t=tag: _skip_unless_tag(opts, t)
+
+def _skip_unless_tag( opts, tag ):
+    if not (tag in config.compiler_tags):
+	opts.skip = 1
+	
+# ---
 def alone(opts):
     opts.alone = 1
 

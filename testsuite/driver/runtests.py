@@ -74,6 +74,9 @@ for opt,arg in opts:
     if opt == '--threads':
         config.threads = int(arg)
 
+# This has to come after arg parsing as the args can change the compiler
+get_compiler_info()
+
 # Can't import this earlier as we need to know if threading will be
 # enabled or not
 from testlib import *

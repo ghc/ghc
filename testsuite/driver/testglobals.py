@@ -54,6 +54,10 @@ class TestConfig:
         # and ghc-pkg
         self.ghc_pkg = ''
 
+        # Compiler version info
+        self.compiler_version = ''
+        self.compiler_tags = []
+
         # Flags we always give to this compiler
         self.compiler_always_flags = []
         

@@ -15,3 +15,7 @@ config.other_ways            = []
 
 config.way_flags = { 'normal' : [] }
 config.way_rts_flags = { 'normal' : [] }
+
+def get_compiler_info():
+    pass
+
