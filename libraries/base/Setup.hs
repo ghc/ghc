@@ -27,6 +27,9 @@ main = do args <- getArgs
                   buildHook = add_ghc_options ghcArgs
                             $ filter_modules_hook
                             $ buildHook defaultUserHooks,
+                  makefileHook = add_ghc_options ghcArgs
+                            $ filter_modules_hook
+                            $ makefileHook defaultUserHooks,
                   instHook = filter_modules_hook
                            $ instHook defaultUserHooks }
           withArgs args'' $ defaultMainWithHooks hooks
