@@ -1,3 +1,5 @@
-test('TestList', normal, compile, ['-fesc'])
-test('TestImport', normal, compile, ['-fesc'])
-test('TestData', normal, compile, ['-fesc'])
+esc = skip_unless_tag('esc')
+
+test('TestList', esc, compile, ['-fesc'])
+test('TestImport', esc, compile, ['-fesc'])
+test('TestData', esc, compile, ['-fesc'])
