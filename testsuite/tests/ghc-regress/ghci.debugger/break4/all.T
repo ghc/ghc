@@ -1,2 +1,2 @@
 
-test('break004', normal, ghci_script, ['break004.script'])
+test('break004', expect_broken(1275), ghci_script, ['break004.script'])
