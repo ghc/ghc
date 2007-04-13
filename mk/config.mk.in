@@ -56,7 +56,8 @@ endif
 # random .o-file stuff might change even if the .hi syntax doesn't
 
 ProjectName       = @ProjectName@
-ProjectVersion    = @ProjectVersion@
+ProjectTags       =
+ProjectVersion    = @ProjectVersion@$(ProjectTags)
 ProjectVersionInt = @ProjectVersionInt@
 ProjectPatchLevel = @ProjectPatchLevel@
 
