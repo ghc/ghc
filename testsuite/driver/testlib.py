@@ -621,6 +621,8 @@ def simple_run( name, way, prog, args ):
    # check the exit code
    if exit_code != getTestOpts().exit_code:
        print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
+       dump_stdout(name)
+       dump_stderr(name)
        return 'fail'
 
    check_hp = my_rts_flags.find("-h") != -1
@@ -710,6 +712,8 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     # check the exit code
     if exit_code != getTestOpts().exit_code:
         print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
+        dump_stdout(name)
+        dump_stderr(name)
         return 'fail'
 
     # split the stdout into compilation/program output
@@ -850,6 +854,10 @@ def check_stdout_ok( name ):
    return compare_outputs('stdout', norm, id, \
                           expected_stdout_file, actual_stdout_file)
 
+def dump_stdout( name ):
+   print "Stdout:"
+   print read_no_crs(qualify(name, 'run.stdout'))
+
 def check_stderr_ok( name ):
    actual_stderr_file   = qualify(name, 'run.stderr')
    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
@@ -862,6 +870,10 @@ def check_stderr_ok( name ):
 
    return compare_outputs('stderr', norm, id, \
                           expected_stderr_file, actual_stderr_file)
+
+def dump_stderr( name ):
+   print "Stderr:"
+   print read_no_crs(qualify(name, 'run.stderr'))
 
 def read_no_crs(file):
     h = open(file)
