@@ -13,8 +13,26 @@
 -- @\<sys\/types.h>@ C header on a POSIX system.
 --
 -----------------------------------------------------------------------------
-
+#ifdef __NHC__
+#define HTYPE_DEV_T
+#define HTYPE_INO_T
+#define HTYPE_MODE_T
+#define HTYPE_OFF_T
+#define HTYPE_PID_T
+#define HTYPE_SSIZE_T
+#define HTYPE_GID_T
+#define HTYPE_NLINK_T
+#define HTYPE_UID_T
+#define HTYPE_CC_T
+#define HTYPE_SPEED_T
+#define HTYPE_TCFLAG_T
+#define HTYPE_RLIM_T
+#define HTYPE_NLINK_T
+#define HTYPE_UID_T
+#define HTYPE_GID_T
+#else
 #include "HsBaseConfig.h"
+#endif
 
 module System.Posix.Types (
 
@@ -83,6 +101,11 @@ module System.Posix.Types (
   FileMode,
   Limit
  ) where
+
+#ifdef __NHC__
+import NHC.PosixTypes
+import Foreign.C
+#else
 
 import Foreign
 import Foreign.C
@@ -162,6 +185,8 @@ type UserID         = CUid
 #if defined(HTYPE_GID_T)
 type GroupID        = CGid
 #endif
+
+#endif /* !__NHC__ */
 
 type ByteCount      = CSize
 type ClockTick      = CClock

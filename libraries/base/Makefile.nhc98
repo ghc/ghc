@@ -17,7 +17,7 @@ SRCS	= \
 	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Instances.hs \
 	Control/Arrow.hs Control/Applicative.hs \
 	Debug/Trace.hs \
-	NHC/SizedTypes.hs \
+	NHC/SizedTypes.hs NHC/PosixTypes.hsc \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
 	System/Environment.hs System/Exit.hs System/Locale.hs \
 	System/Directory.hs System/Mem.hs System/Cmd.hs System/Info.hs \
@@ -36,7 +36,7 @@ SRCS	= \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
 	Unsafe/Coerce.hs \
 	WCsubst.c \
-	System/Posix/Types.hsc \
+	System/Posix/Types.hs \
 
 
 #	Text/Regex/Posix.hsc Text/Regex.hs \
