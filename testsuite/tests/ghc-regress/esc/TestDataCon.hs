@@ -1,4 +1,4 @@
-module DataA where
+module TestDataCon where
 
 {-# CONTRACT g1 :: ({x | x>0}, any) -> {r | r>0} #-}
 g1 :: (Int, Int) -> Int

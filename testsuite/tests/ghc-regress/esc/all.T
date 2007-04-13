@@ -1,2 +1,3 @@
-test('TestList', normal, compile, ['-fesc -ddump-hi'])
-test('TestImport', normal, compile, ['-fesc -ddump-hi'])
+test('TestList', normal, compile, ['-fesc'])
+test('TestImport', normal, compile, ['-fesc'])
+test('TestData', normal, compile, ['-fesc'])
