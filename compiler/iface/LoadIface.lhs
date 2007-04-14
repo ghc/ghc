@@ -567,7 +567,7 @@ pprModIface iface
 		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
 		<+> (if mi_finsts iface then ptext SLIT("[family instance module]") else empty)
-		<+> int opt_HiVersion
+		<+> integer opt_HiVersion
 		<+> ptext SLIT("where")
 	, vcat (map pprExport (mi_exports iface))
 	, pprDeps (mi_deps iface)

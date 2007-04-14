@@ -302,7 +302,7 @@ opt_RulesOff			= lookUp  FSLIT("-frules-off")
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 opt_GranMacros			= lookUp  FSLIT("-fgransim")
-opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Int
+opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_OmitBlackHoling		= lookUp  FSLIT("-dno-black-holing")
 opt_RuntimeTypes		= lookUp  FSLIT("-fruntime-types")
