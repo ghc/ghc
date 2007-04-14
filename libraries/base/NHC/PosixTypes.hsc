@@ -51,6 +51,7 @@ import Control.Monad
 -- Curious hack to ensure that the CTypes macros are expanded *after* hsc2hs.
 ##include "CTypes.h"
 -- C header files that contain all the types we are looking for here.
+#include <libc.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/resource.h>
