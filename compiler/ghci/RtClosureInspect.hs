@@ -315,20 +315,21 @@ printTerm1 p Term{dc=dc, subTerms=tt}
 
 printTerm1 _ t = printTerm t
 
-customPrintTerm :: Monad m => ((Int->Term->m SDoc)->[Term->m (Maybe SDoc)]) -> Term -> m SDoc
-customPrintTerm custom = let 
+customPrintTerm :: forall m. Monad m => ((Int->Term->m SDoc)->[Term->m (Maybe SDoc)]) -> Term -> m SDoc
+customPrintTerm custom = go 0 where
 --  go :: Monad m => Int -> Term -> m SDoc
   go prec t@Term{subTerms=tt, dc=dc} = do
-    mb_customDocs <- sequence$ sequence (custom go) t  -- Inner sequence is List monad
-    case msum mb_customDocs of        -- msum is in Maybe monad
+    let mb_customDocs = map ($t) (custom go) :: [m (Maybe SDoc)]    
+    first_success <- firstJustM mb_customDocs
+    case first_success of
       Just doc -> return$ parensCond (prec>app_prec+1) doc
 --    | dataConIsInfix dc, (t1:t2:tt') <- tt =
       Nothing  -> do pprSubterms <- mapM (go (app_prec+1)) tt
                      return$ parensCond (prec>app_prec+1) 
                                         (ppr dc <+> sep pprSubterms)
   go _ t = return$ printTerm t
-  in go 0 
-   where fixity = undefined 
+  firstJustM (mb:mbs) = mb >>= maybe (firstJustM mbs) (return . Just)
+  firstJustM [] = return Nothing
 
 customPrintTermBase :: Monad m => (Int->Term-> m SDoc)->[Term->m (Maybe SDoc)]
 customPrintTermBase showP =

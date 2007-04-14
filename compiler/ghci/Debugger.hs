@@ -62,7 +62,7 @@ pprintClosureCommand bindThings force str = do
   mb_new_ids <- mapM (io . go cms) (catMaybes mb_ids)
   io$ updateIds cms (catMaybes mb_new_ids)
  where 
-   -- Find the Id, clean up 'Unknowns'
+   -- Find the Id, clean up 'Unknowns' in the idType
    cleanUp :: Session -> [Name] -> String -> IO (Maybe Id)
    cleanUp cms newNames str = do
      tythings <- GHC.parseName cms str >>= mapM (GHC.lookupName cms)
