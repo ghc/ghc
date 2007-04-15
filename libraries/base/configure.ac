@@ -7,14 +7,8 @@ AC_CONFIG_HEADERS([include/HsBaseConfig.h])
 
 AC_ARG_WITH([cc],
             [C compiler],
-            [OLDPATH=$PATH
-             PATH=`dirname $withval`:$PATH
-             AC_PROG_CC(`basename $withval`)
-             PATH=$OLDPATH
-             CC=$withval],
-            [AC_PROG_CC()])
-echo CC is $CC >&5
-echo CC is $CC >&6
+            [CC=$withval])
+AC_PROG_CC()
 
 # do we have long longs?
 AC_CHECK_TYPES([long long])
