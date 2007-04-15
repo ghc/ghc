@@ -172,12 +172,14 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 INSTALL_DIR=$(prefix)/share/ghc/doc/html/
 
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
+ifneq "$(NO_HADDOCK_DOCS)" "YES"
 	$(INSTALL_DATA)   index.html doc-index.html 			  $(INSTALL_DIR)
 	$(INSTALL_SCRIPT) gen_contents_index 					  $(INSTALL_DIR)
 	# Hacks:
 	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.css $(INSTALL_DIR)
 	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.js  $(INSTALL_DIR)
 	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.gif $(INSTALL_DIR)
+endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
 install-docs:
