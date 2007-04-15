@@ -82,7 +82,8 @@ subdirs:
 
 .PHONY: boot
 
-boot: $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup)
+boot: ifBuildable/ifBuildable \
+	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup)
 	# XXX Hideous hacks:
 	$(GENPRIMOP) --make-haskell-source < ../compiler/prelude/primops.txt > base/GHC/Prim.hs
 	$(GENPRIMOP) --make-haskell-wrappers < ../compiler/prelude/primops.txt > base/GHC/PrimopWrappers.hs
@@ -99,6 +100,13 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 	mkdir $*/setup
 	$(CP) $*/Setup.*hs $*/setup
 	cd $*/setup && $(GHC) -Wall --make -i../../$(BOOTSTRAPPING_CABAL) Setup.*hs -o Setup
+
+ifBuildable/ifBuildable: ifBuildable.hs stamp/$(BOOTSTRAPPING_CABAL)
+	-$(RM) -rf ifBuildable
+	mkdir ifBuildable
+	$(CP) ifBuildable.hs ifBuildable/
+	cd ifBuildable && $(GHC) -Wall --make -i../$(BOOTSTRAPPING_CABAL) \
+	                         ifBuildable -o ifBuildable
 
 stamp/$(BOOTSTRAPPING_CABAL):
 	$(RM) -rf $(BOOTSTRAPPING_CABAL)
@@ -143,8 +151,9 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  %/setup/Setup
-	cd $* && setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts))
-	cd $* && setup/Setup register --inplace
+	cd $* && ../ifBuildable/ifBuildable setup/Setup build \
+	                                $(addprefix --ghc-option=,$(GhcLibHcOpts))
+	cd $* && ../ifBuildable/ifBuildable setup/Setup register --inplace
 
 .PHONY: doc
 
@@ -180,22 +189,24 @@ install-docs:
 $(foreach SUBDIR,$(SUBDIRS),stamp/configure.library.install.$(SUBDIR)): \
 stamp/configure.library.install.%: %/setup/Setup
 	-$(RM) -f stamp/configure.library.*.$*
-	cd $* && setup/Setup configure $(CONFIGURE_OPTS) \
-	                               --prefix=$(prefix) \
-	                               --with-compiler=$(bindir)/ghc \
-	                               --datasubdir=ghc
+	cd $* && ../ifBuildable/ifBuildable setup/Setup configure \
+	                                    $(CONFIGURE_OPTS) \
+	                                    --prefix=$(prefix) \
+	                                    --with-compiler=$(bindir)/ghc \
+	                                    --datasubdir=ghc
 	touch $@
 
 # We need to reconfigure as we now need to register with the normal ghc-pkg
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: stamp/configure.library.install.% %/setup/Setup
-	cd $* && setup/Setup install
+	cd $* && ../ifBuildable/ifBuildable setup/Setup install
 
 .PHONY: clean clean.library.%
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -f stamp/$(BOOTSTRAPPING_CABAL)
 	$(RM) -rf $(BOOTSTRAPPING_CABAL)
+	$(RM) -rf ifBuildable
 	$(RM) -f libraries.txt index.html doc-index.html
 
 $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
