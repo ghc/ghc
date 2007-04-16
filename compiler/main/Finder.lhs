@@ -243,6 +243,14 @@ findHomeModule hsc_env mod_name =
      exts | isOneShot (ghcMode dflags) = hi_exts
           | otherwise      	       = source_exts
    in
+
+  -- special case for GHC.Prim; we won't find it in the filesystem.
+  -- This is important only when compiling the base package (where GHC.Prim
+  -- is a home module).
+  if mod == gHC_PRIM 
+        then return (Found (error "GHC.Prim ModLocation") mod)
+        else 
+
    searchPathExts home_path mod exts
 
 
