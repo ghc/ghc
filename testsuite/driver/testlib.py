@@ -760,11 +760,13 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
         out1.write(line)
         line = infile.readline()
 	line = re.sub('\r', '', line)
+    out1.close()
 
     line = infile.readline()
     while (line != ''):
         out2.write(line)
         line = infile.readline()
+    out2.close()
     
 # -----------------------------------------------------------------------------
 # Generate External Core for the given program, then compile the resulting Core
