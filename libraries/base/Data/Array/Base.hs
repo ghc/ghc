@@ -41,6 +41,7 @@ import GHC.Float	( Float(..), Double(..) )
 import GHC.Stable	( StablePtr(..) )
 import GHC.Int		( Int8(..),  Int16(..),  Int32(..),  Int64(..) )
 import GHC.Word		( Word8(..), Word16(..), Word32(..), Word64(..) )
+import GHC.IOBase       ( IO(..) )
 #endif
 
 #ifdef __HUGS__
@@ -1520,9 +1521,14 @@ freezeSTUArray :: Ix i => STUArray s i e -> ST s (UArray i e)
 freezeSTUArray (STUArray l u marr#) = ST $ \s1# ->
     case sizeofMutableByteArray# marr#  of { n# ->
     case newByteArray# n# s1#           of { (# s2#, marr'# #) ->
-    case unsafeCoerce# memcpy marr'# marr# n# s2# of { (# s3#, () #) ->
+    case memcpy_freeze marr'# marr# (fromIntegral (I# n#)) of { IO m ->
+    case unsafeCoerce# m s2#            of { (# s3#, _ #) ->
     case unsafeFreezeByteArray# marr'# s3# of { (# s4#, arr# #) ->
-    (# s4#, UArray l u arr# #) }}}}
+    (# s4#, UArray l u arr# #) }}}}}
+
+foreign import ccall unsafe "memcpy"
+    memcpy_freeze :: MutableByteArray# s -> MutableByteArray# s -> CSize
+           -> IO (Ptr a)
 
 {-# RULES
 "freeze/STArray"  freeze = ArrST.freezeSTArray
@@ -1590,11 +1596,12 @@ thawSTUArray :: Ix i => UArray i e -> ST s (STUArray s i e)
 thawSTUArray (UArray l u arr#) = ST $ \s1# ->
     case sizeofByteArray# arr#          of { n# ->
     case newByteArray# n# s1#           of { (# s2#, marr# #) ->
-    case unsafeCoerce# memcpy marr# arr# n# s2# of { (# s3#, () #) ->
-    (# s3#, STUArray l u marr# #) }}}
+    case memcpy_thaw marr# arr# (fromIntegral (I# n#)) of { IO m ->
+    case unsafeCoerce# m s2#            of { (# s3#, _ #) ->
+    (# s3#, STUArray l u marr# #) }}}}
 
 foreign import ccall unsafe "memcpy"
-    memcpy :: MutableByteArray# RealWorld -> ByteArray# -> CSize
+    memcpy_thaw :: MutableByteArray# s -> ByteArray# -> CSize
            -> IO (Ptr a)
 
 {-# RULES
