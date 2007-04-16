@@ -148,8 +148,7 @@ if config.platform == "i386-unknown-mingw32":
 else:
     config063 = normal
 
-test('conc063', compose(exit_code(1), config063), 
-        compile_and_run, ['-package stm'])
+test('conc063', config063, compile_and_run, ['-package stm'])
 
 test('conc064', exit_code(1), compile_and_run, [''])
 
