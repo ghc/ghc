@@ -73,6 +73,11 @@ CONFIGURE_OPTS += --enable-library-profiling
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-profiling
 endif
 
+ifeq "$(SplitObjs)" "YES"
+CONFIGURE_OPTS += --enable-split-objs
+CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
+endif
+
 BOOTSTRAPPING_CABAL = bootstrapping.cabal
 
 .PHONY: subdirs
