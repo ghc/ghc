@@ -18,5 +18,6 @@ parsec
 regex-base
 regex-compat
 regex-posix
+stm
 time
 xhtml

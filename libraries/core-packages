@@ -3,7 +3,6 @@ Cabal
 filepath
 haskell98
 readline
-stm
 template-haskell
 unix
 Win32
