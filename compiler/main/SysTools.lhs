@@ -411,7 +411,8 @@ runPp dflags args =   do
 runCc :: DynFlags -> [Option] -> IO ()
 runCc dflags args =   do 
   let (p,args0) = pgm_c dflags
-  (args1,mb_env) <- getGccEnv (args0++args)
+      args1 = args0 ++ args
+  mb_env <- getGccEnv args1
   runSomethingFiltered dflags cc_filter "C Compiler" p args1 mb_env
  where
   -- discard some harmless warnings from gcc that we can't turn off
@@ -467,22 +468,26 @@ runCc dflags args =   do
 isContainedIn :: String -> String -> Bool
 xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 
--- Turn the -B<dir> option to gcc into the GCC_EXEC_PREFIX env var, to
--- workaround a bug in MinGW gcc on Windows Vista, see bug #1110.
-getGccEnv :: [Option] -> IO ([Option], Maybe [(String,String)])
+-- If the -B<dir> option is set, add <dir> to PATH.  This works around
+-- a bug in gcc on Windows Vista where it can't find its auxiliary
+-- binaries (see bug #1110).
+getGccEnv :: [Option] -> IO (Maybe [(String,String)])
 getGccEnv opts = 
 #if __GLASGOW_HASKELL__ < 603
   return (opts,Nothing)
 #else
   if null b_dirs
-     then return (opts,Nothing)
+     then return Nothing
      else do env <- getEnvironment
-             return (rest, Just (("GCC_EXEC_PREFIX", head b_dirs) : env))
+             return (Just (map mangle_path env))
  where
-  (b_dirs, rest) = partitionWith get_b_opt opts
+  (b_dirs, _) = partitionWith get_b_opt opts
 
   get_b_opt (Option ('-':'B':dir)) = Left dir
   get_b_opt other = Right other  
+
+  mangle_path ("PATH",paths) = ("PATH", '\"' : head b_dirs ++ "\";" ++ paths)
+  mangle_path other = other
 #endif
 
 runMangle :: DynFlags -> [Option] -> IO ()
@@ -498,7 +503,9 @@ runSplit dflags args = do
 runAs :: DynFlags -> [Option] -> IO ()
 runAs dflags args = do 
   let (p,args0) = pgm_a dflags
-  runSomething dflags "Assembler" p (args0++args)
+      args1 = args0 ++ args
+  mb_env <- getGccEnv args1
+  runSomethingFiltered dflags id "Assembler" p args1 mb_env
 
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = do 
@@ -508,7 +515,8 @@ runLink dflags args = do
 runMkDLL :: DynFlags -> [Option] -> IO ()
 runMkDLL dflags args = do
   let (p,args0) = pgm_dll dflags
-  (args1,mb_env) <- getGccEnv (args0++args)
+      args1 = args0 ++ args
+  mb_env <- getGccEnv (args0++args)
   runSomethingFiltered dflags id "Make DLL" p args1 mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
