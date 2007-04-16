@@ -474,7 +474,7 @@ xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 getGccEnv :: [Option] -> IO (Maybe [(String,String)])
 getGccEnv opts = 
 #if __GLASGOW_HASKELL__ < 603
-  return (opts,Nothing)
+  return Nothing
 #else
   if null b_dirs
      then return Nothing
