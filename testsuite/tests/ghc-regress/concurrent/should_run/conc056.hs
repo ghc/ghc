@@ -1,6 +1,5 @@
 -- Exposed a bug in 6.4.1, fixed in rev. 1.16 of ghc/rts/Exception.cmm
 
-import Network
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad
@@ -12,7 +11,7 @@ inc tv = do
   writeTVar tv (v + 1)
 
 bad :: MVar () -> IO ()
-bad m = do { connectTo "0.0.0.0" (Service "http"); return () }
+bad m = do { evaluate (1 `quot` 0); return () }
 	 `finally` putMVar m ()
 
 main :: IO ()
