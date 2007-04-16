@@ -91,11 +91,11 @@ charType c = case c of
    '\6'   -> 0                         -- \006
    '\7'   -> 0                         -- \007
    '\8'   -> 0                         -- \010
-   '\9'   -> cAny + cSpace             -- \t
-   '\10'  -> cSpace	               -- \n (not allowed in strings, so !cAny)
-   '\11'  -> cAny + cSpace             -- \v
-   '\12'  -> cAny + cSpace             -- \f
-   '\13'  -> cAny + cSpace             --  ^M
+   '\9'   -> cSpace                    -- \t  (not allowed in strings, so !cAny)
+   '\10'  -> cSpace	               -- \n  (ditto)
+   '\11'  -> cSpace                    -- \v  (ditto)
+   '\12'  -> cSpace                    -- \f  (ditto)
+   '\13'  -> cSpace                    --  ^M (ditto)
    '\14'  -> 0                         -- \016
    '\15'  -> 0                         -- \017
    '\16'  -> 0                         -- \020
