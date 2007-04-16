@@ -128,6 +128,13 @@ stg_returnToSchedButFirst
   jump R2;
 }
 
+stg_threadFinished
+{
+  StgRegTable_rRet(BaseReg) = ThreadFinished;
+  R1 = BaseReg;
+  jump StgReturn;
+}  
+
 /* -----------------------------------------------------------------------------
     Strict IO application - performing an IO action and entering its result.
     

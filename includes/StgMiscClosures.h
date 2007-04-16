@@ -484,6 +484,7 @@ RTS_FUN(stg_returnToStackTop);
 RTS_FUN(stg_returnToSched);
 RTS_FUN(stg_returnToSchedNotPaused);
 RTS_FUN(stg_returnToSchedButFirst);
+RTS_FUN(stg_threadFinished);
 
 RTS_FUN(stg_init_finish);
 RTS_FUN(stg_init);

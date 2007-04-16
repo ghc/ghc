@@ -84,8 +84,7 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
 
         if (r != 0::CInt) {
             if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
-                R1 = ThreadFinished;
-                jump StgReturn;
+                jump stg_threadFinished;
             } else {
                 LOAD_THREAD_STATE();
                 ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
@@ -180,8 +179,7 @@ unblockAsyncExceptionszh_fast
 
             if (r != 0::CInt) {
                 if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
-	            R1 = ThreadFinished;
-	            jump StgReturn;
+                    jump stg_threadFinished;
 	        } else {
 	            LOAD_THREAD_STATE();
 	            ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
@@ -229,8 +227,7 @@ killThreadzh_fast
 	foreign "C" throwToSingleThreaded(MyCapability() "ptr", 
 					  target "ptr", exception "ptr")[R1,R2];
 	if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
-	    R1 = ThreadFinished;
-	    jump StgReturn;
+            jump stg_threadFinished;
 	} else {
 	    LOAD_THREAD_STATE();
 	    ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
@@ -431,11 +428,7 @@ retry_pop_stack:
 	StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
 	SAVE_THREAD_STATE();	/* inline! */
 
-	/* The return code goes in BaseReg->rRet, and BaseReg is returned in R1 */
-	StgRegTable_rRet(BaseReg) = ThreadFinished;
-	R1 = BaseReg;
-
-	jump StgReturn;
+        jump stg_threadFinished;
     }
 
     /* Ok, Sp points to the enclosing CATCH_FRAME or CATCH_STM_FRAME.  Pop everything

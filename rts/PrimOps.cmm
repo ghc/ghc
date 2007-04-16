@@ -2142,8 +2142,7 @@ noDuplicatezh_fast
     foreign "C" threadPaused (MyCapability() "ptr", CurrentTSO "ptr") [];
     
     if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
-        R1 = ThreadFinished;
-        jump StgReturn;
+        jump stg_threadFinished;
     } else {
         LOAD_THREAD_STATE();
         ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
