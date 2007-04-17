@@ -179,13 +179,6 @@ main(int argc, char *argv[])
     printf("#define PROF_HDR_SIZE  %d\n", sizeofW(StgProfHeader));
     printf("#define GRAN_HDR_SIZE  %d\n", sizeofW(StgGranHeader));
 
-    printf("#define STD_ITBL_SIZE   %d\n", sizeofW(StgInfoTable));
-    printf("#define RET_ITBL_SIZE   %d\n", sizeofW(StgRetInfoTable) - sizeofW(StgInfoTable));
-    printf("#define PROF_ITBL_SIZE  %d\n", sizeofW(StgProfInfo));
-
-    printf("#define GRAN_ITBL_SIZE  %d\n", 0);
-    printf("#define TICKY_ITBL_SIZE %d\n", 0);
-
     printf("#define BLOCK_SIZE   %d\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %d\n", MBLOCK_SIZE);  
 

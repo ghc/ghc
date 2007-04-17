@@ -79,16 +79,6 @@ pROF_HDR_SIZE      = (PROF_HDR_SIZE      :: Int)
 gRAN_HDR_SIZE      = (GRAN_HDR_SIZE      :: Int)
 \end{code}
 
-Info Table sizes.
-
-\begin{code}
-sTD_ITBL_SIZE   = (STD_ITBL_SIZE   :: Int)
-rET_ITBL_SIZE   = (RET_ITBL_SIZE   :: Int)
-pROF_ITBL_SIZE  = (PROF_ITBL_SIZE  :: Int)
-gRAN_ITBL_SIZE  = (GRAN_ITBL_SIZE  :: Int)
-tICKY_ITBL_SIZE = (TICKY_ITBL_SIZE :: Int)
-\end{code}
-
 Size of a double in StgWords.
 
 \begin{code}
