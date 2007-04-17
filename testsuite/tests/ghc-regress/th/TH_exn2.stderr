@@ -1,5 +1,5 @@
 
-TH_exn.hs:1:0:
+TH_exn2.hs:1:0:
     Exception when trying to interpret result of compile-time code:
       Prelude.tail: empty list
       Code: let

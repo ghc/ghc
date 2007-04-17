@@ -1,7 +1,7 @@
 
-TH_fail.hs:1:0:
+TH_exn1.hs:1:0:
     Exception when trying to run compile-time code:
-      TH_fail.hs:(8,3)-(9,15): Non-exhaustive patterns in case
+      TH_exn1.hs:(9,3)-(10,15): Non-exhaustive patterns in case
 
       Code: case reverse @ Char "no" of
 	      []
