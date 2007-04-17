@@ -388,7 +388,8 @@ typedef struct _StgConInfoTable {
     StgInfoTable i;
 #endif
 
-char *con_desc;  /* the name of the data constructor as: Package:Module.Name */
+    OFFSET_FIELD(con_desc) // the name of the data constructor 
+                           // as: Package:Module.Name
 
 #if defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
