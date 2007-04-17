@@ -18,7 +18,7 @@ module MkId (
 
 	mkDataConIds,
 	mkRecordSelId, 
-	mkPrimOpId, mkFCallId, mkTickBoxOpId, 
+	mkPrimOpId, mkFCallId, mkTickBoxOpId, mkBreakPointOpId,
 
 	mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
         mkUnpackCase, mkProductBox,
@@ -905,17 +905,28 @@ mkFCallId uniq fcall ty
     arity	 = length arg_tys
     strict_sig   = mkStrictSig (mkTopDmdType (replicate arity evalDmd) TopRes)
 
-mkTickBoxOpId :: Unique 
-	      -> Module
-	      -> TickBoxId
-	      -> Id
-mkTickBoxOpId uniq mod ix =  mkGlobalId (TickBoxOpId tickbox) name ty info    
+-- Tick boxes and breakpoints are both represented as TickBoxOpIds,
+-- except for the type:
+--
+--    a plain HPC tick box has type (State# RealWorld)
+--    a breakpoint Id has type forall a.a
+--
+-- The breakpoint Id will be applied to a list of arbitrary free variables,
+-- which is why it needs a polymorphic type.
+
+mkTickBoxOpId :: Unique -> Module -> TickBoxId -> Id
+mkTickBoxOpId uniq mod ix = mkTickBox' uniq mod ix realWorldStatePrimTy
+
+mkBreakPointOpId :: Unique -> Module -> TickBoxId -> Id
+mkBreakPointOpId uniq mod ix = mkTickBox' uniq mod ix ty
+ where ty = mkSigmaTy [openAlphaTyVar] [] openAlphaTy
+
+mkTickBox' uniq mod ix ty = mkGlobalId (TickBoxOpId tickbox) name ty info    
   where
     tickbox = TickBox mod ix
     occ_str = showSDoc (braces (ppr tickbox))
     name    = mkTickBoxOpName uniq occ_str
     info    = noCafIdInfo
-    ty      = realWorldStatePrimTy 
 \end{code}
 
 

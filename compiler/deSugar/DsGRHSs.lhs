@@ -21,7 +21,6 @@ import Type
 
 import DsMonad
 import DsUtils
-import DsBreakpoint
 import Unique
 import PrelInfo
 import TysWiredIn
@@ -73,8 +72,7 @@ dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty =
               patsBinders  = collectPatsBinders (map (L undefined) pats) 
 
 dsGRHS hs_ctx pats rhs_ty (L loc (GRHS guards rhs))
-  = do rhs' <- maybeInsertBreakpoint rhs rhs_ty
-       matchGuards (map unLoc guards) hs_ctx rhs' rhs_ty
+  = matchGuards (map unLoc guards) hs_ctx rhs rhs_ty
 \end{code}
 
 

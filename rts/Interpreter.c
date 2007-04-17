@@ -83,6 +83,7 @@ allocate_NONUPD (int n_words)
     return allocate(stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
 }
 
+rtsBool stop_next_breakpoint = rtsFalse;
 
 #ifdef INTERP_STATS
 
@@ -102,6 +103,7 @@ int it_BCO_entries;
 int it_ofreq[27];
 int it_oofreq[27][27];
 int it_lastopc;
+
 
 #define INTERP_TICK(n) (n)++
 
@@ -175,6 +177,9 @@ static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_pppppp_info,
 };
 
+HsStablePtr breakPointIOAction; // points to the IO action which is executed on a breakpoint
+                                // it is set in main/GHC.hs:runStmt
+
 Capability *
 interpretBCO (Capability* cap)
 {
@@ -198,8 +203,8 @@ interpretBCO (Capability* cap)
     //      	+---------------+
     //       
     if (Sp[0] == (W_)&stg_enter_info) {
-	Sp++;
-	goto eval;
+       Sp++;
+       goto eval;
     }
 
     // ------------------------------------------------------------------------
@@ -284,8 +289,10 @@ eval_obj:
 	break;
 	
     case BCO:
+    {
 	ASSERT(((StgBCO *)obj)->arity > 0);
 	break;
+    }
 
     case AP:	/* Copied from stg_AP_entry. */
     {
@@ -672,6 +679,7 @@ do_apply:
     // Sadly we have three different kinds of stack/heap/cswitch check
     // to do:
 
+
 run_BCO_return:
     // Heap check
     if (doYouWantToGC()) {
@@ -680,6 +688,7 @@ run_BCO_return:
     }
     // Stack checks aren't necessary at return points, the stack use
     // is aggregated into the enclosing function entry point.
+
     goto run_BCO;
     
 run_BCO_return_unboxed:
@@ -689,6 +698,7 @@ run_BCO_return_unboxed:
     }
     // Stack checks aren't necessary at return points, the stack use
     // is aggregated into the enclosing function entry point.
+
     goto run_BCO;
     
 run_BCO_fun:
@@ -715,6 +725,7 @@ run_BCO_fun:
 	Sp[0] = (W_)&stg_apply_interp_info; // placeholder, really
 	RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
     }
+
     goto run_BCO;
     
     // Now, actually interpret the BCO... (no returning to the
@@ -723,7 +734,7 @@ run_BCO:
     INTERP_TICK(it_BCO_entries);
     {
 	register int       bciPtr     = 1; /* instruction pointer */
-    register StgWord16 bci;
+        register StgWord16 bci;
 	register StgBCO*   bco        = (StgBCO*)obj;
 	register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
 	register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
@@ -753,6 +764,7 @@ run_BCO:
 		 //if (do_print_stack) checkStack(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
 	    );
 
+
 	INTERP_TICK(it_insns);
 
 #ifdef INTERP_STATS
@@ -768,6 +780,88 @@ run_BCO:
     ASSERT((bci & 0xFF00) == (bci & 0x8000));
 
     switch (bci & 0xFF) {
+
+        /* check for a breakpoint on the beginning of a let binding */
+        case bci_BRK_FUN: 
+        {
+            int arg1_brk_array, arg2_array_index, arg3_freeVars;
+            StgArrWords *breakPoints;
+            int returning_from_break;     /* are we resuming execution from a breakpoint?
+                                          **   if yes, then don't break this time around */
+            StgClosure *ioAction;         // the io action to run at a breakpoint
+
+            StgAP_STACK *new_aps;         // a closure to save the top stack frame on the heap
+            int i;
+            int size_words;
+
+            arg1_brk_array      = BCO_NEXT;  /* first argument of break instruction */
+            arg2_array_index    = BCO_NEXT;  /* second dargument of break instruction */
+            arg3_freeVars       = BCO_NEXT;  /* third argument of break instruction */
+
+            // check if we are returning from a breakpoint - this info is stored in
+            // the flags field of the current TSO
+            returning_from_break = cap->r.rCurrentTSO->flags & TSO_STOPPED_ON_BREAKPOINT; 
+
+            // if we are returning from a break then skip this section and continue executing
+            if (!returning_from_break)
+            {
+               breakPoints = (StgArrWords *) BCO_PTR(arg1_brk_array);
+
+               // stop the current thread if either the "stop_next_breakpoint" flag is true
+               // OR if the breakpoint flag for this particular expression is true
+               if (stop_next_breakpoint == rtsTrue || breakPoints->payload[arg2_array_index] == rtsTrue)
+               {
+                  stop_next_breakpoint = rtsFalse; // make sure we don't automatically stop at the next breakpoint
+
+                  // allocate memory for a new AP_STACK, enough to store the top stack frame
+                  // plus an stg_apply_interp_info pointer and a pointer to the BCO
+                  size_words = BCO_BITMAP_SIZE(obj) + 2;
+                  new_aps = (StgAP_STACK *) allocate (AP_STACK_sizeW(size_words));
+                  SET_HDR(new_aps,&stg_AP_STACK_info,CCS_SYSTEM); 
+                  new_aps->size = size_words;
+                  // we should never enter new_aps->fun, so it is assigned to a dummy value
+                  // ToDo: fixme to something that explodes with an error if you enter it 
+                  new_aps->fun = &stg_dummy_ret_closure; 
+
+                  // fill in the payload of the AP_STACK 
+                  new_aps->payload[0] = (W_)&stg_apply_interp_info;
+                  new_aps->payload[1] = (W_)obj;
+
+                  // copy the contents of the top stack frame into the AP_STACK
+                  for (i = 2; i < size_words; i++)
+                  {
+                     new_aps->payload[i] = (W_)Sp[i-2];
+                  }
+
+                  // prepare the stack so that we can call the breakPointIOAction
+                  // and ensure that the stack is in a reasonable state for the GC
+                  // and so that execution of this BCO can continue when we resume
+                  ioAction = (StgClosure *) deRefStablePtr (breakPointIOAction);
+                  Sp -= 7;
+                  Sp[6] = (W_)obj;   
+                  Sp[5] = (W_)&stg_apply_interp_info;
+                  Sp[4] = (W_)new_aps;                 /* the AP_STACK */
+                  Sp[3] = (W_)BCO_PTR(arg3_freeVars);  /* the info about local vars of the breakpoint */
+                  Sp[2] = (W_)&stg_ap_ppv_info;
+                  Sp[1] = (W_)ioAction;                /* apply the IO action to its two arguments above */
+                  Sp[0] = (W_)&stg_enter_info;         /* get ready to run the IO action */
+
+                  // set the flag in the TSO to say that we are now stopping at a breakpoint
+                  // so that when we resume we don't stop on the same breakpoint that we already
+                  // stopped at just now 
+                  cap->r.rCurrentTSO->flags |= TSO_STOPPED_ON_BREAKPOINT;
+
+                  // stop this thread and return to the scheduler - eventually we will come back
+                  // and the IO action on the top of the stack will be executed
+                  RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
+               }
+            }
+            // record that this thread is not stopped at a breakpoint anymore
+            cap->r.rCurrentTSO->flags &= ~TSO_STOPPED_ON_BREAKPOINT;
+
+            // continue normal execution of the byte code instructions
+	    goto nextInsn;
+        }
 
 	case bci_STKCHECK: {
 	    // Explicit stack check at the beginning of a function
@@ -1256,7 +1350,7 @@ run_BCO:
 	    bciPtr     = nextpc;
 	    goto nextInsn;
 	}
-
+ 
 	case bci_CASEFAIL:
 	    barf("interpretBCO: hit a CASEFAIL");
 	    
@@ -1270,4 +1364,33 @@ run_BCO:
     }
 
     barf("interpretBCO: fell off end of the interpreter");
+}
+
+/* temporary code for peeking inside a AP_STACK and pulling out values
+   based on their stack offset - used in the debugger for inspecting
+   the local values of a breakpoint
+*/
+HsStablePtr rts_getApStackVal (HsStablePtr, int);
+HsStablePtr rts_getApStackVal (HsStablePtr apStackSptr, int offset)
+{
+   HsStablePtr resultSptr;
+   StgAP_STACK *apStack;
+   StgClosure **payload;
+   StgClosure *val;
+
+   apStack = (StgAP_STACK *) deRefStablePtr (apStackSptr);
+   payload = apStack->payload;
+   val = (StgClosure *) payload[offset+2];
+   resultSptr = getStablePtr (val); 
+   return resultSptr;
+}
+
+/* set the single step flag for the debugger to True -
+   it gets set back to false in the interpreter everytime
+   we hit a breakpoint
+*/
+void rts_setStepFlag (void);
+void rts_setStepFlag (void)
+{
+   stop_next_breakpoint = rtsTrue;
 }

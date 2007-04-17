@@ -18,7 +18,7 @@ module Linker ( HValue, getHValue, showLinkerState,
 		linkExpr, unload, extendLinkEnv, withExtendedLinkEnv,
                 extendLoadedPkgs,
 		linkPackages,initDynLinker,
-                recoverDataCon
+                dataConInfoPtrToName
 	) where
 
 #include "HsVersions.h"
@@ -28,8 +28,9 @@ import ByteCodeLink
 import ByteCodeItbls
 import ByteCodeAsm
 import RtClosureInspect
+import CgInfoTbls
+import SMRep
 import IfaceEnv
-import OccName
 import TcRnMonad
 import Packages
 import DriverPhases
@@ -38,6 +39,7 @@ import HscTypes
 import Name
 import NameEnv
 import NameSet
+import qualified OccName
 import UniqFM
 import Module
 import ListSetOps
@@ -52,6 +54,7 @@ import ErrUtils
 import DriverPhases
 import SrcLoc
 import UniqSet
+import Constants
 
 -- Standard libraries
 import Control.Monad
@@ -151,12 +154,13 @@ extendLinkEnv new_bindings
 --   We use this string to lookup the interpreter's internal representation of the name
 --   using the lookupOrig.    
 
-recoverDataCon :: a -> TcM Name
-recoverDataCon x = do 
+dataConInfoPtrToName :: Ptr () -> TcM Name
+dataConInfoPtrToName x = do 
    theString <- ioToTcRn $ do
-      let ptr = getInfoTablePtr x 
+      let ptr = castPtr x :: Ptr StgInfoTable
       conDescAddress <- getConDescAddress ptr 
-      peekCString conDescAddress  
+      str <- peekCString conDescAddress  
+      return str
    let (pkg, mod, occ) = parse theString 
        occName = mkOccName OccName.dataName occ
        modName = mkModule (stringToPackageId pkg) (mkModuleName mod) 
@@ -207,18 +211,10 @@ recoverDataCon x = do
    getConDescAddress :: Ptr StgInfoTable -> IO (Ptr CChar)
    getConDescAddress ptr = do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-       offsetToString <- peek $ intPtrToPtr $ (ptrToIntPtr ptr) + offset
-       return $ ptr `plusPtr` offsetToString
-       where
-       -- subtract a word number of bytes 
-       offset = negate (fromIntegral SIZEOF_VOID_P)
-#endif
-#ifndef GHCI_TABLES_NEXT_TO_CODE
-        peek $ intPtrToPtr $ (ptrToIntPtr ptr) + offset
-      where 
-      -- add the standard info table size in bytes 
-      infoTableSizeBytes = sTD_ITBL_SIZE * wORD_SIZE
-      offset = infoTableSizeBytes 
+       offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE)
+       return $ (ptr `plusPtr` stdInfoTableSizeB) `plusPtr` (fromIntegral (offsetToString :: StgWord))
+#else
+       peek $ intPtrToPtr $ (ptrToIntPtr ptr) + stdInfoTableSizeB
 #endif
 
    -- parsing names is a little bit fiddly because we have a string in the form: 

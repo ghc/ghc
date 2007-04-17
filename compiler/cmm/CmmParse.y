@@ -607,6 +607,7 @@ stmtMacros = listToUFM [
   ( FSLIT("RET_NN"),	\[a,b] ->     emitRetUT [(NonPtrArg,a),(NonPtrArg,b)]),
   ( FSLIT("RET_NP"),	\[a,b] ->     emitRetUT [(NonPtrArg,a),(PtrArg,b)]),
   ( FSLIT("RET_PPP"),	\[a,b,c] ->   emitRetUT [(PtrArg,a),(PtrArg,b),(PtrArg,c)]),
+  ( FSLIT("RET_NPP"),	\[a,b,c] ->   emitRetUT [(NonPtrArg,a),(PtrArg,b),(PtrArg,c)]),
   ( FSLIT("RET_NNP"),	\[a,b,c] ->   emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(PtrArg,c)]),
   ( FSLIT("RET_NNNP"),	\[a,b,c,d] -> emitRetUT [(NonPtrArg,a),(NonPtrArg,b),(NonPtrArg,c),(PtrArg,d)]),
   ( FSLIT("RET_NPNP"),	\[a,b,c,d] -> emitRetUT [(NonPtrArg,a),(PtrArg,b),(NonPtrArg,c),(PtrArg,d)])

@@ -69,6 +69,8 @@ import SrcLoc
 import Util
 import ListSetOps
 import FastString
+import StaticFlags
+
 import Data.Char
 
 infixl 4 `mkDsApp`, `mkDsApps`
@@ -942,15 +944,22 @@ mkTickBox :: Int -> CoreExpr -> DsM CoreExpr
 mkTickBox ix e = do
        uq <- newUnique 	
        mod <- getModuleDs
-       let tick = mkTickBoxOpId uq mod ix
+       let tick | opt_Hpc   = mkTickBoxOpId uq mod ix
+                | otherwise = mkBreakPointOpId uq mod ix
        uq2 <- newUnique 	
        let occName = mkVarOcc "tick"
        let name = mkInternalName uq2 occName noSrcLoc   -- use mkSysLocal?
        let var  = Id.mkLocalId name realWorldStatePrimTy
-       return $ Case (Var tick) 
-	             var
-		     ty
-	             [(DEFAULT,[],e)]
+       scrut <- 
+          if opt_Hpc 
+            then return (Var tick)
+            else do
+              locals <- getLocalBindsDs
+              let tickVar = Var tick
+              let tickType = mkFunTys (map idType locals) realWorldStatePrimTy 
+              let scrutApTy = App tickVar (Type tickType)
+              return (mkApps scrutApTy (map Var locals) :: Expr Id)
+       return $ Case scrut var ty [(DEFAULT,[],e)]
   where
      ty = exprType e
 

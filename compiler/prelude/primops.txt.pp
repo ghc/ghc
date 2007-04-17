@@ -1738,13 +1738,8 @@ primop  NewBCOOp "newBCO#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-primop  InfoPtrOp "infoPtr#" GenPrimOp
-   a -> Addr#
-   with
-   out_of_line = True
-
-primop  ClosurePayloadOp "closurePayload#" GenPrimOp
-   a -> (# Array# b, ByteArr# #)
+primop  UnpackClosureOp "unpackClosure#" GenPrimOp
+   a -> (# Addr#, Array# b, ByteArr# #)
    with
    out_of_line = True
 

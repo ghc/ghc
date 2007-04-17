@@ -13,6 +13,7 @@ extern void   	   printPtr        ( StgPtr p );
 extern void   	   printObj        ( StgClosure *obj );
 
 #ifdef DEBUG
+extern void        prettyPrintClosure (StgClosure *obj);
 extern void   	   printClosure    ( StgClosure *obj );
 extern StgStackPtr printStackObj   ( StgStackPtr sp );
 extern void        printStackChunk ( StgStackPtr sp, StgStackPtr spLim );

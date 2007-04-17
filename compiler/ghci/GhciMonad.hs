@@ -11,12 +11,12 @@ module GhciMonad where
 #include "HsVersions.h"
 
 import qualified GHC
-import {-#SOURCE#-} Debugger
-import Breakpoints
 import Outputable
 import Panic hiding (showException)
 import Util
 import DynFlags
+import HscTypes
+import SrcLoc
 
 import Numeric
 import Control.Exception as Exception
@@ -43,8 +43,9 @@ data GHCiState = GHCiState
 	session        :: GHC.Session,
 	options        :: [GHCiOption],
         prelude        :: GHC.Module,
-        bkptTable      :: IORef (BkptTable GHC.Module),
-	topLevel       :: Bool
+	topLevel       :: Bool,
+        resume         :: [IO GHC.RunResult],
+        breaks         :: !ActiveBreakPoints
      }
 
 data GHCiOption 
@@ -52,6 +53,73 @@ data GHCiOption
 	| ShowType		-- show the type of expressions
 	| RevertCAFs		-- revert CAFs after every evaluation
 	deriving Eq
+
+data ActiveBreakPoints
+   = ActiveBreakPoints
+   { breakCounter   :: !Int
+   , breakLocations :: ![(Int, BreakLocation)]  -- break location uniquely numbered 
+   }
+
+instance Outputable ActiveBreakPoints where
+   ppr activeBrks = prettyLocations $ breakLocations activeBrks 
+
+emptyActiveBreakPoints :: ActiveBreakPoints
+emptyActiveBreakPoints 
+   = ActiveBreakPoints { breakCounter = 0, breakLocations = [] }
+
+data BreakLocation
+   = BreakLocation
+   { breakModule :: !GHC.Module
+   , breakLoc    :: !SrcSpan
+   , breakTick   :: {-# UNPACK #-} !Int
+   } 
+   deriving Eq
+
+prettyLocations :: [(Int, BreakLocation)] -> SDoc
+prettyLocations []   = text "No active breakpoints." 
+prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ reverse $ locs
+
+instance Outputable BreakLocation where
+   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc)
+
+getActiveBreakPoints :: GHCi ActiveBreakPoints
+getActiveBreakPoints = liftM breaks getGHCiState 
+
+-- don't reset the counter back to zero?
+clearActiveBreakPoints :: GHCi ()
+clearActiveBreakPoints = do
+   st <- getGHCiState
+   let oldActiveBreaks = breaks st
+       newActiveBreaks = oldActiveBreaks { breakLocations = [] } 
+   setGHCiState $ st { breaks = newActiveBreaks }
+
+deleteBreak :: Int -> GHCi ()
+deleteBreak identity = do
+   st <- getGHCiState
+   let oldActiveBreaks = breaks st
+       oldLocations    = breakLocations oldActiveBreaks
+       newLocations    = filter (\loc -> fst loc /= identity) oldLocations
+       newActiveBreaks = oldActiveBreaks { breakLocations = newLocations }   
+   setGHCiState $ st { breaks = newActiveBreaks }
+
+recordBreak :: BreakLocation -> GHCi (Bool{- was already present -}, Int)
+recordBreak brkLoc = do
+   st <- getGHCiState
+   let oldActiveBreaks = breaks st 
+   let oldLocations    = breakLocations oldActiveBreaks
+   -- don't store the same break point twice
+   case [ nm | (nm, loc) <- oldLocations, loc == brkLoc ] of
+     (nm:_) -> return (True, nm)
+     [] -> do
+      let oldCounter = breakCounter oldActiveBreaks 
+          newCounter = oldCounter + 1
+          newActiveBreaks = 
+             oldActiveBreaks 
+             { breakCounter   = newCounter 
+             , breakLocations = (oldCounter, brkLoc) : oldLocations 
+             }
+      setGHCiState $ st { breaks = newActiveBreaks }
+      return (False, oldCounter)
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> IO a }
 
@@ -107,37 +175,31 @@ io m = GHCi { unGHCi = \s -> m >>= return }
 isTopLevel :: GHCi Bool
 isTopLevel = getGHCiState >>= return . topLevel
 
-getBkptTable :: GHCi (BkptTable GHC.Module)
-getBkptTable = do table_ref <- getGHCiState >>= return . bkptTable
-                  io$ readIORef table_ref
+getResume :: GHCi (Maybe (IO GHC.RunResult))
+getResume = do
+   st <- getGHCiState
+   case (resume st) of
+      []    -> return Nothing
+      (x:_) -> return $ Just x
 
-setBkptTable :: BkptTable GHC.Module -> GHCi ()
-setBkptTable new_table = do 
-    table_ref <- getGHCiState >>= return . bkptTable
-    io$ writeIORef table_ref new_table
-                  
-modifyBkptTable :: (BkptTable GHC.Module -> BkptTable GHC.Module) -> GHCi ()
-modifyBkptTable f = do 
-    bt <- getBkptTable
-    new_bt <- io . evaluate$ f bt 
-    setBkptTable new_bt
+popResume :: GHCi ()
+popResume = do
+   st <- getGHCiState 
+   case (resume st) of
+      []     -> return () 
+      (_:xs) -> setGHCiState $ st { resume = xs } 
+         
+pushResume :: IO GHC.RunResult -> GHCi ()
+pushResume resumeAction = do
+   st <- getGHCiState
+   let oldResume = resume st
+   setGHCiState $ st { resume = resumeAction : oldResume }
 
 showForUser :: SDoc -> GHCi String
 showForUser doc = do
   session <- getSession
   unqual <- io (GHC.getPrintUnqual session)
   return $! showSDocForUser unqual doc
-
--- --------------------------------------------------------------------------
--- Inferior Sessions Exceptions (used by the debugger)
-
-data InfSessionException = 
-             StopChildSession -- A child session requests to be stopped
-           | StopParentSession -- A child session requests to be stopped 
-                               -- AND that the parent session quits after that
-           | ChildSessionStopped String  -- A child session has stopped
-  deriving Typeable
-
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

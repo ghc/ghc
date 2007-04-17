@@ -76,7 +76,6 @@ import CodeGen		( codeGen )
 import CmmParse		( parseCmmFile )
 import CodeOutput	( codeOutput )
 import NameEnv          ( emptyNameEnv )
-import Breakpoints      ( noDbgSites )
 
 import DynFlags
 import ErrUtils
@@ -636,7 +635,7 @@ hscInteractive (iface, details, cgguts)
          prepd_binds <- {-# SCC "CorePrep" #-}
                         corePrepPgm dflags core_binds data_tycons ;
          -----------------  Generate byte code ------------------
-         comp_bc <- byteCodeGen dflags prepd_binds data_tycons
+         comp_bc <- byteCodeGen dflags prepd_binds data_tycons (md_modBreaks details)
          ------------------ Create f-x-dynamic C-side stuff ---
          (istub_h_exists, istub_c_exists) 
              <- outputForeignStubs dflags this_mod location foreign_stubs
@@ -682,7 +681,7 @@ hscFileCheck hsc_env mod_summary = do {
 				md_exports   = tcg_exports   tc_result,
 				md_insts     = tcg_insts     tc_result,
 				md_fam_insts = tcg_fam_insts tc_result,
-                                md_dbg_sites = noDbgSites,
+                                md_modBreaks = emptyModBreaks,      
 				md_rules     = [panic "no rules"] }
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker

@@ -5,7 +5,7 @@ ByteCodeInstrs: Bytecode instruction definitions
 
 \begin{code}
 module ByteCodeInstr ( 
- 	BCInstr(..), ProtoBCO(..), bciStackUse
+ 	BCInstr(..), ProtoBCO(..), bciStackUse, BreakInfo (..) 
   ) where
 
 #include "HsVersions.h"
@@ -25,6 +25,10 @@ import PrimOp
 import SMRep
 
 import GHC.Ptr
+
+import Module (Module)
+import GHC.Prim
+
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -129,6 +133,22 @@ data BCInstr
    | RETURN		-- return a lifted value
    | RETURN_UBX CgRep -- return an unlifted value, here's its rep
 
+   -- Breakpoints 
+   | BRK_FUN          (MutableByteArray# RealWorld) Int BreakInfo
+
+data BreakInfo 
+   = BreakInfo
+   { breakInfo_module :: Module
+   , breakInfo_number :: Int
+   , breakInfo_vars   :: [(Id,Int)]
+   }
+
+instance Outputable BreakInfo where
+   ppr info = text "BreakInfo" <+>
+              parens (ppr (breakInfo_module info) <+>
+                      ppr (breakInfo_number info) <+>
+                      ppr (breakInfo_vars info))
+
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions
 
@@ -196,6 +216,7 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr RETURN		     = text "RETURN"
    ppr (RETURN_UBX pk)       = text "RETURN_UBX  " <+> ppr pk
+   ppr (BRK_FUN breakArray index info) = text "BRK_FUN" <+> text "<array>" <+> int index <+> ppr info 
 
 -- -----------------------------------------------------------------------------
 -- The stack use, in words, of each bytecode insn.  These _must_ be
@@ -251,6 +272,7 @@ bciStackUse RETURN{}		  = 0
 bciStackUse RETURN_UBX{}	  = 1
 bciStackUse CCALL{} 		  = 0
 bciStackUse SWIZZLE{}    	  = 0
+bciStackUse BRK_FUN{}    	  = 0
 
 -- These insns actually reduce stack use, but we need the high-tide level,
 -- so can't use this info.  Not that it matters much.

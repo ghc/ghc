@@ -60,9 +60,6 @@ module GHC (
 	modInfoInstances,
 	modInfoIsExportedName,
 	modInfoLookupName,
-#if defined(GHCI)
-        modInfoBkptSites,
-#endif
 	lookupGlobalName,
 
 	-- * Printing
@@ -86,9 +83,8 @@ module GHC (
         isModuleInterpreted,
 	compileExpr, HValue, dynCompileExpr,
 	lookupName,
-
-        getBreakpointHandler, setBreakpointHandler, 
         obtainTerm, obtainTerm1,
+        modInfoModBreaks, 
 #endif
 
 	-- * Abstract syntax elements
@@ -194,24 +190,16 @@ import Name		( nameOccName )
 import Type		( tidyType )
 import Var		( varName )
 import VarEnv		( emptyTidyEnv )
-import GHC.Exts         ( unsafeCoerce# )
-
--- For breakpoints
-import Breakpoints      ( SiteNumber, Coord, nullBkptHandler, 
-                          BkptHandler(..), BkptLocation, noDbgSites )
-import Linker           ( initDynLinker )
-import PrelNames        ( breakpointJumpName, breakpointCondJumpName, 
-                          breakpointAutoJumpName )
-
-import GHC.Exts         ( Int(..), Ptr(..), int2Addr#, indexArray# )
-import GHC.Base         ( Opaque(..) )
-import Foreign.StablePtr( deRefStablePtr, castPtrToStablePtr )
-import Foreign          ( unsafePerformIO )
+import GHC.Exts         ( unsafeCoerce#, Ptr )
+import Foreign.StablePtr( deRefStablePtr, castPtrToStablePtr, StablePtr, newStablePtr, freeStablePtr )
+import Foreign          ( poke )
 import Data.Maybe       ( fromMaybe)
 import qualified Linker
 
 import Data.Dynamic     ( Dynamic )
 import Linker		( HValue, getHValue, extendLinkEnv )
+
+import ByteCodeInstr    (BreakInfo)
 #endif
 
 import Packages		( initPackages )
@@ -854,7 +842,7 @@ checkModule session@(Session ref) mod = do
 				minf_rdr_env   = Just rdr_env,
 				minf_instances = md_insts details
 #ifdef GHCI
-                               ,minf_dbg_sites = noDbgSites
+                               ,minf_modBreaks = emptyModBreaks 
 #endif
 			      }
 		   return (Just (CheckedModule {
@@ -1799,7 +1787,7 @@ data ModuleInfo = ModuleInfo {
 	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
 	minf_instances :: [Instance]
 #ifdef GHCI
-        ,minf_dbg_sites :: [(SiteNumber,Coord)] 
+        ,minf_modBreaks :: ModBreaks 
 #endif
 	-- ToDo: this should really contain the ModIface too
   }
@@ -1840,7 +1828,7 @@ getPackageModuleInfo hsc_env mdl = do
 			minf_exports   = names,
 			minf_rdr_env   = Just $! nameSetToGlobalRdrEnv names (moduleName mdl),
 			minf_instances = error "getModuleInfo: instances for package module unimplemented",
-                        minf_dbg_sites = noDbgSites
+                        minf_modBreaks = emptyModBreaks  
 		}))
 #else
   -- bogusly different for non-GHCI (ToDo)
@@ -1858,7 +1846,7 @@ getHomeModuleInfo hsc_env mdl =
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
 			minf_instances = md_insts details
 #ifdef GHCI
-                       ,minf_dbg_sites = md_dbg_sites details
+                       ,minf_modBreaks = md_modBreaks details  
 #endif
 			}))
 
@@ -1894,7 +1882,7 @@ modInfoLookupName s minf name = withSession s $ \hsc_env -> do
 			    (hsc_HPT hsc_env) (eps_PTE eps) name
 
 #ifdef GHCI
-modInfoBkptSites = minf_dbg_sites
+modInfoModBreaks = minf_modBreaks  
 #endif
 
 isDictonaryId :: Id -> Bool
@@ -1993,7 +1981,6 @@ setContext sess@(Session ref) toplev_mods export_mods = do
   writeIORef ref hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplev_mods,
 					    ic_exports      = export_mods,
 					    ic_rn_gbl_env   = all_env }}
-  reinstallBreakpointHandlers sess
 
 -- Make a GlobalRdrEnv based on the exports of the modules only.
 mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv
@@ -2164,13 +2151,21 @@ data RunResult
   = RunOk [Name] 		-- ^ names bound by this evaluation
   | RunFailed	 		-- ^ statement failed compilation
   | RunException Exception	-- ^ statement raised an exception
+  | forall a . RunBreak a ThreadId BreakInfo (IO RunResult)
 
--- | Run a statement in the current interactive context.  Statemenet
+data Status a
+   = Break RunResult               -- ^ the computation hit a breakpoint
+   | Complete (Either Exception a) -- ^ the computation completed with either an exception or a value
+
+-- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
 runStmt :: Session -> String -> IO RunResult
 runStmt (Session ref) expr
    = do 
 	hsc_env <- readIORef ref
+
+        breakMVar  <- newEmptyMVar  -- wait on this when we hit a breakpoint
+        statusMVar <- newEmptyMVar  -- wait on this when a computation is running 
 
 	-- Turn off -fwarn-unused-bindings when running a statement, to hide
 	-- warnings about the implicit bindings we introduce.
@@ -2183,36 +2178,58 @@ runStmt (Session ref) expr
 	   Nothing -> return RunFailed
 	   Just (new_hsc_env, names, hval) -> do
 
-		let thing_to_run = unsafeCoerce# hval :: IO [HValue]
-		either_hvals <- sandboxIO thing_to_run
+              -- resume says what to do when we continue execution from a breakpoint
+              -- onBreakAction says what to do when we hit a breakpoint
+              -- they are mutually recursive, hence the strange use tuple let-binding 
+              let (resume, onBreakAction)
+                     = ( do stablePtr <- newStablePtr onBreakAction 
+                            poke breakPointIOAction stablePtr
+                            putMVar breakMVar ()
+                            status <- takeMVar statusMVar
+                            switchOnStatus ref new_hsc_env names status
+                       , \ids apStack -> do 
+                            tid <- myThreadId
+                            putMVar statusMVar (Break (RunBreak apStack tid ids resume))
+                            takeMVar breakMVar 
+                       )
 
+              -- set the onBreakAction to be performed when we hit a breakpoint
+              -- this is visible in the Byte Code Interpreter, thus it is a global
+              -- variable, implemented with stable pointers
+              stablePtr <- newStablePtr onBreakAction
+              poke breakPointIOAction stablePtr
+
+              let thing_to_run = unsafeCoerce# hval :: IO [HValue]
+              status <- sandboxIO statusMVar thing_to_run
+              freeStablePtr stablePtr -- be careful not to leak stable pointers!
+              switchOnStatus ref new_hsc_env names status
+   where
+   switchOnStatus ref hs_env names status = 
+      case status of  
+         -- did we hit a breakpoint or did we complete?
+         (Break result) -> return result 
+         (Complete either_hvals) ->
 		case either_hvals of
-		    Left e -> do
-			-- on error, keep the *old* interactive context,
-			-- so that 'it' is not bound to something
-			-- that doesn't exist.
-		        return (RunException e)
-
+		    Left e -> return (RunException e)
 		    Right hvals -> do
-			-- Get the newly bound things, and bind them.  
-			-- Don't need to delete any shadowed bindings;
-			-- the new ones override the old ones. 
 			extendLinkEnv (zip names hvals)
-	     		
-			writeIORef ref new_hsc_env
+			writeIORef ref hs_env 
 			return (RunOk names)
+           
+-- this points to the IO action that is executed when a breakpoint is hit
+foreign import ccall "&breakPointIOAction" 
+        breakPointIOAction :: Ptr (StablePtr (a -> BreakInfo -> IO ())) 
 
 -- When running a computation, we redirect ^C exceptions to the running
 -- thread.  ToDo: we might want a way to continue even if the target
 -- thread doesn't die when it receives the exception... "this thread
 -- is not responding".
-sandboxIO :: IO a -> IO (Either Exception a)
-sandboxIO thing = do
-  m <- newEmptyMVar
+sandboxIO :: MVar (Status a) -> IO a -> IO (Status a) 
+sandboxIO statusMVar thing = do
   ts <- takeMVar interruptTargetThread
-  child <- forkIO (do res <- Exception.try thing; putMVar m res)
+  child <- forkIO (do res <- Exception.try thing; putMVar statusMVar (Complete res))
   putMVar interruptTargetThread (child:ts)
-  takeMVar m `finally` modifyMVar_ interruptTargetThread (return.tail)
+  takeMVar statusMVar `finally` modifyMVar_ interruptTargetThread (return.tail)
 
 {-
 -- This version of sandboxIO runs the expression in a completely new
@@ -2260,75 +2277,6 @@ isModuleInterpreted s mod_summary = withSession s $ \hsc_env ->
 	Just mod_info -> return (not obj_linkable)
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
-
------------------------------------------------------------------------------
--- Breakpoint handlers
-
-getBreakpointHandler :: Session -> IO (Maybe (BkptHandler Module))
-getBreakpointHandler session = getSessionDynFlags session >>= return . bkptHandler
- 
-setBreakpointHandler :: Session -> BkptHandler Module -> IO ()
-setBreakpointHandler session handler = do
-  dflags <- getSessionDynFlags session
-  setSessionDynFlags session dflags{ bkptHandler = Just handler }
-  let linkEnv =   [ ( breakpointJumpName
-                    , unsafeCoerce# (jumpFunction session handler))
-                  , ( breakpointCondJumpName
-                    , unsafeCoerce# (jumpCondFunction session handler))
-                  , ( breakpointAutoJumpName 
-                    , unsafeCoerce# (jumpAutoFunction session handler))
-                  ]
-  writeIORef v_bkptLinkEnv linkEnv
-  dflags <- getSessionDynFlags session
-  reinstallBreakpointHandlers session
-
-reinstallBreakpointHandlers :: Session -> IO ()
-reinstallBreakpointHandlers session = do
-  dflags <- getSessionDynFlags session
-  let mode = ghcMode dflags
-  when (ghcLink dflags == LinkInMemory) $ do
-    linkEnv <- readIORef v_bkptLinkEnv
-    initDynLinker dflags 
-    extendLinkEnv linkEnv
-
------------------------------------------------------------------------
--- Jump functions
-
-type SiteInfo = (String, SiteNumber)
-jumpFunction, jumpAutoFunction  :: Session -> BkptHandler Module -> SiteInfo -> (Int, [Opaque], String) -> b -> b
-jumpCondFunction  :: Session -> BkptHandler Module -> SiteInfo -> (Int, [Opaque], String) -> Bool -> b -> b
-jumpFunctionM :: Session -> BkptHandler a ->  BkptLocation a -> (Int, [Opaque], String) -> b -> IO b
-
-jumpCondFunction _ _ _ _ False b = b
-jumpCondFunction session handler site args True b
-    = jumpFunction session handler site args b
-
-jumpFunction session handler siteInfo args b 
-    | site <- mkSite siteInfo
-    = unsafePerformIO $ jumpFunctionM session handler site args b
-
-jumpFunctionM session handler site (I# idsPtr, wrapped_hValues, locmsg) b = 
-      do 
-         ids <- deRefStablePtr (castPtrToStablePtr (Ptr (int2Addr# idsPtr)))
-         let hValues = unsafeCoerce# b : [unsafeCoerce# hv | O hv <- wrapped_hValues]
-         handleBreakpoint handler session (zip ids hValues) site locmsg b
-
-jumpAutoFunction session handler siteInfo args b 
-    | site <- mkSite siteInfo
-    = unsafePerformIO $ do
-         break <- isAutoBkptEnabled handler session site 
-         if break 
-            then jumpFunctionM session handler site args b
-            else return b
-
-jumpStepByStepFunction session handler siteInfo args b 
-    | site <- mkSite siteInfo
-    = unsafePerformIO $ do
-          jumpFunctionM session handler site args b
-
-mkSite :: SiteInfo -> BkptLocation Module
-mkSite ( modName, sitenum) =
-  (mkModule mainPackageId (mkModuleName modName), sitenum)
 
 obtainTerm1 :: Session -> Bool -> Maybe Type -> a -> IO Term
 obtainTerm1 sess force mb_ty x = withSession sess $ \hsc_env -> cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)

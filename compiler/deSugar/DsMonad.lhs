@@ -23,7 +23,7 @@ module DsMonad (
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
-        bindLocalsDs, getLocalBindsDs, getBkptSitesDs, getModNameRefDs, withModNameRefDs,
+        bindLocalsDs, getLocalBindsDs,
 	-- Warnings
 	DsWarning, warnDs, failWithDs,
 
@@ -57,7 +57,6 @@ import OccName
 import DynFlags
 import ErrUtils
 import Bag
-import Breakpoints
 import OccName
 
 import Data.IORef
@@ -136,17 +135,14 @@ data DsGblEnv = DsGblEnv {
 	ds_mod	   :: Module,       		-- For SCC profiling
 	ds_unqual  :: PrintUnqualified,
 	ds_msgs    :: IORef Messages,		-- Warning messages
-	ds_if_env  :: (IfGblEnv, IfLclEnv),	-- Used for looking up global, 
+	ds_if_env  :: (IfGblEnv, IfLclEnv)	-- Used for looking up global, 
 						-- possibly-imported things
-        ds_bkptSites :: IORef SiteMap  -- Inserted Breakpoints sites
     }
 
 data DsLclEnv = DsLclEnv {
 	ds_meta	   :: DsMetaEnv,	-- Template Haskell bindings
 	ds_loc	   :: SrcSpan,		-- to put in pattern-matching error msgs
-        ds_locals  :: OccEnv Id,        -- For locals in breakpoints
-        ds_mod_name_ref :: Maybe Id     -- The Id used to store the Module name 
-                                        --  used by the breakpoint desugaring 
+        ds_locals  :: OccEnv Id         -- For locals in breakpoints
      }
 
 -- Inside [| |] brackets, the desugarer looks 
@@ -209,12 +205,10 @@ mkDsEnvs mod rdr_env type_env msg_var
                gbl_env = DsGblEnv { ds_mod = mod, 
     			            ds_if_env = (if_genv, if_lenv),
     			            ds_unqual = mkPrintUnqualified rdr_env,
-    			            ds_msgs = msg_var,
-                                    ds_bkptSites = sites_var}
+    			            ds_msgs = msg_var}
                lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
 			            ds_loc = noSrcSpan,
-                                    ds_locals = emptyOccEnv,
-                                    ds_mod_name_ref = Nothing }
+                                    ds_locals = emptyOccEnv }
 
        return (gbl_env, lcl_env)
 
@@ -340,21 +334,10 @@ dsExtendMetaEnv menv thing_inside
 getLocalBindsDs :: DsM [Id]
 getLocalBindsDs = do { env <- getLclEnv; return (occEnvElts$ ds_locals env) }
 
-getModNameRefDs :: DsM (Maybe Id)
-getModNameRefDs = do { env <- getLclEnv; return (ds_mod_name_ref env) }
-
-withModNameRefDs :: Id -> DsM a -> DsM a
-withModNameRefDs id thing_inside =
-    updLclEnv (\env -> env {ds_mod_name_ref = Just id}) thing_inside
-
 bindLocalsDs :: [Id] -> DsM a -> DsM a
 bindLocalsDs new_ids enclosed_scope = 
     updLclEnv (\env-> env {ds_locals = ds_locals env `extendOccEnvList` occnamed_ids})
 	      enclosed_scope
   where occnamed_ids = [ (nameOccName (idName id),id) | id <- new_ids ] 
-
-getBkptSitesDs :: DsM (IORef SiteMap)
-getBkptSitesDs = do { env <- getGblEnv; return (ds_bkptSites env) }
-
 \end{code}
 

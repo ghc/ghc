@@ -415,10 +415,6 @@ ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 SRC_HC_OPTS += -DGHCI -package template-haskell
 PKG_DEPENDS += template-haskell
 
-# Should the debugger commands be enabled?
-ifeq "$(GhciWithDebugger)" "YES"
-SRC_HC_OPTS += -DDEBUGGER
-endif
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
 # or not?
 ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"

@@ -1823,6 +1823,7 @@ newBCOzh_fast
     W_ bco, bitmap_arr, bytes, words;
     
     bitmap_arr = R5;
+
     words = BYTES_TO_WDS(SIZEOF_StgBCO) + StgArrWords_words(bitmap_arr);
     bytes = WDS(words);
 
@@ -1876,34 +1877,48 @@ mkApUpd0zh_fast
     RET_P(ap);
 }
 
-infoPtrzh_fast
-{
-/* args: R1 = closure to analyze */
-   
-  MAYBE_GC(R1_PTR, infoPtrzh_fast);
-
-  W_ info;
-  info = %GET_STD_INFO(R1);
-  RET_N(info);
-}
-
-closurePayloadzh_fast
+unpackClosurezh_fast
 {
 /* args: R1 = closure to analyze */
 // TODO: Consider the absence of ptrs or nonptrs as a special case ?
-
-    MAYBE_GC(R1_PTR, closurePayloadzh_fast);
 
     W_ info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
     info  = %GET_STD_INFO(R1);
     ptrs  = TO_W_(%INFO_PTRS(info)); 
     nptrs = TO_W_(%INFO_NPTRS(info));
-    p = 0;
 
-    ALLOC_PRIM (SIZEOF_StgMutArrPtrs + WDS(ptrs), R1_PTR, closurePayloadzh_fast);
-    ptrs_arr = Hp - SIZEOF_StgMutArrPtrs - WDS(ptrs) + WDS(1);
+    // Some closures have non-standard layout, so we omit those here.
+    W_ type;
+    type = TO_W_(%INFO_TYPE(info));
+    switch [0 .. N_CLOSURE_TYPES] type {
+    case THUNK_SELECTOR : {
+        ptrs = 1;
+        nptrs = 0;
+        goto out;
+    }
+    case THUNK, THUNK_1_0, THUNK_0_1, THUNK_2_0, THUNK_1_1, 
+         THUNK_0_2, THUNK_STATIC, AP, PAP, AP_STACK, BCO : {
+        ptrs = 0;
+        nptrs = 0;
+        goto out;
+    }
+    default: {
+        goto out;
+    }}
+out:
+
+    W_ ptrs_arr_sz, nptrs_arr_sz;
+    nptrs_arr_sz = SIZEOF_StgArrWords   + WDS(nptrs);
+    ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs);
+
+    ALLOC_PRIM (ptrs_arr_sz + nptrs_arr_sz, R1_PTR, unpackClosurezh_fast);
+
+    ptrs_arr  = Hp - nptrs_arr_sz - ptrs_arr_sz + WDS(1);
+    nptrs_arr = Hp - nptrs_arr_sz + WDS(1);
+
     SET_HDR(ptrs_arr, stg_MUT_ARR_PTRS_FROZEN_info, W_[CCCS]);
     StgMutArrPtrs_ptrs(ptrs_arr) = ptrs;
+    p = 0;
 for:
     if(p < ptrs) {
     	 W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(R1,p);
@@ -1911,8 +1926,6 @@ for:
 	 goto for;
     }
     
-    ALLOC_PRIM (SIZEOF_StgArrWords + WDS(nptrs), R1_PTR, closurePayloadzh_fast);
-    nptrs_arr = Hp - SIZEOF_StgArrWords - WDS(nptrs) + WDS(1);
     SET_HDR(nptrs_arr, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(nptrs_arr) = nptrs;
     p = 0;
@@ -1922,7 +1935,7 @@ for2:
     	 p = p + 1;
 	 goto for2;
     }
-    RET_PP(ptrs_arr, nptrs_arr);
+    RET_NPP(info, ptrs_arr, nptrs_arr);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2148,4 +2161,17 @@ noDuplicatezh_fast
         ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
         jump %ENTRY_CODE(Sp(0));
     }
+}
+
+getApStackValzh_fast
+{
+   W_ ap_stack, offset, val;
+
+   /* args: R1 = tso, R2 = offset */
+   ap_stack = R1;
+   offset   = R2;
+
+   val = StgClosure_payload(ap_stack,offset); 
+
+   RET_P(val);
 }

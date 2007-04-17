@@ -1,5 +1,6 @@
 >module TcRnDriver where
 >import HscTypes
 >import DataCon
+>import Foreign.Ptr
 >
->tcRnRecoverDataCon :: HscEnv -> a -> IO (Maybe DataCon) 
+>tcRnRecoverDataCon :: HscEnv -> Ptr () -> IO (Maybe DataCon) 

@@ -49,7 +49,7 @@ import Constants
 
 import Data.List	( intersperse, sortBy, zip4, zip6, partition )
 import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8,
-			  withForeignPtr, castFunPtrToPtr )
+			  withForeignPtr, castFunPtrToPtr, nullPtr, plusPtr )
 import Foreign.C
 import Control.Exception	( throwDyn )
 
@@ -58,21 +58,29 @@ import GHC.Exts		( Int(..), ByteArray# )
 import Control.Monad	( when )
 import Data.Char	( ord, chr )
 
+import UniqSupply
+import BreakArray
+import Data.Maybe
+import Module 
+import IdInfo 
+
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module 
 
 byteCodeGen :: DynFlags
             -> [CoreBind]
 	    -> [TyCon]
+            -> ModBreaks 
             -> IO CompiledByteCode
-byteCodeGen dflags binds tycs
+byteCodeGen dflags binds tycs modBreaks 
    = do showPass dflags "ByteCodeGen"
 
         let flatBinds = [ (bndr, freeVars rhs) 
 			| (bndr, rhs) <- flattenBinds binds]
 
-        (BcM_State final_ctr mallocd, proto_bcos)
-           <- runBc (mapM schemeTopBind flatBinds)
+        us <- mkSplitUniqSupply 'y'  
+        (BcM_State _us final_ctr mallocd _, proto_bcos) 
+           <- runBc us modBreaks (mapM schemeTopBind flatBinds)  
 
         when (notNull mallocd)
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
@@ -98,8 +106,11 @@ coreExprToBCOs dflags expr
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) FSLIT("ExprTopLevel")
           invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
 	  
-      (BcM_State final_ctr mallocd, proto_bco) 
-         <- runBc (schemeTopBind (invented_id, freeVars expr))
+      -- the uniques are needed to generate fresh variables when we introduce new
+      -- let bindings for ticked expressions
+      us <- mkSplitUniqSupply 'y'
+      (BcM_State _us final_ctr mallocd _ , proto_bco)  
+         <- runBc us emptyModBreaks (schemeTopBind (invented_id, freeVars expr))
 
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
@@ -141,8 +152,7 @@ mkProtoBCO
    -> Bool   	-- True <=> is a return point, rather than a function
    -> [BcPtr]
    -> ProtoBCO name
-mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap
-  is_ret mallocd_blocks
+mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap is_ret mallocd_blocks 
    = ProtoBCO {
 	protoBCOName = nm,
 	protoBCOInstrs = maybe_with_stack_check,
@@ -199,21 +209,23 @@ argBits (rep : args)
 schemeTopBind :: (Id, AnnExpr Id VarSet) -> BcM (ProtoBCO Name)
 
 
-schemeTopBind (id, rhs)
+schemeTopBind (id, rhs) 
   | Just data_con <- isDataConWorkId_maybe id,
-    isNullaryRepDataCon data_con
-  = 	-- Special case for the worker of a nullary data con.
+    isNullaryRepDataCon data_con = do
+    	-- Special case for the worker of a nullary data con.
 	-- It'll look like this:	Nil = /\a -> Nil a
 	-- If we feed it into schemeR, we'll get 
 	--	Nil = Nil
 	-- because mkConAppCode treats nullary constructor applications
 	-- by just re-using the single top-level definition.  So
 	-- for the worker itself, we must allocate it directly.
+    -- ioToBc (putStrLn $ "top level BCO")
     emitBc (mkProtoBCO (getName id) (toOL [PACK data_con 0, ENTER])
-                       (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
+                       (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-}) 
 
   | otherwise
   = schemeR [{- No free variables -}] (id, rhs)
+
 
 -- -----------------------------------------------------------------------------
 -- schemeR
@@ -232,7 +244,7 @@ schemeR :: [Id] 		-- Free vars of the RHS, ordered as they
 				-- top-level things, which have no free vars.
 	-> (Id, AnnExpr Id VarSet)
 	-> BcM (ProtoBCO Name)
-schemeR fvs (nm, rhs) 
+schemeR fvs (nm, rhs)
 {-
    | trace (showSDoc (
               (char ' '
@@ -245,11 +257,13 @@ schemeR fvs (nm, rhs)
 -}
    = schemeR_wrk fvs nm rhs (collect [] rhs)
 
+collect :: [Var] -> AnnExpr Id VarSet -> ([Var], AnnExpr' Id VarSet)
 collect xs (_, AnnNote note e) = collect xs e
 collect xs (_, AnnCast e _)    = collect xs e
 collect xs (_, AnnLam x e)     = collect (if isTyVar x then xs else (x:xs)) e
 collect xs (_, not_lambda)     = (reverse xs, not_lambda)
 
+schemeR_wrk :: [Id] -> Id -> AnnExpr Id VarSet -> ([Var], AnnExpr' Var VarSet) -> BcM (ProtoBCO Name) 
 schemeR_wrk fvs nm original_body (args, body)
    = let 
 	 all_args  = reverse args ++ fvs
@@ -267,10 +281,36 @@ schemeR_wrk fvs nm original_body (args, body)
 	 bitmap_size = length bits
 	 bitmap = mkBitmap bits
      in do
-     body_code <- schemeE szw_args 0 p_init body
+     body_code <- schemeER_wrk szw_args p_init body   
+ 
      emitBc (mkProtoBCO (getName nm) body_code (Right original_body)
 		arity bitmap_size bitmap False{-not alts-})
 
+-- introduce break instructions for ticked expressions
+schemeER_wrk :: Int -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
+schemeER_wrk d p rhs
+   | Just (tickInfo, (_annot, newRhs)) <- isTickedExp' rhs = do 
+        code <- schemeE d 0 p newRhs 
+        arr <- getBreakArray 
+        let idOffSets = getVarOffSets d p tickInfo 
+        let tickNumber = tickInfo_number tickInfo
+        let breakInfo = BreakInfo 
+                        { breakInfo_module = tickInfo_module tickInfo
+                        , breakInfo_number = tickNumber 
+                        , breakInfo_vars = idOffSets
+                        }
+        let breakInstr = case arr of (BA arr#) -> BRK_FUN arr# tickNumber breakInfo 
+        return $ breakInstr `consOL` code
+   | otherwise = schemeE d 0 p rhs 
+
+getVarOffSets :: Int -> BCEnv -> TickInfo -> [(Id, Int)]
+getVarOffSets d p = catMaybes . map (getOffSet d p) . tickInfo_locals 
+
+getOffSet :: Int -> BCEnv -> Id -> Maybe (Id, Int)
+getOffSet d env id 
+   = case lookupBCEnv_maybe env id of
+        Nothing     -> Nothing 
+        Just offset -> Just (id, d - offset)
 
 fvsToEnv :: BCEnv -> VarSet -> [Id]
 -- Takes the free variables of a right-hand side, and
@@ -287,6 +327,18 @@ fvsToEnv p fvs = [v | v <- varSetElems fvs,
 
 -- -----------------------------------------------------------------------------
 -- schemeE
+
+data TickInfo 
+   = TickInfo   
+     { tickInfo_number :: Int     -- the (module) unique number of the tick
+     , tickInfo_module :: Module  -- the origin of the ticked expression 
+     , tickInfo_locals :: [Id]    -- the local vars in scope at the ticked expression
+     } 
+
+instance Outputable TickInfo where
+   ppr info = text "TickInfo" <+> 
+              parens (int (tickInfo_number info) <+> ppr (tickInfo_module info) <+>
+                      ppr (tickInfo_locals info))
 
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
@@ -382,7 +434,18 @@ schemeE d s p (AnnLet binds (_,body))
      thunk_codes <- sequence compile_binds
      return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
-
+-- introduce a let binding for a ticked case expression. This rule *should* only fire when the
+-- expression was not already let-bound (the code gen for let bindings should take care of that). 
+-- Todo: we call exprFreeVars on a deAnnotated expression, this may not be the best way
+-- to calculate the free vars but it seemed like the least intrusive thing to do
+schemeE d s p exp@(AnnCase {})
+   | Just (tickInfo, _exp) <- isTickedExp' exp = do 
+        let fvs = exprFreeVars $ deAnnotate' exp
+        let ty = exprType $ deAnnotate' exp
+        id <- newId ty
+        -- Todo: is emptyVarSet correct on the next line?
+        let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyVarSet, AnnVar id)
+        schemeE d s p letExp
 
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind1)
@@ -396,11 +459,11 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
 	-- envt (it won't be bound now) because we never look such things up.
 
    = --trace "automagic mashing of case alts (# VoidArg, a #)" $
-     doCase d s p scrut bind2 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
+     doCase d s p scrut bind2 [(DEFAULT, [], rhs)] True{-unboxed tuple-} 
 
    | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind2)
    = --trace "automagic mashing of case alts (# a, VoidArg #)" $
-     doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
+     doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-} 
 
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
    | isUnboxedTupleCon dc
@@ -409,10 +472,10 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
 	-- to
 	--	case .... of a { DEFAULT -> ... }
    = --trace "automagic mashing of case alts (# a #)"  $
-     doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
+     doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-} 
 
 schemeE d s p (AnnCase scrut bndr _ alts)
-   = doCase d s p scrut bndr alts False{-not an unboxed tuple-}
+   = doCase d s p scrut bndr alts False{-not an unboxed tuple-} 
 
 schemeE d s p (AnnNote note (_, body))
    = schemeE d s p body
@@ -424,6 +487,56 @@ schemeE d s p other
    = pprPanic "ByteCodeGen.schemeE: unhandled case" 
                (pprCoreExpr (deAnnotate' other))
 
+{- 
+   Ticked Expressions
+   ------------------
+  
+   A ticked expression looks like this:
+
+      case tick<n> var1 ... varN of DEFAULT -> e
+
+   (*) <n> is the number of the tick, which is unique within a module
+   (*) var1 ... varN are the local variables in scope at the tick site
+
+   If we find a ticked expression we return:
+
+      Just ((n, [var1 ... varN]), e)
+
+  otherwise we return Nothing.
+
+  The idea is that the "case tick<n> ..." is really just an annotation on 
+  the code. When we find such a thing, we pull out the useful information,
+  and then compile the code as if it was just the expression "e".
+
+-}
+
+isTickedExp :: AnnExpr Id a -> Maybe (TickInfo, AnnExpr Id a)
+isTickedExp (annot, expr) = isTickedExp' expr 
+
+isTickedExp' :: AnnExpr' Id a -> Maybe (TickInfo, AnnExpr Id a)
+isTickedExp' (AnnCase scrut _bndr _type alts)
+   | Just tickInfo <- isTickedScrut scrut,
+     [(DEFAULT, _bndr, rhs)] <- alts 
+     = Just (tickInfo, rhs)
+   where
+   isTickedScrut :: (AnnExpr Id a) -> Maybe TickInfo 
+   isTickedScrut expr
+      | Var id <- f,
+        Just (TickBox modName tickNumber) <- isTickBoxOp_maybe id
+           = Just $ TickInfo { tickInfo_number = tickNumber
+                             , tickInfo_module = modName
+                             , tickInfo_locals = idsOfArgs args
+                             }
+      | otherwise = Nothing
+      where
+      (f, args) = collectArgs $ deAnnotate expr
+      idsOfArgs :: [Expr Id] -> [Id]
+      idsOfArgs = catMaybes . map exprId 
+      exprId :: Expr Id -> Maybe Id
+      exprId (Var id) = Just id
+      exprId other    = Nothing
+
+isTickedExp' other = Nothing
 
 -- Compile code to do a tail call.  Specifically, push the fn,
 -- slide the on-stack app back down to the sequel depth,
@@ -640,8 +753,7 @@ doCase  :: Int -> Sequel -> BCEnv
 	-> AnnExpr Id VarSet -> Id -> [AnnAlt Id VarSet]
 	-> Bool  -- True <=> is an unboxed tuple case, don't enter the result
 	-> BcM BCInstrList
-doCase d s p (_,scrut)
- bndr alts is_unboxed_tuple
+doCase d s p (_,scrut) bndr alts is_unboxed_tuple 
   = let
         -- Top of stack is the return itbl, as usual.
         -- underneath it is the pointer to the alt_code BCO.
@@ -670,9 +782,10 @@ doCase d s p (_,scrut)
         isAlgCase = not (isUnLiftedType bndr_ty) && not is_unboxed_tuple
 
         -- given an alt, return a discr and code for it.
-	codeALt alt@(DEFAULT, _, (_,rhs))
+	codeAlt alt@(DEFAULT, _, (_,rhs))
 	   = do rhs_code <- schemeE d_alts s p_alts rhs
 	        return (NoDiscr, rhs_code)
+
         codeAlt alt@(discr, bndrs, (_,rhs))
 	   -- primitive or nullary constructor alt: no need to UNPACK
 	   | null real_bndrs = do
@@ -695,7 +808,6 @@ doCase d s p (_,scrut)
              return (my_discr alt, unitOL (UNPACK size) `appOL` rhs_code)
 	   where
 	     real_bndrs = filter (not.isTyVar) bndrs
-
 
         my_discr (DEFAULT, binds, rhs) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, binds, rhs) 
@@ -745,6 +857,7 @@ doCase d s p (_,scrut)
      in do
      alt_stuff <- mapM codeAlt alts
      alt_final <- mkMultiBranch maybe_ncons alt_stuff
+
      let 
          alt_bco_name = getName bndr
          alt_bco = mkProtoBCO alt_bco_name alt_final (Left alts)
@@ -1315,9 +1428,12 @@ type BcPtr = Either ItblPtr (Ptr ())
 
 data BcM_State 
    = BcM_State { 
+        uniqSupply :: UniqSupply,       -- for generating fresh variable names
 	nextlabel :: Int,		-- for generating local labels
-	malloced  :: [BcPtr] }		-- thunks malloced for current BCO
+	malloced  :: [BcPtr],		-- thunks malloced for current BCO
 					-- Should be free()d when it is GCd
+        breakArray :: BreakArray        -- array of breakpoint flags 
+        }
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r))
 
@@ -1326,8 +1442,11 @@ ioToBc io = BcM $ \st -> do
   x <- io 
   return (st, x)
 
-runBc :: BcM r -> IO (BcM_State, r)
-runBc (BcM m) = m (BcM_State 0 []) 
+runBc :: UniqSupply -> ModBreaks -> BcM r -> IO (BcM_State, r)
+runBc us modBreaks (BcM m) 
+   = m (BcM_State us 0 [] breakArray)   
+   where
+   breakArray = modBreaks_array modBreaks
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -1370,4 +1489,18 @@ getLabelsBc :: Int -> BcM [Int]
 getLabelsBc n
   = BcM $ \st -> let ctr = nextlabel st 
 		 in return (st{nextlabel = ctr+n}, [ctr .. ctr+n-1])
+
+getBreakArray :: BcM BreakArray 
+getBreakArray = BcM $ \st -> return (st, breakArray st)
+
+newUnique :: BcM Unique
+newUnique = BcM $
+   \st -> case splitUniqSupply (uniqSupply st) of
+             (us1, us2) -> let newState = st { uniqSupply = us2 } 
+                           in  return (newState, uniqFromSupply us1) 
+
+newId :: Type -> BcM Id
+newId ty = do 
+    uniq <- newUnique
+    return $ mkSysLocal FSLIT("ticked") uniq ty
 \end{code}

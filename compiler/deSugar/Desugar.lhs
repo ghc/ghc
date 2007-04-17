@@ -45,7 +45,6 @@ import Util
 import Coverage
 import IOEnv
 import Data.IORef
-
 \end{code}
 
 %************************************************************************
@@ -85,28 +84,24 @@ deSugar hsc_env
 	-- Desugar the program
         ; let export_set = availsToNameSet exports
 	; let auto_scc = mkAutoScc mod export_set
-        ; let noDbgSites = []
         ; let target = hscTarget dflags
 	; mb_res <- case target of
-	             HscNothing -> return (Just ([], [], NoStubs, noHpcInfo, noDbgSites))
-                     _        -> do (binds_cvr,ds_hpc_info) 
-					      <- if opt_Hpc
+	             HscNothing -> return (Just ([], [], NoStubs, noHpcInfo, emptyModBreaks))
+                     _        -> do (binds_cvr,ds_hpc_info, modBreaks) 
+					      <- if opt_Hpc || target == HscInterpreted
                                                  then addCoverageTicksToBinds dflags mod mod_loc binds
-                                                 else return (binds, noHpcInfo)
+                                                 else return (binds, noHpcInfo, emptyModBreaks)
                                     initDs hsc_env mod rdr_env type_env $ do
 		                        { core_prs <- dsTopLHsBinds auto_scc binds_cvr
 		                        ; (ds_fords, foreign_prs) <- dsForeigns fords
 		                        ; let all_prs = foreign_prs ++ core_prs
 		                              local_bndrs = mkVarSet (map fst all_prs)
 		                        ; ds_rules <- mappM (dsRule mod local_bndrs) rules
-		                        ; return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info)
-                                        ; dbgSites_var <- getBkptSitesDs
-                                        ; dbgSites <- ioToIOEnv$ readIORef dbgSites_var
-		                        ; return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info, dbgSites)
+		                        ; return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info, modBreaks)
 		                        }
 	; case mb_res of {
 	   Nothing -> return Nothing ;
-	   Just (all_prs, ds_rules, ds_fords,ds_hpc_info, dbgSites) -> do
+	   Just (all_prs, ds_rules, ds_fords,ds_hpc_info, modBreaks) -> do
 
 	{ 	-- Add export flags to bindings
 	  keep_alive <- readIORef keep_var
@@ -177,7 +172,7 @@ deSugar hsc_env
 		mg_binds     	= ds_binds,
 		mg_foreign   	= ds_fords,
 		mg_hpc_info  	= ds_hpc_info,
-                mg_dbg_sites 	= dbgSites }
+                mg_modBreaks    = modBreaks }
         ; return (Just mod_guts)
 	}}}
 

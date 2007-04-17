@@ -12,11 +12,9 @@ module RtClosureInspect(
 
      ClosureType(..), 
      getClosureData,     -- :: a -> IO Closure
-     Closure ( tipe, infoTable, ptrs, nonPtrs ), 
-     getClosureType,     -- :: a -> IO ClosureType
+     Closure ( tipe, infoPtr, ptrs, nonPtrs ), 
      isConstr,           -- :: ClosureType -> Bool
      isIndirection,      -- :: ClosureType -> Bool
-     getInfoTablePtr,    -- :: a -> Ptr StgInfoTable
 
      Term(..), 
      printTerm, 
@@ -76,6 +74,8 @@ import Data.Maybe
 import Data.Array.Base
 import Data.List        ( partition )
 import Foreign.Storable
+
+import IO
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -139,6 +139,7 @@ data ClosureType = Constr
  deriving (Show, Eq)
 
 data Closure = Closure { tipe         :: ClosureType 
+                       , infoPtr      :: Ptr ()
                        , infoTable    :: StgInfoTable
                        , ptrs         :: Array Int HValue
                         -- What would be the type here? HValue is ok? Should I build a Ptr?
@@ -148,14 +149,6 @@ data Closure = Closure { tipe         :: ClosureType
 instance Outputable ClosureType where
   ppr = text . show 
 
-getInfoTablePtr :: a -> Ptr StgInfoTable
-getInfoTablePtr x = 
-    case infoPtr# x of
-      itbl_ptr -> castPtr ( Ptr itbl_ptr )
-
-getClosureType :: a -> IO ClosureType
-getClosureType = liftM (readCType . BCI.tipe ) . peek . getInfoTablePtr
-
 #include "../includes/ClosureTypes.h"
 
 aP_CODE = AP
@@ -164,14 +157,14 @@ pAP_CODE = PAP
 #undef PAP
 
 getClosureData :: a -> IO Closure
-getClosureData a = do
-   itbl <- peek (getInfoTablePtr a)
-   let tipe = readCType (BCI.tipe itbl)
-   case closurePayload# a of 
-     (# ptrs, nptrs #) -> 
-           let elems = BCI.ptrs itbl 
+getClosureData a =
+   case unpackClosure# a of 
+     (# iptr, ptrs, nptrs #) -> do
+           itbl <- peek (Ptr iptr)
+           let tipe = readCType (BCI.tipe itbl)
+               elems = BCI.ptrs itbl 
                ptrsList = Array 0 (fromIntegral$ elems) ptrs
-           in ptrsList `seq` return (Closure tipe itbl ptrsList nptrs)
+           ptrsList `seq` return (Closure tipe (Ptr iptr) itbl ptrsList nptrs)
 
 readCType :: Integral a => a -> ClosureType
 readCType i
@@ -481,9 +474,10 @@ instScheme ty = liftTcM$ liftM trd (tcInstType (liftM fst3 . tcInstTyVars) ty)
           trd  (x,y,z) = z
 
 cvObtainTerm :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
-cvObtainTerm hsc_env force mb_ty a = 
- -- Obtain the term and tidy the type before returning it
-     cvObtainTerm1 hsc_env force mb_ty a >>= return . tidyTypes 
+cvObtainTerm hsc_env force mb_ty a = do
+   -- Obtain the term and tidy the type before returning it
+   term <- cvObtainTerm1 hsc_env force mb_ty a
+   return $ tidyTypes term
    where 
          tidyTypes = foldTerm idTermFold {
             fTerm = \ty dc hval tt -> Term (tidy ty) dc hval tt,
@@ -505,21 +499,18 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
    go tv hval
     where 
   go tv a = do 
-    ctype <- trIO$ getClosureType a
-    case ctype of
+    clos <- trIO $ getClosureData a
+    case tipe clos of
 -- Thunks we may want to force
       Thunk _ | force -> seq a $ go tv a
 -- We always follow indirections 
-      _       | isIndirection ctype -> do
-        clos   <- trIO$ getClosureData a
-        (go tv $! (ptrs clos ! 0))
+      Indirection _ -> go tv $! (ptrs clos ! 0)
  -- The interesting case
       Constr -> do
-        m_dc <- trIO$ tcRnRecoverDataCon hsc_env a
+        m_dc <- trIO$ tcRnRecoverDataCon hsc_env (infoPtr clos)
         case m_dc of
           Nothing -> panic "Can't find the DataCon for a term"
           Just dc -> do 
-            clos          <- trIO$ getClosureData a
             let extra_args = length(dataConRepArgTys dc) - length(dataConOrigArgTys dc)
                 subTtypes  = drop extra_args (dataConRepArgTys dc)
                 (subTtypesP, subTtypesNP) = partition isPointed subTtypes
@@ -537,7 +528,7 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
             return (Term tv dc a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       otherwise -> do
-         return (Suspension ctype (Just tv) a Nothing)
+         return (Suspension (tipe clos) (Just tv) a Nothing)
 
 -- Access the array of pointers and recurse down. Needs to be done with
 -- care of no introducing a thunk! or go will fail to do its job 

@@ -136,6 +136,7 @@ printClosure( StgClosure *obj )
     case CONSTR_NOCAF_STATIC:
         {
             StgWord i, j;
+
 #ifdef PROFILING
 	    debugBelch("%s(", info->prof.closure_desc);
 	    debugBelch("%s", obj->header.prof.ccs->cc->label);
@@ -1105,6 +1106,88 @@ findPtr(P_ p, int follow)
   }
 }
 
+/* prettyPrintClosure() is for printing out a closure using the data constructor
+   names found in the info tables. Closures are printed in a fashion that resembles
+   their Haskell representation. Useful during debugging.
+
+   Todo: support for more closure types, and support for non pointer fields in the
+   payload.
+*/ 
+
+void prettyPrintClosure_ (StgClosure *);
+
+void prettyPrintClosure (StgClosure *obj)
+{
+   prettyPrintClosure_ (obj);
+   debugBelch ("\n");
+}
+
+void prettyPrintClosure_ (StgClosure *obj)
+{
+    StgInfoTable *info;
+    StgConInfoTable *con_info;
+
+    /* collapse any indirections */
+    unsigned int type;
+    type = get_itbl(obj)->type;
+           
+    while (type == IND ||
+           type == IND_STATIC ||
+           type == IND_OLDGEN ||
+           type == IND_PERM ||
+           type == IND_OLDGEN_PERM) 
+    {
+      obj = ((StgInd *)obj)->indirectee;
+      type = get_itbl(obj)->type;
+    }
+
+    /* find the info table for this object */
+    info = get_itbl(obj);
+
+    /* determine what kind of object we have */
+    switch (info->type) 
+    {
+        /* full applications of data constructors */
+        case CONSTR:
+        case CONSTR_1_0: 
+        case CONSTR_0_1:
+        case CONSTR_1_1: 
+        case CONSTR_0_2: 
+        case CONSTR_2_0:
+        case CONSTR_STATIC:
+        case CONSTR_NOCAF_STATIC: 
+        {
+           int i; 
+           char *descriptor;
+
+           /* find the con_info for the constructor */
+           con_info = get_con_itbl (obj);
+
+           /* obtain the name of the constructor */
+           descriptor = con_info->con_desc;
+
+           debugBelch ("(%s", descriptor);
+
+           /* process the payload of the closure */
+           /* we don't handle non pointers at the moment */
+           for (i = 0; i < info->layout.payload.ptrs; i++)
+           {
+              debugBelch (" ");
+              prettyPrintClosure_ ((StgClosure *) obj->payload[i]);
+           }
+           debugBelch (")");
+           break;
+        }
+
+        /* if it isn't a constructor then just print the closure type */
+        default:
+        {
+           debugBelch ("<%s>", info_type(obj));
+           break;
+        }
+    }
+}
+
 #else /* DEBUG */
 void printPtr( StgPtr p )
 {
@@ -1115,4 +1198,6 @@ void printObj( StgClosure *obj )
 {
     debugBelch("obj 0x%p (enable -DDEBUG for more info) " , obj );
 }
+
+
 #endif /* DEBUG */

@@ -72,7 +72,6 @@ import SrcLoc
 import HscTypes
 import ListSetOps
 import Outputable
-import Breakpoints
 
 #ifdef GHCI
 import Linker
@@ -97,6 +96,9 @@ import Util
 import Bag
 
 import Control.Monad    ( unless )
+import Data.Maybe	( isJust )
+import Foreign.Ptr      ( Ptr )
+
 \end{code}
 
 
@@ -318,7 +320,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_deprecs   = NoDeprecs,
 				mg_foreign   = NoStubs,
 				mg_hpc_info  = noHpcInfo,
-                                mg_dbg_sites = noDbgSites
+                                mg_modBreaks = emptyModBreaks  
 		    } } ;
 
    tcCoreDump mod_guts ;
@@ -1193,11 +1195,11 @@ lookup_rdr_name rdr_name = do {
     return good_names
  }
 
-tcRnRecoverDataCon :: HscEnv -> a -> IO (Maybe DataCon) 
-tcRnRecoverDataCon hsc_env a
+tcRnRecoverDataCon :: HscEnv -> Ptr () -> IO (Maybe DataCon) 
+tcRnRecoverDataCon hsc_env ptr
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext hsc_env (hsc_IC hsc_env) $
-     do name    <- recoverDataCon a
+    setInteractiveContext hsc_env (hsc_IC hsc_env) $ do
+        name <- dataConInfoPtrToName ptr
         tcLookupDataCon name
 
 tcRnLookupName :: HscEnv -> Name -> IO (Maybe TyThing)

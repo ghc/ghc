@@ -22,11 +22,8 @@ import DsMonad
 
 #ifdef GHCI
 import PrelNames
-import DsBreakpoint
 	-- Template Haskell stuff iff bootstrapped
 import DsMeta
-#else
-import DsBreakpoint
 #endif
 
 import HsSyn
@@ -52,8 +49,6 @@ import Util
 import Bag
 import Outputable
 import FastString
-
-import Data.Maybe
 \end{code}
 
 
@@ -189,21 +184,6 @@ scrungleMatch var scrut body
 \begin{code}
 dsLExpr :: LHsExpr Id -> DsM CoreExpr
 
-#if defined(GHCI)
-dsLExpr (L loc expr@(HsWrap w (HsVar v)))
-    | idName v `elem` [breakpointName, breakpointCondName, breakpointAutoName]
-    , WpTyApp ty <- simpWrapper w
-    = do areBreakpointsEnabled <- breakpoints_enabled
-         if areBreakpointsEnabled
-           then do
-              L _ breakpointExpr <- mkBreakpointExpr loc v ty
-              dsLExpr (L loc $ HsWrap w breakpointExpr)
-           else putSrcSpanDs loc $ dsExpr expr
-       where simpWrapper (WpCompose w1 WpHole) = w1
-             simpWrapper (WpCompose WpHole w1) = w1
-             simpWrapper w = w
-#endif
-
 dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e
 
 dsExpr :: HsExpr Id -> DsM CoreExpr
@@ -300,7 +280,7 @@ dsExpr (HsCase discrim matches)
 --       This is to avoid silliness in breakpoints
 dsExpr (HsLet binds body)
   = (bindLocalsDs (map unLoc $ collectLocalBinders binds) $ 
-     dsAndThenMaybeInsertBreakpoint body) `thenDs` \ body' ->
+     dsLExpr body) `thenDs` \ body' ->
     dsLocalBinds binds body'
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
@@ -602,10 +582,10 @@ dsDo	:: [LStmt Id]
 dsDo stmts body result_ty
   = go (map unLoc stmts)
   where
-    go [] = dsAndThenMaybeInsertBreakpoint body
+    go [] = dsLExpr body
     
     go (ExprStmt rhs then_expr _ : stmts)
-      = do { rhs2 <- dsAndThenMaybeInsertBreakpoint rhs
+      = do { rhs2 <- dsLExpr rhs
 	   ; then_expr2 <- dsExpr then_expr
 	   ; rest <- go stmts
 	   ; returnDs (mkApps then_expr2 [rhs2, rest]) }
@@ -625,7 +605,7 @@ dsDo stmts body result_ty
 	   ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
     				  result_ty (cantFailMatchResult body)
 	   ; match_code <- handle_failure pat match fail_op
-           ; rhs'       <- dsAndThenMaybeInsertBreakpoint rhs
+           ; rhs'       <- dsLExpr rhs
 	   ; bind_op'   <- dsExpr bind_op
 	   ; returnDs (mkApps bind_op' [rhs', Lam var match_code]) }
     
@@ -675,7 +655,7 @@ dsMDo tbl stmts body result_ty
 	   ; dsLocalBinds binds rest }
 
     go (ExprStmt rhs _ rhs_ty : stmts)
-      = do { rhs2 <- dsAndThenMaybeInsertBreakpoint rhs
+      = do { rhs2 <- dsLExpr rhs
 	   ; rest <- go stmts
 	   ; returnDs (mkApps (Var then_id) [Type rhs_ty, Type b_ty, rhs2, rest]) }
     
@@ -688,7 +668,7 @@ dsMDo tbl stmts body result_ty
 	   ; let fail_expr = mkApps (Var fail_id) [Type b_ty, fail_msg]
 	   ; match_code <- extractMatchResult match fail_expr
 
-	   ; rhs'       <- dsAndThenMaybeInsertBreakpoint rhs
+	   ; rhs'       <- dsLExpr rhs
 	   ; returnDs (mkApps (Var bind_id) [Type (hsLPatType pat), Type b_ty, 
 					     rhs', Lam var match_code]) }
     

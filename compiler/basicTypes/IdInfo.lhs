@@ -718,8 +718,8 @@ zapFragileInfo info = Just (info `setSpecInfo` emptySpecInfo
 type TickBoxId = Int
 
 data TickBoxOp 
-   = TickBox Module !TickBoxId  -- ^Tick box for Hpc-style coverage,
-				-- type = State# Void#
+   = TickBox Module {-# UNPACK #-} !TickBoxId
+          -- ^Tick box for Hpc-style coverage
 
 instance Outputable TickBoxOp where
     ppr (TickBox mod n)         = ptext SLIT("tick") <+> ppr (mod,n)

@@ -22,6 +22,7 @@ import Constants	( mIN_PAYLOAD_SIZE, wORD_SIZE )
 import CgHeapery	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
 import Util             ( lengthIs, listLengthCmp )
+import Outputable
 
 import Foreign
 import Foreign.C
@@ -32,7 +33,8 @@ import GHC.Exts		( Int(I#), addr2Int# )
 import GHC.Ptr		( Ptr(..) )
 import GHC.Prim
 
-import Outputable
+import Debug.Trace
+import Text.Printf
 \end{code}
 
 %************************************************************************
@@ -48,8 +50,11 @@ itblCode :: ItblPtr -> Ptr ()
 itblCode (ItblPtr ptr)
    = (castPtr ptr)
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-                 `plusPtr` (3 * wORD_SIZE)
+                 `plusPtr` conInfoTableSizeB
 #endif
+
+-- XXX bogus
+conInfoTableSizeB = 3 * wORD_SIZE
 
 type ItblEnv = NameEnv (Name, ItblPtr)
 	-- We need the Name in the range so we know which
@@ -290,7 +295,7 @@ instance Storable StgConInfoTable where
               StgConInfoTable 
               { 
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-                conDesc   = castPtr $ ptr `plusPtr` wORD_SIZE `plusPtr` desc
+                conDesc   = castPtr $ ptr `plusPtr` conInfoTableSizeB `plusPtr` desc
 #else
                 conDesc   = desc
 #endif
@@ -299,7 +304,7 @@ instance Storable StgConInfoTable where
    poke ptr itbl 
       = runState (castPtr ptr) $ do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
-           store (conDesc itbl `minusPtr` (ptr `plusPtr` wORD_SIZE))
+           store (conDesc itbl `minusPtr` (ptr `plusPtr` conInfoTableSizeB))
 #endif
            store (infoTable itbl)
 #ifndef GHCI_TABLES_NEXT_TO_CODE

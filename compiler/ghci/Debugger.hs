@@ -6,10 +6,9 @@
 --
 -----------------------------------------------------------------------------
 
-module Debugger where
+module Debugger (pprintClosureCommand, instantiateTyVarsToUnknown) where
 
 import Linker
-import Breakpoints
 import RtClosureInspect
 
 import PrelNames
@@ -22,8 +21,6 @@ import VarEnv
 import Name 
 import NameEnv
 import RdrName
-import Module
-import Finder
 import UniqSupply
 import Type
 import TyCon
@@ -31,23 +28,15 @@ import DataCon
 import TcGadt
 import GHC
 import GhciMonad
-import PackageConfig
 
 import Outputable
 import Pretty                    ( Mode(..), showDocWith )
-import ErrUtils
 import FastString
 import SrcLoc
-import Util
-import Maybes
 
 import Control.Exception
 import Control.Monad
-import qualified Data.Map as Map
-import Data.Array.Unboxed
-import Data.Array.Base
 import Data.List
-import Data.Typeable             ( Typeable )
 import Data.Maybe
 import Data.IORef
 
@@ -300,288 +289,3 @@ stripUnknowns names id = setIdType id . fst . go names . idType
            kind1 = mkArrowKind liftedTypeKind liftedTypeKind
            kind2 = mkArrowKind kind1 liftedTypeKind
            kind3 = mkArrowKind kind2 liftedTypeKind
-
------------------------------
--- | The :breakpoint command
------------------------------
-bkptOptions :: String -> GHCi Bool
-bkptOptions "continue" = -- We want to quit if in an inferior session
-                         liftM not isTopLevel 
-bkptOptions "stop" = do
-  inside_break <- liftM not isTopLevel
-  when inside_break $ throwDyn StopChildSession 
-  return False
-
-bkptOptions cmd = do 
-  dflags <- getDynFlags
-  bt     <- getBkptTable
-  sess   <- getSession
-  bkptOptions' sess (words cmd) bt
-  return False
-   where
-    bkptOptions' _ ["list"] bt = do 
-      let msgs = [ ppr mod <+> colon <+> ppr coords 
-                   | (mod,site) <- btList bt
-                   , let coords = getSiteCoords bt mod site]
-          num_msgs = [parens (int n) <+> msg | (n,msg) <- zip [1..] msgs]
-      msg <- showForUser$ if null num_msgs 
-                            then text "There are no enabled breakpoints"
-                            else vcat num_msgs
-      io$ putStrLn msg
-
-    bkptOptions' s ("add":cmds) bt 
-      | [line]         <- cmds
-      , [(lineNum,[])] <- reads line
-      = do (toplevel,_) <- io$ GHC.getContext s
-           case toplevel of
-             (m:_) -> handleAdd (\mod->addBkptByLine mod lineNum) m
-             [] -> throwDyn $ CmdLineError $ "No module loaded in debugging mode"
-
-      | [mod_name,line]<- cmds
-      , [(lineNum,[])] <- reads line
-      = io(GHC.findModule s (GHC.mkModuleName mod_name) Nothing) >>=
-         handleAdd (\mod->addBkptByLine mod lineNum)
-
-      | [mod_name,line,col] <- cmds
-      = io(GHC.findModule s (GHC.mkModuleName mod_name) Nothing) >>=
-         handleAdd (\mod->addBkptByCoord mod (read line, read col))
-
-      | otherwise = throwDyn $ CmdLineError $ 
-                       "syntax: :breakpoint add Module line [col]"
-       where 
-         handleAdd f mod = 
-           either 
-             (handleBkptEx s mod)
-             (\(newTable, site) -> do
-               setBkptTable newTable
-               let (x,y) = getSiteCoords newTable mod site
-               io (putStrLn ("Breakpoint set at " ++ showSDoc (ppr mod) 
-                    ++ ':' : show x  ++ ':' : show y)))
-             (f mod bt) 
-
-    bkptOptions' s ("del":cmds) bt 
-      | [i']     <- cmds 
-      , [(i,[])] <- reads i'
-      , bkpts    <- btList bt
-      = if i > length bkpts
-           then throwDyn $ CmdLineError 
-              "Not a valid breakpoint #. Use :breakpoint list to see the current breakpoints."
-           else 
-             let (mod, site) = bkpts !! (i-1)
-             in handleDel mod $ delBkptBySite mod site
-
-      | [fn,line]      <- cmds 
-      , [(lineNum,[])] <- reads line
-      , mod            <- GHC.mkModule mainPackageId (GHC.mkModuleName fn)
-      = handleDel mod $  delBkptByLine mod lineNum
-
-      | [fn,line,col]  <- cmds 
-      , [(lineNum,[])] <- reads line
-      , [(colNum,[])]  <- reads col
-      , mod            <- GHC.mkModule mainPackageId (GHC.mkModuleName fn)
-      = handleDel mod $ delBkptByCoord mod (lineNum, colNum)
-        
-      | otherwise = throwDyn $ CmdLineError $ 
-             "syntax: :breakpoint del (breakpoint # | [Module] line [col])"
-
-       where delMsg = "Breakpoint deleted"
-             handleDel mod f = either (handleBkptEx s mod)
-                                      (\newtable-> setBkptTable newtable >> io (putStrLn delMsg))
-                                      (f bt)
-                                      
-    bkptOptions' _ _ _ = throwDyn $ CmdLineError $ 
-                         "syntax: :breakpoint (list|continue|stop|add|del)"
-
--- Error messages
---    handleBkptEx :: Session -> Module -> Debugger.BkptException -> a
-    handleBkptEx s m NotHandled  = io$ do
-       isInterpreted <- findModSummary m >>= isModuleInterpreted s
-       if isInterpreted
-        then error$ "Module " ++ showSDoc (ppr m) ++  " was not loaded under debugging mode.\n" 
-                 ++ "Enable debugging mode with -fdebugging (and reload your module)"
-        else error$ "Module " ++ showSDoc (ppr m) ++  " was loaded in compiled (.o) mode.\n" 
-                 ++ "You must load a module in interpreted mode and with -fdebugging on to debug it."
-         where findModSummary m = do 
-                 mod_graph <- getModuleGraph s 
-                 return$ head [ modsum | modsum <- mod_graph, ms_mod modsum == m]
-    handleBkptEx _ _ e = error (show e)
-
--------------------------
--- Breakpoint Tables
--------------------------
-
-data BkptTable a  = BkptTable { 
-                           -- | An array of breaks, indexed by site number
-     breakpoints :: Map.Map a (UArray Int Bool)  
-                           -- | A list of lines, each line can have zero or more sites, which are annotated with a column number
-   , sites       :: Map.Map a [[(SiteNumber, Int)]] 
-   }
-                  deriving Show
-
-sitesOf :: Ord a => BkptTable a -> a -> Maybe [[(SiteNumber, Int)]] 
-sitesOf bt fn = Map.lookup fn (sites bt)
-bkptsOf bt fn = Map.lookup fn (breakpoints bt)
-
-
-data BkptError =
-                    NotHandled  -- Trying to manipulate a element not handled by this BkptTable 
-                  | NoBkptFound
-                  | NotNeeded   -- Used when a breakpoint was already enabled
-  deriving Typeable
-
-instance Show BkptError where
-  show NoBkptFound = "No suitable breakpoint site found"
-  show NotNeeded  = "Nothing to do"
-  show NotHandled  = "BkptTable: Element not controlled by this table"
-
-emptyBkptTable :: Ord a => BkptTable a
-addModule      :: Ord a => a -> [(SiteNumber,Coord)] -> BkptTable a -> BkptTable a
--- | Lines start at index 1
-addBkptByLine  :: Ord a => a -> Int        -> BkptTable a -> Either BkptError (BkptTable a, SiteNumber)
-addBkptByCoord :: Ord a => a -> Coord      -> BkptTable a -> Either BkptError (BkptTable a, SiteNumber)
-delBkptByLine  :: Ord a => a -> Int        -> BkptTable a -> Either BkptError (BkptTable a)
-delBkptBySite  :: Ord a => a -> SiteNumber -> BkptTable a -> Either BkptError (BkptTable a)
-delBkptByCoord :: Ord a => a -> Coord      -> BkptTable a -> Either BkptError (BkptTable a)
-
-isBkptEnabled  :: Ord a => BkptTable a -> BkptLocation a -> Bool
-btElems        :: Ord a => BkptTable a -> [(a, [SiteNumber])]
-btList         :: Ord a => BkptTable a -> [BkptLocation a]
-sitesList      :: Ord a => BkptTable a -> [(a, [Coord])]
-getSiteCoords  :: Ord a => BkptTable a -> a -> SiteNumber -> Coord
-
-emptyBkptTable = BkptTable Map.empty Map.empty
-
-addBkptByLine a i bt
-   | Just lines    <- sitesOf bt a
-   , Just bkptsArr <- bkptsOf bt a
-   , i < length lines
-   = case [line | line <- drop i lines, not (null line)] of 
-       ((x:_):_) -> let (siteNum,col) = x
-                        wasAlreadyOn  = bkptsArr ! siteNum
-                        newArr        = bkptsArr // [(siteNum, True)]
-                        newTable      = Map.insert a newArr (breakpoints bt)
-        in if wasAlreadyOn 
-            then Left NotNeeded
-            else Right (bt{breakpoints=newTable}, siteNum)
-       otherwise -> Left NoBkptFound
-
-   | Just sites    <- sitesOf bt a
-   = Left NoBkptFound
-   | otherwise     = Left NotHandled  
-
-addBkptByCoord a (r,c) bt 
-   | Just lines    <- sitesOf bt a
-   , Just bkptsArr <- bkptsOf bt a
-   , r < length lines
-       = case [ (sn,col) | (sn,col)<-lines!!r, col>=c] of 
-       []    -> Left NoBkptFound
-       (x:_) -> let (siteNum, col) = x
-                    wasAlreadyOn  = bkptsArr ! siteNum
-                    newArr        = bkptsArr // [(siteNum, True)]
-                    newTable      = Map.insert a newArr (breakpoints bt)
-        in if wasAlreadyOn 
-           then Left NotNeeded
-           else Right (bt{breakpoints=newTable}, siteNum)
-
-   | Just sites    <- sitesOf bt a
-   = Left NoBkptFound
-   | otherwise     = Left NotHandled  
-
-delBkptBySite a i bt 
-   | Just bkptsArr <- bkptsOf bt a
-   , not (inRange (bounds bkptsArr) i)
-   = Left NoBkptFound
-
-   | Just bkptsArr <- bkptsOf bt a
-   , bkptsArr ! i     -- Check that there was a enabled bkpt here 
-   , newArr        <- bkptsArr // [(i,False)] 
-   , newTable      <- Map.insert a newArr (breakpoints bt)
-   = Right bt {breakpoints=newTable}
-
-   | Just sites    <- sitesOf bt a
-   = Left NotNeeded
-
-   | otherwise = Left NotHandled
-
-delBkptByLine a l bt 
-   | Just sites    <- sitesOf bt a
-   , (site:_)      <- [s | (s,c') <- sites !! l]
-   = delBkptBySite a site bt
-
-   | Just sites    <- sitesOf bt a
-   = Left NoBkptFound
-
-   | otherwise = Left NotHandled
-
-delBkptByCoord a (r,c) bt 
-   | Just sites    <- sitesOf bt a
-   , (site:_)      <- [s | (s,c') <- sites !! r, c>=c', isBkptEnabled bt (a,s)]
-   = delBkptBySite a site bt
-
-   | Just sites    <- sitesOf bt a
-   = Left NoBkptFound
-
-   | otherwise = Left NotHandled
-
-btElems bt = [ (a, [i | (i,True) <- assocs siteArr])
-             | (a, siteArr) <- Map.assocs (breakpoints bt) ]
-
-btList bt =  [(a,site) | (a, sites) <- btElems bt, site <- sites] 
-
-sitesList bt = [ (a, sitesCoords sitesCols) | (a, sitesCols) <- Map.assocs (sites bt) ]
-    where sitesCoords sitesCols = 
-              [ (row,col) 
-                | (row, cols) <- zip [0..] sitesCols, (_,col) <- cols ] 
-
-getSiteCoords bt a site 
-   | Just rows <- sitesOf bt a
-   = head [ (r,c) | (r,row) <- zip [0..] rows
-                  , (s,c)   <- row
-                  , s == site ]
-
--- addModule is dumb and inefficient, but it does the job
-addModule a [] bt = bt {sites = Map.insert a [] (sites bt)}
-addModule a siteCoords bt 
-   | nrows        <- maximum$ [i | (_,(i,j)) <- siteCoords ]
-   , sitesByRow   <- [ [(s,c) | (s,(r,c)) <- siteCoords, r==i] 
-                       | i <- [0..nrows] ]
-   , nsites       <- length siteCoords
-   , initialBkpts <- listArray (0, nsites+1) (repeat False) 
-   = bt{ sites       = Map.insert a sitesByRow (sites bt) 
-       , breakpoints = Map.insert a initialBkpts (breakpoints bt) }
-
--- This MUST be fast
-isBkptEnabled bt site | bt `seq` site `seq` False = undefined
-isBkptEnabled bt (a,site) 
-   | Just bkpts <- bkptsOf bt a 
-   = ASSERT (inRange (bounds bkpts) site) 
-     unsafeAt bkpts site
-
------------------
--- Other stuff
------------------
-refreshBkptTable :: Session -> BkptTable Module -> [ModSummary] -> IO (BkptTable Module)
-refreshBkptTable sess = foldM updIfDebugging
-  where 
-   updIfDebugging bt ms = do
-      isDebugging <- isDebuggingM ms
-      if isDebugging 
-           then addModuleGHC sess bt (GHC.ms_mod ms)
-           else return bt
-   addModuleGHC sess bt mod = do
-      Just mod_info <- GHC.getModuleInfo sess mod
-      dflags <- GHC.getSessionDynFlags sess
-      let sites = GHC.modInfoBkptSites mod_info
-      debugTraceMsg dflags 2 
-                (ppr mod <> text ": inserted " <> int (length sites) <>
-                 text " breakpoints")
-      return$ addModule mod sites bt
-#if defined(GHCI) && defined(DEBUGGER)
-   isDebuggingM ms = isModuleInterpreted sess ms >>= \isInterpreted -> 
-                     return (Opt_Debugging `elem` dflags && 
-                             target == HscInterpreted && isInterpreted)
-       where dflags = flags     (GHC.ms_hspp_opts ms)
-             target = hscTarget (GHC.ms_hspp_opts ms)
-#else
-   isDebuggingM _ = return False
-#endif

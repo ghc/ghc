@@ -246,9 +246,12 @@
  *
  * TSO_INTERRUPTIBLE: the TSO can be interrupted if it blocks
  * interruptibly (eg. with BlockedOnMVar).
+ *
+ * TSO_STOPPED_ON_BREAKPOINT: the thread is currently stopped in a breakpoint
  */
 #define TSO_BLOCKEX       4
 #define TSO_INTERRUPTIBLE 8
+#define TSO_STOPPED_ON_BREAKPOINT 16 
 
 /* -----------------------------------------------------------------------------
    RET_DYN stack frames

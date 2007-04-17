@@ -77,7 +77,6 @@ exposed-modules:
 	DriverPipeline
 	DsArrows
 	DsBinds
-	DsBreakpoint
 	DsCCall
 	DsExpr
 	DsForeign

@@ -43,6 +43,11 @@ disInstr ( StgBCO *bco, int pc )
 
    instr = instrs[pc++];
    switch (instr) {
+      case bci_BRK_FUN:
+         debugBelch ("BRK_FUN  " );  printPtr( ptrs[instrs[pc]] ); 
+         debugBelch (" %d ", instrs[pc+1]); printPtr( ptrs[instrs[pc+2]] ); debugBelch("\n" );
+         pc += 3;
+         break;
       case bci_SWIZZLE:
          debugBelch("SWIZZLE stkoff %d by %d\n",
                          instrs[pc], (signed int)instrs[pc+1]);

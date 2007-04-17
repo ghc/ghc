@@ -27,7 +27,6 @@ import Module
 import PackageConfig
 import FastString
 import Panic
-import Breakpoints
 
 #ifdef DEBUG
 import Outputable
@@ -47,7 +46,7 @@ import GHC.Exts
 import GHC.Arr		( Array(..) )
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..), castPtr )
-import GHC.Base		( writeArray#, RealWorld, Int(..) )
+import GHC.Base		( writeArray#, RealWorld, Int(..), Word# )  
 \end{code}
 
 
@@ -143,6 +142,10 @@ mkPtrsArray ie ce n_ptrs ptrs = do
     fill (BCOPtrBCO ul_bco) i = do
 	BCO bco# <- linkBCO' ie ce ul_bco
 	writeArrayBCO marr i bco#
+    fill (BCOPtrBreakInfo brkInfo) i =                    
+        unsafeWrite marr i (unsafeCoerce# brkInfo)
+    fill (BCOPtrArray brkArray) i =                    
+        unsafeWrite marr i (unsafeCoerce# brkArray)
   zipWithM fill ptrs [0..]
   unsafeFreeze marr
 
@@ -163,10 +166,16 @@ writeArrayBCO (IOArray (STArray _ _ marr#)) (I# i#) bco# = IO $ \s# ->
   case (unsafeCoerce# writeArray#) marr# i# bco# s# of { s# ->
   (# s#, () #) }
 
+{-
+writeArrayMBA :: IOArray Int a -> Int -> MutableByteArray# a -> IO ()
+writeArrayMBA (IOArray (STArray _ _ marr#)) (I# i#) mba# = IO $ \s# ->
+  case (unsafeCoerce# writeArray#) marr# i# bco# s# of { s# ->
+  (# s#, () #) }
+-}
+
 data BCO = BCO BCO#
 
-newBCO :: ByteArray# -> ByteArray# -> Array# a
-	 -> Int# -> ByteArray# -> IO BCO
+newBCO :: ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> IO BCO
 newBCO instrs lits ptrs arity bitmap
    = IO $ \s -> case newBCO# instrs lits ptrs arity bitmap s of 
 		  (# s1, bco #) -> (# s1, BCO bco #)
@@ -201,8 +210,6 @@ lookupName :: ClosureEnv -> Name -> IO HValue
 lookupName ce nm
    = case lookupNameEnv ce nm of
         Just (_,aa) -> return aa
-        Nothing | Just bk <- lookupBogusBreakpointVal nm
-           -> return bk
         Nothing 
            -> ASSERT2(isExternalName nm, ppr nm)
 	      do let sym_to_find = nameToCLabel nm "closure"

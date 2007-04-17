@@ -46,7 +46,7 @@ import Data.Bits
 import Data.Int		( Int64 )
 import Data.Char	( ord )
 
-import GHC.Base		( ByteArray# )
+import GHC.Base		( ByteArray#, MutableByteArray#, RealWorld )
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..) )
 
@@ -71,13 +71,15 @@ data UnlinkedBCO
 	unlinkedBCOInstrs :: ByteArray#,		 -- insns
 	unlinkedBCOBitmap :: ByteArray#,		 -- bitmap
         unlinkedBCOLits   :: (SizedSeq BCONPtr),        -- non-ptrs
-        unlinkedBCOPtrs   :: (SizedSeq BCOPtr) 	        -- ptrs
+        unlinkedBCOPtrs   :: (SizedSeq BCOPtr)   	-- ptrs
    }
 
 data BCOPtr
   = BCOPtrName   Name
   | BCOPtrPrimOp PrimOp
   | BCOPtrBCO    UnlinkedBCO
+  | BCOPtrBreakInfo  BreakInfo
+  | BCOPtrArray (MutableByteArray# RealWorld)
 
 data BCONPtr
   = BCONPtrWord  Word
@@ -158,8 +160,7 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
 	     bitmap_arr = mkBitmapArray bsize bitmap
              bitmap_barr = case bitmap_arr of UArray _lo _hi barr -> barr
 
-         let ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits 
-					final_ptrs
+         let ul_bco = UnlinkedBCO nm arity insns_barr bitmap_barr final_lits final_ptrs 
 
          -- 8 Aug 01: Finalisers aren't safe when attached to non-primitive
          -- objects, since they might get run too early.  Disable this until
@@ -299,6 +300,11 @@ mkBits findLabel st proto_insns
                RETURN_UBX rep     -> instr1 st (return_ubx rep)
                CCALL off m_addr   -> do (np, st2) <- addr st m_addr
                                         instr3 st2 bci_CCALL off np
+               BRK_FUN array index info -> do 
+                  (p1, st2) <- ptr st  (BCOPtrArray array) 
+                  (p2, st3) <- ptr st2 (BCOPtrBreakInfo info)
+                  instr4 st3 bci_BRK_FUN p1 index p2
+               PUSH_LLL  o1 o2 o3 -> instr4 st bci_PUSH_LLL o1 o2 o3
 
        i2s :: Int -> Word16
        i2s = fromIntegral
@@ -448,6 +454,7 @@ instrSize16s instr
         RETURN_UBX{}		-> 1
 	CCALL{}			-> 3
         SWIZZLE{}		-> 3
+        BRK_FUN{}               -> 4 
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the

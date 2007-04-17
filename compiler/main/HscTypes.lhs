@@ -59,12 +59,14 @@ module HscTypes (
 	Linkable(..), isObjectLinkable,
 	Unlinked(..), CompiledByteCode,
 	isObject, nameOfObject, isInterpretable, byteCodeOfObject,
-        HpcInfo, noHpcInfo
+        HpcInfo, noHpcInfo,
+
+        -- Breakpoints
+        ModBreaks (..), emptyModBreaks
     ) where
 
 #include "HsVersions.h"
 
-import Breakpoints      ( SiteNumber, Coord, noDbgSites )
 #ifdef GHCI
 import ByteCodeAsm	( CompiledByteCode )
 #endif
@@ -100,6 +102,7 @@ import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
 import Maybes		( orElse, expectJust, catMaybes, seqMaybe )
 import Outputable
+import BreakArray
 import SrcLoc		( SrcSpan, Located )
 import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
@@ -109,6 +112,7 @@ import StringBuffer	( StringBuffer )
 
 import System.Time	( ClockTime )
 import Data.IORef	( IORef, readIORef )
+import Data.Array       ( Array, array )
 \end{code}
 
 
@@ -456,7 +460,7 @@ data ModDetails
         md_insts     :: ![Instance],	-- Dfun-ids for the instances in this module
         md_fam_insts :: ![FamInst],
         md_rules     :: ![CoreRule],	-- Domain may include Ids from other modules
-        md_dbg_sites     :: ![(SiteNumber, Coord)]     -- Breakpoint sites inserted by the renamer
+        md_modBreaks :: !ModBreaks  -- breakpoint information for this module 
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
@@ -464,7 +468,7 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_insts     = [],
 			       md_rules     = [],
 			       md_fam_insts = [],
-                               md_dbg_sites = noDbgSites}
+                               md_modBreaks = emptyModBreaks } 
 
 -- A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
@@ -498,7 +502,7 @@ data ModGuts
 	mg_foreign   :: !ForeignStubs,
 	mg_deprecs   :: !Deprecations,	 -- Deprecations declared in the module
 	mg_hpc_info  :: !HpcInfo,        -- info about coverage tick boxes
-        mg_dbg_sites :: ![(SiteNumber, Coord)]     -- Bkpts inserted by the renamer
+        mg_modBreaks :: !ModBreaks
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -1140,11 +1144,6 @@ showModMsg target recomp mod_summary
   = showSDoc (hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
 	            char '(', text (msHsFilePath mod_summary) <> comma,
 		    case target of
-#if defined(GHCI) && defined(DEBUGGER)
-                      HscInterpreted | recomp && 
-                                       Opt_Debugging `elem` modflags
-                                 -> text "interpreted(debugging)"
-#endif
                       HscInterpreted | recomp 
                                  -> text "interpreted"
                       HscNothing -> text "nothing"
@@ -1153,7 +1152,6 @@ showModMsg target recomp mod_summary
  where 
     mod     = moduleName (ms_mod mod_summary)
     mod_str = showSDoc (ppr mod) ++ hscSourceString (ms_hsc_src mod_summary)
-    modflags= flags(ms_hspp_opts mod_summary)
 \end{code}
 
 
@@ -1238,5 +1236,25 @@ byteCodeOfObject (BCOs bc) = bc
 byteCodeOfObject other     = pprPanic "byteCodeOfObject" (ppr other)
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+\subsection{Breakpoint Support}
+%*                                                                      *
+%************************************************************************
 
+\begin{code}
+-- all the information about the breakpoints for a given module
+data ModBreaks
+   = ModBreaks
+   { modBreaks_array :: BreakArray
+            -- the array of breakpoint flags indexed by tick number
+   , modBreaks_ticks :: !(Array Int SrcSpan)
+   }
 
+emptyModBreaks :: ModBreaks
+emptyModBreaks = ModBreaks
+   { modBreaks_array = error "ModBreaks.modBreaks_array not initialised"
+         -- Todo: can we avoid this? 
+   , modBreaks_ticks = array (0,-1) []
+   }
+\end{code}

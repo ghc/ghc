@@ -85,10 +85,6 @@ import Util		( split )
 import Data.Char	( isUpper )
 import System.IO        ( hPutStrLn, stderr )
 
-#ifdef GHCI
-import Breakpoints      ( BkptHandler )
-import Module           ( ModuleName )
-#endif
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
@@ -208,9 +204,6 @@ data DynFlag
    | Opt_SplitObjs
    | Opt_StgStats
    | Opt_HideAllPackages
-#if defined(GHCI) && defined(DEBUGGER)
-   | Opt_Debugging
-#endif
    | Opt_PrintBindResult
    | Opt_Haddock
    | Opt_Hpc_No_Auto
@@ -321,11 +314,6 @@ data DynFlags = DynFlags {
   
   -- message output
   log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO ()
-
-#ifdef GHCI
-  -- breakpoint handling
- ,bkptHandler           :: Maybe (BkptHandler Module)
-#endif
  }
 
 data HscTarget
@@ -446,9 +434,6 @@ defaultDynFlags =
 	packageFlags		= [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
-#ifdef GHCI
-        bkptHandler             = Nothing,
-#endif
 	flags = [ 
     	    Opt_ReadUserPackageConf,
     
@@ -1079,9 +1064,6 @@ fFlags = [
   ( "excess-precision",			Opt_ExcessPrecision ),
   ( "asm-mangling",			Opt_DoAsmMangling ),
   ( "print-bind-result",		Opt_PrintBindResult ),
-#if defined(GHCI) && defined(DEBUGGER)
-  ( "debugging",                        Opt_Debugging),
-#endif
   ( "force-recomp",			Opt_ForceRecomp ),
   ( "hpc-no-auto",			Opt_Hpc_No_Auto )
   ]
