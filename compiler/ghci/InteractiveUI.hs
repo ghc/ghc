@@ -1495,29 +1495,43 @@ breakCmd :: String -> GHCi Bool
 breakCmd argLine = do
    session <- getSession
    breakSwitch session $ words argLine
+   return False
 
-breakSwitch :: Session -> [String] -> GHCi Bool
+breakSwitch :: Session -> [String] -> GHCi ()
 breakSwitch _session [] = do
    io $ putStrLn "The break command requires at least one argument."
-   return False
 breakSwitch session args@(arg1:rest) 
-   | looksLikeModule arg1 = do
+   | looksLikeModuleName arg1 = do
         mod <- wantInterpretedModule session arg1
-        breakByModule mod rest
-        return False
-   | otherwise = do
+        breakByModule session mod rest
+   | all isDigit arg1 = do
         (toplevel, _) <- io $ GHC.getContext session 
         case toplevel of
-           (mod : _) -> breakByModule mod args 
+           (mod : _) -> breakByModuleLine mod (read arg1) rest
            [] -> do 
               io $ putStrLn "Cannot find default module for breakpoint." 
               io $ putStrLn "Perhaps no modules are loaded for debugging?"
-        return False
-   where
-   -- Todo there may be a nicer way to test this
-   looksLikeModule :: String -> Bool
-   looksLikeModule []    = False
-   looksLikeModule (x:_) = isUpper x
+   | otherwise = do -- assume it's a name
+        names <- io $ GHC.parseName session arg1
+        case names of
+          []    -> return ()
+          (n:_) -> do
+            let loc  = nameSrcLoc n
+                modl = nameModule n
+            is_interpreted <- io (GHC.moduleIsInterpreted session modl)
+            if not is_interpreted
+               then noCanDo $ text "module " <> ppr modl <>
+                              text " is not interpreted"
+               else do
+            if isGoodSrcLoc loc
+               then findBreakAndSet (nameModule n) $ 
+                         findBreakByCoord (srcLocLine loc, srcLocCol loc)
+               else noCanDo $ text "can't find its location: " <>
+                              ppr loc
+           where
+             noCanDo why = printForUser $
+                text "cannot set breakpoint on " <> ppr n <> text ": " <> why
+
 
 wantInterpretedModule :: Session -> String -> GHCi Module
 wantInterpretedModule session str = do
@@ -1527,26 +1541,18 @@ wantInterpretedModule session str = do
        throwDyn (CmdLineError ("module '" ++ str ++ "' is not interpreted"))
    return modl
 
-breakByModule :: Module -> [String] -> GHCi () 
-breakByModule mod args@(arg1:rest)
+breakByModule :: Session -> Module -> [String] -> GHCi () 
+breakByModule session mod args@(arg1:rest)
    | all isDigit arg1 = do  -- looks like a line number
         breakByModuleLine mod (read arg1) rest
-   | looksLikeVar arg1 = do
-        -- break by a function definition
-        io $ putStrLn "Break by function definition not implemented."
-   | otherwise = io $ putStrLn "Invalid arguments to break command."
-   where
-   -- Todo there may be a nicer way to test this
-   looksLikeVar :: String -> Bool
-   looksLikeVar [] = False
-   looksLikeVar (x:_) = isLower x || x `elem` "~!@#$%^&*-+"
+   | otherwise = io $ putStrLn "Invalid arguments to :break"
 
 breakByModuleLine :: Module -> Int -> [String] -> GHCi ()
 breakByModuleLine mod line args
    | [] <- args = findBreakAndSet mod $ findBreakByLine line
    | [col] <- args, all isDigit col =
         findBreakAndSet mod $ findBreakByCoord (line, read col)
-   | otherwise = io $ putStrLn "Invalid arguments to break command."
+   | otherwise = io $ putStrLn "Invalid arguments to :break"
 
 findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
 findBreakAndSet mod lookupTickTree = do 
