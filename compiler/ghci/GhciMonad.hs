@@ -11,8 +11,9 @@ module GhciMonad where
 #include "HsVersions.h"
 
 import qualified GHC
-import Outputable
-import Panic hiding (showException)
+import Outputable       hiding (printForUser)
+import qualified Outputable
+import Panic            hiding (showException)
 import Util
 import DynFlags
 import HscTypes
@@ -197,11 +198,11 @@ discardResumeContext = do
    st <- getGHCiState
    setGHCiState st { resume = [] }
 
-showForUser :: SDoc -> GHCi String
-showForUser doc = do
+printForUser :: SDoc -> GHCi ()
+printForUser doc = do
   session <- getSession
   unqual <- io (GHC.getPrintUnqual session)
-  return $! showSDocForUser unqual doc
+  io $ Outputable.printForUser stdout unqual doc
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

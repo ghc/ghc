@@ -26,7 +26,7 @@ import Packages
 import PackageConfig
 import UniqFM
 import PprTyThing
-import Outputable
+import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
 
 -- for createtags
@@ -517,9 +517,7 @@ switchOnRunResult (GHC.RunBreak threadId names info resume) = do
 
    -- display information about the breakpoint
    let location = ticks ! breakInfo_number info
-   unqual <- io $ GHC.getPrintUnqual session
-   io $ printForUser stdout unqual $
-      ptext SLIT("Stopped at") <+> ppr location
+   printForUser $ ptext SLIT("Stopped at") <+> ppr location
 
    pushResume location threadId resume
    return (Just (True,names))
@@ -830,8 +828,7 @@ typeOfExpr str
        case maybe_ty of
 	  Nothing -> return ()
 	  Just ty -> do ty' <- cleanType ty
-			tystr <- showForUser (ppr ty')
-		        io (putStrLn (str ++ " :: " ++ tystr))
+                        printForUser $ text str <> text " :: " <> ppr ty'
 
 kindOfType :: String -> GHCi ()
 kindOfType str 
@@ -839,8 +836,7 @@ kindOfType str
        maybe_ty <- io (GHC.typeKind cms str)
        case maybe_ty of
 	  Nothing    -> return ()
-	  Just ty    -> do tystr <- showForUser (ppr ty)
-		           io (putStrLn (str ++ " :: " ++ tystr))
+	  Just ty    -> printForUser $ text str <> text " :: " <> ppr ty
           
 quit :: String -> GHCi Bool
 quit _ = return True
@@ -1222,8 +1218,7 @@ showBindings = do
 
 showTyThing (AnId id) = do 
   ty' <- cleanType (GHC.idType id)
-  str <- showForUser (ppr id <> text " :: " <> ppr ty')
-  io (putStrLn str)
+  printForUser $ ppr id <> text " :: " <> ppr ty'
 showTyThing _  = return ()
 
 -- if -fglasgow-exts is on we show the foralls, otherwise we don't.
@@ -1237,8 +1232,7 @@ cleanType ty = do
 showBkptTable :: GHCi ()
 showBkptTable = do
    activeBreaks <- getActiveBreakPoints 
-   str <- showForUser $ ppr activeBreaks 
-   io $ putStrLn str
+   printForUser $ ppr activeBreaks 
 
 -- -----------------------------------------------------------------------------
 -- Completion
@@ -1555,7 +1549,6 @@ findBreakAndSet mod lookupTickTree = do
       Just (tick, span) -> do
          success <- io $ setBreakFlag True breakArray tick 
          session <- getSession
-         unqual  <- io $ GHC.getPrintUnqual session
          if success 
             then do
                (alreadySet, nm) <- 
@@ -1564,15 +1557,14 @@ findBreakAndSet mod lookupTickTree = do
                              , breakLoc = span
                              , breakTick = tick
                              }
-               io $ printForUser stdout unqual $
+               printForUser $
                   text "Breakpoint " <> ppr nm <>
                   if alreadySet 
                      then text " was already set at " <> ppr span
                      else text " activated at " <> ppr span
             else do
-            str <- showForUser $ text "Breakpoint could not be activated at" 
+            printForUser $ text "Breakpoint could not be activated at" 
                                  <+> ppr span
-            io $ putStrLn str
 
 -- When a line number is specified, the current policy for choosing
 -- the best breakpoint is this:
