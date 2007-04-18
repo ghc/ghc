@@ -1573,10 +1573,12 @@ findBreakAndSet mod lookupTickTree = do
 --    - the rightmost subexpression enclosing the specified line
 --
 findBreakByLine :: Int -> TickArray -> Maybe (BreakIndex,SrcSpan)
-findBreakByLine line arr = 
-  listToMaybe (sortBy leftmost complete)   `mplus`
-  listToMaybe (sortBy leftmost incomplete) `mplus`
-  listToMaybe (sortBy rightmost ticks)
+findBreakByLine line arr
+  | not (inRange (bounds arr) line) = Nothing
+  | otherwise =
+    listToMaybe (sortBy leftmost complete)   `mplus`
+    listToMaybe (sortBy leftmost incomplete) `mplus`
+    listToMaybe (sortBy rightmost ticks)
   where 
         ticks = arr ! line
 
@@ -1587,8 +1589,10 @@ findBreakByLine line arr =
             where ends_here (nm,span) = srcSpanEndLine span == line
 
 findBreakByCoord :: (Int,Int) -> TickArray -> Maybe (BreakIndex,SrcSpan)
-findBreakByCoord (line, col) arr =
-  listToMaybe (sortBy rightmost contains)
+findBreakByCoord (line, col) arr
+  | not (inRange (bounds arr) line) = Nothing
+  | otherwise =
+    listToMaybe (sortBy rightmost contains)
   where 
         ticks = arr ! line
 
