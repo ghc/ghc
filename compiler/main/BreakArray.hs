@@ -1,10 +1,15 @@
+-----------------------------------------------------------------------------
 --
 -- Break Arrays in the IO monad
 -- Entries in the array are Word sized 
 --
+-- (c) The University of Glasgow 2007
+--
+-----------------------------------------------------------------------------
 
 module BreakArray
   ( BreakArray (BA)
+        -- constructor is exported only for ByteCodeGen
   , newBreakArray
   , getBreak 
   , setBreakOn 
