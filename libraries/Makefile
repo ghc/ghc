@@ -150,6 +150,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	                     --with-ld=$(LD) \
 	                     --datasubdir=ghc \
 	                     --haddock-args="--use-contents=../index.html --use-index=../doc-index.html" \
+	                     $(addprefix --configure-option=,$(CONFIGURE_ARGS)) \
 	                     --configure-option=--with-cc=$(CC)
 	touch $@
 

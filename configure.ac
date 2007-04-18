@@ -31,6 +31,8 @@ if test ! -f mk/config.h.in; then
    exit 1
 fi
 
+AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
+
 FP_SETUP_PROJECT_VERSION
 
 # Hmmm, we fix the RPM release number to 1 here... Is this convenient?

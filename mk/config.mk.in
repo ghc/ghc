@@ -1230,3 +1230,11 @@ WAY_o_HC_OPTS=
 # GhcLibCppOpts += -DWORD_SIZE_IN_BITS=31
 # SplitObjs=NO
 
+################################################################################
+#
+#    Library configure arguments
+#
+################################################################################
+
+CONFIGURE_ARGS = @CONFIGURE_ARGS@
+
