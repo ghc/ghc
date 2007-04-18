@@ -208,7 +208,9 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: stamp/configure.library.install.% %/setup/Setup
 	cd $* && ../ifBuildable/ifBuildable setup/Setup install
 
-.PHONY: clean clean.library.%
+.PHONY: distclean clean clean.library.%
+
+distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -f stamp/$(BOOTSTRAPPING_CABAL)
