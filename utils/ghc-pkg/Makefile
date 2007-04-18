@@ -105,8 +105,9 @@ endif
 ifeq "$(INSTALLING)$(HOSTPLATFORM)" "0i386-unknown-mingw32"
 all :: $(INPLACE_SCRIPT_PROG).bat
 
+# See "MSys Note 3" in compiler/Makefile
 $(INPLACE_SCRIPT_PROG).bat :
-	echo '@call $(subst /,\\,$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/$(HS_PROG)) --global-conf $(PKGCONF) %*' >> $@
+	echo '@call $(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/ghc-pkg/$(HS_PROG)) --global-conf $(PKGCONF) %*' >> $@
 	chmod 755 $@
 endif
 

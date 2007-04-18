@@ -98,7 +98,8 @@ endif
 ifeq "$(INSTALLING)$(HOSTPLATFORM)" "0i386-unknown-mingw32"
 all :: $(INPLACE_SCRIPT_PROG).bat
 
-FULL_INPLACE_PATH=$(subst /,\\,$(FPTOOLS_TOP_ABS)/utils/hsc2hs/)
+# See "MSys Note 3" in compiler/Makefile
+FULL_INPLACE_PATH=$(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/hsc2hs/)
 $(INPLACE_SCRIPT_PROG).bat :
 	echo '@call $(FULL_INPLACE_PATH)$(HS_PROG) --template=$(FULL_INPLACE_PATH)template-hsc.h $(HSC2HS_EXTRA) %*' >> $@
 	chmod 755 $@

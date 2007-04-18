@@ -727,7 +727,7 @@ else
 SCRIPT_SHELL = /bin/sh
 endif
 
-# Note 2
+# MSys Note 2
 # On MSys, we must use the following script for ghc-inplace:
 #   exec /c/darcs/fc-branch-2/compiler/stage1/ghc -Bc:/darcs/fc-branch-2 "$@"
 # That is, 
@@ -748,10 +748,16 @@ $(odir)/ghc-inplace : $(GHC_PROG)
 # Re exec, see note 2 above
 	chmod 755 $@
 
+# MSys Note 3
+# When we generate a .bat file, we must also use the form
+#	@call c:\darcs\fc-branch-2\compiler\stage1\ghc-inplace
+# else the cmd shell gets confused; indeed it seems to simply hang
+# Hence the use of $(FPTOOLS_TOP_ABS_PLATFORM) here, just like MSys Note 2
+
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ghc-inplace.bat $(odir)/ghc-inplace.bat: $(GHC_PROG)
 	@$(RM) $@
-	echo '@call $(subst /,\,$(GHC_COMPILER_DIR_ABS)/$(GHC_PROG)) -B$(FPTOOLS_TOP_ABS_PLATFORM) %*' >> $@
+	echo '@call $(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)) -B$(FPTOOLS_TOP_ABS_PLATFORM) %*' >> $@
 	chmod 755 $@
 endif	
 
