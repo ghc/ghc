@@ -13,7 +13,6 @@ import Distribution.PackageDescription
 import Distribution.Setup
 import Distribution.Simple.LocalBuildInfo
 import System.Environment
-import System.Exit
 
 main :: IO ()
 main = do args <- getArgs
@@ -59,16 +58,15 @@ removePrefix (x:xs) (y:ys)
  | x == y = removePrefix xs ys
  | otherwise = Nothing
 
-type Hook a = PackageDescription -> LocalBuildInfo -> Maybe UserHooks -> a
-           -> IO ()
+type Hook a = PackageDescription -> LocalBuildInfo -> UserHooks -> a -> IO ()
 type ConfHook = PackageDescription -> ConfigFlags -> IO LocalBuildInfo
 type PostConfHook = Args -> ConfigFlags -> PackageDescription -> LocalBuildInfo
-                 -> IO ExitCode
+                 -> IO ()
 
 -- type PDHook = PackageDescription -> ConfigFlags -> IO ()
 
 add_ghc_options :: [String] -> Hook a -> Hook a
-add_ghc_options args f pd lbi muhs x
+add_ghc_options args f pd lbi uhs x
  = do let lib' = case library pd of
                      Just lib ->
                          let bi = libBuildInfo lib
@@ -77,14 +75,14 @@ add_ghc_options args f pd lbi muhs x
                          in lib { libBuildInfo = bi' }
                      Nothing -> error "Expected a library"
           pd' = pd { library = Just lib' }
-      f pd' lbi muhs x
+      f pd' lbi uhs x
 
 add_configure_options :: [String] -> PostConfHook -> PostConfHook
 add_configure_options args f as cfs pd lbi
  = f (as ++ args) cfs pd lbi
 
 filter_modules_hook :: Hook a -> Hook a
-filter_modules_hook f pd lbi muhs x
+filter_modules_hook f pd lbi uhs x
  = let build_filter = case compilerFlavor $ compiler lbi of
                           GHC -> forGHCBuild
                           _ -> isPortableBuild
@@ -94,7 +92,7 @@ filter_modules_hook f pd lbi muhs x
                       in lib { exposedModules = ems }
                   Nothing -> error "Expected a library"
        pd' = pd { library = Just lib' }
-   in f pd' lbi muhs x
+   in f pd' lbi uhs x
 
 isPortableBuild :: String -> Bool
 isPortableBuild s
