@@ -77,13 +77,16 @@ module GHC (
 	exprType,
 	typeKind,
 	parseName,
-	RunResult(..),
+	RunResult(..),  ResumeHandle,
 	runStmt,
+        resume,
 	showModule,
         isModuleInterpreted,
 	compileExpr, HValue, dynCompileExpr,
 	lookupName,
         obtainTerm, obtainTerm1,
+        ModBreaks(..), BreakIndex,
+        BreakInfo(breakInfo_number, breakInfo_module),
         modInfoModBreaks, 
 #endif
 
@@ -182,69 +185,50 @@ module GHC (
 import RtClosureInspect ( cvObtainTerm, Term )
 import TcRnDriver	( tcRnLookupRdrName, tcRnGetInfo,
 			  tcRnLookupName, getModuleExports )
-import RdrName		( plusGlobalRdrEnv, Provenance(..), 
-			  ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
-			  mkGlobalRdrEnv )
-import HscMain		( hscParseIdentifier, hscStmt, hscTcExpr, hscKcType )
-import Name		( nameOccName )
-import Type		( tidyType )
-import Var		( varName )
 import VarEnv		( emptyTidyEnv )
 import GHC.Exts         ( unsafeCoerce#, Ptr )
-import Foreign.StablePtr( deRefStablePtr, castPtrToStablePtr, StablePtr, newStablePtr, freeStablePtr )
+import Foreign.StablePtr( deRefStablePtr, StablePtr, newStablePtr, freeStablePtr )
 import Foreign          ( poke )
-import Data.Maybe       ( fromMaybe)
 import qualified Linker
 
 import Data.Dynamic     ( Dynamic )
 import Linker		( HValue, getHValue, extendLinkEnv )
 
-import ByteCodeInstr    (BreakInfo)
+import ByteCodeInstr
+import DebuggerTys
+import IdInfo
+import HscMain          ( hscParseIdentifier, hscTcExpr, hscKcType, hscStmt )
 #endif
 
-import Packages		( initPackages )
-import NameSet		( NameSet, nameSetToList, elemNameSet )
-import RdrName		( GlobalRdrEnv, GlobalRdrElt(..), RdrName(..), 
-			  globalRdrEnvElts, extendGlobalRdrEnv,
-                          emptyGlobalRdrEnv )
+import Packages
+import NameSet
+import RdrName
 import HsSyn 
-import Type		( Kind, Type, dropForAlls, PredType, ThetaType,
-			  pprThetaArrow, pprParendType, splitForAllTys,
-			  pprTypeApp, funResultTy )
-import Id		( Id, idType, isImplicitId, isDeadBinder,
-                          isExportedId, isLocalId, isGlobalId,
-                          isRecordSelector, recordSelectorFieldLabel,
-                          isPrimOpId, isFCallId, isClassOpId_maybe,
-                          isDataConWorkId, idDataCon,
-                          isBottomingId )
-import Var		( TyVar )
+import Type             hiding (typeKind)
+import Id
+import Var              hiding (setIdType)
 import TysPrim		( alphaTyVars )
-import TyCon		( TyCon, isClassTyCon, isSynTyCon, isNewTyCon,
-			  isPrimTyCon, isFunTyCon, isOpenTyCon, tyConArity,
-			  tyConTyVars, tyConDataCons, synTyConDefn,
-			  synTyConType, synTyConResKind )
-import Class		( Class, classSCTheta, classTvsFds, classMethods )
-import FunDeps		( pprFundeps )
-import DataCon		( DataCon, dataConWrapId, dataConSig, dataConTyCon,
-			  dataConFieldLabels, dataConStrictMarks, 
-			  dataConIsInfix, isVanillaDataCon )
-import Name		( Name, nameModule, NamedThing(..), nameSrcLoc )
+import TyCon
+import Class
+import FunDeps
+import DataCon
+import Name             hiding ( varName )
 import OccName		( parenSymOcc )
-import NameEnv		( nameEnvElts )
+import NameEnv
 import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
 import SrcLoc
 import DriverPipeline
 import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo	( getImports, getOptions )
 import Finder
-import HscMain		( newHscEnv, hscFileCheck, HscChecked(..) )
+import HscMain          ( newHscEnv, hscFileCheck, HscChecked(..) )
 import HscTypes
 import DynFlags
 import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
 import Module
 import UniqFM
-import PackageConfig    ( PackageId, stringToPackageId, mainPackageId )
+import PackageConfig
 import FiniteMap
 import Panic
 import Digraph
@@ -259,15 +243,15 @@ import Outputable
 import BasicTypes
 import TcType           ( tcSplitSigmaTy, isDictTy )
 import Maybes		( expectJust, mapCatMaybes )
-import HaddockParse     ( parseHaddockParagraphs, parseHaddockString )
+import HaddockParse
 import HaddockLex       ( tokenise )
 
 import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist )
-import Data.Maybe	( isJust, isNothing )
-import Data.List	( partition, nub )
+import Data.Maybe
+import Data.List
 import qualified Data.List as List
-import Control.Monad	( unless, when )
+import Control.Monad
 import System.Exit	( exitWith, ExitCode(..) )
 import System.Time	( ClockTime )
 import Control.Exception as Exception hiding (handle)
@@ -2151,11 +2135,13 @@ data RunResult
   = RunOk [Name] 		-- ^ names bound by this evaluation
   | RunFailed	 		-- ^ statement failed compilation
   | RunException Exception	-- ^ statement raised an exception
-  | forall a . RunBreak a ThreadId BreakInfo (IO RunResult)
+  | RunBreak ThreadId [Name] BreakInfo ResumeHandle
 
-data Status a
-   = Break RunResult               -- ^ the computation hit a breakpoint
-   | Complete (Either Exception a) -- ^ the computation completed with either an exception or a value
+data Status
+   = Break HValue BreakInfo ThreadId ResumeHandle -- ^ the computation hit a breakpoint
+   | Complete (Either Exception [HValue]) -- ^ the computation completed with either an exception or a value
+
+data ResumeHandle = ResumeHandle (MVar ()) (MVar Status) [Name]
 
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
@@ -2177,59 +2163,66 @@ runStmt (Session ref) expr
         case maybe_stuff of
 	   Nothing -> return RunFailed
 	   Just (new_hsc_env, names, hval) -> do
+              writeIORef ref new_hsc_env
 
-              -- resume says what to do when we continue execution from a breakpoint
-              -- onBreakAction says what to do when we hit a breakpoint
-              -- they are mutually recursive, hence the strange use tuple let-binding 
-              let (resume, onBreakAction)
-                     = ( do stablePtr <- newStablePtr onBreakAction 
-                            poke breakPointIOAction stablePtr
-                            putMVar breakMVar ()
-                            status <- takeMVar statusMVar
-                            switchOnStatus ref new_hsc_env names status
-                       , \ids apStack -> do 
-                            tid <- myThreadId
-                            putMVar statusMVar (Break (RunBreak apStack tid ids resume))
-                            takeMVar breakMVar 
-                       )
-
-              -- set the onBreakAction to be performed when we hit a breakpoint
-              -- this is visible in the Byte Code Interpreter, thus it is a global
-              -- variable, implemented with stable pointers
-              stablePtr <- newStablePtr onBreakAction
-              poke breakPointIOAction stablePtr
+              let resume_handle = ResumeHandle breakMVar statusMVar names
+              -- set the onBreakAction to be performed when we hit a
+              -- breakpoint this is visible in the Byte Code
+              -- Interpreter, thus it is a global variable,
+              -- implemented with stable pointers
+              stablePtr <- setBreakAction resume_handle
 
               let thing_to_run = unsafeCoerce# hval :: IO [HValue]
               status <- sandboxIO statusMVar thing_to_run
               freeStablePtr stablePtr -- be careful not to leak stable pointers!
-              switchOnStatus ref new_hsc_env names status
-   where
-   switchOnStatus ref hs_env names status = 
-      case status of  
-         -- did we hit a breakpoint or did we complete?
-         (Break result) -> return result 
-         (Complete either_hvals) ->
+              handleRunStatus ref names status
+
+handleRunStatus ref names status =
+   case status of  
+      -- did we hit a breakpoint or did we complete?
+      (Break apStack info tid res) -> do
+                hsc_env <- readIORef ref
+                (new_hsc_env, names) <- extendEnvironment hsc_env apStack 
+                                                (breakInfo_vars info)
+                writeIORef ref new_hsc_env 
+                return (RunBreak tid names info res)
+      (Complete either_hvals) ->
 		case either_hvals of
 		    Left e -> return (RunException e)
 		    Right hvals -> do
 			extendLinkEnv (zip names hvals)
-			writeIORef ref hs_env 
 			return (RunOk names)
            
 -- this points to the IO action that is executed when a breakpoint is hit
 foreign import ccall "&breakPointIOAction" 
-        breakPointIOAction :: Ptr (StablePtr (a -> BreakInfo -> IO ())) 
+        breakPointIOAction :: Ptr (StablePtr (BreakInfo -> HValue -> IO ())) 
 
 -- When running a computation, we redirect ^C exceptions to the running
 -- thread.  ToDo: we might want a way to continue even if the target
 -- thread doesn't die when it receives the exception... "this thread
 -- is not responding".
-sandboxIO :: MVar (Status a) -> IO a -> IO (Status a) 
+sandboxIO :: MVar Status -> IO [HValue] -> IO Status
 sandboxIO statusMVar thing = do
   ts <- takeMVar interruptTargetThread
   child <- forkIO (do res <- Exception.try thing; putMVar statusMVar (Complete res))
   putMVar interruptTargetThread (child:ts)
   takeMVar statusMVar `finally` modifyMVar_ interruptTargetThread (return.tail)
+
+setBreakAction res@(ResumeHandle breakMVar statusMVar names) = do 
+  stablePtr <- newStablePtr onBreak
+  poke breakPointIOAction stablePtr
+  return stablePtr
+  where onBreak ids apStack = do
+                tid <- myThreadId
+                putMVar statusMVar (Break apStack ids tid res)
+                takeMVar breakMVar
+
+resume :: Session -> ResumeHandle -> IO RunResult
+resume (Session ref) res@(ResumeHandle breakMVar statusMVar names) = do
+   stablePtr <- setBreakAction res
+   putMVar breakMVar ()
+   status <- takeMVar statusMVar
+   handleRunStatus ref names status
 
 {-
 -- This version of sandboxIO runs the expression in a completely new
@@ -2261,6 +2254,57 @@ XXX the type of rts_evalStableIO no longer matches the above
 
 -}
 
+-- -----------------------------------------------------------------------------
+-- After stopping at a breakpoint, add free variables to the environment
+
+-- Todo: turn this into a primop, and provide special version(s) for unboxed things
+foreign import ccall "rts_getApStackVal" getApStackVal :: StablePtr a -> Int -> IO (StablePtr b)
+
+getIdValFromApStack :: a -> (Id, Int) -> IO (Id, HValue)
+getIdValFromApStack apStack (identifier, stackDepth) = do
+   -- ToDo: check the type of the identifer and decide whether it is unboxed or not
+   apSptr <- newStablePtr apStack
+   resultSptr <- getApStackVal apSptr (stackDepth - 1)
+   result <- deRefStablePtr resultSptr
+   freeStablePtr apSptr
+   freeStablePtr resultSptr 
+   return (identifier, unsafeCoerce# result)
+
+extendEnvironment :: HscEnv -> a -> [(Id, Int)] -> IO (HscEnv, [Name])
+extendEnvironment hsc_env apStack idsOffsets = do
+   idsVals <- mapM (getIdValFromApStack apStack) idsOffsets 
+   let (ids, hValues) = unzip idsVals 
+   let names = map idName ids
+   let global_ids = map globaliseAndTidy ids
+   typed_ids  <- mapM instantiateIdType global_ids
+   let ictxt = hsc_IC hsc_env
+       rn_env   = ic_rn_local_env ictxt
+       type_env = ic_type_env ictxt
+       bound_names = map idName typed_ids
+       new_rn_env  = extendLocalRdrEnv rn_env bound_names
+       -- Remove any shadowed bindings from the type_env;
+       -- they are inaccessible but might, I suppose, cause 
+       -- a space leak if we leave them there
+       shadowed = [ n | name <- bound_names,
+                    let rdr_name = mkRdrUnqual (nameOccName name),
+                    Just n <- [lookupLocalRdrEnv rn_env rdr_name] ]
+       filtered_type_env = delListFromNameEnv type_env shadowed
+       new_type_env = extendTypeEnvWithIds filtered_type_env (typed_ids)
+       new_ic = ictxt { ic_rn_local_env = new_rn_env, 
+		        ic_type_env     = new_type_env }
+   extendLinkEnv (zip names hValues) -- ToDo: we must remember to restore the old env after we finish a breakpoint
+   return (hsc_env{hsc_IC = new_ic}, names)
+  where
+   globaliseAndTidy :: Id -> Id
+   globaliseAndTidy id
+      = let tidied_type = tidyTopType$ idType id
+        in setIdType (globaliseId VanillaGlobal id) tidied_type
+
+   -- | Instantiate the tyVars with GHC.Base.Unknown
+   instantiateIdType :: Id -> IO Id
+   instantiateIdType id = do
+      instantiatedType <- instantiateTyVarsToUnknown hsc_env (idType id)
+      return$ setIdType id instantiatedType
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames

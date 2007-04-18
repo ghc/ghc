@@ -62,7 +62,7 @@ module HscTypes (
         HpcInfo, noHpcInfo,
 
         -- Breakpoints
-        ModBreaks (..), emptyModBreaks
+        ModBreaks (..), BreakIndex, emptyModBreaks
     ) where
 
 #include "HsVersions.h"
@@ -1243,18 +1243,22 @@ byteCodeOfObject other     = pprPanic "byteCodeOfObject" (ppr other)
 %************************************************************************
 
 \begin{code}
--- all the information about the breakpoints for a given module
+type BreakIndex = Int
+
+-- | all the information about the breakpoints for a given module
 data ModBreaks
    = ModBreaks
-   { modBreaks_array :: BreakArray
-            -- the array of breakpoint flags indexed by tick number
-   , modBreaks_ticks :: !(Array Int SrcSpan)
+   { modBreaks_flags :: BreakArray
+        -- The array of flags, one per breakpoint, 
+        -- indicating which breakpoints are enabled.
+   , modBreaks_locs :: !(Array BreakIndex SrcSpan)
+        -- An array giving the source span of each breakpoint.
    }
 
 emptyModBreaks :: ModBreaks
 emptyModBreaks = ModBreaks
-   { modBreaks_array = error "ModBreaks.modBreaks_array not initialised"
+   { modBreaks_flags = error "ModBreaks.modBreaks_array not initialised"
          -- Todo: can we avoid this? 
-   , modBreaks_ticks = array (0,-1) []
+   , modBreaks_locs = array (0,-1) []
    }
 \end{code}

@@ -4,10 +4,15 @@
 --
 -- Pepe Iborra (supported by Google SoC) 2006
 --
+-- ToDo: lots of violation of layering here.  This module should
+-- decide whether it is above the GHC API (import GHC and nothing
+-- else) or below it.
+-- 
 -----------------------------------------------------------------------------
 
-module Debugger (pprintClosureCommand, instantiateTyVarsToUnknown) where
+module Debugger (pprintClosureCommand) where
 
+import qualified DebuggerTys
 import Linker
 import RtClosureInspect
 
@@ -24,7 +29,6 @@ import RdrName
 import UniqSupply
 import Type
 import TyCon
-import DataCon
 import TcGadt
 import GHC
 import GhciMonad
@@ -203,56 +207,6 @@ newGrimName cms userName  = do
         name    = mkInternalName unique occname noSrcLoc
     return name
 
-----------------------------------------------------------------------------
--- | Replace all the tyvars in a Term with the opaque type GHC.Base.Unknown
-----------------------------------------------------------------------------
-instantiateTyVarsToUnknown :: Session -> Type -> IO Type
-instantiateTyVarsToUnknown cms ty
--- We have a GADT, so just fix its tyvars
-    | Just (tycon, args) <- splitTyConApp_maybe ty
-    , tycon /= funTyCon
-    , isGADT tycon
-    = mapM fixTyVars args >>= return . mkTyConApp tycon
--- We have a regular TyCon, so map recursively to its args
-    | Just (tycon, args) <- splitTyConApp_maybe ty
-    , tycon /= funTyCon
-    = do unknownTyVar <- unknownTV
-         args' <- mapM (instantiateTyVarsToUnknown cms) args
-         return$ mkTyConApp tycon args'
--- we have a tyvar of kind *
-    | Just tyvar <- getTyVar_maybe ty
-    , ([],_) <- splitKindFunTys (tyVarKind tyvar) 
-    = unknownTV
--- we have a higher kind tyvar, so insert an unknown of the appropriate kind
-    | Just tyvar <- getTyVar_maybe ty
-    , (args,_) <- splitKindFunTys (tyVarKind tyvar)
-    = liftM mkTyConTy $ unknownTC !! length args
--- Base case
-    | otherwise    = return ty 
-
- where unknownTV = do 
-         Just (ATyCon unknown_tc) <- lookupName cms unknownTyConName
-         return$ mkTyConTy unknown_tc
-       unknownTC = [undefined, unknownTC1, unknownTC2, unknownTC3]
-       unknownTC1 = do 
-         Just (ATyCon unknown_tc) <- lookupName cms unknown1TyConName
-         return unknown_tc
-       unknownTC2 = do 
-         Just (ATyCon unknown_tc) <- lookupName cms unknown2TyConName
-         return unknown_tc
-       unknownTC3 = do 
-         Just (ATyCon unknown_tc) <- lookupName cms unknown3TyConName
-         return unknown_tc
---       isGADT ty | pprTrace' "isGADT" (ppr ty <> colon <> ppr(isGadtSyntaxTyCon ty)) False = undefined
-       isGADT tc | Just dcs <- tyConDataCons_maybe tc = any (not . null . dataConEqSpec) dcs
-                 | otherwise = False
-       fixTyVars ty 
-           | Just (tycon, args) <- splitTyConApp_maybe ty
-           = mapM fixTyVars args >>= return . mkTyConApp tycon
--- Fix the tyvar so that the interactive environment doesn't choke on it TODO 
-           | Just tv <- getTyVar_maybe ty = return ty --TODO
-           | otherwise = return ty
-
 -- | The inverse function. Strip the GHC.Base.Unknowns in the type of the id, they correspond to tyvars. The caller must provide an infinite list of fresh names
 stripUnknowns :: [Name] -> Id -> Id
 stripUnknowns names id = setIdType id . fst . go names . idType 
@@ -289,3 +243,8 @@ stripUnknowns names id = setIdType id . fst . go names . idType
            kind1 = mkArrowKind liftedTypeKind liftedTypeKind
            kind2 = mkArrowKind kind1 liftedTypeKind
            kind3 = mkArrowKind kind2 liftedTypeKind
+
+instantiateTyVarsToUnknown :: Session -> Type -> IO Type
+instantiateTyVarsToUnknown (Session ref) ty
+  = do hsc_env <- readIORef ref
+       DebuggerTys.instantiateTyVarsToUnknown hsc_env ty

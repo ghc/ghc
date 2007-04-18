@@ -87,8 +87,8 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
                         | (P r1 c1 r2 c2, _box) <- entries ] 
 
   let modBreaks = emptyModBreaks 
-                  { modBreaks_array = breakArray 
-                  , modBreaks_ticks = locsTicks 
+                  { modBreaks_flags = breakArray 
+                  , modBreaks_locs  = locsTicks 
                   } 
 
   doIfSet_dyn dflags  Opt_D_dump_hpc $ do
@@ -170,6 +170,19 @@ addTickLHsExprBreakAlways e
     | opt_Hpc   = addTickLHsExpr e
     | otherwise = addTickLHsExprAlways e
 
+-- version of addTick that does not actually add a tick,
+-- because the scope of this tick is completely subsumed by 
+-- another.
+addTickLHsExprNever :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExprNever (L pos e0) = do
+    e1 <- addTickHsExpr e0
+    return $ L pos e1
+
+addTickLHsExprBreakOnly :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExprBreakOnly e
+    | opt_Hpc   = addTickLHsExprNever e
+    | otherwise = addTickLHsExprAlways e
+
 -- selectively add ticks to interesting expressions
 addTickLHsExpr :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExpr (L pos e0) = do
@@ -202,14 +215,6 @@ addTickLHsExprOptAlt oneOfMany (L pos e0)
     fn <- allocTickBox (if oneOfMany then AltBox else ExpBox) pos 
     return $ fn $ L pos e1
 
--- version of addTick that does not actually add a tick,
--- because the scope of this tick is completely subsumed by 
--- another.
-addTickLHsExpr' :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExpr' (L pos e0) = do
-    e1 <- addTickHsExpr e0
-    return $ L pos e1
-
 addBinTickLHsExpr :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addBinTickLHsExpr boxLabel (L pos e0) = do
     e1 <- addTickHsExpr e0
@@ -223,18 +228,18 @@ addTickHsExpr e@(HsLit _) = return e
 addTickHsExpr e@(HsLam matchgroup) =
         liftM HsLam (addTickMatchGroup matchgroup)
 addTickHsExpr (HsApp e1 e2) = 
-	liftM2 HsApp (addTickLHsExpr' e1) (addTickLHsExpr e2)
+	liftM2 HsApp (addTickLHsExprNever e1) (addTickLHsExpr e2)
 addTickHsExpr (OpApp e1 e2 fix e3) = 
 	liftM4 OpApp 
 		(addTickLHsExpr e1) 
-		(addTickLHsExpr' e2)
+		(addTickLHsExprNever e2)
 		(return fix)
 		(addTickLHsExpr e3)
 addTickHsExpr (NegApp e neg) =
 	liftM2 NegApp
 		(addTickLHsExpr e) 
 		(addTickSyntaxExpr hpcSrcSpan neg)
-addTickHsExpr (HsPar e) = liftM HsPar (addTickLHsExpr' e)
+addTickHsExpr (HsPar e) = liftM HsPar (addTickLHsExprNever e)
 addTickHsExpr (SectionL e1 e2) = 
 	liftM2 SectionL
 		(addTickLHsExpr e1)
@@ -255,7 +260,7 @@ addTickHsExpr (HsIf	 e1 e2 e3) =
 addTickHsExpr (HsLet binds e) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds)		-- to think about: !patterns.
-		(addTickLHsExpr' e)
+		(addTickLHsExprBreakOnly e)
 addTickHsExpr (HsDo cxt stmts last_exp srcloc) =
 	liftM4 HsDo
 		(return cxt)
@@ -289,7 +294,7 @@ addTickHsExpr (RecordUpd	e rec_binds ty1 ty2) =
 addTickHsExpr (ExprWithTySig {}) = error "addTickHsExpr: ExprWithTySig"
 addTickHsExpr (ExprWithTySigOut e ty) =
 	liftM2 ExprWithTySigOut
-		(addTickLHsExpr' e) -- No need to tick the inner expression
+		(addTickLHsExprNever e) -- No need to tick the inner expression
 				    -- for expressions with signatures
 		(return ty)
 addTickHsExpr (ArithSeq	 ty arith_seq) =

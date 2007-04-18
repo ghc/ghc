@@ -30,7 +30,9 @@ module SrcLoc (
 
 	-- These are dubious exports, because they crash on some inputs,
 	-- used only in Lexer.x where we are sure what the Span looks like
-	srcSpanFile, srcSpanEndLine, srcSpanEndCol,
+	srcSpanFile, 
+        srcSpanStartLine, srcSpanEndLine, 
+        srcSpanStartCol, srcSpanEndCol,
 
 	Located(..), getLoc, unLoc, noLoc, eqLocated, cmpLocated, combineLocs, addCLoc
     ) where

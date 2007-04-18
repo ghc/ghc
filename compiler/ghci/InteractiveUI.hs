@@ -18,13 +18,16 @@ import GhciMonad
 -- The GHC interface
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
-                          Type, Module, ModuleName, TyThing(..), Phase )
+                          Type, Module, ModuleName, TyThing(..), Phase,
+                          BreakIndex )
+import Debugger
 import DynFlags
 import Packages
 import PackageConfig
 import UniqFM
 import PprTyThing
 import Outputable
+import Module           -- for ModuleEnv
 
 -- for createtags
 import Name
@@ -39,18 +42,6 @@ import Config
 import StaticFlags
 import Linker
 import Util
-
--- The debugger
-import Debugger 
-import HscTypes
-import Id
-import Var       ( globaliseId )
-import IdInfo
-import NameEnv
-import RdrName
-import Module
-import Type
-import TcType
 
 #ifndef mingw32_HOST_OS
 import System.Posix
@@ -74,7 +65,7 @@ import Control.Exception as Exception
 -- import Control.Concurrent
 
 import Data.List
-import Data.Maybe	( isJust, isNothing, fromMaybe, catMaybes )
+import Data.Maybe
 import System.Cmd
 import System.Environment
 import System.Exit	( exitWith, ExitCode(..) )
@@ -85,8 +76,8 @@ import Data.Char
 import Data.Dynamic
 import Data.Array
 import Control.Monad as Monad
-import Foreign.StablePtr	( StablePtr, newStablePtr, deRefStablePtr, freeStablePtr )
 
+import Foreign.StablePtr	( newStablePtr )
 import GHC.Exts		( unsafeCoerce# )
 import GHC.IOBase	( IOErrorType(InvalidArgument), IO(IO) )
 
@@ -98,7 +89,6 @@ import System.Posix.Internals ( setNonBlockingFD )
 import ByteCodeLink (HValue)
 import ByteCodeInstr (BreakInfo (..))
 import BreakArray
-import TickTree 
 
 -----------------------------------------------------------------------------
 
@@ -118,10 +108,10 @@ builtin_commands :: [Command]
 builtin_commands = [
 	-- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",		keepGoing help,			False, completeNone),
-  ("add",	tlC$ keepGoingPaths addModule,	False, completeFilename),
+  ("add",	keepGoingPaths addModule,	False, completeFilename),
   ("break",     breakCmd, False, completeNone),   
   ("browse",    keepGoing browseCmd,		False, completeModule),
-  ("cd",    	tlC$ keepGoing changeDirectory,	False, completeFilename),
+  ("cd",    	keepGoing changeDirectory,	False, completeFilename),
   ("check",	keepGoing checkModule,		False, completeHomeModule),
   ("continue",  continueCmd, False, completeNone),
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
@@ -134,12 +124,12 @@ builtin_commands = [
   ("help",	keepGoing help,			False, completeNone),
   ("info",      keepGoing info,			False, completeIdentifier),
   ("kind",	keepGoing kindOfType,		False, completeIdentifier),
-  ("load",	tlC$ keepGoingPaths loadModule_,False, completeHomeModuleOrFile),
+  ("load",	keepGoingPaths loadModule_,False, completeHomeModuleOrFile),
   ("module",	keepGoing setContext,		False, completeModule),
-  ("main",	tlC$ keepGoing runMain,		False, completeIdentifier),
+  ("main",	keepGoing runMain,		False, completeIdentifier),
   ("print",     keepGoing (pprintClosureCommand True False), False, completeIdentifier),
   ("quit",	quit,				False, completeNone),
-  ("reload", 	tlC$ keepGoing reloadModule,  	False, completeNone),
+  ("reload", 	keepGoing reloadModule,  	False, completeNone),
   ("set",	keepGoing setCmd,		True,  completeSetOptions),
   ("show",	keepGoing showCmd,		False, completeNone),
   ("sprint",    keepGoing (pprintClosureCommand False False),False, completeIdentifier),
@@ -151,14 +141,6 @@ builtin_commands = [
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
 keepGoing a str = a str >> return False
-
--- tlC: Top Level Command, not allowed in inferior sessions
-tlC ::  (String -> GHCi Bool) -> (String -> GHCi Bool)
-tlC a str = do 
-    top_level <- isTopLevel
-    if not top_level
-       then throwDyn (CmdLineError "Command only allowed at Top Level")
-       else a str
 
 keepGoingPaths :: ([FilePath] -> GHCi ()) -> (String -> GHCi Bool)
 keepGoingPaths a str = a (toArgs str) >> return False
@@ -279,9 +261,9 @@ interactiveUI session srcs maybe_expr = do
 		   session = session,
 		   options = [],
                    prelude = prel_mod,
-		   topLevel = True,
                    resume = [],
-                   breaks = emptyActiveBreakPoints
+                   breaks = emptyActiveBreakPoints,
+                   tickarrays = emptyModuleEnv
                  }
 
 #ifdef USE_READLINE
@@ -462,7 +444,7 @@ mkPrompt toplevs exports prompt
     
         perc_s = hsep (map (\m -> char '*' <> ppr (GHC.moduleName m)) toplevs) <+>
                  hsep (map (ppr . GHC.moduleName) exports)
-             
+
 
 #ifdef USE_READLINE
 readlineLoop :: GHCi ()
@@ -513,9 +495,9 @@ runCommandEval c = ghciHandle handleEval (doCommand c)
 		  -- failure to run the command causes exit(1) for ghc -e.
 		_       -> finishEvalExpr nms
 
-runStmt :: String -> GHCi (Maybe [Name])
+runStmt :: String -> GHCi (Maybe (Bool,[Name]))
 runStmt stmt
- | null (filter (not.isSpace) stmt) = return (Just [])
+ | null (filter (not.isSpace) stmt) = return (Just (False,[]))
  | otherwise
  = do st <- getGHCiState
       session <- getSession
@@ -523,90 +505,34 @@ runStmt stmt
 	     	     GHC.runStmt session stmt
       switchOnRunResult result
 
-switchOnRunResult :: GHC.RunResult -> GHCi (Maybe [Name])
+switchOnRunResult :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
 switchOnRunResult GHC.RunFailed = return Nothing
 switchOnRunResult (GHC.RunException e) = throw e
-switchOnRunResult (GHC.RunOk names) = return $ Just names
-switchOnRunResult (GHC.RunBreak apStack _threadId info resume) = do  -- Todo: we don't use threadID, perhaps delete?
+switchOnRunResult (GHC.RunOk names) = return $ Just (False,names)
+switchOnRunResult (GHC.RunBreak threadId names info resume) = do
    session <- getSession
    Just mod_info <- io $ GHC.getModuleInfo session (breakInfo_module info) 
    let modBreaks  = GHC.modInfoModBreaks mod_info
-   let ticks      = modBreaks_ticks modBreaks
-   io $ displayBreakInfo session ticks info
-   io $ extendEnvironment session apStack (breakInfo_vars info) 
-   pushResume resume
-   return Nothing
+   let ticks      = GHC.modBreaks_locs modBreaks
 
-displayBreakInfo :: Session -> Array Int SrcSpan -> BreakInfo -> IO ()
-displayBreakInfo session ticks info = do
-   unqual <- GHC.getPrintUnqual session
+   -- display information about the breakpoint
    let location = ticks ! breakInfo_number info
-   printForUser stdout unqual $
-      ptext SLIT("Stopped at") <+> ppr location $$ localsMsg 
-   where
-   vars = map fst $ breakInfo_vars info 
-   localsMsg = if null vars
-                  then text "No locals in scope."
-                  else text "Locals:" <+> (pprWithCommas showId vars)
-   showId id = ppr (idName id) <+> dcolon <+> ppr (idType id) 
+   unqual <- io $ GHC.getPrintUnqual session
+   io $ printForUser stdout unqual $
+      ptext SLIT("Stopped at") <+> ppr location
 
--- Todo: turn this into a primop, and provide special version(s) for unboxed things
-foreign import ccall "rts_getApStackVal" getApStackVal :: StablePtr a -> Int -> IO (StablePtr b)
-
-getIdValFromApStack :: a -> (Id, Int) -> IO (Id, HValue)
-getIdValFromApStack apStack (identifier, stackDepth) = do
-   -- ToDo: check the type of the identifer and decide whether it is unboxed or not
-   apSptr <- newStablePtr apStack
-   resultSptr <- getApStackVal apSptr (stackDepth - 1)
-   result <- deRefStablePtr resultSptr
-   freeStablePtr apSptr
-   freeStablePtr resultSptr 
-   return (identifier, unsafeCoerce# result)
-
-extendEnvironment :: Session -> a -> [(Id, Int)] -> IO ()
-extendEnvironment s@(Session ref) apStack idsOffsets = do
-   idsVals <- mapM (getIdValFromApStack apStack) idsOffsets 
-   let (ids, hValues) = unzip idsVals 
-   let names = map idName ids
-   let global_ids = map globaliseAndTidy ids
-   typed_ids  <- mapM instantiateIdType global_ids
-   hsc_env <- readIORef ref
-   let ictxt = hsc_IC hsc_env
-       rn_env   = ic_rn_local_env ictxt
-       type_env = ic_type_env ictxt
-       bound_names = map idName typed_ids
-       new_rn_env  = extendLocalRdrEnv rn_env bound_names
-       -- Remove any shadowed bindings from the type_env;
-       -- they are inaccessible but might, I suppose, cause 
-       -- a space leak if we leave them there
-       shadowed = [ n | name <- bound_names,
-                    let rdr_name = mkRdrUnqual (nameOccName name),
-                    Just n <- [lookupLocalRdrEnv rn_env rdr_name] ]
-       filtered_type_env = delListFromNameEnv type_env shadowed
-       new_type_env = extendTypeEnvWithIds filtered_type_env (typed_ids)
-       new_ic = ictxt { ic_rn_local_env = new_rn_env, 
-		        ic_type_env     = new_type_env }
-   writeIORef ref (hsc_env { hsc_IC = new_ic })
-   extendLinkEnv (zip names hValues) -- ToDo: we must remember to restore the old env after we finish a breakpoint
-   where
-   globaliseAndTidy :: Id -> Id
-   globaliseAndTidy id
-      = let tidied_type = tidyTopType$ idType id
-        in setIdType (globaliseId VanillaGlobal id) tidied_type
-
-   -- | Instantiate the tyVars with GHC.Base.Unknown
-   instantiateIdType :: Id -> IO Id
-   instantiateIdType id = do
-      instantiatedType <- instantiateTyVarsToUnknown s (idType id)
-      return$ setIdType id instantiatedType
+   pushResume location threadId resume
+   return (Just (True,names))
 
 -- possibly print the type and revert CAFs after evaluating an expression
 finishEvalExpr mb_names
- = do b <- isOptionSet ShowType
+ = do show_types <- isOptionSet ShowType
       session <- getSession
       case mb_names of
 	Nothing    -> return ()      
-	Just names -> when b (mapM_ (showTypeOfName session) names)
+	Just (is_break,names) -> 
+                when (is_break || show_types) $
+                      mapM_ (showTypeOfName session) names
 
       flushInterpBuffers
       io installSignalHandlers
@@ -841,6 +767,9 @@ reloadModule m = do
 
 afterLoad ok session = do
   io (revertCAFs)  -- always revert CAFs on load.
+  discardResumeContext
+  discardTickArrays
+  discardActiveBreakPoints
   graph <- io (GHC.getModuleGraph session)
   graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
   setContextAfterLoad session graph'
@@ -1043,10 +972,8 @@ browseCmd m =
 
 browseModule m exports_only = do
   s <- getSession
-  modl <- io $ GHC.findModule s (GHC.mkModuleName m) Nothing
-  is_interpreted <- io (GHC.moduleIsInterpreted s modl)
-  when (not is_interpreted && not exports_only) $
-	throwDyn (CmdLineError ("module '" ++ m ++ "' is not interpreted"))
+  modl <- if exports_only then lookupModule s m
+                          else wantInterpretedModule s m
 
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
@@ -1530,15 +1457,15 @@ continueCmd other = do
 
 doContinue :: IO () -> GHCi Bool
 doContinue actionBeforeCont = do 
-   resumeAction <- getResume
-   popResume
+   resumeAction <- popResume
    case resumeAction of
       Nothing -> do 
          io $ putStrLn "There is no computation running."
          return False
-      Just action -> do
+      Just (_,_,handle) -> do
          io $ actionBeforeCont
-         runResult <- io action
+         session <- getSession
+         runResult <- io $ GHC.resume session handle
          names <- switchOnRunResult runResult
          finishEvalExpr names
          return False 
@@ -1552,7 +1479,7 @@ deleteCmd argLine = do
    deleteSwitch [] = 
       io $ putStrLn "The delete command requires at least one argument."
    -- delete all break points
-   deleteSwitch ("*":_rest) = clearActiveBreakPoints
+   deleteSwitch ("*":_rest) = discardActiveBreakPoints
    deleteSwitch idents = do
       mapM_ deleteOneBreak idents 
       where
@@ -1573,7 +1500,7 @@ breakSwitch _session [] = do
    return False
 breakSwitch session args@(arg1:rest) 
    | looksLikeModule arg1 = do
-        mod     <- lookupModule session arg1 
+        mod <- wantInterpretedModule session arg1
         breakByModule mod rest
         return False
    | otherwise = do
@@ -1589,6 +1516,14 @@ breakSwitch session args@(arg1:rest)
    looksLikeModule :: String -> Bool
    looksLikeModule []    = False
    looksLikeModule (x:_) = isUpper x
+
+wantInterpretedModule :: Session -> String -> GHCi Module
+wantInterpretedModule session str = do
+   modl <- io $ GHC.findModule session (GHC.mkModuleName str) Nothing
+   is_interpreted <- io (GHC.moduleIsInterpreted session modl)
+   when (not is_interpreted) $
+       throwDyn (CmdLineError ("module '" ++ str ++ "' is not interpreted"))
+   return modl
 
 breakByModule :: Module -> [String] -> GHCi () 
 breakByModule mod args@(arg1:rest)
@@ -1606,16 +1541,16 @@ breakByModule mod args@(arg1:rest)
 
 breakByModuleLine :: Module -> Int -> [String] -> GHCi ()
 breakByModuleLine mod line args
-   | [] <- args = findBreakAndSet mod $ lookupTickTreeLine line
+   | [] <- args = findBreakAndSet mod $ findBreakByLine line
    | [col] <- args, all isDigit col =
-        findBreakAndSet mod $ lookupTickTreeCoord (line, read col)
+        findBreakAndSet mod $ findBreakByCoord (line, read col)
    | otherwise = io $ putStrLn "Invalid arguments to break command."
-        
-findBreakAndSet :: Module -> (TickTree -> Maybe (Int, SrcSpan)) -> GHCi ()
+
+findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
 findBreakAndSet mod lookupTickTree = do 
-   (breakArray, ticks) <- getModBreak mod 
-   let tickTree   = tickTreeFromList (assocs ticks)
-   case lookupTickTree tickTree of 
+   tickArray <- getTickArray mod
+   (breakArray, _) <- getModBreak mod
+   case lookupTickTree tickArray of 
       Nothing  -> io $ putStrLn $ "No breakpoints found at that location."
       Just (tick, span) -> do
          success <- io $ setBreakFlag True breakArray tick 
@@ -1639,13 +1574,79 @@ findBreakAndSet mod lookupTickTree = do
                                  <+> ppr span
             io $ putStrLn str
 
+-- When a line number is specified, the current policy for choosing
+-- the best breakpoint is this:
+--    - the leftmost complete subexpression on the specified line, or
+--    - the leftmost subexpression starting on the specified line, or
+--    - the rightmost subexpression enclosing the specified line
+--
+findBreakByLine :: Int -> TickArray -> Maybe (BreakIndex,SrcSpan)
+findBreakByLine line arr = 
+  listToMaybe (sortBy leftmost complete)   `mplus`
+  listToMaybe (sortBy leftmost incomplete) `mplus`
+  listToMaybe (sortBy rightmost ticks)
+  where 
+        ticks = arr ! line
+
+        starts_here = [ tick | tick@(nm,span) <- ticks,
+                               srcSpanStartLine span == line ]
+
+        (complete,incomplete) = partition ends_here starts_here
+            where ends_here (nm,span) = srcSpanEndLine span == line
+
+findBreakByCoord :: (Int,Int) -> TickArray -> Maybe (BreakIndex,SrcSpan)
+findBreakByCoord (line, col) arr =
+  listToMaybe (sortBy rightmost contains)
+  where 
+        ticks = arr ! line
+
+        -- the ticks that span this coordinate
+        contains = [ tick | tick@(nm,span) <- ticks, span `spans` (line,col) ]
+
+leftmost  (_,a) (_,b) = a `compare` b
+rightmost (_,a) (_,b) = b `compare` a
+
+spans :: SrcSpan -> (Int,Int) -> Bool
+spans span (l,c) = srcSpanStart span <= loc && loc <= srcSpanEnd span
+   where loc = mkSrcLoc (srcSpanFile span) l c
+
+
+-- --------------------------------------------------------------------------
+-- Tick arrays
+
+getTickArray :: Module -> GHCi TickArray
+getTickArray modl = do
+   st <- getGHCiState
+   let arrmap = tickarrays st
+   case lookupModuleEnv arrmap modl of
+      Just arr -> return arr
+      Nothing  -> do
+        (breakArray, ticks) <- getModBreak modl 
+        let arr = mkTickArray (assocs ticks)
+        setGHCiState st{tickarrays = extendModuleEnv arrmap modl arr}
+        return arr
+
+discardTickArrays :: GHCi ()
+discardTickArrays = do
+   st <- getGHCiState
+   setGHCiState st{tickarrays = emptyModuleEnv}
+
+mkTickArray :: [(BreakIndex,SrcSpan)] -> TickArray
+mkTickArray ticks
+  = accumArray (flip (:)) [] (1, max_line) 
+        [ (line, (nm,span)) | (nm,span) <- ticks,
+                              line <- srcSpanLines span ]
+    where
+        max_line = maximum (map srcSpanEndLine (map snd ticks))
+        srcSpanLines span = [ srcSpanStartLine span .. srcSpanEndLine span ]
+
 getModBreak :: Module -> GHCi (BreakArray, Array Int SrcSpan)
 getModBreak mod = do
    session <- getSession
    Just mod_info <- io $ GHC.getModuleInfo session mod
    let modBreaks  = GHC.modInfoModBreaks mod_info
-   let array      = modBreaks_array modBreaks
-   let ticks      = modBreaks_ticks modBreaks
+   let array      = GHC.modBreaks_flags modBreaks
+   let ticks      = GHC.modBreaks_locs  modBreaks
    return (array, ticks)
 
 lookupModule :: Session -> String -> GHCi Module

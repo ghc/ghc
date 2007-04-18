@@ -1446,7 +1446,7 @@ runBc :: UniqSupply -> ModBreaks -> BcM r -> IO (BcM_State, r)
 runBc us modBreaks (BcM m) 
    = m (BcM_State us 0 [] breakArray)   
    where
-   breakArray = modBreaks_array modBreaks
+   breakArray = modBreaks_flags modBreaks
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do

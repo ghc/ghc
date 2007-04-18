@@ -17,11 +17,13 @@ import Util
 import DynFlags
 import HscTypes
 import SrcLoc
+import Module
 
 import Numeric
+import Control.Concurrent
 import Control.Exception as Exception
+import Data.Array
 import Data.Char
-import Data.Dynamic
 import Data.Int         ( Int64 )
 import Data.IORef
 import Data.List
@@ -43,10 +45,15 @@ data GHCiState = GHCiState
 	session        :: GHC.Session,
 	options        :: [GHCiOption],
         prelude        :: GHC.Module,
-	topLevel       :: Bool,
-        resume         :: [IO GHC.RunResult],
-        breaks         :: !ActiveBreakPoints
+        resume         :: [(SrcSpan, ThreadId, GHC.ResumeHandle)],
+        breaks         :: !ActiveBreakPoints,
+        tickarrays     :: ModuleEnv TickArray
+                -- tickarrays caches the TickArray for loaded modules,
+                -- so that we don't rebuild it each time the user sets
+                -- a breakpoint.
      }
+
+type TickArray = Array Int [(BreakIndex,SrcSpan)]
 
 data GHCiOption 
 	= ShowTiming		-- show time/allocs after evaluation
@@ -86,8 +93,8 @@ getActiveBreakPoints :: GHCi ActiveBreakPoints
 getActiveBreakPoints = liftM breaks getGHCiState 
 
 -- don't reset the counter back to zero?
-clearActiveBreakPoints :: GHCi ()
-clearActiveBreakPoints = do
+discardActiveBreakPoints :: GHCi ()
+discardActiveBreakPoints = do
    st <- getGHCiState
    let oldActiveBreaks = breaks st
        newActiveBreaks = oldActiveBreaks { breakLocations = [] } 
@@ -172,28 +179,23 @@ unsetOption opt
 io :: IO a -> GHCi a
 io m = GHCi { unGHCi = \s -> m >>= return }
 
-isTopLevel :: GHCi Bool
-isTopLevel = getGHCiState >>= return . topLevel
-
-getResume :: GHCi (Maybe (IO GHC.RunResult))
-getResume = do
-   st <- getGHCiState
-   case (resume st) of
-      []    -> return Nothing
-      (x:_) -> return $ Just x
-
-popResume :: GHCi ()
+popResume :: GHCi (Maybe (SrcSpan, ThreadId, GHC.ResumeHandle))
 popResume = do
    st <- getGHCiState 
    case (resume st) of
-      []     -> return () 
-      (_:xs) -> setGHCiState $ st { resume = xs } 
+      []     -> return Nothing
+      (x:xs) -> do setGHCiState $ st { resume = xs } ; return (Just x)
          
-pushResume :: IO GHC.RunResult -> GHCi ()
-pushResume resumeAction = do
+pushResume :: SrcSpan -> ThreadId -> GHC.ResumeHandle -> GHCi ()
+pushResume span threadId resumeAction = do
    st <- getGHCiState
    let oldResume = resume st
-   setGHCiState $ st { resume = resumeAction : oldResume }
+   setGHCiState $ st { resume = (span, threadId, resumeAction) : oldResume }
+
+discardResumeContext :: GHCi ()
+discardResumeContext = do
+   st <- getGHCiState
+   setGHCiState st { resume = [] }
 
 showForUser :: SDoc -> GHCi String
 showForUser doc = do
