@@ -79,7 +79,7 @@ import Control.Monad as Monad
 
 import Foreign.StablePtr	( newStablePtr )
 import GHC.Exts		( unsafeCoerce# )
-import GHC.IOBase	( IOErrorType(InvalidArgument), IO(IO) )
+import GHC.IOBase	( IOErrorType(InvalidArgument) )
 
 import Data.IORef	( IORef, readIORef, writeIORef )
 
