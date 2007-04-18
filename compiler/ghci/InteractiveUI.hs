@@ -1200,7 +1200,8 @@ showCmd str =
 	["bindings"] -> showBindings
 	["linker"]   -> io showLinkerState
         ["breaks"] -> showBkptTable
-	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings]")
+        ["context"] -> showContext
+	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings|breaks]")
 
 showModules = do
   session <- getSession
@@ -1233,6 +1234,13 @@ showBkptTable :: GHCi ()
 showBkptTable = do
    activeBreaks <- getActiveBreakPoints 
    printForUser $ ppr activeBreaks 
+
+showContext :: GHCi ()
+showContext = do
+   st <- getGHCiState
+   printForUser $ vcat (map pp_resume (resume st))
+  where
+   pp_resume (span, _, _) = ptext SLIT("Stopped at") <+> ppr span
 
 -- -----------------------------------------------------------------------------
 -- Completion
