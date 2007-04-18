@@ -42,11 +42,10 @@ removePrefix (x:xs) (y:ys)
  | x == y = removePrefix xs ys
  | otherwise = Nothing
 
-type Hook a = PackageDescription -> LocalBuildInfo -> Maybe UserHooks -> a
-           -> IO ()
+type Hook a = PackageDescription -> LocalBuildInfo -> UserHooks -> a -> IO ()
 
 add_ghc_options :: [String] -> Hook a -> Hook a
-add_ghc_options args f pd lbi muhs x
+add_ghc_options args f pd lbi uhs x
  = do let lib' = case library pd of
                      Just lib ->
                          let bi = libBuildInfo lib
@@ -55,5 +54,5 @@ add_ghc_options args f pd lbi muhs x
                          in lib { libBuildInfo = bi' }
                      Nothing -> error "Expected a library"
           pd' = pd { library = Just lib' }
-      f pd' lbi muhs x
+      f pd' lbi uhs x
 
