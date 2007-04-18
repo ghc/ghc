@@ -321,12 +321,6 @@ defaultCleanupHandler dflags inner =
     inner
 
 
-#if defined(GHCI) 
-GLOBAL_VAR(v_bkptLinkEnv, [], [(Name, HValue)])
-        -- stores the current breakpoint handler to help setContext to
-        -- restore it after a context change
-#endif
-
 -- | Starts a new session.  A session consists of a set of loaded
 -- modules, a set of options (DynFlags), and an interactive context.
 newSession :: Maybe FilePath -> IO Session
@@ -494,7 +488,6 @@ depanal (Session ref) excluded_mods allow_dup_roots = do
   hsc_env <- readIORef ref
   let
 	 dflags  = hsc_dflags hsc_env
-	 gmode   = ghcMode (hsc_dflags hsc_env)
 	 targets = hsc_targets hsc_env
 	 old_graph = hsc_mod_graph hsc_env
 	
@@ -551,7 +544,6 @@ load2 s@(Session ref) how_much mod_graph = do
 
         let hpt1      = hsc_HPT hsc_env
         let dflags    = hsc_dflags hsc_env
-        let ghci_mode = ghcMode dflags -- this never changes
 
 	-- The "bad" boot modules are the ones for which we have
 	-- B.hs-boot in the module graph, but no B.hs
