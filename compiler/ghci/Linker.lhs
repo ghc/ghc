@@ -15,8 +15,9 @@ necessary.
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
 module Linker ( HValue, getHValue, showLinkerState,
-		linkExpr, unload, extendLinkEnv, withExtendedLinkEnv,
-                extendLoadedPkgs,
+		linkExpr, unload, withExtendedLinkEnv,
+                extendLinkEnv, deleteFromLinkEnv,
+                extendLoadedPkgs, 
 		linkPackages,initDynLinker,
                 dataConInfoPtrToName
 	) where
@@ -142,6 +143,13 @@ extendLinkEnv :: [(Name,HValue)] -> IO ()
 extendLinkEnv new_bindings
   = do	pls <- readIORef v_PersistentLinkerState
 	let new_closure_env = extendClosureEnv (closure_env pls) new_bindings
+	    new_pls = pls { closure_env = new_closure_env }
+	writeIORef v_PersistentLinkerState new_pls
+
+deleteFromLinkEnv :: [Name] -> IO ()
+deleteFromLinkEnv to_remove
+  = do	pls <- readIORef v_PersistentLinkerState
+	let new_closure_env = delListFromNameEnv (closure_env pls) to_remove
 	    new_pls = pls { closure_env = new_closure_env }
 	writeIORef v_PersistentLinkerState new_pls
 

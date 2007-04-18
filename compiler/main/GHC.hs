@@ -190,9 +190,9 @@ import GHC.Exts         ( unsafeCoerce#, Ptr )
 import Foreign.StablePtr( deRefStablePtr, StablePtr, newStablePtr, freeStablePtr )
 import Foreign          ( poke )
 import qualified Linker
+import Linker           ( HValue )
 
 import Data.Dynamic     ( Dynamic )
-import Linker		( HValue, getHValue, extendLinkEnv )
 
 import ByteCodeInstr
 import DebuggerTys
@@ -2130,10 +2130,21 @@ data RunResult
   | RunBreak ThreadId [Name] BreakInfo ResumeHandle
 
 data Status
-   = Break HValue BreakInfo ThreadId ResumeHandle -- ^ the computation hit a breakpoint
-   | Complete (Either Exception [HValue]) -- ^ the computation completed with either an exception or a value
+   = Break HValue BreakInfo ThreadId (MVar ()) (MVar Status) [Name]
+          -- ^ the computation hit a breakpoint
+   | Complete (Either Exception [HValue])
+          -- ^ the computation completed with either an exception or a value
 
-data ResumeHandle = ResumeHandle (MVar ()) (MVar Status) [Name]
+-- | This is a token given back to the client when runStmt stops at a
+-- breakpoint.  It allows the original computation to be resumed, restoring
+-- the old interactive context.
+data ResumeHandle
+  = ResumeHandle
+        (MVar ())               -- breakMVar
+        (MVar Status)           -- statusMVar
+        [Name]                  -- [Name] to bind on completion
+        InteractiveContext      -- IC to restore on resumption
+        [Name]                  -- [Name] to remove from the link env
 
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
@@ -2157,32 +2168,33 @@ runStmt (Session ref) expr
 	   Just (new_hsc_env, names, hval) -> do
               writeIORef ref new_hsc_env
 
-              let resume_handle = ResumeHandle breakMVar statusMVar names
               -- set the onBreakAction to be performed when we hit a
               -- breakpoint this is visible in the Byte Code
               -- Interpreter, thus it is a global variable,
               -- implemented with stable pointers
-              stablePtr <- setBreakAction resume_handle
+              stablePtr <- setBreakAction breakMVar statusMVar names
 
               let thing_to_run = unsafeCoerce# hval :: IO [HValue]
               status <- sandboxIO statusMVar thing_to_run
               freeStablePtr stablePtr -- be careful not to leak stable pointers!
-              handleRunStatus ref names status
+              handleRunStatus ref (hsc_IC new_hsc_env) names status
 
-handleRunStatus ref names status =
+handleRunStatus ref ic names status =
    case status of  
       -- did we hit a breakpoint or did we complete?
-      (Break apStack info tid res) -> do
+      (Break apStack info tid breakMVar statusMVar final_names) -> do
                 hsc_env <- readIORef ref
                 (new_hsc_env, names) <- extendEnvironment hsc_env apStack 
                                                 (breakInfo_vars info)
                 writeIORef ref new_hsc_env 
+                let res = ResumeHandle breakMVar statusMVar final_names
+                                       ic names
                 return (RunBreak tid names info res)
       (Complete either_hvals) ->
 		case either_hvals of
 		    Left e -> return (RunException e)
 		    Right hvals -> do
-			extendLinkEnv (zip names hvals)
+			Linker.extendLinkEnv (zip names hvals)
 			return (RunOk names)
            
 -- this points to the IO action that is executed when a breakpoint is hit
@@ -2200,21 +2212,33 @@ sandboxIO statusMVar thing = do
   putMVar interruptTargetThread (child:ts)
   takeMVar statusMVar `finally` modifyMVar_ interruptTargetThread (return.tail)
 
-setBreakAction res@(ResumeHandle breakMVar statusMVar names) = do 
+setBreakAction breakMVar statusMVar final_names = do 
   stablePtr <- newStablePtr onBreak
   poke breakPointIOAction stablePtr
   return stablePtr
   where onBreak ids apStack = do
                 tid <- myThreadId
-                putMVar statusMVar (Break apStack ids tid res)
+                putMVar statusMVar (Break apStack ids tid breakMVar statusMVar 
+                                                final_names)
                 takeMVar breakMVar
 
 resume :: Session -> ResumeHandle -> IO RunResult
-resume (Session ref) res@(ResumeHandle breakMVar statusMVar names) = do
-   stablePtr <- setBreakAction res
-   putMVar breakMVar ()
-   status <- takeMVar statusMVar
-   handleRunStatus ref names status
+resume (Session ref) res@(ResumeHandle breakMVar statusMVar 
+                                       final_names ic names)
+ = do
+   -- restore the original interactive context.  This is not entirely
+   -- satisfactory: any new bindings made since the breakpoint stopped
+   -- will be dropped from the interactive context, but not from the
+   -- linker's environment.
+   hsc_env <- readIORef ref
+   writeIORef ref hsc_env{ hsc_IC = ic }
+   Linker.deleteFromLinkEnv names
+
+   stablePtr <- setBreakAction breakMVar statusMVar final_names
+   putMVar breakMVar ()                 -- this awakens the stopped thread...
+   status <- takeMVar statusMVar        -- and wait for the result
+   freeStablePtr stablePtr -- be careful not to leak stable pointers!
+   handleRunStatus ref ic names status
 
 {-
 -- This version of sandboxIO runs the expression in a completely new
@@ -2284,7 +2308,7 @@ extendEnvironment hsc_env apStack idsOffsets = do
        new_type_env = extendTypeEnvWithIds filtered_type_env (typed_ids)
        new_ic = ictxt { ic_rn_local_env = new_rn_env, 
 		        ic_type_env     = new_type_env }
-   extendLinkEnv (zip names hValues) -- ToDo: we must remember to restore the old env after we finish a breakpoint
+   Linker.extendLinkEnv (zip names hValues) -- ToDo: we must remember to restore the old env after we finish a breakpoint
    return (hsc_env{hsc_IC = new_ic}, names)
   where
    globaliseAndTidy :: Id -> Id
@@ -2319,7 +2343,7 @@ obtainTerm1 sess force mb_ty x = withSession sess $ \hsc_env -> cvObtainTerm hsc
 
 obtainTerm :: Session -> Bool -> Id -> IO (Maybe Term)
 obtainTerm sess force id = withSession sess $ \hsc_env -> do
-              mb_v <- getHValue (varName id) 
+              mb_v <- Linker.getHValue (varName id) 
               case mb_v of
                 Just v  -> fmap Just$ cvObtainTerm hsc_env force (Just$ idType id) v
                 Nothing -> return Nothing
