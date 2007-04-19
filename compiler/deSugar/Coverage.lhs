@@ -164,11 +164,15 @@ addTickLHsExprAlways (L pos e0) = do
     fn <- allocTickBox ExpBox pos 
     return $ fn $ L pos e1
 
--- always a breakpoint tick, maybe an HPC tick
-addTickLHsExprBreakAlways :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprBreakAlways e
-    | opt_Hpc   = addTickLHsExpr e
+addTickLHsExprNeverOrAlways :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExprNeverOrAlways e
+    | opt_Hpc   = addTickLHsExprNever e
     | otherwise = addTickLHsExprAlways e
+
+addTickLHsExprNeverOrMaybe :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExprNeverOrMaybe e
+    | opt_Hpc   = addTickLHsExprNever e
+    | otherwise = addTickLHsExpr e
 
 -- version of addTick that does not actually add a tick,
 -- because the scope of this tick is completely subsumed by 
@@ -177,11 +181,6 @@ addTickLHsExprNever :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprNever (L pos e0) = do
     e1 <- addTickHsExpr e0
     return $ L pos e1
-
-addTickLHsExprBreakOnly :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprBreakOnly e
-    | opt_Hpc   = addTickLHsExprNever e
-    | otherwise = addTickLHsExprAlways e
 
 -- selectively add ticks to interesting expressions
 addTickLHsExpr :: LHsExpr Id -> TM (LHsExpr Id)
@@ -239,7 +238,7 @@ addTickHsExpr (NegApp e neg) =
 	liftM2 NegApp
 		(addTickLHsExpr e) 
 		(addTickSyntaxExpr hpcSrcSpan neg)
-addTickHsExpr (HsPar e) = liftM HsPar (addTickLHsExprNever e)
+addTickHsExpr (HsPar e) = liftM HsPar (addTickLHsExprNeverOrMaybe e)
 addTickHsExpr (SectionL e1 e2) = 
 	liftM2 SectionL
 		(addTickLHsExpr e1)
@@ -260,7 +259,7 @@ addTickHsExpr (HsIf	 e1 e2 e3) =
 addTickHsExpr (HsLet binds e) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds)		-- to think about: !patterns.
-		(addTickLHsExprBreakOnly e)
+		(addTickLHsExprNeverOrAlways e)
 addTickHsExpr (HsDo cxt stmts last_exp srcloc) =
 	liftM4 HsDo
 		(return cxt)
@@ -369,7 +368,7 @@ addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
 addTickStmt isGuard (BindStmt pat e bind fail) =
 	liftM4 BindStmt
 		(addTickLPat pat)
-		(addTickLHsExprBreakAlways e)
+		(addTickLHsExprAlways e)
 		(addTickSyntaxExpr hpcSrcSpan bind)
 		(addTickSyntaxExpr hpcSrcSpan fail)
 addTickStmt isGuard (ExprStmt e bind' ty) =
@@ -379,7 +378,7 @@ addTickStmt isGuard (ExprStmt e bind' ty) =
 		(return ty)
   where
    addTick e | Just fn <- isGuard = addBinTickLHsExpr fn e
-             | otherwise          = addTickLHsExprBreakAlways e
+             | otherwise          = addTickLHsExprAlways e
 
 addTickStmt isGuard (LetStmt binds) =
 	liftM LetStmt
