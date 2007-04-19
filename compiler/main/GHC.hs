@@ -2132,7 +2132,7 @@ data RunResult
   | RunBreak ThreadId [Name] BreakInfo ResumeHandle
 
 data Status
-   = Break HValue BreakInfo ThreadId (MVar ()) (MVar Status) [Name]
+   = Break HValue BreakInfo ThreadId
           -- ^ the computation hit a breakpoint
    | Complete (Either Exception [HValue])
           -- ^ the computation completed with either an exception or a value
@@ -2145,8 +2145,14 @@ data ResumeHandle
         (MVar ())               -- breakMVar
         (MVar Status)           -- statusMVar
         [Name]                  -- [Name] to bind on completion
+        InteractiveContext      -- IC on completion
         InteractiveContext      -- IC to restore on resumption
         [Name]                  -- [Name] to remove from the link env
+
+-- We need to track two InteractiveContexts:
+--      - the IC before runStmt, which is restored on each resume
+--      - the IC binding the results of the original statement, which
+--        will be the IC when runStmt returns with RunOk.
 
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
@@ -2167,38 +2173,40 @@ runStmt (Session ref) expr
 
         case maybe_stuff of
 	   Nothing -> return RunFailed
-	   Just (new_hsc_env, names, hval) -> do
-              writeIORef ref new_hsc_env
+	   Just (new_IC, names, hval) -> do
 
               -- set the onBreakAction to be performed when we hit a
               -- breakpoint this is visible in the Byte Code
               -- Interpreter, thus it is a global variable,
               -- implemented with stable pointers
-              stablePtr <- setBreakAction breakMVar statusMVar names
+              stablePtr <- setBreakAction breakMVar statusMVar
 
               let thing_to_run = unsafeCoerce# hval :: IO [HValue]
               status <- sandboxIO statusMVar thing_to_run
               freeStablePtr stablePtr -- be careful not to leak stable pointers!
-              handleRunStatus ref (hsc_IC new_hsc_env) names status
+              handleRunStatus ref new_IC names (hsc_IC hsc_env) 
+                              breakMVar statusMVar status
 
-handleRunStatus ref ic names status =
+handleRunStatus ref final_ic final_names resume_ic breakMVar statusMVar status =
    case status of  
       -- did we hit a breakpoint or did we complete?
-      (Break apStack info tid breakMVar statusMVar final_names) -> do
+      (Break apStack info tid) -> do
                 hsc_env <- readIORef ref
                 (new_hsc_env, names) <- extendEnvironment hsc_env apStack 
                                                 (breakInfo_vars info)
                 writeIORef ref new_hsc_env 
                 let res = ResumeHandle breakMVar statusMVar final_names
-                                       ic names
+                                       final_ic resume_ic names
                 return (RunBreak tid names info res)
       (Complete either_hvals) ->
 		case either_hvals of
 		    Left e -> return (RunException e)
 		    Right hvals -> do
-			Linker.extendLinkEnv (zip names hvals)
-			return (RunOk names)
-           
+                        hsc_env <- readIORef ref
+                        writeIORef ref hsc_env{hsc_IC=final_ic}
+			Linker.extendLinkEnv (zip final_names hvals)
+			return (RunOk final_names)
+
 -- this points to the IO action that is executed when a breakpoint is hit
 foreign import ccall "&breakPointIOAction" 
         breakPointIOAction :: Ptr (StablePtr (BreakInfo -> HValue -> IO ())) 
@@ -2214,33 +2222,33 @@ sandboxIO statusMVar thing = do
   putMVar interruptTargetThread (child:ts)
   takeMVar statusMVar `finally` modifyMVar_ interruptTargetThread (return.tail)
 
-setBreakAction breakMVar statusMVar final_names = do 
+setBreakAction breakMVar statusMVar = do 
   stablePtr <- newStablePtr onBreak
   poke breakPointIOAction stablePtr
   return stablePtr
   where onBreak ids apStack = do
                 tid <- myThreadId
-                putMVar statusMVar (Break apStack ids tid breakMVar statusMVar 
-                                                final_names)
+                putMVar statusMVar (Break apStack ids tid)
                 takeMVar breakMVar
 
 resume :: Session -> ResumeHandle -> IO RunResult
 resume (Session ref) res@(ResumeHandle breakMVar statusMVar 
-                                       final_names ic names)
+                                       final_names final_ic resume_ic names)
  = do
    -- restore the original interactive context.  This is not entirely
    -- satisfactory: any new bindings made since the breakpoint stopped
    -- will be dropped from the interactive context, but not from the
    -- linker's environment.
    hsc_env <- readIORef ref
-   writeIORef ref hsc_env{ hsc_IC = ic }
+   writeIORef ref hsc_env{ hsc_IC = resume_ic }
    Linker.deleteFromLinkEnv names
 
-   stablePtr <- setBreakAction breakMVar statusMVar final_names
+   stablePtr <- setBreakAction breakMVar statusMVar
    putMVar breakMVar ()                 -- this awakens the stopped thread...
    status <- takeMVar statusMVar        -- and wait for the result
    freeStablePtr stablePtr -- be careful not to leak stable pointers!
-   handleRunStatus ref ic names status
+   handleRunStatus ref final_ic final_names resume_ic 
+                   breakMVar statusMVar status
 
 {-
 -- This version of sandboxIO runs the expression in a completely new

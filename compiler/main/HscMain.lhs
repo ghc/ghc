@@ -797,7 +797,7 @@ A naked expression returns a singleton Name [it].
 hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
   :: HscEnv
   -> String			-- The statement
-  -> IO (Maybe (HscEnv, [Name], HValue))
+  -> IO (Maybe (InteractiveContext, [Name], HValue))
 
 hscStmt hsc_env stmt
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) stmt
@@ -828,7 +828,7 @@ hscStmt hsc_env stmt
 	; let src_span = srcLocSpan interactiveSrcLoc
 	; hval <- compileExpr hsc_env src_span ds_expr
 
-	; return (Just (hsc_env{ hsc_IC=new_ic }, bound_names, hval))
+	; return (Just (new_ic, bound_names, hval))
 	}}}}}}}
 
 hscTcExpr	-- Typecheck an expression (but don't run it)
