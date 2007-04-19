@@ -87,6 +87,7 @@ module GHC (
         obtainTerm, obtainTerm1,
         ModBreaks(..), BreakIndex,
         BreakInfo(breakInfo_number, breakInfo_module),
+        BreakArray, setBreakOn, setBreakOff, getBreak,
         modInfoModBreaks, 
 #endif
 
@@ -198,6 +199,7 @@ import ByteCodeInstr
 import DebuggerTys
 import IdInfo
 import HscMain          ( hscParseIdentifier, hscTcExpr, hscKcType, hscStmt )
+import BreakArray
 #endif
 
 import Packages

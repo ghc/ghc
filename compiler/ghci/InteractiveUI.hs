@@ -85,11 +85,6 @@ import Data.IORef	( IORef, readIORef, writeIORef )
 
 import System.Posix.Internals ( setNonBlockingFD )
 
--- these are needed by the new ghci debugger
-import ByteCodeLink (HValue)
-import ByteCodeInstr (BreakInfo (..))
-import BreakArray
-
 -----------------------------------------------------------------------------
 
 ghciWelcomeMsg =
@@ -1659,7 +1654,7 @@ mkTickArray ticks
         max_line = maximum (map srcSpanEndLine (map snd ticks))
         srcSpanLines span = [ srcSpanStartLine span .. srcSpanEndLine span ]
 
-getModBreak :: Module -> GHCi (BreakArray, Array Int SrcSpan)
+getModBreak :: Module -> GHCi (GHC.BreakArray, Array Int SrcSpan)
 getModBreak mod = do
    session <- getSession
    Just mod_info <- io $ GHC.getModuleInfo session mod
@@ -1672,10 +1667,10 @@ lookupModule :: Session -> String -> GHCi Module
 lookupModule session modName
    = io (GHC.findModule session (GHC.mkModuleName modName) Nothing)
 
-setBreakFlag :: Bool -> BreakArray -> Int -> IO Bool 
+setBreakFlag :: Bool -> GHC.BreakArray -> Int -> IO Bool 
 setBreakFlag toggle array index
-   | toggle    = setBreakOn array index 
-   | otherwise = setBreakOff array index
+   | toggle    = GHC.setBreakOn array index 
+   | otherwise = GHC.setBreakOff array index
 
 
 {- these should probably go to the GHC API at some point -}
