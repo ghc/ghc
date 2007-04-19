@@ -1609,8 +1609,8 @@ findBreakByLine :: Int -> TickArray -> Maybe (BreakIndex,SrcSpan)
 findBreakByLine line arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy leftmost complete)   `mplus`
-    listToMaybe (sortBy leftmost incomplete) `mplus`
+    listToMaybe (sortBy leftmost_largest  complete)   `mplus`
+    listToMaybe (sortBy leftmost_smallest incomplete) `mplus`
     listToMaybe (sortBy rightmost ticks)
   where 
         ticks = arr ! line
@@ -1632,7 +1632,10 @@ findBreakByCoord (line, col) arr
         -- the ticks that span this coordinate
         contains = [ tick | tick@(nm,span) <- ticks, span `spans` (line,col) ]
 
-leftmost  (_,a) (_,b) = a `compare` b
+leftmost_smallest  (_,a) (_,b) = a `compare` b
+leftmost_largest   (_,a) (_,b) = (srcSpanStart a `compare` srcSpanStart b)
+                                `thenCmp`
+                                 (srcSpanEnd b `compare` srcSpanEnd a)
 rightmost (_,a) (_,b) = b `compare` a
 
 spans :: SrcSpan -> (Int,Int) -> Bool
