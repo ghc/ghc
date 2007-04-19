@@ -1659,9 +1659,9 @@ listAround span do_highlight = do
       contents <- BS.readFile (unpackFS file)
       let 
           lines = BS.split '\n' contents
-          these_lines = take (line2 - line1 + 1 + 2*padding) $ 
-                        drop (line1 - 1 - padding) $ lines
-          fst_line = max 1 (line1 - padding)
+          these_lines = take (line2 - line1 + 1 + pad_before + pad_after) $ 
+                        drop (line1 - 1 - pad_before) $ lines
+          fst_line = max 1 (line1 - pad_before)
           line_nos = [ fst_line .. ]
 
           highlighted | do_highlight = zipWith highlight line_nos these_lines
@@ -1677,7 +1677,10 @@ listAround span do_highlight = do
         col1  = srcSpanStartCol span
         line2 = srcSpanEndLine span
         col2  = srcSpanEndCol span
-        padding = 1
+
+        pad_before | line1 == 1 = 0
+                   | otherwise  = 1
+        pad_after = 1
 
         highlight no line
           | no == line1 && no == line2
