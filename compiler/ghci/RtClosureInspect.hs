@@ -486,26 +486,30 @@ cvObtainTerm hsc_env force mb_ty a = do
                           Suspension ct (fmap tidy mb_ty) hval n
             }
          tidy ty = tidyType (emptyTidyOccEnv, tidyVarEnv ty) ty  
-         tidyVarEnv ty = 
-
-             mkVarEnv$ [ (v, setTyVarName v (tyVarName tv))
-                         | (tv,v) <- zip alphaTyVars vars]
+         tidyVarEnv ty = mkVarEnv$ 
+                         [ (v, setTyVarName v (tyVarName tv))
+                           | (tv,v) <- zip alphaTyVars vars]
              where vars = varSetElems$ tyVarsOfType ty
 
 cvObtainTerm1 :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
 cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
-   tv   <- liftM mkTyVarTy (newVar argTypeKind)
-   when (isJust mb_ty) $ 
-        instScheme (sigmaType$ fromJust mb_ty) >>= addConstraint tv
-   go tv hval
+   tv <- case (isMonomorphic `fmap` mb_ty) of
+          Just True -> return (fromJust mb_ty)
+          _         -> do
+            tv   <- liftM mkTyVarTy (newVar argTypeKind)
+            instScheme (sigmaType$ fromJust mb_ty) >>= addConstraint tv
+            return tv
+   go tv (fromMaybe tv mb_ty) hval
     where 
-  go tv a = do 
+  go tv ty a = do 
+    let monomorphic = not(isTyVarTy tv)   -- This is a convention. The ancestor tests for
+                                         -- monomorphism and passes a type instead of a tv
     clos <- trIO $ getClosureData a
     case tipe clos of
 -- Thunks we may want to force
-      Thunk _ | force -> seq a $ go tv a
+      Thunk _ | force -> seq a $ go tv ty a
 -- We always follow indirections 
-      Indirection _ -> go tv $! (ptrs clos ! 0)
+      Indirection _ -> go tv ty $! (ptrs clos ! 0)
  -- The interesting case
       Constr -> do
         m_dc <- trIO$ tcRnRecoverDataCon hsc_env (infoPtr clos)
@@ -513,19 +517,22 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
           Nothing -> panic "Can't find the DataCon for a term"
           Just dc -> do 
             let extra_args = length(dataConRepArgTys dc) - length(dataConOrigArgTys dc)
-                subTtypes  = drop extra_args (dataConRepArgTys dc)
+                subTtypes  = matchSubTypes dc ty
                 (subTtypesP, subTtypesNP) = partition isPointed subTtypes
-                n_subtermsP= length subTtypesP
-            subTermTvs    <- mapM (liftM mkTyVarTy . newVar ) (map typeKind subTtypesP)
-            baseType      <- instScheme (dataConRepType dc)
-            let myType     = mkFunTys (reOrderTerms subTermTvs subTtypesNP subTtypes) tv
-            addConstraint myType baseType
-            subTermsP <- sequence [ extractSubterm i tv (ptrs clos) 
-                                   | (i,tv) <- zip [extra_args..extra_args + n_subtermsP - 1]
-                                                   subTermTvs ]
+            subTermTvs <- sequence
+                 [ if isMonomorphic t then return t else (mkTyVarTy `fmap` newVar k)
+                   | (t,k) <- zip subTtypesP (map typeKind subTtypesP)]
+            -- It is vital for newtype reconstruction that the unification step is done
+            --     right here, _before_ the subterms are RTTI reconstructed.
+            when (not monomorphic) $ do
+                  let myType = mkFunTys (reOrderTerms subTermTvs subTtypesNP subTtypes) tv
+                  instScheme(dataConRepType dc) >>= addConstraint myType 
+            subTermsP <- sequence $ drop extra_args -- all extra arguments are pointed
+                  [ appArr (go tv t) (ptrs clos) i
+                   | (i,tv,t) <- zip3 [0..] subTermTvs subTtypesP]
             let unboxeds   = extractUnboxed subTtypesNP (nonPtrs clos)
                 subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)      
-                subTerms   = reOrderTerms subTermsP subTermsNP subTtypes
+                subTerms   = reOrderTerms subTermsP subTermsNP (drop extra_args subTtypes)
             return (Term tv dc a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       otherwise -> do
@@ -533,16 +540,28 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
 
 -- Access the array of pointers and recurse down. Needs to be done with
 -- care of no introducing a thunk! or go will fail to do its job 
-  extractSubterm (I# i#) tv ptrs = case ptrs of 
+  appArr f arr (I# i#) = case arr of 
                  (Array _ _ ptrs#) -> case indexArray# ptrs# i# of 
-                       (# e #) -> go tv e
+                       (# e #) -> f e
+
+  matchSubTypes dc ty
+    | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
+    , null (dataConExTyVars dc)  --TODO Handle the case of extra existential tyvars
+    = dataConInstArgTys dc ty_args
+
+    | otherwise = dataConRepArgTys dc
 
 -- This is used to put together pointed and nonpointed subterms in the 
 --  correct order.
   reOrderTerms _ _ [] = []
   reOrderTerms pointed unpointed (ty:tys) 
-   | isPointed ty = head pointed : reOrderTerms (tail pointed) unpointed tys
-   | otherwise    = head unpointed : reOrderTerms pointed (tail unpointed) tys
+   | isPointed ty = head pointed : reOrderTerms (tailSafe "reorderTerms1" pointed) unpointed tys
+   | otherwise    = head unpointed : reOrderTerms pointed (tailSafe "reorderTerms2" unpointed) tys
+
+tailSafe msg [] = error msg
+tailSafe _ (x:xs) = xs 
+
+isMonomorphic = isEmptyVarSet . tyVarsOfType
 
 zonkTerm :: Term -> TcM Term
 zonkTerm = foldTerm idTermFoldM {
