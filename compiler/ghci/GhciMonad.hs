@@ -43,6 +43,7 @@ data GHCiState = GHCiState
 	args	       :: [String],
         prompt         :: String,
 	editor         :: String,
+        stop           :: String,
 	session        :: GHC.Session,
 	options        :: [GHCiOption],
         prelude        :: GHC.Module,

@@ -38,6 +38,7 @@ import SrcLoc
 import Digraph
 import BasicTypes hiding (isTopLevel)
 import Panic      hiding (showException)
+import FastString       ( unpackFS )
 import Config
 import StaticFlags
 import Linker
@@ -64,6 +65,7 @@ import System.Console.Readline as Readline
 import Control.Exception as Exception
 -- import Control.Concurrent
 
+import qualified Data.ByteString.Char8 as BS
 import Data.List
 import Data.Maybe
 import System.Cmd
@@ -104,14 +106,14 @@ builtin_commands = [
 	-- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",		keepGoing help,			False, completeNone),
   ("add",	keepGoingPaths addModule,	False, completeFilename),
-  ("break",     breakCmd,                       False, completeIdentifier),
+  ("break",     keepGoing breakCmd,             False, completeIdentifier),
   ("browse",    keepGoing browseCmd,		False, completeModule),
   ("cd",    	keepGoing changeDirectory,	False, completeFilename),
   ("check",	keepGoing checkModule,		False, completeHomeModule),
   ("continue",  continueCmd,                    False, completeNone),
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
   ("def",	keepGoing defineMacro,		False, completeIdentifier),
-  ("delete",    deleteCmd,                      False, completeNone),
+  ("delete",    keepGoing deleteCmd,            False, completeNone),
   ("e", 	keepGoing editFile,		False, completeFilename),
   ("edit",	keepGoing editFile,		False, completeFilename),
   ("etags",	keepGoing createETagsFileCmd,	False, completeFilename),
@@ -120,6 +122,7 @@ builtin_commands = [
   ("info",      keepGoing info,			False, completeIdentifier),
   ("kind",	keepGoing kindOfType,		False, completeIdentifier),
   ("load",	keepGoingPaths loadModule_,     False, completeHomeModuleOrFile),
+  ("list",	keepGoing listCmd,              False, completeNone),
   ("module",	keepGoing setContext,		False, completeModule),
   ("main",	keepGoing runMain,		False, completeIdentifier),
   ("print",     keepGoing (pprintClosureCommand True False), False, completeIdentifier),
@@ -175,6 +178,7 @@ helpText =
  "   :set prog <progname>        set the value returned by System.getProgName\n" ++
  "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
  "   :set editor <cmd>           set the command used for :edit\n" ++
+ "   :set stop <cmd>             set the command to run when a breakpoint is hit\n" ++
  "\n" ++
  "   :show breaks                show active breakpoints\n" ++
  "   :show context               show the breakpoint context\n" ++
@@ -261,6 +265,7 @@ interactiveUI session srcs maybe_expr = do
 	GHCiState{ progname = "<interactive>",
 		   args = [],
                    prompt = "%s> ",
+                   stop = "",
 		   editor = default_editor,
 		   session = session,
 		   options = [],
@@ -497,7 +502,8 @@ runCommandEval c = ghciHandle handleEval (doCommand c)
 	    case nms of 
 		Nothing -> io (exitWith (ExitFailure 1))
 		  -- failure to run the command causes exit(1) for ghc -e.
-		_       -> finishEvalExpr nms
+		_       -> do finishEvalExpr nms
+                              return True
 
 runStmt :: String -> GHCi (Maybe (Bool,[Name]))
 runStmt stmt
@@ -515,15 +521,20 @@ switchOnRunResult (GHC.RunException e) = throw e
 switchOnRunResult (GHC.RunOk names) = return $ Just (False,names)
 switchOnRunResult (GHC.RunBreak threadId names info resume) = do
    session <- getSession
-   Just mod_info <- io $ GHC.getModuleInfo session (breakInfo_module info) 
+   Just mod_info <- io $ GHC.getModuleInfo session (GHC.breakInfo_module info) 
    let modBreaks  = GHC.modInfoModBreaks mod_info
    let ticks      = GHC.modBreaks_locs modBreaks
 
    -- display information about the breakpoint
-   let location = ticks ! breakInfo_number info
+   let location = ticks ! GHC.breakInfo_number info
    printForUser $ ptext SLIT("Stopped at") <+> ppr location
 
    pushResume location threadId resume
+
+   -- run the command set with ":set stop <cmd>"
+   st <- getGHCiState
+   runCommand (stop st)
+
    return (Just (True,names))
 
 -- possibly print the type and revert CAFs after evaluating an expression
@@ -540,7 +551,6 @@ finishEvalExpr mb_names
       io installSignalHandlers
       b <- isOptionSet RevertCAFs
       io (when b revertCAFs)
-      return True
 
 showTypeOfName :: Session -> Name -> GHCi ()
 showTypeOfName session n
@@ -1094,6 +1104,7 @@ setCmd str
 	("prog":prog) -> setProg prog
         ("prompt":prompt) -> setPrompt (after 6)
         ("editor":cmd) -> setEditor (after 6)
+        ("stop":cmd) -> setStop (after 4)
 	wds -> setOptions wds
    where after n = dropWhile isSpace $ drop n $ dropWhile isSpace str
 
@@ -1110,6 +1121,10 @@ setProg _ = do
 setEditor cmd = do
   st <- getGHCiState
   setGHCiState st{ editor = cmd }
+
+setStop cmd = do
+  st <- getGHCiState
+  setGHCiState st{ stop = cmd }
 
 setPrompt value = do
   st <- getGHCiState
@@ -1446,7 +1461,9 @@ setUpConsole = do
 #endif
 	return ()
 
+-- -----------------------------------------------------------------------------
 -- commands for debugger
+
 foreign import ccall "rts_setStepFlag" setStepFlag :: IO () 
 
 stepCmd :: String -> GHCi Bool
@@ -1474,12 +1491,11 @@ doContinue actionBeforeCont = do
          runResult <- io $ GHC.resume session handle
          names <- switchOnRunResult runResult
          finishEvalExpr names
-         return False 
+         return False
 
-deleteCmd :: String -> GHCi Bool
+deleteCmd :: String -> GHCi ()
 deleteCmd argLine = do
    deleteSwitch $ words argLine
-   return False
    where
    deleteSwitch :: [String] -> GHCi ()
    deleteSwitch [] = 
@@ -1495,11 +1511,10 @@ deleteCmd argLine = do
          | otherwise = return ()
 
 -- handle the "break" command
-breakCmd :: String -> GHCi Bool
+breakCmd :: String -> GHCi ()
 breakCmd argLine = do
    session <- getSession
    breakSwitch session $ words argLine
-   return False
 
 breakSwitch :: Session -> [String] -> GHCi ()
 breakSwitch _session [] = do
@@ -1624,6 +1639,56 @@ spans :: SrcSpan -> (Int,Int) -> Bool
 spans span (l,c) = srcSpanStart span <= loc && loc <= srcSpanEnd span
    where loc = mkSrcLoc (srcSpanFile span) l c
 
+start_bold = BS.pack "\ESC[1m"
+end_bold   = BS.pack "\ESC[0m"
+
+listCmd :: String -> GHCi ()
+listCmd str = do
+   st <- getGHCiState
+   case resume st of
+      []  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
+      (span,_,_):_ -> io $ listAround span True
+
+-- | list a section of a source file around a particular SrcSpan.
+-- If the highlight flag is True, also highlight the span using
+-- start_bold/end_bold.
+listAround span do_highlight = do
+      contents <- BS.readFile (unpackFS file)
+      let 
+          lines = BS.split '\n' contents
+          these_lines = take (line2 - line1 + 1 + 2*padding) $ 
+                        drop (line1 - 1 - padding) $ lines
+          fst_line = max 1 (line1 - padding)
+          line_nos = [ fst_line .. ]
+
+          highlighted | do_highlight = zipWith highlight line_nos these_lines
+                      | otherwise   = these_lines
+
+          bs_line_nos = [ BS.pack (show l ++ "  ") | l <- line_nos ]
+          prefixed = zipWith BS.append bs_line_nos highlighted
+      --
+      BS.putStrLn (BS.join (BS.pack "\n") prefixed)
+  where
+        file  = srcSpanFile span
+        line1 = srcSpanStartLine span
+        col1  = srcSpanStartCol span
+        line2 = srcSpanEndLine span
+        col2  = srcSpanEndCol span
+        padding = 1
+
+        highlight no line
+          | no == line1 && no == line2
+          = let (a,r) = BS.splitAt col1 line
+                (b,c) = BS.splitAt (col2-col1) r
+            in
+            BS.concat [a,start_bold,b,end_bold,c]
+          | no == line1
+          = let (a,b) = BS.splitAt col1 line in
+            BS.concat [a, start_bold, b]
+          | no == line2
+          = let (a,b) = BS.splitAt col2 line in
+            BS.concat [a, end_bold, b]
+          | otherwise   = line
 
 -- --------------------------------------------------------------------------
 -- Tick arrays
