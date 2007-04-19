@@ -418,7 +418,7 @@ fileLoop hdl show_prompt = do
    session <- getSession
    (mod,imports) <- io (GHC.getContext session)
    st <- getGHCiState
-   when show_prompt (io (putStr (mkPrompt mod imports (prompt st))))
+   when show_prompt (io (putStr (mkPrompt mod imports (resume st) (prompt st))))
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e		   -> return ()
@@ -443,7 +443,7 @@ stringLoop (s:ss) = do
 	l  -> do quit <- runCommand l
                  if quit then return True else stringLoop ss
 
-mkPrompt toplevs exports prompt
+mkPrompt toplevs exports resumes prompt
   = showSDoc $ f prompt
     where
         f ('%':'s':xs) = perc_s <> f xs
@@ -451,8 +451,17 @@ mkPrompt toplevs exports prompt
         f (x:xs) = char x <> f xs
         f [] = empty
     
-        perc_s = hsep (map (\m -> char '*' <> ppr (GHC.moduleName m)) toplevs) <+>
-                 hsep (map (ppr . GHC.moduleName) exports)
+        perc_s
+          | (span,_,_):rest <- resumes 
+          = (if not (null rest) then text "... " else empty)
+            <> brackets (ppr span) <+> modules_prompt
+          | otherwise
+          = modules_prompt
+
+        modules_prompt = 
+             hsep (map (\m -> char '*' <> ppr (GHC.moduleName m)) toplevs) <+>
+             hsep (map (ppr . GHC.moduleName) exports)
+
 
 
 #ifdef USE_READLINE
@@ -463,7 +472,7 @@ readlineLoop = do
    io yield
    saveSession -- for use by completion
    st <- getGHCiState
-   l <- io (readline (mkPrompt mod imports (prompt st))
+   l <- io (readline (mkPrompt mod imports (resume st) (prompt st))
 	  	`finally` setNonBlockingFD 0)
 		-- readline sometimes puts stdin into blocking mode,
 		-- so we need to put it back for the IO library
