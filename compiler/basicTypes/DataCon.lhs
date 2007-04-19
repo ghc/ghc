@@ -644,10 +644,12 @@ dataConInstArgTys :: DataCon
 				-- NB: these INCLUDE the existentially quantified dict args
 				--     but EXCLUDE the data-decl context which is discarded
 				-- It's all post-flattening etc; this is a representation type
-dataConInstArgTys (MkData {dcRepArgTys = arg_tys, 
-			   dcUnivTyVars = univ_tvs, 
-			   dcExTyVars = ex_tvs}) inst_tys
- = ASSERT( length tyvars == length inst_tys )
+dataConInstArgTys dc@(MkData {dcRepArgTys = arg_tys, 
+			      dcUnivTyVars = univ_tvs, 
+			      dcExTyVars = ex_tvs}) inst_tys
+ = ASSERT2 ( length tyvars == length inst_tys 
+           , ptext SLIT("dataConInstArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys)
+           
    map (substTyWith tyvars inst_tys) arg_tys
  where
    tyvars = univ_tvs ++ ex_tvs
@@ -656,9 +658,10 @@ dataConInstArgTys (MkData {dcRepArgTys = arg_tys,
 -- And the same deal for the original arg tys
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
-			       dcUnivTyVars = univ_tvs, 
-			       dcExTyVars = ex_tvs}) inst_tys
- = ASSERT2( length tyvars == length inst_tys, ptext SLIT("dataConInstOrigArgTys") <+> ppr dc <+> ppr inst_tys )
+			          dcUnivTyVars = univ_tvs, 
+			          dcExTyVars = ex_tvs}) inst_tys
+ = ASSERT2( length tyvars == length inst_tys
+          , ptext SLIT("dataConInstOrigArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
    map (substTyWith tyvars inst_tys) arg_tys
  where
    tyvars = univ_tvs ++ ex_tvs

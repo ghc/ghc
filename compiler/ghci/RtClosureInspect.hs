@@ -555,11 +555,12 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
 --  correct order.
   reOrderTerms _ _ [] = []
   reOrderTerms pointed unpointed (ty:tys) 
-   | isPointed ty = head pointed : reOrderTerms (tailSafe "reorderTerms1" pointed) unpointed tys
-   | otherwise    = head unpointed : reOrderTerms pointed (tailSafe "reorderTerms2" unpointed) tys
-
-tailSafe msg [] = error msg
-tailSafe _ (x:xs) = xs 
+   | isPointed ty = ASSERT2(not(null pointed)
+                           , ptext SLIT("reOrderTerms") $$ (ppr pointed $$ ppr unpointed))
+                    head pointed : reOrderTerms (tail pointed) unpointed tys
+   | otherwise    = ASSERT2(not(null unpointed)
+                           , ptext SLIT("reOrderTerms") $$ (ppr pointed $$ ppr unpointed))
+                    head unpointed : reOrderTerms pointed (tail unpointed) tys
 
 isMonomorphic = isEmptyVarSet . tyVarsOfType
 
