@@ -188,7 +188,7 @@ basicKnownKeyNames
 	wordTyConName, word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
 	-- Others
-	otherwiseIdName, 
+	otherwiseIdName, inlineIdName,
 	plusIntegerName, timesIntegerName,
 	eqStringName, assertName, breakpointName, breakpointCondName,
         breakpointAutoName,  opaqueTyConName, unknownTyConName, 

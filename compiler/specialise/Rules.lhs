@@ -195,10 +195,27 @@ pprRuleBase rules = vcat [ pprRules (tidyRules emptyTidyEnv rs)
 %*									*
 %************************************************************************
 
+Note [Extra args in rule matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we find a matching rule, we return (Just (rule, rhs)), 
+but the rule firing has only consumed as many of the input args
+as the ruleArity says.  It's up to the caller to keep track
+of any left-over args.  E.g. if you call
+	lookupRule ... f [e1, e2, e3]
+and it returns Just (r, rhs), where r has ruleArity 2
+then the real rewrite is
+	f e1 e2 e3 ==> rhs e3
+
+You might think it'd be cleaner for lookupRule to deal with the
+leftover arguments, by applying 'rhs' to them, but the main call
+in the Simplifier works better as it is.  Reason: the 'args' passed
+to lookupRule are the result of a lazy substitution
+
 \begin{code}
 lookupRule :: (Activation -> Bool) -> InScopeSet
 	   -> RuleBase	-- Imported rules
 	   -> Id -> [CoreExpr] -> Maybe (CoreRule, CoreExpr)
+-- See Note [Extra argsin rule matching]
 lookupRule is_active in_scope rule_base fn args
   = matchRules is_active in_scope fn args rules
   where

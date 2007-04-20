@@ -451,9 +451,12 @@ dataToTagRule other = Nothing
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ BuiltinRule FSLIT("AppendLitString") unpackCStringFoldrName 4 match_append_lit,
-      BuiltinRule FSLIT("EqString") eqStringName 2 match_eq_string,
-      BuiltinRule FSLIT("Inline") inlineIdName 1 match_inline
+  = [ BuiltinRule { ru_name = FSLIT("AppendLitString"), ru_fn = unpackCStringFoldrName,
+		    ru_nargs = 4, ru_try = match_append_lit },
+      BuiltinRule { ru_name = FSLIT("EqString"), ru_fn = eqStringName,
+		    ru_nargs = 2, ru_try = match_eq_string },
+      BuiltinRule { ru_name = FSLIT("Inline"), ru_fn = inlineIdName,
+		    ru_nargs = 2, ru_try = match_inline }
     ]
 
 
@@ -494,9 +497,18 @@ match_eq_string other = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
---	inline (f a b c) = <f's unfolding> a b c
+--	inline f_ty (f a b c) = <f's unfolding> a b c
 -- (if f has an unfolding)
-match_inline (e:_)
+--
+-- It's important to allow the argument to 'inline' to have args itself
+-- (a) because its more forgiving to allow the programmer to write
+--	 inline f a b c
+--   or  inline (f a b c)
+-- (b) because a polymorphic f wll get a type argument that the 
+--     programmer can't avoid
+--
+-- Also, don't forget about 'inline's type argument!
+match_inline (Type _ : e : _)
   | (Var f, args1) <- collectArgs e,
     Just unf <- maybeUnfoldingTemplate (idUnfolding f)
   = Just (mkApps unf args1)
