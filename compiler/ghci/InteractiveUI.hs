@@ -14,12 +14,13 @@ module InteractiveUI (
 #include "HsVersions.h"
 
 import GhciMonad
+import GhciTags
 
 -- The GHC interface
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Type, Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex )
+                          BreakIndex, Name, SrcSpan )
 import Debugger
 import DynFlags
 import Packages
@@ -28,11 +29,6 @@ import UniqFM
 import PprTyThing
 import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
-
--- for createtags
-import Name
-import OccName
-import SrcLoc
 
 -- Other random utilities
 import Digraph
@@ -630,9 +626,6 @@ pprInfo exts (thing, fixity, insts)
 	| fix == GHC.defaultFixity = empty
 	| otherwise		   = ppr fix <+> ppr (GHC.getName thing)
 
------------------------------------------------------------------------------
--- Commands
-
 runMain :: String -> GHCi ()
 runMain args = do
   let ss = concat $ intersperse "," (map (\ s -> ('"':s)++"\"") (toArgs args))
@@ -866,118 +859,6 @@ quit _ = return True
 
 shellEscape :: String -> GHCi Bool
 shellEscape str = io (system str >> return False)
-
------------------------------------------------------------------------------
--- create tags file for currently loaded modules.
-
-createETagsFileCmd, createCTagsFileCmd :: String -> GHCi ()
-
-createCTagsFileCmd ""   = ghciCreateTagsFile CTags "tags"
-createCTagsFileCmd file = ghciCreateTagsFile CTags file
-
-createETagsFileCmd ""    = ghciCreateTagsFile ETags "TAGS"
-createETagsFileCmd file  = ghciCreateTagsFile ETags file
-
-data TagsKind = ETags | CTags
-
-ghciCreateTagsFile :: TagsKind -> FilePath -> GHCi ()
-ghciCreateTagsFile kind file = do
-  session <- getSession
-  io $ createTagsFile session kind file
-
--- ToDo: 
--- 	- remove restriction that all modules must be interpreted
---	  (problem: we don't know source locations for entities unless
---	  we compiled the module.
---
---	- extract createTagsFile so it can be used from the command-line
---	  (probably need to fix first problem before this is useful).
---
-createTagsFile :: Session -> TagsKind -> FilePath -> IO ()
-createTagsFile session tagskind tagFile = do
-  graph <- GHC.getModuleGraph session
-  let ms = map GHC.ms_mod graph
-      tagModule m = do 
-        is_interpreted <- GHC.moduleIsInterpreted session m
-        -- should we just skip these?
-        when (not is_interpreted) $
-          throwDyn (CmdLineError ("module '" 
-                                ++ GHC.moduleNameString (GHC.moduleName m)
-                                ++ "' is not interpreted"))
-        mbModInfo <- GHC.getModuleInfo session m
-        let unqual 
-	      | Just modinfo <- mbModInfo,
-		Just unqual <- GHC.modInfoPrintUnqualified modinfo = unqual
-	      | otherwise = GHC.alwaysQualify
-
-        case mbModInfo of 
-          Just modInfo -> return $! listTags unqual modInfo 
-          _            -> return []
-
-  mtags <- mapM tagModule ms
-  either_res <- collateAndWriteTags tagskind tagFile $ concat mtags
-  case either_res of
-    Left e  -> hPutStrLn stderr $ ioeGetErrorString e
-    Right _ -> return ()
-
-listTags :: PrintUnqualified -> GHC.ModuleInfo -> [TagInfo]
-listTags unqual modInfo =
-	   [ tagInfo unqual name loc 
-           | name <- GHC.modInfoExports modInfo
-           , let loc = nameSrcLoc name
-           , isGoodSrcLoc loc
-           ]
-
-type TagInfo = (String -- tag name
-               ,String -- file name
-               ,Int    -- line number
-               ,Int    -- column number
-               )
-
--- get tag info, for later translation into Vim or Emacs style
-tagInfo :: PrintUnqualified -> Name -> SrcLoc -> TagInfo
-tagInfo unqual name loc
-    = ( showSDocForUser unqual $ pprOccName (nameOccName name)
-      , showSDocForUser unqual $ ftext (srcLocFile loc)
-      , srcLocLine loc
-      , srcLocCol loc
-      )
-
-collateAndWriteTags :: TagsKind -> FilePath -> [TagInfo] -> IO (Either IOError ())
-collateAndWriteTags CTags file tagInfos = do -- ctags style, Vim et al
-  let tags = unlines $ sortLe (<=) $ nub $ map showTag tagInfos
-  IO.try (writeFile file tags)
-collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
-  let byFile op (_,f1,_,_) (_,f2,_,_) = f1 `op` f2
-      groups = groupBy (byFile (==)) $ sortLe (byFile (<=)) tagInfos
-  tagGroups <- mapM tagFileGroup groups 
-  IO.try (writeFile file $ concat tagGroups)
-  where
-    tagFileGroup group@[] = throwDyn (CmdLineError "empty tag file group??")
-    tagFileGroup group@((_,fileName,_,_):_) = do
-      file <- readFile fileName -- need to get additional info from sources..
-      let byLine (_,_,l1,_) (_,_,l2,_) = l1 <= l2
-          sortedGroup = sortLe byLine group
-          tags = unlines $ perFile sortedGroup 1 0 $ lines file
-      return $ "\x0c\n" ++ fileName ++ "," ++ show (length tags) ++ "\n" ++ tags
-    perFile (tagInfo@(tag,file,lNo,colNo):tags) count pos (line:lines) | lNo>count =
-      perFile (tagInfo:tags) (count+1) (pos+length line) lines
-    perFile (tagInfo@(tag,file,lNo,colNo):tags) count pos lines@(line:_) | lNo==count =
-      showETag tagInfo line pos : perFile tags count pos lines
-    perFile tags count pos lines = []
-
--- simple ctags format, for Vim et al
-showTag :: TagInfo -> String
-showTag (tag,file,lineNo,colNo)
-    =  tag ++ "\t" ++ file ++ "\t" ++ show lineNo
-
--- etags format, for Emacs/XEmacs
-showETag :: TagInfo -> String -> Int -> String
-showETag (tag,file,lineNo,colNo) line charPos
-    =  take colNo line ++ tag
-    ++ "\x7f" ++ tag
-    ++ "\x01" ++ show lineNo
-    ++ "," ++ show charPos
 
 -----------------------------------------------------------------------------
 -- Browsing a module's contents
@@ -1544,16 +1425,17 @@ breakSwitch session args@(arg1:rest)
         case names of
           []    -> return ()
           (n:_) -> do
-            let loc  = nameSrcLoc n
-                modl = nameModule n
+            let loc  = GHC.nameSrcLoc n
+                modl = GHC.nameModule n
             is_interpreted <- io (GHC.moduleIsInterpreted session modl)
             if not is_interpreted
                then noCanDo $ text "module " <> ppr modl <>
                               text " is not interpreted"
                else do
-            if isGoodSrcLoc loc
-               then findBreakAndSet (nameModule n) $ 
-                         findBreakByCoord (srcLocLine loc, srcLocCol loc)
+            if GHC.isGoodSrcLoc loc
+               then findBreakAndSet (GHC.nameModule n) $ 
+                         findBreakByCoord (GHC.srcLocLine loc, 
+                                           GHC.srcLocCol loc)
                else noCanDo $ text "can't find its location: " <>
                               ppr loc
            where
@@ -1625,10 +1507,10 @@ findBreakByLine line arr
         ticks = arr ! line
 
         starts_here = [ tick | tick@(nm,span) <- ticks,
-                               srcSpanStartLine span == line ]
+                               GHC.srcSpanStartLine span == line ]
 
         (complete,incomplete) = partition ends_here starts_here
-            where ends_here (nm,span) = srcSpanEndLine span == line
+            where ends_here (nm,span) = GHC.srcSpanEndLine span == line
 
 findBreakByCoord :: (Int,Int) -> TickArray -> Maybe (BreakIndex,SrcSpan)
 findBreakByCoord (line, col) arr
@@ -1642,14 +1524,14 @@ findBreakByCoord (line, col) arr
         contains = [ tick | tick@(nm,span) <- ticks, span `spans` (line,col) ]
 
 leftmost_smallest  (_,a) (_,b) = a `compare` b
-leftmost_largest   (_,a) (_,b) = (srcSpanStart a `compare` srcSpanStart b)
+leftmost_largest   (_,a) (_,b) = (GHC.srcSpanStart a `compare` GHC.srcSpanStart b)
                                 `thenCmp`
-                                 (srcSpanEnd b `compare` srcSpanEnd a)
+                                 (GHC.srcSpanEnd b `compare` GHC.srcSpanEnd a)
 rightmost (_,a) (_,b) = b `compare` a
 
 spans :: SrcSpan -> (Int,Int) -> Bool
-spans span (l,c) = srcSpanStart span <= loc && loc <= srcSpanEnd span
-   where loc = mkSrcLoc (srcSpanFile span) l c
+spans span (l,c) = GHC.srcSpanStart span <= loc && loc <= GHC.srcSpanEnd span
+   where loc = GHC.mkSrcLoc (GHC.srcSpanFile span) l c
 
 start_bold = BS.pack "\ESC[1m"
 end_bold   = BS.pack "\ESC[0m"
@@ -1681,11 +1563,11 @@ listAround span do_highlight = do
       --
       BS.putStrLn (BS.join (BS.pack "\n") prefixed)
   where
-        file  = srcSpanFile span
-        line1 = srcSpanStartLine span
-        col1  = srcSpanStartCol span
-        line2 = srcSpanEndLine span
-        col2  = srcSpanEndCol span
+        file  = GHC.srcSpanFile span
+        line1 = GHC.srcSpanStartLine span
+        col1  = GHC.srcSpanStartCol span
+        line2 = GHC.srcSpanEndLine span
+        col2  = GHC.srcSpanEndCol span
 
         pad_before | line1 == 1 = 0
                    | otherwise  = 1
@@ -1731,8 +1613,9 @@ mkTickArray ticks
         [ (line, (nm,span)) | (nm,span) <- ticks,
                               line <- srcSpanLines span ]
     where
-        max_line = maximum (map srcSpanEndLine (map snd ticks))
-        srcSpanLines span = [ srcSpanStartLine span .. srcSpanEndLine span ]
+        max_line = maximum (map GHC.srcSpanEndLine (map snd ticks))
+        srcSpanLines span = [ GHC.srcSpanStartLine span .. 
+                              GHC.srcSpanEndLine span ]
 
 getModBreak :: Module -> GHCi (GHC.BreakArray, Array Int SrcSpan)
 getModBreak mod = do
