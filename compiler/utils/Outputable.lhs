@@ -25,7 +25,7 @@ module Outputable (
 	empty, nest,
 	text, char, ftext, ptext,
 	int, integer, float, double, rational,
-	parens, brackets, braces, quotes, doubleQuotes, angleBrackets,
+	parens, cparen, brackets, braces, quotes, doubleQuotes, angleBrackets,
 	semi, comma, colon, dcolon, space, equals, dot, arrow,
 	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
 	(<>), (<+>), hcat, hsep, 
@@ -310,6 +310,8 @@ braces d sty       = Pretty.braces (d sty)
 brackets d sty     = Pretty.brackets (d sty)
 doubleQuotes d sty = Pretty.doubleQuotes (d sty)
 angleBrackets d    = char '<' <> d <> char '>'
+
+cparen b d sty       = Pretty.cparen b (d sty)
 
 -- quotes encloses something in single quotes...
 -- but it omits them if the thing ends in a single quote

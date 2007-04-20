@@ -162,7 +162,7 @@ module Pretty (
         int, integer, float, double, rational,
         parens, brackets, braces, quotes, doubleQuotes,
         semi, comma, colon, space, equals,
-        lparen, rparen, lbrack, rbrack, lbrace, rbrace,
+        lparen, rparen, lbrack, rbrack, lbrace, rbrace, cparen,
 
         (<>), (<+>), hcat, hsep, 
         ($$), ($+$), vcat, 
@@ -455,6 +455,8 @@ parens p        = char '(' <> p <> char ')'
 brackets p      = char '[' <> p <> char ']'
 braces p        = char '{' <> p <> char '}'
 
+cparen True  = parens
+cparen False = id
 
 hcat = foldr (<>)  empty
 hsep = foldr (<+>) empty
