@@ -2,10 +2,9 @@
 -- Found by Bernie Pope
 
 :set -fglasgow-exts
-:set -fdebugging
 :l ../Test
 
-:break add Test.Test2 40
+:break 40
 poly Unary
 :p x
 :t x

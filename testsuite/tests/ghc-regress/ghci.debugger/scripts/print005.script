@@ -1,7 +1,7 @@
 -- Recovery of types, polymorphic bindings inside a bkpt
-:set -fdebugging
+
 :l ../QSort
-:break add QSort 5
+:break 5
 qsort [8, 4, 42, 16, 15, 23]
 
 :p right
@@ -12,4 +12,4 @@ seq left ()
 :p left
 length left
 :p left
-:break stop
+:continue

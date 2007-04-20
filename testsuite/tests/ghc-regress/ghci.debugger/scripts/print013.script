@@ -7,3 +7,4 @@ let d = Dict 1
 :p d
 seq _t1 ()
 :p d
+:q
