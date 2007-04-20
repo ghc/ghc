@@ -164,6 +164,14 @@ module GHC (
 
 	-- ** Source locations
 	SrcLoc, pprDefnLoc,
+        mkSrcLoc, isGoodSrcLoc,
+	srcLocFile, srcLocLine, srcLocCol,
+        SrcSpan,
+        mkSrcSpan, srcLocSpan,
+        srcSpanStart, srcSpanEnd,
+	srcSpanFile, 
+        srcSpanStartLine, srcSpanEndLine, 
+        srcSpanStartCol, srcSpanEndCol,
 
 	-- * Exceptions
 	GhcException(..), showGhcException,
