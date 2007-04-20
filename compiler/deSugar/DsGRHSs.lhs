@@ -57,19 +57,21 @@ dsGRHSs :: HsMatchContext Name -> [Pat Id]	-- These are to build a MatchContext 
 	-> GRHSs Id				-- Guarded RHSs
 	-> Type					-- Type of RHS
 	-> DsM MatchResult
-dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty =
-   bindLocalsDs (bindsBinders ++ patsBinders) $
-    mappM (dsGRHS hs_ctx pats rhs_ty) grhss	`thenDs` \ match_results ->
+dsGRHSs hs_ctx pats grhssa@(GRHSs grhss binds) rhs_ty =
+   bindLocalsDs binders $ do
+    match_results <- mappM (dsGRHS hs_ctx pats rhs_ty) grhss
     let 
 	match_result1 = foldr1 combineMatchResults match_results
 	match_result2 = adjustMatchResultDs 
-                                 (\e -> bindLocalsDs patsBinders $ dsLocalBinds binds e) 
+                                 (\e -> bindLocalsDs binders $ 
+                                        dsLocalBinds binds e) 
                                  match_result1
 		-- NB: nested dsLet inside matchResult
-    in
+    --
     returnDs match_result2
         where bindsBinders = map unLoc (collectLocalBinders binds)
               patsBinders  = collectPatsBinders (map (L undefined) pats) 
+              binders = bindsBinders ++ patsBinders
 
 dsGRHS hs_ctx pats rhs_ty (L loc (GRHS guards rhs))
   = matchGuards (map unLoc guards) hs_ctx rhs rhs_ty
