@@ -77,7 +77,7 @@ pprintClosureCommand bindThings force str = do
      maybe (return Nothing) `flip` mb_term $ \term -> do
        term'     <- if not bindThings then return term 
                      else bindSuspensions cms term                         
-       showterm  <- pprTerm cms term'
+       showterm  <- printTerm cms term'
        unqual    <- GHC.getPrintUnqual cms
        let showSDocForUserOneLine unqual doc = 
                showDocWith LeftMode (doc (mkErrStyle unqual))
@@ -160,10 +160,10 @@ bindSuspensions cms@(Session ref) t = do
 
 
 --  A custom Term printer to enable the use of Show instances
-pprTerm cms@(Session ref) = customPrintTerm customPrint
+printTerm cms@(Session ref) = cPprTerm cPpr
  where
-  customPrint = \p-> customPrintShowable : customPrintTermBase p 
-  customPrintShowable t@Term{ty=ty, dc=dc, val=val} = do
+  cPpr = \p-> cPprShowable : cPprTermBase p 
+  cPprShowable prec t@Term{ty=ty, dc=dc, val=val} = do
     let hasType = isEmptyVarSet (tyVarsOfType ty)  -- redundant
         isEvaled = isFullyEvaluatedTerm t
     if not isEvaled -- || not hasType
@@ -179,8 +179,10 @@ pprTerm cms@(Session ref) = customPrintTerm customPrint
            GHC.setSessionDynFlags cms dflags{log_action=noop_log}
            mb_txt <- withExtendedLinkEnv [(bname, val)] 
                                          (GHC.compileExpr cms expr)
+           let myprec = 9 -- TODO Infix constructors
            case mb_txt of 
-             Just txt -> return . Just . text . unsafeCoerce# $ txt
+             Just txt -> return . Just . text . unsafeCoerce# 
+                           $ txt
              Nothing  -> return Nothing
          `finally` do 
            writeIORef ref hsc_env

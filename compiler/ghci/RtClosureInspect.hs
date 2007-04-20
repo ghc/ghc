@@ -17,9 +17,9 @@ module RtClosureInspect(
      isIndirection,      -- :: ClosureType -> Bool
 
      Term(..), 
-     printTerm, 
-     customPrintTerm, 
-     customPrintTermBase,
+     pprTerm, 
+     cPprTerm, 
+     cPprTermBase,
      termType,
      foldTerm, 
      TermFold(..), 
@@ -87,9 +87,9 @@ import IO
 
   > (('a',_,_),_,('b',_,_)) = 
       Term ((Char,b,c),d,(Char,e,f)) (,,) (('a',_,_),_,('b',_,_))
-          [ Term (Char, b, c) (,,) ('a',_,_) [Term Char C# "a", Thunk, Thunk]
-          , Thunk
-          , Term (Char, e, f) (,,) ('b',_,_) [Term Char C# "b", Thunk, Thunk]]
+          [ Term (Char, b, c) (,,) ('a',_,_) [Term Char C# "a", Suspension, Suspension]
+          , Suspension
+          , Term (Char, e, f) (,,) ('b',_,_) [Term Char C# "b", Suspension, Suspension]]
 -}
 
 data Term = Term { ty        :: Type 
@@ -122,7 +122,7 @@ isFullyEvaluatedTerm Suspension {}      = False
 isFullyEvaluatedTerm Prim {}            = True
 
 instance Outputable (Term) where
- ppr = head . customPrintTerm customPrintTermBase
+ ppr = head . cPprTerm cPprTermBase
 
 -------------------------------------------------------------------------
 -- Runtime Closure Datatype and functions for retrieving closure related stuff
@@ -142,7 +142,6 @@ data Closure = Closure { tipe         :: ClosureType
                        , infoPtr      :: Ptr ()
                        , infoTable    :: StgInfoTable
                        , ptrs         :: Array Int HValue
-                        -- What would be the type here? HValue is ok? Should I build a Ptr?
                        , nonPtrs      :: ByteArray# 
                        }
 
@@ -289,79 +288,75 @@ idTermFoldM = TermFold {
 -- Pretty printing of terms
 ----------------------------------
 
-parensCond True  = parens
-parensCond False = id
 app_prec::Int
 app_prec = 10
 
-printTerm :: Term -> SDoc
-printTerm Prim{value=value} = text value 
-printTerm t@Term{} = printTerm1 0 t 
-printTerm Suspension{bound_to=Nothing} =  char '_' -- <> ppr ct <> char '_'
-printTerm Suspension{mb_ty=Just ty, bound_to=Just n}
-  | Just _ <- splitFunTy_maybe ty = text "<function>"
-  | otherwise = parens$ ppr n <> text "::" <> ppr ty 
-
-printTerm1 p Term{dc=dc, subTerms=tt} 
+pprTerm :: Int -> Term -> SDoc
+pprTerm p Term{dc=dc, subTerms=tt} 
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt 
-  = parens (printTerm1 True t1 <+> ppr dc <+> printTerm1 True ppr t2) 
-    <+> hsep (map (printTerm1 True) tt) 
+  = parens (pprTerm1 True t1 <+> ppr dc <+> pprTerm1 True ppr t2) 
+    <+> hsep (map (pprTerm1 True) tt) 
 -}
   | null tt   = ppr dc
-  | otherwise = parensCond (p > app_prec) 
-                     (ppr dc <+> sep (map (printTerm1 (app_prec+1)) tt))
+  | otherwise = cparen (p >= app_prec) 
+                       (ppr dc <+> sep (map (pprTerm app_prec) tt))
 
   where fixity   = undefined 
 
-printTerm1 _ t = printTerm t
+pprTerm _ t = pprTerm1 t
 
-customPrintTerm :: forall m. Monad m => ((Int->Term->m SDoc)->[Term->m (Maybe SDoc)]) -> Term -> m SDoc
-customPrintTerm custom = go 0 where
---  go :: Monad m => Int -> Term -> m SDoc
+pprTerm1 Prim{value=value} = text value 
+pprTerm1 t@Term{} = pprTerm 0 t 
+pprTerm1 Suspension{bound_to=Nothing} =  char '_' -- <> ppr ct <> char '_'
+pprTerm1 Suspension{mb_ty=Just ty, bound_to=Just n}
+  | Just _ <- splitFunTy_maybe ty = ptext SLIT("<function>")
+  | otherwise = parens$ ppr n <> text "::" <> ppr ty 
+
+
+cPprTerm :: forall m. Monad m => ((Int->Term->m SDoc)->[Int->Term->m (Maybe SDoc)]) -> Term -> m SDoc
+cPprTerm custom = go 0 where
   go prec t@Term{subTerms=tt, dc=dc} = do
-    let mb_customDocs = map ($t) (custom go) :: [m (Maybe SDoc)]    
+    let mb_customDocs = map (($t) . ($prec)) (custom go) :: [m (Maybe SDoc)]    
     first_success <- firstJustM mb_customDocs
     case first_success of
-      Just doc -> return$ parensCond (prec>app_prec+1) doc
+      Just doc -> return$ cparen (prec>app_prec+1) doc
 --    | dataConIsInfix dc, (t1:t2:tt') <- tt =
       Nothing  -> do pprSubterms <- mapM (go (app_prec+1)) tt
-                     return$ parensCond (prec>app_prec+1) 
-                                        (ppr dc <+> sep pprSubterms)
-  go _ t = return$ printTerm t
+                     return$ cparen (prec >= app_prec) 
+                                    (ppr dc <+> sep pprSubterms)
+  go _ t = return$ pprTerm1 t
   firstJustM (mb:mbs) = mb >>= maybe (firstJustM mbs) (return . Just)
   firstJustM [] = return Nothing
 
-customPrintTermBase :: Monad m => (Int->Term-> m SDoc)->[Term->m (Maybe SDoc)]
-customPrintTermBase showP =
+cPprTermBase :: Monad m => (Int->Term-> m SDoc)->[Int->Term->m (Maybe SDoc)]
+cPprTermBase pprP =
   [ 
-    test isTupleDC (liftM (parens . hcat . punctuate comma) . mapM (showP 0) . subTerms)
-  , test (isDC consDataCon) (\Term{subTerms=[h,t]} -> doList h t)
-  , test (isDC intDataCon)  (coerceShow$ \(a::Int)->a)
-  , test (isDC charDataCon) (coerceShow$ \(a::Char)->a)
---  , test (isDC wordDataCon) (coerceShow$ \(a::Word)->a)
-  , test (isDC floatDataCon) (coerceShow$ \(a::Float)->a)
-  , test (isDC doubleDataCon) (coerceShow$ \(a::Double)->a)
-  , test isIntegerDC (coerceShow$ \(a::Integer)->a)
+    ifTerm isTupleDC            (\_ -> liftM (parens . hcat . punctuate comma) 
+                                 . mapM (pprP (-1)) . subTerms)
+  , ifTerm (isDC consDataCon)   (\ p Term{subTerms=[h,t]} -> doList p h t)
+  , ifTerm (isDC intDataCon)    (coerceShow$ \(a::Int)->a)
+  , ifTerm (isDC charDataCon)   (coerceShow$ \(a::Char)->a)
+--  , ifTerm (isDC wordDataCon) (coerceShow$ \(a::Word)->a)
+  , ifTerm (isDC floatDataCon)  (coerceShow$ \(a::Float)->a)
+  , ifTerm (isDC doubleDataCon) (coerceShow$ \(a::Double)->a)
+  , ifTerm isIntegerDC          (coerceShow$ \(a::Integer)->a)
   ] 
-     where test pred f t = if pred t then liftM Just (f t) else return Nothing
+     where ifTerm pred f p t = if pred t then liftM Just (f p t) else return Nothing
            isIntegerDC Term{dc=dc} = 
               dataConName dc `elem` [ smallIntegerDataConName
                                     , largeIntegerDataConName] 
-           isTupleDC Term{dc=dc}   = dc `elem` snd (unzip (elems boxedTupleArr))
-           isDC a_dc Term{dc=dc}   = a_dc == dc
-           coerceShow f = return . text . show . f . unsafeCoerce# . val
+           isTupleDC Term{dc=dc} = dc `elem` snd (unzip (elems boxedTupleArr))
+           isDC a_dc Term{dc=dc} = a_dc == dc
+           coerceShow f _ = return . text . show . f . unsafeCoerce# . val
            --TODO pprinting of list terms is not lazy
-           doList h t = do
+           doList p h t = do
                let elems = h : getListTerms t
-                   isConsLast = isSuspension (last elems) && 
-                                (mb_ty$ last elems) /= (termType h)
-               init <- mapM (showP 0) (init elems) 
-               last0 <- showP 0 (last elems)
-               let last = case length elems of 
-                            1 -> last0 
-                            _ | isConsLast -> text " | " <> last0
-                            _ -> comma <> last0
-               return$ brackets (hcat (punctuate comma init ++ [last]))
+                   isConsLast = termType(last elems) /= termType h
+               print_elems <- mapM (pprP 5) elems
+               return$ if isConsLast
+                     then cparen (p >= 5) . hsep . punctuate (space<>colon) 
+                           $ print_elems
+                     else brackets (hcat$ punctuate comma print_elems)
 
                 where Just a /= Just b = not (a `coreEqType` b)
                       _      /=   _    = True
