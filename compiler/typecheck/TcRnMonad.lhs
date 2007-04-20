@@ -14,14 +14,6 @@ module TcRnMonad(
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
-#if defined(GHCI)
-import TypeRep
-import IdInfo
-import TysWiredIn
-import PrelNames
-import {-#SOURCE#-} TcEnv
-#endif
-
 import HsSyn hiding (LIE)
 import HscTypes
 import Module
