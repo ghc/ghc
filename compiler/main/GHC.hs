@@ -2326,7 +2326,7 @@ extendEnvironment hsc_env apStack idsOffsets = do
        new_type_env = extendTypeEnvWithIds filtered_type_env (typed_ids)
        new_ic = ictxt { ic_rn_local_env = new_rn_env, 
 		        ic_type_env     = new_type_env }
-   Linker.extendLinkEnv (zip names hValues) -- ToDo: we must remember to restore the old env after we finish a breakpoint
+   Linker.extendLinkEnv (zip names hValues)
    return (hsc_env{hsc_IC = new_ic}, names)
   where
    globaliseAndTidy :: Id -> Id
