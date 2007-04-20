@@ -496,9 +496,10 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
    tv <- case (isMonomorphic `fmap` mb_ty) of
           Just True -> return (fromJust mb_ty)
           _         -> do
-            tv   <- liftM mkTyVarTy (newVar argTypeKind)
-            instScheme (sigmaType$ fromJust mb_ty) >>= addConstraint tv
-            return tv
+            tv_ <- liftM mkTyVarTy (newVar argTypeKind)
+            when (isJust mb_ty) $ 
+                 instScheme (sigmaType$ fromJust mb_ty) >>= addConstraint tv_
+            return tv_
    go tv (fromMaybe tv mb_ty) hval
     where 
   go tv ty a = do 
@@ -535,7 +536,7 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
                 subTerms   = reOrderTerms subTermsP subTermsNP (drop extra_args subTtypes)
             return (Term tv dc a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
-      otherwise -> do
+      otherwise -> 
          return (Suspension (tipe clos) (Just tv) a Nothing)
 
 -- Access the array of pointers and recurse down. Needs to be done with
