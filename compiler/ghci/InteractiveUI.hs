@@ -102,6 +102,7 @@ builtin_commands = [
 	-- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",		keepGoing help,			False, completeNone),
   ("add",	keepGoingPaths addModule,	False, completeFilename),
+  ("abandon",   keepGoing abandonCmd,           False, completeNone),
   ("break",     keepGoing breakCmd,             False, completeIdentifier),
   ("browse",    keepGoing browseCmd,		False, completeModule),
   ("cd",    	keepGoing changeDirectory,	False, completeFilename),
@@ -146,6 +147,7 @@ helpText =
  "\n" ++
  "   <stmt>                      evaluate/run <stmt>\n" ++
  "   :add <filename> ...         add module(s) to the current target set\n" ++
+ "   :abandon                    at a breakpoint, abandon current computation\n" ++
  "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
  "   :break <name>               set a breakpoint on the specified function\n" ++
  "   :browse [*]<module>         display the names defined by <module>\n" ++
@@ -1382,6 +1384,16 @@ doContinue actionBeforeCont = do
          names <- switchOnRunResult runResult
          finishEvalExpr names
          return False
+
+abandonCmd :: String -> GHCi ()
+abandonCmd "" = do
+   mb_res <- popResume
+   case mb_res of
+      Nothing -> do 
+         io $ putStrLn "There is no computation running."
+      Just (span,_,_) ->
+         return ()
+         -- the prompt will change to indicate the new context
 
 deleteCmd :: String -> GHCi ()
 deleteCmd argLine = do
