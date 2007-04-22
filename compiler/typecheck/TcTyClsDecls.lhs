@@ -960,23 +960,23 @@ checkValidTyCon tc
 		-- NB: this check assumes that all the constructors of a given
 		-- data type use the same type variables
         where
-        tvs1 = mkVarSet (dataConAllTyVars con1)
-        res1 = dataConResTys con1
+	(tvs1, _, _, res1) = dataConSig con1
+        ts1 = mkVarSet tvs1
         fty1 = dataConFieldType con1 label
 
         checkOne (_, con2)    -- Do it bothways to ensure they are structurally identical
-	    = do { checkFieldCompat label con1 con2 tvs1 res1 res2 fty1 fty2
-		 ; checkFieldCompat label con2 con1 tvs2 res2 res1 fty2 fty1 }
+	    = do { checkFieldCompat label con1 con2 ts1 res1 res2 fty1 fty2
+		 ; checkFieldCompat label con2 con1 ts2 res2 res1 fty2 fty1 }
 	    where        
-                tvs2 = mkVarSet (dataConAllTyVars con2)
-		res2 = dataConResTys con2 
+		(tvs2, _, _, res2) = dataConSig con2
+	   	ts2 = mkVarSet tvs2
                 fty2 = dataConFieldType con2 label
 
 checkFieldCompat fld con1 con2 tvs1 res1 res2 fty1 fty2
   = do	{ checkTc (isJust mb_subst1) (resultTypeMisMatch fld con1 con2)
 	; checkTc (isJust mb_subst2) (fieldTypeMisMatch fld con1 con2) }
   where
-    mb_subst1 = tcMatchTys tvs1 res1 res2
+    mb_subst1 = tcMatchTy tvs1 res1 res2
     mb_subst2 = tcMatchTyX tvs1 (expectJust "checkFieldCompat" mb_subst1) fty1 fty2
 
 -------------------------------
@@ -1003,7 +1003,7 @@ checkNewDataCon con
 		-- No existentials
     }
   where
-    (univ_tvs, ex_tvs, eq_spec, theta, arg_tys) = dataConFullSig con
+    (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig con
 
 -------------------------------
 checkValidClass :: Class -> TcM ()

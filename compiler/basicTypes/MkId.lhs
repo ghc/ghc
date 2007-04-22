@@ -44,7 +44,6 @@ import TysWiredIn
 import PrelRules
 import Type
 import TcGadt
-import HsBinds
 import Coercion
 import TcType
 import CoreUtils
@@ -162,8 +161,8 @@ Notice that
   Making an explicit case expression allows the simplifier to eliminate
   it in the (common) case where the constructor arg is already evaluated.
 
-[Wrappers for data instance tycons]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Wrappers for data instance tycons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the case of data instances, the wrapper also applies the coercion turning
 the representation type into the family instance type to cast the result of
 the wrapper.  For example, consider the declarations
@@ -171,27 +170,45 @@ the wrapper.  For example, consider the declarations
   data family Map k :: * -> *
   data instance Map (a, b) v = MapPair (Map a (Pair b v))
 
-The tycon to which the datacon MapPair belongs gets a unique internal name of
-the form :R123Map, and we call it the representation tycon.  In contrast, Map
-is the family tycon (accessible via tyConFamInst_maybe).  The wrapper and work
-of MapPair get the types
-
-  $WMapPair :: forall a b v. Map a (Map a b v) -> Map (a, b) v
-  $wMapPair :: forall a b v. Map a (Map a b v) -> :R123Map a b v
-
-which implies that the wrapper code will have to apply the coercion moving
-between representation and family type.  It is accessible via
+The tycon to which the datacon MapPair belongs gets a unique internal
+name of the form :R123Map, and we call it the representation tycon.
+In contrast, Map is the family tycon (accessible via
+tyConFamInst_maybe). A coercion allows you to move between
+representation and family type.  It is accessible from :R123Map via
 tyConFamilyCoercion_maybe and has kind
 
   Co123Map a b v :: {Map (a, b) v :=: :R123Map a b v}
 
+The wrapper and worker of MapPair get the types
+
+  $WMapPair :: forall a b v. Map a (Map a b v) -> Map (a, b) v
+  $WMapPair a b v = $wMapPair a b v `cast` sym (Co123Map a b v)
+
+  $wMapPair :: forall a b v. Map a (Map a b v) -> :R123Map a b v
+
 This coercion is conditionally applied by wrapFamInstBody.
+
+It's a bit more complicated if the data instance is a GADT as well!
+
+   data instance T [a] where
+	T1 :: forall b. b -> T [Maybe b]
+Hence
+   Co7T a :: T [a] ~ :R7T a
+
+Now we want
+
+  $WT1 :: forall b. b -> T [Maybe b]
+  $WT1 a b v = $wT1 b (Maybe b) (Maybe b) 
+			`cast` sym (Co7T (Maybe b))
+
+  $wT1 :: forall b c. (b ~ Maybe c) => b -> :R7T c
 
 \begin{code}
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
 mkDataConIds wrap_name wkr_name data_con
-  | isNewTyCon tycon
-  = DCIds Nothing nt_work_id                 -- Newtype, only has a worker
+  | isNewTyCon tycon			-- Newtype, only has a worker
+  , not (isFamInstTyCon tycon)		-- unless it's a family instancex
+  = DCIds Nothing nt_work_id                 
 
   | any isMarkedStrict all_strict_marks	     -- Algebraic, needs wrapper
     || not (null eq_spec)		     -- NB: LoadIface.ifaceDeclSubBndrs
@@ -202,34 +219,18 @@ mkDataConIds wrap_name wkr_name data_con
   = DCIds Nothing wrk_id
   where
     (univ_tvs, ex_tvs, eq_spec, 
-     theta, orig_arg_tys)          = dataConFullSig data_con
-    tycon                          = dataConTyCon data_con
+     theta, orig_arg_tys, res_ty) = dataConFullSig data_con
+    res_ty_args			  = tyConAppArgs res_ty
+    tycon                         = dataConTyCon data_con
 
 	----------- Wrapper --------------
 	-- We used to include the stupid theta in the wrapper's args
 	-- but now we don't.  Instead the type checker just injects these
 	-- extra constraints where necessary.
     wrap_tvs = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
-    subst	   = mkTopTvSubst eq_spec
-    famSubst	   = ASSERT( length (tyConTyVars tycon  ) ==  
-			     length (mkTyVarTys univ_tvs)   )
-		     zipTopTvSubst (tyConTyVars tycon) (mkTyVarTys univ_tvs)
-		     -- substitution mapping the type constructor's type
-		     -- arguments to the universals of the data constructor
-		     -- (crucial when type checking interfaces)
-    dict_tys       = mkPredTys theta
-    result_ty_args = substTyVars subst univ_tvs
-    result_ty      = case tyConFamInst_maybe tycon of
-		         -- ordinary constructor
-		       Nothing            -> mkTyConApp tycon result_ty_args
-		         -- family instance constructor
-		       Just (familyTyCon, 
-			     instTys)     -> 
-		         mkTyConApp familyTyCon ( substTys subst 
-						. substTys famSubst 
-						$ instTys)
-    wrap_ty        = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
-	             mkFunTys orig_arg_tys $ result_ty
+    dict_tys = mkPredTys theta
+    wrap_ty  = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
+	       mkFunTys orig_arg_tys $ res_ty
 	-- NB: watch out here if you allow user-written equality 
 	--     constraints in data constructor signatures
 
@@ -283,7 +284,7 @@ mkDataConIds wrap_name wkr_name data_con
 	  	   -- e.g. 	newtype Eq a => T a = MkT (...)
 	  	   mkCompulsoryUnfolding $ 
 	  	   mkLams wrap_tvs $ Lam id_arg1 $ 
-	  	   wrapNewTypeBody tycon result_ty_args
+	  	   wrapNewTypeBody tycon res_ty_args
                        (Var id_arg1)
 
     id_arg1 = mkTemplateLocal 1 (head orig_arg_tys)
@@ -318,10 +319,10 @@ mkDataConIds wrap_name wkr_name data_con
 		    (zip (dict_args ++ id_args) all_strict_marks)
 		    i3 []
 
-    con_app _ rep_ids = wrapFamInstBody tycon result_ty_args $
-			  Var wrk_id `mkTyApps`  result_ty_args
-				     `mkVarApps` ex_tvs
-				     `mkTyApps`  map snd eq_spec
+    con_app _ rep_ids = wrapFamInstBody tycon res_ty_args $
+			  Var wrk_id `mkTyApps`  res_ty_args
+				     `mkVarApps` ex_tvs			
+				     `mkTyApps`  map snd eq_spec	-- Equality evidence 
 				     `mkVarApps` reverse rep_ids
 
     (dict_args,i2) = mkLocals 1  dict_tys
@@ -340,7 +341,7 @@ mkDataConIds wrap_name wkr_name data_con
 		MarkedStrict 
 		   | isUnLiftedType (idType arg) -> body i (arg:rep_args)
 		   | otherwise ->
-			Case (Var arg) arg result_ty [(DEFAULT,[], body i (arg:rep_args))]
+			Case (Var arg) arg res_ty [(DEFAULT,[], body i (arg:rep_args))]
 
 		MarkedUnboxed
 		   -> unboxProduct i (Var arg) (idType arg) the_body 
@@ -361,18 +362,6 @@ mAX_CPR_SIZE = 10
 mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
 	       where
 		 n = length tys
-
--- If the type constructor is a representation type of a data instance, wrap
--- the expression into a cast adjusting the expression type, which is an
--- instance of the representation type, to the corresponding instance of the
--- family instance type.
---
-wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
-wrapFamInstBody tycon args result_expr
-  | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
-  | otherwise
-  = result_expr
 \end{code}
 
 
@@ -453,23 +442,41 @@ Note the forall'd tyvars of the selector are just the free tyvars
 of the result type; there may be other tyvars in the constructor's
 type (e.g. 'b' in T2).
 
+Note [Selector running example]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's OK to combine GADTs and type families.  Here's a running example:
+
+	data instance T [a] where 
+	  T1 { fld :: b } :: T [Maybe b]
+
+The representation type looks like this
+	data :R7T a where
+	  T1 { fld :: b } :: :R7T (Maybe b)
+
+and there's coercion from the family type to the representation type
+	:CoR7T a :: T [a] ~ :R7T a
+
+The selector we want for fld looks like this:
+
+	fld :: forall b. T [Maybe b] -> b
+	fld = /\b. \(d::T [Maybe b]).
+	      case d `cast` :CoR7T (Maybe b) of 
+		T1 (x::b) -> x
+
+The scrutinee of the case has type :R7T (Maybe b), which can be
+gotten by appying the eq_spec to the univ_tvs of the data con.
+
 \begin{code}
-
--- Steps for handling "naughty" vs "non-naughty" selectors:
---  1. Determine naughtiness by comparing field type vs result type
---  2. Install naughty ones with selector_ty of type _|_ and fill in mzero for info
---  3. If it's not naughty, do the normal plan.
-
 mkRecordSelId :: TyCon -> FieldLabel -> Id
 mkRecordSelId tycon field_label
 	-- Assumes that all fields with the same field label have the same type
   | is_naughty = naughty_id
   | otherwise  = sel_id
   where
-    is_naughty = not (tyVarsOfType field_ty `subVarSet` res_tv_set)
+    is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tv_set)
     sel_id_details = RecordSelId tycon field_label is_naughty
 
-    -- Escapist case here for naughty construcotrs
+    -- Escapist case here for naughty constructors
     -- We give it no IdInfo, and a type of forall a.a (never looked at)
     naughty_id = mkGlobalId sel_id_details field_label forall_a_a noCafIdInfo
     forall_a_a = mkForAllTy alphaTyVar (mkTyVarTy alphaTyVar)
@@ -481,10 +488,9 @@ mkRecordSelId tycon field_label
     has_field con     = field_label `elem` dataConFieldLabels con
 
     con1	= head data_cons_w_field
-    res_tys	= dataConResTys con1
-    res_tv_set	= tyVarsOfTypes res_tys
-    res_tvs	= varSetElems res_tv_set
-    data_ty	= mkTyConApp tycon res_tys
+    (univ_tvs, _, eq_spec, _, _, data_ty) = dataConFullSig con1
+    data_tv_set	= tyVarsOfType data_ty
+    data_tvs	= varSetElems data_tv_set
     field_ty	= dataConFieldType con1 field_label
     
 	-- *Very* tiresomely, the selectors are (unnecessarily!) overloaded over
@@ -499,10 +505,9 @@ mkRecordSelId tycon field_label
     n_stupid_dicts  = length stupid_dict_tys
 
     (field_tyvars,pre_field_theta,field_tau) = tcSplitSigmaTy field_ty
-  
-    field_theta  = filter (not . isEqPred) pre_field_theta
-    field_dict_tys			 = mkPredTys field_theta
-    n_field_dict_tys			 = length field_dict_tys
+    field_theta       = filter (not . isEqPred) pre_field_theta
+    field_dict_tys    = mkPredTys field_theta
+    n_field_dict_tys  = length field_dict_tys
 	-- If the field has a universally quantified type we have to 
 	-- be a bit careful.  Suppose we have
 	--	data R = R { op :: forall a. Foo a => a -> a }
@@ -519,7 +524,7 @@ mkRecordSelId tycon field_label
 	--	op (R op) = op
 
     selector_ty :: Type
-    selector_ty  = mkForAllTys res_tvs $ mkForAllTys field_tyvars $
+    selector_ty  = mkForAllTys data_tvs $ mkForAllTys field_tyvars $
 		   mkFunTys stupid_dict_tys  $  mkFunTys field_dict_tys $
 		   mkFunTy data_ty field_tau
       
@@ -546,7 +551,8 @@ mkRecordSelId tycon field_label
     field_dict_ids   = mkTemplateLocalsNum field_dict_base field_dict_tys
     dict_id_base     = field_dict_base + n_field_dict_tys
     data_id	     = mkTemplateLocal dict_id_base data_ty
-    arg_base	     = dict_id_base + 1
+    scrut_id	     = mkTemplateLocal (dict_id_base+1) scrut_ty
+    arg_base	     = dict_id_base + 2
 
     the_alts :: [CoreAlt]
     the_alts   = map mk_alt data_cons_w_field	-- Already sorted by data-con
@@ -559,14 +565,19 @@ mkRecordSelId tycon field_label
     caf_info    | no_default = NoCafRefs
 	        | otherwise  = MayHaveCafRefs
 
-    sel_rhs = mkLams res_tvs $ mkLams field_tyvars $ 
+    sel_rhs = mkLams data_tvs $ mkLams field_tyvars $ 
 	      mkLams stupid_dict_ids $ mkLams field_dict_ids $
-	      Lam data_id     $ mk_result sel_body
+	      Lam data_id $ mk_result sel_body
+
+    scrut_ty_args = substTyVars (mkTopTvSubst eq_spec) univ_tvs
+    scrut_ty	  = mkTyConApp tycon scrut_ty_args
+    scrut = unwrapFamInstScrut tycon scrut_ty_args (Var data_id)
+	-- First coerce from the type family to the representation type
 
 	-- NB: A newtype always has a vanilla DataCon; no existentials etc
-	--     res_tys will simply be the dataConUnivTyVars
-    sel_body | isNewTyCon tycon = unwrapNewTypeBody tycon res_tys (Var data_id)
-	     | otherwise	= Case (Var data_id) data_id field_ty (default_alt ++ the_alts)
+	--     data_tys will simply be the dataConUnivTyVars
+    sel_body | isNewTyCon tycon = unwrapNewTypeBody tycon scrut_ty_args scrut
+	     | otherwise	= Case scrut scrut_id field_ty (default_alt ++ the_alts)
 
     mk_result poly_result = mkVarApps (mkVarApps poly_result field_tyvars) field_dict_ids
 	-- We pull the field lambdas to the top, so we need to 
@@ -577,12 +588,12 @@ mkRecordSelId tycon field_label
 	--	foo = /\a. \t:T. case t of { MkT f -> f a }
 
     mk_alt data_con 
-      =   ASSERT2( res_ty `tcEqType` field_ty, ppr data_con $$ ppr res_ty $$ ppr field_ty )
+      =   ASSERT2( data_ty `tcEqType` field_ty, ppr data_con $$ ppr data_ty $$ ppr field_ty )
 	  mkReboxingAlt rebox_uniqs data_con (ex_tvs ++ co_tvs ++ arg_vs) rhs
       where
            -- get pattern binders with types appropriately instantiated
 	arg_uniqs = map mkBuiltinUnique [arg_base..]
-        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat arg_uniqs data_con res_tys
+        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat arg_uniqs data_con scrut_ty_args
 
 	rebox_base  = arg_base + length ex_tvs + length co_tvs + length arg_vs
 	rebox_uniqs = map mkBuiltinUnique [rebox_base..]
@@ -599,9 +610,9 @@ mkRecordSelId tycon field_label
 		-- and apply to (Maybe b'), to get (Maybe b)
         Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs
 	the_arg_id_ty = idType the_arg_id
-        (rhs, res_ty) = case refineType refinement the_arg_id_ty of
-			  Just (co, res_ty) -> (Cast (Var the_arg_id) co, res_ty)
-			  Nothing	    -> (Var the_arg_id, the_arg_id_ty)
+        (rhs, data_ty) = case refineType refinement the_arg_id_ty of
+			  Just (co, data_ty) -> (Cast (Var the_arg_id) co, data_ty)
+			  Nothing	     -> (Var the_arg_id, the_arg_id_ty)
 
 	field_vs    = filter (not . isPredTy . idType) arg_vs 
     	the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` field_vs) field_label
@@ -806,7 +817,16 @@ mkDictSelId name clas
     rhs_body | isNewTyCon tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
 	     | otherwise	= Case (Var dict_id) dict_id (idType the_arg_id)
 			     	       [(DataAlt data_con, arg_ids, Var the_arg_id)]
+\end{code}
 
+
+%************************************************************************
+%*									*
+	Wrapping and unwrapping newtypes and type families
+%*									*
+%************************************************************************
+
+\begin{code}
 wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- The wrapper for the data constructor for a newtype looks like this:
 --	newtype T a = MkT (a,Int)
@@ -818,14 +838,14 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- body of the wrapper, namely
 --	e `cast` (CoT [a])
 --
--- If a coercion constructor is prodivided in the newtype, then we use
+-- If a coercion constructor is provided in the newtype, then we use
 -- it, otherwise the wrap/unwrap are both no-ops 
 --
--- If the we are dealing with a newtype instance, we have a second coercion
+-- If the we are dealing with a newtype *instance*, we have a second coercion
 -- identifying the family instance with the constructor of the newtype
 -- instance.  This coercion is applied in any case (ie, composed with the
 -- coercion constructor of the newtype or applied by itself).
---
+
 wrapNewTypeBody tycon args result_expr
   = wrapFamInstBody tycon args inner
   where
@@ -839,7 +859,7 @@ wrapNewTypeBody tycon args result_expr
 -- be done via a CoPat by the type checker.  We have to do it this way as
 -- computing the right type arguments for the coercion requires more than just
 -- a spliting operation (cf, TcPat.tcConPat).
---
+
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
   | Just co_con <- newTyConCo_maybe tycon
@@ -847,7 +867,24 @@ unwrapNewTypeBody tycon args result_expr
   | otherwise
   = result_expr
 
+-- If the type constructor is a representation type of a data instance, wrap
+-- the expression into a cast adjusting the expression type, which is an
+-- instance of the representation type, to the corresponding instance of the
+-- family instance type.
+-- See Note [Wrappers for data instance tycons]
+wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+wrapFamInstBody tycon args body
+  | Just co_con <- tyConFamilyCoercion_maybe tycon
+  = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) body
+  | otherwise
+  = body
 
+unwrapFamInstScrut :: TyCon -> [Type] -> CoreExpr -> CoreExpr
+unwrapFamInstScrut tycon args scrut
+  | Just co_con <- tyConFamilyCoercion_maybe tycon
+  = mkCoerce (mkTyConApp co_con args) scrut
+  | otherwise
+  = scrut
 \end{code}
 
 

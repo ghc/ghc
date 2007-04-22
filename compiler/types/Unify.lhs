@@ -7,7 +7,8 @@ module Unify (
 	-- Matching of types: 
 	--	the "tc" prefix indicates that matching always
 	--	respects newtypes (rather than looking through them)
-	tcMatchTys, tcMatchTyX, ruleMatchTyX, tcMatchPreds, MatchEnv(..)
+	tcMatchTy, tcMatchTys, tcMatchTyX, 
+	ruleMatchTyX, tcMatchPreds, MatchEnv(..)
    ) where
 
 #include "HsVersions.h"
@@ -57,10 +58,26 @@ data MatchEnv
  	, me_env   :: RnEnv2	-- Renaming envt for nested foralls
 	}			--   In-scope set includes template tyvars
 
+tcMatchTy :: TyVarSet		-- Template tyvars
+	  -> Type		-- Template
+	  -> Type		-- Target
+	  -> Maybe TvSubst	-- One-shot; in principle the template
+				-- variables could be free in the target
+
+tcMatchTy tmpls ty1 ty2
+  = case match menv emptyTvSubstEnv ty1 ty2 of
+	Just subst_env -> Just (TvSubst in_scope subst_env)
+	Nothing	       -> Nothing
+  where
+    menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
+    in_scope = mkInScopeSet (tmpls `unionVarSet` tyVarsOfType ty2)
+	-- We're assuming that all the interesting 
+	-- tyvars in tys1 are in tmpls
+
 tcMatchTys :: TyVarSet		-- Template tyvars
-	 -> [Type]		-- Template
-	 -> [Type]		-- Target
-	 -> Maybe TvSubst	-- One-shot; in principle the template
+	   -> [Type]		-- Template
+	   -> [Type]		-- Target
+	   -> Maybe TvSubst	-- One-shot; in principle the template
 				-- variables could be free in the target
 
 tcMatchTys tmpls tys1 tys2

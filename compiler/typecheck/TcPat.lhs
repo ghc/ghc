@@ -546,7 +546,7 @@ tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon
 	 -> HsConDetails Name (LPat Name) -> (PatState -> TcM a)
 	 -> TcM (Pat TcId, [TcTyVar], a)
 tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
-  = do	{ let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys) = dataConFullSig data_con
+  = do	{ let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
 	      skol_info = PatSkol data_con
 	      origin    = SigOrigin skol_info
 
@@ -583,8 +583,8 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	     ex_tvs' ++ inner_tvs, res)
 	}
   where
-    -- Split against the family tycon if the pattern constructor belongs to a
-    -- representation tycon.
+    -- Split against the family tycon if the pattern constructor 
+    -- belongs to a representation tycon.
     --
     boxySplitTyConAppWithFamily tycon pat_ty =
       traceTc traceMsg >>

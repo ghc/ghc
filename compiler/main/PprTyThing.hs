@@ -18,8 +18,9 @@ module PprTyThing (
 
 import qualified GHC
 
-import GHC ( TyThing(..), SrcLoc )
-import DataCon ( dataConResTys )
+import TyCon	( tyConFamInst_maybe )
+import Type	( pprTypeApp )
+import GHC	( TyThing(..), SrcLoc )
 import Outputable
 
 -- -----------------------------------------------------------------------------
@@ -66,8 +67,11 @@ pprTyThingHdr exts (ADataCon dataCon) = pprDataConSig exts dataCon
 pprTyThingHdr exts (ATyCon tyCon)     = pprTyConHdr   exts tyCon
 pprTyThingHdr exts (AClass cls)       = pprClassHdr   exts cls
         
-pprTyConHdr exts tyCon =
-  addFamily (ptext keyword) <+> ppr_bndr tyCon <+> hsep (map ppr vars)
+pprTyConHdr exts tyCon
+  | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
+  = ptext keyword <+> ptext SLIT("instance") <+> pprTypeApp (ppr_bndr tyCon) tys
+  | otherwise
+  = ptext keyword <+> opt_family <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
     vars | GHC.isPrimTyCon tyCon || 
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
@@ -77,9 +81,9 @@ pprTyConHdr exts tyCon =
             | GHC.isNewTyCon tyCon = SLIT("newtype")
             | otherwise            = SLIT("data")
 
-    addFamily keytext 
-      | GHC.isOpenTyCon tyCon = keytext <> ptext SLIT(" family")
-      | otherwise             = keytext
+    opt_family
+      | GHC.isOpenTyCon tyCon = ptext SLIT("family")
+      | otherwise             = empty
 
 pprDataConSig exts dataCon =
   ppr_bndr dataCon <+> dcolon <+> pprType exts (GHC.dataConType dataCon)
@@ -143,10 +147,9 @@ pprDataConDecl exts gadt_style show_label dataCon
   | otherwise      = ppr_bndr dataCon <+> dcolon <+> 
 			sep [ ppr_tvs, GHC.pprThetaArrow theta, pp_tau ]
   where
-    (tyvars, theta, argTypes) = GHC.dataConSig dataCon
+    (tyvars, theta, argTypes, res_ty) = GHC.dataConSig dataCon
     tyCon = GHC.dataConTyCon dataCon
     labels = GHC.dataConFieldLabels dataCon
-    res_tys = dataConResTys dataCon
     qualVars = filter (flip notElem (GHC.tyConTyVars tyCon)) tyvars
     stricts = GHC.dataConStrictMarks dataCon
     tys_w_strs = zip stricts argTypes
@@ -157,8 +160,7 @@ pprDataConDecl exts gadt_style show_label dataCon
 				hsep (map ppr qualVars) <> dot
 
 	-- printing out the dataCon as a type signature, in GADT style
-    pp_tau = foldr add pp_res_ty tys_w_strs
-    pp_res_ty = GHC.pprTypeApp (ppr_bndr tyCon) res_tys
+    pp_tau = foldr add (ppr res_ty) tys_w_strs
     add (str,ty) pp_ty = pprBangTy str ty <+> arrow <+> pp_ty
 
     pprParendBangTy (strict,ty)

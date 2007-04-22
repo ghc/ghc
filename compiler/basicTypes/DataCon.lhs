@@ -11,9 +11,9 @@ module DataCon (
 	mkDataCon,
 	dataConRepType, dataConSig, dataConFullSig,
 	dataConName, dataConIdentity, dataConTag, dataConTyCon, dataConUserType,
-	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, dataConResTys,
+	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, 
 	dataConEqSpec, eqSpecPreds, dataConTheta, dataConStupidTheta, 
-	dataConInstArgTys, dataConOrigArgTys, 
+	dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
 	dataConInstOrigArgTys, dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
 	dataConStrictMarks, dataConExStricts,
@@ -233,7 +233,7 @@ data DataCon
 	--	dcEqSpec      = [a:=:(x,y)]
 	--	dcTheta       = [Ord x]
 	--	dcOrigArgTys  = [a,List b]
-	--	dcTyCon       = T
+	--	dcRepTyCon       = T
 
 	dcVanilla :: Bool,	-- True <=> This is a vanilla Haskell 98 data constructor
 				--	    Its type is of form
@@ -288,9 +288,11 @@ data DataCon
 
 	dcOrigArgTys :: [Type],		-- Original argument types
 					-- (before unboxing and flattening of strict fields)
-
-	-- Result type of constructor is T t1..tn
-	dcTyCon  :: TyCon,		-- Result tycon, T
+	dcOrigResTy :: Type,		-- Original result type
+		-- NB: for a data instance, the original user result type may 
+		-- differ from the DataCon's representation TyCon.  Example
+		--	data instance T [a] where MkT :: a -> T [a]
+		-- The OrigResTy is T [a], but the dcRepTyCon might be :T123
 
 	-- Now the strictness annotations and field labels of the constructor
 	dcStrictMarks :: [StrictnessMark],
@@ -300,7 +302,7 @@ data DataCon
 
 	dcFields  :: [FieldLabel],
 		-- Field labels for this constructor, in the
-		-- same order as the argument types; 
+		-- same order as the dcOrigArgTys; 
 		-- length = 0 (if not a record) or dataConSourceArity.
 
 	-- Constructor representation
@@ -310,6 +312,9 @@ data DataCon
 
 	dcRepStrictness :: [StrictnessMark],	-- One for each *representation* argument	
 		-- See also Note [Data-con worker strictness] in MkId.lhs
+
+	-- Result type of constructor is T t1..tn
+	dcRepTyCon  :: TyCon,		-- Result tycon, T
 
 	dcRepType   :: Type,	-- Type of the constructor
 				-- 	forall a x y. (a:=:(x,y), Ord x) => x -> y -> MkT a
@@ -459,7 +464,8 @@ mkDataCon name declared_infix
 	  	  dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, 
 		  dcEqSpec = eq_spec, 
 		  dcStupidTheta = stupid_theta, dcTheta = theta,
-		  dcOrigArgTys = orig_arg_tys, dcTyCon = tycon, 
+		  dcOrigArgTys = orig_arg_tys, dcOrigResTy = orig_res_ty,
+		  dcRepTyCon = tycon, 
 		  dcRepArgTys = rep_arg_tys,
 		  dcStrictMarks = arg_stricts, 
 		  dcRepStrictness = rep_arg_stricts,
@@ -476,6 +482,22 @@ mkDataCon name declared_infix
     dict_tys     = mkPredTys theta
     real_arg_tys = dict_tys                      ++ orig_arg_tys
     real_stricts = map mk_dict_strict_mark theta ++ arg_stricts
+
+	-- Example
+	--   data instance T [a] where 
+	--	TI :: forall b. b -> T [Maybe b]
+	-- The representation tycon looks like this:
+	--   data :R7T a where 
+	--	TI :: forall b c. (c :=: Maybe b) b -> :R7T c
+    orig_res_ty 
+	| Just (fam_tc, fam_tys) <- tyConFamInst_maybe tycon
+	, let fam_subst = zipTopTvSubst (tyConTyVars fam_tc) res_tys
+	= mkTyConApp fam_tc (substTys fam_subst fam_tys)
+	| otherwise
+	= mkTyConApp tycon res_tys
+	where
+	  res_tys = substTyVars (mkTopTvSubst eq_spec) univ_tvs
+		-- In the example above, res_tys is a singleton, (Maybe b)
 
 	-- Representation arguments and demands
 	-- To do: eliminate duplication with MkId
@@ -518,7 +540,7 @@ dataConTag :: DataCon -> ConTag
 dataConTag  = dcTag
 
 dataConTyCon :: DataCon -> TyCon
-dataConTyCon = dcTyCon
+dataConTyCon = dcRepTyCon
 
 dataConRepType :: DataCon -> Type
 dataConRepType = dcRepType
@@ -597,24 +619,22 @@ dataConRepStrictness :: DataCon -> [StrictnessMark]
 	-- Core constructor application (Con dc args)
 dataConRepStrictness dc = dcRepStrictness dc
 
-dataConSig :: DataCon -> ([TyVar], ThetaType, [Type])
+dataConSig :: DataCon -> ([TyVar], ThetaType, [Type], Type)
 dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-		    dcTheta  = theta, dcOrigArgTys = arg_tys, dcTyCon = tycon})
-  = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ theta, arg_tys)
+		    dcTheta  = theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
+  = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ theta, arg_tys, res_ty)
 
 dataConFullSig :: DataCon 
-	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, [Type])
+	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, [Type], Type)
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-			dcTheta  = theta, dcOrigArgTys = arg_tys, dcTyCon = tycon})
-  = (univ_tvs, ex_tvs, eq_spec, theta, arg_tys)
+			dcTheta  = theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
+  = (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty)
+
+dataConOrigResTy :: DataCon -> Type
+dataConOrigResTy dc = dcOrigResTy dc
 
 dataConStupidTheta :: DataCon -> ThetaType
 dataConStupidTheta dc = dcStupidTheta dc
-
-dataConResTys :: DataCon -> [Type]
-dataConResTys dc = [substTyVar env tv | tv <- dcUnivTyVars dc]
-  where
-    env = mkTopTvSubst (dcEqSpec dc)
 
 dataConUserType :: DataCon -> Type
 -- The user-declared type of the data constructor
@@ -627,15 +647,11 @@ dataConUserType :: DataCon -> Type
 dataConUserType  (MkData { dcUnivTyVars = univ_tvs, 
 			   dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
 			   dcTheta = theta, dcOrigArgTys = arg_tys,
-			   dcTyCon = tycon })
+			   dcOrigResTy = res_ty })
   = mkForAllTys ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs) $
     mkFunTys (mkPredTys theta) $
     mkFunTys arg_tys $
-    case tyConFamInst_maybe tycon of
-      Nothing             -> mkTyConApp tycon (substTyVars subst univ_tvs)
-      Just (ftc, insttys) -> mkTyConApp ftc insttys	    -- data instance
-  where
-    subst = mkTopTvSubst eq_spec
+    res_ty
 
 dataConInstArgTys :: DataCon
 	      	  -> [Type] 	-- Instantiated at these types
@@ -686,10 +702,10 @@ dataConRepArgTys dc = dcRepArgTys dc
 
 \begin{code}
 isTupleCon :: DataCon -> Bool
-isTupleCon (MkData {dcTyCon = tc}) = isTupleTyCon tc
+isTupleCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
 	
 isUnboxedTupleCon :: DataCon -> Bool
-isUnboxedTupleCon (MkData {dcTyCon = tc}) = isUnboxedTupleTyCon tc
+isUnboxedTupleCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
 
 isVanillaDataCon :: DataCon -> Bool
 isVanillaDataCon dc = dcVanilla dc
@@ -700,6 +716,7 @@ isVanillaDataCon dc = dcVanilla dc
 classDataCon :: Class -> DataCon
 classDataCon clas = case tyConDataCons (classTyCon clas) of
 		      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr 
+		      [] -> panic "classDataCon"
 \end{code}
 
 %************************************************************************

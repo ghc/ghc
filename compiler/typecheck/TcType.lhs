@@ -890,11 +890,11 @@ dataConsStupidTheta (con1:cons)
   = nubBy tcEqPred all_preds
   where
     all_preds 	  = dataConStupidTheta con1 ++ other_stupids
-    res_tys1  	  = dataConResTys con1
-    tvs1      	  = tyVarsOfTypes res_tys1
+    res_ty1       = dataConOrigResTy con1
     other_stupids = [ substPred subst pred
 		    | con <- cons
-		    , let Just subst = tcMatchTys tvs1 res_tys1 (dataConResTys con)
+		    , let (tvs, _, _, res_ty) = dataConSig con
+			  Just subst = tcMatchTy (mkVarSet tvs) res_ty res_ty1
 		    , pred <- dataConStupidTheta con ]
 dataConsStupidTheta [] = panic "dataConsStupidTheta"
 \end{code}

@@ -203,10 +203,11 @@ data AlgTyConRhs
   | OpenTyCon {
 
       otArgPoss   :: Maybe [Int],  
-	-- for associated families: for each tyvar in the AT decl, gives the
-	-- position of that tyvar in the class argument list (starting from 0).
-	-- NB: Length is less than tyConArity iff higher kind signature.
-	-- NB: Just _ <=> associated (not toplevel) family
+	-- Nothing <=> top-level indexed type family
+	-- Just ns <=> associated (not toplevel) family
+	--   In the latter case, for each tyvar in the AT decl, 'ns' gives the
+	--   position of that tyvar in the class argument list (starting from 0).
+	--   NB: Length is less than tyConArity iff higher kind signature.
 	
       otIsNewtype :: Bool	     
         -- is a newtype (rather than data type)?
@@ -274,15 +275,16 @@ data AlgTyConParent
 
   | FamilyTyCon		-- Type constructors representing an instance of a type
 	TyCon		--   The type family
-	[Type]		--   Instance types
+	[Type]		--   Instance types; free variables are the tyConTyVars
+			--	of this TyCon
 	TyCon		--   A CoercionTyCon identifying the representation 
 			--     type with the type instance family.  
 			--	c.f. Note [Newtype coercions]
 	-- E.g.  data intance T [a] = ...
 	-- gives a representation tycon:
-	--	data T77 a = ...
-	-- 	axiom co a :: T [a] ~ T77 a
-	-- with T77's algTcParent = FamilyTyCon T [a] co
+	--	data :R7T a = ...
+	-- 	axiom co a :: T [a] ~ :R7T a
+	-- with :R7T's algTcParent = FamilyTyCon T [a] co
 
 data SynTyConRhs
   = OpenSynTyCon Kind	        -- Type family: *result* kind given
