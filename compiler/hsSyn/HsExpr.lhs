@@ -274,9 +274,13 @@ instance OutputableBndr id => Outputable (HsExpr id) where
 \end{code}
 
 \begin{code}
+-- pprExpr and pprLExpr call pprDeeper; 
+-- the underscore versions do not
 pprExpr :: OutputableBndr id => HsExpr id -> SDoc
-
 pprExpr  e = pprDeeper (ppr_expr e)
+
+pprLExpr :: OutputableBndr id => LHsExpr id -> SDoc
+pprLExpr e = pprDeeper (ppr_expr (unLoc e))
 
 pprBinds :: OutputableBndr id => HsLocalBinds id -> SDoc
 pprBinds b = pprDeeper (ppr b)
@@ -364,13 +368,13 @@ ppr_expr (HsLet binds expr)
 ppr_expr (HsDo do_or_list_comp stmts body _) = pprDo do_or_list_comp stmts body
 
 ppr_expr (ExplicitList _ exprs)
-  = brackets (fsep (punctuate comma (map ppr_lexpr exprs)))
+  = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (ExplicitPArr _ exprs)
-  = pa_brackets (fsep (punctuate comma (map ppr_lexpr exprs)))
+  = pa_brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (ExplicitTuple exprs boxity)
-  = tupleParens boxity (sep (punctuate comma (map ppr_lexpr exprs)))
+  = tupleParens boxity (pprDeeperList sep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (RecordCon con_id con_expr rbinds)
   = pp_rbinds (ppr con_id) rbinds
@@ -457,9 +461,9 @@ Parenthesize unless very simple:
 pprParendExpr :: OutputableBndr id => LHsExpr id -> SDoc
 pprParendExpr expr
   = let
-	pp_as_was = ppr_lexpr expr
-	-- Using ppr_expr here avoids the call to 'deeper'
-	-- Not sure if that's always right.
+	pp_as_was = pprLExpr expr
+	-- Using pprLExpr makes sure that we go 'deeper'
+	-- I think that is usually (always?) right
     in
     case unLoc expr of
       HsLit l		-> ppr l
@@ -473,7 +477,6 @@ pprParendExpr expr
       HsPar _		-> pp_as_was
       HsBracket _	-> pp_as_was
       HsBracketOut _ []	-> pp_as_was
-			
       _			-> parens pp_as_was
 \end{code}
 
@@ -562,7 +565,7 @@ recBindFields (HsRecordBinds rbinds) = [unLoc field | (field,_) <- rbinds]
 pp_rbinds :: OutputableBndr id => SDoc -> HsRecordBinds id -> SDoc
 pp_rbinds thing (HsRecordBinds rbinds)
   = hang thing 
-	 4 (braces (sep (punctuate comma (map (pp_rbind) rbinds))))
+	 4 (braces (pprDeeperList sep (punctuate comma (map (pp_rbind) rbinds))))
   where
     pp_rbind (v, e) = hsep [pprBndr LetBind (unLoc v), char '=', ppr e]
 \end{code}
@@ -666,9 +669,10 @@ pprMatch ctxt (Match pats maybe_ty grhss)
 
 pprGRHSs :: OutputableBndr id => HsMatchContext id -> GRHSs id -> SDoc
 pprGRHSs ctxt (GRHSs grhss binds)
-  = vcat (map (pprGRHS ctxt . unLoc) grhss)
-    $$
-    (if isEmptyLocalBinds binds then empty
+  = pprDeeper
+    (vcat (map (pprGRHS ctxt . unLoc) grhss)
+      $$
+     if isEmptyLocalBinds binds then empty
      else text "where" $$ nest 4 (pprBinds binds))
 
 pprGRHS :: OutputableBndr id => HsMatchContext id -> GRHS id -> SDoc
@@ -791,8 +795,8 @@ pprStmt (ParStmt stmtss)          = hsep (map (\stmts -> ptext SLIT("| ") <> ppr
 pprStmt (RecStmt segment _ _ _ _) = ptext SLIT("rec") <+> braces (vcat (map ppr segment))
 
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
-pprDo DoExpr      stmts body = ptext SLIT("do")  <+> (vcat (map ppr stmts) $$ ppr body)
-pprDo (MDoExpr _) stmts body = ptext SLIT("mdo") <+> (vcat (map ppr stmts) $$ ppr body)
+pprDo DoExpr      stmts body = ptext SLIT("do")  <+> pprDeeperList vcat (map ppr stmts ++ [ppr body])
+pprDo (MDoExpr _) stmts body = ptext SLIT("mdo") <+> pprDeeperList vcat (map ppr stmts ++ [ppr body])
 pprDo ListComp    stmts body = pprComp brackets    stmts body
 pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
 pprDo other	  stmts body = panic "pprDo" 	-- PatGuard, ParStmtCxt

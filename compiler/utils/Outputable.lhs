@@ -14,7 +14,8 @@ module Outputable (
 	BindingSite(..),
 
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
-	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper, pprSetDepth,
+	getPprStyle, withPprStyle, withPprStyleDoc, 
+	pprDeeper, pprDeeperList, pprSetDepth,
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
 	ifPprDebug, qualName, qualModule,
 	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
@@ -187,6 +188,19 @@ pprDeeper :: SDoc -> SDoc
 pprDeeper d (PprUser q (PartWay 0)) = Pretty.text "..."
 pprDeeper d (PprUser q (PartWay n)) = d (PprUser q (PartWay (n-1)))
 pprDeeper d other_sty        	    = d other_sty
+
+pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
+-- Truncate a list that list that is longer than the current depth
+pprDeeperList f ds (PprUser q (PartWay n))
+  | n==0      = Pretty.text "..."
+  | otherwise = f (go 0 ds) (PprUser q (PartWay (n-1)))
+  where
+    go i [] = []
+    go i (d:ds) | i >= n    = [text "...."]
+		| otherwise = d : go (i+1) ds
+
+pprDeeperList f ds other_sty
+  = f ds other_sty
 
 pprSetDepth :: Int -> SDoc -> SDoc
 pprSetDepth n d (PprUser q _) = d (PprUser q (PartWay n))
