@@ -353,7 +353,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
 --------------
 mkExport :: TcPragFun -> [TyVar] -> [TcType] -> MonoBindInfo
-	 -> TcM ([TyVar], Id, Id, [Prag])
+	 -> TcM ([TyVar], Id, Id, [LPrag])
 -- mkExport generates exports with 
 --	zonked type variables, 
 --	zonked poly_ids
@@ -393,12 +393,11 @@ mkPragFun sigs = \n -> lookupNameEnv env n `orElse` []
 	  env = foldl add emptyNameEnv prs
 	  add env (n,p) = extendNameEnv_Acc (:) singleton env n p
 
-tcPrags :: Id -> [LSig Name] -> TcM [Prag]
-tcPrags poly_id prags = mapM tc_prag prags
+tcPrags :: Id -> [LSig Name] -> TcM [LPrag]
+tcPrags poly_id prags = mapM (wrapLocM tc_prag) prags
   where
-    tc_prag (L loc prag) = setSrcSpan loc $ 
-			   addErrCtxt (pragSigCtxt prag) $ 
-			   tcPrag poly_id prag
+    tc_prag prag = addErrCtxt (pragSigCtxt prag) $ 
+		   tcPrag poly_id prag
 
 pragSigCtxt prag = hang (ptext SLIT("In the pragma")) 2 (ppr prag)
 

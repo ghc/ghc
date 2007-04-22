@@ -29,15 +29,15 @@ import CoreSyn		-- lots of things
 import CoreUtils
 
 import TcHsSyn		( mkArbitraryType )	-- Mis-placed?
+import TcType
 import OccurAnal
 import CostCentre
 import Module
 import Id
+import Var	( TyVar )
 import Rules
-import Var              ( TyVar, Var )
 import VarEnv
 import Type
-import TysWiredIn
 import Outputable
 import SrcLoc
 import Maybes
@@ -46,9 +46,6 @@ import BasicTypes hiding ( TopLevel )
 import FastString
 import Util		( mapSnd )
 
-import Name
-import OccName
-import Literal
 
 import Control.Monad
 import Data.List
@@ -207,7 +204,7 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 	; returnDs ((poly_tup_id, poly_tup_expr) : 
 		    (concat export_binds_s ++ rest)) }
 
-mkABEnv :: [([TyVar], Id, Id, [Prag])] -> VarEnv (Id, [Prag])
+mkABEnv :: [([TyVar], Id, Id, [LPrag])] -> VarEnv (Id, [LPrag])
 -- Takes the exports of a AbsBinds, and returns a mapping
 --	lcl_id -> (gbl_id, prags)
 mkABEnv exports = mkVarEnv [ (lcl_id, (gbl_id, prags)) 
@@ -216,7 +213,7 @@ mkABEnv exports = mkVarEnv [ (lcl_id, (gbl_id, prags))
 
 dsSpec :: [TyVar] -> [DictId] -> [TyVar]
        -> Id -> Id		-- Global, local
-       -> CoreBind -> Prag
+       -> CoreBind -> LPrag
        -> DsM (Maybe ((Id,CoreExpr), 	-- Binding for specialised Id
 		      CoreRule))	-- Rule for the Global Id
 
@@ -235,22 +232,39 @@ dsSpec :: [TyVar] -> [DictId] -> [TyVar]
 --			 /\b.\(d:Ix b). in f Int b dInt d
 --		The idea is that f occurs just once, so it'll be 
 --		inlined and specialised
-
-dsSpec all_tvs dicts tvs poly_id mono_id mono_bind (InlinePrag {})
+--
+-- Given SpecPrag (/\as.\ds. f es) t, we have
+-- the defn		f_spec as ds = f es 
+-- and the RULE		f es = f_spec as ds
+--
+-- It is *possible* that 'es' does not mention all of the dictionaries 'ds'
+-- (a bit silly, because then the 
+dsSpec all_tvs dicts tvs poly_id mono_id mono_bind (L _ (InlinePrag {}))
   = return Nothing
 
 dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
-       (SpecPrag spec_expr spec_ty const_dicts inl)
-  = do	{ let poly_name = idName poly_id
+       (L loc (SpecPrag spec_expr spec_ty _const_dicts inl))
+	-- See Note [Const rule dicts]
+  = putSrcSpanDs loc $ 
+    do	{ let poly_name = idName poly_id
 	; spec_name <- newLocalName poly_name
 	; ds_spec_expr  <- dsExpr spec_expr
-	; let (bndrs, body) = collectBinders ds_spec_expr
-	      mb_lhs  	    = decomposeRuleLhs (bndrs ++ const_dicts) body
+	; let (bndrs, body) = collectBinders (occurAnalyseExpr ds_spec_expr)
+		-- The occurrence-analysis does two things
+		-- (a) identifies unused binders: Note [Unused spec binders]
+		-- (b) sorts dict bindings into NonRecs 
+		--	so they can be inlined by decomposeRuleLhs
+	      mb_lhs = decomposeRuleLhs body
 
-	; case mb_lhs of
-	    Nothing -> do { warnDs msg; return Nothing }
+	-- Check for dead binders: Note [Unused spec binders]
+	; case filter isDeadBinder bndrs of {
+		bs | not (null bs) -> do { warnDs (dead_msg bs); return Nothing }
+		   | otherwise -> 
 
-	    Just (bndrs', var, args) -> return (Just (addInlineInfo inl spec_id spec_rhs, rule))
+	  case mb_lhs of
+	    Nothing -> do { warnDs decomp_msg; return Nothing }
+
+	    Just (var, args) -> return (Just (addInlineInfo inl spec_id spec_rhs, rule))
 		where
 		  local_poly  = setIdNotExported poly_id
 			-- Very important to make the 'f' non-exported,
@@ -260,17 +274,11 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 		  poly_f_body = mkLams (tvs ++ dicts) $
 			   	fix_up (Let mono_bind (Var mono_id))
 
-			-- Quantify over constant dicts on the LHS, since
-			-- their value depends only on their type
-			-- The ones we are interested in may even be imported
-			-- e.g. GHC.Base.dEqInt
-
 		  rule =  mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
 				AlwaysActive poly_name
-			        bndrs'	-- Includes constant dicts
-				args
+			        bndrs args
 				(mkVarApps (Var spec_id) bndrs)
-	}
+	} }
   where
 	-- Bind to Any any of all_ptvs that aren't 
 	-- relevant for this particular function 
@@ -279,9 +287,44 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 					   (map mkArbitraryType void_tvs)
     void_tvs = all_tvs \\ tvs
 
-    msg = hang (ptext SLIT("Specialisation too complicated to desugar; ignored"))
-	     2 (ppr spec_expr)
+    dead_msg bs = vcat [ sep [ptext SLIT("Useless constraint") <> plural bs
+				 <+> ptext SLIT("in specialied type:"),
+			     nest 2 (pprTheta (map get_pred bs))]
+		       , ptext SLIT("SPECIALISE pragma ignored")]
+    get_pred b = ASSERT( isId b ) expectJust "dsSpec" (tcSplitPredTy_maybe (idType b))
+
+    decomp_msg = hang (ptext SLIT("Specialisation too complicated to desugar; ignored"))
+		    2 (ppr spec_expr)
 \end{code}
+
+Note [Unused spec binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+	f :: a -> a
+	{-# SPECIALISE f :: Eq a => a -> a #-}
+It's true that this *is* a more specialised type, but the rule
+we get is something like this:
+	f_spec d = f
+	RULE: f = f_spec d
+Note that the rule is bogus, becuase it mentions a 'd' that is
+not bound on the LHS!  But it's a silly specialisation anyway, becuase
+the constraint is unused.  We could bind 'd' to (error "unused")
+but it seems better to reject the program because it's almost certainly
+a mistake.  That's what the isDeadBinder call detects.
+
+Note [Const rule dicts]
+~~~~~~~~~~~~~~~~~~~~~~~
+A SpecPrag has a field for "constant dicts" in the RULE, but I think
+it's pretty useless.  See the place where it's generated in TcBinds.
+TcSimplify will discharge a constraint by binding it to, say, 
+GHC.Base.$f2 :: Eq Int, withour putting anything in the LIE, so this 
+dict won't show up in the const-dicts field.  It probably doesn't matter,
+because the rule will end up being something like
+	f Int GHC.Base.$f2 = ...
+rather than
+	forall d. f Int d = ...
+The latter is more general, but in practice I think it won't make any
+difference.
 
 
 %************************************************************************
@@ -291,29 +334,12 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 %************************************************************************
 
 \begin{code}
-decomposeRuleLhs :: [Var] -> CoreExpr -> Maybe ([Var], Id, [CoreExpr])
+decomposeRuleLhs :: CoreExpr -> Maybe (Id, [CoreExpr])
 -- Returns Nothing if the LHS isn't of the expected shape
--- The argument 'all_bndrs' includes the "constant dicts" of the LHS,
--- and they may be GlobalIds, which we can't forall-ify. 
--- So we substitute them out instead
-decomposeRuleLhs all_bndrs lhs 
-  = go init_env (occurAnalyseExpr lhs)	-- Occurrence analysis sorts out the dict
-					-- bindings so we know if they are recursive
+decomposeRuleLhs lhs 
+  = go emptyVarEnv (occurAnalyseExpr lhs)	-- Occurrence analysis sorts out the dict
+						-- bindings so we know if they are recursive
   where
-
-	-- all_bndrs may include top-level imported dicts, 
-	-- imported things with a for-all.  
-	-- So we localise them and subtitute them out
-    bndr_prs =	[ (id, Var (localise id)) | id <- all_bndrs, isGlobalId id ]
-    localise d = mkLocalId (idName d) (idType d)
-
-    init_env = mkVarEnv bndr_prs
-    all_bndrs' = map subst_bndr all_bndrs
-    subst_bndr bndr = case lookupVarEnv init_env bndr of
-			Just (Var bndr') -> bndr'
-			Just other	 -> panic "decomposeRuleLhs"
-			Nothing		 -> bndr
-
 	-- Substitute dicts in the LHS args, so that there 
 	-- aren't any lets getting in the way
 	-- Note that we substitute the function too; we might have this as
@@ -322,7 +348,7 @@ decomposeRuleLhs all_bndrs lhs
 	= go (extendVarEnv env dict (simpleSubst env rhs)) body
     go env body 
 	= case collectArgs (simpleSubst env body) of
-	    (Var fn, args) -> Just (all_bndrs', fn, args)
+	    (Var fn, args) -> Just (fn, args)
 	    other 	   -> Nothing
 
 simpleSubst :: IdEnv CoreExpr -> CoreExpr -> CoreExpr
@@ -330,7 +356,9 @@ simpleSubst :: IdEnv CoreExpr -> CoreExpr -> CoreExpr
 -- (a) takes no account of capture; dictionary bindings use new names
 -- (b) can have a GlobalId (imported) in its domain
 -- (c) Ids only; no types are substituted
-
+--
+-- (b) is the reason we can't use CoreSubst... and it's no longer relevant
+-- 	so really we should replace simpleSubst 
 simpleSubst subst expr
   = go expr
   where
@@ -346,9 +374,9 @@ simpleSubst subst expr
     go (Case scrut bndr ty alts)    = Case (go scrut) bndr ty 
 					   [(c,bs,go r) | (c,bs,r) <- alts]
 
-addInlinePrags :: [Prag] -> Id -> CoreExpr -> (Id,CoreExpr)
+addInlinePrags :: [LPrag] -> Id -> CoreExpr -> (Id,CoreExpr)
 addInlinePrags prags bndr rhs
-  = case [inl | InlinePrag inl <- prags] of
+  = case [inl | L _ (InlinePrag inl) <- prags] of
 	[]      -> (bndr, rhs)
 	(inl:_) -> addInlineInfo inl bndr rhs
 

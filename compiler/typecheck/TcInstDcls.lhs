@@ -582,10 +582,11 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	dfun_id    = instanceDFunId ispec
 	rigid_info = InstSkol
 	inst_ty    = idType dfun_id
+	loc   	   = srcLocSpan (getSrcLoc dfun_id)
     in
 	 -- Prime error recovery
     recoverM (returnM emptyLHsBinds)		$
-    setSrcSpan (srcLocSpan (getSrcLoc dfun_id))	$
+    setSrcSpan loc				$
     addErrCtxt (instDeclCtxt2 (idType dfun_id))	$
 
 	-- Instantiate the instance decl with skolem constants 
@@ -638,7 +639,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	scs_and_meths = map instToId sc_dicts ++ meth_ids
 	this_dict_id  = instToId this_dict
 	inline_prag | null dfun_arg_dicts = []
-		    | otherwise	= [InlinePrag (Inline AlwaysActive True)]
+		    | otherwise	= [L loc (InlinePrag (Inline AlwaysActive True))]
 		-- Always inline the dfun; this is an experimental decision
 		-- because it makes a big performance difference sometimes.
 		-- Often it means we can do the method selection, and then

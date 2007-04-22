@@ -19,6 +19,7 @@ import MkIface
 import Id
 import Name
 import CoreSyn
+import OccurAnal
 import PprCore
 import DsMonad
 import DsExpr
@@ -277,13 +278,13 @@ ppr_ds_rules rules
 dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM (Maybe CoreRule)
 dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
   = putSrcSpanDs loc $ 
-    do	{ let bndrs     = [var | RuleBndr (L _ var) <- vars]
+    do	{ let bndrs = [var | RuleBndr (L _ var) <- vars]
 	; lhs'  <- dsLExpr lhs
 	; rhs'  <- dsLExpr rhs
 
-	; case decomposeRuleLhs bndrs lhs' of {
+	; case decomposeRuleLhs (occurAnalyseExpr lhs') of {
 		Nothing -> do { warnDs msg; return Nothing } ;
-		Just (bndrs', fn_id, args) -> do
+		Just (fn_id, args) -> do
 	
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
@@ -294,7 +295,7 @@ dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
 	      fn_name   = idName fn_id
 
 	      rule = Rule { ru_name = name, ru_fn = fn_name, ru_act = act,
-			    ru_bndrs = bndrs', ru_args = args, ru_rhs = rhs', 
+			    ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs', 
 			    ru_rough = roughTopNames args, 
 			    ru_local = local_rule }
 	; return (Just rule)
