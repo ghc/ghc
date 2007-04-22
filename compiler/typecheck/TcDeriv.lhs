@@ -381,6 +381,8 @@ deriveTyData (deriv_pred, L loc decl@(TyData { tcdLName = L _ tycon_name,
 		-- The "deriv_pred" is a LHsType to take account of the fact that for
 		-- newtype deriving we allow deriving (forall a. C [a]).
 	; mkEqnHelp DerivOrigin (tvs++deriv_tvs) cls cls_tys tc_app } }
+deriveTyData (deriv_pred, other_decl)
+  = panic "derivTyData"	-- Caller ensures that only TyData can happen
 
 ------------------------------------------------------------------
 mkEqnHelp orig tvs cls cls_tys tc_app
