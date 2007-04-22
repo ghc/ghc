@@ -429,7 +429,7 @@
 	  <para>In error messages, expressions are printed to a
 	  certain &ldquo;depth&rdquo;, with subexpressions beyond the
 	  depth replaced by ellipses.  This flag sets the
-	  depth.</para>
+	  depth.  Its default value is 5.</para>
 	</listitem>
       </varlistentry>
 
