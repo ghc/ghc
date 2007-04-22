@@ -112,7 +112,7 @@ data HsBind id
   | AbsBinds {					-- Binds abstraction; TRANSLATION
 	abs_tvs     :: [TyVar],  
 	abs_dicts   :: [DictId],
-	abs_exports :: [([TyVar], id, id, [Prag])],	-- (tvs, poly_id, mono_id, prags)
+	abs_exports :: [([TyVar], id, id, [LPrag])],	-- (tvs, poly_id, mono_id, prags)
 	abs_binds   :: LHsBinds id		-- The dictionary bindings and typechecked user bindings
 						-- mixed up together; you can tell the dict bindings because
 						-- they are all VarBinds
@@ -414,6 +414,7 @@ type LFixitySig name = Located (FixitySig name)
 data FixitySig name = FixitySig (Located name) Fixity 
 
 -- A Prag conveys pragmas from the type checker to the desugarer
+type LPrag = Located Prag
 data Prag 
   = InlinePrag 
 	InlineSpec
@@ -422,13 +423,15 @@ data Prag
 	(HsExpr Id)	-- An expression, of the given specialised type, which
 	PostTcType 	-- specialises the polymorphic function
 	[Id]		-- Dicts mentioned free in the expression
+			--   Apr07: I think this is pretty useless
+			--	    see Note [Const rule dicts] in DsBinds
 	InlineSpec 	-- Inlining spec for the specialised function
 
 isInlinePrag (InlinePrag _) = True
 isInlinePrag prag	    = False
 
-isSpecPrag (SpecPrag _ _ _ _) = True
-isSpecPrag prag		      = False
+isSpecPrag (SpecPrag {}) = True
+isSpecPrag prag		 = False
 \end{code}
 
 \begin{code}
@@ -537,7 +540,7 @@ pprVarSig var ty = sep [ppr var <+> dcolon, nest 2 (ppr ty)]
 pprSpec :: (Outputable id, Outputable ty) => id -> ty -> InlineSpec -> SDoc
 pprSpec var ty inl = sep [ptext SLIT("SPECIALIZE") <+> ppr inl <+> pprVarSig var ty]
 
-pprPrag :: Outputable id => id -> Prag -> SDoc
-pprPrag var (InlinePrag inl)         = ppr inl <+> ppr var
-pprPrag var (SpecPrag expr ty _ inl) = pprSpec var ty inl
+pprPrag :: Outputable id => id -> LPrag -> SDoc
+pprPrag var (L _ (InlinePrag inl))         = ppr inl <+> ppr var
+pprPrag var (L _ (SpecPrag expr ty _ inl)) = pprSpec var ty inl
 \end{code}
