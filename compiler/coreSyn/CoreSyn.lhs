@@ -228,8 +228,13 @@ data CoreRule
 	ru_name :: RuleName,	-- and suchlike.  It has no free variables.
 	ru_fn :: Name,		-- Name of the Id at 
 				-- the head of this rule
-	ru_nargs :: Int,	-- Number of args that ru_try expects
+	ru_nargs :: Int,	-- Number of args that ru_try expects,
+				-- including type args
 	ru_try  :: [CoreExpr] -> Maybe CoreExpr }
+		-- This function does the rewrite.  It given too many
+		-- arguments, it simply discards them; the returned CoreExpr
+		-- is just the rewrite of ru_fn applied to the first ru_nargs args
+		-- See Note [Extra args in rule matching] in Rules.lhs
 
 isBuiltinRule (BuiltinRule {}) = True
 isBuiltinRule _		       = False
