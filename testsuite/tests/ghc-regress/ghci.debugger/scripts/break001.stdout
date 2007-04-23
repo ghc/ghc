@@ -1,0 +1,15 @@
+Breakpoint 0 activated at ../Test2.hs:3:0-8
+Breakpoint 1 activated at ../Test2.hs:5:0-6
+Stopped at ../Test2.hs:3:0-8
+Stopped at ../Test2.hs:3:6-8
+x :: GHC.Base.Unknown
+Stopped at ../Test2.hs:5:0-6
+Stopped at ../Test2.hs:5:6
+y :: GHC.Base.Unknown
+it :: Integer
+y :: GHC.Base.Unknown
+This is an untyped, unevaluated computation. You can use seq to force its evaluation and then :print to recover its type
+y = (_t1::a)
+()
+y = 1
+1

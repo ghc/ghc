@@ -1,5 +1,6 @@
-Breakpoint set at main:QSort:5:15
-Stopped at a breakpoint in ../QSort.hs:5. Local bindings in scope:
-  _result :: [a], as :: [a], a :: a, left :: [a], right :: [a]
-../QSort.hs:5:15-50> Returning to normal execution...
-
+Breakpoint 0 activated at ../QSort.hs:5:15-50
+Stopped at ../QSort.hs:5:15-50
+as :: [GHC.Base.Unknown]
+a :: GHC.Base.Unknown
+left :: [GHC.Base.Unknown]
+right :: [GHC.Base.Unknown]

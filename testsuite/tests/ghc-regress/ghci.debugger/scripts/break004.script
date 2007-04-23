@@ -1,0 +1,5 @@
+:l ../Test4.hs
+:b f
+seq (f (+(1::Int)) "abc") ()
+-- We can subvert the Unknown machinery this was and pass the string
+-- to the function expecting Int.  ToDo: finish this

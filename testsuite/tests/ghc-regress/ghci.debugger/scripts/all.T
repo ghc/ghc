@@ -18,3 +18,12 @@ test('print015', normal, ghci_script, ['print015.script'])
 test('print016', normal, ghci_script, ['print016.script'])
 test('print017', normal, ghci_script, ['print017.script'])
 test('print018', normal, ghci_script, ['print018.script'])
+
+test('break001', normal, ghci_script, ['break001.script'])
+test('break002', normal, ghci_script, ['break002.script'])
+test('break003', normal, ghci_script, ['break003.script'])
+
+test('dynbrk1', normal, ghci_script, ['dynbrk1.script'])
+test('dynbrk2', normal, ghci_script, ['dynbrk2.script'])
+test('dynbrk3', normal, ghci_script, ['dynbrk3.script'])
+test('dynbrk4', normal, ghci_script, ['dynbrk4.script'])

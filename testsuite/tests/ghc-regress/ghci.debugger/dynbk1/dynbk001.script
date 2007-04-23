@@ -1,32 +1,18 @@
 
 :set -fglasgow-exts
-:l ../Test
 
-:break add 1
--- Illegal, no module loaded under debugging mode
-
-:set -fdebugging
 :l ../QSort
 
-:break del 1        
+:delete 1        
 -- Illegal: empty breakpoint list
 
-:break del QSort 1   
--- Illegal: no breakpoint at line 1 in Main
-
-:break del QSort 1 1 
--- Illegal: no breakpoint at (1,1) in Main
-
-:break add NonModule 1
+:break NonModule 1
 -- Illegal: I don't know this module
 
-:break add Test 1      
--- Illegal: this module was not loaded under -fdebugging
-
-:break add QSort 1 1    
+:break QSort 1 1    
 -- Error: No breakpoint here
 
-:break list             
+:show breaks             
 -- Show an empty list
 
 qsort [8, 4, 42, 16, 15, 23]  
