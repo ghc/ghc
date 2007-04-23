@@ -63,7 +63,7 @@ dsGRHSs hs_ctx pats grhssa@(GRHSs grhss binds) rhs_ty =
     let 
 	match_result1 = foldr1 combineMatchResults match_results
 	match_result2 = adjustMatchResultDs 
-                                 (\e -> bindLocalsDs binders $ 
+                                 (\e -> bindLocalsDs patsBinders $ 
                                         dsLocalBinds binds e) 
                                  match_result1
 		-- NB: nested dsLet inside matchResult
