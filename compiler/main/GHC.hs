@@ -214,8 +214,11 @@ import NameSet
 import RdrName
 import HsSyn 
 import Type             hiding (typeKind)
+import TcType           hiding (typeKind)
 import Id
 import Var              hiding (setIdType)
+import VarEnv
+import VarSet
 import TysPrim		( alphaTyVars )
 import TyCon
 import Class
@@ -2320,13 +2323,22 @@ extendEnvironment hsc_env apStack idsOffsets occs = do
    let (ids, hValues) = unzip idsVals 
    new_ids <- zipWithM mkNewId occs ids
    let names = map idName ids
+
+   let tyvars = varSetElems (tyVarsOfTypes (map idType new_ids))
+       new_tyvars = map (mkTyVarTy . mk_skol) tyvars
+       mk_skol tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) 
+                         (SkolemTv UnkSkol)
+       subst = mkTvSubst emptyInScopeSet (mkVarEnv (zip tyvars new_tyvars))
+       subst_id id = id `setIdType` substTy subst (idType id)
+       subst_ids = map subst_id new_ids
+
    Just (ATyCon unknown_tc) <- tcRnLookupName hsc_env unknownTyConName
    let result_name = mkSystemVarName (mkBuiltinUnique 33) FSLIT("_result")
        result_id   = Id.mkLocalId result_name (mkTyConApp unknown_tc [])
    let ictxt = hsc_IC hsc_env
        rn_env   = ic_rn_local_env ictxt
        type_env = ic_type_env ictxt
-       all_new_ids  = result_id : new_ids
+       all_new_ids  = result_id : subst_ids
        bound_names = map idName all_new_ids
        new_rn_env  = extendLocalRdrEnv rn_env bound_names
        -- Remove any shadowed bindings from the type_env;
@@ -2345,7 +2357,6 @@ extendEnvironment hsc_env apStack idsOffsets occs = do
   where
    mkNewId :: OccName -> Id -> IO Id
    mkNewId occ id = do
-     ty <- instantiateTyVarsToUnknown hsc_env 
      let uniq = idUnique id
          loc = nameSrcLoc (idName id)
          name = mkInternalName uniq occ loc
