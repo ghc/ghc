@@ -112,6 +112,7 @@ subFunTys error_herald n_pats res_ty thing_inside
   where
 	-- In 'loop', the parameter 'arg_tys' accumulates 
 	-- the arg types so far, in *reverse order*
+	-- INVARIANT:   res_ty :: *
     loop n args_so_far res_ty
 	| Just res_ty' <- tcView res_ty  = loop n args_so_far res_ty'
 
@@ -193,10 +194,12 @@ boxySplitTyConApp tc orig_ty
 	return (args ++ args_so_far)
 
     loop n_req args_so_far (AppTy fun arg)
+      | n_req > 0
       = loop (n_req - 1) (arg:args_so_far) fun
 
     loop n_req args_so_far (TyVarTy tv)
       | isTyConableTyVar tv
+      , res_kind `isSubKind` tyVarKind tv
       = do { cts <- readMetaTyVar tv
 	   ; case cts of
 	       Indirect ty -> loop n_req args_so_far ty
@@ -205,7 +208,7 @@ boxySplitTyConApp tc orig_ty
 	}
       where
 	mk_res_ty arg_tys' = mkTyConApp tc arg_tys'
-	arg_kinds = map tyVarKind (take n_req (tyConTyVars tc))
+	(arg_kinds, res_kind) = splitKindFunTysN n_req (tyConKind tc)
 
     loop _ _ _ = boxySplitFailure (mkTyConApp tc (mkTyVarTys (tyConTyVars tc))) orig_ty
 
@@ -218,7 +221,8 @@ boxySplitListTy exp_ty = do { [elt_ty] <- boxySplitTyConApp listTyCon exp_ty
 ----------------------
 boxySplitAppTy :: BoxyRhoType				-- Type to split: m a
 	       -> TcM (BoxySigmaType, BoxySigmaType)	-- Returns m, a
--- Assumes (m: * -> k), where k is the kind of the incoming type
+-- If the incoming type is a mutable type variable of kind k, then 
+-- boxySplitAppTy returns a new type variable (m: * -> k); note the *.
 -- If the incoming type is boxy, then so are the result types; and vice versa
 
 boxySplitAppTy orig_ty
