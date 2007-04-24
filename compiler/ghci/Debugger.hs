@@ -12,7 +12,6 @@
 
 module Debugger (pprintClosureCommand) where
 
-import qualified DebuggerTys
 import Linker
 import RtClosureInspect
 

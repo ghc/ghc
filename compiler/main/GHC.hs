@@ -204,7 +204,6 @@ import Linker           ( HValue )
 import Data.Dynamic     ( Dynamic )
 
 import ByteCodeInstr
-import DebuggerTys
 import IdInfo
 import HscMain          ( hscParseIdentifier, hscTcExpr, hscKcType, hscStmt )
 import BreakArray
