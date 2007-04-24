@@ -52,7 +52,9 @@ data HsValBinds id	-- Value bindings (not implicit parameters)
 					-- Recursive by default
 
   | ValBindsOut				-- After renaming
-	[(RecFlag, LHsBinds id)]	-- Dependency analysed
+	[(RecFlag, LHsBinds id)]	-- Dependency analysed, later bindings 
+                                        -- in the list may depend on earlier
+                                        -- ones.
 	[LSig Name]
 
 type LHsBinds id  = Bag (LHsBind id)
