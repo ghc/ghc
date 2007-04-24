@@ -1152,6 +1152,10 @@ WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
 WAY_debug_u_NAME=debug unregisterised
 WAY_debug_u_HC_OPTS=-optc-DDEBUG -unreg
 
+# Way 'debug_t':
+WAY_debug_t_NAME=debug ticky-ticky profiling
+WAY_debug_t_HC_OPTS= -ticky -optc-DDEBUG
+
 # Way 'thr_debug':
 WAY_thr_debug_NAME=threaded
 WAY_thr_debug_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG
