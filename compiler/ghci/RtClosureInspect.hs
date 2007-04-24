@@ -464,10 +464,12 @@ newVar = liftTcM . newFlexiTyVar
 
 liftTcM = id
 
-instScheme :: Type -> TR TcType
-instScheme ty = liftTcM$ liftM trd (tcInstType (liftM fst3 . tcInstTyVars) ty)
-    where fst3 (x,y,z) = x
-          trd  (x,y,z) = z
+-- | Returns the instantiated type scheme ty', and the substitution sigma 
+--   such that sigma(ty') = ty 
+instScheme :: Type -> TR (TcType, TvSubst)
+instScheme ty | (tvs, rho) <- tcSplitForAllTys ty = liftTcM$ do
+   (tvs',theta,ty') <- tcInstType (mapM tcInstTyVar) ty
+   return (ty', zipTopTvSubst tvs' (mkTyVarTys tvs))
 
 cvObtainTerm :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
 cvObtainTerm hsc_env force mb_ty a = do
@@ -488,14 +490,19 @@ cvObtainTerm hsc_env force mb_ty a = do
 
 cvObtainTerm1 :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
 cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
-   tv <- case (isMonomorphic `fmap` mb_ty) of
-          Just True -> return (fromJust mb_ty)
-          _         -> do
-            tv_ <- liftM mkTyVarTy (newVar argTypeKind)
-            when (isJust mb_ty) $ 
-                 instScheme (sigmaType$ fromJust mb_ty) >>= addConstraint tv_
-            return tv_
-   go tv (fromMaybe tv mb_ty) hval
+   tv <- liftM mkTyVarTy (newVar argTypeKind)
+   case mb_ty of
+     Nothing -> go tv tv hval
+     Just ty | isMonomorphic ty -> go ty ty hval
+     Just ty -> do 
+              (ty',rev_subst) <- instScheme (sigmaType$ fromJust mb_ty)
+              addConstraint tv ty'
+              term <- go tv tv hval
+              --restore original Tyvars
+              return$ flip foldTerm term idTermFold {
+                fTerm = \ty dc hval tt -> Term (substTy rev_subst ty) dc hval tt,
+                fSuspension = \ct mb_ty hval n -> 
+                          Suspension ct (substTy rev_subst `fmap` mb_ty) hval n}
     where 
   go tv ty a = do 
     let monomorphic = not(isTyVarTy tv)   -- This is a convention. The ancestor tests for
@@ -522,7 +529,7 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
             --     right here, _before_ the subterms are RTTI reconstructed.
             when (not monomorphic) $ do
                   let myType = mkFunTys (reOrderTerms subTermTvs subTtypesNP subTtypes) tv
-                  instScheme(dataConRepType dc) >>= addConstraint myType 
+                  instScheme(dataConRepType dc) >>= addConstraint myType . fst
             subTermsP <- sequence $ drop extra_args -- all extra arguments are pointed
                   [ appArr (go tv t) (ptrs clos) i
                    | (i,tv,t) <- zip3 [0..] subTermTvs subTtypesP]

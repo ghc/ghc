@@ -62,12 +62,11 @@ pprintClosureCommand bindThings force str = do
   mb_new_ids <- mapM (io . go cms) (catMaybes mb_ids)
   io$ updateIds cms (catMaybes mb_new_ids)
  where 
-   -- Find the Id, clean up 'Unknowns' in the idType
+   -- Find the Id
    cleanUp :: Session -> [Name] -> String -> IO (Maybe Id)
    cleanUp cms newNames str = do
      tythings <- GHC.parseName cms str >>= mapM (GHC.lookupName cms)
-     return$ listToMaybe (map (stripUnknowns newNames) 
-                              [ i | Just (AnId i) <- tythings]) 
+     return$ listToMaybe [ i | Just (AnId i) <- tythings]
 
    -- Do the obtainTerm--bindSuspensions-refineIdType dance
    -- Warning! This function got a good deal of side-effects
@@ -83,10 +82,8 @@ pprintClosureCommand bindThings force str = do
                showDocWith LeftMode (doc (mkErrStyle unqual))
        (putStrLn . showSDocForUserOneLine unqual) (ppr id <+> char '=' <+> showterm)
      -- Before leaving, we compare the type obtained to see if it's more specific
-     -- Note how we need the Unknown-clear type returned by obtainTerm
        let Just reconstructedType = termType term  
-       new_type  <- instantiateTyVarsToUnknown cms 
-                    (mostSpecificType (idType id) reconstructedType)
+           new_type = mostSpecificType (idType id) reconstructedType
        return . Just $ setIdType id new_type
 
    updateIds :: Session -> [Id] -> IO ()
@@ -129,9 +126,8 @@ bindSuspensions cms@(Session ref) t = do
       availNames_var  <- newIORef availNames
       (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
-      concrete_tys    <- mapM (instantiateTyVarsToUnknown cms) tys
       let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
-                  | (name,ty) <- zip names concrete_tys]
+                  | (name,ty) <- zip names tys]
           new_type_env = extendTypeEnvWithIds type_env ids 
           new_rn_env   = extendLocalRdrEnv rn_env names
           new_ic       = ictxt { ic_rn_local_env = new_rn_env, 
@@ -208,45 +204,3 @@ newGrimName cms userName  = do
         occname = mkOccName varName userName
         name    = mkInternalName unique occname noSrcLoc
     return name
-
--- | The inverse function. Strip the GHC.Base.Unknowns in the type of the id, they correspond to tyvars. The caller must provide an infinite list of fresh names
-stripUnknowns :: [Name] -> Id -> Id
-stripUnknowns names id = setIdType id . fst . go names . idType 
-                           $ id
- where 
-   go tyvarsNames@(v:vv) ty 
-    | Just (ty1,ty2) <- splitFunTy_maybe ty = let
-               (ty1',vv') = go tyvarsNames ty1
-               (ty2',vv'')= go vv' ty2
-               in (mkFunTy ty1' ty2', vv'')
-    | Just (ty1,ty2) <- splitAppTy_maybe ty = let
-               (ty1',vv') = go tyvarsNames ty1
-               (ty2',vv'')= go vv' ty2
-               in (mkAppTy ty1' ty2', vv'')
-    | Just (tycon, args) <- splitTyConApp_maybe ty 
-    , Just (tycon', vv') <- (fixTycon tycon tyvarsNames)
-    , (args',vv'') <- foldr (\arg (aa,vv) -> let (arg',vv') = go vv' arg 
-                                             in (arg':aa,vv'))
-                            ([],vv') args
-    = (mkAppTys tycon' args',vv'')
-    | Just (tycon, args) <- splitTyConApp_maybe ty
-    , (args',vv') <- foldr (\arg (aa,vv) -> let (arg',vv') = go vv' arg 
-                                            in (arg':aa,vv'))
-                           ([],tyvarsNames) args
-    = (mkTyConApp tycon args',vv')
-    | otherwise = (ty, tyvarsNames)
-    where  fixTycon tycon (v:vv) = do
-               k <- lookup (tyConName tycon) kinds
-               return (mkTyVarTy$ mkTyVar v k, vv)
-           kinds = [ (unknownTyConName, liftedTypeKind)
-                   , (unknown1TyConName, kind1)
-                   , (unknown2TyConName, kind2)
-                   , (unknown3TyConName, kind3)]
-           kind1 = mkArrowKind liftedTypeKind liftedTypeKind
-           kind2 = mkArrowKind kind1 liftedTypeKind
-           kind3 = mkArrowKind kind2 liftedTypeKind
-
-instantiateTyVarsToUnknown :: Session -> Type -> IO Type
-instantiateTyVarsToUnknown (Session ref) ty
-  = do hsc_env <- readIORef ref
-       DebuggerTys.instantiateTyVarsToUnknown hsc_env ty

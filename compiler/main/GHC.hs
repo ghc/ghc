@@ -2310,7 +2310,7 @@ extendEnvironment hsc_env apStack idsOffsets = do
    let (ids, hValues) = unzip idsVals 
    let names = map idName ids
    let global_ids = map globaliseAndTidy ids
-   typed_ids  <- mapM instantiateIdType global_ids
+   typed_ids  <- return global_ids -- mapM instantiateIdType global_ids
    let ictxt = hsc_IC hsc_env
        rn_env   = ic_rn_local_env ictxt
        type_env = ic_type_env ictxt
@@ -2333,12 +2333,6 @@ extendEnvironment hsc_env apStack idsOffsets = do
    globaliseAndTidy id
       = let tidied_type = tidyTopType$ idType id
         in setIdType (globaliseId VanillaGlobal id) tidied_type
-
-   -- | Instantiate the tyVars with GHC.Base.Unknown
-   instantiateIdType :: Id -> IO Id
-   instantiateIdType id = do
-      instantiatedType <- instantiateTyVarsToUnknown hsc_env (idType id)
-      return$ setIdType id instantiatedType
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames
