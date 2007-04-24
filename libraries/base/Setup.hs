@@ -13,6 +13,7 @@ import Distribution.PackageDescription
 import Distribution.Setup
 import Distribution.Simple.LocalBuildInfo
 import System.Environment
+import System.Info
 
 main :: IO ()
 main = do args <- getArgs
@@ -27,8 +28,10 @@ main = do args <- getArgs
                             $ filter_modules_hook
                             $ buildHook defaultUserHooks,
                   makefileHook = add_ghc_options ghcArgs
-                            $ filter_modules_hook
-                            $ makefileHook defaultUserHooks,
+                               $ filter_modules_hook
+                               $ makefileHook defaultUserHooks,
+                  regHook = add_extra_libs
+                          $ regHook defaultUserHooks,
                   instHook = filter_modules_hook
                            $ instHook defaultUserHooks }
           withArgs args'' $ defaultMainWithHooks hooks
@@ -115,4 +118,22 @@ add_extra_deps f pd cf
                  f pd' cf
           _ ->
               return lbi
+
+add_extra_libs :: Hook a -> Hook a
+add_extra_libs f pd lbi uhs x
+ = let pd' = if (os == "mingw32") && (compilerFlavor (compiler lbi) == GHC)
+             then case library pd of
+                  Just lib ->
+                      let lib_bi = libBuildInfo lib
+                          lib_bi' = lib_bi { extraLibs = "wsock32"
+                                                       : "msvcrt"
+                                                       : "kernel32"
+                                                       : "user32"
+                                                       : "shell32"
+                                                       : extraLibs lib_bi }
+                          lib' = lib { libBuildInfo = lib_bi' }
+                      in pd { library = Just lib' }
+                  Nothing -> error "Expected a library"
+             else pd
+   in f pd' lbi uhs x
 
