@@ -89,6 +89,7 @@ module Type (
 	mkTvSubst, mkOpenTvSubst, zipOpenTvSubst, zipTopTvSubst, mkTopTvSubst, notElemTvSubst,
 	getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
  	extendTvSubst, extendTvSubstList, isInScope, composeTvSubst, zipTyEnv,
+        isEmptyTvSubst,
 
 	-- Performing substitution on types
 	substTy, substTys, substTyWith, substTheta, 

@@ -54,22 +54,19 @@ import GHC.Exts
 pprintClosureCommand :: Bool -> Bool -> String -> GHCi ()
 pprintClosureCommand bindThings force str = do 
   cms <- getSession
-  newvarsNames <- io$ do 
-           uniques <- liftM uniqsFromSupply (mkSplitUniqSupply 'q')
-           return$ map (\u-> (mkSysTvName u (mkFastString "a"))) uniques
-  mb_ids  <- io$ mapM (cleanUp cms newvarsNames) (words str)
-  mb_new_ids <- mapM (io . go cms) (catMaybes mb_ids)
-  io$ updateIds cms (catMaybes mb_new_ids)
+  tythings <- (catMaybes . concat) `liftM`
+                 mapM (\w -> io(GHC.parseName cms w >>= 
+                                mapM (GHC.lookupName cms)))
+                      (words str)
+  substs <- catMaybes `liftM` mapM (io . go cms) 
+                                   [id | AnId id <- tythings]
+  mapM (io . applySubstToEnv cms) substs
+  return ()
  where 
-   -- Find the Id
-   cleanUp :: Session -> [Name] -> String -> IO (Maybe Id)
-   cleanUp cms newNames str = do
-     tythings <- GHC.parseName cms str >>= mapM (GHC.lookupName cms)
-     return$ listToMaybe [ i | Just (AnId i) <- tythings]
 
    -- Do the obtainTerm--bindSuspensions-refineIdType dance
    -- Warning! This function got a good deal of side-effects
-   go :: Session -> Id -> IO (Maybe Id)
+   go :: Session -> Id -> IO (Maybe TvSubst)
    go cms id = do
      mb_term <- obtainTerm cms force id
      maybe (return Nothing) `flip` mb_term $ \term -> do
@@ -81,34 +78,24 @@ pprintClosureCommand bindThings force str = do
                showDocWith LeftMode (doc (mkErrStyle unqual))
        (putStrLn . showSDocForUserOneLine unqual) (ppr id <+> char '=' <+> showterm)
      -- Before leaving, we compare the type obtained to see if it's more specific
-       let Just reconstructedType = termType term  
-           new_type = mostSpecificType (idType id) reconstructedType
-       return . Just $ setIdType id new_type
+     --  Then, we extract a substitution, 
+     --  mapping the old tyvars to the reconstructed types.
+       let Just reconstructed_type = termType term
+           mb_subst = tcUnifyTys (const BindMe) [idType id] [reconstructed_type]
+       ASSERT (isJust mb_subst) return mb_subst
 
-   updateIds :: Session -> [Id] -> IO ()
-   updateIds (Session ref) new_ids = do
-     hsc_env <- readIORef ref
-     let ictxt = hsc_IC hsc_env
-         type_env = ic_type_env ictxt
-         filtered_type_env = delListFromNameEnv type_env (map idName new_ids)
-         new_type_env =  extendTypeEnvWithIds filtered_type_env new_ids
-         new_ic = ictxt {ic_type_env = new_type_env }
-     writeIORef ref (hsc_env {hsc_IC = new_ic })
-
-isMoreSpecificThan :: Type -> Type -> Bool
-ty `isMoreSpecificThan` ty1 
-      | Just subst    <- tcUnifyTys bindOnlyTy1 [repType' ty] [repType' ty1] 
-      , substFiltered <- filter (not.isTyVarTy) . varEnvElts . getTvSubstEnv $ subst
-      , not . null $ substFiltered
-      , all (flip notElemTvSubst subst) ty_vars
-      = True
-      | otherwise = False
-      where bindOnlyTy1 tyv | tyv `elem` ty_vars = AvoidMe
-                            | otherwise = BindMe
-            ty_vars = varSetElems$ tyVarsOfType ty
-
-mostSpecificType ty1 ty2 | ty1 `isMoreSpecificThan` ty2 = ty1
-                         | otherwise = ty2
+   applySubstToEnv :: Session -> TvSubst -> IO ()
+   applySubstToEnv cms subst | isEmptyTvSubst subst = return ()
+   applySubstToEnv cms@(Session ref) subst = do
+      hsc_env <- readIORef ref
+      inScope <- GHC.getBindings cms
+      let ictxt    = hsc_IC hsc_env
+          type_env = ic_type_env ictxt
+          ids      = typeEnvIds type_env
+          ids'     = map (\id -> setIdType id (substTy subst (idType id))) ids
+          type_env'= extendTypeEnvWithIds type_env ids'
+          ictxt'   = ictxt { ic_type_env = type_env' }
+      writeIORef ref (hsc_env {hsc_IC = ictxt'})
 
 -- | Give names, and bind in the interactive environment, to all the suspensions
 --   included (inductively) in a term
