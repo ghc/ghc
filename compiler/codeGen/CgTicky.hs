@@ -89,9 +89,9 @@ emitTickyCounter cl_info args on_stk
 -- krc: note that all the fields are I32 now; some were I16 before, 
 -- but the code generator wasn't handling that properly and it led to chaos, 
 -- panic and disorder.
-	    [ CmmInt 0 I32,
-	      CmmInt (fromIntegral (length args)) I32, 	-- Arity
-	      CmmInt (fromIntegral on_stk) I32,		-- Words passed on stack
+	    [ mkIntCLit 0,
+	      mkIntCLit (length args),-- Arity
+	      mkIntCLit on_stk,	-- Words passed on stack
 	      fun_descr_lit,
 	      arg_descr_lit,
 	      zeroCLit, 		-- Entry count
@@ -166,9 +166,9 @@ registerTickyCtr ctr_lbl
   = emitIf test (stmtsC register_stmts)
   where
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq I32)
+    test = CmmMachOp (MO_Eq wordRep)
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl 
-				oFFSET_StgEntCounter_registeredp)) I32,
+				oFFSET_StgEntCounter_registeredp)) wordRep,
                CmmLit (mkIntCLit 0)]
     register_stmts
       =	[ CmmStore (CmmLit (cmmLabelOffB ctr_lbl oFFSET_StgEntCounter_link))
@@ -265,13 +265,13 @@ tickyDynAlloc cl_info
 
 
 tickyAllocPrim :: CmmExpr -> CmmExpr -> CmmExpr -> Code
-tickyAllocPrim hdr goods slop = ifTicky $ panic "ToDo: tickyAllocPrim"
+tickyAllocPrim hdr goods slop = ifTicky $ pprTrace "ToDo: tickyAllocPrim" empty (return ())
 
 tickyAllocThunk :: CmmExpr -> CmmExpr -> Code
-tickyAllocThunk goods slop = ifTicky $ panic "ToDo: tickyAllocThunk"
+tickyAllocThunk goods slop = ifTicky $ pprTrace "ToDo: tickyAllocThunk" empty (return ())
 
 tickyAllocPAP :: CmmExpr -> CmmExpr -> Code
-tickyAllocPAP goods slop = ifTicky $ panic "ToDo: tickyAllocPAP"
+tickyAllocPAP goods slop = ifTicky $ pprTrace "ToDo: tickyAllocPAP" empty (return ())
 
 tickyAllocHeap :: VirtualHpOffset -> Code
 -- Called when doing a heap check [TICK_ALLOC_HEAP]
@@ -313,7 +313,8 @@ addToMemLong = addToMem cLongRep
 
 bumpHistogram :: LitString -> Int -> Code
 bumpHistogram lbl n 
-  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLongRep))
+--  = bumpHistogramE lbl (CmmLit (CmmInt (fromIntegral n) cLongRep))
+    = return ()	   -- TEMP SPJ Apr 07
 
 bumpHistogramE :: LitString -> CmmExpr -> Code
 bumpHistogramE lbl n 
