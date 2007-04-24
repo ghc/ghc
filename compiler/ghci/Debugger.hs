@@ -27,6 +27,7 @@ import NameEnv
 import RdrName
 import UniqSupply
 import Type
+import TcType
 import TyCon
 import TcGadt
 import GHC
@@ -60,7 +61,7 @@ pprintClosureCommand bindThings force str = do
                       (words str)
   substs <- catMaybes `liftM` mapM (io . go cms) 
                                    [id | AnId id <- tythings]
-  mapM (io . applySubstToEnv cms) substs
+  mapM (io . applySubstToEnv cms . skolemSubst) substs
   return ()
  where 
 
@@ -92,7 +93,7 @@ pprintClosureCommand bindThings force str = do
       let ictxt    = hsc_IC hsc_env
           type_env = ic_type_env ictxt
           ids      = typeEnvIds type_env
-          ids'     = map (\id -> setIdType id (substTy subst (idType id))) ids
+          ids'     = map (\id -> id `setIdType` substTy subst (idType id)) ids
           type_env'= extendTypeEnvWithIds type_env ids'
           ictxt'   = ictxt { ic_type_env = type_env' }
       writeIORef ref (hsc_env {hsc_IC = ictxt'})
@@ -112,7 +113,7 @@ bindSuspensions cms@(Session ref) t = do
       availNames_var  <- newIORef availNames
       (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
-      let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
+      let ids = [ mkGlobalId VanillaGlobal name (mk_skol_ty ty) vanillaIdInfo
                   | (name,ty) <- zip names tys]
           new_type_env = extendTypeEnvWithIds type_env ids 
           new_rn_env   = extendLocalRdrEnv rn_env names
@@ -190,3 +191,11 @@ newGrimName cms userName  = do
         occname = mkOccName varName userName
         name    = mkInternalName unique occname noSrcLoc
     return name
+
+skolemSubst subst = subst `setTvSubstEnv` 
+                      mapVarEnv mk_skol_ty (getTvSubstEnv subst)
+mk_skol_ty ty | tyvars  <- varSetElems (tyVarsOfType ty)
+              , tyvars' <- map (mkTyVarTy . mk_skol_tv) tyvars
+              = substTyWith tyvars tyvars' ty
+mk_skol_tv tv = mkTcTyVar (tyVarName tv) (tyVarKind tv) 
+                      (SkolemTv UnkSkol)

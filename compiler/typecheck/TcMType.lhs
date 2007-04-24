@@ -422,7 +422,7 @@ zonkTcTyVarsAndFV tyvars = mappM zonkTcTyVar tyvars	`thenM` \ tys ->
 			   returnM (tyVarsOfTypes tys)
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
-zonkTcTyVar tyvar = ASSERT( isTcTyVar tyvar )
+zonkTcTyVar tyvar = ASSERT2( isTcTyVar tyvar, ppr tyvar)
 		    zonk_tc_tyvar (\ tv -> returnM (TyVarTy tv)) tyvar
 \end{code}
 
