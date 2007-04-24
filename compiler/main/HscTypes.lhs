@@ -1253,6 +1253,8 @@ data ModBreaks
         -- indicating which breakpoints are enabled.
    , modBreaks_locs :: !(Array BreakIndex SrcSpan)
         -- An array giving the source span of each breakpoint.
+   , modBreaks_vars :: !(Array BreakIndex [OccName])
+        -- An array giving the names of the free variables at each breakpoint.
    }
 
 emptyModBreaks :: ModBreaks
@@ -1260,5 +1262,6 @@ emptyModBreaks = ModBreaks
    { modBreaks_flags = error "ModBreaks.modBreaks_array not initialised"
          -- Todo: can we avoid this? 
    , modBreaks_locs = array (0,-1) []
+   , modBreaks_vars = array (0,-1) []
    }
 \end{code}

@@ -23,7 +23,6 @@ module DsMonad (
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
-        bindLocalsDs, getLocalBindsDs,
 	-- Warnings
 	DsWarning, warnDs, failWithDs,
 
@@ -141,8 +140,7 @@ data DsGblEnv = DsGblEnv {
 
 data DsLclEnv = DsLclEnv {
 	ds_meta	   :: DsMetaEnv,	-- Template Haskell bindings
-	ds_loc	   :: SrcSpan,		-- to put in pattern-matching error msgs
-        ds_locals  :: OccEnv Id         -- For locals in breakpoints
+	ds_loc	   :: SrcSpan		-- to put in pattern-matching error msgs
      }
 
 -- Inside [| |] brackets, the desugarer looks 
@@ -207,8 +205,7 @@ mkDsEnvs mod rdr_env type_env msg_var
     			            ds_unqual = mkPrintUnqualified rdr_env,
     			            ds_msgs = msg_var}
                lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
-			            ds_loc = noSrcSpan,
-                                    ds_locals = emptyOccEnv }
+			            ds_loc = noSrcSpan }
 
        return (gbl_env, lcl_env)
 
@@ -329,15 +326,3 @@ dsExtendMetaEnv :: DsMetaEnv -> DsM a -> DsM a
 dsExtendMetaEnv menv thing_inside
   = updLclEnv (\env -> env { ds_meta = ds_meta env `plusNameEnv` menv }) thing_inside
 \end{code}
-
-\begin{code}
-getLocalBindsDs :: DsM [Id]
-getLocalBindsDs = do { env <- getLclEnv; return (occEnvElts$ ds_locals env) }
-
-bindLocalsDs :: [Id] -> DsM a -> DsM a
-bindLocalsDs new_ids enclosed_scope = 
-    updLclEnv (\env-> env {ds_locals = ds_locals env `extendOccEnvList` occnamed_ids})
-	      enclosed_scope
-  where occnamed_ids = [ (nameOccName (idName id),id) | id <- new_ids ] 
-\end{code}
-

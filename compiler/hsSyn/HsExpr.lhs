@@ -228,6 +228,7 @@ data HsExpr id
 
   | HsTick 
      Int				-- module-local tick number
+     [id]                               -- variables in scope
      (LHsExpr id)			-- sub-expression
 
   | HsBinTick
@@ -410,8 +411,8 @@ ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("pending") <+> ppr ps
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [ptext SLIT("proc"), ppr pat, ptext SLIT("->"), ppr cmd]
 
-ppr_expr (HsTick tickId exp)
-  = hcat [ptext SLIT("tick<"), ppr tickId,ptext SLIT(">("), ppr exp,ptext SLIT(")")]
+ppr_expr (HsTick tickId vars exp)
+  = hcat [ptext SLIT("tick<"), ppr tickId,ptext SLIT(">("), hsep (map pprHsVar vars), ppr exp,ptext SLIT(")")]
 ppr_expr (HsBinTick tickIdTrue tickIdFalse exp)
   = hcat [ptext SLIT("bintick<"), 
 	  ppr tickIdTrue,

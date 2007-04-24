@@ -936,12 +936,12 @@ mkFailurePair expr
 \end{code}
 
 \begin{code}
-mkOptTickBox :: Maybe Int -> CoreExpr -> DsM CoreExpr
+mkOptTickBox :: Maybe (Int,[Id]) -> CoreExpr -> DsM CoreExpr
 mkOptTickBox Nothing e   = return e
-mkOptTickBox (Just ix) e = mkTickBox ix e
+mkOptTickBox (Just (ix,ids)) e = mkTickBox ix ids e
 
-mkTickBox :: Int -> CoreExpr -> DsM CoreExpr
-mkTickBox ix e = do
+mkTickBox :: Int -> [Id] -> CoreExpr -> DsM CoreExpr
+mkTickBox ix vars e = do
        uq <- newUnique 	
        mod <- getModuleDs
        let tick | opt_Hpc   = mkTickBoxOpId uq mod ix
@@ -954,11 +954,10 @@ mkTickBox ix e = do
           if opt_Hpc 
             then return (Var tick)
             else do
-              locals <- getLocalBindsDs
               let tickVar = Var tick
-              let tickType = mkFunTys (map idType locals) realWorldStatePrimTy 
+              let tickType = mkFunTys (map idType vars) realWorldStatePrimTy 
               let scrutApTy = App tickVar (Type tickType)
-              return (mkApps scrutApTy (map Var locals) :: Expr Id)
+              return (mkApps scrutApTy (map Var vars) :: Expr Id)
        return $ Case scrut var ty [(DEFAULT,[],e)]
   where
      ty = exprType e
@@ -969,8 +968,8 @@ mkBinaryTickBox ixT ixF e = do
        uq <- newUnique 	
        mod <- getModuleDs
        let bndr1 = mkSysLocal FSLIT("t1") uq boolTy 
-       falseBox <- mkTickBox ixF $ Var falseDataConId
-       trueBox  <- mkTickBox ixT $ Var trueDataConId
+       falseBox <- mkTickBox ixF [] $ Var falseDataConId
+       trueBox  <- mkTickBox ixT [] $ Var trueDataConId
        return $ Case e bndr1 boolTy
                        [ (DataAlt falseDataCon, [], falseBox)
                        , (DataAlt trueDataCon,  [], trueBox)

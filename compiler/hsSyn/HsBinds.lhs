@@ -95,7 +95,7 @@ data HsBind id
 				-- Before renaming, and after typechecking, 
 				-- the field is unused; it's just an error thunk
 
-        fun_tick :: Maybe Int   -- This is the (optional) module-local tick number. 
+        fun_tick :: Maybe (Int,[id])   -- This is the (optional) module-local tick number. 
     }
 
   | PatBind {	-- The pattern is never a simple variable;

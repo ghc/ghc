@@ -63,7 +63,8 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
 
   let (binds1,st)
 		 = unTM (addTickLHsBinds binds) 
-		 $ TT { modName      = mod_name
+                   TickEnv { locals = emptyOccEnv }
+		   TT { modName      = mod_name
 		      , declPath     = []
 		      , tickBoxCount = 0
 		      , mixEntries   = []
@@ -77,18 +78,20 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
      let tabStop = 1 -- <tab> counts as a normal char in GHC's location ranges.
      createDirectoryIfMissing True hpc_dir
      modTime <- getModificationTime' orig_file
-     mixCreate hpc_dir mod_name (Mix orig_file modTime tabStop entries)
+     let entries' = [ (hpcPos, box) 
+                    | (span,_,box) <- entries, Just hpcPos <- [mkHpcPos span] ]
+     mixCreate hpc_dir mod_name (Mix orig_file modTime tabStop entries')
 
   -- Todo: use proper src span type
   breakArray <- newBreakArray $ length entries
-  let fn = mkFastString orig_file
-  let locsTicks = listArray (0,tickBoxCount st-1)
-                        [ mkSrcSpan (mkSrcLoc fn r1 c1) (mkSrcLoc fn r2 c2)
-                        | (P r1 c1 r2 c2, _box) <- entries ] 
-
-  let modBreaks = emptyModBreaks 
+  let locsTicks = listArray (0,tickBoxCount st-1) 
+                     [ span | (span,_,_) <- entries ]
+      varsTicks = listArray (0,tickBoxCount st-1) 
+                     [ vars | (_,vars,_) <- entries ]
+      modBreaks = emptyModBreaks 
                   { modBreaks_flags = breakArray 
                   , modBreaks_locs  = locsTicks 
+                  , modBreaks_vars  = varsTicks
                   } 
 
   doIfSet_dyn dflags  Opt_D_dump_hpc $ do
@@ -161,8 +164,7 @@ addTickLHsBind other = return other
 addTickLHsExprAlways :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprAlways (L pos e0) = do
     e1 <- addTickHsExpr e0
-    fn <- allocTickBox ExpBox pos 
-    return $ fn $ L pos e1
+    allocTickBox ExpBox pos e1
 
 addTickLHsExprNeverOrAlways :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprNeverOrAlways e
@@ -188,8 +190,7 @@ addTickLHsExpr (L pos e0) = do
     e1 <- addTickHsExpr e0
     if opt_Hpc || isGoodBreakExpr e0
        then do
-          fn <- allocTickBox ExpBox pos 
-          return $ fn $ L pos e1
+          allocTickBox ExpBox pos e1
        else
           return $ L pos e1 
 
@@ -211,8 +212,7 @@ addTickLHsExprOptAlt oneOfMany (L pos e0)
   | not opt_Hpc = addTickLHsExpr (L pos e0)
   | otherwise = do
     e1 <- addTickHsExpr e0
-    fn <- allocTickBox (if oneOfMany then AltBox else ExpBox) pos 
-    return $ fn $ L pos e1
+    allocTickBox (if oneOfMany then AltBox else ExpBox) pos e1
 
 addBinTickLHsExpr :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addBinTickLHsExpr boxLabel (L pos e0) = do
@@ -259,11 +259,12 @@ addTickHsExpr (HsIf	 e1 e2 e3) =
 addTickHsExpr (HsLet binds e) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds)		-- to think about: !patterns.
-		(addTickLHsExprNeverOrAlways e)
+		(bindLocals (map unLoc $ collectLocalBinders binds) $
+                        addTickLHsExprNeverOrAlways e)
 addTickHsExpr (HsDo cxt stmts last_exp srcloc) =
 	liftM4 HsDo
 		(return cxt)
-		(mapM (liftL (addTickStmt forQual)) stmts)
+		(addTickLStmts forQual stmts)
 		(addTickLHsExpr last_exp)
 		(return srcloc)
   where
@@ -302,9 +303,8 @@ addTickHsExpr (ArithSeq	 ty arith_seq) =
 		(addTickArithSeqInfo arith_seq)
 addTickHsExpr (HsTickPragma (file,(l1,c1),(l2,c2)) (L pos e0)) = do
     e1 <- addTickHsExpr e0
-    fn <- allocTickBox (ExternalBox (unpackFS file) (P l1 c1 l2 c2)) pos
-    let (L _ e2) = fn $ L pos e1
-    return $ e2
+    e2 <- allocTickBox (ExternalBox (unpackFS file) (P l1 c1 l2 c2)) pos e1
+    return $ unLoc e2
 addTickHsExpr (PArrSeq	 {}) = error "addTickHsExpr: PArrSeq"
 addTickHsExpr (HsSCC	 {}) = error "addTickHsExpr: HsSCC"
 addTickHsExpr (HsCoreAnn   {}) = error "addTickHsExpr: HsCoreAnn"
@@ -339,7 +339,7 @@ addTickHsExpr (EAsPat _ _) = error "addTickHsExpr: EAsPat _ _"
 addTickHsExpr (ELazyPat _) = error "addTickHsExpr: ELazyPat _"
 addTickHsExpr (EWildPat) = error "addTickHsExpr: EWildPat"
 addTickHsExpr (HsBinTick _ _ _) = error "addTickhsExpr: HsBinTick _ _ _"
-addTickHsExpr (HsTick _ _) = error "addTickhsExpr: HsTick _ _"
+addTickHsExpr (HsTick _ _ _) = error "addTickhsExpr: HsTick _ _"
 
 addTickMatchGroup (MatchGroup matches ty) = do
   let isOneOfMany = matchesOneOfMany matches
@@ -347,56 +347,83 @@ addTickMatchGroup (MatchGroup matches ty) = do
   return $ MatchGroup matches' ty
 
 addTickMatch :: Bool -> Match Id -> TM (Match Id)
-addTickMatch isOneOfMany (Match pats opSig gRHSs) = do
-  gRHSs' <- addTickGRHSs isOneOfMany gRHSs
-  return $ Match pats opSig gRHSs'
+addTickMatch isOneOfMany (Match pats opSig gRHSs) =
+  bindLocals (collectPatsBinders pats) $ do
+    gRHSs' <- addTickGRHSs isOneOfMany gRHSs
+    return $ Match pats opSig gRHSs'
 
 addTickGRHSs :: Bool -> GRHSs Id -> TM (GRHSs Id)
 addTickGRHSs isOneOfMany (GRHSs guarded local_binds) = do
-  guarded' <- mapM (liftL (addTickGRHS isOneOfMany)) guarded
   local_binds' <- addTickHsLocalBinds local_binds
-  return $ GRHSs guarded' local_binds'
+  bindLocals binders $ do
+    guarded' <- mapM (liftL (addTickGRHS isOneOfMany)) guarded
+    return $ GRHSs guarded' local_binds'
+  where
+    binders = map unLoc (collectLocalBinders local_binds)
 
 addTickGRHS :: Bool -> GRHS Id -> TM (GRHS Id)
 addTickGRHS isOneOfMany (GRHS stmts expr) = do
-  stmts' <- mapM (liftL (addTickStmt (Just $ GuardBinBox))) stmts
-  expr' <- if opt_Hpc then addTickLHsExprOptAlt isOneOfMany expr
-                      else addTickLHsExprAlways expr 
+  (stmts',expr') <- addTickLStmts' (Just $ GuardBinBox) stmts []
+                        (if opt_Hpc then addTickLHsExprOptAlt isOneOfMany expr
+                                    else addTickLHsExprAlways expr)
   return $ GRHS stmts' expr'
 
-addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
-addTickStmt isGuard (BindStmt pat e bind fail) =
-	liftM4 BindStmt
+addTickLStmts :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM [LStmt Id]
+addTickLStmts isGuard stmts = do
+  (stmts',_) <- addTickLStmts' isGuard stmts [] (return ())
+  return stmts'
+
+addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id]
+               -> [LStmt Id] -> TM a -> TM ([LStmt Id], a)
+addTickLStmts' isGuard [] acc do_rhs = do
+  rhs <- do_rhs
+  return (reverse acc, rhs)
+addTickLStmts' isGuard (s:ss) acc do_rhs = do
+  (s', binders) <- addTickLStmt isGuard s
+  bindLocals binders $ addTickLStmts' isGuard ss (s':acc) do_rhs
+
+addTickLStmt isGuard (L pos stmt) = do
+  (stmt',vars) <- addTickStmt isGuard stmt
+  return (L pos stmt', vars)
+
+addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id, [Id])
+addTickStmt isGuard (BindStmt pat e bind fail) = do
+	e <- liftM4 BindStmt
 		(addTickLPat pat)
 		(addTickLHsExprAlways e)
 		(addTickSyntaxExpr hpcSrcSpan bind)
 		(addTickSyntaxExpr hpcSrcSpan fail)
-addTickStmt isGuard (ExprStmt e bind' ty) =
-	liftM3 ExprStmt
+        return (e, collectPatBinders pat)
+addTickStmt isGuard (ExprStmt e bind' ty) = do
+	e <- liftM3 ExprStmt
 		(addTick e)
 		(addTickSyntaxExpr hpcSrcSpan bind')
 		(return ty)
+        return (e, [])
   where
    addTick e | Just fn <- isGuard = addBinTickLHsExpr fn e
              | otherwise          = addTickLHsExprAlways e
 
-addTickStmt isGuard (LetStmt binds) =
-	liftM LetStmt
+addTickStmt isGuard (LetStmt binds) = do
+	e <- liftM LetStmt
 		(addTickHsLocalBinds binds)
-addTickStmt isGuard (ParStmt pairs) =
-  	liftM ParStmt (mapM process pairs)
+        return (e, map unLoc $ collectLocalBinders binds)
+addTickStmt isGuard (ParStmt pairs) = do
+  	e <- liftM ParStmt (mapM process pairs)
+        return (e, [])
   where
 	process (stmts,ids) = 
 		liftM2 (,) 
-			(mapM (liftL (addTickStmt isGuard)) stmts)
+			(addTickLStmts isGuard stmts)
 			(return ids)
-addTickStmt isGuard (RecStmt stmts ids1 ids2 tys dictbinds) =
-  	liftM5 RecStmt 
-		(mapM (liftL (addTickStmt isGuard)) stmts)
+addTickStmt isGuard (RecStmt stmts ids1 ids2 tys dictbinds) = do
+  	e <- liftM5 RecStmt 
+		(addTickLStmts isGuard stmts)
 		(return ids1)
 		(return ids2)
 		(return tys)
 		(addTickDictBinds dictbinds)
+        return (e,[])
 
 addTickHsLocalBinds :: HsLocalBinds Id -> TM (HsLocalBinds Id)
 addTickHsLocalBinds (HsValBinds binds) = 
@@ -482,67 +509,77 @@ data TickTransState = TT { modName     :: String
                          , declPath    :: [String]
                          , tickBoxCount:: Int
                          , mixEntries  :: [MixEntry]
-                         }                        
-	deriving Show
 
-data TM a = TM { unTM :: TickTransState -> (a,TickTransState) }
+                         }                        
+--	deriving Show
+
+newtype TickEnv = TickEnv { locals :: OccEnv Id }
+
+data TM a = TM { unTM :: TickEnv -> TickTransState -> (a,TickTransState) }
 
 instance Monad TM where
-  return a = TM $ \ st -> (a,st)
-  (TM m) >>= k = TM $ \ st -> case m st of
-				(r1,st1) -> unTM (k r1) st1 
+  return a = TM $ \ e st -> (a,st)
+  (TM m) >>= k = TM $ \ e st -> case m e st of
+				  (r1,st1) -> unTM (k r1) e st1 
 
 --addTick :: LHsExpr Id -> TM (LHsExpr Id)
 --addTick e = TM $ \ uq -> (e,succ uq,[(uq,getLoc e)])
 
 addPathEntry :: String -> TM a -> TM a
-addPathEntry nm (TM m) = TM $ \ st -> case m (st { declPath = declPath st ++ [nm] }) of
+addPathEntry nm (TM m) = TM $ \ e st -> case m e (st { declPath = declPath st ++ [nm] }) of
 					(r,st') -> (r,st' { declPath = declPath st })
 
 getPathEntry :: TM [String]
-getPathEntry = TM $ \ st -> (declPath st,st)
+getPathEntry = TM $ \ e st -> (declPath st,st)
+
+bindLocals :: [Id] -> TM a -> TM a
+bindLocals new_ids (TM m)
+  = TM $ \ e st -> m e{locals = locals e `extendOccEnvList` occnamed_ids} st
+  where occnamed_ids = [ (nameOccName (idName id),id) | id <- new_ids ] 
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
-allocTickBox :: BoxLabel -> SrcSpan -> TM (LHsExpr Id -> LHsExpr Id)
-allocTickBox boxLabel pos | Just hpcPos <- mkHpcPos pos = TM $ \ st ->
-  let me = (hpcPos,boxLabel)
+allocTickBox :: BoxLabel -> SrcSpan -> HsExpr Id -> TM (LHsExpr Id)
+allocTickBox boxLabel pos e | isGoodSrcSpan pos = TM $ \ env st ->
+  let me = (pos, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
-  in ( \ (L pos e) -> L pos $ HsTick c (L pos e)
+      ids = occEnvElts (locals env)
+  in ( L pos (HsTick c ids (L pos e))
      , st {tickBoxCount=c+1,mixEntries=me:mes}
      )
-allocTickBox boxLabel e = return id
+allocTickBox boxLabel pos e = return (L pos e)
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
-allocATickBox :: BoxLabel -> SrcSpan -> TM (Maybe Int)
-allocATickBox boxLabel pos | Just hpcPos <- mkHpcPos pos = TM $ \ st ->
-  let me = (hpcPos,boxLabel)
+allocATickBox :: BoxLabel -> SrcSpan -> TM (Maybe (Int,[Id]))
+allocATickBox boxLabel pos | isGoodSrcSpan pos = TM $ \ env st ->
+  let me = (pos, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
-  in ( Just c
+      ids = occEnvElts (locals env)
+  in ( Just (c, ids)
      , st {tickBoxCount=c+1,mixEntries=me:mes}
      )
 allocATickBox boxLabel e = return Nothing
 
 allocBinTickBox :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
-allocBinTickBox boxLabel (L pos e) | Just hpcPos <- mkHpcPos pos = TM $ \ st ->
-  let meT = (hpcPos,boxLabel True)
-      meF = (hpcPos,boxLabel False)
-      meE = (hpcPos,ExpBox)
+allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan pos = TM $ \ _ st ->
+  let meT = (pos,[],boxLabel True)
+      meF = (pos,[],boxLabel False)
+      meE = (pos,[],ExpBox)
       c = tickBoxCount st
       mes = mixEntries st
   in 
      if opt_Hpc 
-        then ( L pos $ HsTick c $ L pos $ HsBinTick (c+1) (c+2) (L pos e)
+        then ( L pos $ HsTick c [] $ L pos $ HsBinTick (c+1) (c+2) (L pos e)
            -- notice that F and T are reversed,
            -- because we are building the list in
            -- reverse...
              , st {tickBoxCount=c+3,mixEntries=meF:meT:meE:mes}
              )
         else
-             ( L pos $ HsTick c $ L pos e
+             ( L pos $ HsTick c [] $ L pos e
              , st {tickBoxCount=c+1,mixEntries=meE:mes}
              )
 
@@ -589,14 +626,15 @@ data Mix = Mix
 	     FilePath		-- location of original file
 	     Integer		-- time (in seconds) of original file's last update, since 1970.
 	     Int 		-- tab stop value 
-	     [MixEntry] 	-- entries
-	deriving (Show,Read)
+	     [MixEntry_] 	-- entries
+        deriving (Show, Read)
 
 -- We would rather use ClockTime in Mix, but ClockTime has no Read instance in 6.4 and before,
 -- but does in 6.6. Definining the instance for ClockTime here is the Wrong Thing to do,
 -- because if some other program also defined that instance, we will not be able to compile.
 
-type MixEntry = (HpcPos, BoxLabel)
+type MixEntry  = (SrcSpan, [OccName], BoxLabel)
+type MixEntry_ = (HpcPos, BoxLabel)
 
 data BoxLabel = ExpBox
               | AltBox

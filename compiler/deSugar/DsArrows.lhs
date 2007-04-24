@@ -587,9 +587,9 @@ dsCmd _ids local_vars env_ids _stack _res_ty (HsArrForm op _ args)
 	      unionVarSets fv_sets)
 
 
-dsCmd ids local_vars env_ids stack res_ty (HsTick ix expr)
+dsCmd ids local_vars env_ids stack res_ty (HsTick ix vars expr)
   = dsLCmd ids local_vars env_ids stack res_ty expr `thenDs` \ (expr1,id_set) ->
-    mkTickBox ix expr1                     	    `thenDs` \ expr2 ->
+    mkTickBox ix vars expr1                    	    `thenDs` \ expr2 ->
     return (expr2,id_set)
 
 --	A | ys |- c :: [ts] t	(ys <= xs)

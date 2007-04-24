@@ -255,7 +255,10 @@ import TcType           ( tcSplitSigmaTy, isDictTy )
 import Maybes		( expectJust, mapCatMaybes )
 import HaddockParse
 import HaddockLex       ( tokenise )
+import PrelNames
+import Unique
 
+import Data.Array
 import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist )
 import Data.Maybe
@@ -2199,13 +2202,16 @@ handleRunStatus ref final_ic final_names resume_ic breakMVar statusMVar status =
    case status of  
       -- did we hit a breakpoint or did we complete?
       (Break apStack info tid) -> do
-                hsc_env <- readIORef ref
-                (new_hsc_env, names) <- extendEnvironment hsc_env apStack 
-                                                (breakInfo_vars info)
-                writeIORef ref new_hsc_env 
-                let res = ResumeHandle breakMVar statusMVar final_names
-                                       final_ic resume_ic names
-                return (RunBreak tid names info res)
+        hsc_env <- readIORef ref
+        mod_info <- getHomeModuleInfo hsc_env (moduleName (breakInfo_module info))
+        let breaks = minf_modBreaks (expectJust "handlRunStatus" mod_info)
+        let occs = modBreaks_vars breaks ! breakInfo_number info
+        (new_hsc_env, names) <- extendEnvironment hsc_env apStack 
+                                        (breakInfo_vars info) occs
+        writeIORef ref new_hsc_env 
+        let res = ResumeHandle breakMVar statusMVar final_names
+                               final_ic resume_ic names
+        return (RunBreak tid names info res)
       (Complete either_hvals) ->
 		case either_hvals of
 		    Left e -> return (RunException e)
@@ -2304,17 +2310,25 @@ getIdValFromApStack apStack (identifier, stackDepth) = do
    freeStablePtr resultSptr 
    return (identifier, unsafeCoerce# result)
 
-extendEnvironment :: HscEnv -> a -> [(Id, Int)] -> IO (HscEnv, [Name])
-extendEnvironment hsc_env apStack idsOffsets = do
+extendEnvironment
+        :: HscEnv
+        -> a            -- the AP_STACK object built by the interpreter
+        -> [(Id, Int)]  -- free variables and offsets into the AP_STACK
+        -> [OccName]    -- names for the variables (from the source code)
+        -> IO (HscEnv, [Name])
+extendEnvironment hsc_env apStack idsOffsets occs = do
    idsVals <- mapM (getIdValFromApStack apStack) idsOffsets 
    let (ids, hValues) = unzip idsVals 
+   new_ids <- zipWithM mkNewId occs ids
    let names = map idName ids
-   let global_ids = map globaliseAndTidy ids
-   typed_ids  <- return global_ids -- mapM instantiateIdType global_ids
+   Just (ATyCon unknown_tc) <- tcRnLookupName hsc_env unknownTyConName
+   let result_name = mkSystemVarName (mkBuiltinUnique 33) FSLIT("_result")
+       result_id   = Id.mkLocalId result_name (mkTyConApp unknown_tc [])
    let ictxt = hsc_IC hsc_env
        rn_env   = ic_rn_local_env ictxt
        type_env = ic_type_env ictxt
-       bound_names = map idName typed_ids
+       all_new_ids  = result_id : new_ids
+       bound_names = map idName all_new_ids
        new_rn_env  = extendLocalRdrEnv rn_env bound_names
        -- Remove any shadowed bindings from the type_env;
        -- they are inaccessible but might, I suppose, cause 
@@ -2323,16 +2337,22 @@ extendEnvironment hsc_env apStack idsOffsets = do
                     let rdr_name = mkRdrUnqual (nameOccName name),
                     Just n <- [lookupLocalRdrEnv rn_env rdr_name] ]
        filtered_type_env = delListFromNameEnv type_env shadowed
-       new_type_env = extendTypeEnvWithIds filtered_type_env (typed_ids)
+       new_type_env = extendTypeEnvWithIds filtered_type_env all_new_ids
        new_ic = ictxt { ic_rn_local_env = new_rn_env, 
 		        ic_type_env     = new_type_env }
    Linker.extendLinkEnv (zip names hValues)
-   return (hsc_env{hsc_IC = new_ic}, names)
+   Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
+   return (hsc_env{hsc_IC = new_ic}, result_name:names)
   where
-   globaliseAndTidy :: Id -> Id
-   globaliseAndTidy id
-      = let tidied_type = tidyTopType$ idType id
-        in setIdType (globaliseId VanillaGlobal id) tidied_type
+   mkNewId :: OccName -> Id -> IO Id
+   mkNewId occ id = do
+     ty <- instantiateTyVarsToUnknown hsc_env 
+     let uniq = idUnique id
+         loc = nameSrcLoc (idName id)
+         name = mkInternalName uniq occ loc
+         ty = tidyTopType (idType id)
+         new_id = Id.mkGlobalId VanillaGlobal name ty (idInfo id)
+     return new_id
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames
