@@ -46,7 +46,6 @@ import BasicTypes hiding ( TopLevel )
 import FastString
 import Util		( mapSnd )
 
-
 import Control.Monad
 import Data.List
 \end{code}

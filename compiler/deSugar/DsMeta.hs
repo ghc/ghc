@@ -33,7 +33,6 @@ import qualified Language.Haskell.TH as TH
 import HsSyn
 import Class
 import PrelNames
-import OccName
 -- To avoid clashes with DsMeta.varName we must make a local alias for
 -- OccName.varName we do this by removing varName from the import of
 -- OccName above, making a qualified instance of OccName and using
@@ -42,10 +41,8 @@ import qualified OccName
 
 import Module
 import Id
-import OccName
 import Name
 import NameEnv
-import Type
 import TcType
 import TyCon
 import TysWiredIn
