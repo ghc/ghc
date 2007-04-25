@@ -171,7 +171,7 @@ doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup
-	cd $* && setup/Setup haddock
+	cd $* && ../ifBuildable/ifBuildable setup/Setup haddock
 
 .PHONY: install install-docs install.library.%
 
