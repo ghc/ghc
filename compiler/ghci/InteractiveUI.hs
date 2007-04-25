@@ -15,13 +15,13 @@ module InteractiveUI (
 
 import GhciMonad
 import GhciTags
+import Debugger
 
 -- The GHC interface
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Type, Module, ModuleName, TyThing(..), Phase,
                           BreakIndex, Name, SrcSpan )
-import Debugger
 import DynFlags
 import Packages
 import PackageConfig
@@ -114,7 +114,7 @@ builtin_commands = [
   ("e", 	keepGoing editFile,		False, completeFilename),
   ("edit",	keepGoing editFile,		False, completeFilename),
   ("etags",	keepGoing createETagsFileCmd,	False, completeFilename),
-  ("force",     keepGoing (pprintClosureCommand False True), False, completeIdentifier),
+  ("force",     keepGoing forceCmd,             False, completeIdentifier),
   ("help",	keepGoing help,			False, completeNone),
   ("info",      keepGoing info,			False, completeIdentifier),
   ("kind",	keepGoing kindOfType,		False, completeIdentifier),
@@ -122,12 +122,12 @@ builtin_commands = [
   ("list",	keepGoing listCmd,              False, completeNone),
   ("module",	keepGoing setContext,		False, completeModule),
   ("main",	keepGoing runMain,		False, completeIdentifier),
-  ("print",     keepGoing (pprintClosureCommand True False), False, completeIdentifier),
+  ("print",     keepGoing printCmd,             False, completeIdentifier),
   ("quit",	quit,				False, completeNone),
   ("reload", 	keepGoing reloadModule,  	False, completeNone),
   ("set",	keepGoing setCmd,		True,  completeSetOptions),
   ("show",	keepGoing showCmd,		False, completeNone),
-  ("sprint",    keepGoing (pprintClosureCommand False False),False, completeIdentifier),
+  ("sprint",    keepGoing sprintCmd,            False, completeIdentifier),
   ("step",      stepCmd,                        False, completeIdentifier), 
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
   ("undef",     keepGoing undefineMacro,	False, completeMacro),
@@ -1355,6 +1355,14 @@ setUpConsole = do
 
 -- -----------------------------------------------------------------------------
 -- commands for debugger
+
+sprintCmd = pprintCommand False False
+printCmd  = pprintCommand True False
+forceCmd  = pprintCommand False True
+
+pprintCommand bind force str = do
+  session <- getSession
+  io $ pprintClosureCommand session bind force str
 
 foreign import ccall "rts_setStepFlag" setStepFlag :: IO () 
 

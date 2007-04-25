@@ -15,7 +15,6 @@ module Debugger (pprintClosureCommand) where
 import Linker
 import RtClosureInspect
 
-import PrelNames
 import HscTypes
 import IdInfo
 --import Id
@@ -23,15 +22,11 @@ import Var hiding ( varName )
 import VarSet
 import VarEnv
 import Name 
-import NameEnv
-import RdrName
 import UniqSupply
 import Type
 import TcType
-import TyCon
 import TcGadt
 import GHC
-import GhciMonad
 
 import Outputable
 import Pretty                    ( Mode(..), showDocWith )
@@ -52,16 +47,15 @@ import GHC.Exts
 -------------------------------------
 -- | The :print & friends commands
 -------------------------------------
-pprintClosureCommand :: Bool -> Bool -> String -> GHCi ()
-pprintClosureCommand bindThings force str = do 
-  cms <- getSession
+pprintClosureCommand :: Session -> Bool -> Bool -> String -> IO ()
+pprintClosureCommand session bindThings force str = do 
   tythings <- (catMaybes . concat) `liftM`
-                 mapM (\w -> io(GHC.parseName cms w >>= 
-                                mapM (GHC.lookupName cms)))
+                 mapM (\w -> GHC.parseName session w >>= 
+                                mapM (GHC.lookupName session))
                       (words str)
-  substs <- catMaybes `liftM` mapM (io . go cms) 
+  substs <- catMaybes `liftM` mapM (go session) 
                                    [id | AnId id <- tythings]
-  mapM (io . applySubstToEnv cms . skolemSubst) substs
+  mapM (applySubstToEnv session . skolemSubst) substs
   return ()
  where 
 
