@@ -168,6 +168,7 @@ readCType i
  | i == BLACKHOLE                          = Blackhole
  | i >= IND    && i <= IND_STATIC          = Indirection (fromIntegral i)
  | fromIntegral i == aP_CODE               = AP
+ | i == AP_STACK                           = AP
  | fromIntegral i == pAP_CODE              = PAP
  | otherwise                               = Other (fromIntegral i)
 
@@ -178,6 +179,11 @@ isConstr    _   = False
 isIndirection (Indirection _) = True
 --isIndirection ThunkSelector = True
 isIndirection _ = False
+
+isThunk (Thunk _)     = True
+isThunk ThunkSelector = True
+isThunk AP            = True
+isThunk _             = False
 
 isFullyEvaluated :: a -> IO Bool
 isFullyEvaluated a = do 
@@ -489,7 +495,7 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
      Nothing -> go tv tv hval
      Just ty | isMonomorphic ty -> go ty ty hval
      Just ty -> do 
-              (ty',rev_subst) <- instScheme (sigmaType$ fromJust mb_ty)
+              (ty',rev_subst) <- instScheme (sigmaType ty)
               addConstraint tv ty'
               term <- go tv tv hval
               --restore original Tyvars
@@ -504,7 +510,7 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
     clos <- trIO $ getClosureData a
     case tipe clos of
 -- Thunks we may want to force
-      Thunk _ | force -> seq a $ go tv ty a
+      t | isThunk t && force -> seq a $ go tv ty a
 -- We always follow indirections 
       Indirection _ -> go tv ty $! (ptrs clos ! 0)
  -- The interesting case
