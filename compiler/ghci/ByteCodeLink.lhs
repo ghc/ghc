@@ -58,7 +58,7 @@ import GHC.Base		( writeArray#, RealWorld, Int(..), Word# )
 
 \begin{code}
 type ClosureEnv = NameEnv (Name, HValue)
-newtype HValue = HValue (forall a . a)
+newtype HValue = HValue Any
 
 emptyClosureEnv = emptyNameEnv
 
