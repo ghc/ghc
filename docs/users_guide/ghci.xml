@@ -1244,9 +1244,9 @@ li - (_t1::[Maybe Integer])
 Prelude> head li
 Just 1
 Prelude> :sp li
-li - [Just 1 | _]
+li - Just 1 : _
 Prelude> :p li
-li - [Just 1 | (_t2::[Maybe Integer])]
+li - Just 1 : (_t2::[Maybe Integer])
 Prelude> last li
 Just 5
 Prelude> :sp li
@@ -1262,8 +1262,6 @@ li - [Just 1,(_t6::Maybe Integer),Just 3,(_t7::Maybe Integer),Just 4]
 	 to help us observe how the <literal>li</literal> variable is evaluated progressively as we operate
          with it. Note for instance how <quote>last</quote> traverses all the elements of
 	 the list to compute its result, but without evaluating the individual elements.</para>
-           <para>Finally note that the Prolog convention of [head | tail] is used by 
-	 <literal>:sprint</literal> to display unevaluated lists.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -1389,7 +1387,7 @@ li - _
 Prelude> head li
 Just 1
 Prelude> :sp li
-li - [Just 1 | _]
+li - Just 1 : _
 Prelude> last li
 Just 5
 Prelude> :sp li
@@ -1398,8 +1396,6 @@ li - [Just 1,_,_,_,Just 5]
          The example uses <literal>:sprint</literal> to help us observe how the <literal>li</literal> variable is evaluated progressively as we operate
          with it. Note for instance how <quote>last</quote> traverses all the elements of
 	 the list to compute its result, but without evaluating the individual elements.</para>
-           <para>Finally note that the Prolog convention of [head | tail] is used by 
-	 <literal>:sprint</literal> to display unevaluated lists.
 	  </para>
 	</listitem>
       </varlistentry>
