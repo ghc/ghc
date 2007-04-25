@@ -358,7 +358,7 @@ Interface file code:
 --
 --   * If it is 'Just pats', we have the definition of an indexed type.  Then,
 --     'pats' are type patterns for the type-indexes of the type constructor
---     and 'tcdVars' are the variables in those patterns.  Hence, the arity of
+--     and 'tcdTyVars' are the variables in those patterns.  Hence, the arity of
 --     the indexed type (ie, the number of indexes) is 'length tcdTyPats' and
 --     *not* 'length tcdVars'.
 --
