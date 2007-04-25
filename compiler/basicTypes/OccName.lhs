@@ -92,8 +92,8 @@ isSymbol = const False
 %************************************************************************
 
 \begin{code}
-data NameSpace = VarName	-- Variables, including "source" data constructors
-	       | DataName	-- "Real" data constructors 
+data NameSpace = VarName	-- Variables, including "real" data constructors
+	       | DataName	-- "Source" data constructors 
 	       | TvName		-- Type variables
 	       | TcClsName	-- Type constructors and classes; Haskell has them
 				-- in the same name space for now.
