@@ -732,7 +732,7 @@ addWarnTcM :: (TidyEnv, Message) -> TcM ()
 addWarnTcM (env0, msg)
  = do { ctxt <- getErrCtxt ;
 	ctxt_msgs <- do_ctxt env0 ctxt ;
-	addWarn (vcat (msg : ctxt_to_use ctxt_msgs)) }
+	addReport (vcat (ptext SLIT("Warning:") <+> msg : ctxt_to_use ctxt_msgs)) }
 
 warnTc :: Bool -> Message -> TcM ()
 warnTc warn_if_true warn_msg

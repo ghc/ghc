@@ -148,6 +148,7 @@ data DynFlag
    | Opt_WarnOverlappingPatterns
    | Opt_WarnSimplePatterns
    | Opt_WarnTypeDefaults
+   | Opt_WarnMonomorphism
    | Opt_WarnUnusedBinds
    | Opt_WarnUnusedImports
    | Opt_WarnUnusedMatches
@@ -583,6 +584,7 @@ standardWarnings
 	Opt_WarnOverlappingPatterns,
 	Opt_WarnMissingFields,
 	Opt_WarnMissingMethods,
+	Opt_WarnMonomorphism,
 	Opt_WarnDuplicateExports
       ]
 
@@ -1023,6 +1025,7 @@ fFlags = [
   ( "warn-overlapping-patterns", 	Opt_WarnOverlappingPatterns ),
   ( "warn-simple-patterns",      	Opt_WarnSimplePatterns ),
   ( "warn-type-defaults",        	Opt_WarnTypeDefaults ),
+  ( "warn-monomorphism-restriction",   	Opt_WarnMonomorphism ),
   ( "warn-unused-binds",         	Opt_WarnUnusedBinds ),
   ( "warn-unused-imports",       	Opt_WarnUnusedImports ),
   ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),

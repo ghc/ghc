@@ -839,6 +839,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-monomorphism-restriction</option></entry>
+	    <entry>warn when the Monomorphism Restriction is applied</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-monomorphism-restriction</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-unused-binds</option></entry>
 	    <entry>warn about bindings that are unused</entry>
 	    <entry>dynamic</entry>

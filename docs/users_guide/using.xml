@@ -1136,6 +1136,20 @@ f "2"    = 2
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fwarn-monomorphism-restriction</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-monomorphism-restriction</option></primary></indexterm>
+	  <indexterm><primary>monomorphism restriction, warning</primary></indexterm>
+	  <para>Have the compiler warn/inform you where in your source
+          the Haskell Monomorphism Restriction is applied.  If applied silently
+	  the MR can give rise to unexpected behaviour, so it can be helpful
+	  to have an explicit warning that it is being applied.</para>
+
+	  <para>This warning is on by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-unused-binds</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-unused-binds</option></primary></indexterm>

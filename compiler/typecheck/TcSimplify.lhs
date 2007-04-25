@@ -1202,9 +1202,22 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	; gbl_tvs' <- tcGetGlobalTyVars
 	; constrained_dicts' <- mappM zonkInst constrained_dicts
 
-	; let constrained_tvs' = tyVarsOfInsts constrained_dicts'
-	      qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
-			 `minusVarSet` constrained_tvs'
+	; let qtvs1 = tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs'
+				-- As in tcSimplifyInfer
+
+		-- Do not quantify over constrained type variables:
+		-- this is the monomorphism restriction
+	      constrained_tvs' = tyVarsOfInsts constrained_dicts'
+	      qtvs = qtvs1 `minusVarSet` constrained_tvs'
+	      pp_bndrs = pprWithCommas (quotes . ppr) bndrs
+
+	-- Warn in the mono
+	; warn_mono <- doptM Opt_WarnMonomorphism
+	; warnTc (warn_mono && (constrained_tvs' `intersectsVarSet` qtvs1))
+		 (vcat[ ptext SLIT("the Monomorphism Restriction applies to the binding")
+				<> plural bndrs <+> ptext SLIT("for") <+> pp_bndrs,
+			ptext SLIT("Consider giving a type signature for") <+> pp_bndrs])
+
 	; traceTc (text "tcSimplifyRestricted" <+> vcat [
 		pprInsts wanteds, pprInsts constrained_dicts',
 		ppr _binds,
