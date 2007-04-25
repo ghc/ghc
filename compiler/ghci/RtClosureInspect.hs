@@ -10,13 +10,7 @@ module RtClosureInspect(
   
      cvObtainTerm,       -- :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
 
-     ClosureType(..), 
-     getClosureData,     -- :: a -> IO Closure
-     Closure ( tipe, infoPtr, ptrs, nonPtrs ), 
-     isConstr,           -- :: ClosureType -> Bool
-     isIndirection,      -- :: ClosureType -> Bool
-
-     Term(..), 
+     Term(..),
      pprTerm, 
      cPprTerm, 
      cPprTermBase,
