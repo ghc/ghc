@@ -178,20 +178,7 @@ rnTopBindsBoot (ValBindsIn mbinds sigs)
 	; return (ValBindsOut [] sigs', usesOnly (hsSigsFVs sigs')) }
 
 rnTopBindsSrc :: HsValBinds RdrName -> RnM (HsValBinds Name, DefUses)
-rnTopBindsSrc binds@(ValBindsIn mbinds _)
-  = do	{ (binds', dus) <- rnValBinds noTrim binds
-
-		-- Warn about missing signatures, 
-	; let	{ ValBindsOut _ sigs' = binds'
-		; ty_sig_vars = mkNameSet [ unLoc n | L _ (TypeSig n _) <- sigs']
-		; un_sigd_bndrs = duDefs dus `minusNameSet` ty_sig_vars }
-
-	; warn_missing_sigs <- doptM Opt_WarnMissingSigs
-	; ifM (warn_missing_sigs)
-	      (mappM_ missingSigWarn (nameSetToList un_sigd_bndrs))
-
-	; return (binds', dus)
-	}
+rnTopBindsSrc binds = rnValBinds noTrim binds
 \end{code}
 
 
@@ -646,12 +633,6 @@ unknownSigErr (L loc sig)
 	sep [ptext SLIT("Misplaced") <+> what_it_is <> colon, ppr sig]
   where
     what_it_is = hsSigDoc sig
-
-missingSigWarn var
-  = addWarnAt (mkSrcSpan loc loc) $
-      sep [ptext SLIT("Definition but no type signature for"), quotes (ppr var)]
-  where 
-    loc = nameSrcLoc var  -- TODO: make a proper span
 
 methodBindErr mbind
  =  hang (ptext SLIT("Pattern bindings (except simple variables) not allowed in instance declarations"))

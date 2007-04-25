@@ -1006,7 +1006,8 @@ f foo = foo { x = 6 }
 
 	  <para>If you would like GHC to check that every top-level
           function/value has a type signature, use the
-          <option>-fwarn-missing-signatures</option> option.  This
+          <option>-fwarn-missing-signatures</option> option.  As part of
+	    the warning GHC also reports the inferred type.  The
           option is off by default.</para>
 	</listitem>
       </varlistentry>

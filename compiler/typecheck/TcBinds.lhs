@@ -337,7 +337,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
 	-- BUILD THE POLYMORPHIC RESULT IDs
   ; let dict_ids = map instToId dicts
-  ; exports <- mapM (mkExport prag_fn tyvars_to_gen (map idType dict_ids))
+  ; exports <- mapM (mkExport top_lvl prag_fn tyvars_to_gen (map idType dict_ids))
 		    mono_bind_infos
 
   ; let	poly_ids = [poly_id | (_, poly_id, _, _) <- exports]
@@ -352,7 +352,8 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 
 
 --------------
-mkExport :: TcPragFun -> [TyVar] -> [TcType] -> MonoBindInfo
+mkExport :: TopLevelFlag -> TcPragFun -> [TyVar] -> [TcType]
+	 -> MonoBindInfo
 	 -> TcM ([TyVar], Id, Id, [LPrag])
 -- mkExport generates exports with 
 --	zonked type variables, 
@@ -365,8 +366,10 @@ mkExport :: TcPragFun -> [TyVar] -> [TcType] -> MonoBindInfo
 
 -- Pre-condition: the inferred_tvs are already zonked
 
-mkExport prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
-  = do	{ (tvs, poly_id) <- mk_poly_id mb_sig
+mkExport top_lvl prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
+  = do	{ warn_missing_sigs <- doptM Opt_WarnMissingSigs
+	; let warn = isTopLevel top_lvl && warn_missing_sigs
+	; (tvs, poly_id) <- mk_poly_id warn mb_sig
 
 	; poly_id' <- zonkId poly_id
 	; prags <- tcPrags poly_id' (prag_fn poly_name)
@@ -376,9 +379,10 @@ mkExport prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
   where
     poly_ty = mkForAllTys inferred_tvs (mkFunTys dict_tys (idType mono_id))
 
-    mk_poly_id Nothing    = return (inferred_tvs, mkLocalId poly_name poly_ty)
-    mk_poly_id (Just sig) = do { tvs <- mapM zonk_tv (sig_tvs sig)
-			       ; return (tvs,  sig_id sig) }
+    mk_poly_id warn Nothing    = do { missingSigWarn warn poly_name poly_ty
+				    ; return (inferred_tvs, mkLocalId poly_name poly_ty) }
+    mk_poly_id warn (Just sig) = do { tvs <- mapM zonk_tv (sig_tvs sig)
+			            ; return (tvs,  sig_id sig) }
 
     zonk_tv tv = do { ty <- zonkTcTyVar tv; return (tcGetTyVar "mkExport" ty) }
 
@@ -1144,4 +1148,13 @@ restrictedBindCtxtErr binder_names
 
 genCtxt binder_names
   = ptext SLIT("When generalising the type(s) for") <+> pprBinders binder_names
+
+missingSigWarn False name ty = return ()
+missingSigWarn True  name ty
+  = do 	{ env0 <- tcInitTidyEnv
+	; let (env1, tidy_ty) = tidyOpenType env0 ty
+	; addWarnTcM (env1, mk_msg tidy_ty) }
+  where
+    mk_msg ty = vcat [ptext SLIT("Definition but no type signature for") <+> quotes (ppr name),
+		      sep [ptext SLIT("Inferred type:") <+> ppr name <+> dcolon <+> ppr ty]]
 \end{code}

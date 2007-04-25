@@ -725,9 +725,12 @@ checkTc False err = failWithTc err
 
 \begin{code}
 addWarnTc :: Message -> TcM ()
-addWarnTc msg
+addWarnTc msg = do { env0 <- tcInitTidyEnv 
+		   ; addWarnTcM (env0, msg) }
+
+addWarnTcM :: (TidyEnv, Message) -> TcM ()
+addWarnTcM (env0, msg)
  = do { ctxt <- getErrCtxt ;
-	env0 <- tcInitTidyEnv ;
 	ctxt_msgs <- do_ctxt env0 ctxt ;
 	addWarn (vcat (msg : ctxt_to_use ctxt_msgs)) }
 
