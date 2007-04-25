@@ -315,7 +315,9 @@ extendCSEnv (CS cs in_scope sub) expr expr'
   = CS (addToUFM_C combine cs hash [(expr, expr')]) in_scope sub
   where
     hash   = hashExpr expr
-    combine old new = WARN( result `lengthExceeds` 4, text "extendCSEnv: long list:" <+> ppr result )
+    combine old new = WARN( result `lengthExceeds` 4, ((text "extendCSEnv: long list (length" <+> int (length result) <> comma 
+							<+> text "hash code" <+> text (show hash) <> char ')')
+							$$ nest 4 (ppr result)) )
 		      result
 		    where
 		      result = new ++ old

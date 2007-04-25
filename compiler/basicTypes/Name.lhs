@@ -260,8 +260,11 @@ localiseName n = n { n_sort = Internal }
 %************************************************************************
 
 \begin{code}
-hashName :: Name -> Int
-hashName name = getKey (nameUnique name)
+hashName :: Name -> Int		-- ToDo: should really be Word
+hashName name = getKey (nameUnique name) + 1
+	-- The +1 avoids keys with lots of zeros in the ls bits, which 
+	-- interacts badly with the cheap and cheerful multiplication in
+	-- hashExpr
 \end{code}
 
 

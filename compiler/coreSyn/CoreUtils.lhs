@@ -1386,10 +1386,10 @@ fast_hash_expr env other        = 1
 
 fast_hash_type :: HashEnv -> Type -> Word32
 fast_hash_type env ty 
-  | Just tv <- getTyVar_maybe ty          = hashVar env tv
-  | Just (tc,_) <- splitTyConApp_maybe ty
-                              = fromIntegral (hashName (tyConName tc))
-  | otherwise				  = 1
+  | Just tv <- getTyVar_maybe ty            = hashVar env tv
+  | Just (tc,tys) <- splitTyConApp_maybe ty = let hash_tc = fromIntegral (hashName (tyConName tc))
+					      in foldr (\t n -> fast_hash_type env t + n) hash_tc tys
+  | otherwise				    = 1
 
 extend_env :: HashEnv -> Var -> (Int, VarEnv Int)
 extend_env (n,env) b = (n+1, extendVarEnv env b n)
