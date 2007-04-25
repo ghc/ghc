@@ -690,6 +690,16 @@ instance Binary IfaceBndr where
 	      _ -> do ab <- get bh
 		      return (IfaceTvBndr ab)
 
+instance Binary IfaceLetBndr where
+    put_ bh (IfLetBndr a b c) = do
+	    put_ bh a
+	    put_ bh b
+	    put_ bh c
+    get bh = do a <- get bh
+	        b <- get bh
+	        c <- get bh
+		return (IfLetBndr a b c)	   
+
 instance Binary IfaceType where
     put_ bh (IfaceForAllTy aa ab) = do
 	    putByte bh 0

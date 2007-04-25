@@ -146,13 +146,16 @@ tidyLetBndr env (id,rhs)
 	-- CorePrep to turn the let into a case.
 	--
 	-- Similarly arity info for eta expansion in CorePrep
-	--
+	-- 
+	-- Set inline-prag info so that we preseve it across 
+	-- separate compilation boundaries
     final_id = new_id `setIdInfo` new_info
     idinfo   = idInfo id
     new_info = vanillaIdInfo
 		`setArityInfo`		exprArity rhs
 		`setAllStrictnessInfo`	newStrictnessInfo idinfo
 		`setNewDemandInfo`	newDemandInfo idinfo
+		`setInlinePragInfo`	inlinePragInfo idinfo
 
     -- Override the env we get back from tidyId with the new IdInfo
     -- so it gets propagated to the usage sites.

@@ -8,7 +8,7 @@ module IfaceSyn (
 	module IfaceType,		-- Re-export all this
 
 	IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceConDecls(..),
-	IfaceExpr(..), IfaceAlt, IfaceNote(..),
+	IfaceExpr(..), IfaceAlt, IfaceNote(..), IfaceLetBndr(..),
 	IfaceBinding(..), IfaceConAlt(..), IfaceIdInfo(..),
 	IfaceInfoItem(..), IfaceRule(..), IfaceInst(..), IfaceFamInst(..),
 
@@ -219,9 +219,26 @@ data IfaceConAlt = IfaceDefault
 		 | IfaceLitAlt Literal
 
 data IfaceBinding
-  = IfaceNonRec	IfaceIdBndr IfaceExpr
-  | IfaceRec 	[(IfaceIdBndr, IfaceExpr)]
+  = IfaceNonRec	IfaceLetBndr IfaceExpr
+  | IfaceRec 	[(IfaceLetBndr, IfaceExpr)]
+
+-- IfaceLetBndr is like IfaceIdBndr, but has IdInfo too
+-- It's used for *non-top-level* let/rec binders
+-- See Note [IdInfo on nested let-bindings]
+data IfaceLetBndr = IfLetBndr FastString IfaceType IfaceIdInfo
 \end{code}
+
+Note [IdInfo on nested let-bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Occasionally we want to preserve IdInfo on nested let bindings The one
+that came up was a NOINLINE pragma on a let-binding inside an INLINE
+function.  The user (Duncan Coutts) really wanted the NOINLINE control
+to cross the separate compilation boundary.
+
+So a IfaceLetBndr keeps a trimmed-down list of IfaceIdInfo stuff.
+Currently we only actually retain InlinePragInfo, but in principle we could
+add strictness etc.
+
 
 Note [Orphans]: the ifInstOrph and ifRuleOrph fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -549,8 +566,9 @@ ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs,
 ppr_con_bs (IfaceTupleAlt tup_con) bs = tupleParens tup_con (interpp'SP bs)
 ppr_con_bs con bs		      = ppr con <+> hsep (map ppr bs)
   
-ppr_bind ((b,ty),rhs) = sep [ppr b <+> dcolon <+> ppr ty, 
-			     equals <+> pprIfaceExpr noParens rhs]
+ppr_bind (IfLetBndr b ty info, rhs) 
+  = sep [hang (ppr b <+> dcolon <+> ppr ty) 2 (ppr info),
+	 equals <+> pprIfaceExpr noParens rhs]
 
 ------------------
 pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun (nest 2 (pprIfaceExpr parens arg) : args)
@@ -572,16 +590,17 @@ instance Outputable IfaceConAlt where
 
 ------------------
 instance Outputable IfaceIdInfo where
-   ppr NoInfo       = empty
-   ppr (HasInfo is) = ptext SLIT("{-") <+> fsep (map ppr_hs_info is) <+> ptext SLIT("-}")
+  ppr NoInfo       = empty
+  ppr (HasInfo is) = ptext SLIT("{-") <+> fsep (map ppr is) <+> ptext SLIT("-}")
 
-ppr_hs_info (HsUnfold unf) 	= ptext SLIT("Unfolding:") <+>
+instance Outputable IfaceInfoItem where
+  ppr (HsUnfold unf)  	 = ptext SLIT("Unfolding:") <+>
 				  	parens (pprIfaceExpr noParens unf)
-ppr_hs_info (HsInline act)      = ptext SLIT("Inline:") <+> ppr act
-ppr_hs_info (HsArity arity)     = ptext SLIT("Arity:") <+> int arity
-ppr_hs_info (HsStrictness str)  = ptext SLIT("Strictness:") <+> pprIfaceStrictSig str
-ppr_hs_info HsNoCafRefs		= ptext SLIT("HasNoCafRefs")
-ppr_hs_info (HsWorker w a)	= ptext SLIT("Worker:") <+> ppr w <+> int a
+  ppr (HsInline act)     = ptext SLIT("Inline:") <+> ppr act
+  ppr (HsArity arity)    = ptext SLIT("Arity:") <+> int arity
+  ppr (HsStrictness str) = ptext SLIT("Strictness:") <+> pprIfaceStrictSig str
+  ppr HsNoCafRefs	 = ptext SLIT("HasNoCafRefs")
+  ppr (HsWorker w a)	 = ptext SLIT("Worker:") <+> ppr w <+> int a
 \end{code}
 
 
@@ -805,10 +824,10 @@ eq_ifaceExpr env (IfaceCase s1 b1 ty1 as1) (IfaceCase s2 b2 ty2 as2)
 	  eq_ifNakedBndrs env bs1 bs2 (\env -> eq_ifaceExpr env r1 r2)
 
 eq_ifaceExpr env (IfaceLet (IfaceNonRec b1 r1) x1) (IfaceLet (IfaceNonRec b2 r2) x2)
-  = eq_ifaceExpr env r1 r2 &&& eq_ifIdBndr env b1 b2 (\env -> eq_ifaceExpr env x1 x2)
+  = eq_ifaceExpr env r1 r2 &&& eq_ifLetBndr env b1 b2 (\env -> eq_ifaceExpr env x1 x2)
 
 eq_ifaceExpr env (IfaceLet (IfaceRec as1) x1) (IfaceLet (IfaceRec as2) x2)
-  = eq_ifIdBndrs env bs1 bs2 (\env -> eqListBy (eq_ifaceExpr env) rs1 rs2 &&& eq_ifaceExpr env x1 x2)
+  = eq_ifLetBndrs env bs1 bs2 (\env -> eqListBy (eq_ifaceExpr env) rs1 rs2 &&& eq_ifaceExpr env x1 x2)
   where
     (bs1,rs1) = unzip as1
     (bs2,rs2) = unzip as2
@@ -909,14 +928,17 @@ eq_ifBndr _ _ _ _ = NotEqual
 eq_ifTvBndr env (v1, k1) (v2, k2) k = eq_ifType env k1 k2 &&& k (extendEqEnv env v1 v2)
 eq_ifIdBndr env (v1, t1) (v2, t2) k = eq_ifType env t1 t2 &&& k (extendEqEnv env v1 v2)
 
+eq_ifLetBndr env (IfLetBndr v1 t1 i1) (IfLetBndr v2 t2 i2) k 
+  = eq_ifType env t1 t2 &&& eqIfIdInfo i1 i2 &&& k (extendEqEnv env v1 v2)
+
 eq_ifBndrs   	:: ExtEnv [IfaceBndr]
-eq_ifIdBndrs 	:: ExtEnv [IfaceIdBndr]
+eq_ifLetBndrs 	:: ExtEnv [IfaceLetBndr]
 eq_ifTvBndrs 	:: ExtEnv [IfaceTvBndr]
 eq_ifNakedBndrs :: ExtEnv [FastString]
 eq_ifBndrs   	= eq_bndrs_with eq_ifBndr
-eq_ifIdBndrs 	= eq_bndrs_with eq_ifIdBndr
 eq_ifTvBndrs 	= eq_bndrs_with eq_ifTvBndr
 eq_ifNakedBndrs = eq_bndrs_with eq_ifNakedBndr
+eq_ifLetBndrs   = eq_bndrs_with eq_ifLetBndr
 
 eq_bndrs_with eq env []       []       k = k env
 eq_bndrs_with eq env (b1:bs1) (b2:bs2) k = eq env b1 b2 (\env -> eq_bndrs_with eq env bs1 bs2 k)

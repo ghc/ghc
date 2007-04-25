@@ -200,12 +200,12 @@ let_bind :: { IfaceBinding }
 	|  vdef                 { let (b,r) = $1
 				  in IfaceNonRec b r }
 
-vdefs1	:: { [(IfaceIdBndr, IfaceExpr)] }
+vdefs1	:: { [(IfaceLetBndr, IfaceExpr)] }
 	: vdef  	        { [$1] }
 	| vdef ';' vdefs1       { $1:$3 }
 
-vdef	:: { (IfaceIdBndr, IfaceExpr) }
-	: fs_var_occ '::' ty '=' exp { (($1, $3), $5) }
+vdef	:: { (IfaceLetBndr, IfaceExpr) }
+	: fs_var_occ '::' ty '=' exp { (IfLetBndr $1 $3 NoInfo, $5) }
         | '%local' vdef              { $2 }
 
   -- NB: qd_occ includes data constructors, because

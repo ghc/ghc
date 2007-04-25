@@ -50,8 +50,7 @@ type IfaceIdBndr  = (FastString, IfaceType)
 type IfaceTvBndr  = (FastString, IfaceKind)
 
 -------------------------------
-type IfaceKind = IfaceType			-- Re-use the Kind type, but no KindVars in it
-
+type IfaceKind     = IfaceType
 type IfaceCoercion = IfaceType
 
 data IfaceType
@@ -177,14 +176,7 @@ pprIfaceTvBndrs tyvars = hsep (map pprIfaceTvBndr tyvars)
 \begin{code}
 ---------------------------------
 instance Outputable IfaceType where
-  ppr ty = pprIfaceTypeForUser ty
-
-pprIfaceTypeForUser ::IfaceType -> SDoc
--- Drop top-level for-alls; if that's not what you want, use pprIfaceType dire
-pprIfaceTypeForUser ty
-  = pprIfaceForAllPart [] theta (pprIfaceType tau)
- where		
-    (_tvs, theta, tau) = splitIfaceSigmaTy ty
+  ppr ty = pprIfaceType ty
 
 pprIfaceType, pprParendIfaceType ::IfaceType -> SDoc
 pprIfaceType       = ppr_ty tOP_PREC

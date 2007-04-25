@@ -48,7 +48,6 @@ import Outputable
 import ErrUtils
 import Maybes
 import SrcLoc
-import Util
 import DynFlags
 import Control.Monad
 
@@ -667,16 +666,17 @@ tcIfaceExpr (IfaceCase scrut case_bndr ty alts)
     returnM (Case scrut' case_bndr' ty' alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec bndr rhs) body)
-  = tcIfaceExpr rhs		`thenM` \ rhs' ->
-    bindIfaceId bndr 		$ \ bndr' ->
-    tcIfaceExpr body		`thenM` \ body' ->
-    returnM (Let (NonRec bndr' rhs') body')
+  = do	{ rhs' <- tcIfaceExpr rhs
+	; id   <- tcIfaceLetBndr bndr
+	; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
+	; return (Let (NonRec id rhs') body') }
 
 tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
-  = bindIfaceIds bndrs		$ \ bndrs' ->
-    mappM tcIfaceExpr rhss	`thenM` \ rhss' ->
-    tcIfaceExpr body		`thenM` \ body' ->
-    returnM (Let (Rec (bndrs' `zip` rhss')) body')
+  = do	{ ids <- mapM tcIfaceLetBndr bndrs
+	; extendIfaceIdEnv ids $ do
+	{ rhss' <- mapM tcIfaceExpr rhss
+	; body' <- tcIfaceExpr body
+	; return (Let (Rec (ids `zip` rhss')) body') } }
   where
     (bndrs, rhss) = unzip pairs
 
@@ -961,8 +961,11 @@ tcIfaceExtId name = do { thing <- tcIfaceGlobal name
 
 \begin{code}
 bindIfaceBndr :: IfaceBndr -> (CoreBndr -> IfL a) -> IfL a
-bindIfaceBndr (IfaceIdBndr bndr) thing_inside
-  = bindIfaceId bndr thing_inside
+bindIfaceBndr (IfaceIdBndr (fs, ty)) thing_inside
+  = do	{ name <- newIfaceName (mkVarOccFS fs)
+	; ty' <- tcIfaceType ty
+	; let id = mkLocalId name ty'
+	; extendIfaceIdEnv [id] (thing_inside id) }
 bindIfaceBndr (IfaceTvBndr bndr) thing_inside
   = bindIfaceTyVar bndr thing_inside
     
@@ -974,26 +977,24 @@ bindIfaceBndrs (b:bs) thing_inside
     thing_inside (b':bs')
 
 -----------------------
-bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
-bindIfaceId (occ, ty) thing_inside
-  = do	{ name <- newIfaceName (mkVarOccFS occ)
+tcIfaceLetBndr (IfLetBndr fs ty info)
+  = do	{ name <- newIfaceName (mkVarOccFS fs)
 	; ty' <- tcIfaceType ty
-	; let {	id = mkLocalId name ty' }
-	; extendIfaceIdEnv [id] (thing_inside id) }
-    
-bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a
-bindIfaceIds bndrs thing_inside
-  = do 	{ names <- newIfaceNames (map mkVarOccFS occs)
-	; tys' <- mappM tcIfaceType tys
-	; let {	ids = zipWithEqual "tcCoreValBndr" mkLocalId names tys' }
-	; extendIfaceIdEnv ids (thing_inside ids) }
+	; case info of
+		NoInfo    -> return (mkLocalId name ty')
+		HasInfo i -> return (mkLocalIdWithInfo name ty' (tc_info i)) } 
   where
-    (occs,tys) = unzip bndrs
-
+	-- Similar to tcIdInfo, but much simpler
+    tc_info [] = vanillaIdInfo
+    tc_info (HsInline p     : i) = tc_info i `setInlinePragInfo` p 
+    tc_info (HsArity a      : i) = tc_info i `setArityInfo` a 
+    tc_info (HsStrictness s : i) = tc_info i `setAllStrictnessInfo` Just s 
+    tc_info (other          : i) = pprTrace "tcIfaceLetBndr: discarding unexpected IdInfo" 
+					    (ppr other) (tc_info i)
 
 -----------------------
-newExtCoreBndr :: IfaceIdBndr -> IfL Id
-newExtCoreBndr (var, ty)
+newExtCoreBndr :: IfaceLetBndr -> IfL Id
+newExtCoreBndr (IfLetBndr var ty _)	-- Ignoring IdInfo for now
   = do	{ mod <- getIfModule
 	; name <- newGlobalBinder mod (mkVarOccFS var) noSrcLoc
 	; ty' <- tcIfaceType ty

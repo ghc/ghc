@@ -1174,6 +1174,22 @@ famInstToIfaceFamInst fi@(FamInst { fi_tycon = tycon,
     do_rough (Just n) = Just (toIfaceTyCon_name n)
 
 --------------------------
+toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
+			       (toIfaceType (idType id)) 
+			       prag_info
+  where
+	-- Stripped-down version of tcIfaceIdInfo
+	-- Change this if you want to export more IdInfo for
+	-- non-top-level Ids.  Don't forget to change
+	-- CoreTidy.tidyLetBndr too!
+	--
+	-- See Note [IdInfo on nested let-bindings] in IfaceSyn
+    id_info = idInfo id
+    inline_prag = inlinePragInfo id_info
+    prag_info | isAlwaysActive inline_prag = NoInfo
+	      | otherwise		   = HasInfo [HsInline inline_prag]
+
+--------------------------
 toIfaceIdInfo :: IdInfo -> [IfaceInfoItem]
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, 
@@ -1282,8 +1298,8 @@ toIfaceNote InlineMe      = IfaceInlineMe
 toIfaceNote (CoreNote s)  = IfaceCoreNote s
 
 ---------------------
-toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceIdBndr b) (toIfaceExpr r)
-toIfaceBind (Rec prs)    = IfaceRec [(toIfaceIdBndr b, toIfaceExpr r) | (b,r) <- prs]
+toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceLetBndr b) (toIfaceExpr r)
+toIfaceBind (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr r) | (b,r) <- prs]
 
 ---------------------
 toIfaceAlt (c,bs,r) = (toIfaceCon c, map getFS bs, toIfaceExpr r)
