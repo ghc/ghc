@@ -1221,7 +1221,7 @@ zipTopTvSubst :: [TyVar] -> [Type] -> TvSubst
 zipTopTvSubst tyvars tys 
 #ifdef DEBUG
   | length tyvars /= length tys
-  = pprTrace "zipOpenTvSubst" (ppr tyvars $$ ppr tys) emptyTvSubst
+  = pprTrace "zipTopTvSubst" (ppr tyvars $$ ppr tys) emptyTvSubst
   | otherwise
 #endif
   = TvSubst emptyInScopeSet (zipTyEnv tyvars tys)
