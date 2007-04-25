@@ -191,8 +191,7 @@ basicKnownKeyNames
 	otherwiseIdName, inlineIdName,
 	plusIntegerName, timesIntegerName,
 	eqStringName, assertName, breakpointName, breakpointCondName,
-        breakpointAutoName,  opaqueTyConName, unknownTyConName, 
-        unknown1TyConName, unknown2TyConName, unknown3TyConName,
+        breakpointAutoName,  opaqueTyConName,
         assertErrorName, runSTRepName,
 	printName, fstName, sndName,
 
@@ -503,10 +502,6 @@ assertName        = varQual gHC_BASE FSLIT("assert")     assertIdKey
 breakpointName    = varQual gHC_BASE FSLIT("breakpoint") breakpointIdKey
 breakpointCondName= varQual gHC_BASE FSLIT("breakpointCond") breakpointCondIdKey
 breakpointAutoName= varQual gHC_BASE FSLIT("breakpointAuto") breakpointAutoIdKey
-unknownTyConName  = tcQual  gHC_BASE FSLIT("Unknown") unknownTyConKey
-unknown1TyConName = tcQual  gHC_BASE FSLIT("Unknown1") unknown1TyConKey
-unknown2TyConName = tcQual  gHC_BASE FSLIT("Unknown2") unknown2TyConKey
-unknown3TyConName = tcQual  gHC_BASE FSLIT("Unknown3") unknown3TyConKey
 opaqueTyConName   = tcQual  gHC_BASE FSLIT("Opaque")   opaqueTyConKey
 
 breakpointJumpName
