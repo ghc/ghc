@@ -823,10 +823,20 @@ setInteractiveContext hsc_env icxt thing_inside
     in
     updGblEnv (\env -> env { 
 	tcg_rdr_env  = ic_rn_gbl_env icxt,
-	tcg_type_env = ic_type_env   icxt,
 	tcg_inst_env = extendInstEnvList (tcg_inst_env env) dfuns }) $
 
-    updLclEnv (\env -> env { tcl_rdr = ic_rn_local_env icxt })	$
+
+    tcExtendIdEnv (typeEnvIds (ic_type_env icxt)) $
+        -- tcExtendIdEnv does lots: 
+        --   - it extends the local type env (tcl_env) with the given Ids,
+        --   - it extends the local rdr env (tcl_rdr) with the Names from 
+        --     the given Ids
+        --   - it adds the free tyvars of the Ids to the tcl_tyvars
+        --     set.
+        --
+        -- We should have no Ids with the same name in the
+        -- ic_type_env, otherwise we'll end up with shadowing in the
+        -- tcl_rdr, and it's random which one will be in scope.
 
     do	{ traceTc (text "setIC" <+> ppr (ic_type_env icxt))
  	; thing_inside }
@@ -875,11 +885,9 @@ tcRnStmt hsc_env ictxt rdr_stmt
 	global_ids = map globaliseAndTidy zonked_ids ;
     
 		-- Update the interactive context
-	rn_env   = ic_rn_local_env ictxt ;
 	type_env = ic_type_env ictxt ;
 
 	bound_names = map idName global_ids ;
-	new_rn_env  = extendLocalRdrEnv rn_env bound_names ;
 
 {- ---------------------------------------------
    At one stage I removed any shadowed bindings from the type_env;
@@ -898,15 +906,17 @@ tcRnStmt hsc_env ictxt rdr_stmt
  
    Hence this code is commented out
 
-	shadowed = [ n | name <- bound_names,
-			 let rdr_name = mkRdrUnqual (nameOccName name),
-			 Just n <- [lookupLocalRdrEnv rn_env rdr_name] ] ;
-	filtered_type_env = delListFromNameEnv type_env shadowed ;
 -------------------------------------------------- -}
 
-	new_type_env = extendTypeEnvWithIds type_env global_ids ;
-	new_ic = ictxt { ic_rn_local_env = new_rn_env, 
-		  	 ic_type_env     = new_type_env }
+        old_bound_names = map idName (typeEnvIds (ic_type_env ictxt)) ;
+	shadowed = [ n | name <- bound_names,
+                         n <- old_bound_names,
+                         nameOccName name == nameOccName n ] ;
+
+	filtered_type_env = delListFromNameEnv type_env shadowed ;
+
+	new_type_env = extendTypeEnvWithIds filtered_type_env global_ids ;
+	new_ic = ictxt { ic_type_env = new_type_env }
     } ;
 
     dumpOptTcRn Opt_D_dump_tc 
@@ -1206,8 +1216,19 @@ tcRnLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
 tcRnLookupName hsc_env name
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env (hsc_IC hsc_env) $
-    tcLookupGlobal name
+    tcRnLookupName' name
 
+-- To look up a name we have to look in the local environment (tcl_lcl)
+-- as well as the global environment, which is what tcLookup does. 
+-- But we also want a TyThing, so we have to convert:
+
+tcRnLookupName' :: Name -> TcRn TyThing
+tcRnLookupName' name = do
+   tcthing <- tcLookup name
+   case tcthing of
+     AGlobal thing    -> return thing
+     ATcId{tct_id=id} -> return (AnId id)
+     _ -> panic "tcRnLookupName'"
 
 tcRnGetInfo :: HscEnv
 	    -> Name
@@ -1231,7 +1252,7 @@ tcRnGetInfo hsc_env name
 	--  in the home package all relevant modules are loaded.)
     loadUnqualIfaces ictxt
 
-    thing  <- tcLookupGlobal name
+    thing <- tcRnLookupName' name
     fixity <- lookupFixityRn name
     ispecs <- lookupInsts (icPrintUnqual ictxt) thing
     return (thing, fixity, ispecs)

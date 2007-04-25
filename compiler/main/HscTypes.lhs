@@ -85,6 +85,7 @@ import InstEnv		( InstEnv, Instance )
 import FamInstEnv	( FamInstEnv, FamInst )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
+import VarSet
 import Id		( Id, isImplicitId )
 import Type		( TyThing(..) )
 
@@ -614,18 +615,27 @@ data InteractiveContext
 	ic_rn_gbl_env :: GlobalRdrEnv,	-- The cached GlobalRdrEnv, built from
 					-- ic_toplev_scope and ic_exports
 
-	ic_rn_local_env :: LocalRdrEnv,	-- Lexical context for variables bound
-					-- during interaction
+	ic_type_env :: TypeEnv,         -- Type env for names bound during
+                                        -- interaction.  NB. the names from
+                                        -- these Ids are used to populate
+                                        -- the LocalRdrEnv used during
+                                        -- typechecking of a statement, so
+                                        -- there should be no duplicate
+                                        -- names in here.
 
-	ic_type_env :: TypeEnv		-- Ditto for types
+        ic_tyvars :: TyVarSet           -- skolem type variables free in
+                                        -- ic_type_env.  These arise at
+                                        -- breakpoints in a polymorphic 
+                                        -- context, where we have only partial
+                                        -- type information.
     }
 
 emptyInteractiveContext
   = InteractiveContext { ic_toplev_scope = [],
 			 ic_exports = [],
 			 ic_rn_gbl_env = emptyGlobalRdrEnv,
-			 ic_rn_local_env = emptyLocalRdrEnv,
-			 ic_type_env = emptyTypeEnv }
+			 ic_type_env = emptyTypeEnv,
+                         ic_tyvars = emptyVarSet }
 
 icPrintUnqual :: InteractiveContext -> PrintUnqualified
 icPrintUnqual ictxt = mkPrintUnqualified (ic_rn_gbl_env ictxt)

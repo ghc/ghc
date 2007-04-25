@@ -25,8 +25,7 @@ module HscMain
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..), LHsExpr, LStmt, LHsType )
-import Module		( Module )
+import HsSyn		( Stmt(..), LStmt, LHsType )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
@@ -43,6 +42,7 @@ import {- Kind parts of -} Type		( Kind )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
 import SrcLoc		( SrcSpan, noSrcLoc, interactiveSrcLoc, srcLocSpan )
+import VarSet
 import VarEnv		( emptyTidyEnv )
 #endif
 
@@ -934,7 +934,10 @@ compileExpr hsc_env srcspan ds_expr
 		-- Lint if necessary
 		-- ToDo: improve SrcLoc
 	; if lint_on then 
-		case lintUnfolding noSrcLoc [] prepd_expr of
+                let ictxt = hsc_IC hsc_env
+                    tyvars = varSetElems (ic_tyvars ictxt)
+                in
+		case lintUnfolding noSrcLoc tyvars prepd_expr of
 		   Just err -> pprPanic "compileExpr" err
 		   Nothing  -> return ()
 	  else

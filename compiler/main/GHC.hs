@@ -2325,10 +2325,11 @@ extendEnvironment hsc_env apStack idsOffsets occs = do
    let names = map idName ids
 
    let tyvars = varSetElems (tyVarsOfTypes (map idType new_ids))
-       new_tyvars = map (mkTyVarTy . mk_skol) tyvars
+       new_tyvars = map mk_skol tyvars
+       new_tyvar_tys = map mkTyVarTy new_tyvars
        mk_skol tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) 
                          (SkolemTv UnkSkol)
-       subst = mkTvSubst emptyInScopeSet (mkVarEnv (zip tyvars new_tyvars))
+       subst = mkTvSubst emptyInScopeSet (mkVarEnv (zip tyvars new_tyvar_tys))
        subst_id id = id `setIdType` substTy subst (idType id)
        subst_ids = map subst_id new_ids
 
@@ -2336,21 +2337,21 @@ extendEnvironment hsc_env apStack idsOffsets occs = do
    let result_name = mkSystemVarName (mkBuiltinUnique 33) FSLIT("_result")
        result_id   = Id.mkLocalId result_name (mkTyConApp unknown_tc [])
    let ictxt = hsc_IC hsc_env
-       rn_env   = ic_rn_local_env ictxt
        type_env = ic_type_env ictxt
        all_new_ids  = result_id : subst_ids
        bound_names = map idName all_new_ids
-       new_rn_env  = extendLocalRdrEnv rn_env bound_names
        -- Remove any shadowed bindings from the type_env;
        -- they are inaccessible but might, I suppose, cause 
        -- a space leak if we leave them there
+       old_bound_names = map idName (typeEnvIds (ic_type_env ictxt)) ;
        shadowed = [ n | name <- bound_names,
-                    let rdr_name = mkRdrUnqual (nameOccName name),
-                    Just n <- [lookupLocalRdrEnv rn_env rdr_name] ]
+                         n <- old_bound_names,
+                         nameOccName name == nameOccName n ] ;
        filtered_type_env = delListFromNameEnv type_env shadowed
        new_type_env = extendTypeEnvWithIds filtered_type_env all_new_ids
-       new_ic = ictxt { ic_rn_local_env = new_rn_env, 
-		        ic_type_env     = new_type_env }
+       old_tyvars = ic_tyvars ictxt
+       new_ic = ictxt { ic_type_env = new_type_env,
+                        ic_tyvars = extendVarSetList old_tyvars new_tyvars }
    Linker.extendLinkEnv (zip names hValues)
    Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
    return (hsc_env{hsc_IC = new_ic}, result_name:names)

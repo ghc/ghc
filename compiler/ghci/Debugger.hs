@@ -105,7 +105,6 @@ bindSuspensions cms@(Session ref) t = do
       hsc_env <- readIORef ref
       inScope <- GHC.getBindings cms
       let ictxt        = hsc_IC hsc_env
-          rn_env       = ic_rn_local_env ictxt
           type_env     = ic_type_env ictxt
           prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
@@ -113,12 +112,14 @@ bindSuspensions cms@(Session ref) t = do
       availNames_var  <- newIORef availNames
       (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
-      let ids = [ mkGlobalId VanillaGlobal name (mk_skol_ty ty) vanillaIdInfo
-                  | (name,ty) <- zip names tys]
+      let tys' = map mk_skol_ty tys
+      let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
+                | (name,ty) <- zip names tys']
+          new_tyvars   = tyVarsOfTypes tys'
           new_type_env = extendTypeEnvWithIds type_env ids 
-          new_rn_env   = extendLocalRdrEnv rn_env names
-          new_ic       = ictxt { ic_rn_local_env = new_rn_env, 
-                                 ic_type_env     = new_type_env }
+          old_tyvars   = ic_tyvars ictxt
+          new_ic       = ictxt { ic_type_env = new_type_env,
+                                 ic_tyvars   = old_tyvars `unionVarSet` new_tyvars }
       extendLinkEnv (zip names hvals)
       writeIORef ref (hsc_env {hsc_IC = new_ic })
       return t'
@@ -174,13 +175,10 @@ printTerm cms@(Session ref) = cPprTerm cPpr
   bindToFreshName hsc_env ty userName = do
     name <- newGrimName cms userName 
     let ictxt    = hsc_IC hsc_env
-        rn_env   = ic_rn_local_env ictxt
         type_env = ic_type_env ictxt
         id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
         new_type_env = extendTypeEnv type_env (AnId id)
-        new_rn_env   = extendLocalRdrEnv rn_env [name]
-        new_ic       = ictxt { ic_rn_local_env = new_rn_env, 
-                               ic_type_env     = new_type_env }
+        new_ic       = ictxt { ic_type_env     = new_type_env }
     return (hsc_env {hsc_IC = new_ic }, name)
 
 --    Create new uniques and give them sequentially numbered names
