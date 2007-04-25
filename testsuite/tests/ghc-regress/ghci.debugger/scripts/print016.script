@@ -1,4 +1,4 @@
--- Type reconstruction with newtypes involved, more gruesome. Can't solve this one for now
+-- Type reconstruction with newtypes involved, more gruesome. 
 
 :set -fglasgow-exts
 :l ../Test
