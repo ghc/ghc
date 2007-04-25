@@ -565,7 +565,8 @@ cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
                            , ptext SLIT("reOrderTerms") $$ (ppr pointed $$ ppr unpointed))
                     head unpointed : reOrderTerms pointed (tail unpointed) tys
 
-isMonomorphic = isEmptyVarSet . tyVarsOfType
+isMonomorphic ty | isForAllTy ty = False
+isMonomorphic ty = (isEmptyVarSet . tyVarsOfType) ty
 
 zonkTerm :: Term -> TcM Term
 zonkTerm = foldTerm idTermFoldM {

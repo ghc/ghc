@@ -76,8 +76,12 @@ pprintClosureCommand session bindThings force str = do
      --  Then, we extract a substitution, 
      --  mapping the old tyvars to the reconstructed types.
        let Just reconstructed_type = termType term
-           mb_subst = tcUnifyTys (const BindMe) [idType id] [reconstructed_type]
-       ASSERT (isJust mb_subst) return mb_subst
+     -- tcUnifyTys doesn't look through forall's, so we drop them from 
+     -- the original type, instead of sigma-typing the reconstructed type
+           mb_subst = tcUnifyTys (const BindMe) [dropForAlls$ idType id] 
+                       [reconstructed_type]  
+       ASSERT2 (isJust mb_subst, ppr reconstructed_type $$ (ppr$ idType id)) 
+        return mb_subst
 
    applySubstToEnv :: Session -> TvSubst -> IO ()
    applySubstToEnv cms subst | isEmptyTvSubst subst = return ()
