@@ -8,9 +8,11 @@ top_dirs="nofib testsuite"
 # based on where this GHC repo came from.
 defaultrepo=`cat _darcs/prefs/defaultrepo`
 case $defaultrepo in
-  http://* | *@*:*)
+  # HTTP or SSH:
+  http://* | *:*)
     defaultrepo_base="`echo $defaultrepo | sed 's!/ghc$!!'`"
     defaultrepo_lib="$defaultrepo_base"/packages;;
+  # Local filesystem (assumes a checked-out tree):
   /*)
     defaultrepo_base="$defaultrepo"
     defaultrepo_lib="$defaultrepo"/libraries;;
