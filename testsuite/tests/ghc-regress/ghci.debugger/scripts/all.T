@@ -18,6 +18,7 @@ test('print015', normal, ghci_script, ['print015.script'])
 test('print016', normal, ghci_script, ['print016.script'])
 test('print017', normal, ghci_script, ['print017.script'])
 test('print018', normal, ghci_script, ['print018.script'])
+test('print019', normal, ghci_script, ['print019.script'])
 
 test('break001', normal, ghci_script, ['break001.script'])
 test('break002', normal, ghci_script, ['break002.script'])
