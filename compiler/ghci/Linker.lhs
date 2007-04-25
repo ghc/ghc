@@ -28,7 +28,6 @@ import ObjLink
 import ByteCodeLink
 import ByteCodeItbls
 import ByteCodeAsm
-import RtClosureInspect
 import CgInfoTbls
 import SMRep
 import IfaceEnv
