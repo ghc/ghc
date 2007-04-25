@@ -2207,9 +2207,12 @@ handleRunStatus ref final_ic final_names resume_ic breakMVar statusMVar status =
         hsc_env <- readIORef ref
         mod_info <- getHomeModuleInfo hsc_env (moduleName (breakInfo_module info))
         let breaks = minf_modBreaks (expectJust "handlRunStatus" mod_info)
-        let occs = modBreaks_vars breaks ! breakInfo_number info
-        (new_hsc_env, names) <- extendEnvironment hsc_env apStack 
-                                        (breakInfo_vars info) occs
+        let index  = breakInfo_number info
+            occs   = modBreaks_vars breaks ! index
+            span   = modBreaks_locs breaks ! index
+        (new_hsc_env, names) <- extendEnvironment hsc_env apStack span
+                                        (breakInfo_vars info) 
+                                        (breakInfo_resty info) occs
         writeIORef ref new_hsc_env 
         let res = ResumeHandle breakMVar statusMVar final_names
                                final_ic resume_ic names
@@ -2315,31 +2318,33 @@ getIdValFromApStack apStack (identifier, stackDepth) = do
 extendEnvironment
         :: HscEnv
         -> a            -- the AP_STACK object built by the interpreter
+        -> SrcSpan
         -> [(Id, Int)]  -- free variables and offsets into the AP_STACK
+        -> Type
         -> [OccName]    -- names for the variables (from the source code)
         -> IO (HscEnv, [Name])
-extendEnvironment hsc_env apStack idsOffsets occs = do
+extendEnvironment hsc_env apStack span idsOffsets result_ty occs = do
    idsVals <- mapM (getIdValFromApStack apStack) idsOffsets 
    let (ids, hValues) = unzip idsVals 
    new_ids <- zipWithM mkNewId occs ids
    let names = map idName ids
 
-   let tyvars = varSetElems (tyVarsOfTypes (map idType new_ids))
-       new_tyvars = map mk_skol tyvars
-       new_tyvar_tys = map mkTyVarTy new_tyvars
-       mk_skol tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) 
-                         (SkolemTv UnkSkol)
-       subst = mkTvSubst emptyInScopeSet (mkVarEnv (zip tyvars new_tyvar_tys))
-       subst_id id = id `setIdType` substTy subst (idType id)
-       subst_ids = map subst_id new_ids
+   -- make an Id for _result.  We use the Unique of the FastString "_result";
+   -- we don't care about uniqueness here, because there will only be one
+   -- _result in scope at any time.
+   let result_fs = FSLIT("_result")
+       result_name = mkInternalName (getUnique result_fs)
+                          (mkVarOccFS result_fs) (srcSpanStart span)
+       result_id   = Id.mkLocalId result_name result_ty
 
-   Just (ATyCon unknown_tc) <- tcRnLookupName hsc_env unknownTyConName
-   let result_name = mkSystemVarName (mkBuiltinUnique 33) FSLIT("_result")
-       result_id   = Id.mkLocalId result_name (mkTyConApp unknown_tc [])
+   let all_ids = result_id : ids
+       (id_tys, tyvarss) = mapAndUnzip (skolemiseTy.idType) all_ids
+       new_tyvars = unionVarSets tyvarss             
+       new_ids = zipWith setIdType all_ids id_tys
+
    let ictxt = hsc_IC hsc_env
        type_env = ic_type_env ictxt
-       all_new_ids  = result_id : subst_ids
-       bound_names = map idName all_new_ids
+       bound_names = map idName new_ids
        -- Remove any shadowed bindings from the type_env;
        -- they are inaccessible but might, I suppose, cause 
        -- a space leak if we leave them there
@@ -2348,10 +2353,10 @@ extendEnvironment hsc_env apStack idsOffsets occs = do
                          n <- old_bound_names,
                          nameOccName name == nameOccName n ] ;
        filtered_type_env = delListFromNameEnv type_env shadowed
-       new_type_env = extendTypeEnvWithIds filtered_type_env all_new_ids
+       new_type_env = extendTypeEnvWithIds filtered_type_env new_ids
        old_tyvars = ic_tyvars ictxt
        new_ic = ictxt { ic_type_env = new_type_env,
-                        ic_tyvars = extendVarSetList old_tyvars new_tyvars }
+                        ic_tyvars = old_tyvars `unionVarSet` new_tyvars }
    Linker.extendLinkEnv (zip names hValues)
    Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
    return (hsc_env{hsc_IC = new_ic}, result_name:names)
@@ -2364,6 +2369,18 @@ extendEnvironment hsc_env apStack idsOffsets occs = do
          ty = tidyTopType (idType id)
          new_id = Id.mkGlobalId VanillaGlobal name ty (idInfo id)
      return new_id
+
+skolemiseTy :: Type -> (Type, TyVarSet)
+skolemiseTy ty = (substTy subst ty, mkVarSet new_tyvars)
+  where env           = mkVarEnv (zip tyvars new_tyvar_tys)
+        subst         = mkTvSubst emptyInScopeSet env
+        tyvars        = varSetElems (tyVarsOfType ty)
+        new_tyvars    = map skolemiseTyVar tyvars
+        new_tyvar_tys = map mkTyVarTy new_tyvars
+
+skolemiseTyVar :: TyVar -> TyVar
+skolemiseTyVar tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) 
+                                 (SkolemTv UnkSkol)
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames

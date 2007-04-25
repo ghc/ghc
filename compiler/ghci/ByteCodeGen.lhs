@@ -298,6 +298,7 @@ schemeER_wrk d p rhs
                         { breakInfo_module = tickInfo_module tickInfo
                         , breakInfo_number = tickNumber 
                         , breakInfo_vars = idOffSets
+                        , breakInfo_resty = exprType (deAnnotate' newRhs)
                         }
         let breakInstr = case arr of (BA arr#) -> BRK_FUN arr# tickNumber breakInfo 
         return $ breakInstr `consOL` code

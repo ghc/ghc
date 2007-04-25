@@ -13,6 +13,7 @@ module ByteCodeInstr (
 
 import ByteCodeItbls	( ItblPtr )
 
+import Type
 import Outputable
 import Name
 import Id
@@ -141,13 +142,15 @@ data BreakInfo
    { breakInfo_module :: Module
    , breakInfo_number :: Int
    , breakInfo_vars   :: [(Id,Int)]
+   , breakInfo_resty  :: Type
    }
 
 instance Outputable BreakInfo where
    ppr info = text "BreakInfo" <+>
               parens (ppr (breakInfo_module info) <+>
                       ppr (breakInfo_number info) <+>
-                      ppr (breakInfo_vars info))
+                      ppr (breakInfo_vars info) <+>
+                      ppr (breakInfo_resty info))
 
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions
