@@ -13,7 +13,7 @@ module TyCon(
 	tyConPrimRep,
 
 	AlgTyConRhs(..), visibleDataCons, 
-        AlgTyConParent(..), 
+        TyConParent(..), 
 	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
@@ -125,7 +125,7 @@ data TyCon
 	hasGenerics :: Bool,		-- True <=> generic to/from functions are available
 					-- (in the exports of the data type's source module)
 
-	algTcParent :: AlgTyConParent	-- Gives the class or family tycon for
+	algTcParent :: TyConParent	-- Gives the class or family tycon for
 					-- derived tycons representing classes
 					-- or family instances, respectively.
     }
@@ -149,7 +149,12 @@ data TyCon
 
 	tyConTyVars  :: [TyVar],	-- Bound tyvars
 
-	synTcRhs     :: SynTyConRhs	-- Expanded type in here
+	synTcRhs     :: SynTyConRhs,	-- Expanded type in here
+
+        synTcParent  :: TyConParent     -- Gives the family tycon of
+                                        -- representation tycons of family
+                                        -- instances
+
     }
 
   | PrimTyCon {			-- Primitive types; cannot be defined in Haskell
@@ -262,12 +267,13 @@ visibleDataCons OpenTyCon {}		      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 
--- Both type classes as well as data/newtype family instances imply implicit
--- type constructors.  These implicit type constructors refer to their parent
+-- Both type classes as well as family instances imply implicit type 
+-- constructors.  These implicit type constructors refer to their parent
 -- structure (ie, the class or family from which they derive) using a type of
--- the following form.
+-- the following form.  We use `TyConParent' for both algebraic and synonym 
+-- types, but the variant `ClassTyCon' will only be used by algebraic tycons.
 --
-data AlgTyConParent 
+data TyConParent 
   = NoParentTyCon	-- An ordinary type constructor has no parent.
 
   | ClassTyCon      	-- Type constructors representing a class dictionary.
@@ -297,7 +303,7 @@ data SynTyConRhs
 
   | SynonymTyCon Type   -- Mentioning head type vars.  Acts as a template for
 			--  the expansion when the tycon is applied to some
-			--  types.  
+			--  types.
 \end{code}
 
 Note [Newtype coercions]
@@ -498,14 +504,15 @@ mkPrimTyCon' name kind arity rep is_unlifted
 	tyConExtName = Nothing
     }
 
-mkSynTyCon name kind tyvars rhs
+mkSynTyCon name kind tyvars rhs parent
   = SynTyCon {	
 	tyConName = name,
 	tyConUnique = nameUnique name,
 	tyConKind = kind,
 	tyConArity = length tyvars,
 	tyConTyVars = tyvars,
-	synTcRhs = rhs
+	synTcRhs = rhs,
+        synTcParent = parent
     }
 
 mkCoercionTyCon name arity kindRule
@@ -860,16 +867,21 @@ tyConClass_maybe other_tycon				    = Nothing
 
 isFamInstTyCon :: TyCon -> Bool
 isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _ _ _ }) = True
+isFamInstTyCon (SynTyCon {synTcParent = FamilyTyCon _ _ _ }) = True
 isFamInstTyCon other_tycon			             = False
 
 tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
 tyConFamInst_maybe (AlgTyCon {algTcParent = FamilyTyCon fam instTys _}) = 
+  Just (fam, instTys)
+tyConFamInst_maybe (SynTyCon {synTcParent = FamilyTyCon fam instTys _}) = 
   Just (fam, instTys)
 tyConFamInst_maybe other_tycon				                = 
   Nothing
 
 tyConFamilyCoercion_maybe :: TyCon -> Maybe TyCon
 tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = FamilyTyCon _ _ coe}) = 
+  Just coe
+tyConFamilyCoercion_maybe (SynTyCon {synTcParent = FamilyTyCon _ _ coe}) = 
   Just coe
 tyConFamilyCoercion_maybe other_tycon 				         = 
   Nothing

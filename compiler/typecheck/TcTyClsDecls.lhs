@@ -252,7 +252,8 @@ tcFamInstDecl (L loc decl)
 
 tcFamInstDecl1 :: TyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
 
-tcFamInstDecl1 (decl@TySynonym {})
+  -- "type instance"
+tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
     do { -- check that the family declaration is for a synonym
 	 unless (isSynTyCon family) $
@@ -266,10 +267,15 @@ tcFamInstDecl1 (decl@TySynonym {})
        ; t_typats <- mappM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
 
-         -- !!!of the form: forall t_tvs. (tcdLName decl) t_typats = t_rhs
-       ; return Nothing     -- !!!TODO: need TyThing for indexed synonym
+         -- (3) construct representation tycon
+       ; rep_tc_name <- newFamInstTyConName tc_name (srcSpanStart loc)
+       ; tycon <- buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
+                                (Just (family, t_typats))
+
+       ; return $ Just (ATyCon tycon)
        }}
-      
+
+  -- "newtype instance" and "data instance"
 tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			     tcdCons = cons})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
@@ -300,6 +306,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; t_typats     <- mappM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
+         -- (3) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name (srcSpanStart loc)
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict tycon t_tvs))
@@ -587,12 +594,15 @@ tcSynDecls (decl : decls)
        ; syn_tcs <- tcExtendGlobalEnv [syn_tc] (tcSynDecls decls)
        ; return (syn_tc : syn_tcs) }
 
+  -- "type"
 tcSynDecl
   (TySynonym {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { traceTc (text "tcd1" <+> ppr tc_name) 
     ; rhs_ty' <- tcHsKindedType rhs_ty
-    ; return (ATyCon (buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty'))) }
+    ; tycon <- buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty') Nothing
+    ; return (ATyCon tycon) 
+    }
 
 --------------------
 tcTyClDecl :: (Name -> RecFlag) -> TyClDecl Name -> TcM [TyThing]
@@ -614,7 +624,8 @@ tcTyClDecl1 _calc_isrec
 	-- Check that we don't use families without -findexed-types
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
-  ; return [ATyCon $ buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing)]
+  ; tycon <- buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing) Nothing
+  ; return [ATyCon tycon]
   }
 
   -- "newtype family" or "data family" declaration
@@ -639,7 +650,7 @@ tcTyClDecl1 _calc_isrec
   ; return [ATyCon tycon]
   }
 
-  -- "newtype", "data", "newtype instance", "data instance"
+  -- "newtype" and "data"
 tcTyClDecl1 calc_isrec
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
 	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = cons})

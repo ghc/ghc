@@ -69,7 +69,7 @@ import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName,
-			  AlgTyConParent(NoParentTyCon) )
+			  TyConParent(NoParentTyCon) )
 
 import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed,
 			  StrictnessMark(..) )

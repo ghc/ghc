@@ -25,7 +25,7 @@ module Coercion (
         mkSymCoercion, mkTransCoercion,
         mkLeftCoercion, mkRightCoercion, mkInstCoercion, mkAppCoercion,
         mkForAllCoercion, mkFunCoercion, mkInstsCoercion, mkUnsafeCoercion,
-        mkNewTypeCoercion, mkDataInstCoercion, mkAppsCoercion,
+        mkNewTypeCoercion, mkFamInstCoercion, mkAppsCoercion,
 
         splitNewTypeRepCo_maybe, decomposeCo,
 
@@ -294,18 +294,18 @@ mkNewTypeCoercion name tycon tvs rhs_ty
     rule args = ASSERT( co_con_arity == length args )
 		(TyConApp tycon args, substTyWith tvs args rhs_ty)
 
--- Coercion identifying a data/newtype representation type and its family
--- instance.  It has the form `Co tvs :: F ts :=: R tvs', where `Co' is the
--- coercion tycon built here, `F' the family tycon and `R' the (derived)
+-- Coercion identifying a data/newtype/synonym representation type and its 
+-- family instance.  It has the form `Co tvs :: F ts :=: R tvs', where `Co' is 
+-- the coercion tycon built here, `F' the family tycon and `R' the (derived)
 -- representation tycon.
 --
-mkDataInstCoercion :: Name	-- unique name for the coercion tycon
-		   -> [TyVar]	-- type parameters of the coercion (`tvs')
-		   -> TyCon	-- family tycon (`F')
-		   -> [Type]	-- type instance (`ts')
-		   -> TyCon	-- representation tycon (`R')
-		   -> TyCon	-- => coercion tycon (`Co')
-mkDataInstCoercion name tvs family instTys rep_tycon
+mkFamInstCoercion :: Name	-- unique name for the coercion tycon
+		  -> [TyVar]	-- type parameters of the coercion (`tvs')
+		  -> TyCon	-- family tycon (`F')
+		  -> [Type]	-- type instance (`ts')
+		  -> TyCon	-- representation tycon (`R')
+		  -> TyCon	-- => coercion tycon (`Co')
+mkFamInstCoercion name tvs family instTys rep_tycon
   = mkCoercionTyCon name coArity rule
   where
     coArity = length tvs

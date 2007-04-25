@@ -650,7 +650,7 @@ newDFunName clas (ty:_) loc
 newDFunName clas [] loc = pprPanic "newDFunName" (ppr clas <+> ppr loc)
 \end{code}
 
-Make a name for the representation tycon of a data/newtype instance.  It's an
+Make a name for the representation tycon of a family instance.  It's an
 *external* name, like otber top-level names, and hence must be made with
 newGlobalBinder.
 

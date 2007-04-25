@@ -51,7 +51,7 @@ data FamInst
 
 		-- Used for "rough matching"; same idea as for class instances
 	    , fi_tcs   :: [Maybe Name]	-- Top of type args
-		-- INVARIANT: fi_tcs = roughMatchTcs is_tys
+		-- INVARIANT: fi_tcs = roughMatchTcs fi_tys
 
 		-- Used for "proper matching"; ditto
 	    , fi_tvs   :: TyVarSet	-- Template tyvars for full match

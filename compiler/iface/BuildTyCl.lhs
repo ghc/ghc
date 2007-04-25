@@ -36,16 +36,29 @@ import Data.List
 
 \begin{code}
 ------------------------------------------------------
-buildSynTyCon :: Name -> [TyVar] -> SynTyConRhs -> TyCon
-buildSynTyCon name tvs rhs@(OpenSynTyCon rhs_ki _)
-  = mkSynTyCon name kind tvs rhs
-  where
-    kind = mkArrowKinds (map tyVarKind tvs) rhs_ki
-buildSynTyCon name tvs rhs@(SynonymTyCon rhs_ty)
-  = mkSynTyCon name kind tvs rhs
-  where
-    kind = mkArrowKinds (map tyVarKind tvs) (typeKind rhs_ty)
+buildSynTyCon :: Name -> [TyVar] 
+              -> SynTyConRhs 
+	      -> Maybe (TyCon, [Type])  -- family instance if applicable
+              -> TcRnIf m n TyCon
 
+buildSynTyCon tc_name tvs rhs@(OpenSynTyCon rhs_ki _) _
+  = let
+      kind = mkArrowKinds (map tyVarKind tvs) rhs_ki
+    in
+    return $ mkSynTyCon tc_name kind tvs rhs NoParentTyCon
+    
+buildSynTyCon tc_name tvs rhs@(SynonymTyCon rhs_ty) mb_family
+  = do { -- We need to tie a knot as the coercion of a data instance depends
+	 -- on the instance representation tycon and vice versa.
+       ; tycon <- fixM (\ tycon_rec -> do 
+	 { parent <- mkParentInfo mb_family tc_name tvs tycon_rec
+	 ; let { tycon   = mkSynTyCon tc_name kind tvs rhs parent
+	       ; kind    = mkArrowKinds (map tyVarKind tvs) (typeKind rhs_ty)
+	       }
+         ; return tycon
+         })
+       ; return tycon 
+       }
 
 ------------------------------------------------------
 buildAlgTyCon :: Name -> [TyVar] 
@@ -62,7 +75,7 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
   = do { -- We need to tie a knot as the coercion of a data instance depends
 	 -- on the instance representation tycon and vice versa.
        ; tycon <- fixM (\ tycon_rec -> do 
-	 { parent <- parentInfo mb_family tycon_rec
+	 { parent <- mkParentInfo mb_family tc_name tvs tycon_rec
 	 ; let { tycon = mkAlgTyCon tc_name kind tvs stupid_theta rhs
 				    fields parent is_rec want_generics gadt_syn
 	       ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
@@ -72,29 +85,32 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
          })
        ; return tycon 
        }
-  where
-    -- If a family tycon with instance types is given, the current tycon is an
-    -- instance of that family and we need to
-    --
-    -- (1) create a coercion that identifies the family instance type and the
-    --     representation type from Step (1); ie, it is of the form 
-    --	   `Co tvs :: F ts :=: R tvs', where `Co' is the name of the coercion,
-    --	   `F' the family tycon and `R' the (derived) representation tycon,
-    --	   and
-    -- (2) produce a `AlgTyConParent' value containing the parent and coercion
-    --     information.
-    --
-    parentInfo Nothing                  rep_tycon = 
-      return NoParentTyCon
-    parentInfo (Just (family, instTys)) rep_tycon =
-      do { -- Create the coercion
-	 ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
-	 ; let co_tycon = mkDataInstCoercion co_tycon_name tvs
-					     family instTys rep_tycon
-	 ; return $ FamilyTyCon family instTys co_tycon
-	 }
-    
 
+-- If a family tycon with instance types is given, the current tycon is an
+-- instance of that family and we need to
+--
+-- (1) create a coercion that identifies the family instance type and the
+--     representation type from Step (1); ie, it is of the form 
+--	   `Co tvs :: F ts :=: R tvs', where `Co' is the name of the coercion,
+--	   `F' the family tycon and `R' the (derived) representation tycon,
+--	   and
+-- (2) produce a `TyConParent' value containing the parent and coercion
+--     information.
+--
+mkParentInfo :: Maybe (TyCon, [Type]) 
+             -> Name -> [TyVar] 
+             -> TyCon 
+             -> TcRnIf m n TyConParent
+mkParentInfo Nothing                  _       _   _         =
+  return NoParentTyCon
+mkParentInfo (Just (family, instTys)) tc_name tvs rep_tycon =
+  do { -- Create the coercion
+     ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
+     ; let co_tycon = mkFamInstCoercion co_tycon_name tvs
+                                        family instTys rep_tycon
+     ; return $ FamilyTyCon family instTys co_tycon
+     }
+    
 ------------------------------------------------------
 mkAbstractTyConRhs :: AlgTyConRhs
 mkAbstractTyConRhs = AbstractTyCon

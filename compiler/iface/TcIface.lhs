@@ -383,7 +383,9 @@ tcIfaceDecl ignore_prags
      ; rhs_tyki <- tcIfaceType rdr_rhs_ty
      ; let rhs = if isOpen then OpenSynTyCon rhs_tyki Nothing
 			   else SynonymTyCon rhs_tyki
-     ; return (ATyCon (buildSynTyCon tc_name tyvars rhs))
+     -- !!!TODO: read mb_family info from iface and pass as last argument
+     ; tycon <- buildSynTyCon tc_name tyvars rhs Nothing
+     ; return $ ATyCon tycon
      }
 
 tcIfaceDecl ignore_prags
