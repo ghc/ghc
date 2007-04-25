@@ -2337,29 +2337,26 @@ extendEnvironment hsc_env apStack span idsOffsets result_ty occs = do
                           (mkVarOccFS result_fs) (srcSpanStart span)
        result_id   = Id.mkLocalId result_name result_ty
 
+   -- for each Id we're about to bind in the local envt:
+   --    - skolemise the type variables in its type, so they can't
+   --      be randomly unified with other types.  These type variables
+   --      can only be resolved by type reconstruction in RtClosureInspect
+   --    - tidy the type variables
+   --    - globalise the Id (Ids are supposed to be Global, apparently).
+   --
    let all_ids = result_id : ids
        (id_tys, tyvarss) = mapAndUnzip (skolemiseTy.idType) all_ids
+       (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
        new_tyvars = unionVarSets tyvarss             
-       new_ids = zipWith setIdType all_ids id_tys
+       new_ids = zipWith setIdType all_ids tidy_tys
+       global_ids = map (globaliseId VanillaGlobal) new_ids
 
-   let ictxt = hsc_IC hsc_env
-       type_env = ic_type_env ictxt
-       bound_names = map idName new_ids
-       -- Remove any shadowed bindings from the type_env;
-       -- they are inaccessible but might, I suppose, cause 
-       -- a space leak if we leave them there
-       old_bound_names = map idName (typeEnvIds (ic_type_env ictxt)) ;
-       shadowed = [ n | name <- bound_names,
-                         n <- old_bound_names,
-                         nameOccName name == nameOccName n ] ;
-       filtered_type_env = delListFromNameEnv type_env shadowed
-       new_type_env = extendTypeEnvWithIds filtered_type_env new_ids
-       old_tyvars = ic_tyvars ictxt
-       new_ic = ictxt { ic_type_env = new_type_env,
-                        ic_tyvars = old_tyvars `unionVarSet` new_tyvars }
+   let ictxt = extendInteractiveContext (hsc_IC hsc_env) 
+                                        global_ids new_tyvars
+
    Linker.extendLinkEnv (zip names hValues)
    Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
-   return (hsc_env{hsc_IC = new_ic}, result_name:names)
+   return (hsc_env{hsc_IC = ictxt}, result_name:names)
   where
    mkNewId :: OccName -> Id -> IO Id
    mkNewId occ id = do

@@ -27,7 +27,7 @@ module HscTypes (
 	lookupIfaceByModule, emptyModIface,
 
 	InteractiveContext(..), emptyInteractiveContext, 
-	icPrintUnqual, mkPrintUnqualified,
+	icPrintUnqual, mkPrintUnqualified, extendInteractiveContext,
 
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
 	emptyIfaceDepCache,
@@ -86,7 +86,7 @@ import FamInstEnv	( FamInstEnv, FamInst )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import VarSet
-import Id		( Id, isImplicitId )
+import Id
 import Type		( TyThing(..) )
 
 import Class		( Class, classSelIds, classATs, classTyCon )
@@ -639,6 +639,27 @@ emptyInteractiveContext
 
 icPrintUnqual :: InteractiveContext -> PrintUnqualified
 icPrintUnqual ictxt = mkPrintUnqualified (ic_rn_gbl_env ictxt)
+
+
+extendInteractiveContext
+        :: InteractiveContext
+        -> [Id]
+        -> TyVarSet
+        -> InteractiveContext
+extendInteractiveContext ictxt ids tyvars
+  = ictxt { ic_type_env = extendTypeEnvWithIds filtered_type_env ids,
+            ic_tyvars   = ic_tyvars ictxt `unionVarSet` tyvars }
+  where
+       type_env    = ic_type_env ictxt
+       bound_names = map idName ids
+       -- Remove any shadowed bindings from the type_env;
+       -- we aren't allowed any duplicates because the LocalRdrEnv is
+       -- build directly from the Ids in the type env in here.
+       old_bound_names = map idName (typeEnvIds type_env)
+       shadowed = [ n | name <- bound_names,
+                         n <- old_bound_names,
+                         nameOccName name == nameOccName n ]
+       filtered_type_env = delListFromNameEnv type_env shadowed
 \end{code}
 
 %************************************************************************

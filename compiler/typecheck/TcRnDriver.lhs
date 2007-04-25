@@ -62,6 +62,7 @@ import CoreSyn
 import ErrUtils
 import Id
 import Var
+import VarSet
 import Module
 import UniqFM
 import Name
@@ -884,9 +885,6 @@ tcRnStmt hsc_env ictxt rdr_stmt
 		--     up to have tidy types
 	global_ids = map globaliseAndTidy zonked_ids ;
     
-		-- Update the interactive context
-	type_env = ic_type_env ictxt ;
-
 	bound_names = map idName global_ids ;
 
 {- ---------------------------------------------
@@ -908,15 +906,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
 
 -------------------------------------------------- -}
 
-        old_bound_names = map idName (typeEnvIds (ic_type_env ictxt)) ;
-	shadowed = [ n | name <- bound_names,
-                         n <- old_bound_names,
-                         nameOccName name == nameOccName n ] ;
-
-	filtered_type_env = delListFromNameEnv type_env shadowed ;
-
-	new_type_env = extendTypeEnvWithIds filtered_type_env global_ids ;
-	new_ic = ictxt { ic_type_env = new_type_env }
+	new_ic = extendInteractiveContext ictxt global_ids emptyVarSet ;
     } ;
 
     dumpOptTcRn Opt_D_dump_tc 
