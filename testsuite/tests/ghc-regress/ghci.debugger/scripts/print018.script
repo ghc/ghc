@@ -5,6 +5,7 @@
 :l ../Test
 
 :break 40
+:step
 poly Unary
 :p x
 :t x
