@@ -59,8 +59,7 @@ pprintClosureCommand session bindThings force str = do
   return ()
  where 
 
-   -- Do the obtainTerm--bindSuspensions-refineIdType dance
-   -- Warning! This function got a good deal of side-effects
+   -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: Session -> Id -> IO (Maybe TvSubst)
    go cms id = do
      mb_term <- obtainTerm cms force id
@@ -76,10 +75,15 @@ pprintClosureCommand session bindThings force str = do
      --  Then, we extract a substitution, 
      --  mapping the old tyvars to the reconstructed types.
        let Just reconstructed_type = termType term
+
      -- tcUnifyTys doesn't look through forall's, so we drop them from 
      -- the original type, instead of sigma-typing the reconstructed type
-           mb_subst = tcUnifyTys (const BindMe) [dropForAlls$ idType id] 
-                       [reconstructed_type]  
+     -- In addition, we strip newtypes too, since the reconstructed type might
+     --   not have recovered them all
+           mb_subst = tcUnifyTys (const BindMe) 
+                                 [repType' $ dropForAlls$ idType id] 
+                                 [repType' $ reconstructed_type]  
+
        ASSERT2 (isJust mb_subst, ppr reconstructed_type $$ (ppr$ idType id)) 
         return mb_subst
 
