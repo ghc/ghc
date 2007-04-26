@@ -1,6 +1,6 @@
 Breakpoint 0 activated at ../QSort.hs:5:15-50
 Stopped at ../QSort.hs:5:15-50
-as :: [GHC.Base.Unknown]
-a :: GHC.Base.Unknown
-left :: [GHC.Base.Unknown]
-right :: [GHC.Base.Unknown]
+_result :: [a]
+a :: a
+left :: [a]
+right :: [a]
