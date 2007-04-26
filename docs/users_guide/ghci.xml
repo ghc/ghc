@@ -1876,7 +1876,7 @@ Main.hs:15> x'
 	   Note that a wrong coercion will likely result in your debugging session being interrupted by a segmentation fault 
 	  </para></listitem>
 	</varlistentry>
-	<varlistentry> <term> * The undocumented (and unsupported) &colon;force command </term>
+	<varlistentry> <term> * The <literal>:force</literal> command </term>
 	  <listitem><para> 
 	      equivalent to <literal> :print</literal> with automatic 
 	      <literal>seq</literal> forcing, 
