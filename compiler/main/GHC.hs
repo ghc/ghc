@@ -194,7 +194,6 @@ module GHC (
 import RtClosureInspect ( cvObtainTerm, Term )
 import TcRnDriver	( tcRnLookupRdrName, tcRnGetInfo,
 			  tcRnLookupName, getModuleExports )
-import VarEnv		( emptyTidyEnv )
 import GHC.Exts         ( unsafeCoerce#, Ptr )
 import Foreign.StablePtr( deRefStablePtr, StablePtr, newStablePtr, freeStablePtr )
 import Foreign          ( poke )
