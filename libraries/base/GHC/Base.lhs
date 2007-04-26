@@ -730,12 +730,6 @@ breakpoint r = r
 breakpointCond :: Bool -> a -> a
 breakpointCond _ r = r
 
-data Unknown 
-data Unknown1 a
-data Unknown2 a b
-data Unknown3 a b c
-data Unknown4 a b c d
-
 data Opaque = forall a. O a
 
 -- | Constant function.

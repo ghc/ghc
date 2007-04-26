@@ -29,7 +29,7 @@ module GHC.Exts
 	IsString(..),
 
 	-- * Debugging
-	breakpoint, breakpointCond, Unknown, Unknown2, Unknown3, Unknown4,
+	breakpoint, breakpointCond,
 
 	-- * Ids with special behaviour
 	lazy, inline,
