@@ -1,5 +1,6 @@
 :l ../QSort
 :break qsort
 qsort [10,9]
+:step
 -- Setting breaks at function names installs the breakpoint too high 
 -- in the expression tree, and bindings don't show up (apart from _result)
