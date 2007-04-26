@@ -2037,8 +2037,15 @@ getNamesInScope s = withSession s $ \hsc_env -> do
 
 getRdrNamesInScope :: Session -> IO [RdrName]
 getRdrNamesInScope  s = withSession s $ \hsc_env -> do
-  let env = ic_rn_gbl_env (hsc_IC hsc_env)
-  return (concat (map greToRdrNames (globalRdrEnvElts env)))
+  let 
+      ic = hsc_IC hsc_env
+      gbl_rdrenv = ic_rn_gbl_env ic
+      ids = typeEnvIds (ic_type_env ic)
+      gbl_names = concat (map greToRdrNames (globalRdrEnvElts gbl_rdrenv))
+      lcl_names = map (mkRdrUnqual.nameOccName.idName) ids
+  --
+  return (gbl_names ++ lcl_names)
+
 
 -- ToDo: move to RdrName
 greToRdrNames :: GlobalRdrElt -> [RdrName]
