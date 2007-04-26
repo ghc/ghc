@@ -266,12 +266,10 @@ addTickHsExpr (HsLet binds e) =
 		(addTickHsLocalBinds binds)		-- to think about: !patterns.
 		(bindLocals (map unLoc $ collectLocalBinders binds) $
                         addTickLHsExprNeverOrAlways e)
-addTickHsExpr (HsDo cxt stmts last_exp srcloc) =
-	liftM4 HsDo
-		(return cxt)
-		(addTickLStmts forQual stmts)
-		(addTickLHsExpr last_exp)
-		(return srcloc)
+addTickHsExpr (HsDo cxt stmts last_exp srcloc) = do
+        (stmts', last_exp') <- addTickLStmts' forQual stmts 
+                                     (addTickLHsExpr last_exp)
+	return (HsDo cxt stmts' last_exp' srcloc)
   where
 	forQual = case cxt of
 		    ListComp -> Just QualBinBox
@@ -368,68 +366,59 @@ addTickGRHSs isOneOfMany (GRHSs guarded local_binds) = do
 
 addTickGRHS :: Bool -> GRHS Id -> TM (GRHS Id)
 addTickGRHS isOneOfMany (GRHS stmts expr) = do
-  (stmts',expr') <- addTickLStmts' (Just $ GuardBinBox) stmts []
+  (stmts',expr') <- addTickLStmts' (Just $ GuardBinBox) stmts
                         (if opt_Hpc then addTickLHsExprOptAlt isOneOfMany expr
                                     else addTickLHsExprAlways expr)
   return $ GRHS stmts' expr'
 
 addTickLStmts :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM [LStmt Id]
 addTickLStmts isGuard stmts = do
-  (stmts',_) <- addTickLStmts' isGuard stmts [] (return ())
-  return stmts'
+  (stmts, _) <- addTickLStmts' isGuard stmts (return ())
+  return stmts
 
-addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id]
-               -> [LStmt Id] -> TM a -> TM ([LStmt Id], a)
-addTickLStmts' isGuard [] acc do_rhs = do
-  rhs <- do_rhs
-  return (reverse acc, rhs)
-addTickLStmts' isGuard (s:ss) acc do_rhs = do
-  (s', binders) <- addTickLStmt isGuard s
-  bindLocals binders $ addTickLStmts' isGuard ss (s':acc) do_rhs
+addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM a 
+               -> TM ([LStmt Id], a)
+addTickLStmts' isGuard lstmts res
+  = bindLocals binders $ do
+        lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
+        a <- res
+        return (lstmts', a)
+  where
+        binders = map unLoc (collectLStmtsBinders lstmts)
 
-addTickLStmt isGuard (L pos stmt) = do
-  (stmt',vars) <- addTickStmt isGuard stmt
-  return (L pos stmt', vars)
-
-addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id, [Id])
+addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
 addTickStmt isGuard (BindStmt pat e bind fail) = do
-	e <- liftM4 BindStmt
+	liftM4 BindStmt
 		(addTickLPat pat)
 		(addTickLHsExprAlways e)
 		(addTickSyntaxExpr hpcSrcSpan bind)
 		(addTickSyntaxExpr hpcSrcSpan fail)
-        return (e, collectPatBinders pat)
 addTickStmt isGuard (ExprStmt e bind' ty) = do
-	e <- liftM3 ExprStmt
+	liftM3 ExprStmt
 		(addTick e)
 		(addTickSyntaxExpr hpcSrcSpan bind')
 		(return ty)
-        return (e, [])
   where
    addTick e | Just fn <- isGuard = addBinTickLHsExpr fn e
              | otherwise          = addTickLHsExprAlways e
 
 addTickStmt isGuard (LetStmt binds) = do
-        let binders = map unLoc (collectLocalBinders binds)
-	e <- liftM LetStmt
-		(bindLocals binders $ addTickHsLocalBinds binds)
-        return (e, binders)
+	liftM LetStmt
+		(addTickHsLocalBinds binds)
 addTickStmt isGuard (ParStmt pairs) = do
-  	e <- liftM ParStmt (mapM process pairs)
-        return (e, [])
+  	liftM ParStmt (mapM process pairs)
   where
 	process (stmts,ids) = 
 		liftM2 (,) 
 			(addTickLStmts isGuard stmts)
 			(return ids)
 addTickStmt isGuard (RecStmt stmts ids1 ids2 tys dictbinds) = do
-  	e <- liftM5 RecStmt 
+  	liftM5 RecStmt 
 		(addTickLStmts isGuard stmts)
 		(return ids1)
 		(return ids2)
 		(return tys)
 		(addTickDictBinds dictbinds)
-        return (e,[])
 
 addTickHsLocalBinds :: HsLocalBinds Id -> TM (HsLocalBinds Id)
 addTickHsLocalBinds (HsValBinds binds) = 
