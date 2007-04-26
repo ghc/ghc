@@ -966,10 +966,6 @@ $ ghci -lm
         </term>
 	<listitem>
 	  <para>Permits to add, delete or list the breakpoints in a debugging session.
-	  In order to make this command available, the 
-	  <literal>-fdebugging</literal> flag must be active. The easiest way is to launch
-	  GHCi with the <literal>-fdebugging</literal> option. For more
-	  details on how the debugger works, see <xref linkend="ghci-debugger"/>.
 	  </para>
 	</listitem>
       </varlistentry>
@@ -1606,9 +1602,6 @@ Prelude> :set -fno-glasgow-exts
          <listitem>
 	   <para>The module must have been loaded interpreted, i.e. not loaded from an <filename>.o</filename> file compiled by ghc </para>
 	 </listitem>
-	 <listitem>
-	   <para>The module must have been loaded with the <literal>-fdebugging</literal> flag
-	   </para></listitem>
        </itemizedlist></para>
     <sect2><title>Using the debugger</title>
     <para>The debugger allows the insertion of breakpoints at specific locations in the source code. These locations are governed by event sites, and not by line as in traditional debuggers such as gdb. </para> <para>
@@ -1918,11 +1911,6 @@ Just 20
     </sect2>
     <sect2><title>Tips</title>
       <variablelist>
-	<varlistentry><term>* Use PRAGMAs to fine tune which modules are loaded under debugging mode</term>
-	  <listitem>
-	    <programlisting>{-# OPTIONS_GHC -fdebugging #-}</programlisting>
-	  </listitem>
-	</varlistentry>
 	<varlistentry> <term>* Repeated use of <literal>seq</literal> and 
 	    <literal>:print</literal> may be necessary to observe unevaluated
 	    untyped bindings</term> 
@@ -1962,13 +1950,6 @@ Main.hs:15> x'
 	  at the scope of a breakpoint if there is a explicit type signature.
 	</para></listitem>
       </itemizedlist>
-      <itemizedlist>
-	<listitem><para>
-	  Modules compiled by GHCi under the <literal>-fdebugging
-	</literal> flag  will perform slower: the debugging mode introduces some overhead.
-      Modules compiled to object code by ghc are not affected.
-	</para></listitem>
-      </itemizedlist>      
      </para>
     </sect2>
   </sect1>
