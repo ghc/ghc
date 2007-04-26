@@ -81,7 +81,8 @@ runCommand string = do
 
 {- | Runs a raw command, optionally specifying 'Handle's from which to
      take the @stdin@, @stdout@ and @stderr@ channels for the new
-     process.  
+     process (otherwise these handles are inherited from the current
+     process).
 
      Any 'Handle's passed to 'runProcess' are placed immediately in the 
      closed state.
