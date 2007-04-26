@@ -1826,14 +1826,15 @@ x :: Integer
 </variablelist></para>
     </sect2>
     <sect2><title>Debugging Higher-Order functions</title>
+      <para>
       It is possible to use the debugger to examine lambdas. 
       When we are at a breakpoint and a lambda is in scope, the debugger cannot show 
       you the source code that constitutes it; however, it is possible to get some 
       information by applying it to some arguments and  observing the result. 
-
+      </para><para>
       The process is slightly complicated when the binding is polymorphic. 
-      We will use a example to show the process.
-      To keep it simple, we will use the well known <literal>map</literal> function:
+      We show the process by means of an example.
+      To keep things simple, we will use the well known <literal>map</literal> function:
       <programlisting>
 import Prelude hiding (map)
 
@@ -1841,6 +1842,7 @@ map :: (a->b) -> a -> b
 map f [] = []
 map f (x:xs) = f x : map f xs
       </programlisting>
+      </para><para>
       We set a breakpoint on <literal>map</literal>, and call it.
       <programlisting>
 *Main> :break map
@@ -1854,10 +1856,11 @@ xs :: [a]
       </programlisting>
       GHCi tells us that, among other bindings, <literal>f</literal> is in scope. 
       However, its type is not fully known yet,  
-      and thus it is not possible to apply it yet to any 
+      and thus it is not possible to apply it to any 
       arguments. Nevertheless, observe that the type of its first argument is the
       same as the type of <literal>x</literal>, and its result type is the
       same as the type of <literal>_result</literal>.
+      </para><para>
       The debugger has some intelligence built-in to update the type of 
       <literal>f</literal> whenever the types of <literal>x</literal> or 
       <literal>_result</literal> are reconstructed. So what we do in this scenario is
@@ -1868,6 +1871,7 @@ xs :: [a]
 *Main> :print x
 x = 1
       </programlisting>
+      </para><para>
       We can check now that as expected, the type of <literal>x</literal>
       has been reconstructed, and with it the 
       type of <literal>f</literal> has been too:
@@ -1877,6 +1881,7 @@ x :: Integer
 *Main> :t f
 f :: Integer -> b
       </programlisting>
+      </para><para>
       From here, we can apply f to any argument of type Integer and observe the 
       results. 
       <programlisting><![CDATA[
@@ -1909,6 +1914,7 @@ Just 20
       in order to recover the result type of <literal>f</literal>. 
       But after that, we are free to use 
       <literal>f</literal> normally.
+     </para>
     </sect2>
     <sect2><title>Tips</title>
       <variablelist>
