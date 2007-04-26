@@ -1657,17 +1657,19 @@ main = <coref linkend="name-binding-co"/> do {
       Simply use ghci to evaluate your Haskell expressions and whenever a breakpoint
       is hit, the debugger will enter the stage:
 <programlisting>
-*main:Main> :break add Main 2
-Breakpoint set at (2,15)
-
-*main:Main> qsort [10,9..1]
-Local bindings in scope:
-  x :: a, xs :: [a], left :: [a], right :: [a]
-
-qsort2.hs:2:15-46>   
+*main:Main> :break qsort
+Breakpoint 0 activated at ../QSort.hs:(4,0)-(6,54)
+*QSort> qsort [10,9,1]
+Stopped at ../QSort.hs:(4,0)-(6,54)
+_result :: [a]
+xs :: [a]
+x :: a
+left :: [a]
+right :: [a]
+[../QSort.hs:(4,0)-(6,54)] *QSort> 
 </programlisting>
       What is happening here is that GHCi has interrupted the evaluation of 
-      <literal>qsort</literal> at the breakpoint set in line 2, as the prompt indicates.
+      <literal>qsort</literal> at the breakpoint, as the prompt indicates.
       At this point you can freely explore the contents of the bindings in scope,
       but with two catches. </para><para>
       First, take into account that due to the lazy nature of Haskell, some of
@@ -1677,66 +1679,65 @@ qsort2.hs:2:15-46>
       GHCi has left its types parameterised by a variable!
       Look at the type of <literal>qsort</literal>, which is 
       polymorphic on the type of its argument. It does not 
-      tell us really what the types of <literal>x</literal> and <literal>xs</literal> can be. 
-      In general, polymorphic programs deal with polymorphic values,
+      tell us really what the types of <literal>x</literal> 
+      and <literal>xs</literal> can be. 
+      In general, polymorphic functions deal with polymorphic values,
       and this means that some of the bindings available in a breakpoint site
       will be parametrically typed.
       </para><para>
       So, what can we do with a value without concrete type? Very few interesting
-      things. The <literal>:print</literal> command in ghci allows you to 
+      things, not even using <literal>show</literal> on it. 
+      The <literal>:print</literal> command in ghci allows you to 
       explore its contents and see if it is evaluated or not. 
-      This is useful because you cannot just type <literal>x</literal> in the 
-      prompt and expect GHCi to return you its value. Perhaps you know for 
-      sure that 
-      <literal>x</literal> is of type <literal>Int</literal>, which is an instance of 
-      <literal>Show</literal>, but GHCi does not have this information. 
-      <literal>:print</literal> however is fine, because it does not need to know the 
-      type to do its work. </para>
+      <literal>:print</literal> works here because it does not need the 
+      type information to do its work. In fact, as we will see later,
+      <literal>:print</literal> can even recover the missing type information.</para>
+
       <para> Let's go on with the debugging session of the <literal>qsort</literal>
       example:
 <example id="debuggingEx"><title>A short debugging session</title>
 <programlisting>
 qsort2.hs:2:15-46> x
-This is an untyped, unevaluated computation. You can use seq to 
-force its evaluation and then :print to recover its type <co id="seq1"/>
+&lt;interactive&gt;:1:0:
+    Ambiguous type variable `a' in the constraint: <co id="seq1"/>
+      `Show a' arising from a use of `print' at &lt;interactive&gt;:1:0
 qsort2.hs:2:15-46> seq x ()  <co id="seq2"/>
 () 
 qsort2.hs:2:15-46> x <co id="seq3"/>
-This is an untyped, unevaluated computation. You can use seq to 
-force its evaluation and then :print to recover its type
-
+&lt;interactive&gt;:1:0:
+    Ambiguous type variable `a' in the constraint:
+      `Show a' arising from a use of `print' at &lt;interactive&gt;:1:0
 qsort2.hs:2:15-46> :t x
-x :: GHC.Base.Unknown
-qsort2.hs:2:15-46> :p x <co id="seq4"/>
-x - 10
+x :: a
+qsort2.hs:2:15-46> :print x <co id="seq4"/>
+x = 10
 qsort2.hs:2:15-46> :t x <co id="seq5"/>
-x :: Int
+x :: Integer
 </programlisting>
 </example>
       <calloutlist>
 	<callout arearefs="seq1">
-	  <para>GHCi reminds us that this value is untyped, and instructs us to force its evaluation </para>
+	  <para>GHCi reminds us that <literal>x</literal> is untyped </para>
 	</callout>
 	<callout arearefs="seq2">
 	  <para>This line forces the evaluation of <literal>x</literal> </para>
 	</callout>
 	<callout arearefs="seq3">
-	  <para>Even though x has been evaluated, we cannot simply use its name to see its value! 
-	  This is a bit counterintuitive, but currently in GHCi the type of a binding
-	  cannot be a type variable <literal>a</literal>. 
-	  Thus, the binding <literal>x</literal> gets assigned the concrete type Unknown.</para>
+	  <para>Even though x has been evaluated, 
+	     we have not updated its type yet. </para>
 	</callout>
 	<callout arearefs="seq4">
 	  <para>We can explore <literal>x</literal> using the <literal>:print</literal> 
-	  command, which does find out that <literal>x</literal> is of type Int and prints
-	  its value accordingly.</para>
+	  command, which does find out that <literal>x</literal> is of type Int and 
+	  prints its value.</para>
 	</callout>
 	<callout arearefs="seq5">
-	   <para><literal>:print</literal> also updates the type of <literal>x</literal> with
-	   the most concrete type information available.</para>
+	   <para>In addition, <literal>:print</literal> also updates 
+	     its type information.</para>
 	</callout>
       </calloutlist>
-      The example shows the standard way to proceeed with polymorphic values in a breakpoint. 
+
+      This example shows the standard way to proceeed with polymorphic values in a breakpoint. 
       </para>
     </sect2>
     <sect2><title>Commands</title>
