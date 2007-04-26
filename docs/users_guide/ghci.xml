@@ -1831,22 +1831,90 @@ x :: Int
 </varlistentry>
 </variablelist></para>
     </sect2>
-    <sect2><title>Limitations</title>
-     <para>
-      <itemizedlist>
-	<listitem><para>
-	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
-	  at the scope of a breakpoint if there is a explicit type signature.
-	</para></listitem>
-      </itemizedlist>
-      <itemizedlist>
-	<listitem><para>
-	  Modules compiled by GHCi under the <literal>-fdebugging
-	</literal> flag  will perform slower: the debugging mode introduces some overhead.
-      Modules compiled to object code by ghc are not affected.
-	</para></listitem>
-      </itemizedlist>      
-     </para>
+    <sect2><title>Debugging Higher-Order functions</title>
+      It is possible to use the debugger to examine lambdas. 
+      When we are at a breakpoint and a lambda is in scope, the debugger cannot show 
+      you the source code that constitutes it; however, it is possible to get some 
+      information by applying it to some arguments and  observing the result. 
+
+      The process is slightly complicated when the binding is polymorphic. 
+      We will use a example to show the process.
+      To keep it simple, we will use the well known <literal>map</literal> function:
+      <programlisting>
+import Prelude hiding (map)
+
+map :: (a->b) -> a -> b
+map f [] = []
+map f (x:xs) = f x : map f xs
+      </programlisting>
+      We set a breakpoint on <literal>map</literal>, and call it.
+      <programlisting>
+*Main> :break map
+Breakpoint 0 activated at map.hs:(4,0)-(5,12)
+*Main> map Just [1..5]
+Stopped at map.hs:(4,0)-(5,12)
+_result :: [b]
+x :: a
+f :: a -> b
+xs :: [a]
+      </programlisting>
+      GHCi tells us that, among other bindings, <literal>f</literal> is in scope. 
+      However, its type is not fully known yet,  
+      and thus it is not possible to apply it yet to any 
+      arguments. Nevertheless, observe that the type of its first argument is the
+      same as the type of <literal>x</literal>, and its result type is the
+      same as the type of <literal>_result</literal>.
+      The debugger has some intelligence built-in to update the type of 
+      <literal>f</literal> whenever the types of <literal>x</literal> or 
+      <literal>_result</literal> are reconstructed. So what we do in this scenario is
+      force <literal>x</literal> a bit, in order to recover both its type 
+      and the argument part of <literal>f</literal>.  
+      <programlisting>
+*Main> seq x ()
+*Main> :print x
+x = 1
+      </programlisting>
+      We can check now that as expected, the type of <literal>x</literal>
+      has been reconstructed, and with it the 
+      type of <literal>f</literal> has been too:
+      <programlisting>
+*Main> :t x
+x :: Integer
+*Main> :t f
+f :: Integer -> b
+      </programlisting>
+      From here, we can apply f to any argument of type Integer and observe the 
+      results. 
+      <programlisting><![CDATA[
+*Main> let b = f 10
+*Main> :t b
+b :: b
+*Main> b
+<interactive>:1:0:
+    Ambiguous type variable `b' in the constraint:
+      `Show b' arising from a use of `print' at <interactive>:1:0
+*Main> :p b
+b = (_t2::a)
+*Main> seq b ()
+()
+*Main> :t b
+b :: a
+*Main> :p b
+b = Just 10
+*Main> :t b
+b :: Maybe Integer
+*Main> :t f
+f :: Integer -> Maybe Integer
+*Main> f 20
+Just 20
+*Main> map f [1..5]
+[Just 1, Just 2, Just 3, Just 4, Just 5]
+      ]]></programlisting>
+      In the first application of <literal>f</literal>, we had to do 
+      some more type reconstruction
+      in order to recover the result type of <literal>f</literal>. 
+      But after that, we are free to use 
+      <literal>f</literal> normally.
     </sect2>
     <sect2><title>Tips</title>
       <variablelist>
@@ -1865,8 +1933,8 @@ x :: Int
 	  <listitem><para><programlisting>
 type MyLongType a = [Maybe [Maybe a]]
 
-main:Main> :m +GHC.Exts
-main:Main> main
+*Main> :m +GHC.Exts
+*Main> main
 Local bindings in scope:
   x :: a
 Main.hs:15> let x' = unsafeCoerce x :: MyLongType Bool
@@ -1885,7 +1953,25 @@ Main.hs:15> x'
 	  </para></listitem>
 	</varlistentry> 
     </variablelist>
-    </sect2></sect1>
+    </sect2>
+    <sect2><title>Limitations</title>
+     <para>
+      <itemizedlist>
+	<listitem><para>
+	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
+	  at the scope of a breakpoint if there is a explicit type signature.
+	</para></listitem>
+      </itemizedlist>
+      <itemizedlist>
+	<listitem><para>
+	  Modules compiled by GHCi under the <literal>-fdebugging
+	</literal> flag  will perform slower: the debugging mode introduces some overhead.
+      Modules compiled to object code by ghc are not affected.
+	</para></listitem>
+      </itemizedlist>      
+     </para>
+    </sect2>
+  </sect1>
   <sect1 id="ghci-dot-files">
     <title>The <filename>.ghci</filename> file</title>
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
