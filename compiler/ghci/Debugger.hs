@@ -198,4 +198,4 @@ mk_skol_ty ty | tyvars  <- varSetElems (tyVarsOfType ty)
               , tyvars' <- map (mkTyVarTy . mk_skol_tv) tyvars
               = substTyWith tyvars tyvars' ty
 mk_skol_tv tv = mkTcTyVar (tyVarName tv) (tyVarKind tv) 
-                      (SkolemTv UnkSkol)
+                      (SkolemTv RuntimeUnkSkol)

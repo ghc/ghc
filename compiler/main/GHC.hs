@@ -2377,7 +2377,7 @@ skolemiseTy ty = (substTy subst ty, mkVarSet new_tyvars)
 
 skolemiseTyVar :: TyVar -> TyVar
 skolemiseTyVar tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) 
-                                 (SkolemTv UnkSkol)
+                                 (SkolemTv RuntimeUnkSkol)
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames

@@ -323,6 +323,9 @@ data SkolemInfo
   | GenSkol [TcTyVar]	-- Bound when doing a subsumption check for 
 	    TcType	-- 	(forall tvs. ty)
 
+  | RuntimeUnkSkol      -- a type variable used to represent an unknown
+                        -- runtime type (used in the GHCi debugger)
+
   | UnkSkol		-- Unhelpful info (until I improve it)
 
 -------------------------------------
@@ -447,6 +450,7 @@ pprSkolTvBinding tv
     ppr_details (SkolemTv info)		= ppr_skol info
 
     ppr_skol UnkSkol = empty	-- Unhelpful; omit
+    ppr_skol RuntimeUnkSkol = quotes (ppr tv) <+> ptext SLIT("is an unknown runtime type")
     ppr_skol info    = quotes (ppr tv) <+> ptext SLIT("is bound by") 
 			<+> sep [pprSkolInfo info, nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]
  
@@ -465,6 +469,7 @@ pprSkolInfo (GenSkol tvs ty) = sep [ptext SLIT("the polymorphic type"),
 -- For type variables the others are dealt with by pprSkolTvBinding.  
 -- For Insts, these cases should not happen
 pprSkolInfo UnkSkol = panic "UnkSkol"
+pprSkolInfo RuntimeUnkSkol = panic "RuntimeUnkSkol"
 
 instance Outputable MetaDetails where
   ppr Flexi 	    = ptext SLIT("Flexi")

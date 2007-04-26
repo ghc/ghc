@@ -2650,6 +2650,10 @@ mkMonomorphismMsg tidy_env inst_tvs
   = findGlobals (mkVarSet inst_tvs) tidy_env	`thenM` \ (tidy_env, docs) ->
     returnM (tidy_env, mk_msg docs)
   where
+    mk_msg _ | any isRuntimeUnk inst_tvs
+        =  vcat [ptext SLIT("Cannot resolve unkonwn runtime types:") <+>
+                   (pprWithCommas ppr inst_tvs),
+                ptext SLIT("Use :print or :force to determine these types")]
     mk_msg []   = ptext SLIT("Probable fix: add a type signature that fixes these type variable(s)")
 			-- This happens in things like
 			--	f x = show (read "foo")
@@ -2658,6 +2662,11 @@ mkMonomorphismMsg tidy_env inst_tvs
 			nest 2 (vcat docs),
 			monomorphism_fix
 		       ]
+
+isRuntimeUnk :: TcTyVar -> Bool
+isRuntimeUnk x | SkolemTv RuntimeUnkSkol <- tcTyVarDetails x = True
+               | otherwise = False
+
 monomorphism_fix :: SDoc
 monomorphism_fix = ptext SLIT("Probable fix:") <+> 
 		   (ptext SLIT("give these definition(s) an explicit type signature")
