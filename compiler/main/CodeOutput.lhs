@@ -30,8 +30,6 @@ import Cmm		( Cmm )
 import HscTypes
 import DynFlags
 
-import StaticFlags      ( opt_DoTickyProfiling )
-
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )

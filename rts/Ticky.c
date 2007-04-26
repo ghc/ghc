@@ -110,6 +110,14 @@ PrintTickyInfo(void)
 
   FILE *tf = RtsFlags.TickyFlags.tickyFile;
 
+  /* If tf = NULL, that means the user passed in stderr for the ticky stats
+     file. According to a comment in RtsFlags.c, this means to use 
+     debugBelch to print out messages. But this function prints out a lot
+     of stuff so in order to avoid changing a lot of code, we just dump
+     the same output to stderr (for now). */
+  if( tf == NULL )
+    tf = stderr;
+
   /* krc: avoid dealing with this just now */
 #if FALSE
   fprintf(tf,"\n\nALLOCATIONS: %ld (%ld words total: %ld admin, %ld goods, %ld slop)\n",
