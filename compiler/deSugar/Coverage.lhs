@@ -19,9 +19,11 @@ import ErrUtils
 import Name
 import Bag
 import Var
+import VarSet
 import Data.List
 import FastString
 import StaticFlags
+import UniqFM
 
 import Data.Array
 import System.Time (ClockTime(..))
@@ -61,13 +63,13 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
 
   let mod_name = moduleNameString (moduleName mod)
 
-  let (binds1,st)
+  let (binds1,_,st)
 		 = unTM (addTickLHsBinds binds) 
-                   TickEnv { locals = emptyOccEnv }
 		   TT { modName      = mod_name
 		      , declPath     = []
 		      , tickBoxCount = 0
 		      , mixEntries   = []
+                      , inScope      = emptyVarSet
 		      }
 
   let entries = reverse $ mixEntries st
@@ -84,6 +86,7 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
 
   -- Todo: use proper src span type
   breakArray <- newBreakArray $ length entries
+
   let locsTicks = listArray (0,tickBoxCount st-1) 
                      [ span | (span,_,_) <- entries ]
       varsTicks = listArray (0,tickBoxCount st-1) 
@@ -119,8 +122,10 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
 
-  mg@(MatchGroup matches' ty) <- addPathEntry name  
-				 $ addTickMatchGroup (fun_matches funBind)
+  (fvs, mg@(MatchGroup matches' ty)) <- 
+        getFreeVars $
+        addPathEntry name $
+        addTickMatchGroup (fun_matches funBind)
 
   -- Todo: we don't want redundant ticks on simple pattern bindings
   if not opt_Hpc && isSimplePatBind funBind
@@ -131,7 +136,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
      else do
         tick_no <- allocATickBox (if null decl_path
                                      then TopLevelBox [name]
-                                     else LocalBox (name : decl_path)) pos
+                                     else LocalBox (name : decl_path)) 
+                                pos fvs
 
         return $ L pos $ funBind { fun_matches = MatchGroup matches' ty 
                                  , fun_tick = tick_no
@@ -163,8 +169,7 @@ addTickLHsBind other = return other
 -- add a tick to the expression no matter what it is
 addTickLHsExprAlways :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprAlways (L pos e0) = do
-    e1 <- addTickHsExpr e0
-    allocTickBox ExpBox pos e1
+    allocTickBox ExpBox pos $ addTickHsExpr e0
 
 addTickLHsExprNeverOrAlways :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprNeverOrAlways e
@@ -187,11 +192,11 @@ addTickLHsExprNever (L pos e0) = do
 -- selectively add ticks to interesting expressions
 addTickLHsExpr :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExpr (L pos e0) = do
-    e1 <- addTickHsExpr e0
     if opt_Hpc || isGoodBreakExpr e0
        then do
-          allocTickBox ExpBox pos e1
-       else
+          allocTickBox ExpBox pos $ addTickHsExpr e0
+       else do
+          e1 <- addTickHsExpr e0
           return $ L pos e1 
 
 -- general heuristic: expressions which do not denote values are good break points
@@ -210,9 +215,9 @@ isGoodBreakExpr other          = False
 addTickLHsExprOptAlt :: Bool -> LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprOptAlt oneOfMany (L pos e0)
   | not opt_Hpc = addTickLHsExpr (L pos e0)
-  | otherwise = do
-    e1 <- addTickHsExpr e0
-    allocTickBox (if oneOfMany then AltBox else ExpBox) pos e1
+  | otherwise =
+    allocTickBox (if oneOfMany then AltBox else ExpBox) pos $ 
+        addTickHsExpr e0
 
 addBinTickLHsExpr :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addBinTickLHsExpr boxLabel (L pos e0) = do
@@ -220,7 +225,7 @@ addBinTickLHsExpr boxLabel (L pos e0) = do
     allocBinTickBox boxLabel $ L pos e1
 
 addTickHsExpr :: HsExpr Id -> TM (HsExpr Id)
-addTickHsExpr e@(HsVar _) = return e
+addTickHsExpr e@(HsVar id) = do freeVar id; return e
 addTickHsExpr e@(HsIPVar _) = return e
 addTickHsExpr e@(HsOverLit _) = return e
 addTickHsExpr e@(HsLit _) = return e
@@ -302,8 +307,8 @@ addTickHsExpr (ArithSeq	 ty arith_seq) =
 		(return ty)
 		(addTickArithSeqInfo arith_seq)
 addTickHsExpr (HsTickPragma (file,(l1,c1),(l2,c2)) (L pos e0)) = do
-    e1 <- addTickHsExpr e0
-    e2 <- allocTickBox (ExternalBox (unpackFS file) (P l1 c1 l2 c2)) pos e1
+    e2 <- allocTickBox (ExternalBox (unpackFS file) (P l1 c1 l2 c2)) pos $
+                addTickHsExpr e0
     return $ unLoc e2
 addTickHsExpr (PArrSeq	 {}) = error "addTickHsExpr: PArrSeq"
 addTickHsExpr (HsSCC	 {}) = error "addTickHsExpr: HsSCC"
@@ -354,8 +359,8 @@ addTickMatch isOneOfMany (Match pats opSig gRHSs) =
 
 addTickGRHSs :: Bool -> GRHSs Id -> TM (GRHSs Id)
 addTickGRHSs isOneOfMany (GRHSs guarded local_binds) = do
-  local_binds' <- addTickHsLocalBinds local_binds
   bindLocals binders $ do
+    local_binds' <- addTickHsLocalBinds local_binds
     guarded' <- mapM (liftL (addTickGRHS isOneOfMany)) guarded
     return $ GRHSs guarded' local_binds'
   where
@@ -405,9 +410,10 @@ addTickStmt isGuard (ExprStmt e bind' ty) = do
              | otherwise          = addTickLHsExprAlways e
 
 addTickStmt isGuard (LetStmt binds) = do
+        let binders = map unLoc (collectLocalBinders binds)
 	e <- liftM LetStmt
-		(addTickHsLocalBinds binds)
-        return (e, map unLoc $ collectLocalBinders binds)
+		(bindLocals binders $ addTickHsLocalBinds binds)
+        return (e, binders)
 addTickStmt isGuard (ParStmt pairs) = do
   	e <- liftM ParStmt (mapM process pairs)
         return (e, [])
@@ -509,62 +515,102 @@ data TickTransState = TT { modName     :: String
                          , declPath    :: [String]
                          , tickBoxCount:: Int
                          , mixEntries  :: [MixEntry]
-
+                         , inScope     :: VarSet
                          }                        
 --	deriving Show
 
-newtype TickEnv = TickEnv { locals :: OccEnv Id }
+type FreeVars = OccEnv Id
+noFVs = emptyOccEnv
 
-data TM a = TM { unTM :: TickEnv -> TickTransState -> (a,TickTransState) }
+-- Note [freevars]
+--   For breakpoints we want to collect the free variables of an
+--   expression for pinning on the HsTick.  We don't want to collect
+--   *all* free variables though: in particular there's no point pinning
+--   on free variables that are will otherwise be in scope at the GHCi
+--   prompt, which means all top-level bindings.  Unfortunately detecting
+--   top-level bindings isn't easy (collectHsBindsBinders on the top-level
+--   bindings doesn't do it), so we keep track of a set of "in-scope"
+--   variables in addition to the free variables, and the former is used
+--   to filter additions to the latter.  This gives us complete control
+--   over what free variables we track.
+
+data TM a = TM { unTM :: TickTransState -> (a,FreeVars,TickTransState) }
+        -- a combination of a state monad (TickTransState) and a writer
+        -- monad (FreeVars).
 
 instance Monad TM where
-  return a = TM $ \ e st -> (a,st)
-  (TM m) >>= k = TM $ \ e st -> case m e st of
-				  (r1,st1) -> unTM (k r1) e st1 
+  return a = TM $ \ st -> (a,noFVs,st)
+  (TM m) >>= k = TM $ \ st -> case m st of
+				  (r1,fv1,st1) -> 
+                                     case unTM (k r1) st1 of
+                                       (r2,fv2,st2) -> 
+                                          (r2, fv1 `plusOccEnv` fv2, st2)
 
---addTick :: LHsExpr Id -> TM (LHsExpr Id)
---addTick e = TM $ \ uq -> (e,succ uq,[(uq,getLoc e)])
+getState :: TM TickTransState
+getState = TM $ \st -> (st, noFVs, st)
+
+setState :: (TickTransState -> TickTransState) -> TM ()
+setState f = TM $ \st -> ((), noFVs, f st)
+
+withState :: (TickTransState -> TickTransState) -> TM a -> TM a
+withState f (TM m) = TM $ \st -> case m (f st) of
+                                   (a, fvs, st') -> (a, fvs, st')
+
+getFreeVars :: TM a -> TM (FreeVars, a)
+getFreeVars (TM m) 
+  = TM $ \st -> case m st of (a, fv, st') -> ((fv,a), fv, st')
+
+freeVar :: Id -> TM ()
+freeVar id = TM $ \st -> 
+                if id `elemVarSet` inScope st
+                   then ((), unitOccEnv (nameOccName (idName id)) id, st)
+                   else ((), noFVs, st)
 
 addPathEntry :: String -> TM a -> TM a
-addPathEntry nm (TM m) = TM $ \ e st -> case m e (st { declPath = declPath st ++ [nm] }) of
-					(r,st') -> (r,st' { declPath = declPath st })
+addPathEntry nm = withState (\st -> st { declPath = declPath st ++ [nm] })
 
 getPathEntry :: TM [String]
-getPathEntry = TM $ \ e st -> (declPath st,st)
+getPathEntry = declPath `liftM` getState
 
 bindLocals :: [Id] -> TM a -> TM a
 bindLocals new_ids (TM m)
-  = TM $ \ e st -> m e{locals = locals e `extendOccEnvList` occnamed_ids} st
-  where occnamed_ids = [ (nameOccName (idName id),id) | id <- new_ids ] 
+  = TM $ \ st -> case m st{ inScope = inScope st `extendVarSetList` new_ids } of
+                   (r, fv, st') -> (r, fv `delListFromUFM` occs, st')
+  where occs = [ nameOccName (idName id) | id <- new_ids ] 
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
-allocTickBox :: BoxLabel -> SrcSpan -> HsExpr Id -> TM (LHsExpr Id)
-allocTickBox boxLabel pos e | isGoodSrcSpan pos = TM $ \ env st ->
-  let me = (pos, map (nameOccName.idName) ids, boxLabel)
-      c = tickBoxCount st
-      mes = mixEntries st
-      ids = occEnvElts (locals env)
-  in ( L pos (HsTick c ids (L pos e))
-     , st {tickBoxCount=c+1,mixEntries=me:mes}
-     )
-allocTickBox boxLabel pos e = return (L pos e)
+allocTickBox :: BoxLabel -> SrcSpan -> TM (HsExpr Id) -> TM (LHsExpr Id)
+allocTickBox boxLabel pos m | isGoodSrcSpan pos = do
+  (fvs, e) <- getFreeVars m
+  TM $ \st ->
+    let c = tickBoxCount st
+        ids = occEnvElts fvs
+        mes = mixEntries st
+        me = (pos, map (nameOccName.idName) ids, boxLabel)
+    in
+    ( L pos (HsTick c ids (L pos e))
+    , fvs
+    , st {tickBoxCount=c+1,mixEntries=me:mes}
+    )
+allocTickBox boxLabel pos m = do e <- m; return (L pos e)
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
-allocATickBox :: BoxLabel -> SrcSpan -> TM (Maybe (Int,[Id]))
-allocATickBox boxLabel pos | isGoodSrcSpan pos = TM $ \ env st ->
+allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
+allocATickBox boxLabel pos fvs | isGoodSrcSpan pos = TM $ \ st ->
   let me = (pos, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
-      ids = occEnvElts (locals env)
+      ids = occEnvElts fvs
   in ( Just (c, ids)
-     , st {tickBoxCount=c+1,mixEntries=me:mes}
+     , noFVs
+     , st {tickBoxCount=c+1, mixEntries=me:mes}
      )
-allocATickBox boxLabel e = return Nothing
+allocATickBox boxLabel pos fvs = return Nothing
 
 allocBinTickBox :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
-allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan pos = TM $ \ _ st ->
+allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan pos = TM $ \ st ->
   let meT = (pos,[],boxLabel True)
       meF = (pos,[],boxLabel False)
       meE = (pos,[],ExpBox)
@@ -576,10 +622,12 @@ allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan pos = TM $ \ _ st ->
            -- notice that F and T are reversed,
            -- because we are building the list in
            -- reverse...
-             , st {tickBoxCount=c+3,mixEntries=meF:meT:meE:mes}
+             , noFVs
+             , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
              )
         else
              ( L pos $ HsTick c [] $ L pos e
+             , noFVs
              , st {tickBoxCount=c+1,mixEntries=meE:mes}
              )
 
