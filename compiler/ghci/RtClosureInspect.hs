@@ -472,31 +472,7 @@ instScheme ty | (tvs, rho) <- tcSplitForAllTys ty = liftTcM$ do
    return (ty', zipTopTvSubst tvs' (mkTyVarTys tvs))
 
 cvObtainTerm :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
-cvObtainTerm hsc_env force mb_ty a = do
-   -- Obtain the term and tidy the type before returning it
-   term <- cvObtainTerm1 hsc_env force mb_ty a
-   let term' =  tidyTypes term
-   return term'
-   where allvars = nub . foldTerm TermFold {
-            fTerm       = \ty _ _ tt   -> 
-                          varEnvElts(tyVarsOfType ty) ++ concat tt,
-            fSuspension = \_ mb_ty _ _ -> 
-                          maybe [] (varEnvElts . tyVarsOfType) mb_ty,
-            fPrim       = \ _ _ -> [] }
-         tidyTypes term = let 
-           go = foldTerm idTermFold {
-                  fTerm       = \ty dc hval tt -> 
-                          Term (tidy ty) dc hval tt,
-                  fSuspension = \ct mb_ty hval n -> 
-                          Suspension ct (fmap tidy mb_ty) hval n }
-           tidy ty      = tidyType (emptyTidyOccEnv, tidyVarEnv) ty  
-           tidyVarEnv   = mkVarEnv$ 
-                         [ (v, alpha_tv `setTyVarUnique` varUnique v)
-                           | (alpha_tv,v) <- zip alphaTyVars (allvars term)]
-           in go term
-
-cvObtainTerm1 :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
-cvObtainTerm1 hsc_env force mb_ty hval = runTR hsc_env $ do
+cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
    tv <- liftM mkTyVarTy (newVar argTypeKind)
    case mb_ty of
      Nothing -> go tv tv hval
