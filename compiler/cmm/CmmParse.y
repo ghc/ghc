@@ -224,7 +224,7 @@ info	:: { ExtFCode (CLabel, [CmmLit],[CmmLit]) }
 	
 	| 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, tag, closure type, description, type
-		{ stdInfo $3 $5 $7 $9 $11 $13 $15 }
+		{ conInfo $3 $5 $7 $9 $11 $13 $15 }
 	
 	| 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- selector, closure type, description, type
@@ -715,6 +715,13 @@ retInfo name size live_bits cl_type = do
 stdInfo name ptrs nptrs srt_bitmap cl_type desc_str ty_str =
   basicInfo name (packHalfWordsCLit ptrs nptrs) 
 	srt_bitmap cl_type desc_str ty_str
+
+conInfo name ptrs nptrs srt_bitmap cl_type desc_str ty_str = do
+  (lbl, info1, _) <- basicInfo name (packHalfWordsCLit ptrs nptrs) 
+                	srt_bitmap cl_type desc_str ty_str
+  desc_lit <- code $ mkStringCLit desc_str
+  let desc_field = makeRelativeRefTo lbl desc_lit
+  return (lbl, info1, [desc_field])
 
 basicInfo name layout srt_bitmap cl_type desc_str ty_str = do
   lit1 <- if opt_SccProfilingOn 

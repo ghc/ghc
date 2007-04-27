@@ -21,7 +21,7 @@ module CgInfoTbls (
 	getConstrTag,
 	infoTable, infoTableClosureType,
 	infoTablePtrs, infoTableNonPtrs,
-	funInfoTable
+	funInfoTable, makeRelativeRefTo
   ) where
 
 
