@@ -717,6 +717,7 @@ all :: $(odir)/ghc-inplace ghc-inplace
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 all :: $(odir)/ghc-inplace.bat ghc-inplace.bat
+CLEAN_FILES += $(odir)/ghc-inplace.bat ghc-inplace.bat
 endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"

@@ -109,6 +109,8 @@ all :: $(INPLACE_SCRIPT_PROG).bat
 $(INPLACE_SCRIPT_PROG).bat :
 	echo '@call $(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/ghc-pkg/$(HS_PROG)) --global-conf $(PKGCONF) %*' >> $@
 	chmod 755 $@
+
+CLEAN_FILES += $(INPLACE_SCRIPT_PROG).bat
 endif
 
 # ghc-pkg is needed to boot in rts/ and library dirs
