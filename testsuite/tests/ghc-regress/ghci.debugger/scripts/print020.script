@@ -1,0 +1,4 @@
+:l ../HappyTest.hs
+:break lexer
+main
+:force _result
