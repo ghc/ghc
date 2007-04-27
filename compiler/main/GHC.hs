@@ -257,6 +257,7 @@ import HaddockParse
 import HaddockLex       ( tokenise )
 import Unique
 
+import System.IO.Unsafe
 import Data.Array
 import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist )
@@ -2196,11 +2197,10 @@ runStmt (Session ref) expr
               -- breakpoint this is visible in the Byte Code
               -- Interpreter, thus it is a global variable,
               -- implemented with stable pointers
-              stablePtr <- setBreakAction breakMVar statusMVar
+              withBreakAction breakMVar statusMVar $ do
 
               let thing_to_run = unsafeCoerce# hval :: IO [HValue]
               status <- sandboxIO statusMVar thing_to_run
-              freeStablePtr stablePtr -- be careful not to leak stable pointers!
               handleRunStatus ref new_IC names (hsc_IC hsc_env) 
                               breakMVar statusMVar status
 
@@ -2245,14 +2245,25 @@ sandboxIO statusMVar thing = do
   putMVar interruptTargetThread (child:ts)
   takeMVar statusMVar `finally` modifyMVar_ interruptTargetThread (return.tail)
 
-setBreakAction breakMVar statusMVar = do 
-  stablePtr <- newStablePtr onBreak
-  poke breakPointIOAction stablePtr
-  return stablePtr
-  where onBreak ids apStack = do
-                tid <- myThreadId
-                putMVar statusMVar (Break apStack ids tid)
-                takeMVar breakMVar
+withBreakAction breakMVar statusMVar io
+ = bracket setBreakAction resetBreakAction (\_ -> io)
+ where
+   setBreakAction = do
+     stablePtr <- newStablePtr onBreak
+     poke breakPointIOAction stablePtr
+     return stablePtr
+
+   onBreak info apStack = do
+     tid <- myThreadId
+     putMVar statusMVar (Break apStack info tid)
+     takeMVar breakMVar
+
+   resetBreakAction stablePtr = do
+     poke breakPointIOAction noBreakStablePtr
+     freeStablePtr stablePtr
+
+noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
+noBreakAction info apStack = putStrLn "*** Ignoring breakpoint"
 
 resume :: Session -> ResumeHandle -> IO RunResult
 resume (Session ref) res@(ResumeHandle breakMVar statusMVar 
@@ -2266,10 +2277,9 @@ resume (Session ref) res@(ResumeHandle breakMVar statusMVar
    writeIORef ref hsc_env{ hsc_IC = resume_ic }
    Linker.deleteFromLinkEnv names
 
-   stablePtr <- setBreakAction breakMVar statusMVar
+   withBreakAction breakMVar statusMVar $ do
    putMVar breakMVar ()                 -- this awakens the stopped thread...
    status <- takeMVar statusMVar        -- and wait for the result
-   freeStablePtr stablePtr -- be careful not to leak stable pointers!
    handleRunStatus ref final_ic final_names resume_ic 
                    breakMVar statusMVar status
 
