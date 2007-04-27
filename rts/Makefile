@@ -35,7 +35,7 @@ WAYS=$(GhcLibWays) $(GhcRTSWays)
 
 ifneq "$(findstring debug, $(way))" ""
 GhcRtsHcOpts=
-GhcRtsCcOpts=-g
+GhcRtsCcOpts=-g -O0
 endif
 
 # -----------------------------------------------------------------------------

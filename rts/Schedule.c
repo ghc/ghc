@@ -28,10 +28,8 @@
 #include "ThreadLabels.h"
 #include "LdvProfile.h"
 #include "Updates.h"
-#ifdef PROFILING
 #include "Proftimer.h"
 #include "ProfHeap.h"
-#endif
 #if defined(GRAN) || defined(PARALLEL_HASKELL)
 # include "GranSimRts.h"
 # include "GranSim.h"
@@ -216,7 +214,7 @@ static rtsBool scheduleHandleYield( Capability *cap, StgTSO *t,
 static void scheduleHandleThreadBlocked( StgTSO *t );
 static rtsBool scheduleHandleThreadFinished( Capability *cap, Task *task,
 					     StgTSO *t );
-static rtsBool scheduleDoHeapProfile(rtsBool ready_to_gc);
+static rtsBool scheduleNeedHeapProfile(rtsBool ready_to_gc);
 static Capability *scheduleDoGC(Capability *cap, Task *task,
 				rtsBool force_major);
 
@@ -572,9 +570,7 @@ run_thread:
     debugTrace(DEBUG_sched, "-->> running thread %ld %s ...", 
 			      (long)t->id, whatNext_strs[t->what_next]);
 
-#if defined(PROFILING)
     startHeapProfTimer();
-#endif
 
     // Check for exceptions blocked on this thread
     maybePerformBlockedException (cap, t);
@@ -667,8 +663,8 @@ run_thread:
     // ----------------------------------------------------------------------
     
     // Costs for the scheduler are assigned to CCS_SYSTEM
-#if defined(PROFILING)
     stopHeapProfTimer();
+#if defined(PROFILING)
     CCCS = CCS_SYSTEM;
 #endif
     
@@ -705,8 +701,7 @@ run_thread:
       barf("schedule: invalid thread return code %d", (int)ret);
     }
 
-    if (scheduleDoHeapProfile(ready_to_gc)) { ready_to_gc = rtsFalse; }
-    if (ready_to_gc) {
+    if (ready_to_gc || scheduleNeedHeapProfile(ready_to_gc)) {
       cap = scheduleDoGC(cap,task,rtsFalse);
     }
   } /* end of while() */
@@ -1920,36 +1915,21 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 }
 
 /* -----------------------------------------------------------------------------
- * Perform a heap census, if PROFILING
+ * Perform a heap census
  * -------------------------------------------------------------------------- */
 
 static rtsBool
-scheduleDoHeapProfile( rtsBool ready_to_gc STG_UNUSED )
+scheduleNeedHeapProfile( rtsBool ready_to_gc STG_UNUSED )
 {
-#if defined(PROFILING)
     // When we have +RTS -i0 and we're heap profiling, do a census at
     // every GC.  This lets us get repeatable runs for debugging.
     if (performHeapProfile ||
 	(RtsFlags.ProfFlags.profileInterval==0 &&
 	 RtsFlags.ProfFlags.doHeapProfile && ready_to_gc)) {
-
-	// checking black holes is necessary before GC, otherwise
-	// there may be threads that are unreachable except by the
-	// blackhole queue, which the GC will consider to be
-	// deadlocked.
-	scheduleCheckBlackHoles(&MainCapability);
-
-	debugTrace(DEBUG_sched, "garbage collecting before heap census");
-	GarbageCollect(rtsTrue);
-
-	debugTrace(DEBUG_sched, "performing heap census");
-	heapCensus();
-
-	performHeapProfile = rtsFalse;
-	return rtsTrue;  // true <=> we already GC'd
+        return rtsTrue;
+    } else {
+        return rtsFalse;
     }
-#endif
-    return rtsFalse;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1960,6 +1940,7 @@ static Capability *
 scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 {
     StgTSO *t;
+    rtsBool heap_census;
 #ifdef THREADED_RTS
     static volatile StgWord waiting_for_gc;
     rtsBool was_waiting;
@@ -2067,6 +2048,8 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 	deleteAllThreads(&capabilities[0]);
 	sched_state = SCHED_SHUTTING_DOWN;
     }
+    
+    heap_census = scheduleNeedHeapProfile(rtsTrue);
 
     /* everybody back, start the GC.
      * Could do it in this thread, or signal a condition var
@@ -2076,8 +2059,14 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 #if defined(THREADED_RTS)
     debugTrace(DEBUG_sched, "doing GC");
 #endif
-    GarbageCollect(force_major);
+    GarbageCollect(force_major || heap_census);
     
+    if (heap_census) {
+        debugTrace(DEBUG_sched, "performing heap census");
+        heapCensus();
+	performHeapProfile = rtsFalse;
+    }
+
 #if defined(THREADED_RTS)
     // release our stash of capabilities.
     for (i = 0; i < n_capabilities; i++) {

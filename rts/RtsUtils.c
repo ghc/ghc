@@ -316,7 +316,6 @@ resetGenSymZh(void) /* it's your funeral */
    Get the current time as a string.  Used in profiling reports.
    -------------------------------------------------------------------------- */
 
-#if defined(PROFILING) || defined(DEBUG) || defined(PAR) || defined(GRAN)
 char *
 time_str(void)
 {
@@ -335,7 +334,6 @@ time_str(void)
     }
     return nowstr;
 }
-#endif
 
 /* -----------------------------------------------------------------------------
  * Reset a file handle to blocking mode.  We do this for the standard

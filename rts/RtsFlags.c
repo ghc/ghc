@@ -172,9 +172,10 @@ void initRtsFlagsDefaults(void)
     RtsFlags.CcFlags.doCostCentres	= 0;
 #endif /* PROFILING or PAR */
 
-#ifdef PROFILING
     RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
     RtsFlags.ProfFlags.profileInterval    = 100;
+
+#ifdef PROFILING
     RtsFlags.ProfFlags.includeTSOs        = rtsFalse;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
@@ -186,9 +187,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.ccsSelector        = NULL;
     RtsFlags.ProfFlags.retainerSelector   = NULL;
     RtsFlags.ProfFlags.bioSelector        = NULL;
-
-#elif defined(DEBUG)
-    RtsFlags.ProfFlags.doHeapProfile      = rtsFalse;
 #endif
 
     RtsFlags.MiscFlags.tickInterval	= 50;  /* In milliseconds */
@@ -382,20 +380,17 @@ usage_text[] = {
 "  -L<chars>      Maximum length of a cost-centre stack in a heap profile",
 "                 (default: 25)",
 "",
-"  -i<sec>        Time between heap samples (seconds, default: 0.1)",
-"",
 "  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
+"",
 # endif
 #endif /* PROFILING or PAR */
-#if !defined(PROFILING) && defined(DEBUG)
+#if !defined(PROFILING)
 "",
-"  -h<break-down> Debugging Heap residency profile",
-"                 (output file <program>.hp)",
-"     break-down: L = closure label (default)",
-"                 T = closure type (constructor, thunk etc.)",
+"  -hT      Heap residency profile (output file <program>.hp)",
 #endif
+"  -i<sec>  Time between heap samples (seconds, default: 0.1)",
 "",
 #if defined(TICKY_TICKY)
 "  -r<file>  Produce ticky-ticky statistics (with -rstderr for stderr)",
@@ -936,12 +931,9 @@ error = rtsTrue;
                       }
 		  ) break;
 	      case 'h': /* serial heap profile */
-#if !defined(PROFILING) && defined(DEBUG)
+#if !defined(PROFILING)
 		switch (rts_argv[arg][2]) {
 		  case '\0':
-		  case 'L':
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_INFOPTR;
-		    break;
 		  case 'T':
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
 		    break;
@@ -1057,7 +1049,6 @@ error = rtsTrue;
 #endif /* PROFILING */
     	    	break;
 
-#if defined(PROFILING) 
     	      case 'i':	/* heap sample interval */
 		if (rts_argv[arg][2] == '\0') {
 		  /* use default */
@@ -1069,7 +1060,6 @@ error = rtsTrue;
 		    RtsFlags.ProfFlags.profileInterval = cst;
 		}
 		break;
-#endif
 
 	      /* =========== CONCURRENT ========================= */
     	      case 'C':	/* context switch interval */
@@ -1251,13 +1241,11 @@ error = rtsTrue;
                     RtsFlags.MiscFlags.tickInterval);
     }
 
-#ifdef PROFILING
     if (RtsFlags.ProfFlags.profileInterval > 0) {
         RtsFlags.MiscFlags.tickInterval =
             stg_min(RtsFlags.ProfFlags.profileInterval,
                     RtsFlags.MiscFlags.tickInterval);
     }
-#endif
 
     if (RtsFlags.ConcFlags.ctxtSwitchTime > 0) {
         RtsFlags.ConcFlags.ctxtSwitchTicks =
@@ -1267,10 +1255,8 @@ error = rtsTrue;
         RtsFlags.ConcFlags.ctxtSwitchTicks = 0;
     }
 
-#ifdef PROFILING
     RtsFlags.ProfFlags.profileIntervalTicks =
         RtsFlags.ProfFlags.profileInterval / RtsFlags.MiscFlags.tickInterval;
-#endif
 
     if (error) {
 	const char **p;

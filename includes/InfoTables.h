@@ -412,6 +412,16 @@ typedef struct _StgConInfoTable {
 #endif
 
 /*
+ * GET_CON_DESC(info)
+ * info must be a StgConInfoTable*.
+ */
+#ifdef TABLES_NEXT_TO_CODE
+#define GET_CON_DESC(info) ((char *)((StgWord)((info)+1) + (info->con_desc)))
+#else
+#define GET_CON_DESC(info) ((info)->con_desc)
+#endif
+
+/*
  * GET_FUN_SRT(info)
  * info must be a StgFunInfoTable*
  */

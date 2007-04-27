@@ -42,9 +42,7 @@ static
 void
 handle_tick(int unused STG_UNUSED)
 {
-#ifdef PROFILING
   handleProfTick();
-#endif
   if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0) {
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
@@ -86,10 +84,7 @@ handle_tick(int unused STG_UNUSED)
 void
 startTimer(void)
 {
-#ifdef PROFILING
   initProfTimer();
-#endif
-
   startTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
 }
 

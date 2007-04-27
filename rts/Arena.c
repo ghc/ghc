@@ -42,7 +42,7 @@ newArena( void )
     Arena *arena;
 
     arena = stgMallocBytes(sizeof(Arena), "newArena");
-    arena->current = allocBlock();
+    arena->current = allocBlock_lock();
     arena->current->link = NULL;
     arena->free = arena->current->start;
     arena->lim  = arena->current->start + BLOCK_SIZE_W;
@@ -81,7 +81,7 @@ arenaAlloc( Arena *arena, size_t size )
     } else {
 	// allocate a fresh block...
 	req_blocks =  (lnat)BLOCK_ROUND_UP(size) / BLOCK_SIZE;
-	bd = allocGroup(req_blocks);
+	bd = allocGroup_lock(req_blocks);
 	arena_blocks += req_blocks;
 
 	bd->gen_no  = 0;
@@ -106,7 +106,7 @@ arenaFree( Arena *arena )
 	next = bd->link;
 	arena_blocks -= bd->blocks;
 	ASSERT(arena_blocks >= 0);
-	freeGroup(bd);
+	freeGroup_lock(bd);
     }
     stgFree(arena);
 }

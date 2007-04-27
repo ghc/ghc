@@ -6,8 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#if defined (PROFILING)
-
 #include "PosixSource.h"
 
 #include "Rts.h"
@@ -66,9 +64,11 @@ initProfTimer( void )
 void
 handleProfTick(void)
 {
+#ifdef PROFILING
     if (do_prof_ticks) {
 	CCCS->time_ticks++;
     }
+#endif
 
     if (do_heap_prof_ticks) {
 	ticks_to_heap_profile--;
@@ -78,5 +78,3 @@ handleProfTick(void)
 	}
     }
 }
-
-#endif /* PROFILING */

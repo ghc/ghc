@@ -11,15 +11,13 @@
 
 #include <stdio.h>
 
-#if defined(PROFILING) || defined(DEBUG)
-void initProfiling1 ( void );
-void freeProfiling1 ( void );
-void initProfiling2 ( void );
-void endProfiling   ( void );
+void initProfiling1 (void);
+void freeProfiling1 (void);
+void initProfiling2 (void);
+void endProfiling   (void);
 
 extern FILE *prof_file;
 extern FILE *hp_file;
-#endif
 
 #ifdef PROFILING
 

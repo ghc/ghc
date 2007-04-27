@@ -86,8 +86,7 @@ struct PROFILING_FLAGS {
 # define HEAP_BY_RETAINER       6
 # define HEAP_BY_LDV            7
 
-# define HEAP_BY_INFOPTR        1      /* DEBUG only */
-# define HEAP_BY_CLOSURE_TYPE   2      /* DEBUG only */
+# define HEAP_BY_CLOSURE_TYPE   8
 
     nat                 profileInterval;      /* delta between samples (in ms) */
     nat                 profileIntervalTicks; /* delta between samples (in 'ticks') */

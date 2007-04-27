@@ -1,18 +1,10 @@
-/* -----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------
  *
  * (c) The GHC Team, 1998-2003
  *
  * Support for heap profiling
  *
- * ---------------------------------------------------------------------------*/
-
-#if defined(DEBUG) && !defined(PROFILING)
-#define DEBUG_HEAP_PROF
-#else
-#undef DEBUG_HEAP_PROF
-#endif
-
-#if defined(PROFILING) || defined(DEBUG_HEAP_PROF)
+ * --------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -103,70 +95,86 @@ static void aggregateCensusInfo( void );
 
 static void dumpCensus( Census *census );
 
-/* -----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------
    Closure Type Profiling;
+   ------------------------------------------------------------------------- */
 
-   PROBABLY TOTALLY OUT OF DATE -- ToDo (SDM)
-   -------------------------------------------------------------------------- */
-
-#ifdef DEBUG_HEAP_PROF
 static char *type_names[] = {
-      "INVALID_OBJECT"
-    , "CONSTR"
-    , "CONSTR_STATIC"
-    , "CONSTR_NOCAF_STATIC"
+    "INVALID_OBJECT",
+    "CONSTR",
+    "CONSTR_1_0",
+    "CONSTR_0_1",
+    "CONSTR_2_0",
+    "CONSTR_1_1",
+    "CONSTR_0_2",
+    "CONSTR_STATIC",
+    "CONSTR_NOCAF_STATIC",
+    "FUN",
+    "FUN_1_0",
+    "FUN_0_1",
+    "FUN_2_0",
+    "FUN_1_1",
+    "FUN_0_2",
+    "FUN_STATIC",
+    "THUNK",
+    "THUNK_1_0",
+    "THUNK_0_1",
+    "THUNK_2_0",
+    "THUNK_1_1",
+    "THUNK_0_2",
+    "THUNK_STATIC",
+    "THUNK_SELECTOR",
+    "BCO",
+    "AP",
+    "PAP",
+    "AP_STACK",
+    "IND",
+    "IND_OLDGEN",
+    "IND_PERM",
+    "IND_OLDGEN_PERM",
+    "IND_STATIC",
+    "RET_BCO",
+    "RET_SMALL",
+    "RET_BIG",
+    "RET_DYN",
+    "RET_FUN",
+    "UPDATE_FRAME",
+    "CATCH_FRAME",
+    "STOP_FRAME",
+    "CAF_BLACKHOLE",
+    "BLACKHOLE",
+    "SE_BLACKHOLE",
+    "SE_CAF_BLACKHOLE",
+    "MVAR",
+    "ARR_WORDS",
+    "MUT_ARR_PTRS_CLEAN",
+    "MUT_ARR_PTRS_DIRTY",
+    "MUT_ARR_PTRS_FROZEN0",
+    "MUT_ARR_PTRS_FROZEN",
+    "MUT_VAR_CLEAN",
+    "MUT_VAR_DIRTY",
+    "WEAK",
+    "STABLE_NAME",
+    "TSO",
+    "BLOCKED_FETCH",
+    "FETCH_ME",
+    "FETCH_ME_BQ",
+    "RBH",
+    "EVACUATED",
+    "REMOTE_REF",
+    "TVAR_WATCH_QUEUE",
+    "INVARIANT_CHECK_QUEUE",
+    "ATOMIC_INVARIANT",
+    "TVAR",
+    "TREC_CHUNK",
+    "TREC_HEADER",
+    "ATOMICALLY_FRAME",
+    "CATCH_RETRY_FRAME",
+    "CATCH_STM_FRAME",
+    "N_CLOSURE_TYPES"
+  };
 
-    , "FUN"
-    , "FUN_STATIC"
-
-    , "THUNK"
-    , "THUNK_STATIC"
-    , "THUNK_SELECTOR"
-
-    , "BCO"
-    , "AP_STACK"
-    , "AP"
-
-    , "PAP"
-
-    , "IND"
-    , "IND_OLDGEN"
-    , "IND_PERM"
-    , "IND_OLDGEN_PERM"
-    , "IND_STATIC"
-
-    , "RET_BCO"
-    , "RET_SMALL"
-    , "RET_BIG"
-    , "RET_DYN"
-    , "UPDATE_FRAME"
-    , "CATCH_FRAME"
-    , "STOP_FRAME"
-
-    , "BLACKHOLE"
-    , "MVAR"
-
-    , "ARR_WORDS"
-
-    , "MUT_ARR_PTRS_CLEAN"
-    , "MUT_ARR_PTRS_DIRTY"
-    , "MUT_ARR_PTRS_FROZEN"
-    , "MUT_VAR_CLEAN"
-    , "MUT_VAR_DIRTY"
-
-    , "WEAK"
-  
-    , "TSO"
-
-    , "BLOCKED_FETCH"
-    , "FETCH_ME"
-
-    , "EVACUATED"
-};
-
-#endif /* DEBUG_HEAP_PROF */
-
-/* -----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------
  * Find the "closure identity", which is a unique pointer reresenting
  * the band to which this closure's heap space is attributed in the
  * heap profile.
@@ -193,11 +201,26 @@ closureIdentity( StgClosure *p )
 	else
 	    return NULL;
 
-#else // DEBUG
-    case HEAP_BY_INFOPTR:
-	return (void *)((StgClosure *)p)->header.info; 
+#else
     case HEAP_BY_CLOSURE_TYPE:
-	return type_names[get_itbl(p)->type];
+    {
+        StgInfoTable *info;
+        info = get_itbl(p);
+        switch (info->type) {
+        case CONSTR:
+        case CONSTR_1_0:
+        case CONSTR_0_1:
+        case CONSTR_2_0:
+        case CONSTR_1_1:
+        case CONSTR_0_2:
+        case CONSTR_STATIC:
+        case CONSTR_NOCAF_STATIC:
+            printf("",strlen(GET_CON_DESC(itbl_to_con_itbl(info))));
+            return GET_CON_DESC(itbl_to_con_itbl(info));
+        default:
+            return type_names[info->type];
+        }
+    }
 
 #endif
     default:
@@ -300,6 +323,7 @@ LDV_recordDead( StgClosure *c, nat size )
 /* --------------------------------------------------------------------------
  * Initialize censuses[era];
  * ----------------------------------------------------------------------- */
+
 STATIC_INLINE void
 initEra(Census *census)
 {
@@ -325,6 +349,7 @@ freeEra(Census *census)
  * Increases era by 1 and initialize census[era].
  * Reallocates gi[] and increases its size if needed.
  * ----------------------------------------------------------------------- */
+
 static void
 nextEra( void )
 {
@@ -348,23 +373,23 @@ nextEra( void )
     initEra( &censuses[era] );
 }
 
-/* -----------------------------------------------------------------------------
- * DEBUG heap profiling, by info table
- * -------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------
+ * Heap profiling by info table
+ * ------------------------------------------------------------------------- */
 
-#ifdef DEBUG_HEAP_PROF
+#if !defined(PROFILNG)
 FILE *hp_file;
 static char *hp_filename;
 
-void initProfiling1( void )
+void initProfiling1 (void)
 {
 }
 
-void freeProfiling1( void )
+void freeProfiling1 (void)
 {
 }
 
-void initProfiling2( void )
+void initProfiling2 (void)
 {
   if (RtsFlags.ProfFlags.doHeapProfile) {
     /* Initialise the log file name */
@@ -387,7 +412,7 @@ void endProfiling( void )
 {
   endHeapProfiling();
 }
-#endif /* DEBUG_HEAP_PROF */
+#endif /* !PROFILING */
 
 static void
 printSample(rtsBool beginSample, StgDouble sampleValue)
@@ -462,10 +487,6 @@ initHeapProfiling(void)
 
     printSample(rtsTrue, 0);
     printSample(rtsFalse, 0);
-
-#ifdef DEBUG_HEAP_PROF
-    DEBUG_LoadSymbols(prog_name);
-#endif
 
 #ifdef PROFILING
     if (doingRetainerProfiling()) {
@@ -603,7 +624,7 @@ strMatchesSelector( char* str, char* sel )
 rtsBool
 closureSatisfiesConstraints( StgClosure* p )
 {
-#ifdef DEBUG_HEAP_PROF
+#if !defined(PROFILING)
     (void)p;   /* keep gcc -Wall happy */
     return rtsTrue;
 #else
@@ -808,11 +829,8 @@ dumpCensus( Census *census )
 
 	if (count == 0) continue;
 
-#ifdef DEBUG_HEAP_PROF
+#if !defined(PROFILING)
 	switch (RtsFlags.ProfFlags.doHeapProfile) {
-	case HEAP_BY_INFOPTR:
-	    fprintf(hp_file, "%s", lookupGHCName(ctr->identity));
-	    break;
 	case HEAP_BY_CLOSURE_TYPE:
 	    fprintf(hp_file, "%s", (char *)ctr->identity);
 	    break;
@@ -984,10 +1002,7 @@ heapCensusChain( Census *census, bdescr *bd )
 		
 	    case TSO:
 		prim = rtsTrue;
-#ifdef DEBUG_HEAP_PROF
-		size = tso_sizeW((StgTSO *)p);
-		break;
-#else
+#ifdef PROFILING
 		if (RtsFlags.ProfFlags.includeTSOs) {
 		    size = tso_sizeW((StgTSO *)p);
 		    break;
@@ -996,6 +1011,9 @@ heapCensusChain( Census *census, bdescr *bd )
 		    p += tso_sizeW((StgTSO *)p);
 		    continue;
 		}
+#else
+		size = tso_sizeW((StgTSO *)p);
+		break;
 #endif
 
 	    case TREC_HEADER: 
@@ -1034,11 +1052,11 @@ heapCensusChain( Census *census, bdescr *bd )
 	    
 	    identity = NULL;
 
-#ifdef DEBUG_HEAP_PROF
-	    real_size = size;
-#else
+#ifdef PROFILING
 	    // subtract the profiling overhead
 	    real_size = size - sizeofW(StgProfHeader);
+#else
+	    real_size = size;
 #endif
 
 	    if (closureSatisfiesConstraints((StgClosure*)p)) {
@@ -1158,13 +1176,13 @@ heapCensus( void )
   // future restriction by biography.
 #ifdef PROFILING
   if (RtsFlags.ProfFlags.bioSelector == NULL)
-#endif
   {
       freeHashTable( census->hash, NULL/* don't free the elements */ );
       arenaFree( census->arena );
       census->hash = NULL;
       census->arena = NULL;
   }
+#endif
 
   // we're into the next time period now
   nextEra();
@@ -1173,6 +1191,4 @@ heapCensus( void )
   stat_endHeapCensus();
 #endif
 }    
-
-#endif /* PROFILING || DEBUG_HEAP_PROF */
 

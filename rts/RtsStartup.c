@@ -38,8 +38,9 @@
 #include "FrontPanel.h"
 #endif
 
-#if defined(PROFILING) || defined(DEBUG)
 # include "Profiling.h"
+
+#if defined(PROFILING)
 # include "ProfHeap.h"
 # include "RetainerProfile.h"
 #endif
@@ -244,9 +245,7 @@ hs_init(int *argc, char **argv[])
     initThreadLabelTable();
 #endif
 
-#if defined(PROFILING) || defined(DEBUG)
     initProfiling1();
-#endif
 
     /* start the virtual timer 'subsystem'. */
     startTimer();
@@ -353,11 +352,9 @@ hs_add_root(void (*init_root)(void))
 
     startupHpc();
 
-#if defined(PROFILING) || defined(DEBUG)
     // This must be done after module initialisation.
     // ToDo: make this work in the presence of multiple hs_add_root()s.
     initProfiling2();
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -455,9 +452,7 @@ hs_exit(void)
     /* free the stable pointer table */
     exitStablePtrTable();
 
-#if defined(PROFILING) || defined(DEBUG)
     freeProfiling1();
-#endif
 
 #if defined(DEBUG)
     /* free the thread label table */
@@ -477,9 +472,7 @@ hs_exit(void)
     reportCCSProfiling();
 #endif
 
-#if defined(PROFILING) || defined(DEBUG)
     endProfiling();
-#endif
 
 #ifdef PROFILING
     // Originally, this was in report_ccs_profiling().  Now, retainer
