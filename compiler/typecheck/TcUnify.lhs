@@ -526,7 +526,7 @@ boxyLub orig_ty1 orig_ty2
 
 	-- Look inside type synonyms, but only if the naive version fails
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
-	       | Just ty2' <- tcView ty1 = go ty1 ty2'
+	       | Just ty2' <- tcView ty2 = go ty1 ty2'
 
     -- For now, we don't look inside ForAlls, PredTys
     go ty1 ty2 = orig_ty1	-- Default
