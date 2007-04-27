@@ -39,6 +39,7 @@ import Config
 import StaticFlags
 import Linker
 import Util
+import FastString
 
 #ifndef mingw32_HOST_OS
 import System.Posix
@@ -1454,7 +1455,8 @@ breakSwitch session args@(arg1:rest)
                else do
             if GHC.isGoodSrcLoc loc
                then findBreakAndSet (GHC.nameModule n) $ 
-                         findBreakByCoord (GHC.srcLocLine loc, 
+                         findBreakByCoord (Just (GHC.srcLocFile loc))
+                                          (GHC.srcLocLine loc, 
                                            GHC.srcLocCol loc)
                else noCanDo $ text "can't find its location: " <>
                               ppr loc
@@ -1481,7 +1483,7 @@ breakByModuleLine :: Module -> Int -> [String] -> GHCi ()
 breakByModuleLine mod line args
    | [] <- args = findBreakAndSet mod $ findBreakByLine line
    | [col] <- args, all isDigit col =
-        findBreakAndSet mod $ findBreakByCoord (line, read col)
+        findBreakAndSet mod $ findBreakByCoord Nothing (line, read col)
    | otherwise = io $ putStrLn "Invalid arguments to :break"
 
 findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
@@ -1532,8 +1534,9 @@ findBreakByLine line arr
         (complete,incomplete) = partition ends_here starts_here
             where ends_here (nm,span) = GHC.srcSpanEndLine span == line
 
-findBreakByCoord :: (Int,Int) -> TickArray -> Maybe (BreakIndex,SrcSpan)
-findBreakByCoord (line, col) arr
+findBreakByCoord :: Maybe FastString -> (Int,Int) -> TickArray
+                 -> Maybe (BreakIndex,SrcSpan)
+findBreakByCoord mb_file (line, col) arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
     listToMaybe (sortBy rightmost contains)
@@ -1541,7 +1544,13 @@ findBreakByCoord (line, col) arr
         ticks = arr ! line
 
         -- the ticks that span this coordinate
-        contains = [ tick | tick@(nm,span) <- ticks, span `spans` (line,col) ]
+        contains = [ tick | tick@(nm,span) <- ticks, span `spans` (line,col),
+                            is_correct_file span ]
+
+        is_correct_file span
+                 | Just f <- mb_file = GHC.srcSpanFile span == f
+                 | otherwise         = True
+
 
 leftmost_smallest  (_,a) (_,b) = a `compare` b
 leftmost_largest   (_,a) (_,b) = (GHC.srcSpanStart a `compare` GHC.srcSpanStart b)
