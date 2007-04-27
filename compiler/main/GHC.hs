@@ -252,11 +252,9 @@ import Util
 import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
 import BasicTypes
-import TcType           ( tcSplitSigmaTy, isDictTy )
 import Maybes		( expectJust, mapCatMaybes )
 import HaddockParse
 import HaddockLex       ( tokenise )
-import PrelNames
 import Unique
 
 import Data.Array
@@ -2309,17 +2307,17 @@ XXX the type of rts_evalStableIO no longer matches the above
 -- After stopping at a breakpoint, add free variables to the environment
 
 -- Todo: turn this into a primop, and provide special version(s) for unboxed things
-foreign import ccall "rts_getApStackVal" getApStackVal :: StablePtr a -> Int -> IO (StablePtr b)
+foreign import ccall unsafe "rts_getApStackVal" 
+        getApStackVal :: StablePtr a -> Int -> IO (StablePtr b)
 
-getIdValFromApStack :: a -> (Id, Int) -> IO (Id, HValue)
-getIdValFromApStack apStack (identifier, stackDepth) = do
-   -- ToDo: check the type of the identifer and decide whether it is unboxed or not
-   apSptr <- newStablePtr apStack
-   resultSptr <- getApStackVal apSptr (stackDepth - 1)
-   result <- deRefStablePtr resultSptr
-   freeStablePtr apSptr
-   freeStablePtr resultSptr 
-   return (identifier, unsafeCoerce# result)
+getIdValFromApStack :: a -> Int -> IO HValue
+getIdValFromApStack apStack stackDepth = do
+     apSptr <- newStablePtr apStack
+     resultSptr <- getApStackVal apSptr (stackDepth - 1)
+     result <- deRefStablePtr resultSptr
+     freeStablePtr apSptr
+     freeStablePtr resultSptr 
+     return (unsafeCoerce# result)
 
 extendEnvironment
         :: HscEnv
@@ -2330,8 +2328,14 @@ extendEnvironment
         -> [OccName]    -- names for the variables (from the source code)
         -> IO (HscEnv, [Name])
 extendEnvironment hsc_env apStack span idsOffsets result_ty occs = do
-   idsVals <- mapM (getIdValFromApStack apStack) idsOffsets 
-   let (ids, hValues) = unzip idsVals 
+
+   -- filter out any unboxed ids; we can't bind these at the prompt
+   let pointers = filter (\(id,_) -> isPointer id) idsOffsets
+       isPointer id | PtrRep <- idPrimRep id = True
+                    | otherwise              = False
+
+   let (ids, offsets) = unzip pointers
+   hValues <- mapM (getIdValFromApStack apStack) offsets
    new_ids <- zipWithM mkNewId occs ids
    let names = map idName ids
 
@@ -2350,7 +2354,8 @@ extendEnvironment hsc_env apStack span idsOffsets result_ty occs = do
    --    - tidy the type variables
    --    - globalise the Id (Ids are supposed to be Global, apparently).
    --
-   let all_ids = result_id : ids
+   let all_ids | isPointer result_id = result_id : ids
+               | otherwise           = ids
        (id_tys, tyvarss) = mapAndUnzip (skolemiseTy.idType) all_ids
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
        new_tyvars = unionVarSets tyvarss             
