@@ -451,9 +451,9 @@ mkPrompt toplevs exports resumes prompt
         f [] = empty
     
         perc_s
-          | (span,_,_):rest <- resumes 
+          | eval:rest <- resumes 
           = (if not (null rest) then text "... " else empty)
-            <> brackets (ppr span) <+> modules_prompt
+            <> brackets (ppr (evalSpan eval)) <+> modules_prompt
           | otherwise
           = modules_prompt
 
@@ -521,13 +521,13 @@ runStmt stmt
       session <- getSession
       result <- io $ withProgName (progname st) $ withArgs (args st) $
 	     	     GHC.runStmt session stmt
-      switchOnRunResult result
+      switchOnRunResult stmt result
 
-switchOnRunResult :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
-switchOnRunResult GHC.RunFailed = return Nothing
-switchOnRunResult (GHC.RunException e) = throw e
-switchOnRunResult (GHC.RunOk names) = return $ Just (False,names)
-switchOnRunResult (GHC.RunBreak threadId names info resume) = do
+switchOnRunResult :: String -> GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
+switchOnRunResult stmt GHC.RunFailed = return Nothing
+switchOnRunResult stmt (GHC.RunException e) = throw e
+switchOnRunResult stmt (GHC.RunOk names) = return $ Just (False,names)
+switchOnRunResult stmt (GHC.RunBreak threadId names info resume) = do
    session <- getSession
    Just mod_info <- io $ GHC.getModuleInfo session (GHC.breakInfo_module info) 
    let modBreaks  = GHC.modInfoModBreaks mod_info
@@ -537,7 +537,10 @@ switchOnRunResult (GHC.RunBreak threadId names info resume) = do
    let location = ticks ! GHC.breakInfo_number info
    printForUser $ ptext SLIT("Stopped at") <+> ppr location
 
-   pushResume location threadId resume
+   pushResume EvalInProgress{ evalStmt = stmt,
+                              evalSpan = location,
+                              evalThreadId = threadId,
+                              evalResumeHandle = resume }
 
    -- run the command set with ":set stop <cmd>"
    st <- getGHCiState
@@ -1150,9 +1153,11 @@ showBkptTable = do
 showContext :: GHCi ()
 showContext = do
    st <- getGHCiState
-   printForUser $ vcat (map pp_resume (resume st))
+   printForUser $ vcat (map pp_resume (reverse (resume st)))
   where
-   pp_resume (span, _, _) = ptext SLIT("Stopped at") <+> ppr span
+   pp_resume eval =
+        ptext SLIT("--> ") <> text (evalStmt eval)
+        $$ nest 2 (ptext SLIT("Stopped at") <+> ppr (evalSpan eval))
 
 -- -----------------------------------------------------------------------------
 -- Completion
@@ -1386,11 +1391,11 @@ doContinue actionBeforeCont = do
       Nothing -> do 
          io $ putStrLn "There is no computation running."
          return False
-      Just (_,_,handle) -> do
+      Just eval -> do
          io $ actionBeforeCont
          session <- getSession
-         runResult <- io $ GHC.resume session handle
-         names <- switchOnRunResult runResult
+         runResult <- io $ GHC.resume session (evalResumeHandle eval)
+         names <- switchOnRunResult (evalStmt eval) runResult
          finishEvalExpr names
          return False
 
@@ -1400,7 +1405,7 @@ abandonCmd "" = do
    case mb_res of
       Nothing -> do 
          io $ putStrLn "There is no computation running."
-      Just (span,_,_) ->
+      Just eval ->
          return ()
          -- the prompt will change to indicate the new context
 
@@ -1570,7 +1575,7 @@ listCmd str = do
    st <- getGHCiState
    case resume st of
       []  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
-      (span,_,_):_ -> io $ listAround span True
+      eval:_ -> io $ listAround (evalSpan eval) True
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using
