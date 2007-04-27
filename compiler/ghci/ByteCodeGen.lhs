@@ -435,18 +435,24 @@ schemeE d s p (AnnLet binds (_,body))
      thunk_codes <- sequence compile_binds
      return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
--- introduce a let binding for a ticked case expression. This rule *should* only fire when the
--- expression was not already let-bound (the code gen for let bindings should take care of that). 
--- Todo: we call exprFreeVars on a deAnnotated expression, this may not be the best way
--- to calculate the free vars but it seemed like the least intrusive thing to do
+-- introduce a let binding for a ticked case expression. This rule
+-- *should* only fire when the expression was not already let-bound
+-- (the code gen for let bindings should take care of that).  Todo: we
+-- call exprFreeVars on a deAnnotated expression, this may not be the
+-- best way to calculate the free vars but it seemed like the least
+-- intrusive thing to do
 schemeE d s p exp@(AnnCase {})
-   | Just (tickInfo, _exp) <- isTickedExp' exp = do 
-        let fvs = exprFreeVars $ deAnnotate' exp
-        let ty = exprType $ deAnnotate' exp
-        id <- newId ty
-        -- Todo: is emptyVarSet correct on the next line?
-        let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyVarSet, AnnVar id)
-        schemeE d s p letExp
+   | Just (tickInfo,rhs) <- isTickedExp' exp
+   = if isUnLiftedType ty
+        then schemeE d s p (snd rhs)
+        else do
+          id <- newId ty
+          -- Todo: is emptyVarSet correct on the next line?
+          let letExp = AnnLet (AnnNonRec id (fvs, exp)) (emptyVarSet, AnnVar id)
+          schemeE d s p letExp
+   where exp' = deAnnotate' exp
+         fvs  = exprFreeVars exp'
+         ty   = exprType exp'
 
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind1)
