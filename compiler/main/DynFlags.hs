@@ -584,7 +584,6 @@ standardWarnings
 	Opt_WarnOverlappingPatterns,
 	Opt_WarnMissingFields,
 	Opt_WarnMissingMethods,
-	Opt_WarnMonomorphism,
 	Opt_WarnDuplicateExports
       ]
 
