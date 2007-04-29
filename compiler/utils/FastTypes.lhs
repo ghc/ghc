@@ -59,7 +59,48 @@ negateFastInt = negate
 
 type FastBool = Bool
 fastBool x = x
-_IS_TRUE_ x = x
+isFastTrue x = x
+fastOr = (||)
+fastAnd = (&&)
+
+--These are among the type-signatures necessary for !ghc to compile
+-- but break ghc (can't give a signature for an import...)
+(+#) :: FastInt -> FastInt -> FastInt
+(-#) :: FastInt -> FastInt -> FastInt
+(*#) :: FastInt -> FastInt -> FastInt
+(==#) :: FastInt -> FastInt -> Bool
+(<#) :: FastInt -> FastInt -> Bool
+(<=#) :: FastInt -> FastInt -> Bool
+(>=#) :: FastInt -> FastInt -> Bool
+(>#) :: FastInt -> FastInt -> Bool
 
 #endif /* ! __GLASGOW_HASKELL__ */
+-- however it's still possible to check that these are
+-- valid signatures nonetheless (e.g., ==# returns Bool
+-- not FastBool/Int# !)
+_signatures =
+ ( (+#) :: FastInt -> FastInt -> FastInt
+ , (-#) :: FastInt -> FastInt -> FastInt
+ , (*#) :: FastInt -> FastInt -> FastInt
+ , (==#) :: FastInt -> FastInt -> Bool
+ , (<#) :: FastInt -> FastInt -> Bool
+ , (<=#) :: FastInt -> FastInt -> Bool
+ , (>=#) :: FastInt -> FastInt -> Bool
+ , (>#) :: FastInt -> FastInt -> Bool
+ )
+
+-- type-signatures will improve the non-ghc-specific versions
+-- and keep things accurate (and ABLE to compile!)
+_ILIT :: Int -> FastInt
+iBox :: FastInt -> Int
+iUnbox :: Int -> FastInt
+
+quotFastInt :: FastInt -> FastInt -> FastInt
+negateFastInt :: FastInt -> FastInt
+
+fastBool :: Bool -> FastBool
+isFastTrue :: FastBool -> Bool
+fastOr :: FastBool -> FastBool -> FastBool
+fastAnd :: FastBool -> FastBool -> FastBool
+
 \end{code}
