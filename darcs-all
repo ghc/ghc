@@ -37,26 +37,6 @@ my $extra = 0;
 my $nofib = 0;
 my $testsuite = 0;
 
-while ($#_ ne -1) {
-    my $arg = shift;
-    if ($arg eq "-q") {
-        $verbose = 0;
-    }
-    elsif ($arg eq "--extra") {
-        $extra = 1;
-    }
-    elsif ($arg eq "--nofib") {
-        $nofib = 1;
-    }
-    elsif ($arg eq "--testsuite") {
-        $testsuite = 1;
-    }
-    else {
-        unshift @_, $arg;
-        last;
-    }
-}
-
 sub message {
     if ($verbose) {
         print "@_\n";
@@ -140,6 +120,26 @@ sub darcsget {
 sub main {
     if (! -d "_darcs" || ! -d "compiler") {
         die "error: darcs-all must be run from the top level of the ghc tree."
+    }
+
+    while ($#_ ne -1) {
+        my $arg = shift;
+        if ($arg eq "-q") {
+            $verbose = 0;
+        }
+        elsif ($arg eq "--extra") {
+            $extra = 1;
+        }
+        elsif ($arg eq "--nofib") {
+            $nofib = 1;
+        }
+        elsif ($arg eq "--testsuite") {
+            $testsuite = 1;
+        }
+        else {
+            unshift @_, $arg;
+            last;
+        }
     }
 
     if ($#_ eq -1) {
