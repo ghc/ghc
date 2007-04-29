@@ -27,7 +27,7 @@ There are two ways to get a source tree:
       ghc-<version>-src-extralibs.tar.bz2
 
   You only need the first one, which contains GHC itself and
-  the "core" libraries.  
+  the "core" libraries.
 
   The extralibs package contains a bunch of optional libraries.  If
   you want, you can unpack this over the top of your source tree, and
@@ -45,16 +45,17 @@ There are two ways to get a source tree:
 
     $ darcs get http://darcs.haskell.org/ghc/
 
-  Then run the darcs-all shell script in that repository 
+  Then run the darcs-all script in that repository
   to get the other repositories:
 
      $ cd ghc
-     $ sh darcs-all get
+     $ chmod +x darcs-all
+     $ ./darcs-all get
 
   This grabs the "core" packages by default.  To get the full set of
   packages, instead say
 
-     $ sh darcs-all --extra get
+     $ ./darcs-all --extra get
 
   This also downloads the libraries that are normally bundled in the
   "extralibs" package (see above).
@@ -71,7 +72,7 @@ below).
 
 You also need a few other tools installed: Happy [4], Alex [5], and
 Haddock [6] (for building library documentation), and a good DocBook
-XML toolchain if you want to build the compiler documentation. 
+XML toolchain if you want to build the compiler documentation.
 
 Quick start:  the following gives you a default build:
 
@@ -107,5 +108,5 @@ Contributors
 ============
 
 Please see
-  
+
    http://www.haskell.org/ghc/contributors.html

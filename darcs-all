@@ -1,135 +1,162 @@
-#!/bin/sh
+#!/usr/bin/perl -w
 
-set -e
+use strict;
 
-top_dirs="nofib testsuite"
+my @top_dirs = ("nofib", "testsuite");
 
 # Figure out where to get the other repositories from,
 # based on where this GHC repo came from.
-defaultrepo=`cat _darcs/prefs/defaultrepo`
-case $defaultrepo in
-  # HTTP or SSH:
-  http://* | *:*)
-    defaultrepo_base="`echo $defaultrepo | sed 's!/ghc$!!'`"
-    defaultrepo_lib="$defaultrepo_base"/packages;;
-  # Local filesystem (assumes a checked-out tree):
-  /*)
-    defaultrepo_base="$defaultrepo"
-    defaultrepo_lib="$defaultrepo"/libraries;;
-esac
+my $defaultrepo = `cat _darcs/prefs/defaultrepo`;
+chomp $defaultrepo;
+my $defaultrepo_base;
+my $defaultrepo_lib;
 
-quiet=NO
-
-message()
-{
-  if [ "$quiet" = "NO" ]; then
-     echo "$@"
-  fi
+if ($defaultrepo =~ /:/) {
+    # HTTP or SSH
+    $defaultrepo_base = $defaultrepo;
+    $defaultrepo_base =~ s#/ghc$##;
+    $defaultrepo_lib = "$defaultrepo_base/packages";
+}
+elsif ($defaultrepo =~ /^\//) {
+    # Local filesystem (assumes a checked-out tree):
+    $defaultrepo_base = $defaultrepo;
+    $defaultrepo_lib = "$defaultrepo/libraries";
+}
+else {
+    die "Couldn't work out defaultrepo";
 }
 
-darcsall()
-{
-  message "== running darcs $@ at the top level"
-  darcs "$@"
-  for dir in $top_dirs; do
-    if test -d $dir -a -d $dir/_darcs; then
-	message "== running darcs $@ in $dir"
-	darcs "$@" --repodir $dir
-    else
-	message "== $dir not present or not a repository; skipping"
-    fi
-  done
-  for pkg in `cat libraries/core-packages libraries/extra-packages`; do
-    if test -d libraries/$pkg; then
-	message "== running darcs $@ in libraries/$pkg"
-	darcs "$@" --repodir libraries/$pkg
-    else
-	echo "warning: $pkg doesn't seem to exist, use 'darcs-all get' to get it"
-    fi
-  done
-}
-
-darcsget()
-{
-  case $* in
-    *--complete*|*--partial*)
-      additional_flag="" ;;
-    *)
-      echo "warning: adding --partial, to override use --complete"
-      additional_flag="--partial" ;;
-  esac
-
-  if test "$nofib" = "YES"; then
-    if test -d nofib; then
-      echo "warning: nofib already present; omitting"
-    else
-      repo="$defaultrepo_base"/nofib
-      message "== running darcs get $additional_flag $@ $repo"
-      darcs get $additional_flag "$@" $repo
-    fi
-  fi
-
-  if test "$testsuite" = "YES"; then
-    if test -d testsuite; then
-      echo "warning: testsuite already present; omitting"
-    else
-      repo="$defaultrepo_base"/testsuite
-      message "== running darcs get $additional_flag $@ $repo"
-      darcs get $additional_flag "$@" $repo
-    fi
-  fi
-
-  cd libraries
-
-  if test "$extra" = "YES"; then
-      packages=`cat core-packages extra-packages`
-  else
-      packages=`cat core-packages`
-  fi
-
-  for pkg in $packages; do
-    if test -d $pkg; then
-	echo "warning: $pkg already present; omitting"
-    else
-	repo=$defaultrepo_lib/$pkg
-	message "== running darcs get $additional_flag $@ $repo"
-	darcs get $additional_flag "$@" $repo
-    fi
-  done
-}
-
-if test ! -d _darcs -o ! -d compiler; then
-  echo "error: darcs-all must be run from the top level of the ghc tree."
-  exit 1;
-fi
-
-case $* in
-  *-q*) quiet=YES;;
-esac
+my $verbose = 1;
+my $ignore_failure = 0;
 
 # --extra says we grab the extra libs with 'get'.  It has no effect on
 # the other commands.
-extra=NO
+my $extra = 0;
 # --nofib/--testsuite tell get to also grab the respective repos.
 # They have no effect on the other commands.
-nofib=NO
-testsuite=NO
+my $nofib = 0;
+my $testsuite = 0;
 
-args_done=NO
+while ($#_ ne -1) {
+    my $arg = shift;
+    if ($arg eq "-q") {
+        $verbose = 0;
+    }
+    elsif ($arg eq "--extra") {
+        $extra = 1;
+    }
+    elsif ($arg eq "--nofib") {
+        $nofib = 1;
+    }
+    elsif ($arg eq "--testsuite") {
+        $testsuite = 1;
+    }
+    else {
+        unshift @_, $arg;
+        last;
+    }
+}
 
-while [ "$args_done" = NO ]
-do
-    case $1 in
-      --extra) shift; extra=YES;;
-      --nofib) shift; nofib=YES;;
-      --testsuite) shift; testsuite=YES;;
-      *) args_done=YES;;
-    esac
-done
+sub message {
+    if ($verbose) {
+        print "@_\n";
+    }
+}
 
-case $1 in
-  get)  shift; darcsget "$@";;
-  # Hack around whatsnew failing if there are no changes
-  w|wh|wha|what|whats|whatsn|whatsne|whatsnew) set +e; darcsall "$@";;
-  *) darcsall "$@";;
-esac
+sub warning {
+    print "warning: @_\n";
+}
+
+sub darcs {
+    message "== running darcs @_";
+    system ("darcs", @_) == 0
+        or $ignore_failure
+        or die "darcs failed: $?";
+}
+
+sub darcsall {
+    darcs @_;
+    for my $dir (@top_dirs) {
+        if (-d $dir && -d "$dir/_darcs") {
+            darcs (@_, "--repodir", $dir);
+        }
+        else {
+            message "== $dir not present or not a repository; skipping";
+        }
+    }
+    for my $pkg (`cat libraries/core-packages libraries/extra-packages`) {
+        chomp $pkg;
+        if (-d "libraries/$pkg") {
+            darcs (@_, "--repodir", "libraries/$pkg");
+        }
+        else {
+            warning("$pkg doesn't exist, use 'darcs-all get' to get it");
+        }
+    }
+}
+
+sub darcsgetpackage {
+    my ($get_it, $r_flags, $repo_root, $package) = @_;
+
+    if ($get_it) {
+        if (-d $package) {
+            warning("$package already present; omitting");
+        }
+        else {
+            darcs (@$r_flags, "$repo_root/$package");
+        }
+    }
+}
+
+sub darcsget {
+    my $r_flags;
+    if (! grep /(?:--complete|--partial)/, @_) {
+        warning("adding --partial, to override use --complete");
+        $r_flags = [@_, "--partial"];
+    }
+    else {
+        $r_flags = \@_;
+    }
+
+    darcsgetpackage($nofib,     $r_flags, $defaultrepo_base, "nofib");
+    darcsgetpackage($testsuite, $r_flags, $defaultrepo_base, "testsuite");
+
+    chdir "libraries";
+
+    my @packages;
+    if ($extra) {
+        @packages = `cat core-packages extra-packages`;
+    }
+    else {
+        @packages = `cat core-packages`;
+    }
+
+    for my $pkg (@packages) {
+        chomp $pkg;
+        darcsgetpackage(1, $r_flags, $defaultrepo_lib, $pkg);
+    }
+}
+
+sub main {
+    if (! -d "_darcs" || ! -d "compiler") {
+        die "error: darcs-all must be run from the top level of the ghc tree."
+    }
+
+    if ($#_ eq -1) {
+        die "What do you want to do?";
+    }
+    my $command = $_[0];
+    if ($command eq "get") {
+        darcsget @_;
+    }
+    else {
+        if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew)$/) {
+            # Hack around whatsnew failing if there are no changes
+            $ignore_failure = 1;
+        }
+        darcsall @_;
+    }
+}
+
+main(@ARGV);
+

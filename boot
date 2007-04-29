@@ -7,7 +7,7 @@ do
     if test ! -d libraries/$d
     then
         echo "Looks like you're missing libraries/$d,"
-        echo "maybe you haven't done 'sh darcs-all get'?"
+        echo "maybe you haven't done './darcs-all get'?"
         exit 1
     fi
 done
