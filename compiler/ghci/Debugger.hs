@@ -18,6 +18,7 @@ import RtClosureInspect
 import HscTypes
 import IdInfo
 --import Id
+import Name
 import Var hiding ( varName )
 import VarSet
 import VarEnv
@@ -61,9 +62,10 @@ pprintClosureCommand session bindThings force str = do
 
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: Session -> Id -> IO (Maybe TvSubst)
-   go cms id = do
-     mb_term <- obtainTerm cms force id
-     maybe (return Nothing) `flip` mb_term $ \term -> do
+   go cms id = do 
+     mb_term <- obtainTerm cms force id 
+     maybe (return Nothing) `flip` mb_term $ \term_ -> do
+       term      <- tidyTermTyVars cms term_
        term'     <- if not bindThings then return term 
                      else bindSuspensions cms term                         
        showterm  <- printTerm cms term'
@@ -99,6 +101,17 @@ pprintClosureCommand session bindThings force str = do
           type_env'= extendTypeEnvWithIds type_env ids'
           ictxt'   = ictxt { ic_type_env = type_env' }
       writeIORef ref (hsc_env {hsc_IC = ictxt'})
+
+   tidyTermTyVars :: Session -> Term -> IO Term
+   tidyTermTyVars (Session ref) t = do
+     hsc_env <- readIORef ref
+     let env_tvs      = ic_tyvars (hsc_IC hsc_env)
+         my_tvs       = termTyVars t
+         tvs          = env_tvs `minusVarSet` my_tvs
+         tyvarOccName = nameOccName . tyVarName 
+         tidyEnv      = (initTidyOccEnv (map tyvarOccName (varSetElems tvs))
+                        , env_tvs `intersectVarSet` my_tvs)
+     return$ mapTermType (snd . tidyOpenType tidyEnv) t
 
 -- | Give names, and bind in the interactive environment, to all the suspensions
 --   included (inductively) in a term

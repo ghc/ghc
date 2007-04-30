@@ -22,6 +22,8 @@ module RtClosureInspect(
      isFullyEvaluated, 
      isPointed,
      isFullyEvaluatedTerm,
+     mapTermType,
+     termTyVars
 --     unsafeDeepSeq, 
  ) where 
 
@@ -284,6 +286,18 @@ idTermFoldM = TermFold {
               fSuspension = (((return.).).). Suspension
                        }
 
+mapTermType f = foldTerm idTermFold {
+          fTerm       = \ty dc hval tt -> Term (f ty) dc hval tt,
+          fSuspension = \ct mb_ty hval n ->
+                          Suspension ct (fmap f mb_ty) hval n }
+
+termTyVars = foldTerm TermFold {
+            fTerm       = \ty _ _ tt   -> 
+                          tyVarsOfType ty `plusVarEnv` concatVarEnv tt,
+            fSuspension = \_ mb_ty _ _ -> 
+                          maybe emptyVarEnv tyVarsOfType mb_ty,
+            fPrim       = \ _ _ -> emptyVarEnv }
+    where concatVarEnv = foldr plusVarEnv emptyVarEnv
 ----------------------------------
 -- Pretty printing of terms
 ----------------------------------
@@ -374,7 +388,7 @@ type TR a = TcM a
 
 runTR :: HscEnv -> TR Term -> IO Term
 runTR hsc_env c = do 
-  mb_term <- initTcPrintErrors hsc_env iNTERACTIVE (c >>= zonkTerm)
+  mb_term <- initTcPrintErrors hsc_env iNTERACTIVE c
   case mb_term of 
     Nothing -> panic "Can't unify"
     Just term -> return term
@@ -475,17 +489,14 @@ cvObtainTerm :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
 cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
    tv <- liftM mkTyVarTy (newVar argTypeKind)
    case mb_ty of
-     Nothing -> go tv tv hval
-     Just ty | isMonomorphic ty -> go ty ty hval
+     Nothing -> go tv tv hval >>= zonkTerm
+     Just ty | isMonomorphic ty -> go ty ty hval >>= zonkTerm
      Just ty -> do 
               (ty',rev_subst) <- instScheme (sigmaType ty)
               addConstraint tv ty'
-              term <- go tv tv hval
+              term <- go tv tv hval >>= zonkTerm
               --restore original Tyvars
-              return$ flip foldTerm term idTermFold {
-                fTerm = \ty dc hval tt -> Term (substTy rev_subst ty) dc hval tt,
-                fSuspension = \ct mb_ty hval n -> 
-                          Suspension ct (substTy rev_subst `fmap` mb_ty) hval n}
+              return$ mapTermType (substTy rev_subst) term
     where 
   go tv ty a = do 
     let monomorphic = not(isTyVarTy tv)   -- This is a convention. The ancestor tests for
