@@ -2,37 +2,27 @@
 module Main (main) where
 
 import Control.Monad
-import Data.Maybe
-import Distribution.PackageDescription
-import Distribution.Simple
-import Distribution.Simple.Utils
 import System.Cmd
+import System.Directory
 import System.Environment
 import System.Exit
 
 main :: IO ()
-main = do let verbosity = 0
-          mustBeBuildables <- getMustBeBuildablePackages
-          dfd <- defaultPackageDesc verbosity
-          pkgDescr <- readPackageDescription verbosity dfd
-          mInfolFile <- defaultHookedPackageDesc
-          info <- case mInfolFile of
-                      Nothing -> return emptyHookedBuildInfo
-                      Just infoFile -> readHookedBuildInfo verbosity infoFile
-          let pkgDescr' = updatePackageDescription info pkgDescr
-              pkg = pkgName (package pkgDescr')
-              mustBeBuildable = pkg `elem` mustBeBuildables
-              buildInfos = map libBuildInfo (maybeToList (library pkgDescr'))
-                        ++ map buildInfo (executables pkgDescr')
-              isBuildable = any buildable buildInfos
-          when (mustBeBuildable || isBuildable) $ do
-              args <- getArgs
-              case args of
-                  prog : progArgs ->
-                      do ec <- rawSystem prog progArgs
-                         exitWith ec
-                  [] ->
-                      error "ifBuildable: No command given"
+main = do args <- getArgs
+          case args of
+              [] ->
+                  error "No package or command given"
+              [_] ->
+                  error "No command given"
+              package : prog : progArgs ->
+                  do setCurrentDirectory package
+                     unbuildable <- doesFileExist "unbuildable"
+                     if unbuildable
+                        then do mustBeBuildables <- getMustBeBuildablePackages
+                                when (package `elem` mustBeBuildables)
+                                     (error (package ++ " is unbuildable"))
+                        else do ec <- rawSystem prog progArgs
+                                exitWith ec
 
 getMustBeBuildablePackages :: IO [String]
 getMustBeBuildablePackages

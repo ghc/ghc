@@ -110,8 +110,7 @@ ifBuildable/ifBuildable: ifBuildable.hs stamp/$(BOOTSTRAPPING_CABAL)
 	-$(RM) -rf ifBuildable
 	mkdir ifBuildable
 	$(CP) ifBuildable.hs ifBuildable/
-	cd ifBuildable && $(GHC) -Wall --make -i../$(BOOTSTRAPPING_CABAL) \
-	                         ifBuildable -o ifBuildable
+	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
 
 stamp/$(BOOTSTRAPPING_CABAL):
 	$(RM) -rf $(BOOTSTRAPPING_CABAL)
@@ -140,7 +139,7 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
-	-$(RM) -f stamp/configure.library.*.$*
+	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	cd $* && setup/Setup configure \
 	                     $(CONFIGURE_OPTS) \
 	                     --prefix=$(prefix) \
@@ -151,15 +150,16 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	                     --datasubdir=ghc \
 	                     --haddock-args="--use-contents=../index.html --use-index=../doc-index.html" \
 	                     $(addprefix --configure-option=,$(CONFIGURE_ARGS)) \
-	                     --configure-option=--with-cc=$(CC)
+	                     --configure-option=--with-cc=$(CC) \
+	      || touch unbuildable
 	touch $@
 
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  %/setup/Setup
-	cd $* && ../ifBuildable/ifBuildable setup/Setup build \
+	ifBuildable/ifBuildable $* setup/Setup build \
 	                                $(addprefix --ghc-option=,$(GhcLibHcOpts))
-	cd $* && ../ifBuildable/ifBuildable setup/Setup register --inplace
+	ifBuildable/ifBuildable $* setup/Setup register --inplace
 
 .PHONY: doc
 
@@ -171,7 +171,7 @@ doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup
-	cd $* && ../ifBuildable/ifBuildable setup/Setup haddock
+	ifBuildable/ifBuildable $* setup/Setup haddock
 
 .PHONY: install install-docs install.library.%
 
@@ -197,7 +197,7 @@ install-docs:
 $(foreach SUBDIR,$(SUBDIRS),stamp/configure.library.install.$(SUBDIR)): \
 stamp/configure.library.install.%: %/setup/Setup
 	-$(RM) -f stamp/configure.library.*.$*
-	cd $* && ../ifBuildable/ifBuildable setup/Setup configure \
+	ifBuildable/ifBuildable $* setup/Setup configure \
 	                                    $(CONFIGURE_OPTS) \
 	                                    --prefix=$(prefix) \
 	                                    --with-compiler=$(bindir)/ghc \
@@ -207,7 +207,7 @@ stamp/configure.library.install.%: %/setup/Setup
 # We need to reconfigure as we now need to register with the normal ghc-pkg
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: stamp/configure.library.install.% %/setup/Setup
-	cd $* && ../ifBuildable/ifBuildable setup/Setup install
+	ifBuildable/ifBuildable $* setup/Setup install
 
 .PHONY: distclean clean clean.library.%
 
@@ -221,7 +221,7 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 
 $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
 clean.library.%:
-	$(RM) -f stamp/configure.library.*.$*
+	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	-cd $* && setup/Setup clean
 	$(RM) -rf $*/setup
 
