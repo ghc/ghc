@@ -2,10 +2,17 @@
 
 set -e
 
-chmod +x rts/gmp/configure
-chmod +x darcs-all
+for d in `cat libraries/core-packages`
+do
+    if test ! -d libraries/$d
+    then
+        echo "Looks like you're missing libraries/$d,"
+        echo "maybe you haven't done './darcs-all get'?"
+        exit 1
+    fi
+done
 
-./darcs-all ${1+"$@"} get
+chmod +x rts/gmp/configure
 
 autoreconf
 
