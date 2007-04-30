@@ -12,6 +12,8 @@ do
     fi
 done
 
+chmod +x rts/gmp/configure
+
 autoreconf
 
 for lib in libraries/*; do
