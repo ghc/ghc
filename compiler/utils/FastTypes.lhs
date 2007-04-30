@@ -34,6 +34,8 @@ fastBool True  = 1#
 fastBool False = 0#
 isFastTrue x = x ==# 1#
 
+-- note that fastOr and fastAnd are strict in both arguments
+-- since they are unboxed
 fastOr 1# _ = 1#
 fastOr 0# x = x
 
@@ -60,8 +62,12 @@ negateFastInt = negate
 type FastBool = Bool
 fastBool x = x
 isFastTrue x = x
-fastOr = (||)
-fastAnd = (&&)
+-- make sure these are as strict as the unboxed version,
+-- so that the performance characteristics match
+fastOr False False = False
+fastOr _ _ = True
+fastAnd True True = True
+fastAnd _ _ = False
 
 --These are among the type-signatures necessary for !ghc to compile
 -- but break ghc (can't give a signature for an import...)
