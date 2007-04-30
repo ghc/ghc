@@ -59,7 +59,7 @@ module HscTypes (
 	Linkable(..), isObjectLinkable,
 	Unlinked(..), CompiledByteCode,
 	isObject, nameOfObject, isInterpretable, byteCodeOfObject,
-        HpcInfo, noHpcInfo,
+        HpcInfo(..), noHpcInfo,
 
         -- Breakpoints
         ModBreaks (..), BreakIndex, emptyModBreaks
@@ -1193,10 +1193,14 @@ showModMsg target recomp mod_summary
 %************************************************************************
 
 \begin{code}
-type HpcInfo = Int             -- just the number of ticks in a module
+data HpcInfo = HpcInfo 
+     { hpcInfoTickCount :: Int 
+     , hpcInfoHash      :: Int  
+     }
+     | NoHpcInfo
 
 noHpcInfo :: HpcInfo
-noHpcInfo = 0                  -- default = 0
+noHpcInfo = NoHpcInfo
 \end{code}
 
 %************************************************************************

@@ -71,7 +71,7 @@ extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr,
 extern void   freeHaskellFunctionPtr(void* ptr);
 
 /* Hpc stuff */
-extern int hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr);
+extern int hs_hpc_module(char *modName,int modCount,int modHashNo,StgWord64 *tixArr);
 extern void hs_hpc_tick(int globIx,struct StgTSO_ *current_tso);
 extern void hs_hpc_raise_event(struct StgTSO_ *current_tso);	
 extern void hs_hpc_thread_finished_event(struct StgTSO_ *current_tso);

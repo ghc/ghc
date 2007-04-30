@@ -58,16 +58,16 @@ cgTickBox mod n = do
       visible_tick = mkFastString "hs_hpc_tick"
 
 hpcTable :: Module -> HpcInfo -> Code
-hpcTable this_mod hpc_tickCount = do
+hpcTable this_mod (HpcInfo hpc_tickCount _) = do
                         emitData ReadOnlyData
                                         [ CmmDataLabel mkHpcModuleNameLabel
                                         , CmmString $ map (fromIntegral . ord)
                                                          (module_name_str)
                                                       ++ [0]
                                         ]
-                        emitData Data
+                        emitData Data	-- change Offset => Data or Info
                                         [ CmmDataLabel (mkHpcModuleOffsetLabel this_mod)
-					, CmmStaticLit (CmmInt 0 I32)
+					, CmmStaticLit (CmmInt 0 I32)	-- stored offset?
                                         ]
                         emitData Data $ [ CmmDataLabel (mkHpcTicksLabel this_mod)
                                         ] ++
@@ -76,10 +76,10 @@ hpcTable this_mod hpc_tickCount = do
                                         ]
   where
     module_name_str = moduleNameString (Module.moduleName this_mod)
-
+hpcTable this_mod (NoHpcInfo) = error "TODO: impossible"
 
 initHpc :: Module -> HpcInfo -> Code
-initHpc this_mod tickCount
+initHpc this_mod (HpcInfo tickCount hashNo)
   = do { id <- newTemp wordRep
        ; emitForeignCall'
                PlayRisky
@@ -90,6 +90,7 @@ initHpc this_mod tickCount
                )
                [ (mkLblExpr mkHpcModuleNameLabel,PtrHint)
                , (CmmLit $ mkIntCLit tickCount,NoHint)
+               , (CmmLit $ mkIntCLit hashNo,NoHint)
                , (CmmLit $ CmmLabel $ mkHpcTicksLabel $ this_mod,PtrHint)
                ]
                (Just [])

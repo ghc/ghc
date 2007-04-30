@@ -22,6 +22,7 @@ import Var
 import VarSet
 import Data.List
 import FastString
+import HscTypes	
 import StaticFlags
 import UniqFM
 
@@ -35,9 +36,10 @@ import Compat.Directory ( createDirectoryIfMissing )
 import System.Directory ( createDirectoryIfMissing )
 #endif
 
-import HscTypes 
 import BreakArray 
+import Data.HashTable   ( hashString )
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -51,7 +53,7 @@ addCoverageTicksToBinds
         -> Module
         -> ModLocation          -- of the current module
         -> LHsBinds Id
-        -> IO (LHsBinds Id, Int, ModBreaks)
+        -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
 addCoverageTicksToBinds dflags mod mod_loc binds = do 
   let orig_file = 
@@ -59,30 +61,39 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
 		    Just file -> file
 		    Nothing -> panic "can not find the original file during hpc trans"
 
-  if "boot" `isSuffixOf` orig_file then return (binds, 0, emptyModBreaks) else do
+  if "boot" `isSuffixOf` orig_file then return (binds, noHpcInfo, emptyModBreaks) else do
 
   let mod_name = moduleNameString (moduleName mod)
 
   let (binds1,_,st)
 		 = unTM (addTickLHsBinds binds) 
-		   TT { modName      = mod_name
+		   (TTE
+		       { modName      = mod_name
 		      , declPath     = []
-		      , tickBoxCount = 0
+		       })
+		   (TT 
+		      { tickBoxCount = 0
 		      , mixEntries   = []
                       , inScope      = emptyVarSet
-		      }
+		      })
 
   let entries = reverse $ mixEntries st
 
   -- write the mix entries for this module
-  when opt_Hpc $ do
+  hashNo <- if opt_Hpc then do
      let hpc_dir = hpcDir dflags
      let tabStop = 1 -- <tab> counts as a normal char in GHC's location ranges.
      createDirectoryIfMissing True hpc_dir
      modTime <- getModificationTime' orig_file
      let entries' = [ (hpcPos, box) 
-                    | (span,_,box) <- entries, Just hpcPos <- [mkHpcPos span] ]
-     mixCreate hpc_dir mod_name (Mix orig_file modTime tabStop entries')
+                    | (span,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
+     when (length entries' /= tickBoxCount st) $ do
+       panic "the number of .mix entries are inconsistent"
+     let hashNo = mixHash orig_file modTime tabStop entries'
+     mixCreate hpc_dir mod_name (Mix orig_file modTime hashNo tabStop entries')
+     return $ hashNo 
+   else do
+     return $ 0
 
   -- Todo: use proper src span type
   breakArray <- newBreakArray $ length entries
@@ -100,7 +111,7 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
   doIfSet_dyn dflags  Opt_D_dump_hpc $ do
 	  printDump (pprLHsBinds binds1)
 
-  return (binds1, tickBoxCount st, modBreaks)
+  return (binds1, HpcInfo (tickBoxCount st) hashNo, modBreaks)
 \end{code}
 
 
@@ -136,7 +147,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
      else do
         tick_no <- allocATickBox (if null decl_path
                                      then TopLevelBox [name]
-                                     else LocalBox (name : decl_path)) 
+                                     else LocalBox (decl_path ++ [name])) 
                                 pos fvs
 
         return $ L pos $ funBind { fun_matches = MatchGroup matches' ty 
@@ -169,7 +180,7 @@ addTickLHsBind other = return other
 -- add a tick to the expression no matter what it is
 addTickLHsExprAlways :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprAlways (L pos e0) = do
-    allocTickBox ExpBox pos $ addTickHsExpr e0
+    allocTickBox (ExpBox False) pos $ addTickHsExpr e0
 
 addTickLHsExprNeverOrAlways :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprNeverOrAlways e
@@ -194,7 +205,7 @@ addTickLHsExpr :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExpr (L pos e0) = do
     if opt_Hpc || isGoodBreakExpr e0
        then do
-          allocTickBox ExpBox pos $ addTickHsExpr e0
+          allocTickBox (ExpBox False) pos $ addTickHsExpr e0
        else do
           e1 <- addTickHsExpr e0
           return $ L pos e1 
@@ -216,7 +227,7 @@ addTickLHsExprOptAlt :: Bool -> LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprOptAlt oneOfMany (L pos e0)
   | not opt_Hpc = addTickLHsExpr (L pos e0)
   | otherwise =
-    allocTickBox (if oneOfMany then AltBox else ExpBox) pos $ 
+    allocTickBox (ExpBox oneOfMany) pos $ 
         addTickHsExpr e0
 
 addBinTickLHsExpr :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
@@ -258,7 +269,7 @@ addTickHsExpr (HsCase e mgs) =
 		(addTickMatchGroup mgs)
 addTickHsExpr (HsIf	 e1 e2 e3) = 
 	liftM3 HsIf
-		(addBinTickLHsExpr CondBinBox e1)
+		(addBinTickLHsExpr (BinBox CondBinBox) e1)
 		(addTickLHsExprOptAlt True e2)
 		(addTickLHsExprOptAlt True e3)
 addTickHsExpr (HsLet binds e) =
@@ -272,7 +283,7 @@ addTickHsExpr (HsDo cxt stmts last_exp srcloc) = do
 	return (HsDo cxt stmts' last_exp' srcloc)
   where
 	forQual = case cxt of
-		    ListComp -> Just QualBinBox
+		    ListComp -> Just $ BinBox QualBinBox
 		    _        -> Nothing
 addTickHsExpr (ExplicitList ty es) = 
 	liftM2 ExplicitList 
@@ -305,7 +316,7 @@ addTickHsExpr (ArithSeq	 ty arith_seq) =
 		(return ty)
 		(addTickArithSeqInfo arith_seq)
 addTickHsExpr (HsTickPragma (file,(l1,c1),(l2,c2)) (L pos e0)) = do
-    e2 <- allocTickBox (ExternalBox (unpackFS file) (P l1 c1 l2 c2)) pos $
+    e2 <- allocTickBox (ExpBox False) pos $
                 addTickHsExpr e0
     return $ unLoc e2
 addTickHsExpr (PArrSeq	 {}) = error "addTickHsExpr: PArrSeq"
@@ -366,7 +377,7 @@ addTickGRHSs isOneOfMany (GRHSs guarded local_binds) = do
 
 addTickGRHS :: Bool -> GRHS Id -> TM (GRHS Id)
 addTickGRHS isOneOfMany (GRHS stmts expr) = do
-  (stmts',expr') <- addTickLStmts' (Just $ GuardBinBox) stmts
+  (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
                         (if opt_Hpc then addTickLHsExprOptAlt isOneOfMany expr
                                     else addTickLHsExprAlways expr)
   return $ GRHS stmts' expr'
@@ -500,12 +511,15 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
 \end{code}
 
 \begin{code}
-data TickTransState = TT { modName     :: String
-                         , declPath    :: [String]
-                         , tickBoxCount:: Int
+data TickTransState = TT { tickBoxCount:: Int
                          , mixEntries  :: [MixEntry]
-                         , inScope     :: VarSet
+                         , inScope     :: VarSet	-- move the TickTransEnv
                          }                        
+
+data TickTransEnv = TTE { modName      :: String
+			, declPath     :: [String]
+			}
+
 --	deriving Show
 
 type FreeVars = OccEnv Id
@@ -523,56 +537,67 @@ noFVs = emptyOccEnv
 --   to filter additions to the latter.  This gives us complete control
 --   over what free variables we track.
 
-data TM a = TM { unTM :: TickTransState -> (a,FreeVars,TickTransState) }
+data TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTransState) }
         -- a combination of a state monad (TickTransState) and a writer
         -- monad (FreeVars).
 
 instance Monad TM where
-  return a = TM $ \ st -> (a,noFVs,st)
-  (TM m) >>= k = TM $ \ st -> case m st of
+  return a = TM $ \ env st -> (a,noFVs,st)
+  (TM m) >>= k = TM $ \ env st -> 
+		                case m env st of
 				  (r1,fv1,st1) -> 
-                                     case unTM (k r1) st1 of
+                                     case unTM (k r1) env st1 of
                                        (r2,fv2,st2) -> 
                                           (r2, fv1 `plusOccEnv` fv2, st2)
 
 getState :: TM TickTransState
-getState = TM $ \st -> (st, noFVs, st)
+getState = TM $ \ env st -> (st, noFVs, st)
 
 setState :: (TickTransState -> TickTransState) -> TM ()
-setState f = TM $ \st -> ((), noFVs, f st)
+setState f = TM $ \ env st -> ((), noFVs, f st)
 
 withState :: (TickTransState -> TickTransState) -> TM a -> TM a
-withState f (TM m) = TM $ \st -> case m (f st) of
+withState f (TM m) = TM $ \ env st -> 
+		                 case m env (f st) of
+                                   (a, fvs, st') -> (a, fvs, st')
+
+getEnv :: TM TickTransEnv
+getEnv = TM $ \ env st -> (env, noFVs, st)
+
+withEnv :: (TickTransEnv -> TickTransEnv) -> TM a -> TM a
+withEnv f (TM m) = TM $ \ env st -> 
+		                 case m (f env) st of
                                    (a, fvs, st') -> (a, fvs, st')
 
 getFreeVars :: TM a -> TM (FreeVars, a)
 getFreeVars (TM m) 
-  = TM $ \st -> case m st of (a, fv, st') -> ((fv,a), fv, st')
+  = TM $ \ env st -> case m env st of (a, fv, st') -> ((fv,a), fv, st')
 
 freeVar :: Id -> TM ()
-freeVar id = TM $ \st -> 
+freeVar id = TM $ \ env st -> 
                 if id `elemVarSet` inScope st
                    then ((), unitOccEnv (nameOccName (idName id)) id, st)
                    else ((), noFVs, st)
 
 addPathEntry :: String -> TM a -> TM a
-addPathEntry nm = withState (\st -> st { declPath = declPath st ++ [nm] })
+addPathEntry nm = withEnv (\ env -> env { declPath = declPath env ++ [nm] })
 
 getPathEntry :: TM [String]
-getPathEntry = declPath `liftM` getState
+getPathEntry = declPath `liftM` getEnv
 
 bindLocals :: [Id] -> TM a -> TM a
 bindLocals new_ids (TM m)
-  = TM $ \ st -> case m st{ inScope = inScope st `extendVarSetList` new_ids } of
+  = TM $ \ env st -> 
+                 case m env st{ inScope = inScope st `extendVarSetList` new_ids } of
                    (r, fv, st') -> (r, fv `delListFromUFM` occs, st')
   where occs = [ nameOccName (idName id) | id <- new_ids ] 
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
 allocTickBox :: BoxLabel -> SrcSpan -> TM (HsExpr Id) -> TM (LHsExpr Id)
-allocTickBox boxLabel pos m | isGoodSrcSpan pos = do
+allocTickBox boxLabel pos m | isGoodSrcSpan' pos = do
   (fvs, e) <- getFreeVars m
-  TM $ \st ->
+  TM $ \ env st ->
     let c = tickBoxCount st
         ids = occEnvElts fvs
         mes = mixEntries st
@@ -587,7 +612,7 @@ allocTickBox boxLabel pos m = do e <- m; return (L pos e)
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
 allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
-allocATickBox boxLabel pos fvs | isGoodSrcSpan pos = TM $ \ st ->
+allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = TM $ \ env st ->
   let me = (pos, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
@@ -599,10 +624,10 @@ allocATickBox boxLabel pos fvs | isGoodSrcSpan pos = TM $ \ st ->
 allocATickBox boxLabel pos fvs = return Nothing
 
 allocBinTickBox :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
-allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan pos = TM $ \ st ->
+allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan' pos = TM $ \ env st ->
   let meT = (pos,[],boxLabel True)
       meF = (pos,[],boxLabel False)
-      meE = (pos,[],ExpBox)
+      meE = (pos,[],ExpBox False)
       c = tickBoxCount st
       mes = mixEntries st
   in 
@@ -622,19 +647,28 @@ allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan pos = TM $ \ st ->
 
 allocBinTickBox boxLabel e = return e
 
-mkHpcPos :: SrcSpan -> Maybe HpcPos
+isGoodSrcSpan' pos
+   | not (isGoodSrcSpan pos) = False
+   | start == end            = False
+   | otherwise		     = True
+  where
+   start = srcSpanStart pos
+   end   = srcSpanEnd pos
+
+mkHpcPos :: SrcSpan -> HpcPos
 mkHpcPos pos 
-   | not (isGoodSrcSpan pos) = Nothing
-   | start == end            = Nothing	-- no actual location
-   | otherwise		     = Just hpcPos
+   | not (isGoodSrcSpan' pos) = panic "bad source span; expected such spans to be filtered out"
+   | otherwise		      = hpcPos
   where
    start = srcSpanStart pos
    end   = srcSpanEnd pos
    hpcPos = toHpcPos ( srcLocLine start
-		     , srcLocCol start
+		     , srcLocCol start + 1
 		     , srcLocLine end
 		     , srcLocCol end
 		     )
+
+noHpcPos = toHpcPos (0,0,0,0)
 
 hpcSrcSpan = mkGeneralSrcSpan (FSLIT("Haskell Program Coverage internals"))
 \end{code}
@@ -649,21 +683,18 @@ matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
 
 
 \begin{code}
----------------------------------------------------------------
--- Datatypes and file-access routines for the per-module (.mix)
--- indexes used by Hpc.
--- Colin Runciman and Andy Gill, June 2006
----------------------------------------------------------------
-
--- a module index records the attributes of each tick-box that has
--- been introduced in that module, accessed by tick-number position
--- in the list
+-- | 'Mix' is the information about a modules static properties, like 
+-- location of Tix's in a file.
+-- tab stops are the size of a tab in the provided line:colunm values.
+--  * In GHC, this is 1 (a tab is just a character)
+--  * With hpc-tracer, this is 8 (a tab represents several spaces).
 
 data Mix = Mix 
-	     FilePath		-- location of original file
-	     Integer		-- time (in seconds) of original file's last update, since 1970.
-	     Int 		-- tab stop value 
-	     [MixEntry_] 	-- entries
+ 	     FilePath		-- ^location of original file
+ 	     Integer		-- ^time (in seconds) of original file's last update, since 1970.
+ 	     Int		-- ^hash of mix entry + timestamp
+ 	     Int 		-- ^tab stop value.
+ 	     [MixEntry_] 	-- ^entries
         deriving (Show, Read)
 
 -- We would rather use ClockTime in Mix, but ClockTime has no Read instance in 6.4 and before,
@@ -673,19 +704,27 @@ data Mix = Mix
 type MixEntry  = (SrcSpan, [OccName], BoxLabel)
 type MixEntry_ = (HpcPos, BoxLabel)
 
-data BoxLabel = ExpBox
-              | AltBox
+data BoxLabel = ExpBox Bool	-- isAlt
               | TopLevelBox [String]
               | LocalBox [String]
-              | GuardBinBox Bool
-              | CondBinBox Bool
-              | QualBinBox Bool
-	      | ExternalBox String HpcPos
-	      	   -- ^The position was generated from the named file/module,
-		   -- with the stated position (inside the named file/module).
-		   -- The HpcPos inside this MixEntry refers to the generated Haskell location.
-              deriving (Read, Show)
-                         
+	      | BinBox CondBox Bool
+              deriving (Read, Show, Eq, Ord)
+
+data CondBox = GuardBinBox
+             | CondBinBox
+             | QualBinBox
+              deriving (Read, Show, Eq, Ord)
+
+-- For the hash value, we hash everything: the file name, 
+--  the timestamp of the original source file, the tab stop,
+--  and the mix entries. We cheat, and hash the show'd string.
+-- This hash only has to be hashed at Mix creation time,
+-- and is for sanity checking only.
+
+mixHash :: FilePath -> Integer -> Int -> [MixEntry_] -> Int
+mixHash file tm tabstop entries = fromIntegral $ hashString
+	(show $ Mix file tm 0 tabstop entries)
+
 mixCreate :: String -> String -> Mix -> IO ()
 mixCreate dirName modName mix =
    writeFile (mixName dirName modName) (show mix)

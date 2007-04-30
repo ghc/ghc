@@ -25,10 +25,8 @@
 #define WOP_SIZE 1024	
 
 static int hpc_inited = 0;		// Have you started this component?
-static int totalTickCount = 0;		// How many ticks have we got to work with
 static FILE *tixFile;			// file being read/written
 static int tix_ch;			// current char
-static StgWord64 magicTixNumber;	// Magic/Hash number to mark .tix files
 
 static FILE *rixFile = NULL;		// The tracer file/pipe (to debugger)
 static FILE *rixCmdFile = NULL;		// The tracer file/pipe (from debugger)
@@ -46,6 +44,7 @@ typedef struct _Info {
   char *modName;		// name of module
   int tickCount;		// number of ticks
   int tickOffset;		// offset into a single large .tix Array
+  int hashNo;			// Hash number for this module's mix info
   StgWord64 *tixArr;		// tix Array from the program execution (local for this module)
   struct _Info *next;
 } Info;
@@ -59,7 +58,6 @@ typedef struct _Info {
 
 Info *modules = 0;
 Info *nextModule = 0;
-StgWord64 *tixBoxes = 0;	// local copy of tixBoxes array, from file.
 int totalTixes = 0;		// total number of tix boxes.
 
 static char *tixFilename;
@@ -67,7 +65,11 @@ static char *tixFilename;
 static void failure(char *msg) {
   debugTrace(DEBUG_hpc,"hpc failure: %s\n",msg);
   fprintf(stderr,"Hpc failure: %s\n",msg);
-  fprintf(stderr,"(perhaps remove .tix file?)\n");
+  if (tixFilename) {
+    fprintf(stderr,"(perhaps remove %s file?)\n",tixFilename);
+  } else {
+    fprintf(stderr,"(perhaps remove .tix file?)\n");
+  }
   exit(-1);
 }
 
@@ -83,6 +85,7 @@ static int init_open(char *filename)
 
 static void expect(char c) {
   if (tix_ch != c) {
+    fprintf(stderr,"('%c' '%c')\n",tix_ch,c);
     failure("parse error when reading .tix file");
   }
   tix_ch = getc(tixFile);
@@ -126,7 +129,6 @@ static void hpc_init(void) {
     return;
   }
   hpc_inited = 1;
-  
 
   tixFilename = (char *) malloc(strlen(prog_name) + 6);
   sprintf(tixFilename, "%s.tix", prog_name);
@@ -139,28 +141,42 @@ static void hpc_init(void) {
     expect('i');
     expect('x');
     ws();
-    magicTixNumber = expectWord64();
-    ws();
     expect('[');
     ws();
     while(tix_ch != ']') {
       tmpModule = (Info *)calloc(1,sizeof(Info));
-      expect('(');
+      expect('T');
+      expect('i');
+      expect('x');
+      expect('M');
+      expect('o');
+      expect('d');
+      expect('u');
+      expect('l');
+      expect('e');
       ws();
       tmpModule -> modName = expectString();
       ws();
-      expect(',');
+      tmpModule -> hashNo = (unsigned int)expectWord64();
       ws();
       tmpModule -> tickCount = (int)expectWord64();
-      ws();
-      expect(')');
-      ws();
-      
+      tmpModule -> tixArr = (StgWord64 *)calloc(tmpModule->tickCount,sizeof(StgWord64));
       tmpModule -> tickOffset = totalTixes;
       totalTixes += tmpModule -> tickCount;
-      
-      tmpModule -> tixArr = 0;
-      
+      ws();
+      expect('[');
+      ws();
+      for(i = 0;i < tmpModule->tickCount;i++) {
+	tmpModule->tixArr[i] = expectWord64();
+	ws();
+	if (tix_ch == ',') {
+	  expect(',');
+	  ws();
+	}
+      }
+      expect(']');
+      ws();
+
       if (!modules) {
 	modules = tmpModule;
       } else {
@@ -174,24 +190,7 @@ static void hpc_init(void) {
       }
     }
     expect(']');
-    ws();
-    tixBoxes = (StgWord64 *)calloc(totalTixes,sizeof(StgWord64));
-
-    expect('[');
-    for(i = 0;i < totalTixes;i++) {
-      if (i != 0) {
-	expect(',');
-	ws();
-      }
-    tixBoxes[i] = expectWord64();
-    ws();
-    }
-    expect(']');
-
     fclose(tixFile);
-  } else {
-    // later, we will find a binary specific 
-    magicTixNumber = (StgWord64)0;
   }
 }
 
@@ -201,7 +200,10 @@ static void hpc_init(void) {
  */
 
 int
-hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
+hs_hpc_module(char *modName,
+	      int modCount,
+	      int modHashNo,
+	      StgWord64 *tixArr) {
   Info *tmpModule, *lastModule;
   int i;
   int offset = 0;
@@ -218,12 +220,18 @@ hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
       if (tmpModule->tickCount != modCount) {
 	failure("inconsistent number of tick boxes");
       }
-      assert(tmpModule->tixArr == 0);	
-      assert(tixBoxes != 0);
-      tmpModule->tixArr = tixArr;
-      for(i=0;i < modCount;i++) {
-	tixArr[i] = tixBoxes[i + tmpModule->tickOffset];
+      assert(tmpModule->tixArr != 0);	
+      if (tmpModule->hashNo != modHashNo) {
+	fprintf(stderr,"in module '%s'\n",tmpModule->modName);
+	failure("module mismatch with .tix/.mix file hash number");
+	fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
+	exit(-1);
+
       }
+      for(i=0;i < modCount;i++) {
+	tixArr[i] = tmpModule->tixArr[i];
+      }
+      tmpModule->tixArr = tixArr;
       return tmpModule->tickOffset;
     }
     lastModule = tmpModule;
@@ -232,6 +240,7 @@ hs_hpc_module(char *modName,int modCount,StgWord64 *tixArr) {
   tmpModule = (Info *)calloc(1,sizeof(Info));
   tmpModule->modName = modName;
   tmpModule->tickCount = modCount;
+  tmpModule->hashNo = modHashNo;
   if (lastModule) {
     tmpModule->tickOffset = lastModule->tickOffset + lastModule->tickCount;
   } else {
@@ -441,7 +450,6 @@ breakPointCommand(HpcRixOp rixOp, StgThreadID rixTid) {
 
 void
 startupHpc(void) {
-  Info *tmpModule;
   char *hpcRix;
 
   debugTrace(DEBUG_hpc,"startupHpc");
@@ -449,21 +457,6 @@ startupHpc(void) {
  if (hpc_inited == 0) {
     return;
   }
-
-  tmpModule = modules;
-
-  if (tixBoxes) {
-    for(;tmpModule != 0;tmpModule = tmpModule->next) {
-      totalTickCount += tmpModule->tickCount;
-      if (!tmpModule->tixArr) {
-	fprintf(stderr,"error: module %s did not register any hpc tick data\n",
-		tmpModule->modName);
-	fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
-	exit(-1);
-      }
-    }
-  }
-
   // HPCRIX contains the name of the file to send our dynamic runtime output to (a named pipe).
 
   hpcRix = getenv("HPCRIX");
@@ -514,10 +507,11 @@ startupHpc(void) {
 
       tixCount += tmpModule->tickCount;
 
-      debugTrace(DEBUG_hpc,"(tracer)%s: %u (offset=%u)\n",
-	      tmpModule->modName,
-	      tmpModule->tickCount,
-	      tmpModule->tickOffset);
+      debugTrace(DEBUG_hpc,"(tracer)%s: %u (offset=%u) (hash=%u)\n",
+		 tmpModule->modName,
+		 tmpModule->tickCount,
+		 tmpModule->hashNo,
+		 tmpModule->tickOffset);
 
     }
     fprintf(rixFile,"]\n");
@@ -538,7 +532,7 @@ startupHpc(void) {
 void
 exitHpc(void) {
   Info *tmpModule;  
-  int i, comma;
+  int i, inner_comma, outer_comma;
 
   debugTrace(DEBUG_hpc,"exitHpc");
 
@@ -548,27 +542,45 @@ exitHpc(void) {
 
   FILE *f = fopen(tixFilename,"w");
   
-  comma = 0;
+  outer_comma = 0;
 
-  fprintf(f,"Tix %" PRIuWORD64 " [", magicTixNumber);
+  fprintf(f,"Tix [");
   tmpModule = modules;
   for(;tmpModule != 0;tmpModule = tmpModule->next) {
-    if (comma) {
+    if (outer_comma) {
       fprintf(f,",");
     } else {
-      comma = 1;
+      outer_comma = 1;
     }
-    fprintf(f,"(\"%s\",%u)",
+    fprintf(f," TixModule \"%s\" %u %u [",
 	   tmpModule->modName,
+	    tmpModule->hashNo,
 	    tmpModule->tickCount);
-    debugTrace(DEBUG_hpc,"%s: %u (offset=%u)\n",
-	   tmpModule->modName,
-	   tmpModule->tickCount,
-	   tmpModule->tickOffset);
+    debugTrace(DEBUG_hpc,"%s: %u (offset=%u) (hash=%u)\n",
+	       tmpModule->modName,
+	       tmpModule->tickCount,
+	       tmpModule->hashNo,
+	       tmpModule->tickOffset);
+
+    inner_comma = 0;
+    for(i = 0;i < tmpModule->tickCount;i++) {
+      if (inner_comma) {
+	fprintf(f,",");
+      } else {
+	inner_comma = 1;
+      }
+
+      if (tmpModule->tixArr) {
+	fprintf(f,"%" PRIuWORD64,tmpModule->tixArr[i]);
+      } else {
+	fprintf(f,"0");
+      }
+    }
+    fprintf(f,"]");
   }
-  fprintf(f,"] [");
+  fprintf(f,"]\n");
   
-  comma = 0;
+  /*
   tmpModule = modules;
   for(;tmpModule != 0;tmpModule = tmpModule->next) {
       if (!tmpModule->tixArr) {
@@ -594,6 +606,7 @@ exitHpc(void) {
   }
       
   fprintf(f,"]\n");
+  */
   fclose(f);
 
   if (rixFile != NULL) {
