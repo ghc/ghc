@@ -89,9 +89,9 @@ import System.Posix.Internals ( setNonBlockingFD )
 ghciWelcomeMsg =
  "   ___         ___ _\n"++
  "  / _ \\ /\\  /\\/ __(_)\n"++
- " / /_\\// /_/ / /  | |      GHC Interactive, version " ++ cProjectVersion ++ ", for Haskell 98.\n"++
- "/ /_\\\\/ __  / /___| |      http://www.haskell.org/ghc/\n"++
- "\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
+ " / /_\\// /_/ / /  | |    GHC Interactive, version " ++ cProjectVersion ++ ", for Haskell 98.\n"++
+ "/ /_\\\\/ __  / /___| |    http://www.haskell.org/ghc/\n"++
+ "\\____/\\/ /_/\\____/|_|    Type :? for help.\n"
 
 type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
 cmdName (n,_,_,_) = n
