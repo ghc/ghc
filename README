@@ -49,13 +49,13 @@ There are two ways to get a source tree:
   to get the other repositories:
 
      $ cd ghc
-     $ chmod +x darcs-all
-     $ ./darcs-all get
+     $ chmod +x boot
+     $ ./boot
 
   This grabs the "core" packages by default.  To get the full set of
   packages, instead say
 
-     $ ./darcs-all --extra get
+     $ ./boot --extra
 
   This also downloads the libraries that are normally bundled in the
   "extralibs" package (see above).
@@ -76,14 +76,9 @@ XML toolchain if you want to build the compiler documentation.
 
 Quick start:  the following gives you a default build:
 
-	$ sh boot
 	$ ./configure
 	$ make
 	$ make install
-
-The "sh boot" step is only necessary if this is a tree checked out
-from darcs.  For source distributions downloaded from GHC's web site,
-this step has already been performed.
 
 These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).

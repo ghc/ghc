@@ -72,7 +72,7 @@ check-packages :
 	@for d in `cat libraries/core-packages`; do \
 	  if test ! -d libraries/$$d; then \
 	     echo "Looks like you're missing libraries/$$d,"; \
-	     echo "maybe you haven't done './darcs-all get'?"; \
+	     echo "Did you run 'sh boot' at the top level?"; \
 	     exit 1; \
 	  fi \
 	done

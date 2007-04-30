@@ -32,6 +32,8 @@ my $ignore_failure = 0;
 # --extra says we grab the extra libs with 'get'.  It has no effect on
 # the other commands.
 my $extra = 0;
+# --complete gets passed onto darcs get
+my $complete = 0;
 # --nofib/--testsuite tell get to also grab the respective repos.
 # They have no effect on the other commands.
 my $nofib = 0;
@@ -90,7 +92,7 @@ sub darcsgetpackage {
 
 sub darcsget {
     my $r_flags;
-    if (! grep /(?:--complete|--partial)/, @_) {
+    if (! $complete && ! grep /(?:--complete|--partial)/, @_) {
         warning("adding --partial, to override use --complete");
         $r_flags = [@_, "--partial"];
     }
@@ -128,6 +130,9 @@ sub main {
         # if it comes before the darcs command
         if ($arg eq "-q") {
             $verbose = 0;
+        }
+        elsif ($arg eq "--complete") {
+            $complete = 1;
         }
         elsif ($arg eq "--extra") {
             $extra = 1;
