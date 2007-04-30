@@ -786,73 +786,82 @@ run_BCO:
         {
             int arg1_brk_array, arg2_array_index, arg3_freeVars;
             StgArrWords *breakPoints;
-            int returning_from_break;     /* are we resuming execution from a breakpoint?
-                                          **   if yes, then don't break this time around */
+            int returning_from_break;     // are we resuming execution from a breakpoint?
+                                          //  if yes, then don't break this time around
             StgClosure *ioAction;         // the io action to run at a breakpoint
 
             StgAP_STACK *new_aps;         // a closure to save the top stack frame on the heap
             int i;
             int size_words;
 
-            arg1_brk_array      = BCO_NEXT;  /* first argument of break instruction */
-            arg2_array_index    = BCO_NEXT;  /* second dargument of break instruction */
-            arg3_freeVars       = BCO_NEXT;  /* third argument of break instruction */
+            arg1_brk_array      = BCO_NEXT;  // 1st arg of break instruction
+            arg2_array_index    = BCO_NEXT;  // 2nd arg of break instruction
+            arg3_freeVars       = BCO_NEXT;  // 3rd arg of break instruction
 
-            // check if we are returning from a breakpoint - this info is stored in
-            // the flags field of the current TSO
+            // check if we are returning from a breakpoint - this info
+            // is stored in the flags field of the current TSO
             returning_from_break = cap->r.rCurrentTSO->flags & TSO_STOPPED_ON_BREAKPOINT; 
 
-            // if we are returning from a break then skip this section and continue executing
+            // if we are returning from a break then skip this section
+            // and continue executing
             if (!returning_from_break)
             {
                breakPoints = (StgArrWords *) BCO_PTR(arg1_brk_array);
 
-               // stop the current thread if either the "stop_next_breakpoint" flag is true
-               // OR if the breakpoint flag for this particular expression is true
-               if (stop_next_breakpoint == rtsTrue || breakPoints->payload[arg2_array_index] == rtsTrue)
+               // stop the current thread if either the
+               // "stop_next_breakpoint" flag is true OR if the
+               // breakpoint flag for this particular expression is
+               // true
+               if (stop_next_breakpoint == rtsTrue || 
+                   breakPoints->payload[arg2_array_index] == rtsTrue)
                {
-                  stop_next_breakpoint = rtsFalse; // make sure we don't automatically stop at the next breakpoint
+                  // make sure we don't automatically stop at the
+                  // next breakpoint
+                  stop_next_breakpoint = rtsFalse;
 
-                  // allocate memory for a new AP_STACK, enough to store the top stack frame
-                  // plus an stg_apply_interp_info pointer and a pointer to the BCO
+                  // allocate memory for a new AP_STACK, enough to
+                  // store the top stack frame plus an
+                  // stg_apply_interp_info pointer and a pointer to
+                  // the BCO
                   size_words = BCO_BITMAP_SIZE(obj) + 2;
                   new_aps = (StgAP_STACK *) allocate (AP_STACK_sizeW(size_words));
                   SET_HDR(new_aps,&stg_AP_STACK_info,CCS_SYSTEM); 
                   new_aps->size = size_words;
-                  // we should never enter new_aps->fun, so it is assigned to a dummy value
-                  // ToDo: fixme to something that explodes with an error if you enter it 
                   new_aps->fun = &stg_dummy_ret_closure; 
 
                   // fill in the payload of the AP_STACK 
-                  new_aps->payload[0] = (W_)&stg_apply_interp_info;
-                  new_aps->payload[1] = (W_)obj;
+                  new_aps->payload[0] = (StgClosure *)&stg_apply_interp_info;
+                  new_aps->payload[1] = (StgClosure *)obj;
 
                   // copy the contents of the top stack frame into the AP_STACK
                   for (i = 2; i < size_words; i++)
                   {
-                     new_aps->payload[i] = (W_)Sp[i-2];
+                     new_aps->payload[i] = (StgClosure *)Sp[i-2];
                   }
 
-                  // prepare the stack so that we can call the breakPointIOAction
-                  // and ensure that the stack is in a reasonable state for the GC
-                  // and so that execution of this BCO can continue when we resume
+                  // prepare the stack so that we can call the
+                  // breakPointIOAction and ensure that the stack is
+                  // in a reasonable state for the GC and so that
+                  // execution of this BCO can continue when we resume
                   ioAction = (StgClosure *) deRefStablePtr (breakPointIOAction);
                   Sp -= 7;
                   Sp[6] = (W_)obj;   
                   Sp[5] = (W_)&stg_apply_interp_info;
-                  Sp[4] = (W_)new_aps;                 /* the AP_STACK */
-                  Sp[3] = (W_)BCO_PTR(arg3_freeVars);  /* the info about local vars of the breakpoint */
+                  Sp[4] = (W_)new_aps;                 // the AP_STACK
+                  Sp[3] = (W_)BCO_PTR(arg3_freeVars);  // the info about local vars of the breakpoint
                   Sp[2] = (W_)&stg_ap_ppv_info;
-                  Sp[1] = (W_)ioAction;                /* apply the IO action to its two arguments above */
-                  Sp[0] = (W_)&stg_enter_info;         /* get ready to run the IO action */
+                  Sp[1] = (W_)ioAction;                // apply the IO action to its two arguments above
+                  Sp[0] = (W_)&stg_enter_info;         // get ready to run the IO action
 
-                  // set the flag in the TSO to say that we are now stopping at a breakpoint
-                  // so that when we resume we don't stop on the same breakpoint that we already
-                  // stopped at just now 
+                  // set the flag in the TSO to say that we are now
+                  // stopping at a breakpoint so that when we resume
+                  // we don't stop on the same breakpoint that we
+                  // already stopped at just now
                   cap->r.rCurrentTSO->flags |= TSO_STOPPED_ON_BREAKPOINT;
 
-                  // stop this thread and return to the scheduler - eventually we will come back
-                  // and the IO action on the top of the stack will be executed
+                  // stop this thread and return to the scheduler -
+                  // eventually we will come back and the IO action on
+                  // the top of the stack will be executed
                   RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
                }
             }
@@ -1381,7 +1390,7 @@ HsStablePtr rts_getApStackVal (HsStablePtr apStackSptr, int offset)
    apStack = (StgAP_STACK *) deRefStablePtr (apStackSptr);
    payload = apStack->payload;
    val = (StgClosure *) payload[offset+2];
-   resultSptr = getStablePtr (val); 
+   resultSptr = getStablePtr ((P_)val); 
    return resultSptr;
 }
 
