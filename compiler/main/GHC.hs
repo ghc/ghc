@@ -2160,6 +2160,7 @@ data Status
 -- the old interactive context.
 data ResumeHandle
   = ResumeHandle
+        ThreadId                -- thread running the computation
         (MVar ())               -- breakMVar
         (MVar Status)           -- statusMVar
         [Name]                  -- [Name] to bind on completion
