@@ -71,6 +71,7 @@ fastAnd _ _ = False
 
 --These are among the type-signatures necessary for !ghc to compile
 -- but break ghc (can't give a signature for an import...)
+--Note that the comparisons actually do return Bools not FastBools.
 (+#) :: FastInt -> FastInt -> FastInt
 (-#) :: FastInt -> FastInt -> FastInt
 (*#) :: FastInt -> FastInt -> FastInt
@@ -81,19 +82,6 @@ fastAnd _ _ = False
 (>#) :: FastInt -> FastInt -> Bool
 
 #endif /* ! __GLASGOW_HASKELL__ */
--- however it's still possible to check that these are
--- valid signatures nonetheless (e.g., ==# returns Bool
--- not FastBool/Int# !)
-_signatures =
- ( (+#) :: FastInt -> FastInt -> FastInt
- , (-#) :: FastInt -> FastInt -> FastInt
- , (*#) :: FastInt -> FastInt -> FastInt
- , (==#) :: FastInt -> FastInt -> Bool
- , (<#) :: FastInt -> FastInt -> Bool
- , (<=#) :: FastInt -> FastInt -> Bool
- , (>=#) :: FastInt -> FastInt -> Bool
- , (>#) :: FastInt -> FastInt -> Bool
- )
 
 -- type-signatures will improve the non-ghc-specific versions
 -- and keep things accurate (and ABLE to compile!)
