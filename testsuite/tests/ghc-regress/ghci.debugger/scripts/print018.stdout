@@ -1,10 +1,12 @@
-Breakpoint set at main:Test.Test2:40:9
-Stopped at a breakpoint in ../Test.hs:40. Local bindings in scope:
-  _result :: (), x :: a
-../Test.hs:40:9-16> x = (_t1::a)
-../Test.hs:40:9-16> x :: GHC.Base.Unknown
-../Test.hs:40:9-16> ()
-../Test.hs:40:9-16> x = Unary
-../Test.hs:40:9-16> x :: Unary
-../Test.hs:40:9-16> ../Test.hs:40:9-16> Returning to normal execution...
+Breakpoint 0 activated at ../Test.hs:42:0-16
+Stopped at ../Test.hs:42:0-16
+_result :: ()
+Stopped at ../Test.hs:42:9-16
+_result :: ()
+x :: a
+x = (_t1::a1)
+x :: a1
 ()
+x = Unary
+x :: Unary
+Unary

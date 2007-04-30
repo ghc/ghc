@@ -34,7 +34,7 @@ instance Show Show1 where
 type Just1 = Maybe
 
 
-data Unary = Unary
+data Unary = Unary deriving Show
 
 poly :: a -> ()
 poly x = seq x ()
