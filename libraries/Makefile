@@ -60,6 +60,7 @@ SUBDIRS += $(wildcard ALUT)
 SUBDIRS += $(wildcard stm)
 SUBDIRS += $(wildcard xhtml)
 SUBDIRS += $(wildcard cgi)
+SUBDIRS += $(wildcard arrows)
 ifeq "$(GhcLibsWithObjectIO)" "YES"
 SUBDIRS += $(wildcard ObjectIO)
 endif
