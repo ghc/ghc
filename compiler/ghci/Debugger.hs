@@ -99,7 +99,11 @@ pprintClosureCommand session bindThings force str = do
           ids      = typeEnvIds type_env
           ids'     = map (\id -> id `setIdType` substTy subst (idType id)) ids
           type_env'= extendTypeEnvWithIds type_env ids'
-          ictxt'   = ictxt { ic_type_env = type_env' }
+          subst_dom= varEnvKeys$ getTvSubstEnv subst
+          ictxt'   = ictxt { ic_type_env = type_env'
+                           , ic_tyvars   = foldl' delVarSetByKey
+                                                  (ic_tyvars ictxt) 
+                                                  subst_dom }
       writeIORef ref (hsc_env {hsc_IC = ictxt'})
 
    tidyTermTyVars :: Session -> Term -> IO Term
