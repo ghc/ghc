@@ -2,6 +2,5 @@
 
 :set -fglasgow-exts
 :set -fth
-:set -fdebugging
 :l A
-:show breakpoints
+:show breaks

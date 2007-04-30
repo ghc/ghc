@@ -4,9 +4,9 @@
 :set -fglasgow-exts
 :l ../Test
 
-:break 40
-:step
+:break poly
 poly Unary
+:step
 :p x
 :t x
 seq x ()
