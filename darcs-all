@@ -124,6 +124,8 @@ sub main {
 
     while ($#_ ne -1) {
         my $arg = shift;
+        # We handle -q here as well as lower down as we need to skip over it
+        # if it comes before the darcs command
         if ($arg eq "-q") {
             $verbose = 0;
         }
@@ -138,6 +140,9 @@ sub main {
         }
         else {
             unshift @_, $arg;
+            if (grep /^-q$/, @_) {
+                $verbose = 0;
+            }
             last;
         }
     }
