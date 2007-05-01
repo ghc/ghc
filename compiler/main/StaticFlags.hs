@@ -278,8 +278,7 @@ opt_AutoSccsOnAllToplevs	= lookUp  FSLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  FSLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  FSLIT("-fauto-sccs-on-individual-cafs")
 opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
-opt_DoTickyProfiling		= lookUp  FSLIT("-fticky-ticky")
-
+opt_DoTickyProfiling            = WayTicky `elem` (unsafePerformIO $ readIORef v_Ways)
 
 -- Hpc opts
 
@@ -354,7 +353,6 @@ isStaticFlag f =
 	"fauto-sccs-on-exported-toplevs",
 	"fauto-sccs-on-individual-cafs",
 	"fscc-profiling",
-	"fticky-ticky",
 	"fdicts-strict",
 	"firrefutable-tuples",
 	"fparallel",
@@ -548,8 +546,7 @@ way_details =
 	, "-optc-DPROFILING" ]),
 
     (WayTicky, Way  "t" True "Ticky-ticky Profiling"  
-	[ "-fticky-ticky"
-	, "-DTICKY_TICKY"
+	[ "-DTICKY_TICKY"
 	, "-optc-DTICKY_TICKY" ]),
 
     (WayUnreg, Way  "u" False "Unregisterised" 
