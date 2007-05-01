@@ -1165,6 +1165,9 @@ rebuildCase env scrut case_bndr [(con,bndrs,rhs)] cont
 	-- The case binder is going to be evaluated later, 
 	-- and the scrutinee is a simple variable
     var_demanded_later (Var v) = isStrictDmd (idNewDemandInfo case_bndr)
+    		       	         && not (isTickBoxOp v)	
+				    -- ugly hack; covering this case is what 
+				    -- exprOkForSpeculation was intended for.
     var_demanded_later other   = False
 
 
