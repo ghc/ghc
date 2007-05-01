@@ -1154,7 +1154,7 @@ f "2"    = 2
 	  the MR can give rise to unexpected behaviour, so it can be helpful
 	  to have an explicit warning that it is being applied.</para>
 
-	  <para>This warning is on by default.</para>
+	  <para>This warning is off by default.</para>
 	</listitem>
       </varlistentry>
 
