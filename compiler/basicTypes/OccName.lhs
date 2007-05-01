@@ -32,6 +32,7 @@ module OccName (
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
+        mkCloOcc, mkCloTyCoOcc,
 
 	-- ** Deconstruction
 	occNameFS, occNameString, occNameSpace, 
@@ -456,6 +457,10 @@ mkGenOcc2           = mk_simple_deriv varName  "$gto"
 --	$cMkT :: Data.Generics.Basics.Constr
 mkDataTOcc = mk_simple_deriv varName  "$t"
 mkDataCOcc = mk_simple_deriv varName  "$c"
+
+-- Closure conversion
+mkCloOcc     = mk_simple_deriv varName "$CC_"
+mkCloTyCoOcc = mk_simple_deriv tcName  ":CC_"
 
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
