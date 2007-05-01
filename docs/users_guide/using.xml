@@ -839,7 +839,16 @@ ghc -c Foo.hs</screen>
 	<term><option>-Wall</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-Wall</option></primary></indexterm>
-	  <para>Turns on all warning options.</para>
+	  <para>Turns on all warning options that indicate potentially
+	  suspicious code.  The warnings that are
+	  <emphasis>not</emphasis> enabled by <option>-Wall</option>
+	  are:</para>
+          <itemizedlist>
+            <listitem><option>-fwarn-simple-patterns</option></listitem>
+            <listitem><option>-fwarn-tabs</option></listitem>
+            <listitem><option>-fwarn-incomplete-record-updates</option></listitem>
+            <listitem><option>-fwarn-monomorphism-restriction</option></listitem>
+          </itemizedlist>
 	</listitem>
       </varlistentry>
 
