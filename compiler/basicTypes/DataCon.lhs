@@ -492,18 +492,7 @@ mkDataCon name declared_infix
 	-- The representation tycon looks like this:
 	--   data :R7T b c where 
 	--	TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
-
-    orig_res_ty 
-	| Just (fam_tc, fam_tys) <- tyConFamInst_maybe tycon
-	, let fam_subst = zipTopTvSubst (tyConTyVars tycon) res_tys
-	= mkTyConApp fam_tc (substTys fam_subst fam_tys)
-	| otherwise
-	= mkTyConApp tycon res_tys
-	where
-	  res_tys = substTyVars (mkTopTvSubst eq_spec) univ_tvs
-		-- In the example above, 
-		--	univ_tvs = [ b1, c1 ]
-		--	res_tys  = [ b1, b1 ]
+    orig_res_ty = mkFamilyTyConApp tycon (substTyVars (mkTopTvSubst eq_spec) univ_tvs)
 
 	-- Representation arguments and demands
 	-- To do: eliminate duplication with MkId
@@ -645,9 +634,9 @@ dataConStupidTheta dc = dcStupidTheta dc
 dataConUserType :: DataCon -> Type
 -- The user-declared type of the data constructor
 -- in the nice-to-read form 
---	T :: forall a. a -> T [a]
+--	T :: forall a b. a -> b -> T [a]
 -- rather than
---	T :: forall b. forall a. (a=[b]) => a -> T b
+--	T :: forall a c. forall b. (c=[a]) => a -> b -> T c
 -- NB: If the constructor is part of a data instance, the result type
 -- mentions the family tycon, not the internal one.
 dataConUserType  (MkData { dcUnivTyVars = univ_tvs, 
@@ -756,7 +745,8 @@ splitProductType_maybe ty
 					-- and for constructors visible
 	   -> Just (tycon, ty_args, data_con, dataConInstArgTys data_con ty_args)
 	   where
-	      data_con = head (tyConDataCons tycon)
+	      data_con = ASSERT( not (null (tyConDataCons tycon)) ) 
+			 head (tyConDataCons tycon)
 	other -> Nothing
 
 splitProductType str ty

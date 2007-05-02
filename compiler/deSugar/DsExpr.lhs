@@ -40,7 +40,6 @@ import CostCentre
 import Id
 import PrelInfo
 import DataCon
-import TyCon
 import TysWiredIn
 import BasicTypes
 import PrelNames
@@ -456,70 +455,50 @@ might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
-dsExpr (RecordUpd record_expr (HsRecordBinds []) record_in_ty record_out_ty)
+dsExpr (RecordUpd record_expr (HsRecordBinds []) _ _ _)
   = dsLExpr record_expr
 
-dsExpr expr@(RecordUpd record_expr (HsRecordBinds rbinds) record_in_ty record_out_ty)
-  = dsLExpr record_expr	 	`thenDs` \ record_expr' ->
-
-	-- Desugar the rbinds, and generate let-bindings if
-	-- necessary so that we don't lose sharing
-
-    let
-	in_inst_tys  = tcTyConAppArgs record_in_ty	-- Newtype opaque
-	out_inst_tys = tcTyConAppArgs record_out_ty	-- Newtype opaque
-	in_out_ty    = mkFunTy record_in_ty record_out_ty
-
-	mk_val_arg field old_arg_id 
-	  = case [rhs | (L _ sel_id, rhs) <- rbinds, field == idName sel_id] of
-	      (rhs:rest) -> ASSERT(null rest) rhs
-	      []	 -> nlHsVar old_arg_id
-
-	mk_alt con
- 	  = ASSERT( isVanillaDataCon con )
-	    newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys) `thenDs` \ arg_ids ->
-		-- This call to dataConInstOrigArgTys won't work for existentials
-		-- but existentials don't have record types anyway
-	    let 
-		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
-					(dataConFieldLabels con) arg_ids
-		rhs = foldl (\a b -> nlHsApp a b)
-			    (nlHsTyApp (dataConWrapId con) out_inst_tys)
-			    val_args
-	    in
- 	    returnDs (mkSimpleMatch [mkPrefixConPat con (map nlVarPat arg_ids) record_in_ty] rhs)
-    in
-	-- Record stuff doesn't work for existentials
+dsExpr expr@(RecordUpd record_expr (HsRecordBinds rbinds) cons_to_upd in_inst_tys out_inst_tys)
+  =	-- Record stuff doesn't work for existentials
 	-- The type checker checks for this, but we need 
 	-- worry only about the constructors that are to be updated
-    ASSERT2( all isVanillaDataCon cons_to_upd, ppr expr )
+    ASSERT2( notNull cons_to_upd && all isVanillaDataCon cons_to_upd, ppr expr )
+
+    do	{ record_expr' <- dsLExpr record_expr
+	; let	-- Awkwardly, for families, the match goes 
+		-- from instance type to family type
+		tycon     = dataConTyCon (head cons_to_upd)
+		in_ty     = mkTyConApp tycon in_inst_tys
+		in_out_ty = mkFunTy in_ty
+				    (mkFamilyTyConApp tycon out_inst_tys)
+
+		mk_val_arg field old_arg_id 
+		  = case [rhs | (L _ sel_id, rhs) <- rbinds, field == idName sel_id] of
+		      (rhs:rest) -> ASSERT(null rest) rhs
+		      []	 -> nlHsVar old_arg_id
+
+		mk_alt con
+	 	  = ASSERT( isVanillaDataCon con )
+		    do 	{ arg_ids <- newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys)
+			-- This call to dataConInstOrigArgTys won't work for existentials
+			-- but existentials don't have record types anyway
+			; let val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
+						(dataConFieldLabels con) arg_ids
+			      rhs = foldl (\a b -> nlHsApp a b)
+				          (nlHsTyApp (dataConWrapId con) out_inst_tys)
+				          val_args
+			      pat = mkPrefixConPat con (map nlVarPat arg_ids) in_ty
+
+			; return (mkSimpleMatch [pat] rhs) }
 
 	-- It's important to generate the match with matchWrapper,
 	-- and the right hand sides with applications of the wrapper Id
 	-- so that everything works when we are doing fancy unboxing on the
 	-- constructor aguments.
-    mappM mk_alt cons_to_upd				`thenDs` \ alts ->
-    matchWrapper RecUpd (MatchGroup alts in_out_ty)	`thenDs` \ ([discrim_var], matching_code) ->
+	; alts <- mapM mk_alt cons_to_upd
+	; ([discrim_var], matching_code) <- matchWrapper RecUpd (MatchGroup alts in_out_ty)
 
-    returnDs (bindNonRec discrim_var record_expr' matching_code)
-
-  where
-    updated_fields :: [FieldLabel]
-    updated_fields = [ idName sel_id | (L _ sel_id,_) <- rbinds]
-
-	-- Get the type constructor from the record_in_ty
-	-- so that we are sure it'll have all its DataCons
-	-- (In GHCI, it's possible that some TyCons may not have all
-	--  their constructors, in a module-loop situation.)
-    tycon       = tcTyConAppTyCon record_in_ty
-    data_cons   = tyConDataCons tycon
-    cons_to_upd = filter has_all_fields data_cons
-
-    has_all_fields :: DataCon -> Bool
-    has_all_fields con_id 
-      = all (`elem` con_fields) updated_fields
-      where
-	con_fields = dataConFieldLabels con_id
+	; return (bindNonRec discrim_var record_expr' matching_code) }
 \end{code}
 
 Here is where we desugar the Template Haskell brackets and escapes

@@ -367,7 +367,7 @@ cvtl e = wrapL (cvt e)
 			      ; return $ RecordCon c' noPostTcExpr (HsRecordBinds flds') }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
 			      ; flds' <- mapM cvtFld flds
-			      ; return $ RecordUpd e' (HsRecordBinds flds') placeHolderType placeHolderType }
+			      ; return $ RecordUpd e' (HsRecordBinds flds') [] [] [] }
 
 cvtFld (v,e) = do { v' <- vNameL v; e' <- cvtl e; return (v',e') }
 

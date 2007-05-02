@@ -872,7 +872,7 @@ mkRecConstrOrUpdate
 mkRecConstrOrUpdate (L l (HsVar c)) loc fs | isRdrDataCon c
   = return (RecordCon (L l c) noPostTcExpr fs)
 mkRecConstrOrUpdate exp loc fs@(HsRecordBinds (_:_))
-  = return (RecordUpd exp fs placeHolderType placeHolderType)
+  = return (RecordUpd exp fs [] [] [])
 mkRecConstrOrUpdate _ loc (HsRecordBinds [])
   = parseError loc "Empty record update"
 

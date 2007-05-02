@@ -531,7 +531,7 @@ repE (RecordCon c _ (HsRecordBinds flds))
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
-repE (RecordUpd e (HsRecordBinds flds) _ _)
+repE (RecordUpd e (HsRecordBinds flds) _ _ _)
  = do { x <- repLE e;
         fs <- repFields flds;
         repRecUpd x fs }

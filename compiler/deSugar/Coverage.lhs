@@ -294,17 +294,17 @@ addTickHsExpr (ExplicitTuple es box) =
 	liftM2 ExplicitTuple
 		(mapM (addTickLHsExpr) es)
 		(return box)
-addTickHsExpr (RecordCon	 id ty rec_binds) = 
+addTickHsExpr (RecordCon id ty rec_binds) = 
 	liftM3 RecordCon
 		(return id)
 		(return ty)
 		(addTickHsRecordBinds rec_binds)
-addTickHsExpr (RecordUpd	e rec_binds ty1 ty2) =
-	liftM4 RecordUpd
+addTickHsExpr (RecordUpd e rec_binds cons tys1 tys2) =
+	liftM5 RecordUpd
 		(addTickLHsExpr e)
 		(addTickHsRecordBinds rec_binds)
-		(return ty1)
-		(return ty2)
+		(return cons) (return tys1) (return tys2)
+
 addTickHsExpr (ExprWithTySig {}) = error "addTickHsExpr: ExprWithTySig"
 addTickHsExpr (ExprWithTySigOut e ty) =
 	liftM2 ExprWithTySigOut

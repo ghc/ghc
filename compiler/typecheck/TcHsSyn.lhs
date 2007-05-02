@@ -463,12 +463,12 @@ zonkExpr env (RecordCon data_con con_expr rbinds)
     zonkRbinds env rbinds	`thenM` \ new_rbinds ->
     returnM (RecordCon data_con new_con_expr new_rbinds)
 
-zonkExpr env (RecordUpd expr rbinds in_ty out_ty)
-  = zonkLExpr env expr		`thenM` \ new_expr ->
-    zonkTcTypeToType env in_ty	`thenM` \ new_in_ty ->
-    zonkTcTypeToType env out_ty	`thenM` \ new_out_ty ->
-    zonkRbinds env rbinds	`thenM` \ new_rbinds ->
-    returnM (RecordUpd new_expr new_rbinds new_in_ty new_out_ty)
+zonkExpr env (RecordUpd expr rbinds cons in_tys out_tys)
+  = zonkLExpr env expr			`thenM` \ new_expr ->
+    mapM (zonkTcTypeToType env) in_tys	`thenM` \ new_in_tys ->
+    mapM (zonkTcTypeToType env) out_tys	`thenM` \ new_out_tys ->
+    zonkRbinds env rbinds		`thenM` \ new_rbinds ->
+    returnM (RecordUpd new_expr new_rbinds cons new_in_tys new_out_tys)
 
 zonkExpr env (ExprWithTySigOut e ty) 
   = do { e' <- zonkLExpr env e

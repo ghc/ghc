@@ -229,10 +229,10 @@ rnExpr (RecordCon con_id _ (HsRecordBinds rbinds))
     returnM (RecordCon conname noPostTcExpr (HsRecordBinds rbinds'), 
 	     fvRbinds `addOneFV` unLoc conname)
 
-rnExpr (RecordUpd expr (HsRecordBinds rbinds) _ _)
+rnExpr (RecordUpd expr (HsRecordBinds rbinds) _ _ _)
   = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
     rnRbinds "update" rbinds	`thenM` \ (rbinds', fvRbinds) ->
-    returnM (RecordUpd expr' (HsRecordBinds rbinds') placeHolderType placeHolderType, 
+    returnM (RecordUpd expr' (HsRecordBinds rbinds') [] [] [], 
 	     fvExpr `plusFV` fvRbinds)
 
 rnExpr (ExprWithTySig expr pty)

@@ -493,6 +493,8 @@ mkRecordSelId tycon field_label
 
     con1	= head data_cons_w_field
     (univ_tvs, _, eq_spec, _, _, data_ty) = dataConFullSig con1
+	-- For a data type family, the data_ty (and hence selector_ty) mentions
+	-- only the family TyCon, not the instance TyCon
     data_tv_set	= tyVarsOfType data_ty
     data_tvs	= varSetElems data_tv_set
     field_ty	= dataConFieldType con1 field_label

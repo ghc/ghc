@@ -54,7 +54,7 @@ module Type (
 	applyTy, applyTys, isForAllTy, dropForAlls,
 
 	-- Source types
-	predTypeRep, mkPredTy, mkPredTys, pprSourceTyCon,
+	predTypeRep, mkPredTy, mkPredTys, pprSourceTyCon, mkFamilyTyConApp,
 
 	-- Newtypes
 	splitRecNewType_maybe, newTyConInstRhs,
@@ -603,13 +603,27 @@ predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 	-- look through that too if necessary
 predTypeRep (EqPred ty1 ty2) = pprPanic "predTypeRep" (ppr (EqPred ty1 ty2))
 
+mkFamilyTyConApp :: TyCon -> [Type] -> Type
+-- Given a family instance TyCon and its arg types, return the
+-- corresponding family type.  E.g.
+--	data family T a
+--	data instance T (Maybe b) = MkT b	-- Instance tycon :RTL
+-- Then 
+--	mkFamilyTyConApp :RTL Int  =  T (Maybe Int)
+mkFamilyTyConApp tc tys
+  | Just (fam_tc, fam_tys) <- tyConFamInst_maybe tc
+  , let fam_subst = zipTopTvSubst (tyConTyVars tc) tys
+  = mkTyConApp fam_tc (substTys fam_subst fam_tys)
+  | otherwise
+  = mkTyConApp tc tys
+
 -- Pretty prints a tycon, using the family instance in case of a
 -- representation tycon.  For example
 --  	e.g.  data T [a] = ...
 -- In that case we want to print `T [a]', where T is the family TyCon
 pprSourceTyCon tycon 
-  | Just (repTyCon, tys) <- tyConFamInst_maybe tycon
-  = ppr $ repTyCon `TyConApp` tys	       -- can't be FunTyCon
+  | Just (fam_tc, tys) <- tyConFamInst_maybe tycon
+  = ppr $ fam_tc `TyConApp` tys	       -- can't be FunTyCon
   | otherwise
   = ppr tycon
 \end{code}
@@ -637,9 +651,6 @@ splitRecNewType_maybe (TyConApp tc tys)
 			 Just (substTyWith tvs tys rep_ty)
 	
 splitRecNewType_maybe other = Nothing
-
-
-
 \end{code}
 
 

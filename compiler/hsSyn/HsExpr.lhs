@@ -22,6 +22,7 @@ import HsBinds
 import Var
 import Name
 import BasicTypes
+import DataCon
 import SrcLoc
 import Outputable	
 import FastString
@@ -158,9 +159,11 @@ data HsExpr id
 	-- Record update
   | RecordUpd	(LHsExpr id)
 		(HsRecordBinds id)
-		PostTcType		-- Type of *input* record
-		PostTcType		-- Type of *result* record (may differ from
-					-- 	type of input record)
+		[DataCon]		-- Filled in by the type checker to the *non-empty*
+					-- list of DataCons that have all the upd'd fields
+		[PostTcType]		-- Argument types of *input* record type
+		[PostTcType]		-- 		and  *output* record type
+	-- For a type family, the arg types are of the *instance* tycon, not the family tycon
 
   | ExprWithTySig			-- e :: type
 		(LHsExpr id)
@@ -380,7 +383,7 @@ ppr_expr (ExplicitTuple exprs boxity)
 ppr_expr (RecordCon con_id con_expr rbinds)
   = pp_rbinds (ppr con_id) rbinds
 
-ppr_expr (RecordUpd aexp rbinds _ _)
+ppr_expr (RecordUpd aexp rbinds _ _ _)
   = pp_rbinds (pprParendExpr aexp) rbinds
 
 ppr_expr (ExprWithTySig expr sig)

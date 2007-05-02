@@ -382,7 +382,7 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 -- don't know how to do the update otherwise.
 
 
-tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _) res_ty
+tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _ _) res_ty
   = 	-- STEP 0
 	-- Check that the field names are really field names
     ASSERT( notNull rbinds )
@@ -407,7 +407,9 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _) res_ty
 	upd_field_lbls  = recBindFields hrbinds
 	sel_id : _   	= sel_ids
 	(tycon, _)   	= recordSelectorFieldLabel sel_id	-- We've failed already if
-	data_cons    	= tyConDataCons tycon		-- it's not a field label
+	data_cons    	= tyConDataCons tycon			-- it's not a field label
+		-- NB: for a data type family, the tycon is the instance tycon
+
 	relevant_cons   = filter is_relevant data_cons
 	is_relevant con = all (`elem` dataConFieldLabels con) upd_field_lbls
     in
@@ -432,12 +434,11 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _) res_ty
     let
 		-- A constructor is only relevant to this process if
 		-- it contains *all* the fields that are being updated
-	con1 		= head relevant_cons	-- A representative constructor
-	con1_tyvars 	= dataConUnivTyVars con1 
-	con1_flds       = dataConFieldLabels con1
-	con1_arg_tys    = dataConOrigArgTys con1
-	common_tyvars   = exactTyVarsOfTypes [ty | (fld,ty) <- con1_flds `zip` con1_arg_tys
-					 	 , not (fld `elem` upd_field_lbls) ]
+	con1 = ASSERT( not (null relevant_cons) ) head relevant_cons	-- A representative constructor
+	(con1_tyvars, theta, con1_arg_tys, con1_res_ty) = dataConSig con1
+	con1_flds     = dataConFieldLabels con1
+	common_tyvars = exactTyVarsOfTypes [ty | (fld,ty) <- con1_flds `zip` con1_arg_tys
+					       , not (fld `elem` upd_field_lbls) ]
 
  	is_common_tv tv = tv `elemVarSet` common_tyvars
 
@@ -445,43 +446,49 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _) res_ty
 	  | is_common_tv tv = returnM result_inst_ty		-- Same as result type
 	  | otherwise	    = newFlexiTyVarTy (tyVarKind tv)	-- Fresh type, of correct kind
     in
-    tcInstTyVars con1_tyvars				`thenM` \ (_, result_inst_tys, inst_env) ->
-    zipWithM mk_inst_ty con1_tyvars result_inst_tys	`thenM` \ inst_tys ->
+    ASSERT( null theta )	-- Vanilla datacon
+    tcInstTyVars con1_tyvars				`thenM` \ (_, result_inst_tys, result_inst_env) ->
+    zipWithM mk_inst_ty con1_tyvars result_inst_tys	`thenM` \ scrut_inst_tys ->
 
-	-- STEP 3
-	-- Typecheck the update bindings.
-	-- (Do this after checking for bad fields in case there's a field that
-	--  doesn't match the constructor.)
+	-- STEP 3: Typecheck the update bindings.
+	-- Do this after checking for bad fields in case 
+	-- there's a field that doesn't match the constructor.
     let
-	result_record_ty = mkTyConApp tycon result_inst_tys
-	con1_arg_tys'    = map (substTy inst_env) con1_arg_tys
+	result_ty     = substTy result_inst_env con1_res_ty
+	con1_arg_tys' = map (substTy result_inst_env) con1_arg_tys
     in
-    tcSubExp result_record_ty res_ty		`thenM` \ co_fn ->
+    tcSubExp result_ty res_ty			`thenM` \ co_fn ->
     tcRecordBinds con1 con1_arg_tys' hrbinds	`thenM` \ rbinds' ->
 
-	-- STEP 5
-	-- Typecheck the expression to be updated
+	-- STEP 5: Typecheck the expression to be updated
     let
-	record_ty = ASSERT( length inst_tys == tyConArity tycon )
-		    mkTyConApp tycon inst_tys
+	scrut_inst_env = zipTopTvSubst con1_tyvars scrut_inst_tys
+	scrut_ty = substTy scrut_inst_env con1_res_ty
 	-- This is one place where the isVanilla check is important
-	-- So that inst_tys matches the tycon
+	-- So that inst_tys matches the con1_tyvars
     in
-    tcMonoExpr record_expr record_ty		`thenM` \ record_expr' ->
+    tcMonoExpr record_expr scrut_ty		`thenM` \ record_expr' ->
 
-	-- STEP 6
-	-- Figure out the LIE we need.  We have to generate some 
-	-- dictionaries for the data type context, since we are going to
-	-- do pattern matching over the data cons.
+	-- STEP 6: Figure out the LIE we need.  
+	-- We have to generate some dictionaries for the data type context, 
+	-- since we are going to do pattern matching over the data cons.
 	--
-	-- What dictionaries do we need?  The tyConStupidTheta tells us.
+	-- What dictionaries do we need?  The dataConStupidTheta tells us.
     let
-	theta' = substTheta inst_env (tyConStupidTheta tycon)
+	theta' = substTheta scrut_inst_env (dataConStupidTheta con1)
     in
     instStupidTheta RecordUpdOrigin theta'	`thenM_`
 
+	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
+    let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
+		 = WpCo $ mkTyConApp co_con scrut_inst_tys
+		 | otherwise
+		 = idHsWrapper
+	scrut_ty = mkTyConApp tycon scrut_inst_tys	-- Type of pattern, the result of the cast
+    in
 	-- Phew!
-    returnM (mkHsWrap co_fn (RecordUpd record_expr' rbinds' record_ty result_record_ty))
+    returnM (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds' 
+				       relevant_cons scrut_inst_tys result_inst_tys))
 \end{code}
 
 
@@ -856,6 +863,7 @@ tcArgs fun args qtvs qtys arg_tys
 	     ; qtys' <- mapM refineBox qtys	-- Exploit new info
 	     ; (qtys'', args') <- go (n+1) qtys' args arg_tys
 	     ; return (qtys'', arg':args') }
+    go n qtys args arg_tys = panic "tcArgs"
 
 tcArg :: LHsExpr Name				-- The function
       -> Int					--   and arg number (for error messages)
@@ -1131,7 +1139,8 @@ predCtxt expr
   = hang (ptext SLIT("In the predicate expression:")) 4 (ppr expr)
 
 nonVanillaUpd tycon
-  = vcat [ptext SLIT("Record update for the non-Haskell-98 data type") <+> quotes (ppr tycon)
+  = vcat [ptext SLIT("Record update for the non-Haskell-98 data type") 
+		<+> quotes (pprSourceTyCon tycon)
 		<+> ptext SLIT("is not (yet) supported"),
 	  ptext SLIT("Use pattern-matching instead")]
 badFieldsUpd rbinds
@@ -1162,8 +1171,7 @@ missingFields con fields
   = ptext SLIT("Fields of") <+> quotes (ppr con) <+> ptext SLIT("not initialised:") 
 	<+> pprWithCommas ppr fields
 
-callCtxt fun args
-  = ptext SLIT("In the call") <+> parens (ppr (foldl mkHsApp fun args))
+-- callCtxt fun args = ptext SLIT("In the call") <+> parens (ppr (foldl mkHsApp fun args))
 
 #ifdef GHCI
 polySpliceErr :: Id -> SDoc
