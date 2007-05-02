@@ -87,14 +87,13 @@ import GHC.Exts		-- For `xori`
 \begin{code}
 exprType :: CoreExpr -> Type
 
-exprType (Var var)		= idType var
-exprType (Lit lit)		= literalType lit
-exprType (Let _ body)	   	= exprType body
-exprType (Case _ _ ty alts)     = ty
-exprType (Cast e co) 
-  = let (_, ty) = coercionKind co in ty
-exprType (Note other_note e)    = exprType e
-exprType (Lam binder expr)      = mkPiType binder (exprType expr)
+exprType (Var var)	     = idType var
+exprType (Lit lit)	     = literalType lit
+exprType (Let _ body)	     = exprType body
+exprType (Case _ _ ty alts)  = ty
+exprType (Cast e co)	     = snd (coercionKind co)
+exprType (Note other_note e) = exprType e
+exprType (Lam binder expr)   = mkPiType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
 	(fun, args) -> applyTypeToArgs e (exprType fun) args
