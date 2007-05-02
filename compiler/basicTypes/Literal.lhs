@@ -34,7 +34,6 @@ import FastTypes
 import FastString
 import Binary
 import Ratio
-import FastString
 
 import Data.Int
 import Data.Word

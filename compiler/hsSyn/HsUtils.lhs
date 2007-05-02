@@ -22,7 +22,6 @@ import HsExpr
 import HsPat
 import HsTypes	
 import HsLit
-import HsDecls
 
 import RdrName
 import Var

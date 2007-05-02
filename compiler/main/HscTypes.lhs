@@ -73,8 +73,7 @@ import ByteCodeAsm	( CompiledByteCode )
 import {-# SOURCE #-}  InteractiveEval ( Resume )
 #endif
 
-import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv,
-			  LocalRdrEnv, emptyLocalRdrEnv, GlobalRdrElt(..), 
+import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, GlobalRdrElt(..), 
                           unQualOK, ImpDeclSpec(..), Provenance(..),
                           ImportSpec(..), lookupGlobalRdrEnv )
 import Name		( Name, NamedThing, getName, nameOccName, nameModule )
@@ -96,7 +95,7 @@ import TyCon
 import DataCon		( DataCon, dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
 import Packages		( PackageId )
-import DynFlags		( DynFlags(..), DynFlag(..), isOneShot, HscTarget (..) )
+import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
 			  Fixity, defaultFixity, DeprecTxt )
