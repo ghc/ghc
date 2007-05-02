@@ -183,7 +183,8 @@ matchLiterals :: [Id]
 	      -> DsM MatchResult
 
 matchLiterals (var:vars) ty sub_groups
-  = do	{	-- Deal with each group
+  = ASSERT( all notNull sub_groups )
+    do	{	-- Deal with each group
 	; alts <- mapM match_group sub_groups
 
 	 	-- Combine results.  For everything except String

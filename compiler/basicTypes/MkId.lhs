@@ -279,7 +279,7 @@ mkDataConIds wrap_name wkr_name data_con
 	  	   wrapNewTypeBody tycon res_ty_args
                        (Var id_arg1)
 
-    id_arg1 = mkTemplateLocal 1 (head orig_arg_tys)
+    id_arg1 = ASSERT( not (null orig_arg_tys) ) mkTemplateLocal 1 (head orig_arg_tys)
 
 	----------- Wrapper --------------
 	-- We used to include the stupid theta in the wrapper's args
@@ -492,7 +492,7 @@ mkRecordSelId tycon field_label
     data_cons_w_field = filter has_field data_cons	-- Can't be empty!
     has_field con     = field_label `elem` dataConFieldLabels con
 
-    con1	= head data_cons_w_field
+    con1	= ASSERT( not (null data_cons_w_field) ) head data_cons_w_field
     (univ_tvs, _, eq_spec, _, _, data_ty) = dataConFullSig con1
 	-- For a data type family, the data_ty (and hence selector_ty) mentions
 	-- only the family TyCon, not the instance TyCon

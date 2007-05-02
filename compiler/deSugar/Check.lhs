@@ -249,7 +249,7 @@ must be one Variable to be complete.
 
 process_literals :: [HsLit] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 process_literals used_lits qs 
-  | null default_eqns  = ([make_row_vars used_lits (head qs)] ++ pats,indexs)
+  | null default_eqns  = ASSERT( not (null qs) ) ([make_row_vars used_lits (head qs)] ++ pats,indexs)
   | otherwise          = (pats_default,indexs_default)
      where
        (pats,indexs)   = process_explicit_literals used_lits qs
@@ -331,7 +331,7 @@ need_default_case used_cons unused_cons qs
        (pats',indexs') = check' default_eqns 
        pats_default    = [(make_whole_con c:ps,constraints) | 
                           c <- unused_cons, (ps,constraints) <- pats'] ++ pats
-       new_wilds       = make_row_vars_for_constructor (head qs)
+       new_wilds       = ASSERT( not (null qs) ) make_row_vars_for_constructor (head qs)
        pats_default_no_eqns =  [(make_whole_con c:new_wilds,[]) | c <- unused_cons] ++ pats
        indexs_default  = unionUniqSets indexs' indexs
 
@@ -432,7 +432,7 @@ mb_neg Nothing  v = v
 mb_neg (Just _) v = -v
 
 get_unused_cons :: [Pat Id] -> [DataCon]
-get_unused_cons used_cons = unused_cons
+get_unused_cons used_cons = ASSERT( not (null used_cons) ) unused_cons
      where
        (ConPatOut { pat_con = l_con, pat_ty = ty }) = head used_cons
        ty_con 	       = dataConTyCon (unLoc l_con)	-- Newtype observable

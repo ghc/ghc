@@ -610,7 +610,8 @@ JJQC 30-Nov-1997
 
 \begin{code}
 matchWrapper ctxt (MatchGroup matches match_ty)
-  = do	{ eqns_info   <- mapM mk_eqn_info matches
+  = ASSERT( notNull matches )
+    do	{ eqns_info   <- mapM mk_eqn_info matches
 	; new_vars    <- selectMatchVars arg_pats
 	; result_expr <- matchEquations ctxt new_vars eqns_info rhs_ty
 	; return (new_vars, result_expr) }

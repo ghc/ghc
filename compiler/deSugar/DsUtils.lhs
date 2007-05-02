@@ -242,7 +242,7 @@ worthy of a type synonym and a few handy functions.
 
 \begin{code}
 firstPat :: EquationInfo -> Pat Id
-firstPat eqn = head (eqn_pats eqn)
+firstPat eqn = ASSERT( notNull (eqn_pats eqn) ) head (eqn_pats eqn)
 
 shiftEqns :: [EquationInfo] -> [EquationInfo]
 -- Drop the first pattern in each equation
@@ -357,8 +357,8 @@ mkCoAlgCaseMatchResult var ty match_alts
 	--  the scrutinised Id to be sufficiently refined to have a TyCon in it]
 
 	-- Stuff for newtype
-    (con1, arg_ids1, match_result1) = head match_alts
-    arg_id1 	= head arg_ids1
+    (con1, arg_ids1, match_result1) = ASSERT( notNull match_alts ) head match_alts
+    arg_id1 	= ASSERT( notNull arg_ids1 ) head arg_ids1
     var_ty      = idType var
     (tc, ty_args) = splitNewTyConApp var_ty
     newtype_rhs = unwrapNewTypeBody tc ty_args (Var var)
