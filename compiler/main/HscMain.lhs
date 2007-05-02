@@ -398,7 +398,7 @@ batchMsg mb_mod_index recomp
          liftIO $ do
          if recomp
             then showMsg "Compiling "
-            else if verbosity (hsc_dflags hsc_env) >= 1
+            else if verbosity (hsc_dflags hsc_env) >= 2
                     then showMsg "Skipping  "
                     else return ()
 
