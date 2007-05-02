@@ -214,9 +214,10 @@ idPrimRep id = typePrimRep (idType id)
 
 \begin{code}
 recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
-recordSelectorFieldLabel id = case globalIdDetails id of
-				 RecordSelId tycon lbl _ -> (tycon,lbl)
-				 other -> panic "recordSelectorFieldLabel"
+recordSelectorFieldLabel id
+  = case globalIdDetails id of
+	RecordSelId { sel_tycon = tycon, sel_label = lbl } -> (tycon,lbl)
+	other -> panic "recordSelectorFieldLabel"
 
 isRecordSelector id = case globalIdDetails id of
 			RecordSelId {}  -> True

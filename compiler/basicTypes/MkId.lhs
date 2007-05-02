@@ -478,7 +478,8 @@ mkRecordSelId tycon field_label
   | otherwise  = sel_id
   where
     is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tv_set)
-    sel_id_details = RecordSelId tycon field_label is_naughty
+    sel_id_details = RecordSelId { sel_tycon = tycon, sel_label = field_label, sel_naughty = is_naughty }
+	-- For a data type family, the tycon is the *instance* TyCon
 
     -- Escapist case here for naughty constructors
     -- We give it no IdInfo, and a type of forall a.a (never looked at)

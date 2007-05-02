@@ -232,7 +232,8 @@ data GlobalIdDetails
   = VanillaGlobal		-- Imported from elsewhere, a default method Id.
 
   | RecordSelId                 -- The Id for a record selector
-    { sel_tycon   :: TyCon
+    { sel_tycon   :: TyCon	-- For a data type family, this is the *instance* TyCon
+				--	not the family TyCon
     , sel_label   :: FieldLabel
     , sel_naughty :: Bool       -- True <=> naughty
     }				-- See Note [Naughty record selectors]
