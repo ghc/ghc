@@ -1034,7 +1034,7 @@ f foo = foo { x = 6 }
           in the inadvertent cyclic definition <literal>let x = ... x
           ... in</literal>.</para>
 
-	  <para>Consequently, this option does
+	  <para>Consequently, this option
           <emphasis>will</emphasis> complain about cyclic recursive
           definitions.</para>
 	</listitem>
