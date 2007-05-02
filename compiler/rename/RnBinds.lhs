@@ -33,12 +33,12 @@ import RnEnv		( bindLocatedLocalsRn, lookupLocatedBndrRn,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import DynFlags	( DynFlag(..) )
-import Name		( Name, nameOccName, nameSrcLoc )
+import Name
 import NameEnv
 import NameSet
 import PrelNames	( isUnboundName )
 import RdrName		( RdrName, rdrNameOcc )
-import SrcLoc		( mkSrcSpan, Located(..), unLoc )
+import SrcLoc		( Located(..), unLoc )
 import ListSetOps	( findDupsEq )
 import BasicTypes	( RecFlag(..) )
 import Digraph		( SCC(..), stronglyConnComp )
@@ -629,10 +629,20 @@ dupSigDeclErr sigs@(L loc sig : _)
     ppr_sig (L loc sig) = ppr loc <> colon <+> ppr sig
 
 unknownSigErr (L loc sig)
-  = addErrAt loc $
-	sep [ptext SLIT("Misplaced") <+> what_it_is <> colon, ppr sig]
+  = do	{ mod <- getModule
+	; addErrAt loc $
+		vcat [sep [ptext SLIT("Misplaced") <+> what_it_is <> colon, ppr sig],
+		      extra_stuff mod sig] }
   where
     what_it_is = hsSigDoc sig
+    extra_stuff mod  (TypeSig (L _ n) _)
+	| nameIsLocalOrFrom mod n
+	= ptext SLIT("The type signature must be given where")
+		<+> quotes (ppr n) <+> ptext SLIT("is declared")
+	| otherwise
+	= ptext SLIT("You cannot give a type signature for an imported value")
+
+    extra_stuff mod other = empty
 
 methodBindErr mbind
  =  hang (ptext SLIT("Pattern bindings (except simple variables) not allowed in instance declarations"))

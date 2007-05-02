@@ -195,8 +195,25 @@ lookupTopBndrRn rdr_name
 -- The Haskell98 report does not stipulate this, but it will!
 -- So we must treat the 'f' in the signature in the same way
 -- as the binding occurrence of 'f', using lookupBndrRn
+--
+-- However, consider this case:
+--	import M( f )
+--	f :: Int -> Int
+--	g x = x
+-- We don't want to say 'f' is out of scope; instead, we want to
+-- return the imported 'f', so that later on the reanamer will
+-- correctly report "misplaced type sig".
 lookupLocatedSigOccRn :: Located RdrName -> RnM (Located Name)
-lookupLocatedSigOccRn = lookupLocatedBndrRn
+lookupLocatedSigOccRn = wrapLocM $ \ rdr_name -> do
+	{ local_env <- getLocalRdrEnv
+	; case lookupLocalRdrEnv local_env rdr_name of {
+		Just n  -> return n ;
+		Nothing -> do
+	{ mb_gre <- lookupGreLocalRn rdr_name
+	; case mb_gre of 
+		Just gre -> return (gre_name gre) 
+		Nothing  -> lookupGlobalOccRn rdr_name
+	}}}
 
 -- lookupInstDeclBndr is used for the binders in an 
 -- instance declaration.   Here we use the class name to
