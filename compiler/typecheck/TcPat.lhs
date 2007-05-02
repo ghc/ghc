@@ -584,8 +584,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	}
   where
     -- Split against the family tycon if the pattern constructor 
-    -- belongs to a representation tycon.
-    --
+    -- belongs to a family instance tycon.
     boxySplitTyConAppWithFamily tycon pat_ty =
       traceTc traceMsg >>
       case tyConFamInst_maybe tycon of

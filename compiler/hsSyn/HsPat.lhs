@@ -131,7 +131,7 @@ data Pat id
   | CoPat 	HsWrapper		-- If co::t1 -> t2, p::t2, 
 					-- then (CoPat co p) :: t1
 		(Pat id)		-- Why not LPat?  Ans: existing locn will do
-	    	Type
+	    	Type			-- Type of whole pattern, t1
 	-- During desugaring a (CoPat co pat) turns into a cast with 'co' on 
 	-- the scrutinee, followed by a match on 'pat'
 \end{code}

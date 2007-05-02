@@ -65,6 +65,7 @@ instance Ord ModulePair where
 --
 type ModulePairSet = FiniteMap ModulePair ()
 
+listToSet :: [ModulePair] -> ModulePairSet
 listToSet l = listToFM (zip l (repeat ()))
 
 checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
