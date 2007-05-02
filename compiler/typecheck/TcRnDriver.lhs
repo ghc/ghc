@@ -688,12 +688,17 @@ tcTopSrcDecls boot_details
 		-- We also typecheck any extra binds that came out 
 		-- of the "deriving" process (deriv_binds)
         traceTc (text "Tc5") ;
-	(tc_val_binds, tcl_env) <- tcTopBinds (val_binds `plusHsValBinds` deriv_binds) ;
+	(tc_val_binds,   tcl_env) <- tcTopBinds val_binds ;
 	setLclTypeEnv tcl_env 	$ do {
+
+		-- Now GHC-generated derived bindings and generics
+		-- Do not generate warnings from compiler-generated code
+	(tc_deriv_binds, tcl_env) <- discardWarnings $ setOptM Opt_GlasgowExts $ 
+				     tcTopBinds deriv_binds ;
 
 	     	-- Second pass over class and instance declarations, 
         traceTc (text "Tc6") ;
-	(inst_binds, tcl_env) <- tcInstDecls2 tycl_decls inst_infos ;
+	(inst_binds, tcl_env)     <- setLclTypeEnv tcl_env $ tcInstDecls2 tycl_decls inst_infos ;
 	showLIE (text "after instDecls2") ;
 
 		-- Foreign exports
@@ -708,6 +713,7 @@ tcTopSrcDecls boot_details
         traceTc (text "Tc7a") ;
 	tcg_env <- getGblEnv ;
 	let { all_binds = tc_val_binds	 `unionBags`
+			  tc_deriv_binds `unionBags`
 			  inst_binds	 `unionBags`
 			  foe_binds  ;
 
