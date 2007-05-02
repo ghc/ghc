@@ -259,6 +259,7 @@ mkAltExpr (DataAlt con) args inst_tys
   = mkConApp con (map Type inst_tys ++ varsToCoreExprs args)
 mkAltExpr (LitAlt lit) [] []
   = Lit lit
+mkAltExpr DEFAULT = panic "mkAltExpr"
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
