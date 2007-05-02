@@ -45,6 +45,7 @@
 ^libraries/html/
 ^libraries/monads/
 ^libraries/mtl/
+^libraries/ndp/
 ^libraries/network/
 ^libraries/parsec/
 ^libraries/readline/
