@@ -14,7 +14,6 @@
 <!ENTITY packages       SYSTEM "packages.xml" >
 <!ENTITY parallel       SYSTEM "parallel.xml" >
 <!ENTITY phases         SYSTEM "phases.xml" >
-<!ENTITY primitives     SYSTEM "primitives.xml" >
 <!ENTITY separate       SYSTEM "separate_compilation.xml" >
 <!ENTITY bugs           SYSTEM "bugs.xml" >
 <!ENTITY wrong          SYSTEM "gone_wrong.xml" >

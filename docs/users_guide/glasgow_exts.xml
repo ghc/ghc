@@ -277,8 +277,6 @@ documentation</ulink> describes all the libraries that come with GHC.
   </sect1>
 
 <!-- UNBOXED TYPES AND PRIMITIVE OPERATIONS -->
-<!--    included from primitives.sgml  -->
-<!-- &primitives; -->
 <sect1 id="primitives">
   <title>Unboxed types and primitive operations</title>
 
