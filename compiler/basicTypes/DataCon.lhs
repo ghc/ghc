@@ -246,6 +246,8 @@ data DataCon
 		--       The declaration format is held in the TyCon (algTcGadtSyntax)
 
 	dcUnivTyVars :: [TyVar],	-- Universally-quantified type vars 
+					-- INVARIANT: length matches arity of the dcRepTyCon
+
 	dcExTyVars   :: [TyVar],	-- Existentially-quantified type vars 
 		-- In general, the dcUnivTyVars are NOT NECESSARILY THE SAME AS THE TYVARS
 		-- FOR THE PARENT TyCon. With GADTs the data con might not even have 
@@ -484,20 +486,24 @@ mkDataCon name declared_infix
     real_stricts = map mk_dict_strict_mark theta ++ arg_stricts
 
 	-- Example
-	--   data instance T [a] where 
-	--	TI :: forall b. b -> T [Maybe b]
+	--   data instance T (b,c) where 
+	--	TI :: forall e. e -> T (e,e)
+	--
 	-- The representation tycon looks like this:
-	--   data :R7T a where 
-	--	TI :: forall b c. (c :=: Maybe b) b -> :R7T c
+	--   data :R7T b c where 
+	--	TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
+
     orig_res_ty 
 	| Just (fam_tc, fam_tys) <- tyConFamInst_maybe tycon
-	, let fam_subst = zipTopTvSubst (tyConTyVars fam_tc) res_tys
+	, let fam_subst = zipTopTvSubst (tyConTyVars tycon) res_tys
 	= mkTyConApp fam_tc (substTys fam_subst fam_tys)
 	| otherwise
 	= mkTyConApp tycon res_tys
 	where
 	  res_tys = substTyVars (mkTopTvSubst eq_spec) univ_tvs
-		-- In the example above, res_tys is a singleton, (Maybe b)
+		-- In the example above, 
+		--	univ_tvs = [ b1, c1 ]
+		--	res_tys  = [ b1, b1 ]
 
 	-- Representation arguments and demands
 	-- To do: eliminate duplication with MkId

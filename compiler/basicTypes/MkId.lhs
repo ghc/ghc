@@ -181,10 +181,12 @@ tyConFamilyCoercion_maybe and has kind
 
 The wrapper and worker of MapPair get the types
 
+	-- Wrapper
   $WMapPair :: forall a b v. Map a (Map a b v) -> Map (a, b) v
-  $WMapPair a b v = $wMapPair a b v `cast` sym (Co123Map a b v)
+  $WMapPair a b v = MapPair a b v `cast` sym (Co123Map a b v)
 
-  $wMapPair :: forall a b v. Map a (Map a b v) -> :R123Map a b v
+	-- Worker
+  MapPair :: forall a b v. Map a (Map a b v) -> :R123Map a b v
 
 This coercion is conditionally applied by wrapFamInstBody.
 
@@ -197,11 +199,13 @@ Hence
 
 Now we want
 
+	-- Wrapper
   $WT1 :: forall b. b -> T [Maybe b]
-  $WT1 a b v = $wT1 b (Maybe b) (Maybe b) 
+  $WT1 b v = T1 (Maybe b) b (Maybe b) v
 			`cast` sym (Co7T (Maybe b))
 
-  $wT1 :: forall b c. (b ~ Maybe c) => b -> :R7T c
+	-- Worker
+  T1 :: forall c b. (c ~ Maybe b) => b -> :R7T c
 
 \begin{code}
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
@@ -220,19 +224,7 @@ mkDataConIds wrap_name wkr_name data_con
   where
     (univ_tvs, ex_tvs, eq_spec, 
      theta, orig_arg_tys, res_ty) = dataConFullSig data_con
-    res_ty_args			  = tyConAppArgs res_ty
-    tycon                         = dataConTyCon data_con
-
-	----------- Wrapper --------------
-	-- We used to include the stupid theta in the wrapper's args
-	-- but now we don't.  Instead the type checker just injects these
-	-- extra constraints where necessary.
-    wrap_tvs = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
-    dict_tys = mkPredTys theta
-    wrap_ty  = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
-	       mkFunTys orig_arg_tys $ res_ty
-	-- NB: watch out here if you allow user-written equality 
-	--     constraints in data constructor signatures
+    tycon = dataConTyCon data_con	-- The representation TyCon (not family)
 
 	----------- Worker (algebraic data types only) --------------
 	-- The *worker* for the data constructor is the function that
@@ -289,13 +281,25 @@ mkDataConIds wrap_name wkr_name data_con
 
     id_arg1 = mkTemplateLocal 1 (head orig_arg_tys)
 
+	----------- Wrapper --------------
+	-- We used to include the stupid theta in the wrapper's args
+	-- but now we don't.  Instead the type checker just injects these
+	-- extra constraints where necessary.
+    wrap_tvs    = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
+    res_ty_args	= substTyVars (mkTopTvSubst eq_spec) univ_tvs
+    dict_tys = mkPredTys theta
+    wrap_ty  = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
+	       mkFunTys orig_arg_tys $ res_ty
+	-- NB: watch out here if you allow user-written equality 
+	--     constraints in data constructor signatures
+
 	----------- Wrappers for algebraic data types -------------- 
     alg_wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty alg_wrap_info
     alg_wrap_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
-		    `setArityInfo` 	   alg_arity
+		    `setArityInfo` 	   wrap_arity
 			-- It's important to specify the arity, so that partial
 			-- applications are treated as values
-		    `setUnfoldingInfo`     alg_unf
+		    `setUnfoldingInfo`     wrap_unf
 		    `setAllStrictnessInfo` Just wrap_sig
 
     all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
@@ -312,7 +316,7 @@ mkDataConIds wrap_name wkr_name data_con
 	--	...(let w = C x in ...(w p q)...)...
 	-- we want to see that w is strict in its two arguments
 
-    alg_unf = mkTopUnfolding $ Note InlineMe $
+    wrap_unf = mkTopUnfolding $ Note InlineMe $
 	      mkLams wrap_tvs $ 
 	      mkLams dict_args $ mkLams id_args $
 	      foldr mk_case con_app 
@@ -327,7 +331,7 @@ mkDataConIds wrap_name wkr_name data_con
 
     (dict_args,i2) = mkLocals 1  dict_tys
     (id_args,i3)   = mkLocals i2 orig_arg_tys
-    alg_arity	   = i3-1
+    wrap_arity	   = i3-1
 
     mk_case 
 	   :: (Id, StrictnessMark)	-- Arg, strictness
@@ -1127,7 +1131,7 @@ seqId
 -- not from GHC.Base.hi.   This is important, because the strictness
 -- analyser will spot it as strict!
 --
--- Also no unfolding in lazyId: it gets "inlined" by a HACK in the worker/wrapper pass
+-- Also no unfolding in lazyId: it gets "inlined" by a HACK in the worker/wrapperpass
 --	(see WorkWrap.wwExpr)	
 -- We could use inline phases to do this, but that would be vulnerable to changes in 
 -- phase numbering....we must inline precisely after strictness analysis.

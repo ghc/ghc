@@ -204,7 +204,13 @@ data AlgTyConRhs
 
   -- The constructor represents an open family without a fixed right hand
   -- side.  Additional instances can appear at any time.
-  --
+  -- 
+  -- These are introduced by either a top level decl:
+  --	data T a :: *
+  -- or an assoicated data type decl, in a class decl:
+  --    class C a b where
+  --	  data T b :: *
+
   | OpenTyCon {
 
       otArgPoss   :: Maybe [Int],  
@@ -267,31 +273,41 @@ visibleDataCons OpenTyCon {}		      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 
--- Both type classes as well as family instances imply implicit type 
--- constructors.  These implicit type constructors refer to their parent
+-- Both type classes as well as family instances imply implicit
+-- type constructors.  These implicit type constructors refer to their parent
 -- structure (ie, the class or family from which they derive) using a type of
 -- the following form.  We use `TyConParent' for both algebraic and synonym 
 -- types, but the variant `ClassTyCon' will only be used by algebraic tycons.
---
+
 data TyConParent 
   = NoParentTyCon	-- An ordinary type constructor has no parent.
 
   | ClassTyCon      	-- Type constructors representing a class dictionary.
-	Class	
+	Class		-- INVARIANT: the classTyCon of this Class is the current tycon
 
   | FamilyTyCon		-- Type constructors representing an instance of a type
 	TyCon		--   The type family
 	[Type]		--   Instance types; free variables are the tyConTyVars
-			--	of this TyCon
+			--	of the current TyCon (not the family one)
+			--	INVARIANT: the number of types matches the arity 
+			--		   of the family tycon
 	TyCon		--   A CoercionTyCon identifying the representation 
 			--     type with the type instance family.  
 			--	c.f. Note [Newtype coercions]
+
+	--
 	-- E.g.  data intance T [a] = ...
 	-- gives a representation tycon:
 	--	data :R7T a = ...
 	-- 	axiom co a :: T [a] ~ :R7T a
 	-- with :R7T's algTcParent = FamilyTyCon T [a] co
 
+okParent :: Name -> TyConParent -> Bool	-- Checks invariants
+okParent tc_name NoParentTyCon    		= True
+okParent tc_name (ClassTyCon cls) 		= tyConName (classTyCon cls) == tc_name
+okParent tc_name (FamilyTyCon fam_tc tys co_tc) = tyConArity fam_tc == length tys
+
+--------------------
 data SynTyConRhs
   = OpenSynTyCon Kind	        -- Type family: *result* kind given
 		 (Maybe [Int])  -- for associated families: for each tyvars in
@@ -373,6 +389,39 @@ we get:
 And now Lint complains unless Foo T == Foo [], and that requires T==[]
 
 
+Note [Indexed data types] (aka data type families)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   See also Note [Wrappers for data instance tycons] in MkId.lhs
+
+Consider
+	data family T a
+
+	data instance T (b,c) where
+	  T1 :: b -> c -> T (b,c)
+
+Then
+  * T is the "family TyCon"
+
+  * We make "representation TyCon" :R1T, thus:
+	data :R1T b c where
+	  T1 ::	forall b c. b -> c -> :R1T b c
+
+  * It has a top-level coercion connecting it to the family TyCon
+
+	axiom :Co:R1T b c : T (b,c) ~ :R1T b c
+
+  * The data contructor T1 has a wrapper (which is what the source-level
+    "T1" invokes):
+
+	$WT1 :: forall b c. b -> c -> T (b,c)
+	$WT1 b c (x::b) (y::c) = T1 b c x y `cast` sym (:Co:R1T b c)
+
+  * The representation TyCon :R1T has an AlgTyConParent of
+
+	FamilyTyCon T [(b,c)] :Co:R1T
+
+
+
 %************************************************************************
 %*									*
 \subsection{PrimRep}
@@ -445,7 +494,7 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
 	algTcStupidTheta = stupid,
 	algTcRhs         = rhs,
 	algTcSelIds	 = sel_ids,
-	algTcParent	 = parent,
+	algTcParent	 = ASSERT( okParent name parent ) parent,
 	algTcRec	 = is_rec,
 	algTcGadtSyntax  = gadt_syn,
 	hasGenerics = gen_info
