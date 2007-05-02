@@ -543,7 +543,7 @@ cond_isProduct (gla_exts, rep_tc)
   | isProductTyCon rep_tc = Nothing
   | otherwise	          = Just why
   where
-    why = (pprSourceTyCon rep_tc) <+> 
+    why = quotes (pprSourceTyCon rep_tc) <+> 
 	  ptext SLIT("has more than one constructor")
 
 cond_typeableOK :: Condition

@@ -54,8 +54,7 @@ module Type (
 	applyTy, applyTys, isForAllTy, dropForAlls,
 
 	-- Source types
-	predTypeRep, mkPredTy, mkPredTys,
-	tyConOrigHead, pprSourceTyCon,
+	predTypeRep, mkPredTy, mkPredTys, pprSourceTyCon,
 
 	-- Newtypes
 	splitRecNewType_maybe, newTyConInstRhs,
@@ -603,13 +602,6 @@ predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 	-- Result might be a newtype application, but the consumer will
 	-- look through that too if necessary
 predTypeRep (EqPred ty1 ty2) = pprPanic "predTypeRep" (ppr (EqPred ty1 ty2))
-
--- The original head is the tycon and its variables for a vanilla tycon and it
--- is the family tycon and its type indexes for a family instance.
-tyConOrigHead :: TyCon -> (TyCon, [Type])
-tyConOrigHead tycon = case tyConFamInst_maybe tycon of
-		        Nothing      -> (tycon, mkTyVarTys (tyConTyVars tycon))
-			Just famInst -> famInst
 
 -- Pretty prints a tycon, using the family instance in case of a
 -- representation tycon.  For example
