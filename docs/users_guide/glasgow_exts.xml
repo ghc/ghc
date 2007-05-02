@@ -381,6 +381,13 @@ worse, the unboxed value might be larger than a pointer
 (<literal>Double&num;</literal> for instance).
 </para>
 </listitem>
+<listitem><para> You cannot define a newtype whose representation type
+(the argument type of the data constructor) is an unboxed type.  Thus,
+this is illegal:
+<programlisting>
+  newtype A = MkA Int#
+</programlisting>
+</para></listitem>
 <listitem><para> You cannot bind a variable with an unboxed type
 in a <emphasis>top-level</emphasis> binding.
 </para></listitem>
