@@ -797,7 +797,7 @@ A naked expression returns a singleton Name [it].
 hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
   :: HscEnv
   -> String			-- The statement
-  -> IO (Maybe (InteractiveContext, [Name], HValue))
+  -> IO (Maybe ([Id], HValue))
 
 hscStmt hsc_env stmt
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) stmt
@@ -812,12 +812,11 @@ hscStmt hsc_env stmt
 
 	; case maybe_tc_result of {
 		Nothing -> return Nothing ;
-		Just (new_ic, bound_names, tc_expr) -> do {
-
+		Just (ids, tc_expr) -> do {
 
 	 	-- Desugar it
-	; let rdr_env  = ic_rn_gbl_env new_ic
-	      type_env = ic_type_env new_ic
+	; let rdr_env  = ic_rn_gbl_env icontext
+	      type_env = mkTypeEnv (map AnId (ic_tmp_ids icontext))
 	; mb_ds_expr <- deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
 	
 	; case mb_ds_expr of {
@@ -828,7 +827,7 @@ hscStmt hsc_env stmt
 	; let src_span = srcLocSpan interactiveSrcLoc
 	; hval <- compileExpr hsc_env src_span ds_expr
 
-	; return (Just (new_ic, bound_names, hval))
+	; return (Just (ids, hval))
 	}}}}}}}
 
 hscTcExpr	-- Typecheck an expression (but don't run it)

@@ -47,7 +47,6 @@ data GHCiState = GHCiState
 	session        :: GHC.Session,
 	options        :: [GHCiOption],
         prelude        :: GHC.Module,
-        resume         :: [EvalInProgress],
         breaks         :: !ActiveBreakPoints,
         tickarrays     :: ModuleEnv TickArray
                 -- tickarrays caches the TickArray for loaded modules,
@@ -68,14 +67,6 @@ data ActiveBreakPoints
    { breakCounter   :: !Int
    , breakLocations :: ![(Int, BreakLocation)]  -- break location uniquely numbered 
    }
-
--- The context of an evaluation in progress that stopped at a breakpoint
-data EvalInProgress
-   = EvalInProgress
-   { evalStmt         :: String,
-     evalSpan         :: SrcSpan,
-     evalThreadId     :: ThreadId,
-     evalResumeHandle :: GHC.ResumeHandle }
 
 instance Outputable ActiveBreakPoints where
    ppr activeBrks = prettyLocations $ breakLocations activeBrks 
@@ -188,24 +179,6 @@ unsetOption opt
 
 io :: IO a -> GHCi a
 io m = GHCi { unGHCi = \s -> m >>= return }
-
-popResume :: GHCi (Maybe EvalInProgress)
-popResume = do
-   st <- getGHCiState 
-   case (resume st) of
-      []     -> return Nothing
-      (x:xs) -> do setGHCiState $ st { resume = xs } ; return (Just x)
-         
-pushResume :: EvalInProgress -> GHCi ()
-pushResume eval = do
-   st <- getGHCiState
-   let oldResume = resume st
-   setGHCiState $ st { resume = eval : oldResume }
-
-discardResumeContext :: GHCi ()
-discardResumeContext = do
-   st <- getGHCiState
-   setGHCiState st { resume = [] }
 
 printForUser :: SDoc -> GHCi ()
 printForUser doc = do

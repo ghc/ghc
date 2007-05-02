@@ -95,17 +95,15 @@ pprintClosureCommand session bindThings force str = do
       hsc_env <- readIORef ref
       inScope <- GHC.getBindings cms
       let ictxt    = hsc_IC hsc_env
-          type_env = ic_type_env ictxt
-          ids      = typeEnvIds type_env
+          ids      = ic_tmp_ids ictxt
           ids'     = map (\id -> id `setIdType` substTy subst (idType id)) ids
-          type_env'= extendTypeEnvWithIds type_env ids'
           subst_dom= varEnvKeys$ getTvSubstEnv subst
           subst_ran= varEnvElts$ getTvSubstEnv subst
           new_tvs  = [ tv | t <- subst_ran, let Just tv = getTyVar_maybe t]  
           ic_tyvars'= (`delVarSetListByKey` subst_dom) 
                     . (`extendVarSetList`   new_tvs)
                         $ ic_tyvars ictxt
-          ictxt'   = ictxt { ic_type_env = type_env'
+          ictxt'   = ictxt { ic_tmp_ids = ids'
                            , ic_tyvars   = ic_tyvars' }
       writeIORef ref (hsc_env {hsc_IC = ictxt'})
 
@@ -129,7 +127,7 @@ bindSuspensions cms@(Session ref) t = do
       hsc_env <- readIORef ref
       inScope <- GHC.getBindings cms
       let ictxt        = hsc_IC hsc_env
-          type_env     = ic_type_env ictxt
+          type_env     = ic_tmp_ids ictxt
           prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
           availNames   = map ((prefix++) . show) [1..] \\ alreadyUsedNames 
@@ -140,9 +138,8 @@ bindSuspensions cms@(Session ref) t = do
       let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
                 | (name,ty) <- zip names tys']
           new_tyvars   = tyVarsOfTypes tys'
-          new_type_env = extendTypeEnvWithIds type_env ids 
           old_tyvars   = ic_tyvars ictxt
-          new_ic       = ictxt { ic_type_env = new_type_env,
+          new_ic       = ictxt { ic_tmp_ids = ids ++ ic_tmp_ids ictxt,
                                  ic_tyvars   = old_tyvars `unionVarSet` new_tyvars }
       extendLinkEnv (zip names hvals)
       writeIORef ref (hsc_env {hsc_IC = new_ic })
@@ -199,10 +196,9 @@ printTerm cms@(Session ref) = cPprTerm cPpr
   bindToFreshName hsc_env ty userName = do
     name <- newGrimName cms userName 
     let ictxt    = hsc_IC hsc_env
-        type_env = ic_type_env ictxt
+        tmp_ids  = ic_tmp_ids ictxt
         id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
-        new_type_env = extendTypeEnv type_env (AnId id)
-        new_ic       = ictxt { ic_type_env     = new_type_env }
+        new_ic   = ictxt { ic_tmp_ids = id : tmp_ids }
     return (hsc_env {hsc_IC = new_ic }, name)
 
 --    Create new uniques and give them sequentially numbered names

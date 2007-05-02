@@ -140,7 +140,7 @@ data BCInstr
 data BreakInfo 
    = BreakInfo
    { breakInfo_module :: Module
-   , breakInfo_number :: Int
+   , breakInfo_number :: {-# UNPACK #-} !Int
    , breakInfo_vars   :: [(Id,Int)]
    , breakInfo_resty  :: Type
    }

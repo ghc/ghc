@@ -62,7 +62,6 @@ import CoreSyn
 import ErrUtils
 import Id
 import Var
-import VarSet
 import Module
 import UniqFM
 import Name
@@ -833,7 +832,7 @@ setInteractiveContext hsc_env icxt thing_inside
 	tcg_inst_env = extendInstEnvList (tcg_inst_env env) dfuns }) $
 
 
-    tcExtendIdEnv (typeEnvIds (ic_type_env icxt)) $
+    tcExtendIdEnv (reverse (ic_tmp_ids icxt)) $
         -- tcExtendIdEnv does lots: 
         --   - it extends the local type env (tcl_env) with the given Ids,
         --   - it extends the local rdr env (tcl_rdr) with the Names from 
@@ -841,11 +840,11 @@ setInteractiveContext hsc_env icxt thing_inside
         --   - it adds the free tyvars of the Ids to the tcl_tyvars
         --     set.
         --
-        -- We should have no Ids with the same name in the
-        -- ic_type_env, otherwise we'll end up with shadowing in the
-        -- tcl_rdr, and it's random which one will be in scope.
+        -- earlier ids in ic_tmp_ids must shadow later ones with the same
+        -- OccName, but tcExtendIdEnv has the opposite behaviour, hence the
+        -- reverse above.
 
-    do	{ traceTc (text "setIC" <+> ppr (ic_type_env icxt))
+    do	{ traceTc (text "setIC" <+> ppr (ic_tmp_ids icxt))
  	; thing_inside }
 \end{code}
 
@@ -854,9 +853,10 @@ setInteractiveContext hsc_env icxt thing_inside
 tcRnStmt :: HscEnv
 	 -> InteractiveContext
 	 -> LStmt RdrName
-	 -> IO (Maybe (InteractiveContext, [Name], LHsExpr Id))
-		-- The returned [Name] is the same as the input except for
-		-- ExprStmt, in which case the returned [Name] is [itName]
+	 -> IO (Maybe ([Id], LHsExpr Id))
+		-- The returned [Id] is the list of new Ids bound by
+                -- this statement.  It can be used to extend the
+                -- InteractiveContext via extendInteractiveContext.
 		--
 		-- The returned TypecheckedHsExpr is of type IO [ () ],
 		-- a list of the bound values, coerced to ().
@@ -891,8 +891,6 @@ tcRnStmt hsc_env ictxt rdr_stmt
 		--     up to have tidy types
 	global_ids = map globaliseAndTidy zonked_ids ;
     
-	bound_names = map idName global_ids ;
-
 {- ---------------------------------------------
    At one stage I removed any shadowed bindings from the type_env;
    they are inaccessible but might, I suppose, cause a space leak if we leave them there.
@@ -911,15 +909,13 @@ tcRnStmt hsc_env ictxt rdr_stmt
    Hence this code is commented out
 
 -------------------------------------------------- -}
-
-	new_ic = extendInteractiveContext ictxt global_ids emptyVarSet ;
     } ;
 
     dumpOptTcRn Opt_D_dump_tc 
     	(vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
     	       text "Typechecked expr" <+> ppr zonked_expr]) ;
 
-    returnM (new_ic, bound_names, zonked_expr)
+    returnM (global_ids, zonked_expr)
     }
   where
     bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),

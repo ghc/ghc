@@ -6,7 +6,8 @@
 \begin{code}
 module HscTypes ( 
 	-- * Sessions and compilation state
-	Session(..), HscEnv(..), hscEPS,
+	Session(..), withSession, modifySession, 
+        HscEnv(..), hscEPS,
 	FinderCache, FindResult(..), ModLocationCache,
 	Target(..), TargetId(..), pprTarget, pprTargetId,
 	ModuleGraph, emptyMG,
@@ -14,7 +15,7 @@ module HscTypes (
 	ModDetails(..),	emptyModDetails,
 	ModGuts(..), CgGuts(..), ModImports(..), ForeignStubs(..),
 
-	ModSummary(..), showModMsg, isBootSummary,
+	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath, 
 
 	HscSource(..), isHsBoot, hscSourceString,	-- Re-exported from DriverPhases
@@ -69,6 +70,7 @@ module HscTypes (
 
 #ifdef GHCI
 import ByteCodeAsm	( CompiledByteCode )
+import {-# SOURCE #-}  InteractiveEval ( Resume )
 #endif
 
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv,
@@ -112,7 +114,7 @@ import FastString	( FastString )
 import StringBuffer	( StringBuffer )
 
 import System.Time	( ClockTime )
-import Data.IORef	( IORef, readIORef )
+import Data.IORef
 import Data.Array       ( Array, array )
 \end{code}
 
@@ -130,6 +132,12 @@ import Data.Array       ( Array, array )
 -- constituting the current program or library, the context for
 -- interactive evaluation, and various caches.
 newtype Session = Session (IORef HscEnv)
+
+withSession :: Session -> (HscEnv -> IO a) -> IO a
+withSession (Session ref) f = do h <- readIORef ref; f h
+
+modifySession :: Session -> (HscEnv -> HscEnv) -> IO ()
+modifySession (Session ref) f = do h <- readIORef ref; writeIORef ref $! f h
 \end{code}
 
 HscEnv is like Session, except that some of the fields are immutable.
@@ -615,27 +623,32 @@ data InteractiveContext
 	ic_rn_gbl_env :: GlobalRdrEnv,	-- The cached GlobalRdrEnv, built from
 					-- ic_toplev_scope and ic_exports
 
-	ic_type_env :: TypeEnv,         -- Type env for names bound during
-                                        -- interaction.  NB. the names from
-                                        -- these Ids are used to populate
-                                        -- the LocalRdrEnv used during
-                                        -- typechecking of a statement, so
-                                        -- there should be no duplicate
-                                        -- names in here.
+	ic_tmp_ids :: [Id],             -- Names bound during interaction.
+                                        -- Earlier Ids shadow
+                                        -- later ones with the same OccName.
 
         ic_tyvars :: TyVarSet           -- skolem type variables free in
-                                        -- ic_type_env.  These arise at
+                                        -- ic_tmp_ids.  These arise at
                                         -- breakpoints in a polymorphic 
                                         -- context, where we have only partial
                                         -- type information.
+
+#ifdef GHCI
+        , ic_resume :: [Resume]         -- the stack of breakpoint contexts
+#endif
     }
+
 
 emptyInteractiveContext
   = InteractiveContext { ic_toplev_scope = [],
 			 ic_exports = [],
 			 ic_rn_gbl_env = emptyGlobalRdrEnv,
-			 ic_type_env = emptyTypeEnv,
-                         ic_tyvars = emptyVarSet }
+			 ic_tmp_ids = [],
+                         ic_tyvars = emptyVarSet
+#ifdef GHCI
+                         , ic_resume = []
+#endif
+                       }
 
 icPrintUnqual :: InteractiveContext -> PrintUnqualified
 icPrintUnqual ictxt = mkPrintUnqualified (ic_rn_gbl_env ictxt)
@@ -647,19 +660,8 @@ extendInteractiveContext
         -> TyVarSet
         -> InteractiveContext
 extendInteractiveContext ictxt ids tyvars
-  = ictxt { ic_type_env = extendTypeEnvWithIds filtered_type_env ids,
+  = ictxt { ic_tmp_ids =  ids ++ ic_tmp_ids ictxt,
             ic_tyvars   = ic_tyvars ictxt `unionVarSet` tyvars }
-  where
-       type_env    = ic_type_env ictxt
-       bound_names = map idName ids
-       -- Remove any shadowed bindings from the type_env;
-       -- we aren't allowed any duplicates because the LocalRdrEnv is
-       -- build directly from the Ids in the type env in here.
-       old_bound_names = map idName (typeEnvIds type_env)
-       shadowed = [ n | name <- bound_names,
-                         n <- old_bound_names,
-                         nameOccName name == nameOccName n ]
-       filtered_type_env = delListFromNameEnv type_env shadowed
 \end{code}
 
 %************************************************************************
@@ -1140,6 +1142,9 @@ data ModSummary
                                                 -- and LANGUAGE pragmas.
 	ms_hspp_buf  :: Maybe StringBuffer    	-- The actual preprocessed source, maybe.
      }
+
+ms_mod_name :: ModSummary -> ModuleName
+ms_mod_name = moduleName . ms_mod
 
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been

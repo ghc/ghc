@@ -21,7 +21,7 @@ import Debugger
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Type, Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex, Name, SrcSpan )
+                          BreakIndex, Name, SrcSpan, Resume )
 import DynFlags
 import Packages
 import PackageConfig
@@ -34,7 +34,6 @@ import Module           -- for ModuleEnv
 import Digraph
 import BasicTypes hiding (isTopLevel)
 import Panic      hiding (showException)
-import FastString       ( unpackFS )
 import Config
 import StaticFlags
 import Linker
@@ -269,7 +268,6 @@ interactiveUI session srcs maybe_expr = do
 		   session = session,
 		   options = [],
                    prelude = prel_mod,
-                   resume = [],
                    breaks = emptyActiveBreakPoints,
                    tickarrays = emptyModuleEnv
                  }
@@ -417,7 +415,8 @@ fileLoop hdl show_prompt = do
    session <- getSession
    (mod,imports) <- io (GHC.getContext session)
    st <- getGHCiState
-   when show_prompt (io (putStr (mkPrompt mod imports (resume st) (prompt st))))
+   resumes <- io $ GHC.getResumeContext session
+   when show_prompt (io (putStr (mkPrompt mod imports resumes (prompt st))))
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e		   -> return ()
@@ -453,7 +452,7 @@ mkPrompt toplevs exports resumes prompt
         perc_s
           | eval:rest <- resumes 
           = (if not (null rest) then text "... " else empty)
-            <> brackets (ppr (evalSpan eval)) <+> modules_prompt
+            <> brackets (ppr (GHC.resumeSpan eval)) <+> modules_prompt
           | otherwise
           = modules_prompt
 
@@ -471,7 +470,8 @@ readlineLoop = do
    io yield
    saveSession -- for use by completion
    st <- getGHCiState
-   l <- io (readline (mkPrompt mod imports (resume st) (prompt st))
+   resumes <- io $ GHC.getResumeContext session
+   l <- io (readline (mkPrompt mod imports resumes (prompt st))
 	  	`finally` setNonBlockingFD 0)
 		-- readline sometimes puts stdin into blocking mode,
 		-- so we need to put it back for the IO library
@@ -492,7 +492,7 @@ runCommand c = ghciHandle handler (doCommand c)
   where 
     doCommand (':' : command) = specialCommand command
     doCommand stmt
-       = do timeIt (do nms <- runStmt stmt; finishEvalExpr nms)
+       = do timeIt $ runStmt stmt
             return False
 
 -- This version is for the GHC command-line option -e.  The only difference
@@ -506,28 +506,50 @@ runCommandEval c = ghciHandle handleEval (doCommand c)
 
     doCommand (':' : command) = specialCommand command
     doCommand stmt
-       = do nms <- runStmt stmt
-	    case nms of 
-		Nothing -> io (exitWith (ExitFailure 1))
+       = do r <- runStmt stmt
+	    case r of 
+		False -> io (exitWith (ExitFailure 1))
 		  -- failure to run the command causes exit(1) for ghc -e.
-		_       -> do finishEvalExpr nms
-                              return True
+		_       -> return True
 
-runStmt :: String -> GHCi (Maybe (Bool,[Name]))
+runStmt :: String -> GHCi Bool
 runStmt stmt
- | null (filter (not.isSpace) stmt) = return (Just (False,[]))
+ | null (filter (not.isSpace) stmt) = return False
  | otherwise
  = do st <- getGHCiState
       session <- getSession
       result <- io $ withProgName (progname st) $ withArgs (args st) $
 	     	     GHC.runStmt session stmt
-      switchOnRunResult stmt result
+      afterRunStmt result
+      return False
 
-switchOnRunResult :: String -> GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
-switchOnRunResult stmt GHC.RunFailed = return Nothing
-switchOnRunResult stmt (GHC.RunException e) = throw e
-switchOnRunResult stmt (GHC.RunOk names) = return $ Just (False,names)
-switchOnRunResult stmt (GHC.RunBreak threadId names info resume) = do
+
+afterRunStmt :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
+afterRunStmt run_result = do
+  mb_result <- switchOnRunResult run_result
+
+  -- possibly print the type and revert CAFs after evaluating an expression
+  show_types <- isOptionSet ShowType
+  session <- getSession
+  case mb_result of
+    Nothing    -> return ()      
+    Just (is_break,names) -> 
+            when (is_break || show_types) $
+                  mapM_ (showTypeOfName session) names
+  
+  flushInterpBuffers
+  io installSignalHandlers
+  b <- isOptionSet RevertCAFs
+  io (when b revertCAFs)
+
+  return mb_result
+
+
+switchOnRunResult :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
+switchOnRunResult GHC.RunFailed = return Nothing
+switchOnRunResult (GHC.RunException e) = throw e
+switchOnRunResult (GHC.RunOk names) = return $ Just (False,names)
+switchOnRunResult (GHC.RunBreak threadId names info) = do
    session <- getSession
    Just mod_info <- io $ GHC.getModuleInfo session (GHC.breakInfo_module info) 
    let modBreaks  = GHC.modInfoModBreaks mod_info
@@ -537,31 +559,12 @@ switchOnRunResult stmt (GHC.RunBreak threadId names info resume) = do
    let location = ticks ! GHC.breakInfo_number info
    printForUser $ ptext SLIT("Stopped at") <+> ppr location
 
-   pushResume EvalInProgress{ evalStmt = stmt,
-                              evalSpan = location,
-                              evalThreadId = threadId,
-                              evalResumeHandle = resume }
-
    -- run the command set with ":set stop <cmd>"
    st <- getGHCiState
    runCommand (stop st)
 
    return (Just (True,names))
 
--- possibly print the type and revert CAFs after evaluating an expression
-finishEvalExpr mb_names
- = do show_types <- isOptionSet ShowType
-      session <- getSession
-      case mb_names of
-	Nothing    -> return ()      
-	Just (is_break,names) -> 
-                when (is_break || show_types) $
-                      mapM_ (showTypeOfName session) names
-
-      flushInterpBuffers
-      io installSignalHandlers
-      b <- isOptionSet RevertCAFs
-      io (when b revertCAFs)
 
 showTypeOfName :: Session -> Name -> GHCi ()
 showTypeOfName session n
@@ -787,7 +790,6 @@ reloadModule m = do
 
 afterLoad ok session = do
   io (revertCAFs)  -- always revert CAFs on load.
-  discardResumeContext
   discardTickArrays
   discardActiveBreakPoints
   graph <- io (GHC.getModuleGraph session)
@@ -1152,12 +1154,14 @@ showBkptTable = do
 
 showContext :: GHCi ()
 showContext = do
-   st <- getGHCiState
-   printForUser $ vcat (map pp_resume (reverse (resume st)))
+   session <- getSession
+   resumes <- io $ GHC.getResumeContext session
+   printForUser $ vcat (map pp_resume (reverse resumes))
   where
-   pp_resume eval =
-        ptext SLIT("--> ") <> text (evalStmt eval)
-        $$ nest 2 (ptext SLIT("Stopped at") <+> ppr (evalSpan eval))
+   pp_resume resume =
+        ptext SLIT("--> ") <> text (GHC.resumeStmt resume)
+        $$ nest 2 (ptext SLIT("Stopped at") <+> ppr (GHC.resumeSpan resume))
+
 
 -- -----------------------------------------------------------------------------
 -- Completion
@@ -1370,44 +1374,34 @@ pprintCommand bind force str = do
   session <- getSession
   io $ pprintClosureCommand session bind force str
 
-foreign import ccall "rts_setStepFlag" setStepFlag :: IO () 
-
 stepCmd :: String -> GHCi Bool
-stepCmd [] = doContinue setStepFlag 
+stepCmd [] = doContinue True
 stepCmd expression = do
-   io $ setStepFlag
    runCommand expression
 
 continueCmd :: String -> GHCi Bool
-continueCmd [] = doContinue $ return () 
+continueCmd [] = doContinue False
 continueCmd other = do
    io $ putStrLn "The continue command accepts no arguments."
    return False
 
-doContinue :: IO () -> GHCi Bool
-doContinue actionBeforeCont = do 
-   resumeAction <- popResume
-   case resumeAction of
-      Nothing -> do 
-         io $ putStrLn "There is no computation running."
-         return False
-      Just eval -> do
-         io $ actionBeforeCont
-         session <- getSession
-         runResult <- io $ GHC.resume session (evalResumeHandle eval)
-         names <- switchOnRunResult (evalStmt eval) runResult
-         finishEvalExpr names
-         return False
+doContinue :: Bool -> GHCi Bool
+doContinue step = do 
+  session <- getSession
+  let resume | step      = GHC.stepResume
+             | otherwise = GHC.resume
+  runResult <- io $ resume session
+  afterRunStmt runResult
+  return False
 
 abandonCmd :: String -> GHCi ()
 abandonCmd "" = do
-   mb_res <- popResume
-   case mb_res of
-      Nothing -> do 
-         io $ putStrLn "There is no computation running."
-      Just eval ->
-         return ()
-         -- the prompt will change to indicate the new context
+  s <- getSession
+  b <- io $ GHC.abandon s -- the prompt will change to indicate the new context
+  when (not b) $ io $ putStrLn "There is no computation running."
+  return ()
+abandonCmd _ = do
+   io $ putStrLn "The abandon command accepts no arguments."
 
 deleteCmd :: String -> GHCi ()
 deleteCmd argLine = do
@@ -1572,10 +1566,11 @@ end_bold   = BS.pack "\ESC[0m"
 
 listCmd :: String -> GHCi ()
 listCmd str = do
-   st <- getGHCiState
-   case resume st of
+   session <- getSession
+   resumes <- io $ GHC.getResumeContext session
+   case resumes of
       []  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
-      eval:_ -> io $ listAround (evalSpan eval) True
+      eval:_ -> io $ listAround (GHC.resumeSpan eval) True
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using
