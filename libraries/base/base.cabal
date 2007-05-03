@@ -192,5 +192,5 @@ extensions:	CPP
 -- XXX is there an extension for using # in varids?
 -- We need to set the package name to base (without a version number)
 -- as it's magic.
-ghc-options: -fglasgow-exts -package-name base -v0
+ghc-options: -fglasgow-exts -package-name base
 
