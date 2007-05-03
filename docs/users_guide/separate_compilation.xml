@@ -1016,6 +1016,15 @@ ghc -M -optdep-f -optdep.depend ...
 
 	<variablelist>
 	  <varlistentry>
+	    <term><option>-ddump-mod-cycles</option></term>
+	    <listitem>
+	      <para>Display a list of the cycles in the module graph. This is
+	  useful when trying to eliminate such cycles.  You do not need the <literal>-optdep</literal> prefix
+	  for this flag.</para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
 	    <term><option>-w</option></term>
 	    <listitem>
 	      <para>Turn off warnings about interface file shadowing.</para>
