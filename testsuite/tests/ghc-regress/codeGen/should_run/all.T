@@ -22,7 +22,7 @@ test('cg021', normal, compile_and_run, [''])
 test('cg022', normal, compile_and_run, [''])
 test('cg024', normal, compile_and_run, [''])
 
-test('cg025', compose(extra_run_opts('cg025.hs'),exit_code(1)),
+test('cg025', compose(reqlib('regex-compat'), compose(extra_run_opts('cg025.hs'),exit_code(1))),
                       compile_and_run, ['-package regex-compat'])
 
 test('cg026', compose(skip_if_fast,only_compiler_types(['ghc'])), compile_and_run, [''])
