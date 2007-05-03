@@ -1,0 +1,15 @@
+:l ../Test3.hs
+-- set a break on the [] case in map
+:b 1
+-- trace an execution
+:tr mymap (+1) [1,2]
+:hist
+:back
+:show bindings
+:back
+:show bindings
+:force _result
+:back
+:forward
+-- at this point, we can't retrieve the bindings because _result (the AP_STACK)
+-- was evaluated previously.  GHCi should not crash, preferably.

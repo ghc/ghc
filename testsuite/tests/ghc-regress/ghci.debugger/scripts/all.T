@@ -35,3 +35,5 @@ test('dynbrk004', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_scr
 test('result001', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['result001.script'])
 
 test('list001', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['list001.script'])
+
+test('hist001', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['hist001.script'])

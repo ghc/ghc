@@ -1,0 +1,30 @@
+Breakpoint 0 activated at ../Test3.hs:1:13-14
+[2,3Stopped at ../Test3.hs:1:13-14
+_result :: [a]
+../Test3.hs:(1,0)-(2,30)
+../Test3.hs:2:21-30
+../Test3.hs:2:17-19
+../Test3.hs:2:17-30
+../Test3.hs:(1,0)-(2,30)
+../Test3.hs:2:21-30
+../Test3.hs:2:17-19
+../Test3.hs:2:17-30
+../Test3.hs:(1,0)-(2,30)
+Logged breakpoint at ../Test3.hs:(1,0)-(2,30)
+_result :: [a]
+_result :: [a]
+Logged breakpoint at ../Test3.hs:2:21-30
+_result :: [a]
+f :: t -> a
+xs :: [t]
+_result :: [a]
+f :: t -> a
+xs :: [t]
+*** Ignoring breakpoint
+_result = []
+Logged breakpoint at ../Test3.hs:2:17-19
+_result :: a
+x :: t
+f :: t -> a
+Logged breakpoint at ../Test3.hs:2:21-30
+_result :: [a]
