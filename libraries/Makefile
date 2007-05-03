@@ -171,7 +171,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                 %/setup/Setup
+                 %/setup/Setup ifBuildable/ifBuildable
 	ifBuildable/ifBuildable $* setup/Setup build \
 	                                $(addprefix --ghc-option=,$(GhcLibHcOpts))
 	ifBuildable/ifBuildable $* setup/Setup register --inplace
@@ -185,7 +185,7 @@ doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
 
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-               %/setup/Setup
+               %/setup/Setup ifBuildable/ifBuildable
 	ifBuildable/ifBuildable $* setup/Setup haddock
 
 .PHONY: install install-docs install.library.%
@@ -210,7 +210,7 @@ install-docs:
 # then we can't change the libraries and then just rerun make.
 # Thus if you install without building then it will just break.
 $(foreach SUBDIR,$(SUBDIRS),stamp/configure.library.install.$(SUBDIR)): \
-stamp/configure.library.install.%: %/setup/Setup
+stamp/configure.library.install.%: %/setup/Setup ifBuildable/ifBuildable
 	-$(RM) -f stamp/configure.library.*.$*
 	ifBuildable/ifBuildable $* setup/Setup configure \
 	                                    $(CONFIGURE_OPTS) \
@@ -221,7 +221,8 @@ stamp/configure.library.install.%: %/setup/Setup
 
 # We need to reconfigure as we now need to register with the normal ghc-pkg
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
-install.library.%: stamp/configure.library.install.% %/setup/Setup
+install.library.%: stamp/configure.library.install.% \
+                   %/setup/Setup ifBuildable/ifBuildable
 	ifBuildable/ifBuildable $* setup/Setup install
 
 .PHONY: distclean clean clean.library.%
