@@ -356,7 +356,7 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 		ru_bndrs = tpl_vars, ru_args = tpl_args,
 		ru_rhs = rhs })
   = hang (doubleQuotes (ftext name) <+> ppr act)
-       4 (sep [ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
+       4 (sep [ptext SLIT("forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
 	       nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
 	       nest 2 (ptext SLIT("=") <+> pprCoreExpr rhs)
 	    ])
