@@ -21,7 +21,6 @@ import SrcLoc
 import Module
 
 import Numeric
-import Control.Concurrent
 import Control.Exception as Exception
 import Data.Array
 import Data.Char
@@ -47,7 +46,8 @@ data GHCiState = GHCiState
 	session        :: GHC.Session,
 	options        :: [GHCiOption],
         prelude        :: GHC.Module,
-        breaks         :: !ActiveBreakPoints,
+        break_ctr      :: !Int,
+        breaks         :: ![(Int, BreakLocation)],
         tickarrays     :: ModuleEnv TickArray
                 -- tickarrays caches the TickArray for loaded modules,
                 -- so that we don't rebuild it each time the user sets
@@ -61,19 +61,6 @@ data GHCiOption
 	| ShowType		-- show the type of expressions
 	| RevertCAFs		-- revert CAFs after every evaluation
 	deriving Eq
-
-data ActiveBreakPoints
-   = ActiveBreakPoints
-   { breakCounter   :: !Int
-   , breakLocations :: ![(Int, BreakLocation)]  -- break location uniquely numbered 
-   }
-
-instance Outputable ActiveBreakPoints where
-   ppr activeBrks = prettyLocations $ breakLocations activeBrks 
-
-emptyActiveBreakPoints :: ActiveBreakPoints
-emptyActiveBreakPoints 
-   = ActiveBreakPoints { breakCounter = 0, breakLocations = [] }
 
 data BreakLocation
    = BreakLocation
@@ -90,43 +77,19 @@ prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ 
 instance Outputable BreakLocation where
    ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc)
 
-getActiveBreakPoints :: GHCi ActiveBreakPoints
-getActiveBreakPoints = liftM breaks getGHCiState 
-
--- don't reset the counter back to zero?
-discardActiveBreakPoints :: GHCi ()
-discardActiveBreakPoints = do
-   st <- getGHCiState
-   let oldActiveBreaks = breaks st
-       newActiveBreaks = oldActiveBreaks { breakLocations = [] } 
-   setGHCiState $ st { breaks = newActiveBreaks }
-
-deleteBreak :: Int -> GHCi ()
-deleteBreak identity = do
-   st <- getGHCiState
-   let oldActiveBreaks = breaks st
-       oldLocations    = breakLocations oldActiveBreaks
-       newLocations    = filter (\loc -> fst loc /= identity) oldLocations
-       newActiveBreaks = oldActiveBreaks { breakLocations = newLocations }   
-   setGHCiState $ st { breaks = newActiveBreaks }
-
 recordBreak :: BreakLocation -> GHCi (Bool{- was already present -}, Int)
 recordBreak brkLoc = do
    st <- getGHCiState
    let oldActiveBreaks = breaks st 
-   let oldLocations    = breakLocations oldActiveBreaks
    -- don't store the same break point twice
-   case [ nm | (nm, loc) <- oldLocations, loc == brkLoc ] of
+   case [ nm | (nm, loc) <- oldActiveBreaks, loc == brkLoc ] of
      (nm:_) -> return (True, nm)
      [] -> do
-      let oldCounter = breakCounter oldActiveBreaks 
+      let oldCounter = break_ctr st
           newCounter = oldCounter + 1
-          newActiveBreaks = 
-             oldActiveBreaks 
-             { breakCounter   = newCounter 
-             , breakLocations = (oldCounter, brkLoc) : oldLocations 
-             }
-      setGHCiState $ st { breaks = newActiveBreaks }
+      setGHCiState $ st { break_ctr = newCounter,
+                          breaks = (oldCounter, brkLoc) : oldActiveBreaks
+                        }
       return (False, oldCounter)
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> IO a }

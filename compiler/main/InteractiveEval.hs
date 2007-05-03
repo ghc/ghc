@@ -8,11 +8,13 @@
 
 module InteractiveEval (
 #ifdef GHCI
-        RunResult(..), Status(..), Resume(..),
-	runStmt, stepStmt, -- traceStmt,
-        resume,  stepResume, -- traceResume,
+        RunResult(..), Status(..), Resume(..), History(..),
+	runStmt, SingleStep(..),
+        resume,
         abandon, abandonAll,
         getResumeContext,
+        getHistorySpan,
+        back, forward,
 	setContext, getContext,	
         nameSetToGlobalRdrEnv,
 	getNamesInScope,
@@ -58,6 +60,7 @@ import UniqFM
 import Maybes
 import Util
 import SrcLoc
+import BreakArray
 import RtClosureInspect
 import Packages
 import BasicTypes
@@ -99,9 +102,11 @@ data Resume
        resumeApStack   :: HValue,       -- The object from which we can get
                                         -- value of the free variables.
        resumeBreakInfo :: BreakInfo,    -- the breakpoint we stopped at.
-       resumeSpan      :: SrcSpan       -- just a cache, otherwise it's a pain
+       resumeSpan      :: SrcSpan,      -- just a cache, otherwise it's a pain
                                         -- to fetch the ModDetails & ModBreaks
                                         -- to get this.
+       resumeHistory   :: [History],
+       resumeHistoryIx :: Int           -- 0 <==> at the top of the history
    }
 
 getResumeContext :: Session -> IO [Resume]
@@ -115,37 +120,46 @@ data SingleStep
 isStep RunToCompletion = False
 isStep _ = True
 
--- type History = [HistoryItem]
--- 
--- data HistoryItem = HistoryItem HValue BreakInfo
--- 
--- historyBreakInfo :: HistoryItem -> BreakInfo
--- historyBreakInfo (HistoryItem _ bi) = bi
--- 
--- setContextToHistoryItem :: Session -> HistoryItem -> IO ()
--- setContextToHistoryItem
+data History
+   = History {
+        historyApStack   :: HValue,
+        historyBreakInfo :: BreakInfo
+   }
 
--- We need to track two InteractiveContexts:
---      - the IC before runStmt, which is restored on each resume
---      - the IC binding the results of the original statement, which
---        will be the IC when runStmt returns with RunOk.
+getHistorySpan :: Session -> History -> IO SrcSpan
+getHistorySpan s hist = withSession s $ \hsc_env -> do
+   let inf = historyBreakInfo hist 
+       num = breakInfo_number inf
+   case lookupUFM (hsc_HPT hsc_env) (moduleName (breakInfo_module inf)) of
+       Just hmi -> return (modBreaks_locs (md_modBreaks (hm_details hmi)) ! num)
+       _ -> panic "getHistorySpan"
+
+{-
+ [Main.hs:42:(1,0)-(3,52)] *Main> :history 2
+ Foo.hs:1:3-5
+ Bar.hs:5:23-48
+ [Main.hs:42:(1,0)-(3,52)] *Main> :back
+ Logged breakpoint at Foo.hs:1:3-5
+ x :: Int
+ y :: a
+ _result :: [Char]
+ [-1: Foo.hs:1:3-5] *Main> :back
+ Logged breakpoint at Bar.hs:5:23-48
+ z :: a
+ _result :: Float
+ [-2: Bar.hs:5:23-48] *Main> :forward
+ Logged breakpoint at Foo.hs:1:3-5
+ x :: Int
+ y :: a
+ _result :: [Char]
+ [-1: Foo.hs:1:3-5] *Main> :cont
+ .. continues
+-} 
 
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
-runStmt :: Session -> String -> IO RunResult
-runStmt session expr = runStmt_ session expr RunToCompletion
-
--- | Run a statement, stopping at the first breakpoint location encountered
--- (regardless of whether the breakpoint is enabled).
-stepStmt :: Session -> String -> IO RunResult
-stepStmt session expr = runStmt_ session expr SingleStep
-
--- | Run a statement, logging breakpoints passed, and stopping when either
--- an enabled breakpoint is reached, or the statement completes.
--- traceStmt :: Session -> String -> IO (RunResult, History)
--- traceStmt session expr = runStmt_ session expr RunAndLogSteps
-
-runStmt_ (Session ref) expr step
+runStmt :: Session -> String -> SingleStep -> IO RunResult
+runStmt (Session ref) expr step
    = do 
 	hsc_env <- readIORef ref
 
@@ -176,23 +190,29 @@ runStmt_ (Session ref) expr step
 
               let ic = hsc_IC hsc_env
                   bindings = (ic_tmp_ids ic, ic_tyvars ic)
-              handleRunStatus expr ref bindings ids breakMVar statusMVar status
 
-handleRunStatus expr ref bindings final_ids breakMVar statusMVar status =
+              case step of
+                RunAndLogSteps -> 
+                        traceRunStatus expr ref bindings ids   
+                                       breakMVar statusMVar status emptyHistory
+                _other ->
+                        handleRunStatus expr ref bindings ids
+                                        breakMVar statusMVar status emptyHistory
+
+
+emptyHistory = nilBL 50 -- keep a log of length 50
+
+handleRunStatus expr ref bindings final_ids breakMVar statusMVar status 
+                history =
    case status of  
       -- did we hit a breakpoint or did we complete?
       (Break apStack info tid) -> do
         hsc_env <- readIORef ref
-        let 
-            mod_name    = moduleName (breakInfo_module info)
-            mod_details = fmap hm_details (lookupUFM (hsc_HPT hsc_env) mod_name)
-            breaks      = md_modBreaks (expectJust "handlRunStatus" mod_details)
-        --
-        (hsc_env1, names, span) <- bindLocalsAtBreakpoint hsc_env 
-                                        apStack info breaks
+        (hsc_env1, names, span) <- bindLocalsAtBreakpoint hsc_env apStack info
         let
             resume = Resume expr tid breakMVar statusMVar 
-                              bindings final_ids apStack info span
+                              bindings final_ids apStack info span 
+                              (toListBL history) 0
             hsc_env2 = pushResume hsc_env1 resume
         --
         writeIORef ref hsc_env2
@@ -210,28 +230,47 @@ handleRunStatus expr ref bindings final_ids breakMVar statusMVar status =
                 Linker.extendLinkEnv (zip final_names hvals)
                 return (RunOk final_names)
 
-{-
-traceRunStatus ref final_ids  
+
+traceRunStatus expr ref bindings final_ids
                breakMVar statusMVar status history = do
   hsc_env <- readIORef ref
   case status of
      -- when tracing, if we hit a breakpoint that is not explicitly
      -- enabled, then we just log the event in the history and continue.
-     (Break apStack info tid) | not (isBreakEnabled hsc_env info) -> do
-        let history' = consBL (apStack,info) history
-        withBreakAction breakMVar statusMVar $ do
-           status <- withInterruptsSentTo
-                (do putMVar breakMVar ()  -- this awakens the stopped thread...
-                    return tid)
-                (takeMVar statusMVar)     -- and wait for the result
-
-           traceRunStatus ref final_ids 
-                          breakMVar statusMVar status history'
+     (Break apStack info tid) -> do
+        b <- isBreakEnabled hsc_env info
+        if b
+           then handle_normally
+           else do
+             let history' = consBL (History apStack info) history
+                -- probably better make history strict here, otherwise
+                -- our BoundedList will be pointless.
+             evaluate history'
+             setStepFlag
+             status <- withBreakAction breakMVar statusMVar $ do
+                       withInterruptsSentTo
+                         (do putMVar breakMVar ()  -- awaken the stopped thread
+                             return tid)
+                         (takeMVar statusMVar)     -- and wait for the result
+             traceRunStatus expr ref bindings final_ids 
+                            breakMVar statusMVar status history'
      _other ->
-        handleRunStatus ref final_ids 
-                        breakMVar statusMVar status
-                  
--}        
+        handle_normally
+  where
+        handle_normally = handleRunStatus expr ref bindings final_ids 
+                                          breakMVar statusMVar status history
+
+
+isBreakEnabled :: HscEnv -> BreakInfo -> IO Bool
+isBreakEnabled hsc_env inf =
+   case lookupUFM (hsc_HPT hsc_env) (moduleName (breakInfo_module inf)) of
+       Just hmi -> do
+         w <- getBreak (modBreaks_flags (md_modBreaks (hm_details hmi)))
+                       (breakInfo_number inf)
+         case w of Just n -> return (n /= 0); _other -> return False
+       _ ->
+         return False
+
 
 foreign import ccall "rts_setStepFlag" setStepFlag :: IO () 
 
@@ -277,17 +316,8 @@ withBreakAction breakMVar statusMVar io
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
 noBreakAction info apStack = putStrLn "*** Ignoring breakpoint"
 
-resume :: Session -> IO RunResult
-resume session = resume_ session RunToCompletion
-
-stepResume :: Session -> IO RunResult
-stepResume session = resume_ session SingleStep
-
--- traceResume :: Session -> IO RunResult
--- traceResume session handle = resume_ session handle RunAndLogSteps
-
-resume_ :: Session -> SingleStep -> IO RunResult
-resume_ (Session ref) step
+resume :: Session -> SingleStep -> IO RunResult
+resume (Session ref) step
  = do
    hsc_env <- readIORef ref
    let ic = hsc_IC hsc_env
@@ -311,11 +341,10 @@ resume_ (Session ref) step
                                            (ic_tmp_ids ic))
         Linker.deleteFromLinkEnv new_names
         
-
         when (isStep step) $ setStepFlag
         case r of 
           Resume expr tid breakMVar statusMVar bindings 
-              final_ids apStack info _ -> do
+              final_ids apStack info _ _ _ -> do
                 withBreakAction breakMVar statusMVar $ do
                 status <- withInterruptsSentTo
                              (do putMVar breakMVar ()
@@ -323,8 +352,58 @@ resume_ (Session ref) step
                                  return tid)
                              (takeMVar statusMVar)
                                       -- and wait for the result
-                handleRunStatus expr ref bindings final_ids 
-                                breakMVar statusMVar status
+                case step of
+                  RunAndLogSteps -> 
+                        traceRunStatus expr ref bindings final_ids
+                                       breakMVar statusMVar status emptyHistory
+                  _other ->
+                        handleRunStatus expr ref bindings final_ids
+                                        breakMVar statusMVar status emptyHistory
+
+
+back :: Session -> IO ([Name], Int, SrcSpan)
+back  = moveHist (+1)
+
+forward :: Session -> IO ([Name], Int, SrcSpan)
+forward  = moveHist (subtract 1)
+
+moveHist fn (Session ref) = do
+  hsc_env <- readIORef ref
+  case ic_resume (hsc_IC hsc_env) of
+     [] -> throwDyn (ProgramError "not stopped at a breakpoint")
+     (r:rs) -> do
+        let ix = resumeHistoryIx r
+            history = resumeHistory r
+            new_ix = fn ix
+        --
+        when (new_ix >= length history) $
+           throwDyn (ProgramError "no more logged breakpoints")
+        when (new_ix < 0) $
+           throwDyn (ProgramError "already at the beginning of the history")
+
+        let
+          update_ic apStack info = do
+            (hsc_env1, names, span) <- bindLocalsAtBreakpoint hsc_env 
+                                                apStack info 
+            let ic = hsc_IC hsc_env1           
+                r' = r { resumeHistoryIx = new_ix }
+                ic' = ic { ic_resume = r':rs }
+            
+            writeIORef ref hsc_env1{ hsc_IC = ic' } 
+            
+            return (names, new_ix, span)
+
+        -- careful: we want apStack to be the AP_STACK itself, not a thunk
+        -- around it, hence the cases are carefully constructed below to
+        -- make this the case.  ToDo: this is v. fragile, do something better.
+        if new_ix == 0
+           then case r of 
+                   Resume { resumeApStack = apStack, 
+                            resumeBreakInfo = info } ->
+                          update_ic apStack info
+           else case history !! (new_ix - 1) of 
+                   History apStack info ->
+                          update_ic apStack info
 
 -- -----------------------------------------------------------------------------
 -- After stopping at a breakpoint, add free variables to the environment
@@ -333,11 +412,13 @@ bindLocalsAtBreakpoint
         :: HscEnv
         -> HValue
         -> BreakInfo
-        -> ModBreaks
         -> IO (HscEnv, [Name], SrcSpan)
-bindLocalsAtBreakpoint hsc_env apStack info breaks = do
+bindLocalsAtBreakpoint hsc_env apStack info = do
 
    let 
+       mod_name    = moduleName (breakInfo_module info)
+       mod_details = fmap hm_details (lookupUFM (hsc_HPT hsc_env) mod_name)
+       breaks      = md_modBreaks (expectJust "handlRunStatus" mod_details)
        index     = breakInfo_number info
        vars      = breakInfo_vars info
        result_ty = breakInfo_resty info
@@ -352,7 +433,7 @@ bindLocalsAtBreakpoint hsc_env apStack info breaks = do
    let (ids, offsets) = unzip pointers
    hValues <- mapM (getIdValFromApStack apStack) offsets
    new_ids <- zipWithM mkNewId occs ids
-   let names = map idName ids
+   let names = map idName new_ids
 
    -- make an Id for _result.  We use the Unique of the FastString "_result";
    -- we don't care about uniqueness here, because there will only be one
@@ -369,16 +450,15 @@ bindLocalsAtBreakpoint hsc_env apStack info breaks = do
    --    - tidy the type variables
    --    - globalise the Id (Ids are supposed to be Global, apparently).
    --
-   let all_ids | isPointer result_id = result_id : ids
-               | otherwise           = ids
+   let all_ids | isPointer result_id = result_id : new_ids
+               | otherwise           = new_ids
        (id_tys, tyvarss) = mapAndUnzip (skolemiseTy.idType) all_ids
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
        new_tyvars = unionVarSets tyvarss             
-       new_ids = zipWith setIdType all_ids tidy_tys
-       global_ids = map (globaliseId VanillaGlobal) new_ids
+       final_ids = zipWith setIdType all_ids tidy_tys
 
    let   ictxt0 = hsc_IC hsc_env
-         ictxt1 = extendInteractiveContext ictxt0 global_ids new_tyvars
+         ictxt1 = extendInteractiveContext ictxt0 final_ids new_tyvars
 
    Linker.extendLinkEnv (zip names hValues)
    Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
@@ -389,7 +469,7 @@ bindLocalsAtBreakpoint hsc_env apStack info breaks = do
      let uniq = idUnique id
          loc = nameSrcLoc (idName id)
          name = mkInternalName uniq occ loc
-         ty = tidyTopType (idType id)
+         ty = idType id
          new_id = Id.mkGlobalId VanillaGlobal name ty (idInfo id)
      return new_id
 
@@ -410,7 +490,7 @@ skolemiseTyVar tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar)
 foreign import ccall unsafe "rts_getApStackVal" 
         getApStackVal :: StablePtr a -> Int -> IO (StablePtr b)
 
-getIdValFromApStack :: a -> Int -> IO HValue
+getIdValFromApStack :: HValue -> Int -> IO HValue
 getIdValFromApStack apStack stackDepth = do
      apSptr <- newStablePtr apStack
      resultSptr <- getApStackVal apSptr (stackDepth - 1)
@@ -459,10 +539,13 @@ data BoundedList a = BL
                         [a] -- left
                         [a] -- right,  list is (left ++ reverse right)
 
+nilBL :: Int -> BoundedList a
+nilBL bound = BL 0 bound [] []
+
 consBL a (BL len bound left right)
   | len < bound = BL (len+1) bound (a:left) right
-  | null right  = BL len     bound [] $! tail (reverse left)
-  | otherwise   = BL len     bound [] $! tail right
+  | null right  = BL len     bound [a]      $! tail (reverse left)
+  | otherwise   = BL len     bound (a:left) $! tail right
 
 toListBL (BL _ _ left right) = left ++ reverse right
 

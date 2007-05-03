@@ -21,7 +21,7 @@ import Debugger
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Type, Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex, Name, SrcSpan, Resume )
+                          BreakIndex, Name, SrcSpan, Resume, SingleStep )
 import DynFlags
 import Packages
 import PackageConfig
@@ -104,6 +104,7 @@ builtin_commands = [
   ("add",	keepGoingPaths addModule,	False, completeFilename),
   ("abandon",   keepGoing abandonCmd,           False, completeNone),
   ("break",     keepGoing breakCmd,             False, completeIdentifier),
+  ("back",      keepGoing backCmd,              False, completeNone),
   ("browse",    keepGoing browseCmd,		False, completeModule),
   ("cd",    	keepGoing changeDirectory,	False, completeFilename),
   ("check",	keepGoing checkModule,		False, completeHomeModule),
@@ -115,7 +116,9 @@ builtin_commands = [
   ("edit",	keepGoing editFile,		False, completeFilename),
   ("etags",	keepGoing createETagsFileCmd,	False, completeFilename),
   ("force",     keepGoing forceCmd,             False, completeIdentifier),
+  ("forward",   keepGoing forwardCmd,           False, completeNone),
   ("help",	keepGoing help,			False, completeNone),
+  ("history",   keepGoing historyCmd,           False, completeNone), 
   ("info",      keepGoing info,			False, completeIdentifier),
   ("kind",	keepGoing kindOfType,		False, completeIdentifier),
   ("load",	keepGoingPaths loadModule_,     False, completeHomeModuleOrFile),
@@ -130,6 +133,7 @@ builtin_commands = [
   ("sprint",    keepGoing sprintCmd,            False, completeIdentifier),
   ("step",      stepCmd,                        False, completeIdentifier), 
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
+  ("trace",     traceCmd,                       False, completeIdentifier), 
   ("undef",     keepGoing undefineMacro,	False, completeMacro),
   ("unset",	keepGoing unsetOptions,		True,  completeSetOptions)
   ]
@@ -268,7 +272,8 @@ interactiveUI session srcs maybe_expr = do
 		   session = session,
 		   options = [],
                    prelude = prel_mod,
-                   breaks = emptyActiveBreakPoints,
+                   break_ctr = 0,
+                   breaks = [],
                    tickarrays = emptyModuleEnv
                  }
 
@@ -412,11 +417,9 @@ checkPerms name =
 
 fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl show_prompt = do
-   session <- getSession
-   (mod,imports) <- io (GHC.getContext session)
-   st <- getGHCiState
-   resumes <- io $ GHC.getResumeContext session
-   when show_prompt (io (putStr (mkPrompt mod imports resumes (prompt st))))
+   when show_prompt $ do
+        prompt <- mkPrompt
+        (io (putStr prompt))
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e		   -> return ()
@@ -441,25 +444,40 @@ stringLoop (s:ss) = do
 	l  -> do quit <- runCommand l
                  if quit then return True else stringLoop ss
 
-mkPrompt toplevs exports resumes prompt
-  = showSDoc $ f prompt
-    where
-        f ('%':'s':xs) = perc_s <> f xs
-        f ('%':'%':xs) = char '%' <> f xs
-        f (x:xs) = char x <> f xs
-        f [] = empty
-    
-        perc_s
-          | eval:rest <- resumes 
-          = (if not (null rest) then text "... " else empty)
-            <> brackets (ppr (GHC.resumeSpan eval)) <+> modules_prompt
-          | otherwise
-          = modules_prompt
+mkPrompt = do
+  session <- getSession
+  (toplevs,exports) <- io (GHC.getContext session)
+  resumes <- io $ GHC.getResumeContext session
 
-        modules_prompt = 
+  context_bit <-
+        case resumes of
+            [] -> return empty
+            r:rs -> do
+                let ix = GHC.resumeHistoryIx r
+                if ix == 0
+                   then return (brackets (ppr (GHC.resumeSpan r)) <> space)
+                   else do
+                        let hist = GHC.resumeHistory r !! (ix-1)
+                        span <- io $ GHC.getHistorySpan session hist
+                        return (brackets (ppr (negate ix) <> char ':' 
+                                          <+> ppr span) <> space)
+  let
+        dots | r:rs <- resumes, not (null rs) = text "... "
+             | otherwise = empty
+
+        modules_bit = 
              hsep (map (\m -> char '*' <> ppr (GHC.moduleName m)) toplevs) <+>
              hsep (map (ppr . GHC.moduleName) exports)
 
+        deflt_prompt = dots <> context_bit <> modules_bit
+
+        f ('%':'s':xs) = deflt_prompt <> f xs
+        f ('%':'%':xs) = char '%' <> f xs
+        f (x:xs) = char x <> f xs
+        f [] = empty
+   --
+  st <- getGHCiState
+  return (showSDoc (f (prompt st)))
 
 
 #ifdef USE_READLINE
@@ -470,9 +488,9 @@ readlineLoop = do
    io yield
    saveSession -- for use by completion
    st <- getGHCiState
-   resumes <- io $ GHC.getResumeContext session
-   l <- io (readline (mkPrompt mod imports resumes (prompt st))
-	  	`finally` setNonBlockingFD 0)
+   mb_span <- getCurrentBreakSpan
+   prompt <- mkPrompt
+   l <- io (readline prompt `finally` setNonBlockingFD 0)
 		-- readline sometimes puts stdin into blocking mode,
 		-- so we need to put it back for the IO library
    splatSavedSession
@@ -492,7 +510,7 @@ runCommand c = ghciHandle handler (doCommand c)
   where 
     doCommand (':' : command) = specialCommand command
     doCommand stmt
-       = do timeIt $ runStmt stmt
+       = do timeIt $ runStmt stmt GHC.RunToCompletion
             return False
 
 -- This version is for the GHC command-line option -e.  The only difference
@@ -506,20 +524,20 @@ runCommandEval c = ghciHandle handleEval (doCommand c)
 
     doCommand (':' : command) = specialCommand command
     doCommand stmt
-       = do r <- runStmt stmt
+       = do r <- runStmt stmt GHC.RunToCompletion
 	    case r of 
 		False -> io (exitWith (ExitFailure 1))
 		  -- failure to run the command causes exit(1) for ghc -e.
 		_       -> return True
 
-runStmt :: String -> GHCi Bool
-runStmt stmt
+runStmt :: String -> SingleStep -> GHCi Bool
+runStmt stmt step
  | null (filter (not.isSpace) stmt) = return False
  | otherwise
  = do st <- getGHCiState
       session <- getSession
       result <- io $ withProgName (progname st) $ withArgs (args st) $
-	     	     GHC.runStmt session stmt
+	     	     GHC.runStmt session stmt step
       afterRunStmt result
       return False
 
@@ -527,7 +545,6 @@ runStmt stmt
 afterRunStmt :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
 afterRunStmt run_result = do
   mb_result <- switchOnRunResult run_result
-
   -- possibly print the type and revert CAFs after evaluating an expression
   show_types <- isOptionSet ShowType
   session <- getSession
@@ -593,8 +610,28 @@ lookupCommand str = do
      		[] -> return Nothing
      		c:_ -> return (Just c)
 
+
+getCurrentBreakSpan :: GHCi (Maybe SrcSpan)
+getCurrentBreakSpan = do
+  session <- getSession
+  resumes <- io $ GHC.getResumeContext session
+  case resumes of
+    [] -> return Nothing
+    (r:rs) -> do
+        let ix = GHC.resumeHistoryIx r
+        if ix == 0
+           then return (Just (GHC.resumeSpan r))
+           else do
+                let hist = GHC.resumeHistory r !! (ix-1)
+                span <- io $ GHC.getHistorySpan session hist
+                return (Just span)
+
 -----------------------------------------------------------------------------
 -- Commands
+
+noArgs :: GHCi () -> String -> GHCi ()
+noArgs m "" = m
+noArgs m _ = io $ putStrLn "This command takes no arguments"
 
 help :: String -> GHCi ()
 help _ = io (putStr helpText)
@@ -1149,8 +1186,8 @@ cleanType ty = do
 
 showBkptTable :: GHCi ()
 showBkptTable = do
-   activeBreaks <- getActiveBreakPoints 
-   printForUser $ ppr activeBreaks 
+  st <- getGHCiState
+  printForUser $ prettyLocations (breaks st)
 
 showContext :: GHCi ()
 showContext = do
@@ -1375,33 +1412,32 @@ pprintCommand bind force str = do
   io $ pprintClosureCommand session bind force str
 
 stepCmd :: String -> GHCi Bool
-stepCmd [] = doContinue True
-stepCmd expression = do
-   runCommand expression
+stepCmd []         = doContinue GHC.SingleStep
+stepCmd expression = runStmt expression GHC.SingleStep
+
+traceCmd :: String -> GHCi Bool
+traceCmd []         = doContinue GHC.RunAndLogSteps
+traceCmd expression = runStmt expression GHC.RunAndLogSteps
 
 continueCmd :: String -> GHCi Bool
-continueCmd [] = doContinue False
+continueCmd [] = doContinue GHC.RunToCompletion
 continueCmd other = do
    io $ putStrLn "The continue command accepts no arguments."
    return False
 
-doContinue :: Bool -> GHCi Bool
+doContinue :: SingleStep -> GHCi Bool
 doContinue step = do 
   session <- getSession
-  let resume | step      = GHC.stepResume
-             | otherwise = GHC.resume
-  runResult <- io $ resume session
+  runResult <- io $ GHC.resume session step
   afterRunStmt runResult
   return False
 
 abandonCmd :: String -> GHCi ()
-abandonCmd "" = do
+abandonCmd = noArgs $ do
   s <- getSession
   b <- io $ GHC.abandon s -- the prompt will change to indicate the new context
   when (not b) $ io $ putStrLn "There is no computation running."
   return ()
-abandonCmd _ = do
-   io $ putStrLn "The abandon command accepts no arguments."
 
 deleteCmd :: String -> GHCi ()
 deleteCmd argLine = do
@@ -1419,6 +1455,41 @@ deleteCmd argLine = do
       deleteOneBreak str
          | all isDigit str = deleteBreak (read str)
          | otherwise = return ()
+
+historyCmd :: String -> GHCi ()
+historyCmd = noArgs $ do
+  s <- getSession
+  resumes <- io $ GHC.getResumeContext s
+  case resumes of
+    [] -> io $ putStrLn "Not stopped at a breakpoint"
+    (r:rs) -> do
+      let hist = GHC.resumeHistory r
+      spans <- mapM (io . GHC.getHistorySpan s) hist
+      printForUser (vcat (map ppr spans))
+
+backCmd :: String -> GHCi ()
+backCmd = noArgs $ do
+  s <- getSession
+  (names, ix, span) <- io $ GHC.back s
+  printForUser $ ptext SLIT("Logged breakpoint at") <+> ppr span
+  mapM_ (showTypeOfName s) names
+   -- run the command set with ":set stop <cmd>"
+  st <- getGHCiState
+  runCommand (stop st)
+  return ()
+
+forwardCmd :: String -> GHCi ()
+forwardCmd = noArgs $ do
+  s <- getSession
+  (names, ix, span) <- io $ GHC.forward s
+  printForUser $ (if (ix == 0)
+                    then ptext SLIT("Stopped at")
+                    else ptext SLIT("Logged breakpoint at")) <+> ppr span
+  mapM_ (showTypeOfName s) names
+   -- run the command set with ":set stop <cmd>"
+  st <- getGHCiState
+  runCommand (stop st)
+  return ()
 
 -- handle the "break" command
 breakCmd :: String -> GHCi ()
@@ -1566,11 +1637,10 @@ end_bold   = BS.pack "\ESC[0m"
 
 listCmd :: String -> GHCi ()
 listCmd str = do
-   session <- getSession
-   resumes <- io $ GHC.getResumeContext session
-   case resumes of
-      []  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
-      eval:_ -> io $ listAround (GHC.resumeSpan eval) True
+   mb_span <- getCurrentBreakSpan
+   case mb_span of
+      Nothing  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
+      Just span -> io $ listAround span True
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using
@@ -1646,6 +1716,33 @@ mkTickArray ticks
         srcSpanLines span = [ GHC.srcSpanStartLine span .. 
                               GHC.srcSpanEndLine span ]
 
+lookupModule :: Session -> String -> GHCi Module
+lookupModule session modName
+   = io (GHC.findModule session (GHC.mkModuleName modName) Nothing)
+
+-- don't reset the counter back to zero?
+discardActiveBreakPoints :: GHCi ()
+discardActiveBreakPoints = do
+   st <- getGHCiState
+   mapM (turnOffBreak.snd) (breaks st)
+   setGHCiState $ st { breaks = [] }
+
+deleteBreak :: Int -> GHCi ()
+deleteBreak identity = do
+   st <- getGHCiState
+   let oldLocations    = breaks st
+       (this,rest)     = partition (\loc -> fst loc == identity) oldLocations
+   if null this 
+      then printForUser (text "Breakpoint" <+> ppr identity <+>
+                         text "does not exist")
+      else do
+           mapM (turnOffBreak.snd) this
+           setGHCiState $ st { breaks = rest }
+
+turnOffBreak loc = do
+  (arr, _) <- getModBreak (breakModule loc)
+  io $ setBreakFlag False arr (breakTick loc)
+
 getModBreak :: Module -> GHCi (GHC.BreakArray, Array Int SrcSpan)
 getModBreak mod = do
    session <- getSession
@@ -1655,28 +1752,8 @@ getModBreak mod = do
    let ticks      = GHC.modBreaks_locs  modBreaks
    return (array, ticks)
 
-lookupModule :: Session -> String -> GHCi Module
-lookupModule session modName
-   = io (GHC.findModule session (GHC.mkModuleName modName) Nothing)
-
 setBreakFlag :: Bool -> GHC.BreakArray -> Int -> IO Bool 
 setBreakFlag toggle array index
    | toggle    = GHC.setBreakOn array index 
    | otherwise = GHC.setBreakOff array index
 
-
-{- these should probably go to the GHC API at some point -}
-enableBreakPoint  :: Session -> Module -> Int -> IO ()
-enableBreakPoint session mod index = return ()
-
-disableBreakPoint :: Session -> Module -> Int -> IO ()
-disableBreakPoint session mod index = return ()
-
-activeBreakPoints :: Session -> IO [(Module,Int)]
-activeBreakPoints session = return []
-
-enableSingleStep  :: Session -> IO ()
-enableSingleStep session = return ()
-
-disableSingleStep :: Session -> IO ()
-disableSingleStep session = return ()
