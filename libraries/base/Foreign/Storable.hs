@@ -45,7 +45,6 @@ import GHC.Stable	( StablePtr )
 import GHC.Num
 import GHC.Int
 import GHC.Word
-import GHC.Stable
 import GHC.Ptr
 import GHC.Float
 import GHC.Err

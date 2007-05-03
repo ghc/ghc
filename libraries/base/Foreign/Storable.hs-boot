@@ -5,7 +5,6 @@ module Foreign.Storable where
 
 import GHC.Float
 import GHC.Int
-import GHC.Num
 import GHC.Word
 
 class Storable a

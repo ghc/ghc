@@ -30,7 +30,6 @@ module Foreign.StablePtr
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Stable
-import GHC.Err
 #endif
 
 #ifdef __HUGS__

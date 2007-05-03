@@ -50,10 +50,9 @@ module GHC.Storable
 	, writeWord64OffPtr   
         ) where
 
-import GHC.Stable	( StablePtr )
+import GHC.Stable	( StablePtr(..) )
 import GHC.Int
 import GHC.Word
-import GHC.Stable
 import GHC.Ptr
 import GHC.Float
 import GHC.IOBase

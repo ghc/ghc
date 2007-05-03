@@ -58,7 +58,8 @@ import GHC.Read
 import Foreign.C.Types (CInt)
 
 #ifndef __HADDOCK__
-import {-# SOURCE #-} GHC.Dynamic
+import {-# SOURCE #-} Data.Typeable	( showsTypeRep )
+import {-# SOURCE #-} Data.Dynamic	( Dynamic, dynTypeRep )
 #endif
 
 -- ---------------------------------------------------------------------------

@@ -65,7 +65,6 @@ import Data.Word
 import Foreign.C.Types
 #endif
 
-import Control.Monad	( liftM )
 import Data.Bits
 import Data.Typeable 	( Typeable(..), mkTyCon, mkTyConApp )
 import Foreign.Storable ( Storable(..) )

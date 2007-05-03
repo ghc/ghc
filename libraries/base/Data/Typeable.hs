@@ -40,6 +40,7 @@ module Data.Typeable
 	-- * Type representations
 	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
 	TyCon,		-- abstract, instance of: Eq, Show, Typeable
+	showsTypeRep,
 
 	-- * Construction of type representations
 	mkTyCon,	-- :: String  -> TyCon
@@ -279,6 +280,9 @@ instance Show TypeRep where
    	    showsPrec p tycon . 
 	    showChar ' '      . 
 	    showArgs tys
+
+showsTypeRep :: TypeRep -> ShowS
+showsTypeRep = shows
 
 instance Show TyCon where
   showsPrec _ (TyCon _ s) = showString s

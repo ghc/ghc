@@ -34,15 +34,13 @@ module GHC.ForeignPtr
 
 import Control.Monad 	( sequence_ )
 import Foreign.Storable
-import Numeric		( showHex )
 
 import GHC.Show
-import GHC.Num
-import GHC.List  	( null, replicate, length )
+import GHC.List  	( null )
 import GHC.Base
 import GHC.IOBase
 import GHC.STRef	( STRef(..) )
-import GHC.Ptr		( Ptr(..), FunPtr, castFunPtrToPtr )
+import GHC.Ptr		( Ptr(..), FunPtr )
 import GHC.Err
 
 -- |The type 'ForeignPtr' represents references to objects that are
