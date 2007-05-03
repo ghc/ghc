@@ -70,11 +70,11 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
 		   (TTE
 		       { modName      = mod_name
 		      , declPath     = []
+                      , inScope      = emptyVarSet
 		       })
 		   (TT 
 		      { tickBoxCount = 0
 		      , mixEntries   = []
-                      , inScope      = emptyVarSet
 		      })
 
   let entries = reverse $ mixEntries st
@@ -513,11 +513,11 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
 \begin{code}
 data TickTransState = TT { tickBoxCount:: Int
                          , mixEntries  :: [MixEntry]
-                         , inScope     :: VarSet	-- move the TickTransEnv
                          }                        
 
 data TickTransEnv = TTE { modName      :: String
 			, declPath     :: [String]
+                        , inScope      :: VarSet
 			}
 
 --	deriving Show
@@ -556,11 +556,6 @@ getState = TM $ \ env st -> (st, noFVs, st)
 setState :: (TickTransState -> TickTransState) -> TM ()
 setState f = TM $ \ env st -> ((), noFVs, f st)
 
-withState :: (TickTransState -> TickTransState) -> TM a -> TM a
-withState f (TM m) = TM $ \ env st -> 
-		                 case m env (f st) of
-                                   (a, fvs, st') -> (a, fvs, st')
-
 getEnv :: TM TickTransEnv
 getEnv = TM $ \ env st -> (env, noFVs, st)
 
@@ -575,7 +570,7 @@ getFreeVars (TM m)
 
 freeVar :: Id -> TM ()
 freeVar id = TM $ \ env st -> 
-                if id `elemVarSet` inScope st
+                if id `elemVarSet` inScope env
                    then ((), unitOccEnv (nameOccName (idName id)) id, st)
                    else ((), noFVs, st)
 
@@ -588,7 +583,7 @@ getPathEntry = declPath `liftM` getEnv
 bindLocals :: [Id] -> TM a -> TM a
 bindLocals new_ids (TM m)
   = TM $ \ env st -> 
-                 case m env st{ inScope = inScope st `extendVarSetList` new_ids } of
+                 case m env{ inScope = inScope env `extendVarSetList` new_ids } st of
                    (r, fv, st') -> (r, fv `delListFromUFM` occs, st')
   where occs = [ nameOccName (idName id) | id <- new_ids ] 
 
