@@ -140,19 +140,23 @@ $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
-	cd $* && setup/Setup configure \
-	                     $(CONFIGURE_OPTS) \
-	                     --prefix=$(prefix) \
-	                     --with-compiler=../../compiler/ghc-inplace$(dot_bat) \
-	                     --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$(dot_bat) \
-	                     --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace$(dot_bat) \
-	                     --with-ld=$(LD) \
-	                     --datasubdir=ghc \
-	                     --haddock-args="--use-contents=../index.html --use-index=../doc-index.html" \
-	                     $(addprefix --configure-option=,$(CONFIGURE_ARGS)) \
-	                     --configure-option=--with-cc=$(CC) \
-	      || touch unbuildable
-	touch $@
+	( cd $* && setup/Setup configure \
+	           $(CONFIGURE_OPTS) \
+	           --prefix=$(prefix) \
+	           --with-compiler=../../compiler/ghc-inplace$(dot_bat) \
+	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$(dot_bat) \
+	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace$(dot_bat) \
+	           --with-ld=$(LD) \
+	           --datasubdir=ghc \
+	           --haddock-args="--use-contents=../index.html \
+	                           --use-index=../doc-index.html" \
+	           $(addprefix --configure-option=,$(CONFIGURE_ARGS)) \
+	           --configure-option=--with-cc=$(CC) ) \
+	      && touch $@ || touch $*/unbuildable
+# We don't touch $@ if configure failed as we would prefer to try
+# configuring it next time round, rather than assuming it'll still fail.
+# This is particularly important for corelibs, where failure means the
+# build dies!
 
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
