@@ -917,8 +917,8 @@ browseCmd m =
 
 browseModule m exports_only = do
   s <- getSession
-  modl <- if exports_only then lookupModule s m
-                          else wantInterpretedModule s m
+  modl <- if exports_only then lookupModule m
+                          else wantInterpretedModule m
 
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
@@ -1376,6 +1376,28 @@ expandPath path =
    other -> 
 	return other
 
+wantInterpretedModule :: String -> GHCi Module
+wantInterpretedModule str = do
+   session <- getSession
+   modl <- lookupModule str
+   is_interpreted <- io (GHC.moduleIsInterpreted session modl)
+   when (not is_interpreted) $
+       throwDyn (CmdLineError ("module '" ++ str ++ "' is not interpreted"))
+   return modl
+
+wantNameFromInterpretedModule noCanDo str and_then = do
+   session <- getSession
+   names <- io $ GHC.parseName session str
+   case names of
+      []    -> return ()
+      (n:_) -> do
+            let modl = GHC.nameModule n
+            is_interpreted <- io (GHC.moduleIsInterpreted session modl)
+            if not is_interpreted
+               then noCanDo n $ text "module " <> ppr modl <>
+                                text " is not interpreted"
+               else and_then n
+
 -- ----------------------------------------------------------------------------
 -- Windows console setup
 
@@ -1502,7 +1524,7 @@ breakSwitch _session [] = do
    io $ putStrLn "The break command requires at least one argument."
 breakSwitch session args@(arg1:rest) 
    | looksLikeModuleName arg1 = do
-        mod <- wantInterpretedModule session arg1
+        mod <- wantInterpretedModule arg1
         breakByModule session mod rest
    | all isDigit arg1 = do
         (toplevel, _) <- io $ GHC.getContext session 
@@ -1511,37 +1533,18 @@ breakSwitch session args@(arg1:rest)
            [] -> do 
               io $ putStrLn "Cannot find default module for breakpoint." 
               io $ putStrLn "Perhaps no modules are loaded for debugging?"
-   | otherwise = do -- assume it's a name
-        names <- io $ GHC.parseName session arg1
-        case names of
-          []    -> return ()
-          (n:_) -> do
-            let loc  = GHC.nameSrcLoc n
-                modl = GHC.nameModule n
-            is_interpreted <- io (GHC.moduleIsInterpreted session modl)
-            if not is_interpreted
-               then noCanDo $ text "module " <> ppr modl <>
-                              text " is not interpreted"
-               else do
-            if GHC.isGoodSrcLoc loc
-               then findBreakAndSet (GHC.nameModule n) $ 
+   | otherwise = do -- try parsing it as an identifier
+        wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
+        let loc = GHC.nameSrcLoc name
+        if GHC.isGoodSrcLoc loc
+               then findBreakAndSet (GHC.nameModule name) $ 
                          findBreakByCoord (Just (GHC.srcLocFile loc))
                                           (GHC.srcLocLine loc, 
                                            GHC.srcLocCol loc)
-               else noCanDo $ text "can't find its location: " <>
-                              ppr loc
-           where
-             noCanDo why = printForUser $
+               else noCanDo name $ text "can't find its location: " <> ppr loc
+       where
+          noCanDo n why = printForUser $
                 text "cannot set breakpoint on " <> ppr n <> text ": " <> why
-
-
-wantInterpretedModule :: Session -> String -> GHCi Module
-wantInterpretedModule session str = do
-   modl <- io $ GHC.findModule session (GHC.mkModuleName str) Nothing
-   is_interpreted <- io (GHC.moduleIsInterpreted session modl)
-   when (not is_interpreted) $
-       throwDyn (CmdLineError ("module '" ++ str ++ "' is not interpreted"))
-   return modl
 
 breakByModule :: Session -> Module -> [String] -> GHCi () 
 breakByModule session mod args@(arg1:rest)
@@ -1636,11 +1639,54 @@ start_bold = BS.pack "\ESC[1m"
 end_bold   = BS.pack "\ESC[0m"
 
 listCmd :: String -> GHCi ()
-listCmd str = do
+listCmd "" = do
    mb_span <- getCurrentBreakSpan
    case mb_span of
       Nothing  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
       Just span -> io $ listAround span True
+listCmd str = list2 (words str)
+
+list2 [arg] | all isDigit arg = do
+    session <- getSession
+    (toplevel, _) <- io $ GHC.getContext session 
+    case toplevel of
+        [] -> io $ putStrLn "No module to list"
+        (mod : _) -> listModuleLine mod (read arg)
+list2 [arg1,arg2] | looksLikeModuleName arg1, all isDigit arg2 = do
+        mod <- wantInterpretedModule arg1
+        listModuleLine mod (read arg2)
+list2 [arg] = do
+        wantNameFromInterpretedModule noCanDo arg $ \name -> do
+        let loc = GHC.nameSrcLoc name
+        if GHC.isGoodSrcLoc loc
+               then do
+                  tickArray <- getTickArray (GHC.nameModule name)
+                  let mb_span = findBreakByCoord (Just (GHC.srcLocFile loc))
+                                        (GHC.srcLocLine loc, GHC.srcLocCol loc)
+                                        tickArray
+                  case mb_span of
+                    Nothing       -> io $ listAround (GHC.srcLocSpan loc) False
+                    Just (_,span) -> io $ listAround span False
+               else
+                  noCanDo name $ text "can't find its location: " <>
+                                 ppr loc
+    where
+        noCanDo n why = printForUser $
+            text "cannot list source code for " <> ppr n <> text ": " <> why
+list2  _other = 
+        io $ putStrLn "syntax:  :list [<line> | <module> <line> | <identifier>]"
+
+listModuleLine :: Module -> Int -> GHCi ()
+listModuleLine modl line = do
+   session <- getSession
+   graph <- io (GHC.getModuleGraph session)
+   let this = filter ((== modl) . GHC.ms_mod) graph
+   case this of
+     [] -> panic "listModuleLine"
+     summ:_ -> do
+           let filename = fromJust (ml_hs_file (GHC.ms_location summ))
+               loc = GHC.mkSrcLoc (mkFastString (filename)) line 0
+           io $ listAround (GHC.srcLocSpan loc) False
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using
@@ -1716,9 +1762,10 @@ mkTickArray ticks
         srcSpanLines span = [ GHC.srcSpanStartLine span .. 
                               GHC.srcSpanEndLine span ]
 
-lookupModule :: Session -> String -> GHCi Module
-lookupModule session modName
-   = io (GHC.findModule session (GHC.mkModuleName modName) Nothing)
+lookupModule :: String -> GHCi Module
+lookupModule modName
+   = do session <- getSession 
+        io (GHC.findModule session (GHC.mkModuleName modName) Nothing)
 
 -- don't reset the counter back to zero?
 discardActiveBreakPoints :: GHCi ()
