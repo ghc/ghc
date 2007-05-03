@@ -623,8 +623,8 @@ data InteractiveContext
 					-- ic_toplev_scope and ic_exports
 
 	ic_tmp_ids :: [Id],             -- Names bound during interaction.
-                                        -- Earlier Ids shadow
-                                        -- later ones with the same OccName.
+                                        -- Later Ids shadow
+                                        -- earlier ones with the same OccName.
 
         ic_tyvars :: TyVarSet           -- skolem type variables free in
                                         -- ic_tmp_ids.  These arise at
@@ -659,7 +659,9 @@ extendInteractiveContext
         -> TyVarSet
         -> InteractiveContext
 extendInteractiveContext ictxt ids tyvars
-  = ictxt { ic_tmp_ids =  ids ++ ic_tmp_ids ictxt,
+  = ictxt { ic_tmp_ids =  ic_tmp_ids ictxt ++ ids,
+                          -- NB. must be this way around, because we want
+                          -- new ids to shadow existing bindings.
             ic_tyvars   = ic_tyvars ictxt `unionVarSet` tyvars }
 \end{code}
 

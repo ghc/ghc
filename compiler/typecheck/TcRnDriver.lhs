@@ -832,7 +832,7 @@ setInteractiveContext hsc_env icxt thing_inside
 	tcg_inst_env = extendInstEnvList (tcg_inst_env env) dfuns }) $
 
 
-    tcExtendIdEnv (reverse (ic_tmp_ids icxt)) $
+    tcExtendIdEnv (ic_tmp_ids icxt) $
         -- tcExtendIdEnv does lots: 
         --   - it extends the local type env (tcl_env) with the given Ids,
         --   - it extends the local rdr env (tcl_rdr) with the Names from 
@@ -840,9 +840,8 @@ setInteractiveContext hsc_env icxt thing_inside
         --   - it adds the free tyvars of the Ids to the tcl_tyvars
         --     set.
         --
-        -- earlier ids in ic_tmp_ids must shadow later ones with the same
-        -- OccName, but tcExtendIdEnv has the opposite behaviour, hence the
-        -- reverse above.
+        -- later ids in ic_tmp_ids must shadow earlier ones with the same
+        -- OccName, and tcExtendIdEnv implements this behaviour.
 
     do	{ traceTc (text "setIC" <+> ppr (ic_tmp_ids icxt))
  	; thing_inside }
