@@ -539,7 +539,7 @@ runStmt stmt step
       result <- io $ withProgName (progname st) $ withArgs (args st) $
 	     	     GHC.runStmt session stmt step
       afterRunStmt result
-      return False
+      return (isRunResultOk result)
 
 
 afterRunStmt :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
@@ -581,6 +581,11 @@ switchOnRunResult (GHC.RunBreak threadId names info) = do
    runCommand (stop st)
 
    return (Just (True,names))
+
+
+isRunResultOk :: GHC.RunResult -> Bool
+isRunResultOk (GHC.RunOk _) = True
+isRunResultOk _             = False
 
 
 showTypeOfName :: Session -> Name -> GHCi ()
