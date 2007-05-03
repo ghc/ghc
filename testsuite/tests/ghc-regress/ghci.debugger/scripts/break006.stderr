@@ -1,0 +1,12 @@
+
+<interactive>:1:0:
+    Ambiguous type variable `a' in the constraint:
+      `Show a' arising from a use of `print' at <interactive>:1:0-2
+    Cannot resolve unkonwn runtime types: a
+    Use :print or :force to determine these types
+
+<interactive>:1:0:
+    Ambiguous type variable `a' in the constraint:
+      `Show a' arising from a use of `print' at <interactive>:1:0
+    Cannot resolve unkonwn runtime types: a
+    Use :print or :force to determine these types

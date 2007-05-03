@@ -1,7 +1,21 @@
-Breakpoint 0 activated at ../QSort.hs:(4,0)-(6,54)
-Stopped at ../QSort.hs:(4,0)-(6,54)
+Stopped at ../Test3.hs:(1,0)-(2,30)
 _result :: [a]
-as :: [a]
-a :: a
-left :: [a]
-right :: [a]
+Stopped at ../Test3.hs:2:17-30
+_result :: [a]
+x :: t
+f :: t -> a
+xs :: [t]
+_result :: [a]
+x :: t
+f :: t -> a
+xs :: [t]
+y = (_t1::a)
+y = 2
+_result :: [Integer]
+x :: t
+f :: t -> Integer
+xs :: [t]
+y :: Integer
+_t1 :: Integer
+*** Exception: ghci/Debugger.hs:102:48-73: Irrefutable pattern failed for pattern Data.Maybe.Just tv
+

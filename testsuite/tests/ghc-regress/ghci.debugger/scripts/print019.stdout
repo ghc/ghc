@@ -1,0 +1,9 @@
+a = O (_t1::t)
+b = O (_t2::t1)
+()
+_t1 = 'a'
+a :: Opaque
+b :: Opaque
+_t1 :: Char
+_t2 :: t1
+it :: ()
