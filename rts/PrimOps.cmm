@@ -2165,13 +2165,18 @@ noDuplicatezh_fast
 
 getApStackValzh_fast
 {
-   W_ ap_stack, offset, val;
+   W_ ap_stack, offset, val, ok;
 
-   /* args: R1 = tso, R2 = offset */
+   /* args: R1 = AP_STACK, R2 = offset */
    ap_stack = R1;
    offset   = R2;
 
-   val = StgClosure_payload(ap_stack,offset); 
-
-   RET_P(val);
+   if (%INFO_PTR(ap_stack) == stg_AP_STACK_info) {
+        ok = 1;
+        val = StgAP_STACK_payload(ap_stack,offset); 
+   } else {
+        ok = 0;
+        val = R1;
+   }
+   RET_NP(ok,val);
 }

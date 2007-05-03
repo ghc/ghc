@@ -58,6 +58,7 @@ import Module
 import Panic
 import UniqFM
 import Maybes
+import ErrUtils
 import Util
 import SrcLoc
 import BreakArray
@@ -431,8 +432,18 @@ bindLocalsAtBreakpoint hsc_env apStack info = do
                     | otherwise              = False
 
    let (ids, offsets) = unzip pointers
-   hValues <- mapM (getIdValFromApStack apStack) offsets
-   new_ids <- zipWithM mkNewId occs ids
+
+   -- It might be that getIdValFromApStack fails, because the AP_STACK
+   -- has been accidentally evaluated, or something else has gone wrong.
+   -- So that we don't fall over in a heap when this happens, just don't
+   -- bind any free variables instead, and we emit a warning.
+   mb_hValues <- mapM (getIdValFromApStack apStack) offsets
+   let filtered_ids = [ id | (id, Just _) <- zip ids mb_hValues ]
+   when (any isNothing mb_hValues) $
+      debugTraceMsg (hsc_dflags hsc_env) 1 $
+	  text "Warning: _result has been evaluated, some bindings have been lost"
+
+   new_ids <- zipWithM mkNewId occs filtered_ids
    let names = map idName new_ids
 
    -- make an Id for _result.  We use the Unique of the FastString "_result";
@@ -460,7 +471,7 @@ bindLocalsAtBreakpoint hsc_env apStack info = do
    let   ictxt0 = hsc_IC hsc_env
          ictxt1 = extendInteractiveContext ictxt0 final_ids new_tyvars
 
-   Linker.extendLinkEnv (zip names hValues)
+   Linker.extendLinkEnv [ (name,hval) | (name, Just hval) <- zip names mb_hValues ]
    Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, result_name:names, span)
   where
@@ -485,19 +496,15 @@ skolemiseTyVar :: TyVar -> TyVar
 skolemiseTyVar tyvar = mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) 
                                  (SkolemTv RuntimeUnkSkol)
 
--- Todo: turn this into a primop, and provide special version(s) for
--- unboxed things
-foreign import ccall unsafe "rts_getApStackVal" 
-        getApStackVal :: StablePtr a -> Int -> IO (StablePtr b)
-
-getIdValFromApStack :: HValue -> Int -> IO HValue
-getIdValFromApStack apStack stackDepth = do
-     apSptr <- newStablePtr apStack
-     resultSptr <- getApStackVal apSptr (stackDepth - 1)
-     result <- deRefStablePtr resultSptr
-     freeStablePtr apSptr
-     freeStablePtr resultSptr 
-     return (unsafeCoerce# result)
+getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
+getIdValFromApStack apStack (I# stackDepth) = do
+   case getApStackVal# apStack (stackDepth +# 1#) of
+                                -- The +1 is magic!  I don't know where it comes
+                                -- from, but this makes things line up.  --SDM
+        (# ok, result #) ->
+            case ok of
+              0# -> return Nothing -- AP_STACK not found
+              _  -> return (Just (unsafeCoerce# result))
 
 pushResume :: HscEnv -> Resume -> HscEnv
 pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
@@ -549,7 +556,7 @@ consBL a (BL len bound left right)
 
 toListBL (BL _ _ left right) = left ++ reverse right
 
-lenBL (BL len _ _ _) = len
+-- lenBL (BL len _ _ _) = len
 
 -- -----------------------------------------------------------------------------
 -- | Set the interactive evaluation context.

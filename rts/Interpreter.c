@@ -1375,25 +1375,6 @@ run_BCO:
     barf("interpretBCO: fell off end of the interpreter");
 }
 
-/* temporary code for peeking inside a AP_STACK and pulling out values
-   based on their stack offset - used in the debugger for inspecting
-   the local values of a breakpoint
-*/
-HsStablePtr rts_getApStackVal (HsStablePtr, int);
-HsStablePtr rts_getApStackVal (HsStablePtr apStackSptr, int offset)
-{
-   HsStablePtr resultSptr;
-   StgAP_STACK *apStack;
-   StgClosure **payload;
-   StgClosure *val;
-
-   apStack = (StgAP_STACK *) deRefStablePtr (apStackSptr);
-   payload = apStack->payload;
-   val = (StgClosure *) payload[offset+2];
-   resultSptr = getStablePtr ((P_)val); 
-   return resultSptr;
-}
-
 /* set the single step flag for the debugger to True -
    it gets set back to false in the interpreter everytime
    we hit a breakpoint

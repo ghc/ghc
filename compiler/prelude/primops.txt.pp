@@ -1743,6 +1743,10 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
    with
    out_of_line = True
 
+primop  GetApStackValOp "getApStackVal#" GenPrimOp
+   a -> Int# -> (# Int#, b #)
+   with
+   out_of_line = True
 
 ------------------------------------------------------------------------
 section "Etc" 
