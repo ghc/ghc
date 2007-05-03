@@ -19,6 +19,7 @@ import CoreSyn
 import VarEnv	
 import CoreLint		( showPass, endPass )
 import Outputable
+import StaticFlags	( opt_PprStyle_Debug )
 import BasicTypes	( isAlwaysActive )
 import Util		( mapAccumL, lengthExceeds )
 import UniqFM
@@ -314,13 +315,14 @@ addCSEnvItem env expr expr' | exprIsBig expr = env
 extendCSEnv (CS cs in_scope sub) expr expr'
   = CS (addToUFM_C combine cs hash [(expr, expr')]) in_scope sub
   where
-    hash   = hashExpr expr
-    combine old new = WARN( result `lengthExceeds` 4, ((text "extendCSEnv: long list (length" <+> int (length result) <> comma 
-							<+> text "hash code" <+> text (show hash) <> char ')')
-							$$ nest 4 (ppr result)) )
-		      result
-		    where
-		      result = new ++ old
+    hash = hashExpr expr
+    combine old new 
+	= WARN( result `lengthExceeds` 4, short_msg $$ nest 2 long_msg ) result
+	where
+	  result = new ++ old
+	  short_msg = ptext SLIT("extendCSEnv: long list, length") <+> int (length result)
+	  long_msg | opt_PprStyle_Debug = (text "hash code" <+> text (show hash)) $$ ppr result 
+		   | otherwise	        = empty
 
 lookupSubst (CS _ _ sub) x = case lookupVarEnv sub x of
 			       Just y  -> y

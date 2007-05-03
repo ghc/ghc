@@ -38,6 +38,7 @@ import Name		( Name, NamedThing(..) )
 import NameEnv
 import Unify 		( ruleMatchTyX, MatchEnv(..) )
 import BasicTypes	( Activation, CompilerPhase, isActive )
+import StaticFlags	( opt_PprStyle_Debug )
 import Outputable
 import FastString
 import Maybes
@@ -258,10 +259,15 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
   | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
 #ifdef DEBUG
-  | otherwise = pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
-			 (vcat [ptext SLIT("Expression to match:") <+> ppr fn <+> sep (map ppr args),
-				ptext SLIT("Rule 1:") <+> ppr rule1, 
-				ptext SLIT("Rule 2:") <+> ppr rule2]) $
+  | otherwise = let pp_rule rule 
+			| opt_PprStyle_Debug = ppr rule
+			| otherwise          = doubleQuotes (ftext (ru_name rule))
+		in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
+			 (vcat [if opt_PprStyle_Debug then 
+				   ptext SLIT("Expression to match:") <+> ppr fn <+> sep (map ppr args)
+				else empty,
+				ptext SLIT("Rule 1:") <+> pp_rule rule1, 
+				ptext SLIT("Rule 2:") <+> pp_rule rule2]) $
 		findBest target (rule1,ans1) prs
 #else
   | otherwise = findBest target (rule1,ans1) prs
