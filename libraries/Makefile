@@ -1,4 +1,15 @@
 
+# To do a fresh build:
+#
+#   make clean
+#   make boot
+#   make
+#
+# To rebuild a particular library <package>:
+#
+#   make clean.library.<package>
+#   make build.library.<package>
+
 .PHONY: default_target
 
 default_target: build
