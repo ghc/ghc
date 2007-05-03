@@ -127,7 +127,6 @@ bindSuspensions cms@(Session ref) t = do
       hsc_env <- readIORef ref
       inScope <- GHC.getBindings cms
       let ictxt        = hsc_IC hsc_env
-          type_env     = ic_tmp_ids ictxt
           prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
           availNames   = map ((prefix++) . show) [1..] \\ alreadyUsedNames 
@@ -138,13 +137,11 @@ bindSuspensions cms@(Session ref) t = do
       let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
                 | (name,ty) <- zip names tys']
           new_tyvars   = tyVarsOfTypes tys'
-          old_tyvars   = ic_tyvars ictxt
-          new_ic       = ictxt { ic_tmp_ids = ids ++ ic_tmp_ids ictxt,
-                                 ic_tyvars   = old_tyvars `unionVarSet` new_tyvars }
+          new_ic       = extendInteractiveContext ictxt ids new_tyvars
       extendLinkEnv (zip names hvals)
       writeIORef ref (hsc_env {hsc_IC = new_ic })
       return t'
-     where    
+     where
 
 --    Processing suspensions. Give names and recopilate info
         nameSuspensionsAndGetInfos :: IORef [String] -> TermFold (IO (Term, [(Name,Type,HValue)]))
