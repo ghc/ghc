@@ -4563,6 +4563,8 @@ remainderCode rep div x y = do
 -- -----------------------------------------------------------------------------
 --  Coercing to/from integer/floating-point...
 
+-- When going to integer, we truncate (round towards 0).
+
 -- @coerce(Int2FP|FP2Int)@ are more complicated integer/float
 -- conversions.  We have to store temporaries in memory to move
 -- between the integer and the floating point register sets.
@@ -4648,7 +4650,7 @@ coerceFP2Int from to x = do
 coerceFP2Int from to x = do
   (x_op, x_code) <- getOperand x  -- ToDo: could be a safe operand
   let
-        opc  = case from of F32 -> CVTSS2SI; F64 -> CVTSD2SI
+        opc  = case from of F32 -> CVTTSS2SIQ; F64 -> CVTTSD2SIQ
         code dst = x_code `snocOL` opc x_op dst
   -- in
   return (Any to code) -- works even if the destination rep is <I32

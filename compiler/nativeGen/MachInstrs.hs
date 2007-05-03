@@ -488,8 +488,8 @@ bit or 64 bit precision.
 
 	| CVTSS2SD	Reg Reg		-- F32 to F64
 	| CVTSD2SS	Reg Reg		-- F64 to F32
-	| CVTSS2SI	Operand Reg	-- F32 to I32/I64 (with rounding)
-	| CVTSD2SI	Operand	Reg	-- F64 to I32/I64 (with rounding)
+	| CVTTSS2SIQ	Operand Reg	-- F32 to I32/I64 (with truncation)
+	| CVTTSD2SIQ	Operand	Reg	-- F64 to I32/I64 (with truncation)
 	| CVTSI2SS	Operand Reg	-- I32/I64 to F32
 	| CVTSI2SD	Operand Reg	-- I32/I64 to F64
 

@@ -214,8 +214,8 @@ regUsage instr = case instr of
 #if x86_64_TARGET_ARCH
     CVTSS2SD src dst	-> mkRU [src] [dst]
     CVTSD2SS src dst	-> mkRU [src] [dst]
-    CVTSS2SI src dst	-> mkRU (use_R src) [dst]
-    CVTSD2SI src dst	-> mkRU (use_R src) [dst]
+    CVTTSS2SIQ src dst	-> mkRU (use_R src) [dst]
+    CVTTSD2SIQ src dst	-> mkRU (use_R src) [dst]
     CVTSI2SS src dst	-> mkRU (use_R src) [dst]
     CVTSI2SD src dst	-> mkRU (use_R src) [dst]
     FDIV sz src dst     -> usageRM src dst
@@ -588,8 +588,8 @@ patchRegs instr env = case instr of
 #if x86_64_TARGET_ARCH
     CVTSS2SD src dst	-> CVTSS2SD (env src) (env dst)
     CVTSD2SS src dst	-> CVTSD2SS (env src) (env dst)
-    CVTSS2SI src dst	-> CVTSS2SI (patchOp src) (env dst)
-    CVTSD2SI src dst	-> CVTSD2SI (patchOp src) (env dst)
+    CVTTSS2SIQ src dst	-> CVTTSS2SIQ (patchOp src) (env dst)
+    CVTTSD2SIQ src dst	-> CVTTSD2SIQ (patchOp src) (env dst)
     CVTSI2SS src dst	-> CVTSI2SS (patchOp src) (env dst)
     CVTSI2SD src dst	-> CVTSI2SD (patchOp src) (env dst)
     FDIV sz src dst	-> FDIV sz (patchOp src) (patchOp dst)
