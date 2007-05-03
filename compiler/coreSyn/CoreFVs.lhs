@@ -14,7 +14,7 @@ module CoreFVs (
 	exprFreeNames, exprsFreeNames,
 
 	idRuleVars, idFreeVars, varTypeTyVars, 
-	ruleRhsFreeVars, rulesRhsFreeVars,
+	ruleRhsFreeVars, rulesFreeVars,
 	ruleLhsFreeNames, ruleLhsFreeIds, 
 
 	CoreExprWithFVs,	-- = AnnExpr Id VarSet
@@ -241,18 +241,18 @@ exprsFreeNames es = foldr (unionNameSets . exprFreeNames) emptyNameSet es
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
 ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
-  = delFromUFM fvs fn
-	-- Hack alert!
-	-- Don't include the Id in its own rhs free-var set.
-	-- Otherwise the occurrence analyser makes bindings recursive
-	-- that shoudn't be.  E.g.
-	--	RULE:  f (f x y) z  ==>  f x (f y z)
+  = delFromUFM fvs fn	 -- Note [Rule free var hack]
   where
     fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
 
-rulesRhsFreeVars :: [CoreRule] -> VarSet
-rulesRhsFreeVars rules
-  = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet rules
+ruleFreeVars :: CoreRule -> VarSet	-- All free variables, both left and right
+ruleFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
+  = delFromUFM fvs fn	-- Note [Rule free var hack]
+  where
+    fvs = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
+
+rulesFreeVars :: [CoreRule] -> VarSet
+rulesFreeVars rules = foldr (unionVarSet . ruleFreeVars) emptyVarSet rules
 
 ruleLhsFreeIds :: CoreRule -> VarSet
 -- This finds all locally-defined free Ids on the LHS of the rule
@@ -261,6 +261,14 @@ ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = addBndrs bndrs (exprs_fvs args) isLocalId emptyVarSet
 \end{code}
 
+Note [Rule free var hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Don't include the Id in its own rhs free-var set.
+Otherwise the occurrence analyser makes bindings recursive
+that shoudn't be.  E.g.
+	RULE:  f (f x y) z  ==>  f x (f y z)
+
+Also since rule_fn is a Name, not a Var, we have to use the grungy delUFM.
 
 %************************************************************************
 %*									*

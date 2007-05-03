@@ -464,9 +464,11 @@ type InlinePragInfo = Activation
 %************************************************************************
 
 \begin{code}
--- CoreRules is used only in an idSpecialisation (move to IdInfo?)
 data SpecInfo 
-  = SpecInfo [CoreRule] VarSet	-- Locally-defined free vars of RHSs
+  = SpecInfo 
+	[CoreRule] 
+	VarSet		-- Locally-defined free vars of *both* LHS and RHS of rules
+			-- Note [Rule dependency info]
 
 emptySpecInfo :: SpecInfo
 emptySpecInfo = SpecInfo [] emptyVarSet
@@ -482,6 +484,17 @@ specInfoRules (SpecInfo rules _) = rules
 
 seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 \end{code}
+
+Note [Rule dependency info]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+THe VarSet in a SpecInfo is used for dependency analysis in the 
+occurrence analyser.  We must track free vars in *both* lhs and rhs.  Why both?  
+Consider
+	x = y
+ 	RULE f x = 4
+Then if we substitute y for x, we'd better do so in the
+ rule's LHS too, so we'd better ensure the dependency is respsected
+
 
 
 %************************************************************************

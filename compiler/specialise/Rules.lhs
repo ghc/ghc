@@ -20,7 +20,7 @@ module Rules (
 
 import CoreSyn		-- All of it
 import OccurAnal	( occurAnalyseExpr )
-import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesRhsFreeVars )
+import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( tcEqExprX, exprType )
 import PprCore		( pprRules )
@@ -136,11 +136,11 @@ ruleCantMatch ts	     as		    = False
 
 \begin{code}
 mkSpecInfo :: [CoreRule] -> SpecInfo
-mkSpecInfo rules = SpecInfo rules (rulesRhsFreeVars rules)
+mkSpecInfo rules = SpecInfo rules (rulesFreeVars rules)
 
 extendSpecInfo :: SpecInfo -> [CoreRule] -> SpecInfo
 extendSpecInfo (SpecInfo rs1 fvs1) rs2
-  = SpecInfo (rs2 ++ rs1) (rulesRhsFreeVars rs2 `unionVarSet` fvs1)
+  = SpecInfo (rs2 ++ rs1) (rulesFreeVars rs2 `unionVarSet` fvs1)
 
 addSpecInfo :: SpecInfo -> SpecInfo -> SpecInfo
 addSpecInfo (SpecInfo rs1 fvs1) (SpecInfo rs2 fvs2) 
