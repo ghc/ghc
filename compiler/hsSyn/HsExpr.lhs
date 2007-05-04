@@ -278,17 +278,20 @@ instance OutputableBndr id => Outputable (HsExpr id) where
 \end{code}
 
 \begin{code}
--- pprExpr and pprLExpr call pprDeeper; 
+-----------------------
+-- pprExpr, pprLExpr, pprBinds call pprDeeper; 
 -- the underscore versions do not
-pprExpr :: OutputableBndr id => HsExpr id -> SDoc
-pprExpr  e = pprDeeper (ppr_expr e)
-
 pprLExpr :: OutputableBndr id => LHsExpr id -> SDoc
-pprLExpr e = pprDeeper (ppr_expr (unLoc e))
+pprLExpr (L _ e) = pprExpr e
+
+pprExpr :: OutputableBndr id => HsExpr id -> SDoc
+pprExpr e | isAtomicHsExpr e = ppr_expr e	-- Never replace 'x' by "..."
+	  | otherwise	     = pprDeeper (ppr_expr e)
 
 pprBinds :: OutputableBndr id => HsLocalBinds id -> SDoc
 pprBinds b = pprDeeper (ppr b)
 
+-----------------------
 ppr_lexpr :: OutputableBndr id => LHsExpr id -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
@@ -378,7 +381,7 @@ ppr_expr (ExplicitPArr _ exprs)
   = pa_brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (ExplicitTuple exprs boxity)
-  = tupleParens boxity (pprDeeperList sep (punctuate comma (map ppr_lexpr exprs)))
+  = tupleParens boxity (sep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (RecordCon con_id con_expr rbinds)
   = pp_rbinds (ppr con_id) rbinds
@@ -403,7 +406,7 @@ ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
 ppr_expr (HsSCC lbl expr)
   = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ftext lbl), pprParendExpr expr ]
 
-ppr_expr (HsWrap co_fn e) = pprHsWrapper (ppr_expr e) co_fn
+ppr_expr (HsWrap co_fn e) = pprHsWrapper (pprExpr e) co_fn
 ppr_expr (HsType id)	    = ppr id
 
 ppr_expr (HsSpliceE s)       = pprSplice s
@@ -470,9 +473,8 @@ pprParendExpr expr
 	-- I think that is usually (always?) right
     in
     case unLoc expr of
-      HsLit l		-> ppr l
-      HsOverLit l 	-> ppr l
-			
+      HsLit l		-> pp_as_was
+      HsOverLit l 	-> pp_as_was
       HsVar _		-> pp_as_was
       HsIPVar _		-> pp_as_was
       ExplicitList _ _  -> pp_as_was
@@ -482,6 +484,15 @@ pprParendExpr expr
       HsBracket _	-> pp_as_was
       HsBracketOut _ []	-> pp_as_was
       _			-> parens pp_as_was
+
+isAtomicHsExpr :: HsExpr id -> Bool	-- A single token
+isAtomicHsExpr (HsVar {})     = True
+isAtomicHsExpr (HsLit {})     = True
+isAtomicHsExpr (HsOverLit {}) = True
+isAtomicHsExpr (HsIPVar {})   = True
+isAtomicHsExpr (HsWrap _ e)   = isAtomicHsExpr e
+isAtomicHsExpr (HsPar e)      = isAtomicHsExpr (unLoc e)
+isAtomicHsExpr e	      = False
 \end{code}
 
 %************************************************************************
