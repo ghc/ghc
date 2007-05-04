@@ -74,3 +74,4 @@ test('set', normal, compile, [''])
 # test('gadt-dim8', normal, compile, [''])
 # test('Arith', normal, compile, [''])
 
+test('Session', normal, compile_and_run, [''])
