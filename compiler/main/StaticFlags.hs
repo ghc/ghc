@@ -42,7 +42,6 @@ module StaticFlags (
 	opt_NoMethodSharing, 
 	opt_NoStateHack,
 	opt_CprOff,
-	opt_RulesOff,
 	opt_SimplNoPreInlining,
 	opt_SimplExcessPrecision,
 	opt_MaxWorkerArgs,
@@ -296,7 +295,6 @@ opt_Flatten			= lookUp  FSLIT("-fflatten")
 opt_NoStateHack			= lookUp  FSLIT("-fno-state-hack")
 opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
 opt_CprOff			= lookUp  FSLIT("-fcpr-off")
-opt_RulesOff			= lookUp  FSLIT("-frules-off")
 	-- Switch off CPR analysis in the new demand analyser
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
@@ -369,7 +367,6 @@ isStaticFlag f =
 	"static",
 	"funregisterised",
 	"fext-core",
-	"frules-off",
 	"fcpr-off",
 	"ferror-spans",
 	"fPIC"

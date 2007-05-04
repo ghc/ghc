@@ -774,10 +774,11 @@ activeInline env id
   where
     prag = idInlinePragma id
 
-activeRule :: SimplEnv -> Maybe (Activation -> Bool)
+activeRule :: DynFlags -> SimplEnv -> Maybe (Activation -> Bool)
 -- Nothing => No rules at all
-activeRule env
-  | opt_RulesOff = Nothing
+activeRule dflags env
+  | not (dopt Opt_RewriteRules dflags)
+  = Nothing	-- Rewriting is off
   | otherwise
   = case getMode env of
 	SimplGently  -> Just isAlwaysActive

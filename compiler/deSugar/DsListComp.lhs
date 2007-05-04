@@ -50,7 +50,7 @@ dsListComp lquals body elt_ty
     let
 	quals = map unLoc lquals
     in
-    if opt_RulesOff || dopt Opt_IgnoreInterfacePragmas dflags
+    if not (dopt Opt_RewriteRules dflags) || dopt Opt_IgnoreInterfacePragmas dflags
 	-- Either rules are switched off, or we are ignoring what there are;
 	-- Either way foldr/build won't happen, so use the more efficient
 	-- Wadler-style desugaring

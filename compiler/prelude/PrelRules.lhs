@@ -44,9 +44,7 @@ import Name		( Name, nameOccName )
 import Outputable
 import FastString
 import StaticFlags      ( opt_SimplExcessPrecision )
-
-import Data.Bits as Bits	( Bits(..), shiftL, shiftR )
-	-- shiftL and shiftR were not always methods of Bits
+import Data.Bits as Bits
 import Data.Word	( Word )
 \end{code}
 
@@ -446,6 +444,33 @@ dataToTagRule other = Nothing
 \subsection{Built in rules}
 %*									*
 %************************************************************************
+
+Note [Scoping for Builtin rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When compiling a (base-package) module that defines one of the
+functions mentioned in the RHS of a built-in rule, there's a danger
+that we'll see
+
+	f = ...(eq String x)....
+
+	....and lower down...
+
+	eqString = ...
+
+Then a rewrite would give
+
+	f = ...(eqString x)...
+	....and lower down...
+	eqString = ...
+
+and lo, eqString is not in scope.  This only really matters when we get to code
+generation.  With -O we do a GlomBinds step that does a new SCC analysis on the whole
+set of bindings, which sorts out the dependency.  Without -O we don't do any rule
+rewriting so again we are fine.
+
+(This whole thing doesn't show up for non-built-in rules because their dependencies
+are explicit.)
+
 
 \begin{code}
 builtinRules :: [CoreRule]

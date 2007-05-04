@@ -192,6 +192,7 @@ data DynFlag
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
    | Opt_DictsCheap
+   | Opt_RewriteRules
 
    -- misc opts
    | Opt_Cpp
@@ -560,12 +561,16 @@ optLevelFlags :: [([Int], DynFlag)]
 optLevelFlags
   = [ ([0],	Opt_IgnoreInterfacePragmas)
     , ([0],     Opt_OmitInterfacePragmas)
+
     , ([1,2],	Opt_IgnoreAsserts)
+    , ([1,2],	Opt_RewriteRules)	-- Off for -O0; see Note [Scoping for Builtin rules]
+					-- 		in PrelRules
     , ([1,2],	Opt_DoEtaReduction)
     , ([1,2],	Opt_CaseMerge)
     , ([1,2],	Opt_Strictness)
     , ([1,2],	Opt_CSE)
     , ([1,2],	Opt_FullLaziness)
+
     , ([2],	Opt_LiberateCase)
     , ([2],	Opt_SpecConstr)
 
@@ -1067,7 +1072,8 @@ fFlags = [
   ( "asm-mangling",			Opt_DoAsmMangling ),
   ( "print-bind-result",		Opt_PrintBindResult ),
   ( "force-recomp",			Opt_ForceRecomp ),
-  ( "hpc-no-auto",			Opt_Hpc_No_Auto )
+  ( "hpc-no-auto",			Opt_Hpc_No_Auto ),
+  ( "rewrite-rules",			Opt_RewriteRules )
   ]
 
 

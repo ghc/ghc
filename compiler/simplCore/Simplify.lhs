@@ -967,7 +967,7 @@ completeCall env var cont
 	-- So it's up to the programmer: rules can cause divergence
 	; let	in_scope   = getInScope env
 		rules	   = getRules env
-		maybe_rule = case activeRule env of
+		maybe_rule = case activeRule dflags env of
 				Nothing     -> Nothing	-- No rules apply
 				Just act_fn -> lookupRule act_fn in_scope 
 							  rules var args 
