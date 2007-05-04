@@ -8,7 +8,9 @@ module Unify (
 	--	the "tc" prefix indicates that matching always
 	--	respects newtypes (rather than looking through them)
 	tcMatchTy, tcMatchTys, tcMatchTyX, 
-	ruleMatchTyX, tcMatchPreds, MatchEnv(..)
+	ruleMatchTyX, tcMatchPreds, MatchEnv(..),
+	
+	dataConCannotMatch
    ) where
 
 #include "HsVersions.h"
@@ -17,8 +19,11 @@ import Var
 import VarEnv
 import VarSet
 import Type
+import TyCon
+import DataCon
 import TypeRep
 import Outputable
+import Util
 import Maybes
 \end{code}
 
@@ -207,3 +212,125 @@ match_pred menv subst p1 p2 = Nothing
 \end{code}
 
 
+%************************************************************************
+%*									*
+		GADTs
+%*									*
+%************************************************************************
+
+Note [Pruning dead case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider	data T a where
+		   T1 :: T Int
+		   T2 :: T a
+
+		newtype X = MkX Int
+		newtype Y = MkY Char
+
+		type family F a
+		type instance F Bool = Int
+
+Now consider	case x of { T1 -> e1; T2 -> e2 }
+
+The question before the house is this: if I know something about the type
+of x, can I prune away the T1 alternative?
+
+Suppose x::T Char.  It's impossible to construct a (T Char) using T1, 
+	Answer = YES (clearly)
+
+Suppose x::T (F a), where 'a' is in scope.  Then 'a' might be instantiated
+to 'Bool', in which case x::T Int, so
+	ANSWER = NO (clearly)
+
+Suppose x::T X.  Then *in Haskell* it's impossible to construct a (non-bottom) 
+value of type (T X) using T1.  But *in FC* it's quite possible.  The newtype
+gives a coercion
+	CoX :: X ~ Int
+So (T CoX) :: T X ~ T Int; hence (T1 `cast` sym (T CoX)) is a non-bottom value
+of type (T X) constructed with T1.  Hence
+	ANSWER = NO (surprisingly)
+
+Furthermore, this can even happen; see Trac #1251.  GHC's newtype-deriving
+mechanism uses a cast, just as above, to move from one dictionary to another,
+in effect giving the programmer access to CoX.
+
+Finally, suppose x::T Y.  Then *even in FC* we can't construct a
+non-bottom value of type (T Y) using T1.  That's because we can get
+from Y to Char, but not to Int.
+
+
+Here's a related question.  	data Eq a b where EQ :: Eq a a
+Consider
+	case x of { EQ -> ... }
+
+Suppose x::Eq Int Char.  Is the alternative dead?  Clearly yes.
+
+What about x::Eq Int a, in a context where we have evidence that a~Char.
+Then again the alternative is dead.   
+
+
+			Summary
+
+We are really doing a test for unsatisfiability of the type
+constraints implied by the match. And that is clearly, in general, a
+hard thing to do.  
+
+However, since we are simply dropping dead code, a conservative test
+suffices.  There is a continuum of tests, ranging from easy to hard, that
+drop more and more dead code.
+
+For now we implement a very simple test: type variables match
+anything, type functions (incl newtypes) match anything, and only
+distinct data types fail to match.  We can elaborate later.
+
+\begin{code}
+dataConCannotMatch :: [Type] -> DataCon -> Bool
+-- Returns True iff the data con *definitely cannot* match a 
+--		    scrutinee of type (T tys)
+--		    where T is the type constructor for the data con
+--
+dataConCannotMatch tys con
+  | null eq_spec      = False	-- Common
+  | all isTyVarTy tys = False	-- Also common
+  | otherwise
+  = cant_match_s (map (substTyVar subst . fst) eq_spec)
+	         (map snd eq_spec)
+  where
+    dc_tvs  = dataConUnivTyVars con
+    eq_spec = dataConEqSpec con
+    subst   = zipTopTvSubst dc_tvs tys
+
+    cant_match_s :: [Type] -> [Type] -> Bool
+    cant_match_s tys1 tys2 = ASSERT( equalLength tys1 tys2 )
+			     or (zipWith cant_match tys1 tys2)
+
+    cant_match :: Type -> Type -> Bool
+    cant_match t1 t2
+	| Just t1' <- coreView t1 = cant_match t1' t2
+	| Just t2' <- coreView t2 = cant_match t1 t2'
+
+    cant_match (FunTy a1 r1) (FunTy a2 r2)
+	= cant_match a1 a2 || cant_match r1 r2
+
+    cant_match (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+	| isDataTyCon tc1 && isDataTyCon tc2
+	= tc1 /= tc2 || cant_match_s tys1 tys2
+
+    cant_match (FunTy {}) (TyConApp tc _) = isDataTyCon tc
+    cant_match (TyConApp tc _) (FunTy {}) = isDataTyCon tc
+	-- tc can't be FunTyCon by invariant
+
+    cant_match (AppTy f1 a1) ty2
+	| Just (f2, a2) <- repSplitAppTy_maybe ty2
+	= cant_match f1 f2 || cant_match a1 a2
+    cant_match ty1 (AppTy f2 a2)
+	| Just (f1, a1) <- repSplitAppTy_maybe ty1
+	= cant_match f1 f2 || cant_match a1 a2
+
+    cant_match ty1 ty2 = False	-- Safe!
+
+-- Things we could add;
+--	foralls
+--	look through newtypes
+--	take account of tyvar bindings (EQ example above)
+\end{code}

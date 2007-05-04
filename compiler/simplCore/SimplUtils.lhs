@@ -40,7 +40,7 @@ import SimplMonad
 import Type
 import TyCon
 import DataCon
-import TcGadt	( dataConCanMatch )
+import Unify	( dataConCannotMatch )
 import VarSet
 import BasicTypes
 import Util
@@ -1199,7 +1199,7 @@ prepareAlts scrut case_bndr' alts
 	; default_alts <- prepareDefault dflags scrut case_bndr' mb_tc_app 
 					 imposs_deflt_cons maybe_deflt
 
-	; let trimmed_alts = filter possible_alt alts_wo_default
+	; let trimmed_alts = filterOut impossible_alt alts_wo_default
 	      merged_alts = mergeAlts trimmed_alts default_alts
 		-- We need the mergeAlts in case the new default_alt 
 		-- has turned into a constructor alternative.
@@ -1215,10 +1215,10 @@ prepareAlts scrut case_bndr' alts
 		    Var v -> otherCons (idUnfolding v)
 		    other -> []
 
-    possible_alt :: CoreAlt -> Bool
-    possible_alt (con, _, _) | con `elem` imposs_cons = False
-    possible_alt (DataAlt con, _, _) = dataConCanMatch inst_tys con
-    possible_alt alt		    = True
+    impossible_alt :: CoreAlt -> Bool
+    impossible_alt (con, _, _) | con `elem` imposs_cons = True
+    impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
+    impossible_alt alt		       = False
 
 
 --------------------------------------------------
@@ -1306,9 +1306,8 @@ prepareDefault dflags scrut case_bndr (Just (tycon, inst_tys)) imposs_cons (Just
 				-- which would be quite legitmate.  But it's a really obscure corner, and
 				-- not worth wasting code on.
   , let imposs_data_cons = [con | DataAlt con <- imposs_cons]	-- We now know it's a data type 
-	is_possible con  = not (con `elem` imposs_data_cons)
-			   && dataConCanMatch inst_tys con
-  = case filter is_possible all_cons of
+	impossible con  = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
+  = case filterOut impossible all_cons of
 	[]    -> return []	-- Eliminate the default alternative
 				-- altogether if it can't match
 
@@ -1361,7 +1360,7 @@ mkCase :: OutExpr -> OutId -> OutType
 -- put an error case here insteadd
 mkCase scrut case_bndr ty []
   = pprTrace "mkCase: null alts" (ppr case_bndr <+> ppr scrut) $
-    return (mkApps (Var eRROR_ID)
+    return (mkApps (Var rUNTIME_ERROR_ID)
 		   [Type ty, Lit (mkStringLit "Impossible alternative")])
 
 
