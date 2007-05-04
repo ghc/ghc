@@ -75,3 +75,4 @@ test('set', normal, compile, [''])
 # test('Arith', normal, compile, [''])
 
 test('Session', normal, compile_and_run, [''])
+test('CasePrune', normal, compile_and_run, [''])
