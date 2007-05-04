@@ -17,8 +17,7 @@ import Id
 import Var
 import IdInfo
 import Coercion
-import DataCon		( dataConTyCon, dataConRepStrictness, dataConUnivTyVars )
-import TyCon		( tyConArity )
+import DataCon		( dataConRepStrictness, dataConUnivTyVars )
 import CoreSyn
 import NewDemand	( isStrictDmd )
 import PprCore		( pprParendExpr, pprCoreExpr )

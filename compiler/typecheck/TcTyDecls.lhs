@@ -24,8 +24,6 @@ import HscTypes
 import TyCon
 import Class
 import DataCon
-import Var
-import VarSet
 import Name
 import NameEnv
 import NameSet
@@ -280,6 +278,7 @@ new_tc_rhs tc = snd (newTyConRhs tc)	-- Ignore the type variables
 
 getTyCon (ATyCon tc) = tc
 getTyCon (AClass cl) = classTyCon cl
+getTyCon other       = panic "getTyCon"
 
 findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
 -- Finds a set of tycons that cut all loops
@@ -312,6 +311,7 @@ tcTyConsOfType ty
      go (PredTy (IParam _ ty))     = go ty
      go (PredTy (ClassP cls tys))  = go_tc (classTyCon cls) tys
      go (ForAllTy _ ty)	  	   = go ty
+     go other			   = panic "tcTyConsOfType"
 
      go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys
