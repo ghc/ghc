@@ -173,7 +173,9 @@ deSugar hsc_env
 		mg_binds     	= ds_binds,
 		mg_foreign   	= ds_fords,
 		mg_hpc_info  	= ds_hpc_info,
-                mg_modBreaks    = modBreaks }
+                mg_modBreaks    = modBreaks,
+                mg_vect_info    = noVectInfo
+              }
         ; return (Just mod_guts)
 	}}}
 

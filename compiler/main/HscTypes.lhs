@@ -63,7 +63,10 @@ module HscTypes (
         HpcInfo(..), noHpcInfo,
 
         -- Breakpoints
-        ModBreaks (..), BreakIndex, emptyModBreaks
+        ModBreaks (..), BreakIndex, emptyModBreaks,
+
+        -- Vectorisation information
+        VectInfo(..), noVectInfo
     ) where
 
 #include "HsVersions.h"
@@ -510,7 +513,8 @@ data ModGuts
 	mg_foreign   :: !ForeignStubs,
 	mg_deprecs   :: !Deprecations,	 -- Deprecations declared in the module
 	mg_hpc_info  :: !HpcInfo,        -- info about coverage tick boxes
-        mg_modBreaks :: !ModBreaks
+        mg_modBreaks :: !ModBreaks,
+        mg_vect_info :: !VectInfo        -- Pool of vectorised declarations
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -1207,6 +1211,21 @@ data HpcInfo = HpcInfo
 
 noHpcInfo :: HpcInfo
 noHpcInfo = NoHpcInfo
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Vectorisation Support}
+%*									*
+%************************************************************************
+
+\begin{code}
+data VectInfo = VectInfo {
+                  vectInfoCCVar :: NameSet
+                }
+
+noVectInfo :: VectInfo
+noVectInfo = VectInfo emptyNameSet
 \end{code}
 
 %************************************************************************
