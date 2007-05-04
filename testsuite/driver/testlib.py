@@ -932,7 +932,7 @@ def check_hp_ok(name):
         print "hp2ps error when processing heap profile for " + name
         return(False)
 
-# Compare expected output to # actual output, and optionally accept the
+# Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
 # otherwise.
 def compare_outputs( kind, normaliser, extra_normaliser,
