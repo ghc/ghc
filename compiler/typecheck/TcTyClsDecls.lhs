@@ -1197,6 +1197,7 @@ wrongKindOfFamily family =
     kindOfFamily | isSynTyCon  family = ptext SLIT("type synonym")
 		 | isDataTyCon family = ptext SLIT("data type")
 		 | isNewTyCon  family = ptext SLIT("newtype")
+		 | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
