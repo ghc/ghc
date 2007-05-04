@@ -1,2 +1,4 @@
 
-mod45.hs:5:2: Misplaced type signature: == :: T -> T -> Bool
+mod45.hs:5:2:
+    Misplaced type signature: == :: T -> T -> Bool
+    You cannot give a type signature for an imported value
