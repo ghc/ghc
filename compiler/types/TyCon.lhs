@@ -616,9 +616,14 @@ isDataTyCon :: TyCon -> Bool
 --	True for all @data@ types
 --	False for newtypes
 --		  unboxed tuples
+--		  type families
+-- 
+-- NB: for a data type family, T, only the *instance* tycons are
+--     get an info table etc.  The family tycon does not.
+--     Hence False for OpenTyCon
 isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})  
   = case rhs of
-        OpenTyCon {}  -> not (otIsNewtype rhs)
+        OpenTyCon {}  -> False
 	DataTyCon {}  -> True
 	NewTyCon {}   -> False
 	AbstractTyCon -> False	 -- We don't know, so return False

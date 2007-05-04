@@ -14,7 +14,6 @@ module TcGadt (
 	Refinement, emptyRefinement, isEmptyRefinement, 
 	gadtRefine, 
 	refineType, refinePred, refineResType,
-	dataConCanMatch,
 	tcUnifyTys, BindFlag(..)
   ) where
 
@@ -242,28 +241,9 @@ fixTvSubstEnv in_scope env
     fixpt = mapVarEnv (substTy (mkTvSubst in_scope fixpt)) env
 
 ----------------------------
-dataConCanMatch :: [Type] -> DataCon -> Bool
--- Returns True iff the data con can match a scrutinee of type (T tys)
---		    where T is the type constructor for the data con
---
--- Instantiate the equations and try to unify them
-dataConCanMatch tys con
-  | null eq_spec      = True	-- Common
-  | all isTyVarTy tys = True	-- Also common
-  | otherwise
-  = isJust (tcUnifyTys (\tv -> BindMe) 
-	   	       (map (substTyVar subst . fst) eq_spec)
-		       (map snd eq_spec))
-  where
-    dc_tvs  = dataConUnivTyVars con
-    eq_spec = dataConEqSpec con
-    subst   = zipTopTvSubst dc_tvs tys
-
-----------------------------
 tryToBind :: TyVarSet -> TyVar -> BindFlag
 tryToBind tv_set tv | tv `elemVarSet` tv_set = BindMe
 		    | otherwise	             = AvoidMe
-
 
 \end{code}
 
