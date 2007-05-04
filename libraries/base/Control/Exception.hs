@@ -143,6 +143,52 @@ import System.IO.Error	hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
 
+#ifdef __NHC__
+import System.IO.Error (catch, ioError)
+import IO              (bracket)
+import DIOError		-- defn of IOError type
+
+-- minimum needed for nhc98 to pretend it has Exceptions
+type Exception	 = IOError
+type IOException = IOError
+data ArithException
+data ArrayException
+data AsyncException
+
+throwIO	 :: Exception -> IO a
+throwIO   = ioError
+throw	 :: Exception -> a
+throw     = unsafePerformIO . throwIO
+
+evaluate :: a -> IO a
+evaluate x = x `seq` return x
+
+ioErrors	:: Exception -> Maybe IOError
+ioErrors e       = Just e
+arithExceptions :: Exception -> Maybe ArithException
+arithExceptions  = const Nothing
+errorCalls	:: Exception -> Maybe String
+errorCalls       = const Nothing
+dynExceptions	:: Exception -> Maybe Dynamic
+dynExceptions    = const Nothing
+assertions	:: Exception -> Maybe String
+assertions       = const Nothing
+asyncExceptions :: Exception -> Maybe AsyncException
+asyncExceptions  = const Nothing
+userErrors	:: Exception -> Maybe String
+userErrors (UserError _ s) = Just s
+userErrors  _              = Nothing
+
+block   :: IO a -> IO a
+block    = id
+unblock :: IO a -> IO a
+unblock  = id
+
+assert :: Bool -> a -> a
+assert True  x = x
+assert False _ = throw (UserError "" "Assertion failed")
+#endif
+
 -----------------------------------------------------------------------------
 -- Catching exceptions
 
@@ -191,12 +237,12 @@ import Data.Dynamic
 --
 -- and then using @C.catch@
 --
-
+#ifndef __NHC__
 catch  	:: IO a 		-- ^ The computation to run
   	-> (Exception -> IO a)	-- ^ Handler to invoke if an exception is raised
   	-> IO a			
 catch =  ExceptionBase.catchException
-
+#endif
 -- | The function 'catchJust' is like 'catch', but it takes an extra
 -- argument which is an /exception predicate/, a function which
 -- selects which type of exceptions we\'re interested in.  There are
@@ -289,7 +335,11 @@ tryJust p a = do
 -- | Raise any value as an exception, provided it is in the
 -- 'Typeable' class.
 throwDyn :: Typeable exception => exception -> b
+#ifdef __NHC__
+throwDyn exception = throw (UserError "" "dynamic exception")
+#else
 throwDyn exception = throw (DynException (toDyn exception))
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 -- | A variant of 'throwDyn' that throws the dynamic exception to an
@@ -307,6 +357,9 @@ throwDynTo t exception = throwTo t (DynException (toDyn exception))
 -- with dynamic exceptions used in other libraries.
 --
 catchDyn :: Typeable exception => IO a -> (exception -> IO a) -> IO a
+#ifdef __NHC__
+catchDyn m k = m 	-- can't catch dyn exceptions in nhc98
+#else
 catchDyn m k = catchException m handle
   where handle ex = case ex of
   			   (DynException dyn) ->
@@ -314,6 +367,7 @@ catchDyn m k = catchException m handle
 				    Just exception  -> k exception
 				    Nothing -> throw ex
 			   _ -> throw ex
+#endif
 
 -----------------------------------------------------------------------------
 -- Exception Predicates
@@ -322,7 +376,7 @@ catchDyn m k = catchException m handle
 -- These pre-defined predicates may be used as the first argument to
 -- 'catchJust', 'tryJust', or 'handleJust' to select certain common
 -- classes of exceptions.
-
+#ifndef __NHC__
 ioErrors		:: Exception -> Maybe IOError
 arithExceptions 	:: Exception -> Maybe ArithException
 errorCalls		:: Exception -> Maybe String
@@ -351,7 +405,7 @@ asyncExceptions _ = Nothing
 
 userErrors (IOException e) | isUserError e = Just (ioeGetErrorString e)
 userErrors _ = Nothing
-
+#endif
 -----------------------------------------------------------------------------
 -- Some Useful Functions
 
@@ -374,6 +428,7 @@ userErrors _ = Nothing
 --
 -- > withFile name mode = bracket (openFile name mode) hClose
 --
+#ifndef __NHC__
 bracket 
 	:: IO a		-- ^ computation to run first (\"acquire resource\")
 	-> (a -> IO b)  -- ^ computation to run last (\"release resource\")
@@ -388,7 +443,7 @@ bracket before after thing =
     after a
     return r
  )
-   
+#endif
 
 -- | A specialised variant of 'bracket' with just a computation to run
 -- afterward.
@@ -503,7 +558,7 @@ Similar arguments apply for other interruptible operations like
 'System.IO.openFile'.
 -}
 
-#ifndef __GLASGOW_HASKELL__
+#if !(__GLASGOW_HASKELL__ || __NHC__)
 assert :: Bool -> a -> a
 assert True x = x
 assert False _ = throw (AssertionFailed "")

@@ -1,5 +1,6 @@
 THISPKG	= base
-SEARCH	= -I$(TOPDIR)/targets/$(MACHINE) -Iinclude
+SEARCH	= -I$(TOPDIR)/targets/$(MACHINE) -Iinclude \
+	  -I../../prelude/PreludeIO -I../../prelude/`harch`
 EXTRA_H_FLAGS   = -H4M -K3M
 EXTRA_HBC_FLAGS = -H16M -A1M
 
@@ -16,6 +17,7 @@ SRCS	= \
 	Data/Function.hs Data/Graph.hs \
 	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Instances.hs \
 	Control/Arrow.hs Control/Applicative.hs \
+	Control/Exception.hs \
 	Debug/Trace.hs \
 	NHC/SizedTypes.hs NHC/PosixTypes.hsc \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
