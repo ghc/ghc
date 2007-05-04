@@ -66,7 +66,8 @@ module HscTypes (
         ModBreaks (..), BreakIndex, emptyModBreaks,
 
         -- Vectorisation information
-        VectInfo(..), noVectInfo
+        VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo, 
+        noIfaceVectInfo
     ) where
 
 #include "HsVersions.h"
@@ -449,6 +450,9 @@ data ModIface
 					-- instances (for classes and families)
 					-- combined
 
+                -- Vectorisation information
+        mi_vect_info :: !IfaceVectInfo,
+
 		-- Cached environments for easy lookup
 		-- These are computed (lazily) from other fields
 		-- and are not put into the interface file
@@ -601,6 +605,7 @@ emptyModIface mod
 	       mi_decls     = [],
 	       mi_globals   = Nothing,
 	       mi_rule_vers = initialVersion,
+               mi_vect_info = noIfaceVectInfo,
 	       mi_dep_fn = emptyIfaceDepCache,
 	       mi_fix_fn = emptyIfaceFixCache,
 	       mi_ver_fn = emptyIfaceVerCache
@@ -1027,6 +1032,7 @@ type PackageTypeEnv    = TypeEnv
 type PackageRuleBase   = RuleBase
 type PackageInstEnv    = InstEnv
 type PackageFamInstEnv = FamInstEnv
+type PackageVectInfo   = VectInfo
 
 data ExternalPackageState
   = EPS {
@@ -1063,10 +1069,10 @@ data ExternalPackageState
 					       -- modules 
 	eps_fam_inst_env :: !PackageFamInstEnv,-- Ditto FamInstEnv
 	eps_rule_base    :: !PackageRuleBase,  -- Ditto RuleEnv
+        eps_vect_info    :: !PackageVectInfo,  -- Ditto VectInfo
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- identifies family
-						       -- instances of each mod
-
+						       -- instances of each mod 
 	eps_stats :: !EpsStats
   }
 
@@ -1219,13 +1225,30 @@ noHpcInfo = NoHpcInfo
 %*									*
 %************************************************************************
 
+The following information is generated and consumed by the vectorisation
+subsystem.  It communicates the vectorisation status of declarations from one
+module to another.
+
 \begin{code}
-data VectInfo = VectInfo {
-                  vectInfoCCVar :: NameSet
-                }
+-- ModGuts version
+data VectInfo      = VectInfo {
+                       vectInfoCCVar :: NameSet
+                     }
+
+-- ModIface version
+data IfaceVectInfo = IfaceVectInfo {
+                       ifaceVectInfoCCVar :: [Name]
+                     }
 
 noVectInfo :: VectInfo
 noVectInfo = VectInfo emptyNameSet
+
+plusVectInfo :: VectInfo -> VectInfo -> VectInfo
+plusVectInfo vi1 vi2 = 
+  VectInfo (vectInfoCCVar vi1 `unionNameSets` vectInfoCCVar vi2)
+
+noIfaceVectInfo :: IfaceVectInfo
+noIfaceVectInfo = IfaceVectInfo []
 \end{code}
 
 %************************************************************************

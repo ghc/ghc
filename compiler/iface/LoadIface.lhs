@@ -38,6 +38,7 @@ import InstEnv
 import FamInstEnv
 import Name
 import NameEnv
+import NameSet
 import MkId
 import Module
 import OccName
@@ -225,7 +226,7 @@ loadInterface doc_str mod from
 	--
 	-- The main thing is to add the ModIface to the PIT, but
 	-- we also take the
-	--	IfaceDecls, IfaceInst, IfaceRules
+	--	IfaceDecls, IfaceInst, IfaceFamInst, IfaceRules, IfaceVectInfo
 	-- out of the ModIface and put them into the big EPS pools
 
 	-- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
@@ -244,7 +245,13 @@ loadInterface doc_str mod from
 				mi_insts     = panic "No mi_insts in PIT",
 				mi_fam_insts = panic "No mi_fam_insts in PIT",
 				mi_rules     = panic "No mi_rules in PIT"
-                              } }
+                              }
+              ; new_eps_vect_info =
+                  VectInfo {
+                    vectInfoCCVar = mkNameSet 
+                                     (ifaceVectInfoCCVar . mi_vect_info $ iface)
+                  }     
+               }
 
 	; updateEps_  $ \ eps -> 
 	    eps { 
@@ -256,6 +263,8 @@ loadInterface doc_str mod from
 						   new_eps_insts,
 	      eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
 						      new_eps_fam_insts,
+              eps_vect_info    = plusVectInfo (eps_vect_info eps) 
+                                              new_eps_vect_info,
               eps_mod_fam_inst_env
 			       = let
 				   fam_inst_env = 
@@ -490,6 +499,7 @@ initExternalPackageState
 	-- Initialise the EPS rule pool with the built-in rules
       eps_mod_fam_inst_env
                        = emptyModuleEnv,
+      eps_vect_info    = noVectInfo,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
 			   , n_insts_in = 0, n_insts_out = 0
 			   , n_rules_in = length builtinRules, n_rules_out = 0 }

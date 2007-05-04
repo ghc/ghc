@@ -242,7 +242,8 @@ mkIface hsc_env maybe_old_iface
 		      mg_deps      = deps,
 		      mg_rdr_env   = rdr_env,
 		      mg_fix_env   = fix_env,
-		      mg_deprecs   = src_deprecs })
+		      mg_deprecs   = src_deprecs,
+                      mg_vect_info = vect_info })
 	(ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
@@ -299,6 +300,8 @@ mkIface hsc_env maybe_old_iface
 			mi_decls     = deliberatelyOmitted "decls",
 			mi_ver_fn    = deliberatelyOmitted "ver_fn",
 
+                        mi_vect_info = flattenVectInfo vect_info,
+
 			-- And build the cached values
 			mi_dep_fn = mkIfaceDepCache deprecs,
 			mi_fix_fn = mkIfaceFixCache fixities }
@@ -332,6 +335,8 @@ mkIface hsc_env maybe_old_iface
      dflags = hsc_dflags hsc_env
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
      ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
+
+     flattenVectInfo (VectInfo ccVar) = IfaceVectInfo (nameSetToList ccVar)
 
 -----------------------------
 writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()
