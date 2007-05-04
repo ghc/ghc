@@ -40,6 +40,7 @@
 ^libraries/base/
 ^libraries/cgi/
 ^libraries/fgl/
+^libraries/filepath/
 ^libraries/haskell-src/
 ^libraries/haskell98/
 ^libraries/html/
