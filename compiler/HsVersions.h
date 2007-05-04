@@ -67,7 +67,7 @@ import qualified FastString as FS
 #define FSLIT(x) (FS.mkFastString# (x#))
 
 -- Useful for declaring arguments to be strict
-#define STRICT1(f) f a b c | a `seq` False = undefined
+#define STRICT1(f) f a | a `seq` False = undefined
 #define STRICT2(f) f a b | a `seq` b `seq` False = undefined
 #define STRICT3(f) f a b c | a `seq` b `seq` c `seq` False = undefined
 #define STRICT4(f) f a b c d | a `seq` b `seq` c `seq` d `seq` False = undefined
