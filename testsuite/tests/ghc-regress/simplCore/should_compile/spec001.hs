@@ -82,7 +82,7 @@ import Prelude hiding (
 	unwords
  )
 
-import GHC.Exts hiding (split)
+import GHC.Exts
 import GHC.IOBase (IO(..))
 import Foreign
 import Data.Typeable
