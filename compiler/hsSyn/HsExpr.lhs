@@ -694,11 +694,9 @@ pprMatch ctxt (Match pats maybe_ty grhss)
 
 pprGRHSs :: OutputableBndr id => HsMatchContext id -> GRHSs id -> SDoc
 pprGRHSs ctxt (GRHSs grhss binds)
-  = pprDeeper
-    (vcat (map (pprGRHS ctxt . unLoc) grhss)
-      $$
-     if isEmptyLocalBinds binds then empty
-     else text "where" $$ nest 4 (pprBinds binds))
+  = vcat (map (pprGRHS ctxt . unLoc) grhss)
+ $$ if isEmptyLocalBinds binds then empty
+                               else text "where" $$ nest 4 (pprBinds binds)
 
 pprGRHS :: OutputableBndr id => HsMatchContext id -> GRHS id -> SDoc
 
