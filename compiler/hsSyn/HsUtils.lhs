@@ -319,22 +319,24 @@ collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
 %************************************************************************
 
 \begin{code}
-collectLStmtsBinders :: [LStmt id] -> [Located id]
+collectLStmtsBinders :: OutputableBndr id => [LStmt id] -> [Located id]
 collectLStmtsBinders = concatMap collectLStmtBinders
 
-collectStmtsBinders :: [Stmt id] -> [Located id]
+collectStmtsBinders :: OutputableBndr id => [Stmt id] -> [Located id]
 collectStmtsBinders = concatMap collectStmtBinders
 
-collectLStmtBinders :: LStmt id -> [Located id]
+collectLStmtBinders :: OutputableBndr id => LStmt id -> [Located id]
 collectLStmtBinders = collectStmtBinders . unLoc
 
-collectStmtBinders :: Stmt id -> [Located id]
+collectStmtBinders :: OutputableBndr id => Stmt id -> [Located id]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt pat _ _ _) = collectLocatedPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
-collectStmtBinders (ExprStmt _ _ _)   	= []
-collectStmtBinders (RecStmt ss _ _ _ _)	= collectLStmtsBinders ss
-collectStmtBinders other              	= panic "collectStmtBinders"
+collectStmtBinders (ExprStmt _ _ _)     = []
+collectStmtBinders (ParStmt xs)         = collectLStmtsBinders
+                                        $ concatMap fst xs
+collectStmtBinders (RecStmt ss _ _ _ _) = collectLStmtsBinders ss
+collectStmtBinders s                    = pprPanic "collectStmtBinders" (ppr s)
 \end{code}
 
 
