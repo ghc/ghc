@@ -9,7 +9,7 @@ setTestOpts(f)
 test('conc003', normal, compile_and_run, [''])
 test('conc006', normal, compile_and_run, [''])
 test('conc027', normal, compile_and_run, [''])
-test('conc049', only_compiler_types(['ghc']), compile_and_run, ['-package stm'])
+test('conc049', compose(reqlib('stm'), only_compiler_types(['ghc'])), compile_and_run, ['-package stm'])
 test('conc051', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
@@ -113,18 +113,18 @@ test('conc047', compose(only_compiler_types(['ghc']),
 test('conc048', compose(only_compiler_types(['ghc']), 
                         omit_ways(['ghci'])), compile_and_run, [''])
 
-test('conc050', compose(only_compiler_types(['ghc']), extra_run_opts('10000')), compile_and_run, ['-package stm'])
+test('conc050', compose(reqlib('stm'), compose(only_compiler_types(['ghc']), extra_run_opts('10000'))), compile_and_run, ['-package stm'])
 
 test('conc051', normal, compile_and_run, [''])
 
-test('conc052', normal, compile_and_run, ['-package stm'])
+test('conc052', reqlib('stm'), compile_and_run, ['-package stm'])
 
-test('conc053', compose(only_ways(['threaded1','threaded2']),
-			skip_if_platform('i386-unknown-mingw32')),
+test('conc053', compose(reqlib('stm'), compose(only_ways(['threaded1','threaded2']),
+			skip_if_platform('i386-unknown-mingw32'))),
 		 compile_and_run, ['-package stm'])
-test('conc054', normal, compile_and_run, ['-package stm'])
-test('conc055', exit_code(1), compile_and_run, ['-package stm'])
-test('conc056', only_ways(['threaded1','threaded2']),
+test('conc054', reqlib('stm'), compile_and_run, ['-package stm'])
+test('conc055', compose(reqlib('stm'), exit_code(1)), compile_and_run, ['-package stm'])
+test('conc056', compose(reqlib('stm'), only_ways(['threaded1','threaded2'])),
                 compile_and_run, ['-package stm -package network'])
 
 test('conc057', only_ways(['threaded2']), compile_and_run, ['-O0'])
@@ -136,9 +136,9 @@ test('conc059', compose(only_compiler_types(['ghc']),
 	compile_and_run, ['conc059_c.c'])
 clean(['conc059_c.o'])
 
-test('conc060', normal, compile_and_run, ['-package stm'])
-test('conc061', normal, compile_and_run, ['-package stm'])
-test('conc062', normal, compile_and_run, ['-package stm'])
+test('conc060', reqlib('stm'), compile_and_run, ['-package stm'])
+test('conc061', reqlib('stm'), compile_and_run, ['-package stm'])
+test('conc062', reqlib('stm'), compile_and_run, ['-package stm'])
 
 # omit conc063(ghci) on Windows for now; it hangs and doesn't get killed by 
 # the timeout program, and it holds up the entire run.
@@ -147,7 +147,7 @@ if config.platform == "i386-unknown-mingw32":
 else:
     config063 = normal
 
-test('conc063', config063, compile_and_run, ['-package stm'])
+test('conc063', compose(reqlib('stm'), config063), compile_and_run, ['-package stm'])
 
 test('conc064', exit_code(1), compile_and_run, [''])
 
