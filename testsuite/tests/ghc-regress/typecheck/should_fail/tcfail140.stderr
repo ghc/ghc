@@ -16,7 +16,7 @@ tcfail140.hs:14:13:
     In the definition of `bot': bot xs = map ((3 `f`)) xs
 
 tcfail140.hs:16:6:
-    The lambda expression `\ Just x -> ...' has two argumentss,
+    The lambda expression `\ Just x -> ...' has two arguments,
     but its type `Maybe a -> a' has only one
     In the expression: (\ Just x -> x) :: Maybe a -> a
     In the definition of `t': t = ((\ Just x -> x) :: Maybe a -> a) (Just 1)
