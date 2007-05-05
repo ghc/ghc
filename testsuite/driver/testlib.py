@@ -725,13 +725,6 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     exit_code = result >> 8
     signal    = result & 0xff
 
-    # check the exit code
-    if exit_code != getTestOpts().exit_code:
-        print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
-        dump_stdout(name)
-        dump_stderr(name)
-        return 'fail'
-
     # split the stdout into compilation/program output
     split_file(in_testdir(outname), delimiter,
                qualify(name, 'comp.stdout'),
@@ -739,6 +732,13 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     split_file(in_testdir(errname), delimiter,
                qualify(name, 'comp.stderr'),
                qualify(name, 'run.stderr'))
+
+    # check the exit code
+    if exit_code != getTestOpts().exit_code:
+        print 'Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')'
+        dump_stdout(name)
+        dump_stderr(name)
+        return 'fail'
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
