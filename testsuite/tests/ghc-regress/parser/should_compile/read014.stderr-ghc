@@ -1,5 +1,7 @@
 
-read014.hs:4:0: Warning: Definition but no type signature for `ng1'
+read014.hs:4:0:
+    Warning: Definition but no type signature for `ng1'
+    Inferred type: ng1 :: forall t a. (Num a) => t -> a -> a
 
 read014.hs:4:4: Warning: Defined but not used: `x'
 
