@@ -7,20 +7,20 @@ tcfail128.hs:18:8:
       (Data.Array.Base.MArray b FlatVector IO)
     In a 'do' expression: v <- thaw tmp
     In the expression:
-	do let sL = [1, 4, 6, 3, 2, 5]
+	do let sL = [...]
 	       dim = length sL
 	       help :: [FlatVector]
-	       help = [listFlatVector (1, s) ([... | i <- ...]) | s <- sL]
+	       help = [listFlatVector ... ... | s <- sL]
 	       tmp :: Vector FlatVector
 	       tmp = listVector (1, dim) help
 	   v <- thaw tmp
 	   return ()
     In the definition of `main':
-	main = do let sL = [1, 4, 6, 3, 2, 5]
+	main = do let sL = ...
 		      dim = length sL
 		      help :: [FlatVector]
-		      help = [... | s <- ...]
+		      help = ...
 		      tmp :: Vector FlatVector
-		      tmp = listVector (1, dim) help
+		      tmp = listVector ... help
 		  v <- thaw tmp
 		  return ()
