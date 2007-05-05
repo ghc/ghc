@@ -1,9 +1,9 @@
 
-tcfail179.hs:12:40:
+tcfail179.hs:14:40:
     Couldn't match expected type `s' (a rigid variable)
 	   against inferred type `x' (a rigid variable)
-      `s' is bound by the type signature for `run' at tcfail179.hs:10:9
-      `x' is bound by the constructor `T' at tcfail179.hs:12:13
+      `s' is bound by the type signature for `run' at tcfail179.hs:12:9
+      `x' is bound by the constructor `T' at tcfail179.hs:14:13
     In the second argument of `g', namely `id'
     In the expression: g x id
     In a pattern binding: (x, _, b) = g x id
