@@ -285,8 +285,18 @@ pprLExpr :: OutputableBndr id => LHsExpr id -> SDoc
 pprLExpr (L _ e) = pprExpr e
 
 pprExpr :: OutputableBndr id => HsExpr id -> SDoc
-pprExpr e | isAtomicHsExpr e = ppr_expr e	-- Never replace 'x' by "..."
-	  | otherwise	     = pprDeeper (ppr_expr e)
+pprExpr e | isAtomicHsExpr e || isQuietHsExpr e =            ppr_expr e
+          | otherwise                           = pprDeeper (ppr_expr e)
+
+isQuietHsExpr :: HsExpr id -> Bool
+-- Parentheses do display something, but it gives little info and
+-- if we go deeper when we go inside them then we get ugly things
+-- like (...)
+isQuietHsExpr (HsPar _) = True
+-- applications don't display anything themselves
+isQuietHsExpr (HsApp _ _) = True
+isQuietHsExpr (OpApp _ _ _ _) = True
+isQuietHsExpr _ = False
 
 pprBinds :: OutputableBndr id => HsLocalBinds id -> SDoc
 pprBinds b = pprDeeper (ppr b)
