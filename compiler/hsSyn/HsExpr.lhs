@@ -483,17 +483,19 @@ pprParendExpr expr
 	-- I think that is usually (always?) right
     in
     case unLoc expr of
-      HsLit l		-> pp_as_was
-      HsOverLit l 	-> pp_as_was
-      HsVar _		-> pp_as_was
-      HsIPVar _		-> pp_as_was
-      ExplicitList _ _  -> pp_as_was
-      ExplicitPArr _ _  -> pp_as_was
-      ExplicitTuple _ _	-> pp_as_was
-      HsPar _		-> pp_as_was
-      HsBracket _	-> pp_as_was
-      HsBracketOut _ []	-> pp_as_was
-      _			-> parens pp_as_was
+      HsLit l		   -> pp_as_was
+      HsOverLit l 	   -> pp_as_was
+      HsVar _		   -> pp_as_was
+      HsIPVar _		   -> pp_as_was
+      ExplicitList _ _     -> pp_as_was
+      ExplicitPArr _ _     -> pp_as_was
+      ExplicitTuple _ _	   -> pp_as_was
+      HsPar _		   -> pp_as_was
+      HsBracket _	   -> pp_as_was
+      HsBracketOut _ []	   -> pp_as_was
+      HsDo sc _ _ _
+       | isListCompExpr sc -> pp_as_was
+      _			   -> parens pp_as_was
 
 isAtomicHsExpr :: HsExpr id -> Bool	-- A single token
 isAtomicHsExpr (HsVar {})     = True
@@ -936,7 +938,12 @@ data HsStmtContext id
 isDoExpr :: HsStmtContext id -> Bool
 isDoExpr DoExpr      = True
 isDoExpr (MDoExpr _) = True
-isDoExpr other       = False
+isDoExpr _           = False
+
+isListCompExpr :: HsStmtContext id -> Bool
+isListCompExpr ListComp = True
+isListCompExpr PArrComp = True
+isListCompExpr _        = False
 \end{code}
 
 \begin{code}
