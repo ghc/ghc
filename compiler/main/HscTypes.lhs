@@ -286,16 +286,19 @@ lookupIfaceByModule dflags hpt pit mod
 
 
 \begin{code}
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> [Instance]
--- Find all the instance declarations that are in modules imported 
--- by this one, directly or indirectly, and are in the Home Package Table
--- This ensures that we don't see instances from modules --make compiled 
--- before this one, but which are not below this one
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([Instance], [FamInst])
+-- Find all the instance declarations (of classes and families) that are in
+-- modules imported by this one, directly or indirectly, and are in the Home
+-- Package Table.  This ensures that we don't see instances from modules --make
+-- compiled before this one, but which are not below this one.
 hptInstances hsc_env want_this_module
-  = [ ispec 
-    | mod_info <- eltsUFM (hsc_HPT hsc_env)
-    , want_this_module (moduleName (mi_module (hm_iface mod_info)))
-    , ispec <- md_insts (hm_details mod_info) ]
+  = let (insts, famInsts) = unzip
+          [ (md_insts details, md_fam_insts details)
+          | mod_info <- eltsUFM (hsc_HPT hsc_env)
+          , want_this_module (moduleName (mi_module (hm_iface mod_info)))
+          , let details = hm_details mod_info ]
+    in
+    (concat insts, concat famInsts)
 
 hptRules :: HscEnv -> [(ModuleName, IsBootInterface)] -> [CoreRule]
 -- Get rules from modules "below" this one (in the dependency sense)

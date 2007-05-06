@@ -210,7 +210,8 @@ tcRnImports hsc_env this_mod import_decls
 	      ; want_instances :: ModuleName -> Bool
 	      ; want_instances mod = mod `elemUFM` dep_mods
 				   && mod /= moduleName this_mod
-	      ; home_insts = hptInstances hsc_env want_instances
+	      ; (home_insts, home_fam_insts) = hptInstances hsc_env 
+                                                            want_instances
 	      } ;
 
 		-- Record boot-file info in the EPS, so that it's 
@@ -220,11 +221,14 @@ tcRnImports hsc_env this_mod import_decls
 
 		-- Update the gbl env
 	; updGblEnv ( \ gbl -> 
-		gbl { tcg_rdr_env    = plusOccEnv (tcg_rdr_env gbl) rdr_env,
-		      tcg_imports    = tcg_imports gbl `plusImportAvails` imports,
-                      tcg_rn_imports = fmap (const rn_imports) (tcg_rn_imports gbl),
-		      tcg_inst_env   = extendInstEnvList (tcg_inst_env gbl) home_insts
-		}) $ do {
+	    gbl { 
+              tcg_rdr_env      = plusOccEnv (tcg_rdr_env gbl) rdr_env,
+	      tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
+              tcg_rn_imports   = fmap (const rn_imports) (tcg_rn_imports gbl),
+	      tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
+	      tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl) 
+                                                      home_fam_insts
+	    }) $ do {
 
 	; traceRn (text "rn1" <+> ppr (imp_dep_mods imports))
 		-- Fail if there are any errors so far
@@ -826,7 +830,7 @@ setInteractiveContext hsc_env icxt thing_inside
 	-- Initialise the tcg_inst_env with instances 
 	-- from all home modules.  This mimics the more selective
 	-- call to hptInstances in tcRnModule
-	dfuns = hptInstances hsc_env (\mod -> True)
+	dfuns = fst (hptInstances hsc_env (\mod -> True))
     in
     updGblEnv (\env -> env { 
 	tcg_rdr_env  = ic_rn_gbl_env icxt,
