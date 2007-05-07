@@ -361,10 +361,10 @@ module 	:: { Located (HsModule RdrName) }
 		{% fileSrcSpan >>= \ loc -> case $1 of { (opt, info, doc) -> 
 		   return (L loc (HsModule (Just $3) $5 (fst $7) (snd $7) $4 
                           opt info doc) )}}
-	| missing_module_keyword top close
+        | body2
 		{% fileSrcSpan >>= \ loc ->
 		   return (L loc (HsModule Nothing Nothing 
-                          (fst $2) (snd $2) Nothing Nothing emptyHaddockModInfo 
+                          (fst $1) (snd $1) Nothing Nothing emptyHaddockModInfo 
                           Nothing)) }
 
 optdoc :: { (Maybe String, HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }                             
@@ -384,6 +384,10 @@ maybemoddeprec :: { Maybe DeprecTxt }
 body 	:: { ([LImportDecl RdrName], [LHsDecl RdrName]) }
 	:  '{'            top '}'		{ $2 }
  	|      vocurly    top close		{ $2 }
+
+body2 	:: { ([LImportDecl RdrName], [LHsDecl RdrName]) }
+	:  '{' top '}'          		{ $2 }
+ 	|  missing_module_keyword top close     { $2 }
 
 top 	:: { ([LImportDecl RdrName], [LHsDecl RdrName]) }
 	: importdecls				{ (reverse $1,[]) }
