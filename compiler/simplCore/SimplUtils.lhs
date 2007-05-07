@@ -19,7 +19,9 @@ module SimplUtils (
 	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhsOrArg,
 	interestingCallContext, interestingArgContext,
 
-	interestingArg, mkArgInfo
+	interestingArg, mkArgInfo,
+	
+	abstractFloats
     ) where
 
 #include "HsVersions.h"
@@ -28,12 +30,14 @@ import SimplEnv
 import DynFlags
 import StaticFlags
 import CoreSyn
+import qualified CoreSubst
 import PprCore
 import CoreFVs
 import CoreUtils
 import Literal	
 import CoreUnfold
 import MkId
+import Name
 import Id
 import NewDemand
 import SimplMonad
@@ -149,14 +153,14 @@ mkLazyArgStop ty has_rules = Stop ty AnArg (canUpdateInPlace ty || has_rules)
 mkRhsStop :: OutType -> SimplCont
 mkRhsStop ty = Stop ty AnRhs (canUpdateInPlace ty)
 
-contIsRhsOrArg (Stop _ _ _)    = True
+contIsRhsOrArg (Stop {})       = True
 contIsRhsOrArg (StrictBind {}) = True
 contIsRhsOrArg (StrictArg {})  = True
 contIsRhsOrArg other	       = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop _ _ _)     		 = True
+contIsDupable (Stop {})     		 = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
 contIsDupable (Select   OkToDup _ _ _ _) = True
 contIsDupable (CoerceIt _ cont)          = contIsDupable cont
@@ -164,7 +168,7 @@ contIsDupable other	  	         = False
 
 -------------------
 contIsTrivial :: SimplCont -> Bool
-contIsTrivial (Stop _ _ _)		  = True
+contIsTrivial (Stop {})			  = True
 contIsTrivial (ApplyTo _ (Type _) _ cont) = contIsTrivial cont
 contIsTrivial (CoerceIt _ cont) 	  = contIsTrivial cont
 contIsTrivial other			  = False
@@ -803,6 +807,8 @@ mkLam :: [OutBndr] -> OutExpr -> SimplM OutExpr
 --	a) eta reduction, if that gives a trivial expression
 --	b) eta expansion [only if there are some value lambdas]
 
+mkLam [] body 
+  = return body
 mkLam bndrs body
   = do	{ dflags <- getDOptsSmpl
 	; mkLam' dflags bndrs body }
@@ -941,8 +947,35 @@ tryEtaExpansion dflags body
 %*									*
 %************************************************************************
 
-tryRhsTyLam tries this transformation, when the big lambda appears as
-the RHS of a let(rec) binding:
+Note [Floating and type abstraction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+	x = /\a. C e1 e2
+We'd like to float this to 
+	y1 = /\a. e1
+	y2 = /\a. e2
+	x = /\a. C (y1 a) (y2 a)
+for the usual reasons: we want to inline x rather vigorously.
+
+You may think that this kind of thing is rare.  But in some programs it is
+common.  For example, if you do closure conversion you might get:
+
+	data a :-> b = forall e. (e -> a -> b) :$ e
+
+	f_cc :: forall a. a :-> a
+	f_cc = /\a. (\e. id a) :$ ()
+
+Now we really want to inline that f_cc thing so that the
+construction of the closure goes away. 
+
+So I have elaborated simplLazyBind to understand right-hand sides that look
+like
+	/\ a1..an. body
+
+and treat them specially. The real work is done in SimplUtils.abstractFloats,
+but there is quite a bit of plumbing in simplLazyBind as well.
+
+The same transformation is good when there are lets in the body:
 
 	/\abc -> let(rec) x = e in b
    ==>
@@ -963,25 +996,6 @@ let-floating.
 
 This optimisation is CRUCIAL in eliminating the junk introduced by
 desugaring mutually recursive definitions.  Don't eliminate it lightly!
-
-So far as the implementation is concerned:
-
-	Invariant: go F e = /\tvs -> F e
-	
-	Equalities:
-		go F (Let x=e in b)
-		= Let x' = /\tvs -> F e 
-		  in 
-		  go G b
-		where
-		    G = F . Let x = x' tvs
-	
-		go F (Letrec xi=ei in b)
-		= Letrec {xi' = /\tvs -> G ei} 
-		  in
-		  go G b
-		where
-		  G = F . Let {xi = xi' tvs}
 
 [May 1999]  If we do this transformation *regardless* then we can
 end up with some pretty silly stuff.  For example, 
@@ -1004,43 +1018,30 @@ and is of the form
 If we abstract this wrt the tyvar we then can't do the case inline
 as we would normally do.
 
+That's why the whole transformation is part of the same process that
+floats let-bindings and constructor arguments out of RHSs.  In particular,
+it is guarded by the doFloatFromRhs call in simplLazyBind.
+
 
 \begin{code}
-{-	Trying to do this in full laziness
-
-tryRhsTyLam :: SimplEnv -> [OutTyVar] -> OutExpr -> SimplM FloatsWithExpr
--- Call ensures that all the binders are type variables
-
-tryRhsTyLam env tyvars body 		-- Only does something if there's a let
-  |  not (all isTyVar tyvars)
-  || not (worth_it body)		-- inside a type lambda, 
-  = returnSmpl (emptyFloats env, body)	-- and a WHNF inside that
-
-  | otherwise
-  = go env (\x -> x) body
-
+abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExpr)
+abstractFloats tvs body_env body
+  = ASSERT( notNull body_floats )
+    do	{ (subst, float_binds) <- mapAccumLSmpl abstract empty_subst body_floats
+	; return (float_binds, CoreSubst.substExpr subst body) }
   where
-    worth_it e@(Let _ _) = whnf_in_middle e
-    worth_it e		 = False
+    main_tv_set = mkVarSet tvs
+    body_floats = getFloats body_env
+    empty_subst = CoreSubst.mkEmptySubst (seInScope body_env)
 
-    whnf_in_middle (Let (NonRec x rhs) e) | isUnLiftedType (idType x) = False
-    whnf_in_middle (Let _ e) = whnf_in_middle e
-    whnf_in_middle e	     = exprIsCheap e
-
-    main_tyvar_set = mkVarSet tyvars
-
-    go env fn (Let bind@(NonRec var rhs) body)
-      | exprIsTrivial rhs
-      = go env (fn . Let bind) body
-
-    go env fn (Let (NonRec var rhs) body)
-      = mk_poly tyvars_here var							`thenSmpl` \ (var', rhs') ->
-	addAuxiliaryBind env (NonRec var' (mkLams tyvars_here (fn rhs)))	$ \ env -> 
-	go env (fn . Let (mk_silly_bind var rhs')) body
-
+    abstract :: CoreSubst.Subst -> OutBind -> SimplM (CoreSubst.Subst, OutBind)
+    abstract subst (NonRec id rhs)
+      = do { (poly_id, poly_app) <- mk_poly tvs_here id
+	   ; let poly_rhs = mkLams tvs_here (CoreSubst.substExpr subst rhs)
+		 subst'   = CoreSubst.extendIdSubst subst id poly_app
+	   ; return (subst', (NonRec poly_id poly_rhs)) }
       where
-
-	tyvars_here = varSetElems (main_tyvar_set `intersectVarSet` exprSomeFreeVars isTyVar rhs)
+	tvs_here = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs)
 		-- Abstract only over the type variables free in the rhs
 		-- wrt which the new binding is abstracted.  But the naive
 		-- approach of abstract wrt the tyvars free in the Id's type
@@ -1057,28 +1058,26 @@ tryRhsTyLam env tyvars body 		-- Only does something if there's a let
 		-- abstracting wrt *all* the tyvars.  We'll see if that
 		-- gives rise to problems.   SLPJ June 98
 
-    go env fn (Let (Rec prs) body)
-       = mapAndUnzipSmpl (mk_poly tyvars_here) vars	`thenSmpl` \ (vars', rhss') ->
-	 let
-	    gn body = fn (foldr Let body (zipWith mk_silly_bind vars rhss'))
-	    pairs   = vars' `zip` [mkLams tyvars_here (gn rhs) | rhs <- rhss]
-	 in
-	 addAuxiliaryBind env (Rec pairs)		$ \ env ->
-	 go env gn body 
+    abstract subst (Rec prs)
+       = do { (poly_ids, poly_apps) <- mapAndUnzipSmpl (mk_poly tvs_here) ids
+	    ; let subst' = CoreSubst.extendSubstList subst (ids `zip` poly_apps)
+		  poly_rhss = [mkLams tvs_here (CoreSubst.substExpr subst' rhs) | rhs <- rhss]
+	    ; return (subst', Rec (poly_ids `zip` poly_rhss)) }
        where
-	 (vars,rhss) = unzip prs
-	 tyvars_here = varSetElems (main_tyvar_set `intersectVarSet` exprsSomeFreeVars isTyVar (map snd prs))
-		-- See notes with tyvars_here above
+	 (ids,rhss) = unzip prs
+	 
+	 tvs_here = varSetElems (main_tv_set `intersectVarSet` bind_ftvs)
+	 bind_ftvs = exprsSomeFreeVars isTyVar rhss `unionVarSet` tyVarsOfTypes (map idType ids)
+		-- Also nb that we must take the tyvars of the Id's type too:
+		--	x::a = x
+		-- Bizarre, I know
 
-    go env fn body = returnSmpl (emptyFloats env, fn body)
-
-    mk_poly tyvars_here var
-      = getUniqueSmpl		`thenSmpl` \ uniq ->
-	let
-	    poly_name = setNameUnique (idName var) uniq		-- Keep same name
-	    poly_ty   = mkForAllTys tyvars_here (idType var)	-- But new type of course
-	    poly_id   = mkLocalId poly_name poly_ty 
-
+    mk_poly tvs_here var
+      = do { uniq <- getUniqueSmpl
+	   ; let  poly_name = setNameUnique (idName var) uniq		-- Keep same name
+		  poly_ty   = mkForAllTys tvs_here (idType var)	-- But new type of course
+		  poly_id   = mkLocalId poly_name poly_ty 
+	   ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
 		-- In the olden days, it was crucial to copy the occInfo of the original var, 
 		-- because we were looking at occurrence-analysed but as yet unsimplified code!
 		-- In particular, we mustn't lose the loop breakers.  BUT NOW we are looking
@@ -1091,10 +1090,10 @@ tryRhsTyLam env tyvars body 		-- Only does something if there's a let
 		-- where x* has an INLINE prag on it.  Now, once x* is inlined,
 		-- the occurrences of x' will be just the occurrences originally
 		-- pinned on x.
-	in
-	returnSmpl (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tyvars_here))
+\end{code}
 
-    mk_silly_bind var rhs = NonRec var (Note InlineMe rhs)
+Historical note: if you use let-bindings instead of a substitution, beware of this:
+
 		-- Suppose we start with:
 		--
 		--	x = /\ a -> let g = G in E
@@ -1114,8 +1113,6 @@ tryRhsTyLam env tyvars body 		-- Only does something if there's a let
 		-- Solution: put an INLINE note on g's RHS, so that poly_g seems
 		--	     to appear many times.  (NB: mkInlineMe eliminates
 		--	     such notes on trivial RHSs, so do it manually.)
--}
-\end{code}
 
 %************************************************************************
 %*									*

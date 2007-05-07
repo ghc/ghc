@@ -305,46 +305,38 @@ simplLazyBind :: SimplEnv
 	      -> SimplM SimplEnv
 
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
-  = do	{ let	rhs_env  = rhs_se `setInScope` env
-		rhs_cont = mkRhsStop (idType bndr1)
+  = do	{ let	rhs_env     = rhs_se `setInScope` env
+		(tvs, body) = collectTyBinders rhs
+	; (body_env, tvs') <- simplBinders rhs_env tvs
+		-- See Note [Floating and type abstraction]
+		-- in SimplUtils
 
   	-- Simplify the RHS; note the mkRhsStop, which tells 
 	-- the simplifier that this is the RHS of a let.
-	; (rhs_env1, rhs1) <- simplExprF rhs_env rhs rhs_cont
+	; let rhs_cont = mkRhsStop (applyTys (idType bndr1) (mkTyVarTys tvs'))
+	; (body_env1, body1) <- simplExprF body_env body rhs_cont
 
-	-- If any of the floats can't be floated, give up now
-	-- (The canFloat predicate says True for empty floats.)
-	; if (not (canFloat top_lvl is_rec False rhs_env1))
-	  then	completeBind env top_lvl bndr bndr1
-				 (wrapFloats rhs_env1 rhs1)
-	  else do
 	-- ANF-ise a constructor or PAP rhs
-	{ (rhs_env2, rhs2) <- prepareRhs rhs_env1 rhs1
-	; (env', rhs3) <- chooseRhsFloats top_lvl is_rec False env rhs_env2 rhs2
-	; completeBind env' top_lvl bndr bndr1 rhs3 } }
+	; (body_env2, body2) <- prepareRhs body_env1 body1
 
-chooseRhsFloats :: TopLevelFlag -> RecFlag -> Bool
-	     	-> SimplEnv	-- Env for the let
-	     	-> SimplEnv	-- Env for the RHS, with RHS floats in it
-	     	-> OutExpr		-- ..and the RHS itself
-	     	-> SimplM (SimplEnv, OutExpr)	-- New env for let, and RHS
+	; (env', rhs')
+	    <-	if not (doFloatFromRhs top_lvl is_rec False body2 body_env2)
+		then				-- No floating, just wrap up!
+		     do	{ rhs' <- mkLam tvs' (wrapFloats body_env2 body2)
+			; return (env, rhs') }
 
-chooseRhsFloats top_lvl is_rec is_strict env rhs_env rhs
-  | not (isEmptyFloats rhs_env) 		-- Something to float
-  , canFloat top_lvl is_rec is_strict rhs_env	-- ...that can float
-  , (isTopLevel top_lvl  || exprIsCheap rhs)	-- ...and we want to float	
-  = do	{ tick LetFloatFromLet	-- Float
-	; return (addFloats env rhs_env, rhs) }	-- Add the floats to the main env
-  | otherwise			-- Don't float
-  = return (env, wrapFloats rhs_env rhs)	-- Wrap the floats around the RHS
+		else if null tvs then 		-- Simple floating
+		     do	{ tick LetFloatFromLet
+			; return (addFloats env body_env2, body2) }
+
+		else  				-- Do type-abstraction first
+		     do	{ tick LetFloatFromLet
+			; (poly_binds, body3) <- abstractFloats tvs body_env2 body2
+			; rhs' <- mkLam tvs' body3
+			; return (extendFloats env poly_binds, rhs') }
+
+	; completeBind env' top_lvl bndr bndr1 rhs' }
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{simplNonRec}
-%*									*
-%************************************************************************
 
 A specialised variant of simplNonRec used when the RHS is already simplified, 
 notably in knownCon.  It uses case-binding where necessary.
@@ -369,7 +361,11 @@ completeNonRecX :: SimplEnv
 
 completeNonRecX env top_lvl is_rec is_strict old_bndr new_bndr new_rhs
   = do 	{ (env1, rhs1) <- prepareRhs (zapFloats env) new_rhs
-	; (env2, rhs2) <- chooseRhsFloats top_lvl is_rec is_strict env env1 rhs1
+	; (env2, rhs2) <- 
+		if doFloatFromRhs top_lvl is_rec is_strict rhs1 env1
+		then do	{ tick LetFloatFromLet
+			; return (addFloats env env1, rhs1) }	-- Add the floats to the main env
+		else return (env, wrapFloats env1 rhs1)		-- Wrap the floats around the RHS
 	; completeBind env2 NotTopLevel old_bndr new_bndr rhs2 }
 \end{code}
 
@@ -446,6 +442,7 @@ prepareRhs env rhs
     go n_val_args env other
 	= return (False, env, other)
 \end{code}
+
 
 Note [Float coercions]
 ~~~~~~~~~~~~~~~~~~~~~~

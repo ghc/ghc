@@ -32,9 +32,9 @@ module SimplEnv (
 	substExpr, substTy, 
 
 	-- Floats
-  	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, 
-	wrapFloats, floatBinds, setFloats, canFloat, zapFloats, addRecFloats,
-	getFloats
+  	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
+	wrapFloats, floatBinds, setFloats, zapFloats, addRecFloats,
+	doFloatFromRhs, getFloats
     ) where
 
 #include "HsVersions.h"
@@ -44,14 +44,12 @@ import IdInfo
 import CoreSyn
 import Rules
 import CoreUtils
-import CoreFVs
 import CostCentre
 import Var
 import VarEnv
 import VarSet
 import OrdList
 import Id
-import NewDemand
 import qualified CoreSubst	( Subst, mkSubst, substExpr, substSpec, substWorker )
 import qualified Type		( substTy, substTyVarBndr )
 import Type hiding		( substTy, substTyVarBndr )
@@ -59,7 +57,6 @@ import Coercion
 import BasicTypes	
 import DynFlags
 import Util
-import UniqFM
 import Outputable
 \end{code}
 
@@ -312,11 +309,13 @@ The Floats is a bunch of bindings, classified by a FloatFlag.
 
   NonRec x (y:ys)	FltLifted
   Rec [(x,rhs)]		FltLifted
-  NonRec x# (y +# 3)	FltOkSpec
+
+  NonRec x# (y +# 3)	FltOkSpec	-- Unboxed, but ok-for-spec'n
+
   NonRec x# (a /# b)	FltCareful
-  NonRec x* (f y)	FltCareful	-- Might fail or diverge
-  NonRec x# (f y)	FltCareful	-- Might fail or diverge
-			  (where f :: Int -> Int#)
+  NonRec x* (f y)	FltCareful	-- Strict binding; might fail or diverge
+  NonRec x# (f y)	FltCareful	-- Unboxed binding: might fail or diverge
+					--	  (where f :: Int -> Int#)
 
 \begin{code}
 data Floats = Floats (OrdList OutBind) FloatFlag
@@ -359,14 +358,15 @@ classifyFF (NonRec bndr rhs)
   | exprOkForSpeculation rhs = FltOkSpec
   | otherwise		     = FltCareful
 
-canFloat :: TopLevelFlag -> RecFlag -> Bool -> SimplEnv -> Bool
-canFloat lvl rec str (SimplEnv {seFloats = Floats _ ff}) 
-  = canFloatFlt lvl rec str ff
-
-canFloatFlt :: TopLevelFlag -> RecFlag -> Bool -> FloatFlag -> Bool
-canFloatFlt lvl rec str FltLifted  = True
-canFloatFlt lvl rec str FltOkSpec  = isNotTopLevel lvl && isNonRec rec
-canFloatFlt lvl rec str FltCareful = str && isNotTopLevel lvl && isNonRec rec
+doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> OutExpr -> SimplEnv -> Bool
+doFloatFromRhs lvl rec str rhs (SimplEnv {seFloats = Floats fs ff}) 
+  =  not (isNilOL fs) && want_to_float && can_float
+  where
+     want_to_float = isTopLevel lvl || exprIsCheap rhs
+     can_float = case ff of
+		   FltLifted  -> True
+	 	   FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
+		   FltCareful -> isNotTopLevel lvl && isNonRec rec && str
 \end{code}
 
 
@@ -386,6 +386,16 @@ addNonRec :: SimplEnv -> OutId -> OutExpr -> SimplEnv
 addNonRec env id rhs
   = env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
 	  seInScope = extendInScopeSet (seInScope env) id }
+
+extendFloats :: SimplEnv -> [OutBind] -> SimplEnv
+-- Add these bindings to the floats, and extend the in-scope env too
+extendFloats env binds
+  = env { seFloats  = seFloats env `addFlts` new_floats,
+	  seInScope = extendInScopeSetList (seInScope env) bndrs }
+  where
+    bndrs = bindersOfBinds binds
+    new_floats = Floats (toOL binds) 
+			(foldr (andFF . classifyFF) FltLifted binds)
 
 addFloats :: SimplEnv -> SimplEnv -> SimplEnv
 -- Add the floats for env2 to env1; 
