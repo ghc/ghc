@@ -2651,7 +2651,7 @@ mkMonomorphismMsg tidy_env inst_tvs
     returnM (tidy_env, mk_msg docs)
   where
     mk_msg _ | any isRuntimeUnk inst_tvs
-        =  vcat [ptext SLIT("Cannot resolve unkonwn runtime types:") <+>
+        =  vcat [ptext SLIT("Cannot resolve unknown runtime types:") <+>
                    (pprWithCommas ppr inst_tvs),
                 ptext SLIT("Use :print or :force to determine these types")]
     mk_msg []   = ptext SLIT("Probable fix: add a type signature that fixes these type variable(s)")
