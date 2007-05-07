@@ -16,7 +16,7 @@ import CoreUtils	( rhsIsStatic, manifestArity, exprType, findDefault )
 import StgSyn
 
 import Type
-import TyCon		( isAlgTyCon )
+import TyCon
 import Id
 import Var		( Var, globalIdDetails, idType )
 import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon, isHiBootTyCon )
@@ -410,10 +410,11 @@ coreToStgExpr (Let bind body)
 mkStgAltType scrut_ty alts
   = case splitTyConApp_maybe (repType scrut_ty) of
 	Just (tc,_) | isUnboxedTupleTyCon tc -> UbxTupAlt tc
-		    | isPrimTyCon tc	     -> PrimAlt tc
+		    | isUnLiftedTyCon tc     -> PrimAlt tc
 		    | isHiBootTyCon tc	     -> look_for_better_tycon
 		    | isAlgTyCon tc 	     -> AlgAlt tc
 		    | isFunTyCon tc	     -> PolyAlt
+                    | isPrimTyCon tc         -> PolyAlt -- for "Any"
 		    | otherwise		     -> pprPanic "mkStgAlts" (ppr tc)
 	Nothing				     -> PolyAlt
 
