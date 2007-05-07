@@ -55,7 +55,7 @@ module TcType (
   eqKind, 
   isSigmaTy, isOverloadedTy, isRigidTy, isBoxyTy,
   isDoubleTy, isFloatTy, isIntTy, isStringTy,
-  isIntegerTy, isBoolTy, isUnitTy,
+  isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
 
   ---------------------------------
@@ -942,6 +942,12 @@ isIntegerTy    = is_tc integerTyConKey
 isIntTy        = is_tc intTyConKey
 isBoolTy       = is_tc boolTyConKey
 isUnitTy       = is_tc unitTyConKey
+isCharTy       = is_tc charTyConKey
+
+isStringTy ty
+  = case tcSplitTyConApp_maybe ty of
+      Just (tc, [arg_ty]) -> tc == listTyCon && isCharTy arg_ty
+      other		  -> False
 
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this
@@ -1135,18 +1141,10 @@ isFFIDotnetTy :: DynFlags -> Type -> Bool
 isFFIDotnetTy dflags ty
   = checkRepTyCon (\ tc -> (legalFIResultTyCon dflags tc || 
 			   isFFIDotnetObjTy ty || isStringTy ty)) ty
+	-- NB: isStringTy used to look through newtypes, but
+	--     it no longer does so.  May need to adjust isFFIDotNetTy
+	--     if we do want to look through newtypes.
 
--- Support String as an argument or result from a .NET FFI call.
-isStringTy ty = 
-  case tcSplitTyConApp_maybe (repType ty) of
-    Just (tc, [arg_ty])
-      | tc == listTyCon ->
-        case tcSplitTyConApp_maybe (repType arg_ty) of
-	  Just (cc,[]) -> cc == charTyCon
-	  _ -> False
-    _ -> False
-
--- Support String as an argument or result from a .NET FFI call.
 isFFIDotnetObjTy ty = 
   let
    (_, t_ty) = tcSplitForAllTys ty
