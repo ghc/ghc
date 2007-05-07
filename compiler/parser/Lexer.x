@@ -271,8 +271,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- Haddock comments
 
 <0,glaexts> {
-  "-- " / $docsym    { multiline_doc_comment }
-  "{-" \ ? / $docsym { nested_doc_comment }
+  "-- " $docsym    / { ifExtension haddockEnabled } { multiline_doc_comment }
+  "{-" \ ? $docsym / { ifExtension haddockEnabled } { nested_doc_comment }
 }
 
 -- "special" symbols
@@ -700,13 +700,7 @@ notFollowedBySymbol _ _ _ (AI _ _ buf)
   = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
 
 isNormalComment bits _ _ (AI _ _ buf)
-  | haddockEnabled bits = notFollowedByDocOrPragma
-  | otherwise           = nextCharIs buf (/='#')
-  where 
-    notFollowedByDocOrPragma 
-	= not $ spaceAndP buf (`nextCharIs` (`elem` "|^*$#"))
-
-spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
+  = nextCharIs buf (/='#')
 
 haddockDisabledAnd p bits _ _ (AI _ _ buf)
   = if haddockEnabled bits then False else (p buf)
@@ -785,13 +779,12 @@ nested_doc_comment span buf _len = withLexedDocType (go "")
       Just (c,input) -> go (c:commentAcc) input docType False
 
 withLexedDocType lexDocComment = do
-  input <- getInput
-  case alexGetChar input of
-    Nothing -> error "Can't happen"
-    Just ('|', input) -> lexDocComment input ITdocCommentNext False
-    Just ('^', input) -> lexDocComment input ITdocCommentPrev False
-    Just ('$', input) -> lexDocComment input ITdocCommentNamed False
-    Just ('*', input) -> lexDocSection 1 input 
+  input@(AI _ _ buf) <- getInput
+  case prevChar buf ' ' of
+    '|' -> lexDocComment input ITdocCommentNext False
+    '^' -> lexDocComment input ITdocCommentPrev False
+    '$' -> lexDocComment input ITdocCommentNamed False
+    '*' -> lexDocSection 1 input 
  where 
     lexDocSection n input = case alexGetChar input of 
       Just ('*', input) -> lexDocSection (n+1) input
