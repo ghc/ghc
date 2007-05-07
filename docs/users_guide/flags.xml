@@ -1050,10 +1050,11 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-fliberate-case-threshold</option></entry>
-	      <entry>Tweak the liberate-case optimisation (default: 10)</entry>
+	      <entry><option>-fspec-threshold</option>=<replaceable>n</replaceable></entry>
+	      <entry>Set the size threshold for function specialisation to <replaceable>n</replaceable>, for both
+		the liberate-case and SpecConstr transformations (default: 200)</entry>
 	      <entry>static</entry>
-	      <entry><option>-fno-liberate-case-threshold</option></entry>
+	      <entry><option>-</option></entry>
 	    </row>
 
 	    <row>
