@@ -223,11 +223,15 @@ checkOptions cli_mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
+   when (notNull (filter isRTSWay (wayNames dflags))
+         && isInterpretiveMode cli_mode) $
+        putStrLn ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
+
 	-- -prof and --interactive are not a good combination
-   when (notNull (filter (/= WayThreaded) (wayNames dflags))
+   when (notNull (filter (not . isRTSWay) (wayNames dflags))
          && isInterpretiveMode cli_mode) $
       do throwDyn (UsageError 
-                   "--interactive can't be used with -prof, -ticky, or -unreg.")
+                   "--interactive can't be used with -prof or -unreg.")
 	-- -ohi sanity check
    if (isJust (outputHi dflags) && 
       (isCompManagerMode cli_mode || srcs `lengthExceeds` 1))

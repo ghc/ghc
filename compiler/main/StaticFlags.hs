@@ -14,7 +14,7 @@ module StaticFlags (
 	staticFlags,
 
 	-- Ways
-	WayName(..), v_Ways, v_Build_tag, v_RTS_Build_tag,
+	WayName(..), v_Ways, v_Build_tag, v_RTS_Build_tag, isRTSWay,
 
 	-- Output style options
 	opt_PprUserLength,
@@ -511,6 +511,8 @@ lkupWay w =
    case lookup w way_details of
 	Nothing -> error "findBuildTag"
 	Just details -> details
+
+isRTSWay = wayRTSOnly . lkupWay 
 
 data Way = Way {
   wayTag     :: String,
