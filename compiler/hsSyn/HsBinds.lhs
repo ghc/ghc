@@ -319,10 +319,10 @@ data HsWrapper
   | WpCo Coercion		-- A cast:  [] `cast` co
 				-- Guaranteedn not the identity coercion
 
-  | WpApp Var			-- [] x; the xi are dicts or coercions
-  | WpTyApp Type		-- [] t
-  | WpLam Id	 		-- \x. []; the xi are dicts or coercions
-  | WpTyLam TyVar 		-- \a. []
+  | WpApp Var			-- [] d		the 'd' is a type-class dictionary
+  | WpTyApp Type		-- [] t		the 't' is a type or corecion
+  | WpLam Id	 		-- \d. []	the 'd' is a type-class dictionary
+  | WpTyLam TyVar 		-- \a. []	the 'a' is a type or coercion variable
 
 	-- Non-empty bindings, so that the identity coercion
 	-- is always exactly WpHole
