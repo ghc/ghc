@@ -15,7 +15,7 @@ module GHC (
 
 	-- * Flags and settings
 	DynFlags(..), DynFlag(..), Severity(..), HscTarget(..), dopt,
-        GhcMode(..), GhcLink(..),
+        GhcMode(..), GhcLink(..), defaultObjectTarget,
 	parseDynamicFlags,
 	getSessionDynFlags,
 	setSessionDynFlags,

@@ -17,7 +17,7 @@ module DynFlags (
 	-- Dynamic flags
 	DynFlag(..),
 	DynFlags(..),
-	HscTarget(..), isObjectTarget,
+	HscTarget(..), isObjectTarget, defaultObjectTarget,
 	GhcMode(..), isOneShot,
 	GhcLink(..), isNoLink,
 	PackageFlag(..),
@@ -366,7 +366,11 @@ data PackageFlag
   | IgnorePackage  String
   deriving Eq
 
-defaultHscTarget
+defaultHscTarget = defaultObjectTarget
+
+-- | the 'HscTarget' value corresponding to the default way to create
+-- object files on the current platform.
+defaultObjectTarget
   | cGhcWithNativeCodeGen == "YES" 	=  HscAsm
   | otherwise				=  HscC
 
