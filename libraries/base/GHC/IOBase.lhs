@@ -380,7 +380,8 @@ data Handle__
       haFD	    :: !FD,		     -- file descriptor
       haType        :: HandleType,	     -- type (read/write/append etc.)
       haIsBin       :: Bool,		     -- binary mode?
-      haIsStream    :: Bool,		     -- is this a stream handle?
+      haIsStream    :: Bool,		     -- Windows : is this a socket?
+                                             -- Unix    : is O_NONBLOCK set?
       haBufferMode  :: BufferMode,	     -- buffer contains read/write data?
       haBuffer	    :: !(IORef Buffer),	     -- the current buffer
       haBuffers     :: !(IORef BufferList),  -- spare buffers

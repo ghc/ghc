@@ -90,13 +90,13 @@ hWaitForInput h msecs = do
 	        writeIORef ref buf'
 		return True
 	else do r <- throwErrnoIfMinus1Retry "hWaitForInput" $
-	             inputReady (haFD handle_)
+	             fdReady (haFD handle_) 0 {- read -}
 	                        (fromIntegral msecs)
                                 (fromIntegral $ fromEnum $ haIsStream handle_)
 		return (r /= 0)
 
-foreign import ccall safe "inputReady"
-  inputReady :: CInt -> CInt -> CInt -> IO CInt
+foreign import ccall safe "fdReady"
+  fdReady :: CInt -> CInt -> CInt -> CInt -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- hGetChar

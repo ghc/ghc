@@ -529,35 +529,102 @@ fillReadBufferWithoutBlocking fd is_stream
 -- Low level routines for reading/writing to (raw)buffers:
 
 #ifndef mingw32_HOST_OS
-readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-readRawBuffer loc fd is_stream buf off len = 
-  throwErrnoIfMinus1RetryMayBlock loc
-	    (read_rawBuffer fd buf off len)
-	    (threadWaitRead (fromIntegral fd))
 
-readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-readRawBufferNoBlock loc fd is_stream buf off len = 
-  throwErrnoIfMinus1RetryOnBlock loc
-	    (read_rawBuffer fd buf off len)
-	    (return 0)
+{-
+NOTE [nonblock]:
+
+Unix has broken semantics when it comes to non-blocking I/O: you can
+set the O_NONBLOCK flag on an FD, but it applies to the all other FDs
+attached to the same underlying file, pipe or TTY; there's no way to
+have private non-blocking behaviour for an FD.  See bug #724.
+
+We fix this by only setting O_NONBLOCK on FDs that we create; FDs that
+come from external sources or are exposed externally are left in
+blocking mode.  This solution has some problems though.  We can't
+completely simulate a non-blocking read without O_NONBLOCK: several
+cases are wrong here.  The cases that are wrong:
+
+  * reading/writing to a blocking FD in non-threaded mode.
+    In threaded mode, we just make a safe call to read().  
+    In non-threaded mode we call select() before attempting to read,
+    but that leaves a small race window where the data can be read
+    from the file descriptor before we issue our blocking read().
+  * readRawBufferNoBlock for a blocking FD
+-}
+
+readRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+readRawBuffer loc fd is_nonblock buf off len
+  | is_nonblock  = unsafe_read
+  | threaded     = safe_read
+  | otherwise    = do r <- throwErrnoIfMinus1 loc 
+                                (fdReady (fromIntegral fd) 0 0 False)
+                      if r /= 0
+                        then unsafe_read
+                        else do threadWaitRead (fromIntegral fd); unsafe_read
+  where
+        unsafe_read = throwErrnoIfMinus1RetryMayBlock loc
+                        (read_rawBuffer fd buf off len)
+                        (threadWaitRead (fromIntegral fd))
+        safe_read   = throwErrnoIfMinus1Retry loc
+                        (safe_read_rawBuffer fd buf off len)
 
 readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
-readRawBufferPtr loc fd is_stream buf off len = 
-  throwErrnoIfMinus1RetryMayBlock loc
-	    (read_off fd buf off len)
-	    (threadWaitRead (fromIntegral fd))
+readRawBufferPtr loc fd is_nonblock buf off len
+  | is_nonblock  = unsafe_read
+  | threaded     = safe_read
+  | otherwise    = do r <- throwErrnoIfMinus1 loc 
+                                (fdReady (fromIntegral fd) 0 0 False)
+                      if r /= 0 
+                        then unsafe_read
+                        else do threadWaitRead (fromIntegral fd); unsafe_read
+  where
+    unsafe_read = throwErrnoIfMinus1RetryMayBlock loc
+	                (read_off fd buf off len)
+	                (threadWaitRead (fromIntegral fd))
+    safe_read   = throwErrnoIfMinus1Retry loc
+                        (safe_read_off fd buf off len)
+
+readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+readRawBufferNoBlock loc fd is_nonblock buf off len
+  | is_nonblock  = unsafe_read
+  | otherwise    = do r <- fdReady (fromIntegral fd) 0 0 False
+                      if r /= 0 then safe_read
+                                else return 0
+       -- XXX see note [nonblock]
+ where
+   unsafe_read = throwErrnoIfMinus1RetryOnBlock loc
+                        (read_rawBuffer fd buf off len)
+                        (return 0)
+   safe_read   = throwErrnoIfMinus1Retry loc
+                        (safe_read_rawBuffer fd buf off len)
 
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
-writeRawBuffer loc fd is_stream buf off len = 
-  throwErrnoIfMinus1RetryMayBlock loc
-		(write_rawBuffer fd buf off len)
-		(threadWaitWrite (fromIntegral fd))
+writeRawBuffer loc fd is_nonblock buf off len
+  | is_nonblock = unsafe_write
+  | threaded    = safe_write
+  | otherwise   = do r <- fdReady (fromIntegral fd) 1 0 False
+                     if r /= 0 then safe_write
+                                else return 0
+  where  
+    unsafe_write = throwErrnoIfMinus1RetryMayBlock loc
+		        (write_rawBuffer fd buf off len)
+		        (threadWaitWrite (fromIntegral fd))
+    safe_write   = throwErrnoIfMinus1Retry loc
+                        (safe_write_rawBuffer (fromIntegral fd) buf off len)
 
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
-writeRawBufferPtr loc fd is_stream buf off len = 
-  throwErrnoIfMinus1RetryMayBlock loc
-		(write_off fd buf off len)
-		(threadWaitWrite (fromIntegral fd))
+writeRawBufferPtr loc fd is_nonblock buf off len
+  | is_nonblock = unsafe_write
+  | threaded    = safe_write
+  | otherwise   = do r <- fdReady (fromIntegral fd) 1 0 False
+                     if r /= 0 then safe_write
+                                else return 0
+  where
+    unsafe_write = throwErrnoIfMinus1RetryMayBlock loc
+		        (write_off fd buf off len)
+		        (threadWaitWrite (fromIntegral fd))
+    safe_write   = throwErrnoIfMinus1Retry loc 
+                        (safe_write_off (fromIntegral fd) buf off len)
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
    read_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
@@ -570,6 +637,9 @@ foreign import ccall unsafe "__hscore_PrelHandle_write"
 
 foreign import ccall unsafe "__hscore_PrelHandle_write"
    write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "fdReady"
+  fdReady :: CInt -> CInt -> CInt -> Bool -> IO CInt
 
 #else /* mingw32_HOST_OS.... */
 
@@ -635,61 +705,62 @@ asyncWriteRawBufferPtr loc fd is_stream buf off len = do
 
 blockingReadRawBuffer loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
-    recv_rawBuffer fd buf off len
+    safe_recv_rawBuffer fd buf off len
 blockingReadRawBuffer loc fd False buf off len = 
   throwErrnoIfMinus1Retry loc $
-    read_rawBuffer fd buf off len
+    safe_read_rawBuffer fd buf off len
 
 blockingReadRawBufferPtr loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
-    recv_off fd buf off len
+    safe_recv_off fd buf off len
 blockingReadRawBufferPtr loc fd False buf off len = 
   throwErrnoIfMinus1Retry loc $
-    read_off fd buf off len
+    safe_read_off fd buf off len
 
 blockingWriteRawBuffer loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
-    send_rawBuffer fd buf off len
+    safe_send_rawBuffer fd buf off len
 blockingWriteRawBuffer loc fd False buf off len = 
   throwErrnoIfMinus1Retry loc $
-    write_rawBuffer fd buf off len
+    safe_write_rawBuffer fd buf off len
 
 blockingWriteRawBufferPtr loc fd True buf off len = 
   throwErrnoIfMinus1Retry loc $
-    send_off fd buf off len
+    safe_send_off fd buf off len
 blockingWriteRawBufferPtr loc fd False buf off len = 
   throwErrnoIfMinus1Retry loc $
-    write_off fd buf off len
+    safe_write_off fd buf off len
 
 -- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
 -- These calls may block, but that's ok.
 
-foreign import ccall safe "__hscore_PrelHandle_read"
-   read_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
-
-foreign import ccall safe "__hscore_PrelHandle_read"
-   read_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
-
-foreign import ccall safe "__hscore_PrelHandle_write"
-   write_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
-
-foreign import ccall safe "__hscore_PrelHandle_write"
-   write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
+foreign import ccall safe "__hscore_PrelHandle_recv"
+   safe_recv_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_recv"
-   recv_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
-
-foreign import ccall safe "__hscore_PrelHandle_recv"
-   recv_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
+   safe_recv_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_send"
-   send_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
+   safe_send_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
 
 foreign import ccall safe "__hscore_PrelHandle_send"
-   send_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
+   safe_send_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
+
+#endif
 
 foreign import ccall "rtsSupportsBoundThreads" threaded :: Bool
-#endif
+
+foreign import ccall safe "__hscore_PrelHandle_read"
+   safe_read_rawBuffer :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_read"
+   safe_read_off :: FD -> Ptr CChar -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_write"
+   safe_write_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import ccall safe "__hscore_PrelHandle_write"
+   safe_write_off :: CInt -> Ptr CChar -> Int -> CInt -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- Standard Handles
@@ -707,7 +778,9 @@ fd_stderr = 2 :: FD
 stdin :: Handle
 stdin = unsafePerformIO $ do
    -- ToDo: acquire lock
-   setNonBlockingFD fd_stdin
+   -- We don't set non-blocking mode on standard handles, because it may
+   -- confuse other applications attached to the same TTY/pipe
+   -- see Note [nonblock]
    (buf, bmode) <- getBuffer fd_stdin ReadBuffer
    mkStdHandle fd_stdin "<stdin>" ReadHandle buf bmode
 
@@ -715,9 +788,9 @@ stdin = unsafePerformIO $ do
 stdout :: Handle
 stdout = unsafePerformIO $ do
    -- ToDo: acquire lock
-   -- We don't set non-blocking mode on stdout or sterr, because
-   -- some shells don't recover properly.
-   -- setNonBlockingFD fd_stdout
+   -- We don't set non-blocking mode on standard handles, because it may
+   -- confuse other applications attached to the same TTY/pipe
+   -- see Note [nonblock]
    (buf, bmode) <- getBuffer fd_stdout WriteBuffer
    mkStdHandle fd_stdout "<stdout>" WriteHandle buf bmode
 
@@ -725,9 +798,9 @@ stdout = unsafePerformIO $ do
 stderr :: Handle
 stderr = unsafePerformIO $ do
     -- ToDo: acquire lock
-   -- We don't set non-blocking mode on stdout or sterr, because
-   -- some shells don't recover properly.
-   -- setNonBlockingFD fd_stderr
+   -- We don't set non-blocking mode on standard handles, because it may
+   -- confuse other applications attached to the same TTY/pipe
+   -- see Note [nonblock]
    buf <- mkUnBuffer
    mkStdHandle fd_stderr "<stderr>" WriteHandle buf NoBuffering
 
@@ -896,6 +969,14 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
+#ifdef mingw32_HOST_OS
+    -- On Windows, the is_stream flag indicates that the Handle is a socket
+    let is_stream = is_socket 
+#else
+    -- On Unix, the is_stream flag indicates that the FD is non-blocking
+    let is_stream = True
+#endif
+
     let (ha_type, write) =
 	  case mode of
 	    ReadMode      -> ( ReadHandle,      False )
@@ -923,18 +1004,18 @@ openFd fd mb_fd_type is_socket filepath mode binary = do
 		ioException (IOError Nothing ResourceBusy "openFile"
 				   "file is locked" Nothing)
 #endif
-	   mkFileHandle fd is_socket filepath ha_type binary
+	   mkFileHandle fd is_stream filepath ha_type binary
 
 	Stream
 	   -- only *Streams* can be DuplexHandles.  Other read/write
 	   -- Handles must share a buffer.
 	   | ReadWriteHandle <- ha_type -> 
-		mkDuplexHandle fd is_socket filepath binary
+		mkDuplexHandle fd is_stream filepath binary
 	   | otherwise ->
-		mkFileHandle   fd is_socket filepath ha_type binary
+		mkFileHandle   fd is_stream filepath ha_type binary
 
 	RawDevice -> 
-		mkFileHandle fd is_socket filepath ha_type binary
+		mkFileHandle fd is_stream filepath ha_type binary
 
 fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
@@ -959,7 +1040,7 @@ mkStdHandle fd filepath ha_type buf bmode = do
 	    (Handle__ { haFD = fd,
 			haType = ha_type,
                         haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
-			haIsStream = False,
+			haIsStream = False, -- means FD is blocking on Unix
 			haBufferMode = bmode,
 			haBuffer = buf,
 			haBuffers = spares,

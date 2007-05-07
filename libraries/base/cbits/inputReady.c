@@ -14,7 +14,7 @@
  * *character* from this file object without blocking?'
  */
 int
-inputReady(int fd, int msecs, int isSock)
+fdReady(int fd, int write, int msecs, int isSock)
 {
     if 
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
@@ -23,11 +23,16 @@ inputReady(int fd, int msecs, int isSock)
     ( 1 ) {
 #endif
 	int maxfd, ready;
-	fd_set rfd;
+	fd_set rfd, wfd;
 	struct timeval tv;
 	
 	FD_ZERO(&rfd);
-	FD_SET(fd, &rfd);
+	FD_ZERO(&wfd);
+        if (write) {
+            FD_SET(fd, &wfd);
+        } else {
+            FD_SET(fd, &rfd);
+        }
 	
 	/* select() will consider the descriptor set in the range of 0 to
 	 * (maxfd-1) 
@@ -36,7 +41,7 @@ inputReady(int fd, int msecs, int isSock)
 	tv.tv_sec  = msecs / 1000;
 	tv.tv_usec = (msecs % 1000) * 1000;
 	
-	while ((ready = select(maxfd, &rfd, NULL, NULL, &tv)) < 0 ) {
+	while ((ready = select(maxfd, &rfd, &wfd, NULL, &tv)) < 0 ) {
 	    if (errno != EINTR ) {
 		return -1;
 	    }
