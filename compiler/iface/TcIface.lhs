@@ -40,6 +40,7 @@ import Var              ( TyVar )
 import qualified Var
 import Name
 import NameEnv
+import NameSet
 import OccName
 import Module
 import UniqFM
@@ -198,6 +199,10 @@ typecheckIface iface
 	; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
 	; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
 
+                -- Vectorisation information
+        ; let vect_info = VectInfo 
+                           (mkNameSet (ifaceVectInfoCCVar (mi_vect_info iface)))
+
 		-- Exports
 	; exports <- ifaceExportNames (mi_exports iface)
 
@@ -208,6 +213,7 @@ typecheckIface iface
 			      , md_insts     = insts
 			      , md_fam_insts = fam_insts
 			      , md_rules     = rules
+                              , md_vect_info = vect_info
 			      , md_exports   = exports
                               , md_modBreaks = emptyModBreaks
 			      }

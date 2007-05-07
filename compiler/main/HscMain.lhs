@@ -682,9 +682,14 @@ hscFileCheck hsc_env mod_summary = do {
 				md_insts     = tcg_insts     tc_result,
 				md_fam_insts = tcg_fam_insts tc_result,
                                 md_modBreaks = emptyModBreaks,      
-				md_rules     = [panic "no rules"] }
+				md_rules     = [panic "no rules"],
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker
+                                md_vect_info = 
+                                  panic "HscMain.hscFileCheck: no VectInfo"
+                                   -- VectInfo is added by the Core 
+                                   -- vectorisation pass
+                          }
                     rnInfo = do decl <- tcg_rn_decls tc_result
                                 imports <- tcg_rn_imports tc_result
                                 let exports = tcg_rn_exports tc_result

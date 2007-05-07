@@ -21,7 +21,7 @@ module HscTypes (
 	HscSource(..), isHsBoot, hscSourceString,	-- Re-exported from DriverPhases
 	
 	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
-	hptInstances, hptRules,
+	hptInstances, hptRules, hptVectInfo,
 
 	ExternalPackageState(..), EpsStats(..), addEpsInStats,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
@@ -330,6 +330,15 @@ hptRules hsc_env deps
 
 	-- And get its dfuns
     , rule <- rules ]
+
+hptVectInfo :: HscEnv -> VectInfo
+-- Get the combined VectInfo of all modules in the home package table.  In
+-- contrast to instances and rules, we don't care whether the modules are
+-- "below" or us.  The VectInfo of those modules not "below" us does not
+-- affect the compilation of the current module.
+hptVectInfo hsc_env 
+  = foldr plusVectInfo noVectInfo [ md_vect_info (hm_details mod_info)
+                                  | mod_info <- eltsUFM (hsc_HPT hsc_env)]
 \end{code}
 
 %************************************************************************
@@ -475,10 +484,11 @@ data ModDetails
 	-- The next two fields are created by the typechecker
 	md_exports   :: [AvailInfo],
         md_types     :: !TypeEnv,
-        md_insts     :: ![Instance],	-- Dfun-ids for the instances in this module
+        md_insts     :: ![Instance],  -- Dfun-ids for the instances in this module
         md_fam_insts :: ![FamInst],
-        md_rules     :: ![CoreRule],	-- Domain may include Ids from other modules
-        md_modBreaks :: !ModBreaks  -- breakpoint information for this module 
+        md_rules     :: ![CoreRule],  -- Domain may include Ids from other modules
+        md_modBreaks :: !ModBreaks,   -- Breakpoint information for this module 
+        md_vect_info :: !VectInfo     -- Vectorisation information
      }
 
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
@@ -486,7 +496,9 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_insts     = [],
 			       md_rules     = [],
 			       md_fam_insts = [],
-                               md_modBreaks = emptyModBreaks } 
+                               md_modBreaks = emptyModBreaks,
+                               md_vect_info = noVectInfo
+                             } 
 
 -- A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module

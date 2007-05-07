@@ -242,11 +242,11 @@ mkIface hsc_env maybe_old_iface
 		      mg_deps      = deps,
 		      mg_rdr_env   = rdr_env,
 		      mg_fix_env   = fix_env,
-		      mg_deprecs   = src_deprecs,
-                      mg_vect_info = vect_info })
+		      mg_deprecs   = src_deprecs})
 	(ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
+                      md_vect_info = vect_info,
 		      md_types 	   = type_env,
 		      md_exports   = exports })
 	
@@ -272,6 +272,7 @@ mkIface hsc_env maybe_old_iface
 		; iface_rules = map (coreRuleToIfaceRule this_mod) rules
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
+                ; iface_vect_info = flattenVectInfo vect_info
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -286,6 +287,8 @@ mkIface hsc_env maybe_old_iface
 			mi_fam_insts= sortLe le_fam_inst iface_fam_insts,
 			mi_rules    = sortLe le_rule iface_rules,
 
+                        mi_vect_info = iface_vect_info,
+
 			mi_fixities = fixities,
 			mi_deprecs  = deprecs,
 			mi_globals  = Just rdr_env,
@@ -299,8 +302,6 @@ mkIface hsc_env maybe_old_iface
                         mi_finsts    = False,   -- Ditto
 			mi_decls     = deliberatelyOmitted "decls",
 			mi_ver_fn    = deliberatelyOmitted "ver_fn",
-
-                        mi_vect_info = flattenVectInfo vect_info,
 
 			-- And build the cached values
 			mi_dep_fn = mkIfaceDepCache deprecs,

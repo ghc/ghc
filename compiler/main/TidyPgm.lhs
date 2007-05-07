@@ -32,7 +32,7 @@ import Name		( Name, getOccName, nameOccName, mkInternalName,
 		  	  localiseName, isExternalName, nameSrcLoc,
 			  isWiredInName, getName
 			)
-import NameSet		( NameSet, elemNameSet )
+import NameSet		( NameSet, elemNameSet, filterNameSet )
 import IfaceEnv		( allocateGlobalBinder )
 import NameEnv		( filterNameEnv, mapNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
@@ -142,6 +142,7 @@ mkBootModDetails hsc_env (ModGuts { mg_module    = mod
 			     , md_rules     = []
 			     , md_exports   = exports
                              , md_modBreaks = modBreaks 
+                             , md_vect_info = noVectInfo
                              })
 	}
   where
@@ -243,6 +244,7 @@ tidyProgram hsc_env
 				mg_insts = insts, mg_fam_insts = fam_insts,
 				mg_binds = binds, 
 				mg_rules = imp_rules,
+                                mg_vect_info = vect_info,
 				mg_dir_imps = dir_imps, mg_deps = deps, 
 				mg_foreign = foreign_stubs,
 			        mg_hpc_info = hpc_info,
@@ -285,6 +287,12 @@ tidyProgram hsc_env
 	      ; implicit_binds = getImplicitBinds type_env
 	      ; all_tidy_binds = implicit_binds ++ tidy_binds
 	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
+
+              ; tidy_vect_info = VectInfo 
+                                   (filterNameSet (isElemId type_env) 
+                                                  (vectInfoCCVar vect_info))
+                -- filter against `type_env', not `tidy_type_env', as we must
+                -- keep all implicit names
 	      }
 
    	; endPass dflags "Tidy Core" Opt_D_dump_simpl all_tidy_binds
@@ -305,14 +313,20 @@ tidyProgram hsc_env
 				md_insts     = tidy_insts,
 				md_fam_insts = fam_insts,
 				md_exports   = exports,
-                                md_modBreaks = modBreaks })
-
+                                md_modBreaks = modBreaks,
+                                md_vect_info = tidy_vect_info
+                              })
 	}
 
 lookup_dfun type_env dfun_id
   = case lookupTypeEnv type_env (idName dfun_id) of
 	Just (AnId dfun_id') -> dfun_id'
 	other -> pprPanic "lookup_dfun" (ppr dfun_id)
+
+isElemId type_env name
+  = case lookupTypeEnv type_env name of
+	Just (AnId _) -> True
+	_             -> False
 
 tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [CoreBind] -> TypeEnv
 
