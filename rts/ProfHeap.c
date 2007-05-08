@@ -377,7 +377,7 @@ nextEra( void )
  * Heap profiling by info table
  * ------------------------------------------------------------------------- */
 
-#if !defined(PROFILNG)
+#if !defined(PROFILING)
 FILE *hp_file;
 static char *hp_filename;
 
