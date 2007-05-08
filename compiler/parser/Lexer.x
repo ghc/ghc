@@ -699,8 +699,19 @@ notFollowedBy char _ _ _ (AI _ _ buf)
 notFollowedBySymbol _ _ _ (AI _ _ buf)
   = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
 
+-- We must reject doc comments as being ordinary comments everywhere.
+-- In some cases the doc comment will be selected as the lexeme due to
+-- maximal munch, but not always, because the nested comment rule is
+-- valid in all states, but the doc-comment rules are only valid in
+-- the non-layout states.
 isNormalComment bits _ _ (AI _ _ buf)
-  = nextCharIs buf (/='#')
+  | haddockEnabled bits = notFollowedByDocOrPragma
+  | otherwise           = nextCharIs buf (/='#')
+  where
+    notFollowedByDocOrPragma
+       = not $ spaceAndP buf (`nextCharIs` (`elem` "|^*$#"))
+
+spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
 
 haddockDisabledAnd p bits _ _ (AI _ _ buf)
   = if haddockEnabled bits then False else (p buf)
