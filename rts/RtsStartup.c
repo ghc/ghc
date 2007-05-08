@@ -459,9 +459,6 @@ hs_exit(void)
     freeThreadLabelTable();
 #endif
 
-    /* free hash table storage */
-    exitHashTable();
-
 #ifdef RTS_GTK_FRONTPANEL
     if (RtsFlags.GcFlags.frontpanel) {
 	stopFrontPanel();
@@ -488,6 +485,9 @@ hs_exit(void)
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
     shutdownAsyncIO();
 #endif
+
+    /* free hash table storage */
+    exitHashTable();
 
     // Finally, free all our storage
     freeStorage();
