@@ -74,6 +74,7 @@ import Data.Char
 import Data.Dynamic
 import Data.Array
 import Control.Monad as Monad
+import Text.Printf
 
 import Foreign.StablePtr	( newStablePtr )
 import GHC.Exts		( unsafeCoerce# )
@@ -1484,15 +1485,23 @@ deleteCmd argLine = do
          | otherwise = return ()
 
 historyCmd :: String -> GHCi ()
-historyCmd = noArgs $ do
-  s <- getSession
-  resumes <- io $ GHC.getResumeContext s
-  case resumes of
-    [] -> io $ putStrLn "Not stopped at a breakpoint"
-    (r:rs) -> do
-      let hist = GHC.resumeHistory r
-      spans <- mapM (io . GHC.getHistorySpan s) hist
-      printForUser (vcat (map ppr spans))
+historyCmd arg
+  | null arg        = history 20
+  | all isDigit arg = history (read arg)
+  | otherwise       = io $ putStrLn "Syntax:  :history [num]"
+  where
+  history num = do
+    s <- getSession
+    resumes <- io $ GHC.getResumeContext s
+    case resumes of
+      [] -> io $ putStrLn "Not stopped at a breakpoint"
+      (r:rs) -> do
+        let hist = GHC.resumeHistory r
+            (took,rest) = splitAt num hist
+        spans <- mapM (io . GHC.getHistorySpan s) took
+        let nums = map (printf "-%-3d:") [(1::Int)..]
+        printForUser (vcat (zipWith (<+>) (map text nums) (map ppr spans)))
+        io $ putStrLn $ if null rest then "<end of history>" else "..."
 
 backCmd :: String -> GHCi ()
 backCmd = noArgs $ do
