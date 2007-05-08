@@ -111,7 +111,10 @@ unblock (IO io) = IO $ unblockAsyncExceptions# io
 -- >   evaluate x >>= f      ==>  (return $! x) >>= f
 --
 -- /Note:/ the first equation implies that @(evaluate x)@ is /not/ the
--- same as @(return $! x)@.
+-- same as @(return $! x)@.  A correct definition is
+--
+-- >   evaluate x = (return $! x) >>= return
+--
 evaluate :: a -> IO a
 evaluate a = IO $ \s -> case a `seq` () of () -> (# s, a #)
         -- NB. can't write  
