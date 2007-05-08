@@ -1,15 +1,16 @@
 Breakpoint 0 activated at ../Test3.hs:1:13-14
 [2,3Stopped at ../Test3.hs:1:13-14
 _result :: [a]
-../Test3.hs:(1,0)-(2,30)
-../Test3.hs:2:21-30
-../Test3.hs:2:17-19
-../Test3.hs:2:17-30
-../Test3.hs:(1,0)-(2,30)
-../Test3.hs:2:21-30
-../Test3.hs:2:17-19
-../Test3.hs:2:17-30
-../Test3.hs:(1,0)-(2,30)
+-1  : ../Test3.hs:(1,0)-(2,30)
+-2  : ../Test3.hs:2:21-30
+-3  : ../Test3.hs:2:17-19
+-4  : ../Test3.hs:2:17-30
+-5  : ../Test3.hs:(1,0)-(2,30)
+-6  : ../Test3.hs:2:21-30
+-7  : ../Test3.hs:2:17-19
+-8  : ../Test3.hs:2:17-30
+-9  : ../Test3.hs:(1,0)-(2,30)
+<end of history>
 Logged breakpoint at ../Test3.hs:(1,0)-(2,30)
 _result :: [a]
 _result :: [a]

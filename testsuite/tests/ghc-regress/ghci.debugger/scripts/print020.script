@@ -1,3 +1,4 @@
+:set -fno-warn-overlapping-patterns
 :l ../HappyTest.hs
 :break lexer
 main
