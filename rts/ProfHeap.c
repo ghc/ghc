@@ -523,6 +523,7 @@ endHeapProfiling(void)
     }
 #endif
 
+#ifdef PROFILING
     if (doingLDVProfiling()) {
         nat t;
         for (t = 1; t <= era; t++) {
@@ -531,6 +532,10 @@ endHeapProfiling(void)
     } else {
         freeEra( &censuses[0] );
     }
+#else
+    freeEra( &censuses[0] );
+#endif
+
     stgFree(censuses);
 
     seconds = mut_user_time();
