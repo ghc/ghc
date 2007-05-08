@@ -150,31 +150,48 @@ shortHelpText = "use :? for help.\n"
 helpText =
  " Commands available from the prompt:\n" ++
  "\n" ++
- "   <stmt>                      evaluate/run <stmt>\n" ++
+ "   <statement>                 evaluate/run <statement>\n" ++
  "   :add <filename> ...         add module(s) to the current target set\n" ++
- "   :abandon                    at a breakpoint, abandon current computation\n" ++
- "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
- "   :break <name>               set a breakpoint on the specified function\n" ++
  "   :browse [*]<module>         display the names defined by <module>\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
- "   :continue                   resume after a breakpoint\n" ++
  "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
- "   :delete <number>            delete the specified breakpoint\n" ++
- "   :delete *                   delete all breakpoints\n" ++
  "   :edit <file>                edit file\n" ++
  "   :edit                       edit last module\n" ++
  "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
--- "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
  "   :help, :?                   display this list of commands\n" ++
  "   :info [<name> ...]          display information about the given names\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
  "   :load <filename> ...        load module(s) and their dependents\n" ++
  "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
- "   :print [<name> ...]         prints a value without forcing its computation\n" ++
  "   :quit                       exit GHCi\n" ++
  "   :reload                     reload the current module set\n" ++
+ "   :type <expr>                show the type of <expr>\n" ++
+ "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
+ "   :!<command>                 run the shell command <command>\n" ++
+ "\n" ++
+ " -- Commands for debugging:\n" ++
+ "\n" ++
+ "   :abandon                    at a breakpoint, abandon current computation\n" ++
+ "   :back                       go back in the history (after :trace)\n" ++
+ "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
+ "   :break <name>               set a breakpoint on the specified function\n" ++
+ "   :continue                   resume after a breakpoint\n" ++
+ "   :delete <number>            delete the specified breakpoint\n" ++
+ "   :delete *                   delete all breakpoints\n" ++
+ "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
+ "   :forward                    go forward in the history (after :back)\n" ++
+ "   :history [<n>]              show the last <n> items in the history (after :trace)\n" ++
+ "   :print [<name> ...]         prints a value without forcing its computation\n" ++
+ "   :step                       single-step after stopping at a breakpoint\n"++
+ "   :step <expr>                single-step into <expr>\n"++
+ "   :trace                      trace after stopping at a breakpoint\n"++
+ "   :trace <expr>               trace into <expr> (remembers breakpoints for :history)\n"++
+ "   :sprint [<name> ...]        simplifed version of :print\n" ++
+
+ "\n" ++
+ " -- Commands for changing settings:\n" ++
  "\n" ++
  "   :set <option> ...           set options\n" ++
  "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
@@ -182,29 +199,24 @@ helpText =
  "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
  "   :set editor <cmd>           set the command used for :edit\n" ++
  "   :set stop <cmd>             set the command to run when a breakpoint is hit\n" ++
- "\n" ++
- "   :show breaks                show active breakpoints\n" ++
- "   :show context               show the breakpoint context\n" ++
- "   :show modules               show the currently loaded modules\n" ++
- "   :show bindings              show the current bindings made at the prompt\n" ++
- "\n" ++
- "   :sprint [<name> ...]        simplifed version of :print\n" ++
- "   :step                       single-step after stopping at a breakpoint\n"++
- "   :step <expr>                single-step into <expr>\n"++
- "   :type <expr>                show the type of <expr>\n" ++
- "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
  "   :unset <option> ...         unset options\n" ++
- "   :!<command>                 run the shell command <command>\n" ++
  "\n" ++
- " Options for ':set' and ':unset':\n" ++
+ "  Options for ':set' and ':unset':\n" ++
  "\n" ++
  "    +r            revert top-level expressions after each evaluation\n" ++
  "    +s            print timing/memory stats after each evaluation\n" ++
  "    +t            print type after evaluation\n" ++
  "    -<flags>      most GHC command line flags can also be set here\n" ++
  "                         (eg. -v2, -fglasgow-exts, etc.)\n" ++
+ "\n" ++
+ " -- Commands for displaying information:\n" ++
+ "\n" ++
+ "   :show bindings              show the current bindings made at the prompt\n" ++
+ "   :show breaks                show the active breakpoints\n" ++
+ "   :show context               show the breakpoint context\n" ++
+ "   :show modules               show the currently loaded modules\n" ++
+ "   :show <setting>             show anything that can be set with :set (e.g. args)\n" ++
  "\n" 
--- Todo: add help for breakpoint commands here
 
 findEditor = do
   getEnv "EDITOR" 
