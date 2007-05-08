@@ -1092,8 +1092,10 @@ setOptions wds =
    do -- first, deal with the GHCi opts (+s, +t, etc.)
       let (plus_opts, minus_opts)  = partition isPlus wds
       mapM_ setOpt plus_opts
-
       -- then, dynamic flags
+      newDynFlags minus_opts
+
+newDynFlags minus_opts = do
       dflags <- getDynFlags
       let pkg_flags = packageFlags dflags
       (dflags',leftovers) <- io $ GHC.parseDynamicFlags dflags minus_opts
@@ -1131,10 +1133,11 @@ unsetOptions str
 
        mapM_ unsetOpt plus_opts
  
-       -- can't do GHC flags for now
-       if (not (null minus_opts))
-	  then throwDyn (CmdLineError "can't unset GHC command-line flags")
-	  else return ()
+       let no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
+           no_flag f = throwDyn (ProgramError ("don't know how to reverse " ++ f))
+
+       no_flags <- mapM no_flag minus_opts
+       newDynFlags no_flags
 
 isMinus ('-':s) = True
 isMinus _ = False
