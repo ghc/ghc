@@ -8,6 +8,15 @@ import System.IO
 
 -- Test invariants using updates & blocking in invariants
 main = do
+  m <- newEmptyMVar
+  forkIO (do_test m)
+  takeMVar m
+  -- We do the test in a separate thread, because this test relies on
+  -- being able to catch BlockedIndefinitely, and the main thread
+  -- won't receive that exception under GHCi because it is held alive
+  -- by the interrupt (^C) handler thread.
+
+do_test m = do
   newStablePtr stdout
 
   putStr "\nStarting\n"
@@ -42,4 +51,4 @@ main = do
   Control.Exception.catch (atomically ( writeTVar x1 0 ))
                  (\e -> putStr ("Caught: " ++ (show e) ++ "\n"))
 
-         
+  putMVar m ()         

@@ -140,14 +140,7 @@ test('conc060', reqlib('stm'), compile_and_run, ['-package stm'])
 test('conc061', reqlib('stm'), compile_and_run, ['-package stm'])
 test('conc062', reqlib('stm'), compile_and_run, ['-package stm'])
 
-# omit conc063(ghci) on Windows for now; it hangs and doesn't get killed by 
-# the timeout program, and it holds up the entire run.
-if config.platform == "i386-unknown-mingw32":
-    config063 = omit_ways(['ghci'])
-else:
-    config063 = normal
-
-test('conc063', compose(reqlib('stm'), config063), compile_and_run, ['-package stm'])
+test('conc063', reqlib('stm'), compile_and_run, ['-package stm'])
 
 test('conc064', exit_code(1), compile_and_run, [''])
 
