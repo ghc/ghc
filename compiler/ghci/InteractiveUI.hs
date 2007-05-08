@@ -1154,14 +1154,20 @@ optToStr RevertCAFs = "r"
 -- ---------------------------------------------------------------------------
 -- code for `:show'
 
-showCmd str =
+showCmd str = do
+  st <- getGHCiState
   case words str of
+        ["args"]     -> io $ putStrLn (show (args st))
+        ["prog"]     -> io $ putStrLn (show (progname st))
+        ["prompt"]   -> io $ putStrLn (show (prompt st))
+        ["editor"]   -> io $ putStrLn (show (editor st))
+        ["stop"]     -> io $ putStrLn (show (stop st))
 	["modules" ] -> showModules
 	["bindings"] -> showBindings
 	["linker"]   -> io showLinkerState
-        ["breaks"] -> showBkptTable
-        ["context"] -> showContext
-	_ -> throwDyn (CmdLineError "syntax:  :show [modules|bindings|breaks]")
+        ["breaks"]   -> showBkptTable
+        ["context"]  -> showContext
+	_ -> throwDyn (CmdLineError "syntax:  :show [args|prog|prompt|editor|stop|modules|bindings|breaks|context]")
 
 showModules = do
   session <- getSession
