@@ -90,7 +90,9 @@ import InstEnv		( InstEnv, Instance )
 import FamInstEnv	( FamInstEnv, FamInst )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
+import VarEnv
 import VarSet
+import Var
 import Id
 import Type		( TyThing(..) )
 
@@ -1244,23 +1246,34 @@ The following information is generated and consumed by the vectorisation
 subsystem.  It communicates the vectorisation status of declarations from one
 module to another.
 
+Why do we need both f and f_CC in the ModGuts/ModDetails/EPS version VectInfo
+below?  We need to know `f' when converting to IfaceVectInfo.  However, during
+closure conversion, we need to know `f_CC', whose `Var' we cannot lookup based
+on just the OccName easily in a Core pass.
+
 \begin{code}
--- ModGuts version
-data VectInfo      = VectInfo {
-                       vectInfoCCVar :: NameSet
-                     }
+-- ModGuts/ModDetails/EPS version
+data VectInfo      
+  = VectInfo {
+      vectInfoCCVar :: VarEnv (Var, Var)        -- (f, f_CC) keyed on f
+                                                -- always tidy, even in ModGuts
+    }
 
 -- ModIface version
-data IfaceVectInfo = IfaceVectInfo {
-                       ifaceVectInfoCCVar :: [Name]
-                     }
+data IfaceVectInfo 
+  = IfaceVectInfo {
+      ifaceVectInfoCCVar :: [Name]              -- all variables in here have
+                                                -- a closure-converted variant
+                                                -- the name of the CC'ed variant
+                                                -- is determined by `mkCloOcc'
+    }
 
 noVectInfo :: VectInfo
-noVectInfo = VectInfo emptyNameSet
+noVectInfo = VectInfo emptyVarEnv
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 = 
-  VectInfo (vectInfoCCVar vi1 `unionNameSets` vectInfoCCVar vi2)
+  VectInfo (vectInfoCCVar vi1 `plusVarEnv` vectInfoCCVar vi2)
 
 noIfaceVectInfo :: IfaceVectInfo
 noIfaceVectInfo = IfaceVectInfo []

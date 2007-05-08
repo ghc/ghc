@@ -8,8 +8,8 @@ Type checking of type signatures in interface files
 \begin{code}
 module TcIface ( 
 	tcImportDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface, 
-	tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules, tcIfaceGlobal, 
-	tcExtCoreBindings
+	tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
+	tcIfaceVectInfo, tcIfaceGlobal, tcExtCoreBindings
  ) where
 
 #include "HsVersions.h"
@@ -38,9 +38,9 @@ import DataCon
 import TysWiredIn
 import Var              ( TyVar )
 import qualified Var
+import VarEnv
 import Name
 import NameEnv
-import NameSet
 import OccName
 import Module
 import UniqFM
@@ -200,8 +200,8 @@ typecheckIface iface
 	; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
 
                 -- Vectorisation information
-        ; let vect_info = VectInfo 
-                           (mkNameSet (ifaceVectInfoCCVar (mi_vect_info iface)))
+        ; vect_info <- tcIfaceVectInfo (mi_module iface) type_env 
+                                       (mi_vect_info iface)
 
 		-- Exports
 	; exports <- ifaceExportNames (mi_exports iface)
@@ -575,6 +575,34 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
     ifTopFreeName other                             = Nothing
 \end{code}
 
+
+%************************************************************************
+%*									*
+		Vectorisation information
+%*									*
+%************************************************************************
+
+\begin{code}
+tcIfaceVectInfo :: Module -> TypeEnv  -> IfaceVectInfo -> IfL VectInfo
+tcIfaceVectInfo mod typeEnv (IfaceVectInfo names)
+  = do { ccVars <- mapM ccMapping names
+       ; return $ VectInfo (mkVarEnv ccVars)
+       }
+  where
+    ccMapping name 
+      = do { ccName <- lookupOrig mod (mkCloOcc (nameOccName name))
+           ; let { var   = lookup name
+                 ; ccVar = lookup ccName
+                 }
+           ; return (var, (var, ccVar))
+           }
+    lookup name = case lookupTypeEnv typeEnv name of
+                    Just (AnId var) -> var
+                    Just _          -> 
+                      panic "TcIface.tcIfaceVectInfo: wrong TyThing"
+                    Nothing         ->
+                      panic "TcIface.tcIfaceVectInfo: unknown name"
+\end{code}
 
 %************************************************************************
 %*									*

@@ -6,9 +6,12 @@ import TcRnTypes  ( IfL )
 import InstEnv	  ( Instance )
 import FamInstEnv ( FamInst )
 import CoreSyn	  ( CoreRule )
+import HscTypes   ( TypeEnv, VectInfo, IfaceVectInfo )
+import Module     ( Module )
 
 tcIfaceDecl    :: Bool -> IfaceDecl -> IfL TyThing
 tcIfaceRules   :: Bool -> [IfaceRule] -> IfL [CoreRule]
+tcIfaceVectInfo:: Module -> TypeEnv -> IfaceVectInfo -> IfL VectInfo
 tcIfaceInst    :: IfaceInst -> IfL Instance
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 \end{code}

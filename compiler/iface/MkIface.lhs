@@ -195,6 +195,8 @@ import TcRnMonad
 import HscTypes
 
 import DynFlags
+import VarEnv
+import Var
 import Name
 import NameEnv
 import NameSet
@@ -337,7 +339,8 @@ mkIface hsc_env maybe_old_iface
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
      ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
 
-     flattenVectInfo (VectInfo ccVar) = IfaceVectInfo (nameSetToList ccVar)
+     flattenVectInfo (VectInfo ccVar) = 
+       IfaceVectInfo [Var.varName v | (v, _) <- varEnvElts ccVar]
 
 -----------------------------
 writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()

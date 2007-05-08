@@ -32,7 +32,7 @@ import Name		( Name, getOccName, nameOccName, mkInternalName,
 		  	  localiseName, isExternalName, nameSrcLoc,
 			  isWiredInName, getName
 			)
-import NameSet		( NameSet, elemNameSet, filterNameSet )
+import NameSet		( NameSet, elemNameSet )
 import IfaceEnv		( allocateGlobalBinder )
 import NameEnv		( filterNameEnv, mapNameEnv )
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
@@ -287,12 +287,6 @@ tidyProgram hsc_env
 	      ; implicit_binds = getImplicitBinds type_env
 	      ; all_tidy_binds = implicit_binds ++ tidy_binds
 	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
-
-              ; tidy_vect_info = VectInfo 
-                                   (filterNameSet (isElemId type_env) 
-                                                  (vectInfoCCVar vect_info))
-                -- filter against `type_env', not `tidy_type_env', as we must
-                -- keep all implicit names
 	      }
 
    	; endPass dflags "Tidy Core" Opt_D_dump_simpl all_tidy_binds
@@ -314,7 +308,7 @@ tidyProgram hsc_env
 				md_fam_insts = fam_insts,
 				md_exports   = exports,
                                 md_modBreaks = modBreaks,
-                                md_vect_info = tidy_vect_info
+                                md_vect_info = vect_info    -- is already tidy
                               })
 	}
 
@@ -322,11 +316,6 @@ lookup_dfun type_env dfun_id
   = case lookupTypeEnv type_env (idName dfun_id) of
 	Just (AnId dfun_id') -> dfun_id'
 	other -> pprPanic "lookup_dfun" (ppr dfun_id)
-
-isElemId type_env name
-  = case lookupTypeEnv type_env name of
-	Just (AnId _) -> True
-	_             -> False
 
 tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [CoreBind] -> TypeEnv
 
