@@ -102,8 +102,8 @@ unblock (IO io) = IO $ unblockAsyncExceptions# io
 \end{code}
 
 \begin{code}
--- | Forces its argument to be evaluated, and returns the result in
--- the 'IO' monad.  It can be used to order evaluation with respect to
+-- | Forces its argument to be evaluated when the resultant 'IO' action
+-- is executed.  It can be used to order evaluation with respect to
 -- other 'IO' operations; its semantics are given by
 --
 -- >   evaluate x `seq` y    ==>  y
