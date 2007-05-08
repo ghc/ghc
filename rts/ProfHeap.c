@@ -523,11 +523,13 @@ endHeapProfiling(void)
     }
 #endif
 
-    {
+    if (doingLDVProfiling()) {
         nat t;
-        for (t = 0; t <= era; t++) {
+        for (t = 1; t <= era; t++) {
             freeEra( &censuses[t] );
         }
+    } else {
+        freeEra( &censuses[0] );
     }
     stgFree(censuses);
 
