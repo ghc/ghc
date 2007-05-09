@@ -1793,7 +1793,7 @@ mkTickArray ticks
         [ (line, (nm,span)) | (nm,span) <- ticks,
                               line <- srcSpanLines span ]
     where
-        max_line = maximum (map GHC.srcSpanEndLine (map snd ticks))
+        max_line = foldr max 0 (map GHC.srcSpanEndLine (map snd ticks))
         srcSpanLines span = [ GHC.srcSpanStartLine span .. 
                               GHC.srcSpanEndLine span ]
 
