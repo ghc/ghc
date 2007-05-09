@@ -109,7 +109,7 @@ builtin_commands = [
   ("browse",    keepGoing browseCmd,		False, completeModule),
   ("cd",    	keepGoing changeDirectory,	False, completeFilename),
   ("check",	keepGoing checkModule,		False, completeHomeModule),
-  ("continue",  continueCmd,                    False, completeNone),
+  ("continue",  keepGoing continueCmd,          False, completeNone),
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
   ("def",	keepGoing defineMacro,		False, completeIdentifier),
   ("delete",    keepGoing deleteCmd,            False, completeNone),
@@ -132,11 +132,12 @@ builtin_commands = [
   ("set",	keepGoing setCmd,		True,  completeSetOptions),
   ("show",	keepGoing showCmd,		False, completeNone),
   ("sprint",    keepGoing sprintCmd,            False, completeIdentifier),
-  ("step",      stepCmd,                        False, completeIdentifier), 
+  ("step",      keepGoing stepCmd,              False, completeIdentifier), 
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
-  ("trace",     traceCmd,                       False, completeIdentifier), 
+  ("trace",     keepGoing traceCmd,             False, completeIdentifier), 
   ("undef",     keepGoing undefineMacro,	False, completeMacro),
-  ("unset",	keepGoing unsetOptions,		True,  completeSetOptions)
+  ("unset",	keepGoing unsetOptions,		True,  completeSetOptions),
+  ("where",	keepGoing whereCmd,		True,  completeNone)
   ]
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
@@ -794,6 +795,7 @@ loadModule' files = do
   session <- getSession
 
   -- unload first
+  discardActiveBreakPoints
   io (GHC.setTargets session [])
   io (GHC.load session LoadAllTargets)
 
@@ -809,9 +811,7 @@ loadModule' files = do
   -- as a ToDo for now.
 
   io (GHC.setTargets session targets)
-  ok <- io (GHC.load session LoadAllTargets)
-  afterLoad ok session
-  return ok
+  doLoad session LoadAllTargets
 
 checkModule :: String -> GHCi ()
 checkModule m = do
@@ -834,19 +834,28 @@ checkModule m = do
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
   io (revertCAFs)		-- always revert CAFs on reload.
+  discardActiveBreakPoints
   session <- getSession
-  ok <- io (GHC.load session LoadAllTargets)
-  afterLoad ok session
+  doLoad session LoadAllTargets
+  return ()
 reloadModule m = do
   io (revertCAFs)		-- always revert CAFs on reload.
+  discardActiveBreakPoints
   session <- getSession
-  ok <- io (GHC.load session (LoadUpTo (GHC.mkModuleName m)))
+  doLoad session (LoadUpTo (GHC.mkModuleName m))
+  return ()
+
+doLoad session howmuch = do
+  -- turn off breakpoints before we load: we can't turn them off later, because
+  -- the ModBreaks will have gone away.
+  discardActiveBreakPoints
+  ok <- io (GHC.load session howmuch)
   afterLoad ok session
+  return ok
 
 afterLoad ok session = do
   io (revertCAFs)  -- always revert CAFs on load.
   discardTickArrays
-  discardActiveBreakPoints
   graph <- io (GHC.getModuleGraph session)
   graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
   setContextAfterLoad session graph'
@@ -1460,26 +1469,23 @@ pprintCommand bind force str = do
   session <- getSession
   io $ pprintClosureCommand session bind force str
 
-stepCmd :: String -> GHCi Bool
+stepCmd :: String -> GHCi ()
 stepCmd []         = doContinue GHC.SingleStep
-stepCmd expression = runStmt expression GHC.SingleStep
+stepCmd expression = do runStmt expression GHC.SingleStep; return ()
 
-traceCmd :: String -> GHCi Bool
+traceCmd :: String -> GHCi ()
 traceCmd []         = doContinue GHC.RunAndLogSteps
-traceCmd expression = runStmt expression GHC.RunAndLogSteps
+traceCmd expression = do runStmt expression GHC.RunAndLogSteps; return ()
 
-continueCmd :: String -> GHCi Bool
-continueCmd [] = doContinue GHC.RunToCompletion
-continueCmd other = do
-   io $ putStrLn "The continue command accepts no arguments."
-   return False
+continueCmd :: String -> GHCi ()
+continueCmd = noArgs $ doContinue GHC.RunToCompletion
 
-doContinue :: SingleStep -> GHCi Bool
+doContinue :: SingleStep -> GHCi ()
 doContinue step = do 
   session <- getSession
   runResult <- io $ GHC.resume session step
   afterRunStmt runResult
-  return False
+  return ()
 
 abandonCmd :: String -> GHCi ()
 abandonCmd = noArgs $ do
