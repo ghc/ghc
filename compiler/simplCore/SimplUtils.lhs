@@ -39,6 +39,7 @@ import CoreUnfold
 import MkId
 import Name
 import Id
+import Var	( isCoVar )
 import NewDemand
 import SimplMonad
 import Type
@@ -1041,8 +1042,11 @@ abstractFloats main_tvs body_env body
 		 subst'   = CoreSubst.extendIdSubst subst id poly_app
 	   ; return (subst', (NonRec poly_id poly_rhs)) }
       where
-	rhs'     = CoreSubst.substExpr subst rhs
-	tvs_here = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
+	rhs' = CoreSubst.substExpr subst rhs
+	tvs_here | any isCoVar main_tvs = main_tvs	-- Note [Abstract over coercions]
+		 | otherwise 
+		 = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
+	
 		-- Abstract only over the type variables free in the rhs
 		-- wrt which the new binding is abstracted.  But the naive
 		-- approach of abstract wrt the tyvars free in the Id's type
@@ -1100,6 +1104,13 @@ abstractFloats main_tvs body_env body
 		-- the occurrences of x' will be just the occurrences originally
 		-- pinned on x.
 \end{code}
+
+Note [Abstract over coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a coercion variable (g :: a ~ Int) is free in the RHS, then so is the
+type variable a.  Rather than sort this mess out, we simply bale out and abstract
+wrt all the type variables if any of them are coercion variables.
+
 
 Historical note: if you use let-bindings instead of a substitution, beware of this:
 

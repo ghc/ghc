@@ -331,7 +331,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
 		else  				-- Do type-abstraction first
 		     do	{ tick LetFloatFromLet
-			; (poly_binds, body3) <- abstractFloats tvs body_env2 body2
+			; (poly_binds, body3) <- abstractFloats tvs' body_env2 body2
 			; rhs' <- mkLam tvs' body3
 			; return (extendFloats env poly_binds, rhs') }
 
