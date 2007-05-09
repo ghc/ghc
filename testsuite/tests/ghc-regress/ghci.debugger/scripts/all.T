@@ -27,6 +27,8 @@ test('break002', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_scri
 test('break003', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['break003.script'])
 test('break005', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['break005.script'])
 test('break006', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['break006.script'])
+test('break007', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['break007.script'])
+test('break008', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['break008.script'])
 
 test('dynbrk001', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['dynbrk001.script'])
 test('dynbrk002', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['dynbrk002.script'])
