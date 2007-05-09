@@ -817,7 +817,6 @@ GhcPatchLevel	= @ProjectPatchLevel@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 
-ghc_ge_504 = YES
 ghc_ge_601 = YES
 ghc_ge_602 = YES
 ghc_ge_603 = YES
@@ -833,7 +832,6 @@ GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 
 # Some useful GHC version predicates:
-ghc_ge_504 = @ghc_ge_504@
 ghc_ge_601 = @ghc_ge_601@
 ghc_ge_602 = @ghc_ge_602@
 ghc_ge_603 = @ghc_ge_603@

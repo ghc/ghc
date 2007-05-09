@@ -19,10 +19,6 @@ SRC_HC_OPTS += $(PACKAGE_CABAL)
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 
-ifeq "$(ghc_ge_504)" "NO"
-SRC_HC_OPTS +=  -package lang -package util -package text
-endif
-
 # On Windows, ghc-pkg is a standalone program
 # ($bindir/ghc-pkg.exe), whereas on Unix it needs a wrapper script
 # to pass the appropriate flag to the real binary

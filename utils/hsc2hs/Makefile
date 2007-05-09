@@ -23,10 +23,6 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-cygwinw32"
 HS_PROG           = hsc2hs$(exeext)
 endif
 
-ifeq "$(ghc_ge_504)" "NO"
-SRC_HC_OPTS +=  -package util
-endif
-
 # Note: Somehow we should pass $(exeext) here, but the history of changes used
 # for calling the C preprocessor via GHC has changed a few times, making a
 # clean solution impossible. So we revert to a hack in Main.hs...
