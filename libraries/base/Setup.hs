@@ -8,10 +8,12 @@ module Main (main) where
 
 import Control.Monad
 import Data.List
-import Distribution.Simple
 import Distribution.PackageDescription
 import Distribution.Setup
+import Distribution.Simple
 import Distribution.Simple.LocalBuildInfo
+import Distribution.Simple.Utils
+import System.Cmd
 import System.Environment
 import System.Info
 
@@ -24,7 +26,8 @@ main = do args <- getArgs
                            $ confHook defaultUserHooks,
                   postConf = add_configure_options confArgs
                            $ postConf defaultUserHooks,
-                  buildHook = add_ghc_options ghcArgs
+                  buildHook = build_primitive_sources
+                            $ add_ghc_options ghcArgs
                             $ filter_modules_hook
                             $ buildHook defaultUserHooks,
                   makefileHook = add_ghc_options ghcArgs
@@ -67,6 +70,13 @@ type PostConfHook = Args -> ConfigFlags -> PackageDescription -> LocalBuildInfo
                  -> IO ()
 
 -- type PDHook = PackageDescription -> ConfigFlags -> IO ()
+
+build_primitive_sources :: Hook a -> Hook a
+build_primitive_sources f pd lbi uhs x
+ = do when (compilerFlavor (compiler lbi) == GHC) $ do
+          maybeExit $ system "../../utils/genprimopcode/genprimopcode --make-haskell-source < ../../compiler/prelude/primops.txt > GHC/Prim.hs"
+          maybeExit $ system "../../utils/genprimopcode/genprimopcode --make-haskell-wrappers < ../../compiler/prelude/primops.txt > GHC/PrimopWrappers.hs"
+      f pd lbi uhs x
 
 add_ghc_options :: [String] -> Hook a -> Hook a
 add_ghc_options args f pd lbi uhs x
