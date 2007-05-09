@@ -90,7 +90,7 @@ CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
 endif
 
-BOOTSTRAPPING_CABAL = bootstrapping.cabal
+BOOTSTRAPPING_STAMPS = $(addprefix stamp/bootstrapping.,Cabal filepath)
 
 .PHONY: subdirs
 
@@ -99,11 +99,8 @@ subdirs:
 
 .PHONY: boot
 
-boot: ifBuildable/ifBuildable \
+boot: $(BOOTSTRAPPING_STAMPS) ifBuildable/ifBuildable \
 	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup)
-	# XXX Hideous hacks:
-	$(GENPRIMOP) --make-haskell-source < ../compiler/prelude/primops.txt > base/GHC/Prim.hs
-	$(GENPRIMOP) --make-haskell-wrappers < ../compiler/prelude/primops.txt > base/GHC/PrimopWrappers.hs
 
 # We build the Setup program in a setup subdirectory to stop it trying
 # to use bits of base and Cabal when we build those packages.
@@ -112,22 +109,25 @@ boot: ifBuildable/ifBuildable \
 # We ought to be depending on %/Setup.*hs, but make makes that difficult.
 
 $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
-%/setup/Setup: stamp/$(BOOTSTRAPPING_CABAL)
+%/setup/Setup: $(BOOTSTRAPPING_STAMPS)
 	-$(RM) -rf $*/setup
 	mkdir $*/setup
 	$(CP) $*/Setup.*hs $*/setup
-	cd $*/setup && $(GHC) -Wall --make -i../../$(BOOTSTRAPPING_CABAL) Setup.*hs -o Setup
+	cd $*/setup && $(GHC) -i../../bootstrapping.Cabal \
+	                      -i../../bootstrapping.filepath \
+	                      -Wall -cpp --make Setup.*hs -o Setup
 
-ifBuildable/ifBuildable: ifBuildable.hs stamp/$(BOOTSTRAPPING_CABAL)
+ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable
 	mkdir ifBuildable
 	$(CP) ifBuildable.hs ifBuildable/
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
 
-stamp/$(BOOTSTRAPPING_CABAL):
-	$(RM) -rf $(BOOTSTRAPPING_CABAL)
-	$(CP) -R Cabal $(BOOTSTRAPPING_CABAL)
-	$(FIND) $(BOOTSTRAPPING_CABAL) \( -name "*.o" -o -name "*.hi" \) -exec $(RM) -f {} \;
+$(BOOTSTRAPPING_STAMPS): stamp/bootstrapping.%:
+	$(RM) -rf bootstrapping.$*
+	$(CP) -R $* bootstrapping.$*
+	$(FIND) bootstrapping.$* \( -name "*.o" -o -name "*.hi" \) \
+	                         -exec $(RM) -f {} \;
 	touch $@
 
 .PHONY: all build configure
@@ -231,8 +231,8 @@ install.library.%: stamp/configure.library.install.% \
 distclean: clean
 
 clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
-	$(RM) -f stamp/$(BOOTSTRAPPING_CABAL)
-	$(RM) -rf $(BOOTSTRAPPING_CABAL)
+	$(RM) -f stamp/bootstrapping.*
+	$(RM) -rf bootstrapping.*
 	$(RM) -rf ifBuildable
 	$(RM) -f libraries.txt index.html doc-index.html
 

@@ -8,6 +8,7 @@ ALL_DIRS = \
 	Distribution/Compat \
 	Language/Haskell \
 	System \
+	System/FilePath \
 	System/Directory \
 	cbits
 
@@ -48,6 +49,9 @@ SRC_HC_OPTS += $(filter-out -D%, $(GhcHcOpts) $(GhcStage1HcOpts))
 # CPP symbol, so we have to do it by hand:
 SRC_CC_OPTS += -D__GHC_PATCHLEVEL__=$(GhcPatchLevel)
 
+# This module shouldn't be compiled itself, only #included into other files
+EXCLUDED_SRCS += System/FilePath/Internal.hs
+
 ifeq "$(ghc_ge_603)" "YES"
 # These modules are provided in GHC 6.3+
 EXCLUDED_SRCS += \
@@ -59,6 +63,8 @@ SRC_MKDEPENDHS_OPTS += \
 # GHC 6.3+ has Cabal, but we're replacing it:
 SRC_HC_OPTS += -ignore-package Cabal
 endif
+
+SRC_HC_OPTS += -ignore-package filepath
 
 # Some explicit dependencies, needed because ghc -M can't discover the
 # true dependencies of these stub files.

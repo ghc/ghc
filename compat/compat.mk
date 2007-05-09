@@ -45,6 +45,9 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=Distribution.ParseUtils \
 	-optdep--exclude-module=Distribution.Compiler \
 	-optdep--exclude-module=Distribution.Version \
+	-optdep--exclude-module=System.FilePath \
+	-optdep--exclude-module=System.FilePath.Posix \
+	-optdep--exclude-module=System.FilePath.Windows \
 	-optdep--exclude-module=System.Directory.Internals
 
 PACKAGE_CABAL =
