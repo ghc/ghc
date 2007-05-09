@@ -9,7 +9,7 @@ ByteCodeLink: Bytecode assembler and linker
 module ByteCodeLink ( 
 	HValue, 
 	ClosureEnv, emptyClosureEnv, extendClosureEnv,
-	linkBCO, lookupStaticPtr
+	linkBCO, lookupStaticPtr, lookupName
        ,lookupIE
   ) where
 

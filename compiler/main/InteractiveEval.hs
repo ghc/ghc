@@ -768,11 +768,9 @@ isModuleInterpreted s mod_summary = withSession s $ \hsc_env ->
 obtainTerm1 :: Session -> Bool -> Maybe Type -> a -> IO Term
 obtainTerm1 sess force mb_ty x = withSession sess $ \hsc_env -> cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)
 
-obtainTerm :: Session -> Bool -> Id -> IO (Maybe Term)
+obtainTerm :: Session -> Bool -> Id -> IO Term
 obtainTerm sess force id = withSession sess $ \hsc_env -> do
-              mb_v <- Linker.getHValue (varName id) 
-              case mb_v of
-                Just v  -> fmap Just$ cvObtainTerm hsc_env force (Just$ idType id) v
-                Nothing -> return Nothing
+              hv <- Linker.getHValue hsc_env (varName id) 
+              cvObtainTerm hsc_env force (Just$ idType id) hv
 
 #endif /* GHCI */

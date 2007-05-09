@@ -247,12 +247,33 @@ dataConInfoPtrToName x = do
               (top, '.':bot) -> parseModOcc (top : acc) bot
        
 
-getHValue :: Name -> IO (Maybe HValue)
-getHValue name = do
-    pls <- readIORef v_PersistentLinkerState
-    case lookupNameEnv (closure_env pls) name of
-      Just (_,x) -> return$ Just x
-      _          -> return Nothing
+getHValue :: HscEnv -> Name -> IO HValue
+getHValue hsc_env name = do
+   when (isExternalName name) $ do
+        ok <- linkDependencies hsc_env noSrcSpan [nameModule name]
+        when (failed ok) $ throwDyn (ProgramError "")
+   pls <- readIORef v_PersistentLinkerState
+   lookupName (closure_env pls) name
+        
+linkDependencies :: HscEnv -> SrcSpan -> [Module] -> IO SuccessFlag
+linkDependencies hsc_env span needed_mods = do
+   let hpt = hsc_HPT hsc_env
+       dflags = hsc_dflags hsc_env
+	-- The interpreter and dynamic linker can only handle object code built
+	-- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
+	-- So here we check the build tag: if we're building a non-standard way
+	-- then we need to find & link object files built the "normal" way.
+   maybe_normal_osuf <- checkNonStdWay dflags span
+
+	-- Find what packages and linkables are required
+   eps <- readIORef (hsc_EPS hsc_env)
+   (lnks, pkgs) <- getLinkDeps hsc_env hpt (eps_PIT eps) 
+				maybe_normal_osuf span needed_mods
+
+	-- Link the packages and modules required
+   linkPackages dflags pkgs
+   linkModules dflags lnks
+
 
 withExtendedLinkEnv :: [(Name,HValue)] -> IO a -> IO a
 withExtendedLinkEnv new_env action
@@ -449,20 +470,8 @@ linkExpr hsc_env span root_ul_bco
      let dflags = hsc_dflags hsc_env
    ; initDynLinker dflags
 
-	-- The interpreter and dynamic linker can only handle object code built
-	-- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
-	-- So here we check the build tag: if we're building a non-standard way
-	-- then we need to find & link object files built the "normal" way.
-   ; maybe_normal_osuf <- checkNonStdWay dflags span
-
-	-- Find what packages and linkables are required
-   ; eps <- readIORef (hsc_EPS hsc_env)
-   ; (lnks, pkgs) <- getLinkDeps hsc_env hpt (eps_PIT eps) 
-				maybe_normal_osuf span needed_mods
-
 	-- Link the packages and modules required
-   ; linkPackages dflags pkgs
-   ; ok <- linkModules dflags lnks
+   ; ok <- linkDependencies hsc_env span needed_mods
    ; if failed ok then
 	throwDyn (ProgramError "")
      else do {
@@ -477,7 +486,6 @@ linkExpr hsc_env span root_ul_bco
    ; return root_hval
    }}
    where
-     hpt    = hsc_HPT hsc_env
      free_names = nameSetToList (bcoFreeNames root_ul_bco)
 
      needed_mods :: [Module]

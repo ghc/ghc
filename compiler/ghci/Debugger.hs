@@ -63,8 +63,7 @@ pprintClosureCommand session bindThings force str = do
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: Session -> Id -> IO (Maybe TvSubst)
    go cms id = do 
-     mb_term <- obtainTerm cms force id 
-     maybe (return Nothing) `flip` mb_term $ \term_ -> do
+       term_ <- obtainTerm cms force id 
        term      <- tidyTermTyVars cms term_
        term'     <- if not bindThings then return term 
                      else bindSuspensions cms term                         
