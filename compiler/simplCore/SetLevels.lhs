@@ -56,7 +56,7 @@ module SetLevels (
 import CoreSyn
 
 import DynFlags	( FloatOutSwitches(..) )
-import CoreUtils	( exprType, exprIsTrivial, exprIsCheap, mkPiTypes )
+import CoreUtils	( exprType, exprIsTrivial, mkPiTypes )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, extendIdSubst,
 			  cloneIdBndr, cloneRecIdBndrs )
@@ -399,21 +399,9 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 	-- that if we'll escape a value lambda, or will go to the top level.
     good_destination 
 	| dest_lvl `ltMajLvl` ctxt_lvl		-- Escapes a value lambda
-	= not (exprIsCheap expr) || isTopLvl dest_lvl
-	  -- Even if it escapes a value lambda, we only
-	  -- float if it's not cheap (unless it'll get all the
-	  -- way to the top).  I've seen cases where we
-	  -- float dozens of tiny free expressions, which cost
-	  -- more to allocate than to evaluate.
-	  -- NB: exprIsCheap is also true of bottom expressions, which
-	  --     is good; we don't want to share them
-	  --
-	  -- It's only Really Bad to float a cheap expression out of a
-	  -- strict context, because that builds a thunk that otherwise
-	  -- would never be built.  So another alternative would be to
-	  -- add 
-	  -- 	|| (strict_ctxt && not (exprIsBottom expr))
-	  -- to the condition above. We should really try this out.
+	= True
+	-- OLD CODE: not (exprIsCheap expr) || isTopLvl dest_lvl
+	-- 	     see Note [Escaping a value lambda]
 
 	| otherwise		-- Does not escape a value lambda
 	= isTopLvl dest_lvl 	-- Only float if we are going to the top level
@@ -432,6 +420,48 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 	  --	lvl    = /\ a -> foldr ..a.. (++) []
 	  -- which is pretty stupid.  Hence the strict_ctxt test
 \end{code}
+
+Note [Escaping a value lambda]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to float even cheap expressions out of value lambdas, 
+because that saves allocation.  Consider
+	f = \x.  .. (\y.e) ...
+Then we'd like to avoid allocating the (\y.e) every time we call f,
+(assuming e does not mention x).   
+
+An example where this really makes a difference is simplrun009.
+
+Another reason it's good is because it makes SpecContr fire on functions.
+Consider
+	f = \x. ....(f (\y.e))....
+After floating we get
+	lvl = \y.e
+	f = \x. ....(f lvl)...
+and that is much easier for SpecConstr to generate a robust specialisation for.
+
+The OLD CODE (given where this Note is referred to) prevents floating
+of the example above, so I just don't understand the old code.  I
+don't understand the old comment either (which appears below).  I
+measured the effect on nofib of changing OLD CODE to 'True', and got
+zeros everywhere, but a 4% win for 'puzzle'.  Very small 0.5% loss for
+'cse'; turns out to be because our arity analysis isn't good enough
+yet (mentioned in Simon-nofib-notes.
+
+OLD comment was:
+	 Even if it escapes a value lambda, we only
+	 float if it's not cheap (unless it'll get all the
+	 way to the top).  I've seen cases where we
+	 float dozens of tiny free expressions, which cost
+	 more to allocate than to evaluate.
+	 NB: exprIsCheap is also true of bottom expressions, which
+	     is good; we don't want to share them
+
+	It's only Really Bad to float a cheap expression out of a
+	strict context, because that builds a thunk that otherwise
+	would never be built.  So another alternative would be to
+	add 
+		|| (strict_ctxt && not (exprIsBottom expr))
+	to the condition above. We should really try this out.
 
 
 %************************************************************************
