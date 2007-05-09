@@ -26,7 +26,7 @@ module CgUtils (
 
 	addToMem, addToMemE,
 	mkWordCLit,
-	mkStringCLit,
+	mkStringCLit, mkByteStringCLit,
 	packHalfWordsCLit,
 	blankWord
   ) where

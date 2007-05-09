@@ -43,6 +43,11 @@ import ListSetOps
 import Util
 import Maybes
 import FastString
+import PackageConfig
+import Module
+
+import Data.Char
+import Data.Word
 \end{code}
 
 
@@ -518,19 +523,6 @@ mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
 dataConName :: DataCon -> Name
 dataConName = dcName
 
--- generate a name in the format: package:Module.OccName
--- and the unique identity of the name
-dataConIdentity :: DataCon -> String
-dataConIdentity dataCon
-   = prettyName
-   where
-   prettyName = pretty packageModule ++ "." ++ pretty occ
-   nm = getName dataCon
-   packageModule = nameModule nm
-   occ = getOccName dataCon
-   pretty :: Outputable a => a -> String 
-   pretty = showSDoc . ppr
-
 dataConTag :: DataCon -> ConTag
 dataConTag  = dcTag
 
@@ -692,6 +684,19 @@ dataConOrigArgTys dc = dcOrigArgTys dc
 
 dataConRepArgTys :: DataCon -> [Type]
 dataConRepArgTys dc = dcRepArgTys dc
+\end{code}
+
+The string <package>:<module>.<name> identifying a constructor, which is attached
+to its info table and used by the GHCi debugger and the heap profiler.  We want
+this string to be UTF-8, so we get the bytes directly from the FastStrings.
+
+\begin{code}
+dataConIdentity :: DataCon -> [Word8]
+dataConIdentity dc = bytesFS (packageIdFS (modulePackageId mod)) ++ 
+                  fromIntegral (ord ':') : bytesFS (moduleNameFS (moduleName mod)) ++
+                  fromIntegral (ord '.') : bytesFS (occNameFS (nameOccName name))
+  where name = dataConName dc
+        mod  = nameModule name
 \end{code}
 
 

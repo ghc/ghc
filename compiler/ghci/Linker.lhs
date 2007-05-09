@@ -55,16 +55,15 @@ import DriverPhases
 import SrcLoc
 import UniqSet
 import Constants
+import FastString
 
 -- Standard libraries
 import Control.Monad
 
+import Data.Char
 import Data.IORef
 import Data.List
-import Foreign.Ptr
-import Foreign.C.Types
-import Foreign.C.String
-import Foreign.Storable
+import Foreign
 
 import System.IO
 import System.Directory
@@ -152,9 +151,10 @@ deleteFromLinkEnv to_remove
 	    new_pls = pls { closure_env = new_closure_env }
 	writeIORef v_PersistentLinkerState new_pls
 
--- | Given a data constructor, find its internal name.
---   The info tables for data constructors have a field which records the source name
---   of the constructor as a CString. The format is:
+-- | Given a data constructor in the heap, find its Name.
+--   The info tables for data constructors have a field which records
+--   the source name of the constructor as a Ptr Word8 (UTF-8 encoded
+--   string). The format is:
 --
 --    Package:Module.Name
 --
@@ -166,11 +166,13 @@ dataConInfoPtrToName x = do
    theString <- ioToTcRn $ do
       let ptr = castPtr x :: Ptr StgInfoTable
       conDescAddress <- getConDescAddress ptr 
-      str <- peekCString conDescAddress  
-      return str
+      peekArray0 0 conDescAddress  
    let (pkg, mod, occ) = parse theString 
-       occName = mkOccName OccName.dataName occ
-       modName = mkModule (stringToPackageId pkg) (mkModuleName mod) 
+       pkgFS = mkFastStringByteList pkg
+       modFS = mkFastStringByteList mod
+       occFS = mkFastStringByteList occ
+       occName = mkOccNameFS OccName.dataName occFS
+       modName = mkModule (fsToPackageId pkgFS) (mkModuleNameFS modFS) 
    lookupOrig modName occName
 
    where
@@ -215,7 +217,7 @@ dataConInfoPtrToName x = do
          in the memory location: info_table_ptr + info_table_size
    -}
 
-   getConDescAddress :: Ptr StgInfoTable -> IO (Ptr CChar)
+   getConDescAddress :: Ptr StgInfoTable -> IO (Ptr Word8)
    getConDescAddress ptr = do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
        offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE)
@@ -231,20 +233,21 @@ dataConInfoPtrToName x = do
    -- this is not the conventional way of writing Haskell names. We stick with
    -- convention, even though it makes the parsing code more troublesome.
    -- Warning: this code assumes that the string is well formed.
-   parse :: String -> (String, String, String)
+   parse :: [Word8] -> ([Word8], [Word8], [Word8])
    parse input 
       = ASSERT (all (>0) (map length [pkg, mod, occ])) (pkg, mod, occ)
       where
-      (pkg, rest1) = break (==':') input 
+      dot = fromIntegral (ord '.')
+      (pkg, rest1) = break (== fromIntegral (ord ':')) input 
       (mod, occ) 
-         = (concat $ intersperse "." $ reverse modWords, occWord)
+         = (concat $ intersperse [dot] $ reverse modWords, occWord)
          where
          (modWords, occWord) = ASSERT (length rest1 > 0) (parseModOcc [] (tail rest1))
-      parseModOcc :: [String] -> String -> ([String], String)
+      parseModOcc :: [[Word8]] -> [Word8] -> ([[Word8]], [Word8])
       parseModOcc acc str
-         = case break (== '.') str of
+         = case break (== dot) str of
               (top, []) -> (acc, top)
-              (top, '.':bot) -> parseModOcc (top : acc) bot
+              (top, _:bot) -> parseModOcc (top : acc) bot
        
 
 getHValue :: HscEnv -> Name -> IO HValue

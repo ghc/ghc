@@ -24,6 +24,7 @@ module FastString
 	-- ** Construction
         mkFastString,
 	mkFastStringBytes,
+        mkFastStringByteList,
 	mkFastStringForeignPtr,
 	mkFastString#,
 	mkZFastString,
@@ -275,6 +276,15 @@ mkFastString str =
       utf8EncodeString ptr str
       mkFastStringForeignPtr ptr buf l 
 
+-- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
+mkFastStringByteList :: [Word8] -> FastString
+mkFastStringByteList str = 
+  inlinePerformIO $ do
+    let l = Prelude.length str
+    buf <- mallocForeignPtrBytes l
+    withForeignPtr buf $ \ptr -> do
+      pokeArray (castPtr ptr) str
+      mkFastStringForeignPtr ptr buf l 
 
 -- | Creates a Z-encoded 'FastString' from a 'String'
 mkZFastString :: String -> FastString

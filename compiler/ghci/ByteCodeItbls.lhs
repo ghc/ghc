@@ -117,7 +117,7 @@ make_constr_itbls cons
                          , code  = code
 #endif
                         }
-           qNameCString <- newCString $ dataConIdentity dcon 
+           qNameCString <- newArray0 0 $ dataConIdentity dcon 
            let conInfoTbl = StgConInfoTable {
                                  conDesc = qNameCString,
                                  infoTable = itbl
@@ -273,7 +273,7 @@ type HalfWord = Word16
 #endif
 
 data StgConInfoTable = StgConInfoTable {
-   conDesc   :: CString,
+   conDesc   :: Ptr Word8,
    infoTable :: StgInfoTable
 }
 

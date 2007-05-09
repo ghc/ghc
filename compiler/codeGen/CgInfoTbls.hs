@@ -43,11 +43,17 @@ import Name
 import DataCon
 import Unique
 import StaticFlags
+import FastString
+import Packages
+import Module
 
 import Maybes
 import Constants
 
 import Outputable 
+
+import Data.Char
+import Data.Word
 
 -------------------------------------------------------------------------
 --
@@ -89,7 +95,7 @@ emitClosureCodeAndInfoTable cl_info args body
 
         ; conName <-  
              if is_con
-                then do cstr <- mkStringCLit $ fromJust conIdentity
+                then do cstr <- mkByteStringCLit $ fromJust conIdentity
                         return (makeRelativeRefTo info_lbl cstr)
                 else return (mkIntCLit 0)
 
@@ -111,7 +117,8 @@ emitClosureCodeAndInfoTable cl_info args body
 	    Just con -> -- Constructors don't have an SRT
 			-- We keep the *zero-indexed* tag in the srt_len
 			-- field of the info table. 
-			(mkIntCLit 0, fromIntegral (dataConTagZ con), Just $ dataConIdentity con) 
+			(mkIntCLit 0, fromIntegral (dataConTagZ con), 
+                         Just $ dataConIdentity con) 
 
 	    Nothing  -> -- Not a constructor
                         let (label, len) = srtLabelAndLength srt info_lbl
