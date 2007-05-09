@@ -2577,7 +2577,7 @@ report_no_instances tidy_env mb_what insts
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))),
 			      ptext SLIT("Use -fallow-incoherent-instances to use the first choice above")])]
       where
-    	ispecs = [ispec | (_, ispec) <- matches]
+    	ispecs = [ispec | (ispec, _) <- matches]
 
     mk_no_inst_err insts
       | null insts = empty

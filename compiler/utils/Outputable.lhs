@@ -409,6 +409,10 @@ instance Outputable a => Outputable (Maybe a) where
   ppr Nothing = ptext SLIT("Nothing")
   ppr (Just x) = ptext SLIT("Just") <+> ppr x
 
+instance (Outputable a, Outputable b) => Outputable (Either a b) where
+  ppr (Left x)  = ptext SLIT("Left")  <+> ppr x
+  ppr (Right y) = ptext SLIT("Right") <+> ppr y
+
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where
     ppr (x,y,z) =

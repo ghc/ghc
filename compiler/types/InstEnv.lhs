@@ -385,20 +385,41 @@ the env is kept ordered, the first match must be the only one.  The
 thing we are looking up can have an arbitrary "flexi" part.
 
 \begin{code}
-lookupInstEnv :: (InstEnv 	-- External package inst-env
-		 ,InstEnv) 	-- Home-package inst-env
-	      -> Class -> [Type]		-- What we are looking for
-	      -> ([(TvSubst, Instance)], 	-- Successful matches
-		  [Instance])			-- These don't match but do unify
-	-- The second component of the tuple happens when we look up
-	--	Foo [a]
-	-- in an InstEnv that has entries for
-	--	Foo [Int]
-	--	Foo [b]
-	-- Then which we choose would depend on the way in which 'a'
-	-- is instantiated.  So we report that Foo [b] is a match (mapping b->a)
-	-- but Foo [Int] is a unifier.  This gives the caller a better chance of
-	-- giving a suitable error messagen
+type InstTypes = [Either TyVar Type]
+	-- Right ty	=> Instantiate with this type
+	-- Left tv 	=> Instantiate with any type of this tyvar's kind
+
+type InstMatch = (Instance, InstTypes)
+\end{code}
+
+Note [InstTypes: instantiating types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A successful match is an Instance, together with the types at which
+	the dfun_id in the Instance should be instantiated
+The instantiating types are (Mabye Type)s because the dfun
+might have some tyvars that *only* appear in arguments
+	dfun :: forall a b. C a b, Ord b => D [a]
+When we match this against D [ty], we return the instantiating types
+	[Right ty, Left b]
+where the Nothing indicates that 'b' can be freely instantiated.  
+(The caller instantiates it to a flexi type variable, which will presumably
+ presumably later become fixed via functional dependencies.)
+
+\begin{code}
+lookupInstEnv :: (InstEnv, InstEnv) 	-- External and home package inst-env
+	      -> Class -> [Type]	-- What we are looking for
+	      -> ([InstMatch], 		-- Successful matches
+		  [Instance])		-- These don't match but do unify
+
+-- The second component of the result pair happens when we look up
+--	Foo [a]
+-- in an InstEnv that has entries for
+--	Foo [Int]
+--	Foo [b]
+-- Then which we choose would depend on the way in which 'a'
+-- is instantiated.  So we report that Foo [b] is a match (mapping b->a)
+-- but Foo [Int] is a unifier.  This gives the caller a better chance of
+-- giving a suitable error messagen
 
 lookupInstEnv (pkg_ie, home_ie) cls tys
   = (pruned_matches, all_unifs)
@@ -427,6 +448,12 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
 			-> find [] [] insts
 
     --------------
+    lookup_tv :: TvSubst -> TyVar -> Either TyVar Type	
+	-- See Note [InstTypes: instantiating types]
+    lookup_tv subst tv = case lookupTyVar subst tv of
+				Just ty -> Right ty
+				Nothing -> Left tv
+
     find ms us [] = (ms, us)
     find ms us (item@(Instance { is_tcs = mb_tcs, is_tvs = tpl_tvs, 
 				 is_tys = tpl_tys, is_flag = oflag,
@@ -436,7 +463,11 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
       = find ms us rest
 
       | Just subst <- tcMatchTys tpl_tvs tpl_tys tys
-      = find ((subst,item):ms) us rest
+      = let 
+	    (dfun_tvs, _) = tcSplitForAllTys (idType dfun)
+	in 
+	ASSERT( all (`elemVarSet` tpl_tvs) dfun_tvs )	-- Check invariant
+ 	find ((item, map (lookup_tv subst) dfun_tvs) : ms) us rest
 
 	-- Does not match, so next check whether the things unify
 	-- See Note [overlapping instances] above
@@ -476,8 +507,7 @@ bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
 	-- on the grounds that the correct instance depends on the instantiation of 'a'
 
 ---------------
-insert_overlapping :: (TvSubst, Instance) -> [(TvSubst, Instance)] 
-		   -> [(TvSubst, Instance)]
+insert_overlapping :: InstMatch -> [InstMatch] -> [InstMatch]
 -- Add a new solution, knocking out strictly less specific ones
 insert_overlapping new_item [] = [new_item]
 insert_overlapping new_item (item:items)
@@ -493,7 +523,7 @@ insert_overlapping new_item (item:items)
     new_beats_old = new_item `beats` item
     old_beats_new = item `beats` new_item
 
-    (_, instA) `beats` (_, instB)
+    (instA, _) `beats` (instB, _)
 	= overlap_ok && 
 	  isJust (tcMatchTys (is_tvs instB) (is_tys instB) (is_tys instA))
 		-- A beats B if A is more specific than B, and B admits overlap

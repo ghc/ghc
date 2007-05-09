@@ -26,7 +26,7 @@ module Inst (
 	ipNamesOfInst, ipNamesOfInsts, fdPredsOfInst, fdPredsOfInsts,
 	getDictClassTys, dictPred,
 
-	lookupSimpleInst, LookupInstResult(..), lookupPred, 
+	lookupSimpleInst, LookupInstResult(..), 
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
 
 	isDict, isClassDict, isMethod, isImplicInst,
@@ -623,7 +623,7 @@ addLocalInst home_ie ispec
 		-- Check for duplicate instance decls
 	; let { (matches, _) = lookupInstEnv inst_envs cls tys'
 	      ;	dup_ispecs = [ dup_ispec 
-			     | (_, dup_ispec) <- matches
+			     | (dup_ispec, _) <- matches
 			     , let (_,_,_,dup_tys) = instanceHead dup_ispec
 			     , isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)] }
 		-- Find memebers of the match list which ispec itself matches.
@@ -745,19 +745,8 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
   = do 	{ mb_result <- lookupPred pred
 	; case mb_result of {
 	    Nothing -> return NoInstance ;
-	    Just (tenv, dfun_id) -> do
+	    Just (dfun_id, mb_inst_tys) -> do
 
-    -- tenv is a substitution that instantiates the dfun_id 
-    -- to match the requested result type.   
-    -- 
-    -- We ASSUME that the dfun is quantified over the very same tyvars 
-    -- that are bound by the tenv.
-    -- 
-    -- However, the dfun
-    -- might have some tyvars that *only* appear in arguments
-    --	dfun :: forall a b. C a b, Ord b => D [a]
-    -- We instantiate b to a flexi type variable -- it'll presumably
-    -- become fixed later via functional dependencies
     { use_stage <- getStage
     ; checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
     		      (topIdLvl dfun_id) use_stage
@@ -766,19 +755,15 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
 	-- the substitution, tenv. For example:
 	--	instance C X a => D X where ...
 	-- (presumably there's a functional dependency in class C)
-	-- Hence the open_tvs to instantiate any un-substituted tyvars.	
-    ; let (tyvars, rho) = tcSplitForAllTys (idType dfun_id)
-	  open_tvs      = filter (`notElemTvSubst` tenv) tyvars
-    ; open_tvs' <- mappM tcInstTyVar open_tvs
+	-- Hence mb_inst_tys :: Either TyVar TcType 
+
+    ; let inst_tv (Left tv)  = do { tv' <- tcInstTyVar tv; return (mkTyVarTy tv') }
+	  inst_tv (Right ty) = return ty
+    ; tys <- mappM inst_tv mb_inst_tys
     ; let
- 	tenv' = extendTvSubstList tenv open_tvs (mkTyVarTys open_tvs')
-		-- Since the open_tvs' are freshly made, they cannot possibly be captured by
-		-- any nested for-alls in rho.  So the in-scope set is unchanged
-    	dfun_rho   = substTy tenv' rho
-    	(theta, _) = tcSplitPhiTy dfun_rho
+    	(theta, _) = tcSplitPhiTy (applyTys (idType dfun_id) tys)
 	src_loc	   = instLocSpan loc
 	dfun	   = HsVar dfun_id
-	tys	   = substTyVars tenv' tyvars
     ; if null theta then
     	returnM (GenInst [] (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
       else do
@@ -788,14 +773,14 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
     }}}}
 
 ---------------
-lookupPred :: TcPredType -> TcM (Maybe (TvSubst, DFunId))
+lookupPred :: TcPredType -> TcM (Maybe (DFunId, [Either TyVar TcType]))
 -- Look up a class constraint in the instance environment
 lookupPred pred@(ClassP clas tys)
   = do	{ eps     <- getEps
 	; tcg_env <- getGblEnv
 	; let inst_envs = (eps_inst_env eps, tcg_inst_env tcg_env)
 	; case lookupInstEnv inst_envs clas tys of {
-	    ([(tenv, ispec)], []) 
+	    ([(ispec, inst_tys)], []) 
 		-> do	{ let dfun_id = is_dfun ispec
 			; traceTc (text "lookupInst success" <+> 
 				   vcat [text "dict" <+> ppr pred, 
@@ -803,7 +788,7 @@ lookupPred pred@(ClassP clas tys)
 					 <+> ppr (idType dfun_id) ])
 				-- Record that this dfun is needed
 			; record_dfun_usage dfun_id
-			; return (Just (tenv, dfun_id)) } ;
+			; return (Just (dfun_id, inst_tys)) } ;
 
      	    (matches, unifs)
 		-> do	{ traceTc (text "lookupInst fail" <+> 
