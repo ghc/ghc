@@ -1025,23 +1025,24 @@ it is guarded by the doFloatFromRhs call in simplLazyBind.
 
 \begin{code}
 abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExpr)
-abstractFloats tvs body_env body
+abstractFloats main_tvs body_env body
   = ASSERT( notNull body_floats )
     do	{ (subst, float_binds) <- mapAccumLSmpl abstract empty_subst body_floats
 	; return (float_binds, CoreSubst.substExpr subst body) }
   where
-    main_tv_set = mkVarSet tvs
+    main_tv_set = mkVarSet main_tvs
     body_floats = getFloats body_env
     empty_subst = CoreSubst.mkEmptySubst (seInScope body_env)
 
     abstract :: CoreSubst.Subst -> OutBind -> SimplM (CoreSubst.Subst, OutBind)
     abstract subst (NonRec id rhs)
       = do { (poly_id, poly_app) <- mk_poly tvs_here id
-	   ; let poly_rhs = mkLams tvs_here (CoreSubst.substExpr subst rhs)
+	   ; let poly_rhs = mkLams tvs_here rhs'
 		 subst'   = CoreSubst.extendIdSubst subst id poly_app
 	   ; return (subst', (NonRec poly_id poly_rhs)) }
       where
-	tvs_here = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs)
+	rhs'     = CoreSubst.substExpr subst rhs
+	tvs_here = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
 		-- Abstract only over the type variables free in the rhs
 		-- wrt which the new binding is abstracted.  But the naive
 		-- approach of abstract wrt the tyvars free in the Id's type
@@ -1065,12 +1066,20 @@ abstractFloats tvs body_env body
 	    ; return (subst', Rec (poly_ids `zip` poly_rhss)) }
        where
 	 (ids,rhss) = unzip prs
-	 
-	 tvs_here = varSetElems (main_tv_set `intersectVarSet` bind_ftvs)
-	 bind_ftvs = exprsSomeFreeVars isTyVar rhss `unionVarSet` tyVarsOfTypes (map idType ids)
-		-- Also nb that we must take the tyvars of the Id's type too:
+	 	-- For a recursive group, it's a bit of a pain to work out the minimal
+		-- set of tyvars over which to abstract:
+		--	/\ a b c.  let x = ...a... in
+		--	 	   letrec { p = ...x...q...
+		--			    q = .....p...b... } in
+		--		   ...
+		-- Since 'x' is abstracted over 'a', the {p,q} group must be abstracted
+		-- over 'a' (because x is replaced by (poly_x a)) as well as 'b'.  
+		-- Since it's a pain, we just use the whole set, which is always safe
+		-- 
+		-- If you ever want to be more selective, remember this bizarre case too:
 		--	x::a = x
-		-- Bizarre, I know
+		-- Here, we must abstract 'x' over 'a'.
+	 tvs_here = main_tvs
 
     mk_poly tvs_here var
       = do { uniq <- getUniqueSmpl
