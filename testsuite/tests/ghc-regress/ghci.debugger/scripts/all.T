@@ -20,6 +20,7 @@ test('print017', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_scri
 test('print018', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['print018.script'])
 test('print019', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['print019.script'])
 test('print020', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['print020.script'])
+test('print021', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['print021.script'])
 
 test('break001', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['break001.script'])
 test('break002', extra_run_opts('-fno-warn-monomorphism-restriction'), ghci_script, ['break002.script'])
