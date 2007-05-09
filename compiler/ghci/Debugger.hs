@@ -99,7 +99,7 @@ pprintClosureCommand session bindThings force str = do
           ids'     = map (\id -> id `setIdType` substTy subst (idType id)) ids
           subst_dom= varEnvKeys$ getTvSubstEnv subst
           subst_ran= varEnvElts$ getTvSubstEnv subst
-          new_tvs  = [ tv | t <- subst_ran, let Just tv = getTyVar_maybe t]  
+          new_tvs  = [ tv | Just tv <- map getTyVar_maybe subst_ran]  
           ic_tyvars'= (`delVarSetListByKey` subst_dom) 
                     . (`extendVarSetList`   new_tvs)
                         $ ic_tyvars ictxt
