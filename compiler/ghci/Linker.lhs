@@ -559,7 +559,7 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
         | mi_boot iface
         = link_boot_mod_error mod
 	| otherwise
-        = follow_deps (map (mkModule this_pkg) boot_deps ++ mods) acc_mods' acc_pkgs'
+        = follow_deps (map (mkModule this_pkg) boot_deps' ++ mods) acc_mods' acc_pkgs'
       where
         pkg   = modulePackageId mod
         iface = get_iface mod
