@@ -451,19 +451,29 @@ specConstrProgram dflags us binds
 \begin{code}
 data ScEnv = SCE { sc_size :: Int,	-- Size threshold
 
-		   sc_subst :: Subst,	-- Current subsitution
+		   sc_subst :: Subst,	-- Current substitution
 
 		   sc_how_bound :: HowBoundEnv,
 			-- Binds interesting non-top-level variables
-			-- Look up in here *after* applying the substitution
+			-- Domain is OutVars (*after* applying the substitution)
 
 		   sc_cons  :: ConstrEnv
-			-- Look up in here *after* applying the substitution
+			-- Domain is OutIds (*after* applying the substitution)
 	     }
 
-type HowBoundEnv = VarEnv HowBound
+---------------------
+-- As we go, we apply a substitution (sc_subst) to the current term
+type InExpr = CoreExpr		-- *Before* applying the subst
 
-type ConstrEnv = IdEnv ConValue
+type OutExpr = CoreExpr		-- *After* applying the subst
+type OutId   = Id
+type OutVar  = Var
+
+---------------------
+type HowBoundEnv = VarEnv HowBound	-- Domain is OutVars
+
+---------------------
+type ConstrEnv = IdEnv ConValue		-- Domain is OutIds
 data ConValue  = CV AltCon [CoreArg]
 	-- Variables known to be bound to a constructor
 	-- in a particular case alternative
@@ -472,6 +482,7 @@ data ConValue  = CV AltCon [CoreArg]
 instance Outputable ConValue where
    ppr (CV con args) = ppr con <+> interpp'SP args
 
+---------------------
 initScEnv dflags
   = SCE { sc_size = specThreshold dflags,
 	  sc_subst = emptySubst, 
@@ -747,23 +758,24 @@ scExpr' env (Case scrut b ty alts)
 	   ; return (usg', scrut_occ, (con,bs',rhs')) }
 
 scExpr' env (Let (NonRec bndr rhs) body)
-  = do	{ (rhs_usg, rhs_info@(_, args', rhs_body', _)) <- scRecRhs env (bndr,rhs)
+  = do	{ let (body_env, bndr') = extendBndr env bndr
+	; (rhs_usg, rhs_info@(_, args', rhs_body', _)) <- scRecRhs env (bndr',rhs)
+
 	; if null args' || isEmptyVarEnv (calls rhs_usg) then do
 	    do	{ 	-- Vanilla case
 		  let rhs' = mkLams args' rhs_body'
-		      (body_env, bndr') = extendBndr env bndr
 		      body_env2 = extendConEnv body_env bndr' (isConApp (sc_cons env) rhs')
 			-- Record if the RHS is a constructor
 		; (body_usg, body') <- scExpr body_env2 body
 		; return (body_usg `combineUsage` rhs_usg, Let (NonRec bndr' rhs') body') }
 	  else 
 	    do	{ 	-- Join-point case
-		  let (body_env, bndr') = extendBndrWith RecFun env bndr
+		  let body_env2 = extendHowBound body_env [bndr'] RecFun
 			-- If the RHS of this 'let' contains calls
 			-- to recursive functions that we're trying
 			-- to specialise, then treat this let too
 			-- as one to specialise
-		; (body_usg, body') <- scExpr body_env body
+		; (body_usg, body') <- scExpr body_env2 body
 
 		; (spec_usg, _, specs) <- specialise env (calls body_usg) ([], rhs_info)
 
@@ -813,7 +825,7 @@ scBind env (Rec prs)
 	; return (rhs_env, combineUsages rhs_usgs, Rec (bndrs' `zip` rhss')) }
   | otherwise	-- Do specialisation
   = do	{ let (rhs_env1,bndrs') = extendRecBndrs env bndrs
-	      rhs_env2 = extendHowBound rhs_env1 bndrs RecFun
+	      rhs_env2 = extendHowBound rhs_env1 bndrs' RecFun
 
 	; (rhs_usgs, rhs_infos) <- mapAndUnzipUs (scRecRhs rhs_env2) (bndrs' `zip` rhss)
 	; let rhs_usg = combineUsages rhs_usgs
@@ -851,7 +863,7 @@ scBind env (NonRec bndr rhs)
 	; return (env', usg, NonRec bndr' rhs') }
 
 ----------------------
-scRecRhs :: ScEnv -> (Id,CoreExpr) -> UniqSM (ScUsage, RhsInfo)
+scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (ScUsage, RhsInfo)
 scRecRhs env (bndr,rhs)
   = do	{ let (arg_bndrs,body) = collectBinders rhs
 	      (body_env, arg_bndrs') = extendBndrsWith RecArg env arg_bndrs
@@ -887,12 +899,12 @@ varUsage env v use
 %************************************************************************
 
 \begin{code}
-type RhsInfo = (Id, [Var], CoreExpr, [ArgOcc])
+type RhsInfo = (OutId, [OutVar], OutExpr, [ArgOcc])
 	-- Info about the *original* RHS of a binding we are specialising
  	-- Original binding f = \xs.body
 	-- Plus info about usage of arguments
 
-type SpecInfo = (CoreRule, Var, CoreExpr)
+type SpecInfo = (CoreRule, OutId, OutExpr)
 	-- One specialisation: Rule plus definition
 
 
@@ -925,7 +937,7 @@ specialise env bind_calls (done_pats, (fn, arg_bndrs, body, arg_occs))
 
 ---------------------
 spec_one :: ScEnv
-	 -> Id		-- Function
+	 -> OutId	-- Function
 	 -> [Var]	-- Lambda-binders of RHS; should match patterns
 	 -> CoreExpr	-- Body of the original function
 	 -> (([Var], [CoreArg]), Int)
