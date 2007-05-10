@@ -484,7 +484,6 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _ _) res_ty
 		 = WpCo $ mkTyConApp co_con scrut_inst_tys
 		 | otherwise
 		 = idHsWrapper
-	scrut_ty = mkTyConApp tycon scrut_inst_tys	-- Type of pattern, the result of the cast
     in
 	-- Phew!
     returnM (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds' 
