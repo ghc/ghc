@@ -136,8 +136,7 @@ builtin_commands = [
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
   ("trace",     keepGoing traceCmd,             False, completeIdentifier), 
   ("undef",     keepGoing undefineMacro,	False, completeMacro),
-  ("unset",	keepGoing unsetOptions,		True,  completeSetOptions),
-  ("where",	keepGoing whereCmd,		True,  completeNone)
+  ("unset",	keepGoing unsetOptions,		True,  completeSetOptions)
   ]
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
