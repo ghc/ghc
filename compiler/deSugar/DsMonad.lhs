@@ -55,8 +55,6 @@ import NameEnv
 import OccName
 import DynFlags
 import ErrUtils
-import Bag
-import OccName
 
 import Data.IORef
 

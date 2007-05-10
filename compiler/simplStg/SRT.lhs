@@ -15,9 +15,7 @@ import StgSyn
 import Id        	( Id )
 import VarSet
 import VarEnv
-import Util		( sortLe )
-import Maybes		( orElse )
-import Maybes		( expectJust )
+import Maybes		( orElse, expectJust )
 import Bitmap		( intsToBitmap )
 
 #ifdef DEBUG
@@ -27,7 +25,6 @@ import Outputable
 import List
 
 import Util
-import Outputable
 \end{code}
 
 \begin{code}

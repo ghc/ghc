@@ -27,12 +27,10 @@ import TcType
 import Type
 import PrelNames
 import TysWiredIn
-import PrelNames
 import Unique
 import Literal
 import SrcLoc
 import Ratio
-import SrcLoc
 import Outputable
 import Util
 import FastString

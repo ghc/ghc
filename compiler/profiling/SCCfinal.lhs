@@ -39,7 +39,6 @@ import UniqSupply	( splitUniqSupply, UniqSupply )
 #ifdef PROF_DO_BOXING
 import UniqSupply	( uniqFromSupply )
 #endif
-import Unique           ( Unique )
 import VarSet
 import ListSetOps	( removeDups )
 import Outputable	

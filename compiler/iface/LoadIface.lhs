@@ -38,7 +38,6 @@ import InstEnv
 import FamInstEnv
 import Name
 import NameEnv
-import NameSet
 import MkId
 import Module
 import OccName
@@ -52,7 +51,6 @@ import Outputable
 import BinIface
 import Panic
 
-import Control.Monad (when)
 import Data.List
 import Data.Maybe
 import Data.IORef

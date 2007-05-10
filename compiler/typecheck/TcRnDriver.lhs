@@ -88,6 +88,7 @@ import TysWiredIn
 import IdInfo
 import {- Kind parts of -} Type
 import BasicTypes
+import Foreign.Ptr( Ptr )
 #endif
 
 import FastString
@@ -97,7 +98,6 @@ import Bag
 
 import Control.Monad    ( unless )
 import Data.Maybe	( isJust )
-import Foreign.Ptr      ( Ptr )
 
 \end{code}
 

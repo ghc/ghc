@@ -1,7 +1,6 @@
 module LexCore where
 
 import ParserCoreUtils
-import Ratio
 import Char
 import Numeric
 

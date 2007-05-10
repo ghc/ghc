@@ -75,7 +75,6 @@ import GHC.IOBase       ( IOErrorType(..) )
 #else
 import System.Process	( runInteractiveProcess, getProcessExitCode )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
-import Data.Char        ( isSpace )
 import FastString       ( mkFastString )
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 #endif

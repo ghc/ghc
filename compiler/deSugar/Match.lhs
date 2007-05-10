@@ -26,7 +26,6 @@ import DataCon
 import MatchCon
 import MatchLit
 import PrelInfo
-import TcType
 import Type
 import TysWiredIn
 import BasicTypes

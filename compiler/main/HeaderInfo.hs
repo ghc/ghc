@@ -23,7 +23,6 @@ import PrelNames        ( gHC_PRIM, mAIN_NAME )
 import StringBuffer	( StringBuffer(..), hGetStringBuffer, hGetStringBufferBlock
                         , appendStringBuffers )
 import SrcLoc
-import FastString	( mkFastString )
 import DynFlags
 import ErrUtils
 import Util

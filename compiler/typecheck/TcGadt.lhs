@@ -24,7 +24,6 @@ import Coercion
 import Type
 
 import TypeRep
-import DataCon
 import Var
 import VarEnv
 import VarSet

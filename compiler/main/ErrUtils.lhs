@@ -31,15 +31,13 @@ module ErrUtils (
 
 import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
 import SrcLoc		( SrcSpan )
-import Util		( sortLe, global )
+import Util		( sortLe )
 import Outputable
-import qualified Pretty
 import SrcLoc		( srcSpanStart, noSrcSpan )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_ErrorSpans )
 
 import System.Exit	( ExitCode(..), exitWith )
-import System.IO	( hPutStrLn, stderr )
 import Data.Dynamic
 
 

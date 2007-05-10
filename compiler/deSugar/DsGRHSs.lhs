@@ -14,14 +14,12 @@ import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
 import HsSyn
-import HsUtils
 import CoreSyn
 import Var
 import Type
 
 import DsMonad
 import DsUtils
-import Unique
 import PrelInfo
 import TysWiredIn
 import PrelNames

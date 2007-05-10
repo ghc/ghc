@@ -34,10 +34,8 @@ import Type
 import SMRep
 import MachOp
 #endif
-import OccName
 import Name
 import TcType
-import ForeignCall
 import DynFlags
 import Outputable
 import SrcLoc

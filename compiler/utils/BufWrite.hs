@@ -24,7 +24,6 @@ module BufWrite (
 
 import FastString
 import FastMutInt
-import Panic		( panic )
 
 import Control.Monad	( when )
 import Data.Char	( ord )
@@ -32,7 +31,6 @@ import Foreign
 import System.IO
 
 import GHC.IOBase	( IO(..) )
-import System.IO	( hPutBuf )
 import GHC.Ptr		( Ptr(..) )
 
 import GHC.Exts		( Int(..), Int#, Addr# )

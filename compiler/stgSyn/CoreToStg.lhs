@@ -19,7 +19,6 @@ import Type
 import TyCon
 import Id
 import Var		( Var, globalIdDetails, idType )
-import TyCon		( isUnboxedTupleTyCon, isPrimTyCon, isFunTyCon, isHiBootTyCon )
 import IdInfo
 import DataCon
 import CostCentre	( noCCS )

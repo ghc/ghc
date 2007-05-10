@@ -30,7 +30,6 @@ import Packages
 import HeaderInfo
 import DriverPhases
 import SysTools
-import qualified SysTools	
 import HscMain
 import Finder
 import HscTypes
@@ -60,7 +59,6 @@ import Control.Monad
 import Data.List	( isSuffixOf )
 import Data.Maybe
 import System.Exit
-import System.Cmd
 import System.Environment
 
 -- ---------------------------------------------------------------------------

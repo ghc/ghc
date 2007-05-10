@@ -26,16 +26,12 @@ import CmmOpt		( cmmMiniInline, cmmMachOpFold )
 import PprCmm		( pprStmt, pprCmms )
 import MachOp
 import CLabel
-#if powerpc_TARGET_ARCH
-import CLabel           ( mkRtsCodeLabel )
-#endif
 
 import UniqFM
 import Unique		( Unique, getUnique )
 import UniqSupply
 import FastTypes
 import List		( groupBy, sortBy )
-import CLabel           ( pprCLabel )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags
 import StaticFlags	( opt_Static, opt_PIC )

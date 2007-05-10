@@ -43,17 +43,9 @@ import Name
 import DataCon
 import Unique
 import StaticFlags
-import FastString
-import Packages
-import Module
 
 import Maybes
 import Constants
-
-import Outputable 
-
-import Data.Char
-import Data.Word
 
 -------------------------------------------------------------------------
 --

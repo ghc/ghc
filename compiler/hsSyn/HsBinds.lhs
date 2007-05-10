@@ -17,7 +17,7 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr, LHsExpr,
 import {-# SOURCE #-} HsPat  ( LPat )
 
 import HsTypes
-import PprCore
+import PprCore ()
 import Coercion
 import Type
 import Name

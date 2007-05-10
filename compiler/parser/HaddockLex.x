@@ -12,14 +12,11 @@ module HaddockLex (
 	tokenise
  ) where
 
-import HsSyn
 import Lexer hiding (Token)
 import Parser ( parseIdentifier )
 import StringBuffer
-import OccName
 import RdrName
 import SrcLoc
-import DynFlags
 import DynFlags
 
 import Char

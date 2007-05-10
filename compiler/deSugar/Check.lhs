@@ -11,7 +11,6 @@ module Check ( check , ExhaustivePat ) where
 
 import HsSyn		
 import TcHsSyn
-import TcType
 import DsUtils
 import MatchLit
 import Id

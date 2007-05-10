@@ -69,7 +69,6 @@ import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
 import Outputable
 import FastString
-import Panic
 
 import List		( isSuffixOf, nubBy )
 import Monad		( unless )

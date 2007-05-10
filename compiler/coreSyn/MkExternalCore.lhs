@@ -10,16 +10,14 @@ module MkExternalCore (
 #include "HsVersions.h"
 
 import qualified ExternalCore as C
-import Char
 import Module
 import CoreSyn
 import HscTypes	
 import TyCon
 import TypeRep
 import Type
-import PprExternalCore	-- Instances
+import PprExternalCore () -- Instances
 import DataCon
-import CoreSyn
 import Coercion
 import Var
 import IdInfo

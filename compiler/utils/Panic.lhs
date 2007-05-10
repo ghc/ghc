@@ -40,7 +40,7 @@ import GHC.ConsoleHandler
 #endif
 
 import Control.Exception
-import Control.Concurrent ( myThreadId, MVar, ThreadId, withMVar, newMVar )
+import Control.Concurrent ( MVar, ThreadId, withMVar, newMVar )
 import Data.Dynamic
 import qualified Control.Exception as Exception
 import Debug.Trace	( trace )

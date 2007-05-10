@@ -55,12 +55,11 @@ module Flattening (
 #include "HsVersions.h"
 
 -- friends
-import NDPCoreUtils (tupleTyArgs, funTyArgs, parrElemTy, isDefault,
+import NDPCoreUtils (tupleTyArgs, funTyArgs, isDefault,
 		     isLit, mkPArrTy, mkTuple, isSimpleExpr, substIdEnv)
 import FlattenMonad (Flatten, runFlatten, mkBind, extendContext, packContext,
 		     liftVar, liftConst, intersectWithContext, mk'fst,
-		     mk'lengthP, mk'replicateP, mk'mapP, mk'bpermuteDftP,
-		     mk'indexOfP,mk'eq,mk'neq) 
+		     mk'mapP, mk'bpermuteDftP, mk'indexOfP,mk'eq,mk'neq) 
 
 -- GHC
 import TcType	    ( tcIsForAllTy, tcView )
@@ -75,9 +74,9 @@ import Literal      (Literal, literalType)
 import Var	    (Var(..), idType, isTyVar)
 import Id	    (setIdType)
 import DataCon	    (DataCon, dataConTag)
-import HscTypes	    ( ModGuts(..), ModGuts, HscEnv(..), hscEPS )
+import HscTypes	    ( ModGuts(..), HscEnv(..), hscEPS )
 import CoreFVs	    (exprFreeVars)
-import CoreSyn	    (Expr(..), Bind(..), Alt(..), AltCon(..), Note(..),
+import CoreSyn	    (Expr(..), Bind(..), Alt, AltCon(..),
 		     CoreBndr, CoreExpr, CoreBind, mkLams, mkLets,
 		     mkApps, mkIntLitInt)  
 import PprCore      (pprCoreExpr)

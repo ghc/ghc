@@ -23,7 +23,6 @@ import Coercion
 import TyCon
 import VarEnv
 import Name		( localiseName )
-import Outputable
 import Util             ( notNull )
 import Data.IORef	( readIORef )
 \end{code}

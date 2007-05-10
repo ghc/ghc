@@ -21,7 +21,6 @@ import DsMonad		-- the monadery used in the desugarer
 import DsUtils
 
 import DynFlags
-import StaticFlags
 import CoreUtils
 import Var
 import Type

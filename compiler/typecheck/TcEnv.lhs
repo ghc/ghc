@@ -55,7 +55,6 @@ import TcMType
 import TcType
 import TcGadt
 import qualified Type
-import Id
 import Var
 import VarSet
 import VarEnv

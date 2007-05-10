@@ -28,7 +28,6 @@ import Class
 import TyCon
 import Type
 import Coercion
-import Outputable
 
 import Data.List
 \end{code}

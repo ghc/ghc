@@ -36,7 +36,6 @@ import Cmm
 import CmmUtils
 import CLabel
 import StgSyn
-import StaticFlags
 import CostCentre	
 import Id
 import Name

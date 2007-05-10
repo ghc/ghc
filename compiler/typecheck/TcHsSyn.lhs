@@ -35,12 +35,10 @@ import Id
 import TcRnMonad
 import Type
 import TcType
-import qualified  Type
 import TcMType
 import TysPrim
 import TysWiredIn
 import TyCon
-import {- Kind parts of -} Type
 import Name
 import Var
 import VarSet
