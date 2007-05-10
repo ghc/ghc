@@ -58,30 +58,30 @@ import Compat.Unicode	( GeneralCategory(..), generalCategory, isPrint, isUpper )
 #endif
 }
 
-$unispace    = \x05
+$unispace    = \x05 -- Trick Alex into handling Unicode. See alexGetChar.
 $whitechar   = [\ \n\r\f\v\xa0 $unispace]
 $white_no_nl = $whitechar # \n
 $tab         = \t
 
 $ascdigit  = 0-9
-$unidigit  = \x03
+$unidigit  = \x03 -- Trick Alex into handling Unicode. See alexGetChar.
 $decdigit  = $ascdigit -- for now, should really be $digit (ToDo)
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
 $ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~ \xa1-\xbf \xd7 \xf7]
-$unisymbol = \x04
+$unisymbol = \x04 -- Trick Alex into handling Unicode. See alexGetChar.
 $symbol    = [$ascsymbol $unisymbol] # [$special \_\:\"\']
 
-$unilarge  = \x01
+$unilarge  = \x01 -- Trick Alex into handling Unicode. See alexGetChar.
 $asclarge  = [A-Z \xc0-\xd6 \xd8-\xde]
 $large     = [$asclarge $unilarge]
 
-$unismall  = \x02
+$unismall  = \x02 -- Trick Alex into handling Unicode. See alexGetChar.
 $ascsmall  = [a-z \xdf-\xf6 \xf8-\xff]
 $small     = [$ascsmall $unismall \_]
 
-$unigraphic = \x06
+$unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetChar.
 $graphic   = [$small $large $symbol $digit $special $unigraphic \:\"\']
 
 $octit	   = 0-7
@@ -1419,6 +1419,9 @@ alexGetChar (AI loc ofs s)
 	adj_c 
 	  | c <= '\x06' = non_graphic
 	  | c <= '\xff' = c
+          -- Alex doesn't handle Unicode, so when Unicode
+          -- character is encoutered we output these values
+          -- with the actual character value hidden in the state.
 	  | otherwise = 
 		case generalCategory c of
 		  UppercaseLetter       -> upper

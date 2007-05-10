@@ -33,16 +33,16 @@ $whitechar   = [\ \t\n\r\f\v\xa0]
 $white_no_nl = $whitechar # \n
 
 $ascdigit  = 0-9
-$unidigit  = \x01
+$unidigit  = \x01 -- Trick Alex into handling Unicode. See alexGetChar.
 $digit     = [$ascdigit $unidigit]
 $octit	   = 0-7
 $hexit     = [$digit A-F a-f]
 
-$unilarge  = \x03
+$unilarge  = \x03 -- Trick Alex into handling Unicode. See alexGetChar.
 $asclarge  = [A-Z \xc0-\xd6 \xd8-\xde]
 $large     = [$asclarge $unilarge]
 
-$unismall  = \x04
+$unismall  = \x04 -- Trick Alex into handling Unicode. See alexGetChar.
 $ascsmall  = [a-z \xdf-\xf6 \xf8-\xff]
 $small     = [$ascsmall $unismall \_]
 
