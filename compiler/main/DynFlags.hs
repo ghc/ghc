@@ -92,6 +92,7 @@ data DynFlag
 
    -- debugging flags
    = Opt_D_dump_cmm
+   | Opt_D_dump_cps_cmm
    | Opt_D_dump_asm
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
@@ -937,6 +938,7 @@ dynamic_flags = [
   ,  ( "dstg-stats",	NoArg (setDynFlag Opt_StgStats))
 
   ,  ( "ddump-cmm",         	 setDumpFlag Opt_D_dump_cmm)
+  ,  ( "ddump-cps-cmm",        	 setDumpFlag Opt_D_dump_cps_cmm)
   ,  ( "ddump-asm",          	 setDumpFlag Opt_D_dump_asm)
   ,  ( "ddump-cpranal",      	 setDumpFlag Opt_D_dump_cpranal)
   ,  ( "ddump-deriv",        	 setDumpFlag Opt_D_dump_deriv)
