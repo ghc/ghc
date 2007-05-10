@@ -12,6 +12,7 @@
 module StaticFlags (
 	parseStaticFlags,
 	staticFlags,
+        initStaticOpts,
 
 	-- Ways
 	WayName(..), v_Ways, v_Build_tag, v_RTS_Build_tag, isRTSWay,
@@ -92,6 +93,9 @@ import Data.List	( sort, intersperse, nub )
 
 parseStaticFlags :: [String] -> IO [String]
 parseStaticFlags args = do
+  ready <- readIORef v_opt_C_ready
+  when ready $ throwDyn (ProgramError "Too late for parseStaticFlags: call it before newSession")
+
   (leftover, errs) <- processArgs static_flags args
   when (not (null errs)) $ throwDyn (UsageError (unlines errs))
 
@@ -118,6 +122,8 @@ parseStaticFlags args = do
   when (not (null errs)) $ ghcError (UsageError (unlines errs))
   return (cg_flags++more_leftover++leftover)
 
+initStaticOpts :: IO ()
+initStaticOpts = writeIORef v_opt_C_ready True
 
 static_flags :: [(String, OptKind IO)]
 -- All the static flags should appear in this list.  It describes how each

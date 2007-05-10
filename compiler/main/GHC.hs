@@ -19,6 +19,7 @@ module GHC (
 	parseDynamicFlags,
 	getSessionDynFlags,
 	setSessionDynFlags,
+        parseStaticFlags,
 
 	-- * Targets
 	Target(..), TargetId(..), Phase,
@@ -231,6 +232,7 @@ import Finder
 import HscMain          ( newHscEnv, hscFileCheck, HscChecked(..) )
 import HscTypes
 import DynFlags
+import StaticFlags
 import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
 import Module
@@ -338,6 +340,7 @@ newSession mb_top_dir = do
   modifyMVar_ interruptTargetThread (return . (main_thread :))
   installSignalHandlers
 
+  initStaticOpts
   dflags0 <- initSysTools mb_top_dir defaultDynFlags
   dflags  <- initDynFlags dflags0
   env <- newHscEnv dflags
