@@ -760,7 +760,8 @@ pprDataItem lit
 	-- Fortunately we're assuming the small memory model, in which
 	-- all such offsets will fit into 32 bits, so we have to stick
 	-- to 32-bit offset fields and modify the RTS appropriately
-	-- (see InfoTables.h).
+        --
+        -- See Note [x86-64-relative] in includes/InfoTables.h
 	-- 
 	ppr_item I64  x 
 	   | isRelativeReloc x =

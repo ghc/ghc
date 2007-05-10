@@ -236,6 +236,8 @@ sub init_TARGET_STUFF {
 	# where x is in the text section and y in the rodata section.
 	# It works if y is in the text section, though.  This is probably
 	# going to cause difficulties for PIC, I imagine.
+        #       
+        # See Note [x86-64-relative] in includes/InfoTables.h
     $T_HDR_relrodata= "\.text\n\t\.align 8\n";
 
     $T_HDR_closure  = "\.data\n\t\.align 8\n";
