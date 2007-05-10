@@ -56,7 +56,7 @@ $namechar  = [$namebegin $digit]
 
 @floating_point = @decimal \. @decimal @exponent? | @decimal @exponent
 
-@escape      = \\ ([abfnrt\\\'\"\?] | x @hexadecimal | @octal)
+@escape      = \\ ([abfnrt\\\'\"\?] | x $hexit{1,2} | $octit{1,3})
 @strchar     = ($printable # [\"\\]) | @escape
 
 cmm :-
