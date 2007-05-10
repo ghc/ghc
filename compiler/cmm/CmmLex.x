@@ -46,7 +46,7 @@ $unismall  = \x04 -- Trick Alex into handling Unicode. See alexGetChar.
 $ascsmall  = [a-z \xdf-\xf6 \xf8-\xff]
 $small     = [$ascsmall $unismall \_]
 
-$namebegin = [$large $small \_ \. \$ \@]
+$namebegin = [$large $small \. \$ \@]
 $namechar  = [$namebegin $digit]
 
 @decimal     = $digit+
