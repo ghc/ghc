@@ -19,7 +19,9 @@ import DynFlags
 import HscTypes
 import SrcLoc
 import Module
+import ObjLink
 
+import Data.Maybe
 import Numeric
 import Control.Exception as Exception
 import Data.Array
@@ -194,56 +196,57 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 -- To flush buffers for the *interpreted* computation we need
 -- to refer to *its* stdout/stderr handles
 
-GLOBAL_VAR(flush_interp,       error "no flush_interp", IO ())
-GLOBAL_VAR(turn_off_buffering, error "no flush_stdout", IO ())
+GLOBAL_VAR(stdin_ptr,  error "no stdin_ptr",  Ptr ())
+GLOBAL_VAR(stdout_ptr, error "no stdout_ptr", Ptr ())
+GLOBAL_VAR(stderr_ptr, error "no stderr_ptr", Ptr ())
 
-command_sequence :: [String] -> String
-command_sequence = unwords . intersperse "Prelude.>>"
-
-no_buffer :: String -> String
-no_buffer h = unwords ["System.IO.hSetBuffering",
-                       "System.IO." ++ h,
-                       "System.IO.NoBuffering"]
-
-no_buf_cmd :: String
-no_buf_cmd = command_sequence $ map no_buffer ["stdout", "stderr", "stdin"]
-
-flush_buffer :: String -> String
-flush_buffer h = unwords ["System.IO.hFlush", "System.IO." ++ h]
-
-flush_cmd :: String
-flush_cmd = command_sequence [flush_buffer "stdout", flush_buffer "stderr"]
+-- After various attempts, I believe this is the least bad way to do
+-- what we want.  We know look up the address of the static stdin,
+-- stdout, and stderr closures in the loaded base package, and each
+-- time we need to refer to them we cast the pointer to a Handle.
+-- This avoids any problems with the CAF having been reverted, because
+-- we'll always get the current value.
+--
+-- The previous attempt that didn't work was to compile an expression
+-- like "hSetBuffering stdout NoBuffering" into an expression of type
+-- IO () and run this expression each time we needed it, but the
+-- problem is that evaluating the expression might cache the contents
+-- of the Handle rather than referring to it from its static address
+-- each time.  There's no safe workaround for this.
 
 initInterpBuffering :: GHC.Session -> IO ()
 initInterpBuffering session
- = do -- we don't want to be fooled by any modules lying around in the current
-      -- directory when we compile these code fragments, so set the import
-      -- path to be empty while we compile them.
-      dflags <- GHC.getSessionDynFlags session
-      GHC.setSessionDynFlags session dflags{importPaths=[]}
+ = do -- make sure these are linked
+      mb_hval1 <- GHC.compileExpr session "System.IO.stdout"
+      mb_hval2 <- GHC.compileExpr session "System.IO.stderr"
+      mb_hval3 <- GHC.compileExpr session "System.IO.stdin"
+      when (any isNothing [mb_hval1,mb_hval2,mb_hval3]) $
+        panic "interactiveUI:setBuffering"
 
-      maybe_hval <- GHC.compileExpr session no_buf_cmd
+        -- ToDo: we should really look up these names properly, but
+        -- it's a fiddle and not all the bits are exposed via the GHC
+        -- interface.
+      mb_stdin_ptr  <- ObjLink.lookupSymbol "base_GHCziHandle_stdin_closure"
+      mb_stdout_ptr <- ObjLink.lookupSymbol "base_GHCziHandle_stdout_closure"
+      mb_stderr_ptr <- ObjLink.lookupSymbol "base_GHCziHandle_stderr_closure"
 
-      case maybe_hval of
-	Just hval -> writeIORef turn_off_buffering (unsafeCoerce# hval :: IO ())
-	other	  -> panic "interactiveUI:setBuffering"
-	
-      maybe_hval <- GHC.compileExpr session flush_cmd
-      case maybe_hval of
-	Just hval -> writeIORef flush_interp (unsafeCoerce# hval :: IO ())
-	_         -> panic "interactiveUI:flush"
-
-      GHC.setSessionDynFlags session dflags
-      GHC.workingDirectoryChanged session
+      let f ref (Just ptr) = writeIORef ref ptr
+          f ref Nothing    = panic "interactiveUI:setBuffering2"
+      zipWithM f [stdin_ptr,stdout_ptr,stderr_ptr]
+                 [mb_stdin_ptr,mb_stdout_ptr,mb_stderr_ptr]
       return ()
-
 
 flushInterpBuffers :: GHCi ()
 flushInterpBuffers
- = io $ do Monad.join (readIORef flush_interp)
-           return ()
+ = io $ do getHandle stdout_ptr >>= hFlush
+           getHandle stderr_ptr >>= hFlush
 
 turnOffBuffering :: IO ()
 turnOffBuffering
- = do Monad.join (readIORef turn_off_buffering)
-      return ()
+ = do hdls <- mapM getHandle [stdin_ptr,stdout_ptr,stderr_ptr]
+      mapM_ (\h -> hSetBuffering h NoBuffering) hdls
+
+getHandle :: IORef (Ptr ()) -> IO Handle
+getHandle ref = do
+  (Ptr addr) <- readIORef ref
+  case addrToHValue# addr of (# hval #) -> return (unsafeCoerce# hval)
