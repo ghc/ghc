@@ -48,7 +48,7 @@
 -- text between curly brackets.  This is a kludge to enable 
 -- processors of this file to easily get hold of simple info
 -- (eg, out_of_line), whilst avoiding parsing complex expressions
--- needed for strictness and usage info.
+-- needed for strictness info.
 
 defaults
    has_side_effects = False
@@ -57,7 +57,6 @@ defaults
    needs_wrapper    = False
    can_fail         = False
    strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity lazyDmd) TopRes) }
-   usage            = { nomangle other }
 
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
@@ -733,46 +732,36 @@ primop  NewArrayOp "newArray#" GenPrimOp
     in the specified state thread,
     with each element containing the specified initial value.}
    with
-   usage       = { mangle NewArrayOp [mkP, mkM, mkP] mkM }
    out_of_line = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
    MutArr# s a -> MutArr# s a -> Bool
-   with
-   usage = { mangle SameMutableArrayOp [mkP, mkP] mkM }
 
 primop  ReadArrayOp "readArray#" GenPrimOp
    MutArr# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
-   with
-   usage = { mangle ReadArrayOp [mkM, mkP, mkP] mkM }
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
    MutArr# s a -> Int# -> a -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
-   usage            = { mangle WriteArrayOp [mkM, mkP, mkM, mkP] mkR }
    has_side_effects = True
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
    Array# a -> Int# -> (# a #)
    {Read from specified index of immutable array. Result is packaged into
     an unboxed singleton; the result itself is not yet evaluated.}
-   with
-   usage = { mangle  IndexArrayOp [mkM, mkP] mkM }
 
 primop  UnsafeFreezeArrayOp "unsafeFreezeArray#" GenPrimOp
    MutArr# s a -> State# s -> (# State# s, Array# a #)
    {Make a mutable array immutable, without copying.}
    with
-   usage            = { mangle UnsafeFreezeArrayOp [mkM, mkP] mkM }
    has_side_effects = True
 
 primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
    Array# a -> State# s -> (# State# s, MutArr# s a #)
    {Make an immutable array mutable, without copying.}
    with
-   usage       = { mangle UnsafeThawArrayOp [mkM, mkP] mkM }
    out_of_line = True
 
 ------------------------------------------------------------------------
@@ -1199,26 +1188,20 @@ primop  NewMutVarOp "newMutVar#" GenPrimOp
    a -> State# s -> (# State# s, MutVar# s a #)
    {Create {\tt MutVar\#} with specified initial value in specified state thread.}
    with
-   usage       = { mangle NewMutVarOp [mkM, mkP] mkM }
    out_of_line = True
 
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
    MutVar# s a -> State# s -> (# State# s, a #)
    {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
-   with
-   usage = { mangle ReadMutVarOp [mkM, mkP] mkM }
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a -> a -> State# s -> State# s
    {Write contents of {\tt MutVar\#}.}
    with
-   usage            = { mangle WriteMutVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
 
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
    MutVar# s a -> MutVar# s a -> Bool
-   with
-   usage = { mangle SameMutVarOp [mkP, mkP] mkM }
 
 -- not really the right type, but we don't know about pairs here.  The
 -- correct type is
@@ -1228,7 +1211,6 @@ primop  SameMutVarOp "sameMutVar#" GenPrimOp
 primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
    MutVar# s a -> (a -> b) -> State# s -> (# State# s, c #)
    with
-   usage = { mangle AtomicModifyMutVarOp [mkP, mkM, mkP] mkM }
    has_side_effects = True
    out_of_line = True
 
@@ -1245,8 +1227,6 @@ primop  CatchOp "catch#" GenPrimOp
 	-- Catch is actually strict in its first argument
 	-- but we don't want to tell the strictness
 	-- analyser about that!
-   usage = { mangle CatchOp [mkM, mkM . (inFun CatchOp mkM mkM), mkP] mkM }
-        --     [mkO, mkO . (inFun mkM mkO)] mkO
         -- might use caught action multiply
    out_of_line = True
 
@@ -1255,7 +1235,6 @@ primop  RaiseOp "raise#" GenPrimOp
    with
    strictness  = { \ arity -> mkStrictSig (mkTopDmdType [lazyDmd] BotRes) }
       -- NB: result is bottom
-   usage       = { mangle RaiseOp [mkM] mkM }
    out_of_line = True
 
 -- raiseIO# needs to be a primop, because exceptions in the IO monad
@@ -1362,7 +1341,6 @@ primop  NewMVarOp "newMVar#"  GenPrimOp
    State# s -> (# State# s, MVar# s a #)
    {Create new {\tt MVar\#}; initially empty.}
    with
-   usage       = { mangle NewMVarOp [mkP] mkR }
    out_of_line = True
 
 primop  TakeMVarOp "takeMVar#" GenPrimOp
@@ -1370,7 +1348,6 @@ primop  TakeMVarOp "takeMVar#" GenPrimOp
    {If {\tt MVar\#} is empty, block until it becomes full.
    Then remove and return its contents, and set it empty.}
    with
-   usage            = { mangle TakeMVarOp [mkM, mkP] mkM }
    has_side_effects = True
    out_of_line      = True
 
@@ -1379,7 +1356,6 @@ primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
    Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
    with
-   usage            = { mangle TryTakeMVarOp [mkM, mkP] mkM }
    has_side_effects = True
    out_of_line      = True
 
@@ -1388,7 +1364,6 @@ primop  PutMVarOp "putMVar#" GenPrimOp
    {If {\tt MVar\#} is full, block until it becomes empty.
    Then store value arg as its new contents.}
    with
-   usage            = { mangle PutMVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
 
@@ -1397,20 +1372,16 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    {If {\tt MVar\#} is full, immediately return with integer 0.
     Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
    with
-   usage            = { mangle TryPutMVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
 
 primop  SameMVarOp "sameMVar#" GenPrimOp
    MVar# s a -> MVar# s a -> Bool
-   with
-   usage = { mangle SameMVarOp [mkP, mkP] mkM }
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int# #)
    {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
    with
-   usage = { mangle IsEmptyMVarOp [mkP, mkP] mkM }
    out_of_line = True
 
 ------------------------------------------------------------------------
@@ -1492,21 +1463,18 @@ primtype ThreadId#
 primop  ForkOp "fork#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   usage            = { mangle ForkOp [mkO, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
 
 primop  ForkOnOp "forkOn#" GenPrimOp
    Int# -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   usage            = { mangle ForkOnOp [mkO, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
 
 primop  KillThreadOp "killThread#"  GenPrimOp
    ThreadId# -> a -> State# RealWorld -> State# RealWorld
    with
-   usage            = { mangle KillThreadOp [mkP, mkM, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
 
@@ -1548,14 +1516,12 @@ primtype Weak# b
 primop  MkWeakOp "mkWeak#" GenPrimOp
    o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
-   usage            = { mangle MkWeakOp [mkZ, mkM, mkM, mkP] mkM }
    has_side_effects = True
    out_of_line      = True
 
 primop  DeRefWeakOp "deRefWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
    with
-   usage            = { mangle DeRefWeakOp [mkM, mkP] mkM }
    has_side_effects = True
    out_of_line      = True
 
@@ -1563,9 +1529,6 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
               (State# RealWorld -> (# State# RealWorld, () #)) #)
    with
-   usage            = { mangle FinalizeWeakOp [mkM, mkP] 
-                               (mkR . (inUB FinalizeWeakOp 
-                                            [id,id,inFun FinalizeWeakOp mkR mkM])) }
    has_side_effects = True
    out_of_line      = True
 
@@ -1585,14 +1548,12 @@ primtype StableName# a
 primop  MakeStablePtrOp "makeStablePtr#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
    with
-   usage            = { mangle MakeStablePtrOp [mkM, mkP] mkM }
    has_side_effects = True
    out_of_line      = True
 
 primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
    StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   usage            = { mangle DeRefStablePtrOp [mkM, mkP] mkM }
    needs_wrapper    = True
    has_side_effects = True
    out_of_line      = True
@@ -1600,26 +1561,20 @@ primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
 primop  EqStablePtrOp "eqStablePtr#" GenPrimOp
    StablePtr# a -> StablePtr# a -> Int#
    with
-   usage            = { mangle EqStablePtrOp [mkP, mkP] mkR }
    has_side_effects = True
 
 primop  MakeStableNameOp "makeStableName#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, StableName# a #)
    with
-   usage            = { mangle MakeStableNameOp [mkZ, mkP] mkR }
    needs_wrapper    = True
    has_side_effects = True
    out_of_line      = True
 
 primop  EqStableNameOp "eqStableName#" GenPrimOp
    StableName# a -> StableName# a -> Int#
-   with
-   usage = { mangle EqStableNameOp [mkP, mkP] mkR }
 
 primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
    StableName# a -> Int#
-   with
-   usage = { mangle StableNameToIntOp [mkP] mkR }
 
 ------------------------------------------------------------------------
 section "Unsafe pointer equality"
@@ -1628,8 +1583,6 @@ section "Unsafe pointer equality"
 
 primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
    a -> a -> Int#
-   with
-   usage = { mangle ReallyUnsafePtrEqualityOp [mkZ, mkZ] mkR }
 
 ------------------------------------------------------------------------
 section "Parallelism"
@@ -1638,7 +1591,6 @@ section "Parallelism"
 primop  ParOp "par#" GenPrimOp
    a -> Int#
    with
-   usage            = { mangle ParOp [mkO] mkR }
       -- Note that Par is lazy to avoid that the sparked thing
       -- gets evaluted strictly, which it should *not* be
    has_side_effects = True
@@ -1652,37 +1604,31 @@ primop  ParOp "par#" GenPrimOp
 primop  ParGlobalOp  "parGlobal#"  GenPrimOp
    a -> Int# -> Int# -> Int# -> Int# -> b -> Int#
    with
-   usage            = { mangle ParGlobalOp [mkO, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
 primop  ParLocalOp  "parLocal#"  GenPrimOp
    a -> Int# -> Int# -> Int# -> Int# -> b -> Int#
    with
-   usage            = { mangle ParLocalOp [mkO, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
 primop  ParAtOp  "parAt#"  GenPrimOp
    b -> a -> Int# -> Int# -> Int# -> Int# -> c -> Int#
    with
-   usage            = { mangle ParAtOp [mkO, mkZ, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
 primop  ParAtAbsOp  "parAtAbs#"  GenPrimOp
    a -> Int# -> Int# -> Int# -> Int# -> Int# -> b -> Int#
    with
-   usage            = { mangle ParAtAbsOp [mkO, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
 primop  ParAtRelOp  "parAtRel#" GenPrimOp
    a -> Int# -> Int# -> Int# -> Int# -> Int# -> b -> Int#
    with
-   usage            = { mangle ParAtRelOp [mkO, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
 primop  ParAtForNowOp  "parAtForNow#" GenPrimOp
    b -> a -> Int# -> Int# -> Int# -> Int# -> c -> Int#
    with
-   usage            = { mangle ParAtForNowOp [mkO, mkZ, mkP, mkP, mkP, mkP, mkM] mkM }
    has_side_effects = True
 
 -- copyable# and noFollow# are yet to be implemented (for GpH)
@@ -1690,13 +1636,11 @@ primop  ParAtForNowOp  "parAtForNow#" GenPrimOp
 --primop  CopyableOp  "copyable#" GenPrimOp
 --   a -> Int#
 --   with
---   usage            = { mangle CopyableOp [mkZ] mkR }
 --   has_side_effects = True
 --
 --primop  NoFollowOp "noFollow#" GenPrimOp
 --   a -> Int#
 --   with
---   usage            = { mangle NoFollowOp [mkZ] mkR }
 --   has_side_effects = True
 
 
@@ -1745,6 +1689,11 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
 
 primop  GetApStackValOp "getApStackVal#" GenPrimOp
    a -> Int# -> (# Int#, b #)
+   with
+   out_of_line = True
+
+primop GetStackFrame "getStackFrame#" GenPrimOp
+   ThreadId# -> Int# -> (# Int#, Int# #)
    with
    out_of_line = True
 

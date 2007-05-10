@@ -62,11 +62,6 @@ main = getArgs >>= \args ->
                                        "strictness" 
                                        "primOpStrictness" p_o_specs)
 
-                      "--usage" 
-                         -> putStr (gen_switch_from_attribs 
-                                       "usage" 
-                                       "primOpUsg" p_o_specs)
-
                       "--primop-primop-info" 
                          -> putStr (gen_primop_info p_o_specs)
 
@@ -97,7 +92,6 @@ known_args
        "--needs-wrapper",
        "--can-fail",
        "--strictness",
-       "--usage",
        "--primop-primop-info",
        "--primop-tag",
        "--primop-list",
@@ -259,7 +253,6 @@ gen_latex_doc (Info defaults entries)
  	      ++ mk_needs_wrapper o ++ "}{"
 	      ++ mk_can_fail o ++ "}{"
 	      ++ latex_encode (mk_strictness o) ++ "}{"
- 	      ++ latex_encode (mk_usage o)
 	      ++ "}"
 
   	   mk_has_side_effects o = mk_bool_opt o "has_side_effects" "Has side effects." "Has no side effects."
@@ -279,12 +272,6 @@ gen_latex_doc (Info defaults entries)
 	     case lookup_attrib "strictness" o of
 	       Just (OptionString _ s) -> s  -- for now
 	       Just _ -> error "Boolean value for strictness"
-	       Nothing -> "" 
-
-	   mk_usage o =
-	     case lookup_attrib "usage" o of
-	       Just (OptionString _ s) -> s  -- for now
-	       Just _ -> error "Boolean value for usage"
 	       Nothing -> "" 
 
 	   zencode xs =
