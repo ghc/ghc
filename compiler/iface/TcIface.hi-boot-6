@@ -3,7 +3,7 @@ module TcIface where
 tcIfaceDecl  :: GHC.Base.Bool -> IfaceSyn.IfaceDecl -> TcRnTypes.IfL TypeRep.TyThing
 tcIfaceInst  :: IfaceSyn.IfaceInst -> TcRnTypes.IfL InstEnv.Instance
 tcIfaceRules :: GHC.Base.Bool -> [IfaceSyn.IfaceRule] -> TcRnTypes.IfL [CoreSyn.CoreRule]
-tcIfaceVectInfo :: Module.Module -> HscTypes.TypeEnv -> HscTypes.IfaceVectInfo -> TcRnTypes.IfL VectInfo
+tcIfaceVectInfo :: Module.Module -> HscTypes.TypeEnv -> HscTypes.IfaceVectInfo -> TcRnTypes.IfL HscTypes.VectInfo
 tcIfaceFamInst :: IfaceSyn.IfaceFamInst -> TcRnTypes.IfL FamInstEnv.FamInst
 
 
