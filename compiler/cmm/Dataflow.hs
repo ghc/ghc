@@ -1,14 +1,15 @@
 module Dataflow (mapCmmTop, onBasicBlock, cmmLivenessComment, cmmLiveness) where
 
 import Cmm
-import PprCmm
+import PprCmm ()
 
-import Unique
 import UniqSet
 import UniqFM
 
 import FastString
 import Outputable
+
+import Maybes
 
 import Data.List
 import Data.Maybe
@@ -34,49 +35,51 @@ cmmBranchTargets (BasicBlock _ stmts) =
 -- The monad we're using is: type State a = s -> s
 
 -- The variables that were made live and killed respectively
-type CmmLiveness = (UniqSet LocalReg, UniqSet LocalReg)
-addLocalLive new_live (live, killed) =
-    (live `unionUniqSets` new_live, killed `minusUniqSet` new_live)
-addLocalKilled new_killed (live, killed) =
-    (live `minusUniqSet` new_killed, killed `unionUniqSets` new_killed)
+type CmmLive = UniqSet LocalReg
+addLive new_live live = live `unionUniqSets` new_live
+addKilled new_killed live = live `minusUniqSet` new_killed
 
 -- Calculate the live and killed registers for a local block
-cmmLocalLiveness :: CmmBasicBlock -> CmmLiveness
-cmmLocalLiveness (BasicBlock _ stmts) =
-    foldr ((.) . cmmStmtLocalLiveness) id stmts (emptyUniqSet, emptyUniqSet)
+cmmBlockLive :: UniqFM {-BlockId-} CmmLive -> CmmBasicBlock -> CmmLive
+cmmBlockLive other_live (BasicBlock _ stmts) =
+    foldr ((.) . (cmmStmtLive other_live)) id stmts emptyUniqSet
 
 -- Helper for cmmLocalLiveness
-cmmStmtLocalLiveness :: CmmStmt -> (CmmLiveness -> CmmLiveness)
-cmmStmtLocalLiveness (CmmNop) = id
-cmmStmtLocalLiveness (CmmComment _) = id
-cmmStmtLocalLiveness (CmmAssign reg expr) =
-    cmmExprLocalLiveness expr . reg_liveness where
+cmmStmtLive :: UniqFM {-BlockId-} CmmLive -> CmmStmt -> (CmmLive -> CmmLive)
+cmmStmtLive _ (CmmNop) = id
+cmmStmtLive _ (CmmComment _) = id
+cmmStmtLive _ (CmmAssign reg expr) =
+    cmmExprLive expr . reg_liveness where
         reg_liveness =
             case reg of
-              (CmmLocal reg') -> addLocalKilled $ unitUniqSet reg'
+              (CmmLocal reg') -> addKilled $ unitUniqSet reg'
               (CmmGlobal _) -> id
-cmmStmtLocalLiveness (CmmStore expr1 expr2) =
-    cmmExprLocalLiveness expr2 . cmmExprLocalLiveness expr1
-cmmStmtLocalLiveness (CmmCall target results arguments _) =
+cmmStmtLive _ (CmmStore expr1 expr2) =
+    cmmExprLive expr2 . cmmExprLive expr1
+cmmStmtLive _ (CmmCall target results arguments _) =
     target_liveness .
-    foldr ((.) . cmmExprLocalLiveness) id (map fst arguments) .
-    addLocalKilled (mkUniqSet $ only_local_regs results) where
+    foldr ((.) . cmmExprLive) id (map fst arguments) .
+    addKilled (mkUniqSet $ only_local_regs results) where
         only_local_regs [] = []
         only_local_regs ((CmmGlobal _,_):args) = only_local_regs args
         only_local_regs ((CmmLocal r,_):args) = r:only_local_regs args
         target_liveness =
             case target of
-              (CmmForeignCall target _) -> cmmExprLocalLiveness target
+              (CmmForeignCall target _) -> cmmExprLive target
               (CmmPrim _) -> id
-cmmStmtLocalLiveness (CmmBranch _) = const (emptyUniqSet, emptyUniqSet)
-cmmStmtLocalLiveness (CmmCondBranch expr _) = cmmExprLocalLiveness expr
-cmmStmtLocalLiveness (CmmSwitch expr _) = cmmExprLocalLiveness expr
-cmmStmtLocalLiveness (CmmJump expr params) =
-    const (cmmExprLocalLiveness expr (mkUniqSet params, emptyUniqSet))
+cmmStmtLive other_live (CmmBranch target) = addLive (lookupWithDefaultUFM other_live emptyUniqSet target)
+cmmStmtLive other_live (CmmCondBranch expr target) = cmmExprLive expr . addLive (lookupWithDefaultUFM other_live emptyUniqSet target)
+cmmStmtLive other_live (CmmSwitch expr targets) =
+    cmmExprLive expr .
+    (foldr ((.) . (addLive . lookupWithDefaultUFM other_live emptyUniqSet)) id (mapCatMaybes id targets))
+cmmStmtLive _ (CmmJump expr params) =
+    const (cmmExprLive expr (mkUniqSet params))
+
+--------
 
 -- Helper for cmmLocalLiveness
-cmmExprLocalLiveness :: CmmExpr -> (CmmLiveness -> CmmLiveness)
-cmmExprLocalLiveness expr = addLocalLive (mkUniqSet $ expr_liveness expr) where
+cmmExprLive :: CmmExpr -> (CmmLive -> CmmLive)
+cmmExprLive expr = addLive (mkUniqSet $ expr_liveness expr) where
     expr_liveness (CmmLit _) = []
     expr_liveness (CmmLoad expr _) = expr_liveness expr
     expr_liveness (CmmReg reg) = reg_liveness reg
@@ -85,62 +88,23 @@ cmmExprLocalLiveness expr = addLocalLive (mkUniqSet $ expr_liveness expr) where
     reg_liveness (CmmLocal reg) = [reg]
     reg_liveness (CmmGlobal _) = []
 
-{-
-branch_update ::
-    UniqFM {-BlockId-} (UniqSet BlockId)
-    -> UniqFM {-BlockId-} CmmLiveness
-    -> BlockId
-    -> UniqFM {-BlockId-} (UniqSet LocalReg)
-    -> Maybe (UniqFM {-BlockId-} (UniqSet LocalReg))
-branch_update targets local_liveness ident input_state =
-    if (sizeUniqSet old_live) >= (sizeUniqSet new_live)
-      then Nothing
-      else Just $ addToUFM input_state ident new_live
-    where
-      old_live = lookupWithDefaultUFM input_state emptyUniqSet ident
-      (born, killed) =
-          lookupWithDefaultUFM
-          local_liveness (emptyUniqSet, emptyUniqSet) ident
-      target_live = unionManyUniqSets $
-                    map (lookupWithDefaultUFM input_state emptyUniqSet) target
-      target = uniqSetToList $ lookupWithDefaultUFM targets emptyUniqSet ident
-      new_live = (target_live `minusUniqSet` killed) `unionUniqSets` born
--}
-
 cmmBlockUpdate ::
-    UniqFM {-BlockId-} CmmLiveness
+    UniqFM {-BlockId-} CmmBasicBlock
     -> BlockId
     -> Maybe BlockId
-    -> UniqFM {-BlockId-} (UniqSet LocalReg)
-    -> Maybe (UniqFM {-BlockId-} (UniqSet LocalReg))
-cmmBlockUpdate local_liveness ident cause input_state =
-    let (born, killed) = lookupWithDefaultUFM
-                         local_liveness (emptyUniqSet, emptyUniqSet) ident
-        old_live = lookupWithDefaultUFM input_state emptyUniqSet ident
-        cause_live =
-            case cause of
-              Just cause' -> lookupWithDefaultUFM input_state emptyUniqSet cause'
-              Nothing -> emptyUniqSet
-        new_live = old_live
-                   `unionUniqSets` (cause_live `minusUniqSet` killed)
-                   `unionUniqSets` born
-    in {-trace (--(showSDoc $ ppr $ getUnique cause) ++ "-->" ++
-              (showSDoc $ ppr $ getUnique ident) ++ ":" ++ 
-              (showSDoc $ ppr $ map CmmLocal $ uniqSetToList $ cause_live) ++ ":" ++
-              (showSDoc $ ppr $ map CmmLocal $ uniqSetToList $ old_live) ++ ":" ++
-              (showSDoc $ ppr $ map CmmLocal $ uniqSetToList $ new_live) ++ "|" ++
-              (show $ map (\(k,v) -> (k, showSDoc $ ppr $ map CmmLocal $ uniqSetToList v)) $ ufmToList input_state)) $-}
-         if (sizeUniqSet old_live) == (sizeUniqSet new_live)
-           then Nothing
-           else Just $ addToUFM input_state ident new_live
+    -> UniqFM {-BlockId-} CmmLive
+    -> Maybe (UniqFM {-BlockId-} CmmLive)
+cmmBlockUpdate blocks node _ state =
+    let old_live = lookupWithDefaultUFM state emptyUniqSet node
+        block = lookupWithDefaultUFM blocks (panic "unknown block id during liveness analysis") node
+        new_live = cmmBlockLive state block
+    in if (sizeUniqSet old_live) == (sizeUniqSet new_live)
+       then Nothing
+       else Just $ addToUFM state node new_live
 
 cmmBlockDependants :: UniqFM {-BlockId-} (UniqSet BlockId) -> BlockId -> [BlockId]
 cmmBlockDependants sources ident =
     uniqSetToList $ lookupWithDefaultUFM sources emptyUFM ident
-
-cmmBlockLiveness :: [CmmBasicBlock] -> UniqFM {-BlockId-} CmmLiveness
-cmmBlockLiveness blocks = listToUFM $ map block_info blocks where
-    block_info block = (blockId block, cmmLocalLiveness block)
 
 cmmBlockSourcesAndTargets ::
     [CmmBasicBlock]
@@ -154,12 +118,16 @@ cmmBlockSourcesAndTargets blocks = foldr aux (emptyUFM, emptyUFM) blocks where
             targets = cmmBranchTargets block
             ident = blockId block
 
-cmmLiveness :: [CmmBasicBlock] -> UniqFM {-BlockId-} (UniqSet LocalReg)
+cmmBlockNames :: [CmmBasicBlock] -> UniqFM {-BlockId-} CmmBasicBlock
+cmmBlockNames blocks = listToUFM $ map block_name blocks where
+    block_name b = (blockId b, b)
+
+cmmLiveness :: [CmmBasicBlock] -> UniqFM {-BlockId-} CmmLive
 cmmLiveness blocks =
-    fixedpoint (cmmBlockDependants sources) (cmmBlockUpdate liveness)
+    fixedpoint (cmmBlockDependants sources) (cmmBlockUpdate blocks')
                (map blockId blocks) emptyUFM where
                    (sources, targets) = cmmBlockSourcesAndTargets blocks
-                   liveness = cmmBlockLiveness blocks
+                   blocks' = cmmBlockNames blocks
 
 cmmLivenessComment ::
     UniqFM {-BlockId-} (UniqSet LocalReg)
