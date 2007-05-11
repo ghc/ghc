@@ -1152,18 +1152,16 @@ instance Binary OverlapFlag where
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon = putByte bh 0
     put_ bh IfOpenDataTyCon = putByte bh 1
-    put_ bh IfOpenNewTyCon = putByte bh 2
-    put_ bh (IfDataTyCon cs) = do { putByte bh 3
+    put_ bh (IfDataTyCon cs) = do { putByte bh 2
 				  ; put_ bh cs }
-    put_ bh (IfNewTyCon c)  = do { putByte bh 4
+    put_ bh (IfNewTyCon c)  = do { putByte bh 3
 				  ; put_ bh c }
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> return IfAbstractTyCon
 	      1 -> return IfOpenDataTyCon
-	      2 -> return IfOpenNewTyCon
-	      3 -> do cs <- get bh
+	      2 -> do cs <- get bh
 		      return (IfDataTyCon cs)
 	      _ -> do aa <- get bh
 		      return (IfNewTyCon aa)

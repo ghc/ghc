@@ -7,7 +7,7 @@
 module BuildTyCl (
 	buildSynTyCon, buildAlgTyCon, buildDataCon,
 	buildClass,
-	mkAbstractTyConRhs, mkOpenDataTyConRhs, mkOpenNewTyConRhs,
+	mkAbstractTyConRhs, mkOpenDataTyConRhs, 
 	mkNewTyConRhs, mkDataTyConRhs 
     ) where
 
@@ -115,10 +115,7 @@ mkAbstractTyConRhs :: AlgTyConRhs
 mkAbstractTyConRhs = AbstractTyCon
 
 mkOpenDataTyConRhs :: AlgTyConRhs
-mkOpenDataTyConRhs = OpenTyCon Nothing False
-
-mkOpenNewTyConRhs :: AlgTyConRhs
-mkOpenNewTyConRhs = OpenTyCon Nothing True
+mkOpenDataTyConRhs = OpenTyCon Nothing
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons

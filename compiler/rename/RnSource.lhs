@@ -797,8 +797,8 @@ rnFamily (tydecl@TyFamily {tcdFlavour = flavour,
 		    emptyFVs) 
          } }
       where
-        isDataFlavour (DataFamily _) = True
-	isDataFlavour _		     = False
+        isDataFlavour DataFamily = True
+	isDataFlavour _		 = False
 
 family_doc tycon = text "In the family declaration for" <+> quotes (ppr tycon)
 needOneIdx = text "Type family declarations requires at least one type index"

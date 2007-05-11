@@ -1100,8 +1100,7 @@ tyThingToIfaceDecl (ATyCon tycon)
       IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons })  = 
       IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls OpenTyCon { otIsNewtype = False } = IfOpenDataTyCon
-    ifaceConDecls OpenTyCon { otIsNewtype = True  } = IfOpenNewTyCon
+    ifaceConDecls OpenTyCon {}                      = IfOpenDataTyCon
     ifaceConDecls AbstractTyCon			    = IfAbstractTyCon
 	-- The last case happens when a TyCon has been trimmed during tidying
 	-- Furthermore, tyThingToIfaceDecl is also used

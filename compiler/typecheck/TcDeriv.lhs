@@ -399,7 +399,10 @@ mkEqnHelp orig tvs cls cls_tys tc_app
 
 	; gla_exts <- doptM Opt_GlasgowExts
 	; overlap_flag <- getOverlapFlag
-	; if isDataTyCon tycon then
+
+          -- Be careful to test rep_tc here: in the case of families, we want
+          -- to check the instance tycon, not the family tycon
+	; if isDataTyCon rep_tc then
 		mkDataTypeEqn orig gla_exts full_tvs cls cls_tys 
 			      tycon full_tc_args rep_tc rep_tc_args
 	  else

@@ -440,7 +440,7 @@ data NewOrData
 
 data FamilyFlavour
   = TypeFamily			-- "type family ..."
-  | DataFamily NewOrData	-- "newtype family ..." or "data family ..."
+  | DataFamily	                -- "data family ..."
 \end{code}
 
 Simple classifiers
@@ -536,9 +536,8 @@ instance OutputableBndr name
       = pp_flavour <+> pp_decl_head [] ltycon tyvars Nothing <+> pp_kind
         where
 	  pp_flavour = case flavour of
-		         TypeFamily          -> ptext SLIT("type family")
-			 DataFamily NewType  -> ptext SLIT("newtype family")
-			 DataFamily DataType -> ptext SLIT("data family")
+		         TypeFamily -> ptext SLIT("type family")
+			 DataFamily -> ptext SLIT("data family")
 
           pp_kind = case mb_kind of
 		      Nothing   -> empty

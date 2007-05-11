@@ -447,7 +447,6 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
 	IfAbstractTyCon	 -> return mkAbstractTyConRhs
 	IfOpenDataTyCon	 -> return mkOpenDataTyConRhs
-	IfOpenNewTyCon	 -> return mkOpenNewTyConRhs
 	IfDataTyCon cons -> do 	{ data_cons <- mappM tc_con_decl cons
 				; return (mkDataTyConRhs data_cons) }
 	IfNewTyCon con	 -> do 	{ data_con <- tc_con_decl con

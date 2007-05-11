@@ -280,8 +280,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 			     tcdCons = cons})
   = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
     do { -- check that the family declaration is for the right kind
-	 unless (new_or_data == NewType  && isNewTyCon  family ||
-		 new_or_data == DataType && isDataTyCon family) $
+	 unless (isAlgTyCon family) $
 	   addErr (wrongKindOfFamily family)
 
        ; -- (1) kind check the data declaration as usual
@@ -630,10 +629,10 @@ tcTyClDecl1 _calc_isrec
 
   -- "newtype family" or "data family" declaration
 tcTyClDecl1 _calc_isrec 
-  (TyFamily {tcdFlavour = DataFamily new_or_data, 
+  (TyFamily {tcdFlavour = DataFamily, 
 	     tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = mb_kind})
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
-  { traceTc (text "data/newtype family: " <+> ppr tc_name) 
+  { traceTc (text "data family: " <+> ppr tc_name) 
   ; extra_tvs <- tcDataKindSig mb_kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
 
@@ -643,10 +642,7 @@ tcTyClDecl1 _calc_isrec
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
-	       (case new_or_data of
-		  DataType -> mkOpenDataTyConRhs
-		  NewType  -> mkOpenNewTyConRhs)
-	       Recursive False True Nothing
+	       mkOpenDataTyConRhs Recursive False True Nothing
   ; return [ATyCon tycon]
   }
 
@@ -1194,9 +1190,8 @@ wrongKindOfFamily family =
   ptext SLIT("Wrong category of family instance; declaration was for a") <+>
   kindOfFamily
   where
-    kindOfFamily | isSynTyCon  family = ptext SLIT("type synonym")
-		 | isDataTyCon family = ptext SLIT("data type")
-		 | isNewTyCon  family = ptext SLIT("newtype")
+    kindOfFamily | isSynTyCon family = ptext SLIT("type synonym")
+		 | isAlgTyCon family = ptext SLIT("data type")
 		 | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
 emptyConDeclsErr tycon

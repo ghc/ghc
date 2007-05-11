@@ -108,14 +108,12 @@ data IfaceClassOp = IfaceClassOp OccName DefMeth IfaceType
 data IfaceConDecls
   = IfAbstractTyCon		-- No info
   | IfOpenDataTyCon		-- Open data family
-  | IfOpenNewTyCon		-- Open newtype family
   | IfDataTyCon [IfaceConDecl]	-- data type decls
   | IfNewTyCon  IfaceConDecl	-- newtype decls
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls IfAbstractTyCon  = []
 visibleIfConDecls IfOpenDataTyCon  = []
-visibleIfConDecls IfOpenNewTyCon   = []
 visibleIfConDecls (IfDataTyCon cs) = cs
 visibleIfConDecls (IfNewTyCon c)   = [c]
 
@@ -414,7 +412,6 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 		IfOpenDataTyCon -> ptext SLIT("data family")
 		IfDataTyCon _   -> ptext SLIT("data")
 		IfNewTyCon _  	-> ptext SLIT("newtype")
-		IfOpenNewTyCon 	-> ptext SLIT("newtype family")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 			  ifFDs = fds, ifATs = ats, ifSigs = sigs, 
@@ -440,7 +437,6 @@ pprIfaceDeclHead context thing tyvars
 	  pprIfaceTvBndrs tyvars]
 
 pp_condecls tc IfAbstractTyCon  = ptext SLIT("{- abstract -}")
-pp_condecls tc IfOpenNewTyCon   = empty
 pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
 pp_condecls tc IfOpenDataTyCon  = empty
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |"))
@@ -766,7 +762,6 @@ eq_hsCD env (IfDataTyCon c1) (IfDataTyCon c2)
 eq_hsCD env (IfNewTyCon c1)  (IfNewTyCon c2)  = eq_ConDecl env c1 c2
 eq_hsCD env IfAbstractTyCon  IfAbstractTyCon  = Equal
 eq_hsCD env IfOpenDataTyCon  IfOpenDataTyCon  = Equal
-eq_hsCD env IfOpenNewTyCon   IfOpenNewTyCon   = Equal
 eq_hsCD env d1		     d2		      = NotEqual
 
 eq_ConDecl env c1 c2

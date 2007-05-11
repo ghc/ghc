@@ -213,16 +213,13 @@ data AlgTyConRhs
 
   | OpenTyCon {
 
-      otArgPoss   :: Maybe [Int],  
+      otArgPoss   :: Maybe [Int]
 	-- Nothing <=> top-level indexed type family
 	-- Just ns <=> associated (not toplevel) family
 	--   In the latter case, for each tyvar in the AT decl, 'ns' gives the
 	--   position of that tyvar in the class argument list (starting from 0).
 	--   NB: Length is less than tyConArity iff higher kind signature.
 	
-      otIsNewtype :: Bool	     
-        -- is a newtype (rather than data type)?
-
     }
 
   | DataTyCon {
@@ -633,7 +630,6 @@ isDataTyCon other = False
 isNewTyCon :: TyCon -> Bool
 isNewTyCon (AlgTyCon {algTcRhs = rhs}) = 
   case rhs of
-    OpenTyCon {} -> otIsNewtype rhs
     NewTyCon {}  -> True
     _	         -> False
 isNewTyCon other		       = False

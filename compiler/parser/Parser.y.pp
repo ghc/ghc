@@ -618,7 +618,7 @@ ty_decl :: { LTyClDecl RdrName }
 			      (unLoc $3) (reverse (unLoc $5)) (unLoc $6)) } }
 
           -- data/newtype family
-        | data_or_newtype 'family' tycl_hdr opt_kind_sig
+        | 'data' 'family' tycl_hdr opt_kind_sig
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $3}
                       ; checkTyVars tparms            -- no type pattern
 		      ; unless (null (unLoc ctxt)) $  -- and no context
@@ -626,8 +626,7 @@ ty_decl :: { LTyClDecl RdrName }
 			    "A family declaration cannot have a context"
 		      ; return $
 			  L (comb3 $1 $2 $4)
-			    (TyFamily (DataFamily (unLoc $1)) tc tvs 
-				      (unLoc $4)) } }
+			    (TyFamily DataFamily tc tvs (unLoc $4)) } }
 
           -- data/newtype instance declaration
 	| data_or_newtype 'instance' tycl_hdr constrs deriving
@@ -682,7 +681,7 @@ at_decl_cls :: { LTyClDecl RdrName }
                       } }
 
           -- data/newtype family declaration
-        | data_or_newtype tycl_hdr opt_kind_sig
+        | 'data' tycl_hdr opt_kind_sig
 		{% do { let {(ctxt, tc, tvs, tparms) = unLoc $2}
                       ; checkTyVars tparms            -- no type pattern
 		      ; unless (null (unLoc ctxt)) $  -- and no context
@@ -690,8 +689,7 @@ at_decl_cls :: { LTyClDecl RdrName }
 			    "A family declaration cannot have a context"
 		      ; return $
 			  L (comb3 $1 $2 $3)
-			    (TyFamily (DataFamily (unLoc $1)) tc tvs
-				      (unLoc $3)) 
+			    (TyFamily DataFamily tc tvs (unLoc $3)) 
                       } }
 
 -- Associate type instances
