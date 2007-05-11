@@ -733,7 +733,7 @@
 	  </row>
 	  <row>
 	    <entry><option>-Wall</option></entry>
-	    <entry>enable all warnings</entry>
+	    <entry>enable almost all warnings (details in <xref linkend="options-sanity"/>)</entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-w</option></entry>
 	  </row>
@@ -765,6 +765,13 @@
 	    <entry>dynamic</entry>
 	    <entry><option>-fno-warn-hi-shadowing</option></entry>
 	  </row>
+
+          <row>
+            <entry><option>-fwarn-implicit-prelude</option></entry>
+            <entry>warn when the Prelude is implicitly imported</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-warn-implicit-prelude</option></entry>
+          </row>
 
 	  <row>
 	    <entry><option>-fwarn-incomplete-patterns</option></entry>

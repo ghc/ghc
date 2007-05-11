@@ -139,6 +139,7 @@ data DynFlag
    | Opt_WarnIsError		-- -Werror; makes warnings fatal
    | Opt_WarnDuplicateExports
    | Opt_WarnHiShadows
+   | Opt_WarnImplicitPrelude
    | Opt_WarnIncompletePatterns
    | Opt_WarnIncompletePatternsRecUpd
    | Opt_WarnMissingFields
@@ -1024,6 +1025,7 @@ dynamic_flags = [
 fFlags = [
   ( "warn-duplicate-exports",    	Opt_WarnDuplicateExports ),
   ( "warn-hi-shadowing",         	Opt_WarnHiShadows ),
+  ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude ),
   ( "warn-incomplete-patterns",  	Opt_WarnIncompletePatterns ),
   ( "warn-incomplete-record-updates",  	Opt_WarnIncompletePatternsRecUpd ),
   ( "warn-missing-fields",       	Opt_WarnMissingFields ),

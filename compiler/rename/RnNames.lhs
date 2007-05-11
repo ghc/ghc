@@ -69,6 +69,10 @@ rnImports imports
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
 
+         ifOptM Opt_WarnImplicitPrelude (
+            when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
+          )
+
          stuff1 <- mapM (rnImportDecl this_mod) (prel_imports ++ ordinary)
          stuff2 <- mapM (rnImportDecl this_mod) source
          let (decls, rdr_env, imp_avails) = combine (stuff1 ++ stuff2)
@@ -1355,4 +1359,7 @@ nullModuleExport mod
 moduleDeprec mod txt
   = sep [ ptext SLIT("Module") <+> quotes (ppr mod) <+> ptext SLIT("is deprecated:"), 
 	  nest 4 (ppr txt) ]	  
+
+implicitPreludeWarn
+  = ptext SLIT("Module `Prelude' implicitly imported")
 \end{code}

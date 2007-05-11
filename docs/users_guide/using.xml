@@ -848,6 +848,7 @@ ghc -c Foo.hs</screen>
             <listitem><option>-fwarn-tabs</option></listitem>
             <listitem><option>-fwarn-incomplete-record-updates</option></listitem>
             <listitem><option>-fwarn-monomorphism-restriction</option></listitem>
+            <listitem><option>-fwarn-implicit-prelude</option></listitem>
           </itemizedlist>
 	</listitem>
       </varlistentry>
@@ -911,6 +912,31 @@ ghc -c Foo.hs</screen>
 	  with the same module name in a library or other
 	  directory.</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-implicit-prelude</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-implicit-prelude</option></primary></indexterm>
+          <indexterm><primary>implicit prelude, warning</primary></indexterm>
+          <para>Have the compiler warn if the Prelude is implicitly
+          imported.  This happens unless either the Prelude module is
+          explicitly imported with an <literal>import ... Prelude ...</literal>
+          line, or this implicit import is disabled (either by
+          <option>-fno-implicit-prelude</option> or a
+          <literal>LANGUAGE NoImplicitPrelude</literal> pragma).</para>
+
+          <para>Note that no warning is given for syntax that implicitly
+          refers to the Prelude, even if <option>-fno-implicit-prelude</option>
+          would change whether it refers to the Prelude.
+          For example, no warning is given when
+          <literal>368</literal> means
+          <literal>Prelude.fromInteger (368::Prelude.Integer)</literal>
+          (where <literal>Prelude</literal> refers to the actual Prelude module,
+          regardless of the imports of the module being compiled).</para>
+
+          <para>This warning is off by default.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
