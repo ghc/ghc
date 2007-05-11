@@ -522,8 +522,9 @@ abandon (Session ref) = do
        resume = ic_resume ic
    case resume of
       []    -> return False
-      _:rs  -> do
+      r:rs  -> do 
          writeIORef ref hsc_env{ hsc_IC = ic { ic_resume = rs } }
+         abandon_ r
          return True
 
 abandonAll :: Session -> IO Bool
@@ -532,10 +533,25 @@ abandonAll (Session ref) = do
    let ic = hsc_IC hsc_env
        resume = ic_resume ic
    case resume of
-      []    -> return False
-      _:rs  -> do
+      []  -> return False
+      rs  -> do 
          writeIORef ref hsc_env{ hsc_IC = ic { ic_resume = [] } }
+         mapM_ abandon_ rs
          return True
+
+-- when abandoning a computation we have to 
+--      (a) kill the thread with an async exception, so that the 
+--          computation itself is stopped, and
+--      (b) fill in the MVar.  This step is necessary because any
+--          thunks that were under evaluation will now be updated
+--          with the partial computation, which still ends in takeMVar,
+--          so any attempt to evaluate one of these thunks will block
+--          unless we fill in the MVar.
+--  See test break010.
+abandon_ :: Resume -> IO ()
+abandon_ r = do
+  killThread (resumeThreadId r)
+  putMVar (resumeBreakMVar r) () 
 
 -- -----------------------------------------------------------------------------
 -- Bounded list, optimised for repeated cons
