@@ -34,12 +34,6 @@ name = Util.global (value) :: IORef (ty); \
 {-# NOINLINE name #-}
 #endif
 
-#if __GLASGOW_HASKELL__ >= 620
-#define UNBOX_FIELD !!
-#else
-#define UNBOX_FIELD !
-#endif
-
 #define COMMA ,
 
 #ifdef DEBUG
