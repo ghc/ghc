@@ -307,6 +307,7 @@ substRecBndrs subst bndrs
 substIdBndr :: Subst		-- Substitution to use for the IdInfo
 	    -> Subst -> Id 	-- Substitition and Id to transform
 	    -> (Subst, Id)	-- Transformed pair
+				-- NB: unfolding may be zapped
 
 substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
   = (Subst (in_scope `extendInScopeSet` new_id) new_env tvs, new_id)
@@ -324,6 +325,7 @@ substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
 	-- rec_subst, when dealing with a mutually-recursive group
     new_id = maybeModifyIdInfo mb_new_info id2
     mb_new_info = substIdInfo rec_subst (idInfo id2)
+	-- NB: unfolding info may be zapped
 
 	-- Extend the substitution if the unique has changed
 	-- See the notes with substTyVarBndr for the delVarEnv
