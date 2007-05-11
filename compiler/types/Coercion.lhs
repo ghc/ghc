@@ -31,7 +31,17 @@ module Coercion (
 
         unsafeCoercionTyCon, symCoercionTyCon,
         transCoercionTyCon, leftCoercionTyCon, 
-        rightCoercionTyCon, instCoercionTyCon -- needed by TysWiredIn
+        rightCoercionTyCon, instCoercionTyCon, -- needed by TysWiredIn
+
+	-- CoercionI
+	CoercionI(..),
+	isIdentityCoercion,
+	mkSymCoI, mkTransCoI, 
+	mkTyConAppCoI, mkAppTyCoI, mkFunTyCoI,
+	mkNoteTyCoI, mkForAllTyCoI,
+	fromCoI,
+	mkClassPPredCoI, mkIParamPredCoI, mkEqPredCoI,
+
        ) where 
 
 #include "HsVersions.h"
@@ -39,6 +49,7 @@ module Coercion (
 import TypeRep
 import Type
 import TyCon
+import Class
 import Var
 import Name
 import OccName
@@ -421,3 +432,92 @@ splitNewTypeRepCo_maybe (TyConApp tc tys)
     co_con = maybe (pprPanic "splitNewTypeRepCo_maybe" (ppr tc)) id (newTyConCo_maybe tc)
 splitNewTypeRepCo_maybe other = Nothing
 \end{code}
+
+
+--------------------------------------
+-- CoercionI smart constructors
+--	lifted smart constructors of ordinary coercions
+
+
+\begin{code}
+
+	-- CoercionI is either 
+	--	(a) proper coercion
+	--	(b) the identity coercion
+data CoercionI     = IdCo     | ACo Coercion
+
+isIdentityCoercion :: CoercionI -> Bool
+isIdentityCoercion IdCo = True
+isIdentityCoercion _    = False
+
+mkSymCoI :: CoercionI -> CoercionI
+mkSymCoI IdCo = IdCo
+mkSymCoI (ACo co) = ACo $ mkCoercion symCoercionTyCon [co] 
+				-- the smart constructor
+				-- is too smart with tyvars
+
+mkTransCoI :: CoercionI -> CoercionI -> CoercionI
+mkTransCoI IdCo aco = aco
+mkTransCoI aco IdCo = aco
+mkTransCoI (ACo co1) (ACo co2) = ACo $ mkTransCoercion co1 co2
+
+mkTyConAppCoI :: TyCon -> [Type] -> [CoercionI] -> CoercionI
+mkTyConAppCoI tyCon tys cois =
+	let (anyAcon,co_args) = f tys cois
+	in if anyAcon
+		then ACo (TyConApp tyCon co_args)
+		else IdCo
+	where
+		f [] [] = (False,[])
+		f (x:xs) (y:ys) = 
+			let (b,cos) = f xs ys
+			in case y of
+				IdCo   -> (b,x:cos)
+				ACo co -> (True,co:cos)
+
+mkAppTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
+mkAppTyCoI ty1 IdCo ty2 IdCo = IdCo
+mkAppTyCoI ty1 coi1 ty2 coi2 =
+	ACo $ AppTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
+
+mkFunTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
+mkFunTyCoI ty1 IdCo ty2 IdCo = IdCo
+mkFunTyCoI ty1 coi1 ty2 coi2 =
+	ACo $ FunTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
+
+mkNoteTyCoI :: TyNote -> CoercionI -> CoercionI
+mkNoteTyCoI _ IdCo = IdCo
+mkNoteTyCoI note (ACo co) = ACo $ NoteTy note co
+
+mkForAllTyCoI :: TyVar -> CoercionI -> CoercionI
+mkForAllTyCoI _ IdCo = IdCo
+mkForAllTyCoI tv (ACo co) = ACo $ ForAllTy tv co
+
+fromCoI IdCo ty     = ty
+fromCoI (ACo co) ty = co
+
+mkClassPPredCoI :: Class -> [Type] -> [CoercionI] -> CoercionI
+mkClassPPredCoI cls tys cois =
+	let (anyAcon,co_args) = f tys cois
+	in if anyAcon
+		then ACo $ PredTy $ ClassP cls co_args
+		else IdCo
+	where
+		f [] [] = (False,[])
+		f (x:xs) (y:ys) = 
+			let (b,cos) = f xs ys
+			in case y of
+				IdCo   -> (b,x:cos)
+				ACo co -> (True,co:cos)
+
+mkIParamPredCoI :: (IPName Name) -> CoercionI -> CoercionI 
+mkIParamPredCoI ipn IdCo     = IdCo
+mkIParamPredCoI ipn (ACo co) = ACo $ PredTy $ IParam ipn co
+
+mkEqPredCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
+mkEqPredCoI _    IdCo     _   IdCo      = IdCo
+mkEqPredCoI ty1  IdCo     _   (ACo co2) = ACo $ PredTy $ EqPred ty1 co2
+mkEqPredCoI ty1 (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi2 ty2)
+
+\end{code}
+
