@@ -351,7 +351,7 @@ lookupRecId env id = lookupVarEnv (lc_rec_env env) id
 lookupLevel :: LibCaseEnv -> Id -> LibCaseLevel
 lookupLevel env id
   = case lookupVarEnv (lc_lvl_env env) id of
-      Just lvl -> lc_lvl env
+      Just lvl -> lvl
       Nothing  -> topLevel
 
 freeScruts :: LibCaseEnv
