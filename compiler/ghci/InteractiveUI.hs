@@ -552,53 +552,34 @@ runStmt stmt step
       result <- io $ withProgName (progname st) $ withArgs (args st) $
 	     	     GHC.runStmt session stmt step
       afterRunStmt result
-      return (isRunResultOk result)
 
 
-afterRunStmt :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
+afterRunStmt :: GHC.RunResult -> GHCi Bool
+                                 -- False <=> the statement failed to compile
+afterRunStmt (GHC.RunException e) = throw e
 afterRunStmt run_result = do
-  mb_result <- switchOnRunResult run_result
-  -- possibly print the type and revert CAFs after evaluating an expression
-  show_types <- isOptionSet ShowType
   session <- getSession
-  case mb_result of
-    Nothing    -> return ()      
-    Just (is_break,names) -> 
-            when (is_break || show_types) $
-                  mapM_ (showTypeOfName session) names
-  
+  case run_result of
+     GHC.RunOk names -> do
+        show_types <- isOptionSet ShowType
+        when show_types $ mapM_ (showTypeOfName session) names
+     GHC.RunBreak _ names _ -> do
+        resumes <- io $ GHC.getResumeContext session
+        printForUser $ ptext SLIT("Stopped at") <+> 
+                       ppr (GHC.resumeSpan (head resumes))
+        mapM_ (showTypeOfName session) names
+        -- run the command set with ":set stop <cmd>"
+        st <- getGHCiState
+        runCommand (stop st)
+        return ()
+     _ -> return ()
+
   flushInterpBuffers
   io installSignalHandlers
   b <- isOptionSet RevertCAFs
   io (when b revertCAFs)
 
-  return mb_result
-
-
-switchOnRunResult :: GHC.RunResult -> GHCi (Maybe (Bool,[Name]))
-switchOnRunResult GHC.RunFailed = return Nothing
-switchOnRunResult (GHC.RunException e) = throw e
-switchOnRunResult (GHC.RunOk names) = return $ Just (False,names)
-switchOnRunResult (GHC.RunBreak threadId names info) = do
-   session <- getSession
-   Just mod_info <- io $ GHC.getModuleInfo session (GHC.breakInfo_module info) 
-   let modBreaks  = GHC.modInfoModBreaks mod_info
-   let ticks      = GHC.modBreaks_locs modBreaks
-
-   -- display information about the breakpoint
-   let location = ticks ! GHC.breakInfo_number info
-   printForUser $ ptext SLIT("Stopped at") <+> ppr location
-
-   -- run the command set with ":set stop <cmd>"
-   st <- getGHCiState
-   runCommand (stop st)
-
-   return (Just (True,names))
-
-
-isRunResultOk :: GHC.RunResult -> Bool
-isRunResultOk (GHC.RunOk _) = True
-isRunResultOk _             = False
+  return (case run_result of GHC.RunOk _ -> True; _ -> False)
 
 
 showTypeOfName :: Session -> Name -> GHCi ()
