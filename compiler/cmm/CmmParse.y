@@ -525,9 +525,9 @@ machOps = listToUFM $
 	( "f2f32",    flip MO_S_Conv F32 ),  -- TODO; rounding mode
 	( "f2f64",    flip MO_S_Conv F64 ),  -- TODO; rounding mode
 	( "f2i8",     flip MO_S_Conv I8 ),
-	( "f2i16",    flip MO_S_Conv I8 ),
-	( "f2i32",    flip MO_S_Conv I8 ),
-	( "f2i64",    flip MO_S_Conv I8 ),
+	( "f2i16",    flip MO_S_Conv I16 ),
+	( "f2i32",    flip MO_S_Conv I32 ),
+	( "f2i64",    flip MO_S_Conv I64 ),
 	( "i2f32",    flip MO_S_Conv F32 ),
 	( "i2f64",    flip MO_S_Conv F64 )
 	]
