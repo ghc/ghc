@@ -1,0 +1,3 @@
+
+read033.hs:2:5:
+    lexical error in string/character literal at character '\t'
