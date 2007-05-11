@@ -527,7 +527,6 @@ typedef struct _RtsSymbolVal {
       SymX(initLinker)				\
       SymX(unpackClosurezh_fast)                \
       SymX(getApStackValzh_fast)                \
-      SymX(getStackFramezh_fast)                \
       SymX(int2Integerzh_fast)			\
       SymX(integer2Intzh_fast)			\
       SymX(integer2Wordzh_fast)			\
