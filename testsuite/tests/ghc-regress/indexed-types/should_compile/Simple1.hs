@@ -3,9 +3,9 @@
 module ShouldCompile where
 
 class C a where
-  data    Sd a :: *
-  newtype Sn a :: *
-  type    St a :: *
+  data Sd a :: *
+  data Sn a :: *
+  type St a :: *
 
 instance C Int where
   data    Sd Int = SdC Char

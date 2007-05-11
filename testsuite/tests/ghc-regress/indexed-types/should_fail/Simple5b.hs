@@ -4,7 +4,7 @@ module ShouldFail where
 
 class C3 a where
   data    S3  a :: *
-  newtype S3n a :: *
+  data    S3n a :: *
   foo3  :: a -> S3 a
   foo3n :: a -> S3n a
   bar3  :: S3 a -> a
