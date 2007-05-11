@@ -175,7 +175,7 @@ cp -Rf $mingw_include/* include/mingw
 # g++-3/ subdir causes problems with installer tool (+ being a 
 # troublesome character); leave out for now.
 #rm -rf include/mingw/g++-3/ || echo "g++-3/ not there"
-rm -rf include/mingw/c++/ || echo "c++/ not there"
+#rm -rf include/mingw/c++/ || echo "c++/ not there"
 rm -rf include/mingw/ddk/ || echo "ddk/ not there"
 rm -rf include/mingw/gnu/ || echo "gnu/ not there"
 rm -rf include/mingw/javax/ || echo "javax/ not there"
