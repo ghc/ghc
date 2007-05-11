@@ -32,7 +32,7 @@ module OccName (
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
-        mkCloOcc, mkCloTyConOcc, mkCloDataConOcc,
+        mkCloOcc, mkCloTyConOcc, mkCloDataConOcc, mkCloIsoOcc,
 
 	-- ** Deconstruction
 	occNameFS, occNameString, occNameSpace, 
@@ -462,6 +462,7 @@ mkDataCOcc = mk_simple_deriv varName  "$c"
 mkCloOcc        = mk_simple_deriv varName  "$CC_"
 mkCloTyConOcc   = mk_simple_deriv tcName   ":CC_"
 mkCloDataConOcc = mk_simple_deriv dataName ":CD_"
+mkCloIsoOcc     = mk_simple_deriv varName  "$CCiso_"
 
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
