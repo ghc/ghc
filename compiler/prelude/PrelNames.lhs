@@ -61,7 +61,7 @@ import Unique	  ( Unique, Uniquable(..), hasKey,
 		  ) 
 import BasicTypes ( Boxity(..), Arity )
 import Name	  ( Name, mkInternalName, mkExternalName )
-import SrcLoc     ( noSrcLoc )
+import SrcLoc
 import FastString
 \end{code}
 
@@ -75,14 +75,14 @@ import FastString
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName uniq = mkInternalName uniq (mkOccNameFS varName FSLIT("it")) noSrcLoc
+itName uniq = mkInternalName uniq (mkOccNameFS varName FSLIT("it")) noSrcSpan
 \end{code}
 
 \begin{code}
 -- mkUnboundName makes a place-holder Name; it shouldn't be looked at except possibly
 -- during compiler debugging.
 mkUnboundName :: RdrName -> Name
-mkUnboundName rdr_name = mkInternalName unboundKey (rdrNameOcc rdr_name) noSrcLoc
+mkUnboundName rdr_name = mkInternalName unboundKey (rdrNameOcc rdr_name) noSrcSpan
 
 isUnboundName :: Name -> Bool
 isUnboundName name = name `hasKey` unboundKey
@@ -508,17 +508,17 @@ breakpointJumpName
     = mkInternalName
         breakpointJumpIdKey
         (mkOccNameFS varName FSLIT("breakpointJump"))
-        noSrcLoc
+        noSrcSpan
 breakpointCondJumpName
     = mkInternalName
         breakpointCondJumpIdKey
         (mkOccNameFS varName FSLIT("breakpointCondJump"))
-        noSrcLoc
+        noSrcSpan
 breakpointAutoJumpName
     = mkInternalName
         breakpointAutoJumpIdKey
         (mkOccNameFS varName FSLIT("breakpointAutoJump"))
-        noSrcLoc
+        noSrcSpan
 
 -- PrelTup
 fstName		  = varQual dATA_TUP FSLIT("fst") fstIdKey
@@ -686,15 +686,15 @@ tcQual   = mk_known_key_name tcName
 clsQual  = mk_known_key_name clsName
 
 mk_known_key_name space mod str uniq 
-  = mkExternalName uniq mod (mkOccNameFS space str) noSrcLoc
+  = mkExternalName uniq mod (mkOccNameFS space str) noSrcSpan
 
 conName :: Module -> FastString -> Unique -> Name
 conName mod occ uniq
-  = mkExternalName uniq mod (mkOccNameFS dataName occ) noSrcLoc
+  = mkExternalName uniq mod (mkOccNameFS dataName occ) noSrcSpan
 
 methName :: Module -> FastString -> Unique -> Name
 methName mod occ uniq
-  = mkExternalName uniq mod (mkVarOccFS occ) noSrcLoc
+  = mkExternalName uniq mod (mkVarOccFS occ) noSrcSpan
 \end{code}
 
 %************************************************************************

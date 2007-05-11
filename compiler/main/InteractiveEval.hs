@@ -451,7 +451,7 @@ bindLocalsAtBreakpoint hsc_env apStack info = do
    -- _result in scope at any time.
    let result_fs = FSLIT("_result")
        result_name = mkInternalName (getUnique result_fs)
-                          (mkVarOccFS result_fs) (srcSpanStart span)
+                          (mkVarOccFS result_fs) span
        result_id   = Id.mkLocalId result_name result_ty
 
    -- for each Id we're about to bind in the local envt:
@@ -478,7 +478,7 @@ bindLocalsAtBreakpoint hsc_env apStack info = do
    mkNewId :: OccName -> Id -> IO Id
    mkNewId occ id = do
      let uniq = idUnique id
-         loc = nameSrcLoc (idName id)
+         loc = nameSrcSpan (idName id)
          name = mkInternalName uniq occ loc
          ty = idType id
          new_id = Id.mkGlobalId VanillaGlobal name ty (idInfo id)

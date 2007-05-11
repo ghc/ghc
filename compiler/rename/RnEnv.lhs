@@ -115,7 +115,7 @@ newTopSrcBinder this_mod (L loc rdr_name)
 	-- the RdrName, not from the environment.  In principle, it'd be fine to 
 	-- have an arbitrary mixture of external core definitions in a single module,
 	-- (apart from module-initialisation issues, perhaps).
-	; newGlobalBinder rdr_mod rdr_occ (srcSpanStart loc) }
+	; newGlobalBinder rdr_mod rdr_occ loc }
 		--TODO, should pass the whole span
 
   | otherwise
@@ -123,7 +123,7 @@ newTopSrcBinder this_mod (L loc rdr_name)
 	         (addErrAt loc (badQualBndrErr rdr_name))
 	 	-- Binders should not be qualified; if they are, and with a different
 		-- module name, we we get a confusing "M.T is not in scope" error later
-	; newGlobalBinder this_mod (rdrNameOcc rdr_name) (srcSpanStart loc) }
+	; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc }
 \end{code}
 
 %*********************************************************
@@ -175,7 +175,7 @@ lookupTopBndrRn rdr_name
 	-- we don't bother to call newTopSrcBinder first
 	-- We assume there is no "parent" name
   = do	{ loc <- getSrcSpanM
-	; newGlobalBinder rdr_mod rdr_occ (srcSpanStart loc) }
+	; newGlobalBinder rdr_mod rdr_occ loc }
 
   | otherwise
   = do	{ mb_gre <- lookupGreLocalRn rdr_name
@@ -626,7 +626,7 @@ newLocalsRn rdr_names_w_loc
 	| otherwise = ASSERT2( isUnqual rdr_name, ppr rdr_name )
 			-- We only bind unqualified names here
 			-- lookupRdrEnv doesn't even attempt to look up a qualified RdrName
-		      mkInternalName uniq (rdrNameOcc rdr_name) (srcSpanStart loc)
+		      mkInternalName uniq (rdrNameOcc rdr_name) loc
 
 bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
 	   	    -> [Located RdrName]

@@ -452,8 +452,7 @@ mkMethId origin clas sel_id inst_tys
 	getSrcSpanM			`thenM` \ loc ->
 	let 
 	    real_tau = mkPhiTy (tail preds) tau
-	    meth_id  = mkUserLocal (getOccName sel_id) uniq real_tau 
-			(srcSpanStart loc) --TODO
+	    meth_id  = mkUserLocal (getOccName sel_id) uniq real_tau loc
 	in
 	returnM (Nothing, meth_id)
 
@@ -707,7 +706,7 @@ mkGenericInstance clas (hs_ty, binds)
 	-- Make the dictionary function.
     getSrcSpanM						`thenM` \ span -> 
     getOverlapFlag					`thenM` \ overlap_flag -> 
-    newDFunName clas [inst_ty] (srcSpanStart span)	`thenM` \ dfun_name ->
+    newDFunName clas [inst_ty] span             	`thenM` \ dfun_name ->
     let
 	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
 	dfun_id    = mkDictFunId dfun_name tyvars inst_theta clas [inst_ty]

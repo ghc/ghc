@@ -578,7 +578,7 @@ std_class_via_iso clas	-- These standard classes can be derived for a newtype
 
 
 new_dfun_name clas tycon 	-- Just a simple wrapper
-  = newDFunName clas [mkTyConApp tycon []] (getSrcLoc tycon)
+  = newDFunName clas [mkTyConApp tycon []] (getSrcSpan tycon)
 	-- The type passed to newDFunName is only used to generate
 	-- a suitable string; hence the empty type arg list
 \end{code}

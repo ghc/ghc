@@ -11,7 +11,6 @@ module SrcLoc (
 	advanceSrcLoc,
 
 	importedSrcLoc,		-- Unknown place in an interface
-	wiredInSrcLoc,		-- Something wired into the compiler
 	generatedSrcLoc,	-- Code generated within the compiler
 	interactiveSrcLoc,	-- Code from an interactive session
 
@@ -22,6 +21,8 @@ module SrcLoc (
 
 	SrcSpan,		-- Abstract
 	noSrcSpan, 
+	wiredInSrcSpan,		-- Something wired into the compiler
+	importedSrcSpan,	-- Unknown place in an interface
 	mkGeneralSrcSpan, 
 	isGoodSrcSpan, isOneLineSpan,
 	mkSrcSpan, srcLocSpan,
@@ -60,7 +61,7 @@ data SrcLoc
 		-- Don't ask me why lines start at 1 and columns start at
 		-- zero.  That's just the way it is, so there.  --SDM
 
-  | ImportedLoc	String		-- Module name
+  | ImportedLoc	FastString	-- Module name
 
   | UnhelpfulLoc FastString	-- Just a general indication
 \end{code}
@@ -81,13 +82,12 @@ Things to make 'em:
 mkSrcLoc x line col = SrcLoc x line col
 noSrcLoc	  = UnhelpfulLoc FSLIT("<no location info>")
 generatedSrcLoc   = UnhelpfulLoc FSLIT("<compiler-generated code>")
-wiredInSrcLoc     = UnhelpfulLoc FSLIT("<wired into compiler>")
 interactiveSrcLoc = UnhelpfulLoc FSLIT("<interactive session>")
 
 mkGeneralSrcLoc :: FastString -> SrcLoc
 mkGeneralSrcLoc = UnhelpfulLoc 
 
-importedSrcLoc :: String -> SrcLoc
+importedSrcLoc :: FastString -> SrcLoc
 importedSrcLoc mod_name = ImportedLoc mod_name
 
 isGoodSrcLoc (SrcLoc _ _ _) = True
@@ -150,7 +150,7 @@ instance Outputable SrcLoc where
 	   hcat [text "{-# LINE ", int src_line, space,
 		 char '\"', ftext src_path, text " #-}"]
 
-    ppr (ImportedLoc mod) = ptext SLIT("Defined in") <+> text mod
+    ppr (ImportedLoc mod) = ptext SLIT("Defined in") <+> ftext mod
     ppr (UnhelpfulLoc s)  = ftext s
 \end{code}
 
@@ -193,7 +193,7 @@ data SrcSpan
 	  srcSpanCol      :: !Int
 	}
 
-  | ImportedSpan String		-- Module name
+  | ImportedSpan FastString	-- Module name
 
   | UnhelpfulSpan FastString	-- Just a general indication
 				-- also used to indicate an empty span
@@ -206,7 +206,9 @@ instance Ord SrcSpan where
      (srcSpanStart a `compare` srcSpanStart b) `thenCmp` 
      (srcSpanEnd   a `compare` srcSpanEnd   b)
 
-noSrcSpan  = UnhelpfulSpan FSLIT("<no location info>")
+noSrcSpan      = UnhelpfulSpan FSLIT("<no location info>")
+wiredInSrcSpan = UnhelpfulSpan FSLIT("<wired into compiler>")
+importedSrcSpan = ImportedSpan
 
 mkGeneralSrcSpan :: FastString -> SrcSpan
 mkGeneralSrcSpan = UnhelpfulSpan
@@ -306,11 +308,11 @@ combineSrcSpans	start end
 	col2  = srcSpanEndCol end
 	file  = srcSpanFile start
 
-pprDefnLoc :: SrcLoc -> SDoc
+pprDefnLoc :: SrcSpan -> SDoc
 -- "defined at ..." or "imported from ..."
 pprDefnLoc loc
-  | isGoodSrcLoc loc = ptext SLIT("Defined at") <+> ppr loc
-  | otherwise	     = ppr loc
+  | isGoodSrcSpan loc = ptext SLIT("Defined at") <+> ppr loc
+  | otherwise	      = ppr loc
 
 instance Outputable SrcSpan where
     ppr span
@@ -347,7 +349,7 @@ pprUserSpan (SrcSpanPoint src_path line col)
 	   char ':', int col
 	 ]
 
-pprUserSpan (ImportedSpan mod) = ptext SLIT("Defined in") <+> text mod
+pprUserSpan (ImportedSpan mod) = ptext SLIT("Defined in") <+> ftext mod
 pprUserSpan (UnhelpfulSpan s)  = ftext s
 \end{code}
 

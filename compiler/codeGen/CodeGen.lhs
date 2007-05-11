@@ -350,7 +350,7 @@ maybeExternaliseId dflags id
     name    = idName id
     uniq    = nameUnique name
     new_occ = mkLocalOcc uniq (nameOccName name)
-    loc     = nameSrcLoc name
+    loc     = nameSrcSpan name
 	-- We want to conjure up a name that can't clash with any
 	-- existing name.  So we generate
 	--	Mod_$L243foo

@@ -378,7 +378,7 @@ make_row_vars used_lits (_, EqnInfo { eqn_pats = pats})
 
 hash_x = mkInternalName unboundKey {- doesn't matter much -}
 		     (mkVarOccFS FSLIT("#x"))
-		     noSrcLoc
+		     noSrcSpan
 
 make_row_vars_for_constructor :: (EqnNo, EquationInfo) -> [WarningPat]
 make_row_vars_for_constructor (_, EqnInfo { eqn_pats = pats}) 

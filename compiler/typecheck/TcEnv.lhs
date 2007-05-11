@@ -635,7 +635,7 @@ Make a name for the dict fun for an instance decl.  It's an *external*
 name, like otber top-level names, and hence must be made with newGlobalBinder.
 
 \begin{code}
-newDFunName :: Class -> [Type] -> SrcLoc -> TcM Name
+newDFunName :: Class -> [Type] -> SrcSpan -> TcM Name
 newDFunName clas (ty:_) loc
   = do	{ index   <- nextDFunIndex
 	; is_boot <- tcIsHsBoot
@@ -654,7 +654,7 @@ Make a name for the representation tycon of a family instance.  It's an
 newGlobalBinder.
 
 \begin{code}
-newFamInstTyConName :: Name -> SrcLoc -> TcM Name
+newFamInstTyConName :: Name -> SrcSpan -> TcM Name
 newFamInstTyConName tc_name loc
   = do	{ index <- nextDFunIndex
 	; mod   <- getModule

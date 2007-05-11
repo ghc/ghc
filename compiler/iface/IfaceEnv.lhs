@@ -46,7 +46,7 @@ import Outputable
 %*********************************************************
 
 \begin{code}
-newGlobalBinder :: Module -> OccName -> SrcLoc -> TcRnIf a b Name
+newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
 --
@@ -66,7 +66,7 @@ newGlobalBinder mod occ loc
 
 allocateGlobalBinder
   :: NameCache 
-  -> Module -> OccName -> SrcLoc 
+  -> Module -> OccName -> SrcSpan
   -> (NameCache, Name)
 allocateGlobalBinder name_supply mod occ loc
   = case lookupOrigNameCache (nsNames name_supply) mod occ of
@@ -114,7 +114,7 @@ newImplicitBinder :: Name			-- Base name
 newImplicitBinder base_name mk_sys_occ
   = newGlobalBinder (nameModule base_name)
 		    (mk_sys_occ (nameOccName base_name))
-		    (nameSrcLoc base_name)    
+		    (nameSrcSpan base_name)    
 
 ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
 ifaceExportNames exports = do
@@ -155,7 +155,7 @@ lookupOrig mod occ
               let
                 us        = nsUniqs name_cache
                 uniq      = uniqFromSupply us
-                name      = mkExternalName uniq mod occ noSrcLoc
+                name      = mkExternalName uniq mod occ noSrcSpan
                 new_cache = extendNameCache (nsNames name_cache) mod occ name
               in
               case splitUniqSupply us of { (us',_) -> do
@@ -292,11 +292,11 @@ lookupIfaceTop occ
 newIfaceName :: OccName -> IfL Name
 newIfaceName occ
   = do	{ uniq <- newUnique
-	; return $! mkInternalName uniq occ noSrcLoc }
+	; return $! mkInternalName uniq occ noSrcSpan }
 
 newIfaceNames :: [OccName] -> IfL [Name]
 newIfaceNames occs
   = do	{ uniqs <- newUniqueSupply
-	; return [ mkInternalName uniq occ noSrcLoc
+	; return [ mkInternalName uniq occ noSrcSpan
 		 | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
 \end{code}

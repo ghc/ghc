@@ -663,9 +663,8 @@ tcDataKindSig (Just kind)
   = do	{ checkTc (isLiftedTypeKind res_kind) (badKindSig kind)
 	; span <- getSrcSpanM
 	; us   <- newUniqueSupply 
-	; let loc   = srcSpanStart span
-	      uniqs = uniqsFromSupply us
-	; return [ mk_tv loc uniq str kind 
+	; let uniqs = uniqsFromSupply us
+	; return [ mk_tv span uniq str kind 
 		 | ((kind, str), uniq) <- arg_kinds `zip` names `zip` uniqs ] }
   where
     (arg_kinds, res_kind) = splitKindFunTys kind

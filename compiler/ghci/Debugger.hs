@@ -203,7 +203,7 @@ newGrimName cms userName  = do
     us <- mkSplitUniqSupply 'b'
     let unique  = uniqFromSupply us
         occname = mkOccName varName userName
-        name    = mkInternalName unique occname noSrcLoc
+        name    = mkInternalName unique occname noSrcSpan
     return name
 
 skolemSubst subst = subst `setTvSubstEnv` 

@@ -367,8 +367,7 @@ loadDecl ignore_prags mod (_version, decl)
 	--	* location
 	-- imported name, to fix the module correctly in the cache
     mk_new_bndr mod occ 
-	= newGlobalBinder mod occ 
-			  (importedSrcLoc (showSDoc (ppr (moduleName mod))))
+	= newGlobalBinder mod occ (importedSrcSpan (moduleNameFS (moduleName mod)))
 			-- ToDo: qualify with the package name if necessary
 
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)

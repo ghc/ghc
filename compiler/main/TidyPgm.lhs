@@ -28,10 +28,7 @@ import IdInfo		{- loads of stuff -}
 import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
 import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( Arity, isNeverActive, isNonRuleLoopBreaker )
-import Name		( Name, getOccName, nameOccName, mkInternalName,
-		  	  localiseName, isExternalName, nameSrcLoc,
-			  isWiredInName, getName
-			)
+import Name
 import NameSet		( NameSet, elemNameSet )
 import IfaceEnv		( allocateGlobalBinder )
 import NameEnv		( filterNameEnv, mapNameEnv )
@@ -674,7 +671,7 @@ tidyTopName mod nc_var ext_ids occ_env id
     global	= isExternalName name
     local	= not global
     internal	= not external
-    loc		= nameSrcLoc name
+    loc		= nameSrcSpan name
 
     (occ_env', occ') = tidyOccName occ_env (nameOccName name)
 

@@ -1556,7 +1556,7 @@ breakSwitch session args@(arg1:rest)
               io $ putStrLn "Perhaps no modules are loaded for debugging?"
    | otherwise = do -- try parsing it as an identifier
         wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
-        let loc = GHC.nameSrcLoc name
+        let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
         if GHC.isGoodSrcLoc loc
                then findBreakAndSet (GHC.nameModule name) $ 
                          findBreakByCoord (Just (GHC.srcLocFile loc))
@@ -1678,7 +1678,7 @@ list2 [arg1,arg2] | looksLikeModuleName arg1, all isDigit arg2 = do
         listModuleLine mod (read arg2)
 list2 [arg] = do
         wantNameFromInterpretedModule noCanDo arg $ \name -> do
-        let loc = GHC.nameSrcLoc name
+        let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
         if GHC.isGoodSrcLoc loc
                then do
                   tickArray <- getTickArray (GHC.nameModule name)

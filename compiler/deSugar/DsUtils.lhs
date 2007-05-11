@@ -948,7 +948,7 @@ mkTickBox ix vars e = do
                 | otherwise = mkBreakPointOpId uq mod ix
        uq2 <- newUnique 	
        let occName = mkVarOcc "tick"
-       let name = mkInternalName uq2 occName noSrcLoc   -- use mkSysLocal?
+       let name = mkInternalName uq2 occName noSrcSpan   -- use mkSysLocal?
        let var  = Id.mkLocalId name realWorldStatePrimTy
        scrut <- 
           if opt_Hpc 

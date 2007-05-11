@@ -268,7 +268,7 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; t_rhs    <- tcHsKindedType k_rhs
 
          -- (3) construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName tc_name (srcSpanStart loc)
+       ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; tycon <- buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
                                 (Just (family, t_typats))
 
@@ -307,7 +307,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
          -- (3) construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName tc_name (srcSpanStart loc)
+       ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict tycon t_tvs))
 				  k_cons

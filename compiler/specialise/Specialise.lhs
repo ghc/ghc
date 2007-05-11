@@ -32,7 +32,7 @@ import UniqSupply	( UniqSupply,
 			  UniqSM, initUs_, thenUs, returnUs, getUniqueUs, 
 			  getUs, mapUs
 			)
-import Name		( nameOccName, mkSpecOcc, getSrcLoc )
+import Name
 import MkId		( voidArgId, realWorldPrimId )
 import FiniteMap
 import Maybes		( catMaybes, maybeToBool )
@@ -1184,7 +1184,7 @@ newIdSM old_id new_ty
     let 
 	-- Give the new Id a similar occurrence name to the old one
 	name   = idName old_id
-	new_id = mkUserLocal (mkSpecOcc (nameOccName name)) uniq new_ty (getSrcLoc name)
+	new_id = mkUserLocal (mkSpecOcc (nameOccName name)) uniq new_ty (getSrcSpan name)
     in
     returnSM new_id
 \end{code}

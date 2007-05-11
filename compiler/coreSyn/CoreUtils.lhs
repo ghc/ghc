@@ -734,7 +734,7 @@ dataConInstPat arg_fun fss uniqs con inst_tys
          co_kind  = substTy subst (mkPredTy eq_pred)
 
       -- make value vars, instantiating types
-    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (substTy subst ty) noSrcLoc
+    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (substTy subst ty) noSrcSpan
     id_bndrs = zipWith3 mk_id_var id_uniqs id_fss arg_tys
 
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])

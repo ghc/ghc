@@ -889,7 +889,7 @@ makeImplicationBind loc all_tvs reft
  | otherwise			-- Otherwise we must generate a binding
  = do	{ uniq <- newUnique 
 	; span <- getSrcSpanM
-	; let name = mkInternalName uniq (mkVarOcc "ic") (srcSpanStart span)
+	; let name = mkInternalName uniq (mkVarOcc "ic") span
 	      implic_inst = ImplicInst { tci_name = name, tci_reft = reft,
 					 tci_tyvars = all_tvs, 
 					 tci_given = givens,

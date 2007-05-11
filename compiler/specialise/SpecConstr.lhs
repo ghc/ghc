@@ -27,7 +27,7 @@ import Id		( Id, idName, idType, isDataConWorkId_maybe,
 import Var		( Var )
 import VarEnv
 import VarSet
-import Name		( nameOccName, nameSrcLoc )
+import Name
 import Rules		( addIdSpecialisations, mkLocalRule, rulesOfBinds )
 import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
@@ -982,7 +982,7 @@ spec_one env fn arg_bndrs body ((qvars, pats), rule_number)
 	      	-- a spec_rhs of unlifted type and no args
 	
 	      fn_name   = idName fn
-	      fn_loc    = nameSrcLoc fn_name
+	      fn_loc    = nameSrcSpan fn_name
 	      spec_occ  = mkSpecOcc (nameOccName fn_name)
 	      rule_name = mkFastString ("SC:" ++ showSDoc (ppr fn <> int rule_number))
 	      spec_rhs  = mkLams spec_lam_args spec_body

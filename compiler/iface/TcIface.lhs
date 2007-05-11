@@ -1032,7 +1032,7 @@ tcIfaceLetBndr (IfLetBndr fs ty info)
 newExtCoreBndr :: IfaceLetBndr -> IfL Id
 newExtCoreBndr (IfLetBndr var ty _)	-- Ignoring IdInfo for now
   = do	{ mod <- getIfModule
-	; name <- newGlobalBinder mod (mkVarOccFS var) noSrcLoc
+	; name <- newGlobalBinder mod (mkVarOccFS var) noSrcSpan
 	; ty' <- tcIfaceType ty
 	; return (mkLocalId name ty') }
 

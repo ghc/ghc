@@ -23,7 +23,7 @@ module Name (
 	tidyNameOcc, 
 	hashName, localiseName,
 
-	nameSrcLoc,
+	nameSrcLoc, nameSrcSpan,
 
 	isSystemName, isInternalName, isExternalName,
 	isTyVarName, isTyConName, isWiredInName, isBuiltInSyntax,
@@ -32,7 +32,7 @@ module Name (
 	
 	-- Class NamedThing and overloaded friends
 	NamedThing(..),
-	getSrcLoc, getOccString
+	getSrcLoc, getSrcSpan, getOccString
     ) where
 
 #include "HsVersions.h"
@@ -66,7 +66,7 @@ data Name = Name {
 		n_sort :: NameSort,	-- What sort of name it is
 		n_occ  :: !OccName,	-- Its occurrence name
 		n_uniq :: Int#,         -- UNPACK doesn't work, recursive type
-		n_loc  :: !SrcLoc	-- Definition site
+		n_loc  :: !SrcSpan	-- Definition site
 	    }
 
 -- NOTE: we make the n_loc field strict to eliminate some potential
@@ -127,10 +127,12 @@ nameUnique		:: Name -> Unique
 nameOccName		:: Name -> OccName 
 nameModule		:: Name -> Module
 nameSrcLoc		:: Name -> SrcLoc
+nameSrcSpan		:: Name -> SrcSpan
 
 nameUnique  name = mkUniqueGrimily (I# (n_uniq name))
 nameOccName name = n_occ  name
-nameSrcLoc  name = n_loc  name
+nameSrcLoc  name = srcSpanStart (n_loc name)
+nameSrcSpan name = n_loc  name
 \end{code}
 
 \begin{code}
@@ -183,7 +185,7 @@ isSystemName other		      = False
 %************************************************************************
 
 \begin{code}
-mkInternalName :: Unique -> OccName -> SrcLoc -> Name
+mkInternalName :: Unique -> OccName -> SrcSpan -> Name
 mkInternalName uniq occ loc = Name { n_uniq = getKey# uniq, n_sort = Internal, n_occ = occ, n_loc = loc }
 	-- NB: You might worry that after lots of huffing and
 	-- puffing we might end up with two local names with distinct
@@ -194,7 +196,7 @@ mkInternalName uniq occ loc = Name { n_uniq = getKey# uniq, n_sort = Internal, n
 	--	* for interface files we tidyCore first, which puts the uniques
 	--	  into the print name (see setNameVisibility below)
 
-mkExternalName :: Unique -> Module -> OccName -> SrcLoc -> Name
+mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name
 mkExternalName uniq mod occ loc 
   = Name { n_uniq = getKey# uniq, n_sort = External mod,
            n_occ = occ, n_loc = loc }
@@ -204,11 +206,11 @@ mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax
 mkWiredInName mod occ uniq thing built_in
   = Name { n_uniq = getKey# uniq,
 	   n_sort = WiredIn mod thing built_in,
-	   n_occ = occ, n_loc = wiredInSrcLoc }
+	   n_occ = occ, n_loc = wiredInSrcSpan }
 
 mkSystemName :: Unique -> OccName -> Name
 mkSystemName uniq occ = Name { n_uniq = getKey# uniq, n_sort = System, 
-			       n_occ = occ, n_loc = noSrcLoc }
+			       n_occ = occ, n_loc = noSrcSpan }
 
 mkSystemVarName :: Unique -> FastString -> Name
 mkSystemVarName uniq fs = mkSystemName uniq (mkVarOccFS fs)
@@ -219,19 +221,19 @@ mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs)
 mkFCallName :: Unique -> String -> Name
 	-- The encoded string completely describes the ccall
 mkFCallName uniq str =  Name { n_uniq = getKey# uniq, n_sort = Internal, 
-			       n_occ = mkVarOcc str, n_loc = noSrcLoc }
+			       n_occ = mkVarOcc str, n_loc = noSrcSpan }
 
 mkTickBoxOpName :: Unique -> String -> Name
 mkTickBoxOpName uniq str 
    = Name { n_uniq = getKey# uniq, n_sort = Internal, 
-	    n_occ = mkVarOcc str, n_loc = noSrcLoc }
+	    n_occ = mkVarOcc str, n_loc = noSrcSpan }
 
 mkIPName :: Unique -> OccName -> Name
 mkIPName uniq occ
   = Name { n_uniq = getKey# uniq,
 	   n_sort = Internal,
 	   n_occ  = occ,
-	   n_loc = noSrcLoc }
+	   n_loc = noSrcSpan }
 \end{code}
 
 \begin{code}
@@ -406,9 +408,11 @@ class NamedThing a where
 
 \begin{code}
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
+getSrcSpan	    :: NamedThing a => a -> SrcSpan
 getOccString	    :: NamedThing a => a -> String
 
 getSrcLoc	    = nameSrcLoc	   . getName
+getSrcSpan	    = nameSrcSpan	   . getName
 getOccString 	    = occNameString	   . getOccName
 \end{code}
 

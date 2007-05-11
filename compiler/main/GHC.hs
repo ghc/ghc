@@ -110,7 +110,7 @@ module GHC (
 
 	-- ** Names
 	Name, 
-	nameModule, pprParenSymName, nameSrcLoc,
+	nameModule, pprParenSymName, nameSrcSpan,
 	NamedThing(..),
 	RdrName(Qual,Unqual),
 	
@@ -175,7 +175,7 @@ module GHC (
         mkSrcLoc, isGoodSrcLoc,
 	srcLocFile, srcLocLine, srcLocCol,
         SrcSpan,
-        mkSrcSpan, srcLocSpan,
+        mkSrcSpan, srcLocSpan, isGoodSrcSpan,
         srcSpanStart, srcSpanEnd,
 	srcSpanFile, 
         srcSpanStartLine, srcSpanEndLine, 

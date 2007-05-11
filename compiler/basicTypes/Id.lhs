@@ -154,7 +154,7 @@ mkSysLocal fs uniq ty = mkLocalId (mkSystemVarName uniq fs) ty
 
 
 -- UserLocal: an Id with a name the user might recognize...
-mkUserLocal :: OccName -> Unique -> Type -> SrcLoc -> Id
+mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
 mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
 
 mkUserLocal occ uniq ty loc = mkLocalId (mkInternalName    uniq occ loc) ty
@@ -175,7 +175,7 @@ mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
   = mkLocalId wkr_name ty
   where
-    wkr_name = mkInternalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcLoc unwrkr)
+    wkr_name = mkInternalName uniq (mkWorkerOcc (getOccName unwrkr)) (getSrcSpan unwrkr)
 
 -- "Template locals" typically used in unfoldings
 mkTemplateLocals :: [Type] -> [Id]

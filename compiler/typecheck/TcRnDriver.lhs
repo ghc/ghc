@@ -777,7 +777,7 @@ check_main dflags tcg_env main_mod main_fn
 		-- See Note [Root-main Id]
 	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
 				   (mkVarOccFS FSLIT("main")) 
-				   (getSrcLoc main_name)
+				   (getSrcSpan main_name)
 	      ; root_main_id = Id.mkExportedLocalId root_main_name ty
 	      ; main_bind    = noLoc (VarBind root_main_id main_expr) }
 

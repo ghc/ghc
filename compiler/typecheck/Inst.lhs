@@ -329,7 +329,7 @@ newIPDict orig ip_name ty
 \begin{code}
 mkPredName :: Unique -> InstLoc -> PredType -> Name
 mkPredName uniq loc pred_ty
-  = mkInternalName uniq occ (srcSpanStart (instLocSpan loc))
+  = mkInternalName uniq occ (instLocSpan loc)
   where
     occ = case pred_ty of
 	    ClassP cls _ -> mkDictOcc (getOccName cls)
@@ -413,7 +413,7 @@ newMethod inst_loc id tys
 	meth_id	    = mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
 	inst        = Method {tci_id = meth_id, tci_oid = id, tci_tys = tys,
 			      tci_theta = theta, tci_loc = inst_loc}
-	loc         = srcSpanStart (instLocSpan inst_loc)
+	loc         = instLocSpan inst_loc
     in
     returnM inst
 \end{code}

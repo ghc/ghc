@@ -81,7 +81,7 @@ listTags :: PrintUnqualified -> GHC.ModuleInfo -> [TagInfo]
 listTags unqual modInfo =
 	   [ tagInfo unqual name loc 
            | name <- GHC.modInfoExports modInfo
-           , let loc = nameSrcLoc name
+           , let loc = srcSpanStart (nameSrcSpan name)
            , isGoodSrcLoc loc
            ]
 

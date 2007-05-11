@@ -161,7 +161,7 @@ tcSkolSigTyVars :: SkolemInfo -> [TyVar] -> [TcTyVar]
 tcSkolSigTyVars info tyvars = [ mkSkolTyVar (tyVarName tv) (tyVarKind tv) info
 			      | tv <- tyvars ]
 
-tcInstSkolTyVar :: SkolemInfo -> Maybe SrcLoc -> TyVar -> TcM TcTyVar
+tcInstSkolTyVar :: SkolemInfo -> Maybe SrcSpan -> TyVar -> TcM TcTyVar
 -- Instantiate the tyvar, using 
 --	* the occ-name and kind of the supplied tyvar, 
 --	* the unique from the monad,
@@ -171,7 +171,7 @@ tcInstSkolTyVar info mb_loc tyvar
   = do	{ uniq <- newUnique
 	; let old_name = tyVarName tyvar
 	      kind     = tyVarKind tyvar
-	      loc      = mb_loc `orElse` getSrcLoc old_name
+	      loc      = mb_loc `orElse` getSrcSpan old_name
 	      new_name = mkInternalName uniq (nameOccName old_name) loc
 	; return (mkSkolTyVar new_name kind info) }
 
@@ -179,7 +179,7 @@ tcInstSkolTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
 -- Get the location from the monad
 tcInstSkolTyVars info tyvars 
   = do 	{ span <- getSrcSpanM
-	; mapM (tcInstSkolTyVar info (Just (srcSpanStart span))) tyvars }
+	; mapM (tcInstSkolTyVar info (Just span)) tyvars }
 
 tcInstSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants

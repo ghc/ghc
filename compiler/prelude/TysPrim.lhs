@@ -57,7 +57,7 @@ import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 			  Kind, mkArrowKinds, mkArrowKind,
 			  TyThing(..)
 			)
-import SrcLoc		( noSrcLoc )
+import SrcLoc
 import Unique		( mkAlphaTyVarUnique, pprUnique )
 import PrelNames
 import FastString	( FastString, mkFastString )
@@ -150,7 +150,7 @@ alphaTyVars is a list of type variables for use in templates:
 tyVarList :: Kind -> [TyVar]
 tyVarList kind = [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u) 
 				(mkTyVarOcc (mkFastString name))
-			 	noSrcLoc) kind
+			 	noSrcSpan) kind
 	         | u <- [2..],
 		   let name | c <= 'z'  = [c]
 		            | otherwise = 't':show u

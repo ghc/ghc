@@ -20,7 +20,7 @@ import qualified GHC
 
 import TyCon	( tyConFamInst_maybe )
 import Type	( pprTypeApp )
-import GHC	( TyThing(..), SrcLoc )
+import GHC	( TyThing(..), SrcSpan )
 import Outputable
 
 -- -----------------------------------------------------------------------------
@@ -33,7 +33,7 @@ import Outputable
 pprTyThingLoc :: Bool -> TyThing -> SDoc
 pprTyThingLoc exts tyThing 
   = showWithLoc loc (pprTyThing exts tyThing)
-  where loc = GHC.nameSrcLoc (GHC.getName tyThing)
+  where loc = GHC.nameSrcSpan (GHC.getName tyThing)
 
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: Bool -> TyThing -> SDoc
@@ -46,7 +46,7 @@ pprTyThing exts (AClass cls)       = pprClass      exts cls
 pprTyThingInContextLoc :: Bool -> TyThing -> SDoc
 pprTyThingInContextLoc exts tyThing 
   = showWithLoc loc (pprTyThingInContext exts tyThing)
-  where loc = GHC.nameSrcLoc (GHC.getName tyThing)
+  where loc = GHC.nameSrcSpan (GHC.getName tyThing)
 
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
 -- is a data constructor, record selector, or class method, then 
@@ -228,7 +228,7 @@ add_bars (c:cs)  = sep ((equals <+> c) : map (char '|' <+>) cs)
 ppr_bndr :: GHC.NamedThing a => a -> SDoc
 ppr_bndr a = GHC.pprParenSymName a
 
-showWithLoc :: SrcLoc -> SDoc -> SDoc
+showWithLoc :: SrcSpan -> SDoc -> SDoc
 showWithLoc loc doc 
     = hang doc 2 (char '\t' <> comment <+> GHC.pprDefnLoc loc)
 		-- The tab tries to make them line up a bit

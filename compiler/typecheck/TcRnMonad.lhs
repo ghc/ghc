@@ -324,7 +324,7 @@ newUniqueSupply
 newLocalName :: Name -> TcRnIf gbl lcl Name
 newLocalName name	-- Make a clone
   = do	{ uniq <- newUnique
-	; return (mkInternalName uniq (nameOccName name) (getSrcLoc name)) }
+	; return (mkInternalName uniq (nameOccName name) (getSrcSpan name)) }
 
 newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys

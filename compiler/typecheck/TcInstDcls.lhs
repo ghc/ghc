@@ -252,7 +252,7 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 
 	-- Finally, construct the Core representation of the instance.
 	-- (This no longer includes the associated types.)
-	; dfun_name <- newDFunName clas inst_tys (srcSpanStart loc)
+	; dfun_name <- newDFunName clas inst_tys loc
 	; overlap_flag <- getOverlapFlag
 	; let dfun           = mkDictFunId dfun_name tyvars theta clas inst_tys
 	      ispec          = mkLocalInstance dfun overlap_flag

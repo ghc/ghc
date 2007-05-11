@@ -214,8 +214,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec) =
    newUnique			`thenM` \ uniq ->
    getModule			`thenM` \ mod ->
    let
-        gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) 
-			      (srcSpanStart loc)
+        gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) loc
 	id   = mkExportedLocalId gnm sig_ty
 	bind = L loc (VarBind id rhs)
    in

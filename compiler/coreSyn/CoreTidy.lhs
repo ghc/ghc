@@ -176,7 +176,7 @@ tidyIdBndr env@(tidy_env, var_env) id
 	-- which should save some space.
 	-- But note that tidyLetBndr puts some of it back.
         ty'          	  = tidyType env (idType id)
-	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcLoc
+	id'          	  = mkUserLocal occ' (idUnique id) ty' noSrcSpan
 				`setIdInfo` vanillaIdInfo
 	var_env'	  = extendVarEnv var_env id id'
     in

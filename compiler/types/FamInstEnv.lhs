@@ -82,7 +82,7 @@ instance Outputable FamInst where
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
   = hang (pprFamInstHdr famInst)
-	2 (ptext SLIT("--") <+> (pprDefnLoc (getSrcLoc famInst)))
+	2 (ptext SLIT("--") <+> (pprDefnLoc (getSrcSpan famInst)))
 
 pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr (FamInst {fi_fam = fam, fi_tys = tys, fi_tycon = tycon})

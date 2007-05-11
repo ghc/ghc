@@ -1421,10 +1421,6 @@ genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
 \end{code}
 
 \begin{code}
-getSrcSpan = srcLocSpan . getSrcLoc
-\end{code}
-
-\begin{code}
 a_RDR		= mkVarUnqual FSLIT("a")
 b_RDR		= mkVarUnqual FSLIT("b")
 c_RDR		= mkVarUnqual FSLIT("c")
