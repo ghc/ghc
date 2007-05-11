@@ -50,10 +50,11 @@ data GHCiState = GHCiState
         prelude        :: GHC.Module,
         break_ctr      :: !Int,
         breaks         :: ![(Int, BreakLocation)],
-        tickarrays     :: ModuleEnv TickArray
+        tickarrays     :: ModuleEnv TickArray,
                 -- tickarrays caches the TickArray for loaded modules,
                 -- so that we don't rebuild it each time the user sets
                 -- a breakpoint.
+        cmdqueue       :: [String]
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
@@ -69,15 +70,22 @@ data BreakLocation
    { breakModule :: !GHC.Module
    , breakLoc    :: !SrcSpan
    , breakTick   :: {-# UNPACK #-} !Int
+   , onBreakCmd  :: String
    } 
-   deriving Eq
+
+instance Eq BreakLocation where
+  loc1 == loc2 = breakModule loc1 == breakModule loc2 &&
+                 breakTick loc1   == breakTick loc2
 
 prettyLocations :: [(Int, BreakLocation)] -> SDoc
 prettyLocations []   = text "No active breakpoints." 
 prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ reverse $ locs
 
 instance Outputable BreakLocation where
-   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc)
+   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+>
+                if null (onBreakCmd loc)
+                   then empty
+                   else doubleQuotes (text (onBreakCmd loc))
 
 recordBreak :: BreakLocation -> GHCi (Bool{- was already present -}, Int)
 recordBreak brkLoc = do

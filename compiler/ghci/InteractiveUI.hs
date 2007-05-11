@@ -287,7 +287,8 @@ interactiveUI session srcs maybe_expr = do
                    prelude = prel_mod,
                    break_ctr = 0,
                    breaks = [],
-                   tickarrays = emptyModuleEnv
+                   tickarrays = emptyModuleEnv,
+                   cmdqueue = []
                  }
 
 #ifdef USE_READLINE
@@ -446,16 +447,8 @@ fileLoop hdl show_prompt = do
 	Right l -> 
 	  case removeSpaces l of
             "" -> fileLoop hdl show_prompt
-	    l  -> do quit <- runCommand l
+	    l  -> do quit <- runCommands l
                      if quit then return () else fileLoop hdl show_prompt
-
-stringLoop :: [String] -> GHCi Bool{-True: we quit-}
-stringLoop [] = return False
-stringLoop (s:ss) = do
-   case removeSpaces s of
-	"" -> stringLoop ss
-	l  -> do quit <- runCommand l
-                 if quit then return True else stringLoop ss
 
 mkPrompt = do
   session <- getSession
@@ -514,17 +507,31 @@ readlineLoop = do
 	    "" -> readlineLoop
 	    l  -> do
         	  io (addHistory l)
-  	  	  quit <- runCommand l
+  	  	  quit <- runCommands l
           	  if quit then return () else readlineLoop
 #endif
 
-runCommand :: String -> GHCi Bool
-runCommand c = ghciHandle handler (doCommand c)
-  where 
-    doCommand (':' : command) = specialCommand command
-    doCommand stmt
-       = do timeIt $ runStmt stmt GHC.RunToCompletion
-            return False
+runCommands :: String -> GHCi Bool
+runCommands cmd = do
+        q <- ghciHandle handler (doCommand cmd)
+        if q then return True else runNext
+  where
+       runNext = do
+          st <- getGHCiState
+          case cmdqueue st of
+            []   -> return False
+            c:cs -> do setGHCiState st{ cmdqueue = cs }
+                       runCommands c
+
+       doCommand (':' : cmd) = specialCommand cmd
+       doCommand stmt        = do timeIt $ runStmt stmt GHC.RunToCompletion
+                                  return False
+
+enqueueCommands :: [String] -> GHCi ()
+enqueueCommands cmds = do
+  st <- getGHCiState
+  setGHCiState st{ cmdqueue = cmds ++ cmdqueue st }
+
 
 -- This version is for the GHC command-line option -e.  The only difference
 -- from runCommand is that it catches the ExitException exception and
@@ -563,14 +570,15 @@ afterRunStmt run_result = do
      GHC.RunOk names -> do
         show_types <- isOptionSet ShowType
         when show_types $ mapM_ (showTypeOfName session) names
-     GHC.RunBreak _ names _ -> do
+     GHC.RunBreak _ names info -> do
         resumes <- io $ GHC.getResumeContext session
         printForUser $ ptext SLIT("Stopped at") <+> 
                        ppr (GHC.resumeSpan (head resumes))
         mapM_ (showTypeOfName session) names
+        runBreakCmd info
         -- run the command set with ":set stop <cmd>"
         st <- getGHCiState
-        runCommand (stop st)
+        enqueueCommands [stop st]
         return ()
      _ -> return ()
 
@@ -581,6 +589,17 @@ afterRunStmt run_result = do
 
   return (case run_result of GHC.RunOk _ -> True; _ -> False)
 
+runBreakCmd :: GHC.BreakInfo -> GHCi ()
+runBreakCmd info = do
+  let mod = GHC.breakInfo_module info
+      nm  = GHC.breakInfo_number info
+  st <- getGHCiState
+  case  [ loc | (i,loc) <- breaks st,
+                breakModule loc == mod, breakTick loc == nm ] of
+        []  -> return ()
+        loc:_ | null cmd  -> return ()
+              | otherwise -> do enqueueCommands [cmd]; return ()
+              where cmd = onBreakCmd loc
 
 showTypeOfName :: Session -> Name -> GHCi ()
 showTypeOfName session n
@@ -674,8 +693,7 @@ pprInfo exts (thing, fixity, insts)
 runMain :: String -> GHCi ()
 runMain args = do
   let ss = concat $ intersperse "," (map (\ s -> ('"':s)++"\"") (toArgs args))
-  runCommand $ '[': ss ++ "] `System.Environment.withArgs` main"
-  return ()
+  enqueueCommands  ['[': ss ++ "] `System.Environment.withArgs` main"]
 
 addModule :: [FilePath] -> GHCi ()
 addModule files = do
@@ -748,7 +766,8 @@ defineMacro s = do
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
   str <- io ((unsafeCoerce# fun :: String -> IO String) s)
-  stringLoop (lines str)
+  enqueueCommands (lines str)
+  return False
 
 undefineMacro :: String -> GHCi ()
 undefineMacro macro_name = do
@@ -1064,6 +1083,19 @@ setEditor cmd = do
   st <- getGHCiState
   setGHCiState st{ editor = cmd }
 
+setStop str@(c:_) | isDigit c
+  = do let (nm_str,rest) = break (not.isDigit) str
+           nm = read nm_str
+       st <- getGHCiState
+       let old_breaks = breaks st
+       if all ((/= nm) . fst) old_breaks
+              then printForUser (text "Breakpoint" <+> ppr nm <+>
+                                 text "does not exist")
+              else do
+       let new_breaks = map fn old_breaks
+           fn (i,loc) | i == nm   = (i,loc { onBreakCmd = dropWhile isSpace rest })
+                      | otherwise = (i,loc)
+       setGHCiState st{ breaks = new_breaks }
 setStop cmd = do
   st <- getGHCiState
   setGHCiState st{ stop = cmd }
@@ -1518,8 +1550,7 @@ backCmd = noArgs $ do
   mapM_ (showTypeOfName s) names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
-  runCommand (stop st)
-  return ()
+  enqueueCommands [stop st]
 
 forwardCmd :: String -> GHCi ()
 forwardCmd = noArgs $ do
@@ -1531,8 +1562,7 @@ forwardCmd = noArgs $ do
   mapM_ (showTypeOfName s) names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
-  runCommand (stop st)
-  return ()
+  enqueueCommands [stop st]
 
 -- handle the "break" command
 breakCmd :: String -> GHCi ()
@@ -1596,6 +1626,7 @@ findBreakAndSet mod lookupTickTree = do
                              { breakModule = mod
                              , breakLoc = span
                              , breakTick = tick
+                             , onBreakCmd = ""
                              }
                printForUser $
                   text "Breakpoint " <> ppr nm <>
