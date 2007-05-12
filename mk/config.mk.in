@@ -775,6 +775,8 @@ MKDIRHIER		= $(GHC_MKDIRHIER_DIR)/$(GHC_MKDIRHIER_PGM)
 LNDIR			= $(GHC_LNDIR_DIR)/$(GHC_LNDIR_PGM)
 RUNTEST			= $(GHC_RUNTEST_DIR)/$(GHC_RUNTEST_PGM)
 
+GENERATED_FILE  = chmod a-w
+
 #-----------------------------------------------------------------------------
 # Haskell compilers and mkdependHS
 

@@ -83,7 +83,7 @@ $(odir_)%.$(way_)s : %.$(way_)hc
 $(odir_)%.$(way_)hc : %.lhc
 	@$(RM) $@
 	$(UNLIT) $< $@
-	@chmod 444 $@
+	$(GENERATED_FILE) $@
 
 
 # Here's an interesting rule!
@@ -358,17 +358,17 @@ endif
 %.prl : %.lprl
 	@$(RM) $@
 	$(UNLIT) $(UNLIT_OPTS) $< $@
-	@chmod 444 $@
+	$(GENERATED_FILE) $@
 
 %.c : %.lc
 	@$(RM) $@
 	$(UNLIT) $(UNLIT_OPTS) $< $@
-	@chmod 444 $@
+	$(GENERATED_FILE) $@
 
 %.h : %.lh
 	@$(RM) $@
 	$(UNLIT) $(UNLIT_OPTS) $< $@
-	@chmod 444 $@
+	$(GENERATED_FILE) $@
 
 #-----------------------------------------------------------------------------
 # Win32 resource files
