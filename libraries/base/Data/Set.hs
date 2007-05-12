@@ -340,7 +340,16 @@ hedgeDiff cmplo cmphi t (Bin _ x l r)
   Intersection
 --------------------------------------------------------------------}
 -- | /O(n+m)/. The intersection of two sets.
--- Elements of the result come from the first set.
+-- Elements of the result come from the first set, so for example
+--
+-- > import qualified Data.Set as S
+-- > data AB = A | B deriving Show
+-- > instance Ord AB where compare _ _ = EQ
+-- > instance Eq AB where _ == _ = True
+-- > main = print (S.singleton A `S.intersection` S.singleton B,
+-- >               S.singleton B `S.intersection` S.singleton A)
+--
+-- prints @(fromList [A],fromList [B])@.
 intersection :: Ord a => Set a -> Set a -> Set a
 intersection Tip t = Tip
 intersection t Tip = Tip
