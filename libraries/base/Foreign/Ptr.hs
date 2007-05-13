@@ -62,6 +62,7 @@ import GHC.Word		( Word(..) )
 import Data.Int
 import Data.Word
 #else
+import Control.Monad	( liftM )
 import Foreign.C.Types
 #endif
 
