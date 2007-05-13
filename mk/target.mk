@@ -15,7 +15,7 @@
 #
 # 2.  GNU standard targets
 #	all*
-#	install* uninstall installcheck installdirs
+#	install* installcheck installdirs
 #       install-docs*
 #	clean* distclean* mostlyclean* maintainer-clean*
 #	tags*
@@ -133,11 +133,6 @@ endif
 #      Use `-' before any command for installing a man page, so that make
 #      will ignore any errors.  This is in case there are systems that
 #      don't have the Unix man page documentation system installed.
-# 
-# `uninstall'
-#      Delete all the installed files that the `install' target would
-#      create (but not the noninstalled files such as `make all' would
-#      create).
 # 
 # `clean'
 # 
@@ -625,7 +620,7 @@ endif # LINK
 
 ###########################################
 #
-#	Targets: install install-strip uninstall
+#	Targets: install install-strip
 #
 ###########################################
 
@@ -647,7 +642,7 @@ endif # LINK
 # friends can be overridden from their original settings in mk/config.mk.in
 # || mk/build.mk
 #
-.PHONY: install install-docs installdirs install-strip install-dirs uninstall install-docs show-install
+.PHONY: install install-docs installdirs install-strip install-dirs install-docs show-install
 
 show-install :
 	@echo "bindir = $(bindir)"
@@ -836,35 +831,6 @@ install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-
 	done
 endif
 endif
-
-#
-# Use with care..
-#
-uninstall:: 
-	@for i in $(INSTALL_PROGS) "" ; do			\
-	  if test "$$i"; then 					\
-		echo rm -f $(bindir)/`basename $$i`;		\
-		rm -f $(bindir)/`basename $$i`;			\
-	  fi; 							\
-	done
-	@for i in $(INSTALL_LIBS) ""; do			\
-	  if test "$$i"; then 					\
-		echo rm -f $(libdir)/`basename $$i`;		\
-		rm -f $(libdir)/`basename $$i`;			\
-	  fi;							\
-	done
-	@for i in $(INSTALL_LIBEXECS) ""; do			\
-	  if test "$$i"; then 					\
-		echo rm -f $(libexecdir)/`basename $$i`;	\
-		rm -f $(libexecdir)/`basename $$i`;		\
-	  fi;							\
-	done
-	@for i in $(INSTALL_DATAS) ""; do			\
-	  if test "$$i"; then 					\
-		echo rm -f $(datadir)/`basename $$i`;		\
-		rm -f $(datadir)/`basename $$i`;		\
-	  fi;							\
-	done
 
 #
 # install-strip is from the GNU Makefile standard.
