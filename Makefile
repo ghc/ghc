@@ -223,10 +223,6 @@ BinDistLinks = ghc ghci ghc-pkg
 BinDistLibSplicedFiles = package.conf
 BinDistDirs = includes compiler docs driver rts utils
 
-BIN_DIST_NAME=ghc-$(ProjectVersion)
-BIN_DIST_TOPDIR=$(FPTOOLS_TOP_ABS)
-BIN_DIST_DIR=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)
-
 BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
 
 BIN_DIST_TOP= distrib/Makefile \
@@ -332,6 +328,7 @@ binary-dist :: $(BINARY_DIST_DOC_RULES)
 $(BINARY_DIST_DOC_RULES): binary-dist-doc-%:
 	$(MAKE) -C $* $(MFLAGS) $(BINDIST_DOC_WAYS)
 	$(MAKE) -C $* $(MFLAGS) install-docs \
+			MAKING_BIN_DIST=1
 	        XMLDocWays="$(BINDIST_DOC_WAYS)" \
 	        prefix=$(BIN_DIST_DIR) \
 	        exec_prefix=$(BIN_DIST_DIR) \
@@ -372,27 +369,8 @@ endif
 
 .PHONY: binary-dist-doc-%
 
-BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
-
-LIBRARY_SUBDIRS=$(shell $(MAKE) -s -C libraries subdirs)
-
-BINARY_DIST_LIBRARY_RULES=$(foreach d,$(LIBRARY_SUBDIRS),binary-dist-lib-$d)
-
-binary-dist:: $(BINARY_DIST_LIBRARY_RULES)
-	cp    libraries/Makefile           $(BIN_DIST_LIBDIR)
-	cp    libraries/gen_contents_index $(BIN_DIST_LIBDIR)
-	cp    libraries/index.html         $(BIN_DIST_LIBDIR)
-	cp    libraries/doc-index.html     $(BIN_DIST_LIBDIR)
-	cp -a libraries/stamp              $(BIN_DIST_LIBDIR)
-
-$(BINARY_DIST_LIBRARY_RULES): binary-dist-lib-%:
-	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*/setup
-	cp    libraries/$*/setup/Setup   $(BIN_DIST_LIBDIR)/$*/setup
-	cp    libraries/$*/*.cabal       $(BIN_DIST_LIBDIR)/$*
-	cp -a libraries/$*/dist          $(BIN_DIST_LIBDIR)/$*
-	find $(BIN_DIST_LIBDIR)/$*/dist \
-	     \( \( -name "*.o" -o -name "*.p_o" \) -a \! -name "HS*" \) \
-	     -exec rm {} \;
+binary-dist::
+	$(MAKE) -C libraries binary-dist
 
 # Jiggle the files around to make a valid Windows distribution if necessary
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"

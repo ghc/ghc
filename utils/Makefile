@@ -1,7 +1,7 @@
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-ifneq "$(BIN_DIST_NAME)" ""
+ifeq "$(MAKING_BIN_DIST)" "1"
 # We're doing a binary-dist, descend into a subset of the dirs.
 SUBDIRS = hp2ps unlit
 else

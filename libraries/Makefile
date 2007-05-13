@@ -226,6 +226,26 @@ install.library.%: stamp/configure.library.install.% \
                    %/setup/Setup ifBuildable/ifBuildable
 	ifBuildable/ifBuildable $* setup/Setup install
 
+.PHONY: binary-dist binary-dist.library.%
+
+BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
+
+binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
+	cp    Makefile           $(BIN_DIST_LIBDIR)
+	cp    gen_contents_index $(BIN_DIST_LIBDIR)
+	cp    index.html         $(BIN_DIST_LIBDIR)
+	cp    doc-index.html     $(BIN_DIST_LIBDIR)
+	cp -a stamp              $(BIN_DIST_LIBDIR)
+
+$(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
+binary-dist.library.%:
+	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*/setup
+	ifBuildable/ifBuildable $* cp    setup/Setup   $(BIN_DIST_LIBDIR)/$*/setup
+	ifBuildable/ifBuildable $* cp    $*.cabal      $(BIN_DIST_LIBDIR)/$*
+	ifBuildable/ifBuildable $* cp -a dist          $(BIN_DIST_LIBDIR)/$*
+	ifBuildable/ifBuildable $* find $(BIN_DIST_LIBDIR)/$*/dist \
+	     \( -name "*.o" -o -name "*.p_o" -o -name "HS*" \) -exec rm {} \;
+
 .PHONY: distclean clean clean.library.%
 
 distclean: clean

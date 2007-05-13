@@ -502,6 +502,10 @@ FPTOOLS_TOP_ABS		= @hardtop@
 # The platform specific version of 'hardtop'.
 FPTOOLS_TOP_ABS_PLATFORM = @hardtop_plat@
 
+BIN_DIST_NAME=ghc-$(ProjectVersion)
+BIN_DIST_TOPDIR=$(FPTOOLS_TOP_ABS)
+BIN_DIST_DIR=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)
+
 #
 # Installation directories, we don't use half of these,
 # but since the configure script has them on offer while
