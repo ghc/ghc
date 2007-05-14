@@ -452,7 +452,8 @@ bindLocalsAtBreakpoint hsc_env apStack info = do
    let result_fs = FSLIT("_result")
        result_name = mkInternalName (getUnique result_fs)
                           (mkVarOccFS result_fs) span
-       result_id   = Id.mkLocalId result_name result_ty
+       result_id   = Id.mkGlobalId VanillaGlobal result_name result_ty 
+                                   vanillaIdInfo
 
    -- for each Id we're about to bind in the local envt:
    --    - skolemise the type variables in its type, so they can't
