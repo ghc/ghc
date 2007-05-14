@@ -87,7 +87,7 @@ Relative to John's original paper, there are the following new features:
     It is Really Useful in practice.
 
 2.  There is a paragraph-fill combinator, fsep, that's much like sep,
-    only it keeps fitting things on one line until itc can't fit any more.
+    only it keeps fitting things on one line until it can't fit any more.
 
 3.  Some random useful extra combinators are provided.  
         <+> puts its arguments beside each other with a space between them,
