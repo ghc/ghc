@@ -485,7 +485,8 @@ getGccEnv opts =
   get_b_opt (Option ('-':'B':dir)) = Left dir
   get_b_opt other = Right other  
 
-  mangle_path ("PATH",paths) = ("PATH", '\"' : head b_dirs ++ "\";" ++ paths)
+  mangle_path (path,paths) | map toUpper path == "PATH" 
+        = (path, '\"' : head b_dirs ++ "\";" ++ paths)
   mangle_path other = other
 #endif
 
