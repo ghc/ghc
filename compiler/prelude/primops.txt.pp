@@ -1692,11 +1692,6 @@ primop  GetApStackValOp "getApStackVal#" GenPrimOp
    with
    out_of_line = True
 
-primop GetStackFrame "getStackFrame#" GenPrimOp
-   ThreadId# -> Int# -> (# Int#, Int# #)
-   with
-   out_of_line = True
-
 ------------------------------------------------------------------------
 section "Etc" 
 	{Miscellaneous built-ins}
