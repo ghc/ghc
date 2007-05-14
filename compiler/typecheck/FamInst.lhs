@@ -180,7 +180,7 @@ checkForConflicts inst_envs famInst
 
        ; let { matches   = lookupFamInstEnvUnify inst_envs fam tys'
 	     ; conflicts = [ conflictingFamInst
-			   | match@(_, conflictingFamInst) <- matches
+			   | match@(conflictingFamInst, _) <- matches
 			   , conflicting fam tys' tycon match 
 			   ]
 	     }

@@ -198,10 +198,24 @@ Multiple matches are only possible in case of type families (not data
 families), and then, it doesn't matter which match we choose (as the
 instances are guaranteed confluent).
 
+We return the matching family instances and the type instance at which it
+matches.  For example, if we lookup 'T [Int]' and have a family instance
+
+  data instance T [a] = ..
+
+desugared to
+
+  data :R42T a = ..
+  coe :Co:R42T a :: T [a] ~ :R42T a
+
+we return the matching instance '(FamInst{.., fi_tycon = :R42T}, Int)'.
+
 \begin{code}
+type FamInstMatch = (FamInst, [Type])           -- Matching type instance
+
 lookupFamInstEnv :: FamInstEnvs
 	         -> TyCon -> [Type]		-- What we are looking for
-	         -> [(TvSubst, FamInst)] 	-- Successful matches
+	         -> [FamInstMatch] 	        -- Successful matches
 lookupFamInstEnv (pkg_ie, home_ie) fam tys
   = home_matches ++ pkg_matches
   where
@@ -231,7 +245,7 @@ lookupFamInstEnv (pkg_ie, home_ie) fam tys
 
         -- Proper check
       | Just subst <- tcMatchTys tpl_tvs tpl_tys tys
-      = (subst, item) : find rest
+      = (item, substTyVars subst (tyConTyVars tycon)) : find rest
 
         -- No match => try next
       | otherwise
@@ -250,7 +264,7 @@ indexed synonyms and we don't want to slow that down by needless unification.
 
 \begin{code}
 lookupFamInstEnvUnify :: (FamInstEnv, FamInstEnv) -> TyCon -> [Type]
-	              -> [(TvSubst, FamInst)]
+	              -> [(FamInstMatch)]
 lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
   = home_matches ++ pkg_matches
   where
@@ -286,7 +300,9 @@ lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
         case tcUnifyTys bind_fn tpl_tys tys of
-	    Just subst -> (subst, item) : find rest
+	    Just subst -> let rep_tys = substTyVars subst (tyConTyVars tycon)
+                          in
+                          (item, rep_tys) : find rest
 	    Nothing    -> find rest
 
 -- See explanation at @InstEnv.bind_fn@.

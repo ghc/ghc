@@ -274,10 +274,9 @@ mkCase :: LibCaseEnv -> CoreExpr -> Id -> Type -> [CoreAlt] -> CoreExpr
 -- See Note [Indexed data types]
 mkCase env scrut bndr ty [(DEFAULT,_,rhs)]
   | Just (tycon, tys)   <- splitTyConApp_maybe (idType bndr)
-  , [(subst, fam_inst)] <- lookupFamInstEnv (lc_fams env) tycon tys
+  , [(fam_inst, rep_tys)] <- lookupFamInstEnv (lc_fams env) tycon tys
   = let 
 	rep_tc     = famInstTyCon fam_inst
-	rep_tys    = map (substTyVar subst) (tyConTyVars rep_tc)
 	bndr'      = setIdType bndr (mkTyConApp rep_tc rep_tys)
 	Just co_tc = tyConFamilyCoercion_maybe rep_tc
 	co	   = mkTyConApp co_tc rep_tys

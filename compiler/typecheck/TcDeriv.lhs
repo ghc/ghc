@@ -47,6 +47,8 @@ import Util
 import ListSetOps
 import Outputable
 import Bag
+
+import Monad (unless)
 \end{code}
 
 %************************************************************************
@@ -395,7 +397,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app
 	      full_tc_args = tc_args ++ mkTyVarTys extra_tvs
 	      full_tvs = tvs ++ extra_tvs
 		
-	; (rep_tc, rep_tc_args) <- tcLookupFamInst tycon full_tc_args
+	; (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon full_tc_args
 
 	; gla_exts <- doptM Opt_GlasgowExts
 	; overlap_flag <- getOverlapFlag
@@ -413,6 +415,27 @@ mkEqnHelp orig tvs cls cls_tys tc_app
 		(ptext SLIT("Last argument of the instance must be a type application")))
 
 baleOut err = addErrTc err >> returnM (Nothing, Nothing) 
+\end{code}
+
+Auxiliary lookup wrapper which requires that looked up family instances are
+not type instances.
+
+\begin{code}
+tcLookupFamInstExact :: TyCon -> [Type] -> TcM (TyCon, [Type])
+tcLookupFamInstExact tycon tys
+  = do { result@(rep_tycon, rep_tys) <- tcLookupFamInst tycon tys
+       ; let { tvs		      = map (Type.getTyVar 
+                                               "TcDeriv.tcLookupFamInstExact") 
+					    tys
+	     ; variable_only_subst = all Type.isTyVarTy rep_tys &&
+				     sizeVarSet (mkVarSet tvs) == length tvs
+					-- renaming may have no repetitions
+             }
+       ; unless variable_only_subst $
+           famInstNotFound tycon tys [result]
+       ; return result
+       }
+       
 \end{code}
 
 
@@ -980,7 +1003,7 @@ genInst spec
 
           -- In case of a family instance, we need to use the representation
           -- tycon (after all, it has the data constructors)
-        ; (tycon, _) <- tcLookupFamInst visible_tycon tyArgs
+        ; (tycon, _) <- tcLookupFamInstExact visible_tycon tyArgs
 	; let (meth_binds, aux_binds) = genDerivBinds clas fix_env tycon
 
 	-- Bring the right type variables into 

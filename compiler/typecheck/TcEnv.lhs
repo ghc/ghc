@@ -42,7 +42,10 @@ module TcEnv(
 	topIdLvl, 
 
 	-- New Ids
-	newLocalName, newDFunName, newFamInstTyConName
+	newLocalName, newDFunName, newFamInstTyConName,
+
+        -- Errors
+        famInstNotFound
   ) where
 
 #include "HsVersions.h"
@@ -159,7 +162,21 @@ tcLookupLocatedTyCon :: Located Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocM tcLookupTyCon
 
 -- Look up the representation tycon of a family instance.
--- Return the rep tycon and the corresponding rep args
+--
+-- The match must be unique - ie, match exactly one instance - but the 
+-- type arguments used for matching may be more specific than those of 
+-- the family instance declaration.
+--
+-- Return the instance tycon and its type instance.  For example, if we have
+--
+--  tcLookupFamInst 'T' '[Int]' yields (':R42T', 'Int')
+--
+-- then we have a coercion (ie, type instance of family instance coercion)
+--
+--  :Co:R42T Int :: T [Int] ~ :R42T Int
+--
+-- which implies that :R42T was declared as 'data instance T [a]'.
+--
 tcLookupFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
 tcLookupFamInst tycon tys
   | not (isOpenTyCon tycon)
@@ -169,20 +186,8 @@ tcLookupFamInst tycon tys
        ; eps <- getEps
        ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
        ; case lookupFamInstEnv instEnv tycon tys of
-
-	   [(subst, fam_inst)] | variable_only_subst -> 
-	     return (rep_tc, substTyVars subst (tyConTyVars rep_tc))
-		where	-- NB: assumption is that (tyConTyVars rep_tc) is in 
-			--     the domain of the substitution
-		  rep_tc              = famInstTyCon fam_inst
-		  subst_domain        = varEnvElts . getTvSubstEnv $ subst
-		  tvs		      = map (Type.getTyVar "tcLookupFamInst") 
-					    subst_domain
-		  variable_only_subst = all Type.isTyVarTy subst_domain &&
-					sizeVarSet (mkVarSet tvs) == length tvs
-					-- renaming may have no repetitions
-
-	   other -> famInstNotFound tycon tys other
+	   [(fam_inst, rep_tys)] -> return (famInstTyCon fam_inst, rep_tys)
+	   other                 -> famInstNotFound tycon tys other
        }
 \end{code}
 
