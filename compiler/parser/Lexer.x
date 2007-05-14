@@ -597,7 +597,7 @@ reservedWordsFM = listToUFM $
 
       	( "forall",	ITforall,	 bit tvBit),
 	( "mdo",	ITmdo,		 bit glaExtsBit),
-	( "family",	ITfamily,	 bit idxTysBit),
+	( "family",	ITfamily,	 bit tyFamBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
@@ -632,7 +632,7 @@ reservedSymsFM = listToUFM $
        ,("!",	ITbang, 	0)
 
        ,("*",	ITstar,		bit glaExtsBit .|. 
-				bit idxTysBit)	    -- For data T (a::*) = MkT
+				bit tyFamBit)	    -- For data T (a::*) = MkT
        ,(".",	ITdot,		bit tvBit)	    -- For 'forall a . t'
 
        ,("-<",	ITlarrowtail,	bit arrowsBit)
@@ -1495,7 +1495,7 @@ ipBit      = 6
 tvBit	   = 7	-- Scoped type variables enables 'forall' keyword
 bangPatBit = 8	-- Tells the parser to understand bang-patterns
 		-- (doesn't affect the lexer)
-idxTysBit  = 9	-- indexed type families: 'family' keyword and kind sigs
+tyFamBit   = 9	-- indexed type families: 'family' keyword and kind sigs
 haddockBit = 10 -- Lex and parse Haddock comments
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
@@ -1507,7 +1507,7 @@ thEnabled      flags = testBit flags thBit
 ipEnabled      flags = testBit flags ipBit
 tvEnabled      flags = testBit flags tvBit
 bangPatEnabled flags = testBit flags bangPatBit
-idxTysEnabled  flags = testBit flags idxTysBit
+tyFamEnabled   flags = testBit flags tyFamBit
 haddockEnabled flags = testBit flags haddockBit
 
 -- PState for parsing options pragmas
@@ -1550,16 +1550,16 @@ mkPState buf loc flags  =
 	-- we begin in the layout state if toplev_layout is set
     }
     where
-      bitmap =     glaExtsBit `setBitIf` dopt Opt_GlasgowExts flags
-	       .|. ffiBit     `setBitIf` dopt Opt_FFI         flags
-	       .|. parrBit    `setBitIf` dopt Opt_PArr        flags
-	       .|. arrowsBit  `setBitIf` dopt Opt_Arrows      flags
-	       .|. thBit      `setBitIf` dopt Opt_TH          flags
+      bitmap =     glaExtsBit `setBitIf` dopt Opt_GlasgowExts  flags
+	       .|. ffiBit     `setBitIf` dopt Opt_FFI          flags
+	       .|. parrBit    `setBitIf` dopt Opt_PArr         flags
+	       .|. arrowsBit  `setBitIf` dopt Opt_Arrows       flags
+	       .|. thBit      `setBitIf` dopt Opt_TH           flags
 	       .|. ipBit      `setBitIf` dopt Opt_ImplicitParams flags
 	       .|. tvBit      `setBitIf` dopt Opt_ScopedTypeVariables flags
 	       .|. bangPatBit `setBitIf` dopt Opt_BangPatterns flags
-	       .|. idxTysBit  `setBitIf` dopt Opt_IndexedTypes flags
-	       .|. haddockBit `setBitIf` dopt Opt_Haddock     flags
+	       .|. tyFamBit   `setBitIf` dopt Opt_TypeFamilies flags
+	       .|. haddockBit `setBitIf` dopt Opt_Haddock      flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

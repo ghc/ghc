@@ -133,7 +133,7 @@ tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
    	           -> TcM TcGblEnv 	-- Input env extended by types and classes 
 					-- and their implicit Ids,DataCons
 tcTyAndClassDecls boot_details allDecls
-  = do	{       -- Omit instances of indexed types; they are handled together
+  = do	{       -- Omit instances of type families; they are handled together
 		-- with the *heads* of class instances
         ; let decls = filter (not . isFamInstDecl . unLoc) allDecls
 
@@ -239,9 +239,9 @@ tcFamInstDecl (L loc decl)
     recoverM (returnM Nothing)		        $
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
-    do { -- type families require -findexed-types and can't be in an
+    do { -- type families require -ftype-families and can't be in an
 	 -- hs-boot file
-       ; gla_exts <- doptM Opt_IndexedTypes
+       ; gla_exts <- doptM Opt_TypeFamilies
        ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
        ; checkTc gla_exts      $ badFamInstDecl (tcdLName decl)
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
@@ -392,7 +392,7 @@ So we must infer their kinds from their right-hand sides *first* and then
 use them, whereas for the mutually recursive data types D we bring into
 scope kind bindings D -> k, where k is a kind variable, and do inference.
 
-Indexed Types
+Type families
 ~~~~~~~~~~~~~
 This treatment of type synonyms only applies to Haskell 98-style synonyms.
 General type functions can be recursive, and hence, appear in `alg_decls'.
@@ -618,9 +618,9 @@ tcTyClDecl1 _calc_isrec
 						      --     kind checking
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
   { traceTc (text "type family: " <+> ppr tc_name) 
-  ; idx_tys <- doptM Opt_IndexedTypes
+  ; idx_tys <- doptM Opt_TypeFamilies
 
-	-- Check that we don't use families without -findexed-types
+	-- Check that we don't use families without -ftype-families
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing) Nothing
@@ -636,9 +636,9 @@ tcTyClDecl1 _calc_isrec
   ; extra_tvs <- tcDataKindSig mb_kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
 
-  ; idx_tys <- doptM Opt_IndexedTypes
+  ; idx_tys <- doptM Opt_TypeFamilies
 
-	-- Check that we don't use families without -findexed-types
+	-- Check that we don't use families without -ftype-families
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
@@ -1168,7 +1168,7 @@ badSigTyDecl tc_name
 badFamInstDecl tc_name
   = vcat [ ptext SLIT("Illegal family instance for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -findexed-types to allow indexed type families")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -ftype-families to allow indexed type families")) ]
 
 badGadtIdxTyDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+>

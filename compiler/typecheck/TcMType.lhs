@@ -943,9 +943,9 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
     how_to_allow = parens (ptext SLIT("Use -fglasgow-exts to permit this"))
 
 check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
-  = do {	-- Equational constraints are valid in all contexts if indexed
-		-- types are permitted
-       ; checkTc (dopt Opt_IndexedTypes dflags) (eqPredTyErr pred)
+  = do {	-- Equational constraints are valid in all contexts if type
+		-- families are permitted
+       ; checkTc (dopt Opt_TypeFamilies dflags) (eqPredTyErr pred)
 
 		-- Check the form of the argument types
        ; check_eq_arg_type ty1
@@ -1075,7 +1075,7 @@ checkThetaCtxt ctxt theta
 badPredTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
 eqPredTyErr  sty = ptext SLIT("Illegal equational constraint") <+> pprPred sty
 		   $$
-		   parens (ptext SLIT("Use -findexed-types to permit this"))
+		   parens (ptext SLIT("Use -ftype-families to permit this"))
 predTyVarErr pred  = sep [ptext SLIT("Non type-variable argument"),
 			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)

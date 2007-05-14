@@ -302,7 +302,7 @@ used for source code.
 
 	*** See "THE NAMING STORY" in HsDecls ****
 
-Instances of indexed types
+Instances of type families
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Indexed data/newtype instances contain data constructors that we need to
 collect, too.  Moreover, we need to descend into the data/newtypes instances
@@ -384,8 +384,8 @@ filterImports iface decl_spec Nothing all_avails
 
 filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
   = do   -- check for errors, convert RdrNames to Names
-        opt_indexedtypes <- doptM Opt_IndexedTypes
-        items1 <- mapM (lookup_lie opt_indexedtypes) import_items
+        opt_typeFamilies <- doptM Opt_TypeFamilies
+        items1 <- mapM (lookup_lie opt_typeFamilies) import_items
 
         let items2 :: [(LIE Name, AvailInfo)]
             items2 = concat items1
@@ -432,10 +432,10 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 	    (name, AvailTC name subs, Just parent)
 
     lookup_lie :: Bool -> LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
-    lookup_lie opt_indexedtypes (L loc ieRdr)
+    lookup_lie opt_typeFamilies (L loc ieRdr)
         = do 
              stuff <- setSrcSpan loc $ 
-                      case lookup_ie opt_indexedtypes ieRdr of
+                      case lookup_ie opt_typeFamilies ieRdr of
                             Failed err  -> addErr err >> return []
                             Succeeded a -> return a
              checkDodgyImport stuff
@@ -460,7 +460,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 	-- AvailInfos for the data constructors and the family (as they have
 	-- different parents).  See the discussion at occ_env.
     lookup_ie :: Bool -> IE RdrName -> MaybeErr Message [(IE Name,AvailInfo)]
-    lookup_ie opt_indexedtypes ie 
+    lookup_ie opt_typeFamilies ie 
       = let bad_ie = Failed (badImportItemErr iface decl_spec ie)
 
             lookup_name rdrName = 
@@ -505,8 +505,8 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
 	    children <- if any isNothing mb_children
                         then bad_ie
                         else return (catMaybes mb_children)
-              -- check for proper import of indexed types
-	    when (not opt_indexedtypes && any isTyConName children) $
+              -- check for proper import of type families
+	    when (not opt_typeFamilies && any isTyConName children) $
               Failed (typeItemErr (head . filter isTyConName $ children)
 				  (text "in import list"))
             case mb_parent of
@@ -837,8 +837,8 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                 then do addErr (exportItemErr ie)
                         return (IEThingWith name [], AvailTC name [name])
                 else do let names = catMaybes mb_names
-                        optIdxTypes <- doptM Opt_IndexedTypes
-                        when (not optIdxTypes && any isTyConName names) $
+                        optTyFam <- doptM Opt_TypeFamilies
+                        when (not optTyFam && any isTyConName names) $
                           addErr (typeItemErr ( head
                                               . filter isTyConName 
                                               $ names )
@@ -1309,7 +1309,7 @@ exportItemErr export_item
 
 typeItemErr name wherestr
   = sep [ ptext SLIT("Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
-	  ptext SLIT("Use -findexed-types to enable this extension") ]
+	  ptext SLIT("Use -ftype-families to enable this extension") ]
 
 exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
                -> Message

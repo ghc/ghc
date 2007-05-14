@@ -175,7 +175,7 @@ data DynFlag
    | Opt_ImplicitPrelude 
    | Opt_ScopedTypeVariables
    | Opt_BangPatterns
-   | Opt_IndexedTypes
+   | Opt_TypeFamilies
    | Opt_OverloadedStrings
 
    -- optimisation opts
@@ -1051,7 +1051,7 @@ fFlags = [
   ( "scoped-type-variables",  		Opt_ScopedTypeVariables ),
   ( "bang-patterns",	  		Opt_BangPatterns ),
   ( "overloaded-strings",		Opt_OverloadedStrings ),
-  ( "indexed-types",	  		Opt_IndexedTypes ),
+  ( "type-families",	  		Opt_TypeFamilies ),
   ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
   ( "mono-pat-binds",			Opt_MonoPatBinds ),
   ( "extended-default-rules",		Opt_ExtendedDefaultRules ),
@@ -1088,7 +1088,7 @@ glasgowExtsFlags = [
   Opt_FFI, 
   Opt_ImplicitParams, 
   Opt_ScopedTypeVariables,
-  Opt_IndexedTypes ]
+  Opt_TypeFamilies ]
 
 isFFlag f = f `elem` (map fst fFlags)
 getFFlag f = fromJust (lookup f fFlags)
