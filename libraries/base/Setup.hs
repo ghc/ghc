@@ -15,6 +15,7 @@ import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Utils
 import System.Cmd
 import System.Environment
+import System.FilePath
 import System.Info
 
 main :: IO ()
@@ -74,8 +75,16 @@ type PostConfHook = Args -> ConfigFlags -> PackageDescription -> LocalBuildInfo
 build_primitive_sources :: Hook a -> Hook a
 build_primitive_sources f pd lbi uhs x
  = do when (compilerFlavor (compiler lbi) == GHC) $ do
-          maybeExit $ system "../../utils/genprimopcode/genprimopcode --make-haskell-source < ../../compiler/prelude/primops.txt > GHC/Prim.hs"
-          maybeExit $ system "../../utils/genprimopcode/genprimopcode --make-haskell-wrappers < ../../compiler/prelude/primops.txt > GHC/PrimopWrappers.hs"
+          let genprimopcode = joinPath ["..", "..", "utils",
+                                        "genprimopcode", "genprimopcode"]
+              primops = joinPath ["..", "..", "compiler", "prelude",
+                                  "primops.txt"]
+              primhs = joinPath ["GHC", "Prim.hs"]
+              primopwrappers = joinPath ["GHC", "PrimopWrappers.hs"]
+          maybeExit $ system (genprimopcode ++ " --make-haskell-source < "
+                           ++ primops ++ " > " ++ primhs)
+          maybeExit $ system (genprimopcode ++ " --make-haskell-wrappers < "
+                           ++ primops ++ " > " ++ primopwrappers)
       f pd lbi uhs x
 
 add_ghc_options :: [String] -> Hook a -> Hook a
