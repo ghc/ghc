@@ -743,23 +743,16 @@ checkMain :: TcM TcGblEnv
 checkMain 
   = do { tcg_env   <- getGblEnv ;
 	 dflags    <- getDOpts ;
-	 let { main_mod = mainModIs dflags ;
-	       main_fn  = case mainFunIs dflags of {
-				Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn)) ;
-				Nothing -> main_RDR_Unqual } } ;
-	
-	 check_main dflags tcg_env main_mod main_fn
+	 check_main dflags tcg_env
     }
 
-
-check_main dflags tcg_env main_mod main_fn
+check_main dflags tcg_env
  | mod /= main_mod
  = traceTc (text "checkMain not" <+> ppr main_mod <+> ppr mod) >>
    return tcg_env
 
  | otherwise
- = addErrCtxt mainCtxt			$
-   do	{ mb_main <- lookupSrcOcc_maybe main_fn
+ = do	{ mb_main <- lookupSrcOcc_maybe main_fn
 		-- Check that 'main' is in scope
 		-- It might be imported from another module!
 	; case mb_main of {
@@ -767,11 +760,13 @@ check_main dflags tcg_env main_mod main_fn
 			   ; complain_no_main	
 			   ; return tcg_env } ;
 	     Just main_name -> do
+
 	{ traceTc (text "checkMain found" <+> ppr main_mod <+> ppr main_fn)
 	; let { rhs = nlHsApp (nlHsVar runMainIOName) (nlHsVar main_name) }
 		   	-- :Main.main :: IO () = runMainIO main 
 
-	; (main_expr, ty) <- setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
+	; (main_expr, ty) <- addErrCtxt mainCtxt			$
+   			     setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
 			     tcInferRho rhs
 
 		-- See Note [Root-main Id]
@@ -790,17 +785,25 @@ check_main dflags tcg_env main_mod main_fn
 		 }) 
     }}}
   where
-    mod = tcg_mod tcg_env
- 
+    mod 	 = tcg_mod tcg_env
+    main_mod     = mainModIs dflags
+    main_is_flag = mainFunIs dflags
+
+    main_fn  = case main_is_flag of
+		  Just fn -> mkRdrUnqual (mkVarOccFS (mkFastString fn))
+		  Nothing -> main_RDR_Unqual
+
     complain_no_main | ghcLink dflags == LinkInMemory = return ()
 		     | otherwise = failWithTc noMainMsg
 	-- In interactive mode, don't worry about the absence of 'main'
 	-- In other modes, fail altogether, so that we don't go on
 	-- and complain a second time when processing the export list.
 
-    mainCtxt  = ptext SLIT("When checking the type of the main function") <+> quotes (ppr main_fn)
-    noMainMsg = ptext SLIT("The main function") <+> quotes (ppr main_fn) 
+    mainCtxt  = ptext SLIT("When checking the type of the") <+> pp_main_fn
+    noMainMsg = ptext SLIT("The") <+> pp_main_fn
 		<+> ptext SLIT("is not defined in module") <+> quotes (ppr main_mod)
+    pp_main_fn | isJust main_is_flag = ptext SLIT("main function") <+> quotes (ppr main_fn)
+	       | otherwise 	     = ptext SLIT("function") <+> quotes (ppr main_fn)
 \end{code}
 
 Note [Root-main Id]
