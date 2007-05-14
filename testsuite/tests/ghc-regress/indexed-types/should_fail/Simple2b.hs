@@ -1,4 +1,4 @@
-{-# OPTIONS -findexed-types #-}
+{-# OPTIONS -ftype-families #-}
 
 class C a where
   data Sd a :: *

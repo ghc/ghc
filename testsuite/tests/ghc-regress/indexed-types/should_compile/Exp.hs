@@ -1,4 +1,4 @@
-{-# OPTIONS -findexed-types #-}
+{-# OPTIONS -ftype-families #-}
 
 module Exp (C, C(type T), T, foo, S)
 where

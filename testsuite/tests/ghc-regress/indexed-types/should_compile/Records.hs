@@ -1,4 +1,4 @@
-{-# OPTIONS -findexed-types #-}
+{-# OPTIONS -ftype-families #-}
 
 -- See Trac #1204
 

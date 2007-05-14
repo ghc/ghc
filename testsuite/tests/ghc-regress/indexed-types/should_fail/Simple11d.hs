@@ -1,4 +1,4 @@
-{-# OPTIONS -findexed-types #-}
+{-# OPTIONS -ftype-families #-}
 
 module ShouldFail where
 

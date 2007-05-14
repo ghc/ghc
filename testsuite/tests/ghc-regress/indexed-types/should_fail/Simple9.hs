@@ -1,4 +1,4 @@
-{-# OPTIONS -findexed-types -fglasgow-exts #-}
+{-# OPTIONS -ftype-families -fglasgow-exts #-}
 
 module ShouldFail where
 
