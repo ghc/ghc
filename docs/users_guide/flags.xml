@@ -693,6 +693,12 @@
 	      <entry><option>-fno-th</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-ftype-families</option></entry>
+	      <entry>Enable <link linkend="type-families">type families</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-type-families</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-fbang-patterns</option></entry>
 	      <entry>Enable <link linkend="bang-patterns">bang patterns</link>.</entry>
 	      <entry>dynamic</entry>

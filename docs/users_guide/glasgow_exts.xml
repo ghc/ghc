@@ -4139,6 +4139,33 @@ to work since it gets translated into an equality comparison.
 </para>
 </sect2>
 
+<sect2 id="type-families">
+<title>Type families
+</title>
+
+<para>
+GHC supports the definition of type families indexed by types.  They may be
+seen as an extension of Haskell 98's class-based overloading of values to
+types.  When type families are declared in classes, they are also known as
+associated types.
+</para>
+<para>
+There are two forms of type families: data families and type synonym families.
+Currently, only the former are fully implemented, while we are still working
+on the latter.  As a result, the specification of the language extension is
+also still to some degree in flux.  Hence, a more detailed description of
+the language extension and its use is currently available
+from <ulink url="http://haskell.org/haskellwiki/GHC/Indexed_types">the Haskell
+wiki page on type families</ulink>.  The material will be moved to this user's
+guide when it has stabilised.
+</para>
+<para>
+Type families are enabled by the flag <option>-ftype-families</option>.
+</para>
+
+
+</sect2>
+
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
   
