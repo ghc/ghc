@@ -12,7 +12,7 @@ _result :: t
 y :: t
 _result :: t
 y :: t
-y = (_t1::a)
+y = (_t1::t)
 ()
 y = 1
 1

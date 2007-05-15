@@ -17,5 +17,4 @@ f :: t -> Integer
 xs :: [t]
 y :: Integer
 _t1 :: Integer
-*** Exception: ghci/Debugger.hs:102:48-73: Irrefutable pattern failed for pattern Data.Maybe.Just tv
-
+2

@@ -1,7 +1,6 @@
 Breakpoint 0 activated at ../QSort.hs:5:15-50
 Stopped at ../QSort.hs:5:15-50
 _result :: [a]
-as :: [a]
 a :: a
 left :: [a]
 right :: [a]
@@ -15,7 +14,6 @@ left = 4 : (_t3::[Integer])
 left = [4]
 Stopped at ../QSort.hs:5:15-50
 _result :: [a]
-as :: [a]
 a :: a
 left :: [a]
 right :: [a]
