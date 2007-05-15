@@ -328,7 +328,7 @@ binary-dist :: $(BINARY_DIST_DOC_RULES)
 $(BINARY_DIST_DOC_RULES): binary-dist-doc-%:
 	$(MAKE) -C $* $(MFLAGS) $(BINDIST_DOC_WAYS)
 	$(MAKE) -C $* $(MFLAGS) install-docs \
-			MAKING_BIN_DIST=1
+			MAKING_BIN_DIST=1 \
 	        XMLDocWays="$(BINDIST_DOC_WAYS)" \
 	        prefix=$(BIN_DIST_DIR) \
 	        exec_prefix=$(BIN_DIST_DIR) \
