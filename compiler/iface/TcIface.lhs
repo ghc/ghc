@@ -383,14 +383,21 @@ tcIfaceDecl ignore_prags
 
 tcIfaceDecl ignore_prags 
 	    (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
-		       ifOpenSyn = isOpen, ifSynRhs = rdr_rhs_ty})
+		       ifOpenSyn = isOpen, ifSynRhs = rdr_rhs_ty,
+		       ifFamInst = mb_family})
    = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
      { tc_name <- lookupIfaceTop occ_name
      ; rhs_tyki <- tcIfaceType rdr_rhs_ty
      ; let rhs = if isOpen then OpenSynTyCon rhs_tyki Nothing
 			   else SynonymTyCon rhs_tyki
-     -- !!!TODO: read mb_family info from iface and pass as last argument
-     ; tycon <- buildSynTyCon tc_name tyvars rhs Nothing
+     ; famInst <- case mb_family of
+		    Nothing         -> return Nothing
+		    Just (fam, tys) -> 
+		      do { famTyCon <- tcIfaceTyCon fam
+		         ; insttys <- mapM tcIfaceType tys
+		         ; return $ Just (famTyCon, insttys)
+		         }
+     ; tycon <- buildSynTyCon tc_name tyvars rhs famInst
      ; return $ ATyCon tycon
      }
 

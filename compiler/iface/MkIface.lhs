@@ -1070,10 +1070,12 @@ tyThingToIfaceDecl (AClass clas)
 
 tyThingToIfaceDecl (ATyCon tycon)
   | isSynTyCon tycon
-  = IfaceSyn {	ifName   = getOccName tycon,
-		ifTyVars = toIfaceTvBndrs tyvars,
+  = IfaceSyn {	ifName    = getOccName tycon,
+		ifTyVars  = toIfaceTvBndrs tyvars,
 		ifOpenSyn = syn_isOpen,
-		ifSynRhs  = toIfaceType syn_tyki }
+		ifSynRhs  = toIfaceType syn_tyki,
+                ifFamInst = famInstToIface (tyConFamInst_maybe tycon)
+             }
 
   | isAlgTyCon tycon
   = IfaceData {	ifName    = getOccName tycon,

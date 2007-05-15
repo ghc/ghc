@@ -77,14 +77,21 @@ data IfaceDecl
     						-- current compilation unit 
                 ifFamInst    :: Maybe (IfaceTyCon, [IfaceType])
                                                 -- Just <=> instance of family
+                                                -- Invariant: 
+                                                --   ifCons /= IfOpenDataTyCon
+                                                --   for family instances
     }
 
   | IfaceSyn  {	ifName    :: OccName,		-- Type constructor
 		ifTyVars  :: [IfaceTvBndr],	-- Type variables
 		ifOpenSyn :: Bool,		-- Is an open family?
-		ifSynRhs  :: IfaceType		-- Type for an ordinary
+		ifSynRhs  :: IfaceType,		-- Type for an ordinary
 						-- synonym and kind for an
 						-- open family
+                ifFamInst    :: Maybe (IfaceTyCon, [IfaceType])
+                                                -- Just <=> instance of family
+                                                -- Invariant: ifOpenSyn == False
+                                                --   for family instances
     }
 
   | IfaceClass { ifCtxt    :: IfaceContext, 	-- Context...
@@ -391,9 +398,10 @@ pprIfaceDecl (IfaceForeign {ifName = tycon})
   = hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
-		        ifOpenSyn = False, ifSynRhs = mono_ty})
+		        ifOpenSyn = False, ifSynRhs = mono_ty, 
+                        ifFamInst = mbFamInst})
   = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (equals <+> ppr mono_ty)
+       4 (vcat [equals <+> ppr mono_ty, pprFamily mbFamInst])
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
 		        ifOpenSyn = True, ifSynRhs = mono_ty})
@@ -712,14 +720,10 @@ eqIfDecl d1@(IfaceData {}) d2@(IfaceData {})
 	-- The type variables of the data type do not scope
 	-- over the constructors (any more), but they do scope
 	-- over the stupid context in the IfaceConDecls
-  where
-    Nothing             `eqIfTc_fam` Nothing             = Equal
-    (Just (fam1, tys1)) `eqIfTc_fam` (Just (fam2, tys2)) = 
-      fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2
-    _		        `eqIfTc_fam` _                   = NotEqual
 
 eqIfDecl d1@(IfaceSyn {}) d2@(IfaceSyn {})
   = bool (ifName d1 == ifName d2) &&&
+    ifFamInst d1 `eqIfTc_fam` ifFamInst d2 &&&
     eqWith (ifTyVars d1) (ifTyVars d2) (\ env -> 
           eq_ifType env (ifSynRhs d1) (ifSynRhs d2)
         )
@@ -739,6 +743,15 @@ eqIfDecl _ _ = NotEqual	-- default case
 -- Helper
 eqWith :: [IfaceTvBndr] -> [IfaceTvBndr] -> (EqEnv -> IfaceEq) -> IfaceEq
 eqWith = eq_ifTvBndrs emptyEqEnv
+
+eqIfTc_fam :: Maybe (IfaceTyCon, [IfaceType]) 
+           -> Maybe (IfaceTyCon, [IfaceType])
+           -> IfaceEq
+Nothing             `eqIfTc_fam` Nothing             = Equal
+(Just (fam1, tys1)) `eqIfTc_fam` (Just (fam2, tys2)) = 
+  fam1 `eqIfTc` fam2 &&& eqListBy eqIfType tys1 tys2
+_		        `eqIfTc_fam` _               = NotEqual
+
 
 -----------------------
 eqIfInst d1 d2 = bool (ifDFun d1 == ifDFun d2 && ifOFlag d1 == ifOFlag d2)

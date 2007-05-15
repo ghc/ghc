@@ -1062,12 +1062,13 @@ instance Binary IfaceDecl where
 	    put_ bh a6
 	    put_ bh a7
 	    put_ bh a8
-    put_ bh (IfaceSyn aq ar as at) = do
+    put_ bh (IfaceSyn a1 a2 a3 a4 a5) = do
 	    putByte bh 3
-	    put_ bh (occNameFS aq)
-	    put_ bh ar
-	    put_ bh as
-	    put_ bh at
+	    put_ bh (occNameFS a1)
+	    put_ bh a2
+	    put_ bh a3
+	    put_ bh a4
+	    put_ bh a5
     put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7) = do
 	    putByte bh 4
 	    put_ bh a1
@@ -1098,12 +1099,13 @@ instance Binary IfaceDecl where
                     occ <- return $! mkOccNameFS tcName a1
 		    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8)
 	      3 -> do
-		    aq <- get bh
-		    ar <- get bh
-		    as <- get bh
-		    at <- get bh
-                    occ <- return $! mkOccNameFS tcName aq
-		    return (IfaceSyn occ ar as at)
+		    a1 <- get bh
+		    a2 <- get bh
+		    a3 <- get bh
+		    a4 <- get bh
+		    a5 <- get bh
+                    occ <- return $! mkOccNameFS tcName a1
+		    return (IfaceSyn occ a2 a3 a4 a5)
 	      _ -> do
 		    a1 <- get bh
 		    a2 <- get bh
