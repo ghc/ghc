@@ -118,6 +118,7 @@ RTS_INFO(stg_AP_info);
 RTS_INFO(stg_AP_STACK_info);
 RTS_INFO(stg_dummy_ret_info);
 RTS_INFO(stg_raise_info);
+RTS_INFO(stg_raise_ret_info);
 RTS_INFO(stg_TVAR_WATCH_QUEUE_info);
 RTS_INFO(stg_INVARIANT_CHECK_QUEUE_info);
 RTS_INFO(stg_ATOMIC_INVARIANT_info);

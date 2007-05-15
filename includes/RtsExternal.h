@@ -99,6 +99,11 @@ extern void setIOManagerPipe (int fd);
 
 extern void* allocateExec(unsigned int len);
 
+// Breakpoint stuff
+extern int rts_stop_next_breakpoint;
+extern int rts_stop_on_exception;
+extern HsStablePtr rts_breakpoint_io_action;
+
 /* -----------------------------------------------------------------------------
    Storage manager stuff exported
    -------------------------------------------------------------------------- */

@@ -210,6 +210,7 @@ data DynFlag
    | Opt_PrintBindResult
    | Opt_Haddock
    | Opt_Hpc_No_Auto
+   | Opt_BreakOnException
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -1079,7 +1080,8 @@ fFlags = [
   ( "print-bind-result",		Opt_PrintBindResult ),
   ( "force-recomp",			Opt_ForceRecomp ),
   ( "hpc-no-auto",			Opt_Hpc_No_Auto ),
-  ( "rewrite-rules",			Opt_RewriteRules )
+  ( "rewrite-rules",			Opt_RewriteRules ),
+  ( "break-on-exception",               Opt_BreakOnException )
   ]
 
 

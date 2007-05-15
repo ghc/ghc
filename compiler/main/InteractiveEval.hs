@@ -70,7 +70,9 @@ import Outputable
 import Data.Dynamic
 import Control.Monad
 import Foreign
+import Foreign.C
 import GHC.Exts
+import GHC.Conc         ( ThreadId(..) )
 import Data.Array
 import Control.Exception as Exception
 import Control.Concurrent
@@ -84,11 +86,11 @@ data RunResult
   = RunOk [Name] 		-- ^ names bound by this evaluation
   | RunFailed	 		-- ^ statement failed compilation
   | RunException Exception	-- ^ statement raised an exception
-  | RunBreak ThreadId [Name] BreakInfo
+  | RunBreak ThreadId [Name] (Maybe BreakInfo)
 
 data Status
-   = Break HValue BreakInfo ThreadId
-          -- ^ the computation hit a breakpoint
+   = Break Bool HValue BreakInfo ThreadId
+          -- ^ the computation hit a breakpoint (Bool <=> was an exception)
    | Complete (Either Exception [HValue])
           -- ^ the computation completed with either an exception or a value
 
@@ -102,7 +104,9 @@ data Resume
        resumeFinalIds  :: [Id],         -- [Id] to bind on completion
        resumeApStack   :: HValue,       -- The object from which we can get
                                         -- value of the free variables.
-       resumeBreakInfo :: BreakInfo,    -- the breakpoint we stopped at.
+       resumeBreakInfo :: Maybe BreakInfo,    
+                                        -- the breakpoint we stopped at
+                                        -- (Nothing <=> exception)
        resumeSpan      :: SrcSpan,      -- just a cache, otherwise it's a pain
                                         -- to fetch the ModDetails & ModBreaks
                                         -- to get this.
@@ -135,28 +139,6 @@ getHistorySpan s hist = withSession s $ \hsc_env -> do
        Just hmi -> return (modBreaks_locs (md_modBreaks (hm_details hmi)) ! num)
        _ -> panic "getHistorySpan"
 
-{-
- [Main.hs:42:(1,0)-(3,52)] *Main> :history 2
- Foo.hs:1:3-5
- Bar.hs:5:23-48
- [Main.hs:42:(1,0)-(3,52)] *Main> :back
- Logged breakpoint at Foo.hs:1:3-5
- x :: Int
- y :: a
- _result :: [Char]
- [-1: Foo.hs:1:3-5] *Main> :back
- Logged breakpoint at Bar.hs:5:23-48
- z :: a
- _result :: Float
- [-2: Bar.hs:5:23-48] *Main> :forward
- Logged breakpoint at Foo.hs:1:3-5
- x :: Int
- y :: a
- _result :: [Char]
- [-1: Foo.hs:1:3-5] *Main> :cont
- .. continues
--} 
-
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
 runStmt :: Session -> String -> SingleStep -> IO RunResult
@@ -178,13 +160,7 @@ runStmt (Session ref) expr step
 	   Nothing -> return RunFailed
 	   Just (ids, hval) -> do
 
-              when (isStep step) $ setStepFlag
-
-              -- set the onBreakAction to be performed when we hit a
-              -- breakpoint this is visible in the Byte Code
-              -- Interpreter, thus it is a global variable,
-              -- implemented with stable pointers
-              withBreakAction breakMVar statusMVar $ do
+              withBreakAction (isStep step) dflags' breakMVar statusMVar $ do
 
               let thing_to_run = unsafeCoerce# hval :: IO [HValue]
               status <- sandboxIO statusMVar thing_to_run
@@ -207,17 +183,20 @@ handleRunStatus expr ref bindings final_ids breakMVar statusMVar status
                 history =
    case status of  
       -- did we hit a breakpoint or did we complete?
-      (Break apStack info tid) -> do
+      (Break is_exception apStack info tid) -> do
         hsc_env <- readIORef ref
-        (hsc_env1, names, span) <- bindLocalsAtBreakpoint hsc_env apStack info
+        let mb_info | is_exception = Nothing
+                    | otherwise    = Just info
+        (hsc_env1, names, span) <- bindLocalsAtBreakpoint hsc_env 
+                                                          apStack mb_info
         let
             resume = Resume expr tid breakMVar statusMVar 
-                              bindings final_ids apStack info span 
+                              bindings final_ids apStack mb_info span 
                               (toListBL history) 0
             hsc_env2 = pushResume hsc_env1 resume
         --
         writeIORef ref hsc_env2
-        return (RunBreak tid names info)
+        return (RunBreak tid names mb_info)
       (Complete either_hvals) ->
 	case either_hvals of
 	    Left e -> return (RunException e)
@@ -238,7 +217,7 @@ traceRunStatus expr ref bindings final_ids
   case status of
      -- when tracing, if we hit a breakpoint that is not explicitly
      -- enabled, then we just log the event in the history and continue.
-     (Break apStack info tid) -> do
+     (Break is_exception apStack info tid) | not is_exception -> do
         b <- isBreakEnabled hsc_env info
         if b
            then handle_normally
@@ -247,8 +226,8 @@ traceRunStatus expr ref bindings final_ids
                 -- probably better make history strict here, otherwise
                 -- our BoundedList will be pointless.
              evaluate history'
-             setStepFlag
-             status <- withBreakAction breakMVar statusMVar $ do
+             status <- withBreakAction True (hsc_dflags hsc_env)
+                                 breakMVar statusMVar $ do
                        withInterruptsSentTo
                          (do putMVar breakMVar ()  -- awaken the stopped thread
                              return tid)
@@ -273,11 +252,15 @@ isBreakEnabled hsc_env inf =
          return False
 
 
-foreign import ccall "rts_setStepFlag" setStepFlag :: IO () 
+foreign import ccall "&rts_stop_next_breakpoint" stepFlag      :: Ptr CInt
+foreign import ccall "&rts_stop_on_exception"    exceptionFlag :: Ptr CInt
+
+setStepFlag   = poke stepFlag 1
+resetStepFlag = poke stepFlag 0
 
 -- this points to the IO action that is executed when a breakpoint is hit
-foreign import ccall "&breakPointIOAction" 
-        breakPointIOAction :: Ptr (StablePtr (BreakInfo -> HValue -> IO ())) 
+foreign import ccall "&rts_breakpoint_io_action" 
+   breakPointIOAction :: Ptr (StablePtr (Bool -> BreakInfo -> HValue -> IO ())) 
 
 -- When running a computation, we redirect ^C exceptions to the running
 -- thread.  ToDo: we might want a way to continue even if the target
@@ -297,25 +280,38 @@ withInterruptsSentTo io get_result = do
   putMVar interruptTargetThread (child:ts)
   get_result `finally` modifyMVar_ interruptTargetThread (return.tail)
 
-withBreakAction breakMVar statusMVar io
+-- This function sets up the interpreter for catching breakpoints, and
+-- resets everything when the computation has stopped running.  This
+-- is a not-very-good way to ensure that only the interactive
+-- evaluation should generate breakpoints.
+withBreakAction step dflags breakMVar statusMVar io
  = bracket setBreakAction resetBreakAction (\_ -> io)
  where
    setBreakAction = do
      stablePtr <- newStablePtr onBreak
      poke breakPointIOAction stablePtr
+     when (dopt Opt_BreakOnException dflags) $ poke exceptionFlag 1
+     when step $ setStepFlag
      return stablePtr
+        -- Breaking on exceptions is not enabled by default, since it
+        -- might be a bit surprising.  The exception flag is turned off
+        -- as soon as it is hit, or in resetBreakAction below.
 
-   onBreak info apStack = do
+   onBreak is_exception info apStack = do
      tid <- myThreadId
-     putMVar statusMVar (Break apStack info tid)
+     putMVar statusMVar (Break is_exception apStack info tid)
      takeMVar breakMVar
 
    resetBreakAction stablePtr = do
      poke breakPointIOAction noBreakStablePtr
+     poke exceptionFlag 0
+     resetStepFlag
      freeStablePtr stablePtr
 
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
-noBreakAction info apStack = putStrLn "*** Ignoring breakpoint"
+
+noBreakAction False info apStack = putStrLn "*** Ignoring breakpoint"
+noBreakAction True  info apStack = return () -- exception: just continue
 
 resume :: Session -> SingleStep -> IO RunResult
 resume (Session ref) step
@@ -346,7 +342,8 @@ resume (Session ref) step
         case r of 
           Resume expr tid breakMVar statusMVar bindings 
               final_ids apStack info _ _ _ -> do
-                withBreakAction breakMVar statusMVar $ do
+                withBreakAction (isStep step) (hsc_dflags hsc_env) 
+                                        breakMVar statusMVar $ do
                 status <- withInterruptsSentTo
                              (do putMVar breakMVar ()
                                       -- this awakens the stopped thread...
@@ -377,15 +374,15 @@ moveHist fn (Session ref) = do
             history = resumeHistory r
             new_ix = fn ix
         --
-        when (new_ix >= length history) $
+        when (new_ix > length history) $
            throwDyn (ProgramError "no more logged breakpoints")
         when (new_ix < 0) $
            throwDyn (ProgramError "already at the beginning of the history")
 
         let
-          update_ic apStack info = do
+          update_ic apStack mb_info = do
             (hsc_env1, names, span) <- bindLocalsAtBreakpoint hsc_env 
-                                                apStack info 
+                                                apStack mb_info
             let ic = hsc_IC hsc_env1           
                 r' = r { resumeHistoryIx = new_ix }
                 ic' = ic { ic_resume = r':rs }
@@ -400,11 +397,11 @@ moveHist fn (Session ref) = do
         if new_ix == 0
            then case r of 
                    Resume { resumeApStack = apStack, 
-                            resumeBreakInfo = info } ->
-                          update_ic apStack info
+                            resumeBreakInfo = mb_info } ->
+                          update_ic apStack mb_info
            else case history !! (new_ix - 1) of 
                    History apStack info ->
-                          update_ic apStack info
+                          update_ic apStack (Just info)
 
 -- -----------------------------------------------------------------------------
 -- After stopping at a breakpoint, add free variables to the environment
@@ -412,9 +409,34 @@ moveHist fn (Session ref) = do
 bindLocalsAtBreakpoint
         :: HscEnv
         -> HValue
-        -> BreakInfo
+        -> Maybe BreakInfo
         -> IO (HscEnv, [Name], SrcSpan)
-bindLocalsAtBreakpoint hsc_env apStack info = do
+
+-- Nothing case: we stopped when an exception was raised, not at a
+-- breakpoint.  We have no location information or local variables to
+-- bind, all we can do is bind a local variable to the exception
+-- value.
+bindLocalsAtBreakpoint hsc_env apStack Nothing = do
+   let exn_fs    = FSLIT("_exception")
+       exn_name  = mkInternalName (getUnique exn_fs) (mkVarOccFS exn_fs) span
+       e_fs      = FSLIT("e")
+       e_name    = mkInternalName (getUnique e_fs) (mkTyVarOcc e_fs) span
+       e_tyvar   = mkTcTyVar e_name liftedTypeKind (SkolemTv RuntimeUnkSkol)
+       exn_id    = Id.mkGlobalId VanillaGlobal exn_name (mkTyVarTy e_tyvar)
+                                vanillaIdInfo
+       new_tyvars = unitVarSet e_tyvar
+
+       ictxt0 = hsc_IC hsc_env
+       ictxt1 = extendInteractiveContext ictxt0 [exn_id] new_tyvars
+
+       span = mkGeneralSrcSpan FSLIT("<exception thrown>")
+   --
+   Linker.extendLinkEnv [(exn_name, unsafeCoerce# apStack)]
+   return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span)
+
+-- Just case: we stopped at a breakpoint, we have information about the location
+-- of the breakpoint and the free variables of the expression.
+bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
 
    let 
        mod_name    = moduleName (breakInfo_module info)

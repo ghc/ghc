@@ -16,6 +16,7 @@
 #include "Updates.h"
 #include "Sanity.h"
 #include "Liveness.h"
+#include "Prelude.h"
 
 #include "Bytecodes.h"
 #include "Printer.h"
@@ -83,7 +84,8 @@ allocate_NONUPD (int n_words)
     return allocate(stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
 }
 
-rtsBool stop_next_breakpoint = rtsFalse;
+int rts_stop_next_breakpoint = 0;
+int rts_stop_on_exception = 0;
 
 #ifdef INTERP_STATS
 
@@ -177,7 +179,7 @@ static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_pppppp_info,
 };
 
-HsStablePtr breakPointIOAction; // points to the IO action which is executed on a breakpoint
+HsStablePtr rts_breakpoint_io_action; // points to the IO action which is executed on a breakpoint
                                 // it is set in main/GHC.hs:runStmt
 
 Capability *
@@ -809,15 +811,15 @@ run_BCO:
                breakPoints = (StgArrWords *) BCO_PTR(arg1_brk_array);
 
                // stop the current thread if either the
-               // "stop_next_breakpoint" flag is true OR if the
+               // "rts_stop_next_breakpoint" flag is true OR if the
                // breakpoint flag for this particular expression is
                // true
-               if (stop_next_breakpoint == rtsTrue || 
+               if (rts_stop_next_breakpoint == rtsTrue || 
                    breakPoints->payload[arg2_array_index] == rtsTrue)
                {
                   // make sure we don't automatically stop at the
                   // next breakpoint
-                  stop_next_breakpoint = rtsFalse;
+                  rts_stop_next_breakpoint = rtsFalse;
 
                   // allocate memory for a new AP_STACK, enough to
                   // store the top stack frame plus an
@@ -840,16 +842,17 @@ run_BCO:
                   }
 
                   // prepare the stack so that we can call the
-                  // breakPointIOAction and ensure that the stack is
+                  // rts_breakpoint_io_action and ensure that the stack is
                   // in a reasonable state for the GC and so that
                   // execution of this BCO can continue when we resume
-                  ioAction = (StgClosure *) deRefStablePtr (breakPointIOAction);
-                  Sp -= 7;
-                  Sp[6] = (W_)obj;   
-                  Sp[5] = (W_)&stg_apply_interp_info;
-                  Sp[4] = (W_)new_aps;                 // the AP_STACK
-                  Sp[3] = (W_)BCO_PTR(arg3_freeVars);  // the info about local vars of the breakpoint
-                  Sp[2] = (W_)&stg_ap_ppv_info;
+                  ioAction = (StgClosure *) deRefStablePtr (rts_breakpoint_io_action);
+                  Sp -= 8;
+                  Sp[7] = (W_)obj;   
+                  Sp[6] = (W_)&stg_apply_interp_info;
+                  Sp[5] = (W_)new_aps;                 // the AP_STACK
+                  Sp[4] = (W_)BCO_PTR(arg3_freeVars);  // the info about local vars of the breakpoint
+                  Sp[3] = (W_)False_closure;            // True <=> a breakpoint
+                  Sp[2] = (W_)&stg_ap_pppv_info;
                   Sp[1] = (W_)ioAction;                // apply the IO action to its two arguments above
                   Sp[0] = (W_)&stg_enter_info;         // get ready to run the IO action
 
@@ -1373,14 +1376,4 @@ run_BCO:
     }
 
     barf("interpretBCO: fell off end of the interpreter");
-}
-
-/* set the single step flag for the debugger to True -
-   it gets set back to false in the interpreter everytime
-   we hit a breakpoint
-*/
-void rts_setStepFlag (void);
-void rts_setStepFlag (void)
-{
-   stop_next_breakpoint = rtsTrue;
 }

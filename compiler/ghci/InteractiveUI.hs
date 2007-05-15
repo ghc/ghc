@@ -570,12 +570,12 @@ afterRunStmt run_result = do
      GHC.RunOk names -> do
         show_types <- isOptionSet ShowType
         when show_types $ mapM_ (showTypeOfName session) names
-     GHC.RunBreak _ names info -> do
+     GHC.RunBreak _ names mb_info -> do
         resumes <- io $ GHC.getResumeContext session
         printForUser $ ptext SLIT("Stopped at") <+> 
                        ppr (GHC.resumeSpan (head resumes))
         mapM_ (showTypeOfName session) names
-        runBreakCmd info
+        maybe (return ()) runBreakCmd mb_info
         -- run the command set with ":set stop <cmd>"
         st <- getGHCiState
         enqueueCommands [stop st]
@@ -1695,7 +1695,8 @@ listCmd "" = do
    mb_span <- getCurrentBreakSpan
    case mb_span of
       Nothing  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
-      Just span -> io $ listAround span True
+      Just span | GHC.isGoodSrcSpan span -> io $ listAround span True
+                | otherwise              -> printForUser $ text "unable to list source for" <+> ppr span
 listCmd str = list2 (words str)
 
 list2 [arg] | all isDigit arg = do

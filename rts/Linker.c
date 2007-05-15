@@ -710,8 +710,7 @@ typedef struct _RtsSymbolVal {
       SymX(getAllocations)                      \
       SymX(revertCAFs)                          \
       SymX(RtsFlags)                            \
-      Sym(breakPointIOAction)			\
-      Sym(rts_setStepFlag)			\
+      SymX(rts_breakpoint_io_action)		\
       RTS_USER_SIGNALS_SYMBOLS
 
 #ifdef SUPPORT_LONG_LONGS

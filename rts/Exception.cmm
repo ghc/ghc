@@ -352,13 +352,26 @@ INFO_TABLE(stg_raise,1,0,THUNK_1_0,"raise","raise")
   jump raisezh_fast;
 }
 
+section "data" {
+  no_break_on_exception: W_[1];
+}
+
+INFO_TABLE_RET(stg_raise_ret, 1, 0, RET_SMALL)
+{
+  R1 = Sp(1);
+  Sp = Sp + WDS(2);
+  W_[no_break_on_exception] = 1;  
+  jump raisezh_fast;
+}
+
 raisezh_fast
 {
     W_ handler;
-    W_ raise_closure;
     W_ frame_type;
+    W_ exception;
     /* args : R1 :: Exception */
 
+   exception = R1;
 
 #if defined(PROFILING)
     /* Debugging tool: on raising an  exception, show where we are. */
@@ -367,16 +380,39 @@ raisezh_fast
      * the info was only displayed for an *uncaught* exception.
      */
     if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags) != 0::I32) {
-      foreign "C" fprintCCS_stderr(W_[CCCS] "ptr");
+      foreign "C" fprintCCS_stderr(W_[CCCS] "ptr") [];
     }
 #endif
     
+    if (W_[no_break_on_exception] != 0) {
+        W_[no_break_on_exception] = 0;
+    } else {
+        if (TO_W_(CInt[rts_stop_on_exception]) != 0) {
+            W_ ioAction;
+            // we don't want any further exceptions to be caught,
+            // until GHCi is ready to handle them.  This prevents
+            // deadlock if an exception is raised in InteractiveUI,
+            // for exmplae.  Perhaps the stop_on_exception flag should
+            // be per-thread.
+            W_[rts_stop_on_exception] = 0;
+            "ptr" ioAction = foreign "C" deRefStablePtr (W_[rts_breakpoint_io_action] "ptr") [];
+            Sp = Sp - WDS(6);
+            Sp(5) = exception;
+            Sp(4) = stg_raise_ret_info;
+            Sp(3) = exception;             // the AP_STACK
+            Sp(2) = base_GHCziBase_True_closure; // dummy breakpoint info
+            Sp(1) = base_GHCziBase_True_closure; // True <=> a breakpoint
+            R1 = ioAction;
+            jump stg_ap_pppv_info;
+        }
+    }
+
     /* Inform the Hpc that an exception has been thrown */
-    foreign "C" hs_hpc_raise_event(CurrentTSO "ptr");
+    foreign "C" hs_hpc_raise_event(CurrentTSO "ptr") [];
 
 retry_pop_stack:
     StgTSO_sp(CurrentTSO) = Sp;
-    frame_type = foreign "C" raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", R1 "ptr");
+    frame_type = foreign "C" raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", exception "ptr") [];
     Sp = StgTSO_sp(CurrentTSO);
     if (frame_type == ATOMICALLY_FRAME) {
       /* The exception has reached the edge of a memory transaction.  Check that 
@@ -390,14 +426,14 @@ retry_pop_stack:
       W_ trec, outer;
       W_ r;
       trec = StgTSO_trec(CurrentTSO);
-      r = foreign "C" stmValidateNestOfTransactions(trec "ptr");
+      r = foreign "C" stmValidateNestOfTransactions(trec "ptr") [];
       "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
-      foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr");
-      foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
+      foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
+      foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
 
       if (outer != NO_TREC) {
-        foreign "C" stmAbortTransaction(MyCapability() "ptr", outer "ptr");
-        foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", outer "ptr");
+        foreign "C" stmAbortTransaction(MyCapability() "ptr", outer "ptr") [];
+        foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", outer "ptr") [];
       }
 
       StgTSO_trec(CurrentTSO) = NO_TREC;
@@ -408,7 +444,7 @@ retry_pop_stack:
       } else {
         // Transaction was not valid: we retry the exception (otherwise continue
         // with a further call to raiseExceptionHelper)
-        "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
+        "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
         StgTSO_trec(CurrentTSO) = trec;
         R1 = StgAtomicallyFrame_code(Sp);
         jump stg_ap_v_fast;
@@ -423,7 +459,7 @@ retry_pop_stack:
 	 */
 	Sp = CurrentTSO + TSO_OFFSET_StgTSO_stack 
 		+ WDS(TO_W_(StgTSO_stack_size(CurrentTSO))) - WDS(2);
-	Sp(1) = R1;		/* save the exception */
+	Sp(1) = exception;	/* save the exception */
 	Sp(0) = stg_enter_info; /* so that GC can traverse this stack */
 	StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
 	SAVE_THREAD_STATE();	/* inline! */
@@ -477,7 +513,7 @@ retry_pop_stack:
      * token as arguments.
      */
     Sp_adj(-1);
-    Sp(0) = R1;
+    Sp(0) = exception;
     R1 = handler;
     Sp_adj(-1);
     TICK_UNKNOWN_CALL();
