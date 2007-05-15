@@ -4,6 +4,7 @@
 ByteCodeInstrs: Bytecode instruction definitions
 
 \begin{code}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 module ByteCodeInstr ( 
  	BCInstr(..), ProtoBCO(..), bciStackUse, BreakInfo (..) 
   ) where
@@ -55,9 +56,9 @@ data BCInstr
    = STKCHECK  Int
 
    -- Push locals (existing bits of the stack)
-   | PUSH_L    Int{-offset-}
-   | PUSH_LL   Int Int{-2 offsets-}
-   | PUSH_LLL  Int Int Int{-3 offsets-}
+   | PUSH_L    !Int{-offset-}
+   | PUSH_LL   !Int !Int{-2 offsets-}
+   | PUSH_LLL  !Int !Int !Int{-3 offsets-}
 
    -- Push a ptr  (these all map to PUSH_G really)
    | PUSH_G       Name
@@ -95,12 +96,12 @@ data BCInstr
    | SLIDE     Int{-this many-} Int{-down by this much-}
 
    -- To do with the heap
-   | ALLOC_AP  Int	-- make an AP with this many payload words
-   | ALLOC_PAP Int Int	-- make a PAP with this arity / payload words
-   | MKAP      Int{-ptr to AP is this far down stack-} Int{-# words-}
-   | MKPAP     Int{-ptr to PAP is this far down stack-} Int{-# words-}
-   | UNPACK    Int	-- unpack N words from t.o.s Constr
-   | PACK      DataCon Int
+   | ALLOC_AP  !Int	-- make an AP with this many payload words
+   | ALLOC_PAP !Int !Int	-- make a PAP with this arity / payload words
+   | MKAP      !Int{-ptr to AP is this far down stack-} !Int{-# words-}
+   | MKPAP     !Int{-ptr to PAP is this far down stack-} !Int{-# words-}
+   | UNPACK    !Int	-- unpack N words from t.o.s Constr
+   | PACK      DataCon !Int
 			-- after assembly, the DataCon is an index into the
 			-- itbl array
    -- For doing case trees
