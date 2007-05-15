@@ -244,7 +244,8 @@ binary-dist.library.%:
 	ifBuildable/ifBuildable $* cp    $*.cabal      $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp -a dist          $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* find $(BIN_DIST_LIBDIR)/$*/dist \
-	     \( -name "*.o" -o -name "*.p_o" -o -name "HS*" \) -exec rm {} \;
+	     \( \( -name "*.o" -o -name "*.p_o" \) -a ! -name "HS*" \) \
+	     -exec rm {} \;
 
 .PHONY: distclean clean clean.library.%
 
