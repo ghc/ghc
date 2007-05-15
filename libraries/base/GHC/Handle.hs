@@ -562,11 +562,10 @@ readRawBuffer loc fd is_nonblock buf off len
                         then unsafe_read
                         else do threadWaitRead (fromIntegral fd); unsafe_read
   where
-        unsafe_read = throwErrnoIfMinus1RetryMayBlock loc
-                        (read_rawBuffer fd buf off len)
-                        (threadWaitRead (fromIntegral fd))
-        safe_read   = throwErrnoIfMinus1Retry loc
-                        (safe_read_rawBuffer fd buf off len)
+    do_read call = throwErrnoIfMinus1RetryMayBlock loc call 
+                            (threadWaitRead (fromIntegral fd))
+    unsafe_read = do_read (read_rawBuffer fd buf off len)
+    safe_read   = do_read (safe_read_rawBuffer fd buf off len)
 
 readRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 readRawBufferPtr loc fd is_nonblock buf off len
@@ -578,11 +577,10 @@ readRawBufferPtr loc fd is_nonblock buf off len
                         then unsafe_read
                         else do threadWaitRead (fromIntegral fd); unsafe_read
   where
-    unsafe_read = throwErrnoIfMinus1RetryMayBlock loc
-	                (read_off fd buf off len)
-	                (threadWaitRead (fromIntegral fd))
-    safe_read   = throwErrnoIfMinus1Retry loc
-                        (safe_read_off fd buf off len)
+        do_read call = throwErrnoIfMinus1RetryMayBlock loc call 
+                                (threadWaitRead (fromIntegral fd))
+        unsafe_read = do_read (read_off fd buf off len)
+        safe_read   = do_read (safe_read_off fd buf off len)
 
 readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBufferNoBlock loc fd is_nonblock buf off len
@@ -592,11 +590,9 @@ readRawBufferNoBlock loc fd is_nonblock buf off len
                                 else return 0
        -- XXX see note [nonblock]
  where
-   unsafe_read = throwErrnoIfMinus1RetryOnBlock loc
-                        (read_rawBuffer fd buf off len)
-                        (return 0)
-   safe_read   = throwErrnoIfMinus1Retry loc
-                        (safe_read_rawBuffer fd buf off len)
+   do_read call = throwErrnoIfMinus1RetryMayBlock loc call (return 0)
+   unsafe_read  = do_read (read_rawBuffer fd buf off len)
+   safe_read    = do_read (safe_read_rawBuffer fd buf off len)
 
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 writeRawBuffer loc fd is_nonblock buf off len
@@ -606,11 +602,10 @@ writeRawBuffer loc fd is_nonblock buf off len
                      if r /= 0 then safe_write
                                 else return 0
   where  
-    unsafe_write = throwErrnoIfMinus1RetryMayBlock loc
-		        (write_rawBuffer fd buf off len)
-		        (threadWaitWrite (fromIntegral fd))
-    safe_write   = throwErrnoIfMinus1Retry loc
-                        (safe_write_rawBuffer (fromIntegral fd) buf off len)
+    do_write call = throwErrnoIfMinus1RetryMayBlock loc call
+		        (threadWaitWrite (fromIntegral fd)) 
+    unsafe_write = do_write (write_rawBuffer fd buf off len)
+    safe_write   = do_write (safe_write_rawBuffer (fromIntegral fd) buf off len)
 
 writeRawBufferPtr :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 writeRawBufferPtr loc fd is_nonblock buf off len
@@ -620,11 +615,10 @@ writeRawBufferPtr loc fd is_nonblock buf off len
                      if r /= 0 then safe_write
                                 else return 0
   where
-    unsafe_write = throwErrnoIfMinus1RetryMayBlock loc
-		        (write_off fd buf off len)
-		        (threadWaitWrite (fromIntegral fd))
-    safe_write   = throwErrnoIfMinus1Retry loc 
-                        (safe_write_off (fromIntegral fd) buf off len)
+    do_write call = throwErrnoIfMinus1RetryMayBlock loc call
+		        (threadWaitWrite (fromIntegral fd)) 
+    unsafe_write  = do_write (write_off fd buf off len)
+    safe_write    = do_write (safe_write_off (fromIntegral fd) buf off len)
 
 foreign import ccall unsafe "__hscore_PrelHandle_read"
    read_rawBuffer :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
