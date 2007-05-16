@@ -1,0 +1,16 @@
+Stopped at break012.hs:(1,0)-(5,17)
+_result :: (a1, a2 -> a2, (), a -> a -> a)
+Stopped at break012.hs:5:9-17
+_result :: (a1, a2 -> a2, (), a -> a -> a)
+a :: a1
+c :: ()
+b :: a3 -> a3
+d :: a -> a -> a
+a :: a1
+b :: a3 -> a3
+c :: ()
+d :: a -> a -> a
+a = (_t1::a1)
+b = <function>
+c = (_t3::())
+d = <function>

@@ -1,7 +1,7 @@
 -- Test polymorphic types in a breakpoint
-:set -fno-debugging
-:l A
-g 5
+:l break012
+:st g 5 `seq` ()
+:st
 :t a 
 :t b 
 :t c 
