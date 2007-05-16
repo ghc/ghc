@@ -611,6 +611,11 @@ echo foo > conftest.txt
 $fp_prog_find conftest.txt -print > conftest.out 2>&1
 if grep '^conftest.txt$' conftest.out > /dev/null 2>&1 ; then
   # OK, looks like a real "find".
+  if which cygpath 1> /dev/null 2> /dev/null
+  then
+    fp_prog_find=`cygpath --mixed "$fp_prog_find"`
+    AC_MSG_NOTICE([Converted to "$fp_prog_find"])
+  fi
   FindCmd="$fp_prog_find"
 else
   # Found a poor WinDoze version of "find", ignore it.
