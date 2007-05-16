@@ -767,15 +767,17 @@ foreignCall
 	-> ExtFCode CmmExpr
 	-> [ExtFCode (CmmExpr,MachHint)]
 	-> Maybe [GlobalReg] -> P ExtCode
-foreignCall "C" results_code expr_code args_code vols
-  = return $ do
-	results <- sequence results_code
-	expr <- expr_code
-	args <- sequence args_code
-        code (emitForeignCall' PlayRisky results 
-                 (CmmForeignCall expr CCallConv) args vols)
-foreignCall conv _ _ _ _
-  = fail ("unknown calling convention: " ++ conv)
+foreignCall conv_string results_code expr_code args_code vols
+  = do  convention <- case conv_string of
+          "C" -> return CCallConv
+          "C--" -> return CmmCallConv
+          _ -> fail ("unknown calling convention: " ++ conv_string)
+	return $ do
+	  results <- sequence results_code
+	  expr <- expr_code
+	  args <- sequence args_code
+          code (emitForeignCall' PlayRisky results 
+                 (CmmForeignCall expr convention) args vols) where
 
 primCall
 	:: [ExtFCode (CmmReg,MachHint)]

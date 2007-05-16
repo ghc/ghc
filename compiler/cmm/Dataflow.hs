@@ -73,7 +73,9 @@ cmmStmtLive other_live (CmmSwitch expr targets) =
     cmmExprLive expr .
     (foldr ((.) . (addLive . lookupWithDefaultUFM other_live emptyUniqSet)) id (mapCatMaybes id targets))
 cmmStmtLive _ (CmmJump expr params) =
-    const (cmmExprLive expr (mkUniqSet params))
+    const (cmmExprLive expr $ foldr ((.) . cmmExprLive) id (map fst params) $ emptyUniqSet)
+cmmStmtLive _ (CmmReturn params) =
+    const (foldr ((.) . cmmExprLive) id (map fst params) $ emptyUniqSet)
 
 --------
 

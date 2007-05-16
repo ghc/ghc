@@ -128,13 +128,14 @@ so perhaps we should emit a warning if it's being used on other
 platforms.
 
 \begin{code}
-data CCallConv = CCallConv | StdCallConv
+data CCallConv = CCallConv | StdCallConv | CmmCallConv
   deriving (Eq)
   {-! derive: Binary !-}
 
 instance Outputable CCallConv where
   ppr StdCallConv = ptext SLIT("stdcall")
   ppr CCallConv   = ptext SLIT("ccall")
+  ppr CmmCallConv = ptext SLIT("C--")
 
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv
