@@ -384,29 +384,6 @@ raisezh_fast
     }
 #endif
     
-    if (W_[no_break_on_exception] != 0) {
-        W_[no_break_on_exception] = 0;
-    } else {
-        if (TO_W_(CInt[rts_stop_on_exception]) != 0) {
-            W_ ioAction;
-            // we don't want any further exceptions to be caught,
-            // until GHCi is ready to handle them.  This prevents
-            // deadlock if an exception is raised in InteractiveUI,
-            // for exmplae.  Perhaps the stop_on_exception flag should
-            // be per-thread.
-            W_[rts_stop_on_exception] = 0;
-            "ptr" ioAction = foreign "C" deRefStablePtr (W_[rts_breakpoint_io_action] "ptr") [];
-            Sp = Sp - WDS(6);
-            Sp(5) = exception;
-            Sp(4) = stg_raise_ret_info;
-            Sp(3) = exception;             // the AP_STACK
-            Sp(2) = base_GHCziBase_True_closure; // dummy breakpoint info
-            Sp(1) = base_GHCziBase_True_closure; // True <=> a breakpoint
-            R1 = ioAction;
-            jump stg_ap_pppv_info;
-        }
-    }
-
     /* Inform the Hpc that an exception has been thrown */
     foreign "C" hs_hpc_raise_event(CurrentTSO "ptr") [];
 
@@ -449,6 +426,35 @@ retry_pop_stack:
         R1 = StgAtomicallyFrame_code(Sp);
         jump stg_ap_v_fast;
       }          
+    }
+
+    // After stripping the stack, see whether we should break here for
+    // GHCi (c.f. the -fbreak-on-exception flag).  We do this after
+    // stripping the stack for a reason: we'll be inspecting values in
+    // GHCi, and it helps if all the thunks under evaluation have
+    // already been updated with the exception, rather than being left
+    // as blackholes.
+    if (W_[no_break_on_exception] != 0) {
+        W_[no_break_on_exception] = 0;
+    } else {
+        if (TO_W_(CInt[rts_stop_on_exception]) != 0) {
+            W_ ioAction;
+            // we don't want any further exceptions to be caught,
+            // until GHCi is ready to handle them.  This prevents
+            // deadlock if an exception is raised in InteractiveUI,
+            // for exmplae.  Perhaps the stop_on_exception flag should
+            // be per-thread.
+            W_[rts_stop_on_exception] = 0;
+            "ptr" ioAction = foreign "C" deRefStablePtr (W_[rts_breakpoint_io_action] "ptr") [];
+            Sp = Sp - WDS(6);
+            Sp(5) = exception;
+            Sp(4) = stg_raise_ret_info;
+            Sp(3) = exception;             // the AP_STACK
+            Sp(2) = base_GHCziBase_True_closure; // dummy breakpoint info
+            Sp(1) = base_GHCziBase_True_closure; // True <=> a breakpoint
+            R1 = ioAction;
+            jump stg_ap_pppv_info;
+        }
     }
 
     if (frame_type == STOP_FRAME) {
