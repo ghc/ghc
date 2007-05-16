@@ -276,10 +276,10 @@ addTickHsExpr (HsIf	 e1 e2 e3) =
 		(addTickLHsExprOptAlt True e2)
 		(addTickLHsExprOptAlt True e3)
 addTickHsExpr (HsLet binds e) =
+	bindLocals (map unLoc $ collectLocalBinders binds) $
 	liftM2 HsLet
-		(addTickHsLocalBinds binds)		-- to think about: !patterns.
-		(bindLocals (map unLoc $ collectLocalBinders binds) $
-                        addTickLHsExprNeverOrAlways e)
+		(addTickHsLocalBinds binds) -- to think about: !patterns.
+                (addTickLHsExprNeverOrAlways e)
 addTickHsExpr (HsDo cxt stmts last_exp srcloc) = do
         (stmts', last_exp') <- addTickLStmts' forQual stmts 
                                      (addTickLHsExpr last_exp)
