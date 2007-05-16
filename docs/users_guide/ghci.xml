@@ -14,9 +14,11 @@
   </indexterm>, then you'll be right at home with GHCi.  However, GHCi
   also has support for interactively loading compiled code, as well as
   supporting all<footnote><para>except <literal>foreign export</literal>, at the moment</para>
-  </footnote> the language extensions that GHC provides.</para>
+  </footnote> the language extensions that GHC provides.
   <indexterm><primary>FFI</primary><secondary>GHCi support</secondary></indexterm>
-  <indexterm><primary>Foreign Function Interface</primary><secondary>GHCi support</secondary></indexterm>
+  <indexterm><primary>Foreign Function
+  Interface</primary><secondary>GHCi support</secondary></indexterm>.
+  GHCi also includes an interactive debugger (see <xref linkend="ghci-debugger"/>)..</para>
 
   <sect1 id="ghci-introduction">
     <title>Introduction to GHCi</title>
@@ -824,6 +826,727 @@ def = toEnum 0
     </sect2>
   </sect1>
 
+  <sect1 id="ghci-debugger">
+    <title>The GHCi Debugger</title>
+    <indexterm><primary>debugger</primary><secondary>in GHCi</secondary>
+    </indexterm>
+
+    <para>GHCi contains a simple imperative-style debugger in which you can
+      stop a running computation in order to examine the values of
+      variables.  The debugger is integrated into GHCi, and is turned on by
+      default: no flags are required to enable the debugging facilities.  There
+      is one major restriction: breakpoints and single-stepping are only
+      available in <emphasis>interpreted</emphasis> modules; compiled code is
+      invisible to the debugger.</para>
+
+    <para>The debugger provides the following:
+    <itemizedlist>
+        <listitem>
+          <para>The abilty to set a <firstterm>breakpoint</firstterm> on a
+            function definition or expression in the program.  When the function
+            is called, or the expression evaluated, GHCi suspends 
+            execution and returns to the prompt, where you can inspect the
+            values of local variables before continuing with the
+            execution.</para>
+        </listitem>
+        <listitem>
+          <para>Execution can be <firstterm>single-stepped</firstterm>: the
+            evaluator will suspend execution approximately after every
+            reduction, allowing local variables to be inspected.  This is
+            equivalent to setting a breakpoint at every point in the
+            program.</para>
+        </listitem>
+        <listitem>
+          <para>Execution can take place in <firstterm>tracing
+              mode</firstterm>, in which the evaluator remembers each
+            evaluation step as it happens, but doesn't suspend execution until
+            an actual breakpoint is reached.  When this happens, the history of
+            evaluation steps can be inspected.</para>
+        </listitem>
+        <listitem>
+          <para>Exceptions (e.g. pattern matching failure and
+            <literal>error</literal>) can be treated as breakpoints, to help
+            locate the source of an exception in the program.</para>
+        </listitem>
+      </itemizedlist>
+    </para>
+      
+    <para>There is currently no support for obtaining a &ldquo;stack
+      trace&rdquo;, but the tracing and history features provide a useful
+      second-best, which will often be enough to establish the context of an
+      error.</para>
+      
+    <sect2 id="breakpoints">
+      <title>Breakpoints and inspecting variables</title>
+      
+      <para>Let's use quicksort as a running example.  Here's the code:</para>
+
+<programlisting>
+qsort [] = [] 
+qsort (a:as) = qsort left ++ [a] ++ qsort right
+  where (left,right) = (filter (&lt;=a) as, filter (&gt;a) as)
+
+main = print (qsort [8, 4, 0, 3, 1, 23, 11, 18])
+</programlisting>
+
+      <para>First, load the module into GHCi:</para>
+
+<screen>
+Prelude> :l qsort.hs
+[1 of 1] Compiling Main             ( qsort.hs, interpreted )
+Ok, modules loaded: Main.
+*Main>
+      </screen>       
+
+      <para>Now, let's set a breakpoint on the right-hand-side of the second
+        equation of qsort:</para>
+
+<programlisting>
+*Main> :break 2
+Breakpoint 0 activated at qsort.hs:2:15-46
+*Main>
+</programlisting>
+      
+      <para>The command <literal>:break 2</literal> sets a breakpoint on line
+        2 of the most recently-loaded module, in this case
+        <literal>qsort.hs</literal>.   Specifically, it picks the
+        leftmost complete subexpression on that line on which to set the
+        breakpoint, which in this case is the expression 
+        <literal>(qsort left ++ [a] ++ qsort right)</literal>.</para>
+
+      <para>Now, we run the program:</para>
+
+<programlisting>
+*Main> main
+Stopped at qsort.hs:2:15-46
+_result :: [a]
+a :: a
+left :: [a]
+right :: [a]
+[qsort.hs:2:15-46] *Main>
+</programlisting>
+
+      <para>Execution has stopped at the breakpoint.  The prompt has changed to
+        indicate that we are currently stopped at a breakpoint, and the location:
+        <literal>[qsort.hs:2:15-46]</literal>.  To further clarify the
+        location, we can use the <literal>:list</literal> command:</para>
+
+<programlisting>
+[qsort.hs:2:15-46] *Main> :list 
+1  qsort [] = [] 
+2  qsort (a:as) = qsort left ++ [a] ++ qsort right
+3    where (left,right) = (filter (&lt;=a) as, filter (&gt;a) as)
+</programlisting>
+
+      <para>The <literal>:list</literal> command lists the source code around
+        the current breakpoint.  If your output device supports it, then GHCi
+        will highlight the active subexpression in bold.</para>
+
+      <para>GHCi has provided bindings for the free variables<footnote><para>We
+            originally provided bindings for all variables in scope, rather
+            than just
+            the free variables of the expression, but found that this affected
+            performance considerably, hence the current restriction to just the
+            free variables.</para>
+        </footnote> of the expression
+        on which the
+        breakpoint was placed (<literal>a</literal>, <literal>left</literal>,
+        <literal>right</literal>), and additionally a binding for the result of
+        the expression (<literal>_result</literal>).  These variables are just
+        like other variables that you might define in GHCi; you
+        can use them in expressions that you type at the prompt, you can ask
+        for their types with <literal>:type</literal>, and so on.  There is one
+        important difference though: these variables may only have partial
+        types.  For example, if we try to display the value of
+        <literal>left</literal>:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> left
+
+&lt;interactive&gt;:1:0:
+    Ambiguous type variable `a' in the constraint:
+      `Show a' arising from a use of `print' at &lt;interactive&gt;:1:0-3
+    Cannot resolve unknown runtime types: a
+    Use :print or :force to determine these types
+</screen>
+
+      <para>This is because <literal>qsort</literal> is a polymorphic function,
+        and because GHCi does not carry type information at runtime, it cannot
+        determine the runtime types of free variables that involve type
+        variables.  Hence, when you ask to display <literal>left</literal> at
+        the prompt, GHCi can't figure out which instance of
+        <literal>Show</literal> to use, so it emits the type error above.</para>
+
+      <para>Fortunately, the debugger includes a generic printing command,
+        <literal>:print</literal>, which can inspect the actual runtime value of a
+        variable and attempt to reconstruct its type.  If we try it on
+        <literal>left</literal>:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> :print left
+left = (_t1::[a])
+</screen>
+
+      <para>This isn't particularly enlightening.  What happened is that
+        <literal>left</literal> is bound to an unevaluated computation (a
+        suspension, or <firstterm>thunk</firstterm>), and
+        <literal>:print</literal> does not force any evaluation.  The idea is
+        that <literal>:print</literal> can be used to inspect values at a
+        breakpoint without any unfortunate side effects.  It won't force any
+        evaluation, which could cause the program to give a different answer
+        than it would normally, and hence it won't cause any exceptions to be
+        raised, infinite loops, or further breakpoints to be triggered (see
+        <xref linkend="nested-breakpoints" />).
+        Rather than forcing thunks, <literal>:print</literal>
+        binds each thunk to a fresh variable beginning with an
+        underscore, in this case
+        <literal>_t1</literal>.</para>
+
+      <para>If we aren't concerned about preserving the evaluatedness of a
+        variable, we can use <literal>:force</literal> instead of
+        <literal>:print</literal>.  The <literal>:force</literal> command
+        behaves exactly like <literal>:print</literal>, except that it forces
+        the evaluation of any thunks it encounters:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> :force left
+left = [4,0,3,1]
+</screen>
+
+      <para>Now, since <literal>:force</literal> has inspected the runtime
+        value of <literal>left</literal>, it has reconstructed its type.  We
+        can see the results of this type reconstruction:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> :show bindings
+_result :: [Integer]
+a :: Integer
+left :: [Integer]
+right :: [Integer]
+_t1 :: [Integer]
+</screen>
+
+      <para>Not only do we now know the type of <literal>left</literal>, but
+        all the other partial types have also been resolved.  So we can ask
+        for the value of <literal>a</literal>, for example:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> a
+8
+</screen>
+      
+      <para>You might find it useful to use Haskell's
+        <literal>seq</literal> function to evaluate individual thunks rather
+        than evaluating the whole expression with <literal>:force</literal>.
+        For example:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> :print right
+right = (_t1::[Integer])
+[qsort.hs:2:15-46] *Main> seq _t1 ()
+()
+[qsort.hs:2:15-46] *Main> :print right
+right = 23 : (_t2::[Integer])
+</screen>
+
+      <para>We evaluated only the <literal>_t1</literal> thunk, revealing the
+        head of the list, and the tail is another thunk now bound to
+        <literal>_t2</literal>.  The <literal>seq</literal> function is a
+        little inconvenient to use here, so you might want to use
+        <literal>:def</literal> to make a nicer interface (left as an exercise
+        for the reader!).</para>
+
+      <para>Finally, we can continue the current execution:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> :continue
+Stopped at qsort.hs:2:15-46
+_result :: [a]
+a :: a
+left :: [a]
+right :: [a]
+[qsort.hs:2:15-46] *Main> 
+</screen>
+
+      <para>The execution continued at the point it previously stopped, and has
+        now stopped at the breakpoint for a second time.</para>
+
+      <sect3 id="setting-breakpoings">
+        <title>Setting breakpoints</title>
+
+        <para>Breakpoints can be set in various ways.  Perhaps the easiest way to
+          set a breakpoint is to name a top-level function:</para>
+
+<screen>
+   :break <replaceable>identifier</replaceable>
+</screen>
+
+      <para>Where <replaceable>identifier</replaceable> names any top-level
+        function in an interpreted module currently loaded into GHCi (qualified
+        names may be used).  The breakpoint will be set on the body of the
+        function, when it is fully applied but before any pattern matching has
+        taken place.</para>
+
+      <para>Breakpoints can also be set by line (and optionally column)
+        number:</para>
+
+<screen>
+   :break <replaceable>line</replaceable>
+   :break <replaceable>line</replaceable> <replaceable>column</replaceable>
+   :break <replaceable>module</replaceable> <replaceable>line</replaceable>
+   :break <replaceable>module</replaceable> <replaceable>line</replaceable> <replaceable>column</replaceable> 
+</screen>
+
+      <para>When a breakpoint is set on a particular line, GHCi sets the
+        breakpoint on the
+        leftmost subexpression that begins and ends on that line.  If two
+        complete subexpressions start at the same 
+        column, the longest one is picked.  If there is no complete
+        subexpression on the line, then the leftmost expression starting on
+        the line is picked, and failing that the rightmost expression that
+        partially or completely covers the line.</para>
+
+      <para>When a breakpoint is set on a particular line and column, GHCi
+        picks the smallest subexpression that encloses that location on which
+        to set the breakpoint.  Note: GHC considers the TAB character to have a
+        width of 1, wherever it occurs; in other words it counts
+          characters, rather than columns.  This matches what some editors do,
+          and doesn't match others.  The best advice is to avoid tab
+          characters in your source code altogether (see
+          <option>-fwarn-tabs</option> in <xref linkend="options-sanity"
+            />).</para> 
+
+      <para>If the module is omitted, then the most recently-loaded module is
+        used.</para>
+
+      <para>Not all subexpressions are potential breakpoint locations.  Single
+        variables are typically not considered to be breakpoint locations
+        (unless the variable is the right-hand-side of a function definition,
+        lambda, or case alternative).  The rule of thumb is that all redexes
+        are breakpoint locations, together with the bodies of functions,
+        lambdas, case alternatives and binding statements.  There is normally
+        no breakpoint on a let expression, but there will always be a
+        breakpoint on its body, because we are usually interested in inspecting
+        the values of the variables bound by the let.</para>
+
+      </sect3>
+      <sect3>
+        <title>Listing and deleting breakpoints</title>
+
+        <para>The list of breakpoints currently enabled can be displayed using
+          <literal>:show&nbsp;breaks</literal></para>:
+<screen>
+*Main> :show breaks
+[0] Main qsort.hs:1:11-12
+[1] Main qsort.hs:2:15-46
+</screen>
+
+        <para>To delete a breakpoint, use the <literal>:delete</literal>
+          command with the number given in the output from <literal>:show&nbsp;breaks</literal>:</para>
+
+<screen>
+*Main> :delete 0
+*Main> :show breaks
+[1] Main qsort.hs:2:15-46
+</screen>        
+
+        <para>To delete all breakpoints at once, use <literal>:delete *</literal>.</para>
+
+    </sect3>
+    </sect2>
+
+    <sect2 id="single-stepping">
+      <title>Single-stepping</title>
+
+      <para>Single-stepping is a great way to visualise the execution of your
+        program, and it is also a useful tool for identifying the source of a
+        bug.  The concept is simple: single-stepping enables all the
+        breakpoints in the program and executes until the next breakpoint is
+        reached, at which point you can single-step again, or continue
+        normally.  For example:</para>
+
+<screen>
+*Main> :step main
+Stopped at qsort.hs:5:7-47
+_result :: IO ()
+</screen>
+
+      <para>The command <literal>:step
+          <replaceable>expr</replaceable></literal> begins the evaluation of
+        <replaceable>expr</replaceable> in single-stepping mode.  If
+        <replaceable>expr</replaceable> is ommitted, then it single-steps from
+        the current breakpoint.</para>
+
+      <para>The <literal>:list</literal> command is particularly useful when
+        single-stepping, to see where you currently are:</para>
+
+<screen>
+[qsort.hs:5:7-47] *Main> :list
+4  
+5  main = print (qsort [8, 4, 0, 3, 1, 23, 11, 18])
+6  
+[qsort.hs:5:7-47] *Main>
+</screen>
+
+      <para>In fact, GHCi provides a way to run a command when a breakpoint is
+        hit, so we can make it automatically do
+        <literal>:list</literal>:</para>
+
+<screen>
+[qsort.hs:5:7-47] *Main> :set stop :list
+[qsort.hs:5:7-47] *Main> :step
+Stopped at qsort.hs:5:14-46
+_result :: [Integer]
+4  
+5  main = print (qsort [8, 4, 0, 3, 1, 23, 11, 18])
+6  
+[qsort.hs:5:14-46] *Main>
+</screen>
+    </sect2>
+
+    <sect2 id="nested-breakpoints">
+      <title>Nested breakpoints</title>
+      <para>When GHCi is stopped at a breakpoint, and an expression entered at
+        the prompt triggers a
+        second breakpoint, the new breakpoint becomes the &ldquo;current&rdquo;
+      one, and the old one is saved on a stack.  An arbitrary number of
+        breakpoint contexts can be built up in this way.  For example:</para>
+
+<screen>
+[qsort.hs:2:15-46] *Main> :st qsort [1,3]
+Stopped at qsort.hs:(1,0)-(3,55)
+_result :: [a]
+... [qsort.hs:(1,0)-(3,55)] *Main>
+</screen>
+
+      <para>While stopped at the breakpoint on line 2 that we set earlier, we
+        started a new evaluation with <literal>:step qsort [1,3]</literal>.
+        This new evaluation stopped after one step (at the definition of
+        <literal>qsort</literal>).  The prompt has changed, now prefixed with
+        <literal>...</literal>, to indicate that there are saved breakpoints
+        beyond the current one.  To see the stack of contexts, use
+        <literal>:show context</literal>:</para>
+
+<screen>
+... [qsort.hs:(1,0)-(3,55)] *Main> :show context
+--> main
+  Stopped at qsort.hs:2:15-46
+--> qsort [1,3]
+  Stopped at qsort.hs:(1,0)-(3,55)
+... [qsort.hs:(1,0)-(3,55)] *Main>
+</screen>
+
+        <para>To abandon the current evaluation, use
+        <literal>:abandon</literal>:</para>
+
+<screen>
+... [qsort.hs:(1,0)-(3,55)] *Main> :abandon
+[qsort.hs:2:15-46] *Main> :abandon
+*Main>
+</screen>
+    </sect2>
+
+    <sect2 id="ghci-debugger-result">
+      <title>The <literal>_result</literal> variable</title>
+      <para>When stopped at a breakpoint or single-step, GHCi binds the
+        variable <literal>_result</literal> to the value of the currently
+        active expression.  The value of <literal>_result</literal> is
+        presumably not available yet, because we stopped its evaluation, but it
+        can be forced: if the type is known and showable, then just entering
+        <literal>_result</literal> at the prompt will show it.  However,
+        there's one caveat to doing this: evaluating <literal>_result</literal>
+        will be likely to trigger further breakpoints, starting with the
+        breakpoint we are currently stopped at (if we stopped at a real
+        breakpoint, rather than due to <literal>:step</literal>).  So it will
+        probably be necessary to issue a <literal>:continue</literal>
+        immediately when evaluating <literal>_result</literal>.  Alternatively,
+        you can use <literal>:force</literal> which ignores breakpoints.</para>
+    </sect2>
+
+    <sect2 id="tracing">
+      <title>Tracing and history</title>
+
+      <para>A question that we often want to ask when debugging a program is
+        &ldquo;how did I get here?&rdquo;.  Traditional imperative debuggers
+        usually provide some kind of stack-tracing feature that lets you see
+        the stack of active function calls (sometimes called the &ldquo;lexical
+        call stack&rdquo;), describing a path through the code
+        to the current location.  Unfortunately this is hard to provide in
+        Haskell, because execution proceeds on a demand-driven basis, rather
+        than a depth-first basis as in strict languages.  The
+        &ldquo;stack&ldquo; in GHC's execution engine bears little
+        resemblance to the lexical call stack.  Ideally GHCi would maintain a
+        separate lexical call stack in addition to the dynamic call stack, and
+        in fact this is exactly
+        what our profiling system does (<xref linkend="profiling" />), and what
+        some other Haskell debuggers do.  For the time being, however, GHCi
+        doesn't maintain a lexical call stack (there are some technical
+        challenges to be overcome).  Instead, we provide a way to backtrack from a
+        breakpoint to previous evaluation steps: essentially this is like
+        single-stepping backwards, and should in many cases provide enough
+        information to answer the &ldquo;how did I get here?&rdquo;
+        question.</para>
+
+      <para>To use tracing, evaluate an expression with the
+        <literal>:trace</literal> command.  For example, if we set a breakpoint
+        on the base case of <literal>qsort</literal>:</para>
+
+<screen>
+*Main&gt; :list qsort
+1  qsort [] = [] 
+2  qsort (a:as) = qsort left ++ [a] ++ qsort right
+3    where (left,right) = (filter (&lt;=a) as, filter (&gt;a) as)
+4  
+*Main&gt; :b 1
+Breakpoint 1 activated at qsort.hs:1:11-12
+*Main&gt; 
+</screen>
+
+      <para>and then run a small <literal>qsort</literal> with
+        tracing:</para>
+
+<screen>
+*Main> :trace qsort [3,2,1]
+Stopped at qsort.hs:1:11-12
+_result :: [a]
+[qsort.hs:1:11-12] *Main>
+</screen>
+
+      <para>We can now inspect the history of evaluation steps:</para>
+
+<screen>
+[qsort.hs:1:11-12] *Main> :hist
+-1  : qsort.hs:3:24-38
+-2  : qsort.hs:3:23-55
+-3  : qsort.hs:(1,0)-(3,55)
+-4  : qsort.hs:2:15-24
+-5  : qsort.hs:2:15-46
+-6  : qsort.hs:3:24-38
+-7  : qsort.hs:3:23-55
+-8  : qsort.hs:(1,0)-(3,55)
+-9  : qsort.hs:2:15-24
+-10 : qsort.hs:2:15-46
+-11 : qsort.hs:3:24-38
+-12 : qsort.hs:3:23-55
+-13 : qsort.hs:(1,0)-(3,55)
+-14 : qsort.hs:2:15-24
+-15 : qsort.hs:2:15-46
+-16 : qsort.hs:(1,0)-(3,55)
+&lt;end of history&gt;
+</screen>
+
+      <para>To examine one of the steps in the history, use
+        <literal>:back</literal>:</para>
+
+<screen>
+[qsort.hs:1:11-12] *Main> :back
+Logged breakpoint at qsort.hs:3:24-38
+_result :: [a]
+as :: [a]
+a :: a
+[-1: qsort.hs:3:24-38] *Main> 
+</screen>
+
+      <para>Note that the local variables at each step in the history have been
+        preserved, and can be examined as usual.  Also note that the prompt has
+        changed to indicate that we're currently examining the first step in
+        the history: <literal>-1</literal>.  The command
+        <literal>:forward</literal> can be used to traverse forward in the
+        history.</para>
+
+      <para>The <literal>:trace</literal> command can be used with or without
+        an expression.  When used without an expression, tracing begins from
+        the current breakpoint, just like <literal>:step</literal>.</para>
+
+      <para>The history is only available when
+        using <literal>:trace</literal>; the reason for this is we found that
+        logging each breakpoint in the history cuts performance by a factor of
+        2 or more.  GHCi remembers the last 50 steps in the history (perhaps in
+        the future we'll make this configurable).</para>
+    </sect2>
+
+    <sect2 id="ghci-debugger-exceptions">
+      <title>Debugging exceptions</title>
+      <para>Another common question that comes up when debugging is
+        &ldquo;where did this exception come from?&rdquo;.  Exceptions such as
+        those raised by <literal>error</literal> or <literal>head []</literal>
+        have no context information attached to them.  Finding which
+        particular call to <literal>head</literal> in your program resulted in
+        the error can be a painstaking process, usually involving
+        <literal>Debug.Trace.trace</literal>.</para>
+
+      <para>The GHCi debugger offers a way to hopefully shed some light on
+        these errors quickly and without modifying or recompiling the source
+        code.  One way would be to set a breakpoint on the location in the
+        source code that throws the exception, and then use
+        <literal>:trace</literal> and <literal>:history</literal> to establish
+        the context.  However, <literal>head</literal> is in a library and
+        we can't set a breakpoint on it directly.  For this reason, GHCi
+        provides the flag <literal>-fbreak-on-exception</literal> which causes
+        the evaluator to stop when an exception is thrown, just as it does when
+        a breakpoint is hit.  This is only really useful in conjunction with
+        <literal>:trace</literal>, in order to log the steps leading up to the
+        exception.  For example:</para>
+
+<screen>
+*Main> :set -fbreak-on-exception
+*Main> :trace qsort ("abc" ++ undefined)
+"Stopped at &lt;exception thrown&gt;
+_exception :: e
+[&lt;exception thrown&gt;] *Main&gt; :hist
+-1  : qsort.hs:3:24-38
+-2  : qsort.hs:3:23-55
+-3  : qsort.hs:(1,0)-(3,55)
+-4  : qsort.hs:2:15-24
+-5  : qsort.hs:2:15-46
+-6  : qsort.hs:(1,0)-(3,55)
+&lt;end of history&gt;
+[&lt;exception thrown&gt;] *Main&gt; :back
+Logged breakpoint at qsort.hs:3:24-38
+_result :: [a]
+as :: [a]
+a :: a
+[-1: qsort.hs:3:24-38] *Main&gt; :force as
+*** Exception: Prelude.undefined
+[-1: qsort.hs:3:24-38] *Main&gt; :print as
+as = 'b' : 'c' : (_t1::[Char])
+</screen>
+
+      <para>The exception itself is bound to a new variable,
+        <literal>_exception</literal>.</para>
+
+      <para>Breaking on exceptions is particularly useful for finding out what
+        your program was doing when it was in an infinite loop.  Just hit
+        Control-C, and examine the history to find out what was going
+        on.</para>
+    </sect2>
+
+    <sect2><title>Example: inspecting functions</title>
+      <para>
+        It is possible to use the debugger to examine function values. 
+        When we are at a breakpoint and a function is in scope, the debugger
+        cannot show 
+        you the source code for it; however, it is possible to get some 
+        information by applying it to some arguments and  observing the result. 
+      </para>
+
+      <para>
+        The process is slightly complicated when the binding is polymorphic. 
+        We show the process by means of an example.
+        To keep things simple, we will use the well known <literal>map</literal> function:
+<programlisting>
+import Prelude hiding (map)
+
+map :: (a->b) -> a -> b
+map f [] = []
+map f (x:xs) = f x : map f xs
+</programlisting>
+      </para>
+
+      <para>
+        We set a breakpoint on <literal>map</literal>, and call it.
+<screen>
+*Main> :break 5
+Breakpoint 0 activated at  map.hs:5:15-28
+*Main> map Just [1..5]
+Stopped at map.hs:(4,0)-(5,12)
+_result :: [b]
+x :: a
+f :: a -> b
+xs :: [a]
+</screen>
+      GHCi tells us that, among other bindings, <literal>f</literal> is in scope. 
+      However, its type is not fully known yet,  
+      and thus it is not possible to apply it to any 
+      arguments. Nevertheless, observe that the type of its first argument is the
+      same as the type of <literal>x</literal>, and its result type is shared
+        with <literal>_result</literal>.
+      </para>
+
+      <para>
+        As we demonstrated earlier (<xref linkend="breakpoints" />),  the
+        debugger has some intelligence built-in to update the type of 
+        <literal>f</literal> whenever the types of <literal>x</literal> or 
+        <literal>_result</literal> are discovered.  So what we do in this
+        scenario is
+        force <literal>x</literal> a bit, in order to recover both its type 
+      and the argument part of <literal>f</literal>.  
+<screen>
+*Main> seq x ()
+*Main> :print x
+x = 1
+</screen>
+      </para>
+      <para>
+        We can check now that as expected, the type of <literal>x</literal>
+        has been reconstructed, and with it the 
+        type of <literal>f</literal> has been too:</para>
+<screen>
+*Main> :t x
+x :: Integer
+*Main> :t f
+f :: Integer -> b
+</screen>
+      <para>
+        From here, we can apply f to any argument of type Integer and observe
+        the results. 
+<screen><![CDATA[
+*Main> let b = f 10
+*Main> :t b
+b :: b
+*Main> b
+<interactive>:1:0:
+    Ambiguous type variable `b' in the constraint:
+      `Show b' arising from a use of `print' at <interactive>:1:0
+*Main> :p b
+b = (_t2::a)
+*Main> seq b ()
+()
+*Main> :t b
+b :: a
+*Main> :p b
+b = Just 10
+*Main> :t b
+b :: Maybe Integer
+*Main> :t f
+f :: Integer -> Maybe Integer
+*Main> f 20
+Just 20
+*Main> map f [1..5]
+[Just 1, Just 2, Just 3, Just 4, Just 5]
+]]></screen>
+      In the first application of <literal>f</literal>, we had to do 
+      some more type reconstruction
+      in order to recover the result type of <literal>f</literal>. 
+      But after that, we are free to use 
+      <literal>f</literal> normally.
+     </para>
+    </sect2>
+
+    <sect2><title>Limitations</title>
+      <itemizedlist>
+        <listitem>
+          <para>When stopped at a breakpoint, if you try to evaluate a variable
+            that is already under evaluation, the second evaluation will hang.
+            The reason is
+            that GHC knows the variable is under evaluation, so the new
+            evaluation just waits for the result before continuing, but of
+            course this isn't going to happen because the first evaluation is
+            stopped at a breakpoint. Control-C can interrupt the hung
+            evaluation and return to the prompt.</para>
+          <para>The most common way this can happen is when you're evaluating a
+            CAF (e.g. main), stop at a breakpoint, and ask for the value of the
+            CAF at the prompt again.</para>
+        </listitem>
+	<listitem><para>
+	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
+	  at the scope of a breakpoint if there is a explicit type signature.
+	</para>
+        </listitem>
+      </itemizedlist>
+    </sect2>
+  </sect1>
+
   <sect1 id="ghci-invocation">
     <title>Invoking GHCi</title>
     <indexterm><primary>invoking</primary><secondary>GHCi</secondary></indexterm>
@@ -835,7 +1558,7 @@ def = toEnum 0
     instructs GHCi to load the specified modules or filenames (and all
     the modules they depend on), just as if you had said
     <literal>:load <replaceable>modules</replaceable></literal> at the
-    GHCi prompt (see <xref linkend="ghci-commands"/>).  For example, to
+    GHCi prompt (see <xref linkend="ghci-commands" />).  For example, to
     start GHCi and load the program whose topmost module is in the
     file <literal>Main.hs</literal>, we could say:</para>
 
@@ -858,7 +1581,7 @@ $ ghci Main.hs
       they will be automatically loaded the first time they are
       needed.</para>
 
-      <para>For non-auto packages, however, you need to request the
+      <para>For hidden packages, however, you need to request the
       package be loaded by using the <literal>-package</literal> flag:</para>
 
 <screen>
@@ -1590,374 +2313,6 @@ Prelude> :set -fno-glasgow-exts
       <option>-l</option> in particular) will also work, but some may
       not take effect until the next reload.</para>
       <indexterm><primary>static</primary><secondary>options</secondary></indexterm>
-    </sect2>
-  </sect1>
-  <sect1 id="ghci-debugger">
-    <title>The GHCi debugger</title>
-    <indexterm><primary>debugger</primary></indexterm>
-    <para>GHCi embeds an utility debugger with a very basic set of operations. The debugger
-          is always available in ghci, you do not need to do anything to activate it. </para>
-    <para>The following conditions must hold before a module can be debugged in GHCi:
-      <itemizedlist>
-         <listitem>
-	   <para>The module must have been loaded interpreted, i.e. not loaded from an <filename>.o</filename> file compiled by ghc </para>
-	 </listitem>
-       </itemizedlist></para>
-    <sect2><title>Using the debugger</title>
-    <para>The debugger allows the insertion of breakpoints at specific locations in the source code. These locations are governed by event sites, and not by line as in traditional debuggers such as gdb. </para> <para>
-      Once a breakpointed event is hit, the debugger stops the execution and you can examine the local variables in scope
-      in the context of the event, as well as evaluate arbitrary Haskell expressions in
-      a special interactive prompt. </para><para>
-      
-     When you are done you issue the <literal>:continue</literal> 
-      command to leave the breakpoint and let the execution go on. 
-     Note that not all the GHCi commands are supported in a breakpoint. 
-
-    </para>
-    <sidebar><title>Events</title><?dbfo float-type="left"?>
-    <para> Events are the places in source code where you can set a breakpoint.
-<programlisting>
-qsort [] = <co id="name-binding-co"/> []
-qsort (x:xs) = 
-   <coref linkend="name-binding-co"/> let left  = <coref linkend="name-binding-co"/> filter (\y -> <co id="lambda-co"/> y &lt; x) xs
-           right = <coref linkend="name-binding-co"/> case filter (\y -> <coref linkend="lambda-co"/> y &gt; x) xs of 
-                              right_val -> <co id="case-co"/> right_val
-    in <co id="let-co"/> qsort left ++ [x] ++ qsort right
-main = <coref linkend="name-binding-co"/> do { 
-   arg &lt;- <coref linkend="name-binding-co"/> getLine ;
-   let num = <coref linkend="name-binding-co"/> read arg :: [Int] ;
- <co id="stmts-co"/> print (qsort num) ;
- <coref linkend="stmts-co"/> putStrLn "GoodBye!" }
-</programlisting>
-     The GHCi debugger recognizes the following event types:
-    <calloutlist>
-      <callout arearefs="name-binding-co" id="name-binding">
-	<para>Function definition and local bindings in let/where</para>
-    </callout>
-    <callout arearefs="lambda-co" id="lambda">
-        <para>Lambda expression entry point</para>
-    </callout>
-    <callout arearefs="let-co" id="let">
-      <para>Let expression body</para>
-    </callout>
-    <callout arearefs="case-co" id="case">
-      <para>Case alternative body</para>
-    </callout>
-    <callout arearefs="stmts-co" id="stmts">
-      <para>do notation statements</para>
-    </callout>
-    </calloutlist></para>
-    <para>In reality however, ghci eliminates some redundant event sites. 
-    For instance, sites with two co-located breakpoint events are coalesced into a single one,
-    and sites with no bindings in scope are assumed to be uninteresting and no breakpoint can be set in them.</para>
-    </sidebar>
-
-<para>
-      You don't need to do anything special in order to start the debugging session.
-      Simply use ghci to evaluate your Haskell expressions and whenever a breakpoint
-      is hit, the debugger will enter the stage:
-<programlisting>
-*main:Main> :break qsort
-Breakpoint 0 activated at ../QSort.hs:(4,0)-(6,54)
-*QSort> qsort [10,9,1]
-Stopped at ../QSort.hs:(4,0)-(6,54)
-_result :: [a]
-xs :: [a]
-x :: a
-left :: [a]
-right :: [a]
-[../QSort.hs:(4,0)-(6,54)] *QSort> 
-</programlisting>
-      What is happening here is that GHCi has interrupted the evaluation of 
-      <literal>qsort</literal> at the breakpoint, as the prompt indicates.
-      At this point you can freely explore the contents of the bindings in scope,
-      but with two catches. </para><para>
-      First, take into account that due to the lazy nature of Haskell, some of
-      these bindings may be unevaluated, and that exploring their contents may 
-      trigger a computation. </para><para>
-      Second: look at the types of the things in scope.
-      GHCi has left its types parameterised by a variable!
-      Look at the type of <literal>qsort</literal>, which is 
-      polymorphic on the type of its argument. It does not 
-      tell us really what the types of <literal>x</literal> 
-      and <literal>xs</literal> can be. 
-      In general, polymorphic functions deal with polymorphic values,
-      and this means that some of the bindings available in a breakpoint site
-      will be parametrically typed.
-      </para><para>
-      So, what can we do with a value without concrete type? Very few interesting
-      things, not even using <literal>show</literal> on it. 
-      The <literal>:print</literal> command in ghci allows you to 
-      explore its contents and see if it is evaluated or not. 
-      <literal>:print</literal> works here because it does not need the 
-      type information to do its work. In fact, as we will see later,
-      <literal>:print</literal> can even recover the missing type information.</para>
-
-      <para> Let's go on with the debugging session of the <literal>qsort</literal>
-      example:
-<example id="debuggingEx"><title>A short debugging session</title>
-<programlisting>
-qsort2.hs:2:15-46> x
-&lt;interactive&gt;:1:0:
-    Ambiguous type variable `a' in the constraint: <co id="seq1"/>
-      `Show a' arising from a use of `print' at &lt;interactive&gt;:1:0
-qsort2.hs:2:15-46> seq x ()  <co id="seq2"/>
-() 
-qsort2.hs:2:15-46> x <co id="seq3"/>
-&lt;interactive&gt;:1:0:
-    Ambiguous type variable `a' in the constraint:
-      `Show a' arising from a use of `print' at &lt;interactive&gt;:1:0
-qsort2.hs:2:15-46> :t x
-x :: a
-qsort2.hs:2:15-46> :print x <co id="seq4"/>
-x = 10
-qsort2.hs:2:15-46> :t x <co id="seq5"/>
-x :: Integer
-</programlisting>
-</example>
-      <calloutlist>
-	<callout arearefs="seq1">
-	  <para>GHCi reminds us that <literal>x</literal> is untyped </para>
-	</callout>
-	<callout arearefs="seq2">
-	  <para>This line forces the evaluation of <literal>x</literal> </para>
-	</callout>
-	<callout arearefs="seq3">
-	  <para>Even though x has been evaluated, 
-	     we have not updated its type yet. </para>
-	</callout>
-	<callout arearefs="seq4">
-	  <para>We can explore <literal>x</literal> using the <literal>:print</literal> 
-	  command, which does find out that <literal>x</literal> is of type Int and 
-	  prints its value.</para>
-	</callout>
-	<callout arearefs="seq5">
-	   <para>In addition, <literal>:print</literal> also updates 
-	     its type information.</para>
-	</callout>
-      </calloutlist>
-
-      This example shows the standard way to proceeed with polymorphic values in a breakpoint. 
-      </para>
-    </sect2>
-    <sect2><title>Commands</title>
-    <para>Breakpoints can be set in several ways using the <literal>:breakpoint</literal> command. Note that you can take advantage of the command abbreviation feature of GHCi and use simply <literal>:bre</literal> to save quite a few keystrokes.
-<variablelist>
-<varlistentry>
-  <term>
-    <literal>:breakpoint add <replaceable>module</replaceable> <replaceable>line</replaceable></literal>
-  </term>
-  <listitem><para>
-    Adds a breakpoint at the first event found at line <literal>line</literal> in <literal>module</literal>, if any.
-  </para></listitem>
-</varlistentry>
-<varlistentry>
-  <term>
-    <literal>:breakpoint add <replaceable>module</replaceable> <replaceable>line</replaceable> <replaceable>column</replaceable></literal>
-  </term>
-  <listitem><para>
-    Adds a breakpoint at the first event found after column <literal>column</literal>
-    at line <literal>line</literal> in <literal>module</literal>, if any.
-  </para></listitem>
-</varlistentry>
-
-<varlistentry>
-  <term>
-    <literal>:breakpoint continue</literal>
-  </term>
-  <listitem><para>
-   When at a breakpoint, continue execution up to the next breakpoint
-   or end of evaluation.
-  </para></listitem>
-</varlistentry>
-
-<varlistentry>
-  <term>
-    <literal>:continue</literal>
-  </term>
-  <listitem><para>
-      Shortcut for <literal>:breakpoint continue</literal>
-  </para></listitem>
-</varlistentry>
-
-<varlistentry>
-  <term>
-    <literal>:breakpoint list</literal>
-  </term>
-  <listitem><para>
-    Lists the currently set up breakpoints.
-  </para></listitem>
-</varlistentry>
-<varlistentry>
-  <term>
-    <literal>:breakpoint del <replaceable>num</replaceable></literal>
-  </term>
-  <listitem><para>
-    Deletes the breakpoint at position <literal>num</literal> in the list of
-    breakpoints shown by <literal>:breakpoint list</literal>.
-  </para></listitem>
-</varlistentry>
-<varlistentry>
-  <term>
-    <literal>:breakpoint del <replaceable>module</replaceable> <replaceable>line</replaceable></literal>
-  </term>
-  <listitem><para>
-  Dels the breakpoint at line <literal>line</literal> in <literal>module</literal>, if any.
-  </para></listitem>
-</varlistentry>
-<varlistentry>
-  <term>
-    <literal>:breakpoint del <replaceable>module</replaceable> <replaceable>line</replaceable><replaceable>col</replaceable> </literal>
-  </term>
-  <listitem><para>
-    Deletes the first breakpoint found after column <literal>column</literal>
-    at line <literal>line</literal> in <literal>module</literal>, if any.
-  </para></listitem>
-</varlistentry>
-<varlistentry>
-  <term>
-    <literal>:breakpoint stop </literal>
-  </term>
-  <listitem><para>
-    Stop the program being executed. This interrupts a debugging session
-    and returns to the top level.
-  </para></listitem>
-</varlistentry>
-</variablelist></para>
-    </sect2>
-    <sect2><title>Debugging Higher-Order functions</title>
-      <para>
-      It is possible to use the debugger to examine lambdas. 
-      When we are at a breakpoint and a lambda is in scope, the debugger cannot show 
-      you the source code that constitutes it; however, it is possible to get some 
-      information by applying it to some arguments and  observing the result. 
-      </para><para>
-      The process is slightly complicated when the binding is polymorphic. 
-      We show the process by means of an example.
-      To keep things simple, we will use the well known <literal>map</literal> function:
-      <programlisting>
-import Prelude hiding (map)
-
-map :: (a->b) -> a -> b
-map f [] = []
-map f (x:xs) = f x : map f xs
-      </programlisting>
-      </para><para>
-      We set a breakpoint on <literal>map</literal>, and call it.
-      <programlisting>
-*Main> :break map
-Breakpoint 0 activated at map.hs:(4,0)-(5,12)
-*Main> map Just [1..5]
-Stopped at map.hs:(4,0)-(5,12)
-_result :: [b]
-x :: a
-f :: a -> b
-xs :: [a]
-      </programlisting>
-      GHCi tells us that, among other bindings, <literal>f</literal> is in scope. 
-      However, its type is not fully known yet,  
-      and thus it is not possible to apply it to any 
-      arguments. Nevertheless, observe that the type of its first argument is the
-      same as the type of <literal>x</literal>, and its result type is the
-      same as the type of <literal>_result</literal>.
-      </para><para>
-      The debugger has some intelligence built-in to update the type of 
-      <literal>f</literal> whenever the types of <literal>x</literal> or 
-      <literal>_result</literal> are reconstructed. So what we do in this scenario is
-      force <literal>x</literal> a bit, in order to recover both its type 
-      and the argument part of <literal>f</literal>.  
-      <programlisting>
-*Main> seq x ()
-*Main> :print x
-x = 1
-      </programlisting>
-      </para><para>
-      We can check now that as expected, the type of <literal>x</literal>
-      has been reconstructed, and with it the 
-      type of <literal>f</literal> has been too:
-      <programlisting>
-*Main> :t x
-x :: Integer
-*Main> :t f
-f :: Integer -> b
-      </programlisting>
-      </para><para>
-      From here, we can apply f to any argument of type Integer and observe the 
-      results. 
-      <programlisting><![CDATA[
-*Main> let b = f 10
-*Main> :t b
-b :: b
-*Main> b
-<interactive>:1:0:
-    Ambiguous type variable `b' in the constraint:
-      `Show b' arising from a use of `print' at <interactive>:1:0
-*Main> :p b
-b = (_t2::a)
-*Main> seq b ()
-()
-*Main> :t b
-b :: a
-*Main> :p b
-b = Just 10
-*Main> :t b
-b :: Maybe Integer
-*Main> :t f
-f :: Integer -> Maybe Integer
-*Main> f 20
-Just 20
-*Main> map f [1..5]
-[Just 1, Just 2, Just 3, Just 4, Just 5]
-      ]]></programlisting>
-      In the first application of <literal>f</literal>, we had to do 
-      some more type reconstruction
-      in order to recover the result type of <literal>f</literal>. 
-      But after that, we are free to use 
-      <literal>f</literal> normally.
-     </para>
-    </sect2>
-    <sect2><title>Tips</title>
-      <variablelist>
-	<varlistentry> <term>* Repeated use of <literal>seq</literal> and 
-	    <literal>:print</literal> may be necessary to observe unevaluated
-	    untyped bindings</term> 
-	  <listitem><para>see <xref linkend="debuggingEx"/> 
-	  </para></listitem>
-	</varlistentry>
-	<varlistentry> <term> * <literal>GHC.Exts.unsafeCoerce</literal> can help if you are positive about the type of a binding</term> 
-	  <listitem><para><programlisting>
-type MyLongType a = [Maybe [Maybe a]]
-
-*Main> :m +GHC.Exts
-*Main> main
-Local bindings in scope:
-  x :: a
-Main.hs:15> let x' = unsafeCoerce x :: MyLongType Bool
-Main.hs:15> x'
-[Just [Just False, Just True]]
-	  </programlisting>
-	   Note that a wrong coercion will likely result in your debugging session being interrupted by a segmentation fault 
-	  </para></listitem>
-	</varlistentry>
-	<varlistentry> <term> * The <literal>:force</literal> command </term>
-	  <listitem><para> 
-	      equivalent to <literal> :print</literal> with automatic 
-	      <literal>seq</literal> forcing, 
-	      may prove useful to replace sequences of <literal>seq</literal> and 
-	      <literal>&colon;print</literal> in some situations. 
-	  </para></listitem>
-	</varlistentry> 
-    </variablelist>
-    </sect2>
-    <sect2><title>Limitations</title>
-     <para>
-      <itemizedlist>
-	<listitem><para>
-	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
-	  at the scope of a breakpoint if there is a explicit type signature.
-	</para></listitem>
-      </itemizedlist>
-     </para>
     </sect2>
   </sect1>
   <sect1 id="ghci-dot-files">
