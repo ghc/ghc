@@ -104,6 +104,7 @@ import System.Exit
 	'jump'		{ L _ (CmmT_jump) }
 	'foreign'	{ L _ (CmmT_foreign) }
 	'prim'		{ L _ (CmmT_prim) }
+	'return'	{ L _ (CmmT_return) }
 	'import'	{ L _ (CmmT_import) }
 	'switch'	{ L _ (CmmT_switch) }
 	'case'		{ L _ (CmmT_case) }
@@ -279,8 +280,10 @@ stmt	:: { ExtCode }
 		{ doSwitch $2 $3 $5 $6 }
 	| 'goto' NAME ';'
 		{ do l <- lookupLabel $2; stmtEC (CmmBranch l) }
-	| 'jump' expr {-maybe_actuals-} ';'
-		{ do e <- $2; stmtEC (CmmJump e []) }
+	| 'jump' expr maybe_actuals ';'
+		{ do e1 <- $2; e2 <- sequence $3; stmtEC (CmmJump e1 e2) }
+        | 'return' maybe_actuals ';'
+		{ do e <- sequence $2; stmtEC (CmmReturn e) }
 	| 'if' bool_expr '{' body '}' else 	
 		{ ifThenElse $2 $4 $6 }
 
@@ -371,6 +374,10 @@ expr0	:: { ExtFCode CmmExpr }
 maybe_ty :: { MachRep }
 	: {- empty -}			{ wordRep }
 	| '::' type			{ $2 }
+
+maybe_actuals :: { [ExtFCode (CmmExpr, MachHint)] }
+	: {- empty -}		{ [] }
+	| '(' hint_exprs0 ')'	{ $2 }
 
 hint_exprs0 :: { [ExtFCode (CmmExpr, MachHint)] }
 	: {- empty -}			{ [] }

@@ -167,6 +167,7 @@ pprStmt stmt = case stmt of
     CmmBranch ident          -> genBranch ident
     CmmCondBranch expr ident -> genCondBranch expr ident
     CmmJump expr params      -> genJump expr params
+    CmmReturn params         -> genReturn params
     CmmSwitch arg ids        -> genSwitch arg ids
 
 -- --------------------------------------------------------------------------
@@ -195,8 +196,8 @@ genCondBranch expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: CmmExpr -> [LocalReg] -> SDoc
-genJump expr actuals = 
+genJump :: CmmExpr -> [(CmmExpr, MachHint)] -> SDoc
+genJump expr args = 
 
     hcat [ ptext SLIT("jump")
          , space
@@ -205,12 +206,21 @@ genJump expr actuals =
                 else case expr of
                     CmmLoad (CmmReg _) _ -> pprExpr expr 
                     _ -> parens (pprExpr expr)
-         , pprActuals actuals
+         , parens  ( commafy $ map ppr args )
          , semi ]
 
-  where
-    pprActuals [] = empty
-    pprActuals as = parens ( commafy $ map pprLocalReg as ) 
+-- --------------------------------------------------------------------------
+-- Return from a function. [1], Section 6.8.2 of version 1.128
+--
+--     return (a, b, c);
+--
+genReturn :: [(CmmExpr, MachHint)] -> SDoc
+genReturn args = 
+
+    hcat [ ptext SLIT("return")
+         , space
+         , parens  ( commafy $ map ppr args )
+         , semi ]
 
 -- --------------------------------------------------------------------------
 -- Tabled jump to local label

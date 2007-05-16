@@ -130,8 +130,11 @@ data CmmStmt
 	--	one  -> second block etc
 	-- Undefined outside range, and when there's a Nothing
 
-  | CmmJump CmmExpr [LocalReg]    -- Jump to another function, with these 
-				  -- parameters.
+  | CmmJump CmmExpr               -- Jump to another function,
+    [(CmmExpr, MachHint)]         -- with these parameters.
+
+  | CmmReturn                     -- Return from a function,
+    [(CmmExpr, MachHint)]         -- with these return values.
 
 {-
 Discussion
