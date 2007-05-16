@@ -62,9 +62,10 @@ SRC_MKDEPENDHS_OPTS += \
 
 # GHC 6.3+ has Cabal, but we're replacing it:
 SRC_HC_OPTS += -ignore-package Cabal
-endif
 
+# only GHC 6.3+ has -ignore-package
 SRC_HC_OPTS += -ignore-package filepath
+endif
 
 # Some explicit dependencies, needed because ghc -M can't discover the
 # true dependencies of these stub files.
