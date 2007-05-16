@@ -1,8 +1,0 @@
--- Check that user breakpoints are caught even with -fno-debugging
-
-:set -fno-debugging
-:l A
-f 4
-:c
-g 1
-:c

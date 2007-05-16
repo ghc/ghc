@@ -1,0 +1,9 @@
+Breakpoint 0 activated at break016.hs:1:6-13
+Stopped at break016.hs:1:6-13
+_result :: Int
+i :: Int
+command '__cond' not defined
+4
+Stopped at break016.hs:1:6-13
+_result :: Int
+i :: Int

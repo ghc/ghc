@@ -1,7 +1,8 @@
 -- implicit params availability in breakpoints
 
 :set -fimplicit-params
-:l A
-
+:l break015.hs
+:b f
 g 5
+:st
 _flag

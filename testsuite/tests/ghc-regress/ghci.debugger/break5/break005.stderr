@@ -1,8 +1,0 @@
-
-A.hs:3:6:
-    Warning: Extracted ids: [i]
-			    [a]
-
-A.hs:6:6:
-    Warning: Extracted ids: [i]
-			    [Int]

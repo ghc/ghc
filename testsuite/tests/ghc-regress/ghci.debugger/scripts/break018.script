@@ -3,4 +3,7 @@
 
 :set -fglasgow-exts
 :l ../mdo.hs
-l2dll "hello world"
+:st l2dll "hello world"
+:st
+:st
+:st
