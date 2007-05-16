@@ -175,6 +175,7 @@ RTS_ENTRY(stg_AP_entry);
 RTS_ENTRY(stg_AP_STACK_entry);
 RTS_ENTRY(stg_dummy_ret_entry);
 RTS_ENTRY(stg_raise_entry);
+RTS_ENTRY(stg_raise_ret_ret);
 RTS_ENTRY(stg_END_STM_WATCH_QUEUE_entry);
 RTS_ENTRY(stg_END_INVARIANT_CHECK_QUEUE_entry);
 RTS_ENTRY(stg_END_STM_CHUNK_LIST_entry);
