@@ -550,8 +550,8 @@ instance Monad TM where
                                        (r2,fv2,st2) -> 
                                           (r2, fv1 `plusOccEnv` fv2, st2)
 
-getState :: TM TickTransState
-getState = TM $ \ env st -> (st, noFVs, st)
+-- getState :: TM TickTransState
+-- getState = TM $ \ env st -> (st, noFVs, st)
 
 setState :: (TickTransState -> TickTransState) -> TM ()
 setState f = TM $ \ env st -> ((), noFVs, f st)
