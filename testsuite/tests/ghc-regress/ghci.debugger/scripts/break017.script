@@ -1,0 +1,8 @@
+:l ../QSort.hs
+:set -fbreak-on-exception
+:trace qsort ("abc" ++ undefined)
+:back
+:print as
+:force as
+-- this should print the exception
+:print as
