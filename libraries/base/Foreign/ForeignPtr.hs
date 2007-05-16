@@ -105,8 +105,9 @@ newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- after the last reference to the foreign object is dropped.  Note that there
 -- is no guarantee on how soon the finaliser is executed after the last
 -- reference was dropped; this depends on the details of the Haskell storage
--- manager. The only guarantee is that the finaliser runs before the program
--- terminates.
+-- manager.  Indeed, there is no guarantee that the finalizer is executed at
+-- all; a program may exit with finalizers outstanding.  (This is true
+-- of GHC, other implementations may give stronger guarantees).
 newForeignPtr finalizer p
   = do fObj <- newForeignPtr_ p
        addForeignPtrFinalizer finalizer fObj
