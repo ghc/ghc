@@ -177,10 +177,13 @@ addTickLHsBind (VarBind var_id var_rhs) = do
 -}
 addTickLHsBind other = return other
 
--- add a tick to the expression no matter what it is
+-- Add a tick to the expression no matter what it is.  There is one exception:
+-- for the debugger, if the expression is a 'let', then we don't want to add
+-- a tick here because there will definititely be a tick on the body anyway.
 addTickLHsExprAlways :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprAlways (L pos e0) = do
-    allocTickBox (ExpBox False) pos $ addTickHsExpr e0
+addTickLHsExprAlways (L pos e0)
+  | not opt_Hpc, HsLet _ _ <- e0 = addTickLHsExprNever (L pos e0)
+  | otherwise = allocTickBox (ExpBox False) pos $ addTickHsExpr e0
 
 addTickLHsExprNeverOrAlways :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprNeverOrAlways e
