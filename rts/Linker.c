@@ -256,6 +256,12 @@ typedef struct _RtsSymbolVal {
 #define RTS_MINGW_EXTRA_SYMS
 #endif
 
+#if HAVE_GETTIMEOFDAY
+#define RTS_MINGW_GETTIMEOFDAY_SYM Sym(gettimeofday)
+#else
+#define RTS_MINGW_GETTIMEOFDAY_SYM /**/
+#endif
+
 /* These are statically linked from the mingw libraries into the ghc
    executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                  \
@@ -339,6 +345,7 @@ typedef struct _RtsSymbolVal {
       Sym(readdir)                              \
       Sym(rewinddir)                            \
       RTS_MINGW_EXTRA_SYMS                      \
+      RTS_MINGW_GETTIMEOFDAY_SYM		\
       Sym(closedir)
 #endif
 
