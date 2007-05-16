@@ -1,4 +1,4 @@
-module Dataflow (mapCmmTop, onBasicBlock, cmmLivenessComment, cmmLiveness) where
+module Dataflow (cmmLivenessComment, cmmLiveness, CmmLive) where
 
 import Cmm
 import PprCmm ()
@@ -97,7 +97,7 @@ cmmBlockUpdate ::
     -> UniqFM {-BlockId-} CmmLive
     -> Maybe (UniqFM {-BlockId-} CmmLive)
 cmmBlockUpdate blocks node _ state =
-    let old_live = lookupWithDefaultUFM state emptyUniqSet node
+    let old_live = lookupWithDefaultUFM state (panic "unknown block id during liveness analysis") node
         block = lookupWithDefaultUFM blocks (panic "unknown block id during liveness analysis") node
         new_live = cmmBlockLive state block
     in if (sizeUniqSet old_live) == (sizeUniqSet new_live)
@@ -127,7 +127,7 @@ cmmBlockNames blocks = listToUFM $ map block_name blocks where
 cmmLiveness :: [CmmBasicBlock] -> UniqFM {-BlockId-} CmmLive
 cmmLiveness blocks =
     fixedpoint (cmmBlockDependants sources) (cmmBlockUpdate blocks')
-               (map blockId blocks) emptyUFM where
+               (map blockId blocks) (listToUFM [(blockId b, emptyUniqSet) | b <- blocks]) where
                    (sources, targets) = cmmBlockSourcesAndTargets blocks
                    blocks' = cmmBlockNames blocks
 
@@ -138,11 +138,6 @@ cmmLivenessComment live (BasicBlock ident stmts) =
     BasicBlock ident stmts' where
         stmts' = (CmmComment $ mkFastString $ showSDoc $ ppr $ live'):stmts
         live' = map CmmLocal $ uniqSetToList $ lookupWithDefaultUFM live emptyUniqSet ident
-
-onBasicBlock f (CmmProc ds ident args blocks) = CmmProc ds ident args (f blocks)
-onBasicBlock f x = x
-
-mapCmmTop f (Cmm xs) = Cmm (map f xs)
 
 --------------------------------------------------------------------------------
 
