@@ -504,6 +504,9 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
     clos <- trIO $ getClosureData a
     case tipe clos of
 -- Thunks we may want to force
+-- NB. this won't attempt to force a BLACKHOLE.  Even with :force, we never
+-- force blackholes, because it would almost certainly result in deadlock,
+-- and showing the '_' is more useful.
       t | isThunk t && force -> seq a $ go tv ty a
 -- We always follow indirections 
       Indirection _ -> go tv ty $! (ptrs clos ! 0)
