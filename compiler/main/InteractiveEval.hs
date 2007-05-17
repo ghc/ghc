@@ -268,9 +268,17 @@ foreign import ccall "&rts_breakpoint_io_action"
 sandboxIO :: MVar Status -> IO [HValue] -> IO Status
 sandboxIO statusMVar thing = 
   withInterruptsSentTo 
-        (forkIO (do res <- Exception.try thing
+        (forkIO (do res <- Exception.try (rethrow thing)
                     putMVar statusMVar (Complete res)))
         (takeMVar statusMVar)
+
+-- | this just re-throws any exceptions received.  The point of this
+-- is that if -fbreak-on-excepsions is on, we only get a chance to break
+-- for synchronous exceptions, and this turns an async exception into
+-- a sync exception, so for instance a ^C exception will break right here
+-- unless it is caught elsewhere.
+rethrow :: IO a -> IO a
+rethrow io = Exception.catch io Exception.throwIO
 
 withInterruptsSentTo :: IO ThreadId -> IO r -> IO r
 withInterruptsSentTo io get_result = do
