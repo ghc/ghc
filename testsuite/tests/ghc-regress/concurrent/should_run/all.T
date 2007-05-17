@@ -9,7 +9,6 @@ setTestOpts(f)
 test('conc003', normal, compile_and_run, [''])
 test('conc006', normal, compile_and_run, [''])
 test('conc027', normal, compile_and_run, [''])
-test('conc049', compose(reqlib('stm'), only_compiler_types(['ghc'])), compile_and_run, ['-package stm'])
 test('conc051', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
@@ -105,27 +104,7 @@ test('conc042', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc043', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc044', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc045', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc046', only_compiler_types(['ghc']), compile_and_run, [''])
-
-# Omit GHCi for these two, since they appear to deadlock (23/11/2004 --SDM)
-test('conc047', compose(only_compiler_types(['ghc']), 
-                        omit_ways(['ghci'])), compile_and_run, [''])
-test('conc048', compose(only_compiler_types(['ghc']), 
-                        omit_ways(['ghci'])), compile_and_run, [''])
-
-test('conc050', compose(reqlib('stm'), compose(only_compiler_types(['ghc']), extra_run_opts('10000'))), compile_and_run, ['-package stm'])
-
 test('conc051', normal, compile_and_run, [''])
-
-test('conc052', reqlib('stm'), compile_and_run, ['-package stm'])
-
-test('conc053', compose(reqlib('stm'), compose(only_ways(['threaded1','threaded2']),
-			skip_if_platform('i386-unknown-mingw32'))),
-		 compile_and_run, ['-package stm'])
-test('conc054', reqlib('stm'), compile_and_run, ['-package stm'])
-test('conc055', compose(reqlib('stm'), exit_code(1)), compile_and_run, ['-package stm'])
-test('conc056', compose(reqlib('stm'), only_ways(['threaded1','threaded2'])),
-                compile_and_run, ['-package stm -package network'])
 
 test('conc057', only_ways(['threaded2']), compile_and_run, ['-O0'])
 
@@ -135,12 +114,6 @@ test('conc059', compose(only_compiler_types(['ghc']),
 			only_ways(['threaded1','threaded2'])),
 	compile_and_run, ['conc059_c.c'])
 clean(['conc059_c.o'])
-
-test('conc060', reqlib('stm'), compile_and_run, ['-package stm'])
-test('conc061', reqlib('stm'), compile_and_run, ['-package stm'])
-test('conc062', reqlib('stm'), compile_and_run, ['-package stm'])
-
-test('conc063', reqlib('stm'), compile_and_run, ['-package stm'])
 
 test('conc064', exit_code(1), compile_and_run, [''])
 
