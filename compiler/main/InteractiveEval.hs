@@ -72,7 +72,6 @@ import Control.Monad
 import Foreign
 import Foreign.C
 import GHC.Exts
-import GHC.Conc         ( ThreadId(..) )
 import Data.Array
 import Control.Exception as Exception
 import Control.Concurrent
@@ -632,7 +631,7 @@ mkExportEnv hsc_env mods = do
 
 nameSetToGlobalRdrEnv :: NameSet -> ModuleName -> GlobalRdrEnv
 nameSetToGlobalRdrEnv names mod =
-  mkGlobalRdrEnv [ GRE  { gre_name = name, gre_prov = vanillaProv mod }
+  mkGlobalRdrEnv [ GRE  { gre_name = name, gre_par = NoParent, gre_prov = vanillaProv mod }
 		 | name <- nameSetToList names ]
 
 vanillaProv :: ModuleName -> Provenance
