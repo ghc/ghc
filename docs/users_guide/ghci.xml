@@ -1672,6 +1672,17 @@ $ ghci -lm
     <variablelist>
       <varlistentry>
 	<term>
+          <literal>:abandon</literal>
+          <indexterm><primary><literal>:abandon</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Abandons the current evaluation (only available when stopped at
+          a breakpoint).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:add</literal> <replaceable>module</replaceable> ...
           <indexterm><primary><literal>:add</literal></primary></indexterm>
         </term>
@@ -1684,12 +1695,27 @@ $ ghci -lm
 
       <varlistentry>
 	<term>
-          <literal>:breakpoint</literal> <replaceable>list|add|continue|del|stop|step</replaceable> ...
-          <indexterm><primary><literal>:breakpoint</literal></primary></indexterm>
+          <literal>:back</literal>
+          <indexterm><primary><literal>:back</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Permits to add, delete or list the breakpoints in a debugging session.
-	  </para>
+	  <para>Travel back one step in the history.  See <xref
+              linkend="tracing" />.  See also:
+            <literal>:trace</literal>, <literal>:history</literal>,
+            <literal>:forward</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:break [<replaceable>identifier</replaceable> |
+            [<replaceable>module</replaceable>] <replaceable>line</replaceable>
+            [<replaceable>column</replaceable>]]</literal>
+        </term>
+          <indexterm><primary><literal>:break</literal></primary></indexterm>
+	<listitem>
+	  <para>Set a breakpoint on the specified function or line and
+              column.  See <xref linkend="setting-breakpoints" />.</para>
 	</listitem>
       </varlistentry>
 
@@ -1740,7 +1766,43 @@ $ ghci -lm
           <literal>:continue</literal> 
           <indexterm><primary><literal>:continue</literal></primary></indexterm>
         </term>
-	<listitem><para>Shortcut to <literal>:breakpoint continue</literal></para>
+	<listitem><para>Continue the current evaluation, when stopped at a
+            breakpoint.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:cmd</literal> <replaceable>expr</replaceable>
+          <indexterm><primary><literal>:cmd</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Executes <replaceable>expr</replaceable> as a computation of
+            type <literal>IO String</literal>, and then executes the resulting
+            string as a list of GHCi commands.  Multiple commands are separated
+            by newlines.  The <literal>:cmd</literal> command is useful with
+            <literal>:def</literal> and <literal>:set stop</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <literal>:ctags</literal> <optional><replaceable>filename</replaceable></optional>
+	  <literal>:etags</literal> <optional><replaceable>filename</replaceable></optional>
+	  <indexterm><primary><literal>:etags</literal></primary>
+	  </indexterm>
+	  <indexterm><primary><literal>:etags</literal></primary>
+	  </indexterm>
+	</term>
+	<listitem>
+	  <para>Generates a &ldquo;tags&rdquo; file for Vi-style editors
+	    (<literal>:ctags</literal>) or Emacs-style editors (<literal>etags</literal>).  If
+	    no filename is specified, the defaulit <filename>tags</filename> or
+	    <filename>TAGS</filename> is
+	    used, respectively.  Tags for all the functions, constructors and
+	    types in the currently loaded modules are created.  All modules must
+	    be interpreted for these commands to work.</para>
+          <para>See also <xref linkend="hasktags" />.</para>
 	</listitem>
       </varlistentry>
 
@@ -1814,6 +1876,18 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
+          <literal>:delete * | <replaceable>num</replaceable> ...</literal> 
+          <indexterm><primary><literal>:delete</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Delete one or more breakpoints by number (use <literal>:show
+              breaks</literal> to see the number of each breakpoint).  The
+            <literal>*</literal> form deletes all the breakpoints.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:edit <optional><replaceable>file</replaceable></optional></literal>
           <indexterm><primary><literal>:edit</literal></primary></indexterm>
         </term>
@@ -1825,6 +1899,34 @@ Prelude> :. cmds.ghci
 	  environment variable, or a default editor on your system if
 	  <literal>EDITOR</literal> is not set.  You can change the
 	  editor using <literal>:set editor</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:force <replaceable>identifier</replaceable> ...</literal>
+          <indexterm><primary><literal>:force</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Prints the value of <replaceable>identifier</replaceable> in
+            the same way as <literal>:print</literal>.   Unlike
+            <literal>:print</literal>, <literal>:force</literal> evaluates each
+            thunk that it encounters while traversing the value.  This may
+            cause exceptions or infinite loops, or further breakpoints (which
+            are ignored, but displayed).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:forward</literal>
+          <indexterm><primary><literal>:forward</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Move forward in the history.   See <xref
+              linkend="tracing" />.  See also:
+            <literal>:trace</literal>, <literal>:history</literal>,
+            <literal>:back</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -1844,6 +1946,19 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
+          <literal>:history [<replaceable>num</replaceable>]</literal>
+          <indexterm><primary><literal>:history</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Display the history of evaluation steps.  With a number,
+            displays that many steps (default: 20).  For use with
+            <literal>:trace</literal>; see <xref
+              linkend="tracing" />.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:info</literal> <replaceable>name</replaceable> ...
           <indexterm><primary><literal>:info</literal></primary></indexterm>
         </term>
@@ -1857,6 +1972,19 @@ Prelude> :. cmds.ghci
 	  will be printed.  If <replaceable>name</replaceable> has
 	  been loaded from a source file, then GHCi will also display
 	  the location of its definition in the source.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:kind</literal> <replaceable>type</replaceable>
+          <indexterm><primary><literal>:kind</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Infers and prints the kind of
+	  <replaceable>type</replaceable>. The latter can be an arbitrary
+	    type expression, including a partial application of a type constructor,
+	    such as <literal>Either Int</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -1949,39 +2077,19 @@ Prelude> :main foo bar
           <indexterm><primary><literal>:print</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para> Prints a semievaluated value without forcing its evaluation. 
-	  <literal>:print </literal> works just like <literal>:sprint</literal> but additionally, 
-           <literal>:print</literal> binds the unevaluated parts -called 
-	   <quote>suspensions</quote>-
-	  to names which you can play with. For example:
-<screen>
-Prelude> let li = map Just [1..5]
-Prelude> :sp li
-li - _
-Prelude> :p li
-li - (_t1::[Maybe Integer])
-Prelude> head li
-Just 1
-Prelude> :sp li
-li - Just 1 : _
-Prelude> :p li
-li - Just 1 : (_t2::[Maybe Integer])
-Prelude> last li
-Just 5
-Prelude> :sp li
-li - [Just 1,_,_,_,Just 5]
-Prelude> :p li
-li - [Just 1,(_t3::Maybe Integer),(_t4::Maybe Integer),(_t5::Maybe Integer),Just 4]
-Prelude> _t4
-Just 3
-Prelude> :p li
-li - [Just 1,(_t6::Maybe Integer),Just 3,(_t7::Maybe Integer),Just 4]
-</screen>
-         The example uses <literal>:print</literal> and  <literal>:sprint</literal> 
-	 to help us observe how the <literal>li</literal> variable is evaluated progressively as we operate
-         with it. Note for instance how <quote>last</quote> traverses all the elements of
-	 the list to compute its result, but without evaluating the individual elements.
-	  </para>
+	  <para>Prints a value without forcing its evaluation.
+            <literal>:print</literal> may be used on values whose types are
+            unkonwn or partially known, which might be the case for local
+            variables with polymorphic types at a breakpoint.  While inspecting
+            the runtime value, <literal>:print</literal> attempts to
+            reconstruct the type of the value, and will elaborate the type in
+            GHCi's environment if possible.  If any unevaluated components
+            (thunks) are encountered, then <literal>:print</literal> binds
+            a fresh variable with a name beginning with <literal>_t</literal>
+            to each thunk.  See <xref linkend="breakpoints" /> for more
+            information.  See also the <literal>:sprint</literal> command,
+            which works like <literal>:print</literal> but does not bind new
+            variables.</para>
 	</listitem>
       </varlistentry>
 
@@ -2072,12 +2180,61 @@ li - [Just 1,(_t6::Maybe Integer),Just 3,(_t7::Maybe Integer),Just 4]
 
       <varlistentry>
 	<term>
+           <literal>:set</literal> <literal>stop</literal>
+          [<replaceable>num</replaceable>] <replaceable>cmd</replaceable>
+        </term>
+	<listitem>
+	  <para>Set a command to be executed when a breakpoint is hit, or a new
+          item in the history is selected.  The most common use of
+            <literal>:set stop</literal> is to display the source code at the
+            current location, e.g. <literal>:set stop :list</literal>.</para>
+
+          <para>If a number is given before the command, then the commands are
+            run when the specified breakpoint (only) is hit.  This can be quite
+            useful: for example, <literal>:set stop 1 :continue</literal>
+            effectively disables breakpoint 1, by running
+            <literal>:continue</literal> whenever it is hit (although GHCi will
+            still emit a message to say the breakpoint was hit).  What's more,
+            with cunning use of <literal>:def</literal> and
+            <literal>:cmd</literal> you can use <literal>:set stop</literal> to
+            implement conditional breakpoints:</para>
+<screen>
+*Main> :def cond \expr -> return (":cmd if (" ++ expr ++ ") then return \"\" else return \":continue\"")
+*Main> :set stop 0 :cond (x &lt; 3)
+</screen>
+          <para>Ignoring breakpoints for a specified number of iterations is
+            also possible using similar techniques.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:show bindings</literal>
           <indexterm><primary><literal>:show bindings</literal></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Show the bindings made at the prompt and their
 	  types.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:show breaks</literal>
+          <indexterm><primary><literal>:show breaks</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>List the active breakpoints.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:show context</literal>
+          <indexterm><primary><literal>:show context</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>List the active evaluations that are stopped at breakpoints.</para>
 	</listitem>
       </varlistentry>
 
@@ -2090,52 +2247,53 @@ li - [Just 1,(_t6::Maybe Integer),Just 3,(_t7::Maybe Integer),Just 4]
 	  <para>Show the list of modules currently load.</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:show [args|prog|prompt|editor|stop]</literal>
+          <indexterm><primary><literal>:show</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Displays the specified setting (see
+            <literal>:set</literal>).</para>
+	</listitem>
+      </varlistentry>
+
       <varlistentry>
 	<term>
           <literal>:sprint</literal>
           <indexterm><primary><literal>:sprint</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Prints a semievaluated value without forcing its evaluation. 
-	  <literal>:sprint</literal> and its sibling <literal>:print</literal> 
-	  are very useful to observe how lazy evaluation works in your code. For example:
-<screen>
-Prelude> let li = map Just [1..5]
-Prelude> :sp li
-li - _
-Prelude> head li
-Just 1
-Prelude> :sp li
-li - Just 1 : _
-Prelude> last li
-Just 5
-Prelude> :sp li
-li - [Just 1,_,_,_,Just 5]
-</screen>
-         The example uses <literal>:sprint</literal> to help us observe how the <literal>li</literal> variable is evaluated progressively as we operate
-         with it. Note for instance how <quote>last</quote> traverses all the elements of
-	 the list to compute its result, but without evaluating the individual elements.
-	  </para>
+	  <para>Prints a value without forcing its evaluation.
+            <literal>:sprint</literal> is similar to <literal>:print</literal>,
+            with the difference that unevaluated subterms are not bound to new
+            variables, they are simply denoted by &lsquo;_&rsquo;.</para>
 	</listitem>
       </varlistentry>
+
       <varlistentry>
 	<term>
-	  <literal>:ctags</literal> <optional><replaceable>filename</replaceable></optional>
-	  <literal>:etags</literal> <optional><replaceable>filename</replaceable></optional>
-	  <indexterm><primary><literal>:etags</literal></primary>
-	  </indexterm>
-	  <indexterm><primary><literal>:etags</literal></primary>
-	  </indexterm>
-	</term>
+          <literal>:step [<replaceable>expr</replaceable>]</literal> 
+          <indexterm><primary><literal>:step</literal></primary></indexterm>
+        </term>
 	<listitem>
-	  <para>Generates a &ldquo;tags&rdquo; file for Vi-style editors
-	    (<literal>:ctags</literal>) or Emacs-style editors (<literal>etags</literal>).  If
-	    no filename is specified, the defaulit <filename>tags</filename> or
-	    <filename>TAGS</filename> is
-	    used, respectively.  Tags for all the functions, constructors and
-	    types in the currently loaded modules are created.  All modules must
-	    be interpreted for these commands to work.</para>
-          <para>See also <xref linkend="hasktags" />.</para>
+	  <para>Single-step from the last breakpoint.  With an expression
+            argument, begins evaluation of the expression with a
+            single-step.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:trace [<replaceable>expr</replaceable>]</literal>
+          <indexterm><primary><literal>:trace</literal></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Evaluates the given expression (or from the last breakpoint if
+            no expression is given), and additionally logs the evaluation
+            steps for later inspection using <literal>:history</literal>.  See
+            <xref linkend="tracing" />.</para>
 	</listitem>
       </varlistentry>
 
@@ -2150,19 +2308,6 @@ li - [Just 1,_,_,_,Just 5]
 	  forall quantifiers for polymorphic types.  The monomorphism
 	  restriction is <emphasis>not</emphasis> applied to the
 	  expression during type inference.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <literal>:kind</literal> <replaceable>type</replaceable>
-          <indexterm><primary><literal>:kind</literal></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Infers and prints the kind of
-	  <replaceable>type</replaceable>. The latter can be an arbitrary
-	    type expression, including a partial application of a type constructor,
-	    such as <literal>Either Int</literal>.</para>
 	</listitem>
       </varlistentry>
 
