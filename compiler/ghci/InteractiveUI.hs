@@ -110,6 +110,7 @@ builtin_commands = [
   ("cd",    	keepGoing changeDirectory,	False, completeFilename),
   ("check",	keepGoing checkModule,		False, completeHomeModule),
   ("continue",  keepGoing continueCmd,          False, completeNone),
+  ("cmd",       keepGoing cmdCmd,               False, completeIdentifier),
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
   ("def",	keepGoing defineMacro,		False, completeIdentifier),
   ("delete",    keepGoing deleteCmd,            False, completeNone),
@@ -154,6 +155,7 @@ helpText =
  "   :add <filename> ...         add module(s) to the current target set\n" ++
  "   :browse [*]<module>         display the names defined by <module>\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
+ "   :cmd <expr>                 run the commands returned by <expr>::IO String"++
  "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
  "   :edit <file>                edit file\n" ++
@@ -782,6 +784,17 @@ undefineMacro macro_name = do
 	else do
   io (writeIORef commands (filter ((/= macro_name) . cmdName) cmds))
 
+cmdCmd :: String -> GHCi ()
+cmdCmd str = do
+  let expr = '(' : str ++ ") :: IO String"
+  session <- getSession
+  maybe_hv <- io (GHC.compileExpr session expr)
+  case maybe_hv of
+    Nothing -> return ()
+    Just hv -> do 
+        cmds <- io $ (unsafeCoerce# hv :: IO String)
+        enqueueCommands (lines cmds)
+        return ()
 
 loadModule :: [(FilePath, Maybe Phase)] -> GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
