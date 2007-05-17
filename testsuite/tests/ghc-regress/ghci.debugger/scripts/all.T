@@ -45,6 +45,10 @@ test('dynbrk001', normal, ghci_script, ['dynbrk001.script'])
 test('dynbrk002', normal, ghci_script, ['dynbrk002.script'])
 test('dynbrk003', normal, ghci_script, ['dynbrk003.script'])
 test('dynbrk004', normal, ghci_script, ['dynbrk004.script'])
+test('dynbrk005', normal, ghci_script, ['dynbrk005.script'])
+test('dynbrk007', normal, ghci_script, ['dynbrk007.script'])
+test('dynbrk008', normal, ghci_script, ['dynbrk008.script'])
+test('dynbrk009', normal, ghci_script, ['dynbrk009.script'])
 
 test('result001', normal, ghci_script, ['result001.script'])
 

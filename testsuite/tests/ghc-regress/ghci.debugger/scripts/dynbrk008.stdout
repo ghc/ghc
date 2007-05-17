@@ -1,0 +1,15 @@
+Stopped at dynbrk008.hs:2:0-40
+_result :: [Int]
+Stopped at dynbrk008.hs:2:6-40
+_result :: [Int]
+i :: Int
+Stopped at dynbrk008.hs:2:17-19
+_result :: [Int]
+i :: Int
+Stopped at dynbrk008.hs:2:27-29
+_result :: [Int]
+j :: Int
+Stopped at dynbrk008.hs:2:37-39
+_result :: [Int]
+h :: Int
+[42]

@@ -1,0 +1,11 @@
+Stopped at dynbrk009.hs:8:18
+_result :: Int
+Stopped at dynbrk009.hs:8:23-31
+_result :: Int
+Stopped at dynbrk009.hs:8:26-30
+_result :: Int
+Stopped at dynbrk009.hs:6:0-8
+_result :: Int
+Stopped at dynbrk009.hs:6:8
+_result :: Int
+3

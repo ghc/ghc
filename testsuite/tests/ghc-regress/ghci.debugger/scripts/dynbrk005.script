@@ -2,5 +2,9 @@
 
 :set -fglasgow-exts
 :set -fth
-:l A
-:show breaks
+:l dynbrk005
+:st normal_fn2 [1,2,3]
+:st
+:st
+:st
+:st
