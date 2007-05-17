@@ -187,6 +187,7 @@ c-sources:
 	cbits/timeUtils.c
 include-dirs: include, ../../includes, ../../rts
 includes:	HsBase.h
+install-includes:	HsBase.h
 extensions:	CPP
 -- XXX is there an extension for using # in varids?
 -- We need to set the package name to base (without a version number)
