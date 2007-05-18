@@ -10,7 +10,7 @@ module Cmm (
 	GenCmm(..), Cmm,
 	GenCmmTop(..), CmmTop,
 	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts,
-	CmmStmt(..),  
+	CmmStmt(..), CmmActuals, CmmFormals,
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
 	CmmExpr(..), cmmExprRep, 
@@ -113,8 +113,8 @@ data CmmStmt
 
   | CmmCall	 		 -- A foreign call, with 
      CmmCallTarget
-     [(CmmReg,MachHint)]	 -- zero or more results
-     [(CmmExpr,MachHint)]	 -- zero or more arguments
+     CmmFormals			 -- zero or more results
+     CmmActuals			 -- zero or more arguments
      (Maybe [GlobalReg])	 -- Global regs that may need to be saved
 				 -- if they will be clobbered by the call.
 				 -- Nothing <=> save *all* globals that
@@ -131,10 +131,13 @@ data CmmStmt
 	-- Undefined outside range, and when there's a Nothing
 
   | CmmJump CmmExpr               -- Jump to another function,
-    [(CmmExpr, MachHint)]         -- with these parameters.
+    CmmActuals                    -- with these parameters.
 
   | CmmReturn                     -- Return from a function,
-    [(CmmExpr, MachHint)]         -- with these return values.
+    CmmActuals                    -- with these return values.
+
+type CmmActuals = [(CmmExpr,MachHint)]
+type CmmFormals = [(CmmReg,MachHint)]
 
 {-
 Discussion
