@@ -18,7 +18,7 @@ module UniqSupply (
 	lazyThenUs, lazyMapUs,
 
 	mkSplitUniqSupply,
-	splitUniqSupply
+	splitUniqSupply, listSplitUniqSupply
   ) where
 
 #include "HsVersions.h"
@@ -56,6 +56,7 @@ data UniqSupply
 mkSplitUniqSupply :: Char -> IO UniqSupply
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
+listSplitUniqSupply :: UniqSupply -> [UniqSupply]   -- Infinite
 uniqFromSupply  :: UniqSupply -> Unique
 uniqsFromSupply :: UniqSupply -> [Unique]	-- Infinite
 \end{code}
@@ -80,6 +81,7 @@ mkSplitUniqSupply (C# c#)
 foreign import ccall unsafe "genSymZh" genSymZh :: IO Int
 
 splitUniqSupply (MkSplitUniqSupply _ s1 s2) = (s1, s2)
+listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
 \end{code}
 
 \begin{code}
